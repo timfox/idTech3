@@ -911,6 +911,9 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 #endif
 {
 	const shaderStage_t *pStage;
+#ifdef USE_VK_PBR
+	Vk_Pipeline_Def	def;
+#endif
 	int tess_flags;
 	int stage, i;
 
@@ -977,6 +980,64 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			//GL_SelectTexture( 0 );
 			GL_Bind( tr.whiteImage ); // replace diffuse texture with a white one thus effectively render only lightmap
 		}
+
+#ifdef USE_VK_PBR
+		if( tess_flags & TESS_PBR ) 
+		{
+			// discard unsuported pbr geometry for now
+			if( backEnd.projection2D )
+				tess_flags &= ~TESS_PBR;
+
+			if( backEnd.viewParms.portalView == PV_MIRROR)
+				tess_flags &= ~TESS_PBR;
+
+			if( backEnd.currentEntity){
+				if ( backEnd.currentEntity != &tr.worldEntity )
+					tess_flags &= ~TESS_PBR;
+			}
+			
+			vk_get_pipeline_def( pipeline, &def );
+			if( def.shader_type < TYPE_GENERIC_BEGIN )
+				tess_flags &= ~TESS_PBR;
+			// check if pbr hasn't been discarded
+			if( tess_flags & TESS_PBR ) {
+				if ( fogCollapse || !(tess_flags & TESS_VPOS) ) {
+					VectorCopy( backEnd.or.viewOrigin, uniform.eyePos );
+					//VectorCopy(tr.sunDirection, uniform.lightPos); 
+					//uniform.lightPos[3] = 0.0f;
+					VK_PushUniform( &uniform );	
+				}
+				// brdf lut
+				vk_update_pbr_descriptor(6, vk.brdflut_image_descriptor);
+				
+				// unused preceeding descriptor sets is invalid API behaivior
+				// find a better way to mark unused descriptors 
+				// following THE last valid descriptor set
+				// for now, send a 2x2 pixel white texture
+				if( pStage->vk_pbr_flags & PBR_HAS_NORMALMAP )
+					vk_update_pbr_descriptor(7, pStage->normalMap->descriptor);
+				else
+					vk_update_pbr_descriptor(7, tr.emptyImage->descriptor);
+
+				if( pStage->vk_pbr_flags & PBR_HAS_ROUGHNESSMAP )
+					vk_update_pbr_descriptor(8, pStage->roughnessMap->descriptor);
+				else
+					vk_update_pbr_descriptor(8, tr.emptyImage->descriptor);
+			
+				if( pStage->vk_pbr_flags & PBR_HAS_METALLICMAP )
+					vk_update_pbr_descriptor(9, pStage->metallicMap->descriptor);
+				else
+					vk_update_pbr_descriptor(9, tr.emptyImage->descriptor);
+			
+				if( pStage->vk_pbr_flags & PBR_HAS_OCCLUSIONMAP )
+					vk_update_pbr_descriptor(10, pStage->occlusionMap->descriptor);
+				else
+					vk_update_pbr_descriptor(10, tr.emptyImage->descriptor);
+
+				pipeline = pStage->vk_pbr_pipeline[fog_stage];
+			}
+		}
+#endif
 
 		vk_bind_pipeline( pipeline );
 		vk_bind_geometry( tess_flags );

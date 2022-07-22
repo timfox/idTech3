@@ -1675,6 +1675,10 @@ static void R_CreateBuiltinImages( void ) {
 		//	IMGFLAG_PICMIP | IMGFLAG_CLAMPTOEDGE | IMGFLAG_RGB );
 	//}
 
+#ifdef USE_VK_PBR
+	tr.emptyImage = R_CreateImage("*empty", NULL, (byte*)data, 2, 2, IMGFLAG_NONE);
+#endif
+
 	R_CreateDlightImage();
 	R_CreateFogImage();
 }

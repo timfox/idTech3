@@ -33,7 +33,7 @@ distance from the true curve.
 Only a single entry point:
 
 srfGridMesh_t *R_SubdividePatchToGrid( int width, int height,
-								drawVert_t points[MAX_PATCH_SIZE*MAX_PATCH_SIZE] ) {
+								srfVert_t points[MAX_PATCH_SIZE*MAX_PATCH_SIZE] ) {
 
 */
 
@@ -43,7 +43,7 @@ srfGridMesh_t *R_SubdividePatchToGrid( int width, int height,
 LerpDrawVert
 ============
 */
-static void LerpDrawVert( drawVert_t *a, drawVert_t *b, drawVert_t *out ) {
+static void LerpDrawVert( srfVert_t *a, srfVert_t *b, srfVert_t *out ) {
 	out->xyz[0] = 0.5f * (a->xyz[0] + b->xyz[0]);
 	out->xyz[1] = 0.5f * (a->xyz[1] + b->xyz[1]);
 	out->xyz[2] = 0.5f * (a->xyz[2] + b->xyz[2]);
@@ -65,9 +65,9 @@ static void LerpDrawVert( drawVert_t *a, drawVert_t *b, drawVert_t *out ) {
 Transpose
 ============
 */
-static void Transpose( int width, int height, drawVert_t ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE] ) {
+static void Transpose( int width, int height, srfVert_t ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE] ) {
 	int		i, j;
-	drawVert_t	temp;
+	srfVert_t	temp;
 
 	if ( width > height ) {
 		for ( i = 0 ; i < height ; i++ ) {
@@ -109,14 +109,14 @@ MakeMeshNormals
 Handles all the complicated wrapping and degenerate cases
 =================
 */
-static void MakeMeshNormals( int width, int height, drawVert_t ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE] ) {
+static void MakeMeshNormals( int width, int height, srfVert_t ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE] ) {
 	int		i, j, k, dist;
 	vec3_t	normal;
 	vec3_t	sum;
 	vec3_t	base;
 	vec3_t	delta;
 	int		x, y;
-	drawVert_t	*dv;
+	srfVert_t	*dv;
 	vec3_t		around[8], temp;
 	qboolean	good[8];
 	qboolean	wrapWidth, wrapHeight;
@@ -124,6 +124,11 @@ static void MakeMeshNormals( int width, int height, drawVert_t ctrl[MAX_GRID_SIZ
 static	int	neighbors[8][2] = {
 	{0,1}, {1,1}, {1,0}, {1,-1}, {0,-1}, {-1,-1}, {-1,0}, {-1,1}
 	};
+
+#ifdef USE_VK_PBR
+	vec3_t	tangent, binormal, sumTangents, sumBinormals;
+	vec2_t	st[8];
+#endif
 
 	wrapWidth = qfalse;
 	for ( i = 0 ; i < height ; i++ ) {
@@ -185,12 +190,19 @@ static	int	neighbors[8][2] = {
 					} else {
 						good[k] = qtrue;
 						VectorCopy( temp, around[k] );
+#ifdef USE_VK_PBR
+						Vector2Copy( ctrl[ y ][ x ].st, st[ k ] );
+#endif
 						break;					// good edge
 					}
 				}
 			}
 
 			VectorClear( sum );
+#ifdef USE_VK_PBR
+			VectorClear( sumTangents );
+			VectorClear( sumBinormals );
+#endif
 			for ( k = 0 ; k < 8 ; k++ ) {
 				if ( !good[k] || !good[(k+1)&7] ) {
 					continue;	// didn't get two points
@@ -200,9 +212,23 @@ static	int	neighbors[8][2] = {
 					continue;
 				}
 				VectorAdd( normal, sum, sum );
+
+#ifdef USE_VK_PBR
+				if( vk.pbrActive ) {
+					R_CalcTangents( tangent, binormal,
+							vec3_origin, around[ k ], around[ ( k + 1 ) & 7 ],
+							dv->st, st[ k ], st[ ( k + 1 ) & 7 ] );
+					VectorAdd( tangent, sumTangents, sumTangents );
+					VectorAdd( binormal, sumBinormals, sumBinormals );
+				}
+#endif
 			}
 
 			VectorNormalize2( sum, dv->normal );
+#ifdef USE_VK_PBR
+			if( vk.pbrActive )
+				R_TBNtoQtangents( sumTangents, sumBinormals, dv->normal, dv->qtangent );
+#endif
 		}
 	}
 }
@@ -213,9 +239,9 @@ static	int	neighbors[8][2] = {
 InvertCtrl
 ============
 */
-static void InvertCtrl( int width, int height, drawVert_t ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE] ) {
+static void InvertCtrl( int width, int height, srfVert_t ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE] ) {
 	int		i, j;
-	drawVert_t	temp;
+	srfVert_t	temp;
 
 	for ( i = 0 ; i < height ; i++ ) {
 		for ( j = 0 ; j < width/2 ; j++ ) {
@@ -253,10 +279,10 @@ static void InvertErrorTable( float errorTable[2][MAX_GRID_SIZE], int width, int
 PutPointsOnCurve
 ==================
 */
-static void PutPointsOnCurve( drawVert_t	ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE], 
+static void PutPointsOnCurve( srfVert_t	ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE], 
 							 int width, int height ) {
 	int			i, j;
-	drawVert_t	prev, next;
+	srfVert_t	prev, next;
 
 	for ( i = 0 ; i < width ; i++ ) {
 		for ( j = 1 ; j < height ; j += 2 ) {
@@ -282,14 +308,14 @@ R_CreateSurfaceGridMesh
 =================
 */
 static srfGridMesh_t *R_CreateSurfaceGridMesh(int width, int height,
-								drawVert_t ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE], float errorTable[2][MAX_GRID_SIZE] ) {
+								srfVert_t ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE], float errorTable[2][MAX_GRID_SIZE] ) {
 	int i, j, size;
-	drawVert_t	*vert;
+	srfVert_t	*vert;
 	vec3_t		tmpVec;
 	srfGridMesh_t *grid;
 
 	// copy the results out to a grid
-	size = (width * height - 1) * sizeof( drawVert_t ) + sizeof( *grid );
+	size = (width * height - 1) * sizeof( srfVert_t ) + sizeof( *grid );
 
 #ifdef PATCH_STITCHING
 	grid = /*ri.Hunk_Alloc*/ ri.Malloc( size );
@@ -352,15 +378,15 @@ R_SubdividePatchToGrid
 =================
 */
 srfGridMesh_t *R_SubdividePatchToGrid( int width, int height,
-								drawVert_t points[MAX_PATCH_SIZE*MAX_PATCH_SIZE] ) {
+								srfVert_t points[MAX_PATCH_SIZE*MAX_PATCH_SIZE] ) {
 	int			i, j, k, l;
-	drawVert_t	prev;
-	drawVert_t	next;
-	drawVert_t	mid;
+	srfVert_t	prev;
+	srfVert_t	next;
+	srfVert_t	mid;
 	float		len, maxLen;
 	int			n;
 	int			t;
-	drawVert_t	ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE];
+	srfVert_t	ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE];
 	float		errorTable[2][MAX_GRID_SIZE];
 
 	memset( &prev, 0, sizeof( prev ) );
@@ -523,7 +549,7 @@ R_GridInsertColumn
 srfGridMesh_t *R_GridInsertColumn( srfGridMesh_t *grid, int column, int row, vec3_t point, float loderror ) {
 	int i, j;
 	int width, height, oldwidth;
-	drawVert_t ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE];
+	srfVert_t ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE];
 	float errorTable[2][MAX_GRID_SIZE];
 	float lodRadius;
 	vec3_t lodOrigin;
@@ -577,7 +603,7 @@ R_GridInsertRow
 srfGridMesh_t *R_GridInsertRow( srfGridMesh_t *grid, int row, int column, vec3_t point, float loderror ) {
 	int i, j;
 	int width, height, oldheight;
-	drawVert_t ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE];
+	srfVert_t ctrl[MAX_GRID_SIZE][MAX_GRID_SIZE];
 	float errorTable[2][MAX_GRID_SIZE];
 	float lodRadius;
 	vec3_t lodOrigin;
