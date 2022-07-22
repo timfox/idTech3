@@ -3,6 +3,12 @@
 #include "../renderercommon/vulkan/vulkan.h"
 #include "tr_common.h"
 
+#ifdef USE_VK_PBR
+#define VK_LAYOUT_COUNT					11
+#else
+#define VK_LAYOUT_COUNT					6
+
+#endif
 #define MAX_SWAPCHAIN_IMAGES 8
 #define MIN_SWAPCHAIN_IMAGES_IMM 3
 #define MIN_SWAPCHAIN_IMAGES_FIFO   3
@@ -143,6 +149,12 @@ typedef struct {
 	int line_width;
 	int abs_light;
 	int allow_discard;
+
+#ifdef USE_VK_PBR
+	uint32_t				vk_pbr_flags;
+	float					roughness_value;
+	float					metallic_value;
+#endif
 } Vk_Pipeline_Def;
 
 typedef struct VK_Pipeline {
@@ -176,6 +188,18 @@ typedef struct vkUniform_s {
 #define TESS_NNN   (128)
 #define TESS_VPOS  (256)  // uniform with eyePos
 #define TESS_ENV   (512) // mark shader stage with environment mapping
+
+#ifdef USE_VK_PBR
+#define TESS_PBR   				( 1024 ) // PBR shader variant, qtangent vertex attribute and eyePos uniform
+
+#define PBR_HAS_NORMALMAP		( 1 )
+#define PBR_HAS_METALLICMAP		( 2 )
+#define PBR_HAS_ROUGHNESSMAP	( 4 )
+#define PBR_HAS_OCCLUSIONMAP	( 8 )
+#define PBR_HAS_ROUGHNESS_VALUE	( 16 )
+#define PBR_HAS_METALLIC_VALUE	( 32 )
+#endif
+
 //
 // Initialization.
 //
@@ -255,6 +279,12 @@ void VBO_ClearQueue( void );
 
 qboolean vk_surface_format_color_depth( VkFormat format, int* r, int* g, int* b );
 
+#ifdef VK_PBR_BRDFLUT
+void vk_update_pbr_descriptor( const int tmu, VkDescriptorSet curDesSet );
+void vk_create_brdflut_pipeline( void );
+void vk_create_brfdlut( void );
+#endif
+
 typedef struct vk_tess_s {
 	VkCommandBuffer command_buffer;
 
@@ -269,15 +299,20 @@ typedef struct vk_tess_s {
 
 	VkDescriptorSet uniform_descriptor;
 	uint32_t		uniform_read_offset;
-	VkDeviceSize	buf_offset[8];
-	VkDeviceSize	vbo_offset[8];
+#ifdef USE_VK_PBR
+	VkDeviceSize		buf_offset[9];
+	VkDeviceSize		vbo_offset[9];
+#else
+	VkDeviceSize		buf_offset[8];
+	VkDeviceSize		vbo_offset[8];
+#endif
 
 	VkBuffer		curr_index_buffer;
 	uint32_t		curr_index_offset;
 
 	struct {
 		uint32_t		start, end;
-		VkDescriptorSet	current[6]; // 0:storage, 1:uniform, 2:color0, 3:color1, 4:color2, 5:fog
+		VkDescriptorSet	current[VK_LAYOUT_COUNT]; // 0:storage, 1:uniform, 2:color0, 3:color1, 4:color2, 5:fog, 6:brdf lut, 7:normal, 8:roughness, 9:metallic, 10: ambient occlusion
 		uint32_t		offset[2]; // 0 (uniform) and 5 (storage)
 	} descriptor_set;
 
@@ -322,6 +357,9 @@ typedef struct {
 		VkRenderPass bloom_extract;
 		VkRenderPass blur[VK_NUM_BLOOM_PASSES*2]; // horizontal-vertical pairs
 		VkRenderPass post_bloom;
+#ifdef VK_PBR_BRDFLUT
+		VkRenderPass brdflut;
+#endif
 	} render_pass;
 
 	VkDescriptorPool descriptor_pool;
@@ -333,6 +371,9 @@ typedef struct {
 	//VkPipelineLayout pipeline_layout_storage;	// flare test shader layout
 	VkPipelineLayout pipeline_layout_post_process;	// post-processing
 	VkPipelineLayout pipeline_layout_blend;		// post-processing
+#ifdef VK_PBR_BRDFLUT
+	VkPipelineLayout pipeline_layout_brdflut;
+#endif
 
 	VkDescriptorSet color_descriptor;
 
@@ -369,6 +410,12 @@ typedef struct {
 		VkImageView image_view;
 	} capture;
 
+#ifdef VK_PBR_BRDFLUT
+	VkImage			brdflut_image;
+	VkImageView		brdflut_image_view;
+	VkDescriptorSet brdflut_image_descriptor;
+#endif
+
 	struct {
 		VkFramebuffer blur[VK_NUM_BLOOM_PASSES*2];
 		VkFramebuffer bloom_extract;
@@ -376,6 +423,9 @@ typedef struct {
 		VkFramebuffer gamma[MAX_SWAPCHAIN_IMAGES];
 		VkFramebuffer screenmap;
 		VkFramebuffer capture;
+#ifdef VK_PBR_BRDFLUT
+		VkFramebuffer brdflut;
+#endif
 	} framebuffers;
 
 	vk_tess_t tess[ NUM_COMMAND_BUFFERS ], *cmd;
@@ -414,14 +464,22 @@ typedef struct {
 	//
 	struct {
 		struct {
+#ifdef USE_VK_PBR
+			VkShaderModule gen[2][3][2][2][2]; // pbr[0,1], tx[0,1,2], cl[0,1] env0[0,1] fog[0,1]
+#else
 			VkShaderModule gen[3][2][2][2]; // tx[0,1,2], cl[0,1] env0[0,1] fog[0,1]
+#endif
 			VkShaderModule light[2]; // fog[0,1]
 			VkShaderModule gen0_ident;
 		}	vert;
 		struct {
 			VkShaderModule gen0_ident;
 			VkShaderModule gen0_df;
+#ifdef USE_VK_PBR
+			VkShaderModule gen[2][3][2][2]; // pbr[0,1], tx[0,1,2] cl[0,1] fog[0,1]
+#else
 			VkShaderModule gen[3][2][2]; // tx[0,1,2] cl[0,1] fog[0,1]
+#endif
 			VkShaderModule light[2][2]; // linear[0,1] fog[0,1]
 		}	frag;
 
@@ -440,6 +498,11 @@ typedef struct {
 
 		VkShaderModule dot_fs;
 		VkShaderModule dot_vs;
+
+#ifdef VK_PBR_BRDFLUT
+		VkShaderModule brdflut_fs;
+#endif
+
 	} modules;
 
 	VkPipelineCache pipelineCache;
@@ -500,6 +563,9 @@ typedef struct {
 	VkPipeline bloom_extract_pipeline;
 	VkPipeline blur_pipeline[VK_NUM_BLOOM_PASSES*2]; // horizontal & vertical pairs
 	VkPipeline bloom_blend_pipeline;
+#ifdef VK_PBR_BRDFLUT
+	VkPipeline brdflut_pipeline;
+#endif
 
 #ifndef NDEBUG
 	VkDebugReportCallbackEXT debug_callback;
@@ -527,6 +593,9 @@ typedef struct {
 	qboolean fboActive;
 	qboolean blitEnabled;
 	qboolean msaaActive;
+#ifdef USE_VK_PBR
+	qboolean pbrActive;
+#endif
 
 	qboolean offscreenRender;
 

@@ -23,6 +23,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef TR_LOCAL_H
 #define TR_LOCAL_H
 
+#define USE_VK_PBR
+
+#ifdef USE_VK_PBR
+#define VK_PBR_BRDFLUT		// for inspecting codebase, does not toggle brdflut. 
+#endif
+
 #define USE_VBO				// store static world geometry in VBO
 #define USE_FOG_ONLY
 #define USE_FOG_COLLAPSE	// not compatible with legacy dlights
@@ -375,6 +381,16 @@ typedef struct {
 
 	uint32_t		vk_pipeline_df; // depthFragment
 	uint32_t		vk_mirror_pipeline_df;
+#ifdef USE_VK_PBR
+	uint32_t		vk_pbr_flags;
+	uint32_t		vk_pbr_pipeline[2];
+	image_t			*normalMap;
+	image_t			*roughnessMap;
+	image_t			*metallicMap;
+	image_t			*occlusionMap;
+	float			roughness_value;
+	float			metallic_value;
+#endif
 #endif
 
 #ifdef USE_VBO
@@ -473,6 +489,9 @@ typedef struct shader_s {
 	int			numVertexes;
 	int			curVertexes;
 	int			curIndexes;
+#ifdef USE_VK_PBR
+	int			qtangentOffset;
+#endif
 #endif
 
 	int			hasScreenMap;
@@ -724,11 +743,14 @@ typedef struct srfGridMesh_s {
 	int				width, height;
 	float			*widthLodError;
 	float			*heightLodError;
-	drawVert_t		verts[1];		// variable sized
+	srfVert_t		verts[1];		// variable sized
 } srfGridMesh_t;
 
-
-#define	VERTEXSIZE	8
+#ifdef USE_VK_PBR
+	#define	VERTEXSIZE	11
+#else
+	#define	VERTEXSIZE	8
+#endif
 typedef struct {
 	surfaceType_t	surfaceType;
 	cplane_t	plane;
@@ -741,6 +763,9 @@ typedef struct {
 	int			vboItemIndex;
 #endif
 	float		*normals;
+#ifdef USE_VK_PBR
+	float			*qtangents;
+#endif
 
 	// triangle definitions (no normals at points)
 	int			numPoints;
@@ -773,7 +798,7 @@ typedef struct {
 	int				*indexes;
 
 	int				numVerts;
-	drawVert_t		*verts;
+	srfVert_t		*verts;
 } srfTriangles_t;
 
 typedef struct {
@@ -1170,6 +1195,9 @@ typedef struct {
 	image_t					*blackImage;
 	image_t					*whiteImage;			// full of 0xff
 	image_t					*identityLightImage;	// full of tr.identityLightByte
+#ifdef USE_VK_PBR
+	image_t					*emptyImage;		// full of 0xff
+#endif
 
 	shader_t				*defaultShader;
 	shader_t				*whiteShader;
@@ -1301,6 +1329,9 @@ extern cvar_t	*r_dlightSaturation;	// 0.0 - 1.0
 extern cvar_t	*r_device;
 #ifdef USE_VBO
 extern cvar_t	*r_vbo;
+#endif
+#ifdef USE_VK_PBR
+extern cvar_t	*r_pbr;
 #endif
 extern cvar_t	*r_fbo;
 extern cvar_t	*r_hdr;
@@ -1552,6 +1583,9 @@ typedef struct shaderCommands_s
 	glIndex_t	indexes[SHADER_MAX_INDEXES] QALIGN(16);
 	vec4_t		xyz[SHADER_MAX_VERTEXES*2] QALIGN(16); // 2x needed for shadows
 	vec4_t		normal[SHADER_MAX_VERTEXES] QALIGN(16);
+#ifdef USE_VK_PBR
+	vec4_t		qtangent[SHADER_MAX_VERTEXES]					QALIGN(16);
+#endif
 	vec2_t		texCoords[2][SHADER_MAX_VERTEXES] QALIGN(16);
 	vec2_t		texCoords00[SHADER_MAX_VERTEXES] QALIGN(16);
 	color4ub_t	vertexColors[SHADER_MAX_VERTEXES] QALIGN(16);
@@ -1702,7 +1736,7 @@ CURVE TESSELATION
 #define PATCH_STITCHING
 
 srfGridMesh_t *R_SubdividePatchToGrid( int width, int height,
-								drawVert_t points[MAX_PATCH_SIZE*MAX_PATCH_SIZE] );
+								srfVert_t points[MAX_PATCH_SIZE*MAX_PATCH_SIZE] );
 srfGridMesh_t *R_GridInsertColumn( srfGridMesh_t *grid, int column, int row, vec3_t point, float loderror );
 srfGridMesh_t *R_GridInsertRow( srfGridMesh_t *grid, int row, int column, vec3_t point, float loderror );
 void R_FreeSurfaceGridMesh( srfGridMesh_t *grid );
@@ -1961,6 +1995,16 @@ void RE_VertexLighting( qboolean allowed );
 	QGL_Core_PROCS;
 	QGL_Ext_PROCS;
 #undef GLE
+
+#endif
+
+#ifdef USE_VK_PBR
+// pbr
+void		R_CalcTangents( vec3_t tangent, vec3_t binormal,
+				const vec3_t v0, const vec3_t v1, const vec3_t v2,
+				const vec2_t t0, const vec2_t t1, const vec2_t t2 );
+void		R_TBNtoQtangents( const vec3_t tangent, const vec3_t binormal,
+		       const vec3_t normal, vec4_t qtangent );
 #endif
 
 #ifdef USE_VBO

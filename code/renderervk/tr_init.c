@@ -81,6 +81,9 @@ cvar_t	*r_device;
 #ifdef USE_VBO
 cvar_t	*r_vbo;
 #endif
+#ifdef USE_VK_PBR
+cvar_t	*r_pbr;
+#endif
 cvar_t	*r_fbo;
 cvar_t	*r_hdr;
 cvar_t	*r_bloom;
@@ -1523,7 +1526,10 @@ static void R_Register( void )
 #if defined (USE_VULKAN) && defined (USE_VBO)
 	r_vbo = ri.Cvar_Get( "r_vbo", "1", CVAR_ARCHIVE | CVAR_LATCH );
 #endif
-
+#if defined (USE_VULKAN) && defined (USE_VK_PBR)
+	r_pbr = ri.Cvar_Get("r_pbr", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_pbr, "Enables Physically Based Rendering. \nRequires " S_COLOR_CYAN "\\r_fbo 1 \n" S_COLOR_GREEN "Advised " S_COLOR_CYAN "\\r_vbo 1 " S_COLOR_GREEN "for static world geometry " S_COLOR_WHITE "*optional" );
+#endif
 	r_mapGreyScale = ri.Cvar_Get( "r_mapGreyScale", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_mapGreyScale, "-1", "1", CV_FLOAT );
 
@@ -1794,6 +1800,9 @@ void R_Init( void ) {
 
 #ifdef USE_VULKAN
 	vk_create_pipelines();
+#ifdef VK_PBR_BRDFLUT
+	vk_create_brfdlut();
+#endif
 #endif
 
 	R_InitShaders();

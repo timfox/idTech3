@@ -917,6 +917,58 @@ static void vk_create_render_passes( void )
 	VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.screenmap ) );
 
 	SET_OBJECT_NAME( vk.render_pass.screenmap, "render pass - screenmap", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
+
+#ifdef VK_PBR_BRDFLUT
+    if( vk.pbrActive )
+    {
+        deps[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+        deps[0].dstSubpass = 0;
+        deps[0].srcStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+        deps[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        deps[0].srcAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+        deps[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        deps[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+       
+		deps[1].srcSubpass = 0;
+        deps[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+        deps[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        deps[1].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+        deps[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        deps[1].dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+        deps[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
+        
+		attachments[0].format = VK_FORMAT_R16G16_SFLOAT;
+        attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+        attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        attachments[0].finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        
+		colorRef0.attachment = 0;
+        colorRef0.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        
+		Com_Memset(&subpass, 0, sizeof(subpass));
+        subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+        subpass.colorAttachmentCount = 1;
+        subpass.pColorAttachments = &colorRef0;
+        subpass.pDepthStencilAttachment = VK_NULL_HANDLE;
+
+        Com_Memset(&desc, 0, sizeof(desc));
+        desc.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+        desc.pNext = NULL;
+        desc.flags = 0;
+        desc.pAttachments = attachments;
+        desc.pSubpasses = &subpass;
+        desc.subpassCount = 1;
+        desc.attachmentCount = 1;
+        desc.dependencyCount = 2;
+        desc.pDependencies = deps;
+        VK_CHECK(qvkCreateRenderPass(device, &desc, NULL, &vk.render_pass.brdflut));
+        SET_OBJECT_NAME(vk.render_pass.brdflut, "render pass - brdf lut", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT);
+    }
+#endif
 }
 
 
@@ -2108,6 +2160,15 @@ static void vk_update_attachment_descriptors( void ) {
 				qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
 			}
 		}
+
+#ifdef VK_PBR_BRDFLUT
+		if( vk.pbrActive )
+		{
+			info.imageView = vk.brdflut_image_view;
+			desc.dstSet = vk.brdflut_image_descriptor;
+			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );	
+		}
+#endif
 	}
 }
 
@@ -2180,6 +2241,11 @@ void vk_init_descriptors( void )
 
 		alloc.descriptorSetCount = 1;
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.screenMap.color_descriptor ) ); // screenmap
+
+#ifdef VK_PBR_BRDFLUT
+		if( vk.pbrActive )
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.brdflut_image_descriptor ) );
+#endif
 
 		vk_update_attachment_descriptors();
 	}
@@ -2403,6 +2469,80 @@ qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size )
 
 static void vk_create_shader_modules( void )
 {
+#ifdef USE_VK_PBR
+    int i, j, k, l, m;
+
+	vk.modules.vert.gen[0][0][0][0][0] = SHADER_MODULE( vert_tx0 );
+	vk.modules.vert.gen[0][0][0][0][1] = SHADER_MODULE( vert_tx0_fog );
+	vk.modules.vert.gen[0][0][0][1][0] = SHADER_MODULE( vert_tx0_env );
+	vk.modules.vert.gen[0][0][0][1][1] = SHADER_MODULE( vert_tx0_env_fog );
+
+	vk.modules.vert.gen[0][1][0][0][0] = SHADER_MODULE( vert_tx1 );
+	vk.modules.vert.gen[0][1][0][0][1] = SHADER_MODULE( vert_tx1_fog );
+	vk.modules.vert.gen[0][1][0][1][0] = SHADER_MODULE( vert_tx1_env );
+	vk.modules.vert.gen[0][1][0][1][1] = SHADER_MODULE( vert_tx1_env_fog );
+
+	vk.modules.vert.gen[0][1][1][0][0] = SHADER_MODULE( vert_tx1_cl );
+	vk.modules.vert.gen[0][1][1][0][1] = SHADER_MODULE( vert_tx1_cl_fog );
+	vk.modules.vert.gen[0][1][1][1][0] = SHADER_MODULE( vert_tx1_cl_env );
+	vk.modules.vert.gen[0][1][1][1][1] = SHADER_MODULE( vert_tx1_cl_env_fog );
+
+	vk.modules.vert.gen[0][2][0][0][0] = SHADER_MODULE( vert_tx2 );
+	vk.modules.vert.gen[0][2][0][0][1] = SHADER_MODULE( vert_tx2_fog );
+	vk.modules.vert.gen[0][2][0][1][0] = SHADER_MODULE( vert_tx2_env );
+	vk.modules.vert.gen[0][2][0][1][1] = SHADER_MODULE( vert_tx2_env_fog );
+
+	vk.modules.vert.gen[0][2][1][0][0] = SHADER_MODULE( vert_tx2_cl );
+	vk.modules.vert.gen[0][2][1][0][1] = SHADER_MODULE( vert_tx2_cl_fog );
+	vk.modules.vert.gen[0][2][1][1][0] = SHADER_MODULE( vert_tx2_cl_env );
+	vk.modules.vert.gen[0][2][1][1][1] = SHADER_MODULE( vert_tx2_cl_env_fog );
+
+    // PBR
+    if( vk.pbrActive ) {
+        vk.modules.vert.gen[1][0][0][0][0] = SHADER_MODULE(vert_tx0_pbr);
+        vk.modules.vert.gen[1][0][0][0][1] = SHADER_MODULE(vert_tx0_pbr_fog);
+        vk.modules.vert.gen[1][0][0][1][0] = SHADER_MODULE(vert_tx0_pbr_env);
+        vk.modules.vert.gen[1][0][0][1][1] = SHADER_MODULE(vert_tx0_pbr_env_fog);
+
+        vk.modules.vert.gen[1][1][0][0][0] = SHADER_MODULE(vert_tx1_pbr);
+        vk.modules.vert.gen[1][1][0][0][1] = SHADER_MODULE(vert_tx1_pbr_fog);
+        vk.modules.vert.gen[1][1][0][1][0] = SHADER_MODULE(vert_tx1_pbr_env);
+        vk.modules.vert.gen[1][1][0][1][1] = SHADER_MODULE(vert_tx1_pbr_env_fog);
+
+        vk.modules.vert.gen[1][1][1][0][0] = SHADER_MODULE(vert_tx1_cl_pbr);
+        vk.modules.vert.gen[1][1][1][0][1] = SHADER_MODULE(vert_tx1_cl_pbr_fog);
+        vk.modules.vert.gen[1][1][1][1][0] = SHADER_MODULE(vert_tx1_cl_pbr_env);
+        vk.modules.vert.gen[1][1][1][1][1] = SHADER_MODULE(vert_tx1_cl_pbr_env_fog);
+
+        vk.modules.vert.gen[1][2][0][0][0] = SHADER_MODULE(vert_tx2_pbr);
+        vk.modules.vert.gen[1][2][0][0][1] = SHADER_MODULE(vert_tx2_pbr_fog);
+        vk.modules.vert.gen[1][2][0][1][0] = SHADER_MODULE(vert_tx2_pbr_env);
+        vk.modules.vert.gen[1][2][0][1][1] = SHADER_MODULE(vert_tx2_pbr_env_fog);
+
+        vk.modules.vert.gen[1][2][1][0][0] = SHADER_MODULE(vert_tx2_cl_pbr);
+        vk.modules.vert.gen[1][2][1][0][1] = SHADER_MODULE(vert_tx2_cl_pbr_fog);
+        vk.modules.vert.gen[1][2][1][1][0] = SHADER_MODULE(vert_tx2_cl_pbr_env);
+        vk.modules.vert.gen[1][2][1][1][1] = SHADER_MODULE(vert_tx2_cl_pbr_env_fog);
+    }
+
+    for (i = 0; i < 2; i++) {
+        const char *pbr[] = { "", "pbr" };
+        const char *tx[] = { "single", "double", "triple" };
+        const char *cl[] = { "", "+cl" };
+        const char *env[] = { "", "+env" };
+        const char *fog[] = { "", "+fog" };
+        for (j = 0; j < 3; j++) {
+            for (k = 0; k < 2; k++) {
+                for (l = 0; l < 2; l++) {
+                    for (m = 0; m < 2; m++) {
+                        const char *s = va("%s-texture%s%s%s%s vertex module", pbr[i], tx[j], cl[k], env[l], fog[m]);
+                        SET_OBJECT_NAME(vk.modules.vert.gen[i][j][k][l][m], s, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT);
+                    }
+                }
+            }
+        }
+    }
+#else
 	int i, j, k, l;
 
 	vk.modules.vert.gen[0][0][0][0] = SHADER_MODULE( vert_tx0 );
@@ -2444,6 +2584,7 @@ static void vk_create_shader_modules( void )
 			}
 		}
 	}
+#endif
 
 	vk.modules.frag.gen0_df = SHADER_MODULE( frag_tx0_df );
 	SET_OBJECT_NAME( vk.modules.frag.gen0_df, "single-texture df fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
@@ -2453,6 +2594,55 @@ static void vk_create_shader_modules( void )
 	SET_OBJECT_NAME( vk.modules.vert.gen0_ident, "single-texture ident.color vertex module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.frag.gen0_ident, "single-texture ident.color fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 
+#ifdef USE_VK_PBR
+	vk.modules.frag.gen[0][0][0][0] = SHADER_MODULE(frag_tx0);
+    vk.modules.frag.gen[0][0][0][1] = SHADER_MODULE(frag_tx0_fog);
+
+    vk.modules.frag.gen[0][1][0][0] = SHADER_MODULE(frag_tx1);
+    vk.modules.frag.gen[0][1][0][1] = SHADER_MODULE(frag_tx1_fog);
+
+    vk.modules.frag.gen[0][1][1][0] = SHADER_MODULE(frag_tx1_cl);
+    vk.modules.frag.gen[0][1][1][1] = SHADER_MODULE(frag_tx1_cl_fog);
+
+    vk.modules.frag.gen[0][2][0][0] = SHADER_MODULE(frag_tx2);
+    vk.modules.frag.gen[0][2][0][1] = SHADER_MODULE(frag_tx2_fog);
+
+    vk.modules.frag.gen[0][2][1][0] = SHADER_MODULE(frag_tx2_cl);
+    vk.modules.frag.gen[0][2][1][1] = SHADER_MODULE(frag_tx2_cl_fog);
+
+    // PBR
+    if( vk.pbrActive ) {
+        vk.modules.frag.gen[1][0][0][0] = SHADER_MODULE(frag_tx0_pbr);
+        vk.modules.frag.gen[1][0][0][1] = SHADER_MODULE(frag_tx0_pbr_fog);
+
+        vk.modules.frag.gen[1][1][0][0] = SHADER_MODULE(frag_tx1_pbr);
+        vk.modules.frag.gen[1][1][0][1] = SHADER_MODULE(frag_tx1_pbr_fog);
+
+        vk.modules.frag.gen[1][1][1][0] = SHADER_MODULE(frag_tx1_cl_pbr);
+        vk.modules.frag.gen[1][1][1][1] = SHADER_MODULE(frag_tx1_cl_pbr_fog);
+
+        vk.modules.frag.gen[1][2][0][0] = SHADER_MODULE(frag_tx2_pbr);
+        vk.modules.frag.gen[1][2][0][1] = SHADER_MODULE(frag_tx2_pbr_fog);
+
+        vk.modules.frag.gen[1][2][1][0] = SHADER_MODULE(frag_tx2_cl_pbr);
+        vk.modules.frag.gen[1][2][1][1] = SHADER_MODULE(frag_tx2_cl_pbr_fog);
+    }
+
+    for (i = 0; i < 2; i++) {
+        const char *pbr[] = { "", "pbr" };
+        const char *tx[] = { "single", "double", "triple" };
+        const char *cl[] = { "", "+cl" };
+        const char *fog[] = { "", "+fog" };
+        for (j = 0; j < 3; j++) {
+            for (k = 0; k < 2; k++) {
+                for (l = 0; l < 2; l++) {
+                    const char *s = va("%s-texture%s%s%s fragment module", pbr[i], tx[j], cl[k], fog[l]);
+                    SET_OBJECT_NAME(vk.modules.frag.gen[i][j][k][l], s, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT);
+                }
+            }
+        }
+    }
+#else
 	vk.modules.frag.gen[0][0][0] = SHADER_MODULE( frag_tx0 );
 	vk.modules.frag.gen[0][0][1] = SHADER_MODULE( frag_tx0_fog );
 
@@ -2479,7 +2669,7 @@ static void vk_create_shader_modules( void )
 			}
 		}
 	}
-
+#endif
 
 	vk.modules.vert.light[0] = SHADER_MODULE( vert_light );
 	vk.modules.vert.light[1] = SHADER_MODULE( vert_light_fog );
@@ -2526,6 +2716,11 @@ static void vk_create_shader_modules( void )
 
 	SET_OBJECT_NAME( vk.modules.gamma_fs, "gamma post-processing fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.gamma_vs, "gamma post-processing vertex module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+
+#ifdef VK_PBR_BRDFLUT
+    vk.modules.brdflut_fs = SHADER_MODULE(brdflut_frag_spv);
+    SET_OBJECT_NAME(vk.modules.brdflut_fs, "brdf LUT fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT);
+#endif
 }
 
 
@@ -3119,6 +3314,18 @@ static void vk_create_attachments( void )
 			create_color_attachment( gls.captureWidth, gls.captureHeight, VK_SAMPLE_COUNT_1_BIT, vk.capture_format,
 				usage, &vk.capture.image, &vk.capture.image_view, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, qfalse );
 		}
+
+#ifdef VK_PBR_BRDFLUT
+        // BRDF LUT
+        if( vk.pbrActive ) {
+            uint32_t size = 512;
+            usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+            
+            create_color_attachment( size, size, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16G16_SFLOAT,
+                usage, &vk.brdflut_image, &vk.brdflut_image_view , VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse );
+        }
+#endif
+
 	} // if ( vk.fboActive )
 
 	//vk_alloc_attachments();
@@ -3278,6 +3485,18 @@ static void vk_create_framebuffers( void )
 				SET_OBJECT_NAME( vk.framebuffers.blur[n+1], va( "framebuffer - blur %i", n+1 ), VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 			}
 		}
+
+#ifdef VK_PBR_BRDFLUT
+        if( vk.pbrActive )
+		{
+            desc.renderPass = vk.render_pass.brdflut;
+            desc.width = desc.height = 512;  
+            desc.attachmentCount = 1;
+            attachments[0] = vk.brdflut_image_view;
+            VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.brdflut ) );
+            SET_OBJECT_NAME( vk.framebuffers.brdflut, va( "framebuffer - brdf LUT" ), VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
+        }
+#endif
 	}
 }
 
@@ -3366,6 +3585,13 @@ static void vk_destroy_framebuffers( void ) {
 			vk.framebuffers.blur[n] = VK_NULL_HANDLE;
 		}
 	}
+
+#ifdef VK_PBR_BRDFLUT
+    if ( vk.framebuffers.brdflut != VK_NULL_HANDLE ) {
+        qvkDestroyFramebuffer( vk.device, vk.framebuffers.brdflut, NULL );
+        vk.framebuffers.brdflut = VK_NULL_HANDLE;
+    }
+#endif
 }
 
 
@@ -3413,6 +3639,9 @@ static void vk_restart_swapchain( const char *funcname )
 	vk_create_render_passes();
 	vk_create_framebuffers();
 	vk_create_bloom_pipelines();
+#ifdef VK_PBR_BRDFLUT
+    vk_create_brdflut_pipeline();
+#endif
 
 	vk_update_attachment_descriptors();
 
@@ -3551,6 +3780,11 @@ void vk_initialize( void )
 
 	vk.maxBoundDescriptorSets = props.limits.maxBoundDescriptorSets;
 
+#ifdef USE_VK_PBR
+	if( vk.fboActive && r_pbr->integer && vk.maxBoundDescriptorSets >= 10 )
+		vk.pbrActive = qtrue;
+#endif
+
 	glConfig.textureEnvAddAvailable = qtrue;
 	glConfig.textureCompression = TC_NONE;
 
@@ -3662,6 +3896,9 @@ void vk_initialize( void )
 
 		pool_size[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		pool_size[0].descriptorCount = MAX_DRAWIMAGES + 1 + 1 + 1 + VK_NUM_BLOOM_PASSES * 2; // color, screenmap, bloom descriptors
+#ifdef USE_VK_PBR
+		pool_size[0].descriptorCount += 5; // brdf-lut, normal, roughness, metallic, ambient-occlusion
+#endif
 
 		pool_size[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 		pool_size[1].descriptorCount = NUM_COMMAND_BUFFERS;
@@ -3698,7 +3935,7 @@ void vk_initialize( void )
 	// Pipeline layouts.
 	//
 	{
-		VkDescriptorSetLayout set_layouts[6];
+		VkDescriptorSetLayout set_layouts[VK_LAYOUT_COUNT];
 		VkPipelineLayoutCreateInfo desc;
 		VkPushConstantRange push_range;
 
@@ -3714,11 +3951,17 @@ void vk_initialize( void )
 		set_layouts[3] = vk.set_layout_sampler; // lightmap / fog-only
 		set_layouts[4] = vk.set_layout_sampler; // blend
 		set_layouts[5] = vk.set_layout_sampler; // collapsed fog texture
-
+#ifdef USE_VK_PBR
+		set_layouts[6] = vk.set_layout_sampler; // brdf lut
+		set_layouts[7] = vk.set_layout_sampler; // normalMap
+		set_layouts[8] = vk.set_layout_sampler; // roughnessMap
+		set_layouts[9] = vk.set_layout_sampler; // metallicMap
+		set_layouts[10] = vk.set_layout_sampler;// occlusionMap
+#endif
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;
 		desc.flags = 0;
-		desc.setLayoutCount = (vk.maxBoundDescriptorSets >= 6) ? 6 : 4;
+		desc.setLayoutCount = (vk.maxBoundDescriptorSets >= VK_LAYOUT_COUNT) ? VK_LAYOUT_COUNT : 4;
 		desc.pSetLayouts = set_layouts;
 		desc.pushConstantRangeCount = 1;
 		desc.pPushConstantRanges = &push_range;
@@ -3763,6 +4006,14 @@ void vk_initialize( void )
 		SET_OBJECT_NAME( vk.pipeline_layout, "pipeline layout - main", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 		SET_OBJECT_NAME( vk.pipeline_layout_post_process, "pipeline layout - post-processing", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
 		SET_OBJECT_NAME( vk.pipeline_layout_blend, "pipeline layout - blend", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+	
+#ifdef VK_PBR_BRDFLUT
+		if( vk.pbrActive ) {
+			desc.setLayoutCount = 1;
+			VK_CHECK(qvkCreatePipelineLayout(vk.device, &desc, NULL, &vk.pipeline_layout_brdflut));
+			SET_OBJECT_NAME(vk.pipeline_layout_brdflut, "pipeline layout - brdflut", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT);
+		}
+#endif	
 	}
 
 	vk.geometry_buffer_size_new = VERTEX_BUFFER_SIZE;
@@ -3807,8 +4058,20 @@ void vk_create_pipelines( void )
 	vk.pipelines_world_base = vk.pipelines_count;
 
 	vk_create_bloom_pipelines();
+#ifdef VK_PBR_BRDFLUT
+    vk_create_brdflut_pipeline();
+#endif
 }
 
+#ifdef VK_PBR_BRDFLUT
+void vk_create_brdflut_pipeline( void )
+{
+    if( !vk.pbrActive )
+        return;
+    uint32_t size = 512;
+    vk_create_post_process_pipeline( 4, size, size );
+}
+#endif
 
 static void vk_destroy_attachments( void )
 {
@@ -3870,6 +4133,15 @@ static void vk_destroy_attachments( void )
 		vk.capture.image_view = VK_NULL_HANDLE;
 	}
 
+#ifdef VK_PBR_BRDFLUT
+    if ( vk.brdflut_image_view ) {
+        qvkDestroyImage( vk.device, vk.brdflut_image, NULL );
+        qvkDestroyImageView( vk.device, vk.brdflut_image_view, NULL );
+        vk.brdflut_image = VK_NULL_HANDLE;
+        vk.brdflut_image_view = VK_NULL_HANDLE;
+    }
+#endif
+
 	for ( i = 0; i < vk.image_memory_count; i++ ) {
 		qvkFreeMemory( vk.device, vk.image_memory[i], NULL );
 	}
@@ -3918,6 +4190,13 @@ static void vk_destroy_render_passes( void )
 		qvkDestroyRenderPass( vk.device, vk.render_pass.capture, NULL );
 		vk.render_pass.capture = VK_NULL_HANDLE;
 	}
+
+#ifdef VK_PBR_BRDFLUT
+    if ( vk.render_pass.brdflut != VK_NULL_HANDLE ) {
+        qvkDestroyRenderPass( vk.device, vk.render_pass.brdflut, NULL );
+        vk.render_pass.brdflut = VK_NULL_HANDLE;
+    }
+#endif
 }
 
 
@@ -3960,6 +4239,13 @@ static void vk_destroy_pipelines( qboolean reset )
 		vk.bloom_blend_pipeline = VK_NULL_HANDLE;
 	}
 
+#ifdef VK_PBR_BRDFLUT
+    if( vk.brdflut_pipeline != VK_NULL_HANDLE ) {
+        qvkDestroyPipeline( vk.device, vk.brdflut_pipeline, NULL );
+        vk.brdflut_pipeline = VK_NULL_HANDLE;
+    }
+#endif
+
 	for ( i = 0; i < ARRAY_LEN( vk.blur_pipeline ); i++ ) {
 		if ( vk.blur_pipeline[i] != VK_NULL_HANDLE ) {
 			qvkDestroyPipeline( vk.device, vk.blur_pipeline[i], NULL );
@@ -3971,7 +4257,11 @@ static void vk_destroy_pipelines( qboolean reset )
 
 void vk_shutdown( void )
 {
+#ifdef USE_VK_PBR
+	int i, j, k, l, m;
+#else
 	int i, j, k, l;
+#endif
 
 	if ( !qvkQueuePresentKHR ) {// not fully initialized
 		goto __cleanup;
@@ -4004,6 +4294,9 @@ void vk_shutdown( void )
 	//qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_storage, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_post_process, NULL);
 	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_blend, NULL);
+#ifdef USE_VK_PBR
+	qvkDestroyPipelineLayout(vk.device, vk.pipeline_layout_brdflut, NULL);
+#endif
 
 #ifdef USE_VBO
 	vk_release_vbo();
@@ -4016,6 +4309,34 @@ void vk_shutdown( void )
 	qvkDestroyBuffer( vk.device, vk.storage.buffer, NULL );
 	qvkFreeMemory( vk.device, vk.storage.memory, NULL );
 
+#ifdef USE_VK_PBR
+for (i = 0; i < 2; i++) {
+        for (j = 0; j < 3; j++) {
+            for (k = 0; k < 2; k++) {
+                for (l = 0; l < 2; l++) {
+                    for (m = 0; m < 2; m++) {
+                        if (vk.modules.vert.gen[i][j][k][l][m] != VK_NULL_HANDLE) {
+                            qvkDestroyShaderModule(vk.device, vk.modules.vert.gen[i][j][k][l][m], NULL);
+                            vk.modules.vert.gen[i][j][k][l][m] = VK_NULL_HANDLE;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    for (i = 0; i < 2; i++) {
+        for (j = 0; j < 3; j++) {
+            for (k = 0; k < 2; k++) {
+                for (l = 0; l < 2; l++) {
+                    if (vk.modules.frag.gen[i][j][k][l] != VK_NULL_HANDLE) {
+                        qvkDestroyShaderModule(vk.device, vk.modules.frag.gen[i][j][k][l], NULL);
+                        vk.modules.frag.gen[i][j][k][l] = VK_NULL_HANDLE;
+                    }
+                }
+            }
+        }
+    }
+#else
 	for ( i = 0; i < 3; i++ ) {
 		for ( j = 0; j < 2; j++ ) {
 			for ( k = 0; k < 2; k++ ) {
@@ -4038,6 +4359,8 @@ void vk_shutdown( void )
 			}
 		}
 	}
+#endif
+
 	for ( i = 0; i < 2; i++ ) {
 		if ( vk.modules.vert.light[i] != VK_NULL_HANDLE ) {
 			qvkDestroyShaderModule( vk.device, vk.modules.vert.light[i], NULL );
@@ -4070,6 +4393,10 @@ void vk_shutdown( void )
 
 	qvkDestroyShaderModule(vk.device, vk.modules.gamma_vs, NULL);
 	qvkDestroyShaderModule(vk.device, vk.modules.gamma_fs, NULL);
+
+#ifdef USE_VK_PBR
+	qvkDestroyShaderModule(vk.device, vk.modules.brdflut_fs, NULL);
+#endif
 
 __cleanup:
 	if ( vk.device != VK_NULL_HANDLE )
@@ -4435,6 +4762,17 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			pipeline_name = "capture buffer pipeline";
 			blend = qfalse;
 			break;
+#ifdef VK_PBR_BRDFLUT
+        case 4: // generate brdf LUT
+            pipeline = &vk.brdflut_pipeline;
+            fsmodule = vk.modules.brdflut_fs;
+            renderpass = vk.render_pass.brdflut;
+            layout = vk.pipeline_layout_brdflut;
+            samples = VK_SAMPLE_COUNT_1_BIT;
+            pipeline_name = "brdf LUT pipeline";
+            blend = qfalse;
+            break;
+#endif
 		default: // gamma correction
 			pipeline = &vk.gamma_pipeline;
 			fsmodule = vk.modules.gamma_fs;
@@ -4818,8 +5156,13 @@ void vk_create_blur_pipeline( uint32_t index, uint32_t width, uint32_t height, q
 }
 
 
+#ifdef USE_VK_PBR
+static VkVertexInputBindingDescription bindings[9];
+static VkVertexInputAttributeDescription attribs[9];
+#else
 static VkVertexInputBindingDescription bindings[8];
 static VkVertexInputAttributeDescription attribs[8];
+#endif
 static uint32_t num_binds;
 static uint32_t num_attrs;
 
@@ -4845,8 +5188,14 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	VkShaderModule *vs_module = NULL;
 	VkShaderModule *fs_module = NULL;
 	int32_t vert_spec_data[1]; // clippping
+#ifdef USE_VK_PBR
+	floatint_t frag_spec_data[15]; // 0:alpha-test-func, 1:alpha-test-value, 2:depth-fragment, 3:alpha-to-coverage, 4:color_mode, 5:abs_light, 6:multitexture mode, 7:discard mode, 8:identity color; 9: metallic value, 10: roughness value, 11: normal texture set; 12: metallic texture set; 13: roughness texture set; 14: occlusion texture set; 
+	VkSpecializationMapEntry spec_entries[16];
+	uint32_t use_pbr;
+#else
 	floatint_t frag_spec_data[9]; // 0:alpha-test-func, 1:alpha-test-value, 2:depth-fragment, 3:alpha-to-coverage, 4:color_mode, 5:abs_light, 6:multitexture mode, 7:discard mode, 8:identity color
 	VkSpecializationMapEntry spec_entries[10];
+#endif
 	VkSpecializationInfo vert_spec_info;
 	VkSpecializationInfo frag_spec_info;
 	VkPipelineVertexInputStateCreateInfo vertex_input_state;
@@ -4866,6 +5215,136 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	unsigned int atest_bits;
 	unsigned int state_bits = def->state_bits;
 
+#ifdef USE_VK_PBR
+	use_pbr = def->vk_pbr_flags ? 1 : 0;
+
+	switch ( def->shader_type ) {
+
+		case TYPE_SIGNLE_TEXTURE_LIGHTING:
+			vs_module = &vk.modules.vert.light[0];
+			fs_module = &vk.modules.frag.light[0][0];
+			break;
+
+		case TYPE_SIGNLE_TEXTURE_LIGHTING_LINEAR:
+			vs_module = &vk.modules.vert.light[0];
+			fs_module = &vk.modules.frag.light[1][0];
+			break;
+
+		case TYPE_SIGNLE_TEXTURE_DF:
+			state_bits |= GLS_DEPTHMASK_TRUE;
+			vs_module = &vk.modules.vert.gen[0][0][0][0][0];
+			fs_module = &vk.modules.frag.gen0_df;
+			break;
+
+		case TYPE_SIGNLE_TEXTURE_IDENTITY:
+			vs_module = &vk.modules.vert.gen0_ident;
+			fs_module = &vk.modules.frag.gen0_ident;
+			break;
+
+		case TYPE_SIGNLE_TEXTURE:
+			vs_module = &vk.modules.vert.gen[use_pbr][0][0][0][0];
+			fs_module = &vk.modules.frag.gen[use_pbr][0][0][0];
+			break;
+
+		case TYPE_SIGNLE_TEXTURE_ENV:
+			vs_module = &vk.modules.vert.gen[use_pbr][0][0][1][0];
+			fs_module = &vk.modules.frag.gen[use_pbr][0][0][0];
+			break;
+
+		case TYPE_MULTI_TEXTURE_MUL2:
+		case TYPE_MULTI_TEXTURE_ADD2_IDENTITY:
+		case TYPE_MULTI_TEXTURE_ADD2:
+			vs_module = &vk.modules.vert.gen[use_pbr][1][0][0][0];
+			fs_module = &vk.modules.frag.gen[use_pbr][1][0][0];
+			break;
+
+		case TYPE_MULTI_TEXTURE_MUL2_ENV:
+		case TYPE_MULTI_TEXTURE_ADD2_IDENTITY_ENV:
+		case TYPE_MULTI_TEXTURE_ADD2_ENV:
+			vs_module = &vk.modules.vert.gen[use_pbr][1][0][1][0];
+			fs_module = &vk.modules.frag.gen[use_pbr][1][0][0];
+			break;
+
+		case TYPE_MULTI_TEXTURE_MUL3:
+		case TYPE_MULTI_TEXTURE_ADD3_IDENTITY:
+		case TYPE_MULTI_TEXTURE_ADD3:
+			vs_module = &vk.modules.vert.gen[use_pbr][2][0][0][0];
+			fs_module = &vk.modules.frag.gen[use_pbr][2][0][0];
+			break;
+
+		case TYPE_MULTI_TEXTURE_MUL3_ENV:
+		case TYPE_MULTI_TEXTURE_ADD3_IDENTITY_ENV:
+		case TYPE_MULTI_TEXTURE_ADD3_ENV:
+			vs_module = &vk.modules.vert.gen[use_pbr][2][0][1][0];
+			fs_module = &vk.modules.frag.gen[use_pbr][2][0][0];
+			break;
+
+		case TYPE_BLEND2_ADD:
+		case TYPE_BLEND2_MUL:
+		case TYPE_BLEND2_ALPHA:
+		case TYPE_BLEND2_ONE_MINUS_ALPHA:
+		case TYPE_BLEND2_MIX_ALPHA:
+		case TYPE_BLEND2_MIX_ONE_MINUS_ALPHA:
+		case TYPE_BLEND2_DST_COLOR_SRC_ALPHA:
+			vs_module = &vk.modules.vert.gen[use_pbr][1][1][0][0];
+			fs_module = &vk.modules.frag.gen[use_pbr][1][1][0];
+			break;
+
+		case TYPE_BLEND2_ADD_ENV:
+		case TYPE_BLEND2_MUL_ENV:
+		case TYPE_BLEND2_ALPHA_ENV:
+		case TYPE_BLEND2_ONE_MINUS_ALPHA_ENV:
+		case TYPE_BLEND2_MIX_ALPHA_ENV:
+		case TYPE_BLEND2_MIX_ONE_MINUS_ALPHA_ENV:
+		case TYPE_BLEND2_DST_COLOR_SRC_ALPHA_ENV:
+			vs_module = &vk.modules.vert.gen[use_pbr][1][1][1][0];
+			fs_module = &vk.modules.frag.gen[use_pbr][1][1][0];
+			break;
+
+		case TYPE_BLEND3_ADD:
+		case TYPE_BLEND3_MUL:
+		case TYPE_BLEND3_ALPHA:
+		case TYPE_BLEND3_ONE_MINUS_ALPHA:
+		case TYPE_BLEND3_MIX_ALPHA:
+		case TYPE_BLEND3_MIX_ONE_MINUS_ALPHA:
+		case TYPE_BLEND3_DST_COLOR_SRC_ALPHA:
+			vs_module = &vk.modules.vert.gen[use_pbr][2][1][0][0];
+			fs_module = &vk.modules.frag.gen[use_pbr][2][1][0];
+			break;
+
+		case TYPE_BLEND3_ADD_ENV:
+		case TYPE_BLEND3_MUL_ENV:
+		case TYPE_BLEND3_ALPHA_ENV:
+		case TYPE_BLEND3_ONE_MINUS_ALPHA_ENV:
+		case TYPE_BLEND3_MIX_ALPHA_ENV:
+		case TYPE_BLEND3_MIX_ONE_MINUS_ALPHA_ENV:
+		case TYPE_BLEND3_DST_COLOR_SRC_ALPHA_ENV:
+			vs_module = &vk.modules.vert.gen[use_pbr][2][1][1][0];
+			fs_module = &vk.modules.frag.gen[use_pbr][2][1][0];
+			break;
+
+		case TYPE_COLOR_WHITE:
+		case TYPE_COLOR_GREEN:
+		case TYPE_COLOR_RED:
+			vs_module = &vk.modules.color_vs;
+			fs_module = &vk.modules.color_fs;
+			break;
+
+		case TYPE_FOG_ONLY:
+			vs_module = &vk.modules.fog_vs;
+			fs_module = &vk.modules.fog_fs;
+			break;
+
+		case TYPE_DOT:
+			vs_module = &vk.modules.dot_vs;
+			fs_module = &vk.modules.dot_fs;
+			break;
+
+		default:
+			ri.Error(ERR_DROP, "create_pipeline: unknown shader type %i\n", def->shader_type);
+			return 0;
+	}
+#else
 	switch ( def->shader_type ) {
 
 		case TYPE_SIGNLE_TEXTURE_LIGHTING:
@@ -4992,6 +5471,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			ri.Error(ERR_DROP, "create_pipeline: unknown shader type %i\n", def->shader_type);
 			return 0;
 	}
+#endif
+	
 
 	if ( def->fog_stage ) {
 		switch ( def->shader_type ) {
@@ -5190,11 +5671,68 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	spec_entries[9].offset = 8 * sizeof( int32_t );
 	spec_entries[9].size = sizeof( float );
 
+#ifdef USE_VK_PBR   
+    spec_entries[10].constantID = 9; // metallic value
+    spec_entries[10].offset = 9 * sizeof( float );
+    spec_entries[10].size = sizeof( float );
+        
+    spec_entries[11].constantID = 10; // roughness value
+    spec_entries[11].offset = 10 * sizeof( float );
+    spec_entries[11].size = sizeof( float );
+        
+    spec_entries[12].constantID = 11; // normal texture set
+    spec_entries[12].offset = 11 * sizeof( uint32_t );
+    spec_entries[12].size = sizeof( uint32_t );
+    
+    spec_entries[13].constantID = 12; // metallic texture set
+    spec_entries[13].offset = 12 * sizeof( uint32_t );
+    spec_entries[13].size = sizeof( uint32_t );
+        
+    spec_entries[14].constantID = 13; // roughness texture set
+    spec_entries[14].offset = 13 * sizeof( uint32_t );
+    spec_entries[14].size = sizeof( uint32_t );
+   
+    spec_entries[15].constantID = 14;// occlusion texture set 
+    spec_entries[15].offset = 14 * sizeof( uint32_t );
+    spec_entries[15].size = sizeof( uint32_t );
+	
+	// set pbr info
+	{
+        frag_spec_data[9].f = 1.0f;
+        frag_spec_data[10].f = 1.0f;
+
+        if( def->vk_pbr_flags & PBR_HAS_METALLIC_VALUE )
+            frag_spec_data[9].f = def->metallic_value;
+
+        if( def->vk_pbr_flags & PBR_HAS_ROUGHNESS_VALUE )
+            frag_spec_data[10].f = def->roughness_value;
+
+        // no pbr texture set
+	    if( ( def->vk_pbr_flags & PBR_HAS_NORMALMAP ) == 0 )
+           frag_spec_data[11].i = -1;
+
+        if( ( def->vk_pbr_flags & PBR_HAS_METALLICMAP ) == 0 )
+	       frag_spec_data[12].i = -1;
+
+        if( ( def->vk_pbr_flags & PBR_HAS_ROUGHNESSMAP ) == 0 )
+           frag_spec_data[13].i = -1;  
+
+        if( ( def->vk_pbr_flags & PBR_HAS_OCCLUSIONMAP ) == 0 )
+           frag_spec_data[14].i = -1;  
+	}
+
+
+	frag_spec_info.mapEntryCount = 15;
+	frag_spec_info.dataSize = sizeof( int32_t ) * 15;
+#else
 	frag_spec_info.mapEntryCount = 9;
-	frag_spec_info.pMapEntries = spec_entries + 1;
 	frag_spec_info.dataSize = sizeof( int32_t ) * 9;
+#endif
+
+	frag_spec_info.pMapEntries = spec_entries + 1;
 	frag_spec_info.pData = &frag_spec_data[0];
 	shader_stages[1].pSpecializationInfo = &frag_spec_info;
+
 
 	//
 	// Vertex input
@@ -5405,6 +5943,13 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			ri.Error( ERR_DROP, "%s: invalid shader type - %i", __func__, def->shader_type );
 			break;
 	}
+
+ #ifdef USE_VK_PBR  // qtangent
+    if( def->vk_pbr_flags ){    
+        push_bind( 8, sizeof( vec4_t ) );
+        push_attr( 8, 8, VK_FORMAT_R32G32B32A32_SFLOAT );
+    }
+#endif
 
 	vertex_input_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 	vertex_input_state.pNext = NULL;
@@ -5963,8 +6508,11 @@ void vk_update_mvp( const float *m ) {
 	vk.stats.push_size += sizeof( push_constants );
 }
 
-
+#ifdef USE_VK_PBR
+static VkBuffer shade_bufs[9];
+#else
 static VkBuffer shade_bufs[8];
+#endif
 static int bind_base;
 static int bind_count;
 
@@ -6062,6 +6610,9 @@ void vk_bind_geometry( uint32_t flags )
 	if ( tess.vboIndex ) {
 
 		shade_bufs[0] = shade_bufs[1] = shade_bufs[2] = shade_bufs[3] = shade_bufs[4] = shade_bufs[5] = shade_bufs[6] = shade_bufs[7] = vk.vbo.vertex_buffer;
+#ifdef USE_VK_PBR
+		shade_bufs[8] = vk.vbo.vertex_buffer;
+#endif
 
 		if ( flags & TESS_XYZ ) {  // 0
 			vk.cmd->vbo_offset[0] = tess.shader->vboOffset + 0;
@@ -6102,6 +6653,12 @@ void vk_bind_geometry( uint32_t flags )
 			vk.cmd->vbo_offset[7] = tess.shader->stages[ tess.vboStage ]->rgb_offset[2];
 			vk_bind_index_attr( 7 );
 		}
+#ifdef USE_VK_PBR
+		if (flags & TESS_PBR) {
+			vk.cmd->vbo_offset[8] = tess.shader->qtangentOffset;
+			vk_bind_index_attr(8);
+		}
+#endif
 
 		qvkCmdBindVertexBuffers( vk.cmd->command_buffer, bind_base, bind_count, shade_bufs, vk.cmd->vbo_offset + bind_base );
 
@@ -6109,6 +6666,9 @@ void vk_bind_geometry( uint32_t flags )
 #endif // USE_VBO
 	{
 		shade_bufs[0] = shade_bufs[1] = shade_bufs[2] = shade_bufs[3] = shade_bufs[4] = shade_bufs[5] = shade_bufs[6] = shade_bufs[7] = vk.cmd->vertex_buffer;
+#ifdef USE_VK_PBR
+		shade_bufs[8] = vk.cmd->vertex_buffer;
+#endif
 
 		if ( flags & TESS_XYZ ) {
 			vk_bind_attr(0, sizeof(tess.xyz[0]), &tess.xyz[0]);
@@ -6141,6 +6701,11 @@ void vk_bind_geometry( uint32_t flags )
 		if ( flags & TESS_RGBA2 ) {
 			vk_bind_attr(7, sizeof( color4ub_t ), tess.svars.colors[2][0].rgba);
 		}
+#ifdef USE_VK_PBR
+		if (flags & TESS_PBR) {
+			vk_bind_attr(8, sizeof(tess.qtangent[0]), tess.qtangent);
+		}
+#endif
 
 		qvkCmdBindVertexBuffers( vk.cmd->command_buffer, bind_base, bind_count, shade_bufs, vk.cmd->buf_offset + bind_base );
 	}
@@ -6193,6 +6758,21 @@ void vk_update_descriptor( int index, VkDescriptorSet descriptor )
 	vk.cmd->descriptor_set.current[ index ] = descriptor;
 }
 
+#ifdef USE_VK_PBR
+static void vk_set_valid_preceeding_descriptor( const int tmu )
+{
+	if( vk.cmd->descriptor_set.current[tmu] != VK_NULL_HANDLE )
+		return;
+	vk_update_descriptor( tmu, tr.emptyImage->descriptor );
+	if( tmu > 0 )
+		vk_set_valid_preceeding_descriptor( tmu - 1 );
+}
+void vk_update_pbr_descriptor( const int tmu, VkDescriptorSet curDesSet ) {
+	
+	vk_set_valid_preceeding_descriptor( tmu - 1 );
+	vk_update_descriptor( tmu, curDesSet );
+}
+#endif
 
 void vk_update_descriptor_offset( int index, uint32_t offset )
 {
@@ -6403,6 +6983,56 @@ void vk_begin_screenmap_render_pass( void )
 	vk_begin_render_pass( vk.render_pass.screenmap, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
 }
 
+#ifdef VK_PBR_BRDFLUT
+void vk_create_brfdlut( void )
+{
+    if( !vk.pbrActive )
+        return;
+
+    VkRenderPassBeginInfo   begin_info;
+    VkClearValue            clear_values[1];
+    VkCommandBuffer         command_buffer;
+    VkViewport              viewport;
+    VkRect2D                scissor_rect;
+    uint32_t                size;
+
+    command_buffer = begin_command_buffer();
+    size = 512;
+    
+    begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    begin_info.pNext = NULL;
+    begin_info.renderPass = vk.render_pass.brdflut;
+    begin_info.framebuffer = vk.framebuffers.brdflut;
+    begin_info.renderArea.offset.x = 0;
+    begin_info.renderArea.offset.y = 0;
+    begin_info.renderArea.extent.width = size;
+    begin_info.renderArea.extent.height = size;
+
+    Com_Memset( clear_values, 0, sizeof( clear_values ) );
+    clear_values[0].color.float32[3] = 1.0f;
+
+    begin_info.clearValueCount = 1;
+    begin_info.pClearValues = clear_values;	
+	
+    Com_Memset( &viewport, 0, sizeof( viewport ) );
+    viewport.width = viewport.height = (float)size;
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    Com_Memset( &scissor_rect, 0, sizeof( scissor_rect ) );
+    scissor_rect.extent.width = scissor_rect.extent.height = size;
+
+    qvkCmdBeginRenderPass( command_buffer, &begin_info, VK_SUBPASS_CONTENTS_INLINE );
+    qvkCmdSetScissor( command_buffer, 0, 1, &scissor_rect );
+    qvkCmdSetViewport( command_buffer, 0, 1, &viewport ); 
+    qvkCmdBindPipeline( command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.brdflut_pipeline );
+    qvkCmdBindDescriptorSets( command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_brdflut, 0, 1, &vk.brdflut_image_descriptor, 0, NULL );
+    qvkCmdDraw( command_buffer, 4, 1, 0, 0 );	
+    qvkCmdEndRenderPass( command_buffer );
+
+    end_command_buffer( command_buffer );
+}
+#endif
 
 void vk_end_render_pass( void )
 {

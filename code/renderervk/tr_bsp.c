@@ -535,6 +535,91 @@ static shader_t *ShaderForShaderNum( int shaderNum, int lightmapNum ) {
 	return shader;
 }
 
+#ifdef USE_VK_PBR
+static void GenerateFaceTangents( srfSurfaceFace_t *face )
+{
+	if( !vk.pbrActive )
+		return;
+
+	float		*xyz0, *xyz1, *xyz2;
+	float		*st0, *st1, *st2;
+	float		*normal0, *normal1, *normal2;
+	float		*qtangent0, *qtangent1, *qtangent2;
+	int			i, *indices, i0, i1, i2;
+	vec3_t		tangent, binormal;
+	
+	indices = ( (int*)( (byte*)face + face->ofsIndices ) );
+	face->qtangents = (float*)ri.Hunk_Alloc( face->numPoints * sizeof(tess.qtangent[0]), h_low );
+
+	for ( i = 0; i < face->numIndices; i += 3 ) {
+		i0 = indices[i + 0];
+		i1 = indices[i + 1];
+		i2 = indices[i + 2];
+
+		if (i0 >= face->numPoints || i1 >= face->numPoints || i2 >= face->numPoints)
+			continue;
+
+		xyz0 = face->points[i0];		// xyz
+		xyz1 = face->points[i1];
+		xyz2 = face->points[i2];
+
+		normal0 = face->points[i0]+3;	// normal
+		normal1 = face->points[i1]+3;
+		normal2 = face->points[i2]+3;
+
+		// squeezed in normals so start reading from index 6 instead of 3
+		st0 = face->points[i0]+6;		// st
+		st1 = face->points[i1]+6;
+		st2 = face->points[i2]+6;
+
+		R_CalcTangents( tangent, binormal,
+			xyz0, xyz1, xyz2, 
+			st0, st1, st2 );
+
+		qtangent0 = face->qtangents + indices[i + 0] * 4;
+		qtangent1 = face->qtangents + indices[i + 1] * 4;
+		qtangent2 = face->qtangents + indices[i + 2] * 4;		
+
+		R_TBNtoQtangents( tangent, binormal, normal0, qtangent0 );
+		R_TBNtoQtangents( tangent, binormal, normal1, qtangent1 );
+		R_TBNtoQtangents( tangent, binormal, normal2, qtangent2 );
+	}
+}
+
+static void GenerateTriTangents( srfTriangles_t *tri )
+{
+	if( !vk.pbrActive )
+		return;
+
+	srfVert_t	*dv0, *dv1, *dv2;
+	int			i, i0, i1, i2;
+	vec3_t		tangent, binormal;
+
+	for (i = 0; i < tri->numIndexes; i += 3) {
+		i0 = tri->indexes[ i + 0 ];
+		i1 = tri->indexes[ i + 1 ];
+		i2 = tri->indexes[ i + 2 ];
+
+		if (i0 >= tri->numVerts || i1 >= tri->numVerts || i2 >= tri->numVerts)
+			continue;
+
+		dv0 = &tri->verts[i0];
+		dv1 = &tri->verts[i1];
+		dv2 = &tri->verts[i2];
+
+		R_CalcTangents( tangent, binormal,
+			dv0->xyz, dv1->xyz, dv2->xyz, 
+			dv0->st, dv1->st, dv2->st );
+
+		R_TBNtoQtangents( tangent, binormal, dv0->normal, dv0->qtangent );
+		R_TBNtoQtangents( tangent, binormal, dv1->normal, dv1->qtangent );
+		R_TBNtoQtangents( tangent, binormal, dv2->normal, dv2->qtangent );
+	}
+}
+
+
+#endif
+
 
 static void GenerateNormals( srfSurfaceFace_t *face )
 {
@@ -665,7 +750,22 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 	for ( i = 0 ; i < numPoints ; i++ ) {
 		for ( j = 0 ; j < 3 ; j++ ) {
 			cv->points[i][j] = LittleFloat( verts[i].xyz[j] );
+#ifdef USE_VK_PBR
+			cv->points[i][3+j] = LittleFloat( verts[i].normal[j] );
+#endif
 		}
+#ifdef USE_VK_PBR
+		for ( j = 0 ; j < 2 ; j++ ) {
+			cv->points[i][6+j] = LittleFloat( verts[i].st[j] );
+			cv->points[i][8+j] = LittleFloat( verts[i].lightmap[j] );
+		}
+		R_ColorShiftLightingBytes( verts[i].color.rgba, (byte *)&cv->points[i][10], qtrue );
+		if ( lightmapNum >= 0 && r_mergeLightmaps->integer ) {
+			// adjust lightmap coords
+			cv->points[i][8] = cv->points[i][8] * tr.lightmapScale[0] + lightmapX;
+			cv->points[i][9] = cv->points[i][9] * tr.lightmapScale[1] + lightmapY;
+		}
+#else
 		for ( j = 0 ; j < 2 ; j++ ) {
 			cv->points[i][3+j] = LittleFloat( verts[i].st[j] );
 			cv->points[i][5+j] = LittleFloat( verts[i].lightmap[j] );
@@ -676,6 +776,7 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 			cv->points[i][5] = cv->points[i][5] * tr.lightmapScale[0] + lightmapX;
 			cv->points[i][6] = cv->points[i][6] * tr.lightmapScale[1] + lightmapY;
 		}
+#endif
 	}
 
 	indexes += LittleLong( ds->firstIndex );
@@ -721,6 +822,10 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 	SetPlaneSignbits( &cv->plane );
 	cv->plane.type = PlaneTypeForNormal( cv->plane.normal );
 
+#ifdef USE_VK_PBR
+	GenerateFaceTangents( cv );
+#endif
+
 	surf->data = (surfaceType_t *)cv;
 }
 
@@ -734,7 +839,7 @@ static void ParseMesh( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 	srfGridMesh_t	*grid;
 	int				i, j;
 	int				width, height, numPoints;
-	drawVert_t points[MAX_PATCH_SIZE*MAX_PATCH_SIZE];
+	srfVert_t points[MAX_PATCH_SIZE*MAX_PATCH_SIZE];
 	int				lightmapNum;
 	float			lightmapX, lightmapY;
 	vec3_t			bounds[2];
@@ -846,7 +951,7 @@ static void ParseTriSurf( const dsurface_t *ds, const drawVert_t *verts, msurfac
 	tri->surfaceType = SF_TRIANGLES;
 	tri->numVerts = numVerts;
 	tri->numIndexes = numIndexes;
-	tri->verts = (drawVert_t *)(tri + 1);
+	tri->verts = (srfVert_t *)(tri + 1);
 	tri->indexes = (int *)(tri->verts + tri->numVerts );
 
 	surf->data = (surfaceType_t *)tri;
@@ -881,6 +986,10 @@ static void ParseTriSurf( const dsurface_t *ds, const drawVert_t *verts, msurfac
 			ri.Error( ERR_DROP, "Bad index in triangle surface" );
 		}
 	}
+
+#ifdef USE_VK_PBR
+	GenerateTriTangents( tri );
+#endif
 }
 
 
@@ -1600,7 +1709,7 @@ static void R_MovePatchSurfacesToHunk( void ) {
 		if ( grid->surfaceType != SF_GRID )
 			continue;
 		//
-		size = (grid->width * grid->height - 1) * sizeof( drawVert_t ) + sizeof( *grid );
+		size = (grid->width * grid->height - 1) * sizeof( srfVert_t ) + sizeof( *grid );
 		hunkgrid = ri.Hunk_Alloc( size, h_low );
 		Com_Memcpy(hunkgrid, grid, size);
 
