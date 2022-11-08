@@ -275,8 +275,6 @@ void VBO_PrepareQueues( void );
 void VBO_RenderIBOItems( void );
 void VBO_ClearQueue( void );
 
-qboolean vk_surface_format_color_depth( VkFormat format, int* r, int* g, int* b );
-
 #ifdef VK_PBR_BRDFLUT
 void vk_update_pbr_descriptor( const int tmu, VkDescriptorSet curDesSet );
 void vk_create_brdflut_pipeline( void );
