@@ -385,9 +385,13 @@ typedef struct {
 	uint32_t		vk_pbr_flags;
 	uint32_t		vk_pbr_pipeline[2];
 	image_t			*normalMap;
-	image_t			*roughnessMap;
-	image_t			*metallicMap;
-	image_t			*occlusionMap;
+	image_t			*physicalMap;
+
+	char			physicalMapName[MAX_QPATH];
+	char			roughnessMapName[MAX_QPATH];
+	char			metallicMapName[MAX_QPATH];
+	char			occlusionMapName[MAX_QPATH];
+
 	float			roughness_value;
 	float			metallic_value;
 #endif
@@ -1557,6 +1561,9 @@ void		R_InitShaders( void );
 void		R_ShaderList_f( void );
 void		RE_RemapShader(const char *oldShader, const char *newShader, const char *timeOffset);
 
+#ifdef USE_VK_PBR
+void		vk_create_phyisical_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags, const uint32_t physicalMapBits );
+#endif
 
 //
 // tr_surface.c

@@ -995,9 +995,8 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			// check if pbr hasn't been discarded
 			if( tess_flags & TESS_PBR ) {
 				if ( fogCollapse || !(tess_flags & TESS_VPOS) ) {
-					VectorCopy( backEnd.or.viewOrigin, uniform.eyePos );
-					//VectorCopy(tr.sunDirection, uniform.lightPos); 
-					//uniform.lightPos[3] = 0.0f;
+					Com_Memcpy( &uniform.eyePos, backEnd.or.viewOrigin, sizeof( vec3_t) );
+					uniform.eyePos[3] = 0.0;
 					VK_PushUniform( &uniform );	
 				}
 				// brdf lut
@@ -1009,24 +1008,12 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				// for now, send a 2x2 pixel white texture
 				if( pStage->vk_pbr_flags & PBR_HAS_NORMALMAP )
 					vk_update_pbr_descriptor(7, pStage->normalMap->descriptor);
-				else
-					vk_update_pbr_descriptor(7, tr.emptyImage->descriptor);
 
-				if( pStage->vk_pbr_flags & PBR_HAS_ROUGHNESSMAP )
-					vk_update_pbr_descriptor(8, pStage->roughnessMap->descriptor);
+				if( pStage->vk_pbr_flags & PBR_HAS_PHYSICALMAP )
+					vk_update_pbr_descriptor(8, pStage->physicalMap->descriptor);
 				else
 					vk_update_pbr_descriptor(8, tr.emptyImage->descriptor);
 			
-				if( pStage->vk_pbr_flags & PBR_HAS_METALLICMAP )
-					vk_update_pbr_descriptor(9, pStage->metallicMap->descriptor);
-				else
-					vk_update_pbr_descriptor(9, tr.emptyImage->descriptor);
-			
-				if( pStage->vk_pbr_flags & PBR_HAS_OCCLUSIONMAP )
-					vk_update_pbr_descriptor(10, pStage->occlusionMap->descriptor);
-				else
-					vk_update_pbr_descriptor(10, tr.emptyImage->descriptor);
-
 				pipeline = pStage->vk_pbr_pipeline[fog_stage];
 			}
 		}
