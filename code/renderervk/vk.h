@@ -4,7 +4,7 @@
 #include "tr_common.h"
 
 #ifdef USE_VK_PBR
-#define VK_LAYOUT_COUNT					11
+#define VK_LAYOUT_COUNT					9
 #else
 #define VK_LAYOUT_COUNT					6
 
@@ -193,11 +193,18 @@ typedef struct vkUniform_s {
 #define TESS_PBR   				( 1024 ) // PBR shader variant, qtangent vertex attribute and eyePos uniform
 
 #define PBR_HAS_NORMALMAP		( 1 )
-#define PBR_HAS_METALLICMAP		( 2 )
-#define PBR_HAS_ROUGHNESSMAP	( 4 )
-#define PBR_HAS_OCCLUSIONMAP	( 8 )
-#define PBR_HAS_ROUGHNESS_VALUE	( 16 )
-#define PBR_HAS_METALLIC_VALUE	( 32 )
+#define PBR_HAS_PHYSICALMAP		( 2 )
+#define PBR_HAS_ROUGHNESS_VALUE	( 4 )
+#define PBR_HAS_METALLIC_VALUE	( 8 )
+
+#define PHYS_NONE				( 1 )
+#define PHYS_ROUGHNESS			( 2 )
+#define PHYS_METALLIC			( 4 )
+#define PHYS_OCCLUSION			( 8 )
+#define PHYS_RMO				( 16 )
+
+#define ByteToFloat(a)			((float)(a) * 1.0f/255.0f)
+#define FloatToByte(a)			(byte)((a) * 255.0f)
 #endif
 
 //
@@ -308,7 +315,7 @@ typedef struct vk_tess_s {
 
 	struct {
 		uint32_t		start, end;
-		VkDescriptorSet	current[VK_LAYOUT_COUNT]; // 0:storage, 1:uniform, 2:color0, 3:color1, 4:color2, 5:fog, 6:brdf lut, 7:normal, 8:roughness, 9:metallic, 10: ambient occlusion
+		VkDescriptorSet	current[VK_LAYOUT_COUNT]; // 0:storage, 1:uniform, 2:color0, 3:color1, 4:color2, 5:fog, 6:brdf lut, 7:normal, 8:physical
 		uint32_t		offset[2]; // 0 (uniform) and 5 (storage)
 	} descriptor_set;
 

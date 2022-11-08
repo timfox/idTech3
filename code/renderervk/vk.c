@@ -2514,31 +2514,31 @@ static void vk_create_shader_modules( void )
 	vk.modules.vert.gen[0][2][1][1][1] = SHADER_MODULE( vert_tx2_cl_env_fog );
 
     // PBR
-    if( vk.pbrActive ) {
-        vk.modules.vert.gen[1][0][0][0][0] = SHADER_MODULE(vert_tx0_pbr);
-        vk.modules.vert.gen[1][0][0][0][1] = SHADER_MODULE(vert_tx0_pbr_fog);
-        vk.modules.vert.gen[1][0][0][1][0] = SHADER_MODULE(vert_tx0_pbr_env);
-        vk.modules.vert.gen[1][0][0][1][1] = SHADER_MODULE(vert_tx0_pbr_env_fog);
+    if ( vk.pbrActive ) {
+        vk.modules.vert.gen[1][0][0][0][0] = SHADER_MODULE(vert_pbr_tx0);
+        vk.modules.vert.gen[1][0][0][0][1] = SHADER_MODULE(vert_pbr_tx0_fog);
+        vk.modules.vert.gen[1][0][0][1][0] = SHADER_MODULE(vert_pbr_tx0_env);
+        vk.modules.vert.gen[1][0][0][1][1] = SHADER_MODULE(vert_pbr_tx0_env_fog);
 
-        vk.modules.vert.gen[1][1][0][0][0] = SHADER_MODULE(vert_tx1_pbr);
-        vk.modules.vert.gen[1][1][0][0][1] = SHADER_MODULE(vert_tx1_pbr_fog);
-        vk.modules.vert.gen[1][1][0][1][0] = SHADER_MODULE(vert_tx1_pbr_env);
-        vk.modules.vert.gen[1][1][0][1][1] = SHADER_MODULE(vert_tx1_pbr_env_fog);
+        vk.modules.vert.gen[1][1][0][0][0] = SHADER_MODULE(vert_pbr_tx1);
+        vk.modules.vert.gen[1][1][0][0][1] = SHADER_MODULE(vert_pbr_tx1_fog);
+        vk.modules.vert.gen[1][1][0][1][0] = SHADER_MODULE(vert_pbr_tx1_env);
+        vk.modules.vert.gen[1][1][0][1][1] = SHADER_MODULE(vert_pbr_tx1_env_fog);
 
-        vk.modules.vert.gen[1][1][1][0][0] = SHADER_MODULE(vert_tx1_cl_pbr);
-        vk.modules.vert.gen[1][1][1][0][1] = SHADER_MODULE(vert_tx1_cl_pbr_fog);
-        vk.modules.vert.gen[1][1][1][1][0] = SHADER_MODULE(vert_tx1_cl_pbr_env);
-        vk.modules.vert.gen[1][1][1][1][1] = SHADER_MODULE(vert_tx1_cl_pbr_env_fog);
+        vk.modules.vert.gen[1][1][1][0][0] = SHADER_MODULE(vert_pbr_tx1_cl);
+        vk.modules.vert.gen[1][1][1][0][1] = SHADER_MODULE(vert_pbr_tx1_cl_fog);
+        vk.modules.vert.gen[1][1][1][1][0] = SHADER_MODULE(vert_pbr_tx1_cl_env);
+        vk.modules.vert.gen[1][1][1][1][1] = SHADER_MODULE(vert_pbr_tx1_cl_env_fog);
 
-        vk.modules.vert.gen[1][2][0][0][0] = SHADER_MODULE(vert_tx2_pbr);
-        vk.modules.vert.gen[1][2][0][0][1] = SHADER_MODULE(vert_tx2_pbr_fog);
-        vk.modules.vert.gen[1][2][0][1][0] = SHADER_MODULE(vert_tx2_pbr_env);
-        vk.modules.vert.gen[1][2][0][1][1] = SHADER_MODULE(vert_tx2_pbr_env_fog);
+        vk.modules.vert.gen[1][2][0][0][0] = SHADER_MODULE(vert_pbr_tx2);
+        vk.modules.vert.gen[1][2][0][0][1] = SHADER_MODULE(vert_pbr_tx2_fog);
+        vk.modules.vert.gen[1][2][0][1][0] = SHADER_MODULE(vert_pbr_tx2_env);
+        vk.modules.vert.gen[1][2][0][1][1] = SHADER_MODULE(vert_pbr_tx2_env_fog);
 
-        vk.modules.vert.gen[1][2][1][0][0] = SHADER_MODULE(vert_tx2_cl_pbr);
-        vk.modules.vert.gen[1][2][1][0][1] = SHADER_MODULE(vert_tx2_cl_pbr_fog);
-        vk.modules.vert.gen[1][2][1][1][0] = SHADER_MODULE(vert_tx2_cl_pbr_env);
-        vk.modules.vert.gen[1][2][1][1][1] = SHADER_MODULE(vert_tx2_cl_pbr_env_fog);
+        vk.modules.vert.gen[1][2][1][0][0] = SHADER_MODULE(vert_pbr_tx2_cl);
+        vk.modules.vert.gen[1][2][1][0][1] = SHADER_MODULE(vert_pbr_tx2_cl_fog);
+        vk.modules.vert.gen[1][2][1][1][0] = SHADER_MODULE(vert_pbr_tx2_cl_env);
+        vk.modules.vert.gen[1][2][1][1][1] = SHADER_MODULE(vert_pbr_tx2_cl_env_fog);
     }
 
     for (i = 0; i < 2; i++) {
@@ -2627,21 +2627,21 @@ static void vk_create_shader_modules( void )
     vk.modules.frag.gen[0][2][1][1] = SHADER_MODULE(frag_tx2_cl_fog);
 
     // PBR
-    if( vk.pbrActive ) {
-        vk.modules.frag.gen[1][0][0][0] = SHADER_MODULE(frag_tx0_pbr);
-        vk.modules.frag.gen[1][0][0][1] = SHADER_MODULE(frag_tx0_pbr_fog);
+    if ( vk.pbrActive ) {
+        vk.modules.frag.gen[1][0][0][0] = SHADER_MODULE(frag_pbr_tx0);
+        vk.modules.frag.gen[1][0][0][1] = SHADER_MODULE(frag_pbr_tx0_fog);
 
-        vk.modules.frag.gen[1][1][0][0] = SHADER_MODULE(frag_tx1_pbr);
-        vk.modules.frag.gen[1][1][0][1] = SHADER_MODULE(frag_tx1_pbr_fog);
+        vk.modules.frag.gen[1][1][0][0] = SHADER_MODULE(frag_pbr_tx1);
+        vk.modules.frag.gen[1][1][0][1] = SHADER_MODULE(frag_pbr_tx1_fog);
 
-        vk.modules.frag.gen[1][1][1][0] = SHADER_MODULE(frag_tx1_cl_pbr);
-        vk.modules.frag.gen[1][1][1][1] = SHADER_MODULE(frag_tx1_cl_pbr_fog);
+        vk.modules.frag.gen[1][1][1][0] = SHADER_MODULE(frag_pbr_tx1_cl);
+        vk.modules.frag.gen[1][1][1][1] = SHADER_MODULE(frag_pbr_tx1_cl_fog);
 
-        vk.modules.frag.gen[1][2][0][0] = SHADER_MODULE(frag_tx2_pbr);
-        vk.modules.frag.gen[1][2][0][1] = SHADER_MODULE(frag_tx2_pbr_fog);
+        vk.modules.frag.gen[1][2][0][0] = SHADER_MODULE(frag_pbr_tx2);
+        vk.modules.frag.gen[1][2][0][1] = SHADER_MODULE(frag_pbr_tx2_fog);
 
-        vk.modules.frag.gen[1][2][1][0] = SHADER_MODULE(frag_tx2_cl_pbr);
-        vk.modules.frag.gen[1][2][1][1] = SHADER_MODULE(frag_tx2_cl_pbr_fog);
+        vk.modules.frag.gen[1][2][1][0] = SHADER_MODULE(frag_pbr_tx2_cl);
+        vk.modules.frag.gen[1][2][1][1] = SHADER_MODULE(frag_pbr_tx2_cl_fog);
     }
 
     for (i = 0; i < 2; i++) {
@@ -3913,7 +3913,8 @@ void vk_initialize( void )
 		pool_size[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		pool_size[0].descriptorCount = MAX_DRAWIMAGES + 1 + 1 + 1 + VK_NUM_BLOOM_PASSES * 2; // color, screenmap, bloom descriptors
 #ifdef USE_VK_PBR
-		pool_size[0].descriptorCount += 5; // brdf-lut, normal, roughness, metallic, ambient-occlusion
+        if ( vk.pbrActive )
+            pool_size[0].descriptorCount += 1 + ( MAX_DRAWIMAGES * 2 ); // + 1:  brdf-lut | MAX_DRAWIMAGES * (physical + normal)
 #endif
 
 		pool_size[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
@@ -3970,9 +3971,7 @@ void vk_initialize( void )
 #ifdef USE_VK_PBR
 		set_layouts[6] = vk.set_layout_sampler; // brdf lut
 		set_layouts[7] = vk.set_layout_sampler; // normalMap
-		set_layouts[8] = vk.set_layout_sampler; // roughnessMap
-		set_layouts[9] = vk.set_layout_sampler; // metallicMap
-		set_layouts[10] = vk.set_layout_sampler;// occlusionMap
+		set_layouts[8] = vk.set_layout_sampler; // physicalMap
 #endif
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;
@@ -5320,8 +5319,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	VkShaderModule *fs_module = NULL;
 	int32_t vert_spec_data[1]; // clippping
 #ifdef USE_VK_PBR
-	floatint_t frag_spec_data[15]; // 0:alpha-test-func, 1:alpha-test-value, 2:depth-fragment, 3:alpha-to-coverage, 4:color_mode, 5:abs_light, 6:multitexture mode, 7:discard mode, 8:identity color; 9: metallic value, 10: roughness value, 11: normal texture set; 12: metallic texture set; 13: roughness texture set; 14: occlusion texture set; 
-	VkSpecializationMapEntry spec_entries[16];
+	floatint_t frag_spec_data[15]; // 0:alpha-test-func, 1:alpha-test-value, 2:depth-fragment, 3:alpha-to-coverage, 4:color_mode, 5:abs_light, 6:multitexture mode, 7:discard mode, 8:identity color; 9: metallic value, 10: roughness value, 11: normal texture set; 12: physical texture set; 
+	VkSpecializationMapEntry spec_entries[14];
 	uint32_t use_pbr;
 #else
 	floatint_t frag_spec_data[9]; // 0:alpha-test-func, 1:alpha-test-value, 2:depth-fragment, 3:alpha-to-coverage, 4:color_mode, 5:abs_light, 6:multitexture mode, 7:discard mode, 8:identity color
@@ -5815,17 +5814,9 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
     spec_entries[12].offset = 11 * sizeof( uint32_t );
     spec_entries[12].size = sizeof( uint32_t );
     
-    spec_entries[13].constantID = 12; // metallic texture set
+    spec_entries[13].constantID = 12; // physical texture set
     spec_entries[13].offset = 12 * sizeof( uint32_t );
     spec_entries[13].size = sizeof( uint32_t );
-        
-    spec_entries[14].constantID = 13; // roughness texture set
-    spec_entries[14].offset = 13 * sizeof( uint32_t );
-    spec_entries[14].size = sizeof( uint32_t );
-   
-    spec_entries[15].constantID = 14;// occlusion texture set 
-    spec_entries[15].offset = 14 * sizeof( uint32_t );
-    spec_entries[15].size = sizeof( uint32_t );
 	
 	// set pbr info
 	{
@@ -5842,19 +5833,13 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	    if( ( def->vk_pbr_flags & PBR_HAS_NORMALMAP ) == 0 )
            frag_spec_data[11].i = -1;
 
-        if( ( def->vk_pbr_flags & PBR_HAS_METALLICMAP ) == 0 )
+        if( ( def->vk_pbr_flags & PBR_HAS_PHYSICALMAP ) == 0 )
 	       frag_spec_data[12].i = -1;
-
-        if( ( def->vk_pbr_flags & PBR_HAS_ROUGHNESSMAP ) == 0 )
-           frag_spec_data[13].i = -1;  
-
-        if( ( def->vk_pbr_flags & PBR_HAS_OCCLUSIONMAP ) == 0 )
-           frag_spec_data[14].i = -1;  
 	}
 
 
-	frag_spec_info.mapEntryCount = 15;
-	frag_spec_info.dataSize = sizeof( int32_t ) * 15;
+	frag_spec_info.mapEntryCount = 13;
+	frag_spec_info.dataSize = sizeof( int32_t ) * 13;
 #else
 	frag_spec_info.mapEntryCount = 9;
 	frag_spec_info.dataSize = sizeof( int32_t ) * 9;

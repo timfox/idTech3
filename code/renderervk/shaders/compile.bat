@@ -1,291 +1,149 @@
 @echo off
 
-set bh=%~dp0bin2hex.exe
-set cl=%VULKAN_SDK%\Bin\glslangValidator.exe
-set tmpf=%~dp0spirv\data.spv
+set "VSCMD_START_DIR=%CD%"
+call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\Common7\Tools\VsDevCmd.bat"
+
+set tools_dir=tools
+set bh=%tools_dir%\bin2hex.exe
+set bh_cpp=%tools_dir%\bin2hex.c
+if not exist %bh% (
+    cl.exe /EHsc /nologo /Fe%tools_dir%\ /Fo%tools_dir%\ %bh_cpp%
+)
+
+set PATH=%tools_dir%;%PATH%
+
+set glsl=glsl\
+set cl=%VULKAN_SDK%\glslangValidator.exe
+set tmpf=spirv\data.spv
 set outf=+spirv\shader_data.c
 
-echo %bin2hex%
+echo %bh%
 
-mkdir %~dp0spirv
+mkdir spirv
 
-del /Q %~dp0spirv\shader_data.c
+del /Q spirv\shader_data.c
 del /Q "%tmpf%"
 
 @rem compile individual shaders
 
-for %%f in (*.vert) do (
+for %%f in (%glsl%*.vert) do (
     "%cl%" -S vert -V -o "%tmpf%" "%%f"
     "%bh%" "%tmpf%" %outf% %%~nf_vert_spv
     del /Q "%tmpf%"
 )
 
-for %%f in (*.frag) do (
+for %%f in (%glsl%*.frag) do (
     "%cl%" -S frag -V -o "%tmpf%" "%%f"
     "%bh%" "%tmpf%" %outf% %%~nf_frag_spv
     del /Q "%tmpf%"
 )
 
-@rem compile lighting shader variations from templates
-
-"%cl%" -S vert -V -o "%tmpf%" light_vert.tmpl
-"%bh%" "%tmpf%" %outf% vert_light
-
-"%cl%" -S vert -V -o "%tmpf%" light_vert.tmpl -DUSE_FOG
-"%bh%" "%tmpf%" %outf% vert_light_fog
-
-"%cl%" -S frag -V -o "%tmpf%" light_frag.tmpl
-"%bh%" "%tmpf%" %outf% frag_light
-
-"%cl%" -S frag -V -o "%tmpf%" light_frag.tmpl -DUSE_FOG 
-"%bh%" "%tmpf%" %outf% frag_light_fog
-
-"%cl%" -S frag -V -o "%tmpf%" light_frag.tmpl -DUSE_LINE
-"%bh%" "%tmpf%" %outf% frag_light_line
-
-"%cl%" -S frag -V -o "%tmpf%" light_frag.tmpl -DUSE_LINE -DUSE_FOG
-"%bh%" "%tmpf%" %outf% frag_light_line_fog
-
-@rem compile generic shader variations from templates
-
-@rem single-texture vertex
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl
-"%bh%" "%tmpf%" %outf% vert_tx0
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl -DUSE_FOG
-"%bh%" "%tmpf%" %outf% vert_tx0_fog
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl -DUSE_ENV
-"%bh%" "%tmpf%" %outf% vert_tx0_env
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl -DUSE_FOG -DUSE_ENV
-"%bh%" "%tmpf%" %outf% vert_tx0_env_fog
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl -DUSE_CL0_IDENT
+"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_CL0_IDENT
 "%bh%" "%tmpf%" %outf% vert_tx0_ident
 
-@rem double-texture vertex
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl -DUSE_TX1
-"%bh%" "%tmpf%" %outf% vert_tx1
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl -DUSE_TX1 -DUSE_FOG
-"%bh%" "%tmpf%" %outf% vert_tx1_fog
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl -DUSE_TX1 -DUSE_ENV
-"%bh%" "%tmpf%" %outf% vert_tx1_env
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl -DUSE_TX1 -DUSE_FOG -DUSE_ENV
-"%bh%" "%tmpf%" %outf% vert_tx1_env_fog
-
-@rem double-texture vertex, non-identical colors
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl -DUSE_CL1 -DUSE_TX1
-"%bh%" "%tmpf%" %outf% vert_tx1_cl
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl -DUSE_CL1 -DUSE_TX1 -DUSE_FOG
-"%bh%" "%tmpf%" %outf% vert_tx1_cl_fog
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl -DUSE_CL1 -DUSE_TX1 -DUSE_ENV
-"%bh%" "%tmpf%" %outf% vert_tx1_cl_env
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl -DUSE_CL1 -DUSE_TX1 -DUSE_ENV -DUSE_FOG
-"%bh%" "%tmpf%" %outf% vert_tx1_cl_env_fog
-
-@rem triple-texture vertex
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl -DUSE_TX2
-"%bh%" "%tmpf%" %outf% vert_tx2
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl -DUSE_TX2 -DUSE_FOG
-"%bh%" "%tmpf%" %outf% vert_tx2_fog
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl -DUSE_TX2 -DUSE_ENV
-"%bh%" "%tmpf%" %outf% vert_tx2_env
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl -DUSE_TX2 -DUSE_ENV -DUSE_FOG
-"%bh%" "%tmpf%" %outf% vert_tx2_env_fog
-
-@rem triple-texture vertex, non-identical colors
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl -DUSE_CL2 -DUSE_TX2
-"%bh%" "%tmpf%" %outf% vert_tx2_cl
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl -DUSE_CL2 -DUSE_TX2 -DUSE_FOG
-"%bh%" "%tmpf%" %outf% vert_tx2_cl_fog
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl -DUSE_CL2 -DUSE_TX2 -DUSE_ENV
-"%bh%" "%tmpf%" %outf% vert_tx2_cl_env
-
-"%cl%" -S vert -V -o "%tmpf%" gen_vert.tmpl -DUSE_CL2 -DUSE_TX2 -DUSE_ENV -DUSE_FOG
-"%bh%" "%tmpf%" %outf% vert_tx2_cl_env_fog
-
-@rem single-texture fragment
-
-"%cl%" -S frag -V -o "%tmpf%" gen_frag.tmpl -DUSE_CL0_IDENT
+"%cl%" -S frag -V -o "%tmpf%" %glsl%gen_frag.tmpl -DUSE_CL0_IDENT
 "%bh%" "%tmpf%" %outf% frag_tx0_ident
 
-"%cl%" -S frag -V -o "%tmpf%" gen_frag.tmpl -DUSE_ATEST -DUSE_DF
+"%cl%" -S frag -V -o "%tmpf%" %glsl%gen_frag.tmpl -DUSE_ATEST -DUSE_DF
 "%bh%" "%tmpf%" %outf% frag_tx0_df
 
-"%cl%" -S frag -V -o "%tmpf%" gen_frag.tmpl -DUSE_ATEST
-"%bh%" "%tmpf%" %outf% frag_tx0
+@rem compile lighting shader variations from templates
 
-"%cl%" -S frag -V -o "%tmpf%" gen_frag.tmpl -DUSE_ATEST -DUSE_FOG
-"%bh%" "%tmpf%" %outf% frag_tx0_fog
+"%cl%" -S vert -V -o "%tmpf%" %glsl%light_vert.tmpl
+"%bh%" "%tmpf%" %outf% vert_light
 
-@rem double-texture fragment
+"%cl%" -S vert -V -o "%tmpf%" %glsl%light_vert.tmpl -DUSE_FOG
+"%bh%" "%tmpf%" %outf% vert_light_fog
 
-"%cl%" -S frag -V -o "%tmpf%" gen_frag.tmpl -DUSE_TX1
-"%bh%" "%tmpf%" %outf% frag_tx1
+"%cl%" -S frag -V -o "%tmpf%" %glsl%light_frag.tmpl
+"%bh%" "%tmpf%" %outf% frag_light
 
-"%cl%" -S frag -V -o "%tmpf%" gen_frag.tmpl -DUSE_TX1 -DUSE_FOG
-"%bh%" "%tmpf%" %outf% frag_tx1_fog
+"%cl%" -S frag -V -o "%tmpf%" %glsl%light_frag.tmpl -DUSE_FOG 
+"%bh%" "%tmpf%" %outf% frag_light_fog
 
-@rem double-texture fragment, non-identical colors
+"%cl%" -S frag -V -o "%tmpf%" %glsl%light_frag.tmpl -DUSE_LINE
+"%bh%" "%tmpf%" %outf% frag_light_line
 
-"%cl%" -S frag -V -o "%tmpf%" gen_frag.tmpl -DUSE_CL1 -DUSE_TX1
-"%bh%" "%tmpf%" %outf% frag_tx1_cl
+"%cl%" -S frag -V -o "%tmpf%" %glsl%light_frag.tmpl -DUSE_LINE -DUSE_FOG
+"%bh%" "%tmpf%" %outf% frag_light_line_fog
 
-"%cl%" -S frag -V -o "%tmpf%" gen_frag.tmpl -DUSE_CL1 -DUSE_TX1 -DUSE_FOG
-"%bh%" "%tmpf%" %outf% frag_tx1_cl_fog
+@rem template shader identifiers and flags
+set "sh[0]="
+set "sh[1]=-DUSE_VK_PBR"
+set "sh_id[0]="
+set "sh_id[1]=pbr_"
 
-@rem triple-texture fragment
+set "tx[0]="
+set "tx[1]=-DUSE_TX1"
+set "tx[2]=-DUSE_TX2"
+set "tx_id[0]=tx0"
+set "tx_id[1]=tx1"
+set "tx_id[2]=tx2"
 
-"%cl%" -S frag -V -o "%tmpf%" gen_frag.tmpl -DUSE_TX2
-"%bh%" "%tmpf%" %outf% frag_tx2
+set "cl[1]=-DUSE_CL1"
+set "cl[2]=-DUSE_CL2"
+set "cl_id[1]=cl"
+set "cl_id[2]=cl"
 
-"%cl%" -S frag -V -o "%tmpf%" gen_frag.tmpl -DUSE_TX2 -DUSE_FOG
-"%bh%" "%tmpf%" %outf% frag_tx2_fog
+set "env[0]="
+set "env[1]=-DUSE_ENV"
+set "env_id[0]="
+set "env_id[1]=_env"
 
-@rem triple-texture fragment, non-identical colors
+set "fog[0]="
+set "fog[1]=-DUSE_FOG"
+set "fog_id[0]="
+set "fog_id[1]=_fog"
 
-"%cl%" -S frag -V -o "%tmpf%" gen_frag.tmpl -DUSE_CL2 -DUSE_TX2
-"%bh%" "%tmpf%" %outf% frag_tx2_cl
+SETLOCAL EnableDelayedExpansion
 
-"%cl%" -S frag -V -o "%tmpf%" gen_frag.tmpl -DUSE_CL2 -DUSE_TX2 -DUSE_FOG
-"%bh%" "%tmpf%" %outf% frag_tx2_cl_fog
+@rem compile generic shader variations from templates
+@rem vertex shader
+for /L %%i in ( 0,1,1 ) do (                @rem shading mode, wip features 
+    for /L %%j in ( 0,1,2 ) do (            @rem tx   
+        for /L %%k in ( 0,1,1 ) do (        @rem +env
+            for /L %%m in ( 0,1,1 ) do (    @rem +fog
+                call :compile_vertex_shader %%i, %%j, %%k, %%m
+            )
+        )
+    )
+)
 
-
-@rem -----------------------------------------
-@rem ------------------ PBR ------------------
-
-
-@rem single-texture vertex
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR 
-"%bh%" "%tmpf%" %outf% vert_tx0_pbr
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR -DUSE_FOG
-"%bh%" "%tmpf%" %outf% vert_tx0_pbr_fog
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR -DUSE_ENV
-"%bh%" "%tmpf%" %outf% vert_tx0_pbr_env
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR -DUSE_FOG -DUSE_ENV
-"%bh%" "%tmpf%" %outf% vert_tx0_pbr_env_fog
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR -DUSE_CL0_IDENT
-"%bh%" "%tmpf%" %outf% vert_tx0_pbr_ident
-
-@rem double-texture vertex
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR -DUSE_TX1
-"%bh%" "%tmpf%" %outf% vert_tx1_pbr
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR -DUSE_TX1 -DUSE_FOG
-"%bh%" "%tmpf%" %outf% vert_tx1_pbr_fog
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR -DUSE_TX1 -DUSE_ENV
-"%bh%" "%tmpf%" %outf% vert_tx1_pbr_env
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR -DUSE_TX1 -DUSE_FOG -DUSE_ENV
-"%bh%" "%tmpf%" %outf% vert_tx1_pbr_env_fog
-
-@rem double-texture vertex, non-identical colors
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR -DUSE_CL1 -DUSE_TX1
-"%bh%" "%tmpf%" %outf% vert_tx1_cl_pbr
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR -DUSE_CL1 -DUSE_TX1 -DUSE_FOG
-"%bh%" "%tmpf%" %outf% vert_tx1_cl_pbr_fog
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR -DUSE_CL1 -DUSE_TX1 -DUSE_ENV
-"%bh%" "%tmpf%" %outf% vert_tx1_cl_pbr_env
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR -DUSE_CL1 -DUSE_TX1 -DUSE_ENV -DUSE_FOG
-"%bh%" "%tmpf%" %outf% vert_tx1_cl_pbr_env_fog
-
-@rem triple-texture vertex
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR -DUSE_TX2
-"%bh%" "%tmpf%" %outf% vert_tx2_pbr
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR -DUSE_TX2 -DUSE_FOG
-"%bh%" "%tmpf%" %outf% vert_tx2_pbr_fog
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR -DUSE_TX2 -DUSE_ENV
-"%bh%" "%tmpf%" %outf% vert_tx2_pbr_env
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR -DUSE_TX2 -DUSE_ENV -DUSE_FOG
-"%bh%" "%tmpf%" %outf% vert_tx2_pbr_env_fog
-
-@rem triple-texture vertex, non-identical colors
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR -DUSE_CL2 -DUSE_TX2
-"%bh%" "%tmpf%" %outf% vert_tx2_cl_pbr
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR -DUSE_CL2 -DUSE_TX2 -DUSE_FOG
-"%bh%" "%tmpf%" %outf% vert_tx2_cl_pbr_fog
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR -DUSE_CL2 -DUSE_TX2 -DUSE_ENV
-"%bh%" "%tmpf%" %outf% vert_tx2_cl_pbr_env
-
-"%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl -DUSE_VK_PBR -DUSE_CL2 -DUSE_TX2 -DUSE_ENV -DUSE_FOG
-"%bh%" "%tmpf%" %outf% vert_tx2_cl_pbr_env_fog
-
-@rem single-texture fragment
-
-"%cl%" -S frag -V -o "%tmpf%" %glsl%gen_frag.tmpl -DUSE_VK_PBR -DUSE_CL0_IDENT
-"%bh%" "%tmpf%" %outf% frag_tx0_pbr_ident
-
-"%cl%" -S frag -V -o "%tmpf%" %glsl%gen_frag.tmpl -DUSE_VK_PBR -DUSE_ATEST
-"%bh%" "%tmpf%" %outf% frag_tx0_pbr
-
-"%cl%" -S frag -V -o "%tmpf%" %glsl%gen_frag.tmpl -DUSE_VK_PBR -DUSE_ATEST -DUSE_FOG
-"%bh%" "%tmpf%" %outf% frag_tx0_pbr_fog
-
-@rem double-texture fragment
-
-"%cl%" -S frag -V -o "%tmpf%" %glsl%gen_frag.tmpl -DUSE_VK_PBR -DUSE_TX1
-"%bh%" "%tmpf%" %outf% frag_tx1_pbr
-
-"%cl%" -S frag -V -o "%tmpf%" %glsl%gen_frag.tmpl -DUSE_VK_PBR -DUSE_TX1 -DUSE_FOG
-"%bh%" "%tmpf%" %outf% frag_tx1_pbr_fog
-
-@rem double-texture fragment, non-identical colors
-
-"%cl%" -S frag -V -o "%tmpf%" %glsl%gen_frag.tmpl -DUSE_VK_PBR -DUSE_CL1 -DUSE_TX1
-"%bh%" "%tmpf%" %outf% frag_tx1_cl_pbr
-
-"%cl%" -S frag -V -o "%tmpf%" %glsl%gen_frag.tmpl -DUSE_VK_PBR -DUSE_CL1 -DUSE_TX1 -DUSE_FOG
-"%bh%" "%tmpf%" %outf% frag_tx1_cl_pbr_fog
-
-@rem triple-texture fragment
-
-"%cl%" -S frag -V -o "%tmpf%" %glsl%gen_frag.tmpl -DUSE_VK_PBR -DUSE_TX2
-"%bh%" "%tmpf%" %outf% frag_tx2_pbr
-
-"%cl%" -S frag -V -o "%tmpf%" %glsl%gen_frag.tmpl -DUSE_VK_PBR -DUSE_TX2 -DUSE_FOG
-"%bh%" "%tmpf%" %outf% frag_tx2_pbr_fog
-
-@rem triple-texture fragment, non-identical colors
-
-"%cl%" -S frag -V -o "%tmpf%" %glsl%gen_frag.tmpl -DUSE_VK_PBR -DUSE_CL2 -DUSE_TX2
-"%bh%" "%tmpf%" %outf% frag_tx2_cl_pbr
-
-"%cl%" -S frag -V -o "%tmpf%" %glsl%gen_frag.tmpl -DUSE_VK_PBR -DUSE_CL2 -DUSE_TX2 -DUSE_FOG
-"%bh%" "%tmpf%" %outf% frag_tx2_cl_pbr_fog
+@rem fragment shader
+for /L %%i in ( 0,1,1 ) do (                @rem shading mode, wip features
+    for /L %%j in ( 0,1,2 ) do (            @rem tx 
+        for /L %%k in ( 0,1,1 ) do (        @rem +fog
+            call :compile_fragment_shader %%i, %%j, %%k
+        )
+    )
+)
 
 del /Q "%tmpf%"
+
+pause
+
+:compile_fragment_shader
+    set "flags=!sh[%1]! !tx[%2]! !fog[%3]!"
+    set "name=!sh_id[%1]!!tx_id[%2]!!fog_id[%3]!"
+    if %2 equ 0 ( set "flags=%flags% -DUSE_ATEST" )
+
+    "%cl%" -S frag -V -o "%tmpf%" %glsl%gen_frag.tmpl %flags%
+    "%bh%" "%tmpf%" %outf% frag_%name%
+
+    @rem +cl
+    if %2 equ 0 goto continue
+        "%cl%" -S frag -V -o "%tmpf%" %glsl%gen_frag.tmpl !sh[%1]! !tx[%2]! !cl[%2]! !fog[%3]!
+        "%bh%" "%tmpf%" %outf% frag_!sh_id[%1]!!tx_id[%2]!_!cl_id[%2]!!fog_id[%3]!
+    :continue
+exit /B
+
+:compile_vertex_shader
+    "%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl !sh[%1]! !tx[%2]! !env[%3]! !fog[%4]!
+    "%bh%" "%tmpf%" %outf% vert_!sh_id[%1]!!tx_id[%2]!!env_id[%3]!!fog_id[%4]!
+
+    @rem +cl
+    if %2 equ 0 goto continue
+        "%cl%" -S vert -V -o "%tmpf%" %glsl%gen_vert.tmpl !sh[%1]! !tx[%2]! !cl[%2]! !env[%3]! !fog[%4]!
+        "%bh%" "%tmpf%" %outf% vert_!sh_id[%1]!!tx_id[%2]!_!cl_id[%2]!!env_id[%3]!!fog_id[%4]!
+    :continue
+exit /B

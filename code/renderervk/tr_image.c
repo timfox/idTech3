@@ -996,6 +996,25 @@ void R_UploadSubImage( byte *data, int x, int y, int width, int height, image_t 
 }
 #endif // !USE_VULKAN
 
+image_t *R_GetLoadedImage( const char *name, int flags ) {
+	long	hash;
+	image_t	*image;
+
+	hash = generateHashValue(name);
+	for ( image = hashTable[hash]; image; image = image->next ) {
+		if ( !strcmp( name, image->imgName ) ) {
+			// the white image can be used with any set of parms, but other mismatches are errors
+			if ( strcmp( name, "*white" ) ) {
+				if ( image->flags != flags ) {
+					ri.Printf( PRINT_DEVELOPER, "WARNING: reused image %s with mixed flags (%i vs %i)\n", name, image->flags, flags );
+				}
+			}
+			return image;
+		}
+	}
+
+	return NULL;
+}
 
 /*
 ================
@@ -1322,6 +1341,122 @@ image_t	*R_FindImageFile( const char *name, imgFlags_t flags )
 	return image;
 }
 
+//
+// generate the required physical map format
+//
+static void vk_generate_phyisical_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags, const uint32_t physicalMapBits ) {
+	if ( !albedoMapName ) {
+		return;
+	}
+
+	int		i, width, height, physicalWidth, phyiscalHeight;
+	byte	*buffer, *albedo, *roughness, *metallic, *occlusion;
+	char	physicalName[MAX_QPATH];
+	image_t *image;
+
+	COM_StripExtension( albedoMapName, physicalName, sizeof(physicalName) );
+	Q_strcat( physicalName, sizeof(physicalName), "_physical_rmo" );
+
+	image = R_GetLoadedImage( physicalName, flags );
+	if ( image != NULL ) {
+		stage->physicalMap = image;
+		stage->vk_pbr_flags |= PBR_HAS_PHYSICALMAP;
+		return;
+	}
+
+	roughness = metallic = occlusion = NULL;
+	R_LoadImage( albedoMapName, &albedo, &width, &height );
+
+	if ( physicalMapBits & PHYS_ROUGHNESS ) {
+		R_LoadImage( stage->roughnessMapName, &roughness, &physicalWidth, &phyiscalHeight );
+
+		if ( width != physicalWidth || height != phyiscalHeight ){
+			ri.Printf( PRINT_ALL, "WARNING: Can't build physical Map for %s (different texture sizes for baseColor and roughness)\n", albedoMapName );
+			goto cleanup;
+		}
+	}
+
+	if ( physicalMapBits & PHYS_METALLIC ) {
+		R_LoadImage( stage->metallicMapName, &metallic, &physicalWidth, &phyiscalHeight );
+
+		if ( width != physicalWidth || height != phyiscalHeight ){
+			ri.Printf( PRINT_ALL, "WARNING: Can't build physical Map for %s (different texture sizes for baseColor and metallic)\n", albedoMapName );
+			goto cleanup;
+		}
+	}
+
+	if ( physicalMapBits & PHYS_OCCLUSION ) {
+		R_LoadImage( stage->occlusionMapName, &occlusion, &physicalWidth, &phyiscalHeight );
+
+		if ( width != physicalWidth || height != phyiscalHeight ){
+			ri.Printf( PRINT_ALL, "WARNING: Can't build physical Map for %s (different texture sizes for baseColor and occlusion)\n", albedoMapName );
+			goto cleanup;
+		}
+	}
+
+	// check texture sizes.
+	buffer = (byte *)Z_Malloc( width * height * 4 );
+
+	for ( i = 0; i < width * height * 4; i += 4 ) {
+		// Red channel
+		if ( physicalMapBits & PHYS_ROUGHNESS && roughness != NULL )
+			buffer[i + 0] = roughness[i + 0];
+		else
+			buffer[i + 0] = FloatToByte( 1.0 );
+
+		// Green channel
+		if ( physicalMapBits & PHYS_METALLIC && metallic != NULL )
+			buffer[i + 1] = metallic[i + 0];
+		else
+			buffer[i + 1] = FloatToByte( 0.0 );
+
+		// Blue channel
+		if ( physicalMapBits & PHYS_OCCLUSION && occlusion != NULL )
+			buffer[i + 2] = occlusion[i + 0];
+		else
+			buffer[i + 2] = FloatToByte( 1.0 );
+
+		// Alpha channel
+		buffer[i + 3] = FloatToByte( 1.0 );
+	}
+
+	stage->physicalMap = R_CreateImage( physicalName, NULL, buffer, width, height, flags );
+	if ( stage->physicalMap )
+		stage->vk_pbr_flags |= PBR_HAS_PHYSICALMAP;
+	else
+		ri.Printf(PRINT_ALL, "WARNING: Can't generate physical Map for %s, failed\n", albedoMapName);
+
+	Z_Free( buffer );
+
+cleanup:
+	Z_Free( albedo );
+
+	if ( roughness != NULL )
+		Z_Free( roughness );
+
+	if ( metallic != NULL )
+		Z_Free( metallic );
+
+	if ( occlusion != NULL )
+		Z_Free( occlusion );
+}
+
+void vk_create_phyisical_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags, const uint32_t physicalMapBits ) {
+
+	if ( physicalMapBits & PHYS_RMO ) {
+		stage->physicalMap = R_FindImageFile( stage->physicalMapName, flags );
+
+		if ( !stage->physicalMap ) {
+			ri.Printf( PRINT_ALL, "WARNING: Can't load physical Map for %s, failed\n", albedoMapName );
+			return;
+		}
+
+		stage->vk_pbr_flags |= PBR_HAS_PHYSICALMAP;
+		return;
+	}
+
+	vk_generate_phyisical_texture( stage, albedoMapName, flags, physicalMapBits );
+}
 
 /*
 ================
