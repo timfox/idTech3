@@ -1441,6 +1441,23 @@ cleanup:
 		Z_Free( occlusion );
 }
 
+void vk_create_normal_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags ) {
+	if ( !albedoMapName )
+		return;
+
+	char normalName[MAX_QPATH];
+
+	COM_StripExtension( albedoMapName, normalName, sizeof(normalName) );
+	Q_strcat( normalName, sizeof(normalName), "_n" );
+
+	stage->normalMap = R_FindImageFile( normalName, flags );
+
+	if ( !stage->normalMap )
+		return;
+
+	stage->vk_pbr_flags |= PBR_HAS_NORMALMAP;
+}
+
 void vk_create_phyisical_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags, const uint32_t physicalMapBits ) {
 
 	if ( physicalMapBits & PHYS_RMO ) {

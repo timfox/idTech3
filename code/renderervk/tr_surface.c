@@ -302,6 +302,7 @@ static void RB_SurfaceTriangles( const srfTriangles_t *srf ) {
 	float		*xyz, *normal;
 #ifdef USE_VK_PBR
 	float				*qtangent;
+	float				*lightdir;
 #endif
 	float		*texCoords0;
 	float		*texCoords1;
@@ -357,6 +358,7 @@ static void RB_SurfaceTriangles( const srfTriangles_t *srf ) {
 	normal = tess.normal[ tess.numVertexes ];
 #ifdef USE_VK_PBR
 	qtangent = tess.qtangent[ tess.numVertexes ];
+	lightdir = tess.lightdir[ tess.numVertexes ];
 #endif
 	texCoords0 = tess.texCoords[0][ tess.numVertexes ];
 	texCoords1 = tess.texCoords[1][ tess.numVertexes ];
@@ -383,6 +385,12 @@ static void RB_SurfaceTriangles( const srfTriangles_t *srf ) {
 			qtangent[2] = dv->qtangent[2];
 			qtangent[3] = dv->qtangent[3];
 			qtangent += 4;
+
+			lightdir[0] = dv->lightdir[0];
+			lightdir[1] = dv->lightdir[1];
+			lightdir[2] = dv->lightdir[2];
+			lightdir[3] = 0.0;
+			lightdir += 4;
 		}
 #endif
 
@@ -972,6 +980,9 @@ static void RB_SurfaceFace( const srfSurfaceFace_t *surf ) {
 #ifdef USE_VK_PBR
 		if( vk.pbrActive && surf->qtangents )	
 			memcpy( &tess.qtangent[ tess.numVertexes ], surf->qtangents, numPoints * sizeof( vec4_t ) );	
+
+		if( vk.pbrActive && surf->lightdir )	
+			memcpy( &tess.lightdir[ tess.numVertexes ], surf->lightdir, numPoints * sizeof( vec4_t ) );
 #endif
 
 	for ( i = 0, v = surf->points[0], ndx = tess.numVertexes; i < numPoints; i++, v += VERTEXSIZE, ndx++ ) {
@@ -1121,6 +1132,7 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 	float	*normal;
 #ifdef USE_VK_PBR
 	float	*qtangent;
+	float	*lightdir;
 #endif
 	uint32_t *color;
 	srfVert_t *dv;
@@ -1248,6 +1260,7 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 		normal = tess.normal[numVertexes];
 #ifdef USE_VK_PBR
 		qtangent = tess.qtangent[numVertexes];
+		lightdir = tess.lightdir[numVertexes];
 #endif
 		texCoords0 = tess.texCoords[0][numVertexes];
 		texCoords1 = tess.texCoords[1][numVertexes];
@@ -1290,6 +1303,12 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 					qtangent[2] = dv->qtangent[2];
 					qtangent[3] = dv->qtangent[3];
 					qtangent += 4;
+
+					lightdir[0] = dv->lightdir[0];
+					lightdir[1] = dv->lightdir[1];
+					lightdir[2] = dv->lightdir[2];
+					lightdir[3] = 0.0;
+					lightdir += 4;
 				}
 #endif
 

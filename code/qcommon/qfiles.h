@@ -456,6 +456,7 @@ typedef struct {
 	vec3_t		normal;
 #ifdef USE_VK_PBR
 	vec4_t		qtangent;
+	vec4_t		lightdir;
 #endif
 	color4ub_t	color;
 } srfVert_t;

@@ -481,7 +481,7 @@ static void RB_Hyperspace( void ) {
 
 static void SetViewportAndScissor( void ) {
 #ifdef USE_VULKAN
-	//Com_Memcpy( vk_world.modelview_transform, backEnd.or.modelMatrix, 64 );
+	//Com_Memcpy( vk_world.modelview_transform, backEnd.or.modelViewMatrix, 64 );
 	//vk_update_mvp();
 	// force depth range and viewport/scissor updates
 	vk.cmd->depth_range = DEPTH_RANGE_COUNT;
@@ -703,11 +703,11 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 			tess.shaderTime = backEnd.refdef.floatTime - tess.shader->timeOffset;
 
 #ifdef USE_VULKAN
-			Com_Memcpy( vk_world.modelview_transform, backEnd.or.modelMatrix, 64 );
+			Com_Memcpy( vk_world.modelview_transform, backEnd.or.modelViewMatrix, 64 );
 			tess.depthRange = depthRange ? DEPTH_RANGE_WEAPON : DEPTH_RANGE_NORMAL;
 			vk_update_mvp( NULL );
 #else
-			qglLoadMatrixf( backEnd.or.modelMatrix );
+			qglLoadMatrixf( backEnd.or.modelViewMatrix );
 #endif
 
 			//
@@ -778,11 +778,11 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 
 	// go back to the world modelview matrix
 #ifdef USE_VULKAN
-	Com_Memcpy( vk_world.modelview_transform, backEnd.viewParms.world.modelMatrix, 64 );
+	Com_Memcpy( vk_world.modelview_transform, backEnd.viewParms.world.modelViewMatrix, 64 );
 	tess.depthRange = DEPTH_RANGE_NORMAL;
 	//vk_update_mvp();
 #else
-	qglLoadMatrixf( backEnd.viewParms.world.modelMatrix );
+	qglLoadMatrixf( backEnd.viewParms.world.modelViewMatrix );
 	if ( depthRange ) {
 		qglDepthRange(0, 1);
 	}
@@ -921,10 +921,10 @@ static void RB_RenderLitSurfList( dlight_t* dl ) {
 
 #ifdef USE_VULKAN
 			tess.depthRange = depthRange ? DEPTH_RANGE_WEAPON : DEPTH_RANGE_NORMAL;
-			Com_Memcpy( vk_world.modelview_transform, backEnd.or.modelMatrix, 64 );
+			Com_Memcpy( vk_world.modelview_transform, backEnd.or.modelViewMatrix, 64 );
 			vk_update_mvp( NULL );
 #else
-			qglLoadMatrixf( backEnd.or.modelMatrix );
+			qglLoadMatrixf( backEnd.or.modelViewMatrix );
 
 			//
 			// change depthrange. Also change projection matrix so first person weapon does not look like coming
@@ -994,11 +994,11 @@ static void RB_RenderLitSurfList( dlight_t* dl ) {
 
 	// go back to the world modelview matrix
 #ifdef USE_VULKAN
-	Com_Memcpy( vk_world.modelview_transform, backEnd.viewParms.world.modelMatrix, 64 );
+	Com_Memcpy( vk_world.modelview_transform, backEnd.viewParms.world.modelViewMatrix, 64 );
 	tess.depthRange = DEPTH_RANGE_NORMAL;
 	//vk_update_mvp();
 #else
-	qglLoadMatrixf( backEnd.viewParms.world.modelMatrix );
+	qglLoadMatrixf( backEnd.viewParms.world.modelViewMatrix );
 	if ( depthRange ) {
 		qglDepthRange (0, 1);
 	}
@@ -1224,7 +1224,7 @@ static void RB_LightingPass( void )
 
 static void transform_to_eye_space( const vec3_t v, vec3_t v_eye )
 {
-	const float *m = backEnd.viewParms.world.modelMatrix;
+	const float *m = backEnd.viewParms.world.modelViewMatrix;
 	v_eye[0] = m[0]*v[0] + m[4]*v[1] + m[8 ]*v[2] + m[12];
 	v_eye[1] = m[1]*v[0] + m[5]*v[1] + m[9 ]*v[2] + m[13];
 	v_eye[2] = m[2]*v[0] + m[6]*v[1] + m[10]*v[2] + m[14];
