@@ -150,6 +150,7 @@ typedef struct {
 	vec3_t		axis[3];		// orientation in world
 	vec3_t		viewOrigin;		// viewParms->or.origin in local coordinates
 	float		modelMatrix[16];
+	float		modelViewMatrix[16];
 } orientationr_t;
 
 //===============================================================================
@@ -394,6 +395,10 @@ typedef struct {
 
 	float			roughness_value;
 	float			metallic_value;
+
+	vec4_t normalScale;
+	vec4_t specularScale;
+	float  parallaxBias;
 #endif
 #endif
 
@@ -496,10 +501,14 @@ typedef struct shader_s {
 	int			curIndexes;
 #ifdef USE_VK_PBR
 	int			qtangentOffset;
+	int			lightdirOffset;
 #endif
 #endif
 
 	int			hasScreenMap;
+#ifdef USE_VK_PBR
+	qboolean	hasPBR;
+#endif
 
 	float		lightmapOffset[2];	// within merged lightmap
 
@@ -770,6 +779,7 @@ typedef struct {
 	float		*normals;
 #ifdef USE_VK_PBR
 	float			*qtangents;
+	float			*lightdir;
 #endif
 
 	// triangle definitions (no normals at points)
@@ -1562,6 +1572,7 @@ void		R_ShaderList_f( void );
 void		RE_RemapShader(const char *oldShader, const char *newShader, const char *timeOffset);
 
 #ifdef USE_VK_PBR
+void		vk_create_normal_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
 void		vk_create_phyisical_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags, const uint32_t physicalMapBits );
 #endif
 
@@ -1593,6 +1604,7 @@ typedef struct shaderCommands_s
 	vec4_t		normal[SHADER_MAX_VERTEXES] QALIGN(16);
 #ifdef USE_VK_PBR
 	vec4_t		qtangent[SHADER_MAX_VERTEXES]					QALIGN(16);
+	vec4_t		lightdir[SHADER_MAX_VERTEXES]					QALIGN(16);
 #endif
 	vec2_t		texCoords[2][SHADER_MAX_VERTEXES] QALIGN(16);
 	vec2_t		texCoords00[SHADER_MAX_VERTEXES] QALIGN(16);
@@ -1699,7 +1711,9 @@ void R_DlightBmodel( bmodel_t *bmodel );
 void R_SetupEntityLighting( const trRefdef_t *refdef, trRefEntity_t *ent );
 void R_TransformDlights( int count, dlight_t *dl, orientationr_t *or );
 int R_LightForPoint( vec3_t point, vec3_t ambientLight, vec3_t directedLight, vec3_t lightDir );
-
+#ifdef USE_VK_PBR
+int R_LightDirForPoint( vec3_t point, vec3_t lightDir, vec3_t normal, world_t *world );
+#endif
 #ifdef USE_PMLIGHT
 void VK_LightingPass( void );
 qboolean R_LightCullBounds( const dlight_t* dl, const vec3_t mins, const vec3_t maxs );
@@ -1820,7 +1834,7 @@ int R_IQMLerpTag( orientation_t *tag, iqmData_t *data,
 =============================================================
 =============================================================
 */
-void	R_TransformModelToClip( const vec3_t src, const float *modelMatrix, const float *projectionMatrix,
+void	R_TransformModelToClip( const vec3_t src, const float *modelViewMatrix, const float *projectionMatrix,
 							vec4_t eye, vec4_t dst );
 void	R_TransformClipToWindow( const vec4_t clip, const viewParms_t *view, vec4_t normalized, vec4_t window );
 

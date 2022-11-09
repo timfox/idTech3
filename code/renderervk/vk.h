@@ -4,6 +4,8 @@
 #include "tr_common.h"
 
 #ifdef USE_VK_PBR
+typedef float mat4_t[16];
+
 #define VK_LAYOUT_COUNT					9
 #else
 #define VK_LAYOUT_COUNT					6
@@ -178,6 +180,11 @@ typedef struct vkUniform_s {
 	vec4_t lightVector;
 } vkUniform_t;
 
+typedef struct vkUniformCamera_s {
+	vec4_t viewOrigin;
+	mat4_t modelMatrix;
+} vkUniformCamera_t;
+
 #define TESS_XYZ   (1)
 #define TESS_RGBA0 (2)
 #define TESS_RGBA1 (4)
@@ -304,7 +311,7 @@ typedef struct vk_tess_s {
 	uint32_t		uniform_read_offset;
 #ifdef USE_VK_PBR
 	VkDeviceSize		buf_offset[9];
-	VkDeviceSize		vbo_offset[9];
+	VkDeviceSize		vbo_offset[10];
 #else
 	VkDeviceSize		buf_offset[8];
 	VkDeviceSize		vbo_offset[8];
@@ -316,7 +323,7 @@ typedef struct vk_tess_s {
 	struct {
 		uint32_t		start, end;
 		VkDescriptorSet	current[VK_LAYOUT_COUNT]; // 0:storage, 1:uniform, 2:color0, 3:color1, 4:color2, 5:fog, 6:brdf lut, 7:normal, 8:physical
-		uint32_t		offset[2]; // 0 (uniform) and 5 (storage)
+		uint32_t		offset[3]; // 0 (uniform) and 5 (storage)
 	} descriptor_set;
 
 	Vk_Depth_Range depth_range;
@@ -442,6 +449,7 @@ typedef struct {
 	} storage;
 
 	uint32_t uniform_item_size;
+	uint32_t uniform_camera_item_size;
 	uint32_t uniform_alignment;
 	uint32_t storage_alignment;
 

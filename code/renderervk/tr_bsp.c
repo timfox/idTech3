@@ -538,7 +538,7 @@ static shader_t *ShaderForShaderNum( int shaderNum, int lightmapNum ) {
 #ifdef USE_VK_PBR
 static void GenerateFaceTangents( srfSurfaceFace_t *face )
 {
-	if( !vk.pbrActive )
+	if ( !vk.pbrActive )
 		return;
 
 	float		*xyz0, *xyz1, *xyz2;
@@ -556,7 +556,7 @@ static void GenerateFaceTangents( srfSurfaceFace_t *face )
 		i1 = indices[i + 1];
 		i2 = indices[i + 2];
 
-		if (i0 >= face->numPoints || i1 >= face->numPoints || i2 >= face->numPoints)
+		if ( i0 >= face->numPoints || i1 >= face->numPoints || i2 >= face->numPoints )
 			continue;
 
 		xyz0 = face->points[i0];		// xyz
@@ -588,19 +588,19 @@ static void GenerateFaceTangents( srfSurfaceFace_t *face )
 
 static void GenerateTriTangents( srfTriangles_t *tri )
 {
-	if( !vk.pbrActive )
+	if ( !vk.pbrActive )
 		return;
 
 	srfVert_t	*dv0, *dv1, *dv2;
 	int			i, i0, i1, i2;
 	vec3_t		tangent, binormal;
 
-	for (i = 0; i < tri->numIndexes; i += 3) {
+	for ( i = 0; i < tri->numIndexes; i += 3 ) {
 		i0 = tri->indexes[ i + 0 ];
 		i1 = tri->indexes[ i + 1 ];
 		i2 = tri->indexes[ i + 2 ];
 
-		if (i0 >= tri->numVerts || i1 >= tri->numVerts || i2 >= tri->numVerts)
+		if ( i0 >= tri->numVerts || i1 >= tri->numVerts || i2 >= tri->numVerts )
 			continue;
 
 		dv0 = &tri->verts[i0];
@@ -617,7 +617,60 @@ static void GenerateTriTangents( srfTriangles_t *tri )
 	}
 }
 
+static void GenerateFaceLightDirs( srfSurfaceFace_t *face ) {
+	face->lightdir = (float*)ri.Hunk_Alloc( face->numPoints * sizeof(tess.lightdir[0]), h_low );
 
+	for ( int i = 0; i < face->numPoints; i++ )
+		R_LightDirForPoint( face->points[i], face->lightdir + i * 4, face->points[i] + 3, &s_worldData );
+}
+
+static void GenerateTriLightDirs( srfTriangles_t *tri ) {
+	for ( int i = 0; i < tri->numVerts; i++ )
+		R_LightDirForPoint( tri->verts[i].xyz, tri->verts[i].lightdir, tri->verts[i].normal, &s_worldData );
+}
+
+static void GenerateGridLightDirs( srfGridMesh_t *grid ) {
+	int	width, height, numPoints;
+
+	width = LittleLong( grid->width );
+	height = LittleLong( grid->height );
+	numPoints = width * height;
+
+	for ( int i = 0; i < numPoints; i++ )
+		R_LightDirForPoint( grid->verts[i].xyz, grid->verts[i].lightdir, grid->verts[i].normal, &s_worldData );
+}
+
+static void vk_generate_light_directions( void )
+{
+	if ( !vk.pbrActive )
+		return;
+
+	srfSurfaceFace_t *face;
+	srfTriangles_t *tris;
+	srfGridMesh_t *grid;
+	msurface_t *sf;
+	uint32_t i;
+
+	for ( i = 0, sf = &s_worldData.surfaces[0]; i < s_worldData.numsurfaces; i++, sf++ ) {
+		face = (srfSurfaceFace_t *)sf->data;
+		if ( face->surfaceType == SF_FACE ) {
+			GenerateFaceLightDirs( face );
+			continue;
+		}
+
+		tris = (srfTriangles_t *)sf->data;
+		if ( tris->surfaceType == SF_TRIANGLES) {
+			GenerateTriLightDirs( tris ); 
+			continue;
+		}
+
+		grid = (srfGridMesh_t *)sf->data;
+		if ( grid->surfaceType == SF_GRID ) {
+			GenerateGridLightDirs( grid ); 
+			continue;
+		}
+	}
+}
 #endif
 
 
@@ -2424,6 +2477,10 @@ void RE_LoadWorldMap( const char *name ) {
 	R_LoadVisibility( &header->lumps[LUMP_VISIBILITY] );
 	R_LoadEntities( &header->lumps[LUMP_ENTITIES] );
 	R_LoadLightGrid( &header->lumps[LUMP_LIGHTGRID] );
+
+#ifdef USE_VK_PBR
+	vk_generate_light_directions();
+#endif	
 
 #ifdef USE_VBO
 	R_BuildWorldVBO( s_worldData.surfaces, s_worldData.numsurfaces );

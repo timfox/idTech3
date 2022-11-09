@@ -1974,46 +1974,71 @@ static VkShaderModule SHADER_MODULE(const uint8_t *bytes, const int count) {
 
 static void vk_create_layout_binding( int binding, VkDescriptorType type, VkShaderStageFlags flags, VkDescriptorSetLayout *layout )
 {
-	VkDescriptorSetLayoutBinding bind;
+	uint32_t count = 0;
+	VkDescriptorSetLayoutBinding bind[2];
 	VkDescriptorSetLayoutCreateInfo desc;
 
-	bind.binding = binding;
-	bind.descriptorType = type;
-	bind.descriptorCount = 1;
-	bind.stageFlags = flags;
-	bind.pImmutableSamplers = NULL;
+	bind[count].binding = binding;
+	bind[count].descriptorType = type;
+	bind[count].descriptorCount = 1;
+	bind[count].stageFlags = flags;
+	bind[count].pImmutableSamplers = NULL;
+	count++;
+
+	if ( *layout == vk.set_layout_uniform ) {
+		bind[count].binding = binding + 1; // binding 1 
+		bind[count].descriptorType = type;
+		bind[count].descriptorCount = 1;
+		bind[count].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		bind[count].pImmutableSamplers = NULL;
+		count++;    
+	}
 
 	desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	desc.pNext = NULL;
 	desc.flags = 0;
-	desc.bindingCount = 1;
-	desc.pBindings = &bind;
+	desc.bindingCount = count;
+	desc.pBindings = bind;
 
 	VK_CHECK( qvkCreateDescriptorSetLayout(vk.device, &desc, NULL, layout ) );
 }
 
+static void vk_write_uniform_descriptor( VkWriteDescriptorSet *desc, VkDescriptorBufferInfo *info, VkDescriptorSet descriptor, const uint32_t binding )
+{
+	desc->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	desc->dstSet = descriptor;
+	desc->dstBinding = binding;
+	desc->dstArrayElement = 0;
+	desc->descriptorCount = 1;
+	desc->pNext = NULL;
+	desc->descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
+	desc->pImageInfo = NULL;
+	desc->pBufferInfo = info;
+	desc->pTexelBufferView = NULL;
+}
 
 void vk_update_uniform_descriptor( VkDescriptorSet descriptor, VkBuffer buffer )
 {
-	VkDescriptorBufferInfo info;
-	VkWriteDescriptorSet desc;
+	VkDescriptorBufferInfo info[2];
+	VkWriteDescriptorSet desc[2];
+	uint32_t count = 0;
 
-	info.buffer = buffer;
-	info.offset = 0;
-	info.range = sizeof( vkUniform_t );
+	info[count].buffer = buffer;
+	info[count].offset = 0;
+	info[count].range = sizeof(vkUniform_t);
 
-	desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	desc.dstSet = descriptor;
-	desc.dstBinding = 0;
-	desc.dstArrayElement = 0;
-	desc.descriptorCount = 1;
-	desc.pNext = NULL;
-	desc.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-	desc.pImageInfo = NULL;
-	desc.pBufferInfo = &info;
-	desc.pTexelBufferView = NULL;
+	vk_write_uniform_descriptor( desc + 0, info + 0, descriptor, 0 );
+	count++;
 
-	qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+	// camera
+	info[count].buffer = buffer;
+	info[count].offset = 0;
+	info[count].range = sizeof(vkUniformCamera_t);
+
+	vk_write_uniform_descriptor( desc + 1, info + 1, descriptor, 1 );
+	count++;
+
+	qvkUpdateDescriptorSets( vk.device, count, desc, 0, NULL );
 }
 
 
@@ -3727,7 +3752,9 @@ void vk_initialize( void )
 	vk.cmd = vk.tess + 0;
 	vk.uniform_alignment = props.limits.minUniformBufferOffsetAlignment;
 	vk.uniform_item_size = PAD( sizeof( vkUniform_t ), vk.uniform_alignment );
-
+#ifdef USE_VK_PBR	
+	vk.uniform_camera_item_size = PAD( sizeof( vkUniformCamera_t ), vk.uniform_alignment );
+#endif
 	// for flare visibility tests
 	vk.storage_alignment = MAX( props.limits.minStorageBufferOffsetAlignment, sizeof( uint32_t ) );
 
@@ -3919,6 +3946,10 @@ void vk_initialize( void )
 
 		pool_size[1].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
 		pool_size[1].descriptorCount = NUM_COMMAND_BUFFERS;
+#ifdef USE_VK_PBR
+        if ( vk.pbrActive )
+            pool_size[1].descriptorCount += NUM_COMMAND_BUFFERS; // camera uniform
+#endif
 
 		//pool_size[2].type = VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
 		//pool_size[2].descriptorCount = NUM_COMMAND_BUFFERS;
@@ -5287,8 +5318,8 @@ void vk_create_blur_pipeline( uint32_t index, uint32_t width, uint32_t height, q
 
 
 #ifdef USE_VK_PBR
-static VkVertexInputBindingDescription bindings[9];
-static VkVertexInputAttributeDescription attribs[9];
+static VkVertexInputBindingDescription bindings[10];
+static VkVertexInputAttributeDescription attribs[10];
 #else
 static VkVertexInputBindingDescription bindings[8];
 static VkVertexInputAttributeDescription attribs[8];
@@ -5321,7 +5352,6 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 #ifdef USE_VK_PBR
 	floatint_t frag_spec_data[15]; // 0:alpha-test-func, 1:alpha-test-value, 2:depth-fragment, 3:alpha-to-coverage, 4:color_mode, 5:abs_light, 6:multitexture mode, 7:discard mode, 8:identity color; 9: metallic value, 10: roughness value, 11: normal texture set; 12: physical texture set; 
 	VkSpecializationMapEntry spec_entries[14];
-	uint32_t use_pbr;
 #else
 	floatint_t frag_spec_data[9]; // 0:alpha-test-func, 1:alpha-test-value, 2:depth-fragment, 3:alpha-to-coverage, 4:color_mode, 5:abs_light, 6:multitexture mode, 7:discard mode, 8:identity color
 	VkSpecializationMapEntry spec_entries[10];
@@ -5346,7 +5376,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	unsigned int state_bits = def->state_bits;
 
 #ifdef USE_VK_PBR
-	use_pbr = def->vk_pbr_flags ? 1 : 0;
+	const int use_pbr = def->vk_pbr_flags ? 1 : 0;
 
 	switch ( def->shader_type ) {
 
@@ -6060,10 +6090,13 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			break;
 	}
 
- #ifdef USE_VK_PBR  // qtangent
+ #ifdef USE_VK_PBR  
     if( def->vk_pbr_flags ){    
-        push_bind( 8, sizeof( vec4_t ) );
+        push_bind( 8, sizeof( vec4_t ) );						// qtangent
         push_attr( 8, 8, VK_FORMAT_R32G32B32A32_SFLOAT );
+
+        push_bind( 9, sizeof(vec4_t) );							// lightdir
+        push_attr( 9, 9, VK_FORMAT_R32G32B32A32_SFLOAT );
     }
 #endif
 
@@ -6625,7 +6658,7 @@ void vk_update_mvp( const float *m ) {
 }
 
 #ifdef USE_VK_PBR
-static VkBuffer shade_bufs[9];
+static VkBuffer shade_bufs[10];
 #else
 static VkBuffer shade_bufs[8];
 #endif
@@ -6734,6 +6767,7 @@ void vk_bind_geometry( uint32_t flags )
 		shade_bufs[0] = shade_bufs[1] = shade_bufs[2] = shade_bufs[3] = shade_bufs[4] = shade_bufs[5] = shade_bufs[6] = shade_bufs[7] = vk.vbo.vertex_buffer;
 #ifdef USE_VK_PBR
 		shade_bufs[8] = vk.vbo.vertex_buffer;
+		shade_bufs[9] = vk.vbo.vertex_buffer;
 #endif
 
 		if ( flags & TESS_XYZ ) {  // 0
@@ -6779,6 +6813,9 @@ void vk_bind_geometry( uint32_t flags )
 		if (flags & TESS_PBR) {
 			vk.cmd->vbo_offset[8] = tess.shader->qtangentOffset;
 			vk_bind_index_attr(8);
+
+			vk.cmd->vbo_offset[9] = tess.shader->lightdirOffset;
+			vk_bind_index_attr(9);
 		}
 #endif
 
@@ -6790,6 +6827,7 @@ void vk_bind_geometry( uint32_t flags )
 		shade_bufs[0] = shade_bufs[1] = shade_bufs[2] = shade_bufs[3] = shade_bufs[4] = shade_bufs[5] = shade_bufs[6] = shade_bufs[7] = vk.cmd->vertex_buffer;
 #ifdef USE_VK_PBR
 		shade_bufs[8] = vk.cmd->vertex_buffer;
+		shade_bufs[9] = vk.cmd->vertex_buffer;
 #endif
 
 		if ( flags & TESS_XYZ ) {
@@ -6826,6 +6864,7 @@ void vk_bind_geometry( uint32_t flags )
 #ifdef USE_VK_PBR
 		if (flags & TESS_PBR) {
 			vk_bind_attr(8, sizeof(tess.qtangent[0]), tess.qtangent);
+			vk_bind_attr(9, sizeof(tess.lightdir[0]), tess.lightdir);
 		}
 #endif
 
@@ -6904,7 +6943,7 @@ void vk_update_descriptor_offset( int index, uint32_t offset )
 
 void vk_bind_descriptor_sets( void )
 {
-	uint32_t offsets[2], offset_count;
+	uint32_t offsets[3], offset_count;
 	uint32_t start, end, count;
 
 	start = vk.cmd->descriptor_set.start;
@@ -6916,6 +6955,10 @@ void vk_bind_descriptor_sets( void )
 	offset_count = 0;
 	if ( start <= 1 ) { // uniform offset or storage offset
 		offsets[ offset_count++ ] = vk.cmd->descriptor_set.offset[ start ];
+
+		if ( start == 1 ) {
+			offsets[offset_count++] = vk.cmd->descriptor_set.offset[start+1]; // camera uniform
+		}
 	}
 
 	count = end - start + 1;
@@ -7779,11 +7822,21 @@ qboolean vk_bloom( void )
 		// force depth range and viewport/scissor updates
 		vk.cmd->depth_range = DEPTH_RANGE_COUNT;
 
+		uint32_t offsets[2], offset_count;
+
 		// restore clobbered descriptor sets
 		for ( i = 0; i < VK_NUM_BLOOM_PASSES; i++ ) {
 			if ( vk.cmd->descriptor_set.current[i] != VK_NULL_HANDLE ) {
-				if ( i == 0 || i == 1 )
-					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout, i, 1, &vk.cmd->descriptor_set.current[i], 1, &vk.cmd->descriptor_set.offset[i] );
+				if ( i == 0 || i == 1 ) {
+					offset_count = 0;
+
+					offsets[offset_count++] = vk.cmd->descriptor_set.offset[i];
+
+					if ( i == 1 )
+						offsets[offset_count++] = vk.cmd->descriptor_set.offset[i + 1];
+
+					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout, i, 1, &vk.cmd->descriptor_set.current[i], offset_count, offsets );
+				}
 				else
 					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout, i, 1, &vk.cmd->descriptor_set.current[i], 0, NULL );
 			}

@@ -531,8 +531,10 @@ static void ProjectDlightTexture( void ) {
 #endif // USE_LEGACY_DLIGHTS
 
 uint32_t VK_PushUniform( const vkUniform_t *uniform );
+uint32_t VK_PushCameraUniform( const vkUniformCamera_t *uniform );
 void VK_SetFogParams( vkUniform_t *uniform, int *fogStage );
 static vkUniform_t uniform;
+static vkUniformCamera_t uniform_camera;
 
 /*
 ===================
@@ -893,6 +895,23 @@ void R_ComputeTexCoords( const int b, const textureBundle_t *bundle ) {
 	tess.svars.texcoordPtr[ b ] = src;
 }
 
+static qboolean vk_is_valid_pbr_surface( const qboolean hasPBR ) {
+	if( !vk.pbrActive || !hasPBR )
+		return qfalse;
+
+	if ( backEnd.projection2D )
+		return qfalse;
+
+	if ( backEnd.viewParms.portalView == PV_MIRROR)
+		return qfalse;
+
+	if ( backEnd.currentEntity) {
+		if ( backEnd.currentEntity != &tr.worldEntity )
+			return qfalse;
+	}
+
+	return qtrue;
+}
 
 /*
 ** RB_IterateStagesGeneric
@@ -904,19 +923,21 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 #endif
 {
 	const shaderStage_t *pStage;
-#ifdef USE_VK_PBR
-	Vk_Pipeline_Def	def;
-#endif
 	int tess_flags;
 	int stage, i;
 
 #ifdef USE_VULKAN
+#ifdef USE_VK_PBR
+	qboolean is_pbr_surface;
+#endif
 	uint32_t pipeline;
 	int fog_stage;
 
 	vk_bind_index();
 
 	tess_flags = input->shader->tessFlags;
+
+	is_pbr_surface = qfalse;
 
 #ifdef USE_FOG_COLLAPSE
 	if ( fogCollapse ) {
@@ -934,6 +955,20 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			tess_flags &= ~TESS_VPOS;
 		}
 	}
+
+
+#ifdef USE_VK_PBR
+	is_pbr_surface = vk_is_valid_pbr_surface( tess.shader->hasPBR );
+
+	if ( is_pbr_surface ) {
+		Com_Memcpy( &uniform_camera.modelMatrix, backEnd.or.modelMatrix, sizeof(float) * 16 );
+		Com_Memcpy( &uniform_camera.viewOrigin, backEnd.refdef.vieworg, sizeof( vec3_t) );
+		uniform_camera.viewOrigin[3] = 0.0;
+	}
+#endif
+	if ( is_pbr_surface )
+		VK_PushCameraUniform( &uniform_camera );
+
 #endif // USE_VULKAN
 
 	for ( stage = 0; stage < MAX_SHADER_STAGES; stage++ )
@@ -975,47 +1010,18 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		}
 
 #ifdef USE_VK_PBR
-		if( tess_flags & TESS_PBR ) 
-		{
-			// discard unsuported pbr geometry for now
-			if( backEnd.projection2D )
-				tess_flags &= ~TESS_PBR;
-
-			if( backEnd.viewParms.portalView == PV_MIRROR)
-				tess_flags &= ~TESS_PBR;
-
-			if( backEnd.currentEntity){
-				if ( backEnd.currentEntity != &tr.worldEntity )
-					tess_flags &= ~TESS_PBR;
-			}
-			
-			vk_get_pipeline_def( pipeline, &def );
-			if( def.shader_type < TYPE_GENERIC_BEGIN )
-				tess_flags &= ~TESS_PBR;
-			// check if pbr hasn't been discarded
-			if( tess_flags & TESS_PBR ) {
-				if ( fogCollapse || !(tess_flags & TESS_VPOS) ) {
-					Com_Memcpy( &uniform.eyePos, backEnd.or.viewOrigin, sizeof( vec3_t) );
-					uniform.eyePos[3] = 0.0;
-					VK_PushUniform( &uniform );	
-				}
-				// brdf lut
-				vk_update_pbr_descriptor(6, vk.brdflut_image_descriptor);
+		if ( is_pbr_surface && pStage->vk_pbr_flags ) {
+			vk_update_pbr_descriptor(6, vk.brdflut_image_descriptor);
 				
-				// unused preceeding descriptor sets is invalid API behaivior
-				// find a better way to mark unused descriptors 
-				// following THE last valid descriptor set
-				// for now, send a 2x2 pixel white texture
-				if( pStage->vk_pbr_flags & PBR_HAS_NORMALMAP )
-					vk_update_pbr_descriptor(7, pStage->normalMap->descriptor);
+			if ( pStage->vk_pbr_flags & PBR_HAS_NORMALMAP )
+				vk_update_pbr_descriptor(7, pStage->normalMap->descriptor);
 
-				if( pStage->vk_pbr_flags & PBR_HAS_PHYSICALMAP )
-					vk_update_pbr_descriptor(8, pStage->physicalMap->descriptor);
-				else
-					vk_update_pbr_descriptor(8, tr.emptyImage->descriptor);
-			
-				pipeline = pStage->vk_pbr_pipeline[fog_stage];
-			}
+			if ( pStage->vk_pbr_flags & PBR_HAS_PHYSICALMAP )
+				vk_update_pbr_descriptor(8, pStage->physicalMap->descriptor);
+			else
+				vk_update_pbr_descriptor(8, tr.emptyImage->descriptor);
+
+			pipeline = pStage->vk_pbr_pipeline[fog_stage];
 		}
 #endif
 
@@ -1159,6 +1165,24 @@ uint32_t VK_PushUniform( const vkUniform_t *uniform ) {
 	return offset;
 }
 
+uint32_t VK_PushCameraUniform( const vkUniformCamera_t *uniform ) {
+	const uint32_t offset = vk.cmd->uniform_read_offset = PAD( vk.cmd->vertex_buffer_offset, vk.uniform_alignment );
+
+	if ( offset + vk.uniform_camera_item_size > vk.geometry_buffer_size )
+		return ~0U;
+
+	// push uniform
+	Com_Memcpy( vk.cmd->vertex_buffer_ptr + offset, uniform, sizeof( *uniform ) );
+	vk.cmd->vertex_buffer_offset = offset + vk.uniform_camera_item_size;
+
+	vk_reset_descriptor( 1 );
+	vk_update_descriptor( 1, vk.cmd->uniform_descriptor );
+	vk_update_descriptor_offset( 1, 0 );
+	vk_update_descriptor_offset( 2, vk.cmd->uniform_read_offset );
+
+	return offset;
+}
+
 
 #ifdef USE_PMLIGHT
 void VK_LightingPass( void )
@@ -1226,7 +1250,6 @@ void VK_LightingPass( void )
 	vk_draw_geometry( tess.depthRange, qtrue );
 }
 #endif // USE_PMLIGHT
-
 
 void RB_StageIteratorGeneric( void )
 {
