@@ -902,10 +902,10 @@ static qboolean vk_is_valid_pbr_surface( const qboolean hasPBR ) {
 	if ( backEnd.projection2D )
 		return qfalse;
 
-	if ( backEnd.viewParms.portalView == PV_MIRROR)
+	if ( backEnd.viewParms.portalView == PV_MIRROR )
 		return qfalse;
 
-	if ( backEnd.currentEntity) {
+	if ( backEnd.currentEntity ) {
 		if ( backEnd.currentEntity != &tr.worldEntity )
 			return qfalse;
 	}
@@ -956,7 +956,6 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		}
 	}
 
-
 #ifdef USE_VK_PBR
 	is_pbr_surface = vk_is_valid_pbr_surface( tess.shader->hasPBR );
 
@@ -964,11 +963,10 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		Com_Memcpy( &uniform_camera.modelMatrix, backEnd.or.modelMatrix, sizeof(float) * 16 );
 		Com_Memcpy( &uniform_camera.viewOrigin, backEnd.refdef.vieworg, sizeof( vec3_t) );
 		uniform_camera.viewOrigin[3] = 0.0;
+
+		VK_PushCameraUniform( &uniform_camera );
 	}
 #endif
-	if ( is_pbr_surface )
-		VK_PushCameraUniform( &uniform_camera );
-
 #endif // USE_VULKAN
 
 	for ( stage = 0; stage < MAX_SHADER_STAGES; stage++ )

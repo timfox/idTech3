@@ -659,7 +659,7 @@ static void vk_generate_light_directions( void )
 		}
 
 		tris = (srfTriangles_t *)sf->data;
-		if ( tris->surfaceType == SF_TRIANGLES) {
+		if ( tris->surfaceType == SF_TRIANGLES ) {
 			GenerateTriLightDirs( tris ); 
 			continue;
 		}
