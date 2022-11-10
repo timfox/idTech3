@@ -6956,9 +6956,8 @@ void vk_bind_descriptor_sets( void )
 	if ( start <= 1 ) { // uniform offset or storage offset
 		offsets[ offset_count++ ] = vk.cmd->descriptor_set.offset[ start ];
 
-		if ( start == 1 ) {
+		if ( start == 1 )
 			offsets[offset_count++] = vk.cmd->descriptor_set.offset[start+1]; // camera uniform
-		}
 	}
 
 	count = end - start + 1;

@@ -1302,7 +1302,8 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			vk_create_phyisical_texture( stage, physicalAlbedoName, flags, physicalMapBits );
 
 		if( ( stage->vk_pbr_flags & PBR_HAS_NORMALMAP ) == 0 )
-			vk_create_normal_texture( stage, physicalAlbedoName, flags );	}
+			vk_create_normal_texture( stage, physicalAlbedoName, flags );
+	}
 #endif
 
 	//
