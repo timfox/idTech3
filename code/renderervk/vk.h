@@ -6,7 +6,7 @@
 #ifdef USE_VK_PBR
 typedef float mat4_t[16];
 
-#define VK_LAYOUT_COUNT					9
+#define VK_LAYOUT_COUNT					10
 #else
 #define VK_LAYOUT_COUNT					6
 
@@ -33,7 +33,7 @@ typedef float mat4_t[16];
 
 #define USE_DEDICATED_ALLOCATION
 //#define MIN_IMAGE_ALIGN (128*1024)
-#define MAX_ATTACHMENTS_IN_POOL (8+VK_NUM_BLOOM_PASSES*2) // depth + msaa + msaa-resolve + depth-resolve + screenmap.msaa + screenmap.resolve + screenmap.depth + bloom_extract + blur pairs
+#define MAX_ATTACHMENTS_IN_POOL (11+VK_NUM_BLOOM_PASSES*2) // depth + msaa + msaa-resolve + depth-resolve + screenmap.msaa + screenmap.resolve + screenmap.depth + bloom_extract + blur pairs
 
 typedef enum {
 	TYPE_COLOR_WHITE,
@@ -136,6 +136,7 @@ typedef enum {
 	RENDER_PASS_SCREENMAP = 0,
 	RENDER_PASS_MAIN,
 	RENDER_PASS_POST_BLOOM,
+	RENDER_PASS_CUBEMAP,
 	RENDER_PASS_COUNT
 } renderPass_t;
 
@@ -154,8 +155,7 @@ typedef struct {
 
 #ifdef USE_VK_PBR
 	uint32_t				vk_pbr_flags;
-	float					roughness_value;
-	float					metallic_value;
+	vec4_t					specularScale;
 #endif
 } Vk_Pipeline_Def;
 
@@ -182,6 +182,7 @@ typedef struct vkUniform_s {
 
 typedef struct vkUniformCamera_s {
 	vec4_t viewOrigin;
+	vec4_t localViewOrigin;
 	mat4_t modelMatrix;
 } vkUniformCamera_t;
 
@@ -201,18 +202,41 @@ typedef struct vkUniformCamera_s {
 
 #define PBR_HAS_NORMALMAP		( 1 )
 #define PBR_HAS_PHYSICALMAP		( 2 )
-#define PBR_HAS_ROUGHNESS_VALUE	( 4 )
-#define PBR_HAS_METALLIC_VALUE	( 8 )
+#define PBR_HAS_LIGHTMAP		( 4 )
 
 #define PHYS_NONE				( 1 )
-#define PHYS_ROUGHNESS			( 2 )
-#define PHYS_METALLIC			( 4 )
-#define PHYS_OCCLUSION			( 8 )
-#define PHYS_RMO				( 16 )
+#define PHYS_RMO				( 2 )
+#define PHYS_RMOS   			( 4 )
+#define PHYS_MOXR   			( 8 )
+#define PHYS_MOSR   			( 16 )
+#define PHYS_ORM  				( 32 )	
+#define PHYS_ORMS   			( 64 )	
+#define PHYS_NORMAL   			( 128 )	
+#define PHYS_NORMALHEIGHT		( 256 )	
 
 #define ByteToFloat(a)			((float)(a) * 1.0f/255.0f)
 #define FloatToByte(a)			(byte)((a) * 255.0f)
 #endif
+
+typedef struct textureMapType_s {
+	uint32_t			type;
+	const char			*suffix;
+	VkComponentMapping	swizzle;
+} textureMapType_t;
+
+static const textureMapType_t textureMapTypes[] = {
+	{ (uint32_t)NULL,				"",			{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, } },
+#ifdef USE_VK_PBR
+	{ (uint32_t)PHYS_RMO,			"_rmo",		{ VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_ONE,	} },
+	{ (uint32_t)PHYS_RMOS,			"_rmos",	{ VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_A, } },
+	{ (uint32_t)PHYS_MOXR,			"_moxr",	{ VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_A, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_ONE } },
+	{ (uint32_t)PHYS_MOSR,			"_mosr",	{ VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_A, VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_B } },
+	{ (uint32_t)PHYS_ORM,			"_orm",		{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY } },
+	{ (uint32_t)PHYS_ORMS,			"_orms",	{ VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY } },
+	{ (uint32_t)PHYS_NORMAL,		"_n",		{ VK_COMPONENT_SWIZZLE_A, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_R } },
+	{ (uint32_t)PHYS_NORMALHEIGHT,	"_nh",		{ VK_COMPONENT_SWIZZLE_A, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_R } },
+#endif
+};
 
 //
 // Initialization.
@@ -288,6 +312,14 @@ const char *vk_format_string( VkFormat format );
 void VBO_PrepareQueues( void );
 void VBO_RenderIBOItems( void );
 void VBO_ClearQueue( void );
+
+// cubemap
+#ifdef VK_CUBEMAP
+void vk_clear_cube_color( image_t *image, VkClearColorValue color );
+void vk_begin_cubemap_render_pass( void );
+void vk_create_cubemap_prefilter( void );
+void vk_destroy_cubemap_prefilter( void );
+#endif
 
 #ifdef VK_PBR_BRDFLUT
 void vk_update_pbr_descriptor( const int tmu, VkDescriptorSet curDesSet );
@@ -370,6 +402,7 @@ typedef struct {
 #ifdef VK_PBR_BRDFLUT
 		VkRenderPass brdflut;
 #endif
+		VkRenderPass cubemap;
 	} render_pass;
 
 	VkDescriptorPool descriptor_pool;
@@ -415,6 +448,17 @@ typedef struct {
 
 	} screenMap;
 
+	// cubemap
+	struct {
+		VkImage			depth_image;
+		VkImageView		depth_image_view;
+		VkImage			color_image_msaa;
+		VkImageView		color_image_view_msaa[7];
+		VkDescriptorSet color_descriptor;
+		VkImage			color_image;
+		VkImageView		color_image_view[7];
+	} cubeMap;
+
 	struct {
 		VkImage image;
 		VkImageView image_view;
@@ -436,6 +480,7 @@ typedef struct {
 #ifdef VK_PBR_BRDFLUT
 		VkFramebuffer brdflut;
 #endif
+		VkFramebuffer cubemap[6];
 	} framebuffers;
 
 	vk_tess_t tess[ NUM_COMMAND_BUFFERS ], *cmd;
@@ -513,7 +558,10 @@ typedef struct {
 #ifdef VK_PBR_BRDFLUT
 		VkShaderModule brdflut_fs;
 #endif
-
+		VkShaderModule filtercube_vs;
+		VkShaderModule filtercube_gm;
+		VkShaderModule irradiancecube_fs;
+		VkShaderModule prefilterenvmap_fs;
 	} modules;
 
 	VkPipelineCache pipelineCache;
@@ -607,7 +655,9 @@ typedef struct {
 #ifdef USE_VK_PBR
 	qboolean pbrActive;
 #endif
-
+#ifdef VK_CUBEMAP
+	qboolean cubemapActive;
+#endif
 	qboolean offscreenRender;
 
 	qboolean windowAdjusted;

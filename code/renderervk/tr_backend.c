@@ -1100,7 +1100,7 @@ void RE_UploadCinematic( int w, int h, int cols, int rows, byte *data, int clien
 	image_t *image;
 
 	if ( !tr.scratchImage[ client ] ) {
-		tr.scratchImage[ client ] = R_CreateImage( va( "*scratch%i", client ), NULL, data, cols, rows, IMGFLAG_CLAMPTOEDGE | IMGFLAG_RGB | IMGFLAG_NOSCALE );
+		tr.scratchImage[ client ] = R_CreateImage( va( "*scratch%i", client ), NULL, data, cols, rows, IMGFLAG_CLAMPTOEDGE | IMGFLAG_RGB | IMGFLAG_NOSCALE, 0, 0 );
 	}
 
 	image = tr.scratchImage[ client ];
@@ -1372,6 +1372,17 @@ static const void *RB_DrawSurfs( const void *data ) {
 
 	// clear the z buffer, set the modelview, etc
 	RB_BeginDrawingView();
+
+#ifdef VK_CUBEMAP
+	if ( backEnd.viewParms.targetCube != NULL ) 
+	{
+		vk_end_render_pass();
+		vk_begin_cubemap_render_pass();
+		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+		backEnd.doneSurfaces = qtrue; // for bloom
+		return (const void*)(cmd + 1);
+	}
+#endif
 
 	RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
 
@@ -1742,6 +1753,41 @@ static const void *RB_SwapBuffers( const void *data ) {
 	return (const void *)(cmd + 1);
 }
 
+#ifdef VK_CUBEMAP
+/*
+=============
+RB_PrefilterEnvMap
+=============
+*/
+static const void *RB_PrefilterEnvMap( const void *data )
+{
+	const convolveCubemapCommand_t *cmd = (const convolveCubemapCommand_t *)data;
+	// finish any 2D drawing if needed
+	if ( tess.numIndexes )
+		RB_EndSurface();
+	RB_SetGL2D();
+	Com_Printf("prefilter cubemapsss %s\n", cmd->cubemap->name);
+	if ( !cmd->cubemap->prefiltered_image )
+		cmd->cubemap->prefiltered_image = R_CreateImage( 
+			va("cubemap prefitlered - %s", cmd->cubemap->name ), NULL,  
+			NULL, REF_CUBEMAP_SIZE, REF_CUBEMAP_SIZE, 
+			IMGFLAG_CUBEMAP | IMGFLAG_MIPMAP, 
+			VK_FORMAT_R16G16B16A16_SFLOAT, 0 );
+	
+	if ( !cmd->cubemap->irradiance_image )
+		cmd->cubemap->irradiance_image = R_CreateImage( 
+			va("cubemap irradiance - %s", cmd->cubemap->name ), NULL, 
+			NULL, REF_CUBEMAP_IRRADIANCE_SIZE, REF_CUBEMAP_IRRADIANCE_SIZE, 
+			IMGFLAG_CUBEMAP | IMGFLAG_MIPMAP, 
+			VK_FORMAT_R32G32B32A32_SFLOAT, 0 );
+#ifdef _DEBUG
+	assert( cmd->cubemap->irradiance_image );
+	assert( cmd->cubemap->prefiltered_image );
+#endif
+	vk_generate_cubemaps( cmd->cubemap );
+	return (const void *)(cmd + 1);
+}
+#endif
 
 /*
 ====================
@@ -1780,6 +1826,11 @@ void RB_ExecuteRenderCommands( const void *data ) {
 		case RC_CLEARDEPTH:
 			data = RB_ClearDepth(data);
 			break;
+#ifdef VK_CUBEMAP
+		case RC_CONVOLVECUBEMAP:
+			data = RB_PrefilterEnvMap( data );
+			break;
+#endif
 		case RC_CLEARCOLOR:
 			data = RB_ClearColor(data);
 			break;

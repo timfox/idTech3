@@ -1023,8 +1023,17 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 			if ( pStage->vk_pbr_flags & PBR_HAS_PHYSICALMAP )
 				vk_update_pbr_descriptor(8, pStage->physicalMap->descriptor);
-			else
-				vk_update_pbr_descriptor(8, tr.emptyImage->descriptor);
+			
+			if ( !tr.numCubemaps || backEnd.viewParms.targetCube != NULL ) {
+				vk_update_pbr_descriptor(9, tr.emptyCubemap->descriptor);
+				//vk_update_pbr_descriptor(10, tr.emptyCubemap->descriptor);
+			}
+			// currently use the frist cubemap for every surface
+			// use the first cubemap index, indexes are not assigned per surface yet
+			else { 
+				vk_update_pbr_descriptor(9, tr.cubemaps[0].prefiltered_image->descriptor);
+				//vk_update_pbr_descriptor(10, tr.cubemaps[0].irradiance_image->descriptor); // irradiance is currently unused
+			}
 
 			pipeline = pStage->vk_pbr_pipeline[fog_stage];
 		}
