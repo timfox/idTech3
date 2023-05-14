@@ -89,8 +89,9 @@ layout(location = 4) out vec2 fog_tex_coord;
 
 #ifdef USE_VK_PBR
 layout(set = 1, binding = 1) uniform UBO_Camera {
-	vec4 viewOrigin;
-	mat4 modelMatrix;
+	vec4 u_ViewOrigin;
+	vec4 u_localViewOrigin;
+	mat4 u_ModelMatrix;
 };
 
 struct NTB {
@@ -100,9 +101,9 @@ struct NTB {
 layout(location = 8) in vec4 in_qtangent;
 layout(location = 9) in vec4 in_lightdir;
 
-layout(location = 9)  out vec3 N;
-layout(location = 10) out vec3 L;
-layout(location = 11) out vec3 V;
+layout(location = 9) out vec4 var_Normal;
+layout(location = 10) out vec4 var_LightDir;
+layout(location = 11) out vec4 var_ViewDir;
 layout(location = 12) out NTB out_ntb;
 
 vec3 QuatTransVec( in vec4 quat, in vec3 vec ) {
@@ -125,15 +126,16 @@ out gl_PerVertex {
 void main() {
 	gl_Position = mvp * vec4(in_position, 1.0);
 
-#ifdef USE_VK_PBR
-	QTangentToNTB( in_qtangent, out_ntb );
+	#ifdef USE_VK_PBR
+		QTangentToNTB( in_qtangent, out_ntb );
+	#endif
 
-	vec3 position  = ( modelMatrix * vec4( in_position, 1.0 ) ).xyz;
-	N = normalize( mat3( modelMatrix ) * out_ntb.normal );
-	L = in_lightdir.xyz * 2.0 - vec3(1.0);
-	L = ( modelMatrix * vec4( L, 0.0 ) ).xyz;
-	V = viewOrigin.xyz - position;
-#endif
+	vec3 position = in_position;
+	#if defined(USE_VK_PBR)
+		vec3 normal = out_ntb.normal;
+	#elif defined(USE_ENV)
+		vec3 normal = in_normal;
+	#endif
 
 #ifdef USE_CL0_IDENT
 // use fixed color from frag.spec.constant.8
@@ -149,9 +151,9 @@ void main() {
 #endif
 
 #ifdef USE_ENV
-	vec3 viewer = normalize(eyePos.xyz - in_position);
-	float d = dot(in_normal, viewer); 
-	vec2 reflected = in_normal.yz * 2 * d - viewer.yz;
+	vec3 viewer = normalize(eyePos.xyz - position);
+	float d = dot(normal, viewer); 
+	vec2 reflected = normal.yz * 2 * d - viewer.yz;
 
 	frag_tex_coord0.s = 0.5 + reflected.x * 0.5;
 	frag_tex_coord0.t = 0.5 - reflected.y * 0.5;
@@ -185,5 +187,20 @@ void main() {
 	}
 
 	fog_tex_coord = vec2(s, t);
+#endif
+
+#if defined(USE_VK_PBR)
+	position		= (u_ModelMatrix * vec4(position, 1.0)).xyz;
+	normal			= normalize(mat3(u_ModelMatrix) * normal);
+
+	vec3 viewDir = u_ViewOrigin.xyz - position;
+
+	vec3 L	= in_lightdir.xyz * 2.0 - vec3(1.0);
+	L		= ( u_ModelMatrix * vec4( L, 0.0 ) ).xyz;
+	L		= normalize( ( L * 0.5 ) + vec3( 0.5 ) );
+
+	var_LightDir	= vec4(L, 0.0);
+	var_Normal		= vec4(normal, 0.0);
+	var_ViewDir		= vec4(viewDir, 0.0);
 #endif
 }

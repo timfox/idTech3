@@ -27,6 +27,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #ifdef USE_VK_PBR
 #define VK_PBR_BRDFLUT		// for inspecting codebase, does not toggle brdflut. 
+#define VK_CUBEMAP	
+
+#ifdef VK_CUBEMAP
+	#define REF_CUBEMAP_IRRADIANCE_SIZE		64
+	#define REF_CUBEMAP_SIZE				256
+#endif
 #endif
 
 #define USE_VBO				// store static world geometry in VBO
@@ -402,13 +408,8 @@ typedef struct {
 	image_t			*normalMap;
 	image_t			*physicalMap;
 
-	char			physicalMapName[MAX_QPATH];
-	char			roughnessMapName[MAX_QPATH];
-	char			metallicMapName[MAX_QPATH];
-	char			occlusionMapName[MAX_QPATH];
-
-	float			roughness_value;
-	float			metallic_value;
+	uint32_t		normalMapType;
+	uint32_t		physicalMapType;
 
 	vec4_t normalScale;
 	vec4_t specularScale;
@@ -593,6 +594,8 @@ typedef struct image_s {
 	int			internalFormat;
 
 	VkSamplerAddressMode wrapClampMode;
+	uint32_t	type;
+	uint32_t	layers;
 	VkImage		handle;
 	VkImageView	view;
 	// Descriptor set that contains single descriptor used to access the given image.
@@ -606,6 +609,13 @@ typedef struct image_s {
 
 } image_t;
 
+typedef struct cubemap_s {
+	char		name[MAX_QPATH];
+	vec3_t		origin;
+	float		parallaxRadius;
+	image_t		*prefiltered_image;
+	image_t		*irradiance_image;
+} cubemap_t;
 
 //=================================================================================
 
@@ -678,6 +688,8 @@ typedef struct {
 	unsigned int num_dlights;
 	struct dlight_s	*dlights;
 #endif
+	cubemap_t		*targetCube;
+	int				targetCubeLayer;
 } viewParms_t;
 
 /*
@@ -1186,6 +1198,12 @@ typedef struct {
 
 typedef struct drawSurfsCommand_s drawSurfsCommand_t;
 
+typedef struct convolveCubemapCommand_s {
+	int			commandId;
+	cubemap_t	*cubemap;
+	int			cubemapId;
+} convolveCubemapCommand_t;
+
 /*
 ** trGlobals_t 
 **
@@ -1224,6 +1242,11 @@ typedef struct {
 	image_t					*identityLightImage;	// full of tr.identityLightByte
 #ifdef USE_VK_PBR
 	image_t					*emptyImage;		// full of 0xff
+#endif
+#ifdef VK_CUBEMAP
+	image_t					*emptyCubemap;
+	int                     numCubemaps;
+	cubemap_t               *cubemaps;
 #endif
 
 	shader_t				*defaultShader;
@@ -1363,6 +1386,10 @@ extern cvar_t	*r_vbo;
 #endif
 #ifdef USE_VK_PBR
 extern cvar_t	*r_pbr;
+extern cvar_t	*r_baseSpecular;
+#ifdef VK_CUBEMAP
+extern cvar_t	*r_cubeMapping;
+#endif
 #endif
 extern cvar_t	*r_fbo;
 extern cvar_t	*r_hdr;
@@ -1588,8 +1615,8 @@ void		R_ShaderList_f( void );
 void		RE_RemapShader(const char *oldShader, const char *newShader, const char *timeOffset);
 
 #ifdef USE_VK_PBR
-void		vk_create_normal_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
-void		vk_create_phyisical_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags, const uint32_t physicalMapBits );
+qboolean vk_create_phyisical_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
+qboolean vk_create_normal_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
 #endif
 
 //
@@ -1809,7 +1836,8 @@ void RE_AddAdditiveLightToScene( const vec3_t org, float intensity, float r, flo
 void RE_AddLinearLightToScene( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b );
 
 void RE_RenderScene( const refdef_t *fd );
-
+void RE_BeginScene( const refdef_t *fd );
+void RE_EndScene( void );
 /*
 =============================================================
 
@@ -1973,7 +2001,8 @@ typedef enum {
 	RC_FINISHBLOOM,
 	RC_COLORMASK,
 	RC_CLEARDEPTH,
-	RC_CLEARCOLOR
+	RC_CLEARCOLOR,
+	RC_CONVOLVECUBEMAP
 } renderCommand_t;
 
 
@@ -2041,6 +2070,9 @@ void		R_CalcTangents( vec3_t tangent, vec3_t binormal,
 				const vec2_t t0, const vec2_t t1, const vec2_t t2 );
 void		R_TBNtoQtangents( const vec3_t tangent, const vec3_t binormal,
 		       const vec3_t normal, vec4_t qtangent );
+void		R_AddConvolveCubemapCmd( cubemap_t *cubemap , int cubemapId );
+void		vk_generate_cubemaps( cubemap_t *cube );
+void		R_IssueRenderCommands( void );
 #endif
 
 #ifdef USE_VBO

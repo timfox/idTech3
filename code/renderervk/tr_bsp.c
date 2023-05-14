@@ -24,6 +24,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #ifdef USE_VULKAN
 #include "vk.h"
+
+#ifdef VK_CUBEMAP
+#define JSON_IMPLEMENTATION
+#include "json.h"
+#undef JSON_IMPLEMENTATION
+#endif
 #endif
 
 /*
@@ -354,7 +360,7 @@ static void R_LoadMergedLightmaps( const lump_t *l, byte *image )
 	for ( offs = 0, i = 0 ; i < tr.numLightmaps; i++ ) {
 
 		tr.lightmaps[ i ] = R_CreateImage( va( "*mergedLightmap%d", i ), NULL, NULL,
-			lightmapWidth, lightmapHeight, lightmapFlags | IMGFLAG_CLAMPTOBORDER );
+			lightmapWidth, lightmapHeight, lightmapFlags | IMGFLAG_CLAMPTOBORDER, 0, 0 );
 
 		for ( y = 0; y < lightmapCountY; y++ ) {
 			if ( offs >= l->filelen )
@@ -439,7 +445,7 @@ static void R_LoadLightmaps( const lump_t *l ) {
 	for ( i = 0 ; i < tr.numLightmaps ; i++ ) {
 		maxIntensity = R_ProcessLightmap( image, buf + i * LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3, maxIntensity );
 		tr.lightmaps[i] = R_CreateImage( va( "*lightmap%d", i ), NULL, image, LIGHTMAP_SIZE, LIGHTMAP_SIZE,
-			lightmapFlags | IMGFLAG_CLAMPTOEDGE );
+			lightmapFlags | IMGFLAG_CLAMPTOEDGE, 0, 0 );
 	}
 
 	//if ( r_lightmap->integer == 2 )	{
@@ -2378,6 +2384,283 @@ qboolean RE_GetEntityToken( char *buffer, int size ) {
 	}
 }
 
+#ifdef VK_CUBEMAP
+#ifndef MAX_SPAWN_VARS
+#define MAX_SPAWN_VARS 64
+#endif
+
+// derived from G_ParseSpawnVars() in g_spawn.c
+static qboolean R_ParseSpawnVars( char *spawnVarChars, int maxSpawnVarChars, int *numSpawnVars, char *spawnVars[MAX_SPAWN_VARS][2] )
+{
+	char    keyname[MAX_TOKEN_CHARS];
+	char	com_token[MAX_TOKEN_CHARS];
+	int		numSpawnVarChars = 0;
+	*numSpawnVars = 0;
+	// parse the opening brace
+	if ( !RE_GetEntityToken( com_token, sizeof( com_token ) ) ) {
+		// end of spawn string
+		return qfalse;
+	}
+	if ( com_token[0] != '{' ) {
+		ri.Printf( PRINT_ALL, "R_ParseSpawnVars: found %s when expecting {\n",com_token );
+		return qfalse;
+	}
+	// go through all the key / value pairs
+	while ( 1 ) {  
+		int keyLength, tokenLength;
+		// parse key
+		if ( !RE_GetEntityToken( keyname, sizeof( keyname ) ) ) {
+			ri.Printf( PRINT_ALL, "R_ParseSpawnVars: EOF without closing brace\n" );
+			return qfalse;
+		}
+		if ( keyname[0] == '}' ) {
+			break;
+		}
+		// parse value  
+		if ( !RE_GetEntityToken( com_token, sizeof( com_token ) ) ) {
+			ri.Printf( PRINT_ALL, "R_ParseSpawnVars: EOF without closing brace\n" );
+			return qfalse;
+		}
+		if ( com_token[0] == '}' ) {
+			ri.Printf( PRINT_ALL, "R_ParseSpawnVars: closing brace without data\n" );
+			return qfalse;
+		}
+		if ( *numSpawnVars == MAX_SPAWN_VARS ) {
+			ri.Printf( PRINT_ALL, "R_ParseSpawnVars: MAX_SPAWN_VARS\n" );
+			return qfalse;
+		}
+		keyLength = strlen(keyname) + 1;
+		tokenLength = strlen(com_token) + 1;
+		if ( numSpawnVarChars + keyLength + tokenLength > maxSpawnVarChars )
+		{
+			ri.Printf( PRINT_ALL, "R_ParseSpawnVars: MAX_SPAWN_VAR_CHARS\n" );
+			return qfalse;
+		}
+		strcpy( spawnVarChars + numSpawnVarChars, keyname );
+		spawnVars[ *numSpawnVars ][0] = spawnVarChars + numSpawnVarChars;
+		numSpawnVarChars += keyLength;
+		strcpy( spawnVarChars + numSpawnVarChars, com_token );
+		spawnVars[ *numSpawnVars ][1] = spawnVarChars + numSpawnVarChars;
+		numSpawnVarChars += tokenLength;
+		(*numSpawnVars)++;
+	}
+	return qtrue;
+}
+
+static void R_LoadEnvironmentJson( const char *baseName )
+{
+	char filename[MAX_QPATH];
+	union {
+		char *c;
+		void *v;
+	} buffer;
+	char *bufferEnd;
+	const char *environmentArrayJson;
+	int filelen, i;
+	Com_sprintf( filename, sizeof(filename), "cubemaps/%s/env.json", baseName );
+	filelen = ri.FS_ReadFile( filename, &buffer.v );
+	if ( !buffer.c )
+		return;
+	bufferEnd = buffer.c + filelen;
+	ri.Printf( PRINT_ALL, "Loaded Enviroment JSON: %s\n", filename );
+	if ( JSON_ValueGetType( buffer.c, bufferEnd ) != JSONTYPE_OBJECT )
+	{
+		ri.Printf( PRINT_ALL, "Bad %s: does not start with a object\n", filename );
+		ri.FS_FreeFile( buffer.v );
+		return;
+	}
+	//-----------------------------CUBEMAPS------------------------------------
+	environmentArrayJson = JSON_ObjectGetNamedValue( buffer.c, bufferEnd, "Cubemaps" );
+	if ( !environmentArrayJson )
+	{
+		ri.Printf( PRINT_ALL, "Bad %s: no Cubemaps\n", filename );
+		ri.FS_FreeFile( buffer.v );
+		return;
+	}
+	if ( JSON_ValueGetType( environmentArrayJson, bufferEnd ) != JSONTYPE_ARRAY )
+	{
+		ri.Printf( PRINT_ALL, "Bad %s: Cubemaps not an array\n", filename );
+		ri.FS_FreeFile( buffer.v );
+		return;
+	}
+	tr.numCubemaps = JSON_ArrayGetIndex( environmentArrayJson, bufferEnd, NULL, 0 );
+	tr.cubemaps = (cubemap_t *)ri.Hunk_Alloc( tr.numCubemaps * sizeof(*tr.cubemaps), h_low );
+	for ( i = 0; i < tr.numCubemaps; i++ )
+	{
+		cubemap_t *cubemap = &tr.cubemaps[i];
+		const char *cubemapJson, *keyValueJson, *indexes[3];
+		int j;
+		cubemapJson = JSON_ArrayGetValue( environmentArrayJson, bufferEnd, i );
+		keyValueJson = JSON_ObjectGetNamedValue( cubemapJson, bufferEnd, "Name" );
+		if ( !JSON_ValueGetString( keyValueJson, bufferEnd, cubemap->name, MAX_QPATH ) )
+			cubemap->name[0] = '\0';
+		keyValueJson = JSON_ObjectGetNamedValue( cubemapJson, bufferEnd, "Position" );
+		JSON_ArrayGetIndex( keyValueJson, bufferEnd, indexes, 3 );
+		for ( j = 0; j < 3; j++ )
+			cubemap->origin[j] = JSON_ValueGetFloat( indexes[j], bufferEnd );
+		cubemap->parallaxRadius = 1000.0f;
+		keyValueJson = JSON_ObjectGetNamedValue( cubemapJson, bufferEnd, "Radius" );
+		if (keyValueJson)
+			cubemap->parallaxRadius = JSON_ValueGetFloat( keyValueJson, bufferEnd );
+	}
+	ri.FS_FreeFile(buffer.v);
+}
+
+static const char *cubemapEntities[5] =
+{
+	"misc_cubemap",
+	"info_player_deathmatch",
+	"info_player_start",
+	"info_player_duel",
+	"info_player_intermission",
+};
+
+static void R_LoadCubemapEntities( int index )
+{
+	const char *cubemapEntityName = cubemapEntities[index];
+	char spawnVarChars[2048];
+	int numSpawnVars;
+	char *spawnVars[MAX_SPAWN_VARS][2];
+	int numCubemaps = 0;
+	// count cubemaps
+	numCubemaps = 0;
+	while( R_ParseSpawnVars( spawnVarChars, sizeof(spawnVarChars), &numSpawnVars, spawnVars ) )
+	{
+		int i;
+		for ( i = 0; i < numSpawnVars; i++ )
+		{
+			if (!Q_stricmp(spawnVars[i][0], "classname") && !Q_stricmp(spawnVars[i][1], cubemapEntityName))
+				numCubemaps++;
+		}
+	}
+	if ( !numCubemaps )
+		return;
+	tr.numCubemaps = numCubemaps;
+	tr.cubemaps = (cubemap_t *)ri.Hunk_Alloc( tr.numCubemaps * sizeof(*tr.cubemaps), h_low );
+	numCubemaps = 0;
+	while( R_ParseSpawnVars( spawnVarChars, sizeof(spawnVarChars), &numSpawnVars, spawnVars ) )
+	{
+		int i;
+		char name[MAX_QPATH];
+		qboolean isCubemap = qfalse;
+		qboolean originSet = qfalse;
+		vec3_t origin;
+		float parallaxRadius = 1000.0f;
+		name[0] = '\0';
+		for ( i = 0; i < numSpawnVars; i++ )
+		{
+			if ( !Q_stricmp( spawnVars[i][0], "classname" ) && !Q_stricmp( spawnVars[i][1], cubemapEntityName ) )
+				isCubemap = qtrue;
+			if ( !Q_stricmp( spawnVars[i][0], "name" ) )
+				Q_strncpyz( name, spawnVars[i][1], MAX_QPATH );
+			if ( !Q_stricmp( spawnVars[i][0], "origin" ) )
+			{
+				sscanf( spawnVars[i][1], "%f %f %f", &origin[0], &origin[1], &origin[2] );
+				originSet = qtrue;
+			}
+			else if ( !Q_stricmp( spawnVars[i][0], "radius" ) )
+				sscanf( spawnVars[i][1], "%f", &parallaxRadius );
+		}
+		if ( isCubemap && originSet )
+		{
+			cubemap_t *cubemap = &tr.cubemaps[numCubemaps];
+			Q_strncpyz( cubemap->name, name, MAX_QPATH );
+			VectorCopy( origin, cubemap->origin );
+			cubemap->parallaxRadius = parallaxRadius;
+			numCubemaps++;
+		}
+	}
+}
+
+static void R_RenderCubemapSide( int cubemapIndex, int cubemapSide, qboolean subscene, qboolean bounce )
+{
+	refdef_t refdef;
+	viewParms_t	parms;
+	Com_Memset( &refdef, 0, sizeof( refdef) );
+	VectorCopy( tr.cubemaps[cubemapIndex].origin, refdef.vieworg );
+	refdef.fov_x = 90;
+	refdef.fov_y = 90;
+	refdef.width = REF_CUBEMAP_SIZE;
+	refdef.height = REF_CUBEMAP_SIZE;
+	refdef.x = 0;
+	refdef.y = 0;
+	switch ( cubemapSide )
+	{
+		case 0:
+			// +X
+			VectorSet( refdef.viewaxis[0], 1, 0, 0 );
+			VectorSet( refdef.viewaxis[1], 0, 0, 1 );
+			VectorSet( refdef.viewaxis[2], 0, -1, 0 );
+			break;
+		case 1:
+			// -X
+			VectorSet( refdef.viewaxis[0], -1, 0, 0 );
+			VectorSet( refdef.viewaxis[1], 0, 0, -1 );
+			VectorSet( refdef.viewaxis[2], 0, -1, 0 );
+			break;
+		case 2:
+			// +Y
+			VectorSet( refdef.viewaxis[0], 0, -1, 0 );
+			VectorSet( refdef.viewaxis[1], -1, 0, 0 );
+			VectorSet( refdef.viewaxis[2], 0, 0, -1 );
+			break;
+		case 3:
+			// -Y
+			VectorSet( refdef.viewaxis[0], 0, 1, 0 );
+			VectorSet( refdef.viewaxis[1], -1, 0, 0 );
+			VectorSet( refdef.viewaxis[2], 0, 0, 1 );
+			break;
+		case 4:
+			// +Z
+			VectorSet( refdef.viewaxis[0], 0, 0, 1 );
+			VectorSet( refdef.viewaxis[1], -1, 0, 0 );
+			VectorSet( refdef.viewaxis[2], 0, -1, 0 );
+			break;
+		case 5:
+			// -Z
+			VectorSet( refdef.viewaxis[0], 0, 0, -1 );
+			VectorSet( refdef.viewaxis[1], 1, 0, 0 );
+			VectorSet( refdef.viewaxis[2], 0, -1, 0 );
+			break;
+	}
+	if ( !subscene )
+		RE_BeginScene( &refdef );
+	Com_Memset( &parms, 0, sizeof( parms ) );
+	parms.viewportX = refdef.x;
+	parms.viewportY = refdef.y;
+	parms.viewportWidth = REF_CUBEMAP_SIZE;
+	parms.viewportHeight = REF_CUBEMAP_SIZE;
+	parms.portalView = PV_NONE;
+	parms.fovX = 90;
+	parms.fovY = 90;
+	VectorCopy( refdef.vieworg, parms.or.origin );
+	VectorCopy( refdef.viewaxis[0], parms.or.axis[0] );
+	VectorCopy( refdef.viewaxis[1], parms.or.axis[1] );
+	VectorCopy( refdef.viewaxis[2], parms.or.axis[2] );
+	VectorCopy( refdef.vieworg, parms.pvsOrigin );
+	parms.targetCube = &tr.cubemaps[cubemapIndex];
+	parms.targetCubeLayer = cubemapSide;
+	R_RenderView( &parms );
+	RE_EndScene();
+}
+static void R_RenderAllCubemaps( void )
+{
+	int maxCubemaps, frontEndMsec, backEndMsec;
+	uint32_t i, j;
+	// Limit number of Cubemaps per map
+	maxCubemaps = MIN( tr.numCubemaps, 128 );
+	for ( i = 0; i < maxCubemaps; i++ ) 
+	{
+		RE_BeginFrame( STEREO_CENTER );
+		for ( j = 0; j < 6; j++ )
+			R_RenderCubemapSide( i, j, qfalse, qfalse );
+		RE_ClearScene();
+		R_AddConvolveCubemapCmd( &tr.cubemaps[i], i );
+		R_IssueRenderCommands();
+		RE_EndFrame( &frontEndMsec, &backEndMsec );
+	}
+}
+#endif
 
 /*
 =================
@@ -2469,6 +2752,24 @@ void RE_LoadWorldMap( const char *name ) {
 
 #ifdef USE_VK_PBR
 	vk_generate_light_directions();
+
+	#ifdef VK_CUBEMAP
+			// load cubemaps
+			if ( vk.cubemapActive )
+			{
+				// Try loading an env.json file first
+				R_LoadEnvironmentJson( s_worldData.baseName );
+
+				if ( !tr.numCubemaps ) {
+					for ( int i = 0; i < ARRAY_LEN(cubemapEntities); i++ )
+					{
+						R_LoadCubemapEntities( i );
+						if ( tr.numCubemaps )
+							break;
+					}
+				}
+			}
+		#endif
 #endif	
 
 #ifdef USE_VBO
@@ -2483,4 +2784,10 @@ void RE_LoadWorldMap( const char *name ) {
 	tr.world = &s_worldData;
 
 	ri.FS_FreeFile( buffer.v );
+
+#ifdef VK_CUBEMAP
+	// Render all cubemaps
+	if ( vk.cubemapActive && tr.numCubemaps )
+		R_RenderAllCubemaps();
+#endif
 }
