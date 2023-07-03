@@ -2603,7 +2603,7 @@ static int tcmodWeight( const textureBundle_t *bundle )
 	return 0;
 }
 
-
+#if 0
 static int rgbWeight( const textureBundle_t *bundle ) {
 
 	switch ( bundle->rgbGen ) {
@@ -2615,6 +2615,7 @@ static int rgbWeight( const textureBundle_t *bundle ) {
 		default: return 0;
 	}
 }
+#endif
 
 static const textureBundle_t *lightingBundle( int stageIndex, const textureBundle_t *selected ) {
 	const shaderStage_t *stage = &stages[ stageIndex ];
@@ -2639,9 +2640,10 @@ static const textureBundle_t *lightingBundle( int stageIndex, const textureBundl
 			if ( tcmodWeight( selected ) > tcmodWeight( bundle ) ) {
 				continue;
 			}
-			if ( rgbWeight( selected ) > rgbWeight( bundle ) ) {
-				continue;
-			}
+			// commented because causes regression in q3dm1' Mouth area
+			//if ( rgbWeight( selected ) > rgbWeight( bundle ) ) {
+				//continue;
+			//}
 		}
 		shader.lightingStage = stageIndex;
 		shader.lightingBundle = i;
