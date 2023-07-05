@@ -1021,7 +1021,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 			if ( pStage->vk_pbr_flags & PBR_HAS_NORMALMAP )
 				vk_update_pbr_descriptor(7, pStage->normalMap->descriptor);
 
-			if ( pStage->vk_pbr_flags & PBR_HAS_PHYSICALMAP )
+			if ( pStage->vk_pbr_flags & PBR_HAS_PHYSICALMAP || pStage->vk_pbr_flags & PBR_HAS_SPECULARMAP )
 				vk_update_pbr_descriptor(8, pStage->physicalMap->descriptor);
 			
 			if ( !tr.numCubemaps || backEnd.viewParms.targetCube != NULL ) {
