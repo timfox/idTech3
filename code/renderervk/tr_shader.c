@@ -681,6 +681,29 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			stage->normalMapType = !Q_stricmp(token, "normalHeightMap") ? PHYS_NORMALHEIGHT : PHYS_NORMAL;
 
 			Q_strncpyz( bufferNormalTextureName, token, sizeof(bufferNormalTextureName) );
+		
+			Vector4Set( stage->normalScale, r_baseNormalX->value, r_baseNormalY->value, 1.0f, r_baseParallax->value );
+		}
+		//
+		// specMap <name> || specularMap <name>
+		//
+		else if (!Q_stricmp(token, "specMap") || !Q_stricmp(token, "specularMap"))
+		{
+			token = COM_ParseExt(text, qfalse);
+			if (!token[0])
+			{
+				ri.Printf(PRINT_WARNING, "WARNING: missing parameter for 'specularMap' keyword in shader '%s'\n", shader.name);
+				return qfalse;
+			}
+			stage->physicalMapType = PHYS_SPECGLOSS;
+			Vector4Set(stage->specularScale, 1.0f, 1.0f, 1.0f, 0.0f);
+			if (!Q_stricmp(token, "$whiteimage"))
+			{
+				stage->physicalMap = tr.whiteImage;
+				stage->vk_pbr_flags |= PBR_HAS_SPECULARMAP;
+				continue;
+			}
+			Q_strncpyz( bufferPackedTextureName, token, sizeof(bufferPackedTextureName) );
 		}
 		else if ( (!Q_stricmp(token, "rmoMap") || !Q_stricmp(token, "rmosMap")) )
 		{
@@ -1312,7 +1335,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 	}
 
 #ifdef USE_VK_PBR
-if ( vk.pbrActive && physicalAlbedo ) {
+	if ( vk.pbrActive && ( physicalAlbedoName || stage->physicalMapType != PHYS_NONE ) ) {
 		uint32_t i;
 		imgFlags_t flags = IMGFLAG_NOLIGHTSCALE;
 
@@ -1330,7 +1353,7 @@ if ( vk.pbrActive && physicalAlbedo ) {
 			vk_create_phyisical_texture( stage, bufferPackedTextureName, flags );
 		
 		// scan for a potential physical map
-		if ( !stage->physicalMap ) {
+		if ( !stage->physicalMap && physicalAlbedoName ) {
 			for ( i = 0; i < ARRAY_LEN( textureMapTypes ); i++ ) {
 				COM_StripExtension( physicalAlbedoName, bufferPackedTextureName, MAX_QPATH );
 				
@@ -1350,7 +1373,7 @@ if ( vk.pbrActive && physicalAlbedo ) {
 			vk_create_normal_texture( stage, bufferNormalTextureName, flags );
 		
 		// scan for a potential normal map
-		if ( !stage->normalMap ) {	
+		if ( !stage->normalMap && physicalAlbedoName ) {
 			for ( i = 0; i < ARRAY_LEN( textureMapTypes ); i++ ) {
 				COM_StripExtension( physicalAlbedoName, bufferNormalTextureName, MAX_QPATH );
 				
@@ -2561,6 +2584,7 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 		st0->normalMap = st1->normalMap;
 		st0->physicalMap = st1->physicalMap;
 		Vector4Copy( st1->specularScale, st0->specularScale );
+		Vector4Copy( st1->normalScale, st0->normalScale );
 	}
 #endif
 
@@ -3627,6 +3651,7 @@ static shader_t *FinishShader( void ) {
 def.mirror = qfalse;
 				def.vk_pbr_flags = pStage->vk_pbr_flags;
 				Vector4Copy( pStage->specularScale, def.specularScale );
+				Vector4Copy( pStage->normalScale, def.normalScale );
 
 				if ( hasLightmapStage ) 
 					def.vk_pbr_flags |= PBR_HAS_LIGHTMAP;
@@ -3660,6 +3685,7 @@ def.mirror = qfalse;
 			def_pbr.fog_stage = 1;
 			def_pbr.vk_pbr_flags = pStage->vk_pbr_flags;
 			Vector4Copy( pStage->specularScale, def_pbr.specularScale );
+			Vector4Copy( pStage->normalScale, def_pbr.normalScale );
 
 			if ( hasLightmapStage ) 
 				def_pbr.vk_pbr_flags |= PBR_HAS_LIGHTMAP;
