@@ -3336,8 +3336,8 @@ static void create_color_attachment(
 
     VkImageViewType view_type = VK_IMAGE_VIEW_TYPE_2D;
 
-    if ( flags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT )
-        view_type = VK_IMAGE_VIEW_TYPE_CUBE;
+	if ( flags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT )
+		view_type = VK_IMAGE_VIEW_TYPE_CUBE;
 
 	if ( multisample )
 		vk_add_attachment_desc( *image, image_view, usage, &memory_requirements, format, VK_IMAGE_ASPECT_COLOR_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, image_layout, view_type );
@@ -8274,7 +8274,7 @@ static void vk_create_prefilter_framebuffer( filterDef *def ) {
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.pNext = NULL;
 	alloc_info.allocationSize = memory_requirements.size;
-	alloc_info.memoryTypeIndex = find_memory_type( vk.physical_device, memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+	alloc_info.memoryTypeIndex = find_memory_type( memory_requirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 			
 	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &def->offscreen.memory ) );
 	VK_CHECK( qvkBindImageMemory( vk.device, def->offscreen.image, def->offscreen.memory, 0 ) );
