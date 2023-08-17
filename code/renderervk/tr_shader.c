@@ -1335,7 +1335,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 	}
 
 #ifdef USE_VK_PBR
-	if ( vk.pbrActive && ( physicalAlbedoName || stage->physicalMapType != PHYS_NONE ) ) {
+	if ( vk.pbrActive && ( physicalAlbedo || stage->physicalMapType != PHYS_NONE ) ) {
 		uint32_t i;
 		imgFlags_t flags = IMGFLAG_NOLIGHTSCALE;
 
@@ -1353,7 +1353,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			vk_create_phyisical_texture( stage, bufferPackedTextureName, flags );
 		
 		// scan for a potential physical map
-		if ( !stage->physicalMap && physicalAlbedoName ) {
+		if ( !stage->physicalMap && physicalAlbedo ) {
 			for ( i = 0; i < ARRAY_LEN( textureMapTypes ); i++ ) {
 				COM_StripExtension( physicalAlbedoName, bufferPackedTextureName, MAX_QPATH );
 				
@@ -1373,7 +1373,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			vk_create_normal_texture( stage, bufferNormalTextureName, flags );
 		
 		// scan for a potential normal map
-		if ( !stage->normalMap && physicalAlbedoName ) {
+		if ( !stage->normalMap && physicalAlbedo ) {
 			for ( i = 0; i < ARRAY_LEN( textureMapTypes ); i++ ) {
 				COM_StripExtension( physicalAlbedoName, bufferNormalTextureName, MAX_QPATH );
 				
