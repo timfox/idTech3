@@ -65,6 +65,8 @@ cvar_t	*r_presentBits;
 
 static cvar_t *r_ignorehwgamma;
 
+cvar_t  *r_teleporterFlash;
+
 cvar_t	*r_fastsky;
 cvar_t	*r_neatsky;
 cvar_t	*r_drawSun;
@@ -96,6 +98,8 @@ cvar_t	*r_hdr;
 cvar_t	*r_bloom;
 cvar_t	*r_bloom_threshold;
 cvar_t	*r_bloom_intensity;
+cvar_t	*r_bloom_threshold_mode;
+cvar_t	*r_bloom_modulate;
 cvar_t	*r_renderWidth;
 cvar_t	*r_renderHeight;
 cvar_t	*r_renderScale;
@@ -129,7 +133,7 @@ cvar_t	*r_ext_max_anisotropy;
 
 cvar_t	*r_ignoreGLErrors;
 
-cvar_t	*r_stencilbits;
+//cvar_t	*r_stencilbits;
 cvar_t	*r_texturebits;
 cvar_t	*r_ext_multisample;
 cvar_t	*r_ext_alpha_to_coverage;
@@ -1228,6 +1232,8 @@ const void *RB_TakeVideoFrameCmd( const void *data )
 static void GL_SetDefaultState( void )
 {
 #ifdef USE_VULKAN
+	GL_TextureMode( r_textureMode->string );
+
 	glState.glStateBits = GLS_DEPTHTEST_DISABLE | GLS_DEPTHMASK_TRUE;
 #else
 	int i;
@@ -1432,11 +1438,10 @@ static void VarInfo( void )
 	} else if ( glConfig.hardwareType == GLHW_RIVA128 ) {
 		ri.Printf( PRINT_ALL, "HACK: riva128 approximations\n" );
 	}
-
+#endif
 	if ( r_finish->integer ) {
 		ri.Printf( PRINT_ALL, "Forcing glFinish\n" );
 	}
-#endif
 }
 
 
@@ -1565,7 +1570,7 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_mapGreyScale, "-1", "1", CV_FLOAT );
 	ri.Cvar_SetDescription(r_mapGreyScale, "Desaturate world map textures only, works independently from \\r_greyscale, negative values only desaturate lightmaps.");
 
-	r_subdivisions = ri.Cvar_Get( "r_subdivisions", "4", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	r_subdivisions = ri.Cvar_Get( "r_subdivisions", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription(r_subdivisions, "Distance to subdivide bezier curved surfaces. Higher values mean less subdivision and less geometric complexity.");
 
 	r_maxpolys = ri.Cvar_Get( "r_maxpolys", XSTRING( MAX_POLYS ), CVAR_LATCH );
@@ -1579,7 +1584,7 @@ static void R_Register( void )
 	r_lodCurveError = ri.Cvar_Get( "r_lodCurveError", "250", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_lodCurveError, "-1", "8192", CV_FLOAT );
 	ri.Cvar_SetDescription( r_lodCurveError, "Level of detail error on curved surface grids. Higher values result in better quality at a distance." );
-	r_lodbias = ri.Cvar_Get( "r_lodbias", "0", CVAR_ARCHIVE_ND );
+	r_lodbias = ri.Cvar_Get( "r_lodbias", "-2", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_lodbias, "Sets the level of detail of in-game models:\n -2: Ultra (further delays LOD transition in the distance)\n -1: Very High (delays LOD transition in the distance)\n 0: High\n 1: Medium\n 2: Low" );
 	r_flares = ri.Cvar_Get ("r_flares", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_flares, "Enables corona effects on light sources." );
@@ -1592,6 +1597,8 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_stereoSeparation, "Control eye separation. Resulting separation is \\r_zproj divided by this value in standard units." );
 	r_ignoreGLErrors = ri.Cvar_Get( "r_ignoreGLErrors", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_ignoreGLErrors, "Ignore OpenGL errors." );
+	r_teleporterFlash = ri.Cvar_Get( "r_teleporterFlash", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_teleporterFlash, "Show a white screen instead of a black screen when being teleported in hyperspace." );
 	r_fastsky = ri.Cvar_Get( "r_fastsky", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_fastsky, "Draw flat colored skies." );
 	r_drawSun = ri.Cvar_Get( "r_drawSun", "0", CVAR_ARCHIVE_ND );
@@ -1623,9 +1630,11 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_finish, "Force a glFinish call after rendering a scene." );
 	r_textureMode = ri.Cvar_Get( "r_textureMode", "GL_LINEAR_MIPMAP_NEAREST", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_textureMode, "Texture interpolation mode:\n GL_NEAREST: Nearest neighbor interpolation and will therefore appear similar to Quake II except with the added colored lighting\n GL_LINEAR: Linear interpolation and will appear to blend in objects that are closer than the resolution that the textures are set as\n GL_NEAREST_MIPMAP_NEAREST: Nearest neighbor interpolation with mipmapping for bilinear hardware, mipmapping will blend objects that are farther away than the resolution that they are set as\n GL_LINEAR_MIPMAP_NEAREST: Linear interpolation with mipmapping for bilinear hardware\n GL_NEAREST_MIPMAP_LINEAR: Nearest neighbor interpolation with mipmapping for trilinear hardware\n GL_LINEAR_MIPMAP_LINEAR: Linear interpolation with mipmapping for trilinear hardware" );
+	ri.Cvar_SetGroup( r_textureMode, CVG_RENDERER );
 	r_gamma = ri.Cvar_Get( "r_gamma", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_gamma, "0.5", "3", CV_FLOAT );
 	ri.Cvar_SetDescription( r_gamma, "Gamma correction factor." );
+	ri.Cvar_SetGroup( r_gamma, CVG_RENDERER );
 	r_facePlaneCull = ri.Cvar_Get ("r_facePlaneCull", "1", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_facePlaneCull, "Enables culling of planar surfaces with back side test." );
 
@@ -1647,10 +1656,12 @@ static void R_Register( void )
 	r_greyscale = ri.Cvar_Get( "r_greyscale", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_greyscale, "-1", "1", CV_FLOAT );
 	ri.Cvar_SetDescription( r_greyscale, "Desaturate rendered frame, requires \\r_fbo 1." );
+	ri.Cvar_SetGroup( r_greyscale, CVG_RENDERER );
 
 	r_dither = ri.Cvar_Get( "r_dither", "0", CVAR_ARCHIVE_ND );
 	ri.Cvar_CheckRange( r_dither, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription(r_dither, "Set dithering mode:\n 0 - disabled\n 1 - ordered\nRequires " S_COLOR_CYAN "\\r_fbo 1." );
+	ri.Cvar_SetGroup( r_dither, CVG_RENDERER );
 
 	r_presentBits = ri.Cvar_Get( "r_presentBits", "24", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_presentBits, "16", "30", CV_INTEGER );
@@ -1734,6 +1745,22 @@ static void R_Register( void )
 	r_screenshotJpegQuality = ri.Cvar_Get( "r_screenshotJpegQuality", "90", CVAR_ARCHIVE_ND );
 	ri.Cvar_SetDescription( r_screenshotJpegQuality, "Controls quality of Jpeg screenshots when using screenshotJpeg." );
 
+	r_bloom_threshold = ri.Cvar_Get( "r_bloom_threshold", "0.6", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_bloom_threshold, "Color level to extract to bloom texture, default is 0.6." );
+	ri.Cvar_SetGroup( r_bloom_threshold, CVG_RENDERER );
+
+	r_bloom_threshold_mode = ri.Cvar_Get( "r_bloom_threshold_mode", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_bloom_threshold_mode, "Color extraction mode:\n 0: (r|g|b) >= threshold\n 1: (r + g + b ) / 3 >= threshold\n 2: luma(r, g, b) >= threshold" );
+	ri.Cvar_SetGroup( r_bloom_threshold_mode, CVG_RENDERER );
+
+	r_bloom_intensity = ri.Cvar_Get( "r_bloom_intensity", "0.5", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_bloom_intensity, "Final bloom blend factor, default is 0.5." );
+	ri.Cvar_SetGroup( r_bloom_intensity, CVG_RENDERER );
+
+	r_bloom_modulate = ri.Cvar_Get( "r_bloom_modulate", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_SetDescription( r_bloom_modulate, "Modulate extracted color:\n 0: off (color = color, i.e. no changes)\n 1: by itself (color = color * color)\n 2: by intensity (color = color * luma(color))" );
+	ri.Cvar_SetGroup( r_bloom_modulate, CVG_RENDERER );
+
 	if ( glConfig.vidWidth )
 		return;
 
@@ -1759,10 +1786,7 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_ext_max_anisotropy, "1", NULL, CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_max_anisotropy, "Sets maximum anisotropic level for your graphics driver. Requires \\r_ext_texture_filter_anisotropic." );
 
-	r_stencilbits = ri.Cvar_Get( "r_stencilbits", "8", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_CheckRange( r_stencilbits, "0", "8", CV_INTEGER );
-	ri.Cvar_SetDescription( r_stencilbits, "Stencil buffer size, value decreases Z-buffer depth." );
-
+	//r_stencilbits = ri.Cvar_Get( "r_stencilbits", "8", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	r_ignorehwgamma = ri.Cvar_Get( "r_ignorehwgamma", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ignorehwgamma, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ignorehwgamma, "Overrides hardware gamma capabilities." );
@@ -1786,14 +1810,6 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_bloom, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription(r_bloom, "Enables bloom post-processing effect. Requires \\r_fbo 1.");
 
-	r_bloom_threshold = ri.Cvar_Get( "r_bloom_threshold", "0.6", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_CheckRange( r_bloom_threshold, "0.01", "1", CV_FLOAT );
-	ri.Cvar_SetDescription(r_bloom_threshold, "Color level to extract to bloom texture, default is 0.6.");
-
-	r_bloom_intensity = ri.Cvar_Get( "r_bloom_intensity", "0.5", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_CheckRange( r_bloom_intensity, "0.01", "2", CV_FLOAT );
-	ri.Cvar_SetDescription( r_bloom_intensity, "Final bloom blend factor, default is 0.5." );
-
 	r_ext_multisample = ri.Cvar_Get( "r_ext_multisample", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_multisample, "0", "64", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_multisample, "For anti-aliasing geometry edges, valid values: 0|2|4|6|8. Requires \\r_fbo 1." );
@@ -1801,9 +1817,11 @@ static void R_Register( void )
 	r_ext_supersample = ri.Cvar_Get( "r_ext_supersample", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_supersample, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_supersample, "Super-sample anti-aliasing, requires \\r_fbo 1." );
+#if 0
 	r_ext_alpha_to_coverage = ri.Cvar_Get( "r_ext_alpha_to_coverage", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_alpha_to_coverage, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_alpha_to_coverage, "Enables alpha-to-coverage multisampling, requires \\r_fbo 1." );
+#endif
 
 	r_renderWidth = ri.Cvar_Get( "r_renderWidth", "800", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_renderWidth, "96", NULL, CV_INTEGER );
@@ -1845,8 +1863,8 @@ void R_Init( void ) {
 	Com_Memset( &tess, 0, sizeof( tess ) );
 	Com_Memset( &glState, 0, sizeof( glState ) );
 
-	if (sizeof(glconfig_t) != 11332)
-		ri.Error( ERR_FATAL, "Mod ABI incompatible: sizeof(glconfig_t) == %u != 11332", (unsigned int) sizeof(glconfig_t));
+	if ( sizeof( glconfig_t ) != 11332 )
+		ri.Error( ERR_FATAL, "Mod ABI incompatible: sizeof(glconfig_t) == %u != 11332", (unsigned int) sizeof( glconfig_t ) );
 
 	if ( (intptr_t)tess.xyz & 15 ) {
 		ri.Printf( PRINT_WARNING, "tess.xyz not 16 byte aligned\n" );
@@ -1857,13 +1875,7 @@ void R_Init( void ) {
 	// init function tables
 	//
 	for ( i = 0; i < FUNCTABLE_SIZE; i++ ) {
-		if ( i == 0 ) {
-			tr.sinTable[i] = EPSILON;
-		} else if ( i == (FUNCTABLE_SIZE - 1) ) {
-			tr.sinTable[i] = -EPSILON;
-		} else {
-			tr.sinTable[i] = sin( DEG2RAD( i * 360.0f / ((float)(FUNCTABLE_SIZE - 1)) ) );
-		}
+		tr.sinTable[i] = sin( DEG2RAD( i * 360.0f / FUNCTABLE_SIZE ) + 0.0001f );
 		tr.squareTable[i] = (i < FUNCTABLE_SIZE / 2) ? 1.0f : -1.0f;
 		if ( i == 0 ) {
 			tr.sawToothTable[i] = EPSILON;
@@ -1940,11 +1952,11 @@ RE_Shutdown
 */
 static void RE_Shutdown( refShutdownCode_t code ) {
 #ifdef USE_VULKAN
-	if ( code == REF_KEEP_CONTEXT ) {
-		if ( ( ri.Milliseconds() - gls.initTime ) > 48 * 3600 * 1000 ) {
-			code = REF_KEEP_WINDOW; // destroy context
-		}
-	}
+	//if ( code == REF_KEEP_CONTEXT ) {
+	//	if ( ( ri.Milliseconds() - gls.initTime ) > 48 * 3600 * 1000 ) {
+	//		code = REF_KEEP_WINDOW; // destroy context
+	//	}
+	//}
 #endif
 	ri.Printf( PRINT_ALL, "RE_Shutdown( %i )\n", code );
 
@@ -1964,23 +1976,26 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	if ( tr.registered ) {
 		//R_IssuePendingRenderCommands();
 		R_DeleteTextures();
-#ifdef USE_VULKAN
-		vk_release_resources();
-#endif
 	}
 
+#ifdef USE_VULKAN
+	vk_release_resources();
+#endif
+
 	R_DoneFreeType();
+
+#ifdef USE_VULKAN
+	if ( r_device->modified ) {
+		code = REF_UNLOAD_DLL;
+	}
+#endif
 
 	// shut down platform specific OpenGL/Vulkan stuff
 	if ( code != REF_KEEP_CONTEXT ) {
 #ifdef USE_VULKAN
-		vk_shutdown();
+		vk_shutdown( code );
 
 		Com_Memset( &glState, 0, sizeof( glState ) );
-
-		if ( r_device->modified ) {
-			code = REF_UNLOAD_DLL;
-		}
 
 		if ( code != REF_KEEP_WINDOW ) {
 			ri.VKimp_Shutdown( code == REF_UNLOAD_DLL ? qtrue : qfalse );

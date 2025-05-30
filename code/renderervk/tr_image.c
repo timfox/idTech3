@@ -82,7 +82,7 @@ void GL_TextureMode( const char *string ) {
 	const textureMode_t *mode;
 	image_t	*img;
 	int		i;
-	
+
 	mode = NULL;
 	for ( i = 0 ; i < ARRAY_LEN( modes ) ; i++ ) {
 		if ( !Q_stricmp( modes[i].name, string ) ) {
@@ -578,8 +578,8 @@ typedef struct {
 
 static void generate_image_upload_data( image_t *image, byte *data, Image_Upload_Data *upload_data ) {
 	
-	qboolean mipmap = image->flags & IMGFLAG_MIPMAP;
-	qboolean picmip = image->flags & IMGFLAG_PICMIP;
+	qboolean mipmap = (image->flags & IMGFLAG_MIPMAP) ? qtrue : qfalse;
+	qboolean picmip = (image->flags & IMGFLAG_PICMIP) ? qtrue : qfalse;
 	byte* resampled_buffer = NULL;
 	int scaled_width, scaled_height;
 	int width = image->width;
@@ -713,7 +713,7 @@ static void generate_image_upload_data( image_t *image, byte *data, Image_Upload
 	upload_data->buffer_size = mip_level_size;
 	
 	if ( mipmap ) {
-		while (scaled_width > 1 || scaled_height > 1) {
+		while (scaled_width > 1 && scaled_height > 1) {
 			R_MipMap((byte *)scaled_buffer, (byte *)scaled_buffer, scaled_width, scaled_height);
 
 			scaled_width >>= 1;
@@ -782,16 +782,12 @@ static void upload_vk_image( image_t *image, byte *pic ) {
 		image->internalFormat = has_alpha ? VK_FORMAT_B4G4R4A4_UNORM_PACK16 : VK_FORMAT_A1R5G5B5_UNORM_PACK16;
 	}
 
-	image->handle = VK_NULL_HANDLE;
-	image->view = VK_NULL_HANDLE;
-	image->descriptor = VK_NULL_HANDLE;
-
 	image->uploadWidth = w;
 	image->uploadHeight = h;
 	image->layers = 1;
 
 	vk_create_image( image, w, h, upload_data.mip_levels );
-	vk_upload_image_data( image, 0, 0, w, h, upload_data.mip_levels, upload_data.buffer, upload_data.buffer_size );
+	vk_upload_image_data( image, 0, 0, w, h, upload_data.mip_levels, upload_data.buffer, upload_data.buffer_size, qfalse );
 
 	ri.Hunk_FreeTempMemory( upload_data.buffer );
 }
@@ -1119,13 +1115,15 @@ image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int widt
 	else
 		image->wrapClampMode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
+	image->handle = VK_NULL_HANDLE;
+	image->view = VK_NULL_HANDLE;
+	image->descriptor = VK_NULL_HANDLE;
 	image->internalFormat = format;
 
 	if ( image->flags & IMGFLAG_CUBEMAP )
 		vk_upload_cube( image );
 	else
 		upload_vk_image( image, pic );
-
 #else
 	if ( flags & IMGFLAG_RGB )
 		image->internalFormat = GL_RGB;
@@ -1904,8 +1902,6 @@ void R_SetColorMappings( void ) {
 	}
 
 #ifdef USE_VULKAN
-	vk_update_post_process_pipelines();
-
 	if ( gls.deviceSupportsGamma ) {
 		if ( vk.fboActive )
 			ri.GLimp_SetGamma( s_gammatable_linear, s_gammatable_linear, s_gammatable_linear );
@@ -1947,6 +1943,10 @@ void R_InitImages( void ) {
 
 	// create default texture and white texture
 	R_CreateBuiltinImages();
+
+#ifdef USE_VULKAN
+	vk_update_post_process_pipelines();
+#endif
 }
 
 

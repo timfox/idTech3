@@ -1422,7 +1422,10 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 		if ( blendSrcBits == GLS_SRCBLEND_SRC_ALPHA && blendDstBits == GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA /*&& stage->rgbGen == CGEN_VERTEX*/ ) {
 			if ( stage->bundle[0].alphaGen != AGEN_SKIP ) {
 				// q3wcp18 @ "textures/ctf_unified/floor_decal_blue" : AGEN_VERTEX, CGEN_VERTEX
-				depthMaskBits &= ~GLS_DEPTHMASK_TRUE;
+				// check for grates on tscabdm3
+				if ( atestBits == 0 ) {
+					depthMaskBits &= ~GLS_DEPTHMASK_TRUE;
+				}
 			} else {
 				// skip for q3wcp14 jumppads and similar
 				// q3wcp14 @ "textures/ctf_unified/bounce_blue" : AGEN_SKIP, CGEN_IDENTITY
@@ -1990,7 +1993,7 @@ FinishStage
 */
 static void FinishStage( shaderStage_t *stage )
 {
-	int i;
+	int i, n;
 
 	if ( !tr.mergeLightmaps ) {
 		return;
@@ -1999,28 +2002,65 @@ static void FinishStage( shaderStage_t *stage )
 	for ( i = 0; i < ARRAY_LEN( stage->bundle ); i++ ) {
 		textureBundle_t *bundle = &stage->bundle[i];
 		// offset lightmap coordinates
-		if ( bundle->lightmap >= LIGHTMAP_INDEX_OFFSET && bundle->tcGen == TCGEN_LIGHTMAP ) {
-			texModInfo_t *tmi = &bundle->texMods[bundle->numTexMods];
-			float x, y;
-			const int lightmapIndex = R_GetLightmapCoords( bundle->lightmap - LIGHTMAP_INDEX_OFFSET, &x, &y );
-			bundle->image[0] = tr.lightmaps[lightmapIndex];
-			tmi->type = TMOD_OFFSET;
-			tmi->offset[0] = x - tr.lightmapOffset[0];
-			tmi->offset[1] = y - tr.lightmapOffset[1];
-			bundle->numTexMods++;
+		if ( bundle->lightmap >= LIGHTMAP_INDEX_OFFSET ) {
+			if ( bundle->tcGen == TCGEN_LIGHTMAP ) {
+				texModInfo_t *tmi = &bundle->texMods[bundle->numTexMods];
+				float x, y;
+				const int lightmapIndex = R_GetLightmapCoords( bundle->lightmap - LIGHTMAP_INDEX_OFFSET, &x, &y );
+				// rescale tcMod transform
+				for ( n = 0; n < bundle->numTexMods; n++ ) {
+					tmi = &bundle->texMods[n];
+					if ( tmi->type == TMOD_TRANSFORM ) {
+						tmi->translate[0] *= tr.lightmapScale[0];
+						tmi->translate[1] *= tr.lightmapScale[1];
+					}
+				}
+				bundle->image[0] = tr.lightmaps[lightmapIndex];
+				tmi->type = TMOD_OFFSET;
+				tmi->offset[0] = x - tr.lightmapOffset[0];
+				tmi->offset[1] = y - tr.lightmapOffset[1];
+				bundle->numTexMods++;
+			}
 			continue;
 		}
-
 		// adjust texture coordinates to map on proper lightmap
-		if ( bundle->lightmap == LIGHTMAP_INDEX_SHADER && bundle->tcGen != TCGEN_LIGHTMAP ) {
-			texModInfo_t *tmi = &bundle->texMods[bundle->numTexMods];
-			tmi->type = TMOD_SCALE_OFFSET;
-			tmi->scale[0] = tr.lightmapScale[0];
-			tmi->scale[1] = tr.lightmapScale[1];
-			tmi->offset[0] = tr.lightmapOffset[0];
-			tmi->offset[1] = tr.lightmapOffset[1];
-			bundle->numTexMods++;
+		if ( bundle->lightmap == LIGHTMAP_INDEX_SHADER ) {
+			if ( bundle->tcGen != TCGEN_LIGHTMAP ) {
+				texModInfo_t *tmi = &bundle->texMods[bundle->numTexMods];
+				tmi->type = TMOD_SCALE_OFFSET;
+				tmi->scale[0] = tr.lightmapScale[0];
+				tmi->scale[1] = tr.lightmapScale[1];
+				tmi->offset[0] = tr.lightmapOffset[0];
+				tmi->offset[1] = tr.lightmapOffset[1];
+				bundle->numTexMods++;
+			} else {
+				for ( n = 0; n < bundle->numTexMods; n++ ) {
+					texModInfo_t *tmi = &bundle->texMods[n];
+					if ( tmi->type == TMOD_TRANSFORM ) {
+						tmi->translate[0] *= tr.lightmapScale[0];
+						tmi->translate[1] *= tr.lightmapScale[1];
+					} else {
+						// TODO: correct other transformations?
+					}
+				}
+			}
 			continue;
+		}
+		// revert lightmap texcoord correction if needed
+		if ( bundle->lightmap == LIGHTMAP_INDEX_NONE ) {
+			if ( bundle->tcGen == TCGEN_LIGHTMAP && shader.lightmapIndex >= 0 ) {
+				texModInfo_t *tmi;
+				for ( n = bundle->numTexMods; n > 0; --n ) {
+					bundle->texMods[n] = bundle->texMods[n - 1];
+				}
+				tmi = &bundle->texMods[0];
+				tmi->type = TMOD_OFFSET_SCALE;
+				tmi->offset[0] = -tr.lightmapOffset[0];
+				tmi->offset[1] = -tr.lightmapOffset[1];
+				tmi->scale[0] = 1.0f / tr.lightmapScale[0];
+				tmi->scale[1] = 1.0f / tr.lightmapScale[1];
+				bundle->numTexMods++;
+			}
 		}
 	}
 }
@@ -2360,7 +2400,7 @@ typedef struct {
 	int		multitextureBlend;
 } collapse_t;
 
-static collapse_t	collapse[] = {
+static const collapse_t collapse[] = {
 	{ 0, GLS_DSTBLEND_SRC_COLOR | GLS_SRCBLEND_ZERO,
 		GL_MODULATE, 0 },
 
@@ -2474,6 +2514,11 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 
 	mtEnv = collapse[i].multitextureEnv;
 
+	// GL_ADD is a separate extension
+	if ( mtEnv == GL_ADD && !glConfig.textureEnvAddAvailable ) {
+		return 0;
+	}
+
 #ifdef USE_VULKAN
 	if ( mtEnv == GL_ADD && st0->bundle[0].rgbGen != CGEN_IDENTITY ) {
 		mtEnv = GL_ADD_NONIDENTITY;
@@ -2484,11 +2529,6 @@ static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shade
 		return 0;
 	}
 #else
-	// GL_ADD is a separate extension
-	if ( mtEnv == GL_ADD && !glConfig.textureEnvAddAvailable ) {
-		return 0;
-	}
-
 	// an add collapse can only have identity colors
 	if ( mtEnv == GL_ADD && st0->rgbGen != CGEN_IDENTITY ) {
 		return 0;
@@ -3276,7 +3316,7 @@ static shader_t *FinishShader( void ) {
 	vertexLightmap = qfalse;
 	colorBlend = qfalse;
 	depthMask = qfalse;
-	fogCollapse = qtrue;
+	fogCollapse = qfalse;
 
 	//
 	// set sky stuff appropriate
@@ -3486,12 +3526,64 @@ static shader_t *FinishShader( void ) {
 
 #ifdef USE_VULKAN
 
+#ifdef USE_FOG_COLLAPSE
+	if ( vk.maxBoundDescriptorSets >= 6 && !(shader.contentFlags & CONTENTS_FOG) && shader.fogPass != FP_NONE ) {
+		fogCollapse = qtrue;
+		if ( stage == 1 ) {
+			// we can always fog-collapse signle-stage shaders
+		} else {
+			if ( tr.numFogs ) {
+				// check for (un)acceptable blend modes
+				for ( i = 0; i < stage; i++ ) {
+					const uint32_t blendBits = stages[i].stateBits & GLS_BLEND_BITS;
+					switch ( blendBits & GLS_SRCBLEND_BITS ) {
+					case GLS_SRCBLEND_DST_COLOR:
+					case GLS_SRCBLEND_ONE_MINUS_DST_COLOR:
+					case GLS_SRCBLEND_DST_ALPHA:
+					case GLS_SRCBLEND_ONE_MINUS_DST_ALPHA:
+						fogCollapse = qfalse;
+						break;
+					}
+					switch ( blendBits & GLS_DSTBLEND_BITS ) {
+						case GLS_DSTBLEND_DST_ALPHA:
+						case GLS_DSTBLEND_ONE_MINUS_DST_ALPHA:
+						fogCollapse = qfalse;
+						break;
+					}
+				}
+				if ( fogCollapse ) {
+					for ( i = 1; i < stage; i++ ) {
+						const uint32_t blendBits = stages[i].stateBits & GLS_BLEND_BITS;
+						if ( blendBits == (GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA) || blendBits == (GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA) ) {
+							if ( stages[i].bundle[0].adjustColorsForFog == ACFF_NONE ) {
+								fogCollapse = qfalse;
+								break;
+							}
+						}
+					}
+				}
+				if ( fogCollapse ) {
+					// correct add mode
+					for ( i = 1; i < stage; i++ ) {
+						const uint32_t blendBits = stages[i].stateBits & GLS_BLEND_BITS;
+						if ( blendBits == (GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE) ) {
+							stages[i].bundle[0].adjustColorsForFog = ACFF_MODULATE_RGBA;
+						}
+					}
+				}
+			}
+		}
+	}
+	if ( tr.numFogs == 0 ) {
+		// if there is no fogs - assume that we can apply all color optimizations without any restrictions
+		fogCollapse = qtrue;
+	}
+#endif
+
 	shader.tessFlags = TESS_XYZ;
-	stages[0].tessFlags = TESS_RGBA0 | TESS_ST0;
 
 	{
 		Vk_Pipeline_Def def;
-		Vk_Shader_Type stype;
 
 		Com_Memset( &def, 0, sizeof( def ) );
 		def.face_culling = shader.cullType;
@@ -3514,7 +3606,7 @@ static shader_t *FinishShader( void ) {
 						break;
 					case GL_ADD:
 						pStage->tessFlags = TESS_RGBA0 | TESS_ST0 | TESS_ST1 | TESS_ST2;
-						def.shader_type = TYPE_MULTI_TEXTURE_ADD3_IDENTITY;
+						def.shader_type = TYPE_MULTI_TEXTURE_ADD3_1_1;
 						break;
 					case GL_ADD_NONIDENTITY:
 						pStage->tessFlags = TESS_RGBA0 | TESS_ST0 | TESS_ST1 | TESS_ST2;
@@ -3554,21 +3646,69 @@ static shader_t *FinishShader( void ) {
 						break;
 				}
 			}
-			else
-			switch ( pStage->mtEnv ) {
+			else {
+				switch ( pStage->mtEnv ) {
 				case GL_MODULATE:
 					pStage->tessFlags = TESS_RGBA0 | TESS_ST0 | TESS_ST1;
 					def.shader_type = TYPE_MULTI_TEXTURE_MUL2;
+					if ( ( pStage->bundle[0].adjustColorsForFog == ACFF_NONE && pStage->bundle[1].adjustColorsForFog == ACFF_NONE ) || fogCollapse ) {
+						if ( pStage->bundle[0].rgbGen == CGEN_IDENTITY && pStage->bundle[1].rgbGen == CGEN_IDENTITY ) {
+							if ( pStage->bundle[1].alphaGen == AGEN_SKIP && pStage->bundle[0].alphaGen == AGEN_SKIP ) {
+								pStage->tessFlags = TESS_ST0 | TESS_ST1;
+								def.shader_type = TYPE_MULTI_TEXTURE_MUL2_IDENTITY;
+							}
+						}
+						else if ( pStage->bundle[0].rgbGen == CGEN_IDENTITY_LIGHTING && pStage->bundle[1].rgbGen == CGEN_IDENTITY_LIGHTING && pStage->bundle[0].alphaGen == pStage->bundle[1].alphaGen ) {
+							if ( pStage->bundle[0].alphaGen == AGEN_SKIP || pStage->bundle[0].alphaGen == AGEN_IDENTITY ) {
+								pStage->tessFlags = TESS_ST0 | TESS_ST1;
+								def.shader_type = TYPE_MULTI_TEXTURE_MUL2_FIXED_COLOR;
+								def.color.rgb = tr.identityLightByte;
+								def.color.alpha = pStage->bundle[0].alphaGen == AGEN_IDENTITY ? 255 : tr.identityLightByte;
+							}
+						}
+					}
 					break;
 				case GL_ADD:
 					pStage->tessFlags = TESS_RGBA0 | TESS_ST0 | TESS_ST1;
-					def.shader_type = TYPE_MULTI_TEXTURE_ADD2_IDENTITY;
+					def.shader_type = TYPE_MULTI_TEXTURE_ADD2_1_1;
+					if ( ( pStage->bundle[0].adjustColorsForFog == ACFF_NONE && pStage->bundle[1].adjustColorsForFog == ACFF_NONE ) || fogCollapse ) {
+						if ( pStage->bundle[0].rgbGen == CGEN_IDENTITY && pStage->bundle[1].rgbGen == CGEN_IDENTITY ) {
+							if ( pStage->bundle[0].alphaGen == AGEN_SKIP && pStage->bundle[1].alphaGen == AGEN_SKIP ) {
+								pStage->tessFlags = TESS_ST0 | TESS_ST1;
+								def.shader_type = TYPE_MULTI_TEXTURE_ADD2_IDENTITY;
+							}
+						}
+						else if ( pStage->bundle[0].rgbGen == CGEN_IDENTITY_LIGHTING && pStage->bundle[1].rgbGen == CGEN_IDENTITY_LIGHTING && pStage->bundle[0].alphaGen == pStage->bundle[1].alphaGen ) {
+							if ( pStage->bundle[0].alphaGen == AGEN_SKIP || pStage->bundle[0].alphaGen == AGEN_IDENTITY ) {
+								pStage->tessFlags = TESS_ST0 | TESS_ST1;
+								def.shader_type = TYPE_MULTI_TEXTURE_ADD2_FIXED_COLOR;
+								def.color.rgb = tr.identityLightByte;
+								def.color.alpha = pStage->bundle[0].alphaGen == AGEN_IDENTITY ? 255 : tr.identityLightByte;
+							}
+						}
+					}
 					break;
 				case GL_ADD_NONIDENTITY:
 					pStage->tessFlags = TESS_RGBA0 | TESS_ST0 | TESS_ST1;
 					def.shader_type = TYPE_MULTI_TEXTURE_ADD2;
+					if ( ( pStage->bundle[0].adjustColorsForFog == ACFF_NONE && pStage->bundle[1].adjustColorsForFog == ACFF_NONE ) || fogCollapse ) {
+						if ( pStage->bundle[0].rgbGen == CGEN_IDENTITY && pStage->bundle[1].rgbGen == CGEN_IDENTITY ) {
+							if ( pStage->bundle[0].alphaGen == AGEN_SKIP && pStage->bundle[1].alphaGen == AGEN_SKIP ) {
+								pStage->tessFlags = TESS_ST0 | TESS_ST1;
+								def.shader_type = TYPE_MULTI_TEXTURE_ADD2_IDENTITY;
+							}
+						}
+						else if ( pStage->bundle[0].rgbGen == CGEN_IDENTITY_LIGHTING && pStage->bundle[1].rgbGen == CGEN_IDENTITY_LIGHTING && pStage->bundle[0].alphaGen == pStage->bundle[1].alphaGen ) {
+							if ( pStage->bundle[0].alphaGen == AGEN_SKIP || pStage->bundle[0].alphaGen == AGEN_IDENTITY ) {
+								pStage->tessFlags = TESS_ST0 | TESS_ST1;
+								def.shader_type = TYPE_MULTI_TEXTURE_ADD2_FIXED_COLOR;
+								def.color.rgb = tr.identityLightByte;
+								def.color.alpha = pStage->bundle[0].alphaGen == AGEN_IDENTITY ? 255 : tr.identityLightByte;
+							}
+						}
+					}
 					break;
-
+				// extended blending modes
 				case GL_BLEND_MODULATE:
 					pStage->tessFlags = TESS_RGBA0 | TESS_RGBA1 | TESS_ST0 | TESS_ST1;
 					def.shader_type = TYPE_BLEND2_MUL;
@@ -3601,8 +3741,31 @@ static shader_t *FinishShader( void ) {
 				default:
 					pStage->tessFlags = TESS_RGBA0 | TESS_ST0;
 					def.shader_type = TYPE_SIGNLE_TEXTURE;
+					if ( pStage->bundle[0].adjustColorsForFog == ACFF_NONE || fogCollapse ) {
+						if ( pStage->bundle[0].rgbGen == CGEN_IDENTITY ) {
+							if ( pStage->bundle[0].alphaGen == AGEN_SKIP ) {
+								pStage->tessFlags = TESS_ST0;
+								def.shader_type = TYPE_SIGNLE_TEXTURE_IDENTITY;
+							}
+						}
+						else if ( pStage->bundle[0].rgbGen == CGEN_IDENTITY_LIGHTING ) {
+							if ( pStage->bundle[0].alphaGen == AGEN_SKIP || pStage->bundle[0].alphaGen == AGEN_IDENTITY ) {
+								pStage->tessFlags = TESS_ST0;
+								def.shader_type = TYPE_SIGNLE_TEXTURE_FIXED_COLOR;
+								def.color.rgb = tr.identityLightByte;
+								def.color.alpha = pStage->bundle[0].alphaGen == AGEN_IDENTITY ? 255 : tr.identityLightByte;
+							}
+						}
+						else if ( pStage->bundle[0].rgbGen == CGEN_ENTITY ) {
+							if ( pStage->bundle[0].alphaGen == AGEN_ENTITY || pStage->bundle[0].alphaGen == AGEN_SKIP || pStage->bundle[0].alphaGen == AGEN_IDENTITY ) {
+								pStage->tessFlags = TESS_ST0 | TESS_ENT0;
+								def.shader_type = TYPE_SIGNLE_TEXTURE_ENT_COLOR;
+							}
+						}
+					}
 					break;
-			}
+				}
+			} // switch mtEnv3 / mtEnv
 
 			for ( env_mask = 0, n = 0; n < pStage->numTexBundles; n++ ) {
 				if ( pStage->bundle[n].numTexMods ) {
@@ -3614,7 +3777,7 @@ static shader_t *FinishShader( void ) {
 			}
 
 			if ( env_mask == 1 && !pStage->depthFragment ) {
-				if ( def.shader_type >= TYPE_GENERIC_BEGIN && def.shader_type <= TYPE_GENERIC_END  ) {
+				if ( def.shader_type >= TYPE_GENERIC_BEGIN && def.shader_type <= TYPE_GENERIC_END ) {
 					def.shader_type++; // switch to *_ENV version
 					shader.tessFlags |= TESS_NNN | TESS_VPOS;
 					pStage->tessFlags &= ~TESS_ST0;
@@ -3627,20 +3790,18 @@ static shader_t *FinishShader( void ) {
 			def.vk_pbr_flags = 0;
 #endif
 
-			stype = def.shader_type;
 			def.mirror = qfalse;
 			pStage->vk_pipeline[0] = vk_find_pipeline_ext( 0, &def, qtrue );
-			if ( pStage->depthFragment ) {
-				def.shader_type = TYPE_SIGNLE_TEXTURE_DF;
-				pStage->vk_pipeline_df = vk_find_pipeline_ext( 0, &def, qtrue );
-				def.shader_type = stype;
-			}
 			def.mirror = qtrue;
 			pStage->vk_mirror_pipeline[0] = vk_find_pipeline_ext( 0, &def, qfalse );
+
 			if ( pStage->depthFragment ) {
+				def.mirror = qfalse;
+				def.shader_type = TYPE_SIGNLE_TEXTURE_DF;
+				pStage->vk_pipeline_df = vk_find_pipeline_ext( 0, &def, qtrue );
+				def.mirror = qtrue;
 				def.shader_type = TYPE_SIGNLE_TEXTURE_DF;
 				pStage->vk_mirror_pipeline_df = vk_find_pipeline_ext( 0, &def, qfalse );
-				def.shader_type = stype;
 			}
 
 #ifdef USE_VK_PBR
@@ -3663,20 +3824,25 @@ def.mirror = qfalse;
 	}
 
 #ifdef USE_FOG_COLLAPSE
-	// single-stage, combined fog pipelines for world surfaces
-	if ( vk.maxBoundDescriptorSets >= 6 && stage == 1 && tr.mapLoading && !(shader.contentFlags & CONTENTS_FOG) && fogCollapse ) {
-		Vk_Pipeline_Def def;
-		Vk_Pipeline_Def def_mirror;
+			if ( fogCollapse && tr.numFogs > 0 ) {
+				Vk_Pipeline_Def def;
+				Vk_Pipeline_Def def_mirror;
 
-		shaderStage_t *pStage = &stages[0];
+				vk_get_pipeline_def( pStage->vk_pipeline[0], &def );
+				vk_get_pipeline_def( pStage->vk_mirror_pipeline[0], &def_mirror );
 
-		vk_get_pipeline_def( pStage->vk_pipeline[0], &def );
-		vk_get_pipeline_def( pStage->vk_mirror_pipeline[0], &def_mirror );
+				def.fog_stage = 1;
+				def_mirror.fog_stage = 1;
+				def.acff = pStage->bundle[0].adjustColorsForFog;
+				def_mirror.acff = pStage->bundle[0].adjustColorsForFog;
 
-		def.fog_stage = 1;
-		def_mirror.fog_stage = 1;
-		pStage->vk_pipeline[1] = vk_find_pipeline_ext( 0, &def, qfalse );
-		pStage->vk_mirror_pipeline[1] = vk_find_pipeline_ext( 0, &def_mirror, qfalse );
+				pStage->vk_pipeline[1] = vk_find_pipeline_ext( 0, &def, qfalse );
+				pStage->vk_mirror_pipeline[1] = vk_find_pipeline_ext( 0, &def_mirror, qfalse );
+
+				pStage->bundle[0].adjustColorsForFog = ACFF_NONE; // will be handled in shader from now
+
+				shader.fogCollapse = qtrue;
+			}
 
 #ifdef USE_VK_PBR
 		if( pStage->tessFlags & TESS_PBR ) {
@@ -3693,12 +3859,9 @@ def.mirror = qfalse;
 			pStage->vk_pbr_pipeline[1] = vk_find_pipeline_ext(0, &def_pbr, qfalse);
 		}
 #endif
-
-		shader.fogCollapse = qtrue;
-		//stages[0].adjustColorsForFog = ACFF_NONE;
 	}
-#endif // USE_FOG_COLLAPSE
 #endif // USE_VULKAN
+
 #ifdef USE_PMLIGHT
 	FindLightingStages();
 #endif
@@ -3713,10 +3876,10 @@ def.mirror = qfalse;
 			if ( stages[ i ].bundle[ n ].image[ 0 ] != NULL ) {
 				lastStage[ n ] = &stages[ i ];
 			}
-			if ( EqualTCgen( n, lastStage[ n ], &stages[ i+1 ] ) ) {
+			if ( EqualTCgen( n, lastStage[ n ], &stages[ i+1 ] ) && (lastStage[n]->tessFlags & (TESS_ST0 << n) ) ) {
 				stages[ i+1 ].tessFlags &= ~(TESS_ST0 << n);
 			}
-			if ( EqualRGBgen( lastStage[n], &stages[ i+1 ] ) && EqualACgen( lastStage[n], &stages[ i+1 ] ) ) {
+			if ( EqualRGBgen( lastStage[n], &stages[ i+1 ] ) && EqualACgen( lastStage[n], &stages[ i+1 ] ) && (lastStage[n]->tessFlags & (TESS_RGBA0 << n) ) ) {
 				stages[ i+1 ].tessFlags &= ~(TESS_RGBA0 << n);
 			}
 		}

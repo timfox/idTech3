@@ -45,6 +45,8 @@ No performance differences from 'Array of Structures' were observed.
 
 */
 
+#ifdef USE_VBO
+
 #define MAX_VBO_STAGES MAX_SHADER_STAGES
 
 #define MIN_IBO_RUN 320
@@ -238,29 +240,26 @@ const char *BuildFP( int multitexture, int alphatest, int fogMode )
 		return buf;
 	}
 
+	if ( alphatest || multitexture == GL_ADD  || multitexture == GL_MODULATE ) {
+		strcat( buf, "TEMP t; \n" );
+	}
+
 	switch ( multitexture ) {
 		case 0:
-			strcat( buf, "TEMP t; \n" );
 			strcat( buf, "TEX base, fragment.texcoord[0], texture[0], 2D; \n" );
-			strcat( buf, genATestFP( alphatest ) );
 			break;
 		case GL_ADD:
-			strcat( buf, "TEMP t; \n" );
 			strcat( buf, "TEX base, fragment.texcoord[0], texture[0], 2D; \n" );
-			strcat( buf, genATestFP( alphatest ) );
 			strcat( buf, "TEX t,    fragment.texcoord[1], texture[1], 2D; \n"
 			"ADD base, base, t; \n" );
 			break;
 		case GL_MODULATE:
-			strcat( buf, "TEMP t; \n" );
 			strcat( buf, "TEX base, fragment.texcoord[0], texture[0], 2D; \n" );
-			strcat( buf, genATestFP( alphatest ) );
 			strcat( buf, "TEX t,    fragment.texcoord[1], texture[1], 2D; \n" );
 			strcat( buf, "MUL base, base, t; \n" );
 			break;
 		case GL_REPLACE:
 			strcat( buf, "TEX base, fragment.texcoord[1], texture[1], 2D; \n" );
-			//strcat( buf, genATestFP( alphatest ) );
 			break;
 		default:
 			ri.Error( ERR_DROP, "Invalid multitexture mode %04x", multitexture );
@@ -269,15 +268,24 @@ const char *BuildFP( int multitexture, int alphatest, int fogMode )
 
 	if ( fogMode == FP_FOG_BLEND ) {
 		strcat( buf, "MUL base, base, fragment.color; \n" );
+		strcat( buf, genATestFP( alphatest ) );
 		strcat( buf, "TEMP fog; \n"
 		"TEX fog, fragment.texcoord[4], texture[2], 2D; \n"
 		"MUL fog, fog, program.local[0]; \n"
 		"LRP_SAT result.color, fog.a, fog, base; \n"
 		"END \n" );
 	} else {
-		strcat( buf,
-		"MUL result.color, base, fragment.color; \n"
-		"END \n" );
+		if ( alphatest ) {
+			strcat( buf, "MUL base, base, fragment.color; \n" );
+			strcat( buf, genATestFP( alphatest ) );
+			strcat( buf,
+			"MOV result.color, base; \n"
+			"END \n" );
+		} else {
+			strcat( buf,
+			"MUL result.color, base, fragment.color; \n"
+			"END \n" );
+		}
 	}
 
 	return buf;
@@ -331,7 +339,7 @@ static int getFPindex( int multitexture, int atest, int fogmode )
 	index <<= 2; // reserve bits for atest
 	switch ( atest )
 	{
-		case GLS_ATEST_GT_0: index |= 1; break;
+		case GLS_ATEST_GT_0:  index |= 1; break;
 		case GLS_ATEST_LT_80: index |= 2; break;
 		case GLS_ATEST_GE_80: index |= 3; break;
 		default: break;
@@ -367,6 +375,28 @@ static qboolean isStaticRGBgen( colorGen_t cgen )
 }
 
 
+static qboolean isStaticTCmod( const textureBundle_t *bundle )
+{
+	int i;
+
+	for ( i = 0; i < bundle->numTexMods; i++ ) {
+		switch ( bundle->texMods[i].type ) {
+		case TMOD_NONE:
+		case TMOD_SCALE:
+		case TMOD_TRANSFORM:
+		case TMOD_OFFSET:
+		case TMOD_SCALE_OFFSET:
+		case TMOD_OFFSET_SCALE:
+			break;
+		default:
+			return qfalse;
+		}
+	}
+
+	return qtrue;
+}
+
+
 static qboolean isStaticTCgen( shaderStage_t *stage, int bundle )
 {
 	switch ( stage->bundle[bundle].tcGen )
@@ -377,7 +407,7 @@ static qboolean isStaticTCgen( shaderStage_t *stage, int bundle )
 		case TCGEN_TEXTURE:
 			return qtrue;
 		case TCGEN_ENVIRONMENT_MAPPED:
-			if ( stage->bundle[bundle].numTexMods == 0 && ( stage->bundle[bundle].lightmap == LIGHTMAP_INDEX_NONE || !tr.mergeLightmaps ) ) {
+			if ( bundle == 0 && stage->bundle[bundle].numTexMods == 0 ) {
 				stage->tessFlags |= TESS_ENV0 << bundle;
 				stage->tessFlags &= ~( TESS_ST0 << bundle );
 				return qtrue;
@@ -393,27 +423,6 @@ static qboolean isStaticTCgen( shaderStage_t *stage, int bundle )
 		default:
 			return qfalse;
 	}
-}
-
-
-static qboolean isStaticTCmod( const textureBundle_t *bundle )
-{
-	int i;
-
-	for ( i = 0; i < bundle->numTexMods; i++ ) {
-		switch ( bundle->texMods[i].type ) {
-		case TMOD_NONE:
-		case TMOD_SCALE:
-		case TMOD_TRANSFORM:
-		case TMOD_OFFSET:
-		case TMOD_SCALE_OFFSET:
-			break;
-		default:
-			return qfalse;
-		}
-	}
-
-	return qtrue;
 }
 
 
@@ -1538,3 +1547,5 @@ void RB_StageIteratorVBO( void )
 	tess.vboIndex = 0;
 	VBO_ClearQueue();
 }
+
+#endif // USE_VBO

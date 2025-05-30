@@ -93,6 +93,22 @@ static void HSVtoRGB( float h, float s, float v, float rgb[3] )
 
 /*
 ===============
+R_ClampDenorm
+
+Clamp fp values that may result in denormalization after further multiplication
+===============
+*/
+float R_ClampDenorm( float v ) {
+	if ( fabsf( v ) > 0.0f && fabsf( v ) < 1e-9f ) {
+		return 0.0f;
+	} else {
+		return v;
+	}
+}
+
+
+/*
+===============
 R_ColorShiftLightingBytes
 ===============
 */
@@ -389,7 +405,7 @@ R_LoadLightmaps
 static void R_LoadLightmaps( const lump_t *l ) {
 	const byte	*buf;
 	byte		image[LIGHTMAP_LEN*LIGHTMAP_LEN*4];
-	int			i;
+	int			i, numLightmaps;
 	float		maxIntensity = 0;
 
 	tr.numLightmaps = 0;
@@ -413,9 +429,11 @@ static void R_LoadLightmaps( const lump_t *l ) {
 		return;
 	}
 
-	if ( r_mergeLightmaps->integer ) {
+	numLightmaps = l->filelen / (LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3);
+
+	if ( r_mergeLightmaps->integer && numLightmaps > 1 ) {
 		// check for low texture sizes
-		if ( glConfig.maxTextureSize >= LIGHTMAP_LEN*2 ) {
+		if ( glConfig.maxTextureSize >= LIGHTMAP_LEN * 2 ) {
 			tr.mergeLightmaps = qtrue;
 			R_LoadMergedLightmaps( l, image ); // reuse stack space
 			return;
@@ -425,12 +443,13 @@ static void R_LoadLightmaps( const lump_t *l ) {
 	buf = fileBase + l->fileofs;
 
 	// create all the lightmaps
-	tr.numLightmaps = l->filelen / (LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3);
+	tr.numLightmaps = numLightmaps;
 
 	// we are about to upload textures
 	//R_IssuePendingRenderCommands();
 
 	tr.lightmaps = ri.Hunk_Alloc( tr.numLightmaps * sizeof(image_t *), h_low );
+
 	for ( i = 0 ; i < tr.numLightmaps ; i++ ) {
 		maxIntensity = R_ProcessLightmap( image, buf + i * LIGHTMAP_SIZE * LIGHTMAP_SIZE * 3, maxIntensity );
 		tr.lightmaps[i] = R_CreateImage( va( "*lightmap%d", i ), NULL, image, LIGHTMAP_SIZE, LIGHTMAP_SIZE,
@@ -532,6 +551,7 @@ static shader_t *ShaderForShaderNum( const int shaderNum, int lightmapNum ) {
 }
 
 
+#ifdef USE_PMLIGHT
 static void GenerateNormals( srfSurfaceFace_t *face )
 {
 	vec3_t ba, ca, cross;
@@ -566,8 +586,12 @@ static void GenerateNormals( srfSurfaceFace_t *face )
 	for ( i = 0; i < face->numPoints; i++ ) {
 		n1 = face->normals + i*4;
 		VectorNormalize2( n1, n1 );
+		for ( i0 = 0; i0 < 3; i0++ ) {
+			n1[i0] = R_ClampDenorm( n1[i0] );
+		}
 	}
 }
+#endif // USE_PMLIGHT
 
 
 /*
@@ -647,7 +671,7 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 
 #ifdef USE_PMLIGHT
 	if ( surf->shader->numUnfoggedPasses && surf->shader->lightingStage >= 0 ) {
-		if ( fabs( cv->plane.normal[0] ) < 0.01 && fabs( cv->plane.normal[1] ) < 0.01 && fabs( cv->plane.normal[2] ) < 0.01 ) {
+		if ( fabsf( cv->plane.normal[0] ) < 0.01f && fabsf( cv->plane.normal[1] ) < 0.01f && fabsf( cv->plane.normal[2] ) < 0.01f ) {
 			// Zero-normals case:
 			// might happen if surface contains multiple non-coplanar faces for terrain simulation
 			// like in 'Pyramid of the Magician', 'tvy-bench' or 'terrast' maps
@@ -661,6 +685,10 @@ static void ParseFace( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 		}
 	}
 #endif
+
+	for ( i = 0; i < 3; i++ ) {
+		cv->plane.normal[i] = R_ClampDenorm( cv->plane.normal[i] );
+	}
 
 	cv->plane.dist = DotProduct( cv->points[0], cv->plane.normal );
 	SetPlaneSignbits( &cv->plane );
@@ -717,7 +745,7 @@ static void ParseMesh( const dsurface_t *ds, const drawVert_t *verts, msurface_t
 	for ( i = 0 ; i < numPoints ; i++ ) {
 		for ( j = 0 ; j < 3 ; j++ ) {
 			points[i].xyz[j] = LittleFloat( verts[i].xyz[j] );
-			points[i].normal[j] = LittleFloat( verts[i].normal[j] );
+			points[i].normal[j] = R_ClampDenorm( LittleFloat( verts[i].normal[j] ) );
 		}
 		for ( j = 0 ; j < 2 ; j++ ) {
 			points[i].st[j] = LittleFloat( verts[i].st[j] );
@@ -768,7 +796,7 @@ static void ParseTriSurf( const dsurface_t *ds, const drawVert_t *verts, msurfac
 	if ( lightmapNum >= 0 && tr.mergeLightmaps ) {
 		lightmapNum = R_GetLightmapCoords( lightmapNum, &lightmapX, &lightmapY );
 	} else {
-		lightmapX = lightmapY = 0;
+		lightmapX = lightmapY = 0.0f;
 	}
 
 	tr.lightmapOffset[0] = lightmapX;
@@ -796,7 +824,7 @@ static void ParseTriSurf( const dsurface_t *ds, const drawVert_t *verts, msurfac
 	for ( i = 0 ; i < numVerts ; i++ ) {
 		for ( j = 0 ; j < 3 ; j++ ) {
 			tri->verts[i].xyz[j] = LittleFloat( verts[i].xyz[j] );
-			tri->verts[i].normal[j] = LittleFloat( verts[i].normal[j] );
+			tri->verts[i].normal[j] = R_ClampDenorm( LittleFloat( verts[i].normal[j] ) );
 		}
 		AddPointToBounds( tri->verts[i].xyz, tri->bounds[0], tri->bounds[1] );
 		for ( j = 0 ; j < 2 ; j++ ) {
@@ -846,7 +874,7 @@ static void ParseFlare( const dsurface_t *ds, const drawVert_t *verts, msurface_
 	for ( i = 0 ; i < 3 ; i++ ) {
 		flare->origin[i] = LittleFloat( ds->lightmapOrigin[i] );
 		flare->color[i] = LittleFloat( ds->lightmapVecs[0][i] );
-		flare->normal[i] = LittleFloat( ds->lightmapVecs[2][i] );
+		flare->normal[i] = R_ClampDenorm( LittleFloat( ds->lightmapVecs[2][i] ) );
 	}
 }
 
@@ -1526,7 +1554,7 @@ R_MovePatchSurfacesToHunk
 ===============
 */
 static void R_MovePatchSurfacesToHunk( void ) {
-	int i, size;
+	int i, j, k, n, size;
 	srfGridMesh_t *grid, *hunkgrid;
 
 	for ( i = 0; i < s_worldData.numsurfaces; i++ ) {
@@ -1536,7 +1564,15 @@ static void R_MovePatchSurfacesToHunk( void ) {
 		if ( grid->surfaceType != SF_GRID )
 			continue;
 		//
-		size = (grid->width * grid->height - 1) * sizeof( drawVert_t ) + sizeof( *grid );
+		n = grid->width * grid->height - 1;
+		size = n * sizeof( drawVert_t ) + sizeof( *grid );
+
+		for (j = 0; j < n; j++) {
+			for (k = 0; k < 3; k++) {
+				grid->verts[j].normal[k] = R_ClampDenorm( grid->verts[j].normal[k] );
+			}
+		}
+
 		hunkgrid = ri.Hunk_Alloc( size, h_low );
 		Com_Memcpy(hunkgrid, grid, size);
 
@@ -2252,7 +2288,9 @@ void RE_LoadWorldMap( const char *name ) {
 	R_LoadEntities( &header->lumps[LUMP_ENTITIES] );
 	R_LoadLightGrid( &header->lumps[LUMP_LIGHTGRID] );
 
+#ifdef USE_VBO
 	R_BuildWorldVBO( s_worldData.surfaces, s_worldData.numsurfaces );
+#endif
 
 	tr.mapLoading = qfalse;
 

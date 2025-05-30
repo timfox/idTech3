@@ -42,12 +42,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define USE_FOG_ONLY
 #endif
 #define USE_LEGACY_DLIGHTS	// vq3 dynamic lights
-#define USE_PMLIGHT		// promode dynamic lights via \r_dlightMode 1|2
+#define USE_PMLIGHT			// promode dynamic lights via \r_dlightMode 1|2
 #define MAX_REAL_DLIGHTS	(MAX_DLIGHTS*2)
 #define MAX_LITSURFS		(MAX_DRAWSURFS)
 #define	MAX_FLARES			256
 
 #define MAX_TEXTURE_SIZE	2048 // must be less or equal to 32768
+
+#define USE_BUFFER_CLEAR	/* clear attachments on render pass begin */
 
 //#define USE_TESS_NEEDS_NORMAL
 //#define USE_TESS_NEEDS_ST2
@@ -292,6 +294,7 @@ typedef enum {
 	TMOD_ENTITY_TRANSLATE,
 	TMOD_OFFSET,
 	TMOD_SCALE_OFFSET,
+	TMOD_OFFSET_SCALE,
 } texMod_t;
 
 #define	MAX_SHADER_DEFORMS	3
@@ -1326,6 +1329,7 @@ typedef struct {
 	drawSurfsCommand_t		*drawSurfCmd;
 	int						numDrawSurfCmds;
 	int						lastRenderCommand;
+	int						numFogs; // read before parsing shaders
 #endif
 
 	qboolean				vertexLightingAllowed;
@@ -1366,6 +1370,8 @@ extern cvar_t	*r_stereoSeparation;			// separation of cameras for stereo renderi
 extern cvar_t	*r_lodbias;				// push/pull LOD transitions
 extern cvar_t	*r_lodscale;
 
+extern cvar_t	*r_teleporterFlash;		// teleport hyperspace visual
+
 extern cvar_t	*r_fastsky;				// controls whether sky should be cleared or drawn
 extern cvar_t	*r_neatsky;				// nomip and nopicmip for skyboxes, cnq3 like look
 extern cvar_t	*r_drawSun;				// controls drawing of sun quad
@@ -1399,9 +1405,11 @@ extern cvar_t	*r_hdr;
 extern cvar_t	*r_bloom;
 extern cvar_t	*r_bloom_threshold;
 extern cvar_t	*r_bloom_intensity;
+extern cvar_t	*r_bloom_threshold_mode;
+extern cvar_t	*r_bloom_modulate;
 extern cvar_t	*r_ext_multisample;
 extern cvar_t	*r_ext_supersample;
-extern cvar_t	*r_ext_alpha_to_coverage;
+//extern cvar_t	*r_ext_alpha_to_coverage;
 extern cvar_t	*r_renderWidth;
 extern cvar_t	*r_renderHeight;
 extern cvar_t	*r_renderScale;
@@ -1605,6 +1613,8 @@ skin_t	*R_GetSkinByHandle( qhandle_t hSkin );
 int R_ComputeLOD( trRefEntity_t *ent );
 
 const void *RB_TakeVideoFrameCmd( const void *data );
+
+float R_ClampDenorm( float v );
 
 //
 // tr_shader.c

@@ -35,10 +35,9 @@ static void R_PerformanceCounters( void ) {
 	}
 
 	if (r_speeds->integer == 1) {
-		ri.Printf (PRINT_ALL, "%i/%i shaders/surfs %i leafs %i verts %i/%i tris %.2f mtex %.2f dc\n",
+		ri.Printf (PRINT_ALL, "%i/%i shaders/surfs %i leafs %i verts %i/%i tris %.2f mtex\n",
 			backEnd.pc.c_shaders, backEnd.pc.c_surfaces, tr.pc.c_leafs, backEnd.pc.c_vertexes, 
-			backEnd.pc.c_indexes/3, backEnd.pc.c_totalIndexes/3, 
-			R_SumOfUsedImages()/(1000000.0f), backEnd.pc.c_overDraw / (float)(glConfig.vidWidth * glConfig.vidHeight) ); 
+			backEnd.pc.c_indexes/3, backEnd.pc.c_totalIndexes/3, R_SumOfUsedImages()/1000000.0); 
 	} else if (r_speeds->integer == 2) {
 		ri.Printf (PRINT_ALL, "(patch) %i sin %i sclip  %i sout %i bin %i bclip %i bout\n",
 			tr.pc.c_sphere_cull_patch_in, tr.pc.c_sphere_cull_patch_clip, tr.pc.c_sphere_cull_patch_out, 
@@ -311,40 +310,22 @@ for each RE_EndFrame
 ====================
 */
 void RE_BeginFrame( stereoFrame_t stereoFrame ) {
-	drawBufferCommand_t	*cmd = NULL;
+	drawBufferCommand_t *cmd;
 
 	if ( !tr.registered ) {
 		return;
 	}
 
-#ifndef USE_VULKAN
 	glState.finishCalled = qfalse;
-#endif
 
 #ifdef USE_VULKAN
 	backEnd.doneBloom = qfalse;
 #endif
 
+	backEnd.color2D.u32 = ~0U;
+
 	tr.frameCount++;
 	tr.frameSceneNum = 0;
-
-	//
-	// texturemode stuff
-	//
-	if ( r_textureMode->modified ) {
-		GL_TextureMode( r_textureMode->string );
-		r_textureMode->modified = qfalse;
-	}
-
-	//
-	// gamma stuff
-	//
-	if ( r_gamma->modified || r_greyscale->modified || r_dither->modified ) {
-		r_gamma->modified = qfalse;
-		r_greyscale->modified = qfalse;
-		r_dither->modified = qfalse;
-		R_SetColorMappings();
-	}
 
 	if ( ( cmd = R_GetCommandBuffer( sizeof( *cmd ) ) ) == NULL )
 		return;
@@ -378,8 +359,9 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 #endif
 	}
 
+#ifndef USE_BUFFER_CLEAR
 #ifdef USE_VULKAN
-	if ( r_fastsky->integer && vk.fastSky ) {
+	if ( r_fastsky->integer && vk.clearAttachment ) {
 #else
 	if ( r_fastsky->integer ) {
 #endif
@@ -390,6 +372,7 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 			clrcmd->commandId = RC_CLEARCOLOR;
 		}
 	}
+#endif // USE_BUFFER_CLEAR
 
 	tr.refdef.stereoFrame = stereoFrame;
 }
@@ -416,9 +399,9 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	}
 	cmd->commandId = RC_SWAP_BUFFERS;
 
-	R_PerformanceCounters();
-
 	R_IssueRenderCommands();
+
+	R_PerformanceCounters();
 
 	R_InitNextFrame();
 
@@ -426,11 +409,33 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 		*frontEndMsec = tr.frontEndMsec;
 	}
 	tr.frontEndMsec = 0;
+
 	if ( backEndMsec ) {
 		*backEndMsec = backEnd.pc.msec;
 	}
 	backEnd.pc.msec = 0;
+
 	backEnd.throttle = qfalse;
+
+	// recompile GPU shaders if needed
+	if ( ri.Cvar_CheckGroup( CVG_RENDERER ) ) {
+
+		// texturemode stuff
+		if ( r_textureMode->modified ) {
+			GL_TextureMode( r_textureMode->string );
+		}
+
+		// gamma stuff
+		if ( r_gamma->modified ) {
+			R_SetColorMappings();
+		}
+
+#ifdef USE_VULKAN
+		vk_update_post_process_pipelines();
+#endif
+
+		ri.Cvar_ResetGroup( CVG_RENDERER, qtrue /* reset modified flags */ );
+	}
 }
 
 
