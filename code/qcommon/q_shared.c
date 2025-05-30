@@ -1306,7 +1306,65 @@ void Q_strncpyz( char *dest, const char *src, int destsize )
 }
 
 
-int Q_stricmpn (const char *s1, const char *s2, int n) {
+/*
+=============
+Q_strncpy
+
+allows src and dest to be overlapped for QVM compatibility purposes
+=============
+*/
+char *Q_strncpy( char *dest, char *src, int destsize )
+{
+	char *s = src, *start = dest;
+	int src_len;
+
+	while ( *s != '\0' )
+		++s;
+	src_len = (int)(s - src);
+	
+	if ( src_len > destsize ) {
+		src_len = destsize;
+	}
+	destsize -= src_len;
+
+	if ( dest > src && dest < src + src_len ) {
+		int i;
+#ifdef _DEBUG
+		Com_Printf( S_COLOR_YELLOW "Q_strncpy: overlapped (dest > src) buffers\n" );
+#endif
+		for ( i = src_len - 1; i >= 0; --i ) {
+			dest[i] = src[i]; // back overlapping
+		}
+		dest += src_len;
+	} else {
+#ifdef _DEBUG
+		if ( src >= dest && src < dest + src_len ) {
+			Com_Printf( S_COLOR_YELLOW "Q_strncpy: overlapped (src >= dst) buffers\n" );
+#ifdef _MSC_VER
+			// __debugbreak();
+#endif 
+		}
+#endif
+		while ( src_len > 0 ) {
+			*dest++ = *src++;
+			--src_len;
+		}
+	}
+
+	while ( destsize > 0 ) {
+		*dest++ = '\0';
+		--destsize;
+	}
+
+	return start;
+}
+
+/*
+=============
+Q_stricmpn
+=============
+*/
+int Q_stricmpn( const char *s1, const char *s2, int n ) {
 	int		c1, c2;
 
 	// bk001129 - moved in 1.17 fix not in id codebase
@@ -1977,6 +2035,11 @@ int Info_RemoveKey( char *s, const char *key )
 		pkey = s;
 		while ( *s != '\\' ) {
 			if ( *s == '\0' ) {
+				if ( s != start ) {
+					// remove any trailing empty keys
+					*start = '\0';
+					ret += (int)(s - start);
+				}
 				return ret;
 			}
 			++s;

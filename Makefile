@@ -71,6 +71,8 @@ endif
 
 ifeq ($(COMPILE_PLATFORM),darwin)
   USE_SDL=1
+  USE_LOCAL_HEADERS=1
+  USE_RENDERER_DLOPEN = 0
 endif
 
 ifeq ($(COMPILE_PLATFORM),cygwin)
@@ -205,6 +207,7 @@ R1DIR=$(MOUNT_DIR)/renderer
 R2DIR=$(MOUNT_DIR)/renderer2
 RVDIR=$(MOUNT_DIR)/renderervk
 SDLDIR=$(MOUNT_DIR)/sdl
+SDLHDIR=$(MOUNT_DIR)/libsdl/include/SDL2
 
 CMDIR=$(MOUNT_DIR)/qcommon
 UDIR=$(MOUNT_DIR)/unix
@@ -234,8 +237,8 @@ ifneq ($(call bin_path, $(PKG_CONFIG)),)
     OGG_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs ogg || echo -logg)
   endif
   ifeq ($(USE_SYSTEM_VORBIS),1)
-    VORBIS_CFLAGS ?= $(shell $(PKG_CONFIG) --silence-errors --cflags vorbis || true)
-    VORBIS_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs vorbis || echo -lvorbis)
+    VORBIS_CFLAGS ?= $(shell $(PKG_CONFIG) --silence-errors --cflags vorbisfile || true)
+    VORBIS_LIBS ?= $(shell $(PKG_CONFIG) --silence-errors --libs vorbisfile || echo -lvorbisfile)
   endif
 endif
 
@@ -264,13 +267,17 @@ ifeq ($(USE_SYSTEM_OGG),1)
 endif
 ifeq ($(USE_SYSTEM_VORBIS),1)
   ifeq ($(VORBIS_LIBS),)
-    VORBIS_LIBS = -lvorbis
+    VORBIS_LIBS = -lvorbisfile
   endif
 endif
 
 # extract version info
+ifneq ($(COMPILE_PLATFORM),darwin)
 VERSION=$(shell grep ".\+define[ \t]\+Q3_VERSION[ \t]\+\+" $(CMDIR)/q_shared.h | \
   sed -e 's/.*".* \([^ ]*\)"/\1/')
+else
+VERSION=1.32e
+endif
 
 # common qvm definition
 ifeq ($(ARCH),x86_64)
@@ -415,7 +422,7 @@ ifdef MINGW
 
   BINEXT = .exe
 
-  LDFLAGS = -mwindows -Wl,--dynamicbase -Wl,--nxcompat
+  LDFLAGS += -mwindows -Wl,--dynamicbase -Wl,--nxcompat
   LDFLAGS += -Wl,--gc-sections -fvisibility=hidden
   LDFLAGS += -lwsock32 -lgdi32 -lwinmm -lole32 -lws2_32 -lpsapi -lcomctl32
   LDFLAGS += -flto
@@ -423,7 +430,7 @@ ifdef MINGW
   CLIENT_LDFLAGS=$(LDFLAGS)
 
   ifeq ($(USE_SDL),1)
-    BASE_CFLAGS += -DUSE_LOCAL_HEADERS=1 -I$(MOUNT_DIR)/libsdl/windows/include/SDL2
+    BASE_CFLAGS += -DUSE_LOCAL_HEADERS=1 -I$(SDLHDIR)
     #CLIENT_CFLAGS += -DUSE_LOCAL_HEADERS=1
     ifeq ($(ARCH),x86)
       CLIENT_LDFLAGS += -L$(MOUNT_DIR)/libsdl/windows/mingw/lib32
@@ -466,20 +473,40 @@ ifeq ($(COMPILE_PLATFORM),darwin)
 
   BASE_CFLAGS += -Wno-unused-result
 
+  BASE_CFLAGS += -DMACOS_X
+
   OPTIMIZE = -O2 -fvisibility=hidden
 
   SHLIBEXT = dylib
   SHLIBCFLAGS = -fPIC -fvisibility=hidden
   SHLIBLDFLAGS = -dynamiclib $(LDFLAGS)
 
-  LDFLAGS =
+  ARCHEXT = .$(ARCH)
 
+  LDFLAGS +=
+
+  ifeq ($(ARCH),x86_64)
+    BASE_CFLAGS += -arch x86_64
+    LDFLAGS += -arch x86_64
+  endif
+  ifeq ($(ARCH),aarch64)
+    BASE_CFLAGS += -arch arm64
+    LDFLAGS += -arch arm64
+  endif
+
+  ifeq ($(USE_LOCAL_HEADERS),1)
+    MACLIBSDIR=$(MOUNT_DIR)/libsdl/macosx
+    BASE_CFLAGS += -I$(SDLHDIR)
+    CLIENT_LDFLAGS += $(MACLIBSDIR)/libSDL2-2.0.0.dylib
+    CLIENT_EXTRA_FILES += $(MACLIBSDIR)/libSDL2-2.0.0.dylib
+  else
   ifneq ($(SDL_INCLUDE),)
     BASE_CFLAGS += $(SDL_INCLUDE)
     CLIENT_LDFLAGS = $(SDL_LIBS)
   else
     BASE_CFLAGS += -I/Library/Frameworks/SDL2.framework/Headers
-    CLIENT_LDFLAGS = -F/Library/Frameworks -framework SDL2
+    CLIENT_LDFLAGS += -F/Library/Frameworks -framework SDL2
+  endif
   endif
 
   ifeq ($(USE_SYSTEM_JPEG),1)
@@ -531,7 +558,7 @@ else
   SHLIBCFLAGS = -fPIC -fvisibility=hidden
   SHLIBLDFLAGS = -shared $(LDFLAGS)
 
-  LDFLAGS = -lm
+  LDFLAGS += -lm
   LDFLAGS += -Wl,--gc-sections -fvisibility=hidden
 
   ifeq ($(USE_SDL),1)
@@ -1103,6 +1130,11 @@ ifndef MINGW
     $(B)/client/snd_mix_mmx.o \
     $(B)/client/snd_mix_sse.o
 endif
+endif
+
+ifeq ($(ARCH),x86_64)
+  Q3OBJ += \
+    $(B)/client/snd_mix_x86_64.o
 endif
 
 ifeq ($(HAVE_VM_COMPILED),true)

@@ -173,7 +173,7 @@ float FloatSwap( const float *f );
 		typedef __int64 int64_t;
 		typedef __int32 int32_t;
 		typedef __int16 int16_t;
-		typedef __int8 int8_t;
+		typedef signed __int8 int8_t;
 		typedef unsigned __int64 uint64_t;
 		typedef unsigned __int32 uint32_t;
 		typedef unsigned __int16 uint16_t;
@@ -803,7 +803,7 @@ const char *Com_SkipCharset( const char *s, const char *sep );
 
 void Com_RandomBytes( byte *string, int len );
 
-void Com_SortFileList( char **list, int nfiles, int fastSort );
+void Com_SortList( char** list, int n );
 
 // mode parm for FS_FOpenFile
 typedef enum {
@@ -848,6 +848,7 @@ void	Q_strcat( char *dest, int size, const char *src );
 int     Q_replace( const char *str1, const char *str2, char *src, int max_len );
 
 char	*Q_stradd( char *dst, const char *src );
+char	*Q_strncpy( char *dest, char *src, int destsize );
 
 // strlen that discounts Quake color sequences
 int Q_PrintStrlen( const char *string );
