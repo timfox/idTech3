@@ -2899,81 +2899,12 @@ qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size )
 #include "shaders/spirv/shader_data.c"
 #define SHADER_MODULE(name) SHADER_MODULE(name,sizeof(name))
 
+#include "shaders/spirv/shader_binding.c"
+
 static void vk_create_shader_modules( void )
 {
 #ifdef USE_VK_PBR
-    int i, j, k, l, m;
-
-	vk.modules.vert.gen[0][0][0][0][0] = SHADER_MODULE( vert_tx0 );
-	vk.modules.vert.gen[0][0][0][0][1] = SHADER_MODULE( vert_tx0_fog );
-	vk.modules.vert.gen[0][0][0][1][0] = SHADER_MODULE( vert_tx0_env );
-	vk.modules.vert.gen[0][0][0][1][1] = SHADER_MODULE( vert_tx0_env_fog );
-
-	vk.modules.vert.gen[0][1][0][0][0] = SHADER_MODULE( vert_tx1 );
-	vk.modules.vert.gen[0][1][0][0][1] = SHADER_MODULE( vert_tx1_fog );
-	vk.modules.vert.gen[0][1][0][1][0] = SHADER_MODULE( vert_tx1_env );
-	vk.modules.vert.gen[0][1][0][1][1] = SHADER_MODULE( vert_tx1_env_fog );
-
-	vk.modules.vert.gen[0][1][1][0][0] = SHADER_MODULE( vert_tx1_cl );
-	vk.modules.vert.gen[0][1][1][0][1] = SHADER_MODULE( vert_tx1_cl_fog );
-	vk.modules.vert.gen[0][1][1][1][0] = SHADER_MODULE( vert_tx1_cl_env );
-	vk.modules.vert.gen[0][1][1][1][1] = SHADER_MODULE( vert_tx1_cl_env_fog );
-
-	vk.modules.vert.gen[0][2][0][0][0] = SHADER_MODULE( vert_tx2 );
-	vk.modules.vert.gen[0][2][0][0][1] = SHADER_MODULE( vert_tx2_fog );
-	vk.modules.vert.gen[0][2][0][1][0] = SHADER_MODULE( vert_tx2_env );
-	vk.modules.vert.gen[0][2][0][1][1] = SHADER_MODULE( vert_tx2_env_fog );
-
-	vk.modules.vert.gen[0][2][1][0][0] = SHADER_MODULE( vert_tx2_cl );
-	vk.modules.vert.gen[0][2][1][0][1] = SHADER_MODULE( vert_tx2_cl_fog );
-	vk.modules.vert.gen[0][2][1][1][0] = SHADER_MODULE( vert_tx2_cl_env );
-	vk.modules.vert.gen[0][2][1][1][1] = SHADER_MODULE( vert_tx2_cl_env_fog );
-
-    // PBR
-    if ( vk.pbrActive ) {
-        vk.modules.vert.gen[1][0][0][0][0] = SHADER_MODULE(vert_pbr_tx0);
-        vk.modules.vert.gen[1][0][0][0][1] = SHADER_MODULE(vert_pbr_tx0_fog);
-        vk.modules.vert.gen[1][0][0][1][0] = SHADER_MODULE(vert_pbr_tx0_env);
-        vk.modules.vert.gen[1][0][0][1][1] = SHADER_MODULE(vert_pbr_tx0_env_fog);
-
-        vk.modules.vert.gen[1][1][0][0][0] = SHADER_MODULE(vert_pbr_tx1);
-        vk.modules.vert.gen[1][1][0][0][1] = SHADER_MODULE(vert_pbr_tx1_fog);
-        vk.modules.vert.gen[1][1][0][1][0] = SHADER_MODULE(vert_pbr_tx1_env);
-        vk.modules.vert.gen[1][1][0][1][1] = SHADER_MODULE(vert_pbr_tx1_env_fog);
-
-        vk.modules.vert.gen[1][1][1][0][0] = SHADER_MODULE(vert_pbr_tx1_cl);
-        vk.modules.vert.gen[1][1][1][0][1] = SHADER_MODULE(vert_pbr_tx1_cl_fog);
-        vk.modules.vert.gen[1][1][1][1][0] = SHADER_MODULE(vert_pbr_tx1_cl_env);
-        vk.modules.vert.gen[1][1][1][1][1] = SHADER_MODULE(vert_pbr_tx1_cl_env_fog);
-
-        vk.modules.vert.gen[1][2][0][0][0] = SHADER_MODULE(vert_pbr_tx2);
-        vk.modules.vert.gen[1][2][0][0][1] = SHADER_MODULE(vert_pbr_tx2_fog);
-        vk.modules.vert.gen[1][2][0][1][0] = SHADER_MODULE(vert_pbr_tx2_env);
-        vk.modules.vert.gen[1][2][0][1][1] = SHADER_MODULE(vert_pbr_tx2_env_fog);
-
-        vk.modules.vert.gen[1][2][1][0][0] = SHADER_MODULE(vert_pbr_tx2_cl);
-        vk.modules.vert.gen[1][2][1][0][1] = SHADER_MODULE(vert_pbr_tx2_cl_fog);
-        vk.modules.vert.gen[1][2][1][1][0] = SHADER_MODULE(vert_pbr_tx2_cl_env);
-        vk.modules.vert.gen[1][2][1][1][1] = SHADER_MODULE(vert_pbr_tx2_cl_env_fog);
-    }
-
-    for (i = 0; i < 2; i++) {
-        const char *pbr[] = { "", "pbr" };
-        const char *tx[] = { "single", "double", "triple" };
-        const char *cl[] = { "", "+cl" };
-        const char *env[] = { "", "+env" };
-        const char *fog[] = { "", "+fog" };
-        for (j = 0; j < 3; j++) {
-            for (k = 0; k < 2; k++) {
-                for (l = 0; l < 2; l++) {
-                    for (m = 0; m < 2; m++) {
-                        const char *s = va("%s-texture%s%s%s%s vertex module", pbr[i], tx[j], cl[k], env[l], fog[m]);
-                        SET_OBJECT_NAME(vk.modules.vert.gen[i][j][k][l][m], s, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT);
-                    }
-                }
-            }
-        }
-    }
+	vk_bind_generated_shaders();
 #else
 	int i, j, k, l;
 
@@ -3016,11 +2947,6 @@ static void vk_create_shader_modules( void )
 			}
 		}
 	}
-#endif
-
-	// specialized depth-fragment shader
-	vk.modules.frag.gen0_df = SHADER_MODULE( frag_tx0_df );
-	SET_OBJECT_NAME( vk.modules.frag.gen0_df, "single-texture df fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 
 	// fixed-color (1.0) shader modules
 	vk.modules.vert.ident1[0][0][0] = SHADER_MODULE( vert_tx0_ident1 );
@@ -3042,56 +2968,13 @@ static void vk_create_shader_modules( void )
 			}
 		}
 	}
+#endif
 
-#ifdef USE_VK_PBR
-	vk.modules.frag.gen[0][0][0][0] = SHADER_MODULE(frag_tx0);
-    vk.modules.frag.gen[0][0][0][1] = SHADER_MODULE(frag_tx0_fog);
+	// specialized depth-fragment shader
+	vk.modules.frag.gen0_df = SHADER_MODULE( frag_tx0_df );
+	SET_OBJECT_NAME( vk.modules.frag.gen0_df, "single-texture df fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 
-    vk.modules.frag.gen[0][1][0][0] = SHADER_MODULE(frag_tx1);
-    vk.modules.frag.gen[0][1][0][1] = SHADER_MODULE(frag_tx1_fog);
-
-    vk.modules.frag.gen[0][1][1][0] = SHADER_MODULE(frag_tx1_cl);
-    vk.modules.frag.gen[0][1][1][1] = SHADER_MODULE(frag_tx1_cl_fog);
-
-    vk.modules.frag.gen[0][2][0][0] = SHADER_MODULE(frag_tx2);
-    vk.modules.frag.gen[0][2][0][1] = SHADER_MODULE(frag_tx2_fog);
-
-    vk.modules.frag.gen[0][2][1][0] = SHADER_MODULE(frag_tx2_cl);
-    vk.modules.frag.gen[0][2][1][1] = SHADER_MODULE(frag_tx2_cl_fog);
-
-    // PBR
-    if ( vk.pbrActive ) {
-        vk.modules.frag.gen[1][0][0][0] = SHADER_MODULE(frag_pbr_tx0);
-        vk.modules.frag.gen[1][0][0][1] = SHADER_MODULE(frag_pbr_tx0_fog);
-
-        vk.modules.frag.gen[1][1][0][0] = SHADER_MODULE(frag_pbr_tx1);
-        vk.modules.frag.gen[1][1][0][1] = SHADER_MODULE(frag_pbr_tx1_fog);
-
-        vk.modules.frag.gen[1][1][1][0] = SHADER_MODULE(frag_pbr_tx1_cl);
-        vk.modules.frag.gen[1][1][1][1] = SHADER_MODULE(frag_pbr_tx1_cl_fog);
-
-        vk.modules.frag.gen[1][2][0][0] = SHADER_MODULE(frag_pbr_tx2);
-        vk.modules.frag.gen[1][2][0][1] = SHADER_MODULE(frag_pbr_tx2_fog);
-
-        vk.modules.frag.gen[1][2][1][0] = SHADER_MODULE(frag_pbr_tx2_cl);
-        vk.modules.frag.gen[1][2][1][1] = SHADER_MODULE(frag_pbr_tx2_cl_fog);
-    }
-
-    for (i = 0; i < 2; i++) {
-        const char *pbr[] = { "", "pbr" };
-        const char *tx[] = { "single", "double", "triple" };
-        const char *cl[] = { "", "+cl" };
-        const char *fog[] = { "", "+fog" };
-        for (j = 0; j < 3; j++) {
-            for (k = 0; k < 2; k++) {
-                for (l = 0; l < 2; l++) {
-                    const char *s = va("%s-texture%s%s%s fragment module", pbr[i], tx[j], cl[k], fog[l]);
-                    SET_OBJECT_NAME(vk.modules.frag.gen[i][j][k][l], s, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT);
-                }
-            }
-        }
-    }
-#else
+#ifndef USE_VK_PBR
 	vk.modules.frag.ident1[0][0] = SHADER_MODULE( frag_tx0_ident1 );
 	vk.modules.frag.ident1[0][1] = SHADER_MODULE( frag_tx0_ident1_fog );
 	vk.modules.frag.ident1[1][0] = SHADER_MODULE( frag_tx1_ident1 );
@@ -3150,8 +3033,6 @@ static void vk_create_shader_modules( void )
 			SET_OBJECT_NAME( vk.modules.frag.ent[i][j], s, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 		}
 	}
-
-
 #endif
 
 	vk.modules.vert.light[0] = SHADER_MODULE( vert_light );
@@ -3638,12 +3519,10 @@ static void vk_alloc_attachments( void )
 }
 
 
-static void vk_add_attachment_desc( 
-	VkImage desc, VkImageView *image_view, 
-	VkImageUsageFlags usage, VkMemoryRequirements *reqs, 
-	VkFormat image_format, VkImageAspectFlags aspect_flags, 
-	VkAccessFlags access_flags, VkImageLayout image_layout, 
-	VkImageViewType view_type )
+static void vk_add_attachment_desc( VkImage desc, VkImageView *image_view, VkImageUsageFlags usage, VkMemoryRequirements *reqs, VkFormat image_format, VkImageAspectFlags aspect_flags, VkImageLayout image_layout
+#ifdef USE_VK_PBR
+	, VkImageViewType view_type )
+#endif
 {
 	if ( num_attachments >= ARRAY_LEN( attachments ) ) {
 		ri.Error( ERR_FATAL, "Attachments array overflow" );
@@ -3772,7 +3651,11 @@ static void create_depth_attachment( uint32_t width, uint32_t height, VkSampleCo
 
 	vk_get_image_memory_erquirements( *image, &memory_requirements );
 
+#ifdef USE_VK_PBR
 	vk_add_attachment_desc( *image, image_view, create_desc.usage, &memory_requirements, vk.depth_format, image_aspect_flags, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_VIEW_TYPE_2D );
+#else
+	vk_add_attachment_desc( *image, image_view, create_desc.usage, &memory_requirements, vk.depth_format, image_aspect_flags, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
+#endif
 }
 
 
@@ -3823,7 +3706,7 @@ static void vk_create_attachments( void )
                     usage, &vk.cubeMap.color_image_msaa, &vk.cubeMap.color_image_view_msaa[0], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT );
             
             create_depth_attachment( REF_CUBEMAP_SIZE, REF_CUBEMAP_SIZE, (VkSampleCountFlagBits)vkSamples,
-                    &vk.cubeMap.depth_image, &vk.cubeMap.depth_image_view );
+                    &vk.cubeMap.depth_image, &vk.cubeMap.depth_image_view, qtrue );
         
             usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
         }
@@ -5096,6 +4979,42 @@ for (i = 0; i < 2; i++) {
 		}
 	}
 
+#ifdef USE_VK_PBR
+	for ( i = 0; i < 2; i++ ) {
+		for ( j = 0; j < 2; j++ ) {
+			for ( k = 0; k < 2; k++ ) {
+				for ( m = 0; m < 2; m++ ) {
+					qvkDestroyShaderModule( vk.device, vk.modules.vert.ident1[i][j][k][m], NULL );
+					vk.modules.vert.ident1[i][j][k][m] = VK_NULL_HANDLE;
+				}
+				qvkDestroyShaderModule( vk.device, vk.modules.frag.ident1[i][j][k], NULL );
+				vk.modules.frag.ident1[i][j][k] = VK_NULL_HANDLE;
+			}
+		}
+	}
+
+	for ( i = 0; i < 2; i++ ) {
+		for ( j = 0; j < 2; j++ ) {
+			for ( k = 0; k < 2; k++ ) {
+				for ( m = 0; m < 2; m++ ) {
+					qvkDestroyShaderModule( vk.device, vk.modules.vert.fixed[i][j][k][m], NULL );
+					vk.modules.vert.fixed[i][j][k][m] = VK_NULL_HANDLE;
+				}
+				qvkDestroyShaderModule( vk.device, vk.modules.frag.fixed[i][j][k], NULL );
+				vk.modules.frag.fixed[i][j][k] = VK_NULL_HANDLE;
+			}
+		}
+	}
+
+	for ( i = 0; i < 2; i++ ) {
+		for ( j = 0; j < 2; j++ ) {
+			for ( k = 0; k < 2; k++ ) {
+				qvkDestroyShaderModule( vk.device, vk.modules.frag.ent[i][j][k], NULL );
+				vk.modules.frag.ent[i][j][k] = VK_NULL_HANDLE;
+			}
+		}
+	}
+#else
 	for ( i = 0; i < 2; i++ ) {
 		for ( j = 0; j < 2; j++ ) {
 			for ( k = 0; k < 2; k++ ) {
@@ -5124,6 +5043,7 @@ for (i = 0; i < 2; i++) {
 			vk.modules.frag.ent[i][j] = VK_NULL_HANDLE;
 		}
 	}
+#endif
 
 	qvkDestroyShaderModule( vk.device, vk.modules.frag.gen0_df, NULL );
 
@@ -6120,14 +6040,14 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		float	identity_alpha;
 		float	acff;
 #ifdef USE_VK_PBR
-        float   specularScale_x;
+        float   specularScale_x;	// use ubo for this
         float   specularScale_y;
         float   specularScale_z;
         float   specularScale_w;
         float   normalScale_x;
         float   normalScale_y;
         float   normalScale_z;
-        float   normalScale_w;
+        float   normalScale_w;		// ..
         int32_t normal_texture_set;
         int32_t physical_texture_set;
         int32_t env_texture_set;
@@ -6180,10 +6100,30 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			fs_module = &vk.modules.frag.gen0_df;
 			break;
 
-		case TYPE_SIGNLE_TEXTURE_IDENTITY:
-			vs_module = &vk.modules.vert.gen0_ident;
-			fs_module = &vk.modules.frag.gen0_ident;
+
+		// new
+
+		case TYPE_SIGNLE_TEXTURE_FIXED_COLOR:
+			vs_module = &vk.modules.vert.fixed[use_pbr][0][0][0];
+			fs_module = &vk.modules.frag.fixed[use_pbr][0][0];
 			break;
+
+		case TYPE_SIGNLE_TEXTURE_FIXED_COLOR_ENV:
+			vs_module = &vk.modules.vert.fixed[use_pbr][0][1][0];
+			fs_module = &vk.modules.frag.fixed[use_pbr][0][0];
+			break;
+
+		case TYPE_SIGNLE_TEXTURE_ENT_COLOR:
+			vs_module = &vk.modules.vert.fixed[use_pbr][0][0][0];
+			fs_module = &vk.modules.frag.ent[use_pbr][0][0];
+			break;
+
+		case TYPE_SIGNLE_TEXTURE_ENT_COLOR_ENV:
+			vs_module = &vk.modules.vert.fixed[use_pbr][0][1][0];
+			fs_module = &vk.modules.frag.ent[use_pbr][0][0];
+		// new end
+
+
 
 		case TYPE_SIGNLE_TEXTURE:
 			vs_module = &vk.modules.vert.gen[use_pbr][0][0][0][0];
@@ -6210,14 +6150,14 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			break;
 
 		case TYPE_MULTI_TEXTURE_MUL3:
-		case TYPE_MULTI_TEXTURE_ADD3_IDENTITY:
+		case TYPE_MULTI_TEXTURE_ADD3_1_1:
 		case TYPE_MULTI_TEXTURE_ADD3:
 			vs_module = &vk.modules.vert.gen[use_pbr][2][0][0][0];
 			fs_module = &vk.modules.frag.gen[use_pbr][2][0][0];
 			break;
 
 		case TYPE_MULTI_TEXTURE_MUL3_ENV:
-		case TYPE_MULTI_TEXTURE_ADD3_IDENTITY_ENV:
+		case TYPE_MULTI_TEXTURE_ADD3_1_1_ENV:
 		case TYPE_MULTI_TEXTURE_ADD3_ENV:
 			vs_module = &vk.modules.vert.gen[use_pbr][2][0][1][0];
 			fs_module = &vk.modules.frag.gen[use_pbr][2][0][0];
@@ -8167,7 +8107,7 @@ void vk_create_brfdlut( void )
     qvkCmdDraw( command_buffer, 4, 1, 0, 0 );	
     qvkCmdEndRenderPass( command_buffer );
 
-    end_command_buffer( command_buffer );
+    end_command_buffer( command_buffer, __func__  );
 }
 #endif
 
@@ -8637,7 +8577,7 @@ void vk_read_pixels( byte *buffer, uint32_t width, uint32_t height )
 		VK_IMAGE_LAYOUT_UNDEFINED,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
 
-	// end_command_buffer( command_buffer );
+	// end_command_buffer( command_buffer, __func__  );
 
 	// command_buffer = begin_command_buffer();
 
@@ -9042,7 +8982,7 @@ static void vk_create_prefilter_framebuffer( filterDef *def ) {
 	record_image_layout_transition( command_buffer, def->offscreen.image, VK_IMAGE_ASPECT_COLOR_BIT, 0, 
 		VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 
 		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
-	end_command_buffer( command_buffer );
+	end_command_buffer( command_buffer, __func__  );
 }
 
 static void vk_create_prefilter_pipeline( filterDef *def ) 
@@ -9231,7 +9171,7 @@ void vk_clear_cube_color( image_t *image, VkClearColorValue color )
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, 
 		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
 
-	end_command_buffer(command_buffer);
+	end_command_buffer( command_buffer, __func__ );
 }
 
 static void vk_copy_to_cubemap( filterDef *def, VkImage *image, uint32_t mipLevel, uint32_t size ) 
@@ -9290,7 +9230,7 @@ void vk_generate_cubemaps( cubemap_t *cube )
 	record_image_layout_transition( command_buffer, vk.cubeMap.color_image, 
 		VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_IMAGE_LAYOUT_UNDEFINED, 
 		VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
-	end_command_buffer( command_buffer );
+	end_command_buffer( command_buffer, __func__  );
 
 	for ( i = 0; i < PREFILTEREDENV + 1; i++ ) 
 	{
@@ -9360,7 +9300,7 @@ void vk_generate_cubemaps( cubemap_t *cube )
 	record_image_layout_transition( command_buffer, vk.cubeMap.color_image, 
 		VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_IMAGE_LAYOUT_UNDEFINED, 
 		VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
-	end_command_buffer( command_buffer );
+	end_command_buffer( command_buffer, __func__  );
 
 	vk_begin_main_render_pass();
 }

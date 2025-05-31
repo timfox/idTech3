@@ -595,23 +595,28 @@ typedef struct {
 		struct {
 #ifdef USE_VK_PBR
 			VkShaderModule gen[2][3][2][2][2]; // pbr[0,1], tx[0,1,2], cl[0,1] env0[0,1] fog[0,1]
+			VkShaderModule ident1[2][2][2][2]; // pbr[0,1], tx[0,1], env0[0,1] fog[0,1]
+			VkShaderModule fixed[2][2][2][2];  // pbr[0,1], tx[0,1], env0[0,1] fog[0,1]
 #else
 			VkShaderModule gen[3][2][2][2]; // tx[0,1,2], cl[0,1] env0[0,1] fog[0,1]
-#endif
 			VkShaderModule ident1[2][2][2]; // tx[0,1], env0[0,1] fog[0,1]
 			VkShaderModule fixed[2][2][2];  // tx[0,1], env0[0,1] fog[0,1]
+#endif			
 			VkShaderModule light[2];        // fog[0,1]
 		} vert;
 		struct {
 			VkShaderModule gen0_df;
 #ifdef USE_VK_PBR
 			VkShaderModule gen[2][3][2][2]; // pbr[0,1], tx[0,1,2] cl[0,1] fog[0,1]
+			VkShaderModule ident1[2][2][2]; // pbr[0,1], tx[0,1], fog[0,1]
+			VkShaderModule fixed[2][2][2];  // pbr[0,1], tx[0,1], fog[0,1]
+			VkShaderModule ent[2][1][2];    // pbr[0,1], tx[0], fog[0,1]
 #else
 			VkShaderModule gen[3][2][2]; // tx[0,1,2] cl[0,1] fog[0,1]
-#endif
 			VkShaderModule ident1[2][2]; // tx[0,1], fog[0,1]
 			VkShaderModule fixed[2][2];  // tx[0,1], fog[0,1]
 			VkShaderModule ent[1][2];    // tx[0], fog[0,1]
+#endif
 			VkShaderModule light[2][2];  // linear[0,1] fog[0,1]
 		} frag;
 
