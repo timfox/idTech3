@@ -118,20 +118,21 @@ layout(set = 7, binding = 0) uniform sampler2D normal_texture;
 layout(set = 8, binding = 0) uniform sampler2D physical_texture;
 layout(set = 9, binding = 0) uniform samplerCube env_texture;
 
-layout (constant_id = 9) const float specularScale_x = 1.0;
-layout (constant_id = 10) const float specularScale_y = 1.0;
-layout (constant_id = 11) const float specularScale_z = 1.0;
-layout (constant_id = 12) const float specularScale_w = 1.0;
+// prob use ubo for specularScale & normalScale ..
+layout (constant_id = 11) const float specularScale_x = 1.0;
+layout (constant_id = 12) const float specularScale_y = 1.0;
+layout (constant_id = 13) const float specularScale_z = 1.0;
+layout (constant_id = 14) const float specularScale_w = 1.0;
 
-layout (constant_id = 13) const float normalScale_x = 0.0;
-layout (constant_id = 14) const float normalScale_y = 0.0;
-layout (constant_id = 15) const float normalScale_z = 0.0;
-layout (constant_id = 16) const float normalScale_w = 0.0;
+layout (constant_id = 15) const float normalScale_x = 0.0;
+layout (constant_id = 16) const float normalScale_y = 0.0;
+layout (constant_id = 17) const float normalScale_z = 0.0;
+layout (constant_id = 18) const float normalScale_w = 0.0;
 
-layout (constant_id = 17) const int normal_texture_set = 0;
-layout (constant_id = 18) const int physical_texture_set = 0;
-layout (constant_id = 19) const int env_texture_set = 0;
-layout (constant_id = 20) const int lightmap_texture_set = 0;
+layout (constant_id = 19) const int normal_texture_set = 0;
+layout (constant_id = 20) const int physical_texture_set = 0;
+layout (constant_id = 21) const int env_texture_set = 0;
+layout (constant_id = 22) const int lightmap_texture_set = 0;
 
 vec3 CalcNormal( in vec3 vertexNormal, in vec2 frag_tex_coord )
 {
@@ -643,21 +644,32 @@ void main() {
 	float sqrLightDist = dot(L, L);
 	L /= sqrt(sqrLightDist);
 
+	// FIX ME
+	#if defined (USE_CLX_IDENT)
+			vec3 bias_color = vec3(1.0);
+	#elif defined (USE_FIXED_COLOR)
+			vec3 bias_color = frag_color.rgb;
+	#elif defined (USE_ENT_COLOR)
+			vec3 bias_color = ent_color1.rgb;
+	#else
+			vec3 bias_color = frag_color0.rgb;
+	#endif
+
 	#if ( defined(USE_TX1) || defined(USE_TX2) )
 		if ( lightmap_texture_set > -1 ) {
 			vec3 lightmapColor = texture(texture1, frag_tex_coord1).rgb;
 
-			lightColor = lightmapColor * frag_color0.rgb;
+			lightColor = lightmapColor * bias_color;
 			diffuse = color0;
 		}
 		else {
-			lightColor = frag_color0.rgb;
+			lightColor = bias_color;
 			diffuse = base;
 		}
 		ambientColor = vec3 (0.0);
 		attenuation = 1.0;
 	#else
-		lightColor = frag_color0.rgb;
+		lightColor = bias_color;
 		diffuse = base;
 		ambientColor = vec3 (0.0);
 		attenuation = 1.0;
