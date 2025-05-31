@@ -2902,12 +2902,36 @@ qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size )
 #include "shaders/spirv/shader_binding.c"
 
 static void vk_create_shader_modules( void )
-{
+{	
+	int i, j, k;
+
+	// specialized depth-fragment shader
+	vk.modules.frag.gen0_df = SHADER_MODULE( frag_tx0_df );
+	SET_OBJECT_NAME( vk.modules.frag.gen0_df, "single-texture df fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+
+	vk.modules.frag.ent[0][0][0] = SHADER_MODULE( frag_tx0_ent );
+	vk.modules.frag.ent[0][0][1] = SHADER_MODULE( frag_tx0_ent_fog );
+	vk.modules.frag.ent[1][0][0] = SHADER_MODULE( frag_pbr_tx0_ent );
+	vk.modules.frag.ent[1][0][1] = SHADER_MODULE( frag_pbr_tx0_ent_fog );
+	//vk.modules.frag.ent[1][0] = SHADER_MODULE( frag_tx1_ent );
+	//vk.modules.frag.ent[1][1] = SHADER_MODULE( frag_tx1_ent_fog );
+
+	for ( i = 0; i < 2; i++ ) {
+		const char *sh[] = { "", "pbr" };
+
+		for ( j = 0; j < 1; j++ ) {
+			const char *tx[] = { "single" /*, "double" */};
+			const char *fog[] = { "", "+fog" };
+			for ( k = 0; k < 2; k++ ) {
+				const char *s = va( "%s-%s-texture entity-color%s fragment module", sh[i], tx[j], fog[k] );
+				SET_OBJECT_NAME( vk.modules.frag.ent[i][j][k], s, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+			}
+		}
+	}
+
 #ifdef USE_VK_PBR
 	vk_bind_generated_shaders();
 #else
-	int i, j, k, l;
-
 	vk.modules.vert.gen[0][0][0][0] = SHADER_MODULE( vert_tx0 );
 	vk.modules.vert.gen[0][0][0][1] = SHADER_MODULE( vert_tx0_fog );
 	vk.modules.vert.gen[0][0][1][0] = SHADER_MODULE( vert_tx0_env );
@@ -2968,13 +2992,7 @@ static void vk_create_shader_modules( void )
 			}
 		}
 	}
-#endif
 
-	// specialized depth-fragment shader
-	vk.modules.frag.gen0_df = SHADER_MODULE( frag_tx0_df );
-	SET_OBJECT_NAME( vk.modules.frag.gen0_df, "single-texture df fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
-
-#ifndef USE_VK_PBR
 	vk.modules.frag.ident1[0][0] = SHADER_MODULE( frag_tx0_ident1 );
 	vk.modules.frag.ident1[0][1] = SHADER_MODULE( frag_tx0_ident1_fog );
 	vk.modules.frag.ident1[1][0] = SHADER_MODULE( frag_tx1_ident1 );
@@ -3652,9 +3670,9 @@ static void create_depth_attachment( uint32_t width, uint32_t height, VkSampleCo
 	vk_get_image_memory_erquirements( *image, &memory_requirements );
 
 #ifdef USE_VK_PBR
-	vk_add_attachment_desc( *image, image_view, create_desc.usage, &memory_requirements, vk.depth_format, image_aspect_flags, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_VIEW_TYPE_2D );
+	vk_add_attachment_desc( *image, image_view, create_desc.usage, &memory_requirements, vk.depth_format, image_aspect_flags, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_VIEW_TYPE_2D );
 #else
-	vk_add_attachment_desc( *image, image_view, create_desc.usage, &memory_requirements, vk.depth_format, image_aspect_flags, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
+	vk_add_attachment_desc( *image, image_view, create_desc.usage, &memory_requirements, vk.depth_format, image_aspect_flags, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
 #endif
 }
 
@@ -3699,11 +3717,11 @@ static void vk_create_attachments( void )
             usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
             create_color_attachment( REF_CUBEMAP_SIZE, REF_CUBEMAP_SIZE, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
-                usage, &vk.cubeMap.color_image, &vk.cubeMap.color_image_view[0], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qfalse, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT );
+                usage, &vk.cubeMap.color_image, &vk.cubeMap.color_image_view[0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT );
 
             if ( vk.msaaActive )
                 create_color_attachment( REF_CUBEMAP_SIZE, REF_CUBEMAP_SIZE, (VkSampleCountFlagBits)vkSamples, vk.color_format,
-                    usage, &vk.cubeMap.color_image_msaa, &vk.cubeMap.color_image_view_msaa[0], VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT );
+                    usage, &vk.cubeMap.color_image_msaa, &vk.cubeMap.color_image_view_msaa[0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qtrue, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT );
             
             create_depth_attachment( REF_CUBEMAP_SIZE, REF_CUBEMAP_SIZE, (VkSampleCountFlagBits)vkSamples,
                     &vk.cubeMap.depth_image, &vk.cubeMap.depth_image_view, qtrue );
@@ -4505,7 +4523,7 @@ void vk_initialize( void )
 	// Pipeline layouts.
 	//
 	{
-		VkDescriptorSetLayout set_layouts[VK_LAYOUT_COUNT];
+		VkDescriptorSetLayout set_layouts[VK_DESC_COUNT];
 		VkPipelineLayoutCreateInfo desc;
 		VkPushConstantRange push_range;
 
@@ -4521,15 +4539,15 @@ void vk_initialize( void )
 		set_layouts[3] = vk.set_layout_sampler; // blend
 		set_layouts[4] = vk.set_layout_sampler; // collapsed fog texture
 #ifdef USE_VK_PBR
-		set_layouts[6] = vk.set_layout_sampler; // brdf lut
-		set_layouts[7] = vk.set_layout_sampler; // normalMap
-		set_layouts[8] = vk.set_layout_sampler; // physicalMap
-		set_layouts[9] = vk.set_layout_sampler; // prefiltered envmap
+		set_layouts[5] = vk.set_layout_sampler; // brdf lut
+		set_layouts[6] = vk.set_layout_sampler; // normalMap
+		set_layouts[7] = vk.set_layout_sampler; // physicalMap
+		set_layouts[8] = vk.set_layout_sampler; // prefiltered envmap
 #endif
 		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		desc.pNext = NULL;
 		desc.flags = 0;
-		desc.setLayoutCount = (vk.maxBoundDescriptorSets >= VK_LAYOUT_COUNT) ? VK_LAYOUT_COUNT : 4;
+		desc.setLayoutCount = (vk.maxBoundDescriptorSets >= VK_DESC_COUNT) ? VK_DESC_COUNT : 4;
 		desc.pSetLayouts = set_layouts;
 		desc.pushConstantRangeCount = 1;
 		desc.pPushConstantRanges = &push_range;
@@ -6082,6 +6100,9 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 #ifdef USE_VK_PBR
 	const int use_pbr = def->vk_pbr_flags ? 1 : 0;
 
+	if ( def->vk_pbr_flags )
+		Com_Printf("hi");
+
 	switch ( def->shader_type ) {
 
 		case TYPE_SIGNLE_TEXTURE_LIGHTING:
@@ -6096,12 +6117,9 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
 		case TYPE_SIGNLE_TEXTURE_DF:
 			state_bits |= GLS_DEPTHMASK_TRUE;
-			vs_module = &vk.modules.vert.gen[0][0][0][0][0];
+			vs_module = &vk.modules.vert.ident1[use_pbr][0][0][0];
 			fs_module = &vk.modules.frag.gen0_df;
 			break;
-
-
-		// new
 
 		case TYPE_SIGNLE_TEXTURE_FIXED_COLOR:
 			vs_module = &vk.modules.vert.fixed[use_pbr][0][0][0];
@@ -6121,9 +6139,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		case TYPE_SIGNLE_TEXTURE_ENT_COLOR_ENV:
 			vs_module = &vk.modules.vert.fixed[use_pbr][0][1][0];
 			fs_module = &vk.modules.frag.ent[use_pbr][0][0];
-		// new end
-
-
+			break;
 
 		case TYPE_SIGNLE_TEXTURE:
 			vs_module = &vk.modules.vert.gen[use_pbr][0][0][0][0];
@@ -6135,15 +6151,49 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			fs_module = &vk.modules.frag.gen[use_pbr][0][0][0];
 			break;
 
-		case TYPE_MULTI_TEXTURE_MUL2:
+		case TYPE_SIGNLE_TEXTURE_IDENTITY:
+			vs_module = &vk.modules.vert.ident1[use_pbr][0][0][0];
+			fs_module = &vk.modules.frag.ident1[use_pbr][0][0];
+			break;
+
+		case TYPE_SIGNLE_TEXTURE_IDENTITY_ENV:
+			vs_module = &vk.modules.vert.ident1[use_pbr][0][1][0];
+			fs_module = &vk.modules.frag.ident1[use_pbr][0][0];
+			break;
+
 		case TYPE_MULTI_TEXTURE_ADD2_IDENTITY:
+		case TYPE_MULTI_TEXTURE_MUL2_IDENTITY:
+			vs_module = &vk.modules.vert.ident1[use_pbr][1][0][0];
+			fs_module = &vk.modules.frag.ident1[use_pbr][1][0];
+			break;
+
+		case TYPE_MULTI_TEXTURE_ADD2_IDENTITY_ENV:
+		case TYPE_MULTI_TEXTURE_MUL2_IDENTITY_ENV:
+			vs_module = &vk.modules.vert.ident1[use_pbr][1][1][0];
+			fs_module = &vk.modules.frag.ident1[use_pbr][1][0];
+			break;
+
+		case TYPE_MULTI_TEXTURE_ADD2_FIXED_COLOR:
+		case TYPE_MULTI_TEXTURE_MUL2_FIXED_COLOR:
+			vs_module = &vk.modules.vert.fixed[use_pbr][1][0][0];
+			fs_module = &vk.modules.frag.fixed[use_pbr][1][0];
+			break;
+
+		case TYPE_MULTI_TEXTURE_ADD2_FIXED_COLOR_ENV:
+		case TYPE_MULTI_TEXTURE_MUL2_FIXED_COLOR_ENV:
+			vs_module = &vk.modules.vert.fixed[use_pbr][1][1][0];
+			fs_module = &vk.modules.frag.fixed[use_pbr][1][0];
+			break;
+
+		case TYPE_MULTI_TEXTURE_MUL2:
+		case TYPE_MULTI_TEXTURE_ADD2_1_1:
 		case TYPE_MULTI_TEXTURE_ADD2:
 			vs_module = &vk.modules.vert.gen[use_pbr][1][0][0][0];
 			fs_module = &vk.modules.frag.gen[use_pbr][1][0][0];
 			break;
 
 		case TYPE_MULTI_TEXTURE_MUL2_ENV:
-		case TYPE_MULTI_TEXTURE_ADD2_IDENTITY_ENV:
+		case TYPE_MULTI_TEXTURE_ADD2_1_1_ENV:
 		case TYPE_MULTI_TEXTURE_ADD2_ENV:
 			vs_module = &vk.modules.vert.gen[use_pbr][1][0][1][0];
 			fs_module = &vk.modules.frag.gen[use_pbr][1][0][0];
@@ -6207,6 +6257,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			fs_module = &vk.modules.frag.gen[use_pbr][2][1][0];
 			break;
 
+		case TYPE_COLOR_BLACK:
 		case TYPE_COLOR_WHITE:
 		case TYPE_COLOR_GREEN:
 		case TYPE_COLOR_RED:
@@ -7822,9 +7873,7 @@ void vk_bind_descriptor_sets( void )
 	offset_count = 0;
 	if ( /*start == VK_DESC_STORAGE || */ start == VK_DESC_UNIFORM ) { // uniform offset or storage offset
 		offsets[ offset_count++ ] = vk.cmd->descriptor_set.offset[ start ];
-
-		if ( start == 1 )
-			offsets[offset_count++] = vk.cmd->descriptor_set.offset[start+1]; // camera uniform
+		offsets[offset_count++] = vk.cmd->descriptor_set.offset[start+1]; // camera uniform
 	}
 
 	count = end - start + 1;
@@ -8864,7 +8913,7 @@ static void vk_create_prefilter_renderpass( filterDef *def )
 	attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 	attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+	attachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     color_attachment_ref.attachment = 0;
     color_attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
@@ -8928,7 +8977,7 @@ static void vk_create_prefilter_framebuffer( filterDef *def ) {
 		desc.samples = VK_SAMPLE_COUNT_1_BIT;
 		desc.tiling = VK_IMAGE_TILING_OPTIMAL;
 		desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		desc.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+		desc.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 		desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		VK_CHECK( qvkCreateImage( vk.device, &desc, NULL, &def->offscreen.image ) );
 	}
@@ -8978,10 +9027,12 @@ static void vk_create_prefilter_framebuffer( filterDef *def ) {
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &def->offscreen.framebuffer));
 	}
 
+
 	command_buffer = begin_command_buffer();
-	record_image_layout_transition( command_buffer, def->offscreen.image, VK_IMAGE_ASPECT_COLOR_BIT, 0, 
-		VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 
-		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
+	record_image_layout_transition( command_buffer, def->offscreen.image, VK_IMAGE_ASPECT_COLOR_BIT, 
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+		0, 0 );
+
 	end_command_buffer( command_buffer, __func__  );
 }
 
@@ -9161,15 +9212,14 @@ void vk_clear_cube_color( image_t *image, VkClearColorValue color )
 
 	command_buffer = begin_command_buffer();
 
-	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, 0, 
-		VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_TRANSFER_WRITE_BIT, 
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
+	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, 
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
 
 	qvkCmdClearColorImage( command_buffer, image->handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &color, 1, &desc );	
 		
-	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, 
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_ACCESS_SHADER_READ_BIT, 
-		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, 
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+		0, 0 );
 
 	end_command_buffer( command_buffer, __func__ );
 }
@@ -9179,9 +9229,9 @@ static void vk_copy_to_cubemap( filterDef *def, VkImage *image, uint32_t mipLeve
 	VkImageCopy region;
 	
 	// change image layout for all offsceen faces to transfer source
-	record_image_layout_transition( vk.cmd->command_buffer, def->offscreen.image, VK_IMAGE_ASPECT_COLOR_BIT, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 
-		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_ACCESS_TRANSFER_READ_BIT, 
-		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+	record_image_layout_transition( vk.cmd->command_buffer, def->offscreen.image, VK_IMAGE_ASPECT_COLOR_BIT, 
+		VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, 
+		0, 0);
 
 	Com_Memset( &region, 0, sizeof( VkImageCopy ) );
 	region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -9207,9 +9257,9 @@ static void vk_copy_to_cubemap( filterDef *def, VkImage *image, uint32_t mipLeve
 
 	qvkCmdCopyImage( vk.cmd->command_buffer, def->offscreen.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, *image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region );
 
-	record_image_layout_transition( vk.cmd->command_buffer, def->offscreen.image, VK_IMAGE_ASPECT_COLOR_BIT, VK_ACCESS_TRANSFER_READ_BIT, 
-		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 
-		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
+	record_image_layout_transition( vk.cmd->command_buffer, def->offscreen.image, VK_IMAGE_ASPECT_COLOR_BIT, 
+		VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+		0, 0 );
 }
 
 void vk_generate_cubemaps( cubemap_t *cube ) 
@@ -9227,9 +9277,9 @@ void vk_generate_cubemaps( cubemap_t *cube )
 	vk_end_render_pass();
 
 	command_buffer = begin_command_buffer();
-	record_image_layout_transition( command_buffer, vk.cubeMap.color_image, 
-		VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_IMAGE_LAYOUT_UNDEFINED, 
-		VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+	record_image_layout_transition( command_buffer, vk.cubeMap.color_image, VK_IMAGE_ASPECT_COLOR_BIT, 
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+		0, 0 );
 	end_command_buffer( command_buffer, __func__  );
 
 	for ( i = 0; i < PREFILTEREDENV + 1; i++ ) 
@@ -9264,9 +9314,9 @@ void vk_generate_cubemaps( cubemap_t *cube )
 		scissor_rect.extent.width = scissor_rect.extent.height = def->size;
 
 		// change image layout for all cubemap faces to transfer destination
-		record_image_layout_transition( vk.cmd->command_buffer, cubemap->handle, VK_IMAGE_ASPECT_COLOR_BIT, 0, 
-			VK_IMAGE_LAYOUT_UNDEFINED, VK_ACCESS_TRANSFER_WRITE_BIT, 
-			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL );
+		record_image_layout_transition( vk.cmd->command_buffer, cubemap->handle, VK_IMAGE_ASPECT_COLOR_BIT, 
+			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
+			0, 0 );
 			
 		for ( j = 0; j < def->mipLevels; j++ ) {
 			qvkCmdSetViewport( vk.cmd->command_buffer, 0, 1, &viewport );
@@ -9291,15 +9341,14 @@ void vk_generate_cubemaps( cubemap_t *cube )
 			viewport.height /= 2;
 		}
 
-		record_image_layout_transition( vk.cmd->command_buffer, cubemap->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, 
-			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_ACCESS_HOST_WRITE_BIT | VK_ACCESS_TRANSFER_WRITE_BIT, 
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL );
+		record_image_layout_transition( vk.cmd->command_buffer, cubemap->handle, VK_IMAGE_ASPECT_COLOR_BIT, 
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 	}
 
 	command_buffer = begin_command_buffer();
-	record_image_layout_transition( command_buffer, vk.cubeMap.color_image, 
-		VK_IMAGE_ASPECT_COLOR_BIT, 0, VK_IMAGE_LAYOUT_UNDEFINED, 
-		VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL );
+	record_image_layout_transition( command_buffer, vk.cubeMap.color_image, VK_IMAGE_ASPECT_COLOR_BIT, 
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+		0, 0 );
 	end_command_buffer( command_buffer, __func__  );
 
 	vk_begin_main_render_pass();

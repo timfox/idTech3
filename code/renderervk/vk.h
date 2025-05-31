@@ -3,14 +3,6 @@
 #include "../renderercommon/vulkan/vulkan.h"
 #include "tr_common.h"
 
-#ifdef USE_VK_PBR
-typedef float mat4_t[16];
-
-#define VK_LAYOUT_COUNT					10
-#else
-#define VK_LAYOUT_COUNT					6
-
-#endif
 #define MAX_SWAPCHAIN_IMAGES 8
 #define MIN_SWAPCHAIN_IMAGES_IMM 3
 #define MIN_SWAPCHAIN_IMAGES_FIFO   3
@@ -46,7 +38,17 @@ typedef float mat4_t[16];
 #define VK_DESC_TEXTURE1     2
 #define VK_DESC_TEXTURE2     3
 #define VK_DESC_FOG_COLLAPSE 4
-#define VK_DESC_COUNT        5
+
+#ifdef USE_VK_PBR
+	typedef float mat4_t[16];
+	#define VK_DESC_PBR_BRDFLUT				5
+	#define VK_DESC_PBR_NORMAL				6
+	#define VK_DESC_PBR_PHYSICAL			7
+	#define VK_DESC_PBR_CUBEMAP				8
+	#define VK_DESC_COUNT	9
+#else
+	#define VK_DESC_COUNT   5
+#endif
 
 #define VK_DESC_TEXTURE_BASE VK_DESC_TEXTURE0
 #define VK_DESC_FOG_ONLY     VK_DESC_TEXTURE1
@@ -419,7 +421,7 @@ typedef struct vk_tess_s {
 
 	struct {
 		uint32_t		start, end;
-		VkDescriptorSet	current[VK_LAYOUT_COUNT]; // 0:storage, 1:uniform, 2:color0, 3:color1, 4:color2, 5:fog, 6:brdf lut, 7:normal, 8:physical
+		VkDescriptorSet	current[VK_DESC_COUNT]; // 0:uniform, 1:color0, 2:color1, 3:color2, 4:fog, 5:brdf lut, 6:normal, 7:physical, 9:(unused)prefilterd-envmap
 		uint32_t		offset[3]; // 0 (uniform) and 5 (storage)
 	} descriptor_set;
 
