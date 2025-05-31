@@ -54,6 +54,11 @@
 #define VK_DESC_FOG_ONLY     VK_DESC_TEXTURE1
 #define VK_DESC_FOG_DLIGHT   VK_DESC_TEXTURE1
 
+
+#define VK_DESC_UNIFORM_MAIN_BINDING		0
+#define VK_DESC_UNIFORM_CAMERA_BINDING		1
+#define VK_DESC_UNIFORM_COUNT				2
+
 typedef enum {
 	TYPE_COLOR_BLACK,
 	TYPE_COLOR_WHITE,
@@ -232,7 +237,6 @@ typedef struct vkUniform_s {
 
 typedef struct vkUniformCamera_s {
 	vec4_t viewOrigin;
-	vec4_t localViewOrigin;
 	mat4_t modelMatrix;
 } vkUniformCamera_t;
 
@@ -409,6 +413,7 @@ typedef struct vk_tess_s {
 	VkDescriptorSet uniform_descriptor;
 	uint32_t		uniform_read_offset;
 #ifdef USE_VK_PBR
+	uint32_t			camera_ubo_offset;
 	VkDeviceSize		buf_offset[9];
 	VkDeviceSize		vbo_offset[10];
 #else

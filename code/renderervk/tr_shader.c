@@ -3597,6 +3597,7 @@ static shader_t *FinishShader( void ) {
 			int env_mask;
 			shaderStage_t *pStage = &stages[i];
 			def.state_bits = pStage->stateBits;
+			def.vk_pbr_flags = 0;
 
 			if ( pStage->mtEnv3 ) {
 				switch ( pStage->mtEnv3 ) {
@@ -3786,9 +3787,21 @@ static shader_t *FinishShader( void ) {
 				}
 			}
 
+			if ( pStage->vk_pbr_flags && def.shader_type >= TYPE_GENERIC_BEGIN  )
+			{
 			#ifdef USE_VK_PBR
-				def.vk_pbr_flags = 0;
+				def.vk_pbr_flags = pStage->vk_pbr_flags;
+				pStage->tessFlags |= TESS_PBR;
+				shader.hasPBR = qtrue;
+
+				if ( hasLightmapStage ) 
+					def.vk_pbr_flags |= PBR_HAS_LIGHTMAP;
+
+				// move this to ubo ..
+				Vector4Copy( pStage->specularScale, def.specularScale );
+				Vector4Copy( pStage->normalScale, def.normalScale );
 			#endif
+			}
 
 			def.mirror = qfalse;
 			pStage->vk_pipeline[0] = vk_find_pipeline_ext( 0, &def, qtrue );
@@ -3797,6 +3810,9 @@ static shader_t *FinishShader( void ) {
 
 			if ( pStage->depthFragment ) {
 				def.mirror = qfalse;
+				#ifdef USE_VK_PBR
+					def.vk_pbr_flags = 0;
+				#endif
 				def.shader_type = TYPE_SIGNLE_TEXTURE_DF;
 				pStage->vk_pipeline_df = vk_find_pipeline_ext( 0, &def, qtrue );
 				def.mirror = qtrue;
@@ -3804,22 +3820,6 @@ static shader_t *FinishShader( void ) {
 				pStage->vk_mirror_pipeline_df = vk_find_pipeline_ext( 0, &def, qfalse );
 			}
 
-			#ifdef USE_VK_PBR
-				if ( pStage->vk_pbr_flags && def.shader_type >= TYPE_GENERIC_BEGIN ) {
-					pStage->tessFlags |= TESS_PBR;
-					shader.hasPBR = qtrue;
-
-					def.mirror = qfalse;
-					def.vk_pbr_flags = pStage->vk_pbr_flags;
-					Vector4Copy( pStage->specularScale, def.specularScale );
-					Vector4Copy( pStage->normalScale, def.normalScale );
-
-					if ( hasLightmapStage ) 
-						def.vk_pbr_flags |= PBR_HAS_LIGHTMAP;
-
-					pStage->vk_pbr_pipeline[0] = vk_find_pipeline_ext(0, &def, qfalse);
-				}
-			#endif
 
 #ifdef USE_FOG_COLLAPSE
 			if ( fogCollapse && tr.numFogs > 0 ) {
@@ -3837,22 +3837,6 @@ static shader_t *FinishShader( void ) {
 				pStage->vk_pipeline[1] = vk_find_pipeline_ext( 0, &def, qfalse );
 				pStage->vk_mirror_pipeline[1] = vk_find_pipeline_ext( 0, &def_mirror, qfalse );
 
-
-				#ifdef USE_VK_PBR
-					if( pStage->tessFlags & TESS_PBR ) {
-						Vk_Pipeline_Def def_pbr;
-						vk_get_pipeline_def(pStage->vk_pipeline[0], &def_pbr);
-						def_pbr.fog_stage = 1;
-						def_pbr.vk_pbr_flags = pStage->vk_pbr_flags;
-						Vector4Copy( pStage->specularScale, def_pbr.specularScale );
-						Vector4Copy( pStage->normalScale, def_pbr.normalScale );
-
-						if ( hasLightmapStage ) 
-							def_pbr.vk_pbr_flags |= PBR_HAS_LIGHTMAP;
-
-						pStage->vk_pbr_pipeline[1] = vk_find_pipeline_ext(0, &def_pbr, qfalse);
-					}
-				#endif
 
 				pStage->bundle[0].adjustColorsForFog = ACFF_NONE; // will be handled in shader from now
 

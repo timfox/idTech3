@@ -543,8 +543,8 @@ static void ProjectDlightTexture( void ) {
 
 #endif // USE_LEGACY_DLIGHTS
 
-uint32_t VK_PushUniform( const vkUniform_t *uniform );
-uint32_t VK_PushCameraUniform( const vkUniformCamera_t *uniform );
+uint32_t vk_append_uniform( const void *uniform, size_t size, uint32_t min_offset );
+uint32_t vk_push_uniform( const vkUniform_t *uniform );
 void VK_SetFogParams( vkUniform_t *uniform, int *fogStage );
 static vkUniform_t uniform;
 static vkUniformCamera_t uniform_camera;
@@ -568,7 +568,7 @@ static void RB_FogPass( qboolean rebindIndex ) {
 		vk_bind_index();
 	}
 	VK_SetFogParams( &uniform, &fog_stage );
-	VK_PushUniform( &uniform );
+	vk_push_uniform( &uniform );
 	vk_update_descriptor( VK_DESC_FOG_ONLY, tr.fogImage->descriptor );
 	vk_draw_geometry( DEPTH_RANGE_NORMAL, qtrue );
 #else
@@ -998,7 +998,12 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		Com_Memcpy( &uniform_camera.viewOrigin, backEnd.refdef.vieworg, sizeof( vec3_t) );
 		uniform_camera.viewOrigin[3] = 0.0;
 
-		VK_PushCameraUniform( &uniform_camera );
+		//VectorCopy4( pStage->normalScale, uniform_global.normalScale );
+		//VectorCopy4( pStage->specularScale, uniform_global.specularScale );
+
+		vk.cmd->camera_ubo_offset = vk_append_uniform( &uniform_camera, sizeof(uniform_camera), vk.uniform_camera_item_size );
+
+		pushUniform = qtrue;
 	}
 #endif
 #endif // USE_VULKAN
@@ -1038,7 +1043,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 		if ( pushUniform ) {
 			pushUniform = qfalse;
-			VK_PushUniform( &uniform );
+			vk_push_uniform( &uniform );
 		}
 
 		GL_SelectTexture( 0 );
@@ -1068,8 +1073,6 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				vk_update_pbr_descriptor(VK_DESC_PBR_CUBEMAP, tr.cubemaps[0].prefiltered_image->descriptor);
 				//vk_update_pbr_descriptor(10, tr.cubemaps[0].irradiance_image->descriptor); // irradiance is currently unused
 			}
-
-			pipeline = pStage->vk_pbr_pipeline[fog_stage];
 		}
 #endif
 
@@ -1140,7 +1143,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 #ifdef USE_VULKAN
 	if ( pushUniform ) {
-		VK_PushUniform( &uniform );
+		vk_push_uniform( &uniform );
 	}
 	if ( tess_flags ) // fog-only shaders?
 		vk_bind_geometry( tess_flags );
@@ -1204,42 +1207,28 @@ static void VK_SetLightParams( vkUniform_t *uniform, const dlight_t *dl ) {
 }
 #endif
 
+uint32_t vk_append_uniform( const void *uniform, size_t size, uint32_t min_offset ) {
+	const uint32_t offset = PAD(vk.cmd->vertex_buffer_offset, (VkDeviceSize)vk.uniform_alignment);
 
-uint32_t VK_PushUniform( const vkUniform_t *uniform ) {
-	const uint32_t offset = vk.cmd->uniform_read_offset = PAD( vk.cmd->vertex_buffer_offset, vk.uniform_alignment );
-
-	if ( offset + vk.uniform_item_size > vk.geometry_buffer_size )
+	if ( offset + min_offset > vk.geometry_buffer_size )
 		return ~0U;
 
-	// push uniform
-	Com_Memcpy( vk.cmd->vertex_buffer_ptr + offset, uniform, sizeof( *uniform ) );
-	vk.cmd->vertex_buffer_offset = offset + vk.uniform_item_size;
+	Com_Memcpy( vk.cmd->vertex_buffer_ptr + offset, uniform, size );
+	vk.cmd->vertex_buffer_offset = offset + min_offset;
+
+	return offset;
+}
+
+uint32_t vk_push_uniform( const vkUniform_t *uniform ) {
+	const uint32_t offset = vk_append_uniform( uniform, sizeof(*uniform), (VkDeviceSize)vk.uniform_item_size );
 
 	vk_reset_descriptor( VK_DESC_UNIFORM );
 	vk_update_descriptor( VK_DESC_UNIFORM, vk.cmd->uniform_descriptor );
-	vk_update_descriptor_offset( VK_DESC_UNIFORM, vk.cmd->uniform_read_offset );
+	vk_update_descriptor_offset( VK_DESC_UNIFORM_MAIN_BINDING, offset );
+	vk_update_descriptor_offset( VK_DESC_UNIFORM_CAMERA_BINDING, vk.cmd->camera_ubo_offset );
 
 	return offset;
 }
-
-uint32_t VK_PushCameraUniform( const vkUniformCamera_t *uniform ) {
-	const uint32_t offset = vk.cmd->uniform_read_offset = PAD( vk.cmd->vertex_buffer_offset, vk.uniform_alignment );
-
-	if ( offset + vk.uniform_camera_item_size > vk.geometry_buffer_size )
-		return ~0U;
-
-	// push uniform
-	Com_Memcpy( vk.cmd->vertex_buffer_ptr + offset, uniform, sizeof( *uniform ) );
-	vk.cmd->vertex_buffer_offset = offset + vk.uniform_camera_item_size;
-
-	vk_reset_descriptor( 1 );
-	vk_update_descriptor( 1, vk.cmd->uniform_descriptor );
-	vk_update_descriptor_offset( 1, 0 );
-	vk_update_descriptor_offset( 2, vk.cmd->uniform_read_offset );
-
-	return offset;
-}
-
 
 #ifdef USE_PMLIGHT
 void VK_LightingPass( void )
@@ -1264,7 +1253,7 @@ void VK_LightingPass( void )
 		// light parameters
 		VK_SetLightParams( &uniform, tess.light );
 
-		uniform_offset = VK_PushUniform( &uniform );
+		uniform_offset = vk_push_uniform( &uniform );
 
 		tess.dlightUpdateParams = qfalse;
 	}
