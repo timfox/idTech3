@@ -113,10 +113,10 @@ layout(location = 10) in vec4 var_LightDir;
 layout(location = 11) in vec4 var_ViewDir;
 layout(location = 12) in NTB in_ntb;
 
-layout(set = 6, binding = 0) uniform sampler2D brdflut_texture;
-layout(set = 7, binding = 0) uniform sampler2D normal_texture;
-layout(set = 8, binding = 0) uniform sampler2D physical_texture;
-layout(set = 9, binding = 0) uniform samplerCube env_texture;
+layout(set = 5, binding = 0) uniform sampler2D brdflut_texture;
+layout(set = 6, binding = 0) uniform sampler2D normal_texture;
+layout(set = 7, binding = 0) uniform sampler2D physical_texture;
+layout(set = 8, binding = 0) uniform samplerCube env_texture;
 
 // prob use ubo for specularScale & normalScale ..
 layout (constant_id = 11) const float specularScale_x = 1.0;

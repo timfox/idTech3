@@ -698,7 +698,7 @@ static void vk_generate_light_directions( void )
 }
 #endif
 
-
+#ifdef USE_PMLIGHT
 static void GenerateNormals( srfSurfaceFace_t *face )
 {
 	vec3_t ba, ca, cross;
