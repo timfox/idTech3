@@ -240,7 +240,7 @@ exit /B
     if %2 equ 0 goto continue
         "%cl%" -S frag -V -o "%tmpf%" %glsl%gen_frag.tmpl !sh[%1]! !tx[%2]! !cl[%2]! !fog[%3]!
         "%bh%" "%tmpf%" %outf% frag_!sh_id[%1]!!tx_id[%2]!_!cl_id[%2]!!fog_id[%3]!
-		    "%bs%" %outfb% "    vk.modules.frag.gen[%1][%2][1][%3] = SHADER_MODULE( frag_!vbo_id[%1]!!tx_id[%2]!_!cl_id[%2]!!fog_id[%3]! );"
-		    "%bs%" %outfb% "    vk_set_shader_name( vk.modules.frag.gen[%1][%2][1][%3], ""frag_!vbo_id[%1]!!tx_id[%2]!_!cl_id[%2]!!fog_id[%3]!"" );"
+		    "%bs%" %outfb% "    vk.modules.frag.gen[%1][%2][1][%3] = SHADER_MODULE( frag_!sh_id[%1]!!tx_id[%2]!_!cl_id[%2]!!fog_id[%3]! );"
+		    "%bs%" %outfb% "    vk_set_shader_name( vk.modules.frag.gen[%1][%2][1][%3], ""frag_!sh_id[%1]!!tx_id[%2]!_!cl_id[%2]!!fog_id[%3]!"" );"
     :continue
 exit /B
