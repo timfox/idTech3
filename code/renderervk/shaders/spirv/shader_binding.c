@@ -205,18 +205,18 @@ void vk_bind_generated_shaders( void ){
     vk_set_shader_name( vk.modules.frag.gen[1][0][0][1], "frag_pbr_tx0_fog" );
     vk.modules.frag.gen[1][1][0][0] = SHADER_MODULE( frag_pbr_tx1 );
     vk_set_shader_name( vk.modules.frag.gen[1][1][0][0], "frag_pbr_tx1" );
-    vk.modules.frag.gen[1][1][1][0] = SHADER_MODULE( frag_tx1_cl );
-    vk_set_shader_name( vk.modules.frag.gen[1][1][1][0], "frag_tx1_cl" );
+    vk.modules.frag.gen[1][1][1][0] = SHADER_MODULE( frag_pbr_tx1_cl );
+    vk_set_shader_name( vk.modules.frag.gen[1][1][1][0], "frag_pbr_tx1_cl" );
     vk.modules.frag.gen[1][1][0][1] = SHADER_MODULE( frag_pbr_tx1_fog );
     vk_set_shader_name( vk.modules.frag.gen[1][1][0][1], "frag_pbr_tx1_fog" );
-    vk.modules.frag.gen[1][1][1][1] = SHADER_MODULE( frag_tx1_cl_fog );
-    vk_set_shader_name( vk.modules.frag.gen[1][1][1][1], "frag_tx1_cl_fog" );
+    vk.modules.frag.gen[1][1][1][1] = SHADER_MODULE( frag_pbr_tx1_cl_fog );
+    vk_set_shader_name( vk.modules.frag.gen[1][1][1][1], "frag_pbr_tx1_cl_fog" );
     vk.modules.frag.gen[1][2][0][0] = SHADER_MODULE( frag_pbr_tx2 );
     vk_set_shader_name( vk.modules.frag.gen[1][2][0][0], "frag_pbr_tx2" );
-    vk.modules.frag.gen[1][2][1][0] = SHADER_MODULE( frag_tx2_cl );
-    vk_set_shader_name( vk.modules.frag.gen[1][2][1][0], "frag_tx2_cl" );
+    vk.modules.frag.gen[1][2][1][0] = SHADER_MODULE( frag_pbr_tx2_cl );
+    vk_set_shader_name( vk.modules.frag.gen[1][2][1][0], "frag_pbr_tx2_cl" );
     vk.modules.frag.gen[1][2][0][1] = SHADER_MODULE( frag_pbr_tx2_fog );
     vk_set_shader_name( vk.modules.frag.gen[1][2][0][1], "frag_pbr_tx2_fog" );
-    vk.modules.frag.gen[1][2][1][1] = SHADER_MODULE( frag_tx2_cl_fog );
-    vk_set_shader_name( vk.modules.frag.gen[1][2][1][1], "frag_tx2_cl_fog" );
+    vk.modules.frag.gen[1][2][1][1] = SHADER_MODULE( frag_pbr_tx2_cl_fog );
+    vk_set_shader_name( vk.modules.frag.gen[1][2][1][1], "frag_pbr_tx2_cl_fog" );
 }
