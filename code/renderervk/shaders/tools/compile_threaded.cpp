@@ -44,7 +44,6 @@ typedef struct {
     char    stage[8];
     char    output_file[MAX_PATH];
     char    defines[256]; 
-    bool    bindless;
 } ShaderTask;
 
 typedef struct {
@@ -97,13 +96,11 @@ static std::string create_compiler_cmd( ShaderTask* task, bool silent = true)
     char cmd[1024];
 
     const char *silent_flag = silent ? "-s " : "";
-    const char *bindless_flag = task->bindless ? "--target-env vulkan1.2 " : "";
 
-    snprintf(cmd, sizeof(cmd), "\"%s\" %s -S %s %s -V -o %s %s %s",
+    snprintf(cmd, sizeof(cmd), "\"%s\" %s -S %s -V -o %s %s %s",
         compiler.base_path.c_str(),
         silent_flag,
         task->stage,
-        bindless_flag,
         task->spirv_out,
         task->input_file,
         task->defines
@@ -167,7 +164,7 @@ unsigned __stdcall compile_shader_thread( void* arg )
     return 0;
 }
 
-static void create_shader_task( const char *f_name, const char *stage, const char *out_var, const char *out_binding, const char *defines, bool bindless = false) 
+static void create_shader_task( const char *f_name, const char *stage, const char *out_var, const char *out_binding, const char *defines ) 
 {
     // wait for thread queue before adding new task if thread pool is overflowing
     if ( thread_count >= MAX_THREADS ) {
@@ -186,7 +183,6 @@ static void create_shader_task( const char *f_name, const char *stage, const cha
     snprintf(t->spirv_out, MAX_PATH, "spirv\\tmp_%d.spv", task_count + 1);
     snprintf(t->stage, 8, "%s", stage);
     snprintf(t->output_var_name, MAX_PATH, "%s", out_var);
-    t->bindless = bindless;
 
     if ( out_binding ) 
     {
@@ -254,7 +250,7 @@ static void compile_and_convert_template_shaders( void )
                         name    = "vert_" + std::string(pbr_ids[i]) + tx_ids[j] + "_" + mode_ids[m] + env_ids[k] + fog_ids[l];
                         ids     = join_indexes("vk.modules.vert." + std::string(mode_ids[m]), { i, j, k, l });
 
-                        create_shader_task("gen_vert.tmpl", "vert", name.c_str(), ids.c_str(), defines.c_str(), false);
+                        create_shader_task("gen_vert.tmpl", "vert", name.c_str(), ids.c_str(), defines.c_str());
                     }
                 }
             }
@@ -274,7 +270,7 @@ static void compile_and_convert_template_shaders( void )
                     name    = "frag_" + std::string(pbr_ids[i]) + tx_ids[j] + "_" + mode_ids[m] + fog_ids[k];
                     ids     = join_indexes("vk.modules.frag." + std::string(mode_ids[m]), { i, j, k });
 
-                    create_shader_task("gen_frag.tmpl", "frag", name.c_str(), ids.c_str(), defines.c_str(), false);
+                    create_shader_task("gen_frag.tmpl", "frag", name.c_str(), ids.c_str(), defines.c_str());
                 }
             }
         }
@@ -291,7 +287,7 @@ static void compile_and_convert_template_shaders( void )
                     name    = "vert_" + std::string(pbr_ids[i]) + tx_ids[j] + env_ids[k] + fog_ids[l];
                     ids     = join_indexes("vk.modules.vert.gen", { i, j, 0, k, l });
 
-                    create_shader_task("gen_vert.tmpl", "vert", name.c_str(), ids.c_str(), defines.c_str(), false);
+                    create_shader_task("gen_vert.tmpl", "vert", name.c_str(), ids.c_str(), defines.c_str());
 
                     if ( j != 0 ) // tx
                     { 
@@ -299,7 +295,7 @@ static void compile_and_convert_template_shaders( void )
                         name_cl    = "vert_" + std::string(pbr_ids[i]) + tx_ids[j] + "_" + cl_ids[j] + env_ids[k] + fog_ids[l];
                         ids_cl     = join_indexes("vk.modules.vert.gen", { i, j, 1, k, l });
 
-                        create_shader_task("gen_vert.tmpl", "vert", name_cl.c_str(), ids_cl.c_str(), defines_cl.c_str(), false);
+                        create_shader_task("gen_vert.tmpl", "vert", name_cl.c_str(), ids_cl.c_str(), defines_cl.c_str());
                     }
                 }
             }
@@ -318,7 +314,7 @@ static void compile_and_convert_template_shaders( void )
                 name    = "frag_" + std::string(pbr_ids[i]) + tx_ids[j] + fog_ids[k];
                 ids     = join_indexes("vk.modules.frag.gen", { i, j, 0, k });
 
-                create_shader_task("gen_frag.tmpl", "frag", name.c_str(), ids.c_str(), defines.c_str(), false);
+                create_shader_task("gen_frag.tmpl", "frag", name.c_str(), ids.c_str(), defines.c_str());
 
                 if ( j != 0 ) // tx
                 { 
@@ -326,7 +322,7 @@ static void compile_and_convert_template_shaders( void )
                     name_cl     = "frag_" + std::string(pbr_ids[i])  + tx_ids[j] + "_" + cl_ids[j] + fog_ids[k];
                     ids_cl      = join_indexes("vk.modules.frag.gen", { i, j, 1, k });
 
-                    create_shader_task("gen_frag.tmpl", "frag", name_cl.c_str(), ids_cl.c_str(), defines_cl.c_str(), false);
+                    create_shader_task("gen_frag.tmpl", "frag", name_cl.c_str(), ids_cl.c_str(), defines_cl.c_str());
                 }
             }
         }
