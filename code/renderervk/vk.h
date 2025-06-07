@@ -391,7 +391,6 @@ void vk_destroy_cubemap_prefilter( void );
 #endif
 
 #ifdef VK_PBR_BRDFLUT
-void vk_update_pbr_descriptor( const int tmu, VkDescriptorSet curDesSet );
 void vk_create_brdflut_pipeline( void );
 void vk_create_brfdlut( void );
 #endif
