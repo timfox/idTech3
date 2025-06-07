@@ -4923,6 +4923,19 @@ void vk_shutdown( refShutdownCode_t code )
 
 #ifdef VK_CUBEMAP	
 	vk_destroy_cubemap_prefilter();
+
+	image_t *img = tr.emptyCubemap;
+	vk_destroy_image_resources( &img->handle, &img->view );
+
+	for ( i = 0; i < tr.numCubemaps; i++ ) {
+		image_t *img = tr.cubemaps[ i ].prefiltered_image;
+		vk_destroy_image_resources( &img->handle, &img->view );
+
+		img = tr.cubemaps[ i ].irradiance_image;
+		vk_destroy_image_resources( &img->handle, &img->view );
+
+		Com_Memset( &tr.cubemaps[ i ], 0, sizeof(cubemap_t) );
+	}
 #endif
 
 	if ( vk.pipelineCache != VK_NULL_HANDLE ) {
@@ -7868,22 +7881,6 @@ void vk_update_descriptor( int index, VkDescriptorSet descriptor )
 	vk.cmd->descriptor_set.current[ index ] = descriptor;
 }
 
-#ifdef USE_VK_PBR
-static void vk_set_valid_preceeding_descriptor( const int tmu )
-{
-	if( vk.cmd->descriptor_set.current[tmu] != VK_NULL_HANDLE )
-		return;
-	vk_update_descriptor( tmu, tr.emptyImage->descriptor );
-	if( tmu > 0 )
-		vk_set_valid_preceeding_descriptor( tmu - 1 );
-}
-void vk_update_pbr_descriptor( const int tmu, VkDescriptorSet curDesSet ) {
-	
-	vk_set_valid_preceeding_descriptor( tmu - 1 );
-	vk_update_descriptor( tmu, curDesSet );
-}
-#endif
-
 void vk_update_descriptor_offset( int index, uint32_t offset )
 {
 	vk.cmd->descriptor_set.offset[ index ] = offset;
@@ -9222,6 +9219,8 @@ void vk_destroy_cubemap_prefilter( void ){
 		qvkFreeMemory( vk.device, def->offscreen.memory, NULL );
 		qvkDestroyImageView( vk.device, def->offscreen.view, NULL );
 		qvkDestroyImage( vk.device, def->offscreen.image, NULL );
+		def->offscreen.image = VK_NULL_HANDLE;
+		def->offscreen.view = VK_NULL_HANDLE;
 		qvkDestroyPipeline( vk.device, def->pipeline, NULL );
 		qvkDestroyPipelineLayout( vk.device, def->pipeline_layout, NULL );
 	}

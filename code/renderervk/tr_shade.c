@@ -1055,23 +1055,22 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 #ifdef USE_VK_PBR
 		if ( is_pbr_surface && pStage->vk_pbr_flags ) {
-			vk_update_pbr_descriptor(VK_DESC_PBR_BRDFLUT, vk.brdflut_image_descriptor);
+			vk_update_descriptor( VK_DESC_PBR_BRDFLUT, vk.brdflut_image_descriptor );
 				
 			if ( pStage->vk_pbr_flags & PBR_HAS_NORMALMAP )
-				vk_update_pbr_descriptor(VK_DESC_PBR_NORMAL, pStage->normalMap->descriptor);
+				vk_update_descriptor( VK_DESC_PBR_NORMAL, pStage->normalMap->descriptor );
 
 			if ( pStage->vk_pbr_flags & PBR_HAS_PHYSICALMAP || pStage->vk_pbr_flags & PBR_HAS_SPECULARMAP )
-				vk_update_pbr_descriptor(VK_DESC_PBR_PHYSICAL, pStage->physicalMap->descriptor);
+				vk_update_descriptor( VK_DESC_PBR_PHYSICAL, pStage->physicalMap->descriptor );
 			
 			if ( !tr.numCubemaps || backEnd.viewParms.targetCube != NULL ) {
-				vk_update_pbr_descriptor(VK_DESC_PBR_CUBEMAP, tr.emptyCubemap->descriptor);
-				//vk_update_pbr_descriptor(10, tr.emptyCubemap->descriptor); // irradiance is currently unused
+				vk_update_descriptor( VK_DESC_PBR_CUBEMAP, tr.emptyCubemap->descriptor );
+				//vk_update_descriptor( 10, tr.emptyCubemap->descriptor ); // irradiance is currently unused
 			}
-			// currently use the frist cubemap for every surface
-			// use the first cubemap index, indexes are not assigned per surface yet
 			else { 
-				vk_update_pbr_descriptor(VK_DESC_PBR_CUBEMAP, tr.cubemaps[0].prefiltered_image->descriptor);
-				//vk_update_pbr_descriptor(10, tr.cubemaps[0].irradiance_image->descriptor); // irradiance is currently unused
+				// use the first cubemap index, indexes are not assigned per surface yet
+				vk_update_descriptor( VK_DESC_PBR_CUBEMAP, tr.cubemaps[0].prefiltered_image->descriptor );
+				//vk_update_descriptor( 10, tr.cubemaps[0].irradiance_image->descriptor ); // irradiance is currently unused
 			}
 		}
 #endif
@@ -1081,6 +1080,17 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		} else {
 			pipeline = pStage->vk_pipeline[fog_stage];
 		}
+
+#ifdef USE_VK_PBR
+		if ( !is_pbr_surface && pStage->vk_pbr_flags ) {
+			Vk_Pipeline_Def			def;
+
+			vk_get_pipeline_def( pipeline, &def );
+
+			def.vk_pbr_flags = 0;
+			pipeline = vk_find_pipeline_ext( 0, &def, qfalse );
+		}
+#endif
 
 		vk_bind_pipeline( pipeline );
 		vk_bind_geometry( tess_flags );
