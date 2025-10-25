@@ -1,8 +1,8 @@
-# Quake3e
+# id Tech 3
 
 [![build](../../workflows/build/badge.svg)](../../actions?query=workflow%3Abuild) * <a href="https://discord.com/invite/X3Exs4C"><img src="https://img.shields.io/discord/314456230649135105?color=7289da&logo=discord&logoColor=white" alt="Discord server" /></a>
 
-This is a modern Quake III Arena engine aimed to be fast, secure and compatible with all existing Q3A mods.
+This is a modern id Tech 3 engine.
 It is based on last non-SDL source dump of [ioquake3](https://github.com/ioquake/ioq3) with latest upstream fixes applied.
 
 Go to [Releases](../../releases) section to download latest binaries for your platform or follow [Build Instructions](#build-instructions)
@@ -84,3 +84,4 @@ Discord channel: https://discordapp.com/invite/X3Exs4C
 * https://github.com/ioquake/ioq3
 * https://github.com/kennyalive/Quake-III-Arena-Kenny-Edition
 * https://github.com/OpenArena/engine
+
