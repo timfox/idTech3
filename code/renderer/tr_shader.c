@@ -665,11 +665,13 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 
 			if ( !Q_stricmp( token, "screenMap" ) ) {
 				flags = IMGFLAG_NONE;
+#ifdef USE_FBO
 				if ( fboEnabled ) {
-					stage->bundle[0].isScreenMap = qtrue;
+					stage->bundle[0].isScreenMap = 1;
 					shader.hasScreenMap = qtrue;
 					tr.needScreenMap = qtrue;
 				}
+#endif
 			} else {
 				flags = IMGFLAG_CLAMPTOEDGE;
 			}
@@ -1084,6 +1086,11 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 		else if ( !Q_stricmp( token, "depthFragment" ) && s_extendedShader )
 		{
 			stage->depthFragment = qtrue;
+			continue;
+		}
+		else if ( !Q_stricmp( token, "dlight" ) && s_extendedShader )
+		{
+			stage->bundle[0].dlight = 1;
 		}
 		else
 		{
@@ -1126,7 +1133,10 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 		if ( blendSrcBits == GLS_SRCBLEND_SRC_ALPHA && blendDstBits == GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA /*&& stage->rgbGen == CGEN_VERTEX*/ ) {
 			if ( stage->alphaGen != AGEN_SKIP ) {
 				// q3wcp18 @ "textures/ctf_unified/floor_decal_blue" : AGEN_VERTEX, CGEN_VERTEX
-				depthMaskBits &= ~GLS_DEPTHMASK_TRUE;
+				// check for grates on tscabdm3
+				if ( atestBits == 0 ) {
+					depthMaskBits &= ~GLS_DEPTHMASK_TRUE;
+				}
 			} else {
 				// skip for q3wcp14 jumppads and similar
 				// q3wcp14 @ "textures/ctf_unified/bounce_blue" : AGEN_SKIP, CGEN_IDENTITY
@@ -1694,7 +1704,7 @@ FinishStage
 */
 static void FinishStage( shaderStage_t *stage )
 {
-	int i;
+	int i, n;
 
 	if ( !tr.mergeLightmaps ) {
 		return;
@@ -1703,28 +1713,65 @@ static void FinishStage( shaderStage_t *stage )
 	for ( i = 0; i < ARRAY_LEN( stage->bundle ); i++ ) {
 		textureBundle_t *bundle = &stage->bundle[i];
 		// offset lightmap coordinates
-		if ( bundle->lightmap >= LIGHTMAP_INDEX_OFFSET && bundle->tcGen == TCGEN_LIGHTMAP ) {
-			texModInfo_t *tmi = &bundle->texMods[bundle->numTexMods];
-			float x, y;
-			const int lightmapIndex = R_GetLightmapCoords( bundle->lightmap - LIGHTMAP_INDEX_OFFSET, &x, &y );
-			bundle->image[0] = tr.lightmaps[lightmapIndex];
-			tmi->type = TMOD_OFFSET;
-			tmi->offset[0] = x - tr.lightmapOffset[0];
-			tmi->offset[1] = y - tr.lightmapOffset[1];
-			bundle->numTexMods++;
+		if ( bundle->lightmap >= LIGHTMAP_INDEX_OFFSET ) {
+			if ( bundle->tcGen == TCGEN_LIGHTMAP ) {
+				texModInfo_t *tmi = &bundle->texMods[bundle->numTexMods];
+				float x, y;
+				const int lightmapIndex = R_GetLightmapCoords( bundle->lightmap - LIGHTMAP_INDEX_OFFSET, &x, &y );
+				// rescale tcMod transform
+				for ( n = 0; n < bundle->numTexMods; n++ ) {
+					tmi = &bundle->texMods[n];
+					if ( tmi->type == TMOD_TRANSFORM ) {
+						tmi->translate[0] *= tr.lightmapScale[0];
+						tmi->translate[1] *= tr.lightmapScale[1];
+					}
+				}
+				bundle->image[0] = tr.lightmaps[lightmapIndex];
+				tmi->type = TMOD_OFFSET;
+				tmi->offset[0] = x - tr.lightmapOffset[0];
+				tmi->offset[1] = y - tr.lightmapOffset[1];
+				bundle->numTexMods++;
+			}
 			continue;
 		}
-
 		// adjust texture coordinates to map on proper lightmap
-		if ( bundle->lightmap == LIGHTMAP_INDEX_SHADER && bundle->tcGen != TCGEN_LIGHTMAP ) {
-			texModInfo_t *tmi = &bundle->texMods[bundle->numTexMods];
-			tmi->type = TMOD_SCALE_OFFSET;
-			tmi->scale[0] = tr.lightmapScale[0];
-			tmi->scale[1] = tr.lightmapScale[1];
-			tmi->offset[0] = tr.lightmapOffset[0];
-			tmi->offset[1] = tr.lightmapOffset[1];
-			bundle->numTexMods++;
+		if ( bundle->lightmap == LIGHTMAP_INDEX_SHADER ) {
+			if ( bundle->tcGen != TCGEN_LIGHTMAP ) {
+				texModInfo_t *tmi = &bundle->texMods[bundle->numTexMods];
+				tmi->type = TMOD_SCALE_OFFSET;
+				tmi->scale[0] = tr.lightmapScale[0];
+				tmi->scale[1] = tr.lightmapScale[1];
+				tmi->offset[0] = tr.lightmapOffset[0];
+				tmi->offset[1] = tr.lightmapOffset[1];
+				bundle->numTexMods++;
+			} else {
+				for ( n = 0; n < bundle->numTexMods; n++ ) {
+					texModInfo_t *tmi = &bundle->texMods[n];
+					if ( tmi->type == TMOD_TRANSFORM ) {
+						tmi->translate[0] *= tr.lightmapScale[0];
+						tmi->translate[1] *= tr.lightmapScale[1];
+					} else {
+						// TODO: correct other transformations?
+					}
+				}
+			}
 			continue;
+		}
+		// revert lightmap texcoord correction if needed
+		if ( bundle->lightmap == LIGHTMAP_INDEX_NONE ) {
+			if ( bundle->tcGen == TCGEN_LIGHTMAP && shader.lightmapIndex >= 0 ) {
+				texModInfo_t *tmi;
+				for ( n = bundle->numTexMods; n > 0; --n ) {
+					bundle->texMods[n] = bundle->texMods[n - 1];
+				}
+				tmi = &bundle->texMods[0];
+				tmi->type = TMOD_OFFSET_SCALE;
+				tmi->offset[0] = -tr.lightmapOffset[0];
+				tmi->offset[1] = -tr.lightmapOffset[1];
+				tmi->scale[0] = 1.0f / tr.lightmapScale[0];
+				tmi->scale[1] = 1.0f / tr.lightmapScale[1];
+				bundle->numTexMods++;
+			}
 		}
 	}
 }
@@ -2061,7 +2108,7 @@ typedef struct {
 	int		multitextureBlend;
 } collapse_t;
 
-static collapse_t	collapse[] = {
+static const collapse_t collapse[] = {
 	{ 0, GLS_DSTBLEND_SRC_COLOR | GLS_SRCBLEND_ZERO,
 		GL_MODULATE, 0 },
 
@@ -2218,95 +2265,165 @@ static qboolean CollapseMultitexture( shaderStage_t *st0, shaderStage_t *st1, in
 
 #ifdef USE_PMLIGHT
 
-static int tcmodWeight( const textureBundle_t *bundle )
+static int tcmodWeight2( const shaderStage_t* st )
 {
-	if ( bundle->numTexMods == 0 )
-		return 1;
+	int i;
 
-	return 0;
-}
-
-
-static const textureBundle_t *lightingBundle( int stageIndex, const textureBundle_t *selected ) {
-	const shaderStage_t *stage = &stages[ stageIndex ];
-	int i, numTexBundles;
-
-	if ( stage->mtEnv )
-		numTexBundles = 2;
-	else
-		numTexBundles = 1;
-
-	for ( i = 0; i < numTexBundles; i++ ) {
-		const textureBundle_t *bundle = &stage->bundle[ i ];
-		if ( bundle->lightmap != LIGHTMAP_INDEX_NONE ) {
-			continue;
+	for ( i = 0; i < st->bundle[0].numTexMods; i++ ) {
+		switch ( st->bundle[0].texMods[i].type ) {
+		case TMOD_NONE:
+		case TMOD_SCALE:
+		case TMOD_TRANSFORM:
+		case TMOD_OFFSET:
+		case TMOD_SCALE_OFFSET:
+		case TMOD_OFFSET_SCALE:
+			break;
+		default:
+			return 0;
 		}
-		if ( bundle->image[0] == tr.whiteImage ) {
-			continue;
-		}
-		if ( bundle->tcGen != TCGEN_TEXTURE ) {
-			continue;
-		}
-		if ( selected ) {
-			if ( stage->rgbGen == CGEN_IDENTITY && ( stage->stateBits & GLS_BLEND_BITS ) == ( GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO ) ) {
-				// fix for q3wcp17' textures/scanctf2/bounce_white and others
-				continue;
-			}
-			if ( tcmodWeight( selected ) > tcmodWeight( bundle ) ) {
-				continue;
-			}
-		}
-		shader.lightingStage = stageIndex;
-		shader.lightingBundle = i;
-		selected = bundle;
 	}
-
-	return selected;
+	return 1;
 }
 
 
 /*
 ====================
-FindLightingStages
+FindLightingStage
 
-Find proper stage for dlight pass
+Find proper stage for dlight pass.
+Perform it before multitexture collapse for simplification and to preserve all info (e.g. isDetail)
+
+Key complex shaders to validate/check:
+[q3dm0]
+* textures/base_wall/comp3 -> stage #3
+[q3dm17]
+* textures/sfx/diamond2cjumppad -> stage #0
+* textures/sfx/launchpad_diamond -> stage #1
+* textures/base_floor/diamond2c_ow -> stage #1
+[q3wcp17]
+* textures/scanctf2/bounce_white -> stage #0
+[q3wcp18]
+* textures/ctf_unified/weapfloor_* -> stage #1
+[q3w8]
+* textures/ctf_cas_v/bounce_red_v -> stage #0
+[lun3dm5]
+* textures/lun3dm5/c_crete6gs -> stage #1
+* textures/lun3dm5/c_crete6j -> stage #4
+[pom]
+* textures/sockter/ter_mossgravel -> stage #1
 ====================
 */
-static void FindLightingStages( void )
-{
-	const shaderStage_t *st;
-	const textureBundle_t *bundle;
-	int i;
+static void FindLightingStage( const int stage ) {
+	int i, selected, lightmap;
 
-	shader.lightingStage = -1;
-	shader.lightingBundle = 0;
+	for ( i = 0; i < stage; i++ ) {
+		if ( stages[i].bundle[0].image[0] == NULL ) {
+			continue; // sanity check
+		}
+		if ( stages[i].bundle[0].dlight ) {
+			shader.lightingStage = i;
+			return; // already defined via 'dlight' keyword
+		}
+	}
 
-	if ( !qglGenProgramsARB )
+	if ( shader.isSky || (shader.surfaceFlags & (SURF_NODLIGHT | SURF_SKY)) /* || shader.sort == SS_ENVIRONMENT || shader.sort >= SS_FOG */ ) {
 		return;
+	}
 
-	if ( shader.isSky || ( shader.surfaceFlags & (SURF_NODLIGHT | SURF_SKY) ) || shader.sort == SS_ENVIRONMENT || shader.sort >= SS_FOG )
-		return;
-
-	bundle = NULL;
-	for ( i = 0; i < shader.numUnfoggedPasses; i++ ) {
-		st = &stages[ i ];
-		if ( !st->active )
+	selected = -2;
+	lightmap = -2;
+	for ( i = 0; i < stage; i++ ) {
+		const shaderStage_t *st = &stages[i];
+		const textureBundle_t *b = &st->bundle[0];
+		if ( !st->active ) {
 			break;
-		if ( st->isDetail && shader.lightingStage >= 0 )
+		}
+		if ( b->lightmap != LIGHTMAP_INDEX_NONE ) {
+			// 1. prefer stages near lightmap
+			if ( selected == i - 1 ) {
+				break;
+			}
+			lightmap = i;
 			continue;
-		if ( ( st->stateBits & GLS_BLEND_BITS ) == ( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE ) ) {
-			if ( bundle && bundle->numTexMods ) {
-				// already selected bundle has somewhat non-static tcgen
-				// so we may accept this stage
-				// this fixes jumppads on lun3dm5
-			} else {
+		}
+		if ( b->image[0] == tr.whiteImage || b->tcGen != TCGEN_TEXTURE ) {
+			continue;
+		}
+		if ( selected >= 0 ) {
+			// 2. skip detail textures
+			if ( st->isDetail ) {
 				continue;
 			}
+			// 3. prefer non-animated stages
+			if ( stages[selected].bundle[0].numImageAnimations < b->numImageAnimations ) {
+				continue;
+			}
+			// 4. prefer static tcgens
+			if ( tcmodWeight2( &stages[selected] ) > tcmodWeight2( st ) ) {
+				continue;
+			}
+			// 5. special case for lun3dm5 crete6gs stage #2
+			if ( ( st->stateBits & GLS_BLEND_BITS ) == ( GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_SRC_COLOR ) ) {
+				if ( ( stages[selected].stateBits & GLS_BLEND_BITS ) == ( GLS_SRCBLEND_ONE | GLS_DSTBLEND_SRC_ALPHA ) ) {
+					continue;
+				}
+			}
+			// 6. special case for q3w8 bounce_red_v/bounce_blue_v
+			if ( ( st->stateBits == ( GLS_SRCBLEND_ONE | GLS_DSTBLEND_ONE ) ) ) {
+				if ( stages[selected].stateBits == ( GLS_DEPTHMASK_TRUE | GLS_ATEST_GE_80 ) ) {
+					break;
+				}
+			}
 		}
-		bundle = lightingBundle( i, bundle );
+		selected = i;
+		// 1. prefer stages near lightmap
+		if ( i == lightmap + 1 ) {
+			break;
+		}
+	}
+
+	if ( selected >= 0 ) {
+		shader.lightingStage = selected;
+		stages[selected].bundle[0].dlight = 1;
 	}
 }
-#endif
+
+
+/*
+====================
+FindLightingStage
+
+Set shader.lightingStage and shader.lightingBundle depending from marked .dlight field
+====================
+*/
+static void FindLightingBundle( void )
+{
+	int i, n;
+
+	if ( shader.lightingStage < 0 ) {
+		return;
+	}
+
+	shader.lightingStage = -1;
+
+	if ( /*shader.isSky || (shader.surfaceFlags & (SURF_SKY)) || */ shader.sort == SS_ENVIRONMENT || shader.sort >= SS_FOG ) {
+		return;
+	}
+
+	for ( i = 0; i < shader.numUnfoggedPasses; i++ ) {
+		const shaderStage_t* st = &stages[i];
+		if ( !st->active ) {
+			break;
+		}
+		for ( n = 0; n < 2; n++ ) {
+			if ( st->bundle[n].dlight ) {
+				shader.lightingStage = i;
+				shader.lightingBundle = n;
+			}
+		}
+	}
+}
+#endif // USE_PMLIGHT
 
 
 /*
@@ -2377,12 +2494,14 @@ static void FixRenderCommandList( int newShader ) {
 				curCmd = (const void *)(sb_cmd + 1);
 				break;
 				}
+#ifdef USE_FBO
 			case RC_FINISHBLOOM:
 				{
 				const finishBloomCommand_t *fb_cmd = (const finishBloomCommand_t *)curCmd;
 				curCmd = (const void *)(fb_cmd + 1);
 				break;
 				}
+#endif // USE_FBO
 			case RC_COLORMASK:
 				{
 				const colorMaskCommand_t *cm_cmd = (const colorMaskCommand_t *)curCmd;
@@ -2623,6 +2742,11 @@ static void InitShader( const char *name, int lightmapIndex ) {
 	for ( i = 0 ; i < MAX_SHADER_STAGES ; i++ ) {
 		stages[i].bundle[0].texMods = texMods[i];
 	}
+
+#ifdef USE_PMLIGHT
+	shader.lightingBundle = 0;
+	shader.lightingStage = -1;
+#endif
 }
 
 
@@ -2839,6 +2963,19 @@ static shader_t *FinishShader( void ) {
 			pStage->alphaGen = AGEN_SKIP;
 	}
 
+	// whiteimage + "filter" texture == texture
+	if ( stage > 1 && stages[0].bundle[0].image[0] == tr.whiteImage && stages[0].bundle[0].numImageAnimations <= 1 && stages[0].rgbGen == CGEN_IDENTITY && stages[0].alphaGen == AGEN_SKIP ) {
+		if ( stages[1].stateBits == ( GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO ) ) {
+			stages[1].stateBits = stages[0].stateBits & ( GLS_DEPTHMASK_TRUE | GLS_DEPTHTEST_DISABLE | GLS_DEPTHFUNC_EQUAL );
+#ifdef USE_PMLIGHT
+			stages[1].bundle[0].dlight |= stages[0].bundle[0].dlight;
+#endif
+			memmove( &stages[0], &stages[1], sizeof( stages[0] ) * ( stage - 1 ) );
+			stages[stage - 1].active = qfalse;
+			stage--;
+		}
+	}
+
 	//
 	// if we are in r_vertexLight mode, never use a lightmap texture
 	//
@@ -2848,19 +2985,13 @@ static shader_t *FinishShader( void ) {
 		hasLightmapStage = qfalse;
 	}
 
-	// whiteimage + "filter" texture == texture
-	if ( stage > 1 && stages[0].bundle[0].image[0] == tr.whiteImage && stages[0].bundle[0].numImageAnimations <= 1 && stages[0].rgbGen == CGEN_IDENTITY && stages[0].alphaGen == AGEN_SKIP ) {
-		if ( stages[1].stateBits == ( GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO ) ) {
-			stages[1].stateBits = stages[0].stateBits & ( GLS_DEPTHMASK_TRUE | GLS_DEPTHTEST_DISABLE | GLS_DEPTHFUNC_EQUAL );
-			memmove( &stages[0], &stages[1], sizeof( stages[0] ) * ( stage - 1 ) );
-			stages[stage - 1].active = qfalse;
-			stage--;
-		}
-	}
-
 	for ( i = 0; i < stage; i++ ) {
 		stages[i].tessFlags = TESS_ST0;
 	}
+
+#ifdef USE_PMLIGHT
+	FindLightingStage( stage );
+#endif
 
 	//
 	// look for multitexture potential
@@ -2874,7 +3005,7 @@ static shader_t *FinishShader( void ) {
 	}
 
 	if ( shader.lightmapIndex >= 0 && !hasLightmapStage ) {
-		if (vertexLightmap) {
+		if ( vertexLightmap ) {
 			ri.Printf( PRINT_DEVELOPER, "WARNING: shader '%s' has VERTEX forced lightmap!\n", shader.name );
 		} else {
 			ri.Printf( PRINT_DEVELOPER, "WARNING: shader '%s' has lightmap but no lightmap stage!\n", shader.name );
@@ -2898,7 +3029,7 @@ static shader_t *FinishShader( void ) {
 	}
 
 #ifdef USE_PMLIGHT
-	FindLightingStages();
+	FindLightingBundle();
 #endif
 
 	// make sure that amplitude for TMOD_STRETCH is not zero

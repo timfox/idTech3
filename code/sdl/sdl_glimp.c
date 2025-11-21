@@ -63,13 +63,22 @@ GLimp_Shutdown
 */
 void GLimp_Shutdown( qboolean unloadDLL )
 {
+	const char* drv = SDL_GetCurrentVideoDriver();
+
 	IN_Shutdown();
 
-	SDL_DestroyWindow( SDL_window );
-	SDL_window = NULL;
+	if ( glw_state.isFullscreen ) {
+		if ( drv && strcmp( drv, "x11" ) == 0 ) {
+			SDL_WarpMouseGlobal( glw_state.desktop_width / 2, glw_state.desktop_height / 2 );
+		} else {
+			SDL_ShowCursor( SDL_TRUE );
+		}
+	}
 
-	if ( glw_state.isFullscreen )
-		SDL_WarpMouseGlobal( glw_state.desktop_width / 2, glw_state.desktop_height / 2 );
+	if ( SDL_window ) {
+		SDL_DestroyWindow( SDL_window );
+		SDL_window = NULL;
+	}
 
 	if ( unloadDLL )
 		SDL_QuitSubSystem( SDL_INIT_VIDEO );
@@ -272,7 +281,11 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 
 	if ( fullscreen )
 	{
+#ifdef MACOS_X
+		flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+#else
 		flags |= SDL_WINDOW_FULLSCREEN;
+#endif
 	}
 	else if ( r_noborder->integer )
 	{
@@ -348,17 +361,11 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 		{ // reduce depthBits
 			if (testDepthBits == 24)
 				testDepthBits = 16;
-			else if (testDepthBits == 16)
-				testDepthBits = 8;
 		}
 
 		if ((i % 4) == 1)
 		{ // reduce stencilBits
-			if (testStencilBits == 24)
-				testStencilBits = 16;
-			else if (testStencilBits == 16)
-				testStencilBits = 8;
-			else
+			if (testStencilBits == 8)
 				testStencilBits = 0;
 		}
 
@@ -778,13 +785,22 @@ VKimp_Shutdown
 */
 void VKimp_Shutdown( qboolean unloadDLL )
 {
+	const char* drv = SDL_GetCurrentVideoDriver();
+
 	IN_Shutdown();
 
-	SDL_DestroyWindow( SDL_window );
-	SDL_window = NULL;
+	if ( glw_state.isFullscreen ) {
+		if ( drv && strcmp( drv, "x11" ) == 0 ) {
+			SDL_WarpMouseGlobal( glw_state.desktop_width / 2, glw_state.desktop_height / 2 );
+		} else {
+			SDL_ShowCursor( SDL_TRUE );
+		}
+	}
 
-	if ( glw_state.isFullscreen )
-		SDL_WarpMouseGlobal( glw_state.desktop_width / 2, glw_state.desktop_height / 2 );
+	if ( SDL_window ) {
+		SDL_DestroyWindow( SDL_window );
+		SDL_window = NULL;
+	}
 
 	if ( unloadDLL )
 		SDL_QuitSubSystem( SDL_INIT_VIDEO );
