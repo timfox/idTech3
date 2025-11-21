@@ -298,13 +298,13 @@ PROTOCOL
 // NOTE: that stuff only works with two digits protocols
 extern const int demo_protocols[];
 
-#define	UPDATE_SERVER_NAME	"update.quake3arena.com"
+#define	UPDATE_SERVER_NAME	"update.idtech3.com"
 // override on command line, config files etc.
 #ifndef MASTER_SERVER_NAME
-#define MASTER_SERVER_NAME	"master.quake3arena.com"
+#define MASTER_SERVER_NAME	"master.idtech3.com"
 #endif
 #ifndef AUTHORIZE_SERVER_NAME
-#define	AUTHORIZE_SERVER_NAME	"authorize.quake3arena.com"
+#define	AUTHORIZE_SERVER_NAME	"authorize.idtech3.com"
 #endif
 
 #define	PORT_MASTER			27950
