@@ -1,0 +1,4 @@
+MyMod - Hybrid Gameplay and Visual Enhancement Mod
+
+A modern mod for Quake III Arena featuring enhanced gameplay mechanics and physically-based rendering (PBR) visual improvements.
+
