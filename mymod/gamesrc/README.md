@@ -20,7 +20,7 @@ gamesrc/
 Compile as native shared libraries to use modern C features:
 
 **Benefits**:
-- ✅ Modern C11/C17 features
+- ✅ Modern C23 features
 - ✅ Full standard library access
 - ✅ Better performance (no VM overhead)
 - ✅ Easier debugging with modern tools

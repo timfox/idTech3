@@ -54,15 +54,9 @@ elseif(WIN32)
     endif()
 endif()
 
-# Game module (server-side)
-add_library(game_${ARCH_SUFFIX} SHARED
-    game/g_main.c
-    # Add your game source files here
-    # game/g_weapon.c
-    # game/g_client.c
-    # game/g_combat.c
-    # etc.
-)
+# Game module (server-side) - OpenArena source
+file(GLOB GAME_SOURCES "game/*.c")
+add_library(game_${ARCH_SUFFIX} SHARED ${GAME_SOURCES})
 
 # Rename output to match engine expectations: gamex86_64.so format (no dot!)
 # Engine expects: {name}{ARCH_STRING}{DLL_EXT}
@@ -71,29 +65,18 @@ set_target_properties(game_${ARCH_SUFFIX} PROPERTIES
     PREFIX ""
 )
 
-# CGame module (client-side)
-add_library(cgame_${ARCH_SUFFIX} SHARED
-    cgame/cg_main.c
-    # Add your cgame source files here
-    # cgame/cg_view.c
-    # cgame/cg_draw.c
-    # cgame/cg_players.c
-    # etc.
-)
+# CGame module (client-side) - OpenArena source
+file(GLOB CGAME_SOURCES "cgame/*.c")
+add_library(cgame_${ARCH_SUFFIX} SHARED ${CGAME_SOURCES})
 
 set_target_properties(cgame_${ARCH_SUFFIX} PROPERTIES
     OUTPUT_NAME "cgame${ARCH_SUFFIX}"
     PREFIX ""
 )
 
-# UI module
-add_library(ui_${ARCH_SUFFIX} SHARED
-    ui/ui_main.c
-    # Add your UI source files here
-    # ui/ui_menu.c
-    # ui/ui_atoms.c
-    # etc.
-)
+# UI module - OpenArena source
+file(GLOB UI_SOURCES "ui/*.c")
+add_library(ui_${ARCH_SUFFIX} SHARED ${UI_SOURCES})
 
 set_target_properties(ui_${ARCH_SUFFIX} PROPERTIES
     OUTPUT_NAME "ui${ARCH_SUFFIX}"

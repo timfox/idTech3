@@ -34,22 +34,14 @@ OUTDIR := ../vm
 # Engine include paths (adjust to match your setup)
 ENGINE_ROOT := ../../..
 INCLUDES := -I$(ENGINE_ROOT)/src/game \
+            -I$(ENGINE_ROOT)/src/cgame \
+            -I$(ENGINE_ROOT)/src/ui \
             -I$(ENGINE_ROOT)/src/qcommon
 
-# Source files (add your source files here)
-GAME_SRCS := $(GAMEDIR)/g_main.c
-# GAME_SRCS += $(GAMEDIR)/g_weapon.c
-# GAME_SRCS += $(GAMEDIR)/g_client.c
-# etc.
-
-CGAME_SRCS := $(CGAMEDIR)/cg_main.c
-# CGAME_SRCS += $(CGAMEDIR)/cg_view.c
-# CGAME_SRCS += $(CGAMEDIR)/cg_draw.c
-# etc.
-
-UI_SRCS := $(UIDIR)/ui_main.c
-# UI_SCS += $(UIDIR)/ui_menu.c
-# etc.
+# Source files - OpenArena source (all .c files in each directory)
+GAME_SRCS := $(wildcard $(GAMEDIR)/*.c)
+CGAME_SRCS := $(wildcard $(CGAMEDIR)/*.c)
+UI_SRCS := $(wildcard $(UIDIR)/*.c)
 
 # Object files
 GAME_OBJS := $(GAME_SRCS:.c=.o)
