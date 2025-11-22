@@ -96,7 +96,7 @@ automatically restricts where game media can come from to prevent add-ons from w
 After the paths are initialized, quake will look for the product.txt file.  If not
 found and verified, the game will run in restricted mode.  In restricted mode, only 
 files contained in demoq3/pak0.pk3 will be available for loading, and only if the zip header is
-verified to not have been modified.  A single exception is made for q3config.cfg.  Files
+verified to not have been modified.  A single exception is made for config.cfg.  Files
 can still be written out in restricted mode, so screenshots and demos are allowed.
 Restricted mode can be tested by setting "+set fs_restrict 1" on the command line, even
 if there is a valid product.txt under the basepath or cdpath.
@@ -184,7 +184,7 @@ Read / write config to floppy option.
 
 Different version coexistence?
 
-When building a pak file, make sure a q3config.cfg isn't present in it,
+When building a pak file, make sure a config.cfg isn't present in it,
 or configs will never get loaded from disk!
 
   todo:
@@ -5442,7 +5442,7 @@ void FS_Restart( int checksumFeed ) {
 
 	// new check before safeMode
 	if ( Q_stricmp(fs_gamedirvar->string, lastValidGame) && execConfig ) {
-		// skip the q3config.cfg if "safe" is on the command line
+		// skip the config.cfg if "safe" is on the command line
 		if ( !Com_SafeMode() ) {
 			Cbuf_AddText( "exec " Q3CONFIG_CFG "\n" );
 		}

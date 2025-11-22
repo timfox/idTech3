@@ -153,10 +153,12 @@ static void CL_NextDemo( void );
 CL_CDDialog
 
 Called by Com_Error when a cd is needed
+CD key screen disabled - no longer shows dialog
 ===============
 */
 void CL_CDDialog( void ) {
-	cls.cddialog = qtrue;	// start it next frame
+	// CD key screen disabled - do nothing
+	// cls.cddialog = qtrue;	// start it next frame
 }
 
 
@@ -3012,11 +3014,13 @@ void CL_Frame( int msec, int realMsec ) {
 	}
 #endif
 
-	if ( cls.cddialog ) {
-		// bring up the cd error dialog if needed
-		cls.cddialog = qfalse;
-		VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_NEED_CD );
-	} else	if ( cls.state == CA_DISCONNECTED && !( Key_GetCatcher( ) & KEYCATCH_UI )
+	// CD key screen disabled - removed dialog check
+	// if ( cls.cddialog ) {
+	// 	// bring up the cd error dialog if needed
+	// 	cls.cddialog = qfalse;
+	// 	VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_NEED_CD );
+	// } else
+	if ( cls.state == CA_DISCONNECTED && !( Key_GetCatcher( ) & KEYCATCH_UI )
 		&& !com_sv_running->integer && uivm ) {
 		// if disconnected, bring up the menu
 		S_StopAllSounds();

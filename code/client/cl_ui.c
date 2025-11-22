@@ -665,15 +665,20 @@ CLUI_GetCDKey
 */
 static void CLUI_GetCDKey( char *buf, int buflen ) {
 #ifndef STANDALONE
-	const char *gamedir;
-	gamedir = Cvar_VariableString( "fs_game" );
-	if ( UI_usesUniqueCDKey() && gamedir[0] != '\0' ) {
-		Com_Memcpy( buf, &cl_cdkey[16], 16 );
-		buf[16] = '\0';
-	} else {
-		Com_Memcpy( buf, cl_cdkey, 16 );
-		buf[16] = '\0';
-	}
+	// CD key screen disabled - always return a valid-looking default CD key
+	// This prevents the UI from showing the CD key screen
+	Q_strncpyz( buf, "1234567890123456", buflen );
+	buf[16] = '\0';
+	// Original code commented out:
+	// const char *gamedir;
+	// gamedir = Cvar_VariableString( "fs_game" );
+	// if ( UI_usesUniqueCDKey() && gamedir[0] != '\0' ) {
+	// 	Com_Memcpy( buf, &cl_cdkey[16], 16 );
+	// 	buf[16] = '\0';
+	// } else {
+	// 	Com_Memcpy( buf, cl_cdkey, 16 );
+	// 	buf[16] = '\0';
+	// }
 #else
 	*buf = '\0';
 #endif
@@ -1161,7 +1166,9 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 		return 0;
 
 	case UI_VERIFY_CDKEY:
-		return Com_CDKeyValidate(VMA(1), VMA(2));
+		// CD key verification disabled - always return valid
+		return qtrue;
+		// return Com_CDKeyValidate(VMA(1), VMA(2));
 
 	// engine extensions
 	case UI_R_ADDREFENTITYTOSCENE2:
@@ -1265,11 +1272,13 @@ void CL_InitUI( void ) {
 			fs_reordered = qfalse;
 			FS_PureServerSetLoadedPaks( "", "" );
 			uivm = VM_Create( VM_UI, CL_UISystemCalls, UI_DllSyscall, interpret );
-			if ( !uivm ) {
-				Com_Error( ERR_DROP, "VM_Create on UI failed" );
-			}
-		} else {
-			Com_Error( ERR_DROP, "VM_Create on UI failed" );
+		}
+		if ( !uivm ) {
+			// UI module loading failed - allow engine to continue without UI
+			// Original code would error here: Com_Error( ERR_DROP, "VM_Create on UI failed" );
+			Com_Printf( "WARNING: UI module not found. Running without UI.\n" );
+			cls.uiStarted = qfalse;
+			return;
 		}
 	}
 
