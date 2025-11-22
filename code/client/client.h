@@ -443,6 +443,8 @@ extern	cvar_t	*cl_drawBuffer;
 void CL_AddReliableCommand( const char *cmd, qboolean isDisconnectCmd );
 
 void CL_StartHunkUsers( void );
+void CL_OpenedPK3List_f( void );
+int CL_ScaledMilliseconds( void );
 
 void CL_Disconnect_f( void );
 void CL_ReadDemoMessage( void );

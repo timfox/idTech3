@@ -255,3 +255,7 @@ void S_AddLoopSounds( void );
 portable_samplepair_t *S_GetRawSamplePointer( void );
 void S_Base_UpdateEntityPosition( int entityNum, const vec3_t origin );
 void S_Base_Respatialize( int entityNum, const vec3_t head, vec3_t axis[3], int inwater );
+
+// snd_mix.c - mixing functions
+void S_WriteLinearBlastStereo16( void );
+void S_TransferStereo16( unsigned long *pbuf, int endtime );

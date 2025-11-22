@@ -29,6 +29,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #	include <SDL.h>
 #endif
 
+#include "../renderercommon/tr_public.h"
+
 //#define USE_JOYSTICK
 
 typedef struct
@@ -56,8 +58,27 @@ extern cvar_t *in_nograb;
 
 void IN_Init( void );
 void IN_Shutdown( void );
+void IN_Frame( void );
 
 // signals.c
 void InitSig( void );
+
+// GLimp functions
+void GLimp_Init( glconfig_t *config );
+void GLimp_Shutdown( qboolean unloadDLL );
+void GLimp_Minimize( void );
+void GLimp_LogComment( const char *comment );
+void GLimp_EndFrame( void );
+void *GL_GetProcAddress( const char *symbol );
+void GLW_HideFullscreenWindow( void );
+void GLW_RestoreGamma( void );
+
+// Vulkan functions
+#ifdef USE_VULKAN
+void VKimp_Init( glconfig_t *config );
+void VKimp_Shutdown( qboolean unloadDLL );
+void *VK_GetInstanceProcAddr( VkInstance instance, const char *name );
+qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR *surface );
+#endif
 
 #endif

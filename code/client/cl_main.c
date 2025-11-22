@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_main.c  -- client main loop
 
 #include "client.h"
+#include "../sdl/sdl_glw.h"
 #include <limits.h>
 
 cvar_t	*cl_noprint;
@@ -3252,14 +3253,16 @@ void CL_StartHunkUsers( void ) {
 		const char *info = cl.gameState.stringData + cl.gameState.stringOffsets[ CS_SERVERINFO ];
 		const char *mapname = Info_ValueForKey( info, "mapname" );
 		if ( mapname && *mapname != '\0' ) {
-			const char *fmt = "cl_mapConfig_%s";
-			const char *cmd = Cvar_VariableString( va( fmt, mapname ) );
+			char cvar_name[MAX_QPATH];
+			Com_sprintf( cvar_name, sizeof( cvar_name ), "cl_mapConfig_%s", mapname );
+			const char *cmd = Cvar_VariableString( cvar_name );
 			if ( cmd && *cmd != '\0' ) {
 				Cbuf_AddText( cmd );
 				Cbuf_AddText( "\n" );
 			} else {
 				// apply mapname "default" if present
-				cmd = Cvar_VariableString( va( fmt, "default" ) );
+				Com_sprintf( cvar_name, sizeof( cvar_name ), "cl_mapConfig_%s", "default" );
+				cmd = Cvar_VariableString( cvar_name );
 				if ( cmd && *cmd != '\0' ) {
 					Cbuf_AddText( cmd );
 					Cbuf_AddText( "\n" );

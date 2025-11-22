@@ -284,15 +284,58 @@ IF(USE_CURL)
 ENDIF()
 
 IF(USE_VULKAN)
-	find_package(Vulkan)
-	IF(Vulkan_FOUND)
-		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_VULKAN)
-		TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${Vulkan_INCLUDE_DIRS})
-		TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PUBLIC ${Vulkan_INCLUDE_DIRS})
-		TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} ${Vulkan_LIBRARIES})
+	# Check if local Vulkan headers exist (renderer has bundled headers)
+	IF(EXISTS "${CMAKE_SOURCE_DIR}/code/renderercommon/vulkan/vulkan.h")
+		# Renderer uses local Vulkan headers, so we just need the library
+		# Try multiple search paths and library name variations
+		FIND_LIBRARY(VULKAN_LIBRARY 
+			NAMES vulkan libvulkan.so.1 libvulkan.so
+			PATHS 
+				/usr/lib/x86_64-linux-gnu
+				/usr/lib64
+				/usr/lib
+				/usr/local/lib
+				/lib/x86_64-linux-gnu
+			NO_DEFAULT_PATH
+		)
+		# If not found with NO_DEFAULT_PATH, try default search
+		IF(NOT VULKAN_LIBRARY)
+			FIND_LIBRARY(VULKAN_LIBRARY NAMES vulkan libvulkan.so.1 libvulkan.so)
+		ENDIF()
+		IF(VULKAN_LIBRARY)
+			MESSAGE(STATUS "Found Vulkan library: ${VULKAN_LIBRARY} (using local headers)")
+			TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_VULKAN)
+			TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VULKAN)
+			TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} ${VULKAN_LIBRARY})
+		ELSE()
+			MESSAGE(WARNING "Vulkan library not found, disabling Vulkan support")
+			SET(USE_VULKAN OFF CACHE BOOL "" FORCE)
+		ENDIF()
 	ELSE()
-		MESSAGE(WARNING "Vulkan not found, disabling Vulkan support")
-		SET(USE_VULKAN OFF CACHE BOOL "" FORCE)
+		# Try CMake's find_package first
+		find_package(Vulkan)
+		IF(Vulkan_FOUND)
+			TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_VULKAN)
+			TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VULKAN)
+			TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${Vulkan_INCLUDE_DIRS})
+			TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PUBLIC ${Vulkan_INCLUDE_DIRS})
+			TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} ${Vulkan_LIBRARIES})
+		ELSE()
+			# Try to find Vulkan manually if CMake's find_package fails
+			FIND_PATH(VULKAN_INCLUDE_DIR NAMES vulkan/vulkan.h PATHS /usr/include /usr/local/include)
+			FIND_LIBRARY(VULKAN_LIBRARY NAMES vulkan PATHS /usr/lib /usr/lib64 /usr/local/lib /usr/lib/x86_64-linux-gnu)
+			IF(VULKAN_INCLUDE_DIR AND VULKAN_LIBRARY)
+				MESSAGE(STATUS "Found Vulkan manually: ${VULKAN_INCLUDE_DIR}, ${VULKAN_LIBRARY}")
+				TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_VULKAN)
+				TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VULKAN)
+				TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${VULKAN_INCLUDE_DIR})
+				TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PUBLIC ${VULKAN_INCLUDE_DIR})
+				TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} ${VULKAN_LIBRARY})
+			ELSE()
+				MESSAGE(WARNING "Vulkan not found, disabling Vulkan support")
+				SET(USE_VULKAN OFF CACHE BOOL "" FORCE)
+			ENDIF()
+		ENDIF()
 	ENDIF()
 ENDIF()
 
@@ -353,4 +396,9 @@ ENDIF()
 # Add SDL include directories to q3ui if SDL is enabled
 IF(USE_SDL)
 	TARGET_INCLUDE_DIRECTORIES(q3ui PUBLIC ${SDL2_INCLUDE_DIR})
+ENDIF()
+
+# Add USE_VULKAN definition to q3ui if Vulkan is enabled (needed for sdl_glimp.c)
+IF(USE_VULKAN)
+	TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_VULKAN)
 ENDIF()

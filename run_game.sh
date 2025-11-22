@@ -4,11 +4,18 @@
 
 set -e
 
-GAME_DIR="/home/tim/Desktop/idtech3/build"
+# Get the script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$SCRIPT_DIR"
+BUILD_DIR="$PROJECT_ROOT/build"
+
+GAME_DIR="$BUILD_DIR"
 GAME_EXEC="./idtech3.x86_64"
 # Start with a map if one is available, otherwise just start the game
 # You can add +map q3dm1 or any other map name to start directly in a map
-GAME_ARGS="+set fs_game mymod +set vm_game 0 +set vm_cgame 0 +set vm_ui 0"
+# fs_basepath defaults to the directory containing the executable (build/)
+# So mymod files should be at build/mymod/
+GAME_ARGS="+set fs_basepath $BUILD_DIR +set fs_game mymod +set vm_game 0 +set vm_cgame 0 +set vm_ui 0"
 
 echo "--------------------------------------------"
 echo "Launching id Tech 3 with the following setup:"

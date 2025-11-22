@@ -22,12 +22,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #ifdef USE_LOCAL_HEADERS
 #	include "SDL.h"
-#ifdef USE_VULKAN_API
+#ifdef USE_VULKAN
 #	include "SDL_vulkan.h"
 #endif
 #else
 #	include <SDL.h>
-#ifdef USE_VULKAN_API
+#ifdef USE_VULKAN
 #	include <SDL_vulkan.h>
 #endif
 #endif
@@ -49,7 +49,7 @@ glwstate_t glw_state;
 
 SDL_Window *SDL_window = NULL;
 static SDL_GLContext SDL_glContext = NULL;
-#ifdef USE_VULKAN_API
+#ifdef USE_VULKAN
 static PFN_vkGetInstanceProcAddr qvkGetInstanceProcAddr;
 #endif
 
@@ -196,7 +196,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 	int y;
 	Uint32 flags = SDL_WINDOW_SHOWN;
 
-#ifdef USE_VULKAN_API
+#ifdef USE_VULKAN
 	if ( vulkan ) {
 		flags |= SDL_WINDOW_VULKAN;
 		Com_Printf( "Initializing Vulkan display\n");
@@ -365,7 +365,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 		else
 			perChannelColorBits = 4;
 
-#ifdef USE_VULKAN_API
+#ifdef USE_VULKAN
 		if ( !vulkan )
 #endif
 		{
@@ -412,35 +412,35 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 
 		if ( fullscreen )
 		{
-			SDL_DisplayMode mode;
+			SDL_DisplayMode display_mode;
 
 			switch ( testColorBits )
 			{
-				case 16: mode.format = SDL_PIXELFORMAT_RGB565; break;
-				case 24: mode.format = SDL_PIXELFORMAT_RGB24;  break;
+				case 16: display_mode.format = SDL_PIXELFORMAT_RGB565; break;
+				case 24: display_mode.format = SDL_PIXELFORMAT_RGB24;  break;
 				default: Com_DPrintf( "testColorBits is %d, can't fullscreen\n", testColorBits ); continue;
 			}
 
-			mode.w = config->vidWidth;
-			mode.h = config->vidHeight;
-			mode.refresh_rate = /* config->displayFrequency = */ Cvar_VariableIntegerValue( "r_displayRefresh" );
-			mode.driverdata = NULL;
+			display_mode.w = config->vidWidth;
+			display_mode.h = config->vidHeight;
+			display_mode.refresh_rate = /* config->displayFrequency = */ Cvar_VariableIntegerValue( "r_displayRefresh" );
+			display_mode.driverdata = NULL;
 
-			if ( SDL_SetWindowDisplayMode( SDL_window, &mode ) < 0 )
+			if ( SDL_SetWindowDisplayMode( SDL_window, &display_mode ) < 0 )
 			{
 				Com_DPrintf( "SDL_SetWindowDisplayMode failed: %s\n", SDL_GetError( ) );
 				continue;
 			}
 
-			if ( SDL_GetWindowDisplayMode( SDL_window, &mode ) >= 0 )
+			if ( SDL_GetWindowDisplayMode( SDL_window, &display_mode ) >= 0 )
 			{
-				config->displayFrequency = mode.refresh_rate;
-				config->vidWidth = mode.w;
-				config->vidHeight = mode.h;
+				config->displayFrequency = display_mode.refresh_rate;
+				config->vidWidth = display_mode.w;
+				config->vidHeight = display_mode.h;
 			}
 		}
 
-#ifdef USE_VULKAN_API
+#ifdef USE_VULKAN
 		if ( vulkan )
 		{
 			config->colorBits = testColorBits;
@@ -512,7 +512,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 	if ( !fullscreen && r_noborder->integer )
 		SDL_SetWindowHitTest( SDL_window, SDL_HitTestFunc, NULL );
 
-#ifdef USE_VULKAN_API
+#ifdef USE_VULKAN
 	if ( vulkan )
 		SDL_Vulkan_GetDrawableSize( SDL_window, &config->vidWidth, &config->vidHeight );
 	else
@@ -673,7 +673,7 @@ void *GL_GetProcAddress( const char *symbol )
 }
 
 
-#ifdef USE_VULKAN_API
+#ifdef USE_VULKAN
 /*
 ===============
 VKimp_Init

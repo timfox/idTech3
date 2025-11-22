@@ -197,7 +197,7 @@ static void RllSetupTable( void )
 //
 // Returns:		Number of samples placed in output buffer
 //-----------------------------------------------------------------------------
-long RllDecodeMonoToMono(unsigned char *from,short *to,unsigned int size,char signedOutput ,unsigned short flag)
+static long RllDecodeMonoToMono(unsigned char *from,short *to,unsigned int size,char signedOutput ,unsigned short flag)
 {
 	unsigned int z;
 	int prev;
@@ -298,7 +298,7 @@ static long RllDecodeStereoToStereo(unsigned char *from,short *to,unsigned int s
 //
 // Returns:		Number of samples placed in output buffer
 //-----------------------------------------------------------------------------
-long RllDecodeStereoToMono(unsigned char *from,short *to,unsigned int size,char signedOutput, unsigned short flag)
+static long RllDecodeStereoToMono(unsigned char *from,short *to,unsigned int size,char signedOutput, unsigned short flag)
 {
 	unsigned int z;
 	int prevL,prevR;
