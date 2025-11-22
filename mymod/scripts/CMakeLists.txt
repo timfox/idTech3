@@ -16,11 +16,17 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../vm)
 
 # Include directories - you'll need to point to engine headers
 # Adjust these paths to match your engine source location
-set(ENGINE_ROOT ${CMAKE_SOURCE_DIR}/../../..)
+# CMAKE_SOURCE_DIR is mymod/scripts/, so go up 2 levels to get to idtech3 root
+get_filename_component(ENGINE_ROOT "${CMAKE_SOURCE_DIR}/../.." ABSOLUTE)
 set(ENGINE_INCLUDE_DIRS
-    ${ENGINE_ROOT}/code/game
     ${ENGINE_ROOT}/code/qcommon
+    ${ENGINE_ROOT}/code/game
+    ${ENGINE_ROOT}/code/cgame
+    ${ENGINE_ROOT}/code/ui
 )
+
+message(STATUS "ENGINE_ROOT: ${ENGINE_ROOT}")
+message(STATUS "ENGINE_INCLUDE_DIRS: ${ENGINE_INCLUDE_DIRS}")
 
 include_directories(${ENGINE_INCLUDE_DIRS})
 
@@ -58,9 +64,9 @@ add_library(game_${ARCH_SUFFIX} SHARED
     # etc.
 )
 
-# Rename output to match engine expectations
+# Rename output to match engine expectations: game.x86_64.so format
 set_target_properties(game_${ARCH_SUFFIX} PROPERTIES
-    OUTPUT_NAME "game"
+    OUTPUT_NAME "game.${ARCH_SUFFIX}"
     PREFIX ""
 )
 
@@ -75,7 +81,7 @@ add_library(cgame_${ARCH_SUFFIX} SHARED
 )
 
 set_target_properties(cgame_${ARCH_SUFFIX} PROPERTIES
-    OUTPUT_NAME "cgame"
+    OUTPUT_NAME "cgame.${ARCH_SUFFIX}"
     PREFIX ""
 )
 
@@ -89,7 +95,7 @@ add_library(ui_${ARCH_SUFFIX} SHARED
 )
 
 set_target_properties(ui_${ARCH_SUFFIX} PROPERTIES
-    OUTPUT_NAME "ui"
+    OUTPUT_NAME "ui.${ARCH_SUFFIX}"
     PREFIX ""
 )
 

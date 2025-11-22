@@ -13,8 +13,9 @@ Required exports:
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../cgame/cg_public.h"
+#include "q_shared.h"
+#include "qcommon.h"
+#include "cg_public.h"
 
 // System call function pointer (set by dllEntry)
 static dllSyscall_t syscallPtr = NULL;
@@ -38,6 +39,7 @@ Main entry point for cgame module. Called by the engine for various commands.
 =================
 */
 intptr_t vmMain( int command, int arg0, int arg1, int arg2 ) {
+	(void)arg0; (void)arg1; (void)arg2; // Suppress unused parameter warnings
 	switch( command ) {
 		case CG_INIT:
 			// Initialize cgame module
@@ -66,11 +68,8 @@ intptr_t vmMain( int command, int arg0, int arg1, int arg2 ) {
 			// arg0 = entityNum
 			return 0;
 			
-		case CG_GET_TAG:
-			// Get tag
-			// arg0 = entityNum
-			// arg1 = tagName
-			// arg2 = start
+		case CG_LAST_ATTACKER:
+			// Last attacker
 			return 0;
 			
 		case CG_KEY_EVENT:
@@ -79,8 +78,8 @@ intptr_t vmMain( int command, int arg0, int arg1, int arg2 ) {
 			// arg1 = down
 			return 0;
 			
-		case CG_MOUSE_MOVE_EVENT:
-			// Mouse move event
+		case CG_MOUSE_EVENT:
+			// Mouse event
 			// arg0 = dx
 			// arg1 = dy
 			return 0;

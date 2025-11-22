@@ -13,8 +13,9 @@ Required exports:
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../game/g_public.h"
+#include "q_shared.h"
+#include "qcommon.h"
+#include "g_public.h"
 
 // System call function pointer (set by dllEntry)
 static dllSyscall_t syscallPtr = NULL;
@@ -38,6 +39,7 @@ Main entry point for game module. Called by the engine for various commands.
 =================
 */
 intptr_t vmMain( int command, int arg0, int arg1, int arg2 ) {
+	(void)arg0; (void)arg1; (void)arg2; // Suppress unused parameter warnings
 	switch( command ) {
 		case GAME_INIT:
 			// Initialize game module
