@@ -281,8 +281,8 @@ void NORETURN Sys_Exit( int code )
 	//exit(ex);
 	_exit( code );
 #else
-	// Give me a backtrace on error exits.
-	assert( code == 0 );
+	// Allow non-zero exit codes for error conditions
+	// Removed assertion that required code == 0 to allow proper error handling
 	exit( code );
 #endif
 }

@@ -26,20 +26,20 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // q_shared.h -- included first by ALL program modules.
 // A user mod should never modify this file
 
-#define Q3_VERSION            "Q3 1.32e"
+#define Q3_VERSION            "id Tech 3"
 #ifndef SVN_VERSION
   #define SVN_VERSION Q3_VERSION
 #endif
-#define CLIENT_WINDOW_TITLE   "Quake 3: Arena"
-#define CONSOLE_WINDOW_TITLE  "Quake 3 Console"
+#define CLIENT_WINDOW_TITLE   "id Tech 3"
+#define CONSOLE_WINDOW_TITLE  "id Tech 3 Console"
 // 1.32 released 7-10-2002
 
 //#define DEFAULT_GAME			"edawn"
 
-#define BASEGAME				"baseq3"
+#define BASEGAME				"base"
 #define BASEDEMO				"demoq3"
 #define BASETA					"missionpack"
-#define STEAMPATH_NAME			"Quake 3 Arena"
+#define STEAMPATH_NAME			"id Tech 3"
 #define STEAMPATH_APPID			"2200"
 
 #define MAX_TEAMNAME            32

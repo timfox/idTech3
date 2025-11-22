@@ -4924,33 +4924,32 @@ static void FS_CheckIdPaks( void )
 		}
 	}
 
+	// Pak file requirement check disabled - allow running without official pak files
+	// Original check would error if pak files were missing
 	if(!founddemo && (foundPak & 0x1ff) != 0x1ff )
 	{
-		FS_PrintSearchPaths();
-
+		// Only warn, don't error - allow custom/modified pk3 files
 		if((foundPak&1) != 1 )
 		{
-			Com_Printf("\n\n"
-			"pak0.pk3 is missing. Please copy it\n"
-			"from your legitimate Q3 CDROM.\n");
+			Com_Printf("\n"
+			"WARNING: pak0.pk3 not found. Using available pak files.\n");
 		}
 
 		if((foundPak&0x1fe) != 0x1fe )
 		{
-			Com_Printf("\n\n"
-			"Point Release files are missing. Please\n"
-			"re-install the 1.32 point release.\n");
+			Com_Printf("\n"
+			"WARNING: Some point release pak files not found. Using available files.\n");
 		}
 
-		Com_Printf("\n\n"
-			"Also check that your Q3 executable is in\n"
-			"the correct place and that every file\n"
-			"in the %s directory is present and readable.\n", BASEGAME);
+		Com_Printf("\n"
+			"Note: You can use any pk3 files in the %s directory.\n", BASEGAME);
 
-		if(!fs_gamedirvar->string[0]
-		|| !Q_stricmp( fs_gamedirvar->string, BASEGAME )
-		|| !Q_stricmp( fs_gamedirvar->string, BASETA ))
-			Com_Error(ERR_FATAL, "\n*** you need to install Quake III Arena in order to play ***");
+		// Removed fatal error - allow running without official pak files
+		// Original code would error here:
+		// if(!fs_gamedirvar->string[0]
+		// || !Q_stricmp( fs_gamedirvar->string, BASEGAME )
+		// || !Q_stricmp( fs_gamedirvar->string, BASETA ))
+		//     Com_Error(ERR_FATAL, "\n*** you need to install Quake III Arena in order to play ***");
 	}
 }
 
@@ -5418,9 +5417,9 @@ void FS_Restart( int checksumFeed ) {
 	// try to start up normally
 	FS_Startup();
 
-	// if we can't find default.cfg, assume that the paths are
-	// busted and error out now, rather than getting an unreadable
-	// graphics screen when the font fails to load
+	// Check for default.cfg - warn if missing but don't error
+	// Original check would error to avoid unreadable graphics screen when font fails to load
+	// Now we allow running without it - engine will use defaults
 	if ( FS_ReadFile( "default.cfg", NULL ) <= 0 ) {
 		// this might happen when connecting to a pure server not using BASEGAME/pak0.pk3
 		// (for instance a TA demo server)
@@ -5436,7 +5435,9 @@ void FS_Restart( int checksumFeed ) {
 			Com_Error( ERR_DROP, "Invalid game folder" );
 			return;
 		}
-		Com_Error( ERR_FATAL, "Couldn't load default.cfg" );
+		// Removed fatal error - allow running without default.cfg
+		// Original: Com_Error( ERR_FATAL, "Couldn't load default.cfg" );
+		Com_Printf( "WARNING: default.cfg not found. Using engine defaults.\n" );
 	}
 
 	// new check before safeMode
@@ -5781,10 +5782,9 @@ void *FS_LoadLibrary( const char *name )
 	void *libHandle = NULL;
 	char *fn;
 
-#ifdef DEBUG
+	// Always try the executable directory first (where renderer libraries are typically located)
 	fn = FS_BuildOSPath( Sys_Pwd(), name, NULL );
 	libHandle = Sys_LoadLibrary( fn );
-#endif
 
 	while ( !libHandle && sp ) {
 		while ( sp && ( sp->policy != DIR_STATIC || !sp->dir ) ) {

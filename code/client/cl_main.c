@@ -3377,9 +3377,35 @@ static void CL_InitRef( void ) {
 	rendererLib = FS_LoadLibrary( dllName );
 	if ( !rendererLib )
 	{
+		// Try with lib prefix (Linux convention)
+		char libName[ MAX_OSPATH ];
+		Com_sprintf( libName, sizeof( libName ), "lib" RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, cl_renderer->string );
+		rendererLib = FS_LoadLibrary( libName );
+	}
+	// Try alternative architecture suffix if x86_64 (some builds use _x86 for 64-bit)
+	if ( !rendererLib && !Q_stricmp( REND_ARCH_STRING, "x86_64" ) )
+	{
+		Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_x86" DLL_EXT, cl_renderer->string );
+		rendererLib = FS_LoadLibrary( dllName );
+		if ( !rendererLib )
+		{
+			char libName[ MAX_OSPATH ];
+			Com_sprintf( libName, sizeof( libName ), "lib" RENDERER_PREFIX "_%s_x86" DLL_EXT, cl_renderer->string );
+			rendererLib = FS_LoadLibrary( libName );
+		}
+	}
+	if ( !rendererLib )
+	{
 		Cvar_ForceReset( "cl_renderer" );
 		Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, cl_renderer->string );
 		rendererLib = FS_LoadLibrary( dllName );
+		if ( !rendererLib )
+		{
+			// Try with lib prefix again after reset
+			char libName[ MAX_OSPATH ];
+			Com_sprintf( libName, sizeof( libName ), "lib" RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, cl_renderer->string );
+			rendererLib = FS_LoadLibrary( libName );
+		}
 		if ( !rendererLib )
 		{
 			Com_Error( ERR_FATAL, "Failed to load renderer %s", dllName );
