@@ -4913,32 +4913,12 @@ static void FS_CheckIdPaks( void )
 			&& strlen(pakBasename) == 4 && !Q_stricmpn( pakBasename, "pak", 3 )
 			&& pakBasename[3] >= '0' && pakBasename[3] <= '8')
 		{
-			if( (unsigned int)path->pack->checksum != pak_checksums[pakBasename[3]-'0'] )
-			{
-				FS_PrintSearchPaths();
-
-				if(pakBasename[3] == '0')
-				{
-					Com_Printf("\n\n"
-						"**************************************************\n"
-						"ERROR: pak0.pk3 is present but its checksum (%u)\n"
-						"is not correct. Please re-copy pak0.pk3 from your\n"
-						"legitimate Q3 CDROM.\n"
-						"**************************************************\n\n\n",
-						path->pack->checksum );
-				}
-				else
-				{
-					Com_Printf("\n\n"
-						"**************************************************\n"
-						"ERROR: pak%d.pk3 is present but its checksum (%u)\n"
-						"is not correct. Please re-install Quake 3 Arena \n"
-						"Point Release v1.32 pk3 files\n"
-						"**************************************************\n\n\n",
-						pakBasename[3]-'0', path->pack->checksum );
-				}
-				Com_Error(ERR_FATAL, "\n* You need to install correct Quake III Arena files in order to play *");
-			}
+			// Checksum verification disabled - allow any pk3 files
+			// Original check was:
+			// if( (unsigned int)path->pack->checksum != pak_checksums[pakBasename[3]-'0'] )
+			// {
+			//     Com_Error(ERR_FATAL, "...");
+			// }
 
 			foundPak |= 1<<(pakBasename[3]-'0');
 		}
