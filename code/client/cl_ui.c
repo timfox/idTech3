@@ -1277,6 +1277,8 @@ void CL_InitUI( void ) {
 			// UI module loading failed - allow engine to continue without UI
 			// Original code would error here: Com_Error( ERR_DROP, "VM_Create on UI failed" );
 			Com_Printf( "WARNING: UI module not found. Running without UI.\n" );
+			Com_Printf( "  To fix: Ensure vm/ui.qvm or ui%s.so exists in your mod directory.\n", ARCH_STRING );
+			Com_Printf( "  Or set vm_ui to 1 to use QVM bytecode, or 2 for compiled QVM.\n" );
 			cls.uiStarted = qfalse;
 			return;
 		}

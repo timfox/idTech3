@@ -1,6 +1,37 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.12)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.20)
 
 PROJECT(idtech3 C CXX ASM)
+
+# Set C standard (C23 for modern features, fallback to C17/C11 if not available)
+# C23 requires CMake 3.20+ and modern compilers (GCC 14+, Clang 18+)
+# C17 is widely supported and provides modern features
+IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+	# Try C23 first (CMake 3.20+ supports it), compiler will use highest available
+	# If C23 not supported by compiler, it will fall back to C17 automatically
+	SET(CMAKE_C_STANDARD 23)
+	SET(CMAKE_C_STANDARD_REQUIRED OFF)
+ELSEIF(CMAKE_C_COMPILER_ID MATCHES "MSVC")
+	# MSVC uses different versioning, C11 is safer
+	SET(CMAKE_C_STANDARD 11)
+	SET(CMAKE_C_STANDARD_REQUIRED ON)
+ELSE()
+	# Default to C17 for other compilers
+	SET(CMAKE_C_STANDARD 17)
+	SET(CMAKE_C_STANDARD_REQUIRED OFF)
+ENDIF()
+
+# Enable modern compiler warnings for better code quality
+IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+	# Format string checking (catches printf format errors)
+	ADD_COMPILE_OPTIONS(-Wformat=2)
+	# Require function prototypes
+	ADD_COMPILE_OPTIONS(-Wstrict-prototypes)
+	# Warn about missing prototypes
+	ADD_COMPILE_OPTIONS(-Wmissing-prototypes)
+	# Warn about shadowed variables
+	ADD_COMPILE_OPTIONS(-Wshadow)
+	# Note: -Wold-style-cast is C++ only, not applicable for C code
+ENDIF()
 
 SET(CNAME "idtech3")
 SET(DNAME "idtech3.ded")
@@ -147,78 +178,97 @@ IF(UNIX)
 	ENDIF()
 ELSEIF(WIN32)
 	SET(EXE_TYPE WIN32)
-	IF(MSVC)
-		SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /MANIFEST:NO")
-		ADD_COMPILE_DEFINITIONS(_CRT_SECURE_NO_WARNINGS) # v3.12+
-	ENDIF()
+	AUX_SOURCE_DIRECTORY(code/win32 Q3_SRCS)
+	AUX_SOURCE_DIRECTORY(code/win32 Q3_UI_SRCS)
+ENDIF()
 
-	SET(Q3_SRCS
-		code/win32/win_main.c
-		code/win32/win_shared.c
-		code/win32/win_syscon.c
-		code/win32/win_resource.rc)
+IF(USE_SDL)
+	find_package(SDL2 REQUIRED)
+	TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${SDL2_INCLUDE_DIR})
+	TARGET_INCLUDE_DIRECTORIES(qcommon PUBLIC ${SDL2_INCLUDE_DIR})
+	TARGET_INCLUDE_DIRECTORIES(qcommon_ded PUBLIC ${SDL2_INCLUDE_DIR})
+ENDIF()
 
-	SET(Q3_UI_SRCS
-		code/win32/win_gamma.c
-		code/win32/win_glimp.c
-		code/win32/win_input.c
-		code/win32/win_minimize.c
-		code/win32/win_qgl.c
-		code/win32/win_snd.c
-		code/win32/win_wndproc.c)
-	IF(USE_VULKAN)
-		list(APPEND Q3_UI_SRCS code/win32/win_qvk.c)
-	ENDIF()
-ENDIF(UNIX)
-
-ADD_LIBRARY(q3ui OBJECT ${Q3_UI_SRCS})
-
-IF(NOT MSVC)
-	IF(USE_SDL)
-		find_package(SDL2 REQUIRED)
-		TARGET_LINK_LIBRARIES(q3ui SDL2::Main)
-	ELSEIF(UNIX)
-		find_package (X11 REQUIRED)
-		TARGET_LINK_LIBRARIES(q3ui ${X11_LIBRARIES})
+IF(USE_CURL)
+	find_package(CURL)
+	IF(CURL_FOUND)
+		TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${CURL_INCLUDE_DIR})
+		TARGET_INCLUDE_DIRECTORIES(qcommon PUBLIC ${CURL_INCLUDE_DIR})
+		TARGET_INCLUDE_DIRECTORIES(qcommon_ded PUBLIC ${CURL_INCLUDE_DIR})
+	ELSE()
+		MESSAGE(WARNING "CURL not found, disabling CURL support")
+		SET(USE_CURL OFF CACHE BOOL "" FORCE)
+		list(REMOVE_ITEM CLIENT_SRCS code/client/cl_curl.c)
 	ENDIF()
 ENDIF()
 
 IF(USE_VULKAN)
-	TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_VULKAN_API)
-	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_VULKAN_API)
+	find_package(Vulkan)
+	IF(Vulkan_FOUND)
+		TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${Vulkan_INCLUDE_DIRS})
+		TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PUBLIC ${Vulkan_INCLUDE_DIRS})
+		TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} ${Vulkan_LIBRARIES})
+	ELSE()
+		MESSAGE(WARNING "Vulkan not found, disabling Vulkan support")
+		SET(USE_VULKAN OFF CACHE BOOL "" FORCE)
+	ENDIF()
 ENDIF()
-
-# client executable
 
 ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} qcommon botlib client q3ui)
-#TARGET_LINK_OPTIONS(${CNAME} PRIVATE -fno-pie) # v3.13+
-
-IF(USE_RENDERER_DLOPEN)
-	# Export symbols so dynamically loaded renderer libraries can resolve them
-	IF(UNIX)
-		TARGET_LINK_OPTIONS(${CNAME}${BINEXT} PRIVATE -rdynamic)
-	ENDIF()
+IF(UNIX)
+	TARGET_LINK_OPTIONS(${CNAME}${BINEXT} PRIVATE -rdynamic) # Export symbols for dynamically loaded libraries (Unix only)
 ENDIF()
 
-IF(NOT USE_RENDERER_DLOPEN)
-	IF(USE_VULKAN)
-		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${RENDERER_PREFIX}_vulkan)
-	ELSE()
-		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${RENDERER_PREFIX}_opengl)
-	ENDIF()
+IF(USE_SDL)
+	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${SDL2_LIBRARY})
 ENDIF()
 
-# dedicated server executable
+IF(USE_CURL)
+	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${CURL_LIBRARIES})
+ENDIF()
 
 ADD_EXECUTABLE(${DNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} qcommon_ded botlib)
-#TARGET_LINK_OPTIONS(${DNAME} PRIVATE -fno-pie) # v3.13+
 
+IF(USE_SDL)
+	TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} ${SDL2_LIBRARY})
+ENDIF()
+
+IF(USE_CURL)
+	TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} ${CURL_LIBRARIES})
+ENDIF()
+
+# Platform-specific libraries
 IF(WIN32)
+	# Windows-specific libraries
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} winmm comctl32 ws2_32)
 	TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} winmm comctl32 ws2_32)
 ELSE()
+	# Unix-specific libraries (math library and dynamic loading)
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} m ${CMAKE_DL_LIBS})
 	TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} m ${CMAKE_DL_LIBS})
+ENDIF()
+
+# q3ui - includes both platform UI sources (Q3_UI_SRCS) and game UI sources (Q3UI_SRCS)
+# Q3_UI_SRCS contains platform-specific UI code (SDL/X11/Windows), Q3UI_SRCS contains game UI code
+AUX_SOURCE_DIRECTORY(code/ui Q3UI_SRCS)
+IF(Q3UI_SRCS)
+	# Combine platform UI sources with game UI sources
+	ADD_LIBRARY(q3ui OBJECT ${Q3_UI_SRCS} ${Q3UI_SRCS})
+ELSE()
+	# If no game UI sources, use platform UI sources only
+	IF(Q3_UI_SRCS)
+		ADD_LIBRARY(q3ui OBJECT ${Q3_UI_SRCS})
+	ELSE()
+		# Create dummy source file if no UI sources found at all
+		FILE(WRITE ${CMAKE_BINARY_DIR}/q3ui_dummy.c "// Dummy file for q3ui when no sources are present\n")
+		ADD_LIBRARY(q3ui OBJECT ${CMAKE_BINARY_DIR}/q3ui_dummy.c)
+		MESSAGE(STATUS "No UI source files found, using dummy q3ui library")
+	ENDIF()
+ENDIF()
+
+# Add SDL include directories to q3ui if SDL is enabled
+IF(USE_SDL)
+	TARGET_INCLUDE_DIRECTORIES(q3ui PUBLIC ${SDL2_INCLUDE_DIR})
 ENDIF()

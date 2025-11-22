@@ -154,9 +154,10 @@ load the file with a request to cache.  Only one file will be kept cached at a t
 so any models that are going to be referenced by both subsystems should alternate
 between the CM_ load function and the ref load function.
 
-TODO: A qpath that starts with a leading slash will always refer to the base game, even if another
+NOTE: A qpath that starts with a leading slash will always refer to the base game, even if another
 game is currently active.  This allows character models, skins, and sounds to be downloaded
-to a common directory no matter which game is active.
+to a common directory no matter which game is active. This behavior is intentional and allows
+shared assets to be stored in the base game directory.
 
 How to prevent downloading zip files?
 Pass pk3 file names in systeminfo, and download before FS_Restart()?
@@ -4932,7 +4933,9 @@ static void FS_CheckIdPaks( void )
 		if((foundPak&1) != 1 )
 		{
 			Com_Printf("\n"
-			"WARNING: pak0.pk3 not found. Using available pak files.\n");
+				"WARNING: pak0.pk3 not found. Using available pak files.\n"
+				"  Note: You can use any .pk3 files in the %s directory.\n"
+				"  Place your game assets (maps, textures, etc.) in .pk3 files.\n", BASEGAME);
 		}
 
 		if((foundPak&0x1fe) != 0x1fe )
@@ -5438,6 +5441,7 @@ void FS_Restart( int checksumFeed ) {
 		// Removed fatal error - allow running without default.cfg
 		// Original: Com_Error( ERR_FATAL, "Couldn't load default.cfg" );
 		Com_Printf( "WARNING: default.cfg not found. Using engine defaults.\n" );
+		Com_Printf( "  Note: Create default.cfg in your %s directory to set default settings.\n", BASEGAME );
 	}
 
 	// new check before safeMode

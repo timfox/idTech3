@@ -958,6 +958,9 @@ void		Com_EndRedirect( void );
 void 		QDECL Com_Printf( const char *fmt, ... ) __attribute__ ((format (printf, 1, 2)));
 void 		QDECL Com_DPrintf( const char *fmt, ... ) __attribute__ ((format (printf, 1, 2)));
 void 		Com_Quit_f( void );
+void 		Com_Help_f( void );
+void 		Com_About_f( void );
+void 		Com_BuildInfo_f( void );
 void		Com_GameRestart( int checksumFeed, qboolean clientRestart );
 
 int			Com_EventLoop( void );

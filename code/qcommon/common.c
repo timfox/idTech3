@@ -328,7 +328,14 @@ void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t code, const char 
 	lastErrorTime = currentTime;
 
 	va_start( argptr, fmt );
+#ifdef NDEBUG
 	Q_vsnprintf( com_errorMessage, sizeof( com_errorMessage ), fmt, argptr );
+#else
+	// In debug builds, include file and line information for better debugging
+	char temp[sizeof(com_errorMessage)];
+	Q_vsnprintf( temp, sizeof( temp ), fmt, argptr );
+	Com_sprintf( com_errorMessage, sizeof( com_errorMessage ), "%s [%s:%d]", temp, __FILE__, __LINE__ );
+#endif
 	va_end( argptr );
 
 	if ( code != ERR_DISCONNECT && code != ERR_NEED_CD ) {
@@ -434,6 +441,124 @@ void Com_Quit_f( void ) {
 		FS_Shutdown( qtrue );
 	}
 	Sys_Quit();
+}
+
+
+/*
+=============
+Com_Help_f
+
+Show help for commands. Usage: help [command]
+If no command is specified, lists common commands.
+=============
+*/
+void Com_Help_f( void ) {
+	const char *cmdname;
+
+	if ( Cmd_Argc() > 1 ) {
+		// Show help for specific command
+		cmdname = Cmd_Argv( 1 );
+		Com_Printf( "\nHelp for: %s\n", cmdname );
+		Com_Printf( "Use 'cmdlist %s' to see similar commands.\n", cmdname );
+		Com_Printf( "Note: Some commands may be game-specific (game/cgame/ui modules).\n" );
+		Com_Printf( "To see CVar information, use the CVar name directly (e.g., 'version').\n" );
+	} else {
+		// List common commands
+		Com_Printf( "\n" );
+		Com_Printf( "========================================\n" );
+		Com_Printf( "Console Help\n" );
+		Com_Printf( "========================================\n" );
+		Com_Printf( "\nCommon commands:\n" );
+		Com_Printf( "  help        - Show this help or help for a specific command\n" );
+		Com_Printf( "  cmdlist     - List all available commands\n" );
+		Com_Printf( "  clear       - Clear console output\n" );
+		Com_Printf( "  quit/exit   - Exit the game\n" );
+		Com_Printf( "  about       - Show engine information\n" );
+		Com_Printf( "  buildinfo   - Show detailed build information\n" );
+		Com_Printf( "  version     - Show version (also available as CVar)\n" );
+		Com_Printf( "\nUsage:\n" );
+		Com_Printf( "  help <command>  - Get help for a specific command\n" );
+		Com_Printf( "  cmdlist        - List all commands\n" );
+		Com_Printf( "  cmdlist <filter> - List commands matching filter\n" );
+		Com_Printf( "\n========================================\n" );
+		Com_Printf( "\n" );
+	}
+}
+
+
+/*
+=============
+Com_About_f
+
+Display engine version and information.
+=============
+*/
+void Com_About_f( void ) {
+	Com_Printf( "\n" );
+	Com_Printf( "========================================\n" );
+	Com_Printf( "%s\n", Q3_VERSION );
+	Com_Printf( "========================================\n" );
+	Com_Printf( "Platform: %s\n", PLATFORM_STRING );
+	Com_Printf( "Build Date: %s\n", __DATE__ );
+#ifdef __TIME__
+	Com_Printf( "Build Time: %s\n", __TIME__ );
+#endif
+	Com_Printf( "\n" );
+	Com_Printf( "Based on Quake III Arena engine\n" );
+	Com_Printf( "Enhanced with modern features\n" );
+	Com_Printf( "\n" );
+	Com_Printf( "Use 'buildinfo' for detailed build information.\n" );
+	Com_Printf( "========================================\n" );
+	Com_Printf( "\n" );
+}
+
+
+/*
+=============
+Com_BuildInfo_f
+
+Display detailed build information including compiler and architecture.
+=============
+*/
+void Com_BuildInfo_f( void ) {
+	Com_Printf( "\n" );
+	Com_Printf( "========================================\n" );
+	Com_Printf( "Build Information\n" );
+	Com_Printf( "========================================\n" );
+	Com_Printf( "Version: %s\n", Q3_VERSION );
+	Com_Printf( "Platform: %s\n", PLATFORM_STRING );
+	Com_Printf( "Build Date: %s\n", __DATE__ );
+#ifdef __TIME__
+	Com_Printf( "Build Time: %s\n", __TIME__ );
+#endif
+#ifdef __GNUC__
+	Com_Printf( "Compiler: GCC %d.%d.%d\n", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__ );
+#elif defined(_MSC_VER)
+	Com_Printf( "Compiler: MSVC %d\n", _MSC_VER );
+#elif defined(__clang__)
+	Com_Printf( "Compiler: Clang %d.%d.%d\n", __clang_major__, __clang_minor__, __clang_patchlevel__ );
+#else
+	Com_Printf( "Compiler: Unknown\n" );
+#endif
+#ifdef NDEBUG
+	Com_Printf( "Build Type: Release\n" );
+#else
+	Com_Printf( "Build Type: Debug\n" );
+#endif
+	Com_Printf( "Architecture: %s\n", ARCH_STRING );
+#ifdef USE_SDL
+	Com_Printf( "SDL: Enabled\n" );
+#else
+	Com_Printf( "SDL: Disabled\n" );
+#endif
+#ifdef USE_VULKAN
+	Com_Printf( "Vulkan: Enabled\n" );
+#endif
+#ifdef USE_CURL
+	Com_Printf( "CURL: Enabled\n" );
+#endif
+	Com_Printf( "========================================\n" );
+	Com_Printf( "\n" );
 }
 
 
@@ -3946,6 +4071,9 @@ void Com_Init( char *commandLine ) {
 
 	Cmd_AddCommand( "quit", Com_Quit_f );
 	Cmd_AddCommand( "exit", Com_Quit_f ); // Alias for quit
+	Cmd_AddCommand( "help", Com_Help_f );
+	Cmd_AddCommand( "about", Com_About_f );
+	Cmd_AddCommand( "buildinfo", Com_BuildInfo_f );
 	Cmd_AddCommand( "changeVectors", MSG_ReportChangeVectors_f );
 	Cmd_AddCommand( "writeconfig", Com_WriteConfig_f );
 	Cmd_SetCommandCompletionFunc( "writeconfig", Cmd_CompleteWriteCfgName );
