@@ -113,11 +113,16 @@ IF(USE_SYSTEM_JPEG)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE -DUSE_SYSTEM_JPEG)
 	TARGET_LINK_LIBRARIES(client ${JPEG_LIBRARIES})
 ELSE()
-	AUX_SOURCE_DIRECTORY(code/libjpeg JPEG_SRCS)
+	AUX_SOURCE_DIRECTORY(libs/jpeg JPEG_SRCS)
 	#ADD_LIBRARY(jpeg ${JPEG_SRCS})
 	#TARGET_LINK_LIBRARIES(client jpeg)
 	ADD_LIBRARY(client OBJECT ${CLIENT_SRCS} ${JPEG_SRCS})
+	# Add JPEG include directory for internal includes
+	TARGET_INCLUDE_DIRECTORIES(client PRIVATE libs/jpeg)
 ENDIF()
+
+# Add OGG/Vorbis include directories for client (used by snd_codec_ogg.c)
+TARGET_INCLUDE_DIRECTORIES(client PRIVATE libs/ogg/include libs/vorbis/include)
 
 # renderers
 AUX_SOURCE_DIRECTORY(code/renderercommon RENDERER_COMMON_SRCS)
