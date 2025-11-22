@@ -195,6 +195,27 @@ typedef struct {
 
 void		NET_Init( void );
 void		NET_Shutdown( void );
+
+#ifdef USE_CJSON
+void		JSON_Init( void );
+#endif
+
+#ifdef USE_ZSTD
+void		ZSTD_Init( void );
+int			ZSTD_Compress( void *dst, size_t dstCapacity, const void *src, size_t srcSize, int compressionLevel );
+int			ZSTD_Decompress( void *dst, size_t dstCapacity, const void *src, size_t srcSize );
+size_t		ZSTD_GetCompressedSize( const void *src, size_t srcSize, int compressionLevel );
+size_t		ZSTD_GetDecompressedSize( const void *src, size_t srcSize );
+#endif
+
+#ifdef USE_ENET
+void		NET_ENet_Init( void );
+void		NET_ENet_Shutdown( void );
+qboolean	NET_ENet_Init_Lib( void );
+ENetHost *	NET_ENet_CreateHost( const ENetAddress *address, size_t peerCount, size_t channelLimit, enet_uint32 incomingBandwidth, enet_uint32 outgoingBandwidth );
+void		NET_ENet_DestroyHost( ENetHost *host );
+int			NET_ENet_Service( ENetHost *host, ENetEvent *event, enet_uint32 timeout );
+#endif
 void		NET_FlushPacketQueue( int time_diff );
 void		NET_QueuePacket( netsrc_t sock, int length, const void *data, const netadr_t *to, int offset );
 void		NET_SendPacket( netsrc_t sock, int length, const void *data, const netadr_t *to );

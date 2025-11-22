@@ -45,12 +45,25 @@ OPTION(USE_LOCAL_HEADERS "" ON)
 OPTION(USE_VULKAN "" ON)
 OPTION(USE_SYSTEM_JPEG "" OFF)
 OPTION(USE_RENDERER_DLOPEN "" ON)
+OPTION(USE_CJSON "" ON)
+OPTION(USE_ZSTD "" ON)
+OPTION(USE_ENET "" ON)
 
 SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules)
 
 AUX_SOURCE_DIRECTORY(code/qcommon QCOMMON_SRCS)
 # exclude platform-dependent QVM bytecode compilers
 list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*vm_[alx].*.c")
+# Add wrapper files conditionally
+IF(USE_CJSON)
+	list(APPEND QCOMMON_SRCS code/qcommon/json_cjson.c)
+ENDIF()
+IF(USE_ZSTD)
+	list(APPEND QCOMMON_SRCS code/qcommon/zstd_compress.c)
+ENDIF()
+IF(USE_ENET)
+	list(APPEND QCOMMON_SRCS code/qcommon/net_enet.c)
+ENDIF()
 # add platform-dependent QVM bytecode compilers
 # Force 64-bit builds by default
 IF(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
@@ -123,6 +136,69 @@ ENDIF()
 
 # Add OGG/Vorbis include directories for client (used by snd_codec_ogg.c)
 TARGET_INCLUDE_DIRECTORIES(client PRIVATE libs/ogg/include libs/vorbis/include)
+
+# cJSON library
+IF(USE_CJSON)
+	SET(CJSON_SRCS libs/cjson/cJSON.c)
+	list(APPEND QCOMMON_SRCS ${CJSON_SRCS})
+	TARGET_INCLUDE_DIRECTORIES(qcommon PRIVATE libs/cjson)
+	TARGET_INCLUDE_DIRECTORIES(qcommon_ded PRIVATE libs/cjson)
+ENDIF()
+
+# zstd library
+IF(USE_ZSTD)
+	SET(ZSTD_SRCS
+		libs/zstd/lib/common/debug.c
+		libs/zstd/lib/common/entropy_common.c
+		libs/zstd/lib/common/error_private.c
+		libs/zstd/lib/common/fse_decompress.c
+		libs/zstd/lib/common/pool.c
+		libs/zstd/lib/common/threading.c
+		libs/zstd/lib/common/xxhash.c
+		libs/zstd/lib/common/zstd_common.c
+		libs/zstd/lib/compress/fse_compress.c
+		libs/zstd/lib/compress/hist.c
+		libs/zstd/lib/compress/huf_compress.c
+		libs/zstd/lib/compress/zstd_compress.c
+		libs/zstd/lib/compress/zstd_compress_literals.c
+		libs/zstd/lib/compress/zstd_compress_sequences.c
+		libs/zstd/lib/compress/zstd_compress_superblock.c
+		libs/zstd/lib/compress/zstd_double_fast.c
+		libs/zstd/lib/compress/zstd_fast.c
+		libs/zstd/lib/compress/zstd_lazy.c
+		libs/zstd/lib/compress/zstd_ldm.c
+		libs/zstd/lib/compress/zstd_opt.c
+		libs/zstd/lib/compress/zstdmt_compress.c
+		libs/zstd/lib/decompress/huf_decompress.c
+		libs/zstd/lib/decompress/zstd_ddict.c
+		libs/zstd/lib/decompress/zstd_decompress.c
+		libs/zstd/lib/decompress/zstd_decompress_block.c
+	)
+	list(APPEND QCOMMON_SRCS ${ZSTD_SRCS})
+	TARGET_INCLUDE_DIRECTORIES(qcommon PRIVATE libs/zstd/lib libs/zstd/lib/common)
+	TARGET_INCLUDE_DIRECTORIES(qcommon_ded PRIVATE libs/zstd/lib libs/zstd/lib/common)
+ENDIF()
+
+# ENet library
+IF(USE_ENET)
+	SET(ENET_SRCS
+		libs/enet/callbacks.c
+		libs/enet/compress.c
+		libs/enet/host.c
+		libs/enet/list.c
+		libs/enet/packet.c
+		libs/enet/peer.c
+		libs/enet/protocol.c
+	)
+	IF(WIN32)
+		list(APPEND ENET_SRCS libs/enet/win32.c)
+	ELSE()
+		list(APPEND ENET_SRCS libs/enet/unix.c)
+	ENDIF()
+	list(APPEND QCOMMON_SRCS ${ENET_SRCS})
+	TARGET_INCLUDE_DIRECTORIES(qcommon PRIVATE libs/enet/include)
+	TARGET_INCLUDE_DIRECTORIES(qcommon_ded PRIVATE libs/enet/include)
+ENDIF()
 
 # renderers
 AUX_SOURCE_DIRECTORY(code/renderercommon RENDERER_COMMON_SRCS)

@@ -4163,6 +4163,18 @@ void Com_Init( char *commandLine ) {
 
 	Com_Printf( "--- Common Initialization Complete ---\n" );
 
+#ifdef USE_CJSON
+	JSON_Init();
+#endif
+
+#ifdef USE_ZSTD
+	ZSTD_Init();
+#endif
+
+#ifdef USE_ENET
+	NET_ENet_Init();
+#endif
+
 	NET_Init();
 
 	Com_Printf( "Working directory: %s\n", Sys_Pwd() );
