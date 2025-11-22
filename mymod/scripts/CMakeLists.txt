@@ -64,9 +64,10 @@ add_library(game_${ARCH_SUFFIX} SHARED
     # etc.
 )
 
-# Rename output to match engine expectations: game.x86_64.so format
+# Rename output to match engine expectations: gamex86_64.so format (no dot!)
+# Engine expects: {name}{ARCH_STRING}{DLL_EXT}
 set_target_properties(game_${ARCH_SUFFIX} PROPERTIES
-    OUTPUT_NAME "game.${ARCH_SUFFIX}"
+    OUTPUT_NAME "game${ARCH_SUFFIX}"
     PREFIX ""
 )
 
@@ -81,7 +82,7 @@ add_library(cgame_${ARCH_SUFFIX} SHARED
 )
 
 set_target_properties(cgame_${ARCH_SUFFIX} PROPERTIES
-    OUTPUT_NAME "cgame.${ARCH_SUFFIX}"
+    OUTPUT_NAME "cgame${ARCH_SUFFIX}"
     PREFIX ""
 )
 
@@ -95,7 +96,7 @@ add_library(ui_${ARCH_SUFFIX} SHARED
 )
 
 set_target_properties(ui_${ARCH_SUFFIX} PROPERTIES
-    OUTPUT_NAME "ui.${ARCH_SUFFIX}"
+    OUTPUT_NAME "ui${ARCH_SUFFIX}"
     PREFIX ""
 )
 

@@ -27,7 +27,7 @@ dllEntry
 Called when the module is loaded. Sets up the system call interface.
 =================
 */
-void dllEntry( dllSyscall_t syscallptr ) {
+__attribute__((visibility("default"))) void dllEntry( dllSyscall_t syscallptr ) {
 	syscallPtr = syscallptr;
 }
 
@@ -38,7 +38,7 @@ vmMain
 Main entry point for cgame module. Called by the engine for various commands.
 =================
 */
-intptr_t vmMain( int command, int arg0, int arg1, int arg2 ) {
+__attribute__((visibility("default"))) intptr_t vmMain( int command, int arg0, int arg1, int arg2 ) {
 	(void)arg0; (void)arg1; (void)arg2; // Suppress unused parameter warnings
 	switch( command ) {
 		case CG_INIT:
