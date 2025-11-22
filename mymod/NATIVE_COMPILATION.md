@@ -113,7 +113,7 @@ set vm_ui "0"
 
 ```
 mymod/
-├── scripts/
+├── gamesrc/
 │   ├── CMakeLists.txt      # CMake build file
 │   ├── Makefile            # Make build file
 │   ├── game/

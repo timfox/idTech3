@@ -51,25 +51,25 @@ OPTION(USE_ENET "" ON)
 
 SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules)
 
-AUX_SOURCE_DIRECTORY(code/qcommon QCOMMON_SRCS)
+AUX_SOURCE_DIRECTORY(src/qcommon QCOMMON_SRCS)
 # exclude platform-dependent QVM bytecode compilers
 list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*vm_[alx].*.c")
 # Add wrapper files conditionally
 IF(USE_CJSON)
-	list(APPEND QCOMMON_SRCS code/qcommon/json_cjson.c)
+	list(APPEND QCOMMON_SRCS src/qcommon/json_cjson.c)
 ENDIF()
 IF(USE_ZSTD)
-	list(APPEND QCOMMON_SRCS code/qcommon/zstd_compress.c)
+	list(APPEND QCOMMON_SRCS src/qcommon/zstd_compress.c)
 ENDIF()
 IF(USE_ENET)
-	list(APPEND QCOMMON_SRCS code/qcommon/net_enet.c)
+	list(APPEND QCOMMON_SRCS src/qcommon/net_enet.c)
 ENDIF()
 # add platform-dependent QVM bytecode compilers
 # Force 64-bit builds by default
 IF(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
 	SET(BINEXT .aarch64)
 	SET(RENDEXT _aarch64)
-	list(APPEND QCOMMON_SRCS code/qcommon/vm_aarch64.c)
+	list(APPEND QCOMMON_SRCS src/qcommon/vm_aarch64.c)
 ELSEIF(CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86_64|x86|i*86")
 	# Default to 64-bit for x86 architectures
 	IF(WIN32)
@@ -78,23 +78,23 @@ ELSEIF(CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86_64|x86|i*86")
 		SET(BINEXT .x86_64)
 	ENDIF()
 	SET(RENDEXT _x86_64)
-	list(APPEND QCOMMON_SRCS code/qcommon/vm_x86.c)
+	list(APPEND QCOMMON_SRCS src/qcommon/vm_x86.c)
 ELSEIF(CMAKE_SYSTEM_PROCESSOR MATCHES "arm*")
 	SET(BINEXT .arm)
 	SET(RENDEXT _arm)
-	list(APPEND QCOMMON_SRCS code/qcommon/vm_armv7l.c)
+	list(APPEND QCOMMON_SRCS src/qcommon/vm_armv7l.c)
 ELSE()
 	TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE -DNO_VM_COMPILED)
 	TARGET_COMPILE_DEFINITIONS(qcommon_ded PRIVATE -DNO_VM_COMPILED)
 ENDIF()
 
 # botlib
-AUX_SOURCE_DIRECTORY(code/botlib BOTLIB_SRCS)
+AUX_SOURCE_DIRECTORY(src/botlib BOTLIB_SRCS)
 ADD_LIBRARY(botlib OBJECT ${BOTLIB_SRCS})
 TARGET_COMPILE_DEFINITIONS(botlib PRIVATE BOTLIB)
 
-AUX_SOURCE_DIRECTORY(code/server SERVER_SRCS)
-list(REMOVE_ITEM SERVER_SRCS code/server/sv_rankings.c)
+AUX_SOURCE_DIRECTORY(src/server SERVER_SRCS)
+list(REMOVE_ITEM SERVER_SRCS src/server/sv_rankings.c)
 
 # universal binary
 ADD_LIBRARY(qcommon OBJECT ${QCOMMON_SRCS} ${SERVER_SRCS})
@@ -104,15 +104,15 @@ ADD_LIBRARY(qcommon_ded OBJECT ${QCOMMON_SRCS} ${SERVER_SRCS})
 TARGET_COMPILE_DEFINITIONS(qcommon_ded PUBLIC DEDICATED)
 
 # client + cURL
-AUX_SOURCE_DIRECTORY(code/client CLIENT_SRCS)
+AUX_SOURCE_DIRECTORY(src/client CLIENT_SRCS)
 IF(NOT USE_CURL)
-	list(REMOVE_ITEM CLIENT_SRCS code/client/cl_curl.c)
+	list(REMOVE_ITEM CLIENT_SRCS src/client/cl_curl.c)
 ENDIF()
 
 # Add assembly files for x86_64
 IF(CMAKE_SYSTEM_PROCESSOR MATCHES AMD64|x86_64)
-	list(APPEND CLIENT_SRCS code/asm/snd_mix_x86_64.s)
-	set_source_files_properties(code/asm/snd_mix_x86_64.s PROPERTIES
+	list(APPEND CLIENT_SRCS src/asm/snd_mix_x86_64.s)
+	set_source_files_properties(src/asm/snd_mix_x86_64.s PROPERTIES
 		COMPILE_FLAGS "-x assembler-with-cpp -DELF"
 		LANGUAGE ASM)
 ENDIF()
@@ -201,15 +201,15 @@ IF(USE_ENET)
 ENDIF()
 
 # renderers
-AUX_SOURCE_DIRECTORY(code/renderercommon RENDERER_COMMON_SRCS)
-AUX_SOURCE_DIRECTORY(code/renderer RENDERER_GL_SRCS)
-AUX_SOURCE_DIRECTORY(code/renderervk RENDERER_VK_SRCS)
+AUX_SOURCE_DIRECTORY(src/renderercommon RENDERER_COMMON_SRCS)
+AUX_SOURCE_DIRECTORY(src/renderer RENDERER_GL_SRCS)
+AUX_SOURCE_DIRECTORY(src/renderervk RENDERER_VK_SRCS)
 
 IF(USE_RENDERER_DLOPEN)
 	SET(AUX_SRCS
-		code/qcommon/q_shared.c
-		code/qcommon/puff.c
-		code/qcommon/q_math.c
+		src/qcommon/q_shared.c
+		src/qcommon/puff.c
+		src/qcommon/q_math.c
 	)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_RENDERER_DLOPEN RENDERER_PREFIX="${RENDERER_PREFIX}" RENDERER_DEFAULT=${RENDERER_DEFAULT})
 
@@ -231,36 +231,36 @@ ENDIF()
 # common function, window system
 IF(UNIX)
 	SET (Q3_SRCS
-		code/unix/unix_main.c
-		code/unix/unix_shared.c
-		code/unix/linux_signals.c)
+		src/unix/unix_main.c
+		src/unix/unix_shared.c
+		src/unix/linux_signals.c)
 
 	IF(USE_SDL)
-		AUX_SOURCE_DIRECTORY(code/sdl Q3_UI_SRCS)
+		AUX_SOURCE_DIRECTORY(src/sdl Q3_UI_SRCS)
 	ELSE()
 		SET(Q3_UI_SRCS
-			code/unix/linux_glimp.c
-			code/unix/linux_qgl.c
-			code/unix/linux_snd.c
-			code/unix/x11_dga.c
-			code/unix/x11_randr.c
-			code/unix/x11_vidmode.c)
+			src/unix/linux_glimp.c
+			src/unix/linux_qgl.c
+			src/unix/linux_snd.c
+			src/unix/x11_dga.c
+			src/unix/x11_randr.c
+			src/unix/x11_vidmode.c)
 		IF(USE_VULKAN)
-			list(APPEND Q3_UI_SRCS code/unix/linux_qvk.c)
+			list(APPEND Q3_UI_SRCS src/unix/linux_qvk.c)
 		ENDIF()
 	ENDIF()
 
 	IF(APPLE)
 		SET(EXE_TYPE MACOSX_BUNDLE)
-		list(APPEND Q3_SRCS code/unix/quake3_flat.icns)
-		set_source_files_properties(code/unix/quake3_flat.icns PROPERTIES
+		list(APPEND Q3_SRCS src/unix/quake3_flat.icns)
+		set_source_files_properties(src/unix/quake3_flat.icns PROPERTIES
 			MACOSX_PACKAGE_LOCATION Resources)
 		SET(MACOSX_BUNDLE_ICON_FILE quake3_flat.icns)
 	ENDIF()
 ELSEIF(WIN32)
 	SET(EXE_TYPE WIN32)
-	AUX_SOURCE_DIRECTORY(code/win32 Q3_SRCS)
-	AUX_SOURCE_DIRECTORY(code/win32 Q3_UI_SRCS)
+	AUX_SOURCE_DIRECTORY(src/win32 Q3_SRCS)
+	AUX_SOURCE_DIRECTORY(src/win32 Q3_UI_SRCS)
 ENDIF()
 
 IF(USE_SDL)
@@ -279,13 +279,13 @@ IF(USE_CURL)
 	ELSE()
 		MESSAGE(WARNING "CURL not found, disabling CURL support")
 		SET(USE_CURL OFF CACHE BOOL "" FORCE)
-		list(REMOVE_ITEM CLIENT_SRCS code/client/cl_curl.c)
+		list(REMOVE_ITEM CLIENT_SRCS src/client/cl_curl.c)
 	ENDIF()
 ENDIF()
 
 IF(USE_VULKAN)
 	# Check if local Vulkan headers exist (renderer has bundled headers)
-	IF(EXISTS "${CMAKE_SOURCE_DIR}/code/renderercommon/vulkan/vulkan.h")
+	IF(EXISTS "${CMAKE_SOURCE_DIR}/src/renderercommon/vulkan/vulkan.h")
 		# Renderer uses local Vulkan headers, so we just need the library
 		# Try multiple search paths and library name variations
 		FIND_LIBRARY(VULKAN_LIBRARY 
@@ -377,7 +377,7 @@ ENDIF()
 
 # q3ui - includes both platform UI sources (Q3_UI_SRCS) and game UI sources (Q3UI_SRCS)
 # Q3_UI_SRCS contains platform-specific UI code (SDL/X11/Windows), Q3UI_SRCS contains game UI code
-AUX_SOURCE_DIRECTORY(code/ui Q3UI_SRCS)
+AUX_SOURCE_DIRECTORY(src/ui Q3UI_SRCS)
 IF(Q3UI_SRCS)
 	# Combine platform UI sources with game UI sources
 	ADD_LIBRARY(q3ui OBJECT ${Q3_UI_SRCS} ${Q3UI_SRCS})

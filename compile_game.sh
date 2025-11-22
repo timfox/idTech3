@@ -16,7 +16,7 @@ echo "Build directory: $BUILD_DIR"
 echo "Mod directory: $MOD_DIR"
 
 # Navigate to the game mod build scripts directory
-cd "$PROJECT_ROOT/mymod/scripts/build"
+cd "$PROJECT_ROOT/mymod/gamesrc/build"
 
 # Run the build process
 make
@@ -29,7 +29,7 @@ echo "Copying libraries to mod directory..."
 mkdir -p "$MOD_DIR"
 
 # Copy from vm/ directory (where Makefile outputs them)
-# We're currently in mymod/scripts/build, so vm is at ../../vm
+# We're currently in mymod/gamesrc/build, so vm is at ../../vm
 VM_DIR="../../vm"
 if [ -d "$VM_DIR" ]; then
     echo "Found libraries in $VM_DIR"
@@ -55,4 +55,4 @@ fi
 echo ""
 echo "Game mod build completed!"
 echo "  Libraries: build/mymod/*.so"
-echo "  Source: mymod/scripts/"
+echo "  Source: mymod/gamesrc/"

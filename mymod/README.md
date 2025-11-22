@@ -64,10 +64,10 @@ This mod supports **native C compilation** (recommended) or traditional QVM comp
 
 Compile your game modules as native shared libraries to use modern C features:
 
-1. Place your source code in the `scripts/` directory:
-   - `scripts/game/` - Server-side game logic
-   - `scripts/cgame/` - Client-side game logic
-   - `scripts/ui/` - User interface code
+1. Place your source code in the `gamesrc/` directory:
+   - `gamesrc/game/` - Server-side game logic
+   - `gamesrc/cgame/` - Client-side game logic
+   - `gamesrc/ui/` - User interface code
 
 2. Build using CMake or Makefile:
    ```bash
@@ -102,7 +102,7 @@ See `NATIVE_COMPILATION.md` for detailed instructions.
 
 If you prefer QVM compilation:
 
-1. Place your source code in the `scripts/` directory
+1. Place your source code in the `gamesrc/` directory
 2. Compile using a Quake III compiler (q3asm or similar tools)
 3. Place compiled `.qvm` files in the `vm/` directory:
    - `vm/game.qvm`
@@ -150,7 +150,7 @@ mymod/
 │   ├── game.qvm
 │   ├── cgame.qvm
 │   └── ui.qvm
-├── scripts/                # Source code (if compiling QVM)
+├── gamesrc/                # Source code (game modules)
 │   ├── game/
 │   ├── cgame/
 │   └── ui/

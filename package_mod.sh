@@ -24,18 +24,18 @@ cd "$MOD_SOURCE_DIR"
 
 # Create pak0.pk3, excluding build artifacts and source files
 # Include: all game assets, configs, shaders
-# Exclude: build/, vm/, scripts/build/, source files, docs
+# Exclude: build/, vm/, gamesrc/build/, source files, docs
 zip -r "$PAK_FILE" . \
     -x "build/*" \
     -x "vm/*" \
-    -x "scripts/build/*" \
-    -x "scripts/*.c" \
-    -x "scripts/*.h" \
-    -x "scripts/CMakeLists.txt" \
-    -x "scripts/Makefile" \
-    -x "scripts/cgame/*" \
-    -x "scripts/game/*" \
-    -x "scripts/ui/*" \
+    -x "gamesrc/build/*" \
+    -x "gamesrc/*.c" \
+    -x "gamesrc/*.h" \
+    -x "gamesrc/CMakeLists.txt" \
+    -x "gamesrc/Makefile" \
+    -x "gamesrc/cgame/*" \
+    -x "gamesrc/game/*" \
+    -x "gamesrc/ui/*" \
     -x "*.md" \
     -x "*.txt" \
     -x "CHANGES" \

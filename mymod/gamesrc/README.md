@@ -1,11 +1,11 @@
-# Scripts Directory
+# Gamesrc Directory
 
 This directory contains the source code for game modules. You can compile them as **native shared libraries** (recommended) or traditional **QVM bytecode**.
 
 ## Structure
 
 ```
-scripts/
+gamesrc/
 ├── CMakeLists.txt    # CMake build configuration
 ├── Makefile          # Make build configuration
 ├── game/             # Server-side game logic
@@ -30,7 +30,7 @@ Compile as native shared libraries to use modern C features:
 
 1. **Using CMake**:
    ```bash
-   cd scripts
+   cd gamesrc
    mkdir build && cd build
    cmake ..
    make
@@ -38,7 +38,7 @@ Compile as native shared libraries to use modern C features:
 
 2. **Using Makefile**:
    ```bash
-   cd scripts
+   cd gamesrc
    make all
    ```
 

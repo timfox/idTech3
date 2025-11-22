@@ -33,8 +33,8 @@ OUTDIR := ../vm
 
 # Engine include paths (adjust to match your setup)
 ENGINE_ROOT := ../../..
-INCLUDES := -I$(ENGINE_ROOT)/code/game \
-            -I$(ENGINE_ROOT)/code/qcommon
+INCLUDES := -I$(ENGINE_ROOT)/src/game \
+            -I$(ENGINE_ROOT)/src/qcommon
 
 # Source files (add your source files here)
 GAME_SRCS := $(GAMEDIR)/g_main.c

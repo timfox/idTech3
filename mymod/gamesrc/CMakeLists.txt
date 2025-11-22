@@ -16,13 +16,13 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../vm)
 
 # Include directories - you'll need to point to engine headers
 # Adjust these paths to match your engine source location
-# CMAKE_SOURCE_DIR is mymod/scripts/, so go up 2 levels to get to idtech3 root
+# CMAKE_SOURCE_DIR is mymod/gamesrc/, so go up 2 levels to get to idtech3 root
 get_filename_component(ENGINE_ROOT "${CMAKE_SOURCE_DIR}/../.." ABSOLUTE)
 set(ENGINE_INCLUDE_DIRS
-    ${ENGINE_ROOT}/code/qcommon
-    ${ENGINE_ROOT}/code/game
-    ${ENGINE_ROOT}/code/cgame
-    ${ENGINE_ROOT}/code/ui
+    ${ENGINE_ROOT}/src/qcommon
+    ${ENGINE_ROOT}/src/game
+    ${ENGINE_ROOT}/src/cgame
+    ${ENGINE_ROOT}/src/ui
 )
 
 message(STATUS "ENGINE_ROOT: ${ENGINE_ROOT}")
