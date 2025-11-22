@@ -497,4 +497,14 @@ void SV_Netchan_FreeQueue( client_t *client );
 void SV_LoadFilters( const char *filename );
 const char *SV_RunFilters( const char *userinfo, const netadr_t *addr );
 void SV_AddFilter_f( void );
+
+//
+// sv_ccmds.c
+//
+int SV_Strlen( const char *str );
+
+//
+// sv_bot.c
+//
+void BotDrawDebugPolygons(void (*drawPoly)(int color, int numPoints, float *points), int value);
 void SV_AddFilterCmd_f( void );

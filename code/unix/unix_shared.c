@@ -35,6 +35,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
+#include "linux_local.h"
 
 //=============================================================================
 
@@ -70,7 +71,6 @@ int Sys_Milliseconds( void )
 	
 	return curtime;
 }
-
 
 char *strlwr( char *s ) {
   if ( s==NULL ) { // bk001204 - paranoia

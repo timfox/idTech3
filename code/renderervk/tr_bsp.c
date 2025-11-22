@@ -2811,9 +2811,9 @@ void RE_LoadWorldMap( const char *name ) {
 				R_LoadEnvironmentJson( s_worldData.baseName );
 
 				if ( !tr.numCubemaps ) {
-					for ( int i = 0; i < ARRAY_LEN(cubemapEntities); i++ )
+					for ( int j = 0; j < ARRAY_LEN(cubemapEntities); j++ )
 					{
-						R_LoadCubemapEntities( i );
+						R_LoadCubemapEntities( j );
 						if ( tr.numCubemaps )
 							break;
 					}

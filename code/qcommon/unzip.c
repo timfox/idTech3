@@ -1248,7 +1248,7 @@ extern  int unzStringFileNameCompare (const char* fileName1,const char* fileName
   Locate the Central directory of a zipfile (at the end, just before
     the global comment)
 */
-extern uLong unzlocal_SearchCentralDir(FILE *fin)
+uLong unzlocal_SearchCentralDir(FILE *fin)
 {
 	unsigned char buf[BUFREADCOMMENT+4];
 	uLong uSizeFile;

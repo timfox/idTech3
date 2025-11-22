@@ -241,6 +241,23 @@ const char *VM_CheckInstructions( instruction_t *buf, int instructionCount,
 
 void VM_ReplaceInstructions( vm_t *vm, instruction_t *buf );
 
+// vm_interpreted.c
+char *VM_Indent( vm_t *vm );
+void VM_StackTrace( vm_t *vm, int programCounter, int programStack );
+
+// vm_x86.c - emit functions
+void emit_cmp_rx_mem( uint32_t reg, int32_t offset );
+void emit_load_rx_offset( uint32_t reg, int32_t offset );
+void emit_store_rx_offset( uint32_t reg, int32_t offset );
+void emit_jump_index( uint32_t base, uint32_t index );
+void emit_jump_index_offset( int32_t offset, uint32_t index );
+void emit_call_index( uint32_t base, uint32_t index );
+void emit_call_index_offset( int32_t offset, uint32_t index );
+void emit_call_indir( int32_t offset );
+void emit_call_rx( uint32_t reg );
+void emit_pushad( void );
+void emit_popad( void );
+
 #define JUMP	(1<<0)
 #define FPU		(1<<1)
 

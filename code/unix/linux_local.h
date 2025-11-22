@@ -22,6 +22,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef __LINUX_LOCAL_H__
 #define __LINUX_LOCAL_H__
 
+#include "../qcommon/q_shared.h"
+
 // Input subsystem
 
 void IN_Init (void);
@@ -48,5 +50,18 @@ char *strlwr (char *s);
 
 // signals.c
 void InitSig(void);
+
+// unix_main.c - TTY console functions
+void tty_Hide( void );
+void tty_Show( void );
+void Sys_ConsoleInputShutdown( void );
+void CON_SigCont( int signum );
+void CON_SigTStp( int signum );
+void NORETURN Sys_Exit( int code );
+void floating_point_exception_handler( int whatever );
+void Sys_ANSIColorify( const char *msg, char *buffer, int bufferSize );
+void Sys_ConfigureFPU( void );
+void Sys_PrintBinVersion( const char* name );
+const char *Sys_BinName( const char *arg0 );
 
 #endif // __LINUX_LOCAL_H__

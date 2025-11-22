@@ -1512,6 +1512,7 @@ void R_AddLitSurf( surfaceType_t *surface, shader_t *shader, int fogIndex );
 #define	CULL_OUT	2		// completely outside the clipping planes
 
 void R_LocalPointToWorld( const vec3_t local, vec3_t world );
+void R_WorldToLocal( const vec3_t world, vec3_t local );
 int R_CullLocalBox( const vec3_t bounds[2] );
 int R_CullPointAndRadius( const vec3_t origin, float radius );
 int R_CullLocalPointAndRadius( const vec3_t origin, float radius );
@@ -1519,6 +1520,11 @@ int R_CullDlight( const dlight_t *dl );
 
 void R_SetupProjection( viewParms_t *dest, float zProj, qboolean computeFrustum );
 void R_RotateForEntity( const trRefEntity_t *ent, const viewParms_t *viewParms, orientationr_t *or );
+
+// Matrix functions
+typedef vec_t mat4_t[16];
+void Matrix16Identity( mat4_t out );
+void Matrix16Copy( const mat4_t in, mat4_t out );
 
 /*
 ** GL wrapper/helper functions

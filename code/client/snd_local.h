@@ -213,6 +213,8 @@ void S_Spatialize(channel_t *ch);
 int  S_AdpcmMemoryNeeded( const wavinfo_t *info );
 void S_AdpcmEncodeSound( sfx_t *sfx, short *samples );
 void S_AdpcmGetSamples(sndBuffer *chunk, short *to);
+void S_AdpcmEncode( short indata[], char outdata[], int len, struct adpcm_state *state );
+void S_AdpcmDecode( const char indata[], short *outdata, int len, struct adpcm_state *state );
 
 // wavelet function
 
@@ -227,6 +229,15 @@ void encodeWavelet(sfx_t *sfx, short *packets);
 void decodeWavelet( sndBuffer *stream, short *packets);
 
 void encodeMuLaw( sfx_t *sfx, short *packets);
+
+// snd_wavelet.c - internal functions
+void daub4(float b[], unsigned long n, int isign);
+void wt1(float a[], unsigned long n, int isign);
+byte MuLawEncode(short s);
+short MuLawDecode(byte uLaw);
+void decodeMuLaw(sndBuffer *chunk, short *to);
+// NXStream is used as a byte array internally
+void NXPutc(byte *stream, char out);
 extern short mulawToShort[256];
 
 extern short *sfxScratchBuffer;
@@ -234,3 +245,13 @@ extern sfx_t *sfxScratchPointer;
 extern int	   sfxScratchIndex;
 
 qboolean S_Base_Init( soundInterface_t *si );
+
+// snd_dma.c - base sound functions
+void S_Base_StopLoopingSound(int entityNum);
+void S_Base_ClearLoopingSounds( qboolean killall );
+void S_Base_AddLoopingSound( int entityNum, const vec3_t origin, const vec3_t velocity, sfxHandle_t sfxHandle );
+void S_Base_AddRealLoopingSound( int entityNum, const vec3_t origin, const vec3_t velocity, sfxHandle_t sfxHandle );
+void S_AddLoopSounds( void );
+portable_samplepair_t *S_GetRawSamplePointer( void );
+void S_Base_UpdateEntityPosition( int entityNum, const vec3_t origin );
+void S_Base_Respatialize( int entityNum, const vec3_t head, vec3_t axis[3], int inwater );

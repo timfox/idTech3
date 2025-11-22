@@ -276,9 +276,9 @@ static const char *vk_result_string( VkResult code ) {
 #undef CASE_STR
 
 #define VK_CHECK( function_call ) { \
-	VkResult res = function_call; \
-	if ( res < 0 ) { \
-		ri.Error( ERR_FATAL, "Vulkan: %s returned %s", #function_call, vk_result_string( res ) ); \
+	VkResult _vk_check_res = function_call; \
+	if ( _vk_check_res < 0 ) { \
+		ri.Error( ERR_FATAL, "Vulkan: %s returned %s", #function_call, vk_result_string( _vk_check_res ) ); \
 	} \
 }
 
@@ -3801,14 +3801,14 @@ static void vk_create_attachments( void )
 
 static void vk_create_framebuffers( void )
 {
-	VkImageView attachments[3];
+	VkImageView fb_attachments[3];
 	VkFramebufferCreateInfo desc;
 	uint32_t n;
 
 	desc.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
 	desc.pNext = NULL;
 	desc.flags = 0;
-	desc.pAttachments = attachments;
+	desc.pAttachments = fb_attachments;
 	desc.layers = 1;
 
 	for ( n = 0; n < vk.swapchain_image_count; n++ )
@@ -3819,8 +3819,8 @@ static void vk_create_framebuffers( void )
 		{
 			desc.width = gls.windowWidth;
 			desc.height = gls.windowHeight;
-			attachments[0] = vk.swapchain_image_views[n];
-			attachments[1] = vk.depth_image_view;
+			fb_attachments[0] = vk.swapchain_image_views[n];
+			fb_attachments[1] = vk.depth_image_view;
 			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.main[n] ) );
 
 			SET_OBJECT_NAME( vk.framebuffers.main[n], va( "framebuffer - main %i", n ), VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
@@ -3830,15 +3830,15 @@ static void vk_create_framebuffers( void )
 			// same framebuffer configuration for main and post-bloom render passes
 			if ( n == 0 )
 			{
-				desc.width = glConfig.vidWidth;
-				desc.height = glConfig.vidHeight;
-				attachments[0] = vk.color_image_view;
-				attachments[1] = vk.depth_image_view;
-				if ( vk.msaaActive )
-				{
-					desc.attachmentCount = 3;
-					attachments[2] = vk.msaa_image_view;
-				}
+		desc.width = glConfig.vidWidth;
+		desc.height = glConfig.vidHeight;
+		fb_attachments[0] = vk.color_image_view;
+		fb_attachments[1] = vk.depth_image_view;
+		if ( vk.msaaActive )
+		{
+			desc.attachmentCount = 3;
+			fb_attachments[2] = vk.msaa_image_view;
+		}
 				VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.main[n] ) );
 				SET_OBJECT_NAME( vk.framebuffers.main[n], "framebuffer - main", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
 			}
@@ -3852,7 +3852,7 @@ static void vk_create_framebuffers( void )
 			desc.attachmentCount = 1;
 			desc.width = gls.windowWidth;
 			desc.height = gls.windowHeight;
-			attachments[0] = vk.swapchain_image_views[n];
+			fb_attachments[0] = vk.swapchain_image_views[n];
 			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.gamma[n] ) );
 
 			SET_OBJECT_NAME( vk.framebuffers.gamma[n], "framebuffer - gamma-correction", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
@@ -3866,12 +3866,12 @@ static void vk_create_framebuffers( void )
 		desc.attachmentCount = 2;
 		desc.width = vk.screenMapWidth;
 		desc.height = vk.screenMapHeight;
-		attachments[0] = vk.screenMap.color_image_view;
-		attachments[1] = vk.screenMap.depth_image_view;
+		fb_attachments[0] = vk.screenMap.color_image_view;
+		fb_attachments[1] = vk.screenMap.depth_image_view;
 		if ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT )
 		{
 			desc.attachmentCount = 3;
-			attachments[2] = vk.screenMap.color_image_view_msaa;
+			fb_attachments[2] = vk.screenMap.color_image_view_msaa;
 		}
 		VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.screenmap ) );
 		SET_OBJECT_NAME( vk.framebuffers.screenmap, "framebuffer - screenmap", VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
@@ -3885,17 +3885,17 @@ static void vk_create_framebuffers( void )
             desc.width = REF_CUBEMAP_SIZE;
             desc.height = REF_CUBEMAP_SIZE;
         
-            attachments[1] = vk.cubeMap.depth_image_view;
+            fb_attachments[1] = vk.cubeMap.depth_image_view;
 
             if ( vk.msaaActive )
                 desc.attachmentCount = 3;
 
             for ( int j = 0; j < 6; j++  ) 
             {
-                attachments[0] = vk.cubeMap.color_image_view[j+1];
+                fb_attachments[0] = vk.cubeMap.color_image_view[j+1];
 
                 if ( vk.msaaActive ) {
-                    attachments[2] = vk.cubeMap.color_image_view_msaa[0];
+                    fb_attachments[2] = vk.cubeMap.color_image_view_msaa[0];
                 }
 
                 VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.cubemap[j] ) );
@@ -3906,10 +3906,10 @@ static void vk_create_framebuffers( void )
 
 		if ( vk.capture.image != VK_NULL_HANDLE )
 		{
-			attachments[0] = vk.capture.image_view;
+			fb_attachments[0] = vk.capture.image_view;
 
 			desc.renderPass = vk.render_pass.capture;
-			desc.pAttachments = attachments;
+			desc.pAttachments = fb_attachments;
 			desc.attachmentCount = 1;
 			desc.width = gls.captureWidth;
 			desc.height = gls.captureHeight;
@@ -3929,7 +3929,7 @@ static void vk_create_framebuffers( void )
 			desc.height = height;
 
 			desc.attachmentCount = 1;
-			attachments[0] = vk.bloom_image_view[0];
+			fb_attachments[0] = vk.bloom_image_view[0];
 
 			VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.bloom_extract ) );
 
@@ -3946,10 +3946,10 @@ static void vk_create_framebuffers( void )
 
 				desc.attachmentCount = 1;
 
-				attachments[0] = vk.bloom_image_view[n+0+1];
+				fb_attachments[0] = vk.bloom_image_view[n+0+1];
 				VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.blur[n+0] ) );
 
-				attachments[0] = vk.bloom_image_view[n+1+1];
+				fb_attachments[0] = vk.bloom_image_view[n+1+1];
 				VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.blur[n+1] ) );
 
 				SET_OBJECT_NAME( vk.framebuffers.blur[n+0], va( "framebuffer - blur %i", n+0 ), VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
@@ -3963,7 +3963,7 @@ static void vk_create_framebuffers( void )
             desc.renderPass = vk.render_pass.brdflut;
             desc.width = desc.height = 512;  
             desc.attachmentCount = 1;
-            attachments[0] = vk.brdflut_image_view;
+            fb_attachments[0] = vk.brdflut_image_view;
             VK_CHECK( qvkCreateFramebuffer( vk.device, &desc, NULL, &vk.framebuffers.brdflut ) );
             SET_OBJECT_NAME( vk.framebuffers.brdflut, va( "framebuffer - brdf LUT" ), VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT );
         }
@@ -4302,25 +4302,25 @@ void vk_initialize( void )
 
 	// get memory size & defaults
 	{
-		VkPhysicalDeviceMemoryProperties props;
+		VkPhysicalDeviceMemoryProperties mem_props;
 		VkDeviceSize maxDedicatedSize = 0;
 		VkDeviceSize maxBARSize = 0;
-		qvkGetPhysicalDeviceMemoryProperties( vk.physical_device, &props );
-		for ( i = 0; i < props.memoryTypeCount; i++ ) {
-			if ( props.memoryTypes[i].propertyFlags == VK_MEMORY_HEAP_DEVICE_LOCAL_BIT ) {
-				maxDedicatedSize = props.memoryHeaps[props.memoryTypes[i].heapIndex].size;
+		qvkGetPhysicalDeviceMemoryProperties( vk.physical_device, &mem_props );
+		for ( i = 0; i < mem_props.memoryTypeCount; i++ ) {
+			if ( mem_props.memoryTypes[i].propertyFlags == VK_MEMORY_HEAP_DEVICE_LOCAL_BIT ) {
+				maxDedicatedSize = mem_props.memoryHeaps[mem_props.memoryTypes[i].heapIndex].size;
 			}
-			else if ( props.memoryTypes[i].propertyFlags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT ) {
-				if ( maxDedicatedSize == 0 || props.memoryHeaps[props.memoryTypes[i].heapIndex].size > maxDedicatedSize ) {
-					maxDedicatedSize = props.memoryHeaps[props.memoryTypes[i].heapIndex].size;
+			else if ( mem_props.memoryTypes[i].propertyFlags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT ) {
+				if ( maxDedicatedSize == 0 || mem_props.memoryHeaps[mem_props.memoryTypes[i].heapIndex].size > maxDedicatedSize ) {
+					maxDedicatedSize = mem_props.memoryHeaps[mem_props.memoryTypes[i].heapIndex].size;
 				}
 			}
-			if ( props.memoryTypes[i].propertyFlags == (VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ) {
-				maxBARSize = props.memoryHeaps[props.memoryTypes[i].heapIndex].size;
+			if ( mem_props.memoryTypes[i].propertyFlags == (VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ) {
+				maxBARSize = mem_props.memoryHeaps[mem_props.memoryTypes[i].heapIndex].size;
 			}
-			else if ( (props.memoryTypes[i].propertyFlags & (VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) == (VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ) {
+			else if ( (mem_props.memoryTypes[i].propertyFlags & (VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)) == (VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ) {
 				if ( maxBARSize == 0 ) {
-					maxBARSize = props.memoryHeaps[props.memoryTypes[i].heapIndex].size;
+					maxBARSize = mem_props.memoryHeaps[mem_props.memoryTypes[i].heapIndex].size;
 				}
 			}
 		}
@@ -4506,7 +4506,7 @@ void vk_initialize( void )
 	{
 		VkDescriptorPoolSize pool_size[3];
 		VkDescriptorPoolCreateInfo desc;
-		uint32_t i, maxSets;
+		uint32_t j, maxSets;
 
 		pool_size[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		pool_size[0].descriptorCount = MAX_DRAWIMAGES + 1 + 1 + 1 + VK_NUM_BLOOM_PASSES * 2; // color, screenmap, bloom descriptors
@@ -4528,8 +4528,8 @@ void vk_initialize( void )
 		pool_size[2].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
 		pool_size[2].descriptorCount = 1;
 
-		for ( i = 0, maxSets = 0; i < ARRAY_LEN( pool_size ); i++ ) {
-			maxSets += pool_size[i].descriptorCount;
+		for ( j = 0, maxSets = 0; j < ARRAY_LEN( pool_size ); j++ ) {
+			maxSets += pool_size[j].descriptorCount;
 		}
 
 		desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -4939,11 +4939,11 @@ void vk_shutdown( refShutdownCode_t code )
 	vk_destroy_image_resources( &img->handle, &img->view );
 
 	for ( i = 0; i < tr.numCubemaps; i++ ) {
-		image_t *img = tr.cubemaps[ i ].prefiltered_image;
-		vk_destroy_image_resources( &img->handle, &img->view );
+		image_t *cubemap_img = tr.cubemaps[ i ].prefiltered_image;
+		vk_destroy_image_resources( &cubemap_img->handle, &cubemap_img->view );
 
-		img = tr.cubemaps[ i ].irradiance_image;
-		vk_destroy_image_resources( &img->handle, &img->view );
+		cubemap_img = tr.cubemaps[ i ].irradiance_image;
+		vk_destroy_image_resources( &cubemap_img->handle, &cubemap_img->view );
 
 		Com_Memset( &tr.cubemaps[ i ], 0, sizeof(cubemap_t) );
 	}

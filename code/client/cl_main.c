@@ -3502,7 +3502,7 @@ static void CL_InitRef( void ) {
 #endif
 
 	// Vulkan API
-#ifdef USE_VULKAN_API
+#ifdef USE_VULKAN
 	rimp.VKimp_Init = VKimp_Init;
 	rimp.VKimp_Shutdown = VKimp_Shutdown;
 	rimp.VK_GetInstanceProcAddr = VK_GetInstanceProcAddr;

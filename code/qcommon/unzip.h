@@ -322,6 +322,9 @@ extern int unzeof (unzFile file);
 
 extern int unzGetLocalExtrafield (unzFile file, void* buf, unsigned len);
 
+// Internal function
+extern unsigned long unzlocal_SearchCentralDir(FILE *fin);
+
 /*
   Read extra field from the current file (opened by unzOpenCurrentFile)
   This is the local-header version of the extra field (sometimes, there is
