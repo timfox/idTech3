@@ -73,7 +73,7 @@ void readFile_string( char **cnf, char *s, int size )
 		t = COM_ParseExt( (const char **)cnf, qfalse );
 		if ( !*t )
 			break;
-		if ( strlen( t ) + strlen( s ) >= size )
+		if ( (int)(strlen( t ) + strlen( s )) >= size )
 			break;
 		if ( *s ) {
 			Q_strcat( s, size, " " );

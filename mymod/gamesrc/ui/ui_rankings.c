@@ -51,13 +51,13 @@ typedef struct
 
 static rankings_t	s_rankings;
 
-static menuframework_s	s_rankings_menu;
-static menuaction_s		s_rankings_login;
-static menuaction_s		s_rankings_logout;
-static menuaction_s		s_rankings_create;
-static menuaction_s		s_rankings_spectate;
-static menuaction_s		s_rankings_setup;
-static menuaction_s		s_rankings_leave;
+[[maybe_unused]] static menuframework_s	s_rankings_menu;
+[[maybe_unused]] static menuaction_s		s_rankings_login;
+[[maybe_unused]] static menuaction_s		s_rankings_logout;
+[[maybe_unused]] static menuaction_s		s_rankings_create;
+[[maybe_unused]] static menuaction_s		s_rankings_spectate;
+[[maybe_unused]] static menuaction_s		s_rankings_setup;
+[[maybe_unused]] static menuaction_s		s_rankings_leave;
 
 
 /*
@@ -92,7 +92,7 @@ void Rankings_DrawText( void* self )
 	color = g_color_table[ColorIndex(COLOR_WHITE)];
 	x = basex;
 	while ( (c = *txt) != 0 ) {
-		UI_DrawChar( x, y, c, style, color );
+		UI_DrawChar( x, y, c, style, (float *)color );
 		txt++;
 		x += SMALLCHAR_WIDTH;
 	}

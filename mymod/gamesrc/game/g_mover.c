@@ -863,7 +863,7 @@ void Blocked_Door( gentity_t *ent, gentity_t *other )
 Touch_DoorTriggerSpectator
 ================
 */
-static void Touch_DoorTriggerSpectator( gentity_t *ent, gentity_t *other, trace_t *trace )
+static void Touch_DoorTriggerSpectator( gentity_t *ent, gentity_t *other, [[maybe_unused]] trace_t *trace )
 {
 	int axis;
 	float doorMin, doorMax;
@@ -1090,7 +1090,7 @@ Touch_Plat
 Don't allow decent if a living player is on it
 ===============
 */
-void Touch_Plat( gentity_t *ent, gentity_t *other, trace_t *trace )
+void Touch_Plat( gentity_t *ent, gentity_t *other, [[maybe_unused]] trace_t *trace )
 {
 	if ( !other->client || other->client->ps.stats[STAT_HEALTH] <= 0 ) {
 		return;
@@ -1109,7 +1109,7 @@ Touch_PlatCenterTrigger
 If the plat is at the bottom position, start it going up
 ===============
 */
-void Touch_PlatCenterTrigger(gentity_t *ent, gentity_t *other, trace_t *trace )
+void Touch_PlatCenterTrigger(gentity_t *ent, gentity_t *other, [[maybe_unused]] trace_t *trace )
 {
 	if ( !other->client ) {
 		return;
@@ -1237,7 +1237,7 @@ Touch_Button
 
 ===============
 */
-void Touch_Button(gentity_t *ent, gentity_t *other, trace_t *trace )
+void Touch_Button(gentity_t *ent, gentity_t *other, [[maybe_unused]] trace_t *trace )
 {
 	if ( !other->client ) {
 		return;

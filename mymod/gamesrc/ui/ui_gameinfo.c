@@ -82,7 +82,7 @@ UI_ParseInfos
 ===============
 */
 int UI_ParseInfos( char *buf, int max, char *infos[] ) {
-	char	*token;
+	const char	*token;
 	int		count;
 	char	key[MAX_TOKEN_CHARS];
 	char	info[MAX_INFO_STRING];
@@ -118,9 +118,10 @@ int UI_ParseInfos( char *buf, int max, char *infos[] ) {
 
 			token = COM_ParseExt((const char **) &buf, qfalse );
 			if ( !token[0] ) {
-				strcpy( token, "<NULL>" );
+				Info_SetValueForKey( info, key, "<NULL>" );
+			} else {
+				Info_SetValueForKey( info, key, token );
 			}
-			Info_SetValueForKey( info, key, token );
 		}
 		//NOTE: extra space for arena number
 		infos[count] = UI_Alloc(strlen(info) + strlen("\\num\\") + strlen(va("%d", MAX_ARENAS)) + 1);
@@ -173,8 +174,8 @@ static void UI_LoadArenas( void ) {
 	char*		dirptr;
 	int			i, n;
 	int			dirlen;
-	char		*type;
-	char		*tag;
+	const char		*type;
+	const char		*tag;
 	int		singlePlayerNum, specialNum, otherNum;
 
 	ui_numArenas = 0;
@@ -192,7 +193,13 @@ static void UI_LoadArenas( void ) {
 	dirptr  = dirlist;
 	for (i = 0; i < numdirs; i++, dirptr += dirlen+1) {
 		dirlen = strlen(dirptr);
-		Q_snprintf(filename, sizeof(filename), "scripts/%s", dirptr);
+		// Check if filename fits: "scripts/" (9 bytes) + dirptr + null terminator
+		if (dirlen > (int)sizeof(filename) - 10) {
+			trap_Print( va( "Skipping arena file with name too long: %s\n", dirptr ) );
+			continue;
+		}
+		Q_strncpyz(filename, "scripts/", sizeof(filename));
+		Q_strcat(filename, sizeof(filename), dirptr);
 		UI_LoadArenasFromFile(filename);
 		trap_Print( va( "Read %s\n", filename ) );
 	}
@@ -268,7 +275,7 @@ UI_GetArenaInfoByNumber
 */
 const char *UI_GetArenaInfoByNumber( int num ) {
 	int		n;
-	char	*value;
+	const char	*value;
 
 	if( num < 0 || num >= ui_numArenas ) {
 		trap_Print( va( S_COLOR_RED "Invalid arena number: %i\n", num ) );
@@ -379,7 +386,13 @@ static void UI_LoadBots( void ) {
 	dirptr  = dirlist;
 	for (i = 0; i < numdirs; i++, dirptr += dirlen+1) {
 		dirlen = strlen(dirptr);
-		Q_snprintf(filename, sizeof(filename), "scripts/%s", dirptr);
+		// Check if filename fits: "scripts/" (9 bytes) + dirptr + null terminator
+		if (dirlen > (int)sizeof(filename) - 10) {
+			trap_Print( va( "Skipping bot file with name too long: %s\n", dirptr ) );
+			continue;
+		}
+		Q_strncpyz(filename, "scripts/", sizeof(filename));
+		Q_strcat(filename, sizeof(filename), dirptr);
 		UI_LoadBotsFromFile(filename);
 	}
 	trap_Print( va( "%i bots parsed\n", ui_numBots ) );
@@ -407,7 +420,7 @@ UI_GetBotInfoByName
 */
 char *UI_GetBotInfoByName( const char *name ) {
 	int		n;
-	char	*value;
+	const char	*value;
 
 	for ( n = 0; n < ui_numBots ; n++ ) {
 		value = Info_ValueForKey( ui_botInfos[n], "name" );

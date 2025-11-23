@@ -176,7 +176,7 @@ to prevent it from blinking away too rapidly on local or lan games.
 ========================
 */
 void UI_DrawConnectScreen( qboolean overlay ) {
-	char			*s;
+	const char			*s;
 	uiClientState_t	cstate;
 	char			info[MAX_INFO_VALUE];
 
@@ -239,10 +239,10 @@ void UI_DrawConnectScreen( qboolean overlay ) {
 
 	switch ( cstate.connState ) {
 	case CA_CONNECTING:
-		s = va("Awaiting challenge...%i", cstate.connectPacketCount);
+		s = (const char *)va("Awaiting challenge...%i", cstate.connectPacketCount);
 		break;
 	case CA_CHALLENGING:
-		s = va("Awaiting connection...%i", cstate.connectPacketCount);
+		s = (const char *)va("Awaiting connection...%i", cstate.connectPacketCount);
 		break;
 	case CA_CONNECTED: {
 		char downloadName[MAX_INFO_VALUE];

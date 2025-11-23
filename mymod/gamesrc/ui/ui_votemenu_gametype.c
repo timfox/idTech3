@@ -315,7 +315,8 @@ UI_VoteGametypeMenu
 =================
 */
 void UI_VoteGametypeMenu( void ) {
-	char serverinfo[MAX_INFO_STRING], *gametypeinfo;
+	char serverinfo[MAX_INFO_STRING];
+	const char *gametypeinfo;
 	// zero set all our globals
 	memset( &s_votemenu_Gametype, 0 ,sizeof(votemenu_t) );
 	trap_GetConfigString( CS_SERVERINFO, serverinfo, MAX_INFO_STRING );

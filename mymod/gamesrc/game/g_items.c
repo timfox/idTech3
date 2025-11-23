@@ -424,7 +424,7 @@ void RespawnItem( gentity_t *ent )
 Touch_Item
 ===============
 */
-void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace)
+void Touch_Item (gentity_t *ent, gentity_t *other, [[maybe_unused]] trace_t *trace)
 {
 	int			respawn;
 	qboolean	predict;
@@ -460,12 +460,12 @@ void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace)
 	//In double DD we cannot "pick up" a flag we already got
 	if(g_gametype.integer == GT_DOUBLE_D) {
 		if( strequals(ent->classname, "team_CTF_redflag") ) {
-			if(other->client->sess.sessionTeam == level.pointStatusA) {
+			if(other->client->sess.sessionTeam == (team_t)level.pointStatusA) {
 				return;
 			}
 		}
 		if( strequals(ent->classname, "team_CTF_blueflag") ) {
-			if(other->client->sess.sessionTeam == level.pointStatusB) {
+			if(other->client->sess.sessionTeam == (team_t)level.pointStatusB) {
 				return;
 			}
 		}
@@ -681,7 +681,7 @@ Use_Item
 Respawn the item
 ================
 */
-void Use_Item( gentity_t *ent, gentity_t *other, gentity_t *activator )
+void Use_Item( gentity_t *ent, [[maybe_unused]] gentity_t *other, [[maybe_unused]] gentity_t *activator )
 {
 	RespawnItem( ent );
 }

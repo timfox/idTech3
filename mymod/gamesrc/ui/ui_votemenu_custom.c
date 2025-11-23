@@ -155,7 +155,8 @@ UI_VoteCustomMenuInternal
 void UI_VoteCustomMenuInternal( void )
 {
 	int y,i;
-	char custominfo[MAX_INFO_STRING], *token,*pointer;
+	char custominfo[MAX_INFO_STRING];
+	const char *token, *pointer;
 
 	VoteMenu_Custom_Cache();
 

@@ -56,13 +56,13 @@ void SP_info_player_start(gentity_t *ent) {
 }
 
 //One for Standard Domination, not really a player spawn point
-void SP_domination_point(gentity_t *ent) {
+void SP_domination_point([[maybe_unused]] gentity_t *ent) {
 }
 
 /*QUAKED info_player_intermission (1 0 1) (-16 -16 -24) (16 16 32)
 The intermission will be viewed from this point.  Target an info_notnull for the view direction.
 */
-void SP_info_player_intermission( gentity_t *ent ) {
+void SP_info_player_intermission( [[maybe_unused]] gentity_t *ent ) {
 
 }
 
@@ -234,7 +234,9 @@ static gentity_t *SelectInitialSpawnPoint( vec3_t origin, vec3_t angles, int fil
 	}
 
 	if ( !spot || SpotWouldTelefrag( spot ) ) {
-		return SelectSpawnPoint( vec3_origin, origin, angles, filter_flags );
+		vec3_t zero_origin;
+		VectorClear( zero_origin );
+		return SelectSpawnPoint( zero_origin, origin, angles, filter_flags );
 	}
 
 	VectorCopy (spot->s.origin, origin);
@@ -603,7 +605,7 @@ int TeamCount( int ignoreClientNum, team_t team ) {
 			continue;
 		}
 
-		if ( level.clients[i].sess.sessionTeam == team ) {
+		if ( level.clients[i].sess.sessionTeam == (team_t)team ) {
 			count++;
 		}
 	}
@@ -635,7 +637,7 @@ team_t TeamLivingCount( int ignoreClientNum, int team ) {
 			continue;
 		}
 		//crash if g_gametype.integer is used here, why?
-		if ( level.clients[i].sess.sessionTeam == team && (level.clients[i].ps.stats[STAT_HEALTH]>0 || isLMS) && !(level.clients[i].isEliminated)) {
+		if ( level.clients[i].sess.sessionTeam == (team_t)team && (level.clients[i].ps.stats[STAT_HEALTH]>0 || isLMS) && !(level.clients[i].isEliminated)) {
 			count++;
 		}
 	}
@@ -725,7 +727,7 @@ team_t TeamHealthCount(int ignoreClientNum, int team ) {
 		}
 
 		//only count clients with positive health
-		if ( level.clients[i].sess.sessionTeam == team && (level.clients[i].ps.stats[STAT_HEALTH]>0)&& !(level.clients[i].isEliminated)) {
+		if ( level.clients[i].sess.sessionTeam == (team_t)team && (level.clients[i].ps.stats[STAT_HEALTH]>0)&& !(level.clients[i].isEliminated)) {
 			count+=level.clients[i].ps.stats[STAT_HEALTH];
 		}
 	}
@@ -914,7 +916,7 @@ int TeamLeader( int team ) {
 		if ( level.clients[i].pers.connected == CON_DISCONNECTED ) {
 			continue;
 		}
-		if ( level.clients[i].sess.sessionTeam == team ) {
+		if ( level.clients[i].sess.sessionTeam == (team_t)team ) {
 			if ( level.clients[i].sess.teamLeader )
 				return i;
 		}
@@ -1041,7 +1043,7 @@ if desired.
 void ClientUserinfoChanged( int clientNum ) {
 	gentity_t *ent;
 	int		teamTask, teamLeader, team, health;
-	char	*s;
+	const char	*s;
 	char	model[MAX_QPATH];
 	char	headModel[MAX_QPATH];
 	char	oldname[MAX_STRING_CHARS];
@@ -1265,12 +1267,12 @@ void ClientUserinfoChanged( int clientNum ) {
 	// send over a subset of the userinfo keys so other clients can
 	// print scoreboards, display models, and play custom sounds
 	if ( ent->r.svFlags & SVF_BOT ) {
-		s = va("n\\%s\\t\\%i\\model\\%s\\hmodel\\%s\\c1\\%s\\c2\\%s\\hc\\%i\\w\\%i\\l\\%i\\skill\\%s\\tt\\%d\\tl\\%d",
+		s = (const char *)va("n\\%s\\t\\%i\\model\\%s\\hmodel\\%s\\c1\\%s\\c2\\%s\\hc\\%i\\w\\%i\\l\\%i\\skill\\%s\\tt\\%d\\tl\\%d",
 			client->pers.netname, client->sess.sessionTeam, model, headModel, c1, c2, 
 			client->pers.maxHealth, client->sess.wins, client->sess.losses,
 			Info_ValueForKey( userinfo, "skill" ), teamTask, teamLeader );
 	} else {
-		s = va("n\\%s\\t\\%i\\model\\%s\\hmodel\\%s\\g_redteam\\%s\\g_blueteam\\%s\\c1\\%s\\c2\\%s\\hc\\%i\\w\\%i\\l\\%i\\tt\\%d\\tl\\%d",
+		s = (const char *)va("n\\%s\\t\\%i\\model\\%s\\hmodel\\%s\\g_redteam\\%s\\g_blueteam\\%s\\c1\\%s\\c2\\%s\\hc\\%i\\w\\%i\\l\\%i\\tt\\%d\\tl\\%d",
 			client->pers.netname, client->sess.sessionTeam, model, headModel, redTeam, blueTeam, c1, c2, 
 			client->pers.maxHealth, client->sess.wins, client->sess.losses, teamTask, teamLeader);
 	}
@@ -1303,7 +1305,7 @@ restarts.
 ============
 */
 char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
-	char		*value;
+	const char		*value;
 //	char		*areabits;
 	gclient_t	*client;
 	char		userinfo[MAX_INFO_STRING];
@@ -1330,13 +1332,13 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 	value = Info_ValueForKey (userinfo, "ip");
 	Q_strncpyz( client->pers.ip, value, sizeof( client->pers.ip ) );
 	
-	if ( G_FilterPacket( value ) && Q_strequal(value,"localhost") ) {
+	if ( G_FilterPacket( (char *)value ) && Q_strequal(value,"localhost") ) {
 		G_Printf("Player with IP: %s is banned\n",value);
 		return "You are banned from this server.";
 	}
 	
 	if( G_admin_ban_check( userinfo, reason, sizeof( reason ) ) ) {    
-		return va( "%s", reason );
+		return (char *)va( "%s", reason );
  	}
  	 
 //KK-OAX
@@ -1350,9 +1352,9 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 			!strequals( g_password.string, value)) {
 			return "Invalid password";
 		}
-		for( i = 0; i < sizeof( client->pers.guid ) - 1 &&
+		for( i = 0; (long unsigned int)i < sizeof( client->pers.guid ) - 1 &&
 			isxdigit( client->pers.guid[ i ] ); i++ ) {};
-		if( i < sizeof( client->pers.guid ) - 1 )
+		if( (long unsigned int)i < sizeof( client->pers.guid ) - 1 )
 			return "Invalid GUID";
 
 		for( i = 0; i < level.maxclients; i++ ) {
@@ -1451,7 +1453,7 @@ void motd (gentity_t *ent)
 		char * p;
 
 		motdLen = strlen(motd);
-		if((motdLen + fileLen) > (sizeof(motd) - 2)) {
+		if((motdLen + fileLen) > (int)(sizeof(motd) - 2)) {
 			fileLen = (sizeof(motd) - 2 - motdLen);
 		}
 		trap_FS_Read(motd + motdLen, fileLen, motdFile);

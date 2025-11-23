@@ -511,7 +511,7 @@ qboolean  ConsoleCommand( void )
 
 	trap_Argv( 0, cmd, sizeof( cmd ) );
 
-	for( i = 0; i < sizeof( svcmds ) / sizeof( svcmds[ 0 ] ); i++ ) {
+	for( i = 0; (long unsigned int)i < sizeof( svcmds ) / sizeof( svcmds[ 0 ] ); i++ ) {
 		if( Q_strequal( cmd, svcmds[ i ].cmd ) ) {
 			if( svcmds[ i ].dedicated && !g_dedicated.integer )
 				return qfalse;

@@ -231,7 +231,7 @@ int BotSortTeamMatesByRelativeTravelTime2ddA(bot_state_t *bs, int *teammates, in
 BotSetTeamMateTaskPreference
 ==================
 */
-void BotSetTeamMateTaskPreference(bot_state_t *bs, int teammate, int preference) {
+void BotSetTeamMateTaskPreference([[maybe_unused]] bot_state_t *bs, int teammate, int preference) {
 	char teammatename[MAX_NETNAME];
 
 	ctftaskpreferences[teammate].preference = preference;
@@ -244,7 +244,7 @@ void BotSetTeamMateTaskPreference(bot_state_t *bs, int teammate, int preference)
 BotGetTeamMateTaskPreference
 ==================
 */
-int BotGetTeamMateTaskPreference(bot_state_t *bs, int teammate) {
+int BotGetTeamMateTaskPreference([[maybe_unused]] bot_state_t *bs, int teammate) {
 	char teammatename[MAX_NETNAME];
 	if ( !ctftaskpreferences[teammate].preference) {
 		return 0;
@@ -340,7 +340,7 @@ void BotSayTeamOrder(bot_state_t *bs, int toclient) {
 BotVoiceChat
 ==================
 */
-void BotVoiceChat(bot_state_t *bs, int toclient, char *voicechat) {
+void BotVoiceChat([[maybe_unused]] bot_state_t *bs, [[maybe_unused]] int toclient, [[maybe_unused]] char *voicechat) {
 #ifdef MISSIONPACK
 	if (toclient == -1) {
 		// voice only say team
@@ -358,7 +358,7 @@ void BotVoiceChat(bot_state_t *bs, int toclient, char *voicechat) {
 BotVoiceChatOnly
 ==================
 */
-void BotVoiceChatOnly(bot_state_t *bs, int toclient, char *voicechat) {
+void BotVoiceChatOnly([[maybe_unused]] bot_state_t *bs, [[maybe_unused]] int toclient, [[maybe_unused]] char *voicechat) {
 
 #ifdef MISSIONPACK
 	if (toclient == -1) {
@@ -377,7 +377,7 @@ void BotVoiceChatOnly(bot_state_t *bs, int toclient, char *voicechat) {
 BotSayVoiceTeamOrder
 ==================
 */
-void BotSayVoiceTeamOrder(bot_state_t *bs, int toclient, char *voicechat) {
+void BotSayVoiceTeamOrder([[maybe_unused]] bot_state_t *bs, [[maybe_unused]] int toclient, [[maybe_unused]] char *voicechat) {
 
 #ifdef MISSIONPACK
 	BotVoiceChat(bs, toclient, voicechat);

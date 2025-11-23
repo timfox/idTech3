@@ -282,7 +282,7 @@ void UI_VoteMenuMenuInternal( void )
 	s_votemenu.banner.style	      = UI_CENTER;
 
 	y = 98;
-	for (i = 0; i < ARRAY_LEN(s_votemenu.bButtons); ++i) {
+	for (i = 0; (long unsigned int)i < ARRAY_LEN(s_votemenu.bButtons); ++i) {
 		s_votemenu.bButtons[i].generic.id          = s_items[i].id;
 		UI_SetMenuTextDefaults(&s_votemenu.bButtons[i] );
 		UI_SetTextEffect(&s_votemenu.bButtons[i], *s_items[i].enabled, s_votemenu.selection);
@@ -293,7 +293,7 @@ void UI_VoteMenuMenuInternal( void )
 		y+=VOTEMENU_MENU_VERTICAL_SPACING;
 	}
 	if(s_votemenu_logic.g_doWarmupEnabled) {
-		for (i = 0; i < ARRAY_LEN(s_votemenu.bButtons); ++i) {
+		for (i = 0; (long unsigned int)i < ARRAY_LEN(s_votemenu.bButtons); ++i) {
 			if (s_votemenu.bButtons[i].generic.id == ID_DOWARMUP) {
 				s_votemenu.bButtons[i].string = "Enable warmup";
 			}
@@ -341,7 +341,7 @@ void UI_VoteMenuMenu( void ) {
 
 	Menu_AddItem( &s_votemenu.menu, (void*) &s_votemenu.banner );
 	Menu_AddItem( &s_votemenu.menu, (void*) &s_votemenu.back );
-	for (i = 0; i < ARRAY_LEN(s_votemenu.bButtons); ++i) {
+	for (i = 0; (long unsigned int)i < ARRAY_LEN(s_votemenu.bButtons); ++i) {
 		Menu_AddItem( &s_votemenu.menu, (void*) &s_votemenu.bButtons[i] );
 	}
 

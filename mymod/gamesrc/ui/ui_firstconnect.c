@@ -101,7 +101,7 @@ static void PlayerSettings_DrawName2( void *self ) {
 	int				style;
 	char			*txt;
 	char			c;
-	float			*color;
+	const float			*color;
 	int				n;
 	int				basex, x, y;
 	char			name[32];
@@ -118,7 +118,7 @@ static void PlayerSettings_DrawName2( void *self ) {
 		color = text_color_highlight;
 	}
 
-	UI_DrawProportionalString( basex, y, "Name:", style, color );
+	UI_DrawProportionalString( basex, y, "Name:", style, (float *)color );
 
 	// draw the actual name
 	basex += 64+10;
@@ -137,7 +137,7 @@ static void PlayerSettings_DrawName2( void *self ) {
 			txt += 2;
 			continue;
 		}
-		UI_DrawChar( x, y, c, style, color );
+		UI_DrawChar( x, y, c, style, (float *)color );
 		txt++;
 		x += SMALLCHAR_WIDTH;
 	}
@@ -166,7 +166,7 @@ static void PlayerSettings_DrawName2( void *self ) {
 FirstConnect_StatusBar_Name
 =================
 */
-static void FirstConnect_StatusBar_Name( void* ptr ) {
+static void FirstConnect_StatusBar_Name( [[maybe_unused]] void* ptr ) {
 		UI_DrawString( 320, 440, "Your nickname", UI_CENTER|UI_SMALLFONT, colorWhite );
 }
 
@@ -175,7 +175,7 @@ static void FirstConnect_StatusBar_Name( void* ptr ) {
 FirstConnect_StatusBar_Rate
 =================
 */
-static void FirstConnect_StatusBar_Rate( void* ptr ) {
+static void FirstConnect_StatusBar_Rate( [[maybe_unused]] void* ptr ) {
 		UI_DrawString( 320, 440, "Your connection speed", UI_CENTER|UI_SMALLFONT, colorWhite );
 }
 
@@ -184,7 +184,7 @@ static void FirstConnect_StatusBar_Rate( void* ptr ) {
 FirstConnect_StatusBar_Delag
 =================
 */
-static void FirstConnect_StatusBar_Delag( void* ptr ) {
+static void FirstConnect_StatusBar_Delag( [[maybe_unused]] void* ptr ) {
 		UI_DrawString( 320, 440, "Reliable Instanthit weapons", UI_CENTER|UI_SMALLFONT, colorWhite );
 }
 
@@ -193,7 +193,7 @@ static void FirstConnect_StatusBar_Delag( void* ptr ) {
 FirstConnect_StatusBar_Download
 =================
 */
-static void FirstConnect_StatusBar_Download( void* ptr ) {
+static void FirstConnect_StatusBar_Download( [[maybe_unused]] void* ptr ) {
 		UI_DrawString( 320, 440, "Auto download missing maps and mods", UI_CENTER|UI_SMALLFONT, colorWhite );
 }
 

@@ -1442,7 +1442,7 @@ void BotMatch_StopTeamLeaderShip(bot_state_t *bs, bot_match_t *match) {
 BotMatch_WhoIsTeamLeader
 ==================
 */
-void BotMatch_WhoIsTeamLeader(bot_state_t *bs, bot_match_t *match) {
+void BotMatch_WhoIsTeamLeader(bot_state_t *bs, [[maybe_unused]] bot_match_t *match) {
 	char netname[MAX_MESSAGE_SIZE];
 
 	if (!TeamPlayIsOn()) return;
@@ -1562,7 +1562,7 @@ void BotMatch_WhatAreYouDoing(bot_state_t *bs, bot_match_t *match) {
 BotMatch_WhatIsMyCommand
 ==================
 */
-void BotMatch_WhatIsMyCommand(bot_state_t *bs, bot_match_t *match) {
+void BotMatch_WhatIsMyCommand(bot_state_t *bs, [[maybe_unused]] bot_match_t *match) {
 	char netname[MAX_NETNAME];
 
 	ClientName(bs->client, netname, sizeof(netname));
@@ -1859,7 +1859,7 @@ void BotMatch_CTF(bot_state_t *bs, bot_match_t *match) {
 	}
 }
 
-void BotMatch_EnterGame(bot_state_t *bs, bot_match_t *match) {
+void BotMatch_EnterGame([[maybe_unused]] bot_state_t *bs, bot_match_t *match) {
 	int client;
 	char netname[MAX_NETNAME];
 

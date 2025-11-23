@@ -138,7 +138,7 @@ Point teleporters at these.
 Now that we don't have teleport destination pads, this is just
 an info_notnull
 */
-void SP_misc_teleporter_dest( gentity_t *ent ) {
+void SP_misc_teleporter_dest( [[maybe_unused]] gentity_t *ent ) {
 }
 
 
@@ -254,7 +254,7 @@ void SP_misc_portal_camera(gentity_t *ent) {
 ======================================================================
 */
 
-void Use_Shooter( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
+void Use_Shooter( gentity_t *ent, [[maybe_unused]] gentity_t *other, [[maybe_unused]] gentity_t *activator ) {
 	vec3_t		dir;
 	float		deg;
 	vec3_t		up, right;
@@ -345,7 +345,7 @@ void SP_shooter_grenade( gentity_t *ent ) {
 	InitShooter( ent, WP_GRENADE_LAUNCHER);
 }
 
-static void PortalDie (gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int mod) {
+static void PortalDie (gentity_t *self, [[maybe_unused]] gentity_t *inflictor, [[maybe_unused]] gentity_t *attacker, [[maybe_unused]] int damage, [[maybe_unused]] int mod) {
 	G_FreeEntity( self );
 	//FIXME do something more interesting
 }
@@ -388,7 +388,7 @@ void DropPortalDestination( gentity_t *player ) {
 }
 
 
-static void PortalTouch( gentity_t *self, gentity_t *other, trace_t *trace) {
+static void PortalTouch( gentity_t *self, gentity_t *other, [[maybe_unused]] trace_t *trace) {
 	gentity_t	*destination;
 
 	// see if we will even let other try to use it

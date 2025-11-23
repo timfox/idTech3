@@ -68,7 +68,7 @@ G_ParseInfos
 ===============
 */
 int G_ParseInfos( char *buf, int max, char *infos[] ) {
-	char	*token;
+	const char	*token;
 	int		count;
 	char	key[MAX_TOKEN_CHARS];
 	char	info[MAX_INFO_STRING];
@@ -104,9 +104,10 @@ int G_ParseInfos( char *buf, int max, char *infos[] ) {
 
 			token = COM_ParseExt( (const char **)&buf, qfalse );
 			if ( !token[0] ) {
-				strcpy( token, "<NULL>" );
+				Info_SetValueForKey( info, key, "<NULL>" );
+			} else {
+				Info_SetValueForKey( info, key, token );
 			}
-			Info_SetValueForKey( info, key, token );
 		}
 		if(!BG_CanAlloc(strlen(info) + strlen("\\num\\") + strlen(va("%d", MAX_ARENAS)) + 1))
 			break; //Not enough memory. Don't even try
@@ -255,7 +256,7 @@ int G_CountBotPlayersByName( const char *name, int team ) {
 		if ( !(g_entities[i].r.svFlags & SVF_BOT) ) {
 			continue;
 		}
-		if ( team >= 0 && cl->sess.sessionTeam != team ) {
+		if ( team >= 0 && cl->sess.sessionTeam != (team_t)team ) {
 			continue;
 		}
 		if ( name && Q_stricmp( name, cl->pers.netname ) ) {
@@ -349,7 +350,7 @@ int G_RemoveRandomBot( int team ) {
 		if ( !(g_entities[cl->ps.clientNum].r.svFlags & SVF_BOT) ) {
 			continue;
 		}
-		if ( team >= 0 && cl->sess.sessionTeam != team ) {
+		if ( team >= 0 && cl->sess.sessionTeam != (team_t)team ) {
 			continue;
 		}
 		trap_SendConsoleCommand( EXEC_INSERT, va("clientkick %d\n", cl->ps.clientNum) );
@@ -376,7 +377,7 @@ int G_CountHumanPlayers( int team ) {
 		if ( g_entities[cl->ps.clientNum].r.svFlags & SVF_BOT ) {
 			continue;
 		}
-		if ( team >= 0 && cl->sess.sessionTeam != team ) {
+		if ( team >= 0 && cl->sess.sessionTeam != (team_t)team ) {
 			continue;
 		}
 		num++;
@@ -404,7 +405,7 @@ int G_CountBotPlayers( int team ) {
 		if ( !(g_entities[cl->ps.clientNum].r.svFlags & SVF_BOT) ) {
 			continue;
 		}
-		if ( team >= 0 && cl->sess.sessionTeam != team ) {
+		if ( team >= 0 && cl->sess.sessionTeam != (team_t)team ) {
 			continue;
 		}
 		num++;

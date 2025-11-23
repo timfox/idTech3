@@ -320,7 +320,7 @@ void GibEntity( gentity_t *self, int killer )
 body_die
 ==================
 */
-void body_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int meansOfDeath )
+void body_die( gentity_t *self, [[maybe_unused]] gentity_t *inflictor, [[maybe_unused]] gentity_t *attacker, [[maybe_unused]] int damage, [[maybe_unused]] int meansOfDeath )
 {
 	if ( self->health > GIB_HEALTH ) {
 		return;
@@ -487,7 +487,7 @@ void CheckAlmostScored( gentity_t *self, gentity_t *attacker )
 player_die
 ==================
 */
-void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int meansOfDeath )
+void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, [[maybe_unused]] int damage, int meansOfDeath )
 {
 	gentity_t	*ent;
 	int			anim;
@@ -549,7 +549,7 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 		killerName = "<world>";
 	}
 
-	if ( meansOfDeath < 0 || meansOfDeath >= sizeof( modNames ) / sizeof( modNames[0] ) ) {
+	if ( meansOfDeath < 0 || meansOfDeath >= (int)(sizeof( modNames ) / sizeof( modNames[0] )) ) {
 		obit = "<bad obituary>";
 	}
 	else {
@@ -1522,7 +1522,7 @@ definitely mangled from player_die with less about the player
 ==================
 */
 
-void monster_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int meansOfDeath )
+void monster_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, [[maybe_unused]] int damage, int meansOfDeath )
 {
 	int			contents;
 	int			killer = 0;

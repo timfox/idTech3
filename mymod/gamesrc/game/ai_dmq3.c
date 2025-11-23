@@ -124,7 +124,7 @@ int untrap_BotGetLevelItemGoal(int start, char *classname, void /* struct bot_go
 	while (start>-1) {
 		if (!trap_AAS_ValueForBSPEpairKey(start, "gametype", allowedGametypes, MAX_EPAIRKEY))
 			return start; //No gametype flag
-		if (gametype >= GT_FFA && gametype < ARRAY_LEN(gametypeNames)) {
+		if (gametype >= GT_FFA && (long unsigned int)gametype < ARRAY_LEN(gametypeNames)) {
 			gametypeName = gametypeNames[gametype];
 			if (strstr(allowedGametypes, gametypeName)) {
 				//In gametype strig
@@ -448,7 +448,7 @@ void BotSetTeamStatus(bot_state_t *bs) {
 			teamtask = TEAMTASK_PATROL;
 			break;
 	}
-	BotSetUserInfo(bs, "teamtask", va("%d", teamtask));
+	BotSetUserInfo(bs, "teamtask", (char *)va("%d", teamtask));
 }
 
 /*
@@ -557,7 +557,7 @@ void BotCTFSeekGoals(bot_state_t *bs) {
 				// don't use any alt route goal, just get the hell out of the base
 				bs->altroutegoal.areanum = 0;
 			}
-			BotSetUserInfo(bs, "teamtask", va("%d", TEAMTASK_OFFENSE));
+			BotSetUserInfo(bs, "teamtask", (char *)va("%d", TEAMTASK_OFFENSE));
 			BotVoiceChat(bs, -1, VOICECHAT_IHAVEFLAG);
 		} else if (bs->rushbaseaway_time > FloatTime()) {
 			if (BotTeam(bs) == TEAM_RED) flagstatus = bs->redflagstatus;
@@ -879,16 +879,16 @@ void BotDDSeekGoals(bot_state_t *bs) {
 	if (bs->ltgtype == LTG_POINTA) {
 		memcpy(&bs->teamgoal, &ctf_redflag, sizeof (bot_goal_t));
 		if (BotTeam(bs) == TEAM_BLUE)
-			BotSetUserInfo(bs, "teamtask", va("%d", TEAMTASK_OFFENSE));
+			BotSetUserInfo(bs, "teamtask", (char *)va("%d", TEAMTASK_OFFENSE));
 		else
-			BotSetUserInfo(bs, "teamtask", va("%d", TEAMTASK_DEFENSE));
+			BotSetUserInfo(bs, "teamtask", (char *)va("%d", TEAMTASK_DEFENSE));
 	} else
 		if (bs->ltgtype == LTG_POINTB) {
 		memcpy(&bs->teamgoal, &ctf_blueflag, sizeof (bot_goal_t));
 		if (BotTeam(bs) == TEAM_RED)
-			BotSetUserInfo(bs, "teamtask", va("%d", TEAMTASK_OFFENSE));
+			BotSetUserInfo(bs, "teamtask", (char *)va("%d", TEAMTASK_OFFENSE));
 		else
-			BotSetUserInfo(bs, "teamtask", va("%d", TEAMTASK_DEFENSE));
+			BotSetUserInfo(bs, "teamtask", (char *)va("%d", TEAMTASK_DEFENSE));
 	}
 
 
@@ -1247,7 +1247,7 @@ void BotGoHarvest(bot_state_t *bs) {
 BotObeliskRetreatGoals
 ==================
  */
-void BotObeliskRetreatGoals(bot_state_t *bs) {
+void BotObeliskRetreatGoals([[maybe_unused]] bot_state_t *bs) {
 	//nothing special
 }
 
@@ -2437,7 +2437,7 @@ int BotWantsToChase(bot_state_t *bs) {
 BotWantsToHelp
 ==================
  */
-int BotWantsToHelp(bot_state_t *bs) {
+int BotWantsToHelp([[maybe_unused]] bot_state_t *bs) {
 	return qtrue;
 }
 
@@ -4040,7 +4040,7 @@ int BotFuncDoorActivateGoal(bot_state_t *bs, int bspent, bot_activategoal_t *act
 BotTriggerMultipleActivateGoal
 ==================
  */
-int BotTriggerMultipleActivateGoal(bot_state_t *bs, int bspent, bot_activategoal_t *activategoal) {
+int BotTriggerMultipleActivateGoal([[maybe_unused]] bot_state_t *bs, int bspent, bot_activategoal_t *activategoal) {
 	int i, areas[10], numareas, modelindex, entitynum;
 	char model[128];
 	vec3_t start, end, mins, maxs;
@@ -5035,7 +5035,11 @@ void BotCheckSnapshot(bot_state_t *bs) {
 	entityState_t state;
 
 	//remove all avoid spots
-	trap_BotAddAvoidSpot(bs->ms, vec3_origin, 0, AVOID_CLEAR);
+	{
+		vec3_t zero_origin;
+		VectorClear( zero_origin );
+		trap_BotAddAvoidSpot(bs->ms, zero_origin, 0, AVOID_CLEAR);
+	}
 	//reset kamikaze body
 	bs->kamikazebody = 0;
 	//reset number of proxmines
@@ -5221,7 +5225,7 @@ void BotSetupAlternativeRouteGoals(void) {
 BotDeathmatchAI
 ==================
  */
-void BotDeathmatchAI(bot_state_t *bs, float thinktime) {
+void BotDeathmatchAI(bot_state_t *bs, [[maybe_unused]] float thinktime) {
 	char gender[144], name[144];
 	char userinfo[MAX_INFO_STRING];
 	int i;
@@ -5456,14 +5460,14 @@ void BotSetupDeathmatchAI(void) {
 		if (ent < 0)
 			BotAI_Print(PRT_WARNING, "Domination without a single domination point\n");
 		else
-			BotSetEntityNumForGoal(&dom_points_bot[0], va("domination_point%i", 0));
+			BotSetEntityNumForGoal(&dom_points_bot[0], (char *)va("domination_point%i", 0));
 		for (i = 1; i < level.domination_points_count; i++) {
 			//Find next from the privius found entity
 			ent = untrap_BotGetLevelItemGoal(ent, "Domination point", &dom_points_bot[i]);
 			if (ent < 0)
 				BotAI_Print(PRT_WARNING, "Domination point %i not found!\n", i);
 			else
-				BotSetEntityNumForGoal(&dom_points_bot[0], va("domination_point%i", i));
+				BotSetEntityNumForGoal(&dom_points_bot[0], (char *)va("domination_point%i", i));
 		}
 		//MAX_DOMINATION_POINTS
 	} else if (gametype == GT_1FCTF) {

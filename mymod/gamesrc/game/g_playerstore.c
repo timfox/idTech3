@@ -49,7 +49,7 @@ void LogAcc(int clientNum)
 	qboolean first = qtrue;
 	Com_sprintf(buffer,sizeof(buffer),"Accuracy: %i ",clientNum);
 	for(i=0; i<WP_NUM_WEAPONS; ++i) {
-		char *tmp = va("%sf%i\\%i\\h%i\\%i",first ? "" : "\\",i,level.clients[clientNum].accuracy[i][0],i,level.clients[clientNum].accuracy[i][1]);
+		const char *tmp = va("%sf%i\\%i\\h%i\\%i",first ? "" : "\\",i,level.clients[clientNum].accuracy[i][0],i,level.clients[clientNum].accuracy[i][1]);
 		if(strlen(tmp)+strlen(buffer)+1+1<sizeof(buffer)) /* +1 \n +1 \0 */
 			strcat(buffer,tmp);
 		first = qfalse;

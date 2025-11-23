@@ -816,7 +816,7 @@ void G_admin_duration( int secs, char *duration, int dursize )
 
 qboolean G_admin_ban_check( char *userinfo, char *reason, int rlen )
 {
-	char *guid, *ip;
+	const char *guid, *ip;
 	int i;
 	int t;
 
@@ -996,7 +996,7 @@ void G_admin_namelog_update( gclient_t *client, qboolean disconnect )
 }
 
 //KK-OAX Added Parsing Warnings
-qboolean G_admin_readconfig( gentity_t *ent, int skiparg )
+qboolean G_admin_readconfig( gentity_t *ent, [[maybe_unused]] int skiparg )
 {
 	g_admin_level_t *l = NULL;
 	g_admin_admin_t *a = NULL;
@@ -1007,7 +1007,7 @@ qboolean G_admin_readconfig( gentity_t *ent, int skiparg )
 	fileHandle_t f;
 	int len;
 	char *cnf, *cnf2;
-	char *t;
+	const char *t;
 	qboolean level_open, admin_open, ban_open, command_open, warning_open;
 	int i;
 
@@ -1154,7 +1154,7 @@ qboolean G_admin_readconfig( gentity_t *ent, int skiparg )
 			else if( Q_strequal( t, "levels" ) ) {
 				char levels[ MAX_STRING_CHARS ] = {""};
 				char *level = levels;
-				char *lp;
+				const char *lp;
 				int cmdlevel = 0;
 
 				readFile_string( &cnf, levels, sizeof( levels ) );
@@ -1222,7 +1222,7 @@ qboolean G_admin_readconfig( gentity_t *ent, int skiparg )
 	return qtrue;
 }
 
-qboolean G_admin_time( gentity_t *ent, int skiparg )
+qboolean G_admin_time( gentity_t *ent, [[maybe_unused]] int skiparg )
 {
 	qtime_t qt;
 
@@ -1257,7 +1257,7 @@ qboolean G_admin_setlevel( gentity_t *ent, int skiparg )
 	G_SayArgv( 2 + skiparg, lstr, sizeof( lstr ) );
 	l = atoi( lstr );
 	G_SanitiseString( testname, name, sizeof( name ) );
-	for( i = 0; i < sizeof( name ) && name[ i ]; i++ ) {
+	for( i = 0; (long unsigned int)i < sizeof( name ) && name[ i ]; i++ ) {
 		if( !isdigit( name[ i ] ) ) {
 			numeric = qfalse;
 			break;
@@ -1495,12 +1495,16 @@ int G_admin_parse_time( const char *time )
 		switch( *time++ ) {
 		case 'w':
 			num *= 7;
+			[[fallthrough]];
 		case 'd':
 			num *= 24;
+			[[fallthrough]];
 		case 'h':
 			num *= 60;
+			[[fallthrough]];
 		case 'm':
 			num *= 60;
+			[[fallthrough]];
 		case 's':
 			break;
 		default:
@@ -2033,7 +2037,7 @@ qboolean G_admin_listadmins( gentity_t *ent, int skiparg )
 
 	if( G_SayArgc() == 2 + skiparg ) {
 		G_SayArgv( 1 + skiparg, s, sizeof( s ) );
-		for( i = 0; i < sizeof( s ) && s[ i ]; i++ ) {
+		for( i = 0; (long unsigned int)i < sizeof( s ) && s[ i ]; i++ ) {
 			if( isdigit( s[ i ] ) )
 				continue;
 			numeric = qfalse;
@@ -2081,7 +2085,7 @@ qboolean G_admin_listadmins( gentity_t *ent, int skiparg )
 }
 
 
-qboolean G_admin_listplayers( gentity_t *ent, int skiparg )
+qboolean G_admin_listplayers( gentity_t *ent, [[maybe_unused]] int skiparg )
 {
 	int i, j;
 	gclient_t *p;
@@ -2227,7 +2231,7 @@ qboolean G_admin_showbans( gentity_t *ent, int skiparg )
 			start = atoi( filter );
 			G_SayArgv( 2 + skiparg, filter, sizeof( filter ) );
 		}
-		for( i = 0; i < sizeof( filter ) && filter[ i ] ; i++ ) {
+		for( i = 0; (long unsigned int)i < sizeof( filter ) && filter[ i ] ; i++ ) {
 			if( !isdigit( filter[ i ] ) &&
 			        filter[ i ] != '.' && filter[ i ] != '-' ) {
 				numeric = qfalse;
@@ -2310,7 +2314,7 @@ qboolean G_admin_showbans( gentity_t *ent, int skiparg )
 		date[ 0 ] = '\0';
 		made = g_admin_bans[ i ]->made;
 		for( j = 0; made && *made; j++ ) {
-			if( ( j + 1 ) >= sizeof( date ) )
+			if( ( j + 1 ) >= (int)sizeof( date ) )
 				break;
 			if( *made == ' ' )
 				break;
@@ -2456,7 +2460,7 @@ qboolean G_admin_help( gentity_t *ent, int skiparg )
 	}
 }
 
-qboolean G_admin_admintest( gentity_t *ent, int skiparg )
+qboolean G_admin_admintest( gentity_t *ent, [[maybe_unused]] int skiparg )
 {
 	int i, l = 0;
 	qboolean found = qfalse;
@@ -2498,7 +2502,7 @@ qboolean G_admin_admintest( gentity_t *ent, int skiparg )
 	return qtrue;
 }
 
-qboolean G_admin_allready( gentity_t *ent, int skiparg )
+qboolean G_admin_allready( gentity_t *ent, [[maybe_unused]] int skiparg )
 {
 	int i = 0;
 	gclient_t *cl;
@@ -2523,7 +2527,7 @@ qboolean G_admin_allready( gentity_t *ent, int skiparg )
 	return qtrue;
 }
 
-qboolean G_admin_cancelvote( gentity_t *ent, int skiparg )
+qboolean G_admin_cancelvote( gentity_t *ent, [[maybe_unused]] int skiparg )
 {
 
 	if(!level.voteTime && !level.teamVoteTime[ 0 ] && !level.teamVoteTime[ 1 ] ) {
@@ -2544,7 +2548,7 @@ qboolean G_admin_cancelvote( gentity_t *ent, int skiparg )
 	return qtrue;
 }
 
-qboolean G_admin_passvote( gentity_t *ent, int skiparg )
+qboolean G_admin_passvote( gentity_t *ent, [[maybe_unused]] int skiparg )
 {
 	if(!level.voteTime && !level.teamVoteTime[ 0 ] && !level.teamVoteTime[ 1 ] ) {
 		ADMP( "^3!passvote: ^7no vote in progress\n" );
@@ -2564,7 +2568,7 @@ qboolean G_admin_passvote( gentity_t *ent, int skiparg )
 	return qtrue;
 }
 
-qboolean G_admin_spec999( gentity_t *ent, int skiparg )
+qboolean G_admin_spec999( gentity_t *ent, [[maybe_unused]] int skiparg )
 {
 	int i;
 	gentity_t *vic;
@@ -2626,7 +2630,7 @@ qboolean G_admin_rename( gentity_t *ent, int skiparg )
 	level.clients[ pids[ 0 ] ].pers.nameChangeTime = 0;
 
 	trap_GetUserinfo( pids[ 0 ], userinfo, sizeof( userinfo ) );
-	s = Info_ValueForKey( userinfo, "name" );
+	s = (char *)Info_ValueForKey( userinfo, "name" );
 	Q_strncpyz( oldname, s, sizeof( oldname ) );
 	Info_SetValueForKey( userinfo, "name", newname );
 	trap_SetUserinfo( pids[ 0 ], userinfo );
@@ -2657,7 +2661,7 @@ qboolean G_admin_restart( gentity_t *ent, int skiparg )
 	return qtrue;
 }
 
-qboolean G_admin_nextmap( gentity_t *ent, int skiparg )
+qboolean G_admin_nextmap( gentity_t *ent, [[maybe_unused]] int skiparg )
 {
 	AP( va( "print \"^3!nextmap: ^7%s^7 decided to load the next map\n\"",
 	        ( ent ) ? ent->client->pers.netname : "console" ) );
@@ -3032,7 +3036,7 @@ qboolean G_admin_warn( gentity_t *ent, int skiparg )
 
 	if((found = G_ClientNumbersFromString(name, pids, MAX_CLIENTS)) != 1) {
 		G_MatchOnePlayer(pids, found, err, sizeof(err));
-		ADMP(va("^/warn: ^7%s", err));
+		ADMP((const char *)va("^/warn: ^7%s", err));
 		return qfalse;
 	}
 
@@ -3122,14 +3126,14 @@ qboolean G_admin_warn( gentity_t *ent, int skiparg )
  that it prints the message to the server console if ent is not defined.
 ================
 */
-void G_admin_print( gentity_t *ent, char *m )
+void G_admin_print( gentity_t *ent, const char *m )
 {
 	if( ent )
 		trap_SendServerCommand( ent - level.gentities, va( "print \"%s\"", m ) );
 	else {
 		char m2[ MAX_STRING_CHARS ];
 		if( !trap_Cvar_VariableIntegerValue( "com_ansiColor" ) ) {
-			G_DecolorString( m, m2, sizeof( m2 ) );
+			G_DecolorString( (char *)m, m2, sizeof( m2 ) );
 			trap_Printf( m2 );
 		}
 		else
@@ -3147,7 +3151,7 @@ void G_admin_buffer_end( gentity_t *ent )
 	ADMP( g_bfb );
 }
 
-void G_admin_buffer_print( gentity_t *ent, char *m )
+void G_admin_buffer_print( gentity_t *ent, const char *m )
 {
 	// 1022 - strlen("print 64 \"\"") - 1
 	if( strlen( m ) + strlen( g_bfb ) >= 1009 ) {

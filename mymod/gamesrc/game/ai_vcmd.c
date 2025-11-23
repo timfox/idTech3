@@ -69,7 +69,7 @@ typedef struct voiceCommand_s
 BotVoiceChat_GetFlag
 ==================
 */
-void BotVoiceChat_GetFlag(bot_state_t *bs, int client, int mode) {
+void BotVoiceChat_GetFlag(bot_state_t *bs, int client, [[maybe_unused]] int mode) {
 	//
 	if (gametype == GT_CTF || gametype == GT_CTF_ELIMINATION) {
 		if (!ctf_redflag.areanum || !ctf_blueflag.areanum)
@@ -161,7 +161,7 @@ void BotVoiceChat_Offense(bot_state_t *bs, int client, int mode) {
 BotVoiceChat_Defend
 ==================
 */
-void BotVoiceChat_Defend(bot_state_t *bs, int client, int mode) {
+void BotVoiceChat_Defend(bot_state_t *bs, int client, [[maybe_unused]] int mode) {
 	if ( gametype == GT_OBELISK || gametype == GT_HARVESTER) {
 		//
 		switch(BotTeam(bs)) {
@@ -217,7 +217,7 @@ void BotVoiceChat_DefendFlag(bot_state_t *bs, int client, int mode) {
 BotVoiceChat_Patrol
 ==================
 */
-void BotVoiceChat_Patrol(bot_state_t *bs, int client, int mode) {
+void BotVoiceChat_Patrol(bot_state_t *bs, int client, [[maybe_unused]] int mode) {
 	//
 	bs->decisionmaker = client;
 	//
@@ -240,7 +240,7 @@ void BotVoiceChat_Patrol(bot_state_t *bs, int client, int mode) {
 BotVoiceChat_Camp
 ==================
 */
-void BotVoiceChat_Camp(bot_state_t *bs, int client, int mode) {
+void BotVoiceChat_Camp(bot_state_t *bs, int client, [[maybe_unused]] int mode) {
 	int areanum;
 	aas_entityinfo_t entinfo;
 	char netname[MAX_NETNAME];
@@ -296,7 +296,7 @@ void BotVoiceChat_Camp(bot_state_t *bs, int client, int mode) {
 BotVoiceChat_FollowMe
 ==================
 */
-void BotVoiceChat_FollowMe(bot_state_t *bs, int client, int mode) {
+void BotVoiceChat_FollowMe(bot_state_t *bs, int client, [[maybe_unused]] int mode) {
 	int areanum;
 	aas_entityinfo_t entinfo;
 	char netname[MAX_NETNAME];
@@ -350,7 +350,7 @@ void BotVoiceChat_FollowMe(bot_state_t *bs, int client, int mode) {
 BotVoiceChat_FollowFlagCarrier
 ==================
 */
-void BotVoiceChat_FollowFlagCarrier(bot_state_t *bs, int client, int mode) {
+void BotVoiceChat_FollowFlagCarrier(bot_state_t *bs, [[maybe_unused]] int client, int mode) {
 	int carrier;
 
 	carrier = BotTeamFlagCarrier(bs);
@@ -366,7 +366,7 @@ void BotVoiceChat_FollowFlagCarrier(bot_state_t *bs, int client, int mode) {
 BotVoiceChat_ReturnFlag
 ==================
 */
-void BotVoiceChat_ReturnFlag(bot_state_t *bs, int client, int mode) {
+void BotVoiceChat_ReturnFlag(bot_state_t *bs, int client, [[maybe_unused]] int mode) {
 	//if not in CTF mode
 	if ( gametype != GT_CTF && gametype != GT_CTF_ELIMINATION && gametype != GT_1FCTF ) {
 		return;
@@ -393,7 +393,7 @@ void BotVoiceChat_ReturnFlag(bot_state_t *bs, int client, int mode) {
 BotVoiceChat_StartLeader
 ==================
 */
-void BotVoiceChat_StartLeader(bot_state_t *bs, int client, int mode) {
+void BotVoiceChat_StartLeader(bot_state_t *bs, int client, [[maybe_unused]] int mode) {
 	ClientName(client, bs->teamleader, sizeof(bs->teamleader));
 }
 
@@ -402,7 +402,7 @@ void BotVoiceChat_StartLeader(bot_state_t *bs, int client, int mode) {
 BotVoiceChat_StopLeader
 ==================
 */
-void BotVoiceChat_StopLeader(bot_state_t *bs, int client, int mode) {
+void BotVoiceChat_StopLeader(bot_state_t *bs, int client, [[maybe_unused]] int mode) {
 	char netname[MAX_MESSAGE_SIZE];
 
 	if (Q_strequal(bs->teamleader, ClientName(client, netname, sizeof(netname)))) {
@@ -416,7 +416,7 @@ void BotVoiceChat_StopLeader(bot_state_t *bs, int client, int mode) {
 BotVoiceChat_WhoIsLeader
 ==================
 */
-void BotVoiceChat_WhoIsLeader(bot_state_t *bs, int client, int mode) {
+void BotVoiceChat_WhoIsLeader(bot_state_t *bs, [[maybe_unused]] int client, [[maybe_unused]] int mode) {
 	char netname[MAX_MESSAGE_SIZE];
 
 	if (!TeamPlayIsOn()) return;
@@ -435,7 +435,7 @@ void BotVoiceChat_WhoIsLeader(bot_state_t *bs, int client, int mode) {
 BotVoiceChat_WantOnDefense
 ==================
 */
-void BotVoiceChat_WantOnDefense(bot_state_t *bs, int client, int mode) {
+void BotVoiceChat_WantOnDefense(bot_state_t *bs, int client, [[maybe_unused]] int mode) {
 	char netname[MAX_NETNAME];
 	int preference;
 
@@ -456,7 +456,7 @@ void BotVoiceChat_WantOnDefense(bot_state_t *bs, int client, int mode) {
 BotVoiceChat_WantOnOffense
 ==================
 */
-void BotVoiceChat_WantOnOffense(bot_state_t *bs, int client, int mode) {
+void BotVoiceChat_WantOnOffense(bot_state_t *bs, int client, [[maybe_unused]] int mode) {
 	char netname[MAX_NETNAME];
 	int preference;
 
@@ -472,7 +472,7 @@ void BotVoiceChat_WantOnOffense(bot_state_t *bs, int client, int mode) {
 	trap_EA_Action(bs->client, ACTION_AFFIRMATIVE);
 }
 
-void BotVoiceChat_Dummy(bot_state_t *bs, int client, int mode) {
+void BotVoiceChat_Dummy([[maybe_unused]] bot_state_t *bs, [[maybe_unused]] int client, [[maybe_unused]] int mode) {
 }
 
 voiceCommand_t voiceCommands[] = {

@@ -1913,7 +1913,7 @@ void Cmd_CallVote_f( gentity_t *ent ) {
 	} 
 	else if ( Q_strequal( arg1, "kick" ) ) {
 		i = 0;
-		while( !(g_entities+i) || !((g_entities+i)->client) || !Q_strequal(arg2,(g_entities+i)->client->pers.netname)) {
+		while( i >= MAX_CLIENTS || !((g_entities+i)->client) || !Q_strequal(arg2,(g_entities+i)->client->pers.netname)) {
 			//Not client i, try next
 			i++;
 			if(i>=MAX_CLIENTS){ //Only numbers <128 is clients
@@ -2108,7 +2108,7 @@ void Cmd_CallTeamVote_f( gentity_t *ent ) {
 				for ( i = 0 ; i < level.maxclients ; i++ ) {
 					if ( level.clients[i].pers.connected == CON_DISCONNECTED )
 						continue;
-					if (level.clients[i].sess.sessionTeam != team)
+					if (level.clients[i].sess.sessionTeam != (team_t)team)
 						continue;
 					Q_strncpyz(netname, level.clients[i].pers.netname, sizeof(netname));
 					Q_CleanStr(netname);
@@ -2136,7 +2136,7 @@ void Cmd_CallTeamVote_f( gentity_t *ent ) {
 		if ( level.clients[i].pers.connected == CON_DISCONNECTED ) {
 			continue;
 		}
-		if (level.clients[i].sess.sessionTeam == team) {
+		if (level.clients[i].sess.sessionTeam == (team_t)team) {
 			trap_SendServerCommand( i, va("print \"%s called a team vote.\n\"", ent->client->pers.netname ) );
 		}
 	}
@@ -2147,7 +2147,7 @@ void Cmd_CallTeamVote_f( gentity_t *ent ) {
 	level.teamVoteNo[cs_offset] = 0;
 
 	for ( i = 0 ; i < level.maxclients ; i++ ) {
-		if (level.clients[i].sess.sessionTeam == team ) {
+		if (level.clients[i].sess.sessionTeam == (team_t)team ) {
 			level.clients[i].ps.eFlags &= ~EF_TEAMVOTED;
 		}
 	}

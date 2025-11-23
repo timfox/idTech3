@@ -60,7 +60,7 @@ static saveConfig_t		saveConfig;
 UI_SaveConfigMenu_BackEvent
 ===============
 */
-static void UI_SaveConfigMenu_BackEvent( void *ptr, int event ) {
+static void UI_SaveConfigMenu_BackEvent( [[maybe_unused]] void *ptr, int event ) {
 	if( event != QM_ACTIVATED ) {
 		return;
 	}
@@ -74,7 +74,7 @@ static void UI_SaveConfigMenu_BackEvent( void *ptr, int event ) {
 UI_SaveConfigMenu_SaveEvent
 ===============
 */
-static void UI_SaveConfigMenu_SaveEvent( void *ptr, int event ) {
+static void UI_SaveConfigMenu_SaveEvent( [[maybe_unused]] void *ptr, int event ) {
 	char	configname[MAX_QPATH];
 
 	if( event != QM_ACTIVATED ) {

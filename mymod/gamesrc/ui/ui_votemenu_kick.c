@@ -134,7 +134,7 @@ static void VoteKickMenu_Event( void* ptr, int event )
 UI_VoteKickMenu_UpEvent
 =================
 */
-static void UI_VoteKickMenu_UpEvent( void* ptr, int event ) {
+static void UI_VoteKickMenu_UpEvent( [[maybe_unused]] void* ptr, int event ) {
 	if (event != QM_ACTIVATED) {
 		return;
 	}
@@ -151,7 +151,7 @@ static void UI_VoteKickMenu_UpEvent( void* ptr, int event ) {
 UI_VoteKickMenu_DownEvent
 =================
 */
-static void UI_VoteKickMenu_DownEvent( void* ptr, int event ) {
+static void UI_VoteKickMenu_DownEvent( [[maybe_unused]] void* ptr, int event ) {
 	if (event != QM_ACTIVATED) {
 		return;
 	}

@@ -115,7 +115,7 @@ static void ProximityMine_Explode( gentity_t *mine )
 ProximityMine_Die
 ================
 */
-static void ProximityMine_Die( gentity_t *ent, gentity_t *inflictor, gentity_t *attacker, int damage, int mod )
+static void ProximityMine_Die( gentity_t *ent, [[maybe_unused]] gentity_t *inflictor, [[maybe_unused]] gentity_t *attacker, [[maybe_unused]] int damage, [[maybe_unused]] int mod )
 {
 	ent->think = ProximityMine_Explode;
 	ent->nextthink = level.time + 1;
@@ -126,7 +126,7 @@ static void ProximityMine_Die( gentity_t *ent, gentity_t *inflictor, gentity_t *
 ProximityMine_Trigger
 ================
 */
-void ProximityMine_Trigger( gentity_t *trigger, gentity_t *other, trace_t *trace )
+void ProximityMine_Trigger( gentity_t *trigger, gentity_t *other, [[maybe_unused]] trace_t *trace )
 {
 	vec3_t		v;
 	gentity_t	*mine;
@@ -144,7 +144,7 @@ void ProximityMine_Trigger( gentity_t *trigger, gentity_t *other, trace_t *trace
 
 	if ( g_gametype.integer >= GT_TEAM && g_ffa_gt!=1) {
 		// don't trigger same team mines
-		if (trigger->parent->s.generic1 == other->client->sess.sessionTeam) {
+		if ((team_t)trigger->parent->s.generic1 == other->client->sess.sessionTeam) {
 			return;
 		}
 	}
@@ -266,7 +266,11 @@ static void ProximityMine_ExplodeOnPlayer( gentity_t *mine )
 	player->client->ps.eFlags &= ~EF_TICKING;
 
 	if ( player->client->invulnerabilityTime > level.time ) {
-		G_Damage( player, mine->parent, mine->parent, vec3_origin, mine->s.origin, 1000, DAMAGE_NO_KNOCKBACK, MOD_JUICED );
+		{
+			vec3_t zero_dir;
+			VectorClear( zero_dir );
+			G_Damage( player, mine->parent, mine->parent, zero_dir, mine->s.origin, 1000, DAMAGE_NO_KNOCKBACK, MOD_JUICED );
+		}
 		player->client->invulnerabilityTime = 0;
 		G_TempEntity( player->client->ps.origin, EV_JUICED );
 	}

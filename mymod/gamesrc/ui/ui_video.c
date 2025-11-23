@@ -543,23 +543,23 @@ static void GraphicsOptions_CheckConfig( void )
 {
 	int i;
 
-	for ( i = 0; i < NUM_IVO_TEMPLATES-1; i++ )
+	for ( i = 0; i < (int)(NUM_IVO_TEMPLATES-1); i++ )
 	{
 		if ( s_ivo_templates[i].driver != s_graphicsoptions.driver.curvalue )
 			continue;
 		if ( GraphicsOptions_FindDetectedResolution(s_ivo_templates[i].mode) != s_graphicsoptions.mode.curvalue )
 			continue;
-		if ( s_ivo_templates[i].fullscreen != s_graphicsoptions.fs.curvalue )
+		if ( (int)s_ivo_templates[i].fullscreen != s_graphicsoptions.fs.curvalue )
 			continue;
 		if ( s_ivo_templates[i].tq != s_graphicsoptions.tq.curvalue )
 			continue;
 		if ( s_ivo_templates[i].lighting != s_graphicsoptions.lighting.curvalue )
 			continue;
-                if ( s_ivo_templates[i].flares != s_graphicsoptions.flares.curvalue )
+                if ( (int)s_ivo_templates[i].flares != s_graphicsoptions.flares.curvalue )
 			continue;
-                if ( s_ivo_templates[i].bloom != s_graphicsoptions.bloom.curvalue )
+                if ( (int)s_ivo_templates[i].bloom != s_graphicsoptions.bloom.curvalue )
 			continue;
-		if ( s_ivo_templates[i].drawfps != s_graphicsoptions.drawfps.curvalue )
+		if ( (int)s_ivo_templates[i].drawfps != s_graphicsoptions.drawfps.curvalue )
 			continue;
 		if ( s_ivo_templates[i].geometry != s_graphicsoptions.geometry.curvalue )
 			continue;
@@ -608,11 +608,11 @@ static void GraphicsOptions_UpdateMenuItems( void )
 	{
 		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
 	}
-	if ( s_ivo.fullscreen != s_graphicsoptions.fs.curvalue )
+	if ( (int)s_ivo.fullscreen != s_graphicsoptions.fs.curvalue )
 	{
 		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
 	}
-	if ( s_ivo.extensions != s_graphicsoptions.allow_extensions.curvalue )
+	if ( (int)s_ivo.extensions != s_graphicsoptions.allow_extensions.curvalue )
 	{
 		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
 	}
@@ -624,15 +624,15 @@ static void GraphicsOptions_UpdateMenuItems( void )
 	{
 		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
 	}
-        if ( s_ivo.flares != s_graphicsoptions.flares.curvalue )
+        if ( (int)s_ivo.flares != s_graphicsoptions.flares.curvalue )
 	{
 		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
 	}
-        if ( s_ivo.bloom != s_graphicsoptions.bloom.curvalue )
+        if ( (int)s_ivo.bloom != s_graphicsoptions.bloom.curvalue )
 	{
 		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
 	}
-	if ( s_ivo.drawfps != s_graphicsoptions.drawfps.curvalue )
+	if ( (int)s_ivo.drawfps != s_graphicsoptions.drawfps.curvalue )
 	{
 		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
 	}
@@ -690,7 +690,7 @@ static void GraphicsOptions_ApplyChanges( [[maybe_unused]] void *unused, int not
 		// search for builtin mode that matches the detected mode
 		int mode;
 		if ( s_graphicsoptions.mode.curvalue == -1
-			|| s_graphicsoptions.mode.curvalue >= sizeof(detectedResolutions)/sizeof(detectedResolutions[0]) ) {
+			|| s_graphicsoptions.mode.curvalue >= (int)(sizeof(detectedResolutions)/sizeof(detectedResolutions[0])) ) {
 			s_graphicsoptions.mode.curvalue = 0;
 		}
 		mode = GraphicsOptions_FindBuiltinResolution( s_graphicsoptions.mode.curvalue );

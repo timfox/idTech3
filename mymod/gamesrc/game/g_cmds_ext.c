@@ -142,7 +142,7 @@ void G_MatchOnePlayer( int *plist, int num, char *err, int len )
 				continue;
 			Com_sprintf( line, sizeof( line ), "%2i - %s^7\n",
 			             plist[ i ], cl->pers.netname );
-			if( strlen( err ) + strlen( line ) > len )
+			if( (int)(strlen( err ) + strlen( line )) > len )
 				break;
 			Q_strcat( err, len, line );
 		}
@@ -366,7 +366,7 @@ void Cmd_AdminMessage_f( gentity_t *ent )
 		G_SayArgv( 1, cmd, sizeof( cmd ) );
 	}
 	if( G_SayArgc( ) < 2 + skiparg ) {
-		ADMP( va( "usage: %s [message]\n", cmd ) );
+		ADMP( (const char *)va( "usage: %s [message]\n", cmd ) );
 		return;
 	}
 

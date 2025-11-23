@@ -111,7 +111,7 @@ static void VoteMapMenu_Event( void* ptr, int event )
 UI_VoteMapMenu_UpEvent
 =================
 */
-static void UI_VoteMapMenu_UpEvent( void* ptr, int event ) {
+static void UI_VoteMapMenu_UpEvent( [[maybe_unused]] void* ptr, int event ) {
 	if (event != QM_ACTIVATED  || mappage.pagenumber<1) {
 		return;
 	}
@@ -124,7 +124,7 @@ static void UI_VoteMapMenu_UpEvent( void* ptr, int event ) {
 UI_VoteMapMenu_DownEvent
 =================
 */
-static void UI_VoteMapMenu_DownEvent( void* ptr, int event ) {
+static void UI_VoteMapMenu_DownEvent( [[maybe_unused]] void* ptr, int event ) {
 	if (event != QM_ACTIVATED) {
 		return;
 	}
@@ -203,7 +203,7 @@ void UI_VoteMapMenuInternal( void )
 	s_votemenu_map.info.generic.type  = MTYPE_TEXT;
 	s_votemenu_map.info.generic.x     = 320;
 	s_votemenu_map.info.generic.y     = 48;
-	s_votemenu_map.info.string        = va("Page %d",mappage.pagenumber+1);
+	s_votemenu_map.info.string        = (char *)va("Page %d",mappage.pagenumber+1);
 	s_votemenu_map.info.color         = color_white;
 	s_votemenu_map.info.style         = UI_CENTER;
 

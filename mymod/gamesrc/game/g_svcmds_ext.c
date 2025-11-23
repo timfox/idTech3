@@ -85,7 +85,7 @@ void Svcmd_TeamMessage_f( void )
 	prefix = BG_TeamName( team );
 	prefix = va( "[%c] ", toupper( *prefix ) );
 
-	G_TeamCommand( team, va( "tchat \"(console): " S_COLOR_CYAN "%s\"", ConcatArgs( 2 ) ) );
+	G_TeamCommand( team, (char *)va( "tchat \"(console): " S_COLOR_CYAN "%s\"", ConcatArgs( 2 ) ) );
 	G_LogPrintf( "sayteam: %sconsole: " S_COLOR_CYAN "%s\n", prefix, ConcatArgs( 2 ) );
 }
 

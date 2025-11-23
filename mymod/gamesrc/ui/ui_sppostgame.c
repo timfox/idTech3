@@ -101,7 +101,7 @@ char	*ui_medalSounds[] = {
 UI_SPPostgameMenu_AgainEvent
 =================
 */
-static void UI_SPPostgameMenu_AgainEvent( void* ptr, int event )
+static void UI_SPPostgameMenu_AgainEvent( [[maybe_unused]] void* ptr, int event )
 {
 	if (event != QM_ACTIVATED) {
 		return;
@@ -116,7 +116,7 @@ static void UI_SPPostgameMenu_AgainEvent( void* ptr, int event )
 UI_SPPostgameMenu_NextEvent
 =================
 */
-static void UI_SPPostgameMenu_NextEvent( void* ptr, int event ) {
+static void UI_SPPostgameMenu_NextEvent( [[maybe_unused]] void* ptr, int event ) {
 	int			currentSet;
 	int			levelSet;
 	int			level;
@@ -161,7 +161,7 @@ static void UI_SPPostgameMenu_NextEvent( void* ptr, int event ) {
 UI_SPPostgameMenu_MenuEvent
 =================
 */
-static void UI_SPPostgameMenu_MenuEvent( void* ptr, int event )
+static void UI_SPPostgameMenu_MenuEvent( [[maybe_unused]] void* ptr, int event )
 {
 	if (event != QM_ACTIVATED) {
 		return;

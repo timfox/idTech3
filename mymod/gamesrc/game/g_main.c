@@ -201,91 +201,91 @@ mapinfo_result_t mapinfo;
 // bk001129 - made static to avoid aliasing
 static cvarTable_t gameCvarTable[] = {
 	// don't override the cheat state set by the system
-	{ &g_cheats, "sv_cheats", "", 0, 0, qfalse },
+	{ &g_cheats, "sv_cheats", "", 0, 0, qfalse, qfalse },
 
 	// noset vars
-	{ NULL, "gamename", GAMEVERSION , CVAR_SERVERINFO | CVAR_ROM, 0, qfalse  },
-	{ NULL, "gamedate", __DATE__ , CVAR_ROM, 0, qfalse  },
-	{ &g_restarted, "g_restarted", "0", CVAR_ROM, 0, qfalse  },
+	{ NULL, "gamename", GAMEVERSION , CVAR_SERVERINFO | CVAR_ROM, 0, qfalse, qfalse  },
+	{ NULL, "gamedate", __DATE__ , CVAR_ROM, 0, qfalse, qfalse  },
+	{ &g_restarted, "g_restarted", "0", CVAR_ROM, 0, qfalse, qfalse  },
 
 	// latched vars
-	{ &g_gametype, "g_gametype", "0", CVAR_SERVERINFO | CVAR_USERINFO | CVAR_LATCH, 0, qfalse  },
+	{ &g_gametype, "g_gametype", "0", CVAR_SERVERINFO | CVAR_USERINFO | CVAR_LATCH, 0, qfalse, qfalse  },
 
-	{ &g_maxclients, "sv_maxclients", "8", CVAR_SERVERINFO | CVAR_LATCH | CVAR_ARCHIVE, 0, qfalse  },
-	{ &g_maxGameClients, "g_maxGameClients", "0", CVAR_SERVERINFO | CVAR_LATCH | CVAR_ARCHIVE, 0, qfalse  },
+	{ &g_maxclients, "sv_maxclients", "8", CVAR_SERVERINFO | CVAR_LATCH | CVAR_ARCHIVE, 0, qfalse, qfalse  },
+	{ &g_maxGameClients, "g_maxGameClients", "0", CVAR_SERVERINFO | CVAR_LATCH | CVAR_ARCHIVE, 0, qfalse, qfalse  },
 
 	// change anytime vars
-	{ &g_dmflags, "dmflags", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue  },
-	{ &g_videoflags, "videoflags", "7", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue  },
-	{ &g_elimflags, "elimflags", "0", CVAR_SERVERINFO, 0, qfalse  },
-	{ &g_voteflags, "voteflags", "0", CVAR_SERVERINFO, 0, qfalse  },
-	{ &g_fraglimit, "fraglimit", "20", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
-	{ &g_timelimit, "timelimit", "0", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
-	{ &g_capturelimit, "capturelimit", "8", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
+	{ &g_dmflags, "dmflags", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue, qfalse  },
+	{ &g_videoflags, "videoflags", "7", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue, qfalse  },
+	{ &g_elimflags, "elimflags", "0", CVAR_SERVERINFO, 0, qfalse, qfalse  },
+	{ &g_voteflags, "voteflags", "0", CVAR_SERVERINFO, 0, qfalse, qfalse  },
+	{ &g_fraglimit, "fraglimit", "20", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue, qfalse },
+	{ &g_timelimit, "timelimit", "0", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue, qfalse },
+	{ &g_capturelimit, "capturelimit", "8", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue, qfalse },
 
-	{ &g_synchronousClients, "g_synchronousClients", "0", CVAR_SYSTEMINFO, 0, qfalse  },
+	{ &g_synchronousClients, "g_synchronousClients", "0", CVAR_SYSTEMINFO, 0, qfalse, qfalse  },
 
-	{ &g_friendlyFire, "g_friendlyFire", "0", CVAR_ARCHIVE, 0, qtrue  },
+	{ &g_friendlyFire, "g_friendlyFire", "0", CVAR_ARCHIVE, 0, qtrue, qfalse  },
 
-	{ &g_teamAutoJoin, "g_teamAutoJoin", "0", CVAR_ARCHIVE  },
-	{ &g_teamForceBalance, "g_teamForceBalance", "0", CVAR_ARCHIVE  },
+	{ &g_teamAutoJoin, "g_teamAutoJoin", "0", CVAR_ARCHIVE, 0, qfalse, qfalse  },
+	{ &g_teamForceBalance, "g_teamForceBalance", "0", CVAR_ARCHIVE, 0, qfalse, qfalse  },
 
-	{ &g_warmup, "g_warmup", "20", CVAR_ARCHIVE, 0, qtrue  },
-	{ &g_doWarmup, "g_doWarmup", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue  },
-	{ &g_logfile, "g_log", "games.log", CVAR_ARCHIVE, 0, qfalse  },
-	{ &g_logfileSync, "g_logsync", "0", CVAR_ARCHIVE, 0, qfalse  },
+	{ &g_warmup, "g_warmup", "20", CVAR_ARCHIVE, 0, qtrue, qfalse  },
+	{ &g_doWarmup, "g_doWarmup", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue, qfalse  },
+	{ &g_logfile, "g_log", "games.log", CVAR_ARCHIVE, 0, qfalse, qfalse  },
+	{ &g_logfileSync, "g_logsync", "0", CVAR_ARCHIVE, 0, qfalse, qfalse  },
 
-	{ &g_password, "g_password", "", CVAR_USERINFO, 0, qfalse  },
+	{ &g_password, "g_password", "", CVAR_USERINFO, 0, qfalse, qfalse  },
 
-	{ &g_banIPs, "g_banIPs", "", CVAR_ARCHIVE, 0, qfalse  },
-	{ &g_filterBan, "g_filterBan", "1", CVAR_ARCHIVE, 0, qfalse  },
+	{ &g_banIPs, "g_banIPs", "", CVAR_ARCHIVE, 0, qfalse, qfalse  },
+	{ &g_filterBan, "g_filterBan", "1", CVAR_ARCHIVE, 0, qfalse, qfalse  },
 
-	{ &g_needpass, "g_needpass", "0", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse },
+	{ &g_needpass, "g_needpass", "0", CVAR_SERVERINFO | CVAR_ROM, 0, qfalse, qfalse },
 
-	{ &g_dedicated, "dedicated", "0", 0, 0, qfalse  },
+	{ &g_dedicated, "dedicated", "0", 0, 0, qfalse, qfalse  },
 
-	{ &g_speed, "g_speed", "320", 0, 0, qtrue  },
-	{ &g_gravity, "g_gravity", "800", 0, 0, qtrue  },
-	{ &g_gravityModifier, "g_gravityModifier", "1", 0, 0, qtrue  },
-	{ &g_damageModifier, "g_damageModifier", "0", 0, 0, qtrue },
-	{ &g_knockback, "g_knockback", "1000", 0, 0, qtrue  },
-	{ &g_quadfactor, "g_quadfactor", "3", 0, 0, qtrue  },
-	{ &g_weaponRespawn, "g_weaponrespawn", "5", 0, 0, qtrue  },
-	{ &g_weaponTeamRespawn, "g_weaponTeamRespawn", "30", 0, 0, qtrue },
-	{ &g_forcerespawn, "g_forcerespawn", "20", 0, 0, qtrue },
-	{ &g_respawntime, "g_respawntime", "0", CVAR_ARCHIVE, 0, qtrue },
-	{ &g_inactivity, "g_inactivity", "0", 0, 0, qtrue },
-	{ &g_debugMove, "g_debugMove", "0", 0, 0, qfalse },
-	{ &g_debugDamage, "g_debugDamage", "0", 0, 0, qfalse },
-	{ &g_debugAlloc, "g_debugAlloc", "0", 0, 0, qfalse },
-	{ &g_motd, "g_motd", "", 0, 0, qfalse },
-	{ &g_motdfile, "g_motdfile", "motd.cfg", 0, 0, qfalse },
-	{ &g_blood, "com_blood", "1", 0, 0, qfalse },
+	{ &g_speed, "g_speed", "320", 0, 0, qtrue, qfalse  },
+	{ &g_gravity, "g_gravity", "800", 0, 0, qtrue, qfalse  },
+	{ &g_gravityModifier, "g_gravityModifier", "1", 0, 0, qtrue, qfalse  },
+	{ &g_damageModifier, "g_damageModifier", "0", 0, 0, qtrue, qfalse },
+	{ &g_knockback, "g_knockback", "1000", 0, 0, qtrue, qfalse  },
+	{ &g_quadfactor, "g_quadfactor", "3", 0, 0, qtrue, qfalse  },
+	{ &g_weaponRespawn, "g_weaponrespawn", "5", 0, 0, qtrue, qfalse  },
+	{ &g_weaponTeamRespawn, "g_weaponTeamRespawn", "30", 0, 0, qtrue, qfalse },
+	{ &g_forcerespawn, "g_forcerespawn", "20", 0, 0, qtrue, qfalse },
+	{ &g_respawntime, "g_respawntime", "0", CVAR_ARCHIVE, 0, qtrue, qfalse },
+	{ &g_inactivity, "g_inactivity", "0", 0, 0, qtrue, qfalse },
+	{ &g_debugMove, "g_debugMove", "0", 0, 0, qfalse, qfalse },
+	{ &g_debugDamage, "g_debugDamage", "0", 0, 0, qfalse, qfalse },
+	{ &g_debugAlloc, "g_debugAlloc", "0", 0, 0, qfalse, qfalse },
+	{ &g_motd, "g_motd", "", 0, 0, qfalse, qfalse },
+	{ &g_motdfile, "g_motdfile", "motd.cfg", 0, 0, qfalse, qfalse },
+	{ &g_blood, "com_blood", "1", 0, 0, qfalse, qfalse },
 
-	{ &g_podiumDist, "g_podiumDist", "80", 0, 0, qfalse },
-	{ &g_podiumDrop, "g_podiumDrop", "70", 0, 0, qfalse },
+	{ &g_podiumDist, "g_podiumDist", "80", 0, 0, qfalse, qfalse },
+	{ &g_podiumDrop, "g_podiumDrop", "70", 0, 0, qfalse, qfalse },
 
 	//Votes start:
-	{ &g_allowVote, "g_allowVote", "1", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse },
-	{ &g_maxvotes, "g_maxVotes", MAX_VOTE_COUNT, CVAR_ARCHIVE, 0, qfalse },
-	{ &g_voteNames, "g_voteNames", "/map_restart/nextmap/map/g_gametype/kick/clientkick/g_doWarmup/timelimit/fraglimit/", CVAR_ARCHIVE, 0, qfalse },
-	{ &g_voteBan, "g_voteBan", "0", CVAR_ARCHIVE, 0, qfalse },
-	{ &g_voteGametypes, "g_voteGametypes", "/0/1/3/4/5/6/7/8/9/10/11/12/13/", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse },
-	{ &g_voteMaxTimelimit, "g_voteMaxTimelimit", "1000", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse },
-	{ &g_voteMinTimelimit, "g_voteMinTimelimit", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse },
-	{ &g_voteMaxFraglimit, "g_voteMaxFraglimit", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse },
-	{ &g_voteMinFraglimit, "g_voteMinFraglimit", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse },
-	{ &g_votemaps, "g_votemapsfile", "votemaps.cfg", 0, 0, qfalse },
-	{ &g_votecustom, "g_votecustomfile", "votecustom.cfg", 0, 0, qfalse },
+	{ &g_allowVote, "g_allowVote", "1", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse },
+	{ &g_maxvotes, "g_maxVotes", MAX_VOTE_COUNT, CVAR_ARCHIVE, 0, qfalse, qfalse },
+	{ &g_voteNames, "g_voteNames", "/map_restart/nextmap/map/g_gametype/kick/clientkick/g_doWarmup/timelimit/fraglimit/", CVAR_ARCHIVE, 0, qfalse, qfalse },
+	{ &g_voteBan, "g_voteBan", "0", CVAR_ARCHIVE, 0, qfalse, qfalse },
+	{ &g_voteGametypes, "g_voteGametypes", "/0/1/3/4/5/6/7/8/9/10/11/12/13/", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse },
+	{ &g_voteMaxTimelimit, "g_voteMaxTimelimit", "1000", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse },
+	{ &g_voteMinTimelimit, "g_voteMinTimelimit", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse },
+	{ &g_voteMaxFraglimit, "g_voteMaxFraglimit", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse },
+	{ &g_voteMinFraglimit, "g_voteMinFraglimit", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse },
+	{ &g_votemaps, "g_votemapsfile", "votemaps.cfg", 0, 0, qfalse, qfalse },
+	{ &g_votecustom, "g_votecustomfile", "votecustom.cfg", 0, 0, qfalse, qfalse },
 
-	{ &g_listEntity, "g_listEntity", "0", 0, 0, qfalse },
+	{ &g_listEntity, "g_listEntity", "0", 0, 0, qfalse, qfalse },
 
-	{ &g_obeliskHealth, "g_obeliskHealth", "2500", 0, 0, qfalse },
-	{ &g_obeliskRegenPeriod, "g_obeliskRegenPeriod", "1", 0, 0, qfalse },
-	{ &g_obeliskRegenAmount, "g_obeliskRegenAmount", "15", 0, 0, qfalse },
-	{ &g_obeliskRespawnDelay, "g_obeliskRespawnDelay", "10", CVAR_SERVERINFO, 0, qfalse },
+	{ &g_obeliskHealth, "g_obeliskHealth", "2500", 0, 0, qfalse, qfalse },
+	{ &g_obeliskRegenPeriod, "g_obeliskRegenPeriod", "1", 0, 0, qfalse, qfalse },
+	{ &g_obeliskRegenAmount, "g_obeliskRegenAmount", "15", 0, 0, qfalse, qfalse },
+	{ &g_obeliskRespawnDelay, "g_obeliskRespawnDelay", "10", CVAR_SERVERINFO, 0, qfalse, qfalse },
 
-	{ &g_cubeTimeout, "g_cubeTimeout", "30", 0, 0, qfalse },
+	{ &g_cubeTimeout, "g_cubeTimeout", "30", 0, 0, qfalse, qfalse },
 #ifdef MISSIONPACK
 	{ &g_redteam, "g_redteam", "Stroggs", CVAR_ARCHIVE | CVAR_SERVERINFO | CVAR_USERINFO , 0, qtrue, qtrue },
 	{ &g_blueteam, "g_blueteam", "Pagans", CVAR_ARCHIVE | CVAR_SERVERINFO | CVAR_USERINFO , 0, qtrue, qtrue  },
@@ -296,119 +296,119 @@ static cvarTable_t gameCvarTable[] = {
 	{ &cg_enableQ, "g_enableQ", "0", CVAR_SERVERINFO, 0, qtrue, qfalse },		// leilei - q scale
 	{ &g_enableDust, "g_enableDust", "0", CVAR_SERVERINFO, 0, qtrue, qfalse },
 	{ &g_enableBreath, "g_enableBreath", "0", CVAR_SERVERINFO, 0, qtrue, qfalse },
-	{ &g_proxMineTimeout, "g_proxMineTimeout", "20000", 0, 0, qfalse },
+	{ &g_proxMineTimeout, "g_proxMineTimeout", "20000", 0, 0, qfalse, qfalse },
 
-	{ &g_smoothClients, "g_smoothClients", "1", 0, 0, qfalse},
-	{ &pmove_fixed, "pmove_fixed", "0", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue},
-	{ &pmove_msec, "pmove_msec", "11", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue},
-	{ &pmove_float, "pmove_float", "1", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue},
+	{ &g_smoothClients, "g_smoothClients", "1", 0, 0, qfalse, qfalse},
+	{ &pmove_fixed, "pmove_fixed", "0", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue, qfalse},
+	{ &pmove_msec, "pmove_msec", "11", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue, qfalse},
+	{ &pmove_float, "pmove_float", "1", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue, qfalse},
 
 //unlagged - server options
-	{ &g_delagHitscan, "g_delagHitscan", "0", CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qtrue },
-	{ &g_truePing, "g_truePing", "0", CVAR_ARCHIVE, 0, qtrue },
+	{ &g_delagHitscan, "g_delagHitscan", "0", CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qtrue, qfalse },
+	{ &g_truePing, "g_truePing", "0", CVAR_ARCHIVE, 0, qtrue, qfalse },
 	// it's CVAR_SYSTEMINFO so the client's sv_fps will be automagically set to its value
-	{ &sv_fps, "sv_fps", "20", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qfalse },
-	{ &g_lagLightning, "g_lagLightning", "1", CVAR_ARCHIVE, 0, qtrue },
+	{ &sv_fps, "sv_fps", "20", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qfalse, qfalse },
+	{ &g_lagLightning, "g_lagLightning", "1", CVAR_ARCHIVE, 0, qtrue, qfalse },
 //unlagged - server options
 
-	{ &g_rankings, "g_rankings", "0", 0, 0, qfalse},
-	{ &g_localTeamPref, "g_localTeamPref", "", 0, 0, qfalse },
-	{ &g_music, "g_music", "", 0, 0, qfalse},
-	{ &g_spawnprotect, "g_spawnprotect", "500", CVAR_ARCHIVE, 0, qtrue},
+	{ &g_rankings, "g_rankings", "0", 0, 0, qfalse, qfalse},
+	{ &g_localTeamPref, "g_localTeamPref", "", 0, 0, qfalse, qfalse },
+	{ &g_music, "g_music", "", 0, 0, qfalse, qfalse},
+	{ &g_spawnprotect, "g_spawnprotect", "500", CVAR_ARCHIVE, 0, qtrue, qfalse},
 	//Now for elimination stuff:
-	{ &g_elimination_selfdamage, "elimination_selfdamage", "0", 0, 0, qtrue },
-	{ &g_elimination_startHealth, "elimination_startHealth", "200", CVAR_ARCHIVE, 0, qtrue },
-	{ &g_elimination_startArmor, "elimination_startArmor", "150", CVAR_ARCHIVE, 0, qtrue },
-	{ &g_elimination_bfg, "elimination_bfg", "0", CVAR_ARCHIVE, 0, qtrue },
-	{ &g_elimination_roundtime, "elimination_roundtime", "120", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
-	{ &g_elimination_warmup, "elimination_warmup", "7", CVAR_ARCHIVE , 0, qtrue },
-	{ &g_elimination_activewarmup, "elimination_activewarmup", "5", CVAR_ARCHIVE , 0, qtrue },
-	{ &g_elimination_allgametypes, "g_elimination", "0", CVAR_LATCH, 0, qfalse },
+	{ &g_elimination_selfdamage, "elimination_selfdamage", "0", 0, 0, qtrue, qfalse },
+	{ &g_elimination_startHealth, "elimination_startHealth", "200", CVAR_ARCHIVE, 0, qtrue, qfalse },
+	{ &g_elimination_startArmor, "elimination_startArmor", "150", CVAR_ARCHIVE, 0, qtrue, qfalse },
+	{ &g_elimination_bfg, "elimination_bfg", "0", CVAR_ARCHIVE, 0, qtrue, qfalse },
+	{ &g_elimination_roundtime, "elimination_roundtime", "120", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue, qfalse },
+	{ &g_elimination_warmup, "elimination_warmup", "7", CVAR_ARCHIVE , 0, qtrue, qfalse },
+	{ &g_elimination_activewarmup, "elimination_activewarmup", "5", CVAR_ARCHIVE , 0, qtrue, qfalse },
+	{ &g_elimination_allgametypes, "g_elimination", "0", CVAR_LATCH, 0, qfalse, qfalse },
 
-	{ &g_elimination_machinegun, "elimination_machinegun", "500", CVAR_ARCHIVE, 0, qtrue },
-	{ &g_elimination_shotgun, "elimination_shotgun", "500", CVAR_ARCHIVE, 0, qtrue },
-	{ &g_elimination_grenade, "elimination_grenade", "100", CVAR_ARCHIVE, 0, qtrue },
-	{ &g_elimination_rocket, "elimination_rocket", "50", CVAR_ARCHIVE, 0, qtrue },
-	{ &g_elimination_railgun, "elimination_railgun", "20", CVAR_ARCHIVE, 0, qtrue },
-	{ &g_elimination_lightning, "elimination_lightning", "300", CVAR_ARCHIVE, 0, qtrue },
-	{ &g_elimination_plasmagun, "elimination_plasmagun", "200", CVAR_ARCHIVE, 0, qtrue },
-	{ &g_elimination_chain, "elimination_chain", "0", CVAR_ARCHIVE, 0, qtrue },
-	{ &g_elimination_mine, "elimination_mine", "0", CVAR_ARCHIVE, 0, qtrue },
-	{ &g_elimination_nail, "elimination_nail", "0", CVAR_ARCHIVE, 0, qtrue },
+	{ &g_elimination_machinegun, "elimination_machinegun", "500", CVAR_ARCHIVE, 0, qtrue, qfalse },
+	{ &g_elimination_shotgun, "elimination_shotgun", "500", CVAR_ARCHIVE, 0, qtrue, qfalse },
+	{ &g_elimination_grenade, "elimination_grenade", "100", CVAR_ARCHIVE, 0, qtrue, qfalse },
+	{ &g_elimination_rocket, "elimination_rocket", "50", CVAR_ARCHIVE, 0, qtrue, qfalse },
+	{ &g_elimination_railgun, "elimination_railgun", "20", CVAR_ARCHIVE, 0, qtrue, qfalse },
+	{ &g_elimination_lightning, "elimination_lightning", "300", CVAR_ARCHIVE, 0, qtrue, qfalse },
+	{ &g_elimination_plasmagun, "elimination_plasmagun", "200", CVAR_ARCHIVE, 0, qtrue, qfalse },
+	{ &g_elimination_chain, "elimination_chain", "0", CVAR_ARCHIVE, 0, qtrue, qfalse },
+	{ &g_elimination_mine, "elimination_mine", "0", CVAR_ARCHIVE, 0, qtrue, qfalse },
+	{ &g_elimination_nail, "elimination_nail", "0", CVAR_ARCHIVE, 0, qtrue, qfalse },
 
-	{ &g_elimination_ctf_oneway, "elimination_ctf_oneway", "0", CVAR_ARCHIVE, 0, qtrue },
+	{ &g_elimination_ctf_oneway, "elimination_ctf_oneway", "0", CVAR_ARCHIVE, 0, qtrue, qfalse },
 
-	{ &g_elimination_lockspectator, "elimination_lockspectator", "0", 0, qtrue },
+	{ &g_elimination_lockspectator, "elimination_lockspectator", "0", 0, 0, qtrue, qfalse },
 
-	{ &g_awardpushing, "g_awardpushing", "1", CVAR_ARCHIVE, 0, qtrue },
+	{ &g_awardpushing, "g_awardpushing", "1", CVAR_ARCHIVE, 0, qtrue, qfalse },
 
 	//g_persistantpowerups
 #ifdef MISSIONPACK
-	{ &g_runes, "g_runes", "1", CVAR_LATCH, 0, qfalse },
+	{ &g_runes, "g_runes", "1", CVAR_LATCH, 0, qfalse, qfalse },
 #else
-	{ &g_runes, "g_runes", "0", CVAR_LATCH|CVAR_ARCHIVE, 0, qfalse },
+	{ &g_runes, "g_runes", "0", CVAR_LATCH|CVAR_ARCHIVE, 0, qfalse, qfalse },
 #endif
 
 
 	//nexuiz style rocket arena
-	{ &g_rockets, "g_rockets", "0", CVAR_SERVERINFO | CVAR_LATCH, 0, qfalse },
+	{ &g_rockets, "g_rockets", "0", CVAR_SERVERINFO | CVAR_LATCH, 0, qfalse, qfalse },
 
 	//Instantgib and Vampire thingies
-	{ &g_instantgib, "g_instantgib", "0", CVAR_SERVERINFO | CVAR_LATCH, 0, qfalse },
-	{ &g_vampire, "g_vampire", "0.0", 0, 0, qtrue },
-	{ &g_regen, "g_regen", "0", 0, 0, qtrue },
-	{ &g_vampireMaxHealth, "g_vampire_max_health", "500", 0, 0, qtrue },
-	{ &g_lms_lives, "g_lms_lives", "1", 0, 0, qtrue },
-	{ &g_lms_mode, "g_lms_mode", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue },
+	{ &g_instantgib, "g_instantgib", "0", CVAR_SERVERINFO | CVAR_LATCH, 0, qfalse, qfalse },
+	{ &g_vampire, "g_vampire", "0.0", 0, 0, qtrue, qfalse },
+	{ &g_regen, "g_regen", "0", 0, 0, qtrue, qfalse },
+	{ &g_vampireMaxHealth, "g_vampire_max_health", "500", 0, 0, qtrue, qfalse },
+	{ &g_lms_lives, "g_lms_lives", "1", 0, 0, qtrue, qfalse },
+	{ &g_lms_mode, "g_lms_mode", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue, qfalse },
 
-	{ &g_autonextmap, "g_autonextmap", "0", CVAR_ARCHIVE, 0, qfalse},
+	{ &g_autonextmap, "g_autonextmap", "0", CVAR_ARCHIVE, 0, qfalse, qfalse},
 	{
 		&g_mappools, "g_mappools", "0\\maps_dm.cfg\\1\\maps_tourney.cfg\\3\\maps_tdm.cfg\\4\\maps_ctf.cfg\\5\\maps_oneflag.cfg\\6\\maps_obelisk.cfg\
-\\7\\maps_harvester.cfg\\8\\maps_elimination.cfg\\9\\maps_ctf.cfg\\10\\maps_lms.cfg\\11\\maps_dd.cfg\\12\\maps_dom.cfg\\13\\maps_dm.cfg\\", CVAR_ARCHIVE, 0, qfalse
+\\7\\maps_harvester.cfg\\8\\maps_elimination.cfg\\9\\maps_ctf.cfg\\10\\maps_lms.cfg\\11\\maps_dd.cfg\\12\\maps_dom.cfg\\13\\maps_dm.cfg\\", CVAR_ARCHIVE, 0, qfalse, qfalse
 	},
-	{ &g_humanplayers, "g_humanplayers", "0", CVAR_ROM, 0, qfalse },
+	{ &g_humanplayers, "g_humanplayers", "0", CVAR_ROM, 0, qfalse, qfalse },
 //used for voIP
-	{ &g_redTeamClientNumbers, "g_redTeamClientNumbers", "0",CVAR_ROM, 0, qfalse },
-	{ &g_blueTeamClientNumbers, "g_blueTeamClientNumbers", "0",CVAR_ROM, 0, qfalse },
+	{ &g_redTeamClientNumbers, "g_redTeamClientNumbers", "0",CVAR_ROM, 0, qfalse, qfalse },
+	{ &g_blueTeamClientNumbers, "g_blueTeamClientNumbers", "0",CVAR_ROM, 0, qfalse, qfalse },
 
 	//KK-OAX
-	{ &g_sprees, "g_sprees", "sprees.dat", 0, 0, qfalse },
-	{ &g_altExcellent, "g_altExcellent", "0", CVAR_SERVERINFO, 0, qtrue},
-	{ &g_spreeDiv, "g_spreeDiv", "5", 0, 0, qfalse},
+	{ &g_sprees, "g_sprees", "sprees.dat", 0, 0, qfalse, qfalse },
+	{ &g_altExcellent, "g_altExcellent", "0", CVAR_SERVERINFO, 0, qtrue, qfalse},
+	{ &g_spreeDiv, "g_spreeDiv", "5", 0, 0, qfalse, qfalse},
 
 	//Used for command/chat flooding
-	{ &g_floodMaxDemerits, "g_floodMaxDemerits", "5000", CVAR_ARCHIVE, 0, qfalse  },
-	{ &g_floodMinTime, "g_floodMinTime", "2000", CVAR_ARCHIVE, 0, qfalse  },
+	{ &g_floodMaxDemerits, "g_floodMaxDemerits", "5000", CVAR_ARCHIVE, 0, qfalse, qfalse  },
+	{ &g_floodMinTime, "g_floodMinTime", "2000", CVAR_ARCHIVE, 0, qfalse, qfalse  },
 
 	//Admin
-	{ &g_admin, "g_admin", "admin.dat", CVAR_ARCHIVE, 0, qfalse  },
-	{ &g_adminLog, "g_adminLog", "admin.log", CVAR_ARCHIVE, 0, qfalse  },
-	{ &g_adminParseSay, "g_adminParseSay", "1", CVAR_ARCHIVE, 0, qfalse  },
-	{ &g_adminNameProtect, "g_adminNameProtect", "1", CVAR_ARCHIVE, 0, qfalse  },
-	{ &g_adminTempBan, "g_adminTempBan", "2m", CVAR_ARCHIVE, 0, qfalse  },
-	{ &g_adminMaxBan, "g_adminMaxBan", "2w", CVAR_ARCHIVE, 0, qfalse  },
+	{ &g_admin, "g_admin", "admin.dat", CVAR_ARCHIVE, 0, qfalse, qfalse  },
+	{ &g_adminLog, "g_adminLog", "admin.log", CVAR_ARCHIVE, 0, qfalse, qfalse  },
+	{ &g_adminParseSay, "g_adminParseSay", "1", CVAR_ARCHIVE, 0, qfalse, qfalse  },
+	{ &g_adminNameProtect, "g_adminNameProtect", "1", CVAR_ARCHIVE, 0, qfalse, qfalse  },
+	{ &g_adminTempBan, "g_adminTempBan", "2m", CVAR_ARCHIVE, 0, qfalse, qfalse  },
+	{ &g_adminMaxBan, "g_adminMaxBan", "2w", CVAR_ARCHIVE, 0, qfalse, qfalse  },
 
-	{ &g_specChat, "g_specChat", "1", CVAR_ARCHIVE, 0, qfalse  },
-	{ &g_publicAdminMessages, "g_publicAdminMessages", "1", CVAR_ARCHIVE, 0, qfalse  },
+	{ &g_specChat, "g_specChat", "1", CVAR_ARCHIVE, 0, qfalse, qfalse  },
+	{ &g_publicAdminMessages, "g_publicAdminMessages", "1", CVAR_ARCHIVE, 0, qfalse, qfalse  },
 
-	{ &g_maxWarnings, "g_maxWarnings", "3", CVAR_ARCHIVE, 0, qfalse },
-	{ &g_warningExpire, "g_warningExpire", "3600", CVAR_ARCHIVE, 0, qfalse },
+	{ &g_maxWarnings, "g_maxWarnings", "3", CVAR_ARCHIVE, 0, qfalse, qfalse },
+	{ &g_warningExpire, "g_warningExpire", "3600", CVAR_ARCHIVE, 0, qfalse, qfalse },
 
-	{ &g_minNameChangePeriod, "g_minNameChangePeriod", "10", 0, 0, qfalse},
-	{ &g_maxNameChanges, "g_maxNameChanges", "50", 0, 0, qfalse},
+	{ &g_minNameChangePeriod, "g_minNameChangePeriod", "10", 0, 0, qfalse, qfalse},
+	{ &g_maxNameChanges, "g_maxNameChanges", "50", 0, 0, qfalse, qfalse},
 
-	{ &g_timestamp_startgame, "g_timestamp", "0001-01-01 00:00:00", CVAR_SERVERINFO, 0, qfalse},
-	{ &g_execute_gametype_script, "g_egs", "0", CVAR_ROM, 0, qfalse },
-	{ &g_emptyCommand, "g_emptyCommand", "map_restart", CVAR_ARCHIVE, 0, qfalse},
-	{ &g_emptyTime, "g_emptytime", "0", CVAR_ARCHIVE, 0, qfalse},
+	{ &g_timestamp_startgame, "g_timestamp", "0001-01-01 00:00:00", CVAR_SERVERINFO, 0, qfalse, qfalse},
+	{ &g_execute_gametype_script, "g_egs", "0", CVAR_ROM, 0, qfalse, qfalse },
+	{ &g_emptyCommand, "g_emptyCommand", "map_restart", CVAR_ARCHIVE, 0, qfalse, qfalse},
+	{ &g_emptyTime, "g_emptytime", "0", CVAR_ARCHIVE, 0, qfalse, qfalse},
 
-	{ &g_grapple, "g_grapple", "0", CVAR_ARCHIVE, 0, qfalse},
-	{ &g_harvesterFromBodies, "g_harvesterFromBodies", "0", CVAR_ARCHIVE, 0, qtrue},
+	{ &g_grapple, "g_grapple", "0", CVAR_ARCHIVE, 0, qfalse, qfalse},
+	{ &g_harvesterFromBodies, "g_harvesterFromBodies", "0", CVAR_ARCHIVE, 0, qtrue, qfalse},
 	/* Neon_Knight: Double Domination-specific cvars*/
-	{ &g_ddCaptureTime, "g_ddCaptureTime", "10", CVAR_ARCHIVE, 0, qtrue},
-	{ &g_ddRespawnDelay, "g_ddRespawnDelay", "10", CVAR_ARCHIVE, 0, qtrue},
+	{ &g_ddCaptureTime, "g_ddCaptureTime", "10", CVAR_ARCHIVE, 0, qtrue, qfalse},
+	{ &g_ddRespawnDelay, "g_ddRespawnDelay", "10", CVAR_ARCHIVE, 0, qtrue, qfalse},
 	/* Neon_Knight: Developer mode*/
-	{ &g_developer, "developer", "0", CVAR_CHEAT, 0, qtrue}
+	{ &g_developer, "developer", "0", CVAR_CHEAT, 0, qtrue, qfalse}
 
 };
 
@@ -432,7 +432,7 @@ This is the only way control passes into the module.
 This must be the very first function compiled into the .q3vm file
 ================
 */
-Q_EXPORT intptr_t vmMain( int command, int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8, int arg9, int arg10, int arg11  )
+Q_EXPORT intptr_t vmMain( int command, int arg0, int arg1, int arg2, [[maybe_unused]] int arg3, [[maybe_unused]] int arg4, [[maybe_unused]] int arg5, [[maybe_unused]] int arg6, [[maybe_unused]] int arg7, [[maybe_unused]] int arg8, [[maybe_unused]] int arg9, [[maybe_unused]] int arg10, [[maybe_unused]] int arg11  )
 {
 	switch ( command ) {
 	case GAME_INIT:
@@ -975,7 +975,7 @@ void G_ShutdownGame( int restart )
 
 //===================================================================
 
-void QDECL Com_Error ( errorParm_t level, const char *error, ... )
+void QDECL Com_Error ( [[maybe_unused]] errorParm_t level, const char *error, ... )
 {
 	va_list		argptr;
 	char		text[1024];
@@ -1541,7 +1541,7 @@ void SendYourTeamMessageToTeam( team_t team )
 	int		i;
 
 	for ( i = 0 ; i < level.maxclients ; i++ ) {
-		if ( level.clients[ i ].pers.connected == CON_CONNECTED && level.clients[ i ].sess.sessionTeam == team ) {
+		if ( level.clients[ i ].pers.connected == CON_CONNECTED && level.clients[ i ].sess.sessionTeam == (team_t)team ) {
 			YourTeamMessage( g_entities + i );
 		}
 	}
@@ -1597,7 +1597,9 @@ void FindIntermissionPoint( void )
 	// find the intermission spot
 	ent = G_Find (NULL, FOFS(classname), "info_player_intermission");
 	if ( !ent ) {	// the map creator forgot to put in an intermission point...
-		SelectSpawnPoint ( vec3_origin, level.intermission_origin, level.intermission_angle, 0 );
+		vec3_t zero_origin;
+		VectorClear( zero_origin );
+		SelectSpawnPoint ( zero_origin, level.intermission_origin, level.intermission_angle, 0 );
 	}
 	else {
 		VectorCopy (ent->s.origin, level.intermission_origin);
@@ -2393,7 +2395,7 @@ void PrintTeam(int team, const char *message)
 	int i;
 
 	for ( i = 0 ; i < level.maxclients ; i++ ) {
-		if (level.clients[i].sess.sessionTeam != team)
+		if (level.clients[i].sess.sessionTeam != (team_t)team)
 			continue;
 		trap_SendServerCommand( i, message );
 	}
@@ -2412,12 +2414,12 @@ void SetLeader(int team, int client)
 		PrintTeam(team, va("print \"%s is not connected\n\"", level.clients[client].pers.netname) );
 		return;
 	}
-	if (level.clients[client].sess.sessionTeam != team) {
+	if (level.clients[client].sess.sessionTeam != (team_t)team) {
 		PrintTeam(team, va("print \"%s is not on the team anymore\n\"", level.clients[client].pers.netname) );
 		return;
 	}
 	for ( i = 0 ; i < level.maxclients ; i++ ) {
-		if (level.clients[i].sess.sessionTeam != team) {
+		if (level.clients[i].sess.sessionTeam != (team_t)team) {
 			continue;
 		}
 		if (level.clients[i].sess.teamLeader) {
@@ -2440,14 +2442,14 @@ void CheckTeamLeader( int team )
 	int i;
 
 	for ( i = 0 ; i < level.maxclients ; i++ ) {
-		if (level.clients[i].sess.sessionTeam != team)
+		if (level.clients[i].sess.sessionTeam != (team_t)team)
 			continue;
 		if (level.clients[i].sess.teamLeader)
 			break;
 	}
 	if (i >= level.maxclients) {
 		for ( i = 0 ; i < level.maxclients ; i++ ) {
-			if (level.clients[i].sess.sessionTeam != team)
+			if (level.clients[i].sess.sessionTeam != (team_t)team)
 				continue;
 			if (!(g_entities[i].r.svFlags & SVF_BOT)) {
 				level.clients[i].sess.teamLeader = qtrue;
@@ -2455,7 +2457,7 @@ void CheckTeamLeader( int team )
 			}
 		}
 		for ( i = 0 ; i < level.maxclients ; i++ ) {
-			if (level.clients[i].sess.sessionTeam != team)
+			if (level.clients[i].sess.sessionTeam != (team_t)team)
 				continue;
 			level.clients[i].sess.teamLeader = qtrue;
 			break;

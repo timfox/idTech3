@@ -114,7 +114,7 @@ static void PlayerSettings_DrawName( void *self ) {
 	int				style;
 	char			*txt;
 	char			c;
-	float			*color;
+	const float		*color;
 	int				n;
 	int				basex, x, y;
 	char			name[32];
@@ -131,7 +131,7 @@ static void PlayerSettings_DrawName( void *self ) {
 		color = text_color_highlight;
 	}
 
-	UI_DrawProportionalString( basex, y, "Name", style, color );
+	UI_DrawProportionalString( basex, y, "Name", style, (float *)color );
 
 	// draw the actual name
 	basex += 64;
@@ -149,7 +149,7 @@ static void PlayerSettings_DrawName( void *self ) {
 			txt += 2;
 			continue;
 		}
-		UI_DrawChar( x, y, c, style, color );
+		UI_DrawChar( x, y, c, style, (float *)color );
 		txt++;
 		x += SMALLCHAR_WIDTH;
 	}
@@ -184,7 +184,7 @@ static void PlayerSettings_DrawHandicap( void *self ) {
 	menulist_s		*item;
 	qboolean		focus;
 	int				style;
-	float			*color;
+	const float		*color;
 
 	item = (menulist_s *)self;
 	focus = (item->generic.parent->cursor == item->generic.menuPosition);
@@ -196,8 +196,8 @@ static void PlayerSettings_DrawHandicap( void *self ) {
 		color = text_color_highlight;
 	}
 
-	UI_DrawProportionalString( item->generic.x, item->generic.y, "Handicap", style, color );
-	UI_DrawProportionalString( item->generic.x + 64, item->generic.y + PROP_HEIGHT, handicap_items[item->curvalue], style, color );
+	UI_DrawProportionalString( item->generic.x, item->generic.y, "Handicap", style, (float *)color );
+	UI_DrawProportionalString( item->generic.x + 64, item->generic.y + PROP_HEIGHT, handicap_items[item->curvalue], style, (float *)color );
 }
 
 
@@ -210,7 +210,7 @@ static void PlayerSettings_DrawEffects( void *self ) {
 	menulist_s		*item;
 	qboolean		focus;
 	int				style;
-	float			*color;
+	const float		*color;
 
 	item = (menulist_s *)self;
 	focus = (item->generic.parent->cursor == item->generic.menuPosition);
@@ -222,7 +222,7 @@ static void PlayerSettings_DrawEffects( void *self ) {
 		color = text_color_highlight;
 	}
 
-	UI_DrawProportionalString( item->generic.x, item->generic.y, "Effects", style, color );
+	UI_DrawProportionalString( item->generic.x, item->generic.y, "Effects", style, (float *)color );
 
 	UI_DrawHandlePic( item->generic.x + 64, item->generic.y + PROP_HEIGHT + 8, 128, 8, s_playersettings.fxBasePic );
 	UI_DrawHandlePic( item->generic.x + 64 + item->curvalue * 16 + 8, item->generic.y + PROP_HEIGHT + 6, 16, 12, s_playersettings.fxPic[item->curvalue] );
@@ -261,7 +261,11 @@ static void PlayerSettings_DrawPlayer( void *self ) {
 		viewangles[YAW]   = 180 - 30;
 		viewangles[PITCH] = 0;
 		viewangles[ROLL]  = 0;
-		UI_PlayerInfo_SetInfo( &s_playersettings.playerinfo, LEGS_IDLE, TORSO_STAND, viewangles, vec3_origin, WP_MACHINEGUN, qfalse );
+		{
+			vec3_t zero_origin;
+			VectorClear( zero_origin );
+			UI_PlayerInfo_SetInfo( &s_playersettings.playerinfo, LEGS_IDLE, TORSO_STAND, viewangles, zero_origin, WP_MACHINEGUN, qfalse );
+		}
 	}
 
 	b = (menubitmap_s*) self;
@@ -337,7 +341,11 @@ static void PlayerSettings_SetMenuItems( void ) {
 	viewangles[ROLL]  = 0;
 
 	UI_PlayerInfo_SetModel( &s_playersettings.playerinfo, UI_Cvar_VariableString( "model" ) );
-	UI_PlayerInfo_SetInfo( &s_playersettings.playerinfo, LEGS_IDLE, TORSO_STAND, viewangles, vec3_origin, WP_MACHINEGUN, qfalse );
+	{
+		vec3_t zero_origin;
+		VectorClear( zero_origin );
+		UI_PlayerInfo_SetInfo( &s_playersettings.playerinfo, LEGS_IDLE, TORSO_STAND, viewangles, zero_origin, WP_MACHINEGUN, qfalse );
+	}
 
 	// handicap
 	h = Com_Clamp( 5, 100, trap_Cvar_VariableValue("handicap") );
@@ -377,7 +385,7 @@ static void PlayerSettings_MenuEvent( void* ptr, int event ) {
 PlayerSettings_StatusBar
 =================
 */
-static void PlayerSettings_StatusBar( void* ptr ) {
+static void PlayerSettings_StatusBar( [[maybe_unused]] void* ptr ) {
 	UI_DrawString( 320, 400, "Lower handicap makes you weaker", UI_CENTER|UI_SMALLFONT, colorWhite );
         UI_DrawString( 320, 420, "giving you more challenge", UI_CENTER|UI_SMALLFONT, colorWhite );
 }

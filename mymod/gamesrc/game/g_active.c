@@ -466,7 +466,7 @@ static void ClientTimerActions( gentity_t *ent, int msec ) {
 				G_Damage (ent, NULL, NULL, NULL, NULL, ent->damage, DAMAGE_NO_KNOCKBACK, MOD_UNKNOWN);
 			}
 			//Start killing players in LMS, if we are in overtime
-			else if (g_elimination_roundtime.integer&&g_gametype.integer==GT_LMS && TeamHealthCount( -1, TEAM_FREE ) != ent->health &&
+			else if (g_elimination_roundtime.integer&&g_gametype.integer==GT_LMS && (int)TeamHealthCount( -1, TEAM_FREE ) != ent->health &&
 			         (level.roundNumber==level.roundNumberStarted)&&(level.time>=level.roundStartTime+1000*g_elimination_roundtime.integer)) {
 				ent->damage=5;
 				G_Damage (ent, NULL, NULL, NULL, NULL, ent->damage, DAMAGE_NO_ARMOR, MOD_UNKNOWN);

@@ -88,7 +88,7 @@ void G_RankRunFrame()
 				trap_SendServerCommand( i, va("rank_status %i\n",status) );
 				if ( i == 0 )
 				{
-					int j = 0;
+					[[maybe_unused]] int j = 0;
 				}
 				ent->client->client_status = status;
 			}

@@ -69,7 +69,7 @@ tryagain:
 		if ( item->giType != IT_WEAPON ) {
 			continue;
 		}
-		if ( item->giTag == weaponNum ) {
+		if ( item->giTag == (int)weaponNum ) {
 			break;
 		}
 	}
@@ -652,7 +652,7 @@ static void UI_PlayerAngles( playerInfo_t *pi, vec3_t legs[3], vec3_t torso[3], 
 UI_PlayerFloatSprite
 ===============
 */
-static void UI_PlayerFloatSprite( playerInfo_t *pi, vec3_t origin, qhandle_t shader ) {
+static void UI_PlayerFloatSprite( [[maybe_unused]] playerInfo_t *pi, vec3_t origin, qhandle_t shader ) {
 	refEntity_t		ent;
 
 	memset( &ent, 0, sizeof( ent ) );
@@ -942,10 +942,10 @@ UI_ParseAnimationFile
 ======================
 */
 static qboolean UI_ParseAnimationFile( const char *filename, playerInfo_t *pi ) {
-	char		*text_p, *prev;
+	const char	*text_p, *prev;
 	int			len;
 	int			i;
-	char		*token;
+	const char	*token;
 	float		fps;
 	int			skip;
 	char		text[20000];
@@ -962,7 +962,7 @@ static qboolean UI_ParseAnimationFile( const char *filename, playerInfo_t *pi ) 
 	if ( len <= 0 ) {
 		return qfalse;
 	}
-	if ( len >= ( sizeof( text ) - 1 ) ) {
+	if ( len >= (int)( sizeof( text ) - 1 ) ) {
 		Com_Printf( "File %s too long\n", filename );
 		trap_FS_FCloseFile( f );
 		return qfalse;

@@ -102,7 +102,7 @@ static void UI_RemoveBotsMenu_SetBotNames( void ) {
 UI_RemoveBotsMenu_DeleteEvent
 =================
 */
-static void UI_RemoveBotsMenu_DeleteEvent( void* ptr, int event ) {
+static void UI_RemoveBotsMenu_DeleteEvent( [[maybe_unused]] void* ptr, int event ) {
 	if (event != QM_ACTIVATED) {
 		return;
 	}
@@ -132,7 +132,7 @@ static void UI_RemoveBotsMenu_BotEvent( void* ptr, int event ) {
 UI_RemoveAddBotsMenu_BackEvent
 =================
 */
-static void UI_RemoveBotsMenu_BackEvent( void* ptr, int event ) {
+static void UI_RemoveBotsMenu_BackEvent( [[maybe_unused]] void* ptr, int event ) {
 	if (event != QM_ACTIVATED) {
 		return;
 	}
@@ -145,7 +145,7 @@ static void UI_RemoveBotsMenu_BackEvent( void* ptr, int event ) {
 UI_RemoveBotsMenu_UpEvent
 =================
 */
-static void UI_RemoveBotsMenu_UpEvent( void* ptr, int event ) {
+static void UI_RemoveBotsMenu_UpEvent( [[maybe_unused]] void* ptr, int event ) {
 	if (event != QM_ACTIVATED) {
 		return;
 	}
@@ -162,7 +162,7 @@ static void UI_RemoveBotsMenu_UpEvent( void* ptr, int event ) {
 UI_RemoveBotsMenu_DownEvent
 =================
 */
-static void UI_RemoveBotsMenu_DownEvent( void* ptr, int event ) {
+static void UI_RemoveBotsMenu_DownEvent( [[maybe_unused]] void* ptr, int event ) {
 	if (event != QM_ACTIVATED) {
 		return;
 	}

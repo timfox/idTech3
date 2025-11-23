@@ -56,7 +56,7 @@ qboolean G_ReadAltKillSettings( void )
 	qboolean        dspree_read;
 	qboolean        mkill_read;
 	char            *cnf, *cnf2;
-	char            *t;
+	const char            *t;
 
 	//Let's clear out any existing killing sprees/death sprees. YAYY BG_FREE!!!!!
 	for( i = 0; i < MAX_KSPREE && killSprees[ i ]; i++ ) {
@@ -451,7 +451,7 @@ void G_checkForMultiKill( gentity_t *ent ) {
 	char    *sound;
 	int     soundIndex;
 	int     multiKillCount;
-	char    multiKillString[ 2 ];
+	char    multiKillString[ 12 ];
 
 	//Let's grab the multikill count for the player first
 	multiKillCount = ent->client->pers.multiKillCount;
