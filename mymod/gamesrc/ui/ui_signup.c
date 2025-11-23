@@ -100,10 +100,11 @@ static void Signup_MenuEvent( void* ptr, int event ) {
 			s_signup.email_box.field.buffer );
 		trap_Cmd_ExecuteText( EXEC_APPEND, cmd );
 		*/
-		trap_CL_UI_RankUserCreate(
-			s_signup.name_box.field.buffer, 
-			s_signup.password_box.field.buffer, 
-			s_signup.email_box.field.buffer );
+		// trap_CL_UI_RankUserCreate( // Removed, function not available
+		//	s_signup.name_box.field.buffer, 
+		//	s_signup.password_box.field.buffer, 
+		//	s_signup.email_box.field.buffer );
+		(void)s_signup.name_box.field.buffer; (void)s_signup.password_box.field.buffer; (void)s_signup.email_box.field.buffer; // Suppress unused warnings
 
 		UI_ForceMenuOff();
 		break;

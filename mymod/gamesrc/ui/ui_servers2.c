@@ -906,7 +906,7 @@ static void ArenaServers_Insert( char* adrstr, char* info, int pingtime )
 	servernodeptr->maxPing    = atoi( Info_ValueForKey( info, "maxPing") );
 
 	
-	s = Info_ValueForKey( info, "nettype" );
+	const char *s_nettype = Info_ValueForKey( info, "nettype" );
 	for (i=0; ;i++)
 	{
 		if (!netnames[i])
@@ -914,7 +914,7 @@ static void ArenaServers_Insert( char* adrstr, char* info, int pingtime )
 			servernodeptr->nettype = 0;
 			break;
 		}
-		else if (Q_strequal( netnames[i], s ))
+		else if (Q_strequal( netnames[i], s_nettype ))
 		{
 			servernodeptr->nettype = i;
 			break;
@@ -923,13 +923,14 @@ static void ArenaServers_Insert( char* adrstr, char* info, int pingtime )
 	
 	servernodeptr->nettype = atoi(Info_ValueForKey(info, "nettype"));
 
-	s = Info_ValueForKey( info, "game");
+	const char *s_game = Info_ValueForKey( info, "game");
+	s = (char *)s_game; // Keep s as char* for compatibility with existing code
 	i = atoi( Info_ValueForKey( info, "gametype") );
 	if( i < 0 ) {
 		i = 0;
 	}
-	else if( i > ARRAY_LEN(gamenames)-2 ) {
-		i = ARRAY_LEN(gamenames)-2;  //Second to last entry in gamenames is "???"
+	else if( i > (int)ARRAY_LEN(gamenames)-2 ) {
+		i = (int)ARRAY_LEN(gamenames)-2;  //Second to last entry in gamenames is "???"
 	}
 	if( *s ) {
 		servernodeptr->gametype = i;//-1;

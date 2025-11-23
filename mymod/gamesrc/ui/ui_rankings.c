@@ -72,7 +72,7 @@ void Rankings_DrawText( void* self )
 	int				style;
 	char			*txt;
 	char			c;
-	float			*color;
+	const float		*color;
 	int				basex, x, y;
 
 	f = (menufield_s*)self;
@@ -248,7 +248,7 @@ static void Rankings_MenuEvent( void* ptr, int event ) {
 
 	case ID_LOGOUT:
 		// server side masqueraded player logout first
-		trap_CL_UI_RankUserRequestLogout();
+		// trap_CL_UI_RankUserRequestLogout(); // Removed, function not available
 		UI_ForceMenuOff();
 		break;
 		

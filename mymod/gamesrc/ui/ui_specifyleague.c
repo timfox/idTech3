@@ -99,7 +99,9 @@ static void SpecifyLeague_GetList()
 		s_specifyleague.rankname.field.buffer, 
 		sizeof(playername) );
 
-	count = trap_CL_UI_RankGetLeauges( playername );
+	// count = trap_CL_UI_RankGetLeauges( playername ); // Removed, function not available
+	count = 0; // Stub: rankings not available
+	(void)playername; // Suppress unused warning
 
 	for(i = 0; i < count; i++)
 	{

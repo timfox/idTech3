@@ -24,6 +24,21 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "g_local.h"
 #include "g_rankings.h"
 
+// Rankings system stubs (server-side functionality not available in game module)
+#ifndef GR_GAMEKEY
+#define GR_GAMEKEY ""
+#endif
+
+// Stub trap functions for rankings (return safe defaults)
+static qboolean trap_RankCheckInit( void ) { return qfalse; }
+static void trap_RankBegin( const char *gamekey ) { (void)gamekey; }
+static void trap_RankPoll( void ) { }
+static qboolean trap_RankActive( void ) { return qfalse; }
+static grank_status_t trap_RankUserStatus( int index ) { (void)index; return QGR_STATUS_NEW; }
+static void trap_RankUserReset( int index ) { (void)index; }
+static void trap_RankReportInt( int self, int other, int key, int value, int time ) { (void)self; (void)other; (void)key; (void)value; (void)time; }
+static void trap_RankReportStr( int self, int other, int key, const char *value ) { (void)self; (void)other; (void)key; (void)value; }
+
 /*
 ================
 G_RankRunFrame
@@ -104,7 +119,7 @@ void G_RankRunFrame()
 				}
 				break;
 			case QGR_STATUS_ACTIVE:
-				if( (ent->client->sess.sessionTeam == TEAM_SPECTATOR || (client->isEliminated)) &&
+				if( (ent->client->sess.sessionTeam == TEAM_SPECTATOR || (ent->client->isEliminated)) &&
 					(g_gametype.integer < GT_TEAM) )
 				{
 					SetTeam( ent, "free" );

@@ -1038,7 +1038,7 @@ qboolean G_admin_readconfig( gentity_t *ent, int skiparg )
 	level_open = admin_open = ban_open = command_open = warning_open = qfalse;
 	COM_BeginParseSession( g_admin.string );
 	while( 1 ) {
-		t = COM_Parse( &cnf );
+		t = COM_Parse( (const char **)&cnf );
 		if( !*t )
 			break;
 
@@ -1159,7 +1159,7 @@ qboolean G_admin_readconfig( gentity_t *ent, int skiparg )
 
 				readFile_string( &cnf, levels, sizeof( levels ) );
 				while( cmdlevel < MAX_ADMIN_LEVELS ) {
-					lp = COM_Parse( &level );
+					lp = COM_Parse( (const char **)&level );
 					if( !*lp )
 						break;
 					c->levels[ cmdlevel++ ] = atoi( lp );

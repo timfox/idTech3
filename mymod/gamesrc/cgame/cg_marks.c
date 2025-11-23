@@ -198,7 +198,7 @@ void CG_ImpactMark( qhandle_t markShader, const vec3_t origin, const vec3_t dir,
 			VectorSubtract( v->xyz, origin, delta );
 			v->st[0] = 0.5 + DotProduct( delta, axis[1] ) * texCoordScale;
 			v->st[1] = 0.5 + DotProduct( delta, axis[2] ) * texCoordScale;
-			*(int *)v->modulate = *(int *)colors;
+			v->modulate.u32 = *(uint32_t *)colors;
 		}
 
 		// if it is a temporary (shadow) mark, add it immediately and forget about it
@@ -261,11 +261,11 @@ void CG_AddMarks( void ) {
 				if ( fade < 0 ) {
 					fade = 0;
 				}
-				if ( mp->verts[0].modulate[0] != 0 ) {
+				if ( mp->verts[0].modulate.rgba[0] != 0 ) {
 					for ( j = 0 ; j < mp->poly.numVerts ; j++ ) {
-						mp->verts[j].modulate[0] = mp->color[0] * fade;
-						mp->verts[j].modulate[1] = mp->color[1] * fade;
-						mp->verts[j].modulate[2] = mp->color[2] * fade;
+						mp->verts[j].modulate.rgba[0] = mp->color[0] * fade;
+						mp->verts[j].modulate.rgba[1] = mp->color[1] * fade;
+						mp->verts[j].modulate.rgba[2] = mp->color[2] * fade;
 					}
 				}
 			}
@@ -277,13 +277,13 @@ void CG_AddMarks( void ) {
 			fade = 255 * t / MARK_FADE_TIME;
 			if ( mp->alphaFade ) {
 				for ( j = 0 ; j < mp->poly.numVerts ; j++ ) {
-					mp->verts[j].modulate[3] = fade;
+					mp->verts[j].modulate.rgba[3] = fade;
 				}
 			} else {
 				for ( j = 0 ; j < mp->poly.numVerts ; j++ ) {
-					mp->verts[j].modulate[0] = mp->color[0] * fade;
-					mp->verts[j].modulate[1] = mp->color[1] * fade;
-					mp->verts[j].modulate[2] = mp->color[2] * fade;
+					mp->verts[j].modulate.rgba[0] = mp->color[0] * fade;
+					mp->verts[j].modulate.rgba[1] = mp->color[1] * fade;
+					mp->verts[j].modulate.rgba[2] = mp->color[2] * fade;
 				}
 			}
 		}

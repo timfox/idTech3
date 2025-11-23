@@ -247,17 +247,17 @@ void CG_RailTrail (clientInfo_t *ci, vec3_t start, vec3_t end)
 	le->endTime = cg.time + cg_railTrailTime.value;
 	le->lifeRate = 1.0 / (le->endTime - le->startTime);
 
-	re->shaderTime = cg.time / 1000.0f;
+	re->shaderTime.f = cg.time / 1000.0f;
 	re->reType = RT_RAIL_CORE;
 	re->customShader = cgs.media.railCoreShader;
 
 	VectorCopy(start, re->origin);
 	VectorCopy(end, re->oldorigin);
 
-	re->shaderRGBA[0] = ci->color1[0] * 255;
-	re->shaderRGBA[1] = ci->color1[1] * 255;
-	re->shaderRGBA[2] = ci->color1[2] * 255;
-	re->shaderRGBA[3] = 255;
+	re->shader.rgba[0] = ci->color1[0] * 255;
+	re->shader.rgba[1] = ci->color1[1] * 255;
+	re->shader.rgba[2] = ci->color1[2] * 255;
+	re->shader.rgba[3] = 255;
 
 	le->color[0] = ci->color1[0] * 0.75;
 	le->color[1] = ci->color1[1] * 0.75;
@@ -284,13 +284,13 @@ void CG_RailTrail (clientInfo_t *ci, vec3_t start, vec3_t end)
 			le->endTime = cg.time + cg_railTrailTime.value;
 			le->lifeRate = 1.0 / (le->endTime - le->startTime);
 
-			re->shaderTime = cg.time / 1000.0f;
+			re->shaderTime.f = cg.time / 1000.0f;
 			re->reType = RT_RAIL_RINGS;
 			re->customShader = cgs.media.railRingsShader;
-			re->shaderRGBA[0] = ci->color1[0] * 255;
-			re->shaderRGBA[1] = ci->color1[1] * 255;
-			re->shaderRGBA[2] = ci->color1[2] * 255;
-			re->shaderRGBA[3] = 255;
+			re->shader.rgba[0] = ci->color1[0] * 255;
+			re->shader.rgba[1] = ci->color1[1] * 255;
+			re->shader.rgba[2] = ci->color1[2] * 255;
+			re->shader.rgba[3] = 255;
 
 			le->color[0] = ci->color1[0] * 0.75;
 			le->color[1] = ci->color1[1] * 0.75;
@@ -301,10 +301,10 @@ void CG_RailTrail (clientInfo_t *ci, vec3_t start, vec3_t end)
 			re->oldorigin[2] -= 8;
 
 			if (cg_oldRail.integer > 2) {		// use the secondary color instead
-				re->shaderRGBA[0] = ci->color2[0] * 255;
-				re->shaderRGBA[1] = ci->color2[1] * 255;
-				re->shaderRGBA[2] = ci->color2[2] * 255;
-				re->shaderRGBA[3] = 255;
+				re->shader.rgba[0] = ci->color2[0] * 255;
+				re->shader.rgba[1] = ci->color2[1] * 255;
+				re->shader.rgba[2] = ci->color2[2] * 255;
+				re->shader.rgba[3] = 255;
 
 				le->color[0] = ci->color2[0] * 0.75;
 				le->color[1] = ci->color2[1] * 0.75;
@@ -341,15 +341,15 @@ void CG_RailTrail (clientInfo_t *ci, vec3_t start, vec3_t end)
 			le->endTime = cg.time + (i>>1) + 600;
 			le->lifeRate = 1.0 / (le->endTime - le->startTime);
 
-			re->shaderTime = cg.time / 1000.0f;
+			re->shaderTime.f = cg.time / 1000.0f;
 			re->reType = RT_SPRITE;
 			re->radius = 1.1f;
 			re->customShader = cgs.media.railRingsShader;
 
-			re->shaderRGBA[0] = ci->color2[0] * 255;
-			re->shaderRGBA[1] = ci->color2[1] * 255;
-			re->shaderRGBA[2] = ci->color2[2] * 255;
-			re->shaderRGBA[3] = 255;
+			re->shader.rgba[0] = ci->color2[0] * 255;
+			re->shader.rgba[1] = ci->color2[1] * 255;
+			re->shader.rgba[2] = ci->color2[2] * 255;
+			re->shader.rgba[3] = 255;
 
 			le->color[0] = ci->color2[0] * 0.75;
 			le->color[1] = ci->color2[1] * 0.75;
@@ -690,17 +690,17 @@ static void CG_OldPlasmaTrail( centity_t *cent, const weaponInfo_t *wi )
 	VectorScale( xvelocity, waterScale, le->pos.trDelta );
 
 	AxisCopy( axisDefault, re->axis );
-	re->shaderTime = cg.time / 1000.0f;
+	re->shaderTime.f = cg.time / 1000.0f;
 	re->reType = RT_SPRITE;
 	re->radius = 0.25f;
 	re->customShader = cgs.media.railRingsShader;
 	le->bounceFactor = 0.3f;
 
 
-	re->shaderRGBA[0] = wi->flashDlightColor[0] * 63;
-	re->shaderRGBA[1] = wi->flashDlightColor[1] * 63;
-	re->shaderRGBA[2] = wi->flashDlightColor[2] * 63;
-	re->shaderRGBA[3] = 63;
+	re->shader.rgba[0] = wi->flashDlightColor[0] * 63;
+	re->shader.rgba[1] = wi->flashDlightColor[1] * 63;
+	re->shader.rgba[2] = wi->flashDlightColor[2] * 63;
+	re->shader.rgba[3] = 63;
 
 	le->color[0] = wi->flashDlightColor[0] * 0.2;
 	le->color[1] = wi->flashDlightColor[1] * 0.2;
@@ -749,10 +749,10 @@ void CG_GrappleTrail( centity_t *ent, const weaponInfo_t *wi )
 	beam.customShader = cgs.media.grappleShader;
 
 	AxisClear( beam.axis );
-	beam.shaderRGBA[0] = 0xff;
-	beam.shaderRGBA[1] = 0xff;
-	beam.shaderRGBA[2] = 0xff;
-	beam.shaderRGBA[3] = 0xff;
+	beam.shader.rgba[0] = 0xff;
+	beam.shader.rgba[1] = 0xff;
+	beam.shader.rgba[2] = 0xff;
+	beam.shader.rgba[3] = 0xff;
 	trap_R_AddRefEntityToScene( &beam );
 }
 
@@ -1567,8 +1567,8 @@ static void CG_AddWeaponWithPowerups( refEntity_t *gun, int powerups )
 
 		if ( powerups & ( 1 << PW_BATTLESUIT ) ) {
 				if (cg_alternateShell.integer > 1){
-					gun->glow = 1340;
-					gun->glowcol = 0xE29000;
+					// gun->glow = 1340; // removed, glow not in refEntity_t
+					// gun->glowcol = 0xE29000; // removed, glowcol not in refEntity_t
 				}
 				else
 				{
@@ -1578,8 +1578,8 @@ static void CG_AddWeaponWithPowerups( refEntity_t *gun, int powerups )
 		}
 		if ( powerups & ( 1 << PW_QUAD ) ) {
 				if (cg_alternateShell.integer > 1){
-					gun->glow = 1338;
-					gun->glowcol = 0x0040E2;
+					// gun->glow = 1338; // removed, glow not in refEntity_t
+					// gun->glowcol = 0x0040E2; // removed, glowcol not in refEntity_t
 				}
 				else
 				{
@@ -1632,9 +1632,9 @@ static void MuzzleFlashStyleQ1(refEntity_t *parent, playerState_t *ps, centity_t
 		clientInfo_t	*ci;
 
 		ci = &cgs.clientinfo[ cent->currentState.clientNum ];
-		flash.shaderRGBA[0] = 255 * ci->color1[0];
-		flash.shaderRGBA[1] = 255 * ci->color1[1];
-		flash.shaderRGBA[2] = 255 * ci->color1[2];
+		flash.shader.rgba[0] = 255 * ci->color1[0];
+		flash.shader.rgba[1] = 255 * ci->color1[1];
+		flash.shader.rgba[2] = 255 * ci->color1[2];
 	}
 
 	CG_PositionRotatedEntityOnTag( &flash, gun, weapon->weaponModel, "tag_flash");
@@ -1699,15 +1699,15 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 			float	f;
 
 			f = (float)cg.predictedPlayerState.weaponTime / 1500;
-			gun.shaderRGBA[1] = 0;
-			gun.shaderRGBA[0] =
-			    gun.shaderRGBA[2] = 255 * ( 1.0 - f );
+			gun.shader.rgba[1] = 0;
+			gun.shader.rgba[0] =
+			    gun.shader.rgba[2] = 255 * ( 1.0 - f );
 		}
 		else {
-			gun.shaderRGBA[0] = 255;
-			gun.shaderRGBA[1] = 255;
-			gun.shaderRGBA[2] = 255;
-			gun.shaderRGBA[3] = 255;
+			gun.shader.rgba[0] = 255;
+			gun.shader.rgba[1] = 255;
+			gun.shader.rgba[2] = 255;
+			gun.shader.rgba[3] = 255;
 		}
 	}
 
@@ -1882,7 +1882,7 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 
 		AnglesToAxis( angles, flash.axis );
 		// set shadertime
-		flash.shaderTime = cent->muzzleFlashTime / 1000.0f;
+		flash.shaderTime.f = cent->muzzleFlashTime / 1000.0f;
 
 		// UT's beam weapons didn't have muzzleflashes, so we don't either.
 
@@ -1956,9 +1956,9 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 			VectorScale(flash.axis[1], eh, flash.axis[1]);
 			VectorScale(flash.axis[2], eh, flash.axis[2]);
 
-			flash.shaderRGBA[0] = 255;
-			flash.shaderRGBA[1] = 255;
-			flash.shaderRGBA[2] = 255;
+			flash.shader.rgba[0] = 255;
+			flash.shader.rgba[1] = 255;
+			flash.shader.rgba[2] = 255;
 
 			// leilei - scale hack, flip the flash 
 			if (cent->startroll > 360)
@@ -1968,16 +1968,16 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 		}
 
 		// set shadertime
-		flash.shaderTime = cent->muzzleFlashTime / 1000.0f;
+		flash.shaderTime.f = cent->muzzleFlashTime / 1000.0f;
 
 		// colorize the railgun blast
 		if ( weaponNum == WP_RAILGUN ) {
 			clientInfo_t	*ci;
 	
 			ci = &cgs.clientinfo[ cent->currentState.clientNum ];
-			flash.shaderRGBA[0] = 255 * ci->color1[0];
-			flash.shaderRGBA[1] = 255 * ci->color1[1];
-			flash.shaderRGBA[2] = 255 * ci->color1[2];
+			flash.shader.rgba[0] = 255 * ci->color1[0];
+			flash.shader.rgba[1] = 255 * ci->color1[1];
+			flash.shader.rgba[2] = 255 * ci->color1[2];
 		}
 
 		CG_PositionRotatedEntityOnTag( &flash, &gun, weapon->weaponModel, "tag_flash");
@@ -2058,23 +2058,23 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 			VectorScale(flash.axis[1], eh, flash.axis[1]);
 			VectorScale(flash.axis[2], eh, flash.axis[2]);
 
-			flash.shaderRGBA[0] = 255 * fadeout;
-			flash.shaderRGBA[1] = 255 * fadeout;
-			flash.shaderRGBA[2] = 255 * fadeout;
+			flash.shader.rgba[0] = 255 * fadeout;
+			flash.shader.rgba[1] = 255 * fadeout;
+			flash.shader.rgba[2] = 255 * fadeout;
 
 		}
 
 		// set shadertime
-		flash.shaderTime = cent->muzzleFlashTime / 1000.0f;
+		flash.shaderTime.f = cent->muzzleFlashTime / 1000.0f;
 
 		// colorize the railgun blast
 		if ( weaponNum == WP_RAILGUN ) {
 			clientInfo_t	*ci;
 	
 			ci = &cgs.clientinfo[ cent->currentState.clientNum ];
-			flash.shaderRGBA[0] = 255 * ci->color1[0] * fadeout;
-			flash.shaderRGBA[1] = 255 * ci->color1[1] * fadeout;
-			flash.shaderRGBA[2] = 255 * ci->color1[2] * fadeout;
+			flash.shader.rgba[0] = 255 * ci->color1[0] * fadeout;
+			flash.shader.rgba[1] = 255 * ci->color1[1] * fadeout;
+			flash.shader.rgba[2] = 255 * ci->color1[2] * fadeout;
 		}
 
 		CG_PositionRotatedEntityOnTag( &flash, &gun, weapon->weaponModel, "tag_flash");
@@ -2133,9 +2133,9 @@ void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent
 		clientInfo_t	*ci;
 
 		ci = &cgs.clientinfo[ cent->currentState.clientNum ];
-		flash.shaderRGBA[0] = 255 * ci->color1[0];
-		flash.shaderRGBA[1] = 255 * ci->color1[1];
-		flash.shaderRGBA[2] = 255 * ci->color1[2];
+		flash.shader.rgba[0] = 255 * ci->color1[0];
+		flash.shader.rgba[1] = 255 * ci->color1[1];
+		flash.shader.rgba[2] = 255 * ci->color1[2];
 	}
 	CG_PositionRotatedEntityOnTag( &flash, &gun, weapon->weaponModel, "tag_flash");
 
@@ -3811,10 +3811,10 @@ void CG_MissileHitWall( int weapon, int clientNum, vec3_t origin, vec3_t dir, im
 		if ( weapon == WP_RAILGUN ) {
 			// colorize with client color
 			VectorCopy( cgs.clientinfo[clientNum].color1, le->color );
-			le->refEntity.shaderRGBA[0] = le->color[0] * 0xff;
-			le->refEntity.shaderRGBA[1] = le->color[1] * 0xff;
-			le->refEntity.shaderRGBA[2] = le->color[2] * 0xff;
-			le->refEntity.shaderRGBA[3] = 0xff;
+			le->refEntity.shader.rgba[0] = le->color[0] * 0xff;
+			le->refEntity.shader.rgba[1] = le->color[1] * 0xff;
+			le->refEntity.shader.rgba[2] = le->color[2] * 0xff;
+			le->refEntity.shader.rgba[3] = 0xff;
 		}
 	}
 
@@ -4067,34 +4067,34 @@ void CG_Tracer( vec3_t source, vec3_t dest )
 	VectorMA( finish, cg_tracerWidth.value, right, verts[0].xyz );
 	verts[0].st[0] = 0;
 	verts[0].st[1] = 1;
-	verts[0].modulate[0] = 255;
-	verts[0].modulate[1] = 255;
-	verts[0].modulate[2] = 255;
-	verts[0].modulate[3] = 255;
+	verts[0].modulate.rgba[0] = 255;
+	verts[0].modulate.rgba[1] = 255;
+	verts[0].modulate.rgba[2] = 255;
+	verts[0].modulate.rgba[3] = 255;
 
 	VectorMA( finish, -cg_tracerWidth.value, right, verts[1].xyz );
 	verts[1].st[0] = 1;
 	verts[1].st[1] = 0;
-	verts[1].modulate[0] = 255;
-	verts[1].modulate[1] = 255;
-	verts[1].modulate[2] = 255;
-	verts[1].modulate[3] = 255;
+	verts[1].modulate.rgba[0] = 255;
+	verts[1].modulate.rgba[1] = 255;
+	verts[1].modulate.rgba[2] = 255;
+	verts[1].modulate.rgba[3] = 255;
 
 	VectorMA( start, -cg_tracerWidth.value, right, verts[2].xyz );
 	verts[2].st[0] = 1;
 	verts[2].st[1] = 1;
-	verts[2].modulate[0] = 255;
-	verts[2].modulate[1] = 255;
-	verts[2].modulate[2] = 255;
-	verts[2].modulate[3] = 255;
+	verts[2].modulate.rgba[0] = 255;
+	verts[2].modulate.rgba[1] = 255;
+	verts[2].modulate.rgba[2] = 255;
+	verts[2].modulate.rgba[3] = 255;
 
 	VectorMA( start, cg_tracerWidth.value, right, verts[3].xyz );
 	verts[3].st[0] = 0;
 	verts[3].st[1] = 0;
-	verts[3].modulate[0] = 255;
-	verts[3].modulate[1] = 255;
-	verts[3].modulate[2] = 255;
-	verts[3].modulate[3] = 255;
+	verts[3].modulate.rgba[0] = 255;
+	verts[3].modulate.rgba[1] = 255;
+	verts[3].modulate.rgba[2] = 255;
+	verts[3].modulate.rgba[3] = 255;
 
 	trap_R_AddPolyToScene( cgs.media.tracerShader, 4, verts );
 

@@ -385,4 +385,5 @@ Key digits:
 #define QGR_KEY_FLAG_PICKUP				1111110000
 #define QGR_KEY_FLAG_CAPTURE			1111110001
 
+
 #endif // _G_RANKINGS_H_

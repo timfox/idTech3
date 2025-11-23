@@ -73,7 +73,7 @@ t_mappage getMappage(int page) {
 		//there is a votemaps.cfg file, take allowed maps from there
 		trap_FS_Read(&buffer,sizeof(buffer),file);
 		pointer = buffer;
-		token = COM_Parse(&pointer);
+		token = COM_Parse((const char **)&pointer);
 		if(token[0]==0 && page == 0) {
 			//First page empty
 			result.pagenumber = -1;
@@ -82,7 +82,7 @@ t_mappage getMappage(int page) {
 		}
 		//Skip the first pages
 		for(i=0;i<MAPS_PER_PAGE*page;i++) {
-			token = COM_Parse(&pointer);
+			token = COM_Parse((const char **)&pointer);
 		}
 		if(!token || token[0]==0) {
 			//Page empty, return to first page
@@ -93,7 +93,7 @@ t_mappage getMappage(int page) {
 		result.pagenumber = page;
 		for(i=0;i<MAPS_PER_PAGE && token;i++) {
 			Q_strncpyz(result.mapname[i],token,MAX_MAPNAME);
-			token = COM_Parse(&pointer);
+			token = COM_Parse((const char **)&pointer);
 		}
 		trap_FS_FCloseFile(file);
 		return result;
@@ -151,11 +151,11 @@ int allowedMap(const char *mapname) {
 	trap_FS_Read(&buffer,MAX_MAPS_TEXT,file);
 	found = qfalse;
 	pointer = buffer;
-	token = COM_Parse(&pointer);
+	token = COM_Parse((const char **)&pointer);
 	while(token[0]!=0 && !found) {
 		if(Q_strequal(token,mapname))
 			found = qtrue;
-		token = COM_Parse(&pointer);
+		token = COM_Parse((const char **)&pointer);
 	}
 
 	trap_FS_FCloseFile(file);
@@ -258,13 +258,13 @@ int VoteParseCustomVotes( void ) {
 	pointer = buffer;
 
 	while ( commands < MAX_CUSTOM_VOTES ) {
-	token = COM_Parse( &pointer );
+	token = COM_Parse( (const char **)&pointer );
 		if ( !token[0] ) {
 			break;
 	}
 
 		if ( strequals( token, "votecommand" ) ) {
-			token = COM_Parse( &pointer );
+			token = COM_Parse( (const char **)&pointer );
 			Q_strcat(custom_vote_info,sizeof(custom_vote_info),va("%s ",token));
 			commands++;
 	}
@@ -303,7 +303,7 @@ t_customvote getCustomVote(char* votecommand) {
 	pointer = buffer;
 
 	while ( qtrue ) {
-		token = COM_Parse( &pointer );
+		token = COM_Parse( (const char **)&pointer );
 			if ( !token[0] ) {
 				break;
 		}
@@ -316,7 +316,7 @@ t_customvote getCustomVote(char* votecommand) {
 		memset(&result,0,sizeof(result));
 
 		while ( 1 ) {
-			token = COM_ParseExt( &pointer, qtrue );
+			token = COM_ParseExt( (const char **)&pointer, qtrue );
 			if ( !token[0] ) {
 					Com_Printf( "Unexpected end of customvote.cfg\n" );
 					break;
@@ -326,7 +326,7 @@ t_customvote getCustomVote(char* votecommand) {
 			}
 			Q_strncpyz( key, token, sizeof( key ) );
 
-			token = COM_ParseExt( &pointer, qfalse );
+			token = COM_ParseExt( (const char **)&pointer, qfalse );
 			if ( !token[0] ) {
 				Com_Printf("Invalid/missing argument to %s in customvote.cfg\n",key);
 			}
@@ -357,7 +357,7 @@ const char* whiteListedStr(const char* str) {
 	int destIndex = 0;
 	int sourceLength = strlen(str);
 	memset(&buffer, 0, sizeof(buffer));
-	for (; sourceIndex < sourceLength && destIndex < sizeof(buffer); ++sourceIndex) {
+	for (; sourceIndex < sourceLength && destIndex < (int)sizeof(buffer); ++sourceIndex) {
 		char a = str[sourceIndex];
 		if ( (a >= 'a' && a <= 'z') || (a >= 'A' && a <= 'Z') || (a >= '0' && a <= '9') || a == ' ' || a == '?' ) {
 			buffer[destIndex] = a;

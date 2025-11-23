@@ -123,7 +123,7 @@ qboolean G_ReadAltKillSettings( void )
 	COM_BeginParseSession( g_sprees.string );
 	while( 1 )
 	{
-		t = COM_Parse( &cnf );
+		t = COM_Parse( (const char **)&cnf );
 		if( !*t )
 			break;
 		if( Q_strequal( t, "[kspree]" ) ) {

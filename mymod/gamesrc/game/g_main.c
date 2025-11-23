@@ -205,7 +205,7 @@ static cvarTable_t gameCvarTable[] = {
 
 	// noset vars
 	{ NULL, "gamename", GAMEVERSION , CVAR_SERVERINFO | CVAR_ROM, 0, qfalse  },
-	{ NULL, "gamedate", PRODUCT_DATE , CVAR_ROM, 0, qfalse  },
+	{ NULL, "gamedate", __DATE__ , CVAR_ROM, 0, qfalse  },
 	{ &g_restarted, "g_restarted", "0", CVAR_ROM, 0, qfalse  },
 
 	// latched vars
@@ -713,7 +713,7 @@ static int G_RunScript( const char* script )
 	fileHandle_t	file;
 	char buffer[100];
 	Q_snprintf(buffer,sizeof(buffer),"%s",script);
-	Q_StrToLower(buffer);
+	Q_strlwr(buffer);
 	G_LogPrintf("Looking for: %s\n",buffer);
 	trap_FS_FOpenFile(buffer,&file,FS_READ);
 	if(!file) {
@@ -721,7 +721,7 @@ static int G_RunScript( const char* script )
 	}
 	trap_FS_FCloseFile(file);
 	Q_snprintf(buffer,sizeof(buffer),"exec %s;\n",script);
-	Q_StrToLower(buffer);
+	Q_strlwr(buffer);
 	trap_SendConsoleCommand( EXEC_APPEND, buffer );
 	return 0;
 }
@@ -749,7 +749,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart )
 
 	G_Printf ("------- Game Initialization -------\n");
 	G_Printf ("gamename: %s\n", GAMEVERSION);
-	G_Printf ("gamedate: %s\n", PRODUCT_DATE);
+        G_Printf ("gamedate: %s\n", __DATE__);
 
 	srand( randomSeed );
 
@@ -975,7 +975,7 @@ void G_ShutdownGame( int restart )
 
 //===================================================================
 
-void QDECL Com_Error ( int level, const char *error, ... )
+void QDECL Com_Error ( errorParm_t level, const char *error, ... )
 {
 	va_list		argptr;
 	char		text[1024];
@@ -1723,7 +1723,7 @@ void ExitLevel (void)
 				trap_FS_Read(&buffer,sizeof(buffer),file);
 				pointer = buffer;
 				while ( qtrue ) {
-					Q_strncpyz(mapnames[count],COM_Parse( &pointer ),20);
+					Q_strncpyz(mapnames[count],COM_Parse( (const char **)&pointer ),20);
 					if ( !mapnames[count][0] ) {
 						break;
 					}

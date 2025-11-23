@@ -90,11 +90,11 @@ int UI_ParseInfos( char *buf, int max, char *infos[] ) {
 	count = 0;
 
 	while ( 1 ) {
-		token = COM_Parse( &buf );
+		token = COM_Parse((const char **) &buf );
 		if ( !token[0] ) {
 			break;
 		}
-		if ( !strequals( token, "{" ) ) {
+		if ( !Q_strequal( token, "{" ) ) {
 			Com_Printf( "Missing { in info file\n" );
 			break;
 		}
@@ -106,17 +106,17 @@ int UI_ParseInfos( char *buf, int max, char *infos[] ) {
 
 		info[0] = '\0';
 		while ( 1 ) {
-			token = COM_ParseExt( &buf, qtrue );
+			token = COM_ParseExt((const char **) &buf, qtrue );
 			if ( !token[0] ) {
 				Com_Printf( "Unexpected end of info file\n" );
 				break;
 			}
-			if ( strequals( token, "}" ) ) {
+			if ( Q_strequal( token, "}" ) ) {
 				break;
 			}
 			Q_strncpyz( key, token, sizeof( key ) );
 
-			token = COM_ParseExt( &buf, qfalse );
+			token = COM_ParseExt((const char **) &buf, qfalse );
 			if ( !token[0] ) {
 				strcpy( token, "<NULL>" );
 			}

@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //
 #include "g_local.h"
 
-#include "../../ui/menudef.h"
+#include "../ui/menudef.h"
 
 /*
 ==================
@@ -463,7 +463,7 @@ void Cmd_Give_f (gentity_t *ent)
 
 	name = ConcatArgs( 1 );
 
-	if Q_strequal(name, "all") {
+	if (Q_strequal(name, "all")) {
 		give_all = qtrue;
 	}
 	else {

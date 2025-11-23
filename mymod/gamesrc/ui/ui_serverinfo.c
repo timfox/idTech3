@@ -133,7 +133,7 @@ static void ServerInfo_MenuDraw( void )
 	y = SCREEN_HEIGHT/2 - s_serverinfo.numlines*(SMALLCHAR_HEIGHT)/2 - 20;
 	s = s_serverinfo.info;
 	while ( s && i < s_serverinfo.numlines ) {
-		Info_NextPair( &s, key, value );
+		s = Info_NextPair( s, key, value );
 		if ( !key[0] ) {
 			break;
 		}
@@ -251,7 +251,7 @@ void UI_ServerInfoMenu( void )
 	s_serverinfo.numlines = 0;
 	s = s_serverinfo.info;
 	while ( s ) {
-		Info_NextPair( &s, key, value );
+		s = Info_NextPair( s, key, value );
 		if ( !key[0] ) {
 			break;
 		}

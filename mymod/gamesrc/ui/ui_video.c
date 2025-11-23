@@ -665,7 +665,7 @@ static void GraphicsOptions_UpdateMenuItems( void )
 GraphicsOptions_ApplyChanges
 =================
 */
-static void GraphicsOptions_ApplyChanges( void *unused, int notification )
+static void GraphicsOptions_ApplyChanges( [[maybe_unused]] void *unused, int notification )
 {
 	if (notification != QM_ACTIVATED)
 		return;
@@ -772,7 +772,7 @@ static void GraphicsOptions_Event( void* ptr, int event ) {
 	switch( ((menucommon_s*)ptr)->id ) {
         case ID_RATIO:
             s_graphicsoptions.mode.curvalue = ratioToRes[ s_graphicsoptions.ratio.curvalue ];
-            // fall through to apply mode constraints
+            [[fallthrough]]; // fall through to apply mode constraints
 	case ID_MODE:
 		// clamp 3dfx video modes
 		if ( s_graphicsoptions.driver.curvalue == 1 )
@@ -836,7 +836,7 @@ static void GraphicsOptions_Event( void* ptr, int event ) {
 GraphicsOptions_TQEvent
 ================
 */
-static void GraphicsOptions_TQEvent( void *ptr, int event ) {
+static void GraphicsOptions_TQEvent( [[maybe_unused]] void *ptr, int event ) {
 	if( event != QM_ACTIVATED ) {
 	 	return;
 	}

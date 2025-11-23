@@ -22,11 +22,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 //#include "cg_local.h"
 #include "../qcommon/q_shared.h"
-#include "../renderer/tr_types.h"
+#include "../../src/renderercommon/tr_types.h"
 #include "../game/bg_public.h"
 #include "../game/challenges.h"
 #ifdef PARTofUI
-#include "../q3_ui/ui_local.h"
+// #include "../q3_ui/ui_local.h" // Removed, file doesn't exist
 #else
 #include "../cgame/cg_local.h"
 #endif

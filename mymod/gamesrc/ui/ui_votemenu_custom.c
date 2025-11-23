@@ -177,7 +177,7 @@ void UI_VoteCustomMenuInternal( void )
 
 	y = 98;
 	for(i=0;i<CUSTOM_MENU_MAX_ENTRIES;i++) {
-		token = COM_Parse( &pointer );
+                token = COM_Parse( (const char **)&pointer );
 		Q_strncpyz(s_votemenu_custom.text[i],token,sizeof(s_votemenu_custom.text[0]));
 		setCustomMenutext(&s_votemenu_custom.bEntry[i],y,ID_CUSTOM0+i,s_votemenu_custom.text[i]);
 		y+=CUSTOM_MENU_VERTICAL_SPACING;

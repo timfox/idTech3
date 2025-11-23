@@ -23,6 +23,23 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // g_local.h -- local definitions for game module
 
 #include "../qcommon/q_shared.h"
+
+// Compatibility: Q_strequal -> Q_streq
+#ifndef Q_strequal
+#define Q_strequal Q_streq
+#endif
+// Compatibility: strequals -> Q_streq
+#ifndef strequals
+#define strequals Q_streq
+#endif
+// Compatibility: strequal -> Q_streq
+#ifndef strequal
+#define strequal Q_streq
+#endif
+// Compatibility: Q_strequaln -> Q_strncmp (case-sensitive compare)
+#ifndef Q_strequaln
+#define Q_strequaln(s1, s2, n) (Q_strncmp((s1), (s2), (n)) == 0)
+#endif
 #include "bg_public.h"
 #include "g_public.h"
 #include "challenges.h"
@@ -380,6 +397,9 @@ struct gclient_s {
 	gentity_t	*hook;				// grapple hook if out
 
 	int			switchTeamTime;		// time the player switched teams
+
+	grank_status_t	client_status;	// rankings status (stub for OpenArena compatibility)
+	int			weapon_change_time;	// time when weapon was last changed (rankings)
 
 	// timeResidual is used to handle events that happen every second
 	// like health / armor countdowns and regeneration

@@ -65,16 +65,16 @@ void CG_BubbleTrail( vec3_t start, vec3_t end, float spacing ) {
 		le->lifeRate = 1.0 / ( le->endTime - le->startTime );
 
 		re = &le->refEntity;
-		re->shaderTime = cg.time / 1000.0f;
+		re->shaderTime.f = cg.time / 1000.0f;
 
 		re->reType = RT_SPRITE;
 		re->rotation = 0;
 		re->radius = 3;
 		re->customShader = cgs.media.waterBubbleShader;
-		re->shaderRGBA[0] = 0xff;
-		re->shaderRGBA[1] = 0xff;
-		re->shaderRGBA[2] = 0xff;
-		re->shaderRGBA[3] = 0xff;
+		re->shader.rgba[0] = 0xff;
+		re->shader.rgba[1] = 0xff;
+		re->shader.rgba[2] = 0xff;
+		re->shader.rgba[3] = 0xff;
 
 		le->color[3] = 1.0;
 
@@ -116,7 +116,7 @@ localEntity_t *CG_SmokePuff( const vec3_t p, const vec3_t vel,
 	re = &le->refEntity;
 	re->rotation = Q_random( &seed ) * 360;
 	re->radius = radius;
-	re->shaderTime = startTime / 1000.0f;
+	re->shaderTime.f = startTime / 1000.0f;
 
 	le->leType = LE_MOVE_SCALE_FADE;
 	le->startTime = startTime;
@@ -145,15 +145,15 @@ localEntity_t *CG_SmokePuff( const vec3_t p, const vec3_t vel,
 	// rage pro can't alpha fade, so use a different shader
 	if ( cgs.glconfig.hardwareType == GLHW_RAGEPRO ) {
 		re->customShader = cgs.media.smokePuffRageProShader;
-		re->shaderRGBA[0] = 0xff;
-		re->shaderRGBA[1] = 0xff;
-		re->shaderRGBA[2] = 0xff;
-		re->shaderRGBA[3] = 0xff;
+		re->shader.rgba[0] = 0xff;
+		re->shader.rgba[1] = 0xff;
+		re->shader.rgba[2] = 0xff;
+		re->shader.rgba[3] = 0xff;
 	} else {
-		re->shaderRGBA[0] = le->color[0] * 0xff;
-		re->shaderRGBA[1] = le->color[1] * 0xff;
-		re->shaderRGBA[2] = le->color[2] * 0xff;
-		re->shaderRGBA[3] = 0xff;
+		re->shader.rgba[0] = le->color[0] * 0xff;
+		re->shader.rgba[1] = le->color[1] * 0xff;
+		re->shader.rgba[2] = le->color[2] * 0xff;
+		re->shader.rgba[3] = 0xff;
 	}
 
 	re->reType = RT_SPRITE;
@@ -182,7 +182,7 @@ localEntity_t *CG_SlowPuff( const vec3_t p, const vec3_t vel,
 	re = &le->refEntity;
 	re->rotation = Q_random( &seed ) * 360;
 	re->radius = radius;
-	re->shaderTime = startTime / 1000.0f;
+	re->shaderTime.f = startTime / 1000.0f;
 
 	le->leType = LE_MOVE_SCALE_FADE;
 	le->startTime = startTime;
@@ -211,15 +211,15 @@ localEntity_t *CG_SlowPuff( const vec3_t p, const vec3_t vel,
 	// rage pro can't alpha fade, so use a different shader
 	if ( cgs.glconfig.hardwareType == GLHW_RAGEPRO ) {
 		re->customShader = cgs.media.smokePuffRageProShader;
-		re->shaderRGBA[0] = 0xff;
-		re->shaderRGBA[1] = 0xff;
-		re->shaderRGBA[2] = 0xff;
-		re->shaderRGBA[3] = 0xff;
+		re->shader.rgba[0] = 0xff;
+		re->shader.rgba[1] = 0xff;
+		re->shader.rgba[2] = 0xff;
+		re->shader.rgba[3] = 0xff;
 	} else {
-		re->shaderRGBA[0] = le->color[0] * 0xff;
-		re->shaderRGBA[1] = le->color[1] * 0xff;
-		re->shaderRGBA[2] = le->color[2] * 0xff;
-		re->shaderRGBA[3] = 0xff;
+		re->shader.rgba[0] = le->color[0] * 0xff;
+		re->shader.rgba[1] = le->color[1] * 0xff;
+		re->shader.rgba[2] = le->color[2] * 0xff;
+		re->shader.rgba[3] = 0xff;
 	}
 
 	re->reType = RT_SPRITE;
@@ -251,7 +251,7 @@ void CG_SpawnEffect( vec3_t org ) {
 	re = &le->refEntity;
 
 	re->reType = RT_MODEL;
-	re->shaderTime = cg.time / 1000.0f;
+	re->shaderTime.f = cg.time / 1000.0f;
 
 #ifndef MISSIONPACK
 	re->customShader = cgs.media.teleportEffectShader;
@@ -315,7 +315,7 @@ void CG_KamikazeEffect( vec3_t org ) {
 	re = &le->refEntity;
 
 	re->reType = RT_MODEL;
-	re->shaderTime = cg.time / 1000.0f;
+	re->shaderTime.f = cg.time / 1000.0f;
 
 	re->hModel = cgs.media.kamikazeEffectModel;
 
@@ -390,7 +390,7 @@ void CG_InvulnerabilityImpact( vec3_t org, vec3_t angles ) {
 	re = &le->refEntity;
 
 	re->reType = RT_MODEL;
-	re->shaderTime = cg.time / 1000.0f;
+	re->shaderTime.f = cg.time / 1000.0f;
 
 	re->hModel = cgs.media.invulnerabilityImpactModel;
 
@@ -430,7 +430,7 @@ void CG_InvulnerabilityJuiced( vec3_t org ) {
 	re = &le->refEntity;
 
 	re->reType = RT_MODEL;
-	re->shaderTime = cg.time / 1000.0f;
+	re->shaderTime.f = cg.time / 1000.0f;
 
 	re->hModel = cgs.media.invulnerabilityJuicedModel;
 
@@ -533,7 +533,7 @@ localEntity_t *CG_MakeExplosion( vec3_t origin, vec3_t dir,
 	ex->endTime = ex->startTime + msec;
 
 	// bias the time so all shader effects start correctly
-	ex->refEntity.shaderTime = ex->startTime / 1000.0f;
+	ex->refEntity.shaderTime.f = ex->startTime / 1000.0f;
 
 	ex->refEntity.hModel = hModel;
 	ex->refEntity.customShader = shader;
@@ -573,7 +573,7 @@ void CG_Bleed( vec3_t origin, int entityNum ) {
 	ex->refEntity.rotation = rand() % 360;
 	ex->refEntity.radius = 24;
 
-	ex->refEntity.shaderTime = ex->startTime / 1000.0f;	// leilei-  fix the blood animation 
+	ex->refEntity.shaderTime.f = ex->startTime / 1000.0f;	// leilei-  fix the blood animation 
 	ex->refEntity.customShader = cgs.media.bloodExplosionShader;
 
 	// don't show player's own blood in view

@@ -155,10 +155,10 @@ static void UI_ServerOptionsMenu( qboolean multiplayer );
 GametypeBits from arenas.txt + .arena files
 =================
 */
-static int GametypeBits( char *string ) {
+static int GametypeBits( const char *string ) {
 	int		bits;
-	char	*p;
-	char	*token;
+	const char	*p;
+	const char	*token;
 
 	bits = 0;
 	p = string;
@@ -336,7 +336,7 @@ static void WriteMapList2File(int gametype,const char *filename) {
     const char	*info;
     fileHandle_t f;
     int len;
-    char *mapname;
+    const char *mapname;
     
     len = trap_FS_FOpenFile( filename, &f, FS_WRITE );
     
@@ -383,7 +383,7 @@ void WriteMapList(void) {
 StartServer_GametypeEvent
 =================
 */
-static void StartServer_GametypeEvent( void* ptr, int event ) {
+static void StartServer_GametypeEvent( [[maybe_unused]] void* ptr, int event ) {
 	int			i;
 	int			j;
 	int			count;
@@ -1234,7 +1234,7 @@ static void ServerOptions_PlayerNameEvent( void* ptr, int event ) {
 ServerOptions_StatusBar
 =================
 */
-static void ServerOptions_StatusBar( void* ptr ) {
+static void ServerOptions_StatusBar( [[maybe_unused]] void* ptr ) {
 	UI_DrawString( 320, 440, "0 = NO LIMIT", UI_CENTER|UI_SMALLFONT, colorWhite );
 }
 
@@ -1243,7 +1243,7 @@ static void ServerOptions_StatusBar( void* ptr ) {
 ServerOptions_StatusBar_Instantgib
 =================
 */
-static void ServerOptions_StatusBar_Instantgib( void* ptr ) {
+static void ServerOptions_StatusBar_Instantgib( [[maybe_unused]] void* ptr ) {
 	UI_DrawString( 320, 440, "Only railgun and instant kill", UI_CENTER|UI_SMALLFONT, colorWhite );
 }
 
@@ -1252,7 +1252,7 @@ static void ServerOptions_StatusBar_Instantgib( void* ptr ) {
 ServerOptions_StatusBar_Allrockets
 =================
 */
-static void ServerOptions_StatusBar_Allrockets( void* ptr ) {
+static void ServerOptions_StatusBar_Allrockets( [[maybe_unused]] void* ptr ) {
 	UI_DrawString( 320, 440, "Only Rocket launcher with Inf. ammo", UI_CENTER|UI_SMALLFONT, colorWhite );
 }
 
@@ -1261,7 +1261,7 @@ static void ServerOptions_StatusBar_Allrockets( void* ptr ) {
 ServerOptions_StatusBar_Pure
 =================
 */
-static void ServerOptions_StatusBar_Pure( void* ptr ) {
+static void ServerOptions_StatusBar_Pure( [[maybe_unused]] void* ptr ) {
 	UI_DrawString( 320, 440, "Require identical pk3 files", UI_CENTER|UI_SMALLFONT, colorWhite );
 }
 
@@ -1270,7 +1270,7 @@ static void ServerOptions_StatusBar_Pure( void* ptr ) {
 ServerOptions_StatusBar_Oneway
 =================
 */
-static void ServerOptions_StatusBar_Oneway( void* ptr ) {
+static void ServerOptions_StatusBar_Oneway( [[maybe_unused]] void* ptr ) {
 	UI_DrawString( 320, 440, "Only one team can capture in a round", UI_CENTER|UI_SMALLFONT, colorWhite );
 }
 
@@ -1407,13 +1407,13 @@ static void ServerOptions_InitBotNames( void ) {
 		}
 
 		botInfo = UI_GetBotInfoByName( bot );
-		bot = Info_ValueForKey( botInfo, "name" );
-                
-		if (Q_strequal(bot,"")) {
-			bot = "Sarge"; 
+		{
+			const char *botName = Info_ValueForKey( botInfo, "name" );
+			if (Q_strequal(botName,"")) {
+				botName = "Sarge"; 
+			}
+			Q_strncpyz( s_serveroptions.playerNameBuffers[count], botName, sizeof(s_serveroptions.playerNameBuffers[count]) );
 		}
-
-		Q_strncpyz( s_serveroptions.playerNameBuffers[count], bot, sizeof(s_serveroptions.playerNameBuffers[count]) );
 		count++;
 	}
 
@@ -2180,7 +2180,7 @@ static void UI_BotSelectMenu_Default( char *bot ) {
 UI_BotSelectMenu_LeftEvent
 =================
 */
-static void UI_BotSelectMenu_LeftEvent( void* ptr, int event ) {
+static void UI_BotSelectMenu_LeftEvent( [[maybe_unused]] void* ptr, int event ) {
 	if( event != QM_ACTIVATED ) {
 		return;
 	}
@@ -2197,7 +2197,7 @@ static void UI_BotSelectMenu_LeftEvent( void* ptr, int event ) {
 UI_BotSelectMenu_RightEvent
 =================
 */
-static void UI_BotSelectMenu_RightEvent( void* ptr, int event ) {
+static void UI_BotSelectMenu_RightEvent( [[maybe_unused]] void* ptr, int event ) {
 	if( event != QM_ACTIVATED ) {
 		return;
 	}
@@ -2239,7 +2239,7 @@ static void UI_BotSelectMenu_BotEvent( void* ptr, int event ) {
 UI_BotSelectMenu_BackEvent
 =================
 */
-static void UI_BotSelectMenu_BackEvent( void* ptr, int event ) {
+static void UI_BotSelectMenu_BackEvent( [[maybe_unused]] void* ptr, int event ) {
 	if( event != QM_ACTIVATED ) {
 		return;
 	}
@@ -2252,7 +2252,7 @@ static void UI_BotSelectMenu_BackEvent( void* ptr, int event ) {
 UI_BotSelectMenu_SelectEvent
 =================
 */
-static void UI_BotSelectMenu_SelectEvent( void* ptr, int event ) {
+static void UI_BotSelectMenu_SelectEvent( [[maybe_unused]] void* ptr, int event ) {
 	if( event != QM_ACTIVATED ) {
 		return;
 	}

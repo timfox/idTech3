@@ -1872,12 +1872,12 @@ void MapInfoGet(const char* mapname, int gametype, mapinfo_result_t *result) {
 	mayRead = qtrue;
 
 	while (qtrue) {
-		token = COM_Parse(&pointer);
+                token = COM_Parse((const char **)&pointer);
 		if (!token[0]) {
 			break;
 		}
 		Q_strncpyz(keyBuffer, token, sizeof (keyBuffer));
-		token = COM_Parse(&pointer);
+                token = COM_Parse((const char **)&pointer);
 
 		Com_Printf("Token \"%s\" found, with value: \"%s\"\n", keyBuffer, token);
 

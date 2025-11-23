@@ -26,7 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define BASEOA
 
 #include "../qcommon/q_shared.h"
-#include "../renderer/tr_types.h"
+#include "../../src/renderercommon/tr_types.h"
 //NOTE: include the ui_public.h from the new UI
 #include "../ui/ui_public.h" // bk001205 - yes, do have to use this
 //redefine to old API version
@@ -34,7 +34,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define UI_API_VERSION	4
 #include "../client/keycodes.h"
 #include "../game/bg_public.h"
-#include "../ui/ui_shared.h"
+// #include "../ui/ui_shared.h" // Removed, file doesn't exist
 
 typedef void (*voidfunc_f)(void);
 
@@ -122,7 +122,9 @@ extern vmCvar_t ui_browserHidePrivate;
 #define LCOLUMN_OFFSET			(-BIGCHAR_WIDTH )
 
 #define SLIDER_RANGE			10
+#ifndef MAX_EDIT_LINE
 #define	MAX_EDIT_LINE			256
+#endif
 
 #define MAX_MENUDEPTH			8
 #ifndef MAX_MENUITEMS

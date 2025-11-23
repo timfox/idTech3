@@ -22,7 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef TR_COMMON_H
 #define TR_COMMON_H
 
+#ifndef USE_VULKAN
 #define USE_VULKAN
+#endif
 
 #include "../qcommon/q_shared.h"
 #include "../renderercommon/tr_public.h"
@@ -96,6 +98,7 @@ void  R_NoiseInit( void );
 image_t *R_FindImageFile( const char *name, imgFlags_t flags, uint32_t type );
 image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int width, int height, imgFlags_t flags, int format, uint32_t type );
 void R_UploadSubImage( byte *data, int x, int y, int width, int height, image_t *image );
+image_t *R_GetLoadedImage( const char *name, int flags );
 
 qhandle_t RE_RegisterShaderLightMap( const char *name, int lightmapIndex );
 qhandle_t RE_RegisterShader( const char *name );

@@ -190,7 +190,7 @@ void Svcmd_DumpUser_f( void )
 	G_Printf( "userinfo\n--------\n" );
 	//Info_Print( userinfo );
 	while( 1 ) {
-		Info_NextPair( &info, key, value );
+		info = Info_NextPair( info, key, value );
 		if( !*info )
 			return;
 

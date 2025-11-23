@@ -1,11 +1,11 @@
 # CMakeLists.txt for building native game modules
 # This allows you to use modern C features instead of QVM's limited C compiler
 
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.20)
 project(mymod_game_modules)
 
-# Set C standard to C11 for modern features
-set(CMAKE_C_STANDARD 11)
+# Set C standard to C23 for modern features
+set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # Build as shared libraries (DLLs/.so files)
@@ -23,6 +23,7 @@ set(ENGINE_INCLUDE_DIRS
     ${ENGINE_ROOT}/src/game
     ${ENGINE_ROOT}/src/cgame
     ${ENGINE_ROOT}/src/ui
+    ${ENGINE_ROOT}/src/renderercommon
 )
 
 message(STATUS "ENGINE_ROOT: ${ENGINE_ROOT}")
@@ -67,6 +68,8 @@ set_target_properties(game_${ARCH_SUFFIX} PROPERTIES
 
 # CGame module (client-side) - OpenArena source
 file(GLOB CGAME_SOURCES "cgame/*.c")
+# Exclude cg_newdraw.c as it requires MISSIONPACK UI components not available
+list(REMOVE_ITEM CGAME_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cgame/cg_newdraw.c")
 add_library(cgame_${ARCH_SUFFIX} SHARED ${CGAME_SOURCES})
 
 set_target_properties(cgame_${ARCH_SUFFIX} PROPERTIES

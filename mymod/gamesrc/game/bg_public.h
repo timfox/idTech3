@@ -29,6 +29,36 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #else
 #define BG_PUBLIC_H 1
 
+#include "../qcommon/q_shared.h"
+
+// Compatibility macros for OpenArena code
+#ifndef Q_strequal
+#define Q_strequal Q_streq
+#endif
+#ifndef Q_strequaln
+#define Q_strequaln(s1, s2, n) (Q_strncmp((s1), (s2), (n)) == 0)
+#endif
+#ifndef Q_snprintf
+#define Q_snprintf snprintf
+#endif
+
+// Rankings status constants (stubs for game module)
+typedef enum {
+	QGR_STATUS_NEW = 0,
+	QGR_STATUS_ACTIVE = 1,
+	QGR_STATUS_SPECTATOR = 2,
+	QGR_STATUS_NO_USER = 3,
+	QGR_STATUS_BAD_PASSWORD = 4,
+	QGR_STATUS_USER_EXISTS = 5,
+	QGR_STATUS_NO_MEMBERSHIP = 6,
+	QGR_STATUS_TIMEOUT = 7,
+	QGR_STATUS_INVALIDUSER = 8,
+	QGR_STATUS_ERROR = 9,
+	QGR_STATUS_PENDING = 10,
+	QGR_STATUS_VALIDATING = 11,
+	QGR_STATUS_LEAVING = 12
+} grank_status_t;
+
 #define	GAME_VERSION		BASEGAME "-1"
 
 #define	DEFAULT_GRAVITY		800
@@ -269,6 +299,8 @@ typedef enum {
 	PERS_PLAYEREVENTS,				// 16 bits that can be flipped for events
 	PERS_ATTACKER,					// clientnum of last damage inflicter
 	PERS_ATTACKEE_ARMOR,			// health/armor of last person we attacked
+	PERS_MATCH_TIME,				// match time in seconds (rankings)
+	PERS_MATCH_RATING,				// match rating (rankings)
 	PERS_KILLED,					// count of the number of times you died
 	// player awards tracking
 	PERS_IMPRESSIVE_COUNT,			// two railgun hits in a row

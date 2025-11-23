@@ -394,7 +394,7 @@ void CG_Draw3DModelEyes(float x, float y, float w, float h, qhandle_t model, qha
 	VectorCopy(origin, ent.origin);
 
 	// leilei - deal with the eyes here
-	VectorCopy(eyep, ent.eyepos[0]);
+	// VectorCopy(eyep, ent.eyepos[0]); // removed, eyepos not in refEntity_t
 
 	//	speed *= 0.05f;
 	{
@@ -404,7 +404,7 @@ void CG_Draw3DModelEyes(float x, float y, float w, float h, qhandle_t model, qha
 		angers[1] *= -2.0;
 		AngleVectors(angers, fawed, right, awp);
 		VectorMA(origin, 1024, fawed, ah);
-		VectorCopy(ah, ent.eyelook);
+		// ent.eyelook - removed, not in refEntity_t
 	}
 
 	ent.hModel = model;

@@ -21,7 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 //
 #include "../qcommon/q_shared.h"
-#include "../renderer/tr_types.h"
+#include "../../src/renderercommon/tr_types.h"
 #include "../game/bg_public.h"
 #include "cg_public.h"
 
@@ -1518,7 +1518,7 @@ int CG_CrosshairPlayer( void );
 int CG_LastAttacker( void );
 void CG_LoadMenus(const char *menuFile);
 void CG_KeyEvent(int key, qboolean down);
-void CG_MouseEvent(int x, int y);
+void CG_MouseEvent(int dx, int dy);
 void CG_EventHandling(int type);
 void CG_RankRunFrame( void );
 void CG_SetScoreSelection(void *menu);

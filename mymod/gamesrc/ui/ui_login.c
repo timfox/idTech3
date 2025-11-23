@@ -77,9 +77,10 @@ static void Login_MenuEvent( void* ptr, int event ) {
 		*/
 
 		// login
-		trap_CL_UI_RankUserLogin(
-			s_login.name_box.field.buffer, 
-			s_login.password_box.field.buffer );
+		// trap_CL_UI_RankUserLogin( // Removed, function not available
+		//	s_login.name_box.field.buffer, 
+		//	s_login.password_box.field.buffer );
+		(void)s_login.name_box.field.buffer; (void)s_login.password_box.field.buffer; // Suppress unused warnings
 
 		UI_ForceMenuOff();
 		break;

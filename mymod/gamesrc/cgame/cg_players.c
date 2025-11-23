@@ -66,7 +66,7 @@ sfxHandle_t CG_CustomSound(int clientNum, const char *soundName) {
 	ci = &cgs.clientinfo[ clientNum ];
 
 	for (i = 0; i < MAX_CUSTOM_SOUNDS && cg_customSoundNames[i]; i++) {
-		if (strequals(soundName, cg_customSoundNames[i])) {
+		if (Q_strequal(soundName, cg_customSoundNames[i])) {
 			return ci->sounds[i];
 		}
 	}
@@ -133,12 +133,12 @@ static qboolean CG_ParseAnimationFile(const char *filename, clientInfo_t *ci) {
 	// read optional parameters
 	while (1) {
 		prev = text_p; // so we can unget
-		token = COM_Parse(&text_p);
+		token = COM_Parse((const char **)&text_p);
 		if ( !token[0] ) {
 			break;
 		}
 		if (Q_strequal(token, "footsteps")) {
-			token = COM_Parse(&text_p);
+			token = COM_Parse((const char **)&text_p);
 			if ( !token[0] ) {
 				break;
 			}
@@ -158,7 +158,7 @@ static qboolean CG_ParseAnimationFile(const char *filename, clientInfo_t *ci) {
 			continue;
 		} else if (Q_strequal(token, "headoffset")) {
 			for (i = 0; i < 3; i++) {
-				token = COM_Parse(&text_p);
+				token = COM_Parse((const char **)&text_p);
 				if ( !token[0] ) {
 					break;
 				}
@@ -167,7 +167,7 @@ static qboolean CG_ParseAnimationFile(const char *filename, clientInfo_t *ci) {
 			continue;
 		} else if (Q_strequal(token, "eyes")) { // leilei - EYES
 			for (i = 0; i < 3; i++) {
-				token = COM_Parse(&text_p);
+				token = COM_Parse((const char **)&text_p);
 				if ( !token[0] ) {
 					break;
 				}
@@ -175,7 +175,7 @@ static qboolean CG_ParseAnimationFile(const char *filename, clientInfo_t *ci) {
 			}
 			continue;
 		} else if (Q_strequal(token, "sex")) {
-			token = COM_Parse(&text_p);
+			token = COM_Parse((const char **)&text_p);
 			if ( !token[0] ) {
 				break;
 			}
@@ -206,7 +206,7 @@ static qboolean CG_ParseAnimationFile(const char *filename, clientInfo_t *ci) {
 	// read information for each frame
 	for (i = 0; i < MAX_ANIMATIONS; i++) {
 
-		token = COM_Parse(&text_p);
+		token = COM_Parse((const char **)&text_p);
 		if ( !token[0] ) {
 			if (i >= TORSO_GETFLAG && i <= TORSO_NEGATIVE) {
 				animations[i] = animations[TORSO_GESTURE];
@@ -310,7 +310,7 @@ static qboolean CG_ParseAnimationFile(const char *filename, clientInfo_t *ci) {
 			animations[i].firstFrame -= skip;
 		}
 
-		token = COM_Parse(&text_p);
+		token = COM_Parse((const char **)&text_p);
 		if ( !token[0] ) {
 			break;
 		}
@@ -324,13 +324,13 @@ static qboolean CG_ParseAnimationFile(const char *filename, clientInfo_t *ci) {
 			animations[i].reversed = qtrue;
 		}
 
-		token = COM_Parse(&text_p);
+		token = COM_Parse((const char **)&text_p);
 		if ( !token[0] ) {
 			break;
 		}
 		animations[i].loopFrames = atoi(token);
 
-		token = COM_Parse(&text_p);
+		token = COM_Parse((const char **)&text_p);
 		if ( !token[0] ) {
 			break;
 		}
@@ -420,7 +420,7 @@ static qboolean CG_ParseEyesFile(const char *filename, clientInfo_t *ci) {
 
 	// read optional parameters
 	while (1) {
-		token = COM_Parse(&text_p);
+		token = COM_Parse((const char **)&text_p);
 		if ( !token[0] ) {
 			break;
 		}
@@ -428,7 +428,7 @@ static qboolean CG_ParseEyesFile(const char *filename, clientInfo_t *ci) {
 
 		if (!Q_stricmp(token, "eyes")) { // leilei - EYES
 			for (i = 0; i < 3; i++) {
-				token = COM_Parse(&text_p);
+				token = COM_Parse((const char **)&text_p);
 				if ( !token[0] ) {
 					break;
 				}
@@ -2181,10 +2181,10 @@ static void CG_PlayerFloatSprite(centity_t *cent, qhandle_t shader) {
 	ent.customShader = shader;
 	ent.radius = 10;
 	ent.renderfx = rf;
-	ent.shaderRGBA[0] = 255;
-	ent.shaderRGBA[1] = 255;
-	ent.shaderRGBA[2] = 255;
-	ent.shaderRGBA[3] = 255;
+	ent.shader.rgba[0] = 255;
+	ent.shader.rgba[1] = 255;
+	ent.shader.rgba[2] = 255;
+	ent.shader.rgba[3] = 255;
 	trap_R_AddRefEntityToScene(&ent);
 }
 
@@ -2460,40 +2460,40 @@ static void CG_PlayerSplash(centity_t *cent) {
 	verts[0].xyz[1] -= 32;
 	verts[0].st[0] = 0;
 	verts[0].st[1] = 0;
-	verts[0].modulate[0] = 255;
-	verts[0].modulate[1] = 255;
-	verts[0].modulate[2] = 255;
-	verts[0].modulate[3] = 255;
+	verts[0].modulate.rgba[0] = 255;
+	verts[0].modulate.rgba[1] = 255;
+	verts[0].modulate.rgba[2] = 255;
+	verts[0].modulate.rgba[3] = 255;
 
 	VectorCopy(trace.endpos, verts[1].xyz);
 	verts[1].xyz[0] -= 32;
 	verts[1].xyz[1] += 32;
 	verts[1].st[0] = 0;
 	verts[1].st[1] = 1;
-	verts[1].modulate[0] = 255;
-	verts[1].modulate[1] = 255;
-	verts[1].modulate[2] = 255;
-	verts[1].modulate[3] = 255;
+	verts[1].modulate.rgba[0] = 255;
+	verts[1].modulate.rgba[1] = 255;
+	verts[1].modulate.rgba[2] = 255;
+	verts[1].modulate.rgba[3] = 255;
 
 	VectorCopy(trace.endpos, verts[2].xyz);
 	verts[2].xyz[0] += 32;
 	verts[2].xyz[1] += 32;
 	verts[2].st[0] = 1;
 	verts[2].st[1] = 1;
-	verts[2].modulate[0] = 255;
-	verts[2].modulate[1] = 255;
-	verts[2].modulate[2] = 255;
-	verts[2].modulate[3] = 255;
+	verts[2].modulate.rgba[0] = 255;
+	verts[2].modulate.rgba[1] = 255;
+	verts[2].modulate.rgba[2] = 255;
+	verts[2].modulate.rgba[3] = 255;
 
 	VectorCopy(trace.endpos, verts[3].xyz);
 	verts[3].xyz[0] += 32;
 	verts[3].xyz[1] -= 32;
 	verts[3].st[0] = 1;
 	verts[3].st[1] = 0;
-	verts[3].modulate[0] = 255;
-	verts[3].modulate[1] = 255;
-	verts[3].modulate[2] = 255;
-	verts[3].modulate[3] = 255;
+	verts[3].modulate.rgba[0] = 255;
+	verts[3].modulate.rgba[1] = 255;
+	verts[3].modulate.rgba[2] = 255;
+	verts[3].modulate.rgba[3] = 255;
 
 	trap_R_AddPolyToScene(cgs.media.wakeMarkShader, 4, verts);
 }
@@ -2518,16 +2518,16 @@ void CG_AddRefEntityWithPowerups(refEntity_t *ent, entityState_t *state, int tea
 		trap_R_AddRefEntityToScene(ent);
 		if (!isMissile && (cgs.dmflags & DF_PLAYER_OVERLAY) && !(state->eFlags & EF_DEAD)) {
 				if (cg_alternateShell.integer > 1){
-					ent->glow = 1337;
+					// ent->glow = 1337; // removed, glow not in refEntity_t
 					switch (team) {
 						case TEAM_RED:
-							ent->glowcol = 0xF80A85;
+							// ent->glowcol = 0xF80A85; // removed, glowcol not in refEntity_t
 							break;
 						case TEAM_BLUE:
-							ent->glowcol = 0x0585FD;
+							// ent->glowcol = 0x0585FD; // removed, glowcol not in refEntity_t
 							break;
 						default:
-							ent->glowcol = 0xA0A0A0;
+							// ent->glowcol = 0xA0A0A0; // removed, glowcol not in refEntity_t
 					}
 				}
 				else
@@ -2550,11 +2550,12 @@ void CG_AddRefEntityWithPowerups(refEntity_t *ent, entityState_t *state, int tea
 
 		if (state->powerups & (1 << PW_QUAD)) {
 			if (cg_alternateShell.integer > 1){
-				ent->glow = 1338;
-				if (team == TEAM_RED)
-				ent->glowcol = 0xFF3040;
-				else
-				ent->glowcol = 0x0040E2;
+				// ent->glow = 1338; // removed, glow not in refEntity_t
+				if (team == TEAM_RED) {
+					// ent->glowcol = 0xFF3040; // removed, glowcol not in refEntity_t
+				} else {
+					// ent->glowcol = 0x0040E2; // removed, glowcol not in refEntity_t
+				}
 
 			}
 			else
@@ -2569,8 +2570,8 @@ void CG_AddRefEntityWithPowerups(refEntity_t *ent, entityState_t *state, int tea
 		if (state->powerups & (1 << PW_REGEN)) {
 			if (((cg.time / 100) % 10) == 1) {
 				if (cg_alternateShell.integer > 1){
-					ent->glow = 1337;
-					ent->glowcol = 0xFF6080;
+					// ent->glow = 1337; // removed, glow not in refEntity_t
+					// ent->glowcol = 0xFF6080; // removed, glowcol not in refEntity_t
 				}
 				else
 				{
@@ -2581,8 +2582,8 @@ void CG_AddRefEntityWithPowerups(refEntity_t *ent, entityState_t *state, int tea
 		}
 		if (state->powerups & (1 << PW_BATTLESUIT)) {
 				if (cg_alternateShell.integer > 1){
-					ent->glow = 1340;
-					ent->glowcol = 0xE29000;
+					// ent->glow = 1340; // removed, glow not in refEntity_t
+					// ent->glowcol = 0xE29000; // removed, glowcol not in refEntity_t
 				}
 				else
 				{
@@ -2612,31 +2613,31 @@ int CG_LightVerts(vec3_t normal, int numVerts, polyVert_t *verts) {
 	for (i = 0; i < numVerts; i++) {
 		incoming = DotProduct(normal, lightDir);
 		if (incoming <= 0) {
-			verts[i].modulate[0] = ambientLight[0];
-			verts[i].modulate[1] = ambientLight[1];
-			verts[i].modulate[2] = ambientLight[2];
-			verts[i].modulate[3] = 255;
+			verts[i].modulate.rgba[0] = ambientLight[0];
+			verts[i].modulate.rgba[1] = ambientLight[1];
+			verts[i].modulate.rgba[2] = ambientLight[2];
+			verts[i].modulate.rgba[3] = 255;
 			continue;
 		}
 		j = (ambientLight[0] + incoming * directedLight[0]);
 		if (j > 255) {
 			j = 255;
 		}
-		verts[i].modulate[0] = j;
+		verts[i].modulate.rgba[0] = j;
 
 		j = (ambientLight[1] + incoming * directedLight[1]);
 		if (j > 255) {
 			j = 255;
 		}
-		verts[i].modulate[1] = j;
+		verts[i].modulate.rgba[1] = j;
 
 		j = (ambientLight[2] + incoming * directedLight[2]);
 		if (j > 255) {
 			j = 255;
 		}
-		verts[i].modulate[2] = j;
+		verts[i].modulate.rgba[2] = j;
 
-		verts[i].modulate[3] = 255;
+		verts[i].modulate.rgba[3] = 255;
 	}
 	return qtrue;
 }
@@ -2807,7 +2808,7 @@ void CG_Player(centity_t *cent) {
 			}
 		}
 
-		VectorCopy(cent->pe.eyepos, head.eyepos[0]); // Copy it to our refdef for the renderer
+		// VectorCopy(cent->pe.eyepos, head.eyepos[0]); // removed, eyepos not in refEntity_t
 
 		// HMM
 		{
@@ -2821,7 +2822,7 @@ void CG_Player(centity_t *cent) {
 			CG_Trace(&trace, orrg, NULL, NULL, v, -1, CONTENTS_SOLID);
 			if (trace.fraction < 1)
 				VectorCopy(trace.endpos, v); // look closer
-			VectorCopy(v, head.eyelook); // Copy it to our refdef for the renderer
+			// VectorCopy(v, head.eyelook); // removed, eyelook not in refEntity_t
 		}
 
 		head.shadowPlane = shadowPlane;
@@ -3048,15 +3049,15 @@ void CG_Player(centity_t *cent) {
 		powerup.origin[2] += -24 + (float) t * 80 / 500;
 		if (t > 400) {
 			c = (float) (t - 1000) * 0xff / 100;
-			powerup.shaderRGBA[0] = 0xff - c;
-			powerup.shaderRGBA[1] = 0xff - c;
-			powerup.shaderRGBA[2] = 0xff - c;
-			powerup.shaderRGBA[3] = 0xff - c;
+			powerup.shader.rgba[0] = 0xff - c;
+			powerup.shader.rgba[1] = 0xff - c;
+			powerup.shader.rgba[2] = 0xff - c;
+			powerup.shader.rgba[3] = 0xff - c;
 		} else {
-			powerup.shaderRGBA[0] = 0xff;
-			powerup.shaderRGBA[1] = 0xff;
-			powerup.shaderRGBA[2] = 0xff;
-			powerup.shaderRGBA[3] = 0xff;
+			powerup.shader.rgba[0] = 0xff;
+			powerup.shader.rgba[1] = 0xff;
+			powerup.shader.rgba[2] = 0xff;
+			powerup.shader.rgba[3] = 0xff;
 		}
 		trap_R_AddRefEntityToScene(&powerup);
 	}
@@ -3102,7 +3103,7 @@ void CG_Player(centity_t *cent) {
 		}
 	}
 
-	VectorCopy(cent->pe.eyepos, head.eyepos[0]); // Copy it to our refdef for the renderer
+	// VectorCopy(cent->pe.eyepos, head.eyepos[0]); // removed, eyepos not in refEntity_t
 
 	// HMM
 	{
@@ -3116,7 +3117,7 @@ void CG_Player(centity_t *cent) {
 		CG_Trace(&trace, orrg, NULL, NULL, v, -1, CONTENTS_SOLID);
 		if (trace.fraction < 1)
 			VectorCopy(trace.endpos, v); // look closer
-		VectorCopy(v, head.eyelook); // Copy it to our refdef for the renderer
+		// VectorCopy(v, head.eyelook); // removed, eyelook not in refEntity_t
 	}
 
 	head.shadowPlane = shadowPlane;

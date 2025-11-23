@@ -20,14 +20,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 
-#ifndef MISSIONPACK // bk001204
-#error This file not be used for classic Q3A.
-#endif
+// #ifndef MISSIONPACK // bk001204
+// #error This file not be used for classic Q3A. // Commented out for OpenArena compatibility
+// #endif
+#define MISSIONPACK // Enable for OpenArena compatibility
 
 #include "cg_local.h"
-#include "../ui/ui_shared.h"
+// #include "../ui/ui_shared.h" // Removed, file doesn't exist
 
-extern displayContextDef_t cgDC;
+// extern displayContextDef_t cgDC; // Commented out, type not available
 
 
 // set in CG_ParseTeamInfo
@@ -2226,7 +2227,7 @@ void CG_OwnerDraw(float x, float y, float w, float h, float text_x, float text_y
 	}
 }
 
-void CG_MouseEvent(int x, int y)
+void CG_MouseEvent(int dx, int dy)
 {
 	int n;
 
@@ -2235,7 +2236,7 @@ void CG_MouseEvent(int x, int y)
 		return;
 	}
 
-	cgs.cursorX+= x;
+	cgs.cursorX+= dx;
 	if (cgs.cursorX < 0)
 		cgs.cursorX = 0;
 	else if (cgs.cursorX > 640)

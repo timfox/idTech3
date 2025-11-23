@@ -15,8 +15,19 @@ echo "Project root: $PROJECT_ROOT"
 echo "Build directory: $BUILD_DIR"
 echo "Mod directory: $MOD_DIR"
 
-# Navigate to the game mod build scripts directory
-cd "$PROJECT_ROOT/mymod/gamesrc/build"
+# Navigate to the game mod source directory
+cd "$PROJECT_ROOT/mymod/gamesrc"
+
+# Clean old build directory if it exists (to remove stale CMake cache)
+if [ -d "build" ]; then
+    echo "Cleaning old build directory..."
+    rm -rf build
+fi
+
+# Create build directory and configure CMake
+mkdir -p build
+cd build
+cmake ..
 
 # Run the build process
 make
@@ -28,9 +39,9 @@ echo "Copying libraries to mod directory..."
 
 mkdir -p "$MOD_DIR"
 
-# Copy from vm/ directory (where Makefile outputs them)
-# We're currently in mymod/gamesrc/build, so vm is at ../../vm
-VM_DIR="../../vm"
+# Copy from vm/ directory (where CMake outputs them)
+# We're currently in mymod/gamesrc/build, so vm is at ../vm
+VM_DIR="../vm"
 if [ -d "$VM_DIR" ]; then
     echo "Found libraries in $VM_DIR"
     echo "Copying to $MOD_DIR/"

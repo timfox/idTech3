@@ -340,6 +340,8 @@ void vk_get_pipeline_def( uint32_t pipeline, Vk_Pipeline_Def *def );
 
 void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_t height );
 void vk_create_pipelines( void );
+VkPipeline vk_gen_pipeline( uint32_t index );
+void vk_bind_generated_shaders( void );
 
 //
 // Rendering setup.
@@ -353,6 +355,9 @@ void vk_present_frame( void );
 
 void vk_end_render_pass( void );
 void vk_begin_main_render_pass( void );
+void vk_begin_post_bloom_render_pass( void );
+void vk_begin_bloom_extract_render_pass( void );
+void vk_begin_blur_render_pass( uint32_t index );
 
 void vk_bind_pipeline( uint32_t pipeline );
 void vk_bind_index( void );
@@ -376,6 +381,8 @@ void vk_draw_indexed( uint32_t indexCount, uint32_t firstIndex );
 void vk_reset_descriptor( int index );
 void vk_update_descriptor( int index, VkDescriptorSet descriptor );
 void vk_update_descriptor_offset( int index, uint32_t offset );
+void vk_bind_descriptor_sets( void );
+void vk_update_uniform_descriptor( VkDescriptorSet descriptor, VkBuffer buffer );
 
 void vk_update_post_process_pipelines( void );
 
@@ -396,6 +403,10 @@ void vk_destroy_cubemap_prefilter( void );
 #ifdef VK_PBR_BRDFLUT
 void vk_create_brdflut_pipeline( void );
 void vk_create_brfdlut( void );
+#endif
+
+#ifdef USE_VBO
+void vk_release_vbo( void );
 #endif
 
 typedef struct vk_tess_s {

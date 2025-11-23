@@ -742,10 +742,10 @@ static void CG_DamageBlendBlob( void ) {
 
 	ent.radius = cg.damageValue * 3;
 	ent.customShader = cgs.media.viewBloodShader;
-	ent.shaderRGBA[0] = 255;
-	ent.shaderRGBA[1] = 255;
-	ent.shaderRGBA[2] = 255;
-	ent.shaderRGBA[3] = 200 * ( 1.0 - ((float)t / maxTime) );
+	ent.shader.rgba[0] = 255;
+	ent.shader.rgba[1] = 255;
+	ent.shader.rgba[2] = 255;
+	ent.shader.rgba[3] = 200 * ( 1.0 - ((float)t / maxTime) );
 	trap_R_AddRefEntityToScene( &ent );
 }
 

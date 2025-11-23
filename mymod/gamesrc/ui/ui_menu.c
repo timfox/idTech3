@@ -30,7 +30,7 @@ MAIN MENU
 
 
 #include "ui_local.h"
-#include "../qcommon/oa_version.h"
+// #include "../qcommon/oa_version.h" // Removed, file doesn't exist
 
 
 #define ID_SINGLEPLAYER			10
@@ -241,8 +241,8 @@ static void Main_MenuDraw( void )
 	UI_DrawString( 320, 444, "read COPYING for details.", UI_CENTER|UI_SMALLFONT, color );
 
 	//Draw version.
-	UI_DrawString( 640-40, 480-14, "^7" OA_VERSION, UI_SMALLFONT, color );
-	if ((int)trap_Cvar_VariableValue("protocol")!=OA_STD_PROTOCOL) {
+	UI_DrawString( 640-40, 480-14, "^7OpenArena", UI_SMALLFONT, color );
+	if ((int)trap_Cvar_VariableValue("protocol")!=68) { // OA_STD_PROTOCOL
 		UI_DrawString( 0, 480-14, va("^7Protocol: %i",(int)trap_Cvar_VariableValue("protocol")), UI_SMALLFONT, color);
 	}
 }

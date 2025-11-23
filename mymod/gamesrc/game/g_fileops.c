@@ -34,13 +34,13 @@ This parses an integer for the "tag" specified (cnf)
 */
 void readFile_int( char **cnf, int *v )
 {
-	char *t;
+	const char *t;
 
 	//COM_MatchToken(cnf, "=");
-	t = COM_ParseExt( cnf, qfalse );
+	t = COM_ParseExt( (const char **)cnf, qfalse );
 	if( strequals( t, "=" ) )
 	{
-		t = COM_ParseExt( cnf, qfalse );
+		t = COM_ParseExt( (const char **)cnf, qfalse );
 	}
 	else
 	{
@@ -58,11 +58,11 @@ Color characters and escape sequences are parsed as well.
 */
 void readFile_string( char **cnf, char *s, int size )
 {
-	char *t;
+	const char *t;
 
 	//COM_MatchToken(cnf, "=");
 	s[ 0 ] = '\0';
-	t = COM_ParseExt( cnf, qfalse );
+	t = COM_ParseExt( (const char **)cnf, qfalse );
 	if( !strequals( t, "=" ) )
 	{
 		COM_ParseWarning( "expected '=' before \"%s\"", t );
@@ -70,7 +70,7 @@ void readFile_string( char **cnf, char *s, int size )
 	}
 	while( 1 )
 	{
-		t = COM_ParseExt( cnf, qfalse );
+		t = COM_ParseExt( (const char **)cnf, qfalse );
 		if ( !*t )
 			break;
 		if ( strlen( t ) + strlen( s ) >= size )

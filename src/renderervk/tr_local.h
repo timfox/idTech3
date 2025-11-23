@@ -1536,10 +1536,8 @@ void	GL_TextureMode( const char *string );
 void	GL_CheckErrors( void );
 void	GL_State( unsigned stateVector );
 void	GL_ClientState( int unit, unsigned stateVector );
-#ifndef USE_VULKAN
 void	GL_TexEnv( GLint env );
 void	GL_Cull( cullType_t cullType );
-#endif
 
 #define GLS_SRCBLEND_ZERO						0x00000001
 #define GLS_SRCBLEND_ONE						0x00000002
@@ -1636,6 +1634,7 @@ void		RE_RemapShader(const char *oldShader, const char *newShader, const char *t
 #ifdef USE_VK_PBR
 qboolean vk_create_phyisical_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
 qboolean vk_create_normal_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
+image_t *R_BuildSDRSpecGlossImage(shaderStage_t *stage, const char *specImageName, imgFlags_t flags);
 #endif
 
 //
@@ -2059,6 +2058,8 @@ void RB_TakeScreenshotJPEG( int x, int y, int width, int height, const char *fil
 void RB_TakeScreenshotBMP( int x, int y, int width, int height, const char *fileName, int clipboard );
 
 void R_AddDrawSurfCmd( drawSurf_t *drawSurfs, int numDrawSurfs );
+void *R_GetCommandBuffer( int bytes );
+void qsort_idx( int32_t *a, const int n );
 
 void RE_SetColor( const float *rgba );
 void RE_StretchPic ( float x, float y, float w, float h, 

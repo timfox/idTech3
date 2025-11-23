@@ -660,7 +660,7 @@ void QDECL CG_Error(const char *msg, ...) {
 	trap_Error(text);
 }
 
-void QDECL Com_Error(int level, const char *error, ...) {
+void QDECL Com_Error(errorParm_t level, const char *error, ...) {
 	va_list argptr;
 	char text[1024];
 
@@ -740,7 +740,7 @@ static void CG_RegisterItemSounds(int itemNum) {
 			s++;
 		}
 
-		if (strequals(data + len - 3, "wav")) {
+		if (Q_strequal(data + len - 3, "wav")) {
 			trap_S_RegisterSound(data, qfalse);
 		}
 	}
@@ -1487,8 +1487,8 @@ void CG_StartMusic(void) {
 		s = (char *) cg_music.string;
 	} else {
 		s = (char *) CG_ConfigString(CS_MUSIC);
-		Q_strncpyz(parm1, COM_Parse(&s), sizeof ( parm1));
-		Q_strncpyz(parm2, COM_Parse(&s), sizeof ( parm2));
+		Q_strncpyz(parm1, COM_Parse((const char **)&s), sizeof ( parm1));
+		Q_strncpyz(parm2, COM_Parse((const char **)&s), sizeof ( parm2));
 
 		trap_S_StartBackgroundTrack(parm1, parm2);
 	}
@@ -2442,7 +2442,7 @@ void CG_Init(int serverMessageNum, int serverCommandSequence, int clientNum) {
 
 	// check version
 	s = CG_ConfigString(CS_GAME_VERSION);
-	if (!strequals(s, GAME_VERSION)) {
+	if (!Q_strequal(s, GAME_VERSION)) {
 		CG_Error("Client/Server game mismatch: %s/%s", GAME_VERSION, s);
 	}
 
@@ -2558,7 +2558,7 @@ void CG_EventHandling(int type) {
 void CG_KeyEvent(int key, qboolean down) {
 }
 
-void CG_MouseEvent(int x, int y) {
+void CG_MouseEvent(int dx, int dy) {
 }
 #endif
 

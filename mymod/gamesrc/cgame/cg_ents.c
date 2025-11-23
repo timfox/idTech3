@@ -250,10 +250,10 @@ static void CG_Item( centity_t *cent ) {
 		VectorCopy( cent->lerpOrigin, ent.origin );
 		ent.radius = 14;
 		ent.customShader = cg_items[es->modelindex].icon;
-		ent.shaderRGBA[0] = 255;
-		ent.shaderRGBA[1] = 255;
-		ent.shaderRGBA[2] = 255;
-		ent.shaderRGBA[3] = 255;
+		ent.shader.rgba[0] = 255;
+		ent.shader.rgba[1] = 255;
+		ent.shader.rgba[2] = 255;
+		ent.shader.rgba[3] = 255;
 		trap_R_AddRefEntityToScene(&ent);
 		return;
 	}
@@ -900,10 +900,10 @@ static void CG_TeamBase( centity_t *cent ) {
 			// show hit model
 			// modelindex2 is the health value of the obelisk
 			c = cent->currentState.modelindex2;
-			model.shaderRGBA[0] = 0xff;
-			model.shaderRGBA[1] = c;
-			model.shaderRGBA[2] = c;
-			model.shaderRGBA[3] = 0xff;
+			model.shader.rgba[0] = 0xff;
+			model.shader.rgba[1] = c;
+			model.shader.rgba[2] = c;
+			model.shader.rgba[3] = 0xff;
 			//
 			model.hModel = cgs.media.overloadEnergyModel;
 			trap_R_AddRefEntityToScene( &model );
@@ -927,10 +927,10 @@ static void CG_TeamBase( centity_t *cent ) {
 			// show the lights
 			AnglesToAxis( cent->currentState.angles, model.axis );
 			//
-			model.shaderRGBA[0] = c * 0xff;
-			model.shaderRGBA[1] = c * 0xff;
-			model.shaderRGBA[2] = c * 0xff;
-			model.shaderRGBA[3] = c * 0xff;
+			model.shader.rgba[0] = c * 0xff;
+			model.shader.rgba[1] = c * 0xff;
+			model.shader.rgba[2] = c * 0xff;
+			model.shader.rgba[3] = c * 0xff;
 
 			model.hModel = cgs.media.overloadLightsModel;
 			trap_R_AddRefEntityToScene( &model );
@@ -948,10 +948,10 @@ static void CG_TeamBase( centity_t *cent ) {
 				VectorScale( model.axis[1], c, model.axis[1]);
 				VectorScale( model.axis[2], c, model.axis[2]);
 
-				model.shaderRGBA[0] = 0xff;
-				model.shaderRGBA[1] = 0xff;
-				model.shaderRGBA[2] = 0xff;
-				model.shaderRGBA[3] = 0xff;
+				model.shader.rgba[0] = 0xff;
+				model.shader.rgba[1] = 0xff;
+				model.shader.rgba[2] = 0xff;
+				model.shader.rgba[3] = 0xff;
 				//
 				model.origin[2] += 56;
 				model.hModel = cgs.media.overloadTargetModel;
@@ -966,10 +966,10 @@ static void CG_TeamBase( centity_t *cent ) {
 			cent->muzzleFlashTime = 0;
 			// modelindex2 is the health value of the obelisk
 			c = cent->currentState.modelindex2;
-			model.shaderRGBA[0] = 0xff;
-			model.shaderRGBA[1] = c;
-			model.shaderRGBA[2] = c;
-			model.shaderRGBA[3] = 0xff;
+			model.shader.rgba[0] = 0xff;
+			model.shader.rgba[1] = c;
+			model.shader.rgba[2] = c;
+			model.shader.rgba[3] = 0xff;
 			// show the lights
 			model.hModel = cgs.media.overloadLightsModel;
 			trap_R_AddRefEntityToScene( &model );
