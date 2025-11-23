@@ -1592,7 +1592,9 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 	// The searchpaths do guarantee that something will always
 	// be prepended, so we don't need to worry about "c:" or "//limbo"
 	if ( FS_CheckDirTraversal( filename ) ) {
-		*file = FS_INVALID_HANDLE;
+		if (file) {
+			*file = FS_INVALID_HANDLE;
+		}
 		return -1;
 	}
 
@@ -2101,7 +2103,7 @@ int FS_ReadFile( const char *qpath, void **buffer ) {
 		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
 	}
 
-	if ( !qpath || !qpath[0] ) {
+	if ( qpath == NULL || qpath[0] == '\0' ) {
 		Com_Error( ERR_FATAL, "FS_ReadFile with empty name" );
 	}
 
@@ -5784,18 +5786,13 @@ void *FS_LoadLibrary( const char *name )
 {
 	const searchpath_t *sp = fs_searchpaths;
 	void *libHandle = NULL;
-	char *fn;
-
-	// Always try the executable directory first (where renderer libraries are typically located)
-	fn = FS_BuildOSPath( Sys_Pwd(), name, NULL );
-	libHandle = Sys_LoadLibrary( fn );
 
 	while ( !libHandle && sp ) {
 		while ( sp && ( sp->policy != DIR_STATIC || !sp->dir ) ) {
 			sp = sp->next;
 		}
 		if ( sp ) {
-			fn = FS_BuildOSPath( sp->dir->path, name, NULL );
+			const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, name );
 			libHandle = Sys_LoadLibrary( fn );
 			sp = sp->next;
 		}
