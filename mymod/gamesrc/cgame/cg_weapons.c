@@ -448,7 +448,7 @@ CG_LeiSmokeTrail
 ==========================
 */
 
-static void CG_LeiSmokeTrail( centity_t *ent, const weaponInfo_t *wi )
+static void CG_LeiSmokeTrail( centity_t *ent, [[maybe_unused]] const weaponInfo_t *wi )
 {
 	int		step;
 	vec3_t	origin, lastPos;
@@ -722,7 +722,7 @@ static void CG_OldPlasmaTrail( centity_t *cent, const weaponInfo_t *wi )
 CG_GrappleTrail
 ==========================
 */
-void CG_GrappleTrail( centity_t *ent, const weaponInfo_t *wi )
+void CG_GrappleTrail( centity_t *ent, [[maybe_unused]] const weaponInfo_t *wi )
 {
 	vec3_t	origin;
 	entityState_t	*es;
@@ -1669,7 +1669,7 @@ sound should only be done on the world model case.
 =============
 */
 
-void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent, int team )
+void CG_AddPlayerWeapon( refEntity_t *parent, playerState_t *ps, centity_t *cent, [[maybe_unused]] int team )
 {
 	refEntity_t	gun;
 	refEntity_t	barrel;
@@ -2524,7 +2524,7 @@ void CG_DrawWeaponBar2(int count, int bits, float *color)
 	int x = 0;
 	int i;
 	int w;
-	char *s;
+	const char *s;
 	float red[4];
 	float yellow[4];
 	float blue[4];
@@ -2611,7 +2611,7 @@ void CG_DrawWeaponBar3(int count, int bits, float *color)
 	int max;
 	int br;
 	int w;
-	char *s;
+	const char *s;
 	float red[4];
 	float yellow[4];
 	float green[4];
@@ -2757,7 +2757,7 @@ void CG_DrawWeaponBar4(int count, int bits, float *color)
 	float ammo;
 	int max;
 	int w;
-	char *s;
+	const char *s;
 	float boxColor[4];
 	float yellow[4];
 
@@ -2870,7 +2870,7 @@ void CG_DrawWeaponBar5(int count, int bits, float *color)
 	int x = 320 - count * 15;
 	int i;
 	int w;
-	char *s;
+	const char *s;
 	float red[4];
 	float yellow[4];
 	float blue[4];
@@ -2953,7 +2953,7 @@ void CG_DrawWeaponBar6(int count, int bits, float *color)
 	int max;
 	int br;
 	int w;
-	char *s;
+	const char *s;
 	float red[4];
 	float yellow[4];
 	float green[4];
@@ -3098,7 +3098,7 @@ void CG_DrawWeaponBar7(int count, int bits, float *color)
 	float ammo;
 	float max;
 	int w;
-	char *s;
+	const char *s;
 	float yellow[4];
 	float boxColor[4];
 

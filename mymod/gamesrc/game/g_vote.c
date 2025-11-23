@@ -59,7 +59,8 @@ getMappage
 t_mappage getMappage(int page) {
 	t_mappage result;
 	fileHandle_t	file;
-	char *token,*pointer;
+	const char *token;
+	char *pointer;
 	char buffer[MAX_MAPNAME_BUFFER];
 	int i, nummaps,maplen;
 
@@ -126,7 +127,8 @@ int allowedMap(const char *mapname) {
 	int length;
 	fileHandle_t	file;           //To check that the map actually exists.
 	char                buffer[MAX_MAPS_TEXT];
-	char                *token,*pointer;
+	const char *token;
+	char *pointer;
 	qboolean            found;
 
 	trap_FS_FOpenFile(va("maps/%s.bsp",mapname),&file,FS_READ);
@@ -240,8 +242,9 @@ VoteParseCustomVotes
 int VoteParseCustomVotes( void ) {
 	fileHandle_t	file;
 	char            buffer[4*1024];
+	const char *token;
+	char *pointer;
 	int             commands;
-	char	*token,*pointer;
 
 	trap_FS_FOpenFile(g_votecustom.string,&file,FS_READ);
 
@@ -284,7 +287,8 @@ t_customvote getCustomVote(char* votecommand) {
 	t_customvote result;
 	fileHandle_t	file;
 	char            buffer[4*1024];
-	char	*token,*pointer;
+	const char *token;
+	char *pointer;
 	char	key[MAX_TOKEN_CHARS];
 
 	trap_FS_FOpenFile(g_votecustom.string,&file,FS_READ);

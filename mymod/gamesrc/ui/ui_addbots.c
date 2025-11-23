@@ -84,7 +84,7 @@ static addBotsMenuInfo_t	addBotsMenuInfo;
 UI_AddBotsMenu_FightEvent
 =================
 */
-static void UI_AddBotsMenu_FightEvent( void* ptr, int event ) {
+static void UI_AddBotsMenu_FightEvent( [[maybe_unused]] void* ptr, int event ) {
 	const char	*team;
 	int			skill;
 
@@ -123,7 +123,7 @@ static void UI_AddBotsMenu_BotEvent( void* ptr, int event ) {
 UI_AddBotsMenu_BackEvent
 =================
 */
-static void UI_AddBotsMenu_BackEvent( void* ptr, int event ) {
+static void UI_AddBotsMenu_BackEvent( [[maybe_unused]] void* ptr, int event ) {
 	if (event != QM_ACTIVATED) {
 		return;
 	}
@@ -153,7 +153,7 @@ static void UI_AddBotsMenu_SetBotNames( void ) {
 UI_AddBotsMenu_UpEvent
 =================
 */
-static void UI_AddBotsMenu_UpEvent( void* ptr, int event ) {
+static void UI_AddBotsMenu_UpEvent( [[maybe_unused]] void* ptr, int event ) {
 	if (event != QM_ACTIVATED) {
 		return;
 	}
@@ -170,7 +170,7 @@ static void UI_AddBotsMenu_UpEvent( void* ptr, int event ) {
 UI_AddBotsMenu_DownEvent
 =================
 */
-static void UI_AddBotsMenu_DownEvent( void* ptr, int event ) {
+static void UI_AddBotsMenu_DownEvent( [[maybe_unused]] void* ptr, int event ) {
 	if (event != QM_ACTIVATED) {
 		return;
 	}

@@ -103,7 +103,7 @@ G_TimeShiftClient
 Move a client back to where he was at the specified "time"
 =================
 */
-void G_TimeShiftClient( gentity_t *ent, int time, qboolean debug, gentity_t *debugger )
+void G_TimeShiftClient( gentity_t *ent, int time, [[maybe_unused]] qboolean debug, [[maybe_unused]] gentity_t *debugger )
 {
 	int		j, k;
 	

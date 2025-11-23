@@ -328,17 +328,21 @@ void CG_KamikazeEffect( vec3_t org ) {
 CG_ObeliskExplode
 ==================
 */
-void CG_ObeliskExplode( vec3_t org, int entityNum ) {
+void CG_ObeliskExplode( vec3_t org, [[maybe_unused]] int entityNum ) {
 	localEntity_t	*le;
 	vec3_t origin;
 
 	// create an explosion
 	VectorCopy( org, origin );
 	origin[2] += 64;
-	le = CG_MakeExplosion( origin, vec3_origin,
+	{
+		vec3_t zero_dir;
+		VectorClear( zero_dir );
+		le = CG_MakeExplosion( origin, zero_dir,
 						   cgs.media.dishFlashModel,
 						   cgs.media.rocketExplosionShader,
 						   600, qtrue );
+	}
 	le->light = 300;
 	le->lightColor[0] = 1;
 	le->lightColor[1] = 0.75;

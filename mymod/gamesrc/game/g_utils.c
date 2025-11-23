@@ -627,7 +627,7 @@ void G_AddEvent( gentity_t *ent, int event, int eventParm )
 G_Sound
 =============
 */
-void G_Sound( gentity_t *ent, int channel, int soundIndex )
+void G_Sound( gentity_t *ent, [[maybe_unused]] int channel, int soundIndex )
 {
 	gentity_t	*te;
 

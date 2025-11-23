@@ -128,7 +128,7 @@ void QDECL PrintMsg( gentity_t *ent, const char *fmt, ... )
 	char		*p;
 
 	va_start (argptr,fmt);
-	if (Q_vsnprintf (msg, sizeof(msg), fmt, argptr) >= sizeof(msg)) {
+	if (Q_vsnprintf (msg, sizeof(msg), fmt, argptr) >= (int)sizeof(msg)) {
 		G_Error ( "PrintMsg overrun" );
 	}
 	va_end (argptr);
@@ -325,7 +325,7 @@ void Team_ForceGesture(int team)
 			continue;
 		if (!ent->client)
 			continue;
-		if (ent->client->sess.sessionTeam != team)
+		if (ent->client->sess.sessionTeam != (team_t)team)
 			continue;
 		ent->flags |= FL_FORCE_GESTURE;
 	}
@@ -351,7 +351,7 @@ void Team_DD_bonusAtPoints(int team)
 		if (!player->client)
 			continue;
 
-		if( player->client->sess.sessionTeam != team )
+		if( player->client->sess.sessionTeam != (team_t)team )
 			return; //player was not on scoring team
 
 		//See if the player is close to any of the points:
@@ -376,7 +376,7 @@ Note that bonuses are not cumulative.  You get one, they are in importance
 order.
 ================
 */
-void Team_FragBonuses(gentity_t *targ, gentity_t *inflictor, gentity_t *attacker)
+void Team_FragBonuses(gentity_t *targ, [[maybe_unused]] gentity_t *inflictor, gentity_t *attacker)
 {
 	int i;
 	gentity_t *ent;
@@ -446,7 +446,7 @@ void Team_FragBonuses(gentity_t *targ, gentity_t *inflictor, gentity_t *attacker
 		// field on the other team
 		for (i = 0; i < g_maxclients.integer; i++) {
 			ent = g_entities + i;
-			if (ent->inuse && ent->client->sess.sessionTeam == otherteam)
+			if (ent->inuse && ent->client->sess.sessionTeam == (team_t)otherteam)
 				ent->client->pers.teamState.lasthurtcarrier = 0;
 		}
 		return;
@@ -468,7 +468,7 @@ void Team_FragBonuses(gentity_t *targ, gentity_t *inflictor, gentity_t *attacker
 		// field on the other team
 		for (i = 0; i < g_maxclients.integer; i++) {
 			ent = g_entities + i;
-			if (ent->inuse && ent->client->sess.sessionTeam == otherteam)
+			if (ent->inuse && ent->client->sess.sessionTeam == (team_t)otherteam)
 				ent->client->pers.teamState.lasthurtcarrier = 0;
 		}
 		return;
@@ -498,7 +498,7 @@ void Team_FragBonuses(gentity_t *targ, gentity_t *inflictor, gentity_t *attacker
 	}
 //We place the Double Domination bonus test here! This appears to be the best place to place them.
 	if ( g_gametype.integer == GT_DOUBLE_D ) {
-		if(attacker->client->sess.sessionTeam == level.pointStatusA ) { //Attack must defend point A
+		if(attacker->client->sess.sessionTeam == (team_t)level.pointStatusA ) { //Attack must defend point A
 			//See how close attacker and target was to Point A:
 			VectorSubtract(targ->r.currentOrigin, ddA->r.currentOrigin, v1);
 			VectorSubtract(attacker->r.currentOrigin, ddA->r.currentOrigin, v2);
@@ -509,9 +509,9 @@ void Team_FragBonuses(gentity_t *targ, gentity_t *inflictor, gentity_t *attacker
 			          trap_InPVS(ddA->r.currentOrigin, attacker->r.currentOrigin ) ) ) &&
 			        attacker->client->sess.sessionTeam != targ->client->sess.sessionTeam) {
 
-				//We defended point A
-				//Was we dominating and maybe close to score?
-				if(attacker->client->sess.sessionTeam == level.pointStatusB && level.time - level.timeTaken > (g_ddCaptureTime.integer-DD_CLOSE)*1000)
+			//We defended point A
+			//Was we dominating and maybe close to score?
+			if(attacker->client->sess.sessionTeam == (team_t)level.pointStatusB && level.time - level.timeTaken > (g_ddCaptureTime.integer-DD_CLOSE)*1000)
 					AddScore(attacker, targ->r.currentOrigin, DD_POINT_DEFENCE_CLOSE_BONUS);
 				else
 					AddScore(attacker, targ->r.currentOrigin, DD_POINT_DEFENCE_BONUS);
@@ -534,7 +534,7 @@ void Team_FragBonuses(gentity_t *targ, gentity_t *inflictor, gentity_t *attacker
 
 		} //Defend point A
 
-		if(attacker->client->sess.sessionTeam == level.pointStatusB ) { //Attack must defend point B
+		if(attacker->client->sess.sessionTeam == (team_t)level.pointStatusB ) { //Attack must defend point B
 			//See how close attacker and target was to Point B:
 			VectorSubtract(targ->r.currentOrigin, ddB->r.currentOrigin, v1);
 			VectorSubtract(attacker->r.currentOrigin, ddB->r.currentOrigin, v2);
@@ -545,9 +545,9 @@ void Team_FragBonuses(gentity_t *targ, gentity_t *inflictor, gentity_t *attacker
 			          trap_InPVS(ddB->r.currentOrigin, attacker->r.currentOrigin ) ) ) &&
 			        attacker->client->sess.sessionTeam != targ->client->sess.sessionTeam) {
 
-				//We defended point B
-				//Was we dominating and maybe close to score?
-				if(attacker->client->sess.sessionTeam == level.pointStatusA && level.time - level.timeTaken > (g_ddCaptureTime.integer-DD_CLOSE)*1000)
+			//We defended point B
+			//Was we dominating and maybe close to score?
+			if(attacker->client->sess.sessionTeam == (team_t)level.pointStatusA && level.time - level.timeTaken > (g_ddCaptureTime.integer-DD_CLOSE)*1000)
 					AddScore(attacker, targ->r.currentOrigin, DD_POINT_DEFENCE_CLOSE_BONUS);
 				else
 					AddScore(attacker, targ->r.currentOrigin, DD_POINT_DEFENCE_BONUS);
@@ -1451,7 +1451,7 @@ int Pickup_Team( gentity_t *ent, gentity_t *other )
 
 	if( g_gametype.integer == GT_HARVESTER ) {
 		// the only team items that can be picked up in harvester are the cubes
-		if( ent->spawnflags != cl->sess.sessionTeam ) {
+		if( (team_t)ent->spawnflags != cl->sess.sessionTeam ) {
 			cl->ps.generic1 += 1; //Skull pickedup
 			G_LogPrintf("HARVESTER: %i %i %i %i %i: %s picked up a skull.\n",
 			            cl->ps.clientNum,cl->sess.sessionTeam,3,-1,1,
@@ -1490,7 +1490,7 @@ int Pickup_Team( gentity_t *ent, gentity_t *other )
 		if( team == TEAM_FREE ) {
 			return Team_TouchEnemyFlag( ent, other, cl->sess.sessionTeam );
 		}
-		if( team != cl->sess.sessionTeam) {
+		if( (team_t)team != cl->sess.sessionTeam) {
 			return Team_TouchOurFlag( ent, other, cl->sess.sessionTeam );
 		}
 		return 0;
@@ -1499,7 +1499,7 @@ int Pickup_Team( gentity_t *ent, gentity_t *other )
 		return Team_TouchDoubleDominationPoint( ent, other, team );
 	}
 	// GT_CTF
-	if( team == cl->sess.sessionTeam) {
+	if( (team_t)team == cl->sess.sessionTeam) {
 		return Team_TouchOurFlag( ent, other, team );
 	}
 	return Team_TouchEnemyFlag( ent, other, team );
@@ -1803,7 +1803,9 @@ gentity_t *SelectCTFSpawnPoint ( team_t team, int teamstate, vec3_t origin, vec3
 	spot = SelectRandomTeamSpawnPoint ( teamstate, team );
 
 	if (!spot) {
-		return SelectSpawnPoint( vec3_origin, origin, angles, 0 );
+		vec3_t zero_origin;
+		VectorClear( zero_origin );
+		return SelectSpawnPoint( zero_origin, origin, angles, 0 );
 	}
 
 	VectorCopy (spot->s.origin, origin);
@@ -1830,7 +1832,9 @@ gentity_t *SelectDoubleDominationSpawnPoint ( team_t team, vec3_t origin, vec3_t
 	}
 
 	if (!spot) {
-		return SelectSpawnPoint( vec3_origin, origin, angles, 0 );
+		vec3_t zero_origin;
+		VectorClear( zero_origin );
+		return SelectSpawnPoint( zero_origin, origin, angles, 0 );
 	}
 
 	VectorCopy (spot->s.origin, origin);
@@ -1853,7 +1857,9 @@ gentity_t *SelectDominationSpawnPoint ( team_t team, vec3_t origin, vec3_t angle
 	spot = SelectRandomTeamDomSpawnPoint( team );
 
 	if (!spot) {
-		return SelectSpawnPoint( vec3_origin, origin, angles, 0 );
+		vec3_t zero_origin;
+		VectorClear( zero_origin );
+		return SelectSpawnPoint( zero_origin, origin, angles, 0 );
 	}
 
 	VectorCopy (spot->s.origin, origin);
@@ -1916,7 +1922,7 @@ void TeamplayInfoMessage( gentity_t *ent )
 	// but in client order (so they don't keep changing position on the overlay)
 	for (i = 0, cnt = 0; i < g_maxclients.integer && i < MAX_CLIENTS && cnt < TEAM_MAXOVERLAY; i++) {
 		player = g_entities + level.sortedClients[i];
-		if (player->inuse && player->client->sess.sessionTeam == team ) {
+		if (player->inuse && player->client->sess.sessionTeam == (team_t)team ) {
 			clients[cnt++] = level.sortedClients[i];
 		}
 	}
@@ -1930,7 +1936,7 @@ void TeamplayInfoMessage( gentity_t *ent )
 
 	for (i = 0, cnt = 0; i < g_maxclients.integer && i < MAX_GENTITIES && cnt < TEAM_MAXOVERLAY; i++) {
 		player = g_entities + i;
-		if (player->inuse && player->client->sess.sessionTeam == team ) {
+		if (player->inuse && player->client->sess.sessionTeam == (team_t)team ) {
 
 			h = player->client->ps.stats[STAT_HEALTH];
 			a = player->client->ps.stats[STAT_ARMOR];
@@ -1949,7 +1955,7 @@ void TeamplayInfoMessage( gentity_t *ent )
 			             i, player->client->pers.teamState.location, h, a,
 			             w, player->s.powerups);
 			j = strlen(entry);
-			if (stringlength + j > sizeof(string))
+			if (stringlength + j > (int)sizeof(string))
 				break;
 			strcpy (string + stringlength, entry);
 			stringlength += j;
@@ -2004,7 +2010,7 @@ void CheckTeamStatus(void)
 /*QUAKED team_CTF_redplayer (1 0 0) (-16 -16 -24) (16 16 32)
 Only in CTF games.  Red players spawn here at game start.
 */
-void SP_team_CTF_redplayer( gentity_t *ent )
+void SP_team_CTF_redplayer( [[maybe_unused]] gentity_t *ent )
 {
 }
 
@@ -2012,7 +2018,7 @@ void SP_team_CTF_redplayer( gentity_t *ent )
 /*QUAKED team_CTF_blueplayer (0 0 1) (-16 -16 -24) (16 16 32)
 Only in CTF games.  Blue players spawn here at game start.
 */
-void SP_team_CTF_blueplayer( gentity_t *ent )
+void SP_team_CTF_blueplayer( [[maybe_unused]] gentity_t *ent )
 {
 }
 
@@ -2021,7 +2027,7 @@ void SP_team_CTF_blueplayer( gentity_t *ent )
 potential spawning position for red team in CTF games.
 Targets will be fired when someone spawns in on them.
 */
-void SP_team_CTF_redspawn(gentity_t *ent)
+void SP_team_CTF_redspawn([[maybe_unused]] gentity_t *ent)
 {
 }
 
@@ -2029,7 +2035,7 @@ void SP_team_CTF_redspawn(gentity_t *ent)
 potential spawning position for blue team in CTF games.
 Targets will be fired when someone spawns in on them.
 */
-void SP_team_CTF_bluespawn(gentity_t *ent)
+void SP_team_CTF_bluespawn([[maybe_unused]] gentity_t *ent)
 {
 }
 
@@ -2111,7 +2117,7 @@ static void ObeliskRespawn( gentity_t *self )
 }
 
 
-static void ObeliskDie( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int mod )
+static void ObeliskDie( gentity_t *self, [[maybe_unused]] gentity_t *inflictor, gentity_t *attacker, [[maybe_unused]] int damage, [[maybe_unused]] int mod )
 {
 	int			otherTeam;
 
@@ -2150,7 +2156,7 @@ static void ObeliskDie( gentity_t *self, gentity_t *inflictor, gentity_t *attack
 }
 
 
-static void ObeliskTouch( gentity_t *self, gentity_t *other, trace_t *trace )
+static void ObeliskTouch( gentity_t *self, gentity_t *other, [[maybe_unused]] trace_t *trace )
 {
 	int			tokens,i;
 
@@ -2369,7 +2375,7 @@ qboolean CheckObeliskAttack( const gentity_t *obelisk, const gentity_t *attacker
 	}
 
 	// if the obelisk is on the same team as the attacker then don't hurt it
-	if( obelisk->spawnflags == attacker->client->sess.sessionTeam ) {
+	if( (team_t)obelisk->spawnflags == attacker->client->sess.sessionTeam ) {
 		return qtrue;
 	}
 

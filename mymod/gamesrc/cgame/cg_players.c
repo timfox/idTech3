@@ -94,10 +94,11 @@ models/players/visor/animation.cfg, etc
 ======================
  */
 static qboolean CG_ParseAnimationFile(const char *filename, clientInfo_t *ci) {
-	char *text_p, *prev;
+	const char *text_p;
+	const char *prev;
 	int len;
 	int i;
-	char *token;
+	const char *token;
 	float fps;
 	int skip;
 	char text[20000];
@@ -111,7 +112,7 @@ static qboolean CG_ParseAnimationFile(const char *filename, clientInfo_t *ci) {
 	if (len <= 0) {
 		return qfalse;
 	}
-	if (len >= sizeof ( text) - 1) {
+	if (len >= (int)(sizeof ( text) - 1)) {
 		CG_Printf("File %s too long\n", filename);
 		trap_FS_FCloseFile(f);
 		return qfalse;
@@ -394,10 +395,10 @@ Read eyes definitions.  Maybe this should be done engine-side for mod compatibli
 ======================
  */
 static qboolean CG_ParseEyesFile(const char *filename, clientInfo_t *ci) {
-	char *text_p;
+	const char *text_p;
 	int len;
 	int i;
-	char *token;
+	const char *token;
 	char text[20000];
 	fileHandle_t f;
 	// load the file
@@ -405,7 +406,7 @@ static qboolean CG_ParseEyesFile(const char *filename, clientInfo_t *ci) {
 	if (len <= 0) {
 		return qfalse;
 	}
-	if (len >= sizeof ( text) - 1) {
+	if (len >= (int)(sizeof ( text) - 1)) {
 		CG_Printf("File %s too long\n", filename);
 		trap_FS_FCloseFile(f);
 		return qfalse;
@@ -415,7 +416,7 @@ static qboolean CG_ParseEyesFile(const char *filename, clientInfo_t *ci) {
 	trap_FS_FCloseFile(f);
 
 	// parse the text
-	text_p = text;
+	text_p = (const char *)text;
 
 
 	// read optional parameters
@@ -2190,7 +2191,7 @@ static void CG_PlayerFloatSprite(centity_t *cent, qhandle_t shader) {
 
 
 // leilei - Print their name over their head. Through walls.
-static void CG_FloatName(centity_t *cent) {
+static void CG_FloatName([[maybe_unused]] centity_t *cent) {
 #ifdef MISSIONPACK
 	int rf;
 	int them;
@@ -2343,7 +2344,7 @@ static void CG_PlayerSprites(centity_t *cent) {
 }
 
 void CG_PlayerSpritesOverWorld(centity_t *cent) {
-	int team;
+	[[maybe_unused]] int team;
 
 	if (!cg.headon[ cent->currentState.clientNum ]){
 		CG_FloatName(cent);

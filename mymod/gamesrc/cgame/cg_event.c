@@ -39,7 +39,7 @@ Also called by scoreboard drawing
  */
 const char *CG_PlaceString(int rank) {
 	static char str[64];
-	char *s, *t;
+	const char *s, *t;
 
 	if (rank & RANK_TIED_FLAG) {
 		rank &= ~RANK_TIED_FLAG;
@@ -91,7 +91,7 @@ static void CG_Obituary(entityState_t *ent) {
 	gender_t gender;
 	clientInfo_t *ci;
 	int i;
-	char *s;
+	const char *s;
 	qhandle_t causeShader;
 	fragInfo_t *lastFrag = &cgs.fragMsg[FRAGMSG_MAX - 1];
 
@@ -252,7 +252,7 @@ static void CG_Obituary(entityState_t *ent) {
 
 	// check for kill messages from the current clientNum
 	if (attacker == cg.snap->ps.clientNum) {
-		char *s;
+		const char *s;
 
 		if ( cgs.gametype < GT_TEAM ) {
 			s = va("You fragged %s\n%s place with %i", targetName,

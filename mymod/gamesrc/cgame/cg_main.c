@@ -46,7 +46,7 @@ This is the only way control passes into the module.
 This must be the very first function compiled into the .q3vm file
 ================
  */
-Q_EXPORT intptr_t vmMain(int command, int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int arg6, int arg7, int arg8, int arg9, int arg10, int arg11) {
+Q_EXPORT intptr_t vmMain(int command, int arg0, int arg1, int arg2, [[maybe_unused]] int arg3, [[maybe_unused]] int arg4, [[maybe_unused]] int arg5, [[maybe_unused]] int arg6, [[maybe_unused]] int arg7, [[maybe_unused]] int arg8, [[maybe_unused]] int arg9, [[maybe_unused]] int arg10, [[maybe_unused]] int arg11) {
 
 	switch (command) {
 		case CG_INIT:
@@ -660,7 +660,7 @@ void QDECL CG_Error(const char *msg, ...) {
 	trap_Error(text);
 }
 
-void QDECL Com_Error(errorParm_t level, const char *error, ...) {
+void QDECL Com_Error([[maybe_unused]] errorParm_t level, const char *error, ...) {
 	va_list argptr;
 	char text[1024];
 
@@ -2552,13 +2552,13 @@ CG_EventHandling
  */
 #ifndef MISSIONPACK
 
-void CG_EventHandling(int type) {
+void CG_EventHandling([[maybe_unused]] int type) {
 }
 
-void CG_KeyEvent(int key, qboolean down) {
+void CG_KeyEvent([[maybe_unused]] int key, [[maybe_unused]] qboolean down) {
 }
 
-void CG_MouseEvent(int dx, int dy) {
+void CG_MouseEvent([[maybe_unused]] int dx, [[maybe_unused]] int dy) {
 }
 #endif
 

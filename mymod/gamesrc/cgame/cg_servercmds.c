@@ -348,7 +348,7 @@ and whenever the server updates any serverinfo flagged cvars
 */
 void CG_ParseServerinfo( void ) {
 	const char	*info;
-	char	*mapname;
+	const char	*mapname;
 
 	info = CG_ConfigString( CS_SERVERINFO );
 	cgs.gametype = atoi( Info_ValueForKey( info, "g_gametype" ) );
@@ -738,8 +738,9 @@ int CG_ParseVoiceChats( const char *filename, voiceChatList_t *voiceChatList, in
 	int	len, i;
 	fileHandle_t f;
 	char buf[MAX_VOICEFILESIZE];
-	char **p, *ptr;
-	char *token;
+	const char **p;
+	const char *ptr;
+	const char *token;
 	voiceChat_t *voiceChats;
 	qboolean compress;
 	sfxHandle_t sound;
@@ -764,7 +765,7 @@ int CG_ParseVoiceChats( const char *filename, voiceChatList_t *voiceChatList, in
 	buf[len] = 0;
 	trap_FS_FCloseFile( f );
 
-	ptr = buf;
+	ptr = (const char *)buf;
 	p = &ptr;
 
 	Com_sprintf(voiceChatList->name, sizeof(voiceChatList->name), "%s", filename);
@@ -772,7 +773,7 @@ int CG_ParseVoiceChats( const char *filename, voiceChatList_t *voiceChatList, in
 	for ( i = 0; i < maxVoiceChats; i++ ) {
 		voiceChats[i].id[0] = 0;
 	}
-	token = COM_ParseExt((const char **)p, qtrue);
+	token = COM_ParseExt(p, qtrue);
 	if (!token[0]) {
 		return qtrue;
 	}
@@ -792,19 +793,19 @@ int CG_ParseVoiceChats( const char *filename, voiceChatList_t *voiceChatList, in
 
 	voiceChatList->numVoiceChats = 0;
 	while ( 1 ) {
-		token = COM_ParseExt((const char **)p, qtrue);
+		token = COM_ParseExt(p, qtrue);
 		if (!token[0]) {
 			return qtrue;
 		}
 		Com_sprintf(voiceChats[voiceChatList->numVoiceChats].id, sizeof( voiceChats[voiceChatList->numVoiceChats].id ), "%s", token);
-		token = COM_ParseExt((const char **)p, qtrue);
+		token = COM_ParseExt(p, qtrue);
 		if ( !Q_strequal(token, "{")) {
 			trap_Print( va( S_COLOR_RED "expected { found %s in voice chat file: %s\n", token, filename ) );
 			return qfalse;
 		}
 		voiceChats[voiceChatList->numVoiceChats].numSounds = 0;
 		while(1) {
-			token = COM_ParseExt((const char **)p, qtrue);
+			token = COM_ParseExt(p, qtrue);
 			if (!token[0]) {
 				return qtrue;
 			}
@@ -812,7 +813,7 @@ int CG_ParseVoiceChats( const char *filename, voiceChatList_t *voiceChatList, in
 				break;
 			sound = trap_S_RegisterSound( token, compress );
 			voiceChats[voiceChatList->numVoiceChats].sounds[voiceChats[voiceChatList->numVoiceChats].numSounds] = sound;
-			token = COM_ParseExt((const char **)p, qtrue);
+			token = COM_ParseExt(p, qtrue);
 			if (!token[0]) {
 				return qtrue;
 			}
@@ -859,8 +860,9 @@ int CG_HeadModelVoiceChats( char *filename ) {
 	int	len, i;
 	fileHandle_t f;
 	char buf[MAX_VOICEFILESIZE];
-	char **p, *ptr;
-	char *token;
+	const char **p;
+	const char *ptr;
+	const char *token;
 
 	len = trap_FS_FOpenFile( filename, &f, FS_READ );
 	if ( !f ) {
@@ -877,10 +879,10 @@ int CG_HeadModelVoiceChats( char *filename ) {
 	buf[len] = 0;
 	trap_FS_FCloseFile( f );
 
-	ptr = buf;
+	ptr = (const char *)buf;
 	p = &ptr;
 
-	token = COM_ParseExt((const char **)p, qtrue);
+	token = COM_ParseExt(p, qtrue);
 	if (!token[0]) {
 		return -1;
 	}
@@ -1026,7 +1028,7 @@ bufferedVoiceChat_t voiceChatBuffer[MAX_VOICECHATBUFFER];
 CG_PlayVoiceChat
 =================
 */
-void CG_PlayVoiceChat( bufferedVoiceChat_t *vchat ) {
+void CG_PlayVoiceChat( [[maybe_unused]] bufferedVoiceChat_t *vchat ) {
 #ifdef MISSIONPACK
 	// if we are going into the intermission, don't start any voices
 	if ( cg.intermissionStarted ) {
@@ -1079,7 +1081,7 @@ void CG_PlayBufferedVoiceChats( void ) {
 CG_AddBufferedVoiceChat
 =====================
 */
-void CG_AddBufferedVoiceChat( bufferedVoiceChat_t *vchat ) {
+void CG_AddBufferedVoiceChat( [[maybe_unused]] bufferedVoiceChat_t *vchat ) {
 #ifdef MISSIONPACK
 	// if we are going into the intermission, don't start any voices
 	if ( cg.intermissionStarted ) {
@@ -1100,7 +1102,7 @@ void CG_AddBufferedVoiceChat( bufferedVoiceChat_t *vchat ) {
 CG_VoiceChatLocal
 =================
 */
-void CG_VoiceChatLocal( int mode, qboolean voiceOnly, int clientNum, int color, const char *cmd ) {
+void CG_VoiceChatLocal( [[maybe_unused]] int mode, [[maybe_unused]] qboolean voiceOnly, [[maybe_unused]] int clientNum, [[maybe_unused]] int color, [[maybe_unused]] const char *cmd ) {
 #ifdef MISSIONPACK
 	char *chat;
 	voiceChatList_t *voiceChatList;
@@ -1149,7 +1151,7 @@ void CG_VoiceChatLocal( int mode, qboolean voiceOnly, int clientNum, int color, 
 CG_VoiceChat
 =================
 */
-void CG_VoiceChat( int mode ) {
+void CG_VoiceChat( [[maybe_unused]] int mode ) {
 #ifdef MISSIONPACK
 	const char *cmd;
 	int clientNum, color;

@@ -58,7 +58,7 @@ GAUNTLET
 ======================================================================
 */
 
-void Weapon_Gauntlet( gentity_t *ent )
+void Weapon_Gauntlet( [[maybe_unused]] gentity_t *ent )
 {
 
 }
@@ -887,7 +887,7 @@ CalcMuzzlePoint
 set muzzle location relative to pivoting eye
 ===============
 */
-void CalcMuzzlePoint ( gentity_t *ent, vec3_t forward, vec3_t right, vec3_t up, vec3_t muzzlePoint )
+void CalcMuzzlePoint ( gentity_t *ent, vec3_t forward, [[maybe_unused]] vec3_t right, [[maybe_unused]] vec3_t up, vec3_t muzzlePoint )
 {
 	VectorCopy( ent->s.pos.trBase, muzzlePoint );
 	muzzlePoint[2] += ent->client->ps.viewheight;
@@ -903,7 +903,7 @@ CalcMuzzlePointOrigin
 set muzzle location relative to pivoting eye
 ===============
 */
-void CalcMuzzlePointOrigin ( gentity_t *ent, vec3_t origin, vec3_t forward, vec3_t right, vec3_t up, vec3_t muzzlePoint )
+void CalcMuzzlePointOrigin ( gentity_t *ent, [[maybe_unused]] vec3_t origin, vec3_t forward, [[maybe_unused]] vec3_t right, [[maybe_unused]] vec3_t up, vec3_t muzzlePoint )
 {
 	VectorCopy( ent->s.pos.trBase, muzzlePoint );
 	muzzlePoint[2] += ent->client->ps.viewheight;

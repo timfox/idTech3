@@ -54,7 +54,7 @@ void challenges_init(void) {
 	fileLen = trap_FS_FOpenFile(FILENAME, &file, FS_READ);
 
 	//If the file not is big enough to contain all challenges then initialize from zero
-	if (fileLen<sizeof (challengeTable)) {
+	if (fileLen < (int)sizeof (challengeTable)) {
 		trap_FS_FCloseFile(file); //Lets remeber to close the file before all returns
 		for (i = 0; i < CHALLENGES_MAX; i++)
 			challengeTable[i] = 0; //Init all challenges to zero

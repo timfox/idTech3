@@ -482,6 +482,7 @@ static sfxHandle_t RadioButton_Key( menuradiobutton_s *rb, int key )
 		case K_MOUSE1:
 			if (!(rb->generic.flags & QMF_HASMOUSEFOCUS))
 				break;
+			[[fallthrough]];
 
 		case K_JOY1:
 		case K_JOY2:

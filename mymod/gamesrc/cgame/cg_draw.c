@@ -377,7 +377,7 @@ void CG_Draw3DModel(float x, float y, float w, float h, qhandle_t model, qhandle
 	trap_R_RenderScene(&refdef);
 }
 
-void CG_Draw3DModelEyes(float x, float y, float w, float h, qhandle_t model, qhandle_t skin, vec3_t origin, vec3_t angles, vec3_t eyep) {
+void CG_Draw3DModelEyes(float x, float y, float w, float h, qhandle_t model, qhandle_t skin, vec3_t origin, vec3_t angles, [[maybe_unused]] vec3_t eyep) {
 	refdef_t refdef;
 	refEntity_t ent;
 
@@ -398,7 +398,8 @@ void CG_Draw3DModelEyes(float x, float y, float w, float h, qhandle_t model, qha
 
 	//	speed *= 0.05f;
 	{
-		vec3_t angers, right, fawed, awp, ah;
+		vec3_t angers, right, fawed, awp;
+		[[maybe_unused]] vec3_t ah;
 		VectorCopy(angles, angers);
 		angers[0] *= 2;
 		angers[1] *= -2.0;
@@ -901,7 +902,7 @@ CG_DrawSpeedMeter
 ================
  */
 static float CG_DrawSpeedMeter(float y) {
-	char *s;
+	const char *s;
 	int w;
 	vec_t *vel;
 	int speed;
@@ -936,7 +937,7 @@ CG_DrawSnapshot
 ==================
  */
 static float CG_DrawSnapshot(float y) {
-	char *s;
+	const char *s;
 	int w;
 
 	s = va("time:%i snap:%i cmd:%i", cg.snap->serverTime,
@@ -956,7 +957,7 @@ CG_DrawFPS
 #define FPS_FRAMES 4
 
 static float CG_DrawFPS(float y) {
-	char *s;
+	const char *s;
 	int w;
 	static int previousTimes[FPS_FRAMES];
 	static int index;
@@ -995,7 +996,7 @@ static float CG_DrawFPS(float y) {
 
 static float CG_DrawPossessionString(float y) {
 	vec4_t *color;
-	char *line;
+	const char *line;
 	int timeUntilWon;
 	int i;
 	int w;
@@ -1045,7 +1046,7 @@ CG_DrawTimer
 =================
  */
 static float CG_DrawTimer(float y) {
-	char *s;
+	const char *s;
 	int w;
 	int mins, seconds, tens;
 	int msec;
@@ -1134,7 +1135,7 @@ CG_DrawLMSmode
  */
 
 static float CG_DrawLMSmode(float y) {
-	char *s;
+	const char *s;
 	int w;
 
 	if (cgs.lms_mode == 0) {
@@ -1166,7 +1167,7 @@ CG_DrawCTFoneway
  */
 
 static float CG_DrawCTFoneway(float y) {
-	char *s;
+	const char *s;
 	int w;
 	vec4_t color;
 
@@ -1205,7 +1206,7 @@ CG_DrawDomStatus
 
 static float CG_DrawDomStatus(float y) {
 	int i, w;
-	char *s;
+	const char *s;
 	vec4_t color;
 
 	for (i = 0; i < cgs.domination_points_count; i++) {
@@ -1237,7 +1238,7 @@ CG_DrawCountdownTimer
 =================
  */
 static float CG_DrawCountdownTimer(float y) {
-	char *s;
+	const char *s;
 	int w;
 	int mins, seconds, tens, sec;
 	int msec;
@@ -1379,7 +1380,7 @@ static float CG_DrawTeamOverlay(float y, qboolean right, qboolean upper) {
 	count = (numSortedTeamPlayers > 8) ? 8 : numSortedTeamPlayers;
 	for (i = 0; i < count; i++) {
 		ci = cgs.clientinfo + sortedTeamPlayers[i];
-		if (ci->infoValid && ci->team == cg.snap->ps.persistant[PERS_TEAM]) {
+		if (ci->infoValid && ci->team == (team_t)cg.snap->ps.persistant[PERS_TEAM]) {
 			plyrs++;
 			len = CG_DrawStrlen(ci->name);
 			if (len > pwidth)
@@ -1440,7 +1441,7 @@ static float CG_DrawTeamOverlay(float y, qboolean right, qboolean upper) {
 
 	for (i = 0; i < count; i++) {
 		ci = cgs.clientinfo + sortedTeamPlayers[i];
-		if (ci->infoValid && ci->team == cg.snap->ps.persistant[PERS_TEAM]) {
+		if (ci->infoValid && ci->team == (team_t)cg.snap->ps.persistant[PERS_TEAM]) {
 
 			hcolor[0] = hcolor[1] = hcolor[2] = hcolor[3] = 1.0;
 
@@ -1520,7 +1521,7 @@ static float CG_DrawTeamOverlay(float y, qboolean right, qboolean upper) {
 }
 
 static float CG_DrawFollowMessage(float y) {
-	char *s;
+	const char *s;
 	int w;
 
 	if (!(cg.snap->ps.pm_flags & PMF_FOLLOW) || ((cgs.elimflags & EF_NO_FREESPEC) && (cgs.gametype == GT_ELIMINATION || cgs.gametype == GT_CTF_ELIMINATION))) {
@@ -2636,7 +2637,7 @@ CG_DrawCenter1FctfString
 static void CG_DrawCenter1FctfString(void) {
 #ifndef MISSIONPACK
 	float *color;
-	char *line;
+	const char *line;
 	int status;
 
 	if (cgs.gametype != GT_1FCTF)
@@ -2677,7 +2678,7 @@ static void CG_DrawCenterDDString(void) {
 #ifndef MISSIONPACK
 	int x, y, w;
 	float *color;
-	char *line;
+	const char *line;
 	int statusA, statusB;
 	int sec;
 	static int lastDDSec = -100;
@@ -3074,7 +3075,7 @@ CG_DrawVote
 =================
  */
 static void CG_DrawVote(void) {
-	char *s;
+	const char *s;
 	int sec;
 
 	if (!cgs.voteTime) {
@@ -3108,7 +3109,7 @@ CG_DrawTeamVote
 =================
  */
 static void CG_DrawTeamVote(void) {
-	char *s;
+	const char *s;
 	int sec, cs_offset;
 
 	if (cgs.clientinfo[cg.clientNum].team == TEAM_RED)
@@ -3200,7 +3201,7 @@ static qboolean CG_DrawScoreboard(void) {
 
 	return qtrue;
 #else
-	char *s;
+	const char *s;
 	int w;
 	if (cg.respawnTime && cg.snap->ps.persistant[PERS_TEAM] != TEAM_SPECTATOR && (cgs.gametype < GT_ELIMINATION || cgs.gametype > GT_LMS)) {
 		if (cg.respawnTime > cg.time) {
@@ -3370,7 +3371,7 @@ static void CG_DrawProxWarning( void ) {
 	}
 
 	w = CG_DrawStrlen( s ) * BIGCHAR_WIDTH;
-	CG_DrawBigStringColor( 320 - w / 2, 64 + BIGCHAR_HEIGHT, s, g_color_table[ColorIndex(COLOR_RED)] );
+	CG_DrawBigStringColor( 320 - w / 2, 64 + BIGCHAR_HEIGHT, s, (vec_t *)g_color_table[ColorIndex(COLOR_RED)] );
 }
 
 /*

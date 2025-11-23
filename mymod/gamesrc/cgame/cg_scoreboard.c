@@ -277,7 +277,7 @@ qboolean CG_DrawOldScoreboard(void) {
 	int x, y, w, i, n1, n2;
 	float fade;
 	float *fadeColor;
-	char *s;
+	const char *s;
 	int maxClients;
 	int lineHeight;
 	int topBorderSize, bottomBorderSize;
