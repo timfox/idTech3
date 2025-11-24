@@ -1447,6 +1447,8 @@ void Svcmd_MessageWrapper( void );
 #include "g_killspree.h"
 #include "g_admin.h"
 #include "g_dialog.h"
+#include "g_inventory.h"
+#include "g_equipment.h"
 
 void MapInfoPrint(mapinfo_result_t *info);
 // leilei - monsters

@@ -121,6 +121,13 @@ qboolean CheckGauntletAttack( gentity_t *ent )
 		damage = 500; //High damage in instant gib (normally enough to gib)
 	else
 		damage = 50 * s_quadFactor;
+	
+	// Apply equipment damage multiplier
+	if( ent && ent->client ) {
+		equipment_stats_t stats = G_Inventory_GetTotalEquipmentStats( ent - g_entities );
+		damage = (int)( damage * stats.damage_multiplier );
+	}
+	
 	G_Damage( traceEnt, ent, ent, forward, tr.endpos,
 	          damage, 0, MOD_GAUNTLET );
 
@@ -212,6 +219,15 @@ void Bullet_Fire (gentity_t *ent, float spread, int damage )
 //unlagged - attack prediction #2
 
 	damage *= s_quadFactor;
+	
+	// Apply equipment damage multiplier
+	if( ent && ent->client ) {
+		equipment_stats_t stats = G_Inventory_GetTotalEquipmentStats( ent - g_entities );
+		damage = (int)( damage * stats.damage_multiplier );
+		// Apply accuracy bonus (reduce spread)
+		spread *= ( 1.0f - stats.accuracy_bonus );
+		if( spread < 0.0f ) spread = 0.0f;
+	}
 
 //unlagged - attack prediction #2
 	// this has to match what's on the client

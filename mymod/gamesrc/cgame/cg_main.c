@@ -2386,6 +2386,9 @@ void CG_Init(int serverMessageNum, int serverCommandSequence, int clientNum) {
 	
 	// Initialize dialog system
 	CG_Dialog_Init();
+	
+	// Initialize inventory UI
+	CG_Inventory_Init();
 	// loadingscreen
 #ifdef SCRIPTHUD
 	String_Init();
@@ -2542,6 +2545,7 @@ void CG_Shutdown(void) {
 	// like closing files or archiving session data
 	challenges_save();
 	CG_Dialog_Shutdown();
+	CG_Inventory_Shutdown();
 }
 
 

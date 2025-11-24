@@ -1401,7 +1401,17 @@ char *ClientConnect( int clientNum, qboolean firstTime, qboolean isBot ) {
 		G_InitSessionData( client, userinfo );
 	}
 	G_ReadSessionData( client );
-
+	
+	// Load inventory for player
+	if( !isBot ) {
+		G_Inventory_Load( clientNum );
+		// Store GUID in inventory structure
+		inventory_t *inv = G_Inventory_GetInventory( clientNum );
+		if( inv ) {
+			Q_strncpyz( inv->playerGuid, client->pers.guid, sizeof( inv->playerGuid ) );
+		}
+	}
+	
 	//KK-OAX Swapped these in order...seemed to help the connection process.
 	// get and distribute relevent paramters
 	ClientUserinfoChanged( clientNum );
@@ -1791,6 +1801,16 @@ void ClientSpawn(gentity_t *ent) {
 	}
 	// clear entity values
 	client->ps.stats[STAT_MAX_HEALTH] = client->pers.maxHealth;
+	
+	// Apply equipment health bonus to max health
+	if( ent && ent->client ) {
+		equipment_stats_t stats = G_Inventory_GetTotalEquipmentStats( ent - g_entities );
+		client->ps.stats[STAT_MAX_HEALTH] += stats.health_bonus;
+		if( client->ps.stats[STAT_MAX_HEALTH] < 1 ) {
+			client->ps.stats[STAT_MAX_HEALTH] = 1;
+		}
+	}
+	
 	client->ps.eFlags = flags;
 
 	ent->s.groundEntityNum = ENTITYNUM_NONE;
@@ -1828,6 +1848,20 @@ void ClientSpawn(gentity_t *ent) {
 
 		// health will count down towards max_health
 		ent->health = client->ps.stats[STAT_HEALTH] = client->ps.stats[STAT_MAX_HEALTH] + 25;
+		
+		// Apply equipment health and armor bonuses
+		if( ent && ent->client ) {
+			equipment_stats_t stats = G_Inventory_GetTotalEquipmentStats( ent - g_entities );
+			client->ps.stats[STAT_MAX_HEALTH] += stats.health_bonus;
+			ent->health += stats.health_bonus;
+			client->ps.stats[STAT_HEALTH] += stats.health_bonus;
+			if( client->ps.stats[STAT_ARMOR] > 0 ) {
+				client->ps.stats[STAT_ARMOR] += stats.armor_bonus;
+				if( client->ps.stats[STAT_ARMOR] < 0 ) {
+					client->ps.stats[STAT_ARMOR] = 0;
+				}
+			}
+		}
 	}
 	else
 	{
@@ -2005,6 +2039,11 @@ void ClientDisconnect( int clientNum ) {
 	ent = g_entities + clientNum;
 	if ( !ent->client ) {
 		return;
+	}
+	
+	// Save inventory before disconnect
+	if( !( ent->r.svFlags & SVF_BOT ) ) {
+		G_Inventory_Save( clientNum );
 	}
 
 	ClientLeaving( clientNum);

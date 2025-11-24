@@ -2306,7 +2306,12 @@ commands_t cmds[ ] =
 	{ "getmappage", 0, Cmd_GetMappage_f },
 	{ "gc", 0, Cmd_GameCommand_f },
 	{ "dialognext", 0, Cmd_DialogNext_f },
-	{ "dialogchoice", 0, Cmd_DialogChoice_f }
+	{ "dialogchoice", 0, Cmd_DialogChoice_f },
+	{ "inventory", 0, Cmd_Inventory_f },
+	{ "inventoryuse", 0, Cmd_InventoryUse_f },
+	{ "inventoryequip", 0, Cmd_InventoryEquip_f },
+	{ "inventoryunequip", 0, Cmd_InventoryUnequip_f },
+	{ "inventorycraft", 0, Cmd_InventoryCraft_f }
 
 };
 
@@ -2344,6 +2349,205 @@ void Cmd_DialogChoice_f( gentity_t *ent ) {
 	trap_Argv( 1, arg, sizeof( arg ) );
 	choiceNum = atoi( arg );
 	G_Dialog_SelectChoice( ent - g_entities, choiceNum );
+}
+
+/*
+================
+Cmd_Inventory_f
+Display inventory to client
+================
+*/
+void Cmd_Inventory_f( gentity_t *ent ) {
+	inventory_t *inv;
+	char cmd[MAX_STRING_CHARS];
+	int i;
+	
+	if ( !ent || !ent->client ) {
+		return;
+	}
+	
+	inv = G_Inventory_GetInventory( ent - g_entities );
+	if( !inv ) {
+		return;
+	}
+	
+	// Build inventory data command
+	Com_sprintf( cmd, sizeof( cmd ), "inventorydata %d", inv->numItems );
+	
+	// Add items
+	for( i = 0; i < inv->numItems; i++ ) {
+		if( inv->items[ i ].itemId >= 0 ) {
+			char itemStr[256];
+			Com_sprintf( itemStr, sizeof( itemStr ), " %d %d \"%s\"", 
+			             inv->items[ i ].itemId,
+			             inv->items[ i ].quantity,
+			             inv->items[ i ].name );
+			if( strlen( cmd ) + strlen( itemStr ) < MAX_STRING_CHARS - 10 ) {
+				Q_strcat( cmd, sizeof( cmd ), itemStr );
+			}
+		}
+	}
+	
+	// Add equipment count
+	int equipCount = 0;
+	for( i = 0; i < EQUIP_SLOT_MAX; i++ ) {
+		if( inv->equipment[ i ].itemId >= 0 ) {
+			equipCount++;
+		}
+	}
+	
+	char equipStr[64];
+	Com_sprintf( equipStr, sizeof( equipStr ), " %d", equipCount );
+	Q_strcat( cmd, sizeof( cmd ), equipStr );
+	
+	// Add equipment slots
+	for( i = 0; i < EQUIP_SLOT_MAX; i++ ) {
+		if( inv->equipment[ i ].itemId >= 0 ) {
+			char slotStr[64];
+			Com_sprintf( slotStr, sizeof( slotStr ), " %d %d", 
+			             inv->equipment[ i ].slot,
+			             inv->equipment[ i ].itemId );
+			if( strlen( cmd ) + strlen( slotStr ) < MAX_STRING_CHARS - 10 ) {
+				Q_strcat( cmd, sizeof( cmd ), slotStr );
+			}
+		}
+	}
+	
+	trap_SendServerCommand( ent - g_entities, cmd );
+}
+
+/*
+================
+Cmd_InventoryUse_f
+Use an item from inventory
+================
+*/
+void Cmd_InventoryUse_f( gentity_t *ent ) {
+	char arg[MAX_TOKEN_CHARS];
+	int itemId;
+	
+	if ( !ent || !ent->client ) {
+		return;
+	}
+	
+	if ( trap_Argc() != 2 ) {
+		trap_SendServerCommand( ent - g_entities, "print \"Usage: inventoryuse <item_id>\n\"" );
+		return;
+	}
+	
+	trap_Argv( 1, arg, sizeof( arg ) );
+	itemId = atoi( arg );
+	
+	// Check if player has item
+	if( !G_Inventory_HasItem( ent - g_entities, itemId, 1 ) ) {
+		trap_SendServerCommand( ent - g_entities, va( "print \"You don't have item %d\n\"", itemId ) );
+		return;
+	}
+	
+	// For now, just remove the item (can be extended later)
+	G_Inventory_RemoveItem( ent - g_entities, itemId, 1 );
+	trap_SendServerCommand( ent - g_entities, va( "print \"Used item %d\n\"", itemId ) );
+}
+
+/*
+================
+Cmd_InventoryEquip_f
+Equip an item to a slot
+================
+*/
+void Cmd_InventoryEquip_f( gentity_t *ent ) {
+	char arg1[MAX_TOKEN_CHARS], arg2[MAX_TOKEN_CHARS];
+	int itemId, slot;
+	
+	if ( !ent || !ent->client ) {
+		return;
+	}
+	
+	if ( trap_Argc() != 3 ) {
+		trap_SendServerCommand( ent - g_entities, "print \"Usage: inventoryequip <slot> <item_id>\n\"" );
+		return;
+	}
+	
+	trap_Argv( 1, arg1, sizeof( arg1 ) );
+	trap_Argv( 2, arg2, sizeof( arg2 ) );
+	slot = atoi( arg1 );
+	itemId = atoi( arg2 );
+	
+	if( slot < 0 || slot >= EQUIP_SLOT_MAX ) {
+		trap_SendServerCommand( ent - g_entities, "print \"Invalid slot number\n\"" );
+		return;
+	}
+	
+	if( G_Inventory_EquipItem( ent - g_entities, (equipment_slot_t)slot, itemId ) ) {
+		trap_SendServerCommand( ent - g_entities, va( "print \"Equipped item %d to slot %d\n\"", itemId, slot ) );
+	} else {
+		trap_SendServerCommand( ent - g_entities, va( "print \"Failed to equip item %d\n\"", itemId ) );
+	}
+}
+
+/*
+================
+Cmd_InventoryUnequip_f
+Unequip an item from a slot
+================
+*/
+void Cmd_InventoryUnequip_f( gentity_t *ent ) {
+	char arg[MAX_TOKEN_CHARS];
+	int slot;
+	
+	if ( !ent || !ent->client ) {
+		return;
+	}
+	
+	if ( trap_Argc() != 2 ) {
+		trap_SendServerCommand( ent - g_entities, "print \"Usage: inventoryunequip <slot>\n\"" );
+		return;
+	}
+	
+	trap_Argv( 1, arg, sizeof( arg ) );
+	slot = atoi( arg );
+	
+	if( slot < 0 || slot >= EQUIP_SLOT_MAX ) {
+		trap_SendServerCommand( ent - g_entities, "print \"Invalid slot number\n\"" );
+		return;
+	}
+	
+	if( G_Inventory_UnequipItem( ent - g_entities, (equipment_slot_t)slot ) ) {
+		trap_SendServerCommand( ent - g_entities, va( "print \"Unequipped slot %d\n\"", slot ) );
+	} else {
+		trap_SendServerCommand( ent - g_entities, va( "print \"Slot %d is empty\n\"", slot ) );
+	}
+}
+
+/*
+================
+Cmd_InventoryCraft_f
+Craft items using a recipe
+================
+*/
+void Cmd_InventoryCraft_f( gentity_t *ent ) {
+	char arg1[MAX_TOKEN_CHARS], arg2[MAX_TOKEN_CHARS];
+	int itemId1, itemId2;
+	
+	if ( !ent || !ent->client ) {
+		return;
+	}
+	
+	if ( trap_Argc() != 3 ) {
+		trap_SendServerCommand( ent - g_entities, "print \"Usage: inventorycraft <item_id1> <item_id2>\n\"" );
+		return;
+	}
+	
+	trap_Argv( 1, arg1, sizeof( arg1 ) );
+	trap_Argv( 2, arg2, sizeof( arg2 ) );
+	itemId1 = atoi( arg1 );
+	itemId2 = atoi( arg2 );
+	
+	if( G_Crafting_Craft( ent - g_entities, itemId1, itemId2 ) ) {
+		trap_SendServerCommand( ent - g_entities, va( "print \"Crafted items %d + %d\n\"", itemId1, itemId2 ) );
+	} else {
+		trap_SendServerCommand( ent - g_entities, va( "print \"Cannot craft %d + %d\n\"", itemId1, itemId2 ) );
+	}
 }
 
 static int numCmds = sizeof( cmds ) / sizeof( cmds[ 0 ] );

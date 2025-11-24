@@ -929,6 +929,14 @@ int CheckArmor (gentity_t *ent, int damage, int dflags)
 
 	// armor
 	count = client->ps.stats[STAT_ARMOR];
+	
+	// Apply equipment armor bonus
+	if( ent && ent->client ) {
+		equipment_stats_t stats = G_Inventory_GetTotalEquipmentStats( ent - g_entities );
+		count += stats.armor_bonus;
+		if( count < 0 ) count = 0;
+	}
+	
 	save = ceil( damage * ARMOR_PROTECTION );
 	if (save >= count)
 		save = count;
@@ -1131,6 +1139,10 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 			max /= 2;
 		}
 		damage = damage * max / 100;
+		
+		// Apply equipment damage multiplier
+		equipment_stats_t stats = G_Inventory_GetTotalEquipmentStats( attacker - g_entities );
+		damage = (int)( damage * stats.damage_multiplier );
 	}
 
 	if ( client ) {

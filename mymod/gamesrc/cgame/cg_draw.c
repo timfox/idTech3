@@ -3673,6 +3673,9 @@ static void CG_Draw2D(stereoFrame_t stereoFrame) {
 		
 		// Draw dialog box if active
 		CG_Dialog_Draw();
+		
+		// Draw inventory UI if active
+		CG_Inventory_Draw();
 
 	cg.accBoardShowing = CG_DrawAccboard();
 }

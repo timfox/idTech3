@@ -1,0 +1,13 @@
+// Equipment definitions file
+// Format: equipment <itemId> <slot> <damage_mult> <rof_mult> <accuracy_bonus> <armor_bonus> <health_bonus> "<name>" "<description>"
+
+// Weapon modifications
+equipment 1000 0 1.0 1.0 0.1 0 0 "Weapon Scope" "Increases accuracy by 10%"
+equipment 1001 0 1.2 1.0 0.0 0 0 "Damage Mod" "Increases damage by 20%"
+equipment 1002 0 1.0 1.2 0.0 0 0 "Rate of Fire Mod" "Increases rate of fire by 20%"
+
+// Armor pieces
+equipment 2000 1 1.0 1.0 0.0 0 0 "Helmet" "Basic helmet protection"
+equipment 2001 2 1.0 1.0 0.0 25 0 "Armor Plate" "Adds 25 armor points"
+equipment 2002 3 1.0 1.0 0.0 0 25 "Leg Guards" "Adds 25 health points"
+

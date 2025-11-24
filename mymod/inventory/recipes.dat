@@ -1,0 +1,7 @@
+// Crafting recipes file
+// Format: recipe <input1> <input2> <output> <outputQuantity> "<name>"
+
+// Example recipes
+recipe 1000 1001 1003 1 "Advanced Scope"
+recipe 2000 2001 2003 1 "Full Armor Set"
+

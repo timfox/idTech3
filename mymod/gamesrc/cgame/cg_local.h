@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../game/bg_public.h"
 #include "cg_public.h"
 #include "cg_dialog.h"
+#include "cg_inventory.h"
 
 #include "../game/challenges.h"
 

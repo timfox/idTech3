@@ -1299,6 +1299,51 @@ static void CG_ServerCommand( void ) {
 		CG_Dialog_Close();
 		return;
 	}
+	
+	if ( Q_strequal( cmd, "inventorydata" ) ) {
+		// Parse inventory data from server
+		// Format: inventorydata <numItems> [itemId quantity name]... <equipmentSlots> [slot itemId]...
+		int numItems, i;
+		int itemIds[MAX_INVENTORY_DISPLAY_ITEMS];
+		int quantities[MAX_INVENTORY_DISPLAY_ITEMS];
+		char names[MAX_INVENTORY_DISPLAY_ITEMS][MAX_ITEM_NAME];
+		int equipmentSlots[EQUIP_SLOT_MAX];
+		int equipmentItemIds[EQUIP_SLOT_MAX];
+		
+		if( trap_Argc() < 2 ) {
+			return;
+		}
+		
+		numItems = atoi( CG_Argv( 1 ) );
+		if( numItems > MAX_INVENTORY_DISPLAY_ITEMS ) {
+			numItems = MAX_INVENTORY_DISPLAY_ITEMS;
+		}
+		
+		// Parse items
+		for( i = 0; i < numItems; i++ ) {
+			if( trap_Argc() < 2 + i * 3 + 1 ) {
+				break;
+			}
+			itemIds[ i ] = atoi( CG_Argv( 2 + i * 3 ) );
+			quantities[ i ] = atoi( CG_Argv( 3 + i * 3 ) );
+			Q_strncpyz( names[ i ], CG_Argv( 4 + i * 3 ), MAX_ITEM_NAME );
+		}
+		
+		// Parse equipment (if provided)
+		int equipStart = 2 + numItems * 3;
+		if( trap_Argc() > equipStart ) {
+			int numEquip = atoi( CG_Argv( equipStart ) );
+			for( i = 0; i < numEquip && i < EQUIP_SLOT_MAX; i++ ) {
+				if( trap_Argc() > equipStart + 1 + i * 2 ) {
+					equipmentSlots[ i ] = atoi( CG_Argv( equipStart + 1 + i * 2 ) );
+					equipmentItemIds[ i ] = atoi( CG_Argv( equipStart + 2 + i * 2 ) );
+				}
+			}
+		}
+		
+		CG_Inventory_Update( numItems, itemIds, quantities, names, equipmentSlots, equipmentItemIds );
+		return;
+	}
 
 	if ( Q_strequal( cmd, "vtchat" ) ) {
 		CG_VoiceChat( SAY_TEAM );

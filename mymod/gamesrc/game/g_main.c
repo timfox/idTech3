@@ -814,6 +814,12 @@ void G_InitGame( int levelTime, int randomSeed, int restart )
 	
 	// Initialize dialog system
 	G_Dialog_Init();
+	
+	// Initialize inventory system
+	G_Inventory_Init();
+	G_Crafting_Init();
+	G_Crafting_LoadRecipes( "inventory/recipes.dat" );
+	G_Equipment_Init();
 
 	// initialize all entities for this game
 	memset( g_entities, 0, MAX_GENTITIES * sizeof(g_entities[0]) );
@@ -972,6 +978,9 @@ void G_ShutdownGame( int restart )
 	
 	// Dialog system cleanup
 	G_Dialog_Shutdown( );
+	
+	// Inventory system cleanup
+	G_Inventory_Shutdown( );
 
 	if ( trap_Cvar_VariableIntegerValue( "bot_enable" ) ) {
 		BotAIShutdown( restart );
