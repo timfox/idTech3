@@ -4175,6 +4175,22 @@ void Com_Init( char *commandLine ) {
 	NET_ENet_Init();
 #endif
 
+#ifdef USE_SQLITE
+	SQLite_Init();
+#endif
+
+#ifdef USE_OPENSSL
+	OpenSSL_Init();
+#endif
+
+#ifdef USE_LUA
+	Lua_Init();
+#endif
+
+#ifdef USE_FREETYPE
+	FreeType_Init();
+#endif
+
 	NET_Init();
 
 	Com_Printf( "Working directory: %s\n", Sys_Pwd() );
@@ -4612,6 +4628,18 @@ static void Com_Shutdown( void ) {
 		FS_FCloseFile( com_journalDataFile );
 		com_journalDataFile = FS_INVALID_HANDLE;
 	}
+
+#ifdef USE_LUA
+	Lua_Shutdown();
+#endif
+
+#ifdef USE_OPENSSL
+	OpenSSL_Shutdown();
+#endif
+
+#ifdef USE_FREETYPE
+	FreeType_Shutdown();
+#endif
 }
 
 //------------------------------------------------------------------------

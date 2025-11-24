@@ -48,6 +48,10 @@ OPTION(USE_RENDERER_DLOPEN "" ON)
 OPTION(USE_CJSON "" ON)
 OPTION(USE_ZSTD "" ON)
 OPTION(USE_ENET "" ON)
+OPTION(USE_SQLITE "" ON)
+OPTION(USE_FREETYPE "" ON)
+OPTION(USE_OPENSSL "" ON)
+OPTION(USE_LUA "" ON)
 
 SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules)
 
@@ -64,6 +68,23 @@ ENDIF()
 IF(USE_ENET)
 	list(APPEND QCOMMON_SRCS src/qcommon/net_enet.c)
 ENDIF()
+
+IF(USE_SQLITE)
+	list(APPEND QCOMMON_SRCS src/qcommon/sqlite_wrapper.c)
+ENDIF()
+
+IF(USE_OPENSSL)
+	list(APPEND QCOMMON_SRCS src/qcommon/openssl_wrapper.c)
+ENDIF()
+
+IF(USE_LUA)
+	list(APPEND QCOMMON_SRCS src/qcommon/lua_wrapper.c)
+ENDIF()
+
+IF(USE_FREETYPE)
+	list(APPEND QCOMMON_SRCS src/qcommon/freetype_wrapper.c)
+ENDIF()
+
 # add platform-dependent QVM bytecode compilers
 # Force 64-bit builds by default
 IF(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
@@ -323,6 +344,187 @@ IF(USE_CURL)
 	ENDIF()
 ENDIF()
 
+IF(USE_SQLITE)
+	# Try CMake's find_package first
+	find_package(SQLite3 QUIET)
+	
+	# If not found, try manual search
+	IF(NOT SQLite3_FOUND)
+		FIND_PATH(SQLite3_INCLUDE_DIR sqlite3.h
+			PATHS
+			/usr/include
+			/usr/local/include
+			/opt/local/include
+			/usr/include/x86_64-linux-gnu
+		)
+		FIND_LIBRARY(SQLite3_LIBRARIES
+			NAMES sqlite3 libsqlite3
+			PATHS
+			/usr/lib
+			/usr/lib/x86_64-linux-gnu
+			/usr/local/lib
+			/opt/local/lib
+		)
+		IF(SQLite3_INCLUDE_DIR AND SQLite3_LIBRARIES)
+			SET(SQLite3_FOUND TRUE)
+			SET(SQLite3_INCLUDE_DIRS ${SQLite3_INCLUDE_DIR})
+		ENDIF()
+	ENDIF()
+	
+	IF(SQLite3_FOUND)
+		TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${SQLite3_INCLUDE_DIRS})
+		TARGET_INCLUDE_DIRECTORIES(qcommon PUBLIC ${SQLite3_INCLUDE_DIRS})
+		TARGET_INCLUDE_DIRECTORIES(qcommon_ded PUBLIC ${SQLite3_INCLUDE_DIRS})
+		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_SQLITE)
+		TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE USE_SQLITE)
+		TARGET_COMPILE_DEFINITIONS(qcommon_ded PRIVATE USE_SQLITE)
+		MESSAGE(STATUS "SQLite found: ${SQLite3_LIBRARIES}")
+	ELSE()
+		MESSAGE(WARNING "SQLite not found, disabling SQLite support")
+		MESSAGE(STATUS "To enable SQLite support, install: sudo apt-get install libsqlite3-dev")
+		SET(USE_SQLITE OFF CACHE BOOL "" FORCE)
+	ENDIF()
+ENDIF()
+
+IF(USE_FREETYPE)
+	# Try CMake's find_package first
+	find_package(Freetype QUIET)
+	
+	# If not found, try manual search
+	IF(NOT Freetype_FOUND)
+		FIND_PATH(FREETYPE_INCLUDE_DIRS
+			NAMES freetype2/freetype/freetype.h freetype/freetype.h
+			PATHS
+			/usr/include
+			/usr/local/include
+			/opt/local/include
+			/usr/include/x86_64-linux-gnu
+		)
+		FIND_LIBRARY(FREETYPE_LIBRARIES
+			NAMES freetype libfreetype
+			PATHS
+			/usr/lib
+			/usr/lib/x86_64-linux-gnu
+			/usr/local/lib
+			/opt/local/lib
+		)
+		IF(FREETYPE_INCLUDE_DIRS AND FREETYPE_LIBRARIES)
+			SET(Freetype_FOUND TRUE)
+		ENDIF()
+	ENDIF()
+	
+	IF(Freetype_FOUND)
+		TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${FREETYPE_INCLUDE_DIRS})
+		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_FREETYPE)
+		MESSAGE(STATUS "Freetype found: ${FREETYPE_LIBRARIES}")
+	ELSE()
+		MESSAGE(WARNING "Freetype not found, disabling Freetype support")
+		MESSAGE(STATUS "To enable Freetype support, install: sudo apt-get install libfreetype6-dev")
+		SET(USE_FREETYPE OFF CACHE BOOL "" FORCE)
+	ENDIF()
+ENDIF()
+
+IF(USE_OPENSSL)
+	# Try CMake's find_package first
+	find_package(OpenSSL QUIET)
+	
+	# If not found, try manual search
+	IF(NOT OpenSSL_FOUND)
+		FIND_PATH(OPENSSL_INCLUDE_DIR
+			NAMES openssl/ssl.h openssl/crypto.h
+			PATHS
+			/usr/include
+			/usr/local/include
+			/opt/local/include
+			/usr/include/x86_64-linux-gnu
+		)
+		FIND_LIBRARY(OPENSSL_SSL_LIBRARY
+			NAMES ssl libssl
+			PATHS
+			/usr/lib
+			/usr/lib/x86_64-linux-gnu
+			/usr/local/lib
+			/opt/local/lib
+		)
+		FIND_LIBRARY(OPENSSL_CRYPTO_LIBRARY
+			NAMES crypto libcrypto
+			PATHS
+			/usr/lib
+			/usr/lib/x86_64-linux-gnu
+			/usr/local/lib
+			/opt/local/lib
+		)
+		IF(OPENSSL_INCLUDE_DIR AND OPENSSL_SSL_LIBRARY AND OPENSSL_CRYPTO_LIBRARY)
+			SET(OpenSSL_FOUND TRUE)
+			SET(OPENSSL_LIBRARIES ${OPENSSL_SSL_LIBRARY} ${OPENSSL_CRYPTO_LIBRARY})
+			SET(OPENSSL_INCLUDE_DIRS ${OPENSSL_INCLUDE_DIR})
+		ENDIF()
+	ENDIF()
+	
+	IF(OpenSSL_FOUND)
+		TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${OPENSSL_INCLUDE_DIRS})
+		TARGET_INCLUDE_DIRECTORIES(qcommon PUBLIC ${OPENSSL_INCLUDE_DIRS})
+		TARGET_INCLUDE_DIRECTORIES(qcommon_ded PUBLIC ${OPENSSL_INCLUDE_DIRS})
+		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_OPENSSL)
+		TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE USE_OPENSSL)
+		TARGET_COMPILE_DEFINITIONS(qcommon_ded PRIVATE USE_OPENSSL)
+		MESSAGE(STATUS "OpenSSL found: ${OPENSSL_LIBRARIES}")
+	ELSE()
+		MESSAGE(WARNING "OpenSSL not found, disabling OpenSSL support")
+		MESSAGE(STATUS "To enable OpenSSL support, install: sudo apt-get install libssl-dev")
+		SET(USE_OPENSSL OFF CACHE BOOL "" FORCE)
+	ENDIF()
+ENDIF()
+
+IF(USE_LUA)
+	# Try CMake's find_package first (supports Lua 5.1-5.4)
+	find_package(Lua QUIET)
+	
+	# If not found, try manual search for common Lua versions
+	IF(NOT Lua_FOUND)
+		FOREACH(LUA_VERSION 5.4 5.3 5.2 5.1)
+			FIND_PATH(LUA_INCLUDE_DIR
+				NAMES lua.h
+				PATHS
+				/usr/include/lua${LUA_VERSION}
+				/usr/include
+				/usr/local/include/lua${LUA_VERSION}
+				/usr/local/include
+				/opt/local/include
+				/usr/include/x86_64-linux-gnu
+			)
+			FIND_LIBRARY(LUA_LIBRARY
+				NAMES lua${LUA_VERSION} lua
+				PATHS
+				/usr/lib
+				/usr/lib/x86_64-linux-gnu
+				/usr/local/lib
+				/opt/local/lib
+			)
+			IF(LUA_INCLUDE_DIR AND LUA_LIBRARY)
+				SET(Lua_FOUND TRUE)
+				SET(LUA_LIBRARIES ${LUA_LIBRARY})
+				SET(LUA_INCLUDE_DIRS ${LUA_INCLUDE_DIR})
+				BREAK()
+			ENDIF()
+		ENDFOREACH()
+	ENDIF()
+	
+	IF(Lua_FOUND)
+		TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${LUA_INCLUDE_DIRS})
+		TARGET_INCLUDE_DIRECTORIES(qcommon PUBLIC ${LUA_INCLUDE_DIRS})
+		TARGET_INCLUDE_DIRECTORIES(qcommon_ded PUBLIC ${LUA_INCLUDE_DIRS})
+		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_LUA)
+		TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE USE_LUA)
+		TARGET_COMPILE_DEFINITIONS(qcommon_ded PRIVATE USE_LUA)
+		MESSAGE(STATUS "Lua found: ${LUA_LIBRARIES}")
+	ELSE()
+		MESSAGE(WARNING "Lua not found, disabling Lua support")
+		MESSAGE(STATUS "To enable Lua support, install: sudo apt-get install liblua5.4-dev")
+		SET(USE_LUA OFF CACHE BOOL "" FORCE)
+	ENDIF()
+ENDIF()
+
 IF(USE_VULKAN)
 	# Check if local Vulkan headers exist (renderer has bundled headers)
 	IF(EXISTS "${CMAKE_SOURCE_DIR}/src/renderercommon/vulkan/vulkan.h")
@@ -393,6 +595,30 @@ IF(USE_CURL)
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${CURL_LIBRARIES})
 ENDIF()
 
+IF(USE_SQLITE)
+	IF(SQLite3_FOUND)
+		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${SQLite3_LIBRARIES})
+	ENDIF()
+ENDIF()
+
+IF(USE_FREETYPE)
+	IF(Freetype_FOUND)
+		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${FREETYPE_LIBRARIES})
+	ENDIF()
+ENDIF()
+
+IF(USE_OPENSSL)
+	IF(OpenSSL_FOUND)
+		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${OPENSSL_LIBRARIES})
+	ENDIF()
+ENDIF()
+
+IF(USE_LUA)
+	IF(Lua_FOUND)
+		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${LUA_LIBRARIES})
+	ENDIF()
+ENDIF()
+
 ADD_EXECUTABLE(${DNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} qcommon_ded botlib)
 
@@ -402,6 +628,24 @@ ENDIF()
 
 IF(USE_CURL)
 	TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} ${CURL_LIBRARIES})
+ENDIF()
+
+IF(USE_SQLITE)
+	IF(SQLite3_FOUND)
+		TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} ${SQLite3_LIBRARIES})
+	ENDIF()
+ENDIF()
+
+IF(USE_OPENSSL)
+	IF(OpenSSL_FOUND)
+		TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} ${OPENSSL_LIBRARIES})
+	ENDIF()
+ENDIF()
+
+IF(USE_LUA)
+	IF(Lua_FOUND)
+		TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} ${LUA_LIBRARIES})
+	ENDIF()
 ENDIF()
 
 # Platform-specific libraries

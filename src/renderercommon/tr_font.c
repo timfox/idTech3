@@ -76,7 +76,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 extern void R_IssuePendingRenderCommands( void );
 extern qhandle_t RE_RegisterShaderNoMip( const char *name );
 
-#ifdef BUILD_FREETYPE
+#ifdef USE_FREETYPE
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_ERRORS_H
@@ -88,15 +88,15 @@ extern qhandle_t RE_RegisterShaderNoMip( const char *name );
 #define _CEIL(x)   (((x)+63) & -64)
 #define _TRUNC(x)  ((x) >> 6)
 
-FT_Library ftLibrary = NULL;  
+static FT_Library ftLibrary = NULL;  
 #endif
 
 #define MAX_FONTS 6
 static int registeredFontCount = 0;
 static fontInfo_t registeredFont[MAX_FONTS];
 
-#ifdef BUILD_FREETYPE
-void R_GetGlyphInfo(FT_GlyphSlot glyph, int *left, int *right, int *width, int *top, int *bottom, int *height, int *pitch) {
+#ifdef USE_FREETYPE
+static void R_GetGlyphInfo(FT_GlyphSlot glyph, int *left, int *right, int *width, int *top, int *bottom, int *height, int *pitch) {
 	*left  = _FLOOR( glyph->metrics.horiBearingX );
 	*right = _CEIL( glyph->metrics.horiBearingX + glyph->metrics.width );
 	*width = _TRUNC(*right - *left);
@@ -108,7 +108,7 @@ void R_GetGlyphInfo(FT_GlyphSlot glyph, int *left, int *right, int *width, int *
 }
 
 
-FT_Bitmap *R_RenderGlyph(FT_GlyphSlot glyph, glyphInfo_t* glyphOut) {
+static FT_Bitmap *R_RenderGlyph(FT_GlyphSlot glyph, glyphInfo_t* glyphOut) {
 	FT_Bitmap  *bit2;
 	int left, right, width, top, bottom, height, pitch, size;
 
@@ -129,9 +129,9 @@ FT_Bitmap *R_RenderGlyph(FT_GlyphSlot glyph, glyphInfo_t* glyphOut) {
 
 		Com_Memset( bit2->buffer, 0, size );
 
-		FT_Outline_Translate( &glyph->outline, -left, -bottom );
+		FreeType_OutlineTranslate( &glyph->outline, -left, -bottom );
 
-		FT_Outline_Get_Bitmap( ftLibrary, &glyph->outline, bit2 );
+		FreeType_OutlineGetBitmap( ftLibrary, &glyph->outline, bit2 );
 
 		glyphOut->height = height;
 		glyphOut->pitch = pitch;
@@ -203,7 +203,7 @@ static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, in
 	Com_Memset(&glyph, 0, sizeof(glyphInfo_t));
 	// make sure everything is here
 	if (face != NULL) {
-		FT_Load_Glyph(face, FT_Get_Char_Index( face, c), FT_LOAD_DEFAULT );
+		FreeType_LoadGlyph(face, FreeType_GetCharIndex( face, c), FT_LOAD_DEFAULT );
 		bitmap = R_RenderGlyph(face->glyph, &glyph);
 		if (bitmap) {
 			glyph.xSkip = (face->glyph->metrics.horiAdvance >> 6) + 1;
@@ -410,9 +410,10 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 		return;
 	}
 
-#ifndef BUILD_FREETYPE
+#ifndef USE_FREETYPE
 	ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType code not available\n");
 #else
+	ftLibrary = FreeType_GetLibrary();
 	if (ftLibrary == NULL) {
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType not initialized.\n");
 		return;
@@ -425,14 +426,17 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	}
 
 	// allocate on the stack first in case we fail
-	if (FT_New_Memory_Face( ftLibrary, faceData, len, 0, &face )) {
+	if (FreeType_NewMemoryFace( faceData, len, 0, &face )) {
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType, unable to allocate new face.\n");
+		ri.FS_FreeFile(faceData);
 		return;
 	}
 
 
-	if (FT_Set_Char_Size( face, pointSize << 6, pointSize << 6, dpi, dpi)) {
+	if (FreeType_SetCharSize( face, pointSize << 6, pointSize << 6, dpi, dpi)) {
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType, unable to set face char size.\n");
+		FreeType_DoneFace(face);
+		ri.FS_FreeFile(faceData);
 		return;
 	}
 
@@ -532,6 +536,9 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	font->glyphScale = glyphScale;
 	Com_Memcpy(&registeredFont[registeredFontCount++], font, sizeof(fontInfo_t));
 
+	FreeType_DoneFace(face);
+	ri.FS_FreeFile(faceData);
+
 	if (r_saveFontData->integer) {
 		ri.FS_WriteFile(va("fonts/fontImage_%i.dat", pointSize), font, sizeof(fontInfo_t));
 	}
@@ -545,9 +552,10 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 
 
 void R_InitFreeType(void) {
-#ifdef BUILD_FREETYPE
-	if (FT_Init_FreeType( &ftLibrary )) {
-		ri.Printf(PRINT_WARNING, "R_InitFreeType: Unable to initialize FreeType.\n");
+#ifdef USE_FREETYPE
+	ftLibrary = FreeType_GetLibrary();
+	if (!ftLibrary) {
+		ri.Printf(PRINT_WARNING, "R_InitFreeType: FreeType not available.\n");
 	}
 #endif
 	registeredFontCount = 0;
@@ -555,11 +563,9 @@ void R_InitFreeType(void) {
 
 
 void R_DoneFreeType(void) {
-#ifdef BUILD_FREETYPE
-	if (ftLibrary) {
-		FT_Done_FreeType( ftLibrary );
-		ftLibrary = NULL;
-	}
+#ifdef USE_FREETYPE
+	// FreeType shutdown is handled by FreeType_Shutdown() in common.c
+	ftLibrary = NULL;
 #endif
 	registeredFontCount = 0;
 }

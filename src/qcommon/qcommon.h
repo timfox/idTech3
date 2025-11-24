@@ -217,6 +217,80 @@ ENetHost *	NET_ENet_CreateHost( const ENetAddress *address, size_t peerCount, si
 void		NET_ENet_DestroyHost( ENetHost *host );
 int			NET_ENet_Service( ENetHost *host, ENetEvent *event, enet_uint32 timeout );
 #endif
+
+#ifdef USE_SQLITE
+#include <sqlite3.h>
+void		SQLite_Init( void );
+sqlite3 *	SQLite_Open( const char *filename );
+void		SQLite_Close( sqlite3 *db );
+int			SQLite_Exec( sqlite3 *db, const char *sql, int (*callback)(void*, int, char**, char**), void *arg );
+int			SQLite_Prepare( sqlite3 *db, const char *sql, sqlite3_stmt **stmt, const char **tail );
+int			SQLite_Step( sqlite3_stmt *stmt );
+int			SQLite_Finalize( sqlite3_stmt *stmt );
+const char *SQLite_GetColumnText( sqlite3_stmt *stmt, int col );
+int			SQLite_GetColumnInt( sqlite3_stmt *stmt, int col );
+double		SQLite_GetColumnDouble( sqlite3_stmt *stmt, int col );
+int			SQLite_BindText( sqlite3_stmt *stmt, int index, const char *value, int len );
+int			SQLite_BindInt( sqlite3_stmt *stmt, int index, int value );
+int			SQLite_BindDouble( sqlite3_stmt *stmt, int index, double value );
+sqlite3_int64 SQLite_LastInsertRowid( sqlite3 *db );
+int			SQLite_Changes( sqlite3 *db );
+#endif
+
+#ifdef USE_OPENSSL
+#include <openssl/ssl.h>
+void		OpenSSL_Init( void );
+void		OpenSSL_Shutdown( void );
+qboolean	OpenSSL_RandomBytes( byte *output, int len );
+qboolean	OpenSSL_SHA256( const byte *input, int inputLen, byte *output );
+qboolean	OpenSSL_SHA1( const byte *input, int inputLen, byte *output );
+qboolean	OpenSSL_MD5( const byte *input, int inputLen, byte *output );
+int			OpenSSL_AES256_Encrypt( const byte *key, const byte *iv, const byte *input, int inputLen, byte *output, int outputMaxLen );
+int			OpenSSL_AES256_Decrypt( const byte *key, const byte *iv, const byte *input, int inputLen, byte *output, int outputMaxLen );
+int			OpenSSL_Base64_Encode( const byte *input, int inputLen, char *output, int outputMaxLen );
+int			OpenSSL_Base64_Decode( const char *input, byte *output, int outputMaxLen );
+#endif
+
+#ifdef USE_LUA
+#include <lua.h>
+void		Lua_Init( void );
+void		Lua_Shutdown( void );
+lua_State *	Lua_CreateState( void );
+void		Lua_DestroyState( lua_State *L );
+qboolean	Lua_LoadFile( lua_State *L, const char *filename );
+qboolean	Lua_LoadString( lua_State *L, const char *code );
+qboolean	Lua_CallFunction( lua_State *L, const char *functionName, int numArgs, int numReturns );
+void		Lua_PushNumber( lua_State *L, double n );
+void		Lua_PushString( lua_State *L, const char *s );
+void		Lua_PushBoolean( lua_State *L, qboolean b );
+double		Lua_GetNumber( lua_State *L, int index );
+const char *Lua_GetString( lua_State *L, int index );
+qboolean	Lua_GetBoolean( lua_State *L, int index );
+void		Lua_RegisterFunction( lua_State *L, const char *name, lua_CFunction func );
+void		Lua_SetGlobal( lua_State *L, const char *name );
+void		Lua_GetGlobal( lua_State *L, const char *name );
+int			Lua_GetTop( lua_State *L );
+void		Lua_SetTop( lua_State *L, int index );
+void		Lua_Pop( lua_State *L, int n );
+#endif
+
+#ifdef USE_FREETYPE
+#include <ft2build.h>
+#include FT_FREETYPE_H
+qboolean	FreeType_Init( void );
+void		FreeType_Shutdown( void );
+FT_Library	FreeType_GetLibrary( void );
+qboolean	FreeType_IsInitialized( void );
+FT_Error	FreeType_NewMemoryFace( const FT_Byte *file_base, FT_Long file_size, FT_Long face_index, FT_Face *aface );
+void		FreeType_DoneFace( FT_Face face );
+FT_Error	FreeType_SetCharSize( FT_Face face, FT_F26Dot6 char_width, FT_F26Dot6 char_height, FT_UInt horz_resolution, FT_UInt vert_resolution );
+FT_Error	FreeType_LoadGlyph( FT_Face face, FT_UInt glyph_index, FT_Int32 load_flags );
+FT_UInt		FreeType_GetCharIndex( FT_Face face, FT_ULong charcode );
+FT_Error	FreeType_RenderGlyph( FT_GlyphSlot slot, FT_Render_Mode render_mode );
+void		FreeType_OutlineTranslate( FT_Outline *outline, FT_Pos xDelta, FT_Pos yDelta );
+FT_Error	FreeType_OutlineGetBitmap( FT_Library library, FT_Outline *outline, const FT_Bitmap *abitmap );
+#endif
+
 void		NET_FlushPacketQueue( int time_diff );
 void		NET_QueuePacket( netsrc_t sock, int length, const void *data, const netadr_t *to, int offset );
 void		NET_SendPacket( netsrc_t sock, int length, const void *data, const netadr_t *to );
