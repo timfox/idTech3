@@ -539,6 +539,81 @@ qboolean G_Crafting_Craft( int clientNum, int itemId1, int itemId2 ) {
 
 /*
 ================
+G_Crafting_LoadRecipes
+Load crafting recipes from file
+================
+*/
+qboolean G_Crafting_LoadRecipes( const char *filename ) {
+	fileHandle_t f;
+	int len;
+	char *cnf, *cnf2;
+	const char *t;
+	int input1, input2, output, outputQuantity;
+	char name[MAX_ITEM_NAME];
+	
+	len = trap_FS_FOpenFile( filename, &f, FS_READ );
+	if( len < 0 ) {
+		// File doesn't exist, use defaults
+		G_Printf( "G_Crafting_LoadRecipes: File %s not found, using defaults\n", filename );
+		
+		// Register some default recipes
+		G_Crafting_RegisterRecipe( 1000, 1001, 1003, 1, "Advanced Scope" );
+		G_Crafting_RegisterRecipe( 2000, 2001, 2003, 1, "Full Armor Set" );
+		
+		return qtrue;
+	}
+	
+	cnf = BG_Alloc( len + 1 );
+	cnf2 = cnf;
+	trap_FS_Read( cnf, len, f );
+	*( cnf + len ) = '\0';
+	trap_FS_FCloseFile( f );
+	
+	COM_BeginParseSession( filename );
+	
+	while( 1 ) {
+		t = COM_Parse( (const char **)&cnf );
+		if( !*t ) {
+			break;
+		}
+		
+		if( Q_strequal( t, "recipe" ) ) {
+			// Parse recipe definition
+			// Format: recipe <input1> <input2> <output> <outputQuantity> "<name>"
+			
+			t = COM_Parse( (const char **)&cnf );
+			if( !*t ) break;
+			input1 = atoi( t );
+			
+			t = COM_Parse( (const char **)&cnf );
+			if( !*t ) break;
+			input2 = atoi( t );
+			
+			t = COM_Parse( (const char **)&cnf );
+			if( !*t ) break;
+			output = atoi( t );
+			
+			t = COM_Parse( (const char **)&cnf );
+			if( !*t ) break;
+			outputQuantity = atoi( t );
+			
+			t = COM_Parse( (const char **)&cnf );
+			if( !*t ) break;
+			Q_strncpyz( name, t, sizeof( name ) );
+			
+			G_Crafting_RegisterRecipe( input1, input2, output, outputQuantity, name );
+		} else {
+			COM_ParseError( "Unknown token '%s' in recipes file %s\n", t, filename );
+		}
+	}
+	
+	BG_Free( cnf2 );
+	G_Printf( "G_Crafting_LoadRecipes: Loaded %d recipes from %s\n", num_craft_recipes, filename );
+	return qtrue;
+}
+
+/*
+================
 G_Inventory_GetSavePath
 Get the file path for saving/loading inventory
 ================

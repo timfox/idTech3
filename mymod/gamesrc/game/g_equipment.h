@@ -9,8 +9,7 @@ Equipment slots and stat modifiers for weapons and armor.
 #ifndef _G_EQUIPMENT_H
 #define _G_EQUIPMENT_H
 
-#include "g_local.h"
-#include "g_inventory.h"
+#include "g_inventory_types.h"
 
 // Equipment item definitions (loaded from equipment.dat)
 typedef struct {

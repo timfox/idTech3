@@ -22,6 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //
 // g_local.h -- local definitions for game module
 
+#ifndef _G_LOCAL_H
+#define _G_LOCAL_H
+
 #include "../qcommon/q_shared.h"
 
 // Compatibility: Q_strequal -> Q_streq
@@ -1449,10 +1452,12 @@ void Svcmd_MessageWrapper( void );
 #include "g_dialog.h"
 #include "g_inventory.h"
 #include "g_equipment.h"
+#include "g_crafting.h"
 
 void MapInfoPrint(mapinfo_result_t *info);
 // leilei - monsters
 
 void monster_die (gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int mod);
 
+#endif // _G_LOCAL_H
 

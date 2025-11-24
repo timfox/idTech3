@@ -2255,6 +2255,15 @@ void Cmd_GetMappage_f( gentity_t *ent ) {
 	trap_SendServerCommand( ent-g_entities, string );
 }
 
+// Forward declarations for command handlers defined later
+void Cmd_DialogNext_f( gentity_t *ent );
+void Cmd_DialogChoice_f( gentity_t *ent );
+void Cmd_Inventory_f( gentity_t *ent );
+void Cmd_InventoryUse_f( gentity_t *ent );
+void Cmd_InventoryEquip_f( gentity_t *ent );
+void Cmd_InventoryUnequip_f( gentity_t *ent );
+void Cmd_InventoryCraft_f( gentity_t *ent );
+
 //KK-OAX This is the table that ClientCommands runs the console entry against. 
 commands_t cmds[ ] = 
 {

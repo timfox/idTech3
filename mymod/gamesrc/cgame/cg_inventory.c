@@ -8,6 +8,7 @@ Overlay menu for inventory management.
 
 #include "cg_local.h"
 #include "cg_inventory.h"
+#include "../../src/client/keycodes.h"
 
 static cg_inventory_ui_t cg_inventory_ui;
 
@@ -242,8 +243,8 @@ void CG_Inventory_HandleInput( int key ) {
 	}
 	
 	// Number keys select items
-	if( key >= K_1 && key <= K_9 ) {
-		int itemIndex = key - K_1;
+	if( key >= '1' && key <= '9' ) {
+		int itemIndex = key - '1';
 		if( itemIndex < cg_inventory_ui.numItems ) {
 			cg_inventory_ui.selectedItem = itemIndex;
 		}

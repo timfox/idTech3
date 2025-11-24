@@ -358,6 +358,7 @@ Entity use function for target_dialog
 ================
 */
 void Use_Target_Dialog( gentity_t *ent, gentity_t *other, gentity_t *activator ) {
+	(void)other; // Unused parameter - required by function signature
 	int dialogId;
 	int clientNum;
 	

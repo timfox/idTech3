@@ -8,6 +8,7 @@ Renders dialog boxes with text, character names, and choices.
 
 #include "cg_local.h"
 #include "cg_dialog.h"
+#include "../../src/client/keycodes.h"
 
 static cg_dialog_t cg_dialog;
 
@@ -229,16 +230,16 @@ void CG_Dialog_HandleInput( int key ) {
 	}
 	
 	// Number keys 1-4 select choices
-	if( key >= K_1 && key <= K_4 ) {
-		int choiceNum = key - K_1;
+	if( key >= '1' && key <= '4' ) {
+		int choiceNum = key - '1';
 		if( choiceNum < cg_dialog.numChoices ) {
 			trap_SendClientCommand( va( "dialogchoice %d", choiceNum ) );
 			return;
 		}
 	}
 	
-	// USE key or ENTER advances dialog
-	if( key == K_ENTER || key == K_KP_ENTER || key == K_USE ) {
+	// USE key (E) or ENTER advances dialog
+	if( key == K_ENTER || key == K_KP_ENTER || key == K_E ) {
 		if( cg_dialog.numChoices == 0 ) {
 			trap_SendClientCommand( "dialognext" );
 		}

@@ -20,6 +20,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 //
+#ifndef _CG_PUBLIC_H
+#define _CG_PUBLIC_H
 
 
 #define	CMD_BACKUP			64	
@@ -161,6 +163,7 @@ typedef enum {
 	CG_R_ADDADDITIVELIGHTTOSCENE,
 	CG_GET_ENTITY_TOKEN,
 	CG_R_ADDPOLYSTOSCENE,
+	CG_R_ADDPARTICLE,
 	CG_R_INPVS,
 	// 1.32
 	CG_FS_SEEK,
@@ -236,5 +239,7 @@ typedef enum {
 	CG_EVENT_HANDLING
 //	void (*CG_EventHandling)(int type);
 } cgameExport_t;
+
+#endif // _CG_PUBLIC_H
 
 //----------------------------------------------
