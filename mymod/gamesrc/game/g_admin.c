@@ -35,9 +35,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 /* KK-OAX TODO
-1. Clean up the default admin levels to include the commands which I have added
-3. Implement Disorientation in Code
-4. DEBUG, DEBUG, DEBUG
+1. Clean up the default admin levels to include the commands which I have added - DONE
+2. Implement Disorientation in Code - DONE (disorient/orient commands implemented)
+3. DEBUG, DEBUG, DEBUG
 */
 
 #include "g_local.h"
@@ -513,7 +513,6 @@ static void admin_writeconfig( void )
 
 // if we can't parse any levels from readconfig, set up default
 // ones to make new installs easier for admins
-//KK-OAX TODO: Add all features to default levels...
 static void admin_default_levels( void )
 {
 	g_admin_level_t *l;
@@ -544,11 +543,11 @@ static void admin_default_levels( void )
 
 	Q_strncpyz( g_admin_levels[ 3 ]->name, "^2Junior Admin",
 	            sizeof( l->name ) );
-	Q_strncpyz( g_admin_levels[ 3 ]->flags, "iahCpPwrkmfKncN?", sizeof( l->flags ) );
+	Q_strncpyz( g_admin_levels[ 3 ]->flags, "iahCpPwrkmfKncN?dwS", sizeof( l->flags ) );
 
 	Q_strncpyz( g_admin_levels[ 4 ]->name, "^3Senior Admin",
 	            sizeof( l->name ) );
-	Q_strncpyz( g_admin_levels[ 4 ]->flags, "iahCpPwrkmfKncN?MVdBbeDS51", sizeof( l->flags ) );
+	Q_strncpyz( g_admin_levels[ 4 ]->flags, "iahCpPwrkmfKncN?MVdBbeDS51w", sizeof( l->flags ) );
 
 	Q_strncpyz( g_admin_levels[ 5 ]->name, "^1Server Operator",
 	            sizeof( l->name ) );

@@ -469,12 +469,14 @@ void ClientRespawn( gentity_t *ent ) {
 				if((g_lms_mode.integer == 2 || g_lms_mode.integer == 3) && level.roundNumber == level.roundNumberStarted) {
 					LMSpoint();	
 				}
-				//Sago: This is really bad
-				//TODO: Try not to make people spectators here
-				ent->client->sess.spectatorState = SPECTATOR_FOLLOW;
-				ent->client->ps.pm_type = PM_SPECTATOR;
-				//We have to force spawn imidiantly to prevent lag.
-				ClientSpawn(ent);
+				// Only force spectator if match is still active (not during intermission)
+				// During intermission, players should be able to see scoreboard
+				if( !level.intermissiontime ) {
+					ent->client->sess.spectatorState = SPECTATOR_FOLLOW;
+					ent->client->ps.pm_type = PM_SPECTATOR;
+					//We have to force spawn immediately to prevent lag.
+					ClientSpawn(ent);
+				}
 			}
 			return;
 		}

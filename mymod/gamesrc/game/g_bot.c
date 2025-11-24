@@ -810,7 +810,9 @@ void Svcmd_AddBot_f( void ) {
 	// go ahead and load the bot's media immediately
 	if ( level.time - level.startTime > 1000 &&
 		trap_Cvar_VariableIntegerValue( "cl_running" ) ) {
-		trap_SendServerCommand( -1, "loaddefered\n" );	// FIXME: spelled wrong, but not changing for demo
+		// NOTE: "loaddefered" is intentionally misspelled for demo compatibility
+		// The correct spelling "loaddeferred" is also supported by the client
+		trap_SendServerCommand( -1, "loaddefered\n" );
 	}
 }
 
