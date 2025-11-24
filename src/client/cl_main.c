@@ -3400,13 +3400,6 @@ static void CL_InitRef( void ) {
 		Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_x86" DLL_EXT, cl_renderer->string );
 		ospath = FS_BuildOSPath( Sys_DefaultBasePath(), dllName, NULL );
 		rendererLib = Sys_LoadLibrary( ospath );
-		if ( !rendererLib )
-		{
-			char libName[ MAX_OSPATH ];
-			Com_sprintf( libName, sizeof( libName ), "lib" RENDERER_PREFIX "_%s_x86" DLL_EXT, cl_renderer->string );
-			ospath = FS_BuildOSPath( Sys_DefaultBasePath(), libName, NULL );
-			rendererLib = Sys_LoadLibrary( ospath );
-		}
 	}
 	if ( !rendererLib )
 	{
@@ -3414,14 +3407,6 @@ static void CL_InitRef( void ) {
 		Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, cl_renderer->string );
 		ospath = FS_BuildOSPath( Sys_DefaultBasePath(), dllName, NULL );
 		rendererLib = Sys_LoadLibrary( ospath );
-		if ( !rendererLib )
-		{
-			// Try with lib prefix again after reset
-			char libName[ MAX_OSPATH ];
-			Com_sprintf( libName, sizeof( libName ), "lib" RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, cl_renderer->string );
-			ospath = FS_BuildOSPath( Sys_DefaultBasePath(), libName, NULL );
-			rendererLib = Sys_LoadLibrary( ospath );
-		}
 		if ( !rendererLib )
 		{
 			Com_Error( ERR_FATAL, "Failed to load renderer %s", dllName );

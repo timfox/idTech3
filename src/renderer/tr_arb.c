@@ -41,15 +41,6 @@ GLenum	blitFilter;
 
 qboolean superSampled;
 
-typedef struct frameBuffer_s {
-	GLuint fbo;
-	GLuint color;			// renderbuffer if multisampled
-	GLuint depthStencil;	// renderbuffer if multisampled
-	GLint  width;
-	GLint  height;
-	qboolean multiSampled;
-} frameBuffer_t;
-
 #ifdef USE_FBO
 static GLuint commonDepthStencil;
 
@@ -1017,12 +1008,20 @@ qboolean ARB_UpdatePrograms( void )
 	qglGenProgramsARB( ARRAY_LEN( programs ) - PROGRAM_BASE, programs + PROGRAM_BASE );
 
 #ifdef USE_PMLIGHT
-	if ( !ARB_CompileProgram( Vertex, va( dlightVP, "" ), programs[ DLIGHT_VERTEX ] ) )
-		return qfalse;
-	if ( !ARB_CompileProgram( Vertex, va( dlightVP, fogInVPCode ), programs[ DLIGHT_VERTEX_FOG_IN ] ) )
-		return qfalse;
-	if ( !ARB_CompileProgram( Vertex, va( dlightVP, fogOutVPCode ), programs[ DLIGHT_VERTEX_FOG_OUT ] ) )
-		return qfalse;
+	{
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
+		const char *dlightVP_empty = va( dlightVP, "" );
+		const char *dlightVP_fogIn = va( dlightVP, fogInVPCode );
+		const char *dlightVP_fogOut = va( dlightVP, fogOutVPCode );
+#pragma GCC diagnostic pop
+		if ( !ARB_CompileProgram( Vertex, dlightVP_empty, programs[ DLIGHT_VERTEX ] ) )
+			return qfalse;
+		if ( !ARB_CompileProgram( Vertex, dlightVP_fogIn, programs[ DLIGHT_VERTEX_FOG_IN ] ) )
+			return qfalse;
+		if ( !ARB_CompileProgram( Vertex, dlightVP_fogOut, programs[ DLIGHT_VERTEX_FOG_OUT ] ) )
+			return qfalse;
+	}
 
 	for ( i = DLIGHT_FRAGMENT; i <= DLIGHT_LINEAR_ABS_FRAGMENT_FOG; i++ ) {
 		program = ARB_BuildDlightFP( buf, i );
@@ -1039,8 +1038,14 @@ qboolean ARB_UpdatePrograms( void )
 		return qfalse;
 
 #ifdef USE_FBO
-	if ( !ARB_CompileProgram( Fragment, va( gammaFP, ARB_BuildGreyscaleProgram( buf ) ), programs[ GAMMA_FRAGMENT ] ) )
-		return qfalse;
+	{
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
+		const char *gammaFP_prog = va( gammaFP, ARB_BuildGreyscaleProgram( buf ) );
+#pragma GCC diagnostic pop
+		if ( !ARB_CompileProgram( Fragment, gammaFP_prog, programs[ GAMMA_FRAGMENT ] ) )
+			return qfalse;
+	}
 
 	if ( !ARB_CompileProgram( Fragment, ARB_BuildBloomProgram( buf ), programs[ BLOOM_EXTRACT_FRAGMENT ] ) )
 		return qfalse;
@@ -1060,8 +1065,14 @@ qboolean ARB_UpdatePrograms( void )
 	if ( !ARB_CompileProgram( Fragment, blend2FP, programs[ BLEND2_FRAGMENT ] ) )
 		return qfalse;
 
-	if ( !ARB_CompileProgram( Fragment, va( blend2gammaFP, ARB_BuildGreyscaleProgram( buf ) ), programs[ BLEND2_GAMMA_FRAGMENT ] ) )
-		return qfalse;
+	{
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
+		const char *blend2gammaFP_prog = va( blend2gammaFP, ARB_BuildGreyscaleProgram( buf ) );
+#pragma GCC diagnostic pop
+		if ( !ARB_CompileProgram( Fragment, blend2gammaFP_prog, programs[ BLEND2_GAMMA_FRAGMENT ] ) )
+			return qfalse;
+	}
 #endif // USE_FBO
 
 	programCompiled = 1;

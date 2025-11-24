@@ -1352,6 +1352,7 @@ void R_AddLitSurf( surfaceType_t *surface, shader_t *shader, int fogIndex );
 #define	CULL_OUT	2		// completely outside the clipping planes
 
 void R_LocalPointToWorld( const vec3_t local, vec3_t world );
+void R_WorldToLocal( const vec3_t world, vec3_t local );
 int R_CullLocalBox( const vec3_t bounds[2] );
 int R_CullPointAndRadius( const vec3_t origin, float radius );
 int R_CullLocalPointAndRadius( const vec3_t origin, float radius );
@@ -1608,6 +1609,14 @@ void R_ComputeTexCoords( const int b, const textureBundle_t *bundle );
 void QGL_InitARB( void );
 void QGL_DoneARB( void );
 #ifdef USE_FBO
+typedef struct frameBuffer_s {
+	GLuint fbo;
+	GLuint color;			// renderbuffer if multisampled
+	GLuint depthStencil;	// renderbuffer if multisampled
+	GLint  width;
+	GLint  height;
+	qboolean multiSampled;
+} frameBuffer_t;
 void QGL_InitFBO( void );
 #endif
 qboolean ARB_UpdatePrograms( void );
@@ -1947,6 +1956,13 @@ extern void RB_StageIteratorVBO( void );
 extern void R_BuildWorldVBO( msurface_t *surf, int surfCount );
 
 extern void VBO_PushData( int itemIndex, shaderCommands_t *input );
+
+// tr_vbo.c
+const char *BuildFP( int multitexture, int alphatest, int fogMode );
+
+// tr_arb.c
+void FBO_Clean( frameBuffer_t *fb );
+void QGL_DoneFBO( void );
 extern void VBO_UnBind( void );
 extern int VBO_Active( void );
 

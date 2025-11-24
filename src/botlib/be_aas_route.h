@@ -29,11 +29,16 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  *
  *****************************************************************************/
 
+struct aas_routingcache_s;
+typedef struct aas_routingcache_s aas_routingcache_t;
+
 #ifdef AASINTERN
 //initialize the AAS routing
 void AAS_InitRouting(void);
 //free the AAS routing caches
 void AAS_FreeRoutingCaches(void);
+//free a single routing cache
+void AAS_FreeRoutingCache(aas_routingcache_t *cache);
 //returns the travel time from start to end in the given area
 unsigned short int AAS_AreaTravelTime(int areanum, vec3_t start, vec3_t end);
 //
@@ -41,6 +46,8 @@ void AAS_CreateAllRoutingCache(void);
 void AAS_WriteRouteCache(void);
 //
 void AAS_RoutingInfo(void);
+//returns the nearest hide area
+int AAS_NearestHideArea(int srcnum, vec3_t origin, int areanum, int enemynum, vec3_t enemyorigin, int enemyareanum, int travelflags);
 #endif //AASINTERN
 
 //returns the travel flag for the given travel type

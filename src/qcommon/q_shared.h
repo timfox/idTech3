@@ -798,6 +798,10 @@ void Parse3DMatrix( const char **buf_p, int z, int y, int x, float *m);
 
 int QDECL Com_sprintf( char *dest, int size, const char *fmt, ... ) __attribute__ ((format (printf, 3, 4)));
 
+int Com_Split( char *in, char **out, int outsz, int delim );
+int Com_HexStrToInt( const char *str );
+qboolean Com_GetHashColor( const char *str, byte *color );
+
 const char *Com_SkipTokens( const char *s, int numTokens, const char *sep );
 const char *Com_SkipCharset( const char *s, const char *sep );
 
@@ -880,12 +884,24 @@ short	LittleShort(short l);
 int		BigLong (int l);
 int		LittleLong (int l);
 qint64  BigLong64 (qint64 l);
+
 qint64  LittleLong64 (qint64 l);
 float	BigFloat (const float *l);
 float	LittleFloat (const float *l);
 
 void	Swap_Init (void);
 */
+
+// Internal swap functions (q_shared.c)
+void CopyShortSwap(void *dest, void *src);
+void CopyLongSwap(void *dest, void *src);
+short ShortNoSwap (short l);
+int LongNoSwap (int l);
+qint64 Long64Swap (qint64 ll);
+qint64 Long64NoSwap( qint64 ll );
+float FloatNoSwap( const float *f );
+unsigned int crc32_buffer( const byte *buf, unsigned int len );
+
 const char *QDECL va( const char *format, ... ) __attribute__ ((format( printf, 1, 2 )));
 
 #define TRUNCATE_LENGTH	64

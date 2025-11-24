@@ -121,7 +121,7 @@ static void copy4(byte *out,uint32_t x)
 	out[3] = (x>>24)&0xFF;
 }
 
-void mdfour_begin(struct mdfour *md)
+static void mdfour_begin(struct mdfour *md)
 {
 	md->A = 0x67452301;
 	md->B = 0xefcdab89;

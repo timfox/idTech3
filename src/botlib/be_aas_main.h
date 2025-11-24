@@ -53,3 +53,5 @@ int AAS_Loaded(void);
 float AAS_Time(void);
 //
 void AAS_ProjectPointOntoVector( vec3_t point, vec3_t vStart, vec3_t vEnd, vec3_t vProj );
+//continue initialization
+void AAS_ContinueInit(float time);

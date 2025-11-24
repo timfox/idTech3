@@ -121,6 +121,14 @@ void BotResetAvoidReach(int movestate);
 void BotResetLastAvoidReach(int movestate);
 //returns a reachability area if the origin is in one
 int BotReachabilityArea(vec3_t origin, int client);
+//returns a fuzzy reachability area for the given origin
+int BotFuzzyPointReachabilityArea(vec3_t origin);
+//returns a reachability to the goal
+int BotGetReachabilityToGoal(vec3_t origin, int areanum,
+									  int lastgoalareanum, int lastareanum,
+									  int *avoidreach, float *avoidreachtimes, int *avoidreachtries,
+									  bot_goal_t *goal, int travelflags,
+									  struct bot_avoidspot_s *avoidspots, int numavoidspots, int *flags);
 //view target based on movement
 int BotMovementViewTarget(int movestate, bot_goal_t *goal, int travelflags, float lookahead, vec3_t target);
 //predict the position of a player based on movement towards a goal

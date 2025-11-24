@@ -49,6 +49,11 @@ void EA_Respawn(int client);
 void EA_Talk(int client);
 void EA_Gesture(int client);
 void EA_Use(int client);
+void EA_Tell(int client, int clientto, const char *str);
+void EA_UseItem(int client, const char *it);
+void EA_DropItem(int client, const char *it);
+void EA_UseInv(int client, const char *inv);
+void EA_DropInv(int client, const char *inv);
 
 //regular elementary actions
 void EA_SelectWeapon(int client, int weapon);

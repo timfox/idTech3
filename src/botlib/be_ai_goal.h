@@ -108,6 +108,11 @@ void BotMutateGoalFuzzyLogic(int goalstate, float range);
 int BotLoadItemWeights(int goalstate, const char *filename);
 //frees the item weights of the bot
 void BotFreeItemWeights(int goalstate);
+//forward declaration
+struct bot_goalstate_s;
+typedef struct bot_goalstate_s bot_goalstate_t;
+//returns the goal state from the handle
+bot_goalstate_t *BotGoalStateFromHandle(int handle);
 //returns the handle of a newly allocated goal state
 int BotAllocGoalState(int client);
 //free the given goal state

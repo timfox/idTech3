@@ -95,6 +95,7 @@ void MSG_WriteLong (msg_t *sb, int c);
 void MSG_WriteFloat (msg_t *sb, float f);
 void MSG_WriteString (msg_t *sb, const char *s);
 void MSG_WriteBigString (msg_t *sb, const char *s);
+void MSG_WriteAngle (msg_t *sb, float f);
 void MSG_WriteAngle16 (msg_t *sb, float f);
 int MSG_HashKey(const char *string, int maxlen);
 
@@ -1000,6 +1001,8 @@ void		Com_MD5Init( void );
 int			Com_MD5Addr( const netadr_t *addr, int timestamp );
 
 qboolean	Com_CDKeyValidate( const char *key, const char *checksum );
+void		Com_ReadCDKey( const char *filename );
+void		Com_AppendCDKey( const char *filename );
 qboolean	Com_EarlyParseCmdLine( char *commandLine, char *con_title, int title_size, int *vid_xpos, int *vid_ypos );
 int			Com_Split( char *in, char **out, int outsz, int delim );
 

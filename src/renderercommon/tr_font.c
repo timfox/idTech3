@@ -71,6 +71,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
 #include "../renderercommon/tr_public.h"
+#include "../renderer/tr_common.h"
 
 extern void R_IssuePendingRenderCommands( void );
 extern qhandle_t RE_RegisterShaderNoMip( const char *name );
@@ -317,7 +318,7 @@ typedef union {
 	float	ffred;
 } poor;
 
-float readFloat( void ) {
+static float readFloat( void ) {
 	poor	me;
 #if defined Q3_BIG_ENDIAN
 	me.fred[0] = fdFile[fdOffset+3];
