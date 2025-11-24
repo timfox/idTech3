@@ -1265,6 +1265,9 @@ static const void *RB_DrawSurfs( const void *data ) {
 	// darken down any stencil shadows
 	RB_ShadowFinish();
 
+	// render batched particles
+	R_RenderParticles();
+
 	// add light flares on lights that aren't obscured
 	RB_RenderFlares();
 

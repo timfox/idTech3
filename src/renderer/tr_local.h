@@ -78,6 +78,30 @@ typedef struct dlight_s {
 #endif
 } dlight_t;
 
+// Particle system structures
+#define MAX_PARTICLES 2048
+
+typedef struct {
+	vec3_t		origin;
+	vec3_t		velocity;
+	vec3_t		color;
+	float		size;
+	float		rotation;
+	float		life;			// 0.0 to 1.0
+	float		fade;
+	qhandle_t	shader;
+	int			spawnTime;
+	int			lifeTime;
+	qboolean	active;
+} particle_t;
+
+typedef struct {
+	particle_t	*particles;
+	int			maxParticles;
+	int			numActive;
+	int			nextFree;
+} particleSystem_t;
+
 
 // a trRefEntity_t has all the information passed in by
 // the client game, as well as some locally derived info
@@ -1709,6 +1733,7 @@ void R_InitNextFrame( void );
 void RE_ClearScene( void );
 void RE_AddRefEntityToScene( const refEntity_t *ent, qboolean intShaderTime );
 void RE_AddPolyToScene( qhandle_t hShader , int numVerts, const polyVert_t *verts, int num );
+void RE_AddParticle( const vec3_t origin, const vec3_t velocity, const vec3_t color, float size, float life, qhandle_t shader );
 void RE_AddLightToScene( const vec3_t org, float intensity, float r, float g, float b );
 void RE_AddAdditiveLightToScene( const vec3_t org, float intensity, float r, float g, float b );
 void RE_AddLinearLightToScene( const vec3_t start, const vec3_t end, float intensity, float r, float g, float b );
@@ -1977,6 +2002,16 @@ extern void VBO_QueueItem( int itemIndex );
 extern void VBO_ClearQueue( void );
 extern void VBO_Flush( void );
 #endif
+
+// Particle system functions
+void R_InitParticleSystem(void);
+void R_ShutdownParticleSystem(void);
+void R_AddParticle(const vec3_t origin, const vec3_t velocity, 
+                   const vec3_t color, float size, float life, 
+                   qhandle_t shader);
+void R_UpdateParticles(float deltaTime);
+void R_RenderParticles(void);
+void R_ClearParticles(void);
 
 // ARB shaders definitions
 

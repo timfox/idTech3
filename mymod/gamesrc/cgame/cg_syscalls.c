@@ -264,6 +264,10 @@ void	trap_R_AddPolysToScene( qhandle_t hShader , int numVerts, const polyVert_t 
 	syscall( CG_R_ADDPOLYSTOSCENE, hShader, numVerts, verts, num );
 }
 
+void	trap_R_AddParticle( const vec3_t origin, const vec3_t velocity, const vec3_t color, float size, float life, qhandle_t shader ) {
+	syscall( CG_R_ADDPARTICLE, origin, velocity, color, PASSFLOAT(size), PASSFLOAT(life), shader );
+}
+
 int		trap_R_LightForPoint( vec3_t point, vec3_t ambientLight, vec3_t directedLight, vec3_t lightDir ) {
 	return syscall( CG_R_LIGHTFORPOINT, point, ambientLight, directedLight, lightDir );
 }

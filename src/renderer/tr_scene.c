@@ -237,6 +237,35 @@ void RE_AddRefEntityToScene( const refEntity_t *ent, qboolean intShaderTime ) {
 	r_numentities++;
 }
 
+/*
+=====================
+RE_AddParticle
+
+Wrapper function for game modules to add particles
+=====================
+*/
+void RE_AddParticle( const vec3_t origin, const vec3_t velocity, const vec3_t color, float size, float life, qhandle_t shader ) {
+	if ( !tr.registered ) {
+		return;
+	}
+	
+	// Validate inputs
+	if ( isnan_fp( &origin[0] ) || isnan_fp( &origin[1] ) || isnan_fp( &origin[2] ) ) {
+		static qboolean first_time = qtrue;
+		if ( first_time ) {
+			first_time = qfalse;
+			ri.Printf( PRINT_WARNING, "RE_AddParticle passed an origin with a NaN component\n" );
+		}
+		return;
+	}
+	
+	if ( size <= 0.0f || life <= 0.0f ) {
+		return; // Invalid particle parameters
+	}
+	
+	R_AddParticle( origin, velocity, color, size, life, shader );
+}
+
 
 /*
 =====================
@@ -435,6 +464,14 @@ void RE_RenderScene( const refdef_t *fd ) {
 	// derived info
 
 	tr.refdef.floatTime = (double)tr.refdef.time * 0.001; // -EC-: cast to double
+
+	// Update particles
+	static int lastTime = 0;
+	if (lastTime > 0) {
+		float deltaTime = (tr.refdef.time - lastTime) * 0.001f;
+		R_UpdateParticles(deltaTime);
+	}
+	lastTime = tr.refdef.time;
 
 	tr.refdef.numDrawSurfs = r_firstSceneDrawSurf;
 	tr.refdef.drawSurfs = backEndData->drawSurfs;

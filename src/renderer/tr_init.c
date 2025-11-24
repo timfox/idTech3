@@ -1882,6 +1882,8 @@ void R_Init( void ) {
 
 	R_InitFreeType();
 
+	R_InitParticleSystem();
+
 	err = qglGetError();
 	if ( err != GL_NO_ERROR )
 		ri.Printf( PRINT_WARNING, "glGetError() = 0x%x\n", err );
@@ -1915,6 +1917,8 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	//}
 
 	R_DoneFreeType();
+
+	R_ShutdownParticleSystem();
 
 	// shut down platform specific OpenGL stuff
 	if ( code != REF_KEEP_CONTEXT ) {
@@ -2006,6 +2010,7 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.ClearScene = RE_ClearScene;
 	re.AddRefEntityToScene = RE_AddRefEntityToScene;
 	re.AddPolyToScene = RE_AddPolyToScene;
+	re.AddParticle = RE_AddParticle;
 	re.LightForPoint = R_LightForPoint;
 	re.AddLightToScene = RE_AddLightToScene;
 	re.AddAdditiveLightToScene = RE_AddAdditiveLightToScene;
