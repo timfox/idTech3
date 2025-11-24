@@ -468,6 +468,42 @@ static void DrawSkySide( image_t *image, const int mins[2], const int maxs[2] )
 }
 
 
+/*
+================
+GetSkyFrameIndex
+
+Returns the current frame index for animated skybox based on shader time
+================
+*/
+static int GetSkyFrameIndex( const shader_t *shader, int side, qboolean isOuterbox )
+{
+	int numFrames;
+	int64_t index;
+	double v;
+
+	if ( !shader->sky.isAnimated ) {
+		return 0;
+	}
+
+	numFrames = isOuterbox ? shader->sky.outerboxFrames[side] : shader->sky.innerboxFrames[side];
+	if ( numFrames <= 1 ) {
+		return 0;
+	}
+
+	// Calculate current frame based on shader time and animation speed
+	// Similar to R_BindAnimatedImage()
+	v = tess.shaderTime * shader->sky.animationSpeed;
+	index = v;
+
+	if ( index < 0 ) {
+		index = 0;	// may happen with shader time offsets
+	}
+	index %= numFrames;
+
+	return index;
+}
+
+
 static void DrawSkyBox( const shader_t *shader )
 {
 	int		i;
@@ -526,7 +562,12 @@ static void DrawSkyBox( const shader_t *shader )
 			}
 		}
 
-		DrawSkySide( shader->sky.outerbox[sky_texorder[i]], sky_mins_subd, sky_maxs_subd );
+		{
+			int side = sky_texorder[i];
+			int frame = GetSkyFrameIndex( shader, side, qtrue );
+			image_t *image = shader->sky.outerbox[side][frame];
+			DrawSkySide( image, sky_mins_subd, sky_maxs_subd );
+		}
 	}
 }
 
@@ -821,6 +862,12 @@ void RB_StageIteratorSky( void ) {
 		return;
 	}
 
+	// Set shader time for animated skybox support
+	tess.shaderTime = backEnd.refdef.floatTime - tess.shader->timeOffset;
+	if ( tess.shader->clampTime && tess.shaderTime >= tess.shader->clampTime ) {
+		tess.shaderTime = tess.shader->clampTime;
+	}
+
 #ifdef USE_VBO
 	VBO_UnBind();
 #endif
@@ -840,7 +887,7 @@ void RB_StageIteratorSky( void ) {
 	}
 
 	// draw the outer skybox
-	if ( tess.shader->sky.outerbox[0] && tess.shader->sky.outerbox[0] != tr.defaultImage ) {
+	if ( tess.shader->sky.outerbox[0][0] && tess.shader->sky.outerbox[0][0] != tr.defaultImage ) {
 
 		GL_ClientState( 1, CLS_NONE );
 		GL_ClientState( 0, CLS_TEXCOORD_ARRAY );

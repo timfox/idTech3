@@ -435,9 +435,16 @@ typedef enum {
 	FP_LE			// surface is translucent, but still needs a fog pass (fog surface)
 } fogPass_t;
 
+#define MAX_SKY_ANIMATIONS		24
+
 typedef struct {
 	float		cloudHeight;
-	image_t		*outerbox[6], *innerbox[6];
+	image_t		*outerbox[6][MAX_SKY_ANIMATIONS];
+	image_t		*innerbox[6][MAX_SKY_ANIMATIONS];
+	int			outerboxFrames[6];
+	int			innerboxFrames[6];
+	double		animationSpeed;
+	qboolean	isAnimated;
 } skyParms_t;
 
 typedef struct {

@@ -537,7 +537,11 @@ static void DrawSkyBox( const shader_t *shader )
 			}
 		}
 
-		DrawSkySide( shader->sky.outerbox[sky_texorder[i]],
+		{
+			int side = sky_texorder[i];
+			int frame = GetSkyFrameIndex( shader, side, qtrue );
+			image_t *image = shader->sky.outerbox[side][frame];
+			DrawSkySide( image,
 			         sky_mins_subd,
 					 sky_maxs_subd );
 	}
@@ -847,6 +851,12 @@ void RB_StageIteratorSky( void ) {
 		return;
 	}
 
+	// Set shader time for animated skybox support
+	tess.shaderTime = backEnd.refdef.floatTime - tess.shader->timeOffset;
+	if ( tess.shader->clampTime && tess.shaderTime >= tess.shader->clampTime ) {
+		tess.shaderTime = tess.shader->clampTime;
+	}
+
 	// go through all the polygons and project them onto
 	// the sky box to see which blocks on each side need
 	// to be drawn
@@ -862,7 +872,7 @@ void RB_StageIteratorSky( void ) {
 	}
 
 	// draw the outer skybox
-	if ( tess.shader->sky.outerbox[0] && tess.shader->sky.outerbox[0] != tr.defaultImage ) {
+	if ( tess.shader->sky.outerbox[0][0] && tess.shader->sky.outerbox[0][0] != tr.defaultImage ) {
 		mat4_t oldmodelview;
 		
 		GL_State( 0 );

@@ -1350,6 +1350,14 @@ static void ParseSkyParms( const char **text ) {
 		imgFlags = IMGFLAG_NONE;
 	}
 
+	// Initialize sky structure for non-animated skybox
+	shader.sky.isAnimated = qfalse;
+	shader.sky.animationSpeed = 0.0;
+	for ( i = 0; i < 6; i++ ) {
+		shader.sky.outerboxFrames[i] = 1;
+		shader.sky.innerboxFrames[i] = 1;
+	}
+
 	// outerbox
 	token = COM_ParseExt( text, qfalse );
 	if ( token[0] == 0 ) {
@@ -1360,10 +1368,10 @@ static void ParseSkyParms( const char **text ) {
 		for (i=0 ; i<6 ; i++) {
 			Com_sprintf( pathname, sizeof(pathname), "%s_%s.tga"
 				, token, suf[i] );
-			shader.sky.outerbox[i] = R_FindImageFile( pathname, imgFlags | IMGFLAG_CLAMPTOEDGE );
+			shader.sky.outerbox[i][0] = R_FindImageFile( pathname, imgFlags | IMGFLAG_CLAMPTOEDGE );
 
-			if ( !shader.sky.outerbox[i] ) {
-				shader.sky.outerbox[i] = tr.defaultImage;
+			if ( !shader.sky.outerbox[i][0] ) {
+				shader.sky.outerbox[i][0] = tr.defaultImage;
 			}
 		}
 	}
@@ -1390,10 +1398,124 @@ static void ParseSkyParms( const char **text ) {
 		for (i=0 ; i<6 ; i++) {
 			Com_sprintf( pathname, sizeof(pathname), "%s_%s.tga"
 				, token, suf[i] );
-			shader.sky.innerbox[i] = R_FindImageFile( pathname, imgFlags );
-			if ( !shader.sky.innerbox[i] ) {
-				shader.sky.innerbox[i] = tr.defaultImage;
+			shader.sky.innerbox[i][0] = R_FindImageFile( pathname, imgFlags );
+			if ( !shader.sky.innerbox[i][0] ) {
+				shader.sky.innerbox[i][0] = tr.defaultImage;
 			}
+		}
+	}
+
+	shader.isSky = qtrue;
+}
+
+
+/*
+===============
+ParseSkyParmsFlipbook
+
+skyParmsFlipbook <base> <cloudheight> <innerbase> <animSpeed>
+Loads frames: <base>_<side>_<frame>.tga (e.g., env/sky_rt_0.tga, env/sky_rt_1.tga, ...)
+===============
+*/
+static void ParseSkyParmsFlipbook( const char **text ) {
+	const char		*token;
+	static const char	*suf[6] = {"rt", "bk", "lf", "ft", "up", "dn"};
+	char		pathname[MAX_QPATH];
+	int			i, frame;
+	imgFlags_t imgFlags = IMGFLAG_MIPMAP | IMGFLAG_PICMIP;
+
+	if ( r_neatsky->integer ) {
+		imgFlags = IMGFLAG_NONE;
+	}
+
+	// Initialize sky structure for animated skybox
+	shader.sky.isAnimated = qtrue;
+	for ( i = 0; i < 6; i++ ) {
+		shader.sky.outerboxFrames[i] = 0;
+		shader.sky.innerboxFrames[i] = 0;
+	}
+
+	// outerbox base name
+	token = COM_ParseExt( text, qfalse );
+	if ( token[0] == 0 ) {
+		ri.Printf( PRINT_WARNING, "WARNING: 'skyParmsFlipbook' missing parameter in shader '%s'\n", shader.name );
+		return;
+	}
+	if ( strcmp( token, "-" ) ) {
+		// Load frames for each side
+		for ( i = 0; i < 6; i++ ) {
+			frame = 0;
+			while ( frame < MAX_SKY_ANIMATIONS ) {
+				Com_sprintf( pathname, sizeof(pathname), "%s_%s_%d.tga"
+					, token, suf[i], frame );
+				shader.sky.outerbox[i][frame] = R_FindImageFile( pathname, imgFlags | IMGFLAG_CLAMPTOEDGE );
+
+				if ( !shader.sky.outerbox[i][frame] ) {
+					// Frame not found, stop loading for this side
+					if ( frame == 0 ) {
+						// No frames found, use default image
+						shader.sky.outerbox[i][0] = tr.defaultImage;
+						shader.sky.outerboxFrames[i] = 1;
+					}
+					break;
+				}
+				frame++;
+			}
+			shader.sky.outerboxFrames[i] = frame;
+		}
+	}
+
+	// cloudheight
+	token = COM_ParseExt( text, qfalse );
+	if ( token[0] == 0 ) {
+		ri.Printf( PRINT_WARNING, "WARNING: 'skyParmsFlipbook' missing parameter in shader '%s'\n", shader.name );
+		return;
+	}
+	shader.sky.cloudHeight = Q_atof( token );
+	if ( shader.sky.cloudHeight == 0.0 ) {
+		shader.sky.cloudHeight = 512.0;
+	}
+	R_InitSkyTexCoords( shader.sky.cloudHeight );
+
+	// innerbox base name
+	token = COM_ParseExt( text, qfalse );
+	if ( token[0] == 0 ) {
+		ri.Printf( PRINT_WARNING, "WARNING: 'skyParmsFlipbook' missing parameter in shader '%s'\n", shader.name );
+		return;
+	}
+	if ( strcmp( token, "-" ) ) {
+		// Load frames for each side
+		for ( i = 0; i < 6; i++ ) {
+			frame = 0;
+			while ( frame < MAX_SKY_ANIMATIONS ) {
+				Com_sprintf( pathname, sizeof(pathname), "%s_%s_%d.tga"
+					, token, suf[i], frame );
+				shader.sky.innerbox[i][frame] = R_FindImageFile( pathname, imgFlags );
+
+				if ( !shader.sky.innerbox[i][frame] ) {
+					// Frame not found, stop loading for this side
+					if ( frame == 0 ) {
+						// No frames found, use default image
+						shader.sky.innerbox[i][0] = tr.defaultImage;
+						shader.sky.innerboxFrames[i] = 1;
+					}
+					break;
+				}
+				frame++;
+			}
+			shader.sky.innerboxFrames[i] = frame;
+		}
+	}
+
+	// animation speed
+	token = COM_ParseExt( text, qfalse );
+	if ( token[0] == 0 ) {
+		ri.Printf( PRINT_WARNING, "WARNING: 'skyParmsFlipbook' missing animation speed parameter in shader '%s'\n", shader.name );
+		shader.sky.animationSpeed = 8.0; // default speed
+	} else {
+		shader.sky.animationSpeed = Q_atof( token );
+		if ( shader.sky.animationSpeed <= 0.0 ) {
+			shader.sky.animationSpeed = 8.0; // default speed
 		}
 	}
 
@@ -1960,6 +2082,16 @@ static qboolean ParseShader( const char **text )
 		else if ( !Q_stricmp( token, "skyparms" ) )
 		{
 			ParseSkyParms( text );
+			if ( r_neatsky->integer ) {
+				shader.noPicMip = qtrue;
+				shader.noMipMaps = qtrue;
+			}
+			continue;
+		}
+		// skyParmsFlipbook <base> <cloudheight> <innerbase> <animSpeed>
+		else if ( !Q_stricmp( token, "skyParmsFlipbook" ) )
+		{
+			ParseSkyParmsFlipbook( text );
 			if ( r_neatsky->integer ) {
 				shader.noPicMip = qtrue;
 				shader.noMipMaps = qtrue;

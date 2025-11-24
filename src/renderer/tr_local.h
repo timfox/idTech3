@@ -292,6 +292,7 @@ typedef struct {
 
 #define MAX_IMAGE_ANIMATIONS		24
 #define MAX_IMAGE_ANIMATIONS_VQ3	8
+#define MAX_SKY_ANIMATIONS		24
 
 #define LIGHTMAP_INDEX_NONE			0
 #define LIGHTMAP_INDEX_SHADER		1
@@ -363,7 +364,12 @@ typedef enum {
 
 typedef struct {
 	float		cloudHeight;
-	image_t		*outerbox[6], *innerbox[6];
+	image_t		*outerbox[6][MAX_SKY_ANIMATIONS];
+	image_t		*innerbox[6][MAX_SKY_ANIMATIONS];
+	int			outerboxFrames[6];
+	int			innerboxFrames[6];
+	double		animationSpeed;
+	qboolean	isAnimated;
 } skyParms_t;
 
 typedef struct {
