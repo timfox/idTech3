@@ -3670,6 +3670,9 @@ static void CG_Draw2D(stereoFrame_t stereoFrame) {
 		CG_DrawCenterDDString();
 		CG_DrawCenter1FctfString();
 		CG_DrawCenterString();
+		
+		// Draw dialog box if active
+		CG_Dialog_Draw();
 
 	cg.accBoardShowing = CG_DrawAccboard();
 }

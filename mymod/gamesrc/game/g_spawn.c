@@ -105,6 +105,7 @@ field_t fields[] = {
 	{"target", FOFS(target), F_LSTRING},
 	{"targetname", FOFS(targetname), F_LSTRING},
 	{"message", FOFS(message), F_LSTRING},
+	{"message2", FOFS(message2), F_LSTRING},
 	{"team", FOFS(team), F_LSTRING},
 	{"wait", FOFS(wait), F_FLOAT},
 	{"random", FOFS(random), F_FLOAT},
@@ -158,6 +159,7 @@ void SP_target_give (gentity_t *ent);
 void SP_target_delay (gentity_t *ent);
 void SP_target_speaker (gentity_t *ent);
 void SP_target_print (gentity_t *ent);
+void SP_target_dialog (gentity_t *ent);
 void SP_target_laser (gentity_t *self);
 void SP_target_character (gentity_t *ent);
 void SP_target_score( gentity_t *ent );
@@ -244,6 +246,7 @@ spawn_t	spawns[] = {
 	{"target_delay", SP_target_delay},
 	{"target_speaker", SP_target_speaker},
 	{"target_print", SP_target_print},
+	{"target_dialog", SP_target_dialog},
 	{"target_laser", SP_target_laser},
 	{"target_score", SP_target_score},
 	{"target_teleporter", SP_target_teleporter},

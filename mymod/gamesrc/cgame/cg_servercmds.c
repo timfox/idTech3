@@ -1260,6 +1260,45 @@ static void CG_ServerCommand( void ) {
 		CG_VoiceChat( SAY_ALL );
 		return;
 	}
+	
+	if ( Q_strequal( cmd, "dialog" ) ) {
+		int id, pageNum, numChoices, i;
+		const char *speaker, *text;
+		const char *choices[ MAX_DIALOG_CHOICES ];
+		int targets[ MAX_DIALOG_CHOICES ];
+		
+		if( trap_Argc() < 6 ) {
+			return;
+		}
+		
+		id = atoi( CG_Argv( 1 ) );
+		pageNum = atoi( CG_Argv( 2 ) );
+		speaker = CG_Argv( 3 );
+		text = CG_Argv( 4 );
+		numChoices = atoi( CG_Argv( 5 ) );
+		
+		if( numChoices > MAX_DIALOG_CHOICES ) {
+			numChoices = MAX_DIALOG_CHOICES;
+		}
+		
+		for( i = 0; i < numChoices; i++ ) {
+			if( trap_Argc() >= 6 + i * 2 ) {
+				choices[ i ] = CG_Argv( 6 + i * 2 );
+				targets[ i ] = atoi( CG_Argv( 7 + i * 2 ) );
+			} else {
+				choices[ i ] = NULL;
+				targets[ i ] = -1;
+			}
+		}
+		
+		CG_Dialog_Show( id, pageNum, speaker, text, numChoices, choices, targets );
+		return;
+	}
+	
+	if ( Q_strequal( cmd, "dialogclose" ) ) {
+		CG_Dialog_Close();
+		return;
+	}
 
 	if ( Q_strequal( cmd, "vtchat" ) ) {
 		CG_VoiceChat( SAY_TEAM );

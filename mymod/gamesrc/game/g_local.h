@@ -143,6 +143,7 @@ struct gentity_s {
 	vec3_t		pos1, pos2;
 
 	char		*message;
+	char		*message2;		// second message field (used by dialog system)
 
 	int			timestamp;		// body queue sinking, etc
 
@@ -1445,6 +1446,7 @@ void Svcmd_MessageWrapper( void );
 
 #include "g_killspree.h"
 #include "g_admin.h"
+#include "g_dialog.h"
 
 void MapInfoPrint(mapinfo_result_t *info);
 // leilei - monsters

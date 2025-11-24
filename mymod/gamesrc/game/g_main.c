@@ -811,6 +811,9 @@ void G_InitGame( int levelTime, int randomSeed, int restart )
 	//Let's Load up any killing sprees/multikills
 	G_ReadAltKillSettings();
 	G_ConfigClientExcellent( qtrue );
+	
+	// Initialize dialog system
+	G_Dialog_Init();
 
 	// initialize all entities for this game
 	memset( g_entities, 0, MAX_GENTITIES * sizeof(g_entities[0]) );
@@ -966,6 +969,9 @@ void G_ShutdownGame( int restart )
 	//KK-OAX Admin Cleanup
 	G_admin_cleanup( );
 	G_admin_namelog_cleanup( );
+	
+	// Dialog system cleanup
+	G_Dialog_Shutdown( );
 
 	if ( trap_Cvar_VariableIntegerValue( "bot_enable" ) ) {
 		BotAIShutdown( restart );

@@ -2304,9 +2304,47 @@ commands_t cmds[ ] =
 	//KK-OAX
 	{ "freespectator", CMD_NOTEAM, StopFollowing },
 	{ "getmappage", 0, Cmd_GetMappage_f },
-	{ "gc", 0, Cmd_GameCommand_f }
+	{ "gc", 0, Cmd_GameCommand_f },
+	{ "dialognext", 0, Cmd_DialogNext_f },
+	{ "dialogchoice", 0, Cmd_DialogChoice_f }
 
 };
+
+/*
+==================
+Cmd_DialogNext_f
+Advance to next page of dialog
+==================
+*/
+void Cmd_DialogNext_f( gentity_t *ent ) {
+	if( !ent || !ent->client ) {
+		return;
+	}
+	G_Dialog_NextPage( ent - g_entities );
+}
+
+/*
+==================
+Cmd_DialogChoice_f
+Select a dialog choice
+==================
+*/
+void Cmd_DialogChoice_f( gentity_t *ent ) {
+	int choiceNum;
+	char arg[ MAX_TOKEN_CHARS ];
+	
+	if( !ent || !ent->client ) {
+		return;
+	}
+	
+	if( trap_Argc() < 2 ) {
+		return;
+	}
+	
+	trap_Argv( 1, arg, sizeof( arg ) );
+	choiceNum = atoi( arg );
+	G_Dialog_SelectChoice( ent - g_entities, choiceNum );
+}
 
 static int numCmds = sizeof( cmds ) / sizeof( cmds[ 0 ] );
 

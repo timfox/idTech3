@@ -2383,6 +2383,9 @@ void CG_Init(int serverMessageNum, int serverCommandSequence, int clientNum) {
 	CG_RegisterCvars();
 
 	CG_InitConsoleCommands();
+	
+	// Initialize dialog system
+	CG_Dialog_Init();
 	// loadingscreen
 #ifdef SCRIPTHUD
 	String_Init();
@@ -2538,6 +2541,7 @@ void CG_Shutdown(void) {
 	// some mods may need to do cleanup work here,
 	// like closing files or archiving session data
 	challenges_save();
+	CG_Dialog_Shutdown();
 }
 
 
