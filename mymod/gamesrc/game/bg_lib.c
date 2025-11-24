@@ -195,6 +195,12 @@ size_t strlen(const char *string) {
 	return s - string;
 }
 
+/**
+ * @brief QVM-compatible strcat implementation
+ * @note This is a custom implementation for QVM compatibility.
+ *       The QVM bytecode compiler may not link against standard C library functions.
+ *       This implementation provides the same functionality without external dependencies.
+ */
 char *strcat(char *strDestination, const char *strSource) {
 	char *s;
 
@@ -209,6 +215,12 @@ char *strcat(char *strDestination, const char *strSource) {
 	return strDestination;
 }
 
+/**
+ * @brief QVM-compatible strcpy implementation
+ * @note This is a custom implementation for QVM compatibility.
+ *       The QVM bytecode compiler may not link against standard C library functions.
+ *       This implementation provides the same functionality without external dependencies.
+ */
 char *strcpy(char *strDestination, const char *strSource) {
 	char *s;
 

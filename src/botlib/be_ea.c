@@ -415,6 +415,8 @@ void EA_View(int client, vec3_t viewangles)
 //===========================================================================
 void EA_EndRegular(int client, float thinktime)
 {
+	(void)client;    // Suppress unused parameter warning
+	(void)thinktime;  // Suppress unused parameter warning
 } //end of the function EA_EndRegular
 //===========================================================================
 //

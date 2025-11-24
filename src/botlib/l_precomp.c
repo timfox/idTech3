@@ -1462,6 +1462,7 @@ void PC_RemoveAllGlobalDefines(void)
 //============================================================================
 static define_t *PC_CopyDefine(source_t *source, const define_t *define)
 {
+	(void)source;  // Suppress unused parameter warning
 	define_t *newdefine;
 	token_t *token, *newtoken, *lasttoken;
 

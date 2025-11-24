@@ -178,6 +178,7 @@ void GL_Cull( cullType_t cullType ) {
 */
 void GL_TexEnv( GLint env )
 {
+	(void)env;  // Suppress unused parameter warning
 #ifndef USE_VULKAN
 	if ( env == glState.texEnv[ glState.currenttmu ] )
 		return;
@@ -208,6 +209,7 @@ void GL_TexEnv( GLint env )
 */
 void GL_State( unsigned stateBits )
 {
+	(void)stateBits;  // Suppress unused parameter warning
 #ifndef USE_VULKAN
 	unsigned diff = stateBits ^ glState.glStateBits;
 
@@ -1108,7 +1110,8 @@ void RE_StretchRaw( int x, int y, int w, int h, int cols, int rows, byte *data, 
 
 
 void RE_UploadCinematic( int w, int h, int cols, int rows, byte *data, int client, qboolean dirty ) {
-
+	(void)w;  // Suppress unused parameter warning
+	(void)h;  // Suppress unused parameter warning
 	image_t *image;
 
 	if ( !tr.scratchImage[ client ] ) {

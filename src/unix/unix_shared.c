@@ -346,6 +346,7 @@ Sys_ResetReadOnlyAttribute
 */
 qboolean Sys_ResetReadOnlyAttribute( const char *ospath )
 {
+	(void)ospath;  // Suppress unused parameter warning
 	return qfalse;
 }
 
@@ -447,6 +448,8 @@ Sys_ShowConsole
 */
 void Sys_ShowConsole( int visLevel, qboolean quitOnClose )
 {
+	(void)visLevel;   // Suppress unused parameter warning
+	(void)quitOnClose;  // Suppress unused parameter warning
 	// not implemented
 }
 

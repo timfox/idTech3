@@ -241,6 +241,8 @@ void BotInterbreedGoalFuzzyLogic(int parent1, int parent2, int child)
 //===========================================================================
 void BotSaveGoalFuzzyLogic(int goalstate, const char *filename)
 {
+	(void)goalstate;  // Suppress unused parameter warning
+	(void)filename;   // Suppress unused parameter warning
 	//bot_goalstate_t *gs;
 
 	//gs = BotGoalStateFromHandle(goalstate);
@@ -256,6 +258,7 @@ void BotSaveGoalFuzzyLogic(int goalstate, const char *filename)
 //===========================================================================
 void BotMutateGoalFuzzyLogic(int goalstate, float range)
 {
+	(void)range;  // Suppress unused parameter warning
 	bot_goalstate_t *gs;
 
 	gs = BotGoalStateFromHandle(goalstate);
@@ -1647,6 +1650,7 @@ int BotTouchingGoal(const vec3_t origin, const bot_goal_t *goal)
 //===========================================================================
 int BotItemGoalInVisButNotVisible(int viewer, vec3_t eye, vec3_t viewangles, bot_goal_t *goal)
 {
+	(void)viewangles;  // Suppress unused parameter warning
 	aas_entityinfo_t entinfo;
 	bsp_trace_t trace;
 	vec3_t middle;

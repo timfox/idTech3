@@ -1345,6 +1345,8 @@ Z_ClearZone
 ========================
 */
 static void Z_ClearZone( memzone_t *zone, memzone_t *head, int size, int segnum ) {
+	(void)head;    // Suppress unused parameter warning
+	(void)segnum;  // Suppress unused parameter warning
 	memblock_t	*block;
 	int min_fragment;
 
@@ -1401,6 +1403,7 @@ Z_AvailableZoneMemory
 ========================
 */
 static int Z_AvailableZoneMemory( const memzone_t *zone ) {
+	(void)zone;  // Suppress unused parameter warning
 #ifdef USE_MULTI_SEGMENT
 	return (1024*1024*1024); // unlimited
 #else
@@ -1856,8 +1859,15 @@ static const memstatic_t numberstring[] = {
 ========================
 CopyString
 
- NOTE:	never write over the memory CopyString returns because
+Allocates and copies a string. Returns a pointer to the copied string.
+
+NOTE:	never write over the memory CopyString returns because
 		memory from a memstatic_t might be returned
+
+@param in Source string to copy
+@return Pointer to newly allocated string copy
+@note Uses S_Malloc for allocation
+@note Returns static memory for empty strings and single-digit numbers (optimization)
 ========================
 */
 char *CopyString( const char *in ) {
@@ -1871,7 +1881,7 @@ char *CopyString( const char *in ) {
 	}
 #endif
 	out = S_Malloc( strlen( in ) + 1 );
-	strcpy( out, in );
+	Q_strncpyz( out, in, strlen( in ) + 1 );
 	return out;
 }
 
@@ -3137,6 +3147,7 @@ Change to a new mod properly with cleaning up cvars before switching.
 */
 void Com_GameRestart( int checksumFeed, qboolean clientRestart )
 {
+	(void)clientRestart;  // Suppress unused parameter warning
 	static qboolean com_gameRestarting = qfalse;
 
 	// make sure no recursion can be triggered

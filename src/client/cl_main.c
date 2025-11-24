@@ -660,6 +660,7 @@ CL_CompleteRecordName
 */
 static void CL_CompleteRecordName(const char *args, int argNum )
 {
+	(void)args;  // Suppress unused parameter warning
 	if ( argNum == 2 )
 	{
 		char demoExt[ 16 ];
@@ -829,6 +830,7 @@ CL_CompleteDemoName
 */
 static void CL_CompleteDemoName(const char *args, int argNum )
 {
+	(void)args;  // Suppress unused parameter warning
 	if ( argNum == 2 )
 	{
 		FS_SetFilenameCallback( CL_DemoNameCallback_f );
@@ -3636,6 +3638,7 @@ CL_CompleteRecordName
 */
 static void CL_CompleteVideoName(const char *args, int argNum )
 {
+	(void)args;  // Suppress unused parameter warning
 	if ( argNum == 2 )
 	{
 		Field_CompleteFilename( "videos", ".avi", qtrue, FS_MATCH_EXTERN | FS_MATCH_STICK );

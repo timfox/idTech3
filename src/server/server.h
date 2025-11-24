@@ -21,6 +21,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 // server.h
 
+#ifndef __SERVER_H__
+#define __SERVER_H__
+
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
 #include "../qcommon/vm_local.h"
@@ -508,3 +511,5 @@ int SV_Strlen( const char *str );
 //
 void BotDrawDebugPolygons(void (*drawPoly)(int color, int numPoints, float *points), int value);
 void SV_AddFilterCmd_f( void );
+
+#endif // __SERVER_H__

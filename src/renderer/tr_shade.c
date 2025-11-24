@@ -157,6 +157,7 @@ Draws vertex normals for debugging
 ================
 */
 static void DrawNormals( const shaderCommands_t *input ) {
+	(void)input;  // Suppress unused parameter warning
 	int		i;
 
 	GL_ClientState( 0, CLS_NONE );

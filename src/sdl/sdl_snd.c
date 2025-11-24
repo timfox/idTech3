@@ -60,6 +60,7 @@ SNDDMA_AudioCallback
 */
 static void SNDDMA_AudioCallback(void *userdata, Uint8 *stream, int len)
 {
+	(void)userdata;  // Suppress unused parameter warning
 	int pos = (dmapos * (dma.samplebits/8));
 	if (pos >= dmasize)
 		dmapos = pos = 0;

@@ -709,6 +709,9 @@ Return value must be freed with ri.Hunk_FreeTempMemory()
 */
 static byte *RB_ReadPixels(int x, int y, int width, int height, size_t *offset, int *padlen, int lineAlign )
 {
+	(void)x;         // Suppress unused parameter warning
+	(void)y;         // Suppress unused parameter warning
+	(void)lineAlign;  // Suppress unused parameter warning
 #ifdef USE_VULKAN
 	byte *buffer, *bufstart;
 	int linelen;

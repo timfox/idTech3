@@ -225,6 +225,7 @@ void AAS_BSPModelMinsMaxsOrigin(int modelnum, vec3_t angles, vec3_t mins, vec3_t
 //===========================================================================
 void AAS_UnlinkFromBSPLeaves(bsp_link_t *leaves)
 {
+	(void)leaves;  // Suppress unused parameter warning
 } //end of the function AAS_UnlinkFromBSPLeaves
 //===========================================================================
 //
@@ -234,6 +235,10 @@ void AAS_UnlinkFromBSPLeaves(bsp_link_t *leaves)
 //===========================================================================
 bsp_link_t *AAS_BSPLinkEntity(vec3_t absmins, vec3_t absmaxs, int entnum, int modelnum)
 {
+	(void)absmins;   // Suppress unused parameter warning
+	(void)absmaxs;   // Suppress unused parameter warning
+	(void)entnum;    // Suppress unused parameter warning
+	(void)modelnum;  // Suppress unused parameter warning
 	return NULL;
 } //end of the function AAS_BSPLinkEntity
 #if 0

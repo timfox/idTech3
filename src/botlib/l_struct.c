@@ -215,6 +215,7 @@ static qboolean ReadChar(source_t *source, const fielddef_t *fd, void *p)
 //===========================================================================
 static int ReadString(source_t *source, const fielddef_t *fd, void *p)
 {
+	(void)fd;  // Suppress unused parameter warning
 	token_t token;
 
 	if (!PC_ExpectTokenType(source, TT_STRING, 0, &token)) return 0;

@@ -440,6 +440,7 @@ int BotChooseBestFightWeapon(int weaponstate, int *inventory)
 //===========================================================================
 void BotResetWeaponState(int weaponstate)
 {
+	(void)weaponstate;  // Suppress unused parameter warning
 } //end of the function BotResetWeaponState
 //========================================================================
 //

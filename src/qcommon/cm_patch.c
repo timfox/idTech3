@@ -707,6 +707,7 @@ CM_SetBorderInward
 */
 static void CM_SetBorderInward( facet_t *facet, const cGrid_t *grid, int gridPlanes[MAX_GRID_SIZE][MAX_GRID_SIZE][2],
 						  int i, int j, int which ) {
+	(void)gridPlanes;  // Suppress unused parameter warning
 	int		k, l;
 	const float *points[4];
 	int		numPoints;

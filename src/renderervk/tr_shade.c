@@ -183,6 +183,7 @@ Draws vertex normals for debugging
 ================
 */
 static void DrawNormals( const shaderCommands_t *input ) {
+	(void)input;  // Suppress unused parameter warning
 	int		i;
 #ifdef USE_VULKAN
 #ifdef USE_VBO

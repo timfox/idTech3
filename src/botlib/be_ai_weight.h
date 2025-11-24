@@ -29,6 +29,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  *
  *****************************************************************************/
 
+#ifndef __BE_AI_WEIGHT_H__
+#define __BE_AI_WEIGHT_H__
+
 #define WT_BALANCE			1
 #define MAX_WEIGHTS			128
 
@@ -83,3 +86,5 @@ void EvolveWeightConfig(weightconfig_t *config);
 void InterbreedWeightConfigs(weightconfig_t *config1, weightconfig_t *config2, weightconfig_t *configout);
 //frees cached weight configurations
 void BotShutdownWeights(void);
+
+#endif // __BE_AI_WEIGHT_H__

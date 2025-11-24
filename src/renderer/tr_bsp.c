@@ -857,6 +857,8 @@ ParseFlare
 ===============
 */
 static void ParseFlare( const dsurface_t *ds, const drawVert_t *verts, msurface_t *surf, int *indexes ) {
+	(void)verts;    // Suppress unused parameter warning
+	(void)indexes;  // Suppress unused parameter warning
 	srfFlare_t		*flare;
 	int				i;
 

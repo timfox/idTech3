@@ -29,6 +29,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  *
  *****************************************************************************/
 
+#ifndef __BE_AAS_ROUTE_H__
+#define __BE_AAS_ROUTE_H__
+
 struct aas_routingcache_s;
 typedef struct aas_routingcache_s aas_routingcache_t;
 
@@ -71,4 +74,5 @@ int AAS_PredictRoute(struct aas_predictroute_s *route, int areanum, vec3_t origi
 							int goalareanum, int travelflags, int maxareas, int maxtime,
 							int stopevent, int stopcontents, int stoptfl, int stopareanum);
 
+#endif // __BE_AAS_ROUTE_H__
 

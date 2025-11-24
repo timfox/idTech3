@@ -20,6 +20,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 
+#ifndef __CM_PATCH_H__
+#define __CM_PATCH_H__
+
 //#define	CULL_BBOX
 
 /*
@@ -101,3 +104,5 @@ typedef struct {
 
 
 struct patchCollide_s	*CM_GeneratePatchCollide( int width, int height, vec3_t *points );
+
+#endif // __CM_PATCH_H__

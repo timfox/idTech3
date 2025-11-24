@@ -105,6 +105,7 @@ GLimp_LogComment
 */
 void GLimp_LogComment( const char *comment )
 {
+	(void)comment;  // Suppress unused parameter warning
 }
 
 
@@ -181,6 +182,9 @@ static int FindNearestDisplay( int *x, int *y, int w, int h )
 
 static SDL_HitTestResult SDL_HitTestFunc( SDL_Window *win, const SDL_Point *area, void *data )
 {
+	(void)win;   // Suppress unused parameter warning
+	(void)area;  // Suppress unused parameter warning
+	(void)data;  // Suppress unused parameter warning
 	if ( Key_GetCatcher() & KEYCATCH_CONSOLE && keys[ K_ALT ].down )
 		return SDL_HITTEST_DRAGGABLE;
 
@@ -857,6 +861,8 @@ Sys_SetClipboardBitmap
 */
 void Sys_SetClipboardBitmap( const byte *bitmap, int length )
 {
+	(void)bitmap;  // Suppress unused parameter warning
+	(void)length;  // Suppress unused parameter warning
 #ifdef _WIN32
 	HGLOBAL hMem;
 	byte *ptr;

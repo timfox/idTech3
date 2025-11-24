@@ -41,9 +41,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "aasfile.h"
 #include "botlib.h"
 #include "be_aas.h"
+#include "be_aas_def.h"  // Must be included before be_aas_funcs.h to define AASINTERN
 #include "be_aas_funcs.h"
 #include "be_interface.h"
-#include "be_aas_def.h"
 
 #define ROUTING_DEBUG
 
@@ -2070,6 +2070,8 @@ int AAS_RandomGoalArea(int areanum, int travelflags, int *goalareanum, vec3_t go
 //===========================================================================
 static int AAS_AreaVisible(int srcarea, int destarea)
 {
+	(void)srcarea;   // Suppress unused parameter warning
+	(void)destarea;  // Suppress unused parameter warning
 	return qfalse;
 } //end of the function AAS_AreaVisible
 #if 0
@@ -2096,6 +2098,8 @@ float DistancePointToLine(vec3_t v1, vec3_t v2, vec3_t point)
 //===========================================================================
 int AAS_NearestHideArea(int srcnum, vec3_t origin, int areanum, int enemynum, vec3_t enemyorigin, int enemyareanum, int travelflags)
 {
+	(void)srcnum;    // Suppress unused parameter warning
+	(void)enemynum;  // Suppress unused parameter warning
 	int i, j, nextareanum, badtravelflags, numreach, bestarea;
 	unsigned short int t, besttraveltime;
 	static unsigned short int *hidetraveltimes;

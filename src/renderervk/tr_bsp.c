@@ -1076,6 +1076,8 @@ ParseFlare
 ===============
 */
 static void ParseFlare( const dsurface_t *ds, const drawVert_t *verts, msurface_t *surf, int *indexes ) {
+	(void)verts;    // Suppress unused parameter warning
+	(void)indexes;  // Suppress unused parameter warning
 	srfFlare_t		*flare;
 	int				i;
 
@@ -2623,6 +2625,7 @@ static void R_LoadCubemapEntities( int index )
 
 static void R_RenderCubemapSide( int cubemapIndex, int cubemapSide, qboolean subscene, qboolean bounce )
 {
+	(void)bounce;  // Suppress unused parameter warning
 	refdef_t refdef;
 	viewParms_t	parms;
 	Com_Memset( &refdef, 0, sizeof( refdef) );

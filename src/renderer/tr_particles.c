@@ -231,7 +231,7 @@ R_RenderParticles
 */
 void R_RenderParticles(void) {
 	particle_t *p;
-	int i, j;
+	int i;
 	particle_t *sortedParticles[MAX_PARTICLES];
 	int numSorted = 0;
 	vec3_t left, up;

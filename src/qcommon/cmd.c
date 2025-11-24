@@ -1011,6 +1011,7 @@ Cmd_CompleteCfgName
 ==================
 */
 static void Cmd_CompleteCfgName( const char *args, int argNum ) {
+	(void)args;  // Suppress unused parameter warning
 	if ( argNum == 2 ) {
 		Field_CompleteFilename( "", "cfg", qfalse, FS_MATCH_ANY | FS_MATCH_STICK | FS_MATCH_SUBDIRS );
 	}
@@ -1023,6 +1024,7 @@ Cmd_CompleteWriteCfgName
 ==================
 */
 void Cmd_CompleteWriteCfgName( const char *args, int argNum ) {
+	(void)args;  // Suppress unused parameter warning
 	if( argNum == 2 ) {
 		Field_CompleteFilename( "", "cfg", qfalse, FS_MATCH_EXTERN | FS_MATCH_STICK );
 	}

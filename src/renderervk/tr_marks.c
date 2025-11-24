@@ -201,6 +201,9 @@ static void R_AddMarkFragments(int numClipPoints, vec3_t clipPoints[2][MAX_VERTS
 				   int maxFragments, markFragment_t *fragmentBuffer,
 				   int *returnedPoints, int *returnedFragments,
 				   vec3_t mins, vec3_t maxs) {
+	(void)maxFragments;  // Suppress unused parameter warning
+	(void)mins;  // Suppress unused parameter warning
+	(void)maxs;  // Suppress unused parameter warning
 	int pingPong, i;
 	markFragment_t	*mf;
 

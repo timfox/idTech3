@@ -3497,6 +3497,7 @@ int inflate_trees_fixed(uInt *bl, uInt *bd, const inflate_huft * *tl, const infl
 //inflate_huft * *td;  /* distance tree result */
 //z_streamp z;             /* for memory allocation */
 {
+	(void)z;  // Suppress unused parameter warning
   *bl = fixed_bl;
   *bd = fixed_bd;
   *tl = fixed_tl;

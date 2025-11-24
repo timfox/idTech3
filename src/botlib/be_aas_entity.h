@@ -29,6 +29,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  *
  *****************************************************************************/
 
+#ifndef __BE_AAS_ENTITY_H__
+#define __BE_AAS_ENTITY_H__
+
 #ifdef AASINTERN
 //invalidates all entity infos
 void AAS_InvalidateEntities(void);
@@ -68,3 +71,4 @@ int AAS_EntityType(int entnum);
 //returns the model index of the entity
 int AAS_EntityModelindex(int entnum);
 
+#endif // __BE_AAS_ENTITY_H__

@@ -200,7 +200,7 @@ or configs will never get loaded from disk!
 // every time a new demo pk3 file is built, this checksum must be updated.
 // the easiest way to get it is to just run the game and see what it spits out
 #define	DEMO_PAK0_CHECKSUM	2985612116u
-static const unsigned pak_checksums[] = {
+static const unsigned pak_checksums[] __attribute__((unused)) = {
 	1566731103u,
 	298122907u,
 	412165236u,
@@ -399,6 +399,7 @@ FS_PakIsPure
 =================
 */
 static qboolean FS_PakIsPure( const pack_t *pack ) {
+	(void)pack;  // Suppress unused parameter warning
 #ifndef DEDICATED
 	int i;
 	if ( fs_numServerPaks ) {
@@ -4025,6 +4026,7 @@ FS_CompleteFileName
 ============
 */
 static void FS_CompleteFileName( const char *args, int argNum ) {
+	(void)args;  // Suppress unused parameter warning
 	if( argNum == 2 ) {
 		Field_CompleteFilename( "", "", qfalse, FS_MATCH_ANY );
 	}

@@ -100,6 +100,7 @@ int AAS_AlternativeRouteGoals(vec3_t start, int startareanum, vec3_t goal, int g
 										 aas_altroutegoal_t *altroutegoals, int maxaltroutegoals,
 										 int type)
 {
+	(void)goal;  // Suppress unused parameter warning
 #ifndef ENABLE_ALTROUTING
 	return 0;
 #else

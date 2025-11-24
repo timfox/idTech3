@@ -1273,6 +1273,12 @@ int Q_vsnprintf( char *str, size_t size, const char *format, va_list ap )
 Q_strncpyz
  
 Safe strncpy that ensures a trailing zero
+
+@param dest Destination buffer
+@param src Source string
+@param destsize Size of destination buffer (must be > 0)
+@note Always null-terminates the destination buffer
+@note Calls Com_Error(ERR_FATAL) if dest or src is NULL, or destsize < 1
 =============
 */
 void Q_strncpyz( char *dest, const char *src, int destsize ) 
@@ -1310,7 +1316,13 @@ void Q_strncpyz( char *dest, const char *src, int destsize )
 =============
 Q_strncpy
 
-allows src and dest to be overlapped for QVM compatibility purposes
+Allows src and dest to be overlapped for QVM compatibility purposes
+
+@param dest Destination buffer
+@param src Source string
+@param destsize Size of destination buffer
+@return Pointer to destination buffer
+@note Handles overlapping buffers correctly
 =============
 */
 char *Q_strncpy( char *dest, char *src, int destsize )
@@ -1710,6 +1722,16 @@ int Q_CountChar(const char *string, char tocount)
 #include <windows.h>
 #endif
 
+/**
+ * @brief Safe sprintf replacement that prevents buffer overflows
+ * @param dest Destination buffer
+ * @param size Size of destination buffer
+ * @param fmt Format string
+ * @param ... Format arguments
+ * @return Number of characters written (excluding null terminator)
+ * @note Truncates output if it exceeds buffer size
+ * @note Prints warning if truncation occurs
+ */
 int QDECL Com_sprintf( char *dest, int size, const char *fmt, ...)
 {
 	int		len;
@@ -1726,7 +1748,7 @@ int QDECL Com_sprintf( char *dest, int size, const char *fmt, ...)
 	}
 
 	va_start( argptr, fmt );
-	len = vsprintf( bigbuffer, fmt, argptr );
+	len = Q_vsnprintf( bigbuffer, sizeof( bigbuffer ), fmt, argptr );
 	va_end( argptr );
 
 	if ( len >= sizeof( bigbuffer ) || len < 0 ) 
@@ -1776,7 +1798,7 @@ const char *QDECL va( const char *format, ... )
 	index ^= 1;
 
 	va_start( argptr, format );
-	vsprintf( buf, format, argptr );
+	Q_vsnprintf( buf, sizeof( string[0] ), format, argptr );
 	va_end( argptr );
 
 	return buf;

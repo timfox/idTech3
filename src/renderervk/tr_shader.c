@@ -1341,7 +1341,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 
 #ifdef USE_VK_PBR
 	if ( vk.pbrActive && ( physicalAlbedo || stage->physicalMapType != PHYS_NONE ) ) {
-		uint32_t j;
+		uint32_t j __attribute__((unused));
 		imgFlags_t flags = IMGFLAG_NOLIGHTSCALE;
 
 		if (!shader.noMipMaps)
@@ -4371,6 +4371,7 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 
 
 qhandle_t RE_RegisterShaderFromImage(const char *name, int lightmapIndex, image_t *image, qboolean mipRawImage) {
+	(void)mipRawImage;  // Suppress unused parameter warning
 	unsigned long hash;
 	shader_t	*sh;
 

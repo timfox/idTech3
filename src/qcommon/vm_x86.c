@@ -2165,6 +2165,7 @@ static uint32_t alloc_sx_const( uint32_t pref, uint32_t imm )
 
 static uint32_t dyn_alloc_rx( uint32_t pref )
 {
+	(void)pref;  // Suppress unused parameter warning
 	const uint32_t _rx_mask = build_rx_mask();
 	const uint32_t mask = _rx_mask | build_opstack_mask( TYPE_RX );
 	const reg_t *reg, *used = NULL;
@@ -2253,6 +2254,7 @@ static uint32_t alloc_rx( uint32_t pref )
 
 static uint32_t dyn_alloc_sx( uint32_t pref )
 {
+	(void)pref;  // Suppress unused parameter warning
 	const uint32_t _sx_mask = build_sx_mask();
 	const uint32_t mask = _sx_mask | build_opstack_mask( TYPE_SX );
 	const reg_t *reg, *used = NULL;
@@ -3048,6 +3050,7 @@ static void EmitJump( instruction_t *i, int op, int addr )
 
 static void EmitCallAddr( vm_t *vm, int addr )
 {
+	(void)vm;  // Suppress unused parameter warning
 	const int v = instructionOffsets[ addr ] - compiledOfs;
 	EmitString( "E8" );
 	Emit4( v - 5 );
@@ -3115,6 +3118,7 @@ static void emit_CheckJump( vm_t *vm, uint32_t reg, int32_t proc_base, int32_t p
 
 static void emit_CheckProc( vm_t *vm, instruction_t *ins )
 {
+	(void)vm;  // Suppress unused parameter warning
 	// programStack overflow check
 	if ( vm_rtChecks->integer & VM_RTCHECK_PSTACK ) {
 #if idx64
@@ -3371,6 +3375,7 @@ static void EmitFloatJump( instruction_t *i, int op, int addr )
 
 static void EmitPSOFFunc( vm_t *vm )
 {
+	(void)vm;  // Suppress unused parameter warning
 	mov_rx_ptr( R_EAX, &badStackPtr ); // mov eax, &badStackPtr
 	EmitString( "FF 10" );		// call [eax]
 	emit_ret();					// ret
@@ -3379,6 +3384,7 @@ static void EmitPSOFFunc( vm_t *vm )
 
 static void EmitOSOFFunc( vm_t *vm )
 {
+	(void)vm;  // Suppress unused parameter warning
 	mov_rx_ptr( R_EAX, &badOpStackPtr ); // mov eax, &badOpStackPtr
 	EmitString( "FF 10" );		// call [eax]
 	emit_ret();					// ret
@@ -3387,6 +3393,7 @@ static void EmitOSOFFunc( vm_t *vm )
 
 static void EmitBADJFunc( vm_t *vm )
 {
+	(void)vm;  // Suppress unused parameter warning
 	mov_rx_ptr( R_EAX, &badJumpPtr ); // mov eax, &badJumpPtr
 	EmitString( "FF 10" );		// call [eax]
 	emit_ret();					// ret
@@ -3395,6 +3402,7 @@ static void EmitBADJFunc( vm_t *vm )
 
 static void EmitERRJFunc( vm_t *vm )
 {
+	(void)vm;  // Suppress unused parameter warning
 	mov_rx_ptr( R_EAX, &errJumpPtr ); // mov eax, &errJumpPtr
 	EmitString( "FF 10" );		// call [eax]
 	emit_ret();					// ret
@@ -3403,6 +3411,7 @@ static void EmitERRJFunc( vm_t *vm )
 
 static void EmitDATRFunc( vm_t *vm )
 {
+	(void)vm;  // Suppress unused parameter warning
 	mov_rx_ptr( R_EAX, &badDataReadPtr ); // mov eax, &badDataReadPtr
 	EmitString( "FF 10" );		// call [eax]
 	emit_ret();					// ret
@@ -3411,6 +3420,7 @@ static void EmitDATRFunc( vm_t *vm )
 
 static void EmitDATWFunc( vm_t *vm )
 {
+	(void)vm;  // Suppress unused parameter warning
 	mov_rx_ptr( R_EAX, &badDataWritePtr ); // mov eax, &badDataWritePtr
 	EmitString( "FF 10" );		// call [eax]
 	emit_ret();					// ret

@@ -331,6 +331,7 @@ static VkCommandBuffer begin_command_buffer( void )
 
 static void end_command_buffer( VkCommandBuffer command_buffer, const char *location )
 {
+	(void)location;  // Suppress unused parameter warning
 #ifdef USE_UPLOAD_QUEUE
 	const VkPipelineStageFlags wait_dst_stage_mask = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 	VkSemaphore waits;
@@ -374,6 +375,7 @@ static void end_command_buffer( VkCommandBuffer command_buffer, const char *loca
 
 static void record_image_layout_transition( VkCommandBuffer command_buffer, VkImage image, VkImageAspectFlags image_aspect_flags, 
 	VkImageLayout old_layout, VkImageLayout new_layout, uint32_t src_stage_override, uint32_t dst_stage_override ) {
+	(void)dst_stage_override;  // Suppress unused parameter warning
 	VkImageMemoryBarrier barrier;
 	uint32_t src_stage, dst_stage;
 
@@ -4136,6 +4138,7 @@ static void vk_destroy_pipelines( qboolean resetCount );
 
 static void vk_restart_swapchain( const char *funcname, VkResult res )
 {
+	(void)res;  // Suppress unused parameter warning
 	uint32_t i;
 
 #ifdef _DEBUG

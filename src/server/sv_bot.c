@@ -101,6 +101,7 @@ BotDrawDebugPolygons
 ==================
 */
 void BotDrawDebugPolygons(void (*drawPoly)(int color, int numPoints, float *points), int value) {
+	(void)value;  // Suppress unused parameter warning
 	static cvar_t *bot_debug, *bot_groundonly, *bot_reachability, *bot_highlightarea;
 	bot_debugpoly_t *poly;
 	int i, parm0;

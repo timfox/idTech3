@@ -1026,7 +1026,8 @@ void RE_StretchRaw( int x, int y, int w, int h, int cols, int rows, byte *data, 
 
 
 void RE_UploadCinematic( int w, int h, int cols, int rows, byte *data, int client, qboolean dirty ) {
-
+	(void)w;  // Suppress unused parameter warning
+	(void)h;  // Suppress unused parameter warning
 	image_t *image;
 
 	if ( !tr.scratchImage[ client ] ) {

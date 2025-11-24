@@ -1315,6 +1315,7 @@ Entities that have a single procedurally generated surface
 ====================
 */
 static void RB_SurfaceEntity( const surfaceType_t *surfType ) {
+	(void)surfType;  // Suppress unused parameter warning
 #ifdef USE_VBO
 	VBO_Flush();
 #endif
@@ -1343,6 +1344,7 @@ static void RB_SurfaceEntity( const surfaceType_t *surfType ) {
 
 
 static void RB_SurfaceBad( const surfaceType_t *surfType ) {
+	(void)surfType;  // Suppress unused parameter warning
 	ri.Printf( PRINT_ALL, "Bad surface tesselated.\n" );
 }
 
@@ -1359,6 +1361,7 @@ static void RB_SurfaceFlare( srfFlare_t *surf ) {
 
 
 static void RB_SurfaceSkip( void *surf ) {
+	(void)surf;  // Suppress unused parameter warning
 }
 
 

@@ -30,7 +30,34 @@ IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 	ADD_COMPILE_OPTIONS(-Wmissing-prototypes)
 	# Warn about shadowed variables
 	ADD_COMPILE_OPTIONS(-Wshadow)
+	# Warn about unused parameters
+	ADD_COMPILE_OPTIONS(-Wunused-parameter)
+	# Warn about unused variables
+	ADD_COMPILE_OPTIONS(-Wunused-variable)
 	# Note: -Wold-style-cast is C++ only, not applicable for C code
+ENDIF()
+
+# Static analysis options
+OPTION(ENABLE_STATIC_ANALYSIS "Enable static analysis tools (clang-tidy, cppcheck)" OFF)
+
+IF(ENABLE_STATIC_ANALYSIS)
+	# Try to find clang-tidy
+	FIND_PROGRAM(CLANG_TIDY_EXE NAMES clang-tidy)
+	IF(CLANG_TIDY_EXE)
+		SET(CMAKE_C_CLANG_TIDY "${CLANG_TIDY_EXE}" "-checks=-*,readability-*,performance-*,portability-*,bugprone-*")
+		MESSAGE(STATUS "Static analysis: clang-tidy enabled")
+	ELSE()
+		MESSAGE(WARNING "Static analysis: clang-tidy not found")
+	ENDIF()
+	
+	# Try to find cppcheck
+	FIND_PROGRAM(CPPCHECK_EXE NAMES cppcheck)
+	IF(CPPCHECK_EXE)
+		SET(CMAKE_C_CPPCHECK "${CPPCHECK_EXE}" "--enable=all" "--suppress=missingIncludeSystem")
+		MESSAGE(STATUS "Static analysis: cppcheck enabled")
+	ELSE()
+		MESSAGE(WARNING "Static analysis: cppcheck not found")
+	ENDIF()
 ENDIF()
 
 SET(CNAME "idtech3")
@@ -685,4 +712,15 @@ ENDIF()
 # Add USE_VULKAN definition to q3ui if Vulkan is enabled (needed for sdl_glimp.c)
 IF(USE_VULKAN)
 	TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_VULKAN)
+ENDIF()
+
+# Unit tests
+OPTION(BUILD_TESTS "Build unit tests" OFF)
+IF(BUILD_TESTS)
+	ENABLE_TESTING()
+	ADD_EXECUTABLE(test_qcommon tests/test_qcommon.c src/qcommon/q_shared.c)
+	TARGET_INCLUDE_DIRECTORIES(test_qcommon PRIVATE src/qcommon)
+	TARGET_INCLUDE_DIRECTORIES(test_qcommon PRIVATE src)
+	ADD_TEST(NAME qcommon_tests COMMAND test_qcommon)
+	MESSAGE(STATUS "Unit tests enabled")
 ENDIF()

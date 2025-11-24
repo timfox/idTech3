@@ -563,6 +563,8 @@ intptr_t QDECL VM_DllSyscall( intptr_t arg, ... ) {
 
 static void VM_SwapLongs( void *data, int length )
 {
+	(void)data;    // Suppress unused parameter warning
+	(void)length;  // Suppress unused parameter warning
 #ifndef Q3_LITTLE_ENDIAN
 	int32_t *ptr;
 	int i;
@@ -1702,7 +1704,7 @@ TTimo: added some verbosity in debug
 */
 static void * QDECL VM_LoadDll( const char *name, vmMainFunc_t *entryPoint, dllSyscall_t systemcalls ) {
 
-	const char	*gamedir = FS_GetCurrentGameDir();
+	const char	*gamedir __attribute__((unused)) = FS_GetCurrentGameDir();
 	char		filename[ MAX_QPATH ];
 	void		*libHandle;
 	dllEntry_t	dllEntry;
@@ -2140,6 +2142,7 @@ Insert calls to this while debugging the vm compiler
 ===============
 */
 void VM_LogSyscalls( int *args ) {
+	(void)args;  // Suppress unused parameter warning
 #if 0
 	static	int		callnum;
 	static	FILE	*f;

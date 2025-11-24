@@ -39,8 +39,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "aasfile.h"
 #include "botlib.h"
 #include "be_aas.h"
+#include "be_aas_def.h"  // Must be included before be_aas_funcs.h to define AASINTERN
 #include "be_aas_funcs.h"
-#include "be_aas_def.h"
 #include "be_interface.h"
 
 #include "be_ea.h"
@@ -307,6 +307,10 @@ void AAS_FloodAreas(vec3_t origin);
 
 int BotExportTest(int parm0, char *parm1, vec3_t parm2, vec3_t parm3)
 {
+	(void)parm0;  // Suppress unused parameter warning
+	(void)parm1;  // Suppress unused parameter warning
+	(void)parm2;  // Suppress unused parameter warning
+	(void)parm3;  // Suppress unused parameter warning
 
 //	return AAS_PointLight(parm2, NULL, NULL, NULL);
 

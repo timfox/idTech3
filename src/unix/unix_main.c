@@ -245,12 +245,14 @@ set attributes if user did CTRL+Z and then does fg again.
 */
 void CON_SigCont( int signum )
 {
+	(void)signum;  // Suppress unused parameter warning
 	Sys_ConsoleInputInit();
 }
 
 
 void CON_SigTStp( int signum )
 {
+	(void)signum;  // Suppress unused parameter warning
 	sigset_t mask;
 
 	tty_FlushIn();
@@ -340,6 +342,7 @@ void NORETURN FORMAT_PRINTF(1, 2) QDECL Sys_Error( const char *format, ... )
 
 void floating_point_exception_handler( int whatever )
 {
+	(void)whatever;  // Suppress unused parameter warning
 	signal( SIGFPE, floating_point_exception_handler );
 }
 
@@ -769,6 +772,7 @@ void Sys_Print( const char *msg )
 
 void QDECL Sys_SetStatus( const char *format, ... )
 {
+	(void)format;  // Suppress unused parameter warning
 	return;
 }
 

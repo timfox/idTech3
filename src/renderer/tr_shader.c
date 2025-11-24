@@ -3454,6 +3454,7 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 
 
 qhandle_t RE_RegisterShaderFromImage(const char *name, int lightmapIndex, image_t *image, qboolean mipRawImage) {
+	(void)mipRawImage;  // Suppress unused parameter warning
 	unsigned long hash;
 	shader_t	*sh;
 

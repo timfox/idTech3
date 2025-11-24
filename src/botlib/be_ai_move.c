@@ -566,6 +566,7 @@ static int BotOnTopOfEntity(bot_movestate_t *ms)
 //===========================================================================
 static int BotValidTravel(vec3_t origin, aas_reachability_t *reach, int travelflags)
 {
+	(void)origin;  // Suppress unused parameter warning
 	//if the reachability uses an unwanted travel type
 	if (AAS_TravelFlagForType(reach->traveltype) & ~travelflags) return qfalse;
 	//don't go into areas with bad travel types
@@ -1095,6 +1096,7 @@ static int BotCheckBarrierJump(bot_movestate_t *ms, vec3_t dir, float speed)
 //===========================================================================
 static int BotSwimInDirection(bot_movestate_t *ms, vec3_t dir, float speed, int type)
 {
+	(void)type;  // Suppress unused parameter warning
 	vec3_t normdir;
 
 	VectorCopy(dir, normdir);
@@ -2495,6 +2497,7 @@ static bot_moveresult_t BotFinishTravel_FuncBobbing(bot_movestate_t *ms, aas_rea
 //===========================================================================
 static int GrappleState(bot_movestate_t *ms, aas_reachability_t *reach)
 {
+	(void)reach;  // Suppress unused parameter warning
 	int i;
 	aas_entityinfo_t entinfo;
 
