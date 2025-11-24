@@ -22,7 +22,6 @@ along with Open Arena source code; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
-// NOTE: This code is by no means complete. 
 
 #include "g_local.h"
 
@@ -58,13 +57,24 @@ qboolean G_ReadAltKillSettings( void )
 	char            *cnf, *cnf2;
 	const char            *t;
 
+	//Initialize arrays to NULL
+	for( i = 0; i < MAX_KSPREE; i++ ) {
+		killSprees[ i ] = NULL;
+	}
+	for( i = 0; i < MAX_DSPREE; i++ ) {
+		deathSprees[ i ] = NULL;
+	}
+	for( i = 0; i < MAX_MULTIKILLS; i++ ) {
+		multiKills[ i ] = NULL;
+	}
+
 	//Let's clear out any existing killing sprees/death sprees. YAYY BG_FREE!!!!!
 	for( i = 0; i < MAX_KSPREE && killSprees[ i ]; i++ ) {
 		BG_Free( killSprees[ i ] );
 		killSprees[ i ] = NULL;
 	}
 
-	for( i = 0; i < MAX_KSPREE && deathSprees[ i ]; i++ ) {
+	for( i = 0; i < MAX_DSPREE && deathSprees[ i ]; i++ ) {
 		BG_Free( deathSprees[ i ] );
 		deathSprees[ i ] = NULL;
 	}
@@ -104,8 +114,12 @@ qboolean G_ReadAltKillSettings( void )
 
 	//If the file can't be accessed/opened. 
 	if( length < 0 ) {
-		G_Printf( "Could not open configuration file for Sprees and Multikills %s\n", g_sprees.string );
-		trap_Cvar_Set( "g_altExcellent", "0" );
+		G_Printf( "^3WARNING:^7 Could not open configuration file for Sprees and Multikills: %s\n", g_sprees.string );
+		G_Printf( "^3WARNING:^7 Kill sprees, death sprees, and multikills are disabled.\n" );
+		G_Printf( "^3WARNING:^7 Set g_sprees to a valid file path or create %s to enable these features.\n", g_sprees.string );
+		if( g_altExcellent.integer ) {
+			trap_Cvar_Set( "g_altExcellent", "0" );
+		}
 		return qfalse;
 	}
 	//Allocate some memory.
@@ -158,6 +172,11 @@ qboolean G_ReadAltKillSettings( void )
 		} else if ( kspree_read ) {
 			if( Q_strequal( t, "level" ) ) {
 				readFile_int( &cnf, &k->spreeLevel );
+				//Validate spree level is positive
+				if( k->spreeLevel <= 0 ) {
+					COM_ParseError( "Killing Spree level must be positive, got %d", k->spreeLevel );
+					k->spreeLevel = 1;
+				}
 				//Let's take the spreeLevel and multiply it by the spreeDivisor to give us our count
 				k->streakCount = ( ( k->spreeLevel ) * ( spreeDivisor ) );
 			} else if ( Q_strequal( t, "message" ) ) {
@@ -172,6 +191,11 @@ qboolean G_ReadAltKillSettings( void )
 		} else if ( dspree_read ) {
 			if( Q_strequal( t, "level" ) ) {
 				readFile_int( &cnf, &d->spreeLevel );
+				//Validate spree level is positive
+				if( d->spreeLevel <= 0 ) {
+					COM_ParseError( "Death Spree level must be positive, got %d", d->spreeLevel );
+					d->spreeLevel = 1;
+				}
 				//Let's take the spreeLevel and multiply it by the spreeDivisor to give us our count
 				d->streakCount = ( ( d->spreeLevel ) * ( spreeDivisor ) );
 			} else if ( Q_strequal( t, "message" ) ) {
@@ -186,6 +210,11 @@ qboolean G_ReadAltKillSettings( void )
 		} else if ( mkill_read ) {
 			if ( Q_strequal( t, "kills" ) ) {
 				readFile_int( &cnf, &m->kills );
+				//Validate multikill count is positive
+				if( m->kills <= 0 ) {
+					COM_ParseError( "Multikill kills must be positive, got %d", m->kills );
+					m->kills = 1;
+				}
 			} else if ( Q_strequal( t, "message" ) ) {
 				readFile_string( &cnf, m->killMsg, sizeof( m->killMsg ) );
 			} else if ( Q_strequal( t, "sound" ) ) {
@@ -209,8 +238,8 @@ qboolean G_ReadAltKillSettings( void )
 	else {
 		level.mKillUBound = -1;
 		//KK-OAX We don't have any kills defined, revert to stock.
-		//FIXME: Make sure this change shows up in the console... 
 		if( g_altExcellent.integer ) {
+			G_Printf( "^3WARNING:^7 No multikills defined in configuration file. Disabling g_altExcellent.\n" );
 			trap_Cvar_Set( "g_altExcellent", "0" );
 		}
 
@@ -345,8 +374,17 @@ void G_CheckForSpree( gentity_t *ent, int streak2Test, qboolean checkKillSpree )
 
 	//Probably Not Needed, but to protect Server Ops from Crashing their Stuff MidMatch
 	if( level.spreeDivisor < 1 ) {
-				return;
+		return;
 	}
+	
+	//Validate arrays are not empty
+	if( checkKillSpree && ( level.kSpreeUBound < 0 || !killSprees[ 0 ] ) ) {
+		return;
+	}
+	if( !checkKillSpree && ( level.dSpreeUBound < 0 || !deathSprees[ 0 ] ) ) {
+		return;
+	}
+	
 	divisionHolder = ( streak2Test / level.spreeDivisor );
 	//if it's a deathspree
 	if( !checkKillSpree ) {
@@ -360,7 +398,7 @@ void G_CheckForSpree( gentity_t *ent, int streak2Test, qboolean checkKillSpree )
 			//We've made it this far...now do the largest spree defined.
 			Q_snprintf( streakcount, sizeof( streakcount ), "%i", streak2Test );
 			//Check if deathSprees is NULL (actual problem!)
-			if(!deathSprees[ level.dSpreeUBound ])
+			if( level.dSpreeUBound < 0 || !deathSprees[ level.dSpreeUBound ] )
 				return;
 			returnedString = CreateMessage( ent, deathSprees[ level.dSpreeUBound ]->spreeMsg, streakcount ); 
 			position = deathSprees[ level.dSpreeUBound ]->position;
@@ -412,15 +450,18 @@ void G_CheckForSpree( gentity_t *ent, int streak2Test, qboolean checkKillSpree )
 			//We've made it this far...now do the largest spree defined.
 			Q_snprintf( streakcount, sizeof( streakcount ), "%i", streak2Test );
 			//Check if killSprees is NULL (actual problem!)
-			if(!killSprees[ level.kSpreeUBound ])
+			if( level.kSpreeUBound < 0 || !killSprees[ level.kSpreeUBound ] )
 				return;
 			returnedString = CreateMessage( ent, killSprees[ level.kSpreeUBound ]->spreeMsg, streakcount ); 
 			position = killSprees[ level.kSpreeUBound ]->position;
 			sound = killSprees[ level.kSpreeUBound ]->sound2Play;
 			soundIndex = G_SoundIndex( sound );
-			soundIndex = G_SoundIndex( sound );
 			G_Sound(ent,0,soundIndex);
-			AP( va("chat \"%s\"", returnedString ) );
+			if( position == CENTER_PRINT ) {
+				AP( va("cp \"%s\"", returnedString ) );
+			} else {
+				AP( va("chat \"%s\"", returnedString ) );
+			}
 		} else { 
 			for( i = 0; killSprees[ i ]; i++ ) {
 				if( killSprees[ i ]->streakCount == streak2Test ) {
@@ -428,10 +469,13 @@ void G_CheckForSpree( gentity_t *ent, int streak2Test, qboolean checkKillSpree )
 					returnedString = CreateMessage ( ent, killSprees[ i ]->spreeMsg, streakcount );
 					position = killSprees[ i ]->position;
 					sound = killSprees[ i ]->sound2Play;
-					soundIndex = G_SoundIndex( sound );                
 					soundIndex = G_SoundIndex( sound );
 					G_Sound(ent,0,soundIndex);
-					AP( va("chat \"%s\"", returnedString ) );
+					if( position == CENTER_PRINT ) {
+						AP( va("cp \"%s\"", returnedString ) );
+					} else {
+						AP( va("chat \"%s\"", returnedString ) );
+					}
 					break;
 				}
 			}
@@ -456,9 +500,14 @@ void G_checkForMultiKill( gentity_t *ent ) {
 	//Let's grab the multikill count for the player first
 	multiKillCount = ent->client->pers.multiKillCount;
 
+	//Validate multikill array is not empty
+	if( level.mKillUBound < 0 || !multiKills[ 0 ] ) {
+		return;
+	}
+	
 	if( multiKillCount > multiKills[ level.mKillUBound ]->kills ) {
 		Q_snprintf( multiKillString, sizeof( multiKillString ), "%i", multiKillCount );
-		if(!multiKills[ level.mKillUBound ])
+		if( !multiKills[ level.mKillUBound ] )
 			return; //If null
 		returnedString = CreateMessage ( ent, multiKills[ level.mKillUBound ]->killMsg, multiKillString );
 		sound = multiKills[ level.mKillUBound ]->sound2Play;
@@ -488,4 +537,24 @@ void G_checkForMultiKill( gentity_t *ent ) {
 			break;
 		}
 	}   
+}
+
+/*
+================
+G_ConfigClientExcellent
+Configures client-side excellent/multikill settings.
+Called when level starts or when g_altExcellent changes.
+================
+*/
+void G_ConfigClientExcellent( qboolean levelStart )
+{
+	// Since g_altExcellent is a CVAR_SERVERINFO, clients automatically receive it
+	// This function can be extended to send additional configuration if needed
+	if( levelStart ) {
+		// Configuration is sent via serverinfo, no additional action needed
+		// but we can log it for debugging
+		if( g_altExcellent.integer && level.mKillUBound >= 0 ) {
+			G_Printf( "Multikills enabled: %d multikill types configured\n", level.mKillUBound + 1 );
+		}
+	}
 }

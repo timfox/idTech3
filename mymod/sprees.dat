@@ -1,0 +1,67 @@
+// Kill Spree / Death Spree / Multikill Configuration File
+// Format: [kspree], [dspree], or [mkill] sections
+// Placeholders: [n] = player name, [k] = kill/streak count
+// Position: 1 = center print, 2 = chat
+
+[kspree]
+level = 1
+message = ^3[n]^7 is on a ^2KILLING SPREE^7! ([k] kills)
+printpos = 2
+sound = sound/player/killspree1.wav
+
+[kspree]
+level = 2
+message = ^3[n]^7 is on a ^2RAMPAGE^7! ([k] kills)
+printpos = 2
+sound = sound/player/killspree2.wav
+
+[kspree]
+level = 3
+message = ^3[n]^7 is ^1DOMINATING^7! ([k] kills)
+printpos = 1
+sound = sound/player/killspree3.wav
+
+[kspree]
+level = 4
+message = ^3[n]^7 is ^1UNSTOPPABLE^7! ([k] kills)
+printpos = 1
+sound = sound/player/killspree4.wav
+
+[kspree]
+level = 5
+message = ^3[n]^7 is ^1GODLIKE^7! ([k] kills)
+printpos = 1
+sound = sound/player/killspree5.wav
+
+[dspree]
+level = 1
+message = ^3[n]^7 is on a ^1DEATH SPREE^7! ([k] deaths)
+printpos = 2
+sound = sound/player/deathspree1.wav
+
+[dspree]
+level = 2
+message = ^3[n]^7 is ^1FEEDING^7! ([k] deaths)
+printpos = 2
+sound = sound/player/deathspree2.wav
+
+[mkill]
+kills = 2
+message = ^3[n]^7 got a ^2DOUBLE KILL^7!
+sound = sound/player/multikill1.wav
+
+[mkill]
+kills = 3
+message = ^3[n]^7 got a ^2TRIPLE KILL^7!
+sound = sound/player/multikill2.wav
+
+[mkill]
+kills = 4
+message = ^3[n]^7 got a ^2ULTRA KILL^7!
+sound = sound/player/multikill3.wav
+
+[mkill]
+kills = 5
+message = ^3[n]^7 got a ^2MONSTER KILL^7!
+sound = sound/player/multikill4.wav
+

@@ -810,6 +810,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart )
 	G_admin_readconfig( NULL, 0 );
 	//Let's Load up any killing sprees/multikills
 	G_ReadAltKillSettings();
+	G_ConfigClientExcellent( qtrue );
 
 	// initialize all entities for this game
 	memset( g_entities, 0, MAX_GENTITIES * sizeof(g_entities[0]) );
