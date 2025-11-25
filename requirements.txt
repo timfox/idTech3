@@ -1,0 +1,47 @@
+# Python requirements for project utilities, asset scripts, and CI/CD/test for C/C++ project
+# Core engine is C/C++, but Python is commonly used for build, CI, and asset tools
+
+# Asset and data pipeline
+numpy
+Pillow
+pyyaml
+jinja2
+tqdm
+click
+
+# CI/CD tools and test frameworks for C/C++ projects
+# (Used for scripting, automation, code quality, etc.)
+
+# Linting, formatting, and code analysis for C/C++
+cpplint
+clang-format
+cmakelang
+
+# Test runners and code coverage
+pytest
+pytest-cov
+
+# YAML/JSON for CI configs and scripting
+pyyaml
+jsonschema
+
+# Continuous Integration tools (for interacting with build/test systems)
+requests
+toml
+
+# For generating code/docs, e.g. Doxygen helpers
+sphinx
+breathe
+
+# Build system helpers (CMake, automation)
+conan
+cmake
+
+# Static analysis report parsers
+lizard
+
+# Miscellaneous
+setuptools
+wheel
+
+
