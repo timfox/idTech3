@@ -21,6 +21,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "server.h"
+#ifdef USE_ENTT
+#include "sv_ecs.h"
+#endif
 
 
 /*
@@ -701,6 +704,10 @@ void SV_Init( void )
 {
 	int index;
 
+#ifdef USE_ENTT
+	SV_ECS_Init();
+#endif
+
 	SV_AddOperatorCommands();
 
 	if ( com_dedicated->integer )
@@ -874,6 +881,9 @@ before Sys_Quit or Sys_Error
 ================
 */
 void SV_Shutdown( const char *finalmsg ) {
+#ifdef USE_ENTT
+	SV_ECS_Shutdown();
+#endif
 	if ( !com_sv_running || !com_sv_running->integer ) {
 		return;
 	}

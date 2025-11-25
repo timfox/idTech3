@@ -23,6 +23,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "g_local.h"
 #include "bg_public.h"
+#ifdef USE_ENTT
+#include "g_ecs.h"
+#endif
 
 level_locals_t	level;
 
@@ -815,6 +818,11 @@ void G_InitGame( int levelTime, int randomSeed, int restart )
 	// Initialize dialog system
 	G_Dialog_Init();
 	
+#ifdef USE_ENTT
+	// Initialize ECS system
+	G_ECS_Init();
+#endif
+	
 	// Initialize inventory system
 	G_Inventory_Init();
 	G_Crafting_Init();
@@ -978,6 +986,11 @@ void G_ShutdownGame( int restart )
 	
 	// Dialog system cleanup
 	G_Dialog_Shutdown( );
+	
+#ifdef USE_ENTT
+	// ECS system cleanup
+	G_ECS_Shutdown( );
+#endif
 	
 	// Inventory system cleanup
 	G_Inventory_Shutdown( );
@@ -2614,6 +2627,16 @@ void G_RunFrame( int levelTime )
 	level.previousTime = level.time;
 	level.time = levelTime;
 	//msec = level.time - level.previousTime;
+
+#ifdef USE_ENTT
+	// Run ECS systems
+	{
+		float deltaTime = (level.time - level.previousTime) / 1000.0f;
+		if (deltaTime > 0.0f) {
+			G_ECS_RunFrame(deltaTime);
+		}
+	}
+#endif
 
 	// get any cvar changes
 	G_UpdateCvars();

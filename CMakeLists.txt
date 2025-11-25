@@ -20,20 +20,36 @@ ELSE()
 	SET(CMAKE_C_STANDARD_REQUIRED OFF)
 ENDIF()
 
+# Set C++ standard for ECS code (EnTT requires C++17)
+IF(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+	SET(CMAKE_CXX_STANDARD 17)
+	SET(CMAKE_CXX_STANDARD_REQUIRED ON)
+ELSEIF(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
+	SET(CMAKE_CXX_STANDARD 17)
+	SET(CMAKE_CXX_STANDARD_REQUIRED ON)
+ELSE()
+	SET(CMAKE_CXX_STANDARD 17)
+	SET(CMAKE_CXX_STANDARD_REQUIRED OFF)
+ENDIF()
+
 # Enable modern compiler warnings for better code quality
 IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-	# Format string checking (catches printf format errors)
+	# Format string checking (catches printf format errors) - applies to both C and C++
 	ADD_COMPILE_OPTIONS(-Wformat=2)
-	# Require function prototypes
-	ADD_COMPILE_OPTIONS(-Wstrict-prototypes)
-	# Warn about missing prototypes
-	ADD_COMPILE_OPTIONS(-Wmissing-prototypes)
-	# Warn about shadowed variables
+	# Warn about shadowed variables - applies to both C and C++
 	ADD_COMPILE_OPTIONS(-Wshadow)
-	# Warn about unused parameters
+	# Warn about unused parameters - applies to both C and C++
 	ADD_COMPILE_OPTIONS(-Wunused-parameter)
-	# Warn about unused variables
+	# Warn about unused variables - applies to both C and C++
 	ADD_COMPILE_OPTIONS(-Wunused-variable)
+	
+	# C-specific flags (only apply to C files, not C++)
+	# These use generator expressions to conditionally apply based on language
+	ADD_COMPILE_OPTIONS(
+		$<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
+		$<$<COMPILE_LANGUAGE:C>:-Wmissing-prototypes>
+	)
+	
 	# Note: -Wold-style-cast is C++ only, not applicable for C code
 ENDIF()
 
@@ -78,7 +94,8 @@ OPTION(USE_ENET "" ON)
 OPTION(USE_SQLITE "" ON)
 OPTION(USE_FREETYPE "" ON)
 OPTION(USE_OPENSSL "" ON)
-OPTION(USE_LUA "" ON)
+OPTION(USE_LUA "" OFF)
+OPTION(USE_ENTT "Enable EnTT ECS system" OFF)
 
 SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules)
 
@@ -110,6 +127,27 @@ ENDIF()
 
 IF(USE_FREETYPE)
 	list(APPEND QCOMMON_SRCS src/qcommon/freetype_wrapper.c)
+ENDIF()
+
+# EnTT ECS system
+IF(USE_ENTT)
+	# Add EnTT include directory
+	INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/libs/entt/src)
+	# Add compile definition
+	ADD_COMPILE_DEFINITIONS(USE_ENTT)
+	# Add C++ source files for ECS (will be created)
+	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/qcommon/ecs.cpp)
+		list(APPEND QCOMMON_SRCS src/qcommon/ecs.cpp)
+	ENDIF()
+	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/qcommon/ecs_systems.cpp)
+		list(APPEND QCOMMON_SRCS src/qcommon/ecs_systems.cpp)
+	ENDIF()
+	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/server/sv_ecs.cpp)
+		list(APPEND SERVER_SRCS src/server/sv_ecs.cpp)
+	ENDIF()
+	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/server/sv_ecs_systems.cpp)
+		list(APPEND SERVER_SRCS src/server/sv_ecs_systems.cpp)
+	ENDIF()
 ENDIF()
 
 # add platform-dependent QVM bytecode compilers
@@ -180,6 +218,12 @@ ELSE()
 	ADD_LIBRARY(client OBJECT ${CLIENT_SRCS} ${JPEG_SRCS})
 	# Add JPEG include directory for internal includes
 	TARGET_INCLUDE_DIRECTORIES(client PRIVATE libs/jpeg)
+	# Suppress warnings for third-party JPEG library code
+	IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+		FOREACH(JPEG_SRC ${JPEG_SRCS})
+			set_source_files_properties(${JPEG_SRC} PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter")
+		ENDFOREACH()
+	ENDIF()
 ENDIF()
 
 # Add OGG/Vorbis include directories for client (used by snd_codec_ogg.c)

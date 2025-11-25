@@ -21,6 +21,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "server.h"
+#ifdef USE_ENTT
+#include "sv_ecs.h"
+#endif
 
 serverStatic_t	svs;				// persistant server info
 server_t		sv;					// local server
@@ -1328,6 +1331,14 @@ void SV_Frame( int msec ) {
 
 	if ( !com_dedicated->integer )
 		SV_BotFrame( sv.time + sv.timeResidual );
+
+#ifdef USE_ENTT
+	// Run ECS systems
+	{
+		float deltaTime = msec / 1000.0f;
+		SV_ECS_RunFrame(deltaTime);
+	}
+#endif
 
 	// if time is about to hit the 32nd bit, kick all clients
 	// and clear sv.time, rather

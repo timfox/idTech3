@@ -8,6 +8,10 @@ project(mymod_game_modules)
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+# Set C++ standard for ECS code (EnTT requires C++17)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 # Build as shared libraries (DLLs/.so files)
 set(BUILD_SHARED_LIBS ON)
 
@@ -57,6 +61,10 @@ endif()
 
 # Game module (server-side) - OpenArena source
 file(GLOB GAME_SOURCES "game/*.c")
+file(GLOB GAME_CPP_SOURCES "game/*.cpp")
+if(GAME_CPP_SOURCES)
+	list(APPEND GAME_SOURCES ${GAME_CPP_SOURCES})
+endif()
 add_library(game_${ARCH_SUFFIX} SHARED ${GAME_SOURCES})
 
 # Rename output to match engine expectations: gamex86_64.so format (no dot!)
@@ -85,6 +93,17 @@ set_target_properties(ui_${ARCH_SUFFIX} PROPERTIES
     OUTPUT_NAME "ui${ARCH_SUFFIX}"
     PREFIX ""
 )
+
+# EnTT ECS support
+option(USE_ENTT "Enable EnTT ECS system" OFF)
+if(USE_ENTT)
+	# Add EnTT include directory
+	include_directories(${ENGINE_ROOT}/libs/entt/src)
+	# Add compile definition
+	target_compile_definitions(game_${ARCH_SUFFIX} PRIVATE USE_ENTT)
+	# Link C++ standard library for C++ files
+	target_link_libraries(game_${ARCH_SUFFIX} stdc++fs)
+endif()
 
 # Link math library if needed
 target_link_libraries(game_${ARCH_SUFFIX} m)

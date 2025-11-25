@@ -9,6 +9,12 @@ with character names and optional choices.
 
 #include "g_local.h"
 #include "g_dialog.h"
+#ifdef USE_ENTT
+#include "g_ecs.h"
+#include "g_ecs_mod_components.h"
+#include "../../../../src/qcommon/ecs.cpp" // For ECS namespace access
+#include <entt/entt.hpp>
+#endif
 
 #define MAX_DIALOGS		32
 

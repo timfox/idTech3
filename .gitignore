@@ -5,3 +5,5 @@ output/
 *.user
 cmake-*
 .idea
+QuakeUSD/
+release/

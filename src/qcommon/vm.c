@@ -1695,14 +1695,14 @@ vm_t *VM_Restart( vm_t *vm ) {
 
 /*
 =================
-Sys_LoadDll
+VM_LoadLib
 
-Used to load a development dll instead of a virtual machine
+Used to load a development library (.so/.dll) instead of a virtual machine
 
 TTimo: added some verbosity in debug
 =================
 */
-static void * QDECL VM_LoadDll( const char *name, vmMainFunc_t *entryPoint, dllSyscall_t systemcalls ) {
+static void * QDECL VM_LoadLib( const char *name, vmMainFunc_t *entryPoint, dllSyscall_t systemcalls ) {
 
 	const char	*gamedir __attribute__((unused)) = FS_GetCurrentGameDir();
 	char		filename[ MAX_QPATH ];
@@ -1714,11 +1714,11 @@ static void * QDECL VM_LoadDll( const char *name, vmMainFunc_t *entryPoint, dllS
 	libHandle = FS_LoadLibrary( filename );
 
 	if ( !libHandle ) {
-		Com_Printf( "VM_LoadDLL '%s' failed\n", filename );
+		Com_Printf( "VM_LoadLib '%s' failed\n", filename );
 		return NULL;
 	}
 
-	Com_Printf( "VM_LoadDLL '%s' ok\n", filename );
+	Com_Printf( "VM_LoadLib '%s' ok\n", filename );
 
 	dllEntry = /* ( dllEntry_t ) */ Sys_LoadFunction( libHandle, "dllEntry" );
 	*entryPoint = /* ( dllSyscall_t ) */ Sys_LoadFunction( libHandle, "vmMain" );
@@ -1727,9 +1727,9 @@ static void * QDECL VM_LoadDll( const char *name, vmMainFunc_t *entryPoint, dllS
 		return NULL;
 	}
 
-	Com_Printf( "VM_LoadDll(%s) found **vmMain** at %p\n", name, *entryPoint );
+	Com_Printf( "VM_LoadLib(%s) found **vmMain** at %p\n", name, *entryPoint );
 	dllEntry( systemcalls );
-	Com_Printf( "VM_LoadDll(%s) succeeded!\n", name );
+	Com_Printf( "VM_LoadLib(%s) succeeded!\n", name );
 
 	return libHandle;
 }
@@ -1786,9 +1786,9 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 	}
 
 	if ( interpret == VMI_NATIVE ) {
-		// try to load as a system dll
-		Com_Printf( "Loading dll file %s.\n", name );
-		vm->dllHandle = VM_LoadDll( name, &vm->entryPoint, dllSyscalls );
+		// try to load as a system library (.so/.dll)
+		Com_Printf( "Loading library file %s.\n", name );
+		vm->dllHandle = VM_LoadLib( name, &vm->entryPoint, dllSyscalls );
 		if ( vm->dllHandle ) {
 			vm->privateFlag = 0; // allow reading private cvars
 			vm->dataAlloc = ~0U;

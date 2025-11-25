@@ -11,6 +11,12 @@ and crafting capabilities.
 #include "g_inventory.h"
 #include "g_equipment.h"
 #include "inv.h"
+#ifdef USE_ENTT
+#include "g_ecs.h"
+#include "g_ecs_mod_components.h"
+#include "../../../../src/qcommon/ecs.cpp" // For ECS namespace access
+#include <entt/entt.hpp>
+#endif
 
 #define MAX_INVENTORIES		MAX_CLIENTS
 
@@ -114,6 +120,19 @@ Add an item to a player's inventory
 ================
 */
 qboolean G_Inventory_AddItem( int clientNum, int itemId, int quantity ) {
+#ifdef USE_ENTT
+	// ECS-based implementation - register entity if needed
+	gentity_t *ent = &g_entities[clientNum];
+	if (ent && ent->inuse) {
+		ecs_entity_t ecsEntity = G_ECS_GetEntityFromGentity(ent);
+		if (ecsEntity == ECS_NULL_ENTITY) {
+			G_ECS_RegisterGentity(ent);
+		}
+	}
+	// Continue with traditional implementation for now
+	// Full ECS migration can be done later
+#endif
+	
 	inventory_t *inv;
 	int slot;
 	
