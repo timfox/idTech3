@@ -33,6 +33,8 @@ static PFN_vkGetPhysicalDeviceFeatures					qvkGetPhysicalDeviceFeatures;
 static PFN_vkGetPhysicalDeviceFormatProperties			qvkGetPhysicalDeviceFormatProperties;
 static PFN_vkGetPhysicalDeviceMemoryProperties			qvkGetPhysicalDeviceMemoryProperties;
 static PFN_vkGetPhysicalDeviceProperties				qvkGetPhysicalDeviceProperties;
+PFN_vkGetPhysicalDeviceProperties2KHR				qvkGetPhysicalDeviceProperties2KHR;
+PFN_vkGetPhysicalDeviceFeatures2KHR					qvkGetPhysicalDeviceFeatures2KHR;
 static PFN_vkGetPhysicalDeviceQueueFamilyProperties		qvkGetPhysicalDeviceQueueFamilyProperties;
 static PFN_vkDestroySurfaceKHR							qvkDestroySurfaceKHR;
 static PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR	qvkGetPhysicalDeviceSurfaceCapabilitiesKHR;
@@ -45,80 +47,80 @@ static PFN_vkDestroyDebugReportCallbackEXT				qvkDestroyDebugReportCallbackEXT;
 #endif
 static PFN_vkAllocateCommandBuffers						qvkAllocateCommandBuffers;
 static PFN_vkAllocateDescriptorSets						qvkAllocateDescriptorSets;
-static PFN_vkAllocateMemory								qvkAllocateMemory;
-static PFN_vkBeginCommandBuffer							qvkBeginCommandBuffer;
-static PFN_vkBindBufferMemory							qvkBindBufferMemory;
-static PFN_vkBindImageMemory							qvkBindImageMemory;
-static PFN_vkCmdBeginRenderPass							qvkCmdBeginRenderPass;
-static PFN_vkCmdBindDescriptorSets						qvkCmdBindDescriptorSets;
-static PFN_vkCmdBindIndexBuffer							qvkCmdBindIndexBuffer;
-static PFN_vkCmdBindPipeline							qvkCmdBindPipeline;
-static PFN_vkCmdBindVertexBuffers						qvkCmdBindVertexBuffers;
-static PFN_vkCmdBlitImage								qvkCmdBlitImage;
-static PFN_vkCmdClearAttachments						qvkCmdClearAttachments;
-static PFN_vkCmdCopyBuffer								qvkCmdCopyBuffer;
-static PFN_vkCmdCopyBufferToImage						qvkCmdCopyBufferToImage;
-static PFN_vkCmdCopyImage								qvkCmdCopyImage;
-static PFN_vkCmdDraw									qvkCmdDraw;
-static PFN_vkCmdDrawIndexed								qvkCmdDrawIndexed;
-static PFN_vkCmdEndRenderPass							qvkCmdEndRenderPass;
-static PFN_vkCmdNextSubpass								qvkCmdNextSubpass;
-static PFN_vkCmdPipelineBarrier							qvkCmdPipelineBarrier;
-static PFN_vkCmdPushConstants							qvkCmdPushConstants;
-static PFN_vkCmdSetDepthBias							qvkCmdSetDepthBias;
-static PFN_vkCmdSetScissor								qvkCmdSetScissor;
-static PFN_vkCmdSetViewport								qvkCmdSetViewport;
-static PFN_vkCreateBuffer								qvkCreateBuffer;
-static PFN_vkCreateCommandPool							qvkCreateCommandPool;
-static PFN_vkCreateDescriptorPool						qvkCreateDescriptorPool;
-static PFN_vkCreateDescriptorSetLayout					qvkCreateDescriptorSetLayout;
-static PFN_vkCreateFence								qvkCreateFence;
-static PFN_vkCreateFramebuffer							qvkCreateFramebuffer;
-static PFN_vkCreateGraphicsPipelines					qvkCreateGraphicsPipelines;
-static PFN_vkCreateImage								qvkCreateImage;
-static PFN_vkCreateImageView							qvkCreateImageView;
-static PFN_vkCreatePipelineLayout						qvkCreatePipelineLayout;
-static PFN_vkCreatePipelineCache						qvkCreatePipelineCache;
-static PFN_vkCreateRenderPass							qvkCreateRenderPass;
-static PFN_vkCreateSampler								qvkCreateSampler;
-static PFN_vkCreateSemaphore							qvkCreateSemaphore;
-static PFN_vkCreateShaderModule							qvkCreateShaderModule;
-static PFN_vkDestroyBuffer								qvkDestroyBuffer;
-static PFN_vkDestroyCommandPool							qvkDestroyCommandPool;
-static PFN_vkDestroyDescriptorPool						qvkDestroyDescriptorPool;
-static PFN_vkDestroyDescriptorSetLayout					qvkDestroyDescriptorSetLayout;
-static PFN_vkDestroyDevice								qvkDestroyDevice;
-static PFN_vkDestroyFence								qvkDestroyFence;
-static PFN_vkDestroyFramebuffer							qvkDestroyFramebuffer;
-static PFN_vkDestroyImage								qvkDestroyImage;
-static PFN_vkDestroyImageView							qvkDestroyImageView;
-static PFN_vkDestroyPipeline							qvkDestroyPipeline;
-static PFN_vkDestroyPipelineCache						qvkDestroyPipelineCache;
-static PFN_vkDestroyPipelineLayout						qvkDestroyPipelineLayout;
-static PFN_vkDestroyRenderPass							qvkDestroyRenderPass;
-static PFN_vkDestroySampler								qvkDestroySampler;
-static PFN_vkDestroySemaphore							qvkDestroySemaphore;
-static PFN_vkDestroyShaderModule						qvkDestroyShaderModule;
-static PFN_vkDeviceWaitIdle								qvkDeviceWaitIdle;
-static PFN_vkEndCommandBuffer							qvkEndCommandBuffer;
-static PFN_vkFlushMappedMemoryRanges					qvkFlushMappedMemoryRanges;
-static PFN_vkFreeCommandBuffers							qvkFreeCommandBuffers;
-static PFN_vkFreeDescriptorSets							qvkFreeDescriptorSets;
-static PFN_vkFreeMemory									qvkFreeMemory;
-static PFN_vkGetBufferMemoryRequirements				qvkGetBufferMemoryRequirements;
-static PFN_vkGetDeviceQueue								qvkGetDeviceQueue;
-static PFN_vkGetImageMemoryRequirements					qvkGetImageMemoryRequirements;
-static PFN_vkGetImageSubresourceLayout					qvkGetImageSubresourceLayout;
-static PFN_vkInvalidateMappedMemoryRanges				qvkInvalidateMappedMemoryRanges;
-static PFN_vkMapMemory									qvkMapMemory;
-static PFN_vkQueueSubmit								qvkQueueSubmit;
-static PFN_vkQueueWaitIdle								qvkQueueWaitIdle;
-static PFN_vkResetCommandBuffer							qvkResetCommandBuffer;
-static PFN_vkResetDescriptorPool						qvkResetDescriptorPool;
-static PFN_vkResetFences								qvkResetFences;
-static PFN_vkUnmapMemory								qvkUnmapMemory;
-static PFN_vkUpdateDescriptorSets						qvkUpdateDescriptorSets;
-static PFN_vkWaitForFences								qvkWaitForFences;
+PFN_vkAllocateMemory								qvkAllocateMemory;
+PFN_vkBeginCommandBuffer							qvkBeginCommandBuffer;
+PFN_vkBindBufferMemory							qvkBindBufferMemory;
+PFN_vkBindImageMemory							qvkBindImageMemory;
+PFN_vkCmdBeginRenderPass							qvkCmdBeginRenderPass;
+PFN_vkCmdBindDescriptorSets						qvkCmdBindDescriptorSets;
+PFN_vkCmdBindIndexBuffer							qvkCmdBindIndexBuffer;
+PFN_vkCmdBindPipeline							qvkCmdBindPipeline;
+PFN_vkCmdBindVertexBuffers						qvkCmdBindVertexBuffers;
+PFN_vkCmdBlitImage								qvkCmdBlitImage;
+PFN_vkCmdClearAttachments						qvkCmdClearAttachments;
+PFN_vkCmdCopyBuffer								qvkCmdCopyBuffer;
+PFN_vkCmdCopyBufferToImage						qvkCmdCopyBufferToImage;
+PFN_vkCmdCopyImage								qvkCmdCopyImage;
+PFN_vkCmdDraw									qvkCmdDraw;
+PFN_vkCmdDrawIndexed								qvkCmdDrawIndexed;
+PFN_vkCmdEndRenderPass							qvkCmdEndRenderPass;
+PFN_vkCmdNextSubpass								qvkCmdNextSubpass;
+PFN_vkCmdPipelineBarrier							qvkCmdPipelineBarrier;
+PFN_vkCmdPushConstants							qvkCmdPushConstants;
+PFN_vkCmdSetDepthBias							qvkCmdSetDepthBias;
+PFN_vkCmdSetScissor								qvkCmdSetScissor;
+PFN_vkCmdSetViewport								qvkCmdSetViewport;
+PFN_vkCreateBuffer								qvkCreateBuffer;
+PFN_vkCreateCommandPool							qvkCreateCommandPool;
+PFN_vkCreateDescriptorPool						qvkCreateDescriptorPool;
+PFN_vkCreateDescriptorSetLayout					qvkCreateDescriptorSetLayout;
+PFN_vkCreateFence								qvkCreateFence;
+PFN_vkCreateFramebuffer							qvkCreateFramebuffer;
+PFN_vkCreateGraphicsPipelines					qvkCreateGraphicsPipelines;
+PFN_vkCreateImage								qvkCreateImage;
+PFN_vkCreateImageView							qvkCreateImageView;
+PFN_vkCreatePipelineLayout						qvkCreatePipelineLayout;
+PFN_vkCreatePipelineCache						qvkCreatePipelineCache;
+PFN_vkCreateRenderPass							qvkCreateRenderPass;
+PFN_vkCreateSampler								qvkCreateSampler;
+PFN_vkCreateSemaphore							qvkCreateSemaphore;
+PFN_vkCreateShaderModule							qvkCreateShaderModule;
+PFN_vkDestroyBuffer								qvkDestroyBuffer;
+PFN_vkDestroyCommandPool							qvkDestroyCommandPool;
+PFN_vkDestroyDescriptorPool						qvkDestroyDescriptorPool;
+PFN_vkDestroyDescriptorSetLayout					qvkDestroyDescriptorSetLayout;
+PFN_vkDestroyDevice								qvkDestroyDevice;
+PFN_vkDestroyFence								qvkDestroyFence;
+PFN_vkDestroyFramebuffer							qvkDestroyFramebuffer;
+PFN_vkDestroyImage								qvkDestroyImage;
+PFN_vkDestroyImageView							qvkDestroyImageView;
+PFN_vkDestroyPipeline							qvkDestroyPipeline;
+PFN_vkDestroyPipelineCache						qvkDestroyPipelineCache;
+PFN_vkDestroyPipelineLayout						qvkDestroyPipelineLayout;
+PFN_vkDestroyRenderPass							qvkDestroyRenderPass;
+PFN_vkDestroySampler								qvkDestroySampler;
+PFN_vkDestroySemaphore							qvkDestroySemaphore;
+PFN_vkDestroyShaderModule						qvkDestroyShaderModule;
+PFN_vkDeviceWaitIdle								qvkDeviceWaitIdle;
+PFN_vkEndCommandBuffer							qvkEndCommandBuffer;
+PFN_vkFlushMappedMemoryRanges					qvkFlushMappedMemoryRanges;
+PFN_vkFreeCommandBuffers							qvkFreeCommandBuffers;
+PFN_vkFreeDescriptorSets							qvkFreeDescriptorSets;
+PFN_vkFreeMemory									qvkFreeMemory;
+PFN_vkGetBufferMemoryRequirements				qvkGetBufferMemoryRequirements;
+PFN_vkGetDeviceQueue								qvkGetDeviceQueue;
+PFN_vkGetImageMemoryRequirements					qvkGetImageMemoryRequirements;
+PFN_vkGetImageSubresourceLayout					qvkGetImageSubresourceLayout;
+PFN_vkInvalidateMappedMemoryRanges				qvkInvalidateMappedMemoryRanges;
+PFN_vkMapMemory									qvkMapMemory;
+PFN_vkQueueSubmit								qvkQueueSubmit;
+PFN_vkQueueWaitIdle								qvkQueueWaitIdle;
+PFN_vkResetCommandBuffer							qvkResetCommandBuffer;
+PFN_vkResetDescriptorPool						qvkResetDescriptorPool;
+PFN_vkResetFences								qvkResetFences;
+PFN_vkUnmapMemory								qvkUnmapMemory;
+PFN_vkUpdateDescriptorSets						qvkUpdateDescriptorSets;
+PFN_vkWaitForFences								qvkWaitForFences;
 static PFN_vkAcquireNextImageKHR						qvkAcquireNextImageKHR;
 static PFN_vkCreateSwapchainKHR							qvkCreateSwapchainKHR;
 static PFN_vkDestroySwapchainKHR						qvkDestroySwapchainKHR;
@@ -130,14 +132,27 @@ static PFN_vkGetImageMemoryRequirements2KHR				qvkGetImageMemoryRequirements2KHR
 
 static PFN_vkDebugMarkerSetObjectNameEXT				qvkDebugMarkerSetObjectNameEXT;
 
-static PFN_vkCmdClearColorImage								qvkCmdClearColorImage;
+PFN_vkCmdClearColorImage								qvkCmdClearColorImage;
+
+// Ray tracing function pointers (non-static for use in vk_raytracing.c)
+PFN_vkCreateAccelerationStructureKHR					qvkCreateAccelerationStructureKHR;
+PFN_vkDestroyAccelerationStructureKHR					qvkDestroyAccelerationStructureKHR;
+PFN_vkGetAccelerationStructureBuildSizesKHR			qvkGetAccelerationStructureBuildSizesKHR;
+PFN_vkGetAccelerationStructureDeviceAddressKHR		qvkGetAccelerationStructureDeviceAddressKHR;
+PFN_vkCmdBuildAccelerationStructuresKHR				qvkCmdBuildAccelerationStructuresKHR;
+PFN_vkCmdTraceRaysKHR									qvkCmdTraceRaysKHR;
+PFN_vkCreateRayTracingPipelinesKHR					qvkCreateRayTracingPipelinesKHR;
+PFN_vkGetRayTracingShaderGroupHandlesKHR				qvkGetRayTracingShaderGroupHandlesKHR;
+PFN_vkGetRayTracingCaptureReplayShaderGroupHandlesKHR	qvkGetRayTracingCaptureReplayShaderGroupHandlesKHR;
+PFN_vkCmdTraceRaysIndirectKHR						qvkCmdTraceRaysIndirectKHR;
+PFN_vkGetBufferDeviceAddress							qvkGetBufferDeviceAddress;
 
 ////////////////////////////////////////////////////////////////////////////
 
 // forward declaration
 VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassIndex, uint32_t def_index );
 
-static uint32_t find_memory_type( uint32_t memory_type_bits, VkMemoryPropertyFlags properties ) {
+uint32_t find_memory_type( uint32_t memory_type_bits, VkMemoryPropertyFlags properties ) {
 	VkPhysicalDeviceMemoryProperties memory_properties;
 	uint32_t i;
 
@@ -226,7 +241,7 @@ const char *vk_format_string( VkFormat format )
 }
 
 
-static const char *vk_result_string( VkResult code ) {
+const char *vk_result_string( VkResult code ) {
 	static char buffer[32];
 
 	switch ( code ) {
@@ -1366,6 +1381,9 @@ static qboolean used_instance_extension( const char *ext )
 	if ( Q_stricmp( ext, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME ) == 0 )
 		return qtrue;
 
+	// Ray tracing requires VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2 (already checked above)
+	// No additional instance extensions needed for ray tracing
+
 	return qfalse;
 }
 
@@ -1643,15 +1661,30 @@ static qboolean vk_select_surface_format( VkPhysicalDevice physical_device, VkSu
 }
 
 
+// Convert sRGB format to linear UNORM format
+static VkFormat convert_srgb_to_linear( VkFormat format )
+{
+	switch ( format ) {
+		case VK_FORMAT_B8G8R8A8_SRGB:
+			return VK_FORMAT_B8G8R8A8_UNORM;
+		case VK_FORMAT_R8G8B8A8_SRGB:
+			return VK_FORMAT_R8G8B8A8_UNORM;
+		default:
+			return format; // Already linear or unknown
+	}
+}
+
 static void setup_surface_formats( VkPhysicalDevice physical_device )
 {
 	vk.depth_format = get_depth_format( physical_device );
 
-	vk.color_format = get_hdr_format( vk.base_format.format );
+	// Ensure color format is linear (not sRGB) for proper rendering
+	vk.color_format = convert_srgb_to_linear( get_hdr_format( vk.base_format.format ) );
 
 	vk.capture_format = VK_FORMAT_R8G8B8A8_UNORM;
 
-	vk.bloom_format = vk.base_format.format;
+	// Bloom should always use linear format, not sRGB
+	vk.bloom_format = convert_srgb_to_linear( vk.base_format.format );
 
 	vk.blitEnabled = vk_blit_enabled( physical_device, vk.color_format, vk.capture_format );
 
@@ -1732,7 +1765,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 
 	// create VkDevice
 	{
-		const char *device_extension_list[8];
+		const char *device_extension_list[16]; // Increased for ray tracing extensions
 		uint32_t device_extension_count;
 		const char *ext, *end;
 		char *str;
@@ -1754,6 +1787,11 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		qboolean storage8bit = qfalse;
 		const void** pNextPtr;
 #endif
+		qboolean rayTracingPipeline = qfalse;
+		qboolean accelerationStructure = qfalse;
+		qboolean rayQuery = qfalse;
+		qboolean deferredHostOperations = qfalse;
+		qboolean bufferDeviceAddress = qfalse;
 		uint32_t i, len, count = 0;
 
 		VK_CHECK( qvkEnumerateDeviceExtensionProperties( physical_device, NULL, &count, NULL ) );
@@ -1784,6 +1822,16 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			} else if ( strcmp( ext, VK_KHR_8BIT_STORAGE_EXTENSION_NAME ) == 0 ) {
 				storage8bit = qtrue;
 #endif
+			} else if ( strcmp( ext, VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME ) == 0 ) {
+				rayTracingPipeline = qtrue;
+			} else if ( strcmp( ext, VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME ) == 0 ) {
+				accelerationStructure = qtrue;
+			} else if ( strcmp( ext, VK_KHR_RAY_QUERY_EXTENSION_NAME ) == 0 ) {
+				rayQuery = qtrue;
+			} else if ( strcmp( ext, VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME ) == 0 ) {
+				deferredHostOperations = qtrue;
+			} else if ( strcmp( ext, VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME ) == 0 ) {
+				bufferDeviceAddress = qtrue;
 			}
 			// add this device extension to glConfig
 			if ( i != 0 ) {
@@ -1843,6 +1891,25 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			device_extension_list[ device_extension_count++ ] = VK_KHR_8BIT_STORAGE_EXTENSION_NAME;
 		}
 #endif // _DEBUG
+
+		// Ray tracing extensions (all required together)
+		if ( rayTracingPipeline && accelerationStructure && deferredHostOperations && bufferDeviceAddress ) {
+			device_extension_list[ device_extension_count++ ] = VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME;
+			device_extension_list[ device_extension_count++ ] = VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME;
+			device_extension_list[ device_extension_count++ ] = VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME;
+			device_extension_list[ device_extension_count++ ] = VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME;
+			if ( rayQuery ) {
+				device_extension_list[ device_extension_count++ ] = VK_KHR_RAY_QUERY_EXTENSION_NAME;
+			}
+			vk.rayTracingSupported = qtrue;
+			ri.Printf( PRINT_ALL, "...ray tracing extensions enabled\n" );
+		} else {
+			vk.rayTracingSupported = qfalse;
+			if ( rayTracingPipeline || accelerationStructure ) {
+				ri.Printf( PRINT_WARNING, "...ray tracing extensions not fully available (missing dependencies)\n" );
+			}
+		}
+
 		qvkGetPhysicalDeviceFeatures( physical_device, &device_features );
 
 		if ( device_features.fillModeNonSolid == VK_FALSE ) {
@@ -1934,6 +2001,34 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			storage_8bit_features.storagePushConstant8 = VK_FALSE;
 			storage_8bit_features.uniformAndStorageBuffer8BitAccess = VK_TRUE;
 			pNextPtr = (const void **)&storage_8bit_features.pNext;
+		}
+
+		// Ray tracing features
+		if ( rayTracingPipeline && accelerationStructure && deferredHostOperations && bufferDeviceAddress ) {
+			static VkPhysicalDeviceRayTracingPipelineFeaturesKHR rt_pipeline_features;
+			static VkPhysicalDeviceAccelerationStructureFeaturesKHR as_features;
+			static VkPhysicalDeviceBufferDeviceAddressFeatures buffer_addr_features_rt;
+
+			*pNextPtr = &buffer_addr_features_rt;
+			buffer_addr_features_rt.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+			buffer_addr_features_rt.pNext = &rt_pipeline_features;
+			buffer_addr_features_rt.bufferDeviceAddress = VK_TRUE;
+			buffer_addr_features_rt.bufferDeviceAddressCaptureReplay = VK_FALSE;
+			buffer_addr_features_rt.bufferDeviceAddressMultiDevice = VK_FALSE;
+
+			rt_pipeline_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+			rt_pipeline_features.pNext = &as_features;
+			rt_pipeline_features.rayTracingPipeline = VK_TRUE;
+			rt_pipeline_features.rayTracingPipelineTraceRaysIndirect = VK_FALSE;
+			rt_pipeline_features.rayTraversalPrimitiveCulling = VK_FALSE;
+
+			as_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+			as_features.pNext = NULL;
+			as_features.accelerationStructure = VK_TRUE;
+			as_features.accelerationStructureCaptureReplay = VK_FALSE;
+			as_features.accelerationStructureIndirectBuild = VK_FALSE;
+			as_features.accelerationStructureHostCommands = VK_FALSE;
+			as_features.descriptorBindingAccelerationStructureUpdateAfterBind = VK_FALSE;
 		}
 #endif
 		res = qvkCreateDevice( physical_device, &device_desc, NULL, &vk.device );
@@ -2030,6 +2125,31 @@ static void init_vulkan_library( void )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceSurfaceFormatsKHR )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceSurfacePresentModesKHR )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceSurfaceSupportKHR )
+
+		// Load KHR_get_physical_device_properties2 extension functions if available
+		// Try KHR version first (for Vulkan 1.0), then core version (Vulkan 1.1+)
+		// Note: In Vulkan 1.1+, these are core functions with identical signatures
+		void *funcPtr = ri.VK_GetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceProperties2KHR");
+		if (!funcPtr) {
+			funcPtr = ri.VK_GetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceProperties2");
+		}
+		qvkGetPhysicalDeviceProperties2KHR = (PFN_vkGetPhysicalDeviceProperties2KHR)funcPtr;
+		if (qvkGetPhysicalDeviceProperties2KHR) {
+			ri.Printf(PRINT_DEVELOPER, "Loaded vkGetPhysicalDeviceProperties2KHR function pointer\n");
+		} else {
+			ri.Printf(PRINT_WARNING, "Failed to load vkGetPhysicalDeviceProperties2KHR function pointer (extension may not be enabled)\n");
+		}
+		
+		funcPtr = ri.VK_GetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceFeatures2KHR");
+		if (!funcPtr) {
+			funcPtr = ri.VK_GetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceFeatures2");
+		}
+		qvkGetPhysicalDeviceFeatures2KHR = (PFN_vkGetPhysicalDeviceFeatures2KHR)funcPtr;
+		if (qvkGetPhysicalDeviceFeatures2KHR) {
+			ri.Printf(PRINT_DEVELOPER, "Loaded vkGetPhysicalDeviceFeatures2KHR function pointer\n");
+		} else {
+			ri.Printf(PRINT_WARNING, "Failed to load vkGetPhysicalDeviceFeatures2KHR function pointer (extension may not be enabled)\n");
+		}
 
 #ifdef USE_VK_VALIDATION
 		INIT_INSTANCE_FUNCTION_EXT( vkCreateDebugReportCallbackEXT )
@@ -2194,6 +2314,23 @@ static void init_vulkan_library( void )
 		if ( !qvkGetBufferMemoryRequirements2KHR || !qvkGetImageMemoryRequirements2KHR ) {
 			vk.dedicatedAllocation = qfalse;
 		}
+	}
+
+	// Load ray tracing functions if supported
+	if ( vk.rayTracingSupported ) {
+		INIT_DEVICE_FUNCTION_EXT(vkCreateAccelerationStructureKHR);
+		INIT_DEVICE_FUNCTION_EXT(vkDestroyAccelerationStructureKHR);
+		INIT_DEVICE_FUNCTION_EXT(vkGetAccelerationStructureBuildSizesKHR);
+		INIT_DEVICE_FUNCTION_EXT(vkGetAccelerationStructureDeviceAddressKHR);
+		INIT_DEVICE_FUNCTION_EXT(vkCmdBuildAccelerationStructuresKHR);
+		INIT_DEVICE_FUNCTION_EXT(vkCmdTraceRaysKHR);
+		INIT_DEVICE_FUNCTION_EXT(vkCreateRayTracingPipelinesKHR);
+		INIT_DEVICE_FUNCTION_EXT(vkGetRayTracingShaderGroupHandlesKHR);
+		INIT_DEVICE_FUNCTION_EXT(vkGetRayTracingCaptureReplayShaderGroupHandlesKHR);
+		INIT_DEVICE_FUNCTION_EXT(vkCmdTraceRaysIndirectKHR);
+		// Note: Ray tracing properties and features are queried via vkGetPhysicalDeviceProperties2KHR
+		// and vkGetPhysicalDeviceFeatures2KHR with pNext chains, not as separate functions
+		INIT_DEVICE_FUNCTION_EXT(vkGetBufferDeviceAddress);
 	}
 
 	if ( vk.debugMarkers ) {
@@ -2539,7 +2676,9 @@ void vk_update_attachment_descriptors( void ) {
 		Vk_Sampler_Def sd;
 
 		Com_Memset( &sd, 0, sizeof( sd ) );
-		sd.gl_mag_filter = sd.gl_min_filter = vk.blitFilter;
+		// Always use linear filtering for color buffer when used for bloom/post-processing
+		// to avoid blocky artifacts. vk.blitFilter (which can be GL_NEAREST) is only for final blit to screen.
+		sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
 		sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 		sd.max_lod_1_0 = qtrue;
 		sd.noAnisotropy = qtrue;
@@ -2572,10 +2711,14 @@ void vk_update_attachment_descriptors( void ) {
 
 		qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
 
-		// bloom images
+		// bloom images - always use linear filtering for smooth bloom
 		if ( r_bloom->integer )
 		{
 			uint32_t i;
+			sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+			sd.max_lod_1_0 = qtrue;
+			sd.noAnisotropy = qtrue;
+			info.sampler = vk_find_sampler( &sd );
 			for ( i = 0; i < ARRAY_LEN( vk.bloom_image_descriptor ); i++ )
 			{
 				info.imageView = vk.bloom_image_view[i];
@@ -2617,6 +2760,13 @@ void vk_init_descriptors( void )
 	alloc.pSetLayouts = &vk.set_layout_storage;
 
 	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.storage.descriptor ) );
+
+	// Allocate ray tracing descriptor set if supported
+	if ( vk.rayTracingSupported && vk.rt.initialized && vk.rt.raytracingDescriptorSetLayout != VK_NULL_HANDLE ) {
+		alloc.pSetLayouts = &vk.rt.raytracingDescriptorSetLayout;
+		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.rt.raytracingDescriptorSet ) );
+		SET_OBJECT_NAME( vk.rt.raytracingDescriptorSet, "ray tracing descriptor set", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
+	}
 
 	info.buffer = vk.storage.buffer;
 	info.offset = 0;
@@ -2917,6 +3067,20 @@ static void vk_create_shader_modules( void )
 
 #ifdef USE_VK_PBR
 	vk_bind_generated_shaders();
+
+	// Load ray tracing shaders if supported
+	// Shaders will be available in shader_data.c after compilation
+	if ( vk.rayTracingSupported ) {
+		// Try to load ray tracing shaders (they may not be compiled yet)
+		// Ray tracing shaders - initialize to NULL for now
+		// These will be loaded after shaders are compiled (see vk_rt_create_pipeline)
+		// The shader arrays are defined in shader_data.c after running compile.sh
+		// Note: Cannot use SHADER_MODULE() macro here because sizeof() doesn't work on incomplete array types
+		// The pipeline creation function will check for NULL and defer creation until shaders are available
+		vk.modules.rt_primary_rays_rgen = VK_NULL_HANDLE;
+		vk.modules.rt_miss_rmiss = VK_NULL_HANDLE;
+		vk.modules.rt_closesthit_rchit = VK_NULL_HANDLE;
+	}
 #else
 	vk.modules.vert.gen[0][0][0][0] = SHADER_MODULE( vert_tx0 );
 	vk.modules.vert.gen[0][0][0][1] = SHADER_MODULE( vert_tx0_fog );
@@ -3084,6 +3248,12 @@ static void vk_create_shader_modules( void )
 
 	SET_OBJECT_NAME( vk.modules.gamma_fs, "gamma post-processing fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.gamma_vs, "gamma post-processing vertex module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+
+#ifdef USE_VULKAN_RAY_TRACING
+	if ( vk.modules.rt_composite_fs != VK_NULL_HANDLE ) {
+		SET_OBJECT_NAME( vk.modules.rt_composite_fs, "RT composite fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+	}
+#endif
 
 #ifdef VK_PBR_BRDFLUT
     vk.modules.brdflut_fs = SHADER_MODULE(brdflut_frag_spv);
@@ -3354,6 +3524,12 @@ void vk_update_post_process_pipelines( void )
 			uint32_t width = gls.captureWidth;
 			uint32_t height = gls.captureHeight;
 			uint32_t i;
+#ifdef USE_VULKAN_RAY_TRACING
+			// Create RT composite pipeline if shader is loaded
+			if ( vk.rayTracingSupported && vk.rt.initialized && vk.modules.rt_composite_fs != VK_NULL_HANDLE ) {
+				vk_create_post_process_pipeline( 5, width, height );
+			}
+#endif
 
 			vk_create_post_process_pipeline( 1, width, height ); // bloom extraction
 
@@ -4417,6 +4593,11 @@ void vk_initialize( void )
 	Com_sprintf( glConfig.version_string, sizeof( glConfig.version_string ), "API: %i.%i.%i, Driver: %s",
 		major, minor, patch, driver_version );
 
+	// Initialize ray tracing if supported
+#ifdef USE_VULKAN_RAY_TRACING
+	vk_rt_init();
+#endif
+
 	vk.offscreenRender = qtrue;
 
 	if ( props.vendorID == 0x1002 ) {
@@ -4643,6 +4824,16 @@ void vk_initialize( void )
 	vk_create_storage_buffer( MAX_FLARES * vk.storage_alignment );
 
 	vk_create_shader_modules();
+
+	// Create ray tracing pipeline after shaders are loaded
+#ifdef USE_VULKAN_RAY_TRACING
+	if ( vk.rayTracingSupported && vk.rt.initialized ) {
+		extern void vk_rt_create_pipeline( void );
+		extern void vk_rt_populate_sbt( void );
+		vk_rt_create_pipeline();
+		vk_rt_populate_sbt();
+	}
+#endif
 
 	{
 		VkPipelineCacheCreateInfo ci;
@@ -5139,11 +5330,23 @@ for (i = 0; i < 2; i++) {
 	qvkDestroyShaderModule(vk.device, vk.modules.gamma_vs, NULL);
 	qvkDestroyShaderModule(vk.device, vk.modules.gamma_fs, NULL);
 
+#ifdef USE_VULKAN_RAY_TRACING
+	if ( vk.modules.rt_composite_fs != VK_NULL_HANDLE ) {
+		qvkDestroyShaderModule(vk.device, vk.modules.rt_composite_fs, NULL);
+		vk.modules.rt_composite_fs = VK_NULL_HANDLE;
+	}
+#endif
+
 #ifdef USE_VK_PBR
 	qvkDestroyShaderModule(vk.device, vk.modules.brdflut_fs, NULL);
 #endif
 
 __cleanup:
+	// Shutdown ray tracing
+#ifdef USE_VULKAN_RAY_TRACING
+	vk_rt_shutdown();
+#endif
+
 	if ( vk.device != VK_NULL_HANDLE ) {
 		qvkDestroyDevice( vk.device, NULL );
 	}
@@ -5689,6 +5892,17 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
             pipeline_name = "brdf LUT pipeline";
             blend = qfalse;
             break;
+#endif
+#ifdef USE_VULKAN_RAY_TRACING
+		case 5: // RT composite
+			pipeline = &vk.rt_composite_pipeline;
+			fsmodule = vk.modules.rt_composite_fs;
+			renderpass = vk.render_pass.post_bloom;
+			layout = vk.pipeline_layout_post_process;
+			samples = VK_SAMPLE_COUNT_1_BIT;
+			pipeline_name = "RT composite pipeline";
+			blend = qfalse;
+			break;
 #endif
 		default: // gamma correction
 			pipeline = &vk.gamma_pipeline;
@@ -8407,6 +8621,17 @@ void vk_end_frame( void )
 	if ( vk.fboActive )
 	{
 		vk.cmd->last_pipeline = VK_NULL_HANDLE; // do not restore clobbered descriptors in vk_bloom()
+
+#ifdef USE_VULKAN_RAY_TRACING
+		// Ray tracing pass (if enabled) - runs after main render pass
+		if ( r_raytracing && r_raytracing->integer && vk.rayTracingSupported && vk.rt.initialized ) {
+			vk_end_render_pass(); // End main render pass before ray tracing
+			vk_rt_trace_rays( vk.renderWidth, vk.renderHeight );
+			
+			// Composite RT output (HDR) to color_image with tonemapping
+			vk_rt_composite();
+		}
+#endif
 
 		if ( r_bloom->integer )
 		{

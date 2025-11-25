@@ -733,16 +733,26 @@ void Com_StartupVariable( const char *match ) {
 
 	for ( i = 0; i < com_numConsoleLines; i++ ) {
 		Cmd_TokenizeString( com_consoleLines[i] );
-		if ( Q_stricmp( Cmd_Argv( 0 ), "set" ) ) {
-			continue;
+		
+		// Handle "set" commands
+		if ( !Q_stricmp( Cmd_Argv( 0 ), "set" ) ) {
+			name = Cmd_Argv( 1 );
+			if ( !match || Q_stricmp( name, match ) == 0 ) {
+				if ( Cvar_Flags( name ) == CVAR_NONEXISTENT )
+					Cvar_Get( name, Cmd_ArgsFrom( 2 ), CVAR_USER_CREATED );
+				else
+					Cvar_Set2( name, Cmd_ArgsFrom( 2 ), qfalse );
+			}
 		}
-
-		name = Cmd_Argv( 1 );
-		if ( !match || Q_stricmp( name, match ) == 0 ) {
-			if ( Cvar_Flags( name ) == CVAR_NONEXISTENT )
-				Cvar_Get( name, Cmd_ArgsFrom( 2 ), CVAR_USER_CREATED );
-			else
-				Cvar_Set2( name, Cmd_ArgsFrom( 2 ), qfalse );
+		// Also handle direct cvar assignments like -fs_game mymod
+		else if ( !match || !Q_stricmp( Cmd_Argv( 0 ), match ) ) {
+			// Check if this is a known filesystem cvar that needs early processing
+			if ( !Q_stricmp( Cmd_Argv( 0 ), "fs_game" ) && Cmd_Argc() >= 2 ) {
+				if ( Cvar_Flags( "fs_game" ) == CVAR_NONEXISTENT )
+					Cvar_Get( "fs_game", Cmd_Argv( 1 ), CVAR_INIT | CVAR_SYSTEMINFO );
+				else
+					Cvar_Set2( "fs_game", Cmd_Argv( 1 ), qfalse );
+			}
 		}
 	}
 }

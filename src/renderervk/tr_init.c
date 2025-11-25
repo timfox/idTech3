@@ -84,16 +84,22 @@ cvar_t	*r_device;
 cvar_t	*r_vbo;
 #endif
 #ifdef USE_VK_PBR
-cvar_t	*r_pbr;
-cvar_t  *r_baseNormalX;
-cvar_t  *r_baseNormalY;
-cvar_t  *r_baseParallax;
-cvar_t  *r_baseSpecular;
+	cvar_t	*r_pbr;
+	cvar_t  *r_baseNormalX;
+	cvar_t  *r_baseNormalY;
+	cvar_t  *r_baseParallax;
+	cvar_t  *r_baseSpecular;
 #ifdef VK_CUBEMAP
-cvar_t	*r_cubeMapping;
+	cvar_t	*r_cubeMapping;
 #endif
 #endif
-cvar_t	*r_fbo;
+#ifdef USE_VULKAN_RAY_TRACING
+	cvar_t	*r_raytracing;
+	cvar_t	*r_rt_samples;
+	cvar_t	*r_rt_maxDepth;
+	cvar_t	*r_rt_debugMagenta;
+#endif
+	cvar_t	*r_fbo;
 cvar_t	*r_hdr;
 cvar_t	*r_bloom;
 cvar_t	*r_bloom_threshold;
@@ -1568,6 +1574,16 @@ static void R_Register( void )
 #ifdef VK_CUBEMAP
 	r_cubeMapping = ri.Cvar_Get( "r_cubeMapping", "0", CVAR_ARCHIVE | CVAR_LATCH );
 #endif
+#endif
+#ifdef USE_VULKAN_RAY_TRACING
+	r_raytracing = ri.Cvar_Get( "r_raytracing", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_raytracing, "Enables Vulkan ray tracing. Requires ray tracing capable GPU and " S_COLOR_CYAN "\\r_fbo 1" );
+	r_rt_samples = ri.Cvar_Get( "r_rt_samples", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_rt_samples, "Number of ray tracing samples per pixel (for denoising)." );
+	r_rt_maxDepth = ri.Cvar_Get( "r_rt_maxDepth", "2", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_rt_maxDepth, "Maximum ray tracing recursion depth." );
+	r_rt_debugMagenta = ri.Cvar_Get( "r_rt_debugMagenta", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_rt_debugMagenta, "Debug mode: 0=normal, 1=magenta clear + gradient test (for diagnosing pixel corruption)." );
 #endif
 	r_mapGreyScale = ri.Cvar_Get( "r_mapGreyScale", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_mapGreyScale, "-1", "1", CV_FLOAT );

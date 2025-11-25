@@ -1130,6 +1130,10 @@ void RE_UploadCinematic( int w, int h, int cols, int rows, byte *data, int clien
 		image->width = image->uploadWidth = cols;
 		image->height = image->uploadHeight = rows;
 #ifdef USE_VULKAN
+		// Ensure video textures use full 32-bit format (already set in R_CreateImage, but ensure it's preserved)
+		if ( image->internalFormat != VK_FORMAT_R8G8B8A8_UNORM ) {
+			image->internalFormat = VK_FORMAT_R8G8B8A8_UNORM;
+		}
 		vk_create_image( image, cols, rows, 1 );
 		vk_upload_image_data( image, 0, 0, cols, rows, 1, data, cols * rows * 4, qfalse );
 #else

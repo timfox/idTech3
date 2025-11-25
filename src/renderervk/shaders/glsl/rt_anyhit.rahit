@@ -1,0 +1,34 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+
+#include "rt_defines.glsl"
+
+hitAttributeEXT vec2 attribs;
+
+layout(binding = 3, set = 0) uniform sampler2D textures[];
+layout(binding = 4, set = 0) uniform MaterialBuffer {
+    vec4 albedo;
+    vec4 emissive;
+    float roughness;
+    float metallic;
+    float normalScale;
+    int albedoTextureIndex;
+    int normalTextureIndex;
+    int roughnessTextureIndex;
+    int metallicTextureIndex;
+    int emissiveTextureIndex;
+} material;
+
+void main()
+{
+    // Check for transparency/alpha testing
+    if (material.albedoTextureIndex >= 0) {
+        vec4 texColor = texture(textures[material.albedoTextureIndex], attribs);
+        if (texColor.a < 0.5) {
+            ignoreIntersectionEXT;
+        }
+    } else if (material.albedo.a < 0.5) {
+        ignoreIntersectionEXT;
+    }
+}
+

@@ -1407,6 +1407,12 @@ extern cvar_t	*r_baseSpecular;
 extern cvar_t	*r_cubeMapping;
 #endif
 #endif
+#ifdef USE_VULKAN_RAY_TRACING
+extern cvar_t	*r_raytracing;
+extern cvar_t	*r_rt_samples;
+extern cvar_t	*r_rt_maxDepth;
+extern cvar_t	*r_rt_debugMagenta;
+#endif
 extern cvar_t	*r_fbo;
 extern cvar_t	*r_hdr;
 extern cvar_t	*r_bloom;

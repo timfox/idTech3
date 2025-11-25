@@ -32,6 +32,11 @@ del /Q spirv\shader_data.c
 del /Q spirv\shader_binding.c
 del /Q "%tmpf%"
 
+@rem compile ray tracing shaders
+%cl% -V rt_primary_rays.rgen -o spirv/rt_primary_rays.rgen.spv
+%cl% -V rt_miss.rmiss -o spirv/rt_miss.rmiss.spv
+%cl% -V rt_closesthit.rchit -o spirv/rt_closesthit.rchit.spv
+
 @rem compile individual shaders
 
 for %%f in (%glsl%*.vert) do (
@@ -49,6 +54,31 @@ for %%f in (%glsl%*.frag) do (
 for %%f in (%glsl%*.geom) do (
     "%cl%" -S geom -V -o "%tmpf%" "%%f"
     "%bh%" "%tmpf%" %outf% %%~nf_geom_spv
+    del /Q "%tmpf%"
+)
+
+@rem compile ray tracing shaders
+for %%f in (%glsl%*.rgen) do (
+    "%cl%" -S rgen -V -I"%glsl%" -o "%tmpf%" "%%f"
+    "%bh%" "%tmpf%" %outf% %%~nf_rgen_spv
+    del /Q "%tmpf%"
+)
+
+for %%f in (%glsl%*.rmiss) do (
+    "%cl%" -S rmiss -V -I"%glsl%" -o "%tmpf%" "%%f"
+    "%bh%" "%tmpf%" %outf% %%~nf_rmiss_spv
+    del /Q "%tmpf%"
+)
+
+for %%f in (%glsl%*.rchit) do (
+    "%cl%" -S rchit -V -I"%glsl%" -o "%tmpf%" "%%f"
+    "%bh%" "%tmpf%" %outf% %%~nf_rchit_spv
+    del /Q "%tmpf%"
+)
+
+for %%f in (%glsl%*.rahit) do (
+    "%cl%" -S rahit -V -I"%glsl%" -o "%tmpf%" "%%f"
+    "%bh%" "%tmpf%" %outf% %%~nf_rahit_spv
     del /Q "%tmpf%"
 )
 

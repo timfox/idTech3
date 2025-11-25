@@ -782,7 +782,12 @@ static void upload_vk_image( image_t *image, byte *pic ) {
 	w = upload_data.base_level_width;
 	h = upload_data.base_level_height;
 
-	if ( r_texturebits->integer > 16 || r_texturebits->integer == 0 || ( image->flags & IMGFLAG_LIGHTMAP ) ) {
+	// Always use full 32-bit format for sprites, video, and UI elements to avoid blocky artifacts
+	// Also use full format for lightmaps and when texturebits is 0 or > 16
+	if ( r_texturebits->integer > 16 || r_texturebits->integer == 0 || 
+		 ( image->flags & IMGFLAG_LIGHTMAP ) || 
+		 ( image->flags & IMGFLAG_RGB ) ||
+		 ( image->flags & IMGFLAG_NOSCALE ) ) {
 		image->internalFormat = VK_FORMAT_R8G8B8A8_UNORM;
 		//image->internalFormat = VK_FORMAT_B8G8R8A8_UNORM;
 	} else {

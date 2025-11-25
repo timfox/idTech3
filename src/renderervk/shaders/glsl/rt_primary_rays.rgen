@@ -1,0 +1,87 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+
+#include "rt_defines.glsl"
+#include "rt_helpers.glsl"
+
+layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
+layout(binding = 1, set = 0, rgba16f) uniform image2D outputImage;
+layout(binding = 2, set = 0) uniform UniformBuffer {
+    mat4 viewInverse;
+    mat4 projInverse;
+    vec4 cameraPos;
+    vec2 resolution;
+    float time;
+    float nearPlane;
+    float farPlane;
+    float exposure;
+    int frameIndex;
+    int samplesPerPixel;
+    int debugMagenta; // 0=normal, 1=gradient test
+} ubo;
+
+layout(location = 0) rayPayloadEXT vec3 hitValue;
+layout(location = 1) rayPayloadEXT float hitDistance;
+
+void main()
+{
+    const ivec2 pixel = ivec2(gl_LaunchIDEXT.xy);
+    
+    // Bounds check to prevent out-of-bounds writes
+    if (pixel.x >= gl_LaunchSizeEXT.x || pixel.y >= gl_LaunchSizeEXT.y) {
+        return;
+    }
+    
+    const vec2 pixelCenter = vec2(pixel) + vec2(0.5);
+    
+    // Debug mode: gradient test (magenta clear + gradient overlay)
+    if (ubo.debugMagenta != 0) {
+        vec2 uv = pixelCenter / ubo.resolution;
+        imageStore(outputImage, pixel, vec4(uv, 0.0, 1.0));
+        return;
+    }
+    
+    // Calculate UV coordinates
+    const vec2 inUV = pixelCenter / ubo.resolution;
+    
+    // Get camera position and ray direction
+    vec3 origin = getWorldRayOrigin(ubo.viewInverse);
+    vec3 direction = getWorldRayDirection(inUV, ubo.viewInverse, ubo.projInverse);
+    
+    // Add jitter for anti-aliasing (using frame index for temporal accumulation)
+    if (ubo.samplesPerPixel > 1) {
+        uint seed = uint(pixel.x + pixel.y * uint(ubo.resolution.x) + ubo.frameIndex);
+        vec2 jitter = (random2(seed) - 0.5) / ubo.resolution;
+        direction = getWorldRayDirection(inUV + jitter, ubo.viewInverse, ubo.projInverse);
+    }
+    
+    // Initialize payload
+    hitValue = vec3(0.0);
+    hitDistance = 0.0;
+    
+    // Trace primary ray
+    uint rayFlags = gl_RayFlagsOpaqueEXT;
+    float tMin = ubo.nearPlane;
+    float tMax = ubo.farPlane;
+    
+    traceRayEXT(
+        topLevelAS,        // accelerationStructure
+        rayFlags,          // rayFlags
+        0xFF,              // cullMask
+        0,                 // sbtRecordOffset
+        0,                 // sbtRecordStride
+        0,                 // missIndex
+        origin,            // origin
+        tMin,              // Tmin
+        direction,         // direction
+        tMax,              // Tmax
+        0                  // payload
+    );
+    
+    // Apply exposure (keep in HDR linear space for ray tracing output)
+    // Tonemapping will be done in the composite pass
+    vec3 color = hitValue * ubo.exposure;
+    
+    // Write HDR color to output image (no tonemapping/sRGB conversion here)
+    imageStore(outputImage, pixel, vec4(color, 1.0));
+}

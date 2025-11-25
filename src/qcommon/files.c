@@ -4551,11 +4551,30 @@ static void FS_ReorderSearchPaths( void ) {
 		path = path->next;
 	}
 
-	fs_searchpaths = list[0];
-	for ( i = 0; i < cnt-1; i++ ) {
-		list[i]->next = list[i+1];
+	// Relink: packs first, then directories
+	// Within directories, mod directories (non-base) should come before base directories
+	// This ensures mod .so files are found before base game files
+	if ( npaks > 0 ) {
+		fs_searchpaths = list[0];
+		for ( i = 0; i < npaks-1; i++ ) {
+			list[i]->next = list[i+1];
+		}
+		if ( ndirs > 0 ) {
+			list[npaks-1]->next = dirs[0];
+			for ( i = 0; i < ndirs-1; i++ ) {
+				dirs[i]->next = dirs[i+1];
+			}
+			dirs[ndirs-1]->next = NULL;
+		} else {
+			list[npaks-1]->next = NULL;
+		}
+	} else if ( ndirs > 0 ) {
+		fs_searchpaths = dirs[0];
+		for ( i = 0; i < ndirs-1; i++ ) {
+			dirs[i]->next = dirs[i+1];
+		}
+		dirs[ndirs-1]->next = NULL;
 	}
-	list[cnt-1]->next = NULL;
 
 	Z_Free( list );
 }
@@ -4792,6 +4811,9 @@ static void FS_Startup( void ) {
 
 	// check for additional game folder for mods
 	if ( fs_gamedirvar->string[0] != '\0' && !FS_IsBaseGame( fs_gamedirvar->string ) ) {
+		if ( fs_debug && fs_debug->integer ) {
+			Com_Printf( "Adding mod directory: %s\n", fs_gamedirvar->string );
+		}
 		if ( fs_steampath->string[0] != '\0' ) {
 			FS_AddGameDirectory( fs_steampath->string, fs_gamedirvar->string );
 		}
@@ -4801,6 +4823,9 @@ static void FS_Startup( void ) {
 		if ( fs_homepath->string[0] != '\0' && Q_stricmp( fs_homepath->string, fs_basepath->string ) ) {
 			FS_AddGameDirectory( fs_homepath->string, fs_gamedirvar->string );
 		}
+	} else if ( fs_debug && fs_debug->integer ) {
+		Com_Printf( "Mod directory not added: fs_game='%s', isBaseGame=%d\n", 
+			fs_gamedirvar->string, FS_IsBaseGame( fs_gamedirvar->string ) );
 	}
 
 	// reorder search paths to minimize further changes
@@ -5789,12 +5814,20 @@ void *FS_LoadLibrary( const char *name )
 	const searchpath_t *sp = fs_searchpaths;
 	void *libHandle = NULL;
 
+	// Search all directory paths (both DIR_STATIC and DIR_ALLOW)
+	// This allows loading .so files from both base game and mod directories
 	while ( !libHandle && sp ) {
-		while ( sp && ( sp->policy != DIR_STATIC || !sp->dir ) ) {
+		// Skip pack files (pk3) and non-directory paths
+		while ( sp && ( sp->pack || !sp->dir ) ) {
 			sp = sp->next;
 		}
 		if ( sp ) {
+			// Try all directory policies (DIR_STATIC, DIR_ALLOW)
+			// DIR_DENY is skipped implicitly since we check for it above
 			const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, name );
+			if ( fs_debug && fs_debug->integer ) {
+				Com_Printf( "FS_LoadLibrary: trying %s (policy=%d)\n", fn, sp->policy );
+			}
 			libHandle = Sys_LoadLibrary( fn );
 			sp = sp->next;
 		}

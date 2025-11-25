@@ -325,6 +325,60 @@ void vk_release_resources( void );
 void vk_wait_idle( void );
 void vk_queue_wait_idle( void );
 
+// Helper function for memory type selection
+uint32_t find_memory_type( uint32_t memory_type_bits, VkMemoryPropertyFlags properties );
+
+// Vulkan error checking macro (vk_result_string is defined in vk.c)
+extern const char *vk_result_string( VkResult res );
+#define VK_CHECK( function_call ) { \
+	VkResult _vk_check_res = function_call; \
+	if ( _vk_check_res < 0 ) { \
+		ri.Error( ERR_FATAL, "Vulkan: %s returned %s", #function_call, vk_result_string( _vk_check_res ) ); \
+	} \
+}
+
+// Vulkan function pointer declarations (defined in vk.c)
+extern PFN_vkAllocateMemory qvkAllocateMemory;
+extern PFN_vkBeginCommandBuffer qvkBeginCommandBuffer;
+extern PFN_vkBindBufferMemory qvkBindBufferMemory;
+extern PFN_vkBindImageMemory qvkBindImageMemory;
+extern PFN_vkCmdBindDescriptorSets qvkCmdBindDescriptorSets;
+extern PFN_vkCmdBindPipeline qvkCmdBindPipeline;
+extern PFN_vkCmdClearColorImage qvkCmdClearColorImage;
+extern PFN_vkCmdPipelineBarrier qvkCmdPipelineBarrier;
+extern PFN_vkCreateBuffer qvkCreateBuffer;
+extern PFN_vkCreateDescriptorSetLayout qvkCreateDescriptorSetLayout;
+extern PFN_vkCreateImage qvkCreateImage;
+extern PFN_vkCreateImageView qvkCreateImageView;
+extern PFN_vkCreatePipelineLayout qvkCreatePipelineLayout;
+extern PFN_vkDestroyBuffer qvkDestroyBuffer;
+extern PFN_vkDestroyDescriptorSetLayout qvkDestroyDescriptorSetLayout;
+extern PFN_vkDestroyImage qvkDestroyImage;
+extern PFN_vkDestroyImageView qvkDestroyImageView;
+extern PFN_vkDestroyPipeline qvkDestroyPipeline;
+extern PFN_vkDestroyPipelineLayout qvkDestroyPipelineLayout;
+extern PFN_vkFreeMemory qvkFreeMemory;
+extern PFN_vkGetBufferMemoryRequirements qvkGetBufferMemoryRequirements;
+extern PFN_vkGetImageMemoryRequirements qvkGetImageMemoryRequirements;
+extern PFN_vkMapMemory qvkMapMemory;
+extern PFN_vkUnmapMemory qvkUnmapMemory;
+extern PFN_vkUpdateDescriptorSets qvkUpdateDescriptorSets;
+extern PFN_vkGetPhysicalDeviceProperties2KHR qvkGetPhysicalDeviceProperties2KHR;
+extern PFN_vkGetPhysicalDeviceFeatures2KHR qvkGetPhysicalDeviceFeatures2KHR;
+
+// Ray tracing function pointers
+extern PFN_vkCreateAccelerationStructureKHR qvkCreateAccelerationStructureKHR;
+extern PFN_vkDestroyAccelerationStructureKHR qvkDestroyAccelerationStructureKHR;
+extern PFN_vkGetAccelerationStructureBuildSizesKHR qvkGetAccelerationStructureBuildSizesKHR;
+extern PFN_vkGetAccelerationStructureDeviceAddressKHR qvkGetAccelerationStructureDeviceAddressKHR;
+extern PFN_vkCmdBuildAccelerationStructuresKHR qvkCmdBuildAccelerationStructuresKHR;
+extern PFN_vkCmdTraceRaysKHR qvkCmdTraceRaysKHR;
+extern PFN_vkCreateRayTracingPipelinesKHR qvkCreateRayTracingPipelinesKHR;
+extern PFN_vkGetRayTracingShaderGroupHandlesKHR qvkGetRayTracingShaderGroupHandlesKHR;
+extern PFN_vkGetRayTracingCaptureReplayShaderGroupHandlesKHR qvkGetRayTracingCaptureReplayShaderGroupHandlesKHR;
+extern PFN_vkCmdTraceRaysIndirectKHR qvkCmdTraceRaysIndirectKHR;
+extern PFN_vkGetBufferDeviceAddress qvkGetBufferDeviceAddress;
+
 //
 // Resources allocation.
 //
@@ -387,6 +441,26 @@ void vk_update_uniform_descriptor( VkDescriptorSet descriptor, VkBuffer buffer )
 void vk_update_post_process_pipelines( void );
 
 const char *vk_format_string( VkFormat format );
+
+// Ray tracing functions
+void vk_rt_init( void );
+void vk_rt_shutdown( void );
+void vk_rt_create_pipeline( void );
+void vk_rt_populate_sbt( void );
+void vk_rt_build_acceleration_structures( void );
+void vk_rt_build_blas( VkBuffer vertexBuffer, VkDeviceSize vertexOffset, uint32_t vertexCount, VkBuffer indexBuffer, VkDeviceSize indexOffset, uint32_t indexCount, uint32_t blasIndex );
+void vk_rt_update_tlas( void );
+void vk_rt_trace_rays( uint32_t width, uint32_t height );
+
+// Internal ray tracing functions (forward declarations)
+void vk_rt_create_descriptor_set_layout( void );
+void vk_rt_create_pipeline_layout( void );
+void vk_rt_create_shader_binding_table( void );
+void vk_rt_create_output_image( uint32_t width, uint32_t height );
+void vk_rt_update_descriptor_set( void );
+void vk_rt_create_composite_descriptor_set( void );
+void vk_rt_update_composite_descriptor_set( void );
+void vk_rt_composite( void );
 
 void VBO_PrepareQueues( void );
 void VBO_RenderIBOItems( void );
@@ -666,6 +740,12 @@ typedef struct {
 		VkShaderModule filtercube_gm;
 		VkShaderModule irradiancecube_fs;
 		VkShaderModule prefilterenvmap_fs;
+
+		// Ray tracing shaders
+		VkShaderModule rt_primary_rays_rgen;
+		VkShaderModule rt_miss_rmiss;
+		VkShaderModule rt_closesthit_rchit;
+		VkShaderModule rt_composite_fs;
 	} modules;
 
 	VkPipelineCache pipelineCache;
@@ -727,6 +807,10 @@ typedef struct {
 	VkPipeline bloom_extract_pipeline;
 	VkPipeline blur_pipeline[VK_NUM_BLOOM_PASSES*2]; // horizontal & vertical pairs
 	VkPipeline bloom_blend_pipeline;
+#ifdef USE_VULKAN_RAY_TRACING
+	VkPipeline rt_composite_pipeline;
+	VkDescriptorSet rt_composite_descriptor;
+#endif
 #ifdef VK_PBR_BRDFLUT
 	VkPipeline brdflut_pipeline;
 #endif
@@ -738,6 +822,7 @@ typedef struct {
 	qboolean fragmentStores;
 	qboolean dedicatedAllocation;
 	qboolean debugMarkers;
+	qboolean rayTracingSupported;
 
 	float maxAnisotropy;
 	float maxLod;
@@ -810,6 +895,62 @@ typedef struct {
 		VkDeviceSize geometry_size;
 	} defaults;
 
+	// Ray tracing structures
+	struct {
+		VkPhysicalDeviceRayTracingPipelinePropertiesKHR properties;
+		VkAccelerationStructureKHR tlas; // Top-Level Acceleration Structure
+		VkBuffer tlasBuffer;
+		VkDeviceMemory tlasMemory;
+		VkDeviceAddress tlasDeviceAddress;
+		
+		VkAccelerationStructureKHR *blas; // Bottom-Level Acceleration Structures (per model)
+		VkBuffer *blasBuffers;
+		VkDeviceMemory *blasMemory;
+		uint32_t blasCount;
+		uint32_t blasCapacity;
+		
+		VkBuffer scratchBuffer;
+		VkDeviceMemory scratchMemory;
+		VkDeviceSize scratchBufferSize;
+		
+		VkPipeline raytracingPipeline;
+		VkPipelineLayout raytracingPipelineLayout;
+		VkDescriptorSetLayout raytracingDescriptorSetLayout;
+		VkDescriptorSet raytracingDescriptorSet;
+		
+		// Shader Binding Table
+		VkBuffer sbtBuffer;
+		VkDeviceMemory sbtMemory;
+		VkDeviceSize raygenRegionSize;
+		VkDeviceSize missRegionSize;
+		VkDeviceSize hitRegionSize;
+		VkDeviceSize callableRegionSize;
+		VkDeviceSize raygenRegionOffset;
+		VkDeviceSize missRegionOffset;
+		VkDeviceSize hitRegionOffset;
+		VkDeviceSize callableRegionOffset;
+		
+		VkStridedDeviceAddressRegionKHR raygenShaderBindingTable;
+		VkStridedDeviceAddressRegionKHR missShaderBindingTable;
+		VkStridedDeviceAddressRegionKHR hitShaderBindingTable;
+		VkStridedDeviceAddressRegionKHR callableShaderBindingTable;
+		
+		// Output image for ray tracing
+		VkImage outputImage;
+		VkImageView outputImageView;
+		VkDeviceMemory outputImageMemory;
+		uint32_t outputImageWidth;
+		uint32_t outputImageHeight;
+		
+		// Uniform buffer for camera data
+		VkBuffer uniformBuffer;
+		VkDeviceMemory uniformBufferMemory;
+		
+		// Blue noise texture for denoising
+		image_t *blueNoiseTexture;
+		
+		qboolean initialized;
+	} rt;
 } Vk_Instance;
 
 typedef struct {
