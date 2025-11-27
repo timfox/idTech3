@@ -55,5 +55,11 @@ for sofile in idtech3_*.so; do
 done
 shopt -u nullglob
 
+# Copy shared ImGui runtime if present (required when USE_CIMGUI=ON)
+if [ -f "libimgui_shared.so" ]; then
+	cp -f "libimgui_shared.so" "$RELEASE_DIR/"
+	echo "Copied libimgui_shared.so to $RELEASE_DIR/"
+fi
+
 echo "Renderer .so files updated in $RELEASE_DIR"
 

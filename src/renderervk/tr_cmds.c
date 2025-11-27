@@ -511,6 +511,7 @@ void RE_VertexLighting( qboolean allowed )
 	tr.vertexLightingAllowed = allowed;
 }
 
+#ifdef USE_CIMGUI
 qboolean RE_ImGuiBackend_Init( void )
 {
 	return VK_ImGui_InitBackend();
@@ -526,11 +527,12 @@ void RE_ImGuiBackend_NewFrame( void )
 	VK_ImGui_NewFrame();
 }
 
+#ifdef USE_CIMGUI
 void RE_ImGuiBackend_RenderDrawData( const ImDrawData *drawData )
 {
 	imguiDrawCommand_t *cmd;
 
-	if ( !drawData || drawData->CmdListsCount <= 0 )
+	if ( !drawData )
 		return;
 
 	cmd = R_GetCommandBuffer( sizeof( *cmd ) );
@@ -540,3 +542,5 @@ void RE_ImGuiBackend_RenderDrawData( const ImDrawData *drawData )
 	cmd->commandId = RC_IMGUI_DRAW;
 	cmd->drawData = drawData;
 }
+#endif
+#endif

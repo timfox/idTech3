@@ -278,6 +278,7 @@ IF(USE_CIMGUI AND DEFINED CIMGUI_DIR)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE
 		USE_CIMGUI
 		IMGUI_USER_CONFIG=${CIMGUI_USER_CONFIG}
+		CIMGUI_USE_SDL2
 	)
 ENDIF()
 
@@ -390,10 +391,13 @@ IF(USE_CIMGUI AND TARGET imgui_shared)
 			${CIMGUI_IMGUI_DIR}
 			${CIMGUI_IMGUI_DIR}/backends
 			${CIMGUI_IMGUI_DIR}/misc/cpp
+			${CMAKE_CURRENT_SOURCE_DIR}/src/renderercommon
+			${CMAKE_CURRENT_SOURCE_DIR}/src/renderercommon/vulkan
 		)
 		target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE
 			USE_CIMGUI
 			IMGUI_USER_CONFIG="cimconfig.h"
+			CIMGUI_USE_VULKAN
 		)
 		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE imgui_shared)
 	elseif(TARGET ${RENDERER_PREFIX}_vulkan)
@@ -402,10 +406,13 @@ IF(USE_CIMGUI AND TARGET imgui_shared)
 			${CIMGUI_IMGUI_DIR}
 			${CIMGUI_IMGUI_DIR}/backends
 			${CIMGUI_IMGUI_DIR}/misc/cpp
+			${CMAKE_CURRENT_SOURCE_DIR}/src/renderercommon
+			${CMAKE_CURRENT_SOURCE_DIR}/src/renderercommon/vulkan
 		)
 		target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE
 			USE_CIMGUI
 			IMGUI_USER_CONFIG="cimconfig.h"
+			CIMGUI_USE_VULKAN
 		)
 	endif()
 ENDIF()

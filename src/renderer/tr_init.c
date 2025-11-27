@@ -23,6 +23,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "tr_local.h"
 
+#ifndef IMGUI_FORWARD_DECLARE
+#define IMGUI_FORWARD_DECLARE
+typedef struct ImDrawData ImDrawData;
+#endif
+
 glconfig_t	glConfig;
 qboolean	nonPowerOfTwoTextures;
 qboolean	textureFilterAnisotropic;
@@ -1322,6 +1327,7 @@ static void RE_SyncRender( void )
 	}
 }
 
+#ifdef USE_CIMGUI
 static qboolean RE_ImGuiBackend_Init( void )
 {
 	return qfalse;
@@ -1339,6 +1345,7 @@ static void RE_ImGuiBackend_RenderDrawData( const ImDrawData *drawData )
 {
 	(void)drawData;
 }
+#endif
 
 
 /*
@@ -2055,10 +2062,12 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.GetConfig = RE_GetConfig;
 	re.VertexLighting = RE_VertexLighting;
 	re.SyncRender = RE_SyncRender;
+#ifdef USE_CIMGUI
 	re.ImGuiBackendInit = RE_ImGuiBackend_Init;
 	re.ImGuiBackendShutdown = RE_ImGuiBackend_Shutdown;
 	re.ImGuiBackendNewFrame = RE_ImGuiBackend_NewFrame;
 	re.ImGuiBackendRenderDrawData = RE_ImGuiBackend_RenderDrawData;
+#endif
 
 	return &re;
 }

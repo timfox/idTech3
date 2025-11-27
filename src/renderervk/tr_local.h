@@ -62,6 +62,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "iqm.h"
 
 
+#ifdef USE_CIMGUI
+typedef struct ImDrawData ImDrawData;
+#endif
+
 #ifdef USE_VULKAN
 #include "vk.h"
 // GL constants substitutions
@@ -2035,11 +2039,13 @@ typedef struct
 	int commandId;
 } clearColorCommand_t;
 
+#ifdef USE_CIMGUI
 typedef struct
 {
 	int commandId;
 	const ImDrawData *drawData;
 } imguiDrawCommand_t;
+#endif
 
 typedef enum {
 	RC_END_OF_LIST,
@@ -2053,7 +2059,9 @@ typedef enum {
 	RC_CLEARDEPTH,
 	RC_CLEARCOLOR,
 	RC_CONVOLVECUBEMAP,
+#ifdef USE_CIMGUI
 	RC_IMGUI_DRAW
+#endif
 } renderCommand_t;
 
 
@@ -2107,10 +2115,12 @@ void RE_ThrottleBackend( void );
 qboolean RE_CanMinimize( void );
 const glconfig_t *RE_GetConfig( void );
 void RE_VertexLighting( qboolean allowed );
+#ifdef USE_CIMGUI
 qboolean RE_ImGuiBackend_Init( void );
 void RE_ImGuiBackend_Shutdown( void );
 void RE_ImGuiBackend_NewFrame( void );
 void RE_ImGuiBackend_RenderDrawData( const ImDrawData *drawData );
+#endif
 
 #ifndef USE_VULKAN
 #define GLE( ret, name, ... ) extern ret ( APIENTRY * q##name )( __VA_ARGS__ );

@@ -7,11 +7,11 @@
 #include <SDL.h>
 #endif
 
+#include <stdbool.h>
+
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #include "cimgui.h"
 #include "cimgui_impl.h"
-
-CIMGUI_API ImGuiIO* igGetIO( void );
 
 typedef struct
 {
@@ -93,7 +93,7 @@ static qboolean CL_ImGui_CreateContext( void )
 		return qfalse;
 	}
 
-	cl_imgui.io = igGetIO();
+	cl_imgui.io = igGetIO_Nil();
 	ImGuiIO *io = cl_imgui.io;
 	io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	io->ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;

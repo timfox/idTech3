@@ -823,38 +823,15 @@ void Sys_PrintBinVersion( const char* name )
 }
 
 
-#ifdef __APPLE__
+#if defined(__APPLE__)
 static char binaryPath[ MAX_OSPATH ] = { 0 };
+#else
+static char binaryPath[ MAX_OSPATH ] = { 0 };
+#endif
 static char installPath[ MAX_OSPATH ] = { 0 };
 
 
-/*
-=================
-Sys_SetBinaryPath
-=================
-*/
-static void Sys_SetBinaryPath( const char *path )
-{
-	char *d;
-	Q_strncpyz( binaryPath, path, sizeof( binaryPath ) );
-
-	d = dirname( binaryPath );
-	if ( d != NULL && d != binaryPath )
-	{
-		Q_strncpyz( binaryPath, d, sizeof( binaryPath ) );
-	}
-}
-
-
-/*
-=================
-Sys_SetDefaultBasePath
-=================
-*/
-static void Sys_SetDefaultBasePath( const char *path )
-{
-	Q_strncpyz( installPath, path, sizeof( installPath ) );
-}
+#ifdef __APPLE__
 
 
 /*
@@ -892,6 +869,41 @@ static char *Sys_StripAppBundle( char *dir )
 
 	return cwd;
 }
+#else
+static char *Sys_StripAppBundle( char *dir )
+{
+	return dir;
+}
+#endif // __APPLE__
+
+
+/*
+=================
+Sys_SetBinaryPath
+=================
+*/
+static void Sys_SetBinaryPath( const char *path )
+{
+	char *d;
+	Q_strncpyz( binaryPath, path, sizeof( binaryPath ) );
+
+	d = dirname( binaryPath );
+	if ( d != NULL && d != binaryPath )
+	{
+		Q_strncpyz( binaryPath, d, sizeof( binaryPath ) );
+	}
+}
+
+
+/*
+=================
+Sys_SetDefaultBasePath
+=================
+*/
+static void Sys_SetDefaultBasePath( const char *path )
+{
+	Q_strncpyz( installPath, path, sizeof( installPath ) );
+}
 
 
 /*
@@ -903,7 +915,6 @@ char *Sys_DefaultAppPath( void )
 {
 	return binaryPath;
 }
-#endif // __APPLE__
 
 
 /*
@@ -913,12 +924,10 @@ Sys_DefaultBasePath
 */
 const char *Sys_DefaultBasePath( void )
 {
-#ifdef __APPLE__
 	if ( installPath[0] != '\0' )
 		return installPath;
-	else
-#endif
-		return Sys_Pwd();
+
+	return Sys_Pwd();
 }
 
 
@@ -1003,10 +1012,8 @@ int main( int argc, const char* argv[] )
 		return 0; // print version and exit
 	}
 
-#ifdef __APPLE__
-	Sys_SetBinaryPath( argv[ 0 ] );
+	Sys_SetBinaryPath( Sys_BinName( argv[ 0 ] ) );
 	Sys_SetDefaultBasePath( Sys_StripAppBundle( binaryPath ) );
-#endif
 
 	// merge the command line, this is kinda silly
 	for ( len = 1, i = 1; i < argc; i++ )

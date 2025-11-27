@@ -1141,15 +1141,17 @@ void HandleEvents( void )
 
 	while ( SDL_PollEvent( &e ) )
 	{
+		qboolean imguiWantsMouse = qfalse;
+		qboolean imguiWantsKeyboard = qfalse;
 #ifdef USE_CIMGUI
 #ifdef USE_SDL
 		CL_ImGui_ProcessEvent( &e );
 #endif
-		qboolean imguiWantsMouse = CL_ImGui_WantCaptureMouse();
-		qboolean imguiWantsKeyboard = CL_ImGui_WantCaptureKeyboard();
+		imguiWantsMouse = CL_ImGui_WantCaptureMouse();
+		imguiWantsKeyboard = CL_ImGui_WantCaptureKeyboard();
 #else
-		qboolean imguiWantsMouse = qfalse;
-		qboolean imguiWantsKeyboard = qfalse;
+		(void)imguiWantsMouse;
+		(void)imguiWantsKeyboard;
 #endif
 		switch( e.type )
 		{

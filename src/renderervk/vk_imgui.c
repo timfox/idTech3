@@ -1,7 +1,14 @@
+#ifndef USE_VULKAN
+#define USE_VULKAN
+#endif
+
 #include "tr_local.h"
 #include "vk.h"
 
 #ifdef USE_CIMGUI
+
+#include <stdbool.h>
+
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
 #include "cimgui.h"
 #include "cimgui_impl.h"
@@ -60,14 +67,6 @@ static void VK_ImGui_DestroyDescriptorPool( void )
 	}
 }
 
-static void VK_ImGui_RecreateFonts( void )
-{
-	VkCommandBuffer cmd = VK_BeginImmediateCommands();
-	ImGui_ImplVulkan_CreateFontsTexture( cmd );
-	VK_EndImmediateCommands( cmd, __func__ );
-	ImGui_ImplVulkan_DestroyFontUploadObjects();
-}
-
 qboolean VK_ImGui_InitBackend( void )
 {
 	if ( vk_imgui_initialized )
@@ -102,8 +101,6 @@ qboolean VK_ImGui_InitBackend( void )
 		VK_ImGui_ShutdownBackend();
 		return qfalse;
 	}
-
-	VK_ImGui_RecreateFonts();
 
 	vk_imgui_initialized = qtrue;
 	return qtrue;

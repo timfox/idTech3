@@ -3,6 +3,10 @@
 #include "../renderercommon/vulkan/vulkan.h"
 #include "tr_common.h"
 
+#ifdef USE_CIMGUI
+struct ImDrawData;
+#endif
+
 #define MAX_SWAPCHAIN_IMAGES 8
 #define MIN_SWAPCHAIN_IMAGES_IMM 3
 #define MIN_SWAPCHAIN_IMAGES_FIFO   3
@@ -368,11 +372,13 @@ extern PFN_vkCmdClearColorImage qvkCmdClearColorImage;
 extern PFN_vkCmdPipelineBarrier qvkCmdPipelineBarrier;
 extern PFN_vkCreateBuffer qvkCreateBuffer;
 extern PFN_vkCreateDescriptorSetLayout qvkCreateDescriptorSetLayout;
+extern PFN_vkCreateDescriptorPool qvkCreateDescriptorPool;
 extern PFN_vkCreateImage qvkCreateImage;
 extern PFN_vkCreateImageView qvkCreateImageView;
 extern PFN_vkCreatePipelineLayout qvkCreatePipelineLayout;
 extern PFN_vkDestroyBuffer qvkDestroyBuffer;
 extern PFN_vkDestroyDescriptorSetLayout qvkDestroyDescriptorSetLayout;
+extern PFN_vkDestroyDescriptorPool qvkDestroyDescriptorPool;
 extern PFN_vkDestroyImage qvkDestroyImage;
 extern PFN_vkDestroyImageView qvkDestroyImageView;
 extern PFN_vkDestroyPipeline qvkDestroyPipeline;

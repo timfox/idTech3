@@ -1747,12 +1747,14 @@ static const void *RB_ClearColor( const void *data )
 	return (const void *)(cmd + 1);
 }
 
+#ifdef USE_CIMGUI
 static const void *RB_ImGuiDraw( const void *data )
 {
 	const imguiDrawCommand_t *cmd = (const imguiDrawCommand_t *)data;
 	VK_ImGui_RenderDrawData( cmd->drawData );
 	return (const void *)( cmd + 1 );
 }
+#endif
 
 
 /*
@@ -1950,9 +1952,11 @@ void RB_ExecuteRenderCommands( const void *data ) {
 		case RC_CLEARCOLOR:
 			data = RB_ClearColor(data);
 			break;
+#ifdef USE_CIMGUI
 		case RC_IMGUI_DRAW:
 			data = RB_ImGuiDraw( data );
 			break;
+#endif
 		case RC_END_OF_LIST:
 		default:
 			// stop rendering

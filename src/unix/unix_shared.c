@@ -482,6 +482,14 @@ void *Sys_LoadLibrary( const char *name )
 	}
 
 	handle = dlopen( name, RTLD_NOW );
+	if ( !handle )
+	{
+		const char *err = dlerror();
+		if ( err && err[0] )
+		{
+			Com_Printf( "dlopen failed on '%s': %s\n", name, err );
+		}
+	}
 	return handle;
 }
 

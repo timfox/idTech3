@@ -1418,9 +1418,7 @@ const char *Sys_DefaultBasePath( void );
 const char *Sys_DefaultHomePath( void );
 const char *Sys_SteamPath( void );
 
-#ifdef __APPLE__
 char    *Sys_DefaultAppPath( void );
-#endif
 
 char **Sys_ListFiles( const char *directory, const char *extension, const char *filter, int *numfiles, int subdirs );
 void Sys_FreeFileList( char **list );
