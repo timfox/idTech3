@@ -1,0 +1,564 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>How do I use a custom visualisation shader? &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/how/how_custom_visualisation.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="How do I edit a shader?" href="how_edit_shader.html" />
+    <link rel="prev" title="How do I capture callstacks?" href="how_capture_callstack.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../python_api/index.html">Python API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">How do I …?</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="how_capture_frame.html">How do I capture a frame?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_android_capture.html">How do I use RenderDoc on Android?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_filter_events.html">How do I filter visible events?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_debug_shader.html">How do I debug a shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_shader_debug_info.html">How do I use shader debug information?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_inspect_pixel.html">How do I inspect a pixel value?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_buffer_format.html">How do I specify a buffer format?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_view_texture.html">How do I view a specific texture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_object_details.html">How do I view details of an object?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_capture_callstack.html">How do I capture callstacks?</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">How do I use a custom visualisation shader?</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#introduction">Introduction</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#predefined-inputs">Predefined inputs</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#uv-co-ordinates">UV co-ordinates</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#constant-parameters">Constant Parameters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#texture-dimensions">Texture dimensions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#selected-mip-level">Selected Mip level</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#selected-slice-face">Selected Slice/Face</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#selected-multisample-sample">Selected Multisample sample</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#selected-rangemin-rangemax">Selected RangeMin, RangeMax</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#current-texture-type">Current texture type</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#samplers">Samplers</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#resources">Resources</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#see-also">See Also</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="how_edit_shader.html">How do I edit a shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_network_capture_replay.html">How do I capture and replay over a network?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_annotate_capture.html">How do I annotate a capture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_import_export.html">How do I import or export a capture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_rgp_profile.html">How do I generate an RGP profile?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_python_extension.html">How do I register a python extension?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_control_replay.html">How do I control the replay?</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">How do I …?</a> &raquo;</li>
+        
+      <li>How do I use a custom visualisation shader?</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/how/how_custom_visualisation.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="how-do-i-use-a-custom-visualisation-shader">
+<h1>How do I use a custom visualisation shader?<a class="headerlink" href="#how-do-i-use-a-custom-visualisation-shader" title="Permalink to this headline">¶</a></h1>
+<p>This page details how to set up a custom shader for visualisation. This can be used in the <a class="reference internal" href="../window/texture_viewer.html"><span class="doc">Texture Viewer</span></a> to unpack or decode complex formats, or simply apply a custom complex transformation to the image beyond the default controls.</p>
+<section id="introduction">
+<h2>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h2>
+<p>The basic process of setting up the custom shader involves writing a shader file that will be compiled and used by RenderDoc. Note that you can use any language that is either natively accepted by the graphics API used, or any language that can be compiled to an accepted shader.</p>
+<p>For example on D3D11 or D3D12, hlsl is the only language usable by default. On OpenGL only glsl can be used, but on Vulkan you can use glsl or use hlsl as long as a compiler is available.</p>
+<p>There are several special global helpers that can be declared and used, which will be implemented and return values by RenderDoc. In addition there are automatic macros that can be used to bind resources and still write shaders which work on different APIs with different bindings.</p>
+<p>Your pixel shader defines an operation that transforms the raw value from the input texture into a value that will then be displayed by the texture viewer. The usual texture viewer controls for range adaption and channels will still be available on the resulting texture.</p>
+<p>To set up your shader, it’s recommended that you use the UI defined in the documentation for the <a class="reference internal" href="../window/texture_viewer.html"><span class="doc">Texture Viewer</span></a>, but you can manually create a <code class="docutils literal notranslate"><span class="pre">.hlsl</span></code> or <code class="docutils literal notranslate"><span class="pre">.glsl</span></code> file in the application storage directory ( <code class="docutils literal notranslate"><span class="pre">%APPDATA%/qrenderdoc/</span></code> on windows or <code class="docutils literal notranslate"><span class="pre">~/.local/share/qrenderdoc</span></code> elsewhere). The file must contain an entry point <code class="docutils literal notranslate"><span class="pre">main()</span></code> that returns <code class="docutils literal notranslate"><span class="pre">float4</span></code>, and uses any of the below inputs. These shaders are loaded when RenderDoc loads a capture, and RenderDoc watches for any changes to the files (either externally or in the shader editor in RenderDoc) and automatically reloads them.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Since <code class="docutils literal notranslate"><span class="pre">.glsl</span></code> is used for both Vulkan and OpenGL shaders, you can differentiate by the pre-defined macro <code class="docutils literal notranslate"><span class="pre">VULKAN</span></code> if you are writing a shader to be used for both.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Previously the custom shaders allowed more direct binding without helper functions or binding macros. These shaders will continue to work as backwards compatibility is maintained, however be aware that these bindings are API specific and so e.g. a shader written for OpenGL in glsl will not work on Vulkan unless care has been taken, or an HLSL shader between Vulkan and D3D. If portability is desired please update and use the new helpers and binding macros, or else be careful only to use custom shaders with the API they were written for.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>See the custom shader templates available in the  <a class="reference external" href="https://github.com/baldurk/renderdoc-contrib/tree/main/baldurk/custom-shader-templates">contrib repository</a> for complete examples.</p>
+</div>
+</section>
+<section id="predefined-inputs">
+<h2>Predefined inputs<a class="headerlink" href="#predefined-inputs" title="Permalink to this headline">¶</a></h2>
+<p>There are several pre-defined inputs that can either be taken as parameters to the shader entry point, or defined as global variables with a particular name that will then be filled in. There are also definitions for the different type of input textures.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Type and capitalisation is important for these variables, so ensure you use the right declaration!</p>
+</div>
+<p>The shader editor when using the UI can be used to insert these snippets for you, with the right type and spelling. For GLSL these snippets are inserted at the top of the file just after any <code class="docutils literal notranslate"><span class="pre">#version</span></code> statement.</p>
+<section id="uv-co-ordinates">
+<h3>UV co-ordinates<a class="headerlink" href="#uv-co-ordinates" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cm">/* HLSL */</span><span class="w"></span>
+<span class="n">float4</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="n">float4</span><span class="w"> </span><span class="n">pos</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">SV_Position</span><span class="p">,</span><span class="w"> </span><span class="n">float4</span><span class="w"> </span><span class="n">uv</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">TEXCOORD0</span><span class="p">)</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">SV_Target0</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="mi">1</span><span class="p">;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+
+<span class="cm">/* GLSL */</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">location</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="n">vec2</span><span class="w"> </span><span class="n">uv</span><span class="p">;</span><span class="w"></span>
+
+<span class="kt">void</span><span class="w"> </span><span class="nf">main</span><span class="p">()</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="c1">// ...</span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p>This input is defined in HLSL as a second parameter to the shader entry point. The first defines the usual <code class="docutils literal notranslate"><span class="pre">SV_Position</span></code> system semantic, and the first two components of the second <code class="docutils literal notranslate"><span class="pre">TEXCOORD0</span></code> parameter gives UV co-ordinates from 0 to 1 in each dimension over the size of the texture (or texture slice).</p>
+<p>In GLSL it is bound as a <code class="docutils literal notranslate"><span class="pre">vec2</span></code> input at location <code class="docutils literal notranslate"><span class="pre">0</span></code>.</p>
+<p>You can also use the auto-generated system co-ordinates - <code class="docutils literal notranslate"><span class="pre">SV_Position</span></code> or <code class="docutils literal notranslate"><span class="pre">gl_FragCoord</span></code> if you need co-ordinates in <code class="docutils literal notranslate"><span class="pre">0</span></code> to <code class="docutils literal notranslate"><span class="pre">N,M</span></code> for an <code class="docutils literal notranslate"><span class="pre">NxM</span></code> texture.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>You must bind these parameters like this in this order to ensure the linkage with the vertex shader matches.</p>
+</div>
+</section>
+<section id="constant-parameters">
+<h3>Constant Parameters<a class="headerlink" href="#constant-parameters" title="Permalink to this headline">¶</a></h3>
+<p>There are several constant parameters available, each available via a helper function. They are detailed below with the values they contain.</p>
+</section>
+<section id="texture-dimensions">
+<h3>Texture dimensions<a class="headerlink" href="#texture-dimensions" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">uint4</span><span class="w"> </span><span class="nf">RD_TexDim</span><span class="p">();</span><span class="w"> </span><span class="c1">// hlsl</span>
+<span class="n">uvec4</span><span class="w"> </span><span class="nf">RD_TexDim</span><span class="p">();</span><span class="w"> </span><span class="c1">// glsl</span>
+
+<span class="n">uint4</span><span class="w"> </span><span class="nf">RD_YUVDownsampleRate</span><span class="p">();</span><span class="w"> </span><span class="c1">// hlsl</span>
+<span class="n">uvec4</span><span class="w"> </span><span class="nf">RD_YUVDownsampleRate</span><span class="p">();</span><span class="w"> </span><span class="c1">// vulkan glsl only</span>
+<span class="n">uint4</span><span class="w"> </span><span class="nf">RD_YUVAChannels</span><span class="p">();</span><span class="w"> </span><span class="c1">// hlsl</span>
+<span class="n">uvec4</span><span class="w"> </span><span class="nf">RD_YUVAChannels</span><span class="p">();</span><span class="w"> </span><span class="c1">// vulkan glsl only</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">RD_TexDim</span></code> will return the following values:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">.x</span></code>  Width</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.y</span></code>  Height (if 2D or 3D)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.z</span></code>  Depth if 3D or array size if an array</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.w</span></code>  Number of mip levels</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">RD_YUVDownsampleRate</span></code> will return the following values:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">.x</span></code>  Horizontal downsample rate. 1 for equal luma and chroma width, 2 for half rate.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.y</span></code>  Vertical downsample rate. 1 for equal luma and chroma height, 2 for half rate.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.z</span></code>  Number of planes in the input texture, 1 for packed, 2+ for planar</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">.w</span></code>  Number of bits per component, e.g. 8, 10 or 16.</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">RD_YUVAChannels</span></code> will return an index indicating where each channel comes from in the source textures. The order is <code class="docutils literal notranslate"><span class="pre">.x</span></code> for <code class="docutils literal notranslate"><span class="pre">Y</span></code>, <code class="docutils literal notranslate"><span class="pre">.y</span></code> for <code class="docutils literal notranslate"><span class="pre">U</span></code>, <code class="docutils literal notranslate"><span class="pre">.z</span></code> for <code class="docutils literal notranslate"><span class="pre">V</span></code> and <code class="docutils literal notranslate"><span class="pre">.w</span></code> for <code class="docutils literal notranslate"><span class="pre">A</span></code>.</p>
+<p>The indices for channels in the first texture in the normal 2D slot are <code class="docutils literal notranslate"><span class="pre">0,</span> <span class="pre">1,</span> <span class="pre">2,</span> <span class="pre">3</span></code>. Indices from <code class="docutils literal notranslate"><span class="pre">4</span></code> to <code class="docutils literal notranslate"><span class="pre">7</span></code> indicate channels in the second texture, and so on.</p>
+<p>If a channel is not present, e.g. alpha is commonly not available, it will be set to <code class="docutils literal notranslate"><span class="pre">0xff</span> <span class="pre">==</span> <span class="pre">255</span></code>.</p>
+</section>
+<section id="selected-mip-level">
+<h3>Selected Mip level<a class="headerlink" href="#selected-mip-level" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">uint</span><span class="w"> </span><span class="nf">RD_SelectedMip</span><span class="p">();</span><span class="w"> </span><span class="c1">// hlsl or glsl</span>
+</pre></div>
+</div>
+<p>This will return the selected mip level in the UI.</p>
+</section>
+<section id="selected-slice-face">
+<h3>Selected Slice/Face<a class="headerlink" href="#selected-slice-face" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">uint</span><span class="w"> </span><span class="nf">RD_SelectedSliceFace</span><span class="p">();</span><span class="w"> </span><span class="c1">// hlsl or glsl</span>
+</pre></div>
+</div>
+<p>This variable will be filled out with the selected texture array slice (or cubemap face) in the UI.</p>
+</section>
+<section id="selected-multisample-sample">
+<h3>Selected Multisample sample<a class="headerlink" href="#selected-multisample-sample" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="nf">RD_SelectedSample</span><span class="p">();</span><span class="w"> </span><span class="c1">// hlsl or glsl</span>
+</pre></div>
+</div>
+<p>This variable will be filled out with the selected multisample sample index as chosen in the UI. If the UI has ‘average value’ selected, this variable will be negative and with an absolute value equal to the number of samples.</p>
+<p>So for example in a 4x MSAA texture, the valid values are <code class="docutils literal notranslate"><span class="pre">0</span></code>, <code class="docutils literal notranslate"><span class="pre">1</span></code>, <code class="docutils literal notranslate"><span class="pre">2</span></code>, <code class="docutils literal notranslate"><span class="pre">3</span></code> to select a sample, or <code class="docutils literal notranslate"><span class="pre">-4</span></code> for ‘average value’.</p>
+</section>
+<section id="selected-rangemin-rangemax">
+<h3>Selected RangeMin, RangeMax<a class="headerlink" href="#selected-rangemin-rangemax" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">float2</span><span class="w"> </span><span class="nf">RD_SelectedRange</span><span class="p">();</span><span class="w"> </span><span class="c1">// hlsl</span>
+<span class="n">vec2</span><span class="w"> </span><span class="nf">RD_SelectedRange</span><span class="p">();</span><span class="w"> </span><span class="c1">// glsl</span>
+</pre></div>
+</div>
+<p>This function will return a pair, with the current Minimum and Maximum values for the Range-selector in the Texture Viewer.</p>
+</section>
+<section id="current-texture-type">
+<h3>Current texture type<a class="headerlink" href="#current-texture-type" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">uint</span><span class="w"> </span><span class="nf">RD_TextureType</span><span class="p">();</span><span class="w"> </span><span class="c1">// hlsl or glsl</span>
+</pre></div>
+</div>
+<p>This variable will be set to a given integer value, depending on the type of the current texture being displayed. This can be used to sample from the correct resource.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The value varies depending on the API this shader will be used for, as each has different resource bindings. You should use the defines below to check, which will be portable across APIs</p>
+</div>
+<section id="d3d11-or-d3d12">
+<h4>D3D11 or D3D12<a class="headerlink" href="#d3d11-or-d3d12" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_1D</span></code> - 1D texture</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_2D</span></code> - 2D texture</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_3D</span></code> - 3D texture</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_Depth</span></code> - Depth</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_DepthStencil</span></code> - Depth + Stencil</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_DepthMS</span></code> - Depth (Multisampled)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_DepthStencilMS</span></code> - Depth + Stencil (Multisampled)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_2DMS</span></code> - 2D texture (Multisampled)</p></li>
+</ul>
+<p>In all cases on D3D the bindings can be used for arrays or not, interchangeably.</p>
+</section>
+<section id="opengl">
+<h4>OpenGL<a class="headerlink" href="#opengl" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_1D</span></code> - 1D texture</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_2D</span></code> - 2D texture</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_3D</span></code> - 3D texture</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_Cube</span></code> - Cubemap</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_1D_Array</span></code> - 1D array texture</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_2D_Array</span></code> - 2D array texture</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_Cube_Array</span></code> - Cube array texture</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_Rect</span></code> - Rectangle texture</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_Buffer</span></code> - Buffer texture</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_2DMS</span></code> - 2D texture (Multisampled)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_2DMS_Array</span></code> - 2D array texture (Multisampled)</p></li>
+</ul>
+<p>OpenGL has separate types and bindings for arrayed and non-arrayed textures.</p>
+</section>
+<section id="vulkan">
+<h4>Vulkan<a class="headerlink" href="#vulkan" title="Permalink to this headline">¶</a></h4>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_1D</span></code> - 1D texture</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_2D</span></code> - 2D texture</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_3D</span></code> - 3D texture</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">RD_TextureType_2DMS</span></code> - 2D texture (Multisampled)</p></li>
+</ul>
+<p>In all cases on Vulkan the bindings can be used for arrays or not, interchangeably.</p>
+</section>
+</section>
+<section id="samplers">
+<h3>Samplers<a class="headerlink" href="#samplers" title="Permalink to this headline">¶</a></h3>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cm">/* HLSL */</span><span class="w"></span>
+<span class="n">SamplerState</span><span class="w"> </span><span class="n">pointSampler</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">register</span><span class="p">(</span><span class="n">RD_POINT_SAMPLER_BINDING</span><span class="p">);</span><span class="w"></span>
+<span class="n">SamplerState</span><span class="w"> </span><span class="n">linearSampler</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">register</span><span class="p">(</span><span class="n">RD_LINEAR_SAMPLER_BINDING</span><span class="p">);</span><span class="w"></span>
+
+
+<span class="cm">/* GLSL */</span><span class="w"></span>
+<span class="cp">#ifdef VULKAN</span>
+
+<span class="n">layout</span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_POINT_SAMPLER_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">sampler</span><span class="w"> </span><span class="n">pointSampler</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_LINEAR_SAMPLER_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">sampler</span><span class="w"> </span><span class="n">linearSampler</span><span class="p">;</span><span class="w"></span>
+
+<span class="cp">#endif</span>
+</pre></div>
+</div>
+<p>These samplers are provided to allow you to sample from the resource as opposed to doing straight loads. Samplers are not available on OpenGL, so it is recommended to protect the glsl definitions with <code class="docutils literal notranslate"><span class="pre">#ifdef</span> <span class="pre">VULKAN</span></code> as shown.</p>
+</section>
+<section id="resources">
+<h3>Resources<a class="headerlink" href="#resources" title="Permalink to this headline">¶</a></h3>
+<section id="hlsl">
+<h4>HLSL<a class="headerlink" href="#hlsl" title="Permalink to this headline">¶</a></h4>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">// Float Textures</span>
+<span class="n">Texture1DArray</span><span class="o">&lt;</span><span class="n">float4</span><span class="o">&gt;</span><span class="w"> </span><span class="n">texDisplayTex1DArray</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">register</span><span class="p">(</span><span class="n">RD_FLOAT_1D_ARRAY_BINDING</span><span class="p">);</span><span class="w"></span>
+<span class="n">Texture2DArray</span><span class="o">&lt;</span><span class="n">float4</span><span class="o">&gt;</span><span class="w"> </span><span class="n">texDisplayTex2DArray</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">register</span><span class="p">(</span><span class="n">RD_FLOAT_2D_ARRAY_BINDING</span><span class="p">);</span><span class="w"></span>
+<span class="n">Texture3D</span><span class="o">&lt;</span><span class="n">float4</span><span class="o">&gt;</span><span class="w"> </span><span class="n">texDisplayTex3D</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">register</span><span class="p">(</span><span class="n">RD_FLOAT_3D_BINDING</span><span class="p">);</span><span class="w"></span>
+<span class="n">Texture2DMSArray</span><span class="o">&lt;</span><span class="n">float4</span><span class="o">&gt;</span><span class="w"> </span><span class="n">texDisplayTex2DMSArray</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">register</span><span class="p">(</span><span class="n">RD_FLOAT_2DMS_ARRAY_BINDING</span><span class="p">);</span><span class="w"></span>
+<span class="n">Texture2DArray</span><span class="o">&lt;</span><span class="n">float4</span><span class="o">&gt;</span><span class="w"> </span><span class="n">texDisplayYUVArray</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">register</span><span class="p">(</span><span class="n">RD_FLOAT_YUV_ARRAY_BINDING</span><span class="p">);</span><span class="w"></span>
+
+<span class="c1">// only used on D3D</span>
+<span class="n">Texture2DArray</span><span class="o">&lt;</span><span class="n">float2</span><span class="o">&gt;</span><span class="w"> </span><span class="n">texDisplayTexDepthArray</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">register</span><span class="p">(</span><span class="n">RD_FLOAT_DEPTH_ARRAY_BINDING</span><span class="p">);</span><span class="w"></span>
+<span class="n">Texture2DArray</span><span class="o">&lt;</span><span class="n">uint2</span><span class="o">&gt;</span><span class="w"> </span><span class="n">texDisplayTexStencilArray</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">register</span><span class="p">(</span><span class="n">RD_FLOAT_STENCIL_ARRAY_BINDING</span><span class="p">);</span><span class="w"></span>
+<span class="n">Texture2DMSArray</span><span class="o">&lt;</span><span class="n">float2</span><span class="o">&gt;</span><span class="w"> </span><span class="n">texDisplayTexDepthMSArray</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">register</span><span class="p">(</span><span class="n">RD_FLOAT_DEPTHMS_ARRAY_BINDING</span><span class="p">);</span><span class="w"></span>
+<span class="n">Texture2DMSArray</span><span class="o">&lt;</span><span class="n">uint2</span><span class="o">&gt;</span><span class="w"> </span><span class="n">texDisplayTexStencilMSArray</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">register</span><span class="p">(</span><span class="n">RD_FLOAT_STENCILMS_ARRAY_BINDING</span><span class="p">);</span><span class="w"></span>
+
+<span class="c1">// Int Textures</span>
+<span class="n">Texture1DArray</span><span class="o">&lt;</span><span class="n">int4</span><span class="o">&gt;</span><span class="w"> </span><span class="n">texDisplayIntTex1DArray</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">register</span><span class="p">(</span><span class="n">RD_INT_1D_ARRAY_BINDING</span><span class="p">);</span><span class="w"></span>
+<span class="n">Texture2DArray</span><span class="o">&lt;</span><span class="n">int4</span><span class="o">&gt;</span><span class="w"> </span><span class="n">texDisplayIntTex2DArray</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">register</span><span class="p">(</span><span class="n">RD_INT_2D_ARRAY_BINDING</span><span class="p">);</span><span class="w"></span>
+<span class="n">Texture3D</span><span class="o">&lt;</span><span class="n">int4</span><span class="o">&gt;</span><span class="w"> </span><span class="n">texDisplayIntTex3D</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">register</span><span class="p">(</span><span class="n">RD_INT_3D_BINDING</span><span class="p">);</span><span class="w"></span>
+<span class="n">Texture2DMSArray</span><span class="o">&lt;</span><span class="n">int4</span><span class="o">&gt;</span><span class="w"> </span><span class="n">texDisplayIntTex2DMSArray</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">register</span><span class="p">(</span><span class="n">RD_INT_2DMS_ARRAY_BINDING</span><span class="p">);</span><span class="w"></span>
+
+<span class="c1">// Unsigned int Textures</span>
+<span class="n">Texture1DArray</span><span class="o">&lt;</span><span class="n">uint4</span><span class="o">&gt;</span><span class="w"> </span><span class="n">texDisplayUIntTex1DArray</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">register</span><span class="p">(</span><span class="n">RD_UINT_1D_ARRAY_BINDING</span><span class="p">);</span><span class="w"></span>
+<span class="n">Texture2DArray</span><span class="o">&lt;</span><span class="n">uint4</span><span class="o">&gt;</span><span class="w"> </span><span class="n">texDisplayUIntTex2DArray</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">register</span><span class="p">(</span><span class="n">RD_UINT_2D_ARRAY_BINDING</span><span class="p">);</span><span class="w"></span>
+<span class="n">Texture3D</span><span class="o">&lt;</span><span class="n">uint4</span><span class="o">&gt;</span><span class="w"> </span><span class="n">texDisplayUIntTex3D</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">register</span><span class="p">(</span><span class="n">RD_UINT_3D_BINDING</span><span class="p">);</span><span class="w"></span>
+<span class="n">Texture2DMSArray</span><span class="o">&lt;</span><span class="n">uint4</span><span class="o">&gt;</span><span class="w"> </span><span class="n">texDisplayUIntTex2DMSArray</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="k">register</span><span class="p">(</span><span class="n">RD_UINT_2DMS_ARRAY_BINDING</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="glsl">
+<h4>GLSL<a class="headerlink" href="#glsl" title="Permalink to this headline">¶</a></h4>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">// Float Textures</span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_FLOAT_1D_ARRAY_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">sampler1DArray</span><span class="w"> </span><span class="n">tex1DArray</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_FLOAT_2D_ARRAY_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">sampler2DArray</span><span class="w"> </span><span class="n">tex2DArray</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_FLOAT_3D_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">sampler3D</span><span class="w"> </span><span class="n">tex3D</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_FLOAT_2DMS_ARRAY_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">sampler2DMSArray</span><span class="w"> </span><span class="n">tex2DMSArray</span><span class="p">;</span><span class="w"></span>
+
+<span class="c1">// YUV textures only supported on vulkan</span>
+<span class="cp">#ifdef VULKAN</span>
+<span class="n">layout</span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_FLOAT_YUV_ARRAY_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">sampler2DArray</span><span class="w"> </span><span class="n">texYUVArray</span><span class="p">[</span><span class="mi">2</span><span class="p">];</span><span class="w"></span>
+<span class="cp">#endif</span>
+
+<span class="c1">// OpenGL has more texture types to match</span>
+<span class="cp">#ifndef VULKAN</span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_FLOAT_1D_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">sampler1D</span><span class="w"> </span><span class="n">tex1D</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_FLOAT_2D_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">sampler2D</span><span class="w"> </span><span class="n">tex2D</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_FLOAT_CUBE_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">samplerCube</span><span class="w"> </span><span class="n">texCube</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_FLOAT_CUBE_ARRAY_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">samplerCubeArray</span><span class="w"> </span><span class="n">texCubeArray</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_FLOAT_RECT_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">sampler2DRect</span><span class="w"> </span><span class="n">tex2DRect</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_FLOAT_BUFFER_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">samplerBuffer</span><span class="w"> </span><span class="n">texBuffer</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_FLOAT_2DMS_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">sampler2DMS</span><span class="w"> </span><span class="n">tex2DMS</span><span class="p">;</span><span class="w"></span>
+<span class="cp">#endif</span>
+
+<span class="c1">// Int Textures</span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_INT_1D_ARRAY_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">isampler1DArray</span><span class="w"> </span><span class="n">texSInt1DArray</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_INT_2D_ARRAY_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">isampler2DArray</span><span class="w"> </span><span class="n">texSInt2DArray</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_INT_3D_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">isampler3D</span><span class="w"> </span><span class="n">texSInt3D</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_INT_2DMS_ARRAY_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">isampler2DMSArray</span><span class="w"> </span><span class="n">texSInt2DMSArray</span><span class="p">;</span><span class="w"></span>
+
+<span class="cp">#ifndef VULKAN</span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_INT_1D_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">isampler1D</span><span class="w"> </span><span class="n">texSInt1D</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_INT_2D_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">isampler2D</span><span class="w"> </span><span class="n">texSInt2D</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_INT_RECT_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">isampler2DRect</span><span class="w"> </span><span class="n">texSInt2DRect</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_INT_BUFFER_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">isamplerBuffer</span><span class="w"> </span><span class="n">texSIntBuffer</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_INT_2DMS_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">isampler2DMS</span><span class="w"> </span><span class="n">texSInt2DMS</span><span class="p">;</span><span class="w"></span>
+<span class="cp">#endif</span>
+
+<span class="c1">// Unsigned int Textures</span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_UINT_1D_ARRAY_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">usampler1DArray</span><span class="w"> </span><span class="n">texUInt1DArray</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_UINT_2D_ARRAY_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">usampler2DArray</span><span class="w"> </span><span class="n">texUInt2DArray</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_UINT_3D_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">usampler3D</span><span class="w"> </span><span class="n">texUInt3D</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_UINT_2DMS_ARRAY_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">usampler2DMSArray</span><span class="w"> </span><span class="n">texUInt2DMSArray</span><span class="p">;</span><span class="w"></span>
+
+<span class="cp">#ifndef VULKAN</span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_UINT_1D_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">usampler1D</span><span class="w"> </span><span class="n">texUInt1D</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_UINT_2D_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">usampler2D</span><span class="w"> </span><span class="n">texUInt2D</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_UINT_RECT_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">usampler2DRect</span><span class="w"> </span><span class="n">texUInt2DRect</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_UINT_BUFFER_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">usamplerBuffer</span><span class="w"> </span><span class="n">texUIntBuffer</span><span class="p">;</span><span class="w"></span>
+<span class="n">layout</span><span class="w"> </span><span class="p">(</span><span class="n">binding</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RD_UINT_2DMS_BINDING</span><span class="p">)</span><span class="w"> </span><span class="n">uniform</span><span class="w"> </span><span class="n">usampler2DMS</span><span class="w"> </span><span class="n">texUInt2DMS</span><span class="p">;</span><span class="w"></span>
+<span class="cp">#endif</span>
+</pre></div>
+</div>
+<p>These resources are bound sparsely with the appropriate type for the current texture. With a couple of exceptions there will only be one texture bound at any one time. Different APIs have different texture type matching requirements, so e.g. OpenGL has separate bindings for array and non-array texures, which will be reflected in the different <code class="docutils literal notranslate"><span class="pre">RD_TextureType</span></code> return values.</p>
+<p>When a cubemap texture is bound, it is bound both to the 2D Array as well as the Cube Array. If a depth-stencil texture has both components, the relevant depth and stencil resources will both be bound at once.</p>
+<p>To determine which resource to sample from you can use the <code class="docutils literal notranslate"><span class="pre">RENDERDOC_TexType</span></code> variable above.</p>
+<p>Usually the float textures are used, but for unsigned and signed integer formats, the relevant integer resources are used.</p>
+<p>As with the samplers, these textures are bound by slot and not by name, so while you are free to name the variables as you wish, you must bind them explicitly to the slots listed here.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>YUV textures may have additional planes bound as separate textures - for D3D this is <code class="docutils literal notranslate"><span class="pre">texDisplayYUVArray</span></code> and for Vulkan it’s <code class="docutils literal notranslate"><span class="pre">texYUVArray</span></code> above. Whether to use these planes or not is specified in the texture dimension variables.</p>
+</div>
+</section>
+</section>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../window/texture_viewer.html"><span class="doc">Texture Viewer</span></a></p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="how_edit_shader.html" class="btn btn-neutral float-right" title="How do I edit a shader?" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="how_capture_callstack.html" class="btn btn-neutral float-left" title="How do I capture callstacks?" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

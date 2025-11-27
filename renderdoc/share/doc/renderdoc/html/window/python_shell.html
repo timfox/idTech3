@@ -1,0 +1,282 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Python Shell &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/window/python_shell.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Resource Inspector" href="resource_inspector.html" />
+    <link rel="prev" title="Debug Messages" href="debug_messages.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../python_api/index.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../how/index.html">How do I …?</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Window reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="texture_viewer.html">Texture Viewer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api_inspector.html">API Inspector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mesh_viewer.html">Mesh Viewer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="buffer_viewer.html">Buffer Viewer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="capture_attach.html">Capture Dialog</a></li>
+<li class="toctree-l2"><a class="reference internal" href="event_browser.html">Event Browser</a></li>
+<li class="toctree-l2"><a class="reference internal" href="settings_window.html">Settings Window</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pipeline_state.html">Pipeline State</a></li>
+<li class="toctree-l2"><a class="reference internal" href="shader_viewer.html">Shader Viewer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="shader_messages.html">Shader Messages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="timeline_bar.html">Timeline Bar</a></li>
+<li class="toctree-l2"><a class="reference internal" href="capture_connection.html">Capture Connection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="debug_messages.html">Debug Messages</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Python Shell</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#see-also">See Also</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="resource_inspector.html">Resource Inspector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="performance_counter_viewer.html">Performance Counter Viewer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="capture_comments.html">Capture Comments</a></li>
+</ul>
+</li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">Window reference</a> &raquo;</li>
+        
+      <li>Python Shell</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/window/python_shell.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="python-shell">
+<h1>Python Shell<a class="headerlink" href="#python-shell" title="Permalink to this headline">¶</a></h1>
+<p>The python shell allows flexible of RenderDoc, including the ability to run simple scripts over the whole dataset in ways not easy to do in the UI. Depending on the build-time configuration the Qt UI itself may also be exposed to python for customisation.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
+<figure class="align-default" id="id1">
+<img alt="../_images/pythonshell.png" src="../_images/pythonshell.png" />
+<figcaption>
+<p><span class="caption-text">The python shell</span><a class="headerlink" href="#id1" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>You can open the python shell from the window menu. It offers both an interactive shell and a window that can open and run scripts and display the output.</p>
+<p>The full <a class="reference internal" href="../python_api/index.html"><span class="doc">python API reference</span></a> contains the explicit detail of the whole API, but you can also use the <code class="docutils literal notranslate"><span class="pre">help()</span></code> command to obtain information about a particular object or function call.</p>
+<p>To get started the <code class="code docutils literal notranslate"><span class="pre">pyrenderdoc</span></code> object corresponds to a <a class="reference internal" href="../python_api/qrenderdoc/main.html#qrenderdoc.CaptureContext" title="qrenderdoc.CaptureContext"><code class="xref py py-class docutils literal notranslate"><span class="pre">qrenderdoc.CaptureContext</span></code></a> object through which the internal API and UI windows can be obtained.</p>
+<p>For Qt integration, if available, you can import <code class="code docutils literal notranslate"><span class="pre">PySide2</span></code> which provides python bindings for the Qt API.</p>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../python_api/index.html"><span class="doc">Python API</span></a></p></li>
+<li><p><a class="reference internal" href="../how/how_python_extension.html"><span class="doc">How do I register a python extension?</span></a></p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="resource_inspector.html" class="btn btn-neutral float-right" title="Resource Inspector" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="debug_messages.html" class="btn btn-neutral float-left" title="Debug Messages" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

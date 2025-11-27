@@ -1,0 +1,2015 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>API Reference: qrenderdoc UI Extensions &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/python_api/qrenderdoc/extensions.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="API Reference: qrenderdoc Windows" href="windows.html" />
+    <link rel="prev" title="API Reference: qrenderdoc Main Interfaces" href="main.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../examples/renderdoc_intro.html">Getting Started (python)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/qrenderdoc_intro.html">Getting Started (RenderDoc UI)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dev_environment.html">Python development environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui_extensions.html">Writing UI extensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../descriptors_bindings.html">Descriptors and Bindings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/basics.html">Basic Interfaces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/renderdoc/index.html">renderdoc Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/qrenderdoc/index.html">qrenderdoc examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../renderdoc/index.html">renderdoc python module</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">qrenderdoc python module</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="main.html">API Reference: qrenderdoc Main Interfaces</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">API Reference: qrenderdoc UI Extensions</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#extension-manager">Extension Manager</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mini-qt-helper">Mini-Qt Helper</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#helpers">Helpers</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="windows.html">API Reference: qrenderdoc Windows</a></li>
+<li class="toctree-l3"><a class="reference internal" href="config.html">API Reference: qrenderdoc Persistant Config</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../how/index.html">How do I …?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../index.html">Python API</a> &raquo;</li>
+        
+          <li><a href="index.html">qrenderdoc python module</a> &raquo;</li>
+        
+      <li>API Reference: qrenderdoc UI Extensions</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/python_api/qrenderdoc/extensions.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="api-reference-qrenderdoc-ui-extensions">
+<h1>API Reference: qrenderdoc UI Extensions<a class="headerlink" href="#api-reference-qrenderdoc-ui-extensions" title="Permalink to this headline">¶</a></h1>
+<p>This is the API reference for the functions, classes, and enums in the <code class="docutils literal notranslate"><span class="pre">qrenderdoc</span></code> module which represents the UI-specific interface for integrating with the UI and writing UI extensions. For more high-level information and instructions on using the python API, see <a class="reference internal" href="../index.html"><span class="doc">Python API</span></a> and <a class="reference internal" href="../ui_extensions.html"><span class="doc">Writing UI extensions</span></a>.</p>
+<div class="contents local topic" id="sections">
+<p class="topic-title">Sections</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#extension-manager" id="id1">Extension Manager</a></p></li>
+<li><p><a class="reference internal" href="#mini-qt-helper" id="id2">Mini-Qt Helper</a></p></li>
+<li><p><a class="reference internal" href="#helpers" id="id3">Helpers</a></p></li>
+</ul>
+</div>
+<section id="extension-manager">
+<h2><a class="toc-backref" href="#id1">Extension Manager</a><a class="headerlink" href="#extension-manager" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionManager">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qrenderdoc.</span></span><span class="sig-name descname"><span class="pre">ExtensionManager</span></span><a class="headerlink" href="#qrenderdoc.ExtensionManager" title="Permalink to this definition">¶</a></dt>
+<dd><p>A manager for listing available and active extensions, as well as the interface for
+extensions to register hooks and additional functionality.</p>
+<p>This manager is retrieved by calling <a class="reference internal" href="main.html#qrenderdoc.CaptureContext.Extensions" title="qrenderdoc.CaptureContext.Extensions"><code class="xref py py-meth docutils literal notranslate"><span class="pre">CaptureContext.Extensions()</span></code></a>.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionManager.ExtensionCallback">
+<span class="sig-name descname"><span class="pre">ExtensionCallback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">context</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.ExtensionManager.ExtensionCallback" title="Permalink to this definition">¶</a></dt>
+<dd><p>Not a member function - the signature for any <code class="docutils literal notranslate"><span class="pre">ExtensionCallback</span></code> callbacks.</p>
+<p>Callback for extensions to register entry points with, used in many situations depending on how it
+was registered.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>context</strong> (<a class="reference internal" href="main.html#qrenderdoc.CaptureContext" title="qrenderdoc.CaptureContext"><em>CaptureContext</em></a>) – The current capture context.</p></li>
+<li><p><strong>data</strong> (<em>dict</em>) – Additional data for the call, as a dictionary with string keys.
+Context-dependent based on what generated the callback</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionManager.ErrorDialog">
+<span class="sig-name descname"><span class="pre">ErrorDialog</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.ExtensionManager.ErrorDialog" title="Permalink to this definition">¶</a></dt>
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">ErrorDialog</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span></dt>
+<dd><p>Display an error message dialog.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.ErrorDialog.params.text"></span><strong>text</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.ErrorDialog.params.text">#</a> (<em>str</em>) – The text of the dialog itself, required.</p></li>
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.ErrorDialog.params.title"></span><strong>title</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.ErrorDialog.params.title">#</a> (<em>str</em>) – The dialog title, optional.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionManager.GetInstalledExtensions">
+<span class="sig-name descname"><span class="pre">GetInstalledExtensions</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.ExtensionManager.GetInstalledExtensions" title="Permalink to this definition">¶</a></dt>
+<dd><p>Retrieve a list of installed extensions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The list of installed extensions.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>List[<a class="reference internal" href="#qrenderdoc.ExtensionMetadata" title="qrenderdoc.ExtensionMetadata">ExtensionMetadata</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionManager.GetMiniQtHelper">
+<span class="sig-name descname"><span class="pre">GetMiniQtHelper</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.ExtensionManager.GetMiniQtHelper" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a handle to the mini Qt helper. See <a class="reference internal" href="#qrenderdoc.MiniQtHelper" title="qrenderdoc.MiniQtHelper"><code class="xref py py-class docutils literal notranslate"><span class="pre">MiniQtHelper</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The helper interface.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p><a class="reference internal" href="#qrenderdoc.MiniQtHelper" title="qrenderdoc.MiniQtHelper">MiniQtHelper</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionManager.IsExtensionLoaded">
+<span class="sig-name descname"><span class="pre">IsExtensionLoaded</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.ExtensionManager.IsExtensionLoaded" title="Permalink to this definition">¶</a></dt>
+<dd><p>Check if an installed extension is enabled.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.ExtensionManager.IsExtensionLoaded.params.name"></span><strong>name</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.IsExtensionLoaded.params.name">#</a> (<em>str</em>) – The qualified name of the extension, e.g. <code class="docutils literal notranslate"><span class="pre">foo.bar</span></code></p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>If the extension is enabled or not.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionManager.LoadExtension">
+<span class="sig-name descname"><span class="pre">LoadExtension</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.ExtensionManager.LoadExtension" title="Permalink to this definition">¶</a></dt>
+<dd><p>Enable an extension by name. If the extension is already enabled, this will reload it.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.ExtensionManager.LoadExtension.params.name"></span><strong>name</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.LoadExtension.params.name">#</a> (<em>str</em>) – The qualified name of the extension, e.g. <code class="docutils literal notranslate"><span class="pre">foo.bar</span></code></p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>If the extension loaded successfully, an empty string, otherwise the errors encountered
+while loading it.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionManager.MessageDialog">
+<span class="sig-name descname"><span class="pre">MessageDialog</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.ExtensionManager.MessageDialog" title="Permalink to this definition">¶</a></dt>
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">MessageDialog</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span></dt>
+<dd><p>Display a simple informational message dialog.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.MessageDialog.params.text"></span><strong>text</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.MessageDialog.params.text">#</a> (<em>str</em>) – The text of the dialog itself, required.</p></li>
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.MessageDialog.params.title"></span><strong>title</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.MessageDialog.params.title">#</a> (<em>str</em>) – The dialog title, optional.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionManager.OpenDirectoryName">
+<span class="sig-name descname"><span class="pre">OpenDirectoryName</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">caption</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dir</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.ExtensionManager.OpenDirectoryName" title="Permalink to this definition">¶</a></dt>
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">OpenDirectoryName</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">caption</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span></dt>
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">OpenDirectoryName</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span></dt>
+<dd><p>Browse for a directory to open.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.OpenDirectoryName.params.caption"></span><strong>caption</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.OpenDirectoryName.params.caption">#</a> (<em>str</em>) – The dialog title, optional.</p></li>
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.OpenDirectoryName.params.dir"></span><strong>dir</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.OpenDirectoryName.params.dir">#</a> (<em>str</em>) – The starting directory for browsing, optional.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The directory selected, or an empty string if nothing was selected.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionManager.OpenFileName">
+<span class="sig-name descname"><span class="pre">OpenFileName</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">caption</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filter</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.ExtensionManager.OpenFileName" title="Permalink to this definition">¶</a></dt>
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">OpenFileName</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">caption</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dir</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span></dt>
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">OpenFileName</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">caption</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span></dt>
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">OpenFileName</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span></dt>
+<dd><p>Browse for a filename to open.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.OpenFileName.params.caption"></span><strong>caption</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.OpenFileName.params.caption">#</a> (<em>str</em>) – The dialog title, optional.</p></li>
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.OpenFileName.params.dir"></span><strong>dir</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.OpenFileName.params.dir">#</a> (<em>str</em>) – The starting directory for browsing, optional.</p></li>
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.OpenFileName.params.filter"></span><strong>filter</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.OpenFileName.params.filter">#</a> (<em>str</em>) – The filter to apply for filenames, optional.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The filename selected, or an empty string if nothing was selected.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionManager.QuestionDialog">
+<span class="sig-name descname"><span class="pre">QuestionDialog</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">title</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.ExtensionManager.QuestionDialog" title="Permalink to this definition">¶</a></dt>
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">QuestionDialog</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span></dt>
+<dd><p>Display an error message dialog.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.QuestionDialog.params.text"></span><strong>text</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.QuestionDialog.params.text">#</a> (<em>str</em>) – The text of the dialog itself, required.</p></li>
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.QuestionDialog.params.options"></span><strong>options</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.QuestionDialog.params.options">#</a> (<em>List</em><em>[</em><a class="reference internal" href="#qrenderdoc.DialogButton" title="qrenderdoc.DialogButton"><em>DialogButton</em></a><em>]</em>) – The buttons to display on the dialog.</p></li>
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.QuestionDialog.params.title"></span><strong>title</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.QuestionDialog.params.title">#</a> (<em>str</em>) – The dialog title, optional.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The button that was clicked on.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#qrenderdoc.DialogButton" title="qrenderdoc.DialogButton">DialogButton</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionManager.RegisterContextMenu">
+<span class="sig-name descname"><span class="pre">RegisterContextMenu</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">submenus</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.ExtensionManager.RegisterContextMenu" title="Permalink to this definition">¶</a></dt>
+<dd><p>Register a context menu item in a panel for an extension.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.RegisterContextMenu.params.base"></span><strong>base</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.RegisterContextMenu.params.base">#</a> (<a class="reference internal" href="#qrenderdoc.ContextMenu" title="qrenderdoc.ContextMenu"><em>ContextMenu</em></a>) – The panel to add the item to.</p></li>
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.RegisterContextMenu.params.submenus"></span><strong>submenus</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.RegisterContextMenu.params.submenus">#</a> (<em>List</em><em>[</em><em>str</em><em>]</em>) – A list of strings containing the submenus to add before the item. The
+last string will be the name of the menu item itself. Must contain at least one entry.</p></li>
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.RegisterContextMenu.params.callback"></span><strong>callback</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.RegisterContextMenu.params.callback">#</a> (<em>ExtensionCallback</em>) – The function to callback when the menu item is selected.
+Callback function signature must match <a class="reference internal" href="#qrenderdoc.ExtensionManager.ExtensionCallback" title="qrenderdoc.ExtensionManager.ExtensionCallback"><code class="xref py py-func docutils literal notranslate"><span class="pre">ExtensionCallback()</span></code></a>.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionManager.RegisterPanelMenu">
+<span class="sig-name descname"><span class="pre">RegisterPanelMenu</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">submenus</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.ExtensionManager.RegisterPanelMenu" title="Permalink to this definition">¶</a></dt>
+<dd><p>Register a menu item in a panel for an extension.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.RegisterPanelMenu.params.base"></span><strong>base</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.RegisterPanelMenu.params.base">#</a> (<a class="reference internal" href="#qrenderdoc.PanelMenu" title="qrenderdoc.PanelMenu"><em>PanelMenu</em></a>) – The panel to add the item to.</p></li>
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.RegisterPanelMenu.params.submenus"></span><strong>submenus</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.RegisterPanelMenu.params.submenus">#</a> (<em>List</em><em>[</em><em>str</em><em>]</em>) – A list of strings containing the submenus to add before the item. The
+last string will be the name of the menu item itself. Must contain at least one entry.</p></li>
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.RegisterPanelMenu.params.callback"></span><strong>callback</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.RegisterPanelMenu.params.callback">#</a> (<em>ExtensionCallback</em>) – The function to callback when the menu item is selected.
+Callback function signature must match <a class="reference internal" href="#qrenderdoc.ExtensionManager.ExtensionCallback" title="qrenderdoc.ExtensionManager.ExtensionCallback"><code class="xref py py-func docutils literal notranslate"><span class="pre">ExtensionCallback()</span></code></a>.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionManager.RegisterWindowMenu">
+<span class="sig-name descname"><span class="pre">RegisterWindowMenu</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">base</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">submenus</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">callback</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.ExtensionManager.RegisterWindowMenu" title="Permalink to this definition">¶</a></dt>
+<dd><p>Register a new menu item in the main window’s menus for an extension.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.RegisterWindowMenu.params.base"></span><strong>base</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.RegisterWindowMenu.params.base">#</a> (<a class="reference internal" href="#qrenderdoc.WindowMenu" title="qrenderdoc.WindowMenu"><em>WindowMenu</em></a>) – The base menu to add the item to.</p></li>
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.RegisterWindowMenu.params.submenus"></span><strong>submenus</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.RegisterWindowMenu.params.submenus">#</a> (<em>List</em><em>[</em><em>str</em><em>]</em>) – A list of strings containing the submenus to add before the item. The
+last string will be the name of the menu item itself. Must contain at least one entry, or two
+entries if <code class="docutils literal notranslate"><span class="pre">base</span></code> is <a class="reference internal" href="#qrenderdoc.WindowMenu.NewMenu" title="qrenderdoc.WindowMenu.NewMenu"><code class="xref py py-data docutils literal notranslate"><span class="pre">WindowMenu.NewMenu</span></code></a>.</p></li>
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.RegisterWindowMenu.params.callback"></span><strong>callback</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.RegisterWindowMenu.params.callback">#</a> (<em>ExtensionCallback</em>) – The function to callback when the menu item is selected.
+Callback function signature must match <a class="reference internal" href="#qrenderdoc.ExtensionManager.ExtensionCallback" title="qrenderdoc.ExtensionManager.ExtensionCallback"><code class="xref py py-func docutils literal notranslate"><span class="pre">ExtensionCallback()</span></code></a>.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionManager.SaveFileName">
+<span class="sig-name descname"><span class="pre">SaveFileName</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">caption</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dir</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filter</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.ExtensionManager.SaveFileName" title="Permalink to this definition">¶</a></dt>
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">SaveFileName</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">caption</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dir</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span></dt>
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">SaveFileName</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">caption</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span></dt>
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">SaveFileName</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span></dt>
+<dd><p>Browse for a filename to save to.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.SaveFileName.params.caption"></span><strong>caption</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.SaveFileName.params.caption">#</a> (<em>str</em>) – The dialog title, optional.</p></li>
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.SaveFileName.params.dir"></span><strong>dir</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.SaveFileName.params.dir">#</a> (<em>str</em>) – The starting directory for browsing, optional.</p></li>
+<li><p><span class="target" id="qrenderdoc.ExtensionManager.SaveFileName.params.filter"></span><strong>filter</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ExtensionManager.SaveFileName.params.filter">#</a> (<em>str</em>) – The filter to apply for filenames, optional.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The filename selected, or an empty string if nothing was selected.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="mini-qt-helper">
+<h2><a class="toc-backref" href="#id2">Mini-Qt Helper</a><a class="headerlink" href="#mini-qt-helper" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qrenderdoc.</span></span><span class="sig-name descname"><span class="pre">MiniQtHelper</span></span><a class="headerlink" href="#qrenderdoc.MiniQtHelper" title="Permalink to this definition">¶</a></dt>
+<dd><p>Python can have direct access to Qt via PySide2, but this is not always available in
+all RenderDoc builds. To aid extensions to manipulate widgets in a simple but portable fashion this
+helper exposes a small subset of Qt via RenderDoc’s python bindings.</p>
+<p>The intention is not to allow fully flexible building of Qt panels, but to allow access to some
+basic UI building tools for simple data input and display which can be used on any RenderDoc build.</p>
+<p>This manager is retrieved by calling <a class="reference internal" href="#qrenderdoc.ExtensionManager.GetMiniQtHelper" title="qrenderdoc.ExtensionManager.GetMiniQtHelper"><code class="xref py py-meth docutils literal notranslate"><span class="pre">ExtensionManager.GetMiniQtHelper()</span></code></a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The widget handles returned are PySide2 widgets where that is available, so this can be used to
+make a basic UI and optionally customise it further with PySide2 when possible.</p>
+</div>
+<dl class="py function">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.WidgetCallback">
+<span class="sig-name descname"><span class="pre">WidgetCallback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">context</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">widget</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">text</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.WidgetCallback" title="Permalink to this definition">¶</a></dt>
+<dd><p>Not a member function - the signature for any <code class="docutils literal notranslate"><span class="pre">WidgetCallback</span></code> callbacks.</p>
+<p>Callback for widgets can be registered at creation time, the text field is optional and may be
+blank depending on the event, but the context and widget are always valid.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>context</strong> (<a class="reference internal" href="main.html#qrenderdoc.CaptureContext" title="qrenderdoc.CaptureContext"><em>CaptureContext</em></a>) – The current capture context.</p></li>
+<li><p><strong>widget</strong> (<em>QWidget</em>) – The widget sending the callback.</p></li>
+<li><p><strong>text</strong> (<em>str</em>) – Additional data for the call, such as the current or selected text.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.InvokeCallback">
+<span class="sig-name descname"><span class="pre">InvokeCallback</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">context</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">widget</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">text</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.InvokeCallback" title="Permalink to this definition">¶</a></dt>
+<dd><p>Not a member function - the signature for any <code class="docutils literal notranslate"><span class="pre">InvokeCallback</span></code> callbacks.</p>
+<p>Callback for invoking onto the UI thread from another thread (in particular the replay thread).
+Takes no parameters as the callback is expected to store its own state.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.AddGridWidget">
+<span class="sig-name descname"><span class="pre">AddGridWidget</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">row</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">column</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">child</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rowSpan</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">columnSpan</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.AddGridWidget" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds a child widget to a grid layout. If the parent is not a grid layout nothing will
+happen and the widget will not be added anywhere.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.AddGridWidget.params.parent"></span><strong>parent</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.AddGridWidget.params.parent">#</a> (<em>QWidget</em>) – The parent grid layout widget.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.AddGridWidget.params.row"></span><strong>row</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.AddGridWidget.params.row">#</a> (<em>int</em>) – The row at which to add the child widget.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.AddGridWidget.params.column"></span><strong>column</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.AddGridWidget.params.column">#</a> (<em>int</em>) – The column at which to add the child widget.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.AddGridWidget.params.child"></span><strong>child</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.AddGridWidget.params.child">#</a> (<em>QWidget</em>) – The child widget to add.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.AddGridWidget.params.rowSpan"></span><strong>rowSpan</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.AddGridWidget.params.rowSpan">#</a> (<em>int</em>) – How many rows should this child span over.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.AddGridWidget.params.columnSpan"></span><strong>columnSpan</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.AddGridWidget.params.columnSpan">#</a> (<em>int</em>) – How many columns should this child span over.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.AddWidget">
+<span class="sig-name descname"><span class="pre">AddWidget</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">child</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.AddWidget" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds a child widget to the end of an ordered layout (either horizontal or vertical).
+If the parent is not an ordered layout nothing will happen and the widget will not be added anywhere.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.AddWidget.params.parent"></span><strong>parent</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.AddWidget.params.parent">#</a> (<em>QWidget</em>) – The parent grid layout widget.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.AddWidget.params.child"></span><strong>child</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.AddWidget.params.child">#</a> (<em>QWidget</em>) – The child widget to add.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.ClearContainedWidgets">
+<span class="sig-name descname"><span class="pre">ClearContainedWidgets</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.ClearContainedWidgets" title="Permalink to this definition">¶</a></dt>
+<dd><p>Removes all child widgets from a parent and makes them invisible.</p>
+<p>These widgets remain valid and can be re-added to another parent or the same parent.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.ClearContainedWidgets.params.parent"></span><strong>parent</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.ClearContainedWidgets.params.parent">#</a> (<em>QWidget</em>) – The parent widget to clear of  children.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.CloseCurrentDialog">
+<span class="sig-name descname"><span class="pre">CloseCurrentDialog</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">success</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.CloseCurrentDialog" title="Permalink to this definition">¶</a></dt>
+<dd><p>Close the active modal dialog. This does nothing if no dialog is being shown.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Closing a dialog ‘sucessfully’ does nothing except modify the return value of
+<a class="reference internal" href="#qrenderdoc.MiniQtHelper.CloseCurrentDialog" title="qrenderdoc.MiniQtHelper.CloseCurrentDialog"><code class="xref py py-meth docutils literal notranslate"><span class="pre">CloseCurrentDialog()</span></code></a>. It allows quick distinguishing between OK and Cancel actions without
+having to carry that information separately in a global or other state.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.CloseCurrentDialog.params.success"></span><strong>success</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.CloseCurrentDialog.params.success">#</a> (<em>bool</em>) – <code class="docutils literal notranslate"><span class="pre">True</span></code> if the dialog was successful (the user clicked an OK/Accept type
+button).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.CloseToplevelWidget">
+<span class="sig-name descname"><span class="pre">CloseToplevelWidget</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.CloseToplevelWidget" title="Permalink to this definition">¶</a></dt>
+<dd><p>Closes a top-level widget as if the user had clicked to close.</p>
+<p>This function is undefined if used on a non top-level widget. It will invoke the closed widget
+callback.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.CloseToplevelWidget.params.widget"></span><strong>widget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.CloseToplevelWidget.params.widget">#</a> (<em>QWidget</em>) – The top-level widget to close.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.CreateButton">
+<span class="sig-name descname"><span class="pre">CreateButton</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pressed</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.CreateButton" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a normal button widget.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.CreateButton.params.pressed"></span><strong>pressed</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.CreateButton.params.pressed">#</a> (<em>WidgetCallback</em>) – Callback to be called when the button is pressed.
+Callback function signature must match <a class="reference internal" href="#qrenderdoc.MiniQtHelper.WidgetCallback" title="qrenderdoc.MiniQtHelper.WidgetCallback"><code class="xref py py-func docutils literal notranslate"><span class="pre">WidgetCallback()</span></code></a>.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The handle to the newly created widget.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>QWidget</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.CreateCheckbox">
+<span class="sig-name descname"><span class="pre">CreateCheckbox</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">changed</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.CreateCheckbox" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a checkbox widget which can be toggled between unchecked and checked. When
+created the checkbox is unchecked.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.CreateCheckbox.params.changed"></span><strong>changed</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.CreateCheckbox.params.changed">#</a> (<em>WidgetCallback</em>) – Callback to be called when the widget is toggled.
+Callback function signature must match <a class="reference internal" href="#qrenderdoc.MiniQtHelper.WidgetCallback" title="qrenderdoc.MiniQtHelper.WidgetCallback"><code class="xref py py-func docutils literal notranslate"><span class="pre">WidgetCallback()</span></code></a>.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The handle to the newly created widget.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>QWidget</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.CreateComboBox">
+<span class="sig-name descname"><span class="pre">CreateComboBox</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">editable</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">changed</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.CreateComboBox" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a drop-down combo box widget.</p>
+<p>When created there are no pre-defined entries in the drop-down section. This can be changed with
+<a class="reference internal" href="#qrenderdoc.MiniQtHelper.SetComboOptions" title="qrenderdoc.MiniQtHelper.SetComboOptions"><code class="xref py py-meth docutils literal notranslate"><span class="pre">SetComboOptions()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.CreateComboBox.params.editable"></span><strong>editable</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.CreateComboBox.params.editable">#</a> (<em>bool</em>) – <code class="docutils literal notranslate"><span class="pre">True</span></code> if the widget should allow the user to enter any text they wish as
+well as being able to select a pre-defined entry.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.CreateComboBox.params.changed"></span><strong>changed</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.CreateComboBox.params.changed">#</a> (<em>WidgetCallback</em>) – Callback to be called when the text in the combobox is changed. This
+will be called both when a new option is selected or when the user edits the text.
+Callback function signature must match <a class="reference internal" href="#qrenderdoc.MiniQtHelper.WidgetCallback" title="qrenderdoc.MiniQtHelper.WidgetCallback"><code class="xref py py-func docutils literal notranslate"><span class="pre">WidgetCallback()</span></code></a>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The handle to the newly created widget.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>QWidget</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.CreateGridContainer">
+<span class="sig-name descname"><span class="pre">CreateGridContainer</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.CreateGridContainer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates and returns a grid layout widget.</p>
+<p>The widget needs to be added to a parent to become part of a panel or window.</p>
+<p>Children added to this layout widget are arranged in a grid. Widget sizing follows default logic,
+which typically has some widgets be only large enough for their content and others which are
+‘greedy’ evenly divide any remaining free space. This will not violate the grid constraint though.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The handle to the newly created widget.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>QWidget</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.CreateGroupBox">
+<span class="sig-name descname"><span class="pre">CreateGroupBox</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">collapsible</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.CreateGroupBox" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a groupbox widget which can optionally allow collapsing.</p>
+<p>This widget can have children added, but it is recommended to immediately add only one child which
+is a layout type widget, to allow customising how children are added. By default the children are
+added in a vertical layout.</p>
+<p>The widget needs to be added to a parent to become part of a panel or window.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.CreateGroupBox.params.collapsible"></span><strong>collapsible</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.CreateGroupBox.params.collapsible">#</a> (<em>bool</em>) – <code class="docutils literal notranslate"><span class="pre">True</span></code> if the groupbox should have a toggle in its header to allow
+collapsing its contents down vertically.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The handle to the newly created widget.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>QWidget</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.CreateHorizontalContainer">
+<span class="sig-name descname"><span class="pre">CreateHorizontalContainer</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.CreateHorizontalContainer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates and returns a horizontal layout widget.</p>
+<p>The widget needs to be added to a parent to become part of a panel or window.</p>
+<p>Children added to this layout widget are listed horizontally. Widget sizing follows default logic,
+which typically has some widgets be only large enough for their content and others which are
+‘greedy’ evenly divide any remaining free space.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The handle to the newly created widget.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>QWidget</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.CreateLabel">
+<span class="sig-name descname"><span class="pre">CreateLabel</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.CreateLabel" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a read-only label widget.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This widget will be blank by default, you can set the text with <a class="reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetText" title="qrenderdoc.MiniQtHelper.SetWidgetText"><code class="xref py py-meth docutils literal notranslate"><span class="pre">SetWidgetText()</span></code></a>.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The handle to the newly created widget.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>QWidget</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.CreateOutputRenderingWidget">
+<span class="sig-name descname"><span class="pre">CreateOutputRenderingWidget</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.CreateOutputRenderingWidget" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a widget suitable for rendering to with a <a class="reference internal" href="../renderdoc/outputs.html#renderdoc.ReplayOutput" title="renderdoc.ReplayOutput"><code class="xref py py-class docutils literal notranslate"><span class="pre">renderdoc.ReplayOutput</span></code></a>. This
+widget takes care of painting on demand and recreating the internal display widget when necessary,
+however this means you must use <a class="reference internal" href="#qrenderdoc.MiniQtHelper.GetWidgetWindowingData" title="qrenderdoc.MiniQtHelper.GetWidgetWindowingData"><code class="xref py py-meth docutils literal notranslate"><span class="pre">GetWidgetWindowingData()</span></code></a> to retrieve the windowing data for
+creating the output as well as call <a class="reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetReplayOutput" title="qrenderdoc.MiniQtHelper.SetWidgetReplayOutput"><code class="xref py py-meth docutils literal notranslate"><span class="pre">SetWidgetReplayOutput()</span></code></a> to notify the widget of the
+current output.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The handle to the newly created widget.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>QWidget</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.CreateProgressBar">
+<span class="sig-name descname"><span class="pre">CreateProgressBar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">horizontal</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.CreateProgressBar" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a progress bar widget.</p>
+<p>By default the progress bar has minimum and maximum values of 0 and 100. These can be changed with
+<a class="reference internal" href="#qrenderdoc.MiniQtHelper.SetProgressBarRange" title="qrenderdoc.MiniQtHelper.SetProgressBarRange"><code class="xref py py-meth docutils literal notranslate"><span class="pre">SetProgressBarRange()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.CreateProgressBar.params.horizontal"></span><strong>horizontal</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.CreateProgressBar.params.horizontal">#</a> (<em>bool</em>) – the progress bar orientation, true for horizontal otherwise vertical.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The handle to the newly created widget.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>QWidget</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.CreateRadiobox">
+<span class="sig-name descname"><span class="pre">CreateRadiobox</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">changed</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.CreateRadiobox" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a radio box widget which can be toggled between unchecked and checked but with
+at most one radio box in any group of sibling radio boxes being checked.</p>
+<p>Upon creation the radio box is unchecked, even in a group of other radio boxes that are unchecked.
+If you want a default radio box to be checked, you should use <a class="reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetChecked" title="qrenderdoc.MiniQtHelper.SetWidgetChecked"><code class="xref py py-meth docutils literal notranslate"><span class="pre">SetWidgetChecked()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.CreateRadiobox.params.changed"></span><strong>changed</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.CreateRadiobox.params.changed">#</a> (<em>WidgetCallback</em>) – Callback to be called when the widget is toggled.
+Callback function signature must match <a class="reference internal" href="#qrenderdoc.MiniQtHelper.WidgetCallback" title="qrenderdoc.MiniQtHelper.WidgetCallback"><code class="xref py py-func docutils literal notranslate"><span class="pre">WidgetCallback()</span></code></a>.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The handle to the newly created widget.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>QWidget</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.CreateSpacer">
+<span class="sig-name descname"><span class="pre">CreateSpacer</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">horizontal</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.CreateSpacer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates and returns a spacer widget.</p>
+<p>This widget is completely empty but consumes empty space, meaning all other non-greedy widgets in
+the same container will be minimally sized. This can be useful for simple layouts.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.CreateSpacer.params.horizontal"></span><strong>horizontal</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.CreateSpacer.params.horizontal">#</a> (<em>bool</em>) – <code class="docutils literal notranslate"><span class="pre">True</span></code> if this spacer should consume horizontal space, <code class="docutils literal notranslate"><span class="pre">False</span></code> if this
+spacer should consume vertical space. Typically this matches the direction of the layout it is
+in.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The handle to the newly created widget.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>QWidget</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.CreateSpinbox">
+<span class="sig-name descname"><span class="pre">CreateSpinbox</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">decimalPlaces</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">step</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.CreateSpinbox" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a spinbox widget with a numerical value and up/down buttons to change it.</p>
+<p>The number of decimal places can be set to 0 for an integer spinbox, and in that case the step
+should be set to 1.0.</p>
+<p>By default the spinbox has minimum and maximum values of 0.0 and 100.0, these can be changed with
+<a class="reference internal" href="#qrenderdoc.MiniQtHelper.SetSpinboxBounds" title="qrenderdoc.MiniQtHelper.SetSpinboxBounds"><code class="xref py py-meth docutils literal notranslate"><span class="pre">SetSpinboxBounds()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.CreateSpinbox.params.decimalPlaces"></span><strong>decimalPlaces</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.CreateSpinbox.params.decimalPlaces">#</a> (<em>int</em>) – The number of decimal places to display when showing the number.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.CreateSpinbox.params.step"></span><strong>step</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.CreateSpinbox.params.step">#</a> (<em>float</em>) – The step value to apply in each direction when clicking up or down.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The handle to the newly created widget.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>QWidget</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.CreateTextBox">
+<span class="sig-name descname"><span class="pre">CreateTextBox</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">singleLine</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">changed</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.CreateTextBox" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a text box widget for the user to enter text into.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.CreateTextBox.params.singleLine"></span><strong>singleLine</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.CreateTextBox.params.singleLine">#</a> (<em>bool</em>) – <code class="docutils literal notranslate"><span class="pre">True</span></code> if the widget should be a single-line entry, otherwise it is a
+multi-line text box.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.CreateTextBox.params.changed"></span><strong>changed</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.CreateTextBox.params.changed">#</a> (<em>WidgetCallback</em>) – Callback to be called when the text in the textbox is changed.
+Callback function signature must match <a class="reference internal" href="#qrenderdoc.MiniQtHelper.WidgetCallback" title="qrenderdoc.MiniQtHelper.WidgetCallback"><code class="xref py py-func docutils literal notranslate"><span class="pre">WidgetCallback()</span></code></a>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The handle to the newly created widget.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>QWidget</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.CreateToplevelWidget">
+<span class="sig-name descname"><span class="pre">CreateToplevelWidget</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">windowTitle</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">closed</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.CreateToplevelWidget" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates and returns a top-level widget for creating layouts.</p>
+<p>The widget is not immediately visible. It should be shown either with <a class="reference internal" href="#qrenderdoc.MiniQtHelper.ShowWidgetAsDialog" title="qrenderdoc.MiniQtHelper.ShowWidgetAsDialog"><code class="xref py py-meth docutils literal notranslate"><span class="pre">ShowWidgetAsDialog()</span></code></a> or
+with <a class="reference internal" href="main.html#qrenderdoc.CaptureContext.AddDockWindow" title="qrenderdoc.CaptureContext.AddDockWindow"><code class="xref py py-meth docutils literal notranslate"><span class="pre">CaptureContext.AddDockWindow()</span></code></a> once it’s ready.</p>
+<p>This widget can have children added, but it is recommended to immediately add only one child which
+is a layout type widget, to allow customising how children are added. By default the children are
+added in a vertical layout.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.CreateToplevelWidget.params.windowTitle"></span><strong>windowTitle</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.CreateToplevelWidget.params.windowTitle">#</a> (<em>str</em>) – The title of any window with this widget as its root.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.CreateToplevelWidget.params.closed"></span><strong>closed</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.CreateToplevelWidget.params.closed">#</a> (<em>WidgetCallback</em>) – A callback that will be called when the widget is closed by the user.
+This implicitly deletes the widget and all its children, which will no longer be valid even if a
+handle to them exists.
+Callback function signature must match <a class="reference internal" href="#qrenderdoc.MiniQtHelper.WidgetCallback" title="qrenderdoc.MiniQtHelper.WidgetCallback"><code class="xref py py-func docutils literal notranslate"><span class="pre">WidgetCallback()</span></code></a>.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The handle to the newly created widget.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>QWidget</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.CreateVerticalContainer">
+<span class="sig-name descname"><span class="pre">CreateVerticalContainer</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.CreateVerticalContainer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Creates and returns a vertical layout widget.</p>
+<p>The widget needs to be added to a parent to become part of a panel or window.</p>
+<p>Children added to this layout widget are listed vertically. Widget sizing follows default logic,
+which typically has some widgets be only large enough for their content and others which are
+‘greedy’ evenly divide any remaining free space.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The handle to the newly created widget.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>QWidget</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.DestroyWidget">
+<span class="sig-name descname"><span class="pre">DestroyWidget</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.DestroyWidget" title="Permalink to this definition">¶</a></dt>
+<dd><p>Destroy a widget. Widgets stay alive unless explicitly destroyed here, OR in one other
+case when they are in a widget hiearchy under a top-level window which the user closes, which can
+be detected with the callback parameter in <a class="reference internal" href="#qrenderdoc.MiniQtHelper.CreateToplevelWidget" title="qrenderdoc.MiniQtHelper.CreateToplevelWidget"><code class="xref py py-meth docutils literal notranslate"><span class="pre">CreateToplevelWidget()</span></code></a>.</p>
+<p>If the widget being destroyed is a top-level window, it will be closed. Otherwise if it is part of a
+widget hierarchy it will be removed from its parent automatically. You can remove a widget and then
+destroy it if you wish, but you must not destroy a widget then attempt to remove it from its parent,
+as after the call to this function the widget is no longer valid to use.</p>
+<p>All children under this widget will be destroyed recursively as well, which will be made invalid
+even if a handle to them exists.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.DestroyWidget.params.widget"></span><strong>widget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.DestroyWidget.params.widget">#</a> (<em>QWidget</em>) – The widget to destroy.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.FindChildByName">
+<span class="sig-name descname"><span class="pre">FindChildByName</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.FindChildByName" title="Permalink to this definition">¶</a></dt>
+<dd><p>Find a child widget of a parent by internal name.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.FindChildByName.params.parent"></span><strong>parent</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.FindChildByName.params.parent">#</a> (<em>QWidget</em>) – The widget to start the search from.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.FindChildByName.params.name"></span><strong>name</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.FindChildByName.params.name">#</a> (<em>str</em>) – The internal name to search for.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The handle to the first widget with a matching name, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if no widget is found.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>QWidget</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.GetChild">
+<span class="sig-name descname"><span class="pre">GetChild</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.GetChild" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return a child widget for a parent.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.GetChild.params.parent"></span><strong>parent</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.GetChild.params.parent">#</a> (<em>QWidget</em>) – The parent widget to look up.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.GetChild.params.index"></span><strong>index</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.GetChild.params.index">#</a> (<em>int</em>) – The child index to return.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The specified child of the parent, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if the index is out of bounds.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>QWidget</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.GetComboCount">
+<span class="sig-name descname"><span class="pre">GetComboCount</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">combo</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.GetComboCount" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the number of options in a drop-down combo box. If another type of widget is
+passed <code class="docutils literal notranslate"><span class="pre">0</span></code> will be returned.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.GetComboCount.params.combo"></span><strong>combo</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.GetComboCount.params.combo">#</a> (<em>QWidget</em>) – The combo box.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The current number of options.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.GetNumChildren">
+<span class="sig-name descname"><span class="pre">GetNumChildren</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.GetNumChildren" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the number of children this widget has. This is generally only useful for
+layout type widgets.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.GetNumChildren.params.widget"></span><strong>widget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.GetNumChildren.params.widget">#</a> (<em>QWidget</em>) – The widget to query.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The number of child widgets this widget has.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.GetParent">
+<span class="sig-name descname"><span class="pre">GetParent</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.GetParent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the parent of a widget in the widget hierarchy.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The widget returned may not be a widget created through this helper interface if the specified
+widget has been docked somewhere. Beware making changes to any widgets returned as you may modify
+the RenderDoc UI itself.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.GetParent.params.widget"></span><strong>widget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.GetParent.params.widget">#</a> (<em>QWidget</em>) – The widget to query.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The handle to the parent widget with a matching name, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if this widget is either
+not yet parented or is a top-level window.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>QWidget</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.GetProgressBarMaximum">
+<span class="sig-name descname"><span class="pre">GetProgressBarMaximum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pbar</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.GetProgressBarMaximum" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the maximum value of the progress bar’s range.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.GetProgressBarMaximum.params.pbar"></span><strong>pbar</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.GetProgressBarMaximum.params.pbar">#</a> (<em>QWidget</em>) – the progress bar.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The maximum value of the range.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.GetProgressBarMinimum">
+<span class="sig-name descname"><span class="pre">GetProgressBarMinimum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pbar</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.GetProgressBarMinimum" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the minimum value of the progress bar’s range.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.GetProgressBarMinimum.params.pbar"></span><strong>pbar</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.GetProgressBarMinimum.params.pbar">#</a> (<em>QWidget</em>) – the progress bar.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The minimum value of the range.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.GetProgressBarValue">
+<span class="sig-name descname"><span class="pre">GetProgressBarValue</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pbar</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.GetProgressBarValue" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the progress bar’s current value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.GetProgressBarValue.params.pbar"></span><strong>pbar</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.GetProgressBarValue.params.pbar">#</a> (<em>QWidget</em>) – the progress bar.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The current value of the progress bar.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.GetSpinboxValue">
+<span class="sig-name descname"><span class="pre">GetSpinboxValue</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">spinbox</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.GetSpinboxValue" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current value of a spinbox widget. If another type of widget is passed
+<code class="docutils literal notranslate"><span class="pre">0.0</span></code> will be returned.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.GetSpinboxValue.params.spinbox"></span><strong>spinbox</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.GetSpinboxValue.params.spinbox">#</a> (<em>QWidget</em>) – The widget to query.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The current  value of the spinbox.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.GetWidgetName">
+<span class="sig-name descname"><span class="pre">GetWidgetName</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.GetWidgetName" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the internal name of a widget, as set my <a class="reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetName" title="qrenderdoc.MiniQtHelper.SetWidgetName"><code class="xref py py-meth docutils literal notranslate"><span class="pre">SetWidgetName()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.GetWidgetName.params.widget"></span><strong>widget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.GetWidgetName.params.widget">#</a> (<em>QWidget</em>) – The widget to query.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The widget’s internal name, which may be an empty string if no name has been set.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.GetWidgetText">
+<span class="sig-name descname"><span class="pre">GetWidgetText</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.GetWidgetText" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current text of a widget. See <a class="reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetText" title="qrenderdoc.MiniQtHelper.SetWidgetText"><code class="xref py py-meth docutils literal notranslate"><span class="pre">SetWidgetText()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.GetWidgetText.params.widget"></span><strong>widget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.GetWidgetText.params.widget">#</a> (<em>QWidget</em>) – The widget to query.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The widget’s current text, which may be an empty string if no valid text is available.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.GetWidgetType">
+<span class="sig-name descname"><span class="pre">GetWidgetType</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.GetWidgetType" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the type of the widget as a string. This type is the Qt type name so this
+should only be used for debugging as the name may change even if for the same type of widget.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.GetWidgetType.params.widget"></span><strong>widget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.GetWidgetType.params.widget">#</a> (<em>QWidget</em>) – The widget to query.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The widget’s type name.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.GetWidgetWindowingData">
+<span class="sig-name descname"><span class="pre">GetWidgetWindowingData</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.GetWidgetWindowingData" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the opaque pointer of windowing data suitable for passing to
+<a class="reference internal" href="../renderdoc/replay.html#renderdoc.ReplayController.CreateOutput" title="renderdoc.ReplayController.CreateOutput"><code class="xref py py-meth docutils literal notranslate"><span class="pre">CreateOutput()</span></code></a> or other functions that expect windowing data.</p>
+<p>If the widget is not a output rendering widget created with <a class="reference internal" href="#qrenderdoc.MiniQtHelper.CreateOutputRenderingWidget" title="qrenderdoc.MiniQtHelper.CreateOutputRenderingWidget"><code class="xref py py-meth docutils literal notranslate"><span class="pre">CreateOutputRenderingWidget()</span></code></a> this
+function will fail and return an invalid set of windowing data.</p>
+<p>It’s important to note that the windowing data is not valid forever, so this function should be
+called as close to where you call <a class="reference internal" href="../renderdoc/replay.html#renderdoc.ReplayController.CreateOutput" title="renderdoc.ReplayController.CreateOutput"><code class="xref py py-meth docutils literal notranslate"><span class="pre">CreateOutput()</span></code></a> as possible.
+Also don’t fetch windowing data unless you are going to create an output, because this function will
+cause the widget to go into an undefined state unless an output is created to render onto it.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This function must be called on the main UI thread.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.GetWidgetWindowingData.params.widget"></span><strong>widget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.GetWidgetWindowingData.params.widget">#</a> (<em>QWidget</em>) – The widget to create windowing data for.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The windowing data.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../renderdoc/outputs.html#renderdoc.WindowingData" title="renderdoc.WindowingData">renderdoc.WindowingData</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.InsertWidget">
+<span class="sig-name descname"><span class="pre">InsertWidget</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">child</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.InsertWidget" title="Permalink to this definition">¶</a></dt>
+<dd><p>Insert a child widget at the specified index in an ordered layout (either horizontal
+or vertical). If the parent is not an ordered layout nothing will happen and the widget will not be
+added anywhere.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.InsertWidget.params.parent"></span><strong>parent</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.InsertWidget.params.parent">#</a> (<em>QWidget</em>) – The parent grid layout widget.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.InsertWidget.params.index"></span><strong>index</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.InsertWidget.params.index">#</a> (<em>int</em>) – The index to insert the widget at. If this index is out of bounds it will be
+clamped, so that negative indices will be equivalent to index 0 and all indices above the number
+of children will append the widget</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.InsertWidget.params.child"></span><strong>child</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.InsertWidget.params.child">#</a> (<em>QWidget</em>) – The child widget to add.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.InvokeOntoUIThread">
+<span class="sig-name descname"><span class="pre">InvokeOntoUIThread</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.InvokeOntoUIThread" title="Permalink to this definition">¶</a></dt>
+<dd><p>Invoke a callback on the UI thread. All widget accesses must come from the UI thread,
+so if work has been done on the render thread then this function can be used to asynchronously and
+safely go back to the UI thread.</p>
+<p>This function is safe to call on the UI thread, but it will synchronously call the callback
+immediately before returning.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>No parameters are provided to the callback, it is assumed that the callback will maintain its own
+context as needed.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.InvokeOntoUIThread.params.callback"></span><strong>callback</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.InvokeOntoUIThread.params.callback">#</a> (<em>InvokeCallback</em>) – The callback to invoke on the UI thread.
+Callback function signature must match <a class="reference internal" href="#qrenderdoc.MiniQtHelper.InvokeCallback" title="qrenderdoc.MiniQtHelper.InvokeCallback"><code class="xref py py-func docutils literal notranslate"><span class="pre">InvokeCallback()</span></code></a>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.IsWidgetChecked">
+<span class="sig-name descname"><span class="pre">IsWidgetChecked</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">checkableWidget</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.IsWidgetChecked" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current checked-state of a widget. See <a class="reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetChecked" title="qrenderdoc.MiniQtHelper.SetWidgetChecked"><code class="xref py py-meth docutils literal notranslate"><span class="pre">SetWidgetChecked()</span></code></a>. If another
+type of widget is passed other than a checkbox or radio box or group box <code class="docutils literal notranslate"><span class="pre">False</span></code> will be returned.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.IsWidgetChecked.params.checkableWidget"></span><strong>checkableWidget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.IsWidgetChecked.params.checkableWidget">#</a> (<em>QWidget</em>) – The widget to query.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the widget is currently checked.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.IsWidgetEnabled">
+<span class="sig-name descname"><span class="pre">IsWidgetEnabled</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.IsWidgetEnabled" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current enabled-state of a widget. See <a class="reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetEnabled" title="qrenderdoc.MiniQtHelper.SetWidgetEnabled"><code class="xref py py-meth docutils literal notranslate"><span class="pre">SetWidgetEnabled()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.IsWidgetEnabled.params.widget"></span><strong>widget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.IsWidgetEnabled.params.widget">#</a> (<em>QWidget</em>) – The widget to query.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the widget is currently enabled.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.IsWidgetVisible">
+<span class="sig-name descname"><span class="pre">IsWidgetVisible</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.IsWidgetVisible" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the current visibility of a widget. See <a class="reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetVisible" title="qrenderdoc.MiniQtHelper.SetWidgetVisible"><code class="xref py py-meth docutils literal notranslate"><span class="pre">SetWidgetVisible()</span></code></a>.</p>
+<p>This query is recursive - a widget could be individually visible, but if it is under a parent which
+is invisible then this widget will be returned as invisible.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.IsWidgetVisible.params.widget"></span><strong>widget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.IsWidgetVisible.params.widget">#</a> (<em>QWidget</em>) – The widget to query.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the widget is currently visible.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.ResetProgressBar">
+<span class="sig-name descname"><span class="pre">ResetProgressBar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pbar</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.ResetProgressBar" title="Permalink to this definition">¶</a></dt>
+<dd><p>Reset a progress bar widget.</p>
+<p>Rewinds the progress bar’s indicator and hides the indicator’s label (theme dependent). If you want
+to keep the label visible, call <code class="xref py py-meth docutils literal notranslate"><span class="pre">SetProgressBarValue(0)()</span></code> instead. The minimum and maximum values
+are not changed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.ResetProgressBar.params.pbar"></span><strong>pbar</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.ResetProgressBar.params.pbar">#</a> (<em>QWidget</em>) – the progress bar.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.SelectComboOption">
+<span class="sig-name descname"><span class="pre">SelectComboOption</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">combo</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">option</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.SelectComboOption" title="Permalink to this definition">¶</a></dt>
+<dd><p>Select the current option in a drop-down combo box. If another type of widget or
+an unknown option is passed, nothing will happen.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SelectComboOption.params.combo"></span><strong>combo</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SelectComboOption.params.combo">#</a> (<em>QWidget</em>) – The combo box.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SelectComboOption.params.option"></span><strong>option</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SelectComboOption.params.option">#</a> (<em>str</em>) – The option to select.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.SetComboOptions">
+<span class="sig-name descname"><span class="pre">SetComboOptions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">combo</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.SetComboOptions" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the pre-defined options in a drop-down combo box. If another type of widget is
+passed nothing will happen.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetComboOptions.params.combo"></span><strong>combo</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetComboOptions.params.combo">#</a> (<em>QWidget</em>) – The combo box.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetComboOptions.params.options"></span><strong>options</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetComboOptions.params.options">#</a> (<em>List</em><em>[</em><em>str</em><em>]</em>) – The new options for the combo box.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.SetLabelImage">
+<span class="sig-name descname"><span class="pre">SetLabelImage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">width</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">height</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.SetLabelImage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set an image for a label widget. If the widget isn’t a label, this call has no effect.</p>
+<p>The label will be resized to a fixed size to display the image at 100% scale. Any text in the label
+will not be displayed, but passing an empty image will revert the label back to being text-based.</p>
+<p>The data must be in RGB(A) format with the first byte of each texel being R.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetLabelImage.params.widget"></span><strong>widget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetLabelImage.params.widget">#</a> (<em>QWidget</em>) – The widget to set the picture for.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetLabelImage.params.data"></span><strong>data</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetLabelImage.params.data">#</a> (<em>bytes</em>) – The image data itself, tightly packed.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetLabelImage.params.width"></span><strong>width</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetLabelImage.params.width">#</a> (<em>int</em>) – The width of the image in pixels.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetLabelImage.params.height"></span><strong>height</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetLabelImage.params.height">#</a> (<em>int</em>) – The height of the image in pixels.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetLabelImage.params.alpha"></span><strong>alpha</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetLabelImage.params.alpha">#</a> (<em>bool</em>) – <code class="docutils literal notranslate"><span class="pre">True</span></code> if the image data contains an alpha channel.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.SetProgressBarRange">
+<span class="sig-name descname"><span class="pre">SetProgressBarRange</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pbar</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">minimum</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maximum</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.SetProgressBarRange" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set a progress bar’s minimum and maximum values.</p>
+<p>If maximum is smaller than minimum, minimum is set as the maximum, too. If the current value falls
+outside the new range, the progress bar is reset. Use range (0, 0) to set the progress bar to
+indeterminated state (the progress cannot be estimated or is not being calculated).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetProgressBarRange.params.pbar"></span><strong>pbar</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetProgressBarRange.params.pbar">#</a> (<em>QWidget</em>) – the progress bar.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetProgressBarRange.params.minimum"></span><strong>minimum</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetProgressBarRange.params.minimum">#</a> (<em>int</em>) – the minimum value.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetProgressBarRange.params.maximum"></span><strong>maximum</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetProgressBarRange.params.maximum">#</a> (<em>int</em>) – the maximum value.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.SetProgressBarValue">
+<span class="sig-name descname"><span class="pre">SetProgressBarValue</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pbar</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.SetProgressBarValue" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the progress bar’s current value.</p>
+<p>Attempting to change the current value outside the minimum and maximum range does not affect
+the current value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetProgressBarValue.params.pbar"></span><strong>pbar</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetProgressBarValue.params.pbar">#</a> (<em>QWidget</em>) – the progress bar.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetProgressBarValue.params.value"></span><strong>value</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetProgressBarValue.params.value">#</a> (<em>int</em>) – the new current value.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.SetSpinboxBounds">
+<span class="sig-name descname"><span class="pre">SetSpinboxBounds</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">spinbox</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">minVal</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">maxVal</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.SetSpinboxBounds" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the minimum and maximum values allowed in the spinbox. If another type of widget
+is passed nothing will happen.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetSpinboxBounds.params.spinbox"></span><strong>spinbox</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetSpinboxBounds.params.spinbox">#</a> (<em>QWidget</em>) – The spinbox.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetSpinboxBounds.params.minVal"></span><strong>minVal</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetSpinboxBounds.params.minVal">#</a> (<em>float</em>) – The minimum value allowed for the spinbox to reach. Lower values entered will
+be clamped to this.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetSpinboxBounds.params.maxVal"></span><strong>maxVal</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetSpinboxBounds.params.maxVal">#</a> (<em>float</em>) – The maximum value allowed for the spinbox to reach. Higher values entered will
+be clamped to this.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.SetSpinboxValue">
+<span class="sig-name descname"><span class="pre">SetSpinboxValue</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">spinbox</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.SetSpinboxValue" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the value contained in a spinbox. If another type of widget is passed nothing will
+happen.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetSpinboxValue.params.spinbox"></span><strong>spinbox</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetSpinboxValue.params.spinbox">#</a> (<em>QWidget</em>) – The spinbox.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetSpinboxValue.params.value"></span><strong>value</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetSpinboxValue.params.value">#</a> (<em>float</em>) – The value for the spinbox, which will be clamped by the current bounds.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.SetWidgetBackgroundColor">
+<span class="sig-name descname"><span class="pre">SetWidgetBackgroundColor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">red</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">green</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">blue</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.SetWidgetBackgroundColor" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the default backkground color for a rendering widget. This background color is
+used when no output is currently configured, e.g. when a capture is closed.</p>
+<p>For all other widget types this has no effect.</p>
+<p>To disable the background color pass negative values for the components, this will cause a default
+checkerboard to be rendered instead. This is the default behaviour when a widget is created.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetBackgroundColor.params.widget"></span><strong>widget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetBackgroundColor.params.widget">#</a> (<em>QWidget</em>) – The widget to set the background color of.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetBackgroundColor.params.red"></span><strong>red</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetBackgroundColor.params.red">#</a> (<em>float</em>) – The red component of the color, in the range <code class="docutils literal notranslate"><span class="pre">0.0</span> <span class="pre">-</span> <span class="pre">1.0</span></code>.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetBackgroundColor.params.green"></span><strong>green</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetBackgroundColor.params.green">#</a> (<em>float</em>) – The green component of the color, in the range <code class="docutils literal notranslate"><span class="pre">0.0</span> <span class="pre">-</span> <span class="pre">1.0</span></code>.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetBackgroundColor.params.blue"></span><strong>blue</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetBackgroundColor.params.blue">#</a> (<em>float</em>) – The blue component of the color, in the range <code class="docutils literal notranslate"><span class="pre">0.0</span> <span class="pre">-</span> <span class="pre">1.0</span></code>.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.SetWidgetChecked">
+<span class="sig-name descname"><span class="pre">SetWidgetChecked</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">checkableWidget</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">checked</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.SetWidgetChecked" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set whether the widget is checked or not. This only affects checkboxes and radio
+boxes and group box. If another type of widget is passed nothing will happen.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetChecked.params.checkableWidget"></span><strong>checkableWidget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetChecked.params.checkableWidget">#</a> (<em>QWidget</em>) – The widget to check or uncheck.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetChecked.params.checked"></span><strong>checked</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetChecked.params.checked">#</a> (<em>bool</em>) – <code class="docutils literal notranslate"><span class="pre">True</span></code> if the widget should be checked.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.SetWidgetEnabled">
+<span class="sig-name descname"><span class="pre">SetWidgetEnabled</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">enabled</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.SetWidgetEnabled" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set whether the widget is enabled or not. This generally only affects interactive
+widgets and not fixed widgets, interactive widgets become read-only while still displaying the same
+data.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Disabled widgets can still be modified programmatically, they are only disabled for the user.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetEnabled.params.widget"></span><strong>widget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetEnabled.params.widget">#</a> (<em>QWidget</em>) – The widget to enable or disable.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetEnabled.params.enabled"></span><strong>enabled</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetEnabled.params.enabled">#</a> (<em>bool</em>) – <code class="docutils literal notranslate"><span class="pre">True</span></code> if the widget should be enabled.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.SetWidgetFont">
+<span class="sig-name descname"><span class="pre">SetWidgetFont</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">font</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fontSize</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bold</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">italic</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.SetWidgetFont" title="Permalink to this definition">¶</a></dt>
+<dd><p>Change the font properties of a widget.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetFont.params.widget"></span><strong>widget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetFont.params.widget">#</a> (<em>QWidget</em>) – The widget to change font of.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetFont.params.font"></span><strong>font</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetFont.params.font">#</a> (<em>str</em>) – The new font family to use, or an empty string to leave the font family the same.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetFont.params.fontSize"></span><strong>fontSize</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetFont.params.fontSize">#</a> (<em>int</em>) – The new font point size to use, or 0 to leave the size the same.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetFont.params.bold"></span><strong>bold</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetFont.params.bold">#</a> (<em>bool</em>) – <code class="docutils literal notranslate"><span class="pre">True</span></code> if the font should be bold.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetFont.params.italic"></span><strong>italic</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetFont.params.italic">#</a> (<em>bool</em>) – <code class="docutils literal notranslate"><span class="pre">True</span></code> if the font should be italic.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.SetWidgetName">
+<span class="sig-name descname"><span class="pre">SetWidgetName</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.SetWidgetName" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the internal name of a widget. This is not displayed anywhere but can be used by
+<a class="reference internal" href="#qrenderdoc.MiniQtHelper.FindChildByName" title="qrenderdoc.MiniQtHelper.FindChildByName"><code class="xref py py-meth docutils literal notranslate"><span class="pre">FindChildByName()</span></code></a> to locate a widget within a hierarchy.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Names are optional and only for your use. Nothing prevents from you from setting duplicate names,
+but this makes searches by name ambiguous.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetName.params.widget"></span><strong>widget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetName.params.widget">#</a> (<em>QWidget</em>) – The widget to set an internal name for.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetName.params.name"></span><strong>name</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetName.params.name">#</a> (<em>str</em>) – The internal name to set for the widget.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.SetWidgetReplayOutput">
+<span class="sig-name descname"><span class="pre">SetWidgetReplayOutput</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.SetWidgetReplayOutput" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the current output for a widget. This only affects output rendering widgets. If
+another type of widget is passed nothing will happen.</p>
+<p>Passing <code class="docutils literal notranslate"><span class="pre">None</span></code> as the output will reset the widget and make it display the default background
+until another output is set.</p>
+<p>When a capture is closed and all outputs are destroyed, the widget will automatically unset the
+output so there is no need to do that manually.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetReplayOutput.params.widget"></span><strong>widget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetReplayOutput.params.widget">#</a> (<em>QWidget</em>) – The widget to set the output for.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetReplayOutput.params.output"></span><strong>output</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetReplayOutput.params.output">#</a> (<a class="reference internal" href="../renderdoc/outputs.html#renderdoc.ReplayOutput" title="renderdoc.ReplayOutput"><em>renderdoc.ReplayOutput</em></a>) – The new output to set, or <code class="docutils literal notranslate"><span class="pre">None</span></code> to unset any previous
+output.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.SetWidgetText">
+<span class="sig-name descname"><span class="pre">SetWidgetText</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">text</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.SetWidgetText" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the ‘text’ of a widget. How this manifests depends on the type of the widget, for
+example a text-box or label will set the text directly. For a checkbox or radio button this will
+add text next to it.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetText.params.widget"></span><strong>widget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetText.params.widget">#</a> (<em>QWidget</em>) – The widget to set text for.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetText.params.text"></span><strong>text</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetText.params.text">#</a> (<em>str</em>) – The text to set for the widget.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.SetWidgetVisible">
+<span class="sig-name descname"><span class="pre">SetWidgetVisible</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">visible</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.SetWidgetVisible" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set whether the widget is visible or not. An invisible widget maintains its position
+in the hierarchy but is not visible and cannot be interacted with in any way.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetVisible.params.widget"></span><strong>widget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetVisible.params.widget">#</a> (<em>QWidget</em>) – The widget to show or hide.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.SetWidgetVisible.params.visible"></span><strong>visible</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.SetWidgetVisible.params.visible">#</a> (<em>bool</em>) – <code class="docutils literal notranslate"><span class="pre">True</span></code> if the widget should be made visible (shown).</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.ShowWidgetAsDialog">
+<span class="sig-name descname"><span class="pre">ShowWidgetAsDialog</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">widget</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.ShowWidgetAsDialog" title="Permalink to this definition">¶</a></dt>
+<dd><p>Show a top-level widget as a blocking modal dialog. This is most useful to prompt the
+user for some specific information.</p>
+<p>The dialog is only closed when the user closes the window explicitly or if you call
+<a class="reference internal" href="#qrenderdoc.MiniQtHelper.CloseCurrentDialog" title="qrenderdoc.MiniQtHelper.CloseCurrentDialog"><code class="xref py py-meth docutils literal notranslate"><span class="pre">CloseCurrentDialog()</span></code></a> in a widget callback, e.g. upon a button press.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.MiniQtHelper.ShowWidgetAsDialog.params.widget"></span><strong>widget</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.ShowWidgetAsDialog.params.widget">#</a> (<em>QWidget</em>) – The top-level widget to show as a dialog.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Whether the dialog was closed successfully, via <a class="reference internal" href="#qrenderdoc.MiniQtHelper.CloseCurrentDialog" title="qrenderdoc.MiniQtHelper.CloseCurrentDialog"><code class="xref py py-meth docutils literal notranslate"><span class="pre">CloseCurrentDialog()</span></code></a>.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.MiniQtHelper.UpdateProgressBarValue">
+<span class="sig-name descname"><span class="pre">UpdateProgressBarValue</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pbar</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">delta</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.MiniQtHelper.UpdateProgressBarValue" title="Permalink to this definition">¶</a></dt>
+<dd><p>Set the progress bar’s current value relative to the existing value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.UpdateProgressBarValue.params.pbar"></span><strong>pbar</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.UpdateProgressBarValue.params.pbar">#</a> (<em>QWidget</em>) – the progress bar.</p></li>
+<li><p><span class="target" id="qrenderdoc.MiniQtHelper.UpdateProgressBarValue.params.delta"></span><strong>delta</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.MiniQtHelper.UpdateProgressBarValue.params.delta">#</a> (<em>int</em>) – the relative value to update the current value.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="helpers">
+<h2><a class="toc-backref" href="#id3">Helpers</a><a class="headerlink" href="#helpers" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionMetadata">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qrenderdoc.</span></span><span class="sig-name descname"><span class="pre">ExtensionMetadata</span></span><a class="headerlink" href="#qrenderdoc.ExtensionMetadata" title="Permalink to this definition">¶</a></dt>
+<dd><p>The metadata for an extension.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionMetadata.author">
+<span class="sig-name descname"><span class="pre">author</span></span><a class="headerlink" href="#qrenderdoc.ExtensionMetadata.author" title="Permalink to this definition">¶</a></dt>
+<dd><p>The author of the extension, optionally with an email contact</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionMetadata.description">
+<span class="sig-name descname"><span class="pre">description</span></span><a class="headerlink" href="#qrenderdoc.ExtensionMetadata.description" title="Permalink to this definition">¶</a></dt>
+<dd><p>A longer description of what the extension does</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionMetadata.extensionAPI">
+<span class="sig-name descname"><span class="pre">extensionAPI</span></span><a class="headerlink" href="#qrenderdoc.ExtensionMetadata.extensionAPI" title="Permalink to this definition">¶</a></dt>
+<dd><p>The version of the extension API that this extension is written against</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionMetadata.extensionURL">
+<span class="sig-name descname"><span class="pre">extensionURL</span></span><a class="headerlink" href="#qrenderdoc.ExtensionMetadata.extensionURL" title="Permalink to this definition">¶</a></dt>
+<dd><p>The URL for where the extension is fetched from</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionMetadata.filePath">
+<span class="sig-name descname"><span class="pre">filePath</span></span><a class="headerlink" href="#qrenderdoc.ExtensionMetadata.filePath" title="Permalink to this definition">¶</a></dt>
+<dd><p>The location of this package on disk</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionMetadata.name">
+<span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#qrenderdoc.ExtensionMetadata.name" title="Permalink to this definition">¶</a></dt>
+<dd><p>The short friendly name for the extension</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionMetadata.package">
+<span class="sig-name descname"><span class="pre">package</span></span><a class="headerlink" href="#qrenderdoc.ExtensionMetadata.package" title="Permalink to this definition">¶</a></dt>
+<dd><p>The python package for this extension, e.g. foo.bar</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.ExtensionMetadata.version">
+<span class="sig-name descname"><span class="pre">version</span></span><a class="headerlink" href="#qrenderdoc.ExtensionMetadata.version" title="Permalink to this definition">¶</a></dt>
+<dd><p>The version of the extension</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qrenderdoc.WindowMenu">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qrenderdoc.</span></span><span class="sig-name descname"><span class="pre">WindowMenu</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.WindowMenu" title="Permalink to this definition">¶</a></dt>
+<dd><p>Specifies the base menu to add a menu item into.</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.WindowMenu.Unknown">
+<span class="sig-name descname"><span class="pre">Unknown</span></span><a class="headerlink" href="#qrenderdoc.WindowMenu.Unknown" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unknown/invalid window.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.WindowMenu.File">
+<span class="sig-name descname"><span class="pre">File</span></span><a class="headerlink" href="#qrenderdoc.WindowMenu.File" title="Permalink to this definition">¶</a></dt>
+<dd><p>The menu item will be in a section between Open/Save/Close captures and Import/Export.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.WindowMenu.Window">
+<span class="sig-name descname"><span class="pre">Window</span></span><a class="headerlink" href="#qrenderdoc.WindowMenu.Window" title="Permalink to this definition">¶</a></dt>
+<dd><p>The menu item will be in a new section at the end of the menu.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.WindowMenu.Tools">
+<span class="sig-name descname"><span class="pre">Tools</span></span><a class="headerlink" href="#qrenderdoc.WindowMenu.Tools" title="Permalink to this definition">¶</a></dt>
+<dd><p>The menu item will be added to a new section above Settings.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.WindowMenu.NewMenu">
+<span class="sig-name descname"><span class="pre">NewMenu</span></span><a class="headerlink" href="#qrenderdoc.WindowMenu.NewMenu" title="Permalink to this definition">¶</a></dt>
+<dd><p>The menu item will be a root menu, placed between Tools and Help.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.WindowMenu.Help">
+<span class="sig-name descname"><span class="pre">Help</span></span><a class="headerlink" href="#qrenderdoc.WindowMenu.Help" title="Permalink to this definition">¶</a></dt>
+<dd><p>The menu item will be added after the error reporting item.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qrenderdoc.PanelMenu">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qrenderdoc.</span></span><span class="sig-name descname"><span class="pre">PanelMenu</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.PanelMenu" title="Permalink to this definition">¶</a></dt>
+<dd><p>Specifies the panel to add a menu item into.</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.PanelMenu.Unknown">
+<span class="sig-name descname"><span class="pre">Unknown</span></span><a class="headerlink" href="#qrenderdoc.PanelMenu.Unknown" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unknown/invalid panel.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.PanelMenu.EventBrowser">
+<span class="sig-name descname"><span class="pre">EventBrowser</span></span><a class="headerlink" href="#qrenderdoc.PanelMenu.EventBrowser" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="windows.html#qrenderdoc.EventBrowser" title="qrenderdoc.EventBrowser"><code class="xref py py-class docutils literal notranslate"><span class="pre">EventBrowser</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.PanelMenu.PipelineStateViewer">
+<span class="sig-name descname"><span class="pre">PipelineStateViewer</span></span><a class="headerlink" href="#qrenderdoc.PanelMenu.PipelineStateViewer" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="windows.html#qrenderdoc.PipelineStateViewer" title="qrenderdoc.PipelineStateViewer"><code class="xref py py-class docutils literal notranslate"><span class="pre">PipelineStateViewer</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.PanelMenu.MeshPreview">
+<span class="sig-name descname"><span class="pre">MeshPreview</span></span><a class="headerlink" href="#qrenderdoc.PanelMenu.MeshPreview" title="Permalink to this definition">¶</a></dt>
+<dd><p>The mesh previewing <a class="reference internal" href="windows.html#qrenderdoc.BufferViewer" title="qrenderdoc.BufferViewer"><code class="xref py py-class docutils literal notranslate"><span class="pre">BufferViewer</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.PanelMenu.TextureViewer">
+<span class="sig-name descname"><span class="pre">TextureViewer</span></span><a class="headerlink" href="#qrenderdoc.PanelMenu.TextureViewer" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="windows.html#qrenderdoc.TextureViewer" title="qrenderdoc.TextureViewer"><code class="xref py py-class docutils literal notranslate"><span class="pre">TextureViewer</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.PanelMenu.BufferViewer">
+<span class="sig-name descname"><span class="pre">BufferViewer</span></span><a class="headerlink" href="#qrenderdoc.PanelMenu.BufferViewer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Any non-mesh previewing <a class="reference internal" href="windows.html#qrenderdoc.BufferViewer" title="qrenderdoc.BufferViewer"><code class="xref py py-class docutils literal notranslate"><span class="pre">BufferViewer</span></code></a>.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qrenderdoc.ContextMenu">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qrenderdoc.</span></span><span class="sig-name descname"><span class="pre">ContextMenu</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.ContextMenu" title="Permalink to this definition">¶</a></dt>
+<dd><p>Specifies the panel to add a menu item into.</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.ContextMenu.Unknown">
+<span class="sig-name descname"><span class="pre">Unknown</span></span><a class="headerlink" href="#qrenderdoc.ContextMenu.Unknown" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unknown/invalid context menu.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.ContextMenu.EventBrowser_Event">
+<span class="sig-name descname"><span class="pre">EventBrowser_Event</span></span><a class="headerlink" href="#qrenderdoc.ContextMenu.EventBrowser_Event" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds the item to the context menu for events in the <a class="reference internal" href="windows.html#qrenderdoc.EventBrowser" title="qrenderdoc.EventBrowser"><code class="xref py py-class docutils literal notranslate"><span class="pre">EventBrowser</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.ContextMenu.MeshPreview_Vertex">
+<span class="sig-name descname"><span class="pre">MeshPreview_Vertex</span></span><a class="headerlink" href="#qrenderdoc.ContextMenu.MeshPreview_Vertex" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds the item to the context menu for all vertices in the mesh previewing <a class="reference internal" href="windows.html#qrenderdoc.BufferViewer" title="qrenderdoc.BufferViewer"><code class="xref py py-class docutils literal notranslate"><span class="pre">BufferViewer</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.ContextMenu.MeshPreview_VSInVertex">
+<span class="sig-name descname"><span class="pre">MeshPreview_VSInVertex</span></span><a class="headerlink" href="#qrenderdoc.ContextMenu.MeshPreview_VSInVertex" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds the item to the context menu for vertex inputs in the mesh previewing <a class="reference internal" href="windows.html#qrenderdoc.BufferViewer" title="qrenderdoc.BufferViewer"><code class="xref py py-class docutils literal notranslate"><span class="pre">BufferViewer</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.ContextMenu.MeshPreview_VSOutVertex">
+<span class="sig-name descname"><span class="pre">MeshPreview_VSOutVertex</span></span><a class="headerlink" href="#qrenderdoc.ContextMenu.MeshPreview_VSOutVertex" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds the item to the context menu for VS output in the mesh previewing <a class="reference internal" href="windows.html#qrenderdoc.BufferViewer" title="qrenderdoc.BufferViewer"><code class="xref py py-class docutils literal notranslate"><span class="pre">BufferViewer</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.ContextMenu.MeshPreview_GSOutVertex">
+<span class="sig-name descname"><span class="pre">MeshPreview_GSOutVertex</span></span><a class="headerlink" href="#qrenderdoc.ContextMenu.MeshPreview_GSOutVertex" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds the item to the context menu for GS/Tess output in the mesh previewing <a class="reference internal" href="windows.html#qrenderdoc.BufferViewer" title="qrenderdoc.BufferViewer"><code class="xref py py-class docutils literal notranslate"><span class="pre">BufferViewer</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.ContextMenu.MeshPreview_TaskOutVertex">
+<span class="sig-name descname"><span class="pre">MeshPreview_TaskOutVertex</span></span><a class="headerlink" href="#qrenderdoc.ContextMenu.MeshPreview_TaskOutVertex" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds the item to the context menu for task shader output in the mesh previewing <a class="reference internal" href="windows.html#qrenderdoc.BufferViewer" title="qrenderdoc.BufferViewer"><code class="xref py py-class docutils literal notranslate"><span class="pre">BufferViewer</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.ContextMenu.MeshPreview_MeshOutVertex">
+<span class="sig-name descname"><span class="pre">MeshPreview_MeshOutVertex</span></span><a class="headerlink" href="#qrenderdoc.ContextMenu.MeshPreview_MeshOutVertex" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds the item to the context menu for mesh shader output in the mesh previewing <a class="reference internal" href="windows.html#qrenderdoc.BufferViewer" title="qrenderdoc.BufferViewer"><code class="xref py py-class docutils literal notranslate"><span class="pre">BufferViewer</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.ContextMenu.TextureViewer_Thumbnail">
+<span class="sig-name descname"><span class="pre">TextureViewer_Thumbnail</span></span><a class="headerlink" href="#qrenderdoc.ContextMenu.TextureViewer_Thumbnail" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds the item to the context menu for all thumbnails in the <a class="reference internal" href="windows.html#qrenderdoc.TextureViewer" title="qrenderdoc.TextureViewer"><code class="xref py py-class docutils literal notranslate"><span class="pre">TextureViewer</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.ContextMenu.TextureViewer_InputThumbnail">
+<span class="sig-name descname"><span class="pre">TextureViewer_InputThumbnail</span></span><a class="headerlink" href="#qrenderdoc.ContextMenu.TextureViewer_InputThumbnail" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds the item to the context menu for input thumbnails in the <a class="reference internal" href="windows.html#qrenderdoc.TextureViewer" title="qrenderdoc.TextureViewer"><code class="xref py py-class docutils literal notranslate"><span class="pre">TextureViewer</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.ContextMenu.TextureViewer_OutputThumbnail">
+<span class="sig-name descname"><span class="pre">TextureViewer_OutputThumbnail</span></span><a class="headerlink" href="#qrenderdoc.ContextMenu.TextureViewer_OutputThumbnail" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds the item to the context menu for output thumbnails in the <a class="reference internal" href="windows.html#qrenderdoc.TextureViewer" title="qrenderdoc.TextureViewer"><code class="xref py py-class docutils literal notranslate"><span class="pre">TextureViewer</span></code></a>.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qrenderdoc.DialogButton">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qrenderdoc.</span></span><span class="sig-name descname"><span class="pre">DialogButton</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.DialogButton" title="Permalink to this definition">¶</a></dt>
+<dd><p>A button for a dialog prompt.</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.DialogButton.OK">
+<span class="sig-name descname"><span class="pre">OK</span></span><a class="headerlink" href="#qrenderdoc.DialogButton.OK" title="Permalink to this definition">¶</a></dt>
+<dd><p>An OK button</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.DialogButton.Save">
+<span class="sig-name descname"><span class="pre">Save</span></span><a class="headerlink" href="#qrenderdoc.DialogButton.Save" title="Permalink to this definition">¶</a></dt>
+<dd><p>A Save button</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.DialogButton.SaveAll">
+<span class="sig-name descname"><span class="pre">SaveAll</span></span><a class="headerlink" href="#qrenderdoc.DialogButton.SaveAll" title="Permalink to this definition">¶</a></dt>
+<dd><p>A Save All button</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.DialogButton.Open">
+<span class="sig-name descname"><span class="pre">Open</span></span><a class="headerlink" href="#qrenderdoc.DialogButton.Open" title="Permalink to this definition">¶</a></dt>
+<dd><p>An Open button</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.DialogButton.Yes">
+<span class="sig-name descname"><span class="pre">Yes</span></span><a class="headerlink" href="#qrenderdoc.DialogButton.Yes" title="Permalink to this definition">¶</a></dt>
+<dd><p>A Yes button</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.DialogButton.YesToAll">
+<span class="sig-name descname"><span class="pre">YesToAll</span></span><a class="headerlink" href="#qrenderdoc.DialogButton.YesToAll" title="Permalink to this definition">¶</a></dt>
+<dd><p>A Yes To All button</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.DialogButton.No">
+<span class="sig-name descname"><span class="pre">No</span></span><a class="headerlink" href="#qrenderdoc.DialogButton.No" title="Permalink to this definition">¶</a></dt>
+<dd><p>A No button</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.DialogButton.NoToAll">
+<span class="sig-name descname"><span class="pre">NoToAll</span></span><a class="headerlink" href="#qrenderdoc.DialogButton.NoToAll" title="Permalink to this definition">¶</a></dt>
+<dd><p>A No To All button</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.DialogButton.Abort">
+<span class="sig-name descname"><span class="pre">Abort</span></span><a class="headerlink" href="#qrenderdoc.DialogButton.Abort" title="Permalink to this definition">¶</a></dt>
+<dd><p>An Abort button</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.DialogButton.Retry">
+<span class="sig-name descname"><span class="pre">Retry</span></span><a class="headerlink" href="#qrenderdoc.DialogButton.Retry" title="Permalink to this definition">¶</a></dt>
+<dd><p>A Retry button</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.DialogButton.Ignore">
+<span class="sig-name descname"><span class="pre">Ignore</span></span><a class="headerlink" href="#qrenderdoc.DialogButton.Ignore" title="Permalink to this definition">¶</a></dt>
+<dd><p>An Ignore button</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.DialogButton.Close">
+<span class="sig-name descname"><span class="pre">Close</span></span><a class="headerlink" href="#qrenderdoc.DialogButton.Close" title="Permalink to this definition">¶</a></dt>
+<dd><p>A Close button</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.DialogButton.Cancel">
+<span class="sig-name descname"><span class="pre">Cancel</span></span><a class="headerlink" href="#qrenderdoc.DialogButton.Cancel" title="Permalink to this definition">¶</a></dt>
+<dd><p>A Cancel button</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.DialogButton.Discard">
+<span class="sig-name descname"><span class="pre">Discard</span></span><a class="headerlink" href="#qrenderdoc.DialogButton.Discard" title="Permalink to this definition">¶</a></dt>
+<dd><p>A Discard button</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.DialogButton.Help">
+<span class="sig-name descname"><span class="pre">Help</span></span><a class="headerlink" href="#qrenderdoc.DialogButton.Help" title="Permalink to this definition">¶</a></dt>
+<dd><p>A Help button</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.DialogButton.Apply">
+<span class="sig-name descname"><span class="pre">Apply</span></span><a class="headerlink" href="#qrenderdoc.DialogButton.Apply" title="Permalink to this definition">¶</a></dt>
+<dd><p>An Apply button</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.DialogButton.Reset">
+<span class="sig-name descname"><span class="pre">Reset</span></span><a class="headerlink" href="#qrenderdoc.DialogButton.Reset" title="Permalink to this definition">¶</a></dt>
+<dd><p>A Reset button</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.DialogButton.RestoreDefaults">
+<span class="sig-name descname"><span class="pre">RestoreDefaults</span></span><a class="headerlink" href="#qrenderdoc.DialogButton.RestoreDefaults" title="Permalink to this definition">¶</a></dt>
+<dd><p>A Restore Defaults button</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="windows.html" class="btn btn-neutral float-right" title="API Reference: qrenderdoc Windows" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="main.html" class="btn btn-neutral float-left" title="API Reference: qrenderdoc Main Interfaces" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

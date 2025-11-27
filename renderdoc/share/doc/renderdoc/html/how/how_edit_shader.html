@@ -1,0 +1,296 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>How do I edit a shader? &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/how/how_edit_shader.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="How do I capture and replay over a network?" href="how_network_capture_replay.html" />
+    <link rel="prev" title="How do I use a custom visualisation shader?" href="how_custom_visualisation.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../python_api/index.html">Python API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">How do I …?</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="how_capture_frame.html">How do I capture a frame?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_android_capture.html">How do I use RenderDoc on Android?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_filter_events.html">How do I filter visible events?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_debug_shader.html">How do I debug a shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_shader_debug_info.html">How do I use shader debug information?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_inspect_pixel.html">How do I inspect a pixel value?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_buffer_format.html">How do I specify a buffer format?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_view_texture.html">How do I view a specific texture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_object_details.html">How do I view details of an object?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_capture_callstack.html">How do I capture callstacks?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_custom_visualisation.html">How do I use a custom visualisation shader?</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">How do I edit a shader?</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#how-to-edit-a-custom-shader">How to edit a custom shader</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#how-to-edit-a-scene-shader">How to edit a scene shader</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#shader-processing-tools">Shader processing tools</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#using-the-built-in-shader-editor">Using the built-in shader editor</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="how_network_capture_replay.html">How do I capture and replay over a network?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_annotate_capture.html">How do I annotate a capture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_import_export.html">How do I import or export a capture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_rgp_profile.html">How do I generate an RGP profile?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_python_extension.html">How do I register a python extension?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_control_replay.html">How do I control the replay?</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">How do I …?</a> &raquo;</li>
+        
+      <li>How do I edit a shader?</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/how/how_edit_shader.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="how-do-i-edit-a-shader">
+<h1>How do I edit a shader?<a class="headerlink" href="#how-do-i-edit-a-shader" title="Permalink to this headline">¶</a></h1>
+<p>This page details how to edit shaders. This applies both to <a class="reference internal" href="how_custom_visualisation.html"><span class="doc">custom visualisation shaders</span></a> for the <a class="reference internal" href="../window/texture_viewer.html"><span class="doc">Texture Viewer</span></a>, but can also be used to temporarily replace or edit a shader used in the actual scene.</p>
+<section id="how-to-edit-a-custom-shader">
+<h2>How to edit a custom shader<a class="headerlink" href="#how-to-edit-a-custom-shader" title="Permalink to this headline">¶</a></h2>
+<p><a class="reference internal" href="how_custom_visualisation.html"><span class="doc">Custom visualisation shaders</span></a> allow you to define your own transformation on any texture you’re viewing before it is displayed. Mostly this is useful for decoding packed or custom-format data, or displaying some data in a more visually intuitive fashion.</p>
+<p>These shaders live as files in the application storage directory ( <code class="docutils literal notranslate"><span class="pre">%APPDATA%/qrenderdoc/</span></code> on windows or <code class="docutils literal notranslate"><span class="pre">~/.local/share/qrenderdoc</span></code> elsewhere), and can be edited in your editor of choice, any changes saved will be reloaded. Note however that there is currently no way to see the compile warnings or errors produced when editing externally.</p>
+<p>To edit a shader inside RenderDoc simply click the edit button <img alt="page_white_edit" src="../_images/page_white_edit.png" /> when you have selected your custom shader for use. This will launch a new window with the custom shader and any changes you make to this shader will be saved to the file and compiled and reflected in the texture viewer as long as you have that custom shader selected.</p>
+</section>
+<section id="how-to-edit-a-scene-shader">
+<h2>How to edit a scene shader<a class="headerlink" href="#how-to-edit-a-scene-shader" title="Permalink to this headline">¶</a></h2>
+<p>RenderDoc allows you to edit a shader used in the capture and make changes to it and see the effects in real-time.</p>
+<p>To launch the shader editor, go to the pipeline stage you wish to change in the <a class="reference internal" href="../window/pipeline_state.html"><span class="doc">Pipeline State</span></a> windows, and click on the edit button <img alt="page_white_edit" src="../_images/page_white_edit.png" /> next to the shader. If there are multiple edit options, a drop-down menu will be available - see below for more information about shader processing tools.</p>
+<p>Any changes to the shader will affect any action using this shader, not just the currently-selected action. The changes will persist until the edit window is closed.</p>
+</section>
+<section id="shader-processing-tools">
+<h2>Shader processing tools<a class="headerlink" href="#shader-processing-tools" title="Permalink to this headline">¶</a></h2>
+<p id="id1">Each graphics API has a native shader format - for D3D11 and D3D12 this is DXBC bytecode as well as DXIL on D3D12, for Vulkan this is SPIR-V bytecode, and for OpenGL this is GLSL shader text. Additionally it’s possible for the bytecode shaders to contain embedded debug information with the original source code and compilation settings.</p>
+<p>When editing a shader RenderDoc will display the original source if available, but otherwise it will attempt to invoke a shader processing tool to decompile the bytecode into a usable form. Multiple tools can be configured <a class="reference internal" href="../window/settings_window.html#shader-processing-tools-config"><span class="std std-ref">in the settings window</span></a> and several for SPIR-V processing come with RenderDoc by default. If no tool is available RenderDoc displays a generated stub or default disassembly as a starting point.</p>
+<p>Each shader tool is defined to translate from some input to some output, so for example a compiler might take HLSL and output DXBC, and a decompiler might take SPIR-V and output HLSL.</p>
+<p>Once the edit window for a shader tool is open, the most appropriate tool to compile from the source into the API’s native format is selected, and the parameters used for compilation are populated from debug info if available. These can then be customised further.</p>
+</section>
+<section id="using-the-built-in-shader-editor">
+<h2>Using the built-in shader editor<a class="headerlink" href="#using-the-built-in-shader-editor" title="Permalink to this headline">¶</a></h2>
+<p>When you have launched the shader editor, the main window will be filled with the source of your shader. In here you can make edits and changes with the basic controls and syntax highlighting available with the Scintilla editor.</p>
+<p>To compile the shader and apply your changes, either click the Apply changes button in the toolbar or press <kbd class="kbd docutils literal notranslate">F5</kbd>. This will compile the shader and apply it, any warnings and errors will be added to the errors panel below the main source.</p>
+<p>You can choose the tool used to compile in the lower section, as well as configure any parameters to it. See above for more information about shader processing tools.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>If there are errors compiling a visualisation shader, it will be removed from the texture viewer and normal RGB display will be used until you fix the error.</p>
+<p>If there are errors compiling a shader-replacement shader, it will revert back to the original shader from the capture until the error is fixed.</p>
+</div>
+<p>In addition, when editing visualisation shaders a button will be available to insert several useful snippets for custom shaders with the pre-defined variables that can be bound. For more detail, see <a class="reference internal" href="how_custom_visualisation.html"><span class="doc">How do I use a custom visualisation shader?</span></a></p>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="how_network_capture_replay.html" class="btn btn-neutral float-right" title="How do I capture and replay over a network?" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="how_custom_visualisation.html" class="btn btn-neutral float-left" title="How do I use a custom visualisation shader?" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

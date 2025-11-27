@@ -1,0 +1,825 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Decoding Mesh Data &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/python_api/examples/renderdoc/decode_mesh.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Display texture in window" href="display_window.html" />
+    <link rel="prev" title="Save a texture to disk" href="save_texture.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../index.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../renderdoc_intro.html">Getting Started (python)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../qrenderdoc_intro.html">Getting Started (RenderDoc UI)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../dev_environment.html">Python development environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ui_extensions.html">Writing UI extensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../descriptors_bindings.html">Descriptors and Bindings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basics.html">Basic Interfaces</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">renderdoc Examples</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="iter_actions.html">Iterate Action tree</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fetch_shader.html">Fetch Shader details</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fetch_counters.html">Fetch GPU Counter Data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="save_texture.html">Save a texture to disk</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Decoding Mesh Data</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#example-source">Example Source</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="display_window.html">Display texture in window</a></li>
+<li class="toctree-l3"><a class="reference internal" href="remote_capture.html">Remote Capture and Replay</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../qrenderdoc/index.html">qrenderdoc examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../renderdoc/index.html">renderdoc python module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../qrenderdoc/index.html">qrenderdoc python module</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../how/index.html">How do I …?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../../index.html">Python API</a> &raquo;</li>
+        
+          <li><a href="index.html">renderdoc Examples</a> &raquo;</li>
+        
+      <li>Decoding Mesh Data</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/python_api/examples/renderdoc/decode_mesh.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="decoding-mesh-data">
+<h1>Decoding Mesh Data<a class="headerlink" href="#decoding-mesh-data" title="Permalink to this headline">¶</a></h1>
+<p>In this example we will fetch the geometry inputs to and outputs from a vertex shader. While this sample does not handle all possible edge cases, it is more complex than most others.</p>
+<p>First we gather the API state that describes the vertex input data. In this example we will use the API abstraction <a class="reference internal" href="../../renderdoc/pipelines/common.html#renderdoc.PipeState" title="renderdoc.PipeState"><code class="xref py py-class docutils literal notranslate"><span class="pre">PipeState</span></code></a> so that this code works on a capture from any API:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">state</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">GetPipelineState</span><span class="p">()</span>
+
+<span class="c1"># Get the index &amp; vertex buffers, and fixed vertex inputs</span>
+<span class="n">ib</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">GetIBuffer</span><span class="p">()</span>
+<span class="n">vbs</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">GetVBuffers</span><span class="p">()</span>
+<span class="n">attrs</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">GetVertexInputs</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>We iterate over every attribute defined, and create an object that describes where to source it from, based on <a class="reference internal" href="../../renderdoc/outputs.html#renderdoc.MeshFormat" title="renderdoc.MeshFormat"><code class="xref py py-class docutils literal notranslate"><span class="pre">MeshFormat</span></code></a> - since that is the format returned by <a class="reference internal" href="../../renderdoc/replay.html#renderdoc.ReplayController.GetPostVSData" title="renderdoc.ReplayController.GetPostVSData"><code class="xref py py-meth docutils literal notranslate"><span class="pre">GetPostVSData()</span></code></a> this allows us to re-use code.</p>
+<p>In the object we pass both the indices (which does not vary per attribute in our case) as well as the data for the vertex buffer the attribute comes from.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="n">attrs</span><span class="p">:</span>
+        <span class="c1"># We don&#39;t handle instance attributes</span>
+        <span class="k">if</span> <span class="n">attr</span><span class="o">.</span><span class="n">perInstance</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Instanced properties are not supported!&quot;</span><span class="p">)</span>
+
+        <span class="n">meshInput</span> <span class="o">=</span> <span class="n">MeshData</span><span class="p">()</span>
+        <span class="n">meshInput</span><span class="o">.</span><span class="n">indexResourceId</span> <span class="o">=</span> <span class="n">ib</span><span class="o">.</span><span class="n">resourceId</span>
+        <span class="n">meshInput</span><span class="o">.</span><span class="n">indexByteOffset</span> <span class="o">=</span> <span class="n">ib</span><span class="o">.</span><span class="n">byteOffset</span>
+        <span class="n">meshInput</span><span class="o">.</span><span class="n">indexByteStride</span> <span class="o">=</span> <span class="n">ib</span><span class="o">.</span><span class="n">byteStride</span>
+        <span class="n">meshInput</span><span class="o">.</span><span class="n">baseVertex</span> <span class="o">=</span> <span class="n">draw</span><span class="o">.</span><span class="n">baseVertex</span>
+        <span class="n">meshInput</span><span class="o">.</span><span class="n">indexOffset</span> <span class="o">=</span> <span class="n">draw</span><span class="o">.</span><span class="n">indexOffset</span>
+        <span class="n">meshInput</span><span class="o">.</span><span class="n">numIndices</span> <span class="o">=</span> <span class="n">draw</span><span class="o">.</span><span class="n">numIndices</span>
+
+        <span class="c1"># If the draw doesn&#39;t use an index buffer, don&#39;t use it even if bound</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">draw</span><span class="o">.</span><span class="n">flags</span> <span class="o">&amp;</span> <span class="n">rd</span><span class="o">.</span><span class="n">ActionFlags</span><span class="o">.</span><span class="n">Indexed</span><span class="p">):</span>
+                <span class="n">meshInput</span><span class="o">.</span><span class="n">indexResourceId</span> <span class="o">=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResourceId</span><span class="o">.</span><span class="n">Null</span><span class="p">()</span>
+
+        <span class="c1"># The total offset is the attribute offset from the base of the vertex</span>
+        <span class="n">meshInput</span><span class="o">.</span><span class="n">vertexByteOffset</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">byteOffset</span> <span class="o">+</span> <span class="n">vbs</span><span class="p">[</span><span class="n">attr</span><span class="o">.</span><span class="n">vertexBuffer</span><span class="p">]</span><span class="o">.</span><span class="n">byteOffset</span> <span class="o">+</span> <span class="n">draw</span><span class="o">.</span><span class="n">vertexOffset</span> <span class="o">*</span> <span class="n">vbs</span><span class="p">[</span><span class="n">attr</span><span class="o">.</span><span class="n">vertexBuffer</span><span class="p">]</span><span class="o">.</span><span class="n">byteStride</span>
+        <span class="n">meshInput</span><span class="o">.</span><span class="n">format</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">format</span>
+        <span class="n">meshInput</span><span class="o">.</span><span class="n">vertexResourceId</span> <span class="o">=</span> <span class="n">vbs</span><span class="p">[</span><span class="n">attr</span><span class="o">.</span><span class="n">vertexBuffer</span><span class="p">]</span><span class="o">.</span><span class="n">resourceId</span>
+        <span class="n">meshInput</span><span class="o">.</span><span class="n">vertexByteStride</span> <span class="o">=</span> <span class="n">vbs</span><span class="p">[</span><span class="n">attr</span><span class="o">.</span><span class="n">vertexBuffer</span><span class="p">]</span><span class="o">.</span><span class="n">byteStride</span>
+        <span class="n">meshInput</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">name</span>
+
+        <span class="n">meshInputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">meshInput</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Next we fetch the index data using <a class="reference internal" href="../../renderdoc/replay.html#renderdoc.ReplayController.GetBufferData" title="renderdoc.ReplayController.GetBufferData"><code class="xref py py-meth docutils literal notranslate"><span class="pre">GetBufferData()</span></code></a>, applying any offsets that might be present, and decode it using python’s <code class="docutils literal notranslate"><span class="pre">struct</span></code> module. If we’re not using index buffers, then we just generate a range of indices from the first vertex up to the number of indices.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">getIndices</span><span class="p">(</span><span class="n">controller</span><span class="p">,</span> <span class="n">mesh</span><span class="p">):</span>
+    <span class="c1"># Get the character for the width of index</span>
+    <span class="n">indexFormat</span> <span class="o">=</span> <span class="s1">&#39;B&#39;</span>
+    <span class="k">if</span> <span class="n">mesh</span><span class="o">.</span><span class="n">indexByteStride</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">indexFormat</span> <span class="o">=</span> <span class="s1">&#39;H&#39;</span>
+    <span class="k">elif</span> <span class="n">mesh</span><span class="o">.</span><span class="n">indexByteStride</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+        <span class="n">indexFormat</span> <span class="o">=</span> <span class="s1">&#39;I&#39;</span>
+
+    <span class="c1"># Duplicate the format by the number of indices</span>
+    <span class="n">indexFormat</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">numIndices</span><span class="p">)</span> <span class="o">+</span> <span class="n">indexFormat</span>
+
+    <span class="c1"># If we have an index buffer</span>
+    <span class="k">if</span> <span class="n">mesh</span><span class="o">.</span><span class="n">indexResourceId</span> <span class="o">!=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResourceId</span><span class="o">.</span><span class="n">Null</span><span class="p">():</span>
+        <span class="c1"># Fetch the data</span>
+        <span class="n">ibdata</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">GetBufferData</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">indexResourceId</span><span class="p">,</span> <span class="n">mesh</span><span class="o">.</span><span class="n">indexByteOffset</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+        <span class="c1"># Unpack all the indices, starting from the first index to fetch</span>
+        <span class="n">offset</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">indexOffset</span> <span class="o">*</span> <span class="n">mesh</span><span class="o">.</span><span class="n">indexByteStride</span>
+        <span class="n">indices</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">unpack_from</span><span class="p">(</span><span class="n">indexFormat</span><span class="p">,</span> <span class="n">ibdata</span><span class="p">,</span> <span class="n">offset</span><span class="p">)</span>
+
+        <span class="c1"># Apply the baseVertex offset</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="n">mesh</span><span class="o">.</span><span class="n">baseVertex</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># With no index buffer, just generate a range</span>
+        <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">numIndices</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>To begin with, we define a helper that will read a given variable out of a <code class="docutils literal notranslate"><span class="pre">bytes</span></code> object, using a <a class="reference internal" href="../../renderdoc/formats.html#renderdoc.ResourceFormat" title="renderdoc.ResourceFormat"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceFormat</span></code></a> do define the size and format of the data.</p>
+<p>We only handle simple regular formatted types, rather than bit-packed types, to simplify the code. As a shortcut, we use a hash of strings, where the hash key is the component type, and then the character index in the string is the byte width. This gives us the <code class="docutils literal notranslate"><span class="pre">struct.unpack</span></code> character to decode one component of the variable, then we prepend the number of components to fetch.</p>
+<p>For normalised formats - <a class="reference internal" href="../../renderdoc/formats.html#renderdoc.CompType.UNorm" title="renderdoc.CompType.UNorm"><code class="xref py py-attr docutils literal notranslate"><span class="pre">UNorm</span></code></a> and <a class="reference internal" href="../../renderdoc/formats.html#renderdoc.CompType.SNorm" title="renderdoc.CompType.SNorm"><code class="xref py py-attr docutils literal notranslate"><span class="pre">SNorm</span></code></a> - we also divide the resulting integer value to get the final floating point value used.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Unpack a tuple of the given format, from the data</span>
+<span class="k">def</span> <span class="nf">unpackData</span><span class="p">(</span><span class="n">fmt</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+    <span class="c1"># We don&#39;t handle &#39;special&#39; formats - typically bit-packed such as 10:10:10:2</span>
+    <span class="k">if</span> <span class="n">fmt</span><span class="o">.</span><span class="n">Special</span><span class="p">():</span>
+        <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Packed formats are not supported!&quot;</span><span class="p">)</span>
+
+    <span class="n">formatChars</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="c1">#                                 012345678</span>
+    <span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">UInt</span><span class="p">]</span>  <span class="o">=</span> <span class="s2">&quot;xBHxIxxxL&quot;</span>
+    <span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">SInt</span><span class="p">]</span>  <span class="o">=</span> <span class="s2">&quot;xbhxixxxl&quot;</span>
+    <span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">Float</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;xxexfxxxd&quot;</span> <span class="c1"># only 2, 4 and 8 are valid</span>
+
+    <span class="c1"># These types have identical decodes, but we might post-process them</span>
+    <span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">UNorm</span><span class="p">]</span> <span class="o">=</span> <span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">UInt</span><span class="p">]</span>
+    <span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">UScaled</span><span class="p">]</span> <span class="o">=</span> <span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">UInt</span><span class="p">]</span>
+    <span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">SNorm</span><span class="p">]</span> <span class="o">=</span> <span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">SInt</span><span class="p">]</span>
+    <span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">SScaled</span><span class="p">]</span> <span class="o">=</span> <span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">SInt</span><span class="p">]</span>
+
+    <span class="c1"># We need to fetch compCount components</span>
+    <span class="n">vertexFormat</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">fmt</span><span class="o">.</span><span class="n">compCount</span><span class="p">)</span> <span class="o">+</span> <span class="n">formatChars</span><span class="p">[</span><span class="n">fmt</span><span class="o">.</span><span class="n">compType</span><span class="p">][</span><span class="n">fmt</span><span class="o">.</span><span class="n">compByteWidth</span><span class="p">]</span>
+
+    <span class="c1"># Unpack the data</span>
+    <span class="n">value</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">unpack_from</span><span class="p">(</span><span class="n">vertexFormat</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+    <span class="c1"># If the format needs post-processing such as normalisation, do that now</span>
+    <span class="k">if</span> <span class="n">fmt</span><span class="o">.</span><span class="n">compType</span> <span class="o">==</span> <span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">UNorm</span><span class="p">:</span>
+        <span class="n">divisor</span> <span class="o">=</span> <span class="nb">float</span><span class="p">((</span><span class="mi">2</span> <span class="o">**</span> <span class="p">(</span><span class="n">fmt</span><span class="o">.</span><span class="n">compByteWidth</span> <span class="o">*</span> <span class="mi">8</span><span class="p">))</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">/</span> <span class="n">divisor</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">value</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">fmt</span><span class="o">.</span><span class="n">compType</span> <span class="o">==</span> <span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">SNorm</span><span class="p">:</span>
+        <span class="n">maxNeg</span> <span class="o">=</span> <span class="o">-</span><span class="nb">float</span><span class="p">(</span><span class="mi">2</span> <span class="o">**</span> <span class="p">(</span><span class="n">fmt</span><span class="o">.</span><span class="n">compByteWidth</span> <span class="o">*</span> <span class="mi">8</span><span class="p">))</span> <span class="o">/</span> <span class="mi">2</span>
+        <span class="n">divisor</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="o">-</span><span class="p">(</span><span class="n">maxNeg</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">((</span><span class="nb">float</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">if</span> <span class="p">(</span><span class="n">i</span> <span class="o">==</span> <span class="n">maxNeg</span><span class="p">)</span> <span class="k">else</span> <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">/</span> <span class="n">divisor</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">value</span><span class="p">)</span>
+
+    <span class="c1"># If the format is BGRA, swap the two components</span>
+    <span class="k">if</span> <span class="n">fmt</span><span class="o">.</span><span class="n">BGRAOrder</span><span class="p">():</span>
+        <span class="n">value</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">value</span>
+</pre></div>
+</div>
+<p>Finally with that helper defined we can iterate over each attribute for the first three indices:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">indices</span> <span class="o">=</span> <span class="n">getIndices</span><span class="p">(</span><span class="n">controller</span><span class="p">,</span> <span class="n">meshData</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+<span class="c1"># We&#39;ll decode the first three indices making up a triangle</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">):</span>
+        <span class="n">idx</span> <span class="o">=</span> <span class="n">indices</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Vertex </span><span class="si">%d</span><span class="s2"> is index </span><span class="si">%d</span><span class="s2">:&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">idx</span><span class="p">))</span>
+
+<span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="n">meshData</span><span class="p">:</span>
+</pre></div>
+</div>
+<p>Using the index, we can fetch the right vertex data for each vertex’s attribute using <a class="reference internal" href="../../renderdoc/replay.html#renderdoc.ReplayController.GetBufferData" title="renderdoc.ReplayController.GetBufferData"><code class="xref py py-meth docutils literal notranslate"><span class="pre">GetBufferData()</span></code></a> again. This simplified approach is very wasteful since we re-fetch the same vertex data for each vertex buffer over and over. A more realistic sample would cache the vertex data:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># This is the data we&#39;re reading from. This would be good to cache instead of</span>
+<span class="c1"># re-fetching for every attribute for every index</span>
+<span class="n">offset</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">vertexByteOffset</span> <span class="o">+</span> <span class="n">attr</span><span class="o">.</span><span class="n">vertexByteStride</span> <span class="o">*</span> <span class="n">idx</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">GetBufferData</span><span class="p">(</span><span class="n">attr</span><span class="o">.</span><span class="n">vertexResourceId</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+<span class="c1"># Get the value from the data</span>
+<span class="n">value</span> <span class="o">=</span> <span class="n">unpackData</span><span class="p">(</span><span class="n">attr</span><span class="o">.</span><span class="n">format</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+
+<span class="c1"># We don&#39;t go into the details of semantic matching here, just print both</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">Attribute &#39;</span><span class="si">%s</span><span class="s2">&#39;: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">attr</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="p">)))</span>
+</pre></div>
+</div>
+<p>For the vertex outputs, we do something very similar but instead of fetching the attributes from state bindings, we look at the shader reflection data of the vertex. Similarly instead of fetching the vertex byte data from bound vertex buffers, we call <a class="reference internal" href="../../renderdoc/replay.html#renderdoc.ReplayController.GetPostVSData" title="renderdoc.ReplayController.GetPostVSData"><code class="xref py py-meth docutils literal notranslate"><span class="pre">GetPostVSData()</span></code></a> to fetch it from the analysis.</p>
+<p>In the case of vertex outputs there is no explicit offset available, so we calculate our own offsets. Note that for some APIs like Vulkan the outputs are not necessarily tightly packed, so padding calculations may be necessary.</p>
+<p>The position output is also treated specially - it always appears first, regardless of the actual order of the outputs. We solve this by noting which output is the builtin position output, and shuffling it to the start of the array.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">posidx</span> <span class="o">=</span> <span class="mi">0</span>
+
+<span class="n">vs</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">GetPipelineState</span><span class="p">()</span><span class="o">.</span><span class="n">GetShaderReflection</span><span class="p">(</span><span class="n">rd</span><span class="o">.</span><span class="n">ShaderStage</span><span class="o">.</span><span class="n">Vertex</span><span class="p">)</span>
+
+<span class="c1"># Repeat the process, but this time sourcing the data from postvs.</span>
+<span class="c1"># Since these are outputs, we iterate over the list of outputs from the</span>
+<span class="c1"># vertex shader&#39;s reflection data</span>
+<span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="n">vs</span><span class="o">.</span><span class="n">outputSignature</span><span class="p">:</span>
+        <span class="c1"># Copy most properties from the postvs struct</span>
+        <span class="n">meshOutput</span> <span class="o">=</span> <span class="n">MeshData</span><span class="p">()</span>
+        <span class="n">meshOutput</span><span class="o">.</span><span class="n">indexResourceId</span> <span class="o">=</span> <span class="n">postvs</span><span class="o">.</span><span class="n">indexResourceId</span>
+        <span class="n">meshOutput</span><span class="o">.</span><span class="n">indexByteOffset</span> <span class="o">=</span> <span class="n">postvs</span><span class="o">.</span><span class="n">indexByteOffset</span>
+        <span class="n">meshOutput</span><span class="o">.</span><span class="n">indexByteStride</span> <span class="o">=</span> <span class="n">postvs</span><span class="o">.</span><span class="n">indexByteStride</span>
+        <span class="n">meshOutput</span><span class="o">.</span><span class="n">baseVertex</span> <span class="o">=</span> <span class="n">postvs</span><span class="o">.</span><span class="n">baseVertex</span>
+        <span class="n">meshOutput</span><span class="o">.</span><span class="n">indexOffset</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">meshOutput</span><span class="o">.</span><span class="n">numIndices</span> <span class="o">=</span> <span class="n">postvs</span><span class="o">.</span><span class="n">numIndices</span>
+
+        <span class="c1"># The total offset is the attribute offset from the base of the vertex,</span>
+        <span class="c1"># as calculated by the stride per index</span>
+        <span class="n">meshOutput</span><span class="o">.</span><span class="n">vertexByteOffset</span> <span class="o">=</span> <span class="n">postvs</span><span class="o">.</span><span class="n">vertexByteOffset</span>
+        <span class="n">meshOutput</span><span class="o">.</span><span class="n">vertexResourceId</span> <span class="o">=</span> <span class="n">postvs</span><span class="o">.</span><span class="n">vertexResourceId</span>
+        <span class="n">meshOutput</span><span class="o">.</span><span class="n">vertexByteStride</span> <span class="o">=</span> <span class="n">postvs</span><span class="o">.</span><span class="n">vertexByteStride</span>
+
+        <span class="c1"># Construct a resource format for this element</span>
+        <span class="n">meshOutput</span><span class="o">.</span><span class="n">format</span> <span class="o">=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResourceFormat</span><span class="p">()</span>
+        <span class="n">meshOutput</span><span class="o">.</span><span class="n">format</span><span class="o">.</span><span class="n">compByteWidth</span> <span class="o">=</span> <span class="n">rd</span><span class="o">.</span><span class="n">VarTypeByteSize</span><span class="p">(</span><span class="n">attr</span><span class="o">.</span><span class="n">varType</span><span class="p">)</span>
+        <span class="n">meshOutput</span><span class="o">.</span><span class="n">format</span><span class="o">.</span><span class="n">compCount</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">compCount</span>
+        <span class="n">meshOutput</span><span class="o">.</span><span class="n">format</span><span class="o">.</span><span class="n">compType</span> <span class="o">=</span> <span class="n">rd</span><span class="o">.</span><span class="n">VarTypeCompType</span><span class="p">(</span><span class="n">attr</span><span class="o">.</span><span class="n">varType</span><span class="p">)</span>
+        <span class="n">meshOutput</span><span class="o">.</span><span class="n">format</span><span class="o">.</span><span class="n">type</span> <span class="o">=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResourceFormatType</span><span class="o">.</span><span class="n">Regular</span>
+
+        <span class="n">meshOutput</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">semanticIdxName</span> <span class="k">if</span> <span class="n">attr</span><span class="o">.</span><span class="n">varName</span> <span class="o">==</span> <span class="s1">&#39;&#39;</span> <span class="k">else</span> <span class="n">attr</span><span class="o">.</span><span class="n">varName</span>
+
+        <span class="k">if</span> <span class="n">attr</span><span class="o">.</span><span class="n">systemValue</span> <span class="o">==</span> <span class="n">rd</span><span class="o">.</span><span class="n">ShaderBuiltin</span><span class="o">.</span><span class="n">Position</span><span class="p">:</span>
+                <span class="n">posidx</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">meshOutputs</span><span class="p">)</span>
+
+        <span class="n">meshOutputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">meshOutput</span><span class="p">)</span>
+
+<span class="c1"># Shuffle the position element to the front</span>
+<span class="k">if</span> <span class="n">posidx</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">pos</span> <span class="o">=</span> <span class="n">meshOutputs</span><span class="p">[</span><span class="n">posidx</span><span class="p">]</span>
+        <span class="k">del</span> <span class="n">meshOutputs</span><span class="p">[</span><span class="n">posidx</span><span class="p">]</span>
+        <span class="n">meshOutputs</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">pos</span><span class="p">)</span>
+
+<span class="n">accumOffset</span> <span class="o">=</span> <span class="mi">0</span>
+
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">meshOutputs</span><span class="p">)):</span>
+        <span class="n">meshOutputs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">vertexByteOffset</span> <span class="o">=</span> <span class="n">accumOffset</span>
+
+        <span class="c1"># Note that some APIs such as Vulkan will pad the size of the attribute here</span>
+        <span class="c1"># while others will tightly pack</span>
+        <span class="n">fmt</span> <span class="o">=</span> <span class="n">meshOutputs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">format</span>
+
+        <span class="n">accumOffset</span> <span class="o">+=</span> <span class="p">(</span><span class="mi">8</span> <span class="k">if</span> <span class="n">fmt</span><span class="o">.</span><span class="n">compByteWidth</span> <span class="o">&gt;</span> <span class="mi">4</span> <span class="k">else</span> <span class="mi">4</span><span class="p">)</span> <span class="o">*</span> <span class="n">fmt</span><span class="o">.</span><span class="n">compCount</span>
+</pre></div>
+</div>
+<section id="example-source">
+<h2>Example Source<a class="headerlink" href="#example-source" title="Permalink to this headline">¶</a></h2>
+<p><a class="reference download internal" download="" href="../../../_downloads/f6cb4e072cbca5f3eb09ae15cc69c3a4/decode_mesh.py"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">the</span> <span class="pre">example</span> <span class="pre">script</span></code></a>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">sys</span>
+
+<span class="c1"># Import renderdoc if not already imported (e.g. in the UI)</span>
+<span class="k">if</span> <span class="s1">&#39;renderdoc&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">modules</span> <span class="ow">and</span> <span class="s1">&#39;_renderdoc&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">:</span>
+	<span class="kn">import</span> <span class="nn">renderdoc</span>
+
+<span class="c1"># Alias renderdoc for legibility</span>
+<span class="n">rd</span> <span class="o">=</span> <span class="n">renderdoc</span>
+
+<span class="c1"># We&#39;ll need the struct data to read out of bytes objects</span>
+<span class="kn">import</span> <span class="nn">struct</span>
+
+<span class="c1"># We base our data on a MeshFormat, but we add some properties</span>
+<span class="k">class</span> <span class="nc">MeshData</span><span class="p">(</span><span class="n">rd</span><span class="o">.</span><span class="n">MeshFormat</span><span class="p">):</span>
+	<span class="n">indexOffset</span> <span class="o">=</span> <span class="mi">0</span>
+	<span class="n">name</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+
+<span class="c1"># Recursively search for the drawcall with the most vertices</span>
+<span class="k">def</span> <span class="nf">biggestDraw</span><span class="p">(</span><span class="n">prevBiggest</span><span class="p">,</span> <span class="n">d</span><span class="p">):</span>
+	<span class="n">ret</span> <span class="o">=</span> <span class="n">prevBiggest</span>
+	<span class="k">if</span> <span class="n">ret</span> <span class="o">==</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">d</span><span class="o">.</span><span class="n">numIndices</span> <span class="o">&gt;</span> <span class="n">ret</span><span class="o">.</span><span class="n">numIndices</span><span class="p">:</span>
+		<span class="n">ret</span> <span class="o">=</span> <span class="n">d</span>
+
+	<span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">d</span><span class="o">.</span><span class="n">children</span><span class="p">:</span>
+		<span class="n">biggest</span> <span class="o">=</span> <span class="n">biggestDraw</span><span class="p">(</span><span class="n">ret</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span>
+
+		<span class="k">if</span> <span class="n">biggest</span><span class="o">.</span><span class="n">numIndices</span> <span class="o">&gt;</span> <span class="n">ret</span><span class="o">.</span><span class="n">numIndices</span><span class="p">:</span>
+			<span class="n">ret</span> <span class="o">=</span> <span class="n">biggest</span>
+
+	<span class="k">return</span> <span class="n">ret</span>
+
+<span class="c1"># Unpack a tuple of the given format, from the data</span>
+<span class="k">def</span> <span class="nf">unpackData</span><span class="p">(</span><span class="n">fmt</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+	<span class="c1"># We don&#39;t handle &#39;special&#39; formats - typically bit-packed such as 10:10:10:2</span>
+	<span class="k">if</span> <span class="n">fmt</span><span class="o">.</span><span class="n">Special</span><span class="p">():</span>
+		<span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Packed formats are not supported!&quot;</span><span class="p">)</span>
+
+	<span class="n">formatChars</span> <span class="o">=</span> <span class="p">{}</span>
+	<span class="c1">#                                 012345678</span>
+	<span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">UInt</span><span class="p">]</span>  <span class="o">=</span> <span class="s2">&quot;xBHxIxxxL&quot;</span>
+	<span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">SInt</span><span class="p">]</span>  <span class="o">=</span> <span class="s2">&quot;xbhxixxxl&quot;</span>
+	<span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">Float</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;xxexfxxxd&quot;</span> <span class="c1"># only 2, 4 and 8 are valid</span>
+
+	<span class="c1"># These types have identical decodes, but we might post-process them</span>
+	<span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">UNorm</span><span class="p">]</span> <span class="o">=</span> <span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">UInt</span><span class="p">]</span>
+	<span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">UScaled</span><span class="p">]</span> <span class="o">=</span> <span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">UInt</span><span class="p">]</span>
+	<span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">SNorm</span><span class="p">]</span> <span class="o">=</span> <span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">SInt</span><span class="p">]</span>
+	<span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">SScaled</span><span class="p">]</span> <span class="o">=</span> <span class="n">formatChars</span><span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">SInt</span><span class="p">]</span>
+
+	<span class="c1"># We need to fetch compCount components</span>
+	<span class="n">vertexFormat</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">fmt</span><span class="o">.</span><span class="n">compCount</span><span class="p">)</span> <span class="o">+</span> <span class="n">formatChars</span><span class="p">[</span><span class="n">fmt</span><span class="o">.</span><span class="n">compType</span><span class="p">][</span><span class="n">fmt</span><span class="o">.</span><span class="n">compByteWidth</span><span class="p">]</span>
+
+	<span class="c1"># Unpack the data</span>
+	<span class="n">value</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">unpack_from</span><span class="p">(</span><span class="n">vertexFormat</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+	<span class="c1"># If the format needs post-processing such as normalisation, do that now</span>
+	<span class="k">if</span> <span class="n">fmt</span><span class="o">.</span><span class="n">compType</span> <span class="o">==</span> <span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">UNorm</span><span class="p">:</span>
+		<span class="n">divisor</span> <span class="o">=</span> <span class="nb">float</span><span class="p">((</span><span class="mi">2</span> <span class="o">**</span> <span class="p">(</span><span class="n">fmt</span><span class="o">.</span><span class="n">compByteWidth</span> <span class="o">*</span> <span class="mi">8</span><span class="p">))</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+		<span class="n">value</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">/</span> <span class="n">divisor</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">value</span><span class="p">)</span>
+	<span class="k">elif</span> <span class="n">fmt</span><span class="o">.</span><span class="n">compType</span> <span class="o">==</span> <span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">SNorm</span><span class="p">:</span>
+		<span class="n">maxNeg</span> <span class="o">=</span> <span class="o">-</span><span class="nb">float</span><span class="p">(</span><span class="mi">2</span> <span class="o">**</span> <span class="p">(</span><span class="n">fmt</span><span class="o">.</span><span class="n">compByteWidth</span> <span class="o">*</span> <span class="mi">8</span><span class="p">))</span> <span class="o">/</span> <span class="mi">2</span>
+		<span class="n">divisor</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="o">-</span><span class="p">(</span><span class="n">maxNeg</span><span class="o">-</span><span class="mi">1</span><span class="p">))</span>
+		<span class="n">value</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">((</span><span class="nb">float</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">if</span> <span class="p">(</span><span class="n">i</span> <span class="o">==</span> <span class="n">maxNeg</span><span class="p">)</span> <span class="k">else</span> <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">/</span> <span class="n">divisor</span><span class="p">))</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">value</span><span class="p">)</span>
+
+	<span class="c1"># If the format is BGRA, swap the two components</span>
+	<span class="k">if</span> <span class="n">fmt</span><span class="o">.</span><span class="n">BGRAOrder</span><span class="p">():</span>
+		<span class="n">value</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">value</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+
+	<span class="k">return</span> <span class="n">value</span>
+
+<span class="c1"># Get a list of MeshData objects describing the vertex inputs at this draw</span>
+<span class="k">def</span> <span class="nf">getMeshInputs</span><span class="p">(</span><span class="n">controller</span><span class="p">,</span> <span class="n">draw</span><span class="p">):</span>
+	<span class="n">state</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">GetPipelineState</span><span class="p">()</span>
+
+	<span class="c1"># Get the index &amp; vertex buffers, and fixed vertex inputs</span>
+	<span class="n">ib</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">GetIBuffer</span><span class="p">()</span>
+	<span class="n">vbs</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">GetVBuffers</span><span class="p">()</span>
+	<span class="n">attrs</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">GetVertexInputs</span><span class="p">()</span>
+
+	<span class="n">meshInputs</span> <span class="o">=</span> <span class="p">[]</span>
+
+	<span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="n">attrs</span><span class="p">:</span>
+
+		<span class="c1"># We don&#39;t handle instance attributes</span>
+		<span class="k">if</span> <span class="n">attr</span><span class="o">.</span><span class="n">perInstance</span><span class="p">:</span>
+			<span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Instanced properties are not supported!&quot;</span><span class="p">)</span>
+		
+		<span class="n">meshInput</span> <span class="o">=</span> <span class="n">MeshData</span><span class="p">()</span>
+		<span class="n">meshInput</span><span class="o">.</span><span class="n">indexResourceId</span> <span class="o">=</span> <span class="n">ib</span><span class="o">.</span><span class="n">resourceId</span>
+		<span class="n">meshInput</span><span class="o">.</span><span class="n">indexByteOffset</span> <span class="o">=</span> <span class="n">ib</span><span class="o">.</span><span class="n">byteOffset</span>
+		<span class="n">meshInput</span><span class="o">.</span><span class="n">indexByteStride</span> <span class="o">=</span> <span class="n">ib</span><span class="o">.</span><span class="n">byteStride</span>
+		<span class="n">meshInput</span><span class="o">.</span><span class="n">baseVertex</span> <span class="o">=</span> <span class="n">draw</span><span class="o">.</span><span class="n">baseVertex</span>
+		<span class="n">meshInput</span><span class="o">.</span><span class="n">indexOffset</span> <span class="o">=</span> <span class="n">draw</span><span class="o">.</span><span class="n">indexOffset</span>
+		<span class="n">meshInput</span><span class="o">.</span><span class="n">numIndices</span> <span class="o">=</span> <span class="n">draw</span><span class="o">.</span><span class="n">numIndices</span>
+
+		<span class="c1"># If the draw doesn&#39;t use an index buffer, don&#39;t use it even if bound</span>
+		<span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="n">draw</span><span class="o">.</span><span class="n">flags</span> <span class="o">&amp;</span> <span class="n">rd</span><span class="o">.</span><span class="n">ActionFlags</span><span class="o">.</span><span class="n">Indexed</span><span class="p">):</span>
+			<span class="n">meshInput</span><span class="o">.</span><span class="n">indexResourceId</span> <span class="o">=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResourceId</span><span class="o">.</span><span class="n">Null</span><span class="p">()</span>
+
+		<span class="c1"># The total offset is the attribute offset from the base of the vertex</span>
+		<span class="n">meshInput</span><span class="o">.</span><span class="n">vertexByteOffset</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">byteOffset</span> <span class="o">+</span> <span class="n">vbs</span><span class="p">[</span><span class="n">attr</span><span class="o">.</span><span class="n">vertexBuffer</span><span class="p">]</span><span class="o">.</span><span class="n">byteOffset</span> <span class="o">+</span> <span class="n">draw</span><span class="o">.</span><span class="n">vertexOffset</span> <span class="o">*</span> <span class="n">vbs</span><span class="p">[</span><span class="n">attr</span><span class="o">.</span><span class="n">vertexBuffer</span><span class="p">]</span><span class="o">.</span><span class="n">byteStride</span>
+		<span class="n">meshInput</span><span class="o">.</span><span class="n">format</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">format</span>
+		<span class="n">meshInput</span><span class="o">.</span><span class="n">vertexResourceId</span> <span class="o">=</span> <span class="n">vbs</span><span class="p">[</span><span class="n">attr</span><span class="o">.</span><span class="n">vertexBuffer</span><span class="p">]</span><span class="o">.</span><span class="n">resourceId</span>
+		<span class="n">meshInput</span><span class="o">.</span><span class="n">vertexByteStride</span> <span class="o">=</span> <span class="n">vbs</span><span class="p">[</span><span class="n">attr</span><span class="o">.</span><span class="n">vertexBuffer</span><span class="p">]</span><span class="o">.</span><span class="n">byteStride</span>
+		<span class="n">meshInput</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">name</span>
+
+		<span class="n">meshInputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">meshInput</span><span class="p">)</span>
+
+	<span class="k">return</span> <span class="n">meshInputs</span>
+
+<span class="c1"># Get a list of MeshData objects describing the vertex outputs at this draw</span>
+<span class="k">def</span> <span class="nf">getMeshOutputs</span><span class="p">(</span><span class="n">controller</span><span class="p">,</span> <span class="n">postvs</span><span class="p">):</span>
+	<span class="n">meshOutputs</span> <span class="o">=</span> <span class="p">[]</span>
+	<span class="n">posidx</span> <span class="o">=</span> <span class="mi">0</span>
+
+	<span class="n">vs</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">GetPipelineState</span><span class="p">()</span><span class="o">.</span><span class="n">GetShaderReflection</span><span class="p">(</span><span class="n">rd</span><span class="o">.</span><span class="n">ShaderStage</span><span class="o">.</span><span class="n">Vertex</span><span class="p">)</span>
+
+	<span class="c1"># Repeat the process, but this time sourcing the data from postvs.</span>
+	<span class="c1"># Since these are outputs, we iterate over the list of outputs from the</span>
+	<span class="c1"># vertex shader&#39;s reflection data</span>
+	<span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="n">vs</span><span class="o">.</span><span class="n">outputSignature</span><span class="p">:</span>
+		<span class="c1"># Copy most properties from the postvs struct</span>
+		<span class="n">meshOutput</span> <span class="o">=</span> <span class="n">MeshData</span><span class="p">()</span>
+		<span class="n">meshOutput</span><span class="o">.</span><span class="n">indexResourceId</span> <span class="o">=</span> <span class="n">postvs</span><span class="o">.</span><span class="n">indexResourceId</span>
+		<span class="n">meshOutput</span><span class="o">.</span><span class="n">indexByteOffset</span> <span class="o">=</span> <span class="n">postvs</span><span class="o">.</span><span class="n">indexByteOffset</span>
+		<span class="n">meshOutput</span><span class="o">.</span><span class="n">indexByteStride</span> <span class="o">=</span> <span class="n">postvs</span><span class="o">.</span><span class="n">indexByteStride</span>
+		<span class="n">meshOutput</span><span class="o">.</span><span class="n">baseVertex</span> <span class="o">=</span> <span class="n">postvs</span><span class="o">.</span><span class="n">baseVertex</span>
+		<span class="n">meshOutput</span><span class="o">.</span><span class="n">indexOffset</span> <span class="o">=</span> <span class="mi">0</span>
+		<span class="n">meshOutput</span><span class="o">.</span><span class="n">numIndices</span> <span class="o">=</span> <span class="n">postvs</span><span class="o">.</span><span class="n">numIndices</span>
+
+		<span class="c1"># The total offset is the attribute offset from the base of the vertex,</span>
+		<span class="c1"># as calculated by the stride per index</span>
+		<span class="n">meshOutput</span><span class="o">.</span><span class="n">vertexByteOffset</span> <span class="o">=</span> <span class="n">postvs</span><span class="o">.</span><span class="n">vertexByteOffset</span>
+		<span class="n">meshOutput</span><span class="o">.</span><span class="n">vertexResourceId</span> <span class="o">=</span> <span class="n">postvs</span><span class="o">.</span><span class="n">vertexResourceId</span>
+		<span class="n">meshOutput</span><span class="o">.</span><span class="n">vertexByteStride</span> <span class="o">=</span> <span class="n">postvs</span><span class="o">.</span><span class="n">vertexByteStride</span>
+
+		<span class="c1"># Construct a resource format for this element</span>
+		<span class="n">meshOutput</span><span class="o">.</span><span class="n">format</span> <span class="o">=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResourceFormat</span><span class="p">()</span>
+		<span class="n">meshOutput</span><span class="o">.</span><span class="n">format</span><span class="o">.</span><span class="n">compByteWidth</span> <span class="o">=</span> <span class="n">rd</span><span class="o">.</span><span class="n">VarTypeByteSize</span><span class="p">(</span><span class="n">attr</span><span class="o">.</span><span class="n">varType</span><span class="p">)</span>
+		<span class="n">meshOutput</span><span class="o">.</span><span class="n">format</span><span class="o">.</span><span class="n">compCount</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">compCount</span>
+		<span class="n">meshOutput</span><span class="o">.</span><span class="n">format</span><span class="o">.</span><span class="n">compType</span> <span class="o">=</span> <span class="n">rd</span><span class="o">.</span><span class="n">VarTypeCompType</span><span class="p">(</span><span class="n">attr</span><span class="o">.</span><span class="n">varType</span><span class="p">)</span>
+		<span class="n">meshOutput</span><span class="o">.</span><span class="n">format</span><span class="o">.</span><span class="n">type</span> <span class="o">=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResourceFormatType</span><span class="o">.</span><span class="n">Regular</span>
+
+		<span class="n">meshOutput</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">semanticIdxName</span> <span class="k">if</span> <span class="n">attr</span><span class="o">.</span><span class="n">varName</span> <span class="o">==</span> <span class="s1">&#39;&#39;</span> <span class="k">else</span> <span class="n">attr</span><span class="o">.</span><span class="n">varName</span>
+
+		<span class="k">if</span> <span class="n">attr</span><span class="o">.</span><span class="n">systemValue</span> <span class="o">==</span> <span class="n">rd</span><span class="o">.</span><span class="n">ShaderBuiltin</span><span class="o">.</span><span class="n">Position</span><span class="p">:</span>
+			<span class="n">posidx</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">meshOutputs</span><span class="p">)</span>
+
+		<span class="n">meshOutputs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">meshOutput</span><span class="p">)</span>
+	
+	<span class="c1"># Shuffle the position element to the front</span>
+	<span class="k">if</span> <span class="n">posidx</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+		<span class="n">pos</span> <span class="o">=</span> <span class="n">meshOutputs</span><span class="p">[</span><span class="n">posidx</span><span class="p">]</span>
+		<span class="k">del</span> <span class="n">meshOutputs</span><span class="p">[</span><span class="n">posidx</span><span class="p">]</span>
+		<span class="n">meshOutputs</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">pos</span><span class="p">)</span>
+
+	<span class="n">accumOffset</span> <span class="o">=</span> <span class="mi">0</span>
+
+	<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">meshOutputs</span><span class="p">)):</span>
+		<span class="n">meshOutputs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">vertexByteOffset</span> <span class="o">=</span> <span class="n">accumOffset</span>
+
+		<span class="c1"># Note that some APIs such as Vulkan will pad the size of the attribute here</span>
+		<span class="c1"># while others will tightly pack</span>
+		<span class="n">fmt</span> <span class="o">=</span> <span class="n">meshOutputs</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">format</span>
+
+		<span class="n">accumOffset</span> <span class="o">+=</span> <span class="p">(</span><span class="mi">8</span> <span class="k">if</span> <span class="n">fmt</span><span class="o">.</span><span class="n">compByteWidth</span> <span class="o">&gt;</span> <span class="mi">4</span> <span class="k">else</span> <span class="mi">4</span><span class="p">)</span> <span class="o">*</span> <span class="n">fmt</span><span class="o">.</span><span class="n">compCount</span>
+
+	<span class="k">return</span> <span class="n">meshOutputs</span>
+
+<span class="k">def</span> <span class="nf">getIndices</span><span class="p">(</span><span class="n">controller</span><span class="p">,</span> <span class="n">mesh</span><span class="p">):</span>
+	<span class="c1"># Get the character for the width of index</span>
+	<span class="n">indexFormat</span> <span class="o">=</span> <span class="s1">&#39;B&#39;</span>
+	<span class="k">if</span> <span class="n">mesh</span><span class="o">.</span><span class="n">indexByteStride</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+		<span class="n">indexFormat</span> <span class="o">=</span> <span class="s1">&#39;H&#39;</span>
+	<span class="k">elif</span> <span class="n">mesh</span><span class="o">.</span><span class="n">indexByteStride</span> <span class="o">==</span> <span class="mi">4</span><span class="p">:</span>
+		<span class="n">indexFormat</span> <span class="o">=</span> <span class="s1">&#39;I&#39;</span>
+
+	<span class="c1"># Duplicate the format by the number of indices</span>
+	<span class="n">indexFormat</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">numIndices</span><span class="p">)</span> <span class="o">+</span> <span class="n">indexFormat</span>
+
+	<span class="c1"># If we have an index buffer</span>
+	<span class="k">if</span> <span class="n">mesh</span><span class="o">.</span><span class="n">indexResourceId</span> <span class="o">!=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResourceId</span><span class="o">.</span><span class="n">Null</span><span class="p">():</span>
+		<span class="c1"># Fetch the data</span>
+		<span class="n">ibdata</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">GetBufferData</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">indexResourceId</span><span class="p">,</span> <span class="n">mesh</span><span class="o">.</span><span class="n">indexByteOffset</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+		<span class="c1"># Unpack all the indices, starting from the first index to fetch</span>
+		<span class="n">offset</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">indexOffset</span> <span class="o">*</span> <span class="n">mesh</span><span class="o">.</span><span class="n">indexByteStride</span>
+		<span class="n">indices</span> <span class="o">=</span> <span class="n">struct</span><span class="o">.</span><span class="n">unpack_from</span><span class="p">(</span><span class="n">indexFormat</span><span class="p">,</span> <span class="n">ibdata</span><span class="p">,</span> <span class="n">offset</span><span class="p">)</span>
+
+		<span class="c1"># Apply the baseVertex offset</span>
+		<span class="k">return</span> <span class="p">[</span><span class="n">i</span> <span class="o">+</span> <span class="n">mesh</span><span class="o">.</span><span class="n">baseVertex</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">indices</span><span class="p">]</span>
+	<span class="k">else</span><span class="p">:</span>
+		<span class="c1"># With no index buffer, just generate a range</span>
+		<span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">numIndices</span><span class="p">))</span>
+
+<span class="k">def</span> <span class="nf">printMeshData</span><span class="p">(</span><span class="n">controller</span><span class="p">,</span> <span class="n">meshData</span><span class="p">):</span>
+	<span class="n">indices</span> <span class="o">=</span> <span class="n">getIndices</span><span class="p">(</span><span class="n">controller</span><span class="p">,</span> <span class="n">meshData</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+	<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Mesh configuration:&quot;</span><span class="p">)</span>
+	<span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="n">meshData</span><span class="p">:</span>
+		<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\t</span><span class="si">%s</span><span class="s2">:&quot;</span> <span class="o">%</span> <span class="n">attr</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+		<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\t\t</span><span class="s2">- vertex: </span><span class="si">%s</span><span class="s2"> / </span><span class="si">%d</span><span class="s2"> stride&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">attr</span><span class="o">.</span><span class="n">vertexResourceId</span><span class="p">,</span>  <span class="n">attr</span><span class="o">.</span><span class="n">vertexByteStride</span><span class="p">))</span>
+		<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\t\t</span><span class="s2">- format: </span><span class="si">%s</span><span class="s2"> x </span><span class="si">%s</span><span class="s2"> @ </span><span class="si">%d</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">attr</span><span class="o">.</span><span class="n">format</span><span class="o">.</span><span class="n">compType</span><span class="p">,</span> <span class="n">attr</span><span class="o">.</span><span class="n">format</span><span class="o">.</span><span class="n">compCount</span><span class="p">,</span> <span class="n">attr</span><span class="o">.</span><span class="n">vertexByteOffset</span><span class="p">))</span>
+
+	<span class="c1"># We&#39;ll decode the first three indices making up a triangle</span>
+	<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">3</span><span class="p">):</span>
+		<span class="n">idx</span> <span class="o">=</span> <span class="n">indices</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+
+		<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Vertex </span><span class="si">%d</span><span class="s2"> is index </span><span class="si">%d</span><span class="s2">:&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">idx</span><span class="p">))</span>
+
+		<span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="n">meshData</span><span class="p">:</span>
+			<span class="c1"># This is the data we&#39;re reading from. This would be good to cache instead of</span>
+			<span class="c1"># re-fetching for every attribute for every index</span>
+			<span class="n">offset</span> <span class="o">=</span> <span class="n">attr</span><span class="o">.</span><span class="n">vertexByteOffset</span> <span class="o">+</span> <span class="n">attr</span><span class="o">.</span><span class="n">vertexByteStride</span> <span class="o">*</span> <span class="n">idx</span>
+			<span class="n">data</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">GetBufferData</span><span class="p">(</span><span class="n">attr</span><span class="o">.</span><span class="n">vertexResourceId</span><span class="p">,</span> <span class="n">offset</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+
+			<span class="c1"># Get the value from the data</span>
+			<span class="n">value</span> <span class="o">=</span> <span class="n">unpackData</span><span class="p">(</span><span class="n">attr</span><span class="o">.</span><span class="n">format</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span>
+
+			<span class="c1"># We don&#39;t go into the details of semantic matching here, just print both</span>
+			<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\t</span><span class="s2">Attribute &#39;</span><span class="si">%s</span><span class="s2">&#39;: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">attr</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="p">))</span>
+
+<span class="k">def</span> <span class="nf">sampleCode</span><span class="p">(</span><span class="n">controller</span><span class="p">):</span>
+	<span class="c1"># Find the biggest drawcall in the whole capture</span>
+	<span class="n">draw</span> <span class="o">=</span> <span class="kc">None</span>
+	<span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">controller</span><span class="o">.</span><span class="n">GetRootActions</span><span class="p">():</span>
+		<span class="n">draw</span> <span class="o">=</span> <span class="n">biggestDraw</span><span class="p">(</span><span class="n">draw</span><span class="p">,</span> <span class="n">d</span><span class="p">)</span>
+
+	<span class="c1"># Move to that draw</span>
+	<span class="n">controller</span><span class="o">.</span><span class="n">SetFrameEvent</span><span class="p">(</span><span class="n">draw</span><span class="o">.</span><span class="n">eventId</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>
+
+	<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Decoding mesh inputs at </span><span class="si">%d</span><span class="s2">: </span><span class="si">%s</span><span class="se">\n\n</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="p">(</span><span class="n">draw</span><span class="o">.</span><span class="n">eventId</span><span class="p">,</span> <span class="n">draw</span><span class="o">.</span><span class="n">GetName</span><span class="p">(</span><span class="n">controller</span><span class="o">.</span><span class="n">GetStructuredFile</span><span class="p">())))</span>
+
+	<span class="c1"># Calculate the mesh input configuration</span>
+	<span class="n">meshInputs</span> <span class="o">=</span> <span class="n">getMeshInputs</span><span class="p">(</span><span class="n">controller</span><span class="p">,</span> <span class="n">draw</span><span class="p">)</span>
+	
+	<span class="c1"># Fetch and print the data from the mesh inputs</span>
+	<span class="n">printMeshData</span><span class="p">(</span><span class="n">controller</span><span class="p">,</span> <span class="n">meshInputs</span><span class="p">)</span>
+
+	<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Decoding mesh outputs</span><span class="se">\n\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+	<span class="c1"># Fetch the postvs data</span>
+	<span class="n">postvs</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">GetPostVSData</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">rd</span><span class="o">.</span><span class="n">MeshDataStage</span><span class="o">.</span><span class="n">VSOut</span><span class="p">)</span>
+
+	<span class="c1"># Calcualte the mesh configuration from that</span>
+	<span class="n">meshOutputs</span> <span class="o">=</span> <span class="n">getMeshOutputs</span><span class="p">(</span><span class="n">controller</span><span class="p">,</span> <span class="n">postvs</span><span class="p">)</span>
+	
+	<span class="c1"># Print it</span>
+	<span class="n">printMeshData</span><span class="p">(</span><span class="n">controller</span><span class="p">,</span> <span class="n">meshOutputs</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">loadCapture</span><span class="p">(</span><span class="n">filename</span><span class="p">):</span>
+	<span class="c1"># Open a capture file handle</span>
+	<span class="n">cap</span> <span class="o">=</span> <span class="n">rd</span><span class="o">.</span><span class="n">OpenCaptureFile</span><span class="p">()</span>
+
+	<span class="c1"># Open a particular file - see also OpenBuffer to load from memory</span>
+	<span class="n">result</span> <span class="o">=</span> <span class="n">cap</span><span class="o">.</span><span class="n">OpenFile</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+	<span class="c1"># Make sure the file opened successfully</span>
+	<span class="k">if</span> <span class="n">result</span> <span class="o">!=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResultCode</span><span class="o">.</span><span class="n">Succeeded</span><span class="p">:</span>
+		<span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Couldn&#39;t open file: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>
+
+	<span class="c1"># Make sure we can replay</span>
+	<span class="k">if</span> <span class="ow">not</span> <span class="n">cap</span><span class="o">.</span><span class="n">LocalReplaySupport</span><span class="p">():</span>
+		<span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Capture cannot be replayed&quot;</span><span class="p">)</span>
+
+	<span class="c1"># Initialise the replay</span>
+	<span class="n">result</span><span class="p">,</span><span class="n">controller</span> <span class="o">=</span> <span class="n">cap</span><span class="o">.</span><span class="n">OpenCapture</span><span class="p">(</span><span class="n">rd</span><span class="o">.</span><span class="n">ReplayOptions</span><span class="p">(),</span> <span class="kc">None</span><span class="p">)</span>
+
+	<span class="k">if</span> <span class="n">result</span> <span class="o">!=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResultCode</span><span class="o">.</span><span class="n">Succeeded</span><span class="p">:</span>
+		<span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Couldn&#39;t initialise replay: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>
+
+	<span class="k">return</span> <span class="p">(</span><span class="n">cap</span><span class="p">,</span> <span class="n">controller</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="s1">&#39;pyrenderdoc&#39;</span> <span class="ow">in</span> <span class="nb">globals</span><span class="p">():</span>
+	<span class="n">pyrenderdoc</span><span class="o">.</span><span class="n">Replay</span><span class="p">()</span><span class="o">.</span><span class="n">BlockInvoke</span><span class="p">(</span><span class="n">sampleCode</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+	<span class="n">rd</span><span class="o">.</span><span class="n">InitialiseReplay</span><span class="p">(</span><span class="n">rd</span><span class="o">.</span><span class="n">GlobalEnvironment</span><span class="p">(),</span> <span class="p">[])</span>
+
+	<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+		<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Usage: python3 </span><span class="si">{}</span><span class="s1"> filename.rdc&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+		<span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+	<span class="n">cap</span><span class="p">,</span><span class="n">controller</span> <span class="o">=</span> <span class="n">loadCapture</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+	<span class="n">sampleCode</span><span class="p">(</span><span class="n">controller</span><span class="p">)</span>
+
+	<span class="n">controller</span><span class="o">.</span><span class="n">Shutdown</span><span class="p">()</span>
+	<span class="n">cap</span><span class="o">.</span><span class="n">Shutdown</span><span class="p">()</span>
+
+	<span class="n">rd</span><span class="o">.</span><span class="n">ShutdownReplay</span><span class="p">()</span>
+
+</pre></div>
+</div>
+<p>Sample output:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>Decoding mesh inputs at 69: DrawIndexed(5580)
+
+
+Mesh configuration:
+    POSITION0:
+        - vertex: &lt;ResourceId 142&gt; / 44 stride
+        - format: CompType.Float x 3 @ 0
+    TANGENT0:
+        - vertex: &lt;ResourceId 142&gt; / 44 stride
+        - format: CompType.Float x 3 @ 12
+    NORMAL0:
+        - vertex: &lt;ResourceId 142&gt; / 44 stride
+        - format: CompType.Float x 3 @ 24
+    TEXCOORD0:
+        - vertex: &lt;ResourceId 142&gt; / 44 stride
+        - format: CompType.Float x 2 @ 36
+Vertex 0 is index 0:
+    Attribute &#39;POSITION0&#39;: (1.0, -1.5, 0.0)
+    Attribute &#39;TANGENT0&#39;: (-0.0, 0.0, 1.0)
+    Attribute &#39;NORMAL0&#39;: (0.9701425433158875, 0.24253533780574799, 0.0)
+    Attribute &#39;TEXCOORD0&#39;: (0.0, 1.0)
+Vertex 1 is index 31:
+    Attribute &#39;POSITION0&#39;: (0.9750000238418579, -1.399999976158142, 0.0)
+    Attribute &#39;TANGENT0&#39;: (-0.0, 0.0, 1.0)
+    Attribute &#39;NORMAL0&#39;: (0.9701424241065979, 0.24253588914871216, 0.0)
+    Attribute &#39;TEXCOORD0&#39;: (0.0, 0.9666666388511658)
+Vertex 2 is index 32:
+    Attribute &#39;POSITION0&#39;: (0.9536939859390259, -1.399999976158142, 0.20271390676498413)
+    Attribute &#39;TANGENT0&#39;: (-0.20791170001029968, 0.0, 0.9781476259231567)
+    Attribute &#39;NORMAL0&#39;: (0.9489423036575317, 0.24253617227077484, 0.20170393586158752)
+    Attribute &#39;TEXCOORD0&#39;: (0.03333333507180214, 0.9666666388511658)
+Decoding mesh outputs
+
+
+Mesh configuration:
+    SV_POSITION:
+        - vertex: &lt;ResourceId 1000000000000000237&gt; / 68 stride
+        - format: CompType.Float x 4 @ 0
+    POSITION:
+        - vertex: &lt;ResourceId 1000000000000000237&gt; / 68 stride
+        - format: CompType.Float x 4 @ 16
+    TEXCOORD:
+        - vertex: &lt;ResourceId 1000000000000000237&gt; / 68 stride
+        - format: CompType.Float x 2 @ 32
+    TANGENT:
+        - vertex: &lt;ResourceId 1000000000000000237&gt; / 68 stride
+        - format: CompType.Float x 3 @ 40
+    NORMAL:
+        - vertex: &lt;ResourceId 1000000000000000237&gt; / 68 stride
+        - format: CompType.Float x 4 @ 52
+Vertex 0 is index 0:
+    Attribute &#39;SV_POSITION&#39;: (-6.269223690032959, -4.345583915710449, -2.4250497817993164, -2.0)
+    Attribute &#39;POSITION&#39;: (-4.0, 0.0, -12.0, 1.0)
+    Attribute &#39;TEXCOORD&#39;: (0.0, 1.0)
+    Attribute &#39;TANGENT&#39;: (-5.0, 1.5, -11.0)
+    Attribute &#39;NORMAL&#39;: (0.9701425433158875, 0.24253533780574799, 0.0, 0.0)
+Vertex 1 is index 31:
+    Attribute &#39;SV_POSITION&#39;: (-6.308406352996826, -4.104162216186523, -2.4250497817993164, -2.0)
+    Attribute &#39;POSITION&#39;: (-4.025000095367432, 0.10000002384185791, -12.0, 1.0)
+    Attribute &#39;TEXCOORD&#39;: (0.0, 0.9666666388511658)
+    Attribute &#39;TANGENT&#39;: (-5.0, 1.5, -11.0)
+    Attribute &#39;NORMAL&#39;: (0.9701424241065979, 0.24253588914871216, 0.0, 0.0)
+Vertex 2 is index 32:
+    Attribute &#39;SV_POSITION&#39;: (-6.341799736022949, -4.104162216186523, -2.221970558166504, -1.797286033630371)
+    Attribute &#39;POSITION&#39;: (-4.046306133270264, 0.10000002384185791, -11.797286033630371, 1.0)
+    Attribute &#39;TEXCOORD&#39;: (0.03333333507180214, 0.9666666388511658)
+    Attribute &#39;TANGENT&#39;: (-5.207911491394043, 1.5, -11.021852493286133)
+    Attribute &#39;NORMAL&#39;: (0.9489423036575317, 0.24253617227077484, 0.20170393586158752, 0.0)
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="display_window.html" class="btn btn-neutral float-right" title="Display texture in window" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="save_texture.html" class="btn btn-neutral float-left" title="Save a texture to disk" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

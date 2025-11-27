@@ -1,0 +1,298 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Tips &amp; Tricks &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/getting_started/tips_tricks.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Behind the scenes" href="../behind_scenes/index.html" />
+    <link rel="prev" title="Features" href="features.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting started</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="quick_start.html">Quick Start</a></li>
+<li class="toctree-l2"><a class="reference internal" href="faq.html">FAQ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gotchas_known_issues.html">Gotchas &amp; Known Issues</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html">Features</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Tips &amp; Tricks</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#keyboard-shortcuts">Keyboard Shortcuts</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../python_api/index.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../how/index.html">How do I …?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">Getting started</a> &raquo;</li>
+        
+      <li>Tips &amp; Tricks</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/getting_started/tips_tricks.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="tips-tricks">
+<h1>Tips &amp; Tricks<a class="headerlink" href="#tips-tricks" title="Permalink to this headline">¶</a></h1>
+<p>This page is a random hodge-podge of different tips and tricks that might not be obvious and aren’t practical to make clear in the UI - e.g. keyboard shortcuts, edge cases and suchlike.</p>
+<ol class="arabic">
+<li><p>RenderDoc can be used as an image viewer! If you drag in or use file → open, you can open images in a variety of formats - <code class="docutils literal notranslate"><span class="pre">.dds</span></code>, <code class="docutils literal notranslate"><span class="pre">.hdr</span></code>, <code class="docutils literal notranslate"><span class="pre">.exr</span></code>, <code class="docutils literal notranslate"><span class="pre">.bmp</span></code>, <code class="docutils literal notranslate"><span class="pre">.jpg</span></code>, <code class="docutils literal notranslate"><span class="pre">.png</span></code>, <code class="docutils literal notranslate"><span class="pre">.tga</span></code>, <code class="docutils literal notranslate"><span class="pre">.gif</span></code>, <code class="docutils literal notranslate"><span class="pre">.psd</span></code>. The image will load up in RenderDoc’s texture viewer and you can use the normal controls to view it as if it were the only texture in a capture. Note that <code class="docutils literal notranslate"><span class="pre">.dds</span></code> files support all DXGI formats, compressed formats, arrays and mips - all of which will display as expected. If the file is modified, RenderDoc will reload it and display it. Note that changing the image’s dimensions or format will likely cause problems.</p></li>
+<li><p>If a <code class="docutils literal notranslate"><span class="pre">.cap</span></code> file is saved with the “auto-start” option enabled, launching RenderDoc by opening this file will cause RenderDoc to automatically trigger a capture with the given options. This is useful for saving a common path &amp; set of options that you regularly re-run.</p>
+<p>For more information check out the <a class="reference internal" href="../window/capture_attach.html"><span class="doc">Capture Dialog</span></a> page.</p>
+</li>
+<li><p>If you’d like to see the geometry data visualised in 3D and with each component separated out and formatted, either open “Mesh Viewer” under the window menu, or click the Go Arrow <img alt="go_arrow" src="../_images/action_hover.png" /> on the vertex input attributes in the <a class="reference internal" href="../window/pipeline_state.html"><span class="doc">Pipeline State</span></a>.</p></li>
+<li><p>Right clicking on one of the channel buttons in the texture viewer (R, G, B, A) will either select only that channel, or if it’s already the only one selected it will select all of the others. This is useful e.g. to toggle between viewing RGB and alpha, or for looking at individual channels in a packed texture or render target.</p></li>
+<li><p>Similarly, right-clicking on the ‘auto-fit’ button <img alt="wand" src="../_images/wand.png" /> will auto-fit whenever the texture or event changes, so that the visible range is maintained as you move through the frame. This can be useful if jumping between places where the visible range is very different.
+Note though that by default the range will be remembered or each texture, so once you have fitted the range once for each texture you should be able to flip back and forth more easily.</p></li>
+<li><p>You can double click on a thumbnail in the texture viewer to open a <a class="reference internal" href="../how/how_view_texture.html"><span class="doc">locked texture</span></a> tab</p></li>
+<li><p>You can close tabs by middle clicking on them.</p></li>
+<li><p>You can trigger a capture from code. <code class="docutils literal notranslate"><span class="pre">renderdoc.dll</span></code> exports an <a class="reference internal" href="../in_application_api.html"><span class="doc">In-application API</span></a> for this purpose, defined in <code class="docutils literal notranslate"><span class="pre">renderdoc_app.h</span></code> in the distributed builds.</p></li>
+<li><p>To get API debug or error messages, enable “Enable API validation” when capturing then check out the <a class="reference internal" href="../window/debug_messages.html"><span class="doc">Debug Messages</span></a> window.</p></li>
+<li><p>You can annotate a capture by adding bookmarks, renaming resources, and adding comments. These can all be saved and embedded in the capture, so that when you share it with someone else.</p></li>
+<li><p>Dragging an executable onto the RenderDoc window anywhere will open the <span class="guilabel">Launch Executable</span> panel with the executable path filled in.</p></li>
+<li><p>Detecting RenderDoc from your code can either be done by trying to load and use the renderdoc <a class="reference internal" href="../in_application_api.html"><span class="doc">In-application API</span></a>, or through API specific ways:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">// For D3D11 / D3D12:</span>
+<span class="n">ID3D11Device</span><span class="w"> </span><span class="o">*</span><span class="n">devicePointer</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...;</span><span class="w"></span>
+<span class="n">IUnknown</span><span class="w"> </span><span class="o">*</span><span class="n">unk</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"></span>
+<span class="n">HRESULT</span><span class="w"> </span><span class="n">hr</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">devicePointer</span><span class="o">-&gt;</span><span class="n">QueryInterface</span><span class="p">(</span><span class="n">MAKE_GUID</span><span class="p">({</span><span class="n">A7AA6116</span><span class="mi">-9</span><span class="n">C8D</span><span class="mi">-4</span><span class="n">BBA</span><span class="mi">-9083</span><span class="o">-</span><span class="n">B4D816B71B78</span><span class="p">}),</span><span class="w"> </span><span class="o">&amp;</span><span class="n">unk</span><span class="p">);</span><span class="w"></span>
+<span class="k">if</span><span class="p">(</span><span class="n">SUCCEEDED</span><span class="p">(</span><span class="n">hr</span><span class="p">))</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="cm">/* renderdoc is present; */</span><span class="w"> </span><span class="p">}</span><span class="w"></span>
+
+<span class="c1">// For OpenGL:</span>
+<span class="c1">// if GL_EXT_debug_tool is present (see https://renderdoc.org/debug_tool.txt)</span>
+<span class="n">glIsEnabled</span><span class="p">(</span><span class="n">GL_DEBUG_TOOL_EXT</span><span class="p">);</span><span class="w"></span>
+
+<span class="c1">// Use reserved enumerants as the extension will not become official</span>
+<span class="cp">#define GL_DEBUG_TOOL_EXT                 0x6789</span>
+<span class="cp">#define GL_DEBUG_TOOL_NAME_EXT            0x678A</span>
+<span class="cp">#define GL_DEBUG_TOOL_PURPOSE_EXT         0x678B</span>
+
+<span class="c1">// For Vulkan</span>
+<span class="c1">// VK_EXT_tooling_info will be available, see the Vulkan specification</span>
+</pre></div>
+</div>
+</li>
+<li><p>RenderDoc can be informed about separated debug shader blobs through API specific ways - see <a class="reference internal" href="../how/how_shader_debug_info.html"><span class="doc">How do I use shader debug information?</span></a> for more details.</p></li>
+<li><p>More coming soon hopefully :).</p></li>
+</ol>
+<section id="keyboard-shortcuts">
+<h2>Keyboard Shortcuts<a class="headerlink" href="#keyboard-shortcuts" title="Permalink to this headline">¶</a></h2>
+<ol class="arabic simple">
+<li><p>In the texture viewer you can hit <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">Ctrl</kbd>-<kbd class="kbd docutils literal notranslate">G</kbd></kbd> to open a popup that lets you jump to a particular pixel co-ordinate.</p></li>
+<li><p>In the texture viewer, after selecting a pixel you can use the arrow keys to ‘nudge’ one pixel at a time in any direction to fine-tune the selection.</p></li>
+<li><p>To close a capture, press <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">Ctrl</kbd>-<kbd class="kbd docutils literal notranslate">F4</kbd></kbd>. This will prompt to save if there are any unsaved changes.</p></li>
+<li><p>Anywhere in the UI, you can use <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">Ctrl</kbd>-<kbd class="kbd docutils literal notranslate">Left</kbd></kbd> and <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">Ctrl</kbd>-<kbd class="kbd docutils literal notranslate">Right</kbd></kbd> to jump to the previous or next action.</p></li>
+<li><p>If you <a class="reference internal" href="../how/how_annotate_capture.html"><span class="doc">add some bookmarks</span></a> you can globally press any key from <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">Ctrl</kbd>-<kbd class="kbd docutils literal notranslate">1</kbd></kbd> to <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">Ctrl</kbd>-<kbd class="kbd docutils literal notranslate">0</kbd></kbd> to jump to the first 10 bookmarks.</p></li>
+</ol>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="../behind_scenes/index.html" class="btn btn-neutral float-right" title="Behind the scenes" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="features.html" class="btn btn-neutral float-left" title="Features" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

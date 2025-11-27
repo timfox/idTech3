@@ -1,0 +1,383 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Getting Started (python) &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/python_api/examples/renderdoc_intro.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Getting Started (RenderDoc UI)" href="qrenderdoc_intro.html" />
+    <link rel="prev" title="Python API" href="../index.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Python API</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Getting Started (python)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#loading-the-module">Loading the Module</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#loading-a-capture">Loading a Capture</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#accessing-capture-analysis">Accessing Capture Analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#example-source">Example Source</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="qrenderdoc_intro.html">Getting Started (RenderDoc UI)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dev_environment.html">Python development environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui_extensions.html">Writing UI extensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../descriptors_bindings.html">Descriptors and Bindings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="basics.html">Basic Interfaces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="renderdoc/index.html">renderdoc Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qrenderdoc/index.html">qrenderdoc examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../renderdoc/index.html">renderdoc python module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../qrenderdoc/index.html">qrenderdoc python module</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../how/index.html">How do I …?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../index.html">Python API</a> &raquo;</li>
+        
+      <li>Getting Started (python)</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/python_api/examples/renderdoc_intro.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="getting-started-python">
+<h1>Getting Started (python)<a class="headerlink" href="#getting-started-python" title="Permalink to this headline">¶</a></h1>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This document is aimed at users getting started with loading a capture and getting access from the renderdoc module, and is generally not relevant when running within the RenderDoc UI.</p>
+<p>The same APIs are available in the UI, so you can follow these steps. Be aware that loading captures while purely from script may interfere with a capture that is loaded in the UI itself, so this is not recommended.</p>
+</div>
+<section id="loading-the-module">
+<h2>Loading the Module<a class="headerlink" href="#loading-the-module" title="Permalink to this headline">¶</a></h2>
+<p>For this section we assume you have built a copy of RenderDoc and have the module (<code class="docutils literal notranslate"><span class="pre">renderdoc.pyd</span></code> or <code class="docutils literal notranslate"><span class="pre">renderdoc.so</span></code> depending on your platform). For information on how to build see the <a class="reference external" href="https://github.com/baldurk/renderdoc">GitHub repository</a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>You must use exactly the same version of python to load the module as was used to build it.</p>
+<p>On windows by default RenderDoc builds against python 3.6 which is what it’s distributed with.</p>
+<p>This can be overridden by setting an overridden path under the <code class="docutils literal notranslate"><span class="pre">Python</span> <span class="pre">Configuration</span></code> section in the properties of the <code class="docutils literal notranslate"><span class="pre">qrenderdoc</span></code> project and <code class="docutils literal notranslate"><span class="pre">pyrenderdoc_module</span></code>/<code class="docutils literal notranslate"><span class="pre">qrenderdoc_module</span></code> projects. It must point to a python installation.</p>
+<p>RenderDoc requires pythonXY.lib, include files such as include/Python.h, as well as a .zip of the standard library. If you installed python with an installer you have the first two, and can generate the standard library zip by zipping the contents of the Lib folder. If you downloaded the embeddable zip distribution you will only have the standard library zip, you need to obtain the include files and <code class="docutils literal notranslate"><span class="pre">.lib</span></code> file separately.</p>
+</div>
+<p>Once you have the module, either place the module within your python’s default library search path, or else insert the location of the python module into the path in your script. You can either set the <code class="docutils literal notranslate"><span class="pre">PYTHONPATH</span></code> environment variable or do it at the start of your script:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">sys</span>
+
+<span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="s1">&#39;/path/to/renderdoc/module&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Additionally, the renderdoc python module needs to be able to load the main renderdoc library (<code class="docutils literal notranslate"><span class="pre">renderdoc.dll</span></code> or <code class="docutils literal notranslate"><span class="pre">librenderdoc.so</span></code> depending on your platform) - the module library itself just contains stubs and python wrappers for the C++ interfaces. You can either place the renderdoc library in the system library paths, or solve it in a platform specific way. For example on windows you can either place <code class="docutils literal notranslate"><span class="pre">renderdoc.dll</span></code> in the same directory as the python module, or append to <code class="docutils literal notranslate"><span class="pre">PATH</span></code>. On Python 3.8 and above <code class="docutils literal notranslate"><span class="pre">PATH</span></code> is no longer searched by default so you need to explicitly add the DLL folder:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">sys</span>
+
+<span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;PATH&quot;</span><span class="p">]</span> <span class="o">+=</span> <span class="n">os</span><span class="o">.</span><span class="n">pathsep</span> <span class="o">+</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">abspath</span><span class="p">(</span><span class="s1">&#39;/path/to/renderdoc/native/library&#39;</span><span class="p">)</span>
+<span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s1">&#39;win32&#39;</span> <span class="ow">and</span> <span class="n">sys</span><span class="o">.</span><span class="n">version_info</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;=</span> <span class="mi">8</span><span class="p">:</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">add_dll_directory</span><span class="p">(</span><span class="s2">&quot;/path/to/renderdoc/native/library&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>On linux you’d perform a similar modification to <code class="docutils literal notranslate"><span class="pre">LD_LIBRARY_PATH</span></code>.</p>
+<p>Assuming all has gone well, you should now be able to import the renderdoc module:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">renderdoc</span> <span class="k">as</span> <span class="nn">rd</span>
+
+<span class="c1"># Prints &#39;CullMode.FrontAndBack&#39;</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">rd</span><span class="o">.</span><span class="n">CullMode</span><span class="o">.</span><span class="n">FrontAndBack</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="loading-a-capture">
+<h2>Loading a Capture<a class="headerlink" href="#loading-a-capture" title="Permalink to this headline">¶</a></h2>
+<p>Given a capture file <code class="docutils literal notranslate"><span class="pre">test.rdc</span></code> we want to load it, begin the replay and get ready to perform analysis on it.</p>
+<p>Before doing anything, we must initialise the replay API. We do that by calling <a class="reference internal" href="../renderdoc/replay.html#renderdoc.InitialiseReplay" title="renderdoc.InitialiseReplay"><code class="xref py py-meth docutils literal notranslate"><span class="pre">InitialiseReplay()</span></code></a>. Generally no special configuration is needed so passing a default <a class="reference internal" href="../renderdoc/replay.html#renderdoc.GlobalEnvironment" title="renderdoc.GlobalEnvironment"><code class="xref py py-class docutils literal notranslate"><span class="pre">GlobalEnvironment</span></code></a> and an empty list of arguments is fine.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">rd</span><span class="o">.</span><span class="n">InitialiseReplay</span><span class="p">(</span><span class="n">rd</span><span class="o">.</span><span class="n">GlobalEnvironment</span><span class="p">(),</span> <span class="p">[])</span>
+</pre></div>
+</div>
+<p>To begin with, we use <a class="reference internal" href="../renderdoc/replay.html#renderdoc.OpenCaptureFile" title="renderdoc.OpenCaptureFile"><code class="xref py py-meth docutils literal notranslate"><span class="pre">OpenCaptureFile()</span></code></a> to obtain a <a class="reference internal" href="../renderdoc/replay.html#renderdoc.CaptureFile" title="renderdoc.CaptureFile"><code class="xref py py-class docutils literal notranslate"><span class="pre">CaptureFile</span></code></a> instance. This gives us access to control over a capture file at a meta level. For more information see the <code class="xref py py-class docutils literal notranslate"><span class="pre">CaptureFile</span></code> reference - the interface can also be used to create.</p>
+<p>To open a file, use <a class="reference internal" href="../renderdoc/replay.html#renderdoc.CaptureFile.OpenFile" title="renderdoc.CaptureFile.OpenFile"><code class="xref py py-meth docutils literal notranslate"><span class="pre">OpenFile()</span></code></a> on the <a class="reference internal" href="../renderdoc/replay.html#renderdoc.CaptureFile" title="renderdoc.CaptureFile"><code class="xref py py-class docutils literal notranslate"><span class="pre">CaptureFile</span></code></a> instance. This function allows conversion from other formats via an importer, but here we’ll use it just for opening a regular <code class="docutils literal notranslate"><span class="pre">rdc</span></code> file. It returns a <a class="reference internal" href="../renderdoc/replay.html#renderdoc.ResultDetails" title="renderdoc.ResultDetails"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResultDetails</span></code></a> which can be used to determine what went wrong in the event that there was a problem. We then check that the capture uses an API which can be replayed locally - for example not every platform supports <code class="docutils literal notranslate"><span class="pre">D3D11</span></code>, so on linux this would return no local replay support.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Open a capture file handle</span>
+<span class="n">cap</span> <span class="o">=</span> <span class="n">rd</span><span class="o">.</span><span class="n">OpenCaptureFile</span><span class="p">()</span>
+
+<span class="c1"># Open a particular file - see also OpenBuffer to load from memory</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">cap</span><span class="o">.</span><span class="n">OpenFile</span><span class="p">(</span><span class="s1">&#39;test.rdc&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+<span class="c1"># Make sure the file opened successfully</span>
+<span class="k">if</span> <span class="n">result</span> <span class="o">!=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResultCode</span><span class="o">.</span><span class="n">Succeeded</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Couldn&#39;t open file: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>
+
+<span class="c1"># Make sure we can replay</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">cap</span><span class="o">.</span><span class="n">LocalReplaySupport</span><span class="p">():</span>
+    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Capture cannot be replayed&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="accessing-capture-analysis">
+<h2>Accessing Capture Analysis<a class="headerlink" href="#accessing-capture-analysis" title="Permalink to this headline">¶</a></h2>
+<p>Once the capture has been loaded, we can now begin the replay analysis. To do that we use <a class="reference internal" href="../renderdoc/replay.html#renderdoc.CaptureFile.OpenCapture" title="renderdoc.CaptureFile.OpenCapture"><code class="xref py py-meth docutils literal notranslate"><span class="pre">OpenCapture()</span></code></a> which returns a tuple of <a class="reference internal" href="../renderdoc/replay.html#renderdoc.ResultDetails" title="renderdoc.ResultDetails"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResultDetails</span></code></a> and <a class="reference internal" href="../renderdoc/replay.html#renderdoc.ReplayController" title="renderdoc.ReplayController"><code class="xref py py-class docutils literal notranslate"><span class="pre">ReplayController</span></code></a>.</p>
+<p>This function call will open the capture and begin to replay it, and initialise the analysis. The <a class="reference internal" href="../renderdoc/replay.html#renderdoc.ReplayController" title="renderdoc.ReplayController"><code class="xref py py-class docutils literal notranslate"><span class="pre">ReplayController</span></code></a> returned is the interface to the majority of RenderDoc’s replaying functionality.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Initialise the replay</span>
+<span class="n">result</span><span class="p">,</span><span class="n">controller</span> <span class="o">=</span> <span class="n">cap</span><span class="o">.</span><span class="n">OpenCapture</span><span class="p">(</span><span class="n">rd</span><span class="o">.</span><span class="n">ReplayOptions</span><span class="p">(),</span> <span class="kc">None</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="n">result</span> <span class="o">!=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResultCode</span><span class="o">.</span><span class="n">Succeeded</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Couldn&#39;t initialise replay: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>
+
+<span class="c1"># Now we can use the controller!</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2"> top-level actions&quot;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">controller</span><span class="o">.</span><span class="n">GetRootActions</span><span class="p">()))</span>
+</pre></div>
+</div>
+<p>Once we’re done with the interfaces, we should call the <code class="docutils literal notranslate"><span class="pre">Shutdown</span></code> function on each, this allows the C++ interface to release the resources allocated.</p>
+<p>Once all work is done we can shutdown the replay API.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Shutdown the controller first, then the capture file</span>
+<span class="n">controller</span><span class="o">.</span><span class="n">Shutdown</span><span class="p">()</span>
+
+<span class="n">cap</span><span class="o">.</span><span class="n">Shutdown</span><span class="p">()</span>
+
+<span class="n">rd</span><span class="o">.</span><span class="n">ShutdownReplay</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+<section id="example-source">
+<h2>Example Source<a class="headerlink" href="#example-source" title="Permalink to this headline">¶</a></h2>
+<p>The full source for this example is available below:</p>
+<p><a class="reference download internal" download="" href="../../_downloads/10b0c92a91c73916904f63779a514f28/renderdoc_intro.py"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">the</span> <span class="pre">example</span> <span class="pre">script</span></code></a>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">renderdoc</span> <span class="k">as</span> <span class="nn">rd</span>
+
+<span class="n">rd</span><span class="o">.</span><span class="n">InitialiseReplay</span><span class="p">(</span><span class="n">rd</span><span class="o">.</span><span class="n">GlobalEnvironment</span><span class="p">(),</span> <span class="p">[])</span>
+
+<span class="c1"># Open a capture file handle</span>
+<span class="n">cap</span> <span class="o">=</span> <span class="n">rd</span><span class="o">.</span><span class="n">OpenCaptureFile</span><span class="p">()</span>
+
+<span class="c1"># Open a particular file - see also OpenBuffer to load from memory</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">cap</span><span class="o">.</span><span class="n">OpenFile</span><span class="p">(</span><span class="s1">&#39;test.rdc&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+<span class="c1"># Make sure the file opened successfully</span>
+<span class="k">if</span> <span class="n">result</span> <span class="o">!=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResultCode</span><span class="o">.</span><span class="n">Succeeded</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Couldn&#39;t open file: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>
+
+<span class="c1"># Make sure we can replay</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">cap</span><span class="o">.</span><span class="n">LocalReplaySupport</span><span class="p">():</span>
+    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Capture cannot be replayed&quot;</span><span class="p">)</span>
+
+<span class="c1"># Initialise the replay</span>
+<span class="n">result</span><span class="p">,</span><span class="n">controller</span> <span class="o">=</span> <span class="n">cap</span><span class="o">.</span><span class="n">OpenCapture</span><span class="p">(</span><span class="n">rd</span><span class="o">.</span><span class="n">ReplayOptions</span><span class="p">(),</span> <span class="kc">None</span><span class="p">)</span>
+
+<span class="k">if</span> <span class="n">result</span> <span class="o">!=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResultCode</span><span class="o">.</span><span class="n">Succeeded</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Couldn&#39;t initialise replay: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>
+
+<span class="c1"># Now we can use the controller!</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">%d</span><span class="s2"> top-level actions&quot;</span> <span class="o">%</span> <span class="nb">len</span><span class="p">(</span><span class="n">controller</span><span class="o">.</span><span class="n">GetRootActions</span><span class="p">()))</span>
+
+<span class="n">controller</span><span class="o">.</span><span class="n">Shutdown</span><span class="p">()</span>
+
+<span class="n">cap</span><span class="o">.</span><span class="n">Shutdown</span><span class="p">()</span>
+
+<span class="n">rd</span><span class="o">.</span><span class="n">ShutdownReplay</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="qrenderdoc_intro.html" class="btn btn-neutral float-right" title="Getting Started (RenderDoc UI)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="../index.html" class="btn btn-neutral float-left" title="Python API" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

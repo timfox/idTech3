@@ -1,0 +1,384 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>How do I debug a shader? &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/how/how_debug_shader.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="How do I use shader debug information?" href="how_shader_debug_info.html" />
+    <link rel="prev" title="How do I filter visible events?" href="how_filter_events.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../python_api/index.html">Python API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">How do I …?</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="how_capture_frame.html">How do I capture a frame?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_android_capture.html">How do I use RenderDoc on Android?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_filter_events.html">How do I filter visible events?</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">How do I debug a shader?</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#including-debug-info-in-shaders">Including debug info in shaders</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#debugging-a-vertex">Debugging a vertex</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#debugging-a-pixel">Debugging a Pixel</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#debugging-a-compute-thread">Debugging a Compute thread</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#debugging-controls">Debugging Controls</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#hlsl-debugging">HLSL Debugging</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#debugging-displays">Debugging Displays</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="how_shader_debug_info.html">How do I use shader debug information?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_inspect_pixel.html">How do I inspect a pixel value?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_buffer_format.html">How do I specify a buffer format?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_view_texture.html">How do I view a specific texture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_object_details.html">How do I view details of an object?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_capture_callstack.html">How do I capture callstacks?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_custom_visualisation.html">How do I use a custom visualisation shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_edit_shader.html">How do I edit a shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_network_capture_replay.html">How do I capture and replay over a network?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_annotate_capture.html">How do I annotate a capture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_import_export.html">How do I import or export a capture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_rgp_profile.html">How do I generate an RGP profile?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_python_extension.html">How do I register a python extension?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_control_replay.html">How do I control the replay?</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">How do I …?</a> &raquo;</li>
+        
+      <li>How do I debug a shader?</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/how/how_debug_shader.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="how-do-i-debug-a-shader">
+<h1>How do I debug a shader?<a class="headerlink" href="#how-do-i-debug-a-shader" title="Permalink to this headline">¶</a></h1>
+<p>This page goes into detail about how to set up your captures for debugging shaders, as well as how to debug a shader and what controls are available.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Shader debugging is currently only supported on D3D11, D3D12, and Vulkan. On other APIs the debug options listed below will either be hidden or disabled. In addition not all shaders can be debugged, e.g. if an unsupported feature such as a Vulkan extension is used. If the shader cannot be debugged the options below will also be disabled.</p>
+</div>
+<section id="including-debug-info-in-shaders">
+<h2>Including debug info in shaders<a class="headerlink" href="#including-debug-info-in-shaders" title="Permalink to this headline">¶</a></h2>
+<p>For the most part at least some reflection information is included with shaders unless it is being explicitly stripped out at some point, but usually information for debugging shaders such as the original source code is not included by default.</p>
+<p>The option to include this additional debug information varies by API.</p>
+<ul>
+<li><p>For D3D11 and D3D12 the flag <code class="docutils literal notranslate"><span class="pre">/Zi</span></code> to fxc or the <code class="docutils literal notranslate"><span class="pre">D3DCOMPILE_DEBUG</span></code> flag to <code class="docutils literal notranslate"><span class="pre">D3DCompile()</span></code> will include additional debugging information. <code class="docutils literal notranslate"><span class="pre">/Qstrip_debug</span></code> and <code class="docutils literal notranslate"><span class="pre">/Qstrip_reflection</span></code> will remove reflection information that can be useful - such as the names of variables in constant buffers - so it’s recommended against using these. RenderDoc does fully support the new split pdb information using <code class="docutils literal notranslate"><span class="pre">/Fd</span></code>.</p>
+<p>For shader debugging it’s recommended that you build with <code class="docutils literal notranslate"><span class="pre">/Od</span></code> or <code class="docutils literal notranslate"><span class="pre">D3DCOMPILE_SKIP_OPTIMIZATION</span></code> for the best experience, as this will also enable HLSL debugging by default.</p>
+</li>
+<li><p>On Vulkan RenderDoc supports source-level debugging via the <code class="docutils literal notranslate"><span class="pre">NonSemantic.Shader.DebugInfo.100</span></code> extended instruction set. This information can be generated by glslang using <code class="docutils literal notranslate"><span class="pre">-gVS</span></code> to specify debug information, and by dxc using <code class="docutils literal notranslate"><span class="pre">-fspv-debug=vulkan-with-source</span></code>. In both cases this will embed the necessary debug information in the SPIR-V blob to debug at source level.</p></li>
+</ul>
+<p>If you are splitting out debug information you can see more information on how to get this information to renderdoc, see <a class="reference internal" href="how_shader_debug_info.html"><span class="doc">How do I use shader debug information?</span></a>.</p>
+</section>
+<section id="debugging-a-vertex">
+<h2>Debugging a vertex<a class="headerlink" href="#debugging-a-vertex" title="Permalink to this headline">¶</a></h2>
+<p>Vertex debugging is invoked from the mesh viewer. With the mesh viewer open you can select the input vertex you wish to debug.</p>
+<p>When a vertex is selected in the mesh data for the vertex input it will be highlighted along with the primitive it is part of in the mesh display, provided the display is in vertex input mode.</p>
+<p>Right click and choose debug vertex from the context menu.</p>
+<figure class="align-default" id="id1">
+<img alt="../_images/VertexDebug.png" src="../_images/VertexDebug.png" />
+<figcaption>
+<p><span class="caption-text">Vertex Debugging: Launching vertex debugging from the mesh viewer.</span><a class="headerlink" href="#id1" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>From here the debugger will open with the vertex shader in the shader debugger. The inputs are automatically filled in from the mesh data.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Geometry and tessellation shaders are not yet debuggable.</p>
+</div>
+</section>
+<section id="debugging-a-pixel">
+<h2>Debugging a Pixel<a class="headerlink" href="#debugging-a-pixel" title="Permalink to this headline">¶</a></h2>
+<p>Pixel debugging is launched from the texture viewer. For more details on selecting the pixel to debug see <a class="reference internal" href="how_inspect_pixel.html"><span class="doc">How do I inspect a pixel value?</span></a>.</p>
+<p>When a given pixel is selected you can click the history button underneath the pixel context. This will launch the <a class="reference internal" href="how_inspect_pixel.html#pixel-history"><span class="std std-ref">Pixel History</span></a> window with the selected pixel showing every modification. You can then choose to debug any of the triangles that generated a change.</p>
+<p>If you already have the current draw selected that you want to debug, you can click the debug button to skip the pixel history and jump straight to the debugger. The inputs to the pixel will be automatically filled in.</p>
+<p>There are a couple of things to note while pixel debugging:</p>
+<ul class="simple">
+<li><p>If the draw selected doesn’t write to the pixel you have highlighted, the pixel history window will open to let you choose which draw call to debug.</p></li>
+<li><p>If a draw overdraws the same pixel several times then the results of debugging will come from the last fragment that passed the depth test. If you wish to choose a particular fragment from the list then first launch the pixel history and choose which fragment to debug from the list there.</p></li>
+</ul>
+</section>
+<section id="debugging-a-compute-thread">
+<h2>Debugging a Compute thread<a class="headerlink" href="#debugging-a-compute-thread" title="Permalink to this headline">¶</a></h2>
+<p>To debug a compute thread simply go to the compute shader section of the pipeline state viewer and enter the group and thread ID of the thread you would like to debug.</p>
+</section>
+<section id="debugging-controls">
+<h2>Debugging Controls<a class="headerlink" href="#debugging-controls" title="Permalink to this headline">¶</a></h2>
+<p>When debugging, at the moment the controls are fairly basic.</p>
+<figure class="align-default" id="id2">
+<img alt="../_images/ShaderControls.png" src="../_images/ShaderControls.png" />
+<figcaption>
+<p><span class="caption-text">Shader controls: Controls for stepping through shaders.</span><a class="headerlink" href="#id2" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>The toolbar at the top gives controls for the program flow through the shader.</p>
+<p><img alt="runfwd" src="../_images/control_end_blue.png" /> Run and <img alt="runback" src="../_images/control_start_blue.png" /> Run Backward simply run from the current position all the way through to the end or start of the program respectively. The keyboard shortcuts for these controls are <kbd class="kbd docutils literal notranslate">F5</kbd> and <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">Shift</kbd>-<kbd class="kbd docutils literal notranslate">F5</kbd></kbd> respectively.</p>
+<p>You can set a breakpoint by pressing <kbd class="kbd docutils literal notranslate">F9</kbd> (this will also remove a breakpoint that is already there). When running in each direction or to cursor (see below) if execution hits a breakpoint it will stop.</p>
+<p><img alt="runsample" src="../_images/control_sample_blue.png" /> will run to the next texture load, gather or sample operation, and stop as if a breakpoint had been placed on that instruction.</p>
+<p><img alt="runnaninf" src="../_images/control_nan_blue.png" /> will run to the next operation that generates either a NaN or infinity value instead of a floating point value. This will not apply to operations that produce integer results which may be NaN/infinity when interpreted as float.</p>
+<p><img alt="stepnext" src="../_images/control_play_blue.png" /> Step forward will execute the current instruction and continue to the next - this includes following any flow control statements such as jumps, loops, etc.</p>
+<p><img alt="stepprev" src="../_images/control_reverse_blue.png" /> Step backwards will jump back to whichever instruction lead to the current instruction. This does not necessarily mean the previous instruction in the program as it could be the destination of a jump. Stepping forwards and stepping backwards will always reverse each other.</p>
+<p>The shortcuts for these commands are <kbd class="kbd docutils literal notranslate">F10</kbd> and <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">Shift</kbd>-<kbd class="kbd docutils literal notranslate">F10</kbd></kbd></p>
+<p><img alt="runcursor" src="../_images/control_cursor_blue.png" /> will run to the cursor. This will perform in a similar fashion to the “Run” command, but when it reaches the line that the cursor highlights it will stop and pause execution. It will also stop if it reaches the end of the shader. The shortcut for this is <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">Ctrl</kbd>-<kbd class="kbd docutils literal notranslate">F10</kbd></kbd></p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The highlighted instruction at any given point indicates the <em>next</em> instruction to be executed - not the instruction that was just executed.</p>
+</div>
+<p>Hovering over a register in either the disassembly or in the view windows will open a tooltip showing the value in different interpretations.</p>
+<p>There is also a toggle available to control the ‘default’ interpretation of temporary register values - float or int. D3D registers are typeless but typically they are interpreted as float values. With this toggle you can toggle them to be interpreted as integers by default instead.</p>
+</section>
+<section id="hlsl-debugging">
+<h2>HLSL Debugging<a class="headerlink" href="#hlsl-debugging" title="Permalink to this headline">¶</a></h2>
+<p>When debug information is available in the shader, RenderDoc allows debugging at the HLSL level. This is activated by default if the shader was built with optimisation disabled, but as long as debug information is available you can toggle between assembly and HLSL debugging at any time.</p>
+<p>In the toolbar there will be a ‘Debug in HLSL’ button when HLSL debugging is available, and similarly in reverse a ‘Debug in Assembly’ button. You can also right-click and select ‘Go to Disassembly’ or ‘Go to Source’.</p>
+<p>While source debugging, the same controls are available to set breakpoints, run forwards and backwards, etc. Note that stepping and running in HLSL may skip over several assembly instructions at once.</p>
+<p>Debug information also includes HLSL callstack and locals mapping, which allows RenderDoc to display the function callstack at the current instruction and the name and values of any local variables that are in scope. They are displayed in the callstack and locals windows respectively.</p>
+<figure class="align-default" id="id3">
+<img alt="../_images/ShaderStackLocals.png" src="../_images/ShaderStackLocals.png" />
+<figcaption>
+<p><span class="caption-text">Callstack and Locals windows.</span><a class="headerlink" href="#id3" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Callstack and local mapping information is only available with windows 8.0 and later versions of fxc. That corresponds to <code class="docutils literal notranslate"><span class="pre">D3DCompiler_47.dll</span></code>.</p>
+</div>
+</section>
+<section id="debugging-displays">
+<h2>Debugging Displays<a class="headerlink" href="#debugging-displays" title="Permalink to this headline">¶</a></h2>
+<p>There are two windows that display different types of registers. The constants window will display input and constant buffer registers that are immutable throughout execution. This will also list registers for resources and samplers (with basic format information).</p>
+<figure class="align-default" id="id4">
+<img alt="../_images/ShaderConsts.png" src="../_images/ShaderConsts.png" />
+<figcaption>
+<p><span class="caption-text">Constants window: Constant, input and resource registers.</span><a class="headerlink" href="#id4" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>The other window will contain variable/mutable registers. These contain temporaries that are typically allocated up front and will update as you step through the execution of the shader. This window also contains the output registers.</p>
+<figure class="align-default" id="id5">
+<img alt="../_images/ShaderRegs.png" src="../_images/ShaderRegs.png" />
+<figcaption>
+<p><span class="caption-text">Registers window: Variable registers - temporaries and outputs.</span><a class="headerlink" href="#id5" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>The final window is initially empty but can be filled out as needed. This shows custom watch expressions and their values. Here you can write any expression involving an input, temporary or output register along with a swizzle and typecast. When debug information is present you can also include locals here.</p>
+<p>Swizzles follow the standard hlsl &amp; glsl rules - <code class="docutils literal notranslate"><span class="pre">.[xyzw]</span></code> or <code class="docutils literal notranslate"><span class="pre">.[rgba]</span></code> in any permutation or repetition will show those channels.</p>
+<p>The custom typecast can be any of <code class="docutils literal notranslate"><span class="pre">,u</span></code> <code class="docutils literal notranslate"><span class="pre">,i</span></code> <code class="docutils literal notranslate"><span class="pre">,f</span></code> <code class="docutils literal notranslate"><span class="pre">,x</span></code> <code class="docutils literal notranslate"><span class="pre">,o</span></code> <code class="docutils literal notranslate"><span class="pre">,b</span></code> to display the register as unsigned integer, signed integer, float, hex, octal, or binary respectively. You can also specify <code class="docutils literal notranslate"><span class="pre">,c</span></code> to specify a color value, and show a small RGB swatch next to the floating point value with the effective color.</p>
+<figure class="align-default" id="id6">
+<img alt="../_images/ShaderWatch.png" src="../_images/ShaderWatch.png" />
+<figcaption>
+<p><span class="caption-text">Watch window: Watch window - custom register expressions evaluated.</span><a class="headerlink" href="#id6" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="how_shader_debug_info.html" class="btn btn-neutral float-right" title="How do I use shader debug information?" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="how_filter_events.html" class="btn btn-neutral float-left" title="How do I filter visible events?" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

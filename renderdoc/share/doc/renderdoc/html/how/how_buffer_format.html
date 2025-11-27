@@ -1,0 +1,489 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>How do I specify a buffer format? &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/how/how_buffer_format.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="How do I view a specific texture?" href="how_view_texture.html" />
+    <link rel="prev" title="How do I inspect a pixel value?" href="how_inspect_pixel.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../python_api/index.html">Python API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">How do I …?</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="how_capture_frame.html">How do I capture a frame?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_android_capture.html">How do I use RenderDoc on Android?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_filter_events.html">How do I filter visible events?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_debug_shader.html">How do I debug a shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_shader_debug_info.html">How do I use shader debug information?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_inspect_pixel.html">How do I inspect a pixel value?</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">How do I specify a buffer format?</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#basic-types">Basic types</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#structs">Structs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#enums">Enums</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#bitfields">Bitfields</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pointers">Pointers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#packing-and-layout-rules">Packing and layout rules</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#annotations">Annotations</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#array-of-structs-aos-vs-struct-of-arrays-soa">Array of Structs (AoS) vs Struct of Arrays (SoA)</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#saving-and-loading-formats">Saving and loading formats</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#see-also">See Also</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="how_view_texture.html">How do I view a specific texture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_object_details.html">How do I view details of an object?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_capture_callstack.html">How do I capture callstacks?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_custom_visualisation.html">How do I use a custom visualisation shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_edit_shader.html">How do I edit a shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_network_capture_replay.html">How do I capture and replay over a network?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_annotate_capture.html">How do I annotate a capture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_import_export.html">How do I import or export a capture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_rgp_profile.html">How do I generate an RGP profile?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_python_extension.html">How do I register a python extension?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_control_replay.html">How do I control the replay?</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">How do I …?</a> &raquo;</li>
+        
+      <li>How do I specify a buffer format?</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/how/how_buffer_format.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="how-do-i-specify-a-buffer-format">
+<h1>How do I specify a buffer format?<a class="headerlink" href="#how-do-i-specify-a-buffer-format" title="Permalink to this headline">¶</a></h1>
+<p>This page documents how to format buffer data, in cases where the default reflected format is missing or you want to customise it.</p>
+<p>The format string can contain C and C++ style comments freely, but a C pre-processor is not supported.</p>
+<p>By default the final interpreted format is defined by the list of global variables in the layout string, however if no global variables are defined the final struct to be defined is used as-if there were a single variable instance of that struct.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">data</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kt">float</span><span class="w"> </span><span class="n">a</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">b</span><span class="p">;</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Is equivalent to</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">data</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kt">float</span><span class="w"> </span><span class="n">a</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">b</span><span class="p">;</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+
+<span class="n">data</span><span class="w"> </span><span class="n">d</span><span class="p">;</span><span class="w"></span>
+</pre></div>
+</div>
+<p>However note that if there are global variables, structs will <strong>not</strong> automatically be instantiated and must be declared as variables.</p>
+<section id="basic-types">
+<h2>Basic types<a class="headerlink" href="#basic-types" title="Permalink to this headline">¶</a></h2>
+<p>Variables can be declared using familiar syntax from either GLSL or HLSL. A float would be declared as:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">float</span><span class="w"> </span><span class="n">myvalue</span><span class="p">;</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Most common basic types are available:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">bool</span></code> - A 4-byte boolean.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">byte</span></code>, <code class="docutils literal notranslate"><span class="pre">short</span></code>, <code class="docutils literal notranslate"><span class="pre">int</span></code>, <code class="docutils literal notranslate"><span class="pre">long</span></code> - 1, 2, 4, and 8 byte signed integers respectively.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">ubyte</span></code>, <code class="docutils literal notranslate"><span class="pre">ushort</span></code>, <code class="docutils literal notranslate"><span class="pre">uint</span></code>, <code class="docutils literal notranslate"><span class="pre">ulong</span></code> - 1, 2, 4, and 8 byte unsigned integers respectively. It is also possible to prefix <code class="docutils literal notranslate"><span class="pre">unsigned</span></code> before a signed type.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">half</span></code>, <code class="docutils literal notranslate"><span class="pre">float</span></code>, <code class="docutils literal notranslate"><span class="pre">double</span></code> - 2, 4, and 8 byte floating point values.</p></li>
+</ul>
+<p>These can be declared as vectors by appending the vector width. Similarly matrices can be declared by appending the vector and matrix dimensions.</p>
+<p>GLSL declarations for float, int, and uint vectors and matrices are supported too.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">float2</span><span class="w"> </span><span class="n">myvector2</span><span class="p">;</span><span class="w"> </span><span class="c1">// 2-vector of floats</span>
+<span class="n">float4</span><span class="w"> </span><span class="n">myvector4</span><span class="p">;</span><span class="w"></span>
+<span class="n">float2x2</span><span class="w"> </span><span class="n">mymat</span><span class="p">;</span><span class="w">   </span><span class="c1">// 2x2 matrix</span>
+<span class="n">mat2</span><span class="w"> </span><span class="n">myGLmat</span><span class="p">;</span><span class="w">     </span><span class="c1">// equivalent to float2x2</span>
+<span class="n">vec2</span><span class="w"> </span><span class="n">myGLvec</span><span class="p">;</span><span class="w">     </span><span class="c1">// equivalent to float2</span>
+</pre></div>
+</div>
+<p>You can also declare any of these types as an array. Arrays can either have a fixed size, or an unbounded size - unbounded arrays are <a class="reference internal" href="#aos-soa"><span class="std std-ref">detailed below in the discussion of AoS vs SoA data</span></a>.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">float</span><span class="w"> </span><span class="n">fixedArray</span><span class="p">[</span><span class="mi">2</span><span class="p">];</span><span class="w">    </span><span class="c1">// array of two floats</span>
+<span class="n">float3</span><span class="w"> </span><span class="n">unboundedArray</span><span class="p">[];</span><span class="w"> </span><span class="c1">// unbounded array of float3s</span>
+</pre></div>
+</div>
+</section>
+<section id="structs">
+<h2>Structs<a class="headerlink" href="#structs" title="Permalink to this headline">¶</a></h2>
+<p>Structs are declared similarly to in GLSL or HLSL, or in C.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">MyStructName</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kt">float</span><span class="w"> </span><span class="n">a</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">b</span><span class="p">;</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+
+<span class="n">MyStructName</span><span class="w"> </span><span class="n">str</span><span class="p">;</span><span class="w"> </span><span class="c1">// single instance of the struct</span>
+<span class="n">MyStructName</span><span class="w"> </span><span class="n">arr</span><span class="p">[</span><span class="mi">4</span><span class="p">];</span><span class="w"> </span><span class="c1">// array of 4 instances</span>
+</pre></div>
+</div>
+<p>Structs can be nested freely, but cannot be forward declared so a struct can only reference structs defined before it.</p>
+</section>
+<section id="enums">
+<h2>Enums<a class="headerlink" href="#enums" title="Permalink to this headline">¶</a></h2>
+<p>Enums can be defined but must be defined using a base integer type to declare their size. Enum values must be literal integers, either in decimal or hexadecimal.</p>
+<p>Values must be explicitly given, and automatic numbering or expression-based values are not supported.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">enum</span><span class="w"> </span><span class="nc">MyEnum</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="n">uint</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="n">FirstValue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span><span class="w"></span>
+<span class="w">  </span><span class="n">HexValue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mh">0xf</span><span class="p">,</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+
+<span class="n">MyEnum</span><span class="w"> </span><span class="n">e</span><span class="p">;</span><span class="w"> </span><span class="c1">// A uint will be read and interpreted as the above enum</span>
+</pre></div>
+</div>
+</section>
+<section id="bitfields">
+<h2>Bitfields<a class="headerlink" href="#bitfields" title="Permalink to this headline">¶</a></h2>
+<p>Integer values can be bit-packed together using C style bitfields.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">int</span><span class="w"> </span><span class="n">first</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mi">3</span><span class="p">;</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="n">second</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mi">5</span><span class="p">;</span><span class="w"></span>
+<span class="kt">int</span><span class="w"> </span><span class="n">third</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mi">10</span><span class="p">;</span><span class="w"></span>
+<span class="nl">int</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="mi">6</span><span class="p">;</span><span class="w"> </span><span class="c1">// anonymous values can be used to skip bits without declaring anything</span>
+<span class="kt">int</span><span class="w"> </span><span class="n">last</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="mi">8</span><span class="p">;</span><span class="w"></span>
+</pre></div>
+</div>
+<p>This declaration will read only a single 32-bit integer, and interpret the bits according to this packing.</p>
+</section>
+<section id="pointers">
+<h2>Pointers<a class="headerlink" href="#pointers" title="Permalink to this headline">¶</a></h2>
+<p>On APIs where GPU pointers can reside within memory, such as Vulkan, pointers can be declared with a base struct type and these will be read and interpreted from a 64-bit address in the underlying buffer.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">MyStructName</span><span class="w"> </span><span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kt">float</span><span class="w"> </span><span class="n">a</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="kt">int</span><span class="w"> </span><span class="n">b</span><span class="p">;</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+
+<span class="n">MyStructName</span><span class="w"> </span><span class="o">*</span><span class="n">pointer</span><span class="p">;</span><span class="w"></span>
+</pre></div>
+</div>
+<p>It is also possible to declare pointers to basic types without a struct, which will be treated as tightly packed.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="kt">float</span><span class="w"> </span><span class="o">*</span><span class="n">pointer</span><span class="p">;</span><span class="w"></span>
+<span class="n">int2</span><span class="w"> </span><span class="o">*</span><span class="n">otherPointer</span><span class="p">;</span><span class="w"></span>
+</pre></div>
+</div>
+</section>
+<section id="packing-and-layout-rules">
+<h2>Packing and layout rules<a class="headerlink" href="#packing-and-layout-rules" title="Permalink to this headline">¶</a></h2>
+<p>Graphics APIs define different rules for how data should be packed into memory, and this sometimes depends on the usage of the buffer within the API.</p>
+<p>RenderDoc will use the most sensible default where possible - e.g. for D3D buffers that are known to be bound as constant buffers the constant buffer packing will be used, similarly for OpenGL uniform buffers using std140. However the packing can be explicitly specified and any automatic reflection-based format will declare the packing explicitly.</p>
+<p>Once a packing format is specified, RenderDoc will calculate the necessary alignment and padding for each element to comply with the rules while otherwise tightly packing, the same as a normal shader declaration would.</p>
+<p>The format for a buffer can be specified using <code class="docutils literal notranslate"><span class="pre">#pack(packing_format)</span></code>. This can only be specified at global scope, not inside a structure, and the packing rules will apply for all subsequent declarations.</p>
+<p>The five packing formats supported are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">cbuffer</span></code>, <code class="docutils literal notranslate"><span class="pre">d3dcbuffer</span></code> or <code class="docutils literal notranslate"><span class="pre">cb</span></code> - D3D constant buffer packing.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">structured</span></code>, <code class="docutils literal notranslate"><span class="pre">d3duav</span></code>, or <code class="docutils literal notranslate"><span class="pre">uav</span></code> - D3D structured buffer packing (applies to buffer SRVs as well as UAVs).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">std140</span></code>, <code class="docutils literal notranslate"><span class="pre">ubo</span></code>, or <code class="docutils literal notranslate"><span class="pre">gl</span></code> - OpenGL std140 uniform buffer packing.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">std430</span></code>, <code class="docutils literal notranslate"><span class="pre">ssbo</span></code> - OpenGL std430 storage buffer packing.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">scalar</span></code> - Vulkan scalar buffer packing.</p></li>
+</ul>
+<p>It is also possible to tweak particular packing properties with <code class="docutils literal notranslate"><span class="pre">#pack()</span></code>. Each property can be enabled or disabled by <code class="docutils literal notranslate"><span class="pre">#pack(prop)</span></code> or <code class="docutils literal notranslate"><span class="pre">#pack(no_prop)</span></code>. Each property will <em>relax</em> some restrictions, so the strictest possible packing is <code class="docutils literal notranslate"><span class="pre">std140</span></code> with all properties off, and the most lax packing is <code class="docutils literal notranslate"><span class="pre">scalar</span></code> with all properties on.</p>
+<p>The available packing properties are:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">vector_align_component</span></code> - If enabled, vectors are only aligned to their component. If disabled, 2-vectors are aligned to 2x their component, 3-vectors and 4-vectors are aligned to 4x their components. This is disabled only for <code class="docutils literal notranslate"><span class="pre">std140</span></code> and <code class="docutils literal notranslate"><span class="pre">std430</span></code> by default.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">vector_straddle_16b</span></code> - If enabled, vectors are allowed to straddle 16-byte alignment boundaries. If disabled, vectors must be padded/aligned to not straddle. This is disabled only for <code class="docutils literal notranslate"><span class="pre">std140</span></code>, <code class="docutils literal notranslate"><span class="pre">std430</span></code>, and <code class="docutils literal notranslate"><span class="pre">cbuffer</span></code> by default.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">tight_arrays</span></code> - If enabled, arrays elements are only aligned to the element size. If disabled, each array element is aligned to a 16-byte boundary. This is disabled for <code class="docutils literal notranslate"><span class="pre">std140</span></code> and <code class="docutils literal notranslate"><span class="pre">cbuffer</span></code> by default.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">trailing_overlap</span></code> - If enabled, elements can be placed in trailing padding from a previous element such as an array or struct. If disabled, each element’s padding is reserved and the next element must come after the padding. This disabled for <code class="docutils literal notranslate"><span class="pre">std140</span></code>, <code class="docutils literal notranslate"><span class="pre">std430</span></code>, and <code class="docutils literal notranslate"><span class="pre">structured</span></code> by default.</p></li>
+</ul>
+<p>Some additional properties are available to go beyond the normal packing rules:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">tight_bitfield_packing</span></code> - If enabled, bitfields consume bits tightly packed no matter what their base type or offset. This would allow a <code class="docutils literal notranslate"><span class="pre">uint</span></code> bitfield to be placed at 30 bits into a buffer and span more than 2 bits, crossing multiple uints. If disabled, padding is added to ensure each bitfield member remains within an instance of its base type. This is disabled by default, and is equivalent to <code class="docutils literal notranslate"><span class="pre">#pragma</span> <span class="pre">pack(1)</span></code> behaviour.</p></li>
+</ul>
+</section>
+<section id="annotations">
+<h2>Annotations<a class="headerlink" href="#annotations" title="Permalink to this headline">¶</a></h2>
+<p>The buffer format supports annotations on declarations to specify special properties. These use C++ <code class="docutils literal notranslate"><span class="pre">[[annotation(parameter)]]</span></code> syntax.</p>
+<p>Struct definitions support the following annotations:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">[[size(number)]]</span></code> or <code class="docutils literal notranslate"><span class="pre">[[byte_size(number)]]</span></code> - Forces the struct to be padded up to a given size even if the contents don’t require it.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">[[align(number)]]</span></code> or <code class="docutils literal notranslate"><span class="pre">[[alignment(number)]]</span></code> - Overrides a struct’s natural alignment (the largest alignment of any member). Can be used in edge cases where buffer definitions are tightly packed and misaligned, e.g. with D3D12 indirect arguments.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">[[single]]</span></code> or <code class="docutils literal notranslate"><span class="pre">[[fixed]]</span></code> - Forces the struct to be considered as a fixed SoA definition, even if in context the buffer viewer may default to AoS. See <a class="reference internal" href="#aos-soa"><span class="std std-ref">the below section</span></a> for more details. Structs with this annotation <strong>may not</strong> be declared as a variable, and should instead be the implicit final struct in a definition.</p></li>
+</ul>
+<p>Variable declarations support the following annotations:</p>
+<ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">[[offset(number)]]</span></code> or <code class="docutils literal notranslate"><span class="pre">[[byte_offset(number)]]</span></code> - Forces this member to be at a given offset <strong>relative to its parent</strong>. This cannot place the member any earlier than it would have according to tight packing with the current packing rules.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">[[pad]]</span></code> or <code class="docutils literal notranslate"><span class="pre">[[padding]]</span></code> - Mark this member as padding, such that structure layout is calculated accounting for it but it is not displayed visibly.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">[[single]]</span></code> or <code class="docutils literal notranslate"><span class="pre">[[fixed]]</span></code> - Forces this variable to be considered as a fixed SoA definition, even if in context the buffer viewer may default to AoS. See <a class="reference internal" href="#aos-soa"><span class="std std-ref">the below section</span></a> for more details. This must be a global variable, and it must be the only global variable in the format definition.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">[[row_major]]</span></code> or <code class="docutils literal notranslate"><span class="pre">[[col_major]]</span></code> - Declares the memory order for a matrix.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">[[rgb]]</span></code> - Will color the background of any repeated data by interpreting its contents as RGB color.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">[[hex]]</span></code> or <code class="docutils literal notranslate"><span class="pre">[[hexadecimal]]</span></code> - Will show integer data as hexadecimal.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">[[bin]]</span></code> or <code class="docutils literal notranslate"><span class="pre">[[binary]]</span></code> - Will show integer data as binary.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">[[unorm]]</span></code> or <code class="docutils literal notranslate"><span class="pre">[[snorm]]</span></code> - On 1-byte or 2-byte integer variables, will interpret them as unsigned or signed normalised data respectively.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">[[packed(format)]]</span></code> - Interprets a variable according to a standard bit-packed format. Supported formats are:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">r11g11b10</span></code> which must be used with a <code class="docutils literal notranslate"><span class="pre">float3</span></code> type.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">r10g10b10a2</span></code> or <code class="docutils literal notranslate"><span class="pre">r10g10b10a2_uint</span></code> which must be used with a <code class="docutils literal notranslate"><span class="pre">uint4</span></code> type. Can optionally be combined with <code class="docutils literal notranslate"><span class="pre">[[unorm]]</span></code> or <code class="docutils literal notranslate"><span class="pre">[[snorm]]</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">r10g10b10a2_unorm</span></code> which must be used with a <code class="docutils literal notranslate"><span class="pre">uint4</span></code> type.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">r10g10b10a2_snorm</span></code> which must be used with a <code class="docutils literal notranslate"><span class="pre">int4</span></code> type.</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+</section>
+<section id="array-of-structs-aos-vs-struct-of-arrays-soa">
+<span id="aos-soa"></span><h2>Array of Structs (AoS) vs Struct of Arrays (SoA)<a class="headerlink" href="#array-of-structs-aos-vs-struct-of-arrays-soa" title="Permalink to this headline">¶</a></h2>
+<p>The <a class="reference internal" href="../window/buffer_viewer.html"><span class="doc">Buffer Viewer</span></a> is capable of displaying both repeating data of a single format (AoS) as well as fixed non-repeating data (called SoA). Typically AoS is used for large buffers, where a small struct is repeated many times to form the elemnts in the buffer. SoA is used most commonly for constant buffers with a fixed amount of data, but can be used in any context. On some APIs it is possible for a buffer to contain some fixed data before the repeating data and thus it contains both types.</p>
+<p>RenderDoc tries to use context to interpret buffer formats correctly, defaulting to AoS interpretation in cases where it is likely intended. However this can be hinted or overridden as desired.</p>
+<p>To specify AoS data explicitly you can declare an unbounded array:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">float3</span><span class="w"> </span><span class="n">unboundedArray</span><span class="p">[];</span><span class="w"> </span><span class="c1">// unbounded array of float3s</span>
+</pre></div>
+</div>
+<p>When supported by the API, this can be preceeded by any fixed data in the buffer before the repeated AoS data. The buffer viewer will show both parts of the data separately, with a tree view for the fixed data and a table for the repeated data.</p>
+<p>In the opposite direction, normally a loose collection of variables without any such unbounded array will be taken as the definition of a struct within an AoS view:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">data</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kt">float</span><span class="w"> </span><span class="n">a</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="n">int2</span><span class="w"> </span><span class="n">b</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="kt">float</span><span class="w"> </span><span class="n">c</span><span class="p">;</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>However if the desire is to display this as a single fixed element where the fixed tree view is more appropriate, the structure or an variable of it can be annotated as <code class="docutils literal notranslate"><span class="pre">[[single]]</span></code> or <code class="docutils literal notranslate"><span class="pre">[[fixed]]</span></code>.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="p">[[</span><span class="n">single</span><span class="p">]]</span><span class="w"></span>
+<span class="k">struct</span><span class="w"> </span><span class="nc">data</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kt">float</span><span class="w"> </span><span class="n">a</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="n">int2</span><span class="w"> </span><span class="n">b</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="kt">float</span><span class="w"> </span><span class="n">c</span><span class="p">;</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">struct</span><span class="w"> </span><span class="nc">data</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="w">  </span><span class="kt">float</span><span class="w"> </span><span class="n">a</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="n">int2</span><span class="w"> </span><span class="n">b</span><span class="p">;</span><span class="w"></span>
+<span class="w">  </span><span class="kt">float</span><span class="w"> </span><span class="n">c</span><span class="p">;</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+
+<span class="p">[[</span><span class="n">single</span><span class="p">]]</span><span class="w"></span>
+<span class="n">data</span><span class="w"> </span><span class="n">fixed_data</span><span class="p">;</span><span class="w"></span>
+</pre></div>
+</div>
+<p>This will force the struct to be displayed as a single instance, and not as a repeated AoS.</p>
+</section>
+<section id="saving-and-loading-formats">
+<h2>Saving and loading formats<a class="headerlink" href="#saving-and-loading-formats" title="Permalink to this headline">¶</a></h2>
+<p>Commonly used formats can be saved and these will be persisted from run to run.</p>
+<p>To save the current format to an existing entry, select it and click on the <img alt="save" src="../_images/save.png" /> button.</p>
+<p>To save to a new entry, either type the name directly into the <code class="docutils literal notranslate"><span class="pre">New...</span></code> at the bottom, double click on it to begin entering the name, or select it and click save then enter the name.</p>
+<p>If the buffer view was opened with an automatically populated format, it will be available as a read-only <code class="docutils literal notranslate"><span class="pre">&lt;Auto-generated&gt;</span></code> entry.</p>
+<p>Loading an entry can be accomplished by either double clicking on it, or selecting it and clicking <img alt="goarrow" src="../_images/action_hover.png" />. This will load the format and automatically apply it to the buffer view.</p>
+<p>You can use undo/redo to undo the loading of a saved format, if you wish to go back to the previous format.</p>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../window/buffer_viewer.html"><span class="doc">Buffer Viewer</span></a></p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="how_view_texture.html" class="btn btn-neutral float-right" title="How do I view a specific texture?" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="how_inspect_pixel.html" class="btn btn-neutral float-left" title="How do I inspect a pixel value?" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

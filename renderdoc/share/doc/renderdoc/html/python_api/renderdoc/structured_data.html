@@ -1,0 +1,1336 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>API Reference: Structured Data &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/python_api/renderdoc/structured_data.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="API Reference: Performance Counters" href="counters.html" />
+    <link rel="prev" title="API Reference: Common Pipeline State Abstraction" href="pipelines/common.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../examples/renderdoc_intro.html">Getting Started (python)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/qrenderdoc_intro.html">Getting Started (RenderDoc UI)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dev_environment.html">Python development environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui_extensions.html">Writing UI extensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../descriptors_bindings.html">Descriptors and Bindings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/basics.html">Basic Interfaces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/renderdoc/index.html">renderdoc Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/qrenderdoc/index.html">qrenderdoc examples</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">renderdoc python module</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="capturing.html">API Reference: Capturing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="replay.html">API Reference: Replay Control</a></li>
+<li class="toctree-l3"><a class="reference internal" href="outputs.html">API Reference: Replay Outputs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="analysis.html">API Reference: Replay Analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="formats.html">API Reference: Formats</a></li>
+<li class="toctree-l3"><a class="reference internal" href="resources.html">API Reference: Resources</a></li>
+<li class="toctree-l3"><a class="reference internal" href="shaders.html">API Reference: Shaders</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pipelines/index.html">API Reference: Pipeline State Objects</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">API Reference: Structured Data</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#type-information">Type information</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#objects">Objects</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#chunks">Chunks</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#structured-file">Structured File</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#creation-helper-functions">Creation Helper Functions</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="counters.html">API Reference: Performance Counters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="frame_stats.html">API Reference: Frame Statistics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="utils.html">API Reference: Utilities</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../qrenderdoc/index.html">qrenderdoc python module</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../how/index.html">How do I …?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../index.html">Python API</a> &raquo;</li>
+        
+          <li><a href="index.html">renderdoc python module</a> &raquo;</li>
+        
+      <li>API Reference: Structured Data</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/python_api/renderdoc/structured_data.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="api-reference-structured-data">
+<h1>API Reference: Structured Data<a class="headerlink" href="#api-reference-structured-data" title="Permalink to this headline">¶</a></h1>
+<p>This is the API reference for the functions, classes, and enums in the <code class="docutils literal notranslate"><span class="pre">renderdoc</span></code> module which represents the underlying interface that the UI is built on top of. For more high-level information and instructions on using the python API, see <a class="reference internal" href="../index.html"><span class="doc">Python API</span></a>.</p>
+<div class="contents local topic" id="sections">
+<p class="topic-title">Sections</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#type-information" id="id1">Type information</a></p></li>
+<li><p><a class="reference internal" href="#objects" id="id2">Objects</a></p></li>
+<li><p><a class="reference internal" href="#chunks" id="id3">Chunks</a></p></li>
+<li><p><a class="reference internal" href="#structured-file" id="id4">Structured File</a></p></li>
+<li><p><a class="reference internal" href="#creation-helper-functions" id="id5">Creation Helper Functions</a></p></li>
+</ul>
+</div>
+<section id="type-information">
+<h2><a class="toc-backref" href="#id1">Type information</a><a class="headerlink" href="#type-information" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.SDType">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">SDType</span></span><a class="headerlink" href="#renderdoc.SDType" title="Permalink to this definition">¶</a></dt>
+<dd><p>Details the name and properties of a structured type</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDType.basetype">
+<span class="sig-name descname"><span class="pre">basetype</span></span><a class="headerlink" href="#renderdoc.SDType.basetype" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="#renderdoc.SDBasic" title="renderdoc.SDBasic"><code class="xref py py-class docutils literal notranslate"><span class="pre">SDBasic</span></code></a> category that this type belongs to.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.SDBasic" title="renderdoc.SDBasic">SDBasic</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDType.byteSize">
+<span class="sig-name descname"><span class="pre">byteSize</span></span><a class="headerlink" href="#renderdoc.SDType.byteSize" title="Permalink to this definition">¶</a></dt>
+<dd><p>The size in bytes that an instance of this type takes up.</p>
+<p>This is only valid for whole chunks (where it contains the whole chunk size), for buffers that have
+an arbitrary size, or for basic types such as integers and floating point values where it gives the
+size/precision of the type.</p>
+<p>For variable size types like structs, arrays, etc it will be set to 0.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDType.flags">
+<span class="sig-name descname"><span class="pre">flags</span></span><a class="headerlink" href="#renderdoc.SDType.flags" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="#renderdoc.SDTypeFlags" title="renderdoc.SDTypeFlags"><code class="xref py py-class docutils literal notranslate"><span class="pre">SDTypeFlags</span></code></a> flags for this type.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.SDTypeFlags" title="renderdoc.SDTypeFlags">SDTypeFlags</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDType.name">
+<span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#renderdoc.SDType.name" title="Permalink to this definition">¶</a></dt>
+<dd><p>The name of this type.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.SDBasic">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">SDBasic</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.SDBasic" title="Permalink to this definition">¶</a></dt>
+<dd><p>The basic irreducible type of an object. Every other more complex type is built on these.</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDBasic.Chunk">
+<span class="sig-name descname"><span class="pre">Chunk</span></span><a class="headerlink" href="#renderdoc.SDBasic.Chunk" title="Permalink to this definition">¶</a></dt>
+<dd><p>A ‘special’ type indicating that the object is a chunk. A chunk can be treated like a
+<a class="reference internal" href="#renderdoc.SDBasic.Struct" title="renderdoc.SDBasic.Struct"><code class="xref py py-data docutils literal notranslate"><span class="pre">Struct</span></code></a> otherwise. See <a class="reference internal" href="#renderdoc.SDChunk" title="renderdoc.SDChunk"><code class="xref py py-class docutils literal notranslate"><span class="pre">SDChunk</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDBasic.Struct">
+<span class="sig-name descname"><span class="pre">Struct</span></span><a class="headerlink" href="#renderdoc.SDBasic.Struct" title="Permalink to this definition">¶</a></dt>
+<dd><p>A composite type with some number of children of different types, each child with its own name.
+May in some cases be empty, so the presence of children should not be assumed.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDBasic.Array">
+<span class="sig-name descname"><span class="pre">Array</span></span><a class="headerlink" href="#renderdoc.SDBasic.Array" title="Permalink to this definition">¶</a></dt>
+<dd><p>A composite type with some number of children with an identical type and referred to purely by
+their index in the array. May be empty.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDBasic.Null">
+<span class="sig-name descname"><span class="pre">Null</span></span><a class="headerlink" href="#renderdoc.SDBasic.Null" title="Permalink to this definition">¶</a></dt>
+<dd><p>An indicator that an object could be here, but is optional and is currently not present. See
+<a class="reference internal" href="#renderdoc.SDTypeFlags.Nullable" title="renderdoc.SDTypeFlags.Nullable"><code class="xref py py-data docutils literal notranslate"><span class="pre">SDTypeFlags.Nullable</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDBasic.Buffer">
+<span class="sig-name descname"><span class="pre">Buffer</span></span><a class="headerlink" href="#renderdoc.SDBasic.Buffer" title="Permalink to this definition">¶</a></dt>
+<dd><p>An opaque byte buffer.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDBasic.String">
+<span class="sig-name descname"><span class="pre">String</span></span><a class="headerlink" href="#renderdoc.SDBasic.String" title="Permalink to this definition">¶</a></dt>
+<dd><p>A string, encoded as UTF-8.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDBasic.Enum">
+<span class="sig-name descname"><span class="pre">Enum</span></span><a class="headerlink" href="#renderdoc.SDBasic.Enum" title="Permalink to this definition">¶</a></dt>
+<dd><p>An enum value - stored as an integer but with a distinct set of possible named values.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDBasic.UnsignedInteger">
+<span class="sig-name descname"><span class="pre">UnsignedInteger</span></span><a class="headerlink" href="#renderdoc.SDBasic.UnsignedInteger" title="Permalink to this definition">¶</a></dt>
+<dd><p>An unsigned integer.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDBasic.SignedInteger">
+<span class="sig-name descname"><span class="pre">SignedInteger</span></span><a class="headerlink" href="#renderdoc.SDBasic.SignedInteger" title="Permalink to this definition">¶</a></dt>
+<dd><p>An signed integer.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDBasic.Float">
+<span class="sig-name descname"><span class="pre">Float</span></span><a class="headerlink" href="#renderdoc.SDBasic.Float" title="Permalink to this definition">¶</a></dt>
+<dd><p>A floating point value.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDBasic.Boolean">
+<span class="sig-name descname"><span class="pre">Boolean</span></span><a class="headerlink" href="#renderdoc.SDBasic.Boolean" title="Permalink to this definition">¶</a></dt>
+<dd><p>A boolean true/false value.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDBasic.Character">
+<span class="sig-name descname"><span class="pre">Character</span></span><a class="headerlink" href="#renderdoc.SDBasic.Character" title="Permalink to this definition">¶</a></dt>
+<dd><p>A single byte character. Wide/multi-byte characters are not supported (these would be stored as a
+string with 1 character and multiple bytes in UTF-8).</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDBasic.Resource">
+<span class="sig-name descname"><span class="pre">Resource</span></span><a class="headerlink" href="#renderdoc.SDBasic.Resource" title="Permalink to this definition">¶</a></dt>
+<dd><p>A ResourceId. Equivalent to (and stored as) an 8-byte unsigned integer, but specifically contains
+the unique Id of a resource in a capture.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDBasic.GPUAddress">
+<span class="sig-name descname"><span class="pre">GPUAddress</span></span><a class="headerlink" href="#renderdoc.SDBasic.GPUAddress" title="Permalink to this definition">¶</a></dt>
+<dd><p>A GPU pointer. Equivalent to (and stored as) an 8-byte unsigned integer, but specifically contains
+the address of a resource in a capture.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.SDTypeFlags">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">SDTypeFlags</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.SDTypeFlags" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bitfield flags that could be applied to a type.</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDTypeFlags.NoFlags">
+<span class="sig-name descname"><span class="pre">NoFlags</span></span><a class="headerlink" href="#renderdoc.SDTypeFlags.NoFlags" title="Permalink to this definition">¶</a></dt>
+<dd><p>This type has no special properties.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDTypeFlags.HasCustomString">
+<span class="sig-name descname"><span class="pre">HasCustomString</span></span><a class="headerlink" href="#renderdoc.SDTypeFlags.HasCustomString" title="Permalink to this definition">¶</a></dt>
+<dd><p>This type has a custom string. This could be used for example for enums, to display the string
+value of the enum as well as the integer storage, or perhaps for opaque types that should be
+displayed to the user as a string even if the underlying representation is not a string.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDTypeFlags.Hidden">
+<span class="sig-name descname"><span class="pre">Hidden</span></span><a class="headerlink" href="#renderdoc.SDTypeFlags.Hidden" title="Permalink to this definition">¶</a></dt>
+<dd><p>This type is considered an implementation detail and should not typically be displayed to the user.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDTypeFlags.Nullable">
+<span class="sig-name descname"><span class="pre">Nullable</span></span><a class="headerlink" href="#renderdoc.SDTypeFlags.Nullable" title="Permalink to this definition">¶</a></dt>
+<dd><p>This type is nullable and can sometimes be removed and replaced simply with a Null type. See
+<a class="reference internal" href="#renderdoc.SDBasic.Null" title="renderdoc.SDBasic.Null"><code class="xref py py-data docutils literal notranslate"><span class="pre">SDBasic.Null</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDTypeFlags.NullString">
+<span class="sig-name descname"><span class="pre">NullString</span></span><a class="headerlink" href="#renderdoc.SDTypeFlags.NullString" title="Permalink to this definition">¶</a></dt>
+<dd><p>Special flag to indicate that this is a C-string which was NULL, not just empty.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDTypeFlags.FixedArray">
+<span class="sig-name descname"><span class="pre">FixedArray</span></span><a class="headerlink" href="#renderdoc.SDTypeFlags.FixedArray" title="Permalink to this definition">¶</a></dt>
+<dd><p>Special flag to indicate that this is array was a fixed-size real array, rather than a complex
+container type or a pointer &amp; length.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDTypeFlags.Union">
+<span class="sig-name descname"><span class="pre">Union</span></span><a class="headerlink" href="#renderdoc.SDTypeFlags.Union" title="Permalink to this definition">¶</a></dt>
+<dd><p>Special flag to indicate that this is structure is stored as a union, meaning all children share
+the same memory and some external flag indicates which element is valid.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDTypeFlags.Important">
+<span class="sig-name descname"><span class="pre">Important</span></span><a class="headerlink" href="#renderdoc.SDTypeFlags.Important" title="Permalink to this definition">¶</a></dt>
+<dd><p>Indicates that this object is important or significant, to aid in generating a summary/one-line
+view of a particular chunk by only including important children.</p>
+<p>This property can be recursive - so an important child which is a structure can have only some
+members which are important.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDTypeFlags.ImportantChildren">
+<span class="sig-name descname"><span class="pre">ImportantChildren</span></span><a class="headerlink" href="#renderdoc.SDTypeFlags.ImportantChildren" title="Permalink to this definition">¶</a></dt>
+<dd><p>Indicates that only important children should be processed, as noted in <a class="reference internal" href="#renderdoc.SDTypeFlags.Important" title="renderdoc.SDTypeFlags.Important"><code class="xref py py-data docutils literal notranslate"><span class="pre">Important</span></code></a>. This
+may appear on an object which has no important children - which indicates explicitly that there
+are no important children so when summarising no parameters should be shown.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDTypeFlags.HiddenChildren">
+<span class="sig-name descname"><span class="pre">HiddenChildren</span></span><a class="headerlink" href="#renderdoc.SDTypeFlags.HiddenChildren" title="Permalink to this definition">¶</a></dt>
+<dd><p>Indicates that some children are marked as hidden. This can be important for cases where the
+number of children is important.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDTypeFlags.OffsetOrSize">
+<span class="sig-name descname"><span class="pre">OffsetOrSize</span></span><a class="headerlink" href="#renderdoc.SDTypeFlags.OffsetOrSize" title="Permalink to this definition">¶</a></dt>
+<dd><p>Special flag to indicate that this type will be used as a byte offset or byte size, which is used to 
+control the formatting mode when the value is displayed in the UI.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="objects">
+<h2><a class="toc-backref" href="#id2">Objects</a><a class="headerlink" href="#objects" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.SDObject">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">SDObject</span></span><a class="headerlink" href="#renderdoc.SDObject" title="Permalink to this definition">¶</a></dt>
+<dd><p>Defines a single structured object. Structured objects are defined recursively and one
+object can either be a basic type (integer, float, etc), an array, or a struct. Arrays and structs
+are defined similarly.</p>
+<p>Each object owns its children and they will be deleted when it is deleted. You can use
+<a class="reference internal" href="#renderdoc.SDObject.Duplicate" title="renderdoc.SDObject.Duplicate"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Duplicate()</span></code></a> to make a deep copy of an object.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.SDObject.AddChild">
+<span class="sig-name descname"><span class="pre">AddChild</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">child</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.SDObject.AddChild" title="Permalink to this definition">¶</a></dt>
+<dd><p>Add a new child object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="renderdoc.SDObject.AddChild.params.child"></span><strong>child</strong><a class="paramlink headerlink reference internal" href="#renderdoc.SDObject.AddChild.params.child">#</a> (<a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject"><em>SDObject</em></a>) – The new child to add</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.SDObject.AsBool">
+<span class="sig-name descname"><span class="pre">AsBool</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.SDObject.AsBool" title="Permalink to this definition">¶</a></dt>
+<dd><p>Interprets the object as a <code class="docutils literal notranslate"><span class="pre">bool</span></code> and returns its value.
+Invalid if the object is not actually a <code class="docutils literal notranslate"><span class="pre">bool</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The interpreted bool value.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.SDObject.AsFloat">
+<span class="sig-name descname"><span class="pre">AsFloat</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.SDObject.AsFloat" title="Permalink to this definition">¶</a></dt>
+<dd><p>Interprets the object as a floating point number and returns its value.
+Invalid if the object is not actually a floating point number.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The interpreted float.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.SDObject.AsInt">
+<span class="sig-name descname"><span class="pre">AsInt</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.SDObject.AsInt" title="Permalink to this definition">¶</a></dt>
+<dd><p>Interprets the object as an integer and returns its value.
+Invalid if the object is not actually an integer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The interpreted integer.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.SDObject.AsResourceId">
+<span class="sig-name descname"><span class="pre">AsResourceId</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.SDObject.AsResourceId" title="Permalink to this definition">¶</a></dt>
+<dd><p>Interprets the object as a <a class="reference internal" href="resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> and returns its value.
+Invalid if the object is not actually a <a class="reference internal" href="resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The interpreted ID.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p><a class="reference internal" href="resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.SDObject.AsString">
+<span class="sig-name descname"><span class="pre">AsString</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.SDObject.AsString" title="Permalink to this definition">¶</a></dt>
+<dd><p>Interprets the object as a string and returns its value.
+Invalid if the object is not actually a string.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The interpreted string.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.SDObject.DeleteChildren">
+<span class="sig-name descname"><span class="pre">DeleteChildren</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.SDObject.DeleteChildren" title="Permalink to this definition">¶</a></dt>
+<dd><p>Delete all child objects.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.SDObject.Duplicate">
+<span class="sig-name descname"><span class="pre">Duplicate</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.SDObject.Duplicate" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>A new deep copy of this object, which the caller owns.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p><a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject">SDObject</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.SDObject.FindChild">
+<span class="sig-name descname"><span class="pre">FindChild</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">childName</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.SDObject.FindChild" title="Permalink to this definition">¶</a></dt>
+<dd><p>Find a child object by a given name. If no matching child is found, <code class="docutils literal notranslate"><span class="pre">None</span></code> is
+returned.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="renderdoc.SDObject.FindChild.params.childName"></span><strong>childName</strong><a class="paramlink headerlink reference internal" href="#renderdoc.SDObject.FindChild.params.childName">#</a> (<em>str</em>) – The name to search for.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A reference to the child object if found, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if not.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject">SDObject</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.SDObject.FindChildRecursively">
+<span class="sig-name descname"><span class="pre">FindChildRecursively</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">childName</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.SDObject.FindChildRecursively" title="Permalink to this definition">¶</a></dt>
+<dd><p>Find a child object by a given name recursively. If no matching child is found,
+<code class="docutils literal notranslate"><span class="pre">None</span></code> is returned.</p>
+<p>The order of the search is not guaranteed, so care should be taken when the name may not be unique.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="renderdoc.SDObject.FindChildRecursively.params.childName"></span><strong>childName</strong><a class="paramlink headerlink reference internal" href="#renderdoc.SDObject.FindChildRecursively.params.childName">#</a> (<em>str</em>) – The name to search for.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A reference to the child object if found, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if not.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject">SDObject</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.SDObject.GetChild">
+<span class="sig-name descname"><span class="pre">GetChild</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">index</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.SDObject.GetChild" title="Permalink to this definition">¶</a></dt>
+<dd><p>Find a child object by a given index. If the index is out of bounds, <code class="docutils literal notranslate"><span class="pre">None</span></code> is
+returned.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="renderdoc.SDObject.GetChild.params.index"></span><strong>index</strong><a class="paramlink headerlink reference internal" href="#renderdoc.SDObject.GetChild.params.index">#</a> (<em>int</em>) – The index to look up.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A reference to the child object if valid, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if not.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject">SDObject</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.SDObject.GetParent">
+<span class="sig-name descname"><span class="pre">GetParent</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.SDObject.GetParent" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the parent of this object. If this object has no parent, <code class="docutils literal notranslate"><span class="pre">None</span></code> is returned.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>A reference to the parent object if valid, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if not.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p><a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject">SDObject</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.SDObject.HasEqualValue">
+<span class="sig-name descname"><span class="pre">HasEqualValue</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">obj</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.SDObject.HasEqualValue" title="Permalink to this definition">¶</a></dt>
+<dd><p>Checks if the given object has the same value as this one. This equality is defined
+recursively through children.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="renderdoc.SDObject.HasEqualValue.params.obj"></span><strong>obj</strong><a class="paramlink headerlink reference internal" href="#renderdoc.SDObject.HasEqualValue.params.obj">#</a> (<a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject"><em>SDObject</em></a>) – The object to compare against</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A boolean indicating if the object is equal to this one.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.SDObject.NumChildren">
+<span class="sig-name descname"><span class="pre">NumChildren</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.SDObject.NumChildren" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the number of child objects.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The number of children this object contains.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.SDObject.RemoveChild">
+<span class="sig-name descname"><span class="pre">RemoveChild</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">index</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.SDObject.RemoveChild" title="Permalink to this definition">¶</a></dt>
+<dd><p>Delete the child object at an index. If the index is out of bounds, nothing happens.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="renderdoc.SDObject.RemoveChild.params.index"></span><strong>index</strong><a class="paramlink headerlink reference internal" href="#renderdoc.SDObject.RemoveChild.params.index">#</a> (<em>int</em>) – The index to remove.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDObject.data">
+<span class="sig-name descname"><span class="pre">data</span></span><a class="headerlink" href="#renderdoc.SDObject.data" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="#renderdoc.SDObjectData" title="renderdoc.SDObjectData"><code class="xref py py-class docutils literal notranslate"><span class="pre">SDObjectData</span></code></a> with the contents of this object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.SDObjectData" title="renderdoc.SDObjectData">SDObjectData</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDObject.name">
+<span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#renderdoc.SDObject.name" title="Permalink to this definition">¶</a></dt>
+<dd><p>The name of this object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>name</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDObject.type">
+<span class="sig-name descname"><span class="pre">type</span></span><a class="headerlink" href="#renderdoc.SDObject.type" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="#renderdoc.SDType" title="renderdoc.SDType"><code class="xref py py-class docutils literal notranslate"><span class="pre">SDType</span></code></a> of this object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.SDType" title="renderdoc.SDType">SDType</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.SDObjectData">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">SDObjectData</span></span><a class="headerlink" href="#renderdoc.SDObjectData" title="Permalink to this definition">¶</a></dt>
+<dd><p>The data inside an <a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject"><code class="xref py py-class docutils literal notranslate"><span class="pre">SDObject</span></code></a> whether it’s plain old data or complex children.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDObjectData.basic">
+<span class="sig-name descname"><span class="pre">basic</span></span><a class="headerlink" href="#renderdoc.SDObjectData.basic" title="Permalink to this definition">¶</a></dt>
+<dd><p>The plain-old data contents of the object, in a <a class="reference internal" href="#renderdoc.SDObjectPODData" title="renderdoc.SDObjectPODData"><code class="xref py py-class docutils literal notranslate"><span class="pre">SDObjectPODData</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>basic</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDObjectData.string">
+<span class="sig-name descname"><span class="pre">string</span></span><a class="headerlink" href="#renderdoc.SDObjectData.string" title="Permalink to this definition">¶</a></dt>
+<dd><p>The string contents of the object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.SDObjectPODData">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">SDObjectPODData</span></span><a class="headerlink" href="#renderdoc.SDObjectPODData" title="Permalink to this definition">¶</a></dt>
+<dd><p>The plain-old-data contents of an <a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject"><code class="xref py py-class docutils literal notranslate"><span class="pre">SDObject</span></code></a>.</p>
+<p>Only one member is valid, as defined by the type of the <a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject"><code class="xref py py-class docutils literal notranslate"><span class="pre">SDObject</span></code></a>.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDObjectPODData.b">
+<span class="sig-name descname"><span class="pre">b</span></span><a class="headerlink" href="#renderdoc.SDObjectPODData.b" title="Permalink to this definition">¶</a></dt>
+<dd><p>The value as a boolean.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDObjectPODData.c">
+<span class="sig-name descname"><span class="pre">c</span></span><a class="headerlink" href="#renderdoc.SDObjectPODData.c" title="Permalink to this definition">¶</a></dt>
+<dd><p>The value as a single byte character.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDObjectPODData.d">
+<span class="sig-name descname"><span class="pre">d</span></span><a class="headerlink" href="#renderdoc.SDObjectPODData.d" title="Permalink to this definition">¶</a></dt>
+<dd><p>The value as a floating point number.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDObjectPODData.i">
+<span class="sig-name descname"><span class="pre">i</span></span><a class="headerlink" href="#renderdoc.SDObjectPODData.i" title="Permalink to this definition">¶</a></dt>
+<dd><p>The value as a signed integer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDObjectPODData.id">
+<span class="sig-name descname"><span class="pre">id</span></span><a class="headerlink" href="#renderdoc.SDObjectPODData.id" title="Permalink to this definition">¶</a></dt>
+<dd><p>The value as a <a class="reference internal" href="resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a></p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDObjectPODData.u">
+<span class="sig-name descname"><span class="pre">u</span></span><a class="headerlink" href="#renderdoc.SDObjectPODData.u" title="Permalink to this definition">¶</a></dt>
+<dd><p>The value as an unsigned integer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="chunks">
+<h2><a class="toc-backref" href="#id3">Chunks</a><a class="headerlink" href="#chunks" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.SDChunk">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">SDChunk</span></span><a class="headerlink" href="#renderdoc.SDChunk" title="Permalink to this definition">¶</a></dt>
+<dd><p>Defines a single structured chunk, which is a <a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject"><code class="xref py py-class docutils literal notranslate"><span class="pre">SDObject</span></code></a>.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.SDChunk.Duplicate">
+<span class="sig-name descname"><span class="pre">Duplicate</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.SDChunk.Duplicate" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>A new deep copy of this chunk, which the caller owns.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p><a class="reference internal" href="#renderdoc.SDChunk" title="renderdoc.SDChunk">SDChunk</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDChunk.metadata">
+<span class="sig-name descname"><span class="pre">metadata</span></span><a class="headerlink" href="#renderdoc.SDChunk.metadata" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="#renderdoc.SDChunkMetaData" title="renderdoc.SDChunkMetaData"><code class="xref py py-class docutils literal notranslate"><span class="pre">SDChunkMetaData</span></code></a> with the metadata for this chunk.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.SDChunkMetaData" title="renderdoc.SDChunkMetaData">SDChunkMetaData</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.SDChunkMetaData">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">SDChunkMetaData</span></span><a class="headerlink" href="#renderdoc.SDChunkMetaData" title="Permalink to this definition">¶</a></dt>
+<dd><p>The metadata that goes along with a <a class="reference internal" href="#renderdoc.SDChunk" title="renderdoc.SDChunk"><code class="xref py py-class docutils literal notranslate"><span class="pre">SDChunk</span></code></a> to detail how it was recorded.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDChunkMetaData.callstack">
+<span class="sig-name descname"><span class="pre">callstack</span></span><a class="headerlink" href="#renderdoc.SDChunkMetaData.callstack" title="Permalink to this definition">¶</a></dt>
+<dd><p>The frames of the CPU-side callstack leading up to the chunk.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDChunkMetaData.chunkID">
+<span class="sig-name descname"><span class="pre">chunkID</span></span><a class="headerlink" href="#renderdoc.SDChunkMetaData.chunkID" title="Permalink to this definition">¶</a></dt>
+<dd><p>The internal chunk ID - unique given a particular driver in use.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDChunkMetaData.durationMicro">
+<span class="sig-name descname"><span class="pre">durationMicro</span></span><a class="headerlink" href="#renderdoc.SDChunkMetaData.durationMicro" title="Permalink to this definition">¶</a></dt>
+<dd><p>The duration in microseconds that this chunk took. This is the time for the actual
+work, not the serialising.
+Since 0 is a possible value for this (for extremely fast calls), -1 is the invalid/not present value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDChunkMetaData.flags">
+<span class="sig-name descname"><span class="pre">flags</span></span><a class="headerlink" href="#renderdoc.SDChunkMetaData.flags" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="#renderdoc.SDChunkFlags" title="renderdoc.SDChunkFlags"><code class="xref py py-class docutils literal notranslate"><span class="pre">SDChunkFlags</span></code></a> for this chunk.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.SDChunkFlags" title="renderdoc.SDChunkFlags">SDChunkFlags</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDChunkMetaData.length">
+<span class="sig-name descname"><span class="pre">length</span></span><a class="headerlink" href="#renderdoc.SDChunkMetaData.length" title="Permalink to this definition">¶</a></dt>
+<dd><p>The length in bytes of this chunk - may be longer than the actual sum of the data if a
+conservative size estimate was used on creation to avoid seeking to fix-up the stored length.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDChunkMetaData.threadID">
+<span class="sig-name descname"><span class="pre">threadID</span></span><a class="headerlink" href="#renderdoc.SDChunkMetaData.threadID" title="Permalink to this definition">¶</a></dt>
+<dd><p>The ID of the thread where this chunk was recorded.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDChunkMetaData.timestampMicro">
+<span class="sig-name descname"><span class="pre">timestampMicro</span></span><a class="headerlink" href="#renderdoc.SDChunkMetaData.timestampMicro" title="Permalink to this definition">¶</a></dt>
+<dd><p>The point in time when this chunk was recorded, in microseconds since program start.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.SDChunkFlags">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">SDChunkFlags</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.SDChunkFlags" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bitfield flags that could be applied to an <a class="reference internal" href="#renderdoc.SDChunk" title="renderdoc.SDChunk"><code class="xref py py-class docutils literal notranslate"><span class="pre">SDChunk</span></code></a>.</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDChunkFlags.NoFlags">
+<span class="sig-name descname"><span class="pre">NoFlags</span></span><a class="headerlink" href="#renderdoc.SDChunkFlags.NoFlags" title="Permalink to this definition">¶</a></dt>
+<dd><p>This chunk has no special properties.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDChunkFlags.OpaqueChunk">
+<span class="sig-name descname"><span class="pre">OpaqueChunk</span></span><a class="headerlink" href="#renderdoc.SDChunkFlags.OpaqueChunk" title="Permalink to this definition">¶</a></dt>
+<dd><p>This chunk wasn’t supported for decoding or was skipped for another reason and was detailed as
+an opaque byte stream. It should be preserved as-is and will remain in native RDC format.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.SDChunkFlags.HasCallstack">
+<span class="sig-name descname"><span class="pre">HasCallstack</span></span><a class="headerlink" href="#renderdoc.SDChunkFlags.HasCallstack" title="Permalink to this definition">¶</a></dt>
+<dd><p>This chunk has a callstack. Used to indicate the presence of a callstack even if it’s empty
+(perhaps due to failure to collect the stack frames).</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="structured-file">
+<h2><a class="toc-backref" href="#id4">Structured File</a><a class="headerlink" href="#structured-file" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.SDFile">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">SDFile</span></span><a class="headerlink" href="#renderdoc.SDFile" title="Permalink to this definition">¶</a></dt>
+<dd><p>Contains the structured information in a file. Owns the buffers and chunks.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.SDFile.Swap">
+<span class="sig-name descname"><span class="pre">Swap</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">other</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.SDFile.Swap" title="Permalink to this definition">¶</a></dt>
+<dd><p>Swaps the contents of this file with another.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="renderdoc.SDFile.Swap.params.other"></span><strong>other</strong><a class="paramlink headerlink reference internal" href="#renderdoc.SDFile.Swap.params.other">#</a> (<a class="reference internal" href="#renderdoc.SDFile" title="renderdoc.SDFile"><em>SDFile</em></a>) – The other file to swap with.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDFile.buffers">
+<span class="sig-name descname"><span class="pre">buffers</span></span><a class="headerlink" href="#renderdoc.SDFile.buffers" title="Permalink to this definition">¶</a></dt>
+<dd><p>The buffers in the file, as referenced by the chunks in <a class="reference internal" href="#renderdoc.SDFile.chunks" title="renderdoc.SDFile.chunks"><code class="xref py py-data docutils literal notranslate"><span class="pre">chunks</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[bytes]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDFile.chunks">
+<span class="sig-name descname"><span class="pre">chunks</span></span><a class="headerlink" href="#renderdoc.SDFile.chunks" title="Permalink to this definition">¶</a></dt>
+<dd><p>The chunks in the file in order.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="#renderdoc.SDChunk" title="renderdoc.SDChunk">SDChunk</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.SDFile.version">
+<span class="sig-name descname"><span class="pre">version</span></span><a class="headerlink" href="#renderdoc.SDFile.version" title="Permalink to this definition">¶</a></dt>
+<dd><p>The version of this structured stream, typically only used internally.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="creation-helper-functions">
+<h2><a class="toc-backref" href="#id5">Creation Helper Functions</a><a class="headerlink" href="#creation-helper-functions" title="Permalink to this headline">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="renderdoc.makeSDArray">
+<span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">makeSDArray</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.makeSDArray" title="Permalink to this definition">¶</a></dt>
+<dd><p>Make a structured object which is an array.</p>
+<p>The array will be created empty, and new members can be added using methods on <a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject"><code class="xref py py-class docutils literal notranslate"><span class="pre">SDObject</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="renderdoc.makeSDArray.params.name"></span><strong>name</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDArray.params.name">#</a> (<em>str</em>) – The name of the object.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The new object, owner by the caller.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject">SDObject</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="renderdoc.makeSDBool">
+<span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">makeSDBool</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">val</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.makeSDBool" title="Permalink to this definition">¶</a></dt>
+<dd><p>Make a structured object as a boolean value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="renderdoc.makeSDBool.params.name"></span><strong>name</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDBool.params.name">#</a> (<em>str</em>) – The name of the object.</p></li>
+<li><p><span class="target" id="renderdoc.makeSDBool.params.val"></span><strong>val</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDBool.params.val">#</a> (<em>bool</em>) – The bool which will be stored in the returned object.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The new object, owner by the caller.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject">SDObject</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="renderdoc.makeSDEnum">
+<span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">makeSDEnum</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">val</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.makeSDEnum" title="Permalink to this definition">¶</a></dt>
+<dd><p>Make a structured object as an enum value.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The enum will be stored just as an integer value, but the string name of the enumeration value can
+be set with <code class="xref py py-meth docutils literal notranslate"><span class="pre">SDObject.SetCustomString()</span></code> if desired.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="renderdoc.makeSDEnum.params.name"></span><strong>name</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDEnum.params.name">#</a> (<em>str</em>) – The name of the object.</p></li>
+<li><p><span class="target" id="renderdoc.makeSDEnum.params.val"></span><strong>val</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDEnum.params.val">#</a> (<em>int</em>) – The integer value of the enum itself.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The new object, owner by the caller.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject">SDObject</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="renderdoc.makeSDFloat">
+<span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">makeSDFloat</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">val</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.makeSDFloat" title="Permalink to this definition">¶</a></dt>
+<dd><p>Make a structured object as a 32-bit float.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>You should ensure that the value you pass in has already been truncated to the appropriate range
+for the storage, as the resulting object will be undefined if the value is out of the valid range.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="renderdoc.makeSDFloat.params.name"></span><strong>name</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDFloat.params.name">#</a> (<em>str</em>) – The name of the object.</p></li>
+<li><p><span class="target" id="renderdoc.makeSDFloat.params.val"></span><strong>val</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDFloat.params.val">#</a> (<em>float</em>) – The float which will be stored in the returned object.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The new object, owner by the caller.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject">SDObject</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="renderdoc.makeSDInt32">
+<span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">makeSDInt32</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">val</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.makeSDInt32" title="Permalink to this definition">¶</a></dt>
+<dd><p>Make a structured object as a signed 32-bit integer.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>You should ensure that the value you pass in has already been truncated to the appropriate range
+for the storage, as the resulting object will be undefined if the value is out of the valid range.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="renderdoc.makeSDInt32.params.name"></span><strong>name</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDInt32.params.name">#</a> (<em>str</em>) – The name of the object.</p></li>
+<li><p><span class="target" id="renderdoc.makeSDInt32.params.val"></span><strong>val</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDInt32.params.val">#</a> (<em>int</em>) – The integer which will be stored in the returned object.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The new object, owner by the caller.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject">SDObject</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="renderdoc.makeSDInt64">
+<span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">makeSDInt64</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">val</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.makeSDInt64" title="Permalink to this definition">¶</a></dt>
+<dd><p>Make a structured object as a signed 64-bit integer.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>You should ensure that the value you pass in has already been truncated to the appropriate range
+for the storage, as the resulting object will be undefined if the value is out of the valid range.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="renderdoc.makeSDInt64.params.name"></span><strong>name</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDInt64.params.name">#</a> (<em>str</em>) – The name of the object.</p></li>
+<li><p><span class="target" id="renderdoc.makeSDInt64.params.val"></span><strong>val</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDInt64.params.val">#</a> (<em>int</em>) – The integer which will be stored in the returned object.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The new object, owner by the caller.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject">SDObject</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="renderdoc.makeSDResourceId">
+<span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">makeSDResourceId</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">val</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.makeSDResourceId" title="Permalink to this definition">¶</a></dt>
+<dd><p>Make a structured object as a ResourceId value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="renderdoc.makeSDResourceId.params.name"></span><strong>name</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDResourceId.params.name">#</a> (<em>str</em>) – The name of the object.</p></li>
+<li><p><span class="target" id="renderdoc.makeSDResourceId.params.val"></span><strong>val</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDResourceId.params.val">#</a> (<a class="reference internal" href="resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><em>ResourceId</em></a>) – The ID which will be stored in the returned object.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The new object, owner by the caller.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject">SDObject</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="renderdoc.makeSDString">
+<span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">makeSDString</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">val</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.makeSDString" title="Permalink to this definition">¶</a></dt>
+<dd><p>Make a structured object as a string value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="renderdoc.makeSDString.params.name"></span><strong>name</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDString.params.name">#</a> (<em>str</em>) – The name of the object.</p></li>
+<li><p><span class="target" id="renderdoc.makeSDString.params.val"></span><strong>val</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDString.params.val">#</a> (<em>str</em>) – The string which will be stored in the returned object.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The new object, owner by the caller.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject">SDObject</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="renderdoc.makeSDStruct">
+<span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">makeSDStruct</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">structtype</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.makeSDStruct" title="Permalink to this definition">¶</a></dt>
+<dd><p>Make a structured object which is a struct.</p>
+<p>The struct will be created empty, and new members can be added using methods on <a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject"><code class="xref py py-class docutils literal notranslate"><span class="pre">SDObject</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="renderdoc.makeSDStruct.params.name"></span><strong>name</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDStruct.params.name">#</a> (<em>str</em>) – The name of the object.</p></li>
+<li><p><span class="target" id="renderdoc.makeSDStruct.params.structtype"></span><strong>structtype</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDStruct.params.structtype">#</a> (<em>str</em>) – The typename of the struct.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The new object, owner by the caller.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject">SDObject</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="renderdoc.makeSDUInt32">
+<span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">makeSDUInt32</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">val</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.makeSDUInt32" title="Permalink to this definition">¶</a></dt>
+<dd><p>Make a structured object as an unsigned 32-bit integer.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>You should ensure that the value you pass in has already been truncated to the appropriate range
+for the storage, as the resulting object will be undefined if the value is out of the valid range.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="renderdoc.makeSDUInt32.params.name"></span><strong>name</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDUInt32.params.name">#</a> (<em>str</em>) – The name of the object.</p></li>
+<li><p><span class="target" id="renderdoc.makeSDUInt32.params.val"></span><strong>val</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDUInt32.params.val">#</a> (<em>int</em>) – The integer which will be stored in the returned object.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The new object, owner by the caller.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject">SDObject</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="renderdoc.makeSDUInt64">
+<span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">makeSDUInt64</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">val</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.makeSDUInt64" title="Permalink to this definition">¶</a></dt>
+<dd><p>Make a structured object as an unsigned 64-bit integer.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>You should ensure that the value you pass in has already been truncated to the appropriate range
+for the storage, as the resulting object will be undefined if the value is out of the valid range.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="renderdoc.makeSDUInt64.params.name"></span><strong>name</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDUInt64.params.name">#</a> (<em>str</em>) – The name of the object.</p></li>
+<li><p><span class="target" id="renderdoc.makeSDUInt64.params.val"></span><strong>val</strong><a class="paramlink headerlink reference internal" href="#renderdoc.makeSDUInt64.params.val">#</a> (<em>int</em>) – The integer which will be stored in the returned object.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The new object, owner by the caller.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.SDObject" title="renderdoc.SDObject">SDObject</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="counters.html" class="btn btn-neutral float-right" title="API Reference: Performance Counters" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="pipelines/common.html" class="btn btn-neutral float-left" title="API Reference: Common Pipeline State Abstraction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

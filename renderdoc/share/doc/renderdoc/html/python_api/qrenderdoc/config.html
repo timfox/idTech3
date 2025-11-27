@@ -1,0 +1,1398 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>API Reference: qrenderdoc Persistant Config &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/python_api/qrenderdoc/config.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="How do I …?" href="../../how/index.html" />
+    <link rel="prev" title="API Reference: qrenderdoc Windows" href="windows.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../examples/renderdoc_intro.html">Getting Started (python)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/qrenderdoc_intro.html">Getting Started (RenderDoc UI)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dev_environment.html">Python development environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui_extensions.html">Writing UI extensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../descriptors_bindings.html">Descriptors and Bindings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/basics.html">Basic Interfaces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/renderdoc/index.html">renderdoc Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/qrenderdoc/index.html">qrenderdoc examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../renderdoc/index.html">renderdoc python module</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">qrenderdoc python module</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="main.html">API Reference: qrenderdoc Main Interfaces</a></li>
+<li class="toctree-l3"><a class="reference internal" href="extensions.html">API Reference: qrenderdoc UI Extensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="windows.html">API Reference: qrenderdoc Windows</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">API Reference: qrenderdoc Persistant Config</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#config">Config</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#shader-processing">Shader Processing</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#bug-reports">Bug Reports</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#remote-host">Remote Host</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../how/index.html">How do I …?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../index.html">Python API</a> &raquo;</li>
+        
+          <li><a href="index.html">qrenderdoc python module</a> &raquo;</li>
+        
+      <li>API Reference: qrenderdoc Persistant Config</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/python_api/qrenderdoc/config.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="api-reference-qrenderdoc-persistant-config">
+<h1>API Reference: qrenderdoc Persistant Config<a class="headerlink" href="#api-reference-qrenderdoc-persistant-config" title="Permalink to this headline">¶</a></h1>
+<p>This is the API reference for the functions, classes, and enums in the <code class="docutils literal notranslate"><span class="pre">qrenderdoc</span></code> module which represents the UI-specific interface for integrating with the UI and writing UI extensions. For more high-level information and instructions on using the python API, see <a class="reference internal" href="../index.html"><span class="doc">Python API</span></a> and <a class="reference internal" href="../ui_extensions.html"><span class="doc">Writing UI extensions</span></a>.</p>
+<div class="contents local topic" id="sections">
+<p class="topic-title">Sections</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#config" id="id1">Config</a></p></li>
+<li><p><a class="reference internal" href="#shader-processing" id="id2">Shader Processing</a></p></li>
+<li><p><a class="reference internal" href="#bug-reports" id="id3">Bug Reports</a></p></li>
+<li><p><a class="reference internal" href="#remote-host" id="id4">Remote Host</a></p></li>
+</ul>
+</div>
+<section id="config">
+<h2><a class="toc-backref" href="#id1">Config</a><a class="headerlink" href="#config" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qrenderdoc.</span></span><span class="sig-name descname"><span class="pre">PersistantConfig</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig" title="Permalink to this definition">¶</a></dt>
+<dd><p>A persistant config file that is automatically loaded and saved, which contains any
+settings and information that needs to be preserved from one run to the next.</p>
+<p>The config is retrieved by calling <a class="reference internal" href="main.html#qrenderdoc.CaptureContext.Config" title="qrenderdoc.CaptureContext.Config"><code class="xref py py-meth docutils literal notranslate"><span class="pre">CaptureContext.Config()</span></code></a>.</p>
+<p>For more information about some of these settings that are user-facing see
+<a class="reference internal" href="../../window/settings_window.html#id1"><span class="std std-ref">the documentation for the settings window</span></a>.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.AddRemoteHost">
+<span class="sig-name descname"><span class="pre">AddRemoteHost</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">host</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.PersistantConfig.AddRemoteHost" title="Permalink to this definition">¶</a></dt>
+<dd><p>Adds a new remote host.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.PersistantConfig.AddRemoteHost.params.host"></span><strong>host</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.PersistantConfig.AddRemoteHost.params.host">#</a> (<a class="reference internal" href="#qrenderdoc.RemoteHost" title="qrenderdoc.RemoteHost"><em>RemoteHost</em></a>) – The remote host to add.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.AllowGlobalHook">
+<span class="sig-name descname"><span class="pre">AllowGlobalHook</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.AllowGlobalHook" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if global hooking is enabled. Since it has potentially problematic side-effects and is dangerous, it requires explicit opt-in.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.:type: bool</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.AllowProcessInject">
+<span class="sig-name descname"><span class="pre">AllowProcessInject</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.AllowProcessInject" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if process injection is enabled. Since it can often break and is almost always not want users want to do. New users can get confused by it being there and go to it first.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.:type: bool</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.AlwaysLoad_Extensions">
+<span class="sig-name descname"><span class="pre">AlwaysLoad_Extensions</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.AlwaysLoad_Extensions" title="Permalink to this definition">¶</a></dt>
+<dd><p>A list of strings with extension packages to always load on startup, without needing manual enabling.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.AlwaysReplayLocally">
+<span class="sig-name descname"><span class="pre">AlwaysReplayLocally</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.AlwaysReplayLocally" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if when loading a capture that was originally captured on a remote device but uses an API that can be supported locally, should be loaded locally without prompting to switch to a remote context.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.:type: bool</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.Analytics_ManualCheck">
+<span class="sig-name descname"><span class="pre">Analytics_ManualCheck</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.Analytics_ManualCheck" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the user has remained with analytics turned on, but has chosen to manually check each report that is sent out.
+collection and reporting.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.:type: bool</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.Analytics_TotalOptOut">
+<span class="sig-name descname"><span class="pre">Analytics_TotalOptOut</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.Analytics_TotalOptOut" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the user has selected to completely opt-out from and disable all analytics collection and reporting.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.:type: bool</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.BufferFormatter_SavedFormats">
+<span class="sig-name descname"><span class="pre">BufferFormatter_SavedFormats</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.BufferFormatter_SavedFormats" title="Permalink to this definition">¶</a></dt>
+<dd><p>A list of strings with saved formats for the buffer formatter. The first line is the name and the rest of the contents are the formats.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.CheckUpdate_AllowChecks">
+<span class="sig-name descname"><span class="pre">CheckUpdate_AllowChecks</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.CheckUpdate_AllowChecks" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the UI should be allowed to make update checks remotely to see if a new version is available.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.:type: bool</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.CheckUpdate_CurrentVersion">
+<span class="sig-name descname"><span class="pre">CheckUpdate_CurrentVersion</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.CheckUpdate_CurrentVersion" title="Permalink to this definition">¶</a></dt>
+<dd><p>The current version at the time of update checks. Used to determine if a cached pending update is no longer valid because we got updated through some other method.:type: str</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.CheckUpdate_LastUpdate">
+<span class="sig-name descname"><span class="pre">CheckUpdate_LastUpdate</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.CheckUpdate_LastUpdate" title="Permalink to this definition">¶</a></dt>
+<dd><p>A date containing the last time that update checks happened.:type: datetime</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.CheckUpdate_UpdateAvailable">
+<span class="sig-name descname"><span class="pre">CheckUpdate_UpdateAvailable</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.CheckUpdate_UpdateAvailable" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if an update to a newer version is currently available.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.:type: bool</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.CheckUpdate_UpdateResponse">
+<span class="sig-name descname"><span class="pre">CheckUpdate_UpdateResponse</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.CheckUpdate_UpdateResponse" title="Permalink to this definition">¶</a></dt>
+<dd><p>Contains the response from the update server from the last update check, with any release notes for the new version.:type: str</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.Close">
+<span class="sig-name descname"><span class="pre">Close</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.PersistantConfig.Close" title="Permalink to this definition">¶</a></dt>
+<dd><p>Closes the config file so that subsequent calls to Save() will not write to disk at
+the file the config was loaded from.</p>
+<p>This function is rarely directly used, except in the case where RenderDoc is relaunching itself and
+wants to avoid file locking conflicts between the closing instance saving, and the loading instance
+loading. It can explicitly save and close before relaunching.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.Comments_ShowOnLoad">
+<span class="sig-name descname"><span class="pre">Comments_ShowOnLoad</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.Comments_ShowOnLoad" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if when loading a new capture that contains a comments section, the comment viewer will be opened and focussed.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.:type: bool</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.CrashReport_EmailAddress">
+<span class="sig-name descname"><span class="pre">CrashReport_EmailAddress</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.CrashReport_EmailAddress" title="Permalink to this definition">¶</a></dt>
+<dd><p>The saved email address for pre-filling out in crash reports.:type: str</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.CrashReport_EmailNagged">
+<span class="sig-name descname"><span class="pre">CrashReport_EmailNagged</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.CrashReport_EmailNagged" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the user has been prompted to enter their email address on a crash report. This really helps find fixes for bugs, so we prompt the user once only if they didn’t enter an email. Once the prompt has happened, regardless of the answer this is set to true and remains there forever.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.:type: bool</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.CrashReport_LastOpenedCapture">
+<span class="sig-name descname"><span class="pre">CrashReport_LastOpenedCapture</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.CrashReport_LastOpenedCapture" title="Permalink to this definition">¶</a></dt>
+<dd><p>The last opened capture, to send if any crash is encountered. This is different to the most recent opened file, because it’s set before any processing happens (recent files are only added to the list when they successfully open), and it’s cleared again when the capture is closed.:type: str</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.CrashReport_ReportedBugs">
+<span class="sig-name descname"><span class="pre">CrashReport_ReportedBugs</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.CrashReport_ReportedBugs" title="Permalink to this definition">¶</a></dt>
+<dd><p>A list of <a class="reference internal" href="#qrenderdoc.BugReport" title="qrenderdoc.BugReport"><code class="xref py py-class docutils literal notranslate"><span class="pre">BugReport</span></code></a> detailing previously submitted bugs that we’re watching for updates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="#qrenderdoc.BugReport" title="qrenderdoc.BugReport">BugReport</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.CrashReport_ShouldRememberEmail">
+<span class="sig-name descname"><span class="pre">CrashReport_ShouldRememberEmail</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.CrashReport_ShouldRememberEmail" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the email address entered in the crash reporter should be remembered for next time. If no email is entered then nothing happens (any previous saved email is kept).</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.:type: bool</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.DefaultCaptureSaveDirectory">
+<span class="sig-name descname"><span class="pre">DefaultCaptureSaveDirectory</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.DefaultCaptureSaveDirectory" title="Permalink to this definition">¶</a></dt>
+<dd><p>The default path to save captures in, when browsing to save a temporary capture somewhere.:type: str</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.DefaultReplayOptions">
+<span class="sig-name descname"><span class="pre">DefaultReplayOptions</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.DefaultReplayOptions" title="Permalink to this definition">¶</a></dt>
+<dd><p>A <code class="xref py py-class docutils literal notranslate"><span class="pre">ReplayOptions</span></code> containing the configured default replay options to use in most scenarios when no specific options are given.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../renderdoc/replay.html#renderdoc.ReplayOptions" title="renderdoc.ReplayOptions">renderdoc.ReplayOptions</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.DegradedCapture_LastUpdate">
+<span class="sig-name descname"><span class="pre">DegradedCapture_LastUpdate</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.DegradedCapture_LastUpdate" title="Permalink to this definition">¶</a></dt>
+<dd><p>A date containing the last time that the user was warned about captures being loaded in degraded support. This prevents the user being spammed if their hardware is low spec.:type: datetime</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.EventBrowser_AddFake">
+<span class="sig-name descname"><span class="pre">EventBrowser_AddFake</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.EventBrowser_AddFake" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if fake action marker regions should be added to captures that don’t have any markers, for easier browsing. The regions are identified by grouping actions that write to the same targets together.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.:type: bool</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.EventBrowser_ApplyColors">
+<span class="sig-name descname"><span class="pre">EventBrowser_ApplyColors</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.EventBrowser_ApplyColors" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the <a class="reference internal" href="windows.html#qrenderdoc.EventBrowser" title="qrenderdoc.EventBrowser"><code class="xref py py-class docutils literal notranslate"><span class="pre">EventBrowser</span></code></a> should apply any colors specified with API marker regions.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.:type: bool</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.EventBrowser_ColorEventRow">
+<span class="sig-name descname"><span class="pre">EventBrowser_ColorEventRow</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.EventBrowser_ColorEventRow" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if when coloring marker regions in the <a class="reference internal" href="windows.html#qrenderdoc.EventBrowser" title="qrenderdoc.EventBrowser"><code class="xref py py-class docutils literal notranslate"><span class="pre">EventBrowser</span></code></a>, the whole row should be colored instead of just a side-bar.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">True</span></code>.:type: bool</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.EventBrowser_TimeUnit">
+<span class="sig-name descname"><span class="pre">EventBrowser_TimeUnit</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.EventBrowser_TimeUnit" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="#qrenderdoc.TimeUnit" title="qrenderdoc.TimeUnit"><code class="xref py py-class docutils literal notranslate"><span class="pre">TimeUnit</span></code></a> to use to display the duration column in the <a class="reference internal" href="windows.html#qrenderdoc.EventBrowser" title="qrenderdoc.EventBrowser"><code class="xref py py-class docutils literal notranslate"><span class="pre">EventBrowser</span></code></a>.</p>
+<p>Defaults to microseconds.:type: TimeUnit</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.ExternalTool_RadeonGPUProfiler">
+<span class="sig-name descname"><span class="pre">ExternalTool_RadeonGPUProfiler</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.ExternalTool_RadeonGPUProfiler" title="Permalink to this definition">¶</a></dt>
+<dd><p>The path to the executable of the external Radeon GPU Profiler tool.:type: str</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.Font_Family">
+<span class="sig-name descname"><span class="pre">Font_Family</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.Font_Family" title="Permalink to this definition">¶</a></dt>
+<dd><p>The font family to use in the UI.</p>
+<p>Defaults to an empty string which means to use the system default.:type: str</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.Font_GlobalScale">
+<span class="sig-name descname"><span class="pre">Font_GlobalScale</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.Font_GlobalScale" title="Permalink to this definition">¶</a></dt>
+<dd><p>The global scale to apply to fonts in the application, expressed as a float.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">1.0</span></code> which means 100%.:type: float</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.Font_MonoFamily">
+<span class="sig-name descname"><span class="pre">Font_MonoFamily</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.Font_MonoFamily" title="Permalink to this definition">¶</a></dt>
+<dd><p>The monospaced font family to use in the UI.</p>
+<p>Defaults to an empty string which means to use the system default.:type: str</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.Font_PreferMonospaced">
+<span class="sig-name descname"><span class="pre">Font_PreferMonospaced</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.Font_PreferMonospaced" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if a monospaced font should be used in all places where data is displayed, even if the data is not tabular such as names.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.:type: bool</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.Formatter_MaxFigures">
+<span class="sig-name descname"><span class="pre">Formatter_MaxFigures</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.Formatter_MaxFigures" title="Permalink to this definition">¶</a></dt>
+<dd><p>The maximum number of decimal places to show in formatted floating point values.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The naming of ‘MaxFigures’ is a historical artifact - this controls the number of   decimal places only, not the number of significant figures.</p>
+</div>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">5</span></code>.:type: int</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.Formatter_MinFigures">
+<span class="sig-name descname"><span class="pre">Formatter_MinFigures</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.Formatter_MinFigures" title="Permalink to this definition">¶</a></dt>
+<dd><p>The minimum number of decimal places to show in formatted floating point values.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The naming of ‘MinFigures’ is a historical artifact - this controls the number of   decimal places only, not the number of significant figures.</p>
+</div>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">2</span></code>.:type: int</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.Formatter_NegExp">
+<span class="sig-name descname"><span class="pre">Formatter_NegExp</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.Formatter_NegExp" title="Permalink to this definition">¶</a></dt>
+<dd><p>The cut-off on negative exponents of a normalised values to display using scientific notation.</p>
+<p>E.g. for a value of 5, anything below 1.0e-5 will be displayed using scientific notation.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">5</span></code>.:type: int</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.Formatter_OffsetSizeDisplayMode">
+<span class="sig-name descname"><span class="pre">Formatter_OffsetSizeDisplayMode</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.Formatter_OffsetSizeDisplayMode" title="Permalink to this definition">¶</a></dt>
+<dd><p>The formatting mode to use for values marked as Offsets or Sizes.</p>
+<p>E.g. Auto: decimal by default and hexadecimal if above a certain threshold, Decimal: always use decimal, Hexadecimal: always use hexadecimal.
+Defaults to <code class="docutils literal notranslate"><span class="pre">Auto</span></code>.:type: OffsetSizeDisplayMode</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.Formatter_PosExp">
+<span class="sig-name descname"><span class="pre">Formatter_PosExp</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.Formatter_PosExp" title="Permalink to this definition">¶</a></dt>
+<dd><p>The cut-off on positive exponents of a normalised values to display using scientific notation.</p>
+<p>E.g. for a value of 7, anything below 1.0e+7 will be displayed using scientific notation.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">7</span></code>.:type: int</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.GetRemoteHost">
+<span class="sig-name descname"><span class="pre">GetRemoteHost</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">hostname</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.PersistantConfig.GetRemoteHost" title="Permalink to this definition">¶</a></dt>
+<dd><p>Look up a remote host by hostname.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.PersistantConfig.GetRemoteHost.params.hostname"></span><strong>hostname</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.PersistantConfig.GetRemoteHost.params.hostname">#</a> (<em>str</em>) – The hostname to look up</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The remote host for the given hostname, or an invalid <code class="docutils literal notranslate"><span class="pre">RemoteHost</span></code> if no such exists.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#qrenderdoc.RemoteHost" title="qrenderdoc.RemoteHost">RemoteHost</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.GetRemoteHosts">
+<span class="sig-name descname"><span class="pre">GetRemoteHosts</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.PersistantConfig.GetRemoteHosts" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a list of all remote hosts.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The remote host list</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>List[<a class="reference internal" href="#qrenderdoc.RemoteHost" title="qrenderdoc.RemoteHost">RemoteHost</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.LastCaptureExe">
+<span class="sig-name descname"><span class="pre">LastCaptureExe</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.LastCaptureExe" title="Permalink to this definition">¶</a></dt>
+<dd><p>The filename of the last executable that was captured, inside <a class="reference internal" href="#qrenderdoc.PersistantConfig.LastCapturePath" title="qrenderdoc.PersistantConfig.LastCapturePath"><code class="xref py py-data docutils literal notranslate"><span class="pre">LastCapturePath</span></code></a>.:type: str</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.LastCaptureFilePath">
+<span class="sig-name descname"><span class="pre">LastCaptureFilePath</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.LastCaptureFilePath" title="Permalink to this definition">¶</a></dt>
+<dd><p>The path to the last capture to be opened, which is useful as a default location for browsing.:type: str</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.LastCapturePath">
+<span class="sig-name descname"><span class="pre">LastCapturePath</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.LastCapturePath" title="Permalink to this definition">¶</a></dt>
+<dd><p>The path containing the last executable that was captured, which is useful as a default location for browsing.:type: str</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.LastFileBrowsePath">
+<span class="sig-name descname"><span class="pre">LastFileBrowsePath</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.LastFileBrowsePath" title="Permalink to this definition">¶</a></dt>
+<dd><p>The path to the last file browsed to in any dialog. Used as a default location for all file browsers without another explicit default directory (such as opening capture files - see <a class="reference internal" href="#qrenderdoc.PersistantConfig.LastCaptureFilePath" title="qrenderdoc.PersistantConfig.LastCaptureFilePath"><code class="xref py py-data docutils literal notranslate"><span class="pre">LastCaptureFilePath</span></code></a>).:type: str</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.Load">
+<span class="sig-name descname"><span class="pre">Load</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.PersistantConfig.Load" title="Permalink to this definition">¶</a></dt>
+<dd><p>Loads the config from a given filename. This happens automatically on startup, so it’s
+not recommended that you call this function manually.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.PersistantConfig.Load.params.filename"></span><strong>filename</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.PersistantConfig.Load.params.filename">#</a> (<em>str</em>) – The filename to load from</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A boolean status if the load was successful.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.LocalProxyAPI">
+<span class="sig-name descname"><span class="pre">LocalProxyAPI</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.LocalProxyAPI" title="Permalink to this definition">¶</a></dt>
+<dd><p>The index of the local proxy API to use when using remote context replay. <code class="docutils literal notranslate"><span class="pre">-1</span></code> if the default proxy should be used.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">-1</span></code>.:type: int</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.RecentCaptureFiles">
+<span class="sig-name descname"><span class="pre">RecentCaptureFiles</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.RecentCaptureFiles" title="Permalink to this definition">¶</a></dt>
+<dd><p>The recently opened capture files.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.RecentCaptureSettings">
+<span class="sig-name descname"><span class="pre">RecentCaptureSettings</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.RecentCaptureSettings" title="Permalink to this definition">¶</a></dt>
+<dd><p>The recently opened capture settings files.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.RemoveRemoteHost">
+<span class="sig-name descname"><span class="pre">RemoveRemoteHost</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">host</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.PersistantConfig.RemoveRemoteHost" title="Permalink to this definition">¶</a></dt>
+<dd><p>Removes an existing remote host.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.PersistantConfig.RemoveRemoteHost.params.host"></span><strong>host</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.PersistantConfig.RemoveRemoteHost.params.host">#</a> (<a class="reference internal" href="#qrenderdoc.RemoteHost" title="qrenderdoc.RemoteHost"><em>RemoteHost</em></a>) – The remote host to remove.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.Save">
+<span class="sig-name descname"><span class="pre">Save</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.PersistantConfig.Save" title="Permalink to this definition">¶</a></dt>
+<dd><p>Saves the config to disk. This can happen if you want to be sure a setting has been
+propagated and will not be forgotten in the case of crash or otherwise unexpected exit.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>A boolean status if the save was successful.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.SetStyle">
+<span class="sig-name descname"><span class="pre">SetStyle</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.PersistantConfig.SetStyle" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sets the UI style to the value in <a class="reference internal" href="#qrenderdoc.PersistantConfig.UIStyle" title="qrenderdoc.PersistantConfig.UIStyle"><code class="xref py py-data docutils literal notranslate"><span class="pre">UIStyle</span></code></a>.</p>
+<p>Changing the style after the application has started may not properly update everything, so to be
+sure the new style is applied, the application should be restarted.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the style was set successfully, <code class="docutils literal notranslate"><span class="pre">False</span></code> if there was a problem e.g. the value
+of <a class="reference internal" href="#qrenderdoc.PersistantConfig.UIStyle" title="qrenderdoc.PersistantConfig.UIStyle"><code class="xref py py-data docutils literal notranslate"><span class="pre">UIStyle</span></code></a> was unrecognised or empty.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.SetupFormatting">
+<span class="sig-name descname"><span class="pre">SetupFormatting</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.PersistantConfig.SetupFormatting" title="Permalink to this definition">¶</a></dt>
+<dd><p>Configures the <code class="xref py py-class docutils literal notranslate"><span class="pre">Formatter</span></code> class with the settings from this config.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.ShaderProcessors">
+<span class="sig-name descname"><span class="pre">ShaderProcessors</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.ShaderProcessors" title="Permalink to this definition">¶</a></dt>
+<dd><p>A list of <a class="reference internal" href="#qrenderdoc.ShaderProcessingTool" title="qrenderdoc.ShaderProcessingTool"><code class="xref py py-class docutils literal notranslate"><span class="pre">ShaderProcessingTool</span></code></a> detailing shader processing programs. The list comes in priority order, with earlier processors preferred over later ones.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="#qrenderdoc.ShaderProcessingTool" title="qrenderdoc.ShaderProcessingTool">ShaderProcessingTool</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.TemporaryCaptureDirectory">
+<span class="sig-name descname"><span class="pre">TemporaryCaptureDirectory</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.TemporaryCaptureDirectory" title="Permalink to this definition">¶</a></dt>
+<dd><p>The path to where temporary capture files should be stored until they’re saved permanently.:type: str</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.TextureViewer_PerTexSettings">
+<span class="sig-name descname"><span class="pre">TextureViewer_PerTexSettings</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.TextureViewer_PerTexSettings" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the <a class="reference internal" href="windows.html#qrenderdoc.TextureViewer" title="qrenderdoc.TextureViewer"><code class="xref py py-class docutils literal notranslate"><span class="pre">TextureViewer</span></code></a> should store most visualisation settings on a per-texture basis instead of keeping it persistent across different textures.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Defaults to True.:type<code class="docutils literal notranslate"><span class="pre">True</span></code>.:type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.TextureViewer_PerTexYFlip">
+<span class="sig-name descname"><span class="pre">TextureViewer_PerTexYFlip</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.TextureViewer_PerTexYFlip" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the <a class="reference internal" href="windows.html#qrenderdoc.TextureViewer" title="qrenderdoc.TextureViewer"><code class="xref py py-class docutils literal notranslate"><span class="pre">TextureViewer</span></code></a> should treat y-flipping as a per-texture state rather than a global toggle.</p>
+<p>Does nothing if per-texture settings are disabled in general.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.:type: bool</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.TextureViewer_ResetRange">
+<span class="sig-name descname"><span class="pre">TextureViewer_ResetRange</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.TextureViewer_ResetRange" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the <a class="reference internal" href="windows.html#qrenderdoc.TextureViewer" title="qrenderdoc.TextureViewer"><code class="xref py py-class docutils literal notranslate"><span class="pre">TextureViewer</span></code></a> should reset the visible range when a new texture is selected.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Defaults to False.:type<code class="docutils literal notranslate"><span class="pre">False</span></code>.:type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.TextureViewer_ShaderDirs">
+<span class="sig-name descname"><span class="pre">TextureViewer_ShaderDirs</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.TextureViewer_ShaderDirs" title="Permalink to this definition">¶</a></dt>
+<dd><p>List of the directories containing custom shader files for the Texture Viewer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[str]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.Tips_HasSeenFirst">
+<span class="sig-name descname"><span class="pre">Tips_HasSeenFirst</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.Tips_HasSeenFirst" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the user has seen the first tip, which should always be shown first before randomising.</p>
+<p>Defaults to <code class="docutils literal notranslate"><span class="pre">False</span></code>.:type: bool</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.UIStyle">
+<span class="sig-name descname"><span class="pre">UIStyle</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.UIStyle" title="Permalink to this definition">¶</a></dt>
+<dd><p>The style to load for the UI. Possible values include ‘Native’, ‘RDLight’, ‘RDDark’. If empty, the closest of RDLight and RDDark will be chosen, based on the overall light-on-dark or dark-on-light theme of the application native style.:type: str</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.UnsupportedAndroid_LastUpdate">
+<span class="sig-name descname"><span class="pre">UnsupportedAndroid_LastUpdate</span></span><a class="headerlink" href="#qrenderdoc.PersistantConfig.UnsupportedAndroid_LastUpdate" title="Permalink to this definition">¶</a></dt>
+<dd><p>A date containing the last time that the user was warned about an Android device being older than is generally supported. This prevents the user being spammed if they consistently use an old Android device. If it has been more than 3 weeks since the last time an old device was seen, we re-warn the user, but if it’s less than 3 weeks we silently update this date so continuous use doesn’t nag.:type: datetime</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.PersistantConfig.UpdateEnumeratedProtocolDevices">
+<span class="sig-name descname"><span class="pre">UpdateEnumeratedProtocolDevices</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.PersistantConfig.UpdateEnumeratedProtocolDevices" title="Permalink to this definition">¶</a></dt>
+<dd><p>If configured, queries available device protocols to update auto-configured hosts.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qrenderdoc.TimeUnit">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qrenderdoc.</span></span><span class="sig-name descname"><span class="pre">TimeUnit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.TimeUnit" title="Permalink to this definition">¶</a></dt>
+<dd><p>The unit that GPU durations are displayed in.</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.TimeUnit.Seconds">
+<span class="sig-name descname"><span class="pre">Seconds</span></span><a class="headerlink" href="#qrenderdoc.TimeUnit.Seconds" title="Permalink to this definition">¶</a></dt>
+<dd><p>The durations are displayed as seconds (s).</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.TimeUnit.Milliseconds">
+<span class="sig-name descname"><span class="pre">Milliseconds</span></span><a class="headerlink" href="#qrenderdoc.TimeUnit.Milliseconds" title="Permalink to this definition">¶</a></dt>
+<dd><p>The durations are displayed as milliseconds (ms).</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.TimeUnit.Microseconds">
+<span class="sig-name descname"><span class="pre">Microseconds</span></span><a class="headerlink" href="#qrenderdoc.TimeUnit.Microseconds" title="Permalink to this definition">¶</a></dt>
+<dd><p>The durations are displayed as microseconds (µs).</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.TimeUnit.Nanoseconds">
+<span class="sig-name descname"><span class="pre">Nanoseconds</span></span><a class="headerlink" href="#qrenderdoc.TimeUnit.Nanoseconds" title="Permalink to this definition">¶</a></dt>
+<dd><p>The durations are displayed as nanoseconds (ns).</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qrenderdoc.OffsetSizeDisplayMode">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qrenderdoc.</span></span><span class="sig-name descname"><span class="pre">OffsetSizeDisplayMode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.OffsetSizeDisplayMode" title="Permalink to this definition">¶</a></dt>
+<dd><p>The formatting mode used when displaying fields marked as Offsets or Sizes.</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.OffsetSizeDisplayMode.Auto">
+<span class="sig-name descname"><span class="pre">Auto</span></span><a class="headerlink" href="#qrenderdoc.OffsetSizeDisplayMode.Auto" title="Permalink to this definition">¶</a></dt>
+<dd><p>The data is displayed as decimal values by default and hexadecimal if above a certain threshold.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.OffsetSizeDisplayMode.Decimal">
+<span class="sig-name descname"><span class="pre">Decimal</span></span><a class="headerlink" href="#qrenderdoc.OffsetSizeDisplayMode.Decimal" title="Permalink to this definition">¶</a></dt>
+<dd><p>The data is displayed as decimal values.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="qrenderdoc.OffsetSizeDisplayMode.Hexadecimal">
+<span class="sig-name descname"><span class="pre">Hexadecimal</span></span><a class="headerlink" href="#qrenderdoc.OffsetSizeDisplayMode.Hexadecimal" title="Permalink to this definition">¶</a></dt>
+<dd><p>The data is displayed as hexadecimal values.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qrenderdoc.ConfigFilePath">
+<span class="sig-prename descclassname"><span class="pre">qrenderdoc.</span></span><span class="sig-name descname"><span class="pre">ConfigFilePath</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.ConfigFilePath" title="Permalink to this definition">¶</a></dt>
+<dd><p>Retrieve the absolute path where a given file can be stored with other application
+data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.ConfigFilePath.params.filename"></span><strong>filename</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ConfigFilePath.params.filename">#</a> (<em>str</em>) – The base filename.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The absolute path.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qrenderdoc.UnitSuffix">
+<span class="sig-prename descclassname"><span class="pre">qrenderdoc.</span></span><span class="sig-name descname"><span class="pre">UnitSuffix</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">unit</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.UnitSuffix" title="Permalink to this definition">¶</a></dt>
+<dd><p>Gets the suffix for a time unit.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.UnitSuffix.params.unit"></span><strong>unit</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.UnitSuffix.params.unit">#</a> (<a class="reference internal" href="#qrenderdoc.TimeUnit" title="qrenderdoc.TimeUnit"><em>TimeUnit</em></a>) – The unit to get a suffix for.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The one or two character suffix.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qrenderdoc.AddRecentFile">
+<span class="sig-prename descclassname"><span class="pre">qrenderdoc.</span></span><span class="sig-name descname"><span class="pre">AddRecentFile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">recentList</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.AddRecentFile" title="Permalink to this definition">¶</a></dt>
+<dd><p>Checks if a given file is in a list. If it is, then it’s shuffled to the end. If it’s
+not then it’s added to the end</p>
+<p>As the name suggests, this is used for tracking a ‘recent file’ list.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.AddRecentFile.params.recentList"></span><strong>recentList</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.AddRecentFile.params.recentList">#</a> (<em>List</em><em>[</em><em>str</em><em>]</em>) – The list that is mutated by the function.</p></li>
+<li><p><span class="target" id="qrenderdoc.AddRecentFile.params.file"></span><strong>file</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.AddRecentFile.params.file">#</a> (<em>str</em>) – The file to add to the list.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="qrenderdoc.RemoveRecentFile">
+<span class="sig-prename descclassname"><span class="pre">qrenderdoc.</span></span><span class="sig-name descname"><span class="pre">RemoveRecentFile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">recentList</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">file</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.RemoveRecentFile" title="Permalink to this definition">¶</a></dt>
+<dd><p>Removes a given file from the list, after normalising the path. If the path isn’t
+present then the list is not modified.</p>
+<p>As the name suggests, this is used for tracking a ‘recent file’ list.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.RemoveRecentFile.params.recentList"></span><strong>recentList</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.RemoveRecentFile.params.recentList">#</a> (<em>List</em><em>[</em><em>str</em><em>]</em>) – The list that is mutated by the function.</p></li>
+<li><p><span class="target" id="qrenderdoc.RemoveRecentFile.params.file"></span><strong>file</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.RemoveRecentFile.params.file">#</a> (<em>str</em>) – The file to remove from the list.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="shader-processing">
+<h2><a class="toc-backref" href="#id2">Shader Processing</a><a class="headerlink" href="#shader-processing" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="qrenderdoc.ShaderProcessingTool">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qrenderdoc.</span></span><span class="sig-name descname"><span class="pre">ShaderProcessingTool</span></span><a class="headerlink" href="#qrenderdoc.ShaderProcessingTool" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes an external program that can be used to process shaders, typically either
+compiling from a high-level language to a binary format, or decompiling from the binary format to
+a high-level language or textual representation.</p>
+<p>Commonly used with SPIR-V.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.ShaderProcessingTool.CompileShader">
+<span class="sig-name descname"><span class="pre">CompileShader</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">window</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">entryPoint</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stage</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">spirvVer</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.ShaderProcessingTool.CompileShader" title="Permalink to this definition">¶</a></dt>
+<dd><p>Runs this program to disassemble a given shader source.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.ShaderProcessingTool.CompileShader.params.window"></span><strong>window</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ShaderProcessingTool.CompileShader.params.window">#</a> (<em>QWidget</em>) – A handle to the window to use when showing a progress bar or error messages.</p></li>
+<li><p><span class="target" id="qrenderdoc.ShaderProcessingTool.CompileShader.params.source"></span><strong>source</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ShaderProcessingTool.CompileShader.params.source">#</a> (<em>str</em>) – The source code, preprocessed into a single file.</p></li>
+<li><p><span class="target" id="qrenderdoc.ShaderProcessingTool.CompileShader.params.entryPoint"></span><strong>entryPoint</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ShaderProcessingTool.CompileShader.params.entryPoint">#</a> (<em>str</em>) – The name of the entry point in the shader to compile.</p></li>
+<li><p><span class="target" id="qrenderdoc.ShaderProcessingTool.CompileShader.params.stage"></span><strong>stage</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ShaderProcessingTool.CompileShader.params.stage">#</a> (<a class="reference internal" href="../renderdoc/shaders.html#renderdoc.ShaderStage" title="renderdoc.ShaderStage"><em>renderdoc.ShaderStage</em></a>) – The pipeline stage that this shader represents.</p></li>
+<li><p><span class="target" id="qrenderdoc.ShaderProcessingTool.CompileShader.params.spirvVer"></span><strong>spirvVer</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ShaderProcessingTool.CompileShader.params.spirvVer">#</a> (<em>str</em>) – The version of SPIR-V in use for this shader, or an empty string for defaults.
+The current version can be obtained from reflection data via the <code class="docutils literal notranslate"><span class="pre">&#64;spirver</span></code> compile flag.</p></li>
+<li><p><span class="target" id="qrenderdoc.ShaderProcessingTool.CompileShader.params.args"></span><strong>args</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ShaderProcessingTool.CompileShader.params.args">#</a> (<em>str</em>) – arguments to pass to the tool. The default arguments can be obtained using
+<a class="reference internal" href="#qrenderdoc.ShaderProcessingTool.DefaultArguments" title="qrenderdoc.ShaderProcessingTool.DefaultArguments"><code class="xref py py-meth docutils literal notranslate"><span class="pre">DefaultArguments()</span></code></a> which can then be customised as desired. Passing an empty string uses the
+default arguments.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The result of running the tool.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#qrenderdoc.ShaderToolOutput" title="qrenderdoc.ShaderToolOutput">ShaderToolOutput</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.ShaderProcessingTool.DefaultArguments">
+<span class="sig-name descname"><span class="pre">DefaultArguments</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.ShaderProcessingTool.DefaultArguments" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the default arguments used when invoking this tool</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The arguments specified for this tool.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.ShaderProcessingTool.DisassembleShader">
+<span class="sig-name descname"><span class="pre">DisassembleShader</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">window</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.ShaderProcessingTool.DisassembleShader" title="Permalink to this definition">¶</a></dt>
+<dd><p>Runs this program to disassemble a given shader reflection.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="qrenderdoc.ShaderProcessingTool.DisassembleShader.params.window"></span><strong>window</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ShaderProcessingTool.DisassembleShader.params.window">#</a> (<em>QWidget</em>) – A handle to the window to use when showing a progress bar or error messages.</p></li>
+<li><p><span class="target" id="qrenderdoc.ShaderProcessingTool.DisassembleShader.params.shader"></span><strong>shader</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ShaderProcessingTool.DisassembleShader.params.shader">#</a> (<a class="reference internal" href="../renderdoc/shaders.html#renderdoc.ShaderReflection" title="renderdoc.ShaderReflection"><em>renderdoc.ShaderReflection</em></a>) – The shader to disassemble.</p></li>
+<li><p><span class="target" id="qrenderdoc.ShaderProcessingTool.DisassembleShader.params.args"></span><strong>args</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.ShaderProcessingTool.DisassembleShader.params.args">#</a> (<em>str</em>) – arguments to pass to the tool. The default arguments can be obtained using
+<a class="reference internal" href="#qrenderdoc.ShaderProcessingTool.DefaultArguments" title="qrenderdoc.ShaderProcessingTool.DefaultArguments"><code class="xref py py-meth docutils literal notranslate"><span class="pre">DefaultArguments()</span></code></a> which can then be customised as desired. Passing an empty string uses the
+default arguments.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The result of running the tool.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#qrenderdoc.ShaderToolOutput" title="qrenderdoc.ShaderToolOutput">ShaderToolOutput</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.ShaderProcessingTool.args">
+<span class="sig-name descname"><span class="pre">args</span></span><a class="headerlink" href="#qrenderdoc.ShaderProcessingTool.args" title="Permalink to this definition">¶</a></dt>
+<dd><p>The command line argmuents to pass to the program.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.ShaderProcessingTool.executable">
+<span class="sig-name descname"><span class="pre">executable</span></span><a class="headerlink" href="#qrenderdoc.ShaderProcessingTool.executable" title="Permalink to this definition">¶</a></dt>
+<dd><p>The path to the executable to run for this program.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.ShaderProcessingTool.input">
+<span class="sig-name descname"><span class="pre">input</span></span><a class="headerlink" href="#qrenderdoc.ShaderProcessingTool.input" title="Permalink to this definition">¶</a></dt>
+<dd><p>The input that this program expects.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../renderdoc/shaders.html#renderdoc.ShaderEncoding" title="renderdoc.ShaderEncoding">ShaderEncoding</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.ShaderProcessingTool.name">
+<span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#qrenderdoc.ShaderProcessingTool.name" title="Permalink to this definition">¶</a></dt>
+<dd><p>The human-readable name of the program.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.ShaderProcessingTool.output">
+<span class="sig-name descname"><span class="pre">output</span></span><a class="headerlink" href="#qrenderdoc.ShaderProcessingTool.output" title="Permalink to this definition">¶</a></dt>
+<dd><p>The output that this program provides.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../renderdoc/shaders.html#renderdoc.ShaderEncoding" title="renderdoc.ShaderEncoding">ShaderEncoding</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.ShaderProcessingTool.tool">
+<span class="sig-name descname"><span class="pre">tool</span></span><a class="headerlink" href="#qrenderdoc.ShaderProcessingTool.tool" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <code class="xref py py-class docutils literal notranslate"><span class="pre">KnownShaderTool</span></code> identifying which known tool this program is.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../renderdoc/shaders.html#renderdoc.KnownShaderTool" title="renderdoc.KnownShaderTool">KnownShaderTool</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="qrenderdoc.ShaderToolOutput">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qrenderdoc.</span></span><span class="sig-name descname"><span class="pre">ShaderToolOutput</span></span><a class="headerlink" href="#qrenderdoc.ShaderToolOutput" title="Permalink to this definition">¶</a></dt>
+<dd><p>Contains the output from invoking a <a class="reference internal" href="#qrenderdoc.ShaderProcessingTool" title="qrenderdoc.ShaderProcessingTool"><code class="xref py py-class docutils literal notranslate"><span class="pre">ShaderProcessingTool</span></code></a>, including both the
+actual output data desired as well as any stdout/stderr messages.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.ShaderToolOutput.log">
+<span class="sig-name descname"><span class="pre">log</span></span><a class="headerlink" href="#qrenderdoc.ShaderToolOutput.log" title="Permalink to this definition">¶</a></dt>
+<dd><p>The output log - containing the information about the tool run and any errors.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.ShaderToolOutput.result">
+<span class="sig-name descname"><span class="pre">result</span></span><a class="headerlink" href="#qrenderdoc.ShaderToolOutput.result" title="Permalink to this definition">¶</a></dt>
+<dd><p>The actual output data from the tool</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bytes</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="bug-reports">
+<h2><a class="toc-backref" href="#id3">Bug Reports</a><a class="headerlink" href="#bug-reports" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="qrenderdoc.BugReport">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qrenderdoc.</span></span><span class="sig-name descname"><span class="pre">BugReport</span></span><a class="headerlink" href="#qrenderdoc.BugReport" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes a submitted bug report.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.BugReport.URL">
+<span class="sig-name descname"><span class="pre">URL</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.BugReport.URL" title="Permalink to this definition">¶</a></dt>
+<dd><p>Gets the URL for this report.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The URL to the report.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.BugReport.checkDate">
+<span class="sig-name descname"><span class="pre">checkDate</span></span><a class="headerlink" href="#qrenderdoc.BugReport.checkDate" title="Permalink to this definition">¶</a></dt>
+<dd><p>The last date that we checked for updates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>datetime</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.BugReport.reportId">
+<span class="sig-name descname"><span class="pre">reportId</span></span><a class="headerlink" href="#qrenderdoc.BugReport.reportId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The private ID of the bug report.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.BugReport.submitDate">
+<span class="sig-name descname"><span class="pre">submitDate</span></span><a class="headerlink" href="#qrenderdoc.BugReport.submitDate" title="Permalink to this definition">¶</a></dt>
+<dd><p>The original date when this bug was submitted.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>datetime</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="qrenderdoc.BugReport.unreadUpdates">
+<span class="sig-name descname"><span class="pre">unreadUpdates</span></span><a class="headerlink" href="#qrenderdoc.BugReport.unreadUpdates" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unread updates to the bug exist</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="remote-host">
+<h2><a class="toc-backref" href="#id4">Remote Host</a><a class="headerlink" href="#remote-host" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="qrenderdoc.RemoteHost">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">qrenderdoc.</span></span><span class="sig-name descname"><span class="pre">RemoteHost</span></span><a class="headerlink" href="#qrenderdoc.RemoteHost" title="Permalink to this definition">¶</a></dt>
+<dd><p>A handle for interacting with a remote server on a given host.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.RemoteHost.CheckStatus">
+<span class="sig-name descname"><span class="pre">CheckStatus</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.RemoteHost.CheckStatus" title="Permalink to this definition">¶</a></dt>
+<dd><p>Ping the host to check current status - if the server is running, connection status, etc.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.RemoteHost.Connect">
+<span class="sig-name descname"><span class="pre">Connect</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.RemoteHost.Connect" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a connection to the remote server.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The status of opening the capture, whether success or failure, and a <code class="xref py py-class docutils literal notranslate"><span class="pre">RemoteServer</span></code>
+instance if it were successful</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>Tuple[<a class="reference internal" href="../renderdoc/replay.html#renderdoc.ResultDetails" title="renderdoc.ResultDetails">renderdoc.ResultDetails</a>, <a class="reference internal" href="../renderdoc/replay.html#renderdoc.RemoteServer" title="renderdoc.RemoteServer">renderdoc.RemoteServer</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.RemoteHost.FriendlyName">
+<span class="sig-name descname"><span class="pre">FriendlyName</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.RemoteHost.FriendlyName" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The friendly name for this host, if available (if empty, the Hostname is used).</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.RemoteHost.Hostname">
+<span class="sig-name descname"><span class="pre">Hostname</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.RemoteHost.Hostname" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The hostname of this host.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.RemoteHost.IsBusy">
+<span class="sig-name descname"><span class="pre">IsBusy</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.RemoteHost.IsBusy" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if someone else is currently connected to this server.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.RemoteHost.IsConnected">
+<span class="sig-name descname"><span class="pre">IsConnected</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.RemoteHost.IsConnected" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if an active connection exists to this remote server.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.RemoteHost.IsLocalhost">
+<span class="sig-name descname"><span class="pre">IsLocalhost</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.RemoteHost.IsLocalhost" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>Returns <code class="docutils literal notranslate"><span class="pre">True</span></code> if this host represents the special localhost device.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.RemoteHost.IsServerRunning">
+<span class="sig-name descname"><span class="pre">IsServerRunning</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.RemoteHost.IsServerRunning" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if a remote server is currently running on this host.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.RemoteHost.IsValid">
+<span class="sig-name descname"><span class="pre">IsValid</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.RemoteHost.IsValid" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns <code class="docutils literal notranslate"><span class="pre">True</span></code> if this host represents a valid remote host.
+:rtype: bool</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.RemoteHost.IsVersionMismatch">
+<span class="sig-name descname"><span class="pre">IsVersionMismatch</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.RemoteHost.IsVersionMismatch" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if there is a code version mismatch with this server.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.RemoteHost.LastCapturePath">
+<span class="sig-name descname"><span class="pre">LastCapturePath</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.RemoteHost.LastCapturePath" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The last folder browsed to on this host, to provide a reasonable default path.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.RemoteHost.Launch">
+<span class="sig-name descname"><span class="pre">Launch</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.RemoteHost.Launch" title="Permalink to this definition">¶</a></dt>
+<dd><p>Runs the command specified in <code class="xref py py-data docutils literal notranslate"><span class="pre">runCommand</span></code>. Returns
+<a class="reference internal" href="../renderdoc/replay.html#renderdoc.ResultDetails" title="renderdoc.ResultDetails"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResultDetails</span></code></a> which indicates success or the type of failure.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The result from launching the remote server.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p><a class="reference internal" href="../renderdoc/replay.html#renderdoc.ResultDetails" title="renderdoc.ResultDetails">renderdoc.ResultDetails</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.RemoteHost.Name">
+<span class="sig-name descname"><span class="pre">Name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.RemoteHost.Name" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The name to display for this host in the UI, either <a class="reference internal" href="#qrenderdoc.RemoteHost.FriendlyName" title="qrenderdoc.RemoteHost.FriendlyName"><code class="xref py py-meth docutils literal notranslate"><span class="pre">FriendlyName()</span></code></a> if it is valid, or
+<a class="reference internal" href="#qrenderdoc.RemoteHost.Hostname" title="qrenderdoc.RemoteHost.Hostname"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Hostname()</span></code></a> if not.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.RemoteHost.Protocol">
+<span class="sig-name descname"><span class="pre">Protocol</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.RemoteHost.Protocol" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The <a class="reference internal" href="../renderdoc/replay.html#renderdoc.DeviceProtocolController" title="renderdoc.DeviceProtocolController"><code class="xref py py-class docutils literal notranslate"><span class="pre">DeviceProtocolController</span></code></a> for this host, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if no protocol
+is in use</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p><a class="reference internal" href="../renderdoc/replay.html#renderdoc.DeviceProtocolController" title="renderdoc.DeviceProtocolController">renderdoc.DeviceProtocolController</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.RemoteHost.RunCommand">
+<span class="sig-name descname"><span class="pre">RunCommand</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.RemoteHost.RunCommand" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The command to run locally to try to launch the server remotely.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.RemoteHost.SetLastCapturePath">
+<span class="sig-name descname"><span class="pre">SetLastCapturePath</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.RemoteHost.SetLastCapturePath" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sets the last folder browsed to. See <a class="reference internal" href="#qrenderdoc.RemoteHost.LastCapturePath" title="qrenderdoc.RemoteHost.LastCapturePath"><code class="xref py py-meth docutils literal notranslate"><span class="pre">LastCapturePath()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.RemoteHost.SetLastCapturePath.params.path"></span><strong>path</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.RemoteHost.SetLastCapturePath.params.path">#</a> (<em>str</em>) – The new path to set.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.RemoteHost.SetRunCommand">
+<span class="sig-name descname"><span class="pre">SetRunCommand</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">cmd</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.RemoteHost.SetRunCommand" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sets the run command. See <a class="reference internal" href="#qrenderdoc.RemoteHost.RunCommand" title="qrenderdoc.RemoteHost.RunCommand"><code class="xref py py-meth docutils literal notranslate"><span class="pre">RunCommand()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="qrenderdoc.RemoteHost.SetRunCommand.params.cmd"></span><strong>cmd</strong><a class="paramlink headerlink reference internal" href="#qrenderdoc.RemoteHost.SetRunCommand.params.cmd">#</a> (<em>str</em>) – The new command to set.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="qrenderdoc.RemoteHost.VersionMismatchError">
+<span class="sig-name descname"><span class="pre">VersionMismatchError</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#qrenderdoc.RemoteHost.VersionMismatchError" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>The version mismatch error.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="../../how/index.html" class="btn btn-neutral float-right" title="How do I …?" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="windows.html" class="btn btn-neutral float-left" title="API Reference: qrenderdoc Windows" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

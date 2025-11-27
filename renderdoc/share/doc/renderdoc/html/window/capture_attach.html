@@ -1,0 +1,469 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Capture Dialog &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/window/capture_attach.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Event Browser" href="event_browser.html" />
+    <link rel="prev" title="Buffer Viewer" href="buffer_viewer.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../python_api/index.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../how/index.html">How do I …?</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Window reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="texture_viewer.html">Texture Viewer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api_inspector.html">API Inspector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mesh_viewer.html">Mesh Viewer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="buffer_viewer.html">Buffer Viewer</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Capture Dialog</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#capturing">Capturing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#inject-into-process">Inject into Process</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#capture-options">Capture Options</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#child-processes">Child Processes</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#global-process-hook">Global Process Hook</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#see-also">See Also</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="event_browser.html">Event Browser</a></li>
+<li class="toctree-l2"><a class="reference internal" href="settings_window.html">Settings Window</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pipeline_state.html">Pipeline State</a></li>
+<li class="toctree-l2"><a class="reference internal" href="shader_viewer.html">Shader Viewer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="shader_messages.html">Shader Messages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="timeline_bar.html">Timeline Bar</a></li>
+<li class="toctree-l2"><a class="reference internal" href="capture_connection.html">Capture Connection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="debug_messages.html">Debug Messages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="python_shell.html">Python Shell</a></li>
+<li class="toctree-l2"><a class="reference internal" href="resource_inspector.html">Resource Inspector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="performance_counter_viewer.html">Performance Counter Viewer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="capture_comments.html">Capture Comments</a></li>
+</ul>
+</li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">Window reference</a> &raquo;</li>
+        
+      <li>Capture Dialog</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/window/capture_attach.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="capture-dialog">
+<h1>Capture Dialog<a class="headerlink" href="#capture-dialog" title="Permalink to this headline">¶</a></h1>
+<p>The Capture Dialog (which doubles as the inject-into-process dialog) is the single point where programs are launched and captures are saved to disk.</p>
+<p>After launching a capture a connection dialog will open to allow you to manage and open any captures you take. See <a class="reference internal" href="capture_connection.html"><span class="doc">Capture Connection</span></a> for more details.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>NOTE: The Load Settings and Save Settings buttons on this dialog refer to loading and saving the set of settings and options configured on this dialog. They do <em>not</em> refer to loading and saving the capture files produced from capturing - that is done from the <span class="guilabel">File</span> menu.</p>
+</div>
+<section id="capturing">
+<h2>Capturing<a class="headerlink" href="#capturing" title="Permalink to this headline">¶</a></h2>
+<p>To capture a program you need to provide the details of the application to be launched, at minimum locating the executable to run.</p>
+<p>The Program section of the dialog prompts for the executable to be launched, the working directory, any command-line arguments to be passed to the program. It also lets you specify any modifications you want to make to the environment variables.</p>
+<figure class="align-default" id="id3">
+<img alt="../_images/CapturePathCmdline.png" src="../_images/CapturePathCmdline.png" />
+<figcaption>
+<p><span class="caption-text">Program Capture: Configuring and launching an exe directly from RenderDoc.</span><a class="headerlink" href="#id3" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>The <span class="guilabel">…</span> buttons next to the executable path and working directory can be used to browse through the file system. If you are working in <a class="reference internal" href="../how/how_network_capture_replay.html"><span class="doc">a remote context</span></a> then the file and directory browser will be replaced by one that browses in the file system of the remote context. By default if the working directory box is left empty then the directory containing the executable will be used as the working directory.</p>
+<p>The <span class="guilabel">…</span> button next to the environment variables line will open up an editing that allows you to specify any changes to the environment variables that you’d like to make when launching the program. This could be used for example to set a configuration option, or perform necessary setup for correct running like configuring a path or setting the <code class="docutils literal notranslate"><span class="pre">DISPLAY</span></code> variable.</p>
+<figure class="align-default" id="id4">
+<img alt="../_images/CaptureEnvVarEditor.png" src="../_images/CaptureEnvVarEditor.png" />
+<figcaption>
+<p><span class="caption-text">Environment Variables: changing the environment that the executable will run under.</span><a class="headerlink" href="#id4" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>In the environment variable editor you can choose the name of the variable to change, and the value to use. Then you can choose the function to use.</p>
+<ul>
+<li><p><span class="guilabel">Set</span> will overwrite any existing value or create the variable with the value you specify.</p></li>
+<li><p><span class="guilabel">Prepend Value</span> and <span class="guilabel">Append Value</span> will add the value you specify to the start or beginning of the existing variable. If the variable does not already exist it will be created with the value.</p>
+<p>When prepending or appending you can also choose the separator to apply, for example if you are modifying the <code class="docutils literal notranslate"><span class="pre">PATH</span></code> variable. You can choose either colons ( <code class="docutils literal notranslate"><span class="pre">:</span></code>), semi-colons ( <code class="docutils literal notranslate"><span class="pre">;</span></code>), platform style ( <code class="docutils literal notranslate"><span class="pre">;</span></code> on Windows and <code class="docutils literal notranslate"><span class="pre">:</span></code> on other platforms), or no separator at all. If the variable does not exist, the separator won’t be added, but if the variable does exist the separator will be added in between the existing value and the value you chose to add.</p>
+</li>
+</ul>
+<p>When you are ready to capture simply click the <span class="guilabel">Capture</span> button in the bottom right.</p>
+<p>If you wish to save these particular settings you can click <span class="guilabel">Save Settings</span> to save them to a <code class="docutils literal notranslate"><span class="pre">.cap</span></code> file. This <code class="docutils literal notranslate"><span class="pre">.cap</span></code> file can either be loaded in manually, accessed through the <span class="guilabel">File</span> → <span class="guilabel">Recent Captures</span> menu. The <code class="docutils literal notranslate"><span class="pre">.cap</span></code> file can be associated with RenderDoc, and if so launching RenderDoc from this file will automatically load the capture settings. If <span class="guilabel">Auto start</span> is checked then double clicking on the <code class="docutils literal notranslate"><span class="pre">.cap</span></code> file will immediately trigger a capture with the given settings.</p>
+<p>The last settings used to launch an executable will be automatically saved, and the next time you set up there will be a <span class="guilabel">Load Last Settings - Executable</span> button next to <span class="guilabel">Save Settings</span> and <span class="guilabel">Load Settings</span>. This can be useful if you didn’t save your configuration but want to quickly re-launch it.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The process will be launched with the same permissions and by the same user as RenderDoc was launched. If your process requires specific permissions (such as administrator permissions) you will need to launch RenderDoc with these permissions.</p>
+</div>
+</section>
+<section id="inject-into-process">
+<h2>Inject into Process<a class="headerlink" href="#inject-into-process" title="Permalink to this headline">¶</a></h2>
+<div class="admonition caution">
+<p class="admonition-title">Caution</p>
+<p>The process <strong>must not</strong> have invoked or initialised the API to be used, as this will be too late for RenderDoc to hook and capture it. At best RenderDoc will not capture, at worst it may cause crashes or undefined behaviour. Only inject to processes you can guarantee are early enough in their initialisation that they have not used the graphics API.</p>
+</div>
+<p>When invoked through <span class="guilabel">File</span> → <span class="guilabel">Inject into Process</span> the capture dialog modifies itself to give a list of processes running on the target system.</p>
+<p>A list of processes is fetched once when the dialog is opened, but this can be refreshed by clicking on the <span class="guilabel">Refresh</span> button below the list. Select the process you would like to inject into and click <span class="guilabel">Inject</span>.</p>
+<figure class="align-default" id="id5">
+<img alt="../_images/Injecting.png" src="../_images/Injecting.png" />
+<figcaption>
+<p><span class="caption-text">Injecting: Injecting into an already-running process via RenderDoc.</span><a class="headerlink" href="#id5" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+</section>
+<section id="capture-options">
+<span id="id1"></span><h2>Capture Options<a class="headerlink" href="#capture-options" title="Permalink to this headline">¶</a></h2>
+<blockquote>
+<div><div class="line-block">
+<div class="line"><span class="guilabel">Allow Fullscreen</span> Default: <code class="docutils literal notranslate"><span class="pre">Enabled</span></code></div>
+</div>
+</div></blockquote>
+<p>Allow Fullscreen simply means that RenderDoc will not interfere with any attempt by the application to switch into an exclusive fullscreen video mode. While debugging sometimes this can be awkward as you may wish to quickly switch to your debugger or another program.</p>
+<p>If this option is unchecked, RenderDoc will attempt to modify any such attempt to an equivalent windowed mode.</p>
+<hr class="docutils" />
+<blockquote>
+<div><div class="line-block">
+<div class="line"><span class="guilabel">Allow VSync</span> Default: <code class="docutils literal notranslate"><span class="pre">Enabled</span></code></div>
+</div>
+</div></blockquote>
+<p>Allow VSync functions very similarly to Allow Fullscreen. When disabled, RenderDoc will prevent any attempt to VSync by the application. This can be useful given that there is a certain degree of inevitable overhead from running with RenderDoc and VSync can amplify that.</p>
+<hr class="docutils" />
+<blockquote>
+<div><div class="line-block">
+<div class="line"><span class="guilabel">Seconds Delay</span> Default: <code class="docutils literal notranslate"><span class="pre">0</span> <span class="pre">Seconds</span> <span class="pre">(Disabled)</span></code></div>
+</div>
+</div></blockquote>
+<p>This option causes RenderDoc to stall for a defined number of seconds immediately after launching the process. Most commonly this is used so that you can launch a program in RenderDoc and immediately attach a traditional debugger before any significant code is executed.</p>
+<p>This can be useful e.g. when early initialisation needs to be debugged.</p>
+<hr class="docutils" />
+<blockquote>
+<div><div class="line-block">
+<div class="line"><span class="guilabel">Collect Callstacks</span> Default: <code class="docutils literal notranslate"><span class="pre">Disabled</span></code></div>
+</div>
+</div></blockquote>
+<p>This option will cause RenderDoc to save a callstack from user code into the API at every API call during the frame being captured. This can then be resolved later and used to determine where the application is calling each API call. More details can be found in <a class="reference internal" href="../how/how_capture_callstack.html"><span class="doc">How do I capture callstacks?</span></a>.</p>
+<hr class="docutils" />
+<blockquote>
+<div><div class="line-block">
+<div class="line"><span class="guilabel">Only Action Callstacks</span> Default: <code class="docutils literal notranslate"><span class="pre">Disabled</span></code></div>
+</div>
+</div></blockquote>
+<p>This option modifies the above capturing of callstacks to only be saved for action calls. This can reduce the CPU load, as well as file-size and memory overhead of capturing callstacks for every API call which may not be desired. Only valid if <code class="docutils literal notranslate"><span class="pre">Collect</span> <span class="pre">Callstacks</span></code> is enabled.</p>
+<hr class="docutils" />
+<blockquote>
+<div><div class="line-block">
+<div class="line"><span class="guilabel">Enable API validation</span> Default: <code class="docutils literal notranslate"><span class="pre">Disabled</span></code></div>
+</div>
+</div></blockquote>
+<p>Enable API validation causes RenderDoc to enable the API’s built-in debugging, and where possible serialise this out and include it in the capture for later inspection in the <a class="reference internal" href="debug_messages.html"><span class="doc">Debug Messages</span></a> window.</p>
+<ul class="simple">
+<li><p>On D3D11 &amp; D3D12 this will activate the D3D debug layer and save out any messages.</p></li>
+<li><p>For OpenGL this means <code class="docutils literal notranslate"><span class="pre">ARB_debug_output</span></code> is automatically enabled.</p></li>
+<li><p>For Vulkan the <code class="docutils literal notranslate"><span class="pre">VK_LAYER_LUNARG_standard_validation</span></code> meta-layer is enabled and <code class="docutils literal notranslate"><span class="pre">VK_EXT_debug_report</span></code> is used to fetch any warnings or errors. The overhead from enabling this option is largely the same as the overhead of enabling the debug device without RenderDoc involved.</p></li>
+</ul>
+<hr class="docutils" />
+<blockquote>
+<div><div class="line-block">
+<div class="line"><span class="guilabel">Capture Child Processes</span> Default: <code class="docutils literal notranslate"><span class="pre">Disabled</span></code></div>
+</div>
+</div></blockquote>
+<p>This option causes RenderDoc to hook into process creation calls from the target application. When this option is enabled those child processes will be injected with RenderDoc in the same way as the parent - which can be useful if you must launch your program through a launcher or level of indirection and still wish to use RenderDoc with one of the child processes.</p>
+<p><a class="reference internal" href="#child-process-hook"><span class="std std-ref">See below</span></a> for more information on handling of child processes.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Due to the hook implementation on linux, child processes will always be hooked regardless of whether this option is enabled or disabled.</p>
+</div>
+<hr class="docutils" />
+<blockquote>
+<div><div class="line-block">
+<div class="line"><span class="guilabel">Ref All Resources</span> Default: <code class="docutils literal notranslate"><span class="pre">Disabled</span></code></div>
+</div>
+</div></blockquote>
+<p>One method RenderDoc uses to keep capture file sizes down is to only include the referenced dependencies of a frame within a capture. This means that even if 100 textures are allocated and present, if 50 of them are never bound to the pipeline or otherwise referenced then they will not be included in the capture file. Enabling this option will cause RenderDoc to include all live resources at the time of capture regardless of whether they are used or not.</p>
+<hr class="docutils" />
+<blockquote>
+<div><div class="line-block">
+<div class="line"><span class="guilabel">Capture All Cmd Lists</span> Default: <code class="docutils literal notranslate"><span class="pre">Disabled</span></code></div>
+</div>
+</div></blockquote>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This option applies to D3D11 only. It may also have a significant performance hit.</p>
+</div>
+<p>By default RenderDoc only begins capturing when you hit the capture key - any commands issued before this point are not available and so if a deferred command list was created before you hit capture and replayed after, it would not be available and RenderDoc would have to fall back and capture again in the hopes that next frame everything will be available.</p>
+<p>If the application creates a command list early and replays it indefinitely without recreating it, RenderDoc will essentially have missed its chance to capture it by the time you hit the capture key. Enabling this option will cause RenderDoc to pre-emptively capture all command lists just in case they are used.</p>
+<hr class="docutils" />
+<blockquote>
+<div><div class="line-block">
+<div class="line"><span class="guilabel">Verify Buffer Access</span> Default: <code class="docutils literal notranslate"><span class="pre">Disabled</span></code></div>
+</div>
+</div></blockquote>
+<p>This option adds checking to any <code class="docutils literal notranslate"><span class="pre">Map()</span></code> calls that adds a boundary marker after any <code class="docutils literal notranslate"><span class="pre">Map()</span></code> pointer returned during a captured frame. These markers are checked on <code class="docutils literal notranslate"><span class="pre">Unmap()</span></code> and if they have been modified a message box will pop up alerting you to this, and you can click Yes to break in the debugger in the target application and investigate the problem.</p>
+<p>It will also initialise any buffers with undefined contents after creation with a marker value to catch use of undefined contents that may not always be zero.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This option is only supported on D3D11 and OpenGL currently, since Vulkan and D3D12 are lower overhead and do not have the infrastructure to intercept map writes.</p>
+</div>
+<hr class="docutils" />
+<blockquote>
+<div><div class="line-block">
+<div class="line"><span class="guilabel">Auto start</span> Default: <code class="docutils literal notranslate"><span class="pre">Disabled</span></code></div>
+</div>
+</div></blockquote>
+<p>This option is slightly different from the others in that it doesn’t change anything for an immediate capture. When a <code class="docutils literal notranslate"><span class="pre">.cap</span></code> settings file is saved with the details of a particular capture, if this option is enabled then loading a <code class="docutils literal notranslate"><span class="pre">.cap</span></code> file from the command line (i.e. most commonly from a file association) will trigger a capture as soon as RenderDoc loads. This is useful for saving a common capture setting and running it with just one click.</p>
+<hr class="docutils" />
+<blockquote>
+<div><div class="line-block">
+<div class="line"><span class="guilabel">Queue Capture of Frame</span> Default: <code class="docutils literal notranslate"><span class="pre">Disabled</span></code></div>
+</div>
+</div></blockquote>
+<p>This option allows you to queue up a precise capture of a given frame number after the program has started.</p>
+<p>Queueing up a capture beginning at frame 0 has a special meaning: Frames are defined as the period between two presents of a window. Frame 0 is defined as starting at initialisation and ending at the first presentation.</p>
+<p>The definition of ‘initialisation’ varies by API, since it can be hard to clearly define initialisation time cleanly:</p>
+<ul class="simple">
+<li><p>On Vulkan, frame 0 begins at the first <code class="docutils literal notranslate"><span class="pre">VkDevice</span></code> that is created. Since capture is instance-local, only this device’s parent instance will be capturing.</p></li>
+<li><p>On D3D11, frame 0 begins at the first swapchain that is created, since it is common to create and destroy many <code class="docutils literal notranslate"><span class="pre">ID3D11Device</span></code> objects for enumeration purposes. Note that since capture is device-local, only the device associated with this first swapchain will be capturing and no frame will be captured if this device or swapchain are destroyed before they is used for presentation.</p></li>
+<li><p>On D3D12, frame 0 begins at the first <code class="docutils literal notranslate"><span class="pre">ID3D12Device</span></code> that is created. Since capture is device-local, only this device will be capturing.</p></li>
+<li><p>On OpenGL, frame 0 begins at the first GL context that is created with an <code class="docutils literal notranslate"><span class="pre">CreateContextAttribs</span></code> create function such as <code class="docutils literal notranslate"><span class="pre">wglCreateContextAttribs</span></code> or <code class="docutils literal notranslate"><span class="pre">glXCreateContextAttribs</span></code>. This is because many programs create and destroy ‘trampoline’ GL contexts before creating their first real context. Since capture is API-wide, the capture will include all work on other contexts up until the first presentation on any context, even if the presentation happens on a different context.</p></li>
+</ul>
+<p>If no presentation happens in the program at all, frame 0 is still undefined and will most likely not capture anything. For purely headless programs you should use the <a class="reference internal" href="../in_application_api.html"><span class="doc">in-application API</span></a> to define the start and end of where you want to capture.</p>
+</section>
+<section id="child-processes">
+<span id="child-process-hook"></span><h2>Child Processes<a class="headerlink" href="#child-processes" title="Permalink to this headline">¶</a></h2>
+<p>RenderDoc is able to automatically inject into any child processes started by the initial process launched from the UI. To do this simply check <span class="guilabel">Capture Child Processes</span> in the options above.</p>
+<p>RenderDoc has a particular handling of child processes to help you navigate to the process of interest. Whenever a child process is launched, the UI is notified and a list of processes is displayed in a box on the <a class="reference internal" href="capture_connection.html"><span class="doc">Capture Connection</span></a> window. You can double click on any of these entries to open up a new connection to that process, in a new window.</p>
+<p>If a process exits, instead of just closing the connection window if there have been no captures, instead RenderDoc looks at the child processes - if there is only one child process, it assume that process must be of interest and immediately switches to tracking that process. If there are <em>more</em> than one child process open, the capture connection window will stay open to give you a chance to double click on those child processes to open a new connection window.</p>
+</section>
+<section id="global-process-hook">
+<span id="id2"></span><h2>Global Process Hook<a class="headerlink" href="#global-process-hook" title="Permalink to this headline">¶</a></h2>
+<div class="admonition danger">
+<p class="admonition-title">Danger</p>
+<p>This option is risky and should not be used lightly. Know what you’re doing and use it as a last resort.</p>
+<p>It is only supported on Windows currently.</p>
+</div>
+<p>To expose this option you have to enable it in <a class="reference internal" href="settings_window.html"><span class="doc">the settings</span></a>, to prevent it being used accidentally.</p>
+<p>When you’ve entered a path, or filename, in the executable text at the top of the window, this option will then insert a global hook that causes <strong>every</strong> new process created to load a very small shim dll.</p>
+<p>The shim dll will load, create a thread that checks to see if the process matches the path or filename specified, and then unload. If the process matches it will also inject RenderDoc and capturing will continue as normal. At this point you should <em>first disable the global hook</em>, then you can use the ‘Attach to running instance’ menu option to continue as normal.</p>
+<p>RenderDoc implements this behaviour by modifying the <a class="reference external" href="http://support2.microsoft.com/kb/197571">AppInit_DLLs</a> registry key to reference RenderDoc’s dlls. This is not a particularly safe method but it’s the only reliable method to do what we want. The shim dll is deliberately made as small and thin as possible, referencing only <code class="docutils literal notranslate"><span class="pre">kernel32.dll</span></code>, to minimise any risks.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you have ‘secure boot’ enabled in Windows, the AppInit_DLLs registry key will not work. To use the global process hook you must disable secure boot.</p>
+</div>
+<p>If RenderDoc crashes or something otherwise goes wrong while these registry keys are modified, the shim dll will continue to be injected into every process which is certainly not desirable. Should anything go wrong, RenderDoc writes a <code class="docutils literal notranslate"><span class="pre">.reg</span></code> file that restores the registry to its previous state in <code class="docutils literal notranslate"><span class="pre">%TEMP%</span></code>.</p>
+<p>Again, <strong>this method should be a last resort</strong>. Given the risks you should always try to capture directly in some way before trying this.</p>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../getting_started/quick_start.html"><span class="doc">Quick Start</span></a></p></li>
+<li><p><a class="reference internal" href="../how/how_capture_callstack.html"><span class="doc">How do I capture callstacks?</span></a></p></li>
+<li><p><a class="reference internal" href="../how/how_capture_frame.html"><span class="doc">How do I capture a frame?</span></a></p></li>
+<li><p><a class="reference internal" href="../how/how_network_capture_replay.html"><span class="doc">How do I capture and replay over a network?</span></a></p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="event_browser.html" class="btn btn-neutral float-right" title="Event Browser" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="buffer_viewer.html" class="btn btn-neutral float-left" title="Buffer Viewer" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

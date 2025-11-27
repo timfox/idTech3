@@ -1,0 +1,302 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Python development environment &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/python_api/dev_environment.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Writing UI extensions" href="ui_extensions.html" />
+    <link rel="prev" title="Getting Started (RenderDoc UI)" href="examples/qrenderdoc_intro.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="examples/renderdoc_intro.html">Getting Started (python)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/qrenderdoc_intro.html">Getting Started (RenderDoc UI)</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Python development environment</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#building-renderdoc">Building RenderDoc</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#python-setup-for-vs-code">Python Setup for VS Code</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#configuring-python-module-for-pycharm">Configuring python module for PyCharm</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#python-setup-for-pycharm">Python Setup for PyCharm</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#id1">Configuring python module for PyCharm</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#troubleshooting-pycharm">Troubleshooting PyCharm</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="ui_extensions.html">Writing UI extensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="descriptors_bindings.html">Descriptors and Bindings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/basics.html">Basic Interfaces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/renderdoc/index.html">renderdoc Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/qrenderdoc/index.html">qrenderdoc examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="renderdoc/index.html">renderdoc python module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qrenderdoc/index.html">qrenderdoc python module</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../how/index.html">How do I …?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">Python API</a> &raquo;</li>
+        
+      <li>Python development environment</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/python_api/dev_environment.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="python-development-environment">
+<h1>Python development environment<a class="headerlink" href="#python-development-environment" title="Permalink to this headline">¶</a></h1>
+<p>This document outlines how to set up a development environment with suitable IDE type information for the RenderDoc modules. It’s entirely optional, and you can write your python code in whichever way makes most sense for you. We will be configuring the PyCharm IDE to have autocomplete for all RenderDoc types.</p>
+<section id="building-renderdoc">
+<h2>Building RenderDoc<a class="headerlink" href="#building-renderdoc" title="Permalink to this headline">¶</a></h2>
+<p>The first step is to build RenderDoc from source to ensure you have a matching python module and RenderDoc build. Due to binary incompatibilities the python module can’t be widely distributed since it is linked against a specific python minor version.</p>
+<p>Build instructions for your platform are available <a class="reference external" href="https://github.com/baldurk/renderdoc">on github</a>. Take note of the python version that you build against, since this will need to be used later.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>On windows by default RenderDoc builds against python 3.6 which is what it’s distributed with.</p>
+<p>This can be overridden by setting an overridden path under the <code class="docutils literal notranslate"><span class="pre">Python</span> <span class="pre">Configuration</span></code> section in the properties of the <code class="docutils literal notranslate"><span class="pre">qrenderdoc</span></code> project and <code class="docutils literal notranslate"><span class="pre">pyrenderdoc_module</span></code>/<code class="docutils literal notranslate"><span class="pre">qrenderdoc_module</span></code> projects. It must point to a python installation.</p>
+<p>RenderDoc requires pythonXY.lib, include files such as include/Python.h, as well as a .zip of the standard library. If you installed python with an installer you have the first two, and can generate the standard library zip by zipping the contents of the Lib folder. If you downloaded the embeddable zip distribution you will only have the standard library zip, you need to obtain the include files and <code class="docutils literal notranslate"><span class="pre">.lib</span></code> file separately.</p>
+</div>
+</section>
+<section id="python-setup-for-vs-code">
+<h2>Python Setup for VS Code<a class="headerlink" href="#python-setup-for-vs-code" title="Permalink to this headline">¶</a></h2>
+<p>Using the same python version as the RenderDoc build used (Python 3.6 by default).
+From inside the <cite>docs</cite> folder run the following command:
+<cite>python3 regenerate_stubs.py &lt;path_to_folder_to_store_render_python_symbols&gt;`</cite>
+After running the command the output folder <cite>&lt;path_to_folder_to_store_render_python_symbols&gt;</cite> should contain <cite>renderdoc</cite> and <cite>qrenderdoc</cite> folders.</p>
+<p>In <cite>VS Code</cite> change the setting <cite>python.analysis.extraPaths`</cite> and add the output path used in the previous command (<cite>&lt;path_to_folder_to_store_render_python_symbols&gt;</cite>).</p>
+<p>Now when viewing a python script in <cite>VS Code</cite>, you should see the <cite>RenderDoc</cite> types being correctly resolved and autocompleted.</p>
+<p>If you get a warning about failure to import module <cite>renderdoc</cite> then something is not correct in the setup, double check the <cite>VS Code</cite> setting <cite>python.analysis.extraPaths</cite> includes the <cite>RenderDoc</cite> python API parsed output folder (which should contain two folders <cite>renderdoc</cite> and <cite>qrenderdoc</cite>).</p>
+</section>
+<section id="configuring-python-module-for-pycharm">
+<h2>Configuring python module for PyCharm<a class="headerlink" href="#configuring-python-module-for-pycharm" title="Permalink to this headline">¶</a></h2>
+</section>
+<section id="python-setup-for-pycharm">
+<h2>Python Setup for PyCharm<a class="headerlink" href="#python-setup-for-pycharm" title="Permalink to this headline">¶</a></h2>
+<p>Now install PyCharm, for this document we will install 2020.3.2. Any version is fine, though newer versions may require modification to work properly.</p>
+<p>Before you run PyCharm, we will replace one file in it to generate better type information for RenderDoc. In the RenderDoc repository there’s a <a class="reference external" href="https://github.com/baldurk/renderdoc/tree/v1.x/docs/pycharm_helpers">pycharm_helpers folder</a>. Copying the content of the plugins folder over the folder in your PyCharm installation will update the file that is customised. You can back it up beforehand at this path: <code class="docutils literal notranslate"><span class="pre">plugins/python-ce/helpers/generator3/module_redeclarator.py</span></code>.</p>
+<p>If you’re using a different version of PyCharm you can try to apply the patch also available in that folder.</p>
+</section>
+<section id="id1">
+<h2>Configuring python module for PyCharm<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+<p>You can now launch PyCharm and open or create the python project where you’ll be writing code. Now we’ll configure the python interpreter. This must match the python version that you built against above - the same major and minor version, and the same bitness (32-bit to 32-bit or 64-bit to 64-bit).</p>
+<p>Go into <span class="guilabel">File</span> enter <span class="guilabel">Settings</span>. On the left you can go into the project and to <span class="guilabel">Python Interpreter</span>.</p>
+<p>In the first entry click the gear next to <span class="guilabel">Python Interpreter</span> and choose <span class="guilabel">Add</span> if the interpreter you want isn’t available. You can now configure a System Interpreter with the correct version as above.</p>
+<p>Once you’ve chosen the correct interpreter we’ll also tell it where to find the RenderDoc libraries since they won’t be in the default python path. Go back to the gear wheel but this time select <span class="guilabel">Show All</span>. With your chosen interpreter selected click on the tree icon at the bottom labeled <code class="docutils literal notranslate"><span class="pre">Show</span> <span class="pre">paths</span> <span class="pre">for</span> <span class="pre">the</span> <span class="pre">selected</span> <span class="pre">interpreter</span></code> and add the directory where you have the <code class="docutils literal notranslate"><span class="pre">renderdoc</span></code> and <code class="docutils literal notranslate"><span class="pre">qrenderdoc</span></code> modules, as well as the <code class="docutils literal notranslate"><span class="pre">renderdoc</span></code> library.</p>
+<p>If everything went well, PyCharm should load that interpreter for the project and discover the renderdoc python modules. It will then generate stubs for them with correct typing information so you can benefit from proper autocomplete while writing python code.</p>
+</section>
+<section id="troubleshooting-pycharm">
+<h2>Troubleshooting PyCharm<a class="headerlink" href="#troubleshooting-pycharm" title="Permalink to this headline">¶</a></h2>
+<p>If you get an error about “No module named ‘renderdoc’” then something has gone wrong with how the interpreter finds and loads the python module. Ensure you have the right path specified and that the interpreter is the correctly matching version for the python module you compiled.</p>
+<p>To regenerate the generated python stubs delete your <code class="docutils literal notranslate"><span class="pre">python_stubs</span></code> folder in the JetBrains local cache. On windows this is in <code class="docutils literal notranslate"><span class="pre">%LOCALAPPDATA%/JetBrains</span></code>.</p>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="ui_extensions.html" class="btn btn-neutral float-right" title="Writing UI extensions" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="examples/qrenderdoc_intro.html" class="btn btn-neutral float-left" title="Getting Started (RenderDoc UI)" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

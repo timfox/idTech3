@@ -1,0 +1,366 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Features &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/getting_started/features.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Tips &amp; Tricks" href="tips_tricks.html" />
+    <link rel="prev" title="Gotchas &amp; Known Issues" href="gotchas_known_issues.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting started</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="quick_start.html">Quick Start</a></li>
+<li class="toctree-l2"><a class="reference internal" href="faq.html">FAQ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gotchas_known_issues.html">Gotchas &amp; Known Issues</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Features</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#current-common-feature-set">Current Common Feature set</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#d3d11">D3D11</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#d3d12">D3D12</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#vulkan">Vulkan</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#opengl-opengl-es">OpenGL &amp; OpenGL ES</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="tips_tricks.html">Tips &amp; Tricks</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../python_api/index.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../how/index.html">How do I …?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">Getting started</a> &raquo;</li>
+        
+      <li>Features</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/getting_started/features.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="features">
+<h1>Features<a class="headerlink" href="#features" title="Permalink to this headline">¶</a></h1>
+<p>This page documents the current feature set of RenderDoc. This gives an overview of what RenderDoc is capable of, and where it is in its development.</p>
+<p>Currently RenderDoc supports Vulkan, D3D11, D3D12, OpenGL, and OpenGL ES on Windows, Linux, Android, and Nintendo Switch <sup>TM</sup>. The UI runs in Qt and will work on any desktop platform.</p>
+<p>RenderDoc can also double as an image viewer in a simplistic fashion, separate to its functionality as a debugger. Drag in or open any of a variety of image file formats and RenderDoc will display them as if they were the only texture in a capture. This way it can be used as a simple e.g. dds viewer, with support for all sorts of formats, encodings and things typical image viewers don’t tend to handle like mips, cubemaps and arrays.</p>
+<section id="current-common-feature-set">
+<h2>Current Common Feature set<a class="headerlink" href="#current-common-feature-set" title="Permalink to this headline">¶</a></h2>
+<ul>
+<li><p>Trimming capture - capture file only contains data necessary for replaying the frame in question, not all textures &amp; buffers ever created in the lifetime of the app.</p></li>
+<li><p>Optional network support. The main way RenderDoc is used is capture &amp; replay on the same machine, but you can also attach over the network, and replay on a remote host.</p></li>
+<li><p>Multiple frame capture with ability to open side-by-side to compare.</p></li>
+<li><p>Event browsing, with API standard tree of markers.</p></li>
+<li><p>Full graphics pipeline state display.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Resources bound to the pipeline are trimmed to what is actually in use, e.g. if a shader only references a texture in the first binding slot, textures in other binding slots will not be displayed by default.</p></li>
+<li><p>Where available through the API, friendly debug names are displayed along with reflection data with the shader to clarify usage.</p></li>
+<li><p>Export of the pipeline to HTML file.</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Shader source display (where possible - i.e. debug info available) and otherwise disassembly where appropriate (when the API has a concept of a compiled binary representation).</p></li>
+<li><p>Timeline bar of the scene hierarchy.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Displays scene left-to-right in time, event hierarchy top-to-bottom.</p></li>
+<li><p><em>Not</em> scaled based on time of each action</p></li>
+<li><p>Individual actions are shown as dots when the tree is full expanded.</p></li>
+<li><p>The currently selected resource in the texture viewer is highlighted below individual actions visible that use it - e.g. orange for ‘used for read’, pale blue for ‘used for write’</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Flexible resource inspector.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Anywhere in the UI that a resource is mentioned by name or handle, it is linked back to the resource inspector.</p></li>
+<li><p>Contains full list of all resources and API objects.</p></li>
+<li><p>Each resource is linked to any parent or child object, visualising construction dependencies.</p></li>
+<li><p>The API calls used to create the object before its use in the frame are displayed.</p></li>
+<li><p>Any object can be renamed, and its name automatically updates everywhere in the UI.</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>For each action, a list of all API calls (state/resource setting) is available, with each call optionally having a complete callstack to locate where it came from in-app.</p></li>
+<li><p>Mesh buffer inspection and visualisation before/after vertex shader and at the end of the geometry pipeline (after GS or DS, whichever is later). All views have arcball and flycam controls, Projected data is not limited to the 2D viewport, RenderDoc attempts to unproject to allow viewing in world-space.</p></li>
+<li><p>More advanced mesh visualisation such as viewing other components as position (e.g. to render a mesh in UV space), and visual mesh picking from both input and output panes.</p></li>
+<li><p>‘Raw’ buffer inspection for buffers. Custom format can be set with HLSL-lite or GLSL-lite syntax.</p></li>
+<li><p>Buffer export to CSV or raw binary blob and texture saving to DDS.</p></li>
+<li><p>Texture/render target viewer.</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>List of textures/RTs in the frame, and filtering system.</p></li>
+<li><p>Standard visualisation controls - zoom/fit to window, mip/face/slice selection.</p></li>
+<li><p>RGBA channels or depth/stencil selection as appropriate for the type of resource.</p></li>
+<li><p>Flexible ‘range’ selection tool, to set custom black/white points (default to 0 and 1).</p></li>
+<li><p>Currently set RT/textures thumbnail strip - updates as you move through the frame. Follows the currently selected pipeline slot as it changes, rather than remaining on the given texture.</p></li>
+<li><p>Tabbed view for locking a view of a particular resource over time.</p></li>
+<li><p>Pixel value picking.</p></li>
+<li><p>Save (in theory) any type of texture and format to various formats, dds as well as regular png/jpg.</p></li>
+<li><p>Several debug overlays for render targets - Wireframe, Depth pass/fail, Stencil pass/fail, Clipping (below black/above white points), NaN/-ve/INF highlight, quad overdraw, triangle size.</p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Custom visualisation shader support - e.g. decode custom packed formats or gbuffers.</p></li>
+<li><p>Hot shader editing and replacement.</p></li>
+<li><p>Pixel history support to determine the set of changes of a given pixel.</p></li>
+<li><p>Auto-range fitting to min/max values in texture data, and histogram display.</p></li>
+<li><p>Simple per-action timings and tabular view of GPU counter data.</p></li>
+<li><p>Python scripting console with full documented API, giving complete access to RenderDoc internals, core data structures, and the Qt UI itself.</p></li>
+<li><p>Import and Export of captures</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>Captures have an internal in-memory representation containing the full serialised data of all function calls, as well as associated metadata.</p></li>
+<li><p>This capture representation can be used to export an <code class="docutils literal notranslate"><span class="pre">.rdc</span></code> file to another form that’s easier for external tools to work with such as <code class="docutils literal notranslate"><span class="pre">.xml</span></code>.</p></li>
+<li><p>If the external format contains full expression of data, it can then be imported again back into an <code class="docutils literal notranslate"><span class="pre">.rdc</span></code> after modification.</p></li>
+<li><p>This also allows generation of RenderDoc captures from arbitrary data into a standard format.</p></li>
+</ul>
+</div></blockquote>
+</li>
+</ul>
+<p>Most of these should be intuitive if you’ve used a graphics debugger before.</p>
+</section>
+<section id="d3d11">
+<h2>D3D11<a class="headerlink" href="#d3d11" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>Support for D3D11 up to D3D11.4, Windows Vista and above. Where hardware support isn’t available for feature level 11, WARP will be used.</p></li>
+<li><p>Debug marker support comes from any available D3D interface (ID3DUserDefinedAnnotation, D3DPERF_ functions, etc)</p></li>
+<li><p>Vertex, Pixel and Compute shader debugging.</p></li>
+<li><p>Detailed statistics on API call usage throughout the frame.</p></li>
+</ul>
+</section>
+<section id="d3d12">
+<h2>D3D12<a class="headerlink" href="#d3d12" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>Support for D3D12 up to D3D12.9, Windows 10 and above, and D3D12On7 on Windows 7.</p></li>
+<li><p>Debug marker uses the SetMarker/BeginEvent/EndEvent functions on the command list or queue.</p></li>
+<li><p>Vertex, Pixel and Compute shader debugging.</p></li>
+</ul>
+</section>
+<section id="vulkan">
+<h2>Vulkan<a class="headerlink" href="#vulkan" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>Support for Vulkan 1.4 on Windows, Linux, and Android.</p></li>
+<li><p>Event markers and object naming both come from <code class="docutils literal notranslate"><span class="pre">VK_EXT_debug_utils</span></code> or deprecated <code class="docutils literal notranslate"><span class="pre">VK_EXT_debug_marker</span></code>.</p></li>
+<li><p>Vertex, Pixel, Mesh, and Compute shader debugging.</p></li>
+</ul>
+<p>Captures have a very limited amount of portability between machines. Many hardware-specific feature uses are baked into captures, and portability depends on how similar the capture and replay hardware are, whether these feature uses can map the same in both cases. Captures are however completely portable between different OSes with sufficiently comparable hardware.</p>
+</section>
+<section id="opengl-opengl-es">
+<h2>OpenGL &amp; OpenGL ES<a class="headerlink" href="#opengl-opengl-es" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>Support for OpenGL Core profile 3.2 - 4.6 on Windows and Linux.</p></li>
+<li><p>Support for OpenGL ES 2.0 - 3.2 on Linux, Windows, and Android.</p></li>
+<li><p>Tree hierarchy of events defined by any of the standard or vendor-specific extensions, and <code class="docutils literal notranslate"><span class="pre">KHR_debug</span></code> object labels used for object naming.</p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="tips_tricks.html" class="btn btn-neutral float-right" title="Tips &amp; Tricks" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="gotchas_known_issues.html" class="btn btn-neutral float-left" title="Gotchas &amp; Known Issues" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

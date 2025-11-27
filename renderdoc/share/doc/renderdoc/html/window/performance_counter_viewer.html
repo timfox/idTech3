@@ -1,0 +1,300 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Performance Counter Viewer &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/window/performance_counter_viewer.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Capture Comments" href="capture_comments.html" />
+    <link rel="prev" title="Resource Inspector" href="resource_inspector.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../python_api/index.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../how/index.html">How do I …?</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Window reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="texture_viewer.html">Texture Viewer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="api_inspector.html">API Inspector</a></li>
+<li class="toctree-l2"><a class="reference internal" href="mesh_viewer.html">Mesh Viewer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="buffer_viewer.html">Buffer Viewer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="capture_attach.html">Capture Dialog</a></li>
+<li class="toctree-l2"><a class="reference internal" href="event_browser.html">Event Browser</a></li>
+<li class="toctree-l2"><a class="reference internal" href="settings_window.html">Settings Window</a></li>
+<li class="toctree-l2"><a class="reference internal" href="pipeline_state.html">Pipeline State</a></li>
+<li class="toctree-l2"><a class="reference internal" href="shader_viewer.html">Shader Viewer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="shader_messages.html">Shader Messages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="timeline_bar.html">Timeline Bar</a></li>
+<li class="toctree-l2"><a class="reference internal" href="capture_connection.html">Capture Connection</a></li>
+<li class="toctree-l2"><a class="reference internal" href="debug_messages.html">Debug Messages</a></li>
+<li class="toctree-l2"><a class="reference internal" href="python_shell.html">Python Shell</a></li>
+<li class="toctree-l2"><a class="reference internal" href="resource_inspector.html">Resource Inspector</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Performance Counter Viewer</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#counter-selection">Counter selection</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#counter-results">Counter Results</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#hardware-counters">Hardware Counters</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="capture_comments.html">Capture Comments</a></li>
+</ul>
+</li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">Window reference</a> &raquo;</li>
+        
+      <li>Performance Counter Viewer</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/window/performance_counter_viewer.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="performance-counter-viewer">
+<h1>Performance Counter Viewer<a class="headerlink" href="#performance-counter-viewer" title="Permalink to this headline">¶</a></h1>
+<p>The performance counter viewer provides a very simple way to fetch the results of GPU counters across all events in a capture.</p>
+<section id="counter-selection">
+<h2>Counter selection<a class="headerlink" href="#counter-selection" title="Permalink to this headline">¶</a></h2>
+<p>Once a capture is opened, clicking the <span class="guilabel">Capture Counters</span> button will open up the selection dialog, listing all of the counters available.</p>
+<figure class="align-default" id="id1">
+<img alt="../_images/counter_selection.png" src="../_images/counter_selection.png" />
+<figcaption>
+<p><span class="caption-text">Performance Counter Viewer: Selecting the set of counters.</span><a class="headerlink" href="#id1" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>On the left-hand side will be a tree view with the available counters. These will be grouped in a hierarchy to allow for easier browsing.</p>
+<p>When a counter is selected, the counter description will list a brief summary of what value or quantity the counter is measuring and may indicate where it is useful.</p>
+<p>Each counter has a checkbox, as well as each category. Counters can be toggled individually, or else whole categories can be toggled on and off at once which enables or disables all counters within that category. On the lower right is a list of all enabled counters - double clicking on any counter will jump to it in the list and display its description.</p>
+<p>The set of counters to be sampled can be saved and loaded to a configuration file using the <span class="guilabel">Save</span> and <span class="guilabel">Load</span> buttons.</p>
+</section>
+<section id="counter-results">
+<h2>Counter Results<a class="headerlink" href="#counter-results" title="Permalink to this headline">¶</a></h2>
+<p>When clicking <span class="guilabel">Sample Counters</span> in the counter selection dialog above, RenderDoc will then iterate over every event and fetch all of the data for the selected counters, and display it in a large table.</p>
+<figure class="align-default" id="id2">
+<img alt="../_images/counter_view.png" src="../_images/counter_view.png" />
+<figcaption>
+<p><span class="caption-text">Performance Counter Viewer: Viewing the results of the counters.</span><a class="headerlink" href="#id2" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>By default the table is sorted by EID, but each column is sortable individually so that you can easily identify the action with the highest or lowest value for any given counter.</p>
+<p>Clicking the <img alt="save" src="../_images/save.png" /> button lets you save the results of the counters as CSV.</p>
+</section>
+<section id="hardware-counters">
+<h2>Hardware Counters<a class="headerlink" href="#hardware-counters" title="Permalink to this headline">¶</a></h2>
+<p>RenderDoc ships with support for AMD’s GPA library, which will allow access to AMD’s hardware counters when running with a supported AMD GPU.</p>
+<p>RenderDoc also has support for nVidia’s NvPerfKit library, but it does not ship as the library’s license forbids redistribution. To enable support, place the <code class="docutils literal notranslate"><span class="pre">NvPmApi.Core.dll</span></code> file into either <code class="docutils literal notranslate"><span class="pre">plugins/nv/counters/x64</span></code> for 64-bit RenderDoc builds and <code class="docutils literal notranslate"><span class="pre">plugins/nv/counters/x86</span></code> for 32-bit RenderDoc builds.</p>
+<p>Similarly RenderDoc has support for nVidia’s Nsight Perf SDK, but this library’s license also forbids redistribution. To enable support, follow these steps:</p>
+<ol class="arabic simple">
+<li><p>Download the Nsight Perf SDK from: <a class="reference external" href="https://developer.nvidia.com/nsight-perf-sdk">https://developer.nvidia.com/nsight-perf-sdk</a>.</p></li>
+<li><p>Extract the contents</p></li>
+<li><p>On windows copy <code class="docutils literal notranslate"><span class="pre">nvperf_grfx_host.dll</span></code> and on linux copy <code class="docutils literal notranslate"><span class="pre">libnvperf_grfx_host.*</span></code> to the plugins folder in <code class="docutils literal notranslate"><span class="pre">renderdoc/plugins/nv</span></code> in your user directory.</p></li>
+</ol>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="capture_comments.html" class="btn btn-neutral float-right" title="Capture Comments" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="resource_inspector.html" class="btn btn-neutral float-left" title="Resource Inspector" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>
