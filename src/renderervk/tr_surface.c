@@ -160,6 +160,18 @@ void RB_AddQuadStamp2( float x, float y, float w, float h, float s1, float t1, f
 	numIndexes = tess.numIndexes;
 	numVerts = tess.numVertexes;
 
+#ifdef USE_VULKAN
+	// Optional debug logging for 2D/UI quads; helps diagnose console/menu corruption
+	if ( r_vk_debug2D && r_vk_debug2D->integer ) {
+		if ( tess.numVertexes + 4 > SHADER_MAX_VERTEXES - 64 ||
+			 tess.numIndexes  + 6 > SHADER_MAX_INDEXES  - 64 ) {
+			ri.Printf( PRINT_DEVELOPER,
+				"RB_AddQuadStamp2: near tess limit v=%d i=%d (adding 4/6) at xywh=(%.1f,%.1f,%.1f,%.1f)\n",
+				tess.numVertexes, tess.numIndexes, x, y, w, h );
+		}
+	}
+#endif
+
 	tess.numVertexes += 4;
 	tess.numIndexes += 6;
 

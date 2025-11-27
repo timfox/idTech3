@@ -439,6 +439,12 @@ void GL_ClientState( int unit, unsigned stateBits )
 #endif
 
 
+#ifdef USE_VULKAN
+// Per-frame 2D/UI debug stats (only used when r_vk_debug2D is enabled)
+static int      rb_debug2D_quadCount;
+static qboolean rb_debug2D_hasFullscreen;
+#endif
+
 static void RB_SetGL2D( void );
 
 /*
@@ -1203,8 +1209,13 @@ static const void *RB_StretchPic( const void *data ) {
 	}
 
 #ifdef USE_VULKAN
-	if ( r_bloom->integer ) {
-		vk_bloom();
+	if ( r_vk_debug2D && r_vk_debug2D->integer ) {
+		// Count all 2D quads this frame, and detect likely full-screen backgrounds
+		rb_debug2D_quadCount++;
+		if ( cmd->x <= 0.1f && cmd->y <= 0.1f &&
+		     cmd->w >= 639.9f && cmd->h >= 479.9f ) {
+			rb_debug2D_hasFullscreen = qtrue;
+		}
 	}
 #endif
 
@@ -1406,7 +1417,27 @@ static const void *RB_DrawSurfs( const void *data ) {
 	}
 #endif
 
-	RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+#ifdef USE_VULKAN
+	// Debug mode: skip all 3D world rendering and only draw 2D UI/console/HUD
+	if ( r_vk_debugUiOnly && r_vk_debugUiOnly->integer ) {
+		backEnd.doneSurfaces = qtrue; // so post-process and UI paths still run
+		return (const void *)(cmd + 1);
+	}
+
+#ifdef USE_VULKAN_RAY_TRACING
+	// In RT mode, let ray tracing provide the world shading instead of raster.
+	// We only enable this for real world views (no UI-only/cinematic)
+	if ( r_raytracing && r_raytracing->integer &&
+	     vk.rayTracingSupported && vk.rt.initialized &&
+	     !( cmd->refdef.rdflags & RDF_NOWORLDMODEL ) ) {
+		backEnd.useRayTracingWorld = qtrue;
+		// Skip raster world surfaces; vk_end_frame will invoke the RT path.
+	} else
+#endif // USE_VULKAN_RAY_TRACING
+#endif // USE_VULKAN
+	{
+		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+	}
 
 #ifdef USE_VBO
 	VBO_UnBind();
@@ -1433,10 +1464,24 @@ static const void *RB_DrawSurfs( const void *data ) {
 	RB_DebugGraphics();
 
 #ifdef USE_VULKAN
-	if ( cmd->refdef.switchRenderPass ) {
-		vk_end_render_pass();
-		vk_begin_main_render_pass();
-		backEnd.screenMapDone = qtrue;
+	if ( cmd->refdef.switchRenderPass || tr.needScreenMap ) {
+		if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
+			vk_end_render_pass();
+		}
+		
+		if ( vk_capture_screenmap() ) {
+			backEnd.screenMapDone = qtrue;
+			ri.Printf( PRINT_DEVELOPER, "VK: screenMap captured after 3D world, screenMapDone = qtrue\n" );
+		} else {
+			backEnd.screenMapDone = qfalse;
+			if ( tr.needScreenMap ) {
+				ri.Printf( PRINT_DEVELOPER, "VK: screenMap capture failed or not needed (menu-only frame?)\n" );
+			}
+		}
+		
+		if ( vk.renderPassIndex >= RENDER_PASS_COUNT ) {
+			vk_begin_main_render_pass();
+		}
 	}
 #endif
 
@@ -1458,6 +1503,15 @@ static const void *RB_DrawBuffer( const void *data ) {
 	cmd = (const drawBufferCommand_t *)data;
 
 #ifdef USE_VULKAN
+	// Reset per-frame 2D/UI debug stats at the start of a frame
+	rb_debug2D_quadCount = 0;
+	rb_debug2D_hasFullscreen = qfalse;
+
+#ifdef USE_VULKAN_RAY_TRACING
+	// Default to raster world; RB_DrawSurfs may enable RT for the main view.
+	backEnd.useRayTracingWorld = qfalse;
+#endif
+
 	vk_begin_frame();
 
 	tess.depthRange = DEPTH_RANGE_NORMAL;
@@ -1706,9 +1760,10 @@ static const void *RB_FinishBloom( const void *data )
 	RB_EndSurface();
 
 #ifdef USE_VULKAN
-	if ( r_bloom->integer ) {
-		vk_bloom();
-	}
+	// Bloom should only run once per frame in vk_end_frame(), not from 2D/UI paths.
+	// This prevents bloom from running mid-frame and ensures a clean framegraph.
+	// The RB_FinishBloom command is still processed, but bloom execution is deferred to vk_end_frame().
+	// (Removed: vk_bloom() call - bloom now runs exclusively in vk_end_frame())
 #endif
 
 	// texture swapping test
@@ -1739,6 +1794,14 @@ static const void *RB_SwapBuffers( const void *data ) {
 	tr.needScreenMap = 0;
 
 #ifdef USE_VULKAN
+	// Emit per-frame 2D/UI stats when requested
+	if ( r_vk_debug2D && r_vk_debug2D->integer ) {
+		ri.Printf( PRINT_DEVELOPER,
+			"VK 2D frame: quads=%d fullScreenBackground=%s\n",
+			rb_debug2D_quadCount,
+			rb_debug2D_hasFullscreen ? "yes" : "no" );
+	}
+
 	vk_end_frame();
 
 	if ( backEnd.doneSurfaces && !glState.finishCalled ) {

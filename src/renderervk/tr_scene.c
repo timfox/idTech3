@@ -537,33 +537,29 @@ void RE_RenderScene( const refdef_t *fd ) {
 #ifdef USE_VULKAN
 	if ( tr.needScreenMap )
 	{
-		if ( lastRenderCommand == RC_DRAW_BUFFER )
+		// Duplicate draw surfaces so we can capture after the first pass and
+		// immediately redraw the subset that samples $currentRender.
+		drawSurfsCommand_t *cmd, *src = NULL;
+		int i;
+
+		for ( i = 0; i < tr.numDrawSurfCmds; i++ )
 		{
-			// duplicate all views, including portals
-			drawSurfsCommand_t *cmd, *src = NULL;
-			int i;
-
-			for ( i = 0; i < tr.numDrawSurfCmds; i++ )
+			cmd = R_GetCommandBuffer( sizeof( *cmd ) );
+			if ( cmd )
 			{
-				cmd = R_GetCommandBuffer( sizeof( *cmd ) );
-				if ( cmd )
-				{
-					src = tr.drawSurfCmd + i;
-					*cmd = *src;
-				}
-				else
-				{
-					break;
-				}
+				src = tr.drawSurfCmd + i;
+				*cmd = *src;
 			}
-
-			if ( src )
+			else
 			{
-				// first drawsurface
-				tr.drawSurfCmd[0].refdef.needScreenMap = qtrue;
-				// last drawsurface
-				src->refdef.switchRenderPass = qtrue;
+				break;
 			}
+		}
+
+		if ( src )
+		{
+			tr.drawSurfCmd[0].refdef.needScreenMap = qtrue;
+			src->refdef.switchRenderPass = qtrue;
 		}
 
 		tr.needScreenMap = 0;

@@ -4555,10 +4555,10 @@ static void FS_ReorderSearchPaths( void ) {
 	// Within directories, mod directories (non-base) should come before base directories
 	// This ensures mod .so files are found before base game files
 	if ( npaks > 0 ) {
-		fs_searchpaths = list[0];
+	fs_searchpaths = list[0];
 		for ( i = 0; i < npaks-1; i++ ) {
-			list[i]->next = list[i+1];
-		}
+		list[i]->next = list[i+1];
+	}
 		if ( ndirs > 0 ) {
 			list[npaks-1]->next = dirs[0];
 			for ( i = 0; i < ndirs-1; i++ ) {

@@ -5,6 +5,8 @@ output/
 *.user
 cmake-*
 .idea
-QuakeUSD/
+usdinterop/
 release/
 blacksun/
+q3rtx/
+wolf/

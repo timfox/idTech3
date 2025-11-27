@@ -711,13 +711,18 @@ static void vk_create_render_passes( void )
 		attachments[0].format = vk.color_format;
 		attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
 
+		// Always clear color_image to prevent corruption on menu-only frames
+		// Menu frames may not call RB_ClearColor() or may not cover the full image,
+		// so we must clear at render pass start to ensure all pixels are initialized
 #ifdef USE_BUFFER_CLEAR
 		if ( vk.msaaActive )
-			attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;	// Assuming this will be completely overwritten
+			// With MSAA, the resolve attachment gets cleared, so we can use DONT_CARE for the MSAA attachment
+			attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		else
 			attachments[ 0 ].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 #else
-		attachments[ 0 ].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;	// Assuming this will be completely overwritten
+		// Even without USE_BUFFER_CLEAR, we must clear to prevent menu corruption
+		attachments[ 0 ].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 #endif
 
 		attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;   // needed for next render pass
@@ -938,7 +943,9 @@ static void vk_create_render_passes( void )
 	attachments[0].flags = 0;
 	attachments[0].format = vk.present_format.format;
 	attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
-	attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+	// Clear to black to ensure letterbox regions and any unwritten pixels are initialized
+	// This prevents corruption on menu screens where the viewport might not cover all pixels
+	attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE; // needed for presentation
 	attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -956,17 +963,15 @@ static void vk_create_render_passes( void )
 	desc.pDependencies = &deps[0];
 
 	// screenmap resolve/color buffer
+	// CRITICAL: Always clear screenMap at render pass start to prevent stale data corruption.
+	// screenMap is captured via blit (not render pass), so we must ensure it's cleared
+	// before capture. Even if the render pass isn't used, clearing prevents corruption
+	// when screenMap contains garbage from previous frames (especially on menu-only frames).
 	attachments[0].flags = 0;
 	attachments[0].format = vk.color_format;
 	attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
-#ifdef USE_BUFFER_CLEAR
-	if ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT )
-		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-	else
-		attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-#else
-	attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; // Assuming this will be completely overwritten
-#endif
+	// Always clear screenMap to prevent stale data - this is critical for UI corruption fixes
+	attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 	attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;   // needed for next render pass
 	attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 	attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
@@ -1339,15 +1344,48 @@ static void vk_alloc_staging_buffer( VkDeviceSize size )
 
 
 #ifdef USE_VK_VALIDATION
-static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT object_type, uint64_t object, size_t location,
-	int32_t message_code, const char* layer_prefix, const char* message, void* user_data) {
+static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
+	VkDebugReportFlagsEXT flags,
+	VkDebugReportObjectTypeEXT object_type,
+	uint64_t object,
+	size_t location,
+	int32_t message_code,
+	const char* layer_prefix,
+	const char* message,
+	void* user_data )
+{
+	const char *severity = "INFO";
+
+	if ( flags & VK_DEBUG_REPORT_ERROR_BIT_EXT ) {
+		severity = S_COLOR_RED "ERROR";
+	} else if ( flags & VK_DEBUG_REPORT_WARNING_BIT_EXT ) {
+		severity = S_COLOR_YELLOW "WARN";
+	} else if ( flags & VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT ) {
+		severity = S_COLOR_CYAN "PERF";
+	} else if ( flags & VK_DEBUG_REPORT_INFORMATION_BIT_EXT ) {
+		severity = "INFO";
+	} else if ( flags & VK_DEBUG_REPORT_DEBUG_BIT_EXT ) {
+		severity = "DEBUG";
+	}
+
+	ri.Printf(
+		PRINT_WARNING,
+		"VK VALIDATION [%s] layer=%s code=%d object=0x%llx type=%d msg=%s\n",
+		severity,
+		layer_prefix ? layer_prefix : "unknown",
+		message_code,
+		(unsigned long long)object,
+		(int)object_type,
+		message ? message : "(null)" );
+
 #ifdef _WIN32
-	MessageBoxA( 0, message, layer_prefix, MB_ICONWARNING );
+	MessageBoxA( 0, message ? message : "(null)", layer_prefix ? layer_prefix : "VK_VALIDATION", MB_ICONWARNING );
 	OutputDebugString(message);
 	OutputDebugString("\n");
 	DebugBreak();
 #endif
-	return VK_FALSE;
+
+	return VK_FALSE; // Never block execution; just log.
 }
 #endif
 
@@ -4842,7 +4880,7 @@ void vk_initialize( void )
 		VK_CHECK( qvkCreatePipelineCache( vk.device, &ci, NULL, &vk.pipelineCache ) );
 	}
 
-	vk.renderPassIndex = RENDER_PASS_MAIN; // default render pass
+	vk.renderPassIndex = RENDER_PASS_COUNT; // No render pass active initially
 
 	// swapchain
 	vk.initSwapchainLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
@@ -5901,8 +5939,8 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 			layout = vk.pipeline_layout_post_process;
 			samples = VK_SAMPLE_COUNT_1_BIT;
 			pipeline_name = "RT composite pipeline";
-			blend = qfalse;
-			break;
+            blend = qfalse;
+            break;
 #endif
 		default: // gamma correction
 			pipeline = &vk.gamma_pipeline;
@@ -6009,11 +6047,14 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	// Viewport.
 	//
 	if ( program_index == 0 ) {
-		// gamma correction
-		viewport.x = 0.0 + vk.blitX0;
-		viewport.y = 0.0 + vk.blitY0;
-		viewport.width = gls.windowWidth - vk.blitX0 * 2;
-		viewport.height = gls.windowHeight - vk.blitY0 * 2;
+		// gamma correction - MUST cover full swapchain extent to prevent corruption
+		// Letterboxing is handled by the shader sampling from the correct region of color_image,
+		// not by restricting the viewport. The viewport must cover the entire swapchain
+		// so all pixels are written (letterbox regions will be black from clear).
+		viewport.x = 0.0;
+		viewport.y = 0.0;
+		viewport.width = (float)gls.windowWidth;
+		viewport.height = (float)gls.windowHeight;
 	} else {
 		// other post-processing
 		viewport.x = 0.0;
@@ -7802,7 +7843,18 @@ void vk_clear_color( const vec4_t color ) {
 	attachment.clearValue.color.float32[3] = color[3];
 	attachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 
-	get_scissor_rect( &clear_rect.rect );
+	// For 2D/menu rendering, always clear the full image extent to prevent corruption
+	// The scissor rect clamping might cut off bottom rows if there's any mismatch
+	if ( backEnd.projection2D ) {
+		// Full-screen clear: use the actual render dimensions, not scissor-clamped
+		clear_rect.rect.offset.x = 0;
+		clear_rect.rect.offset.y = 0;
+		clear_rect.rect.extent.width = vk.renderWidth;
+		clear_rect.rect.extent.height = vk.renderHeight;
+	} else {
+		// For 3D rendering, use scissor rect (may be viewport-restricted)
+		get_scissor_rect( &clear_rect.rect );
+	}
 	clear_rect.baseArrayLayer = 0;
 	clear_rect.layerCount = 1;
 
@@ -8259,6 +8311,15 @@ static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBu
 		// [1] - depth/stencil
 		// [2] - multisampled color, optional
 		Com_Memset( clear_values, 0, sizeof( clear_values ) );
+		// Default clear color is black; in debug mode we can choose a bright color
+		// for the final gamma pass to highlight any uncleared regions.
+		if ( r_vk_debugClearColor && r_vk_debugClearColor->integer &&
+		     renderPass == vk.render_pass.gamma ) {
+			clear_values[0].color.float32[0] = 1.0f; // magenta
+			clear_values[0].color.float32[1] = 0.0f;
+			clear_values[0].color.float32[2] = 1.0f;
+			clear_values[0].color.float32[3] = 1.0f;
+		}
 #ifndef USE_REVERSED_DEPTH
 		clear_values[1].depthStencil.depth = 1.0;
 #endif
@@ -8431,9 +8492,58 @@ void vk_create_brfdlut( void )
 
 void vk_end_render_pass( void )
 {
-	qvkCmdEndRenderPass( vk.cmd->command_buffer );
+	// Only end render pass if one is actually active
+	// We check renderPassIndex to avoid crashing if no render pass was started
+	if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
+		qvkCmdEndRenderPass( vk.cmd->command_buffer );
+		vk.renderPassIndex = RENDER_PASS_COUNT; // Mark as no active render pass
+	}
 
 //	vk.renderPassIndex = RENDER_PASS_MAIN;
+}
+
+
+// Synchronize the final color image so fullscreen passes can safely sample it.
+void vk_barrier_final_image_to_shader_read( VkImage image )
+{
+	if ( image == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	VkImageMemoryBarrier barrier = {};
+	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barrier.pNext = NULL;
+	barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image = image;
+	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	barrier.subresourceRange.baseMipLevel = 0;
+	barrier.subresourceRange.levelCount = 1;
+	barrier.subresourceRange.baseArrayLayer = 0;
+	barrier.subresourceRange.layerCount = 1;
+
+	// Synchronize: wait for color attachment output (including clears) to complete before fragment shader reads.
+	// This is critical for menu-only frames where the image was only cleared, not drawn to.
+	// CRITICAL: The render pass's finalLayout already transitions the image to SHADER_READ_ONLY_OPTIMAL,
+	// but we still need this barrier for proper synchronization between the render pass ending
+	// and the gamma pass beginning. The barrier ensures all color attachment writes (including clears)
+	// are visible to the fragment shader before sampling begins.
+	// 
+	// Note: We use SHADER_READ_ONLY_OPTIMAL for both oldLayout and newLayout because the render pass
+	// already transitioned the layout. This barrier is purely for synchronization, not layout transition.
+	qvkCmdPipelineBarrier(
+		vk.cmd->command_buffer,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		0,
+		0, NULL,
+		0, NULL,
+		1, &barrier
+	);
 }
 
 
@@ -8460,6 +8570,256 @@ static qboolean vk_find_screenmap_drawsurfs( void )
 }
 
 
+// ========================================================================
+// VK_CaptureScreenMap: Copy/blit the main color buffer to screenMap
+// ========================================================================
+// This function captures the current main color buffer (vk.color_image) and
+// copies it to the screenMap image at reduced resolution (1/16th size).
+// screenMap is used by menu/pause shaders for background blur/tint effects.
+//
+// Requirements:
+// - Main color image must be in SHADER_READ_ONLY_OPTIMAL layout (after render pass ends)
+// - screenMap image must exist and be valid
+// - This must be called AFTER the main render pass ends but BEFORE UI rendering
+//
+// After this function completes:
+// - screenMap.color_image contains a downscaled copy of the main scene
+// - screenMap is in SHADER_READ_ONLY_OPTIMAL layout, ready for sampling
+// - backEnd.screenMapDone is set to qtrue (caller responsibility)
+qboolean vk_capture_screenmap( void )
+{
+	if ( !vk.fboActive || vk.screenMap.color_image == VK_NULL_HANDLE || vk.color_image == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+
+	// Optional hard-disable via cvar to isolate bugs/device loss.
+	if ( r_vk_disableScreenMap && r_vk_disableScreenMap->integer ) {
+		if ( tr.needScreenMap ) {
+			ri.Printf( PRINT_DEVELOPER, "VK: screenMap disabled via r_vk_disableScreenMap, using blackImage fallback\n" );
+		}
+		return qfalse;
+	}
+
+	if ( vk.cmd == NULL || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_WARNING, "VK: Cannot capture screenMap - command buffer not available\n" );
+		return qfalse;
+	}
+
+	qboolean needsScreenMap = tr.needScreenMap || vk_find_screenmap_drawsurfs();
+	if ( !needsScreenMap ) {
+		return qfalse;
+	}
+
+	if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
+		ri.Printf( PRINT_WARNING, "VK: Cannot capture screenMap - render pass is still active (index=%d)\n", vk.renderPassIndex );
+		return qfalse;
+	}
+
+	ri.Printf( PRINT_DEVELOPER, "VK: Capturing screenMap from main color buffer (%dx%d -> %dx%d)\n",
+		vk.renderWidth, vk.renderHeight, vk.screenMapWidth, vk.screenMapHeight );
+
+	VkImageMemoryBarrier srcBarrier = {};
+	srcBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	srcBarrier.pNext = NULL;
+	// CRITICAL: vk.color_image layout handling.
+	// After vk_end_render_pass(), the render pass's finalLayout transitions the image to
+	// SHADER_READ_ONLY_OPTIMAL. However, if the render pass wasn't started or ended improperly,
+	// the image might still be in COLOR_ATTACHMENT_OPTIMAL or its initial layout.
+	// 
+	// To handle all cases safely and prevent VK_ERROR_DEVICE_LOST, we use COLOR_ATTACHMENT_OPTIMAL
+	// as oldLayout because:
+	// 1. If render pass was active and ended: finalLayout already transitioned it, but Vulkan allows
+	//    transitioning from COLOR_ATTACHMENT even if current layout is different (with validation warnings)
+	// 2. If render pass wasn't started: image is in initial layout (SHADER_READ_ONLY_OPTIMAL),
+	//    but transitioning from COLOR_ATTACHMENT won't work
+	// 
+	// Actually, the safest approach is to handle both possible layouts. But since we can't know
+	// the actual layout without tracking it, we'll use a two-barrier approach:
+	// 1. First barrier: COLOR_ATTACHMENT_OPTIMAL -> SHADER_READ_ONLY_OPTIMAL (if needed)
+	// 2. Second barrier: SHADER_READ_ONLY_OPTIMAL -> TRANSFER_SRC_OPTIMAL
+	// 
+	// However, for simplicity, let's use COLOR_ATTACHMENT_OPTIMAL as oldLayout and include
+	// both access masks. If the image is actually in SHADER_READ_ONLY_OPTIMAL, this might fail.
+	// 
+	// Actually wait - if finalLayout already transitioned it, we can't transition from COLOR_ATTACHMENT.
+	// We need to use SHADER_READ_ONLY_OPTIMAL, but handle the case where it might still be COLOR_ATTACHMENT.
+	// 
+	// The safest fix: Use COLOR_ATTACHMENT_OPTIMAL and handle the case where it's already transitioned.
+	// But Vulkan doesn't allow that. So we must use SHADER_READ_ONLY_OPTIMAL and ensure the render pass
+	// was properly ended. If device loss occurs, it means the render pass lifecycle is broken.
+	// 
+	// For now, let's try using COLOR_ATTACHMENT_OPTIMAL since that's the state during render pass,
+	// and the finalLayout transition might not be complete yet when we call this.
+	srcBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
+	srcBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+	// CRITICAL: Use SHADER_READ_ONLY_OPTIMAL as oldLayout.
+	// After vk_end_render_pass(), the render pass's finalLayout automatically transitions
+	// vk.color_image from COLOR_ATTACHMENT_OPTIMAL to SHADER_READ_ONLY_OPTIMAL.
+	// This transition happens immediately when the render pass ends, so by the time
+	// vk_capture_screenmap() is called, the image should be in SHADER_READ_ONLY_OPTIMAL.
+	// 
+	// If device loss occurs here, it means the render pass wasn't properly ended or
+	// the finalLayout transition didn't complete. This indicates a bug in the render
+	// pass lifecycle that needs to be fixed.
+	srcBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // Expected after render pass ends
+	srcBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+	srcBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	srcBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	srcBarrier.image = vk.color_image;
+	srcBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	srcBarrier.subresourceRange.baseMipLevel = 0;
+	srcBarrier.subresourceRange.levelCount = 1;
+	srcBarrier.subresourceRange.baseArrayLayer = 0;
+	srcBarrier.subresourceRange.layerCount = 1;
+
+	VkImageMemoryBarrier dstBarrier = {};
+	dstBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	dstBarrier.pNext = NULL;
+	// CRITICAL: screenMap is initialized to SHADER_READ_ONLY_OPTIMAL, so we transition from that.
+	// If screenMap is actually in UNDEFINED (shouldn't happen after init, but be defensive),
+	// Vulkan allows UNDEFINED->any layout transition, but we'll get a validation warning.
+	// To be completely safe, we could check the actual layout, but that's expensive.
+	// Instead, we ensure the image is cleared before blitting, which handles uninitialized data.
+	// CRITICAL: Use UNDEFINED as oldLayout to handle first-use case safely.
+	// Vulkan spec allows UNDEFINED->any layout transition, which always works regardless
+	// of the actual current layout. If screenMap is actually in SHADER_READ_ONLY_OPTIMAL,
+	// this transition still works (Vulkan allows transitioning from UNDEFINED even if
+	// the image is in a different layout). This prevents VK_ERROR_DEVICE_LOST from
+	// layout mismatch errors.
+	dstBarrier.srcAccessMask = 0; // No previous access - UNDEFINED layout has no access requirements
+	dstBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	dstBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Safe for first use - always valid transition
+	dstBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	dstBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	dstBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	dstBarrier.image = vk.screenMap.color_image;
+	dstBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	dstBarrier.subresourceRange.baseMipLevel = 0;
+	dstBarrier.subresourceRange.levelCount = 1;
+	dstBarrier.subresourceRange.baseArrayLayer = 0;
+	dstBarrier.subresourceRange.layerCount = 1;
+
+	VkImageMemoryBarrier barriers[2] = { srcBarrier, dstBarrier };
+	qvkCmdPipelineBarrier(
+		vk.cmd->command_buffer,
+		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		0,
+		0, NULL,
+		0, NULL,
+		2, barriers
+	);
+
+	// Step 2.5: Clear screenMap to black before blitting to prevent stale data corruption
+	// CRITICAL: The blit operation only copies the source region. If screenMap contains
+	// garbage data from previous frames (especially on menu-only frames where screenMap
+	// wasn't used), that garbage will remain and cause checkerboard corruption in UI.
+	// Clearing to black ensures all pixels are initialized before the blit.
+	VkClearColorValue clearColor = { { 0.0f, 0.0f, 0.0f, 1.0f } };
+	VkImageSubresourceRange clearRange = {};
+	clearRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	clearRange.baseMipLevel = 0;
+	clearRange.levelCount = 1;
+	clearRange.baseArrayLayer = 0;
+	clearRange.layerCount = 1;
+	qvkCmdClearColorImage(
+		vk.cmd->command_buffer,
+		vk.screenMap.color_image,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		&clearColor,
+		1, &clearRange
+	);
+
+	// Step 3: Blit from main color buffer to screenMap (downscaled)
+	VkImageBlit blit = {};
+	blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	blit.srcSubresource.mipLevel = 0;
+	blit.srcSubresource.baseArrayLayer = 0;
+	blit.srcSubresource.layerCount = 1;
+	blit.srcOffsets[0].x = 0;
+	blit.srcOffsets[0].y = 0;
+	blit.srcOffsets[0].z = 0;
+	blit.srcOffsets[1].x = vk.renderWidth;
+	blit.srcOffsets[1].y = vk.renderHeight;
+	blit.srcOffsets[1].z = 1;
+
+	blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	blit.dstSubresource.mipLevel = 0;
+	blit.dstSubresource.baseArrayLayer = 0;
+	blit.dstSubresource.layerCount = 1;
+	blit.dstOffsets[0].x = 0;
+	blit.dstOffsets[0].y = 0;
+	blit.dstOffsets[0].z = 0;
+	blit.dstOffsets[1].x = vk.screenMapWidth;
+	blit.dstOffsets[1].y = vk.screenMapHeight;
+	blit.dstOffsets[1].z = 1;
+
+	qvkCmdBlitImage(
+		vk.cmd->command_buffer,
+		vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+		vk.screenMap.color_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		1, &blit,
+		VK_FILTER_LINEAR // Use linear filtering for smooth downscaling
+	);
+
+	// Step 4: Transition images back to their final layouts
+	srcBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+	srcBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	srcBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+	srcBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	dstBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	dstBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	dstBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	dstBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	qvkCmdPipelineBarrier(
+		vk.cmd->command_buffer,
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		0,
+		0, NULL,
+		0, NULL,
+		2, barriers
+	);
+
+	// Step 5: Update screenMap descriptor to ensure shaders sample the correct, fresh image
+	// CRITICAL: The descriptor must be updated after capture to point to the newly written
+	// screenMap image. This ensures UI shaders that bind screenMap via vk.screenMap.color_descriptor
+	// will sample the correct, synchronized image rather than stale data.
+	// Note: vk_update_attachment_descriptors() updates this descriptor, but it's only called
+	// during initialization. We update it here to ensure it's current for this frame.
+	VkDescriptorImageInfo info;
+	VkWriteDescriptorSet desc;
+	Vk_Sampler_Def sd;
+
+	Com_Memset( &sd, 0, sizeof( sd ) );
+	sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+	sd.max_lod_1_0 = qfalse; // Allow mipmaps if needed
+	sd.noAnisotropy = qtrue;
+	sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+
+	info.sampler = vk_find_sampler( &sd );
+	info.imageView = vk.screenMap.color_image_view;
+	info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	desc.pNext = NULL;
+	desc.dstSet = vk.screenMap.color_descriptor;
+	desc.dstBinding = 0;
+	desc.dstArrayElement = 0;
+	desc.descriptorCount = 1;
+	desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	desc.pImageInfo = &info;
+	desc.pBufferInfo = NULL;
+	desc.pTexelBufferView = NULL;
+
+	qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+
+	return qtrue;
+}
+
+
 #ifndef UINT64_MAX
 #define UINT64_MAX 0xFFFFFFFFFFFFFFFFULL
 #endif
@@ -8478,19 +8838,46 @@ void vk_begin_frame( void )
 
 	vk.cmd = &vk.tess[ vk.cmd_index ];
 
+	// CRITICAL: Command buffer lifecycle management
+	// Before reusing a command buffer, we MUST:
+	// 1. Wait for the fence to ensure the previous submission completed
+	// 2. Reset the fence to unsignaled state
+	// 3. Reset the command buffer to allow new recording
+	// Without these steps, we risk VK_ERROR_DEVICE_LOST from invalid command buffer state.
 	if ( vk.cmd->waitForFence ) {
 		vk.cmd->waitForFence = qfalse;
 		res = qvkWaitForFences( vk.device, 1, &vk.cmd->rendering_finished_fence, VK_FALSE, 1e10 );
 		if ( res != VK_SUCCESS ) {
 			if ( res == VK_ERROR_DEVICE_LOST ) {
-				// silently discard previous command buffer
-				ri.Printf( PRINT_WARNING, "Vulkan: %s returned %s", "vkWaitForFences", vk_result_string( res ) );
+				// Device lost - once device is lost, ALL Vulkan operations will fail
+				// We cannot continue rendering. Shut down gracefully.
+				ri.Error( ERR_FATAL, "Vulkan: Device lost detected in vkWaitForFences. "
+					"This indicates a previous frame had invalid Vulkan API usage (invalid barriers, "
+					"layout transitions, or command buffer misuse). Cannot recover - shutting down." );
 			}
 			else {
 				ri.Error( ERR_FATAL, "Vulkan: %s returned %s", "vkWaitForFences", vk_result_string( res ) );
 			}
 		}
-		VK_CHECK( qvkResetFences( vk.device, 1, &vk.cmd->rendering_finished_fence ) );
+		// Reset fence to unsignaled state before reusing
+		// CRITICAL: If device was lost above, we won't reach here due to ri.Error()
+		res = qvkResetFences( vk.device, 1, &vk.cmd->rendering_finished_fence );
+		if ( res != VK_SUCCESS ) {
+			ri.Error( ERR_FATAL, "Vulkan: qvkResetFences returned %s", vk_result_string( res ) );
+		}
+		// CRITICAL: Reset command buffer before reusing - this is required by Vulkan spec
+		// A command buffer must be reset before it can be recorded again after submission
+		res = qvkResetCommandBuffer( vk.cmd->command_buffer, 0 );
+		if ( res != VK_SUCCESS ) {
+			ri.Error( ERR_FATAL, "Vulkan: qvkResetCommandBuffer returned %s", vk_result_string( res ) );
+		}
+	} else {
+		// Even if waitForFence is false (first frame), reset the command buffer to ensure clean state
+		// This handles cases where the command buffer might have been partially recorded
+		res = qvkResetCommandBuffer( vk.cmd->command_buffer, 0 );
+		if ( res != VK_SUCCESS ) {
+			ri.Error( ERR_FATAL, "Vulkan: qvkResetCommandBuffer returned %s", vk_result_string( res ) );
+		}
 	}
 
 	if ( !ri.CL_IsMinimized() && !vk.cmd->swapchain_image_acquired ) {
@@ -8543,13 +8930,12 @@ _retry:
 
 	vk.cmd->last_pipeline = VK_NULL_HANDLE;
 
+	// CRITICAL: Reset screenMapDone at the start of each frame.
+	// It will be set to qtrue only after screenMap is successfully captured.
 	backEnd.screenMapDone = qfalse;
 
-	if ( vk_find_screenmap_drawsurfs() ) {
-		vk_begin_screenmap_render_pass();
-	} else {
-		vk_begin_main_render_pass();
-	}
+	// Always use the main render pass - screenMap will be captured via copy/blit later
+	vk_begin_main_render_pass();
 
 	// dynamic vertex buffer layout
 	vk.cmd->uniform_read_offset = 0;
@@ -8597,6 +8983,7 @@ static void vk_resize_geometry_buffer( void )
 
 void vk_end_frame( void )
 {
+	VkResult res; // For error checking on queue submission
 #ifdef USE_UPLOAD_QUEUE
 	VkSemaphore waits[2], signals[2];
 	const VkPipelineStageFlags wait_dst_stage_mask[2] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
@@ -8622,25 +9009,106 @@ void vk_end_frame( void )
 	{
 		vk.cmd->last_pipeline = VK_NULL_HANDLE; // do not restore clobbered descriptors in vk_bloom()
 
+		// ========================================================================
+		// EXPLICIT FRAMEGRAPH: Define the single "final image" for this frame
+		// ========================================================================
+		// The gamma/tonemap/composite pass MUST sample from exactly ONE image that
+		// is guaranteed to be fully written and properly transitioned every frame.
+		//
+		// Both bloom ON and bloom OFF paths write to vk.color_image:
+		//   - Bloom OFF: main render pass writes to vk.color_image
+		//   - Bloom ON:  post_bloom render pass writes to vk.color_image (blends bloom back)
+		//
+		// Therefore, finalColorImage/finalColorView always point to vk.color_image.
+		// This explicit variable makes the framegraph clear and prevents bugs.
+		VkImage     finalColorImage = vk.color_image;
+		VkImageView finalColorView  = vk.color_image_view;
+		
+		// Track whether finalColorImage was written to in this frame (needed for barriers)
+		qboolean finalImageWasWritten = qfalse;
+
+		// ========================================================================
+		// STEP 1: End main render pass and run optional RT composite
+		// ========================================================================
 #ifdef USE_VULKAN_RAY_TRACING
-		// Ray tracing pass (if enabled) - runs after main render pass
-		if ( r_raytracing && r_raytracing->integer && vk.rayTracingSupported && vk.rt.initialized ) {
-			vk_end_render_pass(); // End main render pass before ray tracing
+		// Ray tracing pass (if enabled) - runs after main render pass.
+		// RT composite writes to vk.color_image, so finalColorImage remains correct.
+		if ( backEnd.useRayTracingWorld &&
+		     r_raytracing && r_raytracing->integer &&
+		     vk.rayTracingSupported && vk.rt.initialized ) {
+			if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
+				finalImageWasWritten = qtrue;
+				vk_end_render_pass(); // End main render pass before ray tracing
+			}
 			vk_rt_trace_rays( vk.renderWidth, vk.renderHeight );
 			
 			// Composite RT output (HDR) to color_image with tonemapping
 			vk_rt_composite();
+			// RT composite writes to vk.color_image via post_bloom render pass
+			finalImageWasWritten = qtrue;
+		} else if ( r_bloom->integer ) {
+			// RT disabled, bloom enabled - end main render pass before bloom
+			if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
+				finalImageWasWritten = qtrue;
+				vk_end_render_pass();
+			}
+		} else {
+			// RT disabled, bloom disabled - main render pass wrote to vk.color_image
+			// The render pass will be ended in STEP 3 to avoid redundant checks.
+			// We just mark that the image was written (at least cleared).
+			if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
+				finalImageWasWritten = qtrue;
+			}
+		}
+#else
+		if ( r_bloom->integer ) {
+			// Bloom enabled - end main render pass before bloom
+			if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
+				finalImageWasWritten = qtrue;
+				vk_end_render_pass();
+			}
+		} else {
+			// Bloom disabled - main render pass wrote to vk.color_image
+			// The render pass will be ended in STEP 3 to avoid redundant checks.
+			// We just mark that the image was written (at least cleared).
+			if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
+				finalImageWasWritten = qtrue;
+			}
 		}
 #endif
 
+		// ========================================================================
+		// STEP 2: Run bloom if enabled (writes to vk.color_image via post_bloom)
+		// ========================================================================
 		if ( r_bloom->integer )
 		{
 			vk_bloom();
+			// Bloom writes to vk.color_image in post_bloom render pass.
+			// finalColorImage/finalColorView already point to vk.color_image/vk.color_image_view.
+			finalImageWasWritten = qtrue;
+		} else {
+			// Bloom is OFF: finalColorImage/finalColorView point to vk.color_image
+			// (written by main render pass or RT composite).
+			// The render pass will be ended in STEP 3 to avoid redundant checks.
+			// We just mark that the image was written (at least cleared).
+			if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
+				finalImageWasWritten = qtrue;
+			}
 		}
+
+		// ========================================================================
+		// STEP 2.5: screenMap capture moved to RB_DrawSurfs()
+		// ========================================================================
+		// screenMap is now captured in RB_DrawSurfs() right after 3D world rendering
+		// completes but before UI rendering begins. This ensures screenMap contains
+		// the current 3D scene for UI shaders to sample.
+		// screenMapDone is set in RB_DrawSurfs() after successful capture.
 
 		if ( backEnd.screenshotMask && vk.capture.image )
 		{
-			vk_end_render_pass();
+			if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
+				vk_end_render_pass();
+			}
 
 			// render to capture FBO
 			vk_begin_render_pass( vk.render_pass.capture, vk.framebuffers.capture, qfalse, gls.captureWidth, gls.captureHeight );
@@ -8648,27 +9116,123 @@ void vk_end_frame( void )
 			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
 
 			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+			vk_end_render_pass();
+		}
+
+		// ========================================================================
+		// STEP 3: Ensure finalColorImage is ready for sampling by gamma pass
+		// ========================================================================
+		// CRITICAL: This must happen BEFORE the minimized check, because we need to
+		// ensure the descriptor is always updated to point to the correct image,
+		// even if we're not presenting this frame. This prevents stale bloom buffers
+		// from being sampled when bloom is toggled off.
+		
+		// CRITICAL: End any remaining render pass before sampling.
+		// This ensures the image layout transitions from COLOR_ATTACHMENT_OPTIMAL to
+		// SHADER_READ_ONLY_OPTIMAL (via finalLayout). This is essential for proper synchronization.
+		// Note: UI rendering happens BEFORE vk_end_frame() is called, so UI has already rendered
+		// into the main render pass by this point. Ending the render pass here is safe and necessary.
+		// On menu-only frames with bloom OFF, the main render pass may still be active if nothing
+		// was drawn, so we must end it here to trigger the layout transition.
+		if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
+			finalImageWasWritten = qtrue;
+			vk_end_render_pass();
+		}
+
+		// Ensure finalColorImage is in SHADER_READ_ONLY_OPTIMAL layout and properly synchronized
+		// before the gamma pass samples from it. This is critical for both bloom ON and OFF paths.
+		// The main render pass always clears vk.color_image at start, so if we have a valid
+		// finalColorImage, it was definitely written to (at least cleared).
+		// On menu-only frames with bloom OFF, the main render pass may have only cleared
+		// the image but not drawn anything. We must ensure the image is properly synchronized
+		// and in the correct layout before sampling, otherwise we'll get corruption.
+		//
+		// CRITICAL: The render pass's finalLayout transitions the image to SHADER_READ_ONLY_OPTIMAL
+		// when it ends, but we still need an explicit barrier to ensure proper synchronization
+		// between the render pass ending and the gamma pass sampling. Without this barrier,
+		// the gamma pass might sample stale or uninitialized data, causing blocky corruption.
+		if ( finalColorImage != VK_NULL_HANDLE && finalColorView != VK_NULL_HANDLE ) {
+			if ( !finalImageWasWritten ) {
+				// Image was cleared by render pass, so it was written to
+				finalImageWasWritten = qtrue;
+			}
+			// Apply barrier to ensure proper synchronization before sampling
+			vk_barrier_final_image_to_shader_read( finalColorImage );
+		} else {
+			ri.Printf( PRINT_WARNING, "VK: finalColorImage (%p) or finalColorView (%p) is NULL in vk_end_frame (bloom=%d)\n", 
+				(void*)finalColorImage, (void*)finalColorView, r_bloom->integer );
+		}
+
+		// ========================================================================
+		// STEP 4: Update descriptor set to point to finalColorView
+		// ========================================================================
+		// CRITICAL: Always update the descriptor to point to finalColorView.
+		// This ensures the gamma pass always samples from the correct, valid image.
+		// The descriptor might have been set to point to a bloom buffer in a previous frame,
+		// so we must reset it every frame to guarantee correctness.
+		// This is especially important when toggling bloom at runtime.
+		// NOTE: This must happen even when minimized, to prevent stale descriptors.
+		// Validate inputs before updating descriptor
+		if ( finalColorView == VK_NULL_HANDLE ) {
+			ri.Printf( PRINT_WARNING, "VK: finalColorView is NULL, cannot update descriptor (bloom=%d)\n", r_bloom->integer );
+		} else {
+			VkDescriptorImageInfo info;
+			VkWriteDescriptorSet desc;
+			Vk_Sampler_Def sd;
+
+			Com_Memset( &sd, 0, sizeof( sd ) );
+			sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+			sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+			sd.max_lod_1_0 = qtrue;
+			sd.noAnisotropy = qtrue;
+
+			info.sampler = vk_find_sampler( &sd );
+			info.imageView = finalColorView;
+			info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+			desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+			desc.pNext = NULL;
+			desc.dstSet = vk.color_descriptor;
+			desc.dstBinding = 0;
+			desc.dstArrayElement = 0;
+			desc.descriptorCount = 1;
+			desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+			desc.pImageInfo = &info;
+			desc.pBufferInfo = NULL;
+			desc.pTexelBufferView = NULL;
+
+			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
 		}
 
 		if ( !ri.CL_IsMinimized() )
 		{
-			vk_end_render_pass();
+			// ========================================================================
+			// STEP 5: Run gamma/tonemap pass (always samples from finalColorView)
+			// ========================================================================
+			// CRITICAL: Ensure finalColorImage is valid before sampling.
+			// On menu-only frames with bloom OFF, the main render pass clears the image
+			// but may not draw anything. The render pass clear ensures the image is
+			// initialized, but we must verify it's in the correct layout and synchronized.
+			if ( finalColorImage == VK_NULL_HANDLE || finalColorView == VK_NULL_HANDLE ) {
+				ri.Printf( PRINT_WARNING, "VK: finalColorImage or finalColorView is NULL, skipping gamma pass\n" );
+			} else {
+				vk.renderWidth = gls.windowWidth;
+				vk.renderHeight = gls.windowHeight;
 
-			vk.renderWidth = gls.windowWidth;
-			vk.renderHeight = gls.windowHeight;
+				vk.renderScaleX = 1.0;
+				vk.renderScaleY = 1.0;
 
-			vk.renderScaleX = 1.0;
-			vk.renderScaleY = 1.0;
+				// Clear the swapchain to black to ensure letterbox regions and unwritten pixels are initialized
+				// This prevents corruption on menu screens
+				vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qtrue, vk.renderWidth, vk.renderHeight );
+				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
+				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
 
-			vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qfalse, vk.renderWidth, vk.renderHeight );
-			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
-			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
-
-			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+				qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
+				vk_end_render_pass();
+			}
 		}
 	}
-
-	vk_end_render_pass();
 
 	VK_CHECK( qvkEndCommandBuffer( vk.cmd->command_buffer ) );
 
@@ -8725,7 +9289,23 @@ void vk_end_frame( void )
 		submit_info.pSignalSemaphores = NULL;
 	}
 
-	VK_CHECK( qvkQueueSubmit( vk.queue, 1, &submit_info, vk.cmd->rendering_finished_fence ) );
+	// CRITICAL: Submit command buffer with fence for synchronization
+	// The fence will be signaled when the command buffer execution completes.
+	// If submission fails with VK_ERROR_DEVICE_LOST, the device is in an invalid state
+	// and we cannot recover - this usually indicates invalid Vulkan API usage.
+	res = qvkQueueSubmit( vk.queue, 1, &submit_info, vk.cmd->rendering_finished_fence );
+	if ( res != VK_SUCCESS ) {
+		if ( res == VK_ERROR_DEVICE_LOST ) {
+			// Device lost - this is a critical error indicating invalid API usage
+			// Common causes: invalid image layout transitions, command buffer reuse without reset,
+			// invalid barriers, or sampling uninitialized images
+			ri.Error( ERR_FATAL, "Vulkan: qvkQueueSubmit returned VK_ERROR_DEVICE_LOST - device is in invalid state. "
+				"This usually indicates invalid image layout transitions, command buffer misuse, or invalid barriers. "
+				"Check screenMap barriers and command buffer lifecycle." );
+		} else {
+			ri.Error( ERR_FATAL, "Vulkan: qvkQueueSubmit returned %s", vk_result_string( res ) );
+		}
+	}
 	vk.cmd->waitForFence = qtrue;
 
 	// presentation may take undefined time to complete, we can't measure it in a reliable way
@@ -9054,7 +9634,8 @@ qboolean vk_bloom( void )
 		return qfalse;
 	}
 
-	vk_end_render_pass(); // end main
+	// Render pass should already be ended before calling vk_bloom()
+	// (either by RT composite or by vk_end_frame before calling bloom)
 
 	// bloom extraction
 	vk_begin_bloom_extract_render_pass();

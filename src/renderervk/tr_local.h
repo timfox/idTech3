@@ -1204,6 +1204,13 @@ typedef struct {
 	qboolean screenMapDone;
 	qboolean doneBloom;
 
+#ifdef USE_VULKAN_RAY_TRACING
+	// When true, this view should be shaded by the Vulkan RT path instead of
+	// the normal raster world draw. Set in RB_DrawSurfs and consumed in
+	// vk_end_frame so that RT behaves like an alternative world renderer
+	qboolean	useRayTracingWorld;
+#endif
+
 } backEndState_t;
 
 typedef struct drawSurfsCommand_s drawSurfsCommand_t;
@@ -1426,6 +1433,12 @@ extern cvar_t	*r_ext_supersample;
 extern cvar_t	*r_renderWidth;
 extern cvar_t	*r_renderHeight;
 extern cvar_t	*r_renderScale;
+
+// Vulkan-specific debug helpers
+extern cvar_t	*r_vk_debug2D;        // log 2D/UI quad usage and tess stats
+extern cvar_t	*r_vk_debugClearColor; // clear swapchain/color to solid color each frame
+extern cvar_t	*r_vk_debugUiOnly;    // skip 3D world, draw only UI/console/HUD
+extern cvar_t	*r_vk_disableScreenMap; // hard-disable screenMap capture to isolate menu corruption
 #endif
 
 extern cvar_t	*r_dlightBacks;			// dlight non-facing surfaces for continuity

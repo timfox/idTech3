@@ -84,13 +84,13 @@ cvar_t	*r_device;
 cvar_t	*r_vbo;
 #endif
 #ifdef USE_VK_PBR
-	cvar_t	*r_pbr;
-	cvar_t  *r_baseNormalX;
-	cvar_t  *r_baseNormalY;
-	cvar_t  *r_baseParallax;
-	cvar_t  *r_baseSpecular;
+cvar_t	*r_pbr;
+cvar_t  *r_baseNormalX;
+cvar_t  *r_baseNormalY;
+cvar_t  *r_baseParallax;
+cvar_t  *r_baseSpecular;
 #ifdef VK_CUBEMAP
-	cvar_t	*r_cubeMapping;
+cvar_t	*r_cubeMapping;
 #endif
 #endif
 #ifdef USE_VULKAN_RAY_TRACING
@@ -99,7 +99,7 @@ cvar_t	*r_vbo;
 	cvar_t	*r_rt_maxDepth;
 	cvar_t	*r_rt_debugMagenta;
 #endif
-	cvar_t	*r_fbo;
+cvar_t	*r_fbo;
 cvar_t	*r_hdr;
 cvar_t	*r_bloom;
 cvar_t	*r_bloom_threshold;
@@ -110,6 +110,12 @@ cvar_t	*r_renderWidth;
 cvar_t	*r_renderHeight;
 cvar_t	*r_renderScale;
 cvar_t	*r_ext_supersample;
+
+	// Vulkan-specific debug helpers
+	cvar_t	*r_vk_debug2D;
+	cvar_t	*r_vk_debugClearColor;
+	cvar_t	*r_vk_debugUiOnly;
+	cvar_t	*r_vk_disableScreenMap;
 #endif // USE_VULKAN
 
 cvar_t	*r_dlightBacks;
@@ -1585,6 +1591,19 @@ static void R_Register( void )
 	r_rt_debugMagenta = ri.Cvar_Get( "r_rt_debugMagenta", "0", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_rt_debugMagenta, "Debug mode: 0=normal, 1=magenta clear + gradient test (for diagnosing pixel corruption)." );
 #endif
+
+	// Vulkan-specific debug helpers
+	r_vk_debug2D = ri.Cvar_Get( "r_vk_debug2D", "0", CVAR_CHEAT );
+	ri.Cvar_SetDescription( r_vk_debug2D, "When non-zero, logs per-frame 2D/UI quad counts and tess usage for debugging menus/console." );
+
+	r_vk_debugClearColor = ri.Cvar_Get( "r_vk_debugClearColor", "0", CVAR_CHEAT );
+	ri.Cvar_SetDescription( r_vk_debugClearColor, "When non-zero, clears the final swapchain image to a solid color each frame to reveal uncleared regions." );
+
+	r_vk_debugUiOnly = ri.Cvar_Get( "r_vk_debugUiOnly", "0", CVAR_CHEAT );
+	ri.Cvar_SetDescription( r_vk_debugUiOnly, "When non-zero, skips 3D world rendering and draws only UI/console/HUD overlays." );
+
+	r_vk_disableScreenMap = ri.Cvar_Get( "r_vk_disableScreenMap", "0", CVAR_CHEAT );
+	ri.Cvar_SetDescription( r_vk_disableScreenMap, "Set to 1 to hard-disable the Vulkan screenMap/$currentRender path (forces UI to use blackImage). Useful for isolating device-lost/menu corruption issues." );
 	r_mapGreyScale = ri.Cvar_Get( "r_mapGreyScale", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_mapGreyScale, "-1", "1", CV_FLOAT );
 	ri.Cvar_SetDescription(r_mapGreyScale, "Desaturate world map textures only, works independently from \\r_greyscale, negative values only desaturate lightmaps.");

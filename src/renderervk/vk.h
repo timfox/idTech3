@@ -149,6 +149,13 @@ typedef enum {
 
 } Vk_Shader_Type;
 
+// Expose Vulkan command function pointers used from other translation units
+// (e.g. tr_backend.c) when building with Vulkan.
+#ifdef USE_VULKAN
+extern PFN_vkCmdSetViewport qvkCmdSetViewport;
+extern PFN_vkCmdSetScissor  qvkCmdSetScissor;
+#endif
+
 // used with cg_shadows == 2
 typedef enum {
 	SHADOW_DISABLED,
@@ -404,10 +411,12 @@ void vk_bind_generated_shaders( void );
 void vk_clear_color( const vec4_t color );
 void vk_clear_depth( qboolean clear_stencil );
 void vk_begin_frame( void );
+qboolean vk_capture_screenmap( void );
 void vk_end_frame( void );
 void vk_present_frame( void );
 
 void vk_end_render_pass( void );
+void vk_barrier_final_image_to_shader_read( VkImage image );
 void vk_begin_main_render_pass( void );
 void vk_begin_post_bloom_render_pass( void );
 void vk_begin_bloom_extract_render_pass( void );

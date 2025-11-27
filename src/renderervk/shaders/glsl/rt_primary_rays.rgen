@@ -3,6 +3,7 @@
 
 #include "rt_defines.glsl"
 #include "rt_helpers.glsl"
+#include "rt_random.glsl"
 
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
 layout(binding = 1, set = 0, rgba16f) uniform image2D outputImage;
@@ -48,10 +49,13 @@ void main()
     vec3 origin = getWorldRayOrigin(ubo.viewInverse);
     vec3 direction = getWorldRayDirection(inUV, ubo.viewInverse, ubo.projInverse);
     
-    // Add jitter for anti-aliasing (using frame index for temporal accumulation)
+    // Add jitter for anti-aliasing. The helper uses a blue-noise texture array
+    // when available (USE_BLUE_NOISE), otherwise it falls back to hash-based RNG.
     if (ubo.samplesPerPixel > 1) {
-        uint seed = uint(pixel.x + pixel.y * uint(ubo.resolution.x) + ubo.frameIndex);
-        vec2 jitter = (random2(seed) - 0.5) / ubo.resolution;
+        uvec2 pix = uvec2(pixel);
+        float jx = rt_getRNG(false, 0u, pix, uint(ubo.frameIndex));
+        float jy = rt_getRNG(false, 1u, pix, uint(ubo.frameIndex));
+        vec2 jitter = (vec2(jx, jy) - 0.5) / ubo.resolution;
         direction = getWorldRayDirection(inUV + jitter, ubo.viewInverse, ubo.projInverse);
     }
     

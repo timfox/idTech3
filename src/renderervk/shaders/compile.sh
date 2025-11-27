@@ -111,7 +111,7 @@ for f in "$GLSL_DIR"/*.rgen; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .rgen)
         echo "  $basename.rgen"
-        glslangValidator -S rgen -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f"
+		glslangValidator -S rgen -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f"
         if [ -f "$TOOLS_DIR/bin2hex" ]; then
             "$TOOLS_DIR/bin2hex" "$TMP_FILE" "$OUT_DATA" "${basename}_rgen_spv"
         fi
@@ -123,7 +123,7 @@ for f in "$GLSL_DIR"/*.rmiss; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .rmiss)
         echo "  $basename.rmiss"
-        glslangValidator -S rmiss -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f"
+		glslangValidator -S rmiss -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f"
         if [ -f "$TOOLS_DIR/bin2hex" ]; then
             "$TOOLS_DIR/bin2hex" "$TMP_FILE" "$OUT_DATA" "${basename}_rmiss_spv"
         fi
@@ -135,7 +135,7 @@ for f in "$GLSL_DIR"/*.rchit; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .rchit)
         echo "  $basename.rchit"
-        glslangValidator -S rchit -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f"
+		glslangValidator -S rchit -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f"
         if [ -f "$TOOLS_DIR/bin2hex" ]; then
             "$TOOLS_DIR/bin2hex" "$TMP_FILE" "$OUT_DATA" "${basename}_rchit_spv"
         fi
@@ -147,7 +147,7 @@ for f in "$GLSL_DIR"/*.rahit; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .rahit)
         echo "  $basename.rahit"
-        glslangValidator -S rahit -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f"
+		glslangValidator -S rahit -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f"
         if [ -f "$TOOLS_DIR/bin2hex" ]; then
             "$TOOLS_DIR/bin2hex" "$TMP_FILE" "$OUT_DATA" "${basename}_rahit_spv"
         fi

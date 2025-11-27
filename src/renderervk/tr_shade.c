@@ -72,10 +72,35 @@ static void R_BindAnimatedImage( const textureBundle_t *bundle ) {
 	}
 
 	if ( bundle->isScreenMap /*&& backEnd.viewParms.frameSceneNum == 1*/ ) {
-		if ( !backEnd.screenMapDone )
+		// CRITICAL: Only use screenMap if it was actually captured THIS frame.
+		// screenMapDone is set to qtrue only after vk_capture_screenmap() successfully
+		// copies the main color buffer to screenMap and updates the descriptor.
+		// If screenMap wasn't captured this frame, we use blackImage as a safe fallback
+		// to prevent sampling stale/uninitialized data that causes checkerboard corruption.
+		if ( !backEnd.screenMapDone ) {
+			// ScreenMap wasn't captured this frame - use black image as fallback
+			// This prevents corruption when menu shaders try to sample screenMap
+			// but it wasn't written (e.g., on menu-only frames or when capture fails).
+			// The black image ensures UI elements render cleanly without checkerboard artifacts.
 			GL_Bind( tr.blackImage );
-		else
-			vk_update_descriptor( glState.currenttmu + VK_DESC_TEXTURE_BASE, vk.screenMap.color_descriptor );
+		} else {
+			// ScreenMap was captured this frame - bind it for sampling
+			// CRITICAL: vk_capture_screenmap() ensures:
+			// 1. screenMap is cleared to prevent stale data
+			// 2. Main color buffer is blitted to screenMap
+			// 3. screenMap is transitioned to SHADER_READ_ONLY_OPTIMAL with proper barriers
+			// 4. vk.screenMap.color_descriptor is updated to point to the fresh image
+			// 5. All synchronization barriers are in place
+			// So it's safe to sample here without corruption or device loss.
+			// Validate descriptor is valid before binding to prevent VK_ERROR_DEVICE_LOST
+			if ( vk.screenMap.color_descriptor != VK_NULL_HANDLE ) {
+				vk_update_descriptor( glState.currenttmu + VK_DESC_TEXTURE_BASE, vk.screenMap.color_descriptor );
+			} else {
+				// Descriptor is invalid - fallback to black image to prevent device loss
+				ri.Printf( PRINT_WARNING, "VK: screenMap descriptor is NULL, using blackImage fallback\n" );
+				GL_Bind( tr.blackImage );
+			}
+		}
 		return;
 	}
 

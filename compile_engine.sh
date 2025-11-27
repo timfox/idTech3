@@ -9,21 +9,18 @@ BUILD_TYPE=${BUILD_TYPE:-Release}
 
 echo "Building id Tech 3 engine (${BUILD_TYPE})..."
 
-# Create build directory if it doesn't exist
-if [ ! -d build ]; then
-    echo "Creating build directory..."
-    mkdir build
+# Remove and recreate build directory to ensure a clean build
+if [ -d build ]; then
+    echo "Clearing build directory..."
+    rm -rf build
 fi
+mkdir build
 
 cd build
 
-# Run CMake configuration step if needed
-if [ ! -f "CMakeCache.txt" ]; then
-    echo "Running CMake configuration..."
-    cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} ..
-else
-    echo "CMake cache found, skipping configuration..."
-fi
+# Run CMake configuration
+echo "Running CMake configuration..."
+cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} ..
 
 # Determine number of CPU cores for parallel build
 if command -v nproc &>/dev/null; then
@@ -42,4 +39,21 @@ echo "Build completed. Binaries are in the build directory."
 echo "  - Client: build/idtech3.x86_64"
 echo "  - Server: build/idtech3.ded.x86_64"
 echo "  - Renderers: build/idtech3_*.so"
+
+# Move .so files to /release directory, overwrite if they exist
+echo ""
+echo "Copying renderer .so files to /release..."
+RELEASE_DIR="../release"
+if [ ! -d "$RELEASE_DIR" ]; then
+    echo "Creating $RELEASE_DIR..."
+    mkdir -p "$RELEASE_DIR"
+fi
+shopt -s nullglob
+for sofile in idtech3_*.so; do
+    cp -f "$sofile" "$RELEASE_DIR/"
+    echo "Moved $sofile to $RELEASE_DIR/"
+done
+shopt -u nullglob
+
+echo "Renderer .so files updated in $RELEASE_DIR"
 
