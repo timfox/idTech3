@@ -18,6 +18,7 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 * Unlagged mouse events processing, can be reverted by setting **\in_lagged 1**
 * **\in_minimize** - hotkey for minimize/restore main window (win32-only, direct replacement for Q3Minimizer)
 * **\video-pipe** - to use external ffmpeg binary as an encoder for better quality and smaller output files
+* Optional Dear ImGui (via cimgui) layer for in-engine tools and overlays
 * Significally reworked QVM (Quake Virtual Machine)
 * Improved server-side DoS protection, much reduced memory usage
 * Raised filesystem limits (up to 20,000 maps can be handled in a single directory)

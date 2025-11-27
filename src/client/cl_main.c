@@ -1015,6 +1015,10 @@ void CL_ShutdownAll( void ) {
 	// shutdown VMs
 	CL_ShutdownVMs();
 
+#ifdef USE_CIMGUI
+	CL_ImGui_Shutdown();
+#endif
+
 	// shutdown the renderer
 	if ( re.Shutdown ) {
 		if ( CL_GameSwitch() ) {
@@ -4074,6 +4078,10 @@ void CL_Init( void ) {
 	Cvar_Get( "cl_guid", "", CVAR_USERINFO | CVAR_ROM | CVAR_PROTECTED );
 	CL_UpdateGUID( NULL, 0 );
 
+#ifdef USE_CIMGUI
+	CL_ImGui_Init();
+#endif
+
 	Com_Printf( "----- Client Initialization Complete -----\n" );
 }
 
@@ -4107,6 +4115,10 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 	S_DisableSounds();
 
 	CL_ShutdownVMs();
+
+#ifdef USE_CIMGUI
+	CL_ImGui_Shutdown();
+#endif
 
 	CL_ShutdownRef( quit ? REF_UNLOAD_DLL : REF_DESTROY_WINDOW );
 

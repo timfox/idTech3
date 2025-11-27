@@ -120,6 +120,8 @@ Several Makefile options are available for linux/mingw/macos builds:
 
 `USE_SYSTEM_JPEG=0` - use current system JPEG library, disabled by default
 
+`USE_CIMGUI=1` - build the bundled Dear ImGui (cimgui) backend for in-engine tooling, enabled by default
+
 Example:
 
 `make BUILD_SERVER=0 USE_RENDERER_DLOPEN=0 RENDERER_DEFAULT=vulkan` - which means do not build dedicated binary, build client with single static vulkan renderer

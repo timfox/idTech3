@@ -467,6 +467,10 @@ qboolean CL_NoDelay( void );
 
 qboolean CL_GetModeInfo( int *width, int *height, float *windowAspect, int mode, const char *modeFS, int dw, int dh, qboolean fullscreen );
 
+void CL_ImGui_Init( void );
+void CL_ImGui_Shutdown( void );
+qboolean CL_ImGui_IsReady( void );
+
 
 //
 // cl_input

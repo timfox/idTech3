@@ -96,6 +96,7 @@ OPTION(USE_FREETYPE "" ON)
 OPTION(USE_OPENSSL "" ON)
 OPTION(USE_LUA "" OFF)
 OPTION(USE_ENTT "Enable EnTT ECS system" OFF)
+OPTION(USE_CIMGUI "Enable Dear ImGui via cimgui" ON)
 #OPTION(USE_OPENAL "" OFF)
 #OPTION(USE_OPENGL "" OFF)
 #OPTION(USE_OPENGL2 "" OFF)
@@ -208,6 +209,26 @@ IF(CMAKE_SYSTEM_PROCESSOR MATCHES AMD64|x86_64)
 		LANGUAGE ASM)
 ENDIF()
 
+IF(USE_CIMGUI)
+	set(CIMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/cimgui)
+	set(CIMGUI_IMGUI_DIR ${CIMGUI_DIR}/imgui)
+	if(EXISTS ${CIMGUI_DIR}/cimgui.cpp AND EXISTS ${CIMGUI_IMGUI_DIR}/imgui.cpp)
+		set(CIMGUI_SRCS
+			${CIMGUI_DIR}/cimgui.cpp
+			${CIMGUI_IMGUI_DIR}/imgui.cpp
+			${CIMGUI_IMGUI_DIR}/imgui_demo.cpp
+			${CIMGUI_IMGUI_DIR}/imgui_draw.cpp
+			${CIMGUI_IMGUI_DIR}/imgui_tables.cpp
+			${CIMGUI_IMGUI_DIR}/imgui_widgets.cpp
+			${CIMGUI_IMGUI_DIR}/misc/cpp/imgui_stdlib.cpp
+		)
+		list(APPEND CLIENT_SRCS ${CIMGUI_SRCS})
+	else()
+		message(WARNING "cimgui sources not found, disabling USE_CIMGUI")
+		set(USE_CIMGUI OFF CACHE BOOL "" FORCE)
+	endif()
+ENDIF()
+
 #ADD_LIBRARY(client OBJECT ${CLIENT_SRCS})
 
 # jpeg
@@ -233,6 +254,20 @@ ENDIF()
 
 # Add OGG/Vorbis include directories for client (used by snd_codec_ogg.c)
 TARGET_INCLUDE_DIRECTORIES(client PRIVATE libs/ogg/include libs/vorbis/include)
+
+IF(USE_CIMGUI AND DEFINED CIMGUI_DIR)
+	set(CIMGUI_USER_CONFIG "\"cimconfig.h\"")
+	TARGET_INCLUDE_DIRECTORIES(client PRIVATE
+		${CIMGUI_DIR}
+		${CIMGUI_IMGUI_DIR}
+		${CIMGUI_IMGUI_DIR}/backends
+		${CIMGUI_IMGUI_DIR}/misc/cpp
+	)
+	TARGET_COMPILE_DEFINITIONS(client PRIVATE
+		USE_CIMGUI
+		IMGUI_USER_CONFIG=${CIMGUI_USER_CONFIG}
+	)
+ENDIF()
 
 # cJSON library
 IF(USE_CJSON)
@@ -659,6 +694,9 @@ ENDIF()
 
 ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} qcommon botlib client q3ui)
+IF(USE_CIMGUI)
+	set_property(TARGET ${CNAME}${BINEXT} PROPERTY LINKER_LANGUAGE CXX)
+ENDIF()
 IF(UNIX)
 	TARGET_LINK_OPTIONS(${CNAME}${BINEXT} PRIVATE -rdynamic) # Export symbols for dynamically loaded libraries (Unix only)
 ENDIF()
