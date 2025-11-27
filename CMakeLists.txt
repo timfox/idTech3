@@ -213,7 +213,7 @@ IF(USE_CIMGUI)
 	set(CIMGUI_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libs/cimgui)
 	set(CIMGUI_IMGUI_DIR ${CIMGUI_DIR}/imgui)
 	if(EXISTS ${CIMGUI_DIR}/cimgui.cpp AND EXISTS ${CIMGUI_IMGUI_DIR}/imgui.cpp)
-		set(CIMGUI_SRCS
+		set(CIMGUI_CORE_SRCS
 			${CIMGUI_DIR}/cimgui.cpp
 			${CIMGUI_IMGUI_DIR}/imgui.cpp
 			${CIMGUI_IMGUI_DIR}/imgui_demo.cpp
@@ -222,7 +222,19 @@ IF(USE_CIMGUI)
 			${CIMGUI_IMGUI_DIR}/imgui_widgets.cpp
 			${CIMGUI_IMGUI_DIR}/misc/cpp/imgui_stdlib.cpp
 		)
-		list(APPEND CLIENT_SRCS ${CIMGUI_SRCS})
+		add_library(imgui_shared SHARED ${CIMGUI_CORE_SRCS})
+		target_include_directories(imgui_shared PUBLIC
+			${CIMGUI_DIR}
+			${CIMGUI_IMGUI_DIR}
+			${CIMGUI_IMGUI_DIR}/misc/cpp
+		)
+		target_compile_definitions(imgui_shared PUBLIC IMGUI_USER_CONFIG="cimconfig.h")
+		target_compile_features(imgui_shared PUBLIC cxx_std_17)
+		set_target_properties(imgui_shared PROPERTIES OUTPUT_NAME "imgui_shared")
+		list(APPEND CLIENT_SRCS
+			${CIMGUI_DIR}/cimgui_impl.cpp
+			${CIMGUI_IMGUI_DIR}/backends/imgui_impl_sdl2.cpp
+		)
 	else()
 		message(WARNING "cimgui sources not found, disabling USE_CIMGUI")
 		set(USE_CIMGUI OFF CACHE BOOL "" FORCE)
@@ -337,6 +349,15 @@ AUX_SOURCE_DIRECTORY(src/renderercommon RENDERER_COMMON_SRCS)
 AUX_SOURCE_DIRECTORY(src/renderer RENDERER_GL_SRCS)
 AUX_SOURCE_DIRECTORY(src/renderervk RENDERER_VK_SRCS)
 
+IF(USE_CIMGUI AND DEFINED CIMGUI_DIR)
+	list(APPEND RENDERER_VK_SRCS
+		${CIMGUI_DIR}/cimgui_impl.cpp
+		${CIMGUI_IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
+	)
+ENDIF()
+
+list(APPEND RENDERER_VK_SRCS src/renderervk/vk_imgui.c)
+
 IF(USE_RENDERER_DLOPEN)
 	SET(AUX_SRCS
 		src/qcommon/q_shared.c
@@ -353,13 +374,40 @@ IF(USE_RENDERER_DLOPEN)
 	ADD_LIBRARY(${RENDERER_PREFIX}_vulkan${RENDEXT} SHARED ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
 	SET_TARGET_PROPERTIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES OUTPUT_NAME "${RENDERER_PREFIX}_vulkan${RENDEXT}" PREFIX "")
 	TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_VULKAN)
-	TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} m)
+	TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE m)
 ELSE()
 	IF(USE_VULKAN)
 		ADD_LIBRARY(${RENDERER_PREFIX}_vulkan OBJECT ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS})
 	ELSE()
 		ADD_LIBRARY(${RENDERER_PREFIX}_opengl OBJECT ${RENDERER_GL_SRCS} ${RENDERER_COMMON_SRCS})
 	ENDIF()
+ENDIF()
+
+IF(USE_CIMGUI AND TARGET imgui_shared)
+	if(TARGET ${RENDERER_PREFIX}_vulkan${RENDEXT})
+		target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE
+			${CIMGUI_DIR}
+			${CIMGUI_IMGUI_DIR}
+			${CIMGUI_IMGUI_DIR}/backends
+			${CIMGUI_IMGUI_DIR}/misc/cpp
+		)
+		target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE
+			USE_CIMGUI
+			IMGUI_USER_CONFIG="cimconfig.h"
+		)
+		target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE imgui_shared)
+	elseif(TARGET ${RENDERER_PREFIX}_vulkan)
+		target_include_directories(${RENDERER_PREFIX}_vulkan PRIVATE
+			${CIMGUI_DIR}
+			${CIMGUI_IMGUI_DIR}
+			${CIMGUI_IMGUI_DIR}/backends
+			${CIMGUI_IMGUI_DIR}/misc/cpp
+		)
+		target_compile_definitions(${RENDERER_PREFIX}_vulkan PRIVATE
+			USE_CIMGUI
+			IMGUI_USER_CONFIG="cimconfig.h"
+		)
+	endif()
 ENDIF()
 
 # common function, window system
@@ -659,7 +707,7 @@ IF(USE_VULKAN)
 			MESSAGE(STATUS "Found Vulkan library: ${VULKAN_LIBRARY} (using local headers)")
 			TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_VULKAN)
 			TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VULKAN)
-			TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} ${VULKAN_LIBRARY})
+			TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${VULKAN_LIBRARY})
 		ELSE()
 			MESSAGE(WARNING "Vulkan library not found, disabling Vulkan support")
 			SET(USE_VULKAN OFF CACHE BOOL "" FORCE)
@@ -672,7 +720,7 @@ IF(USE_VULKAN)
 			TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VULKAN)
 			TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${Vulkan_INCLUDE_DIRS})
 			TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PUBLIC ${Vulkan_INCLUDE_DIRS})
-			TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} ${Vulkan_LIBRARIES})
+			TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${Vulkan_LIBRARIES})
 		ELSE()
 			# Try to find Vulkan manually if CMake's find_package fails
 			FIND_PATH(VULKAN_INCLUDE_DIR NAMES vulkan/vulkan.h PATHS /usr/include /usr/local/include)
@@ -683,7 +731,7 @@ IF(USE_VULKAN)
 				TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VULKAN)
 				TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${VULKAN_INCLUDE_DIR})
 				TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PUBLIC ${VULKAN_INCLUDE_DIR})
-				TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} ${VULKAN_LIBRARY})
+				TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${VULKAN_LIBRARY})
 			ELSE()
 				MESSAGE(WARNING "Vulkan not found, disabling Vulkan support")
 				SET(USE_VULKAN OFF CACHE BOOL "" FORCE)
@@ -760,6 +808,22 @@ IF(USE_LUA)
 	IF(Lua_FOUND)
 		TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} ${LUA_LIBRARIES})
 	ENDIF()
+ENDIF()
+
+IF(USE_CIMGUI AND TARGET imgui_shared)
+	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} imgui_shared)
+	TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} imgui_shared)
+	IF(TARGET ${RENDERER_PREFIX}_vulkan${RENDEXT})
+		set_target_properties(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES
+			BUILD_RPATH "\$ORIGIN"
+			INSTALL_RPATH "\$ORIGIN")
+	ENDIF()
+	set_target_properties(${CNAME}${BINEXT} PROPERTIES
+		BUILD_RPATH "\$ORIGIN"
+		INSTALL_RPATH "\$ORIGIN")
+	set_target_properties(${DNAME}${BINEXT} PROPERTIES
+		BUILD_RPATH "\$ORIGIN"
+		INSTALL_RPATH "\$ORIGIN")
 ENDIF()
 
 # Platform-specific libraries

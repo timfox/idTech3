@@ -120,7 +120,7 @@ Several Makefile options are available for linux/mingw/macos builds:
 
 `USE_SYSTEM_JPEG=0` - use current system JPEG library, disabled by default
 
-`USE_CIMGUI=1` - build the bundled Dear ImGui (cimgui) backend for in-engine tooling, enabled by default
+`USE_CIMGUI=1` - build the bundled Dear ImGui (cimgui) backend for in-engine tooling, enabled by default (produces `imgui_shared` which must be distributed next to the binaries)
 
 Example:
 

@@ -599,6 +599,11 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 	if ( cl_debuggraph->integer || cl_timegraph->integer || cl_debugMove->integer ) {
 		SCR_DrawDebugGraph ();
 	}
+
+	if ( stereoFrame == STEREO_CENTER ) {
+		CL_ImGui_Draw();
+		CL_ImGui_FrameEnd();
+	}
 }
 
 

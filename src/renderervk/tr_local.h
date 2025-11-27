@@ -2035,6 +2035,12 @@ typedef struct
 	int commandId;
 } clearColorCommand_t;
 
+typedef struct
+{
+	int commandId;
+	const ImDrawData *drawData;
+} imguiDrawCommand_t;
+
 typedef enum {
 	RC_END_OF_LIST,
 	RC_SET_COLOR,
@@ -2046,7 +2052,8 @@ typedef enum {
 	RC_COLORMASK,
 	RC_CLEARDEPTH,
 	RC_CLEARCOLOR,
-	RC_CONVOLVECUBEMAP
+	RC_CONVOLVECUBEMAP,
+	RC_IMGUI_DRAW
 } renderCommand_t;
 
 
@@ -2100,6 +2107,10 @@ void RE_ThrottleBackend( void );
 qboolean RE_CanMinimize( void );
 const glconfig_t *RE_GetConfig( void );
 void RE_VertexLighting( qboolean allowed );
+qboolean RE_ImGuiBackend_Init( void );
+void RE_ImGuiBackend_Shutdown( void );
+void RE_ImGuiBackend_NewFrame( void );
+void RE_ImGuiBackend_RenderDrawData( const ImDrawData *drawData );
 
 #ifndef USE_VULKAN
 #define GLE( ret, name, ... ) extern ret ( APIENTRY * q##name )( __VA_ARGS__ );

@@ -510,3 +510,33 @@ void RE_VertexLighting( qboolean allowed )
 {
 	tr.vertexLightingAllowed = allowed;
 }
+
+qboolean RE_ImGuiBackend_Init( void )
+{
+	return VK_ImGui_InitBackend();
+}
+
+void RE_ImGuiBackend_Shutdown( void )
+{
+	VK_ImGui_ShutdownBackend();
+}
+
+void RE_ImGuiBackend_NewFrame( void )
+{
+	VK_ImGui_NewFrame();
+}
+
+void RE_ImGuiBackend_RenderDrawData( const ImDrawData *drawData )
+{
+	imguiDrawCommand_t *cmd;
+
+	if ( !drawData || drawData->CmdListsCount <= 0 )
+		return;
+
+	cmd = R_GetCommandBuffer( sizeof( *cmd ) );
+	if ( !cmd )
+		return;
+
+	cmd->commandId = RC_IMGUI_DRAW;
+	cmd->drawData = drawData;
+}

@@ -387,6 +387,26 @@ static void end_command_buffer( VkCommandBuffer command_buffer, const char *loca
 	qvkFreeCommandBuffers( vk.device, vk.command_pool, 1, cmdbuf );
 }
 
+VkInstance VK_GetInstanceHandle( void )
+{
+	return vk_instance;
+}
+
+VkSampleCountFlagBits VK_GetMsaaSampleCount( void )
+{
+	return (VkSampleCountFlagBits)vkSamples;
+}
+
+VkCommandBuffer VK_BeginImmediateCommands( void )
+{
+	return begin_command_buffer();
+}
+
+void VK_EndImmediateCommands( VkCommandBuffer command_buffer, const char *location )
+{
+	end_command_buffer( command_buffer, location );
+}
+
 
 static void record_image_layout_transition( VkCommandBuffer command_buffer, VkImage image, VkImageAspectFlags image_aspect_flags, 
 	VkImageLayout old_layout, VkImageLayout new_layout, uint32_t src_stage_override, uint32_t dst_stage_override ) {
@@ -668,6 +688,8 @@ static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice devi
 
 		end_command_buffer( command_buffer, __func__ );
 	}
+
+	VK_ImGui_NotifySwapchainChanged();
 }
 
 
@@ -4019,6 +4041,7 @@ static void vk_create_attachments( void )
 
 static void vk_create_framebuffers( void )
 {
+	VK_ImGui_NotifyRenderPassChanged();
 	VkImageView fb_attachments[3];
 	VkFramebufferCreateInfo desc;
 	uint32_t n;
@@ -5155,6 +5178,8 @@ void vk_shutdown( refShutdownCode_t code )
 	if ( qvkQueuePresentKHR == NULL ) { // not fully initialized
 		goto __cleanup;
 	}
+
+	VK_ImGui_ShutdownBackend();
 
 	vk_destroy_framebuffers();
 

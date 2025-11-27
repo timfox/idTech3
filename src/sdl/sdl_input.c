@@ -1141,9 +1141,23 @@ void HandleEvents( void )
 
 	while ( SDL_PollEvent( &e ) )
 	{
+#ifdef USE_CIMGUI
+#ifdef USE_SDL
+		CL_ImGui_ProcessEvent( &e );
+#endif
+		qboolean imguiWantsMouse = CL_ImGui_WantCaptureMouse();
+		qboolean imguiWantsKeyboard = CL_ImGui_WantCaptureKeyboard();
+#else
+		qboolean imguiWantsMouse = qfalse;
+		qboolean imguiWantsKeyboard = qfalse;
+#endif
 		switch( e.type )
 		{
 			case SDL_KEYDOWN:
+#ifdef USE_CIMGUI
+			if ( imguiWantsKeyboard )
+				break;
+#endif
 				if ( e.key.repeat && Key_GetCatcher() == 0 )
 					break;
 				key = IN_TranslateSDLToQ3Key( &e.key.keysym, qtrue );
@@ -1173,6 +1187,10 @@ void HandleEvents( void )
 				break;
 
 			case SDL_KEYUP:
+#ifdef USE_CIMGUI
+			if ( imguiWantsKeyboard )
+				break;
+#endif
 				if( ( key = IN_TranslateSDLToQ3Key( &e.key.keysym, qfalse ) ) )
 					Com_QueueEvent( in_eventTime, SE_KEY, key, qfalse, 0, NULL );
 
@@ -1180,6 +1198,10 @@ void HandleEvents( void )
 				break;
 
 			case SDL_TEXTINPUT:
+#ifdef USE_CIMGUI
+			if ( imguiWantsKeyboard )
+				break;
+#endif
 				if( lastKeyDown != K_CONSOLE )
 				{
 					char *c = e.text.text;
@@ -1230,6 +1252,10 @@ void HandleEvents( void )
 				break;
 
 			case SDL_MOUSEMOTION:
+#ifdef USE_CIMGUI
+			if ( imguiWantsMouse )
+				break;
+#endif
 				if( mouseActive )
 				{
 					if( !e.motion.xrel && !e.motion.yrel )
@@ -1240,6 +1266,10 @@ void HandleEvents( void )
 
 			case SDL_MOUSEBUTTONDOWN:
 			case SDL_MOUSEBUTTONUP:
+#ifdef USE_CIMGUI
+			if ( imguiWantsMouse )
+				break;
+#endif
 				{
 					int b;
 					switch( e.button.button )
@@ -1257,6 +1287,10 @@ void HandleEvents( void )
 				break;
 
 			case SDL_MOUSEWHEEL:
+#ifdef USE_CIMGUI
+			if ( imguiWantsMouse )
+				break;
+#endif
 				if( e.wheel.y > 0 )
 				{
 					Com_QueueEvent( in_eventTime, SE_KEY, K_MWHEELUP, qtrue, 0, NULL );

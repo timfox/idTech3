@@ -1429,6 +1429,24 @@ static void RE_SyncRender( void )
 
 }
 
+static qboolean RE_ImGuiBackend_Init( void )
+{
+	return qfalse;
+}
+
+static void RE_ImGuiBackend_Shutdown( void )
+{
+}
+
+static void RE_ImGuiBackend_NewFrame( void )
+{
+}
+
+static void RE_ImGuiBackend_RenderDrawData( const ImDrawData *drawData )
+{
+	(void)drawData;
+}
+
 
 /*
 ===============
@@ -1672,6 +1690,10 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.GetConfig = RE_GetConfig;
 	re.VertexLighting = RE_VertexLighting;
 	re.SyncRender = RE_SyncRender;
+	re.ImGuiBackendInit = RE_ImGuiBackend_Init;
+	re.ImGuiBackendShutdown = RE_ImGuiBackend_Shutdown;
+	re.ImGuiBackendNewFrame = RE_ImGuiBackend_NewFrame;
+	re.ImGuiBackendRenderDrawData = RE_ImGuiBackend_RenderDrawData;
 
 	return &re;
 }

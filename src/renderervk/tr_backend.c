@@ -1747,6 +1747,13 @@ static const void *RB_ClearColor( const void *data )
 	return (const void *)(cmd + 1);
 }
 
+static const void *RB_ImGuiDraw( const void *data )
+{
+	const imguiDrawCommand_t *cmd = (const imguiDrawCommand_t *)data;
+	VK_ImGui_RenderDrawData( cmd->drawData );
+	return (const void *)( cmd + 1 );
+}
+
 
 /*
 =============
@@ -1942,6 +1949,9 @@ void RB_ExecuteRenderCommands( const void *data ) {
 #endif
 		case RC_CLEARCOLOR:
 			data = RB_ClearColor(data);
+			break;
+		case RC_IMGUI_DRAW:
+			data = RB_ImGuiDraw( data );
 			break;
 		case RC_END_OF_LIST:
 		default:

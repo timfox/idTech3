@@ -3119,9 +3119,12 @@ void CL_Frame( int msec, int realMsec ) {
 	// decide on the serverTime to render
 	CL_SetCGameTime();
 
+	CL_ImGui_FrameBegin();
+
 	// update the screen
 	cls.framecount++;
 	SCR_UpdateScreen();
+	CL_ImGui_FrameEnd();
 
 	// update audio
 	S_Update( realMsec );

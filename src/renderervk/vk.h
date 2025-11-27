@@ -332,6 +332,19 @@ void vk_release_resources( void );
 void vk_wait_idle( void );
 void vk_queue_wait_idle( void );
 
+VkInstance VK_GetInstanceHandle( void );
+VkSampleCountFlagBits VK_GetMsaaSampleCount( void );
+VkCommandBuffer VK_BeginImmediateCommands( void );
+void VK_EndImmediateCommands( VkCommandBuffer command_buffer, const char *location );
+
+struct ImDrawData;
+qboolean VK_ImGui_InitBackend( void );
+void VK_ImGui_ShutdownBackend( void );
+void VK_ImGui_NewFrame( void );
+void VK_ImGui_RenderDrawData( const struct ImDrawData *drawData );
+void VK_ImGui_NotifyRenderPassChanged( void );
+void VK_ImGui_NotifySwapchainChanged( void );
+
 // Helper function for memory type selection
 uint32_t find_memory_type( uint32_t memory_type_bits, VkMemoryPropertyFlags properties );
 

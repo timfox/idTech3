@@ -31,6 +31,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "snd_public.h"
 #include "keys.h"
 
+#ifdef USE_SDL
+struct SDL_Event;
+#endif
+
 #ifdef USE_CURL
 #include "cl_curl.h"
 #endif
@@ -469,7 +473,16 @@ qboolean CL_GetModeInfo( int *width, int *height, float *windowAspect, int mode,
 
 void CL_ImGui_Init( void );
 void CL_ImGui_Shutdown( void );
-qboolean CL_ImGui_IsReady( void );
+void CL_ImGui_FrameBegin( void );
+void CL_ImGui_Draw( void );
+void CL_ImGui_FrameEnd( void );
+#ifdef USE_SDL
+qboolean CL_ImGui_ProcessEvent( const SDL_Event *event );
+#else
+qboolean CL_ImGui_ProcessEvent( const void *event );
+#endif
+qboolean CL_ImGui_WantCaptureMouse( void );
+qboolean CL_ImGui_WantCaptureKeyboard( void );
 
 
 //
