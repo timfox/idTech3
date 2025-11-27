@@ -683,7 +683,7 @@ const char *COM_ParseExt( const char **data_p, qboolean allowLineBreaks )
 			{
 				com_lines++;
 			}
-			if ( len < ARRAY_LEN( com_token )-1 )
+			if ( len < (int)ARRAY_LEN( com_token )-1 )
 			{
 				com_token[ len ] = c;
 				len++;
@@ -694,7 +694,7 @@ const char *COM_ParseExt( const char **data_p, qboolean allowLineBreaks )
 	// parse a regular word
 	do
 	{
-		if ( len < ARRAY_LEN( com_token )-1 )
+		if ( len < (int)ARRAY_LEN( com_token )-1 )
 		{
 			com_token[ len ] = c;
 			len++;
