@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Compile Game Script for id Tech 3 mod
+# Compile Game Script for id Tech 3 mods
 
 set -e
 
@@ -8,62 +8,90 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$SCRIPT_DIR"
 BUILD_DIR="$PROJECT_ROOT/build"
-MOD_DIR="$BUILD_DIR/mymod"
+MOD_NAME="${1:-mymod}"
+MOD_ROOT="$PROJECT_ROOT/$MOD_NAME"
+MOD_SOURCE_DIR="$MOD_ROOT/gamesrc"
+MOD_BUILD_DIR="$MOD_SOURCE_DIR/build"
+MOD_DEST_DIR="$BUILD_DIR/$MOD_NAME"
+
+if [ "$MOD_NAME" = "blacksun" ]; then
+    MOD_DEST_DIR="$MOD_ROOT"
+fi
+
+if [ ! -d "$MOD_SOURCE_DIR" ]; then
+    echo "Error: ${MOD_SOURCE_DIR} not found."
+    echo "Usage: $0 [mod_name]"
+    exit 1
+fi
 
 echo "Building game modules..."
 echo "Project root: $PROJECT_ROOT"
 echo "Build directory: $BUILD_DIR"
-echo "Mod directory: $MOD_DIR"
+echo "Mod name: $MOD_NAME"
+echo "Module sources: $MOD_SOURCE_DIR"
+echo "Artifacts destination: $MOD_DEST_DIR"
 
 # Navigate to the game mod source directory
-cd "$PROJECT_ROOT/mymod/gamesrc"
+cd "$MOD_SOURCE_DIR"
 
 # Clean old build directory if it exists (to remove stale CMake cache)
-if [ -d "build" ]; then
+if [ -d "$MOD_BUILD_DIR" ]; then
     echo "Cleaning old build directory..."
-    rm -rf build
+    rm -rf "$MOD_BUILD_DIR"
 fi
 
 # Create build directory and configure CMake
-mkdir -p build
-cd build
+mkdir -p "$MOD_BUILD_DIR"
+cd "$MOD_BUILD_DIR"
 cmake ..
 
 # Run the build process
 make
 
-# Copy libraries to mod directory where engine expects them
-# The engine looks for files at: fs_basepath/mymod/uix86_64.so
-# fs_basepath defaults to the build/ directory
-echo "Copying libraries to mod directory..."
+# Copy libraries to the destination directory
+echo "Copying libraries to destination..."
+mkdir -p "$MOD_DEST_DIR"
 
-mkdir -p "$MOD_DIR"
+# Determine where CMake placed the artifacts
+SOURCE_LIB_DIR=""
+for candidate in "$MOD_SOURCE_DIR/../vm" "$MOD_ROOT" "$MOD_BUILD_DIR"; do
+    if compgen -G "$candidate"/*.so > /dev/null; then
+        SOURCE_LIB_DIR="$candidate"
+        break
+    fi
+done
 
-# Copy from vm/ directory (where CMake outputs them)
-# We're currently in mymod/gamesrc/build, so vm is at ../vm
-VM_DIR="../vm"
-if [ -d "$VM_DIR" ]; then
-    echo "Found libraries in $VM_DIR"
-    echo "Copying to $MOD_DIR/"
-    cp -v "$VM_DIR"/*.so "$MOD_DIR/" 2>&1 || true
+if [ -z "$SOURCE_LIB_DIR" ]; then
+    echo "Warning: Unable to locate .so outputs."
 else
-    echo "Warning: $VM_DIR not found (current dir: $(pwd))"
+    echo "Found libraries in $SOURCE_LIB_DIR"
+    shopt -s nullglob
+    artifacts=("$SOURCE_LIB_DIR"/*.so "$SOURCE_LIB_DIR"/*.dll)
+    shopt -u nullglob
+    if [ ${#artifacts[@]} -eq 0 ]; then
+        echo "Warning: No shared libraries detected to copy."
+    elif [ "$SOURCE_LIB_DIR" != "$MOD_DEST_DIR" ]; then
+        for lib in "${artifacts[@]}"; do
+            cp -v "$lib" "$MOD_DEST_DIR/"
+        done
+    else
+        echo "Source and destination directories are the same; skipping copy."
+    fi
 fi
 
 # Verify files were copied
 echo ""
-if [ -d "$MOD_DIR" ]; then
-    SO_COUNT=$(ls -1 "$MOD_DIR"/*.so 2>/dev/null | wc -l)
+if [ -d "$MOD_DEST_DIR" ]; then
+    SO_COUNT=$(ls -1 "$MOD_DEST_DIR"/*.so "$MOD_DEST_DIR"/*.dll 2>/dev/null | wc -l)
     if [ "$SO_COUNT" -gt 0 ]; then
-        echo "Libraries copied to $MOD_DIR/:"
-        ls -lh "$MOD_DIR"/*.so
+        echo "Libraries available in $MOD_DEST_DIR/:"
+        ls -lh "$MOD_DEST_DIR"/*.so "$MOD_DEST_DIR"/*.dll 2>/dev/null || true
     else
-        echo "Warning: No .so files copied to $MOD_DIR/"
-        echo "  Check if libraries were built in: $VM_DIR"
+        echo "Warning: No shared libraries found in $MOD_DEST_DIR/"
     fi
 fi
 
 echo ""
 echo "Game mod build completed!"
-echo "  Libraries: build/mymod/*.so"
-echo "  Source: mymod/gamesrc/"
+echo "  Libraries: $MOD_DEST_DIR/*.so"
+echo "  Source: $MOD_SOURCE_DIR/"
