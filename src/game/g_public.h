@@ -23,6 +23,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 // g_public.h -- game module information visible to server
 
+#include "../qcommon/qcommon.h" // For COM_TRAP_GETVALUE
+
 #define	GAME_API_VERSION	8
 
 // entity->svFlags
