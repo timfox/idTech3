@@ -1751,7 +1751,7 @@ int QDECL Com_sprintf( char *dest, int size, const char *fmt, ...)
 	len = Q_vsnprintf( bigbuffer, sizeof( bigbuffer ), fmt, argptr );
 	va_end( argptr );
 
-	if ( len >= sizeof( bigbuffer ) || len < 0 ) 
+	if ( len >= (int)sizeof( bigbuffer ) || len < 0 ) 
 	{
 		Com_Error( ERR_FATAL, "Com_sprintf: overflowed bigbuffer" );
 #if	defined(_DEBUG) && defined(_WIN32)
