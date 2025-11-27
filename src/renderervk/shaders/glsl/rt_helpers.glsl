@@ -102,12 +102,20 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness) {
     return ggx1 * ggx2;
 }
 
+// Optimized Fresnel calculations (manual expansion instead of pow)
 vec3 fresnelSchlick(float cosTheta, vec3 F0) {
-    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+    float oneMinusCos = clamp(1.0 - cosTheta, 0.0, 1.0);
+    // Manual expansion: (1-cos)^5 = (1-cos)^2 * (1-cos)^2 * (1-cos)
+    float oneMinusCos2 = oneMinusCos * oneMinusCos;
+    float oneMinusCos5 = oneMinusCos2 * oneMinusCos2 * oneMinusCos;
+    return F0 + (1.0 - F0) * oneMinusCos5;
 }
 
 vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
-    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+    float oneMinusCos = clamp(1.0 - cosTheta, 0.0, 1.0);
+    float oneMinusCos2 = oneMinusCos * oneMinusCos;
+    float oneMinusCos5 = oneMinusCos2 * oneMinusCos2 * oneMinusCos;
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * oneMinusCos5;
 }
 
 // PBR lighting calculation
@@ -135,7 +143,9 @@ vec3 calculatePBR(vec3 albedo, float metallic, float roughness, vec3 N, vec3 V, 
 
 // Normal mapping
 vec3 perturbNormal(vec3 normal, vec3 tangent, vec3 bitangent, vec2 normalMap) {
-    vec3 normalMapVec = normalMap * 2.0 - 1.0;
+    vec3 normalMapVec = vec3(normalMap * 2.0 - 1.0, 0.0);
+    // Reconstruct Z component from X and Y
+    normalMapVec.z = sqrt(max(1.0 - dot(normalMapVec.xy, normalMapVec.xy), 0.0));
     mat3 TBN = mat3(tangent, bitangent, normal);
     return normalize(TBN * normalMapVec);
 }

@@ -61,14 +61,3 @@ float rt_getRNG(bool /*repeatPerFrame*/, uint sampleIndex, uvec2 pixel, uint fra
 #endif // USE_BLUE_NOISE
 
 #endif // RT_RANDOM_GLSL
-
-{
-  "cells": [],
-  "metadata": {
-    "language_info": {
-      "name": "python"
-    }
-  },
-  "nbformat": 4,
-  "nbformat_minor": 2
-}

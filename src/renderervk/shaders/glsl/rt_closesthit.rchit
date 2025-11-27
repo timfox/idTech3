@@ -1,5 +1,10 @@
 #version 460
 #extension GL_EXT_ray_tracing : require
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_nonuniform_qualifier : enable
+
+precision highp float;
+precision highp int;
 
 #include "rt_defines.glsl"
 #include "rt_helpers.glsl"
@@ -35,12 +40,29 @@ layout(binding = 5, set = 0) uniform AOBuffer {
     int maoNumBounces;
 } aoSettings;
 
+layout(binding = 2, set = 0) uniform UniformBuffer {
+    mat4 viewInverse;
+    mat4 projInverse;
+    vec4 cameraPos;
+    vec2 resolution;
+    float time;
+    float nearPlane;
+    float farPlane;
+    float exposure;
+    int frameIndex;
+    int samplesPerPixel;
+} ubo;
+
 struct VertexData {
     vec3 position;
     vec3 normal;
     vec3 tangent;
     vec2 texCoord;
 };
+
+// Forward declarations for AO functions
+float calculateAmbientOcclusion(vec3 position, vec3 normal);
+float calculateMultiBounceAO(vec3 position, vec3 normal, vec3 albedo);
 
 void main()
 {
@@ -98,6 +120,7 @@ void main()
     // Calculate Ambient Occlusion
     float ao = 1.0;
     if (aoSettings.aoEnabled != 0 && aoSettings.maoEnabled == 0) {
+        // Forward declaration - function defined below
         ao = calculateAmbientOcclusion(worldPos, N);
     } else if (aoSettings.maoEnabled != 0) {
         ao = calculateMultiBounceAO(worldPos, N, albedo);

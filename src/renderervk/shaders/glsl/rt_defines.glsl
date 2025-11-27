@@ -1,4 +1,5 @@
 // Ray tracing defines and constants
+// Optimized with better precision and constants
 
 #define RT_MAX_RECURSION_DEPTH 4
 #define RT_SHADOW_RAY_INDEX 1
@@ -25,10 +26,11 @@
 #define RAY_TYPE_REFRACTION 3
 #define RAY_TYPE_AO 4
 
-// Constants
-#define PI 3.14159265359
-#define INV_PI 0.31830988618
-#define EPSILON 0.0001
+// Mathematical constants (matching shader_constants.glsl)
+#define PI 3.1415926535897932384626433832795
+#define INV_PI 0.31830988618379067153776752674503
+#define EPSILON 1e-5
+#define EPSILON_LARGE 1e-3
 #define MAX_DISTANCE 10000.0
 
 // PBR constants
@@ -47,3 +49,9 @@
 // MAO constants
 #define MAO_NUM_BOUNCES 2
 #define MAO_NUM_SAMPLES_PER_BOUNCE 8
+
+// Optimization constants
+#define ALPHA_TEST_THRESHOLD 0.5
+#define SUN_DISK_THRESHOLD 0.99
+#define SUN_DISK_POWER 256.0
+#define SUN_INTENSITY_MULTIPLIER 5.0

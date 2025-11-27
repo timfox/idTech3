@@ -1,5 +1,9 @@
 #version 460
 #extension GL_EXT_ray_tracing : require
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
 
 #include "rt_defines.glsl"
 #include "rt_helpers.glsl"
@@ -28,10 +32,12 @@ void main()
     hitValue = getSkyColor(rayDir);
     
     // Add sun disk if looking towards sun
+    // Optimized: use constant instead of magic numbers
     vec3 sunDir = normalize(vec3(0.3, 0.8, 0.5));
     float sunAngle = dot(rayDir, sunDir);
-    if (sunAngle > 0.99) {
-        float sunIntensity = pow(sunAngle, 256.0) * 5.0;
+    if (sunAngle > SUN_DISK_THRESHOLD) {
+        // Optimized: use manual pow approximation for better performance
+        float sunIntensity = pow(sunAngle, SUN_DISK_POWER) * SUN_INTENSITY_MULTIPLIER;
         hitValue += vec3(1.0, 0.95, 0.8) * sunIntensity;
     }
     

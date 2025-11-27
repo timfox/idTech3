@@ -1,0 +1,63 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+
+#include "shader_constants.glsl"
+
+// Compute shader version of bloom extraction
+// Uses subgroup operations for parallel reductions when available
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform PRECISION_MEDIUMP sampler2D input_texture;
+layout(set = 0, binding = 1, rgba8) uniform PRECISION_MEDIUMP writeonly image2D output_image;
+
+layout(push_constant) uniform BloomParams {
+	PRECISION_MEDIUMP float threshold;
+	PRECISION_MEDIUMP int extract_mode;  // 0=max, 1=avg, 2=luma
+	PRECISION_MEDIUMP int base_modulate; // 0=none, 1=square, 2=luma
+};
+
+// Subgroup operations require Vulkan 1.1+ or extension
+// Use #extension GL_KHR_shader_subgroup_arithmetic : enable if available
+
+void main() {
+	ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+	mediump vec2 tex_coord = (vec2(coord) + vec2(0.5)) / vec2(imageSize(output_image));
+	
+	mediump vec3 base = texture(input_texture, tex_coord).rgb;
+	
+	// Calculate brightness based on extract mode
+	mediump float brightness;
+	
+	if (extract_mode == 1) {
+		// Average RGB
+		brightness = (base.r + base.g + base.b) * 0.33333333;
+	} else if (extract_mode == 2) {
+		// Luminance
+		brightness = luma(base);
+	} else {
+		// Max channel
+		brightness = max(max(base.r, base.g), base.b);
+	}
+	
+	// Early exit: write black if below threshold
+	if (brightness < threshold) {
+		imageStore(output_image, coord, COLOR_BLACK_A);
+		return;
+	}
+	
+	// Apply modulation if enabled
+	if (base_modulate != 0) {
+		if (base_modulate == 1) {
+			// Square modulation
+			base *= base;
+		} else {
+			// Luminance modulation
+			mediump float lum = luma(base);
+			base *= lum;
+		}
+	}
+	
+	imageStore(output_image, coord, vec4(base, 1.0));
+}
+

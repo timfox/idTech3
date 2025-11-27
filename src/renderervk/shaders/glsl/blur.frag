@@ -1,32 +1,39 @@
 #version 450
+#extension GL_GOOGLE_include_directive : enable
 
-// 3-tap gaussian blur 
-// exploiting linear filtering with -1.2 0 +1.2 texture offsets and 5 6 5 weighting
-// to emulate 5-tap blur
+precision mediump int;
+precision mediump float;
 
-layout(set = 0, binding = 0) uniform sampler2D texture0;
+#include "shader_constants.glsl"
 
-layout(location = 0) in vec2 tex_coord0;
+// Optimized 3-tap gaussian blur 
+// Exploiting linear filtering with -1.2 0 +1.2 texture offsets and 5 6 5 weighting
+// to emulate 5-tap blur with better precision
 
-layout(location = 0) out vec4 out_color;
+layout(set = 0, binding = 0) uniform PRECISION_MEDIUMP sampler2D texture0;
 
-layout(constant_id = 0) const float texoffset_x = 0.0;
-layout(constant_id = 1) const float texoffset_y = 0.0;
+layout(location = 0) in PRECISION_MEDIUMP vec2 tex_coord0;
+
+layout(location = 0) out PRECISION_MEDIUMP vec4 out_color;
+
+layout(constant_id = 0) const PRECISION_MEDIUMP float texoffset_x = 0.0;
+layout(constant_id = 1) const PRECISION_MEDIUMP float texoffset_y = 0.0;
+
+// Gaussian weights: center=6/16, sides=5/16 each
+const PRECISION_MEDIUMP float WEIGHT_CENTER = 0.375;  // 6.0 / 16.0
+const PRECISION_MEDIUMP float WEIGHT_SIDE = 0.3125;   // 5.0 / 16.0
 
 void main()
 {
-	vec2 tex_coord1 = tex_coord0;
-	vec2 tex_coord2 = tex_coord0;
+	PRECISION_MEDIUMP vec2 offset = vec2(texoffset_x, texoffset_y);
+	
+	// Sample three taps: center, positive offset, negative offset
+	PRECISION_MEDIUMP vec3 center = texture(texture0, tex_coord0).rgb;
+	PRECISION_MEDIUMP vec3 pos = texture(texture0, tex_coord0 + offset).rgb;
+	PRECISION_MEDIUMP vec3 neg = texture(texture0, tex_coord0 - offset).rgb;
+	
+	// Weighted sum
+	PRECISION_MEDIUMP vec3 base = center * WEIGHT_CENTER + (pos + neg) * WEIGHT_SIDE;
 
-	tex_coord1.x += texoffset_x;
-	tex_coord1.y += texoffset_y;
-
-	tex_coord2.x -= texoffset_x;
-	tex_coord2.y -= texoffset_y;
-
-	vec3 base = texture(texture0, tex_coord0).rgb * (6.0 / 16.0)
-		+ texture(texture0, tex_coord1).rgb * (5.0 / 16.0)
-		+ texture(texture0, tex_coord2).rgb * (5.0 / 16.0);
-
-	out_color = vec4( base, 1.0 );
+	out_color = vec4(base, 1.0);
 }

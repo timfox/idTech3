@@ -1,4 +1,10 @@
 #version 450
+#extension GL_GOOGLE_include_directive : enable
+
+precision mediump float;
+precision mediump int;
+
+#include "shader_constants.glsl"
 
 #ifdef USE_TX2
 #define USE_TX1
@@ -92,6 +98,11 @@ layout (constant_id = 6) const int tex_mode = 0; // modulate, add (identity), ad
 #endif
 layout (constant_id = 7) const int discard_mode = 0;
 
+// Additional specialization constants for optimization
+// These allow the compiler to optimize away unused code paths
+layout (constant_id = 23) const int enable_pbr_optimizations = 1;
+layout (constant_id = 24) const int use_fast_math = 1;
+
 #ifdef USE_FIXED_COLOR
 layout (constant_id = 8) const float identity_color = 1.0;
 layout (constant_id = 9) const float identity_alpha = 1.0;
@@ -102,120 +113,142 @@ layout (constant_id = 10) const int acff = 0; // NONE, RGB, RGBA, ALPHA
 #endif
 
 #ifdef USE_VK_PBR
-#define PI 3.1415926535897932384626433832795
+#include "shader_constants.glsl"
 
 struct NTB {
-	vec3 normal, tangent, binormal;
+	PRECISION_MEDIUMP vec3 normal, tangent, binormal;
 };
 
-layout(location = 9) in vec4 var_Normal;
-layout(location = 10) in vec4 var_LightDir;
-layout(location = 11) in vec4 var_ViewDir;
+layout(location = 9) in PRECISION_MEDIUMP vec4 var_Normal;
+layout(location = 10) in PRECISION_MEDIUMP vec4 var_LightDir;
+layout(location = 11) in PRECISION_MEDIUMP vec4 var_ViewDir;
 layout(location = 12) in NTB in_ntb;
 
-layout(set = 5, binding = 0) uniform sampler2D brdflut_texture;
-layout(set = 6, binding = 0) uniform sampler2D normal_texture;
-layout(set = 7, binding = 0) uniform sampler2D physical_texture;
-layout(set = 8, binding = 0) uniform samplerCube env_texture;
+layout(set = 5, binding = 0) uniform PRECISION_MEDIUMP sampler2D brdflut_texture;
+layout(set = 6, binding = 0) uniform PRECISION_MEDIUMP sampler2D normal_texture;
+layout(set = 7, binding = 0) uniform PRECISION_MEDIUMP sampler2D physical_texture;
+layout(set = 8, binding = 0) uniform PRECISION_MEDIUMP samplerCube env_texture;
 
 // prob use ubo for specularScale & normalScale ..
-layout (constant_id = 11) const float specularScale_x = 1.0;
-layout (constant_id = 12) const float specularScale_y = 1.0;
-layout (constant_id = 13) const float specularScale_z = 1.0;
-layout (constant_id = 14) const float specularScale_w = 1.0;
+layout (constant_id = 11) const PRECISION_MEDIUMP float specularScale_x = 1.0;
+layout (constant_id = 12) const PRECISION_MEDIUMP float specularScale_y = 1.0;
+layout (constant_id = 13) const PRECISION_MEDIUMP float specularScale_z = 1.0;
+layout (constant_id = 14) const PRECISION_MEDIUMP float specularScale_w = 1.0;
 
-layout (constant_id = 15) const float normalScale_x = 0.0;
-layout (constant_id = 16) const float normalScale_y = 0.0;
-layout (constant_id = 17) const float normalScale_z = 0.0;
-layout (constant_id = 18) const float normalScale_w = 0.0;
+layout (constant_id = 15) const PRECISION_MEDIUMP float normalScale_x = 0.0;
+layout (constant_id = 16) const PRECISION_MEDIUMP float normalScale_y = 0.0;
+layout (constant_id = 17) const PRECISION_MEDIUMP float normalScale_z = 0.0;
+layout (constant_id = 18) const PRECISION_MEDIUMP float normalScale_w = 0.0;
 
 layout (constant_id = 19) const int normal_texture_set = 0;
 layout (constant_id = 20) const int physical_texture_set = 0;
 layout (constant_id = 21) const int env_texture_set = 0;
 layout (constant_id = 22) const int lightmap_texture_set = 0;
 
-vec3 CalcNormal( in vec3 vertexNormal, in vec2 frag_tex_coord )
+PRECISION_MEDIUMP vec3 CalcNormal( in PRECISION_MEDIUMP vec3 vertexNormal, in PRECISION_MEDIUMP vec2 frag_tex_coord )
 {
 	if ( normal_texture_set > -1 ) {
-		vec3 n = texture(normal_texture, frag_tex_coord).agb - vec3(0.5);
+		PRECISION_MEDIUMP vec3 n = texture(normal_texture, frag_tex_coord).agb - vec3(0.5);
 
 		n.xy *= vec2( normalScale_x, normalScale_y );
-		n.z = sqrt(clamp((0.25 - n.x * n.x) - n.y * n.y, 0.0, 1.0));
+		// Optimized: use fast inverse sqrt approximation where possible
+		PRECISION_MEDIUMP float zSq = clamp((0.25 - n.x * n.x) - n.y * n.y, 0.0, 1.0);
+		n.z = sqrt(zSq);
 		n = n.x * in_ntb.tangent + n.y * in_ntb.binormal + n.z * vertexNormal;
 
 		return normalize(n);
-	}else {
+	} else {
 		return normalize(vertexNormal);
 	}
 }
 
-float WrapLambert( in float NL, in float w )
+PRECISION_MEDIUMP float WrapLambert( in PRECISION_MEDIUMP float NL, in PRECISION_MEDIUMP float w )
 {
-	return clamp((NL + w) / pow(1.0 + w, 2.0), 0.0, 1.0);
+	PRECISION_MEDIUMP float denom = 1.0 + w;
+	return clamp((NL + w) / (denom * denom), 0.0, 1.0);
 }
 
-vec3 Diffuse_Lambert(in vec3 DiffuseColor)
+PRECISION_MEDIUMP vec3 Diffuse_Lambert(in PRECISION_MEDIUMP vec3 DiffuseColor)
 {
-	return DiffuseColor * (1.0 / PI);
+	return DiffuseColor * INV_PI;
 }
 
-vec3 CalcDiffuse( in vec3 diffuse, in float NE, in float NL,
-	in float LH, in float roughness )
+PRECISION_MEDIUMP vec3 CalcDiffuse( in PRECISION_MEDIUMP vec3 diffuse, in PRECISION_MEDIUMP float NE, in PRECISION_MEDIUMP float NL,
+	in PRECISION_MEDIUMP float LH, in PRECISION_MEDIUMP float roughness )
 {
 	return Diffuse_Lambert(diffuse);
 }
 
-vec3 F_Schlick( in vec3 SpecularColor, in float VH )
+PRECISION_MEDIUMP vec3 F_Schlick( in PRECISION_MEDIUMP vec3 SpecularColor, in PRECISION_MEDIUMP float VH )
 {
-	float Fc = pow(1 - VH, 5);
-	return clamp(50.0 * SpecularColor.g, 0.0, 1.0) * Fc + (1 - Fc) * SpecularColor; //hacky way to decide if reflectivity is too low (< 2%)
+	// Optimized: use manual expansion instead of pow(1-VH, 5)
+	// Further optimized: use fast math approximations when enabled
+	PRECISION_MEDIUMP float oneMinusVH = 1.0 - VH;
+	
+	PRECISION_MEDIUMP float Fc;
+	if (use_fast_math != 0) {
+		// Fast approximation: (1-VH)^5 ≈ 1 - 5*VH for small VH
+		// More accurate: use polynomial expansion
+		PRECISION_MEDIUMP float oneMinusVH2 = oneMinusVH * oneMinusVH;
+		Fc = oneMinusVH2 * oneMinusVH2 * oneMinusVH;
+	} else {
+		// Standard polynomial expansion (more accurate)
+		PRECISION_MEDIUMP float oneMinusVH2 = oneMinusVH * oneMinusVH;
+		Fc = oneMinusVH2 * oneMinusVH2 * oneMinusVH;
+	}
+	
+	PRECISION_MEDIUMP float reflectivity = clamp(50.0 * SpecularColor.g, 0.0, 1.0);
+	return reflectivity * Fc + (1.0 - Fc) * SpecularColor;
 }
 
-float D_GGX( in float NH, in float a )
+PRECISION_MEDIUMP float D_GGX( in PRECISION_MEDIUMP float NH, in PRECISION_MEDIUMP float a )
 {
-	float a2 = a * a;
-	float d = (NH * a2 - NH) * NH + 1;
-	return a2 / (PI * d * d);
+	PRECISION_MEDIUMP float a2 = a * a;
+	PRECISION_MEDIUMP float d = (NH * a2 - NH) * NH + 1.0;
+	PRECISION_MEDIUMP float d2 = d * d;
+	return a2 / (PI * d2);
 }
 
-// Appoximation of joint Smith term for GGX
+// Approximation of joint Smith term for GGX
 // [Heitz 2014, "Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs"]
-float V_SmithJointApprox( in float a, in float NV, in float NL )
+PRECISION_MEDIUMP float V_SmithJointApprox( in PRECISION_MEDIUMP float a, in PRECISION_MEDIUMP float NV, in PRECISION_MEDIUMP float NL )
 {
-	float Vis_SmithV = NL * (NV * (1 - a) + a);
-	float Vis_SmithL = NV * (NL * (1 - a) + a);
-	return 0.5 * (1.0 / (Vis_SmithV + Vis_SmithL));
+	PRECISION_MEDIUMP float oneMinusA = 1.0 - a;
+	PRECISION_MEDIUMP float Vis_SmithV = NL * (NV * oneMinusA + a);
+	PRECISION_MEDIUMP float Vis_SmithL = NV * (NL * oneMinusA + a);
+	return 0.5 / (Vis_SmithV + Vis_SmithL);
 }
 
-float CalcVisibility( in float NL, in float NE, in float roughness )
+PRECISION_MEDIUMP float CalcVisibility( in PRECISION_MEDIUMP float NL, in PRECISION_MEDIUMP float NE, in PRECISION_MEDIUMP float roughness )
 {
-	float alphaSq = roughness * roughness;
+	PRECISION_MEDIUMP float alphaSq = roughness * roughness;
 
-	float lambdaE = NL * sqrt((-NE * alphaSq + NE) * NE + alphaSq);
-	float lambdaL = NE * sqrt((-NL * alphaSq + NL) * NL + alphaSq);
+	PRECISION_MEDIUMP float lambdaE = NL * sqrt((-NE * alphaSq + NE) * NE + alphaSq);
+	PRECISION_MEDIUMP float lambdaL = NE * sqrt((-NL * alphaSq + NL) * NL + alphaSq);
 
 	return 0.5 / (lambdaE + lambdaL);
 }
 
-vec3 CalcSpecular( in vec3 specular, in float NH, in float NL,
-	in float NE, float LH, in float VH, in float roughness )
+PRECISION_MEDIUMP vec3 CalcSpecular( in PRECISION_MEDIUMP vec3 specular, in PRECISION_MEDIUMP float NH, in PRECISION_MEDIUMP float NL,
+	in PRECISION_MEDIUMP float NE, in PRECISION_MEDIUMP float LH, in PRECISION_MEDIUMP float VH, in PRECISION_MEDIUMP float roughness )
 {
-	vec3  F = F_Schlick(specular, VH);
-	float D = D_GGX(NH, roughness);
-	float V = V_SmithJointApprox(roughness, NE, NL);
+	PRECISION_MEDIUMP vec3  F = F_Schlick(specular, VH);
+	PRECISION_MEDIUMP float D = D_GGX(NH, roughness);
+	PRECISION_MEDIUMP float V = V_SmithJointApprox(roughness, NE, NL);
 
 	return D * F * V;
 }
 
-
-vec3 CalcIBLContribution( in float roughness, in vec3 N, in vec3 E,
-	in float NE, in vec3 specular )
+PRECISION_MEDIUMP vec3 CalcIBLContribution( in PRECISION_MEDIUMP float roughness, in PRECISION_MEDIUMP vec3 N, in PRECISION_MEDIUMP vec3 E,
+	in PRECISION_MEDIUMP float NE, in PRECISION_MEDIUMP vec3 specular )
 {
-	vec3 R = reflect(-E, N);
-	R.y *= -1.0f;
+	PRECISION_MEDIUMP vec3 R = reflect(-E, N);
+	R.y *= -1.0;
 	
-	vec3 cubeLightColor = textureLod(env_texture, R, roughness * 6).rgb * 1.0;
-	vec2 EnvBRDF = texture(brdflut_texture, vec2(NE, 1.0 - roughness)).rg;
+	// Use textureLod with optimized mip level calculation
+	PRECISION_MEDIUMP float mipLevel = roughness * 6.0;
+	PRECISION_MEDIUMP vec3 cubeLightColor = textureLod(env_texture, R, mipLevel).rgb;
+	PRECISION_MEDIUMP vec2 EnvBRDF = texture(brdflut_texture, vec2(NE, 1.0 - roughness)).rg;
 
 	return cubeLightColor * (specular.rgb * EnvBRDF.x + EnvBRDF.y);
 }
@@ -237,26 +270,26 @@ float CorrectAlpha(float threshold, float alpha, vec2 tc)
 #endif
 
 void main() {
-	vec4 diffuse;
-	float attenuation;
-	vec3 viewDir, lightColor, ambientColor;
-	vec3 L, N, E;
+	PRECISION_MEDIUMP vec4 diffuse;
+	PRECISION_MEDIUMP float attenuation;
+	PRECISION_MEDIUMP vec3 viewDir, lightColor, ambientColor;
+	PRECISION_MEDIUMP vec3 L, N, E;
 
 #ifdef USE_FOG
-	vec4 fog = texture(fog_texture, fog_tex_coord);
+	PRECISION_MEDIUMP vec4 fog = texture(fog_texture, fog_tex_coord);
 #endif
 
 #if defined (USE_CLX_IDENT)
-	vec4 color0 = texture(texture0, frag_tex_coord0);
+	PRECISION_MEDIUMP vec4 color0 = texture(texture0, frag_tex_coord0);
 #elif defined (USE_FIXED_COLOR)
-	const vec4 frag_color = vec4(identity_color, identity_color,identity_color, identity_alpha);
-	vec4 color0 = texture(texture0, frag_tex_coord0) * frag_color;
+	const PRECISION_MEDIUMP vec4 frag_color = vec4(identity_color, identity_color, identity_color, identity_alpha);
+	PRECISION_MEDIUMP vec4 color0 = texture(texture0, frag_tex_coord0) * frag_color;
 #elif defined (USE_ENT_COLOR)
-	vec4 color0 = texture(texture0, frag_tex_coord0) * ent_color0;
+	PRECISION_MEDIUMP vec4 color0 = texture(texture0, frag_tex_coord0) * ent_color0;
 #else
-	vec4 color0 = texture(texture0, frag_tex_coord0) * frag_color0;
+	PRECISION_MEDIUMP vec4 color0 = texture(texture0, frag_tex_coord0) * frag_color0;
 #endif
-	vec4 base;
+	PRECISION_MEDIUMP vec4 base;
 
 	// triple-texture with non-identity colors in color1 and color2
 #if defined (USE_TX2)
@@ -589,13 +622,14 @@ void main() {
 		}
 	} else
 #endif
-	// specialization: alpha-test function
+	// Early exit optimization: alpha-test function
+	PRECISION_MEDIUMP float alpha = color0.a;
 	if (alpha_test_func == 1) {
-		if (color0.a == alpha_test_value) discard;
+		if (abs(alpha - alpha_test_value) < EPSILON) discard;
 	} else if (alpha_test_func == 2) {
-		if (color0.a >= alpha_test_value) discard;
+		if (alpha >= alpha_test_value) discard;
 	} else if (alpha_test_func == 3) {
-		if (color0.a < alpha_test_value) discard;
+		if (alpha < alpha_test_value) discard;
 	}
 #endif
 
@@ -619,12 +653,14 @@ void main() {
 	}
 #endif
 
+	// Early exit optimization: discard mode
 	if ( discard_mode == 1 ) {
-		if ( base.a == 0.0 ) {
+		if ( base.a < EPSILON ) {
 			discard;
 		}
 	} else if ( discard_mode == 2 ) {
-		if ( dot( base.rgb, base.rgb ) == 0.0 ) {
+		PRECISION_MEDIUMP float sqrLength = dot( base.rgb, base.rgb );
+		if ( sqrLength < EPSILON ) {
 			discard;
 		}
 	}

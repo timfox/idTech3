@@ -3212,12 +3212,14 @@ static void vk_create_shader_modules( void )
 				const char *s = va( "%s-%s-texture entity-color%s fragment module", sh[i], tx[j], fog[k] );
 				SET_OBJECT_NAME( vk.modules.frag.ent[i][j][k], s, VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 			}
-		}
 	}
+	
+	// Always call vk_bind_generated_shaders - it's safe to call even if USE_VK_PBR is not defined
+	// The function will only bind shaders if they exist
+	vk_bind_generated_shaders();
+}
 
 #ifdef USE_VK_PBR
-	vk_bind_generated_shaders();
-
 	// Load ray tracing shaders if supported
 	// Shaders will be available in shader_data.c after compilation
 	if ( vk.rayTracingSupported ) {
