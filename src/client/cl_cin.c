@@ -1614,19 +1614,17 @@ void CIN_DrawCinematic( int handle ) {
 	h = cinTable[handle].height;
 	buf = cinTable[handle].buf;
 
-#if 0 // keep aspect ratio for cinematics
-	if ( cls.biasX || cls.biasY ) {
-		// clear side areas
+	// Always cover the whole screen with a black quad first so any letterboxed
+	// regions (intro video, widescreen menus, etc.) don't show random garbage.
+	{
+		float bx = 0.0f, by = 0.0f, bw = SCREEN_WIDTH, bh = SCREEN_HEIGHT;
+		SCR_AdjustFrom640( &bx, &by, &bw, &bh );
 		re.SetColor( colorBlack );
-		re.DrawStretchPic( 0, 0, cls.glconfig.vidWidth, cls.glconfig.vidHeight, 0, 0, 1, 1, cls.whiteShader );
+		re.DrawStretchPic( bx, by, bw, bh, 0, 0, 1, 1, cls.whiteShader );
+		re.SetColor( colorWhite );
 	}
-	x = x * cls.scale + cls.biasX;
-	y = y * cls.scale + cls.biasY;
-	w = w * cls.scale;
-	h = h * cls.scale;
-#else
+
 	SCR_AdjustFrom640( &x, &y, &w, &h );
-#endif
 
 	if (cinTable[handle].dirty && (cinTable[handle].CIN_WIDTH != cinTable[handle].drawX || cinTable[handle].CIN_HEIGHT != cinTable[handle].drawY)) {
 		int *buf2;

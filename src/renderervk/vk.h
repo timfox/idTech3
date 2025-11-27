@@ -7,6 +7,15 @@
 struct ImDrawData;
 #endif
 
+// Vulkan Memory Allocator (VMA)
+#ifdef USE_VMA
+#define VMA_IMPLEMENTATION
+#define VMA_STATIC_VULKAN_FUNCTIONS 0
+#define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
+#define VMA_VULKAN_VERSION 1000000 // Vulkan 1.0
+#include "vk_mem_alloc.h"
+#endif
+
 #define MAX_SWAPCHAIN_IMAGES 8
 #define MIN_SWAPCHAIN_IMAGES_IMM 3
 #define MIN_SWAPCHAIN_IMAGES_FIFO   3
@@ -431,6 +440,7 @@ void vk_clear_color( const vec4_t color );
 void vk_clear_depth( qboolean clear_stencil );
 void vk_begin_frame( void );
 qboolean vk_capture_screenmap( void );
+qboolean vk_clear_screenmap( void );
 void vk_end_frame( void );
 void vk_present_frame( void );
 
@@ -894,6 +904,10 @@ typedef struct {
 	uint32_t image_chunk_size;
 
 	uint32_t maxBoundDescriptorSets;
+
+#ifdef USE_VMA
+	VmaAllocator allocator;
+#endif
 
 #ifdef USE_UPLOAD_QUEUE
 	VkFence aux_fence;

@@ -78,11 +78,14 @@ static void R_BindAnimatedImage( const textureBundle_t *bundle ) {
 		// If screenMap wasn't captured this frame, we use blackImage as a safe fallback
 		// to prevent sampling stale/uninitialized data that causes checkerboard corruption.
 		if ( !backEnd.screenMapDone ) {
-			// ScreenMap wasn't captured this frame - use black image as fallback
-			// This prevents corruption when menu shaders try to sample screenMap
-			// but it wasn't written (e.g., on menu-only frames or when capture fails).
-			// The black image ensures UI elements render cleanly without checkerboard artifacts.
+			// ScreenMap wasn't captured this frame - ALWAYS use black image as fallback
+			// This prevents corruption when menu/intro shaders try to sample screenMap
+			// but it contains stale data from previous frames.
+			// Even if we cleared screenMap at frame start, if screenMapDone is false,
+			// it means the clear might not have completed or the descriptor isn't updated.
+			// Using blackImage is the safest fallback to prevent repeating pattern corruption.
 			GL_Bind( tr.blackImage );
+			return;
 		} else {
 			// ScreenMap was captured this frame - bind it for sampling
 			// CRITICAL: vk_capture_screenmap() ensures:

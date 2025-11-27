@@ -408,90 +408,109 @@ void VK_EndImmediateCommands( VkCommandBuffer command_buffer, const char *locati
 }
 
 
-static void record_image_layout_transition( VkCommandBuffer command_buffer, VkImage image, VkImageAspectFlags image_aspect_flags, 
-	VkImageLayout old_layout, VkImageLayout new_layout, uint32_t src_stage_override, uint32_t dst_stage_override ) {
-	(void)dst_stage_override;  // Suppress unused parameter warning
-	VkImageMemoryBarrier barrier;
-	uint32_t src_stage, dst_stage;
-
+// Optimized layout transition helper using C23 designated initializers
+static void record_image_layout_transition( 
+	VkCommandBuffer command_buffer, 
+	VkImage image, 
+	VkImageAspectFlags image_aspect_flags, 
+	VkImageLayout old_layout, 
+	VkImageLayout new_layout, 
+	uint32_t src_stage_override, 
+	uint32_t dst_stage_override )
+{
+	(void)dst_stage_override; // Suppress unused parameter warning
+	
+	// Determine source stage and access mask
+	uint32_t src_stage;
+	VkAccessFlags src_access;
+	
 	switch ( old_layout ) {
 		case VK_IMAGE_LAYOUT_UNDEFINED:
-			if ( src_stage_override != 0 )
-				src_stage = src_stage_override;
-			else
-				src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-			barrier.srcAccessMask = VK_ACCESS_NONE;
+			src_stage = (src_stage_override != 0) ? src_stage_override : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+			src_access = VK_ACCESS_NONE;
+			break;
+		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
+			src_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+			src_access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 			break;
 		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
 			src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			src_access = VK_ACCESS_TRANSFER_WRITE_BIT;
 			break;
 		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
 			src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			src_access = VK_ACCESS_TRANSFER_READ_BIT;
 			break;
 		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
 			src_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-			barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+			src_access = VK_ACCESS_SHADER_READ_BIT;
 			break;
 		case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
 			src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			barrier.srcAccessMask = VK_ACCESS_NONE;
+			src_access = VK_ACCESS_NONE;
 			break;
 		default:
 			ri.Error( ERR_DROP, "unsupported old layout %i", old_layout );
 			src_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-			barrier.srcAccessMask = VK_ACCESS_NONE;
+			src_access = VK_ACCESS_NONE;
 			break;
 	}
 
+	// Determine destination stage and access mask
+	uint32_t dst_stage;
+	VkAccessFlags dst_access;
+	
 	switch ( new_layout ) {
 		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
 			dst_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-			barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			dst_access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 			break;
 		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
 			dst_stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-			barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+			dst_access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 			break;
 		case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
 			dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			barrier.dstAccessMask = VK_ACCESS_NONE;
+			dst_access = VK_ACCESS_NONE;
 			break;
 		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
 			dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			dst_access = VK_ACCESS_TRANSFER_READ_BIT;
 			break;
 		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
 			dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			dst_access = VK_ACCESS_TRANSFER_WRITE_BIT;
 			break;
 		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
 			dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
+			dst_access = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
 			break;
 		default:
 			ri.Error( ERR_DROP, "unsupported new layout %i", new_layout);
 			dst_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-			barrier.dstAccessMask = VK_ACCESS_NONE;
+			dst_access = VK_ACCESS_NONE;
 			break;
 	}
 
-
-	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-	barrier.pNext = NULL;
-	//barrier.srcAccessMask = src_access_flags;
-	//barrier.dstAccessMask = dst_access_flags;
-	barrier.oldLayout = old_layout;
-	barrier.newLayout = new_layout;
-	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.image = image;
-	barrier.subresourceRange.aspectMask = image_aspect_flags;
-	barrier.subresourceRange.baseMipLevel = 0;
-	barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-	barrier.subresourceRange.baseArrayLayer = 0;
-	barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+	// Use C23 designated initializer for better performance and type safety
+	const VkImageMemoryBarrier barrier = {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+		.pNext = NULL,
+		.srcAccessMask = src_access,
+		.dstAccessMask = dst_access,
+		.oldLayout = old_layout,
+		.newLayout = new_layout,
+		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+		.image = image,
+		.subresourceRange = {
+			.aspectMask = image_aspect_flags,
+			.baseMipLevel = 0,
+			.levelCount = VK_REMAINING_MIP_LEVELS,
+			.baseArrayLayer = 0,
+			.layerCount = VK_REMAINING_ARRAY_LAYERS
+		}
+	};
 
 	qvkCmdPipelineBarrier( command_buffer, src_stage, dst_stage, 0, 0, NULL, 0, NULL, 1, &barrier );
 }
@@ -823,17 +842,18 @@ static void vk_create_render_passes( void )
 		subpass.pResolveAttachments = &colorResolveRef;
 	}
 
-	// subpass dependencies
-
+	// subpass dependencies - using C23 designated initializers for better performance
 	Com_Memset( &deps, 0, sizeof( deps ) );
-
-	deps[2].srcSubpass = VK_SUBPASS_EXTERNAL;
-	deps[2].dstSubpass = 0;
-	deps[2].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;	// What pipeline stage is waiting on the dependency
-	deps[2].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;	// What pipeline stage is waiting on the dependency
-	deps[2].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;			// What access scopes are influence the dependency
-	deps[2].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;			// What access scopes are waiting on the dependency
-	deps[2].dependencyFlags = 0;
+	
+	deps[2] = (VkSubpassDependency){
+		.srcSubpass = VK_SUBPASS_EXTERNAL,
+		.dstSubpass = 0,
+		.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT,
+		.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+		.dependencyFlags = 0
+	};
 
 	if ( r_fbo->integer == 0 )
 	{
@@ -849,21 +869,26 @@ static void vk_create_render_passes( void )
 	desc.dependencyCount = 2;
 	desc.pDependencies = &deps[0];
 
-	deps[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-	deps[0].dstSubpass = 0;
-	deps[0].srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;			// What pipeline stage must have completed for the dependency
-	deps[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;	// What pipeline stage is waiting on the dependency
-	deps[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;						// What access scopes are influence the dependency
-	deps[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // What access scopes are waiting on the dependency
-	deps[0].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;					// Only need the current fragment (or tile) synchronized, not the whole framebuffer
+	// Use C23 designated initializers for better performance and clarity
+	deps[0] = (VkSubpassDependency){
+		.srcSubpass = VK_SUBPASS_EXTERNAL,
+		.dstSubpass = 0,
+		.srcStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		.srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
+		.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+		.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT
+	};
 
-	deps[1].srcSubpass = 0;
-	deps[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-	deps[1].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;	// Fragment data has been written
-	deps[1].dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;			// Don't start shading until data is available
-	deps[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;			// Waiting for color data to be written
-	deps[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;						// Don't read things from the shader before ready
-	deps[1].dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;					// Only need the current fragment (or tile) synchronized, not the whole framebuffer
+	deps[1] = (VkSubpassDependency){
+		.srcSubpass = 0,
+		.dstSubpass = VK_SUBPASS_EXTERNAL,
+		.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+		.dstStageMask = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+		.dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+		.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT
+	};
 
 	VK_CHECK( qvkCreateRenderPass( device, &desc, NULL, &vk.render_pass.main ) );
 	SET_OBJECT_NAME( vk.render_pass.main, "render pass - main", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT );
@@ -2895,6 +2920,17 @@ void vk_init_descriptors( void )
 }
 
 
+// VMA allocation structures (if using VMA)
+#ifdef USE_VMA
+typedef struct {
+	VmaAllocation allocation;
+	VmaAllocationInfo allocationInfo;
+} VmaBufferAllocation;
+
+static VmaBufferAllocation vk_geometry_buffer_vma[NUM_COMMAND_BUFFERS];
+static VmaAllocation vk_geometry_buffer_memory_vma = VK_NULL_HANDLE;
+#endif
+
 static void vk_release_geometry_buffers( void )
 {
 	int i;
@@ -2902,23 +2938,76 @@ static void vk_release_geometry_buffers( void )
 	for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
 		qvkDestroyBuffer( vk.device, vk.tess[i].vertex_buffer, NULL );
 		vk.tess[i].vertex_buffer = VK_NULL_HANDLE;
+#ifdef USE_VMA
+		if ( vk_geometry_buffer_vma[i].allocation != VK_NULL_HANDLE ) {
+			vmaDestroyBuffer( vk.allocator, vk.tess[i].vertex_buffer, vk_geometry_buffer_vma[i].allocation );
+			vk_geometry_buffer_vma[i].allocation = VK_NULL_HANDLE;
+		}
+#endif
 	}
 
+#ifndef USE_VMA
 	qvkFreeMemory( vk.device, vk.geometry_buffer_memory, NULL );
 	vk.geometry_buffer_memory = VK_NULL_HANDLE;
+#else
+	if ( vk_geometry_buffer_memory_vma != VK_NULL_HANDLE ) {
+		vmaFreeMemory( vk.allocator, vk_geometry_buffer_memory_vma );
+		vk_geometry_buffer_memory_vma = VK_NULL_HANDLE;
+	}
+#endif
 }
 
 
 static void vk_create_geometry_buffers( VkDeviceSize size )
 {
+	int i;
+	void *data = NULL;
+
+#ifdef USE_VMA
+	// Use VMA for better memory management
+	VkBufferCreateInfo bufferInfo = {
+		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+		.size = size,
+		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+		.sharingMode = VK_SHARING_MODE_EXCLUSIVE
+	};
+
+	VmaAllocationCreateInfo allocCreateInfo = {
+		.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT,
+		.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST,
+		.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+	};
+
+	VkMemoryRequirements vb_memory_requirements = {0};
+
+	for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ ) {
+		VkResult res = vmaCreateBuffer( vk.allocator, &bufferInfo, &allocCreateInfo,
+			&vk.tess[i].vertex_buffer, &vk_geometry_buffer_vma[i].allocation, &vk_geometry_buffer_vma[i].allocationInfo );
+		
+		if ( res != VK_SUCCESS ) {
+			ri.Error( ERR_FATAL, "VMA: Failed to create geometry buffer %i: %s", i, vk_result_string( res ) );
+		}
+
+		// Get memory requirements for size calculation
+		qvkGetBufferMemoryRequirements( vk.device, vk.tess[i].vertex_buffer, &vb_memory_requirements );
+		
+		vk.tess[i].vertex_buffer_ptr = (byte*)vk_geometry_buffer_vma[i].allocationInfo.pMappedData;
+		vk.tess[i].vertex_buffer_offset = 0;
+
+		SET_OBJECT_NAME( vk.tess[i].vertex_buffer, va( "geometry buffer %i", i ), VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
+	}
+
+	vk.geometry_buffer_size = vb_memory_requirements.size;
+	vk.geometry_buffer_memory = VK_NULL_HANDLE; // Not used with VMA
+
+#else
+	// Original manual allocation code
 	VkMemoryRequirements vb_memory_requirements;
 	VkMemoryAllocateInfo alloc_info;
 	VkBufferCreateInfo desc;
 	VkDeviceSize vertex_buffer_offset;
 	uint32_t memory_type_bits;
 	uint32_t memory_type;
-	void *data;
-	int i;
 
 	desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
 	desc.pNext = NULL;
@@ -2962,6 +3051,7 @@ static void vk_create_geometry_buffers( VkDeviceSize size )
 	SET_OBJECT_NAME( vk.geometry_buffer_memory, "geometry buffer memory", VK_DEBUG_REPORT_OBJECT_TYPE_BUFFER_EXT );
 
 	vk.geometry_buffer_size = vb_memory_requirements.size;
+#endif
 
 	Com_Memset( &vk.stats, 0, sizeof( vk.stats ) );
 }
@@ -4789,6 +4879,26 @@ void vk_initialize( void )
 		VK_CHECK( qvkCreateDescriptorPool( vk.device, &desc, NULL, &vk.descriptor_pool ) );
 	}
 
+#ifdef USE_VMA
+	//
+	// Initialize Vulkan Memory Allocator (VMA)
+	//
+	{
+		VmaAllocatorCreateInfo allocatorInfo = {0};
+		allocatorInfo.physicalDevice = vk.physical_device;
+		allocatorInfo.device = vk.device;
+		allocatorInfo.instance = vk_instance;
+		allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
+		
+		VkResult res = vmaCreateAllocator(&allocatorInfo, &vk.allocator);
+		if (res != VK_SUCCESS) {
+			ri.Error(ERR_FATAL, "VMA: Failed to create allocator: %s", vk_result_string(res));
+		}
+		
+		ri.Printf(PRINT_ALL, "VMA: Vulkan Memory Allocator initialized successfully\n");
+	}
+#endif
+
 	//
 	// Descriptor set layout.
 	//
@@ -4897,9 +5007,14 @@ void vk_initialize( void )
 #endif
 
 	{
-		VkPipelineCacheCreateInfo ci;
-		Com_Memset( &ci, 0, sizeof( ci ) );
-		ci.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+		// Use C23 designated initializer for better performance
+		const VkPipelineCacheCreateInfo ci = {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
+			.pNext = NULL,
+			.flags = 0,
+			.initialDataSize = 0,
+			.pInitialData = NULL
+		};
 		VK_CHECK( qvkCreatePipelineCache( vk.device, &ci, NULL, &vk.pipelineCache ) );
 	}
 
@@ -5408,6 +5523,15 @@ __cleanup:
 	// Shutdown ray tracing
 #ifdef USE_VULKAN_RAY_TRACING
 	vk_rt_shutdown();
+#endif
+
+#ifdef USE_VMA
+	// Destroy VMA allocator before device
+	if ( vk.allocator != VK_NULL_HANDLE ) {
+		vmaDestroyAllocator( vk.allocator );
+		vk.allocator = VK_NULL_HANDLE;
+		ri.Printf( PRINT_ALL, "VMA: Allocator destroyed\n" );
+	}
 #endif
 
 	if ( vk.device != VK_NULL_HANDLE ) {
@@ -5996,7 +6120,24 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	set_shader_stage_desc( shader_stages+0, VK_SHADER_STAGE_VERTEX_BIT, vk.modules.gamma_vs, "main" );
 	set_shader_stage_desc( shader_stages+1, VK_SHADER_STAGE_FRAGMENT_BIT, fsmodule, "main" );
 
-	frag_spec_data.gamma = 1.0 / (r_gamma->value);
+	// CRITICAL: When RT is enabled, RT composite already outputs sRGB (linearToSrgb conversion),
+	// so gamma correction should be skipped (gamma=1.0) to avoid double gamma correction.
+	// For non-RT paths, apply normal gamma correction.
+	// NOTE: We check RT state at pipeline creation time. Since r_raytracing uses CVAR_LATCH,
+	// it requires a restart to change, so the state is consistent. However, RT might not be
+	// used in every frame (e.g., menu-only frames), so we conservatively only set gamma=1.0
+	// if RT is enabled AND RT composite shader is available (meaning RT can actually run).
+	qboolean rtEnabled = qfalse;
+#ifdef USE_VULKAN_RAY_TRACING
+	rtEnabled = (r_raytracing && r_raytracing->integer &&
+	             vk.rayTracingSupported && vk.rt.initialized &&
+	             vk.modules.rt_composite_fs != VK_NULL_HANDLE);
+#endif
+	if ( rtEnabled && program_index == 0 ) { // program_index 0 = gamma pipeline
+		frag_spec_data.gamma = 1.0; // Skip gamma correction, RT composite already did sRGB conversion
+	} else {
+		frag_spec_data.gamma = 1.0 / (r_gamma->value);
+	}
 	frag_spec_data.overbright = (float)(1 << tr.overbrightBits);
 	frag_spec_data.greyscale = r_greyscale->value;
 	frag_spec_data.bloom_threshold = r_bloom_threshold->value;
@@ -6179,7 +6320,6 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	create_info.pRasterizationState = &rasterization_state;
 	create_info.pMultisampleState = &multisample_state;
 	create_info.pDepthStencilState = (program_index == 2) ? &depth_stencil_state : NULL;
-	create_info.pDepthStencilState = &depth_stencil_state;
 	create_info.pColorBlendState = &blend_state;
 	create_info.pDynamicState = NULL;
 	create_info.layout = layout;
@@ -6450,9 +6590,6 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
 #ifdef USE_VK_PBR
 	const int use_pbr = def->vk_pbr_flags ? 1 : 0;
-
-	if ( def->vk_pbr_flags )
-		Com_Printf("hi");
 
 	switch ( def->shader_type ) {
 
@@ -7608,52 +7745,49 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		}
 	}
 
-	blend_state.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-	blend_state.pNext = NULL;
-	blend_state.flags = 0;
-	blend_state.logicOpEnable = VK_FALSE;
-	blend_state.logicOp = VK_LOGIC_OP_COPY;
-	blend_state.attachmentCount = 1;
-	blend_state.pAttachments = &attachment_blend_state;
-	blend_state.blendConstants[0] = 0.0f;
-	blend_state.blendConstants[1] = 0.0f;
-	blend_state.blendConstants[2] = 0.0f;
-	blend_state.blendConstants[3] = 0.0f;
+	// Use C23 designated initializer for better performance
+	blend_state = (VkPipelineColorBlendStateCreateInfo){
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+		.pNext = NULL,
+		.flags = 0,
+		.logicOpEnable = VK_FALSE,
+		.logicOp = VK_LOGIC_OP_COPY,
+		.attachmentCount = 1,
+		.pAttachments = &attachment_blend_state,
+		.blendConstants = { 0.0f, 0.0f, 0.0f, 0.0f }
+	};
 
-	dynamic_state.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
-	dynamic_state.pNext = NULL;
-	dynamic_state.flags = 0;
-	dynamic_state.dynamicStateCount = ARRAY_LEN( dynamic_state_array );
-	dynamic_state.pDynamicStates = dynamic_state_array;
+	// Use C23 designated initializer for better performance
+	dynamic_state = (VkPipelineDynamicStateCreateInfo){
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+		.pNext = NULL,
+		.flags = 0,
+		.dynamicStateCount = ARRAY_LEN( dynamic_state_array ),
+		.pDynamicStates = dynamic_state_array
+	};
 
-	create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	create_info.pNext = NULL;
-	create_info.flags = 0;
-	create_info.stageCount = ARRAY_LEN(shader_stages);
-	create_info.pStages = shader_stages;
-	create_info.pVertexInputState = &vertex_input_state;
-	create_info.pInputAssemblyState = &input_assembly_state;
-	create_info.pTessellationState = NULL;
-	create_info.pViewportState = &viewport_state;
-	create_info.pRasterizationState = &rasterization_state;
-	create_info.pMultisampleState = &multisample_state;
-	create_info.pDepthStencilState = &depth_stencil_state;
-	create_info.pColorBlendState = &blend_state;
-	create_info.pDynamicState = &dynamic_state;
-
-	if ( def->shader_type == TYPE_DOT )
-		create_info.layout = vk.pipeline_layout_storage;
-	else
-		create_info.layout = vk.pipeline_layout;
-
-	if ( renderPassIndex == RENDER_PASS_SCREENMAP )
-		create_info.renderPass = vk.render_pass.screenmap;
-	else
-		create_info.renderPass = vk.render_pass.main;
-
-	create_info.subpass = 0;
-	create_info.basePipelineHandle = VK_NULL_HANDLE;
-	create_info.basePipelineIndex = -1;
+	// Use C23 designated initializer for better performance and clarity
+	create_info = (VkGraphicsPipelineCreateInfo){
+		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+		.pNext = NULL,
+		.flags = 0,
+		.stageCount = ARRAY_LEN(shader_stages),
+		.pStages = shader_stages,
+		.pVertexInputState = &vertex_input_state,
+		.pInputAssemblyState = &input_assembly_state,
+		.pTessellationState = NULL,
+		.pViewportState = &viewport_state,
+		.pRasterizationState = &rasterization_state,
+		.pMultisampleState = &multisample_state,
+		.pDepthStencilState = &depth_stencil_state,
+		.pColorBlendState = &blend_state,
+		.pDynamicState = &dynamic_state,
+		.layout = (def->shader_type == TYPE_DOT) ? vk.pipeline_layout_storage : vk.pipeline_layout,
+		.renderPass = (renderPassIndex == RENDER_PASS_SCREENMAP) ? vk.render_pass.screenmap : vk.render_pass.main,
+		.subpass = 0,
+		.basePipelineHandle = VK_NULL_HANDLE,
+		.basePipelineIndex = -1
+	};
 
 	VK_CHECK( qvkCreateGraphicsPipelines( vk.device, vk.pipelineCache, 1, &create_info, NULL, &pipeline ) );
 
@@ -8845,6 +8979,123 @@ qboolean vk_capture_screenmap( void )
 }
 
 
+// ========================================================================
+// vk_clear_screenmap: Clear screenMap to black for UI-only frames
+// ========================================================================
+// When screenMap is needed but capture fails (e.g., intro video frames with no 3D scene),
+// we clear screenMap to black to prevent stale data from being sampled by shaders.
+// This fixes the repeating pattern corruption in intro videos.
+qboolean vk_clear_screenmap( void )
+{
+	if ( !vk.fboActive || vk.screenMap.color_image == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+
+	if ( vk.cmd == NULL || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
+		return qfalse;
+	}
+
+	if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
+		// Can't clear during render pass - must wait until after
+		return qfalse;
+	}
+
+	ri.Printf( PRINT_DEVELOPER, "VK: Clearing screenMap to black (UI-only frame, no 3D scene to capture)\n" );
+
+	// Transition screenMap to TRANSFER_DST_OPTIMAL for clearing
+	// CRITICAL: Use UNDEFINED as oldLayout to handle any current layout safely, matching vk_capture_screenmap().
+	// Vulkan spec allows UNDEFINED->any layout transition, which always works regardless
+	// of the actual current layout. This prevents VK_ERROR_DEVICE_LOST from layout mismatch errors.
+	VkImageMemoryBarrier barrier = {};
+	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barrier.pNext = NULL;
+	barrier.srcAccessMask = 0; // No previous access - UNDEFINED layout has no access requirements
+	barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Safe for any current layout - always valid transition
+	barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image = vk.screenMap.color_image;
+	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	barrier.subresourceRange.baseMipLevel = 0;
+	barrier.subresourceRange.levelCount = 1;
+	barrier.subresourceRange.baseArrayLayer = 0;
+	barrier.subresourceRange.layerCount = 1;
+
+	qvkCmdPipelineBarrier(
+		vk.cmd->command_buffer,
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // No previous stage - UNDEFINED layout
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		0,
+		0, NULL,
+		0, NULL,
+		1, &barrier
+	);
+
+	// Clear screenMap to black
+	VkClearColorValue clearColor = { { 0.0f, 0.0f, 0.0f, 1.0f } };
+	VkImageSubresourceRange clearRange = {};
+	clearRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	clearRange.baseMipLevel = 0;
+	clearRange.levelCount = 1;
+	clearRange.baseArrayLayer = 0;
+	clearRange.layerCount = 1;
+	qvkCmdClearColorImage(
+		vk.cmd->command_buffer,
+		vk.screenMap.color_image,
+		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		&clearColor,
+		1, &clearRange
+	);
+
+	// Transition back to SHADER_READ_ONLY_OPTIMAL
+	barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+	barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	qvkCmdPipelineBarrier(
+		vk.cmd->command_buffer,
+		VK_PIPELINE_STAGE_TRANSFER_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		0,
+		0, NULL,
+		0, NULL,
+		1, &barrier
+	);
+
+	// Update descriptor to ensure shaders sample the cleared image
+	VkDescriptorImageInfo info;
+	VkWriteDescriptorSet desc;
+	Vk_Sampler_Def sd;
+
+	Com_Memset( &sd, 0, sizeof( sd ) );
+	sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+	sd.max_lod_1_0 = qfalse;
+	sd.noAnisotropy = qtrue;
+	sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+
+	info.sampler = vk_find_sampler( &sd );
+	info.imageView = vk.screenMap.color_image_view;
+	info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+	desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	desc.pNext = NULL;
+	desc.dstSet = vk.screenMap.color_descriptor;
+	desc.dstBinding = 0;
+	desc.dstArrayElement = 0;
+	desc.descriptorCount = 1;
+	desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+	desc.pImageInfo = &info;
+	desc.pBufferInfo = NULL;
+	desc.pTexelBufferView = NULL;
+
+	qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+
+	return qtrue;
+}
+
+
 #ifndef UINT64_MAX
 #define UINT64_MAX 0xFFFFFFFFFFFFFFFFULL
 #endif
@@ -8956,8 +9207,21 @@ _retry:
 	vk.cmd->last_pipeline = VK_NULL_HANDLE;
 
 	// CRITICAL: Reset screenMapDone at the start of each frame.
-	// It will be set to qtrue only after screenMap is successfully captured.
+	// It will be set to qtrue only after screenMap is successfully captured from a 3D scene.
+	// We do NOT set it after clearing - shaders should use blackImage fallback unless screenMap
+	// was actually captured. This prevents shaders from sampling stale data.
 	backEnd.screenMapDone = qfalse;
+
+	// CRITICAL: Clear screenMap at the start of every frame to prevent stale data corruption.
+	// This ensures that if screenMap is accidentally sampled (shouldn't happen due to screenMapDone check),
+	// it contains black instead of stale repeating patterns from previous frames.
+	// The clear happens before any render pass starts, so it's always safe.
+	// Note: We clear but don't set screenMapDone - shaders should use blackImage fallback.
+	if ( vk.fboActive && vk.screenMap.color_image != VK_NULL_HANDLE ) {
+		vk_clear_screenmap();
+		// Don't set screenMapDone here - let shaders use blackImage fallback
+		// screenMapDone will only be set after successful capture from 3D scene
+	}
 
 	// Always use the main render pass - screenMap will be captured via copy/blit later
 	vk_begin_main_render_pass();
@@ -9238,6 +9502,10 @@ void vk_end_frame( void )
 			// On menu-only frames with bloom OFF, the main render pass clears the image
 			// but may not draw anything. The render pass clear ensures the image is
 			// initialized, but we must verify it's in the correct layout and synchronized.
+			//
+			// CRITICAL: When RT is enabled, RT composite already outputs sRGB (via linearToSrgb),
+			// so the gamma pipeline should have gamma=1.0 (set at pipeline creation time)
+			// to avoid double gamma correction. The gamma pass still runs for obScale/dithering.
 			if ( finalColorImage == VK_NULL_HANDLE || finalColorView == VK_NULL_HANDLE ) {
 				ri.Printf( PRINT_WARNING, "VK: finalColorImage or finalColorView is NULL, skipping gamma pass\n" );
 			} else {
@@ -9249,6 +9517,10 @@ void vk_end_frame( void )
 
 				// Clear the swapchain to black to ensure letterbox regions and unwritten pixels are initialized
 				// This prevents corruption on menu screens
+				// CRITICAL: Ensure render area matches framebuffer size to prevent stale data in corners
+				// If renderWidth/renderHeight don't match the framebuffer, the clear won't cover the full image
+				ri.Printf( PRINT_DEVELOPER, "VK: Gamma pass: renderArea=%dx%d, framebuffer should be %dx%d\n", 
+					vk.renderWidth, vk.renderHeight, gls.windowWidth, gls.windowHeight );
 				vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qtrue, vk.renderWidth, vk.renderHeight );
 				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
 				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
@@ -10163,9 +10435,13 @@ void vk_generate_cubemaps( cubemap_t *cube )
 
 	vk_end_render_pass();
 
+	// CRITICAL: Ensure vk.cubeMap.color_image is in SHADER_READ_ONLY_OPTIMAL layout for sampling
+	// This image might already be in use from the main render pass, so we need to transition it properly
 	command_buffer = begin_command_buffer();
+	// Use COLOR_ATTACHMENT_OPTIMAL as oldLayout since it might have been written to in the main render pass
+	// If it wasn't written to, the transition from COLOR_ATTACHMENT_OPTIMAL to SHADER_READ_ONLY_OPTIMAL is still safe
 	record_image_layout_transition( command_buffer, vk.cubeMap.color_image, VK_IMAGE_ASPECT_COLOR_BIT, 
-		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
 		0, 0 );
 	end_command_buffer( command_buffer, __func__  );
 
@@ -10200,9 +10476,12 @@ void vk_generate_cubemaps( cubemap_t *cube )
 		Com_Memset( &scissor_rect, 0, sizeof( scissor_rect ) );
 		scissor_rect.extent.width = scissor_rect.extent.height = def->size;
 
-		// change image layout for all cubemap faces to transfer destination
+		// CRITICAL: Change image layout for all cubemap faces to transfer destination
+		// Use SHADER_READ_ONLY_OPTIMAL as oldLayout since cubemap images might have been used before
+		// If this is the first use, transitioning from SHADER_READ_ONLY_OPTIMAL to TRANSFER_DST_OPTIMAL
+		// is still safe (though not optimal). Using UNDEFINED would cause device loss if the image was already used.
 		record_image_layout_transition( vk.cmd->command_buffer, cubemap->handle, VK_IMAGE_ASPECT_COLOR_BIT, 
-			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 
 			0, 0 );
 			
 		for ( j = 0; j < def->mipLevels; j++ ) {
@@ -10232,11 +10511,10 @@ void vk_generate_cubemaps( cubemap_t *cube )
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
 	}
 
-	command_buffer = begin_command_buffer();
-	record_image_layout_transition( command_buffer, vk.cubeMap.color_image, VK_IMAGE_ASPECT_COLOR_BIT, 
-		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 
-		0, 0 );
-	end_command_buffer( command_buffer, __func__  );
+	// CRITICAL: vk.cubeMap.color_image is used for cubemap rendering, not the main render pass.
+	// The main render pass uses vk.color_image, not vk.cubeMap.color_image.
+	// So we don't need to transition vk.cubeMap.color_image back - it can stay in SHADER_READ_ONLY_OPTIMAL.
+	// The transition at the start ensures it's ready for sampling during cubemap prefiltering.
 
 	vk_begin_main_render_pass();
 }

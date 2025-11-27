@@ -1473,9 +1473,18 @@ static const void *RB_DrawSurfs( const void *data ) {
 			backEnd.screenMapDone = qtrue;
 			ri.Printf( PRINT_DEVELOPER, "VK: screenMap captured after 3D world, screenMapDone = qtrue\n" );
 		} else {
-			backEnd.screenMapDone = qfalse;
+			// Capture failed - if screenMap is needed (e.g., intro video shader samples it),
+			// clear it to black to prevent stale data corruption
 			if ( tr.needScreenMap ) {
-				ri.Printf( PRINT_DEVELOPER, "VK: screenMap capture failed or not needed (menu-only frame?)\n" );
+				if ( vk_clear_screenmap() ) {
+					backEnd.screenMapDone = qtrue;
+					ri.Printf( PRINT_DEVELOPER, "VK: screenMap cleared to black (UI-only frame, no 3D scene)\n" );
+				} else {
+					backEnd.screenMapDone = qfalse;
+					ri.Printf( PRINT_DEVELOPER, "VK: screenMap capture/clear failed (menu-only frame?)\n" );
+				}
+			} else {
+				backEnd.screenMapDone = qfalse;
 			}
 		}
 		
