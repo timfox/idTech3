@@ -100,6 +100,35 @@ Copy the resulting binaries from created `build` directory
 
 ---
 
+### android
+
+Android builds rely on the local vendor libraries that live under `libs/`.
+You'll need an Android NDK installation and SDL2 binaries compiled for the
+target ABI.
+
+1. Install Android Studio or the standalone NDK (r26 or newer) and set
+   `ANDROID_NDK_HOME`.
+2. Place the SDL2 shared libraries in `libs/sdl/android/<abi>/`. For example,
+   `libs/sdl/android/arm64-v8a/libSDL2.so` will be picked up automatically when
+   `ANDROID_ABI=arm64-v8a`.
+3. Configure the build with CMake:
+
+```
+cmake -S . -B build-android \
+  -DCMAKE_TOOLCHAIN_FILE=${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake \
+  -DANDROID=ON \
+  -DANDROID_ABI=arm64-v8a \
+  -DANDROID_PLATFORM=android-26 \
+  -DUSE_RENDERER_DLOPEN=OFF
+cmake --build build-android
+```
+
+This produces `libidtech3.so` plus the renderer shared libraries inside
+`build-android/`. Package those into your APK or copy them to a launcher such as
+Delta Touch.
+
+---
+
 Several Makefile options are available for linux/mingw/macos builds:
 
 `BUILD_CLIENT=1` - build unified client/server executable, enabled by default

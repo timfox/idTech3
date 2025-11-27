@@ -149,6 +149,15 @@ because not all systems place things in SDL/ (see FreeBSD).
 
 # Define options for searching SDL2 Library in a custom path
 
+set(_SDL2_EXTRA_INCLUDE_DIRS)
+set(_SDL2_EXTRA_LIBRARY_DIRS)
+if(ANDROID)
+    list(APPEND _SDL2_EXTRA_INCLUDE_DIRS "${CMAKE_SOURCE_DIR}/libs/sdl/include")
+    if(CMAKE_ANDROID_ARCH_ABI)
+        list(APPEND _SDL2_EXTRA_LIBRARY_DIRS "${CMAKE_SOURCE_DIR}/libs/sdl/android/${CMAKE_ANDROID_ARCH_ABI}")
+    endif()
+endif()
+
 set(SDL2_PATH "" CACHE STRING "Custom SDL2 Library path")
 
 set(_SDL2_NO_DEFAULT_PATH OFF)
@@ -173,7 +182,7 @@ find_path(SDL2_INCLUDE_DIR SDL.h
         PATH_SUFFIXES SDL2
         # path suffixes to search inside ENV{SDL2DIR}
         include/SDL2 include
-        PATHS ${SDL2_PATH}
+        PATHS ${SDL2_PATH} ${_SDL2_EXTRA_INCLUDE_DIRS}
         DOC "Where the SDL2 headers can be found"
         )
 
@@ -193,7 +202,7 @@ find_library(SDL2_LIBRARY
         ENV SDL2DIR
         ${SDL2_NO_DEFAULT_PATH_CMD}
         PATH_SUFFIXES lib ${VC_LIB_PATH_SUFFIX}
-        PATHS ${SDL2_PATH}
+        PATHS ${SDL2_PATH} ${_SDL2_EXTRA_LIBRARY_DIRS}
         DOC "Where the SDL2 Library can be found"
         )
 

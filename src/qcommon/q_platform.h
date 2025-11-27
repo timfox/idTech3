@@ -23,6 +23,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef __Q_PLATFORM_H
 #define __Q_PLATFORM_H
 
+#ifdef __ANDROID__
+#include <endian.h>
+#endif
+
 #define QDECL
 
 #define id386 0
@@ -188,6 +192,43 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define DLL_EXT ".dylib"
 
 #endif // __APPLE__
+
+// ============================== Android ==================================
+
+#ifdef __ANDROID__
+
+#ifndef OS_STRING
+#define OS_STRING "android"
+#endif
+
+#define ID_INLINE inline
+#define PATH_SEP '/'
+#define PATH_SEP_FOREIGN '\\'
+
+#if defined(__arm__)
+#undef ARCH_STRING
+#define ARCH_STRING "armeabi-v7a"
+#elif defined(__aarch64__)
+#undef ARCH_STRING
+#define ARCH_STRING "arm64-v8a"
+#elif defined(__i386__)
+#undef ARCH_STRING
+#define ARCH_STRING "x86"
+#elif defined(__x86_64__)
+#undef ARCH_STRING
+#define ARCH_STRING "x86_64"
+#endif
+
+#if __FLOAT_WORD_ORDER == __BIG_ENDIAN
+#define Q3_BIG_ENDIAN
+#else
+#define Q3_LITTLE_ENDIAN
+#endif
+
+#undef DLL_EXT
+#define DLL_EXT ".so"
+
+#endif // __ANDROID__
 
 // ================================ Q3VM ===================================
 
