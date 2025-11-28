@@ -1,6 +1,6 @@
 # id Tech 3
 
-[![build](../../workflows/build/badge.svg)](../../actions?query=workflow%3Abuild) * <a href="https://discord.com/invite/X3Exs4C"><img src="https://img.shields.io/discord/314456230649135105?color=7289da&logo=discord&logoColor=white" alt="Discord server" /></a>
+[![build](../../workflows/build/badge.svg)](../../actions?query=workflow%3Abuild) <a href="https://discord.com/invite/X3Exs4C"><img src="https://img.shields.io/discord/314456230649135105?color=7289da&logo=discord&logoColor=white" alt="Discord server" /></a>
 
 This is a modern id Tech 3 engine with PBR and ray tracing.
 
@@ -61,7 +61,23 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 * All set of offscreen rendering features mentioned in Vulkan renderer, plus:
 * Bloom reflection post-processing effect
 
-Performance is usually greater or equal to other opengl1 renderers
+## DirectX 12 renderer
+* Modern Graphics API: Full DirectX 12 support (feature level 12.0+)
+* Triple buffering for efficient frame presentation
+* Command lists and descriptor heaps for optimized resource and command management
+* Root signatures and pre-compiled pipeline state objects for flexible, efficient rendering
+* Resource barriers and fence-based GPU synchronization
+* Multiple render target (MRT) and 32-bit depth buffer support
+* DXGI swap chain with flip discard model for smooth presentation
+* Optional D3D12 debug layer (in debug builds)
+* Automatic detection of supported Feature Levels (12.2, 12.1, 12.0, 11.1, 11.0 fallback)
+* Support for Resource Binding Tiers 1, 2, and 3
+* **Ray Tracing (DXR):**
+  * DirectX Raytracing (DXR) with GPU-accelerated acceleration structures
+  * Realistic ray-traced lighting and effects (where supported)
+  * Hardware-dependent, requires compatible GPU/driver
+
+See [docs/directx12-support.md](docs/directx12-support.md) for full details and requirements.
 
 ## [Build Instructions](docs/BUILD.md)
 
@@ -71,5 +87,6 @@ Performance is usually greater or equal to other opengl1 renderers
 * https://github.com/ioquake/ioq3
 * https://github.com/kennyalive/Quake-III-Arena-Kenny-Edition
 * https://github.com/OpenArena/engine
+* https://github.com/JKSunny/Quake3e
 
 
