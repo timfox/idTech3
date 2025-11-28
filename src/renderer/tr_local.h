@@ -43,6 +43,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "iqm.h"
 #include "qgl.h"
 
+// Forward declarations for TIKI model system
+struct tikiSurface_s;
+typedef struct tikiSurface_s tikiSurface_t;
+
 #define GL_INDEX_TYPE		GL_UNSIGNED_INT
 
 typedef uint32_t glIndex_t;
@@ -632,6 +636,7 @@ typedef enum {
 	SF_MD3,
 	SF_MDR,
 	SF_IQM,
+	SF_TIKI,
 	SF_FLARE,
 	SF_ENTITY,				// beams, rails, lightning, etc that can be determined by entity
 
@@ -915,7 +920,8 @@ typedef enum {
 	MOD_BRUSH,
 	MOD_MESH,
 	MOD_MDR,
-	MOD_IQM
+	MOD_IQM,
+	MOD_TIKI
 } modtype_t;
 
 typedef struct model_s {
@@ -926,7 +932,7 @@ typedef struct model_s {
 	int			dataSize;	// just for listing purposes
 	bmodel_t	*bmodel;		// only if type == MOD_BRUSH
 	md3Header_t	*md3[MD3_MAX_LODS];	// only if type == MOD_MESH
-	void	*modelData;			// only if type == (MOD_MDR | MOD_IQM)
+	void	*modelData;			// only if type == (MOD_MDR | MOD_IQM | MOD_TIKI)
 
 	int			 numLods;
 } model_t;
@@ -1769,6 +1775,8 @@ ANIMATED MODELS
 
 void R_MDRAddAnimSurfaces( trRefEntity_t *ent );
 void RB_MDRSurfaceAnim( mdrSurface_t *surface );
+void R_TIKIAddAnimSurfaces( trRefEntity_t *ent );
+void RB_TIKISurfaceAnim( tikiSurface_t *surface );
 qboolean R_LoadIQM (model_t *mod, void *buffer, int filesize, const char *name );
 void R_AddIQMSurfaces( trRefEntity_t *ent );
 void RB_IQMSurfaceAnim( const surfaceType_t *surface );
@@ -2012,6 +2020,12 @@ void R_AddParticle(const vec3_t origin, const vec3_t velocity,
 void R_UpdateParticles(float deltaTime);
 void R_RenderParticles(void);
 void R_ClearParticles(void);
+
+// Enhanced particle system (includes emitters, physics, trails, ribbons)
+#include "tr_particles_enhanced.h"
+
+// Enhanced shader system (procedural generation, scripting, runtime modification)
+#include "tr_shaders_enhanced.h"
 
 // ARB shaders definitions
 

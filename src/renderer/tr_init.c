@@ -22,6 +22,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_init.c -- functions that are not called every frame
 
 #include "tr_local.h"
+#include "tr_skyportals.h"
+#include "tr_flares_enhanced.h"
 
 #ifndef IMGUI_FORWARD_DECLARE
 #define IMGUI_FORWARD_DECLARE
@@ -1908,6 +1910,10 @@ void R_Init( void ) {
 	R_InitFreeType();
 
 	R_InitParticleSystem();
+	R_InitParticleSystemEnhanced();
+	R_InitSkyPortals();
+	R_InitFlaresEnhanced();
+	R_InitShadersEnhanced();
 
 	err = qglGetError();
 	if ( err != GL_NO_ERROR )
@@ -1944,6 +1950,10 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	R_DoneFreeType();
 
 	R_ShutdownParticleSystem();
+	R_ShutdownParticleSystemEnhanced();
+	R_ShutdownSkyPortals();
+	R_ShutdownFlaresEnhanced();
+	R_ShutdownShadersEnhanced();
 
 	// shut down platform specific OpenGL stuff
 	if ( code != REF_KEEP_CONTEXT ) {

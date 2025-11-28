@@ -43,7 +43,7 @@ static int frame_history_offset = 0;
 static float fps_history[FRAME_HISTORY_SIZE];
 
 // CVars for debug overlays
-static cvar_t *cl_imgui_debug_performance;
+cvar_t *cl_imgui_debug_performance;
 static cvar_t *cl_imgui_debug_memory;
 static cvar_t *cl_imgui_debug_network;
 static cvar_t *cl_imgui_debug_renderer;
@@ -319,7 +319,8 @@ void CL_ImGui_Debug_ShowRendererOverlay(void) {
 	igText("Stencil Bits: %d", cls.glconfig.stencilBits);
 	
 	// Renderer performance counters (if available)
-	extern cvar_t *r_speeds;
+	// Note: r_speeds is a renderer CVAR, access via Cvar_Get
+	cvar_t *r_speeds = Cvar_Get("r_speeds", "0", 0);
 	if (r_speeds && r_speeds->integer) {
 		igSeparator();
 		igText("Performance Counters");

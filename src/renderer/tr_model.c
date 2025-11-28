@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_models.c -- model loading and caching
 
 #include "tr_local.h"
+#include "tr_tiki.h"
 
 #define	LL(x) x=LittleLong(x)
 
@@ -200,10 +201,14 @@ typedef struct
 	qhandle_t (*ModelLoader)( const char *, model_t * );
 } modelExtToLoaderMap_t;
 
+// Forward declaration for TIKI loader
+qhandle_t R_RegisterTIKI(const char *name, model_t *mod);
+
 // Note that the ordering indicates the order of preference used
 // when there are multiple models of different formats available
 static modelExtToLoaderMap_t modelLoaders[ ] =
 {
+	{ "tiki", R_RegisterTIKI },
 	{ "iqm", R_RegisterIQM },
 	{ "mdr", R_RegisterMDR },
 	{ "md3", R_RegisterMD3 }

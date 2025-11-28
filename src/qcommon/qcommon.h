@@ -259,6 +259,7 @@ lua_State *	Lua_CreateState( void );
 void		Lua_DestroyState( lua_State *L );
 qboolean	Lua_LoadFile( lua_State *L, const char *filename );
 qboolean	Lua_LoadString( lua_State *L, const char *code );
+qboolean	Lua_LoadScriptFromFS( lua_State *L, const char *filename );
 qboolean	Lua_CallFunction( lua_State *L, const char *functionName, int numArgs, int numReturns );
 void		Lua_PushNumber( lua_State *L, double n );
 void		Lua_PushString( lua_State *L, const char *s );
@@ -267,6 +268,10 @@ double		Lua_GetNumber( lua_State *L, int index );
 const char *Lua_GetString( lua_State *L, int index );
 qboolean	Lua_GetBoolean( lua_State *L, int index );
 void		Lua_RegisterFunction( lua_State *L, const char *name, lua_CFunction func );
+void		Lua_RegisterEngineBindings( lua_State *L );
+void		Lua_RegisterGameBindings( lua_State *L );
+void		Lua_RegisterRendererBindings( lua_State *L );
+void		Lua_RegisterSoundBindings( lua_State *L );
 void		Lua_SetGlobal( lua_State *L, const char *name );
 void		Lua_GetGlobal( lua_State *L, const char *name );
 int			Lua_GetTop( lua_State *L );
@@ -290,6 +295,19 @@ FT_Error	FreeType_RenderGlyph( FT_GlyphSlot slot, FT_Render_Mode render_mode );
 void		FreeType_OutlineTranslate( FT_Outline *outline, FT_Pos xDelta, FT_Pos yDelta );
 FT_Error	FreeType_OutlineGetBitmap( FT_Library library, FT_Outline *outline, const FT_Bitmap *abitmap );
 #endif
+
+// Internationalization (i18n)
+void		I18n_Init( void );
+void		I18n_Shutdown( void );
+qboolean	I18n_LoadLanguage( const char *languageCode );
+qboolean	I18n_LoadLanguageFile( const char *filename );
+const char *I18n_Translate( const char *key );
+const char *I18n_TranslateFormat( const char *key, ... );
+void		I18n_SetLanguage( const char *languageCode );
+const char *I18n_GetCurrentLanguage( void );
+qboolean	I18n_LanguageExists( const char *languageCode );
+int			I18n_GetLanguageCount( void );
+void		I18n_ListLanguages( void );
 
 void		NET_FlushPacketQueue( int time_diff );
 void		NET_QueuePacket( netsrc_t sock, int length, const void *data, const netadr_t *to, int offset );

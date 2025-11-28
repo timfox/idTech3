@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "snd_codec.h"
 #include "snd_local.h"
 #include "snd_public.h"
+#include "snd_openal.h"
 
 cvar_t *s_volume;
 cvar_t *s_musicVolume;
@@ -409,6 +410,9 @@ void S_Init( void )
 	qboolean	started = qfalse;
 
 	Com_Printf( "------ Initializing Sound ------\n" );
+	
+	// Initialize OpenAL enhanced audio system
+	SndOpenAL_Init();
 
 	s_volume = Cvar_Get( "s_volume", "0.8", CVAR_ARCHIVE );
 	Cvar_CheckRange( s_volume, "0", "1", CV_FLOAT );
@@ -468,6 +472,9 @@ S_Shutdown
 */
 void S_Shutdown( void )
 {
+	// Shutdown OpenAL enhanced audio system
+	SndOpenAL_Shutdown();
+	
 	if ( si.StopAllSounds ) {
 		si.StopAllSounds();
 	}

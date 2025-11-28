@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "qcommon.h"
 #include "q_log.h"
 #include "q_memtrack.h"
+#include "i18n.h"
 #include <setjmp.h>
 #ifndef _WIN32
 #include <netinet/in.h>
@@ -4226,6 +4227,8 @@ void Com_Init( char *commandLine ) {
 	Lua_Init();
 #endif
 
+	I18n_Init();
+
 #ifdef USE_FREETYPE
 	FreeType_Init();
 #endif
@@ -4677,6 +4680,8 @@ static void Com_Shutdown( void ) {
 #ifdef USE_LUA
 	Lua_Shutdown();
 #endif
+
+	I18n_Shutdown();
 
 #ifdef USE_OPENSSL
 	OpenSSL_Shutdown();

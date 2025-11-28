@@ -11,6 +11,14 @@ It wraps Lua functions with engine-style APIs.
 #include "qcommon.h"
 
 #ifdef USE_LUA
+// Forward declarations for module bindings
+void Lua_RegisterGameBindings(lua_State *L);
+void Lua_RegisterRendererBindings(lua_State *L);
+void Lua_RegisterSoundBindings(lua_State *L);
+
+// Forward declaration for internal function
+static void Lua_LoadScriptsFromFS(lua_State *L);
+
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
@@ -95,8 +103,53 @@ lua_State *Lua_CreateState(void)
 	// Open standard libraries
 	luaL_openlibs(L);
 	
+	// Register engine bindings
+	Lua_RegisterEngineBindings(L);
+	
+	// Register module-specific bindings
+	Lua_RegisterGameBindings(L);
+	Lua_RegisterRendererBindings(L);
+	Lua_RegisterSoundBindings(L);
+	
+	// Load scripts from filesystem
+	Lua_LoadScriptsFromFS(L);
+	
 	lua_states[num_lua_states++] = L;
 	return L;
+}
+
+/*
+=================
+Lua_LoadScriptsFromFS
+=================
+Load all Lua scripts from filesystem (scripts/*.lua)
+=================
+*/
+static void Lua_LoadScriptsFromFS(lua_State *L)
+{
+	char **fileList;
+	int numFiles;
+	int i;
+	char filename[MAX_QPATH];
+	
+	if (!L || !com_lua_enabled || !com_lua_enabled->integer)
+		return;
+	
+	// Find all .lua files in scripts directory
+	fileList = FS_ListFiles("scripts", ".lua", &numFiles);
+	if (!fileList || numFiles <= 0)
+		return;
+	
+	for (i = 0; i < numFiles; i++) {
+		if (!fileList[i])
+			continue;
+		
+		Com_sprintf(filename, sizeof(filename), "scripts/%s", fileList[i]);
+		Com_DPrintf("Loading Lua script: %s\n", filename);
+		Lua_LoadScriptFromFS(L, filename);
+	}
+	
+	FS_FreeFileList(fileList);
 }
 
 /*
@@ -422,6 +475,327 @@ void Lua_Pop(lua_State *L, int n)
 {
 	if (L && n > 0)
 		lua_pop(L, n);
+}
+
+/*
+=================
+Lua_LoadScriptFromFS
+=================
+Load and execute a Lua script from filesystem
+Searches in mod directories and pk3 files
+=================
+*/
+qboolean Lua_LoadScriptFromFS(lua_State *L, const char *filename)
+{
+	fileHandle_t f;
+	int len;
+	char *buffer;
+	
+	if (!L || !filename || !*filename)
+		return qfalse;
+	
+	if (!com_lua_enabled || !com_lua_enabled->integer)
+		return qfalse;
+	
+	// Try to find the file in the filesystem
+	len = FS_FOpenFileRead(filename, &f, qfalse);
+	if (len <= 0 || !f) {
+		Com_DPrintf("Lua_LoadScriptFromFS: Could not find script %s\n", filename);
+		return qfalse;
+	}
+	
+	// Allocate buffer
+	buffer = (char *)Z_Malloc(len + 1);
+	if (!buffer) {
+		FS_FCloseFile(f);
+		return qfalse;
+	}
+	
+	// Read file
+	FS_Read(buffer, len, f);
+	buffer[len] = '\0';
+	FS_FCloseFile(f);
+	
+	// Load and execute
+	if (!Lua_LoadString(L, buffer)) {
+		Z_Free(buffer);
+		return qfalse;
+	}
+	
+	Z_Free(buffer);
+	return qtrue;
+}
+
+// =================
+// CVAR Lua Bindings
+// =================
+
+/*
+=================
+Lua_CvarGet
+=================
+Lua binding: cvar_get(name) -> value
+=================
+*/
+static int Lua_CvarGet(lua_State *L)
+{
+	const char *name;
+	const char *value;
+	
+	if (lua_gettop(L) < 1) {
+		lua_pushnil(L);
+		return 1;
+	}
+	
+	name = lua_tostring(L, 1);
+	if (!name) {
+		lua_pushnil(L);
+		return 1;
+	}
+	
+	value = Cvar_VariableString(name);
+	lua_pushstring(L, value ? value : "");
+	return 1;
+}
+
+/*
+=================
+Lua_CvarSet
+=================
+Lua binding: cvar_set(name, value)
+=================
+*/
+static int Lua_CvarSet(lua_State *L)
+{
+	const char *name;
+	const char *value;
+	
+	if (lua_gettop(L) < 2) {
+		lua_pushboolean(L, 0);
+		return 1;
+	}
+	
+	name = lua_tostring(L, 1);
+	value = lua_tostring(L, 2);
+	
+	if (!name || !value) {
+		lua_pushboolean(L, 0);
+		return 1;
+	}
+	
+	Cvar_Set(name, value);
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+/*
+=================
+Lua_CvarGetFloat
+=================
+Lua binding: cvar_get_float(name) -> number
+=================
+*/
+static int Lua_CvarGetFloat(lua_State *L)
+{
+	const char *name;
+	float value;
+	
+	if (lua_gettop(L) < 1) {
+		lua_pushnumber(L, 0.0);
+		return 1;
+	}
+	
+	name = lua_tostring(L, 1);
+	if (!name) {
+		lua_pushnumber(L, 0.0);
+		return 1;
+	}
+	
+	value = Cvar_VariableValue(name);
+	lua_pushnumber(L, value);
+	return 1;
+}
+
+/*
+=================
+Lua_CvarGetInt
+=================
+Lua binding: cvar_get_int(name) -> integer
+=================
+*/
+static int Lua_CvarGetInt(lua_State *L)
+{
+	const char *name;
+	int value;
+	
+	if (lua_gettop(L) < 1) {
+		lua_pushinteger(L, 0);
+		return 1;
+	}
+	
+	name = lua_tostring(L, 1);
+	if (!name) {
+		lua_pushinteger(L, 0);
+		return 1;
+	}
+	
+	value = Cvar_VariableIntegerValue(name);
+	lua_pushinteger(L, value);
+	return 1;
+}
+
+/*
+=================
+Lua_CvarSetFloat
+=================
+Lua binding: cvar_set_float(name, value)
+=================
+*/
+static int Lua_CvarSetFloat(lua_State *L)
+{
+	const char *name;
+	float value;
+	
+	if (lua_gettop(L) < 2) {
+		lua_pushboolean(L, 0);
+		return 1;
+	}
+	
+	name = lua_tostring(L, 1);
+	if (!name || !lua_isnumber(L, 2)) {
+		lua_pushboolean(L, 0);
+		return 1;
+	}
+	
+	value = (float)lua_tonumber(L, 2);
+	Cvar_SetValue(name, value);
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+/*
+=================
+Lua_CvarSetInt
+=================
+Lua binding: cvar_set_int(name, value)
+=================
+*/
+static int Lua_CvarSetInt(lua_State *L)
+{
+	const char *name;
+	int value;
+	
+	if (lua_gettop(L) < 2) {
+		lua_pushboolean(L, 0);
+		return 1;
+	}
+	
+	name = lua_tostring(L, 1);
+	if (!name || !lua_isnumber(L, 2)) {
+		lua_pushboolean(L, 0);
+		return 1;
+	}
+	
+	value = (int)lua_tointeger(L, 2);
+	Cvar_SetIntegerValue(name, value);
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+// =================
+// Command Lua Bindings
+// =================
+
+/*
+=================
+Lua_ExecuteCommand
+=================
+Lua binding: cmd_execute(command_string)
+=================
+*/
+static int Lua_ExecuteCommand(lua_State *L)
+{
+	const char *cmd;
+	
+	if (lua_gettop(L) < 1) {
+		lua_pushboolean(L, 0);
+		return 1;
+	}
+	
+	cmd = lua_tostring(L, 1);
+	if (!cmd) {
+		lua_pushboolean(L, 0);
+		return 1;
+	}
+	
+	Cmd_ExecuteString(cmd);
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+/*
+=================
+Lua_Print
+=================
+Lua binding: print(...) - prints to console
+=================
+*/
+static int Lua_Print(lua_State *L)
+{
+	int n = lua_gettop(L);
+	int i;
+	const char *str;
+	char buffer[1024];
+	int pos = 0;
+	
+	for (i = 1; i <= n; i++) {
+		if (i > 1) {
+			if (pos < sizeof(buffer) - 1) {
+				buffer[pos++] = ' ';
+			}
+		}
+		
+		str = lua_tostring(L, i);
+		if (str) {
+			int len = strlen(str);
+			if (pos + len < sizeof(buffer) - 1) {
+				Q_strncpyz(buffer + pos, str, sizeof(buffer) - pos);
+				pos += len;
+			}
+		}
+	}
+	
+	buffer[pos] = '\0';
+	Com_Printf("%s\n", buffer);
+	
+	return 0;
+}
+
+/*
+=================
+Lua_RegisterEngineBindings
+=================
+Register all engine bindings with a Lua state
+=================
+*/
+void Lua_RegisterEngineBindings(lua_State *L)
+{
+	if (!L)
+		return;
+	
+	// CVAR bindings
+	Lua_RegisterFunction(L, "cvar_get", Lua_CvarGet);
+	Lua_RegisterFunction(L, "cvar_set", Lua_CvarSet);
+	Lua_RegisterFunction(L, "cvar_get_float", Lua_CvarGetFloat);
+	Lua_RegisterFunction(L, "cvar_get_int", Lua_CvarGetInt);
+	Lua_RegisterFunction(L, "cvar_set_float", Lua_CvarSetFloat);
+	Lua_RegisterFunction(L, "cvar_set_int", Lua_CvarSetInt);
+	
+	// Command bindings
+	Lua_RegisterFunction(L, "cmd_execute", Lua_ExecuteCommand);
+	
+	// Override Lua's print function with our console print
+	Lua_RegisterFunction(L, "print", Lua_Print);
 }
 
 #endif // USE_LUA

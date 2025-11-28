@@ -21,6 +21,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "tr_local.h"
+#include "tr_skyportals.h"
+#include "tr_flares_enhanced.h"
 
 static int			r_firstSceneDrawSurf;
 #ifdef USE_PMLIGHT
@@ -470,6 +472,12 @@ void RE_RenderScene( const refdef_t *fd ) {
 	if (lastTime > 0) {
 		float deltaTime = (tr.refdef.time - lastTime) * 0.001f;
 		R_UpdateParticles(deltaTime);
+		if (r_particlesEnhanced && r_particlesEnhanced->integer) {
+			R_UpdateParticleSystemEnhanced(deltaTime);
+		}
+		R_UpdateSkyPortals();
+		R_UpdateFlaresEnhanced();
+		R_UpdateProceduralShaders(deltaTime);
 	}
 	lastTime = tr.refdef.time;
 

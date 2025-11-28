@@ -172,7 +172,7 @@ OPTION(USE_LUA "" ON)
 OPTION(USE_ENTT "Enable EnTT ECS system" ON)
 OPTION(USE_CIMGUI "Enable ImGui" ON)
 OPTION(USE_WEBSOCKETS "Enable WebSocket support" ON)
-#OPTION(USE_OPENAL "" OFF)
+OPTION(USE_OPENAL "Enable OpenAL enhanced audio system" ON)
 #OPTION(USE_OPENGL "" OFF)
 #OPTION(USE_OPENGL2 "" OFF)
 #OPTION(USE_USD "" ON)
@@ -214,7 +214,13 @@ ENDIF()
 
 IF(USE_LUA)
 	list(APPEND QCOMMON_SRCS src/qcommon/lua_wrapper.c)
+	list(APPEND QCOMMON_SRCS src/qcommon/lua_game.c)
+	list(APPEND QCOMMON_SRCS src/qcommon/lua_renderer.c)
+	list(APPEND QCOMMON_SRCS src/qcommon/lua_sound.c)
 ENDIF()
+
+# Internationalization (i18n) support
+list(APPEND QCOMMON_SRCS src/qcommon/i18n.c)
 
 IF(USE_FREETYPE)
 	list(APPEND QCOMMON_SRCS src/qcommon/freetype_wrapper.c)
@@ -291,6 +297,12 @@ TARGET_COMPILE_DEFINITIONS(qcommon_ded PUBLIC DEDICATED)
 
 # client + cURL
 AUX_SOURCE_DIRECTORY(src/client CLIENT_SRCS)
+
+# Add OpenAL enhanced audio system
+IF(USE_OPENAL)
+	list(APPEND CLIENT_SRCS src/client/snd_openal.c)
+ENDIF()
+
 # Add debug overlay
 IF(USE_CIMGUI)
 	list(APPEND CLIENT_SRCS src/client/cl_imgui_debug.c)
@@ -938,6 +950,77 @@ IF(USE_LUA)
 	ENDIF()
 ENDIF()
 
+IF(USE_OPENAL)
+	# Try CMake's find_package first
+	find_package(OpenAL QUIET)
+	
+	# If still not found, try manual search
+	IF(NOT OpenAL_FOUND)
+		FIND_PATH(OPENAL_INCLUDE_DIR
+			NAMES AL/al.h
+			PATHS
+			/usr/include
+			/usr/local/include
+			/opt/local/include
+			/usr/include/x86_64-linux-gnu
+		)
+		FIND_LIBRARY(OPENAL_LIBRARY
+			NAMES openal OpenAL
+			PATHS
+			/usr/lib
+			/usr/lib/x86_64-linux-gnu
+			/usr/local/lib
+			/opt/local/lib
+		)
+		IF(OPENAL_INCLUDE_DIR AND OPENAL_LIBRARY)
+			SET(OpenAL_FOUND TRUE)
+			SET(OPENAL_LIBRARIES ${OPENAL_LIBRARY})
+			SET(OPENAL_INCLUDE_DIRS ${OPENAL_INCLUDE_DIR})
+		ENDIF()
+	ELSE()
+		# CMake's find_package found OpenAL, use its variables
+		IF(TARGET OpenAL::OpenAL)
+			# Modern CMake target-based approach
+			SET(OPENAL_LIBRARIES OpenAL::OpenAL)
+		ELSEIF(OpenAL_LIBRARIES)
+			# Use provided library variable
+			SET(OPENAL_LIBRARIES ${OpenAL_LIBRARIES})
+		ELSEIF(OpenAL_LIBRARY)
+			# Fallback to single library variable
+			SET(OPENAL_LIBRARIES ${OpenAL_LIBRARY})
+		ELSE()
+			# Try to find the library manually
+			FIND_LIBRARY(OPENAL_LIBRARY
+				NAMES openal OpenAL
+				PATHS
+				/usr/lib
+				/usr/lib/x86_64-linux-gnu
+				/usr/local/lib
+				/opt/local/lib
+			)
+			IF(OPENAL_LIBRARY)
+				SET(OPENAL_LIBRARIES ${OPENAL_LIBRARY})
+			ENDIF()
+		ENDIF()
+		IF(OpenAL_INCLUDE_DIRS)
+			SET(OPENAL_INCLUDE_DIRS ${OpenAL_INCLUDE_DIRS})
+		ELSEIF(OpenAL_INCLUDE_DIR)
+			SET(OPENAL_INCLUDE_DIRS ${OpenAL_INCLUDE_DIR})
+		ENDIF()
+	ENDIF()
+	
+	IF(OpenAL_FOUND AND OPENAL_LIBRARIES)
+		TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${OPENAL_INCLUDE_DIRS})
+		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_OPENAL)
+		MESSAGE(STATUS "OpenAL found: ${OPENAL_LIBRARIES}")
+	ELSE()
+		MESSAGE(WARNING "OpenAL not found, disabling enhanced audio system")
+		MESSAGE(STATUS "To enable OpenAL support, install: sudo apt-get install libopenal-dev")
+		SET(USE_OPENAL OFF CACHE BOOL "" FORCE)
+		list(REMOVE_ITEM CLIENT_SRCS src/client/snd_openal.c)
+	ENDIF()
+ENDIF()
+
 IF(USE_VULKAN)
 	# Check if local Vulkan headers exist (renderer has bundled headers)
 	IF(EXISTS "${CMAKE_SOURCE_DIR}/src/renderercommon/vulkan/vulkan.h")
@@ -1042,6 +1125,18 @@ ENDIF()
 IF(USE_WEBSOCKETS)
 	IF(LibWebSockets_FOUND)
 		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${LIBWEBSOCKETS_LIBRARIES})
+	ENDIF()
+ENDIF()
+
+IF(USE_OPENAL)
+	IF(OpenAL_FOUND AND OPENAL_LIBRARIES)
+		IF(TARGET OpenAL::OpenAL)
+			# Use modern CMake target
+			TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} OpenAL::OpenAL)
+		ELSE()
+			# Use library variable
+			TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${OPENAL_LIBRARIES})
+		ENDIF()
 	ENDIF()
 ENDIF()
 

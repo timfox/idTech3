@@ -20,6 +20,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "tr_local.h"
+#include "tr_particles_enhanced.h"
+#include "tr_flares_enhanced.h"
 
 backEndData_t	*backEndData;
 backEndState_t	backEnd;
@@ -1268,9 +1270,19 @@ static const void *RB_DrawSurfs( const void *data ) {
 
 	// render batched particles
 	R_RenderParticles();
+	
+	// render enhanced particle system
+	if (r_particlesEnhanced && r_particlesEnhanced->integer) {
+		R_RenderParticleSystemEnhanced();
+	}
 
 	// add light flares on lights that aren't obscured
 	RB_RenderFlares();
+	
+	// render enhanced flares
+	if (r_flaresEnhanced && r_flaresEnhanced->integer) {
+		R_RenderFlaresEnhanced();
+	}
 
 #ifdef USE_PMLIGHT
 	if ( backEnd.refdef.numLitSurfs ) {
