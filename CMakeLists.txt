@@ -53,6 +53,78 @@ IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 	# Note: -Wold-style-cast is C++ only, not applicable for C code
 ENDIF()
 
+# Sanitizer support (GCC/Clang only, requires debug build)
+IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+	IF(ENABLE_ASAN)
+		ADD_COMPILE_OPTIONS(-fsanitize=address)
+		ADD_LINK_OPTIONS(-fsanitize=address)
+		SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
+		SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=address")
+		MESSAGE(STATUS "AddressSanitizer (ASan) enabled")
+	ENDIF()
+	
+	IF(ENABLE_UBSAN)
+		ADD_COMPILE_OPTIONS(-fsanitize=undefined)
+		ADD_LINK_OPTIONS(-fsanitize=undefined)
+		SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=undefined")
+		SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=undefined")
+		MESSAGE(STATUS "UndefinedBehaviorSanitizer (UBSan) enabled")
+	ENDIF()
+	
+	IF(ENABLE_MSAN)
+		ADD_COMPILE_OPTIONS(-fsanitize=memory)
+		ADD_LINK_OPTIONS(-fsanitize=memory)
+		SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=memory")
+		SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=memory")
+		MESSAGE(STATUS "MemorySanitizer (MSan) enabled")
+	ENDIF()
+	
+	IF(ENABLE_TSAN)
+		ADD_COMPILE_OPTIONS(-fsanitize=thread)
+		ADD_LINK_OPTIONS(-fsanitize=thread)
+		SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=thread")
+		SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=thread")
+		MESSAGE(STATUS "ThreadSanitizer (TSan) enabled")
+	ENDIF()
+	
+	# Valgrind support (add suppression file support)
+	IF(ENABLE_VALGRIND)
+		ADD_COMPILE_OPTIONS(-g -O0)
+		ADD_COMPILE_DEFINITIONS(HAVE_VALGRIND)
+		MESSAGE(STATUS "Valgrind support enabled (debug symbols, no optimization)")
+	ENDIF()
+	
+	# Check for Valgrind headers
+	IF(ENABLE_VALGRIND)
+		CHECK_INCLUDE_FILE(valgrind/valgrind.h HAVE_VALGRIND_H)
+		IF(HAVE_VALGRIND_H)
+			ADD_COMPILE_DEFINITIONS(HAVE_VALGRIND)
+			MESSAGE(STATUS "Valgrind headers found")
+		ELSE()
+			MESSAGE(WARNING "Valgrind headers not found, Valgrind integration disabled")
+		ENDIF()
+	ENDIF()
+ENDIF()
+
+# Windows-specific: Dr. Memory support
+IF(WIN32 AND ENABLE_DRMEMORY)
+	ADD_COMPILE_OPTIONS(/Zi)
+	CHECK_INCLUDE_FILE(drmemory.h HAVE_DRMEMORY_H)
+	IF(HAVE_DRMEMORY_H)
+		ADD_COMPILE_DEFINITIONS(HAVE_DRMEMORY)
+		MESSAGE(STATUS "Dr. Memory support enabled (debug symbols)")
+	ELSE()
+		MESSAGE(WARNING "Dr. Memory headers not found")
+	ENDIF()
+ENDIF()
+
+# Memory safety and profiling options
+OPTION(ENABLE_ASAN "Enable AddressSanitizer (ASan) for memory error detection" OFF)
+OPTION(ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer (UBSan) for undefined behavior detection" OFF)
+OPTION(ENABLE_MSAN "Enable MemorySanitizer (MSan) for uninitialized memory detection" OFF)
+OPTION(ENABLE_TSAN "Enable ThreadSanitizer (TSan) for data race detection" OFF)
+OPTION(ENABLE_MEMORY_TRACKING "Enable memory usage tracking and statistics" ON)
+
 # Static analysis options
 OPTION(ENABLE_STATIC_ANALYSIS "Enable static analysis tools (clang-tidy, cppcheck)" OFF)
 
@@ -95,9 +167,10 @@ OPTION(USE_ENET "" ON)
 OPTION(USE_SQLITE "" ON)
 OPTION(USE_FREETYPE "" ON)
 OPTION(USE_OPENSSL "" ON)
-OPTION(USE_LUA "" OFF)
-OPTION(USE_ENTT "Enable EnTT ECS system" OFF)
-OPTION(USE_CIMGUI "Enable Dear ImGui via cimgui" ON)
+OPTION(USE_LUA "" ON)
+OPTION(USE_ENTT "Enable EnTT ECS system" ON)
+OPTION(USE_CIMGUI "Enable ImGui" ON)
+OPTION(USE_WEBSOCKETS "Enable WebSocket support" ON)
 #OPTION(USE_OPENAL "" OFF)
 #OPTION(USE_OPENGL "" OFF)
 #OPTION(USE_OPENGL2 "" OFF)
@@ -117,6 +190,8 @@ SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules)
 AUX_SOURCE_DIRECTORY(src/qcommon QCOMMON_SRCS)
 # exclude platform-dependent QVM bytecode compilers
 list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*vm_[alx].*.c")
+# Add structured logging system
+list(APPEND QCOMMON_SRCS src/qcommon/q_log.c)
 # Add wrapper files conditionally
 IF(USE_CJSON)
 	list(APPEND QCOMMON_SRCS src/qcommon/json_cjson.c)
@@ -217,6 +292,10 @@ TARGET_COMPILE_DEFINITIONS(qcommon_ded PUBLIC DEDICATED)
 AUX_SOURCE_DIRECTORY(src/client CLIENT_SRCS)
 IF(NOT USE_CURL)
 	list(REMOVE_ITEM CLIENT_SRCS src/client/cl_curl.c)
+	list(REMOVE_ITEM CLIENT_SRCS src/client/cl_net_enhanced.c)
+ELSE()
+	# Add enhanced networking support
+	list(APPEND CLIENT_SRCS src/client/cl_net_enhanced.c)
 ENDIF()
 
 # Add assembly files for x86_64
@@ -675,19 +754,76 @@ IF(USE_OPENSSL)
 	ENDIF()
 ENDIF()
 
+IF(USE_WEBSOCKETS)
+	# Try CMake's find_package first
+	find_package(LibWebSockets QUIET)
+	
+	# If not found, try pkg-config
+	IF(NOT LibWebSockets_FOUND)
+		find_package(PkgConfig QUIET)
+		IF(PKG_CONFIG_FOUND)
+			pkg_check_modules(LIBWEBSOCKETS libwebsockets QUIET)
+			IF(LIBWEBSOCKETS_FOUND)
+				SET(LIBWEBSOCKETS_INCLUDE_DIR ${LIBWEBSOCKETS_INCLUDE_DIRS})
+				SET(LIBWEBSOCKETS_LIBRARIES ${LIBWEBSOCKETS_LIBRARIES})
+				SET(LibWebSockets_FOUND TRUE)
+			ENDIF()
+		ENDIF()
+	ENDIF()
+	
+	# If still not found, try manual search
+	IF(NOT LibWebSockets_FOUND)
+		FIND_PATH(LIBWEBSOCKETS_INCLUDE_DIR
+			NAMES libwebsockets.h
+			PATHS
+			/usr/include
+			/usr/local/include
+			/opt/local/include
+			/usr/include/x86_64-linux-gnu
+		)
+		FIND_LIBRARY(LIBWEBSOCKETS_LIBRARY
+			NAMES websockets libwebsockets
+			PATHS
+			/usr/lib
+			/usr/lib/x86_64-linux-gnu
+			/usr/local/lib
+			/opt/local/lib
+		)
+		IF(LIBWEBSOCKETS_INCLUDE_DIR AND LIBWEBSOCKETS_LIBRARY)
+			SET(LibWebSockets_FOUND TRUE)
+			SET(LIBWEBSOCKETS_LIBRARIES ${LIBWEBSOCKETS_LIBRARY})
+			SET(LIBWEBSOCKETS_INCLUDE_DIRS ${LIBWEBSOCKETS_INCLUDE_DIR})
+		ENDIF()
+	ENDIF()
+	
+	IF(LibWebSockets_FOUND)
+		TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${LIBWEBSOCKETS_INCLUDE_DIRS})
+		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_WEBSOCKETS)
+		MESSAGE(STATUS "libwebsockets found: ${LIBWEBSOCKETS_LIBRARIES}")
+	ELSE()
+		MESSAGE(WARNING "libwebsockets not found, disabling WebSocket support")
+		MESSAGE(STATUS "To enable WebSocket support, install: sudo apt-get install libwebsockets-dev")
+		SET(USE_WEBSOCKETS OFF CACHE BOOL "" FORCE)
+	ENDIF()
+ENDIF()
+
 IF(USE_LUA)
 	# Try CMake's find_package first (supports Lua 5.1-5.4)
 	find_package(Lua QUIET)
 	
-	# If not found, try manual search for common Lua versions
+	# If still not found, try manual search for common Lua versions
 	IF(NOT Lua_FOUND)
 		FOREACH(LUA_VERSION 5.4 5.3 5.2 5.1)
+			# Try versioned subdirectory first (e.g., /usr/include/lua5.4/)
 			FIND_PATH(LUA_INCLUDE_DIR
 				NAMES lua.h
 				PATHS
 				/usr/include/lua${LUA_VERSION}
-				/usr/include
 				/usr/local/include/lua${LUA_VERSION}
+				/opt/local/include/lua${LUA_VERSION}
+				/usr/include/x86_64-linux-gnu/lua${LUA_VERSION}
+				# Then try standard locations
+				/usr/include
 				/usr/local/include
 				/opt/local/include
 				/usr/include/x86_64-linux-gnu
@@ -695,32 +831,85 @@ IF(USE_LUA)
 			FIND_LIBRARY(LUA_LIBRARY
 				NAMES lua${LUA_VERSION} lua
 				PATHS
-				/usr/lib
 				/usr/lib/x86_64-linux-gnu
+				/usr/lib
 				/usr/local/lib
 				/opt/local/lib
 			)
 			IF(LUA_INCLUDE_DIR AND LUA_LIBRARY)
 				SET(Lua_FOUND TRUE)
 				SET(LUA_LIBRARIES ${LUA_LIBRARY})
-				SET(LUA_INCLUDE_DIRS ${LUA_INCLUDE_DIR})
+				# If header is in subdirectory (e.g., lua5.4/), use parent directory
+				# so #include <lua.h> works (it will find lua5.4/lua.h)
+				GET_FILENAME_COMPONENT(LUA_INCLUDE_PARENT ${LUA_INCLUDE_DIR} DIRECTORY)
+				IF(LUA_INCLUDE_DIR MATCHES "lua[0-9]")
+					# Header is in versioned subdirectory, use parent
+					SET(LUA_INCLUDE_DIRS ${LUA_INCLUDE_PARENT})
+				ELSE()
+					# Header is directly in include directory
+					SET(LUA_INCLUDE_DIRS ${LUA_INCLUDE_DIR})
+				ENDIF()
 				BREAK()
 			ENDIF()
 		ENDFOREACH()
 	ENDIF()
 	
 	IF(Lua_FOUND)
-		TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${LUA_INCLUDE_DIRS})
-		TARGET_INCLUDE_DIRECTORIES(qcommon PUBLIC ${LUA_INCLUDE_DIRS})
-		TARGET_INCLUDE_DIRECTORIES(qcommon_ded PUBLIC ${LUA_INCLUDE_DIRS})
-		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_LUA)
-		TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE USE_LUA)
-		TARGET_COMPILE_DEFINITIONS(qcommon_ded PRIVATE USE_LUA)
-		MESSAGE(STATUS "Lua found: ${LUA_LIBRARIES}")
+		# Ensure LUA_INCLUDE_DIRS is set - CMake's find_package might not set it correctly
+		IF(NOT LUA_INCLUDE_DIRS OR LUA_INCLUDE_DIRS STREQUAL "")
+			# Try to find it manually
+			FIND_PATH(LUA_INCLUDE_DIR_CHECK lua.h 
+				PATHS 
+				/usr/include/lua5.4
+				/usr/include
+				/usr/local/include/lua5.4
+				/usr/local/include
+			)
+			IF(LUA_INCLUDE_DIR_CHECK)
+				SET(LUA_INCLUDE_DIRS ${LUA_INCLUDE_DIR_CHECK})
+			ENDIF()
+		ENDIF()
+		
+		IF(LUA_INCLUDE_DIRS AND NOT LUA_INCLUDE_DIRS STREQUAL "")
+			# Handle versioned Lua include directories (e.g., /usr/include/lua5.4/)
+			# If lua.h is in a versioned subdirectory, we need to include both
+			# the parent directory and the subdirectory so #include <lua.h> works
+			STRING(REGEX MATCH "lua[0-9.]+" LUA_VERSION_MATCH "${LUA_INCLUDE_DIRS}")
+			IF(LUA_VERSION_MATCH)
+				# Header is in versioned subdirectory like lua5.4/
+				# Extract parent directory by removing the versioned subdirectory
+				STRING(REGEX REPLACE "/lua[0-9.]+$" "" LUA_INCLUDE_PARENT "${LUA_INCLUDE_DIRS}")
+				# Add both parent and subdirectory to include path
+				TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${LUA_INCLUDE_PARENT} ${LUA_INCLUDE_DIRS})
+				TARGET_INCLUDE_DIRECTORIES(qcommon PUBLIC ${LUA_INCLUDE_PARENT} ${LUA_INCLUDE_DIRS})
+				TARGET_INCLUDE_DIRECTORIES(qcommon_ded PUBLIC ${LUA_INCLUDE_PARENT} ${LUA_INCLUDE_DIRS})
+				MESSAGE(STATUS "Lua found (versioned): ${LUA_LIBRARIES}, includes: ${LUA_INCLUDE_PARENT} and ${LUA_INCLUDE_DIRS}")
+			ELSE()
+				# Header is directly in include directory
+				TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${LUA_INCLUDE_DIRS})
+				TARGET_INCLUDE_DIRECTORIES(qcommon PUBLIC ${LUA_INCLUDE_DIRS})
+				TARGET_INCLUDE_DIRECTORIES(qcommon_ded PUBLIC ${LUA_INCLUDE_DIRS})
+				MESSAGE(STATUS "Lua found: ${LUA_LIBRARIES}, includes: ${LUA_INCLUDE_DIRS}")
+			ENDIF()
+		ELSE()
+			MESSAGE(WARNING "Lua found but could not determine include directory, disabling Lua support")
+			SET(USE_LUA OFF CACHE BOOL "" FORCE)
+			list(REMOVE_ITEM QCOMMON_SRCS src/qcommon/lua_wrapper.c)
+			SET(Lua_FOUND FALSE)
+		ENDIF()
+		
+		IF(Lua_FOUND)
+			TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_LUA)
+			TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE USE_LUA)
+			TARGET_COMPILE_DEFINITIONS(qcommon_ded PRIVATE USE_LUA)
+		ENDIF()
 	ELSE()
 		MESSAGE(WARNING "Lua not found, disabling Lua support")
 		MESSAGE(STATUS "To enable Lua support, install: sudo apt-get install liblua5.4-dev")
+		MESSAGE(STATUS "Reconfiguring CMake with USE_LUA=OFF")
 		SET(USE_LUA OFF CACHE BOOL "" FORCE)
+		# Remove lua_wrapper.c from sources since Lua is not available
+		list(REMOVE_ITEM QCOMMON_SRCS src/qcommon/lua_wrapper.c)
 	ENDIF()
 ENDIF()
 
@@ -822,6 +1011,12 @@ ENDIF()
 IF(USE_LUA)
 	IF(Lua_FOUND)
 		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${LUA_LIBRARIES})
+	ENDIF()
+ENDIF()
+
+IF(USE_WEBSOCKETS)
+	IF(LibWebSockets_FOUND)
+		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${LIBWEBSOCKETS_LIBRARIES})
 	ENDIF()
 ENDIF()
 

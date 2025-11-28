@@ -24,6 +24,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "client.h"
 #include "../sdl/sdl_glw.h"
 #include <limits.h>
+#ifdef USE_CURL
+#include "cl_net_enhanced.h"
+#endif
 
 cvar_t	*cl_noprint;
 cvar_t	*cl_debugMove;
@@ -1006,6 +1009,10 @@ CL_ShutdownAll
 void CL_ShutdownAll( void ) {
 
 #ifdef USE_CURL
+	NET_Enhanced_Shutdown();
+#ifdef USE_WEBSOCKETS
+	NET_WebSocket_Shutdown();
+#endif
 	CL_cURL_Shutdown();
 #endif
 
@@ -2161,9 +2168,24 @@ void CL_NextDownload( void )
 					"cURL library\n");
 			}
 			else {
-				CL_cURL_BeginDownload(localName, va("%s/%s",
-					clc.sv_dlURL, remoteName));
-				useCURL = qtrue;
+				// Initialize enhanced networking if not already done
+				if (!enhanced_initialized) {
+					NET_Enhanced_Init();
+				}
+				
+				// Use enhanced download with HTTP/2 and IPv6 preferences
+				qboolean use_http2 = (cl_http2_enable && cl_http2_enable->integer && NET_IsHTTP2Supported());
+				qboolean prefer_ipv6_setting = (cl_prefer_ipv6 && cl_prefer_ipv6->integer);
+				
+				if (NET_Enhanced_BeginDownload(localName, va("%s/%s",
+					clc.sv_dlURL, remoteName), use_http2, prefer_ipv6_setting)) {
+					useCURL = qtrue;
+				} else {
+					// Fallback to standard download
+					CL_cURL_BeginDownload(localName, va("%s/%s",
+						clc.sv_dlURL, remoteName));
+					useCURL = qtrue;
+				}
 			}
 		}
 		else if(!(clc.sv_allowDownload & DLF_NO_REDIRECT)) {
@@ -2994,6 +3016,16 @@ void CL_Frame( int msec, int realMsec ) {
 	if ( download.cURL ) {
 		Com_DL_Perform( &download );
 	}
+	
+	// Update rate limiting
+	if (enhanced_initialized) {
+		NET_RateLimit_Update();
+	}
+	
+	// Service WebSocket connections
+#ifdef USE_WEBSOCKETS
+	NET_WebSocket_Service();
+#endif
 #endif
 
 	if ( !com_cl_running->integer ) {
@@ -3005,7 +3037,12 @@ void CL_Frame( int msec, int realMsec ) {
 
 #ifdef USE_CURL
 	if ( clc.downloadCURLM ) {
-		CL_cURL_PerformDownload();
+		// Use enhanced download if available
+		if (enhanced_initialized) {
+			NET_Enhanced_PerformDownload();
+		} else {
+			CL_cURL_PerformDownload();
+		}
 		// we can't process frames normally when in disconnected
 		// download mode since the ui vm expects cls.state to be
 		// CA_CONNECTED

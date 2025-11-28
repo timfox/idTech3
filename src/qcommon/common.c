@@ -23,6 +23,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include "q_log.h"
+#include "q_memtrack.h"
 #include <setjmp.h>
 #ifndef _WIN32
 #include <netinet/in.h>
@@ -193,6 +195,16 @@ void FORMAT_PRINTF(1, 2) QDECL Com_Printf( const char *fmt, ... ) {
 		//rd_flush(rd_buffer);
 		//*rd_buffer = '\0';
 		return;
+	}
+
+	// If structured logging is enabled, use it
+	// Otherwise fall back to legacy behavior
+	if (Q_Log_IsEnabled()) {
+		Q_Log_ComPrintf("%s", msg);
+		// Still do legacy file logging if enabled for compatibility
+		if (!(com_logfile && com_logfile->integer)) {
+			return;
+		}
 	}
 
 #ifndef DEDICATED
@@ -3977,6 +3989,12 @@ void Com_Init( char *commandLine ) {
 
 	FS_InitFilesystem();
 
+	// Initialize structured logging system
+	Q_Log_Init();
+	
+	// Initialize memory tracking system
+	Q_MemTrack_Init();
+
 	com_logfile = Cvar_Get( "logfile", "0", CVAR_TEMP );
 	Cvar_CheckRange( com_logfile, "0", "4", CV_INTEGER );
 	Cvar_SetDescription( com_logfile, "System console logging:\n"
@@ -4635,6 +4653,12 @@ Com_Shutdown
 =================
 */
 static void Com_Shutdown( void ) {
+	// Shutdown memory tracking system
+	Q_MemTrack_Shutdown();
+	
+	// Shutdown structured logging system
+	Q_Log_Shutdown();
+	
 	if ( logfile != FS_INVALID_HANDLE ) {
 		FS_FCloseFile( logfile );
 		logfile = FS_INVALID_HANDLE;
