@@ -1,0 +1,164 @@
+/* Base styles */
+:root {
+    --primary-color: #3498db;
+    --secondary-color: #2c3e50;
+    --text-color: #333;
+    --code-bg: #f8f9fa;
+    --border-color: #e9ecef;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.6;
+    color: var(--text-color);
+    margin: 0 auto;
+    padding: 0;
+}
+
+
+.header {
+    background: rgba(34, 62, 91, 0.3);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: white;
+    padding: 20px;
+    text-align: center;
+    margin-bottom: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 15px;
+    margin-top: 30px;
+}
+
+/* Layout */
+.doc-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+/* Navigation */
+.breadcrumbs {
+    margin-bottom: 2rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.breadcrumbs a {
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+/* Content sections */
+.section {
+    margin-bottom: 3rem;
+}
+
+/* Code blocks */
+.code-block {
+    background: var(--code-bg);
+    border-radius: 4px;
+    padding: 1rem;
+    overflow-x: auto;
+}
+
+pre code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.9em;
+}
+
+/* Lists */
+.requirements-list, .checklist {
+    list-style: none;
+    padding: 0;
+}
+
+.requirements-list li, .checklist li {
+    margin-bottom: 0.5rem;
+}
+
+/* Platform-specific instructions */
+.platform {
+    margin-bottom: 2rem;
+}
+
+/* Footer */
+footer {
+    margin-top: 4rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border-color);
+    text-align: center;
+    color: #666;
+}
+
+/* Property list styling */
+.property-list {
+    list-style: none;
+    padding: 0;
+}
+
+.property-list li {
+    margin-bottom: 2rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1rem;
+}
+
+.property-list li:last-child {
+    border-bottom: none;
+}
+
+.keyword {
+    display: inline-block;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    background-color: var(--code-bg);
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    color: #c7254e;
+}
+
+.description {
+    margin-left: 1rem;
+    color: var(--text-color);
+}
+
+/* Code example styling */
+.code-example {
+    background: var(--code-bg);
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 2rem 0;
+}
+
+.code-example pre {
+    margin: 0;
+    padding: 1.5rem;
+    overflow-x: auto;
+}
+
+.code-example code {
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 0.9em;
+}
+
+.example-description {
+    background: rgba(0,0,0,0.03);
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-color);
+}
+
+/* Section styling */
+.section {
+    margin-bottom: 3rem;
+}
+
+.section h2 {
+    color: var(--secondary-color);
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.section h3 {
+    color: var(--secondary-color);
+    margin: 2rem 0 1rem;
+} 
