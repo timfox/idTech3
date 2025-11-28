@@ -10,8 +10,9 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 
 **Key features**:
 
-* Optimized OpenGL renderer
-* Optimized Vulkan renderer
+* OpenGL renderer
+* DirectX 12 renderer
+* Vulkan renderer
 * Vulkan ray tracing
 * Physical Based Rendering
 * Raw mouse input support, enabled automatically instead of DirectInput(**\in_mouse 1**) if available
@@ -70,4 +71,5 @@ Performance is usually greater or equal to other opengl1 renderers
 * https://github.com/ioquake/ioq3
 * https://github.com/kennyalive/Quake-III-Arena-Kenny-Edition
 * https://github.com/OpenArena/engine
+
 
