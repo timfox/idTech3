@@ -68,7 +68,7 @@ jobs:
           mkdir -p build
           cd build
           if [ "${{ matrix.os }}" == "windows-2019" ] || [ "${{ matrix.os }}" == "windows-2022" ]; then
-            cmake .. -G "Visual Studio 17 2022" -A ${{ matrix.arch }} -DCMAKE_BUILD_TYPE=Release
+            cmake .. -G "Visual Studio 17 2022" -A ${{ matrix.arch }} -DCMAKE_BUILD_TYPE=Release -DUSE_D3D12=ON
           elif startsWith(matrix.os, 'macos'); then
             if [ "${{ matrix.arch }}" == "universal" ]; then
               cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"

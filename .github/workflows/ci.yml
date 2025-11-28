@@ -109,9 +109,9 @@ jobs:
           mkdir build
           cd build
           if ("${{ matrix.generator }}" -eq "Visual Studio 17 2022") {
-            cmake .. -G "${{ matrix.generator }}" -A x64
+            cmake .. -G "${{ matrix.generator }}" -A x64 -DUSE_D3D12=ON
           } else {
-            cmake .. -G "${{ matrix.generator }}"
+            cmake .. -G "${{ matrix.generator }}" -DUSE_D3D12=ON
           }
       
       - name: Build
