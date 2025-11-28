@@ -1,4 +1,5 @@
 #include "client.h"
+#include "cl_imgui_debug.h"
 
 #ifdef USE_CIMGUI
 
@@ -173,35 +174,45 @@ static void CL_ImGui_RenderOverlay( void )
 		}
 	}
 
+	// Render debug overlays
+	CL_ImGui_Debug_RenderAll();
+
 	if ( cls.state <= CA_DISCONNECTED )
 	{
 		return;
 	}
 
-	igSetNextWindowPos( (ImVec2){ 10.0f, 10.0f }, ImGuiCond_Always, (ImVec2){ 0.0f, 0.0f } );
-	igSetNextWindowBgAlpha( 0.25f );
-	if ( igBegin( "ImGuiOverlay", NULL,
-		ImGuiWindowFlags_NoDecoration |
-		ImGuiWindowFlags_AlwaysAutoResize |
-		ImGuiWindowFlags_NoNav |
-		ImGuiWindowFlags_NoFocusOnAppearing |
-		ImGuiWindowFlags_NoMove ) )
+	// Simple overlay (can be disabled if debug overlays are shown)
+	extern cvar_t *cl_imgui_debug_performance;
+	if ( !cl_imgui_debug_performance || !cl_imgui_debug_performance->integer )
 	{
-		const float frameMs = ( cls.realFrametime > 0 ) ? (float)cls.realFrametime : 1.0f;
-		igText( "FPS: %.1f", 1000.0f / frameMs );
-		igText( "Frame ms: %.2f", frameMs );
-		igText( "Renderer: %s", cls.glconfig.renderer_string );
-		igEnd();
+		igSetNextWindowPos( (ImVec2){ 10.0f, 10.0f }, ImGuiCond_Always, (ImVec2){ 0.0f, 0.0f } );
+		igSetNextWindowBgAlpha( 0.25f );
+		if ( igBegin( "ImGuiOverlay", NULL,
+			ImGuiWindowFlags_NoDecoration |
+			ImGuiWindowFlags_AlwaysAutoResize |
+			ImGuiWindowFlags_NoNav |
+			ImGuiWindowFlags_NoFocusOnAppearing |
+			ImGuiWindowFlags_NoMove ) )
+		{
+			const float frameMs = ( cls.realFrametime > 0 ) ? (float)cls.realFrametime : 1.0f;
+			igText( "FPS: %.1f", 1000.0f / frameMs );
+			igText( "Frame ms: %.2f", frameMs );
+			igText( "Renderer: %s", cls.glconfig.renderer_string );
+			igEnd();
+		}
 	}
 }
 
 void CL_ImGui_Init( void )
 {
 	CL_ImGui_RegisterCvars();
+	CL_ImGui_Debug_Init();
 }
 
 void CL_ImGui_Shutdown( void )
 {
+	CL_ImGui_Debug_Shutdown();
 	CL_ImGui_DestroyContext();
 }
 

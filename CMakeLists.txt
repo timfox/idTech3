@@ -290,6 +290,10 @@ TARGET_COMPILE_DEFINITIONS(qcommon_ded PUBLIC DEDICATED)
 
 # client + cURL
 AUX_SOURCE_DIRECTORY(src/client CLIENT_SRCS)
+# Add debug overlay
+IF(USE_CIMGUI)
+	list(APPEND CLIENT_SRCS src/client/cl_imgui_debug.c)
+ENDIF()
 IF(NOT USE_CURL)
 	list(REMOVE_ITEM CLIENT_SRCS src/client/cl_curl.c)
 	list(REMOVE_ITEM CLIENT_SRCS src/client/cl_net_enhanced.c)
