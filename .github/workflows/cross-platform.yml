@@ -1,0 +1,114 @@
+name: Cross-Platform Builds
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-matrix:
+    name: Build ${{ matrix.os }} ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-20.04
+            arch: x86_64
+            compiler: gcc
+          - os: ubuntu-22.04
+            arch: x86_64
+            compiler: clang
+          - os: ubuntu-latest
+            arch: x86_64
+            compiler: gcc
+          - os: windows-2019
+            arch: x64
+            compiler: msvc
+          - os: windows-2022
+            arch: x64
+            compiler: msvc
+          - os: macos-11
+            arch: x86_64
+            compiler: clang
+          - os: macos-12
+            arch: arm64
+            compiler: clang
+          - os: macos-latest
+            arch: universal
+            compiler: clang
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Install dependencies (Ubuntu)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake \
+            libsdl2-dev libcurl4-openssl-dev libssl-dev \
+            libjpeg-dev libvorbis-dev libogg-dev \
+            libfreetype6-dev libsqlite3-dev liblua5.4-dev \
+            libwebsockets-dev libzstd-dev pkg-config
+          if [ "${{ matrix.compiler }}" == "clang" ]; then
+            sudo apt-get install -y clang
+          fi
+      
+      - name: Install dependencies (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          brew install cmake sdl2 curl openssl jpeg vorbis ogg freetype sqlite lua@5.4 libwebsockets zstd
+      
+      - name: Configure CMake
+        run: |
+          mkdir -p build
+          cd build
+          if [ "${{ matrix.os }}" == "windows-2019" ] || [ "${{ matrix.os }}" == "windows-2022" ]; then
+            cmake .. -G "Visual Studio 17 2022" -A ${{ matrix.arch }} -DCMAKE_BUILD_TYPE=Release
+          elif startsWith(matrix.os, 'macos'); then
+            if [ "${{ matrix.arch }}" == "universal" ]; then
+              cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
+            else
+              cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="${{ matrix.arch }}"
+            fi
+          else
+            CC=${{ matrix.compiler == 'clang' && 'clang' || 'gcc' }}
+            CXX=${{ matrix.compiler == 'clang' && 'clang++' || 'g++' }}
+            cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=$CC -DCMAKE_CXX_COMPILER=$CXX
+          fi
+      
+      - name: Build
+        run: |
+          cd build
+          if [ "${{ matrix.os }}" == "windows-2019" ] || [ "${{ matrix.os }}" == "windows-2022" ]; then
+            cmake --build . --config Release -j
+          else
+            make -j$(nproc || sysctl -n hw.ncpu)
+          fi
+      
+      - name: Test
+        run: |
+          cd build
+          if [ -f idtech3.x86_64 ] || [ -f idtech3 ] || [ -f Release/idtech3.exe ]; then
+            echo "Build successful!"
+          else
+            echo "Build failed - binary not found"
+            exit 1
+          fi
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.compiler }}
+          path: |
+            build/idtech3*
+            build/*.so
+            build/*.dylib
+            build/Release/*.exe
+            build/Release/*.dll
+          retention-days: 7
+

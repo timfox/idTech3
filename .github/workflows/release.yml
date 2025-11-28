@@ -1,0 +1,161 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version'
+        required: true
+        default: '1.0.0'
+
+jobs:
+  build-all-platforms:
+    name: Build All Platforms
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux-x86_64
+            artifact: linux-release
+          - os: windows-latest
+            name: windows-x64
+            artifact: windows-release
+          - os: macos-latest
+            name: macos-universal
+            artifact: macos-release
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake \
+            libsdl2-dev libcurl4-openssl-dev libssl-dev \
+            libjpeg-dev libvorbis-dev libogg-dev \
+            libfreetype6-dev libsqlite3-dev liblua5.4-dev \
+            libwebsockets-dev libzstd-dev pkg-config
+      
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install cmake sdl2 curl openssl jpeg vorbis ogg freetype sqlite lua@5.4 libwebsockets zstd
+      
+      - name: Configure CMake
+        run: |
+          mkdir -p build
+          cd build
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
+          elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+            cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
+          else
+            cmake .. -DCMAKE_BUILD_TYPE=Release
+          fi
+      
+      - name: Build
+        run: |
+          cd build
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            cmake --build . --config Release -j
+          else
+            make -j$(nproc || sysctl -n hw.ncpu)
+          fi
+      
+      - name: Package Release
+        run: |
+          mkdir -p release-package
+          cd build
+          
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            cp Release/idtech3.exe ../release-package/
+            cp Release/idtech3.server.exe ../release-package/
+            cp Release/*.dll ../release-package/ || true
+          elif [ "${{ matrix.os }}" == "macos-latest" ]; then
+            cp idtech3 ../release-package/
+            cp idtech3.server ../release-package/
+            cp *.dylib ../release-package/ || true
+            # Create universal binary if needed
+            if [ -f idtech3 ]; then
+              lipo -create -output ../release-package/idtech3 idtech3 || cp idtech3 ../release-package/
+            fi
+          else
+            cp idtech3.x86_64 ../release-package/
+            cp idtech3.server.x86_64 ../release-package/
+            cp *.so ../release-package/ || true
+          fi
+      
+      - name: Create Release Archive
+        run: |
+          cd release-package
+          VERSION=${GITHUB_REF#refs/tags/v}
+          VERSION=${VERSION:-${{ github.event.inputs.version }}}
+          
+          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+            zip -r ../idtech3-${{ matrix.name }}-${VERSION}.zip .
+          else
+            tar czf ../idtech3-${{ matrix.name }}-${VERSION}.tar.gz .
+          fi
+      
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            idtech3-${{ matrix.name }}-*.zip
+            idtech3-${{ matrix.name }}-*.tar.gz
+
+  create-release:
+    name: Create Release
+    needs: build-all-platforms
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release v${{ steps.version.outputs.version }}
+          body: |
+            ## Release v${{ steps.version.outputs.version }}
+            
+            ### Downloads
+            
+            - **Linux x86_64**: [idtech3-linux-x86_64.tar.gz](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/idtech3-linux-x86_64-${{ steps.version.outputs.version }}.tar.gz)
+            - **Windows x64**: [idtech3-windows-x64.zip](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/idtech3-windows-x64-${{ steps.version.outputs.version }}.zip)
+            - **macOS Universal**: [idtech3-macos-universal.tar.gz](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/idtech3-macos-universal-${{ steps.version.outputs.version }}.tar.gz)
+            
+            ### Changes
+            
+            See [CHANGELOG.md](CHANGELOG.md) for details.
+          files: |
+            artifacts/**/*.zip
+            artifacts/**/*.tar.gz
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

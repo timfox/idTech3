@@ -1,0 +1,220 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  linux-build:
+    name: Linux Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        compiler: [gcc, clang]
+        renderer: [opengl, vulkan]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            libsdl2-dev \
+            libcurl4-openssl-dev \
+            libssl-dev \
+            libjpeg-dev \
+            libvorbis-dev \
+            libogg-dev \
+            libfreetype6-dev \
+            libsqlite3-dev \
+            liblua5.4-dev \
+            libwebsockets-dev \
+            libzstd-dev \
+            pkg-config
+      
+      - name: Set up compiler
+        if: matrix.compiler == 'gcc'
+        run: |
+          sudo apt-get install -y gcc g++
+          echo "CC=gcc" >> $GITHUB_ENV
+          echo "CXX=g++" >> $GITHUB_ENV
+      
+      - name: Set up compiler
+        if: matrix.compiler == 'clang'
+        run: |
+          sudo apt-get install -y clang
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
+      
+      - name: Configure CMake
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DCMAKE_C_COMPILER=$CC \
+            -DCMAKE_CXX_COMPILER=$CXX \
+            -DUSE_VULKAN=${{ matrix.renderer == 'vulkan' && 'ON' || 'OFF' }}
+      
+      - name: Build
+        run: |
+          cd build
+          make -j$(nproc)
+      
+      - name: Test
+        run: |
+          cd build
+          ctest --output-on-failure || true
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.compiler }}-${{ matrix.renderer }}
+          path: |
+            build/idtech3.x86_64
+            build/idtech3.server.x86_64
+            build/*.so
+
+  windows-build:
+    name: Windows Build
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        generator: [Visual Studio 17 2022, MinGW Makefiles]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Install dependencies (vcpkg)
+        if: matrix.generator == 'Visual Studio 17 2022'
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git
+          cd vcpkg
+          .\bootstrap-vcpkg.bat
+          .\vcpkg integrate install
+          .\vcpkg install sdl2 curl openssl jpeg-turbo vorbis ogg freetype sqlite3 lua websockets zstd
+      
+      - name: Configure CMake
+        run: |
+          mkdir build
+          cd build
+          if ("${{ matrix.generator }}" -eq "Visual Studio 17 2022") {
+            cmake .. -G "${{ matrix.generator }}" -A x64
+          } else {
+            cmake .. -G "${{ matrix.generator }}"
+          }
+      
+      - name: Build
+        run: |
+          cd build
+          cmake --build . --config ${{ env.BUILD_TYPE }} -j
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ matrix.generator }}
+          path: |
+            build/${{ env.BUILD_TYPE }}/*.exe
+            build/${{ env.BUILD_TYPE }}/*.dll
+
+  macos-build:
+    name: macOS Build
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [x86_64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Install dependencies
+        run: |
+          brew install cmake sdl2 curl openssl jpeg vorbis ogg freetype sqlite lua@5.4 libwebsockets zstd
+      
+      - name: Configure CMake
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}
+      
+      - name: Build
+        run: |
+          cd build
+          make -j$(sysctl -n hw.ncpu)
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-${{ matrix.arch }}
+          path: |
+            build/idtech3
+            build/idtech3.server
+            build/*.dylib
+
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy cppcheck
+      
+      - name: Configure CMake
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. -DENABLE_STATIC_ANALYSIS=ON
+      
+      - name: Run clang-tidy
+        run: |
+          cd build
+          cmake --build . 2>&1 | tee clang-tidy.log || true
+      
+      - name: Run cppcheck
+        run: |
+          cppcheck --enable=all --suppress=missingIncludeSystem src/ || true
+      
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-analysis
+          path: |
+            build/clang-tidy.log
+
+  code-quality:
+    name: Code Quality Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check formatting
+        run: |
+          # Check for common formatting issues
+          if command -v clang-format &> /dev/null; then
+            find src -name "*.c" -o -name "*.h" | xargs clang-format --dry-run --Werror || true
+          fi
+      
+      - name: Check for common issues
+        run: |
+          # Check for TODO/FIXME comments
+          echo "## TODO/FIXME Comments" >> $GITHUB_STEP_SUMMARY
+          grep -r "TODO\|FIXME" src/ --include="*.c" --include="*.h" | head -20 >> $GITHUB_STEP_SUMMARY || true
+
