@@ -42,7 +42,7 @@ An item fires all of its targets when it is picked up.  If the toucher can't car
 "count" override quantity or duration on most items.
  */
 
-gitem_t bg_itemlist[] ={
+__attribute__((visibility("default"))) gitem_t bg_itemlist[] ={
 	{
 		NULL,
 		NULL,
@@ -1077,7 +1077,7 @@ Only in One Flag CTF games
 	{NULL}
 };
 
-int bg_numItems = sizeof (bg_itemlist) / sizeof (bg_itemlist[0]) - 1;
+__attribute__((visibility("default"))) int bg_numItems = sizeof (bg_itemlist) / sizeof (bg_itemlist[0]) - 1;
 
 /*
 ==============

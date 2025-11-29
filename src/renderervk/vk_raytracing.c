@@ -533,10 +533,12 @@ void vk_rt_init( void )
 
 	// Create uniform buffer for camera data
 	// Size: viewInverse(16*4) + projInverse(16*4) + cameraPos(4*4) + resolution(2*4) + time/near/far/exposure(4*4) + frameIndex/samplesPerPixel/debugMagenta(3*4)
-	//      + previousViewInverse(16*4) + previousProjInverse(16*4) + previousCameraPos(4*4) + temporalAlpha(1*4) = 192 floats = 768 bytes
+	//      + previousViewInverse(16*4) + previousProjInverse(16*4) + previousCameraPos(4*4) + temporalAlpha(1*4)
+	//      + maxBounces(1*4) + giIntensity(1*4) + invResolution(2*4) + spatialAlpha(1*4) + varianceAlpha(1*4) + iterations(1*4)
+	//      = 16+16+4+2+6+3+16+16+4+1+1+1+2+1+1+1 = 91 floats + 4 ints = 91*4 + 4*4 = 364 + 16 = 380 bytes
 	VkBufferCreateInfo bufferInfo = {};
 	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferInfo.size = sizeof(float) * 16 * 4 + sizeof(float) * 4 * 2 + sizeof(float) * 2 + sizeof(float) * 6 + sizeof(int) * 3; // viewInverse, projInverse, cameraPos, resolution, time/near/far/exposure/temporalAlpha, frameIndex/samplesPerPixel/debugMagenta, previousViewInverse, previousProjInverse, previousCameraPos
+	bufferInfo.size = sizeof(float) * (16 + 16 + 4 + 2 + 6 + 1 + 16 + 16 + 4 + 1 + 1 + 1 + 2 + 1 + 1) + sizeof(int) * (3 + 1); // All fields including denoising parameters
 	bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -627,6 +629,9 @@ void vk_rt_shutdown( void )
 		vk.rt.motionVectorImageMemory = VK_NULL_HANDLE;
 	}
 
+	// Destroy denoising resources
+	vk_rt_destroy_denoise_resources();
+
 	// Destroy output image
 	if ( vk.rt.outputImageView != VK_NULL_HANDLE ) {
 		qvkDestroyImageView( vk.device, vk.rt.outputImageView, NULL );
@@ -696,6 +701,20 @@ void vk_rt_shutdown( void )
 	if ( vk.rt.sbtMemory != VK_NULL_HANDLE ) {
 		qvkFreeMemory( vk.device, vk.rt.sbtMemory, NULL );
 		vk.rt.sbtMemory = VK_NULL_HANDLE;
+	}
+
+	// Destroy denoising pipeline
+	if ( vk.rt.denoiseComputePipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.rt.denoiseComputePipeline, NULL );
+		vk.rt.denoiseComputePipeline = VK_NULL_HANDLE;
+	}
+	if ( vk.rt.denoisePipelineLayout != VK_NULL_HANDLE ) {
+		qvkDestroyPipelineLayout( vk.device, vk.rt.denoisePipelineLayout, NULL );
+		vk.rt.denoisePipelineLayout = VK_NULL_HANDLE;
+	}
+	if ( vk.rt.denoiseDescriptorSetLayout != VK_NULL_HANDLE ) {
+		qvkDestroyDescriptorSetLayout( vk.device, vk.rt.denoiseDescriptorSetLayout, NULL );
+		vk.rt.denoiseDescriptorSetLayout = VK_NULL_HANDLE;
 	}
 
 	// Destroy uniform buffer
@@ -1480,7 +1499,12 @@ void vk_rt_create_output_image( uint32_t width, uint32_t height )
 	}
 #endif
 	
-	if ( vk.rt.outputImage != VK_NULL_HANDLE && width == vk.renderWidth && height == vk.renderHeight ) {
+	// Check if image needs recreation (size changed or scale changed)
+	uint32_t expectedWidth = width;
+	uint32_t expectedHeight = height;
+	if ( vk.rt.outputImage != VK_NULL_HANDLE && 
+	     vk.rt.outputImageWidth == expectedWidth && 
+	     vk.rt.outputImageHeight == expectedHeight ) {
 		return; // Already created with correct size
 	}
 
@@ -1585,6 +1609,11 @@ void vk_rt_create_output_image( uint32_t width, uint32_t height )
 	// Create temporal accumulation buffers if temporal accumulation is enabled
 	if ( r_rt_temporal && r_rt_temporal->integer ) {
 		vk_rt_create_temporal_buffers( width, height );
+	}
+	
+	// Create denoising buffers if denoising is enabled
+	if ( r_rt_denoise && r_rt_denoise->integer ) {
+		vk_rt_create_denoise_resources( width, height );
 	}
 }
 
@@ -1979,6 +2008,25 @@ static void vk_rt_update_uniform_buffer( void )
 	data[3] = 1.0f;
 	data += 4;
 
+	// invResolution (vec2 = 2 floats) - for ReLAX denoising
+	data[0] = 1.0f / (float)vk.renderWidth;
+	data[1] = 1.0f / (float)vk.renderHeight;
+	data += 2;
+
+	// spatialAlpha (float) - spatial filter blend factor for ReLAX
+	data[0] = r_rt_denoiseSpatialAlpha ? Com_Clamp( 0.0f, 1.0f, r_rt_denoiseSpatialAlpha->value ) : 0.5f;
+	data += 1;
+
+	// varianceAlpha (float) - variance blend factor for ReLAX
+	data[0] = r_rt_denoiseVarianceAlpha ? Com_Clamp( 0.0f, 1.0f, r_rt_denoiseVarianceAlpha->value ) : 0.5f;
+	data += 1;
+
+	// iterations (int) - number of spatial filter iterations for ReLAX
+	idata = (int *)data;
+	idata[0] = r_rt_denoiseIterations ? r_rt_denoiseIterations->integer : 3;
+	idata += 1;
+	data = (float *)idata;
+
 	qvkUnmapMemory( vk.device, vk.rt.uniformBufferMemory );
 
 	// Store current matrices for next frame
@@ -2107,6 +2155,11 @@ void vk_rt_trace_rays( uint32_t width, uint32_t height )
 	// Transition RT output image to SHADER_READ_ONLY_OPTIMAL for subsequent sampling/compositing
 	vk_rt_transition_image_to_sampled( vk.rt.outputImage );
 	
+	// Apply ReLAX denoising if enabled
+	if ( r_rt_denoise && r_rt_denoise->integer && vk.rt.denoiseComputePipeline != VK_NULL_HANDLE ) {
+		vk_rt_denoise( width, height );
+	}
+	
 	// Copy current frame to history for temporal accumulation (if enabled)
 	if ( r_rt_temporal && r_rt_temporal->integer && vk.rt.historyImage != VK_NULL_HANDLE ) {
 		// Transition history image to TRANSFER_DST_OPTIMAL
@@ -2223,6 +2276,645 @@ void vk_rt_trace_rays( uint32_t width, uint32_t height )
 			1, &outputBarrier
 		);
 	}
+}
+
+/*
+=============================================================================
+ReLAX Denoising Implementation
+=============================================================================
+*/
+
+void vk_rt_create_denoise_resources( uint32_t width, uint32_t height )
+{
+	if ( !vk.rayTracingSupported || !vk.rt.initialized ) {
+		return;
+	}
+
+	// Destroy old buffers if they exist and size changed
+	if ( vk.rt.denoiseNormalBuffer != VK_NULL_HANDLE && 
+	     ( width != vk.rt.outputImageWidth || height != vk.rt.outputImageHeight ) ) {
+		vk_rt_destroy_denoise_resources();
+	}
+
+	// Create normal buffer (RGBA16F for G-buffer normals)
+	if ( vk.rt.denoiseNormalBuffer == VK_NULL_HANDLE ) {
+		VkImageCreateInfo imageInfo = {};
+		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+		imageInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+		imageInfo.extent.width = width;
+		imageInfo.extent.height = height;
+		imageInfo.extent.depth = 1;
+		imageInfo.mipLevels = 1;
+		imageInfo.arrayLayers = 1;
+		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+		VK_CHECK( qvkCreateImage( vk.device, &imageInfo, NULL, &vk.rt.denoiseNormalBuffer ) );
+
+		VkMemoryRequirements memRequirements;
+		qvkGetImageMemoryRequirements( vk.device, vk.rt.denoiseNormalBuffer, &memRequirements );
+
+		VkMemoryAllocateInfo allocInfo = {};
+		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		allocInfo.allocationSize = memRequirements.size;
+		allocInfo.memoryTypeIndex = find_memory_type( memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+
+		VK_CHECK( qvkAllocateMemory( vk.device, &allocInfo, NULL, &vk.rt.denoiseNormalBufferMemory ) );
+		VK_CHECK( qvkBindImageMemory( vk.device, vk.rt.denoiseNormalBuffer, vk.rt.denoiseNormalBufferMemory, 0 ) );
+
+		VkImageViewCreateInfo viewInfo = {};
+		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		viewInfo.image = vk.rt.denoiseNormalBuffer;
+		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		viewInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+		viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		viewInfo.subresourceRange.baseMipLevel = 0;
+		viewInfo.subresourceRange.levelCount = 1;
+		viewInfo.subresourceRange.baseArrayLayer = 0;
+		viewInfo.subresourceRange.layerCount = 1;
+
+		VK_CHECK( qvkCreateImageView( vk.device, &viewInfo, NULL, &vk.rt.denoiseNormalBufferView ) );
+	}
+
+	// Create depth buffer (R32F)
+	if ( vk.rt.denoiseDepthBuffer == VK_NULL_HANDLE ) {
+		VkImageCreateInfo imageInfo = {};
+		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+		imageInfo.format = VK_FORMAT_R32_SFLOAT;
+		imageInfo.extent.width = width;
+		imageInfo.extent.height = height;
+		imageInfo.extent.depth = 1;
+		imageInfo.mipLevels = 1;
+		imageInfo.arrayLayers = 1;
+		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+		VK_CHECK( qvkCreateImage( vk.device, &imageInfo, NULL, &vk.rt.denoiseDepthBuffer ) );
+
+		VkMemoryRequirements memRequirements;
+		qvkGetImageMemoryRequirements( vk.device, vk.rt.denoiseDepthBuffer, &memRequirements );
+
+		VkMemoryAllocateInfo allocInfo = {};
+		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		allocInfo.allocationSize = memRequirements.size;
+		allocInfo.memoryTypeIndex = find_memory_type( memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+
+		VK_CHECK( qvkAllocateMemory( vk.device, &allocInfo, NULL, &vk.rt.denoiseDepthBufferMemory ) );
+		VK_CHECK( qvkBindImageMemory( vk.device, vk.rt.denoiseDepthBuffer, vk.rt.denoiseDepthBufferMemory, 0 ) );
+
+		VkImageViewCreateInfo viewInfo = {};
+		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		viewInfo.image = vk.rt.denoiseDepthBuffer;
+		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		viewInfo.format = VK_FORMAT_R32_SFLOAT;
+		viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		viewInfo.subresourceRange.baseMipLevel = 0;
+		viewInfo.subresourceRange.levelCount = 1;
+		viewInfo.subresourceRange.baseArrayLayer = 0;
+		viewInfo.subresourceRange.layerCount = 1;
+
+		VK_CHECK( qvkCreateImageView( vk.device, &viewInfo, NULL, &vk.rt.denoiseDepthBufferView ) );
+	}
+
+	// Create variance buffer (RGBA16F)
+	if ( vk.rt.denoiseVarianceBuffer == VK_NULL_HANDLE ) {
+		VkImageCreateInfo imageInfo = {};
+		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+		imageInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+		imageInfo.extent.width = width;
+		imageInfo.extent.height = height;
+		imageInfo.extent.depth = 1;
+		imageInfo.mipLevels = 1;
+		imageInfo.arrayLayers = 1;
+		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+		VK_CHECK( qvkCreateImage( vk.device, &imageInfo, NULL, &vk.rt.denoiseVarianceBuffer ) );
+
+		VkMemoryRequirements memRequirements;
+		qvkGetImageMemoryRequirements( vk.device, vk.rt.denoiseVarianceBuffer, &memRequirements );
+
+		VkMemoryAllocateInfo allocInfo = {};
+		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		allocInfo.allocationSize = memRequirements.size;
+		allocInfo.memoryTypeIndex = find_memory_type( memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+
+		VK_CHECK( qvkAllocateMemory( vk.device, &allocInfo, NULL, &vk.rt.denoiseVarianceBufferMemory ) );
+		VK_CHECK( qvkBindImageMemory( vk.device, vk.rt.denoiseVarianceBuffer, vk.rt.denoiseVarianceBufferMemory, 0 ) );
+
+		VkImageViewCreateInfo viewInfo = {};
+		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		viewInfo.image = vk.rt.denoiseVarianceBuffer;
+		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		viewInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+		viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		viewInfo.subresourceRange.baseMipLevel = 0;
+		viewInfo.subresourceRange.levelCount = 1;
+		viewInfo.subresourceRange.baseArrayLayer = 0;
+		viewInfo.subresourceRange.layerCount = 1;
+
+		VK_CHECK( qvkCreateImageView( vk.device, &viewInfo, NULL, &vk.rt.denoiseVarianceBufferView ) );
+	}
+
+	// Create denoise history buffer (RGBA16F)
+	if ( vk.rt.denoiseHistoryBuffer == VK_NULL_HANDLE ) {
+		VkImageCreateInfo imageInfo = {};
+		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+		imageInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+		imageInfo.extent.width = width;
+		imageInfo.extent.height = height;
+		imageInfo.extent.depth = 1;
+		imageInfo.mipLevels = 1;
+		imageInfo.arrayLayers = 1;
+		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+		VK_CHECK( qvkCreateImage( vk.device, &imageInfo, NULL, &vk.rt.denoiseHistoryBuffer ) );
+
+		VkMemoryRequirements memRequirements;
+		qvkGetImageMemoryRequirements( vk.device, vk.rt.denoiseHistoryBuffer, &memRequirements );
+
+		VkMemoryAllocateInfo allocInfo = {};
+		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		allocInfo.allocationSize = memRequirements.size;
+		allocInfo.memoryTypeIndex = find_memory_type( memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+
+		VK_CHECK( qvkAllocateMemory( vk.device, &allocInfo, NULL, &vk.rt.denoiseHistoryBufferMemory ) );
+		VK_CHECK( qvkBindImageMemory( vk.device, vk.rt.denoiseHistoryBuffer, vk.rt.denoiseHistoryBufferMemory, 0 ) );
+
+		VkImageViewCreateInfo viewInfo = {};
+		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		viewInfo.image = vk.rt.denoiseHistoryBuffer;
+		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		viewInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+		viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		viewInfo.subresourceRange.baseMipLevel = 0;
+		viewInfo.subresourceRange.levelCount = 1;
+		viewInfo.subresourceRange.baseArrayLayer = 0;
+		viewInfo.subresourceRange.layerCount = 1;
+
+		VK_CHECK( qvkCreateImageView( vk.device, &viewInfo, NULL, &vk.rt.denoiseHistoryBufferView ) );
+	}
+
+	ri.Printf( PRINT_DEVELOPER, "Created ReLAX denoising buffers (%ux%u)\n", width, height );
+}
+
+
+void vk_rt_destroy_denoise_resources( void )
+{
+	if ( !vk.rayTracingSupported || !vk.rt.initialized ) {
+		return;
+	}
+
+	// Destroy normal buffer
+	if ( vk.rt.denoiseNormalBufferView != VK_NULL_HANDLE ) {
+		qvkDestroyImageView( vk.device, vk.rt.denoiseNormalBufferView, NULL );
+		vk.rt.denoiseNormalBufferView = VK_NULL_HANDLE;
+	}
+	if ( vk.rt.denoiseNormalBuffer != VK_NULL_HANDLE ) {
+		qvkDestroyImage( vk.device, vk.rt.denoiseNormalBuffer, NULL );
+		vk.rt.denoiseNormalBuffer = VK_NULL_HANDLE;
+	}
+	if ( vk.rt.denoiseNormalBufferMemory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, vk.rt.denoiseNormalBufferMemory, NULL );
+		vk.rt.denoiseNormalBufferMemory = VK_NULL_HANDLE;
+	}
+
+	// Destroy depth buffer
+	if ( vk.rt.denoiseDepthBufferView != VK_NULL_HANDLE ) {
+		qvkDestroyImageView( vk.device, vk.rt.denoiseDepthBufferView, NULL );
+		vk.rt.denoiseDepthBufferView = VK_NULL_HANDLE;
+	}
+	if ( vk.rt.denoiseDepthBuffer != VK_NULL_HANDLE ) {
+		qvkDestroyImage( vk.device, vk.rt.denoiseDepthBuffer, NULL );
+		vk.rt.denoiseDepthBuffer = VK_NULL_HANDLE;
+	}
+	if ( vk.rt.denoiseDepthBufferMemory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, vk.rt.denoiseDepthBufferMemory, NULL );
+		vk.rt.denoiseDepthBufferMemory = VK_NULL_HANDLE;
+	}
+
+	// Destroy variance buffer
+	if ( vk.rt.denoiseVarianceBufferView != VK_NULL_HANDLE ) {
+		qvkDestroyImageView( vk.device, vk.rt.denoiseVarianceBufferView, NULL );
+		vk.rt.denoiseVarianceBufferView = VK_NULL_HANDLE;
+	}
+	if ( vk.rt.denoiseVarianceBuffer != VK_NULL_HANDLE ) {
+		qvkDestroyImage( vk.device, vk.rt.denoiseVarianceBuffer, NULL );
+		vk.rt.denoiseVarianceBuffer = VK_NULL_HANDLE;
+	}
+	if ( vk.rt.denoiseVarianceBufferMemory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, vk.rt.denoiseVarianceBufferMemory, NULL );
+		vk.rt.denoiseVarianceBufferMemory = VK_NULL_HANDLE;
+	}
+
+	// Destroy denoise history buffer
+	if ( vk.rt.denoiseHistoryBufferView != VK_NULL_HANDLE ) {
+		qvkDestroyImageView( vk.device, vk.rt.denoiseHistoryBufferView, NULL );
+		vk.rt.denoiseHistoryBufferView = VK_NULL_HANDLE;
+	}
+	if ( vk.rt.denoiseHistoryBuffer != VK_NULL_HANDLE ) {
+		qvkDestroyImage( vk.device, vk.rt.denoiseHistoryBuffer, NULL );
+		vk.rt.denoiseHistoryBuffer = VK_NULL_HANDLE;
+	}
+	if ( vk.rt.denoiseHistoryBufferMemory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, vk.rt.denoiseHistoryBufferMemory, NULL );
+		vk.rt.denoiseHistoryBufferMemory = VK_NULL_HANDLE;
+	}
+}
+
+
+void vk_rt_create_denoise_pipeline( void )
+{
+	if ( !vk.rayTracingSupported || !vk.rt.initialized ) {
+		return;
+	}
+
+	// Check if shader module is loaded
+	if ( vk.modules.rt_relax_comp == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_WARNING, "ReLAX denoising shader not loaded, pipeline creation deferred\n" );
+		return;
+	}
+
+	// Create descriptor set layout for denoising
+	// Binding 0: Noisy input (RGBA16F storage image)
+	// Binding 1: History input (RGBA16F storage image)
+	// Binding 2: Motion vectors (RG16F storage image)
+	// Binding 3: Depth buffer (R32F storage image)
+	// Binding 4: Normal buffer (RGBA16F storage image)
+	// Binding 5: Denoised output (RGBA16F storage image)
+	// Binding 6: Variance output (RGBA16F storage image)
+	// Binding 7: History output (RGBA16F storage image)
+	// Binding 8: Uniform buffer
+	VkDescriptorSetLayoutBinding bindings[9] = {};
+	
+	bindings[0].binding = 0;
+	bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	bindings[0].descriptorCount = 1;
+	bindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[0].pImmutableSamplers = NULL;
+
+	bindings[1].binding = 1;
+	bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	bindings[1].descriptorCount = 1;
+	bindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[1].pImmutableSamplers = NULL;
+
+	bindings[2].binding = 2;
+	bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	bindings[2].descriptorCount = 1;
+	bindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[2].pImmutableSamplers = NULL;
+
+	bindings[3].binding = 3;
+	bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	bindings[3].descriptorCount = 1;
+	bindings[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[3].pImmutableSamplers = NULL;
+
+	bindings[4].binding = 4;
+	bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	bindings[4].descriptorCount = 1;
+	bindings[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[4].pImmutableSamplers = NULL;
+
+	bindings[5].binding = 5;
+	bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	bindings[5].descriptorCount = 1;
+	bindings[5].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[5].pImmutableSamplers = NULL;
+
+	bindings[6].binding = 6;
+	bindings[6].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	bindings[6].descriptorCount = 1;
+	bindings[6].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[6].pImmutableSamplers = NULL;
+
+	bindings[7].binding = 7;
+	bindings[7].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	bindings[7].descriptorCount = 1;
+	bindings[7].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[7].pImmutableSamplers = NULL;
+
+	bindings[8].binding = 8;
+	bindings[8].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	bindings[8].descriptorCount = 1;
+	bindings[8].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+	bindings[8].pImmutableSamplers = NULL;
+
+	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layoutInfo.pNext = NULL;
+	layoutInfo.flags = 0;
+	layoutInfo.bindingCount = 9;
+	layoutInfo.pBindings = bindings;
+
+	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &layoutInfo, NULL, &vk.rt.denoiseDescriptorSetLayout ) );
+	SET_OBJECT_NAME( vk.rt.denoiseDescriptorSetLayout, "denoise descriptor set layout", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT_EXT );
+
+	// Create pipeline layout
+	VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
+	pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+	pipelineLayoutInfo.pNext = NULL;
+	pipelineLayoutInfo.flags = 0;
+	pipelineLayoutInfo.setLayoutCount = 1;
+	pipelineLayoutInfo.pSetLayouts = &vk.rt.denoiseDescriptorSetLayout;
+	pipelineLayoutInfo.pushConstantRangeCount = 0;
+	pipelineLayoutInfo.pPushConstantRanges = NULL;
+
+	VK_CHECK( qvkCreatePipelineLayout( vk.device, &pipelineLayoutInfo, NULL, &vk.rt.denoisePipelineLayout ) );
+	SET_OBJECT_NAME( vk.rt.denoisePipelineLayout, "denoise pipeline layout", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_LAYOUT_EXT );
+
+	// Allocate descriptor set
+	VkDescriptorSetAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.pNext = NULL;
+	allocInfo.descriptorPool = vk.descriptor_pool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pSetLayouts = &vk.rt.denoiseDescriptorSetLayout;
+
+	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &allocInfo, &vk.rt.denoiseDescriptorSet ) );
+
+	// Create compute pipeline
+	VkComputePipelineCreateInfo pipelineInfo = {};
+	pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+	pipelineInfo.pNext = NULL;
+	pipelineInfo.flags = 0;
+	pipelineInfo.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	pipelineInfo.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+	pipelineInfo.stage.module = vk.modules.rt_relax_comp;
+	pipelineInfo.stage.pName = "main";
+	pipelineInfo.stage.pSpecializationInfo = NULL;
+	pipelineInfo.layout = vk.rt.denoisePipelineLayout;
+	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+	pipelineInfo.basePipelineIndex = -1;
+
+	VK_CHECK( qvkCreateComputePipelines( vk.device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &vk.rt.denoiseComputePipeline ) );
+	SET_OBJECT_NAME( vk.rt.denoiseComputePipeline, "ReLAX denoise compute pipeline", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+
+	ri.Printf( PRINT_DEVELOPER, "Created ReLAX denoising compute pipeline\n" );
+}
+
+
+void vk_rt_denoise( uint32_t width, uint32_t height )
+{
+	if ( !vk.rayTracingSupported || !vk.rt.initialized || 
+	     !r_rt_denoise || !r_rt_denoise->integer ||
+	     vk.rt.denoiseComputePipeline == VK_NULL_HANDLE ||
+	     vk.rt.denoiseDescriptorSet == VK_NULL_HANDLE ||
+	     vk.rt.outputImage == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	// Check if denoising resources exist
+	if ( vk.rt.denoiseNormalBuffer == VK_NULL_HANDLE ||
+	     vk.rt.denoiseDepthBuffer == VK_NULL_HANDLE ||
+	     vk.rt.denoiseVarianceBuffer == VK_NULL_HANDLE ||
+	     vk.rt.denoiseHistoryBuffer == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	// Transition images to GENERAL layout for compute shader access
+	VkImageMemoryBarrier barriers[8] = {};
+	uint32_t barrierCount = 0;
+
+	// Output image (noisy input)
+	barriers[barrierCount].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	barriers[barrierCount].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	barriers[barrierCount].dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+	barriers[barrierCount].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	barriers[barrierCount].newLayout = VK_IMAGE_LAYOUT_GENERAL;
+	barriers[barrierCount].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barriers[barrierCount].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barriers[barrierCount].image = vk.rt.outputImage;
+	barriers[barrierCount].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	barriers[barrierCount].subresourceRange.baseMipLevel = 0;
+	barriers[barrierCount].subresourceRange.levelCount = 1;
+	barriers[barrierCount].subresourceRange.baseArrayLayer = 0;
+	barriers[barrierCount].subresourceRange.layerCount = 1;
+	barrierCount++;
+
+	// History image (if temporal accumulation is enabled)
+	if ( vk.rt.historyImage != VK_NULL_HANDLE ) {
+		barriers[barrierCount].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barriers[barrierCount].srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+		barriers[barrierCount].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		barriers[barrierCount].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+		barriers[barrierCount].newLayout = VK_IMAGE_LAYOUT_GENERAL;
+		barriers[barrierCount].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barriers[barrierCount].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barriers[barrierCount].image = vk.rt.historyImage;
+		barriers[barrierCount].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barriers[barrierCount].subresourceRange.baseMipLevel = 0;
+		barriers[barrierCount].subresourceRange.levelCount = 1;
+		barriers[barrierCount].subresourceRange.baseArrayLayer = 0;
+		barriers[barrierCount].subresourceRange.layerCount = 1;
+		barrierCount++;
+	}
+
+	// Motion vector image
+	if ( vk.rt.motionVectorImage != VK_NULL_HANDLE ) {
+		barriers[barrierCount].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barriers[barrierCount].srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+		barriers[barrierCount].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		barriers[barrierCount].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+		barriers[barrierCount].newLayout = VK_IMAGE_LAYOUT_GENERAL;
+		barriers[barrierCount].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barriers[barrierCount].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barriers[barrierCount].image = vk.rt.motionVectorImage;
+		barriers[barrierCount].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barriers[barrierCount].subresourceRange.baseMipLevel = 0;
+		barriers[barrierCount].subresourceRange.levelCount = 1;
+		barriers[barrierCount].subresourceRange.baseArrayLayer = 0;
+		barriers[barrierCount].subresourceRange.layerCount = 1;
+		barrierCount++;
+	}
+
+	// Denoise buffers (normal, depth, variance, history) - ensure GENERAL layout
+	VkImage denoiseImages[] = {
+		vk.rt.denoiseNormalBuffer,
+		vk.rt.denoiseDepthBuffer,
+		vk.rt.denoiseVarianceBuffer,
+		vk.rt.denoiseHistoryBuffer
+	};
+
+	for ( uint32_t i = 0; i < 4; i++ ) {
+		barriers[barrierCount].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		barriers[barrierCount].srcAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+		barriers[barrierCount].dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+		barriers[barrierCount].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+		barriers[barrierCount].newLayout = VK_IMAGE_LAYOUT_GENERAL;
+		barriers[barrierCount].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barriers[barrierCount].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barriers[barrierCount].image = denoiseImages[i];
+		barriers[barrierCount].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barriers[barrierCount].subresourceRange.baseMipLevel = 0;
+		barriers[barrierCount].subresourceRange.levelCount = 1;
+		barriers[barrierCount].subresourceRange.baseArrayLayer = 0;
+		barriers[barrierCount].subresourceRange.layerCount = 1;
+		barrierCount++;
+	}
+
+	if ( barrierCount > 0 ) {
+		qvkCmdPipelineBarrier(
+			vk.cmd->command_buffer,
+			VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			0,
+			0, NULL,
+			0, NULL,
+			barrierCount, barriers
+		);
+	}
+
+	// Update descriptor set with current images
+	VkDescriptorImageInfo imageInfos[8] = {};
+	
+	// Binding 0: Noisy input (RT output)
+	imageInfos[0].imageView = vk.rt.outputImageView;
+	imageInfos[0].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	// Binding 1: History input (use denoise history if available, otherwise RT history)
+	imageInfos[1].imageView = vk.rt.denoiseHistoryBufferView != VK_NULL_HANDLE ? 
+	                          vk.rt.denoiseHistoryBufferView : 
+	                          (vk.rt.historyImageView != VK_NULL_HANDLE ? vk.rt.historyImageView : vk.rt.outputImageView);
+	imageInfos[1].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	// Binding 2: Motion vectors
+	imageInfos[2].imageView = vk.rt.motionVectorImageView != VK_NULL_HANDLE ? vk.rt.motionVectorImageView : vk.rt.outputImageView;
+	imageInfos[2].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	// Binding 3: Depth buffer
+	imageInfos[3].imageView = vk.rt.denoiseDepthBufferView;
+	imageInfos[3].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	// Binding 4: Normal buffer
+	imageInfos[4].imageView = vk.rt.denoiseNormalBufferView;
+	imageInfos[4].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	// Binding 5: Denoised output (write to RT output image)
+	imageInfos[5].imageView = vk.rt.outputImageView;
+	imageInfos[5].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	// Binding 6: Variance output
+	imageInfos[6].imageView = vk.rt.denoiseVarianceBufferView;
+	imageInfos[6].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	// Binding 7: History output
+	imageInfos[7].imageView = vk.rt.denoiseHistoryBufferView;
+	imageInfos[7].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	VkWriteDescriptorSet writes[8] = {};
+	for ( uint32_t i = 0; i < 8; i++ ) {
+		writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[i].pNext = NULL;
+		writes[i].dstSet = vk.rt.denoiseDescriptorSet;
+		writes[i].dstBinding = i;
+		writes[i].dstArrayElement = 0;
+		writes[i].descriptorCount = 1;
+		writes[i].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		writes[i].pImageInfo = &imageInfos[i];
+		writes[i].pBufferInfo = NULL;
+		writes[i].pTexelBufferView = NULL;
+	}
+
+	// Add uniform buffer write
+	VkDescriptorBufferInfo bufferInfo = {};
+	bufferInfo.buffer = vk.rt.uniformBuffer;
+	bufferInfo.offset = 0;
+	bufferInfo.range = VK_WHOLE_SIZE;
+
+	writes[7].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writes[7].pNext = NULL;
+	writes[7].dstSet = vk.rt.denoiseDescriptorSet;
+	writes[7].dstBinding = 8;
+	writes[7].dstArrayElement = 0;
+	writes[7].descriptorCount = 1;
+	writes[7].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	writes[7].pImageInfo = NULL;
+	writes[7].pBufferInfo = &bufferInfo;
+	writes[7].pTexelBufferView = NULL;
+
+	qvkUpdateDescriptorSets( vk.device, 9, writes, 0, NULL );
+
+	// Bind compute pipeline
+	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.rt.denoiseComputePipeline );
+
+	// Bind descriptor set
+	qvkCmdBindDescriptorSets(
+		vk.cmd->command_buffer,
+		VK_PIPELINE_BIND_POINT_COMPUTE,
+		vk.rt.denoisePipelineLayout,
+		0,
+		1,
+		&vk.rt.denoiseDescriptorSet,
+		0,
+		NULL
+	);
+
+	// Dispatch compute shader
+	// Workgroup size is 8x8, so dispatch (width+7)/8 x (height+7)/8
+	uint32_t workgroupX = ( width + 7 ) / 8;
+	uint32_t workgroupY = ( height + 7 ) / 8;
+	qvkCmdDispatch( vk.cmd->command_buffer, workgroupX, workgroupY, 1 );
+
+	// Transition output image back to SHADER_READ_ONLY_OPTIMAL for compositing
+	VkImageMemoryBarrier outputBarrier = {};
+	outputBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+	outputBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+	outputBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+	outputBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+	outputBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	outputBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	outputBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	outputBarrier.image = vk.rt.outputImage;
+	outputBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	outputBarrier.subresourceRange.baseMipLevel = 0;
+	outputBarrier.subresourceRange.levelCount = 1;
+	outputBarrier.subresourceRange.baseArrayLayer = 0;
+	outputBarrier.subresourceRange.layerCount = 1;
+
+	qvkCmdPipelineBarrier(
+		vk.cmd->command_buffer,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		0,
+		0, NULL,
+		0, NULL,
+		1, &outputBarrier
+	);
 }
 
 #endif // USE_VULKAN_RAY_TRACING

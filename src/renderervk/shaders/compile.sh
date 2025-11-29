@@ -104,9 +104,10 @@ echo "Compiling compute shaders..."
 for f in "$GLSL_DIR"/*.comp; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .comp)
-        glslangValidator -S comp -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1
-        if [ -f "$TOOLS_DIR/bin2hex" ]; then
-            "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_comp_spv"
+        if glslangValidator -S comp -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
+            if [ -f "$TOOLS_DIR/bin2hex" ] && [ -f "$TMP_FILE" ]; then
+                "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_comp_spv"
+            fi
         fi
         rm -f "$TMP_FILE"
     fi
@@ -118,9 +119,10 @@ echo "Compiling ray tracing shaders..."
 for f in "$GLSL_DIR"/*.rgen; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .rgen)
-		glslangValidator -S rgen --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1
-        if [ -f "$TOOLS_DIR/bin2hex" ]; then
-            "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_rgen_spv"
+		if glslangValidator -S rgen --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
+            if [ -f "$TOOLS_DIR/bin2hex" ] && [ -f "$TMP_FILE" ]; then
+                "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_rgen_spv"
+            fi
         fi
         rm -f "$TMP_FILE"
     fi
@@ -129,9 +131,10 @@ done
 for f in "$GLSL_DIR"/*.rmiss; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .rmiss)
-		glslangValidator -S rmiss --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1
-        if [ -f "$TOOLS_DIR/bin2hex" ]; then
-            "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_rmiss_spv"
+		if glslangValidator -S rmiss --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
+            if [ -f "$TOOLS_DIR/bin2hex" ] && [ -f "$TMP_FILE" ]; then
+                "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_rmiss_spv"
+            fi
         fi
         rm -f "$TMP_FILE"
     fi
@@ -140,9 +143,10 @@ done
 for f in "$GLSL_DIR"/*.rchit; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .rchit)
-		glslangValidator -S rchit --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1
-        if [ -f "$TOOLS_DIR/bin2hex" ]; then
-            "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_rchit_spv"
+		if glslangValidator -S rchit --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
+            if [ -f "$TOOLS_DIR/bin2hex" ] && [ -f "$TMP_FILE" ]; then
+                "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_rchit_spv"
+            fi
         fi
         rm -f "$TMP_FILE"
     fi
@@ -151,9 +155,10 @@ done
 for f in "$GLSL_DIR"/*.rahit; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .rahit)
-		glslangValidator -S rahit --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1
-        if [ -f "$TOOLS_DIR/bin2hex" ]; then
-            "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_rahit_spv"
+		if glslangValidator -S rahit --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
+            if [ -f "$TOOLS_DIR/bin2hex" ] && [ -f "$TMP_FILE" ]; then
+                "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_rahit_spv"
+            fi
         fi
         rm -f "$TMP_FILE"
     fi

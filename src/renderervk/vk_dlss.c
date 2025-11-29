@@ -10,10 +10,10 @@ The SDK provides functions like NVSDK_NGX_VULKAN_Init, NVSDK_NGX_VULKAN_Evaluate
 #include "tr_local.h"
 #include "vk.h"
 
-// Forward declaration - this function is available in vk.c as static
-// We'll use the instance directly instead
-
 #ifdef USE_VULKAN
+
+// External function pointer for getting physical device properties
+extern PFN_vkGetPhysicalDeviceProperties qvkGetPhysicalDeviceProperties;
 
 // DLSS SDK function pointers (would be loaded from DLL/SO)
 // These are placeholder declarations - actual SDK provides these
@@ -34,36 +34,55 @@ void vk_dlss_init( void )
 {
 	Com_Memset( &vk.dlss, 0, sizeof( vk.dlss ) );
 	
-	// Check for NVIDIA GPU
-	// Note: qvkGetPhysicalDeviceProperties is static in vk.c, so we use a different approach
-	// For now, we'll check during device creation or use a different method
-	// This is a placeholder - actual implementation would check GPU vendor
+	// Check for NVIDIA GPU using physical device properties
 	VkPhysicalDeviceProperties props;
-	// We'll need to get this from vk.c or check it differently
-	// For now, assume not supported until properly initialized
-	props.vendorID = 0;
+	qvkGetPhysicalDeviceProperties( vk.physical_device, &props );
 	
 	if ( props.vendorID != 0x10DE ) { // NVIDIA vendor ID
 		vk.dlss.supported = qfalse;
-		ri.Printf( PRINT_DEVELOPER, "DLSS: Not supported (non-NVIDIA GPU)\n" );
+		vk.dlss.initialized = qfalse;
+		ri.Printf( PRINT_DEVELOPER, "DLSS: Not supported (non-NVIDIA GPU, vendor ID: 0x%04X)\n", props.vendorID );
 		return;
 	}
 
-	// TODO: Load DLSS SDK library and get function pointers
-	// For now, mark as not initialized until SDK is available
-	// Actual implementation would:
-	// 1. Load nvngx_dlss.dll (Windows) or libnvngx_dlss.so (Linux)
-	// 2. Get function pointers: NVSDK_NGX_VULKAN_Init, NVSDK_NGX_VULKAN_EvaluateFeature, etc.
-	// 3. Initialize DLSS context with device, instance, etc.
-	// 4. Create DLSS feature with quality mode
+	// Check for RTX-capable GPU (RTX 20 series and above)
+	// RTX GPUs have device ID >= 0x1E00 (RTX 2060) and < 0x2500
+	// This is a rough check - actual capability should be checked via DLSS SDK
+	qboolean rtxCapable = qfalse;
+	if ( props.deviceID >= 0x1E00 && props.deviceID < 0x2500 ) {
+		rtxCapable = qtrue;
+	} else if ( props.deviceID >= 0x2500 ) {
+		// RTX 30 series and above
+		rtxCapable = qtrue;
+	}
 	
+	if ( !rtxCapable ) {
+		ri.Printf( PRINT_DEVELOPER, "DLSS: GPU may not support DLSS (device ID: 0x%04X)\n", props.deviceID );
+		// Still mark as supported - let SDK determine actual capability
+	}
+
+	// TODO: Load DLSS SDK library dynamically
+	// On Windows: LoadLibrary("nvngx_dlss.dll")
+	// On Linux: dlopen("libnvngx_dlss.so")
+	// Then get function pointers via GetProcAddress/dlsym:
+	//   - NVSDK_NGX_VULKAN_Init
+	//   - NVSDK_NGX_VULKAN_EvaluateFeature
+	//   - NVSDK_NGX_VULKAN_Shutdown
+	//   - NVSDK_NGX_VULKAN_GetFeatureRequirements
+	//   - NVSDK_NGX_VULKAN_CreateFeature
+	//   - NVSDK_NGX_VULKAN_ReleaseFeature
+	
+	// For now, mark as supported but not initialized until SDK is loaded
 	vk.dlss.supported = qtrue;
-	vk.dlss.initialized = qfalse; // Set to true when SDK is loaded
+	vk.dlss.initialized = qfalse; // Set to true when SDK is successfully loaded
 	vk.dlss.qualityMode = 1; // Default to Balanced
 	vk.dlss.sharpeningEnabled = qtrue;
 	vk.dlss.sharpening = 0.0f;
+	vk.dlss.dlssContext = NULL;
 
-	ri.Printf( PRINT_DEVELOPER, "DLSS: Framework initialized (SDK integration pending)\n" );
+	ri.Printf( PRINT_DEVELOPER, "DLSS: Framework initialized for NVIDIA GPU (SDK loading pending)\n" );
+	ri.Printf( PRINT_DEVELOPER, "DLSS: GPU: %s (vendor: 0x%04X, device: 0x%04X)\n", 
+		props.deviceName, props.vendorID, props.deviceID );
 }
 
 void vk_dlss_shutdown( void )
@@ -205,29 +224,58 @@ void vk_dlss_evaluate( VkCommandBuffer cmdBuffer, VkImage colorImage, VkImage de
 
 	// TODO: Call DLSS SDK EvaluateFeature function
 	// This requires:
-	// 1. Setting up NGX_VK_DLSS_Eval_Params structure
+	// 1. Setting up NGX_VK_DLSS_Eval_Params structure with:
+	//    - Feature: NVSDK_NGX_Feature_DLSS
+	//    - InColor: colorImage (VkImage handle)
+	//    - InDepth: depthImage (VkImage handle)
+	//    - InMotionVectors: motionVectorImage (VkImage handle)
+	//    - InExposureTexture: NULL (optional, for HDR)
+	//    - OutColor: vk.dlss.dlssOutputImage
+	//    - InRenderSubrectDimensions: {renderWidth, renderHeight}
+	//    - InJitterOffsetX, InJitterOffsetY: camera jitter (for TAA)
+	//    - InReset: qfalse (set to true on camera cuts)
+	//    - InSharpness: vk.dlss.sharpening
+	//    - InPreExposure: 1.0f (for HDR)
+	//    - InFrameTimeDeltaInMsec: frame time delta
+	//    - InColorSubrectBase: {0, 0}
+	//    - InDepthSubrectBase: {0, 0}
+	//    - InMVSubrectBase: {0, 0}
+	//    - InColorSubrectSize: {renderWidth, renderHeight}
+	//    - InDepthSubrectSize: {renderWidth, renderHeight}
+	//    - InMVSubrectSize: {renderWidth, renderHeight}
+	//    - InOutputSubrectBase: {0, 0}
+	//    - InOutputSubrectSize: {outputWidth, outputHeight}
 	// 2. Calling NVSDK_NGX_VULKAN_EvaluateFeature with:
-	//    - DLSS feature handle
-	//    - Command buffer
-	//    - Input color image
-	//    - Input depth image
-	//    - Input motion vectors
-	//    - Output upscaled image
-	//    - Quality mode
-	//    - Sharpening value
-	//    - Frame index
+	//    - Command buffer: cmdBuffer
+	//    - Feature handle: vk.dlss.dlssFeatureHandle
+	//    - Parameters: &evalParams
+	//    - pInOutputColor: vk.dlss.dlssOutputImageView
+	//    - pInOutputDepth: NULL (optional)
+	//    - pInOutputMotionVectors: NULL (optional)
 
 	// Suppress unused parameter warnings (parameters will be used when DLSS SDK is integrated)
 	(void)cmdBuffer;
 	(void)colorImage;
 	(void)depthImage;
 	(void)motionVectorImage;
+	(void)frameIndex;
 
 	// Placeholder: In a real implementation, this would call:
-	// NGX_VULKAN_EvaluateFeature( vk.dlss.dlssContext, &evalParams, ... );
+	// NVSDK_NGX_Result result = NVSDK_NGX_VULKAN_EvaluateFeature(
+	//     cmdBuffer,
+	//     vk.dlss.dlssFeatureHandle,
+	//     &evalParams,
+	//     vk.dlss.dlssOutputImageView,
+	//     NULL,
+	//     NULL
+	// );
+	// if ( result != NVSDK_NGX_Result_Success ) {
+	//     ri.Printf( PRINT_WARNING, "DLSS: EvaluateFeature failed with error %d\n", result );
+	// }
 
-	ri.Printf( PRINT_DEVELOPER, "DLSS: Evaluate called (frame %u, render: %ux%u -> output: %ux%u)\n",
-		frameIndex, vk.dlss.renderWidth, vk.dlss.renderHeight, vk.dlss.outputWidth, vk.dlss.outputHeight );
+	ri.Printf( PRINT_DEVELOPER, "DLSS: Evaluate called (frame %u, render: %ux%u -> output: %ux%u, quality: %d)\n",
+		frameIndex, vk.dlss.renderWidth, vk.dlss.renderHeight, 
+		vk.dlss.outputWidth, vk.dlss.outputHeight, vk.dlss.qualityMode );
 }
 
 #endif // USE_VULKAN

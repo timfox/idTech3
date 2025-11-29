@@ -106,9 +106,14 @@ cvar_t	*r_dlightSaturation;
 	cvar_t	*r_rt_denoise;
 	cvar_t	*r_rt_denoiseMode;
 	cvar_t	*r_rt_denoiseIterations;
+	cvar_t	*r_rt_denoiseSpatialAlpha;
+	cvar_t	*r_rt_denoiseVarianceAlpha;
 	cvar_t	*r_rt_gi;
 	cvar_t	*r_rt_giBounces;
 	cvar_t	*r_rt_giIntensity;
+	cvar_t	*r_rt_outputScale;
+	cvar_t	*r_rt_shadowRays;
+	cvar_t	*r_rt_adaptiveSampling;
 #endif
 	cvar_t	*r_postprocess_compute;
 	cvar_t	*r_postprocess_workgroup;
@@ -1634,6 +1639,22 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_rt_denoiseMode, "Denoising mode: 0=SVGF, 1=ReLAX." );
 	r_rt_denoiseIterations = ri.Cvar_Get( "r_rt_denoiseIterations", "3", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_rt_denoiseIterations, "Number of spatial filter iterations (default 3)." );
+	r_rt_denoiseSpatialAlpha = ri.Cvar_Get( "r_rt_denoiseSpatialAlpha", "0.5", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_rt_denoiseSpatialAlpha, "ReLAX spatial filter blend factor (0.0-1.0, higher = more aggressive filtering, default 0.5)." );
+	r_rt_denoiseVarianceAlpha = ri.Cvar_Get( "r_rt_denoiseVarianceAlpha", "0.5", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_rt_denoiseVarianceAlpha, "ReLAX variance blend factor (0.0-1.0, controls variance estimation, default 0.5)." );
+	r_rt_outputScale = ri.Cvar_Get( "r_rt_outputScale", "1.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_rt_outputScale, "Ray tracing output resolution scale (0.25-2.0, lower = better performance, default 1.0 = full resolution)." );
+	r_rt_shadowRays = ri.Cvar_Get( "r_rt_shadowRays", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_rt_shadowRays, "Number of shadow rays per pixel for soft shadows (1-16, higher = softer shadows but slower, default 1)." );
+	r_rt_adaptiveSampling = ri.Cvar_Get( "r_rt_adaptiveSampling", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_rt_adaptiveSampling, "Enable adaptive sampling (more samples in noisy areas, 0=disabled, 1=enabled)." );
+	r_rt_gi = ri.Cvar_Get( "r_rt_gi", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_rt_gi, "Enable multi-bounce global illumination (0=disabled, 1=enabled)." );
+	r_rt_giBounces = ri.Cvar_Get( "r_rt_giBounces", "2", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_rt_giBounces, "Maximum number of GI bounces (0-8, higher = more realistic but slower, default 2)." );
+	r_rt_giIntensity = ri.Cvar_Get( "r_rt_giIntensity", "1.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_rt_giIntensity, "Global illumination intensity multiplier (0.0-2.0, default 1.0)." );
 #endif
 	r_dlss = ri.Cvar_Get( "r_dlss", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_dlss, "Enable NVIDIA DLSS Super Resolution (requires NVIDIA RTX GPU and DLSS SDK)." );

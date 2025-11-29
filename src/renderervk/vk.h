@@ -399,6 +399,7 @@ extern PFN_vkGetImageMemoryRequirements qvkGetImageMemoryRequirements;
 extern PFN_vkMapMemory qvkMapMemory;
 extern PFN_vkUnmapMemory qvkUnmapMemory;
 extern PFN_vkUpdateDescriptorSets qvkUpdateDescriptorSets;
+extern PFN_vkGetPhysicalDeviceProperties qvkGetPhysicalDeviceProperties;
 extern PFN_vkGetPhysicalDeviceProperties2KHR qvkGetPhysicalDeviceProperties2KHR;
 extern PFN_vkGetPhysicalDeviceFeatures2KHR qvkGetPhysicalDeviceFeatures2KHR;
 
@@ -525,6 +526,7 @@ void vk_mesh_shaders_shutdown( void );
 qboolean vk_mesh_shaders_is_supported( void );
 void vk_mesh_shaders_generate_meshlets( void *vertices, uint32_t vertexCount, void *indices, uint32_t indexCount );
 void vk_mesh_shaders_draw( uint32_t meshletCount );
+void vk_mesh_shaders_create_pipeline( void );
 
 // Virtual Texturing functions
 void vk_virtual_texture_init( void );
@@ -924,11 +926,20 @@ typedef struct {
 	VkDescriptorSet rt_composite_descriptor;
 #endif
 	
+	// Compute shader post-processing pipelines
+	VkPipeline gamma_compute_pipeline;
+	VkPipeline tonemap_compute_pipeline;
+	VkPipelineLayout compute_pipeline_layout;
+	VkDescriptorSetLayout compute_descriptor_set_layout;
+	VkDescriptorSet compute_descriptor_set;
+	
 	// DLSS (NVIDIA Deep Learning Super Sampling)
 	struct {
 		qboolean supported;
 		qboolean initialized;
 		void *dlssContext; // NVSDK_NGX_VK_Context or similar (opaque pointer)
+		void *dlssFeatureHandle; // NVSDK_NGX_Handle for DLSS feature
+		void *dlssLibraryHandle; // Handle to loaded DLSS SDK library (DLL/SO)
 		VkImage dlssOutputImage; // Upscaled output image
 		VkImageView dlssOutputImageView;
 		VkDeviceMemory dlssOutputImageMemory;
@@ -950,6 +961,58 @@ typedef struct {
 		qboolean sharpeningEnabled;
 		float sharpening;
 	} dlss;
+	
+	// Mesh Shaders (VK_EXT_mesh_shader)
+	struct {
+		qboolean meshShaderSupported;
+		qboolean taskShaderSupported;
+		VkPipeline meshShaderPipeline;
+		VkPipelineLayout meshShaderPipelineLayout;
+		VkDescriptorSetLayout meshShaderDescriptorSetLayout;
+		VkDescriptorSet meshShaderDescriptorSet;
+	} mesh;
+	
+	// Virtual Texturing
+	struct {
+		VkImage vt_page_table_image;
+		VkImageView vt_page_table_view;
+		VkDeviceMemory vt_page_table_memory;
+		VkImage vt_page_cache_image;
+		VkImageView vt_page_cache_view;
+		VkDeviceMemory vt_page_cache_memory;
+		VkBuffer vt_feedback_buffer;
+		VkDeviceMemory vt_feedback_memory;
+		VkPipeline vt_update_pipeline;
+		VkPipelineLayout vt_update_pipeline_layout;
+		VkDescriptorSetLayout vt_update_descriptor_set_layout;
+		VkDescriptorSet vt_update_descriptor_set;
+	} vt;
+	
+	// Advanced Material Features
+	struct {
+		qboolean clearcoatEnabled;
+		qboolean anisotropyEnabled;
+		qboolean sheenEnabled;
+		qboolean sssEnabled;
+		qboolean materialLODEnabled;
+	} materials;
+	
+	// GPU Particle Systems
+	struct {
+		VkBuffer particleBuffer;
+		VkDeviceMemory particleMemory;
+		uint32_t particleCount;
+		uint32_t particleMax;
+		VkPipeline particleComputePipeline;
+		VkPipelineLayout particleComputePipelineLayout;
+		VkDescriptorSetLayout particleComputeDescriptorSetLayout;
+		VkDescriptorSet particleComputeDescriptorSet;
+		VkPipeline particleRenderPipeline;
+		VkPipelineLayout particleRenderPipelineLayout;
+		VkDescriptorSetLayout particleRenderDescriptorSetLayout;
+		VkDescriptorSet particleRenderDescriptorSet;
+	} particles;
+	
 #ifdef VK_PBR_BRDFLUT
 	VkPipeline brdflut_pipeline;
 #endif
@@ -1129,6 +1192,7 @@ typedef struct {
 		VkImageView denoiseHistoryBufferView;
 		VkDeviceMemory denoiseHistoryBufferMemory;
 		VkPipeline denoiseComputePipeline; // ReLAX compute pipeline
+		VkPipelineLayout denoisePipelineLayout; // Pipeline layout for denoising
 		VkDescriptorSetLayout denoiseDescriptorSetLayout;
 		VkDescriptorSet denoiseDescriptorSet;
 		

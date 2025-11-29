@@ -1,0 +1,19 @@
+QUICK REFERENCE: How to See UI Changes
+
+1. Open game console (~ key)
+2. Type: /vm_ui
+   - Should show: vm_ui = 0
+   - If not 0, type: /set vm_ui 0
+3. Type: /fs_game
+   - Should show: fs_game = mymod
+   - If not mymod, type: /set fs_game mymod
+4. COMPLETELY EXIT the game (not just minimize)
+5. Restart the game
+6. Load mymod
+7. Go to: System Setup → Graphics
+8. You should see all new rendering options!
+
+If still not working:
+- Type: /vid_restart (reloads UI)
+- Check console for errors
+- Verify: mymod/vm/uix86_64.so exists and is recent

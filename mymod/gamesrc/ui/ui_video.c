@@ -59,6 +59,9 @@ typedef struct
 	char			stringbuff[1024];
 	char*			strings[64];
 	int				numstrings;
+	int				scrollOffset;
+	int				maxScrollOffset;
+	qboolean		needsScrollbar;
 } driverinfo_t;
 
 static driverinfo_t	s_driverinfo;
@@ -83,6 +86,40 @@ static void DriverInfo_Event( void* ptr, int event )
 
 /*
 =================
+DriverInfo_MenuKey
+=================
+*/
+static sfxHandle_t DriverInfo_MenuKey( int key )
+{
+	int scrollAmount = SMALLCHAR_HEIGHT * 2;
+	
+	// Handle mouse wheel scrolling
+	if (key == K_MWHEELUP)
+	{
+		if (s_driverinfo.scrollOffset > 0)
+		{
+			s_driverinfo.scrollOffset -= scrollAmount;
+			if (s_driverinfo.scrollOffset < 0)
+				s_driverinfo.scrollOffset = 0;
+			return menu_null_sound;
+		}
+	}
+	else if (key == K_MWHEELDOWN)
+	{
+		if (s_driverinfo.scrollOffset < s_driverinfo.maxScrollOffset)
+		{
+			s_driverinfo.scrollOffset += scrollAmount;
+			if (s_driverinfo.scrollOffset > s_driverinfo.maxScrollOffset)
+				s_driverinfo.scrollOffset = s_driverinfo.maxScrollOffset;
+			return menu_null_sound;
+		}
+	}
+	
+	return Menu_DefaultKey( &s_driverinfo.menu, key );
+}
+
+/*
+=================
 DriverInfo_MenuDraw
 =================
 */
@@ -90,6 +127,16 @@ static void DriverInfo_MenuDraw( void )
 {
 	int	i;
 	int	y;
+	int	startY;
+	int	endY;
+	int	totalHeight;
+	int	visibleHeight;
+	int	scrollbarX;
+	int	scrollbarY;
+	int	scrollbarHeight;
+	int	thumbY;
+	int	thumbHeight;
+	float	scrollRatio;
 
 	Menu_Draw( &s_driverinfo.menu );
 
@@ -102,16 +149,67 @@ static void DriverInfo_MenuDraw( void )
 	UI_DrawString( 320, 112+16, uis.glconfig.renderer_string, UI_CENTER|UI_SMALLFONT, text_color_normal );
 	UI_DrawString( 320, 152+16, va ("color(%d-bits) Z(%d-bits) stencil(%d-bits)", uis.glconfig.colorBits, uis.glconfig.depthBits, uis.glconfig.stencilBits), UI_CENTER|UI_SMALLFONT, text_color_normal );
 
-	// double column
-	y = 192+16;
+	// Calculate scrollable area
+	startY = 192 + 16;  // Start of extensions list
+	endY = 480 - 64;    // End before back button
+	visibleHeight = endY - startY;
+	
+	// Calculate total height needed for all extension strings
+	totalHeight = (s_driverinfo.numstrings + 1) / 2 * SMALLCHAR_HEIGHT;
+	if (s_driverinfo.numstrings & 1)
+		totalHeight += SMALLCHAR_HEIGHT;
+	
+	// Calculate max scroll offset
+	s_driverinfo.maxScrollOffset = totalHeight - visibleHeight;
+	if (s_driverinfo.maxScrollOffset < 0)
+		s_driverinfo.maxScrollOffset = 0;
+	
+	// Clamp scroll offset
+	if (s_driverinfo.scrollOffset > s_driverinfo.maxScrollOffset)
+		s_driverinfo.scrollOffset = s_driverinfo.maxScrollOffset;
+	
+	// Determine if scrollbar is needed
+	s_driverinfo.needsScrollbar = (s_driverinfo.maxScrollOffset > 0);
+	
+	// Draw extensions with scroll offset
+	y = startY - s_driverinfo.scrollOffset;
 	for (i=0; i<s_driverinfo.numstrings/2; i++) {
-		UI_DrawString( 320-4, y, s_driverinfo.strings[i*2], UI_RIGHT|UI_SMALLFONT, text_color_normal );
-		UI_DrawString( 320+4, y, s_driverinfo.strings[i*2+1], UI_LEFT|UI_SMALLFONT, text_color_normal );
+		// Only draw if visible
+		if (y + SMALLCHAR_HEIGHT >= startY && y <= endY) {
+			UI_DrawString( 320-4, y, s_driverinfo.strings[i*2], UI_RIGHT|UI_SMALLFONT, text_color_normal );
+			UI_DrawString( 320+4, y, s_driverinfo.strings[i*2+1], UI_LEFT|UI_SMALLFONT, text_color_normal );
+		}
 		y += SMALLCHAR_HEIGHT;
 	}
 
-	if (s_driverinfo.numstrings & 1)
-		UI_DrawString( 320, y, s_driverinfo.strings[s_driverinfo.numstrings-1], UI_CENTER|UI_SMALLFONT, text_color_normal );
+	if (s_driverinfo.numstrings & 1) {
+		if (y + SMALLCHAR_HEIGHT >= startY && y <= endY) {
+			UI_DrawString( 320, y, s_driverinfo.strings[s_driverinfo.numstrings-1], UI_CENTER|UI_SMALLFONT, text_color_normal );
+		}
+	}
+	
+	// Draw scrollbar if needed
+	if (s_driverinfo.needsScrollbar) {
+		vec4_t scrollbarTrackColor = {0.3f, 0.3f, 0.3f, 0.8f};
+		vec4_t scrollbarThumbColor = {0.7f, 0.7f, 0.7f, 1.0f};
+		
+		scrollbarX = 620;  // Right side of screen
+		scrollbarY = startY;
+		scrollbarHeight = visibleHeight;
+		
+		// Draw scrollbar track
+		UI_FillRect( scrollbarX, scrollbarY, 2, scrollbarHeight, scrollbarTrackColor );
+		
+		// Calculate thumb position and size
+		scrollRatio = (float)s_driverinfo.scrollOffset / (float)s_driverinfo.maxScrollOffset;
+		thumbHeight = (int)((float)scrollbarHeight * (float)visibleHeight / (float)totalHeight);
+		if (thumbHeight < 8)
+			thumbHeight = 8;
+		thumbY = scrollbarY + (int)(scrollRatio * (scrollbarHeight - thumbHeight));
+		
+		// Draw scrollbar thumb
+		UI_FillRect( scrollbarX, thumbY, 2, thumbHeight, scrollbarThumbColor );
+	}
 }
 
 /*
@@ -150,6 +248,10 @@ static void UI_DriverInfo_Menu( void )
 
 	s_driverinfo.menu.fullscreen = qtrue;
 	s_driverinfo.menu.draw       = DriverInfo_MenuDraw;
+	s_driverinfo.menu.key        = DriverInfo_MenuKey;
+	s_driverinfo.scrollOffset    = 0;
+	s_driverinfo.maxScrollOffset = 0;
+	s_driverinfo.needsScrollbar  = qfalse;
 
 	s_driverinfo.banner.generic.type  = MTYPE_BTEXT;
 	s_driverinfo.banner.generic.x	  = 320;
@@ -335,6 +437,11 @@ typedef struct {
 
 	menubitmap_s	apply;
 	menubitmap_s	back;
+	
+	// Scrolling support
+	int				scrollOffset;
+	int				maxScrollOffset;
+	qboolean		needsScrollbar;
 } graphicsoptions_t;
 
 typedef struct
@@ -929,15 +1036,188 @@ static void GraphicsOptions_TQEvent( [[maybe_unused]] void *ptr, int event ) {
 
 /*
 ================
+GraphicsOptions_MenuKey
+================
+*/
+static sfxHandle_t GraphicsOptions_MenuKey( int key )
+{
+	int itemHeight = BIGCHAR_HEIGHT + 1;
+	int scrollAmount = itemHeight * 2;
+	
+	// Handle mouse wheel scrolling
+	if (key == K_MWHEELUP)
+	{
+		if (s_graphicsoptions.scrollOffset > 0)
+		{
+			s_graphicsoptions.scrollOffset -= scrollAmount;
+			if (s_graphicsoptions.scrollOffset < 0)
+				s_graphicsoptions.scrollOffset = 0;
+			return menu_null_sound;
+		}
+	}
+	else if (key == K_MWHEELDOWN)
+	{
+		if (s_graphicsoptions.scrollOffset < s_graphicsoptions.maxScrollOffset)
+		{
+			s_graphicsoptions.scrollOffset += scrollAmount;
+			if (s_graphicsoptions.scrollOffset > s_graphicsoptions.maxScrollOffset)
+				s_graphicsoptions.scrollOffset = s_graphicsoptions.maxScrollOffset;
+			return menu_null_sound;
+		}
+	}
+	
+	// Let default menu handler process other keys
+	return Menu_DefaultKey( &s_graphicsoptions.menu, key );
+}
+
+// Store original y positions (static array to avoid using menu item fields)
+#define MAX_MENU_ITEMS 100
+static int s_originalYPositions[MAX_MENU_ITEMS];
+static qboolean s_positionsStored = qfalse;
+
+/*
+================
+GraphicsOptions_StoreOriginalPositions
+================
+*/
+static void GraphicsOptions_StoreOriginalPositions( void )
+{
+	int i;
+	menucommon_s *item;
+	
+	if (s_positionsStored)
+		return;
+	
+	for (i = 0; i < s_graphicsoptions.menu.nitems && i < MAX_MENU_ITEMS; i++)
+	{
+		item = (menucommon_s*)s_graphicsoptions.menu.items[i];
+		s_originalYPositions[i] = item->y;
+	}
+	s_positionsStored = qtrue;
+}
+
+/*
+================
+GraphicsOptions_ApplyScrollOffset
+================
+*/
+static void GraphicsOptions_ApplyScrollOffset( void )
+{
+	int i;
+	menucommon_s *item;
+	int minY = 114;  // Starting y position
+	int originalY;
+	
+	// Apply scroll offset to menu items (positions should already be stored)
+	for (i = 0; i < s_graphicsoptions.menu.nitems && i < MAX_MENU_ITEMS; i++)
+	{
+		item = (menucommon_s*)s_graphicsoptions.menu.items[i];
+		
+		// Skip banner, frames, and buttons (they don't scroll)
+		if (item->type == MTYPE_BTEXT || 
+		    item == (menucommon_s*)&s_graphicsoptions.back ||
+		    item == (menucommon_s*)&s_graphicsoptions.apply ||
+		    item == (menucommon_s*)&s_graphicsoptions.framel ||
+		    item == (menucommon_s*)&s_graphicsoptions.framer ||
+		    item == (menucommon_s*)&s_graphicsoptions.graphics ||
+		    item == (menucommon_s*)&s_graphicsoptions.display ||
+		    item == (menucommon_s*)&s_graphicsoptions.sound ||
+		    item == (menucommon_s*)&s_graphicsoptions.network)
+			continue;
+		
+		// Apply scroll offset
+		originalY = s_originalYPositions[i];
+		if (originalY >= minY)
+		{
+			item->y = originalY - s_graphicsoptions.scrollOffset;
+			item->top = item->y;
+			item->bottom = item->y + BIGCHAR_HEIGHT;
+		}
+	}
+}
+
+/*
+================
 GraphicsOptions_MenuDraw
 ================
 */
 void GraphicsOptions_MenuDraw (void)
 {
-//APSFIX - rework this
+	int i;
+	menucommon_s *item;
+	int minY = 114;
+	int maxY = 480 - 64;
+	int visibleHeight = maxY - minY;
+	int totalHeight = 0;
+	int lastItemY = 0;
+	int scrollbarX = 620;
+	int scrollbarY = minY;
+	int scrollbarHeight = visibleHeight;
+	int thumbHeight;
+	int thumbY;
+	float scrollRatio;
+	vec4_t scrollbarTrackColor = {0.3f, 0.3f, 0.3f, 0.8f};
+	vec4_t scrollbarThumbColor = {0.7f, 0.7f, 0.7f, 1.0f};
+	
 	GraphicsOptions_UpdateMenuItems();
-
+	
+	// Store original positions first (before applying scroll offset)
+	GraphicsOptions_StoreOriginalPositions();
+	
+	// Calculate total menu height and max scroll offset using original positions
+	for (i = 0; i < s_graphicsoptions.menu.nitems && i < MAX_MENU_ITEMS; i++)
+	{
+		item = (menucommon_s*)s_graphicsoptions.menu.items[i];
+		if (item->flags & QMF_HIDDEN)
+			continue;
+		if (item->type == MTYPE_BTEXT || item->type == MTYPE_BITMAP)
+			continue;
+		if (item == (menucommon_s*)&s_graphicsoptions.back ||
+		    item == (menucommon_s*)&s_graphicsoptions.apply ||
+		    item == (menucommon_s*)&s_graphicsoptions.framel ||
+		    item == (menucommon_s*)&s_graphicsoptions.framer ||
+		    item == (menucommon_s*)&s_graphicsoptions.graphics ||
+		    item == (menucommon_s*)&s_graphicsoptions.display ||
+		    item == (menucommon_s*)&s_graphicsoptions.sound ||
+		    item == (menucommon_s*)&s_graphicsoptions.network)
+			continue;
+		// Use stored original position
+		if (s_originalYPositions[i] > lastItemY && s_originalYPositions[i] >= minY)
+			lastItemY = s_originalYPositions[i];
+	}
+	
+	totalHeight = lastItemY - minY + BIGCHAR_HEIGHT + 1;
+	s_graphicsoptions.maxScrollOffset = totalHeight > visibleHeight ? totalHeight - visibleHeight : 0;
+	s_graphicsoptions.needsScrollbar = (s_graphicsoptions.maxScrollOffset > 0);
+	
+	// Clamp scroll offset
+	if (s_graphicsoptions.scrollOffset > s_graphicsoptions.maxScrollOffset)
+		s_graphicsoptions.scrollOffset = s_graphicsoptions.maxScrollOffset;
+	if (s_graphicsoptions.scrollOffset < 0)
+		s_graphicsoptions.scrollOffset = 0;
+	
+	// Apply scroll offset to menu items
+	GraphicsOptions_ApplyScrollOffset();
+	
+	// Draw menu
 	Menu_Draw( &s_graphicsoptions.menu );
+	
+	// Draw scrollbar if needed
+	if (s_graphicsoptions.needsScrollbar && s_graphicsoptions.maxScrollOffset > 0 && totalHeight > visibleHeight)
+	{
+		// Draw scrollbar track
+		UI_FillRect(scrollbarX, scrollbarY, 4, scrollbarHeight, scrollbarTrackColor);
+		
+		// Calculate thumb size and position
+		scrollRatio = (float)s_graphicsoptions.scrollOffset / (float)s_graphicsoptions.maxScrollOffset;
+		thumbHeight = (int)((float)scrollbarHeight * ((float)visibleHeight / (float)totalHeight));
+		if (thumbHeight < 8) thumbHeight = 8;
+		if (thumbHeight > scrollbarHeight) thumbHeight = scrollbarHeight;
+		thumbY = scrollbarY + (int)((scrollbarHeight - thumbHeight) * scrollRatio);
+		
+		// Draw scrollbar thumb
+		UI_FillRect(scrollbarX, thumbY, 4, thumbHeight, scrollbarThumbColor);
+	}
 }
 
 /*
@@ -1186,6 +1466,11 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.menu.wrapAround = qtrue;
 	s_graphicsoptions.menu.fullscreen = qtrue;
 	s_graphicsoptions.menu.draw       = GraphicsOptions_MenuDraw;
+	s_graphicsoptions.menu.key        = GraphicsOptions_MenuKey;
+	s_graphicsoptions.scrollOffset    = 0;
+	s_graphicsoptions.maxScrollOffset = 0;
+	s_graphicsoptions.needsScrollbar = qfalse;
+	s_positionsStored = qfalse;  // Reset position storage
 
 	s_graphicsoptions.banner.generic.type  = MTYPE_BTEXT;
 	s_graphicsoptions.banner.generic.x	   = 320;
@@ -1737,6 +2022,11 @@ UI_GraphicsOptionsMenu
 */
 void UI_GraphicsOptionsMenu( void ) {
 	GraphicsOptions_MenuInit();
+	// Reset scroll state when menu is opened
+	s_graphicsoptions.scrollOffset = 0;
+	s_graphicsoptions.maxScrollOffset = 0;
+	s_graphicsoptions.needsScrollbar = qfalse;
+	s_positionsStored = qfalse;
 	UI_PushMenu( &s_graphicsoptions.menu );
 	Menu_SetCursorToItem( &s_graphicsoptions.menu, &s_graphicsoptions.graphics );
 }
