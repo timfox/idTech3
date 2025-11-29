@@ -49,10 +49,10 @@ GAME_OBJS := $(GAME_SRCS:.c=.o)
 CGAME_OBJS := $(CGAME_SRCS:.c=.o)
 UI_OBJS := $(UI_SRCS:.c=.o)
 
-# Output files (must match engine naming: namearch.so for ui, name.arch.so for others)
+# Output files (must match engine naming: name.arch.so format)
 GAME_LIB := $(OUTDIR)/game.$(ARCH_SUFFIX).so
 CGAME_LIB := $(OUTDIR)/cgame.$(ARCH_SUFFIX).so
-UI_LIB := $(OUTDIR)/ui$(ARCH_SUFFIX).so
+UI_LIB := $(OUTDIR)/ui.$(ARCH_SUFFIX).so
 
 .PHONY: all clean game cgame ui
 
@@ -66,7 +66,7 @@ ui: $(UI_LIB)
 
 $(GAME_LIB): $(GAME_OBJS)
 	@mkdir -p $(OUTDIR)
-	$(CC) $(LDFLAGS) -o $@ $^
+	$(CC) $(LDFLAGS) -Wl,-soname,game.$(ARCH_SUFFIX).so -o $@ $^
 	@echo "Built: $@"
 
 $(CGAME_LIB): $(CGAME_OBJS)
@@ -76,8 +76,10 @@ $(CGAME_LIB): $(CGAME_OBJS)
 
 $(UI_LIB): $(UI_OBJS) $(GAME_LIB)
 	@mkdir -p $(OUTDIR)
-	$(CC) $(LDFLAGS) -L$(OUTDIR) -Wl,-rpath,'$$ORIGIN:$$ORIGIN/..' -o $@ $(UI_OBJS) $(GAME_LIB)
+	$(CC) $(LDFLAGS) -Wl,-rpath,'$$ORIGIN' -o $@ $(UI_OBJS) -Wl,--as-needed $(GAME_LIB)
 	@echo "Built: $@"
+	@echo "Note: If ui.x86_64.so fails to load due to '../vm/game.x86_64.so' dependency,"
+	@echo "      install patchelf and run: patchelf --replace-needed ../vm/game.$(ARCH_SUFFIX).so game.$(ARCH_SUFFIX).so $(UI_LIB)"
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@

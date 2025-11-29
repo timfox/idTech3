@@ -176,15 +176,15 @@ static void DriverInfo_MenuDraw( void )
 	for (i=0; i<s_driverinfo.numstrings/2; i++) {
 		// Only draw if visible
 		if (y + SMALLCHAR_HEIGHT >= startY && y <= endY) {
-			UI_DrawString( 320-4, y, s_driverinfo.strings[i*2], UI_RIGHT|UI_SMALLFONT, text_color_normal );
-			UI_DrawString( 320+4, y, s_driverinfo.strings[i*2+1], UI_LEFT|UI_SMALLFONT, text_color_normal );
+		UI_DrawString( 320-4, y, s_driverinfo.strings[i*2], UI_RIGHT|UI_SMALLFONT, text_color_normal );
+		UI_DrawString( 320+4, y, s_driverinfo.strings[i*2+1], UI_LEFT|UI_SMALLFONT, text_color_normal );
 		}
 		y += SMALLCHAR_HEIGHT;
 	}
 
 	if (s_driverinfo.numstrings & 1) {
 		if (y + SMALLCHAR_HEIGHT >= startY && y <= endY) {
-			UI_DrawString( 320, y, s_driverinfo.strings[s_driverinfo.numstrings-1], UI_CENTER|UI_SMALLFONT, text_color_normal );
+		UI_DrawString( 320, y, s_driverinfo.strings[s_driverinfo.numstrings-1], UI_CENTER|UI_SMALLFONT, text_color_normal );
 		}
 	}
 	
@@ -1160,7 +1160,7 @@ void GraphicsOptions_MenuDraw (void)
 	vec4_t scrollbarThumbColor = {0.7f, 0.7f, 0.7f, 1.0f};
 	
 	GraphicsOptions_UpdateMenuItems();
-	
+
 	// Store original positions first (before applying scroll offset)
 	GraphicsOptions_StoreOriginalPositions();
 	

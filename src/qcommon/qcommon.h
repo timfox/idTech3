@@ -803,7 +803,7 @@ typedef enum {
 
 #define FS_MAX_SUBDIRS		8 /* should be enough for practical use with FS_MATCH_SUBDIRS */
 
-#define	MAX_FILE_HANDLES	64
+#define	MAX_FILE_HANDLES	256		// Increased from 64 for better concurrency (C23 improvement)
 #define	FS_INVALID_HANDLE	0
 
 #define	MAX_FOUND_FILES		0x5000

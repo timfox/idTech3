@@ -79,18 +79,18 @@ cvar_t	*r_dlightIntensity;
 #endif
 cvar_t	*r_dlightSaturation;
 #ifdef USE_VULKAN
-	cvar_t	*r_device;
+cvar_t	*r_device;
 #ifdef USE_VBO
-	cvar_t	*r_vbo;
+cvar_t	*r_vbo;
 #endif
 #ifdef USE_VK_PBR
-	cvar_t	*r_pbr;
-	cvar_t  *r_baseNormalX;
-	cvar_t  *r_baseNormalY;
-	cvar_t  *r_baseParallax;
-	cvar_t  *r_baseSpecular;
+cvar_t	*r_pbr;
+cvar_t  *r_baseNormalX;
+cvar_t  *r_baseNormalY;
+cvar_t  *r_baseParallax;
+cvar_t  *r_baseSpecular;
 #ifdef VK_CUBEMAP
-	cvar_t	*r_cubeMapping;
+cvar_t	*r_cubeMapping;
 #endif
 #endif
 #ifdef USE_VULKAN_RAY_TRACING
@@ -132,8 +132,8 @@ cvar_t	*r_dlightSaturation;
 	cvar_t	*r_dlss;
 	cvar_t	*r_dlss_quality;
 	cvar_t	*r_dlss_sharpening;
-	cvar_t	*r_fbo;
-	cvar_t	*r_hdr;
+cvar_t	*r_fbo;
+cvar_t	*r_hdr;
 cvar_t	*r_bloom;
 cvar_t	*r_bloom_threshold;
 cvar_t	*r_bloom_intensity;

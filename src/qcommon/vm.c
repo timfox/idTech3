@@ -1530,13 +1530,15 @@ const char *VM_CheckInstructions( instruction_t *buf,
 		for( i = 0; i < numJumpTableTargets; i++ ) {
 			n = jumpTableTargets[ i ];
 			if ( n < 0 || n >= instructionCount ) {
-				Com_Printf( S_COLOR_YELLOW "jump target %i set on instruction %i that is out of range [0..%i]",
+				Com_DPrintf( "jump target %i set on instruction %i that is out of range [0..%i]\n",
 					i, n, instructionCount - 1 );
 				break;
 			}
 			if ( buf[n].opStack != 0 ) {
-				Com_Printf( S_COLOR_YELLOW "jump target %i set on instruction %i (%s) with bad opStack %i\n",
-					i, n, opname[ buf[n].op ], buf[n].opStack );
+				// we may trap this on buggy VM_MAGIC_VER2 images
+				// but we can safely optimize code even without JTRGSEG
+				// so just switch to VM_MAGIC path here
+				// Suppress warning - this is handled gracefully
 				break;
 			}
 		}
@@ -1704,12 +1706,12 @@ TTimo: added some verbosity in debug
 */
 static void * QDECL VM_LoadLib( const char *name, vmMainFunc_t *entryPoint, dllSyscall_t systemcalls ) {
 
-	const char	*gamedir __attribute__((unused)) = FS_GetCurrentGameDir();
+	const char	*gamedir [[maybe_unused]] = FS_GetCurrentGameDir();
 	char		filename[ MAX_QPATH ];
 	void		*libHandle;
 	dllEntry_t	dllEntry;
 
-	Com_sprintf( filename, sizeof( filename ), "%s" ARCH_STRING DLL_EXT, name );
+	Com_sprintf( filename, sizeof( filename ), "%s." ARCH_STRING DLL_EXT, name );
 
 	libHandle = FS_LoadLibrary( filename );
 

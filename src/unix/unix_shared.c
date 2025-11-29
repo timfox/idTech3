@@ -481,7 +481,15 @@ void *Sys_LoadLibrary( const char *name )
 		Com_Error( ERR_FATAL, "Sys_LoadLibrary: Unable to load library with '%s' extension", ext );
 	}
 
-	handle = dlopen( name, RTLD_NOW );
+	// Use RTLD_LAZY for game modules (ui, cgame, game) to allow trap_ functions
+	// to be resolved via dllEntry callback rather than at load time
+	// RTLD_NOW is used for other libraries that need immediate symbol resolution
+	int flags = RTLD_NOW;
+	if ( strstr( name, "ui" ) || strstr( name, "cgame" ) || strstr( name, "game" ) ) {
+		flags = RTLD_LAZY | RTLD_LOCAL;
+	}
+	
+	handle = dlopen( name, flags );
 	if ( !handle )
 	{
 		const char *err = dlerror();

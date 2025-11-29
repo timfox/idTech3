@@ -88,7 +88,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 #endif
 
-#ifdef __GNUC__
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L
+// C23 standard attribute
+#define UNUSED_VAR [[maybe_unused]]
+#elif defined(__GNUC__) || defined(__clang__)
+// GCC/Clang extension fallback
 #define UNUSED_VAR __attribute__((unused))
 #else
 #define UNUSED_VAR

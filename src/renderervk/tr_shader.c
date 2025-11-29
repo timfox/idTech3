@@ -1341,7 +1341,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 
 #ifdef USE_VK_PBR
 	if ( vk.pbrActive && ( physicalAlbedo || stage->physicalMapType != PHYS_NONE ) ) {
-		uint32_t j __attribute__((unused));
+		uint32_t j [[maybe_unused]];
 		imgFlags_t flags = IMGFLAG_NOLIGHTSCALE;
 
 		if (!shader.noMipMaps)

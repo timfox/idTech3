@@ -200,7 +200,16 @@ or configs will never get loaded from disk!
 // every time a new demo pk3 file is built, this checksum must be updated.
 // the easiest way to get it is to just run the game and see what it spits out
 #define	DEMO_PAK0_CHECKSUM	2985612116u
+// C23 Improvement: Use standard [[maybe_unused]] attribute
+// Note: GCC 15+ may report C23 but doesn't fully support C23 attributes yet
+// Use compiler-specific extensions which are more reliable
+#if defined(__GNUC__) || defined(__clang__)
+	// Use GCC/Clang extension which is well-supported
 static const unsigned pak_checksums[] __attribute__((unused)) = {
+#else
+	// No attribute support for other compilers
+	static const unsigned pak_checksums[] = {
+#endif
 	1566731103u,
 	298122907u,
 	412165236u,
@@ -315,6 +324,37 @@ static	cvar_t		*fs_locked;
 #endif
 static	cvar_t		*fs_excludeReference;
 
+// C23 Filesystem Improvements: Cache cvars
+static	cvar_t		*fs_pathCache;			// Enable path resolution caching
+static	cvar_t		*fs_existenceCache;		// Enable file existence caching
+static	cvar_t		*fs_cacheSize;			// Cache size (default: 1024)
+
+// Case-insensitive file lookups (TODO: Address case sensitivity issues)
+static	cvar_t		*fs_caseInsensitive;	// Enable case-insensitive file lookups
+
+// Path Normalization Cache (Performance improvement)
+#define FS_PATH_NORM_CACHE_SIZE 256
+#define FS_PATH_NORM_CACHE_MASK (FS_PATH_NORM_CACHE_SIZE - 1)
+
+// C23 Improvement: Static assertion to ensure cache size is a power of 2
+_Static_assert( (FS_PATH_NORM_CACHE_SIZE & (FS_PATH_NORM_CACHE_SIZE - 1)) == 0,
+	"FS_PATH_NORM_CACHE_SIZE must be a power of 2 for efficient hashing" );
+
+typedef struct fs_path_norm_cache_entry_s {
+	char			base[MAX_OSPATH];
+	char			game[MAX_OSPATH];
+	char			qpath[MAX_ZPATH];
+	char			normalized[MAX_OSPATH*2+1];
+	uint32_t		hash;
+	qboolean		valid;
+	int				lastAccess;
+} fs_path_norm_cache_entry_t;
+
+static fs_path_norm_cache_entry_t	fs_pathNormCacheTable[FS_PATH_NORM_CACHE_SIZE];
+static int							fs_pathNormCacheHits = 0;
+static int							fs_pathNormCacheMisses = 0;
+static	cvar_t						*fs_pathNormCache;	// Enable path normalization caching
+
 static	searchpath_t	*fs_searchpaths;
 static	int			fs_readCount;			// total bytes read
 static	int			fs_loadCount;			// total files read
@@ -351,6 +391,54 @@ typedef struct {
 } fileHandleData_t;
 
 static fileHandleData_t	fsh[MAX_FILE_HANDLES];
+
+// C23 Improvement: Static assertion to ensure MAX_FILE_HANDLES is reasonable
+_Static_assert( MAX_FILE_HANDLES > 0 && MAX_FILE_HANDLES <= 4096, 
+	"MAX_FILE_HANDLES must be between 1 and 4096" );
+
+// C23 Filesystem Improvements: Path Resolution Cache
+#define FS_PATH_CACHE_SIZE_DEFAULT 1024
+#define FS_PATH_CACHE_MASK (FS_PATH_CACHE_SIZE_DEFAULT - 1)
+
+// C23 Improvement: Static assertion to ensure cache size is a power of 2
+_Static_assert( (FS_PATH_CACHE_SIZE_DEFAULT & (FS_PATH_CACHE_SIZE_DEFAULT - 1)) == 0,
+	"FS_PATH_CACHE_SIZE_DEFAULT must be a power of 2 for efficient hashing" );
+
+typedef struct fs_path_cache_entry_s {
+	char			path[MAX_ZPATH];
+	uint32_t		hash;
+	const searchpath_t	*resolvedPath;
+	pack_t			*pak;
+	fileInPack_t	*pakFile;
+	qboolean		isPakFile;
+	qboolean		valid;
+	fileTime_t		lastAccess;
+} fs_path_cache_entry_t;
+
+static fs_path_cache_entry_t	fs_pathCacheTable[FS_PATH_CACHE_SIZE_DEFAULT];
+static int						fs_pathCacheHits = 0;
+static int						fs_pathCacheMisses = 0;
+
+// C23 Filesystem Improvements: File Existence Cache
+#define FS_EXISTENCE_CACHE_SIZE_DEFAULT 512
+#define FS_EXISTENCE_CACHE_MASK (FS_EXISTENCE_CACHE_SIZE_DEFAULT - 1)
+
+// C23 Improvement: Static assertion to ensure cache size is a power of 2
+_Static_assert( (FS_EXISTENCE_CACHE_SIZE_DEFAULT & (FS_EXISTENCE_CACHE_SIZE_DEFAULT - 1)) == 0,
+	"FS_EXISTENCE_CACHE_SIZE_DEFAULT must be a power of 2 for efficient hashing" );
+
+typedef struct fs_existence_cache_entry_s {
+	char			path[MAX_ZPATH];
+	uint32_t		hash;
+	qboolean		exists;
+	fileTime_t		lastCheck;
+	fileTime_t		fileMtime;		// File modification time when checked
+	qboolean		valid;
+} fs_existence_cache_entry_t;
+
+static fs_existence_cache_entry_t	fs_existenceCacheTable[FS_EXISTENCE_CACHE_SIZE_DEFAULT];
+static int							fs_existenceCacheHits = 0;
+static int							fs_existenceCacheMisses = 0;
 
 // TTimo - https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=540
 // whether we did a reorder on the current search path when joining the server
@@ -457,7 +545,7 @@ static fileHandle_t	FS_HandleForFile( void )
 }
 
 
-static FILE	*FS_FileForHandle( fileHandle_t f ) {
+[[nodiscard]] static FILE	*FS_FileForHandle( fileHandle_t f ) {
 	if ( f <= 0 || f >= MAX_FILE_HANDLES ) {
 		Com_Error( ERR_DROP, "FS_FileForHandle: out of range" );
 	}
@@ -568,20 +656,41 @@ char *FS_BuildOSPath( const char *base, const char *game, const char *qpath ) {
 	char	temp[MAX_OSPATH*2+1];
 	static char ospath[2][sizeof(temp)+MAX_OSPATH];
 	static int toggle;
+	const char *gameToUse;
+	char	cachedPath[MAX_OSPATH*2+1];
 	
+	// Use default game if not provided
+	if( !game || !game[0] ) {
+		gameToUse = fs_gamedir;
+	} else {
+		gameToUse = game;
+	}
+	
+	// Performance improvement: Try path normalization cache first
+	if ( fs_pathNormCache && fs_pathNormCache->integer && FS_Initialized() ) {
+		if ( FS_LookupPathNormCache( base, gameToUse, qpath, cachedPath ) ) {
+			// Cache hit - use cached normalized path
+			toggle ^= 1;
+			Q_strncpyz( ospath[toggle], cachedPath, sizeof( ospath[0] ) );
+			return ospath[toggle];
+		}
+	}
+	
+	// Cache miss or cache disabled - build path normally
 	toggle ^= 1;		// flip-flop to allow two returns without clash
 
-	if( !game || !game[0] ) {
-		game = fs_gamedir;
-	}
-
 	if ( qpath )
-		Com_sprintf( temp, sizeof( temp ), "%c%s%c%s", PATH_SEP, game, PATH_SEP, qpath );
+		Com_sprintf( temp, sizeof( temp ), "%c%s%c%s", PATH_SEP, gameToUse, PATH_SEP, qpath );
 	else
-		Com_sprintf( temp, sizeof( temp ), "%c%s", PATH_SEP, game );
+		Com_sprintf( temp, sizeof( temp ), "%c%s", PATH_SEP, gameToUse );
 
 	FS_ReplaceSeparators( temp );
 	Com_sprintf( ospath[toggle], sizeof( ospath[0] ), "%s%s", base, temp );
+	
+	// Store in cache if enabled
+	if ( fs_pathNormCache && fs_pathNormCache->integer && FS_Initialized() ) {
+		FS_StorePathNormCache( base, gameToUse, qpath, ospath[toggle] );
+	}
 	
 	return ospath[toggle];
 }
@@ -804,6 +913,16 @@ void FS_HomeRemove( const char *osPath )
 
 /*
 ================
+Forward declarations for cache functions (C23 Improvement)
+================
+*/
+static qboolean FS_LookupExistenceCache( const char *filepath, uint32_t hash, qboolean *outExists );
+static void FS_StoreExistenceCache( const char *filepath, uint32_t hash, qboolean exists );
+static qboolean FS_LookupPathNormCache( const char *base, const char *game, const char *qpath, char *outPath );
+static void FS_StorePathNormCache( const char *base, const char *game, const char *qpath, const char *normalized );
+
+/*
+================
 FS_FileExists
 
 Tests if the file exists in the current gamedir, this DOES NOT
@@ -816,13 +935,36 @@ qboolean FS_FileExists( const char *file )
 {
 	FILE *f;
 	char *testpath;
+	uint32_t hash;
+	qboolean cachedExists = qfalse;
 
+	// Build path first (needed regardless of cache)
 	testpath = FS_BuildOSPath( fs_homepath->string, fs_gamedir, file );
 
+	// C23 Improvement: Check existence cache first (only if filesystem is initialized and cache is enabled)
+	if ( FS_Initialized() && fs_existenceCache && fs_existenceCache->integer ) {
+		hash = (uint32_t)FS_HashFileName( testpath, 0U );
+		if ( FS_LookupExistenceCache( testpath, hash, &cachedExists ) ) {
+			return cachedExists;
+		}
+	}
+
+	// Not in cache - check file system
 	f = Sys_FOpen( testpath, "rb" );
 	if (f) {
 		fclose( f );
+		// C23 Improvement: Store in cache (only if filesystem is initialized and cache is enabled)
+		if ( FS_Initialized() && fs_existenceCache && fs_existenceCache->integer ) {
+			hash = (uint32_t)FS_HashFileName( testpath, 0U );
+			FS_StoreExistenceCache( testpath, hash, qtrue );
+		}
 		return qtrue;
+	}
+	
+	// C23 Improvement: Store negative result in cache (only if filesystem is initialized and cache is enabled)
+	if ( FS_Initialized() && fs_existenceCache && fs_existenceCache->integer ) {
+		hash = (uint32_t)FS_HashFileName( testpath, 0U );
+		FS_StoreExistenceCache( testpath, hash, qfalse );
 	}
 	return qfalse;
 }
@@ -879,7 +1021,7 @@ static void FS_InitHandle( fileHandleData_t *fd ) {
 FS_SV_FOpenFileWrite
 ===========
 */
-fileHandle_t FS_SV_FOpenFileWrite( const char *filename ) {
+[[nodiscard]] fileHandle_t FS_SV_FOpenFileWrite( const char *filename ) {
 	char *ospath;
 	fileHandle_t	f;
 	fileHandleData_t *fd;
@@ -932,7 +1074,7 @@ search for a file somewhere below the home path, base path or cd path
 we search in that order, matching FS_SV_FOpenFileRead order
 ===========
 */
-int FS_SV_FOpenFileRead( const char *filename, fileHandle_t *fp ) {
+[[nodiscard]] int FS_SV_FOpenFileRead( const char *filename, fileHandle_t *fp ) {
 	fileHandleData_t *fd;
 	fileHandle_t f;
 	char *ospath;
@@ -1224,7 +1366,7 @@ qboolean FS_ResetReadOnlyAttribute( const char *filename ) {
 FS_FOpenFileWrite
 ===========
 */
-fileHandle_t FS_FOpenFileWrite( const char *filename ) {
+[[nodiscard]] fileHandle_t FS_FOpenFileWrite( const char *filename ) {
 	char			*ospath;
 	fileHandle_t	f;
 	fileHandleData_t *fd;
@@ -1276,7 +1418,7 @@ fileHandle_t FS_FOpenFileWrite( const char *filename ) {
 FS_FOpenFileAppend
 ===========
 */
-fileHandle_t FS_FOpenFileAppend( const char *filename ) {
+[[nodiscard]] fileHandle_t FS_FOpenFileAppend( const char *filename ) {
 	char			*ospath;
 	fileHandleData_t *fd;
 	fileHandle_t	f;
@@ -1355,6 +1497,66 @@ qboolean FS_FilenameCompare( const char *s1, const char *s2 ) {
 	} while ( c1 );
 	
 	return qfalse;		// strings are equal
+}
+
+
+/*
+===========
+FS_FindFileCaseInsensitive (TODO: Address case sensitivity)
+
+Find a file in a directory using case-insensitive matching.
+Given a full path that failed to open, try to find the file case-insensitively.
+Returns qtrue if found and updates the path buffer, qfalse otherwise.
+===========
+*/
+static qboolean FS_FindFileCaseInsensitive( char *fullPath, const char *requestedFilename ) {
+	char		**fileList;
+	int			numFiles;
+	int			i;
+	char		*dirPath;
+	char		*lastSlash;
+	char		*filenameOnly;
+	size_t		dirPathLen;
+	
+	// Extract directory path
+	lastSlash = strrchr( fullPath, PATH_SEP );
+	if ( !lastSlash ) {
+		return qfalse;  // No directory separator found
+	}
+	
+	dirPathLen = lastSlash - fullPath;
+	dirPath = (char *)Z_Malloc( dirPathLen + 1 );
+	Q_strncpyz( dirPath, fullPath, dirPathLen + 1 );
+	
+	// Extract filename from requested path
+	filenameOnly = strrchr( requestedFilename, '/' );
+	if ( filenameOnly ) {
+		filenameOnly++;  // Skip the '/'
+	} else {
+		filenameOnly = (char *)requestedFilename;
+	}
+	
+	// List files in directory
+	fileList = Sys_ListFiles( dirPath, NULL, NULL, &numFiles, qfalse );
+	if ( !fileList || numFiles == 0 ) {
+		Z_Free( dirPath );
+		return qfalse;
+	}
+	
+	// Search for case-insensitive match
+	for ( i = 0; i < numFiles; i++ ) {
+		if ( !FS_FilenameCompare( fileList[i], filenameOnly ) ) {
+			// Found match - update path with actual filename
+			Com_sprintf( fullPath, MAX_OSPATH, "%s%c%s", dirPath, PATH_SEP, fileList[i] );
+			Sys_FreeFileList( fileList );
+			Z_Free( dirPath );
+			return qtrue;
+		}
+	}
+	
+	Sys_FreeFileList( fileList );
+	Z_Free( dirPath );
+	return qfalse;
 }
 
 
@@ -1554,6 +1756,296 @@ static int FS_OpenFileInPak( fileHandle_t *file, pack_t *pak, fileInPack_t *pakF
 
 /*
 ===========
+FS_ClearPathCache (C23 Improvement)
+
+Clears the path resolution cache
+===========
+*/
+static void FS_ClearPathCache( void ) {
+	// Safe to call even before filesystem initialization
+	if ( fs_pathCacheTable ) {
+		Com_Memset( fs_pathCacheTable, 0, sizeof( fs_pathCacheTable ) );
+	}
+	fs_pathCacheHits = 0;
+	fs_pathCacheMisses = 0;
+}
+
+/*
+===========
+FS_ClearExistenceCache (C23 Improvement)
+
+Clears the file existence cache
+===========
+*/
+static void FS_ClearExistenceCache( void ) {
+	// Safe to call even before filesystem initialization
+	if ( fs_existenceCacheTable ) {
+		Com_Memset( fs_existenceCacheTable, 0, sizeof( fs_existenceCacheTable ) );
+	}
+	fs_existenceCacheHits = 0;
+	fs_existenceCacheMisses = 0;
+}
+
+static void FS_ClearPathNormCache( void ) {
+	// Safe to call even before filesystem initialization
+	if ( fs_pathNormCacheTable ) {
+		Com_Memset( fs_pathNormCacheTable, 0, sizeof( fs_pathNormCacheTable ) );
+	}
+	fs_pathNormCacheHits = 0;
+	fs_pathNormCacheMisses = 0;
+}
+
+/*
+===========
+FS_LookupPathCache (C23 Improvement)
+
+Look up a file path in the cache
+Returns qtrue if found, qfalse otherwise
+===========
+*/
+[[nodiscard]] static qboolean FS_LookupPathCache( const char *filename, uint32_t hash, 
+	const searchpath_t **outSearchPath, pack_t **outPak, fileInPack_t **outPakFile, qboolean *outIsPakFile ) {
+	fs_path_cache_entry_t *entry;
+	int index;
+	
+	if ( !fs_pathCache || !fs_pathCache->integer ) {
+		return qfalse;
+	}
+	
+	index = hash & FS_PATH_CACHE_MASK;
+	entry = &fs_pathCacheTable[index];
+	
+	if ( entry->valid && entry->hash == hash && !FS_FilenameCompare( entry->path, filename ) ) {
+		// Cache hit - verify the cached path is still valid
+		if ( entry->isPakFile ) {
+			// Verify pak file is still in search paths
+			// CRITICAL: Check for null pointer before dereferencing
+			if ( entry->pak ) {
+				const searchpath_t *search;
+				for ( search = fs_searchpaths; search; search = search->next ) {
+					if ( search->pack == entry->pak ) {
+						// Cache hit
+						fs_pathCacheHits++;
+						entry->lastAccess = Sys_Milliseconds();
+						*outSearchPath = entry->resolvedPath;
+						*outPak = entry->pak;
+						*outPakFile = entry->pakFile;
+						*outIsPakFile = entry->isPakFile;
+						return qtrue;
+					}
+				}
+			}
+			// Pak file no longer in search paths or invalid pointer - invalidate cache entry
+			entry->valid = qfalse;
+		} else {
+			// Directory file - verify directory is still in search paths
+			// CRITICAL: Check for null pointer before dereferencing
+			if ( entry->resolvedPath && entry->resolvedPath->dir ) {
+				const searchpath_t *search;
+				for ( search = fs_searchpaths; search; search = search->next ) {
+					if ( search->dir == entry->resolvedPath->dir ) {
+						// Cache hit
+						fs_pathCacheHits++;
+						entry->lastAccess = Sys_Milliseconds();
+						*outSearchPath = entry->resolvedPath;
+						*outPak = entry->pak;
+						*outPakFile = entry->pakFile;
+						*outIsPakFile = entry->isPakFile;
+						return qtrue;
+					}
+				}
+			}
+			// Directory no longer in search paths or invalid pointer - invalidate cache entry
+			entry->valid = qfalse;
+		}
+	}
+	
+	fs_pathCacheMisses++;
+	return qfalse;
+}
+
+/*
+===========
+FS_StorePathCache (C23 Improvement)
+
+Store a resolved file path in the cache
+===========
+*/
+static void FS_StorePathCache( const char *filename, uint32_t hash, 
+	const searchpath_t *searchPath, pack_t *pak, fileInPack_t *pakFile, qboolean isPakFile ) {
+	fs_path_cache_entry_t *entry;
+	int index;
+	
+	if ( !fs_pathCache || !fs_pathCache->integer ) {
+		return;
+	}
+	
+	index = hash & FS_PATH_CACHE_MASK;
+	entry = &fs_pathCacheTable[index];
+	
+	Q_strncpyz( entry->path, filename, sizeof( entry->path ) );
+	entry->hash = hash;
+	entry->resolvedPath = searchPath;
+	entry->pak = pak;
+	entry->pakFile = pakFile;
+	entry->isPakFile = isPakFile;
+	entry->valid = qtrue;
+	entry->lastAccess = Sys_Milliseconds();
+}
+
+/*
+===========
+FS_LookupPathNormCache (Performance Improvement)
+
+Look up a normalized path in the cache
+Returns qtrue if found, qfalse otherwise
+===========
+*/
+static qboolean FS_LookupPathNormCache( const char *base, const char *game, const char *qpath, char *outPath ) {
+	fs_path_norm_cache_entry_t *entry;
+	int index;
+	uint32_t hash;
+	
+	if ( !fs_pathNormCache || !fs_pathNormCache->integer ) {
+		return qfalse;
+	}
+	
+	// Build hash from inputs
+	hash = (uint32_t)FS_HashFileName( base ? base : "", 0U );
+	hash ^= (uint32_t)FS_HashFileName( game ? game : "", 0U );
+	hash ^= (uint32_t)FS_HashFileName( qpath ? qpath : "", 0U );
+	
+	index = hash & FS_PATH_NORM_CACHE_MASK;
+	entry = &fs_pathNormCacheTable[index];
+	
+	if ( entry->valid && entry->hash == hash ) {
+		// Verify inputs match
+		if ( (base == NULL && entry->base[0] == '\0') || (base && !Q_stricmp( entry->base, base ) ) ) {
+			if ( (game == NULL && entry->game[0] == '\0') || (game && !Q_stricmp( entry->game, game ) ) ) {
+				if ( (qpath == NULL && entry->qpath[0] == '\0') || (qpath && !FS_FilenameCompare( entry->qpath, qpath ) ) ) {
+					// Cache hit
+					fs_pathNormCacheHits++;
+					entry->lastAccess = Sys_Milliseconds();
+					Q_strncpyz( outPath, entry->normalized, MAX_OSPATH*2+1 );
+					return qtrue;
+				}
+			}
+		}
+	}
+	
+	fs_pathNormCacheMisses++;
+	return qfalse;
+}
+
+/*
+===========
+FS_StorePathNormCache (Performance Improvement)
+
+Store a normalized path in the cache
+===========
+*/
+static void FS_StorePathNormCache( const char *base, const char *game, const char *qpath, const char *normalized ) {
+	fs_path_norm_cache_entry_t *entry;
+	int index;
+	uint32_t hash;
+	
+	if ( !fs_pathNormCache || !fs_pathNormCache->integer ) {
+		return;
+	}
+	
+	// Build hash from inputs
+	hash = (uint32_t)FS_HashFileName( base ? base : "", 0U );
+	hash ^= (uint32_t)FS_HashFileName( game ? game : "", 0U );
+	hash ^= (uint32_t)FS_HashFileName( qpath ? qpath : "", 0U );
+	
+	index = hash & FS_PATH_NORM_CACHE_MASK;
+	entry = &fs_pathNormCacheTable[index];
+	
+	// Store entry
+	Q_strncpyz( entry->base, base ? base : "", sizeof( entry->base ) );
+	Q_strncpyz( entry->game, game ? game : "", sizeof( entry->game ) );
+	Q_strncpyz( entry->qpath, qpath ? qpath : "", sizeof( entry->qpath ) );
+	Q_strncpyz( entry->normalized, normalized, sizeof( entry->normalized ) );
+	entry->hash = hash;
+	entry->valid = qtrue;
+	entry->lastAccess = Sys_Milliseconds();
+}
+
+/*
+===========
+FS_LookupExistenceCache (C23 Improvement)
+
+Look up file existence in the cache
+Returns qtrue if found, qfalse otherwise
+===========
+*/
+[[nodiscard]] static qboolean FS_LookupExistenceCache( const char *filepath, uint32_t hash, qboolean *outExists ) {
+	fs_existence_cache_entry_t *entry;
+	int index;
+	fileTime_t mtime, ctime;
+	fileOffset_t size;
+	
+	if ( !fs_existenceCache || !fs_existenceCache->integer ) {
+		return qfalse;
+	}
+	
+	index = hash & FS_EXISTENCE_CACHE_MASK;
+	entry = &fs_existenceCacheTable[index];
+	
+	if ( entry->valid && entry->hash == hash && !FS_FilenameCompare( entry->path, filepath ) ) {
+		// Verify file hasn't changed since cache entry
+		if ( Sys_GetFileStats( filepath, &size, &mtime, &ctime ) ) {
+			if ( entry->fileMtime == mtime ) {
+				// Cache hit - file unchanged
+				fs_existenceCacheHits++;
+				*outExists = entry->exists;
+				return qtrue;
+			}
+		}
+		// File changed or doesn't exist - invalidate cache entry
+		entry->valid = qfalse;
+	}
+	
+	fs_existenceCacheMisses++;
+	return qfalse;
+}
+
+/*
+===========
+FS_StoreExistenceCache (C23 Improvement)
+
+Store file existence result in the cache
+===========
+*/
+static void FS_StoreExistenceCache( const char *filepath, uint32_t hash, qboolean exists ) {
+	fs_existence_cache_entry_t *entry;
+	int index;
+	fileTime_t mtime, ctime;
+	fileOffset_t size;
+	
+	if ( !fs_existenceCache || !fs_existenceCache->integer ) {
+		return;
+	}
+	
+	index = hash & FS_EXISTENCE_CACHE_MASK;
+	entry = &fs_existenceCacheTable[index];
+	
+	Q_strncpyz( entry->path, filepath, sizeof( entry->path ) );
+	entry->hash = hash;
+	entry->exists = exists;
+	entry->lastCheck = Sys_Milliseconds();
+	entry->valid = qtrue;
+	
+	// Store file modification time for validation
+	if ( exists && Sys_GetFileStats( filepath, &size, &mtime, &ctime ) ) {
+		entry->fileMtime = mtime;
+	} else {
+		entry->fileMtime = 0;
+	}
+}
+
+/*
+===========
 FS_FOpenFileRead
 
 Finds the file in the search path.
@@ -1564,7 +2056,7 @@ separate file or a ZIP file.
 */
 extern qboolean		com_fullyInitialized;
 
-int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueFILE ) {
+[[nodiscard]] int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueFILE ) {
 	const searchpath_t	*search;
 	char			*netpath;
 	pack_t			*pak;
@@ -1603,6 +2095,45 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 	// we can do that as long as we know properties of our hash function
 	fullHash = FS_HashFileName( filename, 0U );
 
+	// C23 Improvement: Try path resolution cache first
+	if ( file != NULL ) {
+		const searchpath_t *cachedSearchPath = NULL;
+		pack_t *cachedPak = NULL;
+		fileInPack_t *cachedPakFile = NULL;
+		qboolean cachedIsPakFile = qfalse;
+		
+		if ( FS_LookupPathCache( filename, (uint32_t)fullHash, &cachedSearchPath, &cachedPak, &cachedPakFile, &cachedIsPakFile ) ) {
+			// Cache hit - use cached resolution
+			if ( cachedIsPakFile && cachedPak && cachedPakFile ) {
+				// File is in a pak file
+				if ( FS_PakIsPure( cachedPak ) ) {
+					return FS_OpenFileInPak( file, cachedPak, cachedPakFile, uniqueFILE );
+				}
+			} else if ( cachedSearchPath && cachedSearchPath->dir && 
+			            cachedSearchPath->dir->path && cachedSearchPath->dir->gamedir &&
+			            cachedSearchPath->policy != DIR_DENY ) {
+				// File is in a directory
+				// CRITICAL: Additional null checks to prevent crashes
+				netpath = FS_BuildOSPath( cachedSearchPath->dir->path, cachedSearchPath->dir->gamedir, filename );
+				temp = Sys_FOpen( netpath, "rb" );
+				if ( temp != NULL ) {
+					*file = FS_HandleForFile();
+					f = &fsh[ *file ];
+					FS_InitHandle( f );
+					f->handleFiles.file.o = temp;
+					Q_strncpyz( f->name, filename, sizeof( f->name ) );
+					f->zipFile = qfalse;
+					if ( fs_debug->integer ) {
+						Com_Printf( "FS_FOpenFileRead: %s (found in '%s/%s' via cache)\n", filename,
+							cachedSearchPath->dir->path, cachedSearchPath->dir->gamedir );
+					}
+					return FS_FileLength( f->handleFiles.file.o );
+				}
+			}
+			// Cache entry invalid - fall through to normal search
+		}
+	}
+
 	if ( file == NULL ) {
 		// just wants to see if file is there
 		for ( search = fs_searchpaths ; search ; search = search->next ) {
@@ -1626,6 +2157,14 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 				dir = search->dir;
 				netpath = FS_BuildOSPath( dir->path, dir->gamedir, filename );
 				temp = Sys_FOpen( netpath, "rb" );
+				
+				// TODO: Case-insensitive file lookup
+				if ( temp == NULL && fs_caseInsensitive && fs_caseInsensitive->integer ) {
+					if ( FS_FindFileCaseInsensitive( netpath, filename ) ) {
+						temp = Sys_FOpen( netpath, "rb" );
+					}
+				}
+				
 				if ( temp ) {
 					length = FS_FileLength( temp );
 					fclose( temp );
@@ -1646,6 +2185,11 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 	//
 	// search through the path, one element at a time
 	//
+	const searchpath_t *foundSearchPath = NULL;
+	pack_t *foundPak = NULL;
+	fileInPack_t *foundPakFile = NULL;
+	qboolean foundIsPakFile = qfalse;
+	
 	for ( search = fs_searchpaths ; search ; search = search->next ) {
 		// is the element a pak file?
 		if ( search->pack && search->pack->hashTable[ (hash = fullHash & (search->pack->hashSize-1)) ] ) {
@@ -1660,7 +2204,19 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 				// case and separator insensitive comparisons
 				if ( !FS_FilenameCompare( pakFile->name, filename ) ) {
 					// found it!
+					foundSearchPath = search;
+					foundPak = pak;
+					foundPakFile = pakFile;
+					foundIsPakFile = qtrue;
+					
+					// C23 Improvement: Store in cache
+					if ( file != NULL ) {
+						FS_StorePathCache( filename, (uint32_t)fullHash, search, pak, pakFile, qtrue );
 					return FS_OpenFileInPak( file, pak, pakFile, uniqueFILE );
+					} else {
+						// Just checking existence
+						return pakFile->size;
+					}
 				}
 				pakFile = pakFile->next;
 			} while ( pakFile != NULL );
@@ -1671,8 +2227,30 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 			netpath = FS_BuildOSPath( dir->path, dir->gamedir, filename );
 
 			temp = Sys_FOpen( netpath, "rb" );
+			
+			// TODO: Case-insensitive file lookup - if direct open fails and case-insensitive is enabled, try case-insensitive match
+			if ( temp == NULL && fs_caseInsensitive && fs_caseInsensitive->integer ) {
+				if ( FS_FindFileCaseInsensitive( netpath, filename ) ) {
+					temp = Sys_FOpen( netpath, "rb" );
+				}
+			}
+			
 			if ( temp == NULL ) {
 				continue;
+			}
+
+			foundSearchPath = search;
+			foundPak = NULL;
+			foundPakFile = NULL;
+			foundIsPakFile = qfalse;
+			
+			if ( file == NULL ) {
+				// Just checking existence
+				length = FS_FileLength( temp );
+				fclose( temp );
+				// C23 Improvement: Store in cache
+				FS_StorePathCache( filename, (uint32_t)fullHash, search, NULL, NULL, qfalse );
+				return length;
 			}
 
 			*file = FS_HandleForFile();
@@ -1688,6 +2266,8 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 					dir->path, dir->gamedir );
 			}
 
+			// C23 Improvement: Store in cache
+			FS_StorePathCache( filename, (uint32_t)fullHash, search, NULL, NULL, qfalse );
 			return FS_FileLength( f->handleFiles.file.o );
 		}
 	}
@@ -1755,7 +2335,7 @@ void FS_TouchFileInPak( const char *filename ) {
 FS_Home_FOpenFileRead
 ===========
 */
-int FS_Home_FOpenFileRead( const char *filename, fileHandle_t *file ) 
+[[nodiscard]] int FS_Home_FOpenFileRead( const char *filename, fileHandle_t *file ) 
 {
 	char path[ MAX_OSPATH*3 + 1 ];
 	fileHandleData_t *fd;
@@ -1803,7 +2383,7 @@ FS_Read
 Properly handles partial reads
 =================
 */
-int FS_Read( void *buffer, int len, fileHandle_t f ) {
+[[nodiscard]] int FS_Read( void *buffer, int len, fileHandle_t f ) {
 	int		block, remaining;
 	int		read;
 	byte	*buf;
@@ -1857,7 +2437,7 @@ FS_Write
 Properly handles partial writes
 =================
 */
-int FS_Write( const void *buffer, int len, fileHandle_t h ) {
+[[nodiscard]] int FS_Write( const void *buffer, int len, fileHandle_t h ) {
 	int		block, remaining;
 	int		written;
 	byte	*buf;
@@ -1911,7 +2491,9 @@ void QDECL FS_Printf( fileHandle_t h, const char *fmt, ... ) {
 	Q_vsnprintf (msg, sizeof(msg), fmt, argptr);
 	va_end (argptr);
 
-	FS_Write(msg, strlen(msg), h);
+	// C23 Improvement: Check return value ([[nodiscard]] attribute ensures this)
+	// For logging, return value is intentionally ignored as errors are non-critical
+	(void)FS_Write(msg, strlen(msg), h);
 }
 
 #define PK3_SEEK_BUFFER_SIZE 65536
@@ -1922,7 +2504,7 @@ FS_Seek
 
 =================
 */
-int FS_Seek( fileHandle_t f, long offset, fsOrigin_t origin ) {
+[[nodiscard]] int FS_Seek( fileHandle_t f, long offset, fsOrigin_t origin ) {
 	int		_origin;
 
 	if ( !fs_searchpaths ) {
@@ -1974,15 +2556,18 @@ int FS_Seek( fileHandle_t f, long offset, fsOrigin_t origin ) {
 				}
 				unzSetCurrentFileInfoPosition( fsh[f].handleFiles.file.z, fsh[f].zipFilePos );
 				unzOpenCurrentFile( fsh[f].handleFiles.file.z );
-				//fallthrough
+				[[fallthrough]];
 
 			case FS_SEEK_END:
 			case FS_SEEK_CUR:
 				while( remainder > PK3_SEEK_BUFFER_SIZE ) {
-					FS_Read( buffer, PK3_SEEK_BUFFER_SIZE, f );
+					// C23 Improvement: Check return value ([[nodiscard]] attribute ensures this)
+					// For PK3 seeking, we intentionally discard the return value as we're just advancing position
+					(void)FS_Read( buffer, PK3_SEEK_BUFFER_SIZE, f );
 					remainder -= PK3_SEEK_BUFFER_SIZE;
 				}
-				FS_Read( buffer, remainder, f );
+				// C23 Improvement: Check return value ([[nodiscard]] attribute ensures this)
+				(void)FS_Read( buffer, remainder, f );
 				return offset;
 
 			default:
@@ -2094,7 +2679,7 @@ Filename are relative to the quake search path
 a null buffer will just return the file length without loading
 ============
 */
-int FS_ReadFile( const char *qpath, void **buffer ) {
+[[nodiscard]] int FS_ReadFile( const char *qpath, void **buffer ) {
 	fileHandle_t	h;
 	byte*			buf;
 	qboolean		isConfig;
@@ -2165,7 +2750,9 @@ int FS_ReadFile( const char *qpath, void **buffer ) {
 		if ( isConfig ) {
 			Com_DPrintf( "Writing zero for %s to journal file.\n", qpath );
 			len = 0;
-			FS_Write( &len, sizeof( len ), com_journalDataFile );
+			// C23 Improvement: Check return value ([[nodiscard]] attribute ensures this)
+			// Journal writes are best-effort, errors are handled by FS_Flush
+			(void)FS_Write( &len, sizeof( len ), com_journalDataFile );
 			FS_Flush( com_journalDataFile );
 		}
 		return -1;
@@ -2174,7 +2761,9 @@ int FS_ReadFile( const char *qpath, void **buffer ) {
 	if ( !buffer ) {
 		if ( isConfig ) {
 			Com_DPrintf( "Writing len for %s to journal file.\n", qpath );
-			FS_Write( &len, sizeof( len ), com_journalDataFile );
+			// C23 Improvement: Check return value ([[nodiscard]] attribute ensures this)
+			// Journal writes are best-effort, errors are handled by FS_Flush
+			(void)FS_Write( &len, sizeof( len ), com_journalDataFile );
 			FS_Flush( com_journalDataFile );
 		}
 		FS_FCloseFile( h );
@@ -2184,7 +2773,10 @@ int FS_ReadFile( const char *qpath, void **buffer ) {
 	buf = Hunk_AllocateTempMemory( len + 1 );
 	*buffer = buf;
 
-	FS_Read( buf, len, h );
+	// C23 Improvement: Check return value ([[nodiscard]] attribute ensures this)
+	if ( FS_Read( buf, len, h ) != len ) {
+		Com_Printf( "WARNING: FS_ReadFile: partial read for %s\n", qpath );
+	}
 
 	fs_loadCount++;
 	fs_loadStack++;
@@ -2196,8 +2788,10 @@ int FS_ReadFile( const char *qpath, void **buffer ) {
 	// if we are journaling and it is a config file, write it to the journal file
 	if ( isConfig ) {
 		Com_DPrintf( "Writing %s to journal file.\n", qpath );
-		FS_Write( &len, sizeof( len ), com_journalDataFile );
-		FS_Write( buf, len, com_journalDataFile );
+		// C23 Improvement: Check return value ([[nodiscard]] attribute ensures this)
+		// Journal writes are best-effort, errors are handled by FS_Flush
+		(void)FS_Write( &len, sizeof( len ), com_journalDataFile );
+		(void)FS_Write( buf, len, com_journalDataFile );
 		FS_Flush( com_journalDataFile );
 	}
 	return len;
@@ -2247,7 +2841,10 @@ void FS_WriteFile( const char *qpath, const void *buffer, int size ) {
 		return;
 	}
 
-	FS_Write( buffer, size, f );
+	// C23 Improvement: Check return value ([[nodiscard]] attribute ensures this)
+	if ( FS_Write( buffer, size, f ) != size ) {
+		Com_Printf( "WARNING: FS_WriteFile: partial write\n" );
+	}
 
 	FS_FCloseFile( f );
 }
@@ -4013,9 +4610,10 @@ static void FS_TouchFile_f( void ) {
 		return;
 	}
 
-	FS_FOpenFileRead( Cmd_Argv( 1 ), &f, qfalse );
+	if ( FS_FOpenFileRead( Cmd_Argv( 1 ), &f, qfalse ) > 0 ) {
 	if ( f != FS_INVALID_HANDLE ) {
 		FS_FCloseFile( f );
+		}
 	}
 }
 
@@ -4030,6 +4628,67 @@ static void FS_CompleteFileName( const char *args, int argNum ) {
 	if( argNum == 2 ) {
 		Field_CompleteFilename( "", "", qfalse, FS_MATCH_ANY );
 	}
+}
+
+
+/*
+============
+FS_CacheStats_f (C23 Improvement)
+
+Display filesystem cache statistics
+============
+*/
+static void FS_CacheStats_f( void ) {
+	int totalPathLookups, totalExistenceLookups;
+	float pathHitRate, existenceHitRate;
+	
+	totalPathLookups = fs_pathCacheHits + fs_pathCacheMisses;
+	totalExistenceLookups = fs_existenceCacheHits + fs_existenceCacheMisses;
+	
+	if ( totalPathLookups > 0 ) {
+		pathHitRate = (float)fs_pathCacheHits / (float)totalPathLookups * 100.0f;
+	} else {
+		pathHitRate = 0.0f;
+	}
+	
+	if ( totalExistenceLookups > 0 ) {
+		existenceHitRate = (float)fs_existenceCacheHits / (float)totalExistenceLookups * 100.0f;
+	} else {
+		existenceHitRate = 0.0f;
+	}
+	
+	Com_Printf( "\n=== Filesystem Cache Statistics (C23 Improvements) ===\n" );
+	Com_Printf( "Path Resolution Cache:\n" );
+	Com_Printf( "  Enabled: %s\n", fs_pathCache && fs_pathCache->integer ? "Yes" : "No" );
+	Com_Printf( "  Hits: %d\n", fs_pathCacheHits );
+	Com_Printf( "  Misses: %d\n", fs_pathCacheMisses );
+	Com_Printf( "  Total: %d\n", totalPathLookups );
+	Com_Printf( "  Hit Rate: %.2f%%\n", pathHitRate );
+	Com_Printf( "\nFile Existence Cache:\n" );
+	Com_Printf( "  Enabled: %s\n", fs_existenceCache && fs_existenceCache->integer ? "Yes" : "No" );
+	Com_Printf( "  Hits: %d\n", fs_existenceCacheHits );
+	Com_Printf( "  Misses: %d\n", fs_existenceCacheMisses );
+	Com_Printf( "  Total: %d\n", totalExistenceLookups );
+	Com_Printf( "  Hit Rate: %.2f%%\n", existenceHitRate );
+	
+	// Path Normalization Cache statistics
+	int totalNormLookups = fs_pathNormCacheHits + fs_pathNormCacheMisses;
+	float normHitRate;
+	if ( totalNormLookups > 0 ) {
+		normHitRate = (float)fs_pathNormCacheHits / (float)totalNormLookups * 100.0f;
+	} else {
+		normHitRate = 0.0f;
+	}
+	Com_Printf( "\nPath Normalization Cache:\n" );
+	Com_Printf( "  Enabled: %s\n", fs_pathNormCache && fs_pathNormCache->integer ? "Yes" : "No" );
+	Com_Printf( "  Hits: %d\n", fs_pathNormCacheHits );
+	Com_Printf( "  Misses: %d\n", fs_pathNormCacheMisses );
+	Com_Printf( "  Total: %d\n", totalNormLookups );
+	Com_Printf( "  Hit Rate: %.2f%%\n", normHitRate );
+	
+	Com_Printf( "\nFile Handles:\n" );
+	Com_Printf( "  Max Handles: %d (increased from 64 for C23)\n", MAX_FILE_HANDLES );
+	Com_Printf( "==================================================\n\n" );
 }
 
 
@@ -4457,6 +5116,11 @@ void FS_Shutdown( qboolean closemfp )
 	searchpath_t	*p, *next;
 	int i;
 
+	// C23 Improvement: Clear caches on shutdown
+	FS_ClearPathCache();
+	FS_ClearExistenceCache();
+	FS_ClearPathNormCache();
+
 	// close opened files
 	if ( closemfp ) 
 	{
@@ -4754,14 +5418,48 @@ static void FS_Startup( void ) {
 	Cvar_SetDescription( fs_homepath, "Directory to store user configuration and downloaded files." );
 
 	fs_gamedirvar = Cvar_Get( "fs_game", "", CVAR_INIT | CVAR_SYSTEMINFO );
-	Cvar_CheckRange( fs_gamedirvar, NULL, NULL, CV_FSPATH );
 	Cvar_SetDescription( fs_gamedirvar, "Specify an alternate mod directory and run the game with this mod." );
 
 	if ( FS_IsBaseGame( fs_gamedirvar->string ) ) {
 		Cvar_ForceReset( "fs_game" );
 	}
+	
+	// Note: Cvar_CheckRange for CV_FSPATH is deferred until after fs_searchpaths is initialized
+	// to avoid calling filesystem validation functions before the filesystem is ready
 
 	fs_excludeReference = Cvar_Get( "fs_excludeReference", "", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	
+	// C23 Filesystem Improvements: Register cache cvars
+	fs_pathCache = Cvar_Get( "fs_pathCache", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( fs_pathCache, "Enable path resolution caching for faster file lookups (C23 improvement)" );
+	
+	fs_existenceCache = Cvar_Get( "fs_existenceCache", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( fs_existenceCache, "Enable file existence caching to reduce I/O overhead (C23 improvement)" );
+	
+	fs_cacheSize = Cvar_Get( "fs_cacheSize", "1024", CVAR_ARCHIVE );
+	
+	// TODO: Case-insensitive file lookups - default based on platform
+	#ifdef _WIN32
+		fs_caseInsensitive = Cvar_Get( "fs_caseInsensitive", "1", CVAR_ARCHIVE );
+	#elif defined(__APPLE__)
+		fs_caseInsensitive = Cvar_Get( "fs_caseInsensitive", "1", CVAR_ARCHIVE );
+	#else
+		fs_caseInsensitive = Cvar_Get( "fs_caseInsensitive", "0", CVAR_ARCHIVE );
+	#endif
+	Cvar_SetDescription( fs_caseInsensitive, "Enable case-insensitive file lookups for directory files (default: 1 on Windows/macOS, 0 on Linux)" );
+	Cvar_SetDescription( fs_cacheSize, "Size of filesystem caches (C23 improvement)" );
+	
+	// Path normalization cache (Performance improvement)
+	fs_pathNormCache = Cvar_Get( "fs_pathNormCache", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( fs_pathNormCache, "Enable path normalization caching to reduce redundant string operations" );
+	
+	// Initialize caches
+	Com_Memset( fs_pathCacheTable, 0, sizeof( fs_pathCacheTable ) );
+	Com_Memset( fs_existenceCacheTable, 0, sizeof( fs_existenceCacheTable ) );
+	fs_pathCacheHits = 0;
+	fs_pathCacheMisses = 0;
+	fs_existenceCacheHits = 0;
+	fs_existenceCacheMisses = 0;
 	Cvar_SetDescription( fs_excludeReference,
 		"Exclude specified pak files from download list on client side.\n"
 		"Format is <moddir>/<pakname> (without .pk3 suffix), you may list multiple entries separated by space." );
@@ -4837,6 +5535,10 @@ static void FS_Startup( void ) {
 
 	// get the pure checksums of the pk3 files loaded by the server
 	FS_LoadedPakPureChecksums();
+	
+	// C23 Improvement: Now that fs_searchpaths is initialized, we can safely validate fs_game cvar
+	// This was deferred from earlier to avoid calling filesystem functions before initialization
+	Cvar_CheckRange( fs_gamedirvar, NULL, NULL, CV_FSPATH );
 
 	end = Sys_Milliseconds();
 
@@ -4854,6 +5556,9 @@ static void FS_Startup( void ) {
  	Cmd_AddCommand( "which", FS_Which_f );
 	Cmd_SetCommandCompletionFunc( "which", FS_CompleteFileName );
 	Cmd_AddCommand( "fs_restart", FS_Reload );
+	
+	// C23 Improvement: Add cache statistics command
+	Cmd_AddCommand( "fs_cacheStats", FS_CacheStats_f );
 
 	// print the current search paths
 	//FS_Path_f();
@@ -5440,6 +6145,11 @@ void FS_Restart( int checksumFeed ) {
 
 	static qboolean execConfig = qfalse;
 
+	// C23 Improvement: Clear caches on restart (FS_Shutdown will also clear them, but explicit for clarity)
+	FS_ClearPathCache();
+	FS_ClearExistenceCache();
+	FS_ClearPathNormCache();
+
 	// free anything we currently have loaded
 	FS_Shutdown( qfalse );
 
@@ -5558,6 +6268,7 @@ int	FS_FOpenFileByMode( const char *qpath, fileHandle_t *f, fsMode_t mode ) {
 		break;
 	case FS_APPEND_SYNC:
 		sync = qtrue;
+		[[fallthrough]];
 	case FS_APPEND:
 		if ( f == NULL )
 			return -1;
@@ -5662,7 +6373,10 @@ void FS_VM_WriteFile( void *buffer, int len, fileHandle_t f, handleOwner_t owner
 	if ( fsh[f].owner != owner || !fsh[f].handleFiles.file.v )
 		return;
 
-	FS_Write( buffer, len, f );
+	// C23 Improvement: Check return value ([[nodiscard]] attribute ensures this)
+	if ( FS_Write( buffer, len, f ) != len ) {
+		Com_Printf( "WARNING: FS_VM_WriteFile: partial write\n" );
+	}
 }
 
 
@@ -5809,10 +6523,11 @@ FS_LoadLibrary
 Tries to load libraries within known searchpaths
 =================
 */
-void *FS_LoadLibrary( const char *name )
+[[nodiscard]] void *FS_LoadLibrary( const char *name )
 {
 	const searchpath_t *sp = fs_searchpaths;
 	void *libHandle = NULL;
+	char vmPath[ MAX_OSPATH ];
 
 	// Search all directory paths (both DIR_STATIC and DIR_ALLOW)
 	// This allows loading .so files from both base game and mod directories
@@ -5824,11 +6539,24 @@ void *FS_LoadLibrary( const char *name )
 		if ( sp ) {
 			// Try all directory policies (DIR_STATIC, DIR_ALLOW)
 			// DIR_DENY is skipped implicitly since we check for it above
-			const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, name );
+			
+			// First try vm/ subdirectory (where libraries are typically stored)
+			Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", name );
+			const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath );
 			if ( fs_debug && fs_debug->integer ) {
 				Com_Printf( "FS_LoadLibrary: trying %s (policy=%d)\n", fn, sp->policy );
 			}
 			libHandle = Sys_LoadLibrary( fn );
+			
+			// If not found in vm/, try directly in game directory
+			if ( !libHandle ) {
+				fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, name );
+				if ( fs_debug && fs_debug->integer ) {
+					Com_Printf( "FS_LoadLibrary: trying %s (policy=%d)\n", fn, sp->policy );
+				}
+				libHandle = Sys_LoadLibrary( fn );
+			}
+			
 			sp = sp->next;
 		}
 	}

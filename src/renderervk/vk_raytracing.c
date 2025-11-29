@@ -480,7 +480,7 @@ void vk_rt_init( void )
 	vk.rt.blasBuffers = (VkBuffer *)ri.Malloc( sizeof( VkBuffer ) * vk.rt.blasCapacity );
 	vk.rt.blasMemory = (VkDeviceMemory *)ri.Malloc( sizeof( VkDeviceMemory ) * vk.rt.blasCapacity );
 	vk.rt.blasCount = 0;
-	
+
 	// Initialize BLAS reuse and compaction tracking
 	vk.rt.blasHashes = (uint64_t *)ri.Malloc( sizeof( uint64_t ) * vk.rt.blasCapacity );
 	vk.rt.blasCompacted = (VkAccelerationStructureKHR *)ri.Malloc( sizeof( VkAccelerationStructureKHR ) * vk.rt.blasCapacity );
