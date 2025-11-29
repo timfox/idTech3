@@ -1389,7 +1389,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.aniso.generic.x	    = 400;
 	s_graphicsoptions.aniso.generic.y	    = y;
 	s_graphicsoptions.aniso.itemnames      = aniso_names;
-	y += 2*BIGCHAR_HEIGHT;
+	y += BIGCHAR_HEIGHT+2;
 
 	// Ray Tracing Section
 	s_graphicsoptions.raytracing.generic.type     = MTYPE_SPINCONTROL;
@@ -1398,7 +1398,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.raytracing.generic.x        = 400;
 	s_graphicsoptions.raytracing.generic.y        = y;
 	s_graphicsoptions.raytracing.itemnames        = enabled_names;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	s_graphicsoptions.rt_samples.generic.type     = MTYPE_SLIDER;
 	s_graphicsoptions.rt_samples.generic.name     = "RT Samples:";
@@ -1407,7 +1407,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.rt_samples.generic.y        = y;
 	s_graphicsoptions.rt_samples.minvalue         = 1;
 	s_graphicsoptions.rt_samples.maxvalue         = 8;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	s_graphicsoptions.rt_maxdepth.generic.type    = MTYPE_SLIDER;
 	s_graphicsoptions.rt_maxdepth.generic.name     = "RT Max Depth:";
@@ -1416,7 +1416,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.rt_maxdepth.generic.y        = y;
 	s_graphicsoptions.rt_maxdepth.minvalue         = 1;
 	s_graphicsoptions.rt_maxdepth.maxvalue         = 8;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	s_graphicsoptions.rt_temporal.generic.type    = MTYPE_SPINCONTROL;
 	s_graphicsoptions.rt_temporal.generic.name   = "RT Temporal:";
@@ -1424,7 +1424,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.rt_temporal.generic.x       = 400;
 	s_graphicsoptions.rt_temporal.generic.y       = y;
 	s_graphicsoptions.rt_temporal.itemnames       = enabled_names;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	s_graphicsoptions.rt_temporalalpha.generic.type = MTYPE_SLIDER;
 	s_graphicsoptions.rt_temporalalpha.generic.name = "RT Temp Alpha:";
@@ -1433,7 +1433,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.rt_temporalalpha.generic.y     = y;
 	s_graphicsoptions.rt_temporalalpha.minvalue      = 0;
 	s_graphicsoptions.rt_temporalalpha.maxvalue      = 10;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	s_graphicsoptions.rt_denoise.generic.type      = MTYPE_SPINCONTROL;
 	s_graphicsoptions.rt_denoise.generic.name     = "RT Denoise:";
@@ -1441,7 +1441,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.rt_denoise.generic.x        = 400;
 	s_graphicsoptions.rt_denoise.generic.y        = y;
 	s_graphicsoptions.rt_denoise.itemnames        = enabled_names;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	s_graphicsoptions.rt_denoisemode.generic.type = MTYPE_SPINCONTROL;
 	s_graphicsoptions.rt_denoisemode.generic.name = "Denoise Mode:";
@@ -1449,7 +1449,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.rt_denoisemode.generic.x     = 400;
 	s_graphicsoptions.rt_denoisemode.generic.y     = y;
 	s_graphicsoptions.rt_denoisemode.itemnames     = rt_denoise_mode_names;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	s_graphicsoptions.rt_denoiseiter.generic.type  = MTYPE_SLIDER;
 	s_graphicsoptions.rt_denoiseiter.generic.name  = "Denoise Iter:";
@@ -1458,7 +1458,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.rt_denoiseiter.generic.y     = y;
 	s_graphicsoptions.rt_denoiseiter.minvalue      = 1;
 	s_graphicsoptions.rt_denoiseiter.maxvalue      = 8;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	s_graphicsoptions.rt_gi.generic.type          = MTYPE_SPINCONTROL;
 	s_graphicsoptions.rt_gi.generic.name           = "RT Global Illum:";
@@ -1466,7 +1466,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.rt_gi.generic.x              = 400;
 	s_graphicsoptions.rt_gi.generic.y              = y;
 	s_graphicsoptions.rt_gi.itemnames              = enabled_names;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	s_graphicsoptions.rt_gibounces.generic.type    = MTYPE_SLIDER;
 	s_graphicsoptions.rt_gibounces.generic.name    = "GI Bounces:";
@@ -1475,7 +1475,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.rt_gibounces.generic.y       = y;
 	s_graphicsoptions.rt_gibounces.minvalue        = 1;
 	s_graphicsoptions.rt_gibounces.maxvalue        = 8;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	s_graphicsoptions.rt_giintensity.generic.type  = MTYPE_SLIDER;
 	s_graphicsoptions.rt_giintensity.generic.name   = "GI Intensity:";
@@ -1484,7 +1484,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.rt_giintensity.generic.y      = y;
 	s_graphicsoptions.rt_giintensity.minvalue      = 0;
 	s_graphicsoptions.rt_giintensity.maxvalue      = 20;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	// DLSS Section
 	s_graphicsoptions.dlss.generic.type            = MTYPE_SPINCONTROL;
@@ -1493,7 +1493,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.dlss.generic.x                = 400;
 	s_graphicsoptions.dlss.generic.y                = y;
 	s_graphicsoptions.dlss.itemnames                = enabled_names;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	s_graphicsoptions.dlss_quality.generic.type    = MTYPE_SPINCONTROL;
 	s_graphicsoptions.dlss_quality.generic.name    = "DLSS Quality:";
@@ -1501,7 +1501,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.dlss_quality.generic.x       = 400;
 	s_graphicsoptions.dlss_quality.generic.y      = y;
 	s_graphicsoptions.dlss_quality.itemnames       = dlss_quality_names;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	s_graphicsoptions.dlss_sharpen.generic.type    = MTYPE_SLIDER;
 	s_graphicsoptions.dlss_sharpen.generic.name    = "DLSS Sharpen:";
@@ -1510,7 +1510,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.dlss_sharpen.generic.y       = y;
 	s_graphicsoptions.dlss_sharpen.minvalue        = 0;
 	s_graphicsoptions.dlss_sharpen.maxvalue        = 10;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	// Compute Post-Processing
 	s_graphicsoptions.postprocess_compute.generic.type = MTYPE_SPINCONTROL;
@@ -1519,7 +1519,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.postprocess_compute.generic.x     = 400;
 	s_graphicsoptions.postprocess_compute.generic.y      = y;
 	s_graphicsoptions.postprocess_compute.itemnames      = enabled_names;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	// Mesh Shaders
 	s_graphicsoptions.meshshaders.generic.type      = MTYPE_SPINCONTROL;
@@ -1528,7 +1528,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.meshshaders.generic.x         = 400;
 	s_graphicsoptions.meshshaders.generic.y         = y;
 	s_graphicsoptions.meshshaders.itemnames         = enabled_names;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	s_graphicsoptions.meshletsize.generic.type      = MTYPE_SLIDER;
 	s_graphicsoptions.meshletsize.generic.name     = "Meshlet Size:";
@@ -1537,7 +1537,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.meshletsize.generic.y         = y;
 	s_graphicsoptions.meshletsize.minvalue          = 1;
 	s_graphicsoptions.meshletsize.maxvalue          = 4;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	// Virtual Texturing
 	s_graphicsoptions.virtualtextures.generic.type  = MTYPE_SPINCONTROL;
@@ -1546,7 +1546,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.virtualtextures.generic.x     = 400;
 	s_graphicsoptions.virtualtextures.generic.y     = y;
 	s_graphicsoptions.virtualtextures.itemnames     = enabled_names;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	s_graphicsoptions.vt_pagesize.generic.type     = MTYPE_SLIDER;
 	s_graphicsoptions.vt_pagesize.generic.name     = "VT Page Size:";
@@ -1555,7 +1555,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.vt_pagesize.generic.y         = y;
 	s_graphicsoptions.vt_pagesize.minvalue          = 2;
 	s_graphicsoptions.vt_pagesize.maxvalue          = 8;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	s_graphicsoptions.vt_cachesize.generic.type     = MTYPE_SLIDER;
 	s_graphicsoptions.vt_cachesize.generic.name    = "VT Cache Size:";
@@ -1564,7 +1564,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.vt_cachesize.generic.y        = y;
 	s_graphicsoptions.vt_cachesize.minvalue         = 1;
 	s_graphicsoptions.vt_cachesize.maxvalue         = 16;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	// Advanced Materials
 	s_graphicsoptions.clearcoat.generic.type        = MTYPE_SPINCONTROL;
@@ -1573,7 +1573,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.clearcoat.generic.x          = 400;
 	s_graphicsoptions.clearcoat.generic.y          = y;
 	s_graphicsoptions.clearcoat.itemnames          = enabled_names;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	s_graphicsoptions.anisotropy_mat.generic.type  = MTYPE_SPINCONTROL;
 	s_graphicsoptions.anisotropy_mat.generic.name  = "Material Aniso:";
@@ -1581,7 +1581,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.anisotropy_mat.generic.x     = 400;
 	s_graphicsoptions.anisotropy_mat.generic.y     = y;
 	s_graphicsoptions.anisotropy_mat.itemnames     = enabled_names;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	s_graphicsoptions.subsurfacescattering.generic.type = MTYPE_SPINCONTROL;
 	s_graphicsoptions.subsurfacescattering.generic.name = "Subsurface Scat:";
@@ -1589,7 +1589,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.subsurfacescattering.generic.x     = 400;
 	s_graphicsoptions.subsurfacescattering.generic.y     = y;
 	s_graphicsoptions.subsurfacescattering.itemnames     = enabled_names;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	// GPU Particles
 	s_graphicsoptions.particles_gpu.generic.type    = MTYPE_SPINCONTROL;
@@ -1598,7 +1598,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.particles_gpu.generic.x       = 400;
 	s_graphicsoptions.particles_gpu.generic.y       = y;
 	s_graphicsoptions.particles_gpu.itemnames       = enabled_names;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	s_graphicsoptions.particles_max.generic.type   = MTYPE_SLIDER;
 	s_graphicsoptions.particles_max.generic.name   = "Max Particles:";
@@ -1607,7 +1607,7 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.particles_max.generic.y       = y;
 	s_graphicsoptions.particles_max.minvalue        = 1;
 	s_graphicsoptions.particles_max.maxvalue         = 50;
-	y += BIGCHAR_HEIGHT+2;
+	y += BIGCHAR_HEIGHT+1;
 
 	s_graphicsoptions.particles_culling.generic.type = MTYPE_SPINCONTROL;
 	s_graphicsoptions.particles_culling.generic.name = "Particle Culling:";

@@ -32,11 +32,12 @@ UIDIR := ui
 OUTDIR := ../vm
 
 # Engine include paths (adjust to match your setup)
-ENGINE_ROOT := ../../..
+ENGINE_ROOT := ../..
 INCLUDES := -I$(ENGINE_ROOT)/src/game \
             -I$(ENGINE_ROOT)/src/cgame \
             -I$(ENGINE_ROOT)/src/ui \
-            -I$(ENGINE_ROOT)/src/qcommon
+            -I$(ENGINE_ROOT)/src/qcommon \
+            -I$(ENGINE_ROOT)/src/renderercommon
 
 # Source files - OpenArena source (all .c files in each directory)
 GAME_SRCS := $(wildcard $(GAMEDIR)/*.c)
