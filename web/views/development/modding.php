@@ -14,6 +14,12 @@ $breadcrumbs = [
         <strong>Welcome to Modding:</strong> This comprehensive guide will teach you everything you need to know about creating modifications for Quake III Arena using the id Tech 3 engine.
     </blockquote>
 
+    <div class="section">
+        <h2>Historical Context</h2>
+        <p>Modding has been a core part of id Tech 3 since its original release in 1999. The engine's Virtual Machine (QVM) architecture was specifically designed to enable extensive community modifications, leading to thousands of custom maps, mods, and total conversions over more than two decades.</p>
+        <p>The open source release in 2005 further expanded modding possibilities, allowing deeper engine modifications and total conversions. See <a href="history">History of id Tech 3</a> to learn about the engine's modding legacy and community evolution.</p>
+    </div>
+
     <h2>Chapter 1: Introduction to Programming Mods</h2>
     
     <h3>What Is a Mod?</h3>

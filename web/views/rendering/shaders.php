@@ -589,11 +589,22 @@ gfxreconstruct-replay capture.gfxr</code></pre>
 </div>
 
 <div class="section">
+    <h2>Skybox Shaders</h2>
+    <p>The engine supports both static and animated skyboxes:</p>
+    <ul>
+        <li><strong>Static Skyboxes:</strong> Use <code>skyParms</code> command with standard texture naming</li>
+        <li><strong>Animated Skyboxes:</strong> Use <code>skyParmsFlipbook</code> command for frame-based animation</li>
+    </ul>
+    <p>See <a href="rendering/animated-skybox">Animated Skybox</a> for detailed documentation on creating animated sky effects.</p>
+</div>
+
+<div class="section">
     <h2>Related Topics</h2>
     <ul>
         <li><a href="rendering/vulkan">Vulkan Renderer</a></li>
         <li><a href="rendering/pbr">PBR Materials</a></li>
         <li><a href="rendering/global-illumination">Global Illumination</a></li>
+        <li><a href="rendering/animated-skybox">Animated Skybox</a></li>
         <li><a href="tools/asset-tools">Asset Pipeline</a></li>
     </ul>
 </div> 

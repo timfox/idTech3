@@ -31,6 +31,21 @@ ini_set('error_log', __DIR__ . '/error.log');
         <input type="text" id="search" placeholder="Search">
     </div>
 
+    <div id="main-container">
+        <div id="sections-container" class="content">
+            <div class="section" style="background: rgba(0, 247, 255, 0.1); border: 2px solid #00f7ff; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
+                <h2 style="color: #00f7ff; margin-top: 0;">🚀 What's New</h2>
+                <p>Check out the latest enhancements and features:</p>
+                <ul>
+                    <li><a href="whats-new">What's New</a> - Recent enhancements overview</li>
+                    <li><a href="rendering/directx12">DirectX 12 Renderer</a> - New Windows renderer with DXR</li>
+                    <li><a href="core/structured-logging">Structured Logging</a> - Modern logging system</li>
+                    <li><a href="core/memory-safety">Memory Safety Tools</a> - ASan, UBSan, memory tracking</li>
+                    <li><a href="networking/websocket">WebSocket Support</a> - Real-time bidirectional communication</li>
+                    <li><a href="imgui">ImGui Debug Overlays</a> - In-engine debugging tools</li>
+                </ul>
+            </div>
+
     <button id="back-button" class="back-button">← Back to Index</button>
     <div id="loading" class="loading">Loading...</div>
     <div id="error-message" class="error-message"></div>
@@ -38,11 +53,33 @@ ini_set('error_log', __DIR__ . '/error.log');
     <div id="main-container">
         <div id="sections-container" class="content">
             <div class="section">
+                <h2>Overview</h2>
+                <ul>
+                    <li><a href="idtech3">id Tech 3 Engine Features</a></li>
+                    <li><a href="history">History of id Tech 3</a></li>
+                </ul>
+            </div>
+
+            <div class="section">
                 <h2>Getting Started</h2>
                                  <ul>
                      <li><a href="getting-started/installation">Installation</a></li>
                      <li><a href="getting-started/configuration">Configuration</a></li>
                      <li><a href="getting-started/quick-start">Quick Start Guide</a></li>
+                 </ul>
+            </div>
+
+            <div class="section">
+                <h2>Tutorials</h2>
+                                 <ul>
+                     <li><a href="tutorials/structured-logging">Structured Logging Tutorial</a></li>
+                     <li><a href="tutorials/memory-profiling">Memory Profiling Tutorial</a></li>
+                     <li><a href="tutorials/imgui-overlays">ImGui Debug Overlays Tutorial</a></li>
+                     <li><a href="tutorials/websocket">WebSocket Integration Tutorial</a></li>
+                     <li><a href="tutorials/animated-skybox">Creating Animated Skyboxes</a></li>
+                     <li><a href="tutorials/enhanced-networking">Enhanced Networking Setup</a></li>
+                     <li><a href="tutorials/directx12-setup">DirectX 12 Setup Tutorial</a></li>
+                     <li><a href="pbr_tutorial">PBR Shader Tutorial</a></li>
                  </ul>
             </div>
 
@@ -71,6 +108,8 @@ ini_set('error_log', __DIR__ . '/error.log');
                      <li><a href="rendering/vulkan">Vulkan Renderer</a></li>
                      <li><a href="rendering/pbr">PBR</a></li>
                      <li><a href="rendering/global-illumination">Global Illumination</a></li>
+                     <li><a href="rendering/directx12">DirectX 12 Renderer</a></li>
+                     <li><a href="rendering/animated-skybox">Animated Skybox</a></li>
                  </ul>
             </div>
 
@@ -85,6 +124,7 @@ ini_set('error_log', __DIR__ . '/error.log');
                 <h2>Networking</h2>
                                  <ul>
                      <li><a href="networking/networking">Networking</a></li>
+                     <li><a href="networking/websocket">WebSocket Support</a></li>
                  </ul>
             </div>
 
@@ -132,6 +172,7 @@ ini_set('error_log', __DIR__ . '/error.log');
                      <li><a href="external/libraries">Libraries Overview</a></li>
                      <li><a href="external/imgui-integration">ImGui Integration (C++)</a></li>
                      <li><a href="external/cimgui-quake3e">CimGui + Quake3e Walkthrough</a></li>
+                     <li><a href="imgui">ImGui Debug Overlays</a></li>
                  </ul>
             </div>
 
@@ -141,11 +182,17 @@ ini_set('error_log', __DIR__ . '/error.log');
                      <li><a href="core/engine-subsystems">Engine Subsystems</a></li>
                      <li><a href="core/main-loop">Main Loop Analysis</a></li>
                      <li><a href="core/memory-management">Memory Management</a></li>
+                     <li><a href="core/memory-improvements">Memory System Improvements</a></li>
+                     <li><a href="core/memory-safety">Memory Safety & Profiling</a></li>
+                     <li><a href="core/structured-logging">Structured Logging</a></li>
                      <li><a href="core/entity-system">Entity System</a></li>
                      <li><a href="core/console-system">Console System</a></li>
                      <li><a href="core/input-system">Input System</a></li>
+                     <li><a href="core/input-improvements">Input System Improvements</a></li>
                      <li><a href="core/filesystem">File System</a></li>
+                     <li><a href="core/filesystem-improvements">Filesystem Improvements</a></li>
                      <li><a href="core/virtual-machine">Virtual Machine (QVM)</a></li>
+                     <li><a href="core/qvm-improvements">QVM Improvements</a></li>
                  </ul>
             </div>
 

@@ -227,4 +227,55 @@ a:hover {
     background: rgba(34, 62, 91, 0.8);
     border-color: rgba(255, 255, 255, 0.5);
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Timeline styles */
+.timeline {
+    position: relative;
+    padding: 20px 0;
+    margin: 20px 0;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 30px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(180deg, rgba(116, 192, 252, 0.3), rgba(116, 192, 252, 0.6), rgba(116, 192, 252, 0.3));
+}
+
+.timeline-item {
+    position: relative;
+    padding-left: 70px;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: 22px;
+    top: 5px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: rgba(116, 192, 252, 0.8);
+    border: 3px solid rgba(34, 62, 91, 0.8);
+    box-shadow: 0 0 10px rgba(116, 192, 252, 0.5);
+}
+
+.timeline-item h4 {
+    color: #74c0fc;
+    margin-top: 0;
+    margin-bottom: 8px;
+    font-size: 1.1em;
+    font-weight: bold;
+}
+
+.timeline-item p {
+    margin: 0;
+    color: rgba(255, 255, 255, 0.9);
+    line-height: 1.6;
 } 

@@ -16,6 +16,17 @@ $breadcrumbs = [
 
     <h2>Essential Debugging Tools</h2>
     
+    <div class="feature-list">
+        <h3>Modern Debugging Tools</h3>
+        <p>The engine now includes comprehensive modern debugging tools:</p>
+        <ul>
+            <li><strong><a href="imgui">ImGui Debug Overlays</a>:</strong> Real-time performance, memory, network, and renderer statistics</li>
+            <li><strong><a href="core/structured-logging">Structured Logging</a>:</strong> Modern logging system with levels, categories, and JSON output</li>
+            <li><strong><a href="core/memory-safety">Memory Safety Tools</a>:</strong> AddressSanitizer, UndefinedBehaviorSanitizer, and memory tracking</li>
+            <li><strong>RenderDoc Integration:</strong> Graphics debugging and profiling - See <a href="renderer/renderdoc-debugging">RenderDoc Debugging</a></li>
+        </ul>
+    </div>
+    
     <h3>Built-in Console Commands</h3>
     <p>Quake III provides powerful debugging capabilities through console commands:</p>
     
@@ -57,8 +68,17 @@ $breadcrumbs = [
     </table>
 
     <h3>Logging and Output</h3>
+    <p><strong>Modern Approach:</strong> Use the <a href="core/structured-logging">structured logging system</a> for better log management:</p>
     <div class="example">
-        <pre>// Custom debug output functions
+        <pre>// Modern structured logging
+#include "q_log.h"
+
+// Category-specific logging
+Q_LogInfo(LOG_CATEGORY_GENERAL, "Player %s health: %d", ent->client->pers.netname, ent->health);
+Q_LogWarn(LOG_CATEGORY_GENERAL, "Low health warning for player %s", ent->client->pers.netname);
+Q_LogError(LOG_CATEGORY_GENERAL, "Entity validation failed");
+
+// Legacy approach (still works, automatically routed through structured logger)
 void G_Printf(const char *fmt, ...) {
     va_list argptr;
     char text[1024];
@@ -72,14 +92,31 @@ void G_Printf(const char *fmt, ...) {
 
 // Conditional debugging
 #ifdef _DEBUG
-    #define DEBUG_PRINT(x) G_Printf x
+    #define DEBUG_PRINT(x) Q_LogDebug(LOG_CATEGORY_GENERAL, x)
 #else
     #define DEBUG_PRINT(x)
-#endif
-
-// Usage example
-DEBUG_PRINT(("Player %s health: %d\n", ent->client->pers.netname, ent->health));</pre>
+#endif</pre>
     </div>
+    
+    <h3>ImGui Debug Overlays</h3>
+    <p>Enable real-time debugging overlays:</p>
+    <div class="code-block">
+        <pre><code># Enable ImGui
+/set cl_imgui 1
+
+# Show performance overlay
+/set cl_imgui_debug_performance 1
+
+# Show memory overlay (requires ENABLE_MEMORY_TRACKING)
+/set cl_imgui_debug_memory 1
+
+# Show network overlay
+/set cl_imgui_debug_network 1
+
+# Show CVar browser
+/set cl_imgui_debug_cvars 1</code></pre>
+    </div>
+    <p>See <a href="imgui">ImGui Debug Overlays</a> for complete documentation.</p>
 
     <h2>Common Debugging Scenarios</h2>
     
@@ -376,8 +413,11 @@ test_t g_tests[] = {
     <ul>
         <li><strong>Visual Studio Debugger:</strong> Step-through debugging for Windows</li>
         <li><strong>GDB:</strong> Command-line debugger for Linux</li>
-        <li><strong>Valgrind:</strong> Memory error detection (Linux)</li>
-        <li><strong>Application Verifier:</strong> Memory debugging (Windows)</li>
+        <li><strong>Valgrind:</strong> Memory error detection (Linux) - See <a href="core/memory-safety">Memory Safety</a></li>
+        <li><strong>Dr. Memory:</strong> Memory debugging (Windows) - See <a href="core/memory-safety">Memory Safety</a></li>
+        <li><strong>AddressSanitizer (ASan):</strong> Runtime memory error detection - See <a href="core/memory-safety">Memory Safety</a></li>
+        <li><strong>UndefinedBehaviorSanitizer (UBSan):</strong> Undefined behavior detection - See <a href="core/memory-safety">Memory Safety</a></li>
+        <li><strong>RenderDoc:</strong> Graphics debugging and profiling - See <a href="renderer/renderdoc-debugging">RenderDoc Debugging</a></li>
     </ul>
 
     <h3>Log Analysis</h3>
@@ -395,13 +435,27 @@ void G_LogEvent(const char *category, const char *event, const char *details) {
     
     <ul>
         <li>✅ Enable developer mode and relevant debug cvars</li>
-        <li>✅ Add comprehensive logging to key functions</li>
+        <li>✅ Use <a href="imgui">ImGui debug overlays</a> for real-time monitoring</li>
+        <li>✅ Enable <a href="core/structured-logging">structured logging</a> with appropriate log levels</li>
+        <li>✅ Add comprehensive logging to key functions using structured logging</li>
+        <li>✅ Enable <a href="core/memory-safety">memory tracking</a> to detect leaks</li>
+        <li>✅ Run with AddressSanitizer/UBSan in development builds</li>
         <li>✅ Validate all input parameters</li>
         <li>✅ Check return values from all function calls</li>
         <li>✅ Use assertions for critical assumptions</li>
         <li>✅ Test with bots for consistent reproduction</li>
-        <li>✅ Profile performance-critical sections</li>
-        <li>✅ Monitor memory usage and leaks</li>
+        <li>✅ Profile performance-critical sections using ImGui overlays</li>
+        <li>✅ Monitor memory usage and leaks with memory overlay</li>
+        <li>✅ Use RenderDoc for graphics debugging</li>
+    </ul>
+    
+    <h2>Related Topics</h2>
+    <ul>
+        <li><a href="imgui">ImGui Debug Overlays</a> - Real-time debugging interface</li>
+        <li><a href="core/structured-logging">Structured Logging</a> - Modern logging system</li>
+        <li><a href="core/memory-safety">Memory Safety & Profiling</a> - Memory debugging tools</li>
+        <li><a href="renderer/renderdoc-debugging">RenderDoc Debugging</a> - Graphics debugging</li>
+        <li><a href="core/console-system">Console System</a> - Console commands and CVars</li>
     </ul>
 
     <blockquote>

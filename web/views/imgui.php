@@ -1,830 +1,291 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dear ImGui Implementation in id Tech 3</title>
-    <style>
-        @font-face {
-            font-family: 'FX300';
-            src: url('fonts/FX300 Angular.ttf') format('truetype');
-        }
-        body {
-            font-family: 'Helvetica', monospace;
-            line-height: 1.6;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #000;
-            color: #0f0;
-        }
-        code {
-            background-color: #111;
-            padding: 2px 5px;
-            border-radius: 3px;
-            color: #0ff;
-        }
-        pre {
-            background-color: #111;
-            padding: 15px;
-            border-radius: 5px;
-            overflow-x: auto;
-            color: #0ff;
-            border: 1px solid #0f0;
-        }
-        h1, h2, h3 {
-            font-family: 'FX300', monospace;
-            color: #f0f;
-            text-shadow: 2px 2px #0f0;
-        }
-        a {
-            color: #0ff;
-        }
-        a:hover {
-            color: #f0f;
-        }
-        .note {
-            background-color: #111;
-            border-left: 4px solid #f0f;
-            padding: 10px;
-            margin: 10px 0;
-        }
-        .warning {
-            background-color: #111;
-            border-left: 4px solid #f00;
-            padding: 10px;
-            margin: 10px 0;
-        }
-    </style>
-</head>
-<body>
-    <h1>Dear ImGui Implementation in id Tech 3</h1>
-    
-    <div class="note">
-        <strong>Note:</strong> This implementation requires Vulkan support and integrates with existing HDR, ACES tonemapping, and LUT systems.
-    </div>
+<?php
+/**
+ * ImGui Debug Overlays Documentation
+ */
+$title = 'ImGui Debug Overlays - id Tech 3 Documentation';
+$breadcrumbs = [
+    '/imgui' => 'ImGui Debug Overlays'
+];
+?>
 
+<h1>ImGui Debug Overlays</h1>
+
+<div class="section">
     <h2>Overview</h2>
-    <p>This guide explains how to implement Dear ImGui in id Tech 3 using Vulkan, providing an in-game debug interface for controlling various engine features including HDR, tonemapping, LUTs, music, fonts, and PBR materials.</p>
-
-    <h2>Prerequisites</h2>
-    <ul>
-        <li>id Tech 3 Source Code with Vulkan support</li>
-        <li>Dear ImGui source code</li>
-        <li>Vulkan SDK</li>
-        <li>Development Environment (C/C++, CMake)</li>
-        <li>Basic understanding of Vulkan pipeline setup</li>
-    </ul>
-
-    <div class="warning">
-        <strong>Warning:</strong> Make sure to backup your source code before implementing ImGui.
+    <p>The id Tech 3 engine now includes comprehensive ImGui-based debug overlays for real-time debugging and profiling. These overlays provide detailed information about performance, memory, networking, rendering, and more.</p>
+    
+    <div class="feature-list">
+        <h3>Available Overlays</h3>
+        <ul>
+            <li><strong>Performance Overlay:</strong> Real-time FPS, frame time, and performance graphs</li>
+            <li><strong>Memory Overlay:</strong> Memory usage statistics and leak detection</li>
+            <li><strong>Network Overlay:</strong> Network statistics and connection information</li>
+            <li><strong>Renderer Overlay:</strong> Renderer information and performance counters</li>
+            <li><strong>CVar Browser:</strong> Interactive console variable browser and editor</li>
+            <li><strong>Console Overlay:</strong> Console output viewer with filtering</li>
+        </ul>
     </div>
+</div>
 
-    <h2>Implementation Steps</h2>
-    <ol>
-        <li><strong>Add ImGui Dependencies:</strong> Add to CMakeLists.txt:
-            <pre>
-# Add ImGui
-add_subdirectory(external/imgui)
-target_link_libraries(quake3e PRIVATE imgui)</pre>
-        </li>
-        <li><strong>Create ImGui Integration Files:</strong> Create imgui_integration.h:
-            <pre>
-#pragma once
+<div class="section">
+    <h2>Enabling ImGui</h2>
+    <p>First, enable ImGui support:</p>
+    <div class="code-block">
+        <pre><code>/set cl_imgui 1</code></pre>
+    </div>
+</div>
 
-#include "tr_local.h"
-#include "imgui.h"
-#include "imgui_impl_vulkan.h"
-#include "imgui_impl_glfw.h"
-
-// ImGui state
-extern bool g_imguiEnabled;
-extern bool g_imguiShowDemo;
-extern bool g_imguiShowConsole;
-extern bool g_imguiShowGraphics;
-extern bool g_imguiShowAudio;
-extern bool g_imguiShowFonts;
-extern bool g_imguiShowPBR;
-
-// ImGui functions
-void ImGui_Init(void);
-void ImGui_Shutdown(void);
-void ImGui_NewFrame(void);
-void ImGui_Render(void);
-void ImGui_UpdateInput(void);</pre>
-        </li>
-        <li><strong>Implement ImGui Integration:</strong> Create imgui_integration.c:
-            <pre>
-#include "imgui_integration.h"
-
-// ImGui state
-bool g_imguiEnabled = false;
-bool g_imguiShowDemo = false;
-bool g_imguiShowConsole = false;
-bool g_imguiShowGraphics = false;
-bool g_imguiShowAudio = false;
-bool g_imguiShowFonts = false;
-bool g_imguiShowPBR = false;
-
-void ImGui_Init(void) {
-    // Initialize ImGui
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+<div class="section">
+    <h2>Performance Overlay</h2>
+    <p>Displays real-time performance metrics:</p>
+    <ul>
+        <li><strong>FPS:</strong> Current frames per second</li>
+        <li><strong>Frame Time:</strong> Time per frame in milliseconds</li>
+        <li><strong>Frame Time History:</strong> Graph showing frame time over the last 120 frames</li>
+        <li><strong>FPS History:</strong> Graph showing FPS over the last 120 frames</li>
+        <li><strong>Client State:</strong> Current connection state</li>
+        <li><strong>Server/Client Time:</strong> Time synchronization information</li>
+    </ul>
     
-    // Setup Vulkan backend
-    ImGui_ImplVulkan_InitInfo init_info = {};
-    init_info.Instance = vk.instance;
-    init_info.PhysicalDevice = vk.physical_device;
-    init_info.Device = vk.device;
-    init_info.QueueFamily = vk.queue_family;
-    init_info.Queue = vk.queue;
-    init_info.PipelineCache = vk.pipeline_cache;
-    init_info.DescriptorPool = vk.descriptor_pool;
-    init_info.Allocator = NULL;
-    init_info.MinImageCount = vk.swapchain_image_count;
-    init_info.ImageCount = vk.swapchain_image_count;
-    init_info.CheckVkResultFn = NULL;
+    <h3>Usage</h3>
+    <div class="code-block">
+        <pre><code># Enable performance overlay
+/set cl_imgui_debug_performance 1</code></pre>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Memory Overlay</h2>
+    <p>Shows memory usage statistics (requires <code>ENABLE_MEMORY_TRACKING</code>):</p>
+    <ul>
+        <li><strong>Total Memory:</strong> Allocated, freed, current, and peak usage</li>
+        <li><strong>Memory by Type:</strong> Breakdown by memory type (HUNK, ZONE, TEMP, SOUND, RENDERER, etc.)</li>
+        <li><strong>Leak Detection:</strong> Number of detected memory leaks</li>
+        <li><strong>Leak Reporting:</strong> Button to generate detailed leak reports</li>
+    </ul>
     
-    ImGui_ImplVulkan_Init(&init_info, vk.render_pass);
+    <h3>Usage</h3>
+    <div class="code-block">
+        <pre><code># Enable memory overlay
+/set cl_imgui_debug_memory 1</code></pre>
+    </div>
     
-    // Load fonts
-    ImFont* font = io.Fonts->AddFontFromFileTTF("fonts/cousine-regular.ttf", 16.0f);
-    io.Fonts->Build();
+    <p><strong>Note:</strong> Requires building with <code>ENABLE_MEMORY_TRACKING=ON</code> for full functionality.</p>
+</div>
+
+<div class="section">
+    <h2>Network Overlay</h2>
+    <p>Displays network statistics:</p>
+    <ul>
+        <li><strong>Bytes Sent/Received:</strong> Total network traffic</li>
+        <li><strong>Request Statistics:</strong> Total, successful, and failed requests</li>
+        <li><strong>Success Rate:</strong> Percentage of successful requests</li>
+        <li><strong>Response Times:</strong> Average and last response time</li>
+        <li><strong>Protocol Usage:</strong> HTTP/2 vs HTTP/1.1, IPv6 vs IPv4</li>
+        <li><strong>Connection Info:</strong> Server address, ping, packet loss</li>
+    </ul>
     
-    // Upload font textures
-    VkCommandBuffer cmd_buffer = vk_begin_single_time_commands();
-    ImGui_ImplVulkan_CreateFontsTexture(cmd_buffer);
-    vk_end_single_time_commands(cmd_buffer);
-}
+    <h3>Usage</h3>
+    <div class="code-block">
+        <pre><code># Enable network overlay
+/set cl_imgui_debug_network 1</code></pre>
+    </div>
+</div>
 
-void ImGui_Shutdown(void) {
-    ImGui_ImplVulkan_Shutdown();
-    ImGui::DestroyContext();
-}
-
-void ImGui_NewFrame(void) {
-    ImGui_ImplVulkan_NewFrame();
-    ImGui::NewFrame();
-}
-
-void ImGui_Render(void) {
-    ImGui::Render();
-    ImDrawData* draw_data = ImGui::GetDrawData();
-    ImGui_ImplVulkan_RenderDrawData(draw_data, vk.command_buffer);
-}
-
-void ImGui_UpdateInput(void) {
-    ImGuiIO& io = ImGui::GetIO();
-    io.MousePos = ImVec2(mouse_x, mouse_y);
-    io.MouseDown[0] = mouse_buttons & 1;
-    io.MouseDown[1] = mouse_buttons & 2;
-    io.MouseDown[2] = mouse_buttons & 4;
-    io.MouseWheel = mouse_wheel;
+<div class="section">
+    <h2>Renderer Overlay</h2>
+    <p>Shows renderer information:</p>
+    <ul>
+        <li><strong>Renderer Info:</strong> Renderer name, vendor, version, extensions</li>
+        <li><strong>Display Settings:</strong> Resolution, color/depth/stencil bits</li>
+        <li><strong>Performance Counters:</strong> Renderer performance metrics (when <code>r_speeds</code> is enabled)</li>
+    </ul>
     
-    // Update keyboard state
-    for (int i = 0; i < 512; i++) {
-        io.KeysDown[i] = keys[i];
-    }
-    io.KeyCtrl = keys[K_CTRL];
-    io.KeyShift = keys[K_SHIFT];
-    io.KeyAlt = keys[K_ALT];
-    io.KeySuper = keys[K_SUPER];
-}</pre>
-        </li>
-        <li><strong>Add ImGui Windows:</strong> Add to imgui_integration.c:
-            <pre>
-void ImGui_ShowMainMenu(void) {
-    if (ImGui::BeginMainMenuBar()) {
-        if (ImGui::BeginMenu("Debug")) {
-            ImGui::MenuItem("Demo Window", NULL, &g_imguiShowDemo);
-            ImGui::MenuItem("Console", NULL, &g_imguiShowConsole);
-            ImGui::MenuItem("Graphics", NULL, &g_imguiShowGraphics);
-            ImGui::MenuItem("Audio", NULL, &g_imguiShowAudio);
-            ImGui::MenuItem("Fonts", NULL, &g_imguiShowFonts);
-            ImGui::MenuItem("PBR", NULL, &g_imguiShowPBR);
-            ImGui::EndMenu();
-        }
-        ImGui::EndMainMenuBar();
-    }
+    <h3>Usage</h3>
+    <div class="code-block">
+        <pre><code># Enable renderer overlay
+/set cl_imgui_debug_renderer 1</code></pre>
+    </div>
+</div>
+
+<div class="section">
+    <h2>CVar Browser</h2>
+    <p>Interactive console variable browser:</p>
+    <ul>
+        <li><strong>Filter:</strong> Search/filter CVars by name</li>
+        <li><strong>CVar List:</strong> Scrollable list of all CVars</li>
+        <li><strong>CVar Details:</strong> View name, value, type, flags, description</li>
+        <li><strong>Edit Values:</strong> Change CVar values directly</li>
+        <li><strong>Reset:</strong> Reset CVars to default values</li>
+        <li><strong>Flags Display:</strong> Shows CVar flags (Archive, UserInfo, ServerInfo, ROM, Init, Latch)</li>
+    </ul>
     
-    if (g_imguiShowDemo) {
-        ImGui::ShowDemoWindow(&g_imguiShowDemo);
-    }
+    <h3>Usage</h3>
+    <div class="code-block">
+        <pre><code># Enable CVar browser
+/set cl_imgui_debug_cvars 1</code></pre>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Console Overlay</h2>
+    <p>Console output viewer:</p>
+    <ul>
+        <li><strong>Filter:</strong> Filter console output</li>
+        <li><strong>Auto-scroll:</strong> Automatically scroll to latest output</li>
+        <li><strong>Command Input:</strong> Execute console commands</li>
+        <li><strong>Scrollable History:</strong> View console history</li>
+    </ul>
     
-    if (g_imguiShowConsole) {
-        ImGui_ShowConsoleWindow();
-    }
+    <h3>Usage</h3>
+    <div class="code-block">
+        <pre><code># Enable console overlay
+/set cl_imgui_debug_console 1</code></pre>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Main Menu</h2>
+    <p>Debug menu bar with quick access to all overlays:</p>
+    <ul>
+        <li><strong>Debug Menu:</strong> Toggle individual overlays</li>
+        <li><strong>Help Menu:</strong> Access help and information</li>
+    </ul>
     
-    if (g_imguiShowGraphics) {
-        ImGui_ShowGraphicsWindow();
-    }
+    <h3>Usage</h3>
+    <div class="code-block">
+        <pre><code># Enable main menu (default: enabled)
+/set cl_imgui_debug_mainmenu 1</code></pre>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Opening Debug Overlays</h2>
     
-    if (g_imguiShowAudio) {
-        ImGui_ShowAudioWindow();
-    }
+    <h3>Via Main Menu</h3>
+    <p>The debug menu bar appears at the top when <code>cl_imgui_debug_mainmenu</code> is enabled (default: 1). Click "Debug" → Select overlay to toggle.</p>
     
-    if (g_imguiShowFonts) {
-        ImGui_ShowFontsWindow();
-    }
+    <h3>Via CVars</h3>
+    <div class="code-block">
+        <pre><code>/set cl_imgui_debug_performance 1
+/set cl_imgui_debug_memory 1
+/set cl_imgui_debug_network 1
+/set cl_imgui_debug_renderer 1
+/set cl_imgui_debug_cvars 1
+/set cl_imgui_debug_console 1</code></pre>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Closing Overlays</h2>
+    <ul>
+        <li>Click the "X" button on each overlay window, or</li>
+        <li>Toggle the CVar off: <code>/set cl_imgui_debug_performance 0</code></li>
+    </ul>
+</div>
+
+<div class="section">
+    <h2>Keyboard Shortcuts</h2>
+    <ul>
+        <li><strong>F12:</strong> Toggle ImGui (if configured)</li>
+        <li><strong>Mouse:</strong> Click and drag to move windows</li>
+        <li><strong>Enter:</strong> Execute commands in console overlay</li>
+    </ul>
+</div>
+
+<div class="section">
+    <h2>Performance Impact</h2>
+    <ul>
+        <li><strong>Minimal:</strong> Overlays are lightweight and only render when visible</li>
+        <li><strong>Frame Time:</strong> Typically adds &lt; 0.1ms per visible overlay</li>
+        <li><strong>Memory:</strong> Negligible memory overhead</li>
+    </ul>
+</div>
+
+<div class="section">
+    <h2>Tips</h2>
+    <ul>
+        <li><strong>Performance Monitoring:</strong> Keep the performance overlay visible during development to catch frame time spikes</li>
+        <li><strong>Memory Debugging:</strong> Enable memory tracking (<code>ENABLE_MEMORY_TRACKING=ON</code>) and use the memory overlay to find leaks</li>
+        <li><strong>Network Debugging:</strong> Use the network overlay to monitor connection quality and protocol usage</li>
+        <li><strong>CVar Tweaking:</strong> Use the CVar browser to quickly find and modify settings without typing commands</li>
+        <li><strong>Console History:</strong> Use the console overlay to review past output and filter for specific messages</li>
+    </ul>
+</div>
+
+<div class="section">
+    <h2>Integration</h2>
+    <p>The debug overlays integrate seamlessly with:</p>
+    <ul>
+        <li><strong>Memory Tracking System:</strong> Shows memory statistics when enabled</li>
+        <li><strong>Enhanced Networking:</strong> Displays network statistics from enhanced networking features</li>
+        <li><strong>Structured Logging:</strong> Can display log output in console overlay (future enhancement)</li>
+        <li><strong>Renderer:</strong> Shows renderer statistics and performance counters</li>
+    </ul>
+</div>
+
+<div class="section">
+    <h2>Customization</h2>
+    <p>All overlays can be customized via CVars:</p>
+    <ul>
+        <li>Window positions are remembered</li>
+        <li>Window sizes can be adjusted</li>
+        <li>Overlays can be enabled/disabled individually</li>
+        <li>Main menu can be hidden if desired</li>
+    </ul>
+</div>
+
+<div class="section">
+    <h2>Future Enhancements</h2>
+    <p>Planned improvements:</p>
+    <ul>
+        <li><strong>Console Integration:</strong> Full console output capture and display</li>
+        <li><strong>Log Viewer:</strong> View structured logs with filtering</li>
+        <li><strong>Profiler Integration:</strong> Display Tracy profiler data</li>
+        <li><strong>Entity Browser:</strong> Browse and inspect game entities</li>
+        <li><strong>Shader Debugger:</strong> Debug shader compilation and execution</li>
+        <li><strong>Asset Browser:</strong> Browse loaded assets (models, textures, sounds)</li>
+    </ul>
+</div>
+
+<div class="section">
+    <h2>Troubleshooting</h2>
     
-    if (g_imguiShowPBR) {
-        ImGui_ShowPBRWindow();
-    }
-}
-
-void ImGui_ShowConsoleWindow(void) {
-    if (ImGui::Begin("Console", &g_imguiShowConsole)) {
-        static char input[256] = "";
-        if (ImGui::InputText("Command", input, sizeof(input), 
-            ImGuiInputTextFlags_EnterReturnsTrue)) {
-            Cbuf_AddText(input);
-            input[0] = '\0';
-        }
-        
-        // Display console history
-        ImGui::BeginChild("ConsoleHistory", ImVec2(0, -ImGui::GetFrameHeightWithSpacing()));
-        for (int i = 0; i < consoleHistory.size(); i++) {
-            ImGui::TextWrapped("%s", consoleHistory[i].c_str());
-        }
-        if (ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
-            ImGui::SetScrollHereY(1.0f);
-        }
-        ImGui::EndChild();
-        
-        // Add clear button
-        if (ImGui::Button("Clear")) {
-            consoleHistory.clear();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Copy")) {
-            std::string history;
-            for (const auto& line : consoleHistory) {
-                history += line + "\n";
-            }
-            ImGui::SetClipboardText(history.c_str());
-        }
-        ImGui::End();
-    }
-}
-
-void ImGui_ShowGraphicsWindow(void) {
-    if (ImGui::Begin("Graphics", &g_imguiShowGraphics)) {
-        // HDR and Tonemapping Settings
-        ImGui::Checkbox("HDR", &r_hdr->integer);
-        ImGui::Checkbox("ACES Tonemapping", &r_acesTonemapping->integer);
-        
-        if (r_hdr->integer) {
-            ImGui::SliderFloat("Exposure", &r_exposure->value, 0.1f, 4.0f, "%.2f");
-        }
-
-        // LUT Settings
-        ImGui::Separator();
-        ImGui::Text("Look-Up Table Settings");
-        ImGui::Checkbox("Enable LUT", &r_lutEnable->integer);
-        
-        if (r_lutEnable->integer) {
-            ImGui::SliderFloat("LUT Intensity", &r_lutIntensity->value, 0.0f, 1.0f, "%.2f");
-            ImGui::Combo("Blend Mode", &r_lutBlendMode->integer, 
-                "Normal\0Multiply\0Screen\0Overlay\0");
-            ImGui::SliderFloat("Animation Speed", &r_lutAnimationSpeed->value, 0.0f, 2.0f, "%.2f");
-            ImGui::Combo("Quality", &r_lutQuality->integer, "Low\0Medium\0High\0");
-        }
-
-        // Post-Processing Settings
-        ImGui::Separator();
-        ImGui::Text("Post-Processing");
-        ImGui::Checkbox("Enable Post-Processing", &r_postProcess->integer);
-        
-        if (r_postProcess->integer) {
-            ImGui::SliderFloat("Bloom Intensity", &r_bloomIntensity->value, 0.0f, 2.0f, "%.2f");
-            ImGui::SliderFloat("Vignette Intensity", &r_vignetteIntensity->value, 0.0f, 1.0f, "%.2f");
-            ImGui::SliderFloat("Chromatic Aberration", &r_chromaticAberration->value, 0.0f, 1.0f, "%.2f");
-            ImGui::SliderFloat("Film Grain", &r_filmGrain->value, 0.0f, 1.0f, "%.2f");
-            ImGui::SliderFloat("Motion Blur", &r_motionBlur->value, 0.0f, 1.0f, "%.2f");
-            ImGui::SliderFloat("Depth of Field", &r_dof->value, 0.0f, 1.0f, "%.2f");
-            ImGui::SliderFloat("Sharpness", &r_sharpness->value, 0.0f, 2.0f, "%.2f");
-            ImGui::SliderFloat("Contrast", &r_contrast->value, 0.5f, 1.5f, "%.2f");
-            ImGui::SliderFloat("Saturation", &r_saturation->value, 0.0f, 2.0f, "%.2f");
-        }
-    }
-    ImGui::End();
-}
-
-void ImGui_ShowPerformanceWindow(void) {
-    if (ImGui::Begin("Performance", &g_imguiShowPerformance)) {
-        // Quality Preset
-        ImGui::Text("Quality Preset");
-        ImGui::Combo("##QualityPreset", &r_qualityPreset->integer, 
-            "Low\0Medium\0High\0Ultra\0");
-        ImGui::SameLine();
-        ImGui::TextDisabled("(?)");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Automatically adjusts graphics settings for optimal performance");
-        }
-
-        // Frame Rate Settings
-        ImGui::Separator();
-        ImGui::Text("Frame Rate Settings");
-        
-        ImGui::Checkbox("VSync", &r_vsync->integer);
-        ImGui::SameLine();
-        ImGui::TextDisabled("(?)");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Synchronizes frame rate with monitor refresh rate");
-        }
-        
-        ImGui::SliderInt("FPS Limit", &r_fpsLimit->integer, 30, 300, "%d FPS");
-        ImGui::SameLine();
-        ImGui::TextDisabled("(?)");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Maximum frames per second (0 = unlimited)");
-        }
-        
-        ImGui::Checkbox("Triple Buffering", &r_tripleBuffering->integer);
-        ImGui::SameLine();
-        ImGui::TextDisabled("(?)");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Reduces screen tearing at the cost of higher latency");
-        }
-
-        // Quality Settings
-        ImGui::Separator();
-        ImGui::Text("Quality Settings");
-        
-        ImGui::SliderInt("Texture Quality", &r_textureQuality->integer, 0, 3, "%d");
-        ImGui::SameLine();
-        ImGui::TextDisabled("(?)");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("0 = Low, 1 = Medium, 2 = High, 3 = Ultra");
-        }
-        
-        ImGui::SliderInt("Shadow Quality", &r_shadowQuality->integer, 0, 3, "%d");
-        ImGui::SameLine();
-        ImGui::TextDisabled("(?)");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("0 = Low, 1 = Medium, 2 = High, 3 = Ultra");
-        }
-        
-        ImGui::SliderInt("Anti-Aliasing", &r_antialiasing->integer, 0, 4, "%d");
-        ImGui::SameLine();
-        ImGui::TextDisabled("(?)");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("0 = Off, 1 = FXAA, 2 = SMAA, 3 = TAA, 4 = MSAA 4x");
-        }
-
-        // Texture Filtering
-        ImGui::Separator();
-        ImGui::Text("Texture Filtering");
-        
-        ImGui::Checkbox("Anisotropic Filtering", &r_anisotropic->integer);
-        ImGui::SameLine();
-        ImGui::TextDisabled("(?)");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Improves texture quality at oblique angles");
-        }
-        
-        if (r_anisotropic->integer) {
-            ImGui::SliderInt("AF Level", &r_anisotropicLevel->integer, 1, 16, "%d");
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Higher values provide better quality but use more memory");
-            }
-        }
-    }
-    ImGui::End();
-}
-
-void ImGui_ShowPostProcessWindow(void) {
-    if (ImGui::Begin("Post-Processing", &g_imguiShowPostProcess)) {
-        // Bloom Settings
-        ImGui::Text("Bloom");
-        ImGui::Checkbox("Enable Bloom", &r_bloom->integer);
-        ImGui::SameLine();
-        ImGui::TextDisabled("(?)");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Adds a bloom effect to bright areas of the scene");
-        }
-        
-        if (r_bloom->integer) {
-            ImGui::SliderFloat("Bloom Intensity", &r_bloomIntensity->value, 0.0f, 2.0f, "%.2f");
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Controls the strength of the bloom effect");
-            }
-            
-            ImGui::SliderFloat("Bloom Threshold", &r_bloomThreshold->value, 0.0f, 3.0f, "%.2f");
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Minimum brightness required for bloom to occur");
-            }
-            
-            ImGui::SliderInt("Bloom Quality", &r_bloomQuality->integer, 0, 2, "%d");
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("0 = Low, 1 = Medium, 2 = High");
-            }
-            
-            ImGui::ColorEdit3("Bloom Tint", r_bloomTint->value);
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Adjusts the color tint of the bloom effect");
-            }
-        }
-
-        // HDR Settings
-        ImGui::Separator();
-        ImGui::Text("HDR Settings");
-        ImGui::Checkbox("Enable HDR", &r_hdr->integer);
-        ImGui::SameLine();
-        ImGui::TextDisabled("(?)");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Enables High Dynamic Range rendering");
-        }
-
-        if (r_hdr->integer) {
-            ImGui::SliderFloat("Exposure", &r_exposure->value, 0.1f, 4.0f, "%.2f");
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Controls the overall scene brightness");
-            }
-
-            ImGui::Checkbox("ACES Tonemapping", &r_acesTonemapping->integer);
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Applies ACES filmic tonemapping to HDR content");
-            }
-        }
-
-        // LUT Settings
-        ImGui::Separator();
-        ImGui::Text("Color Grading");
-        ImGui::Checkbox("Enable LUT", &r_lutEnable->integer);
-        ImGui::SameLine();
-        ImGui::TextDisabled("(?)");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Applies color grading using a Look-Up Table");
-        }
-
-        if (r_lutEnable->integer) {
-            ImGui::SliderFloat("LUT Intensity", &r_lutIntensity->value, 0.0f, 1.0f, "%.2f");
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Controls the strength of the color grading effect");
-            }
-
-            ImGui::Combo("Blend Mode", &r_lutBlendMode->integer, "Normal\0Multiply\0Screen\0Overlay\0");
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Selects how the LUT is blended with the original image");
-            }
-
-            ImGui::SliderFloat("Animation Speed", &r_lutAnimationSpeed->value, 0.0f, 1.0f, "%.2f");
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Controls the speed of animated LUT effects");
-            }
-        }
-    }
-    ImGui::End();
-}
-
-void ImGui_ShowMainMenuBar(void) {
-    if (ImGui::BeginMainMenuBar()) {
-        if (ImGui::BeginMenu("File")) {
-            if (ImGui::MenuItem("Save Settings")) {
-                // Save settings implementation
-            }
-            if (ImGui::MenuItem("Load Settings")) {
-                // Load settings implementation
-    // Main loop
-    while (!done) {
-        // Process input
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            ImGui_ProcessEvent(&event);
-            if (event.type == SDL_QUIT) {
-                done = true;
-            }
-        }
-
-        // Start ImGui frame
-        ImGui_NewFrame();
-
-        // Render game
-        R_RenderFrame();
-
-        // Render ImGui
-        ImGui_Render();
-
-        // Present frame
-        vkQueuePresentKHR(vk.queue, &presentInfo);
-    }
-
-    // Cleanup
-    ImGui_Shutdown();
-    vkDestroySwapchainKHR(vk.device, vk.swapchain, nullptr);
-    vkDestroySurfaceKHR(vk.instance, vk.surface, nullptr);
-    vkDestroyDevice(vk.device, nullptr);
-    vkDestroyInstance(vk.instance, nullptr);
-    SDL_DestroyWindow(window);
-    SDL_Quit();
-    return 0;
-}
-
-// Helper function to create ImGui window for HDR/Tonemapping settings
-void ImGui_ShowHDRSettings(void) {
-    if (ImGui::Begin("HDR & Tonemapping Settings")) {
-        ImGui::Checkbox("Enable HDR", (bool*)&r_hdr->integer);
-        ImGui::SameLine();
-        ImGui::TextDisabled("(?)");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Enables High Dynamic Range rendering");
-        }
-
-        if (r_hdr->integer) {
-            ImGui::SliderFloat("Exposure", &r_exposure->value, 0.1f, 4.0f, "%.2f");
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Controls the overall brightness of HDR scenes");
-            }
-
-            ImGui::Checkbox("ACES Tonemapping", (bool*)&r_acesTonemapping->integer);
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Applies ACES filmic tonemapping to HDR content");
-            }
-        }
-    }
-    ImGui::End();
-}
-
-// Helper function to create ImGui window for LUT settings
-void ImGui_ShowLUTSettings(void) {
-    if (ImGui::Begin("LUT Settings")) {
-        ImGui::Checkbox("Enable LUTs", (bool*)&r_lutEnable->integer);
-        ImGui::SameLine();
-        ImGui::TextDisabled("(?)");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Enables Look-Up Table color grading");
-        }
-
-        if (r_lutEnable->integer) {
-            ImGui::SliderFloat("LUT Intensity", &r_lutIntensity->value, 0.0f, 1.0f, "%.2f");
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Controls the strength of the color grading effect");
-            }
-
-            ImGui::Combo("Blend Mode", &r_lutBlendMode->integer, "Normal\0Multiply\0Screen\0Overlay\0");
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Selects how the LUT is blended with the original image");
-            }
-
-            ImGui::SliderFloat("Animation Speed", &r_lutAnimationSpeed->value, 0.0f, 1.0f, "%.2f");
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Controls the speed of animated LUT effects");
-            }
-
-            ImGui::Checkbox("LUT Streaming", (bool*)&r_lutStreaming->integer);
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Enables streaming of large LUT files");
-            }
-
-            ImGui::SliderInt("LUT Quality", &r_lutQuality->integer, 1, 3, "%d");
-            ImGui::SameLine();
-            ImGui::TextDisabled("(?)");
-            if (ImGui::IsItemHovered()) {
-                ImGui::SetTooltip("Adjusts the quality of LUT processing (higher = better quality)");
-            }
-        }
-    }
-    ImGui::End();
-}
-
-// Main ImGui rendering function
-void ImGui_Render(void) {
-    // Start new frame
-    ImGui_ImplVulkan_NewFrame();
-    ImGui_ImplSDL2_NewFrame();
-    ImGui::NewFrame();
-
-    // Show main menu bar with file, edit, view options
-    ImGui_ShowMainMenuBar();
-
-    // Show HDR settings window
-    ImGui_ShowHDRSettings();
-
-    // Show LUT settings window
-    ImGui_ShowLUTSettings();
-
-    // Show performance metrics window
-    ImGui_ShowPerformanceMetrics();
-
-    // Show debug console window
-    ImGui_ShowDebugConsole();
-
-    // Show about window if requested
-    if (show_about_window) {
-        ImGui_ShowAboutWindow();
-    }
-
-    // Render ImGui
-    ImGui::Render();
+    <h3>Overlays not showing</h3>
+    <ul>
+        <li>Ensure <code>cl_imgui</code> is enabled: <code>/set cl_imgui 1</code></li>
+        <li>Check that ImGui backend is initialized (renderer support required)</li>
+        <li>Verify CVars are set correctly</li>
+    </ul>
     
-    // Record ImGui draw commands
-    VkCommandBuffer cmd = vk.commandBuffers[vk.currentFrame];
-    VkCommandBufferBeginInfo beginInfo = {};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    vkBeginCommandBuffer(cmd, &beginInfo);
+    <h3>Performance issues</h3>
+    <ul>
+        <li>Disable unused overlays</li>
+        <li>Reduce frame history size if needed</li>
+        <li>Check renderer performance counters</li>
+    </ul>
     
-    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
+    <h3>Memory overlay empty</h3>
+    <ul>
+        <li>Build with <code>ENABLE_MEMORY_TRACKING=ON</code></li>
+        <li>Ensure memory tracking is initialized</li>
+    </ul>
     
-    vkEndCommandBuffer(cmd);
-}
+    <h3>Network overlay empty</h3>
+    <ul>
+        <li>Ensure enhanced networking is enabled</li>
+        <li>Check that network statistics are being collected</li>
+    </ul>
+</div>
 
-// Helper function to show performance metrics
-void ImGui_ShowPerformanceMetrics(void) {
-    if (ImGui::Begin("Performance Metrics")) {
-        ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
-        ImGui::Text("Frame Time: %.3f ms", 1000.0f / ImGui::GetIO().Framerate);
-        ImGui::Text("Draw Calls: %d", tr.drawCalls);
-        ImGui::Text("Triangle Count: %d", tr.triangleCount);
-        
-        if (ImGui::CollapsingHeader("GPU Memory")) {
-            ImGui::Text("Texture Memory: %.2f MB", tr.textureMemory / (1024.0f * 1024.0f));
-            ImGui::Text("Buffer Memory: %.2f MB", tr.bufferMemory / (1024.0f * 1024.0f));
-            ImGui::Text("LUT Memory: %.2f MB", tr.lutMemory / (1024.0f * 1024.0f));
-        }
-
-        if (ImGui::CollapsingHeader("Vulkan Info")) {
-            ImGui::Text("Vulkan Version: %s", tr.vulkanVersion);
-            ImGui::Text("Device: %s", tr.deviceName);
-            ImGui::Text("Driver Version: %s", tr.driverVersion);
-        }
-    }
-    ImGui::End();
-}
-
-// Helper function to show debug console
-void ImGui_ShowDebugConsole(void) {
-    if (ImGui::Begin("Debug Console")) {
-        static char input[256] = "";
-        static std::vector<std::string> history;
-        
-        // Command input
-        if (ImGui::InputText("Command", input, IM_ARRAYSIZE(input), 
-            ImGuiInputTextFlags_EnterReturnsTrue)) {
-            if (input[0] != '\0') {
-                history.push_back(input);
-                Cbuf_AddText(input);
-                input[0] = '\0';
-            }
-        }
-
-        // Command history
-        ImGui::BeginChild("History", ImVec2(0, 200), true);
-        for (const auto& cmd : history) {
-            ImGui::TextWrapped("%s", cmd.c_str());
-        }
-        ImGui::EndChild();
-    }
-    ImGui::End();
-}
-
-// Helper function to show about window
-void ImGui_ShowAboutWindow(void) {
-    if (ImGui::Begin("About", &show_about_window)) {
-        ImGui::Text("id Tech 3 Enhanced");
-        ImGui::Text("Version 1.0.0");
-        ImGui::Separator();
-        ImGui::Text("Features:");
-        ImGui::BulletText("Vulkan Rendering");
-        ImGui::BulletText("PBR Materials");
-        ImGui::BulletText("HDR Rendering");
-        ImGui::BulletText("ACES Tonemapping");
-        ImGui::BulletText("LUT Color Grading");
-        ImGui::BulletText("ImGui Debug Interface");
-        ImGui::Separator();
-        ImGui::Text("Built with:");
-        ImGui::BulletText("Dear ImGui");
-        ImGui::BulletText("Vulkan");
-        ImGui::BulletText("SDL2");
-    }
-    ImGui::End();
-}
-
-// Helper function to show HDR settings
-void ImGui_ShowHDRSettings(void) {
-    if (ImGui::Begin("HDR Settings")) {
-        ImGui::Checkbox("Enable HDR", (bool*)&r_hdr->integer);
-        ImGui::SameLine();
-        ImGui::TextDisabled("(?)");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Enables High Dynamic Range rendering");
-        }
-
-        if (r_hdr->integer) {
-            ImGui::SliderFloat("Exposure", &r_exposure->value, 0.1f, 4.0f, "%.2f");
-            ImGui::Checkbox("ACES Tonemapping", (bool*)&r_acesTonemapping->integer);
-            ImGui::SliderFloat("Gamma", &r_gamma->value, 1.0f, 3.0f, "%.2f");
-        }
-    }
-    ImGui::End();
-}
-
-// Helper function to show LUT settings
-void ImGui_ShowLUTSettings(void) {
-    if (ImGui::Begin("LUT Settings")) {
-        ImGui::Checkbox("Enable LUTs", (bool*)&r_lutEnable->integer);
-        ImGui::SameLine();
-        ImGui::TextDisabled("(?)");
-        if (ImGui::IsItemHovered()) {
-            ImGui::SetTooltip("Enables Look-Up Table color grading");
-        }
-
-        if (r_lutEnable->integer) {
-            ImGui::SliderFloat("LUT Intensity", &r_lutIntensity->value, 0.0f, 1.0f, "%.2f");
-            ImGui::Combo("Blend Mode", &r_lutBlendMode->integer, "Normal\0Multiply\0Screen\0Overlay\0");
-            ImGui::SliderFloat("Animation Speed", &r_lutAnimationSpeed->value, 0.0f, 1.0f, "%.2f");
-            ImGui::Checkbox("LUT Streaming", (bool*)&r_lutStreaming->integer);
-            ImGui::SliderInt("LUT Quality", &r_lutQuality->integer, 1, 3, "%d");
-        }
-    }
-    ImGui::End();
-}
-
-// Helper function to show main menu bar
-void ImGui_ShowMainMenuBar(void) {
-    if (ImGui::BeginMainMenuBar()) {
-        if (ImGui::BeginMenu("File")) {
-            if (ImGui::MenuItem("Exit", "Alt+F4")) {
-                Cbuf_AddText("quit\n");
-            }
-            ImGui::EndMenu();
-        }
-        if (ImGui::BeginMenu("View")) {
-            ImGui::MenuItem("HDR Settings", NULL, &show_hdr_window);
-            ImGui::MenuItem("LUT Settings", NULL, &show_lut_window);
-            ImGui::MenuItem("Performance Metrics", NULL, &show_performance_window);
-            ImGui::MenuItem("Debug Console", NULL, &show_console_window);
-            ImGui::EndMenu();
-        }
-        if (ImGui::BeginMenu("Help")) {
-            if (ImGui::MenuItem("About")) {
-                show_about_window = true;
-            }
-            ImGui::EndMenu();
-        }
-        ImGui::EndMainMenuBar();
-    }
-}
-</pre>
-
-<h2>Testing</h2>
-<ul>
-    <li>Test ImGui integration with: <code>/r_showImgui 1</code></li>
-    <li>Verify all windows render correctly</li>
-    <li>Test window dragging and resizing</li>
-    <li>Verify HDR and LUT settings work through ImGui</li>
-    <li>Test performance metrics accuracy</li>
-    <li>Verify debug console command execution</li>
-</ul>
-
-<h2>Performance Considerations</h2>
-<ul>
-    <li>Monitor ImGui rendering overhead</li>
-    <li>Profile window update frequency</li>
-    <li>Consider adding window visibility toggles</li>
-    <li>Test with different display resolutions</li>
-</ul>
-
-<h2>Additional Resources</h2>
-<ul>
-    <li><a href="https://github.com/ocornut/imgui">Dear ImGui Repository</a></li>
-    <li><a href="https://github.com/ocornut/imgui/wiki">ImGui Wiki</a></li>
-    <li><a href="https://github.com/ocornut/imgui/wiki/FAQ">ImGui FAQ</a></li>
-    <li><a href="https://github.com/ocornut/imgui/wiki/Getting-Started">ImGui Getting Started</a></li>
-</ul>
-</body>
-</html>
+<div class="section">
+    <h2>Related Topics</h2>
+    <ul>
+        <li><a href="external/imgui-integration">ImGui Integration (C++)</a></li>
+        <li><a href="external/cimgui-quake3e">CimGui + Quake3e Walkthrough</a></li>
+        <li><a href="core/memory-safety">Memory Safety & Profiling</a></li>
+        <li><a href="core/structured-logging">Structured Logging</a></li>
+        <li><a href="development/debugging">Debugging Tools</a></li>
+        <li><a href="networking/networking">Networking</a></li>
+    </ul>
+</div>

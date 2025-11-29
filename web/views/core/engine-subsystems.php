@@ -26,6 +26,19 @@ $breadcrumbs = [
             <li><strong>Game Logic:</strong> Entity management and gameplay systems</li>
         </ul>
     </div>
+    
+    <div class="feature-list">
+        <h3>Recent Enhancements</h3>
+        <p>The engine has undergone significant refactoring and modernization:</p>
+        <ul>
+            <li><strong>Memory Safety:</strong> AddressSanitizer, UndefinedBehaviorSanitizer, and comprehensive memory tracking</li>
+            <li><strong>Structured Logging:</strong> Modern logging system with levels, categories, and JSON output</li>
+            <li><strong>Enhanced Networking:</strong> HTTP/2, connection pooling, rate limiting, and WebSocket support</li>
+            <li><strong>Code Quality:</strong> Fixed unsafe string operations, added header guards, improved error handling</li>
+            <li><strong>Build System:</strong> Static analysis support, unit test framework, modern C++ features</li>
+        </ul>
+        <p>See <a href="core/memory-safety">Memory Safety & Profiling</a>, <a href="core/structured-logging">Structured Logging</a>, and <a href="networking/networking">Networking</a> for details.</p>
+    </div>
 </div>
 
 <div class="section">
@@ -1031,6 +1044,8 @@ void Com_Shutdown(void) {
     <ul>
         <li><a href="core/main-loop">Main Loop Analysis</a></li>
         <li><a href="core/memory-management">Memory Management</a></li>
+        <li><a href="core/memory-safety">Memory Safety & Profiling</a></li>
+        <li><a href="core/structured-logging">Structured Logging</a></li>
         <li><a href="core/entity-system">Entity System</a></li>
         <li><a href="rendering/vulkan">Vulkan Renderer</a></li>
         <li><a href="networking/networking">Networking</a></li>

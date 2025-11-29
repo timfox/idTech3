@@ -89,14 +89,26 @@ seta r_raymarchSky "1"</code></pre>
 </div>
 
 <div class="section">
+    <h2>Renderer Comparison</h2>
+    <p>The engine supports multiple renderer backends. Choose the one that best fits your needs:</p>
+    <ul>
+        <li><strong><a href="rendering/vulkan">Vulkan:</a></strong> Cross-platform, high performance, modern features (recommended)</li>
+        <li><strong><a href="rendering/directx12">DirectX 12:</a></strong> Windows-only, excellent performance, DXR ray tracing support</li>
+        <li><strong>OpenGL:</strong> Legacy support, maximum compatibility</li>
+    </ul>
+    <p>All renderers support PBR materials, HDR rendering, and modern post-processing effects. See <a href="rendering/directx12">DirectX 12 Renderer</a> for Windows-specific features.</p>
+</div>
+
+<div class="section">
     <h2>Advanced Topics</h2>
     <ul>
         <li><a href="rendering/pbr">Physically-Based Rendering (PBR)</a></li>
-<li><a href="tonemapping">HDR and ACES Tonemapping</a></li>
-<li><a href="luts">3D LUT Color Grading</a></li>
-<li><a href="raymarching_sky">FFXV-Style Raymarching Sky</a></li>
-<li><a href="deferred">Deferred Rendering Pipeline</a></li>
-<li><a href="SHGI">Spherical Harmonics Global Illumination</a></li>
+        <li><a href="tonemapping">HDR and ACES Tonemapping</a></li>
+        <li><a href="luts">3D LUT Color Grading</a></li>
+        <li><a href="raymarching_sky">FFXV-Style Raymarching Sky</a></li>
+        <li><a href="rendering/animated-skybox">Animated Skybox (Flipbook)</a></li>
+        <li><a href="deferred">Deferred Rendering Pipeline</a></li>
+        <li><a href="SHGI">Spherical Harmonics Global Illumination</a></li>
     </ul>
 </div>
 
@@ -119,6 +131,17 @@ quake3e +set r_renderer vulkan +set r_vkValidation 1</code></pre>
             <li>Adjust quality settings in the graphics menu</li>
         </ul>
     </div>
+</div>
+
+<div class="section">
+    <h2>Related Topics</h2>
+    <ul>
+        <li><a href="rendering/directx12">DirectX 12 Renderer</a> - Windows alternative with DXR support</li>
+        <li><a href="rendering/pbr">PBR Pipeline</a> - Physically-based rendering</li>
+        <li><a href="rendering/animated-skybox">Animated Skybox</a> - Dynamic sky effects</li>
+        <li><a href="renderer/renderdoc-debugging">RenderDoc Debugging</a> - Graphics debugging tools</li>
+        <li><a href="development/debugging">Debugging Tools</a> - General debugging</li>
+    </ul>
 </div>
 
 <div class="section">

@@ -14,6 +14,17 @@ $breadcrumbs = [
 <div class="section">
     <h2>Introduction</h2>
     <p>This documentation covers the PBR shader system implementation. PBR shaders provide more realistic material rendering by simulating physical properties of surfaces.</p>
+    
+    <div class="feature-list">
+        <h3>Renderer Compatibility</h3>
+        <p>PBR materials are supported across all renderer backends:</p>
+        <ul>
+            <li><strong><a href="rendering/vulkan">Vulkan Renderer</a>:</strong> Full PBR support with HDR and advanced post-processing</li>
+            <li><strong><a href="rendering/directx12">DirectX 12 Renderer</a>:</strong> Full PBR support with DXR ray tracing capabilities</li>
+            <li><strong>OpenGL Renderer:</strong> PBR support with compatibility mode</li>
+        </ul>
+        <p>All renderers use the same shader syntax and material properties, ensuring consistency across platforms.</p>
+    </div>
 </div>
 
 <div class="section">
@@ -136,4 +147,40 @@ $breadcrumbs = [
             <p>This example creates a gold material using PBR properties without textures. The specularScale values are set to create a gold-like appearance, and the roughness is set to 0.5 for a semi-polished look.</p>
         </div>
     </div>
+</div>
+
+<div class="section">
+    <h2>Configuration</h2>
+    <p>Enable PBR rendering in your configuration:</p>
+    <div class="code-block">
+        <pre><code># Enable PBR materials
+seta r_pbr "1"
+
+# PBR quality settings (if available)
+seta r_pbr_quality "2"  # 0=Low, 1=Medium, 2=High</code></pre>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Best Practices</h2>
+    <ul>
+        <li>Use proper material maps (albedo, normal, roughness/metallic) for best results</li>
+        <li>Keep specularReflectance values realistic (0.04-0.08 for non-metals)</li>
+        <li>Combine with HDR rendering and tonemapping for realistic lighting</li>
+        <li>Test materials in different lighting conditions</li>
+        <li>Use the <a href="imgui">ImGui debug overlays</a> to inspect material properties in real-time</li>
+    </ul>
+</div>
+
+<div class="section">
+    <h2>Related Topics</h2>
+    <ul>
+        <li><a href="rendering/vulkan">Vulkan Renderer</a> - Recommended renderer for PBR</li>
+        <li><a href="rendering/directx12">DirectX 12 Renderer</a> - Windows renderer with DXR</li>
+        <li><a href="tonemapping">HDR and ACES Tonemapping</a> - Essential for realistic PBR lighting</li>
+        <li><a href="luts">3D LUT Color Grading</a> - Post-processing for PBR materials</li>
+        <li><a href="renderer/pbr-pipeline">PBR Pipeline</a> - Technical implementation details</li>
+        <li><a href="development/map-making">Map Making</a> - Creating maps with PBR materials</li>
+        <li><a href="imgui">ImGui Debug Overlays</a> - Real-time material inspection</li>
+    </ul>
 </div> 
