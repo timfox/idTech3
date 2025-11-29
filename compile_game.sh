@@ -40,6 +40,12 @@ if [ -d "$MOD_BUILD_DIR" ]; then
     rm -rf "$MOD_BUILD_DIR"
 fi
 
+# Clear old mod files (shared libraries) from the destination before copy
+if [ -d "$MOD_DEST_DIR" ]; then
+    echo "Removing old mod files from $MOD_DEST_DIR ..."
+    rm -f "$MOD_DEST_DIR"/*.so "$MOD_DEST_DIR"/*.dll 2>/dev/null || true
+fi
+
 # Create build directory and configure CMake
 mkdir -p "$MOD_BUILD_DIR"
 cd "$MOD_BUILD_DIR"
