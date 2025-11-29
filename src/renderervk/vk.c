@@ -28,7 +28,7 @@ static PFN_vkCreateDevice								qvkCreateDevice;
 static PFN_vkDestroyInstance							qvkDestroyInstance;
 static PFN_vkEnumerateDeviceExtensionProperties			qvkEnumerateDeviceExtensionProperties;
 static PFN_vkEnumeratePhysicalDevices					qvkEnumeratePhysicalDevices;
-static PFN_vkGetDeviceProcAddr							qvkGetDeviceProcAddr;
+PFN_vkGetDeviceProcAddr							qvkGetDeviceProcAddr;
 static PFN_vkGetPhysicalDeviceFeatures					qvkGetPhysicalDeviceFeatures;
 static PFN_vkGetPhysicalDeviceFormatProperties			qvkGetPhysicalDeviceFormatProperties;
 static PFN_vkGetPhysicalDeviceMemoryProperties			qvkGetPhysicalDeviceMemoryProperties;
@@ -85,6 +85,8 @@ PFN_vkCreateRenderPass							qvkCreateRenderPass;
 PFN_vkCreateSampler								qvkCreateSampler;
 PFN_vkCreateSemaphore							qvkCreateSemaphore;
 PFN_vkCreateShaderModule							qvkCreateShaderModule;
+PFN_vkCreateQueryPool								qvkCreateQueryPool;
+PFN_vkDestroyQueryPool							qvkDestroyQueryPool;
 PFN_vkDestroyBuffer								qvkDestroyBuffer;
 PFN_vkDestroyCommandPool							qvkDestroyCommandPool;
 PFN_vkDestroyDescriptorPool						qvkDestroyDescriptorPool;
@@ -133,6 +135,11 @@ static PFN_vkGetImageMemoryRequirements2KHR				qvkGetImageMemoryRequirements2KHR
 static PFN_vkDebugMarkerSetObjectNameEXT				qvkDebugMarkerSetObjectNameEXT;
 
 PFN_vkCmdClearColorImage								qvkCmdClearColorImage;
+
+// GPU timing query function pointers
+static PFN_vkCmdWriteTimestamp							qvkCmdWriteTimestamp;
+static PFN_vkGetQueryPoolResults						qvkGetQueryPoolResults;
+static PFN_vkResetQueryPool								qvkResetQueryPool;
 
 // Ray tracing function pointers (non-static for use in vk_raytracing.c)
 PFN_vkCreateAccelerationStructureKHR					qvkCreateAccelerationStructureKHR;
@@ -2336,6 +2343,9 @@ static void init_vulkan_library( void )
 	INIT_DEVICE_FUNCTION(vkCmdSetDepthBias)
 	INIT_DEVICE_FUNCTION(vkCmdSetScissor)
 	INIT_DEVICE_FUNCTION(vkCmdSetViewport)
+	INIT_DEVICE_FUNCTION_EXT(vkCmdWriteTimestamp)
+	INIT_DEVICE_FUNCTION(vkGetQueryPoolResults)
+	INIT_DEVICE_FUNCTION(vkResetQueryPool)
 	INIT_DEVICE_FUNCTION(vkCreateBuffer)
 	INIT_DEVICE_FUNCTION(vkCreateCommandPool)
 	INIT_DEVICE_FUNCTION(vkCreateDescriptorPool)
@@ -2351,6 +2361,8 @@ static void init_vulkan_library( void )
 	INIT_DEVICE_FUNCTION(vkCreateSampler)
 	INIT_DEVICE_FUNCTION(vkCreateSemaphore)
 	INIT_DEVICE_FUNCTION(vkCreateShaderModule)
+	INIT_DEVICE_FUNCTION(vkCreateQueryPool)
+	INIT_DEVICE_FUNCTION(vkDestroyQueryPool)
 	INIT_DEVICE_FUNCTION(vkDestroyBuffer)
 	INIT_DEVICE_FUNCTION(vkDestroyCommandPool)
 	INIT_DEVICE_FUNCTION(vkDestroyDescriptorPool)
@@ -4362,6 +4374,93 @@ static void vk_create_sync_primitives( void ) {
 }
 
 
+static void vk_create_timing_queries( void )
+{
+	VkQueryPoolCreateInfo query_pool_info;
+	VkPhysicalDeviceProperties props;
+
+	// Check if timestamp queries are supported
+	qvkGetPhysicalDeviceProperties( vk.physical_device, &props );
+	if ( props.limits.timestampComputeAndGraphics == VK_FALSE ) {
+		vk.timing.enabled = qfalse;
+		return;
+	}
+
+	// Create query pool for timestamp queries (2 per frame: start and end)
+	vk.timing.query_count = NUM_COMMAND_BUFFERS * 2; // Start and end timestamps per command buffer
+	Com_Memset( &query_pool_info, 0, sizeof( query_pool_info ) );
+	query_pool_info.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+	query_pool_info.queryType = VK_QUERY_TYPE_TIMESTAMP;
+	query_pool_info.queryCount = vk.timing.query_count;
+
+	VkResult res = qvkCreateQueryPool( vk.device, &query_pool_info, NULL, &vk.timing.timestamp_query_pool );
+	if ( res == VK_SUCCESS ) {
+		vk.timing.enabled = qtrue;
+		vk.timing.current_query = 0;
+		vk.timing.frame_time_index = 0;
+		Com_Memset( vk.timing.frame_times, 0, sizeof( vk.timing.frame_times ) );
+		SET_OBJECT_NAME( vk.timing.timestamp_query_pool, "timestamp query pool", VK_DEBUG_REPORT_OBJECT_TYPE_QUERY_POOL_EXT );
+	} else {
+		vk.timing.enabled = qfalse;
+		ri.Printf( PRINT_WARNING, "Vulkan: Failed to create timestamp query pool: %s\n", vk_result_string( res ) );
+	}
+}
+
+static void vk_destroy_timing_queries( void )
+{
+	if ( vk.timing.timestamp_query_pool != VK_NULL_HANDLE ) {
+		qvkDestroyQueryPool( vk.device, vk.timing.timestamp_query_pool, NULL );
+		vk.timing.timestamp_query_pool = VK_NULL_HANDLE;
+	}
+	vk.timing.enabled = qfalse;
+}
+
+void vk_get_gpu_timing_stats( double *avg_frame_time_ms, double *min_frame_time_ms, double *max_frame_time_ms )
+{
+	if ( !vk.timing.enabled || vk.timing.frame_time_index == 0 ) {
+		if ( avg_frame_time_ms ) *avg_frame_time_ms = 0.0;
+		if ( min_frame_time_ms ) *min_frame_time_ms = 0.0;
+		if ( max_frame_time_ms ) *max_frame_time_ms = 0.0;
+		return;
+	}
+
+	VkPhysicalDeviceProperties props;
+	qvkGetPhysicalDeviceProperties( vk.physical_device, &props );
+	uint64_t timestamp_period = props.limits.timestampPeriod;
+	
+	uint32_t count = ( vk.timing.frame_time_index < ARRAY_LEN( vk.timing.frame_times ) ) 
+		? vk.timing.frame_time_index : ARRAY_LEN( vk.timing.frame_times );
+	
+	if ( count == 0 ) {
+		if ( avg_frame_time_ms ) *avg_frame_time_ms = 0.0;
+		if ( min_frame_time_ms ) *min_frame_time_ms = 0.0;
+		if ( max_frame_time_ms ) *max_frame_time_ms = 0.0;
+		return;
+	}
+
+	uint64_t sum = 0;
+	uint64_t min_time = UINT64_MAX;
+	uint64_t max_time = 0;
+	uint32_t i;
+	
+	for ( i = 0; i < count; i++ ) {
+		uint64_t time_ns = vk.timing.frame_times[i];
+		sum += time_ns;
+		if ( time_ns < min_time ) min_time = time_ns;
+		if ( time_ns > max_time ) max_time = time_ns;
+	}
+	
+	if ( avg_frame_time_ms ) {
+		*avg_frame_time_ms = ( (double)sum / count ) * timestamp_period / 1000000.0;
+	}
+	if ( min_frame_time_ms ) {
+		*min_frame_time_ms = (double)min_time * timestamp_period / 1000000.0;
+	}
+	if ( max_frame_time_ms ) {
+		*max_frame_time_ms = (double)max_time * timestamp_period / 1000000.0;
+	}
+}
+
 static void vk_destroy_sync_primitives( void  ) {
 	uint32_t i;
 
@@ -4492,6 +4591,7 @@ static void vk_restart_swapchain( const char *funcname, VkResult res )
 	vk_destroy_attachments();
 	vk_destroy_swapchain();
 	vk_destroy_sync_primitives();
+	vk_destroy_timing_queries();
 #ifdef VK_CUBEMAP	
     vk_destroy_cubemap_prefilter();
 #endif
@@ -4751,6 +4851,9 @@ void vk_initialize( void )
 	vk_rt_init();
 #endif
 
+	// Initialize DLSS
+	vk_dlss_init();
+
 	vk.offscreenRender = qtrue;
 
 	if ( props.vendorID == 0x1002 ) {
@@ -4994,6 +5097,9 @@ void vk_initialize( void )
 	vk_create_geometry_buffers( vk.geometry_buffer_size_new );
 	vk.geometry_buffer_size_new = 0;
 
+	// Initialize geometry buffer history tracking
+	Com_Memset( &vk.geometry_buffer_history, 0, sizeof( vk.geometry_buffer_history ) );
+
 	vk_create_storage_buffer( MAX_FLARES * vk.storage_alignment );
 
 	vk_create_shader_modules();
@@ -5044,6 +5150,9 @@ void vk_initialize( void )
 	if ( vk.defaults.staging_size == STAGING_BUFFER_SIZE_HI ) {
 		vk_alloc_staging_buffer( vk.defaults.staging_size );
 	}
+
+	// Initialize GPU timing queries
+	vk_create_timing_queries();
 
 	vk.active = qtrue;
 }
@@ -5526,6 +5635,14 @@ __cleanup:
 #ifdef USE_VULKAN_RAY_TRACING
 	vk_rt_shutdown();
 #endif
+
+	vk_dlss_shutdown();
+
+	vk_mesh_shaders_shutdown();
+
+	vk_virtual_texture_shutdown();
+	vk_advanced_materials_shutdown();
+	vk_particles_shutdown();
 
 #ifdef USE_VMA
 	// Destroy VMA allocator before device
@@ -7822,7 +7939,9 @@ VkPipeline vk_gen_pipeline( uint32_t index ) {
 	if ( index < vk.pipelines_count ) {
 		VK_Pipeline_t *pipeline = vk.pipelines + index;
 		const renderPass_t pass = vk.renderPassIndex;
+		// Pipeline caching: check if already created for this render pass
 		if ( pipeline->handle[ pass ] == VK_NULL_HANDLE ) {
+			// Create pipeline lazily - Vulkan pipeline cache will handle deduplication
 			pipeline->handle[ pass ] = create_pipeline( &pipeline->def, pass, index );
 		}
 		return pipeline->handle[ pass ];
@@ -8061,10 +8180,21 @@ void vk_update_mvp( const float *m ) {
 	//
 	// Specify push constants.
 	//
-	if ( m )
+	if ( m ) {
 		Com_Memcpy( push_constants, m, sizeof( push_constants ) );
-	else
-		get_mvp_transform( push_constants );
+		// Update cache when explicit matrix provided
+		Com_Memcpy( vk.cmd->mvp_cache.cached_mvp, push_constants, sizeof( push_constants ) );
+		vk.cmd->mvp_cache.mvp_valid = qtrue;
+	} else {
+		// Check cache first to avoid redundant calculations
+		if ( vk.cmd->mvp_cache.mvp_valid ) {
+			Com_Memcpy( push_constants, vk.cmd->mvp_cache.cached_mvp, sizeof( push_constants ) );
+		} else {
+			get_mvp_transform( push_constants );
+			Com_Memcpy( vk.cmd->mvp_cache.cached_mvp, push_constants, sizeof( push_constants ) );
+			vk.cmd->mvp_cache.mvp_valid = qtrue;
+		}
+	}
 
 	qvkCmdPushConstants( vk.cmd->command_buffer, vk.pipeline_layout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof( push_constants ), push_constants );
 
@@ -8095,8 +8225,21 @@ static void vk_bind_attr( int index, unsigned int item_size, const void *src ) {
 	const uint32_t size = tess.numVertexes * item_size;
 
 	if ( offset + size > vk.geometry_buffer_size ) {
-		// schedule geometry buffer resize
-		vk.geometry_buffer_size_new = log2pad( offset + size, 1 );
+		// schedule geometry buffer resize - use history to pre-allocate if available
+		VkDeviceSize requested_size = log2pad( offset + size, 1 );
+		if ( vk.geometry_buffer_history.count >= 4 ) {
+			// Use max of recent history + 25% margin for pre-allocation
+			VkDeviceSize avg_size = 0;
+			uint32_t i;
+			for ( i = 0; i < vk.geometry_buffer_history.count; i++ ) {
+				avg_size += vk.geometry_buffer_history.sizes[i];
+			}
+			avg_size = ( avg_size / vk.geometry_buffer_history.count ) * 5 / 4; // 25% margin
+			if ( avg_size > requested_size ) {
+				requested_size = log2pad( avg_size, 1 );
+			}
+		}
+		vk.geometry_buffer_size_new = requested_size;
 	} else {
 		vk.cmd->buf_offset[ index ] = offset;
 		Com_Memcpy( vk.cmd->vertex_buffer_ptr + offset, src, size );
@@ -8112,8 +8255,20 @@ uint32_t vk_tess_index( uint32_t numIndexes, const void *src ) {
 	const uint32_t size = numIndexes * sizeof( tess.indexes[0] );
 
 	if ( offset + size > vk.geometry_buffer_size ) {
-		// schedule geometry buffer resize
-		vk.geometry_buffer_size_new = log2pad( offset + size, 1 );
+		// schedule geometry buffer resize - use history for pre-allocation
+		VkDeviceSize requested_size = log2pad( offset + size, 1 );
+		if ( vk.geometry_buffer_history.count >= 4 ) {
+			VkDeviceSize avg_size = 0;
+			uint32_t i;
+			for ( i = 0; i < vk.geometry_buffer_history.count; i++ ) {
+				avg_size += vk.geometry_buffer_history.sizes[i];
+			}
+			avg_size = ( avg_size / vk.geometry_buffer_history.count ) * 5 / 4; // 25% margin
+			if ( avg_size > requested_size ) {
+				requested_size = log2pad( avg_size, 1 );
+			}
+		}
+		vk.geometry_buffer_size_new = requested_size;
 		return ~0U;
 	} else {
 		Com_Memcpy( vk.cmd->vertex_buffer_ptr + offset, src, size );
@@ -8328,9 +8483,16 @@ void vk_reset_descriptor( int index )
 
 void vk_update_descriptor( int index, VkDescriptorSet descriptor )
 {
+	// Batch descriptor updates: track range of changed descriptors
+	// Actual binding deferred until vk_bind_descriptor_sets() for efficiency
 	if ( vk.cmd->descriptor_set.current[ index ] != descriptor ) {
-		vk.cmd->descriptor_set.start = ( index < vk.cmd->descriptor_set.start ) ? index : vk.cmd->descriptor_set.start;
-		vk.cmd->descriptor_set.end = ( index > vk.cmd->descriptor_set.end ) ? index : vk.cmd->descriptor_set.end;
+		if ( vk.cmd->descriptor_set.start == ~0U ) {
+			vk.cmd->descriptor_set.start = index;
+			vk.cmd->descriptor_set.end = index;
+		} else {
+			vk.cmd->descriptor_set.start = ( index < vk.cmd->descriptor_set.start ) ? index : vk.cmd->descriptor_set.start;
+			vk.cmd->descriptor_set.end = ( index > vk.cmd->descriptor_set.end ) ? index : vk.cmd->descriptor_set.end;
+		}
 	}
 	vk.cmd->descriptor_set.current[ index ] = descriptor;
 }
@@ -8360,13 +8522,16 @@ void vk_bind_descriptor_sets( void )
 
 	count = end - start + 1;
 
-	// fill NULL descriptor gaps
+	// Pre-fill NULL descriptor gaps to avoid per-frame overhead
+	// Use white image as fallback for missing textures
+	// This batching reduces individual descriptor set updates
 	for ( i = start + 1; i < end; i++ ) {
 		if ( vk.cmd->descriptor_set.current[i] == VK_NULL_HANDLE ) {
 			vk.cmd->descriptor_set.current[i] = tr.whiteImage->descriptor;
 		}
 	}
 
+	// Batch descriptor set binding - single API call for all changed descriptors
 	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout, start, count, vk.cmd->descriptor_set.current + start, offset_count, offsets );
 
 	vk.cmd->descriptor_set.end = 0;
@@ -9202,6 +9367,22 @@ _retry:
 		vk.stats.vertex_buffer_max = vk.cmd->vertex_buffer_offset;
 	}
 
+	// Track geometry buffer usage for pre-allocation
+	if ( vk.geometry_buffer_history.count < ARRAY_LEN( vk.geometry_buffer_history.sizes ) ) {
+		vk.geometry_buffer_history.sizes[ vk.geometry_buffer_history.count++ ] = vk.cmd->vertex_buffer_offset;
+	} else {
+		vk.geometry_buffer_history.sizes[ vk.geometry_buffer_history.index ] = vk.cmd->vertex_buffer_offset;
+		vk.geometry_buffer_history.index = ( vk.geometry_buffer_history.index + 1 ) % ARRAY_LEN( vk.geometry_buffer_history.sizes );
+	}
+	if ( vk.cmd->vertex_buffer_offset > vk.geometry_buffer_history.max_size ) {
+		vk.geometry_buffer_history.max_size = vk.cmd->vertex_buffer_offset;
+	}
+
+	// Initialize MVP cache
+	vk.cmd->mvp_cache.last_entity_num = -1;
+	vk.cmd->mvp_cache.mvp_valid = qfalse;
+	vk.cmd->vertex_buffer_offset = 0;
+
 	if ( vk.stats.push_size > vk.stats.push_size_max ) {
 		vk.stats.push_size_max = vk.stats.push_size;
 	}
@@ -9225,8 +9406,14 @@ _retry:
 		// screenMapDone will only be set after successful capture from 3D scene
 	}
 
-	// Always use the main render pass - screenMap will be captured via copy/blit later
-	vk_begin_main_render_pass();
+		// Always use the main render pass - screenMap will be captured via copy/blit later
+		vk_begin_main_render_pass();
+
+		// Record GPU timing start timestamp after render pass begins
+		if ( vk.timing.enabled && qvkCmdWriteTimestamp ) {
+			uint32_t query_index = vk.cmd_index * 2; // 2 queries per command buffer (start/end)
+			qvkCmdWriteTimestamp( vk.cmd->command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vk.timing.timestamp_query_pool, query_index );
+		}
 
 	// dynamic vertex buffer layout
 	vk.cmd->uniform_read_offset = 0;
@@ -9498,7 +9685,77 @@ void vk_end_frame( void )
 		if ( !ri.CL_IsMinimized() )
 		{
 			// ========================================================================
-			// STEP 5: Run gamma/tonemap pass (always samples from finalColorView)
+			// STEP 5: DLSS upscaling (if enabled, replaces TAA)
+			// ========================================================================
+			VkImage dlssInputImage = finalColorImage;
+			VkImageView dlssInputView = finalColorView;
+			
+			if ( r_dlss && r_dlss->integer && vk_dlss_is_supported() ) {
+				// Calculate render resolution based on DLSS quality mode
+				// DLSS quality modes: 0=Performance (50%), 1=Balanced (58%), 2=Quality (67%), 3=Ultra Quality (77%)
+				float scaleFactors[] = { 0.5f, 0.58f, 0.67f, 0.77f };
+				int qualityMode = r_dlss_quality ? r_dlss_quality->integer : 1;
+				qualityMode = (int)Com_Clamp( 0.0f, 3.0f, (float)qualityMode );
+				float scaleFactor = scaleFactors[qualityMode];
+				
+				uint32_t renderWidth = (uint32_t)(gls.windowWidth * scaleFactor);
+				uint32_t renderHeight = (uint32_t)(gls.windowHeight * scaleFactor);
+				
+				// Ensure render resolution is even (DLSS requirement)
+				renderWidth = (renderWidth / 2) * 2;
+				renderHeight = (renderHeight / 2) * 2;
+				
+				// Create DLSS resources if needed
+				vk_dlss_create_resources( renderWidth, renderHeight, gls.windowWidth, gls.windowHeight );
+				
+				// Update DLSS quality mode and sharpening
+				vk.dlss.qualityMode = qualityMode;
+				vk.dlss.sharpening = r_dlss_sharpening ? r_dlss_sharpening->value : 0.0f;
+				
+				// Run DLSS upscaling
+				// DLSS needs: color buffer, depth buffer, motion vectors
+				// For now, we'll use the color buffer as input
+				// TODO: Pass depth buffer and motion vectors when available
+				if ( vk.dlss.dlssOutputImage != VK_NULL_HANDLE ) {
+					vk_dlss_evaluate( vk.cmd->command_buffer, finalColorImage, 
+					                  vk.depth_image, VK_NULL_HANDLE, vk.frame_count );
+					
+					// Use DLSS output as input for gamma pass
+					dlssInputImage = vk.dlss.dlssOutputImage;
+					dlssInputView = vk.dlss.dlssOutputImageView;
+					
+					// Update descriptor to point to DLSS output
+					VkDescriptorImageInfo info;
+					VkWriteDescriptorSet desc;
+					Vk_Sampler_Def sd;
+					
+					Com_Memset( &sd, 0, sizeof( sd ) );
+					sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+					sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+					sd.max_lod_1_0 = qtrue;
+					sd.noAnisotropy = qtrue;
+					
+					info.sampler = vk_find_sampler( &sd );
+					info.imageView = dlssInputView;
+					info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+					
+					desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+					desc.pNext = NULL;
+					desc.dstSet = vk.color_descriptor;
+					desc.dstBinding = 0;
+					desc.dstArrayElement = 0;
+					desc.descriptorCount = 1;
+					desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+					desc.pImageInfo = &info;
+					desc.pBufferInfo = NULL;
+					desc.pTexelBufferView = NULL;
+					
+					qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
+				}
+			}
+			
+			// ========================================================================
+			// STEP 6: Run gamma/tonemap pass (always samples from finalColorView or DLSS output)
 			// ========================================================================
 			// CRITICAL: Ensure finalColorImage is valid before sampling.
 			// On menu-only frames with bloom OFF, the main render pass clears the image
@@ -9508,7 +9765,7 @@ void vk_end_frame( void )
 			// CRITICAL: When RT is enabled, RT composite already outputs sRGB (via linearToSrgb),
 			// so the gamma pipeline should have gamma=1.0 (set at pipeline creation time)
 			// to avoid double gamma correction. The gamma pass still runs for obScale/dithering.
-			if ( finalColorImage == VK_NULL_HANDLE || finalColorView == VK_NULL_HANDLE ) {
+			if ( dlssInputImage == VK_NULL_HANDLE || dlssInputView == VK_NULL_HANDLE ) {
 				ri.Printf( PRINT_WARNING, "VK: finalColorImage or finalColorView is NULL, skipping gamma pass\n" );
 			} else {
 				vk.renderWidth = gls.windowWidth;
@@ -9517,10 +9774,20 @@ void vk_end_frame( void )
 				vk.renderScaleX = 1.0;
 				vk.renderScaleY = 1.0;
 
-				// Clear the swapchain to black to ensure letterbox regions and unwritten pixels are initialized
-				// This prevents corruption on menu screens
-				// CRITICAL: Ensure render area matches framebuffer size to prevent stale data in corners
-				// If renderWidth/renderHeight don't match the framebuffer, the clear won't cover the full image
+				// Use compute shader post-processing if enabled
+				// Note: Compute pipeline creation would be implemented separately
+				if ( r_postprocess_compute && r_postprocess_compute->integer ) {
+					// Compute shader gamma/tonemap pass
+					// Implementation would:
+					// 1. Bind compute pipeline
+					// 2. Bind descriptor set with input/output images
+					// 3. Dispatch compute shader
+					// 4. Copy result to swapchain
+					ri.Printf( PRINT_DEVELOPER, "VK: Compute gamma/tonemap pass (compute shaders - not yet implemented)\n" );
+				}
+				
+				// Always use graphics pipeline for now (compute shaders need pipeline creation)
+				// Traditional graphics pipeline gamma pass
 				ri.Printf( PRINT_DEVELOPER, "VK: Gamma pass: renderArea=%dx%d, framebuffer should be %dx%d\n", 
 					vk.renderWidth, vk.renderHeight, gls.windowWidth, gls.windowHeight );
 				vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qtrue, vk.renderWidth, vk.renderHeight );
@@ -9531,6 +9798,12 @@ void vk_end_frame( void )
 				vk_end_render_pass();
 			}
 		}
+	}
+
+	// Record GPU timing end timestamp before ending command buffer
+	if ( vk.timing.enabled && qvkCmdWriteTimestamp ) {
+		uint32_t query_index = vk.cmd_index * 2 + 1; // End timestamp
+		qvkCmdWriteTimestamp( vk.cmd->command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vk.timing.timestamp_query_pool, query_index );
 	}
 
 	VK_CHECK( qvkEndCommandBuffer( vk.cmd->command_buffer ) );
@@ -9607,8 +9880,42 @@ void vk_end_frame( void )
 	}
 	vk.cmd->waitForFence = qtrue;
 
-	// presentation may take undefined time to complete, we can't measure it in a reliable way
-	backEnd.pc.msec = ri.Milliseconds() - backEnd.pc.msec;
+	// Retrieve GPU timing results from previous frame (if available)
+	// Note: Results are retrieved after submission, so we get timing from the frame that just completed
+	if ( vk.timing.enabled && qvkGetQueryPoolResults && qvkWaitForFences ) {
+		// Wait for previous frame's command buffer to complete before reading results
+		uint32_t prev_cmd_index = ( vk.cmd_index + 1 ) % NUM_COMMAND_BUFFERS;
+		if ( vk.tess[prev_cmd_index].waitForFence ) {
+			VkResult fence_res = qvkWaitForFences( vk.device, 1, &vk.tess[prev_cmd_index].rendering_finished_fence, VK_FALSE, 1000000 ); // 1ms timeout
+			if ( fence_res == VK_SUCCESS ) {
+				uint32_t query_index = prev_cmd_index * 2;
+				uint64_t timestamps[2];
+				
+				VkResult query_res = qvkGetQueryPoolResults( vk.device, vk.timing.timestamp_query_pool, 
+					query_index, 2, sizeof( timestamps ), timestamps, sizeof( uint64_t ), 
+					VK_QUERY_RESULT_64_BIT );
+				
+				if ( query_res == VK_SUCCESS && timestamps[1] > timestamps[0] ) {
+					VkPhysicalDeviceProperties props;
+					qvkGetPhysicalDeviceProperties( vk.physical_device, &props );
+					uint64_t timestamp_period = props.limits.timestampPeriod; // nanoseconds per timestamp unit
+					uint64_t frame_time_ns = ( timestamps[1] - timestamps[0] ) * timestamp_period;
+					
+					// Store in ring buffer for statistics
+					vk.timing.frame_times[ vk.timing.frame_time_index ] = frame_time_ns;
+					vk.timing.frame_time_index = ( vk.timing.frame_time_index + 1 ) % ARRAY_LEN( vk.timing.frame_times );
+					
+					// GPU timing provides more accurate measurement than CPU timing
+					// Frame time is already calculated in RB_ExecuteRenderCommands via CPU timing
+				}
+				
+				// Reset query pool for next frame
+				if ( qvkResetQueryPool ) {
+					qvkResetQueryPool( vk.device, vk.timing.timestamp_query_pool, query_index, 2 );
+				}
+			}
+		}
+	}
 
 	vk.renderPassIndex = RENDER_PASS_MAIN;
 }

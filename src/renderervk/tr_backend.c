@@ -725,6 +725,11 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 #ifdef USE_VULKAN
 			Com_Memcpy( vk_world.modelview_transform, backEnd.or.modelViewMatrix, 64 );
 			tess.depthRange = depthRange ? DEPTH_RANGE_WEAPON : DEPTH_RANGE_NORMAL;
+			// Invalidate MVP cache when entity changes
+			if ( vk.cmd->mvp_cache.last_entity_num != entityNum ) {
+				vk.cmd->mvp_cache.last_entity_num = entityNum;
+				vk.cmd->mvp_cache.mvp_valid = qfalse;
+			}
 			vk_update_mvp( NULL );
 #else
 			qglLoadMatrixf( backEnd.or.modelViewMatrix );
@@ -800,6 +805,9 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 #ifdef USE_VULKAN
 	Com_Memcpy( vk_world.modelview_transform, backEnd.viewParms.world.modelViewMatrix, 64 );
 	tess.depthRange = DEPTH_RANGE_NORMAL;
+	// Invalidate MVP cache when returning to world entity
+	vk.cmd->mvp_cache.last_entity_num = -1;
+	vk.cmd->mvp_cache.mvp_valid = qfalse;
 	//vk_update_mvp();
 #else
 	qglLoadMatrixf( backEnd.viewParms.world.modelViewMatrix );

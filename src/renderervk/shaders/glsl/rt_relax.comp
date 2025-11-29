@@ -1,0 +1,203 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+// Input images
+layout(binding = 0, set = 0, rgba16f) uniform image2D noisyInput; // Noisy RT output
+layout(binding = 1, set = 0, rgba16f) uniform image2D historyInput; // Previous frame denoised output
+layout(binding = 2, set = 0, rg16f) uniform image2D motionVectors; // Motion vectors
+layout(binding = 3, set = 0, r32f) uniform image2D depthBuffer; // Depth buffer
+layout(binding = 4, set = 0, rgba16f) uniform image2D normalBuffer; // Normal buffer (G-buffer)
+
+// Output images
+layout(binding = 5, set = 0, rgba16f) uniform image2D denoisedOutput; // Denoised output
+layout(binding = 6, set = 0, rgba16f) uniform image2D varianceOutput; // Variance buffer
+layout(binding = 7, set = 0, rgba16f) uniform image2D historyOutput; // Updated history
+
+// Uniform buffer
+layout(binding = 8, set = 0) uniform UniformBuffer {
+    vec2 resolution;
+    vec2 invResolution;
+    float temporalAlpha;
+    float spatialAlpha;
+    float varianceAlpha;
+    int frameIndex;
+    int iterations;
+} ubo;
+
+// Helper functions
+vec3 getHistorySample(vec2 uv) {
+    ivec2 pixel = ivec2(uv * ubo.resolution);
+    pixel = clamp(pixel, ivec2(0), ivec2(ubo.resolution) - ivec2(1));
+    return imageLoad(historyInput, pixel).rgb;
+}
+
+vec2 getMotionVector(ivec2 pixel) {
+    pixel = clamp(pixel, ivec2(0), ivec2(ubo.resolution) - ivec2(1));
+    return imageLoad(motionVectors, pixel).rg;
+}
+
+float getDepth(ivec2 pixel) {
+    pixel = clamp(pixel, ivec2(0), ivec2(ubo.resolution) - ivec2(1));
+    return imageLoad(depthBuffer, pixel).r;
+}
+
+vec3 getNormal(ivec2 pixel) {
+    pixel = clamp(pixel, ivec2(0), ivec2(ubo.resolution) - ivec2(1));
+    return imageLoad(normalBuffer, pixel).rgb;
+}
+
+// Temporal accumulation pass
+void temporalAccumulation(ivec2 pixel) {
+    vec2 uv = (vec2(pixel) + vec2(0.5)) * ubo.invResolution;
+    
+    // Get current noisy input
+    vec3 currentColor = imageLoad(noisyInput, pixel).rgb;
+    
+    // Reproject using motion vectors
+    vec2 motion = getMotionVector(pixel);
+    vec2 historyUV = uv - motion * ubo.invResolution;
+    
+    vec3 historyColor = vec3(0.0);
+    bool historyValid = all(greaterThanEqual(historyUV, vec2(0.0))) && all(lessThanEqual(historyUV, vec2(1.0)));
+    
+    if (historyValid) {
+        historyColor = getHistorySample(historyUV);
+    }
+    
+    // Temporal accumulation with variance-based blending
+    float alpha = ubo.temporalAlpha;
+    
+    // Simple disocclusion detection
+    float currentDepth = getDepth(pixel);
+    float motionMagnitude = length(motion);
+    if (motionMagnitude > 10.0) {
+        alpha = 1.0; // Reject history on large motion
+    }
+    
+    vec3 accumulatedColor = mix(historyColor, currentColor, alpha);
+    
+    // Write accumulated result
+    imageStore(denoisedOutput, pixel, vec4(accumulatedColor, 1.0));
+    
+    // Update history
+    imageStore(historyOutput, pixel, vec4(accumulatedColor, 1.0));
+}
+
+// A-trous wavelet spatial filter
+vec3 spatialFilter(ivec2 pixel, int stepSize) {
+    vec3 centerColor = imageLoad(denoisedOutput, pixel).rgb;
+    float centerDepth = getDepth(pixel);
+    vec3 centerNormal = getNormal(pixel);
+    
+    vec3 sum = centerColor;
+    float weightSum = 1.0;
+    
+    // 5x5 kernel with step size
+    for (int y = -2; y <= 2; y++) {
+        for (int x = -2; x <= 2; x++) {
+            if (x == 0 && y == 0) continue;
+            
+            ivec2 offset = ivec2(x, y) * stepSize;
+            ivec2 samplePos = pixel + offset;
+            
+            if (any(lessThan(samplePos, ivec2(0))) || any(greaterThanEqual(samplePos, ivec2(ubo.resolution)))) {
+                continue;
+            }
+            
+            vec3 sampleColor = imageLoad(denoisedOutput, samplePos).rgb;
+            float sampleDepth = getDepth(samplePos);
+            vec3 sampleNormal = getNormal(samplePos);
+            
+            // Depth-aware weight
+            float depthDiff = abs(sampleDepth - centerDepth);
+            float depthWeight = exp(-depthDiff * 10.0);
+            
+            // Normal-aware weight
+            float normalWeight = max(0.0, dot(centerNormal, sampleNormal));
+            
+            // Color similarity weight
+            vec3 colorDiff = abs(sampleColor - centerColor);
+            float colorWeight = exp(-dot(colorDiff, vec3(1.0)) * 2.0);
+            
+            // Combined weight
+            float weight = depthWeight * normalWeight * colorWeight;
+            
+            sum += sampleColor * weight;
+            weightSum += weight;
+        }
+    }
+    
+    return sum / weightSum;
+}
+
+// Variance estimation
+vec3 estimateVariance(ivec2 pixel) {
+    vec3 mean = vec3(0.0);
+    vec3 meanSquared = vec3(0.0);
+    float weightSum = 0.0;
+    
+    // Sample 3x3 neighborhood
+    for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+            ivec2 samplePos = pixel + ivec2(x, y);
+            
+            if (any(lessThan(samplePos, ivec2(0))) || any(greaterThanEqual(samplePos, ivec2(ubo.resolution)))) {
+                continue;
+            }
+            
+            vec3 sampleColor = imageLoad(denoisedOutput, samplePos).rgb;
+            float weight = 1.0;
+            
+            mean += sampleColor * weight;
+            meanSquared += sampleColor * sampleColor * weight;
+            weightSum += weight;
+        }
+    }
+    
+    mean /= weightSum;
+    meanSquared /= weightSum;
+    
+    // Variance = E[X^2] - E[X]^2
+    vec3 variance = max(vec3(0.0), meanSquared - mean * mean);
+    
+    return variance;
+}
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    
+    if (any(greaterThanEqual(pixel, ivec2(ubo.resolution)))) {
+        return;
+    }
+    
+    // Pass 1: Temporal accumulation
+    if (ubo.frameIndex == 0 || ubo.iterations == 0) {
+        // First frame or first iteration - just copy input
+        vec3 currentColor = imageLoad(noisyInput, pixel).rgb;
+        imageStore(denoisedOutput, pixel, vec4(currentColor, 1.0));
+        imageStore(historyOutput, pixel, vec4(currentColor, 1.0));
+    } else {
+        temporalAccumulation(pixel);
+    }
+    
+    // Pass 2: Spatial filtering (A-trous wavelet)
+    if (ubo.iterations > 0) {
+        int stepSize = 1;
+        for (int i = 0; i < ubo.iterations; i++) {
+            vec3 filtered = spatialFilter(pixel, stepSize);
+            imageStore(denoisedOutput, pixel, vec4(filtered, 1.0));
+            stepSize *= 2; // Double step size for next iteration
+        }
+    }
+    
+    // Pass 3: Variance estimation
+    vec3 variance = estimateVariance(pixel);
+    imageStore(varianceOutput, pixel, vec4(variance, 1.0));
+}
+

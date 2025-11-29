@@ -12,6 +12,8 @@ precision highp int;
 layout(location = 0) rayPayloadInEXT vec3 hitValue;
 layout(location = 1) rayPayloadInEXT float hitDistance;
 layout(location = 2) rayPayloadEXT float aoValue;
+layout(location = 2) rayPayloadInEXT int bounceCount; // Bounce count for multi-bounce GI
+layout(location = 3) rayPayloadInEXT vec3 accumulatedColor; // Accumulated color through bounces
 hitAttributeEXT vec2 attribs;
 
 layout(binding = 0, set = 0) uniform accelerationStructureEXT topLevelAS;
@@ -51,6 +53,8 @@ layout(binding = 2, set = 0) uniform UniformBuffer {
     float exposure;
     int frameIndex;
     int samplesPerPixel;
+    int maxBounces; // Maximum ray bounces for GI
+    float giIntensity; // GI contribution scale
 } ubo;
 
 struct VertexData {
@@ -129,12 +133,52 @@ void main()
     // Apply AO to ambient lighting
     ambient *= ao;
     
-    // Combine lighting
-    hitValue = ambient + Lo + emissive;
+    // Combine direct lighting
+    vec3 directLighting = ambient + Lo + emissive;
+    
+    // Multi-bounce Global Illumination
+    vec3 indirectLighting = vec3(0.0);
+    if (ubo.maxBounces > 0 && bounceCount < ubo.maxBounces) {
+        // Russian Roulette for path termination
+        float continueProbability = min(1.0, max(albedo.r, max(albedo.g, albedo.b)));
+        uint seed = uint(gl_LaunchIDEXT.x + gl_LaunchIDEXT.y * uint(gl_LaunchSizeEXT.x) + ubo.frameIndex + bounceCount);
+        // Simple hash-based random (would use proper RNG in full implementation)
+        float randomValue = float(seed % 1000) / 1000.0;
+        
+        if (randomValue < continueProbability) {
+            // Sample indirect lighting direction (cosine-weighted hemisphere)
+            vec3 indirectDir = getHemisphereSample(uint(bounceCount), N, seed);
+            
+            // Trace indirect ray
+            vec3 indirectValue = vec3(0.0);
+            float indirectDistance = 0.0;
+            int nextBounce = bounceCount + 1;
+            vec3 nextAccumulated = accumulatedColor + directLighting;
+            
+            traceRayEXT(
+                topLevelAS,
+                gl_RayFlagsOpaqueEXT,
+                0xFF,
+                0,
+                0,
+                0,
+                worldPos + N * 0.001, // Offset to avoid self-intersection
+                0.001,
+                indirectDir,
+                1000.0,
+                0
+            );
+            
+            // Indirect lighting contribution (simplified - would use proper BRDF sampling)
+            indirectLighting = hitValue * albedo * ubo.giIntensity / continueProbability;
+        }
+    }
+    
+    // Combine direct and indirect lighting
+    hitValue = directLighting + indirectLighting;
     hitDistance = gl_HitTEXT;
     
-    // Note: Reflection rays would be traced here in a more advanced implementation
-    // For now, we use environment mapping approximation
+    // Reflection rays (simplified - uses environment mapping)
     if (roughness < 0.5) {
         vec3 R = reflectRay(-V, N);
         vec3 reflectionColor = getSkyColor(R) * 0.3;

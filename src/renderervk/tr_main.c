@@ -1542,6 +1542,67 @@ static void R_SortDrawSurfs( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 	// sort the drawsurfs by sort type, then orientation, then shader
 	R_RadixSort( drawSurfs, numDrawSurfs );
 
+	// Separate and sort transparent surfaces back-to-front by depth
+	// Transparent surfaces need depth sorting for correct blending
+	int opaque_start = 0;
+	int transparent_start = numDrawSurfs;
+	for ( i = 0; i < numDrawSurfs; i++ ) {
+		R_DecomposeSort( (drawSurfs+i)->sort, &entityNum, &shader, &fogNum, &dlighted );
+		if ( shader->sort >= SS_BLEND0 ) {
+			transparent_start = i;
+			break;
+		}
+		opaque_start = i + 1;
+	}
+
+	// Sort transparent surfaces back-to-front by distance from camera
+	if ( transparent_start < numDrawSurfs ) {
+		// Calculate depth for each transparent surface and sort
+		vec3_t viewOrigin;
+		VectorCopy( tr.viewParms.or.origin, viewOrigin );
+		
+		// Simple insertion sort for transparent surfaces by depth
+		// This is acceptable since transparent surfaces are typically few
+		for ( i = transparent_start + 1; i < numDrawSurfs; i++ ) {
+			drawSurf_t key = drawSurfs[i];
+			float key_depth = 0.0f;
+			
+			// Calculate approximate depth (distance from camera)
+			// For surfaces, use entity origin as approximation
+			R_DecomposeSort( key.sort, &entityNum, &shader, &fogNum, &dlighted );
+			vec3_t surf_center;
+			if ( entityNum != REFENTITYNUM_WORLD && entityNum >= 0 && entityNum < tr.refdef.num_entities ) {
+				VectorCopy( tr.refdef.entities[entityNum].e.origin, surf_center );
+			} else {
+				VectorClear( surf_center ); // World entity at origin
+			}
+			vec3_t delta;
+			VectorSubtract( surf_center, viewOrigin, delta );
+			key_depth = VectorLength( delta );
+			
+			int j = i - 1;
+			// Move elements with greater depth (farther) to the right
+			while ( j >= transparent_start ) {
+				R_DecomposeSort( drawSurfs[j].sort, &entityNum, &shader, &fogNum, &dlighted );
+				vec3_t j_surf_center;
+				if ( entityNum != REFENTITYNUM_WORLD && entityNum >= 0 && entityNum < tr.refdef.num_entities ) {
+					VectorCopy( tr.refdef.entities[entityNum].e.origin, j_surf_center );
+				} else {
+					VectorClear( j_surf_center );
+				}
+				vec3_t j_delta;
+				VectorSubtract( j_surf_center, viewOrigin, j_delta );
+				float j_depth = VectorLength( j_delta );
+				if ( j_depth <= key_depth ) {
+					break;
+				}
+				drawSurfs[j + 1] = drawSurfs[j];
+				j--;
+			}
+			drawSurfs[j + 1] = key;
+		}
+	}
+
 	// check for any pass through drawing, which
 	// may cause another view to be rendered first
 	for ( i = 0 ; i < numDrawSurfs ; i++ ) {

@@ -23,7 +23,13 @@ layout(binding = 2, set = 0) uniform UniformBuffer {
     int frameIndex;
     int samplesPerPixel;
     int debugMagenta; // 0=normal, 1=gradient test
+    float temporalAlpha; // Blend factor for temporal accumulation
+    mat4 previousViewInverse;
+    mat4 previousProjInverse;
+    vec4 previousCameraPos;
 } ubo;
+layout(binding = 5, set = 0, rgba16f) uniform image2D historyImage; // Previous frame RT output
+layout(binding = 6, set = 0, rg16f) uniform image2D motionVectorImage; // Motion vectors for reprojection
 
 layout(location = 0) rayPayloadEXT vec3 hitValue;
 layout(location = 1) rayPayloadEXT float hitDistance;
@@ -63,9 +69,11 @@ void main()
         direction = getWorldRayDirection(inUV + jitter, ubo.viewInverse, ubo.projInverse);
     }
     
-    // Initialize payload
+    // Initialize payload for multi-bounce GI
     hitValue = vec3(0.0);
     hitDistance = 0.0;
+    bounceCount = 0;
+    accumulatedColor = vec3(0.0);
     
     // Trace primary ray
     uint rayFlags = gl_RayFlagsOpaqueEXT;
@@ -88,8 +96,53 @@ void main()
     
     // Apply exposure (keep in HDR linear space for ray tracing output)
     // Tonemapping will be done in the composite pass
-    vec3 color = hitValue * ubo.exposure;
+    vec3 currentColor = hitValue * ubo.exposure;
+    
+    // Temporal accumulation: blend with previous frame
+    vec3 finalColor = currentColor;
+    if (ubo.temporalAlpha > 0.0 && ubo.frameIndex > 0) {
+        // Calculate motion vector: reproject current pixel to previous frame
+        vec3 worldPos = origin + direction * hitDistance;
+        
+        // Transform world position to previous frame's clip space
+        vec4 prevClipPos = ubo.previousProjInverse * ubo.previousViewInverse * vec4(worldPos, 1.0);
+        prevClipPos /= prevClipPos.w;
+        
+        // Convert to UV coordinates
+        vec2 prevUV = prevClipPos.xy * 0.5 + 0.5;
+        prevUV.y = 1.0 - prevUV.y; // Flip Y for Vulkan
+        
+        // Calculate motion vector (in screen space)
+        vec2 motionVec = (prevUV - inUV) * ubo.resolution;
+        
+        // Write motion vector
+        imageStore(motionVectorImage, pixel, vec4(motionVec, 0.0, 1.0));
+        
+        // Sample history at reprojected position
+        vec2 historyUV = prevUV;
+        bool historyValid = all(greaterThanEqual(historyUV, vec2(0.0))) && all(lessThanEqual(historyUV, vec2(1.0)));
+        
+        vec3 historyColor = vec3(0.0);
+        if (historyValid) {
+            ivec2 historyPixel = ivec2(historyUV * ubo.resolution);
+            historyPixel = clamp(historyPixel, ivec2(0), ivec2(ubo.resolution) - ivec2(1));
+            historyColor = imageLoad(historyImage, historyPixel).rgb;
+        }
+        
+        // Blend current frame with history using exponential moving average
+        float alpha = 1.0 - ubo.temporalAlpha;
+        finalColor = mix(historyColor, currentColor, alpha);
+        
+        // Simple disocclusion detection: if motion vector is too large, reject history
+        float motionMagnitude = length(motionVec);
+        if (motionMagnitude > 10.0) {
+            finalColor = currentColor; // Reject history on large motion
+        }
+    } else {
+        // First frame or temporal disabled, use current color only
+        finalColor = currentColor;
+    }
     
     // Write HDR color to output image (no tonemapping/sRGB conversion here)
-    imageStore(outputImage, pixel, vec4(color, 1.0));
+    imageStore(outputImage, pixel, vec4(finalColor, 1.0));
 }

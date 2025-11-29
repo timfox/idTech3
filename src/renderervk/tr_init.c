@@ -79,18 +79,18 @@ cvar_t	*r_dlightIntensity;
 #endif
 cvar_t	*r_dlightSaturation;
 #ifdef USE_VULKAN
-cvar_t	*r_device;
+	cvar_t	*r_device;
 #ifdef USE_VBO
-cvar_t	*r_vbo;
+	cvar_t	*r_vbo;
 #endif
 #ifdef USE_VK_PBR
-cvar_t	*r_pbr;
-cvar_t  *r_baseNormalX;
-cvar_t  *r_baseNormalY;
-cvar_t  *r_baseParallax;
-cvar_t  *r_baseSpecular;
+	cvar_t	*r_pbr;
+	cvar_t  *r_baseNormalX;
+	cvar_t  *r_baseNormalY;
+	cvar_t  *r_baseParallax;
+	cvar_t  *r_baseSpecular;
 #ifdef VK_CUBEMAP
-cvar_t	*r_cubeMapping;
+	cvar_t	*r_cubeMapping;
 #endif
 #endif
 #ifdef USE_VULKAN_RAY_TRACING
@@ -98,9 +98,37 @@ cvar_t	*r_cubeMapping;
 	cvar_t	*r_rt_samples;
 	cvar_t	*r_rt_maxDepth;
 	cvar_t	*r_rt_debugMagenta;
+	cvar_t	*r_rt_tlasUpdateMode;
+	cvar_t	*r_rt_temporal;
+	cvar_t	*r_rt_temporalAlpha;
+	cvar_t	*r_rt_blasCompaction;
+	cvar_t	*r_rt_blasReuse;
+	cvar_t	*r_rt_denoise;
+	cvar_t	*r_rt_denoiseMode;
+	cvar_t	*r_rt_denoiseIterations;
+	cvar_t	*r_rt_gi;
+	cvar_t	*r_rt_giBounces;
+	cvar_t	*r_rt_giIntensity;
 #endif
-cvar_t	*r_fbo;
-cvar_t	*r_hdr;
+	cvar_t	*r_postprocess_compute;
+	cvar_t	*r_postprocess_workgroup;
+	cvar_t	*r_meshShaders;
+	cvar_t	*r_meshletSize;
+	cvar_t	*r_virtualTextures;
+	cvar_t	*r_vt_pageSize;
+	cvar_t	*r_vt_cacheSize;
+	cvar_t	*r_clearcoat;
+	cvar_t	*r_anisotropy;
+	cvar_t	*r_subsurfaceScattering;
+	cvar_t	*r_materialLOD;
+	cvar_t	*r_particles_gpu;
+	cvar_t	*r_particles_max;
+	cvar_t	*r_particles_culling;
+	cvar_t	*r_dlss;
+	cvar_t	*r_dlss_quality;
+	cvar_t	*r_dlss_sharpening;
+	cvar_t	*r_fbo;
+	cvar_t	*r_hdr;
 cvar_t	*r_bloom;
 cvar_t	*r_bloom_threshold;
 cvar_t	*r_bloom_intensity;
@@ -1590,7 +1618,29 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_rt_maxDepth, "Maximum ray tracing recursion depth." );
 	r_rt_debugMagenta = ri.Cvar_Get( "r_rt_debugMagenta", "0", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_rt_debugMagenta, "Debug mode: 0=normal, 1=magenta clear + gradient test (for diagnosing pixel corruption)." );
+	r_rt_tlasUpdateMode = ri.Cvar_Get( "r_rt_tlasUpdateMode", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_rt_tlasUpdateMode, "TLAS update mode: 0=always rebuild, 1=auto (use UPDATE when only transforms change), 2=force update mode." );
+	r_rt_temporal = ri.Cvar_Get( "r_rt_temporal", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_rt_temporal, "Enable temporal accumulation for ray tracing (reduces noise by blending with previous frame)." );
+	r_rt_temporalAlpha = ri.Cvar_Get( "r_rt_temporalAlpha", "0.9", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_rt_temporalAlpha, "Temporal accumulation blend factor (0.0-1.0, higher = more history, default 0.9)." );
+	r_rt_blasCompaction = ri.Cvar_Get( "r_rt_blasCompaction", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_rt_blasCompaction, "Enable BLAS compaction to reduce memory usage (0=disabled, 1=enabled)." );
+	r_rt_blasReuse = ri.Cvar_Get( "r_rt_blasReuse", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_rt_blasReuse, "Enable BLAS reuse based on geometry hash (0=disabled, 1=enabled)." );
+	r_rt_denoise = ri.Cvar_Get( "r_rt_denoise", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_rt_denoise, "Enable ray tracing denoising (0=disabled, 1=ReLAX)." );
+	r_rt_denoiseMode = ri.Cvar_Get( "r_rt_denoiseMode", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_rt_denoiseMode, "Denoising mode: 0=SVGF, 1=ReLAX." );
+	r_rt_denoiseIterations = ri.Cvar_Get( "r_rt_denoiseIterations", "3", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_rt_denoiseIterations, "Number of spatial filter iterations (default 3)." );
 #endif
+	r_dlss = ri.Cvar_Get( "r_dlss", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_dlss, "Enable NVIDIA DLSS Super Resolution (requires NVIDIA RTX GPU and DLSS SDK)." );
+	r_dlss_quality = ri.Cvar_Get( "r_dlss_quality", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_dlss_quality, "DLSS quality mode: 0=Performance, 1=Balanced, 2=Quality, 3=Ultra Quality." );
+	r_dlss_sharpening = ri.Cvar_Get( "r_dlss_sharpening", "0.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_dlss_sharpening, "DLSS sharpening amount (0.0-1.0, default 0.0)." );
 
 	// Vulkan-specific debug helpers
 	r_vk_debug2D = ri.Cvar_Get( "r_vk_debug2D", "0", CVAR_CHEAT );

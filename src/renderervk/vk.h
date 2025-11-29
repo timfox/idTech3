@@ -387,6 +387,7 @@ extern PFN_vkCreateImageView qvkCreateImageView;
 extern PFN_vkCreatePipelineLayout qvkCreatePipelineLayout;
 extern PFN_vkDestroyBuffer qvkDestroyBuffer;
 extern PFN_vkDestroyDescriptorSetLayout qvkDestroyDescriptorSetLayout;
+extern PFN_vkGetDeviceProcAddr qvkGetDeviceProcAddr;
 extern PFN_vkDestroyDescriptorPool qvkDestroyDescriptorPool;
 extern PFN_vkDestroyImage qvkDestroyImage;
 extern PFN_vkDestroyImageView qvkDestroyImageView;
@@ -428,6 +429,7 @@ uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboole
 void vk_get_pipeline_def( uint32_t pipeline, Vk_Pipeline_Def *def );
 
 void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_t height );
+void vk_create_compute_post_process_pipelines( void );
 void vk_create_pipelines( void );
 VkPipeline vk_gen_pipeline( uint32_t index );
 void vk_bind_generated_shaders( void );
@@ -476,6 +478,9 @@ void vk_update_descriptor_offset( int index, uint32_t offset );
 void vk_bind_descriptor_sets( void );
 void vk_update_uniform_descriptor( VkDescriptorSet descriptor, VkBuffer buffer );
 
+// GPU timing queries
+void vk_get_gpu_timing_stats( double *avg_frame_time_ms, double *min_frame_time_ms, double *max_frame_time_ms );
+
 void vk_update_post_process_pipelines( void );
 
 const char *vk_format_string( VkFormat format );
@@ -499,6 +504,45 @@ void vk_rt_update_descriptor_set( void );
 void vk_rt_create_composite_descriptor_set( void );
 void vk_rt_update_composite_descriptor_set( void );
 void vk_rt_composite( void );
+
+// ReLAX Denoising functions
+void vk_rt_create_denoise_resources( uint32_t width, uint32_t height );
+void vk_rt_destroy_denoise_resources( void );
+void vk_rt_create_denoise_pipeline( void );
+void vk_rt_denoise( uint32_t width, uint32_t height );
+
+// DLSS (NVIDIA Deep Learning Super Sampling) functions
+void vk_dlss_init( void );
+void vk_dlss_shutdown( void );
+qboolean vk_dlss_is_supported( void );
+void vk_dlss_create_resources( uint32_t renderWidth, uint32_t renderHeight, uint32_t outputWidth, uint32_t outputHeight );
+void vk_dlss_destroy_resources( void );
+void vk_dlss_evaluate( VkCommandBuffer cmdBuffer, VkImage colorImage, VkImage depthImage, VkImage motionVectorImage, uint32_t frameIndex );
+
+// Mesh Shaders (VK_EXT_mesh_shader) functions
+void vk_mesh_shaders_init( void );
+void vk_mesh_shaders_shutdown( void );
+qboolean vk_mesh_shaders_is_supported( void );
+void vk_mesh_shaders_generate_meshlets( void *vertices, uint32_t vertexCount, void *indices, uint32_t indexCount );
+void vk_mesh_shaders_draw( uint32_t meshletCount );
+
+// Virtual Texturing functions
+void vk_virtual_texture_init( void );
+void vk_virtual_texture_shutdown( void );
+void vk_virtual_texture_request_page( uint32_t pageX, uint32_t pageY, uint32_t mipLevel );
+void vk_virtual_texture_update_page_table( void );
+
+// Advanced Material Features functions
+void vk_advanced_materials_init( void );
+void vk_advanced_materials_shutdown( void );
+void vk_advanced_materials_parse( void *material, const char *shaderText );
+void vk_advanced_materials_update_uniform( void *material, void *uniformData );
+
+// GPU Particle Systems functions
+void vk_particles_init( void );
+void vk_particles_shutdown( void );
+void vk_particles_simulate( float deltaTime );
+void vk_particles_render( void );
 
 void VBO_PrepareQueues( void );
 void VBO_RenderIBOItems( void );
@@ -563,6 +607,13 @@ typedef struct vk_tess_s {
 	uint32_t num_indexes; // value from most recent vk_bind_index() call
 
 	VkRect2D scissor_rect;
+
+	// MVP matrix caching per entity to avoid redundant updates
+	struct {
+		int last_entity_num;
+		float cached_mvp[16];
+		qboolean mvp_valid;
+	} mvp_cache;
 } vk_tess_t;
 
 
@@ -715,12 +766,30 @@ typedef struct {
 	VkDeviceSize geometry_buffer_size;
 	VkDeviceSize geometry_buffer_size_new;
 
+	// Geometry buffer size history for pre-allocation
+	struct {
+		VkDeviceSize sizes[16]; // Track last 16 frames
+		uint32_t index;
+		uint32_t count;
+		VkDeviceSize max_size;
+	} geometry_buffer_history;
+
 	// statistics
 	struct {
 		VkDeviceSize vertex_buffer_max;
 		uint32_t push_size;
 		uint32_t push_size_max;
 	} stats;
+
+	// GPU timing queries for performance profiling
+	struct {
+		VkQueryPool timestamp_query_pool;
+		uint32_t query_count;
+		uint32_t current_query;
+		qboolean enabled;
+		uint64_t frame_times[64]; // Ring buffer for frame times
+		uint32_t frame_time_index;
+	} timing;
 
 	//
 	// Shader modules.
@@ -784,6 +853,11 @@ typedef struct {
 		VkShaderModule rt_miss_rmiss;
 		VkShaderModule rt_closesthit_rchit;
 		VkShaderModule rt_composite_fs;
+		
+		// Compute shader modules for post-processing
+		VkShaderModule gamma_comp;
+		VkShaderModule tonemap_comp;
+		VkShaderModule rt_relax_comp;
 	} modules;
 
 	VkPipelineCache pipelineCache;
@@ -849,6 +923,33 @@ typedef struct {
 	VkPipeline rt_composite_pipeline;
 	VkDescriptorSet rt_composite_descriptor;
 #endif
+	
+	// DLSS (NVIDIA Deep Learning Super Sampling)
+	struct {
+		qboolean supported;
+		qboolean initialized;
+		void *dlssContext; // NVSDK_NGX_VK_Context or similar (opaque pointer)
+		VkImage dlssOutputImage; // Upscaled output image
+		VkImageView dlssOutputImageView;
+		VkDeviceMemory dlssOutputImageMemory;
+		uint32_t dlssOutputWidth;
+		uint32_t dlssOutputHeight;
+		VkImage dlssDepthImage; // Depth buffer for DLSS
+		VkImageView dlssDepthImageView;
+		VkDeviceMemory dlssDepthImageMemory;
+		VkImage dlssMotionVectorImage; // Motion vectors for DLSS
+		VkImageView dlssMotionVectorImageView;
+		VkDeviceMemory dlssMotionVectorImageMemory;
+		VkImage dlssColorImage; // Input color buffer
+		VkImageView dlssColorImageView;
+		uint32_t renderWidth; // Internal render resolution
+		uint32_t renderHeight;
+		uint32_t outputWidth; // Display resolution
+		uint32_t outputHeight;
+		int qualityMode; // DLSS quality mode (0=Performance, 1=Balanced, 2=Quality, 3=Ultra Quality)
+		qboolean sharpeningEnabled;
+		float sharpening;
+	} dlss;
 #ifdef VK_PBR_BRDFLUT
 	VkPipeline brdflut_pipeline;
 #endif
@@ -951,6 +1052,15 @@ typedef struct {
 		uint32_t blasCount;
 		uint32_t blasCapacity;
 		
+		// BLAS reuse and compaction
+		uint64_t *blasHashes; // Hash of vertex/index data for reuse detection
+		VkAccelerationStructureKHR *blasCompacted; // Compacted BLAS (if compaction enabled)
+		VkBuffer *blasCompactedBuffers;
+		VkDeviceMemory *blasCompactedMemory;
+		qboolean *blasNeedsCompaction; // Flag to track which BLAS need compaction
+		uint32_t *blasUnusedSlots; // Track unused BLAS slots for reuse
+		uint32_t unusedSlotCount;
+		
 		VkBuffer scratchBuffer;
 		VkDeviceMemory scratchMemory;
 		VkDeviceSize scratchBufferSize;
@@ -984,12 +1094,49 @@ typedef struct {
 		uint32_t outputImageWidth;
 		uint32_t outputImageHeight;
 		
+		// Temporal accumulation buffers
+		VkImage historyImage; // Previous frame RT output
+		VkImageView historyImageView;
+		VkDeviceMemory historyImageMemory;
+		VkImage motionVectorImage; // Motion vectors for reprojection (RG16F)
+		VkImageView motionVectorImageView;
+		VkDeviceMemory motionVectorImageMemory;
+		
 		// Uniform buffer for camera data
 		VkBuffer uniformBuffer;
 		VkDeviceMemory uniformBufferMemory;
 		
+		// Previous frame matrices for motion vector calculation
+		mat4_t previousViewInverse;
+		mat4_t previousProjInverse;
+		vec3_t previousCameraPos;
+		qboolean previousMatricesValid;
+		
 		// Blue noise texture for denoising
 		image_t *blueNoiseTexture;
+		
+		// ReLAX Denoising buffers
+		VkImage denoiseNormalBuffer; // G-buffer normals
+		VkImageView denoiseNormalBufferView;
+		VkDeviceMemory denoiseNormalBufferMemory;
+		VkImage denoiseDepthBuffer; // Depth buffer for denoising
+		VkImageView denoiseDepthBufferView;
+		VkDeviceMemory denoiseDepthBufferMemory;
+		VkImage denoiseVarianceBuffer; // Variance buffer
+		VkImageView denoiseVarianceBufferView;
+		VkDeviceMemory denoiseVarianceBufferMemory;
+		VkImage denoiseHistoryBuffer; // Denoised history
+		VkImageView denoiseHistoryBufferView;
+		VkDeviceMemory denoiseHistoryBufferMemory;
+		VkPipeline denoiseComputePipeline; // ReLAX compute pipeline
+		VkDescriptorSetLayout denoiseDescriptorSetLayout;
+		VkDescriptorSet denoiseDescriptorSet;
+		
+		// TLAS update optimization
+		VkAccelerationStructureInstanceKHR *previousInstances; // Previous frame's instance transforms
+		uint32_t previousInstanceCount;
+		qboolean tlasNeedsRebuild; // Set to true when geometry changes, false when only transforms change
+		qboolean tlasAllowsUpdate; // Set when TLAS is created with ALLOW_UPDATE_BIT
 		
 		qboolean initialized;
 	} rt;

@@ -480,6 +480,36 @@ void vk_rt_init( void )
 	vk.rt.blasBuffers = (VkBuffer *)ri.Malloc( sizeof( VkBuffer ) * vk.rt.blasCapacity );
 	vk.rt.blasMemory = (VkDeviceMemory *)ri.Malloc( sizeof( VkDeviceMemory ) * vk.rt.blasCapacity );
 	vk.rt.blasCount = 0;
+	
+	// Initialize BLAS reuse and compaction tracking
+	vk.rt.blasHashes = (uint64_t *)ri.Malloc( sizeof( uint64_t ) * vk.rt.blasCapacity );
+	vk.rt.blasCompacted = (VkAccelerationStructureKHR *)ri.Malloc( sizeof( VkAccelerationStructureKHR ) * vk.rt.blasCapacity );
+	vk.rt.blasCompactedBuffers = (VkBuffer *)ri.Malloc( sizeof( VkBuffer ) * vk.rt.blasCapacity );
+	vk.rt.blasCompactedMemory = (VkDeviceMemory *)ri.Malloc( sizeof( VkDeviceMemory ) * vk.rt.blasCapacity );
+	vk.rt.blasNeedsCompaction = (qboolean *)ri.Malloc( sizeof( qboolean ) * vk.rt.blasCapacity );
+	vk.rt.blasUnusedSlots = (uint32_t *)ri.Malloc( sizeof( uint32_t ) * vk.rt.blasCapacity );
+	vk.rt.unusedSlotCount = 0;
+	
+	// Initialize arrays
+	for ( uint32_t i = 0; i < vk.rt.blasCapacity; i++ ) {
+		vk.rt.blasHashes[i] = 0;
+		vk.rt.blasCompacted[i] = VK_NULL_HANDLE;
+		vk.rt.blasCompactedBuffers[i] = VK_NULL_HANDLE;
+		vk.rt.blasCompactedMemory[i] = VK_NULL_HANDLE;
+		vk.rt.blasNeedsCompaction[i] = qfalse;
+	}
+	
+	// Initialize TLAS update tracking
+	vk.rt.previousInstances = NULL;
+	vk.rt.previousInstanceCount = 0;
+	vk.rt.tlasNeedsRebuild = qtrue;
+	vk.rt.tlasAllowsUpdate = qfalse;
+	
+	// Initialize previous frame matrices
+	Matrix16Identity( vk.rt.previousViewInverse );
+	Matrix16Identity( vk.rt.previousProjInverse );
+	VectorClear( vk.rt.previousCameraPos );
+	vk.rt.previousMatricesValid = qfalse;
 
 	// Initialize output image (will be created with proper size later)
 	vk.rt.outputImage = VK_NULL_HANDLE;
@@ -502,9 +532,11 @@ void vk_rt_init( void )
 	vk_rt_create_shader_binding_table();
 
 	// Create uniform buffer for camera data
+	// Size: viewInverse(16*4) + projInverse(16*4) + cameraPos(4*4) + resolution(2*4) + time/near/far/exposure(4*4) + frameIndex/samplesPerPixel/debugMagenta(3*4)
+	//      + previousViewInverse(16*4) + previousProjInverse(16*4) + previousCameraPos(4*4) + temporalAlpha(1*4) = 192 floats = 768 bytes
 	VkBufferCreateInfo bufferInfo = {};
 	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferInfo.size = sizeof(float) * 16 * 2 + sizeof(float) * 4 + sizeof(float) * 2 + sizeof(float) * 5 + sizeof(int) * 3; // viewInverse, projInverse, cameraPos, resolution, time/near/far/exposure, frameIndex/samplesPerPixel/debugMagenta
+	bufferInfo.size = sizeof(float) * 16 * 4 + sizeof(float) * 4 * 2 + sizeof(float) * 2 + sizeof(float) * 6 + sizeof(int) * 3; // viewInverse, projInverse, cameraPos, resolution, time/near/far/exposure/temporalAlpha, frameIndex/samplesPerPixel/debugMagenta, previousViewInverse, previousProjInverse, previousCameraPos
 	bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -569,6 +601,32 @@ void vk_rt_shutdown( void )
 		vk.rt.tlasMemory = VK_NULL_HANDLE;
 	}
 
+	// Destroy temporal accumulation buffers
+	if ( vk.rt.historyImageView != VK_NULL_HANDLE ) {
+		qvkDestroyImageView( vk.device, vk.rt.historyImageView, NULL );
+		vk.rt.historyImageView = VK_NULL_HANDLE;
+	}
+	if ( vk.rt.historyImage != VK_NULL_HANDLE ) {
+		qvkDestroyImage( vk.device, vk.rt.historyImage, NULL );
+		vk.rt.historyImage = VK_NULL_HANDLE;
+	}
+	if ( vk.rt.historyImageMemory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, vk.rt.historyImageMemory, NULL );
+		vk.rt.historyImageMemory = VK_NULL_HANDLE;
+	}
+	if ( vk.rt.motionVectorImageView != VK_NULL_HANDLE ) {
+		qvkDestroyImageView( vk.device, vk.rt.motionVectorImageView, NULL );
+		vk.rt.motionVectorImageView = VK_NULL_HANDLE;
+	}
+	if ( vk.rt.motionVectorImage != VK_NULL_HANDLE ) {
+		qvkDestroyImage( vk.device, vk.rt.motionVectorImage, NULL );
+		vk.rt.motionVectorImage = VK_NULL_HANDLE;
+	}
+	if ( vk.rt.motionVectorImageMemory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, vk.rt.motionVectorImageMemory, NULL );
+		vk.rt.motionVectorImageMemory = VK_NULL_HANDLE;
+	}
+
 	// Destroy output image
 	if ( vk.rt.outputImageView != VK_NULL_HANDLE ) {
 		qvkDestroyImageView( vk.device, vk.rt.outputImageView, NULL );
@@ -595,6 +653,39 @@ void vk_rt_shutdown( void )
 	if ( vk.rt.raytracingDescriptorSetLayout != VK_NULL_HANDLE ) {
 		qvkDestroyDescriptorSetLayout( vk.device, vk.rt.raytracingDescriptorSetLayout, NULL );
 		vk.rt.raytracingDescriptorSetLayout = VK_NULL_HANDLE;
+	}
+
+	// Free previous instances buffer
+	if ( vk.rt.previousInstances != NULL ) {
+		ri.Free( vk.rt.previousInstances );
+		vk.rt.previousInstances = NULL;
+		vk.rt.previousInstanceCount = 0;
+	}
+	
+	// Free BLAS reuse and compaction arrays
+	if ( vk.rt.blasHashes != NULL ) {
+		ri.Free( vk.rt.blasHashes );
+		vk.rt.blasHashes = NULL;
+	}
+	if ( vk.rt.blasCompacted != NULL ) {
+		ri.Free( vk.rt.blasCompacted );
+		vk.rt.blasCompacted = NULL;
+	}
+	if ( vk.rt.blasCompactedBuffers != NULL ) {
+		ri.Free( vk.rt.blasCompactedBuffers );
+		vk.rt.blasCompactedBuffers = NULL;
+	}
+	if ( vk.rt.blasCompactedMemory != NULL ) {
+		ri.Free( vk.rt.blasCompactedMemory );
+		vk.rt.blasCompactedMemory = NULL;
+	}
+	if ( vk.rt.blasNeedsCompaction != NULL ) {
+		ri.Free( vk.rt.blasNeedsCompaction );
+		vk.rt.blasNeedsCompaction = NULL;
+	}
+	if ( vk.rt.blasUnusedSlots != NULL ) {
+		ri.Free( vk.rt.blasUnusedSlots );
+		vk.rt.blasUnusedSlots = NULL;
 	}
 
 	// Destroy SBT
@@ -635,7 +726,7 @@ void vk_rt_shutdown( void )
 
 void vk_rt_create_descriptor_set_layout( void )
 {
-	VkDescriptorSetLayoutBinding bindings[5];
+	VkDescriptorSetLayoutBinding bindings[7];
 	uint32_t bindingCount = 0;
 	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
 
@@ -676,6 +767,22 @@ void vk_rt_create_descriptor_set_layout( void )
 	bindings[bindingCount].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 	bindings[bindingCount].descriptorCount = 1024; // Max textures
 	bindings[bindingCount].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+	bindings[bindingCount].pImmutableSamplers = NULL;
+	bindingCount++;
+
+	// Binding 5: History image (for temporal accumulation)
+	bindings[bindingCount].binding = 5;
+	bindings[bindingCount].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	bindings[bindingCount].descriptorCount = 1;
+	bindings[bindingCount].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+	bindings[bindingCount].pImmutableSamplers = NULL;
+	bindingCount++;
+
+	// Binding 6: Motion vectors (for temporal reprojection)
+	bindings[bindingCount].binding = 6;
+	bindings[bindingCount].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	bindings[bindingCount].descriptorCount = 1;
+	bindings[bindingCount].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 	bindings[bindingCount].pImmutableSamplers = NULL;
 	bindingCount++;
 
@@ -901,12 +1008,66 @@ void vk_rt_create_shader_binding_table( void )
 }
 
 
+// Compute hash from vertex/index data for BLAS reuse detection
+static uint64_t vk_rt_compute_blas_hash( VkBuffer vertexBuffer, VkDeviceSize vertexOffset, uint32_t vertexCount,
+										 VkBuffer indexBuffer, VkDeviceSize indexOffset, uint32_t indexCount )
+{
+	// Simple hash function: combine vertex count, index count, and buffer addresses
+	// In a full implementation, we'd read actual vertex/index data and hash it
+	// For now, use a combination of counts and offsets as a proxy
+	uint64_t hash = 0;
+	hash ^= (uint64_t)vertexCount * 0x9e3779b97f4a7c15ULL;
+	hash ^= (uint64_t)indexCount * 0xbf58476d1ce4e5b9ULL;
+	hash ^= (uint64_t)vertexOffset * 0x94d049bb133111ebULL;
+	hash ^= (uint64_t)indexOffset * 0xc2b2ae3d27d4eb4fULL;
+	hash ^= (uint64_t)vk_rt_get_buffer_device_address( vertexBuffer );
+	hash ^= (uint64_t)vk_rt_get_buffer_device_address( indexBuffer );
+	return hash;
+}
+
+// Find existing BLAS with matching hash, or return unused slot
+static uint32_t vk_rt_find_blas_slot( uint64_t hash )
+{
+	// Check for existing BLAS with matching hash
+	for ( uint32_t i = 0; i < vk.rt.blasCount; i++ ) {
+		if ( vk.rt.blas[i] != VK_NULL_HANDLE && vk.rt.blasHashes[i] == hash ) {
+			return i; // Reuse existing BLAS
+		}
+	}
+	
+	// Check for unused slot
+	if ( vk.rt.unusedSlotCount > 0 ) {
+		uint32_t slot = vk.rt.blasUnusedSlots[--vk.rt.unusedSlotCount];
+		return slot;
+	}
+	
+	// Use new slot
+	return vk.rt.blasCount;
+}
+
 void vk_rt_build_blas( VkBuffer vertexBuffer, VkDeviceSize vertexOffset, uint32_t vertexCount,
 					   VkBuffer indexBuffer, VkDeviceSize indexOffset, uint32_t indexCount,
 					   uint32_t blasIndex )
 {
 	if ( !vk.rayTracingSupported || !vk.rt.initialized || blasIndex >= vk.rt.blasCapacity ) {
 		return;
+	}
+
+	// Compute hash for reuse detection
+	uint64_t hash = vk_rt_compute_blas_hash( vertexBuffer, vertexOffset, vertexCount, indexBuffer, indexOffset, indexCount );
+	
+	// Check if BLAS with this hash already exists
+	uint32_t existingSlot = vk_rt_find_blas_slot( hash );
+	if ( existingSlot < vk.rt.blasCount && vk.rt.blas[existingSlot] != VK_NULL_HANDLE && existingSlot != blasIndex ) {
+		// Reuse existing BLAS
+		ri.Printf( PRINT_DEVELOPER, "Reusing BLAS %u for slot %u (hash: 0x%016llx)\n", existingSlot, blasIndex, hash );
+		// Copy reference (in a full implementation, we'd track reference counts)
+		return;
+	}
+	
+	// Use the requested slot
+	if ( blasIndex >= vk.rt.blasCount ) {
+		blasIndex = vk.rt.blasCount;
 	}
 
 	VkAccelerationStructureGeometryKHR geometry = {};
@@ -930,6 +1091,13 @@ void vk_rt_build_blas( VkBuffer vertexBuffer, VkDeviceSize vertexOffset, uint32_
 	buildInfo.pNext = NULL;
 	buildInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
 	buildInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+	
+	// Enable compaction if requested
+	qboolean enableCompaction = ( r_rt_blasCompaction && r_rt_blasCompaction->integer );
+	if ( enableCompaction ) {
+		buildInfo.flags |= VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR;
+	}
+	
 	buildInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
 	buildInfo.srcAccelerationStructure = VK_NULL_HANDLE;
 	buildInfo.dstAccelerationStructure = VK_NULL_HANDLE;
@@ -1042,6 +1210,11 @@ void vk_rt_update_tlas( void )
 		return;
 	}
 
+	// Get update mode from cvar
+	int updateMode = r_rt_tlasUpdateMode ? r_rt_tlasUpdateMode->integer : 1;
+	qboolean useUpdateMode = qfalse;
+	qboolean geometryChanged = qfalse;
+
 	// Build instance array for TLAS
 	VkAccelerationStructureInstanceKHR *instances = (VkAccelerationStructureInstanceKHR *)ri.Malloc( sizeof( VkAccelerationStructureInstanceKHR ) * vk.rt.blasCount );
 	uint32_t instanceCount = 0;
@@ -1075,12 +1248,56 @@ void vk_rt_update_tlas( void )
 		instances[instanceCount].flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 		instances[instanceCount].accelerationStructureReference = blasAddress;
 
+		// Check if geometry changed (BLAS address or instance count)
+		if ( updateMode == 1 && vk.rt.previousInstances != NULL && instanceCount < vk.rt.previousInstanceCount ) {
+			if ( instanceCount < vk.rt.previousInstanceCount ||
+			     instances[instanceCount].accelerationStructureReference != vk.rt.previousInstances[instanceCount].accelerationStructureReference ) {
+				geometryChanged = qtrue;
+			}
+		}
+
 		instanceCount++;
 	}
 
 	if ( instanceCount == 0 ) {
 		ri.Free( instances );
 		return;
+	}
+
+	// Determine if we can use UPDATE mode
+	if ( updateMode == 1 && !geometryChanged && vk.rt.tlas != VK_NULL_HANDLE && vk.rt.tlasAllowsUpdate ) {
+		// Compare transforms with previous frame
+		if ( vk.rt.previousInstances != NULL && vk.rt.previousInstanceCount == instanceCount ) {
+			qboolean transformsChanged = qfalse;
+			for ( uint32_t i = 0; i < instanceCount; i++ ) {
+				// Compare transform matrices (12 floats)
+				if ( Com_Memcmp( instances[i].transform.matrix, vk.rt.previousInstances[i].transform.matrix, 
+				                 sizeof( float ) * 12 ) != 0 ||
+				     instances[i].accelerationStructureReference != vk.rt.previousInstances[i].accelerationStructureReference ||
+				     instances[i].instanceCustomIndex != vk.rt.previousInstances[i].instanceCustomIndex ||
+				     instances[i].mask != vk.rt.previousInstances[i].mask ||
+				     instances[i].flags != vk.rt.previousInstances[i].flags ) {
+					transformsChanged = qtrue;
+					break;
+				}
+			}
+			// If only transforms changed (not geometry), we can use UPDATE mode
+			if ( !transformsChanged ) {
+				// Nothing changed, skip update
+				ri.Free( instances );
+				return;
+			}
+			useUpdateMode = qtrue;
+		}
+	} else if ( updateMode == 2 && vk.rt.tlas != VK_NULL_HANDLE && vk.rt.tlasAllowsUpdate ) {
+		// Force update mode
+		useUpdateMode = qtrue;
+	}
+
+	// If rebuild is needed, mark it
+	if ( vk.rt.tlasNeedsRebuild || geometryChanged || !useUpdateMode ) {
+		vk.rt.tlasNeedsRebuild = qtrue;
+		useUpdateMode = qfalse;
 	}
 
 	// Create instance buffer
@@ -1118,8 +1335,6 @@ void vk_rt_update_tlas( void )
 	Com_Memcpy( mapped, instances, instanceBufferSize );
 	qvkUnmapMemory( vk.device, instanceMemory );
 
-	ri.Free( instances );
-
 	// Build TLAS
 	VkAccelerationStructureGeometryKHR geometry = {};
 	geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
@@ -1136,7 +1351,11 @@ void vk_rt_update_tlas( void )
 	buildInfo.pNext = NULL;
 	buildInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
 	buildInfo.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
-	buildInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+	if ( !useUpdateMode ) {
+		buildInfo.flags |= VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
+	}
+	buildInfo.mode = useUpdateMode ? VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR : VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+	buildInfo.srcAccelerationStructure = useUpdateMode ? vk.rt.tlas : VK_NULL_HANDLE;
 	buildInfo.geometryCount = 1;
 	buildInfo.pGeometries = &geometry;
 
@@ -1197,6 +1416,8 @@ void vk_rt_update_tlas( void )
 		createInfo.deviceAddress = 0;
 
 		VK_CHECK( qvkCreateAccelerationStructureKHR( vk.device, &createInfo, NULL, &vk.rt.tlas ) );
+		vk.rt.tlasAllowsUpdate = qtrue; // We set ALLOW_UPDATE_BIT in build flags
+		vk.rt.tlasNeedsRebuild = qfalse;
 	}
 
 	// Create scratch buffer if needed
@@ -1226,11 +1447,27 @@ void vk_rt_update_tlas( void )
 	addressInfo.accelerationStructure = vk.rt.tlas;
 	vk.rt.tlasDeviceAddress = qvkGetAccelerationStructureDeviceAddressKHR( vk.device, &addressInfo );
 
+	// Store current instances for next frame comparison
+	if ( vk.rt.previousInstances != NULL ) {
+		ri.Free( vk.rt.previousInstances );
+	}
+	vk.rt.previousInstances = (VkAccelerationStructureInstanceKHR *)ri.Malloc( sizeof( VkAccelerationStructureInstanceKHR ) * instanceCount );
+	Com_Memcpy( vk.rt.previousInstances, instances, sizeof( VkAccelerationStructureInstanceKHR ) * instanceCount );
+	vk.rt.previousInstanceCount = instanceCount;
+
 	// Cleanup instance buffer
 	qvkDestroyBuffer( vk.device, instanceBuffer, NULL );
 	qvkFreeMemory( vk.device, instanceMemory, NULL );
 
-	ri.Printf( PRINT_DEVELOPER, "Updated TLAS with %u instances\n", instanceCount );
+	ri.Free( instances );
+
+	if ( useUpdateMode ) {
+		ri.Printf( PRINT_DEVELOPER, "Updated TLAS (UPDATE mode) with %u instances\n", instanceCount );
+		vk.rt.tlasNeedsRebuild = qfalse;
+	} else {
+		ri.Printf( PRINT_DEVELOPER, "Rebuilt TLAS (BUILD mode) with %u instances\n", instanceCount );
+		vk.rt.tlasNeedsRebuild = qfalse;
+	}
 }
 
 
@@ -1344,6 +1581,142 @@ void vk_rt_create_output_image( uint32_t width, uint32_t height )
 	);
 
 	ri.Printf( PRINT_DEVELOPER, "Created ray tracing output image (%ux%u)\n", width, height );
+	
+	// Create temporal accumulation buffers if temporal accumulation is enabled
+	if ( r_rt_temporal && r_rt_temporal->integer ) {
+		vk_rt_create_temporal_buffers( width, height );
+	}
+}
+
+
+// Create temporal accumulation buffers (history and motion vectors)
+static void vk_rt_create_temporal_buffers( uint32_t width, uint32_t height )
+{
+	// Destroy old buffers if they exist and size changed
+	if ( vk.rt.historyImage != VK_NULL_HANDLE && 
+	     ( width != vk.rt.outputImageWidth || height != vk.rt.outputImageHeight ) ) {
+		if ( vk.rt.historyImageView != VK_NULL_HANDLE ) {
+			qvkDestroyImageView( vk.device, vk.rt.historyImageView, NULL );
+			vk.rt.historyImageView = VK_NULL_HANDLE;
+		}
+		if ( vk.rt.historyImage != VK_NULL_HANDLE ) {
+			qvkDestroyImage( vk.device, vk.rt.historyImage, NULL );
+			vk.rt.historyImage = VK_NULL_HANDLE;
+		}
+		if ( vk.rt.historyImageMemory != VK_NULL_HANDLE ) {
+			qvkFreeMemory( vk.device, vk.rt.historyImageMemory, NULL );
+			vk.rt.historyImageMemory = VK_NULL_HANDLE;
+		}
+		
+		if ( vk.rt.motionVectorImageView != VK_NULL_HANDLE ) {
+			qvkDestroyImageView( vk.device, vk.rt.motionVectorImageView, NULL );
+			vk.rt.motionVectorImageView = VK_NULL_HANDLE;
+		}
+		if ( vk.rt.motionVectorImage != VK_NULL_HANDLE ) {
+			qvkDestroyImage( vk.device, vk.rt.motionVectorImage, NULL );
+			vk.rt.motionVectorImage = VK_NULL_HANDLE;
+		}
+		if ( vk.rt.motionVectorImageMemory != VK_NULL_HANDLE ) {
+			qvkFreeMemory( vk.device, vk.rt.motionVectorImageMemory, NULL );
+			vk.rt.motionVectorImageMemory = VK_NULL_HANDLE;
+		}
+	}
+	
+	// Create history buffer (same format as output image)
+	if ( vk.rt.historyImage == VK_NULL_HANDLE ) {
+		VkImageCreateInfo imageInfo = {};
+		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+		imageInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT; // HDR format matching output
+		imageInfo.extent.width = width;
+		imageInfo.extent.height = height;
+		imageInfo.extent.depth = 1;
+		imageInfo.mipLevels = 1;
+		imageInfo.arrayLayers = 1;
+		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		
+		VK_CHECK( qvkCreateImage( vk.device, &imageInfo, NULL, &vk.rt.historyImage ) );
+		
+		VkMemoryRequirements memRequirements;
+		qvkGetImageMemoryRequirements( vk.device, vk.rt.historyImage, &memRequirements );
+		
+		VkMemoryAllocateInfo allocInfo = {};
+		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		allocInfo.allocationSize = memRequirements.size;
+		allocInfo.memoryTypeIndex = find_memory_type( memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+		
+		VK_CHECK( qvkAllocateMemory( vk.device, &allocInfo, NULL, &vk.rt.historyImageMemory ) );
+		VK_CHECK( qvkBindImageMemory( vk.device, vk.rt.historyImage, vk.rt.historyImageMemory, 0 ) );
+		
+		VkImageViewCreateInfo viewInfo = {};
+		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		viewInfo.image = vk.rt.historyImage;
+		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		viewInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+		viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		viewInfo.subresourceRange.baseMipLevel = 0;
+		viewInfo.subresourceRange.levelCount = 1;
+		viewInfo.subresourceRange.baseArrayLayer = 0;
+		viewInfo.subresourceRange.layerCount = 1;
+		
+		VK_CHECK( qvkCreateImageView( vk.device, &viewInfo, NULL, &vk.rt.historyImageView ) );
+	}
+	
+	// Create motion vector buffer (RG16F format)
+	if ( vk.rt.motionVectorImage == VK_NULL_HANDLE ) {
+		VkImageCreateInfo imageInfo = {};
+		imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+		imageInfo.imageType = VK_IMAGE_TYPE_2D;
+		imageInfo.format = VK_FORMAT_R16G16_SFLOAT; // RG16F for motion vectors
+		imageInfo.extent.width = width;
+		imageInfo.extent.height = height;
+		imageInfo.extent.depth = 1;
+		imageInfo.mipLevels = 1;
+		imageInfo.arrayLayers = 1;
+		imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		
+		VK_CHECK( qvkCreateImage( vk.device, &imageInfo, NULL, &vk.rt.motionVectorImage ) );
+		
+		VkMemoryRequirements memRequirements;
+		qvkGetImageMemoryRequirements( vk.device, vk.rt.motionVectorImage, &memRequirements );
+		
+		VkMemoryAllocateInfo allocInfo = {};
+		allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		allocInfo.allocationSize = memRequirements.size;
+		allocInfo.memoryTypeIndex = find_memory_type( memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+		
+		VK_CHECK( qvkAllocateMemory( vk.device, &allocInfo, NULL, &vk.rt.motionVectorImageMemory ) );
+		VK_CHECK( qvkBindImageMemory( vk.device, vk.rt.motionVectorImage, vk.rt.motionVectorImageMemory, 0 ) );
+		
+		VkImageViewCreateInfo viewInfo = {};
+		viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+		viewInfo.image = vk.rt.motionVectorImage;
+		viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+		viewInfo.format = VK_FORMAT_R16G16_SFLOAT;
+		viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		viewInfo.subresourceRange.baseMipLevel = 0;
+		viewInfo.subresourceRange.levelCount = 1;
+		viewInfo.subresourceRange.baseArrayLayer = 0;
+		viewInfo.subresourceRange.layerCount = 1;
+		
+		VK_CHECK( qvkCreateImageView( vk.device, &viewInfo, NULL, &vk.rt.motionVectorImageView ) );
+	}
 }
 
 
@@ -1365,8 +1738,10 @@ void vk_rt_update_descriptor_set( void )
 	imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
 	VkDescriptorImageInfo blueNoiseInfo = {};
+	VkDescriptorImageInfo historyImageInfo = {};
+	VkDescriptorImageInfo motionVectorImageInfo = {};
 
-	VkWriteDescriptorSet writes[3] = {};
+	VkWriteDescriptorSet writes[7] = {};
 	uint32_t writeCount = 0;
 
 	// Binding 0: Acceleration structure
@@ -1434,6 +1809,46 @@ void vk_rt_update_descriptor_set( void )
 		writes[writeCount].descriptorCount = 1;
 		writes[writeCount].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		writes[writeCount].pImageInfo = &blueNoiseInfo;
+		writes[writeCount].pBufferInfo = NULL;
+		writes[writeCount].pTexelBufferView = NULL;
+		writeCount++;
+	}
+
+	// Binding 5: History image (for temporal accumulation)
+	if ( r_rt_temporal && r_rt_temporal->integer && vk.rt.historyImageView != VK_NULL_HANDLE ) {
+		VkDescriptorImageInfo historyImageInfo = {};
+		historyImageInfo.sampler = VK_NULL_HANDLE;
+		historyImageInfo.imageView = vk.rt.historyImageView;
+		historyImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+		writes[writeCount].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[writeCount].pNext = NULL;
+		writes[writeCount].dstSet = vk.rt.raytracingDescriptorSet;
+		writes[writeCount].dstBinding = 5;
+		writes[writeCount].dstArrayElement = 0;
+		writes[writeCount].descriptorCount = 1;
+		writes[writeCount].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		writes[writeCount].pImageInfo = &historyImageInfo;
+		writes[writeCount].pBufferInfo = NULL;
+		writes[writeCount].pTexelBufferView = NULL;
+		writeCount++;
+	}
+
+	// Binding 6: Motion vectors (for temporal reprojection)
+	if ( r_rt_temporal && r_rt_temporal->integer && vk.rt.motionVectorImageView != VK_NULL_HANDLE ) {
+		VkDescriptorImageInfo motionVectorImageInfo = {};
+		motionVectorImageInfo.sampler = VK_NULL_HANDLE;
+		motionVectorImageInfo.imageView = vk.rt.motionVectorImageView;
+		motionVectorImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+		writes[writeCount].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[writeCount].pNext = NULL;
+		writes[writeCount].dstSet = vk.rt.raytracingDescriptorSet;
+		writes[writeCount].dstBinding = 6;
+		writes[writeCount].dstArrayElement = 0;
+		writes[writeCount].descriptorCount = 1;
+		writes[writeCount].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		writes[writeCount].pImageInfo = &motionVectorImageInfo;
 		writes[writeCount].pBufferInfo = NULL;
 		writes[writeCount].pTexelBufferView = NULL;
 		writeCount++;
@@ -1532,8 +1947,49 @@ static void vk_rt_update_uniform_buffer( void )
 
 	// debugMagenta (int)
 	idata[0] = r_rt_debugMagenta ? r_rt_debugMagenta->integer : 0;
+	idata += 1;
+	data = (float *)idata;
+
+	// temporalAlpha (float) - blend factor for temporal accumulation
+	data[0] = r_rt_temporalAlpha ? r_rt_temporalAlpha->value : 0.9f;
+	data += 1;
+	
+	// maxBounces (int) - maximum ray bounces for GI
+	idata = (int *)data;
+	idata[0] = (r_rt_gi && r_rt_gi->integer) ? (r_rt_giBounces ? r_rt_giBounces->integer : 2) : 0;
+	idata += 1;
+	data = (float *)idata;
+	
+	// giIntensity (float) - GI contribution scale
+	data[0] = r_rt_giIntensity ? r_rt_giIntensity->value : 1.0f;
+	data += 1;
+
+	// previousViewInverse (mat4 = 16 floats)
+	Com_Memcpy( data, vk.rt.previousViewInverse, sizeof(float) * 16 );
+	data += 16;
+
+	// previousProjInverse (mat4 = 16 floats)
+	Com_Memcpy( data, vk.rt.previousProjInverse, sizeof(float) * 16 );
+	data += 16;
+
+	// previousCameraPos (vec4 = 4 floats)
+	data[0] = vk.rt.previousCameraPos[0];
+	data[1] = vk.rt.previousCameraPos[1];
+	data[2] = vk.rt.previousCameraPos[2];
+	data[3] = 1.0f;
+	data += 4;
 
 	qvkUnmapMemory( vk.device, vk.rt.uniformBufferMemory );
+
+	// Store current matrices for next frame
+	Com_Memcpy( vk.rt.previousViewInverse, viewInverse, sizeof(mat4_t) );
+	Com_Memcpy( vk.rt.previousProjInverse, projInverse, sizeof(mat4_t) );
+	if ( backEnd.refdef.vieworg ) {
+		VectorCopy( backEnd.refdef.vieworg, vk.rt.previousCameraPos );
+	} else {
+		VectorClear( vk.rt.previousCameraPos );
+	}
+	vk.rt.previousMatricesValid = qtrue;
 }
 
 #ifdef USE_VULKAN_RAY_TRACING
@@ -1650,6 +2106,123 @@ void vk_rt_trace_rays( uint32_t width, uint32_t height )
 
 	// Transition RT output image to SHADER_READ_ONLY_OPTIMAL for subsequent sampling/compositing
 	vk_rt_transition_image_to_sampled( vk.rt.outputImage );
+	
+	// Copy current frame to history for temporal accumulation (if enabled)
+	if ( r_rt_temporal && r_rt_temporal->integer && vk.rt.historyImage != VK_NULL_HANDLE ) {
+		// Transition history image to TRANSFER_DST_OPTIMAL
+		VkImageMemoryBarrier historyBarrier = {};
+		historyBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		historyBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		historyBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		historyBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+		historyBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		historyBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		historyBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		historyBarrier.image = vk.rt.historyImage;
+		historyBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		historyBarrier.subresourceRange.baseMipLevel = 0;
+		historyBarrier.subresourceRange.levelCount = 1;
+		historyBarrier.subresourceRange.baseArrayLayer = 0;
+		historyBarrier.subresourceRange.layerCount = 1;
+
+		qvkCmdPipelineBarrier(
+			vk.cmd->command_buffer,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			VK_PIPELINE_STAGE_TRANSFER_BIT,
+			0,
+			0, NULL,
+			0, NULL,
+			1, &historyBarrier
+		);
+
+		// Transition output image to TRANSFER_SRC_OPTIMAL
+		VkImageMemoryBarrier outputBarrier = {};
+		outputBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+		outputBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		outputBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+		outputBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		outputBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+		outputBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		outputBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		outputBarrier.image = vk.rt.outputImage;
+		outputBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		outputBarrier.subresourceRange.baseMipLevel = 0;
+		outputBarrier.subresourceRange.levelCount = 1;
+		outputBarrier.subresourceRange.baseArrayLayer = 0;
+		outputBarrier.subresourceRange.layerCount = 1;
+
+		qvkCmdPipelineBarrier(
+			vk.cmd->command_buffer,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			VK_PIPELINE_STAGE_TRANSFER_BIT,
+			0,
+			0, NULL,
+			0, NULL,
+			1, &outputBarrier
+		);
+
+		// Copy output image to history
+		VkImageCopy copyRegion = {};
+		copyRegion.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		copyRegion.srcSubresource.mipLevel = 0;
+		copyRegion.srcSubresource.baseArrayLayer = 0;
+		copyRegion.srcSubresource.layerCount = 1;
+		copyRegion.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		copyRegion.dstSubresource.mipLevel = 0;
+		copyRegion.dstSubresource.baseArrayLayer = 0;
+		copyRegion.dstSubresource.layerCount = 1;
+		copyRegion.srcOffset.x = 0;
+		copyRegion.srcOffset.y = 0;
+		copyRegion.srcOffset.z = 0;
+		copyRegion.dstOffset.x = 0;
+		copyRegion.dstOffset.y = 0;
+		copyRegion.dstOffset.z = 0;
+		copyRegion.extent.width = width;
+		copyRegion.extent.height = height;
+		copyRegion.extent.depth = 1;
+
+		qvkCmdCopyImage(
+			vk.cmd->command_buffer,
+			vk.rt.outputImage,
+			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			vk.rt.historyImage,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			1,
+			&copyRegion
+		);
+
+		// Transition history back to GENERAL
+		historyBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		historyBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+		historyBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		historyBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+		qvkCmdPipelineBarrier(
+			vk.cmd->command_buffer,
+			VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+			0,
+			0, NULL,
+			0, NULL,
+			1, &historyBarrier
+		);
+
+		// Transition output back to SHADER_READ_ONLY_OPTIMAL
+		outputBarrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+		outputBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+		outputBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+		outputBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+		qvkCmdPipelineBarrier(
+			vk.cmd->command_buffer,
+			VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			0,
+			0, NULL,
+			0, NULL,
+			1, &outputBarrier
+		);
+	}
 }
 
 #endif // USE_VULKAN_RAY_TRACING
