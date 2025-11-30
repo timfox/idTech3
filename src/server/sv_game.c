@@ -1126,7 +1126,7 @@ void SV_InitGameProgs( void ) {
 
 	Com_Printf( "SV_InitGameProgs: Calling VM_Create for game module\n" );
 	// load the dll or bytecode
-	gvm = VM_Create( VM_GAME, SV_GameSystemCalls, SV_DllSyscall, Cvar_VariableIntegerValue( "vm_game" ) );
+	gvm = VM_Create( VM_GAME, SV_GameSystemCalls, SV_DllSyscall, VM_SelectInterpret( "vm_game", VMI_NATIVE, qfalse ) );
 	if ( !gvm ) {
 		Com_Error( ERR_DROP, "VM_Create on game failed" );
 	}

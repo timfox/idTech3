@@ -283,6 +283,38 @@ void VM_Init( void ) {
 
 
 /*
+================
+VM_SelectInterpret
+
+Resolve the effective vmInterpret_t for a VM, honoring pure server
+restrictions and clamping to the valid enum range.
+================
+*/
+vmInterpret_t VM_SelectInterpret( const char *cvarName, vmInterpret_t requested, qboolean requireQvmOnly ) {
+	int value = requested;
+
+	// If a cvar name is provided, let it override the explicit value
+	if ( cvarName && cvarName[0] ) {
+		value = Cvar_VariableIntegerValue( cvarName );
+	}
+
+	// Clamp to known range
+	if ( value < VMI_NATIVE ) {
+		value = VMI_NATIVE;
+	} else if ( value > VMI_BYTECODE ) {
+		value = VMI_BYTECODE;
+	}
+
+	// On pure servers we only allow QVMs (compiled or bytecode)
+	if ( requireQvmOnly && value == VMI_NATIVE ) {
+		value = VMI_COMPILED;
+	}
+
+	return (vmInterpret_t)value;
+}
+
+
+/*
 ===============
 VM_ValueToSymbol
 
@@ -1796,6 +1828,7 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 			Com_Error( ERR_DROP, "VM_Create: bad allocated vm index %i", vm->index );
 			return NULL;
 		}
+		// VM already created; reuse existing instance
 		return vm;
 	}
 
@@ -1816,7 +1849,9 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 
 	if ( interpret == VMI_NATIVE ) {
 		// try to load as a system library (.so/.dll)
-	Com_Printf( "VM_Create: Loading library file %s (index=%d)\n", name, index );
+	if ( com_developer && com_developer->integer ) {
+		Com_Printf( "VM_Create: Loading library file %s (index=%d)\n", name, index );
+	}
 	
 	// Preload game.x86_64.so if loading UI module, since UI depends on it
 	// This ensures the dependency is available when dlopen resolves ../vm/game.x86_64.so
@@ -1825,10 +1860,14 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 	if ( index == VM_UI ) {
 		char preloadName[ MAX_QPATH ];
 		Com_sprintf( preloadName, sizeof( preloadName ), "game." ARCH_STRING DLL_EXT );
-		Com_Printf( "VM_Create: Preloading %s for UI dependency\n", preloadName );
+		if ( com_developer && com_developer->integer ) {
+			Com_Printf( "VM_Create: Preloading %s for UI dependency\n", preloadName );
+		}
 		void *gameHandle = FS_LoadLibrary( preloadName );
 		if ( gameHandle ) {
-			Com_Printf( "VM_Create: Preloaded %s for UI dependency (not initializing syscall pointer)\n", preloadName );
+			if ( com_developer && com_developer->integer ) {
+				Com_Printf( "VM_Create: Preloaded %s for UI dependency (not initializing syscall pointer)\n", preloadName );
+			}
 			// Don't unload it - UI needs it
 			// Don't call dllEntry - it will be called when game module is loaded for server
 		} else {
@@ -1836,15 +1875,21 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 		}
 	}
 	
-	Com_Printf( "VM_Create: Calling VM_LoadLib for %s\n", name );
+	if ( com_developer && com_developer->integer ) {
+		Com_Printf( "VM_Create: Calling VM_LoadLib for %s\n", name );
+	}
 	vm->dllHandle = VM_LoadLib( name, &vm->entryPoint, dllSyscalls );
 	if ( vm->dllHandle ) {
-		Com_Printf( "VM_Create: VM_LoadLib succeeded for %s, entryPoint=%p\n", name, (void*)vm->entryPoint );
+		if ( com_developer && com_developer->integer ) {
+			Com_Printf( "VM_Create: VM_LoadLib succeeded for %s, entryPoint=%p\n", name, (void*)vm->entryPoint );
+		}
 		vm->privateFlag = 0; // allow reading private cvars
 		vm->dataAlloc = ~0U;
 		vm->dataMask = ~0U;
 		vm->dataBase = 0;
-		Com_Printf( "VM_Create: Returning VM for %s\n", name );
+		if ( com_developer && com_developer->integer ) {
+			Com_Printf( "VM_Create: Returning VM for %s\n", name );
+		}
 		return vm;
 	}
 

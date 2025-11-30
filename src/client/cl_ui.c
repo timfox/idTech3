@@ -1249,22 +1249,17 @@ CL_InitUI
 void CL_InitUI( void ) {
 	int		v;
 	vmInterpret_t		interpret;
+	static qboolean uiRetryAttempted = qfalse;
 
 	// disallow vl.collapse for UI elements
 	re.VertexLighting( qfalse );
 
 	// load the dll or bytecode
-	interpret = Cvar_VariableIntegerValue( "vm_ui" );
-	if ( cl_connectedToPureServer )
-	{
-		// if sv_pure is set we only allow qvms to be loaded
-		if ( interpret != VMI_COMPILED && interpret != VMI_BYTECODE )
-			interpret = VMI_COMPILED;
-	}
+	interpret = VM_SelectInterpret( "vm_ui", VMI_NATIVE, cl_connectedToPureServer ? qtrue : qfalse );
 
 	uivm = VM_Create( VM_UI, CL_UISystemCalls, UI_DllSyscall, interpret );
 	if ( !uivm ) {
-		if ( cl_connectedToPureServer && CL_GameSwitch() ) {
+		if ( cl_connectedToPureServer && !uiRetryAttempted && CL_GameSwitch() ) {
 			// server-side modification may require and reference only single custom ui.qvm
 			// so allow referencing everything until we download all files
 			// new gamestate will be requested after downloads complete
@@ -1272,6 +1267,7 @@ void CL_InitUI( void ) {
 			fs_reordered = qfalse;
 			FS_PureServerSetLoadedPaks( "", "" );
 			uivm = VM_Create( VM_UI, CL_UISystemCalls, UI_DllSyscall, interpret );
+			uiRetryAttempted = qtrue;
 		}
 		if ( !uivm ) {
 			// UI module loading failed - allow engine to continue without UI

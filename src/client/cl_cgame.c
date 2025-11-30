@@ -857,13 +857,7 @@ void CL_InitCGame( void ) {
 	re.VertexLighting( qtrue );
 
 	// load the dll or bytecode
-	interpret = Cvar_VariableIntegerValue( "vm_cgame" );
-	if ( cl_connectedToPureServer )
-	{
-		// if sv_pure is set we only allow qvms to be loaded
-		if ( interpret != VMI_COMPILED && interpret != VMI_BYTECODE )
-			interpret = VMI_COMPILED;
-	}
+	interpret = VM_SelectInterpret( "vm_cgame", VMI_NATIVE, cl_connectedToPureServer ? qtrue : qfalse );
 
 	cgvm = VM_Create( VM_CGAME, CL_CgameSystemCalls, CL_DllSyscall, interpret );
 	if ( !cgvm ) {
