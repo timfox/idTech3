@@ -6586,20 +6586,24 @@ Tries to load libraries within known searchpaths
 			skipThis = qtrue; // Skip pack files
 		} else if ( !sp->dir ) {
 			skipThis = qtrue; // Skip non-directory paths
-		} else if ( sp->dir->gamedir && sp->dir->gamedir[0] ) {
-			// Check if gamedir ends with .pk3dir
-			// .pk3dir directories have policy DIR_ALLOW and should be skipped for library loading
-			const char *gamedir = sp->dir->gamedir;
-			size_t len = strlen( gamedir );
-			// Direct string comparison - check if ends with .pk3dir (case-insensitive)
-			if ( len >= 7 ) {
-				const char *ext = gamedir + len - 7;
-				// Use strcmp for case-sensitive comparison first, then fallback to Q_stricmp
-				if ( strcmp( ext, ".pk3dir" ) == 0 || Q_stricmp( ext, ".pk3dir" ) == 0 ) {
+		} else {
+			// Check both path and gamedir for .pk3dir (check path first as it's more reliable)
+			const char *path = sp->dir->path ? sp->dir->path : "";
+			const char *gamedir = sp->dir->gamedir ? sp->dir->gamedir : "";
+			
+			// Debug: always check for DIR_ALLOW to see what we're checking
+			if ( sp->policy == DIR_ALLOW ) {
+				// Check if path or gamedir contains .pk3dir
+				// This is the most reliable way to detect .pk3dir directories
+				if ( ( path[0] && strstr( path, ".pk3dir" ) != NULL ) ||
+				     ( gamedir[0] && strstr( gamedir, ".pk3dir" ) != NULL ) ) {
 					skipThis = qtrue; // Skip .pk3dir directories
 					if ( fs_debug && fs_debug->integer ) {
-						Com_Printf( "FS_LoadLibrary: skipping .pk3dir directory '%s' (policy=%d)\n", gamedir, sp->policy );
+						Com_Printf( "FS_LoadLibrary: skipping .pk3dir directory path='%s' gamedir='%s' (policy=%d)\n", 
+							path, gamedir, sp->policy );
 					}
+				} else if ( fs_debug && fs_debug->integer ) {
+					Com_Printf( "FS_LoadLibrary: DIR_ALLOW not .pk3dir path='%s' gamedir='%s'\n", path, gamedir );
 				}
 			}
 		}
@@ -6615,8 +6619,50 @@ Tries to load libraries within known searchpaths
 			// First try vm/ subdirectory (where libraries are typically stored)
 			Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", name );
 			const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath );
+			
+			// CRITICAL: Check the constructed path for .pk3dir BEFORE trying to load
+			// The earlier check on path/gamedir may not catch all cases, so check the full path
+			// ALWAYS check - this is the most reliable way
+			// Copy the path to a local buffer since FS_BuildOSPath uses a static buffer
+			char checkPath[ MAX_OSPATH * 2 ];
+			if ( !fn ) {
+				sp = sp->next;
+				continue;
+			}
+			Q_strncpyz( checkPath, fn, sizeof( checkPath ) );
+			
+			// Check for .pk3dir in the constructed path - this MUST work
+			// Use a simple, direct check on the copied path
+			const char *found = strstr( checkPath, ".pk3dir" );
+			if ( found != NULL ) {
+				// Found .pk3dir - skip this path
+				if ( fs_debug && fs_debug->integer ) {
+					Com_Printf( "FS_LoadLibrary: skipping .pk3dir path '%s' (policy=%d, found at offset %ld)\n", 
+						checkPath, sp->policy, (long)(found - checkPath) );
+				}
+				sp = sp->next;
+				continue;
+			}
+			
+			// Debug: if we get here and it's a .pk3dir path, something is wrong
+			if ( fs_debug && fs_debug->integer && sp->policy == DIR_ALLOW ) {
+				// Check if path contains pk3dir manually
+				int hasPk3dir = 0;
+				const char *p = checkPath;
+				while ( *p ) {
+					if ( p[0] == '.' && p[1] == 'p' && p[2] == 'k' && p[3] == '3' && p[4] == 'd' && p[5] == 'i' && p[6] == 'r' ) {
+						hasPk3dir = 1;
+						break;
+					}
+					p++;
+				}
+				if ( hasPk3dir ) {
+					Com_Printf( "FS_LoadLibrary: WARNING - path '%s' contains .pk3dir but strstr didn't find it!\n", checkPath );
+				}
+			}
+			
 			if ( fs_debug && fs_debug->integer ) {
-				Com_Printf( "FS_LoadLibrary: trying %s (policy=%d)\n", fn, sp->policy );
+				Com_Printf( "FS_LoadLibrary: trying %s (policy=%d)\n", fn ? fn : "<NULL>", sp->policy );
 			}
 			libHandle = Sys_LoadLibrary( fn );
 			searchCount++;
@@ -6624,8 +6670,18 @@ Tries to load libraries within known searchpaths
 			// If not found in vm/, try directly in game directory
 			if ( !libHandle ) {
 				fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, name );
+				
+				// CRITICAL: Check this path too BEFORE trying to load
+				if ( fn && strstr( fn, ".pk3dir" ) != NULL ) {
+					if ( fs_debug && fs_debug->integer ) {
+						Com_Printf( "FS_LoadLibrary: skipping .pk3dir path '%s' (policy=%d)\n", fn, sp->policy );
+					}
+					sp = sp->next;
+					continue;
+				}
+				
 				if ( fs_debug && fs_debug->integer ) {
-					Com_Printf( "FS_LoadLibrary: trying %s (policy=%d)\n", fn, sp->policy );
+					Com_Printf( "FS_LoadLibrary: trying %s (policy=%d)\n", fn ? fn : "<NULL>", sp->policy );
 				}
 				libHandle = Sys_LoadLibrary( fn );
 				searchCount++;

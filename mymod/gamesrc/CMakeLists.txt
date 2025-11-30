@@ -67,10 +67,10 @@ if(GAME_CPP_SOURCES)
 endif()
 add_library(game_${ARCH_SUFFIX} SHARED ${GAME_SOURCES})
 
-# Rename output to match engine expectations: gamex86_64.so format (no dot!)
-# Engine expects: {name}{ARCH_STRING}{DLL_EXT}
+# Rename output to match engine expectations: game.x86_64.so format (with dot!)
+# Engine expects: {name}.{ARCH_STRING}{DLL_EXT} (VM_LoadLib uses "%s." ARCH_STRING DLL_EXT)
 set_target_properties(game_${ARCH_SUFFIX} PROPERTIES
-    OUTPUT_NAME "game${ARCH_SUFFIX}"
+    OUTPUT_NAME "game.${ARCH_SUFFIX}"
     PREFIX ""
 )
 
@@ -81,7 +81,7 @@ list(REMOVE_ITEM CGAME_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cgame/cg_newdraw.c")
 add_library(cgame_${ARCH_SUFFIX} SHARED ${CGAME_SOURCES})
 
 set_target_properties(cgame_${ARCH_SUFFIX} PROPERTIES
-    OUTPUT_NAME "cgame${ARCH_SUFFIX}"
+    OUTPUT_NAME "cgame.${ARCH_SUFFIX}"
     PREFIX ""
 )
 
@@ -90,7 +90,7 @@ file(GLOB UI_SOURCES "ui/*.c")
 add_library(ui_${ARCH_SUFFIX} SHARED ${UI_SOURCES})
 
 set_target_properties(ui_${ARCH_SUFFIX} PROPERTIES
-    OUTPUT_NAME "ui${ARCH_SUFFIX}"
+    OUTPUT_NAME "ui.${ARCH_SUFFIX}"
     PREFIX ""
 )
 

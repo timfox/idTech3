@@ -1796,15 +1796,26 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 
 	if ( interpret == VMI_NATIVE ) {
 		// try to load as a system library (.so/.dll)
-		Com_Printf( "Loading library file %s.\n", name );
-		vm->dllHandle = VM_LoadLib( name, &vm->entryPoint, dllSyscalls );
-		if ( vm->dllHandle ) {
-			vm->privateFlag = 0; // allow reading private cvars
-			vm->dataAlloc = ~0U;
-			vm->dataMask = ~0U;
-			vm->dataBase = 0;
-			return vm;
+	Com_Printf( "Loading library file %s.\n", name );
+	
+	// Preload game.x86_64.so if loading UI module, since UI depends on it
+	// This ensures the dependency is available when dlopen resolves ../vm/game.x86_64.so
+	if ( index == VM_UI ) {
+		void *gameHandle = FS_LoadLibrary( "game" );
+		if ( gameHandle ) {
+			Com_Printf( "Preloaded game.x86_64.so for UI dependency\n" );
+			// Don't unload it - UI needs it
 		}
+	}
+	
+	vm->dllHandle = VM_LoadLib( name, &vm->entryPoint, dllSyscalls );
+	if ( vm->dllHandle ) {
+		vm->privateFlag = 0; // allow reading private cvars
+		vm->dataAlloc = ~0U;
+		vm->dataMask = ~0U;
+		vm->dataBase = 0;
+		return vm;
+	}
 
 		Com_Printf( "Failed to load dll, looking for qvm.\n" );
 		interpret = VMI_COMPILED;

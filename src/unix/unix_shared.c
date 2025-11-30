@@ -493,6 +493,7 @@ void *Sys_LoadLibrary( const char *name )
 	// Extract directory from library path to handle relative dependencies (e.g., ../vm/game.x86_64.so)
 	// dlopen resolves relative paths from the current working directory, not from the library's location
 	// By changing to the library's directory, we ensure dependencies resolve correctly
+	// Also add parent directory to LD_LIBRARY_PATH to help resolve ../vm/ dependencies
 	Q_strncpyz( libDir, name, sizeof( libDir ) );
 	dirName = strrchr( libDir, '/' );
 	if ( dirName ) {
@@ -501,7 +502,27 @@ void *Sys_LoadLibrary( const char *name )
 		if ( getcwd( oldCwd, sizeof( oldCwd ) ) != NULL ) {
 			if ( chdir( libDir ) == 0 ) {
 				changedDir = qtrue;
+				// Add parent directory to LD_LIBRARY_PATH to help resolve ../vm/ dependencies
+				// This ensures that ../vm/game.x86_64.so resolves correctly
+				const char *oldLdPath = getenv( "LD_LIBRARY_PATH" );
+				char newLdPath[ MAX_OSPATH * 3 ];
+				char parentDir[ MAX_OSPATH ];
+				Q_strncpyz( parentDir, libDir, sizeof( parentDir ) );
+				char *parentSlash = strrchr( parentDir, '/' );
+				if ( parentSlash ) {
+					*parentSlash = '\0'; // Get parent directory
+				}
+				if ( oldLdPath && oldLdPath[0] ) {
+					Com_sprintf( newLdPath, sizeof( newLdPath ), "%s:%s:%s", libDir, parentDir, oldLdPath );
+				} else {
+					Com_sprintf( newLdPath, sizeof( newLdPath ), "%s:%s", libDir, parentDir );
+				}
+				setenv( "LD_LIBRARY_PATH", newLdPath, 1 );
+			} else {
+				Com_Printf( "Sys_LoadLibrary: Failed to change directory to '%s': %s\n", libDir, strerror( errno ) );
 			}
+		} else {
+			Com_Printf( "Sys_LoadLibrary: Failed to get current working directory: %s\n", strerror( errno ) );
 		}
 	}
 
