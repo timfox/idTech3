@@ -21,10 +21,19 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "client.h"
+#define TRAP_EXTENSIONS_LIST ui_extensionTraps
+#include "../qcommon/vm_ext.h"
 
 #include "../botlib/botlib.h"
 
 extern	botlib_export_t	*botlib_export;
+
+static ext_trap_keys_t ui_extensionTraps[] = {
+	{ "trap_R_AddRefEntityToScene2",       UI_R_ADDREFENTITYTOSCENE2, qfalse },
+	{ "trap_R_AddLinearLightToScene_Q3E", UI_R_ADDLINEARLIGHTTOSCENE, qfalse },
+	{ "trap_Cvar_SetDescription_Q3E",     UI_CVAR_SETDESCRIPTION,    qfalse },
+	{ NULL,                               -1,                        qfalse }
+};
 
 vm_t *uivm = NULL;
 
@@ -764,6 +773,10 @@ static void *VM_ArgPtr( intptr_t intValue ) {
 
 
 static qboolean UI_GetValue( char* value, int valueSize, const char* key ) {
+	// First, try the extension table so we can track active extensions
+	if ( VM_Ext_GetKey( value, valueSize, key ) ) {
+		return qtrue;
+	}
 
 	if ( !Q_stricmp( key, "trap_R_AddRefEntityToScene2" ) ) {
 		Com_sprintf( value, valueSize, "%i", UI_R_ADDREFENTITYTOSCENE2 );

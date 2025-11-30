@@ -516,6 +516,7 @@ typedef void (QDECL *dllEntry_t)( dllSyscall_t syscallptr );
 void	VM_Init( void );
 vm_t	*VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscalls, vmInterpret_t interpret );
 vmInterpret_t VM_SelectInterpret( const char *cvarName, vmInterpret_t requested, qboolean requireQvmOnly );
+void	VM_Error( errorParm_t errorParm, vmIndex_t index );
 
 void	VM_Free( vm_t *vm );
 void	VM_Clear(void);

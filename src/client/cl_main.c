@@ -4127,12 +4127,13 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("fs_openedList", CL_OpenedPK3List_f );
 	Cmd_AddCommand ("fs_referencedList", CL_ReferencedPK3List_f );
 	Cmd_AddCommand ("model", CL_SetModel_f );
-	Cmd_AddCommand ("video", CL_Video_f );
-	Cmd_AddCommand ("video-pipe", CL_Video_f );
+	Cmd_AddCommand( "video", CL_Video_f );
+	Cmd_AddCommand( "video-pipe", CL_Video_f );
 	Cmd_SetCommandCompletionFunc( "video", CL_CompleteVideoName );
-	Cmd_AddCommand ("stopvideo", CL_StopVideo_f );
-	Cmd_AddCommand ("serverinfo", CL_Serverinfo_f );
-	Cmd_AddCommand ("systeminfo", CL_Systeminfo_f );
+	Cmd_AddCommand( "stopvideo", CL_StopVideo_f );
+	Cmd_AddCommand( "serverinfo", CL_Serverinfo_f );
+	Cmd_AddCommand( "systeminfo", CL_Systeminfo_f );
+	Cmd_AddCommand( "updatehunkusage", CL_UpdateLevelHunkUsage );
 
 #ifdef USE_CURL
 	Cmd_AddCommand( "download", CL_Download_f );

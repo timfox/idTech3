@@ -284,6 +284,39 @@ void VM_Init( void ) {
 
 /*
 ================
+VM_Error
+
+Emit a user-friendly error when a VM fails to load.
+================
+*/
+void VM_Error( errorParm_t errorParm, vmIndex_t index ) {
+	const char *module;
+	char qvmPath[ MAX_QPATH ];
+	char dllName[ MAX_QPATH ];
+
+	if ( index < 0 || index >= VM_COUNT ) {
+		Com_Error( errorParm, "VM_Create failed for invalid VM index %d", index );
+	}
+
+	module = vmName[ index ];
+
+	Com_sprintf( qvmPath, sizeof( qvmPath ), "vm/%s.qvm", module );
+	Com_sprintf( dllName, sizeof( dllName ), "%s." ARCH_STRING DLL_EXT, module );
+
+	Com_Error(
+		errorParm,
+		"VM_Create on %s failed\n\n"
+		"Checked for QVM '%s' and native module '%s' in the current mod folder.\n"
+		"Ensure at least one of these exists and is built for your platform.",
+		module,
+		qvmPath,
+		dllName
+	);
+}
+
+
+/*
+================
 VM_SelectInterpret
 
 Resolve the effective vmInterpret_t for a VM, honoring pure server
@@ -1713,12 +1746,15 @@ vm_t *VM_Restart( vm_t *vm ) {
 	}
 
 	// load the image
-	if( ( header = VM_LoadQVM( vm, qfalse ) ) == NULL ) {
-		Com_Printf( S_COLOR_RED "VM_Restart() failed\n" );
+	if ( ( header = VM_LoadQVM( vm, qfalse ) ) == NULL ) {
+		// Provide a clearer error about which VM failed to restart
+		VM_Error( ERR_DROP, vm->index );
 		return NULL;
 	}
 
-	Com_Printf( "VM_Restart()\n" );
+	if ( com_developer && com_developer->integer ) {
+		Com_Printf( "VM_Restart(%s)\n", vmName[ vm->index ] );
+	}
 
 	// free the original file
 	FS_FreeFile( header );

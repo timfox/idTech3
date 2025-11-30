@@ -22,10 +22,18 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // sv_game.c -- interface to the game dll
 
 #include "server.h"
+#define TRAP_EXTENSIONS_LIST g_extensionTraps
+#include "../qcommon/vm_ext.h"
 
 #include "../botlib/botlib.h"
 
 botlib_export_t	*botlib_export;
+
+static ext_trap_keys_t g_extensionTraps[] = {
+	{ "SVF_SELF_PORTAL2_Q3E",     SVF_SELF_PORTAL2,      qfalse },
+	{ "trap_Cvar_SetDescription_Q3E", G_CVAR_SETDESCRIPTION, qfalse },
+	{ NULL,                       -1,                    qfalse }
+};
 
 // these functions must be used instead of pointer arithmetic, because
 // the game allocates gentities with private information after the server shared part
@@ -372,6 +380,11 @@ void *GVM_ArgPtr( intptr_t intValue )
 
 static qboolean SV_GetValue( char* value, int valueSize, const char* key )
 {
+	// First, try the extension table so we can track active extensions
+	if ( VM_Ext_GetKey( value, valueSize, key ) ) {
+		return qtrue;
+	}
+
 	if ( !Q_stricmp( key, "SVF_SELF_PORTAL2_Q3E" ) )
 	{
 		Com_sprintf( value, valueSize, "%i", SVF_SELF_PORTAL2 );
@@ -1128,7 +1141,7 @@ void SV_InitGameProgs( void ) {
 	// load the dll or bytecode
 	gvm = VM_Create( VM_GAME, SV_GameSystemCalls, SV_DllSyscall, VM_SelectInterpret( "vm_game", VMI_NATIVE, qfalse ) );
 	if ( !gvm ) {
-		Com_Error( ERR_DROP, "VM_Create on game failed" );
+		VM_Error( ERR_DROP, VM_GAME );
 	}
 	Com_Printf( "SV_InitGameProgs: VM_Create succeeded, gvm=%p\n", (void*)gvm );
 

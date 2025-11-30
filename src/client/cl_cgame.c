@@ -22,10 +22,21 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_cgame.c  -- client system interaction with client game
 
 #include "client.h"
+#define TRAP_EXTENSIONS_LIST cg_extensionTraps
+#include "../qcommon/vm_ext.h"
 
 #include "../botlib/botlib.h"
 
 extern	botlib_export_t	*botlib_export;
+
+static ext_trap_keys_t cg_extensionTraps[] = {
+	{ "trap_R_AddRefEntityToScene2",       CG_R_ADDREFENTITYTOSCENE2, qfalse },
+	{ "trap_R_ForceFixedDLights",          CG_R_FORCEFIXEDDLIGHTS,    qfalse },
+	{ "trap_R_AddLinearLightToScene_Q3E",  CG_R_ADDLINEARLIGHTTOSCENE,qfalse },
+	{ "trap_IsRecordingDemo",              CG_IS_RECORDING_DEMO,      qfalse },
+	{ "trap_Cvar_SetDescription_Q3E",      CG_CVAR_SETDESCRIPTION,    qfalse },
+	{ NULL,                               -1,                         qfalse }
+};
 
 //extern qboolean loadCamera(const char *name);
 //extern void startCamera(int time);
@@ -415,6 +426,10 @@ static void *VM_ArgPtr( intptr_t intValue ) {
 
 
 static qboolean CL_GetValue( char* value, int valueSize, const char* key ) {
+	// First, try the extension table so we can track active extensions
+	if ( VM_Ext_GetKey( value, valueSize, key ) ) {
+		return qtrue;
+	}
 
 	if ( !Q_stricmp( key, "trap_R_AddRefEntityToScene2" ) ) {
 		Com_sprintf( value, valueSize, "%i", CG_R_ADDREFENTITYTOSCENE2 );
@@ -442,6 +457,104 @@ static qboolean CL_GetValue( char* value, int valueSize, const char* key ) {
 	}
 
 	return qfalse;
+}
+
+
+/*
+=================
+CL_UpdateLevelHunkUsage
+
+Update "hunkusage.dat" with the current map's hunk usage so the
+loading UI can show a more accurate progress bar.
+=================
+*/
+void CL_UpdateLevelHunkUsage( void )
+{
+	int        handle;
+	const char *memlistfile = "hunkusage.dat";
+	char       outstr[256];
+	int        len, memusage;
+
+	memusage = Cvar_VariableIntegerValue( "com_hunkused" );
+
+	len = FS_FOpenFileByMode( memlistfile, &handle, FS_READ );
+	if ( len >= 0 ) {
+		const char *buftrav;
+		char *outbuftrav;
+		char *outbuf;
+		const char *token;
+		char *buf;
+
+		buf = (char *)Z_Malloc( len + 1 );
+		Com_Memset( buf, 0, len + 1 );
+		outbuf = (char *)Z_Malloc( len + 1 );
+		Com_Memset( outbuf, 0, len + 1 );
+
+		(void)FS_Read( (void *)buf, len, handle );
+		FS_FCloseFile( handle );
+
+		// parse the file, filtering out the current map
+		buftrav    = buf;
+		outbuftrav = outbuf;
+		outbuftrav[0] = '\0';
+
+		COM_BeginParseSession( "CL_UpdateLevelHunkUsage" );
+		while ( ( token = COM_Parse( &buftrav ) ) != NULL && token[0] ) {
+			if ( !Q_stricmp( token, cl.mapname ) ) {
+				// found a match; read the stored size
+				token = COM_Parse( &buftrav );
+				if ( token && token[0] ) {
+					if ( atoi( token ) == memusage ) {
+						// same usage, nothing to update
+						Z_Free( buf );
+						Z_Free( outbuf );
+						return;
+					}
+				}
+			} else {
+				// keep this entry
+				Q_strcat( outbuftrav, len + 1, token );
+				Q_strcat( outbuftrav, len + 1, " " );
+				token = COM_Parse( &buftrav );
+				if ( token && token[0] ) {
+					Q_strcat( outbuftrav, len + 1, token );
+					Q_strcat( outbuftrav, len + 1, "\n" );
+				} else {
+					Com_Error( ERR_DROP, "hunkusage.dat file is corrupt" );
+				}
+			}
+		}
+
+		handle = FS_FOpenFileWrite( memlistfile );
+		if ( handle < 0 ) {
+			Com_Error( ERR_DROP, "cannot create %s", memlistfile );
+		}
+
+		// write filtered content back
+		len = strlen( outbuf );
+		if ( FS_Write( (void *)outbuf, len, handle ) != len ) {
+			Com_Error( ERR_DROP, "cannot write to %s", memlistfile );
+		}
+		FS_FCloseFile( handle );
+
+		Z_Free( buf );
+		Z_Free( outbuf );
+	}
+
+	// append the current map and its usage
+	(void)FS_FOpenFileByMode( memlistfile, &handle, FS_APPEND );
+	if ( handle < 0 ) {
+		Com_Error( ERR_DROP, "cannot write to hunkusage.dat, check disk full" );
+	}
+	Com_sprintf( outstr, sizeof( outstr ), "%s %i\n", cl.mapname, memusage );
+	(void)FS_Write( outstr, strlen( outstr ), handle );
+	FS_FCloseFile( handle );
+
+	// touch the file so it gets picked up by pak builders if needed
+	len = FS_FOpenFileByMode( memlistfile, &handle, FS_READ );
+	if ( len >= 0 ) {
+		FS_FCloseFile( handle );
+	}
 }
 
 
@@ -861,7 +974,7 @@ void CL_InitCGame( void ) {
 
 	cgvm = VM_Create( VM_CGAME, CL_CgameSystemCalls, CL_DllSyscall, interpret );
 	if ( !cgvm ) {
-		Com_Error( ERR_DROP, "VM_Create on cgame failed" );
+		VM_Error( ERR_DROP, VM_CGAME );
 	}
 	cls.state = CA_LOADING;
 
@@ -887,12 +1000,15 @@ void CL_InitCGame( void ) {
 	re.EndRegistration();
 
 	// make sure everything is paged in
-	if (!Sys_LowPhysicalMemory()) {
+	if ( !Sys_LowPhysicalMemory() ) {
 		Com_TouchMemory();
 	}
 
 	// clear anything that got printed
 	Con_ClearNotify ();
+
+	// update the memory usage file for this map (for better loading feedback)
+	CL_UpdateLevelHunkUsage();
 
 	// do not allow vid_restart for first time
 	cls.lastVidRestart = Sys_Milliseconds();
