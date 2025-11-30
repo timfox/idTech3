@@ -6565,16 +6565,48 @@ Tries to load libraries within known searchpaths
 		return NULL;
 	}
 
-	FS_CheckInitialized();
+	// If filesystem isn't initialized yet, return NULL gracefully
+	// This can happen during early initialization when VMs are being loaded
+	if ( !fs_searchpaths ) {
+		if ( fs_debug && fs_debug->integer ) {
+			Com_Printf( "FS_LoadLibrary: Filesystem not initialized yet, cannot load '%s'\n", name );
+		}
+		return NULL;
+	}
 
 	// Search all directory paths (both DIR_STATIC and DIR_ALLOW)
 	// This allows loading .so files from both base game and mod directories
 	while ( !libHandle && sp ) {
 		// Skip pack files (pk3), non-directory paths, and unpacked pk3dir directories
 		// Libraries should only be loaded from actual game/mod directories, not from unpacked pak directories
-		while ( sp && ( sp->pack || !sp->dir || 
-		                ( sp->dir->gamedir && FS_IsExt( sp->dir->gamedir, ".pk3dir", strlen( sp->dir->gamedir ) ) ) ) ) {
+		// .pk3dir directories have gamedir ending with ".pk3dir" and policy DIR_ALLOW
+		qboolean skipThis = qfalse;
+		
+		if ( sp->pack ) {
+			skipThis = qtrue; // Skip pack files
+		} else if ( !sp->dir ) {
+			skipThis = qtrue; // Skip non-directory paths
+		} else if ( sp->dir->gamedir && sp->dir->gamedir[0] ) {
+			// Check if gamedir ends with .pk3dir
+			// .pk3dir directories have policy DIR_ALLOW and should be skipped for library loading
+			const char *gamedir = sp->dir->gamedir;
+			size_t len = strlen( gamedir );
+			// Direct string comparison - check if ends with .pk3dir (case-insensitive)
+			if ( len >= 7 ) {
+				const char *ext = gamedir + len - 7;
+				// Use strcmp for case-sensitive comparison first, then fallback to Q_stricmp
+				if ( strcmp( ext, ".pk3dir" ) == 0 || Q_stricmp( ext, ".pk3dir" ) == 0 ) {
+					skipThis = qtrue; // Skip .pk3dir directories
+					if ( fs_debug && fs_debug->integer ) {
+						Com_Printf( "FS_LoadLibrary: skipping .pk3dir directory '%s' (policy=%d)\n", gamedir, sp->policy );
+					}
+				}
+			}
+		}
+		
+		if ( skipThis ) {
 			sp = sp->next;
+			continue;
 		}
 		if ( sp ) {
 			// Try all directory policies (DIR_STATIC, DIR_ALLOW)

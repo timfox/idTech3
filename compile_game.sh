@@ -54,14 +54,15 @@ cmake ..
 # Run the build process
 make
 
-# Copy libraries to the destination directory
-echo "Copying libraries to destination..."
-mkdir -p "$MOD_DEST_DIR"
+# VM files should be in mod/vm/ directory for runtime
+MOD_VM_DIR="$MOD_ROOT/vm"
+echo "Ensuring VM files are in mod directory: $MOD_VM_DIR"
+mkdir -p "$MOD_VM_DIR"
 
 # Determine where CMake placed the artifacts
 SOURCE_LIB_DIR=""
-for candidate in "$MOD_SOURCE_DIR/../vm" "$MOD_ROOT" "$MOD_BUILD_DIR"; do
-    if compgen -G "$candidate"/*.so > /dev/null; then
+for candidate in "$MOD_SOURCE_DIR/../vm" "$MOD_ROOT/vm" "$MOD_BUILD_DIR" "$MOD_ROOT"; do
+    if compgen -G "$candidate"/*.so > /dev/null 2>&1; then
         SOURCE_LIB_DIR="$candidate"
         break
     fi
@@ -75,25 +76,38 @@ else
     artifacts=("$SOURCE_LIB_DIR"/*.so "$SOURCE_LIB_DIR"/*.dll)
     shopt -u nullglob
     if [ ${#artifacts[@]} -eq 0 ]; then
-        echo "Warning: No shared libraries detected to copy."
-    elif [ "$SOURCE_LIB_DIR" != "$MOD_DEST_DIR" ]; then
-        for lib in "${artifacts[@]}"; do
-            cp -v "$lib" "$MOD_DEST_DIR/"
-        done
+        echo "Warning: No shared libraries detected."
     else
-        echo "Source and destination directories are the same; skipping copy."
+        # Copy to mod/vm/ directory for runtime (only if source is different)
+        if [ "$SOURCE_LIB_DIR" != "$MOD_VM_DIR" ]; then
+            for lib in "${artifacts[@]}"; do
+                libname=$(basename "$lib")
+                cp -v "$lib" "$MOD_VM_DIR/$libname"
+            done
+            echo "Libraries copied to $MOD_VM_DIR/"
+        else
+            echo "Libraries already in $MOD_VM_DIR/ (no copy needed)"
+        fi
+    fi
+fi
+
+# Also copy to build directory for packaging if different
+if [ "$MOD_VM_DIR" != "$MOD_DEST_DIR" ] && [ -d "$MOD_DEST_DIR" ]; then
+    mkdir -p "$MOD_DEST_DIR/vm"
+    if [ -d "$MOD_VM_DIR" ]; then
+        cp -v "$MOD_VM_DIR"/*.so "$MOD_VM_DIR"/*.dll "$MOD_DEST_DIR/vm/" 2>/dev/null || true
     fi
 fi
 
 # Verify files were copied
 echo ""
-if [ -d "$MOD_DEST_DIR" ]; then
-    SO_COUNT=$(ls -1 "$MOD_DEST_DIR"/*.so "$MOD_DEST_DIR"/*.dll 2>/dev/null | wc -l)
+if [ -d "$MOD_VM_DIR" ]; then
+    SO_COUNT=$(ls -1 "$MOD_VM_DIR"/*.so "$MOD_VM_DIR"/*.dll 2>/dev/null | wc -l)
     if [ "$SO_COUNT" -gt 0 ]; then
-        echo "Libraries available in $MOD_DEST_DIR/:"
-        ls -lh "$MOD_DEST_DIR"/*.so "$MOD_DEST_DIR"/*.dll 2>/dev/null || true
+        echo "Libraries available in $MOD_VM_DIR/:"
+        ls -lh "$MOD_VM_DIR"/*.so "$MOD_VM_DIR"/*.dll 2>/dev/null || true
     else
-        echo "Warning: No shared libraries found in $MOD_DEST_DIR/"
+        echo "Warning: No shared libraries found in $MOD_VM_DIR/"
     fi
 fi
 

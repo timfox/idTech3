@@ -475,6 +475,10 @@ void *Sys_LoadLibrary( const char *name )
 {
 	const char *ext;
 	void *handle;
+	char libDir[ MAX_OSPATH ];
+	char *dirName;
+	char oldCwd[ MAX_OSPATH ];
+	qboolean changedDir = qfalse;
 
 	if ( !name || !name[0] ) {
 		Com_Printf( "Sys_LoadLibrary: Invalid library name (NULL or empty)\n" );
@@ -486,6 +490,21 @@ void *Sys_LoadLibrary( const char *name )
 		Com_Error( ERR_FATAL, "Sys_LoadLibrary: Unable to load library with '%s' extension", ext );
 	}
 
+	// Extract directory from library path to handle relative dependencies (e.g., ../vm/game.x86_64.so)
+	// dlopen resolves relative paths from the current working directory, not from the library's location
+	// By changing to the library's directory, we ensure dependencies resolve correctly
+	Q_strncpyz( libDir, name, sizeof( libDir ) );
+	dirName = strrchr( libDir, '/' );
+	if ( dirName ) {
+		*dirName = '\0'; // Null-terminate at directory
+		// Save current directory and change to library's directory
+		if ( getcwd( oldCwd, sizeof( oldCwd ) ) != NULL ) {
+			if ( chdir( libDir ) == 0 ) {
+				changedDir = qtrue;
+			}
+		}
+	}
+
 	// Use RTLD_LAZY for game modules (ui, cgame, game) to allow trap_ functions
 	// to be resolved via dllEntry callback rather than at load time
 	// RTLD_NOW is used for other libraries that need immediate symbol resolution
@@ -494,7 +513,17 @@ void *Sys_LoadLibrary( const char *name )
 		flags = RTLD_LAZY | RTLD_LOCAL;
 	}
 	
-	handle = dlopen( name, flags );
+	// Use basename when we've changed directory, so dlopen uses the correct path
+	const char *loadName = name;
+	if ( changedDir ) {
+		const char *basename = strrchr( name, '/' );
+		if ( basename && basename[1] ) {
+			loadName = basename + 1; // Use basename (skip the '/')
+		}
+		// If basename extraction failed, use full path (shouldn't happen)
+	}
+	
+	handle = dlopen( loadName, flags );
 	if ( !handle )
 	{
 		const char *err = dlerror();
@@ -505,6 +534,15 @@ void *Sys_LoadLibrary( const char *name )
 			Com_Printf( "dlopen failed on '%s': unknown error\n", name );
 		}
 	}
+	
+	// Restore original directory
+	if ( changedDir ) {
+		if ( chdir( oldCwd ) != 0 ) {
+			// Failed to restore directory - this shouldn't happen, but log it
+			Com_Printf( "Warning: Failed to restore working directory to '%s'\n", oldCwd );
+		}
+	}
+	
 	return handle;
 }
 
