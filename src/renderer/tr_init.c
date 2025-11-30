@@ -742,7 +742,6 @@ team arena .. missionpack/screenshots/ *.tga
 two commands: "screenshot" and "screenshotJPEG"
 we use statics to store a count and start writing the first screenshot/screenshot????.tga (.jpg) available
 (with FS_FileExists / FS_FOpenFileWrite calls)
-FIXME: the statics don't get a reinit between fs_game changes
 
 ==============================================================================
 */
@@ -1457,11 +1456,11 @@ static void VarInfo( void )
 	ri.Printf( PRINT_ALL, "picmip: %d%s\n", r_picmip->integer, r_nomip->integer ? ", worldspawn only" : "" );
 
 	if ( r_vertexLight->integer || glConfig.hardwareType == GLHW_PERMEDIA2 ) {
-		ri.Printf( PRINT_ALL, "HACK: using vertex lightmap approximation\n" );
+		ri.Printf( PRINT_ALL, "using vertex lightmap approximation\n" );
 	} else if ( glConfig.hardwareType == GLHW_RAGEPRO ) {
-		ri.Printf( PRINT_ALL, "HACK: ragePro approximations\n" );
+		ri.Printf( PRINT_ALL, "ragePro approximations enabled\n" );
 	} else if ( glConfig.hardwareType == GLHW_RIVA128 ) {
-		ri.Printf( PRINT_ALL, "HACK: riva128 approximations\n" );
+		ri.Printf( PRINT_ALL, "riva128 approximations enabled\n" );
 	}
 
 	if ( r_finish->integer ) {

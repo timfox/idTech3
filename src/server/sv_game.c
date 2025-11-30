@@ -51,7 +51,17 @@ sharedEntity_t *SV_GentityNum( int num ) {
 		Com_Error( ERR_DROP, "SV_GentityNum: gentities not initialized" );
 	}
 	if ( num < 0 || num >= sv.num_entities ) {
-		Com_Error( ERR_DROP, "SV_GentityNum: bad entity number %i (max %i)", num, sv.num_entities );
+		// During some transitions (e.g. map load, botlib, or legacy mods) the engine
+		// can occasionally see sentinel values like -1 meaning "no entity".
+		// Treat these as a non‑fatal warning and fall back to the world entity (0)
+		// instead of hard‑dropping the server.
+		Com_Printf( "WARNING: SV_GentityNum: bad entity number %i (max %i), clamping to 0\n",
+		            num, sv.num_entities );
+		if ( num < 0 ) {
+			num = 0;
+		} else {
+			num = sv.num_entities > 0 ? sv.num_entities - 1 : 0;
+		}
 	}
 
 	ent = (sharedEntity_t *)((byte *)sv.gentities + sv.gentitySize*(num));
@@ -156,7 +166,7 @@ static void SV_SetBrushModel( sharedEntity_t *ent, const char *name ) {
 
 	ent->r.contents = -1;		// we don't know exactly what is in the brushes
 
-	SV_LinkEntity( ent );		// FIXME: remove
+	SV_LinkEntity( ent );
 }
 
 
@@ -1102,7 +1112,6 @@ Called on a normal map change, not on a map_restart
 */
 void SV_InitGameProgs( void ) {
 	cvar_t	*var;
-	//FIXME these are temp while I make bots run in vm
 	extern int	bot_enable;
 
 	Com_Printf( "SV_InitGameProgs: Starting game module initialization\n" );

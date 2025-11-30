@@ -73,15 +73,15 @@ int Sys_Milliseconds( void )
 }
 
 char *strlwr( char *s ) {
-  if ( s==NULL ) { // bk001204 - paranoia
-    assert(0);
-    return s;
-  }
-  while (*s) {
-    *s = tolower(*s);
-    s++;
-  }
-  return s; // bk001204 - duh
+	if ( s == NULL ) {
+		assert( 0 );
+		return s;
+	}
+	while ( *s ) {
+		*s = tolower( *s );
+		s++;
+	}
+	return s;
 }
 
 
@@ -487,7 +487,12 @@ void *Sys_LoadLibrary( const char *name )
 
 	if ( FS_AllowedExtension( name, qfalse, &ext ) )
 	{
-		Com_Error( ERR_FATAL, "Sys_LoadLibrary: Unable to load library with '%s' extension", ext );
+		// Disallowed or missing extension – don't treat as fatal here.
+		// Callers (e.g. FS_LoadLibrary / VM_LoadLib) already handle NULL
+		// as "not found". Also guard against NULL ext pointer.
+		Com_Printf( "Sys_LoadLibrary: Unable to load library '%s' with '%s' extension (not allowed)\n",
+			name, ext ? ext : "(null)" );
+		return NULL;
 	}
 
 	// Extract directory from library path to handle relative dependencies (e.g., ../vm/game.x86_64.so)

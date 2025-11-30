@@ -13,6 +13,7 @@ MOD_ROOT="$PROJECT_ROOT/$MOD_NAME"
 MOD_SOURCE_DIR="$MOD_ROOT/gamesrc"
 MOD_BUILD_DIR="$MOD_SOURCE_DIR/build"
 MOD_DEST_DIR="$BUILD_DIR/$MOD_NAME"
+RELEASE_MOD_DIR="$PROJECT_ROOT/release/$MOD_NAME"
 
 if [ "$MOD_NAME" = "blacksun" ]; then
     MOD_DEST_DIR="$MOD_ROOT"
@@ -44,6 +45,12 @@ fi
 if [ -d "$MOD_DEST_DIR" ]; then
     echo "Removing old mod files from $MOD_DEST_DIR ..."
     rm -f "$MOD_DEST_DIR"/*.so "$MOD_DEST_DIR"/*.dll 2>/dev/null || true
+fi
+
+# Also clear old VM libs from the release runtime directory, if it exists
+if [ -d "$RELEASE_MOD_DIR/vm" ]; then
+    echo "Removing old VM libs from $RELEASE_MOD_DIR/vm ..."
+    rm -f "$RELEASE_MOD_DIR/vm"/*.so "$RELEASE_MOD_DIR/vm"/*.dll 2>/dev/null || true
 fi
 
 # Create build directory and configure CMake
@@ -97,6 +104,13 @@ if [ "$MOD_VM_DIR" != "$MOD_DEST_DIR" ] && [ -d "$MOD_DEST_DIR" ]; then
     if [ -d "$MOD_VM_DIR" ]; then
         cp -v "$MOD_VM_DIR"/*.so "$MOD_VM_DIR"/*.dll "$MOD_DEST_DIR/vm/" 2>/dev/null || true
     fi
+fi
+
+# And copy to the release runtime directory so the engine can load the DLLs
+if [ -d "$MOD_VM_DIR" ]; then
+    mkdir -p "$RELEASE_MOD_DIR/vm"
+    echo "Copying VM libraries to release runtime dir: $RELEASE_MOD_DIR/vm"
+    cp -v "$MOD_VM_DIR"/*.so "$MOD_VM_DIR"/*.dll "$RELEASE_MOD_DIR/vm/" 2>/dev/null || true
 fi
 
 # Verify files were copied

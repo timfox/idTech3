@@ -45,13 +45,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef __GLIBC__
   #include <fpu_control.h> // bk001213 - force dumps on divide by zero
 #endif
+  #include <sys/sysinfo.h>
 #endif
 
 #if defined(__sun)
   #include <sys/file.h>
 #endif
 
-// FIXME TTimo should we gard this? most *nix system should comply?
 #include <termios.h>
 
 #include "../qcommon/q_shared.h"
@@ -79,8 +79,7 @@ typedef enum {
 	TTY_ERROR
 } tty_err;
 
-// enable/disabled tty input mode
-// NOTE TTimo this is used during startup, cannot be changed during run
+// enable/disabled tty input mode; used during startup and not changed at runtime
 static cvar_t *ttycon = NULL;
 
 // general flag to tell about tty console mode
@@ -92,7 +91,6 @@ static qboolean ttycon_on = qfalse;
 static int ttycon_hide = 0;
 
 // some key codes that the terminal may be using
-// TTimo NOTE: I'm not sure how relevant this is
 static int tty_erase;
 static int tty_eof;
 
@@ -109,7 +107,6 @@ tty_err Sys_ConsoleInputInit( void );
 // General routines
 // =======================================================================
 
-// bk001207
 #define MEM_THRESHOLD 96*1024*1024
 
 /*
@@ -119,10 +116,24 @@ Sys_LowPhysicalMemory()
 */
 qboolean Sys_LowPhysicalMemory( void )
 {
-	//MEMORYSTATUS stat;
-	//GlobalMemoryStatus (&stat);
-	//return (stat.dwTotalPhys <= MEM_THRESHOLD) ? qtrue : qfalse;
-	return qfalse; // bk001207 - FIXME
+#ifdef __linux__
+	struct sysinfo info;
+
+	if ( sysinfo( &info ) != 0 ) {
+		return qfalse;
+	}
+
+	// Use available physical memory to match the Win32 implementation semantics
+	// (see win_main.c: Sys_LowPhysicalMemory).
+	// sysinfo.freeram does not include caches, but that's acceptable for a
+	// conservative "low memory" check.
+	unsigned long long availPhys =
+		(unsigned long long)info.freeram * (unsigned long long)info.mem_unit;
+
+	return ( availPhys <= MEM_THRESHOLD ) ? qtrue : qfalse;
+#else
+	return qfalse;
+#endif
 }
 
 
@@ -138,8 +149,7 @@ void Sys_BeginProfiling( void )
 //   so we provide tty_Clear and tty_Show to be called before and after a stdout or stderr output
 // =============================================================
 
-// flush stdin, I suspect some terminals are sending a LOT of shit
-// FIXME TTimo relevant?
+// flush stdin, I suspect some terminals are sending a LOT of data
 static void tty_FlushIn( void )
 {
 #if 1
@@ -189,7 +199,6 @@ void tty_Hide( void )
 
 
 // show the current line
-// FIXME TTimo need to position the cursor if needed??
 void tty_Show( void )
 {
 	if ( !ttycon_on )
@@ -380,7 +389,6 @@ tty_err Sys_ConsoleInputInit( void )
 	fcntl( STDIN_FILENO, F_SETFL, stdin_flags | O_NONBLOCK );
 	stdin_active = qtrue;
 
-	// FIXME TTimo initialize this in Sys_Init or something?
 	if ( !ttycon || !ttycon->integer )
 	{
 		ttycon_on = qfalse;

@@ -78,6 +78,16 @@ set_target_properties(game_${ARCH_SUFFIX} PROPERTIES
 file(GLOB CGAME_SOURCES "cgame/*.c")
 # Exclude cg_newdraw.c as it requires MISSIONPACK UI components not available
 list(REMOVE_ITEM CGAME_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cgame/cg_newdraw.c")
+
+# CGame also relies on shared gameplay data (bg_itemlist, bg_numItems, etc.)
+# which in this codebase live in game/bg_misc.c. Those symbols are not exported
+# from the server game DLL (and even if they were, RTLD_LOCAL + hidden
+# visibility would prevent cgame from seeing them), so we must compile the
+# shared bg_ code directly into the cgame module as well.
+list(APPEND CGAME_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/game/bg_misc.c"
+)
+
 add_library(cgame_${ARCH_SUFFIX} SHARED ${CGAME_SOURCES})
 
 set_target_properties(cgame_${ARCH_SUFFIX} PROPERTIES

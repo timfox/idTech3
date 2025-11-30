@@ -42,12 +42,19 @@ echo "  - Renderers: build/idtech3_*.so"
 
 # Move .so files to /release directory, overwrite if they exist
 echo ""
-echo "Copying renderer .so files to /release..."
+echo "Copying engine binaries and renderer .so files to /release..."
 RELEASE_DIR="../release"
 if [ ! -d "$RELEASE_DIR" ]; then
     echo "Creating $RELEASE_DIR..."
     mkdir -p "$RELEASE_DIR"
 fi
+
+# Copy main client executable to release (overwrite if it exists)
+if [ -f "idtech3.x86_64" ]; then
+    cp -f "idtech3.x86_64" "$RELEASE_DIR/"
+    echo "Copied idtech3.x86_64 to $RELEASE_DIR/"
+fi
+
 shopt -s nullglob
 for sofile in idtech3_*.so; do
     cp -f "$sofile" "$RELEASE_DIR/"
@@ -61,5 +68,5 @@ if [ -f "libimgui_shared.so" ]; then
 	echo "Copied libimgui_shared.so to $RELEASE_DIR/"
 fi
 
-echo "Renderer .so files updated in $RELEASE_DIR"
+echo "Engine binary and renderer .so files updated in $RELEASE_DIR"
 

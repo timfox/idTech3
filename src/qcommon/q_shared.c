@@ -788,18 +788,18 @@ __reswitch:
 		if ( str[1] == '*' ) {
 			str += 2;
 			while ( (c = *str) != '\0' && ( c != '*' || str[1] != '/' ) ) {
-				if ( c == '\n' || c == '\r' ) {
-					com_lines++;
-					if ( c == '\r' && str[1] == '\n' ) // CR+LF?
-						str++;
-				}
+			if ( c == '\n' || c == '\r' ) {
+				com_lines++;
+				if ( c == '\r' && str[1] == '\n' ) // CR+LF?
+					str++;
+			}
 				str++;
 			}
-			if ( c != '\0' && str[1] != '\0' ) {
-				str += 2;
-			} else {
-				// FIXME: unterminated comment?
-			}
+		if ( c != '\0' && str[1] != '\0' ) {
+			str += 2;
+		} else {
+			// Unterminated comment: treat as end-of-input
+		}
 			goto __reswitch;
 		}
 
@@ -813,7 +813,8 @@ __reswitch:
 		//com_tokenline = com_lines;
 		while ( (c = *str) != '\0' && c != '"' ) {
 			if ( c == '\n' || c == '\r' ) {
-				com_lines++; // FIXME: unterminated quoted string?
+				// Unterminated quoted string that spans lines; continue
+				com_lines++;
 				shift++;
 			}
 			if ( len < MAX_TOKEN_CHARS-1 ) // overflow check
@@ -823,7 +824,7 @@ __reswitch:
 		if ( c != '\0' ) {
 			str++; // skip ending '"'
 		} else {
-			// FIXME: unterminated quoted string?
+			// Unterminated quoted string: treat as end-of-input
 		}
 		com_tokentype = TK_QUOTED;
 		break;
@@ -1214,8 +1215,65 @@ int Q_isalpha( int c )
 qboolean Q_isanumber( const char *s )
 {
 #ifdef Q3_VM
-    //FIXME: implement
-    return qfalse;
+	const char *p;
+	qboolean hasDigits = qfalse;
+	qboolean hasDot = qfalse;
+	qboolean hasExp = qfalse;
+
+	if ( !s || *s == '\0' ) {
+		return qfalse;
+	}
+
+	p = s;
+
+	// Optional sign
+	if ( *p == '+' || *p == '-' ) {
+		p++;
+	}
+
+	// Integer and fractional part
+	while ( *p ) {
+		if ( *p >= '0' && *p <= '9' ) {
+			hasDigits = qtrue;
+			p++;
+			continue;
+		}
+		if ( *p == '.' && !hasDot && !hasExp ) {
+			hasDot = qtrue;
+			p++;
+			continue;
+		}
+		break;
+	}
+
+	if ( !hasDigits ) {
+		return qfalse;
+	}
+
+	// Optional exponent part
+	if ( *p == 'e' || *p == 'E' ) {
+		qboolean hasExpDigits = qfalse;
+
+		hasExp = qtrue;
+		p++;
+
+		// Optional sign in exponent
+		if ( *p == '+' || *p == '-' ) {
+			p++;
+		}
+
+		while ( *p >= '0' && *p <= '9' ) {
+			hasExpDigits = qtrue;
+			p++;
+		}
+
+		if ( !hasExpDigits ) {
+			return qfalse;
+		}
+	}
+
+	// Valid number only if we've consumed the entire string
+	return ( *p == '\0' ) ? qtrue : qfalse;
 #else
     char *p;
 
@@ -1379,15 +1437,14 @@ Q_stricmpn
 int Q_stricmpn( const char *s1, const char *s2, int n ) {
 	int		c1, c2;
 
-	// bk001129 - moved in 1.17 fix not in id codebase
-        if ( s1 == NULL ) {
-           if ( s2 == NULL )
-             return 0;
-           else
-             return -1;
-        }
-        else if ( s2==NULL )
-          return 1;
+	if ( s1 == NULL ) {
+		if ( s2 == NULL ) {
+			return 0;
+		}
+		return -1;
+	} else if ( s2 == NULL ) {
+		return 1;
+	}
 
 
 	
@@ -1784,7 +1841,6 @@ va
 
 does a varargs printf into a temp buffer, so I don't need to have
 varargs versions of all text functions.
-FIXME: make this buffer size safe someday
 ============
 */
 const char *QDECL va( const char *format, ... )

@@ -455,7 +455,7 @@ static void DoRailCore( const vec3_t start, const vec3_t end, const vec3_t up, f
 
 	spanWidth2 = -spanWidth;
 
-	// FIXME: use quad stamp?
+	// Build rail core as a textured quad composed of two triangles
 	VectorMA( start, spanWidth, up, tess.xyz[tess.numVertexes] );
 	tess.texCoords[0][tess.numVertexes][0] = 0;
 	tess.texCoords[0][tess.numVertexes][1] = 0;

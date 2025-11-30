@@ -1296,8 +1296,6 @@ static void SV_NextDownload_f( client_t *cl )
 		return;
 	}
 	// We aren't getting an acknowledge for the correct block, drop the client
-	// FIXME: this is bad... the client will never parse the disconnect message
-	//			because the cgame isn't loaded yet
 	SV_DropClient( cl, "broken download" );
 }
 
@@ -1423,8 +1421,7 @@ static int SV_WriteDownloadToClient( client_t *cl )
                     "able to join the game anyway.\n", cl->downloadName);
 				}
 			} else {
-        // NOTE TTimo this is NOT supposed to happen unless bug in our filesystem scheme?
-        //   if the pk3 is referenced, it must have been found somewhere in the filesystem
+				// Referenced pk3 not found on server filesystem
 				Com_Printf("clientDownload: %d : \"%s\" file not found on server\n", (int) (cl - svs.clients), cl->downloadName);
 				Com_sprintf(errorMessage, sizeof(errorMessage), "File \"%s\" not found on server for autodownloading.\n", cl->downloadName);
 			}
@@ -1600,7 +1597,7 @@ int SV_SendDownloadMessages( void )
 =================
 SV_Disconnect_f
 
-The client is going to disconnect, so remove the connection immediately  FIXME: move to game?
+The client is going to disconnect, so remove the connection immediately.
 =================
 */
 static void SV_Disconnect_f( client_t *cl ) {

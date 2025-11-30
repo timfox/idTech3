@@ -840,7 +840,7 @@ int WINAPI WinMain( HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
 		// set low precision every frame, because some system calls
 		// reset it arbitrarily
 		// _controlfp( _PC_24, _MCW_PC );
-		// _controlfp( -1, _MCW_EM  ); // no exceptions, even if some crappy syscall turns them back on!
+		// _controlfp( -1, _MCW_EM  ); // no exceptions, even if some system call turns them back on
 
 #ifdef DEDICATED
 		// run the game

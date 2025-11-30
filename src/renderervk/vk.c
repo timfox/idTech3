@@ -2351,7 +2351,10 @@ static void init_vulkan_library( void )
 	INIT_DEVICE_FUNCTION(vkCmdSetViewport)
 	INIT_DEVICE_FUNCTION_EXT(vkCmdWriteTimestamp)
 	INIT_DEVICE_FUNCTION(vkGetQueryPoolResults)
-	INIT_DEVICE_FUNCTION(vkResetQueryPool)
+	// vkResetQueryPool was added in Vulkan 1.2. Treat it as optional:
+	// older loaders or drivers may not expose it even if the header does.
+	// We already null-check qvkResetQueryPool before use, so don't hard-fail here.
+	INIT_DEVICE_FUNCTION_EXT(vkResetQueryPool)
 	INIT_DEVICE_FUNCTION(vkCreateBuffer)
 	INIT_DEVICE_FUNCTION(vkCreateCommandPool)
 	INIT_DEVICE_FUNCTION(vkCreateDescriptorPool)
@@ -9192,34 +9195,28 @@ qboolean vk_capture_screenmap( void )
 	ri.Printf( PRINT_DEVELOPER, "VK: Capturing screenMap from main color buffer (%dx%d -> %dx%d)\n",
 		vk.renderWidth, vk.renderHeight, vk.screenMapWidth, vk.screenMapHeight );
 
-	// CRITICAL: vk.color_image layout handling for first frame / match start.
-	// On the first frame when match starts, vk.color_image might be in COLOR_ATTACHMENT_OPTIMAL
-	// even after vk_end_render_pass() is called, because the finalLayout transition happens
-	// synchronously but we might be in the same command buffer. We need to handle BOTH layouts.
+	// CRITICAL: vk.color_image layout handling after render pass ends.
+	// When vk_end_render_pass() is called, it records a transition from COLOR_ATTACHMENT_OPTIMAL
+	// to SHADER_READ_ONLY_OPTIMAL (the render pass's finalLayout). This transition happens
+	// automatically when the render pass ends, so by the time we record our barrier here,
+	// the image is transitioning to (or already in) SHADER_READ_ONLY_OPTIMAL.
 	//
-	// SAFE APPROACH: Use a two-barrier sequence:
-	// 1. First barrier: COLOR_ATTACHMENT_OPTIMAL -> SHADER_READ_ONLY_OPTIMAL (if needed, no-op if already there)
-	// 2. Second barrier: SHADER_READ_ONLY_OPTIMAL -> TRANSFER_SRC_OPTIMAL (always)
+	// Therefore, we MUST use SHADER_READ_ONLY_OPTIMAL as oldLayout, not COLOR_ATTACHMENT_OPTIMAL.
+	// Using COLOR_ATTACHMENT_OPTIMAL would conflict with the render pass end transition and
+	// cause VK_ERROR_DEVICE_LOST.
 	//
-	// However, Vulkan requires oldLayout to match actual layout. So we'll use COLOR_ATTACHMENT_OPTIMAL
-	// as oldLayout and handle the case where it's already SHADER_READ_ONLY_OPTIMAL by using
-	// VK_IMAGE_LAYOUT_UNDEFINED which allows any transition (but that loses image contents).
-	//
-	// ACTUAL FIX: Use COLOR_ATTACHMENT_OPTIMAL -> TRANSFER_SRC_OPTIMAL directly. This works if
-	// a render pass was started. If no render pass was started, the image is in initialLayout
-	// (SHADER_READ_ONLY_OPTIMAL), and this will fail. But that's better than device loss.
-	//
-	// BEST FIX: Ensure render pass is always started before capture. But for safety, use
-	// COLOR_ATTACHMENT_OPTIMAL as oldLayout since that's the most common case on first frame.
+	// The barrier pipeline stages must match: we wait for the render pass end transition
+	// (COLOR_ATTACHMENT_OUTPUT_BIT) to complete, then transition to TRANSFER_SRC_OPTIMAL.
 	VkImageMemoryBarrier srcBarrier = {};
 	srcBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	srcBarrier.pNext = NULL;
-	// Use COLOR_ATTACHMENT_OPTIMAL as oldLayout to handle first-frame case where image
-	// is still in COLOR_ATTACHMENT_OPTIMAL after render pass ends (before finalLayout transition completes).
-	// Include both access masks to handle both possible states.
+	// CRITICAL: Use SHADER_READ_ONLY_OPTIMAL as oldLayout because the render pass's finalLayout
+	// transition has already been recorded by vk_end_render_pass(). The image is transitioning
+	// from COLOR_ATTACHMENT_OPTIMAL to SHADER_READ_ONLY_OPTIMAL, so we must transition from
+	// SHADER_READ_ONLY_OPTIMAL to TRANSFER_SRC_OPTIMAL.
 	srcBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
 	srcBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-	srcBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; // Handle first-frame case
+	srcBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // Match render pass finalLayout
 	srcBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 	srcBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	srcBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -9257,12 +9254,12 @@ qboolean vk_capture_screenmap( void )
 	dstBarrier.subresourceRange.baseArrayLayer = 0;
 	dstBarrier.subresourceRange.layerCount = 1;
 
-	// At this point, render pass should be ended, but on first frame the image might still
-	// be in COLOR_ATTACHMENT_OPTIMAL (finalLayout transition is async). The srcBarrier uses
-	// COLOR_ATTACHMENT_OPTIMAL as oldLayout to handle this case.
-	
+	// CRITICAL: The render pass has ended, so vk.color_image is transitioning to SHADER_READ_ONLY_OPTIMAL
+	// (the finalLayout). Our barrier transitions from SHADER_READ_ONLY_OPTIMAL to TRANSFER_SRC_OPTIMAL.
+	// The pipeline stages must wait for the render pass end transition to complete before our transition.
 	VkImageMemoryBarrier barriers[2] = { srcBarrier, dstBarrier };
-	// Use COLOR_ATTACHMENT_OUTPUT_BIT stage to match COLOR_ATTACHMENT_OPTIMAL layout
+	// Wait for COLOR_ATTACHMENT_OUTPUT_BIT to complete (render pass end transition) and
+	// FRAGMENT_SHADER_BIT (in case image is already sampled), then transition to TRANSFER_BIT.
 	qvkCmdPipelineBarrier(
 		vk.cmd->command_buffer,
 		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,

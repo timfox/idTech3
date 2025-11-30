@@ -395,7 +395,7 @@ static void SV_MapRestart_f( void ) {
 ==================
 SV_Kick_f
 
-Kick a user off of the server  FIXME: move to game
+Kick a user off of the server
 ==================
 */
 static void SV_Kick_f( void ) {

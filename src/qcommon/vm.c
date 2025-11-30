@@ -660,70 +660,70 @@ static char *VM_ValidateHeader( vmHeader_t *header, int fileSize )
 {
 	static char errMsg[128];
 	int n;
-
+	
 	// truncated
 	if ( fileSize < ( sizeof( vmHeader_t ) - sizeof( int32_t ) ) ) {
-		sprintf( errMsg, "truncated image header (%i bytes long)", fileSize );
+		Com_sprintf( errMsg, sizeof( errMsg ), "truncated image header (%i bytes long)", fileSize );
 		return errMsg;
 	}
-
+	
 	// bad magic
 	if ( LittleLong( header->vmMagic ) != VM_MAGIC && LittleLong( header->vmMagic ) != VM_MAGIC_VER2 ) {
-		sprintf( errMsg, "bad file magic %08x", LittleLong( header->vmMagic ) );
+		Com_sprintf( errMsg, sizeof( errMsg ), "bad file magic %08x", LittleLong( header->vmMagic ) );
 		return errMsg;
 	}
-
+	
 	// truncated
 	if ( fileSize < sizeof( vmHeader_t ) && LittleLong( header->vmMagic ) != VM_MAGIC_VER2 ) {
-		sprintf( errMsg, "truncated image header (%i bytes long)", fileSize );
+		Com_sprintf( errMsg, sizeof( errMsg ), "truncated image header (%i bytes long)", fileSize );
 		return errMsg;
 	}
-
+	
 	if ( LittleLong( header->vmMagic ) == VM_MAGIC_VER2 )
 		n = sizeof( vmHeader_t );
 	else
 		n = ( sizeof( vmHeader_t ) - sizeof( int32_t ) );
-
+	
 	// byte swap the header
 	VM_SwapLongs( header, n );
-
+	
 	// bad code offset
 	if ( header->codeOffset >= fileSize ) {
-		sprintf( errMsg, "bad code segment offset %i", header->codeOffset );
+		Com_sprintf( errMsg, sizeof( errMsg ), "bad code segment offset %i", header->codeOffset );
 		return errMsg;
 	}
-
+	
 	// bad code length
 	if ( header->codeLength <= 0 || header->codeOffset + header->codeLength > fileSize ) {
-		sprintf( errMsg, "bad code segment length %i", header->codeLength );
+		Com_sprintf( errMsg, sizeof( errMsg ), "bad code segment length %i", header->codeLength );
 		return errMsg;
 	}
-
+	
 	// bad data offset
 	if ( header->dataOffset >= fileSize || header->dataOffset != header->codeOffset + header->codeLength ) {
-		sprintf( errMsg, "bad data segment offset %i", header->dataOffset );
+		Com_sprintf( errMsg, sizeof( errMsg ), "bad data segment offset %i", header->dataOffset );
 		return errMsg;
 	}
-
+	
 	// bad data length
 	if ( header->dataOffset + header->dataLength > fileSize )  {
-		sprintf( errMsg, "bad data segment length %i", header->dataLength );
+		Com_sprintf( errMsg, sizeof( errMsg ), "bad data segment length %i", header->dataLength );
 		return errMsg;
 	}
-
+	
 	if ( header->vmMagic == VM_MAGIC_VER2 ) {
 		// bad lit/jtrg length
 		if ( header->dataOffset + header->dataLength + header->litLength + header->jtrgLength != fileSize ) {
-			sprintf( errMsg, "bad lit/jtrg segment length" );
+			Com_sprintf( errMsg, sizeof( errMsg ), "bad lit/jtrg segment length" );
 			return errMsg;
 		}
 	}
 	// bad lit length
 	else if ( header->dataOffset + header->dataLength + header->litLength != fileSize ) {
-		sprintf( errMsg, "bad lit segment length %i", header->litLength );
+		Com_sprintf( errMsg, sizeof( errMsg ), "bad lit segment length %i", header->litLength );
 		return errMsg;
 	}
-
+	
 	return NULL;
 }
 
@@ -1721,6 +1721,23 @@ static void * QDECL VM_LoadLib( const char *name, vmMainFunc_t *entryPoint, dllS
 
 	libHandle = FS_LoadLibrary( filename );
 
+	// Fallback for game module: many mods (like this project) build the server DLL as "game.x86_64.so"
+	// instead of the stock "qagame.x86_64.so". If the primary load fails and we're asked for "qagame",
+	// try "game" as a secondary name before giving up.
+	if ( !libHandle && !Q_stricmp( name, "qagame" ) ) {
+		char altFilename[ MAX_QPATH ];
+		Com_sprintf( altFilename, sizeof( altFilename ), "game." ARCH_STRING DLL_EXT );
+		Com_Printf( "VM_LoadLib: Primary '%s' failed, trying fallback '%s' for game module\n",
+		            filename, altFilename );
+		libHandle = FS_LoadLibrary( altFilename );
+		if ( libHandle ) {
+			Com_Printf( "VM_LoadLib: Fallback '%s' loaded successfully for game module\n", altFilename );
+			Q_strncpyz( filename, altFilename, sizeof( filename ) );
+		} else {
+			Com_Printf( "VM_LoadLib: Fallback '%s' also failed for game module\n", altFilename );
+		}
+	}
+
 	if ( !libHandle ) {
 		Com_Printf( "VM_LoadLib '%s' failed (searched in gamedir: %s)\n", filename, gamedir ? gamedir : "<unknown>" );
 		return NULL;
@@ -1806,14 +1823,16 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 	// NOTE: We do NOT call dllEntry on the preloaded handle - it will be called when
 	// the game module is properly loaded for the server with the correct syscall pointer
 	if ( index == VM_UI ) {
-		Com_Printf( "VM_Create: Preloading game.x86_64.so for UI dependency\n" );
-		void *gameHandle = FS_LoadLibrary( "game" );
+		char preloadName[ MAX_QPATH ];
+		Com_sprintf( preloadName, sizeof( preloadName ), "game." ARCH_STRING DLL_EXT );
+		Com_Printf( "VM_Create: Preloading %s for UI dependency\n", preloadName );
+		void *gameHandle = FS_LoadLibrary( preloadName );
 		if ( gameHandle ) {
-			Com_Printf( "VM_Create: Preloaded game.x86_64.so for UI dependency (not initializing syscall pointer)\n" );
+			Com_Printf( "VM_Create: Preloaded %s for UI dependency (not initializing syscall pointer)\n", preloadName );
 			// Don't unload it - UI needs it
 			// Don't call dllEntry - it will be called when game module is loaded for server
 		} else {
-			Com_Printf( "VM_Create: WARNING - Failed to preload game.x86_64.so\n" );
+			Com_Printf( "VM_Create: WARNING - Failed to preload %s\n", preloadName );
 		}
 	}
 	
@@ -1834,7 +1853,31 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 	}
 
 	// load the image
-	if( ( header = VM_LoadQVM( vm, qtrue ) ) == NULL ) {
+	header = VM_LoadQVM( vm, qtrue );
+	if ( header == NULL ) {
+		// QVM bytecode not found or failed to load.
+		// As a fallback, try to load a native DLL for this VM if possible.
+		//
+		// This is especially useful for mods that ship only native modules
+		// (e.g. cgame.x86_64.so) without providing vm/cgame.qvm.
+		Com_Printf( "VM_Create: VM_LoadQVM failed for %s, attempting native DLL fallback\n", name );
+
+		// Avoid recursion: only attempt the fallback if we haven't already
+		// tried native loading for this VM.
+		if ( interpret != VMI_NATIVE ) {
+			vm->dllHandle = VM_LoadLib( name, &vm->entryPoint, dllSyscalls );
+			if ( vm->dllHandle ) {
+				Com_Printf( "VM_Create: DLL fallback succeeded for %s, entryPoint=%p\n",
+				            name, (void*)vm->entryPoint );
+				vm->privateFlag = 0; // allow reading private cvars
+				vm->dataAlloc = ~0U;
+				vm->dataMask = ~0U;
+				vm->dataBase = 0;
+				return vm;
+			}
+			Com_Printf( "VM_Create: DLL fallback also failed for %s\n", name );
+		}
+
 		return NULL;
 	}
 

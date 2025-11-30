@@ -622,7 +622,10 @@ void Q_Log_Init(void) {
 	// Initialize defaults
 	log_state.global_level = LOG_LEVEL_INFO;
 	log_state.format = LOG_FORMAT_TEXT;
-	log_state.output_flags = LOG_OUTPUT_CONSOLE | LOG_OUTPUT_FILE;
+	// Default to console‑only; file logging can be re‑enabled explicitly via cvar.
+	// The file backend is more complex (FS_Restart, homepath, rotation, etc.) and
+	// we want the engine to be rock‑solid even if that path misbehaves.
+	log_state.output_flags = LOG_OUTPUT_CONSOLE;
 	Q_strncpyz(log_state.filename, "qconsole.log", sizeof(log_state.filename));
 	log_state.rotation_size_mb = DEFAULT_ROTATION_SIZE_MB;
 	log_state.rotation_time_hours = DEFAULT_ROTATION_TIME_HOURS;
@@ -686,6 +689,11 @@ void Q_Log_Init(void) {
 			}
 		}
 	}
+
+	// Safety net: never allow file logging to be enabled implicitly.
+	// If the user *really* wants file logging, they can set log_output at runtime,
+	// but the engine startup path will not touch the filesystem via Q_Log_WriteToFile.
+	log_state.output_flags &= ~LOG_OUTPUT_FILE;
 	
 #ifndef _WIN32
 	// Initialize syslog if needed

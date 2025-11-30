@@ -458,7 +458,7 @@ static void RB_Hyperspace( void ) {
 	color4ub_t c;
 
 	if ( !backEnd.isHyperspace ) {
-		// do initialization shit
+		// First frame of hyperspace transition: any one-time setup would go here
 	}
 
 	if ( tess.shader != tr.whiteShader ) {

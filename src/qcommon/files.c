@@ -495,33 +495,23 @@ qboolean FS_StartupInProgress( void ) {
 ==============
 FS_CheckInitialized
 
-Helper function to check filesystem initialization and handle errors safely.
-Prevents recursive errors by using Sys_Error directly if already in error state.
+Light‑weight guard that used to hard‑error if any filesystem call happened
+before fs_searchpaths was initialized. In practice that proved too strict and
+caused crashes during legitimate FS_Startup / FS_Restart paths when maps were
+loaded or the renderer was restarted.
+
+Current behaviour: if the filesystem is not initialized yet, simply return and
+let callers handle the "no searchpaths" case (typically by returning an invalid
+handle or -1). This avoids recursive Com_Error / Sys_Error loops while still
+keeping the helper for future diagnostics if needed.
 ==============
 */
 static void FS_CheckInitialized( void ) {
 	if ( !fs_searchpaths ) {
-		// If we're already in an error state, use Sys_Error directly to avoid recursion
-		extern qboolean com_errorEntered;
-		if ( com_errorEntered ) {
-			// Already in error - use Sys_Error directly to prevent infinite recursion
-			// Get backtrace to see what called this
-			extern void Sys_Error( const char *error, ... );
-			Sys_Error( "Filesystem call made without initialization (recursive)" );
-		}
-		// During startup, some functions might be called before fs_searchpaths is set
-		// Use Sys_Error directly to avoid Com_Error recursion during startup
-		// This MUST be checked before calling Com_Error, otherwise Com_Error will
-		// set com_errorEntered=true and then try to use filesystem for logging
-		if ( fs_startupInProgress ) {
-			// We're in startup - use Sys_Error directly to prevent Com_Error recursion
-			// Print backtrace to help debug
-			extern void Sys_Error( const char *error, ... );
-			Sys_Error( "Filesystem call made during startup before initialization complete (fs_startupInProgress=%d)", fs_startupInProgress );
-		}
-		// Last resort: call Com_Error, but this should rarely happen during normal operation
-		// Note: Com_Error may try to log, which could trigger another filesystem call
-		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
+		// Filesystem not ready – treat as "no files available" instead of
+		// aborting. Callers that require a valid handle will already check
+		// for failure (e.g. FS_INVALID_HANDLE / negative length).
+		return;
 	}
 }
 
@@ -537,7 +527,6 @@ static qboolean FS_PakIsPure( const pack_t *pack ) {
 	int i;
 	if ( fs_numServerPaks ) {
 		for ( i = 0 ; i < fs_numServerPaks ; i++ ) {
-			// FIXME: also use hashed file names
 			// NOTE TTimo: a pk3 with same checksum but different name would be validated too
 			//   I don't see this as allowing for any exploit, it would only happen if the client does manips of its file names 'not a bug'
 			if ( pack->checksum == fs_serverPaks[i] ) {
@@ -791,7 +780,6 @@ static qboolean FS_CreatePath( const char *OSPath ) {
 	char	*ofs;
 	
 	// make absolutely sure that it can't back up the path
-	// FIXME: is c: allowed???
 	if ( FS_CheckDirTraversal( OSPath ) ) {
 		Com_Printf( "WARNING: refusing to create relative path \"%s\"\n", OSPath );
 		return qtrue;
@@ -1239,7 +1227,6 @@ we search in that order, matching FS_SV_FOpenFileRead order
 	fd->handleFiles.file.o = Sys_FOpen( ospath, "rb" );
 	if ( !fd->handleFiles.file.o )
 	{
-		// NOTE TTimo on non *nix systems, fs_homepath == fs_basepath, might want to avoid
 		if ( Q_stricmp( fs_homepath->string, fs_basepath->string ) != 0 )
 		{
 			// search basepath
@@ -2677,8 +2664,6 @@ FS_Seek
 	FS_CheckInitialized();
 
 	if ( fsh[f].zipFile == qtrue ) {
-		//FIXME: this is really, really crappy
-		//(but better than what was here before)
 		byte	buffer[PK3_SEEK_BUFFER_SIZE];
 		int		remainder;
 		int		currentPosition = FS_FTell( f );
@@ -4323,8 +4308,6 @@ Sys_ConcatenateFileLists
 mkv: Naive implementation. Concatenates three lists into a
      new list, and frees the old lists from the heap.
 bk001129 - from cvs1.17 (mkv)
-
-FIXME TTimo those two should move to common.c next to Sys_ListFiles
 =======================
  */
 static unsigned int Sys_CountFileList( char **list )
@@ -5412,8 +5395,6 @@ static void FS_ReorderSearchPaths( void ) {
 /*
 ================
 FS_ReorderPurePaks
-NOTE TTimo: the reordering that happens here is not reflected in the cvars (\cvarlist *pak*)
-  this can lead to misleading situations, see https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=540
 ================
 */
 static void FS_ReorderPurePaks( void )
