@@ -497,16 +497,28 @@ Sys_LoadLibrary
 void *Sys_LoadLibrary( const char *name )
 {
 	const char *ext;
+	void *handle;
 
-	if ( !name || !*name )
+	if ( !name || !*name ) {
+		Com_Printf( "Sys_LoadLibrary: Invalid library name (NULL or empty)\n" );
 		return NULL;
+	}
 
 	if ( FS_AllowedExtension( name, qfalse, &ext ) )
 	{
 		Com_Error( ERR_FATAL, "Sys_LoadLibrary: Unable to load library with '%s' extension", ext );
 	}
 
-	return (void *)LoadLibrary( AtoW( name ) );
+	handle = (void *)LoadLibrary( AtoW( name ) );
+	if ( !handle ) {
+		DWORD error = GetLastError();
+		char errorMsg[256];
+		FormatMessageA( FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+		                NULL, error, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		                errorMsg, sizeof(errorMsg), NULL );
+		Com_Printf( "LoadLibrary failed on '%s': %s (error %lu)\n", name, errorMsg, error );
+	}
+	return handle;
 }
 
 

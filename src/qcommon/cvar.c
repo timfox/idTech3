@@ -732,6 +732,11 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 	{
 		if ( var->latchedString )
 		{
+			// When applying a latched value (force=true), ensure it's marked for archiving
+			// This ensures graphics settings are saved after vid_restart
+			if ( var->flags & CVAR_ARCHIVE ) {
+				cvar_modifiedFlags |= CVAR_ARCHIVE;
+			}
 			Z_Free( var->latchedString );
 			var->latchedString = NULL;
 		}

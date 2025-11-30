@@ -1843,6 +1843,15 @@ static void CL_Vid_Restart( refShutdownCode_t shutdownCode ) {
 	}
 
 	cls.startCgame = qfalse;
+	
+	// Force config save after vid_restart to ensure graphics settings are saved
+	// This ensures that any CVAR_LATCH cvars that were applied are persisted
+	extern qboolean com_fullyInitialized;
+	if ( com_fullyInitialized ) {
+		// Mark archive cvars as modified so they get saved
+		extern int cvar_modifiedFlags;
+		cvar_modifiedFlags |= CVAR_ARCHIVE;
+	}
 }
 
 

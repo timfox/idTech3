@@ -1706,17 +1706,22 @@ TTimo: added some verbosity in debug
 */
 static void * QDECL VM_LoadLib( const char *name, vmMainFunc_t *entryPoint, dllSyscall_t systemcalls ) {
 
-	const char	*gamedir [[maybe_unused]] = FS_GetCurrentGameDir();
+	const char	*gamedir = FS_GetCurrentGameDir();
 	char		filename[ MAX_QPATH ];
 	void		*libHandle;
 	dllEntry_t	dllEntry;
+
+	if ( !name || !name[0] ) {
+		Com_Printf( "VM_LoadLib: Invalid library name (NULL or empty)\n" );
+		return NULL;
+	}
 
 	Com_sprintf( filename, sizeof( filename ), "%s." ARCH_STRING DLL_EXT, name );
 
 	libHandle = FS_LoadLibrary( filename );
 
 	if ( !libHandle ) {
-		Com_Printf( "VM_LoadLib '%s' failed\n", filename );
+		Com_Printf( "VM_LoadLib '%s' failed (searched in gamedir: %s)\n", filename, gamedir ? gamedir : "<unknown>" );
 		return NULL;
 	}
 
@@ -1725,6 +1730,8 @@ static void * QDECL VM_LoadLib( const char *name, vmMainFunc_t *entryPoint, dllS
 	dllEntry = /* ( dllEntry_t ) */ Sys_LoadFunction( libHandle, "dllEntry" );
 	*entryPoint = /* ( dllSyscall_t ) */ Sys_LoadFunction( libHandle, "vmMain" );
 	if ( !*entryPoint || !dllEntry ) {
+		const char *missing = !*entryPoint ? "vmMain" : "dllEntry";
+		Com_Printf( "VM_LoadLib '%s' failed: missing required symbol '%s'\n", filename, missing );
 		Sys_UnloadLibrary( libHandle );
 		return NULL;
 	}

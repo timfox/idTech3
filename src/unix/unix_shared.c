@@ -476,6 +476,11 @@ void *Sys_LoadLibrary( const char *name )
 	const char *ext;
 	void *handle;
 
+	if ( !name || !name[0] ) {
+		Com_Printf( "Sys_LoadLibrary: Invalid library name (NULL or empty)\n" );
+		return NULL;
+	}
+
 	if ( FS_AllowedExtension( name, qfalse, &ext ) )
 	{
 		Com_Error( ERR_FATAL, "Sys_LoadLibrary: Unable to load library with '%s' extension", ext );
@@ -496,6 +501,8 @@ void *Sys_LoadLibrary( const char *name )
 		if ( err && err[0] )
 		{
 			Com_Printf( "dlopen failed on '%s': %s\n", name, err );
+		} else {
+			Com_Printf( "dlopen failed on '%s': unknown error\n", name );
 		}
 	}
 	return handle;

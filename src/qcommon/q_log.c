@@ -344,6 +344,12 @@ static void Q_Log_WriteToFile(const char *message, int len) {
 		return;
 	}
 	
+	// Don't try to use filesystem if it's not initialized yet (e.g., during FS_Startup)
+	// This prevents recursive errors when Com_Printf tries to log during filesystem initialization
+	if (!FS_Initialized()) {
+		return;
+	}
+	
 	if (!log_state.file_handle || log_state.file_handle == FS_INVALID_HANDLE) {
 		// Try to open file
 		if (log_state.filename[0] != '\0') {

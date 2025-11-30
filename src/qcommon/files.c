@@ -357,6 +357,7 @@ static	cvar_t						*fs_pathNormCache;	// Enable path normalization caching
 
 static	searchpath_t	*fs_searchpaths;
 static	int			fs_readCount;			// total bytes read
+static	qboolean	fs_startupInProgress = qfalse;	// Track if FS_Startup is running
 static	int			fs_loadCount;			// total files read
 static	int			fs_loadStack;			// total files in memory
 static	int			fs_packFiles;			// total number of files in all loaded packs
@@ -478,6 +479,36 @@ FS_Initialized
 */
 qboolean FS_Initialized( void ) {
 	return ( fs_searchpaths != NULL );
+}
+
+/*
+==============
+FS_CheckInitialized
+
+Helper function to check filesystem initialization and handle errors safely.
+Prevents recursive errors by using Sys_Error directly if already in error state.
+==============
+*/
+static void FS_CheckInitialized( void ) {
+	if ( !fs_searchpaths ) {
+		// If we're already in an error state, use Sys_Error directly to avoid recursion
+		extern qboolean com_errorEntered;
+		if ( com_errorEntered ) {
+			// Already in error - use Sys_Error directly to prevent infinite recursion
+			Sys_Error( "Filesystem call made without initialization (recursive)" );
+		}
+		// During startup, some functions might be called before fs_searchpaths is set
+		// Use Sys_Error directly to avoid Com_Error recursion during startup
+		// This MUST be checked before calling Com_Error, otherwise Com_Error will
+		// set com_errorEntered=true and then try to use filesystem for logging
+		if ( fs_startupInProgress ) {
+			// We're in startup - use Sys_Error directly to prevent Com_Error recursion
+			Sys_Error( "Filesystem call made during startup before initialization complete" );
+		}
+		// Last resort: call Com_Error, but this should rarely happen during normal operation
+		// Note: Com_Error may try to log, which could trigger another filesystem call
+		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
+	}
 }
 
 
@@ -646,6 +677,14 @@ static void FS_ReplaceSeparators( char *path ) {
 
 
 /*
+================
+Forward declarations for path normalization cache functions
+================
+*/
+static qboolean FS_LookupPathNormCache( const char *base, const char *game, const char *qpath, char *outPath );
+static void FS_StorePathNormCache( const char *base, const char *game, const char *qpath, const char *normalized );
+
+/*
 ===================
 FS_BuildOSPath
 
@@ -657,18 +696,28 @@ char *FS_BuildOSPath( const char *base, const char *game, const char *qpath ) {
 	static char ospath[2][sizeof(temp)+MAX_OSPATH];
 	static int toggle;
 	const char *gameToUse;
+	const char *baseToUse;
 	char	cachedPath[MAX_OSPATH*2+1];
+	
+	// Safety check: base must be valid
+	if ( !base ) {
+		baseToUse = "";
+	} else {
+		baseToUse = base;
+	}
 	
 	// Use default game if not provided
 	if( !game || !game[0] ) {
-		gameToUse = fs_gamedir;
+		// Use fs_gamedir if it's set, otherwise use empty string (safe during initialization)
+		gameToUse = (fs_gamedir[0] != '\0') ? fs_gamedir : "";
 	} else {
 		gameToUse = game;
 	}
 	
 	// Performance improvement: Try path normalization cache first
-	if ( fs_pathNormCache && fs_pathNormCache->integer && FS_Initialized() ) {
-		if ( FS_LookupPathNormCache( base, gameToUse, qpath, cachedPath ) ) {
+	// Only use cache if filesystem is fully initialized
+	if ( FS_Initialized() && fs_pathNormCache && fs_pathNormCache->integer ) {
+		if ( FS_LookupPathNormCache( baseToUse, gameToUse, qpath, cachedPath ) ) {
 			// Cache hit - use cached normalized path
 			toggle ^= 1;
 			Q_strncpyz( ospath[toggle], cachedPath, sizeof( ospath[0] ) );
@@ -685,11 +734,11 @@ char *FS_BuildOSPath( const char *base, const char *game, const char *qpath ) {
 		Com_sprintf( temp, sizeof( temp ), "%c%s", PATH_SEP, gameToUse );
 
 	FS_ReplaceSeparators( temp );
-	Com_sprintf( ospath[toggle], sizeof( ospath[0] ), "%s%s", base, temp );
+	Com_sprintf( ospath[toggle], sizeof( ospath[0] ), "%s%s", baseToUse, temp );
 	
-	// Store in cache if enabled
-	if ( fs_pathNormCache && fs_pathNormCache->integer && FS_Initialized() ) {
-		FS_StorePathNormCache( base, gameToUse, qpath, ospath[toggle] );
+	// Store in cache if enabled (only if filesystem is fully initialized)
+	if ( FS_Initialized() && fs_pathNormCache && fs_pathNormCache->integer ) {
+		FS_StorePathNormCache( baseToUse, gameToUse, qpath, ospath[toggle] );
 	}
 	
 	return ospath[toggle];
@@ -918,8 +967,6 @@ Forward declarations for cache functions (C23 Improvement)
 */
 static qboolean FS_LookupExistenceCache( const char *filepath, uint32_t hash, qboolean *outExists );
 static void FS_StoreExistenceCache( const char *filepath, uint32_t hash, qboolean exists );
-static qboolean FS_LookupPathNormCache( const char *base, const char *game, const char *qpath, char *outPath );
-static void FS_StorePathNormCache( const char *base, const char *game, const char *qpath, const char *normalized );
 
 /*
 ================
@@ -937,6 +984,11 @@ qboolean FS_FileExists( const char *file )
 	char *testpath;
 	uint32_t hash;
 	qboolean cachedExists = qfalse;
+
+	// Safety check: fs_homepath must be initialized
+	if ( !fs_homepath || !fs_homepath->string ) {
+		return qfalse;
+	}
 
 	// Build path first (needed regardless of cache)
 	testpath = FS_BuildOSPath( fs_homepath->string, fs_gamedir, file );
@@ -1026,9 +1078,7 @@ FS_SV_FOpenFileWrite
 	fileHandle_t	f;
 	fileHandleData_t *fd;
 
-	if ( !fs_searchpaths ) {
-		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
-	}
+	FS_CheckInitialized();
 
 	if ( !*filename ) {
 		return FS_INVALID_HANDLE;
@@ -1079,9 +1129,7 @@ we search in that order, matching FS_SV_FOpenFileRead order
 	fileHandle_t f;
 	char *ospath;
 
-	if ( !fs_searchpaths ) {
-		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
-	}
+	FS_CheckInitialized();
 
 	// should never happen but for safe
 	if ( !fp ) { 
@@ -1158,9 +1206,7 @@ FS_SV_Rename
 void FS_SV_Rename( const char *from, const char *to ) {
 	const char			*from_ospath, *to_ospath;
 
-	if ( !fs_searchpaths ) {
-		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
-	}
+	FS_CheckInitialized();
 
 #ifndef DEDICATED
 	// don't let sound stutter
@@ -1191,9 +1237,7 @@ void FS_Rename( const char *from, const char *to ) {
 	const char *from_ospath, *to_ospath;
 	FILE *f;
 
-	if ( !fs_searchpaths ) {
-		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
-	}
+	FS_CheckInitialized();
 
 #ifndef DEDICATED
 	// don't let sound stutter
@@ -1310,9 +1354,7 @@ on files returned by FS_FOpenFile...
 void FS_FCloseFile( fileHandle_t f ) {
 	fileHandleData_t *fd;
 
-	if ( !fs_searchpaths ) {
-		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
-	}
+	FS_CheckInitialized();
 
 	fd = &fsh[ f ];
 
@@ -1371,9 +1413,7 @@ FS_FOpenFileWrite
 	fileHandle_t	f;
 	fileHandleData_t *fd;
 
-	if ( !fs_searchpaths ) {
-		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
-	}
+	FS_CheckInitialized();
 
 	if ( !filename || !*filename ) {
 		return FS_INVALID_HANDLE;
@@ -1423,9 +1463,7 @@ FS_FOpenFileAppend
 	fileHandleData_t *fd;
 	fileHandle_t	f;
 
-	if ( !fs_searchpaths ) {
-		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
-	}
+	FS_CheckInitialized();
 
 	if ( !*filename ) {
 		return FS_INVALID_HANDLE;
@@ -2068,9 +2106,7 @@ extern qboolean		com_fullyInitialized;
 	int				length;
 	fileHandleData_t *f;
 
-	if ( !fs_searchpaths ) {
-		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
-	}
+	FS_CheckInitialized();
 
 	if ( !filename ) {
 		Com_Error( ERR_FATAL, "FS_FOpenFileRead: NULL 'filename' parameter passed\n" );
@@ -2341,9 +2377,7 @@ FS_Home_FOpenFileRead
 	fileHandleData_t *fd;
 	fileHandle_t f;	
 
-	if ( !fs_searchpaths ) {
-		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
-	}
+	FS_CheckInitialized();
 
 	// should never happen but for safe
 	if ( !file ) { 
@@ -2389,9 +2423,7 @@ Properly handles partial reads
 	byte	*buf;
 	int		tries;
 
-	if ( !fs_searchpaths ) {
-		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
-	}
+	FS_CheckInitialized();
 
 	if ( f <= 0 || f >= MAX_FILE_HANDLES ) {
 		return 0;
@@ -2444,9 +2476,7 @@ Properly handles partial writes
 	int		tries;
 	FILE	*f;
 
-	if ( !fs_searchpaths ) {
-		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
-	}
+	FS_CheckInitialized();
 
 	//if ( h <= 0 || h >= MAX_FILE_HANDLES ) {
 	//	return 0;
@@ -2507,10 +2537,7 @@ FS_Seek
 [[nodiscard]] int FS_Seek( fileHandle_t f, long offset, fsOrigin_t origin ) {
 	int		_origin;
 
-	if ( !fs_searchpaths ) {
-		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
-		return -1;
-	}
+	FS_CheckInitialized();
 
 	if ( fsh[f].zipFile == qtrue ) {
 		//FIXME: this is really, really crappy
@@ -2612,9 +2639,7 @@ qboolean FS_FileIsInPAK( const char *filename, int *pChecksum, char *pakName ) {
 	long			hash;
 	long			fullHash;
 
-	if ( !fs_searchpaths ) {
-		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
-	}
+	FS_CheckInitialized();
 
 	if ( !filename ) {
 		Com_Error( ERR_FATAL, "FS_FOpenFileRead: NULL 'filename' parameter passed" );
@@ -2685,9 +2710,7 @@ a null buffer will just return the file length without loading
 	qboolean		isConfig;
 	long			len;
 
-	if ( !fs_searchpaths ) {
-		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
-	}
+	FS_CheckInitialized();
 
 	if ( qpath == NULL || qpath[0] == '\0' ) {
 		Com_Error( ERR_FATAL, "FS_ReadFile with empty name" );
@@ -2804,9 +2827,7 @@ FS_FreeFile
 =============
 */
 void FS_FreeFile( void *buffer ) {
-	if ( !fs_searchpaths ) {
-		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
-	}
+	FS_CheckInitialized();
 	if ( !buffer ) {
 		Com_Error( ERR_FATAL, "FS_FreeFile( NULL )" );
 	}
@@ -3512,6 +3533,13 @@ static void FS_LoadCache( void )
 	fs_paksCached = 0;
 	fs_paksSkipped = 0;
 
+	// Safety check: fs_homepath must be initialized
+	// Note: We check fs_homepath directly rather than FS_Initialized() because
+	// FS_LoadCache is called during FS_Startup before fs_searchpaths is set
+	if ( !fs_homepath || !fs_homepath->string ) {
+		return;
+	}
+
 	ospath = FS_BuildOSPath( fs_homepath->string, filename, NULL );
 
 	f = Sys_FOpen( ospath, "rb" );
@@ -3936,9 +3964,7 @@ static char **FS_ListFilteredFiles( const char *path, const char *extension, con
 	qboolean		hasPatterns;
 	const char		*x;
 
-	if ( !fs_searchpaths ) {
-		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
-	}
+	FS_CheckInitialized();
 
 	if  ( fs_numServerPaks && ( flags & FS_MATCH_STICK ) == 0 ) {
 		flags &= ~FS_MATCH_UNPURE;
@@ -4100,9 +4126,7 @@ FS_FreeFileList
 void FS_FreeFileList( char **list ) {
 	int		i;
 
-	if ( !fs_searchpaths ) {
-		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
-	}
+	FS_CheckInitialized();
 
 	if ( !list ) {
 		return;
@@ -5116,6 +5140,9 @@ void FS_Shutdown( qboolean closemfp )
 	searchpath_t	*p, *next;
 	int i;
 
+	// Reset startup flag - we're shutting down
+	fs_startupInProgress = qfalse;
+
 	// C23 Improvement: Clear caches on shutdown
 	FS_ClearPathCache();
 	FS_ClearExistenceCache();
@@ -5372,6 +5399,9 @@ static void FS_Startup( void ) {
 	const char *homePath;
 	int i, start, end;
 
+	// Set startup flag FIRST, before any operations that might trigger filesystem checks
+	fs_startupInProgress = qtrue;
+	
 	Com_Printf( "----- FS_Startup -----\n" );
 
 	fs_debug = Cvar_Get( "fs_debug", "0", 0 );
@@ -5573,6 +5603,9 @@ static void FS_Startup( void ) {
 	if ( FS_IsBaseGame( BASEGAME ) || FS_IsBaseGame( BASEDEMO ) ) {
 		FS_CheckIdPaks();
 	}
+
+	// Mark startup as complete - fs_searchpaths is now initialized
+	fs_startupInProgress = qfalse;
 
 #ifdef FS_MISSING
 	if (missingFiles == NULL) {
@@ -6458,9 +6491,7 @@ fileHandle_t FS_PipeOpenWrite( const char *cmd, const char *filename ) {
 	fileHandle_t f;
 	const char *ospath;
 
-	if ( !fs_searchpaths ) {
-		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
-	}
+	FS_CheckInitialized();
 
 	ospath = FS_BuildOSPath( fs_homepath->string, fs_gamedir, filename );
 
@@ -6498,8 +6529,7 @@ fileHandle_t FS_PipeOpenWrite( const char *cmd, const char *filename ) {
 
 void FS_PipeClose( fileHandle_t f )
 {
-	if ( !fs_searchpaths )
-		Com_Error( ERR_FATAL, "Filesystem call made without initialization" );
+	FS_CheckInitialized();
 
 	if ( fsh[f].zipFile )
 		return;
@@ -6528,12 +6558,22 @@ Tries to load libraries within known searchpaths
 	const searchpath_t *sp = fs_searchpaths;
 	void *libHandle = NULL;
 	char vmPath[ MAX_OSPATH ];
+	int searchCount = 0;
+
+	if ( !name || !name[0] ) {
+		Com_Printf( "FS_LoadLibrary: Invalid library name (NULL or empty)\n" );
+		return NULL;
+	}
+
+	FS_CheckInitialized();
 
 	// Search all directory paths (both DIR_STATIC and DIR_ALLOW)
 	// This allows loading .so files from both base game and mod directories
 	while ( !libHandle && sp ) {
-		// Skip pack files (pk3) and non-directory paths
-		while ( sp && ( sp->pack || !sp->dir ) ) {
+		// Skip pack files (pk3), non-directory paths, and unpacked pk3dir directories
+		// Libraries should only be loaded from actual game/mod directories, not from unpacked pak directories
+		while ( sp && ( sp->pack || !sp->dir || 
+		                ( sp->dir->gamedir && FS_IsExt( sp->dir->gamedir, ".pk3dir", strlen( sp->dir->gamedir ) ) ) ) ) {
 			sp = sp->next;
 		}
 		if ( sp ) {
@@ -6547,6 +6587,7 @@ Tries to load libraries within known searchpaths
 				Com_Printf( "FS_LoadLibrary: trying %s (policy=%d)\n", fn, sp->policy );
 			}
 			libHandle = Sys_LoadLibrary( fn );
+			searchCount++;
 			
 			// If not found in vm/, try directly in game directory
 			if ( !libHandle ) {
@@ -6555,14 +6596,15 @@ Tries to load libraries within known searchpaths
 					Com_Printf( "FS_LoadLibrary: trying %s (policy=%d)\n", fn, sp->policy );
 				}
 				libHandle = Sys_LoadLibrary( fn );
+				searchCount++;
 			}
 			
 			sp = sp->next;
 		}
 	}
 
-	if ( !libHandle ) {
-		return NULL;
+	if ( !libHandle && fs_debug && fs_debug->integer ) {
+		Com_Printf( "FS_LoadLibrary: '%s' not found after searching %d locations\n", name, searchCount );
 	}
 
 	return libHandle;

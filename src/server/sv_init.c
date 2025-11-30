@@ -444,9 +444,6 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	// timescale can be updated before SV_Frame() and cause division-by-zero in SV_RateMsec()
 	Cvar_CheckRange( com_timescale, "0.001", NULL, CV_FLOAT );
 
-	// Restart renderer?
-	// CL_StartHunkUsers( );
-
 	// init client structures and svs.numSnapshotEntities
 	if ( !Cvar_VariableIntegerValue( "sv_running" ) ) {
 		SV_Startup();
@@ -526,6 +523,15 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	srand( Com_Milliseconds() );
 	Com_RandomBytes( (byte*)&sv.checksumFeed, sizeof( sv.checksumFeed ) );
 	FS_Restart( sv.checksumFeed );
+
+#ifndef DEDICATED
+	// After filesystem restart, client systems need to be restarted
+	// This ensures renderer, sound, and UI are properly initialized
+	// CL_MapLoading already shut down client systems, now restart them
+	if ( com_cl_running && com_cl_running->integer ) {
+		CL_StartHunkUsers();
+	}
+#endif
 
 	Sys_SetStatus( "Loading map %s", mapname );
 	CM_LoadMap( va( "maps/%s.bsp", mapname ), qfalse, &checksum );
