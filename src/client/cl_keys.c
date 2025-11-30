@@ -616,7 +616,9 @@ static void CL_KeyDownEvent( int key, unsigned time )
 
 		if ( !( Key_GetCatcher( ) & KEYCATCH_UI ) ) {
 			if ( cls.state == CA_ACTIVE && !clc.demoplaying ) {
-				VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_INGAME );
+				if ( uivm ) {
+					VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_INGAME );
+				}
 			}
 			else if ( cls.state != CA_DISCONNECTED ) {
 #if 0
@@ -631,12 +633,16 @@ static void CL_KeyDownEvent( int key, unsigned time )
 					CL_FlushMemory();
 				}
 #endif
-				VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
+				if ( uivm ) {
+					VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
+				}
 			}
 			return;
 		}
 
-		VM_Call( uivm, 2, UI_KEY_EVENT, key, qtrue );
+		if ( uivm ) {
+			VM_Call( uivm, 2, UI_KEY_EVENT, key, qtrue );
+		}
 		return;
 	}
 
@@ -752,7 +758,9 @@ void CL_CharEvent( int key )
 	}
 	else if ( Key_GetCatcher( ) & KEYCATCH_UI )
 	{
-		VM_Call( uivm, 2, UI_KEY_EVENT, key | K_CHAR_FLAG, qtrue );
+		if ( uivm ) {
+			VM_Call( uivm, 2, UI_KEY_EVENT, key | K_CHAR_FLAG, qtrue );
+		}
 	}
 	else if ( Key_GetCatcher( ) & KEYCATCH_MESSAGE )
 	{

@@ -137,7 +137,49 @@ gentity_t *SelectNearestDeathmatchSpawnPoint( vec3_t from ) {
 
 #define	MAX_SPAWN_POINTS	128
 /**
- * Pick a random info_player_deathmatch spawnpoint
+ * Calculate danger score for a spawn point
+ * Lower score = safer spawn
+ */
+static int CalculateSpawnDangerScore( gentity_t *spot ) {
+	int i;
+	gentity_t *ent;
+	vec3_t dist;
+	float distance;
+	int dangerScore = 0;
+
+	// Check distance to all active players
+	for ( i = 0; i < level.maxclients; i++ ) {
+		ent = g_entities + i;
+		if ( !ent->inuse || !ent->client ) {
+			continue;
+		}
+		if ( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) {
+			continue;
+		}
+		if ( ent->client->ps.pm_type == PM_DEAD || ent->client->ps.pm_type == PM_FREEZE ) {
+			continue;
+		}
+
+		VectorSubtract( spot->s.origin, ent->s.origin, dist );
+		distance = VectorLength( dist );
+
+		// Add danger if enemy is within 512 units
+		if ( distance < 512.0f ) {
+			dangerScore += (int)( (512.0f - distance) / 32.0f ); // More danger the closer they are
+		}
+	}
+
+	// Prefer spawns that haven't been used recently
+	// Use freetime as a proxy for last use time (if recently freed, it was recently used)
+	if ( spot->freetime > 0 && ( level.time - spot->freetime ) < 5000 ) {
+		dangerScore += 10; // Recently used spawns are less fair
+	}
+
+	return dangerScore;
+}
+
+/**
+ * Pick a random info_player_deathmatch spawnpoint with fairness scoring
  * Will prefer a spot that wont telefrag if such a point exist. 
  * @param filter_flags Will NEVER pick a spawnpoint mathcing these flags.
  * @return Returns a pointer to a spot or NULL if no spots exists. 
@@ -147,11 +189,16 @@ static gentity_t *SelectRandomDeathmatchSpawnPoint( int filter_flags ) {
 	int			count;
 	int			selection;
 	gentity_t	*spots[MAX_SPAWN_POINTS];
+	int			scores[MAX_SPAWN_POINTS];
 	gentity_t	*last_valid_spot; //Last valid spot although it might telefrag; 
+	int			totalScore;
+	int			randomScore;
+	int			i;
 
 	count = 0;
 	spot = NULL;
 	last_valid_spot = NULL;
+	totalScore = 0;
 
 	while ((spot = G_Find (spot, FOFS(classname), "info_player_deathmatch")) != NULL) {
 		if (spot->flags & filter_flags) {
@@ -162,13 +209,35 @@ static gentity_t *SelectRandomDeathmatchSpawnPoint( int filter_flags ) {
 			continue;
 		}
 		spots[ count ] = spot;
+		// Calculate fairness score (inverse of danger)
+		// Higher score = better spawn
+		scores[ count ] = 100 - CalculateSpawnDangerScore( spot );
+		if ( scores[ count ] < 0 ) {
+			scores[ count ] = 0;
+		}
+		totalScore += scores[ count ];
 		count++;
+		if ( count >= MAX_SPAWN_POINTS ) {
+			break;
+		}
 	}
 
 	if ( count == 0 ) {	// no spots that won't telefrag
 		return last_valid_spot;
 	}
 
+	// Weighted random selection based on fairness scores
+	if ( totalScore > 0 ) {
+		randomScore = rand() % totalScore;
+		for ( i = 0; i < count; i++ ) {
+			randomScore -= scores[ i ];
+			if ( randomScore < 0 ) {
+				return spots[ i ];
+			}
+		}
+	}
+
+	// Fallback to pure random if scores are all zero
 	selection = rand() % count;
 	return spots[ selection ];
 }
@@ -204,6 +273,9 @@ gentity_t *SelectSpawnPoint ( vec3_t avoidPoint, vec3_t origin, vec3_t angles, i
 		}
 		spot = &g_entities[0];
 	}
+
+	// Mark spawn point as used (update freetime to track usage)
+	spot->freetime = level.time;
 
 	VectorCopy (spot->s.origin, origin);
 	origin[2] += 9;
@@ -1971,6 +2043,16 @@ void ClientSpawn(gentity_t *ent) {
 	client->ps.torsoAnim = TORSO_STAND;
 	client->ps.legsAnim = LEGS_IDLE;
 
+	// Match start freeze logic
+	if ( level.matchState == MS_PREGAME || level.matchState == MS_COUNTDOWN ) {
+		// Freeze player during pregame/countdown
+		client->ps.pm_type = PM_FREEZE;
+		client->readyForMatchStart = qfalse;
+	} else {
+		// Normal spawn
+		client->readyForMatchStart = qtrue;
+	}
+
 	if ( level.intermissiontime ) {
 		MoveClientToIntermission( ent );
 	} else {
@@ -1992,7 +2074,20 @@ void ClientSpawn(gentity_t *ent) {
 	// initialize animations and other things
 	client->ps.commandTime = level.time - 100;
 	ent->client->pers.cmd.serverTime = level.time;
+	
+	// Mark as ready after spawn completes (model loaded, spawned successfully)
+	if ( level.matchState == MS_PREGAME || level.matchState == MS_COUNTDOWN ) {
+		// Will be set to ready after ClientThink completes
+		client->readyForMatchStart = qfalse;
+	}
+	
 	ClientThink( ent-g_entities );
+	
+	// After ClientThink, mark as ready if we're in pregame
+	if ( ( level.matchState == MS_PREGAME || level.matchState == MS_COUNTDOWN ) &&
+		 client->sess.sessionTeam != TEAM_SPECTATOR ) {
+		client->readyForMatchStart = qtrue;
+	}
 
 	// positively link the client, even if the command times are weird
 	if ( (ent->client->sess.sessionTeam != TEAM_SPECTATOR) || ( (!client->isEliminated || client->ps.pm_type != PM_SPECTATOR)&& 

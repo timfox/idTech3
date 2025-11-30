@@ -78,6 +78,7 @@ vmCvar_t g_votecustom;
 vmCvar_t g_synchronousClients;
 vmCvar_t g_warmup;
 vmCvar_t g_doWarmup;
+vmCvar_t g_matchIntro;
 vmCvar_t g_restarted;
 vmCvar_t g_logfile;
 vmCvar_t g_logfileSync;
@@ -235,6 +236,7 @@ static cvarTable_t gameCvarTable[] = {
 
 	{ &g_warmup, "g_warmup", "20", CVAR_ARCHIVE, 0, qtrue, qfalse  },
 	{ &g_doWarmup, "g_doWarmup", "0", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qtrue, qfalse  },
+	{ &g_matchIntro, "g_matchIntro", "1", CVAR_ARCHIVE, 0, qtrue, qfalse  },
 	{ &g_logfile, "g_log", "games.log", CVAR_ARCHIVE, 0, qfalse, qfalse  },
 	{ &g_logfileSync, "g_logsync", "0", CVAR_ARCHIVE, 0, qfalse, qfalse  },
 
@@ -439,7 +441,9 @@ Q_EXPORT intptr_t vmMain( int command, int arg0, int arg1, int arg2, [[maybe_unu
 {
 	switch ( command ) {
 	case GAME_INIT:
+		G_Printf( "vmMain: GAME_INIT called - levelTime=%d, randomSeed=%d, restart=%d\n", arg0, arg1, arg2 );
 		G_InitGame( arg0, arg1, arg2 );
+		G_Printf( "vmMain: GAME_INIT completed successfully\n" );
 		return 0;
 	case GAME_SHUTDOWN:
 		G_ShutdownGame( arg0 );
@@ -753,6 +757,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart )
 	G_Printf ("------- Game Initialization -------\n");
 	G_Printf ("gamename: %s\n", GAMEVERSION);
         G_Printf ("gamedate: %s\n", __DATE__);
+	G_Printf ("G_InitGame: levelTime=%d, randomSeed=%d, restart=%d\n", levelTime, randomSeed, restart );
 
 	srand( randomSeed );
 
@@ -777,6 +782,8 @@ void G_InitGame( int levelTime, int randomSeed, int restart )
 
 	level.time = levelTime;
 	level.startTime = levelTime;
+	level.matchState = MS_WARMUP;
+	level.matchIntroTime = 2000; // 2 seconds default
 
 	level.snd_fry = G_SoundIndex("sound/player/fry.wav");	// FIXME standing in lava / slime
 
@@ -890,6 +897,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart )
 	G_RemapTeamShaders();
 
 	trap_SetConfigstring( CS_INTERMISSION, "" );
+	trap_SetConfigstring( CS_MATCH_STATE, "MS_WARMUP" );
 
 	//elimination:
 	level.roundNumber = 1;
@@ -2286,6 +2294,169 @@ void CheckDomination(void)
 
 /*
 =============
+G_CheckAllPlayersReady
+
+Check if all playing clients are ready for match start
+=============
+*/
+static qboolean G_CheckAllPlayersReady( void ) {
+	int i;
+	gclient_t *client;
+
+	if ( level.numPlayingClients == 0 ) {
+		return qfalse;
+	}
+
+	// Safety check: ensure clients array is initialized
+	if ( !level.clients ) {
+		return qfalse;
+	}
+	
+	for ( i = 0; i < level.maxclients; i++ ) {
+		client = level.clients + i;
+		// Safety check: ensure client pointer is valid
+		if ( !client ) {
+			continue;
+		}
+		if ( client->pers.connected != CON_CONNECTED ) {
+			continue;
+		}
+		if ( client->sess.sessionTeam == TEAM_SPECTATOR ) {
+			continue;
+		}
+		if ( !client->readyForMatchStart ) {
+			return qfalse;
+		}
+	}
+
+	return qtrue;
+}
+
+/*
+=============
+G_UpdateMatchState
+
+Update match state machine transitions
+=============
+*/
+static void G_UpdateMatchState( void ) {
+	int i;
+	gclient_t *client;
+	qboolean allReady;
+	int counts[TEAM_NUM_TEAMS];
+	qboolean notEnough = qfalse;
+
+	// Single player mode doesn't use match states
+	if ( g_gametype.integer == GT_SINGLE_PLAYER ) {
+		if ( level.matchState != MS_PLAYING ) {
+			level.matchState = MS_PLAYING;
+			trap_SetConfigstring( CS_MATCH_STATE, "MS_PLAYING" );
+		}
+		return;
+	}
+
+	// Check if we have enough players
+	if ( g_gametype.integer >= GT_TEAM && !g_ffa_gt ) {
+		counts[TEAM_BLUE] = TeamCount( -1, TEAM_BLUE );
+		counts[TEAM_RED] = TeamCount( -1, TEAM_RED );
+		if (counts[TEAM_RED] < 1 || counts[TEAM_BLUE] < 1) {
+			notEnough = qtrue;
+		}
+	} else if ( level.numPlayingClients < 2 ) {
+		notEnough = qtrue;
+	}
+
+	// State machine transitions
+	switch ( level.matchState ) {
+		case MS_WARMUP:
+			// Check if we have enough players to start
+			if ( notEnough ) {
+				level.warmupTime = -1;
+				trap_SetConfigstring( CS_WARMUP, va("%i", level.warmupTime) );
+				return;
+			}
+
+			// Transition to PREGAME if match intro enabled
+			if ( g_matchIntro.integer && level.warmupTime < 0 ) {
+				// Start pregame phase
+				level.matchState = MS_PREGAME;
+				level.pregameStartTime = level.time;
+				trap_SetConfigstring( CS_MATCH_STATE, "MS_PREGAME" );
+				
+				// Mark all players as not ready
+				// Safety check: ensure clients array is initialized
+				if ( level.clients ) {
+					for ( i = 0; i < level.maxclients; i++ ) {
+						client = level.clients + i;
+						// Safety check: ensure client pointer is valid
+						if ( client && client->pers.connected == CON_CONNECTED && 
+							 client->sess.sessionTeam != TEAM_SPECTATOR ) {
+							client->readyForMatchStart = qfalse;
+						}
+					}
+				}
+			} else if ( !g_matchIntro.integer && level.warmupTime < 0 ) {
+				// Skip PREGAME, go straight to COUNTDOWN
+				if ( g_warmup.integer > 1 ) {
+					level.warmupTime = level.time + ( g_warmup.integer - 1 ) * 1000;
+				} else {
+					level.warmupTime = 0;
+				}
+				level.matchState = MS_COUNTDOWN;
+				trap_SetConfigstring( CS_MATCH_STATE, "MS_COUNTDOWN" );
+				trap_SetConfigstring( CS_WARMUP, va("%i", level.warmupTime) );
+			}
+			break;
+
+		case MS_PREGAME:
+			// Check if all players are ready or timeout
+			allReady = G_CheckAllPlayersReady();
+			if ( allReady || ( level.time - level.pregameStartTime ) >= level.matchIntroTime ) {
+				// Transition to COUNTDOWN
+				if ( g_warmup.integer > 1 ) {
+					level.warmupTime = level.time + ( g_warmup.integer - 1 ) * 1000;
+				} else {
+					level.warmupTime = 0;
+				}
+				level.matchState = MS_COUNTDOWN;
+				trap_SetConfigstring( CS_MATCH_STATE, "MS_COUNTDOWN" );
+				trap_SetConfigstring( CS_WARMUP, va("%i", level.warmupTime) );
+			}
+			break;
+
+		case MS_COUNTDOWN:
+			// Check if countdown finished
+			// If warmupTime is 0, start immediately; otherwise wait for time
+			if ( level.warmupTime == 0 || ( level.warmupTime > 0 && level.time >= level.warmupTime ) ) {
+				level.matchState = MS_PLAYING;
+				level.warmupTime = 0;
+				trap_SetConfigstring( CS_MATCH_STATE, "MS_PLAYING" );
+				trap_SetConfigstring( CS_WARMUP, "0" );
+				
+				// Unfreeze all players
+				// Safety check: ensure clients array is initialized
+				if ( level.clients ) {
+					for ( i = 0; i < level.maxclients; i++ ) {
+						client = level.clients + i;
+						// Safety check: ensure client pointer is valid
+						if ( client && client->pers.connected == CON_CONNECTED && 
+							 client->sess.sessionTeam != TEAM_SPECTATOR &&
+							 client->ps.pm_type == PM_FREEZE ) {
+							client->ps.pm_type = PM_NORMAL;
+						}
+					}
+				}
+			}
+			break;
+
+		case MS_PLAYING:
+			// Match is active, no transitions needed
+			break;
+	}
+}
+
+/*
+=============
 CheckTournament
 
 Once a frame, check for changes in tournement player state
@@ -2299,8 +2470,15 @@ void CheckTournament( void )
 		return;
 	}
 
-	if ( g_gametype.integer == GT_TOURNAMENT ) {
+	// Handle warmup modification
+	if ( g_warmup.modificationCount != level.warmupModificationCount ) {
+		level.warmupModificationCount = g_warmup.modificationCount;
+		level.warmupTime = -1;
+		level.matchState = MS_WARMUP;
+		trap_SetConfigstring( CS_MATCH_STATE, "MS_WARMUP" );
+	}
 
+	if ( g_gametype.integer == GT_TOURNAMENT ) {
 		// pull in a spectator if needed
 		if ( level.numPlayingClients < 2 ) {
 			AddTournamentPlayer();
@@ -2310,103 +2488,39 @@ void CheckTournament( void )
 		if ( level.numPlayingClients != 2 ) {
 			if ( level.warmupTime != -1 ) {
 				level.warmupTime = -1;
+				level.matchState = MS_WARMUP;
 				trap_SetConfigstring( CS_WARMUP, va("%i", level.warmupTime) );
+				trap_SetConfigstring( CS_MATCH_STATE, "MS_WARMUP" );
 				G_LogPrintf( "Warmup:\n" );
 			}
 			return;
 		}
 
-		if ( level.warmupTime == 0 ) {
-			return;
-		}
+		// Update match state machine
+		G_UpdateMatchState();
 
-		// if the warmup is changed at the console, restart it
-		if ( g_warmup.modificationCount != level.warmupModificationCount ) {
-			level.warmupModificationCount = g_warmup.modificationCount;
-			level.warmupTime = -1;
-		}
-
-		// if all players have arrived, start the countdown
-		if ( level.warmupTime < 0 ) {
-			if ( level.numPlayingClients == 2 ) {
-				// fudge by -1 to account for extra delays
-				if ( g_warmup.integer > 1 ) {
-					level.warmupTime = level.time + ( g_warmup.integer - 1 ) * 1000;
-				}
-				else {
-					level.warmupTime = 0;
-				}
-
-				trap_SetConfigstring( CS_WARMUP, va("%i", level.warmupTime) );
-			}
-			return;
-		}
-
-		// if the warmup time has counted down, restart
-		if ( level.time > level.warmupTime ) {
-			level.warmupTime += 10000;
-			trap_Cvar_Set( "g_restarted", "1" );
-			trap_SendConsoleCommand( EXEC_APPEND, "map_restart 0\n" );
-			level.restarted = qtrue;
+		// Tournament-specific: if warmup finished, restart match
+		if ( level.matchState == MS_PLAYING && level.warmupTime == 0 ) {
+			// Check if we need to restart (tournament mode restarts after each match)
+			// This is handled elsewhere, so we just return here
 			return;
 		}
 	}
-	else if ( g_gametype.integer != GT_SINGLE_PLAYER && level.warmupTime != 0 ) {
-		int		counts[TEAM_NUM_TEAMS];
-		qboolean	notEnough = qfalse;
+	else if ( g_gametype.integer != GT_SINGLE_PLAYER ) {
+		// Update match state machine for all other gametypes
+		// Note: We need to update even when warmupTime == 0 to handle immediate start transitions
+		G_UpdateMatchState();
 
-		if ( g_gametype.integer > GT_TEAM && !g_ffa_gt ) {
-			counts[TEAM_BLUE] = TeamCount( -1, TEAM_BLUE );
-			counts[TEAM_RED] = TeamCount( -1, TEAM_RED );
-
-			if (counts[TEAM_RED] < 1 || counts[TEAM_BLUE] < 1) {
-				notEnough = qtrue;
-			}
-		}
-		else if ( level.numPlayingClients < 2 ) {
-			notEnough = qtrue;
-		}
-
-		if ( notEnough ) {
-			if ( level.warmupTime != -1 ) {
-				level.warmupTime = -1;
-				trap_SetConfigstring( CS_WARMUP, va("%i", level.warmupTime) );
-				G_LogPrintf( "Warmup:\n" );
-			}
-			return; // still waiting for team members
-		}
-
-		if ( level.warmupTime == 0 ) {
+		// Handle match restart when countdown finishes (for non-tournament modes)
+		if ( level.matchState == MS_PLAYING && level.warmupTime == 0 ) {
+			// Match has started, warmup is done
 			return;
 		}
-
-		// if the warmup is changed at the console, restart it
-		if ( g_warmup.modificationCount != level.warmupModificationCount ) {
-			level.warmupModificationCount = g_warmup.modificationCount;
-			level.warmupTime = -1;
-		}
-
-		// if all players have arrived, start the countdown
-		if ( level.warmupTime < 0 ) {
-			// fudge by -1 to account for extra delays
-			if ( g_warmup.integer > 1 ) {
-				level.warmupTime = level.time + ( g_warmup.integer - 1 ) * 1000;
-			}
-			else {
-				level.warmupTime = 0;
-			}
-
-			trap_SetConfigstring( CS_WARMUP, va("%i", level.warmupTime) );
-			return;
-		}
-
-		// if the warmup time has counted down, restart
-		if ( level.time > level.warmupTime ) {
-			level.warmupTime += 10000;
-			trap_Cvar_Set( "g_restarted", "1" );
-			trap_SendConsoleCommand( EXEC_APPEND, "map_restart 0\n" );
-			level.restarted = qtrue;
-			return;
+	} else if ( g_gametype.integer == GT_SINGLE_PLAYER ) {
+		// Single player always in playing state
+		if ( level.matchState != MS_PLAYING ) {
+			level.matchState = MS_PLAYING;
+			trap_SetConfigstring( CS_MATCH_STATE, "MS_PLAYING" );
 		}
 	}
 }

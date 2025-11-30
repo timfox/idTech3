@@ -561,8 +561,10 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 		case CA_CONNECTED:
 			// connecting clients will only show the connection dialog
 			// refresh to update the time
-			VM_Call( uivm, 1, UI_REFRESH, cls.realtime );
-			VM_Call( uivm, 1, UI_DRAW_CONNECT_SCREEN, qfalse );
+			if ( uivm ) {
+				VM_Call( uivm, 1, UI_REFRESH, cls.realtime );
+				VM_Call( uivm, 1, UI_DRAW_CONNECT_SCREEN, qfalse );
+			}
 			break;
 		case CA_LOADING:
 		case CA_PRIMED:
@@ -573,8 +575,10 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 			// also draw the connection information, so it doesn't
 			// flash away too briefly on local or lan games
 			// refresh to update the time
-			VM_Call( uivm, 1, UI_REFRESH, cls.realtime );
-			VM_Call( uivm, 1, UI_DRAW_CONNECT_SCREEN, qtrue );
+			if ( uivm ) {
+				VM_Call( uivm, 1, UI_REFRESH, cls.realtime );
+				VM_Call( uivm, 1, UI_DRAW_CONNECT_SCREEN, qtrue );
+			}
 			break;
 		case CA_ACTIVE:
 			// always supply STEREO_CENTER as vieworg offset is now done by the engine.

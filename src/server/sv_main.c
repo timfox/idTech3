@@ -1199,7 +1199,12 @@ int SV_FrameMsec( void )
 	{
 		int frameMsec;
 		
-		frameMsec = 1000.0f / sv_fps->value;
+		// Safety check: prevent division by zero
+		if ( sv_fps->value > 0.0f ) {
+			frameMsec = 1000.0f / sv_fps->value;
+		} else {
+			frameMsec = 50.0f; // default to 20 FPS if invalid
+		}
 		
 		if ( frameMsec < sv.timeResidual )
 			return 0;
@@ -1318,11 +1323,20 @@ void SV_Frame( int msec ) {
 
 	// if it isn't time for the next frame, do nothing
 
-	frameMsec = 1000 / sv_fps->integer * com_timescale->value;
+	// Safety check: prevent division by zero
+	if ( sv_fps->integer > 0 ) {
+		frameMsec = 1000 / sv_fps->integer * com_timescale->value;
+	} else {
+		frameMsec = 50.0f * com_timescale->value; // default to 20 FPS if invalid
+	}
 	// don't let it scale below 1ms
 	if(frameMsec < 1)
 	{
-		Cvar_Set( "timescale", va( "%f", sv_fps->value / 1000.0f ) );
+		if ( sv_fps->value > 0.0f ) {
+			Cvar_Set( "timescale", va( "%f", sv_fps->value / 1000.0f ) );
+		} else {
+			Cvar_Set( "timescale", "0.05" ); // default to 20 FPS
+		}
 		Com_DPrintf( "timescale adjusted to %f\n", com_timescale->value );
 		frameMsec = 1;
 	}
@@ -1399,7 +1413,10 @@ void SV_Frame( int msec ) {
 		sv.time += frameMsec;
 
 		// let everything in the world think and move
-		VM_Call( gvm, 1, GAME_RUN_FRAME, sv.time );
+		// Safety check: ensure game VM is initialized
+		if ( gvm ) {
+			VM_Call( gvm, 1, GAME_RUN_FRAME, sv.time );
+		}
 	}
 
 	if ( com_speeds->integer ) {

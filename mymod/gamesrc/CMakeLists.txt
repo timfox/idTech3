@@ -86,6 +86,7 @@ set_target_properties(cgame_${ARCH_SUFFIX} PROPERTIES
 )
 
 # UI module - OpenArena source
+# UI depends on game module for bg_itemlist and other shared symbols
 file(GLOB UI_SOURCES "ui/*.c")
 add_library(ui_${ARCH_SUFFIX} SHARED ${UI_SOURCES})
 
@@ -93,6 +94,9 @@ set_target_properties(ui_${ARCH_SUFFIX} PROPERTIES
     OUTPUT_NAME "ui.${ARCH_SUFFIX}"
     PREFIX ""
 )
+
+# Link UI against game module to resolve bg_itemlist and other shared symbols
+target_link_libraries(ui_${ARCH_SUFFIX} game_${ARCH_SUFFIX} m)
 
 # EnTT ECS support
 option(USE_ENTT "Enable EnTT ECS system" OFF)

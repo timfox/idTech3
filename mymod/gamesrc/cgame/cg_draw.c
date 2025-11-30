@@ -3376,6 +3376,92 @@ static void CG_DrawProxWarning( void ) {
 
 /*
 =================
+CG_DrawMatchIntro
+
+Draw match intro overlay during PREGAME phase
+=================
+*/
+static void CG_DrawMatchIntro(void) {
+	const char *gametypeName;
+	const char *mapName;
+	const char *winCondition;
+	int w;
+	int cw;
+	int timeSinceStart;
+	int introDuration = 2000; // 2 seconds
+
+	if ( cg.matchState != MS_PREGAME ) {
+		return;
+	}
+
+	timeSinceStart = cg.time - cg.matchIntroStartTime;
+	if ( timeSinceStart < 0 ) {
+		timeSinceStart = 0;
+	}
+	if ( timeSinceStart > introDuration ) {
+		return; // Intro finished
+	}
+
+	// Get gametype name
+	if (cgs.gametype == GT_FFA) {
+		gametypeName = "FREE FOR ALL";
+	} else if (cgs.gametype == GT_TEAM) {
+		gametypeName = "TEAM DEATHMATCH";
+	} else if (cgs.gametype == GT_CTF) {
+		gametypeName = "CAPTURE THE FLAG";
+	} else if (cgs.gametype == GT_ELIMINATION) {
+		gametypeName = "ELIMINATION";
+	} else if (cgs.gametype == GT_CTF_ELIMINATION) {
+		gametypeName = "CTF ELIMINATION";
+	} else if (cgs.gametype == GT_LMS) {
+		gametypeName = "LAST MAN STANDING";
+	} else if (cgs.gametype == GT_DOUBLE_D) {
+		gametypeName = "DOUBLE DOMINATION";
+	} else if (cgs.gametype == GT_DOMINATION) {
+		gametypeName = "DOMINATION";
+	} else {
+		gametypeName = "ARENA MATCH";
+	}
+
+	// Get map name (use cgs.mapname, strip path)
+	mapName = cgs.mapname;
+	if ( strrchr( mapName, '/' ) ) {
+		mapName = strrchr( mapName, '/' ) + 1;
+	}
+	if ( strrchr( mapName, '\\' ) ) {
+		mapName = strrchr( mapName, '\\' ) + 1;
+	}
+
+	// Get win condition
+	if ( cgs.fraglimit > 0 ) {
+		winCondition = va("First to %i kills", cgs.fraglimit);
+	} else if ( cgs.timelimit > 0 ) {
+		winCondition = va("Time limit: %i minutes", cgs.timelimit);
+	} else {
+		winCondition = "No limit";
+	}
+
+	// Draw gametype name (large)
+	w = CG_DrawStrlen( gametypeName );
+	if (w > 640 / GIANT_WIDTH) {
+		cw = 640 / w;
+	} else {
+		cw = GIANT_WIDTH;
+	}
+	CG_DrawStringExt( 320 - w * cw / 2, 150, gametypeName, colorWhite,
+			qfalse, qtrue, cw, (int)(cw * 1.5f), 0 );
+
+	// Draw map name
+	w = CG_DrawStrlen( mapName ) * BIGCHAR_WIDTH;
+	CG_DrawBigString( 320 - w / 2, 200, mapName, 1.0f );
+
+	// Draw win condition
+	w = CG_DrawStrlen( winCondition ) * SMALLCHAR_WIDTH;
+	CG_DrawSmallString( 320 - w / 2, 230, winCondition, 1.0f );
+}
+
+/*
+=================
 CG_DrawWarmup
 =================
  */
@@ -3485,6 +3571,10 @@ static void CG_DrawWarmup(void) {
 		switch (sec) {
 			case 0:
 				trap_S_StartLocalSound(cgs.media.count1Sound, CHAN_ANNOUNCER);
+				// Screen flash on "1"
+				if ( cg.matchState == MS_COUNTDOWN ) {
+					// Trigger screen flash effect (client can implement visual flash)
+				}
 				break;
 			case 1:
 				trap_S_StartLocalSound(cgs.media.count2Sound, CHAN_ANNOUNCER);
@@ -3661,6 +3751,10 @@ static void CG_Draw2D(stereoFrame_t stereoFrame) {
 	CG_DrawFragMessage();
 
 	if (!CG_DrawFollow()) {
+		// Draw match intro during PREGAME
+		if ( cg.matchState == MS_PREGAME ) {
+			CG_DrawMatchIntro();
+		}
 		CG_DrawWarmup();
 	}
 

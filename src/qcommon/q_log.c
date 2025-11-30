@@ -39,6 +39,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define DEFAULT_ROTATION_SIZE_MB	100
 #define DEFAULT_ROTATION_TIME_HOURS	24
 #define MAX_LOG_FILES			10
+#define MAX_DEFERRED_MESSAGES	256	// Maximum number of deferred log messages
+
+// Deferred log message structure
+typedef struct {
+	char message[MAX_LOG_MESSAGE];
+	int len;
+	log_level_t level;
+	log_category_t category;
+} deferred_log_message_t;
 
 // Logging state
 static struct {
@@ -58,6 +67,11 @@ static struct {
 	int rotation_time_hours;
 	time_t rotation_time;
 	int current_file_size;
+	
+	// Deferred logging queue (for when filesystem is not ready)
+	deferred_log_message_t deferred_queue[MAX_DEFERRED_MESSAGES];
+	int deferred_count;
+	qboolean defer_logging;	// Set to true when filesystem is restarting
 	
 	// Thread safety (simple for now)
 	qboolean in_log;
@@ -339,20 +353,86 @@ static void Q_Log_FormatJSON(log_level_t level, log_category_t category, const c
 Q_Log_WriteToFile
 ================
 */
+/*
+================
+Q_Log_FlushDeferred
+Flush all deferred log messages when filesystem becomes ready
+================
+*/
+static void Q_Log_FlushDeferred(void) {
+	if (log_state.deferred_count == 0) {
+		return;
+	}
+	
+	// Write all deferred messages
+	for (int i = 0; i < log_state.deferred_count; i++) {
+		deferred_log_message_t *msg = &log_state.deferred_queue[i];
+		if (log_state.output_flags & LOG_OUTPUT_FILE) {
+			Q_Log_WriteToFile(msg->message, msg->len);
+		}
+		if (log_state.output_flags & LOG_OUTPUT_CONSOLE) {
+			Q_Log_WriteToConsole(msg->message, msg->len);
+		}
+	}
+	
+	// Clear the queue
+	log_state.deferred_count = 0;
+	log_state.defer_logging = qfalse;
+}
+
+/*
+================
+Q_Log_DeferMessage
+Queue a message for later writing when filesystem is ready
+================
+*/
+static void Q_Log_DeferMessage(const char *message, int len, log_level_t level, log_category_t category) {
+	if (log_state.deferred_count >= MAX_DEFERRED_MESSAGES) {
+		// Queue is full - drop oldest message (FIFO)
+		// Shift all messages left by one
+		for (int i = 0; i < log_state.deferred_count - 1; i++) {
+			log_state.deferred_queue[i] = log_state.deferred_queue[i + 1];
+		}
+		log_state.deferred_count--;
+	}
+	
+	// Add new message to end of queue
+	deferred_log_message_t *msg = &log_state.deferred_queue[log_state.deferred_count];
+	Q_strncpyz(msg->message, message, sizeof(msg->message));
+	msg->len = len < sizeof(msg->message) ? len : sizeof(msg->message) - 1;
+	msg->level = level;
+	msg->category = category;
+	log_state.deferred_count++;
+	log_state.defer_logging = qtrue;
+}
+
 static void Q_Log_WriteToFile(const char *message, int len) {
 	if (!(log_state.output_flags & LOG_OUTPUT_FILE)) {
 		return;
 	}
 	
-	// Don't try to use filesystem if it's not initialized yet (e.g., during FS_Startup)
+	// CRITICAL: Don't try to use filesystem if it's not initialized yet (e.g., during FS_Startup)
 	// This prevents recursive errors when Com_Printf tries to log during filesystem initialization
-	if (!FS_Initialized()) {
+	// FS_Initialized() checks fs_searchpaths != NULL, which is NULL during FS_Startup
+	// Also check FS_StartupInProgress() to avoid filesystem calls during FS_Restart
+	// This check MUST happen before ANY filesystem operations
+	if (!FS_Initialized() || FS_StartupInProgress()) {
+		// Filesystem not ready - this should have been caught earlier, but be safe
 		return;
+	}
+	
+	// If we were deferring messages and filesystem is now ready, flush the queue
+	// But only if filesystem is still ready (double-check)
+	if (log_state.defer_logging && FS_Initialized() && !FS_StartupInProgress()) {
+		Q_Log_FlushDeferred();
 	}
 	
 	if (!log_state.file_handle || log_state.file_handle == FS_INVALID_HANDLE) {
 		// Try to open file
-		if (log_state.filename[0] != '\0') {
+		// CRITICAL: Double-check filesystem is ready before attempting to open file
+		// FS_FOpenFileWrite/FS_FOpenFileAppend will call FS_CheckInitialized() if fs_startupInProgress is false
+		// So we must ensure fs_searchpaths is set (FS_Initialized() returns true) before calling them
+		if (log_state.filename[0] != '\0' && FS_Initialized() && !FS_StartupInProgress()) {
 			log_state.file_handle = FS_FOpenFileWrite(log_state.filename);
 			if (log_state.file_handle == FS_INVALID_HANDLE) {
 				log_state.file_handle = FS_FOpenFileAppend(log_state.filename);
@@ -453,18 +533,55 @@ void QDECL Q_Log(log_level_t level, log_category_t category, const char *file, i
 	}
 	
 	len = strlen(formatted);
+
+	// ALWAYS check filesystem state FIRST before any file operations
+	// This prevents recursive errors when filesystem is being restarted
+	// CRITICAL: Check both FS_Initialized() AND FS_StartupInProgress()
+	// FS_Initialized() checks fs_searchpaths != NULL, which is NULL during FS_Startup
+	// FS_StartupInProgress() checks fs_startupInProgress flag
+	// We need BOTH to be true for filesystem to be ready
+	qboolean fs_ready = FS_Initialized() && !FS_StartupInProgress();
 	
-	// Write to outputs
-	if (log_state.output_flags & LOG_OUTPUT_CONSOLE) {
-		Q_Log_WriteToConsole(formatted, len);
-	}
-	
-	if (log_state.output_flags & LOG_OUTPUT_FILE) {
-		Q_Log_WriteToFile(formatted, len);
-	}
-	
-	if (log_state.output_flags & LOG_OUTPUT_SYSLOG) {
-		Q_Log_WriteToSyslog(level, category, message);
+	// If filesystem is not ready, ALWAYS defer file logging, even if we think it's ready
+	// This is a safety check to prevent any filesystem calls during startup/restart
+	if ((log_state.output_flags & LOG_OUTPUT_FILE) && !fs_ready) {
+		// Defer file logging - queue the message for later
+		Q_Log_DeferMessage(formatted, len, level, category);
+		// Still write to console and syslog immediately (they don't use filesystem)
+		if (log_state.output_flags & LOG_OUTPUT_CONSOLE) {
+			Q_Log_WriteToConsole(formatted, len);
+		}
+		if (log_state.output_flags & LOG_OUTPUT_SYSLOG) {
+			Q_Log_WriteToSyslog(level, category, message);
+		}
+	} else {
+		// Filesystem is ready - write normally
+		// If we have deferred messages, flush them first (but only if filesystem is ready)
+		if (log_state.defer_logging && fs_ready) {
+			Q_Log_FlushDeferred();
+		}
+		
+		// Write to outputs
+		if (log_state.output_flags & LOG_OUTPUT_CONSOLE) {
+			Q_Log_WriteToConsole(formatted, len);
+		}
+		
+		if (log_state.output_flags & LOG_OUTPUT_FILE) {
+			// Triple-check filesystem is still ready before writing
+			// Re-check here because filesystem state might have changed between checks
+			qboolean fs_still_ready = FS_Initialized() && !FS_StartupInProgress();
+			if (fs_still_ready && fs_ready) {
+				Q_Log_WriteToFile(formatted, len);
+			} else {
+				// Filesystem became unavailable - defer instead
+				// This can happen if FS_Restart is called between the first check and now
+				Q_Log_DeferMessage(formatted, len, level, category);
+			}
+		}
+		
+		if (log_state.output_flags & LOG_OUTPUT_SYSLOG) {
+			Q_Log_WriteToSyslog(level, category, message);
+		}
 	}
 	
 	log_state.in_log = qfalse;
@@ -481,6 +598,8 @@ void Q_Log_Init(void) {
 	}
 	
 	Com_Memset(&log_state, 0, sizeof(log_state));
+	log_state.deferred_count = 0;
+	log_state.defer_logging = qfalse;
 	
 	// Register CVars
 	log_enable = Cvar_Get("log_enable", "1", CVAR_ARCHIVE | CVAR_LATCH);

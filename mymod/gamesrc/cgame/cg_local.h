@@ -517,6 +517,14 @@ typedef struct {
 #define MAX_CONSOLE_TEXT 8192
 #define MAX_CONSOLE_LINES 32
 #endif
+
+// match start state machine
+typedef enum {
+	MS_WARMUP,		// waiting for players
+	MS_PREGAME,		// intro phase, players frozen
+	MS_COUNTDOWN,	// countdown phase
+	MS_PLAYING		// match active
+} matchState_t;
 // end loadingscreen
 
 //======================================================================
@@ -686,6 +694,10 @@ typedef struct {
 	// warmup countdown
 	int			warmup;
 	int			warmupCount;
+
+	// match start state
+	matchState_t	matchState;
+	int			matchIntroStartTime;	// when intro started
 
 	//==========================
 

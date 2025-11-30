@@ -159,8 +159,15 @@ static void SV_Map_f( void ) {
 	char		mapname[MAX_QPATH];
 	int			len;
 
+	cmd = Cmd_Argv(0);
 	map = Cmd_Argv(1);
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: SV_Map_f called with cmd=%s map=%s\n", cmd ? cmd : "<NULL>", map ? map : "<NULL>" );
+	}
 	if ( !map || !*map ) {
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: SV_Map_f returning early - no map specified\n" );
+		}
 		return;
 	}
 
@@ -179,8 +186,10 @@ static void SV_Map_f( void ) {
 	// force latched values to get set
 	Cvar_Get ("g_gametype", "0", CVAR_SERVERINFO | CVAR_USERINFO | CVAR_LATCH );
 
-	cmd = Cmd_Argv(0);
 	if( Q_stricmpn( cmd, "sp", 2 ) == 0 ) {
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: SV_Map_f detected single-player map command\n" );
+		}
 		Cvar_SetIntegerValue( "g_gametype", GT_SINGLE_PLAYER );
 		Cvar_Set( "g_doWarmup", "0" );
 		// may not set sv_maxclients directly, always set latched
@@ -211,8 +220,14 @@ static void SV_Map_f( void ) {
 	// and thus nuke the arguments of the map command
 	Q_strncpyz(mapname, map, sizeof(mapname));
 
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: SV_Map_f calling SV_SpawnServer with mapname=%s killBots=%d\n", mapname, killBots );
+	}
 	// start up the map
 	SV_SpawnServer( mapname, killBots );
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: SV_Map_f SV_SpawnServer returned\n" );
+	}
 
 	// set the cheat value
 	// if the level was started with "map <levelname>", then
@@ -312,11 +327,14 @@ static void SV_MapRestart_f( void ) {
 	SV_RestartGameProgs();
 
 	// run a few frames to allow everything to settle
-	for ( i = 0; i < 3; i++ )
-	{
-		Cbuf_Wait();
-		sv.time += 100;
-		VM_Call( gvm, 1, GAME_RUN_FRAME, sv.time );
+	// Safety check: ensure game VM is initialized
+	if ( gvm ) {
+		for ( i = 0; i < 3; i++ )
+		{
+			Cbuf_Wait();
+			sv.time += 100;
+			VM_Call( gvm, 1, GAME_RUN_FRAME, sv.time );
+		}
 	}
 
 	sv.state = SS_GAME;
@@ -1268,8 +1286,13 @@ static void SV_Status_f( void ) {
 			continue;
 
 		Com_Printf( "%2i ", i ); // id
-		ps = SV_GameClientNum( i );
-		Com_Printf( "%5i ", ps->persistant[PERS_SCORE] );
+		// Safety check: ensure gameClients are initialized
+		if ( sv.gameClients ) {
+			ps = SV_GameClientNum( i );
+			Com_Printf( "%5i ", ps->persistant[PERS_SCORE] );
+		} else {
+			Com_Printf( " N/A " );
+		}
 
 		// ping/status
 		if ( cl->state == CS_PRIMED )

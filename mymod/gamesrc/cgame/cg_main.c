@@ -2363,6 +2363,8 @@ void CG_Init(int serverMessageNum, int serverCommandSequence, int clientNum) {
 
 	// clear everything
 	memset(&cgs, 0, sizeof ( cgs));
+	cg.matchState = MS_WARMUP;
+	cg.matchIntroStartTime = 0;
 	memset(&cg, 0, sizeof ( cg));
 	memset(cg_entities, 0, sizeof (cg_entities));
 	memset(cg_weapons, 0, sizeof (cg_weapons));

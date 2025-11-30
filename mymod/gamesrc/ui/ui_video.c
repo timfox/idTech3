@@ -459,6 +459,33 @@ typedef struct
         int aniso;
 	int driver;
 	qboolean extensions;
+	// Advanced rendering features
+	qboolean raytracing;
+	int rt_samples;
+	int rt_maxdepth;
+	qboolean rt_temporal;
+	int rt_temporalalpha;
+	qboolean rt_denoise;
+	int rt_denoisemode;
+	int rt_denoiseiter;
+	qboolean rt_gi;
+	int rt_gibounces;
+	int rt_giintensity;
+	qboolean dlss;
+	int dlss_quality;
+	int dlss_sharpen;
+	qboolean postprocess_compute;
+	qboolean meshshaders;
+	int meshletsize;
+	qboolean virtualtextures;
+	int vt_pagesize;
+	int vt_cachesize;
+	qboolean clearcoat;
+	qboolean anisotropy_mat;
+	qboolean subsurfacescattering;
+	qboolean particles_gpu;
+	int particles_max;
+	qboolean particles_culling;
 } InitialVideoOptions_s;
 
 static InitialVideoOptions_s	s_ivo;
@@ -467,22 +494,28 @@ static graphicsoptions_t		s_graphicsoptions;
 static InitialVideoOptions_s s_ivo_templates[] =
 {
 	{
-		6, qtrue, 3, 0, qfalse,qfalse,qfalse, 2, 2, 1, 0, 0, qtrue
+		6, qtrue, 3, 0, qfalse,qfalse,qfalse, 2, 2, 1, 0, 0, qtrue,
+		qfalse, 1, 1, qfalse, 0, qfalse, 0, 1, qfalse, 1, 0, qfalse, 0, 0, qfalse, qfalse, 1, qfalse, 2, 1, qfalse, qfalse, qfalse, qfalse, 1, qfalse
 	},
 	{
-		4, qtrue, 2, 0, qfalse,qfalse,qfalse, 2, 1, 1, 0, 0, qtrue	// JDC: this was tq 3
+		4, qtrue, 2, 0, qfalse,qfalse,qfalse, 2, 1, 1, 0, 0, qtrue,
+		qfalse, 1, 1, qfalse, 0, qfalse, 0, 1, qfalse, 1, 0, qfalse, 0, 0, qfalse, qfalse, 1, qfalse, 2, 1, qfalse, qfalse, qfalse, qfalse, 1, qfalse	// JDC: this was tq 3
 	},
 	{
-		3, qtrue, 2, 0, qfalse,qfalse,qfalse, 0, 1, 0, 0, 0, qtrue
+		3, qtrue, 2, 0, qfalse,qfalse,qfalse, 0, 1, 0, 0, 0, qtrue,
+		qfalse, 1, 1, qfalse, 0, qfalse, 0, 1, qfalse, 1, 0, qfalse, 0, 0, qfalse, qfalse, 1, qfalse, 2, 1, qfalse, qfalse, qfalse, qfalse, 1, qfalse
 	},
 	{
-		2, qtrue, 1, 0, qfalse,qfalse,qfalse, 0, 0, 0, 0, 0, qtrue
+		2, qtrue, 1, 0, qfalse,qfalse,qfalse, 0, 0, 0, 0, 0, qtrue,
+		qfalse, 1, 1, qfalse, 0, qfalse, 0, 1, qfalse, 1, 0, qfalse, 0, 0, qfalse, qfalse, 1, qfalse, 2, 1, qfalse, qfalse, qfalse, qfalse, 1, qfalse
 	},
 	{
-		2, qtrue, 1, 1, qfalse,qfalse,qfalse, 0, 0, 0, 0, 0, qtrue
+		2, qtrue, 1, 1, qfalse,qfalse,qfalse, 0, 0, 0, 0, 0, qtrue,
+		qfalse, 1, 1, qfalse, 0, qfalse, 0, 1, qfalse, 1, 0, qfalse, 0, 0, qfalse, qfalse, 1, qfalse, 2, 1, qfalse, qfalse, qfalse, qfalse, 1, qfalse
 	},
 	{
-		3, qtrue, 1, 0, qfalse,qfalse,qfalse, 0, 1, 0, 0, 0, qtrue
+		3, qtrue, 1, 0, qfalse,qfalse,qfalse, 0, 1, 0, 0, 0, qtrue,
+		qfalse, 1, 1, qfalse, 0, qfalse, 0, 1, qfalse, 1, 0, qfalse, 0, 0, qfalse, qfalse, 1, qfalse, 2, 1, qfalse, qfalse, qfalse, qfalse, 1, qfalse
 	}
 };
 
@@ -650,6 +683,33 @@ static void GraphicsOptions_GetInitialVideo( void )
 	s_ivo.filter      = s_graphicsoptions.filter.curvalue;
         s_ivo.aniso      = s_graphicsoptions.aniso.curvalue;
 	s_ivo.texturebits = s_graphicsoptions.texturebits.curvalue;
+	// Advanced rendering features
+	s_ivo.raytracing = s_graphicsoptions.raytracing.curvalue;
+	s_ivo.rt_samples = s_graphicsoptions.rt_samples.curvalue;
+	s_ivo.rt_maxdepth = s_graphicsoptions.rt_maxdepth.curvalue;
+	s_ivo.rt_temporal = s_graphicsoptions.rt_temporal.curvalue;
+	s_ivo.rt_temporalalpha = s_graphicsoptions.rt_temporalalpha.curvalue;
+	s_ivo.rt_denoise = s_graphicsoptions.rt_denoise.curvalue;
+	s_ivo.rt_denoisemode = s_graphicsoptions.rt_denoisemode.curvalue;
+	s_ivo.rt_denoiseiter = s_graphicsoptions.rt_denoiseiter.curvalue;
+	s_ivo.rt_gi = s_graphicsoptions.rt_gi.curvalue;
+	s_ivo.rt_gibounces = s_graphicsoptions.rt_gibounces.curvalue;
+	s_ivo.rt_giintensity = s_graphicsoptions.rt_giintensity.curvalue;
+	s_ivo.dlss = s_graphicsoptions.dlss.curvalue;
+	s_ivo.dlss_quality = s_graphicsoptions.dlss_quality.curvalue;
+	s_ivo.dlss_sharpen = s_graphicsoptions.dlss_sharpen.curvalue;
+	s_ivo.postprocess_compute = s_graphicsoptions.postprocess_compute.curvalue;
+	s_ivo.meshshaders = s_graphicsoptions.meshshaders.curvalue;
+	s_ivo.meshletsize = s_graphicsoptions.meshletsize.curvalue;
+	s_ivo.virtualtextures = s_graphicsoptions.virtualtextures.curvalue;
+	s_ivo.vt_pagesize = s_graphicsoptions.vt_pagesize.curvalue;
+	s_ivo.vt_cachesize = s_graphicsoptions.vt_cachesize.curvalue;
+	s_ivo.clearcoat = s_graphicsoptions.clearcoat.curvalue;
+	s_ivo.anisotropy_mat = s_graphicsoptions.anisotropy_mat.curvalue;
+	s_ivo.subsurfacescattering = s_graphicsoptions.subsurfacescattering.curvalue;
+	s_ivo.particles_gpu = s_graphicsoptions.particles_gpu.curvalue;
+	s_ivo.particles_max = s_graphicsoptions.particles_max.curvalue;
+	s_ivo.particles_culling = s_graphicsoptions.particles_culling.curvalue;
 }
 
 /*
@@ -818,6 +878,111 @@ static void GraphicsOptions_UpdateMenuItems( void )
 	{
 		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
 	}
+	// Advanced rendering features
+	if ( (int)s_ivo.raytracing != s_graphicsoptions.raytracing.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( s_ivo.rt_samples != s_graphicsoptions.rt_samples.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( s_ivo.rt_maxdepth != s_graphicsoptions.rt_maxdepth.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( (int)s_ivo.rt_temporal != s_graphicsoptions.rt_temporal.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( s_ivo.rt_temporalalpha != s_graphicsoptions.rt_temporalalpha.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( (int)s_ivo.rt_denoise != s_graphicsoptions.rt_denoise.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( s_ivo.rt_denoisemode != s_graphicsoptions.rt_denoisemode.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( s_ivo.rt_denoiseiter != s_graphicsoptions.rt_denoiseiter.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( (int)s_ivo.rt_gi != s_graphicsoptions.rt_gi.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( s_ivo.rt_gibounces != s_graphicsoptions.rt_gibounces.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( s_ivo.rt_giintensity != s_graphicsoptions.rt_giintensity.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( (int)s_ivo.dlss != s_graphicsoptions.dlss.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( s_ivo.dlss_quality != s_graphicsoptions.dlss_quality.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( s_ivo.dlss_sharpen != s_graphicsoptions.dlss_sharpen.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( (int)s_ivo.postprocess_compute != s_graphicsoptions.postprocess_compute.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( (int)s_ivo.meshshaders != s_graphicsoptions.meshshaders.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( s_ivo.meshletsize != s_graphicsoptions.meshletsize.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( (int)s_ivo.virtualtextures != s_graphicsoptions.virtualtextures.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( s_ivo.vt_pagesize != s_graphicsoptions.vt_pagesize.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( s_ivo.vt_cachesize != s_graphicsoptions.vt_cachesize.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( (int)s_ivo.clearcoat != s_graphicsoptions.clearcoat.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( (int)s_ivo.anisotropy_mat != s_graphicsoptions.anisotropy_mat.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( (int)s_ivo.subsurfacescattering != s_graphicsoptions.subsurfacescattering.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( (int)s_ivo.particles_gpu != s_graphicsoptions.particles_gpu.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( s_ivo.particles_max != s_graphicsoptions.particles_max.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
+	if ( (int)s_ivo.particles_culling != s_graphicsoptions.particles_culling.curvalue )
+	{
+		s_graphicsoptions.apply.generic.flags &= ~(QMF_HIDDEN|QMF_INACTIVE);
+	}
 
 	GraphicsOptions_CheckConfig();
 }	
@@ -944,6 +1109,9 @@ static void GraphicsOptions_ApplyChanges( [[maybe_unused]] void *unused, int not
 	trap_Cvar_SetValue( "r_particles_max", s_graphicsoptions.particles_max.curvalue * 10000 );
 	trap_Cvar_SetValue( "r_particles_culling", s_graphicsoptions.particles_culling.curvalue );
 
+	// Save all settings to config file
+	trap_Cmd_ExecuteText( EXEC_APPEND, "writeconfig\n" );
+
 	trap_Cmd_ExecuteText( EXEC_APPEND, "vid_restart\n" );
 }
 
@@ -990,6 +1158,33 @@ static void GraphicsOptions_Event( void* ptr, int event ) {
                 s_graphicsoptions.flares.curvalue      = ivo->flares;
                 s_graphicsoptions.bloom.curvalue      = ivo->bloom;
                 s_graphicsoptions.drawfps.curvalue      = ivo->drawfps;
+		// Advanced rendering features
+		s_graphicsoptions.raytracing.curvalue = ivo->raytracing;
+		s_graphicsoptions.rt_samples.curvalue = ivo->rt_samples;
+		s_graphicsoptions.rt_maxdepth.curvalue = ivo->rt_maxdepth;
+		s_graphicsoptions.rt_temporal.curvalue = ivo->rt_temporal;
+		s_graphicsoptions.rt_temporalalpha.curvalue = ivo->rt_temporalalpha;
+		s_graphicsoptions.rt_denoise.curvalue = ivo->rt_denoise;
+		s_graphicsoptions.rt_denoisemode.curvalue = ivo->rt_denoisemode;
+		s_graphicsoptions.rt_denoiseiter.curvalue = ivo->rt_denoiseiter;
+		s_graphicsoptions.rt_gi.curvalue = ivo->rt_gi;
+		s_graphicsoptions.rt_gibounces.curvalue = ivo->rt_gibounces;
+		s_graphicsoptions.rt_giintensity.curvalue = ivo->rt_giintensity;
+		s_graphicsoptions.dlss.curvalue = ivo->dlss;
+		s_graphicsoptions.dlss_quality.curvalue = ivo->dlss_quality;
+		s_graphicsoptions.dlss_sharpen.curvalue = ivo->dlss_sharpen;
+		s_graphicsoptions.postprocess_compute.curvalue = ivo->postprocess_compute;
+		s_graphicsoptions.meshshaders.curvalue = ivo->meshshaders;
+		s_graphicsoptions.meshletsize.curvalue = ivo->meshletsize;
+		s_graphicsoptions.virtualtextures.curvalue = ivo->virtualtextures;
+		s_graphicsoptions.vt_pagesize.curvalue = ivo->vt_pagesize;
+		s_graphicsoptions.vt_cachesize.curvalue = ivo->vt_cachesize;
+		s_graphicsoptions.clearcoat.curvalue = ivo->clearcoat;
+		s_graphicsoptions.anisotropy_mat.curvalue = ivo->anisotropy_mat;
+		s_graphicsoptions.subsurfacescattering.curvalue = ivo->subsurfacescattering;
+		s_graphicsoptions.particles_gpu.curvalue = ivo->particles_gpu;
+		s_graphicsoptions.particles_max.curvalue = ivo->particles_max;
+		s_graphicsoptions.particles_culling.curvalue = ivo->particles_culling;
 		break;
 
 	case ID_DRIVERINFO:

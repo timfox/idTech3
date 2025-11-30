@@ -483,6 +483,16 @@ qboolean FS_Initialized( void ) {
 
 /*
 ==============
+FS_StartupInProgress
+==============
+Check if filesystem startup is in progress
+*/
+qboolean FS_StartupInProgress( void ) {
+	return fs_startupInProgress;
+}
+
+/*
+==============
 FS_CheckInitialized
 
 Helper function to check filesystem initialization and handle errors safely.
@@ -495,6 +505,8 @@ static void FS_CheckInitialized( void ) {
 		extern qboolean com_errorEntered;
 		if ( com_errorEntered ) {
 			// Already in error - use Sys_Error directly to prevent infinite recursion
+			// Get backtrace to see what called this
+			extern void Sys_Error( const char *error, ... );
 			Sys_Error( "Filesystem call made without initialization (recursive)" );
 		}
 		// During startup, some functions might be called before fs_searchpaths is set
@@ -503,7 +515,9 @@ static void FS_CheckInitialized( void ) {
 		// set com_errorEntered=true and then try to use filesystem for logging
 		if ( fs_startupInProgress ) {
 			// We're in startup - use Sys_Error directly to prevent Com_Error recursion
-			Sys_Error( "Filesystem call made during startup before initialization complete" );
+			// Print backtrace to help debug
+			extern void Sys_Error( const char *error, ... );
+			Sys_Error( "Filesystem call made during startup before initialization complete (fs_startupInProgress=%d)", fs_startupInProgress );
 		}
 		// Last resort: call Com_Error, but this should rarely happen during normal operation
 		// Note: Com_Error may try to log, which could trigger another filesystem call
@@ -1078,30 +1092,73 @@ FS_SV_FOpenFileWrite
 	fileHandle_t	f;
 	fileHandleData_t *fd;
 
-	FS_CheckInitialized();
-
 	if ( !*filename ) {
 		return FS_INVALID_HANDLE;
 	}
 
-	ospath = FS_BuildOSPath( fs_homepath->string, filename, NULL );
+	// Safety check: fs_homepath must be initialized
+	// This can happen during FS_Restart when FS_Shutdown has cleared fs_searchpaths
+	// but FS_Startup hasn't completed yet
+	if ( !fs_homepath || !fs_homepath->string ) {
+		return FS_INVALID_HANDLE;
+	}
+
+	// During startup, allow file operations if fs_homepath is initialized
+	// This prevents recursive errors when CL_GenerateQKey is called during CL_StartHunkUsers
+	// after FS_Restart but before fs_searchpaths is set
+	if ( fs_startupInProgress ) {
+		// We're in startup - fs_homepath is initialized, so we can proceed
+		// Don't call FS_CheckInitialized() as it will fail during startup
+	} else {
+		FS_CheckInitialized();
+	}
+
+	// During startup, build path directly without using FS_BuildOSPath cache
+	// FS_BuildOSPath might trigger filesystem checks during startup
+	static char tempPath[MAX_OSPATH];
+	if ( fs_startupInProgress ) {
+		// Simple path construction during startup - avoid cache lookups
+		Com_sprintf( tempPath, sizeof(tempPath), "%s/%s/%s", fs_homepath->string, BASEGAME, filename );
+		ospath = tempPath;
+	} else {
+		ospath = FS_BuildOSPath( fs_homepath->string, filename, NULL );
+	}
 
 	f = FS_HandleForFile();
 	fd = &fsh[ f ];
 	FS_InitHandle( fd );
 
-	if ( fs_debug->integer ) {
-		Com_Printf( "FS_SV_FOpenFileWrite: %s\n", ospath );
+	// Only do debug output and filename checks if filesystem is fully initialized
+	// This prevents recursive errors when Com_Printf/Com_DPrintf trigger logging
+	// during FS_Restart when fs_searchpaths is NULL
+	if ( !fs_startupInProgress && FS_Initialized() ) {
+		if ( fs_debug && fs_debug->integer ) {
+			Com_Printf( "FS_SV_FOpenFileWrite: %s\n", ospath );
+		}
+		// Only check filename if filesystem is fully initialized
+		// FS_CheckFilenameIsNotAllowed calls Com_Error which triggers logging
+		FS_CheckFilenameIsNotAllowed( ospath, __func__, qtrue );
+		Com_DPrintf( "writing to: %s\n", ospath );
 	}
-
-	FS_CheckFilenameIsNotAllowed( ospath, __func__, qtrue );
-
-	Com_DPrintf( "writing to: %s\n", ospath );
 
 	fd->handleFiles.file.o = Sys_FOpen( ospath, "wb" );
 	if ( !fd->handleFiles.file.o ) {
-		if ( FS_CreatePath( ospath ) ) {
-			return FS_INVALID_HANDLE;
+		// During startup, try to create directory path if needed
+		// FS_CreatePath uses Sys_Mkdir which doesn't require filesystem initialization
+		if ( fs_startupInProgress ) {
+			// Simple path creation during startup - create directories as needed
+			char dirPath[MAX_OSPATH];
+			Q_strncpyz( dirPath, ospath, sizeof(dirPath) );
+			char *slash = strrchr( dirPath, '/' );
+			if ( slash ) {
+				*slash = '\0';
+				// Create directory if it doesn't exist (Sys_Mkdir handles this)
+				Sys_Mkdir( dirPath );
+			}
+		} else {
+			if ( FS_CreatePath( ospath ) ) {
+				return FS_INVALID_HANDLE;
+			}
 		}
 		fd->handleFiles.file.o = Sys_FOpen( ospath, "wb" );
 		if ( !fd->handleFiles.file.o ) {
@@ -1129,7 +1186,25 @@ we search in that order, matching FS_SV_FOpenFileRead order
 	fileHandle_t f;
 	char *ospath;
 
-	FS_CheckInitialized();
+	// Safety check: fs_homepath must be initialized
+	// This can happen during FS_Restart when FS_Shutdown has cleared fs_searchpaths
+	// but FS_Startup hasn't completed yet
+	if ( !fs_homepath || !fs_homepath->string ) {
+		if ( fp ) {
+			*fp = FS_INVALID_HANDLE;
+		}
+		return -1;
+	}
+
+	// During startup, allow file operations if fs_homepath is initialized
+	// This prevents recursive errors when Com_ReadCDKey is called during FS_Startup
+	// after fs_startupInProgress is set but before fs_searchpaths is initialized
+	if ( fs_startupInProgress ) {
+		// We're in startup - fs_homepath is initialized, so we can proceed
+		// Don't call FS_CheckInitialized() as it will fail during startup
+	} else {
+		FS_CheckInitialized();
+	}
 
 	// should never happen but for safe
 	if ( !fp ) { 
@@ -1147,9 +1222,17 @@ we search in that order, matching FS_SV_FOpenFileRead order
 #endif
 
 	// search homepath
-	ospath = FS_BuildOSPath( fs_homepath->string, filename, NULL );
+	// Build path - use direct construction during startup to avoid FS_BuildOSPath cache
+	static char tempPath[MAX_OSPATH];
+	if ( fs_startupInProgress ) {
+		// Simple path construction during startup - avoid cache lookups
+		Com_sprintf( tempPath, sizeof(tempPath), "%s/%s/%s", fs_homepath->string, BASEGAME, filename );
+		ospath = tempPath;
+	} else {
+		ospath = FS_BuildOSPath( fs_homepath->string, filename, NULL );
+	}
 
-	if ( fs_debug->integer ) {
+	if ( !fs_startupInProgress && fs_debug && fs_debug->integer ) {
 		Com_Printf( "FS_SV_FOpenFileRead (fs_homepath): %s\n", ospath );
 	}
 
@@ -1160,9 +1243,15 @@ we search in that order, matching FS_SV_FOpenFileRead order
 		if ( Q_stricmp( fs_homepath->string, fs_basepath->string ) != 0 )
 		{
 			// search basepath
-			ospath = FS_BuildOSPath( fs_basepath->string, filename, NULL );
+			if ( fs_startupInProgress ) {
+				// Simple path construction during startup
+				Com_sprintf( tempPath, sizeof(tempPath), "%s/%s/%s", fs_basepath->string, BASEGAME, filename );
+				ospath = tempPath;
+			} else {
+				ospath = FS_BuildOSPath( fs_basepath->string, filename, NULL );
+			}
 
-			if ( fs_debug->integer )
+			if ( !fs_startupInProgress && fs_debug && fs_debug->integer )
 			{
 				Com_Printf( "FS_SV_FOpenFileRead (fs_basepath): %s\n", ospath );
 			}
@@ -1174,9 +1263,15 @@ we search in that order, matching FS_SV_FOpenFileRead order
 		if ( !fd->handleFiles.file.o && fs_steampath->string[0] )
 		{
 			// search steampath
-			ospath = FS_BuildOSPath( fs_steampath->string, filename, NULL );
+			if ( fs_startupInProgress ) {
+				// Simple path construction during startup
+				Com_sprintf( tempPath, sizeof(tempPath), "%s/%s/%s", fs_steampath->string, BASEGAME, filename );
+				ospath = tempPath;
+			} else {
+				ospath = FS_BuildOSPath( fs_steampath->string, filename, NULL );
+			}
 
-			if ( fs_debug->integer )
+			if ( !fs_startupInProgress && fs_debug && fs_debug->integer )
 			{
 				Com_Printf( "FS_SV_FOpenFileRead (fs_steampath): %s\n", ospath );
 			}
@@ -1413,19 +1508,41 @@ FS_FOpenFileWrite
 	fileHandle_t	f;
 	fileHandleData_t *fd;
 
-	FS_CheckInitialized();
-
 	if ( !filename || !*filename ) {
 		return FS_INVALID_HANDLE;
 	}
 
-	ospath = FS_BuildOSPath( fs_homepath->string, fs_gamedir, filename );
+	// Safety check: fs_homepath must be initialized
+	// This can happen during FS_Restart when FS_Shutdown has cleared fs_searchpaths
+	// but FS_Startup hasn't completed yet
+	if ( !fs_homepath || !fs_homepath->string ) {
+		return FS_INVALID_HANDLE;
+	}
 
-	if ( fs_debug->integer ) {
+	// During startup, allow file operations if fs_homepath is initialized
+	// This prevents recursive errors when logging tries to write during filesystem initialization
+	if ( fs_startupInProgress ) {
+		// We're in startup - fs_homepath is initialized, so we can proceed
+		// Don't call FS_CheckInitialized() as it will fail during startup
+		// Build path directly without using FS_BuildOSPath cache
+		static char tempPath[MAX_OSPATH];
+		Com_sprintf( tempPath, sizeof(tempPath), "%s/%s/%s", fs_homepath->string, fs_gamedir[0] ? fs_gamedir : BASEGAME, filename );
+		ospath = tempPath;
+	} else {
+		FS_CheckInitialized();
+		ospath = FS_BuildOSPath( fs_homepath->string, fs_gamedir, filename );
+	}
+
+	if ( !fs_startupInProgress && fs_debug && fs_debug->integer ) {
 		Com_Printf( "FS_FOpenFileWrite: %s\n", ospath );
 	}
 
-	FS_CheckFilenameIsNotAllowed( ospath, __func__, qfalse );
+	// Only check filename if filesystem is fully initialized
+	// FS_CheckFilenameIsNotAllowed calls Com_Error which triggers logging
+	// During FS_Restart, fs_searchpaths might be NULL even if fs_startupInProgress is false
+	if ( FS_Initialized() ) {
+		FS_CheckFilenameIsNotAllowed( ospath, __func__, qfalse );
+	}
 
 	f = FS_HandleForFile();
 	fd = &fsh[ f ];
@@ -1463,10 +1580,27 @@ FS_FOpenFileAppend
 	fileHandleData_t *fd;
 	fileHandle_t	f;
 
-	FS_CheckInitialized();
-
 	if ( !*filename ) {
 		return FS_INVALID_HANDLE;
+	}
+
+	// Safety check: fs_homepath must be initialized
+	if ( !fs_homepath || !fs_homepath->string ) {
+		return FS_INVALID_HANDLE;
+	}
+
+	// During startup, allow file operations if fs_homepath is initialized
+	// This prevents recursive errors when logging tries to append during filesystem initialization
+	if ( fs_startupInProgress ) {
+		// We're in startup - fs_homepath is initialized, so we can proceed
+		// Don't call FS_CheckInitialized() as it will fail during startup
+		// Build path directly without using FS_BuildOSPath cache
+		static char tempPath[MAX_OSPATH];
+		Com_sprintf( tempPath, sizeof(tempPath), "%s/%s/%s", fs_homepath->string, fs_gamedir[0] ? fs_gamedir : BASEGAME, filename );
+		ospath = tempPath;
+	} else {
+		FS_CheckInitialized();
+		ospath = FS_BuildOSPath( fs_homepath->string, fs_gamedir, filename );
 	}
 
 #ifndef DEDICATED
@@ -1474,13 +1608,16 @@ FS_FOpenFileAppend
 	// S_ClearSoundBuffer();
 #endif
 
-	ospath = FS_BuildOSPath( fs_homepath->string, fs_gamedir, filename );
-
-	if ( fs_debug->integer ) {
+	if ( !fs_startupInProgress && fs_debug && fs_debug->integer ) {
 		Com_Printf( "FS_FOpenFileAppend: %s\n", ospath );
 	}
 
-	FS_CheckFilenameIsNotAllowed( ospath, __func__, qfalse );
+	// Only check filename if filesystem is fully initialized
+	// FS_CheckFilenameIsNotAllowed calls Com_Error which triggers logging
+	// During FS_Restart, fs_searchpaths might be NULL even if fs_startupInProgress is false
+	if ( FS_Initialized() ) {
+		FS_CheckFilenameIsNotAllowed( ospath, __func__, qfalse );
+	}
 
 	f = FS_HandleForFile();
 	fd = &fsh[ f ];
@@ -3536,7 +3673,8 @@ static void FS_LoadCache( void )
 	// Safety check: fs_homepath must be initialized
 	// Note: We check fs_homepath directly rather than FS_Initialized() because
 	// FS_LoadCache is called during FS_Startup before fs_searchpaths is set
-	if ( !fs_homepath || !fs_homepath->string ) {
+	// Also skip if startup is in progress to avoid filesystem calls during initialization
+	if ( !fs_homepath || !fs_homepath->string || fs_startupInProgress ) {
 		return;
 	}
 
@@ -5402,7 +5540,9 @@ static void FS_Startup( void ) {
 	// Set startup flag FIRST, before any operations that might trigger filesystem checks
 	fs_startupInProgress = qtrue;
 	
-	Com_Printf( "----- FS_Startup -----\n" );
+	// Use Sys_Print directly instead of Com_Printf to avoid triggering logging
+	// which might call filesystem functions during startup
+	Sys_Print( "----- FS_Startup -----\n" );
 
 	fs_debug = Cvar_Get( "fs_debug", "0", 0 );
 	Cvar_SetDescription( fs_debug, "Debugging tool for the filesystem. Run the game in debug mode. Prints additional information regarding read files into the console." );
@@ -5592,10 +5732,11 @@ static void FS_Startup( void ) {
 
 	// print the current search paths
 	//FS_Path_f();
-	Com_Printf( "...loaded in %i milliseconds\n", end - start );
+	// Use Sys_Print during startup to avoid triggering logging
+	Sys_Print( va( "...loaded in %i milliseconds\n", end - start ) );
 
-	Com_Printf( "----------------------\n" );
-	Com_Printf( "%d files in %d pk3 files\n", fs_packFiles, fs_packCount );
+	Sys_Print( "----------------------\n" );
+	Sys_Print( va( "%d files in %d pk3 files\n", fs_packFiles, fs_packCount ) );
 
 	fs_gamedirvar->modified = qfalse; // We just loaded, it's not modified
 
@@ -6495,11 +6636,16 @@ fileHandle_t FS_PipeOpenWrite( const char *cmd, const char *filename ) {
 
 	ospath = FS_BuildOSPath( fs_homepath->string, fs_gamedir, filename );
 
-	if ( fs_debug->integer ) {
+	if ( !fs_startupInProgress && fs_debug && fs_debug->integer ) {
 		Com_Printf( "FS_PipeOpenWrite: %s\n", ospath );
 	}
 
-	FS_CheckFilenameIsNotAllowed( ospath, __func__, qfalse );
+	// Only check filename if filesystem is fully initialized
+	// FS_CheckFilenameIsNotAllowed calls Com_Error which triggers logging
+	// During FS_Restart, fs_searchpaths might be NULL even if fs_startupInProgress is false
+	if ( FS_Initialized() ) {
+		FS_CheckFilenameIsNotAllowed( ospath, __func__, qfalse );
+	}
 
 	f = FS_HandleForFile();
 	fd = &fsh[ f ];
@@ -6574,121 +6720,85 @@ Tries to load libraries within known searchpaths
 		return NULL;
 	}
 
-	// Search all directory paths (both DIR_STATIC and DIR_ALLOW)
-	// This allows loading .so files from both base game and mod directories
+	// Search directory paths, matching reference implementation approach
+	// Reference: only searches DIR_STATIC paths (skips DIR_ALLOW entirely)
+	// We extend this to also search DIR_ALLOW paths that are NOT .pk3dir directories
+	// .pk3dir directories have DIR_ALLOW policy and gamedir ending with ".pk3dir"
 	while ( !libHandle && sp ) {
-		// Skip pack files (pk3), non-directory paths, and unpacked pk3dir directories
-		// Libraries should only be loaded from actual game/mod directories, not from unpacked pak directories
-		// .pk3dir directories have gamedir ending with ".pk3dir" and policy DIR_ALLOW
-		qboolean skipThis = qfalse;
-		
-		if ( sp->pack ) {
-			skipThis = qtrue; // Skip pack files
-		} else if ( !sp->dir ) {
-			skipThis = qtrue; // Skip non-directory paths
-		} else {
-			// Check both path and gamedir for .pk3dir (check path first as it's more reliable)
-			const char *path = sp->dir->path ? sp->dir->path : "";
-			const char *gamedir = sp->dir->gamedir ? sp->dir->gamedir : "";
-			
-			// Debug: always check for DIR_ALLOW to see what we're checking
-			if ( sp->policy == DIR_ALLOW ) {
-				// Check if path or gamedir contains .pk3dir
-				// This is the most reliable way to detect .pk3dir directories
-				if ( ( path[0] && strstr( path, ".pk3dir" ) != NULL ) ||
-				     ( gamedir[0] && strstr( gamedir, ".pk3dir" ) != NULL ) ) {
-					skipThis = qtrue; // Skip .pk3dir directories
-					if ( fs_debug && fs_debug->integer ) {
-						Com_Printf( "FS_LoadLibrary: skipping .pk3dir directory path='%s' gamedir='%s' (policy=%d)\n", 
-							path, gamedir, sp->policy );
-					}
-				} else if ( fs_debug && fs_debug->integer ) {
-					Com_Printf( "FS_LoadLibrary: DIR_ALLOW not .pk3dir path='%s' gamedir='%s'\n", path, gamedir );
-				}
-			}
-		}
-		
-		if ( skipThis ) {
+		// Skip pack files and non-directory paths
+		if ( sp->pack || !sp->dir ) {
 			sp = sp->next;
 			continue;
 		}
-		if ( sp ) {
-			// Try all directory policies (DIR_STATIC, DIR_ALLOW)
-			// DIR_DENY is skipped implicitly since we check for it above
-			
-			// First try vm/ subdirectory (where libraries are typically stored)
-			Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", name );
-			const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath );
-			
-			// CRITICAL: Check the constructed path for .pk3dir BEFORE trying to load
-			// The earlier check on path/gamedir may not catch all cases, so check the full path
-			// ALWAYS check - this is the most reliable way
-			// Copy the path to a local buffer since FS_BuildOSPath uses a static buffer
+		
+		// Skip DIR_ALLOW paths that are .pk3dir directories
+		// From line 4954: strcpy( search->dir->gamedir, pakdirs[ pakdirsi ] ); // mypak.pk3dir
+		// .pk3dir directories have gamedir containing ".pk3dir"
+		// Reference implementation only searches DIR_STATIC, skipping all DIR_ALLOW
+		// We extend this to also search DIR_ALLOW that are NOT .pk3dir directories
+		// Skip DIR_ALLOW paths that are .pk3dir directories
+		// Reference implementation only searches DIR_STATIC, skipping all DIR_ALLOW
+		// We extend this to also search DIR_ALLOW that are NOT .pk3dir directories
+		// .pk3dir directories have gamedir set to the directory name (e.g., "pak6-patch088.pk3dir")
+		// From line 4954: strcpy( search->dir->gamedir, pakdirs[ pakdirsi ] ); // mypak.pk3dir
+		if ( sp->policy == DIR_ALLOW ) {
+			// Check gamedir for .pk3dir - this is the most reliable check
+			if ( sp->dir->gamedir && sp->dir->gamedir[0] ) {
+				// Use strstr to find .pk3dir anywhere in gamedir
+				const char *pk3dirCheck = strstr( sp->dir->gamedir, ".pk3dir" );
+				if ( pk3dirCheck ) {
+					// This is a .pk3dir directory - skip it (matching reference behavior)
+					sp = sp->next;
+					continue;
+				}
+			}
+		}
+		
+		// First try vm/ subdirectory (where libraries are typically stored)
+		Com_sprintf( vmPath, sizeof( vmPath ), "vm/%s", name );
+		const char *fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, vmPath );
+		
+		if ( fn ) {
+			// Double-check the constructed path for .pk3dir (safety check)
+			// Copy to local buffer since FS_BuildOSPath uses a static buffer
 			char checkPath[ MAX_OSPATH * 2 ];
-			if ( !fn ) {
-				sp = sp->next;
-				continue;
-			}
 			Q_strncpyz( checkPath, fn, sizeof( checkPath ) );
-			
-			// Check for .pk3dir in the constructed path - this MUST work
-			// Use a simple, direct check on the copied path
-			const char *found = strstr( checkPath, ".pk3dir" );
-			if ( found != NULL ) {
-				// Found .pk3dir - skip this path
-				if ( fs_debug && fs_debug->integer ) {
-					Com_Printf( "FS_LoadLibrary: skipping .pk3dir path '%s' (policy=%d, found at offset %ld)\n", 
-						checkPath, sp->policy, (long)(found - checkPath) );
-				}
+			if ( strstr( checkPath, ".pk3dir" ) ) {
+				// Found .pk3dir in constructed path - skip it
 				sp = sp->next;
 				continue;
-			}
-			
-			// Debug: if we get here and it's a .pk3dir path, something is wrong
-			if ( fs_debug && fs_debug->integer && sp->policy == DIR_ALLOW ) {
-				// Check if path contains pk3dir manually
-				int hasPk3dir = 0;
-				const char *p = checkPath;
-				while ( *p ) {
-					if ( p[0] == '.' && p[1] == 'p' && p[2] == 'k' && p[3] == '3' && p[4] == 'd' && p[5] == 'i' && p[6] == 'r' ) {
-						hasPk3dir = 1;
-						break;
-					}
-					p++;
-				}
-				if ( hasPk3dir ) {
-					Com_Printf( "FS_LoadLibrary: WARNING - path '%s' contains .pk3dir but strstr didn't find it!\n", checkPath );
-				}
 			}
 			
 			if ( fs_debug && fs_debug->integer ) {
-				Com_Printf( "FS_LoadLibrary: trying %s (policy=%d)\n", fn ? fn : "<NULL>", sp->policy );
+				Com_Printf( "FS_LoadLibrary: trying %s (policy=%d)\n", fn, sp->policy );
 			}
 			libHandle = Sys_LoadLibrary( fn );
 			searchCount++;
+		}
+		
+		// If not found in vm/, try directly in game directory
+		if ( !libHandle ) {
+			fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, name );
 			
-			// If not found in vm/, try directly in game directory
-			if ( !libHandle ) {
-				fn = FS_BuildOSPath( sp->dir->path, sp->dir->gamedir, name );
-				
-				// CRITICAL: Check this path too BEFORE trying to load
-				if ( fn && strstr( fn, ".pk3dir" ) != NULL ) {
-					if ( fs_debug && fs_debug->integer ) {
-						Com_Printf( "FS_LoadLibrary: skipping .pk3dir path '%s' (policy=%d)\n", fn, sp->policy );
-					}
+			if ( fn ) {
+				// Double-check this path too for .pk3dir
+				char checkPath2[ MAX_OSPATH * 2 ];
+				Q_strncpyz( checkPath2, fn, sizeof( checkPath2 ) );
+				if ( strstr( checkPath2, ".pk3dir" ) ) {
+					// Found .pk3dir in constructed path - skip it
 					sp = sp->next;
 					continue;
 				}
 				
 				if ( fs_debug && fs_debug->integer ) {
-					Com_Printf( "FS_LoadLibrary: trying %s (policy=%d)\n", fn ? fn : "<NULL>", sp->policy );
+					Com_Printf( "FS_LoadLibrary: trying %s (policy=%d)\n", fn, sp->policy );
 				}
 				libHandle = Sys_LoadLibrary( fn );
 				searchCount++;
 			}
-			
-			sp = sp->next;
 		}
+		
+		sp = sp->next;
 	}
 
 	if ( !libHandle && fs_debug && fs_debug->integer ) {

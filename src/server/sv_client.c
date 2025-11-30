@@ -676,7 +676,10 @@ void SV_DirectConnect( const netadr_t *from ) {
 			if ( newcl->state >= CS_CONNECTED ) {
 				// call QVM disconnect function before calling connect again
 				// fixes issues such as disappearing CTF flags in unpatched mods
-				VM_Call( gvm, 1, GAME_CLIENT_DISCONNECT, newcl - svs.clients );
+				// Safety check: ensure game VM is initialized
+				if ( gvm ) {
+					VM_Call( gvm, 1, GAME_CLIENT_DISCONNECT, newcl - svs.clients );
+				}
 
 				// don't leak memory or file handles due to e.g. downloads in progress
 				SV_FreeClient( newcl );
@@ -784,6 +787,12 @@ gotnewcl:
 	}
 
 	// get the game a chance to reject this connection or modify the userinfo
+	// Safety check: ensure game VM is initialized
+	if ( !gvm ) {
+		NET_OutOfBandPrint( NS_SERVER, from, "print\nServer is initializing.\n" );
+		Com_DPrintf( "Rejected connection: game VM not initialized.\n" );
+		return;
+	}
 	denied = VM_Call( gvm, 3, GAME_CLIENT_CONNECT, clientNum, qtrue, qfalse ); // firstTime = qtrue
 	if ( denied ) {
 		// we can't just use VM_ArgPtr, because that is only valid inside a VM_Call
@@ -881,7 +890,10 @@ void SV_DropClient( client_t *drop, const char *reason ) {
 
 	// call the prog function for removing a client
 	// this will remove the body, among other things
-	VM_Call( gvm, 1, GAME_CLIENT_DISCONNECT, drop - svs.clients );
+	// Safety check: ensure game VM is initialized
+	if ( gvm ) {
+		VM_Call( gvm, 1, GAME_CLIENT_DISCONNECT, drop - svs.clients );
+	}
 
 	// add the disconnect command
 	if ( reason ) {
@@ -1035,7 +1047,12 @@ static void SV_SendClientGameState( client_t *client ) {
 	client->gotCP = qfalse;
 
 	// to start generating delta for packet entities
-	client->gentity = SV_GentityNum( client - svs.clients );
+	// Safety check: ensure gentities are initialized
+	if ( sv.gentities && (client - svs.clients) < sv.num_entities ) {
+		client->gentity = SV_GentityNum( client - svs.clients );
+	} else {
+		client->gentity = NULL;
+	}
 
 	// when we receive the first packet from the client, we will
 	// notice that it is from a different serverid and that the
@@ -1163,6 +1180,10 @@ void SV_ClientEnterWorld( client_t *client ) {
 
 	// set up the entity for the client
 	clientNum = client - svs.clients;
+	// Safety check: ensure gentities are initialized
+	if ( !sv.gentities || clientNum >= sv.num_entities ) {
+		Com_Error( ERR_DROP, "SV_ClientEnterWorld: gentities not initialized or bad clientNum %i", clientNum );
+	}
 	ent = SV_GentityNum( clientNum );
 	ent->s.number = clientNum;
 	client->gentity = ent;
@@ -1171,7 +1192,10 @@ void SV_ClientEnterWorld( client_t *client ) {
 	client->lastSnapshotTime = svs.time - 9999; // generate a snapshot immediately
 
 	// call the game begin function
-	VM_Call( gvm, 1, GAME_CLIENT_BEGIN, clientNum );
+	// Safety check: ensure game VM is initialized
+	if ( gvm ) {
+		VM_Call( gvm, 1, GAME_CLIENT_BEGIN, clientNum );
+	}
 }
 
 
@@ -1757,7 +1781,12 @@ void SV_UserinfoChanged( client_t *cl, qboolean updateUserinfo, qboolean runFilt
 
 	if ( cl->netchan.remoteAddress.type == NA_BOT ) {
 		cl->lastSnapshotTime = svs.time - 9999; // generate a snapshot immediately
-		cl->snapshotMsec = 1000 / sv_fps->integer;
+		// Safety check: prevent division by zero
+		if ( sv_fps->integer > 0 ) {
+			cl->snapshotMsec = 1000 / sv_fps->integer;
+		} else {
+			cl->snapshotMsec = 50; // default to 20 FPS if invalid
+		}
 		cl->rate = 0;
 		return;
 	}
@@ -1872,7 +1901,10 @@ static void SV_UpdateUserinfo_f( client_t *cl ) {
 
 	SV_UserinfoChanged( cl, qtrue, qtrue ); // update userinfo, run filter
 	// call prog code to allow overrides
-	VM_Call( gvm, 1, GAME_CLIENT_USERINFO_CHANGED, cl - svs.clients );
+	// Safety check: ensure game VM is initialized
+	if ( gvm ) {
+		VM_Call( gvm, 1, GAME_CLIENT_USERINFO_CHANGED, cl - svs.clients );
+	}
 }
 
 extern int SV_Strlen( const char *str );
@@ -2046,11 +2078,14 @@ qboolean SV_ExecuteClientCommand( client_t *cl, const char *s ) {
 	} else {
 		// pass unknown strings to the game
 		if ( !ucmd->name && sv.state == SS_GAME && cl->state >= CS_PRIMED ) {
-			if ( gvm->forceDataMask )
-				Cmd_Args_Sanitize( "\n\r;" ); // handle ';' for OSP
-			else
-				Cmd_Args_Sanitize( "\n\r" );
-			VM_Call( gvm, 1, GAME_CLIENT_COMMAND, cl - svs.clients );
+			// Safety check: ensure game VM is initialized
+			if ( gvm ) {
+				if ( gvm->forceDataMask )
+					Cmd_Args_Sanitize( "\n\r;" ); // handle ';' for OSP
+				else
+					Cmd_Args_Sanitize( "\n\r" );
+				VM_Call( gvm, 1, GAME_CLIENT_COMMAND, cl - svs.clients );
+			}
 		}
 	}
 
@@ -2110,6 +2145,11 @@ void SV_ClientThink (client_t *cl, usercmd_t *cmd) {
 
 	if ( cl->state != CS_ACTIVE ) {
 		return;		// may have been kicked during the last usercmd
+	}
+
+	// Safety check: ensure game VM is initialized
+	if ( !gvm ) {
+		return;
 	}
 
 	VM_Call( gvm, 1, GAME_CLIENT_THINK, cl - svs.clients );

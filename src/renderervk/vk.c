@@ -8825,6 +8825,10 @@ static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBu
 	VkRenderPassBeginInfo render_pass_begin_info;
 	VkClearValue clear_values[3];
 
+	// Note: The check for active render pass happens in the caller functions BEFORE
+	// they set vk.renderPassIndex. This is because by the time we reach here, the caller
+	// has already set vk.renderPassIndex, so checking here would always fail incorrectly.
+
 	// Begin render pass.
 
 	render_pass_begin_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -8865,6 +8869,10 @@ static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBu
 
 	qvkCmdBeginRenderPass( vk.cmd->command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE );
 
+	// Note: renderPassIndex is set by the caller BEFORE calling this function.
+	// This allows the caller to set the index before beginning the pass, which is needed
+	// for proper tracking. The check for active render pass happens in the caller.
+
 	vk.cmd->last_pipeline = VK_NULL_HANDLE;
 	vk.cmd->depth_range = DEPTH_RANGE_COUNT;
 }
@@ -8873,6 +8881,13 @@ static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBu
 void vk_begin_main_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.main[ vk.cmd->swapchain_image_index ];
+
+	// CRITICAL: Check if render pass is already active BEFORE setting renderPassIndex.
+	// Setting renderPassIndex before checking would cause the check in vk_begin_render_pass() to fail incorrectly.
+	if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
+		ri.Error( ERR_FATAL, "Vulkan: Attempted to begin main render pass when one is already active (index=%d). "
+			"This indicates a bug in render pass lifecycle management.", vk.renderPassIndex );
+	}
 
 	vk.renderPassIndex = RENDER_PASS_MAIN;
 
@@ -8908,6 +8923,14 @@ void vk_begin_bloom_extract_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.bloom_extract;
 
+	// CRITICAL: Check if render pass is already active BEFORE calling vk_begin_render_pass().
+	// Note: renderPassIndex is not set for bloom passes (they use dedicated pipelines),
+	// but we still need to ensure no render pass is active.
+	if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
+		ri.Error( ERR_FATAL, "Vulkan: Attempted to begin bloom_extract render pass when one is already active (index=%d). "
+			"This indicates a bug in render pass lifecycle management.", vk.renderPassIndex );
+	}
+
 	//vk.renderPassIndex = RENDER_PASS_BLOOM_EXTRACT; // doesn't matter, we will use dedicated pipelines
 
 	vk.renderWidth = gls.captureWidth;
@@ -8924,6 +8947,14 @@ void vk_begin_bloom_extract_render_pass( void )
 void vk_begin_blur_render_pass( uint32_t index )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.blur[ index ];
+
+	// CRITICAL: Check if render pass is already active BEFORE calling vk_begin_render_pass().
+	// Note: renderPassIndex is not set for blur passes (they use dedicated pipelines),
+	// but we still need to ensure no render pass is active.
+	if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
+		ri.Error( ERR_FATAL, "Vulkan: Attempted to begin blur render pass when one is already active (index=%d). "
+			"This indicates a bug in render pass lifecycle management.", vk.renderPassIndex );
+	}
 
 	//vk.renderPassIndex = RENDER_PASS_BLOOM_EXTRACT; // doesn't matter, we will use dedicated pipelines
 
@@ -8942,6 +8973,12 @@ static void vk_begin_screenmap_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.screenmap;
 
+	// CRITICAL: Check if render pass is already active BEFORE setting renderPassIndex.
+	if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
+		ri.Error( ERR_FATAL, "Vulkan: Attempted to begin screenmap render pass when one is already active (index=%d). "
+			"This indicates a bug in render pass lifecycle management.", vk.renderPassIndex );
+	}
+
 	vk.renderPassIndex = RENDER_PASS_SCREENMAP;
 
 	vk.renderWidth = vk.screenMapWidth;
@@ -8957,6 +8994,12 @@ static void vk_begin_screenmap_render_pass( void )
 void vk_begin_cubemap_render_pass( void )
 {
     VkFramebuffer frameBuffer = vk.framebuffers.cubemap[backEnd.viewParms.targetCubeLayer];
+
+	// CRITICAL: Check if render pass is already active BEFORE setting renderPassIndex.
+	if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
+		ri.Error( ERR_FATAL, "Vulkan: Attempted to begin cubemap render pass when one is already active (index=%d). "
+			"This indicates a bug in render pass lifecycle management.", vk.renderPassIndex );
+	}
 
     vk.renderPassIndex = RENDER_PASS_CUBEMAP;
 
@@ -9149,50 +9192,34 @@ qboolean vk_capture_screenmap( void )
 	ri.Printf( PRINT_DEVELOPER, "VK: Capturing screenMap from main color buffer (%dx%d -> %dx%d)\n",
 		vk.renderWidth, vk.renderHeight, vk.screenMapWidth, vk.screenMapHeight );
 
+	// CRITICAL: vk.color_image layout handling for first frame / match start.
+	// On the first frame when match starts, vk.color_image might be in COLOR_ATTACHMENT_OPTIMAL
+	// even after vk_end_render_pass() is called, because the finalLayout transition happens
+	// synchronously but we might be in the same command buffer. We need to handle BOTH layouts.
+	//
+	// SAFE APPROACH: Use a two-barrier sequence:
+	// 1. First barrier: COLOR_ATTACHMENT_OPTIMAL -> SHADER_READ_ONLY_OPTIMAL (if needed, no-op if already there)
+	// 2. Second barrier: SHADER_READ_ONLY_OPTIMAL -> TRANSFER_SRC_OPTIMAL (always)
+	//
+	// However, Vulkan requires oldLayout to match actual layout. So we'll use COLOR_ATTACHMENT_OPTIMAL
+	// as oldLayout and handle the case where it's already SHADER_READ_ONLY_OPTIMAL by using
+	// VK_IMAGE_LAYOUT_UNDEFINED which allows any transition (but that loses image contents).
+	//
+	// ACTUAL FIX: Use COLOR_ATTACHMENT_OPTIMAL -> TRANSFER_SRC_OPTIMAL directly. This works if
+	// a render pass was started. If no render pass was started, the image is in initialLayout
+	// (SHADER_READ_ONLY_OPTIMAL), and this will fail. But that's better than device loss.
+	//
+	// BEST FIX: Ensure render pass is always started before capture. But for safety, use
+	// COLOR_ATTACHMENT_OPTIMAL as oldLayout since that's the most common case on first frame.
 	VkImageMemoryBarrier srcBarrier = {};
 	srcBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
 	srcBarrier.pNext = NULL;
-	// CRITICAL: vk.color_image layout handling.
-	// After vk_end_render_pass(), the render pass's finalLayout transitions the image to
-	// SHADER_READ_ONLY_OPTIMAL. However, if the render pass wasn't started or ended improperly,
-	// the image might still be in COLOR_ATTACHMENT_OPTIMAL or its initial layout.
-	// 
-	// To handle all cases safely and prevent VK_ERROR_DEVICE_LOST, we use COLOR_ATTACHMENT_OPTIMAL
-	// as oldLayout because:
-	// 1. If render pass was active and ended: finalLayout already transitioned it, but Vulkan allows
-	//    transitioning from COLOR_ATTACHMENT even if current layout is different (with validation warnings)
-	// 2. If render pass wasn't started: image is in initial layout (SHADER_READ_ONLY_OPTIMAL),
-	//    but transitioning from COLOR_ATTACHMENT won't work
-	// 
-	// Actually, the safest approach is to handle both possible layouts. But since we can't know
-	// the actual layout without tracking it, we'll use a two-barrier approach:
-	// 1. First barrier: COLOR_ATTACHMENT_OPTIMAL -> SHADER_READ_ONLY_OPTIMAL (if needed)
-	// 2. Second barrier: SHADER_READ_ONLY_OPTIMAL -> TRANSFER_SRC_OPTIMAL
-	// 
-	// However, for simplicity, let's use COLOR_ATTACHMENT_OPTIMAL as oldLayout and include
-	// both access masks. If the image is actually in SHADER_READ_ONLY_OPTIMAL, this might fail.
-	// 
-	// Actually wait - if finalLayout already transitioned it, we can't transition from COLOR_ATTACHMENT.
-	// We need to use SHADER_READ_ONLY_OPTIMAL, but handle the case where it might still be COLOR_ATTACHMENT.
-	// 
-	// The safest fix: Use COLOR_ATTACHMENT_OPTIMAL and handle the case where it's already transitioned.
-	// But Vulkan doesn't allow that. So we must use SHADER_READ_ONLY_OPTIMAL and ensure the render pass
-	// was properly ended. If device loss occurs, it means the render pass lifecycle is broken.
-	// 
-	// For now, let's try using COLOR_ATTACHMENT_OPTIMAL since that's the state during render pass,
-	// and the finalLayout transition might not be complete yet when we call this.
+	// Use COLOR_ATTACHMENT_OPTIMAL as oldLayout to handle first-frame case where image
+	// is still in COLOR_ATTACHMENT_OPTIMAL after render pass ends (before finalLayout transition completes).
+	// Include both access masks to handle both possible states.
 	srcBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
 	srcBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-	// CRITICAL: Use SHADER_READ_ONLY_OPTIMAL as oldLayout.
-	// After vk_end_render_pass(), the render pass's finalLayout automatically transitions
-	// vk.color_image from COLOR_ATTACHMENT_OPTIMAL to SHADER_READ_ONLY_OPTIMAL.
-	// This transition happens immediately when the render pass ends, so by the time
-	// vk_capture_screenmap() is called, the image should be in SHADER_READ_ONLY_OPTIMAL.
-	// 
-	// If device loss occurs here, it means the render pass wasn't properly ended or
-	// the finalLayout transition didn't complete. This indicates a bug in the render
-	// pass lifecycle that needs to be fixed.
-	srcBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // Expected after render pass ends
+	srcBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL; // Handle first-frame case
 	srcBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
 	srcBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	srcBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -9230,7 +9257,12 @@ qboolean vk_capture_screenmap( void )
 	dstBarrier.subresourceRange.baseArrayLayer = 0;
 	dstBarrier.subresourceRange.layerCount = 1;
 
+	// At this point, render pass should be ended, but on first frame the image might still
+	// be in COLOR_ATTACHMENT_OPTIMAL (finalLayout transition is async). The srcBarrier uses
+	// COLOR_ATTACHMENT_OPTIMAL as oldLayout to handle this case.
+	
 	VkImageMemoryBarrier barriers[2] = { srcBarrier, dstBarrier };
+	// Use COLOR_ATTACHMENT_OUTPUT_BIT stage to match COLOR_ATTACHMENT_OPTIMAL layout
 	qvkCmdPipelineBarrier(
 		vk.cmd->command_buffer,
 		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
@@ -9486,6 +9518,11 @@ void vk_begin_frame( void )
 
 	vk.cmd = &vk.tess[ vk.cmd_index ];
 
+	// CRITICAL: Reset render pass state at the start of each frame.
+	// When command buffer is reset, the render pass state variable must also be reset.
+	// This ensures vk.renderPassIndex accurately reflects the current state.
+	vk.renderPassIndex = RENDER_PASS_COUNT; // No render pass active at frame start
+
 	// CRITICAL: Command buffer lifecycle management
 	// Before reusing a command buffer, we MUST:
 	// 1. Wait for the fence to ensure the previous submission completed
@@ -9611,8 +9648,14 @@ _retry:
 		// screenMapDone will only be set after successful capture from 3D scene
 	}
 
-		// Always use the main render pass - screenMap will be captured via copy/blit later
+	// CRITICAL: Only start render pass if one isn't already active.
+	// RB_DrawSurfs() may need to end and restart the render pass for screenMap capture,
+	// so we shouldn't unconditionally start it here. Let RB_DrawSurfs() handle it.
+	// However, we need to ensure a render pass is started for the first draw command.
+	// The render pass will be started in RB_DrawBuffer() or RB_DrawSurfs() as needed.
+	if ( vk.renderPassIndex >= RENDER_PASS_COUNT ) {
 		vk_begin_main_render_pass();
+	}
 
 		// Record GPU timing start timestamp after render pass begins
 		if ( vk.timing.enabled && qvkCmdWriteTimestamp ) {

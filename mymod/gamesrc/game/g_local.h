@@ -87,6 +87,14 @@ typedef enum {
 	MOVER_2TO1
 } moverState_t;
 
+// match start state machine
+typedef enum {
+	MS_WARMUP,		// waiting for players
+	MS_PREGAME,		// intro phase, players frozen
+	MS_COUNTDOWN,	// countdown phase
+	MS_PLAYING		// match active
+} matchState_t;
+
 #define SP_PODIUM_MODEL		"models/mapobjects/podium/podium4.md3"
 
 #define ELIMINATION_ACTIVE_TARGETNAME "elimination_active"
@@ -448,6 +456,8 @@ struct gclient_s {
 //unlagged - smooth clients #1
 	qboolean        spawnprotected;
 
+	qboolean	readyForMatchStart;	// ready for match start (model loaded, spawned)
+
 	int			accuracy[WP_NUM_WEAPONS][2];
 };
 
@@ -466,6 +476,11 @@ typedef struct {
 	int			num_entities;		// current number, <= MAX_GENTITIES
 
 	int			warmupTime;			// restart match at this time
+
+	// match start state machine
+	matchState_t	matchState;		// current match state
+	int			pregameStartTime;	// when PREGAME phase started
+	int			matchIntroTime;		// duration of intro phase (default 2000ms)
 
 	fileHandle_t	logFile;
 

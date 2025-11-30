@@ -504,7 +504,8 @@ static void SV_BuildCommonSnapshot( void )
 	count = 0;
 
 	// gather all linked entities
-	if ( sv.state != SS_DEAD ) {
+	// Safety check: ensure gentities are initialized
+	if ( sv.state != SS_DEAD && sv.gentities && sv.num_entities > 0 ) {
 		for ( num = 0 ; num < sv.num_entities ; num++ ) {
 			ent = SV_GentityNum( num );
 
@@ -614,6 +615,10 @@ static void SV_BuildClientSnapshot( client_t *client ) {
 		return;
 
 	// grab the current playerState_t
+	// Safety check: ensure gameClients are initialized
+	if ( !sv.gameClients ) {
+		return;
+	}
 	ps = SV_GameClientNum( cl );
 	frame->ps = *ps;
 

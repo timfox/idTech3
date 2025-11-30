@@ -824,6 +824,7 @@ typedef	off_t  fileOffset_t;
 #endif
 
 qboolean FS_Initialized( void );
+qboolean FS_StartupInProgress( void );
 
 void	FS_InitFilesystem ( void );
 void	FS_Shutdown( qboolean closemfp );

@@ -2049,7 +2049,7 @@ void IN_Init( void )
 
 #ifdef USE_JOYSTICK
 	// bk001130 - from cvs.17 (mkv), joystick variables
-	in_joystick = Cvar_Get( "in_joystick", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	in_joystick = Cvar_Get( "in_joystick", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_SetDescription( in_joystick, "Whether or not joystick support is on." );
 	// bk001130 - changed this to match win32
 	in_joystickDebug = Cvar_Get( "in_debugjoystick", "0", CVAR_TEMP );

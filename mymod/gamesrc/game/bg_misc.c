@@ -1798,7 +1798,7 @@ int trap_FS_FOpenFile(const char *qpath, fileHandle_t *f, fsMode_t mode);
 void trap_FS_Read(void *buffer, int len, fileHandle_t f);
 void trap_FS_FCloseFile(fileHandle_t f);
 
-qboolean MatchesGametype(int gametype, const char* gametypeName) {
+__attribute__((visibility("default"))) qboolean MatchesGametype(int gametype, const char* gametypeName) {
 	qboolean mayRead = qfalse;
 	switch (gametype) {
 		case GT_FFA:
@@ -1844,7 +1844,7 @@ qboolean MatchesGametype(int gametype, const char* gametypeName) {
 	return mayRead;
 }
 
-void MapInfoGet(const char* mapname, int gametype, mapinfo_result_t *result) {
+__attribute__((visibility("default"))) void MapInfoGet(const char* mapname, int gametype, mapinfo_result_t *result) {
 	fileHandle_t file;
 	char buffer[4 * 1024];
 	char keyBuffer[MAX_TOKEN_CHARS];
@@ -1852,8 +1852,17 @@ void MapInfoGet(const char* mapname, int gametype, mapinfo_result_t *result) {
 	char *pointer;
 	int mayRead;
 	int i;
+	extern intptr_t (QDECL *syscall)( intptr_t arg, ... );
 
 	memset(result, 0, sizeof (*result));
+	
+	// Safety check: if syscall pointer is not initialized (still -1), return early
+	// This can happen when MapInfoGet is called from UI module before game module is initialized
+	if ( syscall == (intptr_t (QDECL *)( intptr_t, ...))-1 ) {
+		// Game module not initialized yet - return empty result
+		return;
+	}
+	
 	Com_sprintf(buffer, sizeof (buffer), "maps/%s.info", mapname);
 	Q_strlwr(buffer);
 

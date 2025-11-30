@@ -1090,13 +1090,22 @@ memory on the hunk from cgame, ui, and renderer
 =====================
 */
 void CL_MapLoading( void ) {
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: CL_MapLoading called\n" );
+	}
 	if ( com_dedicated->integer ) {
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: CL_MapLoading returning early - dedicated server\n" );
+		}
 		cls.state = CA_DISCONNECTED;
 		Key_SetCatcher( KEYCATCH_CONSOLE );
 		return;
 	}
 
 	if ( !com_cl_running->integer ) {
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: CL_MapLoading returning early - client not running\n" );
+		}
 		return;
 	}
 
@@ -1125,6 +1134,9 @@ void CL_MapLoading( void ) {
 		NET_StringToAdr( cls.servername, &clc.serverAddress, NA_UNSPEC );
 		// we don't need a challenge on the localhost
 		CL_CheckForResend();
+	}
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: CL_MapLoading completed\n" );
 	}
 }
 
@@ -3298,8 +3310,14 @@ This is the only place that any of these functions are called from
 ============================
 */
 void CL_StartHunkUsers( void ) {
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: CL_StartHunkUsers called\n" );
+	}
 
 	if ( !com_cl_running || !com_cl_running->integer ) {
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: CL_StartHunkUsers returning early - client not running\n" );
+		}
 		return;
 	}
 
@@ -3344,6 +3362,9 @@ void CL_StartHunkUsers( void ) {
 	if ( !cls.uiStarted ) {
 		cls.uiStarted = qtrue;
 		CL_InitUI();
+	}
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: CL_StartHunkUsers completed\n" );
 	}
 }
 

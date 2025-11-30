@@ -32,6 +32,11 @@ botlib_export_t	*botlib_export;
 int	SV_NumForGentity( sharedEntity_t *ent ) {
 	int		num;
 
+	// Safety check: ensure gentities are initialized
+	if ( !sv.gentities || !ent ) {
+		Com_Error( ERR_DROP, "SV_NumForGentity: gentities not initialized or ent is NULL" );
+	}
+
 	num = ( (byte *)ent - (byte *)sv.gentities ) / sv.gentitySize;
 
 	return num;
@@ -41,6 +46,14 @@ int	SV_NumForGentity( sharedEntity_t *ent ) {
 sharedEntity_t *SV_GentityNum( int num ) {
 	sharedEntity_t *ent;
 
+	// Safety checks: ensure gentities are initialized and num is in bounds
+	if ( !sv.gentities ) {
+		Com_Error( ERR_DROP, "SV_GentityNum: gentities not initialized" );
+	}
+	if ( num < 0 || num >= sv.num_entities ) {
+		Com_Error( ERR_DROP, "SV_GentityNum: bad entity number %i (max %i)", num, sv.num_entities );
+	}
+
 	ent = (sharedEntity_t *)((byte *)sv.gentities + sv.gentitySize*(num));
 
 	return ent;
@@ -49,6 +62,14 @@ sharedEntity_t *SV_GentityNum( int num ) {
 
 playerState_t *SV_GameClientNum( int num ) {
 	playerState_t	*ps;
+
+	// Safety checks: ensure gameClients are initialized and num is in bounds
+	if ( !sv.gameClients ) {
+		Com_Error( ERR_DROP, "SV_GameClientNum: gameClients not initialized" );
+	}
+	if ( num < 0 || num >= sv.maxclients ) {
+		Com_Error( ERR_DROP, "SV_GameClientNum: bad client number %i (max %i)", num, sv.maxclients );
+	}
 
 	ps = (playerState_t *)((byte *)sv.gameClients + sv.gameClientSize*(num));
 
@@ -1023,20 +1044,26 @@ Called for both a full init and a restart
 static void SV_InitGameVM( qboolean restart ) {
 	int		i;
 
+	Com_Printf( "SV_InitGameVM: Starting VM initialization (restart=%d)\n", restart );
+
 	// start the entity parsing at the beginning
 	sv.entityParsePoint = CM_EntityString();
+	Com_Printf( "SV_InitGameVM: Entity parse point set\n" );
 
 	// clear all gentity pointers that might still be set from
 	// a previous level
 	// https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=522
 	// now done before GAME_INIT call
+	Com_Printf( "SV_InitGameVM: Clearing gentity pointers (maxclients=%d)\n", sv.maxclients );
 	for ( i = 0; i < sv.maxclients; i++ ) {
 		svs.clients[i].gentity = NULL;
 	}
 	
 	// use the current msec count for a random seed
 	// init for this gamestate
+	Com_Printf( "SV_InitGameVM: Calling VM_Call(GAME_INIT) - sv.time=%d, restart=%d\n", sv.time, restart );
 	VM_Call( gvm, 3, GAME_INIT, sv.time, Com_Milliseconds(), restart );
+	Com_Printf( "SV_InitGameVM: VM_Call(GAME_INIT) completed successfully\n" );
 }
 
 
@@ -1078,6 +1105,8 @@ void SV_InitGameProgs( void ) {
 	//FIXME these are temp while I make bots run in vm
 	extern int	bot_enable;
 
+	Com_Printf( "SV_InitGameProgs: Starting game module initialization\n" );
+
 	var = Cvar_Get( "bot_enable", "1", CVAR_LATCH );
 	if ( var ) {
 		bot_enable = var->integer;
@@ -1086,16 +1115,22 @@ void SV_InitGameProgs( void ) {
 		bot_enable = 0;
 	}
 
+	Com_Printf( "SV_InitGameProgs: Calling VM_Create for game module\n" );
 	// load the dll or bytecode
 	gvm = VM_Create( VM_GAME, SV_GameSystemCalls, SV_DllSyscall, Cvar_VariableIntegerValue( "vm_game" ) );
 	if ( !gvm ) {
 		Com_Error( ERR_DROP, "VM_Create on game failed" );
 	}
+	Com_Printf( "SV_InitGameProgs: VM_Create succeeded, gvm=%p\n", (void*)gvm );
 
+	Com_Printf( "SV_InitGameProgs: Calling SV_InitGameVM\n" );
 	SV_InitGameVM( qfalse );
+	Com_Printf( "SV_InitGameProgs: SV_InitGameVM completed\n" );
 
 	// load userinfo filters
+	Com_Printf( "SV_InitGameProgs: Loading userinfo filters\n" );
 	SV_LoadFilters( sv_filter->string );
+	Com_Printf( "SV_InitGameProgs: Game module initialization complete\n" );
 }
 
 
@@ -1108,6 +1143,11 @@ See if the current console command is claimed by the game
 */
 qboolean SV_GameCommand( void ) {
 	if ( sv.state != SS_GAME ) {
+		return qfalse;
+	}
+
+	// Safety check: ensure game VM is initialized
+	if ( !gvm ) {
 		return qfalse;
 	}
 

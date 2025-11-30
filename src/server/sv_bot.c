@@ -59,11 +59,20 @@ int SV_BotAllocateClient( void ) {
 		return -1;
 	}
 
+	// Safety check: ensure gentities are initialized
+	if ( !sv.gentities || i >= sv.num_entities ) {
+		Com_Error( ERR_DROP, "SV_BotAllocateClient: gentities not initialized or bad clientNum %i", i );
+	}
 	cl->gentity = SV_GentityNum( i );
 	cl->gentity->s.number = i;
 	cl->state = CS_ACTIVE;
 	cl->lastPacketTime = svs.time;
-	cl->snapshotMsec = 1000 / sv_fps->integer;
+	// Safety check: prevent division by zero
+	if ( sv_fps->integer > 0 ) {
+		cl->snapshotMsec = 1000 / sv_fps->integer;
+	} else {
+		cl->snapshotMsec = 50; // default to 20 FPS if invalid
+	}
 	cl->netchan.remoteAddress.type = NA_BOT;
 	cl->rate = 0;
 
@@ -124,8 +133,11 @@ void BotDrawDebugPolygons(void (*drawPoly)(int color, int numPoints, float *poin
 		if (bot_reachability->integer) parm0 |= 2;
 		if (bot_groundonly->integer) parm0 |= 4;
 		botlib_export->BotLibVarSet("bot_highlightarea", bot_highlightarea->string);
-		botlib_export->Test(parm0, NULL, svs.clients[0].gentity->r.currentOrigin, 
-			svs.clients[0].gentity->r.currentAngles);
+		// Safety check: ensure client gentity is initialized
+		if ( svs.clients[0].gentity ) {
+			botlib_export->Test(parm0, NULL, svs.clients[0].gentity->r.currentOrigin, 
+				svs.clients[0].gentity->r.currentAngles);
+		}
 	} //end if
 	//draw all debug polys
 	for (i = 0; i < bot_maxdebugpolys; i++) {
@@ -542,6 +554,10 @@ void SV_BotInitBotLib(void) {
 
 	if (debugpolygons) Z_Free(debugpolygons);
 	bot_maxdebugpolys = Cvar_VariableIntegerValue("bot_maxdebugpolys");
+	// Safety check: ensure valid allocation size
+	if ( bot_maxdebugpolys <= 0 ) {
+		bot_maxdebugpolys = 1; // minimum valid value
+	}
 	debugpolygons = Z_Malloc(sizeof(bot_debugpoly_t) * bot_maxdebugpolys);
 
 	botlib_import.Print = BotImport_Print;

@@ -28,6 +28,8 @@ void UI_SPArena_Start( const char *arenaInfo ) {
 	int		n;
 	const char	*txt;
 
+	trap_Print( va( "DEBUG: UI_SPArena_Start called with arenaInfo=%s\n", arenaInfo ? arenaInfo : "<NULL>" ) );
+
 	n = (int)trap_Cvar_VariableValue( "sv_maxclients" );
 	if ( n < 8 ) {
 		trap_Cvar_SetValue( "sv_maxclients", 8 );
@@ -46,5 +48,7 @@ void UI_SPArena_Start( const char *arenaInfo ) {
 	trap_Cvar_SetValue( "ui_spSelection", level );
 
 	map = Info_ValueForKey( arenaInfo, "map" );
+	trap_Print( va( "DEBUG: UI_SPArena_Start executing spmap command for map=%s\n", map ? map : "<NULL>" ) );
 	trap_Cmd_ExecuteText( EXEC_APPEND, va( "spmap %s\n", map ) );
+	trap_Print( "DEBUG: UI_SPArena_Start spmap command executed\n" );
 }

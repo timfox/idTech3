@@ -91,8 +91,15 @@ void SV_UpdateConfigstrings(client_t *client)
 			continue;
 
 		// do not always send server info to all clients
-		if ( index == CS_SERVERINFO && ( SV_GentityNum( client - svs.clients )->r.svFlags & SVF_NOSERVERINFO ) ) {
-			continue;
+		// Check if gentities are initialized before accessing them
+		if ( index == CS_SERVERINFO && sv.gentities ) {
+			int clientNum = client - svs.clients;
+			if ( clientNum >= 0 && clientNum < sv.num_entities ) {
+				sharedEntity_t *gent = SV_GentityNum( clientNum );
+				if ( gent && ( gent->r.svFlags & SVF_NOSERVERINFO ) ) {
+					continue;
+				}
+			}
 		}
 
 		SV_SendConfigstring(client, index);
@@ -130,9 +137,17 @@ void SV_SetConfigstring (int index, const char *val) {
 	// send it to all the clients if we aren't
 	// spawning a new server
 	if ( sv.state == SS_GAME || sv.restarting ) {
+		// Safety check: ensure clients array is initialized
+		if ( !svs.clients ) {
+			return;
+		}
 
 		// send the data to all relevant clients
 		for (i = 0, client = svs.clients; i < sv.maxclients; i++, client++) {
+			// Safety check: ensure client pointer is valid
+			if ( !client ) {
+				continue;
+			}
 			if ( client->state < CS_ACTIVE ) {
 				if ( client->state == CS_PRIMED || client->state == CS_CONNECTED ) {
 					// track CS_CONNECTED clients as well to optimize gamestate acknowledge after downloading/retransmission
@@ -141,8 +156,12 @@ void SV_SetConfigstring (int index, const char *val) {
 				continue;
 			}
 			// do not always send server info to all clients
-			if ( index == CS_SERVERINFO && ( SV_GentityNum( i )->r.svFlags & SVF_NOSERVERINFO ) ) {
-				continue;
+			// Check if gentities are initialized before accessing them
+			if ( index == CS_SERVERINFO && sv.gentities && i < sv.num_entities ) {
+				sharedEntity_t *gent = SV_GentityNum( i );
+				if ( gent && ( gent->r.svFlags & SVF_NOSERVERINFO ) ) {
+					continue;
+				}
 			}
 
 			SV_SendConfigstring(client, index);
@@ -222,6 +241,11 @@ baseline will be transmitted
 static void SV_CreateBaseline( void ) {
 	sharedEntity_t *ent;
 	int				entnum;
+
+	// Safety check: ensure gentities are initialized
+	if ( !sv.gentities || sv.num_entities == 0 ) {
+		return;
+	}
 
 	for ( entnum = 0; entnum < sv.num_entities ; entnum++ ) {
 		ent = SV_GentityNum( entnum );
@@ -418,21 +442,42 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	qboolean	isBot;
 	const char	*p;
 
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: SV_SpawnServer called with mapname=%s killBots=%d\n", mapname, killBots );
+	}
 	// shut down the existing game if it is running
 	SV_ShutdownGameProgs();
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: SV_SpawnServer SV_ShutdownGameProgs completed\n" );
+	}
 
-	Com_Printf( "------ Server Initialization ------\n" );
-	Com_Printf( "Server: %s\n", mapname );
+	// Only print if filesystem is initialized (not during FS_Restart)
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "------ Server Initialization ------\n" );
+		Com_Printf( "Server: %s\n", mapname );
+	}
 
 	Sys_SetStatus( "Initializing server..." );
 
 #ifndef DEDICATED
 	// if not running a dedicated server CL_MapLoading will connect the client to the server
 	// also print some status stuff
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: SV_SpawnServer calling CL_MapLoading\n" );
+	}
 	CL_MapLoading();
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: SV_SpawnServer CL_MapLoading completed\n" );
+	}
 
 	// make sure all the client stuff is unloaded
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: SV_SpawnServer calling CL_ShutdownAll\n" );
+	}
 	CL_ShutdownAll();
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: SV_SpawnServer CL_ShutdownAll completed\n" );
+	}
 #endif
 
 	// clear the whole hunk because we're (re)loading the server
@@ -520,21 +565,38 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	sv.pure = sv_pure->integer;
 
 	// get a new checksum feed and restart the file system
+	// Note: Don't use Com_Printf here as FS_Restart clears fs_searchpaths temporarily
 	srand( Com_Milliseconds() );
 	Com_RandomBytes( (byte*)&sv.checksumFeed, sizeof( sv.checksumFeed ) );
 	FS_Restart( sv.checksumFeed );
+	// Debug output after FS_Restart completes
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: SV_SpawnServer FS_Restart completed\n" );
+	}
 
 #ifndef DEDICATED
 	// After filesystem restart, client systems need to be restarted
 	// This ensures renderer, sound, and UI are properly initialized
 	// CL_MapLoading already shut down client systems, now restart them
 	if ( com_cl_running && com_cl_running->integer ) {
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: SV_SpawnServer calling CL_StartHunkUsers\n" );
+		}
 		CL_StartHunkUsers();
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: SV_SpawnServer CL_StartHunkUsers completed\n" );
+		}
 	}
 #endif
 
 	Sys_SetStatus( "Loading map %s", mapname );
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: SV_SpawnServer calling CM_LoadMap\n" );
+	}
 	CM_LoadMap( va( "maps/%s.bsp", mapname ), qfalse, &checksum );
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: SV_SpawnServer CM_LoadMap completed\n" );
+	}
 
 	// set serverinfo visible name
 	Cvar_Set( "mapname", mapname );
@@ -558,7 +620,13 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	//sv.time = sv.time ? sv.time : 8;
 
 	// load and spawn all other entities
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: SV_SpawnServer calling SV_InitGameProgs\n" );
+	}
 	SV_InitGameProgs();
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: SV_SpawnServer SV_InitGameProgs completed\n" );
+	}
 
 	// don't allow a map_restart if game is modified
 	sv_gametype->modified = qfalse;
@@ -566,11 +634,14 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	sv_pure->modified = qfalse;
 
 	// run a few frames to allow everything to settle
-	for ( i = 0; i < 3; i++ ) {
-		Cbuf_Wait();
-		sv.time += 100;
-		VM_Call( gvm, 1, GAME_RUN_FRAME, sv.time );
-		SV_BotFrame( sv.time );
+	// Safety check: ensure game VM is initialized
+	if ( gvm ) {
+		for ( i = 0; i < 3; i++ ) {
+			Cbuf_Wait();
+			sv.time += 100;
+			VM_Call( gvm, 1, GAME_RUN_FRAME, sv.time );
+			SV_BotFrame( sv.time );
+		}
 	}
 
 	// create a baseline for more efficient communications
@@ -593,6 +664,11 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 			}
 
 			// connect the client again
+			// Safety check: ensure game VM is initialized
+			if ( !gvm ) {
+				SV_DropClient( &svs.clients[i], "game VM not initialized" );
+				continue;
+			}
 			denied = GVM_ArgPtr( VM_Call( gvm, 3, GAME_CLIENT_CONNECT, i, qfalse, isBot ) );	// firstTime = qfalse
 			if ( denied ) {
 				// this generally shouldn't happen, because the client
@@ -615,7 +691,10 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	// run another frame to allow things to look at all the players
 	Cbuf_Wait();
 	sv.time += 100;
-	VM_Call( gvm, 1, GAME_RUN_FRAME, sv.time );
+	// Safety check: ensure game VM is initialized
+	if ( gvm ) {
+		VM_Call( gvm, 1, GAME_RUN_FRAME, sv.time );
+	}
 	SV_BotFrame( sv.time );
 	svs.time += 100;
 

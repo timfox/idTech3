@@ -198,9 +198,27 @@ void FORMAT_PRINTF(1, 2) QDECL Com_Printf( const char *fmt, ... ) {
 		return;
 	}
 
-	// If structured logging is enabled, use it
+	// If structured logging is enabled, use it (with deferred queue support)
 	// Otherwise fall back to legacy behavior
-	if (Q_Log_IsEnabled()) {
+	// Skip ALL file logging (structured and legacy) during filesystem startup/restart to prevent recursive errors
+	// This is critical because FS_Restart clears fs_searchpaths temporarily
+	// Structured logging now uses a deferred queue, so it's safe to call Q_Log_ComPrintf even during FS_Restart
+	// CRITICAL: Check BOTH FS_StartupInProgress() AND FS_Initialized() to catch all cases
+	// FS_StartupInProgress() may be false at the very start of FS_Startup before the flag is set
+	// FS_Initialized() checks fs_searchpaths != NULL, which is NULL during FS_Startup
+	qboolean fs_ready = FS_Initialized() && !FS_StartupInProgress();
+	
+	if (!fs_ready) {
+		// During startup or when filesystem not initialized, only output to console/system, skip legacy file logging
+		// Structured logging will queue messages for later (Q_Log handles the deferring)
+		if (Q_Log_IsEnabled()) {
+			Q_Log_ComPrintf("%s", msg);
+		}
+		// Skip legacy file logging during filesystem operations
+		if (!(com_logfile && com_logfile->integer)) {
+			return;
+		}
+	} else if (Q_Log_IsEnabled()) {
 		Q_Log_ComPrintf("%s", msg);
 		// Still do legacy file logging if enabled for compatibility
 		if (!(com_logfile && com_logfile->integer)) {
@@ -222,7 +240,8 @@ void FORMAT_PRINTF(1, 2) QDECL Com_Printf( const char *fmt, ... ) {
 	if ( com_logfile && com_logfile->integer ) {
 		// TTimo: only open the qconsole.log if the filesystem is in an initialized state
 		//   also, avoid recursing in the qconsole.log opening (i.e. if fs_debug is on)
-		if ( logfile == FS_INVALID_HANDLE && FS_Initialized() && !opening_qconsole ) {
+		// Check fs_startupInProgress to avoid calling FS_FOpenFileWrite/FS_FOpenFileAppend during startup
+		if ( logfile == FS_INVALID_HANDLE && FS_Initialized() && !opening_qconsole && !FS_StartupInProgress() ) {
 			const char *logName = "qconsole.log";
 			int mode;
 
@@ -258,7 +277,8 @@ void FORMAT_PRINTF(1, 2) QDECL Com_Printf( const char *fmt, ... ) {
 
 			opening_qconsole = qfalse;
 		}
-		if ( logfile != FS_INVALID_HANDLE && FS_Initialized() ) {
+		// Only write if filesystem is initialized and not in startup
+		if ( logfile != FS_INVALID_HANDLE && FS_Initialized() && !FS_StartupInProgress() ) {
 			FS_Write( msg, len, logfile );
 		}
 	}

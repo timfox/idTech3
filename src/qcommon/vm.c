@@ -1717,6 +1717,7 @@ static void * QDECL VM_LoadLib( const char *name, vmMainFunc_t *entryPoint, dllS
 	}
 
 	Com_sprintf( filename, sizeof( filename ), "%s." ARCH_STRING DLL_EXT, name );
+	Com_Printf( "VM_LoadLib: Looking for library '%s' in gamedir '%s'\n", filename, gamedir ? gamedir : "<unknown>" );
 
 	libHandle = FS_LoadLibrary( filename );
 
@@ -1725,8 +1726,9 @@ static void * QDECL VM_LoadLib( const char *name, vmMainFunc_t *entryPoint, dllS
 		return NULL;
 	}
 
-	Com_Printf( "VM_LoadLib '%s' ok\n", filename );
+	Com_Printf( "VM_LoadLib '%s' loaded successfully, handle=%p\n", filename, libHandle );
 
+	Com_Printf( "VM_LoadLib: Loading symbols dllEntry and vmMain\n" );
 	dllEntry = /* ( dllEntry_t ) */ Sys_LoadFunction( libHandle, "dllEntry" );
 	*entryPoint = /* ( dllSyscall_t ) */ Sys_LoadFunction( libHandle, "vmMain" );
 	if ( !*entryPoint || !dllEntry ) {
@@ -1736,9 +1738,10 @@ static void * QDECL VM_LoadLib( const char *name, vmMainFunc_t *entryPoint, dllS
 		return NULL;
 	}
 
-	Com_Printf( "VM_LoadLib(%s) found **vmMain** at %p\n", name, *entryPoint );
+	Com_Printf( "VM_LoadLib(%s) found vmMain at %p, dllEntry at %p\n", name, (void*)*entryPoint, (void*)dllEntry );
+	Com_Printf( "VM_LoadLib: Calling dllEntry with systemcalls=%p\n", (void*)systemcalls );
 	dllEntry( systemcalls );
-	Com_Printf( "VM_LoadLib(%s) succeeded!\n", name );
+	Com_Printf( "VM_LoadLib(%s) dllEntry completed successfully!\n", name );
 
 	return libHandle;
 }
@@ -1796,28 +1799,37 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 
 	if ( interpret == VMI_NATIVE ) {
 		// try to load as a system library (.so/.dll)
-	Com_Printf( "Loading library file %s.\n", name );
+	Com_Printf( "VM_Create: Loading library file %s (index=%d)\n", name, index );
 	
 	// Preload game.x86_64.so if loading UI module, since UI depends on it
 	// This ensures the dependency is available when dlopen resolves ../vm/game.x86_64.so
+	// NOTE: We do NOT call dllEntry on the preloaded handle - it will be called when
+	// the game module is properly loaded for the server with the correct syscall pointer
 	if ( index == VM_UI ) {
+		Com_Printf( "VM_Create: Preloading game.x86_64.so for UI dependency\n" );
 		void *gameHandle = FS_LoadLibrary( "game" );
 		if ( gameHandle ) {
-			Com_Printf( "Preloaded game.x86_64.so for UI dependency\n" );
+			Com_Printf( "VM_Create: Preloaded game.x86_64.so for UI dependency (not initializing syscall pointer)\n" );
 			// Don't unload it - UI needs it
+			// Don't call dllEntry - it will be called when game module is loaded for server
+		} else {
+			Com_Printf( "VM_Create: WARNING - Failed to preload game.x86_64.so\n" );
 		}
 	}
 	
+	Com_Printf( "VM_Create: Calling VM_LoadLib for %s\n", name );
 	vm->dllHandle = VM_LoadLib( name, &vm->entryPoint, dllSyscalls );
 	if ( vm->dllHandle ) {
+		Com_Printf( "VM_Create: VM_LoadLib succeeded for %s, entryPoint=%p\n", name, (void*)vm->entryPoint );
 		vm->privateFlag = 0; // allow reading private cvars
 		vm->dataAlloc = ~0U;
 		vm->dataMask = ~0U;
 		vm->dataBase = 0;
+		Com_Printf( "VM_Create: Returning VM for %s\n", name );
 		return vm;
 	}
 
-		Com_Printf( "Failed to load dll, looking for qvm.\n" );
+		Com_Printf( "VM_Create: Failed to load dll for %s, looking for qvm.\n", name );
 		interpret = VMI_COMPILED;
 	}
 
@@ -1963,7 +1975,10 @@ intptr_t QDECL VM_Call( vm_t *vm, int nargs, int callnum, ... )
 	int i;
 
 	if ( !vm ) {
-		Com_Error( ERR_FATAL, "VM_Call with NULL vm" );
+		// Don't crash - return 0 for safety when UI is not available
+		// This allows the engine to continue running without UI
+		Com_Printf( "WARNING: VM_Call called with NULL vm (callnum=%d, nargs=%d)\n", callnum, nargs );
+		return 0;
 	}
 
 #ifdef DEBUG

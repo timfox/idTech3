@@ -960,7 +960,11 @@ void ClientThink_real( gentity_t *ent ) {
 		client->ps.eFlags &= ~(EF_AWARD_IMPRESSIVE | EF_AWARD_EXCELLENT | EF_AWARD_GAUNTLET | EF_AWARD_ASSIST | EF_AWARD_DEFEND | EF_AWARD_CAP );
 	}
 
-	if ( client->noclip ) {
+	// Preserve freeze state during match start
+	if ( client->ps.pm_type == PM_FREEZE && 
+		 ( level.matchState == MS_PREGAME || level.matchState == MS_COUNTDOWN ) ) {
+		// Keep frozen, don't process movement
+	} else if ( client->noclip ) {
 		client->ps.pm_type = PM_NOCLIP;
 	} else if ( client->ps.stats[STAT_HEALTH] <= 0 ) {
 		client->ps.pm_type = PM_DEAD;
@@ -1027,6 +1031,14 @@ void ClientThink_real( gentity_t *ent ) {
 			VectorCopy (oldmaxs, ent->r.maxs);
 			trap_LinkEntity(ent);
 		}
+	}
+
+	// Skip movement processing if frozen during match start
+	if ( client->ps.pm_type == PM_FREEZE && 
+		 ( level.matchState == MS_PREGAME || level.matchState == MS_COUNTDOWN ) ) {
+		// Still update command time but don't process movement
+		client->ps.commandTime = ucmd->serverTime;
+		return;
 	}
 
 	pm.ps = &client->ps;

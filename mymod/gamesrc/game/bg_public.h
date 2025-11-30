@@ -119,9 +119,10 @@ typedef enum {
 #define	CS_GAME_VERSION			20
 #define	CS_LEVEL_START_TIME		21		// so the timer only shows the current level
 #define	CS_INTERMISSION			22		// when 1, fraglimit/timelimit has been hit and intermission will start in a second or two
-#define CS_FLAGSTATUS			23		// string indicating flag status in CTF
-#define CS_SHADERSTATE			24
-#define CS_BOTINFO				25
+#define CS_MATCH_STATE			23		// match state: "MS_WARMUP", "MS_PREGAME", "MS_COUNTDOWN", "MS_PLAYING"
+#define CS_FLAGSTATUS			24		// string indicating flag status in CTF
+#define CS_SHADERSTATE			25
+#define CS_BOTINFO				26
 
 #define	CS_ITEMS				27		// string of 0's and 1's that tell which items are present
 
