@@ -1494,15 +1494,25 @@ int Q_strncmp( const char *s1, const char *s2, int n ) {
 
 
 qboolean Q_streq( const char *s1, const char *s2 ) {
-	int	c1, c2;
+	// Be defensive: treat two NULL pointers as equal, and any mixed
+	// NULL/non-NULL pair as not equal. This mirrors the robustness
+	// of Q_stricmp while keeping the simpler boolean API.
+	if ( s1 == NULL || s2 == NULL ) {
+		return ( s1 == s2 ) ? qtrue : qfalse;
+	}
 
-	do {
-		c1 = *s1++;
-		c2 = *s2++;
+	while ( 1 ) {
+		unsigned char c1 = (unsigned char)*s1++;
+		unsigned char c2 = (unsigned char)*s2++;
+
 		if ( c1 != c2 ) {
 			return qfalse;
 		}
-	} while ( c1 != '\0' );
+
+		if ( c1 == '\0' ) {
+			break;
+		}
+	}
 
 	return qtrue;
 }
