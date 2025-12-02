@@ -163,6 +163,7 @@ OPTION(USE_D3D12 "Enable DirectX 12 renderer (Windows only)" ON)
 OPTION(USE_SYSTEM_JPEG "" OFF)
 OPTION(USE_RENDERER_DLOPEN "" ON)
 OPTION(USE_OPENEXR "Enable OpenEXR (.exr) image support" ON)
+OPTION(USE_ASSIMP "Enable Assimp 3D asset import library" ON)
 OPTION(USE_CJSON "" ON)
 OPTION(USE_ZSTD "" ON)
 OPTION(USE_ENET "" ON)
@@ -360,6 +361,63 @@ IF(USE_OPENEXR)
 		message(WARNING "OpenEXR not found, disabling OpenEXR support")
 		message(STATUS "To enable OpenEXR support, install: sudo apt-get install libopenexr-dev")
 		set(USE_OPENEXR OFF CACHE BOOL "" FORCE)
+	endif()
+ENDIF()
+
+IF(USE_ASSIMP)
+	# Prefer modern CMake config package
+	find_package(assimp QUIET)
+
+	if(TARGET assimp::assimp)
+		set(ASSIMP_FOUND TRUE)
+		set(ASSIMP_LIBRARIES assimp::assimp)
+	endif()
+
+	# Fallback to older FindAssimp.cmake style modules
+	if(NOT ASSIMP_FOUND)
+		find_package(Assimp QUIET)
+		if(Assimp_FOUND)
+			set(ASSIMP_FOUND TRUE)
+			if(DEFINED ASSIMP_LIBRARIES)
+				set(ASSIMP_LIBRARIES ${ASSIMP_LIBRARIES})
+			endif()
+			if(DEFINED ASSIMP_INCLUDE_DIRS)
+				set(ASSIMP_INCLUDE_DIRS ${ASSIMP_INCLUDE_DIRS})
+			endif()
+		endif()
+	endif()
+
+	# Manual search as a last resort
+	if(NOT ASSIMP_FOUND)
+		FIND_PATH(ASSIMP_INCLUDE_DIR
+			NAMES assimp/Importer.hpp
+			PATHS
+				/usr/include
+				/usr/local/include
+				/opt/local/include
+		)
+		FIND_LIBRARY(ASSIMP_LIBRARY
+			NAMES assimp
+			PATHS
+				/usr/lib
+				/usr/lib/x86_64-linux-gnu
+				/usr/local/lib
+				/opt/local/lib
+		)
+		if(ASSIMP_INCLUDE_DIR AND ASSIMP_LIBRARY)
+			set(ASSIMP_FOUND TRUE)
+			set(ASSIMP_LIBRARIES ${ASSIMP_LIBRARY})
+			set(ASSIMP_INCLUDE_DIRS ${ASSIMP_INCLUDE_DIR})
+		endif()
+	endif()
+
+	if(ASSIMP_FOUND AND ASSIMP_LIBRARIES)
+		ADD_COMPILE_DEFINITIONS(USE_ASSIMP)
+		message(STATUS "Assimp found: ${ASSIMP_LIBRARIES}")
+	else()
+		message(WARNING "Assimp not found, disabling Assimp support")
+		message(STATUS "To enable Assimp support, install: sudo apt-get install libassimp-dev")
+		set(USE_ASSIMP OFF CACHE BOOL "" FORCE)
 	endif()
 ENDIF()
 
@@ -1237,6 +1295,12 @@ IF(USE_OPENAL)
 	ENDIF()
 ENDIF()
 
+IF(USE_ASSIMP)
+	IF(ASSIMP_FOUND AND ASSIMP_LIBRARIES)
+		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${ASSIMP_LIBRARIES})
+	ENDIF()
+ENDIF()
+
 IF(ANDROID)
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} android log OpenSLES EGL GLESv1_CM GLESv2)
 ENDIF()
@@ -1268,6 +1332,12 @@ IF(BUILD_SERVER AND NOT ANDROID)
 	IF(USE_LUA)
 		IF(Lua_FOUND)
 			TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} ${LUA_LIBRARIES})
+		ENDIF()
+	ENDIF()
+
+	IF(USE_ASSIMP)
+		IF(ASSIMP_FOUND AND ASSIMP_LIBRARIES)
+			TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} ${ASSIMP_LIBRARIES})
 		ENDIF()
 	ENDIF()
 ENDIF()
