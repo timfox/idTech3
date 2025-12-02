@@ -89,6 +89,23 @@ struct NetworkComponent {
 		: entityIndex(idx), entityType(type), needsSync(qtrue), isServer(server) {}
 };
 
+// Script Component - Attaches Lua scripts to entities
+struct ScriptComponent {
+	char script_path[MAX_QPATH];  // Path to Lua script file
+	int script_ref;                // Lua reference to loaded script table (-1 = no ref)
+	qboolean has_on_spawn;
+	qboolean has_on_update;
+	qboolean has_on_take_damage;
+	qboolean has_on_use;
+	qboolean has_on_death;
+	
+	ScriptComponent() : script_ref(-1), has_on_spawn(qfalse),
+		has_on_update(qfalse), has_on_take_damage(qfalse),
+		has_on_use(qfalse), has_on_death(qfalse) {
+		script_path[0] = '\0';
+	}
+};
+
 #endif // USE_ENTT
 
 #endif // __ECS_COMPONENTS_H__

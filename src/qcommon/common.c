@@ -4562,6 +4562,23 @@ void Com_Frame( qboolean noDelay ) {
 
 	SV_Frame( msec );
 
+#ifdef USE_LUA
+	// Update Lua event bus (process queued events)
+	Lua_Events_Update();
+	
+	// Update coroutine scheduler
+	{
+		float deltaTime = msec / 1000.0f;
+		Lua_Coroutine_Update(deltaTime);
+		
+		// Update encounter system
+		Lua_Encounter_Update();
+		
+		// Update sequence system
+		Lua_Sequence_Update(deltaTime);
+	}
+#endif
+
 	// if "dedicated" has been modified, start up
 	// or shut down the client system.
 	// Do this after the server may have started,

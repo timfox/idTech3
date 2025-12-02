@@ -311,6 +311,20 @@ void ECS_NetworkSyncSystem_Update(void) {
 
 /*
 ================
+ECS_ScriptSystem_Update
+Update entity scripts (call OnUpdate hooks)
+================
+*/
+void ECS_ScriptSystem_Update(float deltaTime) {
+#ifdef USE_LUA
+	extern void Lua_Entity_Update(float deltaTime);
+	Lua_Entity_Update(deltaTime);
+#endif
+	(void)deltaTime;  // Suppress unused warning if USE_LUA is off
+}
+
+/*
+================
 ECS_RunFrame
 Run all ECS systems for a frame
 ================
@@ -334,6 +348,7 @@ void ECS_RunFrame(float deltaTime) {
 	}
 #endif
 	ECS_HealthSystem_Update();
+	ECS_ScriptSystem_Update(deltaTime);
 	ECS_NetworkSyncSystem_Update();
 }
 

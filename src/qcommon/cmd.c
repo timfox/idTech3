@@ -24,6 +24,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_shared.h"
 #include "qcommon.h"
 
+#ifdef USE_LUA
+#include "lua_debug.h"
+#endif
+
 #define MAX_CMD_BUFFER  65536
 
 typedef struct {
@@ -1046,4 +1050,14 @@ void Cmd_Init( void ) {
 	Cmd_SetCommandCompletionFunc( "vstr", Cvar_CompleteCvarName );
 	Cmd_AddCommand ("echo",Cmd_Echo_f);
 	Cmd_AddCommand ("wait", Cmd_Wait_f);
+
+#ifdef USE_LUA
+	// Script debugging commands
+	extern void Cmd_ScriptReload_f(void);
+	extern void Cmd_ScriptList_f(void);
+	extern void Cmd_ScriptDump_f(void);
+	Cmd_AddCommand("script_reload", Cmd_ScriptReload_f);
+	Cmd_AddCommand("script_list", Cmd_ScriptList_f);
+	Cmd_AddCommand("script_dump", Cmd_ScriptDump_f);
+#endif
 }

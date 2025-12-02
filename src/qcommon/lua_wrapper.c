@@ -11,10 +11,17 @@ It wraps Lua functions with engine-style APIs.
 #include "qcommon.h"
 
 #ifdef USE_LUA
+#include "lua_events.h"
+#include "lua_coroutine.h"
+#include "lua_entity.h"
+#include "lua_encounter.h"
+#include "lua_sequence.h"
 // Forward declarations for module bindings
 void Lua_RegisterGameBindings(lua_State *L);
 void Lua_RegisterRendererBindings(lua_State *L);
 void Lua_RegisterSoundBindings(lua_State *L);
+void Lua_Events_RegisterBindings(lua_State *L);
+void Lua_Entity_RegisterBindings(lua_State *L);
 
 // Forward declaration for internal function
 static void Lua_LoadScriptsFromFS(lua_State *L);
@@ -45,6 +52,21 @@ void Lua_Init(void)
 	com_lua_enabled = Cvar_Get("com_lua_enabled", "1", CVAR_ARCHIVE | CVAR_LATCH);
 	Cvar_SetDescription(com_lua_enabled, "Enable Lua scripting support (1 = enabled, 0 = disabled)");
 	
+	// Initialize event bus
+	Lua_Events_Init();
+	
+	// Initialize coroutine scheduler
+	Lua_Coroutine_Init();
+	
+	// Initialize entity script system
+	Lua_Entity_Init();
+	
+	// Initialize encounter system
+	Lua_Encounter_Init();
+	
+	// Initialize sequence system
+	Lua_Sequence_Init();
+	
 	// Initialize Lua state pool
 	for (i = 0; i < MAX_LUA_STATES; i++) {
 		lua_states[i] = NULL;
@@ -65,6 +87,21 @@ void Lua_Shutdown(void)
 	
 	if (!com_lua_enabled || !com_lua_enabled->integer)
 		return;
+	
+	// Shutdown sequence system
+	Lua_Sequence_Shutdown();
+	
+	// Shutdown encounter system
+	Lua_Encounter_Shutdown();
+	
+	// Shutdown entity script system
+	Lua_Entity_Shutdown();
+	
+	// Shutdown coroutine scheduler
+	Lua_Coroutine_Shutdown();
+	
+	// Shutdown event bus
+	Lua_Events_Shutdown();
 	
 	// Close all Lua states
 	for (i = 0; i < num_lua_states; i++) {
@@ -105,6 +142,21 @@ lua_State *Lua_CreateState(void)
 	
 	// Register engine bindings
 	Lua_RegisterEngineBindings(L);
+	
+	// Register event bus bindings
+	Lua_Events_RegisterBindings(L);
+	
+	// Register coroutine bindings
+	Lua_Coroutine_RegisterBindings(L);
+	
+	// Register entity script bindings
+	Lua_Entity_RegisterBindings(L);
+	
+	// Register encounter bindings
+	Lua_Encounter_RegisterBindings(L);
+	
+	// Register sequence bindings
+	Lua_Sequence_RegisterBindings(L);
 	
 	// Register module-specific bindings
 	Lua_RegisterGameBindings(L);
@@ -769,6 +821,20 @@ static int Lua_Print(lua_State *L)
 	Com_Printf("%s\n", buffer);
 	
 	return 0;
+}
+
+/*
+=================
+Lua_GetMainState
+Get the main Lua state (first one created)
+=================
+*/
+lua_State *Lua_GetMainState(void)
+{
+	if (num_lua_states > 0) {
+		return lua_states[0];
+	}
+	return NULL;
 }
 
 /*

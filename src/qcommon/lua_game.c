@@ -5,13 +5,14 @@
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
+#include "ecs.h"
+#include "lua_entity.h"
+#include "sv_ecs.h"
 
-// Forward declarations for game module functions
-// These will be implemented when game module integration is added
-extern void G_SpawnEntity(const char *classname, vec3_t origin, vec3_t angles);
-extern void G_TriggerEvent(int entityNum, const char *eventName);
-extern int G_GetEntityCount(void);
-extern qboolean G_EntityExists(int entityNum);
+#ifdef USE_ENTT
+#include "ecs_internal.h"
+#include "ecs_components.h"
+#endif
 
 /*
 =================
@@ -46,14 +47,28 @@ static int Lua_GameSpawnEntity(lua_State *L)
 	origin[1] = (float)lua_tonumber(L, 3);
 	origin[2] = (float)lua_tonumber(L, 4);
 	
-	// TODO: Implement actual entity spawning when game module is integrated
-	// For now, this is a placeholder
-	Com_DPrintf("Lua_GameSpawnEntity: Spawning %s at (%.2f, %.2f, %.2f)\n",
-		classname, origin[0], origin[1], origin[2]);
-	
-	// Return entity number (placeholder)
-	lua_pushinteger(L, 0);
+#ifdef USE_ENTT
+	// Create ECS entity
+	ecs_entity_t entity = ECS_CreateEntity();
+	if (!ECS_IsValid(entity)) {
+		lua_pushinteger(L, -1);
+		return 1;
+	}
+
+	// Add TransformComponent
+	entt::registry &registry = ECS::GetRegistry();
+	entt::entity e = static_cast<entt::entity>(entity);
+	TransformComponent transform(origin);
+	registry.emplace<TransformComponent>(e, transform);
+
+	// Return entity number
+	lua_pushinteger(L, (lua_Integer)entity);
 	return 1;
+#else
+	Com_DPrintf("Lua_GameSpawnEntity: ECS not available\n");
+	lua_pushinteger(L, -1);
+	return 1;
+#endif
 }
 
 /*
@@ -86,12 +101,17 @@ static int Lua_GameTriggerEvent(lua_State *L)
 		return 1;
 	}
 	
-	// TODO: Implement actual event triggering when game module is integrated
-	Com_DPrintf("Lua_GameTriggerEvent: Triggering event %s on entity %d\n",
-		eventName, entityNum);
+#ifdef USE_LUA
+	// Emit event via event bus
+	extern void Lua_Events_Emit(const char *event_name, int num_args, ...);
+	Lua_Events_Emit(eventName, 1, (double)entityNum);
 	
 	lua_pushboolean(L, 1);
 	return 1;
+#else
+	lua_pushboolean(L, 0);
+	return 1;
+#endif
 }
 
 /*
@@ -103,10 +123,20 @@ Lua binding: game_get_entity_count() -> count
 */
 static int Lua_GameGetEntityCount(lua_State *L)
 {
-	// TODO: Implement actual entity count when game module is integrated
-	int count = 0;
-	lua_pushinteger(L, count);
+#ifdef USE_ENTT
+	extern ecs_registry_t *ECS_GetRegistry(void);
+	if (ECS_GetRegistry()) {
+		entt::registry &registry = ECS::GetRegistry();
+		int count = (int)registry.alive();
+		lua_pushinteger(L, count);
+	} else {
+		lua_pushinteger(L, 0);
+	}
 	return 1;
+#else
+	lua_pushinteger(L, 0);
+	return 1;
+#endif
 }
 
 /*
@@ -127,8 +157,12 @@ static int Lua_GameEntityExists(lua_State *L)
 	
 	entityNum = (int)lua_tointeger(L, 1);
 	
-	// TODO: Implement actual entity existence check when game module is integrated
-	lua_pushboolean(L, 0);
+	ecs_entity_t entity = (ecs_entity_t)entityNum;
+	if (ECS_IsValid(entity)) {
+		lua_pushboolean(L, 1);
+	} else {
+		lua_pushboolean(L, 0);
+	}
 	return 1;
 }
 
@@ -148,6 +182,13 @@ void Lua_RegisterGameBindings(lua_State *L)
 	Lua_RegisterFunction(L, "game_trigger_event", Lua_GameTriggerEvent);
 	Lua_RegisterFunction(L, "game_get_entity_count", Lua_GameGetEntityCount);
 	Lua_RegisterFunction(L, "game_entity_exists", Lua_GameEntityExists);
+	
+	// Additional bindings for ECS and physics
+#ifdef USE_ENTT
+	Lua_RegisterFunction(L, "game_entity_get_position", Lua_GameEntityGetPosition);
+	Lua_RegisterFunction(L, "game_entity_set_position", Lua_GameEntitySetPosition);
+	Lua_RegisterFunction(L, "game_entity_attach_script", Lua_GameEntityAttachScript);
+#endif
 }
 
 #endif // USE_LUA
