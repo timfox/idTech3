@@ -162,6 +162,7 @@ OPTION(USE_VMA "Enable Vulkan Memory Allocator (VMA) for better memory managemen
 OPTION(USE_D3D12 "Enable DirectX 12 renderer (Windows only)" ON)
 OPTION(USE_SYSTEM_JPEG "" OFF)
 OPTION(USE_RENDERER_DLOPEN "" ON)
+OPTION(USE_OPENEXR "Enable OpenEXR (.exr) image support" ON)
 OPTION(USE_CJSON "" ON)
 OPTION(USE_ZSTD "" ON)
 OPTION(USE_ENET "" ON)
@@ -301,6 +302,65 @@ AUX_SOURCE_DIRECTORY(src/client CLIENT_SRCS)
 # Add OpenAL enhanced audio system
 IF(USE_OPENAL)
 	list(APPEND CLIENT_SRCS src/client/snd_openal.c)
+ENDIF()
+
+IF(USE_OPENEXR)
+	# Try CMake's config package first (OpenEXR 3.x and newer)
+	find_package(OpenEXR QUIET)
+
+	if(TARGET OpenEXR::OpenEXR)
+		set(OpenEXR_FOUND TRUE)
+		set(OPENEXR_LIBRARIES OpenEXR::OpenEXR)
+	endif()
+
+	# Fallback for FindOpenEXR or older package layouts
+	if(NOT OpenEXR_FOUND)
+		# Some FindOpenEXR modules define these variables
+		if(DEFINED OpenEXR_LIBRARIES)
+			set(OPENEXR_LIBRARIES ${OpenEXR_LIBRARIES})
+		endif()
+		if(DEFINED OpenEXR_INCLUDE_DIRS)
+			set(OPENEXR_INCLUDE_DIRS ${OpenEXR_INCLUDE_DIRS})
+		endif()
+		if(OPENEXR_LIBRARIES)
+			set(OpenEXR_FOUND TRUE)
+		endif()
+	endif()
+
+	# Manual search as a last resort
+	if(NOT OpenEXR_FOUND)
+		FIND_PATH(OPENEXR_INCLUDE_DIR
+			NAMES ImfRgbaFile.h OpenEXR/ImfRgbaFile.h
+			PATHS
+				/usr/include
+				/usr/local/include
+				/opt/local/include
+				/usr/include/OpenEXR
+				/usr/local/include/OpenEXR
+		)
+		FIND_LIBRARY(OPENEXR_LIBRARY
+			NAMES OpenEXR IlmImf
+			PATHS
+				/usr/lib
+				/usr/lib/x86_64-linux-gnu
+				/usr/local/lib
+				/opt/local/lib
+		)
+		if(OPENEXR_INCLUDE_DIR AND OPENEXR_LIBRARY)
+			set(OpenEXR_FOUND TRUE)
+			set(OPENEXR_LIBRARIES ${OPENEXR_LIBRARY})
+			set(OPENEXR_INCLUDE_DIRS ${OPENEXR_INCLUDE_DIR})
+		endif()
+	endif()
+
+	if(OpenEXR_FOUND AND OPENEXR_LIBRARIES)
+		ADD_COMPILE_DEFINITIONS(USE_OPENEXR)
+		message(STATUS "OpenEXR found: ${OPENEXR_LIBRARIES}")
+	else()
+		message(WARNING "OpenEXR not found, disabling OpenEXR support")
+		message(STATUS "To enable OpenEXR support, install: sudo apt-get install libopenexr-dev")
+		set(USE_OPENEXR OFF CACHE BOOL "" FORCE)
+	endif()
 ENDIF()
 
 # Add debug overlay
@@ -1075,6 +1135,43 @@ IF(USE_VULKAN)
 			ENDIF()
 		ENDIF()
 	ENDIF()
+ENDIF()
+
+IF(USE_OPENEXR AND OpenEXR_FOUND AND OPENEXR_LIBRARIES)
+	# Attach OpenEXR include paths and libraries to the appropriate targets
+	if(USE_RENDERER_DLOPEN)
+		if(TARGET ${RENDERER_PREFIX}_opengl${RENDEXT})
+			if(OPENEXR_INCLUDE_DIRS)
+				target_include_directories(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE ${OPENEXR_INCLUDE_DIRS})
+			endif()
+			# Use plain signature here to match the existing linkage for this target
+			target_link_libraries(${RENDERER_PREFIX}_opengl${RENDEXT} ${OPENEXR_LIBRARIES})
+		endif()
+		if(TARGET ${RENDERER_PREFIX}_vulkan${RENDEXT})
+			if(OPENEXR_INCLUDE_DIRS)
+				target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${OPENEXR_INCLUDE_DIRS})
+			endif()
+			target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${OPENEXR_LIBRARIES})
+		endif()
+		if(WIN32 AND USE_D3D12 AND TARGET ${RENDERER_PREFIX}_d3d12${RENDEXT})
+			if(OPENEXR_INCLUDE_DIRS)
+				target_include_directories(${RENDERER_PREFIX}_d3d12${RENDEXT} PRIVATE ${OPENEXR_INCLUDE_DIRS})
+			endif()
+			target_link_libraries(${RENDERER_PREFIX}_d3d12${RENDEXT} PRIVATE ${OPENEXR_LIBRARIES})
+		endif()
+	else()
+		# Non-DLOPEN renderers are linked directly into the main executable(s)
+		if(OPENEXR_INCLUDE_DIRS)
+			target_include_directories(${CNAME}${BINEXT} PRIVATE ${OPENEXR_INCLUDE_DIRS})
+			if(BUILD_SERVER AND NOT ANDROID)
+				target_include_directories(${DNAME}${BINEXT} PRIVATE ${OPENEXR_INCLUDE_DIRS})
+			endif()
+		endif()
+		target_link_libraries(${CNAME}${BINEXT} ${OPENEXR_LIBRARIES})
+		if(BUILD_SERVER AND NOT ANDROID)
+			target_link_libraries(${DNAME}${BINEXT} ${OPENEXR_LIBRARIES})
+		endif()
+	endif()
 ENDIF()
 
 IF(ANDROID)
