@@ -83,6 +83,7 @@ cvar_t	*r_noborder;
 
 cvar_t *r_allowSoftwareGL;	// don't abort out if the pixelformat claims software
 cvar_t *r_swapInterval;
+cvar_t *r_vsync;            // user-friendly vsync alias (0/1) mapped to r_swapInterval
 cvar_t *r_glDriver;
 cvar_t *r_displayRefresh;
 cvar_t *r_fullscreen;
@@ -97,6 +98,10 @@ cvar_t *r_colorbits;
 cvar_t *cl_stencilbits;
 cvar_t *cl_depthbits;
 cvar_t *cl_drawBuffer;
+
+// engine-wide graphics quality presets
+cvar_t *r_graphicsPreset;
+cvar_t *r_shadowQuality;
 
 clientActive_t		cl;
 clientConnection_t	clc;
@@ -151,6 +156,11 @@ static void CL_ShutdownRef( refShutdownCode_t code );
 static void CL_InitGLimp_Cvars( void );
 
 static void CL_NextDemo( void );
+
+// high-level graphics / tuning helpers
+static void CL_SetIfCvarExists( const char *name, float value );
+static void CL_ApplyGraphicsPreset( int preset );
+static void CL_ApplyShadowQuality( int level );
 
 /*
 ===============
@@ -3052,6 +3062,27 @@ void CL_Frame( int msec, int realMsec ) {
 		return;
 	}
 
+	// Handle high-level graphics / tuning aliases once per frame
+	if ( r_vsync && r_vsync->modified ) {
+		// Map r_vsync 0/1 to the underlying r_swapInterval implementation
+		r_vsync->modified = qfalse;
+		Cvar_SetValueSafe( "r_swapInterval", r_vsync->integer ? 1 : 0 );
+	}
+
+	if ( r_graphicsPreset && r_graphicsPreset->modified ) {
+		int preset = r_graphicsPreset->integer;
+
+		r_graphicsPreset->modified = qfalse;
+		CL_ApplyGraphicsPreset( preset );
+	}
+
+	if ( r_shadowQuality && r_shadowQuality->modified ) {
+		int level = r_shadowQuality->integer;
+
+		r_shadowQuality->modified = qfalse;
+		CL_ApplyShadowQuality( level );
+	}
+
 	// save the msec before checking pause
 	cls.realFrametime = realMsec;
 
@@ -3879,6 +3910,9 @@ static void CL_InitGLimp_Cvars( void )
 	Cvar_SetDescription( r_allowSoftwareGL, "Toggle the use of the default software OpenGL driver supplied by the Operating System." );
 	r_swapInterval = Cvar_Get( "r_swapInterval", "0", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( r_swapInterval, "V-blanks to wait before swapping buffers.\n 0: No V-Sync\n 1: Synced to the monitor's refresh rate." );
+	r_vsync = Cvar_Get( "r_vsync", "1", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( r_vsync, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( r_vsync, "User-friendly toggle for vertical sync (0: off, 1: on). Changing this updates \\r_swapInterval." );
 	r_glDriver = Cvar_Get( "r_glDriver", OPENGL_DRIVER_NAME, CVAR_ARCHIVE_ND | CVAR_LATCH );
 	Cvar_SetDescription( r_glDriver, "Specifies the OpenGL driver to use, will revert back to default if driver name set is invalid." );
 
@@ -3946,6 +3980,170 @@ static void CL_InitGLimp_Cvars( void )
 }
 
 
+// Only set a CVar if it already exists (avoid creating renderer-specific CVars
+// when a particular renderer module is not loaded).
+static void CL_SetIfCvarExists( const char *name, float value )
+{
+	if ( Cvar_Flags( name ) != CVAR_NONEXISTENT ) {
+		Cvar_SetValueSafe( name, value );
+	}
+}
+
+
+static void CL_ApplyShadowQuality( int level )
+{
+	// 0: off, 1: low, 2: medium, 3: high
+	if ( level < 0 ) {
+		level = 0;
+	}
+	if ( level > 3 ) {
+		level = 3;
+	}
+
+	switch ( level ) {
+	default:
+	case 0: // off
+		CL_SetIfCvarExists( "r_sunShadows", 0 );
+		CL_SetIfCvarExists( "r_shadowFilter", 0 );
+		CL_SetIfCvarExists( "r_shadowBlur", 0 );
+		CL_SetIfCvarExists( "r_shadowMapSize", 1024 );
+		break;
+
+	case 1: // low
+		CL_SetIfCvarExists( "r_sunShadows", 1 );
+		CL_SetIfCvarExists( "r_shadowFilter", 0 );
+		CL_SetIfCvarExists( "r_shadowBlur", 0 );
+		CL_SetIfCvarExists( "r_shadowMapSize", 1024 );
+		break;
+
+	case 2: // medium
+		CL_SetIfCvarExists( "r_sunShadows", 1 );
+		CL_SetIfCvarExists( "r_shadowFilter", 1 );
+		CL_SetIfCvarExists( "r_shadowBlur", 1 );
+		CL_SetIfCvarExists( "r_shadowMapSize", 2048 );
+		break;
+
+	case 3: // high
+		CL_SetIfCvarExists( "r_sunShadows", 1 );
+		CL_SetIfCvarExists( "r_shadowFilter", 2 );
+		CL_SetIfCvarExists( "r_shadowBlur", 2 );
+		CL_SetIfCvarExists( "r_shadowMapSize", 4096 );
+		break;
+	}
+}
+
+
+static void CL_ApplyGraphicsPreset( int preset )
+{
+	// 0: custom (do nothing), 1: low, 2: medium, 3: high, 4: ultra
+	if ( preset <= 0 ) {
+		return;
+	}
+	if ( preset > 4 ) {
+		preset = 4;
+	}
+
+	switch ( preset ) {
+	case 1: // Low
+		CL_SetIfCvarExists( "r_picmip", 4 );
+		CL_SetIfCvarExists( "r_ext_multisample", 0 );
+		CL_SetIfCvarExists( "r_ext_texture_filter_anisotropic", 0 );
+		CL_SetIfCvarExists( "r_ext_max_anisotropy", 0 );
+
+		CL_SetIfCvarExists( "r_hdr", 0 );
+		CL_SetIfCvarExists( "r_postProcess", 0 );
+		CL_SetIfCvarExists( "r_toneMap", 0 );
+		CL_SetIfCvarExists( "r_autoExposure", 0 );
+		CL_SetIfCvarExists( "r_ssao", 0 );
+
+		CL_SetIfCvarExists( "r_normalMapping", 0 );
+		CL_SetIfCvarExists( "r_specularMapping", 0 );
+		CL_SetIfCvarExists( "r_parallaxMapping", 0 );
+		CL_SetIfCvarExists( "r_parallaxMapShadows", 0 );
+		CL_SetIfCvarExists( "r_pbr", 0 );
+
+		CL_SetIfCvarExists( "r_depthPrepass", 0 );
+		CL_SetIfCvarExists( "r_lodbias", 2 );
+
+		CL_ApplyShadowQuality( 0 );
+		break;
+
+	case 2: // Medium
+		CL_SetIfCvarExists( "r_picmip", 2 );
+		CL_SetIfCvarExists( "r_ext_multisample", 2 );
+		CL_SetIfCvarExists( "r_ext_texture_filter_anisotropic", 1 );
+		CL_SetIfCvarExists( "r_ext_max_anisotropy", 4 );
+
+		CL_SetIfCvarExists( "r_hdr", 1 );
+		CL_SetIfCvarExists( "r_postProcess", 1 );
+		CL_SetIfCvarExists( "r_toneMap", 1 );
+		CL_SetIfCvarExists( "r_autoExposure", 1 );
+		CL_SetIfCvarExists( "r_ssao", 0 );
+
+		CL_SetIfCvarExists( "r_normalMapping", 1 );
+		CL_SetIfCvarExists( "r_specularMapping", 1 );
+		CL_SetIfCvarExists( "r_parallaxMapping", 0 );
+		CL_SetIfCvarExists( "r_parallaxMapShadows", 0 );
+		CL_SetIfCvarExists( "r_pbr", 0 );
+
+		CL_SetIfCvarExists( "r_depthPrepass", 1 );
+		CL_SetIfCvarExists( "r_lodbias", 0 );
+
+		CL_ApplyShadowQuality( 1 );
+		break;
+
+	case 3: // High
+		CL_SetIfCvarExists( "r_picmip", 1 );
+		CL_SetIfCvarExists( "r_ext_multisample", 4 );
+		CL_SetIfCvarExists( "r_ext_texture_filter_anisotropic", 1 );
+		CL_SetIfCvarExists( "r_ext_max_anisotropy", 8 );
+
+		CL_SetIfCvarExists( "r_hdr", 1 );
+		CL_SetIfCvarExists( "r_postProcess", 1 );
+		CL_SetIfCvarExists( "r_toneMap", 1 );
+		CL_SetIfCvarExists( "r_autoExposure", 1 );
+		CL_SetIfCvarExists( "r_ssao", 1 );
+
+		CL_SetIfCvarExists( "r_normalMapping", 1 );
+		CL_SetIfCvarExists( "r_specularMapping", 1 );
+		CL_SetIfCvarExists( "r_parallaxMapping", 1 );
+		CL_SetIfCvarExists( "r_parallaxMapShadows", 0 );
+		CL_SetIfCvarExists( "r_pbr", 1 );
+
+		CL_SetIfCvarExists( "r_depthPrepass", 1 );
+		CL_SetIfCvarExists( "r_lodbias", -1 );
+
+		CL_ApplyShadowQuality( 2 );
+		break;
+
+	case 4: // Ultra
+	default:
+		CL_SetIfCvarExists( "r_picmip", 0 );
+		CL_SetIfCvarExists( "r_ext_multisample", 8 );
+		CL_SetIfCvarExists( "r_ext_texture_filter_anisotropic", 1 );
+		CL_SetIfCvarExists( "r_ext_max_anisotropy", 16 );
+
+		CL_SetIfCvarExists( "r_hdr", 1 );
+		CL_SetIfCvarExists( "r_postProcess", 1 );
+		CL_SetIfCvarExists( "r_toneMap", 1 );
+		CL_SetIfCvarExists( "r_autoExposure", 1 );
+		CL_SetIfCvarExists( "r_ssao", 1 );
+
+		CL_SetIfCvarExists( "r_normalMapping", 1 );
+		CL_SetIfCvarExists( "r_specularMapping", 1 );
+		CL_SetIfCvarExists( "r_parallaxMapping", 2 );
+		CL_SetIfCvarExists( "r_parallaxMapShadows", 1 );
+		CL_SetIfCvarExists( "r_pbr", 1 );
+
+		CL_SetIfCvarExists( "r_depthPrepass", 1 );
+		CL_SetIfCvarExists( "r_lodbias", -2 );
+
+		CL_ApplyShadowQuality( 3 );
+		break;
+	}
+}
+
+
 /*
 ====================
 CL_Init
@@ -4000,6 +4198,27 @@ void CL_Init( void ) {
 	Cvar_SetDescription( cl_autoRecordDemo, "Auto-record demos when starting or joining a game." );
 	cl_drawRecording = Cvar_Get("cl_drawRecording", "1", CVAR_ARCHIVE);
 	Cvar_SetDescription( cl_drawRecording, "Hide (0) or shorten (1) \"RECORDING\" HUD message when recording demo." );
+
+	// High-level, idTech6/7-style graphics presets
+	r_graphicsPreset = Cvar_Get( "r_graphicsPreset", "2", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( r_graphicsPreset, "0", "4", CV_INTEGER );
+	Cvar_SetDescription( r_graphicsPreset,
+		"High level graphics preset that adjusts multiple renderer CVars:\n"
+		" 0 - Custom (do not change anything)\n"
+		" 1 - Low\n"
+		" 2 - Medium (default)\n"
+		" 3 - High\n"
+		" 4 - Ultra\n"
+		"Changing this will immediately update texture quality, post-processing, shadows and related options." );
+
+	r_shadowQuality = Cvar_Get( "r_shadowQuality", "2", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( r_shadowQuality, "0", "3", CV_INTEGER );
+	Cvar_SetDescription( r_shadowQuality,
+		"Shadow quality preset used by graphics presets and adjustable independently:\n"
+		" 0 - Off\n"
+		" 1 - Low\n"
+		" 2 - Medium (default)\n"
+		" 3 - High" );
 
 	cl_aviFrameRate = Cvar_Get ("cl_aviFrameRate", "25", CVAR_ARCHIVE);
 	Cvar_CheckRange( cl_aviFrameRate, "1", "1000", CV_INTEGER );
