@@ -898,6 +898,28 @@ void SV_Init( void )
 	sv_filter = Cvar_Get( "sv_filter", "filter.txt", CVAR_ARCHIVE );
 	Cvar_SetDescription( sv_filter, "Cvar that point on filter file, if it is "" then filtering will be disabled." );
 
+#ifdef USE_BULLET
+	// Bullet physics tuning (ECS-backed)
+	sv_bulletEnable = Cvar_Get( "sv_bulletEnable", "0", CVAR_ARCHIVE | CVAR_SERVERINFO );
+	Cvar_CheckRange( sv_bulletEnable, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( sv_bulletEnable,
+		"Enable Bullet-based physics stepping for ECS entities (requires USE_BULLET at build time)." );
+
+	sv_bulletMaxSubSteps = Cvar_Get( "sv_bulletMaxSubSteps", "4", CVAR_ARCHIVE );
+	Cvar_CheckRange( sv_bulletMaxSubSteps, "1", "16", CV_INTEGER );
+	Cvar_SetDescription( sv_bulletMaxSubSteps,
+		"Maximum number of internal Bullet substeps per server frame (higher = more stable, slower)." );
+
+	sv_bulletFixedTimestep = Cvar_Get( "sv_bulletFixedTimestep", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( sv_bulletFixedTimestep,
+		"Optional fixed Bullet timestep in seconds (0 = use dynamic server frame delta)." );
+
+	sv_bulletDebug = Cvar_Get( "sv_bulletDebug", "0", CVAR_ARCHIVE | CVAR_DEVELOPER );
+	Cvar_CheckRange( sv_bulletDebug, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( sv_bulletDebug,
+		"Enable debug logging for Bullet ECS integration (developer use only)." );
+#endif
+
 	// initialize bot cvars so they are listed and can be set before loading the botlib
 	SV_BotInitCvars();
 
@@ -914,6 +936,10 @@ void SV_Init( void )
 	Cvar_SetGroup( sv_minRate, CVG_SERVER );
 	Cvar_SetGroup( sv_maxRate, CVG_SERVER );
 	Cvar_SetGroup( sv_fps, CVG_SERVER );
+
+#ifdef USE_BULLET
+	Cvar_SetGroup( sv_bulletEnable, CVG_SERVER );
+#endif
 
 	// force initial check
 	SV_TrackCvarChanges();

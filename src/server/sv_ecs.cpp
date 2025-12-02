@@ -238,6 +238,78 @@ void SV_ECS_RunFrame(float deltaTime) {
 	SV_ECS_SyncToSvEntity();
 }
 
+/*
+================
+SV_ECS_EnableBulletForEntity
+Opt a server entity into Bullet-backed physics via its ECS PhysicsComponent.
+Requires USE_ENTT and USE_BULLET.
+================
+*/
+void SV_ECS_EnableBulletForEntity(svEntity_t *ent, float mass, float friction) {
+	if (!ent) {
+		return;
+	}
+
+#if defined(USE_ENTT) && defined(USE_BULLET)
+	entt::registry &registry = ECS::GetRegistry();
+	
+	ecs_entity_t ecsEntity = SV_ECS_GetEntityFromSvEntity(ent);
+	if (!ECS_IsValid(ecsEntity)) {
+		ecsEntity = SV_ECS_RegisterSvEntity(ent);
+		if (!ECS_IsValid(ecsEntity)) {
+			return;
+		}
+	}
+	
+	entt::entity e = static_cast<entt::entity>(ecsEntity);
+	
+	// Ensure a PhysicsComponent exists
+	if (!registry.all_of<PhysicsComponent>(e)) {
+		registry.emplace<PhysicsComponent>(e);
+	}
+	
+	auto &physics = registry.get<PhysicsComponent>(e);
+	physics.mass = mass;
+	physics.friction = friction;
+	physics.useBullet = qtrue;
+#else
+	(void)ent;
+	(void)mass;
+	(void)friction;
+#endif
+}
+
+/*
+================
+SV_ECS_DisableBulletForEntity
+Disable Bullet-backed physics for a given server entity.
+================
+*/
+void SV_ECS_DisableBulletForEntity(svEntity_t *ent) {
+	if (!ent) {
+		return;
+	}
+
+#if defined(USE_ENTT) && defined(USE_BULLET)
+	ecs_entity_t ecsEntity = SV_ECS_GetEntityFromSvEntity(ent);
+	if (!ECS_IsValid(ecsEntity)) {
+		return;
+	}
+	
+	entt::registry &registry = ECS::GetRegistry();
+	entt::entity e = static_cast<entt::entity>(ecsEntity);
+	
+	if (!registry.all_of<PhysicsComponent>(e)) {
+		return;
+	}
+	
+	auto &physics = registry.get<PhysicsComponent>(e);
+	physics.useBullet = qfalse;
+#else
+	(void)ent;
+#endif
+}
+
 #ifdef __cplusplus
 }
 #endif

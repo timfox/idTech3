@@ -39,6 +39,12 @@ void SV_ECS_SyncFromSvEntity(void); // Sync svEntity_t to ECS
 // Frame update
 void SV_ECS_RunFrame(float deltaTime);
 
+// Physics helpers (optional)
+// Enable or disable Bullet-backed physics for a given server entity.
+// These require USE_BULLET and will be no-ops otherwise.
+void SV_ECS_EnableBulletForEntity(svEntity_t *ent, float mass, float friction);
+void SV_ECS_DisableBulletForEntity(svEntity_t *ent);
+
 #ifdef __cplusplus
 }
 #endif

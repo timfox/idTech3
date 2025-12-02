@@ -57,6 +57,12 @@ cvar_t	*sv_pure;
 cvar_t	*sv_floodProtect;
 cvar_t	*sv_lanForceRate; // dedicated 1 (LAN) server forces local client rates to 99999 (bug #491)
 
+// Bullet physics tuning (server-side)
+cvar_t	*sv_bulletEnable;        // global toggle for Bullet ECS physics
+cvar_t	*sv_bulletMaxSubSteps;   // max Bullet substeps per frame
+cvar_t	*sv_bulletFixedTimestep; // optional fixed Bullet timestep
+cvar_t	*sv_bulletDebug;         // debug logging toggle for Bullet integration
+
 cvar_t *sv_levelTimeReset;
 cvar_t *sv_filter;
 

@@ -175,6 +175,7 @@ OPTION(USE_ENTT "Enable EnTT ECS system" ON)
 OPTION(USE_CIMGUI "Enable ImGui" ON)
 OPTION(USE_WEBSOCKETS "Enable WebSocket support" ON)
 OPTION(USE_OPENAL "Enable OpenAL enhanced audio system" ON)
+OPTION(USE_BULLET "Enable Bullet Physics library for rigid body simulation" OFF)
 #OPTION(USE_OPENGL "" OFF)
 #OPTION(USE_OPENGL2 "" OFF)
 #OPTION(USE_USD "" ON)
@@ -247,6 +248,103 @@ IF(USE_ENTT)
 	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/server/sv_ecs_systems.cpp)
 		list(APPEND SERVER_SRCS src/server/sv_ecs_systems.cpp)
 	ENDIF()
+ENDIF()
+
+IF(USE_BULLET)
+	# Try CMake's config package first (common when Bullet is installed from source or via vcpkg)
+	find_package(Bullet CONFIG QUIET)
+	
+	if(TARGET Bullet::BulletDynamics)
+		set(BULLET_FOUND TRUE)
+		set(BULLET_LIBRARIES
+			Bullet::BulletDynamics
+			Bullet::BulletCollision
+			Bullet::LinearMath
+		)
+	endif()
+	
+	# Fallback to module-style FindBullet.cmake or older package layouts
+	if(NOT BULLET_FOUND)
+		find_package(Bullet QUIET)
+		if(Bullet_FOUND OR BULLET_FOUND)
+			if(DEFINED BULLET_LIBRARIES)
+				set(BULLET_LIBRARIES ${BULLET_LIBRARIES})
+			elseif(DEFINED BULLET_DYNAMICS_LIBRARY AND DEFINED BULLET_COLLISION_LIBRARY AND DEFINED BULLET_MATH_LIBRARY)
+				set(BULLET_LIBRARIES
+					${BULLET_DYNAMICS_LIBRARY}
+					${BULLET_COLLISION_LIBRARY}
+					${BULLET_MATH_LIBRARY}
+				)
+			endif()
+			if(DEFINED BULLET_INCLUDE_DIRS)
+				set(BULLET_INCLUDE_DIRS ${BULLET_INCLUDE_DIRS})
+			elseif(DEFINED BULLET_INCLUDE_DIR)
+				set(BULLET_INCLUDE_DIRS ${BULLET_INCLUDE_DIR})
+			endif()
+			if(Bullet_FOUND)
+				set(BULLET_FOUND TRUE)
+			endif()
+		endif()
+	endif()
+	
+	# Manual search as a last resort (typical distro layout)
+	if(NOT BULLET_FOUND)
+		FIND_PATH(BULLET_INCLUDE_DIR
+			NAMES btBulletDynamicsCommon.h
+			PATHS
+				/usr/include
+				/usr/local/include
+				/opt/local/include
+				/usr/include/bullet
+				/usr/local/include/bullet
+		)
+		FIND_LIBRARY(BULLET_DYNAMICS_LIBRARY
+			NAMES BulletDynamics
+			PATHS
+				/usr/lib
+				/usr/lib/x86_64-linux-gnu
+				/usr/local/lib
+				/opt/local/lib
+		)
+		FIND_LIBRARY(BULLET_COLLISION_LIBRARY
+			NAMES BulletCollision
+			PATHS
+				/usr/lib
+				/usr/lib/x86_64-linux-gnu
+				/usr/local/lib
+				/opt/local/lib
+		)
+		FIND_LIBRARY(BULLET_MATH_LIBRARY
+			NAMES LinearMath
+			PATHS
+				/usr/lib
+				/usr/lib/x86_64-linux-gnu
+				/usr/local/lib
+				/opt/local/lib
+		)
+		if(BULLET_INCLUDE_DIR AND BULLET_DYNAMICS_LIBRARY AND BULLET_COLLISION_LIBRARY AND BULLET_MATH_LIBRARY)
+			set(BULLET_FOUND TRUE)
+			set(BULLET_LIBRARIES
+				${BULLET_DYNAMICS_LIBRARY}
+				${BULLET_COLLISION_LIBRARY}
+				${BULLET_MATH_LIBRARY}
+			)
+			set(BULLET_INCLUDE_DIRS ${BULLET_INCLUDE_DIR})
+		endif()
+	endif()
+	
+	if(BULLET_FOUND AND BULLET_LIBRARIES)
+		TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${BULLET_INCLUDE_DIRS})
+		TARGET_INCLUDE_DIRECTORIES(qcommon PUBLIC ${BULLET_INCLUDE_DIRS})
+		TARGET_INCLUDE_DIRECTORIES(qcommon_ded PUBLIC ${BULLET_INCLUDE_DIRS})
+		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_BULLET)
+		TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE USE_BULLET)
+		TARGET_COMPILE_DEFINITIONS(qcommon_ded PRIVATE USE_BULLET)
+		MESSAGE(STATUS "Bullet found: ${BULLET_LIBRARIES}")
+	else()
+		MESSAGE(WARNING "Bullet not found, disabling Bullet support")
+		SET(USE_BULLET OFF CACHE BOOL "" FORCE)
+	endif()
 ENDIF()
 
 # add platform-dependent QVM bytecode compilers
@@ -493,6 +591,15 @@ ELSE()
 		FOREACH(JPEG_SRC ${JPEG_SRCS})
 			set_source_files_properties(${JPEG_SRC} PROPERTIES COMPILE_FLAGS "-Wno-unused-parameter")
 		ENDFOREACH()
+	ENDIF()
+ENDIF()
+
+IF(USE_BULLET)
+	IF(BULLET_FOUND AND BULLET_LIBRARIES)
+		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${BULLET_LIBRARIES})
+		IF(BUILD_SERVER AND NOT ANDROID)
+			TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} ${BULLET_LIBRARIES})
+		ENDIF()
 	ENDIF()
 ENDIF()
 

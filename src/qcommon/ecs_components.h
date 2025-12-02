@@ -15,6 +15,13 @@ These components are used throughout the engine for common entity properties.
 #include <entt/entt.hpp>
 #include "q_shared.h"
 
+#ifdef __cplusplus
+#ifdef USE_BULLET
+// Forward declaration to avoid pulling Bullet headers into every translation unit
+class btRigidBody;
+#endif
+#endif
+
 // Transform Component - Position, rotation, scale
 struct TransformComponent {
 	vec3_t position;
@@ -41,7 +48,19 @@ struct PhysicsComponent {
 	float mass;
 	float friction;
 	
-	PhysicsComponent() : mass(1.0f), friction(0.0f) {
+#ifdef USE_BULLET
+	// When true, this entity will be simulated by Bullet instead of the
+	// simple integrator. The Bullet world and rigid bodies are managed
+	// by the ECS physics system implementation.
+	qboolean	useBullet;
+	btRigidBody *body;
+#endif
+	
+	PhysicsComponent() : mass(1.0f), friction(0.0f)
+#ifdef USE_BULLET
+		, useBullet(qfalse), body(nullptr)
+#endif
+	{
 		VectorClear(velocity);
 		VectorClear(acceleration);
 	}
