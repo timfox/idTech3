@@ -1,3 +1,6 @@
 [submodule "libs/entt"]
 	path = libs/entt
 	url = https://github.com/skypjack/entt.git
+[submodule "radiant"]
+	path = radiant
+	url = https://github.com/TTimo/GtkRadiant.git
