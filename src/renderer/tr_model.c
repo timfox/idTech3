@@ -203,12 +203,15 @@ typedef struct
 
 // Forward declaration for TIKI loader
 qhandle_t R_RegisterTIKI(const char *name, model_t *mod);
+// Forward declaration for Assimp-backed loader
+qhandle_t R_RegisterAssimpModel(const char *name, model_t *mod);
 
 // Note that the ordering indicates the order of preference used
 // when there are multiple models of different formats available
 static modelExtToLoaderMap_t modelLoaders[ ] =
 {
 	{ "tiki", R_RegisterTIKI },
+	{ "obj",  R_RegisterAssimpModel },
 	{ "iqm", R_RegisterIQM },
 	{ "mdr", R_RegisterMDR },
 	{ "md3", R_RegisterMD3 }

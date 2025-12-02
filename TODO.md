@@ -55,3 +55,34 @@
 - [ ] Better audio system (OpenAL Soft planned, still using legacy)
 - [ ] Improved physics (investigate bullet3 or similar)
 - [ ] Improved networking (DTLS/NAT traversal candidates under review)
+
+## Steam Deck Preparation
+- [ ] Default controller configuration enables access to all in-game functionality (Steam Input or native gamepad support strongly recommended)
+- [ ] Add or supply a controller configuration mapping all required inputs if native support is missing
+- [ ] Ensure on-screen keyboard automatically appears for all text input fields (use Steamworks: ShowFloatingGamepadTextInput or ShowGamepadTextInput where possible)
+- [ ] Support simultaneous mouse-style (gyro/trackpad/1:1) and joystick-style camera input—avoid input lockout or incorrect prompt switching
+- [ ] Prioritize Vulkan as primary graphics API (Unity/Unreal: enable Vulkan for all users; otherwise, use Proton's DX-to-Vulkan fallback)
+- [ ] Prefer standalone video/audio codecs (VP9/AV1) over vendor-locked ones (WMF, etc)
+- [ ] Implement save game cloud sync via Steam Cloud (or 3rd-party service); avoid syncing device-specific settings (e.g., resolution)
+- [ ] Ensure all singleplayer/offline-capable content is playable fully offline—including first run and new user setup
+- [ ] Eliminate or minimize use of custom game launchers; if unavoidable, support controller input translation (see SetGameLauncherMode in Steamworks SDK)
+
+- [ ] Draft initial `script_api.h/cpp` skeleton for engine-side Lua runtime
+- [ ] Embed Lua VM; bind minimal API: `print`, `wait`, `Game.Log`, `Game.SetObjective`
+- [ ] Implement coroutine-powered script runner and `start_script` infra
+- [ ] Entity script class: hook up `OnSpawn`, `OnTakeDamage`, `OnUse`, `OnDeath`
+- [ ] Implement `wait(seconds)` and `wait_for_event(event, filterFn)`—coroutine scheduler
+- [ ] Event bus: engine emits, Lua `Events.on(event, fn)` can subscribe
+- [ ] Level scripts: convention for `level_init` entrypoint (`scripts/levels/<map>.lua`)
+- [ ] Designer DSL layer: implement `Game`, `Events`, `Sequence`, `Encounter` in pure Lua
+- [ ] Encounter state machine helper (`Encounter.define`, state transitions, triggers)
+- [ ] Sequence/cinematic builder (`Sequence.define`, step/timeline API)
+- [ ] Sample scripts: enemy behavior, encounter definition, mission sequence
+- [ ] Hot reload for scripts (reload Lua states on file save)
+- [ ] In-game script inspector (list running coroutines, encounters, sequences, entity script states)
+- [ ] Script-side logging with source info for debugging
+- [ ] Unit test harness for core Lua helpers (wait, event, encounter, sequence)
+- [ ] Docs: quickstart for designers (core Lua API, hooks, patterns, examples)
+- [ ] Long-term: Visual scripting or graph builder (optional, phase 2+)
+- [ ] QOL: console command to reload scripts, restart sequences, dump active scripts
+
