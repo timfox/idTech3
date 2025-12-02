@@ -92,6 +92,7 @@ static cvar_t *com_buildScript;	// for automated data building scripts
 #ifndef DEDICATED
 static cvar_t	*com_introPlayed;
 cvar_t	*com_skipIdLogo;
+cvar_t	*com_jobThreads;
 
 cvar_t	*cl_paused;
 cvar_t	*cl_packetdelay;
@@ -4114,6 +4115,9 @@ void Com_Init( char *commandLine ) {
 	Cvar_SetDescription( com_skipIdLogo, "Skip playing Id Software logo cinematic at startup." );
 #endif
 
+	com_jobThreads = Cvar_Get( "com_jobThreads", "0", CVAR_ARCHIVE );
+	Cvar_SetDescription( com_jobThreads, "Number of worker threads for job system (0 = auto-detect, uses CPU count - 1)" );
+
 	if ( com_dedicated->integer ) {
 		if ( !com_viewlog->integer ) {
 			Cvar_Set( "viewlog", "1" );
@@ -4246,6 +4250,17 @@ void Com_Init( char *commandLine ) {
 #ifdef USE_LUA
 	Lua_Init();
 #endif
+
+	// Initialize job system for multi-threading
+	{
+		extern qboolean JobSystem_Init(int num_threads);
+		int num_threads = com_jobThreads ? com_jobThreads->integer : 0;
+		if (JobSystem_Init(num_threads)) {
+			Com_Printf("Job system initialized\n");
+		} else {
+			Com_Printf("Warning: Job system initialization failed\n");
+		}
+	}
 
 	I18n_Init();
 
@@ -4648,6 +4663,12 @@ void Com_Frame( qboolean noDelay ) {
 
 	NET_FlushPacketQueue( 0 );
 
+	// Update job system
+	{
+		extern void JobSystem_Update(void);
+		JobSystem_Update();
+	}
+
 	Cbuf_Wait();
 
 	//
@@ -4717,6 +4738,12 @@ static void Com_Shutdown( void ) {
 #ifdef USE_LUA
 	Lua_Shutdown();
 #endif
+
+	// Shutdown job system
+	{
+		extern void JobSystem_Shutdown(void);
+		JobSystem_Shutdown();
+	}
 
 	I18n_Shutdown();
 

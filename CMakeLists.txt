@@ -220,6 +220,12 @@ IF(USE_LUA)
 	list(APPEND QCOMMON_SRCS src/qcommon/lua_game.c)
 	list(APPEND QCOMMON_SRCS src/qcommon/lua_renderer.c)
 	list(APPEND QCOMMON_SRCS src/qcommon/lua_sound.c)
+	list(APPEND QCOMMON_SRCS src/qcommon/lua_events.c)
+	list(APPEND QCOMMON_SRCS src/qcommon/lua_coroutine.c)
+	list(APPEND QCOMMON_SRCS src/qcommon/lua_entity.c)
+	list(APPEND QCOMMON_SRCS src/qcommon/lua_encounter.c)
+	list(APPEND QCOMMON_SRCS src/qcommon/lua_sequence.c)
+	list(APPEND QCOMMON_SRCS src/qcommon/lua_debug.c)
 ENDIF()
 
 # Internationalization (i18n) support
