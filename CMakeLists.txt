@@ -176,6 +176,7 @@ OPTION(USE_CIMGUI "Enable ImGui" ON)
 OPTION(USE_WEBSOCKETS "Enable WebSocket support" ON)
 OPTION(USE_OPENAL "Enable OpenAL enhanced audio system" ON)
 OPTION(USE_BULLET "Enable Bullet Physics library for rigid body simulation" OFF)
+OPTION(USE_JOBSYSTEM "Enable multi-threaded job system for parallel execution" ON)
 #OPTION(USE_OPENGL "" OFF)
 #OPTION(USE_OPENGL2 "" OFF)
 #OPTION(USE_USD "" ON)
@@ -222,7 +223,7 @@ IF(USE_LUA)
 	list(APPEND QCOMMON_SRCS src/qcommon/lua_sound.c)
 	list(APPEND QCOMMON_SRCS src/qcommon/lua_events.c)
 	list(APPEND QCOMMON_SRCS src/qcommon/lua_coroutine.c)
-	list(APPEND QCOMMON_SRCS src/qcommon/lua_entity.c)
+	list(APPEND QCOMMON_SRCS src/qcommon/lua_entity.cpp)
 	list(APPEND QCOMMON_SRCS src/qcommon/lua_encounter.c)
 	list(APPEND QCOMMON_SRCS src/qcommon/lua_sequence.c)
 	list(APPEND QCOMMON_SRCS src/qcommon/lua_debug.c)
@@ -353,6 +354,7 @@ IF(USE_BULLET)
 	endif()
 ENDIF()
 
+
 # add platform-dependent QVM bytecode compilers
 # Force 64-bit builds by default
 IF(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
@@ -396,10 +398,16 @@ list(REMOVE_ITEM SERVER_SRCS src/server/sv_rankings.c)
 
 # universal binary
 ADD_LIBRARY(qcommon OBJECT ${QCOMMON_SRCS} ${SERVER_SRCS})
+IF(USE_JOBSYSTEM)
+	TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE USE_JOBSYSTEM)
+ENDIF()
 
 # dedicated server
 ADD_LIBRARY(qcommon_ded OBJECT ${QCOMMON_SRCS} ${SERVER_SRCS})
 TARGET_COMPILE_DEFINITIONS(qcommon_ded PUBLIC DEDICATED)
+IF(USE_JOBSYSTEM)
+	TARGET_COMPILE_DEFINITIONS(qcommon_ded PRIVATE USE_JOBSYSTEM)
+ENDIF()
 
 # client + cURL
 AUX_SOURCE_DIRECTORY(src/client CLIENT_SRCS)
@@ -585,6 +593,9 @@ IF(USE_SYSTEM_JPEG)
 	find_package(JPEG REQUIRED)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE -DUSE_SYSTEM_JPEG)
 	TARGET_LINK_LIBRARIES(client ${JPEG_LIBRARIES})
+	IF(USE_JOBSYSTEM)
+		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_JOBSYSTEM)
+	ENDIF()
 ELSE()
 	AUX_SOURCE_DIRECTORY(libs/jpeg JPEG_SRCS)
 	#ADD_LIBRARY(jpeg ${JPEG_SRCS})
@@ -592,6 +603,9 @@ ELSE()
 	ADD_LIBRARY(client OBJECT ${CLIENT_SRCS} ${JPEG_SRCS})
 	# Add JPEG include directory for internal includes
 	TARGET_INCLUDE_DIRECTORIES(client PRIVATE libs/jpeg)
+	IF(USE_JOBSYSTEM)
+		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_JOBSYSTEM)
+	ENDIF()
 	# Suppress warnings for third-party JPEG library code
 	IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 		FOREACH(JPEG_SRC ${JPEG_SRCS})

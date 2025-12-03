@@ -3,7 +3,7 @@
 Lua Event Bus System
 
 Central event dispatcher for decoupled communication between engine systems
-and Lua scripts. Inspired by id Tech 7's dataflow architecture.
+and Lua scripts.
 ===========================================================================
 */
 

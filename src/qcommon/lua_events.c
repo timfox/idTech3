@@ -66,7 +66,7 @@ void Lua_Events_Init(void)
 	}
 
 	s_event_map_capacity = INITIAL_EVENT_MAP_SIZE;
-	s_event_map = (event_entry_t *)Z_Malloc(sizeof(event_entry_t) * s_event_map_capacity, TAG_STATIC);
+	s_event_map = (event_entry_t *)Z_Malloc(sizeof(event_entry_t) * s_event_map_capacity);
 	memset(s_event_map, 0, sizeof(event_entry_t) * s_event_map_capacity);
 	s_event_map_size = 0;
 
@@ -107,10 +107,9 @@ void Lua_Events_Shutdown(void)
 		int idx = (s_event_queue_head + i) % MAX_EVENT_QUEUE;
 		queued_event_t *evt = &s_event_queue[idx];
 		if (evt->from_lua && evt->source_L) {
-			int j;
-			for (j = 0; j < evt->num_args; j++) {
-				if (evt->arg_refs[j] != LUA_NOREF) {
-					luaL_unref(evt->source_L, LUA_REGISTRYINDEX, evt->arg_refs[j]);
+			for (int k = 0; k < evt->num_args; k++) {
+				if (evt->arg_refs[k] != LUA_NOREF) {
+					luaL_unref(evt->source_L, LUA_REGISTRYINDEX, evt->arg_refs[k]);
 				}
 			}
 		}
@@ -149,7 +148,7 @@ static event_entry_t *FindOrCreateEventEntry(const char *event_name)
 		// Grow the map
 		int new_capacity = s_event_map_capacity * 2;
 		event_entry_t *new_map = (event_entry_t *)Z_Malloc(
-			sizeof(event_entry_t) * new_capacity, TAG_STATIC);
+			sizeof(event_entry_t) * new_capacity);
 		memcpy(new_map, s_event_map, sizeof(event_entry_t) * s_event_map_size);
 		memset(new_map + s_event_map_size, 0,
 			sizeof(event_entry_t) * (new_capacity - s_event_map_size));
@@ -213,8 +212,8 @@ static void Lua_Events_Unsubscribe(lua_State *L, const char *event_name, int cal
 	for (i = 0; i < s_event_map_size; i++) {
 		if (Q_stricmp(s_event_map[i].event_name, event_name) == 0) {
 			entry = &s_event_map[i];
-			for (j = 0; j < entry->num_subscribers; j++) {
-				event_subscriber_t *sub = &entry->subscribers[j];
+			for (int k = 0; k < entry->num_subscribers; k++) {
+				event_subscriber_t *sub = &entry->subscribers[k];
 				if (sub->L == L && sub->callback_ref == callback_ref) {
 					// Remove reference
 					if (sub->callback_ref != LUA_NOREF) {
@@ -222,7 +221,7 @@ static void Lua_Events_Unsubscribe(lua_State *L, const char *event_name, int cal
 					}
 					// Shift remaining subscribers
 					memmove(sub, sub + 1,
-						sizeof(event_subscriber_t) * (entry->num_subscribers - j - 1));
+						sizeof(event_subscriber_t) * (entry->num_subscribers - k - 1));
 					entry->num_subscribers--;
 					return;
 				}
@@ -326,6 +325,7 @@ Emit an event from engine code
 */
 void Lua_Events_Emit(const char *event_name, int num_args, ...)
 {
+	(void)num_args;  // Suppress unused parameter warning
 	// For now, engine events are simpler - we'll queue them without Lua refs
 	// This can be enhanced later to support complex data types
 	if (!s_initialized || !event_name || s_event_queue_count >= MAX_EVENT_QUEUE) {
@@ -457,12 +457,12 @@ static int Lua_Events_Off(lua_State *L)
 		if (Q_stricmp(s_event_map[i].event_name, event_name) == 0) {
 			entry = &s_event_map[i];
 			// Compare functions by reference
-			for (j = 0; j < entry->num_subscribers; j++) {
-				event_subscriber_t *sub = &entry->subscribers[j];
+			for (int k = 0; k < entry->num_subscribers; k++) {
+				event_subscriber_t *sub = &entry->subscribers[k];
 				if (sub->L == L && sub->callback_ref != LUA_NOREF) {
 					// Check if this is the same function
 					lua_rawgeti(L, LUA_REGISTRYINDEX, sub->callback_ref);
-					if (lua_equal(L, -1, 2)) {
+					if (lua_rawequal(L, -1, 2)) {
 						lua_pop(L, 1);
 						// Found it, remove
 						if (sub->callback_ref != LUA_NOREF) {
@@ -470,7 +470,7 @@ static int Lua_Events_Off(lua_State *L)
 						}
 						// Shift remaining subscribers
 						memmove(sub, sub + 1,
-							sizeof(event_subscriber_t) * (entry->num_subscribers - j - 1));
+							sizeof(event_subscriber_t) * (entry->num_subscribers - k - 1));
 						entry->num_subscribers--;
 						lua_pushboolean(L, 1);
 						return 1;

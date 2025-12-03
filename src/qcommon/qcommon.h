@@ -286,9 +286,13 @@ void		Lua_Coroutine_RegisterBindings( lua_State *L );
 void		Lua_Entity_Init( void );
 void		Lua_Entity_Shutdown( void );
 void		Lua_Entity_Update( float deltaTime );
+#ifdef USE_ENTT
+// Forward declaration - ecs.h will be included where needed
+typedef unsigned int ecs_entity_t;
 qboolean	Lua_Entity_AttachScript( ecs_entity_t entity, const char *script_path );
 void		Lua_Entity_DetachScript( ecs_entity_t entity );
 void		Lua_Entity_CallHook( ecs_entity_t entity, const char *hook_name, int num_args, ... );
+#endif
 void		Lua_Entity_RegisterBindings( lua_State *L );
 void		Lua_Encounter_Init( void );
 void		Lua_Encounter_Shutdown( void );
@@ -1437,6 +1441,7 @@ qboolean Sys_SetAffinityMask( const uint64_t mask );
 // any game related timing information should come from event timestamps
 int		Sys_Milliseconds( void );
 int64_t	Sys_Microseconds( void );
+int		Sys_GetCPUCount( void );
 
 void	Sys_SnapVector( float *vector );
 
@@ -1507,5 +1512,10 @@ int HuffmanGetSymbol( unsigned int* symbol, const byte* buffer, int bitIndex );
 
 // functional gate syscall number
 #define COM_TRAP_GETVALUE 700
+
+// Job system declarations
+#ifdef USE_JOBSYSTEM
+#include "job_system.h"
+#endif
 
 #endif // _QCOMMON_H_

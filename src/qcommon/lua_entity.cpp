@@ -13,8 +13,10 @@ Attaches Lua scripts to ECS entities with lifecycle hooks.
 
 #include "lua_entity.h"
 #include "lua_events.h"
+#ifdef USE_ENTT
 #include "ecs_components.h"
 #include "ecs_internal.h"
+#endif
 #include <lua.h>
 #include <lauxlib.h>
 #include <string.h>
@@ -113,7 +115,7 @@ static qboolean CheckScriptHook(lua_State *L, int script_ref, const char *hook_n
 	}
 
 	lua_getfield(L, -1, hook_name);
-	qboolean has_hook = lua_isfunction(L, -1);
+	qboolean has_hook = (qboolean)lua_isfunction(L, -1);
 	lua_pop(L, 2);  // Pop function and table
 
 	return has_hook;

@@ -8,12 +8,12 @@ Console commands for debugging Lua scripts.
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include "lua_debug.h"
 
 #ifdef USE_LUA
 
 #include <lua.h>
 #include <lauxlib.h>
-#include "lua_wrapper.h"
 #include "lua_entity.h"
 #include "lua_encounter.h"
 #include "lua_sequence.h"
@@ -58,10 +58,6 @@ void Cmd_ScriptList_f(void)
 	Com_Printf("=== Lua Script System Status ===\n");
 	
 	// List entity scripts
-	// Note: This would require exposing game_get_entity_count from Lua
-	// For now, just show basic status
-	Com_Printf("Entities: %d\n", entity_count);
-	
 	// Note: Detailed listing would require exposing internal state
 	// This is a basic implementation
 	Com_Printf("Use 'script_dump' for detailed information\n");

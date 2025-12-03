@@ -33,10 +33,10 @@ static qboolean s_initialized = qfalse;
 static volatile int s_pending_jobs = 0;
 static volatile int s_completed_jobs = 0;
 
-// Job pool for allocation
-#define JOB_POOL_SIZE 1024
-static job_t s_job_pool[JOB_POOL_SIZE];
-static volatile int s_job_pool_index = 0;
+// Job pool for allocation (reserved for future use)
+// #define JOB_POOL_SIZE 1024
+// static job_t s_job_pool[JOB_POOL_SIZE];
+// static volatile int s_job_pool_index = 0;
 
 /*
 =================
@@ -247,7 +247,7 @@ job_handle_t *JobSystem_SubmitJob(jobFunction_t function, void *data, jobPriorit
 	}
 
 	// Allocate job handle
-	job_handle_t *handle = (job_handle_t *)Z_Malloc(sizeof(job_handle_t), TAG_STATIC);
+	job_handle_t *handle = (job_handle_t *)Z_Malloc(sizeof(job_handle_t));
 	if (!handle) {
 		return NULL;
 	}
@@ -256,7 +256,7 @@ job_handle_t *JobSystem_SubmitJob(jobFunction_t function, void *data, jobPriorit
 	handle->result = NULL;
 
 	// Create job
-	job_t *job = (job_t *)Z_Malloc(sizeof(job_t), TAG_STATIC);
+	job_t *job = (job_t *)Z_Malloc(sizeof(job_t));
 	if (!job) {
 		Z_Free(handle);
 		return NULL;

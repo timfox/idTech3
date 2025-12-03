@@ -72,7 +72,7 @@ qboolean JobQueue_Enqueue(job_queue_t *queue, jobFunction_t function, void *data
 		return qfalse;
 	}
 
-	job_t *job = (job_t *)Z_Malloc(sizeof(job_t), TAG_STATIC);
+	job_t *job = (job_t *)Z_Malloc(sizeof(job_t));
 	if (!job) {
 		return qfalse;
 	}

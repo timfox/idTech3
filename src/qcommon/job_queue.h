@@ -3,7 +3,6 @@
 Job Queue System
 
 Work-stealing job queue for multi-threaded execution.
-Inspired by id Tech 7's job system architecture.
 ===========================================================================
 */
 

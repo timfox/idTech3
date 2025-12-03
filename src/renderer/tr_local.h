@@ -595,7 +595,11 @@ typedef enum {
 } portalView_t;
 
 typedef struct {
+#ifdef __cplusplus
+	orientationr_t	orientation;  // 'or' is a C++ keyword
+#else
 	orientationr_t	or;
+#endif
 	orientationr_t	world;
 	vec3_t		pvsOrigin;			// may be different than or.origin for portals
 	portalView_t portalView;
@@ -1083,7 +1087,11 @@ enum {
 typedef struct {
 	trRefdef_t	refdef;
 	viewParms_t	viewParms;
+#ifdef __cplusplus
+	orientationr_t	orientation;  // 'or' is a C++ keyword
+#else
 	orientationr_t	or;
+#endif
 	backEndCounters_t	pc;
 	qboolean	isHyperspace;
 	const trRefEntity_t *currentEntity;
@@ -1170,12 +1178,15 @@ typedef struct {
 	model_t					*currentModel;
 
 	viewParms_t				viewParms;
+#ifdef __cplusplus
+	orientationr_t			orientation;		// for current entity ('or' is a C++ keyword)
+#else
+	orientationr_t			or;					// for current entity
+#endif
 
 	float					identityLight;		// 1.0 / ( 1 << overbrightBits )
 	int						identityLightByte;	// identityLight * 255
 	int						overbrightBits;		// r_overbrightBits->integer, but set to 0 if no hw gamma
-
-	orientationr_t			or;					// for current entity
 
 	trRefdef_t				refdef;
 
@@ -1395,7 +1406,11 @@ int R_CullLocalPointAndRadius( const vec3_t origin, float radius );
 int R_CullDlight( const dlight_t *dl );
 
 void R_SetupProjection( viewParms_t *dest, float zProj, qboolean computeFrustum );
+#ifdef __cplusplus
+void R_RotateForEntity( const trRefEntity_t *ent, const viewParms_t *viewParms, orientationr_t *orientation );
+#else
 void R_RotateForEntity( const trRefEntity_t *ent, const viewParms_t *viewParms, orientationr_t *or );
+#endif
 
 /*
 ** GL wrapper/helper functions
@@ -1628,7 +1643,11 @@ LIGHTS
 */
 void R_DlightBmodel( bmodel_t *bmodel );
 void R_SetupEntityLighting( const trRefdef_t *refdef, trRefEntity_t *ent );
+#ifdef __cplusplus
+void R_TransformDlights( int count, dlight_t *dl, orientationr_t *orientation );
+#else
 void R_TransformDlights( int count, dlight_t *dl, orientationr_t *or );
+#endif
 int R_LightForPoint( vec3_t point, vec3_t ambientLight, vec3_t directedLight, vec3_t lightDir );
 
 #ifdef USE_PMLIGHT

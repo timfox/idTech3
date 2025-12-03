@@ -3,7 +3,6 @@
 Job System
 
 Multi-threaded job system with work-stealing for parallel execution.
-Inspired by id Tech 7's asynchronous architecture.
 ===========================================================================
 */
 

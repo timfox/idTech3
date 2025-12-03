@@ -7,7 +7,6 @@
 #include <lualib.h>
 #include "ecs.h"
 #include "lua_entity.h"
-#include "sv_ecs.h"
 
 #ifdef USE_ENTT
 #include "ecs_internal.h"

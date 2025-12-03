@@ -65,7 +65,7 @@ qboolean Thread_Create(thread_handle_t *handle, thread_func_t func, void *arg, c
 			if (SetThreadDescription) {
 				// Convert name to wide string
 				int len = strlen(name);
-				wchar_t *wname = (wchar_t *)Z_Malloc((len + 1) * sizeof(wchar_t), TAG_STATIC);
+				wchar_t *wname = (wchar_t *)Z_Malloc((len + 1) * sizeof(wchar_t));
 				mbstowcs(wname, name, len);
 				wname[len] = 0;
 				SetThreadDescription(*handle, wname);

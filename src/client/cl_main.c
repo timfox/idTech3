@@ -4199,7 +4199,7 @@ void CL_Init( void ) {
 	cl_drawRecording = Cvar_Get("cl_drawRecording", "1", CVAR_ARCHIVE);
 	Cvar_SetDescription( cl_drawRecording, "Hide (0) or shorten (1) \"RECORDING\" HUD message when recording demo." );
 
-	// High-level, idTech6/7-style graphics presets
+	// High-level graphics presets
 	r_graphicsPreset = Cvar_Get( "r_graphicsPreset", "2", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( r_graphicsPreset, "0", "4", CV_INTEGER );
 	Cvar_SetDescription( r_graphicsPreset,

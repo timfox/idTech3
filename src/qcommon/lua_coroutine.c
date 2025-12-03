@@ -203,7 +203,7 @@ void Lua_Coroutine_Update(float deltaTime)
 
 		if (should_resume) {
 			// Resume coroutine
-			int result = lua_resume(co->L, NULL, 0);
+			int result = lua_resume(co->L, NULL, 0, NULL);
 			resumed++;
 
 			if (result == LUA_OK) {
