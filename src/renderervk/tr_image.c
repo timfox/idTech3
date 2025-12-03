@@ -630,13 +630,47 @@ static void generate_image_upload_data( image_t *image, byte *data, Image_Upload
 		scaled_height >>= 1;
 	}
 
-	upload_data->buffer = (byte*) ri.Hunk_AllocateTempMemory( 2 * 4 * scaled_width * scaled_height );
+	// Calculate buffer size with overflow protection
+	// Buffer needs to hold base level + all mip levels (approximately 1.33x base level)
+	// For very large textures, we need to be careful about memory allocation
+	const int64_t MAX_TEMP_TEXTURE_SIZE = 1536LL * 1024 * 1024; // 1.5GB - enough for 16k texture with mipmaps
+	int64_t buffer_size_64 = (int64_t)2 * 4 * (int64_t)scaled_width * (int64_t)scaled_height;
+	
+	// Check for integer overflow
+	if ( scaled_width > 0 && scaled_height > 0 ) {
+		int64_t expected = (int64_t)2 * 4 * (int64_t)scaled_width * (int64_t)scaled_height;
+		if ( buffer_size_64 != expected || buffer_size_64 < 0 ) {
+			ri.Error( ERR_DROP, "R_CreateImage: texture size overflow for '%s' (%dx%d)", 
+				image->imgName, scaled_width, scaled_height );
+		}
+	}
+	
+	// Limit buffer size to prevent excessive memory allocation
+	int buffer_size;
+	if ( buffer_size_64 > MAX_TEMP_TEXTURE_SIZE ) {
+		ri.Printf( PRINT_WARNING, "R_CreateImage: texture '%s' (%dx%d) is very large (%lld bytes), may cause memory issues\n",
+			image->imgName, scaled_width, scaled_height, (long long)buffer_size_64 );
+		buffer_size = (int)MAX_TEMP_TEXTURE_SIZE;
+	} else if ( buffer_size_64 > INT_MAX ) {
+		ri.Error( ERR_DROP, "R_CreateImage: texture '%s' (%dx%d) exceeds maximum buffer size", 
+			image->imgName, scaled_width, scaled_height );
+		buffer_size = 0; // won't be reached due to error
+	} else {
+		buffer_size = (int)buffer_size_64;
+	}
+
+	upload_data->buffer = (byte*) ri.Hunk_AllocateTempMemory( buffer_size );
 	if ( data == NULL ) {
-		Com_Memset( upload_data->buffer, 0, 2 * 4 * scaled_width * scaled_height );
+		Com_Memset( upload_data->buffer, 0, buffer_size );
 	}
 
 	if ( ( scaled_width != width || scaled_height != height ) && data ) {
-		resampled_buffer = (byte*) ri.Hunk_AllocateTempMemory( scaled_width * scaled_height * 4 );
+		int64_t resample_size_64 = (int64_t)scaled_width * (int64_t)scaled_height * 4;
+		if ( resample_size_64 > INT_MAX ) {
+			ri.Error( ERR_DROP, "R_CreateImage: resample buffer size overflow for '%s' (%dx%d)", 
+				image->imgName, scaled_width, scaled_height );
+		}
+		resampled_buffer = (byte*) ri.Hunk_AllocateTempMemory( (int)resample_size_64 );
 		ResampleTexture ((unsigned*)data, width, height, (unsigned*)resampled_buffer, scaled_width, scaled_height);
 		data = resampled_buffer;
 	}
@@ -681,7 +715,12 @@ static void generate_image_upload_data( image_t *image, byte *data, Image_Upload
 
 	if ( scaled_width == width && scaled_height == height && !mipmap ) {
 		upload_data->mip_levels = 1;
-		upload_data->buffer_size = scaled_width * scaled_height * 4;
+		int64_t single_level_size_64 = (int64_t)scaled_width * (int64_t)scaled_height * 4;
+		if ( single_level_size_64 > INT_MAX ) {
+			ri.Error( ERR_DROP, "R_CreateImage: single level size overflow for '%s' (%dx%d)", 
+				image->imgName, scaled_width, scaled_height );
+		}
+		upload_data->buffer_size = (int)single_level_size_64;
 
 		if ( data != NULL ) {
 			Com_Memcpy( upload_data->buffer, data, upload_data->buffer_size );
@@ -707,7 +746,12 @@ static void generate_image_upload_data( image_t *image, byte *data, Image_Upload
 
 	// At this point width == scaled_width and height == scaled_height.
 
-	scaled_buffer = (unsigned int*) ri.Hunk_AllocateTempMemory( sizeof( unsigned ) * scaled_width * scaled_height );
+	int64_t scaled_buffer_size_64 = (int64_t)sizeof( unsigned ) * (int64_t)scaled_width * (int64_t)scaled_height;
+	if ( scaled_buffer_size_64 > INT_MAX ) {
+		ri.Error( ERR_DROP, "R_CreateImage: scaled buffer size overflow for '%s' (%dx%d)", 
+			image->imgName, scaled_width, scaled_height );
+	}
+	scaled_buffer = (unsigned int*) ri.Hunk_AllocateTempMemory( (int)scaled_buffer_size_64 );
 	Com_Memcpy(scaled_buffer, data, scaled_width * scaled_height * 4);
 
 	if ( !(image->flags & IMGFLAG_NOLIGHTSCALE ) ) {
@@ -715,7 +759,12 @@ static void generate_image_upload_data( image_t *image, byte *data, Image_Upload
 	}
 
 	miplevel = 0;
-	mip_level_size = scaled_width * scaled_height * 4;
+	int64_t mip_level_size_64 = (int64_t)scaled_width * (int64_t)scaled_height * 4;
+	if ( mip_level_size_64 > INT_MAX ) {
+		ri.Error( ERR_DROP, "R_CreateImage: mip level size overflow for '%s' (%dx%d)", 
+			image->imgName, scaled_width, scaled_height );
+	}
+	mip_level_size = (int)mip_level_size_64;
 
 	Com_Memcpy(upload_data->buffer, scaled_buffer, mip_level_size);
 	upload_data->buffer_size = mip_level_size;
@@ -731,13 +780,22 @@ static void generate_image_upload_data( image_t *image, byte *data, Image_Upload
 			if (scaled_height < 1) scaled_height = 1;
 
 			miplevel++;
-			mip_level_size = scaled_width * scaled_height * 4;
+			mip_level_size_64 = (int64_t)scaled_width * (int64_t)scaled_height * 4;
+			if ( mip_level_size_64 > INT_MAX ) {
+				ri.Error( ERR_DROP, "R_CreateImage: mip level size overflow for '%s' (mip %d, %dx%d)", 
+					image->imgName, miplevel, scaled_width, scaled_height );
+			}
+			mip_level_size = (int)mip_level_size_64;
 
 			if ( r_colorMipLevels->integer ) {
 				R_BlendOverTexture( (byte *)scaled_buffer, scaled_width * scaled_height, miplevel );
 			}
 
 			Com_Memcpy(&upload_data->buffer[upload_data->buffer_size], scaled_buffer, mip_level_size);
+			// Check for overflow when adding mip level size
+			if ( upload_data->buffer_size > INT_MAX - mip_level_size ) {
+				ri.Error( ERR_DROP, "R_CreateImage: total buffer size overflow for '%s'", image->imgName );
+			}
 			upload_data->buffer_size += mip_level_size;
 		}
 	}

@@ -29,9 +29,9 @@ struct ImDrawData;
 #define VERTEX_BUFFER_SIZE_HI  (8 * 1024 * 1024)
 
 #define STAGING_BUFFER_SIZE    (2 * 1024 * 1024)  /* by default */
-#define STAGING_BUFFER_SIZE_HI (24 * 1024 * 1024) /* enough for max.texture size upload with all mip levels at once */
+#define STAGING_BUFFER_SIZE_HI (128 * 1024 * 1024) /* enough for max.texture size upload with all mip levels at once - supports up to 16k textures */
 
-#define IMAGE_CHUNK_SIZE (32 * 1024 * 1024)
+#define IMAGE_CHUNK_SIZE (1024 * 1024 * 1024) /* 1GB - increased to support high-resolution textures (4k, 8k, 16k) */
 #define MAX_IMAGE_CHUNKS 56
 
 #define NUM_COMMAND_BUFFERS 2	// number of command buffers / render semaphores / framebuffer sets

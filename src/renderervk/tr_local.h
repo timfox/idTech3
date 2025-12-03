@@ -47,7 +47,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define MAX_LITSURFS		(MAX_DRAWSURFS)
 #define	MAX_FLARES			256
 
-#define MAX_TEXTURE_SIZE	2048 // must be less or equal to 32768
+#define MAX_TEXTURE_SIZE	16384 // must be less or equal to 32768 - supports up to 16k textures
 
 #define USE_BUFFER_CLEAR	/* clear attachments on render pass begin */
 
