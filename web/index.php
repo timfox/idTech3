@@ -31,10 +31,14 @@ ini_set('error_log', __DIR__ . '/error.log');
         <input type="text" id="search" placeholder="Search">
     </div>
 
+    <button id="back-button" class="back-button" style="display: none;">← Back to Index</button>
+    <div id="loading" class="loading" style="display: none;">Loading...</div>
+    <div id="error-message" class="error-message" style="display: none;"></div>
+
     <div id="main-container">
         <div id="sections-container" class="content">
             <div class="section" style="background: rgba(0, 247, 255, 0.1); border: 2px solid #00f7ff; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
-                <h2 style="color: #00f7ff; margin-top: 0;">🚀 What's New</h2>
+                <h2 style="color: #00f7ff; margin-top: 0;">What's New</h2>
                 <p>Check out the latest enhancements and features:</p>
                 <ul>
                     <li><a href="whats-new">What's New</a> - Recent enhancements overview</li>
@@ -46,184 +50,110 @@ ini_set('error_log', __DIR__ . '/error.log');
                 </ul>
             </div>
 
-    <button id="back-button" class="back-button">← Back to Index</button>
-    <div id="loading" class="loading">Loading...</div>
-    <div id="error-message" class="error-message"></div>
-
-    <div id="main-container">
-        <div id="sections-container" class="content">
             <div class="section">
                 <h2>Overview</h2>
                 <ul>
                     <li><a href="idtech3">id Tech 3 Engine Features</a></li>
+                    <li><a href="features/complete-features">Complete Features List</a></li>
+                    <li><a href="engine/architecture">Engine Architecture</a></li>
                     <li><a href="history">History of id Tech 3</a></li>
                 </ul>
             </div>
 
             <div class="section">
                 <h2>Getting Started</h2>
-                                 <ul>
-                     <li><a href="getting-started/installation">Installation</a></li>
-                     <li><a href="getting-started/configuration">Configuration</a></li>
-                     <li><a href="getting-started/quick-start">Quick Start Guide</a></li>
-                 </ul>
+                <ul>
+                    <li><a href="getting-started/installation">Installation</a></li>
+                    <li><a href="getting-started/configuration">Configuration</a></li>
+                    <li><a href="getting-started/quick-start">Quick Start Guide</a></li>
+                </ul>
             </div>
 
             <div class="section">
                 <h2>Tutorials</h2>
-                                 <ul>
-                     <li><a href="tutorials/structured-logging">Structured Logging Tutorial</a></li>
-                     <li><a href="tutorials/memory-profiling">Memory Profiling Tutorial</a></li>
-                     <li><a href="tutorials/imgui-overlays">ImGui Debug Overlays Tutorial</a></li>
-                     <li><a href="tutorials/websocket">WebSocket Integration Tutorial</a></li>
-                     <li><a href="tutorials/animated-skybox">Creating Animated Skyboxes</a></li>
-                     <li><a href="tutorials/enhanced-networking">Enhanced Networking Setup</a></li>
-                     <li><a href="tutorials/directx12-setup">DirectX 12 Setup Tutorial</a></li>
-                     <li><a href="pbr_tutorial">PBR Shader Tutorial</a></li>
-                 </ul>
+                <ul>
+                    <li><a href="tutorials/structured-logging">Structured Logging Tutorial</a></li>
+                    <li><a href="tutorials/memory-profiling">Memory Profiling Tutorial</a></li>
+                    <li><a href="tutorials/imgui-overlays">ImGui Debug Overlays Tutorial</a></li>
+                    <li><a href="tutorials/websocket">WebSocket Integration Tutorial</a></li>
+                    <li><a href="tutorials/animated-skybox">Creating Animated Skyboxes</a></li>
+                    <li><a href="tutorials/enhanced-networking">Enhanced Networking Setup</a></li>
+                    <li><a href="tutorials/directx12-setup">DirectX 12 Setup Tutorial</a></li>
+                    <li><a href="pbr_tutorial">PBR Shader Tutorial</a></li>
+                </ul>
             </div>
 
             <div class="section">
                 <h2>Development</h2>
-                                 <ul>
-                     <li><a href="development/map-making">Map Making</a></li>
-                     <li><a href="development/modding">Modding</a></li>
-                     <li><a href="development/scripting">Scripting</a></li>
-                     <li><a href="development/debugging">Debugging</a></li>
-                 </ul>
+                <ul>
+                    <li><a href="development/map-making">Map Making</a></li>
+                    <li><a href="development/modding">Modding</a></li>
+                    <li><a href="development/scripting">Scripting</a></li>
+                    <li><a href="development/debugging">Debugging</a></li>
+                    <li><a href="custom_cursor">Custom Cursor Guide</a></li>
+                </ul>
             </div>
 
             <div class="section">
                 <h2>Tools</h2>
-                                 <ul>
-                     <li><a href="tools/radiant">Q3Radiant</a></li>
-                     <li><a href="tools/compiler">Map Compiler</a></li>
-                     <li><a href="tools/asset-tools">Asset Tools</a></li>
-                 </ul>
+                <ul>
+                    <li><a href="tools/radiant">Q3Radiant</a></li>
+                    <li><a href="tools/compiler">Map Compiler</a></li>
+                    <li><a href="tools/asset-tools">Asset Tools</a></li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h2>Core Systems</h2>
+                <ul>
+                    <li><a href="core/complete-core">Complete Core Systems</a></li>
+                    <li><a href="core/filesystem">Filesystem</a></li>
+                    <li><a href="core/memory-management">Memory Management</a></li>
+                    <li><a href="core/input-system">Input System</a></li>
+                    <li><a href="core/console-system">Console System</a></li>
+                    <li><a href="core/structured-logging">Structured Logging</a></li>
+                    <li><a href="core/memory-safety">Memory Safety</a></li>
+                    <li><a href="core/engine-subsystems">Engine Subsystems</a></li>
+                </ul>
             </div>
 
             <div class="section">
                 <h2>Rendering</h2>
-                                 <ul>
-                     <li><a href="rendering/vulkan">Vulkan Renderer</a></li>
-                     <li><a href="rendering/pbr">PBR</a></li>
-                     <li><a href="rendering/global-illumination">Global Illumination</a></li>
-                     <li><a href="rendering/directx12">DirectX 12 Renderer</a></li>
-                     <li><a href="rendering/animated-skybox">Animated Skybox</a></li>
-                 </ul>
-            </div>
-
-            <div class="section">
-                <h2>Physics</h2>
-                                 <ul>
-                     <li><a href="physics/physics">Physics</a></li>
-                 </ul>
+                <ul>
+                    <li><a href="rendering/complete-renderer">Complete Renderer Guide</a></li>
+                    <li><a href="rendering/vulkan">Vulkan Renderer</a></li>
+                    <li><a href="rendering/directx12">DirectX 12 Renderer</a></li>
+                    <li><a href="rendering/pbr">PBR Pipeline</a></li>
+                    <li><a href="rendering/ray-tracing">Ray Tracing</a></li>
+                    <li><a href="rendering/shaders">Shaders</a></li>
+                    <li><a href="rendering/animated-skybox">Animated Skybox</a></li>
+                </ul>
             </div>
 
             <div class="section">
                 <h2>Networking</h2>
-                                 <ul>
-                     <li><a href="networking/networking">Networking</a></li>
-                     <li><a href="networking/websocket">WebSocket Support</a></li>
-                 </ul>
-            </div>
-
-            <div class="section">
-                <h2>Sound</h2>
-                                 <ul>
-                     <li><a href="sound/sound">Sound</a></li>
-                 </ul>
-            </div>
-            
-            <div class="section">
-                <h2>Gameplay</h2>
-                                 <ul>
-                     <li><a href="gameplay/gameplay">Gameplay</a></li>
-                 </ul>
-            </div>
-            
-            <div class="section">
-                <h2>AI</h2>
-                                 <ul>
-                     <li><a href="ai/ai">AI</a></li>
-                     <li><a href="ai/pathfinding">Pathfinding</a></li>
-                     <li><a href="ai/behavior-trees">Behavior Trees</a></li>
-                     <li><a href="ai/goap">GOAP</a></li>
-                 </ul>
-            </div>
-            
-            <div class="section">
-                <h2>Animation</h2>
-                                 <ul>
-                     <li><a href="animation/animation">Animation</a></li>
-                 </ul>
+                <ul>
+                    <li><a href="networking/complete-networking">Complete Networking Guide</a></li>
+                    <li><a href="networking/networking">Networking</a></li>
+                    <li><a href="networking/websocket">WebSocket Support</a></li>
+                </ul>
             </div>
 
             <div class="section">
                 <h2>UI</h2>
-                                 <ul>
-                     <li><a href="ui/ui">UI</a></li>
-                 </ul>
-            </div>
-
-            <div class="section">
-                <h2>External Libraries</h2>
-                                 <ul>
-                     <li><a href="external/libraries">Libraries Overview</a></li>
-                     <li><a href="external/imgui-integration">ImGui Integration (C++)</a></li>
-                     <li><a href="external/cimgui-quake3e">CimGui + Quake3e Walkthrough</a></li>
-                     <li><a href="imgui">ImGui Debug Overlays</a></li>
-                 </ul>
-            </div>
-
-            <div class="section">
-                <h2>Core Engine</h2>
-                                 <ul>
-                     <li><a href="core/engine-subsystems">Engine Subsystems</a></li>
-                     <li><a href="core/main-loop">Main Loop Analysis</a></li>
-                     <li><a href="core/memory-management">Memory Management</a></li>
-                     <li><a href="core/memory-improvements">Memory System Improvements</a></li>
-                     <li><a href="core/memory-safety">Memory Safety & Profiling</a></li>
-                     <li><a href="core/structured-logging">Structured Logging</a></li>
-                     <li><a href="core/entity-system">Entity System</a></li>
-                     <li><a href="core/console-system">Console System</a></li>
-                     <li><a href="core/input-system">Input System</a></li>
-                     <li><a href="core/input-improvements">Input System Improvements</a></li>
-                     <li><a href="core/filesystem">File System</a></li>
-                     <li><a href="core/filesystem-improvements">Filesystem Improvements</a></li>
-                     <li><a href="core/virtual-machine">Virtual Machine (QVM)</a></li>
-                     <li><a href="core/qvm-improvements">QVM Improvements</a></li>
-                 </ul>
-            </div>
-
-            <div class="section">
-                <h2>Platform and Deployment</h2>
-                                 <ul>
-                     <li><a href="platform/cross-platform">Cross-Platform Development</a></li>
-                     <li><a href="platform/threading-concurrency">Threading and Concurrency</a></li>
-                     <li><a href="platform/mobile-console">Mobile and Console Ports</a></li>
-                 </ul>
-            </div>
-
-            <div class="section">
-                <h2>Renderer Deep Dive</h2>
-                                 <ul>
-                     <li><a href="renderer/vulkan-implementation">Vulkan Renderer</a></li>
-                     <li><a href="renderer/pbr-pipeline">PBR Pipeline</a></li>
-                     <li><a href="renderer/resource-management">Resource Management</a></li>
-                     <li><a href="renderer/renderdoc-debugging">RenderDoc Debugging</a></li>
-                 </ul>
+                <ul>
+                    <li><a href="ui/ui">UI System</a></li>
+                    <li><a href="imgui">ImGui Integration</a></li>
+                </ul>
             </div>
 
             <div class="section">
                 <h2>Modernization</h2>
-                                 <ul>
-                     <li><a href="modernization/modern-cpp">Modern C++ Features</a></li>
-                     <li><a href="modernization/build-systems">Build Systems</a></li>
-                     <li><a href="modernization/profiling-tools">Profiling Tools</a></li>
-                     <li><a href="modernization/package-management">Package Management</a></li>
-                     <li><a href="modernization/ci-cd">CI/CD Pipeline</a></li>
-                 </ul>
+                <ul>
+                    <li><a href="modernization/modern-cpp">Modern C++</a></li>
+                    <li><a href="modernization/build-systems">Build Systems</a></li>
+                    <li><a href="modernization/ci-cd">CI/CD Pipeline</a></li>
+                </ul>
             </div>
         </div>
         
@@ -231,207 +161,206 @@ ini_set('error_log', __DIR__ . '/error.log');
     </div>
 
     <script>
-        // Check if we're loading a direct URL and need to fetch content
-        function handleDirectUrl() {
-            const path = window.location.pathname;
-            console.log('Current path:', path);
-            if (path !== '/' && path !== '') {
-                // Remove leading slash and handle the path
-                const cleanPath = path.substring(1);
-                if (cleanPath) {
-                    console.log('Direct URL detected:', cleanPath);
-                    // Don't update history for initial load
-                    fetchContentDirect(cleanPath);
-                }
+        // State management
+        let currentPage = null;
+        let isLoading = false;
+
+        // Get DOM elements
+        const sectionsContainer = document.getElementById('sections-container');
+        const contentContainer = document.getElementById('content-container');
+        const backButton = document.getElementById('back-button');
+        const loadingIndicator = document.getElementById('loading');
+        const errorMessage = document.getElementById('error-message');
+
+        // Show/hide sections and content
+        function showContent() {
+            if (sectionsContainer) sectionsContainer.style.display = 'none';
+            if (contentContainer) {
+                contentContainer.style.display = 'block';
+                contentContainer.style.visibility = 'visible';
+                contentContainer.style.opacity = '1';
+            }
+            if (backButton) backButton.style.display = 'block';
+        }
+
+        function showSections() {
+            if (sectionsContainer) sectionsContainer.style.display = 'grid';
+            if (contentContainer) contentContainer.style.display = 'none';
+            if (backButton) backButton.style.display = 'none';
+        }
+
+        function setLoadingState(loading) {
+            isLoading = loading;
+            if (loadingIndicator) {
+                loadingIndicator.style.display = loading ? 'block' : 'none';
             }
         }
 
-        // Function to fetch content without updating history (for direct URLs)
-        async function fetchContentDirect(url) {
-            console.log('Fetching content for direct URL:', url);
-            setLoading(true);
-            toggleView(true);
-            
+        function showError(msg) {
+            if (errorMessage) {
+                errorMessage.textContent = msg;
+                errorMessage.style.display = 'block';
+                setTimeout(() => {
+                    errorMessage.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+        // Main content loading function
+        async function loadPage(url) {
+            // Prevent duplicate loads
+            if (isLoading || currentPage === url) {
+                return;
+            }
+
+            currentPage = url;
+            setLoadingState(true);
+            showError(''); // Clear any previous errors
+
             try {
-                const fetchUrl = `/app/core/content-handler.php?page=${encodeURIComponent(url)}`;
-                console.log('Making request to:', fetchUrl);
-                
-                const response = await fetch(fetchUrl, {
+                const response = await fetch(`/app/core/content-handler.php?page=${encodeURIComponent(url)}`, {
                     headers: {
                         'Accept': 'application/json',
                         'X-Requested-With': 'XMLHttpRequest'
                     }
                 });
-                
+
                 if (!response.ok) {
-                    throw new Error('Failed to load content');
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
-                
+
                 const contentType = response.headers.get('content-type');
                 if (!contentType || !contentType.includes('application/json')) {
-                    const textResponse = await response.text();
-                    console.error('Invalid response:', textResponse);
                     throw new Error('Invalid response format');
                 }
-                
+
                 const data = await response.json();
-                console.log('Direct URL response data:', data);
-                
-                if (data.success) {
-                    document.getElementById('content-container').innerHTML = data.content;
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to load content');
+                }
+
+                if (!data.content) {
+                    throw new Error('No content received');
+                }
+
+                // Set content
+                if (contentContainer) {
+                    contentContainer.innerHTML = data.content;
+                    
+                    // Show content view
+                    showContent();
+                    
+                    // Update title
                     if (data.title) {
                         document.title = data.title;
                     }
-                    // Don't update history for direct URL load
+                    
+                    // Update URL without reload
+                    history.pushState({ page: url, content: data.content }, data.title || '', '/' + url);
+                    
+                    // Scroll to top
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
                 } else {
-                    console.error('Server returned error:', data);
-                    throw new Error(data.error || 'Failed to load content');
+                    throw new Error('Content container not found');
                 }
+
             } catch (error) {
-                console.error('Direct URL fetch error:', error);
-                showError(error.message);
-                toggleView(false);
+                console.error('Error loading page:', error);
+                showError(`Failed to load page: ${error.message}`);
+                showSections();
+                currentPage = null;
             } finally {
-                setLoading(false);
+                setLoadingState(false);
             }
         }
 
-        // Utility function to show error message
-        function showError(message) {
-            const errorDiv = document.getElementById('error-message');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-            setTimeout(() => {
-                errorDiv.style.display = 'none';
-            }, 5000);
-        }
-        
-        // Function to show loading state
-        function setLoading(isLoading) {
-            document.getElementById('loading').style.display = isLoading ? 'block' : 'none';
-        }
-        
-        // Function to toggle view between sections and content
-        function toggleView(showContent) {
-            const sectionsContainer = document.getElementById('sections-container');
-            const contentContainer = document.getElementById('content-container');
-            const backButton = document.getElementById('back-button');
-            
-            sectionsContainer.style.display = showContent ? 'none' : 'grid';
-            contentContainer.style.display = showContent ? 'block' : 'none';
-            backButton.style.display = showContent ? 'block' : 'none';
-        }
-        
-        // Function to fetch and display content
-        async function fetchContent(url) {
-            console.log('Fetching content for URL:', url);
-            setLoading(true);
-            toggleView(true);
-            
-            try {
-                const fetchUrl = `/app/core/content-handler.php?page=${encodeURIComponent(url)}`;
-                console.log('Making request to:', fetchUrl);
-                
-                const response = await fetch(fetchUrl, {
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                });
-                
-                console.log('Response status:', response.status);
-                console.log('Response headers:', response.headers);
-                
-                if (!response.ok) {
-                    console.error('Response not OK:', response.status, response.statusText);
-                    throw new Error('Failed to load content');
-                }
-                
-                const contentType = response.headers.get('content-type');
-                console.log('Content type:', contentType);
-                
-                if (!contentType || !contentType.includes('application/json')) {
-                    console.error('Invalid content type:', contentType);
-                    const textResponse = await response.text();
-                    console.error('Response text:', textResponse);
-                    throw new Error('Invalid response format');
-                }
-                
-                const data = await response.json();
-                console.log('Response data:', data);
-                
-                if (data.success) {
-                    document.getElementById('content-container').innerHTML = data.content;
-                    if (data.title) {
-                        document.title = data.title;
-                    }
-                    // Update browser history with clean URL
-                    history.pushState({ content: data.content }, data.title || '', '/' + url);
-                } else {
-                    console.error('Server returned error:', data);
-                    throw new Error(data.error || 'Failed to load content');
-                }
-            } catch (error) {
-                console.error('Fetch error:', error);
-                showError(error.message);
-                toggleView(false);
-            } finally {
-                setLoading(false);
-            }
-        }
+        // Handle link clicks (event delegation)
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest('a');
+            if (!link || !link.hasAttribute('href')) return;
 
-        // Add click handlers to all links
-        document.querySelectorAll('.section a').forEach(link => {
-            link.addEventListener('click', function(e) {
-                e.preventDefault();
-                fetchContent(this.getAttribute('href'));
-            });
+            const href = link.getAttribute('href');
+            
+            // Skip external links, anchors, and special protocols
+            if (href.startsWith('http') || href.startsWith('mailto:') || href.startsWith('#')) {
+                return;
+            }
+
+            e.preventDefault();
+            loadPage(href);
         });
 
         // Back button handler
-        document.getElementById('back-button').addEventListener('click', () => {
-            toggleView(false);
-            document.title = 'id Tech 3 Engine Documentation';
-            history.pushState(null, 'id Tech 3 Engine Documentation', '/');
-        });
-
-        // Search functionality
-        document.getElementById('search').addEventListener('input', function(e) {
-            const searchTerm = e.target.value.toLowerCase();
-            const sections = document.querySelectorAll('.section');
-            
-            sections.forEach(section => {
-                const links = section.querySelectorAll('a');
-                let hasMatch = false;
-                
-                links.forEach(link => {
-                    const text = link.textContent.toLowerCase();
-                    const linkElement = link.parentElement;
-                    
-                    if (text.includes(searchTerm)) {
-                        hasMatch = true;
-                        linkElement.style.display = 'block';
-                    } else {
-                        linkElement.style.display = 'none';
-                    }
-                });
-                
-                section.style.display = hasMatch || searchTerm === '' ? 'block' : 'none';
+        if (backButton) {
+            backButton.addEventListener('click', () => {
+                showSections();
+                document.title = 'id Tech 3 Engine Documentation';
+                history.pushState(null, '', '/');
+                currentPage = null;
             });
-        });
+        }
 
-        // Handle browser navigation
+        // Handle browser back/forward
         window.addEventListener('popstate', (e) => {
-            if (e.state && e.state.content) {
-                document.getElementById('content-container').innerHTML = e.state.content;
-                toggleView(true);
+            if (e.state && e.state.content && contentContainer) {
+                contentContainer.innerHTML = e.state.content;
+                showContent();
+                if (e.state.title) {
+                    document.title = e.state.title;
+                }
+                currentPage = e.state.page;
             } else {
-                toggleView(false);
+                showSections();
+                document.title = 'id Tech 3 Engine Documentation';
+                currentPage = null;
             }
         });
 
-        // Initialize direct URL handling when page loads
-        document.addEventListener('DOMContentLoaded', handleDirectUrl);
+        // Handle direct URL loads (when page is refreshed or opened directly)
+        function handleDirectUrl() {
+            const path = window.location.pathname;
+            if (path && path !== '/' && path !== '') {
+                const cleanPath = path.substring(1); // Remove leading slash
+                if (cleanPath) {
+                    loadPage(cleanPath);
+                }
+            }
+        }
+
+        // Search functionality
+        const searchInput = document.getElementById('search');
+        if (searchInput) {
+            searchInput.addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase();
+                const sections = document.querySelectorAll('#sections-container .section');
+                
+                sections.forEach(section => {
+                    const links = section.querySelectorAll('a');
+                    let hasMatch = false;
+                    
+                    links.forEach(link => {
+                        const text = link.textContent.toLowerCase();
+                        const parent = link.parentElement;
+                        if (text.includes(term)) {
+                            hasMatch = true;
+                            if (parent) parent.style.display = 'block';
+                        } else {
+                            if (parent) parent.style.display = 'none';
+                        }
+                    });
+                    
+                    section.style.display = (hasMatch || term === '') ? 'block' : 'none';
+                });
+            });
+        }
+
+        // Initialize: handle direct URL if present
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', handleDirectUrl);
+        } else {
+            handleDirectUrl();
+        }
     </script>
 </body>
 </html>
