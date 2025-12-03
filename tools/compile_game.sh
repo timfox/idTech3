@@ -4,9 +4,10 @@
 
 set -e
 
-# Get absolute paths BEFORE changing directory
+# Determine absolute paths relative to /tools directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$SCRIPT_DIR"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 MOD_NAME="${1:-mymod}"
 MOD_ROOT="$PROJECT_ROOT/$MOD_NAME"
 MOD_SOURCE_DIR="$MOD_ROOT/gamesrc"

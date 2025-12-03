@@ -1,30 +1,36 @@
 #!/bin/bash
 
-# Package Mod Script - Creates pak0.pk3 from mymod directory
+# Package Mod Script (from /tools) - Creates pak0.pk3 for a mod in /release/mymod
 
 set -e
 
-# Get absolute paths
+# Determine absolute paths relative to /tools
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$SCRIPT_DIR"
-MOD_SOURCE_DIR="$PROJECT_ROOT/mymod"
-BUILD_DIR="$PROJECT_ROOT/build"
-MOD_DIR="$BUILD_DIR/mymod"
-PAK_FILE="$MOD_DIR/pak0.pk3"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Use mod name as argument, or default to mymod
+MOD_NAME="${1:-mymod}"
+MOD_SOURCE_DIR="$PROJECT_ROOT/$MOD_NAME"
+RELEASE_MOD_DIR="$PROJECT_ROOT/release/$MOD_NAME"
+PAK_FILE="$RELEASE_MOD_DIR/pak0.pk3"
 
 echo "Packaging mod into pak0.pk3..."
-echo "Source: $MOD_SOURCE_DIR"
-echo "Output: $PAK_FILE"
+echo " Mod source: $MOD_SOURCE_DIR"
+echo " Output pak: $PAK_FILE"
 
-# Ensure mod directory exists
-mkdir -p "$MOD_DIR"
+# Ensure release mod directory exists
+mkdir -p "$RELEASE_MOD_DIR"
+
+# Verify mod source exists
+if [ ! -d "$MOD_SOURCE_DIR" ]; then
+    echo "Error: Mod source directory '$MOD_SOURCE_DIR' does not exist!"
+    exit 1
+fi
 
 # Change to mod source directory
 cd "$MOD_SOURCE_DIR"
 
 # Create pak0.pk3, excluding build artifacts and source files
-# Include: all game assets, configs, shaders
-# Exclude: build/, vm/, gamesrc/build/, source files, docs
 zip -r "$PAK_FILE" . \
     -x "build/*" \
     -x "vm/*" \
@@ -72,4 +78,4 @@ fi
 
 echo ""
 echo "Mod packaging completed!"
-echo "  pak0.pk3 is ready in: $MOD_DIR"
+echo "  pak0.pk3 is ready in: $RELEASE_MOD_DIR"

@@ -7,20 +7,27 @@ set -e
 # Set build type, default to Release, or use BUILD_TYPE=Debug for debug builds
 BUILD_TYPE=${BUILD_TYPE:-Release}
 
+# Determine project root directory (parent of /tools)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 echo "Building id Tech 3 engine (${BUILD_TYPE})..."
 
-# Remove and recreate build directory to ensure a clean build
-if [ -d build ]; then
+# Remove and recreate build directory in project root to ensure a clean build
+BUILD_DIR="$PROJECT_ROOT/build"
+RELEASE_DIR="$PROJECT_ROOT/release"
+
+if [ -d "$BUILD_DIR" ]; then
     echo "Clearing build directory..."
-    rm -rf build
+    rm -rf "$BUILD_DIR"
 fi
-mkdir build
+mkdir "$BUILD_DIR"
 
-cd build
+cd "$BUILD_DIR"
 
-# Run CMake configuration
+# Run CMake configuration from build dir, pointing to root as source dir
 echo "Running CMake configuration..."
-cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} ..
+cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} "$PROJECT_ROOT"
 
 # Determine number of CPU cores for parallel build
 if command -v nproc &>/dev/null; then
@@ -35,15 +42,14 @@ echo "Building with ${CORES} parallel jobs..."
 cmake --build . -- -j${CORES}
 
 echo ""
-echo "Build completed. Binaries are in the build directory."
-echo "  - Client: build/idtech3.x86_64"
-echo "  - Server: build/idtech3.ded.x86_64"
-echo "  - Renderers: build/idtech3_*.so"
+echo "Build completed. Binaries are in the build directory ($BUILD_DIR)."
+echo "  - Client:   $BUILD_DIR/idtech3.x86_64"
+echo "  - Server:   $BUILD_DIR/idtech3.ded.x86_64"
+echo "  - Renderers: $BUILD_DIR/idtech3_*.so"
 
 # Move .so files to /release directory, overwrite if they exist
 echo ""
-echo "Copying engine binaries and renderer .so files to /release..."
-RELEASE_DIR="../release"
+echo "Copying engine binaries and renderer .so files to $RELEASE_DIR..."
 if [ ! -d "$RELEASE_DIR" ]; then
     echo "Creating $RELEASE_DIR..."
     mkdir -p "$RELEASE_DIR"
@@ -69,4 +75,3 @@ if [ -f "libimgui_shared.so" ]; then
 fi
 
 echo "Engine binary and renderer .so files updated in $RELEASE_DIR"
-
