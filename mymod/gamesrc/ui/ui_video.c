@@ -1,25 +1,3 @@
-/*
-===========================================================================
-Copyright (C) 1999-2005 Id Software, Inc.
-
-This file is part of Quake III Arena source code.
-
-Quake III Arena source code is free software; you can redistribute it
-and/or modify it under the terms of the GNU General Public License as
-published by the Free Software Foundation; either version 2 of the License,
-or (at your option) any later version.
-
-Quake III Arena source code is distributed in the hope that it will be
-useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with Quake III Arena source code; if not, write to the Free Software
-Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-===========================================================================
-*/
-//
 #include "ui_local.h"
 
 void GraphicsOptions_MenuInit( void );
@@ -349,7 +327,8 @@ GRAPHICS OPTIONS MENU
 #define ID_DISPLAY		107
 #define ID_SOUND		108
 #define ID_NETWORK		109
-#define ID_RATIO                110
+#define ID_RENDERING		110
+#define ID_RATIO                111
 // Advanced rendering features
 #define ID_RAYTRACING		111
 #define ID_RT_SAMPLES		112
@@ -1212,6 +1191,11 @@ static void GraphicsOptions_Event( void* ptr, int event ) {
 		UI_PopMenu();
 		UI_NetworkOptionsMenu();
 		break;
+
+	case ID_RENDERING:
+		UI_PopMenu();
+		UI_RenderingOptionsMenu();
+		break;
 	}
 }
 
@@ -1730,6 +1714,16 @@ void GraphicsOptions_MenuInit( void )
 	s_graphicsoptions.network.style				= UI_RIGHT;
 	s_graphicsoptions.network.color				= color_red;
 
+	s_graphicsoptions.rendering.generic.type		= MTYPE_PTEXT;
+	s_graphicsoptions.rendering.generic.flags	= QMF_RIGHT_JUSTIFY|QMF_PULSEIFFOCUS;
+	s_graphicsoptions.rendering.generic.id		= ID_RENDERING;
+	s_graphicsoptions.rendering.generic.callback	= GraphicsOptions_Event;
+	s_graphicsoptions.rendering.generic.x		= 216;
+	s_graphicsoptions.rendering.generic.y		= 240 + 2 * PROP_HEIGHT;
+	s_graphicsoptions.rendering.string			= "RENDERING";
+	s_graphicsoptions.rendering.style			= UI_RIGHT;
+	s_graphicsoptions.rendering.color			= color_red;
+
 	y = 240 - 7 * (BIGCHAR_HEIGHT + 2);
 	s_graphicsoptions.list.generic.type     = MTYPE_SPINCONTROL;
 	s_graphicsoptions.list.generic.name     = "Graphics Settings:";
@@ -2137,6 +2131,7 @@ void GraphicsOptions_MenuInit( void )
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.display );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.sound );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.network );
+	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.rendering );
 
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.list );
 	Menu_AddItem( &s_graphicsoptions.menu, ( void * ) &s_graphicsoptions.driver );

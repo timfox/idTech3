@@ -13,6 +13,12 @@ Core system implementations for physics, health, and network sync.
 #include "ecs_internal.h"
 #include <entt/entt.hpp>
 
+#ifdef USE_LUA
+extern "C" {
+	void Lua_Entity_Update(float deltaTime);
+}
+#endif
+
 #ifdef USE_BULLET
 #include <btBulletDynamicsCommon.h>
 
@@ -317,7 +323,6 @@ Update entity scripts (call OnUpdate hooks)
 */
 void ECS_ScriptSystem_Update(float deltaTime) {
 #ifdef USE_LUA
-	extern void Lua_Entity_Update(float deltaTime);
 	Lua_Entity_Update(deltaTime);
 #endif
 	(void)deltaTime;  // Suppress unused warning if USE_LUA is off

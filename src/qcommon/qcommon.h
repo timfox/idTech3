@@ -252,11 +252,21 @@ int			OpenSSL_Base64_Decode( const char *input, byte *output, int outputMaxLen )
 #endif
 
 #ifdef USE_LUA
+#ifdef __cplusplus
+extern "C" {
 #include <lua.h>
+}
+#else
+#include <lua.h>
+#endif
+#ifdef __cplusplus
+extern "C" {
+#endif
 void		Lua_Init( void );
 void		Lua_Shutdown( void );
 lua_State *	Lua_CreateState( void );
 lua_State *	Lua_GetMainState( void );
+lua_State *	Lua_GetGlobalState( void );
 void		Lua_DestroyState( lua_State *L );
 qboolean	Lua_LoadFile( lua_State *L, const char *filename );
 qboolean	Lua_LoadString( lua_State *L, const char *code );
@@ -303,6 +313,9 @@ void		Lua_Sequence_Shutdown( void );
 void		Lua_Sequence_Update( float deltaTime );
 void		Lua_Sequence_RegisterBindings( lua_State *L );
 void		Lua_SetGlobal( lua_State *L, const char *name );
+#ifdef __cplusplus
+}
+#endif
 void		Lua_GetGlobal( lua_State *L, const char *name );
 int			Lua_GetTop( lua_State *L );
 void		Lua_SetTop( lua_State *L, int index );
@@ -1102,7 +1115,13 @@ void		Info_Print( const char *s );
 
 void		Com_BeginRedirect (char *buffer, int buffersize, void (*flush)(const char *));
 void		Com_EndRedirect( void );
+#ifdef __cplusplus
+extern "C" {
+#endif
 void 		QDECL Com_Printf( const char *fmt, ... ) __attribute__ ((format (printf, 1, 2)));
+#ifdef __cplusplus
+}
+#endif
 void 		QDECL Com_DPrintf( const char *fmt, ... ) __attribute__ ((format (printf, 1, 2)));
 void 		Com_Quit_f( void );
 void 		Com_Help_f( void );

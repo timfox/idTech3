@@ -154,7 +154,7 @@ extern "C" qhandle_t R_RegisterAssimpModel( const char *name, model_t *mod )
 	md3Surface_t *surf = (md3Surface_t *)( (byte *)hdr + LittleLong( hdr->ofsSurfaces ) );
 	Com_Memset( surf, 0, sizeof( md3Surface_t ) );
 
-	Com_Memcpy( surf->ident, "IDP3", 4 );
+	surf->ident = MD3_IDENT;
 	Q_strncpyz( surf->name, "assimp_mesh", sizeof( surf->name ) );
 
 	surf->numFrames   = LittleLong( numFrames );
@@ -214,9 +214,9 @@ extern "C" qhandle_t R_RegisterAssimpModel( const char *name, model_t *mod )
 		const aiVector3D n  = mesh->HasNormals() ? mesh->mNormals[v] : aiVector3D( 0.0f, 0.0f, 1.0f );
 
 		// MD3 stores positions as 1/64 units
-		xyz[v].xyz[0] = (short)Q_clamp( (int)( p.x * 64.0f ), -32768, 32767 );
-		xyz[v].xyz[1] = (short)Q_clamp( (int)( p.y * 64.0f ), -32768, 32767 );
-		xyz[v].xyz[2] = (short)Q_clamp( (int)( p.z * 64.0f ), -32768, 32767 );
+		xyz[v].xyz[0] = (short)Com_Clamp( -32768.0f, 32767.0f, (float)(int)( p.x * 64.0f ) );
+		xyz[v].xyz[1] = (short)Com_Clamp( -32768.0f, 32767.0f, (float)(int)( p.y * 64.0f ) );
+		xyz[v].xyz[2] = (short)Com_Clamp( -32768.0f, 32767.0f, (float)(int)( p.z * 64.0f ) );
 
 		// Encode normal into lat/long as in standard MD3
 		{

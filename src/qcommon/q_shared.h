@@ -800,7 +800,13 @@ void Parse1DMatrix( const char **buf_p, int x, float *m);
 void Parse2DMatrix( const char **buf_p, int y, int x, float *m);
 void Parse3DMatrix( const char **buf_p, int z, int y, int x, float *m);
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 int QDECL Com_sprintf( char *dest, int size, const char *fmt, ... ) __attribute__ ((format (printf, 3, 4)));
+#ifdef __cplusplus
+}
+#endif
 
 int Com_Split( char *in, char **out, int outsz, int delim );
 int Com_HexStrToInt( const char *str );
@@ -850,7 +856,13 @@ qboolean Q_isanumber( const char *s );
 qboolean Q_isintegral( float f );
 
 // buffer size safe library replacements
+#ifdef __cplusplus
+extern "C" {
+#endif
 void	Q_strncpyz( char *dest, const char *src, int destsize );
+#ifdef __cplusplus
+}
+#endif
 void	Q_strcat( char *dest, int size, const char *src );
 
 int     Q_replace( const char *str1, const char *str2, char *src, int max_len );
@@ -927,8 +939,14 @@ const char *Info_NextPair( const char *s, char *key, char *value );
 int Info_RemoveKey( char *s, const char *key );
 
 // this is only here so the functions in q_shared.c and bg_*.c can link
+#ifdef __cplusplus
+extern "C" {
+#endif
 void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t level, const char *fmt, ... );
 void FORMAT_PRINTF(1, 2) QDECL Com_Printf( const char *msg, ... );
+#ifdef __cplusplus
+}
+#endif
 
 
 /*

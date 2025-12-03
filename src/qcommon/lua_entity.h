@@ -14,7 +14,17 @@ Attaches Lua scripts to ECS entities with lifecycle hooks.
 
 #ifdef USE_LUA
 
+#ifdef __cplusplus
+extern "C" {
 #include <lua.h>
+}
+#else
+#include <lua.h>
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
 =================
@@ -82,6 +92,10 @@ L: Lua state
 =================
 */
 void Lua_Entity_RegisterBindings(lua_State *L);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // USE_LUA
 

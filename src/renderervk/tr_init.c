@@ -115,6 +115,17 @@ cvar_t	*r_cubeMapping;
 	cvar_t	*r_rt_shadowRays;
 	cvar_t	*r_rt_adaptiveSampling;
 #endif
+	cvar_t	*r_pathtracing;
+	cvar_t	*r_pt_samples;
+	cvar_t	*r_pt_bounces;
+	cvar_t	*r_pt_maxDepth;
+	cvar_t	*r_pt_denoise;
+	cvar_t	*r_pt_denoiseIterations;
+	cvar_t	*r_pt_temporal;
+	cvar_t	*r_pt_temporalAlpha;
+	cvar_t	*r_pt_gi;
+	cvar_t	*r_pt_giIntensity;
+	cvar_t	*r_pt_outputScale;
 	cvar_t	*r_postprocess_compute;
 	cvar_t	*r_postprocess_workgroup;
 	cvar_t	*r_meshShaders;

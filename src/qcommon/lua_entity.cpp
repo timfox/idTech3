@@ -11,14 +11,17 @@ Attaches Lua scripts to ECS entities with lifecycle hooks.
 
 #ifdef USE_LUA
 
+extern "C" {
+#include <lua.h>
+#include <lauxlib.h>
+}
+
 #include "lua_entity.h"
 #include "lua_events.h"
 #ifdef USE_ENTT
 #include "ecs_components.h"
 #include "ecs_internal.h"
 #endif
-#include <lua.h>
-#include <lauxlib.h>
 #include <string.h>
 
 static qboolean s_initialized = qfalse;
@@ -239,14 +242,11 @@ void Lua_Entity_CallHook(ecs_entity_t entity, const char *hook_name, int num_arg
 	}
 
 	// Get Lua state
-	extern lua_State *lua_states[];
-	extern int num_lua_states;
-	
-	if (num_lua_states == 0) {
+	extern lua_State *Lua_GetMainState(void);
+	lua_State *L = Lua_GetMainState();
+	if (!L) {
 		return;
 	}
-
-	lua_State *L = lua_states[0];
 	if (!L) {
 		return;
 	}
@@ -310,14 +310,11 @@ void Lua_Entity_Update(float deltaTime)
 	auto view = registry.view<ScriptComponent>();
 
 	// Get Lua state
-	extern lua_State *lua_states[];
-	extern int num_lua_states;
-	
-	if (num_lua_states == 0) {
+	extern lua_State *Lua_GetMainState(void);
+	lua_State *L = Lua_GetMainState();
+	if (!L) {
 		return;
 	}
-
-	lua_State *L = lua_states[0];
 	if (!L) {
 		return;
 	}

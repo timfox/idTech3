@@ -202,7 +202,7 @@ Unsubscribe a Lua function from an event (internal)
 */
 static void Lua_Events_Unsubscribe(lua_State *L, const char *event_name, int callback_ref)
 {
-	int i, j;
+	int i;
 	event_entry_t *entry;
 
 	if (!s_initialized) {
@@ -433,7 +433,7 @@ Lua binding: Events.off(event_name, callback)
 static int Lua_Events_Off(lua_State *L)
 {
 	const char *event_name;
-	int i, j;
+	int i;
 	event_entry_t *entry;
 
 	if (lua_gettop(L) < 2) {

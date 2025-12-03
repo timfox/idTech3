@@ -126,7 +126,7 @@ static int Lua_GameGetEntityCount(lua_State *L)
 	extern ecs_registry_t *ECS_GetRegistry(void);
 	if (ECS_GetRegistry()) {
 		entt::registry &registry = ECS::GetRegistry();
-		int count = (int)registry.alive();
+		int count = (int)registry.storage<entt::entity>().size();
 		lua_pushinteger(L, count);
 	} else {
 		lua_pushinteger(L, 0);
@@ -183,11 +183,8 @@ void Lua_RegisterGameBindings(lua_State *L)
 	Lua_RegisterFunction(L, "game_entity_exists", Lua_GameEntityExists);
 	
 	// Additional bindings for ECS and physics
-#ifdef USE_ENTT
-	Lua_RegisterFunction(L, "game_entity_get_position", Lua_GameEntityGetPosition);
-	Lua_RegisterFunction(L, "game_entity_set_position", Lua_GameEntitySetPosition);
-	Lua_RegisterFunction(L, "game_entity_attach_script", Lua_GameEntityAttachScript);
-#endif
+	// Note: Entity position and script functions are available via Entity.* API
+	// These are registered in lua_entity.cpp
 }
 
 #endif // USE_LUA

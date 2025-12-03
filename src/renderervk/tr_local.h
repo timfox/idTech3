@@ -682,7 +682,15 @@ typedef enum {
 } portalView_t;
 
 typedef struct {
+#ifdef __cplusplus
+	orientationr_t	orientation; // 'or' is a C++ keyword
+#else
+#ifdef __cplusplus
+	orientationr_t	orientation; // 'or' is a C++ keyword
+#else
 	orientationr_t	or;
+#endif
+#endif
 	orientationr_t	world;
 	vec3_t		pvsOrigin;			// may be different than or.origin for portals
 	portalView_t portalView;
@@ -1181,7 +1189,11 @@ enum {
 typedef struct {
 	trRefdef_t	refdef;
 	viewParms_t	viewParms;
+#ifdef __cplusplus
+	orientationr_t	orientation; // 'or' is a C++ keyword
+#else
 	orientationr_t	or;
+#endif
 	backEndCounters_t	pc;
 	qboolean	isHyperspace;
 	const trRefEntity_t *currentEntity;
@@ -1299,7 +1311,11 @@ typedef struct {
 	int						identityLightByte;	// identityLight * 255
 	int						overbrightBits;		// r_overbrightBits->integer, but set to 0 if no hw gamma
 
+#ifdef __cplusplus
+	orientationr_t			orientation;		// for current entity ('or' is a C++ keyword)
+#else
 	orientationr_t			or;					// for current entity
+#endif
 
 	trRefdef_t				refdef;
 
@@ -1582,7 +1598,11 @@ int R_CullLocalPointAndRadius( const vec3_t origin, float radius );
 int R_CullDlight( const dlight_t *dl );
 
 void R_SetupProjection( viewParms_t *dest, float zProj, qboolean computeFrustum );
+#ifdef __cplusplus
+void R_RotateForEntity( const trRefEntity_t *ent, const viewParms_t *viewParms, orientationr_t *orientation );
+#else
 void R_RotateForEntity( const trRefEntity_t *ent, const viewParms_t *viewParms, orientationr_t *or );
+#endif
 
 // Matrix functions
 typedef vec_t mat4_t[16];
@@ -1833,7 +1853,11 @@ LIGHTS
 */
 void R_DlightBmodel( bmodel_t *bmodel );
 void R_SetupEntityLighting( const trRefdef_t *refdef, trRefEntity_t *ent );
+#ifdef __cplusplus
+void R_TransformDlights( int count, dlight_t *dl, orientationr_t *orientation );
+#else
 void R_TransformDlights( int count, dlight_t *dl, orientationr_t *or );
+#endif
 int R_LightForPoint( vec3_t point, vec3_t ambientLight, vec3_t directedLight, vec3_t lightDir );
 #ifdef USE_VK_PBR
 int R_LightDirForPoint( vec3_t point, vec3_t lightDir, vec3_t normal, world_t *world );

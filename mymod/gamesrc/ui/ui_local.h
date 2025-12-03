@@ -494,6 +494,7 @@ extern void ServerInfo_Cache( void );
 // ui_video.c
 //
 extern void UI_GraphicsOptionsMenu( void );
+extern void UI_RenderingOptionsMenu( void );
 extern void GraphicsOptions_Cache( void );
 extern void DriverInfo_Cache( void );
 

@@ -6,6 +6,10 @@ Provides unified threading API across Windows, Linux, macOS.
 ===========================================================================
 */
 
+#ifndef _WIN32
+	#define _GNU_SOURCE // For pthread_setname_np (must be before any includes)
+#endif
+
 #include "q_shared.h"
 #include "qcommon.h"
 #include "thread_platform.h"
@@ -16,6 +20,14 @@ Provides unified threading API across Windows, Linux, macOS.
 	#include <pthread.h>
 	#include <unistd.h>
 	#include <sys/syscall.h>
+	#ifdef __linux__
+		// pthread_setname_np is available on Linux with _GNU_SOURCE
+		#ifndef pthread_setname_np
+			// Fallback: use prctl if pthread_setname_np is not available
+			#include <sys/prctl.h>
+			#define pthread_setname_np(thread, name) prctl(PR_SET_NAME, name)
+		#endif
+	#endif
 #endif
 
 /*

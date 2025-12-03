@@ -218,7 +218,7 @@ static int Lua_Sequence_Define(lua_State *L)
 	}
 
 	// Allocate steps
-	seq->steps = (sequence_step_t *)Z_Malloc(sizeof(sequence_step_t) * num_steps, TAG_STATIC);
+	seq->steps = (sequence_step_t *)Z_Malloc(sizeof(sequence_step_t) * num_steps);
 	seq->num_steps = num_steps;
 	seq->total_time = 0.0f;
 
