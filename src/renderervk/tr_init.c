@@ -2110,6 +2110,12 @@ void R_Init( void ) {
 #endif
 
 	R_InitShaders();
+	
+#ifdef USE_VULKAN
+	// Update font textures to use nearest filtering (fixes blurry fonts)
+	extern void vk_update_font_textures( void );
+	vk_update_font_textures();
+#endif
 
 	R_InitSkins();
 

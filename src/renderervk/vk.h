@@ -483,6 +483,7 @@ extern PFN_vkGetBufferDeviceAddress qvkGetBufferDeviceAddress;
 void vk_create_image( image_t *image, int width, int height, int mip_levels );
 void vk_upload_image_data( image_t *image, int x, int y, int width, int height, int miplevels, byte *pixels, int size, qboolean update );
 void vk_update_descriptor_set( image_t *image, qboolean mipmap );
+void vk_update_font_textures( void );
 void vk_destroy_image_resources( VkImage *image, VkImageView *imageView );
 void vk_update_attachment_descriptors( void );
 void vk_destroy_samplers( void );

@@ -43,7 +43,9 @@ MAIN MENU
 #define ID_EXIT					17
 
 #define MAIN_BANNER_MODEL				"models/mapobjects/banner/cube.obj"
-#define MAIN_MENU_VERTICAL_SPACING		34
+#define MAIN_MENU_VERTICAL_SPACING		38  // Increased spacing for better readability
+#define MAIN_MENU_ANIMATION_SPEED		0.003f  // Animation speed multiplier
+#define MAIN_MENU_PULSE_INTENSITY		0.15f   // Pulse effect intensity
 
 
 typedef struct {
@@ -165,7 +167,9 @@ static void Main_MenuDraw( void )
 	vec3_t			angles;
 	float			adjust;
 	float			x, y, w, h;
-	vec4_t			color = {0.2, 0.2, 1.0, 1};
+	vec4_t			color = {0.25f, 0.35f, 0.95f, 1.0f};  // Improved blue color
+	vec4_t			titleColor = {1.0f, 1.0f, 1.0f, 1.0f};  // White for title
+	float			pulse = 1.0f + MAIN_MENU_PULSE_INTENSITY * sin( uis.realtime * MAIN_MENU_ANIMATION_SPEED );
 
 	// setup the refdef
 
@@ -261,13 +265,18 @@ static void Main_MenuDraw( void )
 		Menu_Draw( &s_main.menu );
 	}
 
+	// Draw mod title with improved styling
+	vec4_t titleColorPulse;
+	Vector4Copy( titleColor, titleColorPulse );
+	titleColorPulse[3] *= pulse;  // Pulse alpha for subtle effect
 	UI_DrawProportionalString( 320, 372, "", UI_CENTER|UI_SMALLFONT, color );
-	UI_DrawString( 320, 400, "My Mod Template", UI_CENTER|UI_SMALLFONT, color );
+	UI_DrawProportionalString( 320, 400, "MY MOD TEMPLATE", UI_CENTER|UI_SMALLFONT|UI_DROPSHADOW, titleColorPulse );
 
-	//Draw version.
-	UI_DrawString( 640-40, 480-14, "^7My Mod Template", UI_SMALLFONT, color );
+	// Draw version info with better positioning and styling
+	vec4_t versionColor = {0.7f, 0.7f, 0.7f, 0.8f};  // Subtle gray
+	UI_DrawString( 640-20, 480-16, "^7v1.0", UI_SMALLFONT|UI_RIGHT, versionColor );
 	if ((int)trap_Cvar_VariableValue("protocol")!=68) { // OA_STD_PROTOCOL
-		UI_DrawString( 0, 480-14, va("^7Protocol: %i",(int)trap_Cvar_VariableValue("protocol")), UI_SMALLFONT, color);
+		UI_DrawString( 20, 480-16, va("^7Protocol: %i",(int)trap_Cvar_VariableValue("protocol")), UI_SMALLFONT, versionColor);
 	}
 }
 
@@ -313,10 +322,10 @@ void UI_MainMenu( void )
 {
 	int		y;
 	qboolean teamArena = qfalse;
-	int		style = UI_CENTER | UI_DROPSHADOW;
+	int		style = UI_CENTER | UI_DROPSHADOW | UI_BIGFONT;
 
 	trap_Cvar_Set( "sv_killserver", "1" );
-	trap_Cvar_SetValue( "handicap", 100 ); //Reset handicap during server change, it must be ser per game
+	trap_Cvar_SetValue( "handicap", 100 ); //Reset handicap during server change
 
 	memset( &s_main, 0 ,sizeof(mainmenu_t) );
 	memset( &s_errorMessage, 0 ,sizeof(errorMessage_t) );
@@ -344,9 +353,9 @@ void UI_MainMenu( void )
 	s_main.menu.wrapAround = qtrue;
 	s_main.menu.showlogo = qtrue;
 
-	y = 134;
+	y = 130;
 	s_main.singleplayer.generic.type		= MTYPE_PTEXT;
-	s_main.singleplayer.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
+	s_main.singleplayer.generic.flags		= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS|QMF_HIGHLIGHT_IF_FOCUS;
 	s_main.singleplayer.generic.x			= 320;
 	s_main.singleplayer.generic.y			= y;
 	s_main.singleplayer.generic.id			= ID_SINGLEPLAYER;
@@ -368,29 +377,29 @@ void UI_MainMenu( void )
 
 	y += MAIN_MENU_VERTICAL_SPACING;
 	s_main.setup.generic.type				= MTYPE_PTEXT;
-	s_main.setup.generic.flags				= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
+	s_main.setup.generic.flags				= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS|QMF_HIGHLIGHT_IF_FOCUS;
 	s_main.setup.generic.x					= 320;
 	s_main.setup.generic.y					= y;
 	s_main.setup.generic.id					= ID_SETUP;
 	s_main.setup.generic.callback			= Main_MenuEvent;
-	s_main.setup.string						= "SETUP";
+	s_main.setup.string						= "SETTINGS";
 	s_main.setup.color						= color_red;
 	s_main.setup.style						= style;
 
 	y += MAIN_MENU_VERTICAL_SPACING;
 	s_main.demos.generic.type				= MTYPE_PTEXT;
-	s_main.demos.generic.flags				= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
+	s_main.demos.generic.flags				= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS|QMF_HIGHLIGHT_IF_FOCUS;
 	s_main.demos.generic.x					= 320;
 	s_main.demos.generic.y					= y;
 	s_main.demos.generic.id					= ID_DEMOS;
 	s_main.demos.generic.callback			= Main_MenuEvent;
-	s_main.demos.string						= "DEMOS";
+	s_main.demos.string						= "REPLAYS";
 	s_main.demos.color						= color_red;
 	s_main.demos.style						= style;
 
 	y += MAIN_MENU_VERTICAL_SPACING;
 	s_main.cinematics.generic.type			= MTYPE_PTEXT;
-	s_main.cinematics.generic.flags			= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
+	s_main.cinematics.generic.flags			= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS|QMF_HIGHLIGHT_IF_FOCUS;
 	s_main.cinematics.generic.x				= 320;
 	s_main.cinematics.generic.y				= y;
 	s_main.cinematics.generic.id			= ID_CINEMATICS;
@@ -401,7 +410,7 @@ void UI_MainMenu( void )
 
 	y += MAIN_MENU_VERTICAL_SPACING;
 	s_main.challenges.generic.type			= MTYPE_PTEXT;
-	s_main.challenges.generic.flags			= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
+	s_main.challenges.generic.flags			= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS|QMF_HIGHLIGHT_IF_FOCUS;
 	s_main.challenges.generic.x				= 320;
 	s_main.challenges.generic.y				= y;
 	s_main.challenges.generic.id			= ID_CHALLENGES;
@@ -424,20 +433,9 @@ void UI_MainMenu( void )
 		s_main.teamArena.style					= style;
 	}
 
-	/*y += MAIN_MENU_VERTICAL_SPACING;
-	s_main.mods.generic.type			= MTYPE_PTEXT;
-	s_main.mods.generic.flags			= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
-	s_main.mods.generic.x				= 320;
-	s_main.mods.generic.y				= y;
-	s_main.mods.generic.id				= ID_MODS;
-	s_main.mods.generic.callback		= Main_MenuEvent;
-	s_main.mods.string					= "MODS";
-	s_main.mods.color					= color_red;
-	s_main.mods.style					= style;*/
-
 	y += MAIN_MENU_VERTICAL_SPACING;
 	s_main.exit.generic.type				= MTYPE_PTEXT;
-	s_main.exit.generic.flags				= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
+	s_main.exit.generic.flags				= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS|QMF_HIGHLIGHT_IF_FOCUS;
 	s_main.exit.generic.x					= 320;
 	s_main.exit.generic.y					= y;
 	s_main.exit.generic.id					= ID_EXIT;
@@ -455,7 +453,6 @@ void UI_MainMenu( void )
 	if (teamArena) {
 		Menu_AddItem( &s_main.menu,	&s_main.teamArena );
 	}
-	/*Menu_AddItem( &s_main.menu,	&s_main.mods );*/
 	Menu_AddItem( &s_main.menu,	&s_main.exit );
 
 	trap_Key_SetCatcher( KEYCATCH_UI );

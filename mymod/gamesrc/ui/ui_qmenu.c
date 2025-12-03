@@ -71,13 +71,13 @@ vec4_t color_orange	    = {0.30f, 0.45f, 0.58f, 1.00f};
 vec4_t color_red	    = {0.55f, 0.65f, 0.73f, 1.00f};
 vec4_t color_dim	    = {0.00f, 0.00f, 0.00f, 0.25f};
 
-// current color scheme
+// Enhanced color scheme with better contrast and modern look
 vec4_t pulse_color          = {1.00f, 1.00f, 1.00f, 1.00f};
-vec4_t text_color_disabled  = {0.35f, 0.24f, 0.29f, 1.00f};	// light gray
-vec4_t text_color_normal    = {0.30f, 0.45f, 0.58f, 1.00f};	// light orange
-vec4_t text_color_highlight = {0.76f, 0.89f, 0.93f, 1.00f};	// bright yellow
-vec4_t listbar_color        = {0.13f, 0.26f, 0.38f, 0.30f};	// transluscent orange
-vec4_t text_color_status    = {1.00f, 1.00f, 1.00f, 1.00f};	// bright white
+vec4_t text_color_disabled  = {0.4f, 0.4f, 0.4f, 0.6f};		// Subtle gray for disabled items
+vec4_t text_color_normal    = {0.85f, 0.85f, 0.9f, 1.00f};	// Light blue-gray for normal text
+vec4_t text_color_highlight = {1.0f, 0.95f, 0.7f, 1.00f};	// Warm highlight color
+vec4_t listbar_color        = {0.2f, 0.3f, 0.45f, 0.4f};		// Subtle blue background for selection
+vec4_t text_color_status    = {1.00f, 1.00f, 1.00f, 1.00f};	// Pure white for status text
 
 // action widget
 static void	Action_Init( menuaction_s *a );
@@ -216,10 +216,12 @@ static void PText_Init( menutext_s *t )
 		x -= w / 2;
 	}
 
-	t->generic.left   = x - PROP_GAP_WIDTH * sizeScale;
-	t->generic.right  = x + w + PROP_GAP_WIDTH * sizeScale;
-	t->generic.top    = y;
-	t->generic.bottom = y + h;
+	// Add extra padding for highlight effect
+	int padding = 15;  // Extra padding for visual highlight background
+	t->generic.left   = x - PROP_GAP_WIDTH * sizeScale - padding;
+	t->generic.right  = x + w + PROP_GAP_WIDTH * sizeScale + padding;
+	t->generic.top    = y - 6;  // Add vertical padding
+	t->generic.bottom = y + h + 6;
 }
 
 /*
@@ -233,9 +235,12 @@ static void PText_Draw( menutext_s *t )
 	int		y;
 	float *	color;
 	int		style;
+	qboolean hasFocus;
+	vec4_t highlightBg;
 
 	x = t->generic.x;
 	y = t->generic.y;
+	hasFocus = (Menu_ItemAtCursor( t->generic.parent ) == t);
 
 	if (t->generic.flags & QMF_GRAYED)
 		color = text_color_disabled;
@@ -244,12 +249,27 @@ static void PText_Draw( menutext_s *t )
 
 	style = t->style;
 	if( t->generic.flags & QMF_PULSEIFFOCUS ) {
-		if( Menu_ItemAtCursor( t->generic.parent ) == t ) {
+		if( hasFocus ) {
 			style |= UI_PULSE;
+			// Draw subtle background highlight for focused items
+			Vector4Set( highlightBg, 0.15f, 0.2f, 0.3f, 0.3f );
+			UI_FillRect( t->generic.left - 10, t->generic.top - 2, 
+			            (t->generic.right - t->generic.left) + 20, 
+			            (t->generic.bottom - t->generic.top) + 4, highlightBg );
+			// Use highlight color when focused
+			color = text_color_highlight;
 		}
 		else {
 			style |= UI_INVERSE;
 		}
+	}
+	else if( hasFocus && (t->generic.flags & QMF_HIGHLIGHT_IF_FOCUS) ) {
+		// Draw background for non-pulsing focused items
+		Vector4Set( highlightBg, 0.1f, 0.15f, 0.25f, 0.25f );
+		UI_FillRect( t->generic.left - 10, t->generic.top - 2, 
+		            (t->generic.right - t->generic.left) + 20, 
+		            (t->generic.bottom - t->generic.top) + 4, highlightBg );
+		color = text_color_highlight;
 	}
 
 	UI_DrawProportionalString( x, y, t->string, style, color );

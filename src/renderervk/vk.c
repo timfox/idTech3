@@ -6261,12 +6261,53 @@ void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
 
 	sampler_def.address_mode = image->wrapClampMode;
 
+	// Detect font and UI textures by checking image name and properties
+	// Font textures typically have names like:
+	// - "fonts/fontImage_X_XX.tga" (system fonts)
+	// - "menu/art/font*.tga" (mod fonts like mymod)
+	// - "gfx/2d/bigchars" (standard charset for UI_DrawString)
+	// Also check for small non-mipmap textures (typical for fonts/UI)
+	qboolean isFontTexture = qfalse;
+	if ( image->imgName ) {
+		const char *name = image->imgName;
+		// Check for font-related names and UI textures
+		if ( Q_stristr( name, "font" ) != NULL || 
+		     Q_stristr( name, "fontImage" ) != NULL ||
+		     Q_stristr( name, "menu/art" ) != NULL ||
+		     Q_stristr( name, "gfx/2d" ) != NULL ||
+		     Q_stristr( name, "bigchars" ) != NULL ||
+		     Q_stristr( name, "charset" ) != NULL ) {
+			isFontTexture = qtrue;
+		}
+	}
+	
+	// Also treat small non-mipmap textures as fonts (fonts are typically small and don't use mipmaps)
+	// This catches fonts that might not match the name patterns above
+	if ( !mipmap && !isFontTexture && image->width > 0 && image->height > 0 ) {
+		// Font textures are typically small (e.g., 256x256 or smaller) and square-ish
+		if ( ( image->width <= 512 && image->height <= 512 ) &&
+		     ( image->width == image->height || 
+		       ( image->width <= 256 && image->height <= 256 ) ) ) {
+			// Check if it's likely a UI/font texture (small, no mipmaps, clamped to edge)
+			if ( image->wrapClampMode == VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE ||
+			     image->wrapClampMode == VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER ) {
+				isFontTexture = qtrue;
+			}
+		}
+	}
+
 	if ( mipmap ) {
 		sampler_def.gl_mag_filter = gl_filter_max;
 		sampler_def.gl_min_filter = gl_filter_min;
 	} else {
-		sampler_def.gl_mag_filter = GL_LINEAR;
-		sampler_def.gl_min_filter = GL_LINEAR;
+		// Use nearest filtering for fonts and other UI elements to prevent blurriness
+		if ( isFontTexture ) {
+			sampler_def.gl_mag_filter = GL_NEAREST;
+			sampler_def.gl_min_filter = GL_NEAREST;
+		} else {
+			sampler_def.gl_mag_filter = GL_LINEAR;
+			sampler_def.gl_min_filter = GL_LINEAR;
+		}
 		// no anisotropy without mipmaps
 		sampler_def.noAnisotropy = qtrue;
 	}
@@ -6287,6 +6328,67 @@ void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
 	descriptor_write.pTexelBufferView = NULL;
 
 	qvkUpdateDescriptorSets( vk.device, 1, &descriptor_write, 0, NULL );
+}
+
+/*
+================
+vk_update_font_textures
+
+Update descriptor sets for already-loaded font textures to use nearest filtering
+This is called after initialization to fix fonts that were loaded before the fix
+================
+*/
+void vk_update_font_textures( void )
+{
+	int i;
+	image_t *image;
+	qboolean isFontTexture;
+	
+	if ( !vk.device || !vk.descriptor_pool ) {
+		return;
+	}
+	
+	// Iterate through all loaded images and update font textures
+	for ( i = 0; i < tr.numImages; i++ ) {
+		image = tr.images[i];
+		if ( !image || !image->imgName || image->descriptor == VK_NULL_HANDLE ) {
+			continue;
+		}
+		
+		// Check if this is a font texture
+		isFontTexture = qfalse;
+		const char *name = image->imgName;
+		if ( Q_stristr( name, "font" ) != NULL || 
+		     Q_stristr( name, "fontImage" ) != NULL ||
+		     Q_stristr( name, "menu/art" ) != NULL ||
+		     Q_stristr( name, "gfx/2d" ) != NULL ||
+		     Q_stristr( name, "bigchars" ) != NULL ||
+		     Q_stristr( name, "charset" ) != NULL ) {
+			isFontTexture = qtrue;
+		}
+		
+		// Also check for small non-mipmap textures
+		if ( !isFontTexture && image->width > 0 && image->height > 0 ) {
+			// Check if texture has mipmaps by checking flags
+			if ( !( image->flags & IMGFLAG_MIPMAP ) ) {
+				if ( ( image->width <= 512 && image->height <= 512 ) &&
+				     ( image->width == image->height || 
+				       ( image->width <= 256 && image->height <= 256 ) ) ) {
+					if ( image->wrapClampMode == VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE ||
+					     image->wrapClampMode == VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER ) {
+						isFontTexture = qtrue;
+					}
+				}
+			}
+		}
+		
+		// Update descriptor set if it's a font texture
+		if ( isFontTexture ) {
+			// Determine if texture has mipmaps
+			qboolean hasMipmaps = ( image->flags & IMGFLAG_MIPMAP ) != 0;
+			vk_update_descriptor_set( image, hasMipmaps );
+		}
+	}
 }
 
 

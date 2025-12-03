@@ -306,13 +306,69 @@ void Con_CheckResize( void )
 	{
 		g_console_field_width = DEFAULT_CONSOLE_WIDTH;
 		width = DEFAULT_CONSOLE_WIDTH * scale;
+		
+		// Check if console already has content (logs from startup)
+		// We check both initialized flag and if there are actual log lines
+		qboolean hasContent = con.initialized && con.linewidth > 0 && con.totallines > 0 && 
+		                      (con.current > 0 || (con.current == 0 && con.x > 0));
+		
+		// Save old state if we have content to preserve
+		if ( hasContent ) {
+			oldwidth = con.linewidth;
+			oldtotallines = con.totallines;
+			oldcurrent = con.current;
+			
+			// Copy existing content to temp buffer
+			Com_Memcpy( tbuf, con.text, CON_TEXTSIZE * sizeof( short ) );
+		}
+		
 		con.linewidth = width;
 		con.totallines = CON_TEXTSIZE / con.linewidth;
 		con.vispage = 4;
 
-		Con_Clear_f();
+		// Only clear if console is truly empty (no logs yet)
+		if ( !hasContent ) {
+			// Initialize empty console - clear first line only
+			for ( i = 0 ; i < con.linewidth ; i++ ) {
+				con.text[i] = ( ColorIndex( COLOR_WHITE ) << 8 ) | ' ';
+			}
+			con.x = 0;
+			con.current = 0;
+			con.newline = qtrue;
+			con.display = 0;
+		} else {
+			// Preserve existing logs when transitioning from pre-video to post-video
+			// Clear buffer first
+			for ( i = 0; i < CON_TEXTSIZE; i++ ) 
+				con.text[i] = (ColorIndex(COLOR_WHITE)<<8) | ' ';
+			
+			// Calculate how many lines we can preserve
+			if ( oldcurrent > oldtotallines )
+				numlines = oldtotallines;	
+			else
+				numlines = oldcurrent + 1;	
+			
+			if ( numlines > con.totallines )
+				numlines = con.totallines;
+			
+			// Copy preserved content to new buffer layout
+			numchars = oldwidth;
+			if ( numchars > con.linewidth )
+				numchars = con.linewidth;
+			
+			for ( i = 0; i < numlines; i++ )
+			{
+				src = &tbuf[ ((oldcurrent - i + oldtotallines) % oldtotallines) * oldwidth ];
+				dst = &con.text[ (numlines - 1 - i) * con.linewidth ];
+				for ( j = 0; j < numchars; j++ )
+					*dst++ = *src++;
+			}
+			
+			con.current = numlines - 1;
+			con.display = con.current;
+		}
 	}
-	else
+		else
 	{
 		width = ((cls.glconfig.vidWidth / smallchar_width) - 2);
 
@@ -327,9 +383,18 @@ void Con_CheckResize( void )
 		if ( old_vispage == vispage && old_width == width )
 			return;
 
+		// Save old state before resizing - preserve logs when transitioning from pre-video to post-video
 		oldwidth = con.linewidth;
 		oldtotallines = con.totallines;
 		oldcurrent = con.current;
+		
+		// If transitioning from pre-video (oldwidth might be default) to post-video, ensure we preserve content
+		if ( oldwidth == 0 || oldtotallines == 0 ) {
+			// Console wasn't properly initialized before, use current state
+			oldwidth = con.linewidth > 0 ? con.linewidth : DEFAULT_CONSOLE_WIDTH;
+			oldtotallines = con.totallines > 0 ? con.totallines : (CON_TEXTSIZE / oldwidth);
+			oldcurrent = con.current;
+		}
 
 		con.linewidth = width;
 		con.totallines = CON_TEXTSIZE / con.linewidth;
@@ -443,6 +508,11 @@ Con_Fixup
 static void Con_Fixup( void ) 
 {
 	int filled;
+	
+	// Ensure console is properly initialized
+	if ( !con.initialized ) {
+		return;
+	}
 
 	if ( con.current >= con.totallines ) {
 		filled = con.totallines;
@@ -550,7 +620,18 @@ void CL_ConsolePrint( const char *txt ) {
 		con_scale = &null_cvar;
 		con_scale->value = 1.0f;
 		con_scale->modified = qtrue;
+		
+		// Initialize console buffer properly - don't clear, just initialize structure
+		// This ensures early logs aren't lost
+		con.current = 0;
+		con.x = 0;
+		con.display = 0;
+		con.newline = qtrue;
+		
+		// Set up console dimensions - this will initialize but not clear if called from here
 		Con_CheckResize();
+		
+		// Mark as initialized AFTER resize so resize knows it's a fresh console
 		con.initialized = qtrue;
 	}
 
@@ -591,12 +672,17 @@ void CL_ConsolePrint( const char *txt ) {
 				Con_Fixup();
 				con.newline = qfalse;
 			}
-			// display character and advance
-			y = con.current % con.totallines;
-			con.text[y * con.linewidth + con.x ] = (colorIndex << 8) | (c & 255);
-			con.x++;
-			if ( con.x >= con.linewidth ) {
-				Con_Linefeed( skipnotify );
+			// Ensure we have valid buffer indices
+			if ( con.totallines > 0 && con.linewidth > 0 ) {
+				// display character and advance
+				y = con.current % con.totallines;
+				if ( y >= 0 && y < con.totallines && con.x >= 0 && con.x < con.linewidth ) {
+					con.text[y * con.linewidth + con.x ] = (colorIndex << 8) | (c & 255);
+					con.x++;
+					if ( con.x >= con.linewidth ) {
+						Con_Linefeed( skipnotify );
+					}
+				}
 			}
 			break;
 		}

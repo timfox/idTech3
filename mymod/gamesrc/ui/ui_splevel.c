@@ -325,6 +325,10 @@ static void UI_SPLevelMenu_SetMenuItems( void ) {
 
 		if( selectedArena != -1 ) {
 			levelMenuInfo.selectedArenaInfo = UI_GetArenaInfoByNumber( selectedArenaSet * ARENAS_PER_TIER + selectedArena );
+		} else {
+			// Ensure we have a default selection if selectedArena is -1
+			selectedArena = 0;
+			levelMenuInfo.selectedArenaInfo = UI_GetArenaInfoByNumber( selectedArenaSet * ARENAS_PER_TIER + selectedArena );
 		}
 	}
 
@@ -494,6 +498,17 @@ static void UI_SPLevelMenu_NextEvent( [[maybe_unused]] void* ptr, int notificati
 
 	if ( selectedArena == -1 ) {
 		selectedArena = 0;
+	}
+
+	// Ensure selectedArenaInfo is set before proceeding
+	if ( !levelMenuInfo.selectedArenaInfo ) {
+		levelMenuInfo.selectedArenaInfo = UI_GetArenaInfoByNumber( selectedArenaSet * ARENAS_PER_TIER + selectedArena );
+	}
+
+	// Validate that we have valid arena info before starting
+	if ( !levelMenuInfo.selectedArenaInfo ) {
+		trap_Print( "ERROR: No arena info available for selected map\n" );
+		return;
 	}
 
 	UI_SPSkillMenu( levelMenuInfo.selectedArenaInfo );
