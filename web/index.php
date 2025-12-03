@@ -95,6 +95,15 @@ ini_set('error_log', __DIR__ . '/error.log');
             </div>
 
             <div class="section">
+                <h2>Gameplay</h2>
+                <ul>
+                    <li><a href="gameplay/gameplay">Gameplay Systems</a></li>
+                    <li><a href="gameplay/dialog-system">Dialog System</a></li>
+                    <li><a href="gameplay/inventory-system">Inventory System</a></li>
+                </ul>
+            </div>
+
+            <div class="section">
                 <h2>Tools</h2>
                 <ul>
                     <li><a href="tools/radiant">Q3Radiant</a></li>
@@ -124,6 +133,7 @@ ini_set('error_log', __DIR__ . '/error.log');
                     <li><a href="rendering/vulkan">Vulkan Renderer</a></li>
                     <li><a href="rendering/directx12">DirectX 12 Renderer</a></li>
                     <li><a href="rendering/pbr">PBR Pipeline</a></li>
+                    <li><a href="rendering/pbr-materials">PBR Material Creation</a></li>
                     <li><a href="rendering/ray-tracing">Ray Tracing</a></li>
                     <li><a href="rendering/shaders">Shaders</a></li>
                     <li><a href="rendering/animated-skybox">Animated Skybox</a></li>
@@ -143,6 +153,8 @@ ini_set('error_log', __DIR__ . '/error.log');
                 <h2>UI</h2>
                 <ul>
                     <li><a href="ui/ui">UI System</a></li>
+                    <li><a href="ui/graphics-options">Graphics Options UI Changes</a></li>
+                    <li><a href="ui/reload-ui">Reload UI Changes</a></li>
                     <li><a href="imgui">ImGui Integration</a></li>
                 </ul>
             </div>
