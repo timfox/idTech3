@@ -1609,6 +1609,7 @@ void R_RotateForEntity( const trRefEntity_t *ent, const viewParms_t *viewParms, 
 typedef vec_t mat4_t[16];
 void Matrix16Identity( mat4_t out );
 void Matrix16Copy( const mat4_t in, mat4_t out );
+void Matrix16Inverse( const mat4_t in, mat4_t out );
 
 /*
 ** GL wrapper/helper functions

@@ -6,6 +6,7 @@ Implementation based on SIGGRAPH 2021 paper
 */
 
 #include "tr_local.h"
+#include "tr_math_optimized.h"
 #include "vk.h"
 #include "vk_gibs.h"
 
@@ -171,7 +172,40 @@ void vk_gibs_shutdown( void )
 		vk.gibs.surfelIndirectBufferMemory = VK_NULL_HANDLE;
 	}
 	
-	// TODO: Destroy pipelines and descriptor sets
+	// Destroy pipelines
+	if ( vk.gibs.updatePipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.gibs.updatePipeline, NULL );
+		vk.gibs.updatePipeline = VK_NULL_HANDLE;
+	}
+	
+	if ( vk.gibs.spawnPipeline != VK_NULL_HANDLE ) {
+		qvkDestroyPipeline( vk.device, vk.gibs.spawnPipeline, NULL );
+		vk.gibs.spawnPipeline = VK_NULL_HANDLE;
+	}
+	
+	// Destroy pipeline layouts
+	if ( vk.gibs.updatePipelineLayout != VK_NULL_HANDLE ) {
+		qvkDestroyPipelineLayout( vk.device, vk.gibs.updatePipelineLayout, NULL );
+		vk.gibs.updatePipelineLayout = VK_NULL_HANDLE;
+	}
+	
+	if ( vk.gibs.spawnPipelineLayout != VK_NULL_HANDLE ) {
+		qvkDestroyPipelineLayout( vk.device, vk.gibs.spawnPipelineLayout, NULL );
+		vk.gibs.spawnPipelineLayout = VK_NULL_HANDLE;
+	}
+	
+	// Destroy descriptor set layouts
+	if ( vk.gibs.updateDescriptorSetLayout != VK_NULL_HANDLE ) {
+		qvkDestroyDescriptorSetLayout( vk.device, vk.gibs.updateDescriptorSetLayout, NULL );
+		vk.gibs.updateDescriptorSetLayout = VK_NULL_HANDLE;
+	}
+	
+	if ( vk.gibs.spawnDescriptorSetLayout != VK_NULL_HANDLE ) {
+		qvkDestroyDescriptorSetLayout( vk.device, vk.gibs.spawnDescriptorSetLayout, NULL );
+		vk.gibs.spawnDescriptorSetLayout = VK_NULL_HANDLE;
+	}
+	
+	// Note: Descriptor sets are managed by the descriptor pool and don't need explicit destruction
 	
 	vk.gibs.initialized = qfalse;
 	ri.Printf( PRINT_ALL, "GIBS: Shutdown complete\n" );
@@ -202,11 +236,33 @@ void vk_gibs_update( void )
 	
 	if ( ( vk.gibs.frameCounter % updateRate ) == 0 ) {
 		// Update uniform buffer with camera data
-		// Note: This should be called from a place where viewParms is available
-		// For now, use identity matrices as placeholder
-		Matrix16Identity( gibsUniformData.viewInverse );
-		Matrix16Identity( gibsUniformData.projInverse );
-		VectorClear( gibsUniformData.cameraPos );
+		extern backEndState_t backEnd;
+		
+		// Get view inverse matrix (use optimized inversion for better numerical stability)
+		if ( backEnd.viewParms.world.modelViewMatrix ) {
+			mat4_t viewMatrix;
+			Com_Memcpy( viewMatrix, backEnd.viewParms.world.modelViewMatrix, sizeof( mat4_t ) );
+			Matrix16InverseOptimized( viewMatrix, gibsUniformData.viewInverse );
+		} else {
+			Matrix16Identity( gibsUniformData.viewInverse );
+		}
+		
+		// Get projection inverse matrix (projection matrices are usually not affine, use standard inversion)
+		if ( backEnd.viewParms.projectionMatrix ) {
+			mat4_t projMatrix;
+			Com_Memcpy( projMatrix, backEnd.viewParms.projectionMatrix, sizeof( mat4_t ) );
+			Matrix16InverseOptimized( projMatrix, gibsUniformData.projInverse );
+		} else {
+			Matrix16Identity( gibsUniformData.projInverse );
+		}
+		
+		// Get camera position
+		if ( backEnd.viewParms.or.origin ) {
+			VectorCopy( backEnd.viewParms.or.origin, gibsUniformData.cameraPos );
+		} else {
+			VectorClear( gibsUniformData.cameraPos );
+		}
+		
 		gibsUniformData.time = tr.refdef.floatTime;
 		gibsUniformData.surfelCount = vk.gibs.surfelCount;
 		gibsUniformData.frameIndex = vk.gibs.frameCounter;

@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_main.c -- main control flow for each frame
 
 #include "tr_local.h"
+#include "tr_math_optimized.h"
 
 #include <string.h> // memcpy
 
@@ -336,6 +337,47 @@ void Matrix16Copy( const mat4_t in, mat4_t out )
 	out[ 3] = in[ 3]; out[ 7] = in[ 7]; out[11] = in[11]; out[15] = in[15]; 
 }
 
+void Matrix16Inverse( const mat4_t in, mat4_t out )
+{
+	// Invert a 4x4 matrix using cofactor expansion
+	float inv[16], det;
+	int i;
+
+	inv[0] = in[5] * in[10] * in[15] - in[5] * in[11] * in[14] - in[9] * in[6] * in[15] + in[9] * in[7] * in[14] + in[13] * in[6] * in[11] - in[13] * in[7] * in[10];
+	inv[4] = -in[4] * in[10] * in[15] + in[4] * in[11] * in[14] + in[8] * in[6] * in[15] - in[8] * in[7] * in[14] - in[12] * in[6] * in[11] + in[12] * in[7] * in[10];
+	inv[8] = in[4] * in[9] * in[15] - in[4] * in[11] * in[13] - in[8] * in[5] * in[15] + in[8] * in[7] * in[13] + in[12] * in[5] * in[11] - in[12] * in[7] * in[9];
+	inv[12] = -in[4] * in[9] * in[14] + in[4] * in[10] * in[13] + in[8] * in[5] * in[14] - in[8] * in[6] * in[13] - in[12] * in[5] * in[10] + in[12] * in[6] * in[9];
+
+	inv[1] = -in[1] * in[10] * in[15] + in[1] * in[11] * in[14] + in[9] * in[2] * in[15] - in[9] * in[3] * in[14] - in[13] * in[2] * in[11] + in[13] * in[3] * in[10];
+	inv[5] = in[0] * in[10] * in[15] - in[0] * in[11] * in[14] - in[8] * in[2] * in[15] + in[8] * in[3] * in[14] + in[12] * in[2] * in[11] - in[12] * in[3] * in[10];
+	inv[9] = -in[0] * in[9] * in[15] + in[0] * in[11] * in[13] + in[8] * in[1] * in[15] - in[8] * in[3] * in[13] - in[12] * in[1] * in[11] + in[12] * in[3] * in[9];
+	inv[13] = in[0] * in[9] * in[14] - in[0] * in[10] * in[13] - in[8] * in[1] * in[14] + in[8] * in[2] * in[13] + in[12] * in[1] * in[10] - in[12] * in[2] * in[9];
+
+	inv[2] = in[1] * in[6] * in[15] - in[1] * in[7] * in[14] - in[5] * in[2] * in[15] + in[5] * in[3] * in[14] + in[13] * in[2] * in[7] - in[13] * in[3] * in[6];
+	inv[6] = -in[0] * in[6] * in[15] + in[0] * in[7] * in[14] + in[4] * in[2] * in[15] - in[4] * in[3] * in[14] - in[12] * in[2] * in[7] + in[12] * in[3] * in[6];
+	inv[10] = in[0] * in[5] * in[15] - in[0] * in[7] * in[13] - in[4] * in[1] * in[15] + in[4] * in[3] * in[13] + in[12] * in[1] * in[7] - in[12] * in[3] * in[5];
+	inv[14] = -in[0] * in[5] * in[14] + in[0] * in[6] * in[13] + in[4] * in[1] * in[14] - in[4] * in[2] * in[13] - in[12] * in[1] * in[6] + in[12] * in[2] * in[5];
+
+	inv[3] = -in[1] * in[6] * in[11] + in[1] * in[7] * in[10] + in[5] * in[2] * in[11] - in[5] * in[3] * in[10] - in[9] * in[2] * in[7] + in[9] * in[3] * in[6];
+	inv[7] = in[0] * in[6] * in[11] - in[0] * in[7] * in[10] - in[4] * in[2] * in[11] + in[4] * in[3] * in[10] + in[8] * in[2] * in[7] - in[8] * in[3] * in[6];
+	inv[11] = -in[0] * in[5] * in[11] + in[0] * in[7] * in[9] + in[4] * in[1] * in[11] - in[4] * in[3] * in[9] - in[8] * in[1] * in[7] + in[8] * in[3] * in[5];
+	inv[15] = in[0] * in[5] * in[10] - in[0] * in[6] * in[9] - in[4] * in[1] * in[10] + in[4] * in[2] * in[9] + in[8] * in[1] * in[6] - in[8] * in[2] * in[5];
+
+	det = in[0] * inv[0] + in[1] * inv[4] + in[2] * inv[8] + in[3] * inv[12];
+
+	if ( det == 0.0f ) {
+		// Matrix is singular, return identity
+		Matrix16Identity( out );
+		return;
+	}
+
+	det = 1.0f / det;
+
+	for ( i = 0; i < 16; i++ ) {
+		out[i] = inv[i] * det;
+	}
+}
+
 /*
 =================
 R_RotateForEntity
@@ -496,7 +538,9 @@ static void R_SetFarClip( void )
 		}
 	}
 
-	tr.viewParms.zFar = sqrt( farthestCornerDistance );
+	// Use fast sqrt approximation for distance calculations
+	// Accuracy is sufficient for frustum culling
+	tr.viewParms.zFar = FastSqrtAccurate( farthestCornerDistance );
 }
 
 
@@ -595,11 +639,24 @@ void R_SetupProjection( viewParms_t *dest, float zProj, qboolean computeFrustum 
 			stereoSep = 0;
 	}
 
-	ymax = zProj * tan(dest->fovY * M_PI / 360.0f);
-	ymin = -ymax;
-
-	xmax = zProj * tan(dest->fovX * M_PI / 360.0f);
-	xmin = -xmax;
+	// Use fast tan approximation for frustum calculations (angles are typically small)
+	// For large FOV, fall back to standard tan for accuracy
+	float fovYRad = dest->fovY * M_PI / 360.0f;
+	float fovXRad = dest->fovX * M_PI / 360.0f;
+	
+	if ( fovYRad < 1.5f && fovXRad < 1.5f ) {
+		// Fast approximation for typical FOV values
+		ymax = zProj * ( fovYRad + fovYRad * fovYRad * fovYRad * 0.33333333f + fovYRad * fovYRad * fovYRad * fovYRad * fovYRad * 0.13333333f );
+		ymin = -ymax;
+		xmax = zProj * ( fovXRad + fovXRad * fovXRad * fovXRad * 0.33333333f + fovXRad * fovXRad * fovXRad * fovXRad * fovXRad * 0.13333333f );
+		xmin = -xmax;
+	} else {
+		// Fall back to standard tan for extreme FOV
+		ymax = zProj * tan( fovYRad );
+		ymin = -ymax;
+		xmax = zProj * tan( fovXRad );
+		xmin = -xmax;
+	}
 
 	width = xmax - xmin;
 	height = ymax - ymin;

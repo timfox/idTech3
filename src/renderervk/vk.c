@@ -3,6 +3,10 @@
 #ifdef USE_VULKAN_RAY_TRACING
 #include "vk_gibs.h"
 #endif
+#include "vk_gpu_culling.h"
+#include "vk_material_system.h"
+#include "vk_cell_streaming.h"
+#include "vk_atmosphere.h"
 
 #if defined (_DEBUG)
 #if defined (_WIN32)
@@ -5847,6 +5851,11 @@ for (i = 0; i < 2; i++) {
 #endif
 
 __cleanup:
+	// Shutdown systems in reverse order of initialization
+	vk_atmosphere_shutdown();
+	vk_cell_streaming_shutdown();
+	vk_material_system_shutdown();
+	vk_gpu_culling_shutdown();
 	// Shutdown GIBS before ray tracing
 #ifdef USE_VULKAN_RAY_TRACING
 	vk_gibs_shutdown();
@@ -5926,7 +5935,7 @@ void vk_release_resources( void ) {
 
 	if ( vk_world.num_image_chunks > 1 ) {
 		// if we allocated more than 2 image chunks - use doubled default size
-		vk.image_chunk_size = (IMAGE_CHUNK_SIZE * 2);
+		vk.image_chunk_size = (int64_t)IMAGE_CHUNK_SIZE * 2;
 	}
 #if 0 // do not reduce chunk size
 	else if ( vk_world.num_image_chunks == 1 ) {
@@ -9530,6 +9539,18 @@ void vk_begin_frame( void )
 		vk_gibs_update();
 	}
 #endif
+	// Update GPU culling
+	if ( vk.gpuCulling.enabled && vk.gpuCulling.initialized ) {
+		vk_gpu_culling_update();
+	}
+	// Update material system
+	if ( vk.materialSystem.enabled && vk.materialSystem.initialized ) {
+		vk_material_system_update();
+	}
+	// Update atmosphere system
+	if ( vk.atmosphere.enabled && vk.atmosphere.initialized ) {
+		vk_atmosphere_update();
+	}
 
 	// CRITICAL: Reset render pass state at the start of each frame.
 	// When command buffer is reset, the render pass state variable must also be reset.

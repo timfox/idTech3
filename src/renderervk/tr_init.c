@@ -143,6 +143,20 @@ cvar_t	*r_cubeMapping;
 	cvar_t	*r_dlss;
 	cvar_t	*r_dlss_quality;
 	cvar_t	*r_dlss_sharpening;
+	cvar_t	*r_gpuCulling;
+	cvar_t	*r_gpuInstancing;
+	cvar_t	*r_cullDistance;
+	cvar_t	*r_materialSystem;
+	cvar_t	*r_materialWetness;
+	cvar_t	*r_materialDamage;
+	cvar_t	*r_materialMagic;
+	cvar_t	*r_cellStreaming;
+	cvar_t	*r_cellLoadRadius;
+	cvar_t	*r_cellUnloadDistance;
+	cvar_t	*r_atmosphere;
+	cvar_t	*r_atmospherePreset;
+	cvar_t	*r_fogDensity;
+	cvar_t	*r_bloomIntensity;
 cvar_t	*r_fbo;
 cvar_t	*r_hdr;
 cvar_t	*r_bloom;
@@ -1681,6 +1695,38 @@ static void R_Register( void )
 	r_gibs_samples = ri.Cvar_Get( "r_gibs_samples", "16", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_gibs_samples, "Number of ray samples per surfel update (1-64, higher = more accurate but slower, default 16)." );
 #endif
+	// GPU-driven culling and instancing
+	r_gpuCulling = ri.Cvar_Get( "r_gpuCulling", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_gpuCulling, "Enable GPU-driven frustum culling (0=disabled, 1=enabled)." );
+	r_gpuInstancing = ri.Cvar_Get( "r_gpuInstancing", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_gpuInstancing, "Enable GPU-driven instancing (0=disabled, 1=enabled)." );
+	r_cullDistance = ri.Cvar_Get( "r_cullDistance", "5000", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_cullDistance, "Maximum distance for GPU culling (world units, default 5000)." );
+	// Material system
+	r_materialSystem = ri.Cvar_Get( "r_materialSystem", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_materialSystem, "Enable material system with runtime parameters (0=disabled, 1=enabled)." );
+	r_materialWetness = ri.Cvar_Get( "r_materialWetness", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_materialWetness, "Global material wetness override (0.0-1.0, 0=disabled)." );
+	r_materialDamage = ri.Cvar_Get( "r_materialDamage", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_materialDamage, "Global material damage override (0.0-1.0, 0=disabled)." );
+	r_materialMagic = ri.Cvar_Get( "r_materialMagic", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_materialMagic, "Global material magic glow override (0.0-1.0, 0=disabled)." );
+	// Cell streaming
+	r_cellStreaming = ri.Cvar_Get( "r_cellStreaming", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_cellStreaming, "Enable cell-based world streaming (0=disabled, 1=enabled)." );
+	r_cellLoadRadius = ri.Cvar_Get( "r_cellLoadRadius", "2", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_cellLoadRadius, "Number of cells to load around player (default 2)." );
+	r_cellUnloadDistance = ri.Cvar_Get( "r_cellUnloadDistance", "4", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_cellUnloadDistance, "Distance in cells before unloading (default 4)." );
+	// Atmosphere system
+	r_atmosphere = ri.Cvar_Get( "r_atmosphere", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_atmosphere, "Enable atmosphere/mood system (0=disabled, 1=enabled)." );
+	r_atmospherePreset = ri.Cvar_Get( "r_atmospherePreset", "3", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_atmospherePreset, "Atmosphere preset: 0=Brutal, 1=Mysterious, 2=Combat, 3=Calm." );
+	r_fogDensity = ri.Cvar_Get( "r_fogDensity", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_fogDensity, "Fog density override (0=use preset, >0=override)." );
+	r_bloomIntensity = ri.Cvar_Get( "r_bloomIntensity", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_bloomIntensity, "Bloom intensity override (0=use preset, >0=override)." );
 	r_dlss = ri.Cvar_Get( "r_dlss", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_dlss, "Enable NVIDIA DLSS Super Resolution (requires NVIDIA RTX GPU and DLSS SDK)." );
 	r_dlss_quality = ri.Cvar_Get( "r_dlss_quality", "1", CVAR_ARCHIVE );

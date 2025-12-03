@@ -1900,13 +1900,13 @@ static void vk_rt_update_uniform_buffer( void )
 	int *idata;
 
 	// viewInverse (mat4 = 16 floats)
-	// Get view matrix from backEnd and invert it
+	// Get view matrix from backEnd and invert it (use optimized inversion)
 	mat4_t viewInverse;
 	extern backEndState_t backEnd;
 	if ( backEnd.viewParms.world.modelViewMatrix ) {
 		mat4_t viewMatrix;
 		Com_Memcpy( viewMatrix, backEnd.viewParms.world.modelViewMatrix, sizeof(mat4_t) );
-		Matrix16Inverse( viewMatrix, viewInverse );
+		Matrix16InverseOptimized( viewMatrix, viewInverse );
 	} else {
 		Matrix16Identity( viewInverse );
 	}
@@ -1914,12 +1914,12 @@ static void vk_rt_update_uniform_buffer( void )
 	data += 16;
 
 	// projInverse (mat4 = 16 floats)
-	// Get projection matrix from backEnd and invert it
+	// Get projection matrix from backEnd and invert it (use optimized inversion)
 	mat4_t projInverse;
 	if ( backEnd.viewParms.projectionMatrix ) {
 		mat4_t projMatrix;
 		Com_Memcpy( projMatrix, backEnd.viewParms.projectionMatrix, sizeof(mat4_t) );
-		Matrix16Inverse( projMatrix, projInverse );
+		Matrix16InverseOptimized( projMatrix, projInverse );
 	} else {
 		Matrix16Identity( projInverse );
 	}

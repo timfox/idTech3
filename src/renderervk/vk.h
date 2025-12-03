@@ -3,6 +3,66 @@
 #include "../renderercommon/vulkan/vulkan.h"
 #include "tr_common.h"
 
+// Forward declarations
+typedef struct material_params_s material_params_t;
+
+// Constants for advanced systems
+#define MAX_STREAM_CELLS 256
+
+// Full definitions needed for struct members
+// Stream cell structure
+struct stream_cell_s {
+	int32_t cellX, cellY, cellZ;  // Cell coordinates
+	vec3_t worldMin, worldMax;     // World space bounds
+	uint32_t state;                // Current state
+	uint32_t priority;              // Load priority (lower = higher priority)
+	
+	// Asset references
+	uint32_t modelCount;
+	qhandle_t *models;
+	uint32_t textureCount;
+	image_t **textures;
+	
+	// Memory usage tracking
+	uint32_t memoryUsed;
+	uint32_t lastAccessFrame;
+};
+typedef struct stream_cell_s stream_cell_t;
+
+// Atmosphere preset enum
+enum atmosphere_preset_e {
+	ATMOSPHERE_BRUTAL,
+	ATMOSPHERE_MYSTERIOUS,
+	ATMOSPHERE_COMBAT,
+	ATMOSPHERE_CALM,
+	ATMOSPHERE_CUSTOM
+};
+typedef enum atmosphere_preset_e atmosphere_preset_t;
+
+// Atmosphere parameters structure
+struct atmosphere_params_s {
+	float exposure;
+	float contrast;
+	float saturation;
+	float brightness;
+	float fogDensity;
+	float fogStart;
+	float fogEnd;
+	vec3_t fogColor;
+	float fogHeightFalloff;
+	float bloomIntensity;
+	float bloomThreshold;
+	float bloomSize;
+	vec3_t colorTint;
+	float colorTemperature;
+	float dofFocusDistance;
+	float dofBlurRadius;
+	float timeOfDay;
+	float weatherIntensity;
+	uint32_t flags;
+};
+typedef struct atmosphere_params_s atmosphere_params_t;
+
 #ifdef USE_CIMGUI
 struct ImDrawData;
 #endif
@@ -378,6 +438,7 @@ extern PFN_vkBindImageMemory qvkBindImageMemory;
 extern PFN_vkCmdBindDescriptorSets qvkCmdBindDescriptorSets;
 extern PFN_vkCmdBindPipeline qvkCmdBindPipeline;
 extern PFN_vkCmdClearColorImage qvkCmdClearColorImage;
+extern PFN_vkCmdDispatch qvkCmdDispatch;
 extern PFN_vkCmdPipelineBarrier qvkCmdPipelineBarrier;
 extern PFN_vkCreateBuffer qvkCreateBuffer;
 extern PFN_vkCreateDescriptorSetLayout qvkCreateDescriptorSetLayout;
@@ -1241,6 +1302,100 @@ typedef struct {
 		uint32_t updatedSurfelCount;
 	} gibs;
 #endif
+	
+	// GPU-driven culling and instancing system
+	struct {
+		qboolean enabled;
+		qboolean initialized;
+		
+		VkBuffer instanceBuffer;
+		VkDeviceMemory instanceBufferMemory;
+		VkDeviceAddress instanceBufferAddress;
+		uint32_t instanceCount;
+		uint32_t instanceCapacity;
+		
+		VkBuffer drawCommandBuffer;
+		VkDeviceMemory drawCommandBufferMemory;
+		uint32_t drawCommandCount;
+		
+		VkBuffer cullDataBuffer;
+		VkDeviceMemory cullDataBufferMemory;
+		
+		VkPipeline cullPipeline;
+		VkPipelineLayout cullPipelineLayout;
+		VkDescriptorSetLayout cullDescriptorSetLayout;
+		VkDescriptorSet cullDescriptorSet;
+		
+		VkPipeline instancePipeline;
+		VkPipelineLayout instancePipelineLayout;
+		VkDescriptorSetLayout instanceDescriptorSetLayout;
+		VkDescriptorSet instanceDescriptorSet;
+		
+		uint32_t culledInstanceCount;
+		uint32_t visibleInstanceCount;
+	} gpuCulling;
+	
+	// Material system with runtime parameters
+	struct {
+		qboolean enabled;
+		qboolean initialized;
+		
+		material_params_t *materialParams;
+		uint32_t materialCount;
+		uint32_t materialCapacity;
+		
+		VkBuffer materialBuffer;
+		VkDeviceMemory materialBufferMemory;
+		VkDeviceAddress materialBufferAddress;
+		
+		VkPipeline updatePipeline;
+		VkPipelineLayout updatePipelineLayout;
+		VkDescriptorSetLayout updateDescriptorSetLayout;
+		VkDescriptorSet updateDescriptorSet;
+		
+		void *luaState;
+	} materialSystem;
+	
+	// Cell streaming system
+	struct {
+		qboolean enabled;
+		qboolean initialized;
+		
+		stream_cell_t cells[MAX_STREAM_CELLS];
+		uint32_t cellCount;
+		uint32_t activeCellCount;
+		
+		int32_t currentCellX, currentCellY, currentCellZ;
+		
+		uint32_t loadQueue[MAX_STREAM_CELLS];
+		uint32_t loadQueueCount;
+		
+		uint32_t unloadQueue[MAX_STREAM_CELLS];
+		uint32_t unloadQueueCount;
+		
+		uint32_t frameCounter;
+		uint32_t cellsLoadedThisFrame;
+		uint32_t cellsUnloadedThisFrame;
+	} cellStreaming;
+	
+	// Atmosphere and mood system
+	struct {
+		qboolean enabled;
+		qboolean initialized;
+		
+		atmosphere_params_t currentParams;
+		atmosphere_params_t targetParams;
+		atmosphere_params_t baseParams;
+		
+		atmosphere_preset_t currentPreset;
+		float transitionTime;
+		float transitionDuration;
+		
+		VkBuffer atmosphereBuffer;
+		VkDeviceMemory atmosphereBufferMemory;
+		
+		void *luaState;
+	} atmosphere;
 } Vk_Instance;
 
 typedef struct {

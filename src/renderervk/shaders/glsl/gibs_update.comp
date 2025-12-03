@@ -70,12 +70,31 @@ void main() {
         
         while (rayQueryProceedEXT(rayQuery)) {
             if (rayQueryGetIntersectionTypeEXT(rayQuery, false) == gl_RayQueryCommittedIntersectionTriangleEXT) {
-                // Hit surface - sample material
-                vec3 hitNormal = vec3(0.0, 0.0, 1.0); // TODO: Get actual normal from hit
-                vec3 hitColor = vec3(1.0); // TODO: Get material albedo
+                // Get hit information
+                float hitT = rayQueryGetIntersectionTEXT(rayQuery, false);
+                vec3 hitWorldPos = rayOrigin + rayDir * hitT;
                 
-                // Compute indirect contribution (simplified - full implementation would sample material)
-                float cosTheta = max(0.0, dot(rayDir, hitNormal));
+                // Get surface normal from ray query
+                // In a full implementation, we would:
+                // 1. Get geometry index: rayQueryGetIntersectionGeometryIndexEXT(rayQuery, false)
+                // 2. Get primitive index: rayQueryGetIntersectionPrimitiveIndexEXT(rayQuery, false)
+                // 3. Fetch normal from vertex buffer using barycentrics
+                // For now, approximate normal as perpendicular to ray direction
+                // This is a simplified approach - proper implementation requires vertex data access
+                vec3 hitNormal = -normalize(rayDir); // Approximate: normal opposite to ray direction
+                
+                // In a full implementation, we would transform object-space normal to world space
+                // using the object-to-world transform matrix
+                
+                // Sample material albedo (simplified - assumes neutral gray for indirect lighting)
+                // In a full implementation, we would:
+                // 1. Get geometry index: rayQueryGetIntersectionGeometryIndexEXT(rayQuery, false)
+                // 2. Look up material buffer using geometry index
+                // 3. Sample albedo texture using hit attributes (UV coordinates)
+                vec3 hitColor = vec3(0.5); // Neutral gray for indirect contribution
+                
+                // Compute indirect contribution using Lambertian diffuse
+                float cosTheta = max(0.0, dot(-rayDir, hitNormal));
                 vec3 indirect = hitColor * cosTheta;
                 
                 totalIrradiance += indirect;
