@@ -14,6 +14,7 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 * DirectX 12 renderer
 * Vulkan renderer
 * Vulkan ray tracing
+* Metal renderer (macOS/iOS)
 * Physical Based Rendering
 * Raw mouse input support, enabled automatically instead of DirectInput(**\in_mouse 1**) if available
 * Unlagged mouse events processing, can be reverted by setting **\in_lagged 1**
@@ -77,16 +78,42 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
   * Realistic ray-traced lighting and effects (where supported)
   * Hardware-dependent, requires compatible GPU/driver
 
-See [docs/directx12-support.md](docs/directx12-support.md) for full details and requirements.
+## Metal renderer
+* Modern Graphics API: Full Metal support for macOS and iOS
+* Triple buffering for efficient frame presentation
+* Command buffers and encoders for optimized rendering
+* Render pipeline state objects for efficient shader management
+* Depth stencil state management
+* Support for Metal 2.0+ features including argument buffers and indirect command buffers
+* Metal 3.0+ ray tracing support (where available)
+* Automatic feature detection and capability queries
+* iOS and macOS platform support with unified codebase
+* Metal Shading Language (MSL) shader compilation
+* Efficient memory management with Metal resource allocation
+
+**Requirements:**
+* macOS 10.13+ or iOS 11.0+
+* Metal-compatible GPU
+* Xcode with Metal development tools
+
+**Platform Support:**
+* Full iOS app lifecycle management with UIApplicationDelegate
+* macOS window management with NSWindow
+* Unified platform abstraction layer for both iOS and macOS
+* Automatic Metal feature detection and capability queries
+* Retina display support
+* Variable refresh rate (ProMotion) support
 
 ## [Build Instructions](docs/BUILD.md)
 
 ## Links
 
+* https://idtech3.com
 * https://bitbucket.org/CPMADevs/cnq3
 * https://github.com/ioquake/ioq3
 * https://github.com/kennyalive/Quake-III-Arena-Kenny-Edition
 * https://github.com/OpenArena/engine
+* https://github.com/tomkidd/Quake3-iOS
 * https://github.com/JKSunny/Quake3e
 
 

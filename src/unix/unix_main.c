@@ -309,10 +309,19 @@ void NORETURN Sys_Quit( void )
 }
 
 
+#if defined(__APPLE__) && !defined(__ANDROID__)
+extern void Sys_Init_Apple(void);
+#endif
+
 void Sys_Init( void )
 {
 	Cvar_Set( "arch", OS_STRING " " ARCH_STRING );
 	//IN_Init();   // rcg08312005 moved into glimp.
+	
+#if defined(__APPLE__) && !defined(__ANDROID__)
+	// Initialize Apple platform-specific systems
+	Sys_Init_Apple();
+#endif
 }
 
 

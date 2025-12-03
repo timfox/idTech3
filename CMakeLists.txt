@@ -162,7 +162,7 @@ OPTION(USE_LOCAL_HEADERS "" ON)
 OPTION(USE_VULKAN "" ON)
 OPTION(USE_VMA "Enable Vulkan Memory Allocator (VMA) for better memory management" ON)
 OPTION(USE_D3D12 "Enable DirectX 12 renderer (Windows only)" ON)
-OPTION(USE_METAL "Enable Metal renderer (macOS only)" ON)
+OPTION(USE_METAL "Enable Metal renderer (macOS/iOS only)" ON)
 OPTION(USE_SYSTEM_JPEG "" OFF)
 OPTION(USE_RENDERER_DLOPEN "" ON)
 OPTION(USE_OPENEXR "Enable OpenEXR (.exr) image support" ON)
@@ -862,6 +862,40 @@ IF(WIN32 AND USE_D3D12)
 	ENDIF()
 ENDIF()
 
+# Metal renderer (macOS/iOS only)
+IF(APPLE AND USE_METAL AND NOT ANDROID)
+	SET(RENDERER_METAL_SRCS
+		src/renderermetal/metal.mm
+		src/renderermetal/tr_init.c
+		src/renderermetal/tr_main.c
+		src/renderermetal/tr_image.c
+		src/renderermetal/tr_surface.c
+	)
+	IF(USE_CIMGUI AND DEFINED CIMGUI_DIR)
+		list(APPEND RENDERER_METAL_SRCS
+			${CIMGUI_DIR}/cimgui_impl.cpp
+			${CIMGUI_IMGUI_DIR}/backends/imgui_impl_metal.mm
+		)
+	ENDIF()
+	
+	# Compile Metal shaders
+	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/renderermetal/shaders/default.metal)
+		IF(IOS)
+			SET(METAL_SDK iphoneos)
+		ELSE()
+			SET(METAL_SDK macosx)
+		ENDIF()
+		ADD_CUSTOM_COMMAND(
+			OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/default.metallib
+			COMMAND xcrun -sdk ${METAL_SDK} metal -c ${CMAKE_CURRENT_SOURCE_DIR}/src/renderermetal/shaders/default.metal -o ${CMAKE_CURRENT_BINARY_DIR}/default.air
+			COMMAND xcrun -sdk ${METAL_SDK} metallib ${CMAKE_CURRENT_BINARY_DIR}/default.air -o ${CMAKE_CURRENT_BINARY_DIR}/default.metallib
+			DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/renderermetal/shaders/default.metal
+			COMMENT "Compiling Metal shaders"
+		)
+		ADD_CUSTOM_TARGET(metal_shaders DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/default.metallib)
+	ENDIF()
+ENDIF()
+
 # VMA (Vulkan Memory Allocator)
 IF(USE_VMA AND USE_VULKAN)
 	# Check if VMA header exists
@@ -901,11 +935,27 @@ IF(USE_RENDERER_DLOPEN)
 		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_d3d12${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_D3D12)
 		TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_d3d12${RENDEXT} PRIVATE d3d12 dxgi d3dcompiler)
 	ENDIF()
+	
+	IF(APPLE AND USE_METAL AND NOT ANDROID)
+		ADD_LIBRARY(${RENDERER_PREFIX}_metal${RENDEXT} SHARED ${RENDERER_METAL_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
+		SET_TARGET_PROPERTIES(${RENDERER_PREFIX}_metal${RENDEXT} PROPERTIES OUTPUT_NAME "${RENDERER_PREFIX}_metal${RENDEXT}" PREFIX "")
+		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_metal${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_METAL)
+		TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_metal${RENDEXT} PRIVATE "-framework Metal" "-framework MetalKit" "-framework QuartzCore" "-framework Foundation")
+		IF(IOS)
+			TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_metal${RENDEXT} PRIVATE "-framework UIKit" "-framework GameController")
+		ELSE()
+			TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_metal${RENDEXT} PRIVATE "-framework AppKit")
+		ENDIF()
+		SET_SOURCE_FILES_PROPERTIES(${RENDERER_METAL_SRCS} PROPERTIES COMPILE_FLAGS "-x objective-c++ -fobjc-arc")
+	ENDIF()
 ELSE()
 	IF(USE_VULKAN)
 		ADD_LIBRARY(${RENDERER_PREFIX}_vulkan OBJECT ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS})
 	ELSEIF(WIN32 AND USE_D3D12)
 		ADD_LIBRARY(${RENDERER_PREFIX}_d3d12 OBJECT ${RENDERER_D3D12_SRCS} ${RENDERER_COMMON_SRCS})
+	ELSEIF(APPLE AND USE_METAL AND NOT ANDROID)
+		ADD_LIBRARY(${RENDERER_PREFIX}_metal OBJECT ${RENDERER_METAL_SRCS} ${RENDERER_COMMON_SRCS})
+		SET_SOURCE_FILES_PROPERTIES(${RENDERER_METAL_SRCS} PROPERTIES COMPILE_FLAGS "-x objective-c++ -fobjc-arc")
 	ELSE()
 		ADD_LIBRARY(${RENDERER_PREFIX}_opengl OBJECT ${RENDERER_GL_SRCS} ${RENDERER_COMMON_SRCS})
 	ENDIF()
@@ -967,11 +1017,34 @@ IF(UNIX)
 	ENDIF()
 
 	IF(APPLE)
-		SET(EXE_TYPE MACOSX_BUNDLE)
-		list(APPEND Q3_SRCS src/unix/quake3_flat.icns)
-		set_source_files_properties(src/unix/quake3_flat.icns PROPERTIES
-			MACOSX_PACKAGE_LOCATION Resources)
-		SET(MACOSX_BUNDLE_ICON_FILE quake3_flat.icns)
+		# Detect iOS vs macOS
+		IF(CMAKE_SYSTEM_NAME MATCHES "iOS")
+			SET(IOS TRUE)
+			SET(EXE_TYPE MACOSX_BUNDLE)
+			# iOS-specific sources
+			list(APPEND Q3_SRCS src/unix/ios_appdelegate.mm)
+			list(APPEND Q3_SRCS src/unix/ios_integration.mm)
+			list(APPEND Q3_SRCS src/unix/macos_platform.mm)
+			list(APPEND Q3_SRCS src/unix/macos_integration.c)
+			SET_SOURCE_FILES_PROPERTIES(src/unix/ios_appdelegate.mm PROPERTIES COMPILE_FLAGS "-x objective-c++ -fobjc-arc")
+			SET_SOURCE_FILES_PROPERTIES(src/unix/ios_integration.mm PROPERTIES COMPILE_FLAGS "-x objective-c++ -fobjc-arc")
+			SET_SOURCE_FILES_PROPERTIES(src/unix/macos_platform.mm PROPERTIES COMPILE_FLAGS "-x objective-c++ -fobjc-arc")
+			TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE "-framework UIKit" "-framework Foundation" "-framework Metal" "-framework QuartzCore" "-framework GameController")
+		ELSE()
+			SET(IOS FALSE)
+			SET(EXE_TYPE MACOSX_BUNDLE)
+			# macOS-specific sources
+			list(APPEND Q3_SRCS src/unix/macos_main.mm)
+			list(APPEND Q3_SRCS src/unix/macos_platform.mm)
+			list(APPEND Q3_SRCS src/unix/macos_integration.c)
+			list(APPEND Q3_SRCS src/unix/quake3_flat.icns)
+			set_source_files_properties(src/unix/quake3_flat.icns PROPERTIES
+				MACOSX_PACKAGE_LOCATION Resources)
+			SET(MACOSX_BUNDLE_ICON_FILE quake3_flat.icns)
+			SET_SOURCE_FILES_PROPERTIES(src/unix/macos_main.mm PROPERTIES COMPILE_FLAGS "-x objective-c++ -fobjc-arc")
+			SET_SOURCE_FILES_PROPERTIES(src/unix/macos_platform.mm PROPERTIES COMPILE_FLAGS "-x objective-c++ -fobjc-arc")
+			TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE "-framework AppKit" "-framework Foundation" "-framework Metal" "-framework QuartzCore")
+		ENDIF()
 	ENDIF()
 ELSEIF(WIN32)
 	SET(EXE_TYPE WIN32)
