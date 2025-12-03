@@ -180,6 +180,8 @@ OPTION(USE_WEBSOCKETS "Enable WebSocket support" ON)
 OPTION(USE_OPENAL "Enable OpenAL enhanced audio system" ON)
 OPTION(USE_BULLET "Enable Bullet Physics library for rigid body simulation" ON)
 OPTION(USE_JOBSYSTEM "Enable multi-threaded job system for parallel execution" ON)
+OPTION(USE_THEORA "Enable Theora (Ogg Theora) video codec support" ON)
+OPTION(USE_VPX "Enable VP8/VP9 (WebM) video codec support" ON)
 #OPTION(USE_OPENGL "" OFF)
 #OPTION(USE_OPENGL2 "" OFF)
 #OPTION(USE_USD "" ON)
@@ -1406,6 +1408,114 @@ IF(USE_LUA)
 	ENDIF()
 ENDIF()
 
+# Theora video codec support
+IF(USE_THEORA)
+	# Try pkg-config first (common on Linux)
+	find_package(PkgConfig QUIET)
+	IF(PKG_CONFIG_FOUND)
+		pkg_check_modules(THEORA libtheora QUIET)
+		IF(THEORA_FOUND)
+			SET(THEORA_INCLUDE_DIRS ${THEORA_INCLUDE_DIRS})
+			SET(THEORA_LIBRARIES ${THEORA_LIBRARIES})
+		ENDIF()
+	ENDIF()
+	
+	# Try CMake's find_package
+	IF(NOT THEORA_FOUND)
+		find_package(Theora QUIET)
+		IF(Theora_FOUND)
+			SET(THEORA_FOUND TRUE)
+			IF(DEFINED Theora_INCLUDE_DIRS)
+				SET(THEORA_INCLUDE_DIRS ${Theora_INCLUDE_DIRS})
+			ENDIF()
+			IF(DEFINED Theora_LIBRARIES)
+				SET(THEORA_LIBRARIES ${Theora_LIBRARIES})
+			ENDIF()
+		ENDIF()
+	ENDIF()
+	
+	# Manual search as fallback
+	IF(NOT THEORA_FOUND)
+		FIND_PATH(THEORA_INCLUDE_DIR
+			NAMES theora/theora.h
+			PATHS
+				/usr/include
+				/usr/local/include
+				/opt/local/include
+		)
+		FIND_LIBRARY(THEORA_LIBRARY
+			NAMES theora
+			PATHS
+				/usr/lib
+				/usr/lib/x86_64-linux-gnu
+				/usr/local/lib
+				/opt/local/lib
+		)
+		IF(THEORA_INCLUDE_DIR AND THEORA_LIBRARY)
+			SET(THEORA_FOUND TRUE)
+			SET(THEORA_INCLUDE_DIRS ${THEORA_INCLUDE_DIR})
+			SET(THEORA_LIBRARIES ${THEORA_LIBRARY})
+		ENDIF()
+	ENDIF()
+	
+	IF(THEORA_FOUND AND THEORA_LIBRARIES)
+		TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${THEORA_INCLUDE_DIRS})
+		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_THEORA)
+		MESSAGE(STATUS "Theora found: ${THEORA_LIBRARIES}")
+	ELSE()
+		MESSAGE(WARNING "Theora not found, disabling Theora support")
+		MESSAGE(STATUS "To enable Theora support, install: sudo apt-get install libtheora-dev")
+		SET(USE_THEORA OFF CACHE BOOL "" FORCE)
+	ENDIF()
+ENDIF()
+
+# VPX (VP8/VP9) video codec support
+IF(USE_VPX)
+	# Try pkg-config first
+	find_package(PkgConfig QUIET)
+	IF(PKG_CONFIG_FOUND)
+		pkg_check_modules(VPX libvpx QUIET)
+		IF(VPX_FOUND)
+			SET(VPX_INCLUDE_DIRS ${VPX_INCLUDE_DIRS})
+			SET(VPX_LIBRARIES ${VPX_LIBRARIES})
+		ENDIF()
+	ENDIF()
+	
+	# Manual search as fallback
+	IF(NOT VPX_FOUND)
+		FIND_PATH(VPX_INCLUDE_DIR
+			NAMES vpx/vpx_decoder.h
+			PATHS
+				/usr/include
+				/usr/local/include
+				/opt/local/include
+		)
+		FIND_LIBRARY(VPX_LIBRARY
+			NAMES vpx
+			PATHS
+				/usr/lib
+				/usr/lib/x86_64-linux-gnu
+				/usr/local/lib
+				/opt/local/lib
+		)
+		IF(VPX_INCLUDE_DIR AND VPX_LIBRARY)
+			SET(VPX_FOUND TRUE)
+			SET(VPX_INCLUDE_DIRS ${VPX_INCLUDE_DIR})
+			SET(VPX_LIBRARIES ${VPX_LIBRARY})
+		ENDIF()
+	ENDIF()
+	
+	IF(VPX_FOUND AND VPX_LIBRARIES)
+		TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${VPX_INCLUDE_DIRS})
+		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_VPX)
+		MESSAGE(STATUS "VPX found: ${VPX_LIBRARIES}")
+	ELSE()
+		MESSAGE(WARNING "VPX not found, disabling VP8/VP9 support")
+		MESSAGE(STATUS "To enable VPX support, install: sudo apt-get install libvpx-dev")
+		SET(USE_VPX OFF CACHE BOOL "" FORCE)
+	ENDIF()
+ENDIF()
+
 IF(USE_OPENAL)
 	# Try CMake's find_package first
 	find_package(OpenAL QUIET)
@@ -1681,6 +1791,18 @@ IF(USE_OPENAL)
 			# Use library variable
 			TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${OPENAL_LIBRARIES})
 		ENDIF()
+	ENDIF()
+ENDIF()
+
+IF(USE_THEORA)
+	IF(THEORA_FOUND AND THEORA_LIBRARIES)
+		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${THEORA_LIBRARIES})
+	ENDIF()
+ENDIF()
+
+IF(USE_VPX)
+	IF(VPX_FOUND AND VPX_LIBRARIES)
+		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${VPX_LIBRARIES})
 	ENDIF()
 ENDIF()
 

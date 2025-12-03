@@ -1,25 +1,3 @@
-/*
-===========================================================================
-Copyright (C) 1999-2005 Id Software, Inc.
-
-This file is part of Quake III Arena source code.
-
-Quake III Arena source code is free software; you can redistribute it
-and/or modify it under the terms of the GNU General Public License as
-published by the Free Software Foundation; either version 2 of the License,
-or (at your option) any later version.
-
-Quake III Arena source code is distributed in the hope that it will be
-useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with Quake III Arena source code; if not, write to the Free Software
-Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-===========================================================================
-*/
-
 /*****************************************************************************
  * name:		cl_cin.c
  *
@@ -33,6 +11,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "client.h"
 #include "snd_local.h"
+#include "cl_cin_codec.h"
 
 #define MAXSIZE				8
 #define MINSIZE				4
@@ -56,6 +35,20 @@ extern	int		s_rawend;
 
 static void RoQ_init( void );
 static void CIN_SetLooping (int handle, qboolean loop);
+
+#ifdef USE_THEORA
+qboolean Theora_Init(int handle);
+void Theora_Shutdown(int handle);
+e_status Theora_Run(int handle);
+void Theora_Reset(int handle);
+#endif
+
+#ifdef USE_VPX
+qboolean VPX_Init(int handle);
+void VPX_Shutdown(int handle);
+e_status VPX_Run(int handle);
+void VPX_Reset(int handle);
+#endif
 
 /******************************************************************************
 *
@@ -129,11 +122,13 @@ typedef struct {
 	int					playonwalls;
 	byte*				buf;
 	long				drawX, drawY;
+	video_codec_t		codec;			// Video codec type
+	void*				codecData;		// Codec-specific data
 } cin_cache;
 
 static cinematics_t		cin;
-static cin_cache		cinTable[MAX_VIDEO_HANDLES];
-static int				currentHandle = -1;
+cin_cache				cinTable[MAX_VIDEO_HANDLES];  // Made non-static for codec access
+int						currentHandle = -1;  // Made non-static for codec access
 static int				CL_handle = -1;
 
 extern int				s_soundtime;		// sample PAIRS
@@ -1285,6 +1280,8 @@ static void RoQ_init( void )
 static void RoQShutdown( void ) {
 	const char *s;
 
+	if (currentHandle < 0) return;
+	
 	if (!cinTable[currentHandle].buf) {
 		return;
 	}
@@ -1294,6 +1291,9 @@ static void RoQShutdown( void ) {
 	}
 	Com_DPrintf("finished cinematic\n");
 	cinTable[currentHandle].status = FMV_IDLE;
+
+	// Clean up codec-specific data (handled by codec-specific shutdown functions)
+	// Buffer cleanup is handled by codec shutdown functions
 
 	if ( cinTable[currentHandle].iFile != FS_INVALID_HANDLE ) {
 		FS_FCloseFile( cinTable[currentHandle].iFile );
@@ -1314,6 +1314,7 @@ static void RoQShutdown( void ) {
 		CL_handle = -1;
 	}
 	cinTable[currentHandle].fileName[0] = '\0';
+	cinTable[currentHandle].codec = CODEC_NONE;
 	currentHandle = -1;
 }
 
@@ -1339,7 +1340,29 @@ e_status CIN_StopCinematic( int handle ) {
 		}
 	}
 	cinTable[currentHandle].status = FMV_EOF;
-	RoQShutdown();
+	
+	// Shutdown based on codec type
+	switch (cinTable[currentHandle].codec) {
+		case CODEC_ROQ:
+			RoQShutdown();
+			break;
+#ifdef USE_THEORA
+		case CODEC_THEORA:
+			Theora_Shutdown(currentHandle);
+			RoQShutdown(); // Use common cleanup
+			break;
+#endif
+#ifdef USE_VPX
+		case CODEC_VP8:
+		case CODEC_VP9:
+			VPX_Shutdown(currentHandle);
+			RoQShutdown(); // Use common cleanup
+			break;
+#endif
+		default:
+			RoQShutdown(); // Use common cleanup
+			break;
+	}
 
 	return FMV_EOF;
 }
@@ -1363,7 +1386,23 @@ e_status CIN_RunCinematic( int handle )
 		currentHandle = handle;
 		cin.currentHandle = currentHandle;
 		cinTable[currentHandle].status = FMV_EOF;
-		RoQReset();
+		// Reset based on codec type
+		switch (cinTable[currentHandle].codec) {
+			case CODEC_ROQ:
+				RoQReset();
+				break;
+#ifdef USE_THEORA
+			case CODEC_THEORA:
+				Theora_Reset(currentHandle);
+				break;
+#endif
+#ifdef USE_VPX
+			case CODEC_VP8:
+			case CODEC_VP9:
+				VPX_Reset(currentHandle);
+				break;
+#endif
+		}
 	}
 
 	if (cinTable[handle].playonwalls < -1)
@@ -1383,36 +1422,85 @@ e_status CIN_RunCinematic( int handle )
 		return cinTable[currentHandle].status;
 	}
 
-	thisTime = CL_ScaledMilliseconds();
-	if (cinTable[currentHandle].shader && (abs(thisTime - cinTable[currentHandle].lastTime))>100) {
-		cinTable[currentHandle].startTime += thisTime - cinTable[currentHandle].lastTime;
-	}
-	cinTable[currentHandle].tfps = (((CL_ScaledMilliseconds() - cinTable[currentHandle].startTime)*3)/100);
-
-	start = cinTable[currentHandle].startTime;
-	while(  (cinTable[currentHandle].tfps != cinTable[currentHandle].numQuads)
-		&& (cinTable[currentHandle].status == FMV_PLAY) ) 
-	{
-		RoQInterrupt();
-		if (start != cinTable[currentHandle].startTime) {
+	// Route to codec-specific run function
+	switch (cinTable[currentHandle].codec) {
+		case CODEC_ROQ:
+			thisTime = CL_ScaledMilliseconds();
+			if (cinTable[currentHandle].shader && (abs(thisTime - cinTable[currentHandle].lastTime))>100) {
+				cinTable[currentHandle].startTime += thisTime - cinTable[currentHandle].lastTime;
+			}
 			cinTable[currentHandle].tfps = (((CL_ScaledMilliseconds() - cinTable[currentHandle].startTime)*3)/100);
+
 			start = cinTable[currentHandle].startTime;
-		}
-	}
+			while(  (cinTable[currentHandle].tfps != cinTable[currentHandle].numQuads)
+				&& (cinTable[currentHandle].status == FMV_PLAY) ) 
+			{
+				RoQInterrupt();
+				if (start != cinTable[currentHandle].startTime) {
+					cinTable[currentHandle].tfps = (((CL_ScaledMilliseconds() - cinTable[currentHandle].startTime)*3)/100);
+					start = cinTable[currentHandle].startTime;
+				}
+			}
 
-	cinTable[currentHandle].lastTime = thisTime;
+			cinTable[currentHandle].lastTime = thisTime;
 
-	if (cinTable[currentHandle].status == FMV_LOOPED) {
-		cinTable[currentHandle].status = FMV_PLAY;
-	}
+			if (cinTable[currentHandle].status == FMV_LOOPED) {
+				cinTable[currentHandle].status = FMV_PLAY;
+			}
 
-	if (cinTable[currentHandle].status == FMV_EOF) {
-	  if (cinTable[currentHandle].looping) {
-		RoQReset();
-	  } else {
-		RoQShutdown();
-		return FMV_EOF;
-	  }
+			if (cinTable[currentHandle].status == FMV_EOF) {
+			  if (cinTable[currentHandle].looping) {
+				RoQReset();
+			  } else {
+				RoQShutdown();
+				return FMV_EOF;
+			  }
+			}
+			break;
+			
+#ifdef USE_THEORA
+		case CODEC_THEORA:
+			Theora_Run(currentHandle);
+			// Handle looping and EOF for Theora
+			if (cinTable[currentHandle].status == FMV_EOF) {
+				if (cinTable[currentHandle].looping) {
+					Theora_Reset(currentHandle);
+				} else {
+					Theora_Shutdown(currentHandle);
+					RoQShutdown();
+					return FMV_EOF;
+				}
+			}
+			if (cinTable[currentHandle].status == FMV_LOOPED) {
+				cinTable[currentHandle].status = FMV_PLAY;
+			}
+			break;
+#endif
+			
+#ifdef USE_VPX
+		case CODEC_VP8:
+		case CODEC_VP9:
+			VPX_Run(currentHandle);
+			// Handle looping and EOF for VPX
+			if (cinTable[currentHandle].status == FMV_EOF) {
+				if (cinTable[currentHandle].looping) {
+					VPX_Reset(currentHandle);
+				} else {
+					VPX_Shutdown(currentHandle);
+					RoQShutdown();
+					return FMV_EOF;
+				}
+			}
+			if (cinTable[currentHandle].status == FMV_LOOPED) {
+				cinTable[currentHandle].status = FMV_PLAY;
+			}
+			break;
+#endif
+			
+		default:
+			Com_DPrintf("CIN_RunCinematic: unsupported codec %d\n", cinTable[currentHandle].codec);
+			cinTable[currentHandle].status = FMV_EOF;
+			break;
 	}
 
 	return cinTable[currentHandle].status;
@@ -1425,9 +1513,11 @@ CIN_PlayCinematic
 ==================
 */
 int CIN_PlayCinematic( const char *arg, int x, int y, int w, int h, int systemBits ) {
-	unsigned short RoQID;
 	char	name[MAX_OSPATH];
 	int		i;
+	byte	header[16];
+	video_codec_t detectedCodec;
+	const video_codec_info_t *codecInfo;
 
 	if (strchr(arg, '/') == NULL && strchr(arg, '\\') == NULL) {
 		Com_sprintf (name, sizeof(name), "video/%s", arg);
@@ -1474,6 +1564,8 @@ int CIN_PlayCinematic( const char *arg, int x, int y, int w, int h, int systemBi
 	cinTable[currentHandle].playonwalls = 1;
 	cinTable[currentHandle].silent = (systemBits & CIN_silent) != 0;
 	cinTable[currentHandle].shader = (systemBits & CIN_shader) != 0;
+	cinTable[currentHandle].codec = CODEC_NONE;
+	cinTable[currentHandle].codecData = NULL;
 
 	if (cinTable[currentHandle].alterGameState) {
 		// close the menu
@@ -1484,35 +1576,96 @@ int CIN_PlayCinematic( const char *arg, int x, int y, int w, int h, int systemBi
 		cinTable[currentHandle].playonwalls = cl_inGameVideo->integer;
 	}
 
-	initRoQ();
-					
-	FS_Read (cin.file, 16, cinTable[currentHandle].iFile);
-
-	RoQID = (unsigned short)(cin.file[0]) + (unsigned short)(cin.file[1])*256;
-	if (RoQID == 0x1084)
-	{
-		RoQ_init();
-//		FS_Read (cin.file, cinTable[currentHandle].RoQFrameSize+8, cinTable[currentHandle].iFile);
-
-		cinTable[currentHandle].status = FMV_PLAY;
-		Com_DPrintf("trFMV::play(), playing %s\n", arg);
-
-		if (cinTable[currentHandle].alterGameState) {
-			cls.state = CA_CINEMATIC;
+	// Read header for codec detection
+	FS_Read (header, sizeof(header), cinTable[currentHandle].iFile);
+	
+	// Detect codec
+	detectedCodec = CIN_DetectCodec(name, header, sizeof(header));
+	codecInfo = CIN_GetCodecInfo(detectedCodec);
+	
+	if (!codecInfo || detectedCodec == CODEC_NONE) {
+		Com_DPrintf("CIN_PlayCinematic: unsupported video format for %s\n", name);
+		if ( cinTable[currentHandle].iFile != FS_INVALID_HANDLE ) {
+			FS_FCloseFile( cinTable[currentHandle].iFile );
+			cinTable[currentHandle].iFile = FS_INVALID_HANDLE;
 		}
-		
-		Con_Close();
-
-		if ( !cinTable[currentHandle].silent ) {
-			s_rawend = s_soundtime;
-		}
-
-		return currentHandle;
+		cinTable[currentHandle].fileName[0] = '\0';
+		return -1;
 	}
-	Com_DPrintf("trFMV::play(), invalid RoQ ID\n");
+	
+	cinTable[currentHandle].codec = detectedCodec;
+	Com_DPrintf("CIN_PlayCinematic: detected codec %s for %s\n", codecInfo->name, name);
+	
+	// Initialize codec-specific handlers
+	switch (detectedCodec) {
+		case CODEC_ROQ:
+			// Copy header back to cin.file for ROQ
+			Com_Memcpy(cin.file, header, sizeof(header));
+			initRoQ();
+			RoQ_init();
+			break;
+			
+#ifdef USE_THEORA
+		case CODEC_THEORA:
+			// Reset file position after header read
+			FS_Seek(cinTable[currentHandle].iFile, 0, FS_SEEK_SET);
+			if (!Theora_Init(currentHandle)) {
+				Com_Printf("CIN_PlayCinematic: failed to initialize Theora decoder\n");
+				Com_Printf("  File may not be a valid Theora video or may be corrupted\n");
+				if ( cinTable[currentHandle].iFile != FS_INVALID_HANDLE ) {
+					FS_FCloseFile( cinTable[currentHandle].iFile );
+					cinTable[currentHandle].iFile = FS_INVALID_HANDLE;
+				}
+				cinTable[currentHandle].fileName[0] = '\0';
+				cinTable[currentHandle].codec = CODEC_NONE;
+				return -1;
+			}
+			break;
+#endif
+			
+#ifdef USE_VPX
+		case CODEC_VP8:
+		case CODEC_VP9:
+			// Reset file position after header read
+			FS_Seek(cinTable[currentHandle].iFile, 0, FS_SEEK_SET);
+			if (!VPX_Init(currentHandle)) {
+				Com_Printf("CIN_PlayCinematic: failed to initialize VPX decoder\n");
+				Com_Printf("  File may not be a valid VP8/VP9 video or may be corrupted\n");
+				if ( cinTable[currentHandle].iFile != FS_INVALID_HANDLE ) {
+					FS_FCloseFile( cinTable[currentHandle].iFile );
+					cinTable[currentHandle].iFile = FS_INVALID_HANDLE;
+				}
+				cinTable[currentHandle].fileName[0] = '\0';
+				cinTable[currentHandle].codec = CODEC_NONE;
+				return -1;
+			}
+			break;
+#endif
+			
+		default:
+			Com_DPrintf("CIN_PlayCinematic: codec %d not implemented\n", detectedCodec);
+			if ( cinTable[currentHandle].iFile != FS_INVALID_HANDLE ) {
+				FS_FCloseFile( cinTable[currentHandle].iFile );
+				cinTable[currentHandle].iFile = FS_INVALID_HANDLE;
+			}
+			cinTable[currentHandle].fileName[0] = '\0';
+			return -1;
+	}
 
-	RoQShutdown();
-	return -1;
+	cinTable[currentHandle].status = FMV_PLAY;
+	Com_DPrintf("trFMV::play(), playing %s with codec %s\n", arg, codecInfo->name);
+
+	if (cinTable[currentHandle].alterGameState) {
+		cls.state = CA_CINEMATIC;
+	}
+	
+	Con_Close();
+
+	if ( !cinTable[currentHandle].silent ) {
+		s_rawend = s_soundtime;
+	}
+
+	return currentHandle;
 }
 
 
