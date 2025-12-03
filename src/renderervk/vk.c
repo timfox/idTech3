@@ -6297,8 +6297,14 @@ void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
 	}
 
 	if ( mipmap ) {
-		sampler_def.gl_mag_filter = gl_filter_max;
-		sampler_def.gl_min_filter = gl_filter_min;
+		// Force trilinear filtering for lightmaps
+		if ( image->flags & IMGFLAG_LIGHTMAP ) {
+			sampler_def.gl_mag_filter = GL_LINEAR;
+			sampler_def.gl_min_filter = GL_LINEAR_MIPMAP_LINEAR;
+		} else {
+			sampler_def.gl_mag_filter = gl_filter_max;
+			sampler_def.gl_min_filter = gl_filter_min;
+		}
 	} else {
 		// Use nearest filtering for fonts and other UI elements to prevent blurriness
 		if ( isFontTexture ) {
