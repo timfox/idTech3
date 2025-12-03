@@ -52,6 +52,10 @@ void Lua_Init(void)
 	com_lua_enabled = Cvar_Get("com_lua_enabled", "1", CVAR_ARCHIVE | CVAR_LATCH);
 	Cvar_SetDescription(com_lua_enabled, "Enable Lua scripting support (1 = enabled, 0 = disabled)");
 	
+	// Register console command for hot reload
+	Cmd_AddCommand("lua_reload", Lua_ReloadScript_f);
+	Cvar_SetDescription(Cmd_GetCommand("lua_reload"), "Reload all Lua scripts (hot reload)");
+	
 	// Initialize event bus
 	Lua_Events_Init();
 	
@@ -87,6 +91,9 @@ void Lua_Shutdown(void)
 	
 	if (!com_lua_enabled || !com_lua_enabled->integer)
 		return;
+	
+	// Remove console command
+	Cmd_RemoveCommand("lua_reload");
 	
 	// Shutdown sequence system
 	Lua_Sequence_Shutdown();
@@ -862,6 +869,64 @@ void Lua_RegisterEngineBindings(lua_State *L)
 	
 	// Override Lua's print function with our console print
 	Lua_RegisterFunction(L, "print", Lua_Print);
+}
+
+/*
+=================
+Lua_ReloadScripts
+Reload all Lua scripts (hot reload)
+=================
+*/
+void Lua_ReloadScripts(void)
+{
+	int i;
+	lua_State *L;
+	
+	if (!com_lua_enabled || !com_lua_enabled->integer) {
+		Com_Printf("Lua scripting is disabled\n");
+		return;
+	}
+	
+	// Reload scripts in all Lua states
+	for (i = 0; i < num_lua_states; i++) {
+		L = lua_states[i];
+		if (!L)
+			continue;
+		
+		// Clear package.loaded to force reload
+		lua_getglobal(L, "package");
+		if (lua_istable(L, -1)) {
+			lua_getfield(L, -1, "loaded");
+			if (lua_istable(L, -1)) {
+				// Clear all loaded modules
+				lua_pushnil(L);
+				while (lua_next(L, -2) != 0) {
+					lua_pop(L, 1);
+					lua_pushnil(L);
+					lua_settable(L, -3);
+				}
+			}
+			lua_pop(L, 1);
+		}
+		lua_pop(L, 1);
+		
+		// Reload scripts from filesystem
+		Com_Printf("Reloading scripts in Lua state %d...\n", i);
+		Lua_LoadScriptsFromFS(L);
+	}
+	
+	Com_Printf("Lua scripts reloaded\n");
+}
+
+/*
+=================
+Lua_ReloadScript_f
+Console command to reload Lua scripts
+=================
+*/
+static void Lua_ReloadScript_f(void)
+{
+	Lua_ReloadScripts();
 }
 
 #endif // USE_LUA

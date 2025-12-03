@@ -182,6 +182,10 @@ void Lua_RegisterGameBindings(lua_State *L)
 	Lua_RegisterFunction(L, "game_get_entity_count", Lua_GameGetEntityCount);
 	Lua_RegisterFunction(L, "game_entity_exists", Lua_GameEntityExists);
 	
+	// Register animation event bindings
+	extern void G_RegisterAnimationEventLua( void *luaState );
+	G_RegisterAnimationEventLua( L );
+	
 	// Additional bindings for ECS and physics
 	// Note: Entity position and script functions are available via Entity.* API
 	// These are registered in lua_entity.cpp

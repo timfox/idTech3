@@ -268,6 +268,7 @@ lua_State *	Lua_CreateState( void );
 lua_State *	Lua_GetMainState( void );
 lua_State *	Lua_GetGlobalState( void );
 void		Lua_DestroyState( lua_State *L );
+void		Lua_ReloadScripts( void );
 qboolean	Lua_LoadFile( lua_State *L, const char *filename );
 qboolean	Lua_LoadString( lua_State *L, const char *code );
 qboolean	Lua_LoadScriptFromFS( lua_State *L, const char *filename );

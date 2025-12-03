@@ -80,7 +80,51 @@ void G_TriggerAnimationEvent( int entityNum, anim_event_type_t eventType, const 
 	}
 	
 	// Also trigger Lua callbacks if Lua is enabled
-	// TODO: Implement Lua callback system
+#ifdef USE_LUA
+	extern void Lua_Events_Emit( const char *event_name, int num_args, ... );
+	
+	// Emit Lua event for animation events
+	const char *eventName = NULL;
+	switch ( eventType ) {
+		case ANIM_EVENT_HIT_FRAME:
+			eventName = "anim_hit_frame";
+			break;
+		case ANIM_EVENT_PARRY_WINDOW_OPEN:
+			eventName = "anim_parry_window_open";
+			break;
+		case ANIM_EVENT_PARRY_WINDOW_CLOSE:
+			eventName = "anim_parry_window_close";
+			break;
+		case ANIM_EVENT_RECOVER_START:
+			eventName = "anim_recover_start";
+			break;
+		case ANIM_EVENT_RECOVER_END:
+			eventName = "anim_recover_end";
+			break;
+		case ANIM_EVENT_FOOTSTEP:
+			eventName = "anim_footstep";
+			break;
+		case ANIM_EVENT_WEAPON_FIRE:
+			eventName = "anim_weapon_fire";
+			break;
+		case ANIM_EVENT_WEAPON_RELOAD:
+			eventName = "anim_weapon_reload";
+			break;
+		case ANIM_EVENT_CUSTOM:
+			eventName = "anim_custom";
+			break;
+		default:
+			return;
+	}
+	
+	if ( eventName ) {
+		if ( customData && *customData ) {
+			Lua_Events_Emit( eventName, 2, entityNum, customData );
+		} else {
+			Lua_Events_Emit( eventName, 1, entityNum );
+		}
+	}
+#endif // USE_LUA
 }
 
 /*
@@ -90,9 +134,16 @@ Register Lua Functions
 */
 void G_RegisterAnimationEventLua( void *luaState )
 {
-	// TODO: Register Lua functions for animation events
-	// Example:
-	// lua_register(luaState, "OnHitFrame", lua_on_hit_frame);
-	// lua_register(luaState, "OnParryWindow", lua_on_parry_window);
+#ifdef USE_LUA
+	if ( !luaState ) {
+		return;
+	}
+	
+	// Animation events are handled via the event system
+	// Lua scripts can subscribe using Events.on("anim_hit_frame", function(entityNum) ... end)
+	// No direct function registration needed - events are emitted automatically
+	
+	Com_Printf( "Animation events: Registered Lua integration via event system\n" );
+#endif // USE_LUA
 }
 

@@ -373,14 +373,177 @@ void vk_atmosphere_set_time_of_day( float timeOfDay, float transitionTime )
 Register Lua Functions
 =============================================================================
 */
+#ifdef USE_LUA
+#include "../qcommon/qcommon.h"
+
+/*
+=============================================================================
+Lua Atmosphere Bindings
+=============================================================================
+*/
+
+static int lua_atmosphere_set_preset( lua_State *L )
+{
+	int numArgs = lua_gettop( L );
+	if ( numArgs < 1 ) {
+		lua_pushboolean( L, 0 );
+		return 1;
+	}
+	
+	int preset = (int)lua_tointeger( L, 1 );
+	float transitionTime = 0.0f;
+	if ( numArgs >= 2 ) {
+		transitionTime = (float)lua_tonumber( L, 2 );
+	}
+	
+	if ( preset >= 0 && preset < ATMOSPHERE_CUSTOM ) {
+		vk_atmosphere_set_preset( (atmosphere_preset_t)preset, transitionTime );
+		lua_pushboolean( L, 1 );
+	} else {
+		lua_pushboolean( L, 0 );
+	}
+	return 1;
+}
+
+static int lua_atmosphere_set_exposure( lua_State *L )
+{
+	int numArgs = lua_gettop( L );
+	if ( numArgs < 1 ) {
+		lua_pushboolean( L, 0 );
+		return 1;
+	}
+	
+	float exposure = (float)lua_tonumber( L, 1 );
+	float transitionTime = 0.0f;
+	if ( numArgs >= 2 ) {
+		transitionTime = (float)lua_tonumber( L, 2 );
+	}
+	
+	vk_atmosphere_set_exposure( exposure, transitionTime );
+	lua_pushboolean( L, 1 );
+	return 1;
+}
+
+static int lua_atmosphere_set_fog( lua_State *L )
+{
+	int numArgs = lua_gettop( L );
+	if ( numArgs < 3 ) {
+		lua_pushboolean( L, 0 );
+		return 1;
+	}
+	
+	float density = (float)lua_tonumber( L, 1 );
+	float start = (float)lua_tonumber( L, 2 );
+	float end = (float)lua_tonumber( L, 3 );
+	
+	vec3_t color = { 0.5f, 0.5f, 0.5f };
+	if ( numArgs >= 6 ) {
+		color[0] = (float)lua_tonumber( L, 4 );
+		color[1] = (float)lua_tonumber( L, 5 );
+		color[2] = (float)lua_tonumber( L, 6 );
+	}
+	
+	float transitionTime = 0.0f;
+	if ( numArgs >= 7 ) {
+		transitionTime = (float)lua_tonumber( L, 7 );
+	}
+	
+	vk_atmosphere_set_fog( density, start, end, color, transitionTime );
+	lua_pushboolean( L, 1 );
+	return 1;
+}
+
+static int lua_atmosphere_set_bloom( lua_State *L )
+{
+	int numArgs = lua_gettop( L );
+	if ( numArgs < 1 ) {
+		lua_pushboolean( L, 0 );
+		return 1;
+	}
+	
+	float intensity = (float)lua_tonumber( L, 1 );
+	float threshold = 1.0f;
+	float size = 0.5f;
+	float transitionTime = 0.0f;
+	
+	if ( numArgs >= 2 ) {
+		threshold = (float)lua_tonumber( L, 2 );
+	}
+	if ( numArgs >= 3 ) {
+		size = (float)lua_tonumber( L, 3 );
+	}
+	if ( numArgs >= 4 ) {
+		transitionTime = (float)lua_tonumber( L, 4 );
+	}
+	
+	vk_atmosphere_set_bloom( intensity, threshold, size, transitionTime );
+	lua_pushboolean( L, 1 );
+	return 1;
+}
+
+static int lua_atmosphere_set_color_tint( lua_State *L )
+{
+	int numArgs = lua_gettop( L );
+	if ( numArgs < 3 ) {
+		lua_pushboolean( L, 0 );
+		return 1;
+	}
+	
+	vec3_t color;
+	color[0] = (float)lua_tonumber( L, 1 );
+	color[1] = (float)lua_tonumber( L, 2 );
+	color[2] = (float)lua_tonumber( L, 3 );
+	
+	float transitionTime = 0.0f;
+	if ( numArgs >= 4 ) {
+		transitionTime = (float)lua_tonumber( L, 4 );
+	}
+	
+	vk_atmosphere_set_color_tint( color, transitionTime );
+	lua_pushboolean( L, 1 );
+	return 1;
+}
+
+static int lua_atmosphere_set_time_of_day( lua_State *L )
+{
+	int numArgs = lua_gettop( L );
+	if ( numArgs < 1 ) {
+		lua_pushboolean( L, 0 );
+		return 1;
+	}
+	
+	float timeOfDay = (float)lua_tonumber( L, 1 );
+	float transitionTime = 0.0f;
+	if ( numArgs >= 2 ) {
+		transitionTime = (float)lua_tonumber( L, 2 );
+	}
+	
+	vk_atmosphere_set_time_of_day( timeOfDay, transitionTime );
+	lua_pushboolean( L, 1 );
+	return 1;
+}
+
+#endif // USE_LUA
+
 void vk_atmosphere_register_lua_functions( void *luaState )
 {
-	(void)luaState; // TODO: Implement Lua bindings
+#ifdef USE_LUA
+	if ( !luaState ) {
+		return;
+	}
 	
-	// TODO: Register Lua functions for atmosphere control
-	// Example:
-	// lua_register(luaState, "AtmosphereSetPreset", lua_atmosphere_set_preset);
-	// lua_register(luaState, "AtmosphereSetFog", lua_atmosphere_set_fog);
+	lua_State *L = (lua_State *)luaState;
+	
+	// Register atmosphere functions
+	Lua_RegisterFunction( L, "AtmosphereSetPreset", lua_atmosphere_set_preset );
+	Lua_RegisterFunction( L, "AtmosphereSetExposure", lua_atmosphere_set_exposure );
+	Lua_RegisterFunction( L, "AtmosphereSetFog", lua_atmosphere_set_fog );
+	Lua_RegisterFunction( L, "AtmosphereSetBloom", lua_atmosphere_set_bloom );
+	Lua_RegisterFunction( L, "AtmosphereSetColorTint", lua_atmosphere_set_color_tint );
+	Lua_RegisterFunction( L, "AtmosphereSetTimeOfDay", lua_atmosphere_set_time_of_day );
+	
+	Com_Printf( "Atmosphere system: Registered Lua bindings\n" );
+#endif // USE_LUA
 }
 
 #endif // USE_VULKAN

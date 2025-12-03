@@ -257,15 +257,190 @@ material_params_t *vk_material_get_params( uint32_t materialIndex )
 Register Lua Functions
 =============================================================================
 */
+#ifdef USE_LUA
+#include "../qcommon/qcommon.h"
+
+/*
+=============================================================================
+Lua Material Bindings
+=============================================================================
+*/
+
+static int lua_material_set_wetness( lua_State *L )
+{
+	int numArgs = lua_gettop( L );
+	if ( numArgs < 2 ) {
+		lua_pushboolean( L, 0 );
+		return 1;
+	}
+	
+	uint32_t materialIndex = (uint32_t)lua_tointeger( L, 1 );
+	float wetness = (float)lua_tonumber( L, 2 );
+	
+	vk_material_set_wetness( materialIndex, wetness );
+	lua_pushboolean( L, 1 );
+	return 1;
+}
+
+static int lua_material_set_damage( lua_State *L )
+{
+	int numArgs = lua_gettop( L );
+	if ( numArgs < 2 ) {
+		lua_pushboolean( L, 0 );
+		return 1;
+	}
+	
+	uint32_t materialIndex = (uint32_t)lua_tointeger( L, 1 );
+	float damage = (float)lua_tonumber( L, 2 );
+	
+	vk_material_set_damage( materialIndex, damage );
+	lua_pushboolean( L, 1 );
+	return 1;
+}
+
+static int lua_material_set_corruption( lua_State *L )
+{
+	int numArgs = lua_gettop( L );
+	if ( numArgs < 2 ) {
+		lua_pushboolean( L, 0 );
+		return 1;
+	}
+	
+	uint32_t materialIndex = (uint32_t)lua_tointeger( L, 1 );
+	float corruption = (float)lua_tonumber( L, 2 );
+	
+	vk_material_set_corruption( materialIndex, corruption );
+	lua_pushboolean( L, 1 );
+	return 1;
+}
+
+static int lua_material_set_magic_glow( lua_State *L )
+{
+	int numArgs = lua_gettop( L );
+	if ( numArgs < 5 ) {
+		lua_pushboolean( L, 0 );
+		return 1;
+	}
+	
+	uint32_t materialIndex = (uint32_t)lua_tointeger( L, 1 );
+	float glow = (float)lua_tonumber( L, 2 );
+	vec3_t color;
+	color[0] = (float)lua_tonumber( L, 3 );
+	color[1] = (float)lua_tonumber( L, 4 );
+	color[2] = (float)lua_tonumber( L, 5 );
+	
+	vk_material_set_magic_glow( materialIndex, glow, color );
+	lua_pushboolean( L, 1 );
+	return 1;
+}
+
+static int lua_material_get_wetness( lua_State *L )
+{
+	int numArgs = lua_gettop( L );
+	if ( numArgs < 1 ) {
+		lua_pushnumber( L, 0.0 );
+		return 1;
+	}
+	
+	uint32_t materialIndex = (uint32_t)lua_tointeger( L, 1 );
+	material_params_t *params = vk_material_get_params( materialIndex );
+	
+	if ( params ) {
+		lua_pushnumber( L, params->wetness );
+	} else {
+		lua_pushnumber( L, 0.0 );
+	}
+	return 1;
+}
+
+static int lua_material_get_damage( lua_State *L )
+{
+	int numArgs = lua_gettop( L );
+	if ( numArgs < 1 ) {
+		lua_pushnumber( L, 0.0 );
+		return 1;
+	}
+	
+	uint32_t materialIndex = (uint32_t)lua_tointeger( L, 1 );
+	material_params_t *params = vk_material_get_params( materialIndex );
+	
+	if ( params ) {
+		lua_pushnumber( L, params->damage );
+	} else {
+		lua_pushnumber( L, 0.0 );
+	}
+	return 1;
+}
+
+static int lua_material_get_corruption( lua_State *L )
+{
+	int numArgs = lua_gettop( L );
+	if ( numArgs < 1 ) {
+		lua_pushnumber( L, 0.0 );
+		return 1;
+	}
+	
+	uint32_t materialIndex = (uint32_t)lua_tointeger( L, 1 );
+	material_params_t *params = vk_material_get_params( materialIndex );
+	
+	if ( params ) {
+		lua_pushnumber( L, params->corruption );
+	} else {
+		lua_pushnumber( L, 0.0 );
+	}
+	return 1;
+}
+
+static int lua_material_get_magic_glow( lua_State *L )
+{
+	int numArgs = lua_gettop( L );
+	if ( numArgs < 1 ) {
+		lua_pushnumber( L, 0.0 );
+		lua_pushnumber( L, 0.0 );
+		lua_pushnumber( L, 0.0 );
+		return 3;
+	}
+	
+	uint32_t materialIndex = (uint32_t)lua_tointeger( L, 1 );
+	material_params_t *params = vk_material_get_params( materialIndex );
+	
+	if ( params ) {
+		lua_pushnumber( L, params->magicGlow );
+		lua_pushnumber( L, params->magicColor[0] );
+		lua_pushnumber( L, params->magicColor[1] );
+		lua_pushnumber( L, params->magicColor[2] );
+		return 4;
+	} else {
+		lua_pushnumber( L, 0.0 );
+		lua_pushnumber( L, 0.0 );
+		lua_pushnumber( L, 0.0 );
+		return 3;
+	}
+}
+
+#endif // USE_LUA
+
 void vk_material_register_lua_functions( void *luaState )
 {
-	(void)luaState; // TODO: Implement Lua bindings
+#ifdef USE_LUA
+	if ( !luaState ) {
+		return;
+	}
 	
-	// TODO: Register Lua functions for material scripting
-	// Example:
-	// lua_register(luaState, "MaterialSetWetness", lua_material_set_wetness);
-	// lua_register(luaState, "MaterialSetDamage", lua_material_set_damage);
-	// etc.
+	lua_State *L = (lua_State *)luaState;
+	
+	// Register material functions
+	Lua_RegisterFunction( L, "MaterialSetWetness", lua_material_set_wetness );
+	Lua_RegisterFunction( L, "MaterialSetDamage", lua_material_set_damage );
+	Lua_RegisterFunction( L, "MaterialSetCorruption", lua_material_set_corruption );
+	Lua_RegisterFunction( L, "MaterialSetMagicGlow", lua_material_set_magic_glow );
+	Lua_RegisterFunction( L, "MaterialGetWetness", lua_material_get_wetness );
+	Lua_RegisterFunction( L, "MaterialGetDamage", lua_material_get_damage );
+	Lua_RegisterFunction( L, "MaterialGetCorruption", lua_material_get_corruption );
+	Lua_RegisterFunction( L, "MaterialGetMagicGlow", lua_material_get_magic_glow );
+	
+	Com_Printf( "Material system: Registered Lua bindings\n" );
+#endif // USE_LUA
 }
 
 #endif // USE_VULKAN
