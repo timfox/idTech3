@@ -141,7 +141,7 @@ static void DrawTris( const shaderCommands_t *input ) {
 #ifdef USE_VULKAN
 	uint32_t pipeline;
 
-	if ( r_showtris->integer == 1 && backEnd.drawConsole )
+	if ( (r_showtris->integer == 1 || r_wireframe->integer == 1) && backEnd.drawConsole )
 		return;
 
 	if ( tess.numIndexes == 0 )
@@ -173,7 +173,7 @@ static void DrawTris( const shaderCommands_t *input ) {
 	vk_draw_geometry( DEPTH_RANGE_ZERO, qtrue );
 
 #else
-	if ( r_showtris->integer == 1 && backEnd.drawConsole )
+	if ( (r_showtris->integer == 1 || r_wireframe->integer == 1) && backEnd.drawConsole )
 		return;
 
 	GL_ClientState( 0, CLS_NONE );
@@ -1568,7 +1568,7 @@ void RB_EndSurface( void ) {
 	//
 	// draw debugging stuff
 	//
-	if ( r_showtris->integer ) {
+		if ( r_showtris->integer || r_wireframe->integer ) {
 		DrawTris( input );
 	}
 	if ( r_shownormals->integer ) {

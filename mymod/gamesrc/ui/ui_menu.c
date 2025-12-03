@@ -30,20 +30,19 @@ MAIN MENU
 
 
 #include "ui_local.h"
-// #include "../qcommon/oa_version.h" // Removed, file doesn't exist
 
 
 #define ID_SINGLEPLAYER			10
 #define ID_MULTIPLAYER			11
 #define ID_SETUP				12
 #define ID_DEMOS				13
-//#define ID_CINEMATICS			14
-#define ID_CHALLENGES                   14
+#define ID_CINEMATICS			14
+#define ID_CHALLENGES                   18
 #define ID_TEAMARENA		15
 #define ID_MODS					16
 #define ID_EXIT					17
 
-#define MAIN_BANNER_MODEL				"models/mapobjects/banner/banner5.md3"
+#define MAIN_BANNER_MODEL				"models/mapobjects/banner/cube.obj"
 #define MAIN_MENU_VERTICAL_SPACING		34
 
 
@@ -54,7 +53,7 @@ typedef struct {
 	menutext_s		multiplayer;
 	menutext_s		setup;
 	menutext_s		demos;
-	//menutext_s		cinematics;
+	menutext_s		cinematics;
 	menutext_s              challenges;
 	menutext_s		teamArena;
 	menutext_s		mods;
@@ -72,21 +71,6 @@ typedef struct {
 } errorMessage_t;
 
 static errorMessage_t s_errorMessage;
-
-/*
-=================
-MainMenu_ExitAction
-=================
-*/
-/*static void MainMenu_ExitAction( qboolean result ) {
-	if( !result ) {
-		return;
-	}
-	UI_PopMenu();
-	//UI_CreditMenu();
-        trap_Cmd_ExecuteText( EXEC_APPEND, "quit\n" );
-}*/
-
 
 
 /*
@@ -120,17 +104,17 @@ void Main_MenuEvent (void* ptr, int event)
 		UI_DemosMenu();
 		break;
 
-	/*case ID_CINEMATICS:
+	case ID_CINEMATICS:
 		UI_CinematicsMenu();
-		break;*/
+		break;
 
 	case ID_CHALLENGES:
 		UI_Challenges();
 		break;
 
-	case ID_MODS:
+	/*case ID_MODS:
 		UI_ModsMenu();
-		break;
+		break;*/
 
 	case ID_TEAMARENA:
 		trap_Cvar_Set( "fs_game", "missionpack");
@@ -138,7 +122,6 @@ void Main_MenuEvent (void* ptr, int event)
 		break;
 
 	case ID_EXIT:
-		//UI_ConfirmMenu( "EXIT GAME?", 0, MainMenu_ExitAction );
 		UI_CreditMenu();
 		break;
 	}
@@ -153,6 +136,11 @@ MainMenu_Cache
 void MainMenu_Cache( void )
 {
 	s_main.bannerModel = trap_R_RegisterModel( MAIN_BANNER_MODEL );
+	if ( s_main.bannerModel ) {
+		Com_Printf( "MainMenu_Cache: Successfully loaded banner model '%s' (handle %d)\n", MAIN_BANNER_MODEL, s_main.bannerModel );
+	} else {
+		Com_Printf( "MainMenu_Cache: Failed to load banner model '%s'\n", MAIN_BANNER_MODEL );
+	}
 }
 
 sfxHandle_t ErrorMessage_Key([[maybe_unused]] int key)
@@ -203,26 +191,65 @@ static void Main_MenuDraw( void )
 
 	refdef.time = uis.realtime;
 
-	origin[0] = 300;
-	origin[1] = 0;
-	origin[2] = -32;
+	// Calculate model position similar to UI_DrawPlayer
+	// Cube is 2x2x2 units (with scale 1.0f)
+	// Position it so it fills the viewport
+	float len = 0.7f * 2.0f; // 70% of model height (cube is 2 units tall)
+	origin[0] = len / tan( DEG2RAD(refdef.fov_x) * 0.5f );
+	origin[1] = 0.0f;  // centered
+	origin[2] = 0.0f;  // centered vertically
 
 	trap_R_ClearScene();
 
+	// Add a light source so the model is visible
+	vec3_t lightPos;
+	VectorCopy( origin, lightPos );
+	lightPos[1] += 20; // Position light slightly in front
+	trap_R_AddLightToScene( lightPos, 200.0f, 1.0f, 1.0f, 1.0f );
+
 	// add the model
+	if ( s_main.bannerModel ) {
+		memset( &ent, 0, sizeof(ent) );
 
-	memset( &ent, 0, sizeof(ent) );
+		adjust = 5.0 * sin( (float)uis.realtime / 5000 );
+		VectorSet( angles, 0, 180 + adjust, 0 );
+		AnglesToAxis( angles, ent.axis );
+		
+		// Scale the model - cube is 2x2x2 units, scale it up to be visible
+		// Scale axes to make model 25x larger (50x50x50 units)
+		VectorScale( ent.axis[0], 1.0f, ent.axis[0] );
+		VectorScale( ent.axis[1], 1.0f, ent.axis[1] );
+		VectorScale( ent.axis[2], 1.0f, ent.axis[2] );
+		ent.nonNormalizedAxes = qtrue;
+		
+		// Set frame for static model
+		ent.frame = 0;
+		ent.oldframe = 0;
+		ent.backlerp = 0;
+		
+		// Add some color modulation to make it more visible
+		ent.shader.rgba[0] = 255;
+		ent.shader.rgba[1] = 255;
+		ent.shader.rgba[2] = 255;
+		ent.shader.rgba[3] = 255;
+		
+		ent.hModel = s_main.bannerModel;
+		ent.reType = RT_MODEL;
+		VectorCopy( origin, ent.origin );
+		VectorCopy( origin, ent.lightingOrigin );
+		// Use RF_MINLIGHT to ensure model always has some light
+		ent.renderfx = RF_MINLIGHT | RF_LIGHTING_ORIGIN | RF_NOSHADOW;
+		VectorCopy( ent.origin, ent.oldorigin );
 
-	adjust = 5.0 * sin( (float)uis.realtime / 5000 );
-	VectorSet( angles, 0, 180 + adjust, 0 );
-	AnglesToAxis( angles, ent.axis );
-	ent.hModel = s_main.bannerModel;
-	VectorCopy( origin, ent.origin );
-	VectorCopy( origin, ent.lightingOrigin );
-	ent.renderfx = RF_LIGHTING_ORIGIN | RF_NOSHADOW;
-	VectorCopy( ent.origin, ent.oldorigin );
-
-	trap_R_AddRefEntityToScene( &ent );
+		trap_R_AddRefEntityToScene( &ent );
+	} else {
+		// Debug: draw text if model failed to load
+		static int debugPrintTime = 0;
+		if ( uis.realtime > debugPrintTime + 5000 ) {
+			Com_Printf( "Main_MenuDraw: bannerModel is NULL, model not loaded\n" );
+			debugPrintTime = uis.realtime;
+		}
+	}
 
 	trap_R_RenderScene( &refdef );
 
@@ -235,13 +262,10 @@ static void Main_MenuDraw( void )
 	}
 
 	UI_DrawProportionalString( 320, 372, "", UI_CENTER|UI_SMALLFONT, color );
-	UI_DrawString( 320, 400, "OpenArena(c) 2005-2018 OpenArena Team", UI_CENTER|UI_SMALLFONT, color );
-	UI_DrawString( 320, 414, "OpenArena comes with ABSOLUTELY NO WARRANTY; this is free software", UI_CENTER|UI_SMALLFONT, color );
-	UI_DrawString( 320, 428, "and you are welcome to redistribute it under certain conditions;", UI_CENTER|UI_SMALLFONT, color );
-	UI_DrawString( 320, 444, "read COPYING for details.", UI_CENTER|UI_SMALLFONT, color );
+	UI_DrawString( 320, 400, "My Mod Template", UI_CENTER|UI_SMALLFONT, color );
 
 	//Draw version.
-	UI_DrawString( 640-40, 480-14, "^7OpenArena", UI_SMALLFONT, color );
+	UI_DrawString( 640-40, 480-14, "^7My Mod Template", UI_SMALLFONT, color );
 	if ((int)trap_Cvar_VariableValue("protocol")!=68) { // OA_STD_PROTOCOL
 		UI_DrawString( 0, 480-14, va("^7Protocol: %i",(int)trap_Cvar_VariableValue("protocol")), UI_SMALLFONT, color);
 	}
@@ -364,7 +388,7 @@ void UI_MainMenu( void )
 	s_main.demos.color						= color_red;
 	s_main.demos.style						= style;
 
-	/*y += MAIN_MENU_VERTICAL_SPACING;
+	y += MAIN_MENU_VERTICAL_SPACING;
 	s_main.cinematics.generic.type			= MTYPE_PTEXT;
 	s_main.cinematics.generic.flags			= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
 	s_main.cinematics.generic.x				= 320;
@@ -373,7 +397,7 @@ void UI_MainMenu( void )
 	s_main.cinematics.generic.callback		= Main_MenuEvent;
 	s_main.cinematics.string				= "CINEMATICS";
 	s_main.cinematics.color					= color_red;
-	s_main.cinematics.style					= style;*/
+	s_main.cinematics.style					= style;
 
 	y += MAIN_MENU_VERTICAL_SPACING;
 	s_main.challenges.generic.type			= MTYPE_PTEXT;
@@ -400,7 +424,7 @@ void UI_MainMenu( void )
 		s_main.teamArena.style					= style;
 	}
 
-	y += MAIN_MENU_VERTICAL_SPACING;
+	/*y += MAIN_MENU_VERTICAL_SPACING;
 	s_main.mods.generic.type			= MTYPE_PTEXT;
 	s_main.mods.generic.flags			= QMF_CENTER_JUSTIFY|QMF_PULSEIFFOCUS;
 	s_main.mods.generic.x				= 320;
@@ -409,7 +433,7 @@ void UI_MainMenu( void )
 	s_main.mods.generic.callback		= Main_MenuEvent;
 	s_main.mods.string					= "MODS";
 	s_main.mods.color					= color_red;
-	s_main.mods.style					= style;
+	s_main.mods.style					= style;*/
 
 	y += MAIN_MENU_VERTICAL_SPACING;
 	s_main.exit.generic.type				= MTYPE_PTEXT;
@@ -426,12 +450,12 @@ void UI_MainMenu( void )
 	Menu_AddItem( &s_main.menu,	&s_main.multiplayer );
 	Menu_AddItem( &s_main.menu,	&s_main.setup );
 	Menu_AddItem( &s_main.menu,	&s_main.demos );
-	//Menu_AddItem( &s_main.menu,	&s_main.cinematics );
+	Menu_AddItem( &s_main.menu,	&s_main.cinematics );
 	Menu_AddItem( &s_main.menu,	&s_main.challenges );
 	if (teamArena) {
 		Menu_AddItem( &s_main.menu,	&s_main.teamArena );
 	}
-	Menu_AddItem( &s_main.menu,	&s_main.mods );
+	/*Menu_AddItem( &s_main.menu,	&s_main.mods );*/
 	Menu_AddItem( &s_main.menu,	&s_main.exit );
 
 	trap_Key_SetCatcher( KEYCATCH_UI );

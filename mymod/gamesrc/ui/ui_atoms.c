@@ -1068,6 +1068,19 @@ qboolean UI_ConsoleCommand( int realTime ) {
             return qtrue;
         }
 
+	if ( Q_strequal(cmd, "wireframe") ) {
+		// Toggle wireframe mode - sync both r_showtris and r_wireframe
+		int current = trap_Cvar_VariableValue( "r_showtris" );
+		if ( current ) {
+			trap_Cvar_Set( "r_showtris", "0" );
+			trap_Cvar_Set( "r_wireframe", "0" );
+		} else {
+			trap_Cvar_Set( "r_showtris", "1" );
+			trap_Cvar_Set( "r_wireframe", "1" );
+		}
+		return qtrue;
+	}
+
 	return qfalse;
 }
 

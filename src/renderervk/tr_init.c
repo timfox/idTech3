@@ -206,6 +206,7 @@ cvar_t	*r_colorMipLevels;
 cvar_t	*r_picmip;
 cvar_t	*r_nomip;
 cvar_t	*r_showtris;
+cvar_t	*r_wireframe;
 cvar_t	*r_showsky;
 cvar_t	*r_shownormals;
 cvar_t	*r_finish;
@@ -1840,6 +1841,8 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_nobind, "Backend debugging tool: Disables texture binding." );
 	r_showtris = ri.Cvar_Get ("r_showtris", "0", CVAR_CHEAT);
 	ri.Cvar_SetDescription( r_showtris, "Debugging tool: Wireframe rendering of polygon triangles in the world." );
+	r_wireframe = ri.Cvar_Get ("r_wireframe", "0", CVAR_CHEAT);
+	ri.Cvar_SetDescription( r_wireframe, "Wireframe rendering mode (alias for r_showtris)." );
 	r_shownormals = ri.Cvar_Get( "r_shownormals", "0", CVAR_CHEAT );
 	ri.Cvar_SetDescription( r_shownormals, "Debugging tool: Show wireframe surface normals." );
 	r_clear = ri.Cvar_Get( "r_clear", "0", 0 );

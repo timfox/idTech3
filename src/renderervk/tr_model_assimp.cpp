@@ -29,6 +29,16 @@ Returns the model handle (mod->index) on success, or 0 on failure.
 */
 extern "C" qhandle_t R_RegisterAssimpModel( const char *name, model_t *mod )
 {
+	void *buffer;
+	int filesize;
+
+	// Read file through Quake 3's virtual file system
+	filesize = ri.FS_ReadFile( name, &buffer );
+	if ( !buffer || filesize <= 0 ) {
+		mod->type = MOD_BAD;
+		return 0;
+	}
+
 	Assimp::Importer importer;
 
 	const unsigned int flags =
@@ -39,7 +49,12 @@ extern "C" qhandle_t R_RegisterAssimpModel( const char *name, model_t *mod )
 		aiProcess_OptimizeMeshes |
 		aiProcess_SortByPType;
 
-	const aiScene *scene = importer.ReadFile( name, flags );
+	// Load from memory buffer instead of file path
+	const aiScene *scene = importer.ReadFileFromMemory( buffer, filesize, flags, name );
+	
+	// Free the file buffer
+	ri.FS_FreeFile( buffer );
+
 	if ( !scene || !scene->HasMeshes() ) {
 		ri.Printf( PRINT_WARNING, "R_RegisterAssimpModel(VK): failed to load '%s': %s\n",
 			name, importer.GetErrorString() );
@@ -126,9 +141,13 @@ extern "C" qhandle_t R_RegisterAssimpModel( const char *name, model_t *mod )
 	for ( i = 0; i < 3; ++i ) {
 		frame->bounds[0][i] = mins[i];
 		frame->bounds[1][i] = maxs[i];
-		frame->localOrigin[i] = 0.0f;
+		frame->localOrigin[i] = (mins[i] + maxs[i]) * 0.5f; // Center of bounds
 	}
-	frame->radius = 0.0f; // can be improved later
+	// Calculate radius as distance from center to furthest corner
+	vec3_t center, corner;
+	VectorCopy( frame->localOrigin, center );
+	VectorSet( corner, maxs[0], maxs[1], maxs[2] );
+	frame->radius = Distance( center, corner );
 
 	// Surface
 	md3Surface_t *surf = (md3Surface_t *)( (byte *)hdr + LittleLong( hdr->ofsSurfaces ) );
@@ -154,10 +173,20 @@ extern "C" qhandle_t R_RegisterAssimpModel( const char *name, model_t *mod )
 	surf->ofsXyzNormals = LittleLong( surfXyzOfs );
 	surf->ofsEnd        = LittleLong( surfSize );
 
-	// Shader
+	// Shader: register a shader for the model
+	// Note: We set shaderIndex to 0 (default shader) and store a shader name
+	// The actual shader lookup will happen during rendering, or shader registration
+	// can be deferred to when the model is processed (similar to how MD3 files work)
 	md3Shader_t *shader = (md3Shader_t *)( (byte *)surf + surfShaderOfs );
 	Com_Memset( shader, 0, sizeof( md3Shader_t ) );
-	Q_strncpyz( shader->name, mod->name, sizeof( shader->name ) );
+	
+	// Store shader name - use "white" as default, or model name as fallback
+	Q_strncpyz( shader->name, "white", sizeof( shader->name ) );
+	shader->name[sizeof( shader->name ) - 1] = '\0';
+	
+	// Set shader index to 0 (default shader) - this will be used if shader lookup fails
+	// The renderer will use tr.defaultShader when shaderIndex is 0
+	shader->shaderIndex = 0;
 
 	// Triangles
 	md3Triangle_t *tris = (md3Triangle_t *)( (byte *)surf + surfTriOfs );
@@ -213,6 +242,12 @@ extern "C" qhandle_t R_RegisterAssimpModel( const char *name, model_t *mod )
 	mod->numLods   = 1;
 	mod->md3[0]    = hdr;
 	mod->dataSize += totalSize;
+
+	ri.Printf( PRINT_DEVELOPER, "R_RegisterAssimpModel(VK): loaded '%s' - %d verts, %d tris, bounds (%.2f %.2f %.2f) to (%.2f %.2f %.2f), radius %.2f\n",
+		name, numVerts, numTris,
+		mins[0], mins[1], mins[2],
+		maxs[0], maxs[1], maxs[2],
+		frame->radius );
 
 	return mod->index;
 }

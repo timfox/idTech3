@@ -106,7 +106,7 @@ Draws triangle outlines for debugging
 */
 static void DrawTris( const shaderCommands_t *input ) {
 
-	if ( r_showtris->integer == 1 && backEnd.drawConsole )
+	if ( (r_showtris->integer == 1 || r_wireframe->integer == 1) && backEnd.drawConsole )
 		return;
 
 	if ( tess.numIndexes == 0 )
@@ -1083,7 +1083,7 @@ void RB_EndSurface( void ) {
 #else
 	{
 #endif
-		if ( r_showtris->integer ) {
+		if ( r_showtris->integer || r_wireframe->integer ) {
 			DrawTris( input );
 		}
 		if ( r_shownormals->integer ) {
