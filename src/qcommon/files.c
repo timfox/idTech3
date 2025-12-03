@@ -4194,9 +4194,17 @@ static char **FS_ListFilteredFiles( const char *path, const char *extension, con
 			int		numSysFiles;
 			char	**sysFiles;
 			const char *name;
+			int		subdirDepth;
 
 			netpath = FS_BuildOSPath( search->dir->path, search->dir->gamedir, path );
-			sysFiles = Sys_ListFiles( netpath, extension, filter, &numSysFiles, (flags & FS_MATCH_SUBDIRS) ? FS_MAX_SUBDIRS : 0);
+			// For .pk3dir directories, always enable recursive search to find all files
+			// Regular directories use FS_MATCH_SUBDIRS flag, but .pk3dir needs full recursion
+			if ( search->dir->gamedir && strstr( search->dir->gamedir, ".pk3dir" ) ) {
+				subdirDepth = FS_MAX_SUBDIRS;  // Full recursive search for .pk3dir
+			} else {
+				subdirDepth = (flags & FS_MATCH_SUBDIRS) ? FS_MAX_SUBDIRS : 0;
+			}
+			sysFiles = Sys_ListFiles( netpath, extension, filter, &numSysFiles, subdirDepth);
 			for ( i = 0; i < numSysFiles; i++ ) {
 				// unique the match
 				name = sysFiles[ i ];

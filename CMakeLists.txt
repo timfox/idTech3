@@ -10,8 +10,6 @@ project(idtech3 C CXX ASM)
 # Language Standard Configuration
 # ------------------------------------------------------------------------------
 IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-	# Try C23 first (CMake 3.20+ supports it), compiler will use highest available
-	# If C23 not supported by compiler, it will fall back to C17 automatically
 	SET(CMAKE_C_STANDARD 23)
 	SET(CMAKE_C_STANDARD_REQUIRED OFF)
 ELSEIF(CMAKE_C_COMPILER_ID MATCHES "MSVC")

@@ -17,7 +17,7 @@ disconnected
 {
 	nopicmip
 	{
-		map gfx/2d/net.tga
+		map gfx/2d/net.jpg
 	}
 }
 
@@ -34,7 +34,7 @@ levelShotDetail
 {
 	nopicmip
 	{
-		map textures/sfx/detail.tga
+		map textures/detail/d_conc.jpg
 	        blendFunc GL_DST_COLOR GL_SRC_COLOR
 		rgbgen identity
 	}
@@ -418,30 +418,32 @@ icons/iconf_blu
 
 
 
-gfx/2d/menuinfo
-{
-	nopicmip
-	{
-		map gfx/2d/menuinfo.tga
-	}
-}
-
-gfx/2d/menuinfo2
-{
-	nopicmip
-	{
-		map gfx/2d/menuinfo2.tga
-	}
-}
-
-gfx/2d/quit
-{
-	nopicmip
-	nomipmaps
-	{
-		map gfx/2d/quit.tga
-	}
-}
+// NOTE: menuinfo, menuinfo2, and quit textures are missing
+// Commented out until texture files are added
+//gfx/2d/menuinfo
+//{
+//	nopicmip
+//	{
+//		map gfx/2d/menuinfo.tga
+//	}
+//}
+//
+//gfx/2d/menuinfo2
+//{
+//	nopicmip
+//	{
+//		map gfx/2d/menuinfo2.tga
+//	}
+//}
+//
+//gfx/2d/quit
+//{
+//	nopicmip
+//	nomipmaps
+//	{
+//		map gfx/2d/quit.tga
+//	}
+//}
 
 gfx/2d/cursor
 {
@@ -712,38 +714,40 @@ gfx/2d/select
 }
 
 
-gfx/2d/assault1d
-{
-	nopicmip
-	{
-		map gfx/2d/assault1d.tga
-		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
-	}
-}
-gfx/2d/armor1h
-{
-	nopicmip
-	{
-		map gfx/2d/armor1h.tga
-		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
-	}
-}
-gfx/2d/health
-{
-	nopicmip
-	{
-		map gfx/2d/health.tga
-		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
-	}
-}
-gfx/2d/blank
-{
-	nopicmip
-	{
-		map gfx/2d/blank.tga
-		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
-	}
-}
+// NOTE: assault1d, armor1h, health, and blank textures are missing
+// Commented out until texture files are added
+//gfx/2d/assault1d
+//{
+//	nopicmip
+//	{
+//		map gfx/2d/assault1d.tga
+//		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+//	}
+//}
+//gfx/2d/armor1h
+//{
+//	nopicmip
+//	{
+//		map gfx/2d/armor1h.tga
+//		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+//	}
+//}
+//gfx/2d/health
+//{
+//	nopicmip
+//	{
+//		map gfx/2d/health.tga
+//		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+//	}
+//}
+//gfx/2d/blank
+//{
+//	nopicmip
+//	{
+//		map gfx/2d/blank.tga
+//		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+//	}
+//}
 gfx/2d/numbers/zero_32b
 {
 	nopicmip
@@ -856,23 +860,25 @@ icons/iconw_chaingun
 	}
 }
 
-icons/iconw_chaingun_cl1
-{
-	nopicmip
-	{
-		map icons/iconw_chaingun_cl1.tga
-		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
-	}
-}
-
-icons/iconw_chaingun_cl2
-{
-	nopicmip
-	{
-		map icons/iconw_chaingun_cl2.tga
-		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
-	}
-}
+// NOTE: iconw_chaingun_cl1 and iconw_chaingun_cl2 are missionpack-specific variants
+// Commented out until icon files are added
+//icons/iconw_chaingun_cl1
+//{
+//	nopicmip
+//	{
+//		map icons/iconw_chaingun_cl1.tga
+//		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+//	}
+//}
+//
+//icons/iconw_chaingun_cl2
+//{
+//	nopicmip
+//	{
+//		map icons/iconw_chaingun_cl2.tga
+//		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+//	}
+//}
 
 icons/iconw_grapple
 {
@@ -883,98 +889,96 @@ icons/iconw_grapple
 	}
 }
 
-icons/iconw_kamikaze
-{
-	nopicmip
-	{
-		map icons/iconw_kamikaze.tga
-		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
-	}
-}
-
-icons/iconw_nailgun
-{
-	nopicmip
-	{
-		map icons/iconw_nailgun.tga
-		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
-	}
-}
-
-icons/iconw_proxlauncher
-{
-	nopicmip
-	{
-		map icons/iconw_proxlauncher.tga
-		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
-	}
-}
-
-icons/icona_chaingun
-{
-	nopicmip
-	{
-		map icons/icona_chaingun.tga
-		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
-	}
-}
-
-
-icons/icona_proxlauncher
-{
-	nopicmip
-	{
-		map icons/icona_proxlauncher.tga
-		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
-	}
-}
-
-
-icons/icona_nailgun
-{
-	nopicmip
-	{
-		map icons/icona_nailgun.tga
-		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
-	}
-}
-
-
-icons/guard
-{
-	nopicmip
-	{
-		map icons/guard.tga
-		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
-	}
-}
-
-icons/doubler
-{
-	nopicmip
-	{
-		map icons/doubler.tga
-		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
-	}
-}
-
-icons/ammo_regen
-{
-	nopicmip
-	{
-		map icons/ammo_regen.tga
-		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
-	}
-}
-
-icons/scout
-{
-	nopicmip
-	{
-		map icons/scout.tga
-		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
-	}
-}
+// NOTE: Missionpack weapon icons - commented out until icon files are added
+//icons/iconw_kamikaze
+//{
+//	nopicmip
+//	{
+//		map icons/iconw_kamikaze.tga
+//		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+//	}
+//}
+//
+//icons/iconw_nailgun
+//{
+//	nopicmip
+//	{
+//		map icons/iconw_nailgun.tga
+//		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+//	}
+//}
+//
+//icons/iconw_proxlauncher
+//{
+//	nopicmip
+//	{
+//		map icons/iconw_proxlauncher.tga
+//		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+//	}
+//}
+//
+//icons/icona_chaingun
+//{
+//	nopicmip
+//	{
+//		map icons/icona_chaingun.tga
+//		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+//	}
+//}
+//
+//icons/icona_proxlauncher
+//{
+//	nopicmip
+//	{
+//		map icons/icona_proxlauncher.tga
+//		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+//	}
+//}
+//
+//icons/icona_nailgun
+//{
+//	nopicmip
+//	{
+//		map icons/icona_nailgun.tga
+//		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+//	}
+//}
+//
+//icons/guard
+//{
+//	nopicmip
+//	{
+//		map icons/guard.tga
+//		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+//	}
+//}
+//
+//icons/doubler
+//{
+//	nopicmip
+//	{
+//		map icons/doubler.tga
+//		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+//	}
+//}
+//
+//icons/ammo_regen
+//{
+//	nopicmip
+//	{
+//		map icons/ammo_regen.tga
+//		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+//	}
+//}
+//
+//icons/scout
+//{
+//	nopicmip
+//	{
+//		map icons/scout.tga
+//		blendFunc GL_SRC_ALPHA GL_ONE_MINUS_SRC_ALPHA
+//	}
+//}
 
 
 icons/icona_red

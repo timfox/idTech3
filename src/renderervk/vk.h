@@ -46,7 +46,7 @@ struct ImDrawData;
 #define USE_DEDICATED_ALLOCATION
 #endif
 //#define MIN_IMAGE_ALIGN (128*1024)
-#define MAX_ATTACHMENTS_IN_POOL (11+VK_NUM_BLOOM_PASSES*2) // depth + msaa + msaa-resolve + depth-resolve + screenmap.msaa + screenmap.resolve + screenmap.depth + bloom_extract + blur pairs
+#define MAX_ATTACHMENTS_IN_POOL (11+VK_NUM_BLOOM_PASSES*2+16) // depth + msaa + msaa-resolve + depth-resolve + screenmap.msaa + screenmap.resolve + screenmap.depth + bloom_extract + blur pairs + cubemap + capture + PBR + path tracing + headroom
 
 #define VK_DESC_STORAGE      0
 #define VK_DESC_UNIFORM      0

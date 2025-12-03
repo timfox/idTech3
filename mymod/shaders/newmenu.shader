@@ -24,7 +24,7 @@ logoEmblem
 {
 	cull disable
 	{
-		map textures/oafx/orangechrm_2.tga
+		map textures/oafx/orangechrm_2.jpg
 		tcMod rotate 7
 		tcGen environment 
 	}
@@ -34,20 +34,20 @@ logoHalo
 {
 	deformVertexes autosprite
 	{
-		clampmap textures/oafx/flare.tga
+		clampmap textures/oafx/flare.jpg
 		blendfunc add
 		rgbGen const ( 0.960784 0.360784 0.160784 )
 		tcMod rotate -7
 	}
 	{
-		clampmap textures/oafx/flare.tga
+		clampmap textures/oafx/flare.jpg
 		blendfunc add
 		rgbGen const ( 0.960784 0.360784 0.160784 )
 		tcMod rotate 3
 		tcMod stretch sin 1 -0.5 0 0.3 
 	}
 	{
-		clampmap textures/oafx/flare.tga
+		clampmap textures/oafx/flare.jpg
 		blendfunc add
 		rgbGen const ( 0.960784 0.360784 0.160784 )
 		tcMod rotate 9
