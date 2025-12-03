@@ -42,6 +42,8 @@ ini_set('error_log', __DIR__ . '/error.log');
                 <p>Check out the latest enhancements and features:</p>
                 <ul>
                     <li><a href="whats-new">What's New</a> - Recent enhancements overview</li>
+                    <li><a href="engine/advanced-systems">Advanced Engine Systems</a> - GPU culling, material system, cell streaming, and more</li>
+                    <li><a href="rendering/gibs">Global Illumination (GIBS)</a> - Real-time indirect lighting with surfels</li>
                     <li><a href="rendering/directx12">DirectX 12 Renderer</a> - New Windows renderer with DXR</li>
                     <li><a href="core/structured-logging">Structured Logging</a> - Modern logging system</li>
                     <li><a href="core/memory-safety">Memory Safety Tools</a> - ASan, UBSan, memory tracking</li>
@@ -56,6 +58,7 @@ ini_set('error_log', __DIR__ . '/error.log');
                     <li><a href="idtech3">id Tech 3 Engine Features</a></li>
                     <li><a href="features/complete-features">Complete Features List</a></li>
                     <li><a href="engine/architecture">Engine Architecture</a></li>
+                    <li><a href="engine/advanced-systems">Advanced Engine Systems</a></li>
                     <li><a href="history">History of id Tech 3</a></li>
                 </ul>
             </div>
@@ -64,6 +67,7 @@ ini_set('error_log', __DIR__ . '/error.log');
                 <h2>Getting Started</h2>
                 <ul>
                     <li><a href="getting-started/installation">Installation</a></li>
+                    <li><a href="getting-started/build-instructions">Build Instructions</a></li>
                     <li><a href="getting-started/configuration">Configuration</a></li>
                     <li><a href="getting-started/quick-start">Quick Start Guide</a></li>
                 </ul>
@@ -122,6 +126,7 @@ ini_set('error_log', __DIR__ . '/error.log');
                     <li><a href="core/console-system">Console System</a></li>
                     <li><a href="core/structured-logging">Structured Logging</a></li>
                     <li><a href="core/memory-safety">Memory Safety</a></li>
+                    <li><a href="core/refactoring-summary">Refactoring Summary</a></li>
                     <li><a href="core/engine-subsystems">Engine Subsystems</a></li>
                 </ul>
             </div>
@@ -132,9 +137,12 @@ ini_set('error_log', __DIR__ . '/error.log');
                     <li><a href="rendering/complete-renderer">Complete Renderer Guide</a></li>
                     <li><a href="rendering/vulkan">Vulkan Renderer</a></li>
                     <li><a href="rendering/directx12">DirectX 12 Renderer</a></li>
+                    <li><a href="rendering/metal">Metal Renderer</a></li>
                     <li><a href="rendering/pbr">PBR Pipeline</a></li>
                     <li><a href="rendering/pbr-materials">PBR Material Creation</a></li>
                     <li><a href="rendering/ray-tracing">Ray Tracing</a></li>
+                    <li><a href="rendering/gibs">Global Illumination (GIBS)</a></li>
+                    <li><a href="rendering/video-codecs">Video Codec Support</a></li>
                     <li><a href="rendering/shaders">Shaders</a></li>
                     <li><a href="rendering/animated-skybox">Animated Skybox</a></li>
                 </ul>
@@ -145,6 +153,7 @@ ini_set('error_log', __DIR__ . '/error.log');
                 <ul>
                     <li><a href="networking/complete-networking">Complete Networking Guide</a></li>
                     <li><a href="networking/networking">Networking</a></li>
+                    <li><a href="networking/enhanced-networking">Enhanced Networking</a></li>
                     <li><a href="networking/websocket">WebSocket Support</a></li>
                 </ul>
             </div>
@@ -163,8 +172,26 @@ ini_set('error_log', __DIR__ . '/error.log');
                 <h2>Modernization</h2>
                 <ul>
                     <li><a href="modernization/modern-cpp">Modern C++</a></li>
+                    <li><a href="modernization/cpp23-migration">C++23 Migration</a></li>
                     <li><a href="modernization/build-systems">Build Systems</a></li>
                     <li><a href="modernization/ci-cd">CI/CD Pipeline</a></li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h2>Performance</h2>
+                <ul>
+                    <li><a href="performance/optimization">Optimization and Stability</a></li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h2>Platform</h2>
+                <ul>
+                    <li><a href="platform/cross-platform">Cross Platform</a></li>
+                    <li><a href="platform/ios-macos">iOS and macOS Support</a></li>
+                    <li><a href="platform/mobile-console">Mobile/Console Platform</a></li>
+                    <li><a href="platform/threading-concurrency">Threading & Concurrency</a></li>
                 </ul>
             </div>
         </div>
