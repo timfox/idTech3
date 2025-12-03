@@ -18,7 +18,7 @@ $breadcrumbs = [
     <div class="step">
         <h3>Step 1: Clone the Repository</h3>
         <div class="code-block">
-            <pre><code>git clone https://github.com/yourusername/idtech3
+            <pre><code>git clone https://github.com/timfox/idtech3
 cd idtech3</code></pre>
         </div>
     </div>
