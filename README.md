@@ -4,9 +4,9 @@
 
 This is a modern id Tech 3 engine with PBR and ray tracing.
 
-Go to [Releases](../../releases) section to download latest binaries for your platform or follow [Build Instructions](#build-instructions)
+Go to [Releases](../../releases) section to download the latest binaries for your platform or follow [Build Instructions](#build-instructions).
 
-*This repository does not contain any game content from Quake III Arena*
+*This repository does not contain any game content from Quake III Arena.*
 
 **Key features**:
 
@@ -15,17 +15,20 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 * Vulkan renderer
 * Vulkan ray tracing
 * Metal renderer (macOS/iOS)
-* Physical Based Rendering
-* Raw mouse input support, enabled automatically instead of DirectInput(**\in_mouse 1**) if available
-* Unlagged mouse events processing, can be reverted by setting **\in_lagged 1**
+* Physically Based Rendering (PBR)
+* Material clearcoat, anisotropy, and subsurface scattering options
+* Modernized graphics options menu
+* Raw mouse input support, enabled automatically instead of DirectInput (**\in_mouse 1**) if available
+* Unlagged mouse events processing (can be reverted by setting **\in_lagged 1**)
 * **\in_minimize** - hotkey for minimize/restore main window (win32-only, direct replacement for Q3Minimizer)
-* **\video-pipe** - to use external ffmpeg binary as an encoder for better quality and smaller output files
+* **\video-pipe** - use external ffmpeg binary as encoder for higher quality and smaller output files
 * Optional Dear ImGui (via cimgui) layer for in-engine tools and overlays (`cl_imgui 1`)
-* Significally reworked QVM (Quake Virtual Machine)
+* Significantly reworked QVM (Quake Virtual Machine)
 * Improved server-side DoS protection, much reduced memory usage
-* Raised filesystem limits (up to 20,000 maps can be handled in a single directory)
-* Reworked Zone memory allocator, no more out-of-memory errors
-* Non-intrusive support for SDL2 backend (video, audio, input), selectable at compile time
+* Raised filesystem limits (up to 20,000 maps in a single directory)
+* Reworked Zone memory allocator (no more out-of-memory errors)
+* Non-intrusive SDL2 backend support (video, audio, input), selectable at compile time
+* Improved engine menu UI with high-DPI and modern input support
 
 ## Vulkan renderer
 
@@ -36,60 +39,60 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 * Greatly reduced API overhead (call/dispatch ratio)
 * Flexible vertex buffer memory management to allow loading huge maps
 * Multiple command buffers to reduce processing bottlenecks
-* [reversed depth buffer](https://developer.nvidia.com/content/depth-precision-visualized) to eliminate z-fighting on big maps
+* [Reversed depth buffer](https://developer.nvidia.com/content/depth-precision-visualized) eliminates z-fighting on big maps
 * Merged lightmaps (atlases)
 * Multitexturing optimizations
 * Static world surfaces cached in VBO (**\r_vbo 1**)
-* Useful debug markers for tools like [RenderDoc](https://renderdoc.org/)
+* Useful debug markers for [RenderDoc](https://renderdoc.org/)
 * Fixed framebuffer corruption on some Intel iGPUs
-* Offscreen rendering, enabled with **\r_fbo 1**, all following requires it enabled:
-* `screenMap` texture rendering - to create realistic environment reflections
-* Multisample anti-aliasing (**\r_ext_multisample**)
-* Supersample anti-aliasing (**\r_ext_supersample**)
-* Per-window gamma-correction which is important for screen-capture tools like OBS
-* You can minimize game window any time during **\video**|**\video-pipe** recording
-* High dynamic range render targets (**\r_hdr 1**) to avoid color banding
-* Bloom post-processing effect
-* Arbitrary resolution rendering
-* Greyscale mode
+* Offscreen rendering, enabled with **\r_fbo 1** (required for features below):
+    * `screenMap` texture rendering for realistic environment reflections
+    * Multisample anti-aliasing (**\r_ext_multisample**)
+    * Supersample anti-aliasing (**\r_ext_supersample**)
+    * Per-window gamma-correction (important for OBS/screen-capture tools)
+    * High dynamic range render targets (**\r_hdr 1**), prevents color banding
+    * Bloom post-processing effect
+    * Arbitrary resolution rendering
+    * Greyscale mode
+* You can minimize the game window any time during **\video** or **\video-pipe** recording
 
 ## OpenGL renderer
 
-* OpenGL 1.1 compatible, uses features from newer versions whenever available
-* High-quality per-pixel dynamic lighting, can be triggered by **\r_dlightMode** cvar
+* OpenGL 1.1 compatible (uses features from newer versions when available)
+* High-quality per-pixel dynamic lighting (**\r_dlightMode**)
 * Merged lightmaps (atlases)
 * Static world surfaces cached in VBO (**\r_vbo 1**)
-* All set of offscreen rendering features mentioned in Vulkan renderer, plus:
+* All offscreen rendering features available as in Vulkan renderer
 * Bloom reflection post-processing effect
 
 ## DirectX 12 renderer
 * Modern Graphics API: Full DirectX 12 support (feature level 12.0+)
-* Triple buffering for efficient frame presentation
+* Triple buffering for smooth frame presentation
 * Command lists and descriptor heaps for optimized resource and command management
-* Root signatures and pre-compiled pipeline state objects for flexible, efficient rendering
-* Resource barriers and fence-based GPU synchronization
+* Root signatures and pre-compiled pipeline state objects
+* Resource barriers and fence-based GPU sync
 * Multiple render target (MRT) and 32-bit depth buffer support
-* DXGI swap chain with flip discard model for smooth presentation
+* DXGI swap chain with flip discard model
 * Optional D3D12 debug layer (in debug builds)
 * Automatic detection of supported Feature Levels (12.2, 12.1, 12.0, 11.1, 11.0 fallback)
 * Support for Resource Binding Tiers 1, 2, and 3
 * **Ray Tracing (DXR):**
-  * DirectX Raytracing (DXR) with GPU-accelerated acceleration structures
-  * Realistic ray-traced lighting and effects (where supported)
-  * Hardware-dependent, requires compatible GPU/driver
+  * GPU-accelerated ray tracing (where supported)
+  * Realistic ray-traced lighting and effects
+  * Hardware-dependent
 
 ## Metal renderer
-* Modern Graphics API: Full Metal support for macOS and iOS
-* Triple buffering for efficient frame presentation
-* Command buffers and encoders for optimized rendering
-* Render pipeline state objects for efficient shader management
+* Modern Metal API support (macOS/iOS)
+* Triple buffering for efficient presentation
+* Command buffers and encoders for rendering
+* Render pipeline state objects for shaders
 * Depth stencil state management
-* Support for Metal 2.0+ features including argument buffers and indirect command buffers
-* Metal 3.0+ ray tracing support (where available)
+* Metal 2.0+ features: argument buffers, indirect command buffers
+* Metal 3.0+ ray tracing support (macOS/iOS, where available)
 * Automatic feature detection and capability queries
-* iOS and macOS platform support with unified codebase
+* iOS and macOS support with a unified codebase
 * Metal Shading Language (MSL) shader compilation
-* Efficient memory management with Metal resource allocation
+* Efficient Metal resource allocation
 
 **Requirements:**
 * macOS 10.13+ or iOS 11.0+
@@ -97,12 +100,13 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 * Xcode with Metal development tools
 
 **Platform Support:**
-* Full iOS app lifecycle management with UIApplicationDelegate
-* macOS window management with NSWindow
+* Full iOS app lifecycle management (UIApplicationDelegate)
+* macOS window management (NSWindow)
 * Unified platform abstraction layer for both iOS and macOS
-* Automatic Metal feature detection and capability queries
+* Automatic Metal feature detection/capability queries
 * Retina display support
 * Variable refresh rate (ProMotion) support
+* High-DPI menu and input support on all platforms
 
 ## [Build Instructions](docs/BUILD.md)
 
@@ -115,5 +119,4 @@ Go to [Releases](../../releases) section to download latest binaries for your pl
 * https://github.com/OpenArena/engine
 * https://github.com/tomkidd/Quake3-iOS
 * https://github.com/JKSunny/Quake3e
-
 
