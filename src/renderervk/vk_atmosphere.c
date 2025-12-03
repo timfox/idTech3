@@ -543,6 +543,8 @@ void vk_atmosphere_register_lua_functions( void *luaState )
 	Lua_RegisterFunction( L, "AtmosphereSetTimeOfDay", lua_atmosphere_set_time_of_day );
 	
 	Com_Printf( "Atmosphere system: Registered Lua bindings\n" );
+#else
+	(void)luaState; // Suppress unused parameter warning when USE_LUA is not defined
 #endif // USE_LUA
 }
 

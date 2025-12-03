@@ -438,13 +438,17 @@ void Lua_RegisterRendererBindings(lua_State *L)
 	Lua_RegisterFunction(L, "renderer_set_shader_pbr", Lua_RendererSetShaderPBR);
 	Lua_RegisterFunction(L, "renderer_set_shader_param_animation", Lua_RendererSetShaderParameterAnimation);
 	
-	// Register material system bindings
-	extern void vk_material_register_lua_functions( void *luaState );
-	vk_material_register_lua_functions( L );
+	// Register material system bindings (weak symbol - may not be available if renderer module not loaded)
+	extern __attribute__((weak)) void vk_material_register_lua_functions( void *luaState );
+	if ( vk_material_register_lua_functions ) {
+		vk_material_register_lua_functions( L );
+	}
 	
-	// Register atmosphere system bindings
-	extern void vk_atmosphere_register_lua_functions( void *luaState );
-	vk_atmosphere_register_lua_functions( L );
+	// Register atmosphere system bindings (weak symbol - may not be available if renderer module not loaded)
+	extern __attribute__((weak)) void vk_atmosphere_register_lua_functions( void *luaState );
+	if ( vk_atmosphere_register_lua_functions ) {
+		vk_atmosphere_register_lua_functions( L );
+	}
 }
 
 #endif // USE_LUA

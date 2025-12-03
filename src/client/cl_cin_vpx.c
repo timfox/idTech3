@@ -5,10 +5,6 @@
 #include <vpx/vpx_decoder.h>
 #include <vpx/vp8dx.h>
 
-// External access to cinematic table
-extern cin_cache cinTable[MAX_VIDEO_HANDLES];
-extern int currentHandle;
-
 // VPX decoder state
 typedef struct {
 	vpx_codec_ctx_t decoder;
@@ -49,7 +45,7 @@ static int VPX_ReadData(int handle, byte *buffer, int size) {
 	// If we haven't loaded the file yet, load it all
 	if (!data->file_buffer && cinTable[handle].ROQSize > 0) {
 		data->file_size = cinTable[handle].ROQSize;
-		data->file_buffer = (byte *)Z_Malloc(data->file_size, TAG_TEMP, qfalse);
+				data->file_buffer = (byte *)Z_Malloc(data->file_size);
 		if (data->file_buffer) {
 			FS_Seek(cinTable[handle].iFile, 0, FS_SEEK_SET);
 			FS_Read(data->file_buffer, data->file_size, cinTable[handle].iFile);
@@ -141,7 +137,7 @@ qboolean VPX_Init(int handle) {
 	}
 	
 	// Allocate codec data
-	data = (vpx_data_t *)Z_Malloc(sizeof(vpx_data_t), TAG_TEMP, qfalse);
+		data = (vpx_data_t *)Z_Malloc(sizeof(vpx_data_t));
 	if (!data) {
 		Com_Printf("VPX_Init: failed to allocate memory\n");
 		return qfalse;
@@ -189,7 +185,7 @@ qboolean VPX_Init(int handle) {
 	
 	// Allocate frame buffer if needed
 	if (!cinTable[handle].buf) {
-		cinTable[handle].buf = Z_Malloc(cinTable[handle].CIN_WIDTH * cinTable[handle].CIN_HEIGHT * 4, TAG_TEMP, qfalse);
+				cinTable[handle].buf = Z_Malloc(cinTable[handle].CIN_WIDTH * cinTable[handle].CIN_HEIGHT * 4);
 		if (!cinTable[handle].buf) {
 			Com_Printf("VPX_Init: failed to allocate frame buffer\n");
 			VPX_Shutdown(handle);
@@ -312,7 +308,7 @@ e_status VPX_Run(int handle) {
 			if (cinTable[handle].buf) {
 				Z_Free(cinTable[handle].buf);
 			}
-			cinTable[handle].buf = Z_Malloc(cinTable[handle].CIN_WIDTH * cinTable[handle].CIN_HEIGHT * 4, TAG_TEMP, qfalse);
+				cinTable[handle].buf = Z_Malloc(cinTable[handle].CIN_WIDTH * cinTable[handle].CIN_HEIGHT * 4);
 		}
 		
 		// Convert YUV to RGB

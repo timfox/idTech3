@@ -26,6 +26,9 @@ void Lua_Entity_RegisterBindings(lua_State *L);
 // Forward declaration for internal function
 static void Lua_LoadScriptsFromFS(lua_State *L);
 
+// Forward declaration for console command
+static void Lua_ReloadScript_f(void);
+
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
@@ -54,7 +57,6 @@ void Lua_Init(void)
 	
 	// Register console command for hot reload
 	Cmd_AddCommand("lua_reload", Lua_ReloadScript_f);
-	Cvar_SetDescription(Cmd_GetCommand("lua_reload"), "Reload all Lua scripts (hot reload)");
 	
 	// Initialize event bus
 	Lua_Events_Init();

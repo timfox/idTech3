@@ -83,48 +83,7 @@ typedef struct {
 	int					currentHandle;
 } cinematics_t;
 
-typedef struct {
-	char				fileName[MAX_OSPATH];
-	int					CIN_WIDTH, CIN_HEIGHT;
-	int					xpos, ypos, width, height;
-	qboolean			looping, holdAtEnd, dirty, alterGameState, silent, shader;
-	fileHandle_t		iFile;
-	e_status			status;
-	int					startTime;
-	int					lastTime;
-	long				tfps;
-	long				RoQPlayed;
-	long				ROQSize;
-	unsigned int		RoQFrameSize;
-	long				onQuad;
-	long				numQuads;
-	long				samplesPerLine;
-	unsigned int		roq_id;
-	long				screenDelta;
-
-	void ( *VQ0)(byte *status, void *qdata );
-	void ( *VQ1)(byte *status, void *qdata );
-	void ( *VQNormal)(byte *status, void *qdata );
-	void ( *VQBuffer)(byte *status, void *qdata );
-
-	long				samplesPerPixel;				// defaults to 2
-	byte*				gray;
-	unsigned int		xsize, ysize, maxsize, minsize;
-
-	qboolean			half, smootheddouble;
-	long				inMemory;
-	long				normalBuffer0;
-	long				roq_flags;
-	long				roqF0;
-	long				roqF1;
-	long				t[2];
-	long				roqFPS;
-	int					playonwalls;
-	byte*				buf;
-	long				drawX, drawY;
-	video_codec_t		codec;			// Video codec type
-	void*				codecData;		// Codec-specific data
-} cin_cache;
+// cin_cache structure is now defined in cl_cin_codec.h
 
 static cinematics_t		cin;
 cin_cache				cinTable[MAX_VIDEO_HANDLES];  // Made non-static for codec access

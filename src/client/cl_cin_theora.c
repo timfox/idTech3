@@ -6,10 +6,6 @@
 #include <theora/theoradec.h>
 #include <ogg/ogg.h>
 
-// External access to cinematic table
-extern cin_cache cinTable[MAX_VIDEO_HANDLES];
-extern int currentHandle;
-
 // Theora decoder state
 typedef struct {
 	ogg_sync_state ogg_sync;
@@ -113,12 +109,11 @@ qboolean Theora_Init(int handle) {
 	theora_data_t *data;
 	ogg_page ogg_page;
 	ogg_packet ogg_packet;
-	int ret;
 	
 	if (handle < 0 || handle >= MAX_VIDEO_HANDLES) return qfalse;
 	
 	// Allocate codec data
-	data = (theora_data_t *)Z_Malloc(sizeof(theora_data_t), TAG_TEMP, qfalse);
+		data = (theora_data_t *)Z_Malloc(sizeof(theora_data_t));
 	if (!data) {
 		Com_Printf("Theora_Init: failed to allocate memory\n");
 		return qfalse;
@@ -149,7 +144,7 @@ qboolean Theora_Init(int handle) {
 		
 		// Initialize stream if this is the first page
 		if (ogg_page_bos(&ogg_page)) {
-			ogg_stream_init(&data->ogg_stream, ogg_page.serialno);
+			ogg_stream_init(&data->ogg_stream, ogg_page_serialno(&ogg_page));
 		}
 		
 		// Add page to stream
@@ -195,7 +190,7 @@ qboolean Theora_Init(int handle) {
 	
 	// Allocate frame buffer if needed
 	if (!cinTable[handle].buf) {
-		cinTable[handle].buf = Z_Malloc(cinTable[handle].CIN_WIDTH * cinTable[handle].CIN_HEIGHT * 4, TAG_TEMP, qfalse);
+				cinTable[handle].buf = Z_Malloc(cinTable[handle].CIN_WIDTH * cinTable[handle].CIN_HEIGHT * 4);
 		if (!cinTable[handle].buf) {
 			Com_Printf("Theora_Init: failed to allocate frame buffer\n");
 			Theora_Shutdown(handle);
@@ -385,7 +380,7 @@ void Theora_Reset(int handle) {
 		}
 		
 		if (ogg_page_bos(&ogg_page)) {
-			ogg_stream_init(&data->ogg_stream, ogg_page.serialno);
+			ogg_stream_init(&data->ogg_stream, ogg_page_serialno(&ogg_page));
 		}
 		
 		ogg_stream_pagein(&data->ogg_stream, &ogg_page);

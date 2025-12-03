@@ -843,6 +843,10 @@ ENDIF()
 AUX_SOURCE_DIRECTORY(src/renderercommon RENDERER_COMMON_SRCS)
 AUX_SOURCE_DIRECTORY(src/renderer RENDERER_GL_SRCS)
 AUX_SOURCE_DIRECTORY(src/renderervk RENDERER_VK_SRCS)
+# Add VMA C++ implementation file if VMA is enabled
+IF(USE_VMA AND USE_VULKAN)
+	list(APPEND RENDERER_VK_SRCS src/renderervk/vk_vma.cpp)
+ENDIF()
 
 IF(USE_CIMGUI AND DEFINED CIMGUI_DIR)
 	list(APPEND RENDERER_VK_SRCS
@@ -898,21 +902,6 @@ IF(APPLE AND USE_METAL AND NOT ANDROID)
 	ENDIF()
 ENDIF()
 
-# VMA (Vulkan Memory Allocator)
-IF(USE_VMA AND USE_VULKAN)
-	# Check if VMA header exists
-	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/libs/vma/vk_mem_alloc.h)
-		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VMA)
-		TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE libs/vma)
-		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan PRIVATE USE_VMA)
-		TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan PRIVATE libs/vma)
-		MESSAGE(STATUS "VMA: Vulkan Memory Allocator enabled")
-	ELSE()
-		MESSAGE(WARNING "VMA: Header not found at libs/vma/vk_mem_alloc.h. Download it from https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator")
-		SET(USE_VMA OFF CACHE BOOL "" FORCE)
-	ENDIF()
-ENDIF()
-
 IF(USE_RENDERER_DLOPEN)
 	SET(AUX_SRCS
 		src/qcommon/q_shared.c
@@ -930,6 +919,25 @@ IF(USE_RENDERER_DLOPEN)
 	SET_TARGET_PROPERTIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES OUTPUT_NAME "${RENDERER_PREFIX}_vulkan${RENDEXT}" PREFIX "")
 	TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_VULKAN)
 	TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE m)
+	
+	# VMA (Vulkan Memory Allocator) - configure after target is created
+	IF(USE_VMA AND USE_VULKAN)
+		# Check if VMA header exists
+		IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/libs/vma/vk_mem_alloc.h)
+			TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VMA)
+			TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE libs/vma)
+			# Suppress warnings from third-party VMA library code
+			IF(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+				SET_SOURCE_FILES_PROPERTIES(src/renderervk/vk_vma.cpp PROPERTIES
+					COMPILE_FLAGS "-Wno-unused-parameter -Wno-unused-variable"
+				)
+			ENDIF()
+			MESSAGE(STATUS "VMA: Vulkan Memory Allocator enabled")
+		ELSE()
+			MESSAGE(WARNING "VMA: Header not found at libs/vma/vk_mem_alloc.h. Download it from https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator")
+			SET(USE_VMA OFF CACHE BOOL "" FORCE)
+		ENDIF()
+	ENDIF()
 	
 	IF(WIN32 AND USE_D3D12)
 		ADD_LIBRARY(${RENDERER_PREFIX}_d3d12${RENDEXT} SHARED ${RENDERER_D3D12_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
@@ -953,6 +961,19 @@ IF(USE_RENDERER_DLOPEN)
 ELSE()
 	IF(USE_VULKAN)
 		ADD_LIBRARY(${RENDERER_PREFIX}_vulkan OBJECT ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS})
+		
+		# VMA (Vulkan Memory Allocator) - configure after target is created
+		IF(USE_VMA AND USE_VULKAN)
+			# Check if VMA header exists
+			IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/libs/vma/vk_mem_alloc.h)
+				TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan PRIVATE USE_VMA)
+				TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan PRIVATE libs/vma)
+				MESSAGE(STATUS "VMA: Vulkan Memory Allocator enabled")
+			ELSE()
+				MESSAGE(WARNING "VMA: Header not found at libs/vma/vk_mem_alloc.h. Download it from https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator")
+				SET(USE_VMA OFF CACHE BOOL "" FORCE)
+			ENDIF()
+		ENDIF()
 	ELSEIF(WIN32 AND USE_D3D12)
 		ADD_LIBRARY(${RENDERER_PREFIX}_d3d12 OBJECT ${RENDERER_D3D12_SRCS} ${RENDERER_COMMON_SRCS})
 	ELSEIF(APPLE AND USE_METAL AND NOT ANDROID)
@@ -1443,8 +1464,10 @@ IF(USE_THEORA)
 				/usr/local/include
 				/opt/local/include
 		)
+		# Theora is split into theoradec (decoder) and theoraenc (encoder)
+		# We need theoradec for video playback (contains th_decode_* functions)
 		FIND_LIBRARY(THEORA_LIBRARY
-			NAMES theora
+			NAMES theoradec theora
 			PATHS
 				/usr/lib
 				/usr/lib/x86_64-linux-gnu
@@ -1461,6 +1484,8 @@ IF(USE_THEORA)
 	IF(THEORA_FOUND AND THEORA_LIBRARIES)
 		TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${THEORA_INCLUDE_DIRS})
 		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_THEORA)
+		# Note: client is an OBJECT library, so libraries must be linked to final executable
+		# libogg linking is handled at the final executable linking stage
 		MESSAGE(STATUS "Theora found: ${THEORA_LIBRARIES}")
 	ELSE()
 		MESSAGE(WARNING "Theora not found, disabling Theora support")
@@ -1797,6 +1822,20 @@ ENDIF()
 IF(USE_THEORA)
 	IF(THEORA_FOUND AND THEORA_LIBRARIES)
 		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${THEORA_LIBRARIES})
+		# Also link libogg for Theora (Theora depends on it)
+		find_library(OGG_LIBRARY ogg PATHS /usr/lib /usr/lib/x86_64-linux-gnu /usr/local/lib /opt/local/lib)
+		IF(OGG_LIBRARY)
+			TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${OGG_LIBRARY})
+		ELSE()
+			# Try pkg-config for ogg
+			find_package(PkgConfig QUIET)
+			IF(PKG_CONFIG_FOUND)
+				pkg_check_modules(OGG ogg QUIET)
+				IF(OGG_FOUND)
+					TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${OGG_LIBRARIES})
+				ENDIF()
+			ENDIF()
+		ENDIF()
 	ENDIF()
 ENDIF()
 

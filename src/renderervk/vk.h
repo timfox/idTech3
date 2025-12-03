@@ -69,7 +69,7 @@ struct ImDrawData;
 
 // Vulkan Memory Allocator (VMA)
 #ifdef USE_VMA
-#define VMA_IMPLEMENTATION
+// VMA types and function declarations (implementation is in vk.c)
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
 #define VMA_VULKAN_VERSION 1000000 // Vulkan 1.0

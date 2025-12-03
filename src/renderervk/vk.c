@@ -3000,7 +3000,6 @@ static void vk_release_geometry_buffers( void )
 static void vk_create_geometry_buffers( VkDeviceSize size )
 {
 	int i;
-	void *data = NULL;
 
 #ifdef USE_VMA
 	// Use VMA for better memory management
@@ -5039,10 +5038,17 @@ void vk_initialize( void )
 	// Initialize Vulkan Memory Allocator (VMA)
 	//
 	{
+		VmaVulkanFunctions vulkanFunctions = {0};
+		// Cast function pointer - ri.VK_GetInstanceProcAddr returns void* but VMA expects PFN_vkGetInstanceProcAddr
+		// Both are compatible (PFN_vkVoidFunction is typedef'd as void*), but explicit cast needed
+		vulkanFunctions.vkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)(void*)ri.VK_GetInstanceProcAddr;
+		vulkanFunctions.vkGetDeviceProcAddr = qvkGetDeviceProcAddr;
+		
 		VmaAllocatorCreateInfo allocatorInfo = {0};
 		allocatorInfo.physicalDevice = vk.physical_device;
 		allocatorInfo.device = vk.device;
 		allocatorInfo.instance = vk_instance;
+		allocatorInfo.pVulkanFunctions = &vulkanFunctions;
 		allocatorInfo.flags = VMA_ALLOCATOR_CREATE_BUFFER_DEVICE_ADDRESS_BIT;
 		
 		VkResult res = vmaCreateAllocator(&allocatorInfo, &vk.allocator);

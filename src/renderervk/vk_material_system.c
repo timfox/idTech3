@@ -440,6 +440,8 @@ void vk_material_register_lua_functions( void *luaState )
 	Lua_RegisterFunction( L, "MaterialGetMagicGlow", lua_material_get_magic_glow );
 	
 	Com_Printf( "Material system: Registered Lua bindings\n" );
+#else
+	(void)luaState; // Suppress unused parameter warning when USE_LUA is not defined
 #endif // USE_LUA
 }
 
