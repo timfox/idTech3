@@ -729,6 +729,9 @@ float Q_atof( const char *str );
 
 //=============================================
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 float Com_Clamp( float min, float max, float value );
 
 char	*COM_SkipPath( char *pathname );
@@ -736,6 +739,9 @@ const char	*COM_GetExtension( const char *name );
 void	COM_StripExtension(const char *in, char *out, int destsize);
 qboolean COM_CompareExtension(const char *in, const char *ext);
 void	COM_DefaultExtension( char *path, int maxSize, const char *extension );
+#ifdef __cplusplus
+}
+#endif
 
 unsigned long Com_GenerateHashValue( const char *fname, const unsigned int size );
 

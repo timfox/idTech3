@@ -368,6 +368,7 @@ typedef struct {
 	menutext_s		display;
 	menutext_s		sound;
 	menutext_s		network;
+	menutext_s		rendering;
 
 	menulist_s		list;
         menulist_s              ratio;

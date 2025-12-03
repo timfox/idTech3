@@ -312,6 +312,13 @@ extern	cvar_t	*sv_pure;
 extern	cvar_t	*sv_floodProtect;
 extern	cvar_t	*sv_lanForceRate;
 
+#ifdef USE_BULLET
+extern	cvar_t	*sv_bulletEnable;        // global toggle for Bullet ECS physics
+extern	cvar_t	*sv_bulletMaxSubSteps;   // max Bullet substeps per frame
+extern	cvar_t	*sv_bulletFixedTimestep; // optional fixed Bullet timestep
+extern	cvar_t	*sv_bulletDebug;         // debug logging toggle for Bullet integration
+#endif
+
 extern	cvar_t *sv_levelTimeReset;
 extern	cvar_t *sv_filter;
 

@@ -1,10 +1,14 @@
-CMAKE_MINIMUM_REQUIRED(VERSION 3.20)
+# ==============================================================================
+# id Tech 3 Build System - Modern CMake Configuration
+# ==============================================================================
 
-PROJECT(idtech3 C CXX ASM)
+# --- CMake minimum version and project initialization ---
+cmake_minimum_required(VERSION 3.20)
+project(idtech3 C CXX ASM)
 
-# Set C standard (C23 for modern features, fallback to C17/C11 if not available)
-# C23 requires CMake 3.20+ and modern compilers (GCC 14+, Clang 18+)
-# C17 is widely supported and provides modern features
+# ------------------------------------------------------------------------------
+# Language Standard Configuration
+# ------------------------------------------------------------------------------
 IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 	# Try C23 first (CMake 3.20+ supports it), compiler will use highest available
 	# If C23 not supported by compiler, it will fall back to C17 automatically
@@ -260,19 +264,27 @@ ENDIF()
 
 IF(USE_BULLET)
 	# Try CMake's config package first (common when Bullet is installed from source or via vcpkg)
+	# Clear BULLET_LIBRARIES first to prevent BulletConfig.cmake from setting wrong libraries
+	unset(BULLET_LIBRARIES)
+	unset(BULLET_LIBRARIES CACHE)
 	find_package(Bullet CONFIG QUIET)
 	
 	if(TARGET Bullet::BulletDynamics)
 		set(BULLET_FOUND TRUE)
+		# Use CMake targets - these handle dependencies correctly
+		# Override any BULLET_LIBRARIES that BulletConfig.cmake might have set
 		set(BULLET_LIBRARIES
 			Bullet::BulletDynamics
 			Bullet::BulletCollision
 			Bullet::LinearMath
 		)
 		# Get include directories from the CMake target
-		get_target_property(BULLET_INCLUDE_DIRS_TMP Bullet::BulletDynamics INTERFACE_INCLUDE_DIRECTORIES)
-		if(BULLET_INCLUDE_DIRS_TMP)
-			set(BULLET_INCLUDE_DIRS ${BULLET_INCLUDE_DIRS_TMP})
+		# Note: Bullet's CMake config may return incorrect relative paths that get resolved
+		# incorrectly, so we always validate and use the correct absolute paths
+		if(EXISTS "/usr/include/bullet/btBulletDynamicsCommon.h")
+			set(BULLET_INCLUDE_DIRS /usr/include/bullet)
+		elseif(EXISTS "/usr/local/include/bullet/btBulletDynamicsCommon.h")
+			set(BULLET_INCLUDE_DIRS /usr/local/include/bullet)
 		else()
 			# Fallback: common system paths where Bullet headers are located
 			set(BULLET_INCLUDE_DIRS /usr/include/bullet /usr/local/include/bullet)
@@ -321,8 +333,29 @@ IF(USE_BULLET)
 	if(NOT BULLET_FOUND)
 		find_package(Bullet QUIET)
 		if(Bullet_FOUND OR BULLET_FOUND)
+			# BulletConfig.cmake may set BULLET_LIBRARIES to include libraries that don't exist
+			# (e.g., BulletInverseDynamics, BulletSoftBody). Filter them out and only use
+			# the libraries that actually exist.
 			if(DEFINED BULLET_LIBRARIES)
-				set(BULLET_LIBRARIES ${BULLET_LIBRARIES})
+				# Filter out non-existent libraries
+				set(BULLET_LIBRARIES_FILTERED "")
+				foreach(LIB ${BULLET_LIBRARIES})
+					# Check if it's a CMake target (starts with Bullet::)
+					if(LIB MATCHES "^Bullet::")
+						list(APPEND BULLET_LIBRARIES_FILTERED ${LIB})
+					else()
+						# Check if library file exists
+						find_library(LIB_FILE ${LIB} PATHS /usr/lib /usr/lib/x86_64-linux-gnu /usr/local/lib)
+						if(LIB_FILE)
+							list(APPEND BULLET_LIBRARIES_FILTERED ${LIB_FILE})
+						endif()
+					endif()
+				endforeach()
+				# If filtering removed everything, use only the core libraries
+				if(NOT BULLET_LIBRARIES_FILTERED)
+					set(BULLET_LIBRARIES_FILTERED BulletDynamics BulletCollision LinearMath)
+				endif()
+				set(BULLET_LIBRARIES ${BULLET_LIBRARIES_FILTERED})
 			elseif(DEFINED BULLET_DYNAMICS_LIBRARY AND DEFINED BULLET_COLLISION_LIBRARY AND DEFINED BULLET_MATH_LIBRARY)
 				set(BULLET_LIBRARIES
 					${BULLET_DYNAMICS_LIBRARY}
@@ -428,6 +461,21 @@ IF(USE_BULLET)
 	endif()
 	
 	if(BULLET_FOUND AND BULLET_LIBRARIES)
+		# Filter out any non-existent libraries that BulletConfig.cmake might have added
+		set(BULLET_LIBRARIES_FINAL "")
+		foreach(LIB ${BULLET_LIBRARIES})
+			# Keep CMake targets
+			if(LIB MATCHES "^Bullet::")
+				list(APPEND BULLET_LIBRARIES_FINAL ${LIB})
+			# Keep only core library names (filter out BulletInverseDynamics, BulletSoftBody, Bullet3Common)
+			elseif(LIB MATCHES "^(BulletDynamics|BulletCollision|LinearMath)$")
+				list(APPEND BULLET_LIBRARIES_FINAL ${LIB})
+			endif()
+		endforeach()
+		# If we have CMake targets, use those; otherwise use filtered list
+		if(BULLET_LIBRARIES_FINAL)
+			set(BULLET_LIBRARIES ${BULLET_LIBRARIES_FINAL})
+		endif()
 		MESSAGE(STATUS "Bullet found: ${BULLET_LIBRARIES}")
 	else()
 		MESSAGE(WARNING "Bullet not found, disabling Bullet support")
@@ -484,9 +532,12 @@ IF(USE_JOBSYSTEM)
 ENDIF()
 IF(USE_BULLET)
 	IF(BULLET_FOUND AND BULLET_LIBRARIES)
-		# Set include directories - use BULLET_INCLUDE_DIRS if set, otherwise use common paths
-		if(BULLET_INCLUDE_DIRS)
-			TARGET_INCLUDE_DIRECTORIES(qcommon PUBLIC ${BULLET_INCLUDE_DIRS})
+		# Set include directories - always use absolute paths to avoid CMake resolving relative paths incorrectly
+		# Bullet's CMake config may set relative paths that get resolved relative to CMAKE_CURRENT_SOURCE_DIR
+		if(EXISTS "/usr/include/bullet/btBulletDynamicsCommon.h")
+			TARGET_INCLUDE_DIRECTORIES(qcommon PUBLIC /usr/include/bullet)
+		elseif(EXISTS "/usr/local/include/bullet/btBulletDynamicsCommon.h")
+			TARGET_INCLUDE_DIRECTORIES(qcommon PUBLIC /usr/local/include/bullet)
 		else()
 			# Fallback: common system paths
 			TARGET_INCLUDE_DIRECTORIES(qcommon PUBLIC /usr/include/bullet /usr/local/include/bullet)

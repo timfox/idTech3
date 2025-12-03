@@ -222,6 +222,19 @@ static void UI_RenderingOptionsMenu_Event( void* ptr, int event ) {
 
 /*
 ===============
+UI_RenderingOptionsMenu_Cache
+===============
+*/
+static void UI_RenderingOptionsMenu_Cache( void ) {
+	trap_R_RegisterShaderNoMip( ART_FRAMEL );
+	trap_R_RegisterShaderNoMip( ART_FRAMER );
+	trap_R_RegisterShaderNoMip( ART_BACK0 );
+	trap_R_RegisterShaderNoMip( ART_BACK1 );
+}
+
+
+/*
+===============
 UI_RenderingOptionsMenu_Init
 ===============
 */
@@ -516,19 +529,6 @@ static void UI_RenderingOptionsMenu_Init( void ) {
 	Menu_AddItem( &renderingOptionsInfo.menu, ( void * ) &renderingOptionsInfo.pt_giintensity );
 	Menu_AddItem( &renderingOptionsInfo.menu, ( void * ) &renderingOptionsInfo.pt_outputscale );
 	Menu_AddItem( &renderingOptionsInfo.menu, ( void * ) &renderingOptionsInfo.back );
-}
-
-
-/*
-===============
-UI_RenderingOptionsMenu_Cache
-===============
-*/
-static void UI_RenderingOptionsMenu_Cache( void ) {
-	trap_R_RegisterShaderNoMip( ART_FRAMEL );
-	trap_R_RegisterShaderNoMip( ART_FRAMER );
-	trap_R_RegisterShaderNoMip( ART_BACK0 );
-	trap_R_RegisterShaderNoMip( ART_BACK1 );
 }
 
 
