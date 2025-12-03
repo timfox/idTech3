@@ -1,0 +1,95 @@
+#version 460
+#extension GL_EXT_mesh_shader : require
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+layout(triangles, max_vertices = 64, max_primitives = 124) out;
+
+layout(push_constant) uniform MeshletConstants {
+    mat4 viewMatrix;
+    mat4 projMatrix;
+    vec3 cameraPos;
+    float lodDistance;
+    uint meshletCount;
+} pc;
+
+// Meshlet data
+struct Meshlet {
+    vec3 center;
+    float radius;
+    uint vertexOffset;
+    uint vertexCount;
+    uint indexOffset;
+    uint indexCount;
+    uint flags;
+};
+
+// Vertex data
+struct Vertex {
+    vec3 position;
+    vec3 normal;
+    vec2 texCoord;
+};
+
+layout(std430, binding = 0) restrict readonly buffer MeshletBuffer {
+    Meshlet meshlets[];
+};
+
+layout(std430, binding = 1) restrict readonly buffer VertexBuffer {
+    Vertex vertices[];
+};
+
+layout(std430, binding = 2) restrict readonly buffer IndexBuffer {
+    uint indices[];
+};
+
+// Task payload
+taskPayloadSharedEXT uint meshletIndices[32];
+
+// Outputs
+layout(location = 0) out vec3 outPosition[];
+layout(location = 1) out vec3 outNormal[];
+layout(location = 2) out vec2 outTexCoord[];
+
+void main()
+{
+    uint meshletIndex = meshletIndices[gl_DrawID];
+    Meshlet meshlet = meshlets[meshletIndex];
+    
+    // Emit vertices
+    for (uint i = 0; i < meshlet.vertexCount && i < 64; i++) {
+        uint vertexIndex = meshlet.vertexOffset + i;
+        Vertex vertex = vertices[vertexIndex];
+        
+        // Transform to clip space
+        vec4 viewPos = pc.viewMatrix * vec4(vertex.position, 1.0);
+        gl_MeshVerticesEXT[i].gl_Position = pc.projMatrix * viewPos;
+        
+        outPosition[i] = vertex.position;
+        outNormal[i] = vertex.normal;
+        outTexCoord[i] = vertex.texCoord;
+    }
+    
+    // Emit primitives
+    uint primitiveCount = min(meshlet.indexCount / 3, 124u);
+    for (uint i = 0; i < primitiveCount; i++) {
+        uint index0 = indices[meshlet.indexOffset + i * 3 + 0];
+        uint index1 = indices[meshlet.indexOffset + i * 3 + 1];
+        uint index2 = indices[meshlet.indexOffset + i * 3 + 2];
+        
+        // Map to local meshlet vertex indices
+        index0 -= meshlet.vertexOffset;
+        index1 -= meshlet.vertexOffset;
+        index2 -= meshlet.vertexOffset;
+        
+        gl_PrimitiveIndicesEXT[i * 3 + 0] = index0;
+        gl_PrimitiveIndicesEXT[i * 3 + 1] = index1;
+        gl_PrimitiveIndicesEXT[i * 3 + 2] = index2;
+    }
+    
+    gl_MeshPrimitivesEXT[0].gl_PrimitiveCount = primitiveCount;
+}
+

@@ -1,0 +1,111 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+// Particle data structure
+struct Particle {
+    vec3 position;
+    vec3 velocity;
+    vec3 color;
+    float size;
+    float life;
+    float maxLife;
+    uint flags;
+};
+
+layout(std430, binding = 0) restrict buffer ParticleBuffer {
+    Particle particles[];
+};
+
+layout(std430, binding = 1) restrict buffer EmitterBuffer {
+    vec3 emitterPosition;
+    vec3 emitterVelocity;
+    vec3 emitterColor;
+    float spawnRate;
+    float particleSize;
+    float particleLife;
+    uint maxParticles;
+    uint activeParticles;
+    float time;
+    float deltaTime;
+} emitter;
+
+layout(push_constant) uniform ParticleConstants {
+    vec3 gravity;
+    vec3 wind;
+    float damping;
+    float deltaTime;
+    uint maxParticles;
+} pc;
+
+void main()
+{
+    uint index = gl_GlobalInvocationID.x;
+    
+    if (index >= pc.maxParticles) {
+        return;
+    }
+    
+    Particle particle = particles[index];
+    
+    // Update existing particles
+    if (particle.life > 0.0) {
+        // Apply forces
+        particle.velocity += pc.gravity * pc.deltaTime;
+        particle.velocity += pc.wind * pc.deltaTime;
+        
+        // Apply damping
+        particle.velocity *= pc.damping;
+        
+        // Update position
+        particle.position += particle.velocity * pc.deltaTime;
+        
+        // Update life
+        particle.life -= pc.deltaTime;
+        
+        // Fade out as life decreases
+        float lifeRatio = particle.life / particle.maxLife;
+        particle.color.a *= lifeRatio;
+        
+        // Kill particle if life expired
+        if (particle.life <= 0.0) {
+            particle.life = 0.0;
+            particle.flags = 0;
+        }
+    }
+    // Spawn new particles
+    else if (emitter.activeParticles < emitter.maxParticles) {
+        // Check spawn rate
+        float spawnChance = emitter.spawnRate * pc.deltaTime;
+        if (spawnChance >= 1.0 || fract(emitter.time * emitter.spawnRate) < spawnChance) {
+            particle.position = emitter.emitterPosition;
+            
+            // Random velocity direction
+            float angle = emitter.time * 10.0 + float(index) * 0.618033988749;
+            float elevation = sin(emitter.time * 5.0 + float(index)) * 0.5 + 0.5;
+            float speed = 5.0 + sin(emitter.time * 3.0 + float(index)) * 2.0;
+            
+            particle.velocity = emitter.emitterVelocity + vec3(
+                cos(angle) * sin(elevation),
+                cos(elevation),
+                sin(angle) * sin(elevation)
+            ) * speed;
+            
+            particle.color = emitter.emitterColor;
+            particle.size = emitter.particleSize;
+            particle.life = emitter.particleLife;
+            particle.maxLife = emitter.particleLife;
+            particle.flags = 1;
+            
+            atomicAdd(emitter.activeParticles, 1);
+        }
+    }
+    
+    // Write back
+    particles[index] = particle;
+}
+

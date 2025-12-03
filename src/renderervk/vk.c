@@ -1,5 +1,8 @@
 #include "tr_local.h"
 #include "vk.h"
+#ifdef USE_VULKAN_RAY_TRACING
+#include "vk_gibs.h"
+#endif
 
 #if defined (_DEBUG)
 #if defined (_WIN32)
@@ -4884,6 +4887,11 @@ void vk_initialize( void )
 	// Initialize ray tracing if supported
 #ifdef USE_VULKAN_RAY_TRACING
 	vk_rt_init();
+	// Initialize GIBS after ray tracing (depends on RT)
+	if ( r_gibs && r_gibs->integer ) {
+		vk.gibs.enabled = qtrue;
+		vk_gibs_init();
+	}
 #endif
 
 	// Initialize DLSS
@@ -5839,8 +5847,9 @@ for (i = 0; i < 2; i++) {
 #endif
 
 __cleanup:
-	// Shutdown ray tracing
+	// Shutdown GIBS before ray tracing
 #ifdef USE_VULKAN_RAY_TRACING
+	vk_gibs_shutdown();
 	vk_rt_shutdown();
 #endif
 
@@ -9514,6 +9523,13 @@ void vk_begin_frame( void )
 #endif
 
 	vk.cmd = &vk.tess[ vk.cmd_index ];
+
+#ifdef USE_VULKAN_RAY_TRACING
+	// Update GIBS system
+	if ( vk.gibs.enabled && vk.gibs.initialized ) {
+		vk_gibs_update();
+	}
+#endif
 
 	// CRITICAL: Reset render pass state at the start of each frame.
 	// When command buffer is reset, the render pass state variable must also be reset.

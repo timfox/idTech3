@@ -1,0 +1,124 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D inputImage;
+layout(set = 0, binding = 1) uniform sampler1D lutTexture; // 3D LUT as 1D texture
+
+layout(set = 0, binding = 2, rgba16f) uniform writeonly image2D outputImage;
+
+layout(push_constant) uniform ColorGradingConstants {
+    vec2 resolution;
+    vec2 invResolution;
+    float exposure;
+    float contrast;
+    float saturation;
+    float brightness;
+    vec3 colorFilter; // Tint
+    float gamma;
+    vec3 shadows;
+    vec3 midtones;
+    vec3 highlights;
+    float shadowsStart;
+    float shadowsEnd;
+    float highlightsStart;
+    float highlightsEnd;
+    int useLUT;
+} pc;
+
+// ACES tone mapping approximation
+vec3 acesToneMap(vec3 color)
+{
+    const float a = 2.51;
+    const float b = 0.03;
+    const float c = 2.43;
+    const float d = 0.59;
+    const float e = 0.14;
+    return clamp((color * (a * color + b)) / (color * (c * color + d) + e), 0.0, 1.0);
+}
+
+// Sample 3D LUT
+vec3 sampleLUT(vec3 color)
+{
+    if (pc.useLUT == 0) {
+        return color;
+    }
+    
+    // Assume 32x32x32 LUT
+    const float lutSize = 32.0;
+    const float lutSizeRcp = 1.0 / lutSize;
+    
+    // Clamp to valid range
+    color = clamp(color, 0.0, 1.0);
+    
+    // Calculate LUT coordinates
+    float blue = color.b * (lutSize - 1.0);
+    float blueFloor = floor(blue);
+    float blueFrac = blue - blueFloor;
+    
+    float b0 = blueFloor * lutSize * lutSize;
+    float b1 = min(blueFloor + 1.0, lutSize - 1.0) * lutSize * lutSize;
+    
+    vec2 rg = color.rg * (lutSize - 1.0) * lutSizeRcp + lutSizeRcp * 0.5;
+    
+    vec3 color0 = texture(lutTexture, (b0 + color.r * lutSize + color.g) * lutSizeRcp).rgb;
+    vec3 color1 = texture(lutTexture, (b1 + color.r * lutSize + color.g) * lutSizeRcp).rgb;
+    
+    return mix(color0, color1, blueFrac);
+}
+
+void main()
+{
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+    
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+    vec3 color = texture(inputImage, uv).rgb;
+    
+    // Apply exposure
+    color *= pow(2.0, pc.exposure);
+    
+    // Apply brightness
+    color += pc.brightness;
+    
+    // Apply contrast
+    color = (color - 0.5) * pc.contrast + 0.5;
+    
+    // Apply color filter/tint
+    color *= pc.colorFilter;
+    
+    // Split toning (shadows/midtones/highlights)
+    float luminance = dot(color, vec3(0.299, 0.587, 0.114));
+    
+    vec3 shadowsTint = mix(vec3(1.0), pc.shadows, smoothstep(pc.shadowsStart, pc.shadowsEnd, luminance));
+    vec3 highlightsTint = mix(vec3(1.0), pc.highlights, smoothstep(pc.highlightsStart, pc.highlightsEnd, luminance));
+    vec3 midtonesTint = mix(vec3(1.0), pc.midtones, 
+        1.0 - abs(luminance - 0.5) * 2.0);
+    
+    color *= shadowsTint * highlightsTint * midtonesTint;
+    
+    // Apply saturation
+    float luma = dot(color, vec3(0.299, 0.587, 0.114));
+    color = mix(vec3(luma), color, pc.saturation);
+    
+    // Tone mapping
+    color = acesToneMap(color);
+    
+    // Apply LUT if enabled
+    color = sampleLUT(color);
+    
+    // Apply gamma correction
+    color = pow(color, vec3(1.0 / pc.gamma));
+    
+    // Clamp to valid range
+    color = clamp(color, 0.0, 1.0);
+    
+    imageStore(outputImage, pixel, vec4(color, 1.0));
+}
+

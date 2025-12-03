@@ -1,0 +1,79 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(std430, binding = 0) restrict readonly buffer HistogramBuffer {
+    uint histogram[256];
+    float minLuminance;
+    float maxLuminance;
+    float avgLuminance;
+};
+
+layout(std430, binding = 1) restrict buffer ExposureBuffer {
+    float currentExposure;
+    float targetExposure;
+    float adaptationRate;
+};
+
+layout(push_constant) uniform AutoExposureConstants {
+    float targetLuminance; // Target middle gray (typically 0.18)
+    float minExposure;
+    float maxExposure;
+    float adaptationSpeed;
+} pc;
+
+void main()
+{
+    // Calculate total samples
+    uint totalSamples = 0u;
+    for (int i = 0; i < 256; i++) {
+        totalSamples += histogram[i];
+    }
+    
+    if (totalSamples == 0u) {
+        return;
+    }
+    
+    // Calculate weighted average luminance
+    float weightedSum = 0.0;
+    uint sampleCount = 0u;
+    
+    // Use middle 80% of histogram (ignore extremes)
+    uint startBin = 25u;  // ~10%
+    uint endBin = 230u;   // ~90%
+    
+    for (uint i = startBin; i <= endBin; i++) {
+        uint count = histogram[i];
+        float binLuminance = float(i) / 255.0;
+        weightedSum += binLuminance * float(count);
+        sampleCount += count;
+    }
+    
+    if (sampleCount == 0u) {
+        return;
+    }
+    
+    float avgLuminance = weightedSum / float(sampleCount);
+    
+    // Calculate target exposure
+    // Exposure = targetLuminance / avgLuminance
+    float newTargetExposure = pc.targetLuminance / max(avgLuminance, 0.001);
+    newTargetExposure = clamp(newTargetExposure, pc.minExposure, pc.maxExposure);
+    
+    // Smooth adaptation
+    float currentTarget = ExposureBuffer.targetExposure;
+    float adaptedTarget = mix(currentTarget, newTargetExposure, pc.adaptationSpeed);
+    
+    ExposureBuffer.targetExposure = adaptedTarget;
+    
+    // Smooth current exposure towards target
+    float currentExp = ExposureBuffer.currentExposure;
+    float newExposure = mix(currentExp, adaptedTarget, ExposureBuffer.adaptationRate);
+    
+    ExposureBuffer.currentExposure = newExposure;
+}
+

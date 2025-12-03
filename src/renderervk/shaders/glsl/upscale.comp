@@ -1,0 +1,115 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D inputImage;
+layout(set = 0, binding = 1) uniform sampler2D depthBuffer;
+layout(set = 0, binding = 2) uniform sampler2D normalBuffer;
+
+layout(set = 0, binding = 3, rgba16f) uniform writeonly image2D outputImage;
+
+layout(push_constant) uniform UpscaleConstants {
+    vec2 inputResolution;
+    vec2 outputResolution;
+    vec2 invInputResolution;
+    vec2 invOutputResolution;
+    int upscaleMode; // 0 = bilinear, 1 = lanczos, 2 = FSR/EASU
+    float sharpness;
+} pc;
+
+// Lanczos filter
+float lanczos(float x, float a)
+{
+    if (abs(x) < 0.001) return 1.0;
+    if (abs(x) >= a) return 0.0;
+    float piX = PI * x;
+    return a * sin(piX) * sin(piX / a) / (piX * piX);
+}
+
+// FSR EASU (Edge Adaptive Spatial Upsampling) approximation
+vec3 sampleEASU(vec2 uv)
+{
+    // Simplified EASU - full implementation would use FSR algorithm
+    vec3 color = texture(inputImage, uv).rgb;
+    
+    // Sample neighborhood for edge detection
+    vec3 n = textureOffset(inputImage, uv, ivec2(0, -1)).rgb;
+    vec3 s = textureOffset(inputImage, uv, ivec2(0, 1)).rgb;
+    vec3 e = textureOffset(inputImage, uv, ivec2(1, 0)).rgb;
+    vec3 w = textureOffset(inputImage, uv, ivec2(-1, 0)).rgb;
+    
+    // Detect edges
+    float edgeH = length(n - s);
+    float edgeV = length(e - w);
+    
+    // Adaptive filtering
+    if (edgeH < edgeV) {
+        // Horizontal edge - blend vertically
+        color = mix(color, (n + s) * 0.5, 0.3);
+    } else {
+        // Vertical edge - blend horizontally
+        color = mix(color, (e + w) * 0.5, 0.3);
+    }
+    
+    // Apply sharpening
+    vec3 sharp = color * (1.0 + pc.sharpness) - (n + s + e + w) * 0.25 * pc.sharpness;
+    
+    return clamp(sharp, 0.0, 1.0);
+}
+
+void main()
+{
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.outputResolution.x) || pixel.y >= int(pc.outputResolution.y)) {
+        return;
+    }
+    
+    vec2 outputUV = (vec2(pixel) + 0.5) * pc.invOutputResolution;
+    vec2 inputUV = outputUV * (pc.inputResolution / pc.outputResolution);
+    
+    vec3 color;
+    
+    if (pc.upscaleMode == 0) {
+        // Bilinear upsampling
+        color = texture(inputImage, inputUV).rgb;
+    } else if (pc.upscaleMode == 1) {
+        // Lanczos upsampling
+        vec2 texelSize = pc.invInputResolution;
+        vec2 center = inputUV;
+        vec3 sum = vec3(0.0);
+        float totalWeight = 0.0;
+        
+        const float lanczosRadius = 2.0;
+        const int sampleRadius = 2;
+        
+        for (int y = -sampleRadius; y <= sampleRadius; y++) {
+            for (int x = -sampleRadius; x <= sampleRadius; x++) {
+                vec2 offset = vec2(float(x), float(y)) * texelSize;
+                vec2 sampleUV = center + offset;
+                
+                if (sampleUV.x >= 0.0 && sampleUV.x <= 1.0 && sampleUV.y >= 0.0 && sampleUV.y <= 1.0) {
+                    float distX = abs(float(x));
+                    float distY = abs(float(y));
+                    float weightX = lanczos(distX, lanczosRadius);
+                    float weightY = lanczos(distY, lanczosRadius);
+                    float weight = weightX * weightY;
+                    
+                    sum += texture(inputImage, sampleUV).rgb * weight;
+                    totalWeight += weight;
+                }
+            }
+        }
+        
+        color = totalWeight > 0.001 ? sum / totalWeight : texture(inputImage, inputUV).rgb;
+    } else {
+        // EASU/FSR-style upsampling
+        color = sampleEASU(inputUV);
+    }
+    
+    imageStore(outputImage, pixel, vec4(color, 1.0));
+}
+

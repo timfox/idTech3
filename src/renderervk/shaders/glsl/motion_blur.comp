@@ -1,0 +1,73 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D colorBuffer;
+layout(set = 0, binding = 1) uniform sampler2D velocityBuffer;
+layout(set = 0, binding = 2) uniform sampler2D depthBuffer;
+
+layout(set = 0, binding = 3, rgba16f) uniform writeonly image2D outputImage;
+
+layout(push_constant) uniform MotionBlurConstants {
+    vec2 resolution;
+    vec2 invResolution;
+    int numSamples;
+    float exposureTime; // Shutter speed (0.0-1.0)
+} pc;
+
+void main()
+{
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+    
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+    
+    // Sample velocity
+    vec2 velocity = texture(velocityBuffer, uv).xy * pc.exposureTime;
+    float velocityMagnitude = length(velocity);
+    
+    // Skip if no motion
+    if (velocityMagnitude < 0.001) {
+        vec3 color = texture(colorBuffer, uv).rgb;
+        imageStore(outputImage, pixel, vec4(color, 1.0));
+        return;
+    }
+    
+    // Sample along motion vector
+    vec3 color = vec3(0.0);
+    float totalWeight = 0.0;
+    
+    int samples = min(pc.numSamples, 16);
+    for (int i = 0; i < samples; i++) {
+        float t = (float(i) / float(samples - 1)) - 0.5;
+        vec2 sampleUV = uv + velocity * t;
+        
+        // Clamp to valid range
+        if (sampleUV.x >= 0.0 && sampleUV.x <= 1.0 && sampleUV.y >= 0.0 && sampleUV.y <= 1.0) {
+            vec3 sampleColor = texture(colorBuffer, sampleUV).rgb;
+            
+            // Weight by distance from center (gaussian-like)
+            float weight = 1.0 - abs(t) * 2.0;
+            weight = max(0.0, weight);
+            
+            color += sampleColor * weight;
+            totalWeight += weight;
+        }
+    }
+    
+    // Normalize
+    if (totalWeight > 0.001) {
+        color = color / totalWeight;
+    } else {
+        color = texture(colorBuffer, uv).rgb;
+    }
+    
+    imageStore(outputImage, pixel, vec4(color, 1.0));
+}
+

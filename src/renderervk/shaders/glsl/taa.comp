@@ -1,0 +1,84 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D currentFrame;
+layout(set = 0, binding = 1) uniform sampler2D historyFrame;
+layout(set = 0, binding = 2) uniform sampler2D velocityBuffer;
+layout(set = 0, binding = 3) uniform sampler2D depthBuffer;
+
+layout(set = 0, binding = 4, rgba16f) uniform writeonly image2D outputImage;
+
+layout(push_constant) uniform TAAConstants {
+    vec2 resolution;
+    vec2 invResolution;
+    float alpha; // Temporal blend factor (0.0-1.0)
+    float feedbackMin;
+    float feedbackMax;
+} pc;
+
+vec3 clipToAABB(vec3 color, vec3 minColor, vec3 maxColor)
+{
+    vec3 center = (maxColor + minColor) * 0.5;
+    vec3 extents = (maxColor - minColor) * 0.5;
+    
+    vec3 dist = color - center;
+    vec3 clamped = clamp(dist, -extents, extents);
+    
+    return center + clamped;
+}
+
+void main()
+{
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+    
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+    
+    // Sample current frame
+    vec3 currentColor = texture(currentFrame, uv).rgb;
+    
+    // Sample velocity for reprojection
+    vec2 velocity = texture(velocityBuffer, uv).xy;
+    vec2 historyUV = uv - velocity;
+    
+    // Sample history with clamping
+    vec3 historyColor = texture(historyFrame, historyUV).rgb;
+    
+    // Sample neighborhood for AABB clipping
+    vec3 minColor = currentColor;
+    vec3 maxColor = currentColor;
+    
+    for (int y = -1; y <= 1; y++) {
+        for (int x = -1; x <= 1; x++) {
+            vec2 offset = vec2(float(x), float(y)) * pc.invResolution;
+            vec3 neighbor = texture(currentFrame, uv + offset).rgb;
+            minColor = min(minColor, neighbor);
+            maxColor = max(maxColor, neighbor);
+        }
+    }
+    
+    // Clip history to AABB
+    historyColor = clipToAABB(historyColor, minColor, maxColor);
+    
+    // Temporal blend
+    float blendAlpha = pc.alpha;
+    
+    // Adjust blend based on velocity (less history for fast motion)
+    float velocityMagnitude = length(velocity);
+    blendAlpha = mix(blendAlpha, 0.1, min(1.0, velocityMagnitude * 10.0));
+    
+    // Clamp blend factor
+    blendAlpha = clamp(blendAlpha, pc.feedbackMin, pc.feedbackMax);
+    
+    vec3 finalColor = mix(historyColor, currentColor, blendAlpha);
+    
+    imageStore(outputImage, pixel, vec4(finalColor, 1.0));
+}
+

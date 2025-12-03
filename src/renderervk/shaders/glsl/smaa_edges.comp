@@ -1,0 +1,77 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D colorBuffer;
+layout(set = 0, binding = 1) uniform sampler2D depthBuffer;
+
+layout(set = 0, binding = 2, rgba16f) uniform writeonly image2D edgesImage;
+
+layout(push_constant) uniform SMAAEdgesConstants {
+    vec2 resolution;
+    vec2 invResolution;
+    float threshold;
+} pc;
+
+float luma(vec3 color)
+{
+    return dot(color, vec3(0.299, 0.587, 0.114));
+}
+
+void main()
+{
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+    
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+    
+    // Sample neighborhood
+    vec3 c = texture(colorBuffer, uv).rgb;
+    vec3 n = textureOffset(colorBuffer, uv, ivec2(0, -1)).rgb;
+    vec3 e = textureOffset(colorBuffer, uv, ivec2(1, 0)).rgb;
+    vec3 s = textureOffset(colorBuffer, uv, ivec2(0, 1)).rgb;
+    vec3 w = textureOffset(colorBuffer, uv, ivec2(-1, 0)).rgb;
+    
+    // Calculate luminance differences
+    float lumaC = luma(c);
+    float lumaN = luma(n);
+    float lumaE = luma(e);
+    float lumaS = luma(s);
+    float lumaW = luma(w);
+    
+    // Edge detection
+    float deltaN = abs(lumaC - lumaN);
+    float deltaE = abs(lumaC - lumaE);
+    float deltaS = abs(lumaC - lumaS);
+    float deltaW = abs(lumaC - lumaW);
+    
+    float edgeH = max(deltaN, deltaS);
+    float edgeV = max(deltaE, deltaW);
+    
+    // Depth-based edge detection
+    float depthC = texture(depthBuffer, uv).r;
+    float depthN = textureOffset(depthBuffer, uv, ivec2(0, -1)).r;
+    float depthE = textureOffset(depthBuffer, uv, ivec2(1, 0)).r;
+    float depthS = textureOffset(depthBuffer, uv, ivec2(0, 1)).r;
+    float depthW = textureOffset(depthBuffer, uv, ivec2(-1, 0)).r;
+    
+    float depthDeltaH = max(abs(depthC - depthN), abs(depthC - depthS));
+    float depthDeltaV = max(abs(depthC - depthE), abs(depthC - depthW));
+    
+    // Combine color and depth edges
+    edgeH = max(edgeH, depthDeltaH * 10.0);
+    edgeV = max(edgeV, depthDeltaV * 10.0);
+    
+    // Threshold
+    edgeH = step(pc.threshold, edgeH);
+    edgeV = step(pc.threshold, edgeV);
+    
+    imageStore(edgesImage, pixel, vec4(edgeH, edgeV, 0.0, 1.0));
+}
+

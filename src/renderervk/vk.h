@@ -1204,6 +1204,43 @@ typedef struct {
 		
 		qboolean initialized;
 	} rt;
+	
+#ifdef USE_VULKAN_RAY_TRACING
+	// GIBS (Global Illumination Based on Surfels) system
+	struct {
+		qboolean enabled;
+		qboolean initialized;
+		
+		// Surfel storage
+		VkBuffer surfelBuffer;
+		VkDeviceMemory surfelBufferMemory;
+		VkDeviceAddress surfelBufferAddress;
+		uint32_t surfelCount;
+		uint32_t surfelCapacity;
+		
+		VkBuffer surfelIndirectBuffer;
+		VkDeviceMemory surfelIndirectBufferMemory;
+		
+		// Compute pipelines
+		VkPipeline updatePipeline;
+		VkPipelineLayout updatePipelineLayout;
+		VkDescriptorSetLayout updateDescriptorSetLayout;
+		VkDescriptorSet updateDescriptorSet;
+		
+		VkPipeline spawnPipeline;
+		VkPipelineLayout spawnPipelineLayout;
+		VkDescriptorSetLayout spawnDescriptorSetLayout;
+		VkDescriptorSet spawnDescriptorSet;
+		
+		// Frame tracking
+		uint32_t frameCounter;
+		uint32_t updateFrameOffset;
+		
+		// Statistics
+		uint32_t activeSurfelCount;
+		uint32_t updatedSurfelCount;
+	} gibs;
+#endif
 } Vk_Instance;
 
 typedef struct {

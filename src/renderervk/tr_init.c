@@ -1666,6 +1666,20 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_rt_giBounces, "Maximum number of GI bounces (0-8, higher = more realistic but slower, default 2)." );
 	r_rt_giIntensity = ri.Cvar_Get( "r_rt_giIntensity", "1.0", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_rt_giIntensity, "Global illumination intensity multiplier (0.0-2.0, default 1.0)." );
+	
+	// GIBS (Global Illumination Based on Surfels) CVars
+	r_gibs = ri.Cvar_Get( "r_gibs", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_gibs, "Enable GIBS (Global Illumination Based on Surfels) - efficient surfel-based GI (0=disabled, 1=enabled)." );
+	r_gibs_surfelRadius = ri.Cvar_Get( "r_gibs_surfelRadius", "0.1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_gibs_surfelRadius, "GIBS surfel radius in world units (default 0.1)." );
+	r_gibs_maxSurfels = ri.Cvar_Get( "r_gibs_maxSurfels", "1048576", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_gibs_maxSurfels, "Maximum number of surfels (default 1048576 = 1M)." );
+	r_gibs_updateRate = ri.Cvar_Get( "r_gibs_updateRate", "4", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_gibs_updateRate, "GIBS update rate - update every N frames (default 4, lower = more accurate but slower)." );
+	r_gibs_intensity = ri.Cvar_Get( "r_gibs_intensity", "1.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_gibs_intensity, "GIBS indirect lighting intensity multiplier (0.0-2.0, default 1.0)." );
+	r_gibs_samples = ri.Cvar_Get( "r_gibs_samples", "16", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_gibs_samples, "Number of ray samples per surfel update (1-64, higher = more accurate but slower, default 16)." );
 #endif
 	r_dlss = ri.Cvar_Get( "r_dlss", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_dlss, "Enable NVIDIA DLSS Super Resolution (requires NVIDIA RTX GPU and DLSS SDK)." );

@@ -1,0 +1,104 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_buffer_reference : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+#include "gibs_surfel.glsl"
+#include "rt_defines.glsl"
+#include "rt_helpers.glsl"
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+// Ray tracing acceleration structure
+layout(binding = 2) uniform accelerationStructureEXT topLevelAS;
+
+// Blue noise texture for sampling
+layout(binding = 3) uniform sampler2DArray blueNoiseTexture;
+
+layout(push_constant) uniform PushConstants {
+    uint updateOffset;
+    uint updateCount;
+} pc;
+
+void main() {
+    uint index = gl_GlobalInvocationID.x + pc.updateOffset;
+    
+    if (index >= ubo.surfelCount) {
+        return;
+    }
+    
+    Surfel surfel = surfels[index];
+    
+    // Skip inactive or invalid surfels
+    if ((surfel.flags & GIBS_SURFEL_ACTIVE) == 0 || (surfel.flags & GIBS_SURFEL_VALID) == 0) {
+        return;
+    }
+    
+    // Update age
+    surfel.age++;
+    
+    // Mark as stale if too old
+    if (surfel.age > 1000) {
+        surfel.flags |= GIBS_SURFEL_STALE;
+        surfels[index] = surfel;
+        return;
+    }
+    
+    // Sample indirect lighting using ray tracing
+    vec3 totalIrradiance = vec3(0.0);
+    float totalWeight = 0.0;
+    
+    uint samples = ubo.samplesPerSurfel;
+    uint noiseLayer = (ubo.frameIndex + index) % 128;
+    
+    for (uint i = 0; i < samples; i++) {
+        // Generate sample direction using blue noise
+        vec2 noiseUV = vec2(
+            float(i) / float(samples),
+            hash(index + i) * 0.5 + 0.5
+        );
+        vec4 noise = texture(blueNoiseTexture, vec3(noiseUV, float(noiseLayer)));
+        
+        // Cosine-weighted hemisphere sampling
+        vec3 rayDir = sampleHemisphere(noise.xy, surfel.normal);
+        vec3 rayOrigin = surfel.position + surfel.normal * 0.01; // Offset to avoid self-intersection
+        
+        // Trace ray
+        rayQueryEXT rayQuery;
+        rayQueryInitializeEXT(rayQuery, topLevelAS, gl_RayFlagsOpaqueEXT, 0xFF,
+            rayOrigin, 0.01, rayDir, ubo.maxRayDistance);
+        
+        while (rayQueryProceedEXT(rayQuery)) {
+            if (rayQueryGetIntersectionTypeEXT(rayQuery, false) == gl_RayQueryCommittedIntersectionTriangleEXT) {
+                // Hit surface - sample material
+                vec3 hitNormal = vec3(0.0, 0.0, 1.0); // TODO: Get actual normal from hit
+                vec3 hitColor = vec3(1.0); // TODO: Get material albedo
+                
+                // Compute indirect contribution (simplified - full implementation would sample material)
+                float cosTheta = max(0.0, dot(rayDir, hitNormal));
+                vec3 indirect = hitColor * cosTheta;
+                
+                totalIrradiance += indirect;
+                totalWeight += 1.0;
+                
+                break;
+            }
+        }
+    }
+    
+    // Update irradiance with temporal blending
+    if (totalWeight > 0.0) {
+        vec3 newIrradiance = totalIrradiance / totalWeight;
+        float alpha = 0.1; // Temporal blend factor
+        
+        surfel.irradiance = mix(surfel.irradiance, newIrradiance, alpha);
+        surfel.confidence = min(1.0, surfel.confidence + 0.1);
+    } else {
+        // Decay confidence if no samples hit
+        surfel.confidence *= 0.95;
+    }
+    
+    // Write back updated surfel
+    surfels[index] = surfel;
+}
+

@@ -1,0 +1,78 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_buffer_reference : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+#include "gibs_surfel.glsl"
+#include "rt_defines.glsl"
+#include "rt_helpers.glsl"
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+// Geometry buffer for spawning surfels
+layout(binding = 2) uniform sampler2D depthBuffer;
+layout(binding = 3) uniform sampler2D normalBuffer;
+
+// Indirect dispatch buffer
+layout(std430, binding = 4) restrict buffer IndirectBuffer {
+    uint numGroupsX;
+    uint numGroupsY;
+    uint numGroupsZ;
+};
+
+layout(push_constant) uniform PushConstants {
+    uint outputOffset;
+    uint maxSurfels;
+    vec2 resolution;
+} pc;
+
+void main() {
+    uint index = gl_GlobalInvocationID.x;
+    
+    if (index >= ubo.surfelCount || index >= pc.maxSurfels) {
+        return;
+    }
+    
+    // Check if surfel slot is available
+    if ((surfels[index].flags & GIBS_SURFEL_ACTIVE) != 0) {
+        return; // Slot already occupied
+    }
+    
+    // Sample screen space to find surfaces
+    // Use a hash-based pattern to distribute surfels
+    uint seed = index + ubo.frameIndex * 12345;
+    vec2 uv = vec2(
+        hash(seed) * 0.5 + 0.25,
+        hash(seed + 1) * 0.5 + 0.25
+    );
+    
+    // Sample depth and normal from G-buffer
+    float depth = texture(depthBuffer, uv).r;
+    vec3 normal = normalize(texture(normalBuffer, uv).xyz * 2.0 - 1.0);
+    
+    // Skip if no valid surface
+    if (depth >= 1.0 || length(normal) < 0.5) {
+        return;
+    }
+    
+    // Reconstruct world position from depth
+    vec4 clipPos = vec4(uv * 2.0 - 1.0, depth, 1.0);
+    vec4 viewPos = ubo.projInverse * clipPos;
+    viewPos /= viewPos.w;
+    vec4 worldPos = ubo.viewInverse * viewPos;
+    
+    // Initialize surfel
+    surfels[index].position = worldPos.xyz;
+    surfels[index].normal = normal;
+    surfels[index].radius = ubo.surfelRadius;
+    surfels[index].irradiance = vec3(0.0);
+    surfels[index].confidence = 0.0;
+    surfels[index].age = 0;
+    surfels[index].flags = GIBS_SURFEL_ACTIVE | GIBS_SURFEL_VALID;
+    
+    // Update indirect dispatch count
+    if (index == 0) {
+        atomicAdd(numGroupsX, 1);
+    }
+}
+

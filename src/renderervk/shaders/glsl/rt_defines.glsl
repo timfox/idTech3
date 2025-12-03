@@ -4,7 +4,8 @@
 #define RT_MAX_RECURSION_DEPTH 4
 #define RT_SHADOW_RAY_INDEX 1
 #define RT_REFLECTION_RAY_INDEX 2
-#define RT_AO_RAY_INDEX 3
+#define RT_REFRACTION_RAY_INDEX 3
+#define RT_AO_RAY_INDEX 4
 
 // Material flags
 #define MATERIAL_OPAQUE 0

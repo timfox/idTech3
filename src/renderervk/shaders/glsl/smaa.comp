@@ -1,0 +1,95 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D colorBuffer;
+layout(set = 0, binding = 1) uniform sampler2D edgesTexture; // Edge detection pass output
+layout(set = 0, binding = 2) uniform sampler2D areaTexture; // SMAA area texture
+layout(set = 0, binding = 3) uniform sampler2D searchTexture; // SMAA search texture
+
+layout(set = 0, binding = 4, rgba16f) uniform writeonly image2D outputImage;
+
+layout(push_constant) uniform SMAAConstants {
+    vec2 resolution;
+    vec2 invResolution;
+} pc;
+
+// Sample area texture for blending weights
+vec2 sampleArea(vec2 distance, float e)
+{
+    return texture(areaTexture, vec2(e, distance.x)).rg;
+}
+
+void main()
+{
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+    
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+    
+    // Sample edges
+    vec4 edges = texture(edgesTexture, uv);
+    
+    // If no edge, just pass through color
+    if (edges.r == 0.0 && edges.g == 0.0) {
+        vec3 color = texture(colorBuffer, uv).rgb;
+        imageStore(outputImage, pixel, vec4(color, 1.0));
+        return;
+    }
+    
+    // Calculate blending weights
+    vec2 weights = vec2(0.0);
+    
+    // Horizontal edge
+    if (edges.r > 0.0) {
+        // Search for edge endpoints
+        float d = 0.0;
+        for (int i = 0; i < 16; i++) {
+            vec2 offset = vec2(float(i) * pc.invResolution.x, 0.0);
+            float edge = texture(edgesTexture, uv + offset).r;
+            if (edge < 0.9) break;
+            d += 1.0;
+        }
+        
+        float e = texture(searchTexture, vec2(d / 16.0, 0.0)).r;
+        weights += sampleArea(vec2(d, 0.0), e);
+    }
+    
+    // Vertical edge
+    if (edges.g > 0.0) {
+        float d = 0.0;
+        for (int i = 0; i < 16; i++) {
+            vec2 offset = vec2(0.0, float(i) * pc.invResolution.y);
+            float edge = texture(edgesTexture, uv + offset).g;
+            if (edge < 0.9) break;
+            d += 1.0;
+        }
+        
+        float e = texture(searchTexture, vec2(d / 16.0, 0.0)).r;
+        weights += sampleArea(vec2(0.0, d), e);
+    }
+    
+    // Blend samples
+    vec3 color = texture(colorBuffer, uv).rgb;
+    
+    if (weights.x > 0.0) {
+        vec3 left = texture(colorBuffer, uv + vec2(-weights.x * pc.invResolution.x, 0.0)).rgb;
+        vec3 right = texture(colorBuffer, uv + vec2(weights.x * pc.invResolution.x, 0.0)).rgb;
+        color = mix(color, (left + right) * 0.5, weights.x);
+    }
+    
+    if (weights.y > 0.0) {
+        vec3 up = texture(colorBuffer, uv + vec2(0.0, -weights.y * pc.invResolution.y)).rgb;
+        vec3 down = texture(colorBuffer, uv + vec2(0.0, weights.y * pc.invResolution.y)).rgb;
+        color = mix(color, (up + down) * 0.5, weights.y);
+    }
+    
+    imageStore(outputImage, pixel, vec4(color, 1.0));
+}
+

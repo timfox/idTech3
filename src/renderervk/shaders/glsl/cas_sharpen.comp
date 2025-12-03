@@ -1,0 +1,57 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D inputImage;
+
+layout(set = 0, binding = 1, rgba16f) uniform writeonly image2D outputImage;
+
+layout(push_constant) uniform CASConstants {
+    vec2 resolution;
+    vec2 invResolution;
+    float sharpness; // 0.0-1.0
+} pc;
+
+// Contrast Adaptive Sharpening (CAS) - AMD FidelityFX
+void main()
+{
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+    
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+    
+    // Sample 3x3 neighborhood
+    vec3 a = textureOffset(inputImage, uv, ivec2(-1, -1)).rgb;
+    vec3 b = textureOffset(inputImage, uv, ivec2(0, -1)).rgb;
+    vec3 c = textureOffset(inputImage, uv, ivec2(1, -1)).rgb;
+    vec3 d = textureOffset(inputImage, uv, ivec2(-1, 0)).rgb;
+    vec3 e = texture(inputImage, uv).rgb; // Center
+    vec3 f = textureOffset(inputImage, uv, ivec2(1, 0)).rgb;
+    vec3 g = textureOffset(inputImage, uv, ivec2(-1, 1)).rgb;
+    vec3 h = textureOffset(inputImage, uv, ivec2(0, 1)).rgb;
+    vec3 i = textureOffset(inputImage, uv, ivec2(1, 1)).rgb;
+    
+    // Calculate contrast
+    float minC = min(min(min(e.r, e.g), e.b), min(min(min(a.r, a.g), a.b), min(min(b.r, b.g), b.b)));
+    float maxC = max(max(max(e.r, e.g), e.b), max(max(max(i.r, i.g), i.b), max(max(c.r, c.g), c.b)));
+    
+    // Adaptive sharpening
+    float contrast = maxC - minC;
+    float sharpnessAdaptive = pc.sharpness * (1.0 - contrast * 0.5);
+    
+    // Sharpening kernel
+    vec3 sharpened = e * (1.0 + sharpnessAdaptive * 4.0) - 
+                     (b + d + f + h) * sharpnessAdaptive;
+    
+    // Clamp to valid range
+    sharpened = clamp(sharpened, 0.0, 1.0);
+    
+    imageStore(outputImage, pixel, vec4(sharpened, 1.0));
+}
+

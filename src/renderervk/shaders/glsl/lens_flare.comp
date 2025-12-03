@@ -1,0 +1,87 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D colorBuffer;
+layout(set = 0, binding = 1) uniform sampler2D depthBuffer;
+
+layout(set = 0, binding = 2, rgba16f) uniform writeonly image2D outputImage;
+
+layout(push_constant) uniform LensFlareConstants {
+    vec2 resolution;
+    vec2 invResolution;
+    vec2 lightPos; // Light position in screen space (0.0-1.0)
+    vec3 lightColor;
+    float intensity;
+    int numGhosts; // Number of ghost reflections
+    float ghostSpacing;
+    float haloRadius;
+    float haloThickness;
+} pc;
+
+// Generate ghost reflection
+vec3 sampleGhost(vec2 uv, vec2 lightDir, float dist, int ghostIndex)
+{
+    vec2 ghostPos = uv - lightDir * dist * pc.ghostSpacing * float(ghostIndex);
+    
+    if (ghostPos.x < 0.0 || ghostPos.x > 1.0 || ghostPos.y < 0.0 || ghostPos.y > 1.0) {
+        return vec3(0.0);
+    }
+    
+    float depth = texture(depthBuffer, ghostPos).r;
+    if (depth < 1.0) {
+        return vec3(0.0); // Occluded
+    }
+    
+    vec3 color = texture(colorBuffer, ghostPos).rgb;
+    
+    // Attenuate by distance
+    float attenuation = 1.0 / (1.0 + dist * dist * float(ghostIndex + 1));
+    
+    return color * pc.lightColor * attenuation * pc.intensity;
+}
+
+void main()
+{
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+    
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+    
+    vec3 color = texture(colorBuffer, uv).rgb;
+    
+    // Calculate direction to light
+    vec2 lightDir = normalize(uv - pc.lightPos);
+    float distToLight = length(uv - pc.lightPos);
+    
+    // Sample ghosts
+    vec3 flare = vec3(0.0);
+    for (int i = 1; i <= pc.numGhosts; i++) {
+        flare += sampleGhost(uv, lightDir, distToLight, i);
+    }
+    
+    // Add halo
+    float haloDist = abs(distToLight - pc.haloRadius);
+    if (haloDist < pc.haloThickness) {
+        float haloIntensity = 1.0 - (haloDist / pc.haloThickness);
+        haloIntensity = pow(haloIntensity, 2.0);
+        flare += pc.lightColor * haloIntensity * pc.intensity * 0.5;
+    }
+    
+    // Add main flare (star burst)
+    if (distToLight < 0.05) {
+        float starIntensity = 1.0 - (distToLight / 0.05);
+        flare += pc.lightColor * starIntensity * pc.intensity * 2.0;
+    }
+    
+    color += flare;
+    
+    imageStore(outputImage, pixel, vec4(color, 1.0));
+}
+

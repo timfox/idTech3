@@ -1,0 +1,80 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+#include "rt_defines.glsl"
+
+// Intersection shader for procedural geometry (e.g., spheres, boxes)
+// This allows ray tracing against geometry that isn't explicitly stored as triangles
+
+hitAttributeEXT vec2 attribs;
+
+layout(binding = 0, set = 0) uniform ProceduralGeometryBuffer {
+    vec3 center;
+    float radius;
+    int geometryType; // 0 = sphere, 1 = box, 2 = cylinder
+    vec3 boxMin;
+    vec3 boxMax;
+    vec3 cylinderAxis;
+    float cylinderRadius;
+    float cylinderHeight;
+} geometry;
+
+void main()
+{
+    vec3 rayOrigin = gl_WorldRayOriginEXT;
+    vec3 rayDir = gl_WorldRayDirectionEXT;
+    
+    float t = MAX_DISTANCE;
+    bool hit = false;
+    
+    if (geometry.geometryType == 0) {
+        // Sphere intersection
+        vec3 oc = rayOrigin - geometry.center;
+        float a = dot(rayDir, rayDir);
+        float b = 2.0 * dot(oc, rayDir);
+        float c = dot(oc, oc) - geometry.radius * geometry.radius;
+        float discriminant = b * b - 4.0 * a * c;
+        
+        if (discriminant >= 0.0) {
+            float sqrtDisc = sqrt(discriminant);
+            float t1 = (-b - sqrtDisc) / (2.0 * a);
+            float t2 = (-b + sqrtDisc) / (2.0 * a);
+            
+            if (t1 > EPSILON && t1 < t) {
+                t = t1;
+                hit = true;
+            } else if (t2 > EPSILON && t2 < t) {
+                t = t2;
+                hit = true;
+            }
+        }
+    } else if (geometry.geometryType == 1) {
+        // Box intersection (AABB)
+        vec3 invDir = 1.0 / rayDir;
+        vec3 t0 = (geometry.boxMin - rayOrigin) * invDir;
+        vec3 t1 = (geometry.boxMax - rayOrigin) * invDir;
+        vec3 tMin = min(t0, t1);
+        vec3 tMax = max(t0, t1);
+        
+        float tNear = max(max(tMin.x, tMin.y), tMin.z);
+        float tFar = min(min(tMax.x, tMax.y), tMax.z);
+        
+        if (tNear <= tFar && tNear > EPSILON && tNear < t) {
+            t = tNear;
+            hit = true;
+        }
+    } else if (geometry.geometryType == 2) {
+        // Cylinder intersection (simplified)
+        // TODO: Implement proper cylinder intersection
+        hit = false;
+    }
+    
+    if (hit && t < gl_RayTmaxEXT && t > gl_RayTminEXT) {
+        reportIntersectionEXT(t, 0);
+    }
+}
+

@@ -1,0 +1,66 @@
+#version 460
+#extension GL_EXT_mesh_shader : require
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+
+layout(push_constant) uniform MeshletConstants {
+    mat4 viewMatrix;
+    mat4 projMatrix;
+    vec3 cameraPos;
+    float lodDistance;
+    uint meshletCount;
+} pc;
+
+// Meshlet data structure
+struct Meshlet {
+    vec3 center;
+    float radius;
+    uint vertexOffset;
+    uint vertexCount;
+    uint indexOffset;
+    uint indexCount;
+    uint flags;
+};
+
+layout(std430, binding = 0) restrict readonly buffer MeshletBuffer {
+    Meshlet meshlets[];
+};
+
+// Output meshlet indices
+taskPayloadSharedEXT uint meshletIndices[32];
+
+void main()
+{
+    uint meshletIndex = gl_GlobalInvocationID.x;
+    
+    if (meshletIndex >= pc.meshletCount) {
+        return;
+    }
+    
+    Meshlet meshlet = meshlets[meshletIndex];
+    
+    // Frustum culling (simplified)
+    vec4 centerView = pc.viewMatrix * vec4(meshlet.center, 1.0);
+    float dist = length(centerView.xyz);
+    
+    // LOD culling
+    if (dist > pc.lodDistance) {
+        return; // Skip this meshlet
+    }
+    
+    // Simple distance-based culling
+    if (dist > 1000.0) {
+        return;
+    }
+    
+    // Add meshlet to output
+    uint outputIndex = atomicAdd(gl_MeshTaskCountEXT, 1);
+    if (outputIndex < 32) {
+        meshletIndices[outputIndex] = meshletIndex;
+    }
+}
+

@@ -1,0 +1,114 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D inputImage;
+
+layout(set = 0, binding = 1, rgba16f) uniform writeonly image2D outputImage;
+
+layout(push_constant) uniform FXAAConstants {
+    vec2 resolution;
+    vec2 invResolution;
+    float edgeThreshold;
+    float edgeThresholdMin;
+} pc;
+
+// Luminance calculation
+float luma(vec3 color)
+{
+    return dot(color, vec3(0.299, 0.587, 0.114));
+}
+
+void main()
+{
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+    
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+    
+    // Sample 3x3 neighborhood
+    vec3 nw = textureOffset(inputImage, uv, ivec2(-1, -1)).rgb;
+    vec3 n  = textureOffset(inputImage, uv, ivec2( 0, -1)).rgb;
+    vec3 ne = textureOffset(inputImage, uv, ivec2( 1, -1)).rgb;
+    vec3 w  = textureOffset(inputImage, uv, ivec2(-1,  0)).rgb;
+    vec3 c  = texture(inputImage, uv).rgb;
+    vec3 e  = textureOffset(inputImage, uv, ivec2( 1,  0)).rgb;
+    vec3 sw = textureOffset(inputImage, uv, ivec2(-1,  1)).rgb;
+    vec3 s  = textureOffset(inputImage, uv, ivec2( 0,  1)).rgb;
+    vec3 se = textureOffset(inputImage, uv, ivec2( 1,  1)).rgb;
+    
+    // Calculate luminances
+    float lumaNW = luma(nw);
+    float lumaN  = luma(n);
+    float lumaNE = luma(ne);
+    float lumaW  = luma(w);
+    float lumaM  = luma(c);
+    float lumaE  = luma(e);
+    float lumaSW = luma(sw);
+    float lumaS  = luma(s);
+    float lumaSE = luma(se);
+    
+    // Edge detection
+    float edgeVert = abs((0.25 * lumaNW + -0.5 * lumaN + 0.25 * lumaNE) +
+                         (0.5 * lumaW + -1.0 * lumaM + 0.5 * lumaE) +
+                         (0.25 * lumaSW + -0.5 * lumaS + 0.25 * lumaSE));
+    
+    float edgeHorz = abs((0.25 * lumaNW + 0.5 * lumaW + 0.25 * lumaSW) +
+                         (-0.5 * lumaN + -1.0 * lumaM + -0.5 * lumaS) +
+                         (0.25 * lumaNE + 0.5 * lumaE + 0.25 * lumaSE));
+    
+    bool isHorizontal = edgeHorz >= edgeVert;
+    
+    // Determine if we should apply FXAA
+    float edgeThreshold = max(pc.edgeThresholdMin, lumaM * pc.edgeThreshold);
+    bool isEdge = (isHorizontal ? edgeHorz : edgeVert) >= edgeThreshold;
+    
+    if (!isEdge) {
+        imageStore(outputImage, pixel, vec4(c, 1.0));
+        return;
+    }
+    
+    // Calculate blending factor
+    float lumaMin = min(lumaM, min(min(lumaN, lumaS), min(lumaE, lumaW)));
+    float lumaMax = max(lumaM, max(max(lumaN, lumaS), max(lumaE, lumaW)));
+    float lumaRange = lumaMax - lumaMin;
+    
+    if (lumaRange < max(pc.edgeThresholdMin, lumaMax * pc.edgeThreshold)) {
+        imageStore(outputImage, pixel, vec4(c, 1.0));
+        return;
+    }
+    
+    // Sample along edge
+    vec2 offset;
+    if (isHorizontal) {
+        float lumaL = (lumaN + lumaS) * 0.5;
+        float gradientL = abs(lumaN - lumaS);
+        float lumaR = (lumaNW + lumaNE + lumaSW + lumaSE) * 0.25;
+        float gradientR = abs((lumaNW + lumaNE) * 0.5 - (lumaSW + lumaSE) * 0.5);
+        float p = abs(gradientL - gradientR) / max(gradientL + gradientR, 0.0001);
+        float offsetLength = 0.5 + p * 0.5;
+        offset = vec2(0.0, (lumaL < lumaR ? -offsetLength : offsetLength) * pc.invResolution.y);
+    } else {
+        float lumaD = (lumaE + lumaW) * 0.5;
+        float gradientD = abs(lumaE - lumaW);
+        float lumaU = (lumaNW + lumaSW + lumaNE + lumaSE) * 0.25;
+        float gradientU = abs((lumaNW + lumaSW) * 0.5 - (lumaNE + lumaSE) * 0.5);
+        float p = abs(gradientD - gradientU) / max(gradientD + gradientU, 0.0001);
+        float offsetLength = 0.5 + p * 0.5;
+        offset = vec2((lumaD < lumaU ? -offsetLength : offsetLength) * pc.invResolution.x, 0.0);
+    }
+    
+    // Sample and blend
+    vec3 color1 = texture(inputImage, uv + offset).rgb;
+    vec3 color2 = texture(inputImage, uv - offset).rgb;
+    vec3 color = (color1 + color2) * 0.5;
+    
+    imageStore(outputImage, pixel, vec4(color, 1.0));
+}
+

@@ -1,0 +1,125 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D colorBuffer;
+layout(set = 0, binding = 1) uniform sampler2D normalBuffer;
+layout(set = 0, binding = 2) uniform sampler2D depthBuffer;
+layout(set = 0, binding = 3) uniform sampler2D blueNoise;
+
+layout(set = 0, binding = 4, rgba16f) uniform writeonly image2D outputImage;
+
+layout(push_constant) uniform SSGIConstants {
+    mat4 projectionMatrix;
+    mat4 viewMatrix;
+    mat4 invProjectionMatrix;
+    mat4 invViewMatrix;
+    vec2 resolution;
+    vec2 invResolution;
+    vec3 cameraPos;
+    float radius;
+    float intensity;
+    int numSamples;
+    float bias;
+} pc;
+
+// Reconstruct world position from depth
+vec3 reconstructPosition(vec2 uv, float depth)
+{
+    vec4 clipPos = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+    vec4 viewPos = pc.invProjectionMatrix * clipPos;
+    viewPos /= viewPos.w;
+    vec4 worldPos = pc.invViewMatrix * viewPos;
+    return worldPos.xyz;
+}
+
+void main()
+{
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+    
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+    
+    // Sample G-buffer
+    float depth = texture(depthBuffer, uv).r;
+    if (depth >= 1.0) {
+        imageStore(outputImage, pixel, vec4(0.0, 0.0, 0.0, 1.0));
+        return;
+    }
+    
+    vec3 normal = normalize(texture(normalBuffer, uv).xyz * 2.0 - 1.0);
+    vec3 position = reconstructPosition(uv, depth);
+    
+    // Sample blue noise for random directions
+    vec4 noise = texture(blueNoise, vec3(uv * pc.resolution / 256.0, 0.0));
+    
+    // Generate sample directions (hemisphere around normal)
+    vec3 indirectLight = vec3(0.0);
+    float validSamples = 0.0;
+    
+    for (int i = 0; i < pc.numSamples; i++) {
+        // Generate random direction in hemisphere
+        vec2 random = vec2(
+            fract(noise.x + float(i) * 0.618033988749),
+            fract(noise.y + float(i) * 0.754877666246)
+        );
+        
+        // Cosine-weighted hemisphere sampling
+        float z = random.x;
+        float r = sqrt(max(0.0, 1.0 - z * z));
+        float phi = 2.0 * PI * random.y;
+        
+        vec3 sampleDir = vec3(r * cos(phi), r * sin(phi), z);
+        
+        // Transform to world space (simplified - would use proper TBN)
+        vec3 tangent = normalize(cross(normal, vec3(1.0, 0.0, 0.0)));
+        if (length(tangent) < 0.001) {
+            tangent = normalize(cross(normal, vec3(0.0, 1.0, 0.0)));
+        }
+        vec3 bitangent = cross(normal, tangent);
+        sampleDir = normalize(tangent * sampleDir.x + bitangent * sampleDir.y + normal * sampleDir.z);
+        
+        // Ray march in screen space
+        vec3 rayEnd = position + sampleDir * pc.radius;
+        
+        // Project to screen space
+        vec4 rayEndClip = pc.projectionMatrix * pc.viewMatrix * vec4(rayEnd, 1.0);
+        rayEndClip /= rayEndClip.w;
+        vec2 rayEndUV = rayEndClip.xy * 0.5 + 0.5;
+        
+        // Sample at ray end
+        if (rayEndUV.x >= 0.0 && rayEndUV.x <= 1.0 && rayEndUV.y >= 0.0 && rayEndUV.y <= 1.0) {
+            float sampleDepth = texture(depthBuffer, rayEndUV).r;
+            vec3 samplePos = reconstructPosition(rayEndUV, sampleDepth);
+            
+            // Check if sample is valid (not too far, facing correct direction)
+            float dist = length(samplePos - position);
+            if (dist < pc.radius && dist > pc.bias) {
+                vec3 sampleNormal = normalize(texture(normalBuffer, rayEndUV).xyz * 2.0 - 1.0);
+                vec3 toSample = normalize(samplePos - position);
+                
+                // Only count samples where surface faces the ray
+                if (dot(sampleNormal, -toSample) > 0.0) {
+                    vec3 sampleColor = texture(colorBuffer, rayEndUV).rgb;
+                    float weight = 1.0 - smoothstep(0.0, pc.radius, dist);
+                    indirectLight += sampleColor * weight;
+                    validSamples += weight;
+                }
+            }
+        }
+    }
+    
+    // Normalize and apply intensity
+    if (validSamples > 0.001) {
+        indirectLight = indirectLight / validSamples * pc.intensity;
+    }
+    
+    imageStore(outputImage, pixel, vec4(indirectLight, 1.0));
+}
+
