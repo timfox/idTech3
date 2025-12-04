@@ -9,6 +9,7 @@ Font fallback chain support for modern font rendering
 #include "../renderer/tr_common.h"
 
 #define MAX_FONT_FALLBACKS 4
+#define MAX_FONTS 6  // Match definition in tr_font.c
 
 typedef struct {
 	fontInfo_t *fonts[MAX_FONT_FALLBACKS];
@@ -70,7 +71,7 @@ Find a glyph in a font fallback chain
 Returns glyphInfo_t* or NULL if not found
 =================
 */
-glyphInfo_t *RE_FindGlyphInFallback(fontFallbackChain_t *chain, unsigned char c)
+static glyphInfo_t *RE_FindGlyphInFallback(fontFallbackChain_t *chain, unsigned char c)
 {
 	if (!chain)
 		return NULL;
@@ -97,9 +98,12 @@ Get font fallback chain by primary font name and point size
 Returns NULL if not found
 =================
 */
-fontFallbackChain_t *RE_GetFontFallbackChain(const char *fontName, int pointSize)
+static fontFallbackChain_t *RE_GetFontFallbackChain(const char *fontName, int pointSize)
 {
 	// Simple lookup - in a full implementation, would use hash table
+	// pointSize parameter reserved for future use
+	(void)pointSize;  // Suppress unused parameter warning
+	
 	int i;
 	for (i = 0; i < fallbackChainCount; i++) {
 		if (fallbackChains[i].fonts[0] && 
@@ -109,5 +113,18 @@ fontFallbackChain_t *RE_GetFontFallbackChain(const char *fontName, int pointSize
 	}
 	
 	return NULL;
+}
+
+/*
+=================
+RE_GetFontFallback
+=================
+Get font fallback chain (alias for RE_GetFontFallbackChain)
+Returns NULL if not found
+=================
+*/
+void *RE_GetFontFallback(const char *fontName, int pointSize)
+{
+	return (void *)RE_GetFontFallbackChain(fontName, pointSize);
 }
 

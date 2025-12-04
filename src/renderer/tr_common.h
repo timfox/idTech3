@@ -122,8 +122,14 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font);
 float RE_Text_Width_Improved(const char *text, float scale, fontInfo_t *font, int limit);
 float RE_Text_Height_Improved(const char *text, float scale, fontInfo_t *font, int limit);
 void RE_Text_Bounds_Improved(const char *text, float scale, fontInfo_t *font, int limit, float *outWidth, float *outHeight);
+void RE_Text_Paint_Improved(float x, float y, float scale, vec4_t color, const char *text, float adjust, int limit, int style, fontInfo_t *font);
+void RE_Text_Paint_3D_Improved(float x, float y, float scale, vec4_t color, const char *text, float adjust, int limit, int style, fontInfo_t *font);
 int RE_UTF8_CharLength(const unsigned char *str);
 unsigned int RE_UTF8_DecodeChar(const unsigned char **str);
+
+// Font fallback functions
+qboolean RE_RegisterFontFallback(const char *primaryFontName, int pointSize, const char **fallbackNames, int fallbackCount);
+void *RE_GetFontFallback(const char *fontName, int pointSize);  // Returns fontFallbackChain_t*
 
 /*
 =============================================================

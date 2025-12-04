@@ -1847,6 +1847,12 @@ IF(USE_NANOSVG)
 			target_include_directories(${DNAME}${BINEXT} PRIVATE libs/nanosvg)
 		endif()
 	endif()
+	
+	# Suppress warnings from nanosvg third-party library
+	IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+		set_source_files_properties(src/renderercommon/tr_image_svg.c PROPERTIES 
+			COMPILE_FLAGS "-Wno-shadow -Wno-missing-prototypes")
+	ENDIF()
 ENDIF()
 
 IF(USE_ASSIMP AND ASSIMP_FOUND AND ASSIMP_LIBRARIES)
