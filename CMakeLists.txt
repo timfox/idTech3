@@ -166,6 +166,7 @@ OPTION(USE_METAL "Enable Metal renderer (macOS/iOS only)" ON)
 OPTION(USE_SYSTEM_JPEG "" OFF)
 OPTION(USE_RENDERER_DLOPEN "" ON)
 OPTION(USE_OPENEXR "Enable OpenEXR (.exr) image support" ON)
+OPTION(USE_NANOSVG "Enable SVG (Scalable Vector Graphics) image support" ON)
 OPTION(USE_ASSIMP "Enable Assimp 3D asset import library" ON)
 OPTION(USE_CJSON "" ON)
 OPTION(USE_ZSTD "" ON)
@@ -175,6 +176,7 @@ OPTION(USE_FREETYPE "" ON)
 OPTION(USE_OPENSSL "" ON)
 OPTION(USE_LUA "" ON)
 OPTION(USE_ENTT "Enable EnTT ECS system" ON)
+OPTION(USE_STEAMWORKS "Enable Steamworks SDK integration for Steam Deck features" OFF)
 OPTION(USE_CIMGUI "Enable ImGui" ON)
 OPTION(USE_WEBSOCKETS "Enable WebSocket support" ON)
 OPTION(USE_OPENAL "Enable OpenAL enhanced audio system" ON)
@@ -182,6 +184,7 @@ OPTION(USE_BULLET "Enable Bullet Physics library for rigid body simulation" ON)
 OPTION(USE_JOBSYSTEM "Enable multi-threaded job system for parallel execution" ON)
 OPTION(USE_THEORA "Enable Theora (Ogg Theora) video codec support" ON)
 OPTION(USE_VPX "Enable VP8/VP9 (WebM) video codec support" ON)
+OPTION(USE_DAV1D "Enable AV1 video codec support (dav1d decoder)" ON)
 #OPTION(USE_OPENGL "" OFF)
 #OPTION(USE_OPENGL2 "" OFF)
 #OPTION(USE_USD "" ON)
@@ -620,6 +623,22 @@ IF(USE_OPENEXR)
 	endif()
 ENDIF()
 
+IF(USE_NANOSVG)
+	# nanosvg is a single-header library, check if headers exist
+	IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libs/nanosvg/nanosvg.h" AND 
+	   EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libs/nanosvg/nanosvgrast.h")
+		ADD_COMPILE_DEFINITIONS(USE_NANOSVG)
+		TARGET_INCLUDE_DIRECTORIES(qcommon PRIVATE libs/nanosvg)
+		TARGET_INCLUDE_DIRECTORIES(qcommon_ded PRIVATE libs/nanosvg)
+		message(STATUS "nanosvg found: using bundled headers")
+	else()
+		message(WARNING "nanosvg headers not found, disabling SVG support")
+		message(STATUS "To enable SVG support, download nanosvg from https://github.com/memononen/nanosvg")
+		message(STATUS "Place nanosvg.h and nanosvgrast.h in libs/nanosvg/")
+		set(USE_NANOSVG OFF CACHE BOOL "" FORCE)
+	endif()
+ENDIF()
+
 IF(USE_ASSIMP)
 	# Prefer modern CMake config package
 	find_package(assimp QUIET)
@@ -687,6 +706,54 @@ IF(NOT USE_CURL)
 ELSE()
 	# Add enhanced networking support
 	list(APPEND CLIENT_SRCS src/client/cl_net_enhanced.c)
+ENDIF()
+
+# Add Steam Deck integration
+IF(USE_STEAMWORKS)
+	list(APPEND CLIENT_SRCS src/client/cl_steamdeck.c)
+	ADD_COMPILE_DEFINITIONS(USE_STEAMWORKS)
+	
+	# Find Steamworks SDK
+	# Steamworks SDK is typically located in:
+	# - Steam SDK installation directory
+	# - Third-party/steamworks directory
+	# - System installation (uncommon)
+	FIND_PATH(STEAMWORKS_INCLUDE_DIR
+		NAMES steam/steam_api.h
+		PATHS
+			${CMAKE_CURRENT_SOURCE_DIR}/third-party/steamworks/sdk/public/steam
+			${CMAKE_CURRENT_SOURCE_DIR}/libs/steamworks/sdk/public/steam
+			/usr/include/steam
+			/usr/local/include/steam
+		PATH_SUFFIXES
+			steam
+	)
+	
+	# Find Steamworks library
+	FIND_LIBRARY(STEAMWORKS_LIBRARY
+		NAMES steam_api
+		PATHS
+			${CMAKE_CURRENT_SOURCE_DIR}/third-party/steamworks/sdk/redistributable_bin
+			${CMAKE_CURRENT_SOURCE_DIR}/libs/steamworks/sdk/redistributable_bin
+			/usr/lib
+			/usr/lib/x86_64-linux-gnu
+			/usr/local/lib
+		PATH_SUFFIXES
+			linux64
+			linux32
+	)
+	
+	if(STEAMWORKS_INCLUDE_DIR AND STEAMWORKS_LIBRARY)
+		set(STEAMWORKS_FOUND TRUE)
+		TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${STEAMWORKS_INCLUDE_DIR}/..)
+		TARGET_LINK_LIBRARIES(client PRIVATE ${STEAMWORKS_LIBRARY})
+		message(STATUS "Steamworks SDK found: ${STEAMWORKS_LIBRARY}")
+	else()
+		message(WARNING "Steamworks SDK not found, Steam Deck features will be disabled")
+		message(STATUS "To enable Steamworks SDK, download from https://partner.steamgames.com/doc/sdk")
+		message(STATUS "Place it in third-party/steamworks/ or libs/steamworks/")
+		set(USE_STEAMWORKS OFF CACHE BOOL "" FORCE)
+	endif()
 ENDIF()
 
 # Add assembly files for x86_64
@@ -1547,6 +1614,53 @@ IF(USE_VPX)
 	ENDIF()
 ENDIF()
 
+# dav1d (AV1) video codec support
+IF(USE_DAV1D)
+	# Try pkg-config first
+	find_package(PkgConfig QUIET)
+	IF(PKG_CONFIG_FOUND)
+		pkg_check_modules(DAV1D libdav1d QUIET)
+		IF(DAV1D_FOUND)
+			SET(DAV1D_INCLUDE_DIRS ${DAV1D_INCLUDE_DIRS})
+			SET(DAV1D_LIBRARIES ${DAV1D_LIBRARIES})
+		ENDIF()
+	ENDIF()
+	
+	# Manual search as fallback
+	IF(NOT DAV1D_FOUND)
+		FIND_PATH(DAV1D_INCLUDE_DIR
+			NAMES dav1d/dav1d.h
+			PATHS
+				/usr/include
+				/usr/local/include
+				/opt/local/include
+		)
+		FIND_LIBRARY(DAV1D_LIBRARY
+			NAMES dav1d
+			PATHS
+				/usr/lib
+				/usr/lib/x86_64-linux-gnu
+				/usr/local/lib
+				/opt/local/lib
+		)
+		IF(DAV1D_INCLUDE_DIR AND DAV1D_LIBRARY)
+			SET(DAV1D_FOUND TRUE)
+			SET(DAV1D_INCLUDE_DIRS ${DAV1D_INCLUDE_DIR})
+			SET(DAV1D_LIBRARIES ${DAV1D_LIBRARY})
+		ENDIF()
+	ENDIF()
+	
+	IF(DAV1D_FOUND AND DAV1D_LIBRARIES)
+		TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${DAV1D_INCLUDE_DIRS})
+		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_DAV1D)
+		MESSAGE(STATUS "dav1d found: ${DAV1D_LIBRARIES}")
+	ELSE()
+		MESSAGE(WARNING "dav1d not found, disabling AV1 support")
+		MESSAGE(STATUS "To enable dav1d support, install: sudo apt-get install libdav1d-dev")
+		SET(USE_DAV1D OFF CACHE BOOL "" FORCE)
+	ENDIF()
+ENDIF()
+
 IF(USE_OPENAL)
 	# Try CMake's find_package first
 	find_package(OpenAL QUIET)
@@ -1711,6 +1825,30 @@ IF(USE_OPENEXR AND OpenEXR_FOUND AND OPENEXR_LIBRARIES)
 	endif()
 ENDIF()
 
+IF(USE_NANOSVG)
+	# Attach nanosvg include paths to the appropriate targets
+	if(USE_RENDERER_DLOPEN)
+		if(TARGET ${RENDERER_PREFIX}_opengl${RENDEXT})
+			target_include_directories(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE libs/nanosvg)
+		endif()
+		if(TARGET ${RENDERER_PREFIX}_vulkan${RENDEXT})
+			target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE libs/nanosvg)
+		endif()
+		if(WIN32 AND USE_D3D12 AND TARGET ${RENDERER_PREFIX}_d3d12${RENDEXT})
+			target_include_directories(${RENDERER_PREFIX}_d3d12${RENDEXT} PRIVATE libs/nanosvg)
+		endif()
+		if(APPLE AND USE_METAL AND NOT ANDROID AND TARGET ${RENDERER_PREFIX}_metal${RENDEXT})
+			target_include_directories(${RENDERER_PREFIX}_metal${RENDEXT} PRIVATE libs/nanosvg)
+		endif()
+	else()
+		# Non-DLOPEN renderers are linked directly into the main executable(s)
+		target_include_directories(${CNAME}${BINEXT} PRIVATE libs/nanosvg)
+		if(BUILD_SERVER AND NOT ANDROID)
+			target_include_directories(${DNAME}${BINEXT} PRIVATE libs/nanosvg)
+		endif()
+	endif()
+ENDIF()
+
 IF(USE_ASSIMP AND ASSIMP_FOUND AND ASSIMP_LIBRARIES)
 	# Attach Assimp include paths and libraries to the appropriate targets
 	if(USE_RENDERER_DLOPEN)
@@ -1848,6 +1986,12 @@ ENDIF()
 IF(USE_VPX)
 	IF(VPX_FOUND AND VPX_LIBRARIES)
 		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${VPX_LIBRARIES})
+	ENDIF()
+ENDIF()
+
+IF(USE_DAV1D)
+	IF(DAV1D_FOUND AND DAV1D_LIBRARIES)
+		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} ${DAV1D_LIBRARIES})
 	ENDIF()
 ENDIF()
 

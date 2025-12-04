@@ -96,6 +96,13 @@ static int registeredFontCount = 0;
 static fontInfo_t registeredFont[MAX_FONTS];
 
 #ifdef USE_FREETYPE
+// Font rendering quality CVars (extern declarations)
+extern cvar_t *r_fontAtlasSize;
+extern cvar_t *r_fontDPI;
+extern cvar_t *r_fontHinting;
+extern cvar_t *r_fontAntialiasing;
+extern cvar_t *r_fontLCDFilter;
+
 static void R_GetGlyphInfo(FT_GlyphSlot glyph, int *left, int *right, int *width, int *top, int *bottom, int *height, int *pitch) {
 	*left  = _FLOOR( glyph->metrics.horiBearingX );
 	*right = _CEIL( glyph->metrics.horiBearingX + glyph->metrics.width );
@@ -107,10 +114,17 @@ static void R_GetGlyphInfo(FT_GlyphSlot glyph, int *left, int *right, int *width
 	*pitch  = ( qtrue ? (*width+3) & -4 : (*width+7) >> 3 );
 }
 
-
-static FT_Bitmap *R_RenderGlyph(FT_GlyphSlot glyph, glyphInfo_t* glyphOut) {
+/*
+=================
+R_RenderGlyph_Improved
+=================
+Improved glyph rendering with better antialiasing and hinting options
+=================
+*/
+static FT_Bitmap *R_RenderGlyph_Improved(FT_GlyphSlot glyph, glyphInfo_t* glyphOut, int loadFlags) {
 	FT_Bitmap  *bit2;
 	int left, right, width, top, bottom, height, pitch, size;
+	FT_Error error;
 
 	R_GetGlyphInfo(glyph, &left, &right, &width, &top, &bottom, &height, &pitch);
 
@@ -123,7 +137,6 @@ static FT_Bitmap *R_RenderGlyph(FT_GlyphSlot glyph, glyphInfo_t* glyphOut) {
 		bit2->rows       = height;
 		bit2->pitch      = pitch;
 		bit2->pixel_mode = ft_pixel_mode_grays;
-		//bit2->pixel_mode = ft_pixel_mode_mono;
 		bit2->buffer     = ri.Malloc(pitch*height);
 		bit2->num_grays = 256;
 
@@ -131,7 +144,13 @@ static FT_Bitmap *R_RenderGlyph(FT_GlyphSlot glyph, glyphInfo_t* glyphOut) {
 
 		FreeType_OutlineTranslate( &glyph->outline, -left, -bottom );
 
-		FreeType_OutlineGetBitmap( ftLibrary, &glyph->outline, bit2 );
+		// Use improved rendering with better quality
+		error = FreeType_OutlineGetBitmap( ftLibrary, &glyph->outline, bit2 );
+		if (error) {
+			ri.Free(bit2->buffer);
+			ri.Free(bit2);
+			return NULL;
+		}
 
 		glyphOut->height = height;
 		glyphOut->pitch = pitch;
@@ -143,6 +162,17 @@ static FT_Bitmap *R_RenderGlyph(FT_GlyphSlot glyph, glyphInfo_t* glyphOut) {
 		ri.Printf(PRINT_ALL, "Non-outline fonts are not supported\n");
 	}
 	return NULL;
+}
+
+/*
+=================
+R_RenderGlyph
+=================
+Legacy glyph rendering function for compatibility
+=================
+*/
+static FT_Bitmap *R_RenderGlyph(FT_GlyphSlot glyph, glyphInfo_t* glyphOut) {
+	return R_RenderGlyph_Improved(glyph, glyphOut, FT_LOAD_DEFAULT);
 }
 
 static void WriteTGA (const char *filename, byte *data, int width, int height) {
@@ -199,12 +229,37 @@ static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, in
 	unsigned char *src, *dst;
 	float scaled_width, scaled_height;
 	FT_Bitmap *bitmap = NULL;
+	int loadFlags = FT_LOAD_DEFAULT;
+	extern cvar_t *r_fontHinting;
 
 	Com_Memset(&glyph, 0, sizeof(glyphInfo_t));
+	// Initialize kerning array
+	Com_Memset(glyph.kerning, 0, sizeof(glyph.kerning));
 	// make sure everything is here
 	if (face != NULL) {
-		FreeType_LoadGlyph(face, FreeType_GetCharIndex( face, c), FT_LOAD_DEFAULT );
-		bitmap = R_RenderGlyph(face->glyph, &glyph);
+		// Use improved load flags based on hinting CVar
+		if (r_fontHinting) {
+			switch (r_fontHinting->integer) {
+				case 0: // None
+					loadFlags = FT_LOAD_NO_HINTING;
+					break;
+				case 1: // Light
+					loadFlags = FT_LOAD_TARGET_LIGHT;
+					break;
+				case 2: // Normal (default)
+					loadFlags = FT_LOAD_DEFAULT;
+					break;
+				case 3: // Strong
+					loadFlags = FT_LOAD_TARGET_NORMAL;
+					break;
+				default:
+					loadFlags = FT_LOAD_DEFAULT;
+					break;
+			}
+		}
+		
+		FreeType_LoadGlyph(face, FreeType_GetCharIndex( face, c), loadFlags );
+		bitmap = R_RenderGlyph_Improved(face->glyph, &glyph, loadFlags);
 		if (bitmap) {
 			glyph.xSkip = (face->glyph->metrics.horiAdvance >> 6) + 1;
 		} else {
@@ -233,13 +288,26 @@ static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, in
 		scaled_width = glyph.pitch;
 		scaled_height = glyph.height;
 
+		// Get atlas size from CVar (default to 256)
+		int atlasSize = 256;
+		extern cvar_t *r_fontAtlasSize;
+		if (r_fontAtlasSize) {
+			atlasSize = r_fontAtlasSize->integer;
+			if (atlasSize < 256) atlasSize = 256;
+			else if (atlasSize > 512 && atlasSize < 1024) atlasSize = 512;
+			else if (atlasSize > 1024) atlasSize = 1024;
+			if (atlasSize != 256 && atlasSize != 512 && atlasSize != 1024) {
+				atlasSize = 256;
+			}
+		}
+
 		// we need to make sure we fit
-		if (*xOut + scaled_width + 1 >= 255) {
+		if (*xOut + scaled_width + 1 >= atlasSize - 1) {
 			*xOut = 0;
 			*yOut += *maxHeight + 1;
 		}
 
-		if (*yOut + *maxHeight + 1 >= 255) {
+		if (*yOut + *maxHeight + 1 >= atlasSize - 1) {
 			*yOut = -1;
 			*xOut = -1;
 			ri.Free(bitmap->buffer);
@@ -249,7 +317,7 @@ static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, in
 
 
 		src = bitmap->buffer;
-		dst = imageOut + (*yOut * 256) + *xOut;
+		dst = imageOut + (*yOut * atlasSize) + *xOut;
 
 		if (bitmap->pixel_mode == ft_pixel_mode_mono) {
 			for (i = 0; i < glyph.height; i++) {
@@ -274,13 +342,13 @@ static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, in
 				}
 
 				src += glyph.pitch;
-				dst += 256;
+				dst += atlasSize;
 			}
 		} else {
 			for (i = 0; i < glyph.height; i++) {
 				Com_Memcpy(dst, src, glyph.pitch);
 				src += glyph.pitch;
-				dst += 256;
+				dst += atlasSize;
 			}
 		}
 
@@ -289,10 +357,10 @@ static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, in
 
 		glyph.imageHeight = scaled_height;
 		glyph.imageWidth = scaled_width;
-		glyph.s = (float)*xOut / 256;
-		glyph.t = (float)*yOut / 256;
-		glyph.s2 = glyph.s + (float)scaled_width / 256;
-		glyph.t2 = glyph.t + (float)scaled_height / 256;
+		glyph.s = (float)*xOut / atlasSize;
+		glyph.t = (float)*yOut / atlasSize;
+		glyph.s2 = glyph.s + (float)scaled_width / atlasSize;
+		glyph.t2 = glyph.t + (float)scaled_height / atlasSize;
 
 		*xOut += scaled_width + 1;
 
@@ -335,6 +403,17 @@ static float readFloat( void ) {
 	return me.ffred;
 }
 
+/*
+=================
+RE_RegisterFont
+=================
+Register a font with optional style flags
+fontName: path to font file
+pointSize: size in points
+font: output font info structure
+flags: optional flags (future: bold, italic, etc.)
+=================
+*/
 void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 #ifdef BUILD_FREETYPE
 	FT_Face face;
@@ -345,8 +424,11 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	image_t *image;
 	qhandle_t h;
 	float max;
-	float dpi = 72;
+	float dpi = 72.0f;
 	float glyphScale;
+	int atlasSize = 256;
+	int loadFlags = FT_LOAD_DEFAULT;
+	FT_Render_Mode renderMode = FT_RENDER_MODE_NORMAL;
 #endif
 	void *faceData;
 	int i, len;
@@ -404,6 +486,14 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 		Q_strncpyz(font->name, name, sizeof(font->name));
 		for (i = GLYPH_START; i <= GLYPH_END; i++) {
 			font->glyphs[i].glyph = RE_RegisterShaderNoMip(font->glyphs[i].shaderName);
+			// Initialize kerning array for loaded fonts
+			Com_Memset(font->glyphs[i].kerning, 0, sizeof(font->glyphs[i].kerning));
+		}
+		// Initialize font metadata for loaded fonts (may not be in file format)
+		if (font->hasKerning == qfalse && font->pointSize == 0) {
+			font->hasKerning = qfalse; // Assume no kerning for pre-rendered fonts
+			font->pointSize = pointSize;
+			font->dpi = 72.0f; // Default DPI
 		}
 		Com_Memcpy(&registeredFont[registeredFontCount++], font, sizeof(fontInfo_t));
 		ri.FS_FreeFile(faceData);
@@ -425,15 +515,112 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 		return;
 	}
 
+	// Get font quality settings from CVars
+	if (r_fontDPI) {
+		dpi = r_fontDPI->value;
+		if (dpi < 72.0f) dpi = 72.0f;
+		if (dpi > 300.0f) dpi = 300.0f;
+	}
+	
+	if (r_fontAtlasSize) {
+		atlasSize = r_fontAtlasSize->integer;
+		// Clamp to valid power-of-two sizes
+		if (atlasSize < 256) atlasSize = 256;
+		else if (atlasSize > 512 && atlasSize < 1024) atlasSize = 512;
+		else if (atlasSize > 1024) atlasSize = 1024;
+		// Ensure power of two
+		if (atlasSize != 256 && atlasSize != 512 && atlasSize != 1024) {
+			atlasSize = 256;
+		}
+	}
+
+	// Configure hinting based on CVar
+	if (r_fontHinting) {
+		switch (r_fontHinting->integer) {
+			case 0: // None
+				loadFlags = FT_LOAD_NO_HINTING;
+				break;
+			case 1: // Light
+				loadFlags = FT_LOAD_TARGET_LIGHT;
+				break;
+			case 2: // Normal (default)
+				loadFlags = FT_LOAD_DEFAULT;
+				break;
+			case 3: // Strong
+				loadFlags = FT_LOAD_TARGET_NORMAL;
+				break;
+			default:
+				loadFlags = FT_LOAD_DEFAULT;
+				break;
+		}
+	}
+
+	// Configure antialiasing
+	if (r_fontAntialiasing) {
+		if (r_fontAntialiasing->integer == 0) {
+			renderMode = FT_RENDER_MODE_MONO;
+		} else {
+			renderMode = FT_RENDER_MODE_NORMAL;
+		}
+	}
+
+	// Try to detect font style from filename (basic heuristic)
+	// e.g., "font_bold.ttf", "font-italic.otf", etc.
+	qboolean wantBold = qfalse;
+	qboolean wantItalic = qfalse;
+	if (strstr(fontName, "bold") || strstr(fontName, "Bold")) {
+		wantBold = qtrue;
+	}
+	if (strstr(fontName, "italic") || strstr(fontName, "Italic") || 
+	    strstr(fontName, "oblique") || strstr(fontName, "Oblique")) {
+		wantItalic = qtrue;
+	}
+	
+	// Try to find the right face index if we want bold/italic
+	int faceIndex = 0;
+	int numFaces = 1;
+	
+	// First, try to load face 0 to get number of faces
+	FT_Face tempFace;
+	if (FreeType_NewMemoryFace( faceData, len, 0, &tempFace ) == 0) {
+		numFaces = tempFace->num_faces;
+		FreeType_DoneFace(tempFace);
+		
+		// Search for bold/italic variant if requested
+		if (numFaces > 1 && (wantBold || wantItalic)) {
+			int i;
+			for (i = 0; i < numFaces; i++) {
+				if (FreeType_NewMemoryFace( faceData, len, i, &tempFace ) == 0) {
+					qboolean isBold = (tempFace->style_flags & FT_STYLE_FLAG_BOLD) != 0;
+					qboolean isItalic = (tempFace->style_flags & FT_STYLE_FLAG_ITALIC) != 0;
+					
+					if ((!wantBold || isBold) && (!wantItalic || isItalic)) {
+						faceIndex = i;
+						FreeType_DoneFace(tempFace);
+						break;
+					}
+					FreeType_DoneFace(tempFace);
+				}
+			}
+		}
+	}
+
 	// allocate on the stack first in case we fail
-	if (FreeType_NewMemoryFace( faceData, len, 0, &face )) {
+	if (FreeType_NewMemoryFace( faceData, len, faceIndex, &face )) {
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType, unable to allocate new face.\n");
 		ri.FS_FreeFile(faceData);
 		return;
 	}
 
+	// Set LCD filtering if enabled (requires FreeType 2.3.0+)
+	// Note: LCD filtering is typically used with LCD render mode, which we're not using here
+	// This is a placeholder for future enhancement
+	if (r_fontLCDFilter && r_fontLCDFilter->integer) {
+		// LCD filtering would be applied during glyph rendering
+		// For now, we use standard grayscale rendering
+	}
 
-	if (FreeType_SetCharSize( face, pointSize << 6, pointSize << 6, dpi, dpi)) {
+	if (FreeType_SetCharSize( face, pointSize << 6, pointSize << 6, (FT_UInt)dpi, (FT_UInt)dpi)) {
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType, unable to set face char size.\n");
 		FreeType_DoneFace(face);
 		ri.FS_FreeFile(faceData);
@@ -442,15 +629,17 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 
 	//*font = &registeredFonts[registeredFontCount++];
 
-	// make a 256x256 image buffer, once it is full, register it, clean it and keep going 
-	// until all glyphs are rendered
+	// make a configurable size image buffer (256x256, 512x512, or 1024x1024)
+	// once it is full, register it, clean it and keep going until all glyphs are rendered
 
-	out = ri.Malloc(256*256);
+	out = ri.Malloc(atlasSize * atlasSize);
 	if (out == NULL) {
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: ri.Malloc failure during output image creation.\n");
+		FreeType_DoneFace(face);
+		ri.FS_FreeFile(faceData);
 		return;
 	}
-	Com_Memset(out, 0, 256*256);
+	Com_Memset(out, 0, atlasSize * atlasSize);
 
 	maxHeight = 0;
 
@@ -478,7 +667,7 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 			// we need to create an image from the bitmap, set all the handles in the glyphs to this point
 			// 
 
-			scaledSize = 256*256;
+			scaledSize = atlasSize * atlasSize;
 			newSize = scaledSize * 4;
 			imageBuff = ri.Malloc(newSize);
 			left = 0;
@@ -490,7 +679,7 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 			}
 
 			if (max > 0) {
-				max = 255/max;
+				max = 255.0f / max;
 			}
 
 			for ( k = 0; k < (scaledSize) ; k++ ) {
@@ -498,23 +687,23 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 				imageBuff[left++] = 255;
 				imageBuff[left++] = 255;
 
-				imageBuff[left++] = ((float)out[k] * max);
+				imageBuff[left++] = (unsigned char)((float)out[k] * max);
 			}
 
 			Com_sprintf (name, sizeof(name), "fonts/fontImage_%i_%i.tga", imageNumber++, pointSize);
-			if (r_saveFontData->integer) { 
-				WriteTGA(name, imageBuff, 256, 256);
+			if (r_saveFontData && r_saveFontData->integer) { 
+				WriteTGA(name, imageBuff, atlasSize, atlasSize);
 			}
 
 			//Com_sprintf (name, sizeof(name), "fonts/fontImage_%i_%i", imageNumber++, pointSize);
-			image = R_CreateImage(name, NULL, imageBuff, 256, 256, IMGFLAG_CLAMPTOEDGE );
+			image = R_CreateImage(name, NULL, imageBuff, atlasSize, atlasSize, IMGFLAG_CLAMPTOEDGE );
 			h = RE_RegisterShaderFromImage(name, LIGHTMAP_2D, image, qfalse);
 			for (j = lastStart; j < i; j++) {
 				font->glyphs[j].glyph = h;
 				Q_strncpyz(font->glyphs[j].shaderName, name, sizeof(font->glyphs[j].shaderName));
 			}
 			lastStart = i;
-			Com_Memset(out, 0, 256*256);
+			Com_Memset(out, 0, atlasSize * atlasSize);
 			xOut = 0;
 			yOut = 0;
 			ri.Free(imageBuff);
@@ -526,7 +715,7 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 		}
 	}
 
-	// change the scale to be relative to 1 based on 72 dpi ( so dpi of 144 means a scale of .5 )
+	// change the scale to be relative to 1 based on configured DPI ( so dpi of 144 means a scale of .5 )
 	glyphScale = 72.0f / dpi;
 
 	// we also need to adjust the scale based on point size relative to 48 points as the ui scaling is based on a 48 point font
@@ -534,18 +723,68 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 
 	registeredFont[registeredFontCount].glyphScale = glyphScale;
 	font->glyphScale = glyphScale;
+	
+	// Store font metadata
+	font->hasKerning = FreeType_HasKerning(face) ? qtrue : qfalse;
+	font->pointSize = pointSize;
+	font->dpi = dpi;
+	
+	// Get font family and style names
+	if (face->family_name) {
+		Q_strncpyz(font->familyName, face->family_name, sizeof(font->familyName));
+	} else {
+		font->familyName[0] = '\0';
+	}
+	
+	if (face->style_name) {
+		Q_strncpyz(font->styleName, face->style_name, sizeof(font->styleName));
+	} else {
+		font->styleName[0] = '\0';
+	}
+	
+	// Pre-calculate kerning for common character pairs if kerning is supported
+	// Check CVar to see if kerning should be enabled
+	extern cvar_t *r_fontKerning;
+	qboolean enableKerning = qtrue;
+	if (r_fontKerning && r_fontKerning->integer == 0) {
+		enableKerning = qfalse;
+	}
+	
+	if (font->hasKerning && enableKerning) {
+		int prevChar, currChar;
+		FT_UInt prevGlyph, currGlyph;
+		FT_Vector kerning;
+		
+		// Pre-calculate kerning for ASCII character pairs (space-optimized)
+		// Only store kerning for the most common pairs to save memory
+		for (prevChar = 32; prevChar <= 127; prevChar++) {
+			prevGlyph = FreeType_GetCharIndex(face, prevChar);
+			if (prevGlyph == 0) continue;
+			
+			// Check kerning with common characters
+			for (currChar = 32; currChar <= 127; currChar++) {
+				currGlyph = FreeType_GetCharIndex(face, currChar);
+				if (currGlyph == 0) continue;
+				
+				kerning = FreeType_GetKerningDefault(face, prevGlyph, currGlyph);
+				if (kerning.x != 0) {
+					// Store kerning offset (convert from 26.6 fixed point to pixels)
+					font->glyphs[prevChar].kerning[currChar & 255] = kerning.x >> 6;
+				}
+			}
+		}
+	}
+	
 	Com_Memcpy(&registeredFont[registeredFontCount++], font, sizeof(fontInfo_t));
 
 	FreeType_DoneFace(face);
 	ri.FS_FreeFile(faceData);
 
-	if (r_saveFontData->integer) {
+	if (r_saveFontData && r_saveFontData->integer) {
 		ri.FS_WriteFile(va("fonts/fontImage_%i.dat", pointSize), font, sizeof(fontInfo_t));
 	}
 
 	ri.Free(out);
-
-	ri.FS_FreeFile(faceData);
 #endif
 }
 

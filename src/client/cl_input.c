@@ -610,7 +610,12 @@ static usercmd_t CL_CreateCmd( void ) {
 	CL_MouseMove( &cmd );
 
 	// get basic movement from joystick
-	CL_JoystickMove( &cmd );
+	// Steam Deck: Allow simultaneous mouse and joystick input
+	// Only skip joystick if simultaneous input is disabled AND mouse is actively being used
+	if ( !cl_steamdeck_simultaneous_input || cl_steamdeck_simultaneous_input->integer || 
+	     ( cl.mouseDx[0] == 0 && cl.mouseDx[1] == 0 && cl.mouseDy[0] == 0 && cl.mouseDy[1] == 0 ) ) {
+		CL_JoystickMove( &cmd );
+	}
 
 	// check to make sure the angles haven't wrapped
 	if ( cl.viewangles[PITCH] - oldAngles[PITCH] > 90 ) {

@@ -10,7 +10,8 @@ typedef enum {
 	CODEC_ROQ,      // ROQ format (original Quake 3 codec)
 	CODEC_THEORA,   // Ogg Theora (GPL 2 compatible)
 	CODEC_VP8,      // VP8/WebM (BSD license, GPL 2 compatible)
-	CODEC_VP9       // VP9/WebM (BSD license, GPL 2 compatible)
+	CODEC_VP9,      // VP9/WebM (BSD license, GPL 2 compatible)
+	CODEC_AV1       // AV1/WebM (BSD license, GPL 2 compatible)
 } video_codec_t;
 
 // Full definition of cin_cache structure (needed for array declarations)
@@ -81,6 +82,9 @@ void Theora_RegisterCodec(void);
 #endif
 #ifdef USE_VPX
 void VPX_RegisterCodec(void);
+#endif
+#ifdef USE_DAV1D
+void AV1_RegisterCodec(void);
 #endif
 
 // ROQ magic number

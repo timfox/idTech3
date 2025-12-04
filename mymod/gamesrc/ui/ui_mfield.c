@@ -355,6 +355,31 @@ void MenuField_Draw( menufield_s *f )
 	if (Menu_ItemAtCursor( f->generic.parent ) == f) {
 		focus = qtrue;
 		style |= UI_PULSE;
+		
+		// Steam Deck: Show on-screen keyboard when field gets focus
+		// Use trap functions for QVM/DLL compatibility
+		static qboolean textinput_shown = qfalse;
+		if ( !trap_SteamDeck_IsTextInputActive() && !textinput_shown ) {
+			// Calculate field bounds for floating keyboard
+			int fieldX = f->generic.x;
+			int fieldY = f->generic.y;
+			int fieldWidth = (f->field.widthInChars + 1) * w;
+			int fieldHeight = h;
+			
+			// Show floating keyboard positioned near the field
+			if ( trap_SteamDeck_ShowFloatingTextInput( fieldX, fieldY, fieldWidth, fieldHeight ) ) {
+				textinput_shown = qtrue;
+			}
+		} else if ( !trap_SteamDeck_IsTextInputActive() && textinput_shown ) {
+			// Keyboard was closed, get result
+			char inputBuffer[MAX_EDIT_LINE];
+			trap_SteamDeck_GetTextInputResult( inputBuffer, sizeof( inputBuffer ) );
+			if ( inputBuffer[0] != '\0' ) {
+				Q_strncpyz( f->field.buffer, inputBuffer, sizeof( f->field.buffer ) );
+				f->field.cursor = strlen( f->field.buffer );
+			}
+			textinput_shown = qfalse;
+		}
 	}
 	else {
 		focus = qfalse;
@@ -389,6 +414,33 @@ MenuField_Key
 sfxHandle_t MenuField_Key( menufield_s* m, int* key )
 {
 	int keycode;
+	
+	// Steam Deck: Show text input when field is focused and controller button pressed
+	qboolean isFocused = (Menu_ItemAtCursor( m->generic.parent ) == m );
+	
+	// If field is focused and a controller button is pressed, show Steam Input keyboard
+	if ( isFocused && !trap_SteamDeck_IsTextInputActive() ) {
+		if ( *key == K_JOY1 || *key == K_JOY2 || *key == K_JOY3 || *key == K_JOY4 ) {
+			// Show Steam Input on-screen keyboard
+			if ( trap_SteamDeck_ShowTextInput( m->generic.name ? m->generic.name : "Enter text", 
+			                                  m->field.buffer, 
+			                                  m->field.maxchars ? m->field.maxchars : MAX_EDIT_LINE - 1,
+			                                  qfalse ) ) {
+				return (0); // Consume the key
+			}
+		}
+	}
+	
+	// Check for text input result
+	if ( isFocused && trap_SteamDeck_IsTextInputActive() ) {
+		char inputBuffer[MAX_EDIT_LINE];
+		trap_SteamDeck_GetTextInputResult( inputBuffer, sizeof( inputBuffer ) );
+		if ( inputBuffer[0] != '\0' ) {
+			Q_strncpyz( m->field.buffer, inputBuffer, sizeof( m->field.buffer ) );
+			m->field.cursor = strlen( m->field.buffer );
+			return (0); // Consume the key
+		}
+	}
 
 	keycode = *key;
 

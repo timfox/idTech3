@@ -110,6 +110,20 @@ void R_InitFreeType( void );
 void R_DoneFreeType( void );
 void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font);
 
+// Modern font rendering functions
+float RE_Text_Width_Improved(const char *text, float scale, fontInfo_t *font, int limit);
+float RE_Text_Height_Improved(const char *text, float scale, fontInfo_t *font, int limit);
+void RE_Text_Bounds_Improved(const char *text, float scale, fontInfo_t *font, int limit, float *outWidth, float *outHeight);
+int RE_UTF8_CharLength(const unsigned char *str);
+unsigned int RE_UTF8_DecodeChar(const unsigned char **str);
+
+extern	cvar_t	*r_fontAtlasSize;
+extern	cvar_t	*r_fontDPI;
+extern	cvar_t	*r_fontHinting;
+extern	cvar_t	*r_fontAntialiasing;
+extern	cvar_t	*r_fontLCDFilter;
+extern	cvar_t	*r_fontKerning;
+
 /*
 =============================================================
 
@@ -124,6 +138,7 @@ void R_LoadPCX( const char *name, byte **pic, int *width, int *height );
 void R_LoadPNG( const char *name, byte **pic, int *width, int *height );
 void R_LoadTGA( const char *name, byte **pic, int *width, int *height );
 void R_LoadEXR( const char *name, byte **pic, int *width, int *height );
+void R_LoadSVG( const char *name, byte **pic, int *width, int *height );
 
 /*
 ====================================================================

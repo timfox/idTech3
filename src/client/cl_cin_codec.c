@@ -19,11 +19,28 @@ static qboolean DetectTheora(byte *header, int headerSize) {
 	return (header[0] == 'O' && header[1] == 'g' && header[2] == 'g' && header[3] == 'S');
 }
 
-// WebM/VP8/VP9 detection
+// WebM/VP8/VP9/AV1 detection
 static qboolean DetectWebM(byte *header, int headerSize) {
 	if (headerSize < 4) return qfalse;
 	// Check for EBML header (WebM files start with EBML: 0x1A 0x45 0xDF 0xA3)
 	return (header[0] == 0x1A && header[1] == 0x45 && header[2] == 0xDF && header[3] == 0xA3);
+}
+
+// AV1 detection (can be in WebM container or raw OBU format)
+// For WebM, we rely on container detection; for raw OBU, check for OBU header
+static qboolean DetectAV1(byte *header, int headerSize) {
+	if (headerSize < 4) return qfalse;
+	
+	// Check for WebM container (AV1 can be in WebM)
+	if (DetectWebM(header, headerSize)) {
+		return qtrue; // Will need to check codec ID in container
+	}
+	
+	// Check for raw AV1 OBU (Obsolete Unit) format
+	// OBU header: first bit is obu_forbidden_bit, next 4 bits are obu_type
+	// Common OBU types: 1=OBU_SEQUENCE_HEADER, 2=OBU_FRAME, etc.
+	// For now, we'll rely on extension-based detection for raw AV1
+	return qfalse;
 }
 
 // Codec information table
@@ -67,6 +84,18 @@ static const video_codec_info_t codec_info[] = {
 		".webm,.vp9",
 		DetectWebM,
 		NULL,  // Will be implemented in cl_cin_vpx.c
+		NULL,
+		NULL,
+		NULL
+	},
+#endif
+#ifdef USE_DAV1D
+	{
+		CODEC_AV1,
+		"AV1",
+		".webm,.av1,.mkv",
+		DetectAV1,
+		NULL,  // Will be implemented in cl_cin_av1.c
 		NULL,
 		NULL,
 		NULL

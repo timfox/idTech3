@@ -1429,7 +1429,7 @@ typedef struct {
   int top;          // top of glyph in buffer
   int bottom;       // bottom of glyph in buffer
   int pitch;        // width for copying
-  int xSkip;        // x adjustment
+  int xSkip;        // x adjustment (advance width)
   int imageWidth;   // width of actual image
   int imageHeight;  // height of actual image
   float s;          // x offset in image where glyph starts
@@ -1438,12 +1438,20 @@ typedef struct {
   float t2;
   qhandle_t glyph;  // handle to the shader with the glyph
   char shaderName[32];
+  // Modern font rendering additions
+  int kerning[256]; // kerning offsets for common character pairs (optional optimization)
 } glyphInfo_t;
 
 typedef struct {
   glyphInfo_t glyphs [GLYPHS_PER_FONT];
   float glyphScale;
   char name[MAX_QPATH];
+  // Modern font rendering additions
+  qboolean hasKerning;      // whether this font supports kerning
+  int pointSize;            // point size this font was rendered at
+  float dpi;                // DPI used for rendering
+  char familyName[64];      // font family name
+  char styleName[64];       // font style name (Regular, Bold, Italic, etc.)
 } fontInfo_t;
 
 #define Square(x) ((x)*(x))

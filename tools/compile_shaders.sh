@@ -5,13 +5,14 @@
 
 set -e
 
-# Get the directory where this script is located
+# Get the directory where this script is located (/tools)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-TOOLS_DIR="tools"
-GLSL_DIR="glsl"
-SPIRV_DIR="spirv"
+# If called from anywhere, always operate relative to /tools/
+TOOLS_DIR="$SCRIPT_DIR"
+GLSL_DIR="$SCRIPT_DIR/glsl"
+SPIRV_DIR="$SCRIPT_DIR/../src/renderervk/shaders"   # output goes to src/renderervk/shaders/
 TMP_FILE="$SPIRV_DIR/data.spv"
 OUT_DATA="$SPIRV_DIR/shader_data.c"
 OUT_BINDING="$SPIRV_DIR/shader_binding.c"
@@ -132,9 +133,9 @@ echo "Compiling ray tracing shaders..."
 for f in "$GLSL_DIR"/*.rgen; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .rgen)
-		if glslangValidator -S rgen --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
+        if glslangValidator -S rgen --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
             if [ -f "$TOOLS_DIR/bin2hex" ] && [ -f "$TMP_FILE" ]; then
-            "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_rgen_spv"
+                "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_rgen_spv"
             fi
         fi
         rm -f "$TMP_FILE"
@@ -144,9 +145,9 @@ done
 for f in "$GLSL_DIR"/*.rmiss; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .rmiss)
-		if glslangValidator -S rmiss --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
+        if glslangValidator -S rmiss --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
             if [ -f "$TOOLS_DIR/bin2hex" ] && [ -f "$TMP_FILE" ]; then
-            "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_rmiss_spv"
+                "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_rmiss_spv"
             fi
         fi
         rm -f "$TMP_FILE"
@@ -156,9 +157,9 @@ done
 for f in "$GLSL_DIR"/*.rchit; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .rchit)
-		if glslangValidator -S rchit --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
+        if glslangValidator -S rchit --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
             if [ -f "$TOOLS_DIR/bin2hex" ] && [ -f "$TMP_FILE" ]; then
-            "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_rchit_spv"
+                "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_rchit_spv"
             fi
         fi
         rm -f "$TMP_FILE"
@@ -168,9 +169,9 @@ done
 for f in "$GLSL_DIR"/*.rahit; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .rahit)
-		if glslangValidator -S rahit --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
+        if glslangValidator -S rahit --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
             if [ -f "$TOOLS_DIR/bin2hex" ] && [ -f "$TMP_FILE" ]; then
-            "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_rahit_spv"
+                "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_rahit_spv"
             fi
         fi
         rm -f "$TMP_FILE"
@@ -184,49 +185,49 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/gen_frag.tmpl" -DUSE_CLX_IDENT -DUSE_ATEST -DUSE_DF >/dev/null 2>&1
     "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "frag_tx0_df"
     rm -f "$TMP_FILE"
-    
+
     # Lighting shader variations
     glslangValidator -S vert -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/light_vert.tmpl" >/dev/null 2>&1
     "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "vert_light" 2>/dev/null
     rm -f "$TMP_FILE"
-    
+
     glslangValidator -S vert -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/light_vert.tmpl" -DUSE_FOG >/dev/null 2>&1
     "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "vert_light_fog" 2>/dev/null
     rm -f "$TMP_FILE"
-    
+
     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/light_frag.tmpl" >/dev/null 2>&1
     "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "frag_light" 2>/dev/null
     rm -f "$TMP_FILE"
-    
+
     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/light_frag.tmpl" -DUSE_FOG >/dev/null 2>&1
     "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "frag_light_fog" 2>/dev/null
     rm -f "$TMP_FILE"
-    
+
     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/light_frag.tmpl" -DUSE_LINE >/dev/null 2>&1
     "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "frag_light_line" 2>/dev/null
     rm -f "$TMP_FILE"
-    
+
     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/light_frag.tmpl" -DUSE_LINE -DUSE_FOG >/dev/null 2>&1
     "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "frag_light_line_fog" 2>/dev/null
     rm -f "$TMP_FILE"
-    
+
     # Entity color shaders
     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/gen_frag.tmpl" -DUSE_ENT_COLOR -DUSE_ATEST >/dev/null 2>&1
     "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "frag_tx0_ent" 2>/dev/null
     rm -f "$TMP_FILE"
-    
+
     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/gen_frag.tmpl" -DUSE_ENT_COLOR -DUSE_ATEST -DUSE_FOG >/dev/null 2>&1
     "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "frag_tx0_ent_fog" 2>/dev/null
     rm -f "$TMP_FILE"
-    
+
     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/gen_frag.tmpl" -DUSE_ENT_COLOR -DUSE_ATEST -DUSE_VK_PBR >/dev/null 2>&1
     "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "frag_pbr_tx0_ent" 2>/dev/null
     rm -f "$TMP_FILE"
-    
+
     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/gen_frag.tmpl" -DUSE_ENT_COLOR -DUSE_ATEST -DUSE_FOG -DUSE_VK_PBR >/dev/null 2>&1
     "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "frag_pbr_tx0_ent_fog" 2>/dev/null
     rm -f "$TMP_FILE"
-    
+
     # Compile identity/fixed shader variations (matches Windows batch script)
     # Vertex shaders: shading mode (0-1) × tx (0-1) × mode (0-1) × fog (0-1) × env (0-1)
     for sh_idx in 0 1; do
@@ -237,7 +238,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
             sh_flag="-DUSE_VK_PBR"
             sh_id="pbr_"
         fi
-        
+
         for tx_idx in 0 1; do
             if [ $tx_idx -eq 0 ]; then
                 tx_flag=""
@@ -246,7 +247,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
                 tx_flag="-DUSE_TX1"
                 tx_id="tx1"
             fi
-            
+
             for mode_idx in 0 1; do
                 if [ $mode_idx -eq 0 ]; then
                     mode_flag="-DUSE_CLX_IDENT"
@@ -255,7 +256,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
                     mode_flag="-DUSE_FIXED_COLOR"
                     mode_id="fixed"
                 fi
-                
+
                 for fog_idx in 0 1; do
                     if [ $fog_idx -eq 0 ]; then
                         fog_flag=""
@@ -264,7 +265,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
                         fog_flag="-DUSE_FOG"
                         fog_id="_fog"
                     fi
-                    
+
                     for env_idx in 0 1; do
                         if [ $env_idx -eq 0 ]; then
                             env_flag=""
@@ -273,7 +274,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
                             env_flag="-DUSE_ENV"
                             env_id="_env"
                         fi
-                        
+
                         # Compile vertex shader
                         vert_name="vert_${sh_id}${tx_id}_${mode_id}${env_id}${fog_id}"
                         compile_flags="$sh_flag $tx_flag $mode_flag $env_flag $fog_flag"
@@ -290,7 +291,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
             done
         done
     done
-    
+
     # Fragment shaders for identity/fixed: shading mode (0-1) × tx (0-1) × mode (0-1) × fog (0-1)
     for sh_idx in 0 1; do
         if [ $sh_idx -eq 0 ]; then
@@ -300,7 +301,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
             sh_flag="-DUSE_VK_PBR"
             sh_id="pbr_"
         fi
-        
+
         for tx_idx in 0 1; do
             if [ $tx_idx -eq 0 ]; then
                 tx_flag=""
@@ -309,7 +310,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
                 tx_flag="-DUSE_TX1"
                 tx_id="tx1"
             fi
-            
+
             for mode_idx in 0 1; do
                 if [ $mode_idx -eq 0 ]; then
                     mode_flag="-DUSE_CLX_IDENT"
@@ -318,7 +319,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
                     mode_flag="-DUSE_FIXED_COLOR"
                     mode_id="fixed"
                 fi
-                
+
                 for fog_idx in 0 1; do
                     if [ $fog_idx -eq 0 ]; then
                         fog_flag=""
@@ -327,13 +328,13 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
                         fog_flag="-DUSE_FOG"
                         fog_id="_fog"
                     fi
-                    
+
                     # Build compile flags (add USE_ATEST for tx0)
                     compile_flags="$sh_flag $tx_flag $mode_flag $fog_flag"
                     if [ $tx_idx -eq 0 ]; then
                         compile_flags="$compile_flags -DUSE_ATEST"
                     fi
-                    
+
                     # Compile fragment shader
                     frag_name="frag_${sh_id}${tx_id}_${mode_id}${fog_id}"
                     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/gen_frag.tmpl" $compile_flags >/dev/null 2>&1
@@ -348,7 +349,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
             done
         done
     done
-    
+
     # Compile generic shader variations (matches Windows batch script)
     # Vertex shaders: shading mode (0-1) × tx (0-2) × env (0-1) × fog (0-1), with +cl variants when tx != 0
     for sh_idx in 0 1; do
@@ -359,7 +360,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
             sh_flag="-DUSE_VK_PBR"
             sh_id="pbr_"
         fi
-        
+
         for tx_idx in 0 1 2; do
             if [ $tx_idx -eq 0 ]; then
                 tx_flag=""
@@ -371,7 +372,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
                 tx_flag="-DUSE_TX2"
                 tx_id="tx2"
             fi
-            
+
             for env_idx in 0 1; do
                 if [ $env_idx -eq 0 ]; then
                     env_flag=""
@@ -380,7 +381,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
                     env_flag="-DUSE_ENV"
                     env_id="_env"
                 fi
-                
+
                 for fog_idx in 0 1; do
                     if [ $fog_idx -eq 0 ]; then
                         fog_flag=""
@@ -389,7 +390,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
                         fog_flag="-DUSE_FOG"
                         fog_id="_fog"
                     fi
-                    
+
                     # Base vertex shader (without cl)
                     vert_name="vert_${sh_id}${tx_id}${env_id}${fog_id}"
                     compile_flags="$sh_flag $tx_flag $env_flag $fog_flag"
@@ -401,7 +402,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
                         echo "    vk_set_shader_name( vk.modules.vert.gen[${sh_idx}][${tx_idx}][0][${env_idx}][${fog_idx}], \"${vert_name}\" );" >> "$OUT_BINDING"
                     fi
                     rm -f "$TMP_FILE"
-                    
+
                     # +cl variant (only when tx != 0)
                     if [ $tx_idx -ne 0 ]; then
                         if [ $tx_idx -eq 1 ]; then
@@ -424,7 +425,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
             done
         done
     done
-    
+
     # Fragment shaders for generic: shading mode (0-1) × tx (0-2) × fog (0-1), with +cl variants when tx != 0
     for sh_idx in 0 1; do
         if [ $sh_idx -eq 0 ]; then
@@ -434,7 +435,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
             sh_flag="-DUSE_VK_PBR"
             sh_id="pbr_"
         fi
-        
+
         for tx_idx in 0 1 2; do
             if [ $tx_idx -eq 0 ]; then
                 tx_flag=""
@@ -446,7 +447,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
                 tx_flag="-DUSE_TX2"
                 tx_id="tx2"
             fi
-            
+
             for fog_idx in 0 1; do
                 if [ $fog_idx -eq 0 ]; then
                     fog_flag=""
@@ -455,13 +456,13 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
                     fog_flag="-DUSE_FOG"
                     fog_id="_fog"
                 fi
-                
+
                 # Build compile flags (add USE_ATEST for tx0)
                 compile_flags="$sh_flag $tx_flag $fog_flag"
                 if [ $tx_idx -eq 0 ]; then
                     compile_flags="$compile_flags -DUSE_ATEST"
                 fi
-                
+
                 # Base fragment shader (without cl)
                 frag_name="frag_${sh_id}${tx_id}${fog_id}"
                 glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/gen_frag.tmpl" $compile_flags >/dev/null 2>&1
@@ -472,7 +473,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
                     echo "    vk_set_shader_name( vk.modules.frag.gen[${sh_idx}][${tx_idx}][0][${fog_idx}], \"${frag_name}\" );" >> "$OUT_BINDING"
                 fi
                 rm -f "$TMP_FILE"
-                
+
                 # +cl variant (only when tx != 0)
                 if [ $tx_idx -ne 0 ]; then
                     if [ $tx_idx -eq 1 ]; then

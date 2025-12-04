@@ -888,6 +888,7 @@ typedef struct
 static const imageExtToLoaderMap_t imageLoaders[] =
 {
 	{ "png",  R_LoadPNG },
+	{ "svg",  R_LoadSVG },
 	{ "exr",  R_LoadEXR },
 	{ "tga",  R_LoadTGA },
 	{ "jpg",  R_LoadJPG },

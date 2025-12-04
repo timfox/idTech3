@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef USE_CURL
 #include "cl_net_enhanced.h"
 #endif
+#include "cl_steamdeck.h"
 
 cvar_t	*cl_noprint;
 cvar_t	*cl_debugMove;
@@ -3219,6 +3220,9 @@ void CL_Frame( int msec, int realMsec ) {
 
 	// advance local effects for next frame
 	SCR_RunCinematic();
+	
+	// Run Steam Deck frame updates
+	CL_SteamDeck_RunFrame();
 
 	Con_RunConsole();
 }
@@ -4165,6 +4169,9 @@ void CL_Init( void ) {
 	cls.realtime = 0;
 
 	CL_InitInput();
+	
+	// Initialize Steam Deck features
+	CL_SteamDeck_Init();
 
 	//
 	// register client variables
@@ -4410,6 +4417,9 @@ void CL_Shutdown( const char *finalmsg, qboolean quit ) {
 #endif
 
 	CL_ShutdownRef( quit ? REF_UNLOAD_DLL : REF_DESTROY_WINDOW );
+	
+	// Shutdown Steam Deck features
+	CL_SteamDeck_Shutdown();
 
 	Con_Shutdown();
 

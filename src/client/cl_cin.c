@@ -50,6 +50,13 @@ e_status VPX_Run(int handle);
 void VPX_Reset(int handle);
 #endif
 
+#ifdef USE_DAV1D
+qboolean AV1_Init(int handle);
+void AV1_Shutdown(int handle);
+e_status AV1_Run(int handle);
+void AV1_Reset(int handle);
+#endif
+
 /******************************************************************************
 *
 * Class:		trFMV
@@ -1318,6 +1325,12 @@ e_status CIN_StopCinematic( int handle ) {
 			RoQShutdown(); // Use common cleanup
 			break;
 #endif
+#ifdef USE_DAV1D
+		case CODEC_AV1:
+			AV1_Shutdown(currentHandle);
+			RoQShutdown(); // Use common cleanup
+			break;
+#endif
 		default:
 			RoQShutdown(); // Use common cleanup
 			break;
@@ -1446,6 +1459,24 @@ e_status CIN_RunCinematic( int handle )
 					VPX_Reset(currentHandle);
 				} else {
 					VPX_Shutdown(currentHandle);
+					RoQShutdown();
+					return FMV_EOF;
+				}
+			}
+			if (cinTable[currentHandle].status == FMV_LOOPED) {
+				cinTable[currentHandle].status = FMV_PLAY;
+			}
+			break;
+#endif
+#ifdef USE_DAV1D
+		case CODEC_AV1:
+			AV1_Run(currentHandle);
+			// Handle looping and EOF for AV1
+			if (cinTable[currentHandle].status == FMV_EOF) {
+				if (cinTable[currentHandle].looping) {
+					AV1_Reset(currentHandle);
+				} else {
+					AV1_Shutdown(currentHandle);
 					RoQShutdown();
 					return FMV_EOF;
 				}
@@ -1590,6 +1621,23 @@ int CIN_PlayCinematic( const char *arg, int x, int y, int w, int h, int systemBi
 			if (!VPX_Init(currentHandle)) {
 				Com_Printf("CIN_PlayCinematic: failed to initialize VPX decoder\n");
 				Com_Printf("  File may not be a valid VP8/VP9 video or may be corrupted\n");
+				if ( cinTable[currentHandle].iFile != FS_INVALID_HANDLE ) {
+					FS_FCloseFile( cinTable[currentHandle].iFile );
+					cinTable[currentHandle].iFile = FS_INVALID_HANDLE;
+				}
+				cinTable[currentHandle].fileName[0] = '\0';
+				cinTable[currentHandle].codec = CODEC_NONE;
+				return -1;
+			}
+			break;
+#endif
+#ifdef USE_DAV1D
+		case CODEC_AV1:
+			// Reset file position after header read
+			FS_Seek(cinTable[currentHandle].iFile, 0, FS_SEEK_SET);
+			if (!AV1_Init(currentHandle)) {
+				Com_Printf("CIN_PlayCinematic: failed to initialize AV1 decoder\n");
+				Com_Printf("  File may not be a valid AV1 video or may be corrupted\n");
 				if ( cinTable[currentHandle].iFile != FS_INVALID_HANDLE ) {
 					FS_FCloseFile( cinTable[currentHandle].iFile );
 					cinTable[currentHandle].iFile = FS_INVALID_HANDLE;

@@ -1,0 +1,349 @@
+"controller_mappings"
+{
+	"version"		"3"
+	"controller_type"	"controller_steamdeck"
+	
+	"group"
+	{
+		"id"		"0"
+		"mode"		"four_buttons"
+		
+		"settings"
+		{
+			"haptic_intensity"		"1"
+			"gyro_enable"			"1"
+			"gyro_mode"			"1"
+			"gyro_sensitivity"		"100"
+			"gyro_smoothing"		"0"
+		}
+		
+		"button_dpad_up"
+		{
+			"activators"
+			{
+				"Button Activator"
+				{
+					"bindings"
+					{
+						"binding"		"key_press W"
+					}
+				}
+			}
+		}
+		
+		"button_dpad_down"
+		{
+			"activators"
+			{
+				"Button Activator"
+				{
+					"bindings"
+					{
+						"binding"		"key_press S"
+					}
+				}
+			}
+		}
+		
+		"button_dpad_left"
+		{
+			"activators"
+			{
+				"Button Activator"
+				{
+					"bindings"
+					{
+						"binding"		"key_press A"
+					}
+				}
+			}
+		}
+		
+		"button_dpad_right"
+		{
+			"activators"
+			{
+				"Button Activator"
+				{
+					"bindings"
+					{
+						"binding"		"key_press D"
+					}
+				}
+			}
+		}
+		
+		"button_a"
+		{
+			"activators"
+			{
+				"Button Activator"
+				{
+					"bindings"
+					{
+						"binding"		"mouse_button LEFT"
+					}
+				}
+			}
+		}
+		
+		"button_b"
+		{
+			"activators"
+			{
+				"Button Activator"
+				{
+					"bindings"
+					{
+						"binding"		"key_press ESCAPE"
+					}
+				}
+			}
+		}
+		
+		"button_x"
+		{
+			"activators"
+			{
+				"Button Activator"
+				{
+					"bindings"
+					{
+						"binding"		"key_press SPACE"
+					}
+				}
+			}
+		}
+		
+		"button_y"
+		{
+			"activators"
+			{
+				"Button Activator"
+				{
+					"bindings"
+					{
+						"binding"		"key_press R"
+					}
+				}
+			}
+		}
+		
+		"button_back_left"
+		{
+			"activators"
+			{
+				"Button Activator"
+				{
+					"bindings"
+					{
+						"binding"		"key_press TAB"
+					}
+				}
+			}
+		}
+		
+		"button_back_right"
+		{
+			"activators"
+			{
+				"Button Activator"
+				{
+					"bindings"
+					{
+						"binding"		"key_press ENTER"
+					}
+				}
+			}
+		}
+		
+		"button_start"
+		{
+			"activators"
+			{
+				"Button Activator"
+				{
+					"bindings"
+					{
+						"binding"		"key_press ESCAPE"
+					}
+				}
+			}
+		}
+		
+		"button_steam"
+		{
+			"activators"
+			{
+				"Button Activator"
+				{
+					"bindings"
+					{
+						"binding"		"key_press GRAVE"
+					}
+				}
+			}
+		}
+		
+		"left_trigger"
+		{
+			"activators"
+			{
+				"Button Activator"
+				{
+					"bindings"
+					{
+						"binding"		"mouse_button RIGHT"
+					}
+				}
+			}
+		}
+		
+		"right_trigger"
+		{
+			"activators"
+			{
+				"Button Activator"
+				{
+					"bindings"
+					{
+						"binding"		"mouse_button LEFT"
+					}
+				}
+			}
+		}
+		
+		"left_bumper"
+		{
+			"activators"
+			{
+				"Button Activator"
+				{
+					"bindings"
+					{
+						"binding"		"key_press Q"
+					}
+				}
+			}
+		}
+		
+		"right_bumper"
+		{
+			"activators"
+			{
+				"Button Activator"
+				{
+					"bindings"
+					{
+						"binding"		"key_press E"
+					}
+				}
+			}
+		}
+		
+		"left_stick"
+		{
+			"click"
+			{
+				"activators"
+				{
+					"Button Activator"
+					{
+						"bindings"
+						{
+							"binding"		"key_press LSHIFT"
+						}
+					}
+				}
+			}
+		}
+		
+		"right_stick"
+		{
+			"click"
+			{
+				"activators"
+				{
+					"Button Activator"
+					{
+						"bindings"
+						{
+							"binding"		"key_press F"
+						}
+					}
+				}
+			}
+		}
+		
+		"left_stick"
+		{
+			"output"
+			{
+				"activators"
+				{
+					"Button Activator"
+				}
+			}
+		}
+		
+		"right_stick"
+		{
+			"output"
+			{
+				"activators"
+				{
+					"Button Activator"
+				}
+			}
+		}
+		
+		"gyro"
+		{
+			"activators"
+			{
+				"Button Activator"
+				{
+					"bindings"
+					{
+						"binding"		"mouse_gyro"
+					}
+				}
+			}
+		}
+		
+		"left_trackpad"
+		{
+			"click"
+			{
+				"activators"
+				{
+					"Button Activator"
+					{
+						"bindings"
+						{
+							"binding"		"key_press TAB"
+						}
+					}
+				}
+			}
+		}
+		
+		"right_trackpad"
+		{
+			"click"
+			{
+				"activators"
+				{
+					"Button Activator"
+					{
+						"bindings"
+						{
+							"binding"		"mouse_button LEFT"
+						}
+					}
+				}
+			}
+		}
+	}
+}
+

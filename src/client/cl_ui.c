@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "client.h"
+#include "cl_steamdeck.h"
 #define TRAP_EXTENSIONS_LIST ui_extensionTraps
 #include "../qcommon/vm_ext.h"
 #include "../qcommon/syscall_registry.h"
@@ -1208,6 +1209,21 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 	case UI_TRAP_GETVALUE:
 		VM_CHECKBOUNDS( uivm, args[1], args[2] );
 		return UI_GetValue( VMA(1), args[2], VMA(3) );
+
+	// Steam Deck extensions
+	case UI_STEAMDECK_SHOW_TEXTINPUT:
+		return CL_SteamDeck_ShowTextInput( VMA(1), VMA(2), args[3], args[4] );
+	
+	case UI_STEAMDECK_SHOW_FLOATING_TEXTINPUT:
+		return CL_SteamDeck_ShowFloatingTextInput( args[1], args[2], args[3], args[4] );
+	
+	case UI_STEAMDECK_IS_TEXTINPUT_ACTIVE:
+		return CL_SteamDeck_IsTextInputActive();
+	
+	case UI_STEAMDECK_GET_TEXTINPUT_RESULT:
+		VM_CHECKBOUNDS( uivm, args[1], args[2] );
+		CL_SteamDeck_GetTextInputResult( VMA(1), args[2] );
+		return 0;
 
 	default:
 		Com_Error( ERR_DROP, "Bad UI system trap: %ld", (long int) args[0] );

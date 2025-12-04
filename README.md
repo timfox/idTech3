@@ -17,27 +17,24 @@ Go to [Releases](../../releases) section to download the latest binaries for you
 * Metal renderer (macOS/iOS)
 * Physically Based Rendering (PBR)
 * Material clearcoat, anisotropy, and subsurface scattering options
+* Steamworks and Steam Deck compatible
 * Modernized graphics options menu
-* Raw mouse input support, enabled automatically instead of DirectInput (**\in_mouse 1**) if available
-* Unlagged mouse events processing (can be reverted by setting **\in_lagged 1**)
-* **\in_minimize** - hotkey for minimize/restore main window (win32-only, direct replacement for Q3Minimizer)
-* **\video-pipe** - use external ffmpeg binary as encoder for higher quality and smaller output files
-* Optional Dear ImGui (via cimgui) layer for in-engine tools and overlays (`cl_imgui 1`)
-* Significantly reworked QVM (Quake Virtual Machine)
-* Improved server-side DoS protection, much reduced memory usage
-* Raised filesystem limits (up to 20,000 maps in a single directory)
-* Reworked Zone memory allocator (no more out-of-memory errors)
-* Non-intrusive SDL2 backend support (video, audio, input), selectable at compile time
-* Improved engine menu UI with high-DPI and modern input support
+* ImGui layer for in-engine tools and overlays
+* SysCall Registry
+
 
 ## Vulkan renderer
 
-* Ray tracing (NEW)
+* Ray tracing (hardware-accelerated where available, DXR-compatible)
 * High-quality per-pixel dynamic lighting
+* Surfel-based indirect lighting and global illumination (**experimental**)
+* Volumetric fog and light shafts
+* Physically correct area and spot lights
 * Very fast flares (**\r_flares 1**)
 * Anisotropic filtering (**\r_ext_texture_filter_anisotropic**)
 * Greatly reduced API overhead (call/dispatch ratio)
 * Flexible vertex buffer memory management to allow loading huge maps
+* Pipeline cache and incremental pipeline compilation for faster loading and less stutter
 * Multiple command buffers to reduce processing bottlenecks
 * [Reversed depth buffer](https://developer.nvidia.com/content/depth-precision-visualized) eliminates z-fighting on big maps
 * Merged lightmaps (atlases)
@@ -45,6 +42,7 @@ Go to [Releases](../../releases) section to download the latest binaries for you
 * Static world surfaces cached in VBO (**\r_vbo 1**)
 * Useful debug markers for [RenderDoc](https://renderdoc.org/)
 * Fixed framebuffer corruption on some Intel iGPUs
+* Robust device lost & swapchain recreation handling
 * Offscreen rendering, enabled with **\r_fbo 1** (required for features below):
     * `screenMap` texture rendering for realistic environment reflections
     * Multisample anti-aliasing (**\r_ext_multisample**)
@@ -54,7 +52,10 @@ Go to [Releases](../../releases) section to download the latest binaries for you
     * Bloom post-processing effect
     * Arbitrary resolution rendering
     * Greyscale mode
+* Triple-buffered V-Sync for low-latency and smooth frame pacing
+* VRR (Adaptive Sync/G-SYNC/Freesync) support where available
 * You can minimize the game window any time during **\video** or **\video-pipe** recording
+
 
 ## OpenGL renderer
 
@@ -65,7 +66,9 @@ Go to [Releases](../../releases) section to download the latest binaries for you
 * All offscreen rendering features available as in Vulkan renderer
 * Bloom reflection post-processing effect
 
+
 ## DirectX 12 renderer
+
 * Modern Graphics API: Full DirectX 12 support (feature level 12.0+)
 * Triple buffering for smooth frame presentation
 * Command lists and descriptor heaps for optimized resource and command management
@@ -81,7 +84,9 @@ Go to [Releases](../../releases) section to download the latest binaries for you
   * Realistic ray-traced lighting and effects
   * Hardware-dependent
 
+
 ## Metal renderer
+
 * Modern Metal API support (macOS/iOS)
 * Triple buffering for efficient presentation
 * Command buffers and encoders for rendering
@@ -94,12 +99,16 @@ Go to [Releases](../../releases) section to download the latest binaries for you
 * Metal Shading Language (MSL) shader compilation
 * Efficient Metal resource allocation
 
+
 **Requirements:**
+
 * macOS 10.13+ or iOS 11.0+
 * Metal-compatible GPU
 * Xcode with Metal development tools
 
+
 **Platform Support:**
+
 * Full iOS app lifecycle management (UIApplicationDelegate)
 * macOS window management (NSWindow)
 * Unified platform abstraction layer for both iOS and macOS

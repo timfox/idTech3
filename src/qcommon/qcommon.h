@@ -338,6 +338,12 @@ FT_UInt		FreeType_GetCharIndex( FT_Face face, FT_ULong charcode );
 FT_Error	FreeType_RenderGlyph( FT_GlyphSlot slot, FT_Render_Mode render_mode );
 void		FreeType_OutlineTranslate( FT_Outline *outline, FT_Pos xDelta, FT_Pos yDelta );
 FT_Error	FreeType_OutlineGetBitmap( FT_Library library, FT_Outline *outline, const FT_Bitmap *abitmap );
+FT_Vector	FreeType_GetKerning( FT_Face face, FT_UInt left_glyph, FT_UInt right_glyph, FT_UInt kern_mode );
+FT_Vector	FreeType_GetKerningDefault( FT_Face face, FT_UInt left_glyph, FT_UInt right_glyph );
+qboolean	FreeType_HasKerning( FT_Face face );
+FT_Pos		FreeType_GetCharWidth( FT_Face face, FT_UInt glyph_index );
+FT_Pos		FreeType_GetCharHeight( FT_Face face, FT_UInt glyph_index );
+qboolean	FreeType_GetFaceInfo( FT_Face face, int *num_faces, int *face_index, char *family_name, int family_name_size, char *style_name, int style_name_size );
 #endif
 
 // Internationalization (i18n)

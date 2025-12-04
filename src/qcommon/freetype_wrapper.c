@@ -1,7 +1,5 @@
 /*
 ===========================================================================
-Copyright (C) 2024 id Tech 3
-
 This file provides FreeType integration for font rendering support.
 It wraps FreeType functions with engine-style APIs.
 ===========================================================================
@@ -232,6 +230,118 @@ FT_Error FreeType_OutlineGetBitmap(FT_Library library, FT_Outline *outline, cons
 		return FT_Err_Invalid_Argument;
 	
 	return FT_Outline_Get_Bitmap(library, outline, abitmap);
+}
+
+/*
+=================
+FreeType_GetKerning
+=================
+Get kerning between two glyphs
+Returns kerning value in 26.6 fractional pixels
+=================
+*/
+FT_Vector FreeType_GetKerning(FT_Face face, FT_UInt left_glyph, FT_UInt right_glyph, FT_UInt kern_mode)
+{
+	FT_Vector kerning = {0, 0};
+	
+	if (!face)
+		return kerning;
+	
+	// Check if face has kerning
+	if (FT_HAS_KERNING(face)) {
+		FT_Error error = FT_Get_Kerning(face, left_glyph, right_glyph, kern_mode, &kerning);
+		if (error) {
+			kerning.x = 0;
+			kerning.y = 0;
+		}
+	}
+	
+	return kerning;
+}
+
+/*
+=================
+FreeType_GetKerningDefault
+=================
+Get kerning using default mode (FT_KERNING_DEFAULT)
+=================
+*/
+FT_Vector FreeType_GetKerningDefault(FT_Face face, FT_UInt left_glyph, FT_UInt right_glyph)
+{
+	return FreeType_GetKerning(face, left_glyph, right_glyph, FT_KERNING_DEFAULT);
+}
+
+/*
+=================
+FreeType_HasKerning
+=================
+Check if a font face supports kerning
+=================
+*/
+qboolean FreeType_HasKerning(FT_Face face)
+{
+	if (!face)
+		return qfalse;
+	
+	return FT_HAS_KERNING(face) ? qtrue : qfalse;
+}
+
+/*
+=================
+FreeType_GetCharWidth
+=================
+Get character advance width
+Returns width in 26.6 fractional pixels
+=================
+*/
+FT_Pos FreeType_GetCharWidth(FT_Face face, FT_UInt glyph_index)
+{
+	if (!face || !face->glyph)
+		return 0;
+	
+	return face->glyph->metrics.horiAdvance;
+}
+
+/*
+=================
+FreeType_GetCharHeight
+=================
+Get character height metrics
+Returns height in 26.6 fractional pixels
+=================
+*/
+FT_Pos FreeType_GetCharHeight(FT_Face face, FT_UInt glyph_index)
+{
+	if (!face || !face->glyph)
+		return 0;
+	
+	return face->glyph->metrics.height;
+}
+
+/*
+=================
+FreeType_GetFaceInfo
+=================
+Get font face information
+=================
+*/
+qboolean FreeType_GetFaceInfo(FT_Face face, int *num_faces, int *face_index, char *family_name, int family_name_size, char *style_name, int style_name_size)
+{
+	if (!face)
+		return qfalse;
+	
+	if (num_faces)
+		*num_faces = face->num_faces;
+	if (face_index)
+		*face_index = face->face_index;
+	if (family_name && face->family_name) {
+		Q_strncpyz(family_name, face->family_name, family_name_size);
+	}
+	if (style_name && face->style_name) {
+		Q_strncpyz(style_name, face->style_name, style_name_size);
+	}
+	
+	return qtrue;
 }
 
 #endif // USE_FREETYPE

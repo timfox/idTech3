@@ -186,6 +186,12 @@ cvar_t	*r_debugLight;
 cvar_t	*r_debugSort;
 cvar_t	*r_printShaders;
 cvar_t	*r_saveFontData;
+cvar_t	*r_fontAtlasSize;
+cvar_t	*r_fontDPI;
+cvar_t	*r_fontHinting;
+cvar_t	*r_fontAntialiasing;
+cvar_t	*r_fontLCDFilter;
+cvar_t	*r_fontKerning;
 
 cvar_t	*r_marksOnTriangleMeshes;
 
@@ -1698,6 +1704,31 @@ static void R_Register( void )
 	r_printShaders = ri.Cvar_Get( "r_printShaders", "0", 0 );
 	ri.Cvar_SetDescription( r_printShaders, "Debugging tool to print on console of the number of shaders used." );
 	r_saveFontData = ri.Cvar_Get( "r_saveFontData", "0", 0 );
+	
+	// Font rendering quality CVars
+	r_fontAtlasSize = ri.Cvar_Get( "r_fontAtlasSize", "256", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fontAtlasSize, "256", "1024", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontAtlasSize, "Font texture atlas size in pixels. Larger sizes allow more glyphs per texture but use more memory. Valid values: 256, 512, 1024" );
+	
+	r_fontDPI = ri.Cvar_Get( "r_fontDPI", "96", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fontDPI, "72", "300", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fontDPI, "DPI (dots per inch) for font rendering. Higher values produce sharper text but larger textures. Typical values: 72 (standard), 96 (Windows), 144 (retina)" );
+	
+	r_fontHinting = ri.Cvar_Get( "r_fontHinting", "2", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fontHinting, "0", "3", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontHinting, "Font hinting mode: 0 = None, 1 = Light, 2 = Normal (default), 3 = Strong. Hinting improves text clarity at small sizes." );
+	
+	r_fontAntialiasing = ri.Cvar_Get( "r_fontAntialiasing", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fontAntialiasing, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontAntialiasing, "Enable font antialiasing: 0 = Disabled (monochrome), 1 = Enabled (smooth)" );
+	
+	r_fontLCDFilter = ri.Cvar_Get( "r_fontLCDFilter", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fontLCDFilter, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontLCDFilter, "Enable LCD subpixel filtering for improved text rendering on LCD displays. Requires antialiasing enabled." );
+	
+	r_fontKerning = ri.Cvar_Get( "r_fontKerning", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fontKerning, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontKerning, "Enable font kerning for improved text spacing. Kerning adjusts spacing between character pairs (e.g., 'AV', 'To') for better readability." );
 
 	r_nocurves = ri.Cvar_Get ("r_nocurves", "0", CVAR_CHEAT );
 	ri.Cvar_SetDescription( r_nocurves, "Set to 1 to disable drawing world bezier curves. Set to 0 to enable." );

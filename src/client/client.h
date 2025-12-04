@@ -39,6 +39,8 @@ struct SDL_Event;
 #include "cl_curl.h"
 #endif
 
+#include "cl_steamdeck.h"
+
 // file full of random crap that gets used to create cl_guid
 #define QKEY_FILE "qkey"
 #define QKEY_SIZE 2048
