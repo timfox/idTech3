@@ -24,11 +24,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "server.h"
 #define TRAP_EXTENSIONS_LIST g_extensionTraps
 #include "../qcommon/vm_ext.h"
+#include "../qcommon/syscall_registry.h"
 
 #include "../botlib/botlib.h"
 
 botlib_export_t	*botlib_export;
 
+// Extension traps for VM_Ext system (legacy compatibility)
+// New extensions should be registered in syscall_registry.c
 static ext_trap_keys_t g_extensionTraps[] = {
 	{ "SVF_SELF_PORTAL2_Q3E",     SVF_SELF_PORTAL2,      qfalse },
 	{ "trap_Cvar_SetDescription_Q3E", G_CVAR_SETDESCRIPTION, qfalse },
@@ -385,15 +388,8 @@ static qboolean SV_GetValue( char* value, int valueSize, const char* key )
 		return qtrue;
 	}
 
-	if ( !Q_stricmp( key, "SVF_SELF_PORTAL2_Q3E" ) )
-	{
-		Com_sprintf( value, valueSize, "%i", SVF_SELF_PORTAL2 );
-		return qtrue;
-	}
-
-	if ( !Q_stricmp( key, "trap_Cvar_SetDescription_Q3E" ) )
-	{
-		Com_sprintf( value, valueSize, "%i", G_CVAR_SETDESCRIPTION );
+	// Use centralized syscall registry for extension lookups
+	if ( Syscall_GetValue( VM_GAME, value, valueSize, key ) ) {
 		return qtrue;
 	}
 

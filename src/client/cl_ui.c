@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "client.h"
 #define TRAP_EXTENSIONS_LIST ui_extensionTraps
 #include "../qcommon/vm_ext.h"
+#include "../qcommon/syscall_registry.h"
 
 #include "../botlib/botlib.h"
 
@@ -778,6 +779,13 @@ static qboolean UI_GetValue( char* value, int valueSize, const char* key ) {
 		return qtrue;
 	}
 
+	// Use centralized syscall registry for extension lookups
+	if ( Syscall_GetValue( VM_UI, value, valueSize, key ) ) {
+		return qtrue;
+	}
+
+	// Legacy hardcoded extensions (for compatibility)
+	// TODO: Move these to syscall_registry.c
 	if ( !Q_stricmp( key, "trap_R_AddRefEntityToScene2" ) ) {
 		Com_sprintf( value, valueSize, "%i", UI_R_ADDREFENTITYTOSCENE2 );
 		return qtrue;

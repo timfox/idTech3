@@ -40,13 +40,13 @@ void vk_material_system_init( void )
 	Com_Memset( materialParams, 0, vk.materialSystem.materialCapacity * sizeof( material_params_t ) );
 	
 	// Create GPU buffer for material parameters
-	VkBufferCreateInfo bufferInfo = {};
-	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferInfo.size = vk.materialSystem.materialCapacity * sizeof( material_params_t );
-	bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	VkBufferCreateInfo bufferCreateInfo = {};
+	bufferCreateInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferCreateInfo.size = vk.materialSystem.materialCapacity * sizeof( material_params_t );
+	bufferCreateInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+	bufferCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	
-	VK_CHECK( qvkCreateBuffer( vk.device, &bufferInfo, NULL, &vk.materialSystem.materialBuffer ) );
+	VK_CHECK( qvkCreateBuffer( vk.device, &bufferCreateInfo, NULL, &vk.materialSystem.materialBuffer ) );
 	
 	VkMemoryRequirements memReqs;
 	qvkGetBufferMemoryRequirements( vk.device, vk.materialSystem.materialBuffer, &memReqs );
@@ -68,6 +68,32 @@ void vk_material_system_init( void )
 		addrInfo.buffer = vk.materialSystem.materialBuffer;
 		vk.materialSystem.materialBufferAddress = qvkGetBufferDeviceAddress( vk.device, &addrInfo );
 	}
+	
+	// Allocate descriptor set for material buffer
+	VkDescriptorSetAllocateInfo descAllocInfo = {};
+	descAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	descAllocInfo.descriptorPool = vk.descriptor_pool;
+	descAllocInfo.descriptorSetCount = 1;
+	descAllocInfo.pSetLayouts = &vk.set_layout_material;
+	
+	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &descAllocInfo, &vk.materialSystem.materialDescriptorSet ) );
+	
+	// Update descriptor set with material buffer
+	VkDescriptorBufferInfo descBufferInfo = {};
+	descBufferInfo.buffer = vk.materialSystem.materialBuffer;
+	descBufferInfo.offset = 0;
+	descBufferInfo.range = vk.materialSystem.materialCapacity * sizeof( material_params_t );
+	
+	VkWriteDescriptorSet descriptorWrite = {};
+	descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	descriptorWrite.dstSet = vk.materialSystem.materialDescriptorSet;
+	descriptorWrite.dstBinding = 0;
+	descriptorWrite.dstArrayElement = 0;
+	descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+	descriptorWrite.descriptorCount = 1;
+	descriptorWrite.pBufferInfo = &descBufferInfo;
+	
+	qvkUpdateDescriptorSets( vk.device, 1, &descriptorWrite, 0, NULL );
 	
 	vk.materialSystem.materialParams = materialParams;
 	

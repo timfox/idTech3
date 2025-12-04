@@ -53,6 +53,7 @@ typedef struct {
 	VkBuffer materialBuffer;
 	VkDeviceMemory materialBufferMemory;
 	VkDeviceAddress materialBufferAddress;
+	VkDescriptorSet materialDescriptorSet; // Descriptor set for material buffer
 	
 	// Compute pipeline for material updates
 	VkPipeline updatePipeline;

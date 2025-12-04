@@ -53,6 +53,10 @@ typedef struct {
 	VkBuffer surfelIndirectBuffer;  // For indirect dispatch
 	VkDeviceMemory surfelIndirectBufferMemory;
 	
+	// Uniform buffer for GIBS parameters
+	VkBuffer uniformBuffer;
+	VkDeviceMemory uniformBufferMemory;
+	
 	// Compute pipelines
 	VkPipeline updatePipeline;
 	VkPipelineLayout updatePipelineLayout;
@@ -76,6 +80,7 @@ typedef struct {
 // External API
 void vk_gibs_init( void );
 void vk_gibs_shutdown( void );
+void vk_gibs_create_pipelines( void );
 void vk_gibs_update( void );
 void vk_gibs_spawn_surfels( void );
 qboolean vk_gibs_is_enabled( void );

@@ -283,16 +283,35 @@ void vk_gpu_culling_execute_indirect( void )
 		return;
 	}
 	
-	// Execute indirect draw commands
-	// Note: This requires a graphics pipeline to be bound first
-	// The draw commands are written by the GPU culling compute shader
-	if ( vk.gpuCulling.drawCommandBuffer != VK_NULL_HANDLE ) {
-		// Indirect draw commands are executed via vkCmdDrawIndexedIndirect
-		// This is typically called from the main rendering loop after binding
-		// the appropriate graphics pipeline and vertex/index buffers
-		// For now, this is a placeholder - actual draw execution happens in tr_backend.c
-		// when GPU culling is enabled
+	if ( vk.gpuCulling.drawCommandBuffer == VK_NULL_HANDLE ) {
+		return;
 	}
+	
+	if ( !qvkCmdDrawIndexedIndirect ) {
+		ri.Printf( PRINT_WARNING, "GPU culling: vkCmdDrawIndexedIndirect not available\n" );
+		return;
+	}
+	
+	// Ensure descriptor sets are bound
+	vk_bind_descriptor_sets();
+	
+	// Execute indirect draw commands
+	// The draw commands were written by the GPU culling compute shader
+	// Each command contains: indexCount, instanceCount, firstIndex, vertexOffset, firstInstance
+	// Note: This assumes:
+	// - A graphics pipeline is already bound
+	// - Vertex buffers are bound (including instance buffer if using instancing)
+	// - Index buffer is bound
+	qvkCmdDrawIndexedIndirect(
+		vk.cmd->command_buffer,
+		vk.gpuCulling.drawCommandBuffer,
+		0, // offset into buffer
+		vk.gpuCulling.drawCommandCount, // number of draw commands
+		sizeof( VkDrawIndexedIndirectCommand ) // stride between commands
+	);
+	
+	// Update statistics
+	vk.gpuCulling.visibleInstanceCount = vk.gpuCulling.drawCommandCount;
 }
 
 /*

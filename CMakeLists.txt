@@ -1083,6 +1083,12 @@ IF(USE_SDL)
 ENDIF()
 
 IF(USE_CURL)
+# Add telemetry system
+list(APPEND QCOMMON_SRCS src/qcommon/q_telemetry.c)
+
+# Add syscall registry system
+list(APPEND QCOMMON_SRCS src/qcommon/syscall_registry.c)
+	
 	# Try CMake's find_package first
 	find_package(CURL QUIET)
 	

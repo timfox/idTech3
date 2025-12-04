@@ -121,7 +121,8 @@ struct ImDrawData;
 	#define VK_DESC_PBR_NORMAL				6
 	#define VK_DESC_PBR_PHYSICAL			7
 	#define VK_DESC_PBR_CUBEMAP				8
-	#define VK_DESC_COUNT	9
+	#define VK_DESC_MATERIAL_PARAMS			9
+	#define VK_DESC_COUNT	10
 #else
 	#define VK_DESC_COUNT   5
 #endif
@@ -439,7 +440,9 @@ extern PFN_vkCmdBindDescriptorSets qvkCmdBindDescriptorSets;
 extern PFN_vkCmdBindPipeline qvkCmdBindPipeline;
 extern PFN_vkCmdClearColorImage qvkCmdClearColorImage;
 extern PFN_vkCmdDispatch qvkCmdDispatch;
+extern PFN_vkCmdDrawIndexedIndirect qvkCmdDrawIndexedIndirect;
 extern PFN_vkCmdPipelineBarrier qvkCmdPipelineBarrier;
+extern PFN_vkAllocateDescriptorSets qvkAllocateDescriptorSets;
 extern PFN_vkCreateBuffer qvkCreateBuffer;
 extern PFN_vkCreateDescriptorSetLayout qvkCreateDescriptorSetLayout;
 extern PFN_vkCreateDescriptorPool qvkCreateDescriptorPool;
@@ -725,6 +728,9 @@ typedef struct {
 	VkDescriptorSetLayout set_layout_sampler;	// combined image sampler
 	VkDescriptorSetLayout set_layout_uniform;	// dynamic uniform buffer
 	VkDescriptorSetLayout set_layout_storage;	// feedback buffer
+#ifdef USE_VK_PBR
+	VkDescriptorSetLayout set_layout_material;	// material parameters storage buffer
+#endif
 
 	VkPipelineLayout pipeline_layout;			// default shaders
 	VkPipelineLayout pipeline_layout_storage;	// flare test shader layout
@@ -922,6 +928,10 @@ typedef struct {
 		VkShaderModule gamma_comp;
 		VkShaderModule tonemap_comp;
 		VkShaderModule rt_relax_comp;
+		
+		// GIBS compute shader modules
+		VkShaderModule gibs_spawn_comp;
+		VkShaderModule gibs_update_comp;
 	} modules;
 
 	VkPipelineCache pipelineCache;
@@ -1348,6 +1358,7 @@ typedef struct {
 		VkBuffer materialBuffer;
 		VkDeviceMemory materialBufferMemory;
 		VkDeviceAddress materialBufferAddress;
+		VkDescriptorSet materialDescriptorSet; // Descriptor set for material buffer
 		
 		VkPipeline updatePipeline;
 		VkPipelineLayout updatePipelineLayout;

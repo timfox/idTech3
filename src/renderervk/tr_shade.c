@@ -1101,6 +1101,11 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 				vk_update_descriptor( VK_DESC_PBR_CUBEMAP, tr.cubemaps[0].prefiltered_image->descriptor );
 				//vk_update_descriptor( 10, tr.cubemaps[0].irradiance_image->descriptor ); // irradiance is currently unused
 			}
+			
+			// Bind material parameters buffer (if material system is enabled)
+			if ( vk.materialSystem.enabled && vk.materialSystem.initialized ) {
+				vk_update_descriptor( VK_DESC_MATERIAL_PARAMS, vk.materialSystem.materialDescriptorSet );
+			}
 		}
 #endif
 

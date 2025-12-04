@@ -24,11 +24,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "client.h"
 #define TRAP_EXTENSIONS_LIST cg_extensionTraps
 #include "../qcommon/vm_ext.h"
+#include "../qcommon/syscall_registry.h"
 
 #include "../botlib/botlib.h"
 
 extern	botlib_export_t	*botlib_export;
 
+// Extension traps for VM_Ext system (legacy compatibility)
+// New extensions should be registered in syscall_registry.c
 static ext_trap_keys_t cg_extensionTraps[] = {
 	{ "trap_R_AddRefEntityToScene2",       CG_R_ADDREFENTITYTOSCENE2, qfalse },
 	{ "trap_R_ForceFixedDLights",          CG_R_FORCEFIXEDDLIGHTS,    qfalse },
@@ -431,6 +434,13 @@ static qboolean CL_GetValue( char* value, int valueSize, const char* key ) {
 		return qtrue;
 	}
 
+	// Use centralized syscall registry for extension lookups
+	if ( Syscall_GetValue( VM_CGAME, value, valueSize, key ) ) {
+		return qtrue;
+	}
+
+	// Legacy hardcoded extensions (for compatibility)
+	// TODO: Move these to syscall_registry.c
 	if ( !Q_stricmp( key, "trap_R_AddRefEntityToScene2" ) ) {
 		Com_sprintf( value, valueSize, "%i", CG_R_ADDREFENTITYTOSCENE2 );
 		return qtrue;

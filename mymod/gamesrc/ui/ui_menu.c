@@ -37,8 +37,8 @@ MAIN MENU
 #define ID_SETUP				12
 #define ID_DEMOS				13
 #define ID_CINEMATICS			14
-#define ID_CHALLENGES                   18
-#define ID_TEAMARENA		15
+#define ID_CHALLENGES           18
+#define ID_TEAMARENA		    15
 #define ID_MODS					16
 #define ID_EXIT					17
 

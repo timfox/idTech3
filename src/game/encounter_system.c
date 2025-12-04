@@ -12,6 +12,7 @@ Encounter and Sequence Authoring System Implementation
 #define MAX_ENCOUNTERS 64
 #define MAX_SEQUENCES 16
 #define MAX_WORLD_STATE_ENTRIES 256
+#define MAX_ENEMIES_PER_WAVE 32
 
 // CVars
 cvar_t *g_encounterSystem;
@@ -124,17 +125,15 @@ void G_EncounterSystem_Update( void )
 			
 			// Count alive enemies
 			if ( encounter->enemyEntities && encounter->enemyCount > 0 ) {
-				// TODO: Integrate with game entity system to check enemy health/status
-				// Example implementation:
-				// for (uint32_t j = 0; j < encounter->enemyCount; j++) {
-				//     int entityNum = encounter->enemyEntities[j];
-				//     if (entityNum >= 0 && entityNum < MAX_GENTITIES) {
-				//         gentity_t *enemy = &g_entities[entityNum];
-				//         if (enemy->inuse && enemy->health > 0) {
-				//             aliveEnemyCount++;
-				//         }
-				//     }
-				// }
+				for ( uint32_t j = 0; j < encounter->enemyCount; j++ ) {
+					int entityNum = encounter->enemyEntities[j];
+					if ( entityNum >= 0 && entityNum < MAX_GENTITIES ) {
+						gentity_t *enemy = &g_entities[entityNum];
+						if ( enemy->inuse && enemy->health > 0 ) {
+							aliveEnemyCount++;
+						}
+					}
+				}
 			}
 			
 			// Check if current wave is complete (all enemies defeated)
@@ -146,8 +145,9 @@ void G_EncounterSystem_Update( void )
 			if ( waveComplete && encounter->currentWave < encounter->waveCount - 1 ) {
 				encounter->currentWave++;
 				encounter->enemyCount = 0; // Reset for next wave
-				// TODO: Spawn next wave of enemies
-				// This would call a spawn function with wave-specific enemy types/positions
+				// Note: Actual enemy spawning should be handled by Lua scripts via encounter callbacks
+				// or by extending the encounter structure to include wave definitions
+				// For now, this is a placeholder that can be extended
 			}
 			
 			// Check completion conditions
@@ -250,15 +250,15 @@ void G_Encounter_Start( encounter_t *encounter )
 	
 	// Spawn initial wave of enemies
 	encounter->currentWave = 0;
-	// TODO: Integrate with game spawn system to create enemy entities
-	// Example implementation:
-	// encounter->enemyCount = 0;
-	// if (encounter->waveCount > 0) {
-	//     // Allocate enemy entity array
-	//     encounter->enemyEntities = (int32_t *)ri.Malloc(MAX_ENEMIES_PER_WAVE * sizeof(int32_t));
-	//     // Spawn enemies based on encounter definition
-	//     // This would call G_Spawn() or similar with enemy classnames and positions
-	// }
+	encounter->enemyCount = 0;
+	
+	// Allocate enemy entity array if we have waves
+	if ( encounter->waveCount > 0 ) {
+		encounter->enemyEntities = (int32_t *)ri.Malloc( MAX_ENEMIES_PER_WAVE * sizeof( int32_t ) );
+		// Note: Actual enemy spawning should be handled by Lua scripts via encounter callbacks
+		// or by extending the encounter structure to include wave definitions
+		// For now, this is a placeholder that can be extended
+	}
 	
 	if ( g_debugEncounters && g_debugEncounters->integer ) {
 		Com_Printf( "Encounter started: %s\n", encounter->name );
@@ -280,18 +280,16 @@ void G_Encounter_Stop( encounter_t *encounter )
 	
 	// Clean up enemies
 	if ( encounter->enemyEntities && encounter->enemyCount > 0 ) {
-		// TODO: Integrate with game entity system to remove/kill enemies
-		// Example implementation:
-		// for (uint32_t i = 0; i < encounter->enemyCount; i++) {
-		//     int entityNum = encounter->enemyEntities[i];
-		//     if (entityNum >= 0 && entityNum < MAX_GENTITIES) {
-		//         gentity_t *enemy = &g_entities[entityNum];
-		//         if (enemy->inuse) {
-		//             // Remove enemy (could be G_FreeEntity or G_Damage with massive damage)
-		//             G_Damage(enemy, NULL, NULL, NULL, NULL, 99999, 0, MOD_UNKNOWN);
-		//         }
-		//     }
-		// }
+		for ( uint32_t i = 0; i < encounter->enemyCount; i++ ) {
+			int entityNum = encounter->enemyEntities[i];
+			if ( entityNum >= 0 && entityNum < MAX_GENTITIES ) {
+				gentity_t *enemy = &g_entities[entityNum];
+				if ( enemy->inuse ) {
+					// Remove enemy by freeing the entity
+					G_FreeEntity( enemy );
+				}
+			}
+		}
 		ri.Free( encounter->enemyEntities );
 		encounter->enemyEntities = NULL;
 		encounter->enemyCount = 0;
@@ -490,6 +488,57 @@ void G_WorldState_Update( void )
 
 /*
 =============================================================================
+Spawn Enemy Helper
+Helper function to spawn an enemy entity at a given position
+=============================================================================
+*/
+int G_Encounter_SpawnEnemy( encounter_t *encounter, const char *classname, const vec3_t origin, const vec3_t angles )
+{
+	if ( !encounter || !classname || encounter->enemyCount >= MAX_ENEMIES_PER_WAVE ) {
+		return -1;
+	}
+	
+	gentity_t *enemy = G_Spawn();
+	if ( !enemy ) {
+		return -1;
+	}
+	
+	// Set basic properties
+	enemy->classname = classname;
+	VectorCopy( origin, enemy->s.origin );
+	VectorCopy( origin, enemy->s.pos.trBase );
+	VectorCopy( origin, enemy->r.currentOrigin );
+	if ( angles ) {
+		VectorCopy( angles, enemy->s.angles );
+	} else {
+		VectorSet( enemy->s.angles, 0, 0, 0 );
+	}
+	
+	// Set default health if not specified
+	if ( enemy->health <= 0 ) {
+		enemy->health = 100;
+	}
+	
+	// Link entity to world
+	trap_LinkEntity( enemy );
+	
+	// Add to encounter's enemy list
+	if ( !encounter->enemyEntities ) {
+		encounter->enemyEntities = (int32_t *)ri.Malloc( MAX_ENEMIES_PER_WAVE * sizeof( int32_t ) );
+	}
+	encounter->enemyEntities[encounter->enemyCount] = enemy - g_entities;
+	encounter->enemyCount++;
+	
+	if ( g_debugEncounters && g_debugEncounters->integer ) {
+		Com_Printf( "Encounter '%s': Spawned enemy '%s' at (%.1f, %.1f, %.1f)\n",
+			encounter->name, classname, origin[0], origin[1], origin[2] );
+	}
+	
+	return enemy - g_entities;
+}
+
+/*
+=============================================================================
 Register Lua Functions
 =============================================================================
 */
@@ -500,5 +549,6 @@ void G_EncounterSystem_RegisterLuaFunctions( void *luaState )
 	// lua_register(luaState, "EncounterDefine", lua_encounter_define);
 	// lua_register(luaState, "SequenceDefine", lua_sequence_define);
 	// lua_register(luaState, "WorldStateSet", lua_world_state_set);
+	// lua_register(luaState, "EncounterSpawnEnemy", lua_encounter_spawn_enemy);
 }
 

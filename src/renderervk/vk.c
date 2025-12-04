@@ -53,7 +53,7 @@ static PFN_vkCreateDebugReportCallbackEXT				qvkCreateDebugReportCallbackEXT;
 static PFN_vkDestroyDebugReportCallbackEXT				qvkDestroyDebugReportCallbackEXT;
 #endif
 static PFN_vkAllocateCommandBuffers						qvkAllocateCommandBuffers;
-static PFN_vkAllocateDescriptorSets						qvkAllocateDescriptorSets;
+PFN_vkAllocateDescriptorSets						qvkAllocateDescriptorSets;
 PFN_vkAllocateMemory								qvkAllocateMemory;
 PFN_vkBeginCommandBuffer							qvkBeginCommandBuffer;
 PFN_vkBindBufferMemory							qvkBindBufferMemory;
@@ -71,6 +71,7 @@ PFN_vkCmdCopyImage								qvkCmdCopyImage;
 PFN_vkCmdDispatch								qvkCmdDispatch;
 PFN_vkCmdDraw									qvkCmdDraw;
 PFN_vkCmdDrawIndexed								qvkCmdDrawIndexed;
+PFN_vkCmdDrawIndexedIndirect						qvkCmdDrawIndexedIndirect;
 PFN_vkCmdEndRenderPass							qvkCmdEndRenderPass;
 PFN_vkCmdNextSubpass								qvkCmdNextSubpass;
 PFN_vkCmdPipelineBarrier							qvkCmdPipelineBarrier;
@@ -2349,6 +2350,7 @@ static void init_vulkan_library( void )
 	INIT_DEVICE_FUNCTION(vkCmdDispatch)
 	INIT_DEVICE_FUNCTION(vkCmdDraw)
 	INIT_DEVICE_FUNCTION(vkCmdDrawIndexed)
+	INIT_DEVICE_FUNCTION(vkCmdDrawIndexedIndirect)
 	INIT_DEVICE_FUNCTION(vkCmdEndRenderPass)
 	INIT_DEVICE_FUNCTION(vkCmdNextSubpass)
 	INIT_DEVICE_FUNCTION(vkCmdPipelineBarrier)
@@ -2508,6 +2510,7 @@ static void deinit_device_functions( void )
 	qvkCmdDispatch								= NULL;
 	qvkCmdDraw									= NULL;
 	qvkCmdDrawIndexed							= NULL;
+	qvkCmdDrawIndexedIndirect					= NULL;
 	qvkCmdEndRenderPass							= NULL;
 	qvkCmdNextSubpass							= NULL;
 	qvkCmdPipelineBarrier						= NULL;
@@ -5067,6 +5070,11 @@ void vk_initialize( void )
 	vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, &vk.set_layout_uniform );
 	vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_VERTEX_BIT, &vk.set_layout_storage );
 	//vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, &vk.set_layout_input );
+	
+#ifdef USE_VK_PBR
+	// Material parameters storage buffer layout (for runtime material properties)
+	vk_create_layout_binding( 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT, &vk.set_layout_material );
+#endif
 
 	//
 	// Pipeline layouts.
@@ -5276,6 +5284,14 @@ void vk_create_pipelines( void )
 	
 	// Create compute post-processing pipelines if shaders are available
 	vk_create_compute_post_process_pipelines();
+	
+	// Create GIBS pipelines if enabled
+#ifdef USE_VULKAN_RAY_TRACING
+	if ( vk.gibs.enabled && vk.gibs.initialized ) {
+		extern void vk_gibs_create_pipelines( void );
+		vk_gibs_create_pipelines();
+	}
+#endif
 }
 
 #ifdef VK_PBR_BRDFLUT

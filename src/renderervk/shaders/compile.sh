@@ -104,9 +104,22 @@ echo "Compiling compute shaders..."
 for f in "$GLSL_DIR"/*.comp; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .comp)
-        if glslangValidator -S comp -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
-            if [ -f "$TOOLS_DIR/bin2hex" ] && [ -f "$TMP_FILE" ]; then
-            "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_comp_spv"
+        # Check if shader uses ray tracing extensions (GIBS shaders)
+        if grep -q "GL_EXT_ray_tracing" "$f" 2>/dev/null; then
+            # Ray tracing compute shaders need vulkan1.2 target environment
+            if glslangValidator -S comp --target-env vulkan1.2 -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
+                if [ -f "$TOOLS_DIR/bin2hex" ] && [ -f "$TMP_FILE" ]; then
+                    "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_comp_spv"
+                fi
+            else
+                echo "Warning: Failed to compile ray tracing compute shader: $f"
+            fi
+        else
+            # Standard compute shaders
+            if glslangValidator -S comp -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
+                if [ -f "$TOOLS_DIR/bin2hex" ] && [ -f "$TMP_FILE" ]; then
+                    "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_comp_spv"
+                fi
             fi
         fi
         rm -f "$TMP_FILE"

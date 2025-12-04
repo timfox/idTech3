@@ -102,6 +102,9 @@ void G_WorldState_Set( const char *key, float value, float transitionTime );
 float G_WorldState_Get( const char *key );
 void G_WorldState_Update( void );
 
+// Enemy spawning
+int G_Encounter_SpawnEnemy( encounter_t *encounter, const char *classname, const vec3_t origin, const vec3_t angles );
+
 // Lua integration
 void G_EncounterSystem_RegisterLuaFunctions( void *luaState );
 

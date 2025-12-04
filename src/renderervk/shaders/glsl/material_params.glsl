@@ -28,8 +28,8 @@ struct MaterialParams {
 #define MATERIAL_EMISSIVE  0x10
 #define MATERIAL_DYNAMIC   0x20
 
-// Material parameter buffer
-layout(std430, binding = 10) restrict readonly buffer MaterialParamsBuffer {
+// Material parameter buffer (set 9, binding 0)
+layout(set = 9, binding = 0, std430) restrict readonly buffer MaterialParamsBuffer {
     MaterialParams materials[];
 };
 

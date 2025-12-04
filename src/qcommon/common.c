@@ -26,6 +26,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_log.h"
 #include "q_memtrack.h"
 #include "i18n.h"
+#ifdef USE_CURL
+#include "q_telemetry.h"
+#endif
 #include <setjmp.h>
 #ifndef _WIN32
 #include <netinet/in.h>
@@ -4016,6 +4019,11 @@ void Com_Init( char *commandLine ) {
 	
 	// Initialize memory tracking system
 	Q_MemTrack_Init();
+	
+#ifdef USE_CURL
+	// Initialize telemetry system
+	Telemetry_Init();
+#endif
 
 	com_logfile = Cvar_Get( "logfile", "0", CVAR_TEMP );
 	Cvar_CheckRange( com_logfile, "0", "4", CV_INTEGER );
@@ -4595,6 +4603,11 @@ void Com_Frame( qboolean noDelay ) {
 	}
 #endif
 
+#ifdef USE_CURL
+	// Update telemetry system
+	Telemetry_Update();
+#endif
+
 	// if "dedicated" has been modified, start up
 	// or shut down the client system.
 	// Do this after the server may have started,
@@ -4719,6 +4732,11 @@ static void Com_Shutdown( void ) {
 	
 	// Shutdown structured logging system
 	Q_Log_Shutdown();
+	
+#ifdef USE_CURL
+	// Shutdown telemetry system
+	Telemetry_Shutdown();
+#endif
 	
 	if ( logfile != FS_INVALID_HANDLE ) {
 		FS_FCloseFile( logfile );
