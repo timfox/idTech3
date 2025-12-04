@@ -148,7 +148,18 @@ float RE_Text_Width_Improved(const char *text, float scale, fontInfo_t *font, in
 			}
 		}
 		
-		glyphInfo_t *glyph = &font->glyphs[c & 255];
+		glyphInfo_t *		glyph = &font->glyphs[c & 255];
+		
+		// Check fallback chain if glyph is missing
+		if (glyph->glyph == 0 && font->fallbackFont) {
+			fontInfo_t *fallback = font->fallbackFont;
+			glyphInfo_t *fallbackGlyph = &fallback->glyphs[c & 255];
+			if (fallbackGlyph->glyph != 0) {
+				glyph = fallbackGlyph;
+				useScale = scale * fallback->glyphScale;
+			}
+		}
+		
 		width += glyph->xSkip * useScale;
 		
 		// Apply kerning if available and enabled
@@ -200,17 +211,37 @@ float RE_Text_Height_Improved(const char *text, float scale, fontInfo_t *font, i
 		
 		unsigned char c = *s;
 		
-		// Handle UTF-8
+		// Handle UTF-8 with Unicode glyph mapping
 		if ((c & 0x80) != 0) {
-			int utf8Len = RE_UTF8_CharLength(s);
-			if (utf8Len > 0) {
-				s += utf8Len;
+			const unsigned char *utf8Start = s;
+			unsigned int codePoint = RE_UTF8_DecodeChar(&s);
+			if (codePoint != 0) {
+				extern glyphInfo_t *RE_FindUnicodeGlyphInFont(fontInfo_t *font, unsigned int codePoint);
+				glyphInfo_t *unicodeGlyph = RE_FindUnicodeGlyphInFont(font, codePoint);
+				if (unicodeGlyph && unicodeGlyph->glyph != 0) {
+					if (unicodeGlyph->height > maxHeight) {
+						maxHeight = unicodeGlyph->height;
+					}
+				}
 				count++;
 				continue;
 			}
+			s = utf8Start + 1;
+			count++;
+			continue;
 		}
 		
-		glyphInfo_t *glyph = &font->glyphs[c & 255];
+		glyphInfo_t *		glyph = &font->glyphs[c & 255];
+		
+		// Check fallback chain if glyph is missing
+		if (glyph->glyph == 0 && font->fallbackFont) {
+			fontInfo_t *fallback = font->fallbackFont;
+			glyphInfo_t *fallbackGlyph = &fallback->glyphs[c & 255];
+			if (fallbackGlyph->glyph != 0) {
+				glyph = fallbackGlyph;
+			}
+		}
+		
 		if (glyph->height > maxHeight) {
 			maxHeight = glyph->height;
 		}

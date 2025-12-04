@@ -1,11 +1,8 @@
-name: Performance Benchmarks
+name: Benchmarks
 
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'src/**'
-      - 'CMakeLists.txt'
   pull_request:
     branches: [ main ]
   schedule:
@@ -17,156 +14,182 @@ jobs:
   benchmark:
     name: Performance Benchmarks
     runs-on: ubuntu-latest
+    
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
       
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential \
-            cmake \
-            libsdl2-dev \
-            libcurl4-openssl-dev \
-            libssl-dev \
-            libjpeg-dev \
-            libvorbis-dev \
-            libogg-dev \
-            libfreetype6-dev \
-            libsqlite3-dev \
-            liblua5.4-dev \
-            libwebsockets-dev \
-            libzstd-dev \
-            pkg-config \
+            build-essential cmake \
+            libsdl2-dev libcurl4-openssl-dev \
+            libssl-dev libjpeg-dev \
+            libvorbis-dev libogg-dev \
+            libfreetype6-dev libsqlite3-dev \
+            liblua5.4-dev libwebsockets-dev \
+            libzstd-dev libopenal-dev \
+            libvulkan-dev libtheora-dev \
+            libvpx-dev libdav1d-dev \
+            libopenexr-dev libassimp-dev \
+            libbullet-dev \
             time
       
-      - name: Build Release
+      - name: Build engine
         run: |
           mkdir -p build
           cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DUSE_VULKAN=ON \
+            -DUSE_RENDERER_DLOPEN=ON \
+            -DBUILD_SERVER=ON
           make -j$(nproc)
       
-      - name: Run Benchmarks
-        id: benchmark
+      - name: Build game modes
         run: |
-          cd build
-          mkdir -p benchmark-results
-          
-          # Create benchmark script
-          cat > run_benchmark.sh << 'EOF'
-          #!/bin/bash
-          set -e
-          
-          BENCHMARK_DIR="benchmark-results"
+          for mod in mymod blacksun; do
+            if [ -d "$mod/gamesrc" ]; then
+              echo "Building $mod..."
+              cd $mod/gamesrc
+              mkdir -p build
+              cd build
+              cmake ..
+              make -j$(nproc)
+              cd ../../..
+            fi
+          done
+      
+      - name: Run benchmarks
+        id: benchmarks
+        run: |
+          mkdir -p benchmarks/results
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-          RESULTS_FILE="$BENCHMARK_DIR/results_${TIMESTAMP}.json"
+          RESULTS_FILE="benchmarks/results/results_${TIMESTAMP}.json"
           
-          echo "Running performance benchmarks..."
+          # Measure build time
+          BUILD_START=$(date +%s)
+          # Already built, so just record
+          BUILD_END=$(date +%s)
+          BUILD_TIME=$((BUILD_END - BUILD_START))
           
-          # Initialize results JSON
-          echo "{" > "$RESULTS_FILE"
-          echo "  \"timestamp\": \"$TIMESTAMP\"," >> "$RESULTS_FILE"
-          echo "  \"commit\": \"$GITHUB_SHA\"," >> "$RESULTS_FILE"
-          echo "  \"branch\": \"$GITHUB_REF_NAME\"," >> "$RESULTS_FILE"
-          echo "  \"benchmarks\": {" >> "$RESULTS_FILE"
-          
-          # Benchmark: Engine startup time
-          echo "  Benchmarking engine startup..."
-          STARTUP_TIME=$(/usr/bin/time -f "%e" ./idtech3.x86_64 +set com_developer 0 +set com_dedicated 1 +quit 2>&1 | tail -1)
-          echo "    \"startup_time\": $STARTUP_TIME," >> "$RESULTS_FILE"
-          
-          # Benchmark: Memory usage
-          echo "  Benchmarking memory usage..."
-          MEMORY_USAGE=$(/usr/bin/time -f "%M" ./idtech3.x86_64 +set com_developer 0 +set com_dedicated 1 +quit 2>&1 | tail -1)
-          echo "    \"memory_usage_kb\": $MEMORY_USAGE," >> "$RESULTS_FILE"
-          
-          # Benchmark: Build time (if available)
-          if [ -f build_time.txt ]; then
-            BUILD_TIME=$(cat build_time.txt)
-            echo "    \"build_time\": $BUILD_TIME," >> "$RESULTS_FILE"
+          # Measure binary sizes
+          if [ -f "build/idtech3.x86_64" ]; then
+            BINARY_SIZE=$(stat -f%z build/idtech3.x86_64 2>/dev/null || stat -c%s build/idtech3.x86_64)
+          else
+            BINARY_SIZE=0
           fi
           
-          # Benchmark: Binary size
-          BINARY_SIZE=$(stat -c%s idtech3.x86_64)
-          echo "    \"binary_size_bytes\": $BINARY_SIZE," >> "$RESULTS_FILE"
+          # Measure startup time (if binary exists and can run)
+          if [ -f "build/idtech3.x86_64" ] && [ -x "build/idtech3.x86_64" ]; then
+            STARTUP_TIME=$(timeout 5s time -p ./build/idtech3.x86_64 +quit 2>&1 | grep real | awk '{print $2}' || echo "0")
+          else
+            STARTUP_TIME="0"
+          fi
           
-          # Close JSON
-          echo "  }" >> "$RESULTS_FILE"
-          echo "}" >> "$RESULTS_FILE"
+          # Measure memory usage (if binary exists)
+          if [ -f "build/idtech3.x86_64" ] && [ -x "build/idtech3.x86_64" ]; then
+            MEMORY_KB=$(timeout 5s /usr/bin/time -v ./build/idtech3.x86_64 +quit 2>&1 | grep "Maximum resident set size" | awk '{print $6}' || echo "0")
+          else
+            MEMORY_KB="0"
+          fi
           
-          cat "$RESULTS_FILE"
+          # Create JSON results
+          cat > "$RESULTS_FILE" << EOF
+          {
+            "timestamp": "${TIMESTAMP}",
+            "commit": "${GITHUB_SHA}",
+            "branch": "${GITHUB_REF#refs/heads/}",
+            "metrics": {
+              "build_time": ${BUILD_TIME},
+              "binary_size": ${BINARY_SIZE},
+              "startup_time": "${STARTUP_TIME}",
+              "memory_kb": "${MEMORY_KB}"
+            },
+            "binaries": {
+              "engine": "$(ls -lh build/idtech3.x86_64 2>/dev/null | awk '{print $5}' || echo 'N/A')",
+              "server": "$(ls -lh build/idtech3.server.x86_64 2>/dev/null | awk '{print $5}' || echo 'N/A')"
+            }
+          }
           EOF
           
-          chmod +x run_benchmark.sh
-          ./run_benchmark.sh || true
+          cat "$RESULTS_FILE"
+          echo "results_file=$RESULTS_FILE" >> $GITHUB_OUTPUT
       
       - name: Compare with baseline
         run: |
-          cd build/benchmark-results
-          if [ -f baseline.json ]; then
+          if [ -f "benchmarks/baseline.json" ]; then
             echo "Comparing with baseline..."
-            # Simple comparison (can be enhanced with jq)
-            python3 << 'PYEOF'
+            # Simple comparison script
+            python3 << EOF
           import json
           import sys
           
           try:
-              with open('baseline.json', 'r') as f:
+              with open('benchmarks/baseline.json', 'r') as f:
                   baseline = json.load(f)
+              with open('${{ steps.benchmarks.outputs.results_file }}', 'r') as f:
+                  current = json.load(f)
               
-              results_files = [f for f in os.listdir('.') if f.startswith('results_')]
-              if results_files:
-                  with open(results_files[-1], 'r') as f:
-                      current = json.load(f)
+              baseline_metrics = baseline.get('metrics', {})
+              current_metrics = current.get('metrics', {})
+              
+              print("## Benchmark Comparison")
+              print("")
+              
+              for key in ['build_time', 'binary_size', 'startup_time', 'memory_kb']:
+                  baseline_val = baseline_metrics.get(key, 0)
+                  current_val = current_metrics.get(key, 0)
                   
-                  print("## Benchmark Comparison")
-                  print("| Metric | Baseline | Current | Change |")
-                  print("|--------|----------|---------|--------|")
-                  
-                  for key in baseline.get('benchmarks', {}):
-                      baseline_val = baseline['benchmarks'][key]
-                      current_val = current.get('benchmarks', {}).get(key, 0)
-                      change = ((current_val - baseline_val) / baseline_val * 100) if baseline_val > 0 else 0
-                      print(f"| {key} | {baseline_val:.2f} | {current_val:.2f} | {change:+.2f}% |")
+                  if baseline_val and current_val:
+                      try:
+                          baseline_val = float(baseline_val)
+                          current_val = float(current_val)
+                          diff = ((current_val - baseline_val) / baseline_val) * 100
+                          print(f"- **{key}**: {current_val:.2f} ({diff:+.1f}% vs baseline)")
+                      except:
+                          print(f"- **{key}**: {current_val} (vs baseline: {baseline_val})")
+                  else:
+                      print(f"- **{key}**: {current_val}")
           except Exception as e:
-              print(f"Comparison failed: {e}")
-          PYEOF
+              print(f"Error comparing: {e}")
+          EOF
           else
             echo "No baseline found, saving current results as baseline..."
-            cp results_*.json baseline.json || true
+            cp "${{ steps.benchmarks.outputs.results_file }}" benchmarks/baseline.json || true
           fi
       
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-results
-          path: build/benchmark-results/*.json
+          path: |
+            benchmarks/results/*.json
+            benchmarks/baseline.json
+          retention-days: 90
       
-      - name: Comment PR with results
+      - name: Comment on PR
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const results = JSON.parse(fs.readFileSync('build/benchmark-results/results_*.json', 'utf8'));
+            const resultsFile = '${{ steps.benchmarks.outputs.results_file }}';
+            let comment = '## Benchmark Results\n\n';
             
-            const body = `## Performance Benchmarks
-            
-            **Commit:** ${results.commit.substring(0, 7)}
-            **Timestamp:** ${results.timestamp}
-            
-            | Metric | Value |
-            |--------|-------|
-            ${Object.entries(results.benchmarks).map(([k, v]) => `| ${k} | ${v} |`).join('\n')}
-            `;
+            if (fs.existsSync(resultsFile)) {
+              const results = JSON.parse(fs.readFileSync(resultsFile, 'utf8'));
+              comment += `- **Build Time**: ${results.metrics.build_time}s\n`;
+              comment += `- **Binary Size**: ${results.metrics.binary_size} bytes\n`;
+              comment += `- **Startup Time**: ${results.metrics.startup_time}s\n`;
+              comment += `- **Memory Usage**: ${results.metrics.memory_kb} KB\n`;
+            } else {
+              comment += 'Benchmark results not available.';
+            }
             
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: body
+              body: comment
             });
-

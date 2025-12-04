@@ -350,7 +350,10 @@ void MenuField_Draw( menufield_s *f )
 	{
 		w = BIGCHAR_WIDTH;
 		style = UI_BIGFONT;
-	}	
+	}
+	
+	// Calculate field height based on font size
+	int h = (f->generic.flags & QMF_SMALLFONT) ? SMALLCHAR_HEIGHT : BIGCHAR_HEIGHT;
 
 	if (Menu_ItemAtCursor( f->generic.parent ) == f) {
 		focus = qtrue;
@@ -359,6 +362,9 @@ void MenuField_Draw( menufield_s *f )
 		// Steam Deck: Show on-screen keyboard when field gets focus
 		// Use trap functions for QVM/DLL compatibility
 		static qboolean textinput_shown = qfalse;
+		
+		// Only show keyboard if Steam Deck functions are available
+		// Check if text input is not already active
 		if ( !trap_SteamDeck_IsTextInputActive() && !textinput_shown ) {
 			// Calculate field bounds for floating keyboard
 			int fieldX = f->generic.x;
@@ -375,8 +381,19 @@ void MenuField_Draw( menufield_s *f )
 			char inputBuffer[MAX_EDIT_LINE];
 			trap_SteamDeck_GetTextInputResult( inputBuffer, sizeof( inputBuffer ) );
 			if ( inputBuffer[0] != '\0' ) {
-				Q_strncpyz( f->field.buffer, inputBuffer, sizeof( f->field.buffer ) );
-				f->field.cursor = strlen( f->field.buffer );
+				// Validate input length before copying
+				int inputLen = strlen( inputBuffer );
+				size_t bufferSize = sizeof( f->field.buffer );
+				if ( inputLen >= 0 && (size_t)inputLen < bufferSize ) {
+					Q_strncpyz( f->field.buffer, inputBuffer, bufferSize );
+					f->field.cursor = inputLen;
+				} else {
+					// Truncate if too long
+					size_t maxLen = bufferSize - 1;
+					Q_strncpyz( f->field.buffer, inputBuffer, maxLen + 1 );
+					f->field.buffer[maxLen] = '\0';
+					f->field.cursor = (int)maxLen;
+				}
 			}
 			textinput_shown = qfalse;
 		}
@@ -436,8 +453,20 @@ sfxHandle_t MenuField_Key( menufield_s* m, int* key )
 		char inputBuffer[MAX_EDIT_LINE];
 		trap_SteamDeck_GetTextInputResult( inputBuffer, sizeof( inputBuffer ) );
 		if ( inputBuffer[0] != '\0' ) {
-			Q_strncpyz( m->field.buffer, inputBuffer, sizeof( m->field.buffer ) );
-			m->field.cursor = strlen( m->field.buffer );
+			// Validate input length before copying
+			int inputLen = strlen( inputBuffer );
+			size_t bufferSize = sizeof( m->field.buffer );
+			int maxLen = m->field.maxchars ? m->field.maxchars : (int)(bufferSize - 1);
+			
+			if ( inputLen >= 0 && inputLen <= maxLen ) {
+				Q_strncpyz( m->field.buffer, inputBuffer, bufferSize );
+				m->field.cursor = inputLen;
+			} else {
+				// Truncate to max length
+				Q_strncpyz( m->field.buffer, inputBuffer, maxLen + 1 );
+				m->field.buffer[maxLen] = '\0';
+				m->field.cursor = maxLen;
+			}
 			return (0); // Consume the key
 		}
 	}

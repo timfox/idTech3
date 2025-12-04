@@ -69,6 +69,22 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //limit of the votemaps.cfg file and other custom map files
 #define	MAX_MAPS_TEXT		8192
 
+// Buffer sizes for print/error functions
+#define PRINT_BUFFER_SIZE		1024
+#define ERROR_BUFFER_SIZE		1024
+
+// Macro to stringify a value
+#define STRINGIFY(x) #x
+
+// Debug macros
+#ifdef DEBUG
+#define DEBUG_PRINTF(fmt, ...) G_Printf("[DEBUG] " fmt, ##__VA_ARGS__)
+#define DEBUG_ERROR(fmt, ...) G_Error("[DEBUG ERROR] " fmt, ##__VA_ARGS__)
+#else
+#define DEBUG_PRINTF(fmt, ...) ((void)0)
+#define DEBUG_ERROR(fmt, ...) ((void)0)
+#endif
+
 // gentity->flags
 #define	FL_GODMODE				0x00000010
 #define	FL_NOTARGET				0x00000020

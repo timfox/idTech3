@@ -92,8 +92,20 @@ static FT_Library ftLibrary = NULL;
 #endif
 
 #define MAX_FONTS 6
+#define MAX_FONT_CACHE 32  // Extended cache for better performance
 static int registeredFontCount = 0;
 static fontInfo_t registeredFont[MAX_FONTS];
+
+// Font cache entry for name+size lookup
+typedef struct {
+	char fontName[MAX_QPATH];
+	int pointSize;
+	fontInfo_t *font;
+	qboolean inUse;
+} fontCacheEntry_t;
+
+static fontCacheEntry_t fontCache[MAX_FONT_CACHE];
+static int fontCacheCount = 0;
 
 #ifdef USE_FREETYPE
 // Font rendering quality CVars (extern declarations)
@@ -445,15 +457,35 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 
 	//R_IssuePendingRenderCommands();
 
+	// Check font cache first (by name+size for better caching)
+	for (i = 0; i < fontCacheCount; i++) {
+		if (fontCache[i].inUse && 
+		    fontCache[i].pointSize == pointSize &&
+		    !Q_stricmp(fontCache[i].fontName, fontName)) {
+			// Found in cache - copy cached font
+			Com_Memcpy(font, fontCache[i].font, sizeof(fontInfo_t));
+			return;
+		}
+	}
+
 	if (registeredFontCount >= MAX_FONTS) {
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: Too many fonts registered already.\n");
 		return;
 	}
 
+	// Check pre-rendered font data files (legacy cache by point size only)
 	Com_sprintf(name, sizeof(name), "fonts/fontImage_%i.dat",pointSize);
 	for (i = 0; i < registeredFontCount; i++) {
 		if (Q_stricmp(name, registeredFont[i].name) == 0) {
 			Com_Memcpy(font, &registeredFont[i], sizeof(fontInfo_t));
+			// Also add to new cache
+			if (fontCacheCount < MAX_FONT_CACHE) {
+				fontCacheEntry_t *entry = &fontCache[fontCacheCount++];
+				Q_strncpyz(entry->fontName, fontName, sizeof(entry->fontName));
+				entry->pointSize = pointSize;
+				entry->font = &registeredFont[i];
+				entry->inUse = qtrue;
+			}
 			return;
 		}
 	}
@@ -775,7 +807,21 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 		}
 	}
 	
+	// Store font name and point size for caching
+	Q_strncpyz(font->name, fontName, sizeof(font->name));
+	font->pointSize = pointSize;
+	font->fallbackFont = NULL; // Initialize fallback pointer
+	
 	Com_Memcpy(&registeredFont[registeredFontCount++], font, sizeof(fontInfo_t));
+	
+	// Add to font cache for faster future lookups
+	if (fontCacheCount < MAX_FONT_CACHE) {
+		fontCacheEntry_t *entry = &fontCache[fontCacheCount++];
+		Q_strncpyz(entry->fontName, fontName, sizeof(entry->fontName));
+		entry->pointSize = pointSize;
+		entry->font = &registeredFont[registeredFontCount - 1];
+		entry->inUse = qtrue;
+	}
 
 	FreeType_DoneFace(face);
 	ri.FS_FreeFile(faceData);
@@ -798,6 +844,8 @@ void R_InitFreeType(void) {
 	}
 #endif
 	registeredFontCount = 0;
+	// Don't clear font cache on init - allows fonts to persist across level changes
+	// fontCacheCount = 0; // Keep cache for better performance
 }
 
 
@@ -806,6 +854,12 @@ void R_DoneFreeType(void) {
 	// FreeType shutdown is handled by FreeType_Shutdown() in common.c
 	ftLibrary = NULL;
 #endif
+	// Clear registered fonts but keep cache for faster reloading
 	registeredFontCount = 0;
+	// Optionally clear cache if memory is tight (uncomment if needed):
+	// fontCacheCount = 0;
+	// for (int i = 0; i < MAX_FONT_CACHE; i++) {
+	//     fontCache[i].inUse = qfalse;
+	// }
 }
 

@@ -1,0 +1,120 @@
+name: Full Build (Engine + Game Modes)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.gitignore'
+
+jobs:
+  build-all:
+    name: Build Everything
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake \
+            libsdl2-dev libcurl4-openssl-dev \
+            libssl-dev libjpeg-dev \
+            libvorbis-dev libogg-dev \
+            libfreetype6-dev libsqlite3-dev \
+            liblua5.4-dev libwebsockets-dev \
+            libzstd-dev libopenal-dev \
+            libvulkan-dev libtheora-dev \
+            libvpx-dev libdav1d-dev \
+            libopenexr-dev libassimp-dev \
+            libbullet-dev
+      
+      - name: Build engine
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DUSE_VULKAN=ON \
+            -DUSE_RENDERER_DLOPEN=ON \
+            -DBUILD_SERVER=ON
+          make -j$(nproc)
+      
+      - name: Build mymod game modules
+        run: |
+          if [ -d "mymod/gamesrc" ]; then
+            cd mymod/gamesrc
+            mkdir -p build
+            cd build
+            cmake ..
+            make -j$(nproc)
+            cd ../../..
+          fi
+      
+      - name: Build blacksun game modules
+        run: |
+          if [ -d "blacksun/gamesrc" ]; then
+            cd blacksun/gamesrc
+            mkdir -p build
+            cd build
+            cmake ..
+            make -j$(nproc)
+            cd ../../..
+          fi
+      
+      - name: Verify build outputs
+        run: |
+          echo "=== Engine Binaries ==="
+          ls -lh build/idtech3.* build/idtech3.server.* build/idtech3_*.so build/libimgui_shared.so 2>/dev/null || echo "Some binaries not found"
+          
+          echo ""
+          echo "=== Game Modules ==="
+          for mod in mymod blacksun; do
+            if [ -d "$mod/vm" ]; then
+              echo "$mod modules:"
+              ls -lh $mod/vm/*.so 2>/dev/null || echo "  No modules found"
+            fi
+          done
+      
+      - name: Package for release directory
+        run: |
+          mkdir -p release
+          
+          # Copy engine binaries
+          cp build/idtech3.x86_64 release/ 2>/dev/null || true
+          cp build/idtech3.server.x86_64 release/ 2>/dev/null || true
+          cp build/idtech3_*.so release/ 2>/dev/null || true
+          cp build/libimgui_shared.so release/ 2>/dev/null || true
+          
+          # Copy game modes
+          for mod in mymod blacksun; do
+            if [ -d "$mod" ]; then
+              mkdir -p release/$mod
+              # Copy mod files (excluding source)
+              rsync -a --exclude='gamesrc' --exclude='build' --exclude='*.o' \
+                $mod/ release/$mod/ || cp -r $mod/* release/$mod/ 2>/dev/null || true
+              
+              # Ensure VM directory exists
+              if [ -d "$mod/vm" ]; then
+                mkdir -p release/$mod/vm
+                cp $mod/vm/*.so release/$mod/vm/ 2>/dev/null || true
+              fi
+            fi
+          done
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-build-artifacts
+          path: |
+            release/
+            build/idtech3.*
+            build/idtech3.server.*
+            build/idtech3_*.so
+            build/libimgui_shared.so
+          retention-days: 7
+

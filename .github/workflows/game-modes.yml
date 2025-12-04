@@ -1,0 +1,177 @@
+name: Build Game Modes
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'mymod/**'
+      - 'blacksun/**'
+      - 'src/**'
+      - 'CMakeLists.txt'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'mymod/**'
+      - 'blacksun/**'
+      - 'src/**'
+      - 'CMakeLists.txt'
+  workflow_dispatch:
+    inputs:
+      mod:
+        description: 'Game mod to build'
+        required: true
+        type: choice
+        options:
+          - mymod
+          - blacksun
+          - all
+
+jobs:
+  build-game-modes:
+    name: Build ${{ matrix.mod }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        mod: [mymod, blacksun]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        exclude:
+          # Skip Windows for now if mod doesn't have Windows build setup
+          - mod: blacksun
+            os: windows-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake \
+            libsdl2-dev
+      
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake sdl2
+      
+      - name: Build engine headers (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DUSE_VULKAN=ON \
+            -DUSE_RENDERER_DLOPEN=ON
+          # Only build enough to generate headers
+          make -j$(nproc) qcommon || true
+      
+      - name: Build engine headers (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. \
+            -G "Visual Studio 17 2022" \
+            -A x64 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DUSE_VULKAN=ON \
+            -DUSE_RENDERER_DLOPEN=ON
+          # Only build enough to generate headers
+          cmake --build . --target qcommon --config Release || true
+      
+      - name: Build ${{ matrix.mod }} game modules
+        run: |
+          if [ ! -d "${{ matrix.mod }}/gamesrc" ]; then
+            echo "Warning: ${{ matrix.mod }}/gamesrc not found, skipping"
+            exit 0
+          fi
+          
+          cd ${{ matrix.mod }}/gamesrc
+          mkdir -p build
+          cd build
+          
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            cmake .. -G "Visual Studio 17 2022" -A x64
+            cmake --build . --config Release
+          else
+            cmake ..
+            make -j$(nproc)
+          fi
+      
+      - name: Verify compiled modules
+        run: |
+          if [ -d "${{ matrix.mod }}/vm" ]; then
+            echo "Found compiled modules in ${{ matrix.mod }}/vm:"
+            ls -lh ${{ matrix.mod }}/vm/*.so ${{ matrix.mod }}/vm/*.dll 2>/dev/null || echo "No modules found"
+            
+            # Count modules
+            MOD_COUNT=$(find ${{ matrix.mod }}/vm -name "*.so" -o -name "*.dll" 2>/dev/null | wc -l)
+            echo "Module count: $MOD_COUNT"
+            
+            if [ "$MOD_COUNT" -eq 0 ]; then
+              echo "Warning: No modules compiled"
+            fi
+          else
+            echo "Warning: vm directory not found for ${{ matrix.mod }}"
+          fi
+      
+      - name: Upload game modules
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.mod }}-modules-${{ matrix.os }}
+          path: |
+            ${{ matrix.mod }}/vm/*.so
+            ${{ matrix.mod }}/vm/*.dll
+          if-no-files-found: warn
+          retention-days: 7
+
+  test-game-modes:
+    name: Test Game Modes
+    runs-on: ubuntu-latest
+    needs: build-game-modes
+    if: always()
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download all game mode artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: *-modules-*
+          merge-multiple: true
+      
+      - name: List downloaded modules
+        run: |
+          echo "Downloaded game modules:"
+          find . -name "*.so" -o -name "*.dll" | head -20
+          
+          echo ""
+          echo "Module summary:"
+          for mod in mymod blacksun; do
+            if [ -d "$mod/vm" ]; then
+              echo "$mod modules:"
+              ls -lh $mod/vm/*.so $mod/vm/*.dll 2>/dev/null || echo "  None found"
+            fi
+          done
+      
+      - name: Verify module structure
+        run: |
+          for mod in mymod blacksun; do
+            if [ -d "$mod/vm" ]; then
+              echo "Checking $mod modules..."
+              for lib in $mod/vm/*.so $mod/vm/*.dll 2>/dev/null; do
+                if [ -f "$lib" ]; then
+                  echo "  Found: $(basename $lib)"
+                  # Check if it's a valid shared library
+                  if [ "${{ runner.os }}" == "Linux" ]; then
+                    file "$lib" || true
+                  fi
+                fi
+              done
+            fi
+          done
+

@@ -1442,7 +1442,9 @@ typedef struct {
   int kerning[256]; // kerning offsets for common character pairs (optional optimization)
 } glyphInfo_t;
 
-typedef struct {
+typedef struct fontInfo_s fontInfo_t; // Forward declaration for fallback pointer
+
+struct fontInfo_s {
   glyphInfo_t glyphs [GLYPHS_PER_FONT];
   float glyphScale;
   char name[MAX_QPATH];
@@ -1452,7 +1454,8 @@ typedef struct {
   float dpi;                // DPI used for rendering
   char familyName[64];      // font family name
   char styleName[64];       // font style name (Regular, Bold, Italic, etc.)
-} fontInfo_t;
+  fontInfo_t *fallbackFont; // fallback font for missing glyphs
+};
 
 #define Square(x) ((x)*(x))
 

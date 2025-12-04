@@ -46,6 +46,13 @@ MAIN MENU
 #define MAIN_MENU_VERTICAL_SPACING		38  // Increased spacing for better readability
 #define MAIN_MENU_ANIMATION_SPEED		0.003f  // Animation speed multiplier
 #define MAIN_MENU_PULSE_INTENSITY		0.15f   // Pulse effect intensity
+#define MAIN_MENU_VERSION_COLOR_R		0.7f    // Version text color (gray)
+#define MAIN_MENU_VERSION_COLOR_G		0.7f
+#define MAIN_MENU_VERSION_COLOR_B		0.7f
+#define MAIN_MENU_VERSION_COLOR_A		0.8f
+
+// Error message buffer size
+#define ERROR_MESSAGE_SIZE				4096
 
 
 typedef struct {
@@ -69,7 +76,7 @@ static mainmenu_t s_main;
 
 typedef struct {
 	menuframework_s menu;
-	char errorMessage[4096];
+	char errorMessage[ERROR_MESSAGE_SIZE];
 } errorMessage_t;
 
 static errorMessage_t s_errorMessage;
@@ -265,18 +272,27 @@ static void Main_MenuDraw( void )
 		Menu_Draw( &s_main.menu );
 	}
 
-	// Draw mod title with improved styling
+	// Draw mod title with improved styling and modern font rendering
 	vec4_t titleColorPulse;
 	Vector4Copy( titleColor, titleColorPulse );
 	titleColorPulse[3] *= pulse;  // Pulse alpha for subtle effect
 	UI_DrawProportionalString( 320, 372, "", UI_CENTER|UI_SMALLFONT, color );
-	UI_DrawProportionalString( 320, 400, "MY MOD TEMPLATE", UI_CENTER|UI_SMALLFONT|UI_DROPSHADOW, titleColorPulse );
+	// Use bigger font for title with improved rendering
+	UI_DrawProportionalString( 320, 400, "MY MOD TEMPLATE", UI_CENTER|UI_BIGFONT|UI_DROPSHADOW, titleColorPulse );
 
 	// Draw version info with better positioning and styling
-	vec4_t versionColor = {0.7f, 0.7f, 0.7f, 0.8f};  // Subtle gray
+	vec4_t versionColor = {
+		MAIN_MENU_VERSION_COLOR_R,
+		MAIN_MENU_VERSION_COLOR_G,
+		MAIN_MENU_VERSION_COLOR_B,
+		MAIN_MENU_VERSION_COLOR_A
+	};
 	UI_DrawString( 640-20, 480-16, "^7v1.0", UI_SMALLFONT|UI_RIGHT, versionColor );
-	if ((int)trap_Cvar_VariableValue("protocol")!=68) { // OA_STD_PROTOCOL
-		UI_DrawString( 20, 480-16, va("^7Protocol: %i",(int)trap_Cvar_VariableValue("protocol")), UI_SMALLFONT, versionColor);
+	
+	// Show protocol version if not standard
+	int protocol = (int)trap_Cvar_VariableValue("protocol");
+	if (protocol != 68) { // OA_STD_PROTOCOL
+		UI_DrawString( 20, 480-16, va("^7Protocol: %i", protocol), UI_SMALLFONT, versionColor);
 	}
 }
 

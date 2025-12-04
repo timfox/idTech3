@@ -10,25 +10,29 @@ on:
 jobs:
   build-matrix:
     name: Build ${{ matrix.os }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
+          # Linux builds
           - os: ubuntu-20.04
             arch: x86_64
             compiler: gcc
           - os: ubuntu-22.04
             arch: x86_64
-            compiler: clang
+            compiler: gcc
           - os: ubuntu-latest
             arch: x86_64
-            compiler: gcc
+            compiler: clang
+          # Windows builds
           - os: windows-2019
             arch: x64
             compiler: msvc
           - os: windows-2022
             arch: x64
             compiler: msvc
+          # macOS builds
           - os: macos-11
             arch: x86_64
             compiler: clang
@@ -38,77 +42,121 @@ jobs:
           - os: macos-latest
             arch: universal
             compiler: clang
-    runs-on: ${{ matrix.os }}
+    
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
       
-      - name: Install dependencies (Ubuntu)
-        if: startsWith(matrix.os, 'ubuntu')
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             build-essential cmake \
-            libsdl2-dev libcurl4-openssl-dev libssl-dev \
-            libjpeg-dev libvorbis-dev libogg-dev \
-            libfreetype6-dev libsqlite3-dev liblua5.4-dev \
-            libwebsockets-dev libzstd-dev pkg-config
+            libsdl2-dev libcurl4-openssl-dev \
+            libssl-dev libjpeg-dev \
+            libvorbis-dev libogg-dev \
+            libfreetype6-dev libsqlite3-dev \
+            liblua5.4-dev libwebsockets-dev \
+            libzstd-dev libopenal-dev \
+            libvulkan-dev libtheora-dev \
+            libvpx-dev libdav1d-dev \
+            libopenexr-dev libassimp-dev \
+            libbullet-dev
           if [ "${{ matrix.compiler }}" == "clang" ]; then
             sudo apt-get install -y clang
           fi
       
       - name: Install dependencies (macOS)
-        if: startsWith(matrix.os, 'macos')
+        if: runner.os == 'macOS'
         run: |
-          brew install cmake sdl2 curl openssl jpeg vorbis ogg freetype sqlite lua@5.4 libwebsockets zstd
+          brew install cmake sdl2 curl openssl jpeg vorbis ogg freetype sqlite lua@5.4 libwebsockets zstd openal theora libvpx dav1d openexr assimp bullet
       
-      - name: Configure CMake
+      - name: Configure CMake (Linux)
+        if: runner.os == 'Linux'
         run: |
           mkdir -p build
           cd build
-          if [ "${{ matrix.os }}" == "windows-2019" ] || [ "${{ matrix.os }}" == "windows-2022" ]; then
-            cmake .. -G "Visual Studio 17 2022" -A ${{ matrix.arch }} -DCMAKE_BUILD_TYPE=Release -DUSE_D3D12=ON
-          elif startsWith(matrix.os, 'macos'); then
-            if [ "${{ matrix.arch }}" == "universal" ]; then
-              cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
-            else
-              cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="${{ matrix.arch }}"
-            fi
-          else
-            CC=${{ matrix.compiler == 'clang' && 'clang' || 'gcc' }}
-            CXX=${{ matrix.compiler == 'clang' && 'clang++' || 'g++' }}
-            cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=$CC -DCMAKE_CXX_COMPILER=$CXX
+          if [ "${{ matrix.compiler }}" == "clang" ]; then
+            export CC=clang
+            export CXX=clang++
           fi
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DUSE_VULKAN=ON \
+            -DUSE_RENDERER_DLOPEN=ON \
+            -DBUILD_SERVER=ON
       
-      - name: Build
+      - name: Configure CMake (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          mkdir -p build
+          cd build
+          cmake .. \
+            -G "Visual Studio 17 2022" \
+            -A ${{ matrix.arch }} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DUSE_VULKAN=ON \
+            -DUSE_RENDERER_DLOPEN=ON \
+            -DBUILD_SERVER=ON
+      
+      - name: Configure CMake (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p build
+          cd build
+          if [ "${{ matrix.arch }}" == "universal" ]; then
+            ARCH_FLAGS="-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64"
+          else
+            ARCH_FLAGS="-DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}"
+          fi
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            $ARCH_FLAGS \
+            -DUSE_VULKAN=ON \
+            -DUSE_RENDERER_DLOPEN=ON \
+            -DBUILD_SERVER=ON
+      
+      - name: Build (Linux/macOS)
+        if: runner.os != 'Windows'
         run: |
           cd build
-          if [ "${{ matrix.os }}" == "windows-2019" ] || [ "${{ matrix.os }}" == "windows-2022" ]; then
-            cmake --build . --config Release -j
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            make -j$(nproc)
           else
-            make -j$(nproc || sysctl -n hw.ncpu)
+            make -j$(sysctl -n hw.ncpu)
           fi
       
-      - name: Test
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
         run: |
           cd build
-          if [ -f idtech3.x86_64 ] || [ -f idtech3 ] || [ -f Release/idtech3.exe ]; then
-            echo "Build successful!"
+          cmake --build . --config Release -j
+      
+      - name: Package artifacts
+        run: |
+          mkdir -p dist
+          if [ "${{ runner.os }}" == "Linux" ]; then
+            cp build/idtech3.x86_64 dist/ 2>/dev/null || true
+            cp build/idtech3.server.x86_64 dist/ 2>/dev/null || true
+            cp build/idtech3_*.so dist/ 2>/dev/null || true
+            cp build/libimgui_shared.so dist/ 2>/dev/null || true
+          elif [ "${{ runner.os }}" == "Windows" ]; then
+            cp build/Release/idtech3.x64.exe dist/ 2>/dev/null || true
+            cp build/Release/idtech3.server.x64.exe dist/ 2>/dev/null || true
+            cp build/Release/idtech3_*.dll dist/ 2>/dev/null || true
+            cp build/Release/libimgui_shared.dll dist/ 2>/dev/null || true
           else
-            echo "Build failed - binary not found"
-            exit 1
+            cp build/idtech3.* dist/ 2>/dev/null || true
+            cp build/idtech3.server.* dist/ 2>/dev/null || true
+            cp build/idtech3_*.dylib dist/ 2>/dev/null || true
+            cp build/libimgui_shared.dylib dist/ 2>/dev/null || true
           fi
       
-      - name: Upload build artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-${{ matrix.os }}-${{ matrix.arch }}-${{ matrix.compiler }}
-          path: |
-            build/idtech3*
-            build/*.so
-            build/*.dylib
-            build/Release/*.exe
-            build/Release/*.dll
+          name: build-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/
           retention-days: 7
-

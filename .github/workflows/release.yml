@@ -7,155 +7,217 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version'
+        description: 'Release version (e.g., 1.0.0)'
         required: true
-        default: '1.0.0'
+        type: string
 
 jobs:
-  build-all-platforms:
-    name: Build All Platforms
+  build-release:
+    name: Build Release ${{ matrix.os }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
-            name: linux-x86_64
-            artifact: linux-release
+            arch: x86_64
+            suffix: x86_64
           - os: windows-latest
-            name: windows-x64
-            artifact: windows-release
+            arch: x64
+            suffix: x64
           - os: macos-latest
-            name: macos-universal
-            artifact: macos-release
-    runs-on: ${{ matrix.os }}
+            arch: universal
+            suffix: macos
+    
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
+      
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          fi
       
       - name: Install dependencies (Linux)
-        if: matrix.os == 'ubuntu-latest'
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             build-essential cmake \
-            libsdl2-dev libcurl4-openssl-dev libssl-dev \
-            libjpeg-dev libvorbis-dev libogg-dev \
-            libfreetype6-dev libsqlite3-dev liblua5.4-dev \
-            libwebsockets-dev libzstd-dev pkg-config
+            libsdl2-dev libcurl4-openssl-dev \
+            libssl-dev libjpeg-dev \
+            libvorbis-dev libogg-dev \
+            libfreetype6-dev libsqlite3-dev \
+            liblua5.4-dev libwebsockets-dev \
+            libzstd-dev libopenal-dev \
+            libvulkan-dev libtheora-dev \
+            libvpx-dev libdav1d-dev \
+            libopenexr-dev libassimp-dev \
+            libbullet-dev
       
       - name: Install dependencies (macOS)
-        if: matrix.os == 'macos-latest'
+        if: runner.os == 'macOS'
         run: |
-          brew install cmake sdl2 curl openssl jpeg vorbis ogg freetype sqlite lua@5.4 libwebsockets zstd
+          brew install cmake sdl2 curl openssl jpeg vorbis ogg freetype sqlite lua@5.4 libwebsockets zstd openal theora libvpx dav1d openexr assimp bullet
       
-      - name: Configure CMake
+      - name: Build engine
         run: |
           mkdir -p build
           cd build
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            cmake .. -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release -DUSE_D3D12=ON
-          elif [ "${{ matrix.os }}" == "macos-latest" ]; then
-            cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="x86_64;arm64"
-          else
-            cmake .. -DCMAKE_BUILD_TYPE=Release
-          fi
-      
-      - name: Build
-        run: |
-          cd build
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            cmake .. \
+              -G "Visual Studio 17 2022" \
+              -A ${{ matrix.arch }} \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DUSE_VULKAN=ON \
+              -DUSE_RENDERER_DLOPEN=ON \
+              -DBUILD_SERVER=ON
             cmake --build . --config Release -j
-          else
-            make -j$(nproc || sysctl -n hw.ncpu)
-          fi
-      
-      - name: Package Release
-        run: |
-          mkdir -p release-package
-          cd build
-          
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            cp Release/idtech3.exe ../release-package/
-            cp Release/idtech3.server.exe ../release-package/
-            cp Release/*.dll ../release-package/ || true
-          elif [ "${{ matrix.os }}" == "macos-latest" ]; then
-            cp idtech3 ../release-package/
-            cp idtech3.server ../release-package/
-            cp *.dylib ../release-package/ || true
-            # Create universal binary if needed
-            if [ -f idtech3 ]; then
-              lipo -create -output ../release-package/idtech3 idtech3 || cp idtech3 ../release-package/
+          elif [ "${{ runner.os }}" == "macOS" ]; then
+            if [ "${{ matrix.arch }}" == "universal" ]; then
+              ARCH_FLAGS="-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64"
+            else
+              ARCH_FLAGS="-DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }}"
             fi
+            cmake .. \
+              -DCMAKE_BUILD_TYPE=Release \
+              $ARCH_FLAGS \
+              -DUSE_VULKAN=ON \
+              -DUSE_RENDERER_DLOPEN=ON \
+              -DBUILD_SERVER=ON
+            make -j$(sysctl -n hw.ncpu)
           else
-            cp idtech3.x86_64 ../release-package/
-            cp idtech3.server.x86_64 ../release-package/
-            cp *.so ../release-package/ || true
+            cmake .. \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DUSE_VULKAN=ON \
+              -DUSE_RENDERER_DLOPEN=ON \
+              -DBUILD_SERVER=ON
+            make -j$(nproc)
           fi
       
-      - name: Create Release Archive
+      - name: Build game modes
         run: |
-          cd release-package
-          VERSION=${GITHUB_REF#refs/tags/v}
-          VERSION=${VERSION:-${{ github.event.inputs.version }}}
+          for mod in mymod blacksun; do
+            if [ -d "$mod/gamesrc" ]; then
+              echo "Building $mod..."
+              cd $mod/gamesrc
+              mkdir -p build
+              cd build
+              if [ "${{ runner.os }}" == "Windows" ]; then
+                cmake .. -G "Visual Studio 17 2022" -A ${{ matrix.arch }}
+                cmake --build . --config Release
+              else
+                cmake ..
+                make -j$(nproc)
+              fi
+              cd ../../..
+            fi
+          done
+      
+      - name: Package release
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          PLATFORM="${{ matrix.suffix }}"
           
-          if [ "${{ matrix.os }}" == "windows-latest" ]; then
-            zip -r ../idtech3-${{ matrix.name }}-${VERSION}.zip .
+          mkdir -p release/idtech3-$VERSION-$PLATFORM
+          
+          # Copy engine binaries
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            cp build/Release/idtech3.x64.exe release/idtech3-$VERSION-$PLATFORM/
+            cp build/Release/idtech3.server.x64.exe release/idtech3-$VERSION-$PLATFORM/ 2>/dev/null || true
+            cp build/Release/idtech3_*.dll release/idtech3-$VERSION-$PLATFORM/ 2>/dev/null || true
+            cp build/Release/libimgui_shared.dll release/idtech3-$VERSION-$PLATFORM/ 2>/dev/null || true
+          elif [ "${{ runner.os }}" == "macOS" ]; then
+            cp build/idtech3.* release/idtech3-$VERSION-$PLATFORM/ 2>/dev/null || true
+            cp build/idtech3.server.* release/idtech3-$VERSION-$PLATFORM/ 2>/dev/null || true
+            cp build/idtech3_*.dylib release/idtech3-$VERSION-$PLATFORM/ 2>/dev/null || true
+            cp build/libimgui_shared.dylib release/idtech3-$VERSION-$PLATFORM/ 2>/dev/null || true
           else
-            tar czf ../idtech3-${{ matrix.name }}-${VERSION}.tar.gz .
+            cp build/idtech3.x86_64 release/idtech3-$VERSION-$PLATFORM/
+            cp build/idtech3.server.x86_64 release/idtech3-$VERSION-$PLATFORM/ 2>/dev/null || true
+            cp build/idtech3_*.so release/idtech3-$VERSION-$PLATFORM/ 2>/dev/null || true
+            cp build/libimgui_shared.so release/idtech3-$VERSION-$PLATFORM/ 2>/dev/null || true
+          fi
+          
+          # Copy game modes
+          for mod in mymod blacksun; do
+            if [ -d "$mod" ]; then
+              mkdir -p release/idtech3-$VERSION-$PLATFORM/$mod
+              # Copy mod assets (excluding source and build artifacts)
+              rsync -a --exclude='gamesrc' --exclude='build' --exclude='*.o' \
+                $mod/ release/idtech3-$VERSION-$PLATFORM/$mod/ || cp -r $mod/* release/idtech3-$VERSION-$PLATFORM/$mod/ 2>/dev/null || true
+              
+              # Copy compiled modules
+              if [ -d "$mod/vm" ]; then
+                mkdir -p release/idtech3-$VERSION-$PLATFORM/$mod/vm
+                cp $mod/vm/*.so $mod/vm/*.dll release/idtech3-$VERSION-$PLATFORM/$mod/vm/ 2>/dev/null || true
+              fi
+            fi
+          done
+          
+          # Copy documentation
+          cp README.md LICENSE.md release/idtech3-$VERSION-$PLATFORM/ 2>/dev/null || true
+          
+          # Create archive
+          cd release
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            # Use PowerShell on Windows
+            Compress-Archive -Path "idtech3-$VERSION-$PLATFORM" -DestinationPath "idtech3-$VERSION-$PLATFORM.zip"
+          else
+            tar czf idtech3-$VERSION-$PLATFORM.tar.gz idtech3-$VERSION-$PLATFORM
           fi
       
-      - name: Upload Artifacts
+      - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact }}
-          path: |
-            idtech3-${{ matrix.name }}-*.zip
-            idtech3-${{ matrix.name }}-*.tar.gz
+          name: release-${{ matrix.suffix }}
+          path: release/idtech3-${{ steps.version.outputs.VERSION }}-${{ matrix.suffix }}.*
+          retention-days: 30
 
   create-release:
-    name: Create Release
-    needs: build-all-platforms
+    name: Create GitHub Release
     runs-on: ubuntu-latest
+    needs: build-release
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    
     steps:
-      - uses: actions/checkout@v4
+      - name: Get version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
       
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
       
-      - name: Get version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          else
-            VERSION=${GITHUB_REF#refs/tags/v}
-            echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          fi
-      
-      - name: Create Release
+      - name: Create release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: Release v${{ steps.version.outputs.version }}
+          tag_name: v${{ steps.version.outputs.VERSION }}
+          name: Release v${{ steps.version.outputs.VERSION }}
           body: |
-            ## Release v${{ steps.version.outputs.version }}
+            ## Release v${{ steps.version.outputs.VERSION }}
             
             ### Downloads
+            - Linux x86_64: `idtech3-${{ steps.version.outputs.VERSION }}-x86_64.tar.gz`
+            - Windows x64: `idtech3-${{ steps.version.outputs.VERSION }}-x64.zip`
+            - macOS: `idtech3-${{ steps.version.outputs.VERSION }}-macos.tar.gz`
             
-            - **Linux x86_64**: [idtech3-linux-x86_64.tar.gz](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/idtech3-linux-x86_64-${{ steps.version.outputs.version }}.tar.gz)
-            - **Windows x64**: [idtech3-windows-x64.zip](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/idtech3-windows-x64-${{ steps.version.outputs.version }}.zip)
-            - **macOS Universal**: [idtech3-macos-universal.tar.gz](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/idtech3-macos-universal-${{ steps.version.outputs.version }}.tar.gz)
+            ### Included Game Modes
+            - mymod
+            - blacksun
             
-            ### Changes
-            
-            See [CHANGELOG.md](CHANGELOG.md) for details.
+            ### Build Information
+            - Built with CMake
+            - Vulkan renderer enabled
+            - Includes OpenGL fallback renderer
           files: |
-            artifacts/**/*.zip
-            artifacts/**/*.tar.gz
+            artifacts/release-*/*
           draft: false
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

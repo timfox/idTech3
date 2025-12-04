@@ -1,0 +1,52 @@
+// Modern HUD configuration with improved fonts
+// This file demonstrates how to use modern TrueType fonts in menus
+
+loadmenu {
+	menudef {
+		name "assetGlobalDef"
+		fullScreen 0
+		focusColor 1 1 0.5 1.0
+		disableColor 0.5 0.5 0.5 1.0
+		descriptorColor 1 1 1 1.0
+		outlineColor 0.5 0.5 0.5 1.0
+		background "menu/art/cut_frame"
+		cursor "ui/assets/3_cursor2"
+		
+		// Modern font configuration
+		// Use TrueType fonts for better quality and Unicode support
+		font "fonts/roboto-regular.ttf" 16
+		smallFont "fonts/roboto-regular.ttf" 12
+		bigFont "fonts/roboto-bold.ttf" 24
+		
+		// Menu sounds
+		menuEnterSound "sound/misc/menu1.wav"
+		menuExitSound "sound/misc/menu3.wav"
+		itemFocusSound "sound/misc/menu2.wav"
+		menuBuzzSound "sound/misc/menu4.wav"
+		
+		// UI elements
+		gradientBar "menu/art/gradientbar2"
+		fxBasePic "menu/art/fx_base"
+		fxPic[0] "menu/art/fx_red"
+		fxPic[1] "menu/art/fx_yellow"
+		fxPic[2] "menu/art/fx_green"
+		fxPic[3] "menu/art/fx_teal"
+		fxPic[4] "menu/art/fx_blue"
+		fxPic[5] "menu/art/fx_cyan"
+		fxPic[6] "menu/art/fx_white"
+		scrollBar "menu/art/scrollbar_thumb"
+		scrollBarArrowDown "menu/art/scrollbar_arrow_down"
+		scrollBarArrowUp "menu/art/scrollbar_arrow_up"
+		scrollBarArrowLeft "menu/art/scrollbar_arrow_left"
+		scrollBarArrowRight "menu/art/scrollbar_arrow_right"
+		scrollBarThumb "menu/art/scrollbar_thumb"
+		sliderBar "menu/art/slider2"
+		sliderThumb "menu/art/sliderbutt_1"
+	}
+}
+
+// Note: To use this HUD configuration:
+// 1. Set cg_hudFiles to "ui/hud_modern.txt"
+// 2. Ensure font files exist in fonts/ directory
+// 3. Fonts will be automatically loaded with kerning and antialiasing enabled
+

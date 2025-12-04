@@ -387,3 +387,20 @@ int			trap_LAN_GetServerPing( int source, int n ) {
 	return syscall( UI_LAN_GETSERVERPING, source, n );
 }
 
+// Steam Deck text input functions
+qboolean	trap_SteamDeck_ShowTextInput( const char *description, const char *existingText, int maxChars, qboolean multiline ) {
+	return syscall( UI_STEAMDECK_SHOW_TEXTINPUT, description, existingText, maxChars, multiline );
+}
+
+qboolean	trap_SteamDeck_ShowFloatingTextInput( int x, int y, int width, int height ) {
+	return syscall( UI_STEAMDECK_SHOW_FLOATING_TEXTINPUT, x, y, width, height );
+}
+
+qboolean	trap_SteamDeck_IsTextInputActive( void ) {
+	return syscall( UI_STEAMDECK_IS_TEXTINPUT_ACTIVE );
+}
+
+void		trap_SteamDeck_GetTextInputResult( char *buffer, int bufferSize ) {
+	syscall( UI_STEAMDECK_GET_TEXTINPUT_RESULT, buffer, bufferSize );
+}
+

@@ -2574,20 +2574,38 @@ void ClientCommand( int clientNum )
 	char      cmd[ MAX_TOKEN_CHARS ];
 	int       i;
 
+	// Validate client number
+	if (clientNum < 0 || clientNum >= MAX_CLIENTS) {
+		G_Printf("ClientCommand: invalid client number %d\n", clientNum);
+		return;
+	}
+
 	ent = g_entities + clientNum;
  	if (!ent->client || ent->client->pers.connected != CON_CONNECTED) {
 		if (ent->client && ent->client->pers.localClient) {
 			// Handle early team command sent by UI when starting a local
 			// team play game.
 			trap_Argv( 0, cmd, sizeof( cmd ) );
-			if (Q_stricmp (cmd, "team") == 0) {
-				Cmd_Team_f (ent);
+			// Validate command string
+			if (cmd[0] != '\0' && strlen(cmd) < sizeof(cmd)) {
+				if (Q_stricmp (cmd, "team") == 0) {
+					Cmd_Team_f (ent);
+				}
 			}
 		}
 		return;   // not fully in game yet
 	}
 
 	trap_Argv( 0, cmd, sizeof( cmd ) );
+	
+	// Validate command string length
+	if (cmd[0] == '\0') {
+		// Empty command - ignore
+		return;
+	}
+	
+	// Ensure null termination
+	cmd[sizeof(cmd) - 1] = '\0';
 
 	for( i = 0; i < numCmds; i++ ) {
 		if( Q_strequal( cmd, cmds[ i ].cmdName ) ) {
@@ -2598,7 +2616,10 @@ void ClientCommand( int clientNum )
 	if( i == numCmds ) {
 		// KK-OAX Admin Command Check
 		if( !G_admin_cmd_check( ent, qfalse ) ) {
-			trap_SendServerCommand( clientNum, va( "print \"Unknown command %s\n\"", cmd ) );
+			// Sanitize command name for output (prevent format string attacks)
+			char safeCmd[MAX_TOKEN_CHARS];
+			Q_strncpyz(safeCmd, cmd, sizeof(safeCmd));
+			trap_SendServerCommand( clientNum, va( "print \"Unknown command %s\n\"", safeCmd ) );
 		}
 		return;
 	}

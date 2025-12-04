@@ -44,6 +44,16 @@ qboolean RE_RegisterFontFallback(const char *primaryFontName, int pointSize, con
 		return qfalse;
 	
 	RE_RegisterFont(primaryFontName, pointSize, primaryFont);
+	
+	// Link fallback fonts in chain
+	if (fallbackCount > 0 && fallbackNames[0]) {
+		fontInfo_t *firstFallback = ri.Malloc(sizeof(fontInfo_t));
+		if (firstFallback) {
+			RE_RegisterFont(fallbackNames[0], pointSize, firstFallback);
+			primaryFont->fallbackFont = firstFallback; // Link first fallback
+		}
+	}
+	
 	chain->fonts[chain->count++] = primaryFont;
 	
 	// Register fallback fonts

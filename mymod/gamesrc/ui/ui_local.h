@@ -784,6 +784,12 @@ qboolean               trap_VerifyCDKey( const char *key, const char *chksum); /
 
 void			trap_SetPbClStatus( int status );
 
+// Steam Deck text input functions
+qboolean	trap_SteamDeck_ShowTextInput( const char *description, const char *existingText, int maxChars, qboolean multiline );
+qboolean	trap_SteamDeck_ShowFloatingTextInput( int x, int y, int width, int height );
+qboolean	trap_SteamDeck_IsTextInputActive( void );
+void		trap_SteamDeck_GetTextInputResult( char *buffer, int bufferSize );
+
 //
 // ui_addbots.c
 //

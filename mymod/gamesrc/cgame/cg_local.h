@@ -57,6 +57,28 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define	ATTACKER_HEAD_TIME	10000
 #define	REWARD_TIME			3000
 
+// Buffer sizes for print/error functions
+#define PRINT_BUFFER_SIZE		1024
+#define ERROR_BUFFER_SIZE		1024
+
+// Font configuration constants
+#define MAX_FONT_CONFIG_SIZE		65536	// Maximum size of font config file (64KB)
+#define MAX_FONT_POINT_SIZE			200		// Maximum font point size
+#define MIN_FONT_POINT_SIZE			1		// Minimum font point size
+#define MAX_FONT_FALLBACKS			4		// Maximum number of fallback fonts
+
+// Macro to stringify a value
+#define STRINGIFY(x) #x
+
+// Debug macros
+#ifdef DEBUG
+#define DEBUG_PRINTF(fmt, ...) CG_Printf("[DEBUG] " fmt, ##__VA_ARGS__)
+#define DEBUG_ERROR(fmt, ...) CG_Error("[DEBUG ERROR] " fmt, ##__VA_ARGS__)
+#else
+#define DEBUG_PRINTF(fmt, ...) ((void)0)
+#define DEBUG_ERROR(fmt, ...) ((void)0)
+#endif
+
 #define	PULSE_SCALE			1.5			// amount to scale up the icons when activating
 
 #define	MAX_STEP_CHANGE		32
@@ -1533,6 +1555,7 @@ void CG_UpdateCvars( void );
 int CG_CrosshairPlayer( void );
 int CG_LastAttacker( void );
 void CG_LoadMenus(const char *menuFile);
+void CG_LoadFontConfig(void);
 void CG_KeyEvent(int key, qboolean down);
 void CG_MouseEvent(int dx, int dy);
 void CG_EventHandling(int type);

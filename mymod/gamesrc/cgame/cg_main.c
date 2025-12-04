@@ -640,22 +640,48 @@ int CG_LastAttacker(void) {
 
 void QDECL CG_Printf(const char *msg, ...) {
 	va_list argptr;
-	char text[1024];
+	char text[PRINT_BUFFER_SIZE];
+	int result;
 
 	va_start(argptr, msg);
-	Q_vsnprintf(text, sizeof (text), msg, argptr);
+	result = Q_vsnprintf(text, sizeof (text), msg, argptr);
 	va_end(argptr);
+
+	// Ensure null termination even if truncation occurred
+	text[sizeof(text) - 1] = '\0';
+	
+	// Log warning if message was truncated (only in debug builds)
+	#ifdef DEBUG
+	if (result >= (int)sizeof(text)) {
+		trap_Print( "WARNING: CG_Printf message truncated (max %d chars)\n", PRINT_BUFFER_SIZE );
+	}
+	#else
+	(void)result; // Suppress unused variable warning in release builds
+	#endif
 
 	trap_Print(text);
 }
 
 void QDECL CG_Error(const char *msg, ...) {
 	va_list argptr;
-	char text[1024];
+	char text[ERROR_BUFFER_SIZE];
+	int result;
 
 	va_start(argptr, msg);
-	Q_vsnprintf(text, sizeof (text), msg, argptr);
+	result = Q_vsnprintf(text, sizeof (text), msg, argptr);
 	va_end(argptr);
+
+	// Ensure null termination even if truncation occurred
+	text[sizeof(text) - 1] = '\0';
+	
+	// Log warning if message was truncated (only in debug builds)
+	#ifdef DEBUG
+	if (result >= (int)sizeof(text)) {
+		trap_Print( "WARNING: CG_Error message truncated (max %d chars)\n", ERROR_BUFFER_SIZE );
+	}
+	#else
+	(void)result; // Suppress unused variable warning in release builds
+	#endif
 
 	trap_Error(text);
 }
@@ -2290,6 +2316,9 @@ void CG_LoadHudMenu(void) {
 	}
 
 	CG_LoadMenus(hudSet);
+	
+	// Load custom fonts from configuration
+	CG_LoadFontConfig();
 }
 
 void CG_AssetCache(void) {
