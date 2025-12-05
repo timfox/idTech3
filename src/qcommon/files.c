@@ -1743,6 +1743,18 @@ static qboolean FS_IsExt( const char *filename, const char *ext, size_t namelen 
 	return !Q_stricmp( filename, ext );
 }
 
+/*
+============
+FS_IsPakExt
+
+Return qtrue if filename ends with a supported pak extension (.pk3 or .orb)
+============
+*/
+static qboolean FS_IsPakExt( const char *filename, size_t namelen )
+{
+	return FS_IsExt( filename, ".pk3", namelen ) || FS_IsExt( filename, ".orb", namelen );
+}
+
 
 /*
 ===========
@@ -2335,9 +2347,9 @@ extern qboolean		com_fullyInitialized;
 		return -1;
 	}
 
-	// make sure the q3key file is only readable by the quake3.exe at initialization
+	// make sure the key file is only readable by the quake3.exe at initialization
 	// any other time the key should only be accessed in memory using the provided functions
-	if ( com_fullyInitialized && strstr( filename, "q3key" ) ) {
+	if ( com_fullyInitialized && strstr( filename, "key" ) ) {
 		*file = FS_INVALID_HANDLE;
 		return -1;
 	}
@@ -3815,8 +3827,9 @@ static pack_t *FS_LoadZipFile( const char *zipfile )
 	Com_Memcpy( pack->pakFilename, zipfile, fileNameLen );
 	Com_Memcpy( pack->pakBasename, basename, baseNameLen );
 
-	// strip .pk3 if needed
+	// strip pak extension if needed
 	FS_StripExt( pack->pakBasename, ".pk3" );
+	FS_StripExt( pack->pakBasename, ".orb" );
 
 	unzGoToFirstFile( uf );
 	curFile = pack->buildBuffer;
@@ -4983,8 +4996,8 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 	// find all pak files in this directory
 	Q_strncpyz( curpath, FS_BuildOSPath( path, dir, NULL ), sizeof( curpath ) );
 
-	// Get .pk3 files
-	pakfiles = Sys_ListFiles( curpath, ".pk3", NULL, &numfiles, 0 );
+	// Get pak files (.pk3 and .orb) - filter manually to allow multiple extensions
+	pakfiles = Sys_ListFiles( curpath, NULL, NULL, &numfiles, 0 );
 
 	if ( numfiles >= 2 )
 		FS_SortFileList( pakfiles, numfiles - 1 );
@@ -5022,8 +5035,8 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 		if ( pakwhich ) {
 
 			len = strlen( pakfiles[pakfilesi] );
-			if ( !FS_IsExt( pakfiles[pakfilesi], ".pk3", len ) ) {
-				// not a pk3 file
+			if ( !FS_IsPakExt( pakfiles[pakfilesi], len ) ) {
+				// not a pak file
 				pakfilesi++;
 				continue;
 			}
@@ -5576,7 +5589,12 @@ static void FS_Startup( void ) {
 	fs_homepath = Cvar_Get( "fs_homepath", homePath, CVAR_INIT | CVAR_PROTECTED | CVAR_PRIVATE );
 	Cvar_SetDescription( fs_homepath, "Directory to store user configuration and downloaded files." );
 
-	fs_gamedirvar = Cvar_Get( "fs_game", "", CVAR_INIT | CVAR_SYSTEMINFO );
+	// Default fs_game value - can be set at compile time for monolithic builds
+	#ifdef DEFAULT_FS_GAME
+		fs_gamedirvar = Cvar_Get( "fs_game", DEFAULT_FS_GAME, CVAR_INIT | CVAR_SYSTEMINFO );
+	#else
+		fs_gamedirvar = Cvar_Get( "fs_game", "", CVAR_INIT | CVAR_SYSTEMINFO );
+	#endif
 	Cvar_SetDescription( fs_gamedirvar, "Specify an alternate mod directory and run the game with this mod." );
 
 	if ( FS_IsBaseGame( fs_gamedirvar->string ) ) {

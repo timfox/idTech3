@@ -36,6 +36,14 @@ and one exported function: Perform
 
 #include "vm_local.h"
 
+#ifdef COMBINED_MONOLITH
+	#ifndef _WIN32
+		#include <dlfcn.h>  // For dlsym and RTLD_DEFAULT
+	#else
+		#include <windows.h>  // For GetModuleHandle and GetProcAddress
+	#endif
+#endif
+
 opcode_info_t ops[ OP_MAX ] =
 {
 	// size, stack, nargs, flags
@@ -204,9 +212,65 @@ const char *opname[ 256 ] = {
 };
 
 cvar_t	*vm_rtChecks;
+cvar_t	*vm_combined;
 
 #ifdef DEBUG
 int		vm_debugLevel;
+#endif
+
+// Monolithic build: function pointers for statically linked game modules
+#ifdef COMBINED_MONOLITH
+// Forward declarations for statically linked module entry points
+// These will be resolved at link time from the static libraries
+// Note: Must match QDECL calling convention
+extern void QDECL dllEntry_game( dllSyscall_t syscallptr );
+extern intptr_t QDECL vmMain_game( int command, int arg0, int arg1, int arg2 );
+
+extern void QDECL dllEntry_cgame( dllSyscall_t syscallptr );
+extern intptr_t QDECL vmMain_cgame( int command, int arg0, int arg1, int arg2 );
+
+extern void QDECL dllEntry_ui( dllSyscall_t syscallptr );
+extern intptr_t QDECL vmMain_ui( int command, int arg0, int arg1, int arg2 );
+
+// Get entry points from statically linked modules using direct extern references
+// Since modules are statically linked, we can reference them directly
+static void *VM_GetCombinedEntryPoint( vmIndex_t index, vmMainFunc_t *entryPoint, dllSyscall_t dllSyscalls ) {
+	const char *moduleName;
+	dllEntry_t dllEntryFunc;
+	
+	// Map index to module-specific function pointers
+	switch ( index ) {
+		case VM_GAME:
+			moduleName = "qagame";
+			dllEntryFunc = dllEntry_game;
+			*entryPoint = (vmMainFunc_t)vmMain_game;
+			break;
+		case VM_CGAME:
+			moduleName = "cgame";
+			dllEntryFunc = dllEntry_cgame;
+			*entryPoint = (vmMainFunc_t)vmMain_cgame;
+			break;
+		case VM_UI:
+			moduleName = "ui";
+			dllEntryFunc = dllEntry_ui;
+			*entryPoint = (vmMainFunc_t)vmMain_ui;
+			break;
+		default:
+			return NULL;
+	}
+	
+	if ( !dllEntryFunc || !*entryPoint ) {
+		// Symbols not found - this shouldn't happen if modules are properly linked
+		Com_Printf( "VM_GetCombinedEntryPoint: Failed to get function pointers for %s\n", moduleName );
+		return NULL;
+	}
+	
+	// Call dllEntry to initialize the module
+	dllEntryFunc( dllSyscalls );
+	
+	// Return a dummy handle (not NULL so VM knows it's loaded)
+	return (void*)1;
+}
 #endif
 
 // used by Com_Error to get rid of running vm's before longjmp
@@ -274,6 +338,19 @@ void VM_Init( void ) {
 	Cvar_Get( "vm_cgame", "2", CVAR_ARCHIVE | CVAR_PROTECTED );	// !@# SHIP WITH SET TO 2
 #endif
 	Cvar_Get( "vm_game", "2", CVAR_ARCHIVE | CVAR_PROTECTED );	// !@# SHIP WITH SET TO 2
+
+	// Monolithic build detection
+	#ifdef COMBINED_MONOLITH
+		vm_combined = Cvar_Get( "vm_combined", "1", CVAR_INIT | CVAR_ROM | CVAR_PROTECTED );
+		Cvar_SetDescription( vm_combined, "Indicates that game modules are statically linked into the executable (monolithic build)" );
+		// Force-enable combined path even if an old config archived a different value.
+		if ( vm_combined->integer != 1 ) {
+			Cvar_ForceReset( "vm_combined" );
+		}
+	#else
+		vm_combined = Cvar_Get( "vm_combined", "0", CVAR_INIT | CVAR_ROM | CVAR_PROTECTED );
+		Cvar_SetDescription( vm_combined, "Indicates that game modules are statically linked into the executable (monolithic build)" );
+	#endif
 
 	Cmd_AddCommand( "vmprofile", VM_VmProfile_f );
 	Cmd_AddCommand( "vminfo", VM_VmInfo_f );
@@ -1858,6 +1935,17 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 
 	vm = &vmTable[ index ];
 
+	/* For monolithic builds, force native interpretation so we prefer the
+	 * statically-linked entry points instead of attempting to load QVM/DLL.
+	 * If the static symbols are missing, we still fall through to the normal
+	 * QVM/DLL path below.
+	 */
+#ifdef COMBINED_MONOLITH
+	if ( vm_combined && vm_combined->integer ) {
+		interpret = VMI_NATIVE;
+	}
+#endif
+
 	// see if we already have the VM
 	if ( vm->name ) {
 		if ( vm->index != index ) {
@@ -1884,53 +1972,92 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 	}
 
 	if ( interpret == VMI_NATIVE ) {
-		// try to load as a system library (.so/.dll)
-	if ( com_developer && com_developer->integer ) {
-		Com_Printf( "VM_Create: Loading library file %s (index=%d)\n", name, index );
-	}
-	
-	// Preload game.x86_64.so if loading UI module, since UI depends on it
-	// This ensures the dependency is available when dlopen resolves ../vm/game.x86_64.so
-	// NOTE: We do NOT call dllEntry on the preloaded handle - it will be called when
-	// the game module is properly loaded for the server with the correct syscall pointer
-	if ( index == VM_UI ) {
-		char preloadName[ MAX_QPATH ];
-		Com_sprintf( preloadName, sizeof( preloadName ), "game." ARCH_STRING DLL_EXT );
-		if ( com_developer && com_developer->integer ) {
-			Com_Printf( "VM_Create: Preloading %s for UI dependency\n", preloadName );
-		}
-		void *gameHandle = FS_LoadLibrary( preloadName );
-		if ( gameHandle ) {
+		// Check if this is a monolithic build with combined modules
+		if ( vm_combined && vm_combined->integer ) {
+			// Monolithic build: modules are statically linked, skip library loading
 			if ( com_developer && com_developer->integer ) {
-				Com_Printf( "VM_Create: Preloaded %s for UI dependency (not initializing syscall pointer)\n", preloadName );
+				Com_Printf( "VM_Create: Monolithic build detected (vm_combined=1), skipping library load for %s\n", name );
 			}
-			// Don't unload it - UI needs it
-			// Don't call dllEntry - it will be called when game module is loaded for server
+			
+			// For monolithic builds, we need to get entry points from statically linked modules
+			// This will be handled by the linker resolving symbols from static libraries
+			#ifdef COMBINED_MONOLITH
+				// Try to get entry point from statically linked module
+				// The linker will resolve these symbols from the static libraries we linked
+				void *combinedHandle = VM_GetCombinedEntryPoint( index, &vm->entryPoint, dllSyscalls );
+				if ( combinedHandle && vm->entryPoint ) {
+					vm->dllHandle = combinedHandle;
+					vm->privateFlag = 0; // allow reading private cvars
+					vm->dataAlloc = ~0U;
+					vm->dataMask = ~0U;
+					vm->dataBase = 0;
+					Com_Printf( "VM_Create: Using statically linked %s, entryPoint=%p\n", name, (void*)vm->entryPoint );
+					// Debug: verify function pointer
+					if ( index == VM_GAME ) {
+						extern intptr_t QDECL vmMain_game( int command, int arg0, int arg1, int arg2 );
+						Com_Printf( "VM_Create: vmMain_game address=%p, vm->entryPoint=%p\n", (void*)vmMain_game, (void*)vm->entryPoint );
+						Com_Printf( "VM_Create: Calling dllEntry_game to initialize syscall pointer\n" );
+					}
+					return vm;
+				} else {
+					Com_Error( ERR_DROP, "VM_Create: monolithic build expected statically linked %s but entry point was missing", name );
+				}
+			#else
+				// vm_combined is set but COMBINED_MONOLITH not defined - shouldn't happen
+				Com_Printf( "VM_Create: WARNING - vm_combined set but COMBINED_MONOLITH not defined\n" );
+				interpret = VMI_COMPILED;
+			#endif
 		} else {
-			Com_Printf( "VM_Create: WARNING - Failed to preload %s\n", preloadName );
-		}
-	}
-	
-	if ( com_developer && com_developer->integer ) {
-		Com_Printf( "VM_Create: Calling VM_LoadLib for %s\n", name );
-	}
-	vm->dllHandle = VM_LoadLib( name, &vm->entryPoint, dllSyscalls );
-	if ( vm->dllHandle ) {
-		if ( com_developer && com_developer->integer ) {
-			Com_Printf( "VM_Create: VM_LoadLib succeeded for %s, entryPoint=%p\n", name, (void*)vm->entryPoint );
-		}
-		vm->privateFlag = 0; // allow reading private cvars
-		vm->dataAlloc = ~0U;
-		vm->dataMask = ~0U;
-		vm->dataBase = 0;
-		if ( com_developer && com_developer->integer ) {
-			Com_Printf( "VM_Create: Returning VM for %s\n", name );
-		}
-		return vm;
-	}
+			// Normal build: try to load as a system library (.so/.dll)
+			if ( com_developer && com_developer->integer ) {
+				Com_Printf( "VM_Create: Loading library file %s (index=%d)\n", name, index );
+			}
+			
+			// Preload game.x86_64.so if loading UI module, since UI depends on it
+			// This ensures the dependency is available when dlopen resolves ../vm/game.x86_64.so
+			// NOTE: We do NOT call dllEntry on the preloaded handle - it will be called when
+			// the game module is properly loaded for the server with the correct syscall pointer
+			if ( index == VM_UI ) {
+				char preloadName[ MAX_QPATH ];
+				Com_sprintf( preloadName, sizeof( preloadName ), "game." ARCH_STRING DLL_EXT );
+				if ( com_developer && com_developer->integer ) {
+					Com_Printf( "VM_Create: Preloading %s for UI dependency\n", preloadName );
+				}
+				void *gameHandle = FS_LoadLibrary( preloadName );
+				if ( gameHandle ) {
+					if ( com_developer && com_developer->integer ) {
+						Com_Printf( "VM_Create: Preloaded %s for UI dependency (not initializing syscall pointer)\n", preloadName );
+					}
+					// Don't unload it - UI needs it
+					// Don't call dllEntry - it will be called when game module is loaded for server
+				} else {
+					if ( com_developer && com_developer->integer ) {
+						Com_Printf( "VM_Create: WARNING - Failed to preload %s (this is normal for monolithic builds)\n", preloadName );
+					}
+				}
+			}
+			
+			if ( com_developer && com_developer->integer ) {
+				Com_Printf( "VM_Create: Calling VM_LoadLib for %s\n", name );
+			}
+			vm->dllHandle = VM_LoadLib( name, &vm->entryPoint, dllSyscalls );
+			if ( vm->dllHandle ) {
+				if ( com_developer && com_developer->integer ) {
+					Com_Printf( "VM_Create: VM_LoadLib succeeded for %s, entryPoint=%p\n", name, (void*)vm->entryPoint );
+				}
+				vm->privateFlag = 0; // allow reading private cvars
+				vm->dataAlloc = ~0U;
+				vm->dataMask = ~0U;
+				vm->dataBase = 0;
+				if ( com_developer && com_developer->integer ) {
+					Com_Printf( "VM_Create: Returning VM for %s\n", name );
+				}
+				return vm;
+			}
 
-		Com_Printf( "VM_Create: Failed to load dll for %s, looking for qvm.\n", name );
-		interpret = VMI_COMPILED;
+			Com_Printf( "VM_Create: Failed to load dll for %s, looking for qvm.\n", name );
+			interpret = VMI_COMPILED;
+		}
 	}
 
 	// load the image
@@ -2127,6 +2254,11 @@ intptr_t QDECL VM_Call( vm_t *vm, int nargs, int callnum, ... )
 			args[i] = va_arg( ap, int32_t );
 		}
 		va_end( ap );
+		
+		// Ensure unused arguments are zero-initialized
+		for ( i = nargs; i < MAX_VMMAIN_CALL_ARGS-1; i++ ) {
+			args[i] = 0;
+		}
 
 		// add more arguments if you're changed MAX_VMMAIN_CALL_ARGS:
 		r = vm->entryPoint( callnum, args[0], args[1], args[2] );

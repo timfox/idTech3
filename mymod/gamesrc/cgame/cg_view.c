@@ -320,12 +320,12 @@ static void CG_OffsetThirdPersonView( void ) {
 		//cg.refdefViewAngles[YAW] -= cg_thirdPersonAngle.value;	 // can't do this right now.
 
 		{
-			vec3_t			forward, up;
+			vec3_t			forwardTmp, upTmp;
 
 			cg.refdef.vieworg[2] -= 24;
-			AngleVectors( cg.refdefViewAngles, forward, NULL, up );
-			VectorMA( cg.refdef.vieworg, 1, forward, cg.refdef.vieworg );
-			VectorMA( cg.refdef.vieworg, 24, up, cg.refdef.vieworg );
+			AngleVectors( cg.refdefViewAngles, forwardTmp, NULL, upTmp );
+			VectorMA( cg.refdef.vieworg, 1, forwardTmp, cg.refdef.vieworg );
+			VectorMA( cg.refdef.vieworg, 24, upTmp, cg.refdef.vieworg );
 		}
 
 

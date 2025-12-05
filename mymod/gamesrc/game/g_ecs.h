@@ -10,7 +10,7 @@ Game module ECS integration with gentity_t bridge for game logic.
 #define __G_ECS_H__
 
 #include "g_local.h"
-#include "../../../../src/qcommon/ecs.h"
+#include "ecs.h"
 
 #ifdef USE_ENTT
 

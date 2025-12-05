@@ -1861,6 +1861,13 @@ void CG_CheckChangedPredictableEvents( playerState_t *ps );
 // These functions are how the cgame communicates with the main game system
 //
 
+// cgame entry points (exported)
+Q_EXPORT void dllEntry( intptr_t (QDECL  *syscallptr)( intptr_t arg,... ) );
+#ifdef COMBINED_MONOLITH
+Q_EXPORT void QDECL dllEntry_cgame( dllSyscall_t syscallptr );
+#endif
+int PASSFLOAT( float x );
+
 // print message on the local console
 void		trap_Print( const char *fmt );
 

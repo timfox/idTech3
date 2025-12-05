@@ -78,7 +78,7 @@ void SendAttackingTeamMessageToAllClients( void ) {
 }
 
 //the elimination start function
-void StartEliminationRound(void) {
+static void StartEliminationRound(void) {
 
 	int		countsLiving[TEAM_NUM_TEAMS];
 	countsLiving[TEAM_BLUE] = TeamLivingCount( -1, TEAM_BLUE );

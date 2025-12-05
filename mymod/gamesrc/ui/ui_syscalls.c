@@ -35,6 +35,15 @@ Q_EXPORT void dllEntry( intptr_t (QDECL  *syscallptr)( intptr_t arg,... ) ) {
 	syscall = syscallptr;
 }
 
+// Monolithic build: export with unique name for static linking
+// Match dllEntry_t signature exactly
+#ifdef COMBINED_MONOLITH
+#include "../qcommon/qcommon.h"
+Q_EXPORT void QDECL dllEntry_ui( dllSyscall_t syscallptr ) {
+	dllEntry( syscallptr );
+}
+#endif
+
 
 int PASSFLOAT( float x ) {
 	float	floatTemp;

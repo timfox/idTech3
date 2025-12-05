@@ -242,11 +242,11 @@ void FORMAT_PRINTF(1, 2) QDECL Com_Printf( const char *fmt, ... ) {
 
 	// logfile
 	if ( com_logfile && com_logfile->integer ) {
-		// TTimo: only open the qconsole.log if the filesystem is in an initialized state
-		//   also, avoid recursing in the qconsole.log opening (i.e. if fs_debug is on)
+		// TTimo: only open the console.log if the filesystem is in an initialized state
+		//   also, avoid recursing in the console.log opening (i.e. if fs_debug is on)
 		// Check fs_startupInProgress to avoid calling FS_FOpenFileWrite/FS_FOpenFileAppend during startup
 		if ( logfile == FS_INVALID_HANDLE && FS_Initialized() && !opening_qconsole && !FS_StartupInProgress() ) {
-			const char *logName = "qconsole.log";
+			const char *logName = "console.log";
 			int mode;
 
 			opening_qconsole = qtrue;
@@ -1919,6 +1919,10 @@ NOTE:	never write over the memory CopyString returns because
 */
 char *CopyString( const char *in ) {
 	char *out;
+	if ( !in ) {
+		Com_Printf( "CopyString: NULL input parameter, returning empty string\n" );
+		in = ""; // Use empty string as fallback
+	}
 #ifdef USE_STATIC_TAGS
 	if ( in[0] == '\0' ) {
 		return ((char *)&emptystring) + sizeof(memblock_t);
@@ -3349,7 +3353,7 @@ void Com_ReadCDKey( const char *filename ) {
 	char			buffer[33];
 	char			fbuffer[MAX_OSPATH];
 
-	Com_sprintf( fbuffer, sizeof( fbuffer ), "%s/q3key", filename );
+	Com_sprintf( fbuffer, sizeof( fbuffer ), "%s/key", filename );
 
 	FS_SV_FOpenFileRead( fbuffer, &f );
 	if ( f == FS_INVALID_HANDLE ) {
@@ -3380,7 +3384,7 @@ void Com_AppendCDKey( const char *filename ) {
 	char			buffer[33];
 	char			fbuffer[MAX_OSPATH];
 
-	Com_sprintf(fbuffer, sizeof(fbuffer), "%s/q3key", filename);
+	Com_sprintf(fbuffer, sizeof(fbuffer), "%s/key", filename);
 
 	FS_SV_FOpenFileRead( fbuffer, &f );
 	if ( f == FS_INVALID_HANDLE ) {
@@ -3415,7 +3419,7 @@ static void Com_WriteCDKey( const char *filename, const char *ikey ) {
 	mode_t			savedumask;
 #endif
 
-	Com_sprintf( fbuffer, sizeof(fbuffer), "%s/q3key", filename );
+	Com_sprintf( fbuffer, sizeof(fbuffer), "%s/key", filename );
 
 	Q_strncpyz( key, ikey, 17 );
 

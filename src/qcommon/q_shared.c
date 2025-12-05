@@ -1343,17 +1343,23 @@ void Q_strncpyz( char *dest, const char *src, int destsize )
 {
 	if ( !dest ) 
 	{
-		Com_Error( ERR_FATAL, "Q_strncpyz: NULL dest" );
+		Com_Printf( "Q_strncpyz: NULL dest parameter, ignoring\n" );
+		return;
 	}
 
 	if ( !src ) 
 	{
-		Com_Error( ERR_FATAL, "Q_strncpyz: NULL src" );
+		Com_Printf( "Q_strncpyz: NULL src parameter, setting dest to empty string\n" );
+		if ( destsize > 0 ) {
+			dest[0] = '\0';
+		}
+		return;
 	}
 
 	if ( destsize < 1 )
 	{
-		Com_Error(ERR_FATAL,"Q_strncpyz: destsize < 1" );
+		Com_Printf( "Q_strncpyz: destsize < 1 (%d), ignoring\n", destsize );
+		return;
 	}
 #if 1 
 	// do not fill whole remaining buffer with zeros

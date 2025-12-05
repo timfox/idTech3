@@ -177,12 +177,12 @@ void CG_PredictWeaponEffects( centity_t *cent ) {
 
 			if ( cgs.glconfig.hardwareType != GLHW_RAGEPRO ) {
 				// ragepro can't alpha fade, so don't even bother with smoke
-				vec3_t			up;
+				vec3_t			smokeUp;
 
 				contents = trap_CM_PointContents( muzzlePoint, 0 );
 				if ( !( contents & CONTENTS_WATER ) ) {
-					VectorSet( up, 0, 0, 8 );
-					CG_SmokePuff( v, up, 32, 1, 1, 1, 0.33f, 900, cg.time, 0, LEF_PUFF_DONT_SCALE, cgs.media.shotgunSmokePuffShader );
+					VectorSet( smokeUp, 0, 0, 8 );
+					CG_SmokePuff( v, smokeUp, 32, 1, 1, 1, 0.33f, 900, cg.time, 0, LEF_PUFF_DONT_SCALE, cgs.media.shotgunSmokePuffShader );
 				}
 			}
 

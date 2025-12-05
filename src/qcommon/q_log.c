@@ -200,7 +200,7 @@ static void Q_Log_RotateFile(void) {
 	log_state.file_handle = FS_INVALID_HANDLE;
 	log_state.current_file_size = 0;
 	
-	// Rotate existing files (qconsole.log -> qconsole.log.1, etc.)
+	// Rotate existing files (console.log -> console.log.1, etc.)
 	char old_name[MAX_LOG_FILENAME];
 	char new_name[MAX_LOG_FILENAME];
 	
@@ -610,7 +610,7 @@ void Q_Log_Init(void) {
 	Cvar_SetDescription(log_format, "Log format (0=text, 1=JSON)");
 	log_output = Cvar_Get("log_output", "3", CVAR_ARCHIVE);
 	Cvar_SetDescription(log_output, "Log output destinations (1=console, 2=file, 4=syslog, combine with +)");
-	log_file = Cvar_Get("log_file", "qconsole.log", CVAR_ARCHIVE);
+	log_file = Cvar_Get("log_file", "console.log", CVAR_ARCHIVE);
 	Cvar_SetDescription(log_file, "Log file name");
 	log_rotation_size = Cvar_Get("log_rotation_size", va("%d", DEFAULT_ROTATION_SIZE_MB), CVAR_ARCHIVE);
 	Cvar_SetDescription(log_rotation_size, "Log rotation size in MB (0=disabled)");
@@ -626,7 +626,7 @@ void Q_Log_Init(void) {
 	// The file backend is more complex (FS_Restart, homepath, rotation, etc.) and
 	// we want the engine to be rock‑solid even if that path misbehaves.
 	log_state.output_flags = LOG_OUTPUT_CONSOLE;
-	Q_strncpyz(log_state.filename, "qconsole.log", sizeof(log_state.filename));
+	Q_strncpyz(log_state.filename, "console.log", sizeof(log_state.filename));
 	log_state.rotation_size_mb = DEFAULT_ROTATION_SIZE_MB;
 	log_state.rotation_time_hours = DEFAULT_ROTATION_TIME_HOURS;
 	

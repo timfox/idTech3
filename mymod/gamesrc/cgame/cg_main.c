@@ -46,7 +46,14 @@ This is the only way control passes into the module.
 This must be the very first function compiled into the .q3vm file
 ================
  */
+// For monolithic builds, use QDECL to match calling convention
+// Note: In monolithic builds, we need to avoid symbol conflicts with game/ui modules
+// So we make vmMain static (internal linkage) and use vmMain_cgame as the exported entry point
+#ifdef COMBINED_MONOLITH
+static intptr_t QDECL vmMain(int command, int arg0, int arg1, int arg2, [[maybe_unused]] int arg3, [[maybe_unused]] int arg4, [[maybe_unused]] int arg5, [[maybe_unused]] int arg6, [[maybe_unused]] int arg7, [[maybe_unused]] int arg8, [[maybe_unused]] int arg9, [[maybe_unused]] int arg10, [[maybe_unused]] int arg11) {
+#else
 Q_EXPORT intptr_t vmMain(int command, int arg0, int arg1, int arg2, [[maybe_unused]] int arg3, [[maybe_unused]] int arg4, [[maybe_unused]] int arg5, [[maybe_unused]] int arg6, [[maybe_unused]] int arg7, [[maybe_unused]] int arg8, [[maybe_unused]] int arg9, [[maybe_unused]] int arg10, [[maybe_unused]] int arg11) {
+#endif
 
 	switch (command) {
 		case CG_INIT:
@@ -84,6 +91,18 @@ Q_EXPORT intptr_t vmMain(int command, int arg0, int arg1, int arg2, [[maybe_unus
 	}
 	return -1;
 }
+
+// Monolithic build: export with unique name for static linking
+// Match vmMainFunc_t signature (4 parameters) - engine only passes 4 args
+// Must use QDECL to match calling convention
+// Directly call vmMain with proper arguments - vmMain will handle the extra parameters as unused
+#ifdef COMBINED_MONOLITH
+Q_EXPORT intptr_t QDECL vmMain_cgame( int command, int arg0, int arg1, int arg2 ) {
+	// Call vmMain directly - both functions use QDECL so calling convention matches
+	// Pass the 4 real arguments plus zeros for the unused parameters
+	return vmMain( command, arg0, arg1, arg2, 0, 0, 0, 0, 0, 0, 0, 0, 0 );
+}
+#endif
 
 
 cg_t cg;

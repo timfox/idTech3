@@ -18,11 +18,8 @@ def compute_file_hash(path):
 def find_assets(mod_dir):
     """Find all asset files to add to the manifest, excluding gamesrc."""
     assets = []
-    exclude_dir = os.path.join(mod_dir, "gamesrc")
     for root, dirs, files in os.walk(mod_dir):
-        if exclude_dir in root:
-            continue
-        # Remove 'gamesrc' from dirs so os.walk doesn't descend into it.
+        # Prevent descent into gamesrc explicitly
         if 'gamesrc' in dirs:
             dirs.remove('gamesrc')
         for filename in files:
@@ -33,6 +30,7 @@ def find_assets(mod_dir):
             # Assets usually should not include .pyc, build files, etc.
             if relpath.startswith('.') or relpath.endswith('~'):
                 continue
+            # Store manifest paths with forward slashes
             assets.append(relpath.replace(os.sep, '/'))
     return assets
 
@@ -76,7 +74,8 @@ def main():
     # Gather assets and compute their hashes
     assets = []
     for asset_path in sorted(find_assets(mod_dir)):
-        full_asset_path = os.path.join(mod_dir, asset_path)
+        # Normalize mixed separators (especially on Windows) before isfile/hash
+        full_asset_path = os.path.join(mod_dir, *asset_path.split('/'))
         if os.path.isfile(full_asset_path):
             file_hash = compute_file_hash(full_asset_path)
             assets.append({

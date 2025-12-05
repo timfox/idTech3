@@ -746,7 +746,7 @@ headModelVoiceChat_t headModelVoiceChat[MAX_HEADMODELS];
 CG_ParseVoiceChats
 =================
 */
-int CG_ParseVoiceChats( const char *filename, voiceChatList_t *voiceChatList, int maxVoiceChats ) {
+static int CG_ParseVoiceChats( const char *filename, voiceChatList_t *voiceChatList, int maxVoiceChats ) {
 	int	len, i;
 	fileHandle_t f;
 	char buf[MAX_VOICEFILESIZE];
@@ -868,7 +868,7 @@ void CG_LoadVoiceChats( void ) {
 CG_HeadModelVoiceChats
 =================
 */
-int CG_HeadModelVoiceChats( char *filename ) {
+static int CG_HeadModelVoiceChats( char *filename ) {
 	int	len, i;
 	fileHandle_t f;
 	char buf[MAX_VOICEFILESIZE];
@@ -916,7 +916,7 @@ int CG_HeadModelVoiceChats( char *filename ) {
 CG_GetVoiceChat
 =================
 */
-int CG_GetVoiceChat( voiceChatList_t *voiceChatList, const char *id, sfxHandle_t *snd, char **chat) {
+static int CG_GetVoiceChat( voiceChatList_t *voiceChatList, const char *id, sfxHandle_t *snd, char **chat) {
 	int i, rnd;
 
 	for ( i = 0; i < voiceChatList->numVoiceChats; i++ ) {
@@ -935,7 +935,7 @@ int CG_GetVoiceChat( voiceChatList_t *voiceChatList, const char *id, sfxHandle_t
 CG_VoiceChatListForClient
 =================
 */
-voiceChatList_t *CG_VoiceChatListForClient( int clientNum ) {
+static voiceChatList_t *CG_VoiceChatListForClient( int clientNum ) {
 	clientInfo_t *ci;
 	int voiceChatNum, i, j, k, gender;
 	char filename[MAX_QPATH], headModelName[MAX_QPATH];
@@ -1040,7 +1040,7 @@ bufferedVoiceChat_t voiceChatBuffer[MAX_VOICECHATBUFFER];
 CG_PlayVoiceChat
 =================
 */
-void CG_PlayVoiceChat( [[maybe_unused]] bufferedVoiceChat_t *vchat ) {
+static void CG_PlayVoiceChat( [[maybe_unused]] bufferedVoiceChat_t *vchat ) {
 #ifdef MISSIONPACK
 	// if we are going into the intermission, don't start any voices
 	if ( cg.intermissionStarted ) {
@@ -1093,7 +1093,7 @@ void CG_PlayBufferedVoiceChats( void ) {
 CG_AddBufferedVoiceChat
 =====================
 */
-void CG_AddBufferedVoiceChat( [[maybe_unused]] bufferedVoiceChat_t *vchat ) {
+static void CG_AddBufferedVoiceChat( [[maybe_unused]] bufferedVoiceChat_t *vchat ) {
 #ifdef MISSIONPACK
 	// if we are going into the intermission, don't start any voices
 	if ( cg.intermissionStarted ) {
@@ -1163,7 +1163,7 @@ void CG_VoiceChatLocal( [[maybe_unused]] int mode, [[maybe_unused]] qboolean voi
 CG_VoiceChat
 =================
 */
-void CG_VoiceChat( [[maybe_unused]] int mode ) {
+static void CG_VoiceChat( [[maybe_unused]] int mode ) {
 #ifdef MISSIONPACK
 	const char *cmd;
 	int clientNum, color;
@@ -1275,7 +1275,7 @@ static void CG_ServerCommand( void ) {
 	
 	if ( Q_strequal( cmd, "dialog" ) ) {
 		int id, pageNum, numChoices, i;
-		const char *speaker, *text;
+		const char *speaker, *dialogText;
 		const char *choices[ MAX_DIALOG_CHOICES ];
 		int targets[ MAX_DIALOG_CHOICES ];
 		
@@ -1286,7 +1286,7 @@ static void CG_ServerCommand( void ) {
 		id = atoi( CG_Argv( 1 ) );
 		pageNum = atoi( CG_Argv( 2 ) );
 		speaker = CG_Argv( 3 );
-		text = CG_Argv( 4 );
+		dialogText = CG_Argv( 4 );
 		numChoices = atoi( CG_Argv( 5 ) );
 		
 		if( numChoices > MAX_DIALOG_CHOICES ) {
@@ -1303,7 +1303,7 @@ static void CG_ServerCommand( void ) {
 			}
 		}
 		
-		CG_Dialog_Show( id, pageNum, speaker, text, numChoices, choices, targets );
+		CG_Dialog_Show( id, pageNum, speaker, dialogText, numChoices, choices, targets );
 		return;
 	}
 	

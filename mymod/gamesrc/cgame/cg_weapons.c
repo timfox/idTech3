@@ -23,6 +23,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cg_weapons.c -- events and effects dealing with weapons
 #include "cg_local.h"
 
+// Forward declarations for helpers defined later in this file.
+void CG_ShotgunPattern( vec3_t origin, vec3_t origin2, int seed, int otherEntNum );
+void CG_Tracer( vec3_t source, vec3_t dest );
+
 /*
 ==========================
 CG_MachineGunEjectBrass

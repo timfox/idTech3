@@ -28,13 +28,43 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #error "Do not use in VM build"
 #endif
 
+// For monolithic build, need dllSyscall_t type
+#ifdef COMBINED_MONOLITH
+#include "../qcommon/qcommon.h"
+#endif
+
 // Make syscall visible to bg_misc.c for MapInfoGet safety check
 intptr_t (QDECL *syscall)( intptr_t arg, ... ) = (intptr_t (QDECL *)( intptr_t, ...))-1;
 
 
 Q_EXPORT void dllEntry( intptr_t (QDECL *syscallptr)( intptr_t arg,... ) ) {
 	syscall = syscallptr;
+	// Debug: verify syscall pointer is set
+	if ( syscall == (intptr_t (QDECL *)( intptr_t, ...))-1 ) {
+		// This shouldn't happen - syscall should be set by dllEntry
+		// But we can't use trap_Printf here since syscall isn't initialized yet
+	}
 }
+
+// Monolithic build: export with unique name for static linking
+// Match dllEntry_t signature exactly
+#ifdef COMBINED_MONOLITH
+Q_EXPORT void QDECL dllEntry_game( dllSyscall_t syscallptr ) {
+	// Debug: verify syscall pointer is valid
+	if ( syscallptr == NULL ) {
+		// Can't use trap_Printf here since syscall isn't initialized yet
+		// This shouldn't happen - engine should pass valid syscall pointer
+		return;
+	}
+	dllEntry( syscallptr );
+	// Verify syscall was set correctly
+	if ( syscall == (intptr_t (QDECL *)( intptr_t, ...))-1 ) {
+		// syscall wasn't initialized - this is a problem
+		// Can't use trap_Printf here since syscall isn't initialized
+		return;
+	}
+}
+#endif
 
 int PASSFLOAT( float x ) {
 	floatint_t fi;

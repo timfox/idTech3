@@ -165,12 +165,21 @@ Cvar_VariableStringBuffer
 void Cvar_VariableStringBuffer( const char *var_name, char *buffer, int bufsize ) {
 	cvar_t *var;
 	
+	if ( !buffer || bufsize < 1 ) {
+		Com_Printf( "Cvar_VariableStringBuffer: NULL buffer or invalid bufsize, ignoring\n" );
+		return;
+	}
+	
 	var = Cvar_FindVar (var_name);
 	if (!var) {
 		*buffer = '\0';
 	}
 	else {
-		Q_strncpyz( buffer, var->string, bufsize );
+		if ( !var->string ) {
+			*buffer = '\0';
+		} else {
+			Q_strncpyz( buffer, var->string, bufsize );
+		}
 	}
 }
 
@@ -183,12 +192,21 @@ Cvar_VariableStringBufferSafe
 void Cvar_VariableStringBufferSafe( const char *var_name, char *buffer, int bufsize, int flag ) {
 	cvar_t *var;
 	
+	if ( !buffer || bufsize < 1 ) {
+		Com_Printf( "Cvar_VariableStringBufferSafe: NULL buffer or invalid bufsize, ignoring\n" );
+		return;
+	}
+	
 	var = Cvar_FindVar( var_name );
 	if ( !var || var->flags & flag ) {
 		*buffer = '\0';
 	}
 	else {
-		Q_strncpyz( buffer, var->string, bufsize );
+		if ( !var->string ) {
+			*buffer = '\0';
+		} else {
+			Q_strncpyz( buffer, var->string, bufsize );
+		}
 	}
 }
 
@@ -355,8 +373,13 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 	}
 
 	if ( !Cvar_ValidateName( var_name ) ) {
-		Com_Printf( "invalid cvar name string: %s\n", var_name );
-		var_name = "BADNAME";
+		Com_Printf( "invalid cvar name string: %s\n", var_name ? var_name : "(null)" );
+		if ( var_name ) {
+			var_name = "BADNAME";
+		} else {
+			Com_Error( ERR_FATAL, "Cvar_Get: NULL var_name after validation check" );
+			return NULL; // Never reached
+		}
 	}
 
 #if 0 // FIXME: values with backslash happen
@@ -629,6 +652,11 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 
 //	Com_DPrintf( "Cvar_Set2: %s %s\n", var_name, value );
 
+	if ( !var_name ) {
+		Com_Error( ERR_FATAL, "Cvar_Set2: NULL var_name parameter" );
+		return NULL; // Never reached, but helps compiler
+	}
+
 	if ( !Cvar_ValidateName( var_name ) )
 	{
 		Com_Printf( "invalid cvar name string: %s\n", var_name );
@@ -776,6 +804,10 @@ Cvar_SetSafe
 */
 void Cvar_SetSafe( const char *var_name, const char *value )
 {
+	if ( !var_name ) {
+		Com_Printf( "Cvar_SetSafe: NULL var_name parameter, ignoring\n" );
+		return;
+	}
 	unsigned flags = Cvar_Flags( var_name );
 	qboolean force = qtrue;
 
@@ -850,6 +882,10 @@ Cvar_SetValueSafe
 */
 void Cvar_SetValueSafe( const char *var_name, float value )
 {
+	if ( !var_name ) {
+		Com_Printf( "Cvar_SetValueSafe: NULL var_name parameter, ignoring\n" );
+		return;
+	}
 	char val[32];
 
 	if( Q_isintegral( value ) )
@@ -2013,6 +2049,12 @@ void Cvar_Register( vmCvar_t *vmCvar, const char *varName, const char *defaultVa
 	if ( flags & INVALID_FLAGS ) {
 		Com_DPrintf( S_COLOR_YELLOW "WARNING: VM tried to set invalid flags 0x%02x on cvar '%s'\n", ( flags & INVALID_FLAGS ), varName );
 		flags &= ~INVALID_FLAGS;
+	}
+
+	// Validate parameters
+	if ( !varName ) {
+		Com_Printf( "Cvar_Register: NULL varName parameter\n" );
+		return;
 	}
 
 	cv = Cvar_FindVar( varName );

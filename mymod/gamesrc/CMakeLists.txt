@@ -12,16 +12,23 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Build as shared libraries (DLLs/.so files)
-set(BUILD_SHARED_LIBS ON)
+# Build as shared libraries by default (DLLs/.so files)
+# Can be overridden with -DBUILD_SHARED_LIBS=OFF for static libraries
+if(NOT DEFINED BUILD_SHARED_LIBS)
+    set(BUILD_SHARED_LIBS ON)
+endif()
 
 # Output directory - libraries go in vm/ directory
+# Set both library and archive output directories for shared and static libs
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../vm)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../vm)
 
-# Include directories - you'll need to point to engine headers
-# Adjust these paths to match your engine source location
-# CMAKE_SOURCE_DIR is mymod/gamesrc/, so go up 2 levels to get to idtech3 root
-get_filename_component(ENGINE_ROOT "${CMAKE_SOURCE_DIR}/../.." ABSOLUTE)
+# Include directories - ensure we locate the engine tree correctly.
+# When built as a subproject (monolithic build), CMAKE_SOURCE_DIR points to the root engine dir,
+# so compute from the current source dir instead.
+if(NOT DEFINED ENGINE_ROOT)
+	get_filename_component(ENGINE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+endif()
 set(ENGINE_INCLUDE_DIRS
     ${ENGINE_ROOT}/src/qcommon
     ${ENGINE_ROOT}/src/game
@@ -39,6 +46,20 @@ include_directories(${ENGINE_INCLUDE_DIRS})
 add_compile_options(-fPIC)
 add_compile_options(-fvisibility=hidden)
 add_compile_options(-Wall -Wextra)
+
+# Suppress warnings common in legacy game code
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    # Suppress strict-aliasing warnings (common in legacy C code with type punning)
+    add_compile_options(-Wno-strict-aliasing)
+    # Suppress array-bounds warnings (legacy code may access arrays at MAX_PERSISTANT)
+    add_compile_options(-Wno-array-bounds)
+    # Suppress stringop-overflow warnings (false positives with matrix operations)
+    add_compile_options(-Wno-stringop-overflow)
+    # Suppress format-truncation warnings (legacy code uses fixed-size buffers)
+    add_compile_options(-Wno-format-truncation)
+    # Suppress uninitialized variable warnings (legacy code patterns)
+    add_compile_options(-Wno-uninitialized)
+endif()
 
 # Platform-specific settings
 if(UNIX)
@@ -59,13 +80,34 @@ elseif(WIN32)
     endif()
 endif()
 
+# Shared gameplay sources used across modules
+file(GLOB BG_SHARED_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/game/bg_*.c")
+
 # Game module (server-side) - OpenArena source
 file(GLOB GAME_SOURCES "game/*.c")
+# Remove shared bg_* from the per-module source list; they will be linked once
+list(FILTER GAME_SOURCES EXCLUDE REGEX ".*/bg_.*\\.c")
 file(GLOB GAME_CPP_SOURCES "game/*.cpp")
 if(GAME_CPP_SOURCES)
 	list(APPEND GAME_SOURCES ${GAME_CPP_SOURCES})
 endif()
-add_library(game_${ARCH_SUFFIX} SHARED ${GAME_SOURCES})
+
+# Build shared gameplay logic once
+add_library(bg_shared STATIC ${BG_SHARED_SOURCES})
+if(COMBINED_MONOLITH)
+    target_compile_definitions(bg_shared PRIVATE COMBINED_MONOLITH)
+endif()
+# Make sure shared code sees the same includes as the modules (propagate to dependents)
+target_include_directories(bg_shared PUBLIC ${ENGINE_INCLUDE_DIRS})
+# Use BUILD_SHARED_LIBS to determine library type
+if(BUILD_SHARED_LIBS)
+    add_library(game_${ARCH_SUFFIX} SHARED ${GAME_SOURCES})
+else()
+    add_library(game_${ARCH_SUFFIX} STATIC ${GAME_SOURCES})
+    if(COMBINED_MONOLITH)
+        target_compile_definitions(game_${ARCH_SUFFIX} PRIVATE COMBINED_MONOLITH)
+    endif()
+endif()
 
 # Rename output to match engine expectations: game.x86_64.so format (with dot!)
 # Engine expects: {name}.{ARCH_STRING}{DLL_EXT} (VM_LoadLib uses "%s." ARCH_STRING DLL_EXT)
@@ -79,15 +121,16 @@ file(GLOB CGAME_SOURCES "cgame/*.c")
 # Exclude cg_newdraw.c as it requires MISSIONPACK UI components not available
 list(REMOVE_ITEM CGAME_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/cgame/cg_newdraw.c")
 
-# CGame also relies on shared gameplay logic/data (bg_itemlist, bg_numItems,
-# Pmove, PM_StepSlideMove, etc.) which in this codebase live under game/bg_*.c.
-# Those symbols are not exported from the server game DLL (and even if they
-# were, RTLD_LOCAL + hidden visibility would prevent cgame from seeing them),
-# so we must compile the shared bg_ code directly into the cgame module as well.
-file(GLOB BG_SHARED_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/game/bg_*.c")
-list(APPEND CGAME_SOURCES ${BG_SHARED_SOURCES})
-
-add_library(cgame_${ARCH_SUFFIX} SHARED ${CGAME_SOURCES})
+# Use BUILD_SHARED_LIBS to determine library type
+if(BUILD_SHARED_LIBS)
+    add_library(cgame_${ARCH_SUFFIX} SHARED ${CGAME_SOURCES})
+else()
+    add_library(cgame_${ARCH_SUFFIX} STATIC ${CGAME_SOURCES})
+    # When building as static library for monolithic build, define COMBINED_MONOLITH
+    if(COMBINED_MONOLITH)
+        target_compile_definitions(cgame_${ARCH_SUFFIX} PRIVATE COMBINED_MONOLITH)
+    endif()
+endif()
 
 set_target_properties(cgame_${ARCH_SUFFIX} PROPERTIES
     OUTPUT_NAME "cgame.${ARCH_SUFFIX}"
@@ -97,15 +140,27 @@ set_target_properties(cgame_${ARCH_SUFFIX} PROPERTIES
 # UI module - OpenArena source
 # UI depends on game module for bg_itemlist and other shared symbols
 file(GLOB UI_SOURCES "ui/*.c")
-add_library(ui_${ARCH_SUFFIX} SHARED ${UI_SOURCES})
+# Use BUILD_SHARED_LIBS to determine library type
+if(BUILD_SHARED_LIBS)
+    add_library(ui_${ARCH_SUFFIX} SHARED ${UI_SOURCES})
+else()
+    add_library(ui_${ARCH_SUFFIX} STATIC ${UI_SOURCES})
+    # When building as static library for monolithic build, define COMBINED_MONOLITH
+    if(COMBINED_MONOLITH)
+        target_compile_definitions(ui_${ARCH_SUFFIX} PRIVATE COMBINED_MONOLITH)
+    endif()
+endif()
 
 set_target_properties(ui_${ARCH_SUFFIX} PROPERTIES
     OUTPUT_NAME "ui.${ARCH_SUFFIX}"
     PREFIX ""
 )
 
-# Link UI against game module to resolve bg_itemlist and other shared symbols
-target_link_libraries(ui_${ARCH_SUFFIX} game_${ARCH_SUFFIX} m)
+# Link shared gameplay logic once; UI still links game for other shared data
+target_link_libraries(bg_shared m)
+target_link_libraries(game_${ARCH_SUFFIX} bg_shared m)
+target_link_libraries(cgame_${ARCH_SUFFIX} bg_shared m)
+target_link_libraries(ui_${ARCH_SUFFIX} bg_shared game_${ARCH_SUFFIX} m)
 
 # EnTT ECS support
 option(USE_ENTT "Enable EnTT ECS system" OFF)
@@ -119,7 +174,5 @@ if(USE_ENTT)
 endif()
 
 # Link math library if needed
-target_link_libraries(game_${ARCH_SUFFIX} m)
-target_link_libraries(cgame_${ARCH_SUFFIX} m)
-target_link_libraries(ui_${ARCH_SUFFIX} m)
+# Legacy math links are handled above alongside bg_shared
 

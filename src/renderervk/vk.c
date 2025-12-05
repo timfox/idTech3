@@ -1,5 +1,19 @@
 #include "tr_local.h"
 #include "vk.h"
+
+// Compatibility shim: some SDKs may not expose the EXT mesh shader feature struct/enum.
+#ifndef VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT
+#define VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT (VkStructureType)1000328000
+typedef struct VkPhysicalDeviceMeshShaderFeaturesEXT {
+	VkStructureType sType;
+	void*           pNext;
+	VkBool32        taskShader;
+	VkBool32        meshShader;
+	VkBool32        multiviewMeshShader;
+	VkBool32        primitiveFragmentShadingRateMeshShader;
+	VkBool32        meshShaderQueries;
+} VkPhysicalDeviceMeshShaderFeaturesEXT;
+#endif
 #ifdef USE_VULKAN_RAY_TRACING
 #include "vk_gibs.h"
 #endif
@@ -1867,7 +1881,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 
 	// create VkDevice
 	{
-		const char *device_extension_list[16]; // Increased for ray tracing extensions
+		const char *device_extension_list[20]; // Increased for ray tracing and mesh shader extensions
 		uint32_t device_extension_count;
 		const char *ext, *end;
 		char *str;
@@ -1882,12 +1896,15 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		qboolean dedicatedAllocation = qfalse;
 		qboolean memoryRequirements2 = qfalse;
 		qboolean debugMarker = qfalse;
+		qboolean meshShaderExt = qfalse;
+		qboolean meshShadersEnabled = qfalse;
+		VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features;
+		const void **pNextPtr = NULL;
 #ifdef _DEBUG
 		qboolean timelineSemaphore = qfalse;
 		qboolean memoryModel = qfalse;
 		qboolean devAddrFeat = qfalse;
 		qboolean storage8bit = qfalse;
-		const void** pNextPtr;
 #endif
 		qboolean rayTracingPipeline = qfalse;
 		qboolean accelerationStructure = qfalse;
@@ -1935,8 +1952,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			} else if ( strcmp( ext, VK_KHR_BUFFER_DEVICE_ADDRESS_EXTENSION_NAME ) == 0 ) {
 				bufferDeviceAddress = qtrue;
 			} else if ( strcmp( ext, "VK_EXT_mesh_shader" ) == 0 ) {
-				// Mesh shader extension detected
-				// Will be enabled if r_meshShaders is set
+				meshShaderExt = qtrue;
 			}
 			// add this device extension to glConfig
 			if ( i != 0 ) {
@@ -1951,6 +1967,40 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		}
 
 		ri.Free( extension_properties );
+
+		// Query mesh shader features when requested
+		Com_Memset( &mesh_shader_features, 0, sizeof( mesh_shader_features ) );
+		if ( r_meshShaders && r_meshShaders->integer ) {
+			if ( !meshShaderExt ) {
+				ri.Printf( PRINT_WARNING, "...mesh shaders requested but VK_EXT_mesh_shader not supported by device\n" );
+			} else if ( !qvkGetPhysicalDeviceFeatures2KHR ) {
+				ri.Printf( PRINT_WARNING, "...mesh shaders requested but vkGetPhysicalDeviceFeatures2KHR is unavailable\n" );
+			} else {
+				VkPhysicalDeviceFeatures2 mesh_features2;
+				Com_Memset( &mesh_features2, 0, sizeof( mesh_features2 ) );
+				mesh_features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+				mesh_features2.pNext = &mesh_shader_features;
+
+				mesh_shader_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;
+				mesh_shader_features.pNext = NULL;
+				mesh_shader_features.meshShader = VK_FALSE;
+				mesh_shader_features.taskShader = VK_FALSE;
+
+				qvkGetPhysicalDeviceFeatures2KHR( physical_device, &mesh_features2 );
+
+				if ( mesh_shader_features.meshShader ) {
+					meshShadersEnabled = qtrue;
+					if ( !mesh_shader_features.taskShader ) {
+						ri.Printf( PRINT_WARNING, "...mesh shaders supported but task shaders unavailable; proceeding with mesh-only\n" );
+					}
+					// Enable the supported feature bits
+					mesh_shader_features.meshShader = VK_TRUE;
+					mesh_shader_features.taskShader = mesh_shader_features.taskShader ? VK_TRUE : VK_FALSE;
+				} else {
+					ri.Printf( PRINT_WARNING, "...mesh shaders requested but meshShader feature not supported by device\n" );
+				}
+			}
+		}
 
 		device_extension_count = 0;
 
@@ -1996,6 +2046,13 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			device_extension_list[ device_extension_count++ ] = VK_KHR_8BIT_STORAGE_EXTENSION_NAME;
 		}
 #endif // _DEBUG
+
+		if ( meshShadersEnabled ) {
+			device_extension_list[ device_extension_count++ ] = "VK_EXT_mesh_shader";
+			ri.Printf( PRINT_ALL, "...mesh shader extension enabled\n" );
+		} else if ( r_meshShaders && r_meshShaders->integer ) {
+			ri.Printf( PRINT_WARNING, "...mesh shader extension not enabled\n" );
+		}
 
 		// Ray tracing extensions (all required together)
 		if ( rayTracingPipeline && accelerationStructure && deferredHostOperations && bufferDeviceAddress ) {
@@ -2066,10 +2123,14 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		device_desc.enabledExtensionCount = device_extension_count;
 		device_desc.ppEnabledExtensionNames = device_extension_list;
 		device_desc.pEnabledFeatures = &features;
-
-#ifdef _DEBUG
 		pNextPtr = (const void **)&device_desc.pNext;
 
+		if ( meshShadersEnabled ) {
+			*pNextPtr = &mesh_shader_features;
+			pNextPtr = (const void **)&mesh_shader_features.pNext;
+		}
+
+#ifdef _DEBUG
 		if ( timelineSemaphore ) {
 			*pNextPtr = &timeline_semaphore;
 			timeline_semaphore.pNext = NULL;
@@ -2136,6 +2197,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			as_features.descriptorBindingAccelerationStructureUpdateAfterBind = VK_FALSE;
 		}
 #endif
+		(void)pNextPtr;
 		res = qvkCreateDevice( physical_device, &device_desc, NULL, &vk.device );
 		if ( res < 0 ) {
 			ri.Printf( PRINT_ERROR, "vkCreateDevice returned %s\n", vk_result_string( res ) );

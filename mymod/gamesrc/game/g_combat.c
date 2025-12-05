@@ -30,7 +30,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ScorePlum
 ============
 */
-void ScorePlum( gentity_t *ent, vec3_t origin, int score )
+static void ScorePlum( gentity_t *ent, vec3_t origin, int score )
 {
 	gentity_t *plum;
 
@@ -261,7 +261,7 @@ void TossClientPersistantPowerups( gentity_t *ent )
 LookAtKiller
 ==================
 */
-void LookAtKiller( gentity_t *self, gentity_t *inflictor, gentity_t *attacker )
+static void LookAtKiller( gentity_t *self, gentity_t *inflictor, gentity_t *attacker )
 {
 	vec3_t		dir;
 	//vec3_t		angles;
@@ -289,7 +289,7 @@ void LookAtKiller( gentity_t *self, gentity_t *inflictor, gentity_t *attacker )
 GibEntity
 ==================
 */
-void GibEntity( gentity_t *self, int killer )
+static void GibEntity( gentity_t *self, int killer )
 {
 	gentity_t *ent;
 	int i;
@@ -372,7 +372,7 @@ static const char *modNames[] = {
 Kamikaze_DeathActivate
 ==================
 */
-void Kamikaze_DeathActivate( gentity_t *ent )
+static void Kamikaze_DeathActivate( gentity_t *ent )
 {
 	G_StartKamikaze(ent);
 	G_FreeEntity(ent);
@@ -383,7 +383,7 @@ void Kamikaze_DeathActivate( gentity_t *ent )
 Kamikaze_DeathTimer
 ==================
 */
-void Kamikaze_DeathTimer( gentity_t *self )
+static void Kamikaze_DeathTimer( gentity_t *self )
 {
 	gentity_t *ent;
 
@@ -403,7 +403,7 @@ void Kamikaze_DeathTimer( gentity_t *self )
 CheckAlmostCapture
 ==================
 */
-void CheckAlmostCapture( gentity_t *self, gentity_t *attacker )
+static void CheckAlmostCapture( gentity_t *self, gentity_t *attacker )
 {
 	gentity_t	*ent;
 	vec3_t		dir;
@@ -453,7 +453,7 @@ void CheckAlmostCapture( gentity_t *self, gentity_t *attacker )
 CheckAlmostScored
 ==================
 */
-void CheckAlmostScored( gentity_t *self, gentity_t *attacker )
+static void CheckAlmostScored( gentity_t *self, gentity_t *attacker )
 {
 	gentity_t	*ent;
 	vec3_t		dir;
@@ -861,9 +861,9 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, [[m
 	}
 	else {
 		// normal death
-		static int i;
+		static int deathAnimIndex;
 
-		switch ( i ) {
+		switch ( deathAnimIndex ) {
 		case 0:
 			anim = BOTH_DEATH1;
 			break;
@@ -887,13 +887,13 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, [[m
 		self->client->ps.torsoAnim =
 		    ( ( self->client->ps.torsoAnim & ANIM_TOGGLEBIT ) ^ ANIM_TOGGLEBIT ) | anim;
 
-		G_AddEvent( self, EV_DEATH1 + i, killer );
+		G_AddEvent( self, EV_DEATH1 + deathAnimIndex, killer );
 
 		// the body can still be gibbed
 		self->die = body_die;
 
 		// globally cycle through the different death animations
-		i = ( i + 1 ) % 3;
+		deathAnimIndex = ( deathAnimIndex + 1 ) % 3;
 
 		if (self->s.eFlags & EF_KAMIKAZE) {
 			Kamikaze_DeathTimer( self );
@@ -910,7 +910,7 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, [[m
 CheckArmor
 ================
 */
-int CheckArmor (gentity_t *ent, int damage, int dflags)
+static int CheckArmor (gentity_t *ent, int damage, int dflags)
 {
 	gclient_t	*client;
 	int			save;
@@ -954,7 +954,7 @@ int CheckArmor (gentity_t *ent, int damage, int dflags)
 RaySphereIntersections
 ================
 */
-int RaySphereIntersections( vec3_t origin, float radius, vec3_t point, vec3_t dir, vec3_t intersections[2] )
+static int RaySphereIntersections( vec3_t origin, float radius, vec3_t point, vec3_t dir, vec3_t intersections[2] )
 {
 	float b, c, d, t;
 

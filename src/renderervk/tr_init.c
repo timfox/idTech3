@@ -1701,6 +1701,12 @@ static void R_Register( void )
 	r_gibs_samples = ri.Cvar_Get( "r_gibs_samples", "16", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_gibs_samples, "Number of ray samples per surfel update (1-64, higher = more accurate but slower, default 16)." );
 #endif
+	// Mesh shaders (VK_EXT_mesh_shader)
+	r_meshShaders = ri.Cvar_Get( "r_meshShaders", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_meshShaders, "Enable Vulkan mesh shaders (VK_EXT_mesh_shader). Requires a supported GPU/driver and vid_restart." );
+	r_meshletSize = ri.Cvar_Get( "r_meshletSize", "128", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_meshletSize, "32", "256", CV_INTEGER );
+	ri.Cvar_SetDescription( r_meshletSize, "Target meshlet size used when generating meshlets (32-256)." );
 	// GPU-driven culling and instancing
 	r_gpuCulling = ri.Cvar_Get( "r_gpuCulling", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_gpuCulling, "Enable GPU-driven frustum culling (0=disabled, 1=enabled)." );

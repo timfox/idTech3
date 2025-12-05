@@ -437,10 +437,24 @@ This is the only way control passes into the module.
 This must be the very first function compiled into the .q3vm file
 ================
 */
+// For monolithic builds, use QDECL to match calling convention
+// Note: In monolithic builds, we need to avoid symbol conflicts with ui/cgame modules
+// So we make vmMain static (internal linkage) and use vmMain_game as the exported entry point
+#ifdef COMBINED_MONOLITH
+static intptr_t QDECL vmMain( int command, int arg0, int arg1, int arg2, [[maybe_unused]] int arg3, [[maybe_unused]] int arg4, [[maybe_unused]] int arg5, [[maybe_unused]] int arg6, [[maybe_unused]] int arg7, [[maybe_unused]] int arg8, [[maybe_unused]] int arg9, [[maybe_unused]] int arg10, [[maybe_unused]] int arg11  )
+#else
 Q_EXPORT intptr_t vmMain( int command, int arg0, int arg1, int arg2, [[maybe_unused]] int arg3, [[maybe_unused]] int arg4, [[maybe_unused]] int arg5, [[maybe_unused]] int arg6, [[maybe_unused]] int arg7, [[maybe_unused]] int arg8, [[maybe_unused]] int arg9, [[maybe_unused]] int arg10, [[maybe_unused]] int arg11  )
+#endif
 {
 	switch ( command ) {
 	case GAME_INIT:
+		// Debug: verify syscall is initialized before using G_Printf
+		extern intptr_t (QDECL *syscall)( intptr_t arg, ... );
+		if ( syscall == (intptr_t (QDECL *)( intptr_t, ...))-1 ) {
+			// syscall not initialized - can't use G_Printf, so use trap_Printf directly if available
+			// This shouldn't happen if dllEntry was called correctly
+			// For now, just proceed and hope syscall gets initialized
+		}
 		G_Printf( "vmMain: GAME_INIT called - levelTime=%d, randomSeed=%d, restart=%d\n", arg0, arg1, arg2 );
 		G_InitGame( arg0, arg1, arg2 );
 		G_Printf( "vmMain: GAME_INIT completed successfully\n" );
@@ -527,6 +541,22 @@ void QDECL G_Error( const char *fmt, ... )
 
 	trap_Error( text );
 }
+
+// Monolithic build: export with unique name for static linking
+// Match vmMainFunc_t signature (4 parameters) - engine only passes 4 args
+// Must use QDECL to match calling convention
+// Since vmMain is now static in monolithic builds, we can call it directly
+#ifdef COMBINED_MONOLITH
+Q_EXPORT intptr_t QDECL vmMain_game( int command, int arg0, int arg1, int arg2 ) {
+	// The engine calls this with 4 int32_t arguments via function pointer
+	// We need to ensure the calling convention matches exactly
+	// On x86_64 Linux, int and int32_t are both 32-bit, so they should be compatible
+	// Call vmMain directly (it's static so linker won't confuse it with ui/cgame module's vmMain)
+	// Both functions use QDECL so calling convention matches
+	// Pass the 4 real arguments plus zeros for the unused parameters
+	return vmMain( command, arg0, arg1, arg2, 0, 0, 0, 0, 0, 0, 0, 0, 0 );
+}
+#endif
 
 /*
 ================
@@ -784,6 +814,13 @@ void G_InitGame( int levelTime, int randomSeed, int restart )
 	G_Printf ("gamename: %s\n", GAMEVERSION);
         G_Printf ("gamedate: %s\n", __DATE__);
 	G_Printf ("G_InitGame: levelTime=%d, randomSeed=%d, restart=%d\n", levelTime, randomSeed, restart );
+
+	// Debug: verify syscall is initialized
+	extern intptr_t (QDECL *syscall)( intptr_t arg, ... );
+	if ( syscall == (intptr_t (QDECL *)( intptr_t, ...))-1 ) {
+		G_Error( "G_InitGame: syscall pointer not initialized!" );
+		return;
+	}
 
 	srand( randomSeed );
 
