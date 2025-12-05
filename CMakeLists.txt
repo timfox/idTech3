@@ -22,15 +22,15 @@ ELSE()
 	SET(CMAKE_C_STANDARD_REQUIRED OFF)
 ENDIF()
 
-# Set C++ standard for ECS code (EnTT requires C++17)
+# Set C++ standard for engine features (AIML and ECS rely on C++23)
 IF(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-	SET(CMAKE_CXX_STANDARD 17)
+	SET(CMAKE_CXX_STANDARD 23)
 	SET(CMAKE_CXX_STANDARD_REQUIRED ON)
 ELSEIF(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-	SET(CMAKE_CXX_STANDARD 17)
+	SET(CMAKE_CXX_STANDARD 23)
 	SET(CMAKE_CXX_STANDARD_REQUIRED ON)
 ELSE()
-	SET(CMAKE_CXX_STANDARD 17)
+	SET(CMAKE_CXX_STANDARD 23)
 	SET(CMAKE_CXX_STANDARD_REQUIRED OFF)
 ENDIF()
 
@@ -175,6 +175,7 @@ OPTION(USE_SQLITE "" ON)
 OPTION(USE_FREETYPE "" ON)
 OPTION(USE_OPENSSL "" ON)
 OPTION(USE_LUA "" ON)
+OPTION(USE_AIML "Enable AIML 2.1 parser/interpreter support" ON)
 OPTION(USE_ENTT "Enable EnTT ECS system" ON)
 OPTION(USE_STEAMWORKS "Enable Steamworks SDK integration for Steam Deck features" OFF)
 OPTION(USE_CIMGUI "Enable ImGui" ON)
@@ -235,6 +236,15 @@ IF(USE_LUA)
 	list(APPEND QCOMMON_SRCS src/qcommon/lua_encounter.c)
 	list(APPEND QCOMMON_SRCS src/qcommon/lua_sequence.c)
 	list(APPEND QCOMMON_SRCS src/qcommon/lua_debug.c)
+ENDIF()
+
+IF(USE_AIML)
+	list(APPEND QCOMMON_SRCS
+		src/qcommon/aiml/aiml_parser.cpp
+		src/qcommon/aiml/aiml_interpreter.cpp
+		src/qcommon/aiml/aiml_c_api.cpp
+	)
+	ADD_COMPILE_DEFINITIONS(USE_AIML)
 ENDIF()
 
 # Internationalization (i18n) support

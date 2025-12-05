@@ -1,0 +1,30 @@
+<aiml version="2.1">
+	<bot name="name">idtech3-bot</bot>
+	<category>
+		<pattern>HELLO</pattern>
+		<template>Hello there!</template>
+	</category>
+	<category>
+		<pattern>HELLO *</pattern>
+		<template>Hello, <star/>.</template>
+	</category>
+	<category>
+		<pattern>MY NAME IS *</pattern>
+		<template>
+			<think><set name="name"><star/></set></think>
+			Nice to meet you, <get name="name"/>.
+		</template>
+	</category>
+	<topic name="JOKES">
+		<category>
+			<pattern>TELL ME A JOKE</pattern>
+			<template>
+				<random>
+					<li>Debuggers step into a bar and say "I'm here to help."</li>
+					<li>Why do programmers prefer dark mode? Because light attracts bugs.</li>
+				</random>
+			</template>
+		</category>
+	</topic>
+</aiml>
+

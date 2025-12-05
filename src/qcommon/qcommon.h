@@ -323,6 +323,10 @@ void		Lua_SetTop( lua_State *L, int index );
 void		Lua_Pop( lua_State *L, int n );
 #endif
 
+#ifdef USE_AIML
+#include "aiml/aiml_c_api.h"
+#endif
+
 #ifdef USE_FREETYPE
 #include <ft2build.h>
 #include FT_FREETYPE_H

@@ -892,10 +892,6 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 			Com_Printf( "UI_CVAR_SETVALUE: NULL var_name (ignored)\n" );
 			return 0;
 		}
-		if ( args[2] == 0 && VM_ArgPtr( args[2] ) == NULL ) {
-			Com_Printf( "UI_CVAR_SETVALUE: NULL value (ignored)\n" );
-			return 0;
-		}
 		Cvar_SetValueSafe( name, VMF(2) );
 		return 0;
 	}

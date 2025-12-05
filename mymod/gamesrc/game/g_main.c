@@ -451,9 +451,8 @@ Q_EXPORT intptr_t vmMain( int command, int arg0, int arg1, int arg2, [[maybe_unu
 		// Debug: verify syscall is initialized before using G_Printf
 		extern intptr_t (QDECL *syscall)( intptr_t arg, ... );
 		if ( syscall == (intptr_t (QDECL *)( intptr_t, ...))-1 ) {
-			// syscall not initialized - can't use G_Printf, so use trap_Printf directly if available
-			// This shouldn't happen if dllEntry was called correctly
-			// For now, just proceed and hope syscall gets initialized
+			// Syscall not initialized; bail out before using any trap-dependent logging
+			return -1;
 		}
 		G_Printf( "vmMain: GAME_INIT called - levelTime=%d, randomSeed=%d, restart=%d\n", arg0, arg1, arg2 );
 		G_InitGame( arg0, arg1, arg2 );

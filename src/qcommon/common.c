@@ -4263,6 +4263,10 @@ void Com_Init( char *commandLine ) {
 	Lua_Init();
 #endif
 
+#ifdef USE_AIML
+	AIML_Init();
+#endif
+
 	// Initialize job system for multi-threading
 #ifdef USE_JOBSYSTEM
 	{
@@ -4759,6 +4763,10 @@ static void Com_Shutdown( void ) {
 
 #ifdef USE_LUA
 	Lua_Shutdown();
+#endif
+
+#ifdef USE_AIML
+	AIML_Shutdown();
 #endif
 
 	// Shutdown job system

@@ -55,6 +55,11 @@ static intptr_t QDECL vmMain(int command, int arg0, int arg1, int arg2, [[maybe_
 Q_EXPORT intptr_t vmMain(int command, int arg0, int arg1, int arg2, [[maybe_unused]] int arg3, [[maybe_unused]] int arg4, [[maybe_unused]] int arg5, [[maybe_unused]] int arg6, [[maybe_unused]] int arg7, [[maybe_unused]] int arg8, [[maybe_unused]] int arg9, [[maybe_unused]] int arg10, [[maybe_unused]] int arg11) {
 #endif
 
+	// Ensure syscall is initialized before any trap-dependent work
+	if ( syscall == (intptr_t (QDECL *)( intptr_t, ...))-1 ) {
+		return -1;
+	}
+
 	switch (command) {
 		case CG_INIT:
 			CG_Init(arg0, arg1, arg2);
