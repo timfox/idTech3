@@ -226,10 +226,10 @@ case "$MODE" in
         echo "Copying engine binaries and renderer .so files to $RELEASE_DIR..."
         mkdir -p "$RELEASE_DIR"
 
-        # Copy/rename main client executable
+        # Copy/rename main client executable (ship with .so suffix)
         if [ -f "idtech3.x86_64" ]; then
-            cp -f "idtech3.x86_64" "$RELEASE_DIR/${GAME_NAME}.x86_64"
-            echo "Copied idtech3.x86_64 to $RELEASE_DIR/${GAME_NAME}.x86_64"
+            cp -f "idtech3.x86_64" "$RELEASE_DIR/${GAME_NAME}.x86_64.so"
+            echo "Copied idtech3.x86_64 to $RELEASE_DIR/${GAME_NAME}.x86_64.so"
         fi
 
         # Copy/rename dedicated server executable if present
@@ -239,19 +239,11 @@ case "$MODE" in
             echo "Copied idtech3.server.x86_64 to $RELEASE_DIR/${GAME_NAME}.server.x86_64 (alias *.ded.x86_64)"
         fi
 
-        # Copy renderer .so files and friendly aliases
+        # Copy renderer .so files (canonical names only)
         shopt -s nullglob
         for sofile in idtech3_*_*.so; do
             base=$(basename "$sofile")
             cp -f "$sofile" "$RELEASE_DIR/$base"
-            case "$base" in
-                idtech3_vulkan_*.so)
-                    cp -f "$sofile" "$RELEASE_DIR/${GAME_NAME}_renderervk.so"
-                    ;;
-                idtech3_opengl_*.so)
-                    cp -f "$sofile" "$RELEASE_DIR/${GAME_NAME}_rendereropengl.so"
-                    ;;
-            esac
             echo "Copied $sofile to $RELEASE_DIR/$base"
         done
         shopt -u nullglob

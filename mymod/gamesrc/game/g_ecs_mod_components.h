@@ -10,7 +10,7 @@ These components are for mod features like inventory, dialogs, and equipment.
 #ifndef __G_ECS_MOD_COMPONENTS_H__
 #define __G_ECS_MOD_COMPONENTS_H__
 
-#ifdef USE_ENTT
+#if defined(USE_ENTT) && defined(__cplusplus)
 
 #include <entt/entt.hpp>
 #include "g_inventory_types.h"
@@ -71,7 +71,7 @@ struct EquipmentComponent {
 	}
 };
 
-#endif // USE_ENTT
+#endif // defined(USE_ENTT) && defined(__cplusplus)
 
 #endif // __G_ECS_MOD_COMPONENTS_H__
 

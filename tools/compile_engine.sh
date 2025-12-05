@@ -79,10 +79,10 @@ echo ""
 echo "Copying engine binaries and renderer .so files to $RELEASE_DIR..."
 mkdir -p "$RELEASE_DIR"
 
-# Copy main client executable
+# Copy main client executable (ship with .so suffix)
 if [ -f "idtech3.x86_64" ]; then
-    cp -f "idtech3.x86_64" "$RELEASE_DIR/${GAME_NAME}.x86_64"
-    echo "Copied client -> $RELEASE_DIR/${GAME_NAME}.x86_64"
+    cp -f "idtech3.x86_64" "$RELEASE_DIR/${GAME_NAME}.x86_64.so"
+    echo "Copied client -> $RELEASE_DIR/${GAME_NAME}.x86_64.so"
 fi
 
 # Copy dedicated server executable (if present) with both native and legacy name
@@ -92,19 +92,11 @@ if [ -f "idtech3.server.x86_64" ]; then
     echo "Copied server -> ${RELEASE_DIR}/${GAME_NAME}.server.x86_64 (alias *.ded.x86_64)"
 fi
 
-# Copy renderers; keep CMake names and add friendly aliases
+# Copy renderers; keep only canonical CMake names (no extra aliases)
 shopt -s nullglob
 for sofile in idtech3_*_*.so; do
     base=$(basename "$sofile")
     cp -f "$sofile" "$RELEASE_DIR/$base"
-    case "$base" in
-        idtech3_vulkan_*.so)
-            cp -f "$sofile" "$RELEASE_DIR/${GAME_NAME}_renderervk.so"
-            ;;
-        idtech3_opengl_*.so)
-            cp -f "$sofile" "$RELEASE_DIR/${GAME_NAME}_rendereropengl.so"
-            ;;
-    esac
     echo "Copied renderer -> $RELEASE_DIR/$base"
 done
 shopt -u nullglob

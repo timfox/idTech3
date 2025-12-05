@@ -49,6 +49,9 @@ This must be the very first function compiled into the .q3vm file
 // For monolithic builds, use QDECL to match calling convention
 // Note: In monolithic builds, we need to avoid symbol conflicts with game/ui modules
 // So we make vmMain static (internal linkage) and use vmMain_cgame as the exported entry point
+#ifndef Q3_VM
+extern intptr_t (QDECL *syscall)( intptr_t arg, ... );
+#endif
 #ifdef COMBINED_MONOLITH
 static intptr_t QDECL vmMain(int command, int arg0, int arg1, int arg2, [[maybe_unused]] int arg3, [[maybe_unused]] int arg4, [[maybe_unused]] int arg5, [[maybe_unused]] int arg6, [[maybe_unused]] int arg7, [[maybe_unused]] int arg8, [[maybe_unused]] int arg9, [[maybe_unused]] int arg10, [[maybe_unused]] int arg11) {
 #else

@@ -9,7 +9,8 @@ with character names and optional choices.
 
 #include "g_local.h"
 #include "g_dialog.h"
-#ifdef USE_ENTT
+#if defined(USE_ENTT) && defined(__cplusplus)
+// ECS integration is C++-only; guard to avoid breaking C compilation units
 #include "g_ecs.h"
 #include "g_ecs_mod_components.h"
 #include "../../../../src/qcommon/ecs.cpp" // For ECS namespace access

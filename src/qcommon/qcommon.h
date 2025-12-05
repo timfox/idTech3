@@ -879,6 +879,10 @@ typedef	_off_t  fileOffset_t;
 typedef	off_t  fileOffset_t;
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 qboolean FS_Initialized( void );
 qboolean FS_StartupInProgress( void );
 
@@ -997,6 +1001,7 @@ const char *FS_LoadedPakChecksums( qboolean *overflowed );
 qboolean FS_ExcludeReference( void );
 const char *FS_ReferencedPakNames( void );
 const char *FS_ReferencedPakChecksums( void );
+
 const char *FS_ReferencedPakPureChecksums( int maxlen );
 // Returns a space separated string containing the checksums of all loaded 
 // AND referenced pk3 files. Servers with sv_pure set will get this string 
@@ -1031,6 +1036,10 @@ void FS_VM_WriteFile( void *buffer, int len, fileHandle_t f, handleOwner_t owner
 int FS_VM_SeekFile( fileHandle_t f, long offset, fsOrigin_t origin, handleOwner_t owner );
 void FS_VM_CloseFile( fileHandle_t f, handleOwner_t owner );
 void FS_VM_CloseFiles( handleOwner_t owner );
+
+#ifdef __cplusplus
+}
+#endif
 
 const char *FS_GetCurrentGameDir( void );
 const char *FS_GetBaseGameDir( void );
