@@ -1,0 +1,9 @@
+{
+  "manifestVersion": 1,
+  "bundleVersion": "1.0.0",
+  "gameName": "mymod",
+  "assets": [
+    { "path": "textures/sky/skybox01.tga", "hash": "a1b2c3..." }
+  ],
+  "generatedAt": "2025-12-04T00:00:00Z"
+}
