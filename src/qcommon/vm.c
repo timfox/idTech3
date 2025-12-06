@@ -1988,7 +1988,7 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 				// The linker will resolve these symbols from the static libraries we linked
 				void *combinedHandle = VM_GetCombinedEntryPoint( index, &vm->entryPoint, dllSyscalls );
 				if ( combinedHandle && vm->entryPoint ) {
-					vm->dllHandle = combinedHandle;
+					vm->dllHandle = NULL; // statically linked; no dlclose
 					vm->privateFlag = 0; // allow reading private cvars
 					vm->dataAlloc = ~0U;
 					vm->dataMask = ~0U;
@@ -2175,8 +2175,17 @@ void VM_Free( vm_t *vm ) {
 	if ( vm->destroy )
 		vm->destroy( vm );
 
-	if ( vm->dllHandle )
-		Sys_UnloadLibrary( vm->dllHandle );
+	if ( vm->dllHandle ) {
+#ifdef COMBINED_MONOLITH
+		// Statically linked modules shouldn't be unloaded via dlclose.
+		if ( vm_combined && vm_combined->integer ) {
+			// Skip unload; handle is NULL for monolith entries.
+		} else
+#endif
+		{
+			Sys_UnloadLibrary( vm->dllHandle );
+		}
+	}
 
 #if 0	// now automatically freed by hunk
 	if ( vm->codeBase.ptr ) {
@@ -2263,11 +2272,11 @@ intptr_t QDECL VM_Call( vm_t *vm, int nargs, int callnum, ... )
 	if ( vm->entryPoint )
 	{
 		//rcg010207 -  see dissertation at top of VM_DllSyscall() in this file.
-		int32_t args[MAX_VMMAIN_CALL_ARGS-1];
+		intptr_t args[MAX_VMMAIN_CALL_ARGS-1];
 		va_list ap;
 		va_start( ap, callnum );
 		for ( i = 0; i < nargs; i++ ) {
-			args[i] = va_arg( ap, int32_t );
+			args[i] = va_arg( ap, intptr_t );
 		}
 		va_end( ap );
 		

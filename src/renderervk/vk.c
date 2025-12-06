@@ -3076,7 +3076,8 @@ static void vk_create_geometry_buffers( VkDeviceSize size )
 	};
 
 	VmaAllocationCreateInfo allocCreateInfo = {
-		.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT,
+		// Mapped + AUTO requires a host access flag to satisfy VMA assertions.
+		.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
 		.usage = VMA_MEMORY_USAGE_AUTO_PREFER_HOST,
 		.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
 	};

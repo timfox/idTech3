@@ -561,7 +561,8 @@ typedef enum {
 // we don't need more than 4 arguments (counting callnum) for vmMain, at least in Vanilla Quake3
 #define MAX_VMMAIN_CALL_ARGS 4
 
-typedef intptr_t (QDECL *vmMainFunc_t)( int command, int arg0, int arg1, int arg2 );
+// Use intptr_t for vmMain arguments so pointers are preserved on 64-bit native builds.
+typedef intptr_t (QDECL *vmMainFunc_t)( int command, intptr_t arg0, intptr_t arg1, intptr_t arg2 );
 
 typedef intptr_t (*syscall_t)( intptr_t *parms );
 typedef intptr_t (QDECL *dllSyscall_t)( intptr_t callNum, ... );

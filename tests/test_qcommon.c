@@ -56,6 +56,24 @@ TEST(q_strncpyz_empty_string) {
 	ASSERT_EQ(dest[0], '\0');
 }
 
+TEST(q_printstrlen_ignores_color_codes) {
+	const char *src = "^1Hel^2lo^7!";
+	// Color codes (^x) should be ignored in length
+	ASSERT_EQ(Q_PrintStrlen(src), 6);
+}
+
+TEST(q_cleanstr_strips_color_and_control) {
+	char src[] = "^1Hello^7 \x01World";
+	Q_CleanStr(src);
+	ASSERT_STR_EQ(src, "Hello World");
+}
+
+TEST(q_countchar_basic) {
+	ASSERT_EQ(Q_CountChar("hello", 'l'), 2);
+	ASSERT_EQ(Q_CountChar("aaaa", 'a'), 4);
+	ASSERT_EQ(Q_CountChar("", 'x'), 0);
+}
+
 TEST(q_stricmp_basic) {
 	ASSERT_EQ(Q_stricmp("hello", "HELLO"), 0);
 	ASSERT_EQ(Q_stricmp("hello", "world"), -1);
@@ -74,6 +92,9 @@ int main(void) {
 	RUN_TEST(q_strncpyz_basic);
 	RUN_TEST(q_strncpyz_truncation);
 	RUN_TEST(q_strncpyz_empty_string);
+	RUN_TEST(q_printstrlen_ignores_color_codes);
+	RUN_TEST(q_cleanstr_strips_color_and_control);
+	RUN_TEST(q_countchar_basic);
 	RUN_TEST(q_stricmp_basic);
 	RUN_TEST(q_streq_basic);
 	

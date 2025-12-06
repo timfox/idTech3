@@ -9,7 +9,7 @@
 # Usage: ./compile_monolith.sh [mode] [Debug|Release] [clean] [output_name|mod_name]
 #
 #     [mode]          : Build mode: game, engine, or monolith (default: monolith)
-#     [Debug|Release] : CMake build type (default: Release)
+#     [Debug|Release] : CMake build type (default: RelWithDebInfo)
 #     [clean]         : Optionally erase the build directory before building
 #     [output_name]   : For monolith: Name for the output executable (without extension, optional)
 #                       For game: Mod name (default: mymod)
@@ -35,6 +35,9 @@ normalize_build_type() {
             ;;
         release|rel|r)
             echo "Release"
+            ;;
+        relwithdebinfo|relwithdeb|withdebinfo|withdeb|rwd|relwd|rwdi)
+            echo "RelWithDebInfo"
             ;;
         *)
             echo ""
@@ -89,8 +92,8 @@ if [ -z "$BUILD_TYPE" ] && [ $i -lt ${#ARGS[@]} ]; then
     fi
 fi
 
-# Default build type
-BUILD_TYPE=${BUILD_TYPE:-Release}
+# Default build type (with debug symbols)
+BUILD_TYPE=${BUILD_TYPE:-RelWithDebInfo}
 
 # Check for "clean" flag
 if [ $i -lt ${#ARGS[@]} ]; then
@@ -210,7 +213,13 @@ case "$MODE" in
         cd "$BUILD_DIR"
 
         echo "Running CMake configuration..."
-        cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} "$PROJECT_ROOT"
+        CMAKE_ARGS=(
+            -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
+            -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -g"
+            -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -g"
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+        )
+        cmake "${CMAKE_ARGS[@]}" "$PROJECT_ROOT"
 
         echo "Building with ${CORES} parallel jobs..."
         cmake --build . -- -j${CORES}
@@ -287,14 +296,19 @@ case "$MODE" in
         cd "$BUILD_DIR"
 
         echo "Preparing CMake configuration..."
-        CMAKE_ARGS="-DCMAKE_BUILD_TYPE=$BUILD_TYPE"
-        CMAKE_ARGS="$CMAKE_ARGS -DCOMBINED_MONOLITH=ON"
-        CMAKE_ARGS="$CMAKE_ARGS -DMONOLITH_EXECUTABLE_NAME=$OUTPUT_NAME"
-        CMAKE_ARGS="$CMAKE_ARGS -DMONOLITH_MOD_NAME=$MOD_NAME"
-        CMAKE_ARGS="$CMAKE_ARGS -DMONOLITH_MOD_DIR=$MOD_ROOT"
+        CMAKE_ARGS=(
+            -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+            -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -g"
+            -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -g"
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+            -DCOMBINED_MONOLITH=ON
+            -DMONOLITH_EXECUTABLE_NAME=$OUTPUT_NAME
+            -DMONOLITH_MOD_NAME=$MOD_NAME
+            -DMONOLITH_MOD_DIR=$MOD_ROOT
+        )
 
         echo "Running CMake configuration..."
-        cmake $CMAKE_ARGS "$PROJECT_ROOT"
+        cmake "${CMAKE_ARGS[@]}" "$PROJECT_ROOT"
 
         echo "Building monolithic executable with ${CORES} parallel jobs..."
         cmake --build . -- -j${CORES}

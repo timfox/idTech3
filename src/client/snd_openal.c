@@ -1,5 +1,6 @@
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
+#include "../qcommon/q_log.h"
 #include "snd_public.h"
 #include "snd_local.h"
 #include "snd_openal.h"
@@ -71,14 +72,14 @@ qboolean SndOpenAL_Init(void)
 	deviceName = alcGetString(NULL, ALC_DEFAULT_DEVICE_SPECIFIER);
 	openalDevice = alcOpenDevice(deviceName);
 	if (!openalDevice) {
-		Com_Printf("SndOpenAL_Init: Failed to open OpenAL device\n");
+		LOG_SOUND_WARN("OpenAL: failed to open default device");
 		return qfalse;
 	}
 	
 	// Create context
 	openalContext = alcCreateContext(openalDevice, NULL);
 	if (!openalContext) {
-		Com_Printf("SndOpenAL_Init: Failed to create OpenAL context\n");
+		LOG_SOUND_WARN("OpenAL: failed to create context");
 		alcCloseDevice(openalDevice);
 		openalDevice = NULL;
 		return qfalse;
@@ -86,13 +87,14 @@ qboolean SndOpenAL_Init(void)
 	
 	// Make context current
 	if (!alcMakeContextCurrent(openalContext)) {
-		Com_Printf("SndOpenAL_Init: Failed to make context current\n");
+		LOG_SOUND_WARN("OpenAL: failed to make context current");
 		alcDestroyContext(openalContext);
 		alcCloseDevice(openalDevice);
 		openalContext = NULL;
 		openalDevice = NULL;
 		return qfalse;
 	}
+	LOG_SOUND_INFO("OpenAL initialized (device: %s)", deviceName ? deviceName : "unknown");
 	
 	// Initialize sound slots
 	for (i = 0; i < MAX_OPENAL_SOURCES; i++) {

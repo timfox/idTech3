@@ -441,7 +441,7 @@ This must be the very first function compiled into the .q3vm file
 // Note: In monolithic builds, we need to avoid symbol conflicts with ui/cgame modules
 // So we make vmMain static (internal linkage) and use vmMain_game as the exported entry point
 #ifdef COMBINED_MONOLITH
-static intptr_t QDECL vmMain( int command, int arg0, int arg1, int arg2, [[maybe_unused]] int arg3, [[maybe_unused]] int arg4, [[maybe_unused]] int arg5, [[maybe_unused]] int arg6, [[maybe_unused]] int arg7, [[maybe_unused]] int arg8, [[maybe_unused]] int arg9, [[maybe_unused]] int arg10, [[maybe_unused]] int arg11  )
+static intptr_t QDECL vmMain( int command, intptr_t arg0, intptr_t arg1, intptr_t arg2, [[maybe_unused]] intptr_t arg3, [[maybe_unused]] intptr_t arg4, [[maybe_unused]] intptr_t arg5, [[maybe_unused]] intptr_t arg6, [[maybe_unused]] intptr_t arg7, [[maybe_unused]] intptr_t arg8, [[maybe_unused]] intptr_t arg9, [[maybe_unused]] intptr_t arg10, [[maybe_unused]] intptr_t arg11  )
 #else
 Q_EXPORT intptr_t vmMain( int command, int arg0, int arg1, int arg2, [[maybe_unused]] int arg3, [[maybe_unused]] int arg4, [[maybe_unused]] int arg5, [[maybe_unused]] int arg6, [[maybe_unused]] int arg7, [[maybe_unused]] int arg8, [[maybe_unused]] int arg9, [[maybe_unused]] int arg10, [[maybe_unused]] int arg11  )
 #endif
@@ -454,7 +454,8 @@ Q_EXPORT intptr_t vmMain( int command, int arg0, int arg1, int arg2, [[maybe_unu
 			// Syscall not initialized; bail out before using any trap-dependent logging
 			return -1;
 		}
-		G_Printf( "vmMain: GAME_INIT called - levelTime=%d, randomSeed=%d, restart=%d\n", arg0, arg1, arg2 );
+			G_Printf( "vmMain: GAME_INIT called - levelTime=%ld, randomSeed=%ld, restart=%ld\n",
+				(long)arg0, (long)arg1, (long)arg2 );
 		G_InitGame( arg0, arg1, arg2 );
 		G_Printf( "vmMain: GAME_INIT completed successfully\n" );
 		return 0;

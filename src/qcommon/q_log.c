@@ -112,6 +112,72 @@ static const char *level_names[LOG_LEVEL_COUNT] = {
 	"FATAL"
 };
 
+typedef struct log_prefix_map_s {
+	const char *prefix;
+	log_category_t category;
+} log_prefix_map_t;
+
+static const log_prefix_map_t log_prefix_map[] = {
+	{ "[net]",       LOG_CATEGORY_NETWORK },
+	{ "[network]",   LOG_CATEGORY_NETWORK },
+	{ "[render]",    LOG_CATEGORY_RENDERER },
+	{ "[renderer]",  LOG_CATEGORY_RENDERER },
+	{ "[fs]",        LOG_CATEGORY_FILESYSTEM },
+	{ "[file]",      LOG_CATEGORY_FILESYSTEM },
+	{ "[sound]",     LOG_CATEGORY_SOUND },
+	{ "[audio]",     LOG_CATEGORY_SOUND },
+	{ "[input]",     LOG_CATEGORY_INPUT },
+	{ "[phys]",      LOG_CATEGORY_PHYSICS },
+	{ "[physics]",   LOG_CATEGORY_PHYSICS },
+	{ "[ai]",        LOG_CATEGORY_AI },
+	{ "[script]",    LOG_CATEGORY_SCRIPT },
+	{ "[lua]",       LOG_CATEGORY_SCRIPT },
+	{ "[mem]",       LOG_CATEGORY_MEMORY },
+	{ "[memory]",    LOG_CATEGORY_MEMORY },
+	{ "[server]",    LOG_CATEGORY_SERVER },
+	{ "[client]",    LOG_CATEGORY_CLIENT },
+	{ "[general]",   LOG_CATEGORY_GENERAL }
+};
+
+/*
+================
+Q_Log_DetectCategoryFromPrefix
+================
+*/
+static log_category_t Q_Log_DetectCategoryFromPrefix(const char *message, const char **payload_out) {
+	const char *p = message;
+	if (!p) {
+		if (payload_out) {
+			*payload_out = message;
+		}
+		return LOG_CATEGORY_GENERAL;
+	}
+
+	// Skip leading whitespace
+	while (*p && (*p == ' ' || *p == '\t')) {
+		++p;
+	}
+
+	if (*p == '[') {
+		for (size_t i = 0; i < ARRAY_LEN(log_prefix_map); i++) {
+			const char *tag = log_prefix_map[i].prefix;
+			size_t tag_len = strlen(tag);
+			if (!Q_strnicmp(p, tag, tag_len)) {
+				if (payload_out) {
+					*payload_out = p + tag_len;
+				}
+				return log_prefix_map[i].category;
+			}
+		}
+	}
+
+	if (payload_out) {
+		*payload_out = message;
+	}
+
+	return LOG_CATEGORY_GENERAL;
+}
+
 // Syslog level mapping
 #ifndef _WIN32
 static int syslog_levels[LOG_LEVEL_COUNT] = {
@@ -606,7 +672,7 @@ void Q_Log_Init(void) {
 	Cvar_SetDescription(log_enable, "Enable structured logging (0=disabled, 1=enabled)");
 	log_level = Cvar_Get("log_level", "1", CVAR_ARCHIVE);
 	Cvar_SetDescription(log_level, "Global log level (0=DEBUG, 1=INFO, 2=WARN, 3=ERROR, 4=FATAL)");
-	log_format = Cvar_Get("log_format", "0", CVAR_ARCHIVE);
+	log_format = Cvar_Get("log_format", "1", CVAR_ARCHIVE);
 	Cvar_SetDescription(log_format, "Log format (0=text, 1=JSON)");
 	log_output = Cvar_Get("log_output", "3", CVAR_ARCHIVE);
 	Cvar_SetDescription(log_output, "Log output destinations (1=console, 2=file, 4=syslog, combine with +)");
@@ -621,11 +687,10 @@ void Q_Log_Init(void) {
 	
 	// Initialize defaults
 	log_state.global_level = LOG_LEVEL_INFO;
-	log_state.format = LOG_FORMAT_TEXT;
-	// Default to console‑only; file logging can be re‑enabled explicitly via cvar.
-	// The file backend is more complex (FS_Restart, homepath, rotation, etc.) and
-	// we want the engine to be rock‑solid even if that path misbehaves.
-	log_state.output_flags = LOG_OUTPUT_CONSOLE;
+	log_state.format = LOG_FORMAT_JSON;
+	// Default to console + file; safety is preserved by deferred logging when FS
+	// is not ready yet.
+	log_state.output_flags = LOG_OUTPUT_CONSOLE | LOG_OUTPUT_FILE;
 	Q_strncpyz(log_state.filename, "console.log", sizeof(log_state.filename));
 	log_state.rotation_size_mb = DEFAULT_ROTATION_SIZE_MB;
 	log_state.rotation_time_hours = DEFAULT_ROTATION_TIME_HOURS;
@@ -888,12 +953,19 @@ Compatibility layer for Com_Printf
 void QDECL Q_Log_ComPrintf(const char *fmt, ...) {
 	va_list argptr;
 	char message[MAX_LOG_MESSAGE];
+	const char *payload = NULL;
+	log_category_t category;
 	
 	va_start(argptr, fmt);
 	Q_vsnprintf(message, sizeof(message), fmt, argptr);
 	va_end(argptr);
+
+	category = Q_Log_DetectCategoryFromPrefix(message, &payload);
+	if (!payload) {
+		payload = message;
+	}
 	
-	Q_Log(LOG_LEVEL_INFO, LOG_CATEGORY_GENERAL, "compat", 0, "Com_Printf", "%s", message);
+	Q_Log(LOG_LEVEL_INFO, category, "compat", 0, "Com_Printf", "%s", payload);
 }
 
 /*
@@ -910,12 +982,19 @@ void QDECL Q_Log_ComDPrintf(const char *fmt, ...) {
 	
 	va_list argptr;
 	char message[MAX_LOG_MESSAGE];
+	const char *payload = NULL;
+	log_category_t category;
 	
 	va_start(argptr, fmt);
 	Q_vsnprintf(message, sizeof(message), fmt, argptr);
 	va_end(argptr);
 	
-	Q_Log(LOG_LEVEL_DEBUG, LOG_CATEGORY_GENERAL, "compat", 0, "Com_DPrintf", "%s", message);
+	category = Q_Log_DetectCategoryFromPrefix(message, &payload);
+	if (!payload) {
+		payload = message;
+	}
+	
+	Q_Log(LOG_LEVEL_DEBUG, category, "compat", 0, "Com_DPrintf", "%s", payload);
 }
 
 /*

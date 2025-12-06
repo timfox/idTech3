@@ -178,6 +178,7 @@ OPTION(USE_LUA "" ON)
 OPTION(USE_AIML "Enable AIML 2.1 parser/interpreter support" ON)
 OPTION(USE_ENTT "Enable EnTT ECS system" ON)
 OPTION(USE_STEAMWORKS "Enable Steamworks SDK integration for Steam Deck features" OFF)
+OPTION(USE_TRACY "Enable Tracy profiler instrumentation (header-only shim)" OFF)
 OPTION(USE_CIMGUI "Enable ImGui" ON)
 OPTION(USE_WEBSOCKETS "Enable WebSocket support" ON)
 OPTION(USE_OPENAL "Enable OpenAL enhanced audio system" ON)
@@ -1911,6 +1912,8 @@ TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui)
 
 # Monolithic build support: link game module targets directly
 OPTION(COMBINED_MONOLITH "Build monolithic executable with game modules linked statically" OFF)
+OPTION(MONOLITH_USE_LTO "Enable link-time optimization for monolithic builds" OFF)
+OPTION(MONOLITH_USE_GC_SECTIONS "Enable function/data section GC for monolithic builds" ON)
 IF(COMBINED_MONOLITH)
 	ADD_DEFINITIONS(-DCOMBINED_MONOLITH)
 	IF(BUILD_SHARED_LIBS)
@@ -1960,6 +1963,28 @@ IF(COMBINED_MONOLITH)
 	# trampolines and logging wrappers). The engine copies take precedence.
 	if (UNIX AND NOT APPLE)
 		target_link_options(${CNAME}${BINEXT} PRIVATE -Wl,--allow-multiple-definition)
+	endif()
+
+	# Optional size/speed optimizations for the monolithic binary
+	if (MONOLITH_USE_GC_SECTIONS)
+		# Enable section GC on the monolith and its statically linked modules
+		target_compile_options(${CNAME}${BINEXT} PRIVATE -ffunction-sections -fdata-sections)
+		target_link_options(${CNAME}${BINEXT} PRIVATE -Wl,--gc-sections)
+		foreach(_mod game_${MONOLITH_ARCH_SUFFIX} cgame_${MONOLITH_ARCH_SUFFIX} ui_${MONOLITH_ARCH_SUFFIX})
+			if (TARGET ${_mod})
+				target_compile_options(${_mod} PRIVATE -ffunction-sections -fdata-sections)
+			endif()
+		endforeach()
+	endif()
+
+	if (MONOLITH_USE_LTO)
+		# Enable LTO/IPO for the monolith and its statically linked modules
+		set_property(TARGET ${CNAME}${BINEXT} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+		foreach(_mod game_${MONOLITH_ARCH_SUFFIX} cgame_${MONOLITH_ARCH_SUFFIX} ui_${MONOLITH_ARCH_SUFFIX})
+			if (TARGET ${_mod})
+				set_property(TARGET ${_mod} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+			endif()
+		endforeach()
 	endif()
 	IF(WIN32)
 		SET_TARGET_PROPERTIES(${CNAME}${BINEXT} PROPERTIES SUFFIX ".exe")
@@ -2189,5 +2214,14 @@ IF(BUILD_TESTS)
 	TARGET_INCLUDE_DIRECTORIES(test_qcommon PRIVATE src/qcommon)
 	TARGET_INCLUDE_DIRECTORIES(test_qcommon PRIVATE src)
 	ADD_TEST(NAME qcommon_tests COMMAND test_qcommon)
+
+	IF(USE_ENET)
+		ADD_EXECUTABLE(test_network_enet
+			tests/test_network_enet.c
+			${ENET_SRCS}
+		)
+		TARGET_INCLUDE_DIRECTORIES(test_network_enet PRIVATE libs/enet/include)
+		ADD_TEST(NAME network_enet_tests COMMAND test_network_enet)
+	endif()
 	MESSAGE(STATUS "Unit tests enabled")
 ENDIF()

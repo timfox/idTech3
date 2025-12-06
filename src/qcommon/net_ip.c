@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
+#include "../qcommon/q_log.h"
 
 #ifdef _WIN32
 #	include <winsock2.h>
@@ -1776,15 +1777,16 @@ void NET_Init( void ) {
 
 	r = WSAStartup( MAKEWORD( 2, 0 ), &winsockdata );
 	if( r ) {
-		Com_Printf( S_COLOR_YELLOW "WARNING: Winsock initialization failed, returned %d\n", r );
+		LOG_NETWORK_WARN("Winsock initialization failed (%d)", r);
 		return;
 	}
 
 	winsockInitialized = qtrue;
-	Com_DPrintf( "Winsock Initialized\n" );
+	LOG_NETWORK_INFO("Winsock initialized");
 #endif
 
 	NET_Config( qtrue );
+	LOG_NETWORK_INFO("Networking initialized (udp=%d, ipv6=%d)", net_enabled->integer, net_enabled->integer && net_enabled->integer != 1);
 	
 	Cmd_AddCommand( "net_restart", NET_Restart_f );
 }
@@ -1797,10 +1799,12 @@ NET_Shutdown
 */
 void NET_Shutdown( void ) {
 	if ( !networkingEnabled ) {
+		LOG_NETWORK_INFO("Networking already shut down");
 		return;
 	}
 
 	NET_Config( qfalse );
+	LOG_NETWORK_INFO("Networking shut down");
 
 #ifdef _WIN32
 	WSACleanup();

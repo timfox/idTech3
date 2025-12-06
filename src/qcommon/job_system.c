@@ -10,6 +10,7 @@ Multi-threaded job system with work-stealing for parallel execution.
 #include "qcommon.h"
 #include "job_system.h"
 #include "thread_platform.h"
+#include "profiler.h"
 #include <string.h>
 
 // Worker thread structure
@@ -47,6 +48,7 @@ Main function for worker threads
 static THREAD_RETURN THREAD_CALL WorkerThread_Main(void *arg)
 {
 	worker_thread_t *worker = (worker_thread_t *)arg;
+	TracyCZoneCtx zone_main;
 	
 	while (!worker->should_stop) {
 		job_t *job = NULL;
@@ -82,7 +84,13 @@ static THREAD_RETURN THREAD_CALL WorkerThread_Main(void *arg)
 		
 		// Execute job if we have one
 		if (job) {
+			if (PROF_ENABLED) {
+				PROF_THREAD_NAME("JobWorker");
+			}
+
+			PROF_ZONE_BEGIN(zone_main, "JobExecute");
 			job->function(job->data);
+			PROF_ZONE_END(zone_main);
 			job->completed = qtrue;
 			
 			// Signal completion

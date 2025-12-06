@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_shared.h"
 #include "qcommon.h"
 #include "q_log.h"
+#include "profiler.h"
 #include "q_memtrack.h"
 #include "i18n.h"
 #ifdef USE_CURL
@@ -165,6 +166,23 @@ void Com_EndRedirect( void )
 	rd_buffer = NULL;
 	rd_buffersize = 0;
 	rd_flush = NULL;
+}
+
+/*
+=============
+Com_LogFlush_f
+
+Manually flush structured and legacy log outputs.
+=============
+*/
+static void Com_LogFlush_f( void ) {
+	if ( Q_Log_IsEnabled() ) {
+		Q_Log_Flush();
+	}
+
+	if ( logfile != FS_INVALID_HANDLE ) {
+		FS_ForceFlush( logfile );
+	}
 }
 
 
@@ -4145,6 +4163,7 @@ void Com_Init( char *commandLine ) {
 		Cmd_AddCommand( "freeze", Com_Freeze_f );
 	}
 
+	Cmd_AddCommand( "log_flush", Com_LogFlush_f );
 	Cmd_AddCommand( "quit", Com_Quit_f );
 	Cmd_AddCommand( "exit", Com_Quit_f ); // Alias for quit
 	Cmd_AddCommand( "help", Com_Help_f );
@@ -4480,10 +4499,14 @@ void Com_Frame( qboolean noDelay ) {
 	int	timeBeforeEvents;
 	int	timeBeforeClient;
 	int	timeAfter;
+	TracyCZoneCtx prof_frame;
 
 	if ( Q_setjmp( abortframe ) ) {
 		return;			// an ERR_DROP was thrown
 	}
+
+	PROF_FRAME_MARK();
+	PROF_ZONE_BEGIN(prof_frame, "Com_Frame");
 
 	minMsec = 0; // silent compiler warning
 
@@ -4726,6 +4749,7 @@ void Com_Frame( qboolean noDelay ) {
 	}
 
 	com_frameNumber++;
+	PROF_ZONE_END(prof_frame);
 }
 
 

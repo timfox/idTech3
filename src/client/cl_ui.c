@@ -816,8 +816,15 @@ The ui module is making a system call
 static intptr_t CL_UISystemCalls( intptr_t *args ) {
 	switch( args[0] ) {
 	case UI_ERROR:
-		Com_Error( ERR_DROP, "%s", (const char*)VMA(1) );
+	{
+		const char *msg = (const char*)VMA(1);
+		if ( !msg || !msg[0] ) {
+			Com_Printf( "UI_ERROR: empty message (ignored)\n" );
+			return 0;
+		}
+		Com_Error( ERR_DROP, "%s", msg );
 		return 0;
+	}
 
 	case UI_PRINT:
 		Com_Printf( "%s", (const char*)VMA(1) );
@@ -827,19 +834,39 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 		return Sys_Milliseconds();
 
 	case UI_CVAR_REGISTER:
-		Cvar_Register( VMA(1), VMA(2), VMA(3), args[4], uivm->privateFlag );
+	{
+		const char *name = VMA(2);
+		if ( !name || !name[0] ) {
+			Com_Printf( "UI_CVAR_REGISTER: NULL/empty var_name (ignored)\n" );
+			return 0;
+		}
+		Cvar_Register( VMA(1), name, VMA(3), args[4], uivm->privateFlag );
 		return 0;
+	}
 
 	case UI_CVAR_UPDATE:
-		Cvar_Update( VMA(1), uivm->privateFlag );
+	{
+		vmCvar_t *cvar = VMA(1);
+		if ( !cvar ) {
+			Com_Printf( "UI_CVAR_UPDATE: NULL vmCvar (ignored)\n" );
+			return 0;
+		}
+		Cvar_Update( cvar, uivm->privateFlag );
 		return 0;
+	}
 
 	case UI_CVAR_SET:
 	{
 		const char *name = VMA(1);
 		const char *val  = VMA(2);
-		if (!name) {
-			Com_Printf( "UI_CVAR_SET: NULL var_name (ignored)\n" );
+		static int emptySetWarnings = 0;
+		if (!name || !name[0]) {
+			if (emptySetWarnings < 5) {
+				Com_Printf( "UI_CVAR_SET: NULL/empty var_name (ignored)\n" );
+			} else if (emptySetWarnings == 5) {
+				Com_Printf( "UI_CVAR_SET: further NULL/empty var_name warnings suppressed\n" );
+			}
+			++emptySetWarnings;
 			return 0;
 		}
 		if (!val) {
@@ -853,8 +880,8 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 	case UI_CVAR_VARIABLEVALUE:
 	{
 		const char *name = VMA(1);
-		if (!name) {
-			Com_Printf( "UI_CVAR_VARIABLEVALUE: NULL var_name (ignored)\n" );
+		if (!name || !name[0]) {
+			Com_Printf( "UI_CVAR_VARIABLEVALUE: NULL/empty var_name (ignored)\n" );
 			return 0;
 		}
 		return FloatAsInt( Cvar_VariableValue( name ) );
@@ -866,8 +893,8 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 		char *buffer   = VMA(2);
 		int   bufsize  = args[3];
 
-		if (!name) {
-			Com_Printf( "UI_CVAR_VARIABLESTRINGBUFFER: NULL var_name (ignored)\n" );
+		if (!name || !name[0]) {
+			Com_Printf( "UI_CVAR_VARIABLESTRINGBUFFER: NULL/empty var_name (ignored)\n" );
 			return 0;
 		}
 
@@ -888,8 +915,8 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 	case UI_CVAR_SETVALUE:
 	{
 		const char *name = VMA(1);
-		if (!name) {
-			Com_Printf( "UI_CVAR_SETVALUE: NULL var_name (ignored)\n" );
+		if (!name || !name[0]) {
+			Com_Printf( "UI_CVAR_SETVALUE: NULL/empty var_name (ignored)\n" );
 			return 0;
 		}
 		Cvar_SetValueSafe( name, VMF(2) );
@@ -899,8 +926,8 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 	case UI_CVAR_RESET:
 	{
 		const char *name = VMA(1);
-		if (!name) {
-			Com_Printf( "UI_CVAR_RESET: NULL var_name (ignored)\n" );
+		if (!name || !name[0]) {
+			Com_Printf( "UI_CVAR_RESET: NULL/empty var_name (ignored)\n" );
 			return 0;
 		}
 		Cvar_Reset( name );
@@ -910,8 +937,8 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 	case UI_CVAR_CREATE:
 	{
 		const char *name = VMA(1);
-		if (!name) {
-			Com_Printf( "UI_CVAR_CREATE: NULL var_name (ignored)\n" );
+		if (!name || !name[0]) {
+			Com_Printf( "UI_CVAR_CREATE: NULL/empty var_name (ignored)\n" );
 			return 0;
 		}
 		Cvar_Register( NULL, name, VMA(2), args[3], uivm->privateFlag );
@@ -929,35 +956,76 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 		return Cmd_Argc();
 
 	case UI_ARGV:
+	{
+		int index = args[1];
+		char *buffer = VMA(2);
+		int bufsize = args[3];
+		if ( !buffer || bufsize <= 0 ) {
+			Com_Printf( "UI_ARGV: invalid buffer (%p) or size (%d)\n", buffer, bufsize );
+			return 0;
+		}
+		if ( index < 0 || index >= Cmd_Argc() ) {
+			buffer[0] = '\0';
+			return 0;
+		}
 		VM_CHECKBOUNDS( uivm, args[2], args[3] );
-		Cmd_ArgvBuffer( args[1], VMA(2), args[3] );
+		Cmd_ArgvBuffer( index, buffer, bufsize );
 		return 0;
+	}
 
 	case UI_CMD_EXECUTETEXT:
+	{
+		const char *text = VMA(2);
+		if ( !text || !text[0] ) {
+			Com_Printf( "UI_CMD_EXECUTETEXT: empty command ignored\n" );
+			return 0;
+		}
 		if(args[1] == EXEC_NOW
-		&& (!strncmp(VMA(2), "snd_restart", 11)
-		|| !strncmp(VMA(2), "vid_restart", 11)
-		|| !strncmp(VMA(2), "disconnect", 10)
-		|| !strncmp(VMA(2), "quit", 5)))
+		&& (!strncmp(text, "snd_restart", 11)
+		|| !strncmp(text, "vid_restart", 11)
+		|| !strncmp(text, "disconnect", 10)
+		|| !strncmp(text, "quit", 5)))
 		{
-			Com_Printf (S_COLOR_YELLOW "turning EXEC_NOW '%.11s' into EXEC_INSERT\n", (const char*)VMA(2));
+			Com_Printf (S_COLOR_YELLOW "turning EXEC_NOW '%.11s' into EXEC_INSERT\n", text);
 			args[1] = EXEC_INSERT;
 		}
-		Cbuf_ExecuteText( args[1], VMA(2) );
+		Cbuf_ExecuteText( args[1], text );
 		return 0;
+	}
 
 	case UI_FS_FOPENFILE:
-		return FS_VM_OpenFile( VMA(1), VMA(2), args[3], H_Q3UI );
+	{
+		const char *qpath = VMA(1);
+		if ( !qpath || !qpath[0] ) {
+			Com_Printf( "UI_FS_FOPENFILE: empty filename ignored\n" );
+			return -1;
+		}
+		return FS_VM_OpenFile( qpath, VMA(2), args[3], H_Q3UI );
+	}
 
 	case UI_FS_READ:
+	{
+		void *buf = VMA(1);
+		int len = args[2];
+		if ( !buf || len <= 0 ) {
+			return 0;
+		}
 		VM_CHECKBOUNDS( uivm, args[1], args[2] );
-		FS_VM_ReadFile( VMA(1), args[2], args[3], H_Q3UI );
+		FS_VM_ReadFile( buf, len, args[3], H_Q3UI );
 		return 0;
+	}
 
 	case UI_FS_WRITE:
+	{
+		void *buf = VMA(1);
+		int len = args[2];
+		if ( !buf || len <= 0 ) {
+			return 0;
+		}
 		VM_CHECKBOUNDS( uivm, args[1], args[2] );
-		FS_VM_WriteFile( VMA(1), args[2], args[3], H_Q3UI );
+		FS_VM_WriteFile( buf, len, args[3], H_Q3UI );
 		return 0;
+	}
 
 	case UI_FS_FCLOSEFILE:
 		FS_VM_CloseFile( args[1], H_Q3UI );
@@ -967,8 +1035,20 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 		return FS_VM_SeekFile( args[1], args[2], args[3], H_Q3UI );
 
 	case UI_FS_GETFILELIST:
+	{
+		const char *path = VMA(1);
+		const char *ext  = VMA(2);
+		void *list = VMA(3);
+		int size = args[4];
+		if ( !list || size <= 0 ) {
+			return 0;
+		}
+		if ( !path || !path[0] ) {
+			return 0;
+		}
 		VM_CHECKBOUNDS( uivm, args[3], args[4] );
-		return FS_GetFileList( VMA(1), VMA(2), VMA(3), args[4] );
+		return FS_GetFileList( path, ext, list, size );
+	}
 
 	case UI_R_REGISTERMODEL:
 		return re.RegisterModel( VMA(1) );

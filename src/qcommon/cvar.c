@@ -808,6 +808,10 @@ void Cvar_SetSafe( const char *var_name, const char *value )
 		Com_Printf( "Cvar_SetSafe: NULL var_name parameter, ignoring\n" );
 		return;
 	}
+	if ( !var_name[0] ) {
+		Com_Printf( "Cvar_SetSafe: empty var_name parameter, ignoring\n" );
+		return;
+	}
 	unsigned flags = Cvar_Flags( var_name );
 	qboolean force = qtrue;
 
@@ -2054,6 +2058,10 @@ void Cvar_Register( vmCvar_t *vmCvar, const char *varName, const char *defaultVa
 	// Validate parameters
 	if ( !varName ) {
 		Com_Printf( "Cvar_Register: NULL varName parameter\n" );
+		return;
+	}
+	if ( !varName[0] ) {
+		Com_Printf( "Cvar_Register: empty varName parameter\n" );
 		return;
 	}
 
