@@ -1450,6 +1450,8 @@ struct fontInfo_s {
   float glyphScale;
   char name[MAX_QPATH];
   // Modern font rendering additions
+  qboolean isSDF;           // true when atlas stores distance field
+  float sdfSpread;          // spread (in pixels) used to generate SDF
   qboolean hasKerning;      // whether this font supports kerning
   int pointSize;            // point size this font was rendered at
   float dpi;                // DPI used for rendering

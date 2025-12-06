@@ -192,6 +192,9 @@ cvar_t	*r_fontHinting;
 cvar_t	*r_fontAntialiasing;
 cvar_t	*r_fontLCDFilter;
 cvar_t	*r_fontKerning;
+cvar_t	*r_fontSDF;
+cvar_t	*r_fontSDFSpread;
+cvar_t	*r_fontSDFSmooth;
 
 cvar_t	*r_marksOnTriangleMeshes;
 
@@ -1729,6 +1732,18 @@ static void R_Register( void )
 	r_fontKerning = ri.Cvar_Get( "r_fontKerning", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_fontKerning, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_fontKerning, "Enable font kerning for improved text spacing. Kerning adjusts spacing between character pairs (e.g., 'AV', 'To') for better readability." );
+
+	r_fontSDF = ri.Cvar_Get( "r_fontSDF", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fontSDF, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontSDF, "Use signed distance field (SDF) font atlases when available. Requires atlas rebuild." );
+
+	r_fontSDFSpread = ri.Cvar_Get( "r_fontSDFSpread", "6", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fontSDFSpread, "4", "16", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontSDFSpread, "SDF spread (pixels) for SDF font baking." );
+
+	r_fontSDFSmooth = ri.Cvar_Get( "r_fontSDFSmooth", "0.25", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fontSDFSmooth, "0.05", "0.5", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fontSDFSmooth, "SDF smoothstep width (normalized distance). Higher = softer edges." );
 
 	r_nocurves = ri.Cvar_Get ("r_nocurves", "0", CVAR_CHEAT );
 	ri.Cvar_SetDescription( r_nocurves, "Set to 1 to disable drawing world bezier curves. Set to 0 to enable." );

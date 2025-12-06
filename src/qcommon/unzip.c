@@ -1,3 +1,9 @@
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#endif
 /*****************************************************************************
  * name:		unzip.c
  *
@@ -4333,6 +4339,10 @@ int inflateSyncPoint(z_streamp z)
     return Z_STREAM_ERROR;
   return inflate_blocks_sync_point(z->state->blocks);
 }
+
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 #endif
 
 voidp zcalloc (voidp opaque, unsigned items, unsigned size)

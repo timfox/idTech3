@@ -603,6 +603,9 @@ typedef struct image_s {
 	int			uploadHeight;
 	imgFlags_t	flags;
 	int			frameUsed;			// for texture usage in frame statistics
+	qboolean	isFont;			// hint: font/UI texture
+	qboolean	isSDF;			// hint: font atlas is SDF
+	float		sdfSpread;		// spread used to bake SDF
 
 #ifdef USE_VULKAN
 	int			internalFormat;

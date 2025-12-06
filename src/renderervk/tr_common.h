@@ -129,6 +129,9 @@ extern	cvar_t	*r_fontHinting;
 extern	cvar_t	*r_fontAntialiasing;
 extern	cvar_t	*r_fontLCDFilter;
 extern	cvar_t	*r_fontKerning;
+extern	cvar_t	*r_fontSDF;
+extern	cvar_t	*r_fontSDFSpread;
+extern	cvar_t	*r_fontSDFSmooth;
 
 /*
 =============================================================

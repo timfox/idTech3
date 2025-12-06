@@ -330,6 +330,8 @@ typedef struct {
 	int fog_stage; // off, fog-in / fog-out
 	int abs_light;
 	int allow_discard;
+	int use_font_sdf;
+	float font_sdf_smooth;
 
 #ifdef USE_VK_PBR
 	uint32_t				vk_pbr_flags;

@@ -1,3 +1,7 @@
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Woverlength-strings"
+#endif
 /* GIMP RGBA C-Source image dump (sdl_icon.h) */
 
 static const struct {
@@ -129,4 +133,8 @@ static const struct {
   "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
   "\0\0\0\0\0\0\0\0",
 };
+
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif
 

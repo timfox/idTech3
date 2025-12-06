@@ -7107,6 +7107,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
         float   identity_color;
 		float	identity_alpha;
 		float	acff;
+		int32_t use_font_sdf;
+		float   font_sdf_smooth;
 #ifdef USE_VK_PBR
         float   specularScale_x;	// use ubo for this
         float   specularScale_y;
@@ -7124,9 +7126,9 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
     } frag_spec_data; 
 
 #ifdef USE_VK_PBR
-    VkSpecializationMapEntry spec_entries[24];
+    VkSpecializationMapEntry spec_entries[26];
 #else
-    VkSpecializationMapEntry spec_entries[12];
+    VkSpecializationMapEntry spec_entries[14];
 #endif
 	
 	VkSpecializationInfo frag_spec_info;
@@ -7731,7 +7733,15 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
     spec_entries[11].offset = offsetof(struct FragSpecData, identity_color);
     spec_entries[11].size = sizeof(frag_spec_data.identity_color);
 
-	frag_spec_info.mapEntryCount = 11;
+	spec_entries[12].constantID = 25;
+    spec_entries[12].offset = offsetof(struct FragSpecData, use_font_sdf);
+    spec_entries[12].size = sizeof(frag_spec_data.use_font_sdf);
+
+	spec_entries[13].constantID = 26;
+    spec_entries[13].offset = offsetof(struct FragSpecData, font_sdf_smooth);
+    spec_entries[13].size = sizeof(frag_spec_data.font_sdf_smooth);
+
+	frag_spec_info.mapEntryCount = 13;
 #ifdef USE_VK_PBR   
 {
         frag_spec_info.mapEntryCount += 12;

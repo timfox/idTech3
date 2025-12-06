@@ -25,10 +25,18 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../renderer/tr_common.h"
 
 #ifdef USE_NANOSVG
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#pragma GCC diagnostic ignored "-Wuninitialized"
+#endif
 #define NANOSVG_IMPLEMENTATION
 #define NANOSVGRAST_IMPLEMENTATION
 #include "../../libs/nanosvg/nanosvg.h"
 #include "../../libs/nanosvg/nanosvgrast.h"
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
 void R_LoadSVG( const char *name, byte **pic, int *width, int *height )
 {

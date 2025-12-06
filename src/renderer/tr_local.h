@@ -535,6 +535,9 @@ typedef struct image_s {
 	int			uploadWidth;		// after power of two and picmip but not including clamp to MAX_TEXTURE_SIZE
 	int			uploadHeight;
 	imgFlags_t	flags;
+	qboolean	isFont;			// hint: font/UI texture
+	qboolean	isSDF;			// hint: font atlas is SDF
+	float		sdfSpread;		// spread used to bake SDF (pixels)
 	GLuint		texnum;				// gl texture binding
 
 	int			frameUsed;			// for texture usage in frame statistics

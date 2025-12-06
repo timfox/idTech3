@@ -77,7 +77,7 @@ void GLW_RestoreGamma( void );
 #ifdef USE_VULKAN
 void VKimp_Init( glconfig_t *config );
 void VKimp_Shutdown( qboolean unloadDLL );
-void *VK_GetInstanceProcAddr( VkInstance instance, const char *name );
+PFN_vkVoidFunction VK_GetInstanceProcAddr( VkInstance instance, const char *name );
 qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR *surface );
 #endif
 

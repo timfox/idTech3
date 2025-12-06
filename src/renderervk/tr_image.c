@@ -1160,6 +1160,9 @@ image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int widt
 	} else {
 		image->imgName2 = image->imgName; 
 	}
+	image->isFont = qfalse;
+	image->isSDF = qfalse;
+	image->sdfSpread = 0.0f;
 
 	hash = generateHashValue( name );
 	image->next = hashTable[ hash ];

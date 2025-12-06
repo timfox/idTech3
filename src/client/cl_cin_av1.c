@@ -83,7 +83,7 @@ static void AV1_YUVtoRGB(Dav1dPicture *pic, byte *rgb, int width, int height) {
 	const uint8_t *v_plane = pic->data[2];
 	int y_stride = pic->stride[0];
 	int u_stride = pic->stride[1];
-	int v_stride = pic->stride[2];
+        int v_stride = pic->stride[1]; // dav1d exposes only Y and UV strides
 	
 	// AV1 uses 4:2:0 chroma subsampling
 	for (y = 0; y < height; y++) {

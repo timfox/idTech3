@@ -343,6 +343,7 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 						depthBits = 16;
 					else if (depthBits == 16)
 						depthBits = 8;
+					/* fall through */
 				case 3 :
 					if (stencilBits == 24)
 						stencilBits = 16;
@@ -736,7 +737,7 @@ void VKimp_Init( glconfig_t *config )
 		}
 	}
 
-	qvkGetInstanceProcAddr = SDL_Vulkan_GetVkGetInstanceProcAddr();
+	qvkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)SDL_Vulkan_GetVkGetInstanceProcAddr();
 
 	if ( qvkGetInstanceProcAddr == NULL )
 	{
@@ -762,7 +763,7 @@ void VKimp_Init( glconfig_t *config )
 VK_GetInstanceProcAddr
 ===============
 */
-void *VK_GetInstanceProcAddr( VkInstance instance, const char *name )
+PFN_vkVoidFunction VK_GetInstanceProcAddr( VkInstance instance, const char *name )
 {
 	return qvkGetInstanceProcAddr( instance, name );
 }

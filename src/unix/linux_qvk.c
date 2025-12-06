@@ -71,7 +71,7 @@ void QVK_Shutdown( qboolean unloadDLL )
 }
 
 
-void *VK_GetInstanceProcAddr( VkInstance instance, const char *name )
+PFN_vkVoidFunction VK_GetInstanceProcAddr( VkInstance instance, const char *name )
 {
 	return qvkGetInstanceProcAddr( instance, name );
 }

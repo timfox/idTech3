@@ -936,7 +936,7 @@ static intptr_t QDECL CL_DllSyscall( intptr_t arg, ... ) {
 #if !id386 || defined __clang__
 	intptr_t	args[10]; // max.count for cgame
 	va_list	ap;
-	int i;
+	size_t i;
 
 	args[0] = arg;
 	va_start( ap, arg );

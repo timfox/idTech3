@@ -1,3 +1,7 @@
+#ifdef __GNUC__
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#endif
 /*
 ===========================================================================
 Copyright (C) 1999-2005 Id Software, Inc.

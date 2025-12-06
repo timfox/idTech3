@@ -112,7 +112,7 @@ TODO: If the SDL_Scancode situation improves, use it instead of
       both of these methods
 ===============
 */
-static qboolean IN_IsConsoleKey( keyNum_t key, int character )
+static qboolean IN_IsConsoleKey( keyNum_t key, keyNum_t character )
 {
 	typedef struct consoleKey_s
 	{
@@ -125,7 +125,7 @@ static qboolean IN_IsConsoleKey( keyNum_t key, int character )
 		union
 		{
 			keyNum_t key;
-			int character;
+			keyNum_t character;
 		} u;
 	} consoleKey_t;
 
@@ -156,7 +156,7 @@ static qboolean IN_IsConsoleKey( keyNum_t key, int character )
 			if( charCode > 0 )
 			{
 				c->type = CHARACTER;
-				c->u.character = charCode;
+				c->u.character = (keyNum_t)charCode;
 			}
 			else
 			{

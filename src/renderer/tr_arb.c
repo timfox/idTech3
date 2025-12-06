@@ -727,7 +727,7 @@ static char *ARB_BuildBloomProgram( char *buf ) {
 
 // Gaussian blur shader
 static char *ARB_BuildBlurProgram( char *buf, int taps ) {
-	int i;
+	size_t i;
 	char *s = buf;
 
 	*s = '\0';

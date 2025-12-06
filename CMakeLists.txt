@@ -6,14 +6,42 @@
 cmake_minimum_required(VERSION 3.20)
 project(idtech3 C CXX ASM)
 
+# Prefer colored compiler diagnostics when supported
+if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
+	set(CMAKE_COLOR_DIAGNOSTICS ON)
+endif()
+set(CMAKE_COLOR_MAKEFILE ON)
+add_compile_options($<$<OR:$<C_COMPILER_ID:GNU>,$<C_COMPILER_ID:Clang>>:-fdiagnostics-color=always>)
+
+# Simple helper to print colored headings during configure
+# Use ANSI escapes; double-backslash to survive CMake parsing
+set(COL_RESET "\\033[0m")
+set(COL_TITLE "\\033[1;36m") # bright cyan
+set(COL_STEP  "\\033[1;35m") # bright magenta
+set(COL_OK    "\\033[1;32m") # bright green
+set(COL_WARN  "\\033[1;33m") # bright yellow
+set(COL_ERROR "\\033[1;31m") # bright red
+
+function(color_msg COLOR TEXT)
+	if (CMAKE_COLOR_MAKEFILE)
+		message("${COLOR}${TEXT}${COL_RESET}")
+	else()
+		message("${TEXT}")
+	endif()
+endfunction()
+
+color_msg("${COL_TITLE}" "=== Configuring id Tech 3 build ===")
+color_msg("${COL_STEP}"  "-- Compiler: ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
+
 # ------------------------------------------------------------------------------
 # Language Standard Configuration
 # ------------------------------------------------------------------------------
+# Set C23 standard
 SET(CMAKE_C_STANDARD 23)
 SET(CMAKE_C_STANDARD_REQUIRED ON)
 SET(CMAKE_C_EXTENSIONS OFF)
 
-# Set C++ standard for engine features (AIML and ECS rely on C++23)
+# Set C++23 standard
 SET(CMAKE_CXX_STANDARD 23)
 SET(CMAKE_CXX_STANDARD_REQUIRED ON)
 SET(CMAKE_CXX_EXTENSIONS OFF)
@@ -167,6 +195,7 @@ OPTION(USE_JOBSYSTEM "Enable multi-threaded job system for parallel execution" O
 OPTION(USE_THEORA "Enable Theora (Ogg Theora) video codec support" ON)
 OPTION(USE_VPX "Enable VP8/VP9 (WebM) video codec support" ON)
 OPTION(USE_DAV1D "Enable AV1 video codec support (dav1d decoder)" ON)
+OPTION(USE_STB_TRUETYPE "Enable stb_truetype font baking (SDF/TTF runtime atlases)" ON)
 #OPTION(USE_OPENGL "" OFF)
 #OPTION(USE_OPENGL2 "" OFF)
 #OPTION(USE_USD "" ON)
@@ -178,6 +207,10 @@ IF(ANDROID)
 	SET(BUILD_TESTS OFF CACHE BOOL "" FORCE)
 	SET(USE_RENDERER_DLOPEN OFF CACHE BOOL "" FORCE)
 	SET(CMAKE_POSITION_INDEPENDENT_CODE ON)
+ENDIF()
+
+IF(USE_STB_TRUETYPE)
+	add_compile_definitions(USE_STB_TRUETYPE)
 ENDIF()
 
 SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules)
