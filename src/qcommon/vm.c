@@ -341,12 +341,9 @@ void VM_Init( void ) {
 
 	// Monolithic build detection
 	#ifdef COMBINED_MONOLITH
-		vm_combined = Cvar_Get( "vm_combined", "1", CVAR_INIT | CVAR_ROM | CVAR_PROTECTED );
+		// Allow command-line override; keep INIT so it is set during startup.
+		vm_combined = Cvar_Get( "vm_combined", "1", CVAR_INIT );
 		Cvar_SetDescription( vm_combined, "Indicates that game modules are statically linked into the executable (monolithic build)" );
-		// Force-enable combined path even if an old config archived a different value.
-		if ( vm_combined->integer != 1 ) {
-			Cvar_ForceReset( "vm_combined" );
-		}
 	#else
 		vm_combined = Cvar_Get( "vm_combined", "0", CVAR_INIT | CVAR_ROM | CVAR_PROTECTED );
 		Cvar_SetDescription( vm_combined, "Indicates that game modules are statically linked into the executable (monolithic build)" );
@@ -1992,6 +1989,20 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 					vm->dataMask = ~0U;
 					vm->dataBase = 0;
 					Com_Printf( "VM_Create: Using statically linked %s, entryPoint=%p\n", name, (void*)vm->entryPoint );
+					// Defensive: ensure dllEntry was invoked so the module's syscall pointer is initialized.
+					switch ( index ) {
+						case VM_GAME:
+							if ( dllEntry_game ) dllEntry_game( dllSyscalls );
+							break;
+						case VM_CGAME:
+							if ( dllEntry_cgame ) dllEntry_cgame( dllSyscalls );
+							break;
+						case VM_UI:
+							if ( dllEntry_ui ) dllEntry_ui( dllSyscalls );
+							break;
+						default:
+							break;
+					}
 					// Debug: verify function pointer
 					if ( index == VM_GAME ) {
 						extern intptr_t QDECL vmMain_game( int command, int arg0, int arg1, int arg2 );

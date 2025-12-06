@@ -5550,7 +5550,11 @@ static void FS_Startup( void ) {
 	Cvar_SetDescription( fs_debug, "Debugging tool for the filesystem. Run the game in debug mode. Prints additional information regarding read files into the console." );
 	fs_copyfiles = Cvar_Get( "fs_copyfiles", "0", CVAR_INIT );
 	Cvar_SetDescription( fs_copyfiles, "Whether or not to copy files when loading them into the game. Every file found in the cdpath will be copied over." );
+	#ifdef COMBINED_MONOLITH
+	fs_basepath = Cvar_Get( "fs_basepath", Sys_DefaultAppPath(), CVAR_INIT | CVAR_PROTECTED | CVAR_PRIVATE );
+	#else
 	fs_basepath = Cvar_Get( "fs_basepath", Sys_DefaultBasePath(), CVAR_INIT | CVAR_PROTECTED | CVAR_PRIVATE );
+	#endif
 	Cvar_SetDescription( fs_basepath, "Write-protected CVAR specifying the path to the installation folder of the game." );
 	fs_basegame = Cvar_Get( "fs_basegame", BASEGAME, CVAR_INIT | CVAR_PROTECTED );
 	Cvar_SetDescription( fs_basegame, "Write-protected CVAR specifying the path to the base game(s) folder(s), separated by '/'." );
@@ -5586,7 +5590,11 @@ static void FS_Startup( void ) {
 		homePath = fs_basepath->string;
 	}
 
+	#ifdef COMBINED_MONOLITH
+	fs_homepath = Cvar_Get( "fs_homepath", fs_basepath->string, CVAR_INIT | CVAR_PROTECTED | CVAR_PRIVATE );
+	#else
 	fs_homepath = Cvar_Get( "fs_homepath", homePath, CVAR_INIT | CVAR_PROTECTED | CVAR_PRIVATE );
+	#endif
 	Cvar_SetDescription( fs_homepath, "Directory to store user configuration and downloaded files." );
 
 	// Default fs_game value - can be set at compile time for monolithic builds
@@ -5596,6 +5604,13 @@ static void FS_Startup( void ) {
 		fs_gamedirvar = Cvar_Get( "fs_game", "", CVAR_INIT | CVAR_SYSTEMINFO );
 	#endif
 	Cvar_SetDescription( fs_gamedirvar, "Specify an alternate mod directory and run the game with this mod." );
+
+#ifdef COMBINED_MONOLITH
+	// Monolithic builds: force defaults to bundled mod.
+	#ifdef DEFAULT_FS_GAME
+		Cvar_Set( "fs_game", DEFAULT_FS_GAME );
+	#endif
+#endif
 
 	if ( FS_IsBaseGame( fs_gamedirvar->string ) ) {
 		Cvar_ForceReset( "fs_game" );

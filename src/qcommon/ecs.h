@@ -13,13 +13,14 @@ backwards compatibility.
 
 #include "q_shared.h"
 
+typedef unsigned int ecs_entity_t;
+
+#define ECS_NULL_ENTITY 0
+
 #ifdef USE_ENTT
 
 // Forward declarations
 typedef struct ecs_registry_s ecs_registry_t;
-typedef unsigned int ecs_entity_t;
-
-#define ECS_NULL_ENTITY 0
 
 // Initialization
 void ECS_Init(void);
