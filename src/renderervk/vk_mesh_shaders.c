@@ -25,10 +25,20 @@ static PFN_vkCmdDrawMeshTasksIndirectCountEXT qvkCmdDrawMeshTasksIndirectCountEX
 
 static qboolean meshShadersSupported = qfalse;
 
+static qboolean mesh_shaders_requested( void )
+{
+	return ( r_meshShaders && r_meshShaders->integer != 0 );
+}
+
 void vk_mesh_shaders_init( void )
 {
 	Com_Memset( &vk.mesh, 0, sizeof( vk.mesh ) );
 	
+	vk.mesh.meshletCapacity = 0;
+	vk.mesh.meshlets = NULL;
+	vk.mesh.meshletCount = 0;
+	vk.mesh.useFallback = qtrue;
+
 	// Check if mesh shader extension is available
 	// First, check if extension was enabled during device creation
 	// Then try to load the function pointers
@@ -39,16 +49,24 @@ void vk_mesh_shaders_init( void )
 	if ( qvkCmdDrawMeshTasksEXT ) {
 		meshShadersSupported = qtrue;
 		vk.mesh.meshShaderSupported = qtrue;
+		vk.mesh.active = mesh_shaders_requested();
+		vk.mesh.useFallback = !vk.mesh.active;
 		
 		// Check for task shader support (optional, but recommended)
 		// Task shaders are part of the same extension
 		vk.mesh.taskShaderSupported = qtrue;
 		
-		ri.Printf( PRINT_DEVELOPER, "Mesh shaders: Extension detected, function pointers loaded\n" );
+		if ( vk.mesh.active ) {
+			ri.Printf( PRINT_DEVELOPER, "Mesh shaders: Extension detected, enabled (mesh tasks available)\n" );
+		} else {
+			ri.Printf( PRINT_DEVELOPER, "Mesh shaders: Extension detected but disabled via cvar, using fallback path\n" );
+		}
 	} else {
 		meshShadersSupported = qfalse;
 		vk.mesh.meshShaderSupported = qfalse;
 		vk.mesh.taskShaderSupported = qfalse;
+		vk.mesh.active = qfalse;
+		vk.mesh.useFallback = qtrue;
 		ri.Printf( PRINT_DEVELOPER, "Mesh shaders: Not available (extension not enabled or not supported)\n" );
 		return;
 	}
@@ -67,6 +85,15 @@ void vk_mesh_shaders_shutdown( void )
 	qvkCmdDrawMeshTasksIndirectEXT = NULL;
 	qvkCmdDrawMeshTasksIndirectCountEXT = NULL;
 	meshShadersSupported = qfalse;
+
+	if ( vk.mesh.meshlets ) {
+		ri.Free( vk.mesh.meshlets );
+		vk.mesh.meshlets = NULL;
+	}
+	vk.mesh.meshletCapacity = 0;
+	vk.mesh.meshletCount = 0;
+	vk.mesh.active = qfalse;
+	vk.mesh.useFallback = qtrue;
 }
 
 qboolean vk_mesh_shaders_is_supported( void )
@@ -74,52 +101,68 @@ qboolean vk_mesh_shaders_is_supported( void )
 	return meshShadersSupported && qvkCmdDrawMeshTasksEXT != NULL;
 }
 
+qboolean vk_mesh_shaders_use_fallback( void )
+{
+	return vk.mesh.useFallback || !vk_mesh_shaders_is_supported();
+}
+
+uint32_t vk_mesh_shaders_meshlet_count( void )
+{
+	return vk.mesh.meshletCount;
+}
+
 // Generate meshlets from geometry (would be called during model loading)
 void vk_mesh_shaders_generate_meshlets( void *vertices, uint32_t vertexCount, void *indices, uint32_t indexCount )
 {
-	if ( !vk_mesh_shaders_is_supported() ) {
+	// Require source buffers; otherwise mark fallback and bail.
+	if ( !vertices || !indices ) {
+		vk.mesh.meshletCount = 0;
+		vk.mesh.useFallback = qtrue;
+		ri.Printf( PRINT_DEVELOPER, "Meshlet generation skipped: missing vertex or index data\n" );
 		return;
 	}
 
-	// Meshlet generation algorithm:
-	// 1. Partition geometry into meshlets (typically 64-128 vertices per meshlet)
-	//    - Use greedy algorithm to maximize vertex reuse
-	//    - Respect triangle connectivity
-	//    - Limit to max vertices/primitives per meshlet
-	// 2. Store meshlets in GPU buffers:
-	//    - Vertex buffer: interleaved vertex data
-	//    - Index buffer: triangle indices per meshlet
-	//    - Meshlet buffer: metadata (vertex count, primitive count, bounds)
-	// 3. Create meshlet metadata:
-	//    - Bounding sphere/box for culling
-	//    - LOD information
-	//    - Material index
-	
-	uint32_t meshletSize = r_meshletSize ? r_meshletSize->integer : 64;
-	if ( meshletSize < 32 ) meshletSize = 32;
-	if ( meshletSize > 256 ) meshletSize = 256;
-	
-	// Estimate meshlet count
-	uint32_t estimatedMeshlets = ( indexCount / 3 + meshletSize - 1 ) / meshletSize;
-	
-	ri.Printf( PRINT_DEVELOPER, "Meshlet generation: %u vertices, %u indices -> ~%u meshlets (size: %u)\n", 
-		vertexCount, indexCount, estimatedMeshlets, meshletSize );
-	
-	// TODO: Implement actual meshlet generation
-	// This would involve:
-	// - Allocating GPU buffers for meshlet data
-	// - Running CPU-side meshlet generation algorithm
-	// - Uploading meshlet data to GPU buffers
-	// - Storing meshlet handles in model structure
-	
-	(void)vertices; // Unused for now
-	(void)indices; // Unused for now
+	// Always build CPU metadata to drive fallback or GPU mesh shaders.
+	uint32_t meshletSize = ( r_meshletSize ) ? (uint32_t)Com_Clamp( 32.0f, 256.0f, r_meshletSize->value ) : 128;
+	const uint32_t triangleCount = ( indexCount / 3 );
+	if ( triangleCount == 0 ) {
+		vk.mesh.meshletCount = 0;
+		return;
+	}
+
+	const uint32_t meshletCount = ( triangleCount + meshletSize - 1 ) / meshletSize;
+	if ( meshletCount > vk.mesh.meshletCapacity ) {
+		if ( vk.mesh.meshlets ) {
+			ri.Free( vk.mesh.meshlets );
+		}
+		vk.mesh.meshletCapacity = meshletCount;
+		vk.mesh.meshlets = (meshlet_info_t *)ri.Malloc( sizeof( meshlet_info_t ) * meshletCount );
+	}
+
+	for ( uint32_t m = 0; m < meshletCount; ++m ) {
+		const uint32_t firstTri = m * meshletSize;
+		const uint32_t remaining = triangleCount - firstTri;
+		const uint32_t triInMeshlet = ( meshletSize < remaining ) ? meshletSize : remaining;
+		meshlet_info_t *info = &vk.mesh.meshlets[m];
+		info->firstIndex = firstTri * 3;
+		info->indexCount = triInMeshlet * 3;
+		const uint32_t vertsNeeded = triInMeshlet * 3;
+		info->vertexCount = ( vertexCount < vertsNeeded ) ? vertexCount : vertsNeeded;
+	}
+
+	vk.mesh.meshletCount = meshletCount;
+
+	// If mesh shaders are unavailable, mark fallback but keep metadata for instancing.
+	if ( !vk_mesh_shaders_is_supported() || !mesh_shaders_requested() ) {
+		vk.mesh.useFallback = qtrue;
+		return;
+	}
 }
 
 // Create mesh shader pipeline (task + mesh shader)
 void vk_mesh_shaders_create_pipeline( void )
 {
-	if ( !vk_mesh_shaders_is_supported() ) {
+	if ( !vk_mesh_shaders_is_supported() || vk_mesh_shaders_use_fallback() ) {
 		return;
 	}
 	
@@ -148,7 +191,7 @@ void vk_mesh_shaders_create_pipeline( void )
 // Render using mesh shaders
 void vk_mesh_shaders_draw( uint32_t meshletCount )
 {
-	if ( !vk_mesh_shaders_is_supported() || meshletCount == 0 ) {
+	if ( vk_mesh_shaders_use_fallback() || meshletCount == 0 ) {
 		return;
 	}
 

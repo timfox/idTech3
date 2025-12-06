@@ -3,4 +3,4 @@
 	url = https://github.com/skypjack/entt.git
 [submodule "radiant"]
 	path = radiant
-	url = https://github.com/TTimo/GtkRadiant.git
+	url = https://github.com/timfox/idTech3Radiant.git

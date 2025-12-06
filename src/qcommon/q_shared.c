@@ -1479,6 +1479,45 @@ int Q_stricmpn( const char *s1, const char *s2, int n ) {
 }
 
 
+/*
+=============
+Q_strnicmp
+=============
+*/
+int Q_strnicmp( const char *s1, const char *s2, int n ) {
+	int c1, c2;
+
+	if ( s1 == NULL ) {
+		return ( s2 == NULL ) ? 0 : -1;
+	} else if ( s2 == NULL ) {
+		return 1;
+	}
+
+	do {
+		c1 = *s1++;
+		c2 = *s2++;
+
+		if ( !n-- ) {
+			return 0; // equal up to n
+		}
+
+		if ( c1 != c2 ) {
+			if ( c1 >= 'a' && c1 <= 'z' ) {
+				c1 -= ('a' - 'A');
+			}
+			if ( c2 >= 'a' && c2 <= 'z' ) {
+				c2 -= ('a' - 'A');
+			}
+			if ( c1 != c2 ) {
+				return c1 < c2 ? -1 : 1;
+			}
+		}
+	} while ( c1 );
+
+	return 0;
+}
+
+
 int Q_strncmp( const char *s1, const char *s2, int n ) {
 	int		c1, c2;
 	

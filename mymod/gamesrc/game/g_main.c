@@ -94,6 +94,7 @@ vmCvar_t g_smoothClients;
 vmCvar_t pmove_fixed;
 vmCvar_t pmove_msec;
 vmCvar_t pmove_float;
+vmCvar_t pmove_nextgen;
 vmCvar_t g_rankings;
 vmCvar_t g_listEntity;
 vmCvar_t g_localTeamPref;
@@ -307,6 +308,7 @@ static cvarTable_t gameCvarTable[] = {
 	{ &pmove_fixed, "pmove_fixed", "0", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue, qfalse},
 	{ &pmove_msec, "pmove_msec", "11", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue, qfalse},
 	{ &pmove_float, "pmove_float", "1", CVAR_SYSTEMINFO | CVAR_ARCHIVE, 0, qtrue, qfalse},
+	{ &pmove_nextgen, "pmove_nextgen", "0", CVAR_SYSTEMINFO | CVAR_LATCH, 0, qtrue, qfalse},
 
 //unlagged - server options
 	{ &g_delagHitscan, "g_delagHitscan", "0", CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qtrue, qfalse },

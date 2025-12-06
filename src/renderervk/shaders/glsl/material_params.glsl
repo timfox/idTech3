@@ -6,18 +6,36 @@
 
 // Material parameter structure (matches CPU layout)
 struct MaterialParams {
-    float wetness;          // 0.0 = dry, 1.0 = fully wet
-    float damage;          // 0.0 = pristine, 1.0 = destroyed
-    float corruption;      // 0.0 = clean, 1.0 = corrupted
-    float magicGlow;       // 0.0 = no glow, 1.0 = full glow
-    float temperature;     // Temperature for thermal effects
-    float time;            // Time-based animation parameter
-    
-    vec3 magicColor;       // Magical glow color
-    vec3 damageColor;      // Damage tint color
-    
-    uint flags;            // Material flags
-    uint stateHash;        // Hash of current state
+    // Dynamic state
+    float wetness;
+    float damage;
+    float corruption;
+    float magicGlow;
+    float temperature;
+    float time;
+
+    vec3 magicColor;
+    float _pad0;
+    vec3 damageColor;
+    float _pad1;
+
+    // Layered/PBR baseline
+    vec3 baseColor;
+    float roughness;
+    vec3 emissive;
+    float metallic;
+    float normalScale;
+    float clearcoat;
+    float clearcoatRoughness;
+    float layerWeight;
+
+    // Metadata
+    uint flags;
+    uint stateHash;
+    uint layerCount;
+    uint debugFlags;
+    float layerCost;
+    vec3 _pad2;
 };
 
 // Material flags
@@ -27,6 +45,7 @@ struct MaterialParams {
 #define MATERIAL_CORRUPTED 0x08
 #define MATERIAL_EMISSIVE  0x10
 #define MATERIAL_DYNAMIC   0x20
+#define MATERIAL_HAS_LAYERS 0x40
 
 // Material parameter buffer (set 9, binding 0)
 layout(set = 9, binding = 0, std430) restrict readonly buffer MaterialParamsBuffer {
@@ -37,7 +56,14 @@ layout(set = 9, binding = 0, std430) restrict readonly buffer MaterialParamsBuff
 vec3 applyMaterialParams(uint materialIndex, vec3 baseColor, float roughness, float metallic, out vec3 emissive)
 {
     MaterialParams params = materials[materialIndex];
-    emissive = vec3(0.0);
+    emissive = params.emissive;
+    
+    // Layered base override when provided
+    if ((params.flags & MATERIAL_HAS_LAYERS) != 0) {
+        baseColor = params.baseColor;
+        roughness = params.roughness;
+        metallic = params.metallic;
+    }
     
     // Apply wetness (reduces roughness)
     float finalRoughness = roughness;
@@ -78,7 +104,7 @@ vec3 applyMaterialParams(uint materialIndex, vec3 baseColor, float roughness, fl
 float getMaterialRoughness(uint materialIndex, float baseRoughness)
 {
     MaterialParams params = materials[materialIndex];
-    float roughness = baseRoughness;
+    float roughness = ((params.flags & MATERIAL_HAS_LAYERS) != 0) ? params.roughness : baseRoughness;
     
     // Wetness reduces roughness
     if ((params.flags & MATERIAL_WET) != 0) {
@@ -97,7 +123,7 @@ float getMaterialRoughness(uint materialIndex, float baseRoughness)
 float getMaterialMetallic(uint materialIndex, float baseMetallic)
 {
     MaterialParams params = materials[materialIndex];
-    float metallic = baseMetallic;
+    float metallic = ((params.flags & MATERIAL_HAS_LAYERS) != 0) ? params.metallic : baseMetallic;
     
     // Corruption can make materials more metallic-looking
     if ((params.flags & MATERIAL_CORRUPTED) != 0) {

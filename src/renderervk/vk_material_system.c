@@ -8,6 +8,7 @@ Supports runtime material parameters and scripting
 #include "tr_local.h"
 #include "vk.h"
 #include "vk_material_system.h"
+#include "vk_layered_materials.h"
 
 #ifdef USE_VULKAN
 
@@ -27,6 +28,11 @@ Material System Initialization
 void vk_material_system_init( void )
 {
 	if ( vk.materialSystem.initialized ) {
+		return;
+	}
+
+	vk.materialSystem.enabled = ( r_materialSystem && r_materialSystem->integer );
+	if ( !vk.materialSystem.enabled ) {
 		return;
 	}
 	
@@ -98,6 +104,9 @@ void vk_material_system_init( void )
 	vk.materialSystem.materialParams = materialParams;
 	
 	ri.Printf( PRINT_ALL, "Material system: Initialized with capacity for %u materials\n", vk.materialSystem.materialCapacity );
+
+	// Initialize layered materials (pilot feature)
+	vk_layered_materials_init( vk.materialSystem.materialCapacity );
 	
 	vk.materialSystem.initialized = qtrue;
 }
@@ -127,7 +136,9 @@ void vk_material_system_shutdown( void )
 		ri.Free( materialParams );
 		materialParams = NULL;
 	}
+	vk.materialSystem.materialCount = 0;
 	
+	vk_layered_materials_shutdown();
 	vk.materialSystem.initialized = qfalse;
 	ri.Printf( PRINT_ALL, "Material system: Shutdown complete\n" );
 }
@@ -148,6 +159,9 @@ void vk_material_system_update( void )
 	for ( uint32_t i = 0; i < vk.materialSystem.materialCount; i++ ) {
 		materialParams[i].time = time;
 	}
+
+	// Profile layered materials (no-op if disabled)
+	vk_layered_materials_update();
 	
 	// Upload material parameters to GPU
 	if ( vk.materialSystem.materialCount > 0 && materialParams ) {

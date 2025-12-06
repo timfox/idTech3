@@ -922,6 +922,18 @@ typedef struct srfIQModel_s {
 
 extern	void (*rb_surfaceTable[SF_NUM_SURFACE_TYPES])(void *);
 
+static inline void RB_CallSurfaceSafe(surfaceType_t *surface) {
+	if (!surface) {
+		return;
+	}
+	int type = *surface;
+	if (type < 0 || type >= SF_NUM_SURFACE_TYPES || rb_surfaceTable[type] == NULL) {
+		ri.Printf(PRINT_WARNING, "RB: invalid surface type %d\n", type);
+		return;
+	}
+	rb_surfaceTable[type](surface);
+}
+
 /*
 ==============================================================================
 

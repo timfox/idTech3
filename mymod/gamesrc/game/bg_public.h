@@ -260,6 +260,9 @@ typedef struct {
 	//Flags effecting movement (see dmflags)
 	int                     pmove_flags;
 
+	// Experimental wide-parallel movement toggle
+	int                     pmove_nextgen;
+
 	// callbacks to test the world
 	// these will be different functions during game and cgame
 	void		(*trace)( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentMask );

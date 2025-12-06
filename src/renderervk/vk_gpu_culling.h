@@ -87,6 +87,7 @@ typedef struct {
 // External API
 void vk_gpu_culling_init( void );
 void vk_gpu_culling_shutdown( void );
+void vk_gpu_culling_begin_frame( void );
 void vk_gpu_culling_update( void );
 void vk_gpu_culling_add_instance( const mat4_t modelMatrix, uint32_t entityIndex, const vec4_t color );
 void vk_gpu_culling_execute_indirect( void );

@@ -535,10 +535,11 @@ void vk_rt_init( void )
 	// Size: viewInverse(16*4) + projInverse(16*4) + cameraPos(4*4) + resolution(2*4) + time/near/far/exposure(4*4) + frameIndex/samplesPerPixel/debugMagenta(3*4)
 	//      + previousViewInverse(16*4) + previousProjInverse(16*4) + previousCameraPos(4*4) + temporalAlpha(1*4)
 	//      + maxBounces(1*4) + giIntensity(1*4) + invResolution(2*4) + spatialAlpha(1*4) + varianceAlpha(1*4) + iterations(1*4)
-	//      = 16+16+4+2+6+3+16+16+4+1+1+1+2+1+1+1 = 91 floats + 4 ints = 91*4 + 4*4 = 364 + 16 = 380 bytes
+	//      + pathTracing (1*4 int)
+	//      = 16+16+4+2+6+3+16+16+4+1+1+1+2+1+1+1 = 91 floats + 5 ints = 91*4 + 5*4 = 364 + 20 = 384 bytes
 	VkBufferCreateInfo bufferInfo = {};
 	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferInfo.size = sizeof(float) * (16 + 16 + 4 + 2 + 6 + 1 + 16 + 16 + 4 + 1 + 1 + 1 + 2 + 1 + 1) + sizeof(int) * (3 + 1); // All fields including denoising parameters
+	bufferInfo.size = sizeof(float) * (16 + 16 + 4 + 2 + 6 + 1 + 16 + 16 + 4 + 1 + 1 + 1 + 2 + 1 + 1) + sizeof(int) * (3 + 1 + 1); // All fields including denoising parameters + pathTracing
 	bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -2024,6 +2025,12 @@ static void vk_rt_update_uniform_buffer( void )
 	// iterations (int) - number of spatial filter iterations for ReLAX
 	idata = (int *)data;
 	idata[0] = r_rt_denoiseIterations ? r_rt_denoiseIterations->integer : 3;
+	idata += 1;
+	data = (float *)idata;
+
+	// pathTracing (int) - enable path tracing mode (hybrid vs full path)
+	idata = (int *)data;
+	idata[0] = ri.Cvar_VariableIntegerValue( "r_rt_pathtracing" );
 	idata += 1;
 	data = (float *)idata;
 

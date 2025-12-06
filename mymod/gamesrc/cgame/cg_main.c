@@ -209,6 +209,7 @@ vmCvar_t pmove_fixed;
 //vmCvar_t cg_pmove_fixed;
 vmCvar_t pmove_msec;
 vmCvar_t pmove_float;
+vmCvar_t pmove_nextgen;
 vmCvar_t cg_pmove_msec;
 
 vmCvar_t cg_cameraEyes;
@@ -456,6 +457,7 @@ static cvarTable_t cvarTable[] = {// bk001129
 	{ &pmove_fixed, "pmove_fixed", "0", CVAR_SYSTEMINFO},
 	{ &pmove_msec, "pmove_msec", "11", CVAR_SYSTEMINFO},
 	{ &pmove_float, "pmove_float", "1", CVAR_SYSTEMINFO},
+	{ &pmove_nextgen, "pmove_nextgen", "0", CVAR_SYSTEMINFO},
 	{ &cg_noTaunt, "cg_noTaunt", "0", CVAR_ARCHIVE},
 	{ &cg_noProjectileTrail, "cg_noProjectileTrail", "0", CVAR_ARCHIVE},
 	{ &cg_smallFont, "ui_smallFont", "0.25", CVAR_ARCHIVE},

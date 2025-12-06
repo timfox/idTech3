@@ -61,6 +61,7 @@ cvar_t	*cl_motdString;
 cvar_t	*cl_allowDownload;
 #ifdef USE_CURL
 cvar_t	*cl_mapAutoDownload;
+cvar_t  *cl_enhancedNetworking;
 #endif
 cvar_t	*cl_conXOffset;
 cvar_t	*cl_conColor;
@@ -4249,6 +4250,8 @@ void CL_Init( void ) {
 #ifdef USE_CURL
 	cl_mapAutoDownload = Cvar_Get( "cl_mapAutoDownload", "0", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( cl_mapAutoDownload, "Automatic map download for play and demo playback (via automatic \\dlmap call)." );
+	cl_enhancedNetworking = Cvar_Get( "cl_enhancedNetworking", "1", CVAR_ARCHIVE_ND );
+	Cvar_SetDescription( cl_enhancedNetworking, "Enable enhanced networking stack (HTTP/2, pooled connections) when available." );
 #ifdef USE_CURL_DLOPEN
 	cl_cURLLib = Cvar_Get( "cl_cURLLib", DEFAULT_CURL_LIB, 0 );
 	Cvar_SetDescription( cl_cURLLib, "Filename of cURL library to load." );
@@ -4376,6 +4379,12 @@ void CL_Init( void ) {
 
 #ifdef USE_CIMGUI
 	CL_ImGui_Init();
+#endif
+
+#ifdef USE_CURL
+	if ( cl_enhancedNetworking && cl_enhancedNetworking->integer && !enhanced_initialized ) {
+		NET_Enhanced_Init();
+	}
 #endif
 
 	Com_Printf( "----- Client Initialization Complete -----\n" );

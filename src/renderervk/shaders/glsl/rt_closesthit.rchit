@@ -55,6 +55,7 @@ layout(binding = 2, set = 0) uniform UniformBuffer {
     int samplesPerPixel;
     int maxBounces; // Maximum ray bounces for GI
     float giIntensity; // GI contribution scale
+    int pathTracing; // 0 = hybrid, 1 = full path tracing
 } ubo;
 
 struct VertexData {
@@ -106,35 +107,31 @@ void main()
     // View direction
     vec3 V = normalize(-rayDir);
     
-    // Simple lighting setup (will be enhanced with actual light sources)
-    vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
-    vec3 lightColor = vec3(1.0, 0.95, 0.8) * 2.0;
-    
-    // Calculate PBR lighting
-    vec3 Lo = calculatePBR(albedo, metallic, roughness, N, V, lightDir, lightColor);
-    
-    // Add ambient lighting (IBL approximation)
-    vec3 F0 = mix(vec3(0.04), albedo, metallic);
-    vec3 kS = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
-    vec3 kD = 1.0 - kS;
-    kD *= 1.0 - metallic;
-    
-    vec3 ambient = kD * albedo * getSkyColor(N) * 0.1;
-    
-    // Calculate Ambient Occlusion
-    float ao = 1.0;
-    if (aoSettings.aoEnabled != 0 && aoSettings.maoEnabled == 0) {
-        // Forward declaration - function defined below
-        ao = calculateAmbientOcclusion(worldPos, N);
-    } else if (aoSettings.maoEnabled != 0) {
-        ao = calculateMultiBounceAO(worldPos, N, albedo);
+    vec3 directLighting = emissive;
+    if (ubo.pathTracing == 0) {
+        // Hybrid mode: keep direct lighting + ambient
+        vec3 lightDir = normalize(vec3(1.0, 1.0, 1.0));
+        vec3 lightColor = vec3(1.0, 0.95, 0.8) * 2.0;
+
+        vec3 Lo = calculatePBR(albedo, metallic, roughness, N, V, lightDir, lightColor);
+
+        vec3 F0 = mix(vec3(0.04), albedo, metallic);
+        vec3 kS = fresnelSchlickRoughness(max(dot(N, V), 0.0), F0, roughness);
+        vec3 kD = 1.0 - kS;
+        kD *= 1.0 - metallic;
+
+        vec3 ambient = kD * albedo * getSkyColor(N) * 0.1;
+
+        float ao = 1.0;
+        if (aoSettings.aoEnabled != 0 && aoSettings.maoEnabled == 0) {
+            ao = calculateAmbientOcclusion(worldPos, N);
+        } else if (aoSettings.maoEnabled != 0) {
+            ao = calculateMultiBounceAO(worldPos, N, albedo);
+        }
+        ambient *= ao;
+
+        directLighting = ambient + Lo + emissive;
     }
-    
-    // Apply AO to ambient lighting
-    ambient *= ao;
-    
-    // Combine direct lighting
-    vec3 directLighting = ambient + Lo + emissive;
     
     // Multi-bounce Global Illumination
     vec3 indirectLighting = vec3(0.0);

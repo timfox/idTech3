@@ -690,7 +690,7 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 		tess.needsST2 = qtrue;
 #endif
 		// tesselate
-		rb_surfaceTable[ *sf->data ]( sf->data ); // VBO_PushData() may be called multiple times there
+		RB_CallSurfaceSafe( sf->data ); // VBO_PushData() may be called multiple times there
 		// setup colors and texture coordinates
 		VBO_PushData( i + 1, &tess );
 		if ( grid->surfaceType == SF_GRID ) {

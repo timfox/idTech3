@@ -150,6 +150,21 @@ void vk_gpu_culling_shutdown( void )
 
 /*
 =============================================================================
+GPU Culling Begin Frame - reset instance cursor
+=============================================================================
+*/
+void vk_gpu_culling_begin_frame( void )
+{
+	if ( !vk.gpuCulling.enabled || !vk.gpuCulling.initialized ) {
+		return;
+	}
+
+	gpuInstanceWriteIndex = 0;
+	vk.gpuCulling.instanceCount = 0;
+}
+
+/*
+=============================================================================
 Add Instance for GPU Culling
 =============================================================================
 */
@@ -190,10 +205,6 @@ void vk_gpu_culling_update( void )
 	if ( vk.gpuCulling.cullPipeline == VK_NULL_HANDLE ) {
 		return; // Pipeline not created yet
 	}
-	
-	// Reset instance count
-	gpuInstanceWriteIndex = 0;
-	vk.gpuCulling.instanceCount = 0;
 	
 	// Update cull data with current camera frustum
 	gpu_cull_data_t cullData;

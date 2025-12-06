@@ -18,9 +18,17 @@ typedef struct VkPhysicalDeviceMeshShaderFeaturesEXT {
 #include "vk_gibs.h"
 #endif
 #include "vk_gpu_culling.h"
+#include "vk_proc_dressing.h"
 #include "vk_material_system.h"
 #include "vk_cell_streaming.h"
 #include "vk_atmosphere.h"
+
+extern cvar_t *r_frameTelemetry;
+extern cvar_t *r_procDressing;
+extern cvar_t *r_procDressingDensity;
+extern cvar_t *r_procDressingDebug;
+extern cvar_t *r_foliageWindStrength;
+extern cvar_t *r_foliageWindFrequency;
 
 #if defined (_DEBUG)
 #if defined (_WIN32)
@@ -31,6 +39,7 @@ typedef struct VkPhysicalDeviceMeshShaderFeaturesEXT {
 
 static int vkSamples = VK_SAMPLE_COUNT_1_BIT;
 static int vkMaxSamples = VK_SAMPLE_COUNT_1_BIT;
+static double vkFrameTelemetryLast = 0.0;
 
 static VkInstance vk_instance = VK_NULL_HANDLE;
 static VkSurfaceKHR vk_surface = VK_NULL_HANDLE;
@@ -9732,17 +9741,39 @@ void vk_begin_frame( void )
 		vk_gibs_update();
 	}
 #endif
-	// Update GPU culling
+	// Reset GPU culling instance cursor for this frame
+	if ( vk.gpuCulling.enabled && vk.gpuCulling.initialized ) {
+		vk_gpu_culling_begin_frame();
+	}
+	// Procedural dressing generates instance transforms before the cull/update pass
+	if ( r_procDressing && r_procDressing->integer ) {
+		vk_proc_dressing_tick();
+	}
+	// Update GPU culling after instances have been queued
 	if ( vk.gpuCulling.enabled && vk.gpuCulling.initialized ) {
 		vk_gpu_culling_update();
 	}
-	// Update material system
+	// Material system (lazy init + update)
+	if ( r_materialSystem && r_materialSystem->integer && !vk.materialSystem.initialized ) {
+		vk_material_system_init();
+	}
 	if ( vk.materialSystem.enabled && vk.materialSystem.initialized ) {
 		vk_material_system_update();
 	}
 	// Update atmosphere system
 	if ( vk.atmosphere.enabled && vk.atmosphere.initialized ) {
 		vk_atmosphere_update();
+	}
+
+	// Telemetry: per-second GPU timing stats for frame pacing
+	if ( r_frameTelemetry && r_frameTelemetry->integer ) {
+		double avg = 0.0, min = 0.0, max = 0.0;
+		vk_get_gpu_timing_stats( &avg, &min, &max );
+		if ( tr.refdef.floatTime - vkFrameTelemetryLast > 1.0f ) {
+			ri.Printf( PRINT_DEVELOPER, "FrameTelemetry: gpu avg %.3f ms (min %.3f / max %.3f) meshlets %u\n",
+				avg, min, max, vk.mesh.meshletCount );
+			vkFrameTelemetryLast = tr.refdef.floatTime;
+		}
 	}
 
 	// CRITICAL: Reset render pass state at the start of each frame.

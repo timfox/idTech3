@@ -27,6 +27,7 @@ layout(binding = 2, set = 0) uniform UniformBuffer {
     mat4 previousViewInverse;
     mat4 previousProjInverse;
     vec4 previousCameraPos;
+    int pathTracing; // 0 = hybrid, 1 = full path tracing
 } ubo;
 layout(binding = 5, set = 0, rgba16f) uniform image2D historyImage; // Previous frame RT output
 layout(binding = 6, set = 0, rg16f) uniform image2D motionVectorImage; // Motion vectors for reprojection

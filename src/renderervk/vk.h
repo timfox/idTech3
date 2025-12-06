@@ -5,6 +5,7 @@
 
 // Forward declarations
 typedef struct material_params_s material_params_t;
+typedef struct meshlet_info_s meshlet_info_t;
 
 // Constants for advanced systems
 #define MAX_STREAM_CELLS 256
@@ -222,6 +223,52 @@ typedef enum {
 	TYPE_GENERIC_END = TYPE_BLEND3_MIX_ONE_MINUS_ALPHA_ENV
 
 } Vk_Shader_Type;
+
+// Meshlet metadata (CPU-side)
+struct meshlet_info_s {
+	uint32_t firstIndex;
+	uint32_t indexCount;
+	uint32_t vertexCount;
+};
+
+// Procedural dressing limits
+#define VK_MAX_PROC_RULES     64
+#define VK_MAX_PROC_BIOMES    8
+#define VK_MAX_PROC_INSTANCES 65536
+
+// Procedural dressing data
+typedef enum {
+	PROC_RULE_PAINT = 0,
+	PROC_RULE_VOLUME,
+	PROC_RULE_SPLINE
+} proc_rule_type_t;
+
+typedef struct proc_biome_s {
+	char name[32];
+	vec3_t tint;
+	vec2_t scaleRange;
+	float densityMultiplier;
+	uint32_t materialIndex;
+} proc_biome_t;
+
+typedef struct proc_rule_s {
+	proc_rule_type_t type;
+	vec3_t a;
+	vec3_t b;
+	vec3_t mins;
+	vec3_t maxs;
+	float radius;
+	float density;
+	float jitter;
+	uint32_t biomeId;
+	uint32_t maxInstances;
+} proc_rule_t;
+
+typedef struct proc_instance_s {
+	mat4_t transform;
+	vec4_t color;
+	uint32_t biomeId;
+} proc_instance_t;
 
 // Expose Vulkan command function pointers used from other translation units
 // (e.g. tr_backend.c) when building with Vulkan.
@@ -589,6 +636,8 @@ void vk_dlss_evaluate( VkCommandBuffer cmdBuffer, VkImage colorImage, VkImage de
 void vk_mesh_shaders_init( void );
 void vk_mesh_shaders_shutdown( void );
 qboolean vk_mesh_shaders_is_supported( void );
+qboolean vk_mesh_shaders_use_fallback( void );
+uint32_t vk_mesh_shaders_meshlet_count( void );
 void vk_mesh_shaders_generate_meshlets( void *vertices, uint32_t vertexCount, void *indices, uint32_t indexCount );
 void vk_mesh_shaders_draw( uint32_t meshletCount );
 void vk_mesh_shaders_create_pipeline( void );
@@ -1038,6 +1087,11 @@ typedef struct {
 	struct {
 		qboolean meshShaderSupported;
 		qboolean taskShaderSupported;
+		qboolean active;          // mesh shader path enabled by user + device
+		qboolean useFallback;     // fall back to classic path
+		uint32_t meshletCount;    // last generated meshlets
+		uint32_t meshletCapacity;
+		meshlet_info_t *meshlets; // CPU metadata
 		VkPipeline meshShaderPipeline;
 		VkPipelineLayout meshShaderPipelineLayout;
 		VkDescriptorSetLayout meshShaderDescriptorSetLayout;
@@ -1345,6 +1399,18 @@ typedef struct {
 		uint32_t culledInstanceCount;
 		uint32_t visibleInstanceCount;
 	} gpuCulling;
+
+	// Procedural dressing state
+	struct {
+		qboolean enabled;
+		qboolean initialized;
+		qboolean dirty;
+		uint32_t ruleCount;
+		proc_rule_t rules[VK_MAX_PROC_RULES];
+		uint32_t biomeCount;
+		proc_biome_t biomes[VK_MAX_PROC_BIOMES];
+		uint32_t instanceCount;
+	} procDressing;
 	
 	// Material system with runtime parameters
 	struct {

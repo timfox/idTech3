@@ -759,6 +759,14 @@ void main() {
 	if ( material_index >= 0 && material_index < materials.length() ) {
 		MaterialParams matParams = materials[material_index];
 		
+		// Layered material baseline
+		if ((matParams.flags & MATERIAL_HAS_LAYERS) != 0) {
+			diffuse.rgb = matParams.baseColor;
+			roughness = matParams.roughness;
+			baseMetallic = matParams.metallic;
+			materialEmissive += matParams.emissive;
+		}
+		
 		// Apply wetness (reduces roughness, darkens slightly)
 		if ((matParams.flags & MATERIAL_WET) != 0) {
 			roughness = mix(roughness, 0.1, matParams.wetness);

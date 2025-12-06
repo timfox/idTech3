@@ -21,6 +21,7 @@ layout(binding = 2, set = 0) uniform UniformBuffer {
     float exposure;
     int frameIndex;
     int samplesPerPixel;
+    int pathTracing;
 } ubo;
 
 void main()

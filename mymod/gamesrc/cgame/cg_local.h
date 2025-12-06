@@ -1426,6 +1426,7 @@ extern vmCvar_t cg_obituaryOutput;
 extern vmCvar_t pmove_fixed;
 extern vmCvar_t pmove_msec;
 extern vmCvar_t pmove_float;
+extern vmCvar_t pmove_nextgen;
 //extern vmCvar_t cg_pmove_fixed;
 extern vmCvar_t cg_cameraOrbit;
 extern vmCvar_t cg_cameraOrbitDelay;

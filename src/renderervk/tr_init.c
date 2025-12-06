@@ -22,6 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_init.c -- functions that are not called every frame
 
 #include "tr_local.h"
+#ifdef USE_VULKAN
+#include "vk_layered_materials.h"
+#endif
 
 glconfig_t	glConfig;
 
@@ -93,6 +96,13 @@ cvar_t  *r_baseSpecular;
 cvar_t	*r_cubeMapping;
 #endif
 #endif
+
+// Layered materials / material runtime params
+cvar_t *r_layeredMaterials;
+cvar_t *r_layeredMaterialMaxLayers;
+cvar_t *r_layeredMaterialProfile;
+cvar_t *r_layeredMaterialSimple;
+cvar_t *r_layeredMaterialsPilot;
 #ifdef USE_VULKAN_RAY_TRACING
 	cvar_t	*r_raytracing;
 	cvar_t	*r_rt_samples;
@@ -146,6 +156,12 @@ cvar_t	*r_cubeMapping;
 	cvar_t	*r_gpuCulling;
 	cvar_t	*r_gpuInstancing;
 	cvar_t	*r_cullDistance;
+cvar_t *r_procDressing;
+cvar_t *r_procDressingDensity;
+cvar_t *r_procDressingDebug;
+cvar_t *r_foliageWindStrength;
+cvar_t *r_foliageWindFrequency;
+cvar_t *r_frameTelemetry;
 	cvar_t	*r_materialSystem;
 	cvar_t	*r_materialWetness;
 	cvar_t	*r_materialDamage;
@@ -1648,6 +1664,8 @@ static void R_Register( void )
 #ifdef USE_VULKAN_RAY_TRACING
 	r_raytracing = ri.Cvar_Get( "r_raytracing", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_raytracing, "Enables Vulkan ray tracing. Requires ray tracing capable GPU and " S_COLOR_CYAN "\\r_fbo 1" );
+	cvar_t *r_rt_pathtracing = ri.Cvar_Get( "r_rt_pathtracing", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_rt_pathtracing, "Enable path tracing mode (replaces hybrid RT lighting with multi-bounce GI). Requires r_raytracing 1." );
 	r_rt_samples = ri.Cvar_Get( "r_rt_samples", "1", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_rt_samples, "Number of ray tracing samples per pixel (for denoising)." );
 	r_rt_maxDepth = ri.Cvar_Get( "r_rt_maxDepth", "2", CVAR_ARCHIVE );
@@ -1714,6 +1732,18 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_gpuInstancing, "Enable GPU-driven instancing (0=disabled, 1=enabled)." );
 	r_cullDistance = ri.Cvar_Get( "r_cullDistance", "5000", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_cullDistance, "Maximum distance for GPU culling (world units, default 5000)." );
+	r_procDressing = ri.Cvar_Get( "r_procDressing", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_procDressing, "Enable procedural dressing rules (0=disabled, 1=enabled)." );
+	r_procDressingDensity = ri.Cvar_Get( "r_procDressingDensity", "1.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_procDressingDensity, "Global density multiplier for procedural dressing (0..2)." );
+	r_procDressingDebug = ri.Cvar_Get( "r_procDressingDebug", "0", CVAR_CHEAT );
+	ri.Cvar_SetDescription( r_procDressingDebug, "Log procedural dressing instance counts each frame." );
+	r_foliageWindStrength = ri.Cvar_Get( "r_foliageWindStrength", "0.35", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_foliageWindStrength, "Wind sway strength for procedural foliage instances." );
+	r_foliageWindFrequency = ri.Cvar_Get( "r_foliageWindFrequency", "0.6", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_foliageWindFrequency, "Wind sway frequency (Hz) for procedural foliage instances." );
+	r_frameTelemetry = ri.Cvar_Get( "r_frameTelemetry", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_frameTelemetry, "When enabled, logs per-second GPU timing stats for frame pacing." );
 	// Material system
 	r_materialSystem = ri.Cvar_Get( "r_materialSystem", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_materialSystem, "Enable material system with runtime parameters (0=disabled, 1=enabled)." );
@@ -1723,6 +1753,16 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_materialDamage, "Global material damage override (0.0-1.0, 0=disabled)." );
 	r_materialMagic = ri.Cvar_Get( "r_materialMagic", "0", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_materialMagic, "Global material magic glow override (0.0-1.0, 0=disabled)." );
+	r_layeredMaterials = ri.Cvar_Get( "r_layeredMaterials", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_layeredMaterials, "Enable layered material flattening (0=off, 1=on)." );
+	r_layeredMaterialMaxLayers = ri.Cvar_Get( "r_layeredMaterialMaxLayers", XSTRING( VK_MAX_LAYERS_PER_MATERIAL ), CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_layeredMaterialMaxLayers, "Clamp maximum contributing layers per material (1-8)." );
+	r_layeredMaterialSimple = ri.Cvar_Get( "r_layeredMaterialSimple", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_layeredMaterialSimple, "Force simple flatten path (single layer only)." );
+	r_layeredMaterialProfile = ri.Cvar_Get( "r_layeredMaterialProfile", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_layeredMaterialProfile, "Collect layered material metrics each frame (0=off,1=on)." );
+	r_layeredMaterialsPilot = ri.Cvar_Get( "r_layeredMaterialsPilot", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_layeredMaterialsPilot, "Seed demo layered materials for hero assets on startup." );
 	// Cell streaming
 	r_cellStreaming = ri.Cvar_Get( "r_cellStreaming", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_cellStreaming, "Enable cell-based world streaming (0=disabled, 1=enabled)." );
