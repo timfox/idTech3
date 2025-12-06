@@ -31,6 +31,10 @@ USER INTERFACE MAIN
 
 #include "ui_local.h"
 
+#ifdef COMBINED_MONOLITH
+Q_EXPORT intptr_t QDECL vmMain_ui( int command, int arg0, int arg1, int arg2 );
+#endif
+
 
 /*
 ================

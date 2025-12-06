@@ -53,6 +53,49 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "syn.h"				//synonyms
 #include "match.h"				//string matching types and vars
 
+// Forward declarations to satisfy -Wmissing-prototypes in this unit
+int BotGetItemTeamGoal(char *goalname, bot_goal_t *goal);
+int BotGetMessageTeamGoal(bot_state_t *bs, char *goalname, bot_goal_t *goal);
+float BotGetTime(bot_match_t *match);
+int FindClientByName(char *name);
+int FindEnemyByName(bot_state_t *bs, char *name);
+int NumPlayersOnSameTeam(bot_state_t *bs);
+int BotGetPatrolWaypoints(bot_state_t *bs, bot_match_t *match);
+int BotAddressedToBot(bot_state_t *bs, bot_match_t *match);
+int BotGPSToPosition(char *buf, vec3_t position);
+void BotMatch_HelpAccompany(bot_state_t *bs, bot_match_t *match);
+void BotMatch_DefendKeyArea(bot_state_t *bs, bot_match_t *match);
+void BotMatch_TakeA(bot_state_t *bs, bot_match_t *match);
+void BotMatch_TakeB(bot_state_t *bs, bot_match_t *match);
+void BotMatch_GetItem(bot_state_t *bs, bot_match_t *match);
+void BotMatch_Camp(bot_state_t *bs, bot_match_t *match);
+void BotMatch_Patrol(bot_state_t *bs, bot_match_t *match);
+void BotMatch_GetFlag(bot_state_t *bs, bot_match_t *match);
+void BotMatch_AttackEnemyBase(bot_state_t *bs, bot_match_t *match);
+void BotMatch_Harvest(bot_state_t *bs, bot_match_t *match);
+void BotMatch_RushBase(bot_state_t *bs, bot_match_t *match);
+void BotMatch_TaskPreference(bot_state_t *bs, bot_match_t *match);
+void BotMatch_ReturnFlag(bot_state_t *bs, bot_match_t *match);
+void BotMatch_JoinSubteam(bot_state_t *bs, bot_match_t *match);
+void BotMatch_LeaveSubteam(bot_state_t *bs, bot_match_t *match);
+void BotMatch_WhichTeam(bot_state_t *bs, bot_match_t *match);
+void BotMatch_CheckPoint(bot_state_t *bs, bot_match_t *match);
+void BotMatch_FormationSpace(bot_state_t *bs, bot_match_t *match);
+void BotMatch_Dismiss(bot_state_t *bs, bot_match_t *match);
+void BotMatch_Suicide(bot_state_t *bs, bot_match_t *match);
+void BotMatch_StartTeamLeaderShip(bot_state_t *bs, bot_match_t *match);
+void BotMatch_StopTeamLeaderShip(bot_state_t *bs, bot_match_t *match);
+void BotMatch_WhoIsTeamLeader(bot_state_t *bs, bot_match_t *match);
+void BotMatch_WhatAreYouDoing(bot_state_t *bs, bot_match_t *match);
+void BotMatch_WhatIsMyCommand(bot_state_t *bs, bot_match_t *match);
+float BotNearestVisibleItem(bot_state_t *bs, char *itemname, bot_goal_t *goal);
+void BotMatch_WhereAreYou(bot_state_t *bs, bot_match_t *match);
+void BotMatch_LeadTheWay(bot_state_t *bs, bot_match_t *match);
+void BotMatch_Kill(bot_state_t *bs, bot_match_t *match);
+void BotMatch_CTF(bot_state_t *bs, bot_match_t *match);
+void BotMatch_EnterGame(bot_state_t *bs, bot_match_t *match);
+void BotMatch_NewLeader(bot_state_t *bs, bot_match_t *match);
+
 // for the voice chats
 #include "../ui/menudef.h"
 

@@ -120,7 +120,7 @@ static void Signup_MenuEvent( void* ptr, int event ) {
 Signup_MenuInit
 ===============
 */
-void Signup_MenuInit( void ) {
+static void Signup_MenuInit( void ) {
 	grank_status_t	status;
 	int				y;
 

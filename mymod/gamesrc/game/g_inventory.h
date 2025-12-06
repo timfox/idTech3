@@ -11,7 +11,6 @@ and crafting capabilities.
 #define _G_INVENTORY_H
 
 #include "g_inventory_types.h"
-#include "g_local.h"
 
 // Inventory item structure
 typedef struct {

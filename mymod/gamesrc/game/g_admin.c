@@ -575,15 +575,15 @@ int G_admin_level( gentity_t *ent )
 static qboolean admin_command_permission( gentity_t *ent, char *command )
 {
 	int i, j;
-	int level;
+	int adminLevel;
 
 	if( !ent )
 		return qtrue;
-	level = ent->client->pers.adminLevel;
+	adminLevel = ent->client->pers.adminLevel;
 	for( i = 0; i < MAX_ADMIN_COMMANDS && g_admin_commands[ i ]; i++ ) {
 		if( Q_strequal( command, g_admin_commands[ i ]->command ) ) {
 			for( j = 0; g_admin_commands[ i ]->levels[ j ] != -1; j++ ) {
-				if( g_admin_commands[ i ]->levels[ j ] == level ) {
+				if( g_admin_commands[ i ]->levels[ j ] == adminLevel ) {
 					return qtrue;
 				}
 			}
@@ -1152,13 +1152,13 @@ qboolean G_admin_readconfig( gentity_t *ent, [[maybe_unused]] int skiparg )
 			}
 			else if( Q_strequal( t, "levels" ) ) {
 				char levels[ MAX_STRING_CHARS ] = {""};
-				char *level = levels;
+				char *levelPtr = levels;
 				const char *lp;
 				int cmdlevel = 0;
 
 				readFile_string( &cnf, levels, sizeof( levels ) );
 				while( cmdlevel < MAX_ADMIN_LEVELS ) {
-					lp = COM_Parse( (const char **)&level );
+					lp = COM_Parse( (const char **)&levelPtr );
 					if( !*lp )
 						break;
 					c->levels[ cmdlevel++ ] = atoi( lp );

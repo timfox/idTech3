@@ -55,6 +55,27 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "inv.h"
 #include "syn.h"
 
+// Forward declarations to satisfy -Wmissing-prototypes in this unit
+void BotReportStatus(bot_state_t *bs);
+void BotTeamplayReport(void);
+void BotSetInfoConfigString(bot_state_t *bs);
+void BotUpdateInfoConfigStrings(void);
+void BotInterbreedBots(void);
+void BotWriteInterbreeded(char *filename);
+void BotInterbreeding(void);
+float AngleDifference(float ang1, float ang2);
+float BotChangeViewAngle(float angle, float ideal_angle, float speed);
+void BotChangeViewAngles(bot_state_t *bs, float thinktime);
+void BotInputToUserCommand(bot_input_t *bi, usercmd_t *ucmd, int delta_angles[3], int time);
+void BotUpdateInput(bot_state_t *bs, int time, int elapsed_time);
+void BotAIRegularUpdate(void);
+void RemoveColorEscapeSequences( char *text );
+int BotAI(int client, float thinktime);
+void BotScheduleBotThink(void);
+void BotWriteSessionData(bot_state_t *bs);
+void BotReadSessionData(bot_state_t *bs);
+int BotInitLibrary(void);
+
 #ifndef MAX_PATH
 #define MAX_PATH		144
 #endif

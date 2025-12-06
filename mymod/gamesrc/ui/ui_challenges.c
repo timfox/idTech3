@@ -127,7 +127,7 @@ static void UI_Challenges_Event( void* ptr, int event ) {
 UI_Challenges_Cache
 ===============
 */
-void UI_Challenges_Cache( void ) {
+static void UI_Challenges_Cache( void ) {
 	trap_R_RegisterShaderNoMip( ART_FRAMEL );
 	trap_R_RegisterShaderNoMip( ART_FRAMER );
 	trap_R_RegisterShaderNoMip( ART_BACK0 );
@@ -141,6 +141,8 @@ UI_Challenges_Init
 */
 static void UI_Challenges_Init( void ) {
     int y,i;
+
+	UI_Challenges_Cache();
 
 	memset( &challenges, 0, sizeof(challenges) );
 

@@ -61,7 +61,7 @@ Favorites_Add
 Add current server to favorites
 =================
 */
-void Favorites_Add( void )
+static void Favorites_Add( void )
 {
 	char	adrstr[128];
 	char	serverbuff[128];

@@ -98,7 +98,7 @@ static void SpecifyPassword_Event( void* ptr, int event )
 SpecifyPassword_MenuInit
 =================
 */
-void SpecifyPassword_MenuInit( void )
+static void SpecifyPassword_MenuInit( void )
 {
 	// zero set all our globals
 	memset( &s_specifypassword, 0 ,sizeof(specifypassword_t) );

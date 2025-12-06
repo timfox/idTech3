@@ -298,7 +298,7 @@ static void FirstConnect_SetMenuItems( void ) {
 FirstConnect_MenuInit
 =================
 */
-void FirstConnect_MenuInit( void )
+static void FirstConnect_MenuInit( void )
 {
     int y;
 	// zero set all our globals

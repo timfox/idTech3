@@ -699,6 +699,7 @@ void UI_SPLevelMenu_Cache( void );
 void UI_SPLevelMenu( void );
 void UI_SPLevelMenu_f( void );
 void UI_SPLevelMenu_ReInit( void );
+void UI_ResetMenu(void);
 
 //
 // ui_spArena.c
@@ -751,10 +752,15 @@ void			trap_R_AddLightToScene( const vec3_t org, float intensity, float r, float
 void			trap_R_RenderScene( const refdef_t *fd );
 void			trap_R_SetColor( const float *rgba );
 void			trap_R_DrawStretchPic( float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader );
+int				trap_CM_LoadModel( const char *name );
+void			trap_R_RegisterFont( const char *fontName, int pointSize, fontInfo_t *font );
+void			trap_R_ModelBounds( clipHandle_t model, vec3_t mins, vec3_t maxs );
 void			trap_UpdateScreen( void );
 int				trap_CM_LerpTag( orientation_t *tag, clipHandle_t mod, int startFrame, int endFrame, float frac, const char *tagName );
 void			trap_S_StartLocalSound( sfxHandle_t sfx, int channelNum );
 sfxHandle_t	trap_S_RegisterSound( const char *sample, qboolean compressed );
+void			trap_S_StopBackgroundTrack( void );
+void			trap_S_StartBackgroundTrack( const char *intro, const char *loop );
 void			trap_Key_KeynumToStringBuf( int keynum, char *buf, int buflen );
 void			trap_Key_GetBindingBuf( int keynum, char *buf, int buflen );
 void			trap_Key_SetBinding( int keynum, const char *binding );
@@ -769,6 +775,7 @@ void			trap_GetClientState( uiClientState_t *state );
 void			trap_GetGlconfig( glconfig_t *glconfig );
 int				trap_GetConfigString( int index, char* buff, int buffsize );
 int				trap_LAN_GetServerCount( int source );
+int				trap_LAN_GetServerPing( int source, int n );
 void			trap_LAN_GetServerAddressString( int source, int n, char *buf, int buflen );
 void			trap_LAN_GetServerInfo( int source, int n, char *buf, int buflen );
 int				trap_LAN_GetPingQueueCount( void );
@@ -776,13 +783,39 @@ int				trap_LAN_ServerStatus( const char *serverAddress, char *serverStatus, int
 void			trap_LAN_ClearPing( int n );
 void			trap_LAN_GetPing( int n, char *buf, int buflen, int *pingtime );
 void			trap_LAN_GetPingInfo( int n, char *buf, int buflen );
+void			trap_LAN_MarkServerVisible( int n, qboolean visible );
+qboolean		trap_LAN_UpdateVisiblePings( int n );
+void			trap_LAN_ResetPings( int n );
+void			trap_LAN_LoadCachedServers( void );
+void			trap_LAN_SaveCachedServers( void );
+void			trap_LAN_AddServer( int source, const char *name, const char *addr );
+void			trap_LAN_RemoveServer( int source, const char *addr );
 int				trap_MemoryRemaining( void );
 void			trap_GetCDKey( char *buf, int buflen );
 void			trap_SetCDKey( char *buf );
+int				trap_RealTime( qtime_t *qtime );
 
 qboolean               trap_VerifyCDKey( const char *key, const char *chksum); // bk001208 - RC4
 
 void			trap_SetPbClStatus( int status );
+
+int				trap_PC_AddGlobalDefine( char *define );
+int				trap_PC_LoadSource( const char *filename );
+int				trap_PC_FreeSource( int handle );
+int				trap_PC_ReadToken( int handle, pc_token_t *pc_token );
+int				trap_PC_SourceFileAndLine( int handle, char *filename, int *line );
+int				trap_CIN_PlayCinematic( const char *arg0, int xpos, int ypos, int width, int height, int bits );
+e_status		trap_CIN_StopCinematic( int handle );
+e_status		trap_CIN_RunCinematic (int handle );
+void			trap_CIN_DrawCinematic (int handle );
+void			trap_CIN_SetExtents (int handle, int x, int y, int w, int h);
+void			trap_R_RemapShader( const char *oldShader, const char *newShader, const char *timeOffset );
+
+void			dllEntry( intptr_t (QDECL *syscallptr)( intptr_t arg,... ) );
+#ifdef COMBINED_MONOLITH
+void			QDECL dllEntry_ui( dllSyscall_t syscallptr );
+#endif
+int				PASSFLOAT( float x );
 
 // Steam Deck text input functions
 qboolean	trap_SteamDeck_ShowTextInput( const char *description, const char *existingText, int maxChars, qboolean multiline );

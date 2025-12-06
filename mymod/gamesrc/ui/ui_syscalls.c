@@ -188,8 +188,8 @@ int		trap_CM_LerpTag( orientation_t *tag, clipHandle_t mod, int startFrame, int 
 	return syscall( UI_CM_LERPTAG, tag, mod, startFrame, endFrame, PASSFLOAT(frac), tagName );
 }
 
-void	trap_CM_LoadModel( const char *name ) {
-	syscall( UI_CM_LOADMODEL, name );
+int		trap_CM_LoadModel( const char *name ) {
+	return syscall( UI_CM_LOADMODEL, name );
 }
 
 sfxHandle_t	trap_S_RegisterSound( const char *sample, qboolean compressed ) {

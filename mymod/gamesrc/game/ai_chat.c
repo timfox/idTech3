@@ -52,6 +52,18 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "syn.h"				//synonyms
 #include "match.h"				//string matching types and vars
 
+// Forward declarations to satisfy -Wmissing-prototypes in this unit
+int BotNumActivePlayers(void);
+int BotIsFirstInRankings(bot_state_t *bs);
+int BotIsLastInRankings(bot_state_t *bs);
+char *BotFirstClientInRankings(void);
+char *BotLastClientInRankings(void);
+char *BotRandomOpponentName(bot_state_t *bs);
+char *BotMapTitle(void);
+char *BotWeaponNameForMeansOfDeath(int mod);
+char *BotRandomWeaponName(void);
+int BotVisibleEnemies(bot_state_t *bs);
+
 // for the voice chats
 #ifdef MISSIONPACK // bk001205
 #include "../ui/menudef.h"

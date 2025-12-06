@@ -187,6 +187,7 @@ qboolean G_admin_disorient(gentity_t *ent, int skiparg);
 qboolean G_admin_orient(gentity_t *ent, int skiparg);
 qboolean G_admin_slap(gentity_t *ent, int skiparg);
 qboolean G_admin_warn(gentity_t *ent, int skiparg);
+int G_admin_warn_check( gentity_t *ent );
 
 void G_admin_print(gentity_t *ent, const char *m);
 void G_admin_buffer_print(gentity_t *ent, const char *m);

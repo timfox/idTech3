@@ -1321,7 +1321,7 @@ static void GraphicsOptions_ApplyScrollOffset( void )
 GraphicsOptions_MenuDraw
 ================
 */
-void GraphicsOptions_MenuDraw (void)
+static void GraphicsOptions_MenuDraw (void)
 {
 	int i;
 	menucommon_s *item;

@@ -6,11 +6,10 @@ Game module ECS integration with gentity_t bridge.
 ===========================================================================
 */
 
-#ifdef USE_ENTT
-
 #include "g_ecs.h"
-#include "../../../../src/qcommon/ecs_components.h"
-#include "../../../../src/qcommon/ecs.cpp" // For ECS namespace access
+
+#ifdef USE_ENTT
+#include "../../../src/qcommon/ecs_components.h"
 #include <entt/entt.hpp>
 
 extern gentity_t g_entities[MAX_GENTITIES];
@@ -53,14 +52,21 @@ ecs_entity_t G_ECS_RegisterGentity(gentity_t *ent) {
 		return ECS_NULL_ENTITY;
 	}
 	
+	entt::registry *registry_ptr = reinterpret_cast<entt::registry *>(ECS_GetRegistry());
+	if (!registry_ptr) {
+		return ECS_NULL_ENTITY;
+	}
+	entt::registry &registry = *registry_ptr;
+	
 	// Check if already registered
-	entt::entity existing = ECS::GetEntityFromIndex(index);
+	entt::entity existing = ECS_GetEntityFromIndex(index);
 	if (existing != entt::null) {
 		return static_cast<ecs_entity_t>(existing);
 	}
 	
 	// Create new ECS entity
-	entt::entity entity = ECS::GetRegistry().create();
+	entt::entity entity = registry.create();
+	ECS_MapEntity(index, entity);
 	
 	// Add NetworkComponent
 	NetworkComponent network(index, ent->s.eType, qfalse);
@@ -104,10 +110,11 @@ void G_ECS_UnregisterGentity(gentity_t *ent) {
 	
 	// Find entity by NetworkComponent
 	auto view = registry.view<NetworkComponent>();
-	for (auto ent : view) {
-		auto &net = view.get<NetworkComponent>(ent);
+	for (auto entity : view) {
+		auto &net = view.get<NetworkComponent>(entity);
 		if (net.entityIndex == index && !net.isServer) {
-			registry.destroy(ent);
+			registry.destroy(entity);
+			ECS_UnmapEntity(index);
 			break;
 		}
 	}
@@ -135,10 +142,10 @@ ecs_entity_t G_ECS_GetEntityFromGentity(gentity_t *ent) {
 	
 	// Find entity by NetworkComponent
 	auto view = registry.view<NetworkComponent>();
-	for (auto ent : view) {
-		auto &net = view.get<NetworkComponent>(ent);
+	for (auto entity : view) {
+		auto &net = view.get<NetworkComponent>(entity);
 		if (net.entityIndex == index && !net.isServer) {
-			return static_cast<ecs_entity_t>(ent);
+			return static_cast<ecs_entity_t>(entity);
 		}
 	}
 	return ECS_NULL_ENTITY;
@@ -274,5 +281,16 @@ void G_ECS_RunFrame(float deltaTime) {
 	G_ECS_SyncToGentity();
 }
 
+#else // USE_ENTT
+// ECS disabled: provide stubs to satisfy linkage when the module is built without EnTT.
+void G_ECS_Init(void) {}
+void G_ECS_Shutdown(void) {}
+ecs_entity_t G_ECS_RegisterGentity([[maybe_unused]] gentity_t *ent) { return ECS_NULL_ENTITY; }
+void G_ECS_UnregisterGentity([[maybe_unused]] gentity_t *ent) {}
+ecs_entity_t G_ECS_GetEntityFromGentity([[maybe_unused]] gentity_t *ent) { return ECS_NULL_ENTITY; }
+gentity_t *G_ECS_GetGentityFromEntity([[maybe_unused]] ecs_entity_t entity) { return nullptr; }
+void G_ECS_SyncToGentity(void) {}
+void G_ECS_SyncFromGentity(void) {}
+void G_ECS_RunFrame([[maybe_unused]] float deltaTime) {}
 #endif // USE_ENTT
 

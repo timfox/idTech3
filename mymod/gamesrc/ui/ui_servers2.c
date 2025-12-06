@@ -288,7 +288,7 @@ ArenaServers_SourceForLAN
 Convert ui's g_servertype to AS_* used by trap calls.
 =================
 */
-int ArenaServers_SourceForLAN(void) {
+static int ArenaServers_SourceForLAN(void) {
 	switch( g_servertype ) {
 	default:
 	case UIAS_LOCAL:
@@ -309,7 +309,7 @@ int ArenaServers_SourceForLAN(void) {
 /*
  *Removes illigal chars but keeps colors
  */
-char *Q_CleanStrWithColor( char *string ) {
+static char *Q_CleanStrWithColor( char *string ) {
 	char*	d;
 	char*	s;
 	int		c;
@@ -477,7 +477,7 @@ static void ArenaServers_UpdatePicture( void ) {
 		formatted environments. Otherwise, the columns will be off 2 * num of color codes.
 =================
 */
-int Q_strcpyColor( const char *src, char *dest, int numChars )
+static int Q_strcpyColor( const char *src, char *dest, int numChars )
 {
 int count, len;
 char *d;
@@ -951,7 +951,7 @@ ArenaServers_InsertFavorites
 Insert nonresponsive address book entries into display lists.
 =================
 */
-void ArenaServers_InsertFavorites( void )
+static void ArenaServers_InsertFavorites( void )
 {
 	int		i;
 	int		j;
@@ -983,7 +983,7 @@ ArenaServers_LoadFavorites
 Load cvar address book entries into local lists.
 =================
 */
-void ArenaServers_LoadFavorites( void )
+static void ArenaServers_LoadFavorites( void )
 {
 	int				i;
 	int				j;
@@ -1361,7 +1361,7 @@ static void ArenaServers_StartRefreshNoClearList( void )
 ArenaServers_SaveChanges
 =================
 */
-void ArenaServers_SaveChanges( void )
+static void ArenaServers_SaveChanges( void )
 {
 	int	i;
 
@@ -1378,7 +1378,7 @@ void ArenaServers_SaveChanges( void )
 ArenaServers_Sort
 =================
 */
-void ArenaServers_Sort( int type ) {
+static void ArenaServers_Sort( int type ) {
 	if( g_sortkey == type ) {
 		return;
 	}
@@ -1393,7 +1393,7 @@ void ArenaServers_Sort( int type ) {
 ArenaServers_SetType
 =================
 */
-int ArenaServers_SetType( int type )
+static int ArenaServers_SetType( int type )
 {
 	if(type >= UIAS_GLOBAL1 && type <= UIAS_GLOBAL5)
 	{

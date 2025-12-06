@@ -252,7 +252,6 @@ static void CG_Obituary(entityState_t *ent) {
 
 	// check for kill messages from the current clientNum
 	if (attacker == cg.snap->ps.clientNum) {
-		const char *s;
 
 		if ( cgs.gametype < GT_TEAM ) {
 			s = va("You fragged %s\n%s place with %i", targetName,

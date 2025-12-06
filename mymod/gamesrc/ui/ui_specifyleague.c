@@ -172,7 +172,7 @@ static void SpecifyLeague_Event( void* ptr, int event )
 SpecifyLeague_MenuInit
 =================
 */
-void SpecifyLeague_MenuInit( void )
+static void SpecifyLeague_MenuInit( void )
 {
 	int i;
 	// zero set all our globals

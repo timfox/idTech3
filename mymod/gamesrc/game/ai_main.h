@@ -306,3 +306,24 @@ int		BotAI_GetClientState( int clientNum, playerState_t *state );
 int		BotAI_GetEntityState( int entityNum, entityState_t *state );
 int		BotAI_GetSnapshotEntity( int clientNum, int sequence, entityState_t *state );
 int		BotTeamLeader(bot_state_t *bs);
+
+// bot AI helpers exported within ai_main.c
+void BotReportStatus(bot_state_t *bs);
+void BotTeamplayReport(void);
+void BotSetInfoConfigString(bot_state_t *bs);
+void BotUpdateInfoConfigStrings(void);
+void BotInterbreedBots(void);
+void BotWriteInterbreeded(char *filename);
+void BotInterbreeding(void);
+float AngleDifference(float ang1, float ang2);
+float BotChangeViewAngle(float angle, float ideal_angle, float speed);
+void BotChangeViewAngles(bot_state_t *bs, float thinktime);
+void BotInputToUserCommand(bot_input_t *bi, usercmd_t *ucmd, int delta_angles[3], int time);
+void BotUpdateInput(bot_state_t *bs, int time, int elapsed_time);
+void BotAIRegularUpdate(void);
+void RemoveColorEscapeSequences( char *text );
+int  BotAI(int client, float thinktime);
+void BotScheduleBotThink(void);
+void BotWriteSessionData(bot_state_t *bs);
+void BotReadSessionData(bot_state_t *bs);
+int  BotInitLibrary(void);

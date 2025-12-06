@@ -268,15 +268,3 @@ void UI_DrawConnectScreen( qboolean overlay ) {
 	// password required / connection rejected information goes here
 }
 
-
-/*
-===================
-UI_KeyConnect
-===================
-*/
-void UI_KeyConnect( int key ) {
-	if ( key == K_ESCAPE ) {
-		trap_Cmd_ExecuteText( EXEC_APPEND, "disconnect\n" );
-		return;
-	}
-}

@@ -1074,7 +1074,7 @@ void G_ShutdownGame( int restart )
 
 //===================================================================
 
-void QDECL Com_Error ( [[maybe_unused]] errorParm_t level, const char *error, ... )
+void QDECL Com_Error ( [[maybe_unused]] errorParm_t errParm, const char *error, ... )
 {
 	va_list		argptr;
 	char		text[1024];
@@ -1819,7 +1819,7 @@ void ExitLevel (void)
 				char mapnames[1024][20]; // Array of mapnames in the map pool
 				char *pointer;
 				int choice, count=0; //The random choice from mapnames and count of mapnames
-				int i;
+				int retry;
 				memset(&buffer,0,sizeof(buffer));
 				trap_FS_Read(&buffer,sizeof(buffer),file);
 				pointer = buffer;
@@ -1833,7 +1833,7 @@ void ExitLevel (void)
 				}
 				trap_FS_FCloseFile(file);
 				//It is possible that the maps in the file read are flawed, so we try up to ten times:
-				for(i=0; i<10; i++) {
+				for(retry=0; retry<10; retry++) {
 					choice = (count > 0)? rand()%count : 0;
 					if(Q_strequal(mapnames[choice],Info_ValueForKey(serverinfo,"mapname")))
 						continue;

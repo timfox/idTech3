@@ -104,7 +104,7 @@ static void InGame_QuitAction( qboolean result ) {
 InGame_Event
 =================
 */
-void InGame_Event( void *ptr, int notification ) {
+static void InGame_Event( void *ptr, int notification ) {
 	if( notification != QM_ACTIVATED ) {
 		return;
 	}
@@ -162,7 +162,7 @@ void InGame_Event( void *ptr, int notification ) {
 InGame_MenuInit
 =================
 */
-void InGame_MenuInit( void ) {
+static void InGame_MenuInit( void ) {
 	int		y;
 	uiClientState_t	cs;
 	char	info[MAX_INFO_STRING];

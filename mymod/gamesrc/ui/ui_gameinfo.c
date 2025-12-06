@@ -51,7 +51,7 @@ static int		allocPoint, outOfMemory;
 UI_Alloc
 ===============
 */
-void *UI_Alloc( int size ) {
+static void *UI_Alloc( int size ) {
 	char	*p;
 
 	if ( allocPoint + size > POOLSIZE ) {
@@ -71,7 +71,7 @@ void *UI_Alloc( int size ) {
 UI_InitMemory
 ===============
 */
-void UI_InitMemory( void ) {
+static void UI_InitMemory( void ) {
 	allocPoint = 0;
 	outOfMemory = qfalse;
 }
@@ -81,7 +81,7 @@ void UI_InitMemory( void ) {
 UI_ParseInfos
 ===============
 */
-int UI_ParseInfos( char *buf, int max, char *infos[] ) {
+static int UI_ParseInfos( char *buf, int max, char *infos[] ) {
 	const char	*token;
 	int		count;
 	char	key[MAX_TOKEN_CHARS];

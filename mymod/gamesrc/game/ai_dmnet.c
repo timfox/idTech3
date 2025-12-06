@@ -53,6 +53,19 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "syn.h"			//synonyms
 #include "match.h"			//string matching types and vars
 
+// Forward declarations to satisfy -Wmissing-prototypes in this unit
+void BotRecordNodeSwitch(bot_state_t *bs, char *node, char *str, char *s);
+int BotGetAirGoal(bot_state_t *bs, bot_goal_t *goal);
+int BotGoForAir(bot_state_t *bs, int tfl, bot_goal_t *ltg, float range);
+int BotNearbyGoal(bot_state_t *bs, int tfl, bot_goal_t *ltg, float range);
+int BotReachedGoal(bot_state_t *bs, bot_goal_t *goal);
+int BotGetItemLongTermGoal(bot_state_t *bs, int tfl, bot_goal_t *goal);
+int BotGetLongTermGoal(bot_state_t *bs, int tfl, int retreat, bot_goal_t *goal);
+int BotLongTermGoal(bot_state_t *bs, int tfl, int retreat, bot_goal_t *goal);
+int BotSelectActivateWeapon(bot_state_t *bs);
+void BotClearPath(bot_state_t *bs, bot_moveresult_t *moveresult);
+void AIEnter_Battle_SuicidalFight(bot_state_t *bs, char *s);
+
 // for the voice chats
 #include "../ui/menudef.h"
 

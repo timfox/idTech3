@@ -28,7 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 extern menuDef_t *menuScoreboard;
 #endif
 
-void CG_PrintClientNumbers(void) {
+static void CG_PrintClientNumbers(void) {
 	int i;
 
 	CG_Printf("slot score ping name\n");
@@ -45,7 +45,7 @@ void CG_PrintClientNumbers(void) {
 	}
 }
 
-void CG_TargetCommand_f(void) {
+static void CG_TargetCommand_f(void) {
 	int targetNum;
 	char test[4];
 

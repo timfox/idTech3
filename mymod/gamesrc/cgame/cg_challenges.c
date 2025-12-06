@@ -33,6 +33,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define FILENAME    "challenges.dat"
 
+void challenges_init(void);
+void challenges_save(void);
+unsigned int getChallenge(int challenge);
+void addChallenge(int challenge);
+
 //First two static variables that may only be accessed throgh functions in this file
 //The challengeTable is of constant size so there is room for more challenges being added in the furture
 static unsigned int challengeTable[CHALLENGES_MAX];

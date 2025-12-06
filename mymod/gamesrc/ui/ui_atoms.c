@@ -954,7 +954,7 @@ char *UI_Cvar_VariableString( const char *var_name ) {
 UI_Cache
 =================
 */
-void UI_Cache_f( void ) {
+static void UI_Cache_f( void ) {
 	MainMenu_Cache();
 	InGame_Cache();
 	ConfirmMenu_Cache();
@@ -1178,7 +1178,7 @@ void UI_DrawHandlePic( float x, float y, float w, float h, qhandle_t hShader ) {
 	trap_R_DrawStretchPic( x, y, w, h, s0, t0, s1, t1, hShader );
 }
 
-void UI_DrawBackgroundPic( qhandle_t hShader ) {
+static void UI_DrawBackgroundPic( qhandle_t hShader ) {
 	trap_R_DrawStretchPic( 0.0, 0.0, uis.glconfig.vidWidth, uis.glconfig.vidHeight, 0, 0, 1, 1, hShader );
 }
 

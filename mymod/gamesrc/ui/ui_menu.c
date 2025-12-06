@@ -87,7 +87,7 @@ static errorMessage_t s_errorMessage;
 Main_MenuEvent
 =================
 */
-void Main_MenuEvent (void* ptr, int event)
+static void Main_MenuEvent (void* ptr, int event)
 {
 	if( event != QM_ACTIVATED ) {
 		return;
@@ -152,7 +152,7 @@ void MainMenu_Cache( void )
 	}
 }
 
-sfxHandle_t ErrorMessage_Key([[maybe_unused]] int key)
+static sfxHandle_t ErrorMessage_Key([[maybe_unused]] int key)
 {
 	trap_Cvar_Set( "com_errorMessage", "" );
 	UI_MainMenu();

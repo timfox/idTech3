@@ -52,8 +52,7 @@ void G_ECS_DialogSystem_Update(void) {
 	auto view = registry.view<DialogComponent>();
 	
 	for (auto entity : view) {
-		auto &dialogComp = view.get<DialogComponent>(entity);
-		
+		(void)entity;
 		// Update dialog state
 		// Dialog logic remains in traditional system for now
 		// This system can be extended to handle ECS-based dialog interactions

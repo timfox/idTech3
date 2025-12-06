@@ -32,5 +32,19 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 int BotVoiceChatCommand(bot_state_t *bs, int mode, char *voicechat);
 void BotVoiceChat_Defend(bot_state_t *bs, int client, int mode);
+void BotVoiceChat_GetFlag( bot_state_t *bs, int client, int mode );
+void BotVoiceChat_Offense( bot_state_t *bs, int client, int mode );
+void BotVoiceChat_DefendFlag( bot_state_t *bs, int client, int mode );
+void BotVoiceChat_Patrol( bot_state_t *bs, int client, int mode );
+void BotVoiceChat_Camp( bot_state_t *bs, int client, int mode );
+void BotVoiceChat_FollowMe( bot_state_t *bs, int client, int mode );
+void BotVoiceChat_FollowFlagCarrier( bot_state_t *bs, int client, int mode );
+void BotVoiceChat_ReturnFlag( bot_state_t *bs, int client, int mode );
+void BotVoiceChat_StartLeader( bot_state_t *bs, int client, int mode );
+void BotVoiceChat_StopLeader( bot_state_t *bs, int client, int mode );
+void BotVoiceChat_WhoIsLeader( bot_state_t *bs, int client, int mode );
+void BotVoiceChat_WantOnDefense( bot_state_t *bs, int client, int mode );
+void BotVoiceChat_WantOnOffense( bot_state_t *bs, int client, int mode );
+void BotVoiceChat_Dummy( bot_state_t *bs, int client, int mode );
 
 

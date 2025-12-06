@@ -97,7 +97,7 @@ static void Login_MenuEvent( void* ptr, int event ) {
 Login_MenuInit
 ===============
 */
-void Login_MenuInit( void ) {
+static void Login_MenuInit( void ) {
 	int				y;
 
 	memset( &s_login, 0, sizeof(s_login) );

@@ -31,6 +31,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // For monolithic build, need dllSyscall_t type
 #ifdef COMBINED_MONOLITH
 #include "../qcommon/qcommon.h"
+// Forward declaration to silence missing-prototype warning
+Q_EXPORT void QDECL dllEntry_game( dllSyscall_t syscallptr );
 #endif
 
 // Make syscall visible to bg_misc.c for MapInfoGet safety check

@@ -51,7 +51,7 @@ static resetMenu_t	s_reset;
 Reset_MenuEvent
 =================
 */
-void Reset_MenuEvent(void* ptr, int event) {
+static void Reset_MenuEvent(void* ptr, int event) {
 	if( event != QM_ACTIVATED ) {
 		return;
 	}
@@ -120,7 +120,7 @@ static void Reset_MenuDraw( void ) {
 Reset_Cache
 =================
 */
-void Reset_Cache( void ) {
+static void Reset_Cache( void ) {
 	trap_R_RegisterShaderNoMip( ART_FRAME );
 }
 

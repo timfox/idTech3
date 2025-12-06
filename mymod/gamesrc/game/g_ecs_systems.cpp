@@ -9,8 +9,7 @@ Game module-specific ECS systems for game logic.
 #ifdef USE_ENTT
 
 #include "g_ecs.h"
-#include "../../../../src/qcommon/ecs_components.h"
-#include "../../../../src/qcommon/ecs.cpp" // For ECS namespace access
+#include "../../../src/qcommon/ecs_components.h"
 #include <entt/entt.hpp>
 
 extern gentity_t g_entities[MAX_GENTITIES];
@@ -23,7 +22,9 @@ This ensures all ECS entities are properly represented in network state
 ================
 */
 void G_ECS_NetworkSyncSystem_Update(void) {
-	entt::registry &registry = ECS::GetRegistry();
+	entt::registry *registry_ptr = reinterpret_cast<entt::registry *>(ECS_GetRegistry());
+	if (!registry_ptr) return;
+	entt::registry &registry = *registry_ptr;
 	
 	auto view = registry.view<NetworkComponent>();
 	

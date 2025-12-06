@@ -100,7 +100,7 @@ static void SpecifyServer_Event( void* ptr, int event )
 SpecifyServer_MenuInit
 =================
 */
-void SpecifyServer_MenuInit( void )
+static void SpecifyServer_MenuInit( void )
 {
 	// zero set all our globals
 	memset( &s_specifyserver, 0 ,sizeof(specifyserver_t) );

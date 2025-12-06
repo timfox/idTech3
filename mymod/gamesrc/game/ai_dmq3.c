@@ -54,6 +54,48 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "syn.h"    //synonyms
 #include "match.h"    //string matching types and vars
 
+// Forward declarations to satisfy -Wmissing-prototypes in this unit
+int untrap_BotGetLevelItemGoal(int start, char *classname, void /* struct bot_goal_s */ *goal);
+bot_goal_t *BotEnemyFlag(bot_state_t *bs);
+bot_goal_t *BotTeamFlag(bot_state_t *bs);
+qboolean EntityCarriesFlag(aas_entityinfo_t *entinfo);
+qboolean EntityIsChatting(aas_entityinfo_t *entinfo);
+qboolean EntityHasQuad(aas_entityinfo_t *entinfo);
+qboolean EntityCarriesCubes(aas_entityinfo_t *entinfo);
+void BotRefuseOrder(bot_state_t *bs);
+void BotDDSeekGoals(bot_state_t *bs);
+void BotCheckItemPickup(bot_state_t *bs, int *oldinventory);
+void BotUseKamikaze(bot_state_t *bs);
+void BotUseInvulnerability(bot_state_t *bs);
+void BotSetTeleportTime(bot_state_t *bs);
+void BotInitWaypoints(void);
+void BotGoCamp(bot_state_t *bs, bot_goal_t *goal);
+void BotDontAvoid(bot_state_t *bs, char *itemname);
+void BotGoForPowerups(bot_state_t *bs);
+void BotSetMovedir(vec3_t angles, vec3_t movedir);
+int BotModelMinsMaxs(int modelindex, int eType, int contents, vec3_t mins, vec3_t maxs);
+int BotFuncButtonActivateGoal(bot_state_t *bs, int bspent, bot_activategoal_t *activategoal);
+int BotFuncDoorActivateGoal(bot_state_t *bs, int bspent, bot_activategoal_t *activategoal);
+int BotTriggerMultipleActivateGoal(bot_state_t *bs, int bspent, bot_activategoal_t *activategoal);
+int BotPushOntoActivateGoalStack(bot_state_t *bs, bot_activategoal_t *activategoal);
+int BotIsGoingToActivateEntity(bot_state_t *bs, int entitynum);
+int BotGetActivateGoal(bot_state_t *bs, int entitynum, bot_activategoal_t *activategoal);
+int BotGoForActivateGoal(bot_state_t *bs, bot_activategoal_t *activategoal);
+void BotPrintActivateGoalInfo(bot_state_t *bs, bot_activategoal_t *activategoal, int bspent);
+void BotRandomMove(bot_state_t *bs, bot_moveresult_t *moveresult);
+void BotCheckConsoleMessages(bot_state_t *bs);
+void BotCheckForGrenades(bot_state_t *bs, entityState_t *state);
+void BotCheckForProxMines(bot_state_t *bs, entityState_t *state);
+void BotCheckForKamikazeBody(bot_state_t *bs, entityState_t *state);
+void BotCheckEvents(bot_state_t *bs, entityState_t *state);
+void BotCheckSnapshot(bot_state_t *bs);
+void BotCheckAir(bot_state_t *bs);
+void BotSetupAlternativeRouteGoals(void);
+void BotSetEntityNumForGoalWithModel(bot_goal_t *goal, int eType, char *modelname);
+void BotSetEntityNumForGoal(bot_goal_t *goal, char *classname);
+void BotSetEntityNumForGoalWithActivator(bot_goal_t *goal, char *classname);
+int BotGoalForBSPEntity(char *classname, bot_goal_t *goal);
+
 // for the voice chats
 #include "../ui/menudef.h" // sos001205 - for q3_ui also
 
@@ -1529,11 +1571,10 @@ ClientOnSameTeamFromName
 int ClientOnSameTeamFromName(bot_state_t *bs, char *name) {
 	int i;
 	char buf[MAX_INFO_STRING];
-	static int maxclients;
+	int maxclients_local;
 
-	if (!maxclients)
-		maxclients = trap_Cvar_VariableIntegerValue("sv_maxclients");
-	for (i = 0; i < maxclients && i < MAX_CLIENTS; i++) {
+	maxclients_local = trap_Cvar_VariableIntegerValue("sv_maxclients");
+	for (i = 0; i < maxclients_local && i < MAX_CLIENTS; i++) {
 		if (!BotSameTeam(bs, i))
 			continue;
 		trap_GetConfigstring(CS_PLAYERS + i, buf, sizeof (buf));

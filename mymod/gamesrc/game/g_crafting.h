@@ -9,7 +9,6 @@ Simple 2-item combination recipe system.
 #ifndef _G_CRAFTING_H
 #define _G_CRAFTING_H
 
-#include "g_local.h"
 #include "g_inventory.h"
 
 // Crafting system functions (implemented in g_inventory.c)

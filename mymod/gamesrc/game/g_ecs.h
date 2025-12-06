@@ -12,6 +12,10 @@ Game module ECS integration with gentity_t bridge for game logic.
 #include "g_local.h"
 #include "ecs.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifdef USE_ENTT
 
 // Initialization
@@ -32,6 +36,10 @@ void G_ECS_SyncFromGentity(void); // Sync gentity_t to ECS
 void G_ECS_RunFrame(float deltaTime);
 
 #endif // USE_ENTT
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
 #endif // __G_ECS_H__
 

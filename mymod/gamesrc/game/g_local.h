@@ -639,6 +639,13 @@ qboolean	G_SpawnInt( const char *key, const char *defaultString, int *out );
 qboolean	G_SpawnVector( const char *key, const char *defaultString, float *out );
 void		G_SpawnEntitiesFromString( void );
 char *G_NewString( const char *string );
+void SP_item_botroam( gentity_t *ent );
+qboolean G_CallSpawn( gentity_t *ent );
+void G_ParseField( const char *key, const char *value, gentity_t *ent );
+void G_SpawnGEntityFromSpawnVars( void );
+char *G_AddSpawnVarToken( const char *string );
+qboolean G_ParseSpawnVars( void );
+void SP_worldspawn( void );
 
 //
 // g_cmds.c
@@ -651,6 +658,29 @@ void Cmd_FollowCycle_f( gentity_t *ent );  //KK-OAX Changed to match definition
 char *ConcatArgs( int start );  //KK-OAX This declaration moved from g_svccmds.c
 //KK-OAX Added this to make accessible from g_svcmds_ext.c
 void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText ); 
+void AccMessage( gentity_t *ent );
+void Cmd_Acc_f( gentity_t *ent );
+qboolean CheatsOk( gentity_t *ent );
+qboolean StringIsInteger( const char * s );
+int ClientNumberFromString( gentity_t *to, char *s, qboolean checkNums, qboolean checkNames );
+void Cmd_Give_f( gentity_t *ent );
+void Cmd_God_f( gentity_t *ent );
+void Cmd_Notarget_f( gentity_t *ent );
+void Cmd_Noclip_f( gentity_t *ent );
+void Cmd_LevelShot_f( gentity_t *ent );
+void Cmd_TeamTask_f( gentity_t *ent );
+void Cmd_Kill_f( gentity_t *ent );
+void Cmd_Team_f( gentity_t *ent );
+void Cmd_Follow_f( gentity_t *ent );
+void G_Voice( gentity_t *ent, gentity_t *target, int mode, const char *id, qboolean voiceonly );
+void Cmd_GameCommand_f( gentity_t *ent );
+void Cmd_Where_f( gentity_t *ent );
+void Cmd_CallVote_f( gentity_t *ent );
+void Cmd_Vote_f( gentity_t *ent );
+void Cmd_CallTeamVote_f( gentity_t *ent );
+void Cmd_TeamVote_f( gentity_t *ent );
+void Cmd_SetViewpos_f( gentity_t *ent );
+void Cmd_GetMappage_f( gentity_t *ent );
 
 
 // KK-OAX Added these in a seperate file to keep g_cmds.c familiar. 
@@ -707,6 +737,16 @@ void Think_Weapon (gentity_t *ent);
 int ArmorIndex (gentity_t *ent);
 void	Add_Ammo (gentity_t *ent, int weapon, int count);
 void Touch_Item (gentity_t *ent, gentity_t *other, trace_t *trace);
+int Pickup_Powerup( gentity_t *ent, gentity_t *other );
+int Pickup_PersistantPowerup( gentity_t *ent, gentity_t *other );
+int Pickup_Holdable( gentity_t *ent, gentity_t *other );
+int Pickup_Ammo( gentity_t *ent, gentity_t *other );
+int Pickup_Weapon( gentity_t *ent, gentity_t *other );
+int Pickup_Health( gentity_t *ent, gentity_t *other );
+int Pickup_Armor( gentity_t *ent, gentity_t *other );
+void Use_Item( gentity_t *ent, gentity_t *other, gentity_t *activator );
+int G_ItemDisabled( gitem_t *item );
+void G_BounceItem( gentity_t *ent, trace_t *trace );
 
 void ClearRegisteredItems( void );
 void RegisterItem( gitem_t *item );
@@ -774,6 +814,10 @@ void TossClientCubes( gentity_t *self );
 //
 void G_RunMissile( gentity_t *ent );
 void ProximityMine_RemoveAll( void );
+void G_BounceMissile( gentity_t *ent, trace_t *trace );
+void G_ExplodeMissile( gentity_t *ent );
+void ProximityMine_Trigger( gentity_t *trigger, gentity_t *other, trace_t *trace );
+void G_MissileImpact( gentity_t *ent, trace_t *trace );
 
 gentity_t *fire_blaster (gentity_t *self, vec3_t start, vec3_t aimdir);
 gentity_t *fire_plasma (gentity_t *self, vec3_t start, vec3_t aimdir);
@@ -791,11 +835,62 @@ gentity_t *fire_prox( gentity_t *self, vec3_t start, vec3_t aimdir );
 void G_RunMover( gentity_t *ent );
 void Touch_DoorTrigger( gentity_t *ent, gentity_t *other, trace_t *trace );
 void MatchTeam( gentity_t *teamLeader, int moverState, int time );
+gentity_t *G_TestEntityPosition( gentity_t *ent );
+void G_CreateRotationMatrix(vec3_t angles, vec3_t matrix[3]);
+void G_TransposeMatrix(vec3_t matrix[3], vec3_t transpose[3]);
+void G_RotatePoint(vec3_t point, vec3_t matrix[3]);
+qboolean G_TryPushingEntity( gentity_t *check, gentity_t *pusher, vec3_t move, vec3_t amove );
+qboolean G_CheckProxMinePosition( gentity_t *check );
+qboolean G_TryPushingProxMine( gentity_t *check, gentity_t *pusher, vec3_t move, vec3_t amove );
+qboolean G_MoverPush( gentity_t *pusher, vec3_t move, vec3_t amove, gentity_t **obstacle );
+void G_MoverTeam( gentity_t *ent );
+void SetMoverState( gentity_t *ent, moverState_t moverState, int time );
+void ReturnToPos1( gentity_t *ent );
+void Reached_BinaryMover( gentity_t *ent );
+void Use_BinaryMover( gentity_t *ent, gentity_t *other, gentity_t *activator );
+void InitMover( gentity_t *ent );
+void Blocked_Door( gentity_t *ent, gentity_t *other );
+void Think_MatchTeam( gentity_t *ent );
+void SP_func_door (gentity_t *ent);
+void Touch_Plat( gentity_t *ent, gentity_t *other, trace_t *trace );
+void Touch_PlatCenterTrigger(gentity_t *ent, gentity_t *other, trace_t *trace );
+void SpawnPlatTrigger( gentity_t *ent );
+void SP_func_plat (gentity_t *ent);
+void Touch_Button(gentity_t *ent, gentity_t *other, trace_t *trace );
+void SP_func_button( gentity_t *ent );
+void Think_BeginMoving( gentity_t *ent );
+void Think_SetupTrainTargets( gentity_t *ent );
+void SP_path_corner( gentity_t *self );
+void SP_func_train (gentity_t *self);
+void SP_func_static( gentity_t *ent );
+void SP_func_rotating (gentity_t *ent);
+void SP_func_bobbing (gentity_t *ent);
+void SP_func_pendulum(gentity_t *ent);
 
 //
 // g_trigger.c
 //
 void trigger_teleporter_touch (gentity_t *self, gentity_t *other, trace_t *trace );
+void InitTrigger( gentity_t *self );
+void multi_wait( gentity_t *ent );
+void multi_trigger( gentity_t *ent, gentity_t *activator );
+void Use_Multi( gentity_t *ent, gentity_t *other, gentity_t *activator );
+void Touch_Multi( gentity_t *self, gentity_t *other, trace_t *trace );
+void SP_trigger_multiple( gentity_t *ent );
+void trigger_always_think( gentity_t *ent );
+void SP_trigger_always (gentity_t *ent);
+void trigger_push_touch (gentity_t *self, gentity_t *other, trace_t *trace );
+void AimAtTarget( gentity_t *self );
+void SP_trigger_push( gentity_t *self );
+void Use_target_push( gentity_t *self, gentity_t *other, gentity_t *activator );
+void SP_target_push( gentity_t *self );
+void SP_trigger_teleport( gentity_t *self );
+void hurt_use( gentity_t *self, gentity_t *other, gentity_t *activator );
+void hurt_touch( gentity_t *self, gentity_t *other, trace_t *trace );
+void SP_trigger_hurt( gentity_t *self );
+void func_timer_think( gentity_t *self );
+void func_timer_use( gentity_t *self, gentity_t *other, gentity_t *activator );
+void SP_func_timer( gentity_t *self );
 
 
 //
@@ -810,6 +905,20 @@ void DropPortalDestination( gentity_t *ent );
  * @return number of spawnpoints for each type of spawning (initial spawn, respawn, red, blue)
  */
 int MinSpawnpointCount( void );
+void SP_info_camp( gentity_t *self );
+void SP_info_null( gentity_t *self );
+void SP_info_notnull( gentity_t *self );
+void SP_light( gentity_t *self );
+void SP_misc_teleporter_dest( gentity_t *ent );
+void SP_misc_model( gentity_t *ent );
+void locateCamera( gentity_t *ent );
+void SP_misc_portal_surface( gentity_t *ent );
+void SP_misc_portal_camera( gentity_t *ent );
+void Use_Shooter( gentity_t *ent, gentity_t *other, gentity_t *activator );
+void InitShooter( gentity_t *ent, int weapon );
+void SP_shooter_rocket( gentity_t *ent );
+void SP_shooter_plasma( gentity_t *ent );
+void SP_shooter_grenade( gentity_t *ent );
 
 
 //
@@ -817,6 +926,22 @@ int MinSpawnpointCount( void );
 //
 qboolean LogAccuracyHit( gentity_t *target, gentity_t *attacker );
 void CalcMuzzlePoint ( gentity_t *ent, vec3_t forward, vec3_t right, vec3_t up, vec3_t muzzlePoint );
+void CalcMuzzlePointOrigin ( gentity_t *ent, vec3_t origin, vec3_t forward, vec3_t right, vec3_t up, vec3_t muzzlePoint );
+void G_BounceProjectile( vec3_t start, vec3_t impact, vec3_t dir, vec3_t endout );
+void Weapon_Gauntlet( gentity_t *ent );
+void Bullet_Fire (gentity_t *ent, float spread, int damage );
+void BFG_Fire ( gentity_t *ent );
+qboolean ShotgunPellet( vec3_t start, vec3_t end, gentity_t *ent );
+void ShotgunPattern( vec3_t origin, vec3_t origin2, int seed, gentity_t *ent );
+void weapon_supershotgun_fire (gentity_t *ent);
+void weapon_grenadelauncher_fire (gentity_t *ent);
+void Weapon_RocketLauncher_Fire (gentity_t *ent);
+void Weapon_Plasmagun_Fire (gentity_t *ent);
+void weapon_railgun_fire (gentity_t *ent);
+void Weapon_GrapplingHook_Fire (gentity_t *ent );
+void Weapon_LightningFire( gentity_t *ent );
+void Weapon_Nailgun_Fire (gentity_t *ent);
+void weapon_proxlauncher_fire (gentity_t *ent);
 //unlagged - attack prediction #3
 // we're making this available to both games
 void SnapVectorTowards( vec3_t v, vec3_t to );
@@ -824,6 +949,55 @@ void SnapVectorTowards( vec3_t v, vec3_t to );
 qboolean CheckGauntletAttack( gentity_t *ent );
 void Weapon_HookFree (gentity_t *ent);
 void Weapon_HookThink (gentity_t *ent);
+
+//
+// g_target.c
+//
+void Use_Target_Give( gentity_t *ent, gentity_t *other, gentity_t *activator );
+void SP_target_give( gentity_t *ent );
+void Use_target_remove_powerups( gentity_t *ent, gentity_t *other, gentity_t *activator );
+void SP_target_remove_powerups( gentity_t *ent );
+void Think_Target_Delay( gentity_t *ent );
+void Use_Target_Delay( gentity_t *ent, gentity_t *other, gentity_t *activator );
+void SP_target_delay( gentity_t *ent );
+void Use_Target_Score (gentity_t *ent, gentity_t *other, gentity_t *activator);
+void SP_target_score( gentity_t *ent );
+void Use_Target_Print (gentity_t *ent, gentity_t *other, gentity_t *activator);
+void SP_target_print( gentity_t *ent );
+void Use_Target_Speaker (gentity_t *ent, gentity_t *other, gentity_t *activator);
+void SP_target_speaker( gentity_t *ent );
+void target_laser_think (gentity_t *self);
+void target_laser_on (gentity_t *self);
+void target_laser_off (gentity_t *self);
+void target_laser_use (gentity_t *self, gentity_t *other, gentity_t *activator);
+void target_laser_start (gentity_t *self);
+void SP_target_laser (gentity_t *self);
+void target_teleporter_use( gentity_t *self, gentity_t *other, gentity_t *activator );
+void SP_target_teleporter( gentity_t *self );
+void target_relay_use (gentity_t *self, gentity_t *other, gentity_t *activator);
+void SP_target_relay (gentity_t *self);
+void target_kill_use( gentity_t *self, gentity_t *other, gentity_t *activator );
+void SP_target_kill( gentity_t *self );
+void SP_target_position( gentity_t *self );
+void SP_target_location( gentity_t *self );
+
+//
+// g_utils.c
+//
+int G_FindConfigstringIndex( char *name, int start, int max, qboolean create );
+int DebugLine(vec3_t start, vec3_t end, int color);
+
+//
+// g_syscalls.c
+//
+void dllEntry( intptr_t (QDECL *syscallptr)( intptr_t arg,... ) );
+int PASSFLOAT( float x );
+void trap_TraceCapsule( trace_t *results, const vec3_t start, const vec3_t mins, const vec3_t maxs, const vec3_t end, int passEntityNum, int contentmask );
+qboolean trap_EntityContactCapsule( const vec3_t mins, const vec3_t maxs, const gentity_t *ent );
+int trap_PC_LoadSource( const char *filename );
+int trap_PC_FreeSource( int handle );
+int trap_PC_ReadToken( int handle, pc_token_t *pc_token );
+int trap_PC_SourceFileAndLine( int handle, char *filename, int *line );
 
 //unlagged - g_unlagged.c
 void G_ResetHistory( gentity_t *ent );
@@ -835,6 +1009,36 @@ void G_UndoTimeShiftFor( gentity_t *ent );
 void G_UnTimeShiftClient( gentity_t *client );
 void G_PredictPlayerMove( gentity_t *ent, float frametime );
 //unlagged - g_unlagged.c
+void G_TimeShiftClient( gentity_t *ent, int time, qboolean debug, gentity_t *debugger );
+void G_PredictPlayerClipVelocity( vec3_t in, vec3_t normal, vec3_t out );
+qboolean G_PredictPlayerSlideMove( gentity_t *ent, float frametime );
+void G_PredictPlayerStepSlideMove( gentity_t *ent, float frametime );
+
+//
+// g_vote.c
+//
+void ForceFail( void );
+
+//
+// g_rankings.c
+//
+void G_RankRunFrame( void );
+void G_RankFireWeapon( int self, int weapon );
+void G_RankDamage( int self, int attacker, int damage, int means_of_death );
+void G_RankPlayerDie( int self, int attacker, int means_of_death );
+void G_RankWeaponTime( int self, int weapon );
+void G_RankPickupWeapon( int self, int weapon );
+void G_RankPickupAmmo( int self, int weapon, int quantity );
+void G_RankPickupHealth( int self, int quantity );
+void G_RankPickupArmor( int self, int quantity );
+void G_RankPickupPowerup( int self, int powerup );
+void G_RankPickupHoldable( int self, int holdable );
+void G_RankUseHoldable( int self, int holdable );
+void G_RankReward( int self, int award );
+void G_RankCapture( int self );
+void G_RankUserTeamName( int self, char* team_name );
+void G_RankClientDisconnect( int self );
+void G_RankGameOver( void );
 
 //
 // g_client.c
@@ -851,6 +1055,34 @@ void DisableWeapons(void);
 void EndEliminationRound(void);
 void LMSpoint(void);
 //void wins2score(void);
+
+//
+// g_team.c
+//
+gentity_t *Team_ResetFlag( int team );
+int getDomPointNumber( gentity_t *point );
+void Team_Dom_TakePoint( gentity_t *point, int team, int clientnumber );
+void Team_DD_RemovePointAgfx( void );
+void Team_DD_RemovePointBgfx( void );
+void Team_DD_makeA2team( gentity_t *target, int team );
+void Team_ReturnFlagSound( gentity_t *ent, int team );
+void Team_TakeFlagSound( gentity_t *ent, int team );
+void Team_CaptureFlagSound( gentity_t *ent, int team );
+void updateDDpoints(void);
+int Team_TouchDoubleDominationPoint( gentity_t *ent, gentity_t *other, int team );
+int Team_TouchOurFlag( gentity_t *ent, gentity_t *other, int team );
+int Team_TouchEnemyFlag( gentity_t *ent, gentity_t *other, int team );
+gentity_t *SelectRandomTeamSpawnPoint( int teamstate, team_t team );
+gentity_t *SelectRandomDDSpawnPoint( void );
+gentity_t *SelectRandomTeamDDSpawnPoint( team_t team );
+gentity_t *SelectRandomTeamDomSpawnPoint( team_t team );
+void SP_team_CTF_redplayer( gentity_t *ent );
+void SP_team_CTF_blueplayer( gentity_t *ent );
+void SP_team_CTF_redspawn( gentity_t *ent );
+void SP_team_CTF_bluespawn( gentity_t *ent );
+void SP_team_redobelisk( gentity_t *ent );
+void SP_team_blueobelisk( gentity_t *ent );
+void SP_team_neutralobelisk( gentity_t *ent );
 int TeamLeader( int team );
 team_t PickTeam( int ignoreClientNum );
 void SetClientViewAngle( gentity_t *ent, vec3_t angle );
@@ -873,6 +1105,12 @@ qboolean SpotWouldTelefrag( gentity_t *spot );
 qboolean	ConsoleCommand( void );
 void G_ProcessIPBans(void);
 qboolean G_FilterPacket (char *from);
+void Svcmd_AddIP_f (void);
+void Svcmd_RemoveIP_f (void);
+void Svcmd_EntityList_f (void);
+void Svcmd_ForceTeam_f( void );
+void ClientKick_f( void );
+void EndGame_f ( void );
 
 //KK-OAX Added this to make accessible from g_svcmds_ext.c
 gclient_t	*ClientForString( const char *s );
@@ -930,6 +1168,23 @@ void QDECL G_Error( const char *fmt, ... ) __attribute__((noreturn,format (print
 //KK-OAX Made Accessible for g_admin.c
 void LogExit( const char *string ); 
 void CheckTeamVote( int team );
+Q_EXPORT intptr_t QDECL vmMain_game( int command, int arg0, int arg1, int arg2 );
+void G_FindTeams( void );
+void G_RemapTeamShaders( void );
+void G_RegisterCvars( void );
+void G_UpdateCvars( void );
+void AddTournamentPlayer( void );
+void RemoveTournamentLoser( void );
+void RemoveTournamentWinner( void );
+void AdjustTournamentScores( void );
+int QDECL SortRanks( const void *a, const void *b );
+void CheckIntermissionExit( void );
+qboolean ScoreIsTied( void );
+void CheckDoubleDomination( void );
+void CheckDomination( void );
+void CheckTournament( void );
+void PrintTeam( int team, const char *message );
+void CheckCvars( void );
 
 //
 // g_client.c
@@ -939,6 +1194,15 @@ void ClientUserinfoChanged( int clientNum );
 void ClientDisconnect( int clientNum );
 void ClientBegin( int clientNum );
 void ClientCommand( int clientNum );
+void SP_info_player_deathmatch( gentity_t *ent );
+void SP_info_player_start( gentity_t *ent );
+void SP_domination_point( gentity_t *ent );
+void SP_info_player_intermission( gentity_t *ent );
+gentity_t *SelectNearestDeathmatchSpawnPoint( vec3_t from );
+void BodySink( gentity_t *ent );
+void respawnRound( gentity_t *ent );
+void TeamCvarSet( void );
+void motd( gentity_t *ent );
 
 //
 // g_active.c
@@ -946,6 +1210,17 @@ void ClientCommand( int clientNum );
 void ClientThink( int clientNum );
 void ClientEndFrame( gentity_t *ent );
 void G_RunClient( gentity_t *ent );
+void P_DamageFeedback( gentity_t *player );
+void P_WorldEffects( gentity_t *ent );
+void G_SetClientSound( gentity_t *ent );
+void ClientImpacts( gentity_t *ent, pmove_t *pm );
+void SpectatorThink( gentity_t *ent, usercmd_t *ucmd );
+qboolean ClientInactivityTimer( gclient_t *client );
+void ClientIntermissionThink( gclient_t *client );
+void ClientEvents( gentity_t *ent, int oldEventSequence );
+void SendPendingPredictableEvents( playerState_t *ps );
+void ClientThink_real( gentity_t *ent );
+void SpectatorClientEndFrame( gentity_t *ent );
 
 //
 // g_team.c
@@ -1005,6 +1280,15 @@ qboolean G_BotConnect( int clientNum, qboolean restart );
 void Svcmd_AddBot_f( void );
 void Svcmd_BotList_f( void );
 void BotInterbreedEndMatch( void );
+int G_ParseInfos( char *buf, int max, char *infos[] );
+const char *G_GetArenaInfoByMap( const char *map );
+int G_CountBotPlayersByName( const char *name, int team );
+int G_SelectRandomBotInfo( int team );
+void G_AddRandomBot( int team );
+int G_RemoveRandomBot( int team );
+int G_CountHumanPlayers( int team );
+int G_CountBotPlayers( int team );
+void G_CheckMinimumPlayers( void );
 
 //
 // g_playerstore.c

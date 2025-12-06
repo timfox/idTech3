@@ -86,10 +86,6 @@ void G_RankRunFrame()
 				// inform client of current status
 				// not needed for client side log in
 				trap_SendServerCommand( i, va("rank_status %i\n",status) );
-				if ( i == 0 )
-				{
-					[[maybe_unused]] int j = 0;
-				}
 				ent->client->client_status = status;
 			}
 			

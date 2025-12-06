@@ -279,7 +279,7 @@ static void Rankings_MenuEvent( void* ptr, int event ) {
 Rankings_MenuInit
 ===============
 */
-void Rankings_MenuInit( void ) {
+static void Rankings_MenuInit( void ) {
 	grank_status_t	status;
 	int				y;
 

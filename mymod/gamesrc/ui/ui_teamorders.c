@@ -242,7 +242,7 @@ static void UI_TeamOrdersMenu_SetList( int id )
 UI_TeamOrdersMenu_Key
 =================
 */
-sfxHandle_t UI_TeamOrdersMenu_Key( int key )
+static sfxHandle_t UI_TeamOrdersMenu_Key( int key )
 {
 	menulist_s	*l;
 	int	x;
@@ -376,20 +376,21 @@ static void UI_TeamOrdersMenu_ListEvent( void *ptr, int event )
 		return;
 	}
 
+	const char *botName = teamOrdersMenuInfo.botNames[teamOrdersMenuInfo.selectedBot];
 	if( id == ID_LIST_CTF_ORDERS ) {
-		Com_sprintf( message, sizeof(message), ctfMessages[selection], teamOrdersMenuInfo.botNames[teamOrdersMenuInfo.selectedBot] );
+		Q_strncpyz( message, va(ctfMessages[selection], botName), sizeof(message) );
 	}
-	if( id == ID_LIST_CTF1F_ORDERS ) {
-		Com_sprintf( message, sizeof(message), ctf1fMessages[selection], teamOrdersMenuInfo.botNames[teamOrdersMenuInfo.selectedBot] );
+	else if( id == ID_LIST_CTF1F_ORDERS ) {
+		Q_strncpyz( message, va(ctf1fMessages[selection], botName), sizeof(message) );
 	}
-	if( id == ID_LIST_BASE_ORDERS ) {
-		Com_sprintf( message, sizeof(message), baseMessages[selection], teamOrdersMenuInfo.botNames[teamOrdersMenuInfo.selectedBot] );
+	else if( id == ID_LIST_BASE_ORDERS ) {
+		Q_strncpyz( message, va(baseMessages[selection], botName), sizeof(message) );
 	}
-	if( id == ID_LIST_TEAM_ORDERS ) {
-		Com_sprintf( message, sizeof(message), teamMessages[selection], teamOrdersMenuInfo.botNames[teamOrdersMenuInfo.selectedBot] );
+	else if( id == ID_LIST_TEAM_ORDERS ) {
+		Q_strncpyz( message, va(teamMessages[selection], botName), sizeof(message) );
 	}
-	if( id == ID_LIST_DD_ORDERS ) {
-		Com_sprintf( message, sizeof(message), ddMessages[selection], teamOrdersMenuInfo.botNames[teamOrdersMenuInfo.selectedBot] );
+	else if( id == ID_LIST_DD_ORDERS ) {
+		Q_strncpyz( message, va(ddMessages[selection], botName), sizeof(message) );
 	}
 
 	trap_Cmd_ExecuteText( EXEC_APPEND, va( "say_team \"%s\"\n", message ) );
