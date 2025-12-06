@@ -408,7 +408,7 @@ static void ParseTexMod( const char *_text, shaderStage_t *stage )
 			ri.Printf( PRINT_WARNING, "WARNING: missing scale parms in shader '%s'\n", shader.name );
 			return;
 		}
-		tmi->scale[0] = Q_atof( token );
+		tmi->scaleOffset.scale[0] = Q_atof( token );
 
 		token = COM_ParseExt( text, qfalse );
 		if ( token[0] == 0 )
@@ -416,7 +416,7 @@ static void ParseTexMod( const char *_text, shaderStage_t *stage )
 			ri.Printf( PRINT_WARNING, "WARNING: missing scale parms in shader '%s'\n", shader.name );
 			return;
 		}
-		tmi->scale[1] = Q_atof( token );
+		tmi->scaleOffset.scale[1] = Q_atof( token );
 		tmi->type = TMOD_SCALE;
 	}
 	//
@@ -498,7 +498,7 @@ static void ParseTexMod( const char *_text, shaderStage_t *stage )
 			ri.Printf( PRINT_WARNING, "WARNING: missing transform parms in shader '%s'\n", shader.name );
 			return;
 		}
-		tmi->matrix[0][0] = Q_atof( token );
+		tmi->transform.matrix[0][0] = Q_atof( token );
 
 		token = COM_ParseExt( text, qfalse );
 		if ( token[0] == 0 )
@@ -506,7 +506,7 @@ static void ParseTexMod( const char *_text, shaderStage_t *stage )
 			ri.Printf( PRINT_WARNING, "WARNING: missing transform parms in shader '%s'\n", shader.name );
 			return;
 		}
-		tmi->matrix[0][1] = Q_atof( token );
+		tmi->transform.matrix[0][1] = Q_atof( token );
 
 		token = COM_ParseExt( text, qfalse );
 		if ( token[0] == 0 )
@@ -514,7 +514,7 @@ static void ParseTexMod( const char *_text, shaderStage_t *stage )
 			ri.Printf( PRINT_WARNING, "WARNING: missing transform parms in shader '%s'\n", shader.name );
 			return;
 		}
-		tmi->matrix[1][0] = Q_atof( token );
+		tmi->transform.matrix[1][0] = Q_atof( token );
 
 		token = COM_ParseExt( text, qfalse );
 		if ( token[0] == 0 )
@@ -522,7 +522,7 @@ static void ParseTexMod( const char *_text, shaderStage_t *stage )
 			ri.Printf( PRINT_WARNING, "WARNING: missing transform parms in shader '%s'\n", shader.name );
 			return;
 		}
-		tmi->matrix[1][1] = Q_atof( token );
+		tmi->transform.matrix[1][1] = Q_atof( token );
 
 		token = COM_ParseExt( text, qfalse );
 		if ( token[0] == 0 )
@@ -530,7 +530,7 @@ static void ParseTexMod( const char *_text, shaderStage_t *stage )
 			ri.Printf( PRINT_WARNING, "WARNING: missing transform parms in shader '%s'\n", shader.name );
 			return;
 		}
-		tmi->translate[0] = Q_atof( token );
+		tmi->transform.translate[0] = Q_atof( token );
 
 		token = COM_ParseExt( text, qfalse );
 		if ( token[0] == 0 )
@@ -538,7 +538,7 @@ static void ParseTexMod( const char *_text, shaderStage_t *stage )
 			ri.Printf( PRINT_WARNING, "WARNING: missing transform parms in shader '%s'\n", shader.name );
 			return;
 		}
-		tmi->translate[1] = Q_atof( token );
+		tmi->transform.translate[1] = Q_atof( token );
 
 		tmi->type = TMOD_TRANSFORM;
 	}
@@ -1359,7 +1359,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 		
 		// scan for a potential physical map
 		if ( !stage->physicalMap && physicalAlbedo ) {
-			for ( i = 0; i < ARRAY_LEN( textureMapTypes ); i++ ) {
+			for ( i = 0; i < (int)ARRAY_LEN( textureMapTypes ); i++ ) {
 				COM_StripExtension( physicalAlbedoName, bufferPackedTextureName, MAX_QPATH );
 				
 				Q_strcat( bufferPackedTextureName, MAX_QPATH, textureMapTypes[i].suffix );
@@ -1379,7 +1379,7 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 		
 		// scan for a potential normal map
 		if ( !stage->normalMap && physicalAlbedo ) {
-			for ( i = 0; i < ARRAY_LEN( textureMapTypes ); i++ ) {
+			for ( i = 0; i < (int)ARRAY_LEN( textureMapTypes ); i++ ) {
 				COM_StripExtension( physicalAlbedoName, bufferNormalTextureName, MAX_QPATH );
 				
 				Q_strcat( bufferNormalTextureName, MAX_QPATH, textureMapTypes[i].suffix );
@@ -2126,7 +2126,7 @@ static void FinishStage( shaderStage_t *stage )
 		return;
 	}
 
-	for ( i = 0; i < ARRAY_LEN( stage->bundle ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( stage->bundle ); i++ ) {
 		textureBundle_t *bundle = &stage->bundle[i];
 		// offset lightmap coordinates
 		if ( bundle->lightmap >= LIGHTMAP_INDEX_OFFSET ) {
@@ -2138,14 +2138,14 @@ static void FinishStage( shaderStage_t *stage )
 				for ( n = 0; n < bundle->numTexMods; n++ ) {
 					tmi = &bundle->texMods[n];
 					if ( tmi->type == TMOD_TRANSFORM ) {
-						tmi->translate[0] *= tr.lightmapScale[0];
-						tmi->translate[1] *= tr.lightmapScale[1];
+			tmi->transform.translate[0] *= tr.lightmapScale[0];
+			tmi->transform.translate[1] *= tr.lightmapScale[1];
 					}
 				}
 				bundle->image[0] = tr.lightmaps[lightmapIndex];
 				tmi->type = TMOD_OFFSET;
-				tmi->offset[0] = x - tr.lightmapOffset[0];
-				tmi->offset[1] = y - tr.lightmapOffset[1];
+				tmi->scaleOffset.offset[0] = x - tr.lightmapOffset[0];
+				tmi->scaleOffset.offset[1] = y - tr.lightmapOffset[1];
 				bundle->numTexMods++;
 			}
 			continue;
@@ -2155,17 +2155,17 @@ static void FinishStage( shaderStage_t *stage )
 			if ( bundle->tcGen != TCGEN_LIGHTMAP ) {
 				texModInfo_t *tmi = &bundle->texMods[bundle->numTexMods];
 				tmi->type = TMOD_SCALE_OFFSET;
-				tmi->scale[0] = tr.lightmapScale[0];
-				tmi->scale[1] = tr.lightmapScale[1];
-				tmi->offset[0] = tr.lightmapOffset[0];
-				tmi->offset[1] = tr.lightmapOffset[1];
+				tmi->scaleOffset.scale[0] = tr.lightmapScale[0];
+				tmi->scaleOffset.scale[1] = tr.lightmapScale[1];
+				tmi->scaleOffset.offset[0] = tr.lightmapOffset[0];
+				tmi->scaleOffset.offset[1] = tr.lightmapOffset[1];
 				bundle->numTexMods++;
 			} else {
 				for ( n = 0; n < bundle->numTexMods; n++ ) {
 					texModInfo_t *tmi = &bundle->texMods[n];
 					if ( tmi->type == TMOD_TRANSFORM ) {
-						tmi->translate[0] *= tr.lightmapScale[0];
-						tmi->translate[1] *= tr.lightmapScale[1];
+			tmi->transform.translate[0] *= tr.lightmapScale[0];
+			tmi->transform.translate[1] *= tr.lightmapScale[1];
 					} else {
 						// TODO: correct other transformations?
 					}
@@ -2182,10 +2182,10 @@ static void FinishStage( shaderStage_t *stage )
 				}
 				tmi = &bundle->texMods[0];
 				tmi->type = TMOD_OFFSET_SCALE;
-				tmi->offset[0] = -tr.lightmapOffset[0];
-				tmi->offset[1] = -tr.lightmapOffset[1];
-				tmi->scale[0] = 1.0f / tr.lightmapScale[0];
-				tmi->scale[1] = 1.0f / tr.lightmapScale[1];
+				tmi->scaleOffset.offset[0] = -tr.lightmapOffset[0];
+				tmi->scaleOffset.offset[1] = -tr.lightmapOffset[1];
+				tmi->scaleOffset.scale[0] = 1.0f / tr.lightmapScale[0];
+				tmi->scaleOffset.scale[1] = 1.0f / tr.lightmapScale[1];
 				bundle->numTexMods++;
 			}
 		}
@@ -2581,7 +2581,7 @@ static const collapse_t collapse[] = {
 	{ 0, GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_SRCBLEND_SRC_ALPHA,
 		GL_DECAL, 0 },
 #endif
-	{ -1 }
+	{ -1, 0, 0, 0 }
 };
 
 
@@ -2948,7 +2948,7 @@ static void FindLightingBundle( void )
 		if ( !st->active ) {
 			break;
 		}
-		for ( n = 0; n < st->numTexBundles; n++ ) {
+		for ( n = 0; n < (int)st->numTexBundles; n++ ) {
 			if ( st->bundle[n].dlight ) {
 				shader.lightingStage = i;
 				shader.lightingBundle = n;
@@ -3179,34 +3179,34 @@ static qboolean EqualTCgen( int bundle, const shaderStage_t *st1, const shaderSt
 		}
 
 		if ( tm1->type == TMOD_SCALE ) {
-			if ( memcmp( tm1->scale, tm2->scale, sizeof( tm1->scale ) ) != 0 ) {
+	if ( memcmp( tm1->scaleOffset.scale, tm2->scaleOffset.scale, sizeof( tm1->scaleOffset.scale ) ) != 0 ) {
 				return qfalse;
 			}
 			continue;
 		}
 
 		if ( tm1->type == TMOD_OFFSET ) {
-			if ( memcmp( tm1->offset, tm2->offset, sizeof( tm1->offset ) ) != 0 ) {
+	if ( memcmp( tm1->scaleOffset.offset, tm2->scaleOffset.offset, sizeof( tm1->scaleOffset.offset ) ) != 0 ) {
 				return qfalse;
 			}
 			continue;
 		}
 
 		if ( tm1->type == TMOD_SCALE_OFFSET ) {
-			if ( memcmp( tm1->scale, tm2->scale, sizeof( tm1->scale ) ) != 0 ) {
+	if ( memcmp( tm1->scaleOffset.scale, tm2->scaleOffset.scale, sizeof( tm1->scaleOffset.scale ) ) != 0 ) {
 				return qfalse;
 			}
-			if ( memcmp( tm1->offset, tm2->offset, sizeof( tm1->offset ) ) != 0 ) {
+	if ( memcmp( tm1->scaleOffset.offset, tm2->scaleOffset.offset, sizeof( tm1->scaleOffset.offset ) ) != 0 ) {
 				return qfalse;
 			}
 			continue;
 		}
 
 		if ( tm1->type == TMOD_TRANSFORM ) {
-			if ( memcmp( tm1->matrix, tm2->matrix, sizeof( tm1->matrix ) ) != 0 ) {
+	if ( memcmp( tm1->transform.matrix, tm2->transform.matrix, sizeof( tm1->transform.matrix ) ) != 0 ) {
 				return qfalse;
 			}
-			if ( memcmp( tm1->translate, tm2->translate, sizeof( tm1->translate ) ) != 0 ) {
+	if ( memcmp( tm1->transform.translate, tm2->transform.translate, sizeof( tm1->transform.translate ) ) != 0 ) {
 				return qfalse;
 			}
 			continue;
@@ -3980,7 +3980,7 @@ static shader_t *FinishShader( void ) {
 				}
 			} // switch mtEnv3 / mtEnv
 
-			for ( env_mask = 0, n = 0; n < pStage->numTexBundles; n++ ) {
+	for ( env_mask = 0, n = 0; n < (int)pStage->numTexBundles; n++ ) {
 				if ( pStage->bundle[n].numTexMods ) {
 					continue;
 				}
@@ -4088,7 +4088,7 @@ static shader_t *FinishShader( void ) {
 		if ( !stages[i].active ) {
 			continue;
 		}
-		for ( n = 0; n < stages[i].numTexBundles; n++ ) {
+	for ( n = 0; n < (int)stages[i].numTexBundles; n++ ) {
 			for ( m = 0; m < stages[i].bundle[n].numTexMods; m++ ) {
 				if ( stages[i].bundle[n].texMods[m].type == TMOD_STRETCH ) {
 					if ( fabsf( stages[i].bundle[n].texMods[m].wave.amplitude ) < 1e-6f ) {

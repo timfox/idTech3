@@ -1259,7 +1259,7 @@ static qboolean R_MirrorViewBySurface( const drawSurf_t *drawSurf, int entityNum
 		newParms.dlights = oldParms.dlights + oldParms.num_dlights;
 		newParms.num_dlights = oldParms.num_dlights;
 		r_numdlights += oldParms.num_dlights;
-		for ( i = 0; i < oldParms.num_dlights; i++ )
+		for ( i = 0; i < (int)oldParms.num_dlights; i++ )
 			newParms.dlights[i] = oldParms.dlights[i];
 	}
 #endif
@@ -1505,7 +1505,7 @@ void R_AddLitSurf( surfaceType_t *surface, shader_t *shader, int fogIndex )
 {
 	struct litSurf_s *litsurf;
 
-	if ( tr.refdef.numLitSurfs >= ARRAY_LEN( backEndData->litSurfs ) )
+	if ( tr.refdef.numLitSurfs >= (int)ARRAY_LEN( backEndData->litSurfs ) )
 		return;
 
 	tr.pc.c_lit_surfs++;
@@ -1601,7 +1601,7 @@ static void R_SortDrawSurfs( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 
 	// Separate and sort transparent surfaces back-to-front by depth
 	// Transparent surfaces need depth sorting for correct blending
-	int opaque_start = 0;
+	int opaque_start __attribute__((unused)) = 0;
 	int transparent_start = numDrawSurfs;
 	for ( i = 0; i < numDrawSurfs; i++ ) {
 		R_DecomposeSort( (drawSurfs+i)->sort, &entityNum, &shader, &fogNum, &dlighted );
@@ -1698,7 +1698,7 @@ static void R_SortDrawSurfs( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 		dlight_t *dl;
 		// all the lit surfaces are in a single queue
 		// but each light's surfaces are sorted within its subsection
-		for ( i = 0; i < tr.refdef.num_dlights; ++i ) { 
+	for ( i = 0; i < (int)tr.refdef.num_dlights; ++i ) {
 			dl = &tr.refdef.dlights[ i ];
 			if ( dl->head ) {
 				R_SortLitsurfs( dl );

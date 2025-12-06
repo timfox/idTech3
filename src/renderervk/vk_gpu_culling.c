@@ -210,42 +210,26 @@ void vk_gpu_culling_update( void )
 	gpu_cull_data_t cullData;
 	extern backEndState_t backEnd;
 	
-	// Extract frustum planes from viewParms (6 planes: left, right, top, bottom, near, far)
-	if ( backEnd.viewParms.frustum ) {
-		for ( int i = 0; i < 6; i++ ) {
-			if ( i < 5 && backEnd.viewParms.frustum[i].normal ) {
-				// Convert plane to vec4 format (normal + distance)
-				cullData.frustumPlanes[i][0] = backEnd.viewParms.frustum[i].normal[0];
-				cullData.frustumPlanes[i][1] = backEnd.viewParms.frustum[i].normal[1];
-				cullData.frustumPlanes[i][2] = backEnd.viewParms.frustum[i].normal[2];
-				cullData.frustumPlanes[i][3] = backEnd.viewParms.frustum[i].dist;
-			} else {
-				// Far plane (if not provided, use a default)
-				cullData.frustumPlanes[i][0] = 0.0f;
-				cullData.frustumPlanes[i][1] = 0.0f;
-				cullData.frustumPlanes[i][2] = -1.0f;
-				cullData.frustumPlanes[i][3] = backEnd.viewParms.zFar > 0.0f ? backEnd.viewParms.zFar : 1000.0f;
-			}
+	// Extract frustum planes from viewParms (5 planes provided; use default far plane)
+	for ( int i = 0; i < 6; i++ ) {
+		if ( i < 5 ) {
+			// Convert plane to vec4 format (normal + distance)
+			cullData.frustumPlanes[i][0] = backEnd.viewParms.frustum[i].normal[0];
+			cullData.frustumPlanes[i][1] = backEnd.viewParms.frustum[i].normal[1];
+			cullData.frustumPlanes[i][2] = backEnd.viewParms.frustum[i].normal[2];
+			cullData.frustumPlanes[i][3] = backEnd.viewParms.frustum[i].dist;
+		} else {
+			// Far plane (if not provided, use a default)
+			cullData.frustumPlanes[i][0] = 0.0f;
+			cullData.frustumPlanes[i][1] = 0.0f;
+			cullData.frustumPlanes[i][2] = -1.0f;
+			cullData.frustumPlanes[i][3] = backEnd.viewParms.zFar > 0.0f ? backEnd.viewParms.zFar : 1000.0f;
 		}
-	} else {
-		// Default frustum if not available
-		Com_Memset( cullData.frustumPlanes, 0, sizeof( cullData.frustumPlanes ) );
 	}
 	
 	// Get camera position and forward vector
-	if ( backEnd.viewParms.or.origin ) {
-		VectorCopy( backEnd.viewParms.or.origin, cullData.cameraPos );
-	} else {
-		VectorClear( cullData.cameraPos );
-	}
-	
-	if ( backEnd.viewParms.or.axis[0] ) {
-		VectorCopy( backEnd.viewParms.or.axis[0], cullData.cameraForward );
-	} else {
-		cullData.cameraForward[0] = 0.0f;
-		cullData.cameraForward[1] = 0.0f;
-		cullData.cameraForward[2] = 1.0f;
-	}
+	VectorCopy( backEnd.viewParms.or.origin, cullData.cameraPos );
+	VectorCopy( backEnd.viewParms.or.axis[0], cullData.cameraForward );
 	
 	cullData.cullDistance = r_cullDistance ? r_cullDistance->value : 5000.0f;
 	cullData.instanceCount = vk.gpuCulling.instanceCount;

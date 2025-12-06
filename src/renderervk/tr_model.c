@@ -71,7 +71,7 @@ static qhandle_t R_RegisterMD3(const char *name, model_t *mod)
 		if ( !buf.v )
 			continue;
 
-		if ( fileSize < sizeof( md3Header_t ) ) {
+	if ( (size_t)fileSize < sizeof( md3Header_t ) ) {
 			ri.Printf( PRINT_WARNING, "%s: truncated header for %s\n", __func__, name );
 			ri.FS_FreeFile( buf.v );
 			break;
@@ -135,7 +135,7 @@ static qhandle_t R_RegisterMDR(const char *name, model_t *mod)
 		return 0;
 	}
 
-	if ( filesize < sizeof( ident ) ) {
+	if ( (size_t)filesize < sizeof( ident ) ) {
 		ri.FS_FreeFile( buf.v );
 		mod->type = MOD_BAD;
 		return 0;
@@ -439,7 +439,10 @@ static qboolean R_LoadMD3( model_t *mod, int lod, void *buffer, int fileSize, co
 		return qfalse;
 	}
 
-	if ( hdr->ofsFrames > size || hdr->ofsTags > size || hdr->ofsSurfaces > size ) {
+	size_t fileSizeSz = (size_t)fileSize;
+	size_t sizeSz = (size_t)size;
+
+	if ( (size_t)hdr->ofsFrames > sizeSz || (size_t)hdr->ofsTags > sizeSz || (size_t)hdr->ofsSurfaces > sizeSz ) {
 		ri.Printf( PRINT_WARNING, "%s: %s has corrupted header\n", __func__, mod_name );
 		return qfalse;
 	}
@@ -448,15 +451,15 @@ static qboolean R_LoadMD3( model_t *mod, int lod, void *buffer, int fileSize, co
 		return qfalse;
 	}
 
-	if ( hdr->ofsFrames + hdr->numFrames * sizeof( md3Frame_t ) > fileSize ) {
+	if ( (size_t)hdr->ofsFrames + (size_t)hdr->numFrames * sizeof( md3Frame_t ) > fileSizeSz ) {
 		ri.Printf( PRINT_WARNING, "%s: %s has corrupted header\n", __func__, mod_name );
 		return qfalse;
 	}
-	if ( hdr->ofsTags + hdr->numTags * hdr->numFrames * sizeof( md3Tag_t ) > fileSize ) {
+	if ( (size_t)hdr->ofsTags + (size_t)hdr->numTags * (size_t)hdr->numFrames * sizeof( md3Tag_t ) > fileSizeSz ) {
 		ri.Printf( PRINT_WARNING, "%s: %s has corrupted header\n", __func__, mod_name );
 		return qfalse;
 	}
-	if ( hdr->ofsSurfaces + ( hdr->numSurfaces ? 1 : 0 ) * sizeof( md3Surface_t ) > fileSize ) {
+	if ( (size_t)hdr->ofsSurfaces + ( hdr->numSurfaces ? 1 : 0 ) * sizeof( md3Surface_t ) > fileSizeSz ) {
 		ri.Printf( PRINT_WARNING, "%s: %s has corrupted header\n", __func__, mod_name );
 		return qfalse;
 	}
@@ -501,27 +504,27 @@ static qboolean R_LoadMD3( model_t *mod, int lod, void *buffer, int fileSize, co
 		LL(surf->ofsXyzNormals);
 		LL(surf->ofsEnd);
 
-		if ( surf->ofsEnd > fileSize || (((byte*)surf - (byte*)hdr) + surf->ofsEnd) > fileSize ) {
+		if ( (size_t)surf->ofsEnd > fileSizeSz || (((byte*)surf - (byte*)hdr) + (size_t)surf->ofsEnd) > fileSizeSz ) {
 			ri.Printf( PRINT_WARNING, "%s: %s has corrupted surface header\n", __func__, mod_name );
 			return qfalse;
 		}
-		if ( surf->ofsTriangles > fileSize || surf->ofsShaders > fileSize || surf->ofsSt > fileSize || surf->ofsXyzNormals > fileSize ) {
+		if ( (size_t)surf->ofsTriangles > fileSizeSz || (size_t)surf->ofsShaders > fileSizeSz || (size_t)surf->ofsSt > fileSizeSz || (size_t)surf->ofsXyzNormals > fileSizeSz ) {
 			ri.Printf( PRINT_WARNING, "%s: %s has corrupted surface header\n", __func__, mod_name );
 			return qfalse;
 		}
-		if ( surf->ofsTriangles + surf->numTriangles * sizeof( md3Triangle_t ) > fileSize ) {
+		if ( (size_t)surf->ofsTriangles + (size_t)surf->numTriangles * sizeof( md3Triangle_t ) > fileSizeSz ) {
 			ri.Printf( PRINT_WARNING, "%s: %s has corrupted surface header\n", __func__, mod_name );
 			return qfalse;
 		}
-		if ( surf->ofsShaders + surf->numShaders * sizeof( md3Shader_t ) > fileSize || surf->numShaders > (1<<20) ) {
+		if ( (size_t)surf->ofsShaders + (size_t)surf->numShaders * sizeof( md3Shader_t ) > fileSizeSz || surf->numShaders > (1<<20) ) {
 			ri.Printf( PRINT_WARNING, "%s: %s has corrupted surface header\n", __func__, mod_name );
 			return qfalse;
 		}
-		if ( surf->ofsSt + surf->numVerts * sizeof( md3St_t ) > fileSize ) {
+		if ( (size_t)surf->ofsSt + (size_t)surf->numVerts * sizeof( md3St_t ) > fileSizeSz ) {
 			ri.Printf( PRINT_WARNING, "%s: %s has corrupted surface header\n", __func__, mod_name );
 			return qfalse;
 		}
-		if ( surf->ofsXyzNormals + surf->numVerts * sizeof( md3XyzNormal_t ) > fileSize ) {
+		if ( (size_t)surf->ofsXyzNormals + (size_t)surf->numVerts * sizeof( md3XyzNormal_t ) > fileSizeSz ) {
 			ri.Printf( PRINT_WARNING, "%s: %s has corrupted surface header\n", __func__, mod_name );
 			return qfalse;
 		}
@@ -635,6 +638,8 @@ static qboolean R_LoadMDR( model_t *mod, void *buffer, int filesize, const char 
 
 	size = LittleLong(pinmodel->ofsEnd);
 	
+	size_t sizeSz = (size_t)size;
+
 	if ( size > filesize )
 	{
 		ri.Printf( PRINT_WARNING, "%s: Header of %s is broken. Wrong filesize declared!\n", __func__, mod_name );
@@ -659,7 +664,7 @@ static qboolean R_LoadMDR( model_t *mod, void *buffer, int filesize, const char 
 	
 	// simple bounds check
 	if(pinmodel->numBones < 0 ||
-		sizeof(*mdr) + pinmodel->numFrames * (sizeof(*frame) + (pinmodel->numBones - 1) * sizeof(*frame->bones)) > size)
+		(size_t)sizeof(*mdr) + (size_t)pinmodel->numFrames * (sizeof(*frame) + (size_t)(pinmodel->numBones - 1) * sizeof(*frame->bones)) > sizeSz)
 	{
 		ri.Printf(PRINT_WARNING, "R_LoadMDR: %s has broken structure.\n", mod_name);
 		return qfalse;
@@ -712,7 +717,7 @@ static qboolean R_LoadMDR( model_t *mod, void *buffer, int filesize, const char 
 			
 			for(j = 0; j < mdr->numBones; j++)
 			{
-				for(k = 0; k < (sizeof(cframe->bones[j].Comp) / 2); k++)
+				for(k = 0; k < (int)(sizeof(cframe->bones[j].Comp) / 2); k++)
 				{
 					// Do swapping for the uncompressing functions. They seem to use shorts
 					// values only, so I assume this will work. Never tested it on other

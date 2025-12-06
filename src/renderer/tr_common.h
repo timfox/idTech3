@@ -117,6 +117,7 @@ qhandle_t RE_RegisterShaderFromImage(const char *name, int lightmapIndex, image_
 void R_InitFreeType( void );
 void R_DoneFreeType( void );
 void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font);
+qboolean RE_RegisterFont_Stb(const char *fontName, int pointSize, fontInfo_t *font);
 
 // Modern font rendering functions
 float RE_Text_Width_Improved(const char *text, float scale, fontInfo_t *font, int limit);

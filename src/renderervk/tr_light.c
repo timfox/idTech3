@@ -76,7 +76,7 @@ void R_DlightBmodel( bmodel_t *bmodel ) {
 	R_TransformDlights( tr.refdef.num_dlights, tr.refdef.dlights, &tr.or );
 
 	mask = 0;
-	for ( i = 0; i < tr.refdef.num_dlights; i++ ) {
+	for ( i = 0; i < (int)tr.refdef.num_dlights; i++ ) {
 		dl = &tr.refdef.dlights[i];
 
 		// see if the point is close enough to the bounds to matter
@@ -343,7 +343,7 @@ void R_SetupEntityLighting( const trRefdef_t *refdef, trRefEntity_t *ent ) {
 		// but we need to deal with shadow light direction
 		VectorCopy( lightDir, shadowLightDir );
 		if ( r_shadows->integer == 2 ) {
-			for ( i = 0 ; i < refdef->num_dlights ; i++ ) {
+			for ( i = 0 ; i < (int)refdef->num_dlights ; i++ ) {
 				dl = &refdef->dlights[i];
 				if ( dl->linear ) // no support for linear lights atm
 					continue;
@@ -360,7 +360,7 @@ void R_SetupEntityLighting( const trRefdef_t *refdef, trRefEntity_t *ent ) {
 	}  // if ( r_dlightMode->integer == 2 )
 	else
 #endif
-	for ( i = 0 ; i < refdef->num_dlights ; i++ ) {
+	for ( i = 0 ; i < (int)refdef->num_dlights ; i++ ) {
 		dl = &refdef->dlights[i];
 		VectorSubtract( dl->origin, lightOrigin, dir );
 		d = VectorNormalize( dir );

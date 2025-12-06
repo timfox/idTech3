@@ -327,13 +327,13 @@ typedef struct {
 		struct {
 			float		matrix[2][2];	// s' = s * m[0][0] + t * m[1][0] + trans[0]
 			float		translate[2];	// t' = s * m[0][1] + t * m[0][1] + trans[1]
-		};
+		} transform;
 
 		// used for TMOD_SCALE, TMOD_OFFSET, TMOD_SCALE_OFFSET
 		struct {
 			float		scale[2];		// s' = s * scale[0] + offset[0]
 			float		offset[2];		// t' = t * scale[1] + offset[1]
-		};
+		} scaleOffset;
 
 		// used for TMOD_SCROLL
 		float			scroll[2];		// s' = s + scroll[0] * time

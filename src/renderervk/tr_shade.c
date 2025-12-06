@@ -435,7 +435,7 @@ static void ProjectDlightTexture( void ) {
 #endif
 	}
 
-	for ( l = 0 ; l < backEnd.refdef.num_dlights ; l++ ) {
+	for ( l = 0 ; l < (int)backEnd.refdef.num_dlights ; l++ ) {
 
 		if ( !( tess.dlightBits & ( 1 << l ) ) ) {
 			continue;	// this surface definitely doesn't have any of this light
@@ -903,30 +903,30 @@ void R_ComputeTexCoords( const int b, const textureBundle_t *bundle ) {
 			break;
 
 		case TMOD_SCALE:
-			RB_CalcScaleTexCoords( bundle->texMods[tm].scale, (float *) src, (float *) dst );
+			RB_CalcScaleTexCoords( bundle->texMods[tm].scaleOffset.scale, (float *) src, (float *) dst );
 			src = dst;
 			break;
 
 		case TMOD_OFFSET:
 			for ( i = 0; i < tess.numVertexes; i++ ) {
-				dst[i][0] = src[i][0] + bundle->texMods[tm].offset[0];
-				dst[i][1] = src[i][1] + bundle->texMods[tm].offset[1];
+				dst[i][0] = src[i][0] + bundle->texMods[tm].scaleOffset.offset[0];
+				dst[i][1] = src[i][1] + bundle->texMods[tm].scaleOffset.offset[1];
 			}
 			src = dst;
 			break;
 
 		case TMOD_SCALE_OFFSET:
 			for ( i = 0; i < tess.numVertexes; i++ ) {
-				dst[i][0] = (src[i][0] * bundle->texMods[tm].scale[0] ) + bundle->texMods[tm].offset[0];
-				dst[i][1] = (src[i][1] * bundle->texMods[tm].scale[1] ) + bundle->texMods[tm].offset[1];
+				dst[i][0] = (src[i][0] * bundle->texMods[tm].scaleOffset.scale[0] ) + bundle->texMods[tm].scaleOffset.offset[0];
+				dst[i][1] = (src[i][1] * bundle->texMods[tm].scaleOffset.scale[1] ) + bundle->texMods[tm].scaleOffset.offset[1];
 			}
 			src = dst;
 			break;
 
 		case TMOD_OFFSET_SCALE:
 			for ( i = 0; i < tess.numVertexes; i++ ) {
-				dst[i][0] = (src[i][0] + bundle->texMods[tm].offset[0]) * bundle->texMods[tm].scale[0];
-				dst[i][1] = (src[i][1] + bundle->texMods[tm].offset[1]) * bundle->texMods[tm].scale[1];
+				dst[i][0] = (src[i][0] + bundle->texMods[tm].scaleOffset.offset[0]) * bundle->texMods[tm].scaleOffset.scale[0];
+				dst[i][1] = (src[i][1] + bundle->texMods[tm].scaleOffset.offset[1]) * bundle->texMods[tm].scaleOffset.scale[1];
 			}
 			src = dst;
 			break;
@@ -1050,7 +1050,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 #ifdef USE_VULKAN
 		tess_flags |= pStage->tessFlags;
 
-		for ( i = 0;  i < pStage->numTexBundles; i++ ) {
+		for ( i = 0;  i < (int)pStage->numTexBundles; i++ ) {
 			if ( pStage->bundle[i].image[0] != NULL ) {
 				GL_SelectTexture( i );
 				R_BindAnimatedImage( &pStage->bundle[i] );
@@ -1302,7 +1302,7 @@ void VK_LightingPass( void )
 		tess.dlightUpdateParams = qfalse;
 	}
 
-	if ( uniform_offset == ~0 )
+	if ( uniform_offset == (uint32_t)~0u )
 		return; // no space left...
 
 	cull = tess.shader->cullType;
