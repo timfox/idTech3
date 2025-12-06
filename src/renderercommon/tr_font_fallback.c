@@ -81,7 +81,7 @@ Find a glyph in a font fallback chain
 Returns glyphInfo_t* or NULL if not found
 =================
 */
-static glyphInfo_t *RE_FindGlyphInFallback(fontFallbackChain_t *chain, unsigned char c)
+__attribute__((unused)) static glyphInfo_t *RE_FindGlyphInFallback(fontFallbackChain_t *chain, unsigned char c)
 {
 	if (!chain)
 		return NULL;

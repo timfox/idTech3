@@ -472,4 +472,7 @@ void *S_OGG_CodecLoad(const char *filename, snd_info_t *info)
 	return buffer;
 }
 
+#else
+// Keep translation unit non-empty when OGG support is disabled
+static const int snd_codec_ogg_stub = 0;
 #endif // USE_OGG_VORBIS

@@ -395,7 +395,8 @@ float MSG_ReadFloat( msg_t *msg ) {
 
 const char *MSG_ReadString( msg_t *msg ) {
 	static char	string[MAX_STRING_CHARS];
-	int	l, c;
+	size_t	l;
+	int c;
 	
 	l = 0;
 	do {
@@ -422,7 +423,8 @@ const char *MSG_ReadString( msg_t *msg ) {
 
 const char *MSG_ReadBigString( msg_t *msg ) {
 	static char	string[ BIG_INFO_STRING ];
-	int	l, c;
+	size_t	l;
+	int c;
 	
 	l = 0;
 	do {
@@ -449,7 +451,8 @@ const char *MSG_ReadBigString( msg_t *msg ) {
 
 const char *MSG_ReadStringLine( msg_t *msg ) {
 	static char	string[MAX_STRING_CHARS];
-	int	l, c;
+	size_t	l;
+	int c;
 
 	l = 0;
 	do {

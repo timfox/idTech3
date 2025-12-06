@@ -823,6 +823,7 @@ void R_UpdateShaderAnimations(float deltaTime)
 	}
 	
 	time = tr.refdef.time / 1000.0f;
+	(void)time;
 	
 	for (i = 0; i < MAX_PROCEDURAL_SHADERS; i++) {
 		pshader = &proceduralShaders[i];
@@ -1967,12 +1968,12 @@ void R_SetShaderStageTexMod(int shaderId, int stageIndex, int bundleIndex, int m
 			case TMOD_SCALE:
 			case TMOD_SCALE_OFFSET:
 			case TMOD_OFFSET_SCALE:
-				if (params[0] != 0.0f) texMod->matrix[0][0] = params[0];
-				if (params[1] != 0.0f) texMod->matrix[0][1] = params[1];
-				if (params[2] != 0.0f) texMod->matrix[1][0] = params[2];
-				if (params[3] != 0.0f) texMod->matrix[1][1] = params[3];
-				if (params[4] != 0.0f) texMod->translate[0] = params[4];
-				if (params[5] != 0.0f) texMod->translate[1] = params[5];
+				if (params[0] != 0.0f) texMod->transform.matrix[0][0] = params[0];
+				if (params[1] != 0.0f) texMod->transform.matrix[0][1] = params[1];
+				if (params[2] != 0.0f) texMod->transform.matrix[1][0] = params[2];
+				if (params[3] != 0.0f) texMod->transform.matrix[1][1] = params[3];
+				if (params[4] != 0.0f) texMod->transform.translate[0] = params[4];
+				if (params[5] != 0.0f) texMod->transform.translate[1] = params[5];
 				break;
 			case TMOD_TURBULENT:
 			case TMOD_SCROLL:

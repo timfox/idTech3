@@ -86,7 +86,7 @@ int Sys_MilliSeconds(void)
 //===========================================================================
 static qboolean ValidEntityNumber(int num, const char *str)
 {
-	if ( /*num < 0 || */ (unsigned)num > botlibglobals.maxentities )
+	if ( num < 0 || num > botlibglobals.maxentities )
 	{
 		botimport.Print(PRT_ERROR, "%s: invalid entity number %d, [0, %d]\n",
 										str, num, botlibglobals.maxentities);

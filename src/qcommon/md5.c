@@ -276,7 +276,7 @@ char *Com_MD5File( const char *fn, int length, const char *prefix, int prefix_le
 	fileHandle_t f;
 	MD5_CTX md5;
 	byte buffer[2048];
-	int i;
+	size_t i;
 	int filelen = 0;
 	int r;
 	int total = 0;
@@ -311,7 +311,7 @@ char *Com_MD5File( const char *fn, int length, const char *prefix, int prefix_le
 			r = length - total;
 		total += r;
 		MD5Update( &md5 , buffer, r );
-		if ( r < sizeof( buffer ) || total >= length )
+		if ( (size_t)r < sizeof( buffer ) || total >= length )
 			break;
 	}
 	FS_FCloseFile( f );

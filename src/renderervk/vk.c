@@ -29,6 +29,10 @@ extern cvar_t *r_procDressingDensity;
 extern cvar_t *r_procDressingDebug;
 extern cvar_t *r_foliageWindStrength;
 extern cvar_t *r_foliageWindFrequency;
+extern cvar_t *r_gpuSceneGraph;
+extern cvar_t *r_gpuSceneDebug;
+extern cvar_t *r_gpuSkinning;
+extern cvar_t *r_gpuRagdoll;
 
 #if defined (_DEBUG)
 #if defined (_WIN32)
@@ -347,7 +351,7 @@ static VkFlags get_composite_alpha( VkCompositeAlphaFlagsKHR flags )
 		VK_COMPOSITE_ALPHA_POST_MULTIPLIED_BIT_KHR,
 		VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR
 	};
-	int i;
+	size_t i;
 
 	for ( i = 1; i < ARRAY_LEN( compositeFlags ); i++ ) {
 		if ( flags & compositeFlags[i] ) {
@@ -1226,7 +1230,7 @@ static void allocate_and_bind_image_memory(VkImage image) {
 	VkMemoryRequirements memory_requirements;
 	VkDeviceSize alignment;
 	ImageChunk *chunk;
-	int i;
+	size_t i;
 
 	qvkGetImageMemoryRequirements(vk.device, image, &memory_requirements);
 
@@ -1239,7 +1243,7 @@ static void allocate_and_bind_image_memory(VkImage image) {
 
 	// Try to find an existing chunk of sufficient capacity.
 	alignment = memory_requirements.alignment;
-	for ( i = 0; i < vk_world.num_image_chunks; i++ ) {
+	for ( i = 0; i < (size_t)vk_world.num_image_chunks; i++ ) {
 		// ensure that memory region has proper alignment
 		VkDeviceSize offset = PAD( vk_world.image_chunks[i].used, alignment );
 
@@ -1625,7 +1629,7 @@ static void create_instance( void )
 static VkFormat get_depth_format( VkPhysicalDevice physical_device ) {
 	VkFormatProperties props;
 	VkFormat formats[2];
-	int i;
+	size_t i;
 
 	if ( glConfig.stencilBits > 0 ) {
 		formats[0] = glConfig.depthBits == 16 ? VK_FORMAT_D16_UNORM_S8_UINT : VK_FORMAT_D24_UNORM_S8_UINT;
@@ -1696,7 +1700,7 @@ static const present_format_t present_formats[] = {
 
 static void get_present_format( int present_bits, VkFormat *bgr, VkFormat *rgb ) {
 	const present_format_t *pf, *sel;
-	int i;
+	size_t i;
 
 	sel = NULL;
 	pf = present_formats;
@@ -2218,14 +2222,16 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 }
 
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
 #define INIT_INSTANCE_FUNCTION(func) \
-	q##func = /*(PFN_ ## func)*/ ri.VK_GetInstanceProcAddr(vk_instance, #func); \
+	q##func = (PFN_##func) ri.VK_GetInstanceProcAddr(vk_instance, #func); \
 	if (q##func == NULL) {											\
 		ri.Error(ERR_FATAL, "Failed to find entrypoint %s", #func);	\
 	}
 
 #define INIT_INSTANCE_FUNCTION_EXT(func) \
-	q##func = /*(PFN_ ## func)*/ ri.VK_GetInstanceProcAddr(vk_instance, #func);
+	q##func = (PFN_##func) ri.VK_GetInstanceProcAddr(vk_instance, #func);
 
 
 #define INIT_DEVICE_FUNCTION(func) \
@@ -2269,7 +2275,8 @@ static void init_vulkan_library( void )
 	VkPhysicalDeviceProperties props;
 	VkPhysicalDevice *physical_devices;
 	uint32_t device_count;
-	int device_index, i;
+	int device_index;
+	uint32_t i;
 	VkResult res;
 
 	Com_Memset( &vk, 0, sizeof( vk ) );
@@ -2383,7 +2390,7 @@ static void init_vulkan_library( void )
 
 	vk.physical_device = VK_NULL_HANDLE;
 	for ( i = 0; i < device_count; i++, device_index++ ) {
-		if ( device_index >= device_count || device_index < 0 ) {
+	if ( device_index < 0 || (uint32_t)device_index >= device_count ) {
 			device_index = 0;
 		}
 		if ( vk_create_device( physical_devices[ device_index ], device_index ) ) {
@@ -2530,6 +2537,7 @@ static void init_vulkan_library( void )
 #undef INIT_INSTANCE_FUNCTION
 #undef INIT_DEVICE_FUNCTION
 #undef INIT_DEVICE_FUNCTION_EXT
+#pragma GCC diagnostic pop
 
 static void deinit_instance_functions( void )
 {
@@ -3273,10 +3281,10 @@ qboolean vk_alloc_vbo( const byte *vbo_data, int vbo_size )
 #endif
 	// utilize existing staging buffer
 	uploadDone = 0;
-	while ( uploadDone < vbo_size ) {
+	while ( uploadDone < (VkDeviceSize)vbo_size ) {
 		VkDeviceSize uploadSize = vk.staging_buffer.size;
-		if ( uploadDone + uploadSize > vbo_size ) {
-			uploadSize = vbo_size - uploadDone;
+		if ( uploadDone + uploadSize > (VkDeviceSize)vbo_size ) {
+			uploadSize = (VkDeviceSize)vbo_size - uploadDone;
 		}
 		memcpy(vk.staging_buffer.ptr + 0, vbo_data + uploadDone, uploadSize);
 		command_buffer = begin_command_buffer();
@@ -4830,7 +4838,7 @@ void vk_initialize( void )
 	if ( /*vk.fboActive &&*/ vk.msaaActive ) {
 		VkSampleCountFlags mask = vkMaxSamples;
 		vkSamples = MAX( log2pad( r_ext_multisample->integer, 1 ), VK_SAMPLE_COUNT_2_BIT );
-		while ( vkSamples > mask )
+		while ( (VkSampleCountFlags)vkSamples > mask )
 				vkSamples >>= 1;
 		ri.Printf( PRINT_ALL, "...using %ix MSAA\n", vkSamples );
 	} else {
@@ -5116,7 +5124,10 @@ void vk_initialize( void )
 		VmaVulkanFunctions vulkanFunctions = {0};
 		// Cast function pointer - ri.VK_GetInstanceProcAddr returns void* but VMA expects PFN_vkGetInstanceProcAddr
 		// Both are compatible (PFN_vkVoidFunction is typedef'd as void*), but explicit cast needed
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wpedantic"
 		vulkanFunctions.vkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)(void*)ri.VK_GetInstanceProcAddr;
+	#pragma GCC diagnostic pop
 		vulkanFunctions.vkGetDeviceProcAddr = qvkGetDeviceProcAddr;
 		
 		VmaAllocatorCreateInfo allocatorInfo = {0};
@@ -6002,18 +6013,19 @@ void vk_queue_wait_idle( void )
 
 
 void vk_release_resources( void ) {
-	int i, j;
+	uint32_t i;
+	int j;
 
 	vk_wait_idle();
 
-	for (i = 0; i < vk_world.num_image_chunks; i++)
+	for (i = 0; i < (uint32_t)vk_world.num_image_chunks; i++)
 		qvkFreeMemory(vk.device, vk_world.image_chunks[i].memory, NULL);
 
 	vk_clean_staging_buffer();
 
 	// vk_destroy_samplers();
 
-	for ( i = vk.pipelines_world_base; i < vk.pipelines_count; i++ ) {
+	for ( i = (uint32_t)vk.pipelines_world_base; i < vk.pipelines_count; i++ ) {
 		for ( j = 0; j < RENDER_PASS_COUNT; j++ ) {
 			if ( vk.pipelines[i].handle[j] != VK_NULL_HANDLE ) {
 				qvkDestroyPipeline( vk.device, vk.pipelines[i].handle[j], NULL );
@@ -6238,8 +6250,8 @@ void vk_upload_image_data( image_t *image, int x, int y, int width, int height, 
 	byte *buf;
 	int n;
 
-	int num_regions = 0;
-	int buffer_size = 0;
+	size_t num_regions = 0;
+	VkDeviceSize buffer_size = 0;
 
 	buf = resample_image_data( image->internalFormat, pixels, size, &n /*bpp*/ );
 
@@ -6264,7 +6276,7 @@ void vk_upload_image_data( image_t *image, int x, int y, int width, int height, 
 
 		buffer_size += width * height * n;
 
-		if ( num_regions >= mipmaps || (width == 1 && height == 1) || num_regions >= ARRAY_LEN( regions ) )
+	if ( num_regions >= (size_t)mipmaps || (width == 1 && height == 1) || num_regions >= ARRAY_LEN( regions ) )
 			break;
 
 		x >>= 1;
@@ -8157,7 +8169,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	multisample_state.pNext = NULL;
 	multisample_state.flags = 0;
 
-	multisample_state.rasterizationSamples = (renderPassIndex == RENDER_PASS_SCREENMAP) ? vk.screenMapSamples : vkSamples;
+multisample_state.rasterizationSamples = (renderPassIndex == RENDER_PASS_SCREENMAP) ? vk.screenMapSamples : (uint32_t)vkSamples;
 
 	multisample_state.sampleShadingEnable = VK_FALSE;
 	multisample_state.minSampleShading = 1.0f;
@@ -8496,10 +8508,10 @@ static void get_scissor_rect(VkRect2D *r) {
 		if (r->offset.y < 0)
 			r->offset.y = 0;
 
-		if (r->offset.x + r->extent.width > glConfig.vidWidth)
-			r->extent.width = glConfig.vidWidth - r->offset.x;
-		if (r->offset.y + r->extent.height > glConfig.vidHeight)
-			r->extent.height = glConfig.vidHeight - r->offset.y;
+		if (r->offset.x + r->extent.width > (uint32_t)glConfig.vidWidth)
+			r->extent.width = (uint32_t)glConfig.vidWidth - r->offset.x;
+		if (r->offset.y + r->extent.height > (uint32_t)glConfig.vidHeight)
+			r->extent.height = (uint32_t)glConfig.vidHeight - r->offset.y;
 	}
 }
 
@@ -8909,7 +8921,7 @@ void vk_reset_descriptor( int index )
 }
 
 
-void vk_update_descriptor( int index, VkDescriptorSet descriptor )
+void vk_update_descriptor( uint32_t index, VkDescriptorSet descriptor )
 {
 	// Batch descriptor updates: track range of changed descriptors
 	// Actual binding deferred until vk_bind_descriptor_sets() for efficiency
@@ -9192,7 +9204,7 @@ void vk_begin_blur_render_pass( uint32_t index )
 }
 
 
-static void vk_begin_screenmap_render_pass( void )
+static void __attribute__((unused)) vk_begin_screenmap_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.screenmap;
 
@@ -10687,7 +10699,7 @@ void vk_read_pixels( byte *buffer, uint32_t width, uint32_t height )
 	// host_cached bit is desirable for fast reads
 	memory_reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
 	alloc_info.memoryTypeIndex = find_memory_type2( memory_requirements.memoryTypeBits, memory_reqs, &memory_flags );
-	if ( alloc_info.memoryTypeIndex == ~0 ) {
+	if ( alloc_info.memoryTypeIndex == ~0U ) {
 		// try less explicit flags, without host_coherent
 		memory_reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
 		alloc_info.memoryTypeIndex = find_memory_type2( memory_requirements.memoryTypeBits, memory_reqs, &memory_flags );
@@ -11371,7 +11383,7 @@ void vk_generate_cubemaps( cubemap_t *cube )
 	VkClearValue			clear_values[1];
 	VkCommandBuffer			command_buffer;
 
-	image_t		*cubemap;
+	image_t		*cubemap = NULL;
 	uint32_t	i, j;
 	filterDef	*def;
 
@@ -11394,7 +11406,11 @@ void vk_generate_cubemaps( cubemap_t *cube )
 		switch ( def->target ) {
 			case IRRADIANCE: cubemap = cube->irradiance_image; break;
 			case PREFILTEREDENV: cubemap = cube->prefiltered_image; break;
-		};
+			default: cubemap = NULL; break;
+		}
+		if (!cubemap) {
+			continue;
+		}
 
 		Com_Memset( clear_values, 0, sizeof( clear_values ) );
 		clear_values[0].color.float32[0] = 0.75f;

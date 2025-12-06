@@ -29,9 +29,22 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  *****************************************************************************/
 
 
+#ifndef _WIN32
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE // ensure popen/pclose prototypes are visible
+#endif
+#endif
+
 #include "q_shared.h"
 #include "qcommon.h"
 #include "unzip.h"
+#ifndef _WIN32
+#include <stdio.h> // popen, pclose
+// Some libc headers may hide popen/pclose behind feature macros;
+// provide forward declarations to avoid implicit warnings on strict builds.
+FILE *popen(const char *command, const char *mode);
+int pclose(FILE *stream);
+#endif
 
 /*
 =============================================================================
@@ -2248,6 +2261,14 @@ extern qboolean		com_fullyInitialized;
 		Com_Error( ERR_FATAL, "FS_FOpenFileRead: NULL 'filename' parameter passed\n" );
 	}
 
+	if ( filename[0] == '\0' ) {
+		Com_Printf( "FS_FOpenFileRead: empty filename (ignored)\n" );
+		if ( file ) {
+			*file = 0;
+		}
+		return -1;
+	}
+
 	// qpaths are not supposed to have a leading slash
 	if ( filename[0] == '/' || filename[0] == '\\' ) {
 		filename++;
@@ -2449,6 +2470,10 @@ extern qboolean		com_fullyInitialized;
 		fprintf( missingFiles, "%s\n", filename );
 	}
 #endif
+
+	if ( fs_debug && fs_debug->integer ) {
+		Com_Printf( "FS_FOpenFileRead: missing '%s'\n", filename );
+	}
 
 	*file = FS_INVALID_HANDLE;
 	return -1;

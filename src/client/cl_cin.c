@@ -158,7 +158,7 @@ static void RllSetupTable( void )
 //
 // Returns:		Number of samples placed in output buffer
 //-----------------------------------------------------------------------------
-static long RllDecodeMonoToMono(unsigned char *from,short *to,unsigned int size,char signedOutput ,unsigned short flag)
+static __attribute__((unused)) long RllDecodeMonoToMono(unsigned char *from,short *to,unsigned int size,char signedOutput ,unsigned short flag)
 {
 	unsigned int z;
 	int prev;
@@ -259,7 +259,7 @@ static long RllDecodeStereoToStereo(unsigned char *from,short *to,unsigned int s
 //
 // Returns:		Number of samples placed in output buffer
 //-----------------------------------------------------------------------------
-static long RllDecodeStereoToMono(unsigned char *from,short *to,unsigned int size,char signedOutput, unsigned short flag)
+static __attribute__((unused)) long RllDecodeStereoToMono(unsigned char *from,short *to,unsigned int size,char signedOutput, unsigned short flag)
 {
 	unsigned int z;
 	int prevL,prevR;
@@ -1360,6 +1360,8 @@ e_status CIN_RunCinematic( int handle )
 		cinTable[currentHandle].status = FMV_EOF;
 		// Reset based on codec type
 		switch (cinTable[currentHandle].codec) {
+			case CODEC_NONE:
+				break;
 			case CODEC_ROQ:
 				RoQReset();
 				break;
@@ -1374,6 +1376,9 @@ e_status CIN_RunCinematic( int handle )
 				VPX_Reset(currentHandle);
 				break;
 #endif
+			case CODEC_AV1:
+				// AV1 handled in its own module; nothing to reset here yet.
+				break;
 		}
 	}
 

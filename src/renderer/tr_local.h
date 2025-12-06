@@ -297,13 +297,13 @@ typedef struct {
 		struct {
 			float		matrix[2][2];	// s' = s * m[0][0] + t * m[1][0] + trans[0]
 			float		translate[2];	// t' = s * m[0][1] + t * m[0][1] + trans[1]
-		};
+		} transform;
 
 		// used for TMOD_SCALE, TMOD_OFFSET, TMOD_SCALE_OFFSET
 		struct {
 			float		scale[2];		// s' = s * scale[0] + offset[0]
 			float		offset[2];		// t' = t * scale[1] + offset[1]
-		};
+		} scaleOffset;
 
 		// used for TMOD_SCROLL
 		float			scroll[2];		// s' = s + scroll[0] * time
@@ -316,6 +316,7 @@ typedef struct {
 	};
 
 } texModInfo_t;
+
 
 
 #define MAX_IMAGE_ANIMATIONS		24
@@ -2001,12 +2002,12 @@ void RE_VertexLighting( qboolean allowed );
 void R_BloomScreen( void );
 
 #define GLE( ret, name, ... ) extern ret ( APIENTRY * q##name )( __VA_ARGS__ );
-	QGL_Core_PROCS;
-	QGL_Ext_PROCS;
-	QGL_ARB_PROGRAM_PROCS;
-	QGL_VBO_PROCS;
-	QGL_FBO_PROCS;
-	QGL_FBO_OPT_PROCS;
+	QGL_Core_PROCS
+	QGL_Ext_PROCS
+	QGL_ARB_PROGRAM_PROCS
+	QGL_VBO_PROCS
+	QGL_FBO_PROCS
+	QGL_FBO_OPT_PROCS
 #undef GLE
 
 // VBO functions

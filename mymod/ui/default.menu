@@ -1,0 +1,5 @@
+// Minimal default menu stub to satisfy UI load
+{
+  loadmenu { "ui/hud.txt" }
+}
+

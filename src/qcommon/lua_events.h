@@ -81,6 +81,23 @@ L: Lua state
 */
 void Lua_Events_RegisterBindings(lua_State *L);
 
+/*
+=================
+Lua_Events_SubscribeCallback
+Subscribe a Lua function (by registry ref) to an event from C code.
+Returns qtrue on success.
+=================
+*/
+qboolean Lua_Events_SubscribeCallback(lua_State *L, const char *event_name, int callback_ref);
+
+/*
+=================
+Lua_Events_UnsubscribeCallback
+Unsubscribe a Lua function (by registry ref) from an event.
+=================
+*/
+void Lua_Events_UnsubscribeCallback(lua_State *L, const char *event_name, int callback_ref);
+
 #endif // USE_LUA
 
 #endif // __LUA_EVENTS_H__

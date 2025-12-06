@@ -1147,3 +1147,8 @@ qboolean Com_DL_Perform( download_t *dl )
 }
 
 #endif /* USE_CURL */
+
+#ifndef USE_CURL
+/* Stub to avoid empty translation unit warning when cURL support is disabled. */
+static int cl_curl_disabled_stub(void) { return 0; }
+#endif

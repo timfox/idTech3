@@ -402,7 +402,7 @@ static void S_TransferPaintBuffer( int endtime, byte *buffer )
 		out_idx = ( s_paintedtime * dma.channels ) % dma.samples;
 		while ( count > 0 ) {
 			int n = count;
-			if ( n + out_idx > dma.samples )
+			if ( (unsigned int)(n + out_idx) > dma.samples )
 				n = dma.samples - out_idx;
 			CL_WriteAVIAudioFrame( buffer + out_idx * dma.samplebits / 8, n * dma.samplebits / 8 );
 			out_idx = (out_idx + n) % dma.samples;

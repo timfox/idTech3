@@ -91,13 +91,13 @@ void RB_CalcStretchTexCoords( const waveForm_t *wf, float *src, float *dst )
 
 	p = 1.0f / EvalWaveForm( wf );
 
-	tmi.matrix[0][0] = p;
-	tmi.matrix[1][0] = 0;
-	tmi.translate[0] = 0.5f - 0.5f * p;
+	tmi.transform.matrix[0][0] = p;
+	tmi.transform.matrix[1][0] = 0;
+	tmi.transform.translate[0] = 0.5f - 0.5f * p;
 
-	tmi.matrix[0][1] = 0;
-	tmi.matrix[1][1] = p;
-	tmi.translate[1] = 0.5f - 0.5f * p;
+	tmi.transform.matrix[0][1] = 0;
+	tmi.transform.matrix[1][1] = p;
+	tmi.transform.translate[1] = 0.5f - 0.5f * p;
 
 	RB_CalcTransformTexCoords( &tmi, src, dst );
 }
@@ -1130,8 +1130,8 @@ void RB_CalcTransformTexCoords( const texModInfo_t *tmi, float *src, float *dst 
 		const float s = src[0];
 		const float t = src[1];
 
-		dst[0] = s * tmi->matrix[0][0] + t * tmi->matrix[1][0] + tmi->translate[0];
-		dst[1] = s * tmi->matrix[0][1] + t * tmi->matrix[1][1] + tmi->translate[1];
+		dst[0] = s * tmi->transform.matrix[0][0] + t * tmi->transform.matrix[1][0] + tmi->transform.translate[0];
+		dst[1] = s * tmi->transform.matrix[0][1] + t * tmi->transform.matrix[1][1] + tmi->transform.translate[1];
 	}
 }
 
@@ -1153,13 +1153,13 @@ void RB_CalcRotateTexCoords( float degsPerSecond, float *src, float *dst )
 	sinValue = tr.sinTable[ index & FUNCTABLE_MASK ];
 	cosValue = tr.sinTable[ ( index + FUNCTABLE_SIZE / 4 ) & FUNCTABLE_MASK ];
 
-	tmi.matrix[0][0] = cosValue;
-	tmi.matrix[1][0] = -sinValue;
-	tmi.translate[0] = 0.5 - 0.5 * cosValue + 0.5 * sinValue;
+	tmi.transform.matrix[0][0] = cosValue;
+	tmi.transform.matrix[1][0] = -sinValue;
+	tmi.transform.translate[0] = 0.5 - 0.5 * cosValue + 0.5 * sinValue;
 
-	tmi.matrix[0][1] = sinValue;
-	tmi.matrix[1][1] = cosValue;
-	tmi.translate[1] = 0.5 - 0.5 * sinValue - 0.5 * cosValue;
+	tmi.transform.matrix[0][1] = sinValue;
+	tmi.transform.matrix[1][1] = cosValue;
+	tmi.transform.translate[1] = 0.5 - 0.5 * sinValue - 0.5 * cosValue;
 
 	RB_CalcTransformTexCoords( &tmi, src, dst );
 }

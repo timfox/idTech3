@@ -167,6 +167,39 @@ static int Lua_GameEntityExists(lua_State *L)
 
 /*
 =================
+Lua_GameEntityAttachScript
+=================
+Lua binding: game_entity_attach_script(entity_num, script_path) -> boolean
+Attaches a Lua script to an ECS entity (alias for Entity.attach_script)
+=================
+*/
+static int Lua_GameEntityAttachScript(lua_State *L)
+{
+	ecs_entity_t entity;
+	const char *script_path;
+
+	if (lua_gettop(L) < 2 || !lua_isnumber(L, 1)) {
+		lua_pushboolean(L, 0);
+		return 1;
+	}
+
+	entity = (ecs_entity_t)lua_tointeger(L, 1);
+	script_path = lua_tostring(L, 2);
+	if (!script_path) {
+		lua_pushboolean(L, 0);
+		return 1;
+	}
+
+	if (Lua_Entity_AttachScript(entity, script_path)) {
+		lua_pushboolean(L, 1);
+	} else {
+		lua_pushboolean(L, 0);
+	}
+	return 1;
+}
+
+/*
+=================
 Lua_RegisterGameBindings
 =================
 Register all game module bindings with a Lua state
@@ -181,6 +214,7 @@ void Lua_RegisterGameBindings(lua_State *L)
 	Lua_RegisterFunction(L, "game_trigger_event", Lua_GameTriggerEvent);
 	Lua_RegisterFunction(L, "game_get_entity_count", Lua_GameGetEntityCount);
 	Lua_RegisterFunction(L, "game_entity_exists", Lua_GameEntityExists);
+	Lua_RegisterFunction(L, "game_entity_attach_script", Lua_GameEntityAttachScript);
 	
 	// Register animation event bindings (weak symbol - may not be available if game module not loaded)
 	extern __attribute__((weak)) void G_RegisterAnimationEventLua( void *luaState );

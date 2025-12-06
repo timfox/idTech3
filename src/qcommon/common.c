@@ -342,8 +342,8 @@ void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t code, const char 
 	va_list		argptr;
 	static int	lastErrorTime;
 	static int	errorCount;
-	static qboolean	calledSysError = qfalse;
 	int			currentTime;
+	char		debugMsg[1024];
 
 #if defined(_WIN32) && defined(_DEBUG)
 	if ( code != ERR_DISCONNECT && code != ERR_NEED_CD ) {
@@ -355,10 +355,8 @@ void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t code, const char 
 #endif
 
 	if ( com_errorEntered ) {
-		if ( !calledSysError ) {
-			calledSysError = qtrue;
-			Sys_Error( "recursive error after: %s", com_errorMessage );
-		}
+		// Prevent hard recursion: bail out hard to satisfy noreturn contract
+		Sys_Error( "Recursive Com_Error: %s", fmt ? fmt : "<null>" );
 	}
 
 	com_errorEntered = qtrue;
@@ -382,6 +380,12 @@ void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t code, const char 
 	}
 	lastErrorTime = currentTime;
 
+	// capture incoming message for diagnostics before formatting with file:line
+	va_start( argptr, fmt );
+	Q_vsnprintf( debugMsg, sizeof( debugMsg ), fmt, argptr );
+	va_end( argptr );
+	Sys_Print( va( "Com_Error: code=%d msg=\"%s\"\n", code, debugMsg ) );
+
 	va_start( argptr, fmt );
 #ifdef NDEBUG
 	Q_vsnprintf( com_errorMessage, sizeof( com_errorMessage ), fmt, argptr );
@@ -392,6 +396,20 @@ void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t code, const char 
 	Com_sprintf( com_errorMessage, sizeof( com_errorMessage ), "%s [%s:%d]", temp, __FILE__, __LINE__ );
 #endif
 	va_end( argptr );
+
+	// If fatal mentions file-not-found (even with control codes), demote to drop
+	if ( code == ERR_FATAL ) {
+		if ( Q_stristr( com_errorMessage, "file not found" ) ) {
+			code = ERR_DROP;
+		}
+	}
+
+	// If a missing file triggers a fatal error, try to downgrade to a drop so we can continue
+	if ( code == ERR_FATAL ) {
+		if ( !Q_strnicmp( com_errorMessage, "file not found:", 15 ) ) {
+			code = ERR_DROP;
+		}
+	}
 
 	if ( code != ERR_DISCONNECT && code != ERR_NEED_CD ) {
 		// we can't recover from ERR_FATAL so there is no recipients for com_errorMessage
@@ -465,7 +483,6 @@ void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t code, const char 
 
 	Com_Shutdown();
 
-	calledSysError = qtrue;
 	Sys_Error( "%s", com_errorMessage );
 }
 
@@ -977,7 +994,7 @@ qboolean Com_FilterExt( const char *filter, const char *name )
 	while ( *filter ) {
 		if ( *filter == '*' ) {
 			filter++;
-			for ( i = 0; *filter != '\0' && i < sizeof(buf)-1; i++ ) {
+			for ( i = 0; *filter != '\0' && i < (int)sizeof(buf)-1; i++ ) {
 				if ( *filter == '*' || *filter == '?' )
 					break;
 				buf[i] = *filter++;
@@ -1653,8 +1670,8 @@ void *Z_TagMalloc( int size, memtag_t tag ) {
 #endif
 
 #ifdef USE_MULTI_SEGMENT
-	if ( size < (sizeof( freeblock_t ) ) ) {
-		size = (sizeof( freeblock_t ) );
+	if ( size < (int)sizeof( freeblock_t ) ) {
+		size = (int)sizeof( freeblock_t );
 	}
 #endif
 
@@ -3888,8 +3905,13 @@ static const char *parseAffinityMask( const char *str, uint64_t *outv, int level
 			++str;
 			continue;
 		}
-		else if ( *str == '0' && (str[1] == 'x' || str[1] == 'X') && (v = hex_code( str[2] )) >= 0 ) {
-			int hex;
+		else if ( *str == '0' && (str[1] == 'x' || str[1] == 'X') ) {
+			int hex, hv = hex_code( str[2] );
+			if ( hv < 0 ) {
+				++str;
+				continue;
+			}
+			v = (uint64_t)hv;
 			str += 3; // 0xH
 			while ( (hex = hex_code( *str )) >= 0 ) {
 				v = v * 16 + hex;
@@ -4999,7 +5021,7 @@ void Field_CompleteKeyBind( int key )
 		vlen += 2;
 	}
 
-	if ( vlen + blen > sizeof( completionField->buffer ) - 1 )
+	if ( (size_t)( vlen + blen ) > sizeof( completionField->buffer ) - 1 )
 	{
 		//vlen = sizeof( completionField->buffer ) - 1 - blen;
 		return;
@@ -5045,7 +5067,7 @@ static void Field_CompleteCvarValue( const char *value, const char *current )
 		vlen += 2;
 	}
 
-	if ( vlen + blen > sizeof( completionField->buffer ) - 1 )
+	if ( (size_t)( vlen + blen ) > sizeof( completionField->buffer ) - 1 )
 	{
 		//vlen = sizeof( completionField->buffer ) - 1 - blen;
 		return;

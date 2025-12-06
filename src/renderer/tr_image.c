@@ -81,7 +81,7 @@ GL_TextureMode
 void GL_TextureMode( const char *string ) {
 	const textureMode_t *mode;
 	image_t	*img;
-	int		i;
+	size_t		i;
 	
 	mode = NULL;
 	for ( i = 0 ; i < ARRAY_LEN( modes ) ; i++ ) {
@@ -108,7 +108,7 @@ void GL_TextureMode( const char *string ) {
 	}
 
 	// change all the existing mipmap texture objects
-	for ( i = 0; i < tr.numImages; i++ ) {
+	for ( i = 0; i < (size_t)tr.numImages; i++ ) {
 		img = tr.images[ i ];
 		if ( img->flags & IMGFLAG_MIPMAP ) {
 			GL_Bind( img );
@@ -249,33 +249,33 @@ before or after.
 */
 static void ResampleTexture( unsigned *in, int inwidth, int inheight, unsigned *out,  
 							int outwidth, int outheight ) {
-	int		i, j;
+	size_t		i, j;
 	unsigned	*inrow, *inrow2;
 	unsigned	frac, fracstep;
 	unsigned	p1[MAX_TEXTURE_SIZE];
 	unsigned	p2[MAX_TEXTURE_SIZE];
 	byte		*pix1, *pix2, *pix3, *pix4;
 
-	if ( outwidth > ARRAY_LEN( p1 ) )
+		if ( (size_t)outwidth > ARRAY_LEN( p1 ) )
 		ri.Error( ERR_DROP, "ResampleTexture: max width" );
 								
 	fracstep = inwidth * 0x10000 / outwidth;
 
 	frac = fracstep>>2;
-	for ( i=0 ; i<outwidth ; i++ ) {
+	for ( i=0 ; i<(size_t)outwidth ; i++ ) {
 		p1[i] = 4*(frac>>16);
 		frac += fracstep;
 	}
 	frac = 3*(fracstep>>2);
-	for ( i=0 ; i<outwidth ; i++ ) {
+	for ( i=0 ; i<(size_t)outwidth ; i++ ) {
 		p2[i] = 4*(frac>>16);
 		frac += fracstep;
 	}
 
-	for (i=0 ; i<outheight ; i++, out += outwidth) {
+	for (i=0 ; i<(size_t)outheight ; i++, out += outwidth) {
 		inrow = in + inwidth*(int)((i+0.25)*inheight/outheight);
 		inrow2 = in + inwidth*(int)((i+0.75)*inheight/outheight);
-		for (j=0 ; j<outwidth ; j++) {
+		for (j=0 ; j<(size_t)outwidth ; j++) {
 			pix1 = (byte *)inrow + p1[j];
 			pix2 = (byte *)inrow + p2[j];
 			pix3 = (byte *)inrow2 + p1[j];
@@ -1362,7 +1362,8 @@ R_SetColorMappings
 ===============
 */
 void R_SetColorMappings( void ) {
-	int		i, j;
+	size_t	i;
+	int		j;
 	float	g;
 	int		inf;
 	int		shift;

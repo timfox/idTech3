@@ -137,13 +137,13 @@ static void ARB_Lighting( const shaderStage_t* pStage )
 	unsigned hitIndexes[ SHADER_MAX_INDEXES ];
 	int numIndexes;
 	int clip;
-	int i;
+	size_t i;
 	
 	backEnd.pc.c_lit_vertices_lateculltest += tess.numVertexes;
 
 	dl = tess.light;
 
-	for ( i = 0; i < tess.numVertexes; ++i ) {
+	for ( i = 0; i < (size_t)tess.numVertexes; ++i ) {
 		vec3_t dist;
 		VectorSubtract( dl->transformed, tess.xyz[i], dist );
 
@@ -175,7 +175,7 @@ static void ARB_Lighting( const shaderStage_t* pStage )
 	// build a list of triangles that need light
 	numIndexes = 0;
 
-	for ( i = 0 ; i < tess.numIndexes ; i += 3 ) {
+	for ( i = 0 ; i < (size_t)tess.numIndexes ; i += 3 ) {
 		int		a, b, c;
 
 		a = tess.indexes[i];

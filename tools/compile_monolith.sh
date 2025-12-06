@@ -373,8 +373,6 @@ case "$MODE" in
                     -x "*.o" \
                     -x "*.a" \
                     -x "*.so" \
-                    -x "*.md" \
-                    -x "*.txt" \
                     -x "CHANGES" \
                     -x "COPYING" \
                     -x "CREDITS" \

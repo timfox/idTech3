@@ -210,7 +210,8 @@ RB_AddDlightFlares
 */
 void RB_AddDlightFlares( void ) {
 	dlight_t		*l;
-	int				i, j, k;
+	unsigned int	i;
+	int				j, k;
 	fog_t			*fog = NULL;
 
 	if ( !r_flares->integer ) {

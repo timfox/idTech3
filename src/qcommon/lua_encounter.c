@@ -16,6 +16,7 @@ State machine for combat encounters.
 #include <lua.h>
 #include <lauxlib.h>
 #include <string.h>
+#include <stdarg.h>
 
 // Encounter state
 typedef enum {
@@ -39,6 +40,61 @@ typedef struct encounter_s {
 static encounter_t s_encounters[MAX_ENCOUNTERS];
 static int s_num_encounters = 0;
 static qboolean s_initialized = qfalse;
+
+static encounter_t *Lua_Encounter_Find(const char *name)
+{
+	int i;
+	if (!name) {
+		return NULL;
+	}
+	for (i = 0; i < s_num_encounters; i++) {
+		if (s_encounters[i].active && Q_stricmp(s_encounters[i].name, name) == 0) {
+			return &s_encounters[i];
+		}
+	}
+	return NULL;
+}
+
+static void Lua_Encounter_CallHook(encounter_t *enc, const char *hook_name, int num_args, ...)
+{
+	extern lua_State *Lua_GetMainState(void);
+	lua_State *L = Lua_GetMainState();
+	int i;
+	va_list args;
+
+	if (!L || !enc || !hook_name || enc->script_ref < 0) {
+		return;
+	}
+
+	lua_rawgeti(L, LUA_REGISTRYINDEX, enc->script_ref);
+	if (!lua_istable(L, -1)) {
+		lua_pop(L, 1);
+		return;
+	}
+
+	lua_getfield(L, -1, hook_name);
+	if (!lua_isfunction(L, -1)) {
+		lua_pop(L, 2);
+		return;
+	}
+
+	va_start(args, num_args);
+	for (i = 0; i < num_args; i++) {
+		double arg = va_arg(args, double);
+		lua_pushnumber(L, arg);
+	}
+	va_end(args);
+
+	if (lua_pcall(L, num_args, 0, 0) != LUA_OK) {
+		const char *error = lua_tostring(L, -1);
+		Com_Printf("Lua_Encounter: Error calling hook %s for %s: %s\n",
+			hook_name, enc->name, error ? error : "Unknown error");
+		lua_pop(L, 1);
+	}
+
+	// Pop encounter table
+	lua_pop(L, 1);
+}
 
 /*
 =================
@@ -184,7 +240,6 @@ Lua binding: Encounter.start(name)
 static int Lua_Encounter_Start(lua_State *L)
 {
 	const char *name;
-	int i;
 
 	if (lua_gettop(L) < 1) {
 		return 0;
@@ -195,32 +250,7 @@ static int Lua_Encounter_Start(lua_State *L)
 		return 0;
 	}
 
-	for (i = 0; i < s_num_encounters; i++) {
-		if (Q_stricmp(s_encounters[i].name, name) == 0 && s_encounters[i].active) {
-			encounter_t *enc = &s_encounters[i];
-			enc->state = ENCOUNTER_ACTIVE;
-			enc->current_wave = 0;
-
-			// Call on_start hook if present
-			lua_rawgeti(L, LUA_REGISTRYINDEX, enc->script_ref);
-			if (lua_istable(L, -1)) {
-				lua_getfield(L, -1, "on_start");
-				if (lua_isfunction(L, -1)) {
-					if (lua_pcall(L, 0, 0, 0) != LUA_OK) {
-						const char *error = lua_tostring(L, -1);
-						Com_Printf("Lua_Encounter_Start: Error in on_start: %s\n",
-							error ? error : "Unknown error");
-						lua_pop(L, 1);
-					}
-				} else {
-					lua_pop(L, 1);
-				}
-			}
-			lua_pop(L, 1);
-
-			break;
-		}
-	}
+	Lua_Encounter_StartByName(name);
 
 	return 0;
 }
@@ -246,6 +276,81 @@ void Lua_Encounter_RegisterBindings(lua_State *L)
 
 	// Set as global
 	lua_setglobal(L, "Encounter");
+}
+
+/*
+=================
+Lua_Encounter_StartByName
+Called by engine code to start a named encounter
+=================
+*/
+void Lua_Encounter_StartByName(const char *name)
+{
+	encounter_t *enc;
+
+	if (!s_initialized || !name) {
+		return;
+	}
+
+	enc = Lua_Encounter_Find(name);
+	if (!enc) {
+		return;
+	}
+
+	enc->state = ENCOUNTER_ACTIVE;
+	enc->current_wave = 0;
+
+	Lua_Encounter_CallHook(enc, "on_start", 0);
+}
+
+/*
+=================
+Lua_Encounter_OnWaveSpawn
+Called by engine code when a new wave should be spawned
+=================
+*/
+void Lua_Encounter_OnWaveSpawn(const char *name, int wave_num)
+{
+	encounter_t *enc;
+
+	if (!s_initialized || !name) {
+		return;
+	}
+
+	enc = Lua_Encounter_Find(name);
+	if (!enc || enc->state != ENCOUNTER_ACTIVE) {
+		return;
+	}
+
+	Lua_Encounter_CallHook(enc, "on_wave_spawn", 1, (double)wave_num);
+}
+
+/*
+=================
+Lua_Encounter_OnComplete
+Called by engine code when an encounter ends
+=================
+*/
+void Lua_Encounter_OnComplete(const char *name, qboolean success)
+{
+	encounter_t *enc;
+
+	if (!s_initialized || !name) {
+		return;
+	}
+
+	enc = Lua_Encounter_Find(name);
+	if (!enc || enc->state == ENCOUNTER_COMPLETE || enc->state == ENCOUNTER_FAILED) {
+		return;
+	}
+
+	enc->state = success ? ENCOUNTER_COMPLETE : ENCOUNTER_FAILED;
+
+	if (success) {
+		Lua_Encounter_CallHook(enc, "on_complete", 0);
+	} else {
+		Lua_Encounter_CallHook(enc, "on_fail", 0);
+	}
 }
 
 #endif // USE_LUA

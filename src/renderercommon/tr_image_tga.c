@@ -44,7 +44,8 @@ void R_LoadTGA ( const char *name, byte **pic, int *width, int *height)
 {
 	unsigned	columns, rows, numPixels;
 	byte	*pixbuf;
-	int		row, column;
+	int		row;
+	unsigned int column;
 	byte	*buf_p;
 	byte	*end;
 	union {

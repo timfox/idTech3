@@ -46,6 +46,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "be_ea.h"
 #include "be_ai_chat.h"
 
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
 
 //escape character
 #define ESCAPE_CHAR				0x01	//'_'
@@ -3160,3 +3164,7 @@ void BotShutdownChatAI(void)
 	if (replychats) BotFreeReplyChat(replychats);
 	replychats = NULL;
 } //end of the function BotShutdownChatAI
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif

@@ -74,7 +74,10 @@ struct ImDrawData;
 #define VMA_STATIC_VULKAN_FUNCTIONS 0
 #define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
 #define VMA_VULKAN_VERSION 1000000 // Vulkan 1.0
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #include "vk_mem_alloc.h"
+#pragma GCC diagnostic pop
 #endif
 
 #define MAX_SWAPCHAIN_IMAGES 8
@@ -586,7 +589,7 @@ void vk_bind_index_buffer( VkBuffer buffer, uint32_t offset );
 void vk_draw_indexed( uint32_t indexCount, uint32_t firstIndex );
 #endif
 void vk_reset_descriptor( int index );
-void vk_update_descriptor( int index, VkDescriptorSet descriptor );
+void vk_update_descriptor( uint32_t index, VkDescriptorSet descriptor );
 void vk_update_descriptor_offset( int index, uint32_t offset );
 void vk_bind_descriptor_sets( void );
 void vk_update_uniform_descriptor( VkDescriptorSet descriptor, VkBuffer buffer );

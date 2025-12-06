@@ -46,6 +46,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "be_ai_goal.h"
 #include "be_ai_move.h"
 
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
 //#define DEBUG_AI_GOAL
 #ifdef RANDOMIZE
 #define UNDECIDEDFUZZY
@@ -1834,3 +1838,7 @@ void BotShutdownGoalAI(void)
 		} //end if
 	} //end for
 } //end of the function BotShutdownGoalAI
+
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif

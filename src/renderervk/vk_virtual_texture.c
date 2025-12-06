@@ -191,7 +191,7 @@ static int32_t vk_vt_find_page_in_cache( uint32_t pageID )
 }
 
 // Find LRU page slot (least recently used)
-static uint32_t vk_vt_find_lru_slot( void )
+static __attribute__((unused)) uint32_t vk_vt_find_lru_slot( void )
 {
 	if ( vk_vt.cache.cacheSize < vk_vt.cache.cacheCapacity ) {
 		// Cache not full, return next free slot
@@ -211,7 +211,7 @@ static uint32_t vk_vt_find_lru_slot( void )
 }
 
 // Update LRU order when page is accessed
-static void vk_vt_update_lru( uint32_t slotIndex )
+static __attribute__((unused)) void vk_vt_update_lru( uint32_t slotIndex )
 {
 	vk_vt.cache.pageLastAccess[slotIndex] = ++vk_vt.cache.accessCounter;
 }

@@ -60,6 +60,9 @@ vmCvar_t g_speed;
 vmCvar_t g_gravity;
 vmCvar_t g_gravityModifier;
 vmCvar_t g_damageModifier;
+vmCvar_t g_destructionSleep;
+vmCvar_t g_destructionAwakeImpulse;
+vmCvar_t g_destructionMaxActive;
 vmCvar_t g_cheats;
 vmCvar_t g_knockback;
 vmCvar_t g_quadfactor;
@@ -254,6 +257,9 @@ static cvarTable_t gameCvarTable[] = {
 	{ &g_gravity, "g_gravity", "800", 0, 0, qtrue, qfalse  },
 	{ &g_gravityModifier, "g_gravityModifier", "1", 0, 0, qtrue, qfalse  },
 	{ &g_damageModifier, "g_damageModifier", "0", 0, 0, qtrue, qfalse },
+	{ &g_destructionSleep, "g_destructionSleep", "0.15", CVAR_ARCHIVE, 0, qtrue, qfalse },
+	{ &g_destructionAwakeImpulse, "g_destructionAwakeImpulse", "50", CVAR_ARCHIVE, 0, qtrue, qfalse },
+	{ &g_destructionMaxActive, "g_destructionMaxActive", "64", CVAR_ARCHIVE, 0, qtrue, qfalse },
 	{ &g_knockback, "g_knockback", "1000", 0, 0, qtrue, qfalse  },
 	{ &g_quadfactor, "g_quadfactor", "3", 0, 0, qtrue, qfalse  },
 	{ &g_weaponRespawn, "g_weaponrespawn", "5", 0, 0, qtrue, qfalse  },

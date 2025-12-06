@@ -38,6 +38,9 @@
 #define EMITTER_MESH		4
 #define EMITTER_BURST		5
 
+// Particle physics flags (from tr_particles_enhanced.h)
+#define PARTICLE_PHYSICS_GRAVITY	0x0001
+
 // Renderer function declarations - these will be resolved at runtime when renderer is loaded
 // Using weak symbols so they can be overridden by the renderer module
 
@@ -54,6 +57,11 @@ __attribute__((weak)) void R_SetShaderMetallic(int shaderId, float metallic);
 __attribute__((weak)) void R_SetShaderRoughness(int shaderId, float roughness);
 __attribute__((weak)) void R_SetShaderAlbedo(int shaderId, const float *albedo);
 __attribute__((weak)) void R_SetShaderParameterAnimation(int shaderId, int paramIndex, int animType, float speed, float min, float max);
+__attribute__((weak)) void R_AddParticleEnhanced(const vec3_t origin, const vec3_t velocity, const vec3_t color,
+						 const vec3_t colorEnd, float size, float sizeEnd, float life,
+						 qhandle_t shaderHandle, int physicsFlags);
+__attribute__((weak)) int R_CreateFlareEnhanced(const vec3_t origin, const vec3_t color, float intensity, qhandle_t shader);
+__attribute__((weak)) qhandle_t RE_RegisterShaderNoMip(const char *name);
 
 // Weak symbol implementations
 __attribute__((weak)) int R_FindProceduralShader(const char *name) { (void)name; return -1; }
@@ -68,6 +76,21 @@ __attribute__((weak)) void R_SetShaderMetallic(int shaderId, float metallic) { (
 __attribute__((weak)) void R_SetShaderRoughness(int shaderId, float roughness) { (void)shaderId; (void)roughness; }
 __attribute__((weak)) void R_SetShaderAlbedo(int shaderId, const float *albedo) { (void)shaderId; (void)albedo; }
 __attribute__((weak)) void R_SetShaderParameterAnimation(int shaderId, int paramIndex, int animType, float speed, float min, float max) { (void)shaderId; (void)paramIndex; (void)animType; (void)speed; (void)min; (void)max; }
+__attribute__((weak)) void R_AddParticleEnhanced(const vec3_t origin, const vec3_t velocity, const vec3_t color,
+						 const vec3_t colorEnd, float size, float sizeEnd, float life,
+						 qhandle_t shaderHandle, int physicsFlags)
+{
+	(void)origin; (void)velocity; (void)color; (void)colorEnd;
+	(void)size; (void)sizeEnd; (void)life; (void)shaderHandle; (void)physicsFlags;
+}
+__attribute__((weak)) int R_CreateFlareEnhanced(const vec3_t origin, const vec3_t color, float intensity, qhandle_t shader)
+{
+	(void)origin; (void)color; (void)intensity; (void)shader; return -1;
+}
+__attribute__((weak)) qhandle_t RE_RegisterShaderNoMip(const char *name)
+{
+	(void)name; return 0;
+}
 // RE_RegisterShaderNoMip is in renderer interface, accessed via ri
 
 /*
@@ -82,6 +105,8 @@ static int Lua_RendererSpawnParticle(lua_State *L)
 	vec3_t origin, velocity, color;
 	float size, life;
 	const char *shaderName;
+	qhandle_t shaderHandle = 0;
+	vec3_t colorEnd;
 	int numArgs = lua_gettop(L);
 	
 	if (numArgs < 12) {
@@ -117,11 +142,21 @@ static int Lua_RendererSpawnParticle(lua_State *L)
 		shaderName = "default";
 	}
 	
-	// TODO: Implement actual particle spawning when renderer integration is added
-	Com_DPrintf("Lua_RendererSpawnParticle: Spawning particle at (%.2f, %.2f, %.2f)\n",
-		origin[0], origin[1], origin[2]);
+	// Resolve shader: prefer renderer registration, fall back to procedural lookup
+	if (shaderName && *shaderName) {
+		shaderHandle = RE_RegisterShaderNoMip(shaderName);
+		if (!shaderHandle) {
+			int procId = R_FindProceduralShader(shaderName);
+			if (procId >= 0) {
+				shaderHandle = procId;
+			}
+		}
+	}
+	VectorCopy(color, colorEnd);
 	
-	// Return particle ID (placeholder)
+	R_AddParticleEnhanced(origin, velocity, color, colorEnd, size, size, life, shaderHandle, PARTICLE_PHYSICS_GRAVITY);
+	
+	// Return a placeholder ID (enhanced particle API does not return IDs)
 	lua_pushinteger(L, 0);
 	return 1;
 }
@@ -306,6 +341,7 @@ static int Lua_RendererAddFlare(lua_State *L)
 {
 	vec3_t origin, color;
 	float size;
+	int flareId;
 	int numArgs = lua_gettop(L);
 	
 	if (numArgs < 7) {
@@ -330,12 +366,8 @@ static int Lua_RendererAddFlare(lua_State *L)
 	
 	size = (float)lua_tonumber(L, 7);
 	
-	// TODO: Implement actual flare addition when renderer integration is added
-	Com_DPrintf("Lua_RendererAddFlare: Adding flare at (%.2f, %.2f, %.2f)\n",
-		origin[0], origin[1], origin[2]);
-	
-	// Return flare ID (placeholder)
-	lua_pushinteger(L, 0);
+	flareId = R_CreateFlareEnhanced(origin, color, size, -1);
+	lua_pushinteger(L, flareId);
 	return 1;
 }
 

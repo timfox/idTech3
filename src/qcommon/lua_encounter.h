@@ -52,6 +52,31 @@ L: Lua state
 */
 void Lua_Encounter_RegisterBindings(lua_State *L);
 
+/*
+=================
+Lua_Encounter_StartByName
+Invoke the Lua on_start hook for a named encounter (if defined)
+=================
+*/
+void Lua_Encounter_StartByName(const char *name);
+
+/*
+=================
+Lua_Encounter_OnWaveSpawn
+Invoke the Lua on_wave_spawn hook for a named encounter (if defined)
+=================
+*/
+void Lua_Encounter_OnWaveSpawn(const char *name, int wave_num);
+
+/*
+=================
+Lua_Encounter_OnComplete
+Invoke the Lua on_complete/on_fail hooks for a named encounter
+success: qtrue for completion, qfalse for failure
+=================
+*/
+void Lua_Encounter_OnComplete(const char *name, qboolean success);
+
 #endif // USE_LUA
 
 #endif // __LUA_ENCOUNTER_H__

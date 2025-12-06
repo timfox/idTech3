@@ -48,7 +48,8 @@ Provides unified threading API across Windows, Linux, macOS.
 	typedef pthread_t thread_handle_t;
 	typedef pthread_mutex_t mutex_t;
 	typedef pthread_cond_t condition_t;
-	typedef pthread_rwlock_t rwlock_t;
+	// Some libpthread builds hide pthread_rwlock_t behind feature macros; fall back to mutex when unavailable.
+	typedef pthread_mutex_t rwlock_t;
 	typedef atomic_int atomic_int_t;
 	
 	#define THREAD_CALL

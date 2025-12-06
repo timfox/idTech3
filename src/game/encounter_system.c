@@ -8,6 +8,9 @@ Encounter and Sequence Authoring System Implementation
 #include "../qcommon/q_common.h"
 #include "g_local.h"
 #include "encounter_system.h"
+#ifdef USE_LUA
+#include "../qcommon/lua_encounter.h"
+#endif
 
 #define MAX_ENCOUNTERS 64
 #define MAX_SEQUENCES 16
@@ -55,7 +58,7 @@ void G_EncounterSystem_Shutdown( void )
 	// Stop all active encounters
 	for ( uint32_t i = 0; i < encounterCount; i++ ) {
 		if ( encounters[i].state == ENCOUNTER_STATE_ACTIVE ) {
-			G_Encounter_Stop( &encounters[i] );
+			G_Encounter_Stop( &encounters[i], qfalse );
 		}
 		if ( encounters[i].enemyEntities ) {
 			ri.Free( encounters[i].enemyEntities );
@@ -148,16 +151,19 @@ void G_EncounterSystem_Update( void )
 				// Note: Actual enemy spawning should be handled by Lua scripts via encounter callbacks
 				// or by extending the encounter structure to include wave definitions
 				// For now, this is a placeholder that can be extended
+#ifdef USE_LUA
+				Lua_Encounter_OnWaveSpawn( encounter->name, encounter->currentWave + 1 );
+#endif
 			}
 			
 			// Check completion conditions
 			if ( encounter->currentWave >= encounter->waveCount - 1 && aliveEnemyCount == 0 ) {
 				// All waves complete, all enemies defeated
-				G_Encounter_Stop( encounter );
+				G_Encounter_Stop( encounter, qtrue );
 			} else if ( encounter->duration > 0.0f && 
 			           ( currentTime - encounter->startTime ) >= encounter->duration ) {
 				// Time expired
-				G_Encounter_Stop( encounter );
+				G_Encounter_Stop( encounter, qfalse );
 			}
 		}
 	}
@@ -259,6 +265,12 @@ void G_Encounter_Start( encounter_t *encounter )
 		// or by extending the encounter structure to include wave definitions
 		// For now, this is a placeholder that can be extended
 	}
+
+#ifdef USE_LUA
+	// Kick off Lua-side encounter logic and first wave
+	Lua_Encounter_StartByName( encounter->name );
+	Lua_Encounter_OnWaveSpawn( encounter->name, encounter->currentWave + 1 );
+#endif
 	
 	if ( g_debugEncounters && g_debugEncounters->integer ) {
 		Com_Printf( "Encounter started: %s\n", encounter->name );
@@ -270,13 +282,13 @@ void G_Encounter_Start( encounter_t *encounter )
 Stop Encounter
 =============================================================================
 */
-void G_Encounter_Stop( encounter_t *encounter )
+void G_Encounter_Stop( encounter_t *encounter, qboolean success )
 {
 	if ( !encounter || encounter->state != ENCOUNTER_STATE_ACTIVE ) {
 		return;
 	}
 	
-	encounter->state = ENCOUNTER_STATE_COMPLETE;
+	encounter->state = success ? ENCOUNTER_STATE_COMPLETE : ENCOUNTER_STATE_FAILED;
 	
 	// Clean up enemies
 	if ( encounter->enemyEntities && encounter->enemyCount > 0 ) {
@@ -300,9 +312,13 @@ void G_Encounter_Stop( encounter_t *encounter )
 		// Reset to default value (0.0) or remove the world state entry
 		G_WorldState_Set( encounter->worldStateKey, 0.0f, 0.5f );
 	}
+
+#ifdef USE_LUA
+	Lua_Encounter_OnComplete( encounter->name, success );
+#endif
 	
 	if ( g_debugEncounters && g_debugEncounters->integer ) {
-		Com_Printf( "Encounter stopped: %s\n", encounter->name );
+		Com_Printf( "Encounter stopped: %s (%s)\n", encounter->name, success ? "complete" : "failed" );
 	}
 }
 
@@ -406,7 +422,7 @@ void G_Sequence_Stop( sequence_t *sequence )
 	
 	// Stop current encounter
 	if ( sequence->currentEncounter < sequence->encounterCount ) {
-		G_Encounter_Stop( &sequence->encounters[sequence->currentEncounter] );
+		G_Encounter_Stop( &sequence->encounters[sequence->currentEncounter], qfalse );
 	}
 }
 

@@ -818,6 +818,7 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 	case UI_ERROR:
 	{
 		const char *msg = (const char*)VMA(1);
+		// Avoid blowing up on malformed UI errors
 		if ( !msg || !msg[0] ) {
 			Com_Printf( "UI_ERROR: empty message (ignored)\n" );
 			return 0;

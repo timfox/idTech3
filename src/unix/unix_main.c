@@ -19,6 +19,13 @@ along with Quake III Arena source code; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include <unistd.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -26,6 +33,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <time.h>
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -544,7 +552,7 @@ char *Sys_ConsoleInput( void )
 
 				if ( key == 12 ) // clear teaminal
 				{
-					ssize_t ret [[maybe_unused]] = write( STDOUT_FILENO, "\ec]", 3 );
+					ssize_t ret [[maybe_unused]] = write( STDOUT_FILENO, "\x1b" "c]", 3 );
 					if ( tty_con.cursor )
 					{
 						ssize_t __attribute__((unused)) ret2 = write( STDOUT_FILENO, tty_con.buffer, tty_con.cursor );
@@ -557,7 +565,7 @@ char *Sys_ConsoleInput( void )
 				tty_FlushIn();
 				return NULL;
 			}
-			if ( tty_con.cursor >= sizeof( text ) - 1 )
+			if ( (size_t)tty_con.cursor >= sizeof( text ) - 1 )
 				return NULL;
 			// push regular character
 			tty_con.buffer[ tty_con.cursor ] = key;
@@ -693,7 +701,7 @@ static const struct Q3ToAnsiColorTable_s
 
 
 static const char *getANSIcolor( char Q3color ) {
-	int i;
+	size_t i;
 	for ( i = 0; i < ARRAY_LEN( tty_colorTable ); i++ ) {
 		if ( Q3color == tty_colorTable[ i ].Q3color ) {
 			return tty_colorTable[ i ].ANSIcolor;

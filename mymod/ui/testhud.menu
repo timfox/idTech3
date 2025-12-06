@@ -1,0 +1,9 @@
+#include "ui/menudef.h"
+
+menuDef {
+  name "testhud"
+  fullScreen 1
+  visible 0
+  rect 0 0 640 480
+}
+

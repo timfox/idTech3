@@ -6,8 +6,10 @@
 #include "snd_openal.h"
 
 #ifdef USE_OPENAL
+#define AL_ALEXT_PROTOTYPES
 #include <AL/al.h>
 #include <AL/alc.h>
+#include <AL/efx.h>
 
 static ALCdevice *openalDevice = NULL;
 static ALCcontext *openalContext = NULL;
@@ -15,6 +17,9 @@ static cvar_t *s_openal_enabled;
 static cvar_t *s_openal_3d;
 static cvar_t *s_openal_occlusion;
 static cvar_t *s_openal_reverb;
+static qboolean openalEfxAvailable = qfalse;
+static ALuint openalReverbEffect = 0;
+static ALuint openalReverbSlot = 0;
 
 #define MAX_OPENAL_SOURCES		256
 #define MAX_OPENAL_STREAMS		16
@@ -22,6 +27,7 @@ static cvar_t *s_openal_reverb;
 typedef struct {
 	sndOpenALHandle_t	handle;
 	ALuint				source;
+	ALuint				buffer;
 	sfxHandle_t			sfxHandle;
 	vec3_t				position;
 	vec3_t				velocity;
@@ -39,6 +45,11 @@ typedef struct {
 
 static openalSound_t openalSounds[MAX_OPENAL_SOURCES];
 static int numOpenALSounds = 0;
+
+static qboolean SndOpenAL_CreateBufferFromSfx( sfxHandle_t sfxHandle, ALuint *outBuffer );
+static qboolean SndOpenAL_AttachBufferToSource( ALuint source, ALuint buffer );
+static void SndOpenAL_InitEfx(void);
+static void SndOpenAL_ShutdownEfx(void);
 
 /*
 =================
@@ -95,12 +106,15 @@ qboolean SndOpenAL_Init(void)
 		return qfalse;
 	}
 	LOG_SOUND_INFO("OpenAL initialized (device: %s)", deviceName ? deviceName : "unknown");
+
+	SndOpenAL_InitEfx();
 	
 	// Initialize sound slots
 	for (i = 0; i < MAX_OPENAL_SOURCES; i++) {
 		openalSounds[i].handle = SND_OPENAL_INVALID_HANDLE;
 		openalSounds[i].playing = qfalse;
 		openalSounds[i].source = 0;
+		openalSounds[i].buffer = 0;
 	}
 	
 	numOpenALSounds = 0;
@@ -128,7 +142,13 @@ void SndOpenAL_Shutdown(void)
 			alDeleteSources(1, &openalSounds[i].source);
 			openalSounds[i].source = 0;
 		}
+		if (openalSounds[i].buffer) {
+			alDeleteBuffers(1, &openalSounds[i].buffer);
+			openalSounds[i].buffer = 0;
+		}
 	}
+
+	SndOpenAL_ShutdownEfx();
 	
 	// Destroy context and close device
 	if (openalContext) {
@@ -167,6 +187,150 @@ static int SndOpenAL_FindFreeSlot(void)
 
 /*
 =================
+SndOpenAL_CreateBufferFromSfx
+=================
+Create an OpenAL buffer by flattening the engine's sfx data into
+interleaved 16-bit PCM and uploading it to the device.
+=================
+*/
+static qboolean SndOpenAL_CreateBufferFromSfx( sfxHandle_t sfxHandle, ALuint *outBuffer ) {
+	sfx_t *sfx;
+	ALenum format;
+	size_t sampleCount, byteCount, copied;
+	short *pcm;
+	sndBuffer *chunk;
+
+	sfx = S_GetSfxByHandle( sfxHandle );
+	if ( !sfx ) {
+		return qfalse;
+	}
+
+	// Currently only mono/stereo 16-bit are expected after resampling
+	if ( sfx->soundChannels <= 1 ) {
+		format = AL_FORMAT_MONO16;
+	} else {
+		format = AL_FORMAT_STEREO16;
+	}
+
+	sampleCount = (size_t)sfx->soundLength * (size_t)sfx->soundChannels;
+	byteCount = sampleCount * sizeof(short);
+	if ( sampleCount == 0 || byteCount == 0 ) {
+		return qfalse;
+	}
+
+	pcm = Z_Malloc( byteCount );
+	if ( !pcm ) {
+		return qfalse;
+	}
+
+	// Flatten the linked chunks into contiguous PCM
+	chunk = sfx->soundData;
+	copied = 0;
+	while ( chunk && copied < sampleCount ) {
+		size_t toCopy = SND_CHUNK_SIZE;
+		if ( copied + toCopy > sampleCount ) {
+			toCopy = sampleCount - copied;
+		}
+		Com_Memcpy( pcm + copied, chunk->sndChunk, toCopy * sizeof(short) );
+		copied += toCopy;
+		chunk = chunk->next;
+	}
+
+	if ( copied < sampleCount ) {
+		Z_Free( pcm );
+		return qfalse;
+	}
+
+	alGenBuffers( 1, outBuffer );
+	if ( alGetError() != AL_NO_ERROR ) {
+		Z_Free( pcm );
+		return qfalse;
+	}
+
+	alBufferData( *outBuffer, format, pcm, (ALsizei)byteCount, dma.speed );
+	Z_Free( pcm );
+
+	return ( alGetError() == AL_NO_ERROR );
+}
+
+static qboolean SndOpenAL_AttachBufferToSource( ALuint source, ALuint buffer ) {
+	alSourcei( source, AL_BUFFER, buffer );
+	return ( alGetError() == AL_NO_ERROR );
+}
+
+/*
+=================
+SndOpenAL_InitEfx
+=================
+Detect and set up a shared reverb effect/slot if the EFX extension is present.
+=================
+*/
+static void SndOpenAL_InitEfx(void) {
+#ifdef AL_EFFECT_REVERB
+	if (!openalDevice || !openalContext) {
+		return;
+	}
+
+	if (!alcIsExtensionPresent(openalDevice, "ALC_EXT_EFX")) {
+		return;
+	}
+
+	alGetError(); // clear
+
+	alGenEffects(1, &openalReverbEffect);
+	if (alGetError() != AL_NO_ERROR) {
+		openalReverbEffect = 0;
+		return;
+	}
+
+	alEffecti(openalReverbEffect, AL_EFFECT_TYPE, AL_EFFECT_REVERB);
+	if (alGetError() != AL_NO_ERROR) {
+		alDeleteEffects(1, &openalReverbEffect);
+		openalReverbEffect = 0;
+		return;
+	}
+
+	// Reasonable defaults
+	alEffectf(openalReverbEffect, AL_REVERB_GAIN, 0.32f);
+	alEffectf(openalReverbEffect, AL_REVERB_DECAY_TIME, 1.5f);
+
+	alGenAuxiliaryEffectSlots(1, &openalReverbSlot);
+	if (alGetError() != AL_NO_ERROR) {
+		alDeleteEffects(1, &openalReverbEffect);
+		openalReverbEffect = 0;
+		openalReverbSlot = 0;
+		return;
+	}
+
+	alAuxiliaryEffectSloti(openalReverbSlot, AL_EFFECTSLOT_EFFECT, openalReverbEffect);
+	if (alGetError() != AL_NO_ERROR) {
+		alDeleteAuxiliaryEffectSlots(1, &openalReverbSlot);
+		alDeleteEffects(1, &openalReverbEffect);
+		openalReverbSlot = 0;
+		openalReverbEffect = 0;
+		return;
+	}
+
+	openalEfxAvailable = qtrue;
+#endif
+}
+
+static void SndOpenAL_ShutdownEfx(void) {
+#ifdef AL_EFFECT_REVERB
+	if (openalReverbSlot) {
+		alDeleteAuxiliaryEffectSlots(1, &openalReverbSlot);
+		openalReverbSlot = 0;
+	}
+	if (openalReverbEffect) {
+		alDeleteEffects(1, &openalReverbEffect);
+		openalReverbEffect = 0;
+	}
+	openalEfxAvailable = qfalse;
+#endif
+}
+
+/*
+=================
 SndOpenAL_PlaySound
 =================
 Play a sound with enhanced 3D properties
@@ -174,32 +338,19 @@ Play a sound with enhanced 3D properties
 */
 sndOpenALHandle_t SndOpenAL_PlaySound(const char *soundName, const sndOpenAL3DProps_t *props)
 {
-	int slot;
-	openalSound_t *sound;
+	int slot = -1;
+	openalSound_t *sound = NULL;
 	sfxHandle_t sfxHandle;
-	ALuint source;
-	// TODO: Implement OpenAL sound playback
-	// ALuint buffer;
-	// sfx_t *sfx;
+	ALuint source = 0;
+	ALuint buffer = 0;
 	
-	if (!s_openal_enabled || !s_openal_enabled->integer) {
-		// Fallback to standard sound system
-		if (soundName) {
-			sfxHandle = S_RegisterSound(soundName, qfalse);
-			if (sfxHandle) {
-				if (props && (props->flags & SND_OPENAL_3D)) {
-					// Cast away const qualifier for compatibility with S_StartSound API
-					S_StartSound((vec_t *)props->position, 0, 0, sfxHandle);
-				} else {
-					S_StartLocalSound(sfxHandle, 0);
-				}
-			}
-		}
-		return 0;
+	if (!s_openal_enabled || !s_openal_enabled->integer || !openalContext) {
+		goto fallback_legacy;
 	}
 	
-	if (!soundName || !*soundName)
+	if (!soundName || !*soundName) {
 		return SND_OPENAL_INVALID_HANDLE;
+	}
 	
 	slot = SndOpenAL_FindFreeSlot();
 	if (slot < 0)
@@ -210,26 +361,24 @@ sndOpenALHandle_t SndOpenAL_PlaySound(const char *soundName, const sndOpenAL3DPr
 	// Register sound
 	sfxHandle = S_RegisterSound(soundName, qfalse);
 	if (!sfxHandle)
-		return SND_OPENAL_INVALID_HANDLE;
-	
-	// TODO: Get sound effect data for OpenAL buffer creation
-	// sfx = S_GetSfxByHandle(sfxHandle);
-	// if (!sfx)
-	//	return SND_OPENAL_INVALID_HANDLE;
+		goto fallback_legacy;
 	
 	// Generate OpenAL source
 	alGenSources(1, &source);
 	if (alGetError() != AL_NO_ERROR) {
-		return SND_OPENAL_INVALID_HANDLE;
+		goto fallback_legacy;
 	}
-	
-	// TODO: Create OpenAL buffer from sfx data
-	// For now, use standard sound system
-	// This would require converting sfx->soundData to OpenAL buffer format
+
+	// Upload buffer
+	if (!SndOpenAL_CreateBufferFromSfx( sfxHandle, &buffer )) {
+		alDeleteSources(1, &source);
+		goto fallback_legacy;
+	}
 	
 	// Initialize sound
 	sound->handle = slot;
 	sound->source = source;
+	sound->buffer = buffer;
 	sound->sfxHandle = sfxHandle;
 	sound->playing = qtrue;
 	sound->looping = qfalse;
@@ -267,16 +416,47 @@ sndOpenALHandle_t SndOpenAL_PlaySound(const char *soundName, const sndOpenAL3DPr
 		alSourcei(source, AL_LOOPING, props->looping ? AL_TRUE : AL_FALSE);
 	}
 	
-	// Use standard sound system for now
-	// TODO: Implement full OpenAL playback
-	if (sound->flags & SND_OPENAL_3D) {
-		S_StartSound(sound->position, sound->entityNum, sound->channel, sfxHandle);
-	} else {
-		S_StartLocalSound(sfxHandle, sound->channel);
+	if (!SndOpenAL_AttachBufferToSource( source, buffer )) {
+		alDeleteSources(1, &source);
+		alDeleteBuffers(1, &buffer);
+		goto fallback_legacy;
 	}
-	
+
+	alSourcePlay( source );
+	if ( alGetError() != AL_NO_ERROR ) {
+		alDeleteSources(1, &source);
+		alDeleteBuffers(1, &buffer);
+		goto fallback_legacy;
+	}
+
 	numOpenALSounds++;
 	return sound->handle;
+
+fallback_legacy:
+	if ( sound ) {
+		if ( source ) {
+			alDeleteSources( 1, &source );
+		}
+		if ( buffer ) {
+			alDeleteBuffers( 1, &buffer );
+		}
+		sound->handle = SND_OPENAL_INVALID_HANDLE;
+		sound->playing = qfalse;
+		sound->source = 0;
+		sound->buffer = 0;
+	}
+	// Fallback to standard sound system to ensure audio is still heard
+	if (soundName) {
+		sfxHandle_t legacy = S_RegisterSound(soundName, qfalse);
+		if (legacy) {
+			if (props && (props->flags & SND_OPENAL_3D)) {
+				S_StartSound((vec_t *)props->position, 0, 0, legacy);
+			} else {
+				S_StartLocalSound(legacy, 0);
+			}
+		}
+	}
+	return SND_OPENAL_INVALID_HANDLE;
 }
 
 /*
@@ -302,11 +482,17 @@ void SndOpenAL_StopSound(sndOpenALHandle_t handle)
 		alDeleteSources(1, &sound->source);
 		sound->source = 0;
 	}
+	if (sound->buffer) {
+		alDeleteBuffers(1, &sound->buffer);
+		sound->buffer = 0;
+	}
 	
 	S_StopLoopingSound(sound->entityNum);
 	sound->playing = qfalse;
 	sound->handle = SND_OPENAL_INVALID_HANDLE;
-	numOpenALSounds--;
+	if ( numOpenALSounds > 0 ) {
+		numOpenALSounds--;
+	}
 }
 
 /*
@@ -517,6 +703,8 @@ Set reverb effect parameters
 void SndOpenAL_SetReverb(sndOpenALHandle_t handle, float reverbLevel, float reverbDelay)
 {
 	openalSound_t *sound;
+	float clampedLevel;
+	float clampedDecay;
 	
 	if (!s_openal_reverb || !s_openal_reverb->integer)
 		return;
@@ -530,8 +718,23 @@ void SndOpenAL_SetReverb(sndOpenALHandle_t handle, float reverbLevel, float reve
 	
 	sound->reverbLevel = reverbLevel;
 	sound->reverbDelay = reverbDelay;
-	
-	// TODO: Apply reverb using OpenAL EFX extension if available
+
+#ifdef AL_EFFECT_REVERB
+	if (openalEfxAvailable && openalReverbSlot && openalReverbEffect) {
+		clampedLevel = Com_Clamp(0.0f, 1.0f, reverbLevel);
+		clampedDecay = Com_Clamp(0.1f, 20.0f, reverbDelay > 0.0f ? reverbDelay : 1.0f);
+
+		alEffectf(openalReverbEffect, AL_REVERB_GAIN, clampedLevel);
+		alEffectf(openalReverbEffect, AL_REVERB_DECAY_TIME, clampedDecay);
+		alAuxiliaryEffectSloti(openalReverbSlot, AL_EFFECTSLOT_EFFECT, openalReverbEffect);
+
+		// Bind the effect send 0 to this source
+#ifndef AL_FILTER_NULL
+#define AL_FILTER_NULL 0
+#endif
+		alSource3i(sound->source, AL_AUXILIARY_SEND_FILTER, openalReverbSlot, 0, AL_FILTER_NULL);
+	}
+#endif
 }
 
 /*

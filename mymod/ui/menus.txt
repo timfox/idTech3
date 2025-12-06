@@ -1,0 +1,3 @@
+// Minimal menus manifest for the monolithic build
+ui/main.menu
+

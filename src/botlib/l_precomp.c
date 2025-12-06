@@ -460,7 +460,7 @@ static int PC_ReadDefineParms(source_t *source, define_t *define, token_t **parm
 static int PC_StringizeTokens( const token_t *tokens, token_t *token )
 {
 	const token_t *t;
-	int len, total;
+	size_t len, total;
 
 	token->type = TT_STRING;
 	token->whitespace_p = NULL;
@@ -469,7 +469,7 @@ static int PC_StringizeTokens( const token_t *tokens, token_t *token )
 	total = 1;
 	for (t = tokens; t; t = t->next)
 	{
-		len = (int)strlen( t->string );
+		len = strlen( t->string );
 		if ( len + total >= sizeof( token->string ) - 1 ) // reserve space for '"' and '\0'
 			return qfalse;
 		strcpy( token->string + total, t->string );
@@ -1883,7 +1883,7 @@ static int PC_EvaluateTokens(source_t *source, token_t *tokens, int *intvalue, f
 							break;
 						} //end if
 					} //end case
-					
+					__attribute__((fallthrough));
 					case P_MUL:
 					case P_DIV:
 					case P_MOD:

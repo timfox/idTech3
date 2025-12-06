@@ -88,7 +88,7 @@ void G_EncounterSystem_Update( void );
 // Encounter management
 encounter_t *G_Encounter_Create( const char *name, const char *scriptName );
 void G_Encounter_Start( encounter_t *encounter );
-void G_Encounter_Stop( encounter_t *encounter );
+void G_Encounter_Stop( encounter_t *encounter, qboolean success );
 void G_Encounter_SetTrigger( encounter_t *encounter, encounter_trigger_type_t type, const vec3_t position, float radius );
 
 // Sequence management

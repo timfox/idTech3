@@ -382,6 +382,33 @@ static void S_memoryLoad( sfx_t *sfx ) {
 	sfx->inMemory = qtrue;
 }
 
+/*
+=================
+S_GetSfxByHandle
+=================
+Provide safe access to an sfx by handle, ensuring it is resident.
+=================
+*/
+sfx_t *S_GetSfxByHandle( sfxHandle_t sfxHandle ) {
+	sfx_t *sfx;
+
+	if ( sfxHandle < 0 || sfxHandle >= s_numSfx ) {
+		return NULL;
+	}
+
+	sfx = &s_knownSfx[ sfxHandle ];
+
+	if ( sfx->inMemory == qfalse ) {
+		S_memoryLoad( sfx );
+	}
+
+	if ( !sfx->soundLength ) {
+		return NULL;
+	}
+
+	return sfx;
+}
+
 //=============================================================================
 
 /*

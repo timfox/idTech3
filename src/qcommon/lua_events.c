@@ -233,6 +233,28 @@ static void Lua_Events_Unsubscribe(lua_State *L, const char *event_name, int cal
 
 /*
 =================
+Lua_Events_SubscribeCallback
+Public helper for C code to subscribe a Lua callback (registry ref) to an event
+=================
+*/
+qboolean Lua_Events_SubscribeCallback(lua_State *L, const char *event_name, int callback_ref)
+{
+	return Lua_Events_Subscribe(L, event_name, callback_ref);
+}
+
+/*
+=================
+Lua_Events_UnsubscribeCallback
+Public helper for C code to unsubscribe a Lua callback from an event
+=================
+*/
+void Lua_Events_UnsubscribeCallback(lua_State *L, const char *event_name, int callback_ref)
+{
+	Lua_Events_Unsubscribe(L, event_name, callback_ref);
+}
+
+/*
+=================
 Lua_Events_Update
 Process queued events and dispatch to subscribers
 =================

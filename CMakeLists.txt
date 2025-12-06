@@ -9,50 +9,30 @@ project(idtech3 C CXX ASM)
 # ------------------------------------------------------------------------------
 # Language Standard Configuration
 # ------------------------------------------------------------------------------
-IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-	SET(CMAKE_C_STANDARD 23)
-	SET(CMAKE_C_STANDARD_REQUIRED OFF)
-ELSEIF(CMAKE_C_COMPILER_ID MATCHES "MSVC")
-	# MSVC uses different versioning, C11 is safer
-	SET(CMAKE_C_STANDARD 11)
-	SET(CMAKE_C_STANDARD_REQUIRED ON)
-ELSE()
-	# Default to C17 for other compilers
-	SET(CMAKE_C_STANDARD 17)
-	SET(CMAKE_C_STANDARD_REQUIRED OFF)
-ENDIF()
+SET(CMAKE_C_STANDARD 23)
+SET(CMAKE_C_STANDARD_REQUIRED ON)
+SET(CMAKE_C_EXTENSIONS OFF)
 
 # Set C++ standard for engine features (AIML and ECS rely on C++23)
-IF(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-	SET(CMAKE_CXX_STANDARD 23)
-	SET(CMAKE_CXX_STANDARD_REQUIRED ON)
-ELSEIF(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-	SET(CMAKE_CXX_STANDARD 23)
-	SET(CMAKE_CXX_STANDARD_REQUIRED ON)
-ELSE()
-	SET(CMAKE_CXX_STANDARD 23)
-	SET(CMAKE_CXX_STANDARD_REQUIRED OFF)
-ENDIF()
+SET(CMAKE_CXX_STANDARD 23)
+SET(CMAKE_CXX_STANDARD_REQUIRED ON)
+SET(CMAKE_CXX_EXTENSIONS OFF)
 
 # Enable modern compiler warnings for better code quality
 IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-	# Format string checking (catches printf format errors) - applies to both C and C++
-	ADD_COMPILE_OPTIONS(-Wformat=2)
-	# Warn about shadowed variables - applies to both C and C++
-	ADD_COMPILE_OPTIONS(-Wshadow)
-	# Warn about unused parameters - applies to both C and C++
-	ADD_COMPILE_OPTIONS(-Wunused-parameter)
-	# Warn about unused variables - applies to both C and C++
-	ADD_COMPILE_OPTIONS(-Wunused-variable)
-	
-	# C-specific flags (only apply to C files, not C++)
-	# These use generator expressions to conditionally apply based on language
 	ADD_COMPILE_OPTIONS(
+		-Wall
+		-Wextra
+		-Wpedantic
+		-Wformat=2
+		-Wshadow
+		-Wunused-parameter
+		-Wunused-variable
 		$<$<COMPILE_LANGUAGE:C>:-Wstrict-prototypes>
 		$<$<COMPILE_LANGUAGE:C>:-Wmissing-prototypes>
 	)
-	
-	# Note: -Wold-style-cast is C++ only, not applicable for C code
+ELSEIF(MSVC)
+	ADD_COMPILE_OPTIONS(/W4)
 ENDIF()
 
 # Sanitizer support (GCC/Clang only, requires debug build)

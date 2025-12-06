@@ -762,30 +762,30 @@ void R_ComputeTexCoords( const int b, const textureBundle_t *bundle ) {
 			break;
 
 		case TMOD_SCALE:
-			RB_CalcScaleTexCoords( bundle->texMods[tm].scale, (float *) src, (float *) dst );
+			RB_CalcScaleTexCoords( bundle->texMods[tm].scaleOffset.scale, (float *) src, (float *) dst );
 			src = dst;
 			break;
 
 		case TMOD_OFFSET:
 			for ( i = 0; i < tess.numVertexes; i++ ) {
-				dst[i][0] = src[i][0] + bundle->texMods[tm].offset[0];
-				dst[i][1] = src[i][1] + bundle->texMods[tm].offset[1];
+				dst[i][0] = src[i][0] + bundle->texMods[tm].scaleOffset.offset[0];
+				dst[i][1] = src[i][1] + bundle->texMods[tm].scaleOffset.offset[1];
 			}
 			src = dst;
 			break;
 
 		case TMOD_SCALE_OFFSET:
 			for ( i = 0; i < tess.numVertexes; i++ ) {
-				dst[i][0] = (src[i][0] * bundle->texMods[tm].scale[0] ) + bundle->texMods[tm].offset[0];
-				dst[i][1] = (src[i][1] * bundle->texMods[tm].scale[1] ) + bundle->texMods[tm].offset[1];
+				dst[i][0] = (src[i][0] * bundle->texMods[tm].scaleOffset.scale[0] ) + bundle->texMods[tm].scaleOffset.offset[0];
+				dst[i][1] = (src[i][1] * bundle->texMods[tm].scaleOffset.scale[1] ) + bundle->texMods[tm].scaleOffset.offset[1];
 			}
 			src = dst;
 			break;
 
 		case TMOD_OFFSET_SCALE:
 			for ( i = 0; i < tess.numVertexes; i++ ) {
-				dst[i][0] = (src[i][0] + bundle->texMods[tm].offset[0]) * bundle->texMods[tm].scale[0];
-				dst[i][1] = (src[i][1] + bundle->texMods[tm].offset[1]) * bundle->texMods[tm].scale[1];
+				dst[i][0] = (src[i][0] + bundle->texMods[tm].scaleOffset.offset[0]) * bundle->texMods[tm].scaleOffset.scale[0];
+				dst[i][1] = (src[i][1] + bundle->texMods[tm].scaleOffset.offset[1]) * bundle->texMods[tm].scaleOffset.scale[1];
 			}
 			src = dst;
 			break;

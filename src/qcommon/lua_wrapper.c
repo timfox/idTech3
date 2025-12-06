@@ -78,6 +78,12 @@ void Lua_Init(void)
 		lua_states[i] = NULL;
 	}
 	num_lua_states = 0;
+
+	// Create the primary Lua state immediately so scripts and bindings
+	// are ready for use once initialization completes.
+	if (!Lua_CreateState()) {
+		Com_Printf("Lua_Init: Failed to create main Lua state\n");
+	}
 }
 
 /*
@@ -179,13 +185,8 @@ lua_State *Lua_CreateState(void)
 	return L;
 }
 
-/*
-=================
-Lua_LoadScriptsFromFS
-=================
-Load all Lua scripts from filesystem (scripts/*.lua)
-=================
-*/
+// Lua_LoadScriptsFromFS
+// Load all Lua scripts from filesystem (scripts/*.lua)
 static void Lua_LoadScriptsFromFS(lua_State *L)
 {
 	char **fileList;
@@ -807,7 +808,7 @@ static int Lua_Print(lua_State *L)
 	int i;
 	const char *str;
 	char buffer[1024];
-	int pos = 0;
+	size_t pos = 0;
 	
 	for (i = 1; i <= n; i++) {
 		if (i > 1) {
@@ -818,7 +819,7 @@ static int Lua_Print(lua_State *L)
 		
 		str = lua_tostring(L, i);
 		if (str) {
-			int len = strlen(str);
+			size_t len = strlen(str);
 			if (pos + len < sizeof(buffer) - 1) {
 				Q_strncpyz(buffer + pos, str, sizeof(buffer) - pos);
 				pos += len;

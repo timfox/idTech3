@@ -64,8 +64,8 @@ void R_LoadPCX ( const char *filename, byte **pic, int *width, int *height)
 	unsigned short w, h;
 	byte	*pic8;
 	byte	*palette;
-	int	i;
-	unsigned size = 0;
+	size_t	i;
+	size_t size = 0;
 
 	if (width)
 		*width = 0;

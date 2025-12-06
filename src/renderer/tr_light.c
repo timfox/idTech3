@@ -67,7 +67,8 @@ Determine which dynamic lights may effect this bmodel
 =============
 */
 void R_DlightBmodel( bmodel_t *bmodel ) {
-	int			i, j;
+	unsigned int	i;
+	int			j;
 	const dlight_t	*dl;
 	int			mask;
 	msurface_t	*surf;
@@ -99,7 +100,7 @@ void R_DlightBmodel( bmodel_t *bmodel ) {
 	tr.currentEntity->needDlights = (mask != 0) ? 1 : 0;
 
 	// set the dlight bits in all the surfaces
-	for ( i = 0 ; i < bmodel->numSurfaces ; i++ ) {
+	for ( i = 0 ; i < (unsigned int)bmodel->numSurfaces ; i++ ) {
 		surf = bmodel->firstSurface + i;
 
 		if ( *surf->data == SF_FACE ) {
@@ -283,7 +284,7 @@ by the Calc_* functions
 =================
 */
 void R_SetupEntityLighting( const trRefdef_t *refdef, trRefEntity_t *ent ) {
-	int				i;
+	unsigned int	i;
 	const dlight_t		*dl;
 	float			power;
 	vec3_t			dir;

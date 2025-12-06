@@ -206,12 +206,12 @@ int		max_polyverts;
 static char gl_extensions[ 32768 ];
 
 #define GLE( ret, name, ... ) ret ( APIENTRY * q##name )( __VA_ARGS__ );
-	QGL_Core_PROCS;
-	QGL_Ext_PROCS;
-	QGL_ARB_PROGRAM_PROCS;
-	QGL_VBO_PROCS;
-	QGL_FBO_PROCS;
-	QGL_FBO_OPT_PROCS;
+	QGL_Core_PROCS
+	QGL_Ext_PROCS
+	QGL_ARB_PROGRAM_PROCS
+	QGL_VBO_PROCS
+	QGL_FBO_PROCS
+	QGL_FBO_OPT_PROCS
 #undef GLE
 
 typedef struct {

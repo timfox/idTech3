@@ -1,0 +1,3 @@
+// Minimal HUD script placeholder
+// Required by UI to avoid missing file errors
+

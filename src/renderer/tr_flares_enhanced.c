@@ -676,7 +676,7 @@ void R_RenderFlaresEnhanced(void)
 	flareElement_t *element;
 	int i, j;
 	float distance, size, intensity, factor;
-	vec3_t color;
+	vec3_t scaledColor;
 	
 	if (!r_flaresEnhanced || r_flaresEnhanced->integer == 0) {
 		return;
@@ -715,7 +715,7 @@ void R_RenderFlaresEnhanced(void)
 		intensity = r_flareCoeff->value * size * size / (factor * factor);
 		intensity *= flare->intensity * flare->occlusionFactor * flare->currentFade;
 		
-		VectorScale(flare->color, intensity, color);
+		VectorScale(flare->color, intensity, scaledColor);
 		
 		// Render all elements
 		for (j = 0; j < flare->numElements; j++) {

@@ -465,7 +465,11 @@ static void Q_Log_DeferMessage(const char *message, int len, log_level_t level, 
 	// Add new message to end of queue
 	deferred_log_message_t *msg = &log_state.deferred_queue[log_state.deferred_count];
 	Q_strncpyz(msg->message, message, sizeof(msg->message));
-	msg->len = len < sizeof(msg->message) ? len : sizeof(msg->message) - 1;
+	{
+		size_t maxlen = sizeof(msg->message) - 1;
+		size_t copylen = (len < 0) ? 0 : ((size_t)len < maxlen ? (size_t)len : maxlen);
+		msg->len = (int)copylen;
+	}
 	msg->level = level;
 	msg->category = category;
 	log_state.deferred_count++;
@@ -586,7 +590,10 @@ void QDECL Q_Log(log_level_t level, log_category_t category, const char *file, i
 	len = Q_vsnprintf(message, sizeof(message), fmt, argptr);
 	va_end(argptr);
 	
-	if (len >= sizeof(message)) {
+	if (len < 0) {
+		len = 0;
+		message[0] = '\0';
+	} else if ((size_t)len >= sizeof(message)) {
 		len = sizeof(message) - 1;
 		message[len] = '\0';
 	}

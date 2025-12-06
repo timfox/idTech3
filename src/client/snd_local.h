@@ -173,6 +173,11 @@ void	SNDDMA_Submit(void);
 //====================================================================
 
 #define	MAX_CHANNELS			96
+#define SND_OPENAL_MAX_CHANNELS  MAX_CHANNELS
+#define SND_OPENAL_MAX_SFX       MAX_SFX
+
+// OpenAL helpers
+sfx_t *S_GetSfxByHandle( sfxHandle_t sfxHandle );
 
 extern	channel_t   s_channels[MAX_CHANNELS];
 extern	channel_t   loop_channels[MAX_CHANNELS];

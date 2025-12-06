@@ -315,7 +315,7 @@ static void *BufferedFileRead(struct BufferedFile *BF, unsigned Length)
 	 *  not enough bytes left
 	 */
 
-	if(Length > BF->BytesLeft)
+	if(Length > (unsigned)BF->BytesLeft)
 	{
 		return(NULL);
 	}
@@ -409,7 +409,7 @@ static qboolean BufferedFileSkip(struct BufferedFile *BF, unsigned Offset)
 	 *  We can only skip to the end of the BufferedFile.
 	 */
 
-	if(Offset > BF->BytesLeft)
+	if(Offset > (unsigned)BF->BytesLeft)
 	{
 		return(qfalse);
 	}

@@ -1296,5 +1296,8 @@ void NET_WebSocket_SetCallbacks(net_websocket_t *ws,
 	ws->user_data = user_data;
 }
 
+#else
+// Keep translation unit non-empty when CURL support is disabled
+static const int cl_net_enhanced_stub = 0;
 #endif /* USE_CURL */
 

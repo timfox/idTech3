@@ -24,7 +24,8 @@ typedef struct coroutine_s {
 	coroutine_state_t state;
 	float wait_until_time;  // For time-based waiting
 	char wait_event[64];  // For event-based waiting
-	int wait_event_callback_ref;  // Callback for event waiting
+	int wait_event_callback_ref;  // Optional filter callback ref
+	int wait_event_sub_ref;       // Event subscription callback ref
 	qboolean active;
 } coroutine_t;
 
@@ -32,6 +33,85 @@ typedef struct coroutine_s {
 static coroutine_t s_coroutines[MAX_COROUTINES];
 static int s_num_coroutines = 0;
 static qboolean s_initialized = qfalse;
+static float s_coroutine_time = 0.0f;
+
+// Forward declaration for event callback
+static int Lua_Coroutine_EventCallback(lua_State *L);
+
+static void Lua_Coroutine_ClearEventWait(coroutine_t *co, lua_State *L)
+{
+	if (!co) {
+		return;
+	}
+
+	if (co->wait_event[0] && co->wait_event_sub_ref != LUA_NOREF) {
+		Lua_Events_UnsubscribeCallback(L, co->wait_event, co->wait_event_sub_ref);
+	}
+
+	if (co->wait_event_sub_ref != LUA_NOREF && L) {
+		luaL_unref(L, LUA_REGISTRYINDEX, co->wait_event_sub_ref);
+	}
+	if (co->wait_event_callback_ref != LUA_NOREF && L) {
+		luaL_unref(L, LUA_REGISTRYINDEX, co->wait_event_callback_ref);
+	}
+
+	co->wait_event[0] = '\0';
+	co->wait_event_callback_ref = LUA_NOREF;
+	co->wait_event_sub_ref = LUA_NOREF;
+}
+
+static void Lua_Coroutine_HandleYield(coroutine_t *co, lua_State *coL)
+{
+	int top = lua_gettop(coL);
+
+	// Default to running unless we explicitly set a wait state
+	co->state = COROUTINE_RUNNING;
+
+	// Clear any previous wait subscription
+	Lua_Coroutine_ClearEventWait(co, coL);
+
+	if (top >= 1 && lua_isstring(coL, 1)) {
+		const char *wait_type = lua_tostring(coL, 1);
+
+		if (Q_stricmp(wait_type, "time") == 0 && top >= 2) {
+			float wait_time = (float)lua_tonumber(coL, 2);
+			if (wait_time < 0.0f) {
+				wait_time = 0.0f;
+			}
+			co->wait_until_time = s_coroutine_time + wait_time;
+			co->state = COROUTINE_WAITING_TIME;
+		} else if (Q_stricmp(wait_type, "event") == 0 && top >= 2) {
+			const char *event_name = lua_tostring(coL, 2);
+			if (event_name && *event_name) {
+				Q_strncpyz(co->wait_event, event_name, sizeof(co->wait_event));
+				co->state = COROUTINE_WAITING_EVENT;
+
+				// Optional filter function is at index 3 (if present)
+				if (top >= 3 && lua_isfunction(coL, 3)) {
+					lua_pushvalue(coL, 3);
+					co->wait_event_callback_ref = luaL_ref(coL, LUA_REGISTRYINDEX);
+				} else {
+					co->wait_event_callback_ref = LUA_NOREF;
+				}
+
+				// Create event callback closure with coroutine slot as upvalue
+				int slot = (int)(co - s_coroutines);
+				lua_pushinteger(coL, slot);
+				lua_pushcclosure(coL, Lua_Coroutine_EventCallback, 1);
+				co->wait_event_sub_ref = luaL_ref(coL, LUA_REGISTRYINDEX);
+
+				if (!Lua_Events_SubscribeCallback(coL, co->wait_event, co->wait_event_sub_ref)) {
+					Com_Printf("Lua_Coroutine: Failed to subscribe to event '%s'\n", co->wait_event);
+					Lua_Coroutine_ClearEventWait(co, coL);
+					co->state = COROUTINE_RUNNING;
+				}
+			}
+		}
+	}
+
+	// Clear yielded values from coroutine stack
+	lua_settop(coL, 0);
+}
 
 /*
 =================
@@ -48,6 +128,7 @@ void Lua_Coroutine_Init(void)
 	memset(s_coroutines, 0, sizeof(s_coroutines));
 	s_num_coroutines = 0;
 	s_initialized = qtrue;
+	s_coroutine_time = 0.0f;
 }
 
 /*
@@ -71,9 +152,7 @@ void Lua_Coroutine_Shutdown(void)
 			if (co->coroutine_ref != LUA_NOREF) {
 				luaL_unref(co->L, LUA_REGISTRYINDEX, co->coroutine_ref);
 			}
-			if (co->wait_event_callback_ref != LUA_NOREF) {
-				luaL_unref(co->L, LUA_REGISTRYINDEX, co->wait_event_callback_ref);
-			}
+			Lua_Coroutine_ClearEventWait(co, co->L);
 		}
 	}
 
@@ -151,6 +230,7 @@ int Lua_Coroutine_Create(lua_State *L, int func_ref)
 	co->wait_until_time = 0.0f;
 	co->wait_event[0] = '\0';
 	co->wait_event_callback_ref = LUA_NOREF;
+	co->wait_event_sub_ref = LUA_NOREF;
 	co->active = qtrue;
 
 	if (slot >= s_num_coroutines) {
@@ -158,6 +238,72 @@ int Lua_Coroutine_Create(lua_State *L, int func_ref)
 	}
 
 	return slot;
+}
+
+/*
+=================
+Lua_Coroutine_EventCallback
+Called by the event bus when a waited-for event fires.
+Upvalue 1: coroutine slot index
+Stack: event_name, ...args
+=================
+*/
+static int Lua_Coroutine_EventCallback(lua_State *L)
+{
+	int slot = (int)lua_tointeger(L, lua_upvalueindex(1));
+	int num_args = lua_gettop(L); // includes event name
+
+	if (slot < 0 || slot >= s_num_coroutines) {
+		return 0;
+	}
+
+	coroutine_t *co = &s_coroutines[slot];
+	if (!co->active || co->state != COROUTINE_WAITING_EVENT || !co->L) {
+		return 0;
+	}
+
+	// Optional filter
+	if (co->wait_event_callback_ref != LUA_NOREF) {
+		lua_rawgeti(L, LUA_REGISTRYINDEX, co->wait_event_callback_ref);
+		lua_insert(L, 1); // place function before args
+		if (lua_pcall(L, num_args, 1, 0) != LUA_OK) {
+			const char *error = lua_tostring(L, -1);
+			Com_Printf("Lua_Coroutine: Event filter error: %s\n", error ? error : "Unknown error");
+			lua_pop(L, 1);
+			return 0;
+		}
+		if (!lua_toboolean(L, -1)) {
+			lua_pop(L, 1);
+			return 0; // filter rejected
+		}
+		lua_pop(L, 1); // pop filter result
+	}
+
+	// Move event args to coroutine stack
+	for (int i = 1; i <= num_args; i++) {
+		lua_pushvalue(L, i);
+	}
+	lua_xmove(L, co->L, num_args);
+
+	// Clear wait state and unsubscribe before resuming
+	Lua_Coroutine_ClearEventWait(co, L);
+	co->state = COROUTINE_RUNNING;
+
+	int result = lua_resume(co->L, NULL, num_args, NULL);
+	if (result == LUA_OK) {
+		co->state = COROUTINE_FINISHED;
+		co->active = qfalse;
+	} else if (result == LUA_YIELD) {
+		Lua_Coroutine_HandleYield(co, co->L);
+	} else {
+		const char *error = lua_tostring(co->L, -1);
+		Com_Printf("Lua_Coroutine: Error resuming coroutine %d: %s\n",
+			slot, error ? error : "Unknown error");
+		lua_pop(co->L, 1);
+		co->active = qfalse;
+	}
+
+	return 0;
 }
 
 /*
@@ -178,6 +324,7 @@ void Lua_Coroutine_Update(float deltaTime)
 	}
 
 	current_time += deltaTime;
+	s_coroutine_time = current_time;
 
 	for (i = 0; i < s_num_coroutines && resumed < max_per_frame; i++) {
 		coroutine_t *co = &s_coroutines[i];
@@ -207,42 +354,11 @@ void Lua_Coroutine_Update(float deltaTime)
 			resumed++;
 
 			if (result == LUA_OK) {
-				// Coroutine finished
 				co->state = COROUTINE_FINISHED;
 				co->active = qfalse;
-				// Note: coroutine_ref cleanup happens in Shutdown
 			} else if (result == LUA_YIELD) {
-				// Coroutine yielded - check what it's waiting for
-				int top = lua_gettop(co->L);
-				if (top >= 1) {
-					if (lua_isstring(co->L, -1)) {
-						const char *wait_type = lua_tostring(co->L, -1);
-						if (Q_stricmp(wait_type, "time") == 0 && top >= 2) {
-							// Waiting for time
-							float wait_time = (float)lua_tonumber(co->L, -2);
-							co->wait_until_time = current_time + wait_time;
-							co->state = COROUTINE_WAITING_TIME;
-							lua_pop(co->L, 2);
-						} else if (Q_stricmp(wait_type, "event") == 0 && top >= 2) {
-							// Waiting for event
-							const char *event_name = lua_tostring(co->L, -2);
-							if (event_name) {
-								Q_strncpyz(co->wait_event, event_name, sizeof(co->wait_event));
-								co->state = COROUTINE_WAITING_EVENT;
-								
-								// Create callback for event
-								lua_pushvalue(co->L, -3);  // Filter function if present
-								co->wait_event_callback_ref = luaL_ref(co->L, LUA_REGISTRYINDEX);
-								
-								// Subscribe to event
-								// We'll handle this via a special event callback
-							}
-							lua_pop(co->L, top);
-						}
-					}
-				}
+				Lua_Coroutine_HandleYield(co, co->L);
 			} else {
-				// Error in coroutine
 				const char *error = lua_tostring(co->L, -1);
 				Com_Printf("Lua_Coroutine_Update: Error in coroutine %d: %s\n",
 					i, error ? error : "Unknown error");

@@ -42,6 +42,11 @@
 #if 0
 static char sccsid[] = "@(#)qsort.c	8.1 (Berkeley) 6/4/93";
 #endif
+
+#ifndef Q3_VM
+/* Prevent empty translation unit when building native code. */
+static int bg_lib_stub(void) { return 0; }
+#endif
 static const char rcsid[] =
 #endif /* LIBC_SCCS and not lint */
 

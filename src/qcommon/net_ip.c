@@ -20,6 +20,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 
+#ifndef _WIN32
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200112L
+#endif
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#endif
+
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
 #include "../qcommon/q_log.h"
@@ -85,6 +94,7 @@ static qboolean	winsockInitialized = qfalse;
 #	include <sys/ioctl.h>
 #	include <sys/types.h>
 #	include <sys/time.h>
+#	include <time.h>
 #	include <unistd.h>
 #	if !defined(__sun) && !defined(__sgi)
 #		include <ifaddrs.h>
@@ -417,7 +427,10 @@ static qboolean Sys_StringToSockaddr( const char *s, sockaddr_t *sadr, int sadr_
 
 		if ( search )
 		{
-			size_t addrlen = MIN( search->ai_addrlen, sadr_len );
+			socklen_t addrlen = search->ai_addrlen;
+			if ( addrlen > (socklen_t)sadr_len ) {
+				addrlen = (socklen_t)sadr_len;
+			}
 
 			memcpy ( sadr, search->ai_addr, addrlen );
 			freeaddrinfo( res );
@@ -802,7 +815,7 @@ void Sys_SendPacket( int length, const void *data, const netadr_t *to ) {
 	if ( usingSocks && to->type == NA_IP ) {
 		socks5_udp_request_t cmd;
 
-		if ( length <= sizeof( cmd.s.u.v4.data ) ) {
+		if ( (size_t)length <= sizeof( cmd.s.u.v4.data ) ) {
 			cmd.s.reserved[0] = 0;
 			cmd.s.reserved[1] = 0;
 			cmd.s.fragnum = 0;  // not fragmented
@@ -1439,7 +1452,7 @@ static void NET_GetLocalAddress( void )
 		for( search = ifap; search; search = search->ifa_next )
 		{
 			// Only add interfaces that are up.
-			if ( ifap->ifa_flags & IFF_UP )
+			if ( search->ifa_flags & IFF_UP )
 				NET_AddLocalAddress( search->ifa_name, search->ifa_addr, search->ifa_netmask );
 		}
 	
@@ -1701,11 +1714,11 @@ static void NET_Config( qboolean enableNetworking ) {
 	}
 
 	// if enable state is the same and no cvars were modified, we have nothing to do
-	if( enableNetworking == networkingEnabled && !modified ) {
+	if( (int)enableNetworking == networkingEnabled && !modified ) {
 		return;
 	}
 
-	if( enableNetworking == networkingEnabled ) {
+	if( (int)enableNetworking == networkingEnabled ) {
 		if( enableNetworking ) {
 			stop = qtrue;
 			start = qtrue;

@@ -1,0 +1,22 @@
+#include "ui/menudef.h"
+
+menuDef {
+  name "main"
+  fullScreen 1
+  visible 1
+  rect 0 0 640 480
+  focusColor 1 1 1 1
+  descText "Placeholder UI"
+
+  itemDef {
+    name "title"
+    type ITEM_TYPE_TEXT
+    rect 50 50 200 30
+    text "Monolith Placeholder UI"
+    textscale 0.5
+    textalign ITEM_ALIGN_LEFT
+    textstyle 1
+    forecolor 1 1 1 1
+  }
+}
+
