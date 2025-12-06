@@ -265,6 +265,11 @@ static void *VM_GetCombinedEntryPoint( vmIndex_t index, vmMainFunc_t *entryPoint
 		return NULL;
 	}
 	
+	if ( com_developer && com_developer->integer ) {
+		Com_Printf( "VM_GetCombinedEntryPoint(%s): dllSyscalls=%p entryPoint=%p\n",
+			moduleName, (void*)dllSyscalls, (void*)*entryPoint );
+	}
+	
 	// Call dllEntry to initialize the module
 	dllEntryFunc( dllSyscalls );
 	

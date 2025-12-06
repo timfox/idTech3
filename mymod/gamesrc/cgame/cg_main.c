@@ -713,6 +713,8 @@ void QDECL CG_Error(const char *msg, ...) {
 	trap_Error(text);
 }
 
+#ifndef COMBINED_MONOLITH
+// DLL-only logging wrappers; the engine's Com_Error/Com_Printf are used in monolith.
 void QDECL Com_Error([[maybe_unused]] errorParm_t level, const char *error, ...) {
 	va_list argptr;
 	char text[1024];
@@ -734,6 +736,7 @@ void QDECL Com_Printf(const char *msg, ...) {
 
 	CG_Printf("%s", text);
 }
+#endif // COMBINED_MONOLITH
 
 /*
 ================

@@ -1951,10 +1951,16 @@ IF(COMBINED_MONOLITH)
 		SET_TARGET_PROPERTIES(${CNAME}${BINEXT} PROPERTIES OUTPUT_NAME "${MONOLITH_EXECUTABLE_NAME}")
 	ENDIF()
 	# Always embed the default mod name for monolithic builds so fs_game defaults correctly.
-	TARGET_COMPILE_DEFINITIONS(${CNAME}${BINEXT} PRIVATE DEFAULT_FS_GAME="\\\"${MONOLITH_MOD_NAME}\\\"")
+	TARGET_COMPILE_DEFINITIONS(${CNAME}${BINEXT} PRIVATE DEFAULT_FS_GAME="${MONOLITH_MOD_NAME}")
 	# Propagate the default mod name to shared/object libs that include filesystem code.
-	TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE DEFAULT_FS_GAME="\\\"${MONOLITH_MOD_NAME}\\\"")
-	TARGET_COMPILE_DEFINITIONS(qcommon_ded PRIVATE DEFAULT_FS_GAME="\\\"${MONOLITH_MOD_NAME}\\\"")
+	TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE DEFAULT_FS_GAME="${MONOLITH_MOD_NAME}")
+	TARGET_COMPILE_DEFINITIONS(qcommon_ded PRIVATE DEFAULT_FS_GAME="${MONOLITH_MOD_NAME}")
+	# When linking statically in monolithic mode, allow duplicate symbols coming from
+	# the statically linked game/cgame/ui modules (they provide their own syscall
+	# trampolines and logging wrappers). The engine copies take precedence.
+	if (UNIX AND NOT APPLE)
+		target_link_options(${CNAME}${BINEXT} PRIVATE -Wl,--allow-multiple-definition)
+	endif()
 	IF(WIN32)
 		SET_TARGET_PROPERTIES(${CNAME}${BINEXT} PROPERTIES SUFFIX ".exe")
 	ELSEIF(UNIX AND NOT APPLE AND NOT ANDROID)

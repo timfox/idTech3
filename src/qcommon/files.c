@@ -5610,6 +5610,9 @@ static void FS_Startup( void ) {
 	#ifdef DEFAULT_FS_GAME
 		Cvar_Set( "fs_game", DEFAULT_FS_GAME );
 	#endif
+	// Emit a one-time startup diagnostic so we can verify the paths used
+	Sys_Print( va( "FS (monolith) basepath=\"%s\" homepath=\"%s\" game=\"%s\"\n",
+		fs_basepath->string, fs_homepath->string, fs_gamedirvar->string ) );
 #endif
 
 	if ( FS_IsBaseGame( fs_gamedirvar->string ) ) {
@@ -5717,6 +5720,28 @@ static void FS_Startup( void ) {
 		Com_Printf( "Mod directory not added: fs_game='%s', isBaseGame=%d\n", 
 			fs_gamedirvar->string, FS_IsBaseGame( fs_gamedirvar->string ) );
 	}
+
+#ifdef COMBINED_MONOLITH
+	// If we still haven't found any pak files, fall back to the executable's directory
+	// and the default mod name to ensure ./release/mymod.so works without extra args.
+	if ( fs_packCount == 0 ) {
+		const char *appPath = Sys_DefaultAppPath();
+		const char *modName = NULL;
+
+		if ( fs_gamedirvar->string[0] != '\0' ) {
+			modName = fs_gamedirvar->string;
+		}
+#ifdef DEFAULT_FS_GAME
+		else if ( DEFAULT_FS_GAME[0] != '\0' ) {
+			modName = DEFAULT_FS_GAME;
+		}
+#endif
+
+		if ( appPath && appPath[0] && modName && modName[0] ) {
+			FS_AddGameDirectory( appPath, modName );
+		}
+	}
+#endif
 
 	// reorder search paths to minimize further changes
 	FS_ReorderSearchPaths();

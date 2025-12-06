@@ -31,6 +31,52 @@ TEAM ORDERS MENU
 
 #include "ui_local.h"
 
+// Replace the first "%s" in a source string with botName without using
+// runtime-determined format strings (avoids -Wformat-nonliteral).
+static void UI_TeamOrders_FormatMessage( char *dest, size_t destSize, const char *src, const char *botName ) {
+	if ( !dest || destSize == 0 ) {
+		return;
+	}
+	if ( !src ) {
+		dest[0] = '\0';
+		return;
+	}
+	if ( !botName ) {
+		Q_strncpyz( dest, src, destSize );
+		return;
+	}
+
+	const char *placeholder = Q_stristr( src, "%s" );
+	if ( placeholder == NULL ) {
+		Q_strncpyz( dest, src, destSize );
+		return;
+	}
+
+	size_t prefixLen = (size_t)( placeholder - src );
+	size_t botLen = strlen( botName );
+	size_t suffixLen = strlen( placeholder + 2 ); // skip "%s"
+	size_t total = prefixLen + botLen + suffixLen;
+
+	if ( total >= destSize ) {
+		size_t copyPrefix = (prefixLen < destSize - 1) ? prefixLen : destSize - 1;
+		size_t remaining = destSize - 1 - copyPrefix;
+		size_t copyBot = (botLen < remaining) ? botLen : remaining;
+		size_t remaining2 = remaining - copyBot;
+		size_t copySuffix = (suffixLen < remaining2) ? suffixLen : remaining2;
+
+		Com_Memcpy( dest, src, copyPrefix );
+		Com_Memcpy( dest + copyPrefix, botName, copyBot );
+		Com_Memcpy( dest + copyPrefix + copyBot, placeholder + 2, copySuffix );
+		dest[ copyPrefix + copyBot + copySuffix ] = '\0';
+		return;
+	}
+
+	Com_Memcpy( dest, src, prefixLen );
+	Com_Memcpy( dest + prefixLen, botName, botLen );
+	Com_Memcpy( dest + prefixLen + botLen, placeholder + 2, suffixLen );
+	dest[ total ] = '\0';
+}
+
 
 #define ART_FRAME		"menu/" MENU_ART_DIR "/addbotframe"
 #define ART_BACK0		"menu/" MENU_ART_DIR "/back_0"
@@ -378,19 +424,19 @@ static void UI_TeamOrdersMenu_ListEvent( void *ptr, int event )
 
 	const char *botName = teamOrdersMenuInfo.botNames[teamOrdersMenuInfo.selectedBot];
 	if( id == ID_LIST_CTF_ORDERS ) {
-		Q_strncpyz( message, va("%s", va(ctfMessages[selection], botName)), sizeof(message) );
+		UI_TeamOrders_FormatMessage( message, sizeof(message), ctfMessages[selection], botName );
 	}
 	else if( id == ID_LIST_CTF1F_ORDERS ) {
-		Q_strncpyz( message, va("%s", va(ctf1fMessages[selection], botName)), sizeof(message) );
+		UI_TeamOrders_FormatMessage( message, sizeof(message), ctf1fMessages[selection], botName );
 	}
 	else if( id == ID_LIST_BASE_ORDERS ) {
-		Q_strncpyz( message, va("%s", va(baseMessages[selection], botName)), sizeof(message) );
+		UI_TeamOrders_FormatMessage( message, sizeof(message), baseMessages[selection], botName );
 	}
 	else if( id == ID_LIST_TEAM_ORDERS ) {
-		Q_strncpyz( message, va("%s", va(teamMessages[selection], botName)), sizeof(message) );
+		UI_TeamOrders_FormatMessage( message, sizeof(message), teamMessages[selection], botName );
 	}
 	else if( id == ID_LIST_DD_ORDERS ) {
-		Q_strncpyz( message, va("%s", va(ddMessages[selection], botName)), sizeof(message) );
+		UI_TeamOrders_FormatMessage( message, sizeof(message), ddMessages[selection], botName );
 	}
 
 	trap_Cmd_ExecuteText( EXEC_APPEND, va( "say_team \"%s\"\n", message ) );

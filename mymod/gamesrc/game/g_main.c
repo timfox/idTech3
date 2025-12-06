@@ -1074,6 +1074,9 @@ void G_ShutdownGame( int restart )
 
 //===================================================================
 
+#ifndef COMBINED_MONOLITH
+// Module-local logging/error wrappers are only needed for DLL builds.
+// In monolithic builds the engine's Com_Error/Com_Printf are used.
 void QDECL Com_Error ( [[maybe_unused]] errorParm_t errParm, const char *error, ... )
 {
 	va_list		argptr;
@@ -1097,6 +1100,7 @@ void QDECL Com_Printf( const char *msg, ... )
 
 	G_Printf ("%s", text);
 }
+#endif // COMBINED_MONOLITH
 
 /*
 ========================================================================

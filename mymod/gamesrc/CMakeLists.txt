@@ -14,7 +14,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Build as shared libraries by default (DLLs/.so files)
 # Can be overridden with -DBUILD_SHARED_LIBS=OFF for static libraries
-if(NOT DEFINED BUILD_SHARED_LIBS)
+# Monolithic builds must be static to avoid runtime dependencies on module .so files.
+if(COMBINED_MONOLITH)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libs" FORCE)
+elseif(NOT DEFINED BUILD_SHARED_LIBS)
     set(BUILD_SHARED_LIBS ON)
 endif()
 
