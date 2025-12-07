@@ -11,6 +11,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 MOD_NAME=""
 BUILD_TYPE="Release"
 CLEAN=0
+PK3_ENABLED=1
 
 normalize_build_type() {
     local arg=$(echo "$1" | tr '[:upper:]' '[:lower:]')
@@ -44,6 +45,8 @@ MOD_BUILD_DIR="$MOD_SOURCE_DIR/build"
 MOD_VM_DIR="$MOD_ROOT/vm"
 RELEASE_MOD_DIR="$PROJECT_ROOT/release/$MOD_NAME"
 RELEASE_VM_DIR="$RELEASE_MOD_DIR/vm"
+RELEASE_PK3="$RELEASE_MOD_DIR/$MOD_NAME.pk3"
+RELEASE_SO="$PROJECT_ROOT/release/$MOD_NAME.so"
 
 if [ ! -d "$MOD_SOURCE_DIR" ]; then
     echo "Error: ${MOD_SOURCE_DIR} not found."
@@ -106,6 +109,64 @@ else
     echo "Libraries copied to $RELEASE_VM_DIR/"
 fi
 
+if [ ${#ARTIFACTS[@]} -gt 0 ]; then
+    primary_so="${ARTIFACTS[0]}"
+    for lib in "${ARTIFACTS[@]}"; do
+        if [[ "$(basename "$lib")" == game*.so ]]; then
+            primary_so="$lib"
+            break
+        fi
+    done
+    echo "Copying primary module to $RELEASE_SO"
+    mkdir -p "$(dirname "$RELEASE_SO")"
+    cp -v "$primary_so" "$RELEASE_SO"
+fi
+
+package_pk3() {
+    INCLUDES=()
+    add_if_exists() {
+        local rel="$1"
+        if [ -e "$PROJECT_ROOT/$rel" ]; then
+            INCLUDES+=("$rel")
+        fi
+    }
+
+    add_if_exists "$MOD_NAME/default.cfg"
+    add_if_exists "$MOD_NAME/autoexec.cfg"
+    add_if_exists "$MOD_NAME/config"
+    add_if_exists "$MOD_NAME/fonts"
+    add_if_exists "$MOD_NAME/scripts"
+    add_if_exists "$MOD_NAME/shaders"
+    add_if_exists "$MOD_NAME/ui"
+    add_if_exists "$MOD_NAME/vm"
+    add_if_exists "$MOD_NAME/maps"
+    add_if_exists "$MOD_NAME/levelshots"
+    add_if_exists "$MOD_NAME/gfx"
+    add_if_exists "$MOD_NAME/sound"
+
+    if [ ${#INCLUDES[@]} -eq 0 ]; then
+        echo "Nothing to package into pk3 for $MOD_NAME."
+        return
+    fi
+
+    mkdir -p "$RELEASE_MOD_DIR"
+    cd "$PROJECT_ROOT"
+
+    echo "Packaging ${MOD_NAME}.pk3 ..."
+    zip -r "$RELEASE_PK3" "${INCLUDES[@]}" \
+        -x "$MOD_NAME/gamesrc/*" "$MOD_NAME/gamesrc/**" \
+           "$MOD_NAME/build/*" "$MOD_NAME/build/**" \
+           "$MOD_NAME/out/*" "$MOD_NAME/out/**" \
+           "$MOD_NAME/vm/*.a" "$MOD_NAME/vm/*.pdb" "$MOD_NAME/vm/*.dll" \
+           "$MOD_NAME/**/.DS_Store" "$MOD_NAME/**/.git*" "$MOD_NAME/**/CMakeFiles/**" \
+        >/dev/null
+    echo "✓ Wrote $RELEASE_PK3"
+}
+
+if [ $PK3_ENABLED -eq 1 ]; then
+    package_pk3
+fi
+
 echo ""
 if [ -d "$RELEASE_VM_DIR" ]; then
     SO_COUNT=$(ls -1 "$RELEASE_VM_DIR"/*.so "$RELEASE_VM_DIR"/*.dll 2>/dev/null | wc -l)
@@ -121,4 +182,6 @@ fi
 echo ""
 echo "Game mod build completed!"
 echo "  Libraries: $RELEASE_VM_DIR/*.so"
+echo "  Primary:  $RELEASE_SO"
+echo "  Package:  $RELEASE_PK3"
 echo "  Source: $MOD_SOURCE_DIR/"
