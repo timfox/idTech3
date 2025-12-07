@@ -5470,11 +5470,14 @@ void vk_create_compute_post_process_pipelines( void )
 	// We can't use sizeof() on extern incomplete arrays, so we try to load directly
 	// The SHADER_MODULE macro will fail at link time if the array doesn't exist
 	if ( vk.modules.gamma_comp == VK_NULL_HANDLE ) {
-		// Remove extern declaration - it's already declared at top of function
 		// Try loading - if array doesn't exist, linker will fail (expected if shaders not compiled)
 		vk.modules.gamma_comp = SHADER_MODULE( gamma_comp_spv );
-		SET_OBJECT_NAME( vk.modules.gamma_comp, "gamma compute shader module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
-		ri.Printf( PRINT_DEVELOPER, "VK: Loaded gamma compute shader module\n" );
+		if ( vk.modules.gamma_comp != VK_NULL_HANDLE ) {
+			SET_OBJECT_NAME( vk.modules.gamma_comp, "gamma compute shader module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+			ri.Printf( PRINT_DEVELOPER, "VK: Loaded gamma compute shader module\n" );
+		} else {
+			ri.Printf( PRINT_WARNING, "VK: gamma compute shader module missing; run shader compile step.\n" );
+		}
 	}
 	
 	// Try to load tonemap compute shader if not already loaded

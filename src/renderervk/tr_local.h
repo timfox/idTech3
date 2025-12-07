@@ -925,16 +925,12 @@ typedef struct srfIQModel_s {
 
 extern	void (*rb_surfaceTable[SF_NUM_SURFACE_TYPES])(void *);
 
+void RB_CallSurfaceSafe_impl(surfaceType_t *surface);
+
 static inline void RB_CallSurfaceSafe(surfaceType_t *surface) {
-	if (!surface) {
-		return;
-	}
-	int type = *surface;
-	if (type < 0 || type >= SF_NUM_SURFACE_TYPES || rb_surfaceTable[type] == NULL) {
-		ri.Printf(PRINT_WARNING, "RB: invalid surface type %d\n", type);
-		return;
-	}
-	rb_surfaceTable[type](surface);
+	// Inline shim ensures all call sites route through the non-inlined impl
+	// so gdb can break and capture a stack when the type is invalid.
+	RB_CallSurfaceSafe_impl(surface);
 }
 
 /*

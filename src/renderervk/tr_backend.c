@@ -24,6 +24,20 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 backEndData_t	*backEndData;
 backEndState_t	backEnd;
 
+// Centralized (non-inlined) version so we can break in gdb when an invalid
+// surface type is encountered.
+__attribute__((noinline)) void RB_CallSurfaceSafe_impl(surfaceType_t *surface) {
+	if (!surface) {
+		return;
+	}
+	int type = *surface;
+	if (type < 0 || type >= SF_NUM_SURFACE_TYPES || rb_surfaceTable[type] == NULL) {
+		ri.Printf(PRINT_WARNING, "RB: invalid surface type %d\n", type);
+		return;
+	}
+	rb_surfaceTable[type](surface);
+}
+
 #ifndef USE_VULKAN
 static const float s_flipMatrix[16] = {
 	// convert from our coordinate system (looking down X)

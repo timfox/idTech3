@@ -24,8 +24,9 @@ After building, run tests with:
 
 Tests are organized by module:
 - `test_qcommon.c` - Tests for qcommon module (string functions, utilities)
-- `test_qmath.c` - Tests for math functions
-- `test_memory.c` - Tests for memory allocators
+- `test_qmath.c` - Tests for math utilities (vector ops, bounds helpers)
+- `test_network_enet.c` - ENet loopback smoke test (when USE_ENET is on)
+- `test_info.c` - Tests for info string helpers (get/set/remove)
 
 ## Writing Tests
 

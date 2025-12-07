@@ -38,8 +38,10 @@ cmake --build "${BUILD_DIR}" --target idtech3.x86_64
 timestamp="$(date +%Y%m%d_%H%M%S)"
 BT_LOG="${LOG_DIR}/gdb_bt_${timestamp}_${GAME}.log"
 GDB_CMDS="${LOG_DIR}/gdb_cmds_${timestamp}_${GAME}.gdb"
+GDB_CMDS_OVERRIDE="${GDB_CMDS_OVERRIDE:-}"
 
-cat > "${GDB_CMDS}" <<'EOF'
+if [ -z "${GDB_CMDS_OVERRIDE}" ]; then
+  cat > "${GDB_CMDS}" <<'EOF'
 set pagination off
 set confirm off
 set breakpoint pending on
@@ -55,9 +57,12 @@ printf "\n== Full backtrace ==\n"
 thread apply all bt full
 quit
 EOF
-sed -i "s|__SOLIB__|${SOLIB_PATH}|g" "${GDB_CMDS}"
+  sed -i "s|__SOLIB__|${SOLIB_PATH}|g" "${GDB_CMDS}"
+else
+  GDB_CMDS="${GDB_CMDS_OVERRIDE}"
+fi
 
-echo "[4/5] Running under gdb (logs: ${BT_LOG})…"
+echo "[4/5] Running under gdb using ${GDB_CMDS} (logs: ${BT_LOG})…"
 gdb --batch -x "${GDB_CMDS}" --args "${EXE}" \
   +set fs_game "${GAME}" \
   +set r_vkValidation "${VK_VALIDATION}" \

@@ -10,6 +10,7 @@ Core EnTT registry wrapper providing C interface for engine use.
 
 #include "ecs.h"
 #include "ecs_components.h"
+#include "ecs_internal.h"
 #include <entt/entt.hpp>
 #include <unordered_map>
 #include <cassert>
@@ -94,6 +95,14 @@ void ECS_DestroyEntity(ecs_entity_t entity) {
 		g_entityMap.erase(it->second);
 		g_reverseEntityMap.erase(it);
 	}
+
+#ifdef USE_BULLET
+	// Tear down Bullet state before destroying the entity so bodies do not leak or keep simulating.
+	if (g_registry->valid(enttEntity) && g_registry->all_of<PhysicsComponent>(enttEntity)) {
+		auto &physics = g_registry->get<PhysicsComponent>(enttEntity);
+		ECS::BulletOnEntityDestroyed(*g_registry, enttEntity, physics);
+	}
+#endif
 	
 	g_registry->destroy(enttEntity);
 }

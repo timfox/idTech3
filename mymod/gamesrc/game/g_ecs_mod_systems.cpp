@@ -79,6 +79,8 @@ void G_ECS_EquipmentSystem_Update(void) {
 		
 		// Calculate total stats from equipped items
 		memset(&equipment.totalStats, 0, sizeof(equipment_stats_t));
+		equipment.totalStats.damage_multiplier = 1.0f;
+		equipment.totalStats.rof_multiplier = 1.0f;
 		
 		for (int i = 0; i < EQUIP_SLOT_MAX; i++) {
 			if (inventory.inventory.equipment[i].itemId >= 0) {

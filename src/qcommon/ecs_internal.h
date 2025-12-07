@@ -24,6 +24,10 @@ namespace ECS {
 	int GetIndexFromEntity(entt::entity entity);
 	void MapEntity(int index, entt::entity entity);
 	void UnmapEntity(int index);
+#ifdef USE_BULLET
+	// Called before destroying an ECS entity to tear down Bullet state.
+	void BulletOnEntityDestroyed(entt::registry &registry, entt::entity entity, struct PhysicsComponent &physics);
+#endif
 }
 
 #endif // __cplusplus

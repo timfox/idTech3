@@ -2228,6 +2228,15 @@ IF(BUILD_TESTS)
 	TARGET_INCLUDE_DIRECTORIES(test_qcommon PRIVATE src)
 	ADD_TEST(NAME qcommon_tests COMMAND test_qcommon)
 
+	ADD_EXECUTABLE(test_qmath
+		tests/test_qmath.c
+		src/qcommon/q_math.c
+		src/qcommon/q_shared.c
+	)
+	TARGET_INCLUDE_DIRECTORIES(test_qmath PRIVATE src/qcommon)
+	TARGET_INCLUDE_DIRECTORIES(test_qmath PRIVATE src)
+	ADD_TEST(NAME qmath_tests COMMAND test_qmath)
+
 	IF(USE_ENET)
 		ADD_EXECUTABLE(test_network_enet
 			tests/test_network_enet.c
@@ -2236,5 +2245,13 @@ IF(BUILD_TESTS)
 		TARGET_INCLUDE_DIRECTORIES(test_network_enet PRIVATE libs/enet/include)
 		ADD_TEST(NAME network_enet_tests COMMAND test_network_enet)
 	endif()
+
+	ADD_EXECUTABLE(test_info
+		tests/test_info.c
+		src/qcommon/q_shared.c
+	)
+	TARGET_INCLUDE_DIRECTORIES(test_info PRIVATE src/qcommon)
+	TARGET_INCLUDE_DIRECTORIES(test_info PRIVATE src)
+	ADD_TEST(NAME info_tests COMMAND test_info)
 	MESSAGE(STATUS "Unit tests enabled")
 ENDIF()

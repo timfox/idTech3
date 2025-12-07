@@ -199,6 +199,37 @@ static void ECS_Bullet_Step(entt::registry &registry, float deltaTime) {
 		
 		// Clear acceleration; it should be re-applied by gameplay each frame
 		VectorClear(physics.acceleration);
+
+		if (auto net = registry.try_get<NetworkComponent>(entity)) {
+			net->needsSync = qtrue;
+		}
+	}
+}
+
+// Called by ECS_DestroyEntity to tear down Bullet state before entity destruction.
+void ECS::BulletOnEntityDestroyed(entt::registry &registry, entt::entity entity, PhysicsComponent &physics) {
+	if (!physics.useBullet || !physics.body || !s_bulletWorld.initialized || s_bulletWorld.world == nullptr) {
+		return;
+	}
+
+	btRigidBody *body = physics.body;
+	physics.body = nullptr;
+
+	if (body->getMotionState()) {
+		delete body->getMotionState();
+	}
+	btCollisionShape *shape = body->getCollisionShape();
+	if (shape) {
+		s_bulletWorld.world->removeCollisionObject(body);
+		delete shape;
+	} else {
+		s_bulletWorld.world->removeRigidBody(body);
+	}
+	delete body;
+
+	// Ensure the registry still owns the entity before removing components.
+	if (registry.valid(entity) && registry.all_of<PhysicsComponent>(entity)) {
+		physics.useBullet = qfalse;
 	}
 }
 #endif // USE_BULLET
@@ -251,6 +282,10 @@ void ECS_PhysicsSystem_Update(float deltaTime) {
 		
 		// Clear acceleration (should be set each frame if needed)
 		VectorClear(physics.acceleration);
+
+		if (auto net = registry.try_get<NetworkComponent>(entity)) {
+			net->needsSync = qtrue;
+		}
 	}
 }
 
@@ -269,6 +304,8 @@ void ECS_HealthSystem_Update(void) {
 	
 	for (auto entity : view) {
 		auto &health = view.get<HealthComponent>(entity);
+		const int prevHealth = health.health;
+		const int prevArmor = health.armor;
 		
 		// Clamp health values
 		if (health.health > health.maxHealth) {
@@ -283,6 +320,12 @@ void ECS_HealthSystem_Update(void) {
 		if (health.armor < 0) {
 			health.armor = 0;
 		}
+
+		if ((health.health != prevHealth || health.armor != prevArmor)) {
+			if (auto net = registry.try_get<NetworkComponent>(entity)) {
+				net->needsSync = qtrue;
+			}
+		}
 	}
 }
 
@@ -294,25 +337,8 @@ This is a placeholder - actual implementation will sync to gentity_t/svEntity_t
 ================
 */
 void ECS_NetworkSyncSystem_Update(void) {
-	entt::registry *registry_ptr = reinterpret_cast<entt::registry *>(ECS_GetRegistry());
-	if (!registry_ptr) return;
-	entt::registry &registry = *registry_ptr;
-	
-	auto view = registry.view<NetworkComponent, TransformComponent>();
-	
-	for (auto entity : view) {
-		auto &network = view.get<NetworkComponent>(entity);
-		// TransformComponent is included in view but not used yet
-		// It will be used when syncing to actual gentity_t/svEntity_t
-		
-		if (!network.needsSync || network.entityIndex < 0) {
-			continue;
-		}
-		
-		// This will be implemented to sync to actual gentity_t/svEntity_t
-		// For now, just mark that sync is needed
-		network.needsSync = qfalse;
-	}
+	// Placeholder intentionally left as a no-op. Actual syncing is handled
+	// in the game/server bridge layers (G_ECS_SyncToGentity, SV_ECS_SyncToSvEntity).
 }
 
 /*

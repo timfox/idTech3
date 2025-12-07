@@ -154,6 +154,15 @@ lua_State *Lua_CreateState(void)
 	
 	// Open standard libraries
 	luaL_openlibs(L);
+
+	// Prepend mod script paths so `require` can find scripts/lib/*.lua
+	lua_getglobal(L, "package");
+	if ( lua_istable(L, -1) ) {
+		const char *paths = "scripts/?.lua;scripts/lib/?.lua;./scripts/?.lua;./scripts/lib/?.lua;";
+		lua_pushstring(L, paths );
+		lua_setfield(L, -2, "path");
+	}
+	lua_pop(L, 1); // pop package
 	
 	// Register engine bindings
 	Lua_RegisterEngineBindings(L);
