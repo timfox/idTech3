@@ -56,6 +56,15 @@
 - [ ] Improved physics (investigate bullet3 or similar)
 - [ ] Improved networking (DTLS/NAT traversal candidates under review)
 
+## OOP / Entity Architecture (Half-Life-style)
+- [ ] Decide OOP strategy for game VM: C with vtables vs C++ gamecode; define ABI boundary to keep QVM/bytecode targets working
+- [ ] Design `BaseEntity` interface: Spawn/Precache, Think/ScheduleNextThink, Touch/Use, TakeDamage/Pain/Death, Save/Restore hooks
+- [ ] Add classname→factory registry so entities spawn via class descriptors (HL-style), with backwards-compatible fallbacks to current spawn funcs
+- [ ] Implement per-entity vtable/method table and shared mixins for movement/physics/rendering so code reuse mirrors HL/HL2 (e.g., door/trigger/npc behaviors)
+- [ ] Provide message dispatch helpers (FireOutput, Input handlers) and a simple event bus for entities to communicate without hard coupling
+- [ ] Define network/save descriptors per class (fields, serializers) to unify snapshot + save/load logic; include versioning and defaulting
+- [ ] Port pilot entities to the new model (e.g., `func_door`, `trigger_multiple`, one NPC) and benchmark parity with legacy paths
+
 ## Steam Deck Preparation
 - [ ] Default controller configuration enables access to all in-game functionality (Steam Input or native gamepad support strongly recommended)
 - [ ] Add or supply a controller configuration mapping all required inputs if native support is missing

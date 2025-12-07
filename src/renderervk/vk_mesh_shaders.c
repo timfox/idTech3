@@ -51,6 +51,13 @@ void vk_mesh_shaders_init( void )
 		vk.mesh.meshShaderSupported = qtrue;
 		vk.mesh.active = mesh_shaders_requested();
 		vk.mesh.useFallback = !vk.mesh.active;
+		// Verify that required shader modules are present; otherwise stay on fallback.
+		if ( vk.mesh.mesh_task == VK_NULL_HANDLE || vk.mesh.mesh_mesh == VK_NULL_HANDLE ) {
+			vk.mesh.useFallback = qtrue;
+			if ( vk.mesh.active ) {
+				ri.Printf( PRINT_WARNING, "Mesh shaders requested but shader modules are missing; fallback enabled\n" );
+			}
+		}
 		
 		// Check for task shader support (optional, but recommended)
 		// Task shaders are part of the same extension
@@ -163,6 +170,14 @@ void vk_mesh_shaders_generate_meshlets( void *vertices, uint32_t vertexCount, vo
 void vk_mesh_shaders_create_pipeline( void )
 {
 	if ( !vk_mesh_shaders_is_supported() || vk_mesh_shaders_use_fallback() ) {
+		return;
+	}
+
+	// We currently rely on externally compiled mesh/task shader SPIR-V modules.
+	// If they are not present in shader_data, stay on the fallback path to avoid crashes.
+	if ( vk.mesh.mesh_task == VK_NULL_HANDLE || vk.mesh.mesh_mesh == VK_NULL_HANDLE ) {
+		vk.mesh.useFallback = qtrue;
+		ri.Printf( PRINT_WARNING, "Mesh shaders requested but mesh/task shader modules are missing; using fallback path\n" );
 		return;
 	}
 	

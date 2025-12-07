@@ -84,6 +84,14 @@ static void flatten_layers( const layered_material_t *mat, material_params_t *ou
 	float normalScale = 1.0f;
 	float clearcoat = 0.0f;
 	float clearcoatRoughness = 0.25f;
+	float anisotropy = 0.0f;
+	vec3_t anisotropyDir = { 1.0f, 0.0f, 0.0f };
+	float sheen = 0.0f;
+	vec3_t sheenColor = { 1.0f, 1.0f, 1.0f };
+	float subsurface = 0.0f;
+	vec3_t subsurfaceColor = { 1.0f, 1.0f, 1.0f };
+	float microfacet = 0.0f;
+	float microfacetSharpness = 1.0f;
 	float weightSum = 0.0f;
 	float cost = 0.0f;
 
@@ -117,6 +125,13 @@ static void flatten_layers( const layered_material_t *mat, material_params_t *ou
 				clearcoat = ( clearcoat > candidate ) ? clearcoat : candidate;
 				clearcoatRoughness = lerpf( clearcoatRoughness, layer->roughness, w );
 			}
+			if ( layer->type == LAYER_TYPE_DETAIL || layer->type == LAYER_TYPE_CUSTOM ) {
+				anisotropy = lerpf( anisotropy, layer->roughness, w ); // reuse roughness slot as anisotropy hint
+			}
+			if ( layer->type == LAYER_TYPE_DETAIL || layer->type == LAYER_TYPE_CUSTOM ) {
+				microfacet = lerpf( microfacet, clamp01f( layer->emissiveStrength ), w ); // reuse emissiveStrength as microfacet hint
+				microfacetSharpness = lerpf( microfacetSharpness, 1.0f + layer->normalScale * 0.5f, w );
+			}
 			estimate_layer_cost( layer, &cost );
 		}
 	}
@@ -132,6 +147,14 @@ static void flatten_layers( const layered_material_t *mat, material_params_t *ou
 	outParams->normalScale = normalScale;
 	outParams->clearcoat = clearcoat;
 	outParams->clearcoatRoughness = clearcoatRoughness;
+	outParams->anisotropy = clamp01f( anisotropy );
+	VectorCopy( anisotropyDir, outParams->anisotropyDir );
+	outParams->sheen = clamp01f( sheen );
+	VectorCopy( sheenColor, outParams->sheenColor );
+	outParams->subsurface = clamp01f( subsurface );
+	VectorCopy( subsurfaceColor, outParams->subsurfaceColor );
+	outParams->microfacet = clamp01f( microfacet );
+	outParams->microfacetSharpness = ( microfacetSharpness < 0.1f ) ? 0.1f : microfacetSharpness;
 	outParams->layerWeight = weightSum;
 	outParams->layerCount = count;
 	outParams->layerCost = cost;

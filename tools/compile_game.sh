@@ -126,23 +126,23 @@ package_pk3() {
     INCLUDES=()
     add_if_exists() {
         local rel="$1"
-        if [ -e "$PROJECT_ROOT/$rel" ]; then
+        if [ -e "$MOD_ROOT/$rel" ]; then
             INCLUDES+=("$rel")
         fi
     }
 
-    add_if_exists "$MOD_NAME/default.cfg"
-    add_if_exists "$MOD_NAME/autoexec.cfg"
-    add_if_exists "$MOD_NAME/config"
-    add_if_exists "$MOD_NAME/fonts"
-    add_if_exists "$MOD_NAME/scripts"
-    add_if_exists "$MOD_NAME/shaders"
-    add_if_exists "$MOD_NAME/ui"
-    add_if_exists "$MOD_NAME/vm"
-    add_if_exists "$MOD_NAME/maps"
-    add_if_exists "$MOD_NAME/levelshots"
-    add_if_exists "$MOD_NAME/gfx"
-    add_if_exists "$MOD_NAME/sound"
+    add_if_exists "default.cfg"
+    add_if_exists "autoexec.cfg"
+    add_if_exists "config"
+    add_if_exists "fonts"
+    add_if_exists "scripts"
+    add_if_exists "shaders"
+    add_if_exists "ui"
+    add_if_exists "vm"
+    add_if_exists "maps"
+    add_if_exists "levelshots"
+    add_if_exists "gfx"
+    add_if_exists "sound"
 
     if [ ${#INCLUDES[@]} -eq 0 ]; then
         echo "Nothing to package into pk3 for $MOD_NAME."
@@ -150,15 +150,15 @@ package_pk3() {
     fi
 
     mkdir -p "$RELEASE_MOD_DIR"
-    cd "$PROJECT_ROOT"
+    cd "$MOD_ROOT"
 
     echo "Packaging ${MOD_NAME}.pk3 ..."
     zip -r "$RELEASE_PK3" "${INCLUDES[@]}" \
-        -x "$MOD_NAME/gamesrc/*" "$MOD_NAME/gamesrc/**" \
-           "$MOD_NAME/build/*" "$MOD_NAME/build/**" \
-           "$MOD_NAME/out/*" "$MOD_NAME/out/**" \
-           "$MOD_NAME/vm/*.a" "$MOD_NAME/vm/*.pdb" "$MOD_NAME/vm/*.dll" \
-           "$MOD_NAME/**/.DS_Store" "$MOD_NAME/**/.git*" "$MOD_NAME/**/CMakeFiles/**" \
+        -x "gamesrc/*" "gamesrc/**" \
+           "build/*" "build/**" \
+           "out/*" "out/**" \
+           "vm/*.a" "vm/*.pdb" "vm/*.dll" \
+           "**/.DS_Store" "**/.git*" "**/CMakeFiles/**" \
         >/dev/null
     echo "✓ Wrote $RELEASE_PK3"
 }

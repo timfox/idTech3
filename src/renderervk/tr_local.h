@@ -1436,6 +1436,7 @@ extern cvar_t	*r_dlightIntensity;		// 0.1 - 1.0
 extern cvar_t	*r_dlightSaturation;	// 0.0 - 1.0
 #ifdef USE_VULKAN
 extern cvar_t	*r_device;
+extern cvar_t  *r_vk_icd;
 #ifdef USE_VBO
 extern cvar_t	*r_vbo;
 #endif
@@ -1473,6 +1474,8 @@ extern cvar_t	*r_rt_giIntensity;
 #endif
 extern cvar_t	*r_postprocess_compute;
 extern cvar_t	*r_postprocess_workgroup;
+extern cvar_t	*r_tonemapMode;
+extern cvar_t	*r_tonemapExposure;
 extern cvar_t	*r_meshShaders;
 extern cvar_t	*r_meshletSize;
 extern cvar_t	*r_virtualTextures;

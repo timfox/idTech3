@@ -1101,6 +1101,8 @@ typedef struct {
 		VkPipelineLayout meshShaderPipelineLayout;
 		VkDescriptorSetLayout meshShaderDescriptorSetLayout;
 		VkDescriptorSet meshShaderDescriptorSet;
+		VkShaderModule mesh_task;
+		VkShaderModule mesh_mesh;
 	} mesh;
 	
 	// Virtual Texturing

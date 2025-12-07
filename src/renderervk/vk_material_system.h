@@ -47,6 +47,14 @@ struct material_params_s {
 	float normalScale;
 	float clearcoat;
 	float clearcoatRoughness;
+	float anisotropy;          // -1..1, 0 = isotropic
+	vec3_t anisotropyDir;      // tangent-space direction
+	float sheen;               // 0..1
+	vec3_t sheenColor;         // sheen tint
+	float subsurface;          // 0..1
+	vec3_t subsurfaceColor;    // SSS color
+	float microfacet;          // 0..1 strength to tighten/spec highlight
+	float microfacetSharpness; // exponent modifier (>0, 1=neutral, <1 softer, >1 sharper)
 	float layerWeight;
 
 	// Metadata

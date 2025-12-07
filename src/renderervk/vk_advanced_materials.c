@@ -8,6 +8,7 @@ Adds support for clearcoat, anisotropy, sheen, subsurface scattering, etc.
 
 #include "tr_local.h"
 #include "vk.h"
+#include "vk_material_system.h"
 
 #ifdef USE_VULKAN
 
@@ -28,6 +29,8 @@ typedef struct {
 	float subsurfaceScattering; // SSS strength
 	vec3_t subsurfaceColor; // SSS color
 	vec3_t emissive; // Emissive color (HDR)
+	float microfacet; // Microfacet tightening (0..1)
+	float microfacetSharpness; // Microfacet exponent modifier (>0, 1=neutral)
 	
 	// Texture indices
 	int clearcoatTextureIndex;
@@ -39,7 +42,6 @@ typedef struct {
 
 void vk_advanced_materials_init( void )
 {
-	// Initialize advanced material system
 	ri.Printf( PRINT_DEVELOPER, "Advanced material features initialized\n" );
 }
 
@@ -56,23 +58,48 @@ void vk_advanced_materials_parse( void *material, const char *shaderText )
 		return;
 	}
 	
-	// Parse material parameters from shader text
-	// Implementation would extract clearcoat, anisotropy, etc. from shader definitions
-	(void)shaderText; // Unused for now
+	// TODO: real parser. For now, seed sane defaults if unset.
+	(void)shaderText;
+	mat->roughness = ( mat->roughness <= 0.0f ) ? 0.5f : mat->roughness;
+	mat->metallic = Com_Clamp( 0.0f, 1.0f, mat->metallic );
+	mat->clearcoat = Com_Clamp( 0.0f, 1.0f, mat->clearcoat );
+	mat->clearcoatRoughness = Com_Clamp( 0.02f, 1.0f, mat->clearcoatRoughness <= 0.0f ? 0.3f : mat->clearcoatRoughness );
+	mat->anisotropy = Com_Clamp( -1.0f, 1.0f, mat->anisotropy );
+	VectorNormalizeFast( mat->anisotropyDirection );
+	mat->sheen = Com_Clamp( 0.0f, 1.0f, mat->sheen );
+	for ( int i = 0; i < 3; ++i ) {
+		mat->sheenColor[i] = Com_Clamp( 0.0f, 1.0f, mat->sheenColor[i] <= 0.0f ? 1.0f : mat->sheenColor[i] );
+		mat->subsurfaceColor[i] = Com_Clamp( 0.0f, 1.0f, mat->subsurfaceColor[i] <= 0.0f ? 1.0f : mat->subsurfaceColor[i] );
+		mat->emissive[i] = Com_Clamp( 0.0f, 8.0f, mat->emissive[i] );
+	}
+	mat->subsurfaceScattering = Com_Clamp( 0.0f, 1.0f, mat->subsurfaceScattering );
+	mat->microfacet = Com_Clamp( 0.0f, 1.0f, mat->microfacet );
+	mat->microfacetSharpness = ( mat->microfacetSharpness <= 0.0f ) ? 1.0f : Com_Clamp( 0.1f, 8.0f, mat->microfacetSharpness );
 }
 
 // Update material uniform buffer with advanced parameters
 void vk_advanced_materials_update_uniform( void *material, void *uniformData )
 {
 	vk_advanced_material_t *mat = (vk_advanced_material_t *)material;
-	if ( !mat || !uniformData ) {
+	material_params_t *params = (material_params_t *)uniformData;
+	if ( !mat || !params ) {
 		return;
 	}
 	
-	// Update uniform buffer with advanced material parameters
-	// Implementation would pack material data into uniform buffer
-	(void)mat; // Unused for now
-	(void)uniformData; // Unused for now
+	// Pack advanced features into the material params structure.
+	params->clearcoat = Com_Clamp( 0.0f, 1.0f, mat->clearcoat );
+	params->clearcoatRoughness = Com_Clamp( 0.02f, 1.0f, mat->clearcoatRoughness );
+	params->anisotropy = Com_Clamp( -1.0f, 1.0f, mat->anisotropy );
+	VectorCopy( mat->anisotropyDirection, params->anisotropyDir );
+	params->sheen = Com_Clamp( 0.0f, 1.0f, mat->sheen );
+	VectorCopy( mat->sheenColor, params->sheenColor );
+	params->subsurface = Com_Clamp( 0.0f, 1.0f, mat->subsurfaceScattering );
+	VectorCopy( mat->subsurfaceColor, params->subsurfaceColor );
+	params->microfacet = Com_Clamp( 0.0f, 1.0f, mat->microfacet );
+	params->microfacetSharpness = ( mat->microfacetSharpness <= 0.0f ) ? 1.0f : Com_Clamp( 0.1f, 8.0f, mat->microfacetSharpness );
+	for ( int i = 0; i < 3; ++i ) {
+		params->emissive[i] += mat->emissive[i];
+	}
 }
 
 #endif // USE_VULKAN

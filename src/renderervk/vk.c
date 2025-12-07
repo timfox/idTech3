@@ -1,5 +1,8 @@
 #include "tr_local.h"
 #include "vk.h"
+#include <stdlib.h>
+#include <unistd.h>
+extern int setenv( const char *name, const char *value, int overwrite );
 
 // Compatibility shim: some SDKs may not expose the EXT mesh shader feature struct/enum.
 #ifndef VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT
@@ -2281,6 +2284,17 @@ static void init_vulkan_library( void )
 
 	Com_Memset( &vk, 0, sizeof( vk ) );
 
+#ifdef USE_VULKAN
+	// Allow forcing a specific ICD via cvar (maps to VK_ICD_FILENAMES).
+	if ( r_vk_icd && r_vk_icd->string && r_vk_icd->string[0] ) {
+		if ( setenv( "VK_ICD_FILENAMES", r_vk_icd->string, 1 ) == 0 ) {
+			ri.Printf( PRINT_ALL, "...using VK_ICD_FILENAMES override: %s\n", r_vk_icd->string );
+		} else {
+			ri.Printf( PRINT_WARNING, "Failed to set VK_ICD_FILENAMES to '%s'\n", r_vk_icd->string );
+		}
+	}
+#endif
+
 	if ( vk_instance == VK_NULL_HANDLE ) {
 
 		// force cleanup
@@ -2389,13 +2403,30 @@ static void init_vulkan_library( void )
 	ri.Printf( PRINT_ALL, ".......................\n" );
 
 	vk.physical_device = VK_NULL_HANDLE;
-	for ( i = 0; i < device_count; i++, device_index++ ) {
-	if ( device_index < 0 || (uint32_t)device_index >= device_count ) {
-			device_index = 0;
+	{
+		int requested_index = r_device ? r_device->integer : -1;
+		qboolean forced_index = ( requested_index >= 0 );
+		int preferred_index = device_index;
+
+		// Clamp explicit index into range if needed (will fall back to other devices if creation fails).
+		if ( preferred_index >= (int)device_count ) {
+			preferred_index = device_count - 1;
+		} else if ( preferred_index < 0 ) {
+			preferred_index = 0;
 		}
-		if ( vk_create_device( physical_devices[ device_index ], device_index ) ) {
-			vk.physical_device = physical_devices[ device_index ];
-			break;
+
+		for ( int attempt = 0; attempt < (int)device_count; attempt++ ) {
+			int attempt_index = ( attempt == 0 ) ? preferred_index : ( ( preferred_index + attempt ) % (int)device_count );
+
+			if ( forced_index && attempt == 1 ) {
+				ri.Printf( PRINT_WARNING, "...requested device %d failed, falling back to other adapters\n", requested_index );
+			}
+
+			if ( vk_create_device( physical_devices[ attempt_index ], attempt_index ) ) {
+				vk.physical_device = physical_devices[ attempt_index ];
+				ri.Printf( PRINT_ALL, "...selected physical device: %d (requested %d)\n", attempt_index, requested_index );
+				break;
+			}
 		}
 	}
 
@@ -3527,6 +3558,10 @@ static void vk_create_shader_modules( void )
 
 	SET_OBJECT_NAME( vk.modules.gamma_fs, "gamma post-processing fragment module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 	SET_OBJECT_NAME( vk.modules.gamma_vs, "gamma post-processing vertex module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+
+	// Mesh/task shader modules (optional; only if compiled into shader_data)
+	vk.mesh.mesh_task = VK_NULL_HANDLE;
+	vk.mesh.mesh_mesh = VK_NULL_HANDLE;
 
 	// Load compute shaders for post-processing
 	// Note: These will be VK_NULL_HANDLE if shaders aren't compiled yet
@@ -5356,6 +5391,11 @@ void vk_initialize( void )
 
 void vk_create_pipelines( void )
 {
+	// ensure a valid default render pass index before pipeline generation
+	if ( vk.renderPassIndex < 0 || vk.renderPassIndex >= RENDER_PASS_COUNT ) {
+		vk.renderPassIndex = RENDER_PASS_MAIN;
+	}
+
 	vk_alloc_persistent_pipelines();
 
 	vk.pipelines_world_base = vk.pipelines_count;
@@ -5382,6 +5422,10 @@ void vk_create_brdflut_pipeline( void )
 {
     if( !vk.pbrActive )
         return;
+    if ( vk.modules.brdflut_fs == VK_NULL_HANDLE ) {
+        ri.Printf( PRINT_WARNING, "VK: BRDF LUT shader not loaded, skipping BRDF LUT pipeline\n" );
+        return;
+    }
     uint32_t size = 512;
     vk_create_post_process_pipeline( 4, size, size );
 }
@@ -5424,25 +5468,19 @@ void vk_create_compute_post_process_pipelines( void )
 	
 	// Try to load tonemap compute shader if not already loaded
 	// NOTE: tonemap_comp_spv must be compiled first via: cd src/renderervk/shaders && ./compile.sh
-	// Temporarily commented out until shaders are compiled to avoid sizeof() errors
-	/*
 	if ( vk.modules.tonemap_comp == VK_NULL_HANDLE ) {
 		vk.modules.tonemap_comp = SHADER_MODULE( tonemap_comp_spv );
 		SET_OBJECT_NAME( vk.modules.tonemap_comp, "tonemap compute shader module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 		ri.Printf( PRINT_DEVELOPER, "VK: Loaded tonemap compute shader module\n" );
 	}
-	*/
 	
 	// Try to load ReLAX denoising compute shader if not already loaded
 	// NOTE: rt_relax_comp_spv must be compiled first via: cd src/renderervk/shaders && ./compile.sh
-	// Temporarily commented out until shaders are compiled to avoid sizeof() errors
-	/*
 	if ( vk.rayTracingSupported && vk.modules.rt_relax_comp == VK_NULL_HANDLE ) {
 		vk.modules.rt_relax_comp = SHADER_MODULE( rt_relax_comp_spv );
 		SET_OBJECT_NAME( vk.modules.rt_relax_comp, "ReLAX denoise compute shader module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 		ri.Printf( PRINT_DEVELOPER, "VK: Loaded ReLAX denoise compute shader module\n" );
 	}
-	*/
 	
 	// If gamma compute shader is available, create pipeline
 	if ( vk.modules.gamma_comp != VK_NULL_HANDLE ) {
@@ -7148,6 +7186,19 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	VkBool32 alphaToCoverage = VK_FALSE;
 	unsigned int atest_bits;
 	unsigned int state_bits = def->state_bits;
+	int spec_count = 0;
+
+	Com_Memset( &frag_spec_data, 0, sizeof( frag_spec_data ) );
+#ifdef USE_VK_PBR
+	Com_Memset( spec_entries, 0, sizeof( spec_entries[0] ) * 26 );
+#else
+	Com_Memset( spec_entries, 0, sizeof( spec_entries[0] ) * 14 );
+#endif
+
+	if ( renderPassIndex < 0 || renderPassIndex >= RENDER_PASS_COUNT ) {
+		ri.Printf( PRINT_WARNING, "create_pipeline: invalid renderPassIndex %d (dropping pipeline)\n", (int)renderPassIndex );
+		return VK_NULL_HANDLE;
+	}
 
 #ifdef USE_VK_PBR
 	const int use_pbr = def->vk_pbr_flags ? 1 : 0;
@@ -7687,116 +7738,49 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	//
 	// fragment module specialization data
 	//
+#define PUSH_SPEC_ENTRY(id, field)                          \
+	do {                                                    \
+		if ( spec_count >= (int)ARRAY_LEN( spec_entries ) ) {\
+			ri.Printf( PRINT_WARNING, "create_pipeline: specialization entry overflow at id %d (dropping pipeline)\n", (id) ); \
+			return VK_NULL_HANDLE;                          \
+		}                                                   \
+		spec_entries[spec_count].constantID = (id);         \
+		spec_entries[spec_count].offset =                  \
+			offsetof(struct FragSpecData, field);          \
+		spec_entries[spec_count].size =                    \
+			sizeof(frag_spec_data.field);                  \
+		spec_count++;                                      \
+	} while (0)
 
-    spec_entries[1].constantID = 0;
-    spec_entries[1].offset = offsetof(struct FragSpecData, alpha_test_func);
-    spec_entries[1].size = sizeof(frag_spec_data.alpha_test_func);
-
-    spec_entries[2].constantID = 1;
-    spec_entries[2].offset = offsetof(struct FragSpecData, alpha_test_value);
-    spec_entries[2].size = sizeof(frag_spec_data.alpha_test_value);
-
-    spec_entries[3].constantID = 2;
-    spec_entries[3].offset = offsetof(struct FragSpecData, depth_fragment);
-    spec_entries[3].size = sizeof(frag_spec_data.depth_fragment);
-
-    spec_entries[4].constantID = 3;
-    spec_entries[4].offset = offsetof(struct FragSpecData, alpha_to_coverage);
-    spec_entries[4].size = sizeof(frag_spec_data.alpha_to_coverage);
-
-    spec_entries[5].constantID = 4;
-    spec_entries[5].offset = offsetof(struct FragSpecData, color_mode);
-    spec_entries[5].size = sizeof(frag_spec_data.color_mode);
-
-    spec_entries[6].constantID = 5;
-    spec_entries[6].offset = offsetof(struct FragSpecData, abs_light);
-    spec_entries[6].size = sizeof(frag_spec_data.abs_light);
-
-    spec_entries[7].constantID = 6;
-    spec_entries[7].offset = offsetof(struct FragSpecData, tex_mode);
-    spec_entries[7].size = sizeof(frag_spec_data.tex_mode);
-
-    spec_entries[8].constantID = 7;
-    spec_entries[8].offset = offsetof(struct FragSpecData, discard_mode);
-    spec_entries[8].size = sizeof(frag_spec_data.discard_mode);
-
-    spec_entries[9].constantID = 8;
-    spec_entries[9].offset = offsetof(struct FragSpecData, identity_color);
-    spec_entries[9].size = sizeof(frag_spec_data.identity_color);
-
-
-	spec_entries[10].constantID = 9;
-    spec_entries[10].offset = offsetof(struct FragSpecData, identity_color);
-    spec_entries[10].size = sizeof(frag_spec_data.identity_color);
-
-	spec_entries[11].constantID = 10;
-    spec_entries[11].offset = offsetof(struct FragSpecData, identity_color);
-    spec_entries[11].size = sizeof(frag_spec_data.identity_color);
-
-	spec_entries[12].constantID = 25;
-    spec_entries[12].offset = offsetof(struct FragSpecData, use_font_sdf);
-    spec_entries[12].size = sizeof(frag_spec_data.use_font_sdf);
-
-	spec_entries[13].constantID = 26;
-    spec_entries[13].offset = offsetof(struct FragSpecData, font_sdf_smooth);
-    spec_entries[13].size = sizeof(frag_spec_data.font_sdf_smooth);
-
-	frag_spec_info.mapEntryCount = 13;
+	PUSH_SPEC_ENTRY( 0, alpha_test_func );
+	PUSH_SPEC_ENTRY( 1, alpha_test_value );
+	PUSH_SPEC_ENTRY( 2, depth_fragment );
+	PUSH_SPEC_ENTRY( 3, alpha_to_coverage );
+	PUSH_SPEC_ENTRY( 4, color_mode );
+	PUSH_SPEC_ENTRY( 5, abs_light );
+	PUSH_SPEC_ENTRY( 6, tex_mode );
+	PUSH_SPEC_ENTRY( 7, discard_mode );
+	PUSH_SPEC_ENTRY( 8, identity_color );
+	PUSH_SPEC_ENTRY( 9, identity_color );
+	PUSH_SPEC_ENTRY( 10, identity_color );
+	PUSH_SPEC_ENTRY( 25, use_font_sdf );
+	PUSH_SPEC_ENTRY( 26, font_sdf_smooth );
 #ifdef USE_VK_PBR   
 {
-        frag_spec_info.mapEntryCount += 12;
+        PUSH_SPEC_ENTRY( 11, specularScale_x );
+        PUSH_SPEC_ENTRY( 12, specularScale_y );
+        PUSH_SPEC_ENTRY( 13, specularScale_z );
+        PUSH_SPEC_ENTRY( 14, specularScale_w );
 
-        {
-            spec_entries[12].constantID = 11;
-            spec_entries[12].offset = offsetof(struct FragSpecData, specularScale_x);
-            spec_entries[12].size = sizeof(frag_spec_data.specularScale_x);
+        PUSH_SPEC_ENTRY( 15, normalScale_x );
+        PUSH_SPEC_ENTRY( 16, normalScale_y );
+        PUSH_SPEC_ENTRY( 17, normalScale_z );
+        PUSH_SPEC_ENTRY( 18, normalScale_w );
 
-            spec_entries[13].constantID = 12;
-            spec_entries[13].offset = offsetof(struct FragSpecData, specularScale_y);
-            spec_entries[13].size = sizeof(frag_spec_data.specularScale_y);
-
-            spec_entries[14].constantID = 13;
-            spec_entries[14].offset = offsetof(struct FragSpecData, specularScale_z);
-            spec_entries[14].size = sizeof(frag_spec_data.specularScale_z);
-
-            spec_entries[15].constantID = 14;
-            spec_entries[15].offset = offsetof(struct FragSpecData, specularScale_w);
-            spec_entries[15].size = sizeof(frag_spec_data.specularScale_w);
-        }
-
-        {
-            spec_entries[16].constantID = 15;
-            spec_entries[16].offset = offsetof(struct FragSpecData, normalScale_x);
-            spec_entries[16].size = sizeof(frag_spec_data.normalScale_x);
-
-            spec_entries[17].constantID = 16;
-            spec_entries[17].offset = offsetof(struct FragSpecData, normalScale_y);
-            spec_entries[17].size = sizeof(frag_spec_data.normalScale_y);
-
-            spec_entries[18].constantID = 17;
-            spec_entries[18].offset = offsetof(struct FragSpecData, normalScale_z);
-            spec_entries[18].size = sizeof(frag_spec_data.normalScale_z);
-
-            spec_entries[19].constantID = 18;
-            spec_entries[19].offset = offsetof(struct FragSpecData, normalScale_w);
-            spec_entries[19].size = sizeof(frag_spec_data.normalScale_w);
-        }
-
-        spec_entries[20].constantID = 19;
-        spec_entries[20].offset = offsetof(struct FragSpecData, normal_texture_set);
-        spec_entries[20].size = sizeof(frag_spec_data.normal_texture_set);
-    
-        spec_entries[21].constantID = 20;
-        spec_entries[21].offset = offsetof(struct FragSpecData, physical_texture_set);
-        spec_entries[21].size = sizeof(frag_spec_data.physical_texture_set);
-
-        spec_entries[22].constantID = 21;
-        spec_entries[22].offset = offsetof(struct FragSpecData, env_texture_set);
-        spec_entries[22].size = sizeof(frag_spec_data.env_texture_set);
-
-        spec_entries[23].constantID = 22;
-        spec_entries[23].offset = offsetof(struct FragSpecData, lightmap_texture_set);
-        spec_entries[23].size = sizeof(frag_spec_data.lightmap_texture_set);
+        PUSH_SPEC_ENTRY( 19, normal_texture_set );
+        PUSH_SPEC_ENTRY( 20, physical_texture_set );
+        PUSH_SPEC_ENTRY( 21, env_texture_set );
+        PUSH_SPEC_ENTRY( 22, lightmap_texture_set );
         
         // only use w value, specgloss maps are not supported
         frag_spec_data.specularScale_x = def->specularScale[0];
@@ -7825,10 +7809,32 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
             frag_spec_data.lightmap_texture_set = -1;
     }
 #endif
-	frag_spec_info.pMapEntries = spec_entries + 1;
+	if ( spec_count > (int)ARRAY_LEN( spec_entries ) ) {
+		ri.Error( ERR_DROP, "create_pipeline: specialization entry overflow (%d > %zu)", spec_count, ARRAY_LEN( spec_entries ) );
+		return VK_NULL_HANDLE;
+	}
+
+	// Sanity-check specialization entries stay within struct bounds
+	for ( int i = 0; i < spec_count; i++ ) {
+		const size_t off = spec_entries[i].offset;
+		const size_t sz = spec_entries[i].size;
+		if ( sz == 0 || off >= sizeof( frag_spec_data ) || off + sz > sizeof( frag_spec_data ) ) {
+			ri.Printf( PRINT_WARNING, "create_pipeline: invalid specialization entry %d (off=%zu size=%zu struct=%zu), dropping pipeline\n", i, off, sz, sizeof( frag_spec_data ) );
+			return VK_NULL_HANDLE;
+		}
+	}
+
+	if ( spec_count == 0 ) {
+		ri.Printf( PRINT_WARNING, "create_pipeline: no specialization entries populated, dropping pipeline\n" );
+		return VK_NULL_HANDLE;
+	}
+
+	frag_spec_info.mapEntryCount = spec_count;
+	frag_spec_info.pMapEntries = spec_entries;
 	frag_spec_info.dataSize = sizeof( frag_spec_data );
 	frag_spec_info.pData = &frag_spec_data;
 	shader_stages[1].pSpecializationInfo = &frag_spec_info;
+#undef PUSH_SPEC_ENTRY
 
 
 	//
@@ -8390,9 +8396,16 @@ VkPipeline vk_gen_pipeline( uint32_t index ) {
 		VK_Pipeline_t *pipeline = vk.pipelines + index;
 		const renderPass_t pass = vk.renderPassIndex;
 		// Pipeline caching: check if already created for this render pass
+		if ( pass < 0 || pass >= RENDER_PASS_COUNT ) {
+			ri.Printf( PRINT_WARNING, "%s(%u): invalid render pass %d, skipping pipeline\n", __func__, index, (int)pass );
+			return VK_NULL_HANDLE;
+		}
 		if ( pipeline->handle[ pass ] == VK_NULL_HANDLE ) {
 			// Create pipeline lazily - Vulkan pipeline cache will handle deduplication
 			pipeline->handle[ pass ] = create_pipeline( &pipeline->def, pass, index );
+			if ( pipeline->handle[ pass ] == VK_NULL_HANDLE ) {
+				return VK_NULL_HANDLE;
+			}
 		}
 		return pipeline->handle[ pass ];
 	} else {
@@ -10314,9 +10327,20 @@ void vk_end_frame( void )
 				vk.renderScaleY = 1.0;
 
 				// Use compute shader post-processing if enabled
-				if ( r_postprocess_compute && r_postprocess_compute->integer && 
-				     vk.gamma_compute_pipeline != VK_NULL_HANDLE && 
+				VkPipeline activeComputePipeline = VK_NULL_HANDLE;
+				qboolean useTonemapCompute = qfalse;
+
+				if ( r_postprocess_compute && r_postprocess_compute->integer &&
 				     vk.compute_descriptor_set != VK_NULL_HANDLE ) {
+					if ( vk.tonemap_compute_pipeline != VK_NULL_HANDLE && r_hdr && r_hdr->integer ) {
+						activeComputePipeline = vk.tonemap_compute_pipeline;
+						useTonemapCompute = qtrue;
+					} else if ( vk.gamma_compute_pipeline != VK_NULL_HANDLE ) {
+						activeComputePipeline = vk.gamma_compute_pipeline;
+					}
+				}
+
+				if ( activeComputePipeline != VK_NULL_HANDLE ) {
 					
 					// Compute shader gamma pass
 					VkImage swapchainImage = vk.swapchain_images[vk.cmd->swapchain_image_index];
@@ -10395,36 +10419,51 @@ void vk_end_frame( void )
 					qvkUpdateDescriptorSets( vk.device, write_count, desc_writes, 0, NULL );
 					
 					// 2. Bind compute pipeline
-					qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.gamma_compute_pipeline );
+					qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, activeComputePipeline );
 					
 					// 3. Bind descriptor set
 					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
 						vk.compute_pipeline_layout, 0, 1, &vk.compute_descriptor_set, 0, NULL );
 					
-					// 4. Push constants (gamma parameters)
-					struct {
-						float gamma;
-						float obScale;
-						float greyscale;
-						int ditherMode;
-						int depth_r, depth_g, depth_b;
-					} gamma_params;
+					// 4. Push constants
+					if ( useTonemapCompute ) {
+						struct {
+							int tonemapMode;
+							float exposure;
+							float padding[2];
+						} tonemap_params;
+						tonemap_params.tonemapMode = (int)Com_Clamp( 0.0f, 3.0f, r_tonemapMode ? (float)r_tonemapMode->integer : 1.0f );
+						tonemap_params.exposure = Com_Clamp( 0.01f, 16.0f, r_tonemapExposure ? r_tonemapExposure->value : 1.0f );
+						tonemap_params.padding[0] = tonemap_params.padding[1] = 0.0f;
+
+						qvkCmdPushConstants( vk.cmd->command_buffer, vk.compute_pipeline_layout,
+							VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( tonemap_params ), &tonemap_params );
+					} else {
+						struct {
+							float gamma;
+							float obScale;
+							float greyscale;
+							int ditherMode;
+							int depth_r, depth_g, depth_b;
+						} gamma_params;
+						
+						gamma_params.gamma = 1.0f / (r_gamma->value);
+						gamma_params.obScale = (float)(1 << tr.overbrightBits);
+						gamma_params.greyscale = r_greyscale->value;
+						gamma_params.ditherMode = r_dither->integer;
+						// Depth bits for dithering (assuming 8-bit per channel)
+						gamma_params.depth_r = 255;
+						gamma_params.depth_g = 255;
+						gamma_params.depth_b = 255;
+						
+						qvkCmdPushConstants( vk.cmd->command_buffer, vk.compute_pipeline_layout,
+							VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(gamma_params), &gamma_params );
+					}
 					
-					gamma_params.gamma = 1.0f / (r_gamma->value);
-					gamma_params.obScale = (float)(1 << tr.overbrightBits);
-					gamma_params.greyscale = r_greyscale->value;
-					gamma_params.ditherMode = r_dither->integer;
-					// Depth bits for dithering (assuming 8-bit per channel)
-					gamma_params.depth_r = 255;
-					gamma_params.depth_g = 255;
-					gamma_params.depth_b = 255;
-					
-					qvkCmdPushConstants( vk.cmd->command_buffer, vk.compute_pipeline_layout,
-						VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(gamma_params), &gamma_params );
-					
-					// 5. Dispatch compute shader (workgroup size is 8x8)
-					uint32_t groupCountX = (vk.renderWidth + 7) / 8;
-					uint32_t groupCountY = (vk.renderHeight + 7) / 8;
+					// 5. Dispatch compute shader (workgroup size configurable, default 8x8)
+					uint32_t wgSize = ( r_postprocess_workgroup && r_postprocess_workgroup->integer > 0 ) ? (uint32_t)r_postprocess_workgroup->integer : 8u;
+					uint32_t groupCountX = (vk.renderWidth + (wgSize - 1)) / wgSize;
+					uint32_t groupCountY = (vk.renderHeight + (wgSize - 1)) / wgSize;
 					qvkCmdDispatch( vk.cmd->command_buffer, groupCountX, groupCountY, 1 );
 					
 					// 6. Transition swapchain image back to PRESENT_SRC_KHR for presentation
@@ -10437,7 +10476,8 @@ void vk_end_frame( void )
 						VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
 						0, 0, NULL, 0, NULL, 1, &barrier );
 					
-					ri.Printf( PRINT_DEVELOPER, "VK: Compute gamma pass dispatched (%ux%u groups)\n", groupCountX, groupCountY );
+					ri.Printf( PRINT_DEVELOPER, "VK: Compute %s pass dispatched (%ux%u groups)\n",
+						useTonemapCompute ? "tonemap" : "gamma", groupCountX, groupCountY );
 				} else {
 					// Traditional graphics pipeline gamma pass
 					if ( r_postprocess_compute && r_postprocess_compute->integer ) {

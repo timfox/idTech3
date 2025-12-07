@@ -20,6 +20,10 @@ extern cvar_t *r_materialMagic;
 
 static material_params_t *materialParams = NULL;
 
+static float lerp01( float a, float b, float w ) {
+	return a + ( b - a ) * w;
+}
+
 /*
 =============================================================================
 Material System Initialization
@@ -158,6 +162,47 @@ void vk_material_system_update( void )
 	float time = tr.refdef.floatTime;
 	for ( uint32_t i = 0; i < vk.materialSystem.materialCount; i++ ) {
 		materialParams[i].time = time;
+		
+		// Procedural modulation for wetness/damage/corruption to keep it from looking uniform.
+		const float randSeed = (float)( i + 1 );
+		float hash = sinf( randSeed * 12.9898f + time * 0.1f ) * 43758.5453f;
+		hash = hash - floorf( hash ); // fract
+
+		// Global sliders
+		const float wetScale = r_materialWetness ? Com_Clamp( 0.0f, 1.0f, r_materialWetness->value ) : 1.0f;
+		const float damageScale = r_materialDamage ? Com_Clamp( 0.0f, 1.0f, r_materialDamage->value ) : 1.0f;
+		const float magicScale = r_materialMagic ? Com_Clamp( 0.0f, 1.0f, r_materialMagic->value ) : 1.0f;
+
+		material_params_t *p = &materialParams[i];
+
+		const float wet = Com_Clamp( 0.0f, 1.0f, p->wetness * wetScale * ( 0.65f + 0.35f * hash ) );
+		if ( wet > 0.0f ) {
+			const float darken = 1.0f - 0.18f * wet;
+			p->baseColor[0] *= darken;
+			p->baseColor[1] *= darken;
+			p->baseColor[2] *= darken;
+			p->roughness = Com_Clamp( 0.02f, 1.0f, p->roughness * ( 1.0f - 0.6f * wet ) );
+			p->clearcoat = MAX( p->clearcoat, 0.45f * wet );
+			p->clearcoatRoughness = Com_Clamp( 0.02f, 1.0f, p->clearcoatRoughness * ( 1.0f - 0.5f * wet ) );
+			p->flags |= MATERIAL_WET | MATERIAL_DYNAMIC;
+		}
+
+		const float dmg = Com_Clamp( 0.0f, 1.0f, p->damage * damageScale * ( 0.8f + 0.4f * hash ) );
+		if ( dmg > 0.0f ) {
+			for ( int c = 0; c < 3; ++c ) {
+				p->baseColor[c] = lerp01( p->baseColor[c], p->damageColor[c], dmg );
+			}
+			p->roughness = Com_Clamp( 0.02f, 1.0f, p->roughness + 0.3f * dmg );
+			p->flags |= MATERIAL_DAMAGED | MATERIAL_DYNAMIC;
+		}
+
+		const float corrupt = Com_Clamp( 0.0f, 1.0f, p->corruption * ( 0.7f + 0.3f * hash ) );
+		if ( corrupt > 0.0f ) {
+			for ( int c = 0; c < 3; ++c ) {
+				p->emissive[c] += p->magicColor[c] * corrupt * magicScale;
+			}
+			p->flags |= MATERIAL_CORRUPTED | MATERIAL_EMISSIVE | MATERIAL_DYNAMIC;
+		}
 	}
 
 	// Profile layered materials (no-op if disabled)

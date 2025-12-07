@@ -27,6 +27,14 @@ struct MaterialParams {
     float normalScale;
     float clearcoat;
     float clearcoatRoughness;
+    float anisotropy;          // -1..1
+    vec3 anisotropyDir;        // tangent-space direction
+    float sheen;               // 0..1
+    vec3 sheenColor;           // sheen tint
+    float subsurface;          // 0..1
+    vec3 subsurfaceColor;      // SSS color
+    float microfacet;          // 0..1 tighten highlights
+    float microfacetSharpness; // >0, 1=neutral
     float layerWeight;
 
     // Metadata
@@ -131,6 +139,46 @@ float getMaterialMetallic(uint materialIndex, float baseMetallic)
     }
     
     return clamp(metallic, 0.0, 1.0);
+}
+
+// Advanced: anisotropy (returns -1..1) and direction (tangent-space)
+float getMaterialAnisotropy(uint materialIndex)
+{
+    MaterialParams params = materials[materialIndex];
+    return clamp(params.anisotropy, -1.0, 1.0);
+}
+
+vec3 getMaterialAnisotropyDir(uint materialIndex)
+{
+    MaterialParams params = materials[materialIndex];
+    return normalize(params.anisotropyDir);
+}
+
+// Advanced: sheen
+vec3 getMaterialSheen(uint materialIndex)
+{
+    MaterialParams params = materials[materialIndex];
+    return clamp(params.sheen, 0.0, 1.0) * params.sheenColor;
+}
+
+// Advanced: subsurface scattering strength/color
+vec3 getMaterialSubsurface(uint materialIndex)
+{
+    MaterialParams params = materials[materialIndex];
+    return clamp(params.subsurface, 0.0, 1.0) * params.subsurfaceColor;
+}
+
+// Advanced: microfaceting controls — tighten or soften spec lobes
+float getMaterialMicrofacet(uint materialIndex)
+{
+    MaterialParams params = materials[materialIndex];
+    return clamp(params.microfacet, 0.0, 1.0);
+}
+
+float getMaterialMicrofacetSharpness(uint materialIndex)
+{
+    MaterialParams params = materials[materialIndex];
+    return max(params.microfacetSharpness, 0.1);
 }
 
 #endif // MATERIAL_PARAMS_GLSL

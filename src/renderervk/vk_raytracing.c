@@ -2568,6 +2568,10 @@ void vk_rt_create_denoise_pipeline( void )
 	if ( !vk.rayTracingSupported || !vk.rt.initialized ) {
 		return;
 	}
+	if ( vk.modules.rt_relax_comp == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_WARNING, "ReLAX denoiser shader not loaded; skipping denoise pipeline creation\n" );
+		return;
+	}
 
 	// Check if shader module is loaded
 	if ( vk.modules.rt_relax_comp == VK_NULL_HANDLE ) {

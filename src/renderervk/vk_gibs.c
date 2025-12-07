@@ -433,6 +433,14 @@ void vk_gibs_create_pipelines( void )
 		}
 	}
 	
+	// If any required shader module or pipeline is missing, disable GIBS to avoid runtime crashes.
+	if ( vk.modules.gibs_spawn_comp == VK_NULL_HANDLE || vk.modules.gibs_update_comp == VK_NULL_HANDLE ||
+	     vk.gibs.spawnPipeline == VK_NULL_HANDLE || vk.gibs.updatePipeline == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_WARNING, "GIBS: Missing shader module or pipeline; disabling GIBS\n" );
+		vk.gibs.enabled = qfalse;
+		return;
+	}
+	
 	// Allocate descriptor sets
 	VkDescriptorSetAllocateInfo descAllocInfo = {};
 	descAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;

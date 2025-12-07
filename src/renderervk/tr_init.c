@@ -82,6 +82,7 @@ cvar_t	*r_dlightIntensity;
 #endif
 cvar_t	*r_dlightSaturation;
 #ifdef USE_VULKAN
+cvar_t  *r_vk_icd;
 cvar_t	*r_device;
 #ifdef USE_VBO
 cvar_t	*r_vbo;
@@ -138,6 +139,8 @@ cvar_t *r_layeredMaterialsPilot;
 	cvar_t	*r_pt_outputScale;
 	cvar_t	*r_postprocess_compute;
 	cvar_t	*r_postprocess_workgroup;
+cvar_t	*r_tonemapMode;
+cvar_t	*r_tonemapExposure;
 	cvar_t	*r_meshShaders;
 	cvar_t	*r_meshletSize;
 	cvar_t	*r_virtualTextures;
@@ -2087,6 +2090,8 @@ static void R_Register( void )
 		" -1 - first discrete GPU\n" \
 		" -2 - first integrated GPU" );
 	r_device->modified = qfalse;
+	r_vk_icd = ri.Cvar_Get( "r_vk_icd", "", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_vk_icd, "Optional override for VK_ICD_FILENAMES. Set to a driver manifest path to force a specific ICD." );
 
 	r_fbo = ri.Cvar_Get( "r_fbo", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_fbo, "Use framebuffer objects, enables gamma correction in windowed mode and allows arbitrary video size and screenshot/video capture.\n Required for bloom, HDR rendering, anti-aliasing and greyscale effects." );
@@ -2095,6 +2100,15 @@ static void R_Register( void )
 	r_bloom = ri.Cvar_Get( "r_bloom", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_bloom, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription(r_bloom, "Enables bloom post-processing effect. Requires \\r_fbo 1.");
+	r_postprocess_compute = ri.Cvar_Get( "r_postprocess_compute", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_postprocess_compute, "Use compute shader post-processing (gamma/tonemap) when available." );
+	r_postprocess_workgroup = ri.Cvar_Get( "r_postprocess_workgroup", "8", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_postprocess_workgroup, "Workgroup size (X/Y) for compute post-process dispatch. 8 matches the compiled shaders." );
+	r_tonemapMode = ri.Cvar_Get( "r_tonemapMode", "1", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_tonemapMode, "0", "3", CV_INTEGER );
+	ri.Cvar_SetDescription( r_tonemapMode, "Tonemap operator for compute path: 0=Reinhard, 1=ACES, 2=Filmic, 3=Uncharted2." );
+	r_tonemapExposure = ri.Cvar_Get( "r_tonemapExposure", "1.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_tonemapExposure, "Exposure multiplier used by compute tonemap (1.0 = neutral)." );
 
 	r_ext_multisample = ri.Cvar_Get( "r_ext_multisample", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_multisample, "0", "64", CV_INTEGER );
