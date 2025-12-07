@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef USE_ENTT
 #include "g_ecs.h"
 #endif
+#include "g_oop.h"
 
 level_locals_t	level;
 
@@ -118,6 +119,7 @@ vmCvar_t g_enableBreath;
 vmCvar_t g_proxMineTimeout;
 vmCvar_t g_music;
 vmCvar_t g_spawnprotect;
+vmCvar_t g_oopEntities;
 //Following for elimination:
 vmCvar_t g_elimination_selfdamage;
 vmCvar_t g_elimination_startHealth;
@@ -276,6 +278,8 @@ static cvarTable_t gameCvarTable[] = {
 
 	{ &g_podiumDist, "g_podiumDist", "80", 0, 0, qfalse, qfalse },
 	{ &g_podiumDrop, "g_podiumDrop", "70", 0, 0, qfalse, qfalse },
+
+	{ &g_oopEntities, "g_oopEntities", "0", CVAR_ARCHIVE, 0, qtrue, qfalse },
 
 	//Votes start:
 	{ &g_allowVote, "g_allowVote", "1", CVAR_SERVERINFO | CVAR_ARCHIVE, 0, qfalse, qfalse },
@@ -900,6 +904,8 @@ void G_InitGame( int levelTime, int randomSeed, int restart )
 	// Initialize ECS system
 	G_ECS_Init();
 #endif
+	// Initialize OOP bridge (enabled via g_oopEntities)
+	G_OOP_Init();
 	
 	// Initialize inventory system
 	G_Inventory_Init();
@@ -1066,6 +1072,8 @@ void G_ShutdownGame( int restart )
 	// Dialog system cleanup
 	G_Dialog_Shutdown( );
 	
+	// OOP bridge cleanup
+	G_OOP_Shutdown( );
 #ifdef USE_ENTT
 	// ECS system cleanup
 	G_ECS_Shutdown( );
@@ -2815,17 +2823,21 @@ void G_RunFrame( int levelTime )
 	level.framenum++;
 	level.previousTime = level.time;
 	level.time = levelTime;
-	//msec = level.time - level.previousTime;
+	const int frameMsec = level.time - level.previousTime;
 
 #ifdef USE_ENTT
 	// Run ECS systems
 	{
-		float deltaTime = (level.time - level.previousTime) / 1000.0f;
+		float deltaTime = frameMsec / 1000.0f;
 		if (deltaTime > 0.0f) {
 			G_ECS_RunFrame(deltaTime);
 		}
 	}
 #endif
+	// Run OOP bridge (if enabled)
+	if ( frameMsec > 0 ) {
+		G_OOP_RunFrame( frameMsec );
+	}
 
 	// get any cvar changes
 	G_UpdateCvars();

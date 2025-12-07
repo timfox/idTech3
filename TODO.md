@@ -56,8 +56,9 @@
 - [ ] Improved physics (investigate bullet3 or similar)
 - [ ] Improved networking (DTLS/NAT traversal candidates under review)
 
-## OOP / Entity Architecture (Half-Life-style)
-- [ ] Decide OOP strategy for game VM: C with vtables vs C++ gamecode; define ABI boundary to keep QVM/bytecode targets working
+## OOP / Entity Architecture
+- [x] Decide OOP strategy for game VM: use C++ for new gamecode, keep a stable C ABI shim for engine/VM boundaries and QVM compatibility
+- [ ] Document C/C++ boundary rules (extern "C", POD layouts for net/save structs, no RTTI/exceptions across boundary)
 - [ ] Design `BaseEntity` interface: Spawn/Precache, Think/ScheduleNextThink, Touch/Use, TakeDamage/Pain/Death, Save/Restore hooks
 - [ ] Add classname→factory registry so entities spawn via class descriptors (HL-style), with backwards-compatible fallbacks to current spawn funcs
 - [ ] Implement per-entity vtable/method table and shared mixins for movement/physics/rendering so code reuse mirrors HL/HL2 (e.g., door/trigger/npc behaviors)

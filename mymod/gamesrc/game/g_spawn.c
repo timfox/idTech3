@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //
 
 #include "g_local.h"
+#include "g_oop.h"
 
 qboolean	G_SpawnString( const char *key, const char *defaultString, char **out ) {
 	int		i;
@@ -311,6 +312,11 @@ qboolean G_CallSpawn( gentity_t *ent ) {
 	if ( itemname[0]==0) {
 		G_Printf ("G_CallSpawn: NULL classname\n");
 		return qfalse;
+	}
+
+	// Optional OOP/EnTT path: if enabled and class is registered, use it.
+	if ( G_OOP_CallSpawn( ent, itemname ) ) {
+		return qtrue;
 	}
 
 	// check item spawn functions

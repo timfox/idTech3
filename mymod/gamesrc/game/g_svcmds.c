@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // this file holds commands that can be executed by the server console, but not remote clients
 
 #include "g_local.h"
+#include "g_oop.h"
 
 
 /*
@@ -300,6 +301,20 @@ void Svcmd_RemoveIP_f (void)
 
 /*
 ===================
+Svcmd_OOPStatus_f
+===================
+*/
+void Svcmd_OOPStatus_f( void )
+{
+	const qboolean enabled = G_OOP_Enabled();
+	const int active = G_OOP_ActiveCount();
+	const int cvar = trap_Cvar_VariableIntegerValue( "g_oopEntities" );
+	G_Printf( "oop_status: enabled=%d (g_oopEntities=%d) active_entities=%d\n",
+		enabled ? 1 : 0, cvar, active );
+}
+
+/*
+===================
 Svcmd_EntityList_f
 ===================
 */
@@ -488,6 +503,7 @@ struct {
 	{ "status", qfalse, Svcmd_Status_f },
 	{ "eject", qfalse, Svcmd_EjectClient_f },
 	{ "dumpuser", qfalse, Svcmd_DumpUser_f },
+	{ "oop_status", qfalse, Svcmd_OOPStatus_f },
 	// don't handle communication commands unless dedicated
 	{ "cp", qtrue, Svcmd_CenterPrint_f },
 	{ "say_team", qtrue, Svcmd_TeamMessage_f },

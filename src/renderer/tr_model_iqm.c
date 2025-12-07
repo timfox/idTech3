@@ -206,10 +206,11 @@ qboolean R_LoadIQM( model_t *mod, void *buffer, int filesize, const char *mod_na
 		float *f;
 	} blendWeights;
 
-	header = (iqmHeader_t *)buffer;
-	if( (size_t)filesize < sizeof(iqmHeader_t) ) {
+	if( !buffer || (size_t)filesize < sizeof(iqmHeader_t) ) {
 		return qfalse;
 	}
+
+	header = (iqmHeader_t *)buffer;
 
 	if( Q_strncmp( header->magic, IQM_MAGIC, sizeof(header->magic) ) ) {
 		return qfalse;

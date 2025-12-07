@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // g_utils.c -- misc utility functions for game module
 
 #include "g_local.h"
+#include "g_oop.h"
 
 typedef struct {
 	char oldShader[MAX_QPATH];
@@ -488,6 +489,9 @@ void G_FreeEntity( gentity_t *ed )
 	if ( ed->neverFree ) {
 		return;
 	}
+
+	// Let the OOP layer clean up any associated C++ entity
+	G_OOP_OnFreeEntity( ed );
 
 	memset (ed, 0, sizeof(*ed));
 	ed->classname = "freed";
