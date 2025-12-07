@@ -522,7 +522,9 @@ prepare_for_pass (j_compress_ptr cinfo)
      */
     master->pass_type = output_pass;
     master->pass_number++;
-    /* fall through */
+#if defined(__GNUC__) && __GNUC__ >= 7
+    __attribute__((fallthrough));
+#endif
 #endif
   case output_pass:
     /* Do a data-output pass. */

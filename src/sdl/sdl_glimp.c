@@ -737,7 +737,10 @@ void VKimp_Init( glconfig_t *config )
 		}
 	}
 
-	qvkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)SDL_Vulkan_GetVkGetInstanceProcAddr();
+	{
+		void *addr = SDL_Vulkan_GetVkGetInstanceProcAddr();
+		qvkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)(intptr_t)addr;
+	}
 
 	if ( qvkGetInstanceProcAddr == NULL )
 	{

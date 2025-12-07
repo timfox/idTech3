@@ -29,7 +29,7 @@ qboolean R_LoadTIKI(model_t *mod, void *buffer, int filesize, const char *mod_na
 	int				i, j, size;
 	int				version;
 	
-	if (!mod || !buffer || filesize < sizeof(tikiHeader_t))
+	if (!mod || !buffer || (size_t)filesize < sizeof(tikiHeader_t))
 		return qfalse;
 	
 	pinmodel = (tikiHeader_t *)buffer;
@@ -206,7 +206,7 @@ qhandle_t R_RegisterTIKI(const char *name, model_t *mod)
 		return 0;
 	}
 	
-	if (filesize < sizeof(ident)) {
+	if ((size_t)filesize < sizeof(ident)) {
 		ri.FS_FreeFile(buf.v);
 		mod->type = MOD_BAD;
 		return 0;

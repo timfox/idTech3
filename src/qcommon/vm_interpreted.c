@@ -239,7 +239,7 @@ nextInstruction2:
 			// check for leaving the VM
 			if ( v1 == -1 ) {
 				goto done;
-			} else if ( (unsigned)v1 >= vm->instructionCount ) {
+			} else if ( (uint32_t)v1 >= (uint32_t)vm->instructionCount ) {
 				Com_Error( ERR_DROP, "VM program counter out of range in OP_LEAVE" );
 			}
 			ci = inst + v1;
@@ -261,7 +261,7 @@ nextInstruction2:
 					// the vm has ints on the stack, we expect
 					// longs so we have to convert it
 					intptr_t argarr[16];
-					int argn;
+					size_t argn;
 					for ( argn = 0; argn < ARRAY_LEN( argarr ); ++argn ) {
 						argarr[ argn ] = *(int32_t*)&image[ programStack + 4 + 4*argn ];
 					}
@@ -275,7 +275,7 @@ nextInstruction2:
 				//opStack++;
 				ci = inst + *(int32_t *)&image[ programStack ];
 				*opStack = v0;
-			} else if ( r0.u < vm->instructionCount ) {
+			} else if ( r0.u < (uint32_t)vm->instructionCount ) {
 				// vm call
 				ci = inst + r0.i;
 				opStack--;
@@ -306,7 +306,7 @@ nextInstruction2:
 			goto nextInstruction2;
 
 		case OP_JUMP:
-			if ( r0.u >= vm->instructionCount ) {
+			if ( r0.u >= (uint32_t)vm->instructionCount ) {
 				Com_Error( ERR_DROP, "VM program counter out of range in OP_JUMP" );
 			}
 			ci = inst + r0.i;

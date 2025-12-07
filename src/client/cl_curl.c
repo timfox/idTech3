@@ -1151,4 +1151,8 @@ qboolean Com_DL_Perform( download_t *dl )
 #ifndef USE_CURL
 /* Stub to avoid empty translation unit warning when cURL support is disabled. */
 static int cl_curl_disabled_stub(void) { return 0; }
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+static void cl_curl_disable_ref(void) { (void)cl_curl_disabled_stub; }
+#pragma GCC diagnostic pop
 #endif

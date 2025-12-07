@@ -409,7 +409,7 @@ static void SV_InjectLocation( const char *tld, const char *country ) {
 
 
 static const char *SV_FindCountry( const char *tld ) {
-	int i;
+	size_t i;
 
 	if ( *tld == '\0' )
 		return "Unknown Location";
@@ -1638,8 +1638,8 @@ static void SV_VerifyPaks_f( client_t *cl ) {
 
 		nClientPaks = Cmd_Argc();
 
-		if ( nClientPaks > ARRAY_LEN( nClientChkSum ) )
-			nClientPaks = ARRAY_LEN( nClientChkSum );
+		if ( nClientPaks > (int)ARRAY_LEN( nClientChkSum ) )
+			nClientPaks = (int)ARRAY_LEN( nClientChkSum );
 
 		// start at arg 2 ( skip serverId cl_paks )
 		nCurArg = 1;
@@ -1960,7 +1960,7 @@ void SV_PrintLocations_f( client_t *client ) {
 		len = Com_sprintf( line, sizeof( line ), "%2i %s%-*s" S_COLOR_WHITE " %2s %s\n",
 			i, cl->name, max_namelength-SV_Strlen(cl->name), "", cl->tld, cl->country );
 
-		if ( s - buf + len >= sizeof( buf )-1 ) // flush accumulated buffer
+		if ( (size_t)(s - buf) + (size_t)len >= sizeof( buf )-1 ) // flush accumulated buffer
 		{
 			if ( client )
 				NET_OutOfBandPrint( NS_SERVER, &client->netchan.remoteAddress, "print\n%s", buf );

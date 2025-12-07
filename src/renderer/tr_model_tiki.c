@@ -189,6 +189,7 @@ void RB_TIKISurfaceAnim(tikiSurface_t *surface)
 	// vec3_t tempVert, tempNormal;
 	// vec3_t bonePos, boneScale;
 	// quat_t boneRot;
+	(void)frontlerp; (void)backlerp; (void)frame; (void)oldFrame; (void)weight;
 	
 	if (!surface || !tr.currentModel || tr.currentModel->type != MOD_TIKI)
 		return;

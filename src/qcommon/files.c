@@ -1950,9 +1950,7 @@ Clears the path resolution cache
 */
 static void FS_ClearPathCache( void ) {
 	// Safe to call even before filesystem initialization
-	if ( fs_pathCacheTable ) {
-		Com_Memset( fs_pathCacheTable, 0, sizeof( fs_pathCacheTable ) );
-	}
+	Com_Memset( fs_pathCacheTable, 0, sizeof( fs_pathCacheTable ) );
 	fs_pathCacheHits = 0;
 	fs_pathCacheMisses = 0;
 }
@@ -1966,18 +1964,14 @@ Clears the file existence cache
 */
 static void FS_ClearExistenceCache( void ) {
 	// Safe to call even before filesystem initialization
-	if ( fs_existenceCacheTable ) {
-		Com_Memset( fs_existenceCacheTable, 0, sizeof( fs_existenceCacheTable ) );
-	}
+	Com_Memset( fs_existenceCacheTable, 0, sizeof( fs_existenceCacheTable ) );
 	fs_existenceCacheHits = 0;
 	fs_existenceCacheMisses = 0;
 }
 
 static void FS_ClearPathNormCache( void ) {
 	// Safe to call even before filesystem initialization
-	if ( fs_pathNormCacheTable ) {
-		Com_Memset( fs_pathNormCacheTable, 0, sizeof( fs_pathNormCacheTable ) );
-	}
+	Com_Memset( fs_pathNormCacheTable, 0, sizeof( fs_pathNormCacheTable ) );
 	fs_pathNormCacheHits = 0;
 	fs_pathNormCacheMisses = 0;
 }
@@ -2382,6 +2376,7 @@ extern qboolean		com_fullyInitialized;
 	pack_t *foundPak = NULL;
 	fileInPack_t *foundPakFile = NULL;
 	qboolean foundIsPakFile = qfalse;
+	(void)foundSearchPath; (void)foundPak; (void)foundPakFile; (void)foundIsPakFile;
 	
 	for ( search = fs_searchpaths ; search ; search = search->next ) {
 		// is the element a pak file?
@@ -3256,7 +3251,7 @@ static void FS_InsertPK3ToCache( pack_t *pak )
 static void FS_ResetCacheReferences( void )
 {
 	pack_t *pak;
-	int i;
+	size_t i;
 	for ( i = 0; i < ARRAY_LEN( pakHashTable ); i++ )
 	{
 		pak = pakHashTable[ i ];
@@ -3273,7 +3268,7 @@ static void FS_ResetCacheReferences( void )
 static void FS_FreeUnusedCache( void )
 {
 	pack_t *next, *pak;
-	int i;
+	size_t i;
 
 	for ( i = 0; i < ARRAY_LEN( pakHashTable ); i++ )
 	{
@@ -3425,7 +3420,7 @@ static qboolean FS_LoadPakFromFile( FILE *f )
 
 	// validate header data
 
-	if ( pk.pakNameLen > sizeof( pakName ) || pk.pakNameLen & 3 || pk.pakNameLen == 0 )
+	if ( pk.pakNameLen > (int)sizeof( pakName ) || pk.pakNameLen & 3 || pk.pakNameLen == 0 )
 	{
 		//Com_Printf( "bad pakNameLen: %08X\n", pk.pakNameLen );
 		return qfalse;
@@ -3544,7 +3539,7 @@ static qboolean FS_LoadPakFromFile( FILE *f )
 			//Com_Printf( "error reading file item[%i]\n", i );
 			goto __error;
 		}
-		if ( it.name >= pk.namesLen )
+		if ( (unsigned)it.name >= (unsigned)pk.namesLen )
 		{
 			//Com_Printf( "bad name offset: %i (expecting less than %i)\n", it.name, pk.namesLen );
 			goto __error;
@@ -4568,7 +4563,7 @@ static int FS_GetModList( char *listbuf, int bufsize ) {
 	nMods = nTotal = 0;
 
 	// iterate through paths and get list of potential mods
-	for (i = 0; i < ARRAY_LEN( paths ); i++) {
+	for (i = 0; i < (int)ARRAY_LEN( paths ); i++) {
 		if ( !*paths[ i ] || !(*paths[i])->string[0] )
 			continue;
 		pFiles0 = Sys_ListFiles( (*paths[i])->string, "/", NULL, &dummy, 1 );
@@ -4610,7 +4605,7 @@ static int FS_GetModList( char *listbuf, int bufsize ) {
 		// we didn't keep the information when we merged the directory names, as to what OS Path it was found under
 		// so we will try each of them here
 		nPaks = nPakDirs = 0;
-		for ( j = 0; j < ARRAY_LEN( paths ); j++ ) {
+		for ( j = 0; j < (int)ARRAY_LEN( paths ); j++ ) {
 			if ( !*paths[ j ] || !(*paths[ j ])->string[0] )
 				break;
 			path = FS_BuildOSPath( (*paths[j])->string, name, NULL );
@@ -5267,7 +5262,7 @@ qboolean FS_ComparePaks( char *neededpaks, int len, qboolean dlstring ) {
         
         // Find out whether it might have overflowed the buffer and don't add this file to the
         // list if that is the case.
-        if(strlen(origpos) + (origpos - neededpaks) >= len - 1)
+		if(strlen(origpos) + (size_t)(origpos - neededpaks) >= (size_t)(len - 1))
 	{
 		*origpos = '\0';
 		break;
@@ -5523,7 +5518,7 @@ static void FS_LoadedPakPureChecksums( void )
 	fs_numPureChecksums = 0;
 	for ( search = fs_searchpaths ; search ; search = search->next ) {
 		if ( search->pack ) {
-			if ( fs_numPureChecksums >= ARRAY_LEN( fs_pureChecksum ) ) {
+		if ( fs_numPureChecksums >= (int)ARRAY_LEN( fs_pureChecksum ) ) {
 				Com_DPrintf( "WARNING: pure checksums overflowed\n" );
 				fs_numPureChecksums = 0;
 				return;
@@ -5835,6 +5830,9 @@ static void FS_Startup( void ) {
 }
 
 
+#if defined(__GNUC__)
+__attribute__((unused))
+#endif
 static void FS_PrintSearchPaths( void )
 {
 	const searchpath_t *path = fs_searchpaths;
@@ -5879,7 +5877,7 @@ static void FS_CheckIdPaks( void )
 		{
 			founddemo = qtrue;
 
-			if( path->pack->checksum == DEMO_PAK0_CHECKSUM )
+		if( (uint32_t)path->pack->checksum == (uint32_t)DEMO_PAK0_CHECKSUM )
 			{
 				Com_Printf( "\n\n"
 						"**************************************************\n"
@@ -6242,8 +6240,8 @@ void FS_PureServerSetLoadedPaks( const char *pakSums, const char *pakNames ) {
 	Cmd_TokenizeString( pakSums );
 
 	c = Cmd_Argc();
-	if ( c > ARRAY_LEN( fs_serverPaks ) ) {
-		c = ARRAY_LEN( fs_serverPaks );
+	if ( c > (int)ARRAY_LEN( fs_serverPaks ) ) {
+		c = (int)ARRAY_LEN( fs_serverPaks );
 	}
 
 	fs_numServerPaks = c;
@@ -6269,7 +6267,7 @@ void FS_PureServerSetLoadedPaks( const char *pakSums, const char *pakNames ) {
 		}
 	}
 
-	for ( i = 0 ; i < ARRAY_LEN( fs_serverPakNames ) ; i++ ) {
+	for ( i = 0 ; i < (int)ARRAY_LEN( fs_serverPakNames ) ; i++ ) {
 		if ( fs_serverPakNames[i] ) {
 			Z_Free( fs_serverPakNames[i] );
 		}
@@ -6280,8 +6278,8 @@ void FS_PureServerSetLoadedPaks( const char *pakSums, const char *pakNames ) {
 		Cmd_TokenizeString( pakNames );
 
 		d = Cmd_Argc();
-		if ( d > ARRAY_LEN( fs_serverPakNames ) ) {
-			d = ARRAY_LEN( fs_serverPakNames );
+		if ( d > (int)ARRAY_LEN( fs_serverPakNames ) ) {
+			d = (int)ARRAY_LEN( fs_serverPakNames );
 		}
 
 		for ( i = 0 ; i < d ; i++ ) {
@@ -6306,15 +6304,15 @@ void FS_PureServerSetReferencedPaks( const char *pakSums, const char *pakNames )
 	Cmd_TokenizeString( pakSums );
 
 	c = Cmd_Argc();
-	if ( c > ARRAY_LEN( fs_serverReferencedPaks ) ) {
-		c = ARRAY_LEN( fs_serverReferencedPaks );
+	if ( c > (int)ARRAY_LEN( fs_serverReferencedPaks ) ) {
+		c = (int)ARRAY_LEN( fs_serverReferencedPaks );
 	}
 
 	for ( i = 0 ; i < c ; i++ ) {
 		fs_serverReferencedPaks[i] = atoi( Cmd_Argv( i ) );
 	}
 
-	for ( i = 0 ; i < ARRAY_LEN( fs_serverReferencedPakNames ); i++ ) {
+	for ( i = 0 ; i < (int)ARRAY_LEN( fs_serverReferencedPakNames ); i++ ) {
 		if ( fs_serverReferencedPakNames[i] )
 			Z_Free( fs_serverReferencedPakNames[i] );
 		fs_serverReferencedPakNames[i] = NULL;
@@ -6325,7 +6323,7 @@ void FS_PureServerSetReferencedPaks( const char *pakSums, const char *pakNames )
 
 		d = Cmd_Argc();
 
-		if ( d > c )
+		if ( d > (int)c )
 			d = c;
 
 		for ( i = 0 ; i < d ; i++ ) {

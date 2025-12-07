@@ -33,15 +33,25 @@ static float identityMatrix[12] = {
 	0, 0, 1, 0
 };
 
-static qboolean IQM_CheckRange( iqmHeader_t *header, int offset,
-				int count, int size ) {
+static qboolean IQM_CheckRange( iqmHeader_t *header, size_t offset,
+				size_t count, size_t size ) {
 	// return true if the range specified by offset, count and size
-	// doesn't fit into the file
-	return ( count <= 0 ||
-		 offset <= 0 ||
-		 offset > header->filesize ||
-		 offset + count * size < 0 ||
-		 offset + count * size > header->filesize );
+	// doesn't fit into the file (with overflow-safe checks)
+	size_t limit = header->filesize;
+
+	if ( count == 0 || size == 0 || offset == 0 ) {
+		return qtrue;
+	}
+	if ( offset > limit ) {
+		return qtrue;
+	}
+	if ( count > limit / size ) {
+		return qtrue;
+	}
+	if ( offset > limit - count * size ) {
+		return qtrue;
+	}
+	return qfalse;
 }
 // "multiply" 3x4 matrices, these are assumed to be the top 3 rows
 // of a 4x4 matrix with the last row = (0 0 0 1)
@@ -180,7 +190,7 @@ qboolean R_LoadIQM( model_t *mod, void *buffer, int filesize, const char *mod_na
 	iqmBounds_t		*bounds;
 	unsigned short		*framedata;
 	char			*str;
-	int			i, j, k;
+	size_t			i, j, k;
 	iqmTransform_t		*transform;
 	float			*mat, *matInv;
 	size_t			size, joint_names;
@@ -196,15 +206,15 @@ qboolean R_LoadIQM( model_t *mod, void *buffer, int filesize, const char *mod_na
 		float *f;
 	} blendWeights;
 
-	if( filesize < sizeof(iqmHeader_t) ) {
+	header = (iqmHeader_t *)buffer;
+	if( (size_t)filesize < sizeof(iqmHeader_t) ) {
 		return qfalse;
 	}
 
-	header = (iqmHeader_t *)buffer;
 	if( Q_strncmp( header->magic, IQM_MAGIC, sizeof(header->magic) ) ) {
 		return qfalse;
 	}
-
+	
 	LL( header->version );
 	if( header->version != IQM_VERSION ) {
 		ri.Printf(PRINT_WARNING, "R_LoadIQM: %s is a unsupported IQM version (%d), only version %d is supported.\n",
@@ -213,7 +223,7 @@ qboolean R_LoadIQM( model_t *mod, void *buffer, int filesize, const char *mod_na
 	}
 
 	LL( header->filesize );
-	if( header->filesize > filesize || header->filesize > 16<<20 ) {
+	if( (size_t)header->filesize > (size_t)filesize || header->filesize > 16u<<20 ) {
 		return qfalse;
 	}
 
@@ -292,11 +302,11 @@ qboolean R_LoadIQM( model_t *mod, void *buffer, int filesize, const char *mod_na
 			case IQM_FLOAT:
 				// 4-byte swap
 				if( IQM_CheckRange( header, vertexarray->offset,
-						    n, sizeof(float) ) ) {
+						    (size_t)n, sizeof(float) ) ) {
 					return qfalse;
 				}
 				intPtr = (int *)((byte *)header + vertexarray->offset);
-				for( j = 0; j < n; j++, intPtr++ ) {
+				for( j = 0; j < (size_t)n; j++, intPtr++ ) {
 					LL( *intPtr );
 				}
 				break;
@@ -506,7 +516,7 @@ qboolean R_LoadIQM( model_t *mod, void *buffer, int filesize, const char *mod_na
 
 			if( joint->parent < -1 ||
 				joint->parent >= (int)header->num_joints ||
-				joint->name >= (int)header->num_text ) {
+				(unsigned)joint->name >= header->num_text ) {
 				return qfalse;
 			}
 			joint_names += strlen( (char *)header + header->ofs_text +
@@ -777,10 +787,10 @@ qboolean R_LoadIQM( model_t *mod, void *buffer, int filesize, const char *mod_na
 				surface->first_influence = totalInfluences;
 				surface->num_influences = 0;
 
-				for( j = 0; j < surface->num_vertexes; j++ ) {
+				for( j = 0; j < (size_t)surface->num_vertexes; j++ ) {
 					vtx = surface->first_vertex + j;
 
-					for( k = 0; k < surface->num_influences; k++ ) {
+					for( k = 0; k < (size_t)surface->num_influences; k++ ) {
 						influence = surface->first_influence + k;
 
 						if( *(int*)&iqmData->influenceBlendIndexes[4*influence] != *(int*)&blendIndexes[4*vtx] ) {
@@ -803,7 +813,7 @@ qboolean R_LoadIQM( model_t *mod, void *buffer, int filesize, const char *mod_na
 
 					iqmData->influences[vtx] = surface->first_influence + k;
 
-					if( k == surface->num_influences ) {
+						if( k == (size_t)surface->num_influences ) {
 						influence = surface->first_influence + k;
 
 						iqmData->influenceBlendIndexes[4*influence+0] = blendIndexes[4*vtx+0];
@@ -1303,7 +1313,7 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 			int influence = surf->first_influence + i;
 			float *vtxMat = &influenceVtxMat[12*i];
 			float *nrmMat = &influenceNrmMat[9*i];
-			int	j;
+			size_t	j;
 			float	blendWeights[4];
 
 			if ( data->blendWeightsType == IQM_FLOAT ) {

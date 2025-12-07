@@ -1298,6 +1298,10 @@ void NET_WebSocket_SetCallbacks(net_websocket_t *ws,
 
 #else
 // Keep translation unit non-empty when CURL support is disabled
+#if defined(__GNUC__)
+static const int cl_net_enhanced_stub __attribute__((unused)) = 0;
+#else
 static const int cl_net_enhanced_stub = 0;
+#endif
 #endif /* USE_CURL */
 

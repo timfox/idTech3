@@ -139,7 +139,7 @@ static void R_BoxSurfaces_r(mnode_t *node, vec3_t mins, vec3_t maxs, surfaceType
 	msurface_t	*surf, **mark;
 
 	// do the tail recursion in a loop
-	while ( node->contents == CONTENTS_NODE ) {
+	while ( (int)node->contents == (int)CONTENTS_NODE ) {
 		s = BoxOnPlaneSide( mins, maxs, node->plane );
 		if (s == 1) {
 			node = node->children[0];

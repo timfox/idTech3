@@ -474,5 +474,9 @@ void *S_OGG_CodecLoad(const char *filename, snd_info_t *info)
 
 #else
 // Keep translation unit non-empty when OGG support is disabled
+#if defined(__GNUC__)
+static const int snd_codec_ogg_stub __attribute__((unused)) = 0;
+#else
 static const int snd_codec_ogg_stub = 0;
+#endif
 #endif // USE_OGG_VORBIS

@@ -594,7 +594,8 @@ static void SV_BuildClientSnapshot( client_t *client ) {
 	vec3_t						org;
 	clientSnapshot_t			*frame;
 	snapshotEntityNumbers_t		entityNumbers;
-	int							i, cl;
+	size_t						i;
+	int							cl;
 	svEntity_t					*svEnt;
 	int							clientNum;
 	playerState_t				*ps;
@@ -678,7 +679,7 @@ static void SV_BuildClientSnapshot( client_t *client ) {
 
 	frame->num_entities = entityNumbers.numSnapshotEntities;
 	// get pointers from common snapshot
-	for ( i = 0 ; i < entityNumbers.numSnapshotEntities ; i++ )	{
+	for ( i = 0 ; i < (size_t)entityNumbers.numSnapshotEntities ; i++ )	{
 		frame->ents[ i ] = svs.currFrame->ents[ entityNumbers.snapshotEntities[ i ] ];
 	}
 }

@@ -2547,7 +2547,8 @@ CL_ServersResponsePacket
 ===================
 */
 static void CL_ServersResponsePacket( const netadr_t* from, msg_t *msg, qboolean extended ) {
-	int				i, count, total;
+	int				i;
+	int				count, total;
 	netadr_t addresses[MAX_SERVERSPERPACKET];
 	int				numservers;
 	byte*			buffptr;
@@ -2584,10 +2585,10 @@ static void CL_ServersResponsePacket( const netadr_t* from, msg_t *msg, qboolean
 		{
 			buffptr++;
 
-			if (buffend - buffptr < sizeof(addresses[numservers].ipv._4) + sizeof(addresses[numservers].port) + 1)
+			if ((size_t)(buffend - buffptr) < sizeof(addresses[numservers].ipv._4) + sizeof(addresses[numservers].port) + 1)
 				break;
 
-			for(i = 0; i < sizeof(addresses[numservers].ipv._4); i++)
+			for(i = 0; i < (int)sizeof(addresses[numservers].ipv._4); i++)
 				addresses[numservers].ipv._4[i] = *buffptr++;
 
 			addresses[numservers].type = NA_IP;
@@ -2598,10 +2599,10 @@ static void CL_ServersResponsePacket( const netadr_t* from, msg_t *msg, qboolean
 		{
 			buffptr++;
 
-			if (buffend - buffptr < sizeof(addresses[numservers].ipv._6) + sizeof(addresses[numservers].port) + 1)
+			if ((size_t)(buffend - buffptr) < sizeof(addresses[numservers].ipv._6) + sizeof(addresses[numservers].port) + 1)
 				break;
 
-			for(i = 0; i < sizeof(addresses[numservers].ipv._6); i++)
+			for(i = 0; i < (int)sizeof(addresses[numservers].ipv._6); i++)
 				addresses[numservers].ipv._6[i] = *buffptr++;
 
 			addresses[numservers].type = NA_IP6;
@@ -3524,7 +3525,10 @@ static void CL_InitRef( void ) {
 		}
 	}
 
-	GetRefAPI = (GetRefAPI_t)Sys_LoadFunction( rendererLib, "GetRefAPI" );
+	{
+		void *sym = Sys_LoadFunction( rendererLib, "GetRefAPI" );
+		GetRefAPI = (GetRefAPI_t)(intptr_t)sym;
+	}
 	if( !GetRefAPI )
 	{
 		Com_Error( ERR_FATAL, "Can't load symbol GetRefAPI" );
@@ -5075,7 +5079,7 @@ static ping_t* CL_GetFreePing( void )
 	ping_t* pingptr;
 	ping_t* best;
 	int		oldest;
-	int		i;
+	size_t	i;
 	int		time, msec;
 
 	msec = Sys_Milliseconds();

@@ -538,7 +538,7 @@ CL_CmdButtons
 ==============
 */
 static void CL_CmdButtons( usercmd_t *cmd ) {
-	int		i;
+	size_t		i;
 
 	//
 	// figure button bits

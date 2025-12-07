@@ -94,7 +94,7 @@ static const char *SV_ExpandNewlines( const char *in ) {
 	int		l;
 
 	l = 0;
-	while ( *in && l < sizeof(string) - 3 ) {
+	while ( *in && l < (int)sizeof(string) - 3 ) {
 		if ( *in == '\n' ) {
 			string[l++] = '\\';
 			string[l++] = 'n';
@@ -478,7 +478,7 @@ static leakyBucket_t *SVC_BucketForAddress( const netadr_t *address, int burst, 
 		interval = now - bucket->rate.lastTime;
 
 		// Reclaim expired buckets
-		if ( bucket->type != NA_BAD && (unsigned)interval > ( bucket->rate.burst * period ) ) {
+		if ( bucket->type != NA_BAD && (unsigned)interval > ( (unsigned)bucket->rate.burst * period ) ) {
 			if ( bucket->prev != NULL ) {
 				bucket->prev->next = bucket->next;
 			} else {

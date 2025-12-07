@@ -67,7 +67,7 @@ static void LAN_LoadCachedServers( void ) {
 	cls.numGlobalServerAddresses = 0;
 
 	file_size = FS_Home_FOpenFileRead( "servercache.dat", &fileIn );
-	if ( file_size < (3*sizeof(int)) ) {
+	if ( file_size < (int)(3*sizeof(int)) ) {
 		if ( fileIn != FS_INVALID_HANDLE ) {
 			FS_FCloseFile( fileIn );
 		}
@@ -1386,7 +1386,7 @@ static intptr_t QDECL UI_DllSyscall( intptr_t arg, ... ) {
 #if !id386 || defined __clang__
 	intptr_t	args[10]; // max.count for UI
 	va_list	ap;
-	int i;
+	size_t i;
 
 	args[0] = arg;
 	va_start( ap, arg );

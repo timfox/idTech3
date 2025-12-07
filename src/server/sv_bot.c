@@ -91,7 +91,7 @@ SV_BotFreeClient
 void SV_BotFreeClient( int clientNum ) {
 	client_t	*cl;
 
-	if ( (unsigned) clientNum >= sv.maxclients ) {
+	if ( (unsigned) clientNum >= (unsigned)sv.maxclients ) {
 		Com_Error( ERR_DROP, "SV_BotFreeClient: bad clientNum: %i", clientNum );
 	}
 
@@ -369,7 +369,7 @@ static void BotImport_DebugPolygonShow(int id, int color, int numPoints, vec3_t 
 	if ( !debugpolygons )
 		return;
 
-	if ( (unsigned) id >= bot_maxdebugpolys )
+	if ( (unsigned) id >= (unsigned)bot_maxdebugpolys )
 		return;
 
 	poly = &debugpolygons[id];
@@ -389,7 +389,7 @@ void BotImport_DebugPolygonDelete(int id)
 	if ( !debugpolygons )
 		return;
 
-	if ( (unsigned) id >= bot_maxdebugpolys )
+	if ( (unsigned) id >= (unsigned)bot_maxdebugpolys )
 		return;
 
 	debugpolygons[id].inuse = qfalse;
@@ -453,7 +453,7 @@ SV_BotClientCommand
 ==================
 */
 static void BotClientCommand( int client, const char *command ) {
-	if ( (unsigned) client < sv.maxclients ) {
+	if ( (unsigned) client < (unsigned)sv.maxclients ) {
 		SV_ExecuteClientCommand( &svs.clients[client], command );
 	}
 }
@@ -611,7 +611,7 @@ SV_BotGetConsoleMessage
 */
 int SV_BotGetConsoleMessage( int client, char *buf, int size )
 {
-	if ( (unsigned) client < sv.maxclients ) {
+	if ( (unsigned) client < (unsigned)sv.maxclients ) {
 		client_t* cl;
 		int index;
 
@@ -666,10 +666,10 @@ SV_BotGetSnapshotEntity
 ==================
 */
 int SV_BotGetSnapshotEntity( int client, int sequence ) {
-	if ( (unsigned) client < sv.maxclients ) {
+	if ( (unsigned) client < (unsigned)sv.maxclients ) {
 		const client_t* cl = &svs.clients[client];
 		const clientSnapshot_t* frame = &cl->frames[cl->netchan.outgoingSequence & PACKET_MASK];
-		if ( (unsigned) sequence >= frame->num_entities ) {
+	if ( (unsigned) sequence >= (unsigned)frame->num_entities ) {
 			return -1;
 		}
 		return frame->ents[sequence]->number;

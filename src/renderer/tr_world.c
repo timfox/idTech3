@@ -244,10 +244,10 @@ static qboolean R_LightCullSurface( const surfaceType_t* surface, const dlight_t
 #ifdef USE_LEGACY_DLIGHTS
 static int R_DlightFace( srfSurfaceFace_t *face, int dlightBits ) {
 	float		d;
-	int			i;
+	unsigned int i;
 	const dlight_t	*dl;
 
-	for ( i = 0; i < tr.refdef.num_dlights; i++ ) {
+	for ( i = 0U; i < tr.refdef.num_dlights; i++ ) {
 		if ( ! ( dlightBits & ( 1 << i ) ) ) {
 			continue;
 		}
@@ -269,10 +269,10 @@ static int R_DlightFace( srfSurfaceFace_t *face, int dlightBits ) {
 
 
 static int R_DlightGrid( srfGridMesh_t *grid, int dlightBits ) {
-	int			i;
+	unsigned int	i;
 	const dlight_t	*dl;
 
-	for ( i = 0 ; i < tr.refdef.num_dlights ; i++ ) {
+	for ( i = 0U ; i < tr.refdef.num_dlights ; i++ ) {
 		if ( ! ( dlightBits & ( 1 << i ) ) ) {
 			continue;
 		}
@@ -452,7 +452,7 @@ static void R_RecursiveLightNode( const mnode_t* node )
 		if ( node->visframe != tr.visCount )
 			return;
 
-		if ( node->contents != CONTENTS_NODE )
+		if ( (unsigned int)node->contents != CONTENTS_NODE )
 			break;
 
 		children[0] = children[1] = qfalse;
@@ -523,7 +523,7 @@ void R_AddBrushModelSurfaces ( trRefEntity_t *ent ) {
 	bmodel_t	*bmodel;
 	int			clip;
 	const model_t		*pModel;
-	int			i;
+	unsigned int	i;
 
 	pModel = R_GetModelByHandle( ent->e.hModel );
 
@@ -550,7 +550,7 @@ void R_AddBrushModelSurfaces ( trRefEntity_t *ent ) {
 		
 		R_TransformDlights( tr.viewParms.num_dlights, tr.viewParms.dlights, &tr.or );
 
-		for ( i = 0; i < tr.viewParms.num_dlights; i++ ) {
+		for ( i = 0U; i < tr.viewParms.num_dlights; i++ ) {
 			dl = &tr.viewParms.dlights[i];
 			if ( !R_LightCullBounds( dl, bmodel->bounds[0], bmodel->bounds[1] ) ) {
 				tr.lightCount++;
@@ -568,7 +568,7 @@ void R_AddBrushModelSurfaces ( trRefEntity_t *ent ) {
 	R_SetupEntityLighting( &tr.refdef, ent );
 	R_DlightBmodel( bmodel );
 
-	for ( i = 0 ; i < bmodel->numSurfaces ; i++ ) {
+	for ( i = 0U ; i < (unsigned int)bmodel->numSurfaces ; i++ ) {
 		R_AddWorldSurface( bmodel->firstSurface + i, tr.currentEntity->needDlights );
 	}
 #endif
@@ -647,7 +647,7 @@ static void R_RecursiveWorldNode( mnode_t *node, unsigned int planeBits, unsigne
 
 		}
 
-		if ( node->contents != CONTENTS_NODE ) {
+		if ( (unsigned int)node->contents != CONTENTS_NODE ) {
 			break;
 		}
 
@@ -662,9 +662,9 @@ static void R_RecursiveWorldNode( mnode_t *node, unsigned int planeBits, unsigne
 		if ( !r_dlightMode->integer )
 #endif
 		if ( dlightBits ) {
-			int	i;
+			unsigned int i;
 
-			for ( i = 0 ; i < tr.refdef.num_dlights ; i++ ) {
+			for ( i = 0U ; i < tr.refdef.num_dlights ; i++ ) {
 				const dlight_t	*dl;
 				float		dist;
 
@@ -751,7 +751,7 @@ static mnode_t *R_PointInLeaf( const vec3_t p ) {
 
 	node = tr.world->nodes;
 	while( 1 ) {
-		if (node->contents != CONTENTS_NODE ) {
+				if ((unsigned int)node->contents != CONTENTS_NODE ) {
 			break;
 		}
 		plane = node->plane;
@@ -887,7 +887,7 @@ R_AddWorldSurfaces
 void R_AddWorldSurfaces( void ) {
 #ifdef USE_PMLIGHT
 	dlight_t* dl;
-	int i;
+	unsigned int i;
 #endif
 
 	if ( !r_drawworld->integer ) {
@@ -925,7 +925,7 @@ void R_AddWorldSurfaces( void ) {
 	// instead of having copypasted versions for both world and local cases
 
 	R_TransformDlights( tr.viewParms.num_dlights, tr.viewParms.dlights, &tr.viewParms.world );
-	for ( i = 0; i < tr.viewParms.num_dlights; i++ ) 
+		for ( i = 0U; i < tr.viewParms.num_dlights; i++ )
 	{
 		dl = &tr.viewParms.dlights[i];	
 		dl->head = dl->tail = NULL;

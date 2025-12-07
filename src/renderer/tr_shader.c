@@ -1826,7 +1826,8 @@ FinishStage
 */
 static void FinishStage( shaderStage_t *stage )
 {
-	int i, n;
+	size_t i;
+	int n;
 
 	if ( !tr.mergeLightmaps ) {
 		return;
@@ -2268,7 +2269,7 @@ static const collapse_t collapse[] = {
 	{ 0, GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA | GLS_SRCBLEND_SRC_ALPHA,
 		GL_DECAL, 0 },
 #endif
-	{ -1 }
+	{ -1, -1, 0, 0 }
 };
 
 

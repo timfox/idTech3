@@ -635,7 +635,7 @@ static void VBO_AddGeometry( vbo_t *vbo, vbo_item_t *vi, shaderCommands_t *input
 
 	size = input->numIndexes * sizeof( input->indexes[ 0 ] );
 	offs = input->shader->iboOffset + input->shader->curIndexes * sizeof( input->indexes[0] );
-	if ( offs + size > vbo->ibo_size ) {
+	if ( (uint32_t)(offs + size) > (uint32_t)vbo->ibo_size ) {
 		ri.Error( ERR_DROP, "Index0 overflow" );
 	}
 	memcpy( vbo->ibo_buffer + offs, input->indexes, size );
@@ -644,7 +644,7 @@ static void VBO_AddGeometry( vbo_t *vbo, vbo_item_t *vi, shaderCommands_t *input
 	// vertexes
 	offs = input->shader->vboOffset + input->shader->curVertexes * sizeof( input->xyz[0] );
 	size = input->numVertexes * sizeof( input->xyz[ 0 ] );
-	if ( offs + size > vbo->vbo_size ) {
+	if ( (uint32_t)(offs + size) > (uint32_t)vbo->vbo_size ) {
 		ri.Error( ERR_DROP, "Vertex overflow" );
 	}
 	//Com_Printf( "v offs=%i size=%i\n", offs, size );
@@ -653,7 +653,7 @@ static void VBO_AddGeometry( vbo_t *vbo, vbo_item_t *vi, shaderCommands_t *input
 	// normals
 	offs = input->shader->normalOffset + input->shader->curVertexes * sizeof( input->normal[0] );
 	size = input->numVertexes * sizeof( input->normal[ 0 ] );
-	if ( offs + size > vbo->vbo_size ) {
+	if ( (uint32_t)(offs + size) > (uint32_t)vbo->vbo_size ) {
 		ri.Error( ERR_DROP, "Normals overflow" );
 	}
 	//Com_Printf( "v offs=%i size=%i\n", offs, size );
@@ -1069,7 +1069,7 @@ void VBO_Cleanup( void )
 		}
 	}
 
-	for ( i = 0; i < ARRAY_LEN( vbo_vp ); i++ )
+	for ( i = 0; i < (int)ARRAY_LEN( vbo_vp ); i++ )
 	{
 		if ( vbo_vp[i] )
 		{
@@ -1078,7 +1078,7 @@ void VBO_Cleanup( void )
 	}
 	memset( vbo_vp, 0, sizeof( vbo_vp ) );
 
-	for ( i = 0; i < ARRAY_LEN( vbo_fp ); i++ )
+	for ( i = 0; i < (int)ARRAY_LEN( vbo_fp ); i++ )
 	{
 		if ( vbo_fp[i] )
 		{

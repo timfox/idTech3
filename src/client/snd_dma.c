@@ -1259,7 +1259,7 @@ static void S_Update_( int msec ) {
 		& ~(dma.submission_chunk-1);
 
 	// never mix more than the complete buffer
-	if ( endtime - s_paintedtime > dma.fullsamples ) {
+	if ( endtime - (unsigned)s_paintedtime > (unsigned)dma.fullsamples ) {
 		endtime = s_paintedtime + dma.fullsamples;
 	}
 
@@ -1389,8 +1389,8 @@ static void S_UpdateBackgroundTrack( void ) {
 
 		// our max buffer size
 		fileBytes = fileSamples * (s_backgroundStream->info.width * s_backgroundStream->info.channels);
-		if ( fileBytes > sizeof(raw) ) {
-			fileBytes = sizeof(raw);
+		if ( fileBytes > (int)sizeof(raw) ) {
+			fileBytes = (int)sizeof(raw);
 			fileSamples = fileBytes / (s_backgroundStream->info.width * s_backgroundStream->info.channels);
 		}
 

@@ -727,7 +727,7 @@ static char *ARB_BuildBloomProgram( char *buf ) {
 
 // Gaussian blur shader
 static char *ARB_BuildBlurProgram( char *buf, int taps ) {
-	size_t i;
+	int i;
 	char *s = buf;
 
 	*s = '\0';
@@ -1780,7 +1780,7 @@ static void R_Bloom_LensEffect( float alpha )
 	vec4_t color;
 
 	alpha /= (float)ARRAY_LEN( lc );
-	for ( i = 0; i < ARRAY_LEN( lc ); i++ ) {
+	for ( i = 0; i < (int)ARRAY_LEN( lc ); i++ ) {
 		VectorCopy( lc[i], color ); color[3] = alpha;
 		R_Setup_Quad_Lens( (i+1)*144, color, &verts[i*6], &coords[i*6], &colors[i*6] );
 	}

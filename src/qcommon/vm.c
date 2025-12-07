@@ -746,14 +746,14 @@ static int Load_JTS( vm_t *vm, uint32_t crc32, void *data, int vmPakIndex ) {
 		return -1;
 	}
 
-	if ( length < sizeof( header ) ) {
+	if ( (size_t)length < sizeof( header ) ) {
 		if ( data )
 			Com_Printf( " bad filesize %i for %s.\n", length, filename );
 		FS_FCloseFile( fh );
 		return -1;
 	}
 
-	if ( FS_Read( header, sizeof( header ), fh ) != sizeof( header ) ) {
+	if ( FS_Read( header, sizeof( header ), fh ) != (int)sizeof( header ) ) {
 		if ( data )
 			Com_Printf( " error reading header of %s.\n", filename );
 		FS_FCloseFile( fh );
@@ -804,9 +804,10 @@ static char *VM_ValidateHeader( vmHeader_t *header, int fileSize )
 {
 	static char errMsg[128];
 	int n;
+	size_t fileSizeSz = (size_t)fileSize;
 	
 	// truncated
-	if ( fileSize < ( sizeof( vmHeader_t ) - sizeof( int32_t ) ) ) {
+	if ( fileSizeSz < ( sizeof( vmHeader_t ) - sizeof( int32_t ) ) ) {
 		Com_sprintf( errMsg, sizeof( errMsg ), "truncated image header (%i bytes long)", fileSize );
 		return errMsg;
 	}
@@ -818,7 +819,7 @@ static char *VM_ValidateHeader( vmHeader_t *header, int fileSize )
 	}
 	
 	// truncated
-	if ( fileSize < sizeof( vmHeader_t ) && LittleLong( header->vmMagic ) != VM_MAGIC_VER2 ) {
+	if ( fileSizeSz < sizeof( vmHeader_t ) && LittleLong( header->vmMagic ) != VM_MAGIC_VER2 ) {
 		Com_sprintf( errMsg, sizeof( errMsg ), "truncated image header (%i bytes long)", fileSize );
 		return errMsg;
 	}
@@ -832,19 +833,19 @@ static char *VM_ValidateHeader( vmHeader_t *header, int fileSize )
 	VM_SwapLongs( header, n );
 	
 	// bad code offset
-	if ( header->codeOffset >= fileSize ) {
+	if ( (size_t)header->codeOffset >= fileSizeSz ) {
 		Com_sprintf( errMsg, sizeof( errMsg ), "bad code segment offset %i", header->codeOffset );
 		return errMsg;
 	}
 	
 	// bad code length
-	if ( header->codeLength <= 0 || header->codeOffset + header->codeLength > fileSize ) {
+	if ( header->codeLength <= 0 || (size_t)(header->codeOffset + header->codeLength) > fileSizeSz ) {
 		Com_sprintf( errMsg, sizeof( errMsg ), "bad code segment length %i", header->codeLength );
 		return errMsg;
 	}
 	
 	// bad data offset
-	if ( header->dataOffset >= fileSize || header->dataOffset != header->codeOffset + header->codeLength ) {
+	if ( (size_t)header->dataOffset >= fileSizeSz || header->dataOffset != header->codeOffset + header->codeLength ) {
 		Com_sprintf( errMsg, sizeof( errMsg ), "bad data segment offset %i", header->dataOffset );
 		return errMsg;
 	}
@@ -1893,8 +1894,12 @@ static void * QDECL VM_LoadLib( const char *name, vmMainFunc_t *entryPoint, dllS
 	Com_Printf( "VM_LoadLib '%s' loaded successfully, handle=%p\n", filename, libHandle );
 
 	Com_Printf( "VM_LoadLib: Loading symbols dllEntry and vmMain\n" );
-	dllEntry = /* ( dllEntry_t ) */ Sys_LoadFunction( libHandle, "dllEntry" );
-	*entryPoint = /* ( dllSyscall_t ) */ Sys_LoadFunction( libHandle, "vmMain" );
+	{
+		void *dllEntrySym = Sys_LoadFunction( libHandle, "dllEntry" );
+		void *vmMainSym   = Sys_LoadFunction( libHandle, "vmMain" );
+		dllEntry = (dllEntry_t)(intptr_t)dllEntrySym;
+		*entryPoint = (vmMainFunc_t)(intptr_t)vmMainSym;
+	}
 	if ( !*entryPoint || !dllEntry ) {
 		const char *missing = !*entryPoint ? "vmMain" : "dllEntry";
 		Com_Printf( "VM_LoadLib '%s' failed: missing required symbol '%s'\n", filename, missing );
@@ -1902,8 +1907,8 @@ static void * QDECL VM_LoadLib( const char *name, vmMainFunc_t *entryPoint, dllS
 		return NULL;
 	}
 
-	Com_Printf( "VM_LoadLib(%s) found vmMain at %p, dllEntry at %p\n", name, (void*)*entryPoint, (void*)dllEntry );
-	Com_Printf( "VM_LoadLib: Calling dllEntry with systemcalls=%p\n", (void*)systemcalls );
+	Com_Printf( "VM_LoadLib(%s) found vmMain at %p, dllEntry at %p\n", name, (void*)(intptr_t)*entryPoint, (void*)(intptr_t)dllEntry );
+	Com_Printf( "VM_LoadLib: Calling dllEntry with systemcalls=%p\n", (void*)(intptr_t)systemcalls );
 	dllEntry( systemcalls );
 	Com_Printf( "VM_LoadLib(%s) dllEntry completed successfully!\n", name );
 
@@ -2059,7 +2064,8 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 			vm->dllHandle = VM_LoadLib( name, &vm->entryPoint, dllSyscalls );
 			if ( vm->dllHandle ) {
 				if ( com_developer && com_developer->integer ) {
-					Com_Printf( "VM_Create: VM_LoadLib succeeded for %s, entryPoint=%p\n", name, (void*)vm->entryPoint );
+					Com_Printf( "VM_Create: VM_LoadLib succeeded for %s, entryPoint=%p\n", name, (void*)(intptr_t)vm->entryPoint );
+					Com_Printf( "VM_Create: VM_LoadLib succeeded for %s, entryPoint=%p\n", name, (void*)(intptr_t)vm->entryPoint );
 				}
 				vm->privateFlag = 0; // allow reading private cvars
 				vm->dataAlloc = ~0U;
@@ -2092,7 +2098,7 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 			vm->dllHandle = VM_LoadLib( name, &vm->entryPoint, dllSyscalls );
 			if ( vm->dllHandle ) {
 				Com_Printf( "VM_Create: DLL fallback succeeded for %s, entryPoint=%p\n",
-				            name, (void*)vm->entryPoint );
+				            name, (void*)(intptr_t)vm->entryPoint );
 				vm->privateFlag = 0; // allow reading private cvars
 				vm->dataAlloc = ~0U;
 				vm->dataMask = ~0U;
