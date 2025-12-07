@@ -1,0 +1,47 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+precision mediump float;
+precision mediump int;
+
+// Simple stylization compute pass. Takes HDR color as input and writes
+// stylized color to a storage image.
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform mediump sampler2D input_texture;   // HDR color
+layout(set = 0, binding = 1, rgba16f) uniform mediump writeonly image2D output_image;
+
+layout(push_constant) uniform StyleParams {
+    mediump float strength;   // 0..2
+    mediump float levels;     // 2..32 posterization levels
+    mediump float edgeScale;  // edge contrast weight
+    mediump float pad;
+} params;
+
+mediump float luma(mediump vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+
+void main() {
+    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+    mediump vec2 tex_coord = (vec2(coord) + vec2(0.5)) / vec2(imageSize(output_image));
+    mediump vec3 base = texture(input_texture, tex_coord).rgb;
+
+    if (params.strength <= 0.0) {
+        imageStore(output_image, coord, vec4(base, 1.0));
+        return;
+    }
+
+    // Posterize
+    mediump float lv = clamp(params.levels, 2.0, 32.0);
+    mediump vec3 poster = floor(base * lv) / lv;
+
+    // Edge-ish contrast on luma
+    mediump float lum = luma(base);
+    mediump float edge = clamp(abs(lum - 0.5) * params.edgeScale, 0.0, 1.0);
+
+    mediump float s = clamp(params.strength, 0.0, 2.0);
+    base = mix(base, poster, clamp(s, 0.0, 1.0));
+    base = mix(base, base * (0.8 + 0.4 * edge), clamp(s * 0.5, 0.0, 1.0));
+
+    imageStore(output_image, coord, vec4(base, 1.0));
+}
+

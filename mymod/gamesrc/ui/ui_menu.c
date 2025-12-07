@@ -31,6 +31,25 @@ MAIN MENU
 
 #include "ui_local.h"
 
+#define MAINMENU_FONT_CONFIG          "fonts/fonts.cfg"
+#define MAINMENU_MAX_FALLBACKS        3
+#define MAINMENU_DEFAULT_TEXT_FONT    "fonts/roboto-regular.ttf"
+#define MAINMENU_DEFAULT_SMALL_FONT   "fonts/roboto-regular.ttf"
+#define MAINMENU_DEFAULT_BIG_FONT     "fonts/roboto-bold.ttf"
+#define MAINMENU_DEFAULT_TEXT_SIZE    18
+#define MAINMENU_DEFAULT_SMALL_SIZE   14
+#define MAINMENU_DEFAULT_BIG_SIZE     26
+#define MAINMENU_FONT_BUFFER_SIZE     8192
+
+typedef struct {
+	fontInfo_t textFont;
+	fontInfo_t smallFont;
+	fontInfo_t bigFont;
+	fontInfo_t fallbackFonts[MAINMENU_MAX_FALLBACKS];
+	int        fallbackCount;
+	qboolean   loaded;
+} mainmenu_font_state_t;
+
 
 #define ID_SINGLEPLAYER			10
 #define ID_MULTIPLAYER			11
@@ -80,6 +99,396 @@ typedef struct {
 } errorMessage_t;
 
 static errorMessage_t s_errorMessage;
+
+static mainmenu_font_state_t s_mainFonts;
+
+#define FONT_CHAR_VALID(c) ((c) >= 0 && (c) < GLYPHS_PER_FONT)
+#define FONT_LOADED(f) ((f) && ((f)->glyphScale != 0.0f || (f)->name[0] != '\0'))
+
+/* ------------------------------------------------------------------------- */
+/* Modern font helpers for the main menu                                    */
+/* ------------------------------------------------------------------------- */
+static fontInfo_t *MainMenu_SelectFontForStyle( int style ) {
+	if ( style & UI_SMALLFONT ) {
+		if ( FONT_LOADED( &s_mainFonts.smallFont ) ) {
+			return &s_mainFonts.smallFont;
+		}
+	}
+
+	if ( style & UI_BIGFONT ) {
+		if ( FONT_LOADED( &s_mainFonts.bigFont ) ) {
+			return &s_mainFonts.bigFont;
+		}
+	}
+
+	if ( FONT_LOADED( &s_mainFonts.textFont ) ) {
+		return &s_mainFonts.textFont;
+	}
+
+	return NULL;
+}
+
+static void MainMenu_LinkFallbackChain( fontInfo_t *primary ) {
+	if ( !primary ) {
+		return;
+	}
+
+	fontInfo_t *current = primary;
+	for ( int i = 0; i < s_mainFonts.fallbackCount; i++ ) {
+		if ( FONT_LOADED( &s_mainFonts.fallbackFonts[i] ) ) {
+			current->fallbackFont = &s_mainFonts.fallbackFonts[i];
+			current = current->fallbackFont;
+		}
+	}
+}
+
+static void MainMenu_RegisterFontSafe( const char *path, int pointSize, fontInfo_t *outFont, const char *label ) {
+	if ( !outFont ) {
+		return;
+	}
+
+	memset( outFont, 0, sizeof( *outFont ) );
+	if ( !path || !path[0] ) {
+		Com_Printf( "MainMenu font %s: missing path\n", label ? label : "unknown" );
+		return;
+	}
+
+	trap_R_RegisterFont( path, pointSize, outFont );
+	if ( FONT_LOADED( outFont ) ) {
+		Com_Printf( "MainMenu font %s: loaded %s (%dpt)\n", label ? label : "font", path, pointSize );
+	} else {
+		Com_Printf( "MainMenu font %s: failed to load %s (%dpt)\n", label ? label : "font", path, pointSize );
+	}
+}
+
+static void MainMenu_LoadFontsFromConfig( void ) {
+	if ( s_mainFonts.loaded ) {
+		return;
+	}
+
+	memset( &s_mainFonts, 0, sizeof( s_mainFonts ) );
+
+	fileHandle_t f = 0;
+	int len = trap_FS_FOpenFile( MAINMENU_FONT_CONFIG, &f, FS_READ );
+	if ( !f || len <= 0 || len >= MAINMENU_FONT_BUFFER_SIZE ) {
+		if ( f ) {
+			trap_FS_FCloseFile( f );
+		}
+		MainMenu_RegisterFontSafe( MAINMENU_DEFAULT_TEXT_FONT, MAINMENU_DEFAULT_TEXT_SIZE, &s_mainFonts.textFont, "text" );
+		MainMenu_RegisterFontSafe( MAINMENU_DEFAULT_SMALL_FONT, MAINMENU_DEFAULT_SMALL_SIZE, &s_mainFonts.smallFont, "small" );
+		MainMenu_RegisterFontSafe( MAINMENU_DEFAULT_BIG_FONT, MAINMENU_DEFAULT_BIG_SIZE, &s_mainFonts.bigFont, "big" );
+		s_mainFonts.loaded = FONT_LOADED( &s_mainFonts.textFont );
+		return;
+	}
+
+	static char buffer[MAINMENU_FONT_BUFFER_SIZE];
+	int bytesRead = trap_FS_Read( buffer, len, f );
+	trap_FS_FCloseFile( f );
+	if ( bytesRead != len ) {
+		MainMenu_RegisterFontSafe( MAINMENU_DEFAULT_TEXT_FONT, MAINMENU_DEFAULT_TEXT_SIZE, &s_mainFonts.textFont, "text" );
+		MainMenu_RegisterFontSafe( MAINMENU_DEFAULT_SMALL_FONT, MAINMENU_DEFAULT_SMALL_SIZE, &s_mainFonts.smallFont, "small" );
+		MainMenu_RegisterFontSafe( MAINMENU_DEFAULT_BIG_FONT, MAINMENU_DEFAULT_BIG_SIZE, &s_mainFonts.bigFont, "big" );
+		s_mainFonts.loaded = FONT_LOADED( &s_mainFonts.textFont );
+		return;
+	}
+
+	buffer[len] = '\0';
+
+	const char *p = buffer;
+	const char *token;
+
+	while ( 1 ) {
+		token = COM_ParseExt( &p, qtrue );
+		if ( !token[0] ) {
+			break;
+		}
+
+		if ( Q_stricmp( token, "font" ) == 0 ) {
+			const char *fontName = COM_ParseExt( &p, qtrue );
+			const char *sizeTok  = COM_ParseExt( &p, qtrue );
+			int pointSize = sizeTok[0] ? atoi( sizeTok ) : MAINMENU_DEFAULT_TEXT_SIZE;
+			MainMenu_RegisterFontSafe( fontName, pointSize, &s_mainFonts.textFont, "text" );
+			continue;
+		}
+
+		if ( Q_stricmp( token, "smallFont" ) == 0 ) {
+			const char *fontName = COM_ParseExt( &p, qtrue );
+			const char *sizeTok  = COM_ParseExt( &p, qtrue );
+			int pointSize = sizeTok[0] ? atoi( sizeTok ) : MAINMENU_DEFAULT_SMALL_SIZE;
+			MainMenu_RegisterFontSafe( fontName, pointSize, &s_mainFonts.smallFont, "small" );
+			continue;
+		}
+
+		if ( Q_stricmp( token, "bigFont" ) == 0 || Q_stricmp( token, "bigfont" ) == 0 ) {
+			const char *fontName = COM_ParseExt( &p, qtrue );
+			const char *sizeTok  = COM_ParseExt( &p, qtrue );
+			int pointSize = sizeTok[0] ? atoi( sizeTok ) : MAINMENU_DEFAULT_BIG_SIZE;
+			MainMenu_RegisterFontSafe( fontName, pointSize, &s_mainFonts.bigFont, "big" );
+			continue;
+		}
+
+		if ( Q_stricmp( token, "fontFallback" ) == 0 ) {
+			const char *primary = COM_ParseExt( &p, qtrue );
+			const char *sizeTok = COM_ParseExt( &p, qtrue );
+			int pointSize = sizeTok[0] ? atoi( sizeTok ) : MAINMENU_DEFAULT_TEXT_SIZE;
+
+			if ( primary && primary[0] ) {
+				MainMenu_RegisterFontSafe( primary, pointSize, &s_mainFonts.textFont, "text" );
+			}
+
+			s_mainFonts.fallbackCount = 0;
+			while ( s_mainFonts.fallbackCount < MAINMENU_MAX_FALLBACKS ) {
+				const char *fb = COM_ParseExt( &p, qfalse );
+				if ( !fb[0] || fb[0] == '\n' ) {
+					break;
+				}
+				MainMenu_RegisterFontSafe( fb, pointSize, &s_mainFonts.fallbackFonts[s_mainFonts.fallbackCount], "fallback" );
+				s_mainFonts.fallbackCount++;
+			}
+			continue;
+		}
+	}
+
+	MainMenu_LinkFallbackChain( &s_mainFonts.textFont );
+	s_mainFonts.loaded = FONT_LOADED( &s_mainFonts.textFont );
+}
+
+static int MainMenu_DecodeUTF8( const unsigned char **textPtr ) {
+	const unsigned char *s = *textPtr;
+	if ( !s || !*s ) {
+		return -1;
+	}
+
+	unsigned char c = *s;
+	if ( c < 0x80 ) {
+		(*textPtr)++;
+		return c;
+	}
+
+	if ( ( c & 0xE0 ) == 0xC0 && ( s[1] & 0xC0 ) == 0x80 ) {
+		int code = ( ( c & 0x1F ) << 6 ) | ( s[1] & 0x3F );
+		(*textPtr) += 2;
+		return code;
+	}
+
+	if ( ( c & 0xF0 ) == 0xE0 && ( s[1] & 0xC0 ) == 0x80 && ( s[2] & 0xC0 ) == 0x80 ) {
+		int code = ( ( c & 0x0F ) << 12 ) | ( ( s[1] & 0x3F ) << 6 ) | ( s[2] & 0x3F );
+		(*textPtr) += 3;
+		return code;
+	}
+
+	(*textPtr)++;
+	return -1;
+}
+
+static glyphInfo_t *MainMenu_FindGlyph( fontInfo_t **font, int ch ) {
+	if ( !font || !*font || !FONT_CHAR_VALID( ch ) ) {
+		return NULL;
+	}
+
+	fontInfo_t *cur = *font;
+	while ( cur ) {
+		glyphInfo_t *glyph = &cur->glyphs[ch];
+		if ( glyph && glyph->glyph ) {
+			*font = cur;
+			return glyph;
+		}
+		cur = cur->fallbackFont;
+	}
+	return &(*font)->glyphs[ch];
+}
+
+static float MainMenu_TextWidth( const char *text, float scale, fontInfo_t *baseFont ) {
+	if ( !text || !*text ) {
+		return 0.0f;
+	}
+
+	if ( !baseFont || !FONT_LOADED( baseFont ) ) {
+		// Fallback to legacy proportional metrics if modern font isn't available
+		return UI_ProportionalStringWidth( text ) * scale;
+	}
+
+	float width = 0.0f;
+	int prev = -1;
+	const unsigned char *s = (const unsigned char *)text;
+
+	while ( *s ) {
+		if ( Q_IsColorString( (const char *)s ) ) {
+			s += 2;
+			continue;
+		}
+
+		int code = MainMenu_DecodeUTF8( &s );
+		if ( code < 0 || code >= GLYPHS_PER_FONT ) {
+			continue;
+		}
+
+		fontInfo_t *useFont = baseFont;
+		glyphInfo_t *glyph = MainMenu_FindGlyph( &useFont, code );
+		if ( !glyph ) {
+			continue;
+		}
+
+		float useScale = scale * useFont->glyphScale;
+		if ( useFont->hasKerning && prev >= 0 && prev < 256 ) {
+			width += glyph->kerning[prev] * useScale;
+		}
+
+		width += glyph->xSkip * useScale;
+		prev = code;
+	}
+
+	return width;
+}
+
+static void MainMenu_DrawGlyph( float x, float y, float useScale, const glyphInfo_t *glyph, const vec4_t color ) {
+	float adjX = x;
+	float adjY = y - glyph->top * useScale;
+	float w    = glyph->imageWidth * useScale;
+	float h    = glyph->imageHeight * useScale;
+
+	UI_AdjustFrom640( &adjX, &adjY, &w, &h );
+	trap_R_SetColor( color );
+	trap_R_DrawStretchPic( adjX, adjY, w, h, glyph->s, glyph->t, glyph->s2, glyph->t2, glyph->glyph );
+}
+
+static void MainMenu_TextPaint( float x, float y, float scale, vec4_t color, const char *text, int style, fontInfo_t *baseFont ) {
+	if ( !text || !*text ) {
+		return;
+	}
+
+	fontInfo_t *font = baseFont ? baseFont : MainMenu_SelectFontForStyle( style );
+	if ( !font || !FONT_LOADED( font ) ) {
+		UI_DrawProportionalString( x, y, text, style, color );
+		return;
+	}
+
+	float sizeScale = scale > 0.0f ? scale : 1.0f;
+	float width = MainMenu_TextWidth( text, sizeScale, font );
+	if ( style & UI_CENTER ) {
+		x -= width * 0.5f;
+	} else if ( style & UI_RIGHT ) {
+		x -= width;
+	}
+
+	vec4_t drawColor;
+	Vector4Copy( color, drawColor );
+
+	const unsigned char *s = (const unsigned char *)text;
+	int prev = -1;
+
+	qboolean drawShadow = ( style & UI_DROPSHADOW ) ? qtrue : qfalse;
+	float shadowOfs = 2.0f;
+
+	while ( *s ) {
+		if ( Q_IsColorString( (const char *)s ) ) {
+			VectorCopy( g_color_table[ColorIndex( s[1] )], drawColor );
+			drawColor[3] = color[3];
+			s += 2;
+			continue;
+		}
+
+		int code = MainMenu_DecodeUTF8( &s );
+		if ( code < 0 || code >= GLYPHS_PER_FONT ) {
+			continue;
+		}
+
+		fontInfo_t *useFont = font;
+		glyphInfo_t *glyph = MainMenu_FindGlyph( &useFont, code );
+		if ( !glyph ) {
+			continue;
+		}
+
+		float useScale = sizeScale * useFont->glyphScale;
+
+		if ( drawShadow ) {
+			vec4_t shadowColor = { 0, 0, 0, drawColor[3] };
+			MainMenu_DrawGlyph( x + shadowOfs, y + shadowOfs, useScale, glyph, shadowColor );
+		}
+
+		MainMenu_DrawGlyph( x, y, useScale, glyph, drawColor );
+
+		if ( useFont->hasKerning && prev >= 0 && prev < 256 ) {
+			x += glyph->kerning[prev] * useScale;
+		}
+
+		x += glyph->xSkip * useScale;
+		prev = code;
+	}
+
+	trap_R_SetColor( NULL );
+}
+
+static void MainMenu_DrawMenuItem( void *ptr ) {
+	menutext_s *t = (menutext_s *)ptr;
+	if ( !t ) {
+		return;
+	}
+
+	qboolean hasFocus = ( Menu_ItemAtCursor( t->generic.parent ) == t );
+	vec4_t color;
+	int style = t->style;
+
+	if ( t->generic.flags & QMF_GRAYED ) {
+		VectorCopy( text_color_disabled, color );
+		color[3] = text_color_disabled[3];
+	} else {
+		VectorCopy( t->color, color );
+	}
+
+	fontInfo_t *font = MainMenu_SelectFontForStyle( style );
+	float sizeScale = 1.0f;
+	if ( style & UI_SMALLFONT ) {
+		sizeScale = 0.85f;
+	} else if ( style & UI_BIGFONT ) {
+		sizeScale = 1.25f;
+	}
+
+	float measuredWidth = MainMenu_TextWidth( t->string, sizeScale, font ? font : &s_mainFonts.textFont );
+	float measuredHeight;
+	if ( font && FONT_LOADED( font ) ) {
+		measuredHeight = font->glyphs['A'].imageHeight * sizeScale;
+	} else {
+		measuredHeight = PROP_HEIGHT * sizeScale;
+	}
+
+	float x = t->generic.x;
+	float y = t->generic.y;
+	if ( t->generic.flags & QMF_RIGHT_JUSTIFY ) {
+		x -= measuredWidth;
+	} else if ( t->generic.flags & QMF_CENTER_JUSTIFY ) {
+		x -= measuredWidth * 0.5f;
+	}
+
+	t->generic.left   = x - 12;
+	t->generic.right  = x + measuredWidth + 12;
+	t->generic.top    = y - measuredHeight * 0.35f;
+	t->generic.bottom = y + measuredHeight * 1.1f;
+
+	vec4_t highlightBg;
+	if ( t->generic.flags & QMF_PULSEIFFOCUS ) {
+		if ( hasFocus ) {
+			style |= UI_PULSE;
+			Vector4Set( highlightBg, 0.15f, 0.2f, 0.3f, 0.3f );
+			UI_FillRect( t->generic.left - 10, t->generic.top - 2,
+			             ( t->generic.right - t->generic.left ) + 20,
+			             ( t->generic.bottom - t->generic.top ) + 4, highlightBg );
+			VectorCopy( text_color_highlight, color );
+			color[3] = text_color_highlight[3];
+		} else {
+			style |= UI_INVERSE;
+		}
+	} else if ( hasFocus && ( t->generic.flags & QMF_HIGHLIGHT_IF_FOCUS ) ) {
+		Vector4Set( highlightBg, 0.1f, 0.15f, 0.25f, 0.25f );
+		UI_FillRect( t->generic.left - 10, t->generic.top - 2,
+		             ( t->generic.right - t->generic.left ) + 20,
+		             ( t->generic.bottom - t->generic.top ) + 4, highlightBg );
+		VectorCopy( text_color_highlight, color );
+		color[3] = text_color_highlight[3];
+	}
+
+	MainMenu_TextPaint( x, y, sizeScale, color, t->string, style | UI_DROPSHADOW, font );
+}
 
 
 /*
@@ -144,6 +553,7 @@ MainMenu_Cache
 */
 void MainMenu_Cache( void )
 {
+	MainMenu_LoadFontsFromConfig();
 	s_main.bannerModel = trap_R_RegisterModel( MAIN_BANNER_MODEL );
 	if ( s_main.bannerModel ) {
 		Com_Printf( "MainMenu_Cache: Successfully loaded banner model '%s' (handle %d)\n", MAIN_BANNER_MODEL, s_main.bannerModel );
@@ -177,6 +587,8 @@ static void Main_MenuDraw( void )
 	vec4_t			color = {0.25f, 0.35f, 0.95f, 1.0f};  // Improved blue color
 	vec4_t			titleColor = {1.0f, 1.0f, 1.0f, 1.0f};  // White for title
 	float			pulse = 1.0f + MAIN_MENU_PULSE_INTENSITY * sin( uis.realtime * MAIN_MENU_ANIMATION_SPEED );
+	fontInfo_t     *titleFont = MainMenu_SelectFontForStyle( UI_BIGFONT );
+	fontInfo_t     *smallFont = MainMenu_SelectFontForStyle( UI_SMALLFONT );
 
 	// setup the refdef
 
@@ -276,9 +688,8 @@ static void Main_MenuDraw( void )
 	vec4_t titleColorPulse;
 	Vector4Copy( titleColor, titleColorPulse );
 	titleColorPulse[3] *= pulse;  // Pulse alpha for subtle effect
-	UI_DrawProportionalString( 320, 372, "", UI_CENTER|UI_SMALLFONT, color );
-	// Use bigger font for title with improved rendering
-	UI_DrawProportionalString( 320, 400, "MY MOD TEMPLATE", UI_CENTER|UI_BIGFONT|UI_DROPSHADOW, titleColorPulse );
+	MainMenu_TextPaint( 320, 372, 0.9f, color, "", UI_CENTER|UI_SMALLFONT, smallFont );
+	MainMenu_TextPaint( 320, 400, 1.1f, titleColorPulse, "MY MOD TEMPLATE", UI_CENTER|UI_BIGFONT|UI_DROPSHADOW, titleFont );
 
 	// Draw version info with better positioning and styling
 	vec4_t versionColor = {
@@ -287,12 +698,12 @@ static void Main_MenuDraw( void )
 		MAIN_MENU_VERSION_COLOR_B,
 		MAIN_MENU_VERSION_COLOR_A
 	};
-	UI_DrawString( 640-20, 480-16, "^7v1.0", UI_SMALLFONT|UI_RIGHT, versionColor );
+	MainMenu_TextPaint( 640 - 20, 480 - 16, 0.9f, versionColor, "^7v1.0", UI_RIGHT|UI_SMALLFONT, smallFont );
 	
 	// Show protocol version if not standard
 	int protocol = (int)trap_Cvar_VariableValue("protocol");
 	if (protocol != 68) { // OA_STD_PROTOCOL
-		UI_DrawString( 20, 480-16, va("^7Protocol: %i", protocol), UI_SMALLFONT, versionColor);
+		MainMenu_TextPaint( 20, 480 - 16, 0.9f, versionColor, va("^7Protocol: %i", protocol), UI_SMALLFONT, smallFont );
 	}
 }
 
@@ -379,6 +790,7 @@ void UI_MainMenu( void )
 	s_main.singleplayer.string				= "SINGLE PLAYER";
 	s_main.singleplayer.color				= color_red;
 	s_main.singleplayer.style				= style;
+	s_main.singleplayer.generic.ownerdraw  = MainMenu_DrawMenuItem;
 
 	y += MAIN_MENU_VERTICAL_SPACING;
 	s_main.multiplayer.generic.type			= MTYPE_PTEXT;
@@ -390,6 +802,7 @@ void UI_MainMenu( void )
 	s_main.multiplayer.string				= "MULTIPLAYER";
 	s_main.multiplayer.color				= color_red;
 	s_main.multiplayer.style				= style;
+	s_main.multiplayer.generic.ownerdraw   = MainMenu_DrawMenuItem;
 
 	y += MAIN_MENU_VERTICAL_SPACING;
 	s_main.setup.generic.type				= MTYPE_PTEXT;
@@ -401,6 +814,7 @@ void UI_MainMenu( void )
 	s_main.setup.string						= "SETTINGS";
 	s_main.setup.color						= color_red;
 	s_main.setup.style						= style;
+	s_main.setup.generic.ownerdraw         = MainMenu_DrawMenuItem;
 
 	y += MAIN_MENU_VERTICAL_SPACING;
 	s_main.demos.generic.type				= MTYPE_PTEXT;
@@ -412,6 +826,7 @@ void UI_MainMenu( void )
 	s_main.demos.string						= "REPLAYS";
 	s_main.demos.color						= color_red;
 	s_main.demos.style						= style;
+	s_main.demos.generic.ownerdraw         = MainMenu_DrawMenuItem;
 
 	y += MAIN_MENU_VERTICAL_SPACING;
 	s_main.cinematics.generic.type			= MTYPE_PTEXT;
@@ -423,6 +838,7 @@ void UI_MainMenu( void )
 	s_main.cinematics.string				= "CINEMATICS";
 	s_main.cinematics.color					= color_red;
 	s_main.cinematics.style					= style;
+	s_main.cinematics.generic.ownerdraw    = MainMenu_DrawMenuItem;
 
 	y += MAIN_MENU_VERTICAL_SPACING;
 	s_main.challenges.generic.type			= MTYPE_PTEXT;
@@ -434,6 +850,7 @@ void UI_MainMenu( void )
 	s_main.challenges.string				= "STATISTICS";
 	s_main.challenges.color					= color_red;
 	s_main.challenges.style					= style;
+	s_main.challenges.generic.ownerdraw    = MainMenu_DrawMenuItem;
 
 	if (UI_TeamArenaExists()) {
 		teamArena = qtrue;
@@ -447,6 +864,7 @@ void UI_MainMenu( void )
 		s_main.teamArena.string					= "MISSION PACK";
 		s_main.teamArena.color					= color_red;
 		s_main.teamArena.style					= style;
+		s_main.teamArena.generic.ownerdraw     = MainMenu_DrawMenuItem;
 	}
 
 	y += MAIN_MENU_VERTICAL_SPACING;
@@ -459,6 +877,7 @@ void UI_MainMenu( void )
 	s_main.exit.string						= "EXIT";
 	s_main.exit.color						= color_red;
 	s_main.exit.style						= style;
+	s_main.exit.generic.ownerdraw          = MainMenu_DrawMenuItem;
 
 	Menu_AddItem( &s_main.menu,	&s_main.singleplayer );
 	Menu_AddItem( &s_main.menu,	&s_main.multiplayer );

@@ -4218,6 +4218,13 @@ static void vk_create_attachments( void )
 		create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
 			usage, &vk.color_image, &vk.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
 
+		// style-transfer output (storage-capable)
+		{
+			VkImageUsageFlags style_usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+			create_color_attachment( gls.windowWidth, gls.windowHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
+				style_usage, &vk.style_image, &vk.style_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
+		}
+
 		// screenmap-msaa
 		if ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT ) {
 			create_color_attachment( vk.screenMapWidth, vk.screenMapHeight, vk.screenMapSamples, vk.color_format,
@@ -4273,6 +4280,9 @@ static void vk_create_attachments( void )
 
 	SET_OBJECT_NAME( vk.color_image, "color attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
 	SET_OBJECT_NAME( vk.color_image_view, "color attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+
+	SET_OBJECT_NAME( vk.style_image, "style attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+	SET_OBJECT_NAME( vk.style_image_view, "style attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 
 	SET_OBJECT_NAME( vk.capture.image, "capture image", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 	SET_OBJECT_NAME( vk.capture.image_view, "capture image view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
@@ -5445,6 +5455,7 @@ void vk_create_compute_post_process_pipelines( void )
 	// Initialize pipelines to NULL
 	vk.gamma_compute_pipeline = VK_NULL_HANDLE;
 	vk.tonemap_compute_pipeline = VK_NULL_HANDLE;
+	vk.style_compute_pipeline = VK_NULL_HANDLE;
 	
 	// Try to load compute shader modules if they're compiled
 	// The shader arrays are defined in shader_data.c (included at file scope, line 3214)
@@ -5472,6 +5483,13 @@ void vk_create_compute_post_process_pipelines( void )
 		vk.modules.tonemap_comp = SHADER_MODULE( tonemap_comp_spv );
 		SET_OBJECT_NAME( vk.modules.tonemap_comp, "tonemap compute shader module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 		ri.Printf( PRINT_DEVELOPER, "VK: Loaded tonemap compute shader module\n" );
+	}
+
+	// Try to load style-transfer compute shader if compiled
+	if ( vk.modules.style_comp == VK_NULL_HANDLE ) {
+		vk.modules.style_comp = SHADER_MODULE( style_transfer_comp_spv );
+		SET_OBJECT_NAME( vk.modules.style_comp, "style-transfer compute shader module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+		ri.Printf( PRINT_DEVELOPER, "VK: Loaded style-transfer compute shader module\n" );
 	}
 	
 	// Try to load ReLAX denoising compute shader if not already loaded
@@ -5509,6 +5527,36 @@ void vk_create_compute_post_process_pipelines( void )
 		} else {
 			ri.Printf( PRINT_WARNING, "VK: Failed to create gamma compute pipeline: %d\n", result );
 			vk.gamma_compute_pipeline = VK_NULL_HANDLE;
+		}
+	}
+	
+	// If style compute shader is available, create pipeline
+	if ( vk.modules.style_comp != VK_NULL_HANDLE ) {
+		Com_Memset( &shader_stage, 0, sizeof( shader_stage ) );
+		shader_stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shader_stage.pNext = NULL;
+		shader_stage.flags = 0;
+		shader_stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+		shader_stage.module = vk.modules.style_comp;
+		shader_stage.pName = "main";
+		shader_stage.pSpecializationInfo = NULL;
+		
+		Com_Memset( &compute_info, 0, sizeof( compute_info ) );
+		compute_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+		compute_info.pNext = NULL;
+		compute_info.flags = 0;
+		compute_info.stage = shader_stage;
+		compute_info.layout = vk.compute_pipeline_layout;
+		compute_info.basePipelineHandle = VK_NULL_HANDLE;
+		compute_info.basePipelineIndex = -1;
+		
+		result = qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &compute_info, NULL, &vk.style_compute_pipeline );
+		if ( result == VK_SUCCESS ) {
+			SET_OBJECT_NAME( vk.style_compute_pipeline, "style-transfer compute pipeline", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+			ri.Printf( PRINT_DEVELOPER, "VK: Created style-transfer compute pipeline\n" );
+		} else {
+			ri.Printf( PRINT_WARNING, "VK: Failed to create style-transfer compute pipeline: %d\n", result );
+			vk.style_compute_pipeline = VK_NULL_HANDLE;
 		}
 	}
 	
@@ -5561,6 +5609,13 @@ static void vk_destroy_attachments( void )
 		qvkDestroyImageView( vk.device, vk.color_image_view, NULL );
 		vk.color_image = VK_NULL_HANDLE;
 		vk.color_image_view = VK_NULL_HANDLE;
+	}
+
+	if ( vk.style_image ) {
+		qvkDestroyImage( vk.device, vk.style_image, NULL );
+		qvkDestroyImageView( vk.device, vk.style_image_view, NULL );
+		vk.style_image = VK_NULL_HANDLE;
+		vk.style_image_view = VK_NULL_HANDLE;
 	}
 
 	if ( vk.msaa_image ) {
@@ -10307,7 +10362,122 @@ void vk_end_frame( void )
 			}
 			
 			// ========================================================================
-			// STEP 6: Run gamma/tonemap pass (always samples from finalColorView or DLSS output)
+			// STEP 6: Optional style-transfer compute pass (writes to vk.style_image)
+			// ========================================================================
+			if ( r_styleTransfer && r_styleTransfer->integer &&
+			     vk.style_compute_pipeline != VK_NULL_HANDLE &&
+			     vk.style_image != VK_NULL_HANDLE && vk.style_image_view != VK_NULL_HANDLE ) {
+
+				VkDescriptorImageInfo input_info, output_info;
+				VkWriteDescriptorSet desc_writes[2];
+				uint32_t write_count = 0;
+				Vk_Sampler_Def sd;
+
+				Com_Memset( &sd, 0, sizeof( sd ) );
+				sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+				sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+				sd.max_lod_1_0 = qtrue;
+				sd.noAnisotropy = qtrue;
+
+				// Transition style image to GENERAL for compute write
+				VkImageMemoryBarrier style_barrier = {
+					.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+					.pNext = NULL,
+					.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT,
+					.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+					.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+					.newLayout = VK_IMAGE_LAYOUT_GENERAL,
+					.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+					.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+					.image = vk.style_image,
+					.subresourceRange = {
+						.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+						.baseMipLevel = 0,
+						.levelCount = 1,
+						.baseArrayLayer = 0,
+						.layerCount = 1
+					}
+				};
+				qvkCmdPipelineBarrier( vk.cmd->command_buffer,
+					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+					0, 0, NULL, 0, NULL, 1, &style_barrier );
+
+				// Update descriptor set for style compute
+				input_info.sampler = vk_find_sampler( &sd );
+				input_info.imageView = dlssInputView;
+				input_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+				desc_writes[write_count].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				desc_writes[write_count].pNext = NULL;
+				desc_writes[write_count].dstSet = vk.compute_descriptor_set;
+				desc_writes[write_count].dstBinding = 0;
+				desc_writes[write_count].dstArrayElement = 0;
+				desc_writes[write_count].descriptorCount = 1;
+				desc_writes[write_count].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+				desc_writes[write_count].pImageInfo = &input_info;
+				desc_writes[write_count].pBufferInfo = NULL;
+				desc_writes[write_count].pTexelBufferView = NULL;
+				write_count++;
+
+				output_info.sampler = VK_NULL_HANDLE;
+				output_info.imageView = vk.style_image_view;
+				output_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+				desc_writes[write_count].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+				desc_writes[write_count].pNext = NULL;
+				desc_writes[write_count].dstSet = vk.compute_descriptor_set;
+				desc_writes[write_count].dstBinding = 1;
+				desc_writes[write_count].dstArrayElement = 0;
+				desc_writes[write_count].descriptorCount = 1;
+				desc_writes[write_count].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+				desc_writes[write_count].pImageInfo = &output_info;
+				desc_writes[write_count].pBufferInfo = NULL;
+				desc_writes[write_count].pTexelBufferView = NULL;
+				write_count++;
+
+				qvkUpdateDescriptorSets( vk.device, write_count, desc_writes, 0, NULL );
+
+				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.style_compute_pipeline );
+				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+					vk.compute_pipeline_layout, 0, 1, &vk.compute_descriptor_set, 0, NULL );
+
+				struct {
+					float strength;
+					float levels;
+					float edgeScale;
+					float pad;
+				} style_params;
+
+				style_params.strength = Com_Clamp( 0.0f, 2.0f, r_styleStrength ? r_styleStrength->value : 0.35f );
+				style_params.levels = Com_Clamp( 2.0f, 32.0f, r_styleLevels ? (float)r_styleLevels->integer : 8.0f );
+				style_params.edgeScale = Com_Clamp( 0.0f, 4.0f, r_styleEdge ? r_styleEdge->value : 2.0f );
+				style_params.pad = 0.0f;
+
+				qvkCmdPushConstants( vk.cmd->command_buffer, vk.compute_pipeline_layout,
+					VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( style_params ), &style_params );
+
+				uint32_t wgSize = ( r_postprocess_workgroup && r_postprocess_workgroup->integer > 0 ) ? (uint32_t)r_postprocess_workgroup->integer : 8u;
+				uint32_t groupCountX = (gls.windowWidth + (wgSize - 1)) / wgSize;
+				uint32_t groupCountY = (gls.windowHeight + (wgSize - 1)) / wgSize;
+				qvkCmdDispatch( vk.cmd->command_buffer, groupCountX, groupCountY, 1 );
+
+				// Transition style image for sampling
+				style_barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+				style_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+				style_barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+				style_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+				qvkCmdPipelineBarrier( vk.cmd->command_buffer,
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+					0, 0, NULL, 0, NULL, 1, &style_barrier );
+
+				dlssInputImage = vk.style_image;
+				dlssInputView = vk.style_image_view;
+			}
+			
+			// ========================================================================
+			// STEP 7: Run gamma/tonemap pass (always samples from finalColorView or DLSS output)
 			// ========================================================================
 			// CRITICAL: Ensure finalColorImage is valid before sampling.
 			// On menu-only frames with bloom OFF, the main render pass clears the image
@@ -10332,12 +10502,17 @@ void vk_end_frame( void )
 
 				if ( r_postprocess_compute && r_postprocess_compute->integer &&
 				     vk.compute_descriptor_set != VK_NULL_HANDLE ) {
-					if ( vk.tonemap_compute_pipeline != VK_NULL_HANDLE && r_hdr && r_hdr->integer ) {
-						activeComputePipeline = vk.tonemap_compute_pipeline;
-						useTonemapCompute = qtrue;
-					} else if ( vk.gamma_compute_pipeline != VK_NULL_HANDLE ) {
-						activeComputePipeline = vk.gamma_compute_pipeline;
-					}
+				if ( vk.tonemap_compute_pipeline != VK_NULL_HANDLE && r_hdr && r_hdr->integer ) {
+					activeComputePipeline = vk.tonemap_compute_pipeline;
+					useTonemapCompute = qtrue;
+				} else if ( vk.gamma_compute_pipeline != VK_NULL_HANDLE ) {
+					activeComputePipeline = vk.gamma_compute_pipeline;
+				}
+				// If style transfer is requested, force the compute gamma path when available
+				if ( r_styleTransfer && r_styleTransfer->integer && vk.gamma_compute_pipeline != VK_NULL_HANDLE ) {
+					activeComputePipeline = vk.gamma_compute_pipeline;
+					useTonemapCompute = qfalse;
+				}
 				}
 
 				if ( activeComputePipeline != VK_NULL_HANDLE ) {
@@ -10445,6 +10620,7 @@ void vk_end_frame( void )
 							float greyscale;
 							int ditherMode;
 							int depth_r, depth_g, depth_b;
+							float styleStrength;
 						} gamma_params;
 						
 						gamma_params.gamma = 1.0f / (r_gamma->value);
@@ -10455,6 +10631,9 @@ void vk_end_frame( void )
 						gamma_params.depth_r = 255;
 						gamma_params.depth_g = 255;
 						gamma_params.depth_b = 255;
+						gamma_params.styleStrength = ( r_styleTransfer && r_styleTransfer->integer )
+							? Com_Clamp( 0.0f, 2.0f, r_styleStrength ? r_styleStrength->value : 0.35f )
+							: 0.0f;
 						
 						qvkCmdPushConstants( vk.cmd->command_buffer, vk.compute_pipeline_layout,
 							VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(gamma_params), &gamma_params );

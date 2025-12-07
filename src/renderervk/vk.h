@@ -982,6 +982,7 @@ typedef struct {
 		VkShaderModule gamma_comp;
 		VkShaderModule tonemap_comp;
 		VkShaderModule rt_relax_comp;
+		VkShaderModule style_comp;
 		
 		// GIBS compute shader modules
 		VkShaderModule gibs_spawn_comp;
@@ -1055,9 +1056,14 @@ typedef struct {
 	// Compute shader post-processing pipelines
 	VkPipeline gamma_compute_pipeline;
 	VkPipeline tonemap_compute_pipeline;
+	VkPipeline style_compute_pipeline;
 	VkPipelineLayout compute_pipeline_layout;
 	VkDescriptorSetLayout compute_descriptor_set_layout;
 	VkDescriptorSet compute_descriptor_set;
+
+	// Style transfer output
+	VkImage style_image;
+	VkImageView style_image_view;
 	
 	// DLSS (NVIDIA Deep Learning Super Sampling)
 	struct {

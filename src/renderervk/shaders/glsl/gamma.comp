@@ -17,6 +17,7 @@ layout(push_constant) uniform GammaParams {
 	mediump float greyscale;
 	int ditherMode;
 	ivec3 depth;
+	mediump float styleStrength; // 0 = off, >0 applies simple stylization
 };
 
 const int BAYER_SIZE = 8;
@@ -66,6 +67,16 @@ void main() {
 	}
 	
 	base *= obScale;
+
+	// Very lightweight "style" look: posterize + edge-ish contrast
+	if (styleStrength > 0.0) {
+		mediump float levels = mix(4.0, 12.0, clamp(styleStrength, 0.0, 1.0));
+		mediump vec3 poster = floor(base * levels) / levels;
+		mediump float lum = dot(base, vec3(0.299, 0.587, 0.114));
+		mediump float edge = clamp(abs(lum - 0.5) * 2.0, 0.0, 1.0);
+		base = mix(base, poster, clamp(styleStrength, 0.0, 1.0));
+		base = mix(base, base * (0.8 + 0.4 * edge), clamp(styleStrength * 0.5, 0.0, 1.0));
+	}
 
 	// Dithering
 	if (ditherMode == 1) {
