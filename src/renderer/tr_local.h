@@ -41,6 +41,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../qcommon/qfiles.h"
 #include "../qcommon/qcommon.h"
 #include "../renderercommon/tr_public.h"
+#include "../renderercommon/tr_backend_iface.h"
 #include "tr_common.h"
 #include "iqm.h"
 #include "qgl.h"
@@ -1369,6 +1370,7 @@ extern	cvar_t	*r_finish;
 extern	cvar_t	*r_textureMode;
 extern	cvar_t	*r_offsetFactor;
 extern	cvar_t	*r_offsetUnits;
+extern	cvar_t	*r_clusteredLight;
 
 extern	cvar_t	*r_fullbright;					// avoid lightmap pass
 extern	cvar_t	*r_lightmap;					// render lightmaps only
@@ -1642,6 +1644,12 @@ void RB_CheckOverflow( int verts, int indexes );
 
 void RB_StageIteratorGeneric( void );
 void RB_StageIteratorSky( void );
+
+// Light clustering (clustered/forward+ binning)
+void R_BuildLightClusters( void );
+
+// Backend interface (GL implementation)
+const rb_backend_iface_t *RB_GL_GetBackendInterface( void );
 
 void RB_AddQuadStamp( const vec3_t origin, const vec3_t left, const vec3_t up, color4ub_t color );
 void RB_AddQuadStampExt( const vec3_t origin, const vec3_t left, const vec3_t up, color4ub_t color, float s1, float t1, float s2, float t2 );

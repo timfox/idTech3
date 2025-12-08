@@ -20,11 +20,53 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "tr_local.h"
+#include "../renderercommon/tr_backend_iface.h"
 #include "tr_particles_enhanced.h"
 #include "tr_flares_enhanced.h"
 
 backEndData_t	*backEndData;
 backEndState_t	backEnd;
+
+// -----------------------------------------------------------------------------
+// Backend interface (GL implementation)
+// -----------------------------------------------------------------------------
+static qboolean RBGL_InitInterface( void ) {
+	return qtrue;
+}
+
+static void RBGL_ShutdownInterface( void ) {
+	// nothing to do for legacy GL backend
+}
+
+static void RBGL_BeginFrame( void ) {
+	// legacy backend already manages per-frame state in RE_BeginFrame
+}
+
+static void RBGL_EndFrame( void ) {
+	// legacy backend already swaps in RE_EndFrame
+}
+
+static void RBGL_BeginPass( const char *name ) {
+	(void)name;
+	// hook point for debug labels or GPU markers in the future
+}
+
+static void RBGL_EndPass( void ) {
+	// hook point for debug labels or GPU markers in the future
+}
+
+static const rb_backend_iface_t rb_gl_backend_iface = {
+	.init = RBGL_InitInterface,
+	.shutdown = RBGL_ShutdownInterface,
+	.begin_frame = RBGL_BeginFrame,
+	.end_frame = RBGL_EndFrame,
+	.begin_pass = RBGL_BeginPass,
+	.end_pass = RBGL_EndPass
+};
+
+const rb_backend_iface_t *RB_GL_GetBackendInterface( void ) {
+	return &rb_gl_backend_iface;
+}
 
 // Centralized (non-inlined) version so we can break in gdb when an invalid
 // surface type is encountered.

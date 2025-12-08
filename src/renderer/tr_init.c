@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #include "tr_skyportals.h"
 #include "tr_flares_enhanced.h"
+#include "../renderercommon/tr_backend_iface.h"
 
 #ifndef IMGUI_FORWARD_DECLARE
 #define IMGUI_FORWARD_DECLARE
@@ -176,6 +177,8 @@ cvar_t	*r_mapGreyScale;
 
 cvar_t	*r_debugSurface;
 cvar_t	*r_simpleMipMaps;
+
+cvar_t	*r_clusteredLight;
 
 cvar_t	*r_showImages;
 cvar_t	*r_defaultImage;
@@ -1706,6 +1709,9 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_debugSort, "Debugging tool to filter out shaders with depth sorting order values higher than the set value." );
 	r_printShaders = ri.Cvar_Get( "r_printShaders", "0", 0 );
 	ri.Cvar_SetDescription( r_printShaders, "Debugging tool to print on console of the number of shaders used." );
+
+	r_clusteredLight = ri.Cvar_Get( "r_clusteredLight", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_clusteredLight, "Enable clustered/forward+ light binning (experimental)" );
 	r_saveFontData = ri.Cvar_Get( "r_saveFontData", "0", 0 );
 	
 	// Font rendering quality CVars
@@ -1967,6 +1973,9 @@ void R_Init( void ) {
 	if ( err != GL_NO_ERROR )
 		ri.Printf( PRINT_WARNING, "glGetError() = 0x%x\n", err );
 
+	// Install the GL backend interface for graph/driver-agnostic callers.
+	RB_SetBackendInterface( RB_GL_GetBackendInterface() );
+
 	ri.Printf( PRINT_ALL, "----- finished R_Init -----\n" );
 }
 
@@ -2021,6 +2030,9 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 			Com_Memset( &glConfig, 0, sizeof( glConfig ) );
 		}
 	}
+
+	// Restore null backend interface for safety.
+	RB_ResetBackendInterface();
 
 	ri.FreeAll();
 

@@ -24,6 +24,30 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 backEndData_t	*backEndData;
 backEndState_t	backEnd;
 
+// Backend interface (Vulkan implementation)
+// -----------------------------------------------------------------------------
+#include "../renderercommon/tr_backend_iface.h"
+
+static qboolean RBVK_InitInterface( void ) { return qtrue; }
+static void RBVK_ShutdownInterface( void ) {}
+static void RBVK_BeginFrame( void ) {}
+static void RBVK_EndFrame( void ) {}
+static void RBVK_BeginPass( const char *name ) { (void)name; }
+static void RBVK_EndPass( void ) {}
+
+static const rb_backend_iface_t rb_vk_backend_iface = {
+	.init = RBVK_InitInterface,
+	.shutdown = RBVK_ShutdownInterface,
+	.begin_frame = RBVK_BeginFrame,
+	.end_frame = RBVK_EndFrame,
+	.begin_pass = RBVK_BeginPass,
+	.end_pass = RBVK_EndPass
+};
+
+const rb_backend_iface_t *RB_VK_GetBackendInterface( void ) {
+	return &rb_vk_backend_iface;
+}
+
 // Centralized (non-inlined) version so we can break in gdb when an invalid
 // surface type is encountered.
 __attribute__((noinline)) void RB_CallSurfaceSafe_impl(surfaceType_t *surface) {

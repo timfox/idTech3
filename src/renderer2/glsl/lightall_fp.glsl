@@ -34,6 +34,15 @@ uniform vec3  u_PrimaryLightColor;
 uniform vec3  u_PrimaryLightAmbient;
 #endif
 
+#ifdef USE_CLUSTERED_LIGHT
+// Cluster buffer bindings must match CPU side (bindings 6/7)
+#include "../../renderercommon/tr_lightclusters.glsl"
+uniform int u_ClusterTilesX;
+uniform int u_ClusterTilesY;
+uniform int u_ClusterSlice;
+uniform int u_ClusterTileSize;
+#endif
+
 #if defined(USE_LIGHT) && !defined(USE_FAST_LIGHT)
 uniform vec4      u_NormalScale;
 uniform vec4      u_SpecularScale;
@@ -510,6 +519,14 @@ void main()
 
 	gl_FragColor.rgb = diffuse.rgb * lightColor;
 
+#endif
+
+#ifdef USE_CLUSTERED_LIGHT
+	// Probe clustered light buffer (no-op scaling to validate bindings)
+	int tileX = int(gl_FragCoord.x) / u_ClusterTileSize;
+	int tileY = int(gl_FragCoord.y) / u_ClusterTileSize;
+	ivec2 range = LC_GetClusterRange(u_ClusterTilesX, u_ClusterTilesY, u_ClusterSlice, tileX, tileY);
+	gl_FragColor.rgb *= (1.0 + float(range.y) * 0.0);
 #endif
 
 	gl_FragColor.a = alpha;

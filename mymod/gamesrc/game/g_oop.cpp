@@ -18,6 +18,9 @@ a matching C++ EntityClass is registered.
 #include <string>
 #include <cassert>
 
+// Legacy spawn implementation we will wrap in the pilot OOP class.
+extern "C" void SP_func_door( gentity_t *ent );
+
 extern vmCvar_t g_oopEntities;
 extern level_locals_t level;
 extern gentity_t g_entities[MAX_GENTITIES];
@@ -31,6 +34,15 @@ public:
 	void Spawn() override {
 		// Mark that the legacy gentity is “owned” by OOP but do not alter behavior.
 		// By default the gentity continues to function as before.
+	}
+};
+
+// Adapter that reuses the existing C spawn function for func_door.
+class FuncDoorEntity : public oop::BaseEntity {
+public:
+	using oop::BaseEntity::BaseEntity;
+	void Spawn() override {
+		SP_func_door( self );
 	}
 };
 
@@ -76,6 +88,14 @@ void RegisterBuiltins() {
 		"class_oop_stub",
 		[]( gentity_t *self, entt::entity ) -> std::unique_ptr<oop::BaseEntity> {
 			return std::make_unique<NoOpEntity>( self );
+		}
+	} );
+
+	// Pilot: route func_door through the OOP registry while reusing the legacy spawn.
+	oop::RegisterClass( oop::EntityClass{
+		"func_door",
+		[]( gentity_t *self, entt::entity ) -> std::unique_ptr<oop::BaseEntity> {
+			return std::make_unique<FuncDoorEntity>( self );
 		}
 	} );
 

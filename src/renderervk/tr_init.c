@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_init.c -- functions that are not called every frame
 
 #include "tr_local.h"
+#include "../renderercommon/tr_backend_iface.h"
 #ifdef USE_VULKAN
 #include "vk_layered_materials.h"
 #endif
@@ -2277,6 +2278,9 @@ void R_Init( void ) {
 		ri.Printf( PRINT_WARNING, "glGetError() = 0x%x\n", err );
 #endif
 
+	// Install the Vulkan backend interface for graph/driver-agnostic callers.
+	RB_SetBackendInterface( RB_VK_GetBackendInterface() );
+
 	ri.Printf( PRINT_ALL, "----- finished R_Init -----\n" );
 }
 
@@ -2352,6 +2356,9 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 
 	tr.registered = qfalse;
 	tr.inited = qfalse;
+
+	// Restore null backend interface for safety.
+	RB_ResetBackendInterface();
 }
 
 

@@ -22,9 +22,33 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #include "tr_fbo.h"
 #include "tr_dsa.h"
+#include "../renderercommon/tr_backend_iface.h"
 
 backEndData_t	*backEndData;
 backEndState_t	backEnd;
+
+// -----------------------------------------------------------------------------
+// Backend interface (GL2 implementation)
+// -----------------------------------------------------------------------------
+static qboolean RBGL2_InitInterface( void ) { return qtrue; }
+static void RBGL2_ShutdownInterface( void ) {}
+static void RBGL2_BeginFrame( void ) {}
+static void RBGL2_EndFrame( void ) {}
+static void RBGL2_BeginPass( const char *name ) { (void)name; }
+static void RBGL2_EndPass( void ) {}
+
+static const rb_backend_iface_t rb_gl2_backend_iface = {
+	.init = RBGL2_InitInterface,
+	.shutdown = RBGL2_ShutdownInterface,
+	.begin_frame = RBGL2_BeginFrame,
+	.end_frame = RBGL2_EndFrame,
+	.begin_pass = RBGL2_BeginPass,
+	.end_pass = RBGL2_EndPass
+};
+
+const rb_backend_iface_t *RB_GL2_GetBackendInterface( void ) {
+	return &rb_gl2_backend_iface;
+}
 
 
 __attribute__((noinline)) void RB_CallSurfaceSafe_impl(surfaceType_t *surface) {

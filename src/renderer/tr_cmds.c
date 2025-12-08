@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "tr_local.h"
+#include "../renderercommon/tr_frame_graph.h"
 
 /*
 =====================
@@ -98,6 +99,23 @@ static void R_IssueRenderCommands( void ) {
 		// let it start on the new batch
 		RB_ExecuteRenderCommands( cmdList->cmds );
 	}
+}
+
+// Frame graph execute wrapper
+static void RG_ExecuteRenderCommands( void *user ) {
+	(void)user;
+	R_IssueRenderCommands();
+}
+
+// Light clustering pass
+static void RG_ExecuteLightClusters( void *user ) {
+	(void)user;
+	R_BuildLightClusters();
+}
+
+// Placeholder post pass (currently no-op). Extend later for post effects.
+static void RG_ExecutePostPass( void *user ) {
+	(void)user;
 }
 
 
@@ -418,6 +436,7 @@ Returns the number of msec spent in the back end
 void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 
 	swapBuffersCommand_t *cmd;
+	rg_frame_graph_t graph;
 
 	if ( !tr.registered ) {
 		return;
@@ -429,7 +448,36 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	}
 	cmd->commandId = RC_SWAP_BUFFERS;
 
-	R_IssueRenderCommands();
+	// Build a minimal frame graph: light clustering -> main -> post.
+	RG_Reset( &graph );
+	{
+		rg_pass_desc_t pass = {
+			.name = "light_clusters",
+			.execute = RG_ExecuteLightClusters,
+			.user = NULL,
+			.flags = 0
+		};
+		RG_AddPass( &graph, &pass );
+	}
+	{
+		rg_pass_desc_t pass = {
+			.name = "main",
+			.execute = RG_ExecuteRenderCommands,
+			.user = NULL,
+			.flags = 0
+		};
+		RG_AddPass( &graph, &pass );
+	}
+	{
+		rg_pass_desc_t pass = {
+			.name = "post",
+			.execute = RG_ExecutePostPass,
+			.user = NULL,
+			.flags = 0
+		};
+		RG_AddPass( &graph, &pass );
+	}
+	RG_Execute( &graph, NULL );
 
 	R_PerformanceCounters();
 

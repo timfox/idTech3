@@ -29,6 +29,7 @@ typedef struct ImDrawData ImDrawData;
 #endif
 
 #include "tr_dsa.h"
+#include "../renderercommon/tr_backend_iface.h"
 
 glconfig_t  glConfig;
 glRefConfig_t glRefConfig;
@@ -36,6 +37,7 @@ qboolean    textureFilterAnisotropic = qfalse;
 int         maxAnisotropy = 0;
 
 glstate_t	glState;
+cvar_t *r_clusteredLight;
 
 static void GfxInfo_f( void );
 static void GfxMemInfo_f( void );
@@ -1330,6 +1332,9 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_debugSort, "Debugging tool to filter out shaders with depth sorting order values higher than the set value." );
 	r_printShaders = ri.Cvar_Get( "r_printShaders", "0", 0 );
 	ri.Cvar_SetDescription( r_printShaders, "Debugging tool to print on console of the number of shaders used." );
+
+	r_clusteredLight = ri.Cvar_Get( "r_clusteredLight", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_clusteredLight, "Enable clustered/forward+ light binning (experimental)" );
 	r_saveFontData = ri.Cvar_Get( "r_saveFontData", "0", 0 );
 	
 	// Font rendering quality CVars
@@ -1590,6 +1595,9 @@ void R_Init( void ) {
 	// print info
 	GfxInfo_f();
 	ri.Printf( PRINT_ALL, "----- finished R_Init -----\n" );
+
+	// Install the GL2 backend interface for graph/driver-agnostic callers.
+	RB_SetBackendInterface( RB_GL2_GetBackendInterface() );
 }
 
 
@@ -1643,6 +1651,9 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.FreeAll();
 
 	tr.registered = qfalse;
+
+	// Restore null backend interface for safety.
+	RB_ResetBackendInterface();
 }
 
 
