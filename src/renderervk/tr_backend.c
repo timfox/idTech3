@@ -27,12 +27,17 @@ backEndState_t	backEnd;
 // Centralized (non-inlined) version so we can break in gdb when an invalid
 // surface type is encountered.
 __attribute__((noinline)) void RB_CallSurfaceSafe_impl(surfaceType_t *surface) {
+	R_DebugAssertSurfacePointer(surface);
 	if (!surface) {
 		return;
 	}
-	int type = *surface;
-	if (type < 0 || type >= SF_NUM_SURFACE_TYPES || rb_surfaceTable[type] == NULL) {
-		ri.Printf(PRINT_WARNING, "RB: invalid surface type %d\n", type);
+	const int type = *surface;
+	if (type < 0 || type >= SF_NUM_SURFACE_TYPES) {
+		ri.Printf(PRINT_WARNING, "RB: invalid surface type %d (ptr=%p)\n", type, (void *)surface);
+		return;
+	}
+	if (rb_surfaceTable[type] == NULL) {
+		ri.Printf(PRINT_WARNING, "RB: missing surface handler for type %d (ptr=%p)\n", type, (void *)surface);
 		return;
 	}
 	rb_surfaceTable[type](surface);
@@ -891,7 +896,7 @@ static void RB_RenderLitSurfList( dlight_t* dl ) {
 		//if ( litSurf->sort == sort ) {
 		if ( litSurf->sort == oldSort ) {
 			// fast path, same as previous sort
-			rb_surfaceTable[ *litSurf->surface ]( litSurf->surface );
+			RB_CallSurfaceSafe( litSurf->surface );
 			continue;
 		}
 
@@ -1022,7 +1027,7 @@ static void RB_RenderLitSurfList( dlight_t* dl ) {
 		}
 
 		// add the triangles for this surface
-		rb_surfaceTable[ *litSurf->surface ]( litSurf->surface );
+		RB_CallSurfaceSafe( litSurf->surface );
 	}
 
 	// draw the contents of the last shader batch

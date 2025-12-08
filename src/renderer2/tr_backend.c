@@ -27,6 +27,24 @@ backEndData_t	*backEndData;
 backEndState_t	backEnd;
 
 
+__attribute__((noinline)) void RB_CallSurfaceSafe_impl(surfaceType_t *surface) {
+	R_DebugAssertSurfacePointer(surface);
+	if (!surface) {
+		return;
+	}
+	const int type = *surface;
+	if (type < 0 || type >= SF_NUM_SURFACE_TYPES) {
+		ri.Printf(PRINT_WARNING, "RB: invalid surface type %d (ptr=%p)\n", type, (void *)surface);
+		return;
+	}
+	if (rb_surfaceTable[type] == NULL) {
+		ri.Printf(PRINT_WARNING, "RB: missing surface handler for type %d (ptr=%p)\n", type, (void *)surface);
+		return;
+	}
+	rb_surfaceTable[type](surface);
+}
+
+
 static float	s_flipMatrix[16] = {
 	// convert from our coordinate system (looking down X)
 	// to OpenGL's coordinate system (looking down -Z)
@@ -466,7 +484,7 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 				continue;
 
 			// fast path, same as previous sort
-			rb_surfaceTable[ *drawSurf->surface ]( drawSurf->surface );
+			RB_CallSurfaceSafe( drawSurf->surface );
 			continue;
 		}
 		oldSort = drawSurf->sort;
@@ -589,7 +607,7 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 		}
 
 		// add the triangles for this surface
-		rb_surfaceTable[ *drawSurf->surface ]( drawSurf->surface );
+		RB_CallSurfaceSafe( drawSurf->surface );
 	}
 
 	backEnd.refdef.floatTime = originalTime;

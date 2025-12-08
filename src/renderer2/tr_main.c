@@ -72,7 +72,7 @@ static qboolean R_CompareVert(srfVert_t * v1, srfVert_t * v2, qboolean checkST)
 =============
 R_CalcTexDirs
 
-Lengyel, Eric. “Computing Tangent Space Basis Vectors for an Arbitrary Mesh”. Terathon Software 3D Graphics Library, 2001. http://www.terathon.com/code/tangent.html
+Lengyel, Eric. ï¿½Computing Tangent Space Basis Vectors for an Arbitrary Meshï¿½. Terathon Software 3D Graphics Library, 2001. http://www.terathon.com/code/tangent.html
 =============
 */
 void R_CalcTexDirs(vec3_t sdir, vec3_t tdir, const vec3_t v1, const vec3_t v2,
@@ -104,7 +104,7 @@ void R_CalcTexDirs(vec3_t sdir, vec3_t tdir, const vec3_t v1, const vec3_t v2,
 =============
 R_CalcTangentSpace
 
-Lengyel, Eric. “Computing Tangent Space Basis Vectors for an Arbitrary Mesh”. Terathon Software 3D Graphics Library, 2001. http://www.terathon.com/code/tangent.html
+Lengyel, Eric. ï¿½Computing Tangent Space Basis Vectors for an Arbitrary Meshï¿½. Terathon Software 3D Graphics Library, 2001. http://www.terathon.com/code/tangent.html
 =============
 */
 vec_t R_CalcTangentSpace(vec3_t tangent, vec3_t bitangent, const vec3_t normal, const vec3_t sdir, const vec3_t tdir)
@@ -1211,7 +1211,12 @@ static qboolean SurfIsOffscreen( const drawSurf_t *drawSurf, vec4_t clipDest[128
 
 	R_DecomposeSort( drawSurf->sort, &entityNum, &shader, &fogNum, &dlighted, &pshadowed );
 	RB_BeginSurface( shader, fogNum, drawSurf->cubemapIndex);
-	rb_surfaceTable[ *drawSurf->surface ]( drawSurf->surface );
+	if ( !R_SurfaceTypeIsValid( drawSurf->surface ) ) {
+		ri.Printf( PRINT_WARNING, "SurfIsOffscreen: invalid surface (ptr=%p type=%d)\n",
+			(void *)drawSurf->surface, drawSurf->surface ? *drawSurf->surface : -1 );
+		return qtrue;
+	}
+	RB_CallSurfaceSafe( drawSurf->surface );
 
 	assert( tess.numVertexes < 128 );
 
@@ -1459,6 +1464,16 @@ R_AddDrawSurf
 void R_AddDrawSurf( surfaceType_t *surface, shader_t *shader, 
 				   int fogIndex, int dlightMap, int pshadowMap, int cubemap ) {
 	int			index;
+
+#ifndef NDEBUG
+	R_DebugAssertSurfacePointer( surface );
+	assert( shader != NULL );
+#endif
+	if ( !R_SurfaceTypeIsValid( surface ) || shader == NULL ) {
+		ri.Printf( PRINT_WARNING, "R_AddDrawSurf: invalid surface (ptr=%p type=%d) shader=%s\n",
+			(void *)surface, surface ? *surface : -1, shader ? shader->name : "<null>" );
+		return;
+	}
 
 	// instead of checking for overflow, we just mask the index
 	// so it wraps around

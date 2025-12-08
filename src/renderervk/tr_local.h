@@ -54,6 +54,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 //#define USE_TESS_NEEDS_NORMAL
 //#define USE_TESS_NEEDS_ST2
 
+#include <assert.h>
+
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qfiles.h"
 #include "../qcommon/qcommon.h"
@@ -926,6 +928,28 @@ typedef struct srfIQModel_s {
 extern	void (*rb_surfaceTable[SF_NUM_SURFACE_TYPES])(void *);
 
 void RB_CallSurfaceSafe_impl(surfaceType_t *surface);
+
+static inline qboolean R_SurfaceTypeIsValid(const surfaceType_t *surface) {
+	if (!surface) {
+		return qfalse;
+	}
+	const int type = *surface;
+	return (type >= 0 && type < SF_NUM_SURFACE_TYPES) && rb_surfaceTable[type] != NULL;
+}
+
+static inline void R_DebugAssertSurfacePointer(const surfaceType_t *surface) {
+#ifndef NDEBUG
+	if (!surface) {
+		assert(surface != NULL);
+		return;
+	}
+	const int type = *surface;
+	assert(type >= 0 && type < SF_NUM_SURFACE_TYPES);
+	assert(rb_surfaceTable[type] != NULL);
+#else
+	(void)surface;
+#endif
+}
 
 static inline void RB_CallSurfaceSafe(surfaceType_t *surface) {
 	// Inline shim ensures all call sites route through the non-inlined impl

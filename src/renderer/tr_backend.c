@@ -26,6 +26,25 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 backEndData_t	*backEndData;
 backEndState_t	backEnd;
 
+// Centralized (non-inlined) version so we can break in gdb when an invalid
+// surface type is encountered.
+__attribute__((noinline)) void RB_CallSurfaceSafe_impl(surfaceType_t *surface) {
+	R_DebugAssertSurfacePointer(surface);
+	if (!surface) {
+		return;
+	}
+	const int type = *surface;
+	if (type < 0 || type >= SF_NUM_SURFACE_TYPES) {
+		ri.Printf(PRINT_WARNING, "RB: invalid surface type %d (ptr=%p)\n", type, (void *)surface);
+		return;
+	}
+	if (rb_surfaceTable[type] == NULL) {
+		ri.Printf(PRINT_WARNING, "RB: missing surface handler for type %d (ptr=%p)\n", type, (void *)surface);
+		return;
+	}
+	rb_surfaceTable[type](surface);
+}
+
 const float *GL_Ortho( const float left, const float right, const float bottom, const float top, const float znear, const float zfar )
 {
 	static float m[ 16 ] = { 0 };
@@ -594,7 +613,7 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 	for (i = 0, drawSurf = drawSurfs ; i < numDrawSurfs ; i++, drawSurf++) {
 		if ( drawSurf->sort == oldSort ) {
 			// fast path, same as previous sort
-			rb_surfaceTable[ *drawSurf->surface ]( drawSurf->surface );
+			RB_CallSurfaceSafe( drawSurf->surface );
 			continue;
 		}
 
@@ -732,7 +751,7 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 		}
 
 		// add the triangles for this surface
-		rb_surfaceTable[ *drawSurf->surface ]( drawSurf->surface );
+		RB_CallSurfaceSafe( drawSurf->surface );
 	}
 
 	// draw the contents of the last shader batch
@@ -927,7 +946,7 @@ static void RB_RenderLitSurfList( dlight_t* dl ) {
 		}
 
 		// add the triangles for this surface
-		rb_surfaceTable[ *litSurf->surface ]( litSurf->surface );
+		RB_CallSurfaceSafe( litSurf->surface );
 	}
 
 	// draw the contents of the last shader batch

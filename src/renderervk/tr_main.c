@@ -1508,6 +1508,16 @@ void R_AddLitSurf( surfaceType_t *surface, shader_t *shader, int fogIndex )
 	if ( tr.refdef.numLitSurfs >= (int)ARRAY_LEN( backEndData->litSurfs ) )
 		return;
 
+#ifndef NDEBUG
+	R_DebugAssertSurfacePointer( surface );
+	assert( shader != NULL );
+#endif
+	if ( !R_SurfaceTypeIsValid( surface ) || shader == NULL ) {
+		ri.Printf( PRINT_WARNING, "R_AddLitSurf: invalid surface (ptr=%p type=%d) shader=%s\n",
+			(void *)surface, surface ? *surface : -1, shader ? shader->name : "<null>" );
+		return;
+	}
+
 	tr.pc.c_lit_surfs++;
 
 	litsurf = &tr.refdef.litSurfs[ tr.refdef.numLitSurfs++ ];
@@ -1550,6 +1560,16 @@ R_AddDrawSurf
 void R_AddDrawSurf( surfaceType_t *surface, shader_t *shader, 
 				   int fogIndex, int dlightMap ) {
 	int			index;
+
+#ifndef NDEBUG
+	R_DebugAssertSurfacePointer( surface );
+	assert( shader != NULL );
+#endif
+	if ( !R_SurfaceTypeIsValid( surface ) || shader == NULL ) {
+		ri.Printf( PRINT_WARNING, "R_AddDrawSurf: invalid surface (ptr=%p type=%d) shader=%s\n",
+			(void *)surface, surface ? *surface : -1, shader ? shader->name : "<null>" );
+		return;
+	}
 
 	// instead of checking for overflow, we just mask the index
 	// so it wraps around

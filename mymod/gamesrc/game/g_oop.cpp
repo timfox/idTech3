@@ -16,12 +16,23 @@ a matching C++ EntityClass is registered.
 
 #include <unordered_map>
 #include <string>
+#include <cassert>
 
 extern vmCvar_t g_oopEntities;
 extern level_locals_t level;
 extern gentity_t g_entities[MAX_GENTITIES];
 
 namespace {
+
+// Simple no-op pilot entity to prove out the OOP path without changing gameplay.
+class NoOpEntity : public oop::BaseEntity {
+public:
+	using oop::BaseEntity::BaseEntity;
+	void Spawn() override {
+		// Mark that the legacy gentity is “owned” by OOP but do not alter behavior.
+		// By default the gentity continues to function as before.
+	}
+};
 
 // Component bridging a gentity to a C++ BaseEntity instance
 struct OOPComponent {
@@ -36,6 +47,7 @@ std::unordered_map<entt::entity, std::unique_ptr<oop::BaseEntity>> g_instances;
 int g_oopEntityCount = 0;
 
 bool g_enabled = false;
+bool g_builtinsRegistered = false;
 
 entt::registry *GetRegistry() {
 	return reinterpret_cast<entt::registry *>( ECS_GetRegistry() );
@@ -54,7 +66,20 @@ bool ShouldEnable() {
 }
 
 void RegisterBuiltins() {
-	// Placeholder for initial classes; keep empty to avoid changing gameplay.
+	if ( g_builtinsRegistered ) {
+		return;
+	}
+
+	// Register a no-op pilot class behind the cvar. It is safe because no stock
+	// maps use this classname.
+	oop::RegisterClass( oop::EntityClass{
+		"class_oop_stub",
+		[]( gentity_t *self, entt::entity ) -> std::unique_ptr<oop::BaseEntity> {
+			return std::make_unique<NoOpEntity>( self );
+		}
+	} );
+
+	g_builtinsRegistered = true;
 }
 
 } // namespace
@@ -153,6 +178,7 @@ qboolean G_OOP_CallSpawn( gentity_t *ent, const char *classname ) {
 	}
 
 	entt::registry *registry = GetRegistry();
+	assert( registry && "ECS registry must exist when OOP is enabled" );
 	if ( !registry ) {
 		return qfalse;
 	}
@@ -200,6 +226,7 @@ void G_OOP_OnFreeEntity( gentity_t *ent ) {
 			}
 		}
 	}
+	assert( g_instances.find( e ) != g_instances.end() || "OOP instance map out of sync" );
 	g_instances.erase( e );
 	G_ECS_UnregisterGentity( ent );
 }
@@ -230,6 +257,7 @@ void G_OOP_RunFrame( int msec ) {
 
 	for ( auto entity : view ) {
 		auto instIt = g_instances.find( entity );
+		assert( instIt != g_instances.end() && "OOP component without instance owner" );
 		if ( instIt == g_instances.end() ) {
 			continue;
 		}

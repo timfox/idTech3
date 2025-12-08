@@ -963,7 +963,12 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 		tess.needsST2 = qtrue;
 #endif
 		// tesselate
-		rb_surfaceTable[ *sf->data ]( sf->data ); // VBO_PushData() may be called multiple times there
+		if ( !R_SurfaceTypeIsValid( sf->data ) ) {
+			ri.Printf( PRINT_WARNING, "VBO_CreateSurfaceVBO: invalid surface (ptr=%p type=%d)\n",
+				(void *)sf->data, sf->data ? *sf->data : -1 );
+			goto __fail;
+		}
+		RB_CallSurfaceSafe( sf->data ); // VBO_PushData() may be called multiple times there
 		// setup colors and texture coordinates
 		VBO_PushData( i + 1, &tess );
 		if ( grid->surfaceType == SF_GRID ) {

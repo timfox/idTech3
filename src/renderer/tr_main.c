@@ -956,7 +956,12 @@ static qboolean SurfIsOffscreen( const drawSurf_t *drawSurf, qboolean *isMirror 
 #ifdef USE_TESS_NEEDS_NORMAL
 	tess.needsNormal = qtrue;
 #endif
-	rb_surfaceTable[ *drawSurf->surface ]( drawSurf->surface );
+	if ( !R_SurfaceTypeIsValid( drawSurf->surface ) ) {
+		ri.Printf( PRINT_WARNING, "SurfIsOffscreen: invalid surface (ptr=%p type=%d)\n",
+			(void *)drawSurf->surface, drawSurf->surface ? *drawSurf->surface : -1 );
+		return qtrue;
+	}
+	RB_CallSurfaceSafe( drawSurf->surface );
 
 	for ( i = 0; i < tess.numVertexes; i++ )
 	{
@@ -1398,6 +1403,16 @@ void R_AddLitSurf( surfaceType_t *surface, shader_t *shader, int fogIndex )
 	if ( (size_t)tr.refdef.numLitSurfs >= ARRAY_LEN( backEndData->litSurfs ) )
 		return;
 
+#ifndef NDEBUG
+	R_DebugAssertSurfacePointer( surface );
+	assert( shader != NULL );
+#endif
+	if ( !R_SurfaceTypeIsValid( surface ) || shader == NULL ) {
+		ri.Printf( PRINT_WARNING, "R_AddLitSurf: invalid surface (ptr=%p type=%d) shader=%s\n",
+			(void *)surface, surface ? *surface : -1, shader ? shader->name : "<null>" );
+		return;
+	}
+
 	tr.pc.c_lit_surfs++;
 
 	litsurf = &tr.refdef.litSurfs[ tr.refdef.numLitSurfs++ ];
@@ -1440,6 +1455,16 @@ R_AddDrawSurf
 void R_AddDrawSurf( surfaceType_t *surface, shader_t *shader, 
 				   int fogIndex, int dlightMap ) {
 	int			index;
+
+#ifndef NDEBUG
+	R_DebugAssertSurfacePointer( surface );
+	assert( shader != NULL );
+#endif
+	if ( !R_SurfaceTypeIsValid( surface ) || shader == NULL ) {
+		ri.Printf( PRINT_WARNING, "R_AddDrawSurf: invalid surface (ptr=%p type=%d) shader=%s\n",
+			(void *)surface, surface ? *surface : -1, shader ? shader->name : "<null>" );
+		return;
+	}
 
 	// instead of checking for overflow, we just mask the index
 	// so it wraps around
