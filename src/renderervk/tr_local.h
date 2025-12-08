@@ -934,7 +934,11 @@ static inline qboolean R_SurfaceTypeIsValid(const surfaceType_t *surface) {
 		return qfalse;
 	}
 	const int type = *surface;
-	return (type >= 0 && type < SF_NUM_SURFACE_TYPES) && rb_surfaceTable[type] != NULL;
+	if (type == MD3_IDENT || type == MDR_IDENT) {
+		// MD3/MDR store their file ident at the head rather than surfaceType_t.
+		return qtrue;
+	}
+	return (type >= 0 && type < SF_NUM_SURFACE_TYPES && rb_surfaceTable[type] != NULL) ? qtrue : qfalse;
 }
 
 static inline void R_DebugAssertSurfacePointer(const surfaceType_t *surface) {
@@ -944,6 +948,9 @@ static inline void R_DebugAssertSurfacePointer(const surfaceType_t *surface) {
 		return;
 	}
 	const int type = *surface;
+	if (type == MD3_IDENT || type == MDR_IDENT) {
+		return;
+	}
 	assert(type >= 0 && type < SF_NUM_SURFACE_TYPES);
 	assert(rb_surfaceTable[type] != NULL);
 #else
@@ -1462,6 +1469,9 @@ extern cvar_t	*r_vbo;
 #endif
 #ifdef USE_VK_PBR
 extern cvar_t	*r_pbr;
+extern cvar_t	*r_glint;
+extern cvar_t	*r_glint_intensity;
+extern cvar_t	*r_glint_scale;
 extern cvar_t	*r_baseNormalX;
 extern cvar_t	*r_baseNormalY;
 extern cvar_t	*r_baseParallax;

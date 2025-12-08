@@ -23,6 +23,9 @@ void Lua_RegisterSoundBindings(lua_State *L);
 void Lua_Events_RegisterBindings(lua_State *L);
 void Lua_Entity_RegisterBindings(lua_State *L);
 
+// fs_basepath and current game dir are queried via Cvar API to avoid
+// direct linkage against internal file system globals.
+
 // Forward declaration for internal function
 static void Lua_LoadScriptsFromFS(lua_State *L);
 
@@ -155,11 +158,34 @@ lua_State *Lua_CreateState(void)
 	// Open standard libraries
 	luaL_openlibs(L);
 
-	// Prepend mod script paths so `require` can find scripts/lib/*.lua
+	// Prepend mod script paths so `require` can find scripts/lib/*.lua using absolute paths
 	lua_getglobal(L, "package");
 	if ( lua_istable(L, -1) ) {
-		const char *paths = "scripts/?.lua;scripts/lib/?.lua;./scripts/?.lua;./scripts/lib/?.lua;";
-		lua_pushstring(L, paths );
+		const char *existing = NULL;
+		lua_getfield(L, -1, "path");
+		if ( lua_isstring(L, -1) ) {
+			existing = lua_tostring(L, -1);
+		}
+		lua_pop(L, 1); // pop existing path
+
+		char newPath[4096];
+		newPath[0] = '\0';
+		// Prepend fs_basepath/fs_game if available (use Cvar API to avoid linking internal globals)
+		char basepath[MAX_OSPATH] = {0};
+		char gamedir[MAX_OSPATH] = {0};
+		Cvar_VariableStringBuffer( "fs_basepath", basepath, sizeof(basepath) );
+		Cvar_VariableStringBuffer( "fs_game", gamedir, sizeof(gamedir) );
+		if ( basepath[0] && gamedir[0] ) {
+			Com_sprintf( newPath, sizeof(newPath), "%s/%s/scripts/?.lua;%s/%s/scripts/lib/?.lua;",
+				basepath, gamedir, basepath, gamedir );
+		}
+		// Always include local fallbacks
+		Q_strcat( newPath, sizeof(newPath), "scripts/?.lua;scripts/lib/?.lua;./scripts/?.lua;./scripts/lib/?.lua;" );
+		// Append existing search path
+		if ( existing && existing[0] ) {
+			Q_strcat( newPath, sizeof(newPath), existing );
+		}
+		lua_pushstring(L, newPath );
 		lua_setfield(L, -2, "path");
 	}
 	lua_pop(L, 1); // pop package

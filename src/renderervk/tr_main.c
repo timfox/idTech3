@@ -1513,8 +1513,16 @@ void R_AddLitSurf( surfaceType_t *surface, shader_t *shader, int fogIndex )
 	assert( shader != NULL );
 #endif
 	if ( !R_SurfaceTypeIsValid( surface ) || shader == NULL ) {
-		ri.Printf( PRINT_WARNING, "R_AddLitSurf: invalid surface (ptr=%p type=%d) shader=%s\n",
-			(void *)surface, surface ? *surface : -1, shader ? shader->name : "<null>" );
+		int surfaceType = surface ? (int)(*surface) : -1;
+		static int once = 0;
+		if ( !once ) {
+			once = 1;
+			ri.Error( ERR_DROP, "R_AddLitSurf: invalid surface (ptr=%p type=%d) shader=%s",
+				(void *)surface, surfaceType, shader ? shader->name : "<null>" );
+		} else {
+			ri.Printf( PRINT_WARNING, "R_AddLitSurf: invalid surface (ptr=%p type=%d) shader=%s\n",
+				(void *)surface, surfaceType, shader ? shader->name : "<null>" );
+		}
 		return;
 	}
 
@@ -1566,8 +1574,11 @@ void R_AddDrawSurf( surfaceType_t *surface, shader_t *shader,
 	assert( shader != NULL );
 #endif
 	if ( !R_SurfaceTypeIsValid( surface ) || shader == NULL ) {
-		ri.Printf( PRINT_WARNING, "R_AddDrawSurf: invalid surface (ptr=%p type=%d) shader=%s\n",
-			(void *)surface, surface ? *surface : -1, shader ? shader->name : "<null>" );
+		int surfaceType = surface ? (int)(*surface) : -1;
+		// Trap immediately so gdb captures the exact call site.
+		__builtin_trap();
+		ri.Error( ERR_DROP, "R_AddDrawSurf: invalid surface (ptr=%p type=%d) shader=%s",
+			(void *)surface, surfaceType, shader ? shader->name : "<null>" );
 		return;
 	}
 

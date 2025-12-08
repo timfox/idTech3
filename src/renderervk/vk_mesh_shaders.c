@@ -30,6 +30,40 @@ static qboolean mesh_shaders_requested( void )
 	return ( r_meshShaders && r_meshShaders->integer != 0 );
 }
 
+static VkShaderModule vk_load_shader_file( const char *path )
+{
+	FILE *f = fopen( path, "rb" );
+	if ( !f ) {
+		return VK_NULL_HANDLE;
+	}
+	fseek( f, 0, SEEK_END );
+	long size = ftell( f );
+	fseek( f, 0, SEEK_SET );
+	if ( size <= 0 ) {
+		fclose( f );
+		return VK_NULL_HANDLE;
+	}
+	byte *buf = (byte *)Z_Malloc( size );
+	if ( fread( buf, 1, size, f ) != (size_t)size ) {
+		fclose( f );
+		Z_Free( buf );
+		return VK_NULL_HANDLE;
+	}
+	fclose( f );
+
+	VkShaderModuleCreateInfo createInfo = {
+		.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+		.codeSize = (size_t)size,
+		.pCode = (const uint32_t *)buf
+	};
+	VkShaderModule module = VK_NULL_HANDLE;
+	if ( vkCreateShaderModule( vk.device, &createInfo, NULL, &module ) != VK_SUCCESS ) {
+		module = VK_NULL_HANDLE;
+	}
+	Z_Free( buf );
+	return module;
+}
+
 void vk_mesh_shaders_init( void )
 {
 	Com_Memset( &vk.mesh, 0, sizeof( vk.mesh ) );
@@ -51,6 +85,30 @@ void vk_mesh_shaders_init( void )
 		vk.mesh.meshShaderSupported = qtrue;
 		vk.mesh.active = mesh_shaders_requested();
 		vk.mesh.useFallback = !vk.mesh.active;
+		// Try to satisfy module requirement from disk before warning
+		if ( vk.mesh.mesh_task == VK_NULL_HANDLE || vk.mesh.mesh_mesh == VK_NULL_HANDLE ) {
+			static const char *searchPairs[][2] = {
+				{ "shaders/spirv/meshlet.task.spv", "shaders/spirv/meshlet.mesh.spv" },
+				{ "./shaders/spirv/meshlet.task.spv", "./shaders/spirv/meshlet.mesh.spv" },
+				{ "/home/tim/Desktop/idtech3/shaders/spirv/meshlet.task.spv", "/home/tim/Desktop/idtech3/shaders/spirv/meshlet.mesh.spv" },
+				{ "/home/tim/Desktop/idtech3/build/shaders/spirv/meshlet.task.spv", "/home/tim/Desktop/idtech3/build/shaders/spirv/meshlet.mesh.spv" },
+				{ "/home/tim/Desktop/idtech3/release/shaders/spirv/meshlet.task.spv", "/home/tim/Desktop/idtech3/release/shaders/spirv/meshlet.mesh.spv" },
+			};
+			const int searchCount = (int)(sizeof(searchPairs)/sizeof(searchPairs[0]));
+			for ( int si = 0; si < searchCount; ++si ) {
+				if ( vk.mesh.mesh_task == VK_NULL_HANDLE ) {
+					vk.mesh.mesh_task = vk_load_shader_file( searchPairs[si][0] );
+				}
+				if ( vk.mesh.mesh_mesh == VK_NULL_HANDLE ) {
+					vk.mesh.mesh_mesh = vk_load_shader_file( searchPairs[si][1] );
+				}
+				if ( vk.mesh.mesh_task != VK_NULL_HANDLE && vk.mesh.mesh_mesh != VK_NULL_HANDLE ) {
+					ri.Printf( PRINT_DEVELOPER, "Mesh shaders: loaded external modules from %s and %s\n",
+						searchPairs[si][0], searchPairs[si][1] );
+					break;
+				}
+			}
+		}
 		// Verify that required shader modules are present; otherwise stay on fallback.
 		if ( vk.mesh.mesh_task == VK_NULL_HANDLE || vk.mesh.mesh_mesh == VK_NULL_HANDLE ) {
 			vk.mesh.useFallback = qtrue;
@@ -176,9 +234,19 @@ void vk_mesh_shaders_create_pipeline( void )
 	// We currently rely on externally compiled mesh/task shader SPIR-V modules.
 	// If they are not present in shader_data, stay on the fallback path to avoid crashes.
 	if ( vk.mesh.mesh_task == VK_NULL_HANDLE || vk.mesh.mesh_mesh == VK_NULL_HANDLE ) {
-		vk.mesh.useFallback = qtrue;
-		ri.Printf( PRINT_WARNING, "Mesh shaders requested but mesh/task shader modules are missing; using fallback path\n" );
-		return;
+		// Try to load external modules from disk to satisfy the request
+		if ( vk.mesh.mesh_task == VK_NULL_HANDLE ) {
+			vk.mesh.mesh_task = vk_load_shader_file( "shaders/spirv/meshlet.task.spv" );
+		}
+		if ( vk.mesh.mesh_mesh == VK_NULL_HANDLE ) {
+			vk.mesh.mesh_mesh = vk_load_shader_file( "shaders/spirv/meshlet.mesh.spv" );
+		}
+		if ( vk.mesh.mesh_task == VK_NULL_HANDLE || vk.mesh.mesh_mesh == VK_NULL_HANDLE ) {
+			vk.mesh.useFallback = qtrue;
+			ri.Printf( PRINT_WARNING, "Mesh shaders requested but mesh/task shader modules are missing; using fallback path\n" );
+			return;
+		}
+		ri.Printf( PRINT_DEVELOPER, "Mesh shaders: loaded external mesh/task modules from shaders/spirv\n" );
 	}
 	
 	// TODO: Create mesh shader pipeline

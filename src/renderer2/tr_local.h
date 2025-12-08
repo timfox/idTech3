@@ -1060,6 +1060,10 @@ static inline qboolean R_SurfaceTypeIsValid(const surfaceType_t *surface) {
 		return qfalse;
 	}
 	const int type = *surface;
+	if (type == MD3_IDENT || type == MDR_IDENT) {
+		// MD3/MDR surfaces carry the file ident instead of surfaceType_t.
+		return qtrue;
+	}
 	return (type >= 0 && type < SF_NUM_SURFACE_TYPES) && rb_surfaceTable[type] != NULL;
 }
 
@@ -1070,6 +1074,9 @@ static inline void R_DebugAssertSurfacePointer(const surfaceType_t *surface) {
 		return;
 	}
 	const int type = *surface;
+	if (type == MD3_IDENT || type == MDR_IDENT) {
+		return;
+	}
 	assert(type >= 0 && type < SF_NUM_SURFACE_TYPES);
 	assert(rb_surfaceTable[type] != NULL);
 #else

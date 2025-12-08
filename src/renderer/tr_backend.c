@@ -34,13 +34,19 @@ __attribute__((noinline)) void RB_CallSurfaceSafe_impl(surfaceType_t *surface) {
 		return;
 	}
 	const int type = *surface;
-	if (type < 0 || type >= SF_NUM_SURFACE_TYPES) {
-		ri.Printf(PRINT_WARNING, "RB: invalid surface type %d (ptr=%p)\n", type, (void *)surface);
+	if (type == MD3_IDENT) {
+		rb_surfaceTable[SF_MD3](surface);
 		return;
 	}
-	if (rb_surfaceTable[type] == NULL) {
-		ri.Printf(PRINT_WARNING, "RB: missing surface handler for type %d (ptr=%p)\n", type, (void *)surface);
+	if (type == MDR_IDENT) {
+		rb_surfaceTable[SF_MDR](surface);
 		return;
+	}
+	if (type < 0 || type >= SF_NUM_SURFACE_TYPES) {
+		ri.Error( ERR_DROP, "RB: invalid surface type %d (ptr=%p)", type, (void *)surface );
+	}
+	if (rb_surfaceTable[type] == NULL) {
+		ri.Error( ERR_DROP, "RB: missing surface handler for type %d (ptr=%p)", type, (void *)surface );
 	}
 	rb_surfaceTable[type](surface);
 }

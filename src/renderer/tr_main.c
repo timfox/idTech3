@@ -957,8 +957,9 @@ static qboolean SurfIsOffscreen( const drawSurf_t *drawSurf, qboolean *isMirror 
 	tess.needsNormal = qtrue;
 #endif
 	if ( !R_SurfaceTypeIsValid( drawSurf->surface ) ) {
+		int surfaceType = drawSurf->surface ? (int)(*drawSurf->surface) : -1;
 		ri.Printf( PRINT_WARNING, "SurfIsOffscreen: invalid surface (ptr=%p type=%d)\n",
-			(void *)drawSurf->surface, drawSurf->surface ? *drawSurf->surface : -1 );
+			(void *)drawSurf->surface, surfaceType );
 		return qtrue;
 	}
 	RB_CallSurfaceSafe( drawSurf->surface );
@@ -1408,8 +1409,9 @@ void R_AddLitSurf( surfaceType_t *surface, shader_t *shader, int fogIndex )
 	assert( shader != NULL );
 #endif
 	if ( !R_SurfaceTypeIsValid( surface ) || shader == NULL ) {
+		int surfaceType = surface ? (int)(*surface) : -1;
 		ri.Printf( PRINT_WARNING, "R_AddLitSurf: invalid surface (ptr=%p type=%d) shader=%s\n",
-			(void *)surface, surface ? *surface : -1, shader ? shader->name : "<null>" );
+			(void *)surface, surfaceType, shader ? shader->name : "<null>" );
 		return;
 	}
 
@@ -1461,9 +1463,10 @@ void R_AddDrawSurf( surfaceType_t *surface, shader_t *shader,
 	assert( shader != NULL );
 #endif
 	if ( !R_SurfaceTypeIsValid( surface ) || shader == NULL ) {
-		ri.Printf( PRINT_WARNING, "R_AddDrawSurf: invalid surface (ptr=%p type=%d) shader=%s\n",
-			(void *)surface, surface ? *surface : -1, shader ? shader->name : "<null>" );
-		return;
+		int surfaceType = surface ? (int)(*surface) : -1;
+		__builtin_trap(); // trap immediately so gdb captures the stack
+		ri.Error( ERR_DROP, "R_AddDrawSurf: invalid surface (ptr=%p type=%d) shader=%s",
+			(void *)surface, surfaceType, shader ? shader->name : "<null>" );
 	}
 
 	// instead of checking for overflow, we just mask the index

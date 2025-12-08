@@ -807,7 +807,7 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 	int ibo_size;
 	int vbo_size;
 	int i, n;
-	GLenum err;
+	GLenum err = GL_NO_ERROR;
 
 	int numStaticSurfaces = 0;
 	int numStaticIndexes = 0;
@@ -964,8 +964,9 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 #endif
 		// tesselate
 		if ( !R_SurfaceTypeIsValid( sf->data ) ) {
+			int surfaceType = sf->data ? (int)(*sf->data) : -1;
 			ri.Printf( PRINT_WARNING, "VBO_CreateSurfaceVBO: invalid surface (ptr=%p type=%d)\n",
-				(void *)sf->data, sf->data ? *sf->data : -1 );
+				(void *)sf->data, surfaceType );
 			goto __fail;
 		}
 		RB_CallSurfaceSafe( sf->data ); // VBO_PushData() may be called multiple times there

@@ -1470,9 +1470,10 @@ void R_AddDrawSurf( surfaceType_t *surface, shader_t *shader,
 	assert( shader != NULL );
 #endif
 	if ( !R_SurfaceTypeIsValid( surface ) || shader == NULL ) {
-		ri.Printf( PRINT_WARNING, "R_AddDrawSurf: invalid surface (ptr=%p type=%d) shader=%s\n",
-			(void *)surface, surface ? *surface : -1, shader ? shader->name : "<null>" );
-		return;
+		int surfaceType = surface ? (int)(*surface) : -1;
+		__builtin_trap(); // trap immediately so gdb captures the stack
+		ri.Error( ERR_DROP, "R_AddDrawSurf: invalid surface (ptr=%p type=%d) shader=%s",
+			(void *)surface, surfaceType, shader ? shader->name : "<null>" );
 	}
 
 	// instead of checking for overflow, we just mask the index
