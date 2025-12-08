@@ -7218,11 +7218,14 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
         int32_t physical_texture_set;
         int32_t env_texture_set;
         int32_t lightmap_texture_set;
+        int32_t glint_enabled;
+        float   glint_intensity;
+        float   glint_scale;
 #endif
     } frag_spec_data; 
 
 #ifdef USE_VK_PBR
-    VkSpecializationMapEntry spec_entries[26];
+    VkSpecializationMapEntry spec_entries[28];
 #else
     VkSpecializationMapEntry spec_entries[14];
 #endif
@@ -7839,6 +7842,9 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
         PUSH_SPEC_ENTRY( 20, physical_texture_set );
         PUSH_SPEC_ENTRY( 21, env_texture_set );
         PUSH_SPEC_ENTRY( 22, lightmap_texture_set );
+        PUSH_SPEC_ENTRY( 23, glint_enabled );
+        PUSH_SPEC_ENTRY( 24, glint_intensity );
+        PUSH_SPEC_ENTRY( 27, glint_scale );
         
         // only use w value, specgloss maps are not supported
         frag_spec_data.specularScale_x = def->specularScale[0];
@@ -7865,6 +7871,10 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
         if ( ( def->vk_pbr_flags & PBR_HAS_LIGHTMAP ) == 0 )
             frag_spec_data.lightmap_texture_set = -1;
+
+        frag_spec_data.glint_enabled   = ( r_glint && r_glint->integer && r_pbr->integer ) ? 1 : 0;
+        frag_spec_data.glint_intensity = r_glint_intensity ? r_glint_intensity->value : 0.0f;
+        frag_spec_data.glint_scale     = r_glint_scale ? r_glint_scale->value : 0.0f;
     }
 #endif
 	if ( spec_count > (int)ARRAY_LEN( spec_entries ) ) {

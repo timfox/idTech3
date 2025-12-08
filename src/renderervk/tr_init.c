@@ -89,6 +89,9 @@ cvar_t	*r_vbo;
 #endif
 #ifdef USE_VK_PBR
 cvar_t	*r_pbr;
+cvar_t	*r_glint;
+cvar_t	*r_glint_intensity;
+cvar_t	*r_glint_scale;
 cvar_t  *r_baseNormalX;
 cvar_t  *r_baseNormalY;
 cvar_t  *r_baseParallax;
@@ -1666,6 +1669,13 @@ static void R_Register( void )
 #if defined (USE_VULKAN) && defined (USE_VK_PBR)
 	r_pbr = ri.Cvar_Get("r_pbr", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_pbr, "Enables Physically Based Rendering. \nRequires " S_COLOR_CYAN "\\r_fbo 1 \n" S_COLOR_GREEN "Advised " S_COLOR_CYAN "\\r_vbo 1 " S_COLOR_GREEN "for static world geometry " S_COLOR_WHITE "*optional" );
+
+	r_glint = ri.Cvar_Get( "r_glint", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_glint, "Enables glint (sparkle) highlights on PBR materials. 0 = off, 1 = on." );
+	r_glint_intensity = ri.Cvar_Get( "r_glint_intensity", "0.35", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_glint_intensity, "Glint brightness multiplier. Higher values increase sparkle strength." );
+	r_glint_scale = ri.Cvar_Get( "r_glint_scale", "140.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_glint_scale, "Glint noise scale. Higher values produce finer, denser sparkles." );
 
 	r_baseNormalX	= ri.Cvar_Get("r_baseNormalX",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );
 	r_baseNormalY	= ri.Cvar_Get("r_baseNormalY",		"1.0",	CVAR_ARCHIVE | CVAR_LATCH );

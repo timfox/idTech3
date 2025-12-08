@@ -150,6 +150,9 @@ layout (constant_id = 19) const int normal_texture_set = 0;
 layout (constant_id = 20) const int physical_texture_set = 0;
 layout (constant_id = 21) const int env_texture_set = 0;
 layout (constant_id = 22) const int lightmap_texture_set = 0;
+layout (constant_id = 23) const int glint_enabled = 0;
+layout (constant_id = 24) const float glint_intensity = 0.0;
+layout (constant_id = 27) const float glint_scale = 140.0;
 
 PRECISION_MEDIUMP vec3 CalcNormal( in PRECISION_MEDIUMP vec3 vertexNormal, in PRECISION_MEDIUMP vec2 frag_tex_coord )
 {
@@ -818,11 +821,28 @@ void main() {
 
 	vec3 reflectance = Fd + Fs;
 
+	// Optional glint/sparkle term for PBR materials
+	float glintTerm = 0.0;
+	if ( glint_enabled != 0 && physical_texture_set > -1 ) {
+		// hash-based noise, scaled in UV space, animated via material time when available
+		float timeOffset = 0.0;
+		if ( material_index >= 0 && material_index < materials.length() ) {
+			timeOffset = materials[material_index].time;
+		}
+		float noise = fract(sin(dot(frag_tex_coord0 * glint_scale + timeOffset, vec2(12.9898,78.233))) * 43758.5453);
+		// bias toward grazing highlights and smoother surfaces
+		float micro = clamp(1.0 - roughness, 0.0, 1.0);
+		float highlight = pow(VH, 12.0) * pow(NH, 8.0);
+		glintTerm = glint_intensity * noise * micro * highlight;
+	}
+
 	out_color.rgb  = lightColor * reflectance * ( attenuation * NL );
 	out_color.rgb += ambientColor * diffuse.rgb;
 
 	if ( env_texture_set > -1 )
 		out_color.rgb += CalcIBLContribution( roughness, N, E, NE, specular.rgb * AO );
+		
+	out_color.rgb += glintTerm * specular.rgb;
 	
 	// Add material emissive (magic glow, corruption, etc.)
 	out_color.rgb += materialEmissive;
