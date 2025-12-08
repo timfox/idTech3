@@ -102,10 +102,37 @@ typedef struct {
 	int pointSize;
 	fontInfo_t *font;
 	qboolean inUse;
+	qboolean useSDF;
 } fontCacheEntry_t;
 
 static fontCacheEntry_t fontCache[MAX_FONT_CACHE];
 static int fontCacheCount = 0;
+
+// Store a built font in the registry and name+size cache
+static void R_AddFontToCache(const char *fontName, int pointSize, qboolean useSDF, fontInfo_t *font) {
+	int slot = registeredFontCount;
+
+	if (registeredFontCount >= MAX_FONTS) {
+		ri.Printf(PRINT_WARNING, "RE_RegisterFont: Too many fonts registered already.\n");
+		return;
+	}
+
+	Com_Memcpy(&registeredFont[slot], font, sizeof(fontInfo_t));
+
+	if (fontCacheCount < MAX_FONT_CACHE) {
+		fontCacheEntry_t *entry = &fontCache[fontCacheCount++];
+		Q_strncpyz(entry->fontName, fontName, sizeof(entry->fontName));
+		entry->pointSize = pointSize;
+		entry->useSDF = useSDF;
+		entry->font = &registeredFont[slot];
+		entry->inUse = qtrue;
+	}
+
+	registeredFontCount++;
+
+	ri.Printf(PRINT_ALL, "RE_RegisterFont: registered '%s' (%dpt, SDF=%d) as slot %d, total=%d\n",
+		fontName, pointSize, useSDF ? 1 : 0, slot, registeredFontCount);
+}
 
 #ifdef USE_FREETYPE
 // Font rendering quality CVars (extern declarations)
@@ -445,6 +472,18 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	void *faceData;
 	int i, len;
 	char name[1024];
+	qboolean wantSDF = (r_fontSDF && r_fontSDF->integer != 0);
+	qboolean fromCache = qfalse;
+	qboolean fromDat = qfalse;
+	qboolean fromStb = qfalse;
+	qboolean fromFreeType = qfalse;
+	qboolean generatedAtlas = qfalse;
+	int atlasPages = 0;
+	int selectedAtlasSize = 256;
+	int selectedDPI = 72;
+	int selectedHint = -1;
+	int selectedAA = -1;
+	int selectedSpread = -1;
 
 	if (!fontName) {
 		ri.Printf(PRINT_ALL, "RE_RegisterFont: called with empty name\n");
@@ -461,9 +500,13 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	for (i = 0; i < fontCacheCount; i++) {
 		if (fontCache[i].inUse && 
 		    fontCache[i].pointSize == pointSize &&
+		    fontCache[i].useSDF == wantSDF &&
 		    !Q_stricmp(fontCache[i].fontName, fontName)) {
 			// Found in cache - copy cached font
 			Com_Memcpy(font, fontCache[i].font, sizeof(fontInfo_t));
+			fromCache = qtrue;
+			ri.Printf(PRINT_ALL, "RE_RegisterFont: cache hit '%s' (%dpt, SDF=%d)\n",
+				fontName, pointSize, wantSDF ? 1 : 0);
 			return;
 		}
 	}
@@ -472,6 +515,9 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: Too many fonts registered already.\n");
 		return;
 	}
+
+	ri.Printf(PRINT_ALL, "RE_RegisterFont: request name='%s' size=%d SDF=%d cache=%d/%d registered=%d/%d\n",
+		fontName, pointSize, wantSDF ? 1 : 0, fontCacheCount, MAX_FONT_CACHE, registeredFontCount, MAX_FONTS);
 
 	// Check pre-rendered font data files (legacy cache by point size only)
 	Com_sprintf(name, sizeof(name), "fonts/fontImage_%i.dat",pointSize);
@@ -491,7 +537,7 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	}
 
 	len = ri.FS_ReadFile(name, NULL);
-	if (len == sizeof(fontInfo_t)) {
+	if (!wantSDF && len == sizeof(fontInfo_t)) {
 		ri.FS_ReadFile(name, &faceData);
 		fdOffset = 0;
 		fdFile = faceData;
@@ -512,6 +558,9 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 			fdOffset += sizeof(font->glyphs[i].shaderName);
 		}
 		font->glyphScale = readFloat();
+		font->isSDF = qfalse;
+		font->sdfSpread = 0.0f;
+		font->fallbackFont = NULL;
 		Com_Memcpy(font->name, &fdFile[fdOffset], MAX_QPATH);
 
 //		Com_Memcpy(font, faceData, sizeof(fontInfo_t));
@@ -527,10 +576,42 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 			font->pointSize = pointSize;
 			font->dpi = 72.0f; // Default DPI
 		}
-		Com_Memcpy(&registeredFont[registeredFontCount++], font, sizeof(fontInfo_t));
+		R_AddFontToCache(fontName, pointSize, qfalse, font);
+		fromDat = qtrue;
+		ri.Printf(PRINT_ALL, "RE_RegisterFont: loaded legacy fontImage_%i.dat for '%s'\n", pointSize, fontName);
 		ri.FS_FreeFile(faceData);
 		return;
 	}
+
+#ifdef USE_STB_TRUETYPE
+	qboolean tryStb = wantSDF;
+#ifndef USE_FREETYPE
+	tryStb = qtrue;
+#endif
+	if (tryStb) {
+		int dbgAtlas = (r_fontAtlasSize) ? r_fontAtlasSize->integer : 512;
+		if (dbgAtlas < 256) dbgAtlas = 256;
+		if (dbgAtlas > 1024) dbgAtlas = 1024;
+		int dbgSpread = (r_fontSDFSpread) ? r_fontSDFSpread->integer : 6;
+		ri.Printf(PRINT_ALL, "RE_RegisterFont: stb path begin '%s' size=%d atlasHint=%d spread=%d\n",
+			fontName, pointSize, dbgAtlas, dbgSpread);
+		if (RE_RegisterFont_Stb(fontName, pointSize, font)) {
+			R_AddFontToCache(fontName, pointSize, font->isSDF, font);
+			fromStb = qtrue;
+			generatedAtlas = qtrue;
+			atlasPages = 1; // stb path always uses a single atlas page
+			ri.Printf(PRINT_ALL, "RE_RegisterFont: stb_truetype baked '%s' (%dpt, SDF=%d)\n",
+				fontName, pointSize, wantSDF ? 1 : 0);
+			return;
+		}
+#ifndef USE_FREETYPE
+		ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType not available and stb_truetype failed for '%s'\n", fontName);
+		return;
+#else
+		ri.Printf(PRINT_WARNING, "RE_RegisterFont: stb_truetype failed for '%s', falling back to FreeType\n", fontName);
+#endif
+	}
+#endif
 
 #ifndef USE_FREETYPE
 	ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType code not available\n");
@@ -553,6 +634,7 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 		if (dpi < 72.0f) dpi = 72.0f;
 		if (dpi > 300.0f) dpi = 300.0f;
 	}
+	selectedDPI = (int)dpi;
 	
 	if (r_fontAtlasSize) {
 		atlasSize = r_fontAtlasSize->integer;
@@ -565,24 +647,33 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 			atlasSize = 256;
 		}
 	}
+	selectedAtlasSize = atlasSize;
+	if (r_fontSDFSpread) {
+		selectedSpread = r_fontSDFSpread->integer;
+	}
 
 	// Configure hinting based on CVar
 	if (r_fontHinting) {
 		switch (r_fontHinting->integer) {
 			case 0: // None
 				loadFlags = FT_LOAD_NO_HINTING;
+				selectedHint = 0;
 				break;
 			case 1: // Light
 				loadFlags = FT_LOAD_TARGET_LIGHT;
+				selectedHint = 1;
 				break;
 			case 2: // Normal (default)
 				loadFlags = FT_LOAD_DEFAULT;
+				selectedHint = 2;
 				break;
 			case 3: // Strong
 				loadFlags = FT_LOAD_TARGET_NORMAL;
+				selectedHint = 3;
 				break;
 			default:
 				loadFlags = FT_LOAD_DEFAULT;
+				selectedHint = -1;
 				break;
 		}
 	}
@@ -591,8 +682,10 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	if (r_fontAntialiasing) {
 		if (r_fontAntialiasing->integer == 0) {
 			renderMode = FT_RENDER_MODE_MONO;
+			selectedAA = 0;
 		} else {
 			renderMode = FT_RENDER_MODE_NORMAL;
+			selectedAA = 1;
 		}
 	}
 
@@ -746,6 +839,8 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 			i++;
 		}
 	}
+	generatedAtlas = qtrue;
+	atlasPages = imageNumber;
 
 	// change the scale to be relative to 1 based on configured DPI ( so dpi of 144 means a scale of .5 )
 	glyphScale = 72.0f / dpi;
@@ -812,16 +907,8 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	font->pointSize = pointSize;
 	font->fallbackFont = NULL; // Initialize fallback pointer
 	
-	Com_Memcpy(&registeredFont[registeredFontCount++], font, sizeof(fontInfo_t));
-	
-	// Add to font cache for faster future lookups
-	if (fontCacheCount < MAX_FONT_CACHE) {
-		fontCacheEntry_t *entry = &fontCache[fontCacheCount++];
-		Q_strncpyz(entry->fontName, fontName, sizeof(entry->fontName));
-		entry->pointSize = pointSize;
-		entry->font = &registeredFont[registeredFontCount - 1];
-		entry->inUse = qtrue;
-	}
+	R_AddFontToCache(fontName, pointSize, qfalse, font);
+	fromFreeType = qtrue;
 
 	FreeType_DoneFace(face);
 	ri.FS_FreeFile(faceData);
@@ -832,6 +919,14 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 
 	ri.Free(out);
 #endif
+
+	ri.Printf(PRINT_ALL,
+		"RE_RegisterFont: source=%s '%s' (%dpt, SDF=%d) atlasPages=%d generated=%d registered=%d\n",
+		fromDat ? "dat" : (fromStb ? "stb" : (fromFreeType ? "freetype" : (fromCache ? "cache" : "unknown"))),
+		fontName, pointSize, wantSDF ? 1 : 0, atlasPages, generatedAtlas ? 1 : 0, registeredFontCount);
+	ri.Printf(PRINT_ALL,
+		"RE_RegisterFont: settings name='%s' size=%d dpi=%d atlas=%d hint=%d aa=%d spread=%d glyphScale=%.3f\n",
+		fontName, pointSize, selectedDPI, selectedAtlasSize, selectedHint, selectedAA, selectedSpread, font->glyphScale);
 }
 
 

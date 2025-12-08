@@ -808,7 +808,14 @@ static qboolean CG_RegisterClientModelname(clientInfo_t *ci, const char *modelNa
 	}
 
 	if (!ci->modelIcon) {
-		return qfalse;
+		// Try a generic fallback icon to avoid hard failure
+		ci->modelIcon = trap_R_RegisterShaderNoMip("icons/iconf_default");
+		if (!ci->modelIcon) {
+			ci->modelIcon = trap_R_RegisterShaderNoMip("gfx/2d/console");
+		}
+		if (!ci->modelIcon) {
+			return qfalse;
+		}
 	}
 
 	return qtrue;
@@ -840,6 +847,60 @@ static void CG_ColorFromString(const char *v, vec3_t color) {
 	if (val & 4) {
 		color[0] = 1.0f;
 	}
+}
+
+/*
+===================
+CG_TryRegisterFallbackModel
+===================
+Attempt to find and register a safe fallback player model so we don't crash
+when the configured DEFAULT_MODEL is missing. Tries a small list first, then
+scans models/players for any model folder that successfully registers.
+*/
+static qboolean CG_TryRegisterFallbackModel( clientInfo_t *ci, const char *teamname ) {
+	const char *fallbackModels[] = {
+		DEFAULT_MODEL,
+		"sorceress",
+		"sarge",
+		"ayumi",
+		"visor",
+		"keel",
+		"tankjr",
+		"grunt",
+		NULL
+	};
+
+	for (const char **m = fallbackModels; *m; ++m) {
+		if (CG_RegisterClientModelname( ci, *m, "default", *m, "default", teamname )) {
+			Q_strncpyz(ci->modelName, *m, sizeof(ci->modelName));
+			Q_strncpyz(ci->headModelName, *m, sizeof(ci->headModelName));
+			Com_Printf("CG: using fallback model '%s'\n", *m);
+			return qtrue;
+		}
+	}
+
+	// Last resort: scan available player model directories
+	char list[4096];
+	int num = trap_FS_GetFileList( "models/players", "/", list, sizeof(list) );
+	int offset = 0;
+	for (int i = 0; i < num; i++) {
+		const char *name = list + offset;
+		offset += (int)strlen(name) + 1;
+		if (!name[0]) {
+			continue;
+		}
+		if (!Q_stricmp(name, ".") || !Q_stricmp(name, "..")) {
+			continue;
+		}
+		if (CG_RegisterClientModelname( ci, name, "default", name, "default", teamname )) {
+			Q_strncpyz(ci->modelName, name, sizeof(ci->modelName));
+			Q_strncpyz(ci->headModelName, name, sizeof(ci->headModelName));
+			Com_Printf("CG: auto-discovered fallback model '%s'\n", name);
+			return qtrue;
+		}
+	}
+
+	return qfalse;
 }
 
 /*
@@ -889,7 +950,9 @@ static void CG_LoadClientInfo(int clientNum, clientInfo_t *ci) {
 		} else {
 			// Non-team fallback: use a valid skin name for the default model
 			if ( !CG_RegisterClientModelname( ci, DEFAULT_MODEL, "red", DEFAULT_MODEL, "red", teamname ) ) {
-				CG_Error( "DEFAULT_MODEL (%s) failed to register", DEFAULT_MODEL );
+				if ( !CG_TryRegisterFallbackModel( ci, teamname ) ) {
+					Com_Printf("WARNING: DEFAULT_MODEL (%s) failed and no fallback model could be registered.\n", DEFAULT_MODEL);
+				}
 			}
 		}
 		modelloaded = qfalse;
@@ -907,6 +970,10 @@ static void CG_LoadClientInfo(int clientNum, clientInfo_t *ci) {
 	// sounds
 	dir = ci->modelName;
 	fallback = (cgs.gametype >= GT_TEAM && cgs.ffa_gt != 1) ? DEFAULT_TEAM_MODEL : DEFAULT_MODEL;
+	if (!modelloaded && ci->modelName[0]) {
+		// prefer discovered fallback for sounds if the original failed
+		fallback = ci->modelName;
+	}
 
 	for (i = 0; i < MAX_CUSTOM_SOUNDS; i++) {
 		s = cg_customSoundNames[i];
