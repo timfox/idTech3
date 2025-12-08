@@ -109,6 +109,7 @@ clientActive_t		cl;
 clientConnection_t	clc;
 clientStatic_t		cls;
 vm_t				*cgvm = NULL;
+extern vm_t			*uivm;
 
 netadr_t			rcon_address;
 
@@ -1914,6 +1915,41 @@ static void CL_Snd_Restart_f( void )
 
 	// sound will be reinitialized by vid_restart
 	CL_Vid_Restart( REF_KEEP_CONTEXT /*REF_KEEP_WINDOW*/ );
+}
+
+/*
+=================
+CL_UI_OpenMain_f
+Open the main UI menu (helper for aliases)
+=================
+*/
+static void CL_UI_OpenMain_f( void )
+{
+	if ( !uivm ) {
+		Com_Printf( "UI not running\n" );
+		return;
+	}
+
+	Key_SetCatcher( Key_GetCatcher() | KEYCATCH_UI );
+	VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
+}
+
+/*
+=================
+CL_UI_Restart_f
+Reload the UI VM and reopen the main menu
+=================
+*/
+static void CL_UI_Restart_f( void )
+{
+	Com_Printf( "Restarting UI...\n" );
+	CL_ShutdownUI();
+	CL_InitUI();
+
+	if ( uivm ) {
+		Key_SetCatcher( Key_GetCatcher() | KEYCATCH_UI );
+		VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
+	}
 }
 
 
@@ -4341,6 +4377,10 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("clientinfo", CL_Clientinfo_f);
 	Cmd_AddCommand ("snd_restart", CL_Snd_Restart_f);
 	Cmd_AddCommand ("vid_restart", CL_Vid_Restart_f);
+	Cmd_AddCommand ("ui_restart", CL_UI_Restart_f);
+	Cmd_AddCommand ("ui_openmenu", CL_UI_OpenMain_f);
+	Cmd_AddCommand ("openmenu", CL_UI_OpenMain_f);
+	Cmd_AddCommand ("mainmenu", CL_UI_OpenMain_f);
 	Cmd_AddCommand ("disconnect", CL_Disconnect_f);
 	Cmd_AddCommand ("record", CL_Record_f);
 	Cmd_SetCommandCompletionFunc( "record", CL_CompleteRecordName );

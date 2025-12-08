@@ -271,8 +271,10 @@ void Lua_Encounter_RegisterBindings(lua_State *L)
 	lua_newtable(L);
 
 	// Register functions
-	Lua_RegisterFunction(L, "define", Lua_Encounter_Define);
-	Lua_RegisterFunction(L, "start", Lua_Encounter_Start);
+	lua_pushcfunction(L, Lua_Encounter_Define);
+	lua_setfield(L, -2, "define");
+	lua_pushcfunction(L, Lua_Encounter_Start);
+	lua_setfield(L, -2, "start");
 
 	// Set as global
 	lua_setglobal(L, "Encounter");

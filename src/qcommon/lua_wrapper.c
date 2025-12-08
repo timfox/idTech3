@@ -28,6 +28,7 @@ void Lua_Entity_RegisterBindings(lua_State *L);
 
 // Forward declaration for internal function
 static void Lua_LoadScriptsFromFS(lua_State *L);
+static int Lua_FSLoader(lua_State *L);
 
 // Forward declaration for console command
 static void Lua_ReloadScript_f(void);
@@ -43,6 +44,59 @@ static cvar_t *com_lua_enabled;
 #define MAX_LUA_STATES 16
 static lua_State *lua_states[MAX_LUA_STATES];
 static int num_lua_states = 0;
+
+// Replace '.' with '/' for module names to map require("a.b") -> a/b.lua
+static void Lua_ModuleNameToPath(const char *moduleName, char *out, size_t outSize) {
+	if (!moduleName || !out || outSize == 0) {
+		return;
+	}
+	Q_strncpyz(out, moduleName, outSize);
+	for (char *p = out; *p; ++p) {
+		if (*p == '.') {
+			*p = '/';
+		}
+	}
+}
+
+// Custom require loader that reads Lua files from the engine virtual FS (pk3/homepath)
+// Search order: scripts/<name>.lua, scripts/lib/<name>.lua
+static int Lua_FSLoader(lua_State *L)
+{
+	const char *module = luaL_checkstring(L, 1);
+	char normalized[MAX_QPATH];
+	char path[MAX_QPATH];
+	void *buffer = NULL;
+	int len = 0;
+
+	Lua_ModuleNameToPath(module, normalized, sizeof(normalized));
+
+	for (int i = 0; i < 2; ++i) {
+		if (i == 0) {
+			Com_sprintf(path, sizeof(path), "scripts/%s.lua", normalized);
+		} else {
+			Com_sprintf(path, sizeof(path), "scripts/lib/%s.lua", normalized);
+		}
+		len = FS_ReadFile(path, &buffer);
+		if (len > 0 && buffer) {
+			if (luaL_loadbuffer(L, (const char *)buffer, len, path) == LUA_OK) {
+				FS_FreeFile(buffer);
+				return 1; // chunk loaded; Lua will run it
+			}
+			// Loading failed; return the error to Lua
+			const char *err = lua_tostring(L, -1);
+			FS_FreeFile(buffer);
+			return luaL_error(L, "error loading module '%s' from %s: %s", module, path, err ? err : "unknown");
+		}
+		if (buffer) {
+			FS_FreeFile(buffer);
+			buffer = NULL;
+		}
+	}
+
+	// Not found: return a message string (Lua require concatenates messages)
+	lua_pushfstring(L, "\n\tno file '%s' in game filesystem (pk3/homepath)", path);
+	return 1;
+}
 
 /*
 =================
@@ -187,6 +241,21 @@ lua_State *Lua_CreateState(void)
 		}
 		lua_pushstring(L, newPath );
 		lua_setfield(L, -2, "path");
+
+		// Prepend our virtual-FS loader to package.searchers so require()
+		// can pull modules directly from pk3/homepath via FS_ReadFile.
+		lua_getfield(L, -1, "searchers"); // package.searchers
+		if ( lua_istable(L, -1) ) {
+			int len = lua_rawlen(L, -1);
+			// Shift existing searchers up by one to insert at slot 1
+			for (int i = len + 1; i > 1; --i) {
+				lua_rawgeti(L, -1, i - 1);
+				lua_rawseti(L, -2, i);
+			}
+			lua_pushcfunction(L, Lua_FSLoader);
+			lua_rawseti(L, -2, 1);
+		}
+		lua_pop(L, 1); // pop searchers
 	}
 	lua_pop(L, 1); // pop package
 	

@@ -182,15 +182,8 @@ static void MainMenu_LoadFontsFromConfig( void ) {
 	}
 
 	static char buffer[MAINMENU_FONT_BUFFER_SIZE];
-	int bytesRead = trap_FS_Read( buffer, len, f );
+	trap_FS_Read( buffer, len, f );
 	trap_FS_FCloseFile( f );
-	if ( bytesRead != len ) {
-		MainMenu_RegisterFontSafe( MAINMENU_DEFAULT_TEXT_FONT, MAINMENU_DEFAULT_TEXT_SIZE, &s_mainFonts.textFont, "text" );
-		MainMenu_RegisterFontSafe( MAINMENU_DEFAULT_SMALL_FONT, MAINMENU_DEFAULT_SMALL_SIZE, &s_mainFonts.smallFont, "small" );
-		MainMenu_RegisterFontSafe( MAINMENU_DEFAULT_BIG_FONT, MAINMENU_DEFAULT_BIG_SIZE, &s_mainFonts.bigFont, "big" );
-		s_mainFonts.loaded = FONT_LOADED( &s_mainFonts.textFont );
-		return;
-	}
 
 	buffer[len] = '\0';
 

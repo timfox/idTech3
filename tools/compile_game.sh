@@ -46,7 +46,7 @@ MOD_VM_DIR="$MOD_ROOT/vm"
 RELEASE_MOD_DIR="$PROJECT_ROOT/release/$MOD_NAME"
 RELEASE_VM_DIR="$RELEASE_MOD_DIR/vm"
 RELEASE_PK3="$RELEASE_MOD_DIR/$MOD_NAME.pk3"
-RELEASE_SO="$PROJECT_ROOT/release/$MOD_NAME.so"
+RUNTIME_VM_DIR="$HOME/.q3a/$MOD_NAME/vm"
 
 if [ ! -d "$MOD_SOURCE_DIR" ]; then
     echo "Error: ${MOD_SOURCE_DIR} not found."
@@ -93,33 +93,39 @@ cmake --build . -- -j${CORES}
 echo "Checking for compiled VM files in $MOD_VM_DIR"
 mkdir -p "$MOD_VM_DIR"
 
+# Map upstream artifact names to engine-expected names
+map_vm_name() {
+    local base="$1"
+    case "$base" in
+        gamex86_64.so)  echo "game.x86_64.so" ;;
+        cgamex86_64.so) echo "cgame.x86_64.so" ;;
+        uix86_64.so)    echo "ui.x86_64.so" ;;
+        *)              echo "$base" ;;
+    esac
+}
+
 shopt -s nullglob
-ARTIFACTS=("$MOD_VM_DIR"/*.so "$MOD_VM_DIR"/*.dll)
+# Prefer vm/ outputs, but also pick up direct outputs in the mod root (CMake BS_OUTPUT_DIR=..)
+ARTIFACTS=("$MOD_VM_DIR"/*.so "$MOD_VM_DIR"/*.dll "$MOD_ROOT"/*x86_64.so "$MOD_ROOT"/*x86_64.dll)
 shopt -u nullglob
 
 if [ ${#ARTIFACTS[@]} -eq 0 ]; then
     echo "Warning: No shared libraries found in $MOD_VM_DIR/"
 else
     mkdir -p "$RELEASE_VM_DIR"
-    echo "Copying files to mod's release directory: $RELEASE_VM_DIR"
+    mkdir -p "$RUNTIME_VM_DIR"
+    # Clear stale qvms and misnamed so files so the engine loads the fresh natives
+    rm -f "$RELEASE_VM_DIR"/*.qvm "$RUNTIME_VM_DIR"/*.qvm \
+          "$RELEASE_VM_DIR"/gamex86_64.so "$RELEASE_VM_DIR"/cgamex86_64.so "$RELEASE_VM_DIR"/uix86_64.so \
+          "$RUNTIME_VM_DIR"/gamex86_64.so "$RUNTIME_VM_DIR"/cgamex86_64.so "$RUNTIME_VM_DIR"/uix86_64.so 2>/dev/null || true
+    echo "Copying files to mod's release directory: $RELEASE_VM_DIR (and runtime: $RUNTIME_VM_DIR)"
     for lib in "${ARTIFACTS[@]}"; do
         libname=$(basename "$lib")
-        cp -v "$lib" "$RELEASE_VM_DIR/$libname"
+        mapped=$(map_vm_name "$libname")
+        cp -v "$lib" "$RELEASE_VM_DIR/$mapped"
+        cp -v "$lib" "$RUNTIME_VM_DIR/$mapped"
     done
     echo "Libraries copied to $RELEASE_VM_DIR/"
-fi
-
-if [ ${#ARTIFACTS[@]} -gt 0 ]; then
-    primary_so="${ARTIFACTS[0]}"
-    for lib in "${ARTIFACTS[@]}"; do
-        if [[ "$(basename "$lib")" == game*.so ]]; then
-            primary_so="$lib"
-            break
-        fi
-    done
-    echo "Copying primary module to $RELEASE_SO"
-    mkdir -p "$(dirname "$RELEASE_SO")"
-    cp -v "$primary_so" "$RELEASE_SO"
 fi
 
 package_pk3() {

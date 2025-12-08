@@ -322,8 +322,10 @@ void Lua_Sequence_RegisterBindings(lua_State *L)
 	lua_newtable(L);
 
 	// Register functions
-	Lua_RegisterFunction(L, "define", Lua_Sequence_Define);
-	Lua_RegisterFunction(L, "play", Lua_Sequence_Play);
+	lua_pushcfunction(L, Lua_Sequence_Define);
+	lua_setfield(L, -2, "define");
+	lua_pushcfunction(L, Lua_Sequence_Play);
+	lua_setfield(L, -2, "play");
 
 	// Set as global
 	lua_setglobal(L, "Sequence");

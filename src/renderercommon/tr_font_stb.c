@@ -11,13 +11,27 @@ libs/stb/stb_truetype.h. Falls back to a stub otherwise.
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
 #include "../renderer/tr_common.h"
+#include "../renderer/tr_local.h"
 
-#if defined(USE_STB_TRUETYPE) && __has_include("../../libs/stb/stb_truetype.h")
+#if defined(USE_STB_TRUETYPE) && (__has_include("../../libs/stb/stb_truetype.h") || __has_include("../../libs/cimgui/imgui/imstb_truetype.h"))
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_STATIC
-#define STBTT_malloc ri.Malloc
-#define STBTT_free ri.Free
+static void *R_StbMalloc(size_t size, void *user) { (void)user; return ri.Malloc((int)size); }
+static void R_StbFree(void *ptr, void *user) { (void)user; ri.Free(ptr); }
+#define STBTT_malloc(x,u) R_StbMalloc((x),(u))
+#define STBTT_free(x,u)   R_StbFree((x),(u))
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#endif
+#if __has_include("../../libs/stb/stb_truetype.h")
 #include "../../libs/stb/stb_truetype.h"
+#elif __has_include("../../libs/cimgui/imgui/imstb_truetype.h")
+#include "../../libs/cimgui/imgui/imstb_truetype.h"
+#endif
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 #else
 #undef USE_STB_TRUETYPE
 #endif

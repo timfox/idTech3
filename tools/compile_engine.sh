@@ -79,8 +79,10 @@ echo ""
 echo "Copying engine binaries and renderer .so files to $RELEASE_DIR..."
 mkdir -p "$RELEASE_DIR"
 
-# Copy main client executable (ship with .so suffix)
+# Copy main client executable as .so only (no plain binary kept in release)
 if [ -f "idtech3.x86_64" ]; then
+    # Remove any stale non-.so copy to avoid confusion
+    rm -f "$RELEASE_DIR/${GAME_NAME}.x86_64"
     cp -f "idtech3.x86_64" "$RELEASE_DIR/${GAME_NAME}.x86_64.so"
     echo "Copied client -> $RELEASE_DIR/${GAME_NAME}.x86_64.so"
 fi
@@ -109,8 +111,8 @@ fi
 
 # Quick validation summary
 MISSING=0
-if [ ! -f "$RELEASE_DIR/${GAME_NAME}.x86_64" ]; then
-    echo "Warning: Client binary missing at $RELEASE_DIR/${GAME_NAME}.x86_64"
+if [ ! -f "$RELEASE_DIR/${GAME_NAME}.x86_64.so" ]; then
+    echo "Warning: Client binary missing at $RELEASE_DIR/${GAME_NAME}.x86_64.so"
     MISSING=1
 fi
 shopt -s nullglob

@@ -30,6 +30,50 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 // extern displayContextDef_t cgDC; // Commented out, type not available
 
+// Fallback voice chat tokens (MissionPack constants) for builds where they may be missing
+#ifndef VOICECHAT_ONOFFENSE
+#define VOICECHAT_ONOFFENSE       "onoffense"
+#endif
+#ifndef VOICECHAT_OFFENSE
+#define VOICECHAT_OFFENSE         "offense"
+#endif
+#ifndef VOICECHAT_ONDEFENSE
+#define VOICECHAT_ONDEFENSE       "ondefense"
+#endif
+#ifndef VOICECHAT_DEFEND
+#define VOICECHAT_DEFEND          "defend"
+#endif
+#ifndef VOICECHAT_ONPATROL
+#define VOICECHAT_ONPATROL        "onpatrol"
+#endif
+#ifndef VOICECHAT_PATROL
+#define VOICECHAT_PATROL          "patrol"
+#endif
+#ifndef VOICECHAT_ONFOLLOW
+#define VOICECHAT_ONFOLLOW        "onfollow"
+#endif
+#ifndef VOICECHAT_FOLLOWME
+#define VOICECHAT_FOLLOWME        "followme"
+#endif
+#ifndef VOICECHAT_ONCAMPING
+#define VOICECHAT_ONCAMPING       "oncamping"
+#endif
+#ifndef VOICECHAT_CAMP
+#define VOICECHAT_CAMP            "camp"
+#endif
+#ifndef VOICECHAT_ONGETFLAG
+#define VOICECHAT_ONGETFLAG       "ongetflag"
+#endif
+#ifndef VOICECHAT_RETURNFLAG
+#define VOICECHAT_RETURNFLAG      "returnflag"
+#endif
+#ifndef VOICECHAT_ONFOLLOWCARRIER
+#define VOICECHAT_ONFOLLOWCARRIER "onfollowcarrier"
+#endif
+#ifndef VOICECHAT_FOLLOWFLAGCARRIER
+#define VOICECHAT_FOLLOWFLAGCARRIER "followflagcarrier"
+#endif
+
 
 // set in CG_ParseTeamInfo
 

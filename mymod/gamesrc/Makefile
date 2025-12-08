@@ -31,6 +31,14 @@ CGAMEDIR := cgame
 UIDIR := ui
 OUTDIR := ../vm
 
+# Runtime install / cache locations
+MOD_ROOT := $(abspath ..)
+RUNTIME_VM := $(abspath ../../release/blacksun/vm)
+HOME_VM := $(HOME)/.q3a/blacksun/vm
+HOME_FONTS := $(HOME)/.q3a/blacksun/fonts
+HOME_PK3CACHE := $(HOME)/.q3a/blacksun/pk3cache.dat
+MOD_PK3CACHE := $(MOD_ROOT)/pk3cache.dat
+
 # Engine include paths (adjust to match your setup)
 ENGINE_ROOT := ../..
 INCLUDES := -I$(ENGINE_ROOT)/src/game \
@@ -41,7 +49,7 @@ INCLUDES := -I$(ENGINE_ROOT)/src/game \
 
 # Source files - OpenArena source (all .c files in each directory)
 GAME_SRCS := $(wildcard $(GAMEDIR)/*.c)
-CGAME_SRCS := $(wildcard $(CGAMEDIR)/*.c)
+CGAME_SRCS := $(filter-out $(CGAMEDIR)/cg_newdraw.c,$(wildcard $(CGAMEDIR)/*.c))
 UI_SRCS := $(wildcard $(UIDIR)/*.c)
 
 # Object files
@@ -68,11 +76,13 @@ $(GAME_LIB): $(GAME_OBJS)
 	@mkdir -p $(OUTDIR)
 	$(CC) $(LDFLAGS) -Wl,-soname,game.$(ARCH_SUFFIX).so -o $@ $^
 	@echo "Built: $@"
+	@$(MAKE) postinstall
 
 $(CGAME_LIB): $(CGAME_OBJS)
 	@mkdir -p $(OUTDIR)
 	$(CC) $(LDFLAGS) -o $@ $^
 	@echo "Built: $@"
+	@$(MAKE) postinstall
 
 $(UI_LIB): $(UI_OBJS) $(GAME_LIB)
 	@mkdir -p $(OUTDIR)
@@ -80,6 +90,23 @@ $(UI_LIB): $(UI_OBJS) $(GAME_LIB)
 	@echo "Built: $@"
 	@echo "Note: If ui.x86_64.so fails to load due to '../vm/game.x86_64.so' dependency,"
 	@echo "      install patchelf and run: patchelf --replace-needed ../vm/game.$(ARCH_SUFFIX).so game.$(ARCH_SUFFIX).so $(UI_LIB)"
+	@$(MAKE) postinstall
+
+# After building, copy freshly built modules to runtime locations and clear stale caches
+.PHONY: postinstall
+postinstall:
+	@rm -f $(HOME_VM)/cgame.* $(HOME_VM)/ui.* $(HOME_VM)/game.* 2>/dev/null || true
+	@rm -f $(HOME_FONTS)/fontImage_* 2>/dev/null || true
+	@rm -f $(HOME_PK3CACHE) $(MOD_PK3CACHE) 2>/dev/null || true
+	@mkdir -p $(RUNTIME_VM)
+	@mkdir -p $(HOME_VM)
+	@cp -f $(OUTDIR)/game.$(ARCH_SUFFIX).so $(RUNTIME_VM)/ 2>/dev/null || true
+	@cp -f $(OUTDIR)/cgame.$(ARCH_SUFFIX).so $(RUNTIME_VM)/ 2>/dev/null || true
+	@cp -f $(OUTDIR)/ui.$(ARCH_SUFFIX).so $(RUNTIME_VM)/ 2>/dev/null || true
+	@cp -f $(OUTDIR)/game.$(ARCH_SUFFIX).so $(HOME_VM)/ 2>/dev/null || true
+	@cp -f $(OUTDIR)/cgame.$(ARCH_SUFFIX).so $(HOME_VM)/ 2>/dev/null || true
+	@cp -f $(OUTDIR)/ui.$(ARCH_SUFFIX).so $(HOME_VM)/ 2>/dev/null || true
+	@echo "Postinstall: copied VMs to runtime and cleared font/pk3 caches."
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@

@@ -858,6 +858,9 @@ when the configured DEFAULT_MODEL is missing. Tries a small list first, then
 scans models/players for any model folder that successfully registers.
 */
 static qboolean CG_TryRegisterFallbackModel( clientInfo_t *ci, const char *teamname ) {
+	// Forward declaration for native builds (normally from cg_syscalls)
+	extern int trap_FS_GetFileList( const char *path, const char *extension, char *listbuf, int bufsize );
+
 	const char *fallbackModels[] = {
 		DEFAULT_MODEL,
 		"sorceress",
@@ -945,7 +948,9 @@ static void CG_LoadClientInfo(int clientNum, clientInfo_t *ci) {
 				Q_strncpyz(teamname, DEFAULT_REDTEAM_NAME, sizeof (teamname));
 			}
 			if (!CG_RegisterClientModelname(ci, DEFAULT_TEAM_MODEL, ci->skinName, DEFAULT_TEAM_HEAD, ci->skinName, teamname)) {
-				CG_Error("DEFAULT_TEAM_MODEL / skin (%s/%s) failed to register", DEFAULT_TEAM_MODEL, ci->skinName);
+				if ( !CG_TryRegisterFallbackModel( ci, teamname ) ) {
+					Com_Printf("WARNING: DEFAULT_TEAM_MODEL (%s) failed and no fallback model could be registered.\n", DEFAULT_TEAM_MODEL);
+				}
 			}
 		} else {
 			// Non-team fallback: use a valid skin name for the default model
