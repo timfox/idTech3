@@ -563,6 +563,26 @@ $breadcrumbs = [
             <h4>2021-Present</h4>
             <p>Modern tooling and enhancements to id Tech 3: Structured logging, memory safety tools, ImGui overlays, WebSocket support, animated skyboxes, enhanced networking, DirectX 12 renderer</p>
         </div>
+
+        <div class="timeline-item">
+            <h4>2023-2024</h4>
+            <p>C23/C++23 migration in engine and mod modules; ECS helpers and entity facade added</p>
+        </div>
+
+        <div class="timeline-item">
+            <h4>2024</h4>
+            <p>Vulkan pipeline cache persistence - load/save cache to speed pipeline creation</p>
+        </div>
+
+        <div class="timeline-item">
+            <h4>2024</h4>
+            <p>Legacy GL clustered lighting SSBO fix - correct SSBO binding for clustered light data</p>
+        </div>
+
+        <div class="timeline-item">
+            <h4>2024</h4>
+            <p>ECS lifetime system and component setters - C-callable helpers and auto-despawn support</p>
+        </div>
         
         <div class="timeline-item">
             <h4>2025</h4>
@@ -573,6 +593,22 @@ $breadcrumbs = [
             <h4>2025</h4>
             <p>Doom: The Dark Ages announced - Upcoming prequel to Doom (2016), medieval twist on franchise</p>
         </div>
+
+        <div class="timeline-item">
+            <h4>2025</h4>
+            <p>Pipeline cache persistence added to Vulkan renderer - faster startup by reusing compiled pipelines</p>
+        </div>
+
+        <div class="timeline-item">
+            <h4>2025</h4>
+            <p>Legacy GL clustered lighting fix - SSBOs bound correctly for clustered lights in the GL renderer</p>
+        </div>
+
+        <div class="timeline-item">
+            <h4>2025</h4>
+            <p>ECS lifetime system and component setters - new C-callable ECS helpers and auto-despawn lifetime component</p>
+        </div>
+
     </div>
 </div>
 
