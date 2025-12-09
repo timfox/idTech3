@@ -24,6 +24,26 @@ static std::unordered_map<int, entt::entity> g_entityMap;
 static std::unordered_map<entt::entity, int> g_reverseEntityMap;
 static entt::entity g_nextEntity = entt::null;
 
+// Helper to validate registry/entity handles from C-callable wrappers.
+static bool ECS_GetRegistryAndEntity(ecs_entity_t entity, entt::registry **outRegistry, entt::entity *outEntity) {
+	if (g_registry == nullptr) {
+		return false;
+	}
+
+	entt::entity enttEntity = static_cast<entt::entity>(entity);
+	if (!g_registry->valid(enttEntity)) {
+		return false;
+	}
+
+	if (outRegistry) {
+		*outRegistry = g_registry;
+	}
+	if (outEntity) {
+		*outEntity = enttEntity;
+	}
+	return true;
+}
+
 /*
 ================
 ECS_Init
@@ -120,6 +140,156 @@ qboolean ECS_IsValid(ecs_entity_t entity) {
 	
 	entt::entity enttEntity = static_cast<entt::entity>(entity);
 	return g_registry->valid(enttEntity) ? qtrue : qfalse;
+}
+
+/*
+================
+ECS_SetTransform
+Ensure a TransformComponent exists and update its values
+================
+*/
+qboolean ECS_SetTransform(ecs_entity_t entity, const vec3_t position, const vec3_t rotation, const vec3_t scale) {
+	entt::registry *registry = nullptr;
+	entt::entity enttEntity = entt::null;
+	if (!ECS_GetRegistryAndEntity(entity, &registry, &enttEntity)) {
+		return qfalse;
+	}
+
+	TransformComponent *transform = registry->try_get<TransformComponent>(enttEntity);
+	if (!transform) {
+		transform = &registry->emplace<TransformComponent>(enttEntity);
+	}
+
+	VectorCopy(position, transform->position);
+	VectorCopy(rotation, transform->rotation);
+	VectorCopy(scale, transform->scale);
+
+	if (auto net = registry->try_get<NetworkComponent>(enttEntity)) {
+		net->needsSync = qtrue;
+	}
+
+	return qtrue;
+}
+
+/*
+================
+ECS_SetPhysics
+Ensure a PhysicsComponent exists and update its values
+================
+*/
+qboolean ECS_SetPhysics(ecs_entity_t entity, const vec3_t velocity, const vec3_t acceleration, float mass, float friction, qboolean useBullet) {
+	entt::registry *registry = nullptr;
+	entt::entity enttEntity = entt::null;
+	if (!ECS_GetRegistryAndEntity(entity, &registry, &enttEntity)) {
+		return qfalse;
+	}
+
+	PhysicsComponent *physics = registry->try_get<PhysicsComponent>(enttEntity);
+	if (!physics) {
+		physics = &registry->emplace<PhysicsComponent>(enttEntity);
+	}
+
+	VectorCopy(velocity, physics->velocity);
+	VectorCopy(acceleration, physics->acceleration);
+	physics->mass = mass;
+	physics->friction = friction;
+
+#ifdef USE_BULLET
+	// If Bullet was previously enabled and we are turning it off, tear down the body.
+	const bool disableBullet = physics->useBullet && (useBullet == qfalse);
+	physics->useBullet = useBullet;
+	if (disableBullet && physics->body) {
+		ECS::BulletOnEntityDestroyed(*registry, enttEntity, *physics);
+	}
+#else
+	(void)useBullet;
+#endif
+
+	if (auto net = registry->try_get<NetworkComponent>(enttEntity)) {
+		net->needsSync = qtrue;
+	}
+
+	return qtrue;
+}
+
+/*
+================
+ECS_SetHealth
+Ensure a HealthComponent exists and update its values
+================
+*/
+qboolean ECS_SetHealth(ecs_entity_t entity, int health, int maxHealth, int armor, int maxArmor) {
+	entt::registry *registry = nullptr;
+	entt::entity enttEntity = entt::null;
+	if (!ECS_GetRegistryAndEntity(entity, &registry, &enttEntity)) {
+		return qfalse;
+	}
+
+	HealthComponent *hc = registry->try_get<HealthComponent>(enttEntity);
+	if (!hc) {
+		hc = &registry->emplace<HealthComponent>(enttEntity);
+	}
+
+	hc->health = health;
+	hc->maxHealth = maxHealth;
+	hc->armor = armor;
+	hc->maxArmor = maxArmor;
+
+	// Clamp to valid ranges
+	if (hc->maxHealth < 1) hc->maxHealth = 1;
+	if (hc->health < 0) hc->health = 0;
+	if (hc->health > hc->maxHealth) hc->health = hc->maxHealth;
+
+	if (hc->maxArmor < 0) hc->maxArmor = 0;
+	if (hc->armor < 0) hc->armor = 0;
+	if (hc->armor > hc->maxArmor) hc->armor = hc->maxArmor;
+
+	if (auto net = registry->try_get<NetworkComponent>(enttEntity)) {
+		net->needsSync = qtrue;
+	}
+
+	return qtrue;
+}
+
+/*
+================
+ECS_SetLifetime
+Attach or update a LifetimeComponent on the entity
+================
+*/
+qboolean ECS_SetLifetime(ecs_entity_t entity, float seconds) {
+	entt::registry *registry = nullptr;
+	entt::entity enttEntity = entt::null;
+	if (!ECS_GetRegistryAndEntity(entity, &registry, &enttEntity)) {
+		return qfalse;
+	}
+
+	LifetimeComponent *life = registry->try_get<LifetimeComponent>(enttEntity);
+	if (!life) {
+		life = &registry->emplace<LifetimeComponent>(enttEntity);
+	}
+
+	life->remaining = seconds;
+	life->destroyOnExpire = qtrue;
+	return qtrue;
+}
+
+/*
+================
+ECS_ClearLifetime
+Remove the LifetimeComponent if present
+================
+*/
+void ECS_ClearLifetime(ecs_entity_t entity) {
+	entt::registry *registry = nullptr;
+	entt::entity enttEntity = entt::null;
+	if (!ECS_GetRegistryAndEntity(entity, &registry, &enttEntity)) {
+		return;
+	}
+
+	if (registry->any_of<LifetimeComponent>(enttEntity)) {
+		registry->remove<LifetimeComponent>(enttEntity);
+	}
 }
 
 /*

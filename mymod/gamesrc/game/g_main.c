@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "g_ecs.h"
 #endif
 #include "g_oop.h"
+#include "bs_features.h"
 
 level_locals_t	level;
 
@@ -837,6 +838,9 @@ void G_InitGame( int levelTime, int randomSeed, int restart )
 	srand( randomSeed );
 
 	G_RegisterCvars();
+
+	// Initialize Blacksun feature flags (C++23-backed registry)
+	BS_Features_InitDefaults();
 
 	G_UpdateTimestamp();
 

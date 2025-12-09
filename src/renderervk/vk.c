@@ -2,6 +2,7 @@
 #include "vk.h"
 #include <stdlib.h>
 #include <unistd.h>
+#include <stdio.h>
 extern int setenv( const char *name, const char *value, int overwrite );
 
 // Compatibility shim: some SDKs may not expose the EXT mesh shader feature struct/enum.
@@ -36,6 +37,84 @@ extern cvar_t *r_gpuSceneGraph;
 extern cvar_t *r_gpuSceneDebug;
 extern cvar_t *r_gpuSkinning;
 extern cvar_t *r_gpuRagdoll;
+
+static const char *VK_PIPELINE_CACHE_PATH = "release/pipeline_cache_vk.bin";
+
+#ifndef ARRAYSIZE
+#define ARRAYSIZE(x) (sizeof(x)/sizeof(*(x)))
+#endif
+
+static void vk_pipeline_cache_load( void **data_out, size_t *size_out ) {
+	*data_out = NULL;
+	*size_out = 0;
+
+	FILE *f = fopen( VK_PIPELINE_CACHE_PATH, "rb" );
+	if ( !f ) {
+		return;
+	}
+
+	if ( fseek( f, 0, SEEK_END ) != 0 ) {
+		fclose( f );
+		return;
+	}
+	long len = ftell( f );
+	if ( len <= 0 ) {
+		fclose( f );
+		return;
+	}
+	if ( fseek( f, 0, SEEK_SET ) != 0 ) {
+		fclose( f );
+		return;
+	}
+
+	void *buf = malloc( (size_t)len );
+	if ( !buf ) {
+		fclose( f );
+		return;
+	}
+
+	size_t read = fread( buf, 1, (size_t)len, f );
+	fclose( f );
+	if ( read != (size_t)len ) {
+		free( buf );
+		return;
+	}
+
+	*data_out = buf;
+	*size_out = (size_t)len;
+}
+
+static void vk_pipeline_cache_save( void ) {
+	if ( !vk.pipelineCache || !qvkGetPipelineCacheData ) {
+		return;
+	}
+
+	size_t size = 0;
+	// First call to get required size
+	if ( qvkGetPipelineCacheData( vk.device, vk.pipelineCache, &size, NULL ) != VK_SUCCESS || size == 0 ) {
+		return;
+	}
+
+	void *buf = malloc( size );
+	if ( !buf ) {
+		return;
+	}
+
+	if ( qvkGetPipelineCacheData( vk.device, vk.pipelineCache, &size, buf ) != VK_SUCCESS || size == 0 ) {
+		free( buf );
+		return;
+	}
+
+	FILE *f = fopen( VK_PIPELINE_CACHE_PATH, "wb" );
+	if ( !f ) {
+		free( buf );
+		return;
+	}
+
+	(void)fwrite( buf, 1, size, f );
+	fclose( f );
+	free( buf );
+}
 
 #if defined (_DEBUG)
 #if defined (_WIN32)
@@ -144,6 +223,7 @@ PFN_vkCreateImage								qvkCreateImage;
 PFN_vkCreateImageView							qvkCreateImageView;
 PFN_vkCreatePipelineLayout						qvkCreatePipelineLayout;
 PFN_vkCreatePipelineCache						qvkCreatePipelineCache;
+PFN_vkGetPipelineCacheData						qvkGetPipelineCacheData;
 PFN_vkCreateRenderPass							qvkCreateRenderPass;
 PFN_vkCreateSampler								qvkCreateSampler;
 PFN_vkCreateSemaphore							qvkCreateSemaphore;
@@ -2509,6 +2589,7 @@ static void init_vulkan_library( void )
 	INIT_DEVICE_FUNCTION(vkCreateImage)
 	INIT_DEVICE_FUNCTION(vkCreateImageView)
 	INIT_DEVICE_FUNCTION(vkCreatePipelineCache)
+	INIT_DEVICE_FUNCTION(vkGetPipelineCacheData)
 	INIT_DEVICE_FUNCTION(vkCreatePipelineLayout)
 	INIT_DEVICE_FUNCTION(vkCreateRenderPass)
 	INIT_DEVICE_FUNCTION(vkCreateSampler)
@@ -2665,6 +2746,7 @@ static void deinit_device_functions( void )
 	qvkCreateImage								= NULL;
 	qvkCreateImageView							= NULL;
 	qvkCreatePipelineCache						= NULL;
+qvkGetPipelineCacheData					= NULL;
 	qvkCreatePipelineLayout						= NULL;
 	qvkCreateRenderPass							= NULL;
 	qvkCreateSampler							= NULL;
@@ -5381,15 +5463,22 @@ void vk_initialize( void )
 #endif
 
 	{
-		// Use C23 designated initializer for better performance
+		void *cache_data = NULL;
+		size_t cache_size = 0;
+		vk_pipeline_cache_load( &cache_data, &cache_size );
+
 		const VkPipelineCacheCreateInfo ci = {
 			.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,
 			.pNext = NULL,
 			.flags = 0,
-			.initialDataSize = 0,
-			.pInitialData = NULL
+			.initialDataSize = cache_size,
+			.pInitialData = cache_data
 		};
 		VK_CHECK( qvkCreatePipelineCache( vk.device, &ci, NULL, &vk.pipelineCache ) );
+
+		if ( cache_data ) {
+			free( cache_data );
+		}
 	}
 
 	vk.renderPassIndex = RENDER_PASS_COUNT; // No render pass active initially
@@ -5881,6 +5970,7 @@ void vk_shutdown( refShutdownCode_t code )
 #endif
 
 	if ( vk.pipelineCache != VK_NULL_HANDLE ) {
+		vk_pipeline_cache_save();
 		qvkDestroyPipelineCache( vk.device, vk.pipelineCache, NULL );
 		vk.pipelineCache = VK_NULL_HANDLE;
 	}

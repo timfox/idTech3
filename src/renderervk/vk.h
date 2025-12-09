@@ -501,6 +501,7 @@ extern PFN_vkCreateDescriptorPool qvkCreateDescriptorPool;
 extern PFN_vkCreateImage qvkCreateImage;
 extern PFN_vkCreateImageView qvkCreateImageView;
 extern PFN_vkCreatePipelineLayout qvkCreatePipelineLayout;
+extern PFN_vkGetPipelineCacheData qvkGetPipelineCacheData;
 extern PFN_vkDestroyBuffer qvkDestroyBuffer;
 extern PFN_vkDestroyDescriptorSetLayout qvkDestroyDescriptorSetLayout;
 extern PFN_vkGetDeviceProcAddr qvkGetDeviceProcAddr;

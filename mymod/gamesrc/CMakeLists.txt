@@ -8,8 +8,8 @@ project(mymod_game_modules)
 set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-# Set C++ standard for ECS code (EnTT requires C++17)
-set(CMAKE_CXX_STANDARD 17)
+# Set C++ standard for C++ gamecode helpers (use C++23 features)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Build as shared libraries by default (DLLs/.so files)

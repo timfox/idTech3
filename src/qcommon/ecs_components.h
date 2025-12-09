@@ -106,6 +106,16 @@ struct ScriptComponent {
 	}
 };
 
+// Lifetime Component - auto-destroys entities after a duration
+struct LifetimeComponent {
+	float remaining;          // Seconds until expiration
+	qboolean destroyOnExpire; // Whether to delete the entity when time elapses
+
+	LifetimeComponent() : remaining(0.0f), destroyOnExpire(qtrue) {}
+	LifetimeComponent(float seconds, qboolean destroy = qtrue)
+		: remaining(seconds), destroyOnExpire(destroy) {}
+};
+
 #endif // USE_ENTT
 
 #endif // __ECS_COMPONENTS_H__

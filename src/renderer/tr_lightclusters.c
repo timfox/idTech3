@@ -22,6 +22,8 @@ static lc_cluster_header_t lc_headers[LC_MAX_CLUSTERS];
 static int lc_indices[LC_MAX_CLUSTERS * LC_MAX_LIGHTS_PER_CLUSTER];
 static GLuint lcHeaderBuffer = 0;
 static GLuint lcIndexBuffer = 0;
+typedef void (APIENTRYP PFNGLBINDBUFFERBASEPROC)(GLenum target, GLuint index, GLuint buffer);
+static PFNGLBINDBUFFERBASEPROC pglBindBufferBase = NULL;
 
 // Compute grid dimensions for current viewport
 static lc_grid_params_t LC_ComputeGrid(void) {
@@ -86,6 +88,9 @@ static void LC_InitBuffers( void ) {
 		qglGenBuffersARB( 1, &lcHeaderBuffer );
 		qglGenBuffersARB( 1, &lcIndexBuffer );
 	}
+	if ( !pglBindBufferBase ) {
+		pglBindBufferBase = (PFNGLBINDBUFFERBASEPROC)glXGetProcAddressARB( (const GLubyte *)"glBindBufferBase" );
+	}
 	initialized = qtrue;
 }
 
@@ -123,7 +128,8 @@ void R_BuildLightClusters( void ) {
 	}
 
 	// For each light, determine affected cluster bounds and append
-	for (int li = 0; li < tr.refdef.num_dlights && li < LC_MAX_LIGHTS; ++li) {
+	const int numLights = (int)tr.refdef.num_dlights;
+	for (int li = 0; li < numLights && li < LC_MAX_LIGHTS; ++li) {
 		const dlight_t *dl = &tr.refdef.dlights[li];
 
 		// Transform to view space (without mutating source)
@@ -189,14 +195,20 @@ void R_BuildLightClusters( void ) {
 	LC_InitBuffers();
 
 	if ( qglBindBufferARB && qglBufferDataARB ) {
-		qglBindBufferARB( GL_ARRAY_BUFFER_ARB, lcHeaderBuffer );
-		qglBufferDataARB( GL_ARRAY_BUFFER_ARB, clusterCount * sizeof( lc_cluster_header_t ), lc_headers, GL_DYNAMIC_DRAW );
+		qglBindBufferARB( GL_SHADER_STORAGE_BUFFER, lcHeaderBuffer );
+		qglBufferDataARB( GL_SHADER_STORAGE_BUFFER, clusterCount * sizeof( lc_cluster_header_t ), lc_headers, GL_DYNAMIC_DRAW );
+		if ( pglBindBufferBase ) {
+			pglBindBufferBase( GL_SHADER_STORAGE_BUFFER, 6, lcHeaderBuffer );
+		}
 
 		const int indexCount = clusterCount * LC_MAX_LIGHTS_PER_CLUSTER;
-		qglBindBufferARB( GL_ARRAY_BUFFER_ARB, lcIndexBuffer );
-		qglBufferDataARB( GL_ARRAY_BUFFER_ARB, indexCount * sizeof( int ), lc_indices, GL_DYNAMIC_DRAW );
+		qglBindBufferARB( GL_SHADER_STORAGE_BUFFER, lcIndexBuffer );
+		qglBufferDataARB( GL_SHADER_STORAGE_BUFFER, indexCount * sizeof( int ), lc_indices, GL_DYNAMIC_DRAW );
+		if ( pglBindBufferBase ) {
+			pglBindBufferBase( GL_SHADER_STORAGE_BUFFER, 7, lcIndexBuffer );
+		}
 
-		qglBindBufferARB( GL_ARRAY_BUFFER_ARB, 0 );
+		qglBindBufferARB( GL_SHADER_STORAGE_BUFFER, 0 );
 	}
 }
 

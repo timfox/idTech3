@@ -12,6 +12,7 @@ Core system implementations for physics, health, and network sync.
 #include "ecs_components.h"
 #include "ecs_internal.h"
 #include <entt/entt.hpp>
+#include <vector>
 
 #ifdef USE_LUA
 extern "C" {
@@ -236,6 +237,36 @@ void ECS::BulletOnEntityDestroyed(entt::registry &registry, entt::entity entity,
 
 /*
 ================
+ECS_LifetimeSystem_Update
+Expire entities that have a LifetimeComponent
+================
+*/
+static void ECS_LifetimeSystem_Update(float deltaTime) {
+	if (deltaTime <= 0.0f) {
+		return;
+	}
+
+	entt::registry &registry = ECS::GetRegistry();
+	auto view = registry.view<LifetimeComponent>();
+
+	std::vector<entt::entity> toDestroy;
+	toDestroy.reserve(view.size());
+
+	for (auto entity : view) {
+		auto &life = view.get<LifetimeComponent>(entity);
+		life.remaining -= deltaTime;
+		if (life.remaining <= 0.0f && life.destroyOnExpire) {
+			toDestroy.push_back(entity);
+		}
+	}
+
+	for (auto entity : toDestroy) {
+		ECS_DestroyEntity(static_cast<ecs_entity_t>(entity));
+	}
+}
+
+/*
+================
 PhysicsSystem
 Update physics components (velocity, position) using a simple integrator.
 Bullet-enabled entities will be overridden by ECS_Bullet_Step when
@@ -368,6 +399,7 @@ void ECS_RunFrame(float deltaTime) {
 	}
 	
 	// Run systems in order
+	ECS_LifetimeSystem_Update(deltaTime);
 	ECS_PhysicsSystem_Update(deltaTime);
 	// If Bullet is enabled, advance Bullet after the simple integrator so
 	// Bullet-enabled entities override the basic integration while

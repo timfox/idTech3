@@ -38,6 +38,13 @@ ecs_registry_t *ECS_GetRegistry(void);
 // Note: Specific component functions will be added as needed
 // These are placeholder functions for the basic interface
 
+// Component helpers
+qboolean ECS_SetTransform(ecs_entity_t entity, const vec3_t position, const vec3_t rotation, const vec3_t scale);
+qboolean ECS_SetPhysics(ecs_entity_t entity, const vec3_t velocity, const vec3_t acceleration, float mass, float friction, qboolean useBullet);
+qboolean ECS_SetHealth(ecs_entity_t entity, int health, int maxHealth, int armor, int maxArmor);
+qboolean ECS_SetLifetime(ecs_entity_t entity, float seconds);
+void ECS_ClearLifetime(ecs_entity_t entity);
+
 // Frame update
 void ECS_RunFrame(float deltaTime);
 
