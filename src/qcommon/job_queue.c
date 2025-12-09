@@ -59,30 +59,18 @@ void JobQueue_Shutdown(job_queue_t *queue)
 /*
 =================
 JobQueue_Enqueue
-Add a job to the queue
+Add a preallocated job to the queue
 =================
 */
-qboolean JobQueue_Enqueue(job_queue_t *queue, jobFunction_t function, void *data, jobPriority_t priority)
+qboolean JobQueue_Enqueue(job_queue_t *queue, job_t *job)
 {
-	if (!queue || !function) {
+	if (!queue || !job || !job->function) {
 		return qfalse;
 	}
 
 	if (queue->count >= queue->max_size) {
 		return qfalse;
 	}
-
-	job_t *job = (job_t *)Z_Malloc(sizeof(job_t));
-	if (!job) {
-		return qfalse;
-	}
-
-	job->function = function;
-	job->data = data;
-	job->priority = priority;
-	job->completed = qfalse;
-	job->dependencies = 0;
-	job->next = NULL;
 
 	// Simple enqueue (not fully lock-free, but good enough for our use)
 	if (queue->tail) {

@@ -44,12 +44,12 @@ Automated release packaging:
 
 ## Local Scripts
 
-### Package Release (`scripts/package_release.sh`)
+### Package Release (`tools/package_release.sh`)
 
 Creates release packages for the current platform:
 
 ```bash
-./scripts/package_release.sh [version]
+./tools/package_release.sh [version]
 ```
 
 **Features:**
@@ -61,31 +61,39 @@ Creates release packages for the current platform:
 **Usage:**
 ```bash
 # Auto-detect version
-./scripts/package_release.sh
+./tools/package_release.sh
 
 # Specify version
-./scripts/package_release.sh 1.0.0
+./tools/package_release.sh 1.0.0
 ```
 
-### Run Benchmarks (`scripts/run_benchmarks.sh`)
+### Run Benchmarks (`tools/run_benchmarks.sh`)
 
 Runs performance benchmarks locally:
 
 ```bash
-./scripts/run_benchmarks.sh
+./tools/run_benchmarks.sh
 ```
 
 **Features:**
-- Measures startup time
-- Tracks memory usage
-- Records binary size
-- Compares with baseline
-- Generates JSON reports
+- Timedemo harness (configurable via env: ENGINE_BIN, MOD, DEMO, OUTDIR)
+- Logs output to `benchmarks/` for later ingestion/CI artifacts
+- Non-zero exit if assets/demo are missing (signals CI failure)
 
 **Output:**
-- Results saved to `benchmarks/results_YYYYMMDD_HHMMSS.json`
-- Baseline comparison if available
-- Console output with metrics
+- Logs saved to `benchmarks/timedemo_<mod>_<demo>_<timestamp>.log`
+- Console output with metrics from the engine
+
+### Smoke Tests (`tools/ci_smoke.sh`)
+
+Minimal startup checks for common mods (env: ENGINE_BIN, MOD_LIST):
+
+```bash
+./tools/ci_smoke.sh
+ENGINE_BIN=./build/idtech3.x86_64 MOD_LIST="mymod blacksun" ./tools/ci_smoke.sh
+```
+
+Emits per-mod logs in `/tmp/ci_smoke_<mod>.log` if failures occur.
 
 ## Benchmark Metrics
 
@@ -186,7 +194,7 @@ cp benchmarks/results_YYYYMMDD_HHMMSS.json benchmarks/baseline.json
 
 1. **Always test locally first:**
    ```bash
-   ./scripts/run_benchmarks.sh
+   ./tools/run_benchmarks.sh
    ```
 
 2. **Check build on multiple platforms:**

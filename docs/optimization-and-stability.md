@@ -4,6 +4,32 @@
 
 This document outlines existing optimizations and safe stability improvements that don't affect gameplay.
 
+### Quick runbooks: sanitizers & memory tools
+
+- **ASan/UBSan (debug):**
+  - `cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBSAN=ON`
+  - `cmake --build build-asan && ./build-asan/idtech3.x86_64 +set fs_game mymod`
+- **Valgrind (debug, Linux):**
+  - `cmake -S . -B build-valgrind -DCMAKE_BUILD_TYPE=Debug -DENABLE_VALGRIND=ON`
+  - `cmake --build build-valgrind && valgrind --tool=memcheck ./build-valgrind/idtech3.x86_64`
+- **Dr. Memory (Windows):**
+  - `cmake -S . -B build-drmemory -DCMAKE_BUILD_TYPE=Debug -DENABLE_DRMEMORY=ON`
+  - `cmake --build build-drmemory && drmemory.exe -- ./build-drmemory/idtech3.exe`
+- **Coverage (gcc/clang):**
+  - `cmake -S . -B build-coverage -DCMAKE_BUILD_TYPE=Debug -DENABLE_COVERAGE=ON`
+  - `cmake --build build-coverage --target coverage  # emits coverage.html/xml`
+  - Requires `gcovr` in `PATH`.
+
+### Filesystem cache tuning & metrics
+
+- Add to `autoexec.cfg` (client) or server config to make tuning obvious:
+  - `seta fs_pathCache 1`
+  - `seta fs_existenceCache 1`
+  - `seta fs_pathNormCache 1`
+  - `seta fs_cacheSize 1024` (use higher for many pak/mod directories; prefer powers of two)
+- Inspect cache health: run `fs_cacheStats` to print hit/miss counts and hit rates for path, existence, and normalization caches.
+- Reset caches while testing: `fs_restart` rebuilds search paths and clears caches.
+
 ## Existing Optimizations
 
 ### 1. Filesystem Caching (`src/qcommon/files.c`)

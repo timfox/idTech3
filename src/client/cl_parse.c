@@ -91,6 +91,10 @@ static void CL_ParsePacketEntities( msg_t *msg, const clSnapshot_t *oldframe, cl
 	int	newnum;
 	int	oldindex, oldnum;
 
+	if ( oldframe && oldframe->numEntities > MAX_PARSE_ENTITIES ) {
+		Com_Error( ERR_DROP, "CL_ParsePacketEntities: oldframe numEntities %i exceeds MAX_PARSE_ENTITIES", oldframe->numEntities );
+	}
+
 	newframe->parseEntitiesNum = cl.parseEntitiesNum;
 	newframe->numEntities = 0;
 
@@ -117,6 +121,10 @@ static void CL_ParsePacketEntities( msg_t *msg, const clSnapshot_t *oldframe, cl
 			Com_Error( ERR_DROP, "CL_ParsePacketEntities: end of message" );
 		}
 
+		if ( newnum >= MAX_GENTITIES ) {
+			Com_Error( ERR_DROP, "CL_ParsePacketEntities: bad entity num %d (max %d)", newnum, MAX_GENTITIES );
+		}
+
 		if ( newnum == (MAX_GENTITIES-1) ) {
 			break;
 		}
@@ -127,6 +135,10 @@ static void CL_ParsePacketEntities( msg_t *msg, const clSnapshot_t *oldframe, cl
 				Com_Printf ("%3i:  unchanged: %i\n", msg->readcount, oldnum);
 			}
 			CL_DeltaEntity( msg, newframe, oldnum, oldstate, qtrue );
+
+			if ( newframe->numEntities >= MAX_PARSE_ENTITIES ) {
+				Com_Error( ERR_DROP, "CL_ParsePacketEntities: numEntities overflow (%i >= %i)", newframe->numEntities, MAX_PARSE_ENTITIES );
+			}
 
 			oldindex++;
 
@@ -144,6 +156,10 @@ static void CL_ParsePacketEntities( msg_t *msg, const clSnapshot_t *oldframe, cl
 				Com_Printf ("%3i:  delta: %i\n", msg->readcount, newnum);
 			}
 			CL_DeltaEntity( msg, newframe, newnum, oldstate, qfalse );
+
+			if ( newframe->numEntities >= MAX_PARSE_ENTITIES ) {
+				Com_Error( ERR_DROP, "CL_ParsePacketEntities: numEntities overflow (%i >= %i)", newframe->numEntities, MAX_PARSE_ENTITIES );
+			}
 
 			oldindex++;
 
@@ -163,6 +179,9 @@ static void CL_ParsePacketEntities( msg_t *msg, const clSnapshot_t *oldframe, cl
 				Com_Printf ("%3i:  baseline: %i\n", msg->readcount, newnum);
 			}
 			CL_DeltaEntity( msg, newframe, newnum, &cl.entityBaselines[newnum], qfalse );
+			if ( newframe->numEntities >= MAX_PARSE_ENTITIES ) {
+				Com_Error( ERR_DROP, "CL_ParsePacketEntities: numEntities overflow (%i >= %i)", newframe->numEntities, MAX_PARSE_ENTITIES );
+			}
 			continue;
 		}
 
@@ -175,6 +194,10 @@ static void CL_ParsePacketEntities( msg_t *msg, const clSnapshot_t *oldframe, cl
 			Com_Printf ("%3i:  unchanged: %i\n", msg->readcount, oldnum);
 		}
 		CL_DeltaEntity( msg, newframe, oldnum, oldstate, qtrue );
+
+		if ( newframe->numEntities >= MAX_PARSE_ENTITIES ) {
+			Com_Error( ERR_DROP, "CL_ParsePacketEntities: numEntities overflow (%i >= %i)", newframe->numEntities, MAX_PARSE_ENTITIES );
+		}
 
 		oldindex++;
 

@@ -52,6 +52,20 @@ job_handle_t *JobSystem_SubmitJob(jobFunction_t function, void *data, jobPriorit
 
 /*
 =================
+JobSystem_SubmitJobWithCompletion
+Submit a job and invoke a completion callback on the main thread
+function: Worker function
+data: Data to pass to worker
+priority: Job priority
+onComplete: Called from JobSystem_Update on main thread
+onCompleteData: Data passed to completion callback
+=================
+*/
+job_handle_t *JobSystem_SubmitJobWithCompletion(jobFunction_t function, void *data, jobPriority_t priority,
+	void (*onComplete)(void *user), void *onCompleteData);
+
+/*
+=================
 JobSystem_WaitForJob
 Wait for a job to complete
 handle: Job handle returned from SubmitJob

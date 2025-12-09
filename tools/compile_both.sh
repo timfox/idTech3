@@ -25,3 +25,13 @@ fi
   +set fs_basepath "$ROOT_DIR/release" \
   +set fs_homepath "$ROOT_DIR/release" \
   +set fs_game "$MODNAME"
+
+# Coverage build/report (Debug + ENABLE_COVERAGE=ON) if gcovr is available
+if command -v gcovr >/dev/null 2>&1; then
+  echo "[compile_both] Running coverage build..."
+  cmake -S "$ROOT_DIR" -B "$ROOT_DIR/build-coverage" -DCMAKE_BUILD_TYPE=Debug -DENABLE_COVERAGE=ON
+  cmake --build "$ROOT_DIR/build-coverage" --target coverage
+  echo "[compile_both] Coverage artifacts should be in build-coverage/"
+else
+  echo "[compile_both] gcovr not found; skipping coverage build."
+fi

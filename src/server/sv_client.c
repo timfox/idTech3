@@ -2307,6 +2307,11 @@ void SV_ExecuteClientMessage( client_t *cl, msg_t *msg ) {
 
 	cl->messageAcknowledge = MSG_ReadLong( msg );
 
+	if ( msg->readcount > msg->cursize ) {
+		SV_DropClient( cl, "illegible client message (truncated)" );
+		return;
+	}
+
 	//if ( cl->messageAcknowledge < 0 ) {
 	if ( cl->netchan.outgoingSequence - cl->messageAcknowledge <= 0 ) {
 		// usually only hackers create messages like this

@@ -30,6 +30,16 @@ static int s_num_workers = 0;
 static job_queue_t s_global_queue;
 static mutex_t s_global_mutex;
 static condition_t s_global_condition;
+// Main-thread completion queue
+#define MAX_COMPLETIONS 1024
+typedef struct completion_s {
+	void (*fn)(void *user);
+	void *user;
+} completion_t;
+static completion_t s_completions[MAX_COMPLETIONS];
+static int s_completion_head = 0;
+static int s_completion_tail = 0;
+static mutex_t s_completion_mutex;
 static qboolean s_initialized = qfalse;
 static volatile int s_pending_jobs = 0;
 static volatile int s_completed_jobs = 0;
@@ -97,6 +107,20 @@ static THREAD_RETURN THREAD_CALL WorkerThread_Main(void *arg)
 			if (job->handle) {
 				job->handle->completed = qtrue;
 			}
+
+			// Queue completion callback for main thread
+			if (job->onComplete) {
+				MUTEX_LOCK(s_completion_mutex);
+				int next_tail = (s_completion_tail + 1) % MAX_COMPLETIONS;
+				if (next_tail == s_completion_head) {
+					Com_Printf(S_COLOR_YELLOW "JobSystem: completion queue overflow, dropping callback\n");
+				} else {
+					s_completions[s_completion_tail].fn = job->onComplete;
+					s_completions[s_completion_tail].user = job->onCompleteData;
+					s_completion_tail = next_tail;
+				}
+				MUTEX_UNLOCK(s_completion_mutex);
+			}
 			
 			ATOMIC_DECREMENT(&s_pending_jobs);
 			ATOMIC_INCREMENT(&s_completed_jobs);
@@ -148,6 +172,7 @@ qboolean JobSystem_Init(int num_threads)
 
 	MUTEX_INIT(s_global_mutex);
 	CONDITION_INIT(s_global_condition);
+	MUTEX_INIT(s_completion_mutex);
 
 	// Initialize worker threads
 	for (int i = 0; i < s_num_workers; i++) {
@@ -237,6 +262,7 @@ void JobSystem_Shutdown(void)
 	JobQueue_Shutdown(&s_global_queue);
 	MUTEX_DESTROY(s_global_mutex);
 	CONDITION_DESTROY(s_global_condition);
+	MUTEX_DESTROY(s_completion_mutex);
 
 	s_num_workers = 0;
 	s_initialized = qfalse;
@@ -249,6 +275,17 @@ Submit a job for execution
 =================
 */
 job_handle_t *JobSystem_SubmitJob(jobFunction_t function, void *data, jobPriority_t priority)
+{
+	return JobSystem_SubmitJobWithCompletion(function, data, priority, NULL, NULL);
+}
+
+/*
+=================
+JobSystem_SubmitJobWithCompletion
+=================
+*/
+job_handle_t *JobSystem_SubmitJobWithCompletion(jobFunction_t function, void *data, jobPriority_t priority,
+	void (*onComplete)(void *user), void *onCompleteData)
 {
 	if (!s_initialized || !function) {
 		return NULL;
@@ -277,6 +314,8 @@ job_handle_t *JobSystem_SubmitJob(jobFunction_t function, void *data, jobPriorit
 	job->dependencies = 0;
 	job->next = NULL;
 	job->handle = handle;  // Store handle for completion notification
+	job->onComplete = onComplete;
+	job->onCompleteData = onCompleteData;
 
 	// Enqueue job (prefer local queue for better cache locality)
 	int worker_index = Thread_GetCurrentID() % s_num_workers;
@@ -284,7 +323,7 @@ job_handle_t *JobSystem_SubmitJob(jobFunction_t function, void *data, jobPriorit
 
 	if (worker_index < s_num_workers) {
 		MUTEX_LOCK(s_workers[worker_index].queue_mutex);
-		enqueued = JobQueue_Enqueue(&s_workers[worker_index].local_queue, function, data, priority);
+		enqueued = JobQueue_Enqueue(&s_workers[worker_index].local_queue, job);
 		if (enqueued) {
 			CONDITION_SIGNAL(s_workers[worker_index].work_available);
 		}
@@ -294,7 +333,7 @@ job_handle_t *JobSystem_SubmitJob(jobFunction_t function, void *data, jobPriorit
 	if (!enqueued) {
 		// Fall back to global queue
 		MUTEX_LOCK(s_global_mutex);
-		enqueued = JobQueue_Enqueue(&s_global_queue, function, data, priority);
+		enqueued = JobQueue_Enqueue(&s_global_queue, job);
 		if (enqueued) {
 			CONDITION_BROADCAST(s_global_condition);
 		}
@@ -395,7 +434,27 @@ Update job system (process completed jobs, etc.)
 */
 void JobSystem_Update(void)
 {
-	// This can be used for cleanup, statistics, etc.
-	// For now, it's a placeholder
+	if (!s_initialized) {
+		return;
+	}
+
+	for (;;) {
+		void (*fn)(void *) = NULL;
+		void *user = NULL;
+
+		MUTEX_LOCK(s_completion_mutex);
+		if (s_completion_head != s_completion_tail) {
+			fn = s_completions[s_completion_head].fn;
+			user = s_completions[s_completion_head].user;
+			s_completion_head = (s_completion_head + 1) % MAX_COMPLETIONS;
+		}
+		MUTEX_UNLOCK(s_completion_mutex);
+
+		if (!fn) {
+			break;
+		}
+
+		fn(user);
+	}
 }
 

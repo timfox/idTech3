@@ -1504,6 +1504,7 @@ extern cvar_t	*r_rt_giIntensity;
 #endif
 extern cvar_t	*r_postprocess_compute;
 extern cvar_t	*r_postprocess_workgroup;
+extern cvar_t	*r_postQuality;
 extern cvar_t	*r_tonemapMode;
 extern cvar_t	*r_tonemapExposure;
 extern cvar_t	*r_meshShaders;
@@ -1778,6 +1779,9 @@ image_t *R_BuildSDRSpecGlossImage(shaderStage_t *stage, const char *specImageNam
 // tr_surface.c
 //
 void		RB_SurfaceGridEstimate( srfGridMesh_t *cv, int *numVertexes, int *numIndexes ); 
+
+// Backend interface (Vulkan)
+const rb_backend_iface_t *RB_VK_GetBackendInterface( void );
 
 /*
 ====================================================================

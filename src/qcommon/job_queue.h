@@ -36,6 +36,9 @@ typedef struct job_s {
 	qboolean completed;
 	int dependencies;  // Number of jobs this depends on
 	job_handle_t *handle;  // Handle for completion tracking
+	// Optional main-thread completion callback; invoked from JobSystem_Update
+	void (*onComplete)(void *user);
+	void *onCompleteData;
 	struct job_s *next;
 } job_t;
 
@@ -66,10 +69,10 @@ void JobQueue_Shutdown(job_queue_t *queue);
 /*
 =================
 JobQueue_Enqueue
-Add a job to the queue
+Add a preallocated job to the queue
 =================
 */
-qboolean JobQueue_Enqueue(job_queue_t *queue, jobFunction_t function, void *data, jobPriority_t priority);
+qboolean JobQueue_Enqueue(job_queue_t *queue, job_t *job);
 
 /*
 =================

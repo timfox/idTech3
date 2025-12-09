@@ -16,6 +16,7 @@ RELEASE_DIR="$PROJECT_ROOT/release"
 GAME_NAME="idtech3"
 BUILD_TYPE="Release"
 CLEAN=0
+COVERAGE=0
 
 normalize_build_type() {
     local arg=$(echo "$1" | tr '[:upper:]' '[:lower:]')
@@ -37,6 +38,10 @@ for arg in "$@"; do
         CLEAN=1
         continue
     fi
+    if [ "$arg" = "coverage" ] || [ "$arg" = "cov" ]; then
+        COVERAGE=1
+        continue
+    fi
     # Anything else is treated as desired game name (for copied filenames)
     GAME_NAME="$arg"
 done
@@ -49,6 +54,10 @@ echo "Release dir:  $RELEASE_DIR"
 if [ $CLEAN -eq 1 ] && [ -d "$BUILD_DIR" ]; then
     echo "Cleaning build directory..."
     rm -rf "$BUILD_DIR"
+fi
+if [ $CLEAN -eq 1 ] && [ -d "$PROJECT_ROOT/build-coverage" ]; then
+    echo "Cleaning coverage build directory..."
+    rm -rf "$PROJECT_ROOT/build-coverage"
 fi
 mkdir -p "$BUILD_DIR"
 
@@ -127,3 +136,16 @@ if [ $MISSING -eq 0 ]; then
 fi
 
 echo "Engine binary and renderer .so files updated in $RELEASE_DIR"
+
+# Optional coverage build (Debug + ENABLE_COVERAGE=ON)
+if [ $COVERAGE -eq 1 ]; then
+    echo ""
+    echo "Running coverage configuration/build (Debug, ENABLE_COVERAGE=ON)..."
+    if ! command -v gcovr >/dev/null 2>&1; then
+        echo "gcovr not found in PATH; skipping coverage report generation."
+    else
+        cmake -S "$PROJECT_ROOT" -B "$PROJECT_ROOT/build-coverage" -DCMAKE_BUILD_TYPE=Debug -DENABLE_COVERAGE=ON
+        cmake --build "$PROJECT_ROOT/build-coverage" --target coverage
+        echo "Coverage artifacts (HTML/XML) should be in build-coverage/"
+    fi
+fi

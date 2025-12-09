@@ -667,10 +667,23 @@ static void CM_TraceThroughLeaf( traceWork_t *tw, const cLeaf_t *leaf ) {
 	int			brushnum;
 	cbrush_t	*b;
 	cPatch_t	*patch;
+	int			leafBrushLimit = cm.numLeafBrushes;
+	int			leafSurfaceLimit = cm.numLeafSurfaces;
 
 	// trace line against all brushes in the leaf
 	for ( k = 0 ; k < leaf->numLeafBrushes ; k++ ) {
-		brushnum = cm.leafbrushes[leaf->firstLeafBrush+k];
+		int leafBrushIndex = leaf->firstLeafBrush + k;
+		if ( leafBrushIndex < 0 || leafBrushIndex >= leafBrushLimit ) {
+			Com_DPrintf( "CM_TraceThroughLeaf: leafBrushIndex out of range (%d / %d)\n", leafBrushIndex, leafBrushLimit );
+			break;
+		}
+
+		brushnum = cm.leafbrushes[leafBrushIndex];
+
+		if ( brushnum < 0 || brushnum >= cm.numBrushes ) {
+			Com_DPrintf( "CM_TraceThroughLeaf: brushnum out of range (%d / %d)\n", brushnum, cm.numBrushes );
+			continue;
+		}
 
 		b = &cm.brushes[brushnum];
 		if ( b->checkcount == cm.checkcount ) {
@@ -700,7 +713,13 @@ static void CM_TraceThroughLeaf( traceWork_t *tw, const cLeaf_t *leaf ) {
 	if ( !cm_noCurves->integer ) {
 #endif
 		for ( k = 0 ; k < leaf->numLeafSurfaces ; k++ ) {
-			patch = cm.surfaces[ cm.leafsurfaces[ leaf->firstLeafSurface + k ] ];
+			int leafSurfaceIndex = leaf->firstLeafSurface + k;
+			if ( leafSurfaceIndex < 0 || leafSurfaceIndex >= leafSurfaceLimit ) {
+				Com_DPrintf( "CM_TraceThroughLeaf: leafSurfaceIndex out of range (%d / %d)\n", leafSurfaceIndex, leafSurfaceLimit );
+				break;
+			}
+
+			patch = cm.surfaces[ cm.leafsurfaces[ leafSurfaceIndex ] ];
 			if ( !patch ) {
 				continue;
 			}

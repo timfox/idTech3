@@ -1,24 +1,76 @@
-name: CI
+name: CI/CD
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - '.gitignore'
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
+  schedule:
+    # Nightly safety net
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BUILD_TYPE: RelWithDebInfo
+  CMAKE_COMMON_FLAGS: -DUSE_VULKAN=ON -DUSE_RENDERER_DLOPEN=ON -DBUILD_SERVER=ON
 
 jobs:
-  build-engine-linux:
-    name: Build Engine (Linux)
+  configure:
+    name: Configure (Linux)
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        compiler: [gcc, clang]
-        renderer: [opengl, vulkan]
-    
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Install dependencies
+      - name: Install CMake
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake
+      - name: Generate build files
+        run: |
+          cmake -S . -B build-config \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            ${{ env.CMAKE_COMMON_FLAGS }} \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+  build:
+    name: Build ${{ matrix.name }}
+    needs: configure
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-gcc
+            runner: ubuntu-24.04
+            os: linux
+            compiler: gcc
+          - name: linux-clang
+            runner: ubuntu-24.04
+            os: linux
+            compiler: clang
+          - name: windows-msvc
+            runner: windows-2022
+            os: windows
+            arch: x64
+          - name: macos-universal
+            runner: macos-13
+            os: macos
+            arch: "x86_64;arm64"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -33,220 +85,135 @@ jobs:
             libvpx-dev libdav1d-dev \
             libopenexr-dev libassimp-dev \
             libbullet-dev
-      
-      - name: Set up ${{ matrix.compiler }}
-        if: matrix.compiler == 'clang'
-        run: |
-          sudo apt-get install -y clang
-          echo "CC=clang" >> $GITHUB_ENV
-          echo "CXX=clang++" >> $GITHUB_ENV
-      
-      - name: Configure CMake
-        run: |
-          mkdir -p build
-          cd build
-          cmake .. \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DUSE_VULKAN=${{ matrix.renderer == 'vulkan' && 'ON' || 'OFF' }} \
-            -DUSE_RENDERER_DLOPEN=ON \
-            -DBUILD_SERVER=ON
-      
-      - name: Build
-        run: |
-          cd build
-          make -j$(nproc)
-      
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: engine-linux-${{ matrix.compiler }}-${{ matrix.renderer }}
-          path: |
-            build/idtech3.x86_64
-            build/idtech3.server.x86_64
-            build/idtech3_*.so
-            build/libimgui_shared.so
+          if [ "${{ matrix.compiler }}" = "clang" ]; then
+            sudo apt-get install -y clang lld
+            echo "CC=clang" >> $GITHUB_ENV
+            echo "CXX=clang++" >> $GITHUB_ENV
+          fi
 
-  build-engine-windows:
-    name: Build Engine (Windows)
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        renderer: [opengl, vulkan]
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install dependencies
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macos'
         run: |
-          choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' -y
-      
-      - name: Configure CMake
-        shell: bash
-        run: |
-          mkdir -p build
-          cd build
-          cmake .. \
-            -G "Visual Studio 17 2022" \
-            -A x64 \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DUSE_VULKAN=${{ matrix.renderer == 'vulkan' && 'ON' || 'OFF' }} \
-            -DUSE_RENDERER_DLOPEN=ON \
-            -DBUILD_SERVER=ON
-      
-      - name: Build
-        shell: bash
-        run: |
-          cd build
-          cmake --build . --config Release -j
-      
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: engine-windows-${{ matrix.renderer }}
-          path: |
-            build/Release/idtech3.x64.exe
-            build/Release/idtech3.server.x64.exe
-            build/Release/idtech3_*.dll
-            build/Release/libimgui_shared.dll
-
-  build-engine-macos:
-    name: Build Engine (macOS)
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        arch: [x86_64, arm64]
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Install dependencies
-        run: |
+          brew update
           brew install cmake sdl2 curl openssl jpeg vorbis ogg freetype sqlite lua@5.4 libwebsockets zstd openal theora libvpx dav1d openexr assimp bullet
-      
-      - name: Configure CMake
+
+      - name: Configure (CMake)
+        shell: bash
         run: |
           mkdir -p build
           cd build
-          cmake .. \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_OSX_ARCHITECTURES=${{ matrix.arch }} \
-            -DUSE_VULKAN=ON \
-            -DUSE_RENDERER_DLOPEN=ON \
-            -DBUILD_SERVER=ON
-      
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            cmake .. \
+              -G "Visual Studio 17 2022" \
+              -A ${{ matrix.arch }} \
+              -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+              ${{ env.CMAKE_COMMON_FLAGS }}
+          elif [ "${{ matrix.os }}" = "macos" ]; then
+            cmake .. \
+              -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+              -DCMAKE_OSX_ARCHITECTURES="${{ matrix.arch }}" \
+              ${{ env.CMAKE_COMMON_FLAGS }}
+          else
+            cmake .. \
+              -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+              ${{ env.CMAKE_COMMON_FLAGS }}
+          fi
+
       - name: Build
+        shell: bash
         run: |
           cd build
-          make -j$(sysctl -n hw.ncpu)
-      
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            cmake --build . --config ${{ env.BUILD_TYPE }} -j
+          elif [ "${{ matrix.os }}" = "macos" ]; then
+            cmake --build . -- -j$(sysctl -n hw.ncpu)
+          else
+            cmake --build . -- -j$(nproc)
+          fi
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: engine-macos-${{ matrix.arch }}
+          name: engine-${{ matrix.name }}
           path: |
             build/idtech3.*
             build/idtech3.server.*
+            build/idtech3_*.so
             build/idtech3_*.dylib
-            build/libimgui_shared.dylib
+            build/idtech3_*.dll
+            build/libimgui_shared.*
+          if-no-files-found: warn
+          retention-days: 7
 
-  build-game-modes:
-    name: Build Game Modes
+  game-modules:
+    name: Build game modules (Linux)
+    needs: build
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        mod: [mymod, blacksun]
-    
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y \
-            build-essential cmake \
-            libsdl2-dev
-      
-      - name: Build engine (required for game mode headers)
+          sudo apt-get install -y build-essential cmake libsdl2-dev
+
+      - name: Build engine headers
         run: |
-          mkdir -p build
-          cd build
-          cmake .. \
-            -DCMAKE_BUILD_TYPE=Release \
+          cmake -S . -B build-mods \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
             -DUSE_VULKAN=ON \
             -DUSE_RENDERER_DLOPEN=ON
-          make -j$(nproc) || true  # May fail, but we just need headers
-      
-      - name: Build ${{ matrix.mod }} game modules
+          cmake --build build-mods --target qcommon -- -j$(nproc) || true
+
+      - name: Build game modules
         run: |
-          cd ${{ matrix.mod }}/gamesrc
-          mkdir -p build
-          cd build
-          cmake ..
-          make -j$(nproc)
-      
-      - name: Check for compiled modules
-        run: |
-          if [ -d "${{ matrix.mod }}/vm" ]; then
-            echo "Found compiled modules:"
-            ls -lh ${{ matrix.mod }}/vm/*.so 2>/dev/null || echo "No .so files found"
-          else
-            echo "Warning: vm directory not found"
-          fi
-      
-      - name: Upload artifacts
+          for mod in mymod blacksun; do
+            if [ -d "$mod/gamesrc" ]; then
+              cmake -S "$mod/gamesrc" -B "$mod/gamesrc/build"
+              cmake --build "$mod/gamesrc/build" -- -j$(nproc)
+            else
+              echo "Skipping $mod (no gamesrc directory)"
+            fi
+          done
+
+      - name: Upload module artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.mod }}-modules
+          name: modules-linux
           path: |
-            ${{ matrix.mod }}/vm/*.so
-            ${{ matrix.mod }}/vm/*.dll
+            mymod/vm/*.so
+            blacksun/vm/*.so
+          if-no-files-found: warn
+          retention-days: 7
 
-  static-analysis:
-    name: Static Analysis
+  smoke:
+    name: Smoke test (Linux)
+    needs: [build, game-modules]
     runs-on: ubuntu-latest
-    
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang-tidy cppcheck
-      
-      - name: Run clang-tidy
-        run: |
-          mkdir -p build
-          cd build
-          cmake .. -DCMAKE_BUILD_TYPE=Release -DENABLE_STATIC_ANALYSIS=ON
-          # Run clang-tidy on a subset of files
-          find ../src -name "*.c" -type f | head -20 | xargs clang-tidy -p build || true
-      
-      - name: Run cppcheck
-        run: |
-          cppcheck --enable=all --suppress=missingIncludeSystem \
-            --suppress=unusedFunction src/ 2>&1 | tee cppcheck.log || true
 
-  test-build:
-    name: Test Build
-    runs-on: ubuntu-latest
-    needs: [build-engine-linux, build-game-modes]
-    
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Download engine artifacts
+      - name: Download Linux engine artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: engine-linux-*
           merge-multiple: true
-      
-      - name: Download game mode artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: *-modules
-          merge-multiple: true
-      
-      - name: Verify binaries
+          path: artifacts
+
+      - name: Run smoke tests
+        env:
+          ENGINE_BIN: artifacts/build/idtech3.x86_64
         run: |
-          find . -name "idtech3.x86_64" -type f -executable
-          find . -name "*.so" -type f | head -10
+          set -euo pipefail
+          if [ ! -x "${ENGINE_BIN}" ]; then
+            ALT_BIN=$(find artifacts -name "idtech3.x86_64" -type f | head -n1 || true)
+            if [ -n "${ALT_BIN}" ]; then
+              ENGINE_BIN="${ALT_BIN}"
+              chmod +x "${ENGINE_BIN}"
+            fi
+          fi
+          if [ ! -x "${ENGINE_BIN}" ]; then
+            echo "Engine binary not found for smoke test"
+            exit 1
+          fi
+          ENGINE_BIN="${ENGINE_BIN}" MOD_LIST="mymod blacksun" tools/ci_smoke.sh

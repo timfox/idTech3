@@ -23,6 +23,34 @@ static int lc_indices[LC_MAX_CLUSTERS * LC_MAX_LIGHTS_PER_CLUSTER];
 static GLuint lcHeaderBuffer = 0;
 static GLuint lcIndexBuffer = 0;
 
+// Detect whether the SSBO/GL version we rely on is available.
+static qboolean LC_HaveSSBO( void ) {
+	static qboolean checked = qfalse;
+	static qboolean supported = qfalse;
+
+	if ( checked ) {
+		return supported;
+	}
+
+	supported = QGL_VERSION_ATLEAST( 4, 3 );
+
+	// Allow the ARB extension on older GL versions.
+	if ( !supported ) {
+		const char *exts = glConfig.extensions_string;
+		if ( exts && Q_stristr( exts, "GL_ARB_shader_storage_buffer_object" ) ) {
+			supported = qtrue;
+		}
+	}
+
+	// We still need the entry points; guard against NULL on legacy drivers.
+	if ( supported ) {
+		supported = ( qglBindBufferBase && qglBindBuffer && qglBufferData && qglGenBuffers );
+	}
+
+	checked = qtrue;
+	return supported;
+}
+
 // Compute grid dimensions for current viewport
 static lc_grid_params_t LC_ComputeGrid(void) {
 	lc_grid_params_t g = {0};
@@ -86,11 +114,21 @@ static void LC_InitBuffers( void ) {
 }
 
 void R_BuildLightClusters( void ) {
+	static qboolean ssboWarned = qfalse;
+
 	if ( !tr.registered || tr.refdef.num_dlights <= 0 ) {
 		return;
 	}
 
 	if ( !r_clusteredLight || !r_clusteredLight->integer ) {
+		return;
+	}
+
+	if ( !LC_HaveSSBO() ) {
+		if ( !ssboWarned ) {
+			ri.Printf( PRINT_DEVELOPER, "R_BuildLightClusters: GL4.3/ARB_shader_storage_buffer_object missing, using legacy dlight loop\n" );
+			ssboWarned = qtrue;
+		}
 		return;
 	}
 

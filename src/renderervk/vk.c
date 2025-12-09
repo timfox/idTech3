@@ -55,6 +55,29 @@ static VkSurfaceKHR vk_surface = VK_NULL_HANDLE;
 VkDebugReportCallbackEXT vk_debug_callback = VK_NULL_HANDLE;
 #endif
 
+static void vk_log_subgroup_capabilities( VkPhysicalDevice physical_device ) {
+	if ( qvkGetPhysicalDeviceProperties2KHR == NULL ) {
+		ri.Printf( PRINT_DEVELOPER, "...subgroup capabilities unavailable (vkGetPhysicalDeviceProperties2KHR not loaded)\n" );
+		return;
+	}
+
+	VkPhysicalDeviceSubgroupProperties subgroup = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES,
+		.pNext = NULL
+	};
+	VkPhysicalDeviceProperties2 props2 = {
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+		.pNext = &subgroup
+	};
+
+	qvkGetPhysicalDeviceProperties2KHR( physical_device, &props2 );
+
+	ri.Printf( PRINT_ALL, "...subgroup: size=%u stages=0x%x ops=0x%x\n",
+		subgroup.subgroupSize,
+		subgroup.supportedStages,
+		subgroup.supportedOperations );
+}
+
 //
 // Vulkan API functions used by the renderer.
 //
@@ -2094,6 +2117,8 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			ri.Printf( PRINT_ERROR, "...fillModeNonSolid feature is not supported\n" );
 			return qfalse;
 		}
+
+	vk_log_subgroup_capabilities( physical_device );
 
 		queue_desc.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 		queue_desc.pNext = NULL;
@@ -10513,19 +10538,21 @@ void vk_end_frame( void )
 				VkPipeline activeComputePipeline = VK_NULL_HANDLE;
 				qboolean useTonemapCompute = qfalse;
 
-				if ( r_postprocess_compute && r_postprocess_compute->integer &&
-				     vk.compute_descriptor_set != VK_NULL_HANDLE ) {
-				if ( vk.tonemap_compute_pipeline != VK_NULL_HANDLE && r_hdr && r_hdr->integer ) {
-					activeComputePipeline = vk.tonemap_compute_pipeline;
-					useTonemapCompute = qtrue;
-				} else if ( vk.gamma_compute_pipeline != VK_NULL_HANDLE ) {
-					activeComputePipeline = vk.gamma_compute_pipeline;
-				}
-				// If style transfer is requested, force the compute gamma path when available
-				if ( r_styleTransfer && r_styleTransfer->integer && vk.gamma_compute_pipeline != VK_NULL_HANDLE ) {
-					activeComputePipeline = vk.gamma_compute_pipeline;
-					useTonemapCompute = qfalse;
-				}
+				const qboolean allowCompute = ( r_postprocess_compute && r_postprocess_compute->integer ) &&
+					( !r_postQuality || r_postQuality->integer > 0 );
+
+				if ( allowCompute && vk.compute_descriptor_set != VK_NULL_HANDLE ) {
+					if ( vk.tonemap_compute_pipeline != VK_NULL_HANDLE && r_hdr && r_hdr->integer ) {
+						activeComputePipeline = vk.tonemap_compute_pipeline;
+						useTonemapCompute = qtrue;
+					} else if ( vk.gamma_compute_pipeline != VK_NULL_HANDLE ) {
+						activeComputePipeline = vk.gamma_compute_pipeline;
+					}
+					// If style transfer is requested, force the compute gamma path when available
+					if ( r_styleTransfer && r_styleTransfer->integer && vk.gamma_compute_pipeline != VK_NULL_HANDLE ) {
+						activeComputePipeline = vk.gamma_compute_pipeline;
+						useTonemapCompute = qfalse;
+					}
 				}
 
 				if ( activeComputePipeline != VK_NULL_HANDLE ) {
@@ -10672,8 +10699,8 @@ void vk_end_frame( void )
 						useTonemapCompute ? "tonemap" : "gamma", groupCountX, groupCountY );
 				} else {
 					// Traditional graphics pipeline gamma pass
-					if ( r_postprocess_compute && r_postprocess_compute->integer ) {
-						ri.Printf( PRINT_WARNING, "VK: Compute post-processing requested but pipelines not available, using graphics pipeline\n" );
+					if ( r_postprocess_compute && r_postprocess_compute->integer && (!r_postQuality || r_postQuality->integer > 0) ) {
+						ri.Printf( PRINT_WARNING, "VK: Compute post-processing requested but pipelines not available or disabled by quality, using graphics pipeline\n" );
 					}
 					ri.Printf( PRINT_DEVELOPER, "VK: Gamma pass: renderArea=%dx%d, framebuffer should be %dx%d\n", 
 						vk.renderWidth, vk.renderHeight, gls.windowWidth, gls.windowHeight );

@@ -1,5 +1,63 @@
 ## Build Instructions
 
+### Modern CMake workflow (recommended)
+
+Cross-platform build using out-of-tree directories:
+
+```
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
+
+Optional tooling flags (can be combined where it makes sense):
+
+- `-DENABLE_ASAN=ON -DENABLE_UBSAN=ON` (debug): Address/UB sanitizers
+- `-DENABLE_VALGRIND=ON` (debug): add debug symbols/flags for Valgrind runs
+- `-DENABLE_DRMEMORY=ON` (Windows): enable Dr. Memory support
+- `-DENABLE_COVERAGE=ON` (gcc/clang, debug): add `--coverage` flags and expose `coverage` target
+
+Coverage workflow (requires `gcovr` in `PATH`):
+
+```
+cmake -S . -B build-coverage -DCMAKE_BUILD_TYPE=Debug -DENABLE_COVERAGE=ON
+cmake --build build-coverage
+cmake --build build-coverage --target coverage
+# outputs coverage.html and coverage.xml in the build dir
+```
+
+Sanitizer workflows (Linux/macOS):
+
+```
+cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DENABLE_UBSAN=ON
+cmake --build build-asan
+./build-asan/idtech3.x86_64 +set fs_game mymod
+```
+
+Valgrind quickstart (Linux):
+
+```
+cmake -S . -B build-valgrind -DCMAKE_BUILD_TYPE=Debug -DENABLE_VALGRIND=ON
+cmake --build build-valgrind
+valgrind --tool=memcheck ./build-valgrind/idtech3.x86_64 +set fs_game mymod
+```
+
+Dr. Memory quickstart (Windows):
+
+```
+cmake -S . -B build-drmemory -DCMAKE_BUILD_TYPE=Debug -DENABLE_DRMEMORY=ON
+cmake --build build-drmemory
+drmemory.exe -- ./build-drmemory/idtech3.exe +set fs_game mymod
+```
+
+Formatting hook (clang-format):
+
+```
+git config core.hooksPath tools/git-hooks
+```
+
+This installs a pre-commit hook that formats staged C/C++/GLSL files. Ensure
+`clang-format` is installed and re-stage files after formatting.
+
 ### windows/msvc
 
 Install Visual Studio Community Edition 2017 or later and compile `quake3e` project from solution

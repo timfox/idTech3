@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../renderercommon/tr_backend_iface.h"
 #ifdef USE_VULKAN
 #include "vk_layered_materials.h"
+extern const rb_backend_iface_t *RB_VK_GetBackendInterface( void );
 #endif
 
 glconfig_t	glConfig;
@@ -145,6 +146,7 @@ cvar_t *r_layeredMaterialsPilot;
 	cvar_t	*r_postprocess_workgroup;
 cvar_t	*r_tonemapMode;
 cvar_t	*r_tonemapExposure;
+cvar_t	*r_postQuality;
 	cvar_t	*r_meshShaders;
 	cvar_t	*r_meshletSize;
 	cvar_t	*r_virtualTextures;
@@ -166,6 +168,36 @@ cvar_t	*r_tonemapExposure;
 cvar_t *r_procDressing;
 cvar_t *r_procDressingDensity;
 cvar_t *r_procDressingDebug;
+
+static void R_ApplyPostQualityDefaults(void)
+{
+#ifdef USE_VULKAN
+	if ( !r_postQuality ) {
+		return;
+	}
+
+	const int tier = r_postQuality->integer;
+
+	if ( tier <= 0 ) {
+		if ( r_postprocess_compute && !r_postprocess_compute->modified ) {
+			ri.Cvar_Set( "r_postprocess_compute", "0" );
+		}
+		if ( r_bloom && !r_bloom->modified ) {
+			ri.Cvar_Set( "r_bloom", "0" );
+		}
+		if ( r_hdr && !r_hdr->modified ) {
+			ri.Cvar_Set( "r_hdr", "0" );
+		}
+	} else if ( tier >= 2 ) {
+		if ( r_postprocess_compute && !r_postprocess_compute->modified ) {
+			ri.Cvar_Set( "r_postprocess_compute", "1" );
+		}
+		if ( r_hdr && !r_hdr->modified ) {
+			ri.Cvar_Set( "r_hdr", "1" );
+		}
+	}
+#endif
+}
 cvar_t *r_foliageWindStrength;
 cvar_t *r_foliageWindFrequency;
 cvar_t *r_frameTelemetry;
@@ -2131,6 +2163,11 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_styleEdge, "0.0", "4.0", CV_FLOAT );
 	ri.Cvar_SetDescription( r_styleEdge, "Edge contrast scale for style-transfer pass." );
 	ri.Cvar_SetGroup( r_styleEdge, CVG_RENDERER );
+	// Quality tier for post stack (0=low/fallback, 1=default, 2=high/compute+subgroup)
+	r_postQuality = ri.Cvar_Get( "r_postQuality", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_postQuality, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_postQuality, "Post stack quality tier: 0=low (prefer graphics fallbacks), 1=balanced, 2=high (prefer compute/subgroup variants when available)." );
+	ri.Cvar_SetGroup( r_postQuality, CVG_RENDERER );
 	r_postprocess_compute = ri.Cvar_Get( "r_postprocess_compute", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_postprocess_compute, "Use compute shader post-processing (gamma/tonemap) when available." );
 	r_postprocess_workgroup = ri.Cvar_Get( "r_postprocess_workgroup", "8", CVAR_ARCHIVE_ND | CVAR_LATCH );
@@ -2170,6 +2207,8 @@ static void R_Register( void )
 		" 3 - linear filtering, stretch to full size\n"
 		" 4 - linear filtering, preserve aspect ratio (black bars on sides)\n" );
 #endif // USE_VULKAN
+
+	R_ApplyPostQualityDefaults();
 }
 
 #define EPSILON 1e-6f

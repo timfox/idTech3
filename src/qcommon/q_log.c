@@ -679,7 +679,7 @@ void Q_Log_Init(void) {
 	Cvar_SetDescription(log_enable, "Enable structured logging (0=disabled, 1=enabled)");
 	log_level = Cvar_Get("log_level", "1", CVAR_ARCHIVE);
 	Cvar_SetDescription(log_level, "Global log level (0=DEBUG, 1=INFO, 2=WARN, 3=ERROR, 4=FATAL)");
-	log_format = Cvar_Get("log_format", "1", CVAR_ARCHIVE);
+	log_format = Cvar_Get("log_format", "0", CVAR_ARCHIVE);
 	Cvar_SetDescription(log_format, "Log format (0=text, 1=JSON)");
 	log_output = Cvar_Get("log_output", "3", CVAR_ARCHIVE);
 	Cvar_SetDescription(log_output, "Log output destinations (1=console, 2=file, 4=syslog, combine with +)");

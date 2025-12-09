@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# clang-format pre-commit hook for idtech3
+# Usage: git config core.hooksPath tools/git-hooks
+
+if ! command -v clang-format >/dev/null 2>&1; then
+	echo "[pre-commit] clang-format not found; install it or disable this hook." >&2
+	exit 1
+fi
+
+# Collect staged source files (added or modified)
+mapfile -t files < <(git diff --cached --name-only --diff-filter=ACM \
+	| grep -E '\.(c|cc|cpp|cxx|h|hh|hpp|hxx|glsl)$' || true)
+
+if [[ ${#files[@]} -eq 0 ]]; then
+	exit 0
+fi
+
+echo "[pre-commit] Formatting ${#files[@]} file(s) with clang-format..."
+for f in "${files[@]}"; do
+	# Skip deleted or missing paths
+	if [[ ! -f "$f" ]]; then
+		continue
+	fi
+	clang-format -i --style=file "$f"
+	git add "$f"
+done
+
+echo "[pre-commit] Done."
+

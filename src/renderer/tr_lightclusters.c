@@ -82,17 +82,31 @@ static void LC_InitBuffers( void ) {
 	if ( initialized ) {
 		return;
 	}
-	qglGenBuffers( 1, &lcHeaderBuffer );
-	qglGenBuffers( 1, &lcIndexBuffer );
+	if ( qglGenBuffersARB ) {
+		qglGenBuffersARB( 1, &lcHeaderBuffer );
+		qglGenBuffersARB( 1, &lcIndexBuffer );
+	}
 	initialized = qtrue;
 }
 
 void R_BuildLightClusters( void ) {
+	static qboolean warned = qfalse;
+
 	if ( !tr.registered || tr.refdef.num_dlights <= 0 ) {
 		return;
 	}
 
 	if ( !r_clusteredLight || !r_clusteredLight->integer ) {
+		return;
+	}
+
+	// Legacy GL fallback: require VBO entry points. If missing, silently fall back to the
+	// existing per-surface dlight loop.
+	if ( !qglGenBuffersARB || !qglBindBufferARB || !qglBufferDataARB ) {
+		if ( !warned ) {
+			Com_DPrintf( "R_BuildLightClusters: VBO/ARB buffer funcs missing, using legacy dlight path\n" );
+			warned = qtrue;
+		}
 		return;
 	}
 
@@ -114,8 +128,9 @@ void R_BuildLightClusters( void ) {
 
 		// Transform to view space (without mutating source)
 		vec3_t vpos;
+		const orientationr_t *viewOr = &tr.viewParms.or;
 		for (int a = 0; a < 3; ++a) {
-			vpos[a] = DotProduct(dl->origin, tr.orientation.axis[a]) - tr.orientation.origin[a];
+			vpos[a] = DotProduct(dl->origin, viewOr->axis[a]) - viewOr->origin[a];
 		}
 
 		// Depth slice range
@@ -173,16 +188,16 @@ void R_BuildLightClusters( void ) {
 	// Upload to GPU buffers
 	LC_InitBuffers();
 
-	qglBindBuffer( GL_SHADER_STORAGE_BUFFER, lcHeaderBuffer );
-	qglBufferData( GL_SHADER_STORAGE_BUFFER, clusterCount * sizeof( lc_cluster_header_t ), lc_headers, GL_DYNAMIC_DRAW );
-	qglBindBufferBase( GL_SHADER_STORAGE_BUFFER, 6, lcHeaderBuffer ); // binding slot 6 (arbitrary)
+	if ( qglBindBufferARB && qglBufferDataARB ) {
+		qglBindBufferARB( GL_ARRAY_BUFFER_ARB, lcHeaderBuffer );
+		qglBufferDataARB( GL_ARRAY_BUFFER_ARB, clusterCount * sizeof( lc_cluster_header_t ), lc_headers, GL_DYNAMIC_DRAW );
 
-	const int indexCount = clusterCount * LC_MAX_LIGHTS_PER_CLUSTER;
-	qglBindBuffer( GL_SHADER_STORAGE_BUFFER, lcIndexBuffer );
-	qglBufferData( GL_SHADER_STORAGE_BUFFER, indexCount * sizeof( int ), lc_indices, GL_DYNAMIC_DRAW );
-	qglBindBufferBase( GL_SHADER_STORAGE_BUFFER, 7, lcIndexBuffer ); // binding slot 7 (arbitrary)
+		const int indexCount = clusterCount * LC_MAX_LIGHTS_PER_CLUSTER;
+		qglBindBufferARB( GL_ARRAY_BUFFER_ARB, lcIndexBuffer );
+		qglBufferDataARB( GL_ARRAY_BUFFER_ARB, indexCount * sizeof( int ), lc_indices, GL_DYNAMIC_DRAW );
 
-	qglBindBuffer( GL_SHADER_STORAGE_BUFFER, 0 );
+		qglBindBufferARB( GL_ARRAY_BUFFER_ARB, 0 );
+	}
 }
 
 

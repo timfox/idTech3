@@ -63,7 +63,7 @@ ELSEIF(MSVC)
 	ADD_COMPILE_OPTIONS(/W4)
 ENDIF()
 
-# Sanitizer support (GCC/Clang only, requires debug build)
+# Sanitizer & coverage support (GCC/Clang only, requires debug build)
 IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 	IF(ENABLE_ASAN)
 		ADD_COMPILE_OPTIONS(-fsanitize=address)
@@ -103,6 +103,15 @@ IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 		ADD_COMPILE_DEFINITIONS(HAVE_VALGRIND)
 		MESSAGE(STATUS "Valgrind support enabled (debug symbols, no optimization)")
 	ENDIF()
+
+	IF(ENABLE_COVERAGE)
+		IF(ENABLE_ASAN OR ENABLE_UBSAN OR ENABLE_MSAN OR ENABLE_TSAN)
+			MESSAGE(WARNING "Coverage with sanitizers can produce unusable reports; consider disabling sanitizers.")
+		ENDIF()
+		ADD_COMPILE_OPTIONS(-g -O0 --coverage)
+		ADD_LINK_OPTIONS(--coverage)
+		SET(COVERAGE_ENABLED TRUE)
+	ENDIF()
 	
 	# Check for Valgrind headers
 	IF(ENABLE_VALGRIND)
@@ -133,6 +142,7 @@ OPTION(ENABLE_ASAN "Enable AddressSanitizer (ASan) for memory error detection" O
 OPTION(ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer (UBSan) for undefined behavior detection" OFF)
 OPTION(ENABLE_MSAN "Enable MemorySanitizer (MSan) for uninitialized memory detection" OFF)
 OPTION(ENABLE_TSAN "Enable ThreadSanitizer (TSan) for data race detection" OFF)
+OPTION(ENABLE_COVERAGE "Enable code coverage instrumentation (gcc/clang, Debug)" OFF)
 OPTION(ENABLE_MEMORY_TRACKING "Enable memory usage tracking and statistics" ON)
 
 # Static analysis options
@@ -155,6 +165,28 @@ IF(ENABLE_STATIC_ANALYSIS)
 		MESSAGE(STATUS "Static analysis: cppcheck enabled")
 	ELSE()
 		MESSAGE(WARNING "Static analysis: cppcheck not found")
+	ENDIF()
+ENDIF()
+
+# Coverage reporting target (gcovr) if coverage instrumentation is enabled
+FIND_PROGRAM(GCOVR_EXE NAMES gcovr)
+IF(ENABLE_COVERAGE)
+	IF(GCOVR_EXE)
+		ADD_CUSTOM_TARGET(coverage
+			COMMAND ${GCOVR_EXE}
+				--root ${CMAKE_SOURCE_DIR}
+				--filter ${CMAKE_SOURCE_DIR}/src
+				--filter ${CMAKE_SOURCE_DIR}/tests
+				--exclude ${CMAKE_SOURCE_DIR}/libs
+				--exclude ${CMAKE_BINARY_DIR}
+				--print-summary
+				--html --html-details -o coverage.html
+				--xml -o coverage.xml
+			WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+			COMMENT "Generating coverage report with gcovr"
+		)
+	ELSE()
+		MESSAGE(WARNING "gcovr not found; coverage target will be skipped")
 	ENDIF()
 ENDIF()
 
