@@ -420,7 +420,10 @@ static void Q_Log_FormatJSON(log_level_t level, log_category_t category, const c
 Q_Log_FormatPlain
 ================
 */
+static void Q_Log_FormatPlain(log_level_t level, log_category_t category, const char *file, int line, const char *func, const char *message, char *buffer, int buffer_size) __attribute__((unused));
 static void Q_Log_FormatPlain(log_level_t level, log_category_t category, const char *file, int line, const char *func, const char *message, char *buffer, int buffer_size) {
+	(void)level;
+	(void)category;
 	const char *filename = file;
 	if ( filename ) {
 		const char *slash = strrchr( filename, '/' );
@@ -438,13 +441,17 @@ static void Q_Log_FormatPlain(log_level_t level, log_category_t category, const 
 		filename = "unknown";
 	}
 
-	Com_sprintf(buffer, buffer_size, "[%s] [%s] [%s:%d] %s() - %s\n",
-		Q_Log_GetLevelName(level),
-		Q_Log_GetCategoryName(category),
-		filename,
-		line,
-		func ? func : "unknown",
-		message);
+	// Plain format: just source location and message (no timestamp/level/category prefixes)
+	if ( line == 0 && filename && !Q_stricmp( filename, "compat" ) ) {
+		// Compatibility-originated logs (e.g., Com_Printf) get message only
+		Com_sprintf(buffer, buffer_size, "%s\n", message);
+	} else {
+		Com_sprintf(buffer, buffer_size, "%s:%d %s() - %s\n",
+			filename,
+			line,
+			func ? func : "unknown",
+			message);
+	}
 }
 
 /*
@@ -632,10 +639,17 @@ void QDECL Q_Log(log_level_t level, log_category_t category, const char *file, i
 	}
 	
 	// Format according to output format
-	if (log_state.format == LOG_FORMAT_JSON) {
-		Q_Log_FormatJSON(level, category, file, line, func, message, formatted, sizeof(formatted));
-	} else {
-		Q_Log_FormatText(level, category, file, line, func, message, formatted, sizeof(formatted));
+	switch ( log_state.format ) {
+		case LOG_FORMAT_JSON:
+			Q_Log_FormatJSON(level, category, file, line, func, message, formatted, sizeof(formatted));
+			break;
+		case LOG_FORMAT_SIMPLE:
+			Q_Log_FormatPlain(level, category, file, line, func, message, formatted, sizeof(formatted));
+			break;
+		case LOG_FORMAT_TEXT:
+		default:
+			Q_Log_FormatText(level, category, file, line, func, message, formatted, sizeof(formatted));
+			break;
 	}
 	
 	len = strlen(formatted);
