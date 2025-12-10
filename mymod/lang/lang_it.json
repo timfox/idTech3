@@ -7,5 +7,11 @@
   "STR_DIALOGUE_NEXT": "Avanti",
   "STR_DIALOGUE_SKIP": "Salta",
   "STR_DIALOGUE_CONTINUE": "Continua",
-  "STR_SYSTEM_MISSING_KEY": "Testo localizzato mancante."
+  "STR_SYSTEM_MISSING_KEY": "Testo localizzato mancante.",
+  "STR_PICKUP_FMT": "{count} {item} raccolti",
+  "STR_SCORE_KILLS_ONE": "{count} uccisione",
+  "STR_SCORE_KILLS_MANY": "{count} uccisioni",
+  "STR_PROMPT_USE": "Premi {key} per usare",
+  "STR_CONNECTING": "Connessione...",
+  "STR_CONNECTION_FAILED": "Connessione fallita. Riprova."
 }

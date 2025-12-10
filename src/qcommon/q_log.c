@@ -198,6 +198,7 @@ static void Q_Log_RotateFile(void);
 static qboolean Q_Log_ShouldLog(log_level_t level, log_category_t category);
 static void Q_Log_FormatText(log_level_t level, log_category_t category, const char *file, int line, const char *func, const char *message, char *buffer, int buffer_size);
 static void Q_Log_FormatJSON(log_level_t level, log_category_t category, const char *file, int line, const char *func, const char *message, char *buffer, int buffer_size);
+static void Q_Log_FormatPlain(log_level_t level, log_category_t category, const char *file, int line, const char *func, const char *message, char *buffer, int buffer_size);
 
 /*
 ================
@@ -412,6 +413,38 @@ static void Q_Log_FormatJSON(log_level_t level, log_category_t category, const c
 		line,
 		func ? func : "unknown",
 		escaped_message);
+}
+
+/*
+================
+Q_Log_FormatPlain
+================
+*/
+static void Q_Log_FormatPlain(log_level_t level, log_category_t category, const char *file, int line, const char *func, const char *message, char *buffer, int buffer_size) {
+	const char *filename = file;
+	if ( filename ) {
+		const char *slash = strrchr( filename, '/' );
+		const char *bslash = strrchr( filename, '\\' );
+		if ( slash || bslash ) {
+			if ( slash && bslash ) {
+				filename = ( slash > bslash ) ? slash + 1 : bslash + 1;
+			} else if ( slash ) {
+				filename = slash + 1;
+			} else {
+				filename = bslash + 1;
+			}
+		}
+	} else {
+		filename = "unknown";
+	}
+
+	Com_sprintf(buffer, buffer_size, "[%s] [%s] [%s:%d] %s() - %s\n",
+		Q_Log_GetLevelName(level),
+		Q_Log_GetCategoryName(category),
+		filename,
+		line,
+		func ? func : "unknown",
+		message);
 }
 
 /*
@@ -679,8 +712,8 @@ void Q_Log_Init(void) {
 	Cvar_SetDescription(log_enable, "Enable structured logging (0=disabled, 1=enabled)");
 	log_level = Cvar_Get("log_level", "1", CVAR_ARCHIVE);
 	Cvar_SetDescription(log_level, "Global log level (0=DEBUG, 1=INFO, 2=WARN, 3=ERROR, 4=FATAL)");
-	log_format = Cvar_Get("log_format", "0", CVAR_ARCHIVE);
-	Cvar_SetDescription(log_format, "Log format (0=text, 1=JSON)");
+	log_format = Cvar_Get("log_format", "2", CVAR_ARCHIVE);
+	Cvar_SetDescription(log_format, "Log format (0=text, 1=JSON, 2=simple)");
 	log_output = Cvar_Get("log_output", "3", CVAR_ARCHIVE);
 	Cvar_SetDescription(log_output, "Log output destinations (1=console, 2=file, 4=syslog, combine with +)");
 	log_file = Cvar_Get("log_file", "console.log", CVAR_ARCHIVE);
@@ -694,7 +727,7 @@ void Q_Log_Init(void) {
 	
 	// Initialize defaults
 	log_state.global_level = LOG_LEVEL_INFO;
-	log_state.format = LOG_FORMAT_JSON;
+	log_state.format = LOG_FORMAT_SIMPLE;
 	// Default to console + file; safety is preserved by deferred logging when FS
 	// is not ready yet.
 	log_state.output_flags = LOG_OUTPUT_CONSOLE | LOG_OUTPUT_FILE;

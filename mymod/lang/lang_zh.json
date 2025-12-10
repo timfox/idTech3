@@ -1,0 +1,17 @@
+{
+  "STR_MAIN_MENU_PLAY": "开始游戏",
+  "STR_MAIN_MENU_OPTIONS": "选项",
+  "STR_MAIN_MENU_QUIT": "退出",
+  "STR_DIALOGUE_OK": "确定",
+  "STR_DIALOGUE_CANCEL": "取消",
+  "STR_DIALOGUE_NEXT": "下一步",
+  "STR_DIALOGUE_SKIP": "跳过",
+  "STR_DIALOGUE_CONTINUE": "继续",
+  "STR_SYSTEM_MISSING_KEY": "缺少本地化文本。",
+  "STR_PICKUP_FMT": "已拾取 {count} 个 {item}",
+  "STR_SCORE_KILLS_ONE": "{count} 次击杀",
+  "STR_SCORE_KILLS_MANY": "{count} 次击杀",
+  "STR_PROMPT_USE": "按 {key} 使用",
+  "STR_CONNECTING": "正在连接...",
+  "STR_CONNECTION_FAILED": "连接失败，请重试。"
+}

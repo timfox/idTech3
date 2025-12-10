@@ -56,6 +56,7 @@ typedef enum {
 typedef enum {
 	LOG_FORMAT_TEXT = 0,
 	LOG_FORMAT_JSON = 1,
+	LOG_FORMAT_SIMPLE = 2,
 	LOG_FORMAT_COUNT
 } log_format_t;
 

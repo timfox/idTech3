@@ -7,5 +7,11 @@
   "STR_DIALOGUE_NEXT": "Siguiente",
   "STR_DIALOGUE_SKIP": "Omitir",
   "STR_DIALOGUE_CONTINUE": "Continuar",
-  "STR_SYSTEM_MISSING_KEY": "Falta texto localizado."
+  "STR_SYSTEM_MISSING_KEY": "Falta texto localizado.",
+  "STR_PICKUP_FMT": "{count} {item} recogidos",
+  "STR_SCORE_KILLS_ONE": "{count} baja",
+  "STR_SCORE_KILLS_MANY": "{count} bajas",
+  "STR_PROMPT_USE": "Pulsa {key} para usar",
+  "STR_CONNECTING": "Conectando...",
+  "STR_CONNECTION_FAILED": "Fallo de conexión. Inténtalo de nuevo."
 }

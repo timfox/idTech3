@@ -7,5 +7,11 @@
   "STR_DIALOGUE_NEXT": "Далее",
   "STR_DIALOGUE_SKIP": "Пропустить",
   "STR_DIALOGUE_CONTINUE": "Продолжить",
-  "STR_SYSTEM_MISSING_KEY": "Отсутствует локализованный текст."
+  "STR_SYSTEM_MISSING_KEY": "Отсутствует локализованный текст.",
+  "STR_PICKUP_FMT": "{count} {item} получено",
+  "STR_SCORE_KILLS_ONE": "{count} убийство",
+  "STR_SCORE_KILLS_MANY": "{count} убийства",
+  "STR_PROMPT_USE": "Нажмите {key}, чтобы использовать",
+  "STR_CONNECTING": "Подключение...",
+  "STR_CONNECTION_FAILED": "Не удалось подключиться. Попробуйте снова."
 }

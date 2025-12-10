@@ -7,5 +7,11 @@
   "STR_DIALOGUE_NEXT": "Next",
   "STR_DIALOGUE_SKIP": "Skip",
   "STR_DIALOGUE_CONTINUE": "Continue",
-  "STR_SYSTEM_MISSING_KEY": "Missing localized text."
+  "STR_SYSTEM_MISSING_KEY": "Missing localized text.",
+  "STR_PICKUP_FMT": "{count} {item} picked up",
+  "STR_SCORE_KILLS_ONE": "{count} kill",
+  "STR_SCORE_KILLS_MANY": "{count} kills",
+  "STR_PROMPT_USE": "Press {key} to use",
+  "STR_CONNECTING": "Connecting...",
+  "STR_CONNECTION_FAILED": "Connection failed. Please try again."
 }

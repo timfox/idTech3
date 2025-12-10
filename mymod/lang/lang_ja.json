@@ -1,0 +1,17 @@
+{
+  "STR_MAIN_MENU_PLAY": "プレイ",
+  "STR_MAIN_MENU_OPTIONS": "オプション",
+  "STR_MAIN_MENU_QUIT": "終了",
+  "STR_DIALOGUE_OK": "OK",
+  "STR_DIALOGUE_CANCEL": "キャンセル",
+  "STR_DIALOGUE_NEXT": "次へ",
+  "STR_DIALOGUE_SKIP": "スキップ",
+  "STR_DIALOGUE_CONTINUE": "続行",
+  "STR_SYSTEM_MISSING_KEY": "ローカライズされたテキストがありません。",
+  "STR_PICKUP_FMT": "{count} {item} を取得",
+  "STR_SCORE_KILLS_ONE": "{count} キル",
+  "STR_SCORE_KILLS_MANY": "{count} キル",
+  "STR_PROMPT_USE": "{key} を押して使用",
+  "STR_CONNECTING": "接続中...",
+  "STR_CONNECTION_FAILED": "接続に失敗しました。もう一度お試しください。"
+}

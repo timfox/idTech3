@@ -7,5 +7,11 @@
   "STR_DIALOGUE_NEXT": "Suivant",
   "STR_DIALOGUE_SKIP": "Passer",
   "STR_DIALOGUE_CONTINUE": "Continuer",
-  "STR_SYSTEM_MISSING_KEY": "Texte de localisation manquant."
+  "STR_SYSTEM_MISSING_KEY": "Texte de localisation manquant.",
+  "STR_PICKUP_FMT": "{count} {item} récupéré(s)",
+  "STR_SCORE_KILLS_ONE": "{count} frag",
+  "STR_SCORE_KILLS_MANY": "{count} frags",
+  "STR_PROMPT_USE": "Appuyez sur {key} pour utiliser",
+  "STR_CONNECTING": "Connexion...",
+  "STR_CONNECTION_FAILED": "Échec de connexion. Veuillez réessayer."
 }

@@ -1,0 +1,17 @@
+{
+  "STR_MAIN_MENU_PLAY": "Hrát",
+  "STR_MAIN_MENU_OPTIONS": "Nastavení",
+  "STR_MAIN_MENU_QUIT": "Konec",
+  "STR_DIALOGUE_OK": "OK",
+  "STR_DIALOGUE_CANCEL": "Zrušit",
+  "STR_DIALOGUE_NEXT": "Další",
+  "STR_DIALOGUE_SKIP": "Přeskočit",
+  "STR_DIALOGUE_CONTINUE": "Pokračovat",
+  "STR_SYSTEM_MISSING_KEY": "Chybí lokalizovaný text.",
+  "STR_PICKUP_FMT": "{count} {item} sebráno",
+  "STR_SCORE_KILLS_ONE": "{count} frag",
+  "STR_SCORE_KILLS_MANY": "{count} fragů",
+  "STR_PROMPT_USE": "Stiskni {key} pro použití",
+  "STR_CONNECTING": "Připojování...",
+  "STR_CONNECTION_FAILED": "Připojení selhalo. Zkuste to znovu."
+}

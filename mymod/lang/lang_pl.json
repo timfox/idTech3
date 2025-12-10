@@ -7,5 +7,11 @@
   "STR_DIALOGUE_NEXT": "Dalej",
   "STR_DIALOGUE_SKIP": "Pomiń",
   "STR_DIALOGUE_CONTINUE": "Kontynuuj",
-  "STR_SYSTEM_MISSING_KEY": "Brak przetłumaczonego tekstu."
+  "STR_SYSTEM_MISSING_KEY": "Brak przetłumaczonego tekstu.",
+  "STR_PICKUP_FMT": "{count} {item} zebrano",
+  "STR_SCORE_KILLS_ONE": "{count} frag",
+  "STR_SCORE_KILLS_MANY": "{count} fragi",
+  "STR_PROMPT_USE": "Naciśnij {key}, aby użyć",
+  "STR_CONNECTING": "Łączenie...",
+  "STR_CONNECTION_FAILED": "Połączenie nieudane. Spróbuj ponownie."
 }

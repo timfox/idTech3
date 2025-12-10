@@ -1,0 +1,17 @@
+{
+  "STR_MAIN_MENU_PLAY": "플레이",
+  "STR_MAIN_MENU_OPTIONS": "옵션",
+  "STR_MAIN_MENU_QUIT": "종료",
+  "STR_DIALOGUE_OK": "확인",
+  "STR_DIALOGUE_CANCEL": "취소",
+  "STR_DIALOGUE_NEXT": "다음",
+  "STR_DIALOGUE_SKIP": "건너뛰기",
+  "STR_DIALOGUE_CONTINUE": "계속",
+  "STR_SYSTEM_MISSING_KEY": "로컬라이즈된 텍스트가 없습니다.",
+  "STR_PICKUP_FMT": "{count}개의 {item}을(를) 획득",
+  "STR_SCORE_KILLS_ONE": "{count} 킬",
+  "STR_SCORE_KILLS_MANY": "{count} 킬",
+  "STR_PROMPT_USE": "{key} 키를 눌러 사용",
+  "STR_CONNECTING": "연결 중...",
+  "STR_CONNECTION_FAILED": "연결 실패. 다시 시도하세요."
+}

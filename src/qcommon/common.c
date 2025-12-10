@@ -27,6 +27,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "profiler.h"
 #include "q_memtrack.h"
 #include "i18n.h"
+#include <locale.h>
+#include <ctype.h>
 #ifdef USE_CURL
 #include "q_telemetry.h"
 #endif
@@ -124,6 +126,29 @@ static int	com_frameNumber;
 qboolean	com_errorEntered = qfalse;
 qboolean	com_fullyInitialized = qfalse;
 
+static void Com_InitLocaleUTF8( void )
+{
+	const char *result;
+
+	// Try user's locale first
+	result = setlocale( LC_CTYPE, "" );
+	if ( result && Q_stristr( result, "UTF-8" ) ) {
+		return;
+	}
+
+	// Fallback to common UTF-8 locales
+	result = setlocale( LC_CTYPE, "C.UTF-8" );
+	if ( result && Q_stristr( result, "UTF-8" ) ) {
+		return;
+	}
+
+	result = setlocale( LC_CTYPE, "en_US.UTF-8" );
+	if ( result && Q_stristr( result, "UTF-8" ) ) {
+		return;
+	}
+
+	Com_Printf( S_COLOR_YELLOW "Warning: Could not set UTF-8 locale. Text rendering may be limited.\n" );
+}
 // renderer window states
 qboolean	gw_minimized = qfalse; // this will be always true for dedicated servers
 #ifndef DEDICATED
@@ -3982,6 +4007,9 @@ void Com_Init( char *commandLine ) {
 	Sys_Milliseconds();
 
 	Com_Printf( "%s %s %s\n", SVN_VERSION, PLATFORM_STRING, __DATE__ );
+
+	// Ensure libc locale uses UTF-8 for case folding, wide char ops, etc.
+	Com_InitLocaleUTF8();
 
 	if ( Q_setjmp( abortframe ) ) {
 		Sys_Error ("Error during initialization");

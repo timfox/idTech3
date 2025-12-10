@@ -1,0 +1,17 @@
+{
+  "STR_MAIN_MENU_PLAY": "Jogar",
+  "STR_MAIN_MENU_OPTIONS": "Opções",
+  "STR_MAIN_MENU_QUIT": "Sair",
+  "STR_DIALOGUE_OK": "OK",
+  "STR_DIALOGUE_CANCEL": "Cancelar",
+  "STR_DIALOGUE_NEXT": "Próximo",
+  "STR_DIALOGUE_SKIP": "Ignorar",
+  "STR_DIALOGUE_CONTINUE": "Continuar",
+  "STR_SYSTEM_MISSING_KEY": "Texto localizado ausente.",
+  "STR_PICKUP_FMT": "{count} {item} coletados",
+  "STR_SCORE_KILLS_ONE": "{count} abate",
+  "STR_SCORE_KILLS_MANY": "{count} abates",
+  "STR_PROMPT_USE": "Pressione {key} para usar",
+  "STR_CONNECTING": "Conectando...",
+  "STR_CONNECTION_FAILED": "Falha na conexão. Tente novamente."
+}

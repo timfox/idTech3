@@ -1,6 +1,7 @@
 #include "q_shared.h"
 #include "qcommon.h"
 #include "i18n.h"
+#include <ctype.h>
 
 #ifdef USE_CJSON
 #include "cJSON.h"
@@ -27,6 +28,7 @@ static locTable_t loc_defaultLang;
 static locTable_t loc_missingKeys;
 
 static qboolean loc_initialized = qfalse;
+static qboolean loc_languageAutoDetected = qfalse;
 static cvar_t *cl_language = NULL;
 static cvar_t *cl_loc_debug = NULL;
 static cvar_t *cl_loc_missingFile = NULL;
@@ -418,6 +420,37 @@ static qboolean Loc_LoadLanguageTables(const char *languageCode)
 	return loaded;
 }
 
+static void Loc_DetectSystemLanguage(char *out, size_t outSize)
+{
+	const char *langEnv;
+	char code[MAX_LANGUAGE_CODE];
+	size_t i = 0;
+
+	if (!out || outSize == 0) {
+		return;
+	}
+
+	out[0] = '\0';
+
+	langEnv = getenv("LANG");
+	if (!langEnv || !*langEnv) {
+		return;
+	}
+
+	// Extract leading alphabetic chars until '_' or '.' or end
+	while (langEnv[i] && langEnv[i] != '_' && langEnv[i] != '.' && i < sizeof(code) - 1) {
+		code[i] = (char)tolower((unsigned char)langEnv[i]);
+		i++;
+	}
+	code[i] = '\0';
+
+	if (i == 0) {
+		return;
+	}
+
+	Q_strncpyz(out, code, outSize);
+}
+
 static void CL_Localize_Reload_f(void)
 {
 	const char *target = (cl_language && cl_language->string[0]) ? cl_language->string : loc_activeCode;
@@ -489,6 +522,19 @@ void CL_Localize_Init(void)
 	Cmd_AddCommand("loc_test_replace", CL_Localize_TestReplace_f);
 
 	loc_initialized = qtrue;
+
+	// Auto-detect system language on first run if user hasn't picked one
+	if (cl_language && cl_language->string && cl_language->string[0] &&
+	    !cl_language->modified && !loc_languageAutoDetected) {
+		char detected[MAX_LANGUAGE_CODE] = {0};
+		if (!Q_stricmp(cl_language->string, DEFAULT_LANGUAGE_CODE)) {
+			Loc_DetectSystemLanguage(detected, sizeof(detected));
+			if (detected[0] && Q_stricmp(detected, cl_language->string) != 0) {
+				Cvar_Set("cl_language", detected);
+				loc_languageAutoDetected = qtrue;
+			}
+		}
+	}
 
 	Loc_LoadLanguageTables(cl_language->string);
 }

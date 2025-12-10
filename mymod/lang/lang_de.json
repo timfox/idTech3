@@ -7,5 +7,11 @@
   "STR_DIALOGUE_NEXT": "Weiter",
   "STR_DIALOGUE_SKIP": "Überspringen",
   "STR_DIALOGUE_CONTINUE": "Fortfahren",
-  "STR_SYSTEM_MISSING_KEY": "Fehlender lokalisierter Text."
+  "STR_SYSTEM_MISSING_KEY": "Fehlender lokalisierter Text.",
+  "STR_PICKUP_FMT": "{count} {item} aufgenommen",
+  "STR_SCORE_KILLS_ONE": "{count} Kill",
+  "STR_SCORE_KILLS_MANY": "{count} Kills",
+  "STR_PROMPT_USE": "Drücke {key}, um zu benutzen",
+  "STR_CONNECTING": "Verbinde...",
+  "STR_CONNECTION_FAILED": "Verbindung fehlgeschlagen. Bitte erneut versuchen."
 }

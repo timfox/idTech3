@@ -83,6 +83,7 @@ ini_set('error_log', __DIR__ . '/error.log');
                     <li><a href="tutorials/animated-skybox">Creating Animated Skyboxes</a></li>
                     <li><a href="tutorials/enhanced-networking">Enhanced Networking Setup</a></li>
                     <li><a href="tutorials/directx12-setup">DirectX 12 Setup Tutorial</a></li>
+                    <li><a href="tutorials/custom-backgrounds">Custom Menu &amp; Console Backgrounds</a></li>
                     <li><a href="pbr_tutorial">PBR Shader Tutorial</a></li>
                 </ul>
             </div>

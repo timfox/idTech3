@@ -271,6 +271,11 @@ static PFN_vkCreateSwapchainKHR							qvkCreateSwapchainKHR;
 static PFN_vkDestroySwapchainKHR						qvkDestroySwapchainKHR;
 static PFN_vkGetSwapchainImagesKHR						qvkGetSwapchainImagesKHR;
 static PFN_vkQueuePresentKHR							qvkQueuePresentKHR;
+static PFN_vkCmdBeginRenderingKHR						qvkCmdBeginRenderingKHR;
+static PFN_vkCmdEndRenderingKHR						qvkCmdEndRenderingKHR;
+static PFN_vkCmdPipelineBarrier2KHR					qvkCmdPipelineBarrier2KHR;
+static PFN_vkQueueSubmit2KHR							qvkQueueSubmit2KHR;
+static PFN_vkCmdSetFragmentShadingRateKHR				qvkCmdSetFragmentShadingRateKHR;
 
 static PFN_vkGetBufferMemoryRequirements2KHR			qvkGetBufferMemoryRequirements2KHR;
 static PFN_vkGetImageMemoryRequirements2KHR				qvkGetImageMemoryRequirements2KHR;
@@ -2000,7 +2005,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 
 	// create VkDevice
 	{
-		const char *device_extension_list[20]; // Increased for ray tracing and mesh shader extensions
+		const char *device_extension_list[28]; // room for RT/mesh + sync2/dynRender/VRS
 		uint32_t device_extension_count;
 		const char *ext, *end;
 		char *str;
@@ -2017,7 +2022,15 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		qboolean debugMarker = qfalse;
 		qboolean meshShaderExt = qfalse;
 		qboolean meshShadersEnabled = qfalse;
+		qboolean sync2 = qfalse;
+		qboolean dynamicRendering = qfalse;
+		qboolean extDynState = qfalse;
+		qboolean fragmentShadingRate = qfalse;
 		VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features;
+		VkPhysicalDeviceSynchronization2FeaturesKHR sync2_features;
+		VkPhysicalDeviceDynamicRenderingFeaturesKHR dyn_render_features;
+		VkPhysicalDeviceExtendedDynamicStateFeaturesEXT xdyn_features;
+		VkPhysicalDeviceFragmentShadingRateFeaturesKHR fsr_features;
 		const void **pNextPtr = NULL;
 #ifdef _DEBUG
 		qboolean timelineSemaphore = qfalse;
@@ -2072,6 +2085,14 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 				bufferDeviceAddress = qtrue;
 			} else if ( strcmp( ext, "VK_EXT_mesh_shader" ) == 0 ) {
 				meshShaderExt = qtrue;
+			} else if ( strcmp( ext, VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME ) == 0 ) {
+				sync2 = qtrue;
+			} else if ( strcmp( ext, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME ) == 0 ) {
+				dynamicRendering = qtrue;
+			} else if ( strcmp( ext, VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME ) == 0 ) {
+				extDynState = qtrue;
+			} else if ( strcmp( ext, VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME ) == 0 ) {
+				fragmentShadingRate = qtrue;
 			}
 			// add this device extension to glConfig
 			if ( i != 0 ) {
@@ -2089,6 +2110,10 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 
 		// Query mesh shader features when requested
 		Com_Memset( &mesh_shader_features, 0, sizeof( mesh_shader_features ) );
+		Com_Memset( &sync2_features, 0, sizeof( sync2_features ) );
+		Com_Memset( &dyn_render_features, 0, sizeof( dyn_render_features ) );
+		Com_Memset( &xdyn_features, 0, sizeof( xdyn_features ) );
+		Com_Memset( &fsr_features, 0, sizeof( fsr_features ) );
 		if ( r_meshShaders && r_meshShaders->integer ) {
 			if ( !meshShaderExt ) {
 				ri.Printf( PRINT_WARNING, "...mesh shaders requested but VK_EXT_mesh_shader not supported by device\n" );
@@ -2173,6 +2198,22 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			ri.Printf( PRINT_WARNING, "...mesh shader extension not enabled\n" );
 		}
 
+		if ( sync2 ) {
+			device_extension_list[ device_extension_count++ ] = VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME;
+		}
+
+		if ( dynamicRendering ) {
+			device_extension_list[ device_extension_count++ ] = VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME;
+		}
+
+		if ( extDynState ) {
+			device_extension_list[ device_extension_count++ ] = VK_EXT_EXTENDED_DYNAMIC_STATE_EXTENSION_NAME;
+		}
+
+		if ( fragmentShadingRate ) {
+			device_extension_list[ device_extension_count++ ] = VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME;
+		}
+
 		// Ray tracing extensions (all required together)
 		if ( rayTracingPipeline && accelerationStructure && deferredHostOperations && bufferDeviceAddress ) {
 			device_extension_list[ device_extension_count++ ] = VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME;
@@ -2249,6 +2290,40 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		if ( meshShadersEnabled ) {
 			*pNextPtr = &mesh_shader_features;
 			pNextPtr = (const void **)&mesh_shader_features.pNext;
+		}
+
+		if ( sync2 ) {
+			*pNextPtr = &sync2_features;
+			sync2_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR;
+			sync2_features.pNext = NULL;
+			sync2_features.synchronization2 = VK_TRUE;
+			pNextPtr = (const void **)&sync2_features.pNext;
+		}
+
+		if ( dynamicRendering ) {
+			*pNextPtr = &dyn_render_features;
+			dyn_render_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
+			dyn_render_features.pNext = NULL;
+			dyn_render_features.dynamicRendering = VK_TRUE;
+			pNextPtr = (const void **)&dyn_render_features.pNext;
+		}
+
+		if ( extDynState ) {
+			*pNextPtr = &xdyn_features;
+			xdyn_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT;
+			xdyn_features.pNext = NULL;
+			xdyn_features.extendedDynamicState = VK_TRUE;
+			pNextPtr = (const void **)&xdyn_features.pNext;
+		}
+
+		if ( fragmentShadingRate ) {
+			*pNextPtr = &fsr_features;
+			fsr_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR;
+			fsr_features.pNext = NULL;
+			fsr_features.pipelineFragmentShadingRate = VK_TRUE;
+			fsr_features.primitiveFragmentShadingRate = VK_TRUE;
+			fsr_features.attachmentFragmentShadingRate = VK_TRUE;
+			pNextPtr = (const void **)&fsr_features.pNext;
 		}
 
 #ifdef _DEBUG
@@ -2642,6 +2717,11 @@ static void init_vulkan_library( void )
 	if ( vk.dedicatedAllocation ) {
 		INIT_DEVICE_FUNCTION_EXT(vkGetBufferMemoryRequirements2KHR);
 		INIT_DEVICE_FUNCTION_EXT(vkGetImageMemoryRequirements2KHR);
+		qvkCmdBeginRenderingKHR      = (PFN_vkCmdBeginRenderingKHR)      qvkGetDeviceProcAddr( vk.device, "vkCmdBeginRenderingKHR" );
+		qvkCmdEndRenderingKHR        = (PFN_vkCmdEndRenderingKHR)        qvkGetDeviceProcAddr( vk.device, "vkCmdEndRenderingKHR" );
+		qvkCmdPipelineBarrier2KHR    = (PFN_vkCmdPipelineBarrier2KHR)    qvkGetDeviceProcAddr( vk.device, "vkCmdPipelineBarrier2KHR" );
+		qvkQueueSubmit2KHR           = (PFN_vkQueueSubmit2KHR)           qvkGetDeviceProcAddr( vk.device, "vkQueueSubmit2KHR" );
+		qvkCmdSetFragmentShadingRateKHR = (PFN_vkCmdSetFragmentShadingRateKHR) qvkGetDeviceProcAddr( vk.device, "vkCmdSetFragmentShadingRateKHR" );
 		if ( !qvkGetBufferMemoryRequirements2KHR || !qvkGetImageMemoryRequirements2KHR ) {
 			vk.dedicatedAllocation = qfalse;
 		}

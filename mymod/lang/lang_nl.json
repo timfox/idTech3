@@ -1,0 +1,17 @@
+{
+  "STR_MAIN_MENU_PLAY": "Spelen",
+  "STR_MAIN_MENU_OPTIONS": "Opties",
+  "STR_MAIN_MENU_QUIT": "Afsluiten",
+  "STR_DIALOGUE_OK": "OK",
+  "STR_DIALOGUE_CANCEL": "Annuleren",
+  "STR_DIALOGUE_NEXT": "Volgende",
+  "STR_DIALOGUE_SKIP": "Overslaan",
+  "STR_DIALOGUE_CONTINUE": "Doorgaan",
+  "STR_SYSTEM_MISSING_KEY": "Ontbrekende gelokaliseerde tekst.",
+  "STR_PICKUP_FMT": "{count} {item} opgepakt",
+  "STR_SCORE_KILLS_ONE": "{count} kill",
+  "STR_SCORE_KILLS_MANY": "{count} kills",
+  "STR_PROMPT_USE": "Druk op {key} om te gebruiken",
+  "STR_CONNECTING": "Verbinden...",
+  "STR_CONNECTION_FAILED": "Verbinding mislukt. Probeer het opnieuw."
+}

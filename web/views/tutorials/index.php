@@ -23,6 +23,7 @@ $breadcrumbs = [
         <li><a href="/tutorials/oop-improvements">OOP Improvements</a></li>
         <li><a href="/tutorials/dynres-plan">Dynamic Resolution & Compute Particles (Plan)</a></li>
         <li><a href="/tutorials/idtech-family-tree">id Tech Family Tree</a></li>
+        <li><a href="/tutorials/custom-backgrounds">Custom Menu and Console Backgrounds</a></li>
     </ul>
 </div>
 

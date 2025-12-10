@@ -1,0 +1,17 @@
+{
+  "STR_MAIN_MENU_PLAY": "Oyna",
+  "STR_MAIN_MENU_OPTIONS": "Ayarlar",
+  "STR_MAIN_MENU_QUIT": "Çıkış",
+  "STR_DIALOGUE_OK": "Tamam",
+  "STR_DIALOGUE_CANCEL": "İptal",
+  "STR_DIALOGUE_NEXT": "İleri",
+  "STR_DIALOGUE_SKIP": "Atla",
+  "STR_DIALOGUE_CONTINUE": "Devam et",
+  "STR_SYSTEM_MISSING_KEY": "Yerelleştirilmiş metin eksik.",
+  "STR_PICKUP_FMT": "{count} {item} alındı",
+  "STR_SCORE_KILLS_ONE": "{count} öldürme",
+  "STR_SCORE_KILLS_MANY": "{count} öldürme",
+  "STR_PROMPT_USE": "Kullanmak için {key} tuşuna bas",
+  "STR_CONNECTING": "Bağlanıyor...",
+  "STR_CONNECTION_FAILED": "Bağlantı başarısız. Lütfen tekrar deneyin."
+}
