@@ -21,6 +21,7 @@ $breadcrumbs = [
         <li><a href="/tutorials/ecs-entity-facade">ECS Entity Facade</a></li>
         <li><a href="/tutorials/service-logger">Service Locator & Logger</a></li>
         <li><a href="/tutorials/oop-improvements">OOP Improvements</a></li>
+        <li><a href="/tutorials/dynres-plan">Dynamic Resolution & Compute Particles (Plan)</a></li>
         <li><a href="/tutorials/idtech-family-tree">id Tech Family Tree</a></li>
     </ul>
 </div>
@@ -36,6 +37,8 @@ $breadcrumbs = [
         <li><a href="/tutorials/radiant-entities">Radiant Entity Definitions</a></li>
         <li><a href="/tutorials/radiant-shaderlist">Radiant Shaderlist Maintenance</a></li>
         <li><a href="/tutorials/radiant-texture-troubleshooting">Radiant Texture Troubleshooting</a></li>
+        <li><a href="/tutorials/radiant-material-blending">Radiant Material Blending</a></li>
+        <li><a href="/tutorials/radiant-pbr-materials">Radiant PBR / Enhanced Materials</a></li>
     </ul>
 </div>
 

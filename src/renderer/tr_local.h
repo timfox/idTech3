@@ -1196,6 +1196,9 @@ typedef struct {
 	image_t					*flareImage;
 	image_t					*whiteImage;			// full of 0xff
 	image_t					*identityLightImage;	// full of tr.identityLightByte
+	image_t					*checkerImage;			// checkerboard debug texture
+	image_t					*gridImage;				// gridlines debug texture
+	image_t					*noiseImage;			// noise debug texture
 
 	shader_t				*defaultShader;
 	shader_t				*whiteShader;

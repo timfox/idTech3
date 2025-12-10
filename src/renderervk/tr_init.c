@@ -231,6 +231,12 @@ cvar_t	*r_renderWidth;
 cvar_t	*r_renderHeight;
 cvar_t	*r_renderScale;
 cvar_t	*r_ext_supersample;
+cvar_t	*r_dynRes_enable;
+cvar_t	*r_dynRes_minScale;
+cvar_t	*r_dynRes_maxScale;
+cvar_t	*r_dynRes_targetMs;
+cvar_t	*r_particles_enableCompute;
+cvar_t	*r_particles_maxCount;
 
 	// Vulkan-specific debug helpers
 	cvar_t	*r_vk_debug2D;
@@ -263,6 +269,7 @@ cvar_t	*r_ext_compiled_vertex_array;
 cvar_t	*r_ext_texture_env_add;
 cvar_t	*r_ext_texture_filter_anisotropic;
 cvar_t	*r_ext_max_anisotropy;
+cvar_t	*r_textureLodBias;
 
 cvar_t	*r_ignoreGLErrors;
 
@@ -1612,6 +1619,37 @@ static void VkInfo_f( void )
 	ri.Printf(PRINT_ALL, "pipeline descriptors: %i, base: %i\n", vk.pipelines_count, vk.pipelines_world_base );
 	ri.Printf(PRINT_ALL, "image chunks: %i\n", vk_world.num_image_chunks );
 }
+
+static void VkMemStats_f( void )
+{
+#if defined(USE_VMA)
+	if ( vk.allocator == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_ALL, "vk_memstats: allocator not initialized\n" );
+		return;
+	}
+
+	VmaBudget budgets[VK_MAX_MEMORY_HEAPS];
+	vmaGetHeapBudgets( vk.allocator, budgets );
+
+	ri.Printf( PRINT_ALL, "Vulkan memory budgets (VMA):\n" );
+	for ( uint32_t i = 0; i < VK_MAX_MEMORY_HEAPS; ++i ) {
+		if ( budgets[i].budget == 0 && budgets[i].usage == 0 )
+			continue;
+
+		double budgetMB = (double)budgets[i].budget / (1024.0 * 1024.0);
+		double usageMB  = (double)budgets[i].usage  / (1024.0 * 1024.0);
+		double availMB  = budgetMB - usageMB;
+		const VmaStatistics *s = &budgets[i].statistics;
+
+		ri.Printf( PRINT_ALL,
+			"  heap %u: usage %.2f MB / %.2f MB (avail %.2f MB) allocs %u blocks %u\n",
+			i, usageMB, budgetMB, availMB,
+			(unsigned)s->allocationCount, (unsigned)s->blockCount );
+	}
+#else
+	ri.Printf( PRINT_ALL, "vk_memstats: VMA not compiled in\n" );
+#endif
+}
 #endif
 
 
@@ -1650,6 +1688,7 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "gfxinfo", GfxInfo_f );
 #ifdef USE_VULKAN
 	ri.Cmd_AddCommand( "vkinfo", VkInfo_f );
+	ri.Cmd_AddCommand( "vk_memstats", VkMemStats_f );
 #endif
 
 	//
@@ -2122,6 +2161,11 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_ext_max_anisotropy, "1", NULL, CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_max_anisotropy, "Sets maximum anisotropic level for your graphics driver. Requires \\r_ext_texture_filter_anisotropic." );
 
+	r_textureLodBias = ri.Cvar_Get( "r_textureLodBias", "0.0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_textureLodBias, "-2.0", "2.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_textureLodBias, "Global mip LOD bias for Vulkan samplers (-2 = sharper, +2 = blurrier). Requires \\vid_restart." );
+	ri.Cvar_SetGroup( r_textureLodBias, CVG_RENDERER );
+
 	//r_stencilbits = ri.Cvar_Get( "r_stencilbits", "8", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	r_ignorehwgamma = ri.Cvar_Get( "r_ignorehwgamma", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ignorehwgamma, "0", "1", CV_INTEGER );
@@ -2206,6 +2250,24 @@ static void R_Register( void )
 		" 2 - nearest filtering, preserve aspect ratio (black bars on sides)\n"
 		" 3 - linear filtering, stretch to full size\n"
 		" 4 - linear filtering, preserve aspect ratio (black bars on sides)\n" );
+
+	r_dynRes_enable = ri.Cvar_Get( "r_dynRes_enable", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_dynRes_enable, "Enable Vulkan dynamic resolution (experimental, restart required)." );
+	r_dynRes_minScale = ri.Cvar_Get( "r_dynRes_minScale", "0.70", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_dynRes_minScale, "0.50", "1.00", CV_FLOAT );
+	ri.Cvar_SetDescription( r_dynRes_minScale, "Minimum dynamic resolution scale (0.50–1.00)." );
+	r_dynRes_maxScale = ri.Cvar_Get( "r_dynRes_maxScale", "1.00", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_dynRes_maxScale, "0.50", "1.00", CV_FLOAT );
+	ri.Cvar_SetDescription( r_dynRes_maxScale, "Maximum dynamic resolution scale (0.50–1.00)." );
+	r_dynRes_targetMs = ri.Cvar_Get( "r_dynRes_targetMs", "16.7", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_dynRes_targetMs, "8.0", "50.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_dynRes_targetMs, "Target GPU frame time (ms) for dynamic resolution." );
+
+	r_particles_enableCompute = ri.Cvar_Get( "r_particles_enableCompute", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_particles_enableCompute, "Enable Vulkan compute particle path (experimental, restart required)." );
+	r_particles_maxCount = ri.Cvar_Get( "r_particles_maxCount", "150000", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_particles_maxCount, "1000", "1000000", CV_INTEGER );
+	ri.Cvar_SetDescription( r_particles_maxCount, "Max live particles for compute path (experimental)." );
 #endif // USE_VULKAN
 
 	R_ApplyPostQualityDefaults();
@@ -2350,6 +2412,7 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.Cmd_RemoveCommand( "shaderstate" );
 #ifdef USE_VULKAN
 	ri.Cmd_RemoveCommand( "vkinfo" );
+	ri.Cmd_RemoveCommand( "vk_memstats" );
 #endif
 
 	//if ( tr.registered ) {

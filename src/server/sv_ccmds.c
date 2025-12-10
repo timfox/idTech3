@@ -164,6 +164,13 @@ static void SV_Map_f( void ) {
 	if ( !FS_StartupInProgress() ) {
 		Com_Printf( "DEBUG: SV_Map_f called with cmd=%s map=%s\n", cmd ? cmd : "<NULL>", map ? map : "<NULL>" );
 	}
+
+	// Track background maps for menu-like behavior (compat with Xash3D-style map_background)
+	if ( !Q_stricmp( cmd, "map_background" ) ) {
+		Cvar_Set( "sv_background", "1" );
+	} else {
+		Cvar_Set( "sv_background", "0" );
+	}
 	if ( !map || !*map ) {
 		if ( !FS_StartupInProgress() ) {
 			Com_Printf( "DEBUG: SV_Map_f returning early - no map specified\n" );
@@ -1593,6 +1600,8 @@ void SV_AddOperatorCommands( void ) {
 	Cmd_SetCommandCompletionFunc( "spmap", SV_CompleteMapName );
 	Cmd_AddCommand ("spdevmap", SV_Map_f);
 	Cmd_SetCommandCompletionFunc( "spdevmap", SV_CompleteMapName );
+	Cmd_AddCommand ("map_background", SV_Map_f);
+	Cmd_SetCommandCompletionFunc( "map_background", SV_CompleteMapName );
 #endif
 	Cmd_AddCommand ("killserver", SV_KillServer_f);
 #ifdef USE_BANS	

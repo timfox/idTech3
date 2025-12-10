@@ -311,6 +311,8 @@ extern	cvar_t	*sv_gametype;
 extern	cvar_t	*sv_pure;
 extern	cvar_t	*sv_floodProtect;
 extern	cvar_t	*sv_lanForceRate;
+extern	cvar_t	*sv_background;
+extern	cvar_t	*sv_backgroundFps;
 
 #ifdef USE_BULLET
 extern	cvar_t	*sv_bulletEnable;        // global toggle for Bullet ECS physics

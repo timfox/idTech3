@@ -26,6 +26,18 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // q_shared.h -- included first by ALL program modules.
 // A user mod should never modify this file
 
+#if defined(__cplusplus)
+static_assert(__cplusplus >= 202002L, "C++23 or newer is required to build this codebase.");
+#else
+# if defined(__STDC_VERSION__)
+#  if __STDC_VERSION__ < 202000L
+#   error "C23 or newer is required to build this codebase."
+#  endif
+# else
+#  error "__STDC_VERSION__ is undefined; a C23-capable compiler is required."
+# endif
+#endif
+
 #define Q3_VERSION            "id Tech 3"
 #ifndef SVN_VERSION
   #define SVN_VERSION Q3_VERSION

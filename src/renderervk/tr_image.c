@@ -1870,6 +1870,48 @@ static void R_CreateBuiltinImages( void ) {
 
 	tr.identityLightImage = R_CreateImage( "*identityLight", NULL, (byte *)data, 8, 8, IMGFLAG_NONE, 0, 0 );
 
+	// Checkerboard (procedural)
+	for (y = 0; y < DEFAULT_SIZE; y++) {
+		for (x = 0; x < DEFAULT_SIZE; x++) {
+			int tile = ((x / 8) + (y / 8)) & 1;
+			byte v = tile ? 240 : 32;
+			data[y][x][0] = v;
+			data[y][x][1] = v;
+			data[y][x][2] = v;
+			data[y][x][3] = 255;
+		}
+	}
+	tr.checkerImage = R_CreateImage( "*checker", NULL, (byte *)data, DEFAULT_SIZE, DEFAULT_SIZE, IMGFLAG_MIPMAP, 0, 0 );
+
+	// Grid (procedural)
+	Com_Memset( data, 32, sizeof( data ) );
+	for (y = 0; y < DEFAULT_SIZE; y++) {
+		for (x = 0; x < DEFAULT_SIZE; x++) {
+			if ( (x % 16) == 0 || (y % 16) == 0 ) {
+				data[y][x][0] = data[y][x][1] = data[y][x][2] = 96;
+			}
+			if ( (x % 64) == 0 || (y % 64) == 0 ) {
+				data[y][x][0] = data[y][x][1] = data[y][x][2] = 180;
+			}
+			data[y][x][3] = 255;
+		}
+	}
+	tr.gridImage = R_CreateImage( "*grid", NULL, (byte *)data, DEFAULT_SIZE, DEFAULT_SIZE, IMGFLAG_MIPMAP, 0, 0 );
+
+	// Noise (procedural)
+	for (y = 0; y < DEFAULT_SIZE; y++) {
+		for (x = 0; x < DEFAULT_SIZE; x++) {
+			uint32_t v = (uint32_t)(x * 73856093u) ^ (uint32_t)(y * 19349663u);
+			v ^= v << 13;
+			v ^= v >> 17;
+			v ^= v << 5;
+			byte n = (byte)(v & 0xFF);
+			data[y][x][0] = data[y][x][1] = data[y][x][2] = n;
+			data[y][x][3] = 255;
+		}
+	}
+	tr.noiseImage = R_CreateImage( "*noise", NULL, (byte *)data, DEFAULT_SIZE, DEFAULT_SIZE, IMGFLAG_MIPMAP, 0, 0 );
+
 	//for ( x = 0; x < ARRAY_LEN( tr.scratchImage ); x++ ) {
 		// scratchimage is usually used for cinematic drawing
 		//tr.scratchImage[x] = R_CreateImage( "*scratch", (byte*)data, DEFAULT_SIZE, DEFAULT_SIZE,

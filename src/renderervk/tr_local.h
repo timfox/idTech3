@@ -1316,6 +1316,9 @@ typedef struct {
 	image_t					*blackImage;
 	image_t					*whiteImage;			// full of 0xff
 	image_t					*identityLightImage;	// full of tr.identityLightByte
+	image_t					*checkerImage;			// checkerboard debug texture
+	image_t					*gridImage;				// gridlines debug texture
+	image_t					*noiseImage;			// noise debug texture
 #ifdef USE_VK_PBR
 	image_t					*emptyImage;		// full of 0xff
 #endif
@@ -1540,6 +1543,12 @@ extern cvar_t	*r_ext_supersample;
 extern cvar_t	*r_renderWidth;
 extern cvar_t	*r_renderHeight;
 extern cvar_t	*r_renderScale;
+extern cvar_t	*r_dynRes_enable;
+extern cvar_t	*r_dynRes_minScale;
+extern cvar_t	*r_dynRes_maxScale;
+extern cvar_t	*r_dynRes_targetMs;
+extern cvar_t	*r_particles_enableCompute;
+extern cvar_t	*r_particles_maxCount;
 
 // Vulkan-specific debug helpers
 extern cvar_t	*r_vk_debug2D;        // log 2D/UI quad usage and tess stats

@@ -2892,6 +2892,7 @@ static VkSampler vk_find_sampler( const Vk_Sampler_Def *def ) {
 	VkFilter min_filter;
 	VkSamplerMipmapMode mipmap_mode;
 	float maxLod;
+	float lodBias;
 	int i;
 
 	// Look for sampler among existing samplers.
@@ -2950,6 +2951,8 @@ static VkSampler vk_find_sampler( const Vk_Sampler_Def *def ) {
 		maxLod = 1.0f;
 	}
 
+	lodBias = Com_Clamp( -2.0f, 2.0f, r_textureLodBias ? r_textureLodBias->value : 0.0f );
+
 	desc.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
 	desc.pNext = NULL;
 	desc.flags = 0;
@@ -2959,7 +2962,7 @@ static VkSampler vk_find_sampler( const Vk_Sampler_Def *def ) {
 	desc.addressModeU = address_mode;
 	desc.addressModeV = address_mode;
 	desc.addressModeW = address_mode;
-	desc.mipLodBias = 0.0f;
+	desc.mipLodBias = lodBias;
 
 	if ( def->noAnisotropy || mipmap_mode == VK_SAMPLER_MIPMAP_MODE_NEAREST || mag_filter == VK_FILTER_NEAREST ) {
 		desc.anisotropyEnable = VK_FALSE;
@@ -9322,6 +9325,26 @@ static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBu
 void vk_begin_main_render_pass( void )
 {
 	VkFramebuffer frameBuffer = vk.framebuffers.main[ vk.cmd->swapchain_image_index ];
+
+	// Update dynamic resolution state (no-op unless enabled)
+	if ( r_dynRes_enable && r_dynRes_enable->integer && r_dynRes_minScale && r_dynRes_maxScale && r_dynRes_targetMs ) {
+		vk.dynres.enabled = qtrue;
+		vk.dynres.minScale = Com_Clamp( 0.5f, 1.0f, r_dynRes_minScale->value );
+		vk.dynres.maxScale = Com_Clamp( 0.5f, 1.0f, r_dynRes_maxScale->value );
+		if ( vk.dynres.minScale > vk.dynres.maxScale ) {
+			float t = vk.dynres.minScale;
+			vk.dynres.minScale = vk.dynres.maxScale;
+			vk.dynres.maxScale = t;
+		}
+		vk.dynres.targetMs = r_dynRes_targetMs->value;
+		// Placeholder: keep scale at 1.0 until scaled attachments are supported
+		vk.dynres.currentScale = 1.0f;
+		vk.dynres.smoothedScale = 1.0f;
+	} else {
+		vk.dynres.enabled = qfalse;
+		vk.dynres.currentScale = 1.0f;
+		vk.dynres.smoothedScale = 1.0f;
+	}
 
 	// CRITICAL: Check if render pass is already active BEFORE setting renderPassIndex.
 	// Setting renderPassIndex before checking would cause the check in vk_begin_render_pass() to fail incorrectly.

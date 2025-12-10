@@ -163,6 +163,50 @@ static vec_t QuatNormalize2( const quat_t v, quat_t out) {
 	return length;
 }
 
+static void IQM_SanitizeWeightsFloat( float *weights, byte *indexes ) {
+	float sum = weights[0] + weights[1] + weights[2] + weights[3];
+	if ( sum <= 0.0f ) {
+		weights[0] = 1.0f;
+		weights[1] = weights[2] = weights[3] = 0.0f;
+		// collapse to first joint to keep skeleton valid
+		indexes[1] = indexes[2] = indexes[3] = indexes[0];
+		return;
+	}
+
+	if ( fabsf( sum - 1.0f ) > 0.0001f ) {
+		float inv = 1.0f / sum;
+		weights[0] *= inv;
+		weights[1] *= inv;
+		weights[2] *= inv;
+		weights[3] *= inv;
+	}
+}
+
+static void IQM_SanitizeWeightsByte( byte *weights, byte *indexes ) {
+	int sum = weights[0] + weights[1] + weights[2] + weights[3];
+	if ( sum == 0 ) {
+		weights[0] = 255;
+		weights[1] = weights[2] = weights[3] = 0;
+		indexes[1] = indexes[2] = indexes[3] = indexes[0];
+		return;
+	}
+
+	if ( sum != 255 ) {
+		float scale = 255.0f / (float)sum;
+		int w0 = (int)(weights[0] * scale + 0.5f);
+		int w1 = (int)(weights[1] * scale + 0.5f);
+		int w2 = (int)(weights[2] * scale + 0.5f);
+		int w3 = (int)(weights[3] * scale + 0.5f);
+		int adjusted = w0 + w1 + w2 + w3;
+		int delta = 255 - adjusted;
+		w3 = Com_Clamp( 0, 255, w3 + delta );
+		weights[0] = (byte)Com_Clamp( 0, 255, w0 );
+		weights[1] = (byte)Com_Clamp( 0, 255, w1 );
+		weights[2] = (byte)Com_Clamp( 0, 255, w2 );
+		weights[3] = (byte)w3;
+	}
+}
+
 /*
 =================
 R_LoadIQM
@@ -816,11 +860,15 @@ qboolean R_LoadIQM( model_t *mod, void *buffer, int filesize, const char *mod_na
 							iqmData->influenceBlendWeights.f[4*influence+1] = blendWeights.f[4*vtx+1];
 							iqmData->influenceBlendWeights.f[4*influence+2] = blendWeights.f[4*vtx+2];
 							iqmData->influenceBlendWeights.f[4*influence+3] = blendWeights.f[4*vtx+3];
+							IQM_SanitizeWeightsFloat( &iqmData->influenceBlendWeights.f[4*influence],
+								&iqmData->influenceBlendIndexes[4*influence] );
 						} else {
 							iqmData->influenceBlendWeights.b[4*influence+0] = blendWeights.b[4*vtx+0];
 							iqmData->influenceBlendWeights.b[4*influence+1] = blendWeights.b[4*vtx+1];
 							iqmData->influenceBlendWeights.b[4*influence+2] = blendWeights.b[4*vtx+2];
 							iqmData->influenceBlendWeights.b[4*influence+3] = blendWeights.b[4*vtx+3];
+							IQM_SanitizeWeightsByte( &iqmData->influenceBlendWeights.b[4*influence],
+								&iqmData->influenceBlendIndexes[4*influence] );
 						}
 
 						totalInfluences++;

@@ -1,13 +1,12 @@
 /*
 ===========================================================================
-+
-+ Assimp-backed model loader for Vulkan renderer
-+
-+ This mirrors the OpenGL renderer's Assimp integration so that
-+ RE_RegisterModel can import simple static meshes (e.g. OBJ) when using
-+ the Vulkan renderer.
-+
-+===========================================================================
+
+Assimp-backed model loader for Vulkan renderer
+
+Supports static mesh import (OBJ, etc.) via Assimp, merging all meshes into
+one MD3-like surface. Animated bones/skins are not yet handled.
+
+===========================================================================
 */
 
 #include "tr_local.h"
@@ -18,6 +17,20 @@
 #include <assimp/scene.h>
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
+
+static inline void Assimp_EncodeLatLng( const aiVector3D &n, short *outNormal ) {
+	float lat, lng;
+	if ( n.x == 0.0f && n.y == 0.0f ) {
+		lat = 0.0f;
+		lng = 0.0f;
+	} else {
+		lat = atan2f( n.y, n.x );
+		lng = acosf( Com_Clamp( -1.0f, 1.0f, n.z ) );
+	}
+	int ilat = (int)( lat * (32767.0f / (2.0f * (float)M_PI) ) ) & 0xFFFF;
+	int ilng = (int)( lng * (32767.0f / (float)M_PI) ) & 0xFFFF;
+	*outNormal = (short)( ( ilat << 8 ) | ( ilng & 0xFF ) );
+}
 
 /*
 =================
@@ -43,8 +56,8 @@ extern "C" qhandle_t R_RegisterAssimpModel( const char *name, model_t *mod )
 
 	const unsigned int flags =
 		aiProcess_Triangulate |
-		aiProcess_GenSmoothNormals |
 		aiProcess_JoinIdenticalVertices |
+		aiProcess_GenSmoothNormals |
 		aiProcess_ImproveCacheLocality |
 		aiProcess_OptimizeMeshes |
 		aiProcess_SortByPType;
@@ -62,56 +75,50 @@ extern "C" qhandle_t R_RegisterAssimpModel( const char *name, model_t *mod )
 		return 0;
 	}
 
-	// For the initial integration, take only the first mesh.
-	const aiMesh *mesh = scene->mMeshes[0];
-	if ( !mesh->HasPositions() || !mesh->HasFaces() ) {
-		ri.Printf( PRINT_WARNING, "R_RegisterAssimpModel(VK): mesh '%s' missing positions or faces\n",
-			name );
-		mod->type = MOD_BAD;
-		return 0;
-	}
-
-	const int numVerts  = mesh->mNumVertices;
-	const int numFaces  = mesh->mNumFaces;
-	const int numTris   = numFaces; // after aiProcess_Triangulate
-
-	if ( numVerts <= 0 || numTris <= 0 ) {
-		mod->type = MOD_BAD;
-		return 0;
-	}
-
-	// Allocate a basic MD3 header + single frame/surface.
-	int i;
+	// Merge all meshes into a single surface
+	int totalVerts = 0;
+	int totalTris  = 0;
 	vec3_t mins, maxs;
-
-	for ( i = 0; i < 3; ++i ) {
+	for ( int i = 0; i < 3; ++i ) {
 		mins[i] =  99999.0f;
 		maxs[i] = -99999.0f;
 	}
 
-	for ( unsigned int v = 0; v < mesh->mNumVertices; ++v ) {
-		const aiVector3D &p = mesh->mVertices[v];
-		if ( p.x < mins[0] ) mins[0] = p.x;
-		if ( p.y < mins[1] ) mins[1] = p.y;
-		if ( p.z < mins[2] ) mins[2] = p.z;
-		if ( p.x > maxs[0] ) maxs[0] = p.x;
-		if ( p.y > maxs[1] ) maxs[1] = p.y;
-		if ( p.z > maxs[2] ) maxs[2] = p.z;
+	for ( unsigned int m = 0; m < scene->mNumMeshes; ++m ) {
+		const aiMesh *mesh = scene->mMeshes[m];
+		if ( !mesh->HasPositions() || !mesh->HasFaces() )
+			continue;
+		totalVerts += (int)mesh->mNumVertices;
+		totalTris  += (int)mesh->mNumFaces;
+		for ( unsigned int v = 0; v < mesh->mNumVertices; ++v ) {
+			const aiVector3D &p = mesh->mVertices[v];
+			if ( p.x < mins[0] ) mins[0] = p.x;
+			if ( p.y < mins[1] ) mins[1] = p.y;
+			if ( p.z < mins[2] ) mins[2] = p.z;
+			if ( p.x > maxs[0] ) maxs[0] = p.x;
+			if ( p.y > maxs[1] ) maxs[1] = p.y;
+			if ( p.z > maxs[2] ) maxs[2] = p.z;
+		}
+	}
+
+	if ( totalVerts <= 0 || totalTris <= 0 ) {
+		mod->type = MOD_BAD;
+		return 0;
 	}
 
 	const int numFrames   = 1;
-	const int numSurfaces = 1;
+	const int numSurfaces = 1; // merged
 	const int numTags     = 0;
 	const int numShaders  = 1;
 
-	const int headerSize  = sizeof( md3Header_t );
-	const int frameSize   = sizeof( md3Frame_t ) * numFrames;
-	const int tagSize     = sizeof( md3Tag_t ) * numTags * numFrames;
-	const int surfSize    = sizeof( md3Surface_t ) +
-	                        sizeof( md3Shader_t ) * numShaders +
-	                        sizeof( md3Triangle_t ) * numTris +
-	                        sizeof( md3St_t ) * numVerts +
-	                        sizeof( md3XyzNormal_t ) * numVerts;
+	const int headerSize  = (int)sizeof( md3Header_t );
+	const int frameSize   = (int)sizeof( md3Frame_t ) * numFrames;
+	const int tagSize     = (int)sizeof( md3Tag_t ) * numTags * numFrames;
+	const int surfSize    = (int)sizeof( md3Surface_t ) +
+	                        (int)sizeof( md3Shader_t ) * numShaders +
+	                        (int)sizeof( md3Triangle_t ) * totalTris +
+	                        (int)sizeof( md3St_t ) * totalVerts +
+	                        (int)sizeof( md3XyzNormal_t ) * totalVerts;
 
 	const int totalSize   = headerSize + frameSize + tagSize + surfSize;
 
@@ -123,27 +130,27 @@ extern "C" qhandle_t R_RegisterAssimpModel( const char *name, model_t *mod )
 
 	Com_Memset( hdr, 0, totalSize );
 
-	hdr->ident      = LittleLong( MD3_IDENT );
-	hdr->version    = LittleLong( MD3_VERSION );
-	hdr->numFrames  = LittleLong( numFrames );
-	hdr->numTags    = LittleLong( numTags );
-	hdr->numSurfaces= LittleLong( numSurfaces );
-	hdr->numSkins   = LittleLong( numShaders );
+	hdr->ident       = LittleLong( MD3_IDENT );
+	hdr->version     = LittleLong( MD3_VERSION );
+	hdr->numFrames   = LittleLong( numFrames );
+	hdr->numTags     = LittleLong( numTags );
+	hdr->numSurfaces = LittleLong( numSurfaces );
+	hdr->numSkins    = LittleLong( numShaders );
 
-	hdr->ofsFrames  = LittleLong( sizeof( md3Header_t ) );
-	hdr->ofsTags    = LittleLong( hdr->ofsFrames + frameSize );
-	hdr->ofsSurfaces= LittleLong( hdr->ofsTags + tagSize );
-	hdr->ofsEnd     = LittleLong( totalSize );
+	hdr->ofsFrames   = LittleLong( sizeof( md3Header_t ) );
+	hdr->ofsTags     = LittleLong( hdr->ofsFrames + frameSize );
+	hdr->ofsSurfaces = LittleLong( hdr->ofsTags + tagSize );
+	hdr->ofsEnd      = LittleLong( totalSize );
 
 	// Frame
 	md3Frame_t *frame = (md3Frame_t *)( (byte *)hdr + LittleLong( hdr->ofsFrames ) );
 	Com_Memset( frame, 0, sizeof( md3Frame_t ) );
-	for ( i = 0; i < 3; ++i ) {
+	for ( int i = 0; i < 3; ++i ) {
 		frame->bounds[0][i] = mins[i];
 		frame->bounds[1][i] = maxs[i];
 		frame->localOrigin[i] = (mins[i] + maxs[i]) * 0.5f; // Center of bounds
 	}
-	// Calculate radius as distance from center to furthest corner
+	// radius
 	vec3_t center, corner;
 	VectorCopy( frame->localOrigin, center );
 	VectorSet( corner, maxs[0], maxs[1], maxs[2] );
@@ -156,16 +163,16 @@ extern "C" qhandle_t R_RegisterAssimpModel( const char *name, model_t *mod )
 	surf->ident = MD3_IDENT;
 	Q_strncpyz( surf->name, "assimp_mesh", sizeof( surf->name ) );
 
-	surf->numFrames   = LittleLong( numFrames );
-	surf->numShaders  = LittleLong( numShaders );
-	surf->numVerts    = LittleLong( numVerts );
-	surf->numTriangles= LittleLong( numTris );
+	surf->numFrames    = LittleLong( numFrames );
+	surf->numShaders   = LittleLong( numShaders );
+	surf->numVerts     = LittleLong( totalVerts );
+	surf->numTriangles = LittleLong( totalTris );
 
-	const int surfHeaderSize = sizeof( md3Surface_t );
+	const int surfHeaderSize = (int)sizeof( md3Surface_t );
 	const int surfShaderOfs  = surfHeaderSize;
-	const int surfTriOfs     = surfShaderOfs + sizeof( md3Shader_t ) * numShaders;
-	const int surfStOfs      = surfTriOfs + sizeof( md3Triangle_t ) * numTris;
-	const int surfXyzOfs     = surfStOfs + sizeof( md3St_t ) * numVerts;
+	const int surfTriOfs     = surfShaderOfs + (int)sizeof( md3Shader_t ) * numShaders;
+	const int surfStOfs      = surfTriOfs + (int)sizeof( md3Triangle_t ) * totalTris;
+	const int surfXyzOfs     = surfStOfs + (int)sizeof( md3St_t ) * totalVerts;
 
 	surf->ofsShaders    = LittleLong( surfShaderOfs );
 	surf->ofsTriangles  = LittleLong( surfTriOfs );
@@ -173,69 +180,60 @@ extern "C" qhandle_t R_RegisterAssimpModel( const char *name, model_t *mod )
 	surf->ofsXyzNormals = LittleLong( surfXyzOfs );
 	surf->ofsEnd        = LittleLong( surfSize );
 
-	// Shader: register a shader for the model
-	// Note: We set shaderIndex to 0 (default shader) and store a shader name
-	// The actual shader lookup will happen during rendering, or shader registration
-	// can be deferred to when the model is processed (similar to how MD3 files work)
+	// Shader placeholder
 	md3Shader_t *shader = (md3Shader_t *)( (byte *)surf + surfShaderOfs );
 	Com_Memset( shader, 0, sizeof( md3Shader_t ) );
-	
-	// Store shader name - use "white" as default, or model name as fallback
 	Q_strncpyz( shader->name, "white", sizeof( shader->name ) );
-	shader->name[sizeof( shader->name ) - 1] = '\0';
-	
-	// Set shader index to 0 (default shader) - this will be used if shader lookup fails
-	// The renderer will use tr.defaultShader when shaderIndex is 0
 	shader->shaderIndex = 0;
 
-	// Triangles
+	// Triangles, texcoords, verts
 	md3Triangle_t *tris = (md3Triangle_t *)( (byte *)surf + surfTriOfs );
-	for ( int f = 0; f < numFaces; ++f ) {
-		const aiFace &face = mesh->mFaces[f];
-		if ( face.mNumIndices != 3 ) {
-			continue;
-		}
-		tris[f].indexes[0] = LittleLong( face.mIndices[0] );
-		tris[f].indexes[1] = LittleLong( face.mIndices[1] );
-		tris[f].indexes[2] = LittleLong( face.mIndices[2] );
-	}
-
-	// Texture coordinates
-	md3St_t *st = (md3St_t *)( (byte *)surf + surfStOfs );
-	if ( mesh->HasTextureCoords( 0 ) ) {
-		for ( int v = 0; v < numVerts; ++v ) {
-			const aiVector3D &tc = mesh->mTextureCoords[0][v];
-			st[v].st[0] = tc.x;
-			st[v].st[1] = 1.0f - tc.y;
-		}
-	} else {
-		for ( int v = 0; v < numVerts; ++v ) {
-			st[v].st[0] = 0.0f;
-			st[v].st[1] = 0.0f;
-		}
-	}
-
-	// Positions and normals
+	md3St_t       *st   = (md3St_t *)      ( (byte *)surf + surfStOfs );
 	md3XyzNormal_t *xyz = (md3XyzNormal_t *)( (byte *)surf + surfXyzOfs );
-	for ( int v = 0; v < numVerts; ++v ) {
-		const aiVector3D &p = mesh->mVertices[v];
-		const aiVector3D n  = mesh->HasNormals() ? mesh->mNormals[v] : aiVector3D( 0.0f, 0.0f, 1.0f );
 
-		xyz[v].xyz[0] = (short)Com_Clamp( -32768.0f, 32767.0f, (float)(int)( p.x * 64.0f ) );
-		xyz[v].xyz[1] = (short)Com_Clamp( -32768.0f, 32767.0f, (float)(int)( p.y * 64.0f ) );
-		xyz[v].xyz[2] = (short)Com_Clamp( -32768.0f, 32767.0f, (float)(int)( p.z * 64.0f ) );
+	int baseVert = 0;
+	int triIdx   = 0;
 
-		float lat, lng;
-		if ( n.x == 0 && n.y == 0 ) {
-			lat = 0.0f;
-			lng = 0.0f;
-		} else {
-			lat = atan2f( n.y, n.x );
-			lng = acosf( n.z );
+	for ( unsigned int m = 0; m < scene->mNumMeshes; ++m ) {
+		const aiMesh *mesh = scene->mMeshes[m];
+		if ( !mesh->HasPositions() || !mesh->HasFaces() )
+			continue;
+
+		// Triangles
+		for ( unsigned int f = 0; f < mesh->mNumFaces; ++f ) {
+			const aiFace &face = mesh->mFaces[f];
+			if ( face.mNumIndices != 3 )
+				continue;
+			tris[triIdx].indexes[0] = LittleLong( (int)face.mIndices[0] + baseVert );
+			tris[triIdx].indexes[1] = LittleLong( (int)face.mIndices[1] + baseVert );
+			tris[triIdx].indexes[2] = LittleLong( (int)face.mIndices[2] + baseVert );
+			triIdx++;
 		}
-		int ilat = (int)( lat * (32767.0f / (2.0f * (float)M_PI) ) ) & 0xFFFF;
-		int ilng = (int)( lng * (32767.0f / (float)M_PI) ) & 0xFFFF;
-		xyz[v].normal = (short)( ( ilat << 8 ) | ( ilng & 0xFF ) );
+
+		// Vertices
+		for ( unsigned int v = 0; v < mesh->mNumVertices; ++v ) {
+			const aiVector3D &p = mesh->mVertices[v];
+			const aiVector3D n  = mesh->HasNormals() ? mesh->mNormals[v] : aiVector3D( 0.0f, 0.0f, 1.0f );
+
+			int dst = baseVert + (int)v;
+
+			xyz[dst].xyz[0] = (short)Com_Clamp( -32768.0f, 32767.0f, (float)(int)( p.x * 64.0f ) );
+			xyz[dst].xyz[1] = (short)Com_Clamp( -32768.0f, 32767.0f, (float)(int)( p.y * 64.0f ) );
+			xyz[dst].xyz[2] = (short)Com_Clamp( -32768.0f, 32767.0f, (float)(int)( p.z * 64.0f ) );
+
+			Assimp_EncodeLatLng( n, &xyz[dst].normal );
+
+			if ( mesh->HasTextureCoords( 0 ) ) {
+				const aiVector3D &tc = mesh->mTextureCoords[0][v];
+				st[dst].st[0] = tc.x;
+				st[dst].st[1] = 1.0f - tc.y;
+			} else {
+				st[dst].st[0] = 0.0f;
+				st[dst].st[1] = 0.0f;
+			}
+		}
+
+		baseVert += (int)mesh->mNumVertices;
 	}
 
 	mod->type      = MOD_MESH;
@@ -243,8 +241,8 @@ extern "C" qhandle_t R_RegisterAssimpModel( const char *name, model_t *mod )
 	mod->md3[0]    = hdr;
 	mod->dataSize += totalSize;
 
-	ri.Printf( PRINT_DEVELOPER, "R_RegisterAssimpModel(VK): loaded '%s' - %d verts, %d tris, bounds (%.2f %.2f %.2f) to (%.2f %.2f %.2f), radius %.2f\n",
-		name, numVerts, numTris,
+	ri.Printf( PRINT_DEVELOPER, "R_RegisterAssimpModel(VK): loaded '%s' - %d verts, %d tris, meshes %d, bounds (%.2f %.2f %.2f) to (%.2f %.2f %.2f), radius %.2f\n",
+		name, totalVerts, triIdx, (int)scene->mNumMeshes,
 		mins[0], mins[1], mins[2],
 		maxs[0], maxs[1], maxs[2],
 		frame->radius );

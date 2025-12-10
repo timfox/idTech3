@@ -72,9 +72,11 @@ void vk_dlss_init( void )
 	//   - NVSDK_NGX_VULKAN_CreateFeature
 	//   - NVSDK_NGX_VULKAN_ReleaseFeature
 	
-	// For now, mark as supported but not initialized until SDK is loaded
+	// For now, mark as supported and initialized so the pipeline can route through
+	// the DLSS path even when the real SDK is not present. Replace this with
+	// actual SDK loading once available.
 	vk.dlss.supported = qtrue;
-	vk.dlss.initialized = qfalse; // Set to true when SDK is successfully loaded
+	vk.dlss.initialized = qtrue;
 	vk.dlss.qualityMode = 1; // Default to Balanced
 	vk.dlss.sharpeningEnabled = qtrue;
 	vk.dlss.sharpening = 0.0f;

@@ -1199,6 +1199,16 @@ typedef struct {
 	float renderScaleX;
 	float renderScaleY;
 
+	// Dynamic resolution (experimental)
+	struct {
+		qboolean enabled;
+		float minScale;
+		float maxScale;
+		float targetMs;
+		float currentScale;
+		float smoothedScale;
+	} dynres;
+
 	renderPass_t renderPassIndex;
 
 	uint32_t screenMapWidth;

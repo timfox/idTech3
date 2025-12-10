@@ -56,6 +56,8 @@ cvar_t	*sv_gametype;
 cvar_t	*sv_pure;
 cvar_t	*sv_floodProtect;
 	cvar_t	*sv_lanForceRate; // dedicated 1 (LAN) server forces local client rates to 99999 (bug #491)
+cvar_t	*sv_background;		// flag for background map (map_background)
+cvar_t	*sv_backgroundFps;	// reduced FPS target when in background mode
 
 #ifdef USE_BULLET
 // Bullet physics tuning (server-side)
@@ -1205,14 +1207,20 @@ int SV_FrameMsec( void )
 	if ( sv_fps )
 	{
 		int frameMsec;
-		
+		float targetFps = sv_fps->value;
+
+		// If running a background map, drop to background FPS to save CPU/GPU
+		if ( sv_background && sv_background->integer && sv_backgroundFps ) {
+			targetFps = sv_backgroundFps->value;
+		}
+
 		// Safety check: prevent division by zero
-		if ( sv_fps->value > 0.0f ) {
-			frameMsec = 1000.0f / sv_fps->value;
+		if ( targetFps > 0.0f ) {
+			frameMsec = 1000.0f / targetFps;
 		} else {
 			frameMsec = 50.0f; // default to 20 FPS if invalid
 		}
-		
+
 		if ( frameMsec < sv.timeResidual )
 			return 0;
 		else
@@ -1329,10 +1337,13 @@ void SV_Frame( int msec ) {
 	}
 
 	// if it isn't time for the next frame, do nothing
-
 	// Safety check: prevent division by zero
 	if ( sv_fps->integer > 0 ) {
-		frameMsec = 1000 / sv_fps->integer * com_timescale->value;
+		float targetFps = sv_fps->integer;
+		if ( sv_background && sv_background->integer && sv_backgroundFps ) {
+			targetFps = sv_backgroundFps->value;
+		}
+		frameMsec = 1000.0f / targetFps * com_timescale->value;
 	} else {
 		frameMsec = 50.0f * com_timescale->value; // default to 20 FPS if invalid
 	}

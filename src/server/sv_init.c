@@ -886,6 +886,12 @@ void SV_Init( void )
 	Cvar_SetDescription( sv_mapChecksum, "Allows check for client server map to match." );
 	sv_lanForceRate = Cvar_Get( "sv_lanForceRate", "1", CVAR_ARCHIVE_ND );
 	Cvar_SetDescription( sv_lanForceRate, "Forces LAN clients to the maximum rate instead of accepting client setting." );
+	sv_background = Cvar_Get( "sv_background", "0", CVAR_TEMP | CVAR_SERVERINFO );
+	Cvar_CheckRange( sv_background, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( sv_background, "Flag indicating the server is running a background map (map_background). Set automatically." );
+	sv_backgroundFps = Cvar_Get( "sv_backgroundFps", "20", CVAR_ARCHIVE_ND );
+	Cvar_CheckRange( sv_backgroundFps, "5", "125", CV_FLOAT );
+	Cvar_SetDescription( sv_backgroundFps, "Server tickrate (FPS) to use when running a background map (map_background). Lower saves CPU/GPU while menu stays up." );
 
 #ifdef USE_BANS
 	sv_banFile = Cvar_Get("sv_banFile", "serverbans.dat", CVAR_ARCHIVE);
