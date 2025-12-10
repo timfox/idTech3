@@ -2005,7 +2005,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 
 	// create VkDevice
 	{
-		const char *device_extension_list[28]; // room for RT/mesh + sync2/dynRender/VRS
+		const char *device_extension_list[36]; // room for RT/mesh + sync2/dynRender/VRS + bindless/push/F16
 		uint32_t device_extension_count;
 		const char *ext, *end;
 		char *str;
@@ -2026,11 +2026,16 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		qboolean dynamicRendering = qfalse;
 		qboolean extDynState = qfalse;
 		qboolean fragmentShadingRate = qfalse;
+		qboolean descriptorIndexing = qfalse;
+		qboolean shaderFloat16Int8 = qfalse;
+		qboolean pushDescriptor = qfalse;
 		VkPhysicalDeviceMeshShaderFeaturesEXT mesh_shader_features;
 		VkPhysicalDeviceSynchronization2FeaturesKHR sync2_features;
 		VkPhysicalDeviceDynamicRenderingFeaturesKHR dyn_render_features;
 		VkPhysicalDeviceExtendedDynamicStateFeaturesEXT xdyn_features;
 		VkPhysicalDeviceFragmentShadingRateFeaturesKHR fsr_features;
+		VkPhysicalDeviceDescriptorIndexingFeaturesEXT desc_index_features;
+		VkPhysicalDeviceShaderFloat16Int8FeaturesKHR f16i8_features;
 		const void **pNextPtr = NULL;
 #ifdef _DEBUG
 		qboolean timelineSemaphore = qfalse;
@@ -2093,6 +2098,12 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 				extDynState = qtrue;
 			} else if ( strcmp( ext, VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME ) == 0 ) {
 				fragmentShadingRate = qtrue;
+			} else if ( strcmp( ext, VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME ) == 0 ) {
+				descriptorIndexing = qtrue;
+			} else if ( strcmp( ext, VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME ) == 0 ) {
+				shaderFloat16Int8 = qtrue;
+			} else if ( strcmp( ext, VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME ) == 0 ) {
+				pushDescriptor = qtrue;
 			}
 			// add this device extension to glConfig
 			if ( i != 0 ) {
@@ -2114,6 +2125,8 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		Com_Memset( &dyn_render_features, 0, sizeof( dyn_render_features ) );
 		Com_Memset( &xdyn_features, 0, sizeof( xdyn_features ) );
 		Com_Memset( &fsr_features, 0, sizeof( fsr_features ) );
+		Com_Memset( &desc_index_features, 0, sizeof( desc_index_features ) );
+		Com_Memset( &f16i8_features, 0, sizeof( f16i8_features ) );
 		if ( r_meshShaders && r_meshShaders->integer ) {
 			if ( !meshShaderExt ) {
 				ri.Printf( PRINT_WARNING, "...mesh shaders requested but VK_EXT_mesh_shader not supported by device\n" );
@@ -2212,6 +2225,18 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 
 		if ( fragmentShadingRate ) {
 			device_extension_list[ device_extension_count++ ] = VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME;
+		}
+
+		if ( descriptorIndexing ) {
+			device_extension_list[ device_extension_count++ ] = VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME;
+		}
+
+		if ( shaderFloat16Int8 ) {
+			device_extension_list[ device_extension_count++ ] = VK_KHR_SHADER_FLOAT16_INT8_EXTENSION_NAME;
+		}
+
+		if ( pushDescriptor ) {
+			device_extension_list[ device_extension_count++ ] = VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME;
 		}
 
 		// Ray tracing extensions (all required together)
@@ -2324,6 +2349,36 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			fsr_features.primitiveFragmentShadingRate = VK_TRUE;
 			fsr_features.attachmentFragmentShadingRate = VK_TRUE;
 			pNextPtr = (const void **)&fsr_features.pNext;
+		}
+
+		if ( descriptorIndexing ) {
+			*pNextPtr = &desc_index_features;
+			desc_index_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
+			desc_index_features.pNext = NULL;
+			desc_index_features.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+			desc_index_features.runtimeDescriptorArray = VK_TRUE;
+			desc_index_features.shaderUniformBufferArrayNonUniformIndexing = VK_TRUE;
+			desc_index_features.shaderStorageBufferArrayNonUniformIndexing = VK_TRUE;
+			desc_index_features.descriptorBindingPartiallyBound = VK_TRUE;
+			desc_index_features.descriptorBindingVariableDescriptorCount = VK_TRUE;
+			desc_index_features.descriptorBindingSampledImageUpdateAfterBind = VK_TRUE;
+			desc_index_features.descriptorBindingStorageBufferUpdateAfterBind = VK_TRUE;
+			desc_index_features.descriptorBindingUniformBufferUpdateAfterBind = VK_TRUE;
+			desc_index_features.descriptorBindingStorageImageUpdateAfterBind = VK_TRUE;
+			desc_index_features.shaderStorageImageArrayNonUniformIndexing = VK_TRUE;
+			desc_index_features.shaderStorageTexelBufferArrayNonUniformIndexing = VK_TRUE;
+			desc_index_features.shaderUniformTexelBufferArrayNonUniformIndexing = VK_TRUE;
+			desc_index_features.shaderStorageImageArrayNonUniformIndexing = VK_TRUE;
+			pNextPtr = (const void **)&desc_index_features.pNext;
+		}
+
+		if ( shaderFloat16Int8 ) {
+			*pNextPtr = &f16i8_features;
+			f16i8_features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES_KHR;
+			f16i8_features.pNext = NULL;
+			f16i8_features.shaderFloat16 = VK_TRUE;
+			f16i8_features.shaderInt8 = VK_TRUE;
+			pNextPtr = (const void **)&f16i8_features.pNext;
 		}
 
 #ifdef _DEBUG
