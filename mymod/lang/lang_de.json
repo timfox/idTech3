@@ -1,0 +1,11 @@
+{
+  "STR_MAIN_MENU_PLAY": "Spielen",
+  "STR_MAIN_MENU_OPTIONS": "Optionen",
+  "STR_MAIN_MENU_QUIT": "Beenden",
+  "STR_DIALOGUE_OK": "OK",
+  "STR_DIALOGUE_CANCEL": "Abbrechen",
+  "STR_DIALOGUE_NEXT": "Weiter",
+  "STR_DIALOGUE_SKIP": "Überspringen",
+  "STR_DIALOGUE_CONTINUE": "Fortfahren",
+  "STR_SYSTEM_MISSING_KEY": "Fehlender lokalisierter Text."
+}

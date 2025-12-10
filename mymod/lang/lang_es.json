@@ -1,0 +1,11 @@
+{
+  "STR_MAIN_MENU_PLAY": "Jugar",
+  "STR_MAIN_MENU_OPTIONS": "Opciones",
+  "STR_MAIN_MENU_QUIT": "Salir",
+  "STR_DIALOGUE_OK": "OK",
+  "STR_DIALOGUE_CANCEL": "Cancelar",
+  "STR_DIALOGUE_NEXT": "Siguiente",
+  "STR_DIALOGUE_SKIP": "Omitir",
+  "STR_DIALOGUE_CONTINUE": "Continuar",
+  "STR_SYSTEM_MISSING_KEY": "Falta texto localizado."
+}

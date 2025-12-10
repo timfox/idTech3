@@ -3101,6 +3101,9 @@ void CL_Frame( int msec, int realMsec ) {
 		return;
 	}
 
+	// Reload localization data when cl_language changes
+	CL_Localize_Frame();
+
 	// Handle high-level graphics / tuning aliases once per frame
 	if ( r_vsync && r_vsync->modified ) {
 		// Map r_vsync 0/1 to the underlying r_swapInterval implementation

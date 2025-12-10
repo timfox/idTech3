@@ -1,0 +1,11 @@
+{
+  "STR_MAIN_MENU_PLAY": "Gioca",
+  "STR_MAIN_MENU_OPTIONS": "Opzioni",
+  "STR_MAIN_MENU_QUIT": "Esci",
+  "STR_DIALOGUE_OK": "OK",
+  "STR_DIALOGUE_CANCEL": "Annulla",
+  "STR_DIALOGUE_NEXT": "Avanti",
+  "STR_DIALOGUE_SKIP": "Salta",
+  "STR_DIALOGUE_CONTINUE": "Continua",
+  "STR_SYSTEM_MISSING_KEY": "Testo localizzato mancante."
+}

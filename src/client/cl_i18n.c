@@ -21,11 +21,18 @@ void CL_I18n_Shutdown(void);
 void CL_I18n_Init(void)
 {
 	// i18n is initialized in common.c
-	// Load language from CVAR if set
-	cvar_t *com_language = Cvar_Get("com_language", "en", CVAR_ARCHIVE);
-	if (com_language && com_language->string && com_language->string[0]) {
-		I18n_SetLanguage(com_language->string);
-		I18n_LoadLanguage(com_language->string);
+	// Sync legacy com_language to the new cl_language if present
+	cvar_t *legacy = Cvar_Get("com_language", "", CVAR_ARCHIVE);
+	if (legacy && legacy->string && legacy->string[0]) {
+		Cvar_Set("cl_language", legacy->string);
+	}
+
+	// Ensure the active language is loaded on client bring-up
+	{
+		cvar_t *cl_language_cvar = Cvar_Get("cl_language", DEFAULT_LANGUAGE_CODE, CVAR_ARCHIVE);
+		if (cl_language_cvar && cl_language_cvar->string && cl_language_cvar->string[0]) {
+			CL_LoadLanguage(cl_language_cvar->string);
+		}
 	}
 }
 

@@ -1,0 +1,11 @@
+{
+  "STR_MAIN_MENU_PLAY": "Jouer",
+  "STR_MAIN_MENU_OPTIONS": "Options",
+  "STR_MAIN_MENU_QUIT": "Quitter",
+  "STR_DIALOGUE_OK": "OK",
+  "STR_DIALOGUE_CANCEL": "Annuler",
+  "STR_DIALOGUE_NEXT": "Suivant",
+  "STR_DIALOGUE_SKIP": "Passer",
+  "STR_DIALOGUE_CONTINUE": "Continuer",
+  "STR_SYSTEM_MISSING_KEY": "Texte de localisation manquant."
+}

@@ -141,7 +141,7 @@ void CG_Dialogue_Start(int entityNum, int playerNum, const char *speaker, const 
 	
 	// Translate text using i18n
 	if (text && *text) {
-		const char *translated = I18n_Translate(text);
+		const char *translated = CL_Localize(text);
 		Q_strncpyz(display->text, translated, sizeof(display->text));
 	} else {
 		display->text[0] = '\0';
@@ -150,7 +150,7 @@ void CG_Dialogue_Start(int entityNum, int playerNum, const char *speaker, const 
 	display->numChoices = (numChoices > 8) ? 8 : numChoices;
 	for (i = 0; i < display->numChoices; i++) {
 		if (choices && choices[i]) {
-			const char *translated = I18n_Translate(choices[i]);
+			const char *translated = CL_Localize(choices[i]);
 			Q_strncpyz(display->choices[i], translated, sizeof(display->choices[i]));
 		} else {
 			display->choices[i][0] = '\0';

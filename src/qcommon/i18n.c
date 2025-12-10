@@ -2,138 +2,265 @@
 #include "qcommon.h"
 #include "i18n.h"
 
-static cvar_t *com_language;
-static language_t *languages = NULL;
-static language_t *currentLanguage = NULL;
+#ifdef USE_CJSON
+#include "cJSON.h"
+#endif
 
-/*
-=================
-I18n_FindLanguage
-=================
-Find a language by code
-=================
-*/
-static language_t *I18n_FindLanguage(const char *code)
+#define LOC_HASH_SIZE          1024
+#define LOC_DEBUG_RING         4
+#define LOC_MISSING_LOG_PATH   "lang/missing_keys.txt"
+
+typedef struct locEntry_s {
+	char *key;
+	char *value;
+	struct locEntry_s *next;
+} locEntry_t;
+
+typedef struct locTable_s {
+	char code[MAX_LANGUAGE_CODE];
+	locEntry_t *buckets[LOC_HASH_SIZE];
+	int numEntries;
+} locTable_t;
+
+static locTable_t loc_current;
+static locTable_t loc_defaultLang;
+static locTable_t loc_missingKeys;
+
+static qboolean loc_initialized = qfalse;
+static cvar_t *cl_language = NULL;
+static cvar_t *cl_loc_debug = NULL;
+static cvar_t *cl_loc_missingFile = NULL;
+static cvar_t *cl_loc_trackMissing = NULL;
+static cvar_t *com_language = NULL; // legacy alias for configs that still reference it
+
+static char loc_activeCode[MAX_LANGUAGE_CODE];
+static char loc_defaultCode[MAX_LANGUAGE_CODE] = DEFAULT_LANGUAGE_CODE;
+
+static char loc_debugRing[LOC_DEBUG_RING][MAX_TRANSLATION_TEXT + MAX_TRANSLATION_KEY];
+static int loc_debugRingIndex = 0;
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+static unsigned int Loc_HashKey(const char *key)
 {
-	language_t *lang;
-	
-	if (!code || !*code)
-		return NULL;
-	
-	for (lang = languages; lang; lang = lang->next) {
-		if (Q_stricmp(lang->code, code) == 0) {
-			return lang;
-		}
-	}
-	
-	return NULL;
+	return MSG_HashKey(key, LOC_HASH_SIZE);
 }
 
-/*
-=================
-I18n_FindTranslation
-=================
-Find a translation entry in the current language
-=================
-*/
-static translationEntry_t *I18n_FindTranslation(language_t *lang, const char *key)
+static void Loc_ClearTable(locTable_t *table)
 {
-	translationEntry_t *entry;
-	
-	if (!lang || !key || !*key)
+	int i;
+
+	if (!table) {
+		return;
+	}
+
+	for (i = 0; i < LOC_HASH_SIZE; i++) {
+		locEntry_t *entry = table->buckets[i];
+		while (entry) {
+			locEntry_t *next = entry->next;
+			Z_Free(entry->key);
+			Z_Free(entry->value);
+			Z_Free(entry);
+			entry = next;
+		}
+		table->buckets[i] = NULL;
+	}
+
+	table->numEntries = 0;
+	table->code[0] = '\0';
+}
+
+static locEntry_t *Loc_Find(const locTable_t *table, const char *key)
+{
+	locEntry_t *entry;
+
+	if (!table || !key || !*key) {
 		return NULL;
-	
-	for (entry = lang->entries; entry; entry = entry->next) {
+	}
+
+	for (entry = table->buckets[Loc_HashKey(key)]; entry; entry = entry->next) {
 		if (Q_stricmp(entry->key, key) == 0) {
 			return entry;
 		}
 	}
-	
+
 	return NULL;
 }
 
-/*
-=================
-I18n_AddTranslation
-=================
-Add a translation entry to a language
-=================
-*/
-static void I18n_AddTranslation(language_t *lang, const char *key, const char *text)
+static qboolean Loc_Insert(locTable_t *table, const char *key, const char *value)
 {
-	translationEntry_t *entry;
-	
-	if (!lang || !key || !*key || !text)
-		return;
-	
-	// Check if entry already exists
-	entry = I18n_FindTranslation(lang, key);
-	if (entry) {
-		Q_strncpyz(entry->text, text, sizeof(entry->text));
-		return;
+	locEntry_t *entry;
+	unsigned int hash;
+
+	if (!table || !key || !*key || !value) {
+		return qfalse;
 	}
-	
-	// Create new entry
-	entry = (translationEntry_t *)Z_Malloc(sizeof(translationEntry_t));
-	if (!entry)
-		return;
-	
-	Q_strncpyz(entry->key, key, sizeof(entry->key));
-	Q_strncpyz(entry->text, text, sizeof(entry->text));
-	entry->next = lang->entries;
-	lang->entries = entry;
-	lang->numEntries++;
+
+	hash = Loc_HashKey(key);
+	for (entry = table->buckets[hash]; entry; entry = entry->next) {
+		if (Q_stricmp(entry->key, key) == 0) {
+			Z_Free(entry->value);
+			entry->value = CopyString(value);
+			return qtrue;
+		}
+	}
+
+	entry = (locEntry_t *)Z_Malloc(sizeof(locEntry_t));
+	if (!entry) {
+		return qfalse;
+	}
+
+	entry->key = CopyString(key);
+	entry->value = CopyString(value);
+	entry->next = table->buckets[hash];
+	table->buckets[hash] = entry;
+	table->numEntries++;
+	return qtrue;
 }
 
-/*
-=================
-I18n_CreateLanguage
-=================
-Create a new language entry
-=================
-*/
-static language_t *I18n_CreateLanguage(const char *code, const char *name)
+static void Loc_NormalizeLanguageCode(const char *in, char *out, size_t outSize)
 {
-	language_t *lang;
-	
-	if (!code || !*code)
-		return NULL;
-	
-	// Check if language already exists
-	lang = I18n_FindLanguage(code);
-	if (lang)
-		return lang;
-	
-	// Create new language
-	lang = (language_t *)Z_Malloc(sizeof(language_t));
-	if (!lang)
-		return NULL;
-	
-	Q_strncpyz(lang->code, code, sizeof(lang->code));
-	if (name && *name) {
-		Q_strncpyz(lang->name, name, sizeof(lang->name));
+	if (!out || outSize == 0) {
+		return;
+	}
+
+	if (!in || !*in) {
+		Q_strncpyz(out, loc_defaultCode, outSize);
 	} else {
-		Q_strncpyz(lang->name, code, sizeof(lang->name));
+		Q_strncpyz(out, in, outSize);
+		Q_strlwr(out);
 	}
-	
-	lang->entries = NULL;
-	lang->numEntries = 0;
-	lang->next = languages;
-	languages = lang;
-	
-	return lang;
 }
 
-/*
-=================
-I18n_ParseTranslationFile
-=================
-Parse a translation file (INI format)
-Format: key=value
-Lines starting with # or ; are comments
-=================
-*/
-static qboolean I18n_ParseTranslationFile(const char *filename, language_t *lang)
+static const char *Loc_DebugWrap(const char *id, const char *value)
+{
+	if (!cl_loc_debug || cl_loc_debug->integer == 0) {
+		return value;
+	}
+
+	if (cl_loc_debug->integer >= 2) {
+		return id ? id : "";
+	}
+
+	// Wrap localized text to make it obvious when localization is active
+	{
+		int slot = loc_debugRingIndex++ % LOC_DEBUG_RING;
+		Com_sprintf(loc_debugRing[slot], sizeof(loc_debugRing[slot]), "[L]%s[/L]", value ? value : "");
+		return loc_debugRing[slot];
+	}
+}
+
+static qboolean Loc_AddMissingKey(const char *key)
+{
+	if (!key || !*key) {
+		return qfalse;
+	}
+
+	if (Loc_Find(&loc_missingKeys, key)) {
+		return qfalse; // already tracked
+	}
+
+	return Loc_Insert(&loc_missingKeys, key, key);
+}
+
+static void Loc_LogMissing(const char *key)
+{
+	fileHandle_t f;
+
+	if (!cl_loc_trackMissing || !cl_loc_trackMissing->integer) {
+		return;
+	}
+
+	if (!Loc_AddMissingKey(key)) {
+		return;
+	}
+
+	Com_Printf(S_COLOR_YELLOW "Missing localization key: %s\n", key);
+
+	if (!cl_loc_missingFile || !cl_loc_missingFile->string[0]) {
+		return;
+	}
+
+	f = FS_FOpenFileAppend(cl_loc_missingFile->string);
+	if (f == FS_INVALID_HANDLE) {
+		return;
+	}
+
+	FS_Printf(f, "%s\n", key);
+	FS_FCloseFile(f);
+}
+
+// ---------------------------------------------------------------------------
+// File loading
+// ---------------------------------------------------------------------------
+
+static qboolean Loc_LoadJsonFile(const char *filename, locTable_t *table)
+{
+	fileHandle_t f;
+	int len;
+	char *buffer;
+	qboolean loaded = qfalse;
+
+	if (!filename || !table) {
+		return qfalse;
+	}
+
+	len = FS_FOpenFileRead(filename, &f, qfalse);
+	if (len <= 0 || f == FS_INVALID_HANDLE) {
+		return qfalse;
+	}
+
+	buffer = (char *)Z_Malloc(len + 1);
+	if (!buffer) {
+		FS_FCloseFile(f);
+		return qfalse;
+	}
+
+	FS_Read(buffer, len, f);
+	buffer[len] = '\0';
+	FS_FCloseFile(f);
+
+#ifdef USE_CJSON
+	{
+		cJSON *root = cJSON_Parse(buffer);
+		cJSON *child;
+
+		Z_Free(buffer);
+
+		if (!root) {
+			return qfalse;
+		}
+
+		if (!cJSON_IsObject(root)) {
+			cJSON_Delete(root);
+			return qfalse;
+		}
+
+		for (child = root->child; child; child = child->next) {
+			if (!child->string) {
+				continue;
+			}
+			if (cJSON_IsString(child) && child->valuestring) {
+				if (Loc_Insert(table, child->string, child->valuestring)) {
+					loaded = qtrue;
+				}
+			}
+		}
+
+		cJSON_Delete(root);
+	}
+#else
+	Z_Free(buffer);
+	Com_Printf("Localization: JSON support disabled, cannot load %s\n", filename);
+#endif
+
+	return loaded;
+}
+
+// Legacy INI format loader for compatibility
+static qboolean Loc_ParseLegacyIni(const char *filename, locTable_t *table)
 {
 	fileHandle_t f;
 	int len;
@@ -141,35 +268,34 @@ static qboolean I18n_ParseTranslationFile(const char *filename, language_t *lang
 	char *line;
 	char *key, *value;
 	char *newline;
-	
-	if (!filename || !lang)
+	qboolean loaded = qfalse;
+
+	if (!filename || !table) {
 		return qfalse;
-	
+	}
+
 	len = FS_FOpenFileRead(filename, &f, qfalse);
-	if (len <= 0 || !f)
+	if (len <= 0 || f == FS_INVALID_HANDLE) {
 		return qfalse;
-	
+	}
+
 	buffer = (char *)Z_Malloc(len + 1);
 	if (!buffer) {
 		FS_FCloseFile(f);
 		return qfalse;
 	}
-	
+
 	FS_Read(buffer, len, f);
 	buffer[len] = '\0';
 	FS_FCloseFile(f);
-	
+
 	line = buffer;
 	while (*line) {
-		// Skip whitespace
 		while (*line == ' ' || *line == '\t') {
 			line++;
 		}
-		
-		// Skip empty lines and comments
-		if (*line == '\0' || *line == '\n' || *line == '\r' ||
-			*line == '#' || *line == ';') {
-			// Find next line
+
+		if (*line == '\0' || *line == '\n' || *line == '\r' || *line == '#' || *line == ';') {
 			newline = strchr(line, '\n');
 			if (newline) {
 				line = newline + 1;
@@ -178,12 +304,10 @@ static qboolean I18n_ParseTranslationFile(const char *filename, language_t *lang
 			}
 			continue;
 		}
-		
-		// Find key
+
 		key = line;
 		value = strchr(line, '=');
 		if (!value) {
-			// No = found, skip line
 			newline = strchr(line, '\n');
 			if (newline) {
 				line = newline + 1;
@@ -192,10 +316,9 @@ static qboolean I18n_ParseTranslationFile(const char *filename, language_t *lang
 			}
 			continue;
 		}
-		
+
 		*value++ = '\0';
-		
-		// Trim key
+
 		while (*key == ' ' || *key == '\t') {
 			key++;
 		}
@@ -205,8 +328,7 @@ static qboolean I18n_ParseTranslationFile(const char *filename, language_t *lang
 				*end-- = '\0';
 			}
 		}
-		
-		// Trim value
+
 		while (*value == ' ' || *value == '\t') {
 			value++;
 		}
@@ -216,13 +338,13 @@ static qboolean I18n_ParseTranslationFile(const char *filename, language_t *lang
 				*end-- = '\0';
 			}
 		}
-		
-		// Add translation
+
 		if (*key && *value) {
-			I18n_AddTranslation(lang, key, value);
+			if (Loc_Insert(table, key, value)) {
+				loaded = qtrue;
+			}
 		}
-		
-		// Find next line
+
 		newline = strchr(value, '\n');
 		if (newline) {
 			line = newline + 1;
@@ -230,302 +352,465 @@ static qboolean I18n_ParseTranslationFile(const char *filename, language_t *lang
 			break;
 		}
 	}
-	
+
 	Z_Free(buffer);
-	return qtrue;
-}
-
-/*
-=================
-I18n_Init
-=================
-Initialize i18n system
-=================
-*/
-void I18n_Init(void)
-{
-	com_language = Cvar_Get("com_language", LANGUAGE_ENGLISH, CVAR_ARCHIVE);
-	Cvar_SetDescription(com_language, "Language code for translations (en, fr, de, es, it, ru, pl, cs)");
-	
-	languages = NULL;
-	currentLanguage = NULL;
-	
-	// Create default English language
-	currentLanguage = I18n_CreateLanguage(LANGUAGE_ENGLISH, "English");
-	
-	Com_Printf("I18n system initialized\n");
-}
-
-/*
-=================
-I18n_Shutdown
-=================
-Shutdown i18n system
-=================
-*/
-void I18n_Shutdown(void)
-{
-	language_t *lang, *nextLang;
-	translationEntry_t *entry, *nextEntry;
-	
-	for (lang = languages; lang; lang = nextLang) {
-		nextLang = lang->next;
-		
-		for (entry = lang->entries; entry; entry = nextEntry) {
-			nextEntry = entry->next;
-			Z_Free(entry);
-		}
-		
-		Z_Free(lang);
-	}
-	
-	languages = NULL;
-	currentLanguage = NULL;
-}
-
-/*
-=================
-I18n_LoadLanguageFile
-=================
-Load a translation file
-=================
-*/
-qboolean I18n_LoadLanguageFile(const char *filename)
-{
-	char languageCode[MAX_LANGUAGE_CODE];
-	char *dot;
-	language_t *lang;
-	
-	if (!filename || !*filename)
-		return qfalse;
-	
-	// Extract language code from filename (e.g., "translations/en.ini" -> "en")
-	Q_strncpyz(languageCode, filename, sizeof(languageCode));
-	dot = strrchr(languageCode, '/');
-	if (dot) {
-		Q_strncpyz(languageCode, dot + 1, sizeof(languageCode));
-	}
-	
-	dot = strchr(languageCode, '.');
-	if (dot) {
-		*dot = '\0';
-	}
-	
-	// Create or find language
-	lang = I18n_FindLanguage(languageCode);
-	if (!lang) {
-		lang = I18n_CreateLanguage(languageCode, languageCode);
-		if (!lang)
-			return qfalse;
-	}
-	
-	// Parse translation file
-	return I18n_ParseTranslationFile(filename, lang);
-}
-
-/*
-=================
-I18n_LoadLanguage
-=================
-Load all translation files for a language
-=================
-*/
-qboolean I18n_LoadLanguage(const char *languageCode)
-{
-	char filename[MAX_QPATH];
-	char **fileList;
-	int numFiles;
-	int i;
-	qboolean loaded = qfalse;
-	
-	if (!languageCode || !*languageCode)
-		return qfalse;
-	
-	// Find all translation files for this language
-	Com_sprintf(filename, sizeof(filename), "translations/%s", languageCode);
-	fileList = FS_ListFiles(filename, ".ini", &numFiles);
-	
-	if (fileList && numFiles > 0) {
-		for (i = 0; i < numFiles; i++) {
-			if (!fileList[i])
-				continue;
-			
-			Com_sprintf(filename, sizeof(filename), "translations/%s/%s", languageCode, fileList[i]);
-			if (I18n_LoadLanguageFile(filename)) {
-				loaded = qtrue;
-			}
-		}
-		FS_FreeFileList(fileList);
-	}
-	
-	// Also try single file format
-	Com_sprintf(filename, sizeof(filename), "translations/%s.ini", languageCode);
-	if (I18n_LoadLanguageFile(filename)) {
-		loaded = qtrue;
-	}
-	
 	return loaded;
 }
 
-/*
-=================
-I18n_Translate
-=================
-Translate a key to the current language
-Returns the key itself if translation not found
-=================
-*/
-const char *I18n_Translate(const char *key)
+static qboolean Loc_LoadIntoTable(const char *languageCode, locTable_t *table)
 {
-	translationEntry_t *entry;
-	
-	if (!key || !*key)
-		return "";
-	
-	if (!currentLanguage) {
-		return key;
+	char filename[MAX_QPATH];
+	qboolean loaded = qfalse;
+
+	if (!table) {
+		return qfalse;
 	}
-	
-	entry = I18n_FindTranslation(currentLanguage, key);
-	if (entry) {
-		return entry->text;
+
+	Loc_ClearTable(table);
+	Q_strncpyz(table->code, languageCode, sizeof(table->code));
+
+	// Preferred: JSON file under lang/
+	Com_sprintf(filename, sizeof(filename), "lang/lang_%s.json", languageCode);
+	loaded = Loc_LoadJsonFile(filename, table);
+
+	// Legacy fallback: single INI file
+	if (!loaded) {
+		Com_sprintf(filename, sizeof(filename), "translations/%s.ini", languageCode);
+		loaded = Loc_ParseLegacyIni(filename, table);
 	}
-	
-	// Fallback to English if not current language
-	if (Q_stricmp(currentLanguage->code, LANGUAGE_ENGLISH) != 0) {
-		language_t *english = I18n_FindLanguage(LANGUAGE_ENGLISH);
-		if (english) {
-			entry = I18n_FindTranslation(english, key);
-			if (entry) {
-				return entry->text;
-			}
-		}
+
+	// Legacy fallback: lang/lang_xx.ini
+	if (!loaded) {
+		Com_sprintf(filename, sizeof(filename), "lang/lang_%s.ini", languageCode);
+		loaded = Loc_ParseLegacyIni(filename, table);
 	}
-	
-	// Return key as fallback
-	return key;
+
+	return loaded;
 }
 
-/*
-=================
-I18n_TranslateFormat
-=================
-Translate a key and format with arguments
-=================
-*/
+static qboolean Loc_LoadLanguageTables(const char *languageCode)
+{
+	char normalized[MAX_LANGUAGE_CODE];
+	qboolean loaded = qfalse;
+
+	Loc_NormalizeLanguageCode(languageCode, normalized, sizeof(normalized));
+
+	// Always refresh default language so fallback text stays up to date
+	Loc_LoadIntoTable(loc_defaultCode, &loc_defaultLang);
+
+	loaded = Loc_LoadIntoTable(normalized, &loc_current);
+	if (!loaded && Q_stricmp(normalized, loc_defaultCode) != 0) {
+		Com_Printf("Localization: unable to load '%s', falling back to '%s'\n", normalized, loc_defaultCode);
+		Loc_LoadIntoTable(loc_defaultCode, &loc_current);
+	}
+
+	Q_strncpyz(loc_activeCode,
+		loc_current.code[0] ? loc_current.code : loc_defaultCode,
+		sizeof(loc_activeCode));
+
+	// Reset missing-key tracking for the new language
+	Loc_ClearTable(&loc_missingKeys);
+
+	if (com_language) {
+		Cvar_Set("com_language", loc_activeCode);
+	}
+
+	return loaded;
+}
+
+static void CL_Localize_Reload_f(void)
+{
+	const char *target = (cl_language && cl_language->string[0]) ? cl_language->string : loc_activeCode;
+
+	Loc_LoadLanguageTables(target);
+	Com_Printf("Localization reloaded for '%s'\n", loc_activeCode);
+}
+
+static void CL_Localize_Test_f(void)
+{
+	if (Cmd_Argc() < 2) {
+		Com_Printf("Usage: loc_test <stringId>\n");
+		return;
+	}
+
+	Com_Printf("%s\n", CL_Localize(Cmd_Argv(1)));
+}
+
+static void CL_Localize_TestReplace_f(void)
+{
+	locVar_t vars[8];
+	int varCount = 0;
+	int argc = Cmd_Argc();
+	int i;
+
+	if (argc < 2) {
+		Com_Printf("Usage: loc_test_replace <stringId> <key> <value> [key value]...\n");
+		return;
+	}
+
+	// pairs start at arg 2
+	for (i = 2; i + 1 < argc && varCount < (int)ARRAY_LEN(vars); i += 2) {
+		vars[varCount].key = Cmd_Argv(i);
+		vars[varCount].value = Cmd_Argv(i + 1);
+		varCount++;
+	}
+
+	Com_Printf("%s\n", CL_LocalizeReplace(Cmd_Argv(1), vars, varCount));
+}
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+void CL_Localize_Init(void)
+{
+	if (loc_initialized) {
+		return;
+	}
+
+	cl_language = Cvar_Get("cl_language", DEFAULT_LANGUAGE_CODE, CVAR_ARCHIVE);
+	Cvar_SetDescription(cl_language, "Active language code (\"en\", \"fr\", \"pl\"...)");
+
+	// Legacy alias preserved for compatibility with existing configs
+	com_language = Cvar_Get("com_language", cl_language->string, CVAR_ARCHIVE);
+	Cvar_SetDescription(com_language, "Deprecated: use cl_language instead");
+
+	cl_loc_debug = Cvar_Get("cl_loc_debug", "0", CVAR_ARCHIVE);
+	Cvar_SetDescription(cl_loc_debug, "Localization debug mode (0=off, 1=wrap text, 2=show keys)");
+
+	cl_loc_missingFile = Cvar_Get("cl_loc_missingFile", LOC_MISSING_LOG_PATH, CVAR_ARCHIVE);
+	Cvar_SetDescription(cl_loc_missingFile, "Path to append missing localization keys");
+
+	cl_loc_trackMissing = Cvar_Get("cl_loc_trackMissing", "1", CVAR_ARCHIVE);
+	Cvar_SetDescription(cl_loc_trackMissing, "Track and log missing localization keys");
+
+	Cmd_AddCommand("reloadLanguage", CL_Localize_Reload_f);
+	Cmd_AddCommand("loc_test", CL_Localize_Test_f);
+	Cmd_AddCommand("loc_test_replace", CL_Localize_TestReplace_f);
+
+	loc_initialized = qtrue;
+
+	Loc_LoadLanguageTables(cl_language->string);
+}
+
+void CL_Localize_Shutdown(void)
+{
+	if (!loc_initialized) {
+		return;
+	}
+
+	Cmd_RemoveCommand("reloadLanguage");
+	Cmd_RemoveCommand("loc_test");
+	Cmd_RemoveCommand("loc_test_replace");
+
+	Loc_ClearTable(&loc_current);
+	Loc_ClearTable(&loc_defaultLang);
+	Loc_ClearTable(&loc_missingKeys);
+
+	loc_initialized = qfalse;
+}
+
+void CL_Localize_Frame(void)
+{
+	qboolean modified = qfalse;
+
+	if (!loc_initialized) {
+		return;
+	}
+
+	if (cl_language && cl_language->modified) {
+		cl_language->modified = qfalse;
+		modified = qtrue;
+	}
+
+	if (com_language && com_language->modified) {
+		com_language->modified = qfalse;
+		if (cl_language && com_language->string[0]) {
+			Cvar_Set("cl_language", com_language->string);
+		}
+		modified = qtrue;
+	}
+
+	if (modified) {
+		Loc_LoadLanguageTables(cl_language ? cl_language->string : loc_defaultCode);
+	}
+}
+
+qboolean CL_LoadLanguage(const char *languageCode)
+{
+	if (cl_language && languageCode && languageCode[0]) {
+		Cvar_Set("cl_language", languageCode);
+	}
+
+	return Loc_LoadLanguageTables(languageCode);
+}
+
+const char *CL_Localize(const char *id)
+{
+	locEntry_t *entry;
+	const char *text = id;
+
+	if (!id || !*id) {
+		return "";
+	}
+
+	entry = Loc_Find(&loc_current, id);
+	if (entry) {
+		text = entry->value;
+	} else {
+		// try fallback language
+		if (Q_stricmp(loc_current.code, loc_defaultCode) != 0) {
+			entry = Loc_Find(&loc_defaultLang, id);
+			if (entry) {
+				text = entry->value;
+			}
+		}
+
+		if (!entry) {
+			Loc_LogMissing(id);
+		}
+	}
+
+	return Loc_DebugWrap(id, text);
+}
+
+const char *CL_LocalizeFmt(const char *id, ...)
+{
+	static char buffer[MAX_TRANSLATION_TEXT];
+	va_list argptr;
+	const char *translated;
+
+	if (!id || !*id) {
+		return "";
+	}
+
+	translated = CL_Localize(id);
+
+	va_start(argptr, id);
+	Q_vsnprintf(buffer, sizeof(buffer), translated, argptr);
+	va_end(argptr);
+
+	return buffer;
+}
+
+const char *CL_LocalizeReplace(const char *id, const locVar_t *vars, int varCount)
+{
+	static char buffer[MAX_TRANSLATION_TEXT * 2];
+	const char *src;
+	char *dst = buffer;
+	size_t remaining = sizeof(buffer);
+
+	if (!id || !*id) {
+		return "";
+	}
+
+	src = CL_Localize(id);
+
+	while (*src && remaining > 1) {
+		if (*src == '{') {
+			const char *end = strchr(src, '}');
+			if (end && end > src + 1) {
+				char key[64];
+				size_t keyLen = (size_t)(end - src - 1);
+				int i;
+				const char *value = NULL;
+
+				if (keyLen >= sizeof(key)) {
+					keyLen = sizeof(key) - 1;
+				}
+
+				Q_strncpyz(key, src + 1, keyLen + 1);
+
+				for (i = 0; vars && i < varCount; i++) {
+					if (vars[i].key && Q_stricmp(vars[i].key, key) == 0) {
+						value = vars[i].value ? vars[i].value : "";
+						break;
+					}
+				}
+
+				if (value) {
+					size_t vlen = strlen(value);
+					if (vlen >= remaining) {
+						vlen = remaining - 1;
+					}
+					memcpy(dst, value, vlen);
+					dst += vlen;
+					remaining -= vlen;
+				}
+
+				src = end + 1;
+				continue;
+			}
+		}
+
+		*dst++ = *src++;
+		remaining--;
+	}
+
+	*dst = '\0';
+	return buffer;
+}
+
+// ---------------------------------------------------------------------------
+// Legacy wrappers (keep old API stable)
+// ---------------------------------------------------------------------------
+
+void I18n_Init(void)
+{
+	CL_Localize_Init();
+}
+
+void I18n_Shutdown(void)
+{
+	CL_Localize_Shutdown();
+}
+
+qboolean I18n_LoadLanguage(const char *languageCode)
+{
+	return CL_LoadLanguage(languageCode);
+}
+
+qboolean I18n_LoadLanguageFile(const char *filename)
+{
+	// Merge an additional file into the active language (useful for mods or hot reload)
+	qboolean loaded = qfalse;
+
+	if (!loc_initialized) {
+		return qfalse;
+	}
+
+	loaded = Loc_LoadJsonFile(filename, &loc_current);
+	if (!loaded) {
+		loaded = Loc_ParseLegacyIni(filename, &loc_current);
+	}
+
+	return loaded;
+}
+
+const char *I18n_Translate(const char *key)
+{
+	return CL_Localize(key);
+}
+
 const char *I18n_TranslateFormat(const char *key, ...)
 {
 	static char buffer[MAX_TRANSLATION_TEXT];
 	va_list argptr;
 	const char *translated;
-	
-	if (!key || !*key)
+
+	if (!key || !*key) {
 		return "";
-	
-	translated = I18n_Translate(key);
-	
+	}
+
+	translated = CL_Localize(key);
+
 	va_start(argptr, key);
 	Q_vsnprintf(buffer, sizeof(buffer), translated, argptr);
 	va_end(argptr);
-	
+
 	return buffer;
 }
 
-/*
-=================
-I18n_SetLanguage
-=================
-Set the current language
-=================
-*/
 void I18n_SetLanguage(const char *languageCode)
 {
-	language_t *lang;
-	
-	if (!languageCode || !*languageCode)
-		return;
-	
-	lang = I18n_FindLanguage(languageCode);
-	if (!lang) {
-		// Try to load the language
-		if (!I18n_LoadLanguage(languageCode)) {
-			Com_Printf("I18n_SetLanguage: Could not load language %s\n", languageCode);
-			return;
-		}
-		lang = I18n_FindLanguage(languageCode);
-		if (!lang)
-			return;
-	}
-	
-	currentLanguage = lang;
-	if (com_language) {
-		Cvar_Set("com_language", languageCode);
-	}
-	
-	Com_Printf("Language set to: %s (%s)\n", lang->name, lang->code);
+	CL_LoadLanguage(languageCode);
 }
 
-/*
-=================
-I18n_GetCurrentLanguage
-=================
-Get the current language code
-=================
-*/
 const char *I18n_GetCurrentLanguage(void)
 {
-	if (currentLanguage) {
-		return currentLanguage->code;
+	if (loc_activeCode[0]) {
+		return loc_activeCode;
 	}
-	return LANGUAGE_ENGLISH;
+	return loc_defaultCode;
 }
 
-/*
-=================
-I18n_LanguageExists
-=================
-Check if a language exists
-=================
-*/
 qboolean I18n_LanguageExists(const char *languageCode)
 {
-	return I18n_FindLanguage(languageCode) != NULL;
+	fileHandle_t f;
+	char filename[MAX_QPATH];
+	int len;
+	char normalized[MAX_LANGUAGE_CODE];
+
+	Loc_NormalizeLanguageCode(languageCode, normalized, sizeof(normalized));
+
+	Com_sprintf(filename, sizeof(filename), "lang/lang_%s.json", normalized);
+	len = FS_FOpenFileRead(filename, &f, qfalse);
+	if (len > 0 && f != FS_INVALID_HANDLE) {
+		FS_FCloseFile(f);
+		return qtrue;
+	}
+
+	// Legacy INI checks
+	Com_sprintf(filename, sizeof(filename), "translations/%s.ini", normalized);
+	len = FS_FOpenFileRead(filename, &f, qfalse);
+	if (len > 0 && f != FS_INVALID_HANDLE) {
+		FS_FCloseFile(f);
+		return qtrue;
+	}
+
+	Com_sprintf(filename, sizeof(filename), "lang/lang_%s.ini", normalized);
+	len = FS_FOpenFileRead(filename, &f, qfalse);
+	if (len > 0 && f != FS_INVALID_HANDLE) {
+		FS_FCloseFile(f);
+		return qtrue;
+	}
+
+	return qfalse;
 }
 
-/*
-=================
-I18n_GetLanguageCount
-=================
-Get the number of loaded languages
-=================
-*/
 int I18n_GetLanguageCount(void)
 {
-	language_t *lang;
-	int count = 0;
-	
-	for (lang = languages; lang; lang = lang->next) {
-		count++;
+	int countJson = 0;
+	int countIni = 0;
+	char **files;
+
+	files = FS_ListFiles("lang", ".json", &countJson);
+	if (files) {
+		FS_FreeFileList(files);
 	}
-	
-	return count;
+
+	files = FS_ListFiles("lang", ".ini", &countIni);
+	if (files) {
+		FS_FreeFileList(files);
+	}
+
+	// Use max to avoid double-counting language codes that have both formats
+	return countJson > countIni ? countJson : countIni;
 }
 
-/*
-=================
-I18n_ListLanguages
-=================
-List all available languages
-=================
-*/
 void I18n_ListLanguages(void)
 {
-	language_t *lang;
-	
-	Com_Printf("Available languages:\n");
-	for (lang = languages; lang; lang = lang->next) {
-		Com_Printf("  %s - %s (%d translations)\n",
-			lang->code, lang->name, lang->numEntries);
+	int count;
+	int i;
+	char **files;
+
+	Com_Printf("Available languages (lang/lang_<code>.json):\n");
+	files = FS_ListFiles("lang", ".json", &count);
+	if (files && count > 0) {
+		for (i = 0; i < count; i++) {
+			char code[MAX_LANGUAGE_CODE];
+			char *dot;
+
+			if (!files[i]) {
+				continue;
+			}
+
+			Q_strncpyz(code, files[i], sizeof(code));
+			dot = strchr(code, '.');
+			if (dot) {
+				*dot = '\0';
+			}
+
+			// Trim "lang_" prefix if present
+			if (!Q_strncmp(code, "lang_", 5)) {
+				memmove(code, code + 5, strlen(code + 5) + 1);
+			}
+
+			Com_Printf("  %s\n", code);
+		}
+		FS_FreeFileList(files);
+	} else {
+		Com_Printf("  (none found)\n");
 	}
 }
 

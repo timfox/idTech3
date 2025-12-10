@@ -1,0 +1,11 @@
+{
+  "STR_MAIN_MENU_PLAY": "Играть",
+  "STR_MAIN_MENU_OPTIONS": "Настройки",
+  "STR_MAIN_MENU_QUIT": "Выход",
+  "STR_DIALOGUE_OK": "OK",
+  "STR_DIALOGUE_CANCEL": "Отмена",
+  "STR_DIALOGUE_NEXT": "Далее",
+  "STR_DIALOGUE_SKIP": "Пропустить",
+  "STR_DIALOGUE_CONTINUE": "Продолжить",
+  "STR_SYSTEM_MISSING_KEY": "Отсутствует локализованный текст."
+}

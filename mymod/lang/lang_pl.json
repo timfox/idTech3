@@ -1,0 +1,11 @@
+{
+  "STR_MAIN_MENU_PLAY": "Graj",
+  "STR_MAIN_MENU_OPTIONS": "Opcje",
+  "STR_MAIN_MENU_QUIT": "Wyjście",
+  "STR_DIALOGUE_OK": "OK",
+  "STR_DIALOGUE_CANCEL": "Anuluj",
+  "STR_DIALOGUE_NEXT": "Dalej",
+  "STR_DIALOGUE_SKIP": "Pomiń",
+  "STR_DIALOGUE_CONTINUE": "Kontynuuj",
+  "STR_SYSTEM_MISSING_KEY": "Brak przetłumaczonego tekstu."
+}

@@ -350,7 +350,16 @@ FT_Pos		FreeType_GetCharHeight( FT_Face face, FT_UInt glyph_index );
 qboolean	FreeType_GetFaceInfo( FT_Face face, int *num_faces, int *face_index, char *family_name, int family_name_size, char *style_name, int style_name_size );
 #endif
 
-// Internationalization (i18n)
+// Internationalization (i18n) / localization
+void		CL_Localize_Init( void );
+void		CL_Localize_Shutdown( void );
+void		CL_Localize_Frame( void );
+qboolean	CL_LoadLanguage( const char *languageCode );
+const char *CL_Localize( const char *id );
+const char *CL_LocalizeFmt( const char *id, ... );
+const char *CL_LocalizeReplace( const char *id, const locVar_t *vars, int varCount );
+
+// Legacy-compatible entry points (redirect to the modern API)
 void		I18n_Init( void );
 void		I18n_Shutdown( void );
 qboolean	I18n_LoadLanguage( const char *languageCode );
