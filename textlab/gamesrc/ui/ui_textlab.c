@@ -92,13 +92,9 @@ static inline void trap_Key_SetCatcher(int catcher) {
 }
 
 // --- helpers -----------------------------------------------------------------
-static float UI_To640X(float px) {
-	return (ui_glconfig.vidWidth > 0) ? (px * 640.0f / (float)ui_glconfig.vidWidth) : px;
-}
-
-static float UI_To640Y(float py) {
-	return (ui_glconfig.vidHeight > 0) ? (py * 480.0f / (float)ui_glconfig.vidHeight) : py;
-}
+/* Debug: operate in real pixel space to avoid double scaling. */
+static float UI_To640X(float px) { (void)ui_glconfig; return px; }
+static float UI_To640Y(float py) { (void)ui_glconfig; return py; }
 
 static void UI_DrawSolid(float x, float y, float w, float h, const float color[4]) {
 	if (!ui_white_shader) {
@@ -150,6 +146,27 @@ static void UI_DrawStringPixels(float x, float y, const char *text, const float 
 	trap_R_SetColor(NULL);
 }
 
+static float UI_StringWidthPixels(const char *text) {
+	if (!text || !ui_font.name[0]) {
+		return 0.0f;
+	}
+	float useScale = ui_base_scale * ui_font.glyphScale;
+	float width = 0.0f;
+	const unsigned char *s = (const unsigned char *)text;
+	while (s && *s) {
+		if (Q_IsColorString((const char *)s)) {
+			s += 2;
+			continue;
+		}
+		glyphInfo_t *glyph = &ui_font.glyphs[*s];
+		if (glyph->glyph != 0) {
+			width += glyph->xSkip * useScale;
+		}
+		s++;
+	}
+	return width;
+}
+
 static void UI_LoadFont(void) {
 	fileHandle_t f = 0;
 	int len = trap_FS_FOpenFile("fonts/fonts.cfg", &f, FS_READ);
@@ -187,13 +204,39 @@ static void UI_LoadFont(void) {
 }
 
 static void UI_DrawHarness(void) {
-	static const vec4_t bg = {0.05f, 0.05f, 0.05f, 1.0f};
-	static const vec4_t white = {1.0f, 1.0f, 1.0f, 1.0f};
+static const vec4_t white = {1.0f, 1.0f, 1.0f, 1.0f};
+static const vec4_t red   = {1.0f, 0.0f, 0.0f, 1.0f};
+static const vec4_t green = {0.0f, 1.0f, 0.0f, 1.0f};
+static const vec4_t magenta = {1.0f, 0.0f, 1.0f, 1.0f}; // vivid background
+	static int drawCount = 0;
 
-	UI_DrawSolid(0.0f, 0.0f, (float)ui_glconfig.vidWidth, (float)ui_glconfig.vidHeight, bg);
+	const float w = (float)ui_glconfig.vidWidth;
+	const float h = (float)ui_glconfig.vidHeight;
+
+	if (!ui_white_shader && drawCount < 5) {
+		UI_Printf("textlab: ui_white_shader missing; draws skipped\n");
+	}
+
+	UI_DrawSolid(0.0f, 0.0f, w, h, magenta);
+	UI_DrawSolid(0.0f, 0.0f, w * 0.5f, h * 0.5f, red);
+	UI_DrawSolid(w * 0.5f, h * 0.5f, w * 0.5f, h * 0.5f, green);
+
 	UI_DrawStringPixels(100.0f, 120.0f, "TEST", white);
 	UI_DrawStringPixels(100.0f, 164.0f, "The quick brown fox jumps over the lazy dog.", white);
 	UI_DrawStringPixels(100.0f, 208.0f, "ĄĆĘŁŃÓŚŹŻ ąćęłńóśźż", white);
+
+	// Centered reference string so it's obvious when UI is active
+	const char *centerText = "Textlab font harness (UI)";
+	float centerW = UI_StringWidthPixels(centerText);
+	float centerX = (w - centerW) * 0.5f;
+	float centerY = h * 0.5f;
+	UI_DrawStringPixels(centerX, centerY, centerText, white);
+
+	if (drawCount < 5) {
+		UI_Printf("textlab: UI_DrawHarness frame %d (centerX=%.1f centerY=%.1f width=%.1f) w=%.0f h=%.0f\n",
+		          drawCount, centerX, centerY, centerW, w, h);
+	}
+	drawCount++;
 }
 
 // --- exports -----------------------------------------------------------------
@@ -206,7 +249,7 @@ Q_EXPORT intptr_t vmMain(int command, int arg0, int arg1, int arg2,
                          int arg3, int arg4, int arg5, int arg6,
                          int arg7, int arg8, int arg9, int arg10,
                          int arg11) {
-	(void)arg2; (void)arg3; (void)arg4; (void)arg5;
+	(void)arg0; (void)arg1; (void)arg2; (void)arg3; (void)arg4; (void)arg5;
 	(void)arg6; (void)arg7; (void)arg8; (void)arg9;
 	(void)arg10; (void)arg11;
 
@@ -215,34 +258,47 @@ Q_EXPORT intptr_t vmMain(int command, int arg0, int arg1, int arg2,
 		return UI_API_VERSION;
 	case UI_INIT:
 		trap_GetGlconfig(&ui_glconfig);
-		trap_Key_SetCatcher(trap_Key_GetCatcher() | KEYCATCH_UI);
+		// Force the harness UI to own input so UI_REFRESH is called every frame.
+		trap_Key_SetCatcher(KEYCATCH_UI);
 		UI_LoadFont();
 		if (ui_font.glyphScale > 0.0f) {
 			ui_base_scale = 1.0f / ui_font.glyphScale;
 		}
-		ui_white_shader = trap_R_RegisterShaderNoMip("white");
-		UI_Printf("textlab: ui init (%dx%d) glyphScale=%.3f baseScale=%.3f\n",
+		// Use a known built-in shader first to guarantee a handle.
+		ui_white_shader = trap_R_RegisterShaderNoMip("gfx/2d/console");
+		if (!ui_white_shader) {
+			ui_white_shader = trap_R_RegisterShaderNoMip("textures/textlab/textlab_white");
+		}
+		if (!ui_white_shader) {
+			ui_white_shader = trap_R_RegisterShaderNoMip("ui/textlab_white");
+		}
+		if (!ui_white_shader) {
+			ui_white_shader = trap_R_RegisterShaderNoMip("textures/textlab_white");
+		}
+		if (!ui_white_shader) {
+			ui_white_shader = trap_R_RegisterShaderNoMip("*white");
+		}
+		if (!ui_white_shader) {
+			ui_white_shader = trap_R_RegisterShaderNoMip("white");
+		}
+		UI_Printf("textlab: ui init (%dx%d) glyphScale=%.3f baseScale=%.3f whiteShader=%d\n",
 		          ui_glconfig.vidWidth, ui_glconfig.vidHeight,
-		          ui_font.glyphScale, ui_base_scale);
+		          ui_font.glyphScale, ui_base_scale, ui_white_shader);
 		return 0;
 	case UI_SHUTDOWN:
 		UI_Printf("textlab: ui shutdown\n");
 		return 0;
 	case UI_REFRESH:
+		// Reassert catcher each frame in case something cleared it.
+		trap_Key_SetCatcher(KEYCATCH_UI);
 		UI_DrawHarness();
 		return 0;
 	case UI_KEY_EVENT:
-		// arg0 = key, arg1 = down
-		if (arg1 && arg0 == K_ESCAPE) {
-			trap_Cmd_ExecuteText(EXEC_APPEND, "quit\n");
-		}
+		// Ignore key events for this harness (we only display)
 		return 0;
 	case UI_SET_ACTIVE_MENU:
-		if (arg0 == UIMENU_NONE) {
-			trap_Key_SetCatcher(trap_Key_GetCatcher() & ~KEYCATCH_UI);
-		} else {
-			trap_Key_SetCatcher(trap_Key_GetCatcher() | KEYCATCH_UI);
-		}
+		// Keep UI active so the harness stays visible
+		trap_Key_SetCatcher(KEYCATCH_UI);
 		return 0;
 	case UI_IS_FULLSCREEN:
 		return qtrue;

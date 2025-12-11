@@ -134,6 +134,27 @@ static void CG_DrawStringPixels(float x, float y, const char *text, const float 
 	trap_R_SetColor(NULL);
 }
 
+static float CG_StringWidthPixels(const char *text) {
+	if (!text || !cg_font.name[0]) {
+		return 0.0f;
+	}
+	float useScale = cg_base_scale * cg_font.glyphScale;
+	float width = 0.0f;
+	const unsigned char *s = (const unsigned char *)text;
+	while (s && *s) {
+		if (Q_IsColorString((const char *)s)) {
+			s += 2;
+			continue;
+		}
+		glyphInfo_t *glyph = &cg_font.glyphs[*s];
+		if (glyph->glyph != 0) {
+			width += glyph->xSkip * useScale;
+		}
+		s++;
+	}
+	return width;
+}
+
 static void CG_LoadFont(void) {
 	// Simple parser: first 'font' entry wins
 	fileHandle_t f = 0;
@@ -182,6 +203,13 @@ static void CG_DrawHarness(void) {
 	CG_DrawStringPixels(100.0f, 120.0f, "TEST", white);
 	CG_DrawStringPixels(100.0f, 164.0f, "The quick brown fox jumps over the lazy dog.", white);
 	CG_DrawStringPixels(100.0f, 208.0f, "ĄĆĘŁŃÓŚŹŻ ąćęłńóśźż", white);
+
+	// Centered reference line
+	const char *centerText = "Textlab font harness";
+	float centerW = CG_StringWidthPixels(centerText);
+	float centerX = (cg_glconfig.vidWidth - centerW) * 0.5f;
+	float centerY = (float)cg_glconfig.vidHeight * 0.5f;
+	CG_DrawStringPixels(centerX, centerY, centerText, white);
 }
 
 // --- exports -----------------------------------------------------------------

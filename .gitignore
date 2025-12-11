@@ -1,4 +1,6 @@
 build/
+build-debug/
+build-coverage/
 output/
 .vs/
 .vscode/

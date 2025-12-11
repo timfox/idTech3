@@ -17,7 +17,9 @@ libs/stb/stb_truetype.h. Falls back to a stub otherwise.
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_STATIC
 static void *R_StbMalloc(size_t size, void *user) { (void)user; return ri.Malloc((int)size); }
-static void R_StbFree(void *ptr, void *user) { (void)user; ri.Free(ptr); }
+/* stb_truetype follows the standard free() contract where freeing NULL is a no-op.
+ * Our allocator raises a fatal error on NULL, so guard here to match stb's expectations. */
+static void R_StbFree(void *ptr, void *user) { (void)user; if (!ptr) return; ri.Free(ptr); }
 #define STBTT_malloc(x,u) R_StbMalloc((x),(u))
 #define STBTT_free(x,u)   R_StbFree((x),(u))
 #if defined(__GNUC__)
