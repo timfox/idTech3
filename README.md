@@ -21,6 +21,7 @@ Go to [Releases](../../releases) section to download the latest binaries for you
 * Modernized graphics options menu
 * ImGui layer for in-engine tools and overlays
 * SysCall Registry
+* QT Radiant world editor
 
 
 ## Vulkan renderer
@@ -122,10 +123,11 @@ Go to [Releases](../../releases) section to download the latest binaries for you
 ## Links
 
 * https://idtech3.com
+* https://github.com/timfox/idTech3Radiant
 * https://bitbucket.org/CPMADevs/cnq3
 * https://github.com/ioquake/ioq3
 * https://github.com/kennyalive/Quake-III-Arena-Kenny-Edition
 * https://github.com/OpenArena/engine
 * https://github.com/tomkidd/Quake3-iOS
+* https://github.com/TTimo/GtkRadiant
 * https://github.com/JKSunny/Quake3e
-
