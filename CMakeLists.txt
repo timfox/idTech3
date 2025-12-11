@@ -190,13 +190,47 @@ IF(ENABLE_COVERAGE)
 	ENDIF()
 ENDIF()
 
+# ==== SDL2 Integration ====
+OPTION(USE_SDL "Enable SDL2 integration" ON)
+
+if(USE_SDL)
+	# Use CMake's built-in FindSDL2 or pkg-config fallback
+	find_package(PkgConfig)
+	if(PKG_CONFIG_FOUND)
+		pkg_check_modules(SDL2 IMPORTED_TARGET sdl2)
+	endif()
+
+	find_package(SDL2 QUIET)
+	if(NOT SDL2_FOUND)
+		# If built-in not found, try imported target from pkg-config
+		if(TARGET PkgConfig::SDL2)
+			add_library(SDL2::SDL2 ALIAS PkgConfig::SDL2)
+			set(SDL2_FOUND TRUE)
+		endif()
+	endif()
+
+	if(SDL2_FOUND)
+		message(STATUS "SDL2 library found: using SDL2::SDL2")
+		set(SDL2_MAIN_LIBRARY SDL2::SDL2)
+		set(SDL2_INCLUDE_DIRS "")
+		if(DEFINED SDL2_INCLUDE_DIR)
+			list(APPEND SDL2_INCLUDE_DIRS ${SDL2_INCLUDE_DIR})
+		endif()
+		if(DEFINED SDL2_INCLUDE_DIRS_)
+			list(APPEND SDL2_INCLUDE_DIRS ${SDL2_INCLUDE_DIRS_})
+		endif()
+		set(SDL2_INCLUDE_DIRS ${SDL2_INCLUDE_DIRS} ${SDL2_INCLUDE_DIRS})
+	else()
+		message(FATAL_ERROR "SDL2 could not be found. Please install libsdl2 or set SDL2_DIR.")
+	endif()
+endif()
+
 SET(CNAME "idtech3")
 SET(DNAME "idtech3.server")
 
 SET(RENDERER_PREFIX ${CNAME})
 SET(RENDERER_DEFAULT vulkan) # valid options: opengl, vulkan, opengl2, d3d12, metal
 
-OPTION(USE_SDL "" ON)
 OPTION(USE_CURL "" ON)
 OPTION(USE_LOCAL_HEADERS "" ON)
 OPTION(USE_VULKAN "" ON)
