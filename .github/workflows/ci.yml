@@ -43,6 +43,11 @@ jobs:
             libvpx-dev libdav1d-dev \
             libopenexr-dev libassimp-dev \
             libbullet-dev
+      - name: Verify SDL2 via pkg-config
+        run: |
+          export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH
+          pkg-config --modversion sdl2
+          echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}" >> $GITHUB_ENV
       - name: Generate build files
         run: |
           cmake -S . -B build-config \
