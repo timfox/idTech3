@@ -59,6 +59,7 @@ jobs:
       - name: Build engine headers (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
+          JOBS=$(command -v nproc >/dev/null && nproc || sysctl -n hw.ncpu)
           mkdir -p build
           cd build
           cmake .. \
@@ -66,7 +67,7 @@ jobs:
             -DUSE_VULKAN=ON \
             -DUSE_RENDERER_DLOPEN=ON
           # Only build enough to generate headers
-          make -j$(nproc) qcommon || true
+          make -j${JOBS} qcommon || true
       
       - name: Build engine headers (Windows)
         if: runner.os == 'Windows'
@@ -98,8 +99,9 @@ jobs:
             cmake .. -G "Visual Studio 17 2022" -A x64
             cmake --build . --config Release
           else
+            JOBS=$(command -v nproc >/dev/null && nproc || sysctl -n hw.ncpu)
             cmake ..
-            make -j$(nproc)
+            make -j${JOBS}
           fi
       
       - name: Verify compiled modules
@@ -141,7 +143,7 @@ jobs:
       - name: Download all game mode artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: *-modules-*
+          pattern: "*-modules-*"
           merge-multiple: true
       
       - name: List downloaded modules

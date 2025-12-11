@@ -28,10 +28,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install CMake
+      - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake
+          sudo apt-get install -y \
+            build-essential cmake pkg-config \
+            libsdl2-dev libcurl4-openssl-dev \
+            libssl-dev libjpeg-dev \
+            libvorbis-dev libogg-dev \
+            libfreetype6-dev libsqlite3-dev \
+            liblua5.4-dev libwebsockets-dev \
+            libzstd-dev libopenal-dev \
+            libvulkan-dev libtheora-dev \
+            libvpx-dev libdav1d-dev \
+            libopenexr-dev libassimp-dev \
+            libbullet-dev
       - name: Generate build files
         run: |
           cmake -S . -B build-config \

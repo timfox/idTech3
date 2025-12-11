@@ -190,6 +190,15 @@ IF(ENABLE_COVERAGE)
 	ENDIF()
 ENDIF()
 
+# ------------------------------------------------------------------------------
+# GtkRadiant (editor + tools) toggle
+# ------------------------------------------------------------------------------
+OPTION(BUILD_RADIANT "Build GtkRadiant editor, tools, and plugins (requires GTK2/GTKGLext)" OFF)
+IF(ANDROID AND BUILD_RADIANT)
+	MESSAGE(WARNING "GtkRadiant is not supported on Android; disabling BUILD_RADIANT")
+	SET(BUILD_RADIANT OFF CACHE BOOL "" FORCE)
+ENDIF()
+
 # ==== SDL2 Integration ====
 OPTION(USE_SDL "Enable SDL2 integration" ON)
 
@@ -2303,6 +2312,11 @@ ENDIF()
 # Add USE_VULKAN definition to q3ui if Vulkan is enabled (needed for sdl_glimp.c)
 IF(USE_VULKAN)
 	TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_VULKAN)
+ENDIF()
+
+# GtkRadiant editor/toolchain (optional)
+IF(BUILD_RADIANT)
+	ADD_SUBDIRECTORY(radiant)
 ENDIF()
 
 # Unit tests
