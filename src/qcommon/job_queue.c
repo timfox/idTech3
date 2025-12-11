@@ -25,7 +25,11 @@ qboolean JobQueue_Init(job_queue_t *queue, int max_size)
 
 	queue->head = NULL;
 	queue->tail = NULL;
-	queue->count = 0;
+	#ifdef _WIN32
+		queue->count = 0;
+	#else
+		atomic_init(&queue->count, 0);
+	#endif
 	queue->max_size = max_size;
 
 	return qtrue;
@@ -53,7 +57,11 @@ void JobQueue_Shutdown(job_queue_t *queue)
 
 	queue->head = NULL;
 	queue->tail = NULL;
-	queue->count = 0;
+	#ifdef _WIN32
+		queue->count = 0;
+	#else
+		atomic_store(&queue->count, 0);
+	#endif
 }
 
 /*
@@ -68,7 +76,13 @@ qboolean JobQueue_Enqueue(job_queue_t *queue, job_t *job)
 		return qfalse;
 	}
 
-	if (queue->count >= queue->max_size) {
+	#ifdef _WIN32
+	int current = queue->count;
+	#else
+	int current = atomic_load(&queue->count);
+	#endif
+
+	if (current >= queue->max_size) {
 		return qfalse;
 	}
 
@@ -94,7 +108,13 @@ Remove a job from the queue (thread-safe)
 */
 job_t *JobQueue_Dequeue(job_queue_t *queue)
 {
-	if (!queue || queue->count == 0) {
+	#ifdef _WIN32
+	int current = queue ? queue->count : 0;
+	#else
+	int current = (queue ? atomic_load(&queue->count) : 0);
+	#endif
+
+	if (!queue || current == 0) {
 		return NULL;
 	}
 
@@ -137,6 +157,10 @@ int JobQueue_GetCount(job_queue_t *queue)
 	if (!queue) {
 		return 0;
 	}
+	#ifdef _WIN32
 	return queue->count;
+	#else
+	return atomic_load(&queue->count);
+	#endif
 }
 

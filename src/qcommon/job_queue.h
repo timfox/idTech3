@@ -10,6 +10,7 @@ Work-stealing job queue for multi-threaded execution.
 #define __JOB_QUEUE_H__
 
 #include "q_shared.h"
+#include "thread_platform.h"
 
 // Maximum number of worker threads
 #define MAX_WORKER_THREADS 16
@@ -46,8 +47,8 @@ typedef struct job_s {
 typedef struct job_queue_s {
 	job_t *head;
 	job_t *tail;
-	volatile int count;
-	volatile int max_size;
+	atomic_int_t count;
+	int max_size;
 } job_queue_t;
 
 /*
