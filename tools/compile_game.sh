@@ -143,6 +143,7 @@ package_pk3() {
     add_if_exists "fonts"
     add_if_exists "scripts"
     add_if_exists "shaders"
+    add_if_exists "textures"
     add_if_exists "ui"
     add_if_exists "vm"
     add_if_exists "maps"
