@@ -11,6 +11,22 @@ INSTALL_DIR="${ROOT_DIR}/build/radiant/install"
 QT_BIN="${INSTALL_DIR}/radiant_qt"
 GTK_BIN="${INSTALL_DIR}/radiant"
 
+# Provide a default renderer path for the Qt viewport if available.
+if [[ -z "${ENGINE_RENDERER_VK_LIB:-}" ]]; then
+  CANDIDATES=(
+    "${ROOT_DIR}/build/idtech3_vulkan_x86_64.so"
+    "${ROOT_DIR}/release/idtech3_vulkan_x86_64.so"
+    "${ROOT_DIR}/build/idtech3_vulkan.so"
+    "${ROOT_DIR}/release/idtech3_vulkan.so"
+  )
+  for c in "${CANDIDATES[@]}"; do
+    if [[ -f "$c" ]]; then
+      export ENGINE_RENDERER_VK_LIB="$c"
+      break
+    fi
+  done
+fi
+
 if [[ "${1:-}" == "--gtk" ]]; then
   shift
   if [[ ! -x "${GTK_BIN}" ]]; then

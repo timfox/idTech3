@@ -38,7 +38,7 @@ echo "Configuring project with CMake..."
 cmake -S "$SRC_DIR" -B "$BUILD_DIR" \
   -DBUILD_RADIANT=ON \
   -DRADIANT_BUILD_QT=ON \
-  -DRADIANT_USE_ENGINE_RENDERER_VK=ON \
+  -DRADIANT_USE_ENGINE_RENDERER_VK=OFF \
   -DRADIANT_BUILD_EDITOR=$([[ $BUILD_GTK -eq 1 ]] && echo ON || echo OFF) \
   -DRADIANT_BUILD_PLUGINS=$([[ $BUILD_GTK -eq 1 ]] && echo ON || echo OFF) \
   -DRADIANT_BUILD_CONTRIB=$([[ $BUILD_GTK -eq 1 ]] && echo ON || echo OFF)
