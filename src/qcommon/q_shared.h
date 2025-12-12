@@ -900,6 +900,8 @@ int Q_CountChar(const char *string, char tocount);
 
 // 64-bit integers for global rankings interface
 // implemented as a struct for qvm compatibility
+#if !defined(Q3_QINT64_DEFINED) && !defined(QT_CORE_LIB)
+#define Q3_QINT64_DEFINED
 typedef struct
 {
 	byte	b0;
@@ -911,6 +913,7 @@ typedef struct
 	byte	b6;
 	byte	b7;
 } qint64;
+#endif
 
 //=============================================
 /*
