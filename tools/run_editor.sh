@@ -43,4 +43,7 @@ if [[ ! -x "${QT_BIN}" ]]; then
   exit 127
 fi
 
+# Force XCB platform for better compatibility (fixes Wayland issues)
+export QT_QPA_PLATFORM=xcb
+
 exec "${QT_BIN}" "$@"
