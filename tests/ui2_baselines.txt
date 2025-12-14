@@ -1,0 +1,10 @@
+# UI2 Golden Image Test Baselines
+# These hashes are computed from deterministic layout boxes and colors
+# Format: test_name hash_value
+# To regenerate: run 'ui2_test' command and copy the output hashes here
+
+scene1_box_nesting 0x00000000
+scene2_flex_row 0x00000000
+scene3_flex_column 0x00000000
+scene4_absolute 0x00000000
+scene5_overflow 0x00000000

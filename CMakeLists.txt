@@ -2099,7 +2099,7 @@ IF(ANDROID)
 ELSE()
 	ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 ENDIF()
-TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui)
+TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui ui2)
 
 # Monolithic build support: link game module targets directly
 OPTION(COMBINED_MONOLITH "Build monolithic executable with game modules linked statically" OFF)
@@ -2440,6 +2440,25 @@ ENDIF()
 # Add USE_VULKAN definition to q3ui if Vulkan is enabled (needed for sdl_glimp.c)
 IF(USE_VULKAN)
 	TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_VULKAN)
+ENDIF()
+
+# UI2 - Deterministic UI/Layout System (C++23)
+AUX_SOURCE_DIRECTORY(src/ui2 UI2_SRCS)
+IF(UI2_SRCS)
+	ADD_LIBRARY(ui2 OBJECT ${UI2_SRCS})
+	TARGET_COMPILE_DEFINITIONS(ui2 PRIVATE UI2_ENABLED)
+	# UI2 uses C++23 features
+	SET_TARGET_PROPERTIES(ui2 PROPERTIES
+		CXX_STANDARD 23
+		CXX_STANDARD_REQUIRED ON
+		CXX_EXTENSIONS OFF
+	)
+	MESSAGE(STATUS "UI2 module: enabled")
+ELSE()
+	# Create dummy source file if no UI2 sources found
+	FILE(WRITE ${CMAKE_BINARY_DIR}/ui2_dummy.cpp "// Dummy file for ui2 when no sources are present\n")
+	ADD_LIBRARY(ui2 OBJECT ${CMAKE_BINARY_DIR}/ui2_dummy.cpp)
+	MESSAGE(STATUS "UI2 module: no sources found, using dummy library")
 ENDIF()
 
 # GtkRadiant editor/toolchain (optional)
