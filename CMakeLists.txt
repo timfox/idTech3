@@ -376,6 +376,7 @@ list(APPEND QCOMMON_SRCS src/qcommon/memory_stats.c)
 list(APPEND QCOMMON_SRCS src/qcommon/vm_hot_reload.c)
 # Add event system
 list(APPEND QCOMMON_SRCS src/qcommon/event_system.c)
+list(APPEND QCOMMON_SRCS src/qcommon/files_v2.c)
 # Add wrapper files conditionally
 IF(USE_CJSON)
 	list(APPEND QCOMMON_SRCS src/qcommon/json_cjson.c)

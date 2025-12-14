@@ -38,6 +38,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_shared.h"
 #include "qcommon.h"
 #include "unzip.h"
+#include "files_v2.h"  // VFS v2 mount table
 #ifndef _WIN32
 #include <stdio.h> // popen, pclose
 // Some libc headers may hide popen/pclose behind feature macros;
@@ -534,7 +535,8 @@ static void FS_CheckInitialized( void ) {
 FS_PakIsPure
 =================
 */
-static qboolean FS_PakIsPure( const pack_t *pack ) {
+// Make FS_PakIsPure accessible to files_v2.c
+qboolean FS_PakIsPure( const pack_t *pack ) {
 	(void)pack;  // Suppress unused parameter warning
 #ifndef DEDICATED
 	int i;
@@ -1537,6 +1539,28 @@ FS_FOpenFileWrite
 		Com_Printf( "FS_FOpenFileWrite: %s\n", ospath );
 	}
 
+	// VFS v2: Check write policy if mount table is active (but not during startup)
+	if (!fs_startupInProgress && FS_MountTable_IsActive()) {
+		fsMount_t *writeMount = FS_WritePolicy_GetMount(filename);
+		if (!writeMount) {
+			return FS_INVALID_HANDLE;
+		}
+		
+		// Apply sandboxing
+		if (!FS_Sandbox_ValidateOperation(filename, writeMount, qtrue)) {
+			return FS_INVALID_HANDLE;
+		}
+		
+		// Use write mount's backend for path building
+		if (writeMount->backend.dir) {
+			directory_t *dir = writeMount->backend.dir;
+			ospath = FS_BuildOSPath(dir->path, dir->gamedir, filename);
+		} else {
+			// No directory backend - can't write
+			return FS_INVALID_HANDLE;
+		}
+	}
+
 	// Only check filename if filesystem is fully initialized
 	// FS_CheckFilenameIsNotAllowed calls Com_Error which triggers logging
 	// During FS_Restart, fs_searchpaths might be NULL even if fs_startupInProgress is false
@@ -1858,7 +1882,8 @@ void FS_RestorePure( void )
 }
 
 
-static int FS_OpenFileInPak( fileHandle_t *file, pack_t *pak, fileInPack_t *pakFile, qboolean uniqueFILE ) {
+// Make FS_OpenFileInPak accessible to files_v2.c
+int FS_OpenFileInPak( fileHandle_t *file, pack_t *pak, fileInPack_t *pakFile, qboolean uniqueFILE ) {
 	fileHandleData_t *f;
 	unz_s *zfi;
 	FILE *temp;
@@ -2281,6 +2306,11 @@ extern qboolean		com_fullyInitialized;
 	// we will calculate full hash only once then just mask it by current pack->hashSize
 	// we can do that as long as we know properties of our hash function
 	fullHash = FS_HashFileName( filename, 0U );
+
+	// VFS v2: Try mount table first if active
+	// Note: FS_Mount_FindFile is currently a stub - mount table migration
+	// will populate mounts, but file operations still go through legacy path
+	// TODO: Complete FS_Mount_FindFile implementation when types are accessible
 
 	// C23 Improvement: Try path resolution cache first
 	if ( file != NULL ) {
@@ -3730,7 +3760,8 @@ Creates a new pak_t in the search chain for the contents
 of a zip file.
 =================
 */
-static pack_t *FS_LoadZipFile( const char *zipfile )
+// Make FS_LoadZipFile accessible to files_v2.c
+pack_t *FS_LoadZipFile( const char *zipfile )
 {
 	fileInPack_t	*curFile;
 	pack_t			*pack;
@@ -5302,6 +5333,9 @@ void FS_Shutdown( qboolean closemfp )
 	searchpath_t	*p, *next;
 	int i;
 
+	// VFS v2: Shutdown mount table
+	FS_MountTable_Shutdown();
+
 	// Reset startup flag - we're shutting down
 	fs_startupInProgress = qfalse;
 
@@ -5769,6 +5803,15 @@ static void FS_Startup( void ) {
 	// https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=506
 	// reorder the pure pk3 files according to server order
 	FS_ReorderPurePaks();
+
+	// VFS v2: Initialize mount table and migrate legacy searchpaths
+	FS_MountTable_Init();
+	if (fs_searchpaths) {
+		FS_MigrateLegacySearchPaths();
+	}
+	
+	// Register VFS v2 console commands
+	FS_Mount_RegisterCommands();
 
 	// get the pure checksums of the pk3 files loaded by the server
 	FS_LoadedPakPureChecksums();
