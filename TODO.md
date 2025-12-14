@@ -5,7 +5,7 @@
 
 ## Memory Safety & Profiling
 - [x] ASan/UBSan supported via CMake option (`ENABLE_SANITIZERS`)
-- [ ] Provide documented workflows for ASan/UBSan
+- [x] Provide documented workflows for ASan/UBSan
 - [ ] Add Valgrind/Dr. Memory integration for leak and error detection
 - [ ] Add memory usage tracking/stats in engine
 
@@ -208,4 +208,112 @@
 
 - [ ] Add **priorities + phases** to every section (P0 ship blocker / P1 / P2 nice-to-have)
 - [ ] Add a **Definition of Done template** per feature (tests, docs, CI, perf impact, debug toggles)
+
+---
+
+## Event-Driven Architecture (EDA)
+
+### Core Event System
+
+- [ ] **Define central event bus API (engine-level)**
+    - `publish(event)`
+    - `subscribe(event_type, handler, priority)`
+    - `unsubscribe(handle)`
+    - Support **typed events** (struct-based, not string-only)
+    - Event **categories/namespaces**: `Engine.*`, `Game.*`, `Entity.*`, `Net.*`, `UI.*`
+    - **Event priority ordering**: pre, normal, post
+    - **Event cancellation / consumption** semantics
+    - **Event bubbling rules** (entity → world → engine, if applicable)
+
+### Event Lifecycle & Timing
+
+- [ ] **Explicit event phases**
+    - immediate (same tick)
+    - deferred (end of frame)
+    - scheduled (future tick / time)
+- [ ] **Deterministic event ordering guarantees** (important for net/replay)
+- [ ] **Event queue flushing rules per subsystem** (render, physics, script, net)
+- [ ] **Frame/tick boundary documentation** (what must not fire mid-tick)
+
+### Threading & Concurrency
+
+- [ ] **Thread-safe event publishing** (lock-free queue or double-buffered queues)
+- [ ] **Main-thread dispatch guarantees for unsafe handlers** (UI, scripting)
+- [ ] **Background job → main thread handoff helpers**
+- [ ] **Debug assertions** for illegal cross-thread dispatch
+
+### Entity & Gameplay Integration
+
+- [ ] **Entity-scoped events** (`OnSpawn`, `OnThink`, `OnTouch`, `OnUse`, `OnDeath`)
+- [ ] **World events** (`OnMapLoad`, `OnMapUnload`, `OnCheckpoint`)
+- [ ] **Player events** (`OnConnect`, `OnDisconnect`, `OnInput`, `OnRespawn`)
+- [ ] **Damage/combat events decoupled from direct calls**
+- [ ] Replace hard-coded callbacks with event dispatch **where feasible**
+
+### Networking & Replication
+
+- [ ] **Define network-relevant events vs local-only events**
+- [ ] Event → snapshot mapping rules (**what events affect state**)
+- [ ] **Deterministic replay of events** (for demo/replay system)
+- [ ] **Event filtering per client** (interest management hooks)
+- [ ] **Security**: validate network-originated events strictly
+
+### Scripting (Lua) Integration
+
+- [ ] **Expose event bus to Lua**
+    - `Events.on(event, fn)`
+    - `Events.once(event, fn)`
+    - `Events.emit(event, data)`
+- [ ] **Script-side event filters** (by entity, tag, distance, team, etc.)
+- [ ] **Coroutine-safe event waiting** (`wait_for_event`)
+- [ ] **Script event error isolation** (handler failure does not kill bus)
+- [ ] **Hot-reload behavior** for subscribed script handlers
+
+### Tooling & Debugging
+
+- [ ] **Event tracing** (enable/disable per category)
+- [ ] **Event inspector UI**
+    - live event stream
+    - subscribers per event
+    - queue depth / backlog
+- [ ] Log events as **structured logs** (tie into structured logging TODO)
+- [ ] Tracy/Profiler integration:
+    - event dispatch zones
+    - handler execution time
+- [ ] **Replayable event capture** (for debugging/bugs)
+
+### Persistence & Save/Load
+
+- [ ] Define which events are **transient vs persistent**
+- [ ] **Save/load behavior for scheduled events**
+- [ ] **Versioned event payload schemas**
+- [ ] **Backwards-compatibility** handling for old saves
+
+### Configuration & Extensibility
+
+- [ ] **Data-driven event definitions** (JSON/YAML for simple events)
+- [ ] **Plugin/mod registration** of new event types
+- [ ] **Soft-fail for unknown events** (warn, don’t crash)
+- [ ] **Editor hooks** (Radiant emits events on selection, compile, etc.)
+
+### Testing & Validation
+
+- [ ] **Unit tests for event ordering and cancellation**
+- [ ] **Stress tests** for high-frequency events
+- [ ] **Determinism tests** (same inputs → same event stream)
+- [ ] **Fuzz event payloads** (ties into security/fuzzing TODOs)
+
+### Documentation
+
+- [ ] **Event naming conventions & best practices**
+- [ ] "When to use events vs direct calls" guide
+- [ ] Examples:
+    - damage flow
+    - scripted encounter
+    - UI reacting to gameplay
+- [ ] **EDA + ECS interaction diagram**
+
+---
+
+
 

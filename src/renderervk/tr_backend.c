@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "tr_local.h"
+#include "performance_counters.h"
 
 backEndData_t	*backEndData;
 backEndState_t	backEnd;
@@ -30,7 +31,9 @@ backEndState_t	backEnd;
 
 static qboolean RBVK_InitInterface( void ) { return qtrue; }
 static void RBVK_ShutdownInterface( void ) {}
-static void RBVK_BeginFrame( void ) {}
+static void RBVK_BeginFrame( void ) {
+	Perf_ResetFrameCounters();
+}
 static void RBVK_EndFrame( void ) {}
 static void RBVK_BeginPass( const char *name ) { (void)name; }
 static void RBVK_EndPass( void ) {}

@@ -1389,7 +1389,7 @@ Allows src and dest to be overlapped for QVM compatibility purposes
 @note Handles overlapping buffers correctly
 =============
 */
-char *Q_strncpy( char *dest, char *src, int destsize )
+char *Q_strncpy( char *dest, const char *src, int destsize )
 {
 	char *s = src, *start = dest;
 	int src_len;

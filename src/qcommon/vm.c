@@ -47,22 +47,22 @@ and one exported function: Perform
 opcode_info_t ops[ OP_MAX ] =
 {
 	// size, stack, nargs, flags
-	{ 0, 0, 0, 0 }, // undef
-	{ 0, 0, 0, 0 }, // ignore
-	{ 0, 0, 0, 0 }, // break
+	{ .size = 0, .stack = 0, .nargs = 0, .flags = 0 }, // undef
+	{ .size = 0, .stack = 0, .nargs = 0, .flags = 0 }, // ignore
+	{ .size = 0, .stack = 0, .nargs = 0, .flags = 0 }, // break
 
-	{ 4, 0, 0, 0 }, // enter
-	{ 4,-4, 0, 0 }, // leave
-	{ 0, 0, 1, 0 }, // call
-	{ 0, 4, 0, 0 }, // push
-	{ 0,-4, 1, 0 }, // pop
+	{ .size = 4, .stack = 0, .nargs = 0, .flags = 0 }, // enter
+	{ .size = 4, .stack = -4, .nargs = 0, .flags = 0 }, // leave
+	{ .size = 0, .stack = 0, .nargs = 1, .flags = 0 }, // call
+	{ .size = 0, .stack = 4, .nargs = 0, .flags = 0 }, // push
+	{ .size = 0, .stack = -4, .nargs = 1, .flags = 0 }, // pop
 
-	{ 4, 4, 0, 0 }, // const
-	{ 4, 4, 0, 0 }, // local
-	{ 0,-4, 1, 0 }, // jump
+	{ .size = 4, .stack = 4, .nargs = 0, .flags = 0 }, // const
+	{ .size = 4, .stack = 4, .nargs = 0, .flags = 0 }, // local
+	{ .size = 0, .stack = -4, .nargs = 1, .flags = 0 }, // jump
 
-	{ 4,-8, 2, JUMP }, // eq
-	{ 4,-8, 2, JUMP }, // ne
+	{ .size = 4, .stack = -8, .nargs = 2, .flags = JUMP }, // eq
+	{ .size = 4, .stack = -8, .nargs = 2, .flags = JUMP }, // ne
 
 	{ 4,-8, 2, JUMP }, // lti
 	{ 4,-8, 2, JUMP }, // lei

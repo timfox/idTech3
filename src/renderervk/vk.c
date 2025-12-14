@@ -1,4 +1,5 @@
 #include "tr_local.h"
+#include "performance_counters.h"
 #include "vk.h"
 #include <stdlib.h>
 #include <unistd.h>
@@ -9075,9 +9076,20 @@ void vk_bind_index_buffer( VkBuffer buffer, uint32_t offset )
 #ifdef USE_VBO
 void vk_draw_indexed( uint32_t indexCount, uint32_t firstIndex )
 {
-	qvkCmdDrawIndexed( vk.cmd->command_buffer, indexCount, 1, firstIndex, 0, 0 );
+	vk_draw_indexed_call( vk.cmd->command_buffer, indexCount, 1, firstIndex, 0, 0 );
 }
 #endif
+
+// Performance counter wrapper for draw calls
+static inline void vk_draw_call(VkCommandBuffer cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
+	Perf_CountDrawCall();
+	qvkCmdDraw(cmd, vertexCount, instanceCount, firstVertex, firstInstance);
+}
+
+static inline void vk_draw_indexed_call(VkCommandBuffer cmd, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance) {
+	Perf_CountDrawCall();
+	qvkCmdDrawIndexed(cmd, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+}
 
 
 void vk_bind_index( void )
@@ -9376,9 +9388,9 @@ void vk_draw_geometry( Vk_Depth_Range depth_range, qboolean indexed ) {
 	else
 #endif
 	if ( indexed ) {
-		qvkCmdDrawIndexed( vk.cmd->command_buffer, vk.cmd->num_indexes, 1, 0, 0, 0 );
+		vk_draw_indexed_call( vk.cmd->command_buffer, vk.cmd->num_indexes, 1, 0, 0, 0 );
 	} else {
-		qvkCmdDraw( vk.cmd->command_buffer, tess.numVertexes, 1, 0, 0 );
+		vk_draw_call( vk.cmd->command_buffer, tess.numVertexes, 1, 0, 0 );
 	}
 }
 
@@ -9395,7 +9407,7 @@ void vk_draw_dot( uint32_t storage_offset )
 	// configure pipeline's dynamic state
 	vk_update_depth_range( DEPTH_RANGE_NORMAL );
 
-	qvkCmdDraw( vk.cmd->command_buffer, tess.numVertexes, 1, 0, 0 );
+	vk_draw_call( vk.cmd->command_buffer, tess.numVertexes, 1, 0, 0 );
 }
 
 

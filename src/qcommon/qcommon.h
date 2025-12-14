@@ -464,10 +464,16 @@ PROTOCOL
 ==============================================================
 */
 
+#define	PROTOCOL_VERSION_66	66  // Legacy protocol version
+#define	PROTOCOL_VERSION_67	67  // 1.31 protocol version
 #define	OLD_PROTOCOL_VERSION	68
 // new protocol with UDP spoofing protection:
 #define	NEW_PROTOCOL_VERSION	71
-// 1.31 - 67
+
+// Static assertions for protocol version ordering
+static_assert(PROTOCOL_VERSION_66 < PROTOCOL_VERSION_67, "Protocol versions must be sequential");
+static_assert(PROTOCOL_VERSION_67 < OLD_PROTOCOL_VERSION, "Protocol versions must be sequential");
+static_assert(OLD_PROTOCOL_VERSION < NEW_PROTOCOL_VERSION, "Protocol versions must be sequential");
 
 #define DEFAULT_PROTOCOL_VERSION	OLD_PROTOCOL_VERSION
 

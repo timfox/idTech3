@@ -245,6 +245,11 @@ typedef union {
 	uint32_t u32;
 } color4ub_t;
 
+// Static assertions for critical structure sizes
+static_assert(sizeof(vec3_t) == 12, "vec3_t must be 12 bytes for network compatibility");
+static_assert(sizeof(color4ub_t) == 4, "color4ub_t must be 4 bytes");
+static_assert(sizeof(floatint_t) == 4, "floatint_t must be 4 bytes for type punning");
+
 
 typedef int		qhandle_t;
 typedef int		sfxHandle_t;
@@ -887,7 +892,7 @@ void	Q_strcat( char *dest, int size, const char *src );
 int     Q_replace( const char *str1, const char *str2, char *src, int max_len );
 
 char	*Q_stradd( char *dst, const char *src );
-char	*Q_strncpy( char *dest, char *src, int destsize );
+char	*Q_strncpy( char *dest, const char *src, int destsize );
 
 // strlen that discounts Quake color sequences
 int Q_PrintStrlen( const char *string );

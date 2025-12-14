@@ -1,0 +1,144 @@
+# Valgrind suppression file for id Tech 3
+# This file contains suppressions for known issues that are not actual bugs
+
+# Suppress SDL-related issues (SDL uses its own memory management)
+{
+   SDL_Init
+   Memcheck:Leak
+   fun:SDL_Init*
+   ...
+}
+
+{
+   SDL_Quit
+   Memcheck:Leak
+   fun:SDL_Quit
+   ...
+}
+
+# Suppress OpenAL context leaks (OpenAL manages its own memory)
+{
+   OpenAL_Context
+   Memcheck:Leak
+   fun:alcCreateContext
+   ...
+}
+
+{
+   OpenAL_Device
+   Memcheck:Leak
+   fun:alcOpenDevice
+   ...
+}
+
+# Suppress Vulkan library initialization (driver manages its own memory)
+{
+   Vulkan_Loader
+   Memcheck:Leak
+   fun:vkCreateInstance
+   ...
+}
+
+{
+   Vulkan_Device
+   Memcheck:Leak
+   fun:vkCreateDevice
+   ...
+}
+
+# Suppress dlopen/dlsym leaks (dynamic loader manages its own memory)
+{
+   Dynamic_Loader
+   Memcheck:Leak
+   fun:dlopen
+   ...
+}
+
+{
+   Dynamic_Loader_Symbol
+   Memcheck:Leak
+   fun:dlsym
+   ...
+}
+
+# Suppress X11 library leaks (X11 manages its own memory)
+{
+   X11_Display
+   Memcheck:Leak
+   fun:XOpenDisplay
+   ...
+}
+
+# Suppress fontconfig leaks (fontconfig manages its own cache)
+{
+   FontConfig
+   Memcheck:Leak
+   fun:FcInit*
+   ...
+}
+
+# Suppress zlib initialization (zlib manages internal state)
+{
+   ZLib_Init
+   Memcheck:Leak
+   fun:inflateInit*
+   ...
+}
+
+{
+   ZLib_Stream
+   Memcheck:Leak
+   fun:deflateInit*
+   ...
+}
+
+# Suppress C++ STL internal allocations (implementation detail)
+{
+   STL_Internal
+   Memcheck:Leak
+   fun:*alloc
+   obj:*/libstdc++.so*
+   ...
+}
+
+# Suppress intentional memory leaks in third-party libraries
+{
+   ThirdParty_Library
+   Memcheck:Leak
+   fun:malloc
+   obj:*libSDL2*
+   ...
+}
+
+{
+   ThirdParty_Library_OpenAL
+   Memcheck:Leak
+   fun:malloc
+   obj:*libopenal*
+   ...
+}
+
+# Suppress false positives from compiler optimizations
+{
+   Compiler_Optimization
+   Memcheck:Cond
+   fun:*
+   obj:*
+}
+
+# Suppress uninitialized memory reads in third-party code
+{
+   ThirdParty_Uninit
+   Memcheck:UninitValue
+   fun:*
+   obj:*libSDL2*
+   ...
+}
+
+{
+   ThirdParty_Uninit_OpenAL
+   Memcheck:UninitValue
+   fun:*
+   obj:*libopenal*
+   ...
+}

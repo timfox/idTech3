@@ -25,6 +25,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "qcommon.h"
 #include "q_log.h"
 #include "profiler.h"
+#include "performance_counters.h"
+#include "vm_hot_reload.h"
+#include "event_system.h"
 #include "q_memtrack.h"
 #include "i18n.h"
 #include <locale.h>
@@ -46,7 +49,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../client/keys.h"
 
-const int demo_protocols[] = { 66, 67, OLD_PROTOCOL_VERSION, NEW_PROTOCOL_VERSION, 0 };
+const int demo_protocols[] = { PROTOCOL_VERSION_66, PROTOCOL_VERSION_67, OLD_PROTOCOL_VERSION, NEW_PROTOCOL_VERSION, 0 };
 
 #define USE_MULTI_SEGMENT // allocate additional zone segments on demand
 
@@ -188,9 +191,9 @@ void Com_EndRedirect( void )
 		rd_flushing = qfalse;
 	}
 
-	rd_buffer = NULL;
+	rd_buffer = nullptr;
 	rd_buffersize = 0;
-	rd_flush = NULL;
+	rd_flush = nullptr;
 }
 
 /*
@@ -222,6 +225,7 @@ A raw string should NEVER be passed as fmt, because of "%f" type crashers.
 =============
 */
 void FORMAT_PRINTF(1, 2) QDECL Com_Printf( const char *fmt, ... ) {
+	PROF_ZONE_BEGIN(prof_printf, "Com_Printf");
 	static qboolean opening_qconsole = qfalse;
 	va_list		argptr;
 	char		msg[MAXPRINTMSG];
@@ -329,6 +333,7 @@ void FORMAT_PRINTF(1, 2) QDECL Com_Printf( const char *fmt, ... ) {
 			FS_Write( msg, len, logfile );
 		}
 	}
+	PROF_ZONE_END(prof_printf);
 }
 
 
@@ -395,9 +400,12 @@ void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t code, const char 
 	}
 
 	// if we are getting a solid stream of ERR_DROP, do an ERR_FATAL
+#define ERROR_RATE_LIMIT_MS 100
+#define ERROR_RATE_LIMIT_COUNT 3
+
 	currentTime = Sys_Milliseconds();
-	if ( currentTime - lastErrorTime < 100 ) {
-		if ( ++errorCount > 3 ) {
+	if ( currentTime - lastErrorTime < ERROR_RATE_LIMIT_MS ) {
+		if ( ++errorCount > ERROR_RATE_LIMIT_COUNT ) {
 			code = ERR_FATAL;
 		}
 	} else {
@@ -930,7 +938,7 @@ static const char *Com_StringContains( const char *str1, const char *str2, int l
 			return str1;
 		}
 	}
-	return NULL;
+	return nullptr;
 }
 
 
@@ -1355,7 +1363,7 @@ static freeblock_t *NewBlock( memzone_t *zone, int size )
 	if ( sep == NULL ) {
 		Com_Error( ERR_FATAL, "Z_Malloc: failed on allocation of %i bytes from the %s zone",
 			size, zone == smallzone ? "small" : "main" );
-		return NULL;
+		return nullptr;
 	}
 	block = sep+1;
 
@@ -1441,7 +1449,7 @@ static memblock_t *SearchFree( memzone_t *zone, int size )
 			return base;
 		}
 	}
-	return NULL;
+	return nullptr;
 }
 #endif // USE_MULTI_SEGMENT
 
@@ -1669,9 +1677,11 @@ Z_TagMalloc
 */
 #ifdef ZONE_DEBUG
 void *Z_TagMallocDebug( int size, memtag_t tag, char *label, char *file, int line ) {
+	PROF_ZONE_BEGIN(prof_zmalloc, "Z_TagMallocDebug");
 	int		allocSize;
 #else
 void *Z_TagMalloc( int size, memtag_t tag ) {
+	PROF_ZONE_BEGIN(prof_zmalloc, "Z_TagMalloc");
 #endif
 	int		extra;
 #ifndef USE_MULTI_SEGMENT
@@ -1731,7 +1741,7 @@ void *Z_TagMalloc( int size, memtag_t tag ) {
 			Com_Error( ERR_FATAL, "Z_Malloc: failed on allocation of %i bytes from the %s zone",
 								size, zone == smallzone ? "small" : "main" );
 #endif
-			return NULL;
+			return nullptr;
 		}
 		if ( rover->tag != TAG_FREE ) {
 			base = rover = rover->next;
@@ -1782,6 +1792,7 @@ void *Z_TagMalloc( int size, memtag_t tag ) {
 	*(int *)((byte *)base + base->size - 4) = ZONEID;
 #endif
 
+	PROF_ZONE_END(prof_zmalloc);
 	return (void *) ( base + 1 );
 }
 
@@ -4021,6 +4032,15 @@ void Com_Init( char *commandLine ) {
 	Com_InitSmallZoneMemory();
 	Cvar_Init();
 
+	// Initialize performance counters
+	Perf_Init();
+
+	// Initialize VM hot reload system
+	VM_HotReloadInit();
+
+	// Initialize event system
+	Event_Init();
+
 #if defined(_WIN32) && defined(_DEBUG)
 	com_noErrorInterrupt = Cvar_Get( "com_noErrorInterrupt", "0", 0 );
 #endif
@@ -4219,6 +4239,13 @@ void Com_Init( char *commandLine ) {
 	Cmd_AddCommand( "help", Com_Help_f );
 	Cmd_AddCommand( "about", Com_About_f );
 	Cmd_AddCommand( "buildinfo", Com_BuildInfo_f );
+	Cmd_AddCommand( "perfinfo", Perf_DisplayInfo_f );
+
+	// Register VM hot reload commands
+	VM_HotReloadRegisterCommands();
+
+	// Register event system commands
+	Cmd_AddCommand( "event_stats", Event_PrintStats );
 	Cmd_AddCommand( "changeVectors", MSG_ReportChangeVectors_f );
 	Cmd_AddCommand( "writeconfig", Com_WriteConfig_f );
 	Cmd_SetCommandCompletionFunc( "writeconfig", Cmd_CompleteWriteCfgName );
@@ -4558,6 +4585,9 @@ void Com_Frame( qboolean noDelay ) {
 	PROF_FRAME_MARK();
 	PROF_ZONE_BEGIN(prof_frame, "Com_Frame");
 
+	// Publish frame start event
+	PUBLISH_EVENT(EVENT_TYPE_ENGINE_FRAME_START, EVENT_CATEGORY_ENGINE, NULL, 0);
+
 	minMsec = 0; // silent compiler warning
 
 	// bk001204 - init to zero.
@@ -4591,6 +4621,7 @@ void Com_Frame( qboolean noDelay ) {
 	//
 	// main event loop
 	//
+	PROF_ZONE_BEGIN(prof_events, "Event Processing");
 	if ( com_speeds->integer ) {
 		timeBeforeFirstEvents = Sys_Milliseconds();
 	}
@@ -4657,15 +4688,18 @@ void Com_Frame( qboolean noDelay ) {
 
 	// mess with msec if needed
 	msec = Com_ModifyMsec( realMsec );
+	PROF_ZONE_END(prof_events);
 
 	//
 	// server side
 	//
+	PROF_ZONE_BEGIN(prof_server, "Server Frame");
 	if ( com_speeds->integer ) {
 		timeBeforeServer = Sys_Milliseconds();
 	}
 
 	SV_Frame( msec );
+	PROF_ZONE_END(prof_server);
 
 #ifdef USE_LUA
 	// Update Lua event bus (process queued events)
@@ -4744,6 +4778,7 @@ void Com_Frame( qboolean noDelay ) {
 		//
 		// client side
 		//
+		PROF_ZONE_BEGIN(prof_client, "Client Frame");
 		if ( com_speeds->integer ) {
 			timeBeforeClient = Sys_Milliseconds();
 		}
@@ -4753,6 +4788,7 @@ void Com_Frame( qboolean noDelay ) {
 		if ( com_speeds->integer ) {
 			timeAfter = Sys_Milliseconds();
 		}
+		PROF_ZONE_END(prof_client);
 	}
 #endif
 
@@ -4799,6 +4835,19 @@ void Com_Frame( qboolean noDelay ) {
 	}
 
 	com_frameNumber++;
+
+	// Update performance counters
+	Perf_Frame(msec);
+
+	// Check for VM hot reload
+	VM_CheckHotReload();
+
+	// Publish frame end event
+	PUBLISH_EVENT(EVENT_TYPE_ENGINE_FRAME_END, EVENT_CATEGORY_ENGINE, NULL, 0);
+
+	// Process immediate events
+	Event_ProcessImmediate();
+
 	PROF_ZONE_END(prof_frame);
 }
 
@@ -4957,7 +5006,7 @@ static const char *Field_FindFirstSeparator( const char *s )
 			return s;
 		s++;
 	}
-	return NULL;
+	return nullptr;
 }
 
 

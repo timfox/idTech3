@@ -142,29 +142,56 @@ OPTION(ENABLE_ASAN "Enable AddressSanitizer (ASan) for memory error detection" O
 OPTION(ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer (UBSan) for undefined behavior detection" OFF)
 OPTION(ENABLE_MSAN "Enable MemorySanitizer (MSan) for uninitialized memory detection" OFF)
 OPTION(ENABLE_TSAN "Enable ThreadSanitizer (TSan) for data race detection" OFF)
+OPTION(ENABLE_VALGRIND "Enable Valgrind integration (debug symbols, no optimization)" OFF)
 OPTION(ENABLE_COVERAGE "Enable code coverage instrumentation (gcc/clang, Debug)" OFF)
 OPTION(ENABLE_MEMORY_TRACKING "Enable memory usage tracking and statistics" ON)
+OPTION(USE_TRACY "Enable Tracy Profiler integration for performance analysis" OFF)
+
+# Windows-specific memory analysis
+OPTION(ENABLE_DRMEMORY "Enable Dr. Memory integration (Windows only)" OFF)
 
 # Static analysis options
 OPTION(ENABLE_STATIC_ANALYSIS "Enable static analysis tools (clang-tidy, cppcheck)" OFF)
+OPTION(ENABLE_CLANG_TIDY "Enable clang-tidy static analysis" OFF)
+OPTION(ENABLE_CPPCHECK "Enable cppcheck static analysis" OFF)
 
-IF(ENABLE_STATIC_ANALYSIS)
+IF(ENABLE_STATIC_ANALYSIS OR ENABLE_CLANG_TIDY OR ENABLE_CPPCHECK)
 	# Try to find clang-tidy
 	FIND_PROGRAM(CLANG_TIDY_EXE NAMES clang-tidy)
-	IF(CLANG_TIDY_EXE)
-		SET(CMAKE_C_CLANG_TIDY "${CLANG_TIDY_EXE}" "-checks=-*,readability-*,performance-*,portability-*,bugprone-*")
-		MESSAGE(STATUS "Static analysis: clang-tidy enabled")
-	ELSE()
+	IF((ENABLE_STATIC_ANALYSIS OR ENABLE_CLANG_TIDY) AND CLANG_TIDY_EXE)
+		# Use .clang-tidy configuration file if it exists
+		IF(EXISTS "${CMAKE_SOURCE_DIR}/.clang-tidy")
+			SET(CMAKE_C_CLANG_TIDY "${CLANG_TIDY_EXE}")
+			SET(CMAKE_CXX_CLANG_TIDY "${CLANG_TIDY_EXE}")
+			MESSAGE(STATUS "Static analysis: clang-tidy enabled (using .clang-tidy config)")
+		ELSE()
+			# Fallback to basic checks
+			SET(CMAKE_C_CLANG_TIDY "${CLANG_TIDY_EXE}" "-checks=-*,readability-*,performance-*,portability-*,bugprone-*")
+			SET(CMAKE_CXX_CLANG_TIDY "${CLANG_TIDY_EXE}" "-checks=-*,readability-*,performance-*,portability-*,bugprone-*")
+			MESSAGE(STATUS "Static analysis: clang-tidy enabled (basic checks)")
+		ENDIF()
+	ELSEIF((ENABLE_STATIC_ANALYSIS OR ENABLE_CLANG_TIDY) AND NOT CLANG_TIDY_EXE)
 		MESSAGE(WARNING "Static analysis: clang-tidy not found")
+		MESSAGE(STATUS "Install clang-tidy: sudo apt install clang-tidy")
 	ENDIF()
-	
+
 	# Try to find cppcheck
 	FIND_PROGRAM(CPPCHECK_EXE NAMES cppcheck)
-	IF(CPPCHECK_EXE)
-		SET(CMAKE_C_CPPCHECK "${CPPCHECK_EXE}" "--enable=all" "--suppress=missingIncludeSystem")
-		MESSAGE(STATUS "Static analysis: cppcheck enabled")
-	ELSE()
+	IF((ENABLE_STATIC_ANALYSIS OR ENABLE_CPPCHECK) AND CPPCHECK_EXE)
+		# Use cppcheck.cfg configuration file if it exists
+		IF(EXISTS "${CMAKE_SOURCE_DIR}/cppcheck.cfg")
+			SET(CMAKE_C_CPPCHECK "${CPPCHECK_EXE}" "--config-exclude=${CMAKE_SOURCE_DIR}/cppcheck.cfg")
+			SET(CMAKE_CXX_CPPCHECK "${CPPCHECK_EXE}" "--config-exclude=${CMAKE_SOURCE_DIR}/cppcheck.cfg")
+			MESSAGE(STATUS "Static analysis: cppcheck enabled (using cppcheck.cfg config)")
+		ELSE()
+			# Fallback to basic configuration
+			SET(CMAKE_C_CPPCHECK "${CPPCHECK_EXE}" "--enable=all" "--suppress=missingIncludeSystem" "--inline-suppr")
+			SET(CMAKE_CXX_CPPCHECK "${CPPCHECK_EXE}" "--enable=all" "--suppress=missingIncludeSystem" "--inline-suppr")
+			MESSAGE(STATUS "Static analysis: cppcheck enabled (basic config)")
+		ENDIF()
+	ELSEIF((ENABLE_STATIC_ANALYSIS OR ENABLE_CPPCHECK) AND NOT CPPCHECK_EXE)
 		MESSAGE(WARNING "Static analysis: cppcheck not found")
+		MESSAGE(STATUS "Install cppcheck: sudo apt install cppcheck")
 	ENDIF()
 ENDIF()
 
@@ -295,6 +322,12 @@ AUX_SOURCE_DIRECTORY(src/qcommon QCOMMON_SRCS)
 list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*vm_[alx].*.c")
 # Add structured logging system
 list(APPEND QCOMMON_SRCS src/qcommon/q_log.c)
+# Add performance counters
+list(APPEND QCOMMON_SRCS src/qcommon/performance_counters.c)
+# Add VM hot reload system
+list(APPEND QCOMMON_SRCS src/qcommon/vm_hot_reload.c)
+# Add event system
+list(APPEND QCOMMON_SRCS src/qcommon/event_system.c)
 # Add wrapper files conditionally
 IF(USE_CJSON)
 	list(APPEND QCOMMON_SRCS src/qcommon/json_cjson.c)
@@ -2286,6 +2319,51 @@ ELSE()
 	ENDIF()
 ENDIF()
 
+# Tracy Profiler Integration
+IF(USE_TRACY)
+	# Try to find Tracy headers
+	FIND_PATH(TRACY_INCLUDE_DIR TracyC.h
+		PATHS
+		/usr/include
+		/usr/local/include
+		/opt/tracy/include
+		${CMAKE_SOURCE_DIR}/libs/tracy
+	)
+
+	IF(TRACY_INCLUDE_DIR)
+		MESSAGE(STATUS "Tracy Profiler enabled - found headers at: ${TRACY_INCLUDE_DIR}")
+
+		# Add Tracy include directory to all relevant targets
+		TARGET_INCLUDE_DIRECTORIES(qcommon PUBLIC ${TRACY_INCLUDE_DIR})
+		TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${TRACY_INCLUDE_DIR})
+		TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE USE_TRACY)
+		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_TRACY)
+
+		# Try to find Tracy library (optional - Tracy can be header-only)
+		FIND_LIBRARY(TRACY_LIBRARY
+			NAMES TracyClient TracyClientDebug
+			PATHS
+			/usr/lib
+			/usr/lib64
+			/usr/local/lib
+			/opt/tracy/lib
+			${CMAKE_SOURCE_DIR}/libs/tracy/build
+		)
+
+		IF(TRACY_LIBRARY)
+			MESSAGE(STATUS "Found Tracy library: ${TRACY_LIBRARY}")
+			TARGET_LINK_LIBRARIES(qcommon PRIVATE ${TRACY_LIBRARY})
+			TARGET_LINK_LIBRARIES(client PRIVATE ${TRACY_LIBRARY})
+		ELSE()
+			MESSAGE(STATUS "Tracy headers found but library not found - using header-only mode")
+		ENDIF()
+	ELSE()
+		MESSAGE(WARNING "USE_TRACY enabled but Tracy headers not found. Install Tracy or set TRACY_INCLUDE_DIR.")
+		MESSAGE(STATUS "To install Tracy: git clone https://github.com/wolfpld/tracy.git && cd tracy && make -j")
+		SET(USE_TRACY OFF CACHE BOOL "" FORCE)
+	ENDIF()
+ENDIF()
+
 # q3ui - includes both platform UI sources (Q3_UI_SRCS) and game UI sources (Q3UI_SRCS)
 # Q3_UI_SRCS contains platform-specific UI code (SDL/X11/Windows), Q3UI_SRCS contains game UI code
 AUX_SOURCE_DIRECTORY(src/ui Q3UI_SRCS)
@@ -2353,5 +2431,21 @@ IF(BUILD_TESTS)
 	TARGET_INCLUDE_DIRECTORIES(test_info PRIVATE src/qcommon)
 	TARGET_INCLUDE_DIRECTORIES(test_info PRIVATE src)
 	ADD_TEST(NAME info_tests COMMAND test_info)
+
+	ADD_EXECUTABLE(test_performance_counters
+		tests/test_performance_counters.c
+		src/qcommon/performance_counters.c)
+	TARGET_INCLUDE_DIRECTORIES(test_performance_counters PRIVATE src/qcommon)
+	TARGET_INCLUDE_DIRECTORIES(test_performance_counters PRIVATE src)
+	TARGET_COMPILE_DEFINITIONS(test_performance_counters PRIVATE STANDALONE_TEST)
+	ADD_TEST(NAME performance_counters_tests COMMAND test_performance_counters)
+
+	ADD_EXECUTABLE(test_memory
+		tests/test_memory.c)
+	TARGET_INCLUDE_DIRECTORIES(test_memory PRIVATE src/qcommon)
+	TARGET_INCLUDE_DIRECTORIES(test_memory PRIVATE src)
+	TARGET_COMPILE_DEFINITIONS(test_memory PRIVATE STANDALONE_TEST)
+	ADD_TEST(NAME memory_tests COMMAND test_memory)
+
 	MESSAGE(STATUS "Unit tests enabled")
 ENDIF()
