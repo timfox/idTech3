@@ -117,6 +117,9 @@ layout (constant_id = 10) const int acff = 0; // NONE, RGB, RGBA, ALPHA
 #ifdef USE_VK_PBR
 #include "shader_constants.glsl"
 #include "material_params.glsl"
+#ifdef USE_VULKAN_RAY_TRACING
+#include "gibs_sampling.glsl"
+#endif
 
 struct NTB {
 	PRECISION_MEDIUMP vec3 normal, tangent, binormal;
@@ -126,6 +129,9 @@ layout(location = 9) in PRECISION_MEDIUMP vec4 var_Normal;
 layout(location = 10) in PRECISION_MEDIUMP vec4 var_LightDir;
 layout(location = 11) in PRECISION_MEDIUMP vec4 var_ViewDir;
 layout(location = 12) in NTB in_ntb;
+#ifdef USE_VULKAN_RAY_TRACING
+layout(location = 13) in vec3 var_WorldPos;
+#endif
 
 layout(set = 5, binding = 0) uniform PRECISION_MEDIUMP sampler2D brdflut_texture;
 layout(set = 6, binding = 0) uniform PRECISION_MEDIUMP sampler2D normal_texture;
@@ -843,6 +849,12 @@ void main() {
 		out_color.rgb += CalcIBLContribution( roughness, N, E, NE, specular.rgb * AO );
 		
 	out_color.rgb += glintTerm * specular.rgb;
+	
+	// Add GIBS indirect lighting (surfel-based global illumination)
+#ifdef USE_VULKAN_RAY_TRACING
+	vec3 gibsIndirect = sampleGIBSIrradiance(var_WorldPos, N);
+	out_color.rgb += gibsIndirect * diffuse.rgb;
+#endif
 	
 	// Add material emissive (magic glow, corruption, etc.)
 	out_color.rgb += materialEmissive;

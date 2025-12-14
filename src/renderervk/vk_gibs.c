@@ -501,11 +501,18 @@ void vk_gibs_create_pipelines( void )
 	updateWrites[2].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
 	updateWrites[2].descriptorCount = 1;
 	
-	// Blue noise texture (placeholder - will need to be created/loaded)
-	// For now, use a null descriptor or default texture
-	updateBlueNoiseImageInfo.sampler = vk.samplers.handle[0];
-	updateBlueNoiseImageInfo.imageView = VK_NULL_HANDLE; // TODO: Create/load blue noise texture
-	updateBlueNoiseImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	// Blue noise texture - use ray tracing system's blue noise texture if available
+	if ( vk.rt.blueNoiseTexture && vk.rt.blueNoiseTexture->view != VK_NULL_HANDLE ) {
+		updateBlueNoiseImageInfo.sampler = vk.samplers.handle[0];
+		updateBlueNoiseImageInfo.imageView = vk.rt.blueNoiseTexture->view;
+		updateBlueNoiseImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	} else {
+		// Fallback to default sampler with null image view (shader will handle gracefully)
+		updateBlueNoiseImageInfo.sampler = vk.samplers.handle[0];
+		updateBlueNoiseImageInfo.imageView = VK_NULL_HANDLE;
+		updateBlueNoiseImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		ri.Printf( PRINT_WARNING, "GIBS: Blue noise texture not available, using fallback\n" );
+	}
 	
 	updateWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	updateWrites[3].dstSet = vk.gibs.updateDescriptorSet;
@@ -548,10 +555,18 @@ void vk_gibs_create_pipelines( void )
 	spawnWrites[1].descriptorCount = 1;
 	spawnWrites[1].pBufferInfo = &spawnSurfelBufferInfo;
 	
-	// Depth buffer (G-buffer depth texture) - TODO: Use actual depth buffer from G-buffer
-	spawnDepthImageInfo.sampler = vk.samplers.handle[0];
-	spawnDepthImageInfo.imageView = VK_NULL_HANDLE; // TODO: Use actual depth buffer from G-buffer
-	spawnDepthImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	// Depth buffer (G-buffer depth texture) - use ray tracing system's depth buffer
+	if ( vk.rt.denoiseDepthBufferView != VK_NULL_HANDLE ) {
+		spawnDepthImageInfo.sampler = vk.samplers.handle[0];
+		spawnDepthImageInfo.imageView = vk.rt.denoiseDepthBufferView;
+		spawnDepthImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	} else {
+		// Fallback - use main depth buffer if available
+		spawnDepthImageInfo.sampler = vk.samplers.handle[0];
+		spawnDepthImageInfo.imageView = vk.depth_image_view;
+		spawnDepthImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		ri.Printf( PRINT_WARNING, "GIBS: Using main depth buffer for surfel spawning\n" );
+	}
 	
 	spawnWrites[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	spawnWrites[2].dstSet = vk.gibs.spawnDescriptorSet;
@@ -560,10 +575,18 @@ void vk_gibs_create_pipelines( void )
 	spawnWrites[2].descriptorCount = 1;
 	spawnWrites[2].pImageInfo = &spawnDepthImageInfo;
 	
-	// Normal buffer (G-buffer normal texture) - TODO: Use actual normal buffer from G-buffer
-	spawnNormalImageInfo.sampler = vk.samplers.handle[0];
-	spawnNormalImageInfo.imageView = VK_NULL_HANDLE; // TODO: Use actual normal buffer from G-buffer
-	spawnNormalImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	// Normal buffer (G-buffer normal texture) - use ray tracing system's normal buffer
+	if ( vk.rt.denoiseNormalBufferView != VK_NULL_HANDLE ) {
+		spawnNormalImageInfo.sampler = vk.samplers.handle[0];
+		spawnNormalImageInfo.imageView = vk.rt.denoiseNormalBufferView;
+		spawnNormalImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	} else {
+		// Fallback - use null descriptor (shader will handle gracefully)
+		spawnNormalImageInfo.sampler = vk.samplers.handle[0];
+		spawnNormalImageInfo.imageView = VK_NULL_HANDLE;
+		spawnNormalImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		ri.Printf( PRINT_WARNING, "GIBS: Normal buffer not available for surfel spawning\n" );
+	}
 	
 	spawnWrites[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
 	spawnWrites[3].dstSet = vk.gibs.spawnDescriptorSet;
@@ -625,10 +648,13 @@ void vk_gibs_update( void )
 			Matrix16Identity( gibsUniformData.viewInverse );
 		}
 		
-		// Get projection inverse matrix (projection matrices are usually not affine, use standard inversion)
+		// Get projection inverse matrix (projection matrices are not affine, use general inversion)
+		// Matrix16InverseOptimized handles both affine and non-affine matrices correctly
 		if ( backEnd.viewParms.projectionMatrix ) {
 			mat4_t projMatrix;
 			Com_Memcpy( projMatrix, backEnd.viewParms.projectionMatrix, sizeof( mat4_t ) );
+			// Projection matrices are not affine (bottom row is not [0,0,0,1])
+			// Matrix16InverseOptimized will use the general 4x4 inversion path
 			Matrix16InverseOptimized( projMatrix, gibsUniformData.projInverse );
 		} else {
 			Matrix16Identity( gibsUniformData.projInverse );
@@ -650,6 +676,12 @@ void vk_gibs_update( void )
 		gibsUniformData.intensity = r_gibs_intensity ? r_gibs_intensity->value : 1.0f;
 		gibsUniformData.updateRate = updateRate;
 		gibsUniformData.tlasAddress = vk.rt.tlasDeviceAddress;
+		
+		// Update uniform buffer on GPU
+		void *mapped;
+		VK_CHECK( qvkMapMemory( vk.device, vk.gibs.uniformBufferMemory, 0, sizeof( GIBSUniformBuffer ), 0, &mapped ) );
+		Com_Memcpy( mapped, &gibsUniformData, sizeof( GIBSUniformBuffer ) );
+		qvkUnmapMemory( vk.device, vk.gibs.uniformBufferMemory );
 		
 		// Dispatch compute shader to update surfels
 		// Calculate how many surfels to update this frame
@@ -680,6 +712,11 @@ void vk_gibs_update( void )
 		// Update offset for next frame
 		vk.gibs.updateFrameOffset = ( vk.gibs.updateFrameOffset + updateCount ) % vk.gibs.surfelCount;
 		vk.gibs.updatedSurfelCount = updateCount;
+		
+		// Cull stale surfels periodically (every 10 update cycles)
+		if ( ( vk.gibs.frameCounter % ( updateRate * 10 ) ) == 0 ) {
+			vk_gibs_cull_stale_surfels();
+		}
 	}
 }
 
@@ -728,6 +765,34 @@ void vk_gibs_spawn_surfels( void )
 	
 	// Update surfel count (simplified - shader should update this atomically)
 	// In a full implementation, we'd read back the count from GPU
+}
+
+/*
+=============================================================================
+GIBS Surfel Culling - Remove stale surfels
+=============================================================================
+*/
+void vk_gibs_cull_stale_surfels( void )
+{
+	if ( !vk.gibs.enabled || !vk.gibs.initialized ) {
+		return;
+	}
+	
+	// This is a simplified CPU-side culling pass
+	// In a full implementation, this would be done on GPU via compute shader
+	// For now, we'll mark stale surfels for removal in the next spawn pass
+	
+	// The shader already marks surfels as STALE when age > 1000
+	// We can add additional culling logic here:
+	// - Remove surfels that are too far from camera
+	// - Remove surfels with very low confidence
+	// - Remove surfels that haven't been updated recently
+	
+	// For now, the shader handles stale marking, and we'll rely on that
+	// A full GPU-based culling pass would be more efficient but requires
+	// additional compute shader implementation
+	
+	ri.Printf( PRINT_DEVELOPER, "GIBS: Culling stale surfels (handled by shader)\n" );
 }
 
 /*

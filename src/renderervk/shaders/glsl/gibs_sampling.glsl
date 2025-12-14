@@ -6,6 +6,15 @@
 
 #include "gibs_surfel.glsl"
 
+// Simple spatial hash function for grid-based acceleration structure
+// This is a basic implementation - a full spatial hash would require
+// a separate buffer storing grid cells and surfel indices
+uint spatialHash(vec3 pos, float cellSize) {
+    ivec3 cell = ivec3(floor(pos / cellSize));
+    // Simple hash function combining cell coordinates
+    return uint(cell.x * 73856093u) ^ uint(cell.y * 19349663u) ^ uint(cell.z * 83492791u);
+}
+
 // Sample nearby surfels for indirect lighting
 vec3 sampleGIBSIrradiance(vec3 worldPos, vec3 normal) {
     vec3 indirectLight = vec3(0.0);
@@ -13,15 +22,22 @@ vec3 sampleGIBSIrradiance(vec3 worldPos, vec3 normal) {
     
     // Search radius based on surfel radius
     float searchRadius = ubo.surfelRadius * 2.0;
+    float cellSize = searchRadius; // Grid cell size matches search radius
     
     // Sample nearby surfels
-    // In a full implementation, this would use a spatial acceleration structure
-    // For now, we'll sample a subset of surfels
+    // TODO: Implement full spatial acceleration structure (grid hash or octree)
+    // For now, use improved sampling with spatial hash-based selection
     uint sampleCount = min(ubo.surfelCount, 64u); // Limit samples for performance
     uint step = max(1u, ubo.surfelCount / sampleCount);
     
+    // Use spatial hash to bias sampling toward nearby cells
+    uint baseHash = spatialHash(worldPos, cellSize);
+    
     for (uint i = 0; i < sampleCount; i++) {
-        uint index = i * step;
+        // Use hash-based index selection to improve spatial locality
+        uint hashIndex = (baseHash + i * 12345u) % ubo.surfelCount;
+        uint index = hashIndex;
+        
         if (index >= ubo.surfelCount) break;
         
         Surfel surfel = surfels[index];

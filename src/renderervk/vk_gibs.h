@@ -83,6 +83,7 @@ void vk_gibs_shutdown( void );
 void vk_gibs_create_pipelines( void );
 void vk_gibs_update( void );
 void vk_gibs_spawn_surfels( void );
+void vk_gibs_cull_stale_surfels( void );
 qboolean vk_gibs_is_enabled( void );
 
 // CVars
