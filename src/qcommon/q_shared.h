@@ -245,11 +245,6 @@ typedef union {
 	uint32_t u32;
 } color4ub_t;
 
-// Static assertions for critical structure sizes
-static_assert(sizeof(vec3_t) == 12, "vec3_t must be 12 bytes for network compatibility");
-static_assert(sizeof(color4ub_t) == 4, "color4ub_t must be 4 bytes");
-static_assert(sizeof(floatint_t) == 4, "floatint_t must be 4 bytes for type punning");
-
 
 typedef int		qhandle_t;
 typedef int		sfxHandle_t;
@@ -422,6 +417,11 @@ typedef vec_t vec4_t[4];
 typedef vec_t vec5_t[5];
 
 typedef vec_t quat_t[4];
+
+// Static assertions for critical structure sizes (must be after type definitions)
+static_assert(sizeof(vec3_t) == 12, "vec3_t must be 12 bytes for network compatibility");
+static_assert(sizeof(color4ub_t) == 4, "color4ub_t must be 4 bytes");
+static_assert(sizeof(floatint_t) == 4, "floatint_t must be 4 bytes for type punning");
 
 typedef	int	fixed4_t;
 typedef	int	fixed8_t;

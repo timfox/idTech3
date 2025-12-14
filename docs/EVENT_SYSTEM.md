@@ -47,6 +47,12 @@ void Event_Shutdown(void);
 ### Publishing Events
 
 ```c
+// Publishing functions
+qboolean Event_Publish(event_t *event);                    // Immediate (default)
+qboolean Event_PublishImmediate(event_t *event);            // Immediate
+qboolean Event_PublishDeferred(event_t *event);             // Deferred
+qboolean Event_PublishScheduled(event_t *event, uint32_t delayMs);  // Scheduled
+
 // Create and publish an event immediately
 PUBLISH_EVENT(EVENT_TYPE_ENTITY_SPAWN, EVENT_CATEGORY_ENTITY, &entityData, sizeof(entityData));
 

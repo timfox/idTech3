@@ -57,10 +57,11 @@ typedef void (*eventHandler_t)(const event_t *event, void *userData);
 // Event subscription handle (for unsubscribing)
 typedef struct eventSubscription_s *eventSubscription_t;
 
-// Event queue entry for deferred processing
+// Event queue entry for deferred/scheduled processing
 typedef struct {
 	event_t *event;
-	uint32_t timestamp;
+	uint32_t timestamp;        // When event was queued
+	uint32_t scheduledTime;    // When event should be processed (for scheduled events)
 	eventHandler_t handler;
 	void *userData;
 } eventQueueEntry_t;
@@ -85,6 +86,7 @@ Event Publishing
 qboolean Event_Publish(event_t *event);
 qboolean Event_PublishImmediate(event_t *event);
 qboolean Event_PublishDeferred(event_t *event);
+qboolean Event_PublishScheduled(event_t *event, uint32_t delayMs);
 
 /*
 ================
@@ -110,6 +112,7 @@ Event Processing
 */
 void Event_ProcessImmediate(void);
 void Event_ProcessDeferred(void);
+void Event_ProcessScheduled(void);
 void Event_ProcessAll(void);
 
 /*
@@ -137,6 +140,21 @@ void Event_PrintStats(void);
 uint32_t Event_GetQueueSize(void);
 uint32_t Event_GetSubscriptionCount(uint32_t eventType);
 
+// Get event system statistics for debug overlays
+typedef struct {
+	uint32_t eventsPublished;
+	uint32_t eventsProcessed;
+	uint32_t subscriptionsCreated;
+	uint32_t subscriptionsDestroyed;
+	uint32_t activeSubscriptions;
+	uint32_t immediateQueueSize;
+	uint32_t deferredQueueSize;
+	uint32_t scheduledQueueSize;
+	uint32_t registeredEventTypes;
+} eventSystemStats_t;
+
+void Event_GetStats(eventSystemStats_t *stats);
+
 /*
 ================
 Thread Safety
@@ -162,10 +180,44 @@ void Event_Unlock(void);
 #define PUBLISH_EVENT(type, category, data, size) \
 	do { \
 		event_t *evt = Event_Create(type, category, size); \
-		if (evt && data) { \
-			Com_Memcpy(evt->data, data, size); \
+		if (evt) { \
+			const void *_evt_data = (data); \
+			uint32_t _evt_size = (size); \
+			if (_evt_size > 0 && _evt_data != NULL) { \
+				Com_Memcpy(evt->data, _evt_data, _evt_size); \
+			} \
+			Event_Publish(evt); \
 		} \
-		Event_Publish(evt); \
+	} while(0)
+
+// Create and publish an event with explicit phase
+#define PUBLISH_EVENT_PHASE(type, category, phase, data, size) \
+	do { \
+		event_t *evt = Event_Create(type, category, size); \
+		if (evt) { \
+			if ((size) > 0 && (data) != NULL) { \
+				Com_Memcpy(evt->data, (data), (size)); \
+			} \
+			if ((phase) == EVENT_PHASE_IMMEDIATE) { \
+				Event_PublishImmediate(evt); \
+			} else if ((phase) == EVENT_PHASE_DEFERRED) { \
+				Event_PublishDeferred(evt); \
+			} else { \
+				Event_Publish(evt); \
+			} \
+		} \
+	} while(0)
+
+// Create and publish a scheduled event (delay in milliseconds)
+#define PUBLISH_EVENT_SCHEDULED(type, category, delayMs, data, size) \
+	do { \
+		event_t *evt = Event_Create(type, category, size); \
+		if (evt) { \
+			if ((size) > 0 && (data) != NULL) { \
+				Com_Memcpy(evt->data, (data), (size)); \
+			} \
+			Event_PublishScheduled(evt, delayMs); \
+		} \
 	} while(0)
 
 // Subscribe to an event type

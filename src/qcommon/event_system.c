@@ -7,6 +7,10 @@ Event System Implementation
 #include "event_system.h"
 #include "qcommon.h"
 
+// Forward declarations for event handlers
+static void Event_OnFrameStart(const event_t *event, void *userData);
+static void Event_OnFrameEnd(const event_t *event, void *userData);
+
 // ============================================================================
 // Internal Data Structures
 // ============================================================================
@@ -16,14 +20,14 @@ Event System Implementation
 #define MAX_EVENT_TYPES 512
 
 // Event subscription
-typedef struct eventSubscription_s {
+struct eventSubscription_s {
 	uint32_t eventType;
 	eventHandler_t handler;
 	void *userData;
 	eventPriority_t priority;
 	qboolean active;
 	struct eventSubscription_s *next;  // Linked list for multiple handlers per type
-} eventSubscription_t;
+};
 
 // Event type registry
 typedef struct {
@@ -34,14 +38,16 @@ typedef struct {
 // Global event system state
 static struct {
 	// Subscription management
-	eventSubscription_t subscriptions[MAX_EVENT_SUBSCRIPTIONS];
-	eventSubscription_t *subscriptionHash[MAX_EVENT_TYPES];  // Hash table for fast lookup
+	struct eventSubscription_s subscriptions[MAX_EVENT_SUBSCRIPTIONS];
+	struct eventSubscription_s *subscriptionHash[MAX_EVENT_TYPES];  // Hash table for fast lookup
 
 	// Event processing queues
 	eventQueueEntry_t immediateQueue[MAX_EVENT_QUEUE_SIZE];
 	eventQueueEntry_t deferredQueue[MAX_EVENT_QUEUE_SIZE];
+	eventQueueEntry_t scheduledQueue[MAX_EVENT_QUEUE_SIZE];
 	uint32_t immediateQueueSize;
 	uint32_t deferredQueueSize;
+	uint32_t scheduledQueueSize;
 
 	// Event type registry
 	eventTypeInfo_t eventTypes[MAX_EVENT_TYPES];
@@ -81,7 +87,7 @@ static uint32_t Event_HashEventType(uint32_t eventType) {
 Event_FindSubscriptionSlot
 ================
 */
-static eventSubscription_t *Event_FindSubscriptionSlot(void) {
+static struct eventSubscription_s *Event_FindSubscriptionSlot(void) {
 	for (int i = 0; i < MAX_EVENT_SUBSCRIPTIONS; i++) {
 		if (!eventSystem.subscriptions[i].active) {
 			return &eventSystem.subscriptions[i];
@@ -105,10 +111,34 @@ static qboolean Event_AddToQueue(eventQueueEntry_t *queue, uint32_t *queueSize,
 	eventQueueEntry_t *entry = &queue[*queueSize];
 	entry->event = (event_t *)event;  // Note: We take ownership of the event
 	entry->timestamp = Sys_Milliseconds();
+	entry->scheduledTime = 0;  // Default: not scheduled
 	entry->handler = handler;
 	entry->userData = userData;
 
 	(*queueSize)++;
+	return qtrue;
+}
+
+/*
+================
+Event_AddToScheduledQueue
+================
+*/
+static qboolean Event_AddToScheduledQueue(const event_t *event, uint32_t delayMs,
+                                         eventHandler_t handler, void *userData) {
+	if (eventSystem.scheduledQueueSize >= MAX_EVENT_QUEUE_SIZE) {
+		Com_Printf("Event_AddToScheduledQueue: Queue overflow\n");
+		return qfalse;
+	}
+
+	eventQueueEntry_t *entry = &eventSystem.scheduledQueue[eventSystem.scheduledQueueSize];
+	entry->event = (event_t *)event;  // Note: We take ownership of the event
+	entry->timestamp = Sys_Milliseconds();
+	entry->scheduledTime = entry->timestamp + delayMs;
+	entry->handler = handler;
+	entry->userData = userData;
+
+	eventSystem.scheduledQueueSize++;
 	return qtrue;
 }
 
@@ -142,6 +172,68 @@ static void Event_ProcessQueue(eventQueueEntry_t *queue, uint32_t *queueSize) {
 	}
 
 	*queueSize = 0;
+}
+
+/*
+================
+Event_ProcessScheduledQueue
+================
+Process scheduled events that have reached their scheduled time.
+Returns number of events processed.
+================
+*/
+static uint32_t Event_ProcessScheduledQueue(void) {
+	if (!eventSystem.initialized || eventSystem.scheduledQueueSize == 0) {
+		return 0;
+	}
+
+	uint32_t currentTime = Sys_Milliseconds();
+	uint32_t processed = 0;
+	uint32_t remaining = 0;
+
+	// Process all scheduled events that are ready
+	for (uint32_t i = 0; i < eventSystem.scheduledQueueSize; i++) {
+		eventQueueEntry_t *entry = &eventSystem.scheduledQueue[i];
+
+		if (entry->scheduledTime > 0 && currentTime >= entry->scheduledTime) {
+			// Event is ready to process
+			// Find subscribers for this event type
+			uint32_t hash = Event_HashEventType(entry->event->type);
+			struct eventSubscription_s *sub = eventSystem.subscriptionHash[hash];
+
+			if (sub) {
+				// Use provided handler or find subscribers
+				if (entry->handler) {
+					entry->handler(entry->event, entry->userData);
+					eventSystem.eventsProcessed++;
+				} else {
+					// Find and call all subscribers
+					while (sub) {
+						if (sub->active && sub->eventType == entry->event->type) {
+							sub->handler(entry->event, sub->userData);
+							eventSystem.eventsProcessed++;
+						}
+						sub = sub->next;
+					}
+				}
+			}
+
+			// Clean up event
+			if (entry->event) {
+				Event_Destroy(entry->event);
+			}
+			processed++;
+		} else {
+			// Keep this event in the queue
+			if (remaining != i) {
+				eventSystem.scheduledQueue[remaining] = eventSystem.scheduledQueue[i];
+			}
+			remaining++;
+		}
+	}
+
+	eventSystem.scheduledQueueSize = remaining;
+	return processed;
 }
 
 // ============================================================================
@@ -236,12 +328,20 @@ void Event_Shutdown(void) {
 	}
 	eventSystem.immediateQueueSize = 0;
 
-	for (uint32_t i = 0; i < eventSystem.deferredQueueSize; i++) {
-		if (eventSystem.deferredQueue[i].event) {
-			Event_Destroy(eventSystem.deferredQueue[i].event);
+		for (uint32_t i = 0; i < eventSystem.deferredQueueSize; i++) {
+			if (eventSystem.deferredQueue[i].event) {
+				Event_Destroy(eventSystem.deferredQueue[i].event);
+			}
 		}
-	}
-	eventSystem.deferredQueueSize = 0;
+		eventSystem.deferredQueueSize = 0;
+
+		// Clear scheduled queue
+		for (uint32_t i = 0; i < eventSystem.scheduledQueueSize; i++) {
+			if (eventSystem.scheduledQueue[i].event) {
+				Event_Destroy(eventSystem.scheduledQueue[i].event);
+			}
+		}
+		eventSystem.scheduledQueueSize = 0;
 
 	eventSystem.initialized = qfalse;
 
@@ -270,7 +370,7 @@ qboolean Event_Publish(event_t *event) {
 
 	// Find subscribers for this event type
 	uint32_t hash = Event_HashEventType(event->type);
-	eventSubscription_t *sub = eventSystem.subscriptionHash[hash];
+	struct eventSubscription_s *sub = eventSystem.subscriptionHash[hash];
 
 	while (sub) {
 		if (sub->active && sub->eventType == event->type) {
@@ -331,6 +431,39 @@ qboolean Event_PublishDeferred(event_t *event) {
 
 /*
 ================
+Event_PublishScheduled
+================
+Publish an event to be processed after a delay (in milliseconds).
+================
+*/
+qboolean Event_PublishScheduled(event_t *event, uint32_t delayMs) {
+	if (!eventSystem.initialized || !event) {
+		return qfalse;
+	}
+
+	// Check if category is enabled
+	if (!eventSystem.categoryEnabled[event->category]) {
+		Event_Destroy(event);
+		return qtrue;
+	}
+
+	eventSystem.eventsPublished++;
+
+	// Find subscribers for this event type to determine handlers
+	uint32_t hash = Event_HashEventType(event->type);
+	struct eventSubscription_s *sub = eventSystem.subscriptionHash[hash];
+
+	if (sub && sub->active && sub->eventType == event->type) {
+		// Use first subscriber's handler
+		return Event_AddToScheduledQueue(event, delayMs, sub->handler, sub->userData);
+	} else {
+		// No handler found, use NULL handler (will find subscribers when processing)
+		return Event_AddToScheduledQueue(event, delayMs, NULL, NULL);
+	}
+}
+
+/*
+================
 Event_Subscribe
 ================
 */
@@ -340,7 +473,7 @@ eventSubscription_t Event_Subscribe(uint32_t eventType, eventHandler_t handler,
 		return NULL;
 	}
 
-	eventSubscription_t *slot = Event_FindSubscriptionSlot();
+	struct eventSubscription_s *slot = Event_FindSubscriptionSlot();
 	if (!slot) {
 		Com_Printf("Event_Subscribe: No free subscription slots\n");
 		return NULL;
@@ -430,12 +563,26 @@ void Event_ProcessDeferred(void) {
 
 /*
 ================
+Event_ProcessScheduled
+================
+*/
+void Event_ProcessScheduled(void) {
+	if (!eventSystem.initialized) {
+		return;
+	}
+
+	Event_ProcessScheduledQueue();
+}
+
+/*
+================
 Event_ProcessAll
 ================
 */
 void Event_ProcessAll(void) {
 	Event_ProcessImmediate();
 	Event_ProcessDeferred();
+	Event_ProcessScheduled();
 }
 
 /*
@@ -499,7 +646,7 @@ uint32_t Event_RegisterType(const char *typeName) {
 
 	uint32_t typeId = eventSystem.nextEventTypeId++;
 	Q_strncpyz(eventSystem.eventTypes[typeId].name, typeName, sizeof(eventSystem.eventTypes[typeId].name));
-	eventSystem.eventTypes[typeId].hash = Com_HashKey(typeName, 0);
+	eventSystem.eventTypes[typeId].hash = MSG_HashKey(typeName, 0);
 
 	return typeId;
 }
@@ -518,17 +665,13 @@ const char *Event_GetTypeName(uint32_t type) {
 
 /*
 ================
-Event_PrintStats
+Event_GetStats
 ================
 */
-void Event_PrintStats(void) {
-	Com_Printf("=== Event System Statistics ===\n");
-	Com_Printf("Events Published: %u\n", eventSystem.eventsPublished);
-	Com_Printf("Events Processed: %u\n", eventSystem.eventsProcessed);
-	Com_Printf("Subscriptions Created: %u\n", eventSystem.subscriptionsCreated);
-	Com_Printf("Subscriptions Destroyed: %u\n", eventSystem.subscriptionsDestroyed);
-	Com_Printf("Immediate Queue Size: %u\n", eventSystem.immediateQueueSize);
-	Com_Printf("Deferred Queue Size: %u\n", eventSystem.deferredQueueSize);
+void Event_GetStats(eventSystemStats_t *stats) {
+	if (!stats) {
+		return;
+	}
 
 	// Count active subscriptions
 	uint32_t activeSubs = 0;
@@ -537,7 +680,37 @@ void Event_PrintStats(void) {
 			activeSubs++;
 		}
 	}
-	Com_Printf("Active Subscriptions: %u\n", activeSubs);
+
+	stats->eventsPublished = eventSystem.eventsPublished;
+	stats->eventsProcessed = eventSystem.eventsProcessed;
+	stats->subscriptionsCreated = eventSystem.subscriptionsCreated;
+	stats->subscriptionsDestroyed = eventSystem.subscriptionsDestroyed;
+	stats->activeSubscriptions = activeSubs;
+	stats->immediateQueueSize = eventSystem.immediateQueueSize;
+	stats->deferredQueueSize = eventSystem.deferredQueueSize;
+	stats->scheduledQueueSize = eventSystem.scheduledQueueSize;
+	stats->registeredEventTypes = eventSystem.nextEventTypeId;
+}
+
+/*
+================
+Event_PrintStats
+================
+*/
+void Event_PrintStats(void) {
+	eventSystemStats_t stats;
+	Event_GetStats(&stats);
+	
+	Com_Printf("=== Event System Statistics ===\n");
+	Com_Printf("Events Published: %u\n", stats.eventsPublished);
+	Com_Printf("Events Processed: %u\n", stats.eventsProcessed);
+	Com_Printf("Subscriptions Created: %u\n", stats.subscriptionsCreated);
+	Com_Printf("Subscriptions Destroyed: %u\n", stats.subscriptionsDestroyed);
+	Com_Printf("Immediate Queue Size: %u\n", stats.immediateQueueSize);
+	Com_Printf("Deferred Queue Size: %u\n", stats.deferredQueueSize);
+	Com_Printf("Scheduled Queue Size: %u\n", stats.scheduledQueueSize);
+	Com_Printf("Active Subscriptions: %u\n", stats.activeSubscriptions);
+	Com_Printf("Registered Event Types: %u\n", stats.registeredEventTypes);
 }
 
 /*
@@ -557,7 +730,7 @@ Event_GetSubscriptionCount
 uint32_t Event_GetSubscriptionCount(uint32_t eventType) {
 	uint32_t count = 0;
 	uint32_t hash = Event_HashEventType(eventType);
-	eventSubscription_t *sub = eventSystem.subscriptionHash[hash];
+	struct eventSubscription_s *sub = eventSystem.subscriptionHash[hash];
 
 	while (sub) {
 		if (sub->active && sub->eventType == eventType) {

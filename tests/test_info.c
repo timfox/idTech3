@@ -6,6 +6,9 @@ Info string helpers tests (Info_ValueForKey, Info_SetValueForKey, Info_RemoveKey
 
 #include "test_framework.h"
 #include "../src/qcommon/q_shared.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
 
 // Minimal Com_Printf stub for the test framework
 void Com_Printf(const char *fmt, ...) {
@@ -13,6 +16,21 @@ void Com_Printf(const char *fmt, ...) {
 	va_start(argptr, fmt);
 	vprintf(fmt, argptr);
 	va_end(argptr);
+}
+
+// Mock Com_Error for testing
+void Com_Error(errorParm_t level, const char *error, ...) {
+	va_list argptr;
+	va_start(argptr, error);
+	vfprintf(stderr, error, argptr);
+	va_end(argptr);
+	fprintf(stderr, "\n");
+	exit(1);
+}
+
+// Mock Q_atof for testing
+float Q_atof(const char *str) {
+	return (float)atof(str);
 }
 
 TEST(info_value_for_key_basic) {

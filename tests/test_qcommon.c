@@ -22,6 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "test_framework.h"
 #include "../src/qcommon/q_shared.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
 
 // Mock Com_Printf for testing
 void Com_Printf(const char *fmt, ...) {
@@ -29,6 +32,21 @@ void Com_Printf(const char *fmt, ...) {
 	va_start(argptr, fmt);
 	vprintf(fmt, argptr);
 	va_end(argptr);
+}
+
+// Mock Com_Error for testing
+void Com_Error(errorParm_t level, const char *error, ...) {
+	va_list argptr;
+	va_start(argptr, error);
+	vfprintf(stderr, error, argptr);
+	va_end(argptr);
+	fprintf(stderr, "\n");
+	exit(1);
+}
+
+// Mock Q_atof for testing
+float Q_atof(const char *str) {
+	return (float)atof(str);
 }
 
 TEST(q_strncpyz_basic) {

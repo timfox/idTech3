@@ -281,9 +281,9 @@ static void *VM_GetCombinedEntryPoint( vmIndex_t index, vmMainFunc_t *entryPoint
 // used by Com_Error to get rid of running vm's before longjmp
 static int forced_unload;
 
-static struct vm_s vmTable[ VM_COUNT ];
+struct vm_s vmTable[ VM_COUNT ];
 
-static const char *vmName[ VM_COUNT ] = {
+const char *vmName[ VM_COUNT ] = {
 	"qagame",
 	"cgame",
 	"ui"

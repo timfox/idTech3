@@ -1,5 +1,5 @@
 #include "tr_local.h"
-#include "performance_counters.h"
+#include "../qcommon/performance_counters.h"
 #include "vk.h"
 #include <stdlib.h>
 #include <unistd.h>
@@ -9073,13 +9073,6 @@ void vk_bind_index_buffer( VkBuffer buffer, uint32_t offset )
 }
 
 
-#ifdef USE_VBO
-void vk_draw_indexed( uint32_t indexCount, uint32_t firstIndex )
-{
-	vk_draw_indexed_call( vk.cmd->command_buffer, indexCount, 1, firstIndex, 0, 0 );
-}
-#endif
-
 // Performance counter wrapper for draw calls
 static inline void vk_draw_call(VkCommandBuffer cmd, uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance) {
 	Perf_CountDrawCall();
@@ -9090,6 +9083,13 @@ static inline void vk_draw_indexed_call(VkCommandBuffer cmd, uint32_t indexCount
 	Perf_CountDrawCall();
 	qvkCmdDrawIndexed(cmd, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 }
+
+#ifdef USE_VBO
+void vk_draw_indexed( uint32_t indexCount, uint32_t firstIndex )
+{
+	vk_draw_indexed_call( vk.cmd->command_buffer, indexCount, 1, firstIndex, 0, 0 );
+}
+#endif
 
 
 void vk_bind_index( void )
@@ -11081,6 +11081,9 @@ void vk_end_frame( void )
 					
 					// GPU timing provides more accurate measurement than CPU timing
 					// Frame time is already calculated in RB_ExecuteRenderCommands via CPU timing
+					// Update performance counters with current GPU frame time
+					float gpu_frame_time_ms = (float)frame_time_ns / 1000000.0f;
+					Perf_UpdateGPUTiming(gpu_frame_time_ms);
 				}
 				
 				// Reset query pool for next frame

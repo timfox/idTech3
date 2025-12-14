@@ -6,6 +6,11 @@ VM Hot Reloading System
 
 #include "qcommon.h"
 #include "vm_local.h"
+#include "vm_hot_reload.h"
+
+// Forward declarations for VM table access
+extern struct vm_s vmTable[VM_COUNT];
+extern const char *vmName[VM_COUNT];
 
 // Hot reload configuration
 cvar_t *vm_hotReload;
@@ -77,7 +82,6 @@ VM_CheckFileModified
 */
 static qboolean VM_CheckFileModified(vmIndex_t index) {
 	char qvmPath[MAX_QPATH];
-	fileHandle_t f;
 	char *buffer;
 	int len;
 
@@ -190,7 +194,7 @@ Usage: vm_reload <vm_name>
 ================
 */
 static void VM_ReloadVM_f(void) {
-	const char *vmName;
+		const char *argVmName = NULL;
 	vmIndex_t index;
 
 	if (Cmd_Argc() != 2) {
@@ -204,19 +208,19 @@ static void VM_ReloadVM_f(void) {
 		return;
 	}
 
-	vmName = Cmd_Argv(1);
+		argVmName = Cmd_Argv(1);
 
 	// Find VM by name
 	index = VM_COUNT; // Invalid index
 	for (vmIndex_t i = 0; i < VM_COUNT; i++) {
-		if (Q_stricmp(vmName[i], vmName) == 0) {
+		if (Q_stricmp(vmName[i], argVmName) == 0) {
 			index = i;
 			break;
 		}
 	}
 
 	if (index >= VM_COUNT) {
-		Com_Printf("Unknown VM name: %s\n", vmName);
+		Com_Printf("Unknown VM name: %s\n", argVmName);
 		return;
 	}
 

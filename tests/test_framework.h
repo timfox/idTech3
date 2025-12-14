@@ -44,8 +44,8 @@ static const char *current_test_name = NULL;
 	do { \
 		test_count++; \
 		if ((a) != (b)) { \
-			Com_Printf("FAIL: %s:%d: Expected %d, got %d\n", \
-				__FUNCTION__, __LINE__, (int)(b), (int)(a)); \
+		Com_Printf("FAIL: %s:%d: Expected %d, got %d\n", \
+			__func__, __LINE__, (int)(b), (int)(a)); \
 			test_failed++; \
 			return; \
 		} \
@@ -56,8 +56,8 @@ static const char *current_test_name = NULL;
 	do { \
 		test_count++; \
 		if ((a) == (b)) { \
-			Com_Printf("FAIL: %s:%d: Expected not equal, got %d\n", \
-				__FUNCTION__, __LINE__, (int)(a)); \
+		Com_Printf("FAIL: %s:%d: Expected not equal, got %d\n", \
+			__func__, __LINE__, (int)(a)); \
 			test_failed++; \
 			return; \
 		} \
@@ -68,8 +68,8 @@ static const char *current_test_name = NULL;
 	do { \
 		test_count++; \
 		if (strcmp((a), (b)) != 0) { \
-			Com_Printf("FAIL: %s:%d: Expected \"%s\", got \"%s\"\n", \
-				__FUNCTION__, __LINE__, (b), (a)); \
+		Com_Printf("FAIL: %s:%d: Expected \"%s\", got \"%s\"\n", \
+			__func__, __LINE__, (b), (a)); \
 			test_failed++; \
 			return; \
 		} \
@@ -81,7 +81,7 @@ static const char *current_test_name = NULL;
 		test_count++; \
 		if ((ptr) == NULL) { \
 			Com_Printf("FAIL: %s:%d: Expected non-NULL pointer\n", \
-				__FUNCTION__, __LINE__); \
+				__func__, __LINE__); \
 			test_failed++; \
 			return; \
 		} \
@@ -105,7 +105,7 @@ static const char *current_test_name = NULL;
 		test_count++; \
 		if (!(condition)) { \
 			Com_Printf("FAIL: %s:%d: Expected true\n", \
-				__FUNCTION__, __LINE__); \
+				__func__, __LINE__); \
 			test_failed++; \
 			return; \
 		} \
@@ -117,7 +117,7 @@ static const char *current_test_name = NULL;
 		test_count++; \
 		if (condition) { \
 			Com_Printf("FAIL: %s:%d: Expected false\n", \
-				__FUNCTION__, __LINE__); \
+				__func__, __LINE__); \
 			test_failed++; \
 			return; \
 		} \

@@ -155,26 +155,61 @@ void Perf_ResetFrameCounters(void) {
 
 /*
 ================
+Perf_UpdateGPUTiming
+================
+*/
+void Perf_UpdateGPUTiming(float gpuFrameTimeMs) {
+	if (gpuFrameTimeMs > 0.0f) {
+		perfCounters.gpuFrameTime = gpuFrameTimeMs;
+		perfCounters.gpuTimingAvailable = qtrue;
+	} else {
+		perfCounters.gpuTimingAvailable = qfalse;
+	}
+}
+
+/*
+================
 Perf_GetInfoString
 ================
 */
 void Perf_GetInfoString(char *buffer, int bufferSize) {
-	Com_sprintf(buffer, bufferSize,
-		"FPS: %.1f (avg: %.1f)\n"
-		"Frame Time: %.1fms (avg: %.1fms, min: %.1fms, max: %.1fms)\n"
-		"Draw Calls: %d (avg: %.1f, min: %d, max: %d, total: %d)\n",
-		perfCounters.currentFPS,
-		perfCounters.averageFPS,
-		perfCounters.currentFrameTime,
-		perfCounters.averageFrameTime,
-		perfCounters.minFrameTime,
-		perfCounters.maxFrameTime,
-		perfCounters.drawCallsThisFrame,
-		perfCounters.averageDrawCallsPerFrame,
-		perfCounters.minDrawCallsPerFrame,
-		perfCounters.maxDrawCallsPerFrame,
-		perfCounters.totalDrawCalls
-	);
+	if (perfCounters.gpuTimingAvailable) {
+		Com_sprintf(buffer, bufferSize,
+			"FPS: %.1f (avg: %.1f)\n"
+			"CPU Frame Time: %.1fms (avg: %.1fms, min: %.1fms, max: %.1fms)\n"
+			"GPU Frame Time: %.1fms\n"
+			"Draw Calls: %d (avg: %.1f, min: %d, max: %d, total: %d)\n",
+			perfCounters.currentFPS,
+			perfCounters.averageFPS,
+			perfCounters.currentFrameTime,
+			perfCounters.averageFrameTime,
+			perfCounters.minFrameTime,
+			perfCounters.maxFrameTime,
+			perfCounters.gpuFrameTime,
+			perfCounters.drawCallsThisFrame,
+			perfCounters.averageDrawCallsPerFrame,
+			perfCounters.minDrawCallsPerFrame,
+			perfCounters.maxDrawCallsPerFrame,
+			perfCounters.totalDrawCalls
+		);
+	} else {
+		Com_sprintf(buffer, bufferSize,
+			"FPS: %.1f (avg: %.1f)\n"
+			"Frame Time: %.1fms (avg: %.1fms, min: %.1fms, max: %.1fms)\n"
+			"Draw Calls: %d (avg: %.1f, min: %d, max: %d, total: %d)\n",
+			perfCounters.currentFPS,
+			perfCounters.averageFPS,
+			perfCounters.currentFrameTime,
+			perfCounters.averageFrameTime,
+			perfCounters.minFrameTime,
+			perfCounters.maxFrameTime,
+			perfCounters.drawCallsThisFrame,
+			perfCounters.averageDrawCallsPerFrame,
+			perfCounters.minDrawCallsPerFrame,
+			perfCounters.maxDrawCallsPerFrame,
+			perfCounters.totalDrawCalls
+		);
+	}
 }
 
 /*

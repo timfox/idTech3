@@ -26,6 +26,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../qcommon/q_memtrack.h"
 #include "../qcommon/q_log.h"
 #include "../qcommon/qcommon.h"
+#include "../qcommon/event_system.h"
+#include "../qcommon/performance_counters.h"
 
 #ifdef USE_CIMGUI
 
@@ -49,6 +51,8 @@ static cvar_t *cl_imgui_debug_network;
 static cvar_t *cl_imgui_debug_renderer;
 static cvar_t *cl_imgui_debug_cvars;
 static cvar_t *cl_imgui_debug_console;
+static cvar_t *cl_imgui_debug_events;
+static cvar_t *cl_imgui_debug_profiler;
 static cvar_t *cl_imgui_debug_mainmenu;
 
 // CVar browser state
@@ -83,6 +87,12 @@ static void CL_ImGui_Debug_RegisterCvars(void) {
 	
 	cl_imgui_debug_console = Cvar_Get("cl_imgui_debug_console", "0", CVAR_ARCHIVE_ND);
 	Cvar_SetDescription(cl_imgui_debug_console, "Display console output in ImGui window");
+	
+	cl_imgui_debug_events = Cvar_Get("cl_imgui_debug_events", "0", CVAR_ARCHIVE_ND);
+	Cvar_SetDescription(cl_imgui_debug_events, "Display event system statistics and subscriptions");
+	
+	cl_imgui_debug_profiler = Cvar_Get("cl_imgui_debug_profiler", "0", CVAR_ARCHIVE_ND);
+	Cvar_SetDescription(cl_imgui_debug_profiler, "Display profiler and performance counter information");
 	
 	cl_imgui_debug_mainmenu = Cvar_Get("cl_imgui_debug_mainmenu", "1", CVAR_ARCHIVE_ND);
 	Cvar_SetDescription(cl_imgui_debug_mainmenu, "Show main debug menu bar");
@@ -501,6 +511,126 @@ void CL_ImGui_Debug_ShowConsoleOverlay(void) {
 
 /*
 ================
+CL_ImGui_Debug_ShowEventSystemOverlay
+================
+*/
+void CL_ImGui_Debug_ShowEventSystemOverlay(void) {
+	if (!cl_imgui_debug_events || !cl_imgui_debug_events->integer) {
+		return;
+	}
+	
+	bool open = true;
+	if (!igBegin("Event System", &open, 0)) {
+		igEnd();
+		if (!open) {
+			Cvar_Set("cl_imgui_debug_events", "0");
+		}
+		return;
+	}
+	
+	eventSystemStats_t stats;
+	Event_GetStats(&stats);
+	
+	igText("Event System Statistics");
+	igSeparator();
+	
+	igText("Events Published: %u", stats.eventsPublished);
+	igText("Events Processed: %u", stats.eventsProcessed);
+	igText("Registered Event Types: %u", stats.registeredEventTypes);
+	
+	igSeparator();
+	igText("Subscriptions");
+	igText("  Created: %u", stats.subscriptionsCreated);
+	igText("  Destroyed: %u", stats.subscriptionsDestroyed);
+	igText("  Active: %u", stats.activeSubscriptions);
+	
+	igSeparator();
+	igText("Queue Status");
+	igText("  Immediate Queue: %u / %u", stats.immediateQueueSize, 256);
+	igText("  Deferred Queue: %u / %u", stats.deferredQueueSize, 256);
+	
+	// Show queue status with color coding
+	if (stats.immediateQueueSize > 200) {
+		igTextColored((ImVec4){1.0f, 0.0f, 0.0f, 1.0f}, "  WARNING: Immediate queue nearly full!");
+	}
+	if (stats.deferredQueueSize > 200) {
+		igTextColored((ImVec4){1.0f, 0.0f, 0.0f, 1.0f}, "  WARNING: Deferred queue nearly full!");
+	}
+	
+	igSeparator();
+	if (igButton("Print Stats to Console", (ImVec2){-1, 0})) {
+		Event_PrintStats();
+	}
+	
+	igEnd();
+}
+
+/*
+================
+CL_ImGui_Debug_ShowProfilerOverlay
+================
+*/
+void CL_ImGui_Debug_ShowProfilerOverlay(void) {
+	if (!cl_imgui_debug_profiler || !cl_imgui_debug_profiler->integer) {
+		return;
+	}
+	
+	bool open = true;
+	if (!igBegin("Profiler", &open, 0)) {
+		igEnd();
+		if (!open) {
+			Cvar_Set("cl_imgui_debug_profiler", "0");
+		}
+		return;
+	}
+	
+	extern performanceCounters_t perfCounters;
+	
+	igText("Performance Counters");
+	igSeparator();
+	
+	igText("FPS: %.1f (avg: %.1f)", perfCounters.currentFPS, perfCounters.averageFPS);
+	igText("Frame Time: %.2f ms (avg: %.2f ms)", perfCounters.currentFrameTime, perfCounters.averageFrameTime);
+	igText("  Min: %.2f ms, Max: %.2f ms", perfCounters.minFrameTime, perfCounters.maxFrameTime);
+	
+	if (perfCounters.gpuTimingAvailable && perfCounters.gpuFrameTime > 0.0f) {
+		igText("GPU Frame Time: %.2f ms", perfCounters.gpuFrameTime);
+		float ratio = (perfCounters.currentFrameTime > 0.0f) ? 
+			(perfCounters.currentFrameTime / perfCounters.gpuFrameTime) : 0.0f;
+		igText("CPU/GPU Ratio: %.2f", ratio);
+	} else {
+		igTextColored((ImVec4){0.7f, 0.7f, 0.7f, 1.0f}, "GPU Timing: Not available");
+	}
+	
+	igSeparator();
+	igText("Draw Calls");
+	igText("  Current Frame: %d", perfCounters.drawCallsThisFrame);
+	igText("  Average: %.1f", perfCounters.averageDrawCallsPerFrame);
+	igText("  Min: %d, Max: %d", perfCounters.minDrawCallsPerFrame, perfCounters.maxDrawCallsPerFrame);
+	igText("  Total: %d", perfCounters.totalDrawCalls);
+	
+	igSeparator();
+	igText("Frame Time History");
+	igText("  Samples: %d / 60", perfCounters.frameTimeHistoryCount);
+	
+	// Frame time graph
+	if (perfCounters.frameTimeHistoryCount > 0) {
+		ImVec2 graph_size = {-1, 100};
+		igPlotLines_FloatPtr("##frametime", perfCounters.frameTimeHistory, 
+			perfCounters.frameTimeHistoryCount, perfCounters.frameTimeHistoryIndex,
+			NULL, 0.0f, 50.0f, graph_size, sizeof(float));
+	}
+	
+	igSeparator();
+	if (igButton("Print Stats to Console", (ImVec2){-1, 0})) {
+		Perf_DisplayInfo_f();
+	}
+	
+	igEnd();
+}
+
+/*
+================
 CL_ImGui_Debug_ShowMainMenu
 ================
 */
@@ -529,6 +659,12 @@ void CL_ImGui_Debug_ShowMainMenu(void) {
 			if (igMenuItem_Bool("Console", NULL, cl_imgui_debug_console && cl_imgui_debug_console->integer, true)) {
 				Cvar_Set("cl_imgui_debug_console", cl_imgui_debug_console->integer ? "0" : "1");
 			}
+			if (igMenuItem_Bool("Event System", NULL, cl_imgui_debug_events && cl_imgui_debug_events->integer, true)) {
+				Cvar_Set("cl_imgui_debug_events", cl_imgui_debug_events->integer ? "0" : "1");
+			}
+			if (igMenuItem_Bool("Profiler", NULL, cl_imgui_debug_profiler && cl_imgui_debug_profiler->integer, true)) {
+				Cvar_Set("cl_imgui_debug_profiler", cl_imgui_debug_profiler->integer ? "0" : "1");
+			}
 			igEndMenu();
 		}
 		
@@ -556,6 +692,8 @@ void CL_ImGui_Debug_RenderAll(void) {
 	CL_ImGui_Debug_ShowRendererOverlay();
 	CL_ImGui_Debug_ShowCVarBrowser();
 	CL_ImGui_Debug_ShowConsoleOverlay();
+	CL_ImGui_Debug_ShowEventSystemOverlay();
+	CL_ImGui_Debug_ShowProfilerOverlay();
 }
 
 /*

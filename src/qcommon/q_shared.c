@@ -1391,7 +1391,8 @@ Allows src and dest to be overlapped for QVM compatibility purposes
 */
 char *Q_strncpy( char *dest, const char *src, int destsize )
 {
-	char *s = src, *start = dest;
+	const char *s = src;
+	char *start = dest;
 	int src_len;
 
 	while ( *s != '\0' )

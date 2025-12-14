@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vm_hot_reload.h"
 #include "event_system.h"
 #include "q_memtrack.h"
+#include "memory_stats.h"
 #include "i18n.h"
 #include <locale.h>
 #include <ctype.h>
@@ -225,6 +226,7 @@ A raw string should NEVER be passed as fmt, because of "%f" type crashers.
 =============
 */
 void FORMAT_PRINTF(1, 2) QDECL Com_Printf( const char *fmt, ... ) {
+	TracyCZoneCtx prof_printf;
 	PROF_ZONE_BEGIN(prof_printf, "Com_Printf");
 	static qboolean opening_qconsole = qfalse;
 	va_list		argptr;
@@ -1589,6 +1591,10 @@ void Z_Free( void *ptr ) {
 
 	zone->used -= block->size;
 
+	// Track memory statistics (actual allocated size excluding header)
+	memtag_t freed_tag = block->tag;
+	MemStats_Free(freed_tag, block->size - sizeof(*block));
+
 	// set the block to something that should cause problems
 	// if it is referenced...
 	Com_Memset( ptr, 0xaa, block->size - sizeof( *block ) );
@@ -1677,10 +1683,12 @@ Z_TagMalloc
 */
 #ifdef ZONE_DEBUG
 void *Z_TagMallocDebug( int size, memtag_t tag, char *label, char *file, int line ) {
+	TracyCZoneCtx prof_zmalloc;
 	PROF_ZONE_BEGIN(prof_zmalloc, "Z_TagMallocDebug");
 	int		allocSize;
 #else
 void *Z_TagMalloc( int size, memtag_t tag ) {
+	TracyCZoneCtx prof_zmalloc;
 	PROF_ZONE_BEGIN(prof_zmalloc, "Z_TagMalloc");
 #endif
 	int		extra;
@@ -1791,6 +1799,9 @@ void *Z_TagMalloc( int size, memtag_t tag ) {
 	// marker for memory trash testing
 	*(int *)((byte *)base + base->size - 4) = ZONEID;
 #endif
+
+	// Track memory statistics (actual allocated size excluding header)
+	MemStats_Alloc(tag, base->size - sizeof(*base));
 
 	PROF_ZONE_END(prof_zmalloc);
 	return (void *) ( base + 1 );
@@ -2449,6 +2460,10 @@ static void Com_InitHunkMemory( void ) {
 	Hunk_Clear();
 
 	Cmd_AddCommand( "meminfo", Com_Meminfo_f );
+	
+	// Initialize memory statistics tracking
+	MemStats_Init();
+	
 #ifdef ZONE_DEBUG
 	Cmd_AddCommand( "zonelog", Z_LogHeap );
 #endif
@@ -4586,7 +4601,12 @@ void Com_Frame( qboolean noDelay ) {
 	PROF_ZONE_BEGIN(prof_frame, "Com_Frame");
 
 	// Publish frame start event
-	PUBLISH_EVENT(EVENT_TYPE_ENGINE_FRAME_START, EVENT_CATEGORY_ENGINE, NULL, 0);
+	{
+		event_t *evt = Event_Create(EVENT_TYPE_ENGINE_FRAME_START, EVENT_CATEGORY_ENGINE, 0);
+		if (evt) {
+			Event_Publish(evt);
+		}
+	}
 
 	minMsec = 0; // silent compiler warning
 
@@ -4621,6 +4641,7 @@ void Com_Frame( qboolean noDelay ) {
 	//
 	// main event loop
 	//
+	TracyCZoneCtx prof_events;
 	PROF_ZONE_BEGIN(prof_events, "Event Processing");
 	if ( com_speeds->integer ) {
 		timeBeforeFirstEvents = Sys_Milliseconds();
@@ -4693,6 +4714,7 @@ void Com_Frame( qboolean noDelay ) {
 	//
 	// server side
 	//
+	TracyCZoneCtx prof_server;
 	PROF_ZONE_BEGIN(prof_server, "Server Frame");
 	if ( com_speeds->integer ) {
 		timeBeforeServer = Sys_Milliseconds();
@@ -4778,6 +4800,7 @@ void Com_Frame( qboolean noDelay ) {
 		//
 		// client side
 		//
+		TracyCZoneCtx prof_client;
 		PROF_ZONE_BEGIN(prof_client, "Client Frame");
 		if ( com_speeds->integer ) {
 			timeBeforeClient = Sys_Milliseconds();
@@ -4843,10 +4866,15 @@ void Com_Frame( qboolean noDelay ) {
 	VM_CheckHotReload();
 
 	// Publish frame end event
-	PUBLISH_EVENT(EVENT_TYPE_ENGINE_FRAME_END, EVENT_CATEGORY_ENGINE, NULL, 0);
+	{
+		event_t *evt = Event_Create(EVENT_TYPE_ENGINE_FRAME_END, EVENT_CATEGORY_ENGINE, 0);
+		if (evt) {
+			Event_Publish(evt);
+		}
+	}
 
-	// Process immediate events
-	Event_ProcessImmediate();
+	// Process all event phases (immediate, deferred, scheduled)
+	Event_ProcessAll();
 
 	PROF_ZONE_END(prof_frame);
 }

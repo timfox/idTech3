@@ -9,6 +9,7 @@ Memory Management Tests
 #include <math.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdint.h>
 
 // Forward declarations and type definitions for testing
 typedef enum {
@@ -33,6 +34,18 @@ static int test_failed = 0;
 		if ((a) != (b)) { \
 			printf("FAIL: %s:%d: Expected %d, got %d\n", \
 				__func__, __LINE__, (int)(b), (int)(a)); \
+			test_failed++; \
+			return; \
+		} \
+		test_passed++; \
+	} while(0)
+
+#define ASSERT_NE(a, b) \
+	do { \
+		test_count++; \
+		if ((a) == (b)) { \
+			printf("FAIL: %s:%d: Expected not equal, got %d\n", \
+				__func__, __LINE__, (int)(a)); \
 			test_failed++; \
 			return; \
 		} \
@@ -136,14 +149,6 @@ static float VectorNormalize2_impl(const vec3_t v, vec3_t out) {
 	((origin)[0] - (radius) >= (mins)[0] && (origin)[0] + (radius) <= (maxs)[0] && \
 	 (origin)[1] - (radius) >= (mins)[1] && (origin)[1] + (radius) <= (maxs)[1] && \
 	 (origin)[2] - (radius) >= (mins)[2] && (origin)[2] + (radius) <= (maxs)[2])
-
-// Minimal Com_Printf stub for the test framework
-void Com_Printf(const char *fmt, ...) {
-	va_list argptr;
-	va_start(argptr, fmt);
-	vprintf(fmt, argptr);
-	va_end(argptr);
-}
 
 // Test stub for memory tag allocation (simplified)
 void *Z_TagMalloc(int size, memtag_t tag) {

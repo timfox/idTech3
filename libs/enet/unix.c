@@ -4,11 +4,20 @@
 */
 #ifndef _WIN32
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#ifndef _BSD_SOURCE
+#define _BSD_SOURCE
+#endif
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <netinet/tcp.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 #include <unistd.h>
 #include <string.h>
@@ -54,7 +63,11 @@
 #endif
 
 #ifndef HAS_SOCKLEN_T
+// Only define socklen_t if system headers haven't already defined it
+// Modern systems (Linux glibc, etc.) define it in sys/socket.h
+#if !defined(socklen_t) && !defined(__socklen_t_defined)
 typedef int socklen_t;
+#endif
 #endif
 
 #ifndef MSG_NOSIGNAL

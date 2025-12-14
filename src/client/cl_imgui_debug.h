@@ -32,6 +32,8 @@ void CL_ImGui_Debug_ShowNetworkOverlay(void);
 void CL_ImGui_Debug_ShowRendererOverlay(void);
 void CL_ImGui_Debug_ShowCVarBrowser(void);
 void CL_ImGui_Debug_ShowConsoleOverlay(void);
+void CL_ImGui_Debug_ShowEventSystemOverlay(void);
+void CL_ImGui_Debug_ShowProfilerOverlay(void);
 void CL_ImGui_Debug_ShowMainMenu(void);
 
 // Initialize debug overlay system

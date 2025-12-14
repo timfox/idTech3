@@ -195,25 +195,71 @@ IF(ENABLE_STATIC_ANALYSIS OR ENABLE_CLANG_TIDY OR ENABLE_CPPCHECK)
 	ENDIF()
 ENDIF()
 
-# Coverage reporting target (gcovr) if coverage instrumentation is enabled
+# Coverage reporting target (gcovr/lcov) if coverage instrumentation is enabled
 FIND_PROGRAM(GCOVR_EXE NAMES gcovr)
+FIND_PROGRAM(LCOV_EXE NAMES lcov)
+FIND_PROGRAM(GENHTML_EXE NAMES genhtml)
+
 IF(ENABLE_COVERAGE)
+	# Run tests first to generate coverage data
+	IF(BUILD_TESTS)
+		FIND_PROGRAM(CTEST_EXE NAMES ctest)
+		IF(CTEST_EXE)
+			ADD_CUSTOM_TARGET(coverage_run_tests
+				COMMAND ${CTEST_EXE} --output-on-failure
+				WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+				COMMENT "Running tests to generate coverage data"
+			)
+		ELSE()
+			ADD_CUSTOM_TARGET(coverage_run_tests
+				COMMAND ${CMAKE_COMMAND} -E echo "Warning: ctest not found, skipping test execution"
+				COMMENT "Skipping test execution (ctest not found)"
+			)
+		ENDIF()
+	ELSE()
+		# If tests aren't built, create a dummy target
+		ADD_CUSTOM_TARGET(coverage_run_tests
+			COMMAND ${CMAKE_COMMAND} -E echo "Warning: BUILD_TESTS is OFF, no tests to run"
+			COMMENT "Skipping test execution (BUILD_TESTS=OFF)"
+		)
+	ENDIF()
+
+	# gcovr-based coverage report (preferred)
 	IF(GCOVR_EXE)
 		ADD_CUSTOM_TARGET(coverage
+			DEPENDS coverage_run_tests
 			COMMAND ${GCOVR_EXE}
 				--root ${CMAKE_SOURCE_DIR}
 				--filter ${CMAKE_SOURCE_DIR}/src
 				--filter ${CMAKE_SOURCE_DIR}/tests
 				--exclude ${CMAKE_SOURCE_DIR}/libs
 				--exclude ${CMAKE_BINARY_DIR}
+				--exclude ".*/tests/.*"
 				--print-summary
 				--html --html-details -o coverage.html
 				--xml -o coverage.xml
+				--txt -o coverage.txt
 			WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 			COMMENT "Generating coverage report with gcovr"
 		)
+		MESSAGE(STATUS "Coverage: gcovr found - 'coverage' target available")
 	ELSE()
-		MESSAGE(WARNING "gcovr not found; coverage target will be skipped")
+		MESSAGE(WARNING "gcovr not found; install with: sudo apt install gcovr")
+	ENDIF()
+
+	# lcov-based coverage report (alternative)
+	IF(LCOV_EXE AND GENHTML_EXE)
+		ADD_CUSTOM_TARGET(coverage_lcov
+			DEPENDS coverage_run_tests
+			COMMAND ${LCOV_EXE} --capture --directory . --output-file coverage.info --ignore-errors mismatch
+			COMMAND ${LCOV_EXE} --remove coverage.info '*/libs/*' '*/tests/*' '*/build/*' --output-file coverage.info
+			COMMAND ${GENHTML_EXE} coverage.info --output-directory coverage_lcov --legend --show-details
+			WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+			COMMENT "Generating coverage report with lcov"
+		)
+		MESSAGE(STATUS "Coverage: lcov/genhtml found - 'coverage_lcov' target available")
+	ELSEIF(ENABLE_COVERAGE AND NOT LCOV_EXE)
+		MESSAGE(STATUS "Coverage: lcov not found (optional) - install with: sudo apt install lcov")
 	ENDIF()
 ENDIF()
 
@@ -324,6 +370,8 @@ list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*vm_[alx].*.c")
 list(APPEND QCOMMON_SRCS src/qcommon/q_log.c)
 # Add performance counters
 list(APPEND QCOMMON_SRCS src/qcommon/performance_counters.c)
+# Add memory statistics tracking
+list(APPEND QCOMMON_SRCS src/qcommon/memory_stats.c)
 # Add VM hot reload system
 list(APPEND QCOMMON_SRCS src/qcommon/vm_hot_reload.c)
 # Add event system
@@ -2413,6 +2461,10 @@ IF(BUILD_TESTS)
 	)
 	TARGET_INCLUDE_DIRECTORIES(test_qmath PRIVATE src/qcommon)
 	TARGET_INCLUDE_DIRECTORIES(test_qmath PRIVATE src)
+	TARGET_INCLUDE_DIRECTORIES(test_qmath PRIVATE tests)
+	IF(UNIX)
+		TARGET_LINK_LIBRARIES(test_qmath PRIVATE m)
+	ENDIF()
 	ADD_TEST(NAME qmath_tests COMMAND test_qmath)
 
 	IF(USE_ENET)

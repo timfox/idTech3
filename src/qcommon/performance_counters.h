@@ -81,6 +81,9 @@ void Perf_ResetFrameCounters(void);
 // Get formatted performance info string
 void Perf_GetInfoString(char *buffer, int bufferSize);
 
+// Update GPU timing (called by renderer)
+void Perf_UpdateGPUTiming(float gpuFrameTimeMs);
+
 // Console command to display performance info
 void Perf_DisplayInfo_f(void);
 

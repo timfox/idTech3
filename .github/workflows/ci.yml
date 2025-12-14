@@ -23,6 +23,23 @@ env:
   CMAKE_COMMON_FLAGS: -DUSE_VULKAN=ON -DUSE_RENDERER_DLOPEN=ON -DBUILD_SERVER=ON
 
 jobs:
+  validate-assets:
+    name: Validate Assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Python dependencies
+        run: |
+          python3 --version
+      - name: Validate assets (if mods exist)
+        run: |
+          if [ -d "mymod" ]; then
+            python3 tools/validate_assets.py mymod --check-manifest --json || true
+          else
+            echo "No mod directory found, skipping asset validation"
+          fi
+        continue-on-error: true
+
   configure:
     name: Configure (Linux)
     runs-on: ubuntu-latest
@@ -32,7 +49,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential cmake pkg-config \
+            build-essential cmake pkg-config python3 \
             libsdl2-dev libcurl4-openssl-dev \
             libssl-dev libjpeg-dev \
             libvorbis-dev libogg-dev \
@@ -90,7 +107,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential cmake \
+            build-essential cmake python3 \
             libsdl2-dev libcurl4-openssl-dev \
             libssl-dev libjpeg-dev \
             libvorbis-dev libogg-dev \

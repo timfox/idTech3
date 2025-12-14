@@ -20,7 +20,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "tr_local.h"
-#include "performance_counters.h"
+#include "../qcommon/performance_counters.h"
+#include "../renderervk/vk.h"
 
 backEndData_t	*backEndData;
 backEndState_t	backEnd;
@@ -34,7 +35,10 @@ static void RBVK_ShutdownInterface( void ) {}
 static void RBVK_BeginFrame( void ) {
 	Perf_ResetFrameCounters();
 }
-static void RBVK_EndFrame( void ) {}
+static void RBVK_EndFrame( void ) {
+	// GPU timing is updated in vk_begin_frame() when results are retrieved
+	// from the previous frame's command buffer completion
+}
 static void RBVK_BeginPass( const char *name ) { (void)name; }
 static void RBVK_EndPass( void ) {}
 
