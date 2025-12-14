@@ -6,12 +6,36 @@ Unit tests for Virtual Filesystem v2
 
 #include "test_framework.h"
 #include "../src/qcommon/q_shared.h"
+#include "../src/qcommon/files_internal.h"  // For pack_t, fileHandleData_t, etc.
 #include "../src/qcommon/files_v2.h"
 #include <string.h>
+#include <strings.h>  // for strcasecmp, strncasecmp
 #include <stdlib.h>
+#include <stdio.h>
+#include <stdarg.h>
+
+// Undefine macros that we need to implement as functions
+#undef Com_Memset
+
+// Forward declarations for mock functions
+void *Com_Memset(void *dest, int val, size_t count);
+float Q_atof(const char *str);
+qboolean FS_PakIsPure(const pack_t *pack);
+int FS_OpenFileInPak(fileHandle_t *file, pack_t *pak, fileInPack_t *pakFile, qboolean uniqueFILE);
+pack_t *FS_LoadZipFile(const char *zipfile);
+char *FS_BuildOSPath(const char *base, const char *game, const char *qpath);
+int FS_FileLength(FILE *h);
+fileHandle_t FS_HandleForFile(void);
+void FS_InitHandle(fileHandleData_t *fd);
+qboolean FS_FilenameCompare(const char *s1, const char *s2);
+FILE *Sys_FOpen(const char *ospath, const char *mode);
+int Cmd_Argc(void);
+const char *Cmd_Argv(int arg);
+void Cmd_AddCommand(const char *cmd_name, xcommand_t function);
 
 // Mock functions needed by files_v2.c
 void Com_Error(errorParm_t level, const char *error, ...) {
+	(void)level;  // Suppress unused parameter warning
 	va_list argptr;
 	va_start(argptr, error);
 	vfprintf(stderr, error, argptr);
@@ -36,6 +60,17 @@ void Com_DPrintf(const char *fmt, ...) {
 static char mock_memory[1024 * 1024];  // 1MB mock heap
 static size_t mock_offset = 0;
 
+// Mock fsh array (declared extern in files_internal.h, defined in files.c)
+// We need to provide a definition for the test
+fileHandleData_t fsh[MAX_FILE_HANDLES];
+
+// Mock fs_searchpaths (declared extern in files_internal.h, defined in files.c)
+// We need to provide a definition for the test
+searchpath_t *fs_searchpaths = NULL;
+
+// Mock fs_checksumFeed (declared extern in files_internal.h, defined in files.c)
+int fs_checksumFeed = 0;
+
 void *Z_TagMalloc(int size, memtag_t tag) {
 	(void)tag;
 	if (mock_offset + size > sizeof(mock_memory)) {
@@ -51,45 +86,87 @@ void Z_Free(void *ptr) {
 	(void)ptr;
 }
 
-// Mock Com_Memset
-void Com_Memset(void *dest, int val, size_t count) {
-	memset(dest, val, count);
+// Mock Com_Memset (q_shared.c defines it as a macro, we need a function)
+void *Com_Memset(void *dest, int val, size_t count) {
+	return memset(dest, val, count);
 }
 
-// Mock Com_sprintf
-int Com_sprintf(char *dest, size_t size, const char *fmt, ...) {
-	va_list argptr;
-	va_start(argptr, fmt);
-	int result = vsnprintf(dest, size, fmt, argptr);
-	va_end(argptr);
-	return result;
+// Note: Com_sprintf, Q_strncpyz, Q_stricmp, Q_stricmpn, Com_GenerateHashValue
+// are already defined in q_shared.c, so we don't redefine them here
+
+// Mock Q_atof
+float Q_atof(const char *str) {
+	return (float)atof(str);
 }
 
-// Mock Q_strncpyz
-void Q_strncpyz(char *dest, const char *src, int destsize) {
-	strncpy(dest, src, destsize - 1);
-	dest[destsize - 1] = '\0';
+// Mock functions from files.c that files_v2.c needs
+qboolean FS_PakIsPure(const pack_t *pack) {
+	(void)pack;
+	return qfalse;
 }
 
-// Mock Q_stricmp
-int Q_stricmp(const char *s1, const char *s2) {
-	return strcasecmp(s1, s2);
+int FS_OpenFileInPak(fileHandle_t *file, pack_t *pak, fileInPack_t *pakFile, qboolean uniqueFILE) {
+	(void)file;
+	(void)pak;
+	(void)pakFile;
+	(void)uniqueFILE;
+	return 0;
 }
 
-// Mock Q_stricmpn
-int Q_stricmpn(const char *s1, const char *s2, int n) {
-	return strncasecmp(s1, s2, n);
+pack_t *FS_LoadZipFile(const char *zipfile) {
+	(void)zipfile;
+	return NULL;
 }
 
-// Mock Com_GenerateHashValue
-uint32_t Com_GenerateHashValue(const char *fname, uint32_t hashSize) {
-	uint32_t hash = 0;
-	const char *p = fname;
-	while (*p) {
-		hash = hash * 31 + (unsigned char)*p;
-		p++;
+char *FS_BuildOSPath(const char *base, const char *game, const char *qpath) {
+	static char path[1024];
+	snprintf(path, sizeof(path), "%s/%s/%s", base, game, qpath);
+	return path;
+}
+
+int FS_FileLength(FILE *h) {
+	if (!h) return 0;
+	long pos = ftell(h);
+	fseek(h, 0, SEEK_END);
+	long len = ftell(h);
+	fseek(h, pos, SEEK_SET);
+	return (int)len;
+}
+
+fileHandle_t FS_HandleForFile(void) {
+	static int handle = 1;
+	return handle++;
+}
+
+void FS_InitHandle(fileHandleData_t *fd) {
+	if (fd) {
+		memset(fd, 0, sizeof(*fd));
 	}
-	return hash % hashSize;
+}
+
+qboolean FS_FilenameCompare(const char *s1, const char *s2) {
+	return (qboolean)(strcmp(s1, s2) == 0);
+}
+
+FILE *Sys_FOpen(const char *ospath, const char *mode) {
+	(void)ospath;
+	(void)mode;
+	return NULL;  // Mock - return NULL for tests
+}
+
+// Mock Cmd functions
+int Cmd_Argc(void) {
+	return 0;
+}
+
+const char *Cmd_Argv(int arg) {
+	(void)arg;
+	return "";
+}
+
+void Cmd_AddCommand(const char *cmd_name, xcommand_t function) {
+	(void)cmd_name;
+	(void)function;
 }
 
 // ============================================================================

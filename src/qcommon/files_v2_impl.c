@@ -9,7 +9,7 @@ Write Policy, Sandboxing, Mod Management, Console Commands, Migration
 #include "qcommon.h"
 #include "files_internal.h"
 #include "files_v2.h"
-#include "cmd.h"
+// Cmd_ functions are declared in qcommon.h
 
 // Forward declarations
 struct searchpath_s;

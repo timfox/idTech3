@@ -37,8 +37,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "q_shared.h"
 #include "qcommon.h"
-#include "unzip.h"
-#include "files_internal.h"  // Internal type definitions
+#include "files_internal.h"  // Internal type definitions (includes unzip.h)
 #include "files_v2.h"  // VFS v2 mount table
 #ifndef _WIN32
 #include <stdio.h> // popen, pclose
@@ -250,56 +249,12 @@ static const unsigned pak_checksums[] __attribute__((unused)) = {
 #define USE_HANDLE_CACHE
 #define MAX_CACHED_HANDLES 384
 
-#define MAX_ZPATH			256
 #define MAX_FILEHASH_SIZE	4096
 
 // Type definitions moved to files_internal.h
+// pack_t is now defined in files_internal.h
 
-typedef struct pack_s {
-	char			*pakFilename;				// c:\quake3\baseq3\pak0.pk3
-	char			*pakBasename;				// pak0
-	const char		*pakGamename;				// baseq3
-	unzFile			handle;						// handle to zip file
-	int				checksum;					// regular checksum
-	int				pure_checksum;				// checksum for pure
-	int				numfiles;					// number of files in pk3
-	int				referenced;					// referenced file flags
-	qboolean		exclude;					// found in \fs_excludeReference list
-	int				hashSize;					// hash table size (power of 2)
-	fileInPack_t*	*hashTable;					// hash table
-	fileInPack_t*	buildBuffer;				// buffer with the filenames etc.
-	int				index;
-
-	int				handleUsed;
-
-#ifdef USE_HANDLE_CACHE
-	struct pack_s	*next_h;						// double-linked list of unreferenced paks with open file handles
-	struct pack_s	*prev_h;
-#endif
-
-	// caching subsystem
-#ifdef USE_PK3_CACHE
-	unsigned int	namehash;
-	fileOffset_t	size;
-	fileTime_t		mtime;
-	fileTime_t		ctime;
-	qboolean		touched;
-	struct pack_s	*next;
-	struct pack_s	*prev;
-	int				checksumFeed;
-	int				*headerLongs;
-	int				numHeaderLongs;
-#endif
-} pack_t;
-
-// directory_t, dirPolicy_t moved to files_internal.h
-
-typedef struct searchpath_s {
-	struct searchpath_s *next;
-	pack_t		*pack;		// only one of pack / dir will be non NULL
-	directory_t	*dir;
-	dirPolicy_t	policy;
-} searchpath_t;
+// directory_t, dirPolicy_t, searchpath_t moved to files_internal.h
 
 #define MAX_BASEGAMES 4
 static  char		basegame_str[MAX_OSPATH], *basegames[MAX_BASEGAMES];
@@ -356,7 +311,7 @@ static int							fs_pathNormCacheHits = 0;
 static int							fs_pathNormCacheMisses = 0;
 static	cvar_t						*fs_pathNormCache;	// Enable path normalization caching
 
-static	searchpath_t	*fs_searchpaths;
+searchpath_t	*fs_searchpaths;  // Exported in files_internal.h
 static	int			fs_readCount;			// total bytes read
 static	qboolean	fs_startupInProgress = qfalse;	// Track if FS_Startup is running
 static	int			fs_loadCount;			// total files read
@@ -367,11 +322,11 @@ static	int			fs_pk3dirCount;			// total number of pk3 directories in searchpath
 static	int			fs_packCount;			// total number of packs in searchpath
 static	int			fs_dirCount;			// total number of directories in searchpath
 
-static	int			fs_checksumFeed;
+int			fs_checksumFeed;  // Exported in files_internal.h
 
 // qfile_gut, qfile_ut, fileHandleData_t moved to files_internal.h
 
-static fileHandleData_t	fsh[MAX_FILE_HANDLES];
+fileHandleData_t	fsh[MAX_FILE_HANDLES];  // Exported in files_internal.h
 
 // C23 Improvement: Static assertion to ensure MAX_FILE_HANDLES is reasonable
 _Static_assert( MAX_FILE_HANDLES > 0 && MAX_FILE_HANDLES <= 4096, 
@@ -545,7 +500,7 @@ return a hash value for the filename
 FS_HandleForFile
 =================
 */
-static fileHandle_t	FS_HandleForFile( void ) 
+fileHandle_t	FS_HandleForFile( void )  // Exported in files_internal.h 
 {
 	int		i;
 
@@ -614,7 +569,7 @@ static int FS_FileLengthByHandle( fileHandle_t f ) {
 FS_FileLength
 ================
 */
-static int FS_FileLength( FILE* h ) 
+int FS_FileLength( FILE* h )  // Exported in files_internal.h 
 {
 	int		pos;
 	int		end;
@@ -1044,7 +999,7 @@ qboolean FS_SV_FileExists( const char *file )
 FS_InitHandle
 ===========
 */
-static void FS_InitHandle( fileHandleData_t *fd ) {
+void FS_InitHandle( fileHandleData_t *fd ) {  // Exported in files_internal.h
 	fd->pak = NULL;
 	fd->pakIndex = -1;
 	fs_lastPakIndex = -1;

@@ -12,6 +12,19 @@ Shared between files.c and files_v2.c
 #include "qcommon.h"
 #include "unzip.h"
 
+// File path constants
+#ifndef MAX_ZPATH
+#define MAX_ZPATH			256		// max length of a filesystem pathname
+#endif
+
+// Feature flags (must be defined before pack_t struct)
+#ifndef USE_HANDLE_CACHE
+#define USE_HANDLE_CACHE
+#endif
+#ifndef USE_PK3_CACHE
+#define USE_PK3_CACHE
+#endif
+
 // Forward declarations
 typedef struct pack_s pack_t;
 typedef struct fileInPack_s fileInPack_t;
@@ -102,9 +115,12 @@ typedef struct fileHandleData_s {
 } fileHandleData_t;
 
 // Searchpath structure (needed for migration)
-// Forward declaration - full definition in files.c
-struct searchpath_s;
-typedef struct searchpath_s searchpath_t;
+typedef struct searchpath_s {
+	struct searchpath_s *next;
+	pack_t		*pack;		// only one of pack / dir will be non NULL
+	directory_t	*dir;
+	dirPolicy_t	policy;
+} searchpath_t;
 
 // External declarations from files.c
 extern fileHandleData_t fsh[];
