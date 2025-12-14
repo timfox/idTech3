@@ -96,3 +96,116 @@
 - [ ] Long-term: Visual scripting or graph builder (optional, phase 2+)
 - [ ] QOL: console command to reload scripts, restart sequences, dump active scripts
 
+---
+
+## Build & Platform Hardening
+
+- [ ] **Reproducible builds** (pinned toolchains, deterministic archives, `SOURCE_DATE_EPOCH`)
+- [ ] **Package manager integration** (vcpkg/Conan presets; lockfile + CI cache)
+- [ ] **Compiler matrix** (GCC/Clang/MSVC, `-Werror` on CI, warning budgets)
+- [ ] **LTO/PGO toggles** (CMake options + docs + CI artifact)
+- [ ] **Cross compilation** (Steam Deck / Linux cross toolchain; `x86_64` + `aarch64` plans)
+- [ ] **Symbol + crash dump pipeline** (PDB/dSYM/DWARF upload, symbol server layout)
+
+## Runtime Observability (beyond logging)
+
+- [ ] **Central “stats + telemetry” system** (cvars + HUD + JSON snapshot endpoint)
+- [ ] **Scoped trace zones everywhere** (CPU + GPU zones unified: Tracy or your replacement)
+- [ ] **Frame capture hooks** (RenderDoc markers + capture automation in dev builds)
+- [ ] **Configurable debug channels** (`r_debug_*`, `net_debug_*`, `fs_debug_*` categories)
+
+## Crash Resilience & Diagnostics
+
+- [ ] **Crash handler** (minidump + last 4k log ring buffer + build ID)
+- [ ] **Assert strategy** (`hard assert`, `soft assert`, “once” asserts, per-module toggles)
+- [ ] **“Safe mode” boot** (disable renderer mods, reset config, start windowed)
+- [ ] **Watchdog for deadlocks** (thread heartbeat + dump stacks if hung)
+
+## Determinism & Replayability (huge for networking + debugging)
+
+- [ ] **Deterministic time step mode** (fixed tick, decoupled render)
+- [ ] **Input recording + replay** (for bug repro and perf comparisons)
+- [ ] **Deterministic RNG** (seed control per subsystem; snapshot seed state)
+- [ ] **Golden test replays** in CI (run headless, validate checksums)
+
+## Filesystem / Asset System Modernization
+
+- [ ] **Virtual FS v2**: mount table, priority, write dir policy, sandboxing
+- [ ] **Asset manifest + hashing** (content-addressable IDs, integrity checks)
+- [ ] **Background streaming** (IO thread + decompression jobs + main-thread finalize)
+- [ ] **Shader pipeline**: shader cache versioning, hot reload, fallback shaders
+- [ ] **Texture pipeline**: KTX2/BasisU path (even if optional), mip policy, SRGB rules
+- [ ] **Validation command**: `--validate-assets` (missing refs, bad paths, invalid metadata)
+
+## Networking & Multiplayer Robustness
+
+- [ ] **Protocol versioning** (compat strategy, negotiated features, “strict/loose”)
+- [ ] **Snapshot correctness tests** (serialize/deserialize roundtrip fuzz + golden packets)
+- [ ] **Rate limiting + abuse hardening** (per-IP, per-client, command budget)
+- [ ] **NAT traversal plan** (even if later): abstraction layer + feature flags
+- [ ] **Lag compensation hooks** (server rewind framework; even stubbed)
+
+## Save/Load & Persistence
+
+- [ ] **Unified serialization framework** (engine + gamecode, versioned, schema-driven)
+- [ ] **Save corruption recovery** (atomic writes, backups, checksums)
+- [ ] **Migration tests** (load old saves in CI, auto-upgrade, verify invariants)
+
+## Renderer: Modern “Must-haves”
+
+- [ ] **Render graph / pass system** (even lightweight; explicit dependencies + barriers)
+- [ ] **GPU validation workflows** (Vulkan validation layers toggle + docs + CI run)
+- [ ] **Pipeline cache** (persistent, per-GPU, invalidation rules)
+- [ ] **Texture streaming budget** (VRAM estimator + eviction policy)
+- [ ] **Dynamic resolution / FSR/XeSS/DLSS strategy** (optional, but plan the interface)
+- [ ] **HDR path** (swapchain formats, tonemap, UI color space rules)
+
+## Audio
+
+- [ ] **Audio graph abstraction** (mix buses, sends, ducking, priorities)
+- [ ] **HRTF + spatialization** (OpenAL Soft path, fallbacks)
+- [ ] **Audio profiler** (voices active, CPU time, memory, streaming health)
+
+## Tooling & Content Authoring (Radiant-focused)
+
+- [ ] **Gamepack schema + validator** (JSON schema, versioning, env var expansion tests)
+- [ ] **Entity def modernization** (typed fields, defaults, ranges, UI hints)
+- [ ] **Prefab system improvements** (dependency tracking, versioned prefabs, “bake to brushes”)
+- [ ] **Map compile orchestration** (profiles, incremental compile, artifact caching)
+- [ ] **Remote compile farm option** (later): compiler RPC protocol stub
+
+## Testing & QA Engineering
+
+- [ ] **Headless test runner** (unit + integration + replay tests)
+- [ ] **Property tests** for math/geom (AABB, planes, winding, BSP ops)
+- [ ] **Fuzz targets expanded** (bsp, shader scripts, pk3 parsing, network messages)
+- [ ] **Performance regression gates** (threshold-based; fail CI if >X% regression)
+
+## Security & Supply Chain
+
+- [ ] **Dependency audit pipeline** (SBOM generation, `cargo/vcpkg` equivalent where applicable)
+- [ ] **Signed releases** (sign binaries + manifests)
+- [ ] **Secure defaults** (no remote downloads, no unsafe cvars in release builds)
+
+## Packaging, Modding, UX
+
+- [ ] **First-run UX** (auto-detect settings, safe defaults, controller prompts)
+- [ ] **Mod packaging format spec** (your `.pk3` rename: define rules, mounting, conflicts)
+- [ ] **In-engine mod browser hooks** (even if no UI yet: backend list/enable/disable)
+- [ ] **Dedicated server packaging** (minimal headless build + scripts + docs)
+
+## Scripting (your Lua plan) — missing “engine contracts”
+
+- [ ] **Stable C API boundary for Lua bindings** (no direct engine internals)
+- [ ] **Deterministic script execution rules** (what runs in tick vs frame)
+- [ ] **Sandboxing** (no `os.execute`, file IO gating, whitelisted libs)
+- [ ] **Error containment** (script errors don’t kill engine; quarantine failing coroutine)
+- [ ] **Save/load for scripts** (serialize coroutine/encounter state or define reset policy)
+
+---
+
+### Shippability Meta
+
+- [ ] Add **priorities + phases** to every section (P0 ship blocker / P1 / P2 nice-to-have)
+- [ ] Add a **Definition of Done template** per feature (tests, docs, CI, perf impact, debug toggles)
+
