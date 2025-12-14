@@ -11,6 +11,18 @@ $breadcrumbs = [
 <h1>Tutorials Index</h1>
 
 <div class="section">
+    <h2>C23 Programming Language</h2>
+    <ul>
+        <li><a href="/tutorials/c23-overview">C23 Overview</a> - Introduction to C23 features and migration</li>
+        <li><a href="/tutorials/c23-attributes">C23 Attributes</a> - Standardized attribute syntax</li>
+        <li><a href="/tutorials/c23-type-system">C23 Type System</a> - typeof, typeof_unqual, and type improvements</li>
+        <li><a href="/tutorials/c23-memory-safety">C23 Memory Safety</a> - Bounds checking and safer memory operations</li>
+        <li><a href="/tutorials/c23-standard-library">C23 Standard Library</a> - New and improved standard library functions</li>
+        <li><a href="/tutorials/c23-constexpr">C23 Compile-Time Features</a> - constexpr functions and compile-time evaluation</li>
+    </ul>
+</div>
+
+<div class="section">
     <h2>Engine & Rendering</h2>
     <ul>
         <li><a href="/tutorials/vulkan-renderer-quickstart">Vulkan Renderer Quick Start</a></li>

@@ -214,9 +214,6 @@ Convert legacy searchpath_t to mount table
 */
 void FS_MigrateLegacySearchPaths(void);
 
-// Migrate legacy searchpath_t to mount table
-void FS_MigrateLegacySearchPaths(void);
-
 // Check if mount table is active
 qboolean FS_MountTable_IsActive(void);
 

@@ -47,6 +47,7 @@ ini_set('error_log', __DIR__ . '/error.log');
                     <li><a href="rendering/directx12">DirectX 12 Renderer</a> - New Windows renderer with DXR</li>
                     <li><a href="core/structured-logging">Structured Logging</a> - Modern logging system</li>
                     <li><a href="core/memory-safety">Memory Safety Tools</a> - ASan, UBSan, memory tracking</li>
+                    <li><a href="core/filesystem-v2">Virtual Filesystem v2.0</a> - Modern mount management, priority-based search, enhanced security</li>
                     <li><a href="networking/websocket">WebSocket Support</a> - Real-time bidirectional communication</li>
                     <li><a href="imgui">ImGui Debug Overlays</a> - In-engine debugging tools</li>
                 </ul>
@@ -76,6 +77,7 @@ ini_set('error_log', __DIR__ . '/error.log');
             <div class="section">
                 <h2>Tutorials</h2>
                 <ul>
+                    <li><a href="tutorials/c23-overview">C23 Programming Language Tutorial</a></li>
                     <li><a href="tutorials/structured-logging">Structured Logging Tutorial</a></li>
                     <li><a href="tutorials/memory-profiling">Memory Profiling Tutorial</a></li>
                     <li><a href="tutorials/imgui-overlays">ImGui Debug Overlays Tutorial</a></li>
@@ -122,6 +124,7 @@ ini_set('error_log', __DIR__ . '/error.log');
                 <ul>
                     <li><a href="core/complete-core">Complete Core Systems</a></li>
                     <li><a href="core/filesystem">Filesystem</a></li>
+                    <li><a href="core/filesystem-v2">Virtual Filesystem v2.0</a></li>
                     <li><a href="core/memory-management">Memory Management</a></li>
                     <li><a href="core/input-system">Input System</a></li>
                     <li><a href="core/console-system">Console System</a></li>

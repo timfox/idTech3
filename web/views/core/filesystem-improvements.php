@@ -163,6 +163,7 @@ $breadcrumbs = [
 <div class="section">
     <h2>Related Topics</h2>
     <ul>
+        <li><a href="core/filesystem-v2">Virtual Filesystem v2.0</a> - Modern mount management system</li>
         <li><a href="core/filesystem">Filesystem Documentation</a> - Complete filesystem reference</li>
         <li><a href="development/modding">Modding Guide</a> - Creating mods</li>
         <li><a href="development/map-making">Map Making</a> - Creating maps</li>

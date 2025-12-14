@@ -6,41 +6,23 @@ Virtual Filesystem v2 - Mount Table Implementation
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include "files_internal.h"  // Internal type definitions
 #include "files_v2.h"
 
-// Forward declarations from files.c
-// Note: These types are defined in files.c, we use forward declarations
+// Forward declarations
 struct searchpath_s;
 typedef struct searchpath_s searchpath_t;
-struct directory_s;
-typedef struct directory_s directory_t;
-struct pack_s;
-typedef struct pack_s pack_t;
-struct fileInPack_s;
-typedef struct fileInPack_s fileInPack_t;
-typedef struct fileHandleData_s fileHandleData_t;
-
-typedef enum {
-	DIR_STATIC = 0,
-	DIR_ALLOW,
-	DIR_DENY
-} dirPolicy_t;
 
 extern searchpath_t *fs_searchpaths;
 extern int fs_checksumFeed;
 
-// Function declarations from files.c
-pack_t *FS_LoadZipFile(const char *zipfile);
-char *FS_BuildOSPath(const char *base, const char *game, const char *qpath);
-
-// Mount table instance
-static fsMountTable_t fs_mountTable;
-static qboolean fs_mountTableInitialized = qfalse;
+// Mount table instance (shared with files_v2_impl.c)
+fsMountTable_t fs_mountTable;
+qboolean fs_mountTableInitialized = qfalse;
 
 // Forward declarations
 static void FS_Mount_InsertByPriority(fsMount_t *mount);
 static void FS_Mount_RemoveFromPriority(fsMount_t *mount);
-static qboolean FS_IsPakFile(const char *path);
 
 // ============================================================================
 // Mount Table Management
@@ -378,7 +360,7 @@ FS_IsPakFile
 Check if path points to a PAK file
 ================
 */
-static qboolean FS_IsPakFile(const char *path) {
+qboolean FS_IsPakFile(const char *path) {
 	const char *ext;
 	int len;
 	
@@ -442,16 +424,166 @@ static fsMount_t *FS_Mount_GetNextByPriority(fsMountPriority_t *currentPriority,
 FS_Mount_FindFile
 ================
 Find file in mount table using priority-ordered search
-TODO: Complete implementation when pack_t/fileInPack_t/directory_t types are accessible
-For now, returns -1 to fall back to legacy search path
 ================
 */
 int FS_Mount_FindFile(const char *qpath, fileHandle_t *file, 
                       fsMount_t **outMount, pack_t **outPak, 
                       fileInPack_t **outPakFile) {
-	// TODO: Implement full file search when types are accessible
-	// For now, mount table is populated via migration but file operations
-	// go through legacy path in files.c
+	fsMount_t *mount;
+	fsMountPriority_t currentPriority;
+	pack_t *pak;
+	fileInPack_t *pakFile;
+	directory_t *dir;
+	char *netpath;
+	FILE *temp;
+	int length;
+	fileHandleData_t *f;
+	uint32_t hash;
+	uint32_t fullHash;
+	
+	if (!qpath || !*qpath) {
+		if (file) {
+			*file = FS_INVALID_HANDLE;
+		}
+		return -1;
+	}
+	
+	if (!fs_mountTableInitialized || !fs_mountTable.mounts) {
+		if (file) {
+			*file = FS_INVALID_HANDLE;
+		}
+		return -1;
+	}
+	
+	// Generate hash for filename
+	fullHash = Com_GenerateHashValue(qpath, 0U);
+	hash = fullHash;
+	
+	// Start at highest priority
+	currentPriority = FS_PRIORITY_SYSTEM;
+	mount = fs_mountTable.mountsByPriority[currentPriority];
+	if (!mount) {
+		// Find first available priority
+		for (currentPriority = FS_PRIORITY_SYSTEM; currentPriority >= FS_PRIORITY_FALLBACK; currentPriority--) {
+			mount = fs_mountTable.mountsByPriority[currentPriority];
+			if (mount) {
+				break;
+			}
+		}
+		if (!mount) {
+			if (file) {
+				*file = FS_INVALID_HANDLE;
+			}
+			return -1;
+		}
+	}
+	
+	// Search through mounts by priority
+	while (mount) {
+		if (!mount->enabled) {
+			mount = FS_Mount_GetNextByPriority(&currentPriority, mount);
+			continue;
+		}
+		
+		// Update statistics
+		mount->accessCount++;
+		
+		// Check PAK file mount
+		if (mount->type == FS_MOUNT_PAK && mount->backend.pak) {
+			pak = mount->backend.pak;
+			
+			// Check pure server pak list
+			if (!FS_PakIsPure(pak)) {
+				mount = FS_Mount_GetNextByPriority(&currentPriority, mount);
+				continue;
+			}
+			
+			if (pak->hashTable && pak->hashTable[(hash & (pak->hashSize - 1))]) {
+				pakFile = pak->hashTable[hash & (pak->hashSize - 1)];
+				do {
+					// Case and separator insensitive comparison
+					if (!FS_FilenameCompare(pakFile->name, qpath)) {
+						// Found it!
+						mount->hitCount++;
+						
+						if (outMount) {
+							*outMount = mount;
+						}
+						if (outPak) {
+							*outPak = pak;
+						}
+						if (outPakFile) {
+							*outPakFile = pakFile;
+						}
+						
+						if (file) {
+							// Open file in PAK
+							return FS_OpenFileInPak(file, pak, pakFile, qtrue);
+						} else {
+							// Just checking existence
+							return pakFile->size;
+						}
+					}
+					pakFile = pakFile->next;
+				} while (pakFile != NULL);
+			}
+		}
+		// Check directory mount
+		else if (mount->type == FS_MOUNT_DIR && mount->backend.dir) {
+			dir = mount->backend.dir;
+			
+			// Build OS path
+			netpath = FS_BuildOSPath(dir->path, dir->gamedir, qpath);
+			
+			// Try to open file
+			temp = Sys_FOpen(netpath, "rb");
+			
+			// TODO: Case-insensitive file lookup
+			// if (temp == NULL && fs_caseInsensitive && fs_caseInsensitive->integer) {
+			//     if (FS_FindFileCaseInsensitive(netpath, qpath)) {
+			//         temp = Sys_FOpen(netpath, "rb");
+			//     }
+			// }
+			
+			if (temp != NULL) {
+				// Found it!
+				mount->hitCount++;
+				
+				if (outMount) {
+					*outMount = mount;
+				}
+				if (outPak) {
+					*outPak = NULL;
+				}
+				if (outPakFile) {
+					*outPakFile = NULL;
+				}
+				
+				if (file == NULL) {
+					// Just checking existence
+					length = FS_FileLength(temp);
+					fclose(temp);
+					return length;
+				}
+				
+				// Open file handle
+				*file = FS_HandleForFile();
+				f = &fsh[*file];
+				FS_InitHandle(f);
+				
+				f->handleFiles.file.o = temp;
+				Q_strncpyz(f->name, qpath, sizeof(f->name));
+				f->zipFile = qfalse;
+				
+				return FS_FileLength(f->handleFiles.file.o);
+			}
+		}
+		
+		// Move to next mount
+		mount = FS_Mount_GetNextByPriority(&currentPriority, mount);
+	}
+	
+	// File not found
 	if (file) {
 		*file = FS_INVALID_HANDLE;
 	}

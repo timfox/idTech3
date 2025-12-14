@@ -755,10 +755,12 @@ int FS_ReadStream(fileStream_t* stream, void* buffer, int size) {
 <div class="section">
     <h2>Related Topics</h2>
     <ul>
-        <li><a href="/core/engine-subsystems">Engine Subsystems</a></li>
-        <li><a href="/core/memory-management">Memory Management</a></li>
-        <li><a href="/development/modding">Modding Guide</a></li>
-        <li><a href="/tools/asset-tools">Asset Tools</a></li>
-        <li><a href="/platform/cross-platform">Cross-Platform Development</a></li>
+        <li><a href="core/filesystem-v2">Virtual Filesystem v2.0</a> - Modern mount management system</li>
+        <li><a href="core/filesystem-improvements">Filesystem Improvements</a> - Enhanced filesystem features</li>
+        <li><a href="core/engine-subsystems">Engine Subsystems</a></li>
+        <li><a href="core/memory-management">Memory Management</a></li>
+        <li><a href="development/modding">Modding Guide</a></li>
+        <li><a href="tools/asset-tools">Asset Tools</a></li>
+        <li><a href="platform/cross-platform">Cross-Platform Development</a></li>
     </ul>
 </div>

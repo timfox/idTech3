@@ -377,6 +377,7 @@ list(APPEND QCOMMON_SRCS src/qcommon/vm_hot_reload.c)
 # Add event system
 list(APPEND QCOMMON_SRCS src/qcommon/event_system.c)
 list(APPEND QCOMMON_SRCS src/qcommon/files_v2.c)
+list(APPEND QCOMMON_SRCS src/qcommon/files_v2_impl.c)
 # Add wrapper files conditionally
 IF(USE_CJSON)
 	list(APPEND QCOMMON_SRCS src/qcommon/json_cjson.c)
@@ -2497,6 +2498,17 @@ IF(BUILD_TESTS)
 		tests/test_memory.c)
 	TARGET_INCLUDE_DIRECTORIES(test_memory PRIVATE src/qcommon)
 	TARGET_INCLUDE_DIRECTORIES(test_memory PRIVATE src)
+
+	ADD_EXECUTABLE(test_filesystem_v2
+		tests/test_filesystem_v2.c
+		src/qcommon/files_v2.c
+		src/qcommon/files_v2_impl.c
+		src/qcommon/q_shared.c
+	)
+	TARGET_INCLUDE_DIRECTORIES(test_filesystem_v2 PRIVATE src/qcommon)
+	TARGET_INCLUDE_DIRECTORIES(test_filesystem_v2 PRIVATE src)
+	TARGET_INCLUDE_DIRECTORIES(test_filesystem_v2 PRIVATE tests)
+	ADD_TEST(NAME filesystem_v2_tests COMMAND test_filesystem_v2)
 	TARGET_COMPILE_DEFINITIONS(test_memory PRIVATE STANDALONE_TEST)
 	ADD_TEST(NAME memory_tests COMMAND test_memory)
 

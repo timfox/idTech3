@@ -38,6 +38,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_shared.h"
 #include "qcommon.h"
 #include "unzip.h"
+#include "files_internal.h"  // Internal type definitions
 #include "files_v2.h"  // VFS v2 mount table
 #ifndef _WIN32
 #include <stdio.h> // popen, pclose
@@ -252,12 +253,7 @@ static const unsigned pak_checksums[] __attribute__((unused)) = {
 #define MAX_ZPATH			256
 #define MAX_FILEHASH_SIZE	4096
 
-typedef struct fileInPack_s {
-	char					*name;		// name of the file
-	unsigned long			pos;		// file info position in zip
-	unsigned long			size;		// file size
-	struct	fileInPack_s*	next;		// next file in the hash
-} fileInPack_t;
+// Type definitions moved to files_internal.h
 
 typedef struct pack_s {
 	char			*pakFilename;				// c:\quake3\baseq3\pak0.pk3
@@ -296,16 +292,7 @@ typedef struct pack_s {
 #endif
 } pack_t;
 
-typedef struct {
-	char		*path;		// c:\quake3
-	char		*gamedir;	// baseq3
-} directory_t;
-
-typedef enum {
-	DIR_STATIC = 0,	// always allowed, never changes
-	DIR_ALLOW,
-	DIR_DENY
-} dirPolicy_t;
+// directory_t, dirPolicy_t moved to files_internal.h
 
 typedef struct searchpath_s {
 	struct searchpath_s *next;
@@ -382,28 +369,7 @@ static	int			fs_dirCount;			// total number of directories in searchpath
 
 static	int			fs_checksumFeed;
 
-typedef union qfile_gus {
-	FILE*		o;
-	unzFile		z;
-	void*		v;
-} qfile_gut;
-
-typedef struct qfile_us {
-	qfile_gut	file;
-	qboolean	unique;
-} qfile_ut;
-
-typedef struct {
-	qfile_ut	handleFiles;
-	qboolean	handleSync;
-	qboolean	zipFile;
-	int			zipFilePos;
-	int			zipFileLen;
-	char		name[MAX_ZPATH];
-	handleOwner_t	owner;
-	int			pakIndex;
-	pack_t		*pak;
-} fileHandleData_t;
+// qfile_gut, qfile_ut, fileHandleData_t moved to files_internal.h
 
 static fileHandleData_t	fsh[MAX_FILE_HANDLES];
 
@@ -2308,9 +2274,17 @@ extern qboolean		com_fullyInitialized;
 	fullHash = FS_HashFileName( filename, 0U );
 
 	// VFS v2: Try mount table first if active
-	// Note: FS_Mount_FindFile is currently a stub - mount table migration
-	// will populate mounts, but file operations still go through legacy path
-	// TODO: Complete FS_Mount_FindFile implementation when types are accessible
+	if (FS_MountTable_IsActive()) {
+		fsMount_t *mount = NULL;
+		pack_t *foundPak = NULL;
+		fileInPack_t *foundPakFile = NULL;
+		int result = FS_Mount_FindFile(filename, file, &mount, &foundPak, &foundPakFile);
+		if (result >= 0) {
+			// File found in mount table
+			return result;
+		}
+		// Not found in mount table, fall through to legacy search
+	}
 
 	// C23 Improvement: Try path resolution cache first
 	if ( file != NULL ) {
