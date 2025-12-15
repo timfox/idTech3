@@ -128,7 +128,18 @@ jobs:
         if: matrix.os == 'macos'
         run: |
           brew update
-          brew install cmake sdl2 curl openssl jpeg vorbis ogg freetype sqlite lua@5.4 libwebsockets zstd openal theora libvpx dav1d openexr assimp bullet
+          brew install cmake sdl2 curl openssl jpeg libvorbis libogg freetype sqlite lua@5.4 libwebsockets zstd openal theora libvpx dav1d openexr assimp bullet
+
+      - name: Install dependencies (Windows)
+        if: matrix.os == 'windows'
+        shell: pwsh
+        run: |
+          # Use vcpkg to provide SDL2 (CMake config package)
+          $ErrorActionPreference = "Stop"
+          git clone https://github.com/microsoft/vcpkg "$env:GITHUB_WORKSPACE\vcpkg"
+          & "$env:GITHUB_WORKSPACE\vcpkg\bootstrap-vcpkg.bat"
+          & "$env:GITHUB_WORKSPACE\vcpkg\vcpkg.exe" install sdl2:x64-windows
+          "VCPKG_ROOT=$env:GITHUB_WORKSPACE\vcpkg" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Configure (CMake)
         shell: bash
@@ -139,6 +150,8 @@ jobs:
             cmake .. \
               -G "Visual Studio 17 2022" \
               -A ${{ matrix.arch }} \
+              -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+              -DVCPKG_TARGET_TRIPLET=x64-windows \
               -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
               ${{ env.CMAKE_COMMON_FLAGS }}
           elif [ "${{ matrix.os }}" = "macos" ]; then

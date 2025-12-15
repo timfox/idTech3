@@ -15,6 +15,9 @@ jobs:
   build-release:
     name: Build Release ${{ matrix.os }} ${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
@@ -31,6 +34,8 @@ jobs:
     
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       
       - name: Get version
         id: version
@@ -62,7 +67,7 @@ jobs:
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install cmake sdl2 curl openssl jpeg vorbis ogg freetype sqlite lua@5.4 libwebsockets zstd openal theora libvpx dav1d openexr assimp bullet
+          brew install cmake sdl2 curl openssl jpeg libvorbis libogg freetype sqlite lua@5.4 libwebsockets zstd openal theora libvpx dav1d openexr assimp bullet
       
       - name: Build engine
         run: |
@@ -165,8 +170,8 @@ jobs:
           # Create archive
           cd release
           if [ "${{ runner.os }}" == "Windows" ]; then
-            # Use PowerShell on Windows
-            Compress-Archive -Path "idtech3-$VERSION-$PLATFORM" -DestinationPath "idtech3-$VERSION-$PLATFORM.zip"
+            # Use PowerShell on Windows (explicitly, since this step runs in bash)
+            powershell -NoProfile -NonInteractive -Command "Compress-Archive -Path 'idtech3-$VERSION-$PLATFORM' -DestinationPath 'idtech3-$VERSION-$PLATFORM.zip'"
           else
             tar czf idtech3-$VERSION-$PLATFORM.tar.gz idtech3-$VERSION-$PLATFORM
           fi
