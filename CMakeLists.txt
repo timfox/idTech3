@@ -1091,10 +1091,10 @@ ENDIF()
 # renderers
 AUX_SOURCE_DIRECTORY(src/renderercommon RENDERER_COMMON_SRCS)
 AUX_SOURCE_DIRECTORY(src/renderer RENDERER_GL_SRCS)
-AUX_SOURCE_DIRECTORY(src/renderervk RENDERER_VK_SRCS)
+AUX_SOURCE_DIRECTORY(src/renderers/vulkan RENDERER_VK_SRCS)
 # Add VMA C++ implementation file if VMA is enabled
 IF(USE_VMA AND USE_VULKAN)
-	list(APPEND RENDERER_VK_SRCS src/renderervk/vk_vma.cpp)
+	list(APPEND RENDERER_VK_SRCS src/renderers/vulkan/vk_vma.cpp)
 ENDIF()
 
 IF(USE_CIMGUI AND DEFINED CIMGUI_DIR)
@@ -1104,7 +1104,7 @@ IF(USE_CIMGUI AND DEFINED CIMGUI_DIR)
 	)
 ENDIF()
 
-list(APPEND RENDERER_VK_SRCS src/renderervk/vk_imgui.c)
+list(APPEND RENDERER_VK_SRCS src/renderers/vulkan/vk_imgui.c)
 
 # DirectX 12 renderer (Windows only)
 IF(WIN32 AND USE_D3D12)
@@ -1177,7 +1177,7 @@ IF(USE_RENDERER_DLOPEN)
 			TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE libs/vma)
 			# Suppress warnings from third-party VMA library code
 			IF(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-				SET_SOURCE_FILES_PROPERTIES(src/renderervk/vk_vma.cpp PROPERTIES
+				SET_SOURCE_FILES_PROPERTIES(src/renderers/vulkan/vk_vma.cpp PROPERTIES
 					COMPILE_FLAGS "-Wno-unused-parameter -Wno-unused-variable"
 				)
 			ENDIF()
@@ -2453,6 +2453,10 @@ IF(UI2_SRCS)
 		CXX_STANDARD_REQUIRED ON
 		CXX_EXTENSIONS OFF
 	)
+	# UI2 depends on qcommon for Hunk_AllocateTempMemory, Cvar_Get, Cmd_AddCommand, etc.
+	# Note: OBJECT libraries don't actually link, but this establishes the dependency
+	# relationship for include directories and ensures proper linking order
+	TARGET_LINK_LIBRARIES(ui2 PRIVATE qcommon)
 	MESSAGE(STATUS "UI2 module: enabled")
 ELSE()
 	# Create dummy source file if no UI2 sources found
@@ -2517,6 +2521,11 @@ IF(BUILD_TESTS)
 		tests/test_memory.c)
 	TARGET_INCLUDE_DIRECTORIES(test_memory PRIVATE src/qcommon)
 	TARGET_INCLUDE_DIRECTORIES(test_memory PRIVATE src)
+	TARGET_INCLUDE_DIRECTORIES(test_memory PRIVATE tests)
+	TARGET_COMPILE_DEFINITIONS(test_memory PRIVATE STANDALONE_TEST)
+	IF(UNIX)
+		TARGET_LINK_LIBRARIES(test_memory PRIVATE m)
+	ENDIF()
 
 	ADD_EXECUTABLE(test_filesystem_v2
 		tests/test_filesystem_v2.c
