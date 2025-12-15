@@ -1,15 +1,5 @@
-id Tech 3 GPL source release
+id Tech 3 GPL License
 ==================================
-
-This file contains the following sections:
-
-LICENSE
-GENERAL NOTES
-
-LICENSE
-=======
-
-See COPYING.txt for the GNU GENERAL PUBLIC LICENSE
 
 Some source code in this release is not covered by the GPL:
 
