@@ -1933,11 +1933,12 @@ static const void *RB_SwapBuffers( const void *data ) {
 		backEnd.screenshotMask = 0;
 	}
 
-#ifdef USE_VULKAN
-	vk_present_frame();
-#else
+#ifndef USE_VULKAN
 	ri.GLimp_EndFrame();
 #endif
+	// NOTE: For Vulkan, vk_present_frame() is now called at the end of vk_end_frame().
+	// This code path is never reached for Vulkan because RB_ExecuteRenderCommands() returns
+	// after processing RC_END_OF_LIST (which calls vk_end_frame()).
 
 	backEnd.projection2D = qfalse;
 	backEnd.doneSurfaces = qfalse;

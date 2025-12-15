@@ -10990,7 +10990,7 @@ void vk_end_frame( void )
 					uint32_t groupCountX = (vk.renderWidth + (wgSize - 1)) / wgSize;
 					uint32_t groupCountY = (vk.renderHeight + (wgSize - 1)) / wgSize;
 					qvkCmdDispatch( vk.cmd->command_buffer, groupCountX, groupCountY, 1 );
-					
+
 					// 6. Transition swapchain image back to PRESENT_SRC_KHR for presentation
 					barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
 					barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
@@ -11024,19 +11024,19 @@ void vk_end_frame( void )
 					{
 						VkViewport viewport;
 						VkRect2D scissor_rect;
-						
+
 						viewport.x = 0.0f;
 						viewport.y = 0.0f;
 						viewport.width = (float)gls.windowWidth;
 						viewport.height = (float)gls.windowHeight;
 						viewport.minDepth = 0.0f;
 						viewport.maxDepth = 1.0f;
-						
+
 						scissor_rect.offset.x = 0;
 						scissor_rect.offset.y = 0;
 						scissor_rect.extent.width = gls.windowWidth;
 						scissor_rect.extent.height = gls.windowHeight;
-						
+
 						qvkCmdSetViewport( vk.cmd->command_buffer, 0, 1, &viewport );
 						qvkCmdSetScissor( vk.cmd->command_buffer, 0, 1, &scissor_rect );
 					}
@@ -11168,6 +11168,12 @@ void vk_end_frame( void )
 	}
 
 	vk.renderPassIndex = RENDER_PASS_MAIN;
+
+	// CRITICAL FIX: Present the frame NOW, at the end of vk_end_frame().
+	// Previously vk_present_frame() was only called from RB_SwapBuffers(),
+	// but RB_ExecuteRenderCommands() returns after RC_END_OF_LIST (which calls vk_end_frame()),
+	// so vk_present_frame() in RB_SwapBuffers() was NEVER REACHED -> black screen!
+	vk_present_frame();
 }
 
 }
