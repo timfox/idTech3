@@ -320,7 +320,7 @@ set(CNAME "idtech3" CACHE STRING "Main executable/library name")
 set(DNAME "idtech3.server" CACHE STRING "Dedicated server executable name")
 
 SET(RENDERER_PREFIX ${CNAME})
-set(RENDERER_DEFAULT "vulkan" CACHE STRING "Default renderer (opengl, vulkan, opengl2, d3d12, metal)")
+set(RENDERER_DEFAULT "opengl" CACHE STRING "Default renderer (opengl, vulkan, opengl2, d3d12, metal)")
 
 # Some configurations (notably monolithic Vulkan without dlopen) are not fully supported yet.
 # Prefer the dlopen renderer path to keep builds reproducible (and to provide `make install`).
@@ -2196,7 +2196,10 @@ IF(ANDROID)
 ELSE()
 	ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 ENDIF()
-TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui ui2)
+TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui)
+IF(USE_UI2)
+	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ui2)
+ENDIF()
 
 # Non-SDL UNIX UI code (src/unix/linux_glimp.c, etc.) depends on X11 symbols.
 if(UNIX AND NOT USE_SDL)
@@ -2600,7 +2603,10 @@ IF(USE_VULKAN)
 ENDIF()
 
 # UI2 - Deterministic UI/Layout System (C++23)
-AUX_SOURCE_DIRECTORY(src/ui2 UI2_SRCS)
+OPTION(USE_UI2 "Enable UI2 deterministic UI/layout system" OFF)
+IF(USE_UI2)
+	AUX_SOURCE_DIRECTORY(src/ui2 UI2_SRCS)
+ENDIF()
 IF(UI2_SRCS)
 	ADD_LIBRARY(ui2 OBJECT ${UI2_SRCS})
 	TARGET_COMPILE_DEFINITIONS(ui2 PRIVATE UI2_ENABLED)

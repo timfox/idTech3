@@ -886,7 +886,7 @@ typedef enum {
 #define CONSOLE_HISTORY_FILE "q3history_server"
 #else
 #define Q3CONFIG_CFG "config.cfg"
-#define CONSOLE_HISTORY_FILE "q3history"
+#define CONSOLE_HISTORY_FILE "history"
 #endif
 
 typedef	time_t fileTime_t;
