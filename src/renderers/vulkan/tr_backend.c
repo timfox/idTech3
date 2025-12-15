@@ -1106,6 +1106,13 @@ static void RB_SetGL2D( void ) {
 	backEnd.projection2D = qtrue;
 
 #ifdef USE_VULKAN
+	// CRITICAL: Ensure main render pass is started before UI rendering.
+	// On menu-only frames (no 3D world), RB_DrawSurfs() may never be called,
+	// so the render pass never starts, causing UI to render to nothing -> black screen.
+	if ( vk.renderPassIndex >= RENDER_PASS_COUNT ) {
+		vk_begin_main_render_pass();
+	}
+
 	vk_update_mvp( NULL );
 
 	// force depth range and viewport/scissor updates

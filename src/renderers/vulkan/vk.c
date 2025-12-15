@@ -11008,11 +11008,38 @@ void vk_end_frame( void )
 					if ( r_postprocess_compute && r_postprocess_compute->integer && (!r_postQuality || r_postQuality->integer > 0) ) {
 						ri.Printf( PRINT_WARNING, "VK: Compute post-processing requested but pipelines not available or disabled by quality, using graphics pipeline\n" );
 					}
-					ri.Printf( PRINT_DEVELOPER, "VK: Gamma pass: renderArea=%dx%d, framebuffer should be %dx%d\n", 
-						vk.renderWidth, vk.renderHeight, gls.windowWidth, gls.windowHeight );
-					vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qtrue, vk.renderWidth, vk.renderHeight );
+					// The gamma pass renders directly to the swapchain framebuffer.
+					// Its render area MUST match the swapchain/window extent, not the internal render resolution.
+					// If vk.renderWidth/Height are larger than the swapchain (e.g. desktop-sized internal res),
+					// the fullscreen quad can be clipped to nothing -> black window with audio/input still working.
+					ri.Printf( PRINT_DEVELOPER, "VK: Gamma pass: renderArea=%dx%d (swapchain), internal=%dx%d\n",
+						gls.windowWidth, gls.windowHeight, vk.renderWidth, vk.renderHeight );
+					vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qtrue, gls.windowWidth, gls.windowHeight );
 					qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
 					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
+
+					// CRITICAL: Set viewport and scissor for gamma pass.
+					// Since viewport/scissor are dynamic states, they MUST be set before drawing.
+					// Without this, the viewport may be zero-sized or invalid, causing black screen.
+					{
+						VkViewport viewport;
+						VkRect2D scissor_rect;
+						
+						viewport.x = 0.0f;
+						viewport.y = 0.0f;
+						viewport.width = (float)gls.windowWidth;
+						viewport.height = (float)gls.windowHeight;
+						viewport.minDepth = 0.0f;
+						viewport.maxDepth = 1.0f;
+						
+						scissor_rect.offset.x = 0;
+						scissor_rect.offset.y = 0;
+						scissor_rect.extent.width = gls.windowWidth;
+						scissor_rect.extent.height = gls.windowHeight;
+						
+						qvkCmdSetViewport( vk.cmd->command_buffer, 0, 1, &viewport );
+						qvkCmdSetScissor( vk.cmd->command_buffer, 0, 1, &scissor_rect );
+					}
 
 					qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 					vk_end_render_pass();
