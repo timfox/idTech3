@@ -5286,12 +5286,19 @@ void vk_initialize( void )
 	// Initialize graphics settings system first
 	VK_GraphicsSettings_Init();
 
+	// Initialize dynamic rendering system (needed for modern rendering features)
+	VK_DynamicRendering_Init();
+
+	// Initialize multi-threaded rendering system
+	VK_MultithreadedRendering_Init();
+
 	// Initialize advanced rendering systems
 	VK_IBL_Init();
 	VK_Shadows_Init();
 	R_GLTF_Init();
 	VK_SEM_Init();
 	VK_Physics_Init();
+	VK_ComputeRT_Init();
 
 	// Apply graphics settings after systems are initialized
 	VK_GraphicsSettings_ApplySettings();
@@ -6331,11 +6338,14 @@ __cleanup:
 	vk_material_system_shutdown();
 	vk_gpu_culling_shutdown();
 	// Shutdown advanced rendering systems
+	VK_ComputeRT_Shutdown();
 	VK_Physics_Shutdown();
 	VK_SEM_Shutdown();
 	VK_IBL_Shutdown();
 	VK_Shadows_Shutdown();
 	R_GLTF_Shutdown();
+	VK_MultithreadedRendering_Shutdown();
+	VK_DynamicRendering_Shutdown();
 	VK_GraphicsSettings_Shutdown();
 	// Shutdown GIBS before ray tracing
 #ifdef USE_VULKAN_RAY_TRACING

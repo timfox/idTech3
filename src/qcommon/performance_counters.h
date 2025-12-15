@@ -11,6 +11,7 @@ Performance Counters - FPS, frame times, draw calls
 #include "q_shared.h"
 #else
 // Minimal definitions for standalone testing
+#include <stddef.h>
 #include <stdint.h>
 typedef uint8_t qboolean;
 typedef int qhandle_t;
@@ -25,6 +26,12 @@ typedef enum {
 	ERR_DISCONNECT,
 	ERR_NEED_CD
 } errorParm_t;
+
+// Stub function prototypes for standalone testing
+void Com_Memset(void *dest, int value, size_t size);
+int Sys_Milliseconds(void);
+void Com_sprintf(char *buffer, int bufferSize, const char *fmt, ...);
+void Com_Printf(const char *fmt, ...);
 #endif
 
 // Performance counter structure

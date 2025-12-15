@@ -4,6 +4,7 @@
 #include "vk_shadows.h"
 #include "vk_sem.h"
 #include "vk_physics.h"
+#include "vk_compute_raytracing.h"
 #include "tr_local.h"
 #include "../../qcommon/qcommon.h"
 #include <string.h>
@@ -37,6 +38,10 @@ static cvar_t *r_maxAnisotropy;
 static cvar_t *r_physics;
 static cvar_t *r_physicsWind;
 static cvar_t *r_physicsIterations;
+static cvar_t *r_computeRT;
+static cvar_t *r_computeRTResolution;
+static cvar_t *r_computeRTReflections;
+static cvar_t *r_computeRTMaxBounces;
 
 void VK_GraphicsSettings_Init(void) {
     memset(&vk_graphics_settings, 0, sizeof(vk_graphics_settings_t));
@@ -65,6 +70,13 @@ void VK_GraphicsSettings_Init(void) {
     r_textureQuality = ri.Cvar_Get("r_textureQuality", "2", CVAR_ARCHIVE, "Texture quality (0=Low, 1=Medium, 2=High, 3=Ultra)");
     r_anisotropic = ri.Cvar_Get("r_anisotropic", "1", CVAR_ARCHIVE, "Enable anisotropic filtering");
     r_maxAnisotropy = ri.Cvar_Get("r_maxAnisotropy", "16", CVAR_ARCHIVE, "Maximum anisotropic filtering level");
+    r_physics = ri.Cvar_Get("r_physics", "0", CVAR_ARCHIVE, "Enable GPU physics simulation");
+    r_physicsWind = ri.Cvar_Get("r_physicsWind", "0", CVAR_ARCHIVE, "Enable wind simulation");
+    r_physicsIterations = ri.Cvar_Get("r_physicsIterations", "64", CVAR_ARCHIVE, "Physics simulation iterations per frame");
+    r_computeRT = ri.Cvar_Get("r_computeRT", "0", CVAR_ARCHIVE, "Enable compute shader ray tracing (software)");
+    r_computeRTResolution = ri.Cvar_Get("r_computeRTResolution", "2048", CVAR_ARCHIVE, "Compute RT resolution");
+    r_computeRTReflections = ri.Cvar_Get("r_computeRTReflections", "1", CVAR_ARCHIVE, "Enable reflections in compute RT");
+    r_computeRTMaxBounces = ri.Cvar_Get("r_computeRTMaxBounces", "3", CVAR_ARCHIVE, "Maximum ray bounces in compute RT");
 
     // Load settings from CVars
     VK_GraphicsSettings_LoadFromCvars();
@@ -126,6 +138,12 @@ void VK_GraphicsSettings_LoadFromCvars(void) {
     vk_graphics_settings.physicsWindEnabled = r_physicsWind->integer != 0;
     vk_graphics_settings.physicsIterations = Com_Clamp(1, 256, r_physicsIterations->integer);
     VectorSet(vk_graphics_settings.physicsGravity, 0.0f, -9.8f, 0.0f);
+
+    // Compute Ray Tracing
+    vk_graphics_settings.computeRTEnabled = r_computeRT->integer != 0;
+    vk_graphics_settings.computeRTResolution = Com_Clamp(256, 4096, r_computeRTResolution->integer);
+    vk_graphics_settings.computeRTReflections = r_computeRTReflections->integer != 0;
+    vk_graphics_settings.computeRTMaxBounces = Com_Clamp(0, 8, r_computeRTMaxBounces->integer);
 }
 
 void VK_GraphicsSettings_ApplyPreset(graphics_preset_t preset) {
@@ -226,6 +244,14 @@ void VK_GraphicsSettings_ApplySettings(void) {
         VK_Physics_SetGravity(vk_graphics_settings.physicsGravity);
     }
 
+    // Apply Compute Ray Tracing settings
+    if (vk_compute_rt.initialized) {
+        VK_ComputeRT_SetEnabled(vk_graphics_settings.computeRTEnabled);
+        VK_ComputeRT_SetResolution(vk_graphics_settings.computeRTResolution);
+        VK_ComputeRT_SetUseReflections(vk_graphics_settings.computeRTReflections);
+        VK_ComputeRT_SetMaxBounces(vk_graphics_settings.computeRTMaxBounces);
+    }
+
     // Update CVars to match settings
     if (r_pbr) r_pbr->integer = vk_graphics_settings.pbrEnabled ? 1 : 0;
     if (r_ibl) r_ibl->integer = vk_graphics_settings.iblEnabled ? 1 : 0;
@@ -239,6 +265,10 @@ void VK_GraphicsSettings_ApplySettings(void) {
     if (r_physics) r_physics->integer = vk_graphics_settings.physicsEnabled ? 1 : 0;
     if (r_physicsWind) r_physicsWind->integer = vk_graphics_settings.physicsWindEnabled ? 1 : 0;
     if (r_physicsIterations) r_physicsIterations->integer = vk_graphics_settings.physicsIterations;
+    if (r_computeRT) r_computeRT->integer = vk_graphics_settings.computeRTEnabled ? 1 : 0;
+    if (r_computeRTResolution) r_computeRTResolution->integer = vk_graphics_settings.computeRTResolution;
+    if (r_computeRTReflections) r_computeRTReflections->integer = vk_graphics_settings.computeRTReflections ? 1 : 0;
+    if (r_computeRTMaxBounces) r_computeRTMaxBounces->integer = vk_graphics_settings.computeRTMaxBounces;
 }
 
 void VK_GraphicsSettings_ResetToDefaults(void) {

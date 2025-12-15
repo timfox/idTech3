@@ -87,6 +87,12 @@ typedef struct {
     qboolean physicsWindEnabled;
     int physicsIterations;
     float physicsGravity[3];
+
+    // Compute Ray Tracing (Software)
+    qboolean computeRTEnabled;
+    int computeRTResolution;
+    qboolean computeRTReflections;
+    int computeRTMaxBounces;
 } vk_graphics_settings_t;
 
 extern vk_graphics_settings_t vk_graphics_settings;
