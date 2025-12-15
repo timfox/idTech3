@@ -29,10 +29,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../src/qcommon/q_shared.h"
 
 // Test statistics
-static int test_count = 0;
-static int test_passed = 0;
-static int test_failed = 0;
-static const char *current_test_name = NULL;
+static int test_count __attribute__((unused)) = 0;
+static int test_passed __attribute__((unused)) = 0;
+static int test_failed __attribute__((unused)) = 0;
+static const char *current_test_name __attribute__((unused)) = NULL;
 
 // Test macro
 #define TEST(name) \

@@ -12,6 +12,7 @@ Basic math utilities tests for q_math.c
 
 // Mock Com_Error for testing
 void Com_Error(errorParm_t level, const char *error, ...) {
+	(void)level;  // Unused parameter
 	va_list argptr;
 	va_start(argptr, error);
 	vfprintf(stderr, error, argptr);

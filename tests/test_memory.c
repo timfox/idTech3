@@ -7,6 +7,11 @@ Memory Management Tests
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
+
+// Ensure sqrtf is available
+#ifndef sqrtf
+#define sqrtf sqrt
+#endif
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdint.h>
@@ -44,8 +49,8 @@ static int test_failed = 0;
 	do { \
 		test_count++; \
 		if ((a) == (b)) { \
-			printf("FAIL: %s:%d: Expected not equal, got %d\n", \
-				__func__, __LINE__, (int)(a)); \
+			printf("FAIL: %s:%d: Expected not equal, got %p\n", \
+				__func__, __LINE__, (void *)(a)); \
 			test_failed++; \
 			return; \
 		} \
@@ -58,6 +63,18 @@ static int test_failed = 0;
 		if (strcmp((a), (b)) != 0) { \
 			printf("FAIL: %s:%d: Expected \"%s\", got \"%s\"\n", \
 				__func__, __LINE__, (b), (a)); \
+			test_failed++; \
+			return; \
+		} \
+		test_passed++; \
+	} while(0)
+
+#define ASSERT_FLOAT_EQ(a, b, tolerance) \
+	do { \
+		test_count++; \
+		if (fabsf((a) - (b)) > (tolerance)) { \
+			printf("FAIL: %s:%d: Expected %f (±%f), got %f\n", \
+				__func__, __LINE__, (b), (tolerance), (a)); \
 			test_failed++; \
 			return; \
 		} \
@@ -96,6 +113,13 @@ static int test_failed = 0;
 	} while(0)
 
 // Minimal stubs for test framework
+// Forward declarations
+void Com_Printf(const char *fmt, ...);
+void Com_Error(errorParm_t level, const char *error, ...);
+float Q_atof(const char *str);
+void *Z_TagMalloc(int size, memtag_t tag);
+void Z_Free(void *ptr);
+
 void Com_Printf(const char *fmt, ...) {
 	va_list argptr;
 	va_start(argptr, fmt);
@@ -105,6 +129,7 @@ void Com_Printf(const char *fmt, ...) {
 
 // Stub for Com_Error
 void Com_Error(errorParm_t level, const char *error, ...) {
+	(void)level;  // Unused parameter
 	va_list argptr;
 	va_start(argptr, error);
 	vfprintf(stderr, error, argptr);
@@ -152,6 +177,7 @@ static float VectorNormalize2_impl(const vec3_t v, vec3_t out) {
 
 // Test stub for memory tag allocation (simplified)
 void *Z_TagMalloc(int size, memtag_t tag) {
+	(void)tag;  // Unused parameter
 	return malloc(size);
 }
 
@@ -226,6 +252,26 @@ TEST(memory_large_allocation) {
 		// Large allocation failed - this might be expected in constrained environments
 		Com_Printf("Large allocation test skipped (allocation failed)\n");
 	}
+}
+
+TEST(memory_vector_operations) {
+	// Test vector normalization function
+	vec3_t input = {3.0f, 4.0f, 0.0f};
+	vec3_t output;
+
+	float originalLength = VectorNormalize2(input, output);
+
+	// Should return original length (5.0)
+	ASSERT_FLOAT_EQ(originalLength, 5.0f, 0.001f);
+
+	// Output should be normalized (length = 1.0)
+	float normalizedLength = sqrtf(output[0]*output[0] + output[1]*output[1] + output[2]*output[2]);
+	ASSERT_FLOAT_EQ(normalizedLength, 1.0f, 0.001f);
+
+	// Check normalized components
+	ASSERT_FLOAT_EQ(output[0], 0.6f, 0.001f); // 3/5
+	ASSERT_FLOAT_EQ(output[1], 0.8f, 0.001f); // 4/5
+	ASSERT_FLOAT_EQ(output[2], 0.0f, 0.001f);
 }
 
 TEST(memory_alignment) {
