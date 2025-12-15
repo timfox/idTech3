@@ -1,6 +1,7 @@
 build/
 build-debug/
 build-coverage/
+build_static/
 output/
 .vs/
 .vscode/
