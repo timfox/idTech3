@@ -32,7 +32,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../qcommon/qcommon.h"
 #include "linux_local.h"
 #ifndef DEDICATED
-#include "../renderer/tr_local.h"
+// Renderer-specific includes removed - linux_signals.c doesn't use renderer functionality
 #endif
 
 static qboolean signalcaught = qfalse;

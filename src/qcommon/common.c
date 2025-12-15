@@ -1557,7 +1557,7 @@ void Z_Free( void *ptr ) {
 	memzone_t *zone;
 
 	if (!ptr) {
-		Com_Error( ERR_DROP, "Z_Free: NULL pointer" );
+		Com_Error( ERR_FATAL, "Z_Free: NULL pointer" );
 	}
 
 	block = (memblock_t *) ( (byte *)ptr - sizeof(memblock_t));

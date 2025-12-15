@@ -81,7 +81,7 @@ typedef struct fsMount_s {
 // Mount table
 typedef struct {
 	fsMount_t *mounts;            // Priority-ordered list
-	fsMount_t *mountsByPriority[FS_PRIORITY_FALLBACK + 1];  // Quick lookup (first mount at each priority)
+	fsMount_t *mountsByPriority[FS_PRIORITY_SYSTEM + 1];  // Quick lookup (first mount at each priority)
 	int numMounts;
 	
 	// Write policy
@@ -189,6 +189,9 @@ qboolean FS_Mod_Unmount(const char *modName);
 
 // List mounted mods
 int FS_Mod_ListMounted(char *buffer, int bufferSize);
+
+// Check if path points to a PAK file
+qboolean FS_IsPakFile(const char *path);
 
 // Get mod info
 qboolean FS_Mod_GetInfo(const char *modName, char *path, int pathSize,

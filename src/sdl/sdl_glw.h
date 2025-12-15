@@ -29,7 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #	include <SDL.h>
 #endif
 
-#include "../renderercommon/tr_public.h"
+#include "../renderers/renderercommon/tr_public.h"
 
 //#define USE_JOYSTICK
 
