@@ -111,8 +111,9 @@ TEST(performance_counters_draw_call_tracking) {
 TEST(performance_counters_fps_calculation) {
 	Perf_Init();
 
-	// Simulate 60 frames over 1 second (1000ms)
-	for (int i = 0; i < 60; i++) {
+	// In STANDALONE_TEST, Perf_Frame advances a deterministic internal clock.
+	// Drive it past 1000ms so the FPS update path runs.
+	for (int i = 0; i < 70; i++) {
 		Perf_Frame(16); // ~16ms per frame = ~60 FPS
 	}
 
@@ -125,11 +126,11 @@ TEST(performance_counters_average_calculation) {
 	Perf_Init();
 
 	// Add some frame times to history
-	float testTimes[] = {16.0f, 17.0f, 15.0f, 16.5f, 15.5f};
+	int testTimes[] = {16, 17, 15, 16, 15};
 	int numFrames = sizeof(testTimes) / sizeof(testTimes[0]);
 
 	for (int i = 0; i < numFrames; i++) {
-		Perf_Frame((int)testTimes[i]);
+		Perf_Frame(testTimes[i]);
 	}
 
 	// Check that we have history
@@ -138,7 +139,7 @@ TEST(performance_counters_average_calculation) {
 	// Calculate expected average
 	float expectedAvg = 0.0f;
 	for (int i = 0; i < numFrames; i++) {
-		expectedAvg += testTimes[i];
+		expectedAvg += (float)testTimes[i];
 	}
 	expectedAvg /= numFrames;
 

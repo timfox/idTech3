@@ -1,6 +1,7 @@
 #pragma once
 
 #include "tr_local.h"
+#include "vk_shadows.h"
 
 // Graphics Settings System
 // Provides comprehensive in-game configuration for all rendering features

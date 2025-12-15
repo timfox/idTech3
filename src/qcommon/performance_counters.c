@@ -57,7 +57,12 @@ void Perf_Init(void) {
 
 	perfCounters.minFrameTime = 999.0f;
 	perfCounters.minDrawCallsPerFrame = INT_MAX;
+#ifdef STANDALONE_TEST
+	// In tests we drive time forward deterministically via Perf_Frame().
+	perfCounters.lastFPSUpdate = 0;
+#else
 	perfCounters.lastFPSUpdate = Sys_Milliseconds();
+#endif
 }
 
 /*
@@ -66,7 +71,13 @@ Perf_Frame
 ================
 */
 void Perf_Frame(int frameTimeMs) {
+#ifdef STANDALONE_TEST
+	static int testTimeMs = 0;
+	testTimeMs += frameTimeMs;
+	int currentTime = testTimeMs;
+#else
 	int currentTime = Sys_Milliseconds();
+#endif
 
 	// Update frame time
 	perfCounters.currentFrameTime = frameTimeMs;

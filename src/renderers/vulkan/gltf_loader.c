@@ -127,23 +127,18 @@ qhandle_t R_LoadGLTF(const char* filename) {
     memset(model, 0, sizeof(gltfModel_t));
     Q_strncpyz(model->filename, filename, sizeof(model->filename));
 
-    // Load glTF file
-    fileHandle_t file;
-    int fileLen = ri.FS_FOpenFileRead(filename, &file, qfalse);
-    if (fileLen <= 0) {
-        ri.Printf(PRINT_WARNING, "R_LoadGLTF: Could not open %s\n", filename);
+    // Load glTF file (renderer import API exposes FS_ReadFile/FS_FreeFile)
+    char* fileData = NULL;
+    int fileLen = ri.FS_ReadFile(filename, (void**)&fileData);
+    if (fileLen <= 0 || !fileData) {
+        ri.Printf(PRINT_WARNING, "R_LoadGLTF: Could not read %s\n", filename);
         return 0;
     }
-
-    char* fileData = ri.Hunk_AllocateTempMemory(fileLen + 1);
-    ri.FS_Read(fileData, fileLen, file);
-    fileData[fileLen] = '\0';
-    ri.FS_FCloseFile(file);
 
     // Parse glTF JSON
     if (!R_GLTF_ParseJSON(model, fileData)) {
         ri.Printf(PRINT_WARNING, "R_LoadGLTF: Failed to parse %s\n", filename);
-        ri.Hunk_FreeTempMemory(fileData);
+        ri.FS_FreeFile(fileData);
         return 0;
     }
 
@@ -158,7 +153,7 @@ qhandle_t R_LoadGLTF(const char* filename) {
     // Compute bounds
     R_GLTF_ComputeBounds(model);
 
-    ri.Hunk_FreeTempMemory(fileData);
+    ri.FS_FreeFile(fileData);
     gltfModelsUsed[slot] = qtrue;
     model->loaded = qtrue;
 
@@ -215,7 +210,7 @@ void R_FreeGLTF(qhandle_t handle) {
 
 qboolean R_GLTF_ParseJSON(gltfModel_t* model, const char* jsonData) {
     // Simplified JSON parsing - in production would use a proper JSON library
-    json_parser_t parser = {jsonData, 0, strlen(jsonData)};
+    // json_parser_t parser = {jsonData, 0, (int)strlen(jsonData)};
 
     // Skip to assets object
     // This is a very basic parser - production code would use cJSON or similar
@@ -443,21 +438,21 @@ void R_GLTF_Render(qhandle_t handle, const float* modelMatrix, const float* view
     if (!model || !model->loaded) return;
 
     // Bind descriptor set
-    qvkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+    qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
         vk.pipeline_layout, 0, 1, &model->descriptorSet, 0, NULL);
 
     // Set model matrix (push constant)
-    qvkCmdPushConstants(vk.command_buffer, vk.pipeline_layout,
+    qvkCmdPushConstants(vk.cmd->command_buffer, vk.pipeline_layout,
         VK_SHADER_STAGE_VERTEX_BIT, 0, 64, modelMatrix);
 
     // Render each primitive
     gltfPrimitive_t* prim = &model->meshes[0].primitives[0];
 
     VkDeviceSize offsets[] = {0};
-    qvkCmdBindVertexBuffers(vk.command_buffer, 0, 1, &prim->vertexBuffer, offsets);
-    qvkCmdBindIndexBuffer(vk.command_buffer, prim->indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+    qvkCmdBindVertexBuffers(vk.cmd->command_buffer, 0, 1, &prim->vertexBuffer, offsets);
+    qvkCmdBindIndexBuffer(vk.cmd->command_buffer, prim->indexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
-    qvkCmdDrawIndexed(vk.command_buffer, prim->indexCount, 1, 0, 0, 0);
+    qvkCmdDrawIndexed(vk.cmd->command_buffer, prim->indexCount, 1, 0, 0, 0);
 }
 
 gltfModel_t* R_GLTF_GetModel(qhandle_t handle) {

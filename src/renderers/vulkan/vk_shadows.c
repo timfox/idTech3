@@ -7,7 +7,7 @@ vk_shadow_t vk_shadow;
 void VK_Shadows_Init(void) {
     memset(&vk_shadow, 0, sizeof(vk_shadow_t));
 
-    vk_shadow.technique = SHADOW_DEPTH_MAP;
+    vk_shadow.technique = VK_SHADOW_TECHNIQUE_DEPTH_MAP;
     vk_shadow.enabled = qtrue;
     vk_shadow.shadowBias = 0.005f;
     vk_shadow.shadowSlopeBias = 0.01f;
@@ -24,13 +24,13 @@ void VK_Shadows_Init(void) {
 
     // Initialize based on technique
     switch (vk_shadow.technique) {
-        case SHADOW_DEPTH_MAP:
+        case VK_SHADOW_TECHNIQUE_DEPTH_MAP:
             VK_Shadows_InitDepthMap();
             break;
-        case SHADOW_CSM:
+        case VK_SHADOW_TECHNIQUE_CSM:
             VK_Shadows_InitCSM();
             break;
-        case SHADOW_VSM:
+        case VK_SHADOW_TECHNIQUE_VSM:
             VK_Shadows_InitVSM();
             break;
         default:
@@ -46,13 +46,13 @@ void VK_Shadows_Shutdown(void) {
 
     // Free resources based on technique
     switch (vk_shadow.technique) {
-        case SHADOW_DEPTH_MAP:
+        case VK_SHADOW_TECHNIQUE_DEPTH_MAP:
             VK_Shadows_ShutdownDepthMap();
             break;
-        case SHADOW_CSM:
+        case VK_SHADOW_TECHNIQUE_CSM:
             VK_Shadows_ShutdownCSM();
             break;
-        case SHADOW_VSM:
+        case VK_SHADOW_TECHNIQUE_VSM:
             VK_Shadows_ShutdownVSM();
             break;
         default:
@@ -312,13 +312,13 @@ void VK_Shadows_RenderDepth(const refdef_t* refdef) {
     if (!vk_shadow.enabled || !vk_shadow.initialized) return;
 
     switch (vk_shadow.technique) {
-        case SHADOW_DEPTH_MAP:
+        case VK_SHADOW_TECHNIQUE_DEPTH_MAP:
             VK_Shadows_RenderDepthMap(refdef);
             break;
-        case SHADOW_CSM:
+        case VK_SHADOW_TECHNIQUE_CSM:
             VK_Shadows_RenderCSMAll(refdef);
             break;
-        case SHADOW_VSM:
+        case VK_SHADOW_TECHNIQUE_VSM:
             VK_Shadows_RenderVSM(refdef);
             break;
         default:
@@ -396,15 +396,15 @@ float VK_Shadows_GetVisibility(const vec3_t position, float ndotl) {
     if (!vk_shadow.enabled || !vk_shadow.initialized) return 1.0f;
 
     switch (vk_shadow.technique) {
-        case SHADOW_DEPTH_MAP:
+        case VK_SHADOW_TECHNIQUE_DEPTH_MAP:
             return VK_Shadows_SampleDepthMap(position, ndotl);
-        case SHADOW_CSM:
+        case VK_SHADOW_TECHNIQUE_CSM:
             return VK_Shadows_SampleCSM(position, ndotl);
-        case SHADOW_VSM:
+        case VK_SHADOW_TECHNIQUE_VSM:
             return VK_Shadows_SampleVSM(position);
-        case SHADOW_PCF:
+        case VK_SHADOW_TECHNIQUE_PCF:
             return VK_Shadows_SamplePCF(position, 4);
-        case SHADOW_PCSS:
+        case VK_SHADOW_TECHNIQUE_PCSS:
             return VK_Shadows_SamplePCSS(position);
         default:
             return 1.0f;
@@ -451,15 +451,15 @@ float VK_Shadows_SamplePCSS(const vec3_t position) {
 
 const char* VK_Shadows_GetTechniqueName(void) {
     switch (vk_shadow.technique) {
-        case SHADOW_DISABLED: return "Disabled";
-        case SHADOW_STENCIL_VOLUME: return "Stencil Volumes";
-        case SHADOW_DEPTH_MAP: return "Depth Map";
-        case SHADOW_CSM: return "Cascaded Shadow Maps";
-        case SHADOW_VSM: return "Variance Shadow Maps";
-        case SHADOW_PCF: return "PCF";
-        case SHADOW_PCSS: return "PCSS";
-        case SHADOW_MSM: return "Moment Shadow Maps";
-        case SHADOW_RSM: return "Reflective Shadow Maps";
+        case VK_SHADOW_TECHNIQUE_DISABLED: return "Disabled";
+        case VK_SHADOW_TECHNIQUE_STENCIL_VOLUME: return "Stencil Volumes";
+        case VK_SHADOW_TECHNIQUE_DEPTH_MAP: return "Depth Map";
+        case VK_SHADOW_TECHNIQUE_CSM: return "Cascaded Shadow Maps";
+        case VK_SHADOW_TECHNIQUE_VSM: return "Variance Shadow Maps";
+        case VK_SHADOW_TECHNIQUE_PCF: return "PCF";
+        case VK_SHADOW_TECHNIQUE_PCSS: return "PCSS";
+        case VK_SHADOW_TECHNIQUE_MSM: return "Moment Shadow Maps";
+        case VK_SHADOW_TECHNIQUE_RSM: return "Reflective Shadow Maps";
         default: return "Unknown";
     }
 }

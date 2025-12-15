@@ -155,6 +155,8 @@ typedef struct gltfModel {
 } gltfModel_t;
 
 // glTF loading API
+void R_GLTF_Init(void);
+void R_GLTF_Shutdown(void);
 qhandle_t R_LoadGLTF(const char* filename);
 void R_FreeGLTF(qhandle_t handle);
 
@@ -164,6 +166,8 @@ void R_GLTF_Render(qhandle_t handle, const float* modelMatrix, const float* view
 // Internal functions
 gltfModel_t* R_GLTF_GetModel(qhandle_t handle);
 void R_GLTF_ComputeNodeTransforms(gltfModel_t* model, gltfNode_t* node, const float* parentMatrix);
-void R_GLTF_LoadBuffers(gltfModel_t* model, const char* jsonData);
+qboolean R_GLTF_ParseJSON(gltfModel_t* model, const char* jsonData);
+void R_GLTF_ComputeBounds(gltfModel_t* model);
+void R_GLTF_LoadBuffers(gltfModel_t* model, const char* basePath);
 void R_GLTF_LoadImages(gltfModel_t* model, const char* basePath);
 void R_GLTF_CreateVulkanResources(gltfModel_t* model);

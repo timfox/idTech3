@@ -307,11 +307,21 @@ if(USE_SDL)
 	endif()
 endif()
 
-SET(CNAME "idtech3")
-SET(DNAME "idtech3.server")
+set(CNAME "idtech3" CACHE STRING "Main executable/library name")
+set(DNAME "idtech3.server" CACHE STRING "Dedicated server executable name")
 
 SET(RENDERER_PREFIX ${CNAME})
-SET(RENDERER_DEFAULT vulkan) # valid options: opengl, vulkan, opengl2, d3d12, metal
+set(RENDERER_DEFAULT "vulkan" CACHE STRING "Default renderer (opengl, vulkan, opengl2, d3d12, metal)")
+
+# Some configurations (notably monolithic Vulkan without dlopen) are not fully supported yet.
+# Prefer the dlopen renderer path to keep builds reproducible (and to provide `make install`).
+if(NOT USE_RENDERER_DLOPEN AND RENDERER_DEFAULT STREQUAL "vulkan")
+	message(WARNING "USE_RENDERER_DLOPEN=OFF with RENDERER_DEFAULT=vulkan is not supported yet; forcing USE_RENDERER_DLOPEN=ON.")
+	set(USE_RENDERER_DLOPEN ON CACHE BOOL "" FORCE)
+endif()
+
+# Installation layout
+include(GNUInstallDirs)
 
 OPTION(USE_CURL "" ON)
 OPTION(USE_LOCAL_HEADERS "" ON)
@@ -968,10 +978,11 @@ IF(USE_CIMGUI)
 		target_compile_definitions(imgui_shared PUBLIC IMGUI_USER_CONFIG="cimconfig.h")
 		target_compile_features(imgui_shared PUBLIC cxx_std_17)
 		set_target_properties(imgui_shared PROPERTIES OUTPUT_NAME "imgui_shared")
-		list(APPEND CLIENT_SRCS
-			${CIMGUI_DIR}/cimgui_impl.cpp
-			${CIMGUI_IMGUI_DIR}/backends/imgui_impl_sdl2.cpp
-		)
+		list(APPEND CLIENT_SRCS ${CIMGUI_DIR}/cimgui_impl.cpp)
+		# Only include SDL backend when SDL is enabled (CI may build with USE_SDL=0).
+		if(USE_SDL)
+			list(APPEND CLIENT_SRCS ${CIMGUI_IMGUI_DIR}/backends/imgui_impl_sdl2.cpp)
+		endif()
 	else()
 		message(WARNING "cimgui sources not found, disabling USE_CIMGUI")
 		set(USE_CIMGUI OFF CACHE BOOL "" FORCE)
@@ -1021,8 +1032,10 @@ IF(USE_CIMGUI AND DEFINED CIMGUI_DIR)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE
 		USE_CIMGUI
 		IMGUI_USER_CONFIG=${CIMGUI_USER_CONFIG}
-		CIMGUI_USE_SDL2
 	)
+	if(USE_SDL)
+		TARGET_COMPILE_DEFINITIONS(client PRIVATE CIMGUI_USE_SDL2)
+	endif()
 ENDIF()
 
 # cJSON library
@@ -1089,9 +1102,28 @@ IF(USE_ENET)
 ENDIF()
 
 # renderers
+# NOTE: renderer common sources are currently provided by each renderer and shared
+# libs. Keep this list empty unless/until a unified, buildable renderercommon folder exists.
 AUX_SOURCE_DIRECTORY(src/renderercommon RENDERER_COMMON_SRCS)
 AUX_SOURCE_DIRECTORY(src/renderer RENDERER_GL_SRCS)
 AUX_SOURCE_DIRECTORY(src/renderers/vulkan RENDERER_VK_SRCS)
+
+# Vulkan experimental modules (work-in-progress). Keep OFF by default to ensure
+# the default Vulkan build stays compatible with the engine APIs/structures.
+option(IDTECH3_VK_EXPERIMENTAL "Build experimental Vulkan renderer modules" OFF)
+if(NOT IDTECH3_VK_EXPERIMENTAL)
+	list(REMOVE_ITEM RENDERER_VK_SRCS
+		src/renderers/vulkan/gltf_loader.c
+		src/renderers/vulkan/vk_compute_raytracing.c
+		src/renderers/vulkan/vk_dynamic_rendering.c
+		src/renderers/vulkan/vk_graphics_settings.c
+		src/renderers/vulkan/vk_ibl.c
+		src/renderers/vulkan/vk_multithreaded_rendering.c
+		src/renderers/vulkan/vk_physics.c
+		src/renderers/vulkan/vk_sem.c
+		src/renderers/vulkan/vk_shadows.c
+	)
+endif()
 # Add VMA C++ implementation file if VMA is enabled
 IF(USE_VMA AND USE_VULKAN)
 	list(APPEND RENDERER_VK_SRCS src/renderers/vulkan/vk_vma.cpp)
@@ -1167,6 +1199,9 @@ IF(USE_RENDERER_DLOPEN)
 	ADD_LIBRARY(${RENDERER_PREFIX}_vulkan${RENDEXT} SHARED ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
 	SET_TARGET_PROPERTIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES OUTPUT_NAME "${RENDERER_PREFIX}_vulkan${RENDEXT}" PREFIX "")
 	TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_VULKAN)
+	IF(IDTECH3_VK_EXPERIMENTAL)
+		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE IDTECH3_VK_EXPERIMENTAL)
+	ENDIF()
 	TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE m)
 	
 	# VMA (Vulkan Memory Allocator) - configure after target is created
@@ -1956,8 +1991,13 @@ IF(USE_VULKAN)
 		IF(VULKAN_LIBRARY)
 			MESSAGE(STATUS "Found Vulkan library: ${VULKAN_LIBRARY} (using local headers)")
 			TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_VULKAN)
-			TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VULKAN)
-			TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${VULKAN_LIBRARY})
+			IF(TARGET ${RENDERER_PREFIX}_vulkan${RENDEXT})
+				TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VULKAN)
+				TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${VULKAN_LIBRARY})
+			ELSEIF(TARGET ${RENDERER_PREFIX}_vulkan)
+				TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan PRIVATE USE_VULKAN)
+				TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan PRIVATE ${VULKAN_LIBRARY})
+			ENDIF()
 		ELSE()
 			MESSAGE(WARNING "Vulkan library not found, disabling Vulkan support")
 			SET(USE_VULKAN OFF CACHE BOOL "" FORCE)
@@ -1967,10 +2007,16 @@ IF(USE_VULKAN)
 		find_package(Vulkan)
 		IF(Vulkan_FOUND)
 			TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_VULKAN)
-			TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VULKAN)
 			TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${Vulkan_INCLUDE_DIRS})
-			TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PUBLIC ${Vulkan_INCLUDE_DIRS})
-			TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${Vulkan_LIBRARIES})
+			IF(TARGET ${RENDERER_PREFIX}_vulkan${RENDEXT})
+				TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VULKAN)
+				TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PUBLIC ${Vulkan_INCLUDE_DIRS})
+				TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${Vulkan_LIBRARIES})
+			ELSEIF(TARGET ${RENDERER_PREFIX}_vulkan)
+				TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan PRIVATE USE_VULKAN)
+				TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan PUBLIC ${Vulkan_INCLUDE_DIRS})
+				TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan PRIVATE ${Vulkan_LIBRARIES})
+			ENDIF()
 		ELSE()
 			# Try to find Vulkan manually if CMake's find_package fails
 			FIND_PATH(VULKAN_INCLUDE_DIR NAMES vulkan/vulkan.h PATHS /usr/include /usr/local/include)
@@ -1978,10 +2024,16 @@ IF(USE_VULKAN)
 			IF(VULKAN_INCLUDE_DIR AND VULKAN_LIBRARY)
 				MESSAGE(STATUS "Found Vulkan manually: ${VULKAN_INCLUDE_DIR}, ${VULKAN_LIBRARY}")
 				TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_VULKAN)
-				TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VULKAN)
 				TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${VULKAN_INCLUDE_DIR})
-				TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PUBLIC ${VULKAN_INCLUDE_DIR})
-				TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${VULKAN_LIBRARY})
+				IF(TARGET ${RENDERER_PREFIX}_vulkan${RENDEXT})
+					TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VULKAN)
+					TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PUBLIC ${VULKAN_INCLUDE_DIR})
+					TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${VULKAN_LIBRARY})
+				ELSEIF(TARGET ${RENDERER_PREFIX}_vulkan)
+					TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan PRIVATE USE_VULKAN)
+					TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan PUBLIC ${VULKAN_INCLUDE_DIR})
+					TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan PRIVATE ${VULKAN_LIBRARY})
+				ENDIF()
 			ELSE()
 				MESSAGE(WARNING "Vulkan not found, disabling Vulkan support")
 				SET(USE_VULKAN OFF CACHE BOOL "" FORCE)
@@ -2014,15 +2066,17 @@ IF(USE_OPENEXR AND OpenEXR_FOUND AND OPENEXR_LIBRARIES)
 		endif()
 	else()
 		# Non-DLOPEN renderers are linked directly into the main executable(s)
-		if(OPENEXR_INCLUDE_DIRS)
-			target_include_directories(${CNAME}${BINEXT} PRIVATE ${OPENEXR_INCLUDE_DIRS})
-			if(BUILD_SERVER AND NOT ANDROID)
-				target_include_directories(${DNAME}${BINEXT} PRIVATE ${OPENEXR_INCLUDE_DIRS})
+		if(TARGET ${CNAME}${BINEXT})
+			if(OPENEXR_INCLUDE_DIRS)
+				target_include_directories(${CNAME}${BINEXT} PRIVATE ${OPENEXR_INCLUDE_DIRS})
+				if(BUILD_SERVER AND NOT ANDROID AND TARGET ${DNAME}${BINEXT})
+					target_include_directories(${DNAME}${BINEXT} PRIVATE ${OPENEXR_INCLUDE_DIRS})
+				endif()
 			endif()
-		endif()
-		target_link_libraries(${CNAME}${BINEXT} ${OPENEXR_LIBRARIES})
-		if(BUILD_SERVER AND NOT ANDROID)
-			target_link_libraries(${DNAME}${BINEXT} ${OPENEXR_LIBRARIES})
+			target_link_libraries(${CNAME}${BINEXT} ${OPENEXR_LIBRARIES})
+			if(BUILD_SERVER AND NOT ANDROID AND TARGET ${DNAME}${BINEXT})
+				target_link_libraries(${DNAME}${BINEXT} ${OPENEXR_LIBRARIES})
+			endif()
 		endif()
 	endif()
 ENDIF()
@@ -2044,9 +2098,11 @@ IF(USE_NANOSVG)
 		endif()
 	else()
 		# Non-DLOPEN renderers are linked directly into the main executable(s)
-		target_include_directories(${CNAME}${BINEXT} PRIVATE libs/nanosvg)
-		if(BUILD_SERVER AND NOT ANDROID)
-			target_include_directories(${DNAME}${BINEXT} PRIVATE libs/nanosvg)
+		if(TARGET ${CNAME}${BINEXT})
+			target_include_directories(${CNAME}${BINEXT} PRIVATE libs/nanosvg)
+			if(BUILD_SERVER AND NOT ANDROID AND TARGET ${DNAME}${BINEXT})
+				target_include_directories(${DNAME}${BINEXT} PRIVATE libs/nanosvg)
+			endif()
 		endif()
 	endif()
 	
@@ -2081,15 +2137,17 @@ IF(USE_ASSIMP AND ASSIMP_FOUND AND ASSIMP_LIBRARIES)
 		endif()
 	else()
 		# Non-DLOPEN renderers are linked directly into the main executable(s)
-		if(ASSIMP_INCLUDE_DIRS)
-			target_include_directories(${CNAME}${BINEXT} PRIVATE ${ASSIMP_INCLUDE_DIRS})
-			if(BUILD_SERVER AND NOT ANDROID AND TARGET ${DNAME}${BINEXT})
-				target_include_directories(${DNAME}${BINEXT} PRIVATE ${ASSIMP_INCLUDE_DIRS})
+		if(TARGET ${CNAME}${BINEXT})
+			if(ASSIMP_INCLUDE_DIRS)
+				target_include_directories(${CNAME}${BINEXT} PRIVATE ${ASSIMP_INCLUDE_DIRS})
+				if(BUILD_SERVER AND NOT ANDROID AND TARGET ${DNAME}${BINEXT})
+					target_include_directories(${DNAME}${BINEXT} PRIVATE ${ASSIMP_INCLUDE_DIRS})
+				endif()
 			endif()
-		endif()
-		target_link_libraries(${CNAME}${BINEXT} ${ASSIMP_LIBRARIES})
-		if(BUILD_SERVER AND NOT ANDROID AND TARGET ${DNAME}${BINEXT})
-			target_link_libraries(${DNAME}${BINEXT} ${ASSIMP_LIBRARIES})
+			target_link_libraries(${CNAME}${BINEXT} ${ASSIMP_LIBRARIES})
+			if(BUILD_SERVER AND NOT ANDROID AND TARGET ${DNAME}${BINEXT})
+				target_link_libraries(${DNAME}${BINEXT} ${ASSIMP_LIBRARIES})
+			endif()
 		endif()
 	endif()
 ENDIF()
@@ -2100,6 +2158,20 @@ ELSE()
 	ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 ENDIF()
 TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui ui2)
+
+# When not using dlopen-based renderers, link the selected renderer directly.
+if(NOT USE_RENDERER_DLOPEN)
+	if(USE_VULKAN AND TARGET ${RENDERER_PREFIX}_vulkan)
+		target_link_libraries(${CNAME}${BINEXT} PRIVATE ${RENDERER_PREFIX}_vulkan)
+		target_compile_definitions(${CNAME}${BINEXT} PRIVATE USE_VULKAN RENDERER_DEFAULT=${RENDERER_DEFAULT})
+		if(IDTECH3_VK_EXPERIMENTAL)
+			target_compile_definitions(${CNAME}${BINEXT} PRIVATE IDTECH3_VK_EXPERIMENTAL)
+		endif()
+	elseif(TARGET ${RENDERER_PREFIX}_opengl)
+		target_link_libraries(${CNAME}${BINEXT} PRIVATE ${RENDERER_PREFIX}_opengl)
+		target_compile_definitions(${CNAME}${BINEXT} PRIVATE RENDERER_DEFAULT=${RENDERER_DEFAULT})
+	endif()
+endif()
 
 # Monolithic build support: link game module targets directly
 OPTION(COMBINED_MONOLITH "Build monolithic executable with game modules linked statically" OFF)
@@ -2333,6 +2405,38 @@ IF(BUILD_SERVER AND NOT ANDROID)
 		ENDIF()
 	ENDIF()
 ENDIF()
+
+# Install targets so `make install` exists for Makefile generators.
+# CI workflows commonly rely on `DESTDIR=... make install`.
+if(NOT ANDROID)
+	install(TARGETS ${CNAME}${BINEXT}
+		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+		LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+		ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+	)
+	if(BUILD_SERVER AND TARGET ${DNAME}${BINEXT})
+		install(TARGETS ${DNAME}${BINEXT}
+			RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+			LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+			ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+		)
+	endif()
+	# Install renderer shared libraries when building with dlopen renderer modules
+	if(USE_RENDERER_DLOPEN)
+		if(TARGET ${RENDERER_PREFIX}_vulkan${RENDEXT})
+			install(TARGETS ${RENDERER_PREFIX}_vulkan${RENDEXT} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+		endif()
+		if(TARGET ${RENDERER_PREFIX}_opengl${RENDEXT})
+			install(TARGETS ${RENDERER_PREFIX}_opengl${RENDEXT} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+		endif()
+		if(WIN32 AND USE_D3D12 AND TARGET ${RENDERER_PREFIX}_d3d12${RENDEXT})
+			install(TARGETS ${RENDERER_PREFIX}_d3d12${RENDEXT} RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+		endif()
+		if(APPLE AND USE_METAL AND TARGET ${RENDERER_PREFIX}_metal${RENDEXT})
+			install(TARGETS ${RENDERER_PREFIX}_metal${RENDEXT} LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+		endif()
+	endif()
+endif()
 
 IF(USE_CIMGUI AND TARGET imgui_shared)
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE imgui_shared)

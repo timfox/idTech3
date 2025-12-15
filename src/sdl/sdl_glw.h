@@ -23,10 +23,16 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef __GLW_LINUX_H__
 #define __GLW_LINUX_H__
 
-#ifdef USE_LOCAL_HEADERS
-#	include "SDL.h"
+#ifdef USE_SDL
+#	ifdef USE_LOCAL_HEADERS
+#		include "SDL.h"
+#	else
+#		include <SDL.h>
+#	endif
 #else
-#	include <SDL.h>
+// Allow building without SDL development headers (e.g. CI builds where USE_SDL=0).
+// Only the SDL_Window pointer type is referenced from this header.
+typedef struct SDL_Window SDL_Window;
 #endif
 
 #include "../renderers/renderercommon/tr_public.h"

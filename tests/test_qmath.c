@@ -161,26 +161,29 @@ TEST(vector_copy_and_set) {
 TEST(angle_normalization) {
 	// Test angle normalization to 0-360 range
 	float angle1 = AngleNormalize360(370.0f);
-	ASSERT_TRUE(float_eq(angle1, 10.0f, 1e-4f));
+	// AngleNormalize360 uses a fixed-point wrap; allow small quantization error.
+	ASSERT_TRUE(float_eq(angle1, 10.0f, 0.01f));
 	
 	float angle2 = AngleNormalize360(-10.0f);
-	ASSERT_TRUE(float_eq(angle2, 350.0f, 1e-4f));
+	ASSERT_TRUE(float_eq(angle2, 350.0f, 0.01f));
 	
 	// Test angle normalization to -180 to 180 range
 	float angle3 = AngleNormalize180(190.0f);
-	ASSERT_TRUE(float_eq(angle3, -170.0f, 1e-4f));
+	ASSERT_TRUE(float_eq(angle3, -170.0f, 0.01f));
 	
 	float angle4 = AngleNormalize180(-190.0f);
-	ASSERT_TRUE(float_eq(angle4, 170.0f, 1e-4f));
+	ASSERT_TRUE(float_eq(angle4, 170.0f, 0.01f));
 }
 
 TEST(angle_delta) {
 	// Test angle difference calculation
 	float delta1 = AngleDelta(10.0f, 20.0f);
-	ASSERT_TRUE(float_eq(delta1, 10.0f, 1e-4f));
+	// AngleDelta returns AngleNormalize180(angle1 - angle2)
+	ASSERT_TRUE(float_eq(delta1, -10.0f, 0.01f));
 	
 	float delta2 = AngleDelta(350.0f, 10.0f);
-	ASSERT_TRUE(float_eq(fabsf(delta2), 20.0f, 1e-4f) || float_eq(fabsf(delta2), 340.0f, 1e-4f));
+	// 350 - 10 = 340, normalized to -20
+	ASSERT_TRUE(float_eq(delta2, -20.0f, 0.01f));
 }
 
 TEST(bounds_operations) {

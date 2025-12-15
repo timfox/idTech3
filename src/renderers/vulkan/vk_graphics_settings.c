@@ -13,70 +13,70 @@ vk_graphics_settings_t vk_graphics_settings;
 
 // CVars for graphics settings
 static cvar_t *r_graphicsPreset;
-static cvar_t *r_pbr;
-static cvar_t *r_ibl;
-static cvar_t *r_iblIntensity;
-static cvar_t *r_shadows;
-static cvar_t *r_shadowQuality;
-static cvar_t *r_shadowTechnique;
-static cvar_t *r_shadowBias;
-static cvar_t *r_shadowMapSize;
-static cvar_t *r_sem;
-static cvar_t *r_semMatCap;
-static cvar_t *r_tessellation;
-static cvar_t *r_tessellationLevel;
-static cvar_t *r_deferred;
-static cvar_t *r_bloom;
-static cvar_t *r_bloomIntensity;
-static cvar_t *r_tonemap;
-static cvar_t *r_tonemapExposure;
-static cvar_t *r_msaa;
-static cvar_t *r_fxaa;
-static cvar_t *r_textureQuality;
-static cvar_t *r_anisotropic;
-static cvar_t *r_maxAnisotropy;
-static cvar_t *r_physics;
-static cvar_t *r_physicsWind;
-static cvar_t *r_physicsIterations;
-static cvar_t *r_computeRT;
-static cvar_t *r_computeRTResolution;
-static cvar_t *r_computeRTReflections;
-static cvar_t *r_computeRTMaxBounces;
+static cvar_t *vk_r_pbr;
+static cvar_t *vk_r_ibl;
+static cvar_t *vk_r_iblIntensity;
+static cvar_t *vk_r_shadows;
+static cvar_t *vk_r_shadowQuality;
+static cvar_t *vk_r_shadowTechnique;
+static cvar_t *vk_r_shadowBias;
+static cvar_t *vk_r_shadowMapSize;
+static cvar_t *vk_r_sem;
+static cvar_t *vk_r_semMatCap;
+static cvar_t *vk_r_tessellation;
+static cvar_t *vk_r_tessellationLevel;
+static cvar_t *vk_r_deferred;
+static cvar_t *vk_r_bloom;
+static cvar_t *vk_r_bloomIntensity;
+static cvar_t *vk_r_tonemap;
+static cvar_t *vk_r_tonemapExposure;
+static cvar_t *vk_r_msaa;
+static cvar_t *vk_r_fxaa;
+static cvar_t *vk_r_textureQuality;
+static cvar_t *vk_r_anisotropic;
+static cvar_t *vk_r_maxAnisotropy;
+static cvar_t *vk_r_physics;
+static cvar_t *vk_r_physicsWind;
+static cvar_t *vk_r_physicsIterations;
+static cvar_t *vk_r_computeRT;
+static cvar_t *vk_r_computeRTResolution;
+static cvar_t *vk_r_computeRTReflections;
+static cvar_t *vk_r_computeRTMaxBounces;
 
 void VK_GraphicsSettings_Init(void) {
     memset(&vk_graphics_settings, 0, sizeof(vk_graphics_settings_t));
 
     // Register CVars
-    r_graphicsPreset = ri.Cvar_Get("r_graphicsPreset", "2", CVAR_ARCHIVE | CVAR_LATCH, "Graphics quality preset (0=Low, 1=Medium, 2=High, 3=Ultra, 4=Custom)");
-    r_pbr = ri.Cvar_Get("r_pbr", "1", CVAR_ARCHIVE, "Enable PBR rendering");
-    r_ibl = ri.Cvar_Get("r_ibl", "1", CVAR_ARCHIVE, "Enable Image-Based Lighting");
-    r_iblIntensity = ri.Cvar_Get("r_iblIntensity", "1.0", CVAR_ARCHIVE, "IBL intensity multiplier");
-    r_shadows = ri.Cvar_Get("r_shadows", "1", CVAR_ARCHIVE, "Enable shadows");
-    r_shadowQuality = ri.Cvar_Get("r_shadowQuality", "2", CVAR_ARCHIVE, "Shadow quality (0=Disabled, 1=Low, 2=Medium, 3=High, 4=Ultra)");
-    r_shadowTechnique = ri.Cvar_Get("r_shadowTechnique", "2", CVAR_ARCHIVE, "Shadow technique (0=Disabled, 1=Depth Map, 2=CSM, 3=VSM)");
-    r_shadowBias = ri.Cvar_Get("r_shadowBias", "0.005", CVAR_ARCHIVE, "Shadow depth bias");
-    r_shadowMapSize = ri.Cvar_Get("r_shadowMapSize", "2048", CVAR_ARCHIVE, "Shadow map resolution");
-    r_sem = ri.Cvar_Get("r_sem", "0", CVAR_ARCHIVE, "Enable Spherical Environment Mapping");
-    r_semMatCap = ri.Cvar_Get("r_semMatCap", "0", CVAR_ARCHIVE, "SEM material capture index");
-    r_tessellation = ri.Cvar_Get("r_tessellation", "0", CVAR_ARCHIVE, "Enable tessellation");
-    r_tessellationLevel = ri.Cvar_Get("r_tessellationLevel", "3.0", CVAR_ARCHIVE, "Tessellation level");
-    r_deferred = ri.Cvar_Get("r_deferred", "0", CVAR_ARCHIVE, "Enable deferred rendering");
-    r_bloom = ri.Cvar_Get("r_bloom", "1", CVAR_ARCHIVE, "Enable bloom post-processing");
-    r_bloomIntensity = ri.Cvar_Get("r_bloomIntensity", "0.5", CVAR_ARCHIVE, "Bloom intensity");
-    r_tonemap = ri.Cvar_Get("r_tonemap", "1", CVAR_ARCHIVE, "Enable tonemapping");
-    r_tonemapExposure = ri.Cvar_Get("r_tonemapExposure", "1.0", CVAR_ARCHIVE, "Tonemap exposure");
-    r_msaa = ri.Cvar_Get("r_msaa", "0", CVAR_ARCHIVE, "MSAA samples (0=Disabled, 1=2x, 2=4x, 3=8x)");
-    r_fxaa = ri.Cvar_Get("r_fxaa", "0", CVAR_ARCHIVE, "Enable FXAA");
-    r_textureQuality = ri.Cvar_Get("r_textureQuality", "2", CVAR_ARCHIVE, "Texture quality (0=Low, 1=Medium, 2=High, 3=Ultra)");
-    r_anisotropic = ri.Cvar_Get("r_anisotropic", "1", CVAR_ARCHIVE, "Enable anisotropic filtering");
-    r_maxAnisotropy = ri.Cvar_Get("r_maxAnisotropy", "16", CVAR_ARCHIVE, "Maximum anisotropic filtering level");
-    r_physics = ri.Cvar_Get("r_physics", "0", CVAR_ARCHIVE, "Enable GPU physics simulation");
-    r_physicsWind = ri.Cvar_Get("r_physicsWind", "0", CVAR_ARCHIVE, "Enable wind simulation");
-    r_physicsIterations = ri.Cvar_Get("r_physicsIterations", "64", CVAR_ARCHIVE, "Physics simulation iterations per frame");
-    r_computeRT = ri.Cvar_Get("r_computeRT", "0", CVAR_ARCHIVE, "Enable compute shader ray tracing (software)");
-    r_computeRTResolution = ri.Cvar_Get("r_computeRTResolution", "2048", CVAR_ARCHIVE, "Compute RT resolution");
-    r_computeRTReflections = ri.Cvar_Get("r_computeRTReflections", "1", CVAR_ARCHIVE, "Enable reflections in compute RT");
-    r_computeRTMaxBounces = ri.Cvar_Get("r_computeRTMaxBounces", "3", CVAR_ARCHIVE, "Maximum ray bounces in compute RT");
+    r_graphicsPreset = ri.Cvar_Get("r_graphicsPreset", "2", CVAR_ARCHIVE | CVAR_LATCH);
+    vk_r_pbr = ri.Cvar_Get("r_pbr", "1", CVAR_ARCHIVE);
+    vk_r_ibl = ri.Cvar_Get("r_ibl", "1", CVAR_ARCHIVE);
+    vk_r_iblIntensity = ri.Cvar_Get("r_iblIntensity", "1.0", CVAR_ARCHIVE);
+    vk_r_shadows = ri.Cvar_Get("r_shadows", "1", CVAR_ARCHIVE);
+    vk_r_shadowQuality = ri.Cvar_Get("r_shadowQuality", "2", CVAR_ARCHIVE);
+    vk_r_shadowTechnique = ri.Cvar_Get("r_shadowTechnique", "2", CVAR_ARCHIVE);
+    vk_r_shadowBias = ri.Cvar_Get("r_shadowBias", "0.005", CVAR_ARCHIVE);
+    vk_r_shadowMapSize = ri.Cvar_Get("r_shadowMapSize", "2048", CVAR_ARCHIVE);
+    vk_r_sem = ri.Cvar_Get("r_sem", "0", CVAR_ARCHIVE);
+    vk_r_semMatCap = ri.Cvar_Get("r_semMatCap", "0", CVAR_ARCHIVE);
+    vk_r_tessellation = ri.Cvar_Get("r_tessellation", "0", CVAR_ARCHIVE);
+    vk_r_tessellationLevel = ri.Cvar_Get("r_tessellationLevel", "3.0", CVAR_ARCHIVE);
+    vk_r_deferred = ri.Cvar_Get("r_deferred", "0", CVAR_ARCHIVE);
+    vk_r_bloom = ri.Cvar_Get("r_bloom", "1", CVAR_ARCHIVE);
+    vk_r_bloomIntensity = ri.Cvar_Get("r_bloomIntensity", "0.5", CVAR_ARCHIVE);
+    vk_r_tonemap = ri.Cvar_Get("r_tonemap", "1", CVAR_ARCHIVE);
+    vk_r_tonemapExposure = ri.Cvar_Get("r_tonemapExposure", "1.0", CVAR_ARCHIVE);
+    vk_r_msaa = ri.Cvar_Get("r_msaa", "0", CVAR_ARCHIVE);
+    vk_r_fxaa = ri.Cvar_Get("r_fxaa", "0", CVAR_ARCHIVE);
+    vk_r_textureQuality = ri.Cvar_Get("r_textureQuality", "2", CVAR_ARCHIVE);
+    vk_r_anisotropic = ri.Cvar_Get("r_anisotropic", "1", CVAR_ARCHIVE);
+    vk_r_maxAnisotropy = ri.Cvar_Get("r_maxAnisotropy", "16", CVAR_ARCHIVE);
+    vk_r_physics = ri.Cvar_Get("r_physics", "0", CVAR_ARCHIVE);
+    vk_r_physicsWind = ri.Cvar_Get("r_physicsWind", "0", CVAR_ARCHIVE);
+    vk_r_physicsIterations = ri.Cvar_Get("r_physicsIterations", "64", CVAR_ARCHIVE);
+    vk_r_computeRT = ri.Cvar_Get("r_computeRT", "0", CVAR_ARCHIVE);
+    vk_r_computeRTResolution = ri.Cvar_Get("r_computeRTResolution", "2048", CVAR_ARCHIVE);
+    vk_r_computeRTReflections = ri.Cvar_Get("r_computeRTReflections", "1", CVAR_ARCHIVE);
+    vk_r_computeRTMaxBounces = ri.Cvar_Get("r_computeRTMaxBounces", "3", CVAR_ARCHIVE);
 
     // Load settings from CVars
     VK_GraphicsSettings_LoadFromCvars();
@@ -94,56 +94,56 @@ void VK_GraphicsSettings_LoadFromCvars(void) {
     vk_graphics_settings.preset = (graphics_preset_t)Com_Clamp(0, 4, r_graphicsPreset->integer);
 
     // PBR/IBL
-    vk_graphics_settings.pbrEnabled = r_pbr->integer != 0;
-    vk_graphics_settings.iblEnabled = r_ibl->integer != 0;
-    vk_graphics_settings.iblIntensity = r_iblIntensity->value;
+    vk_graphics_settings.pbrEnabled = vk_r_pbr->integer != 0;
+    vk_graphics_settings.iblEnabled = vk_r_ibl->integer != 0;
+    vk_graphics_settings.iblIntensity = vk_r_iblIntensity->value;
     VectorSet(vk_graphics_settings.iblTintColor, 1.0f, 1.0f, 1.0f);
 
     // Shadows
-    vk_graphics_settings.shadowsEnabled = r_shadows->integer != 0;
-    vk_graphics_settings.shadowQuality = (shadow_quality_t)Com_Clamp(0, 4, r_shadowQuality->integer);
-    vk_graphics_settings.shadowTechnique = (shadowTechnique_t)Com_Clamp(0, 7, r_shadowTechnique->integer);
-    vk_graphics_settings.shadowBias = r_shadowBias->value;
-    vk_graphics_settings.shadowMapSize = r_shadowMapSize->integer;
+    vk_graphics_settings.shadowsEnabled = vk_r_shadows->integer != 0;
+    vk_graphics_settings.shadowQuality = (shadow_quality_t)Com_Clamp(0, 4, vk_r_shadowQuality->integer);
+    vk_graphics_settings.shadowTechnique = (shadowTechnique_t)Com_Clamp(0, 8, vk_r_shadowTechnique->integer);
+    vk_graphics_settings.shadowBias = vk_r_shadowBias->value;
+    vk_graphics_settings.shadowMapSize = vk_r_shadowMapSize->integer;
 
     // SEM
-    vk_graphics_settings.semEnabled = r_sem->integer != 0;
-    vk_graphics_settings.semMatCapIndex = r_semMatCap->integer;
+    vk_graphics_settings.semEnabled = vk_r_sem->integer != 0;
+    vk_graphics_settings.semMatCapIndex = vk_r_semMatCap->integer;
     vk_graphics_settings.semIntensity = 1.0f;
 
     // Tessellation
-    vk_graphics_settings.tessellationEnabled = r_tessellation->integer != 0;
-    vk_graphics_settings.tessellationLevel = r_tessellationLevel->value;
+    vk_graphics_settings.tessellationEnabled = vk_r_tessellation->integer != 0;
+    vk_graphics_settings.tessellationLevel = vk_r_tessellationLevel->value;
 
     // Deferred
-    vk_graphics_settings.deferredEnabled = r_deferred->integer != 0;
+    vk_graphics_settings.deferredEnabled = vk_r_deferred->integer != 0;
 
     // Post-processing
-    vk_graphics_settings.bloomEnabled = r_bloom->integer != 0;
-    vk_graphics_settings.bloomIntensity = r_bloomIntensity->value;
-    vk_graphics_settings.tonemappingEnabled = r_tonemap->integer != 0;
-    vk_graphics_settings.tonemapExposure = r_tonemapExposure->value;
+    vk_graphics_settings.bloomEnabled = vk_r_bloom->integer != 0;
+    vk_graphics_settings.bloomIntensity = vk_r_bloomIntensity->value;
+    vk_graphics_settings.tonemappingEnabled = vk_r_tonemap->integer != 0;
+    vk_graphics_settings.tonemapExposure = vk_r_tonemapExposure->value;
 
     // Anti-aliasing
-    vk_graphics_settings.msaaSamples = Com_Clamp(0, 3, r_msaa->integer);
-    vk_graphics_settings.fxaaEnabled = r_fxaa->integer != 0;
+    vk_graphics_settings.msaaSamples = Com_Clamp(0, 3, vk_r_msaa->integer);
+    vk_graphics_settings.fxaaEnabled = vk_r_fxaa->integer != 0;
 
     // Texture quality
-    vk_graphics_settings.textureQuality = Com_Clamp(0, 3, r_textureQuality->integer);
-    vk_graphics_settings.anisotropicFiltering = r_anisotropic->integer != 0;
-    vk_graphics_settings.maxAnisotropy = Com_Clamp(1, 16, r_maxAnisotropy->integer);
+    vk_graphics_settings.textureQuality = Com_Clamp(0, 3, vk_r_textureQuality->integer);
+    vk_graphics_settings.anisotropicFiltering = vk_r_anisotropic->integer != 0;
+    vk_graphics_settings.maxAnisotropy = Com_Clamp(1, 16, vk_r_maxAnisotropy->integer);
 
     // Physics
-    vk_graphics_settings.physicsEnabled = r_physics->integer != 0;
-    vk_graphics_settings.physicsWindEnabled = r_physicsWind->integer != 0;
-    vk_graphics_settings.physicsIterations = Com_Clamp(1, 256, r_physicsIterations->integer);
+    vk_graphics_settings.physicsEnabled = vk_r_physics->integer != 0;
+    vk_graphics_settings.physicsWindEnabled = vk_r_physicsWind->integer != 0;
+    vk_graphics_settings.physicsIterations = Com_Clamp(1, 256, vk_r_physicsIterations->integer);
     VectorSet(vk_graphics_settings.physicsGravity, 0.0f, -9.8f, 0.0f);
 
     // Compute Ray Tracing
-    vk_graphics_settings.computeRTEnabled = r_computeRT->integer != 0;
-    vk_graphics_settings.computeRTResolution = Com_Clamp(256, 4096, r_computeRTResolution->integer);
-    vk_graphics_settings.computeRTReflections = r_computeRTReflections->integer != 0;
-    vk_graphics_settings.computeRTMaxBounces = Com_Clamp(0, 8, r_computeRTMaxBounces->integer);
+    vk_graphics_settings.computeRTEnabled = vk_r_computeRT->integer != 0;
+    vk_graphics_settings.computeRTResolution = Com_Clamp(256, 4096, vk_r_computeRTResolution->integer);
+    vk_graphics_settings.computeRTReflections = vk_r_computeRTReflections->integer != 0;
+    vk_graphics_settings.computeRTMaxBounces = Com_Clamp(0, 8, vk_r_computeRTMaxBounces->integer);
 }
 
 void VK_GraphicsSettings_ApplyPreset(graphics_preset_t preset) {
@@ -253,22 +253,22 @@ void VK_GraphicsSettings_ApplySettings(void) {
     }
 
     // Update CVars to match settings
-    if (r_pbr) r_pbr->integer = vk_graphics_settings.pbrEnabled ? 1 : 0;
-    if (r_ibl) r_ibl->integer = vk_graphics_settings.iblEnabled ? 1 : 0;
-    if (r_shadows) r_shadows->integer = vk_graphics_settings.shadowsEnabled ? 1 : 0;
-    if (r_shadowQuality) r_shadowQuality->integer = vk_graphics_settings.shadowQuality;
-    if (r_shadowMapSize) r_shadowMapSize->integer = vk_graphics_settings.shadowMapSize;
-    if (r_sem) r_sem->integer = vk_graphics_settings.semEnabled ? 1 : 0;
-    if (r_tessellation) r_tessellation->integer = vk_graphics_settings.tessellationEnabled ? 1 : 0;
-    if (r_bloom) r_bloom->integer = vk_graphics_settings.bloomEnabled ? 1 : 0;
-    if (r_msaa) r_msaa->integer = vk_graphics_settings.msaaSamples;
-    if (r_physics) r_physics->integer = vk_graphics_settings.physicsEnabled ? 1 : 0;
-    if (r_physicsWind) r_physicsWind->integer = vk_graphics_settings.physicsWindEnabled ? 1 : 0;
-    if (r_physicsIterations) r_physicsIterations->integer = vk_graphics_settings.physicsIterations;
-    if (r_computeRT) r_computeRT->integer = vk_graphics_settings.computeRTEnabled ? 1 : 0;
-    if (r_computeRTResolution) r_computeRTResolution->integer = vk_graphics_settings.computeRTResolution;
-    if (r_computeRTReflections) r_computeRTReflections->integer = vk_graphics_settings.computeRTReflections ? 1 : 0;
-    if (r_computeRTMaxBounces) r_computeRTMaxBounces->integer = vk_graphics_settings.computeRTMaxBounces;
+    if (vk_r_pbr) vk_r_pbr->integer = vk_graphics_settings.pbrEnabled ? 1 : 0;
+    if (vk_r_ibl) vk_r_ibl->integer = vk_graphics_settings.iblEnabled ? 1 : 0;
+    if (vk_r_shadows) vk_r_shadows->integer = vk_graphics_settings.shadowsEnabled ? 1 : 0;
+    if (vk_r_shadowQuality) vk_r_shadowQuality->integer = vk_graphics_settings.shadowQuality;
+    if (vk_r_shadowMapSize) vk_r_shadowMapSize->integer = vk_graphics_settings.shadowMapSize;
+    if (vk_r_sem) vk_r_sem->integer = vk_graphics_settings.semEnabled ? 1 : 0;
+    if (vk_r_tessellation) vk_r_tessellation->integer = vk_graphics_settings.tessellationEnabled ? 1 : 0;
+    if (vk_r_bloom) vk_r_bloom->integer = vk_graphics_settings.bloomEnabled ? 1 : 0;
+    if (vk_r_msaa) vk_r_msaa->integer = vk_graphics_settings.msaaSamples;
+    if (vk_r_physics) vk_r_physics->integer = vk_graphics_settings.physicsEnabled ? 1 : 0;
+    if (vk_r_physicsWind) vk_r_physicsWind->integer = vk_graphics_settings.physicsWindEnabled ? 1 : 0;
+    if (vk_r_physicsIterations) vk_r_physicsIterations->integer = vk_graphics_settings.physicsIterations;
+    if (vk_r_computeRT) vk_r_computeRT->integer = vk_graphics_settings.computeRTEnabled ? 1 : 0;
+    if (vk_r_computeRTResolution) vk_r_computeRTResolution->integer = vk_graphics_settings.computeRTResolution;
+    if (vk_r_computeRTReflections) vk_r_computeRTReflections->integer = vk_graphics_settings.computeRTReflections ? 1 : 0;
+    if (vk_r_computeRTMaxBounces) vk_r_computeRTMaxBounces->integer = vk_graphics_settings.computeRTMaxBounces;
 }
 
 void VK_GraphicsSettings_ResetToDefaults(void) {

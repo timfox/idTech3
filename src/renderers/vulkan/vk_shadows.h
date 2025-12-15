@@ -6,15 +6,17 @@
 // Supports multiple shadow mapping methods and cascaded shadow maps
 
 typedef enum {
-    SHADOW_DISABLED = 0,
-    SHADOW_STENCIL_VOLUME,    // Traditional stencil shadow volumes
-    SHADOW_DEPTH_MAP,         // Basic shadow mapping
-    SHADOW_CSM,              // Cascaded Shadow Maps
-    SHADOW_VSM,              // Variance Shadow Maps
-    SHADOW_PCF,              // Percentage Closer Filtering
-    SHADOW_PCSS,             // Percentage Closer Soft Shadows
-    SHADOW_MSM,              // Moment Shadow Maps
-    SHADOW_RSM               // Reflective Shadow Maps
+    // NOTE: Names are prefixed to avoid collision with Vk_Shadow_Phase enum
+    // in `vk.h` (which defines `SHADOW_DISABLED` in the global namespace).
+    VK_SHADOW_TECHNIQUE_DISABLED = 0,
+    VK_SHADOW_TECHNIQUE_STENCIL_VOLUME,    // Traditional stencil shadow volumes
+    VK_SHADOW_TECHNIQUE_DEPTH_MAP,         // Basic shadow mapping
+    VK_SHADOW_TECHNIQUE_CSM,               // Cascaded Shadow Maps
+    VK_SHADOW_TECHNIQUE_VSM,               // Variance Shadow Maps
+    VK_SHADOW_TECHNIQUE_PCF,               // Percentage Closer Filtering
+    VK_SHADOW_TECHNIQUE_PCSS,              // Percentage Closer Soft Shadows
+    VK_SHADOW_TECHNIQUE_MSM,               // Moment Shadow Maps
+    VK_SHADOW_TECHNIQUE_RSM                // Reflective Shadow Maps
 } shadowTechnique_t;
 
 typedef struct {

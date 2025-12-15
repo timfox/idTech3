@@ -27,12 +27,17 @@ typedef struct VkPhysicalDeviceMeshShaderFeaturesEXT {
 #include "vk_material_system.h"
 #include "vk_cell_streaming.h"
 #include "vk_atmosphere.h"
+#ifdef IDTECH3_VK_EXPERIMENTAL
 #include "vk_ibl.h"
 #include "vk_shadows.h"
 #include "gltf_loader.h"
+#include "vk_dynamic_rendering.h"
+#include "vk_multithreaded_rendering.h"
+#include "vk_compute_raytracing.h"
 #include "vk_sem.h"
 #include "vk_graphics_settings.h"
 #include "vk_physics.h"
+#endif
 
 extern cvar_t *r_frameTelemetry;
 extern cvar_t *r_procDressing;
@@ -191,7 +196,7 @@ static PFN_vkGetPhysicalDeviceSurfaceSupportKHR			qvkGetPhysicalDeviceSurfaceSup
 static PFN_vkCreateDebugReportCallbackEXT				qvkCreateDebugReportCallbackEXT;
 static PFN_vkDestroyDebugReportCallbackEXT				qvkDestroyDebugReportCallbackEXT;
 #endif
-static PFN_vkAllocateCommandBuffers						qvkAllocateCommandBuffers;
+PFN_vkAllocateCommandBuffers						qvkAllocateCommandBuffers;
 PFN_vkAllocateDescriptorSets						qvkAllocateDescriptorSets;
 PFN_vkAllocateMemory								qvkAllocateMemory;
 PFN_vkBeginCommandBuffer							qvkBeginCommandBuffer;
@@ -5283,6 +5288,8 @@ void vk_initialize( void )
 	// Initialize mesh shaders
 	vk_mesh_shaders_init();
 
+	// Optional experimental modules (WIP)
+#ifdef IDTECH3_VK_EXPERIMENTAL
 	// Initialize graphics settings system first
 	VK_GraphicsSettings_Init();
 
@@ -5302,6 +5309,7 @@ void vk_initialize( void )
 
 	// Apply graphics settings after systems are initialized
 	VK_GraphicsSettings_ApplySettings();
+#endif
 
 	vk.offscreenRender = qtrue;
 
@@ -6338,6 +6346,7 @@ __cleanup:
 	vk_material_system_shutdown();
 	vk_gpu_culling_shutdown();
 	// Shutdown advanced rendering systems
+#ifdef IDTECH3_VK_EXPERIMENTAL
 	VK_ComputeRT_Shutdown();
 	VK_Physics_Shutdown();
 	VK_SEM_Shutdown();
@@ -6347,6 +6356,7 @@ __cleanup:
 	VK_MultithreadedRendering_Shutdown();
 	VK_DynamicRendering_Shutdown();
 	VK_GraphicsSettings_Shutdown();
+#endif
 	// Shutdown GIBS before ray tracing
 #ifdef USE_VULKAN_RAY_TRACING
 	vk_gibs_shutdown();
