@@ -1566,7 +1566,8 @@ void Z_Free( void *ptr ) {
 	}
 
 	if (block->tag == TAG_FREE) {
-		Com_Error( ERR_FATAL, "Z_Free: freed a freed pointer" );
+		Com_Printf( S_COLOR_YELLOW "WARNING: Z_Free: attempt to free already freed pointer (double-free)\n" );
+		return;
 	}
 
 	// if static memory

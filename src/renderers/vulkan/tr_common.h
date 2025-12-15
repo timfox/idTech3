@@ -124,6 +124,12 @@ unsigned int RE_UTF8_DecodeChar(const unsigned char **str);
 qboolean RE_RegisterFontFallback(const char *primaryFontName, int pointSize, const char **fallbackNames, int fallbackCount);
 void *RE_GetFontFallback(const char *fontName, int pointSize);  // Returns fontFallbackChain_t*
 
+// Unicode glyph mapping functions
+unsigned int RE_GetGlyphIndexForUnicode(fontInfo_t *font, unsigned int codePoint);
+glyphInfo_t *RE_FindUnicodeGlyphInFont(fontInfo_t *font, unsigned int codePoint);
+void RE_CacheUnicodeGlyph(unsigned int codePoint, unsigned int glyphIndex);
+void RE_ClearUnicodeCache(void);
+
 extern	cvar_t	*r_fontAtlasSize;
 extern	cvar_t	*r_fontDPI;
 extern	cvar_t	*r_fontHinting;
