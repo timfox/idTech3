@@ -6,8 +6,23 @@ Wrapper functions for C++ implementation
 */
 
 #include "ui2_internal.h"
-#include "../qcommon/qcommon.h"
 #include <climits>
+#include <new>
+
+// Forward declare C functions with C linkage to avoid name mangling
+#ifdef __cplusplus
+extern "C" {
+#endif
+	void *Hunk_AllocateTempMemory(int size);
+	void Hunk_FreeTempMemory(void *buf);
+	cvar_t *Cvar_Get(const char *var_name, const char *value, int flags);
+	void Cvar_SetDescription(cvar_s *cv, const char *description);
+	void Cmd_AddCommand(const char *cmd_name, void (*function)(void));
+#ifdef __cplusplus
+}
+#endif
+
+#include "../qcommon/qcommon.h"
 
 #ifdef __cplusplus
 
@@ -102,8 +117,9 @@ ui2Context_t *UI2_CreateContext(const ui2Renderer_t *renderer) {
 		return nullptr;
 	}
 	
-	// Zero-initialize (use Com_Memset for POD struct)
-	Com_Memset(ctx, 0, sizeof(ui2Context_t));
+	// Zero-initialize (struct has default constructors for members)
+	// Use placement new with default constructor
+	new(ctx) ui2Context_t();
 	
 	// Copy renderer callbacks
 	ctx->renderer = *renderer;

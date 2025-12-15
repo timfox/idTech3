@@ -6,9 +6,19 @@ Renders deterministic scenes and compares against baseline hashes
 */
 
 #include "ui2_internal.h"
-#include "../qcommon/qcommon.h"
 #include <cstring>
 #include <cstdio>
+
+// Forward declare C functions with C linkage
+#ifdef __cplusplus
+extern "C" {
+#endif
+	void Cmd_AddCommand(const char *cmd_name, void (*function)(void));
+#ifdef __cplusplus
+}
+#endif
+
+#include "../qcommon/qcommon.h"
 
 #ifdef __cplusplus
 

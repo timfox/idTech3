@@ -492,11 +492,14 @@ static bool parsePropertyValue(Tokenizer &tok, Token &token, Style &style, const
 			return true;
 		}
 		return false;
+	}
 	
-	// Consume token
+	// Consume token (for properties that don't explicitly return)
 	token = nextToken(tok);
 	return true;
 }
+
+// End of parsePropertyValue function
 
 extern "C" {
 
