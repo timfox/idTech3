@@ -1,11 +1,16 @@
 #if defined (__linux__) // ALSA sound path
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE 1
+#endif
+
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
+#include <alloca.h>
 #include <alsa/asoundlib.h>
 #include <pthread.h>
 
@@ -229,8 +234,8 @@ static int buffer_sz;					// buffers size, in bytes
 static int frame_sz;					// frame size, in bytes
 
 static void async_proc( snd_async_handler_t *ahandler );
-static void thread_proc_mmap( void );
-static void thread_proc_direct( void );
+static void *thread_proc_mmap( void *unused );
+static void *thread_proc_direct( void *unused );
 
 
 void Snd_Memset( void* dest, const int val, const size_t count )
@@ -603,9 +608,9 @@ static qboolean setup_ALSA( smode_t mode )
 #endif
 	
 		if ( use_mmap )
-			err = _pthread_create( &thread, NULL, (void*)&thread_proc_mmap, NULL );
+			err = _pthread_create( &thread, NULL, thread_proc_mmap, NULL );
 		else
-			err = _pthread_create( &thread, NULL, (void*)&thread_proc_direct, NULL );
+			err = _pthread_create( &thread, NULL, thread_proc_direct, NULL );
 
 		if ( err != 0 )
 		{
@@ -830,8 +835,9 @@ int SNDDMA_GetDMAPos( void )
 }
 
 
-static void thread_proc_mmap( void )
+static void *thread_proc_mmap( void *unused )
 {
+	(void)unused;
 	const snd_pcm_channel_area_t *areas;
 	snd_pcm_sframes_t commitres;
 	snd_pcm_uframes_t frames;
@@ -941,12 +947,13 @@ static void thread_proc_mmap( void )
 
 	_snd_pcm_drop( handle );
 
-	_pthread_exit( 0 );
+	return NULL;
 }
 
 
-static void thread_proc_direct( void )
+static void *thread_proc_direct( void *unused )
 {
+	(void)unused;
 	snd_pcm_uframes_t size;
 	snd_pcm_uframes_t pos;
 	snd_pcm_sframes_t avail, x;
@@ -1030,7 +1037,7 @@ static void thread_proc_direct( void )
 
 	_snd_pcm_drop( handle );
 
-	_pthread_exit( 0 );
+	return NULL;
 }
 
 

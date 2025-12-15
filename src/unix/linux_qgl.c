@@ -30,19 +30,28 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ** QGL_Shutdown() - unloads libraries, NULLs function pointers
 */
 
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 199309L
+#endif
+
 #include <unistd.h>
 #include <sys/types.h>
+#include <time.h>
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
-#include "../renderer/qgl.h"
+#include "../renderers/opengl/qgl.h"
 #include "../renderercommon/tr_types.h"
 #include "unix_glw.h"
 
 #include <dlfcn.h>
 
+// Some build environments still hide the prototype behind feature-test macros.
+// Declare it explicitly to avoid implicit-declaration errors.
+int nanosleep( const struct timespec *req, struct timespec *rem );
+
 #define GLE( ret, name, ... ) ret ( APIENTRY * q##name )( __VA_ARGS__ );
-QGL_LinX11_PROCS;
-QGL_Swp_PROCS;
+QGL_LinX11_PROCS
+QGL_Swp_PROCS
 #undef GLE
 
 /*

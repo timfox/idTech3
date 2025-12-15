@@ -5,8 +5,17 @@
 #include <X11/Xutil.h>
 #include <X11/Xos.h>
 
+#if defined(__has_include)
+#if __has_include(<X11/extensions/Xxf86dga.h>)
 #include <X11/extensions/Xxf86dga.h>
+#define IDTECH3_HAVE_XF86DGA_H 1
+#endif
+#else
+#include <X11/extensions/Xxf86dga.h>
+#define IDTECH3_HAVE_XF86DGA_H 1
+#endif
 
+#if defined(IDTECH3_HAVE_XF86DGA_H)
 static void *d_lib = NULL;
 
 Bool (*_XF86DGAQueryVersion)( Display *dpy, int *majorVersion, int *minorVersion );
@@ -19,9 +28,14 @@ static sym_t d_list[] =
 	{ (void**)&_XF86DGAQueryExtension, "XF86DGAQueryExtension" },
 	{ (void**)&_XF86DGADirectVideo, "XF86DGADirectVideo" }
 };
+#endif /* IDTECH3_HAVE_XF86DGA_H */
 
 qboolean DGA_Init( Display *_dpy )
 {
+#if !defined(IDTECH3_HAVE_XF86DGA_H)
+	glw_state.dga_ext = qfalse;
+	return qfalse;
+#else
 	int event_base, error_base;
 	int ver_major = 0, ver_minor = 0;
 	int i;
@@ -69,23 +83,34 @@ qboolean DGA_Init( Display *_dpy )
 __fail:
 	DGA_Done();
 	return qfalse;
+#endif
 }
 
 
 void DGA_Done( void )
 {
+#if !defined(IDTECH3_HAVE_XF86DGA_H)
+	glw_state.dga_ext = qfalse;
+	return;
+#else
 	if ( d_lib )
 	{
 		Sys_UnloadLibrary( d_lib );
 		d_lib = NULL;
 	}
 	glw_state.dga_ext = qfalse;
+#endif
 }
 
 void DGA_Mouse( qboolean enable )
 {
+#if !defined(IDTECH3_HAVE_XF86DGA_H)
+	(void)enable;
+	return;
+#else
 	if ( !glw_state.dga_ext )
 		return;
 
 	_XF86DGADirectVideo( dpy, DefaultScreen( dpy ), enable ? XF86DGADirectMouse : 0 );
+#endif
 }

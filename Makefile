@@ -13,6 +13,8 @@
 ARCH ?= x86_64
 CC ?= gcc
 CXX ?=
+INSTALL ?=
+STRIP ?=
 
 USE_SDL ?= 1
 USE_RENDERER_DLOPEN ?= 1
@@ -26,6 +28,9 @@ DESTDIR ?=
 # - Release jobs call `make install ...`
 # - Debug jobs call `make debug ...`
 BUILD_TYPE ?= Release
+
+# Parallelism (Linux: nproc, macOS: sysctl)
+JOBS ?= $(shell nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 1)
 
 # If someone requests monolithic Vulkan (USE_RENDERER_DLOPEN=0) we currently
 # force dlopen renderers for reproducible builds (matches CMake warning logic).
@@ -51,16 +56,16 @@ configure:
 
 all: BUILD_TYPE := Release
 all: configure
-	@cmake --build "$(BUILD_DIR)" -j$$(nproc)
+	@cmake --build "$(BUILD_DIR)" -j$(JOBS)
 
 install: BUILD_TYPE := Release
 install: configure
-	@cmake --build "$(BUILD_DIR)" -j$$(nproc)
+	@cmake --build "$(BUILD_DIR)" -j$(JOBS)
 	@DESTDIR="$(DESTDIR)" cmake --install "$(BUILD_DIR)"
 
 debug: BUILD_TYPE := Debug
 debug: configure
-	@cmake --build "$(BUILD_DIR)" -j$$(nproc)
+	@cmake --build "$(BUILD_DIR)" -j$(JOBS)
 	@DESTDIR="$(DESTDIR)" cmake --install "$(BUILD_DIR)"
 
 clean:

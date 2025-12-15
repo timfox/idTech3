@@ -41,7 +41,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define VK_USE_PLATFORM_XLIB_KHR
 //#define VK_USE_PLATFORM_XLIB_XRANDR_EXT
-#include "../renderercommon/vulkan/vulkan.h"
+#include "../renderers/renderercommon/vulkan/vulkan.h"
 
 static PFN_vkGetInstanceProcAddr qvkGetInstanceProcAddr;
 static PFN_vkCreateXlibSurfaceKHR qvkCreateXlibSurfaceKHR;

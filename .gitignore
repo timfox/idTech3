@@ -1,6 +1,7 @@
 build/
 build-debug/
 build-coverage/
+build-*/
 build_static/
 build_monolith/
 build-tests/

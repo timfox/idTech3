@@ -33,6 +33,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 **
 */
 
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200112L
+#endif
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE 1
+#endif
+
 #include <termios.h>
 #include <sys/ioctl.h>
 #ifdef __linux__
@@ -41,6 +48,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <signal.h>
 #include <pthread.h>
 #include <semaphore.h>
@@ -66,7 +74,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <X11/XKBlib.h>
 
 #if !defined(__sun)
+#if defined(__has_include)
+#if __has_include(<X11/extensions/Xxf86dga.h>)
 #include <X11/extensions/Xxf86dga.h>
+#endif
+#else
+#include <X11/extensions/Xxf86dga.h>
+#endif
 #endif
 
 #if defined(__sun)

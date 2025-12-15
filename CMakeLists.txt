@@ -273,7 +273,14 @@ IF(ANDROID AND BUILD_RADIANT)
 ENDIF()
 
 # ==== SDL2 Integration ====
-OPTION(USE_SDL "Enable SDL2 integration" ON)
+# SDL2 is optional; some CI jobs (notably MSVC) don't have it installed.
+# Default to ON where discovery is typically available, but keep Windows default OFF.
+if(WIN32)
+	set(USE_SDL_DEFAULT OFF)
+else()
+	set(USE_SDL_DEFAULT ON)
+endif()
+OPTION(USE_SDL "Enable SDL2 integration" ${USE_SDL_DEFAULT})
 
 if(USE_SDL)
 	# Use CMake's built-in FindSDL2 or pkg-config fallback
@@ -303,7 +310,9 @@ if(USE_SDL)
 		endif()
 		set(SDL2_INCLUDE_DIRS ${SDL2_INCLUDE_DIRS} ${SDL2_INCLUDE_DIRS})
 	else()
-		message(FATAL_ERROR "SDL2 could not be found. Please install libsdl2 or set SDL2_DIR.")
+		# Don't hard-fail configure; builds that don't need SDL should still work.
+		message(WARNING "SDL2 could not be found; disabling USE_SDL (set SDL2_DIR to enable).")
+		set(USE_SDL OFF CACHE BOOL "" FORCE)
 	endif()
 endif()
 
@@ -1103,8 +1112,10 @@ ENDIF()
 
 # renderers
 # NOTE: renderer common sources are currently provided by each renderer and shared
-# libs. Keep this list empty unless/until a unified, buildable renderercommon folder exists.
-AUX_SOURCE_DIRECTORY(src/renderercommon RENDERER_COMMON_SRCS)
+# Renderer-common code shared by all renderers (OpenGL/Vulkan/etc).
+# Note: `src/renderercommon/` contains compatibility shims; the real shared
+# renderer code lives under `src/renderers/renderercommon/`.
+AUX_SOURCE_DIRECTORY(src/renderers/renderercommon RENDERER_COMMON_SRCS)
 AUX_SOURCE_DIRECTORY(src/renderer RENDERER_GL_SRCS)
 AUX_SOURCE_DIRECTORY(src/renderers/vulkan RENDERER_VK_SRCS)
 
@@ -1194,11 +1205,17 @@ IF(USE_RENDERER_DLOPEN)
 	ADD_LIBRARY(${RENDERER_PREFIX}_opengl${RENDEXT} SHARED ${RENDERER_GL_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
 	SET_TARGET_PROPERTIES(${RENDERER_PREFIX}_opengl${RENDEXT} PROPERTIES OUTPUT_NAME "${RENDERER_PREFIX}_opengl${RENDEXT}" PREFIX "")
 	TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE USE_RENDERER_DLOPEN)
+	# `src/renderers/renderercommon/*` uses legacy relative includes like "../qcommon/...".
+	# Adding `src/renderers` to the include path keeps those includes resolving to `src/qcommon/...`.
+	target_include_directories(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/renderers)
 	TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_opengl${RENDEXT} m)
 
 	ADD_LIBRARY(${RENDERER_PREFIX}_vulkan${RENDEXT} SHARED ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
 	SET_TARGET_PROPERTIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES OUTPUT_NAME "${RENDERER_PREFIX}_vulkan${RENDEXT}" PREFIX "")
 	TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_VULKAN)
+	# `src/renderers/renderercommon/*` uses legacy relative includes like "../qcommon/...".
+	# Adding `src/renderers` to the include path keeps those includes resolving to `src/qcommon/...`.
+	target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/renderers)
 	IF(IDTECH3_VK_EXPERIMENTAL)
 		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE IDTECH3_VK_EXPERIMENTAL)
 	ENDIF()
@@ -1321,6 +1338,22 @@ IF(UNIX)
 		IF(USE_VULKAN)
 			list(APPEND Q3_UI_SRCS src/unix/linux_qvk.c)
 		ENDIF()
+
+		# These UNIX/X11 backends are legacy code and tend to trigger a lot of
+		# noisy warnings under modern compilers. Keep CI usable by suppressing
+		# the most common ones for these files specifically.
+		IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+			set_source_files_properties(
+				src/unix/linux_glimp.c
+				src/unix/linux_qgl.c
+				src/unix/linux_snd.c
+				src/unix/linux_qvk.c
+				src/unix/x11_dga.c
+				src/unix/x11_randr.c
+				src/unix/x11_vidmode.c
+				PROPERTIES COMPILE_FLAGS "-Wno-missing-prototypes -Wno-shadow -Wno-sign-compare -Wno-pedantic -Wno-unused-parameter"
+			)
+		ENDIF()
 	ENDIF()
 
 	IF(APPLE)
@@ -1336,7 +1369,10 @@ IF(UNIX)
 			SET_SOURCE_FILES_PROPERTIES(src/unix/ios_appdelegate.mm PROPERTIES COMPILE_FLAGS "-x objective-c++ -fobjc-arc")
 			SET_SOURCE_FILES_PROPERTIES(src/unix/ios_integration.mm PROPERTIES COMPILE_FLAGS "-x objective-c++ -fobjc-arc")
 			SET_SOURCE_FILES_PROPERTIES(src/unix/macos_platform.mm PROPERTIES COMPILE_FLAGS "-x objective-c++ -fobjc-arc")
-			TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE "-framework UIKit" "-framework Foundation" "-framework Metal" "-framework QuartzCore" "-framework GameController")
+			# Target may not exist yet (created later); link frameworks after creation.
+			IF(TARGET ${CNAME}${BINEXT})
+				TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE "-framework UIKit" "-framework Foundation" "-framework Metal" "-framework QuartzCore" "-framework GameController")
+			ENDIF()
 		ELSE()
 			SET(IOS FALSE)
 			SET(EXE_TYPE MACOSX_BUNDLE)
@@ -1350,7 +1386,10 @@ IF(UNIX)
 			SET(MACOSX_BUNDLE_ICON_FILE quake3_flat.icns)
 			SET_SOURCE_FILES_PROPERTIES(src/unix/macos_main.mm PROPERTIES COMPILE_FLAGS "-x objective-c++ -fobjc-arc")
 			SET_SOURCE_FILES_PROPERTIES(src/unix/macos_platform.mm PROPERTIES COMPILE_FLAGS "-x objective-c++ -fobjc-arc")
-			TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE "-framework AppKit" "-framework Foundation" "-framework Metal" "-framework QuartzCore")
+			# Target may not exist yet (created later); link frameworks after creation.
+			IF(TARGET ${CNAME}${BINEXT})
+				TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE "-framework AppKit" "-framework Foundation" "-framework Metal" "-framework QuartzCore")
+			ENDIF()
 		ENDIF()
 	ENDIF()
 ELSEIF(WIN32)
@@ -2159,6 +2198,20 @@ ELSE()
 ENDIF()
 TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui ui2)
 
+# Non-SDL UNIX UI code (src/unix/linux_glimp.c, etc.) depends on X11 symbols.
+if(UNIX AND NOT USE_SDL)
+	find_package(X11 REQUIRED)
+	if(X11_FOUND)
+		if(X11_INCLUDE_DIR)
+			target_include_directories(${CNAME}${BINEXT} PRIVATE ${X11_INCLUDE_DIR})
+		endif()
+		# FindX11 populates X11_LIBRARIES with all required link items.
+		if(X11_LIBRARIES)
+			target_link_libraries(${CNAME}${BINEXT} PRIVATE ${X11_LIBRARIES})
+		endif()
+	endif()
+endif()
+
 # When not using dlopen-based renderers, link the selected renderer directly.
 if(NOT USE_RENDERER_DLOPEN)
 	if(USE_VULKAN AND TARGET ${RENDERER_PREFIX}_vulkan)
@@ -2543,7 +2596,7 @@ ENDIF()
 
 # Add USE_VULKAN definition to q3ui if Vulkan is enabled (needed for sdl_glimp.c)
 IF(USE_VULKAN)
-	TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_VULKAN)
+	TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_VULKAN USE_VULKAN_API)
 ENDIF()
 
 # UI2 - Deterministic UI/Layout System (C++23)
