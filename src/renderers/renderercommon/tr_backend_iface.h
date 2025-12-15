@@ -11,7 +11,7 @@ interface without direct backend knowledge.
 
 #pragma once
 
-#include "../qcommon/q_shared.h"
+#include "../../qcommon/q_shared.h"
 
 #ifdef __cplusplus
 extern "C" {

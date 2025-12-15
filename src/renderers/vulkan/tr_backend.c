@@ -20,8 +20,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "tr_local.h"
-#include "../qcommon/performance_counters.h"
-#include "../renderervk/vk.h"
+#include "../../qcommon/performance_counters.h"
+#include "vk.h"
 
 backEndData_t	*backEndData;
 backEndState_t	backEnd;

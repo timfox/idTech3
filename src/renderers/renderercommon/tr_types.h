@@ -23,8 +23,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef __TR_TYPES_H
 #define __TR_TYPES_H
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "../../qcommon/q_shared.h"
+#include "../../qcommon/qcommon.h"
 
 #define MAX_VIDEO_HANDLES	16
 

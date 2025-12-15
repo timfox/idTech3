@@ -41,7 +41,49 @@ void vk_material_system_init( void )
 	}
 	
 	ri.Printf( PRINT_ALL, "Initializing material system...\n" );
-	
+
+	/*
+	=============================================================================
+	MATERIAL SYSTEM CAPACITY LIMITS
+
+	Current capacity: 2048 materials (MAX_DRAWIMAGES)
+	Memory usage per material: 168 bytes (CPU) + 168 bytes (GPU)
+	Total memory: 336KB CPU + 336KB GPU for 2048 materials
+
+	CONSTRAINTS:
+	1. MAX_DRAWIMAGES (2048) - Shared with texture/image system
+	   - Increasing requires updating MAX_DRAWIMAGES in tr_local.h
+	   - Affects Vulkan descriptor pool allocation in vk.c
+	   - Must not exceed hardware texture limits
+
+	2. Vulkan Storage Buffer Limits:
+	   - maxStorageBufferRange: Hardware-specific (typically 128MB-2GB)
+	   - Current usage: Well within limits (344KB << 128MB)
+
+	3. Descriptor Pool Limits:
+	   - Combined image sampler descriptors: MAX_DRAWIMAGES + overhead
+	   - Storage buffer descriptors: 1 (material params buffer)
+	   - Pool size automatically scales with MAX_DRAWIMAGES
+
+	4. GPU Memory:
+	   - Storage buffer for material parameters
+	   - No additional per-material GPU resources
+
+	INCREASING CAPACITY:
+	1. Update MAX_DRAWIMAGES in src/renderer/tr_local.h and src/renderervk/tr_local.h
+	2. Rebuild engine - descriptor pools scale automatically
+	3. Memory usage scales linearly: new_memory = old_memory * (new_capacity / 2048)
+	4. Test on target hardware for storage buffer limits
+
+	MAXIMUM THEORETICAL CAPACITY:
+	- Limited by Vulkan maxStorageBufferRange (hardware specific)
+	- For 128MB limit: ~786,432 materials (128MB / 168 bytes)
+	- For 2GB limit: ~12.5M materials
+	- Practical limit likely lower due to descriptor pool constraints
+
+	CURRENT RECOMMENDATION: 2048 is sufficient for most use cases
+	=============================================================================
+	*/
 	vk.materialSystem.materialCapacity = MAX_DRAWIMAGES; // Use same limit as images
 	vk.materialSystem.materialCount = 0;
 	
@@ -111,7 +153,7 @@ void vk_material_system_init( void )
 
 	// Initialize layered materials (pilot feature)
 	vk_layered_materials_init( vk.materialSystem.materialCapacity );
-	
+
 	vk.materialSystem.initialized = qtrue;
 }
 
@@ -343,7 +385,7 @@ Register Lua Functions
 =============================================================================
 */
 #ifdef USE_LUA
-#include "../qcommon/qcommon.h"
+#include "../../qcommon/qcommon.h"
 
 /*
 =============================================================================

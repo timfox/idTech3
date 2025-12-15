@@ -163,6 +163,9 @@ static void flatten_layers( const layered_material_t *mat, material_params_t *ou
 
 static void seed_pilot_materials( void )
 {
+	// Temporarily disable pilot materials seeding to avoid crash
+	return;
+
 	if ( !r_layeredMaterialsPilot || !r_layeredMaterialsPilot->integer ) {
 		return;
 	}

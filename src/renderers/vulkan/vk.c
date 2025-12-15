@@ -1,5 +1,5 @@
 #include "tr_local.h"
-#include "../qcommon/performance_counters.h"
+#include "../../qcommon/performance_counters.h"
 #include "vk.h"
 #include <stdlib.h>
 #include <unistd.h>
@@ -27,6 +27,12 @@ typedef struct VkPhysicalDeviceMeshShaderFeaturesEXT {
 #include "vk_material_system.h"
 #include "vk_cell_streaming.h"
 #include "vk_atmosphere.h"
+#include "vk_ibl.h"
+#include "vk_shadows.h"
+#include "gltf_loader.h"
+#include "vk_sem.h"
+#include "vk_graphics_settings.h"
+#include "vk_physics.h"
 
 extern cvar_t *r_frameTelemetry;
 extern cvar_t *r_procDressing;
@@ -5277,6 +5283,19 @@ void vk_initialize( void )
 	// Initialize mesh shaders
 	vk_mesh_shaders_init();
 
+	// Initialize graphics settings system first
+	VK_GraphicsSettings_Init();
+
+	// Initialize advanced rendering systems
+	VK_IBL_Init();
+	VK_Shadows_Init();
+	R_GLTF_Init();
+	VK_SEM_Init();
+	VK_Physics_Init();
+
+	// Apply graphics settings after systems are initialized
+	VK_GraphicsSettings_ApplySettings();
+
 	vk.offscreenRender = qtrue;
 
 	if ( props.vendorID == 0x1002 ) {
@@ -6311,6 +6330,13 @@ __cleanup:
 	vk_cell_streaming_shutdown();
 	vk_material_system_shutdown();
 	vk_gpu_culling_shutdown();
+	// Shutdown advanced rendering systems
+	VK_Physics_Shutdown();
+	VK_SEM_Shutdown();
+	VK_IBL_Shutdown();
+	VK_Shadows_Shutdown();
+	R_GLTF_Shutdown();
+	VK_GraphicsSettings_Shutdown();
 	// Shutdown GIBS before ray tracing
 #ifdef USE_VULKAN_RAY_TRACING
 	vk_gibs_shutdown();

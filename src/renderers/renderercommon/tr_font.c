@@ -70,8 +70,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
-#include "../renderercommon/tr_public.h"
-#include "../renderer/tr_common.h"
+#include "tr_public.h"
+#include "../opengl/tr_common.h"
 
 extern void R_IssuePendingRenderCommands( void );
 extern qhandle_t RE_RegisterShaderNoMip( const char *name );
