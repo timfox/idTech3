@@ -1185,7 +1185,7 @@ void GLimp_Shutdown( qboolean unloadDLL )
 #endif // USE_OPENGL_API
 
 
-#ifdef USE_VULKAN_API
+#ifdef USE_VULKAN
 /*
 ** VKimp_Shutdown
 */
@@ -1248,7 +1248,7 @@ void VKimp_Shutdown( qboolean unloadDLL )
 
 	QVK_Shutdown( unloadDLL );
 }
-#endif // USE_VULKAN_API
+#endif // USE_VULKAN
 
 
 /*
@@ -1418,7 +1418,7 @@ static XVisualInfo *GL_SelectVisual( int colorbits, int depthbits, int stencilbi
 #endif // USE_OPENGL_API
 
 
-#ifdef USE_VULKAN_API
+#ifdef USE_VULKAN
 static XVisualInfo *VK_SelectVisual( int colorbits, int depthbits, int stencilbits, glconfig_t *config )
 {
 	static XVisualInfo visinfo;
@@ -1590,7 +1590,7 @@ int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qboolean vul
 	if ( depthbits < 24 )
 		stencilbits = 0;
 
-#ifdef USE_VULKAN_API
+#ifdef USE_VULKAN
 	if ( vulkan )
 		visinfo = VK_SelectVisual( colorbits, depthbits, stencilbits, config );
 #endif
@@ -1953,7 +1953,7 @@ void GLimp_EndFrame( void )
 #endif // USE_OPENGL_API
 
 
-#ifdef USE_VULKAN_API
+#ifdef USE_VULKAN
 /*
 ** GLW_LoadVulkan
 */
@@ -2032,7 +2032,7 @@ void VKimp_Init( glconfig_t *config )
 
 	IN_Init();
 }
-#endif // USE_VULKAN_API
+#endif // USE_VULKAN
 
 
 /*****************************************************************************/

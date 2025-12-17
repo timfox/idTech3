@@ -37,6 +37,19 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "sdl_glw.h"
 #include "sdl_icon.h"
 
+// Export Vulkan functions for dynamic renderer loading
+#ifdef USE_VULKAN
+#if defined(_WIN32)
+#define VK_EXPORT __declspec(dllexport)
+#elif defined(__GNUC__)
+#define VK_EXPORT __attribute__((visibility("default")))
+#else
+#define VK_EXPORT
+#endif
+#else
+#define VK_EXPORT
+#endif
+
 typedef enum {
 	RSERR_OK,
 	RSERR_INVALID_FULLSCREEN,
@@ -696,7 +709,7 @@ This routine is responsible for initializing the OS specific portions
 of Vulkan
 ===============
 */
-void VKimp_Init( glconfig_t *config )
+VK_EXPORT void VKimp_Init( glconfig_t *config )
 {
 	rserr_t err;
 
@@ -766,7 +779,7 @@ void VKimp_Init( glconfig_t *config )
 VK_GetInstanceProcAddr
 ===============
 */
-PFN_vkVoidFunction VK_GetInstanceProcAddr( VkInstance instance, const char *name )
+VK_EXPORT PFN_vkVoidFunction VK_GetInstanceProcAddr( VkInstance instance, const char *name )
 {
 	return qvkGetInstanceProcAddr( instance, name );
 }
@@ -777,7 +790,7 @@ PFN_vkVoidFunction VK_GetInstanceProcAddr( VkInstance instance, const char *name
 VK_CreateSurface
 ===============
 */
-qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR *surface )
+VK_EXPORT qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR *surface )
 {
 	if ( SDL_Vulkan_CreateSurface( SDL_window, instance, surface ) == SDL_TRUE )
 		return qtrue;
@@ -791,7 +804,7 @@ qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR *surface )
 VKimp_Shutdown
 ===============
 */
-void VKimp_Shutdown( qboolean unloadDLL )
+VK_EXPORT void VKimp_Shutdown( qboolean unloadDLL )
 {
 	const char* drv = SDL_GetCurrentVideoDriver();
 
@@ -813,7 +826,7 @@ void VKimp_Shutdown( qboolean unloadDLL )
 	if ( unloadDLL )
 		SDL_QuitSubSystem( SDL_INIT_VIDEO );
 }
-#endif // USE_VULKAN_API
+#endif // USE_VULKAN
 
 
 /*

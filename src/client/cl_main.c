@@ -3659,17 +3659,39 @@ static void CL_InitRef( void ) {
 #endif
 
 	// Vulkan API
-	// CRITICAL FIX: SDL backend provides Vulkan initialization functions
+	// SDL backend provides Vulkan initialization functions
 	// These must be assigned to rimp so the renderer can use them
 	// Functions are declared in sdl_glw.h (included at top) when USE_VULKAN is defined
 	// They are implemented in sdl_glimp.c and linked via q3ui OBJECT library
 #if defined(USE_VULKAN) && defined(USE_SDL)
-	// The functions are conditionally declared in sdl_glw.h when USE_VULKAN is defined
-	// Since we're in a USE_VULKAN && USE_SDL block, they should be available
 	rimp.VKimp_Init = VKimp_Init;
 	rimp.VKimp_Shutdown = VKimp_Shutdown;
 	rimp.VK_GetInstanceProcAddr = VK_GetInstanceProcAddr;
 	rimp.VK_CreateSurface = VK_CreateSurface;
+	
+	// Validate that all Vulkan function pointers were properly assigned
+	if ( !rimp.VKimp_Init || !rimp.VKimp_Shutdown || 
+	     !rimp.VK_GetInstanceProcAddr || !rimp.VK_CreateSurface ) {
+		Com_Error( ERR_FATAL, 
+			"CL_InitRef: Vulkan functions not properly linked.\n"
+			"  VKimp_Init: %s\n"
+			"  VKimp_Shutdown: %s\n"
+			"  VK_GetInstanceProcAddr: %s\n"
+			"  VK_CreateSurface: %s\n"
+			"This indicates a build configuration error - ensure USE_VULKAN and USE_SDL are defined.",
+			rimp.VKimp_Init ? "OK" : "NULL",
+			rimp.VKimp_Shutdown ? "OK" : "NULL",
+			rimp.VK_GetInstanceProcAddr ? "OK" : "NULL",
+			rimp.VK_CreateSurface ? "OK" : "NULL" );
+	}
+	
+	Com_Printf( "CL_InitRef: Vulkan function pointers validated successfully\n" );
+#else
+	// If USE_VULKAN or USE_SDL not defined, ensure pointers are NULL
+	rimp.VKimp_Init = NULL;
+	rimp.VKimp_Shutdown = NULL;
+	rimp.VK_GetInstanceProcAddr = NULL;
+	rimp.VK_CreateSurface = NULL;
 #endif
 	ret = GetRefAPI( REF_API_VERSION, &rimp );
 

@@ -12,7 +12,7 @@
 
 #pragma once
 
-#if defined(USE_VULKAN) || defined(USE_VULKAN_API)
+#if defined(USE_VULKAN)
 #include "../vulkan/tr_common.h"
 #elif defined(USE_OPENGL2)
 #include "../opengl2/tr_common.h"

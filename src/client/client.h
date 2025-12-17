@@ -643,7 +643,7 @@ void	*GL_GetProcAddress( const char *name );
 #endif
 
 // Vulkan
-#ifdef USE_VULKAN_API
+#ifdef USE_VULKAN
 void	VKimp_Init( glconfig_t *config );
 void	VKimp_Shutdown( qboolean unloadDLL );
 PFN_vkVoidFunction VK_GetInstanceProcAddr( VkInstance instance, const char *name );

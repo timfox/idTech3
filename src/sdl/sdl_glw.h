@@ -80,11 +80,20 @@ void GLW_HideFullscreenWindow( void );
 void GLW_RestoreGamma( void );
 
 // Vulkan functions
+// Mark these for symbol export so dynamically loaded renderers can find them
 #ifdef USE_VULKAN
-void VKimp_Init( glconfig_t *config );
-void VKimp_Shutdown( qboolean unloadDLL );
-PFN_vkVoidFunction VK_GetInstanceProcAddr( VkInstance instance, const char *name );
-qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR *surface );
+#if defined(_WIN32)
+#define VK_EXPORT __declspec(dllexport)
+#elif defined(__GNUC__)
+#define VK_EXPORT __attribute__((visibility("default")))
+#else
+#define VK_EXPORT
+#endif
+
+VK_EXPORT void VKimp_Init( glconfig_t *config );
+VK_EXPORT void VKimp_Shutdown( qboolean unloadDLL );
+VK_EXPORT PFN_vkVoidFunction VK_GetInstanceProcAddr( VkInstance instance, const char *name );
+VK_EXPORT qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR *surface );
 #endif
 
 #endif
