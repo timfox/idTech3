@@ -6,6 +6,8 @@
 cmake_minimum_required(VERSION 3.20)
 project(idtech3 C CXX ASM)
 
+# Find Lua globally
+
 # Prefer colored compiler diagnostics when supported
 if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
 	set(CMAKE_COLOR_DIAGNOSTICS ON)
@@ -349,7 +351,6 @@ OPTION(USE_ENET "" ON)
 OPTION(USE_SQLITE "" ON)
 OPTION(USE_FREETYPE "" ON)
 OPTION(USE_OPENSSL "" ON)
-OPTION(USE_LUA "" ON)
 OPTION(USE_AIML "Enable AIML 2.1 parser/interpreter support" ON)
 OPTION(USE_ENTT "Enable EnTT ECS system" ON)
 OPTION(USE_STEAMWORKS "Enable Steamworks SDK integration for Steam Deck features" OFF)
@@ -391,8 +392,10 @@ list(APPEND QCOMMON_SRCS src/qcommon/q_log.c)
 list(APPEND QCOMMON_SRCS src/qcommon/performance_counters.c)
 # Add memory safety utilities
 list(APPEND QCOMMON_SRCS src/qcommon/q_memory_safety.c)
-# Add memory safety utilities
-list(APPEND QCOMMON_SRCS src/qcommon/q_memory_safety.c)
+# Add secure message functions
+list(APPEND QCOMMON_SRCS src/qcommon/msg_secure.c)
+# Add secure message functions
+list(APPEND QCOMMON_SRCS src/qcommon/msg_secure.c)
 # Add memory statistics tracking
 list(APPEND QCOMMON_SRCS src/qcommon/memory_stats.c)
 # Add VM hot reload system
@@ -420,18 +423,6 @@ IF(USE_OPENSSL)
 	list(APPEND QCOMMON_SRCS src/qcommon/openssl_wrapper.c)
 ENDIF()
 
-IF(USE_LUA)
-	list(APPEND QCOMMON_SRCS src/qcommon/lua_wrapper.c)
-	list(APPEND QCOMMON_SRCS src/qcommon/lua_game.cpp)
-	list(APPEND QCOMMON_SRCS src/qcommon/lua_renderer.c)
-	list(APPEND QCOMMON_SRCS src/qcommon/lua_sound.c)
-	list(APPEND QCOMMON_SRCS src/qcommon/lua_events.c)
-	list(APPEND QCOMMON_SRCS src/qcommon/lua_coroutine.c)
-	list(APPEND QCOMMON_SRCS src/qcommon/lua_entity.cpp)
-	list(APPEND QCOMMON_SRCS src/qcommon/lua_encounter.c)
-	list(APPEND QCOMMON_SRCS src/qcommon/lua_sequence.c)
-	list(APPEND QCOMMON_SRCS src/qcommon/lua_debug.c)
-ENDIF()
 
 IF(USE_AIML)
 	list(APPEND QCOMMON_SRCS
@@ -735,6 +726,7 @@ list(REMOVE_ITEM SERVER_SRCS src/server/sv_rankings.c)
 
 # universal binary
 ADD_LIBRARY(qcommon OBJECT ${QCOMMON_SRCS} ${SERVER_SRCS})
+	TARGET_INCLUDE_DIRECTORIES(qcommon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/qcommon)
 IF(USE_JOBSYSTEM)
 	TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE USE_JOBSYSTEM)
 ENDIF()
@@ -1675,116 +1667,6 @@ IF(USE_WEBSOCKETS)
 	ENDIF()
 ENDIF()
 
-IF(USE_LUA)
-	# Try CMake's find_package first (supports Lua 5.1-5.4)
-	find_package(Lua QUIET)
-	
-	# If still not found, try manual search for common Lua versions
-	IF(NOT Lua_FOUND)
-		FOREACH(LUA_VERSION 5.4 5.3 5.2 5.1)
-			# Try versioned subdirectory first (e.g., /usr/include/lua5.4/)
-			FIND_PATH(LUA_INCLUDE_DIR
-				NAMES lua.h
-				PATHS
-				/usr/include/lua${LUA_VERSION}
-				/usr/local/include/lua${LUA_VERSION}
-				/opt/local/include/lua${LUA_VERSION}
-				/usr/include/x86_64-linux-gnu/lua${LUA_VERSION}
-				# Then try standard locations
-				/usr/include
-				/usr/local/include
-				/opt/local/include
-				/usr/include/x86_64-linux-gnu
-			)
-			FIND_LIBRARY(LUA_LIBRARY
-				NAMES lua${LUA_VERSION} lua
-				PATHS
-				/usr/lib/x86_64-linux-gnu
-				/usr/lib
-				/usr/local/lib
-				/opt/local/lib
-			)
-			IF(LUA_INCLUDE_DIR AND LUA_LIBRARY)
-				SET(Lua_FOUND TRUE)
-				# Ensure LUA_LIBRARIES is a list, not a semicolon-separated string
-				SET(LUA_LIBRARIES ${LUA_LIBRARY})
-				# Add math library if not already included
-				IF(NOT "${LUA_LIBRARIES}" MATCHES "m")
-					LIST(APPEND LUA_LIBRARIES m)
-				ENDIF()
-				# If header is in subdirectory (e.g., lua5.4/), use parent directory
-				# so #include <lua.h> works (it will find lua5.4/lua.h)
-				GET_FILENAME_COMPONENT(LUA_INCLUDE_PARENT ${LUA_INCLUDE_DIR} DIRECTORY)
-				IF(LUA_INCLUDE_DIR MATCHES "lua[0-9]")
-					# Header is in versioned subdirectory, use parent
-					SET(LUA_INCLUDE_DIRS ${LUA_INCLUDE_PARENT})
-				ELSE()
-					# Header is directly in include directory
-					SET(LUA_INCLUDE_DIRS ${LUA_INCLUDE_DIR})
-				ENDIF()
-				BREAK()
-			ENDIF()
-		ENDFOREACH()
-	ENDIF()
-	
-	IF(Lua_FOUND)
-		# Ensure LUA_INCLUDE_DIRS is set - CMake's find_package might not set it correctly
-		IF(NOT LUA_INCLUDE_DIRS OR LUA_INCLUDE_DIRS STREQUAL "")
-			# Try to find it manually
-			FIND_PATH(LUA_INCLUDE_DIR_CHECK lua.h 
-				PATHS 
-				/usr/include/lua5.4
-				/usr/include
-				/usr/local/include/lua5.4
-				/usr/local/include
-			)
-			IF(LUA_INCLUDE_DIR_CHECK)
-				SET(LUA_INCLUDE_DIRS ${LUA_INCLUDE_DIR_CHECK})
-			ENDIF()
-		ENDIF()
-		
-		IF(LUA_INCLUDE_DIRS AND NOT LUA_INCLUDE_DIRS STREQUAL "")
-			# Handle versioned Lua include directories (e.g., /usr/include/lua5.4/)
-			# If lua.h is in a versioned subdirectory, we need to include both
-			# the parent directory and the subdirectory so #include <lua.h> works
-			STRING(REGEX MATCH "lua[0-9.]+" LUA_VERSION_MATCH "${LUA_INCLUDE_DIRS}")
-			IF(LUA_VERSION_MATCH)
-				# Header is in versioned subdirectory like lua5.4/
-				# Extract parent directory by removing the versioned subdirectory
-				STRING(REGEX REPLACE "/lua[0-9.]+$" "" LUA_INCLUDE_PARENT "${LUA_INCLUDE_DIRS}")
-				# Add both parent and subdirectory to include path
-				TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${LUA_INCLUDE_PARENT} ${LUA_INCLUDE_DIRS})
-				TARGET_INCLUDE_DIRECTORIES(qcommon PUBLIC ${LUA_INCLUDE_PARENT} ${LUA_INCLUDE_DIRS})
-				TARGET_INCLUDE_DIRECTORIES(qcommon_ded PUBLIC ${LUA_INCLUDE_PARENT} ${LUA_INCLUDE_DIRS})
-				MESSAGE(STATUS "Lua found (versioned): ${LUA_LIBRARIES}, includes: ${LUA_INCLUDE_PARENT} and ${LUA_INCLUDE_DIRS}")
-			ELSE()
-				# Header is directly in include directory
-				TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${LUA_INCLUDE_DIRS})
-				TARGET_INCLUDE_DIRECTORIES(qcommon PUBLIC ${LUA_INCLUDE_DIRS})
-				TARGET_INCLUDE_DIRECTORIES(qcommon_ded PUBLIC ${LUA_INCLUDE_DIRS})
-				MESSAGE(STATUS "Lua found: ${LUA_LIBRARIES}, includes: ${LUA_INCLUDE_DIRS}")
-			ENDIF()
-		ELSE()
-			MESSAGE(WARNING "Lua found but could not determine include directory, disabling Lua support")
-			SET(USE_LUA OFF CACHE BOOL "" FORCE)
-			list(REMOVE_ITEM QCOMMON_SRCS src/qcommon/lua_wrapper.c)
-			SET(Lua_FOUND FALSE)
-		ENDIF()
-		
-		IF(Lua_FOUND)
-			TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_LUA)
-			TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE USE_LUA)
-			TARGET_COMPILE_DEFINITIONS(qcommon_ded PRIVATE USE_LUA)
-		ENDIF()
-	ELSE()
-		MESSAGE(WARNING "Lua not found, disabling Lua support")
-		MESSAGE(STATUS "To enable Lua support, install: sudo apt-get install liblua5.4-dev")
-		MESSAGE(STATUS "Reconfiguring CMake with USE_LUA=OFF")
-		SET(USE_LUA OFF CACHE BOOL "" FORCE)
-		# Remove lua_wrapper.c from sources since Lua is not available
-		list(REMOVE_ITEM QCOMMON_SRCS src/qcommon/lua_wrapper.c)
-	ENDIF()
-ENDIF()
 
 # Theora video codec support
 IF(USE_THEORA)
@@ -2208,6 +2090,9 @@ TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui)
 IF(USE_UI2)
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ui2)
 ENDIF()
+IF(Lua_FOUND)
+	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE Lua::lua)
+ENDIF()
 
 # Non-SDL UNIX UI code (src/unix/linux_glimp.c, etc.) depends on X11 symbols.
 if(UNIX AND NOT USE_SDL)
@@ -2365,11 +2250,12 @@ ENDIF()
 
 IF(USE_LUA)
 	IF(Lua_FOUND)
-		# Link Lua library AFTER object libraries to ensure proper symbol resolution
-		# Force linking even if symbols appear unused (--no-as-needed)
-		TARGET_LINK_OPTIONS(${CNAME}${BINEXT} PRIVATE -Wl,--no-as-needed)
-		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ${LUA_LIBRARIES})
-		TARGET_LINK_OPTIONS(${CNAME}${BINEXT} PRIVATE -Wl,--as-needed)
+		# Create an INTERFACE IMPORTED library target for Lua
+		add_library(Lua::lua INTERFACE IMPORTED)
+		set_target_properties(Lua::lua PROPERTIES
+			INTERFACE_INCLUDE_DIRECTORIES "${LUA_INCLUDE_DIRS}"
+			INTERFACE_LINK_LIBRARIES "${LUA_LIBRARIES}"
+		)
 	ENDIF()
 ENDIF()
 
@@ -2457,11 +2343,11 @@ IF(BUILD_SERVER AND NOT ANDROID)
 		ENDIF()
 	ENDIF()
 
-	IF(USE_LUA)
-		IF(Lua_FOUND)
-			TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE ${LUA_LIBRARIES})
-		ENDIF()
+IF(USE_LUA)
+	IF(Lua_FOUND)
+		TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE Lua::lua)
 	ENDIF()
+ENDIF()
 
 	IF(USE_ASSIMP)
 		IF(ASSIMP_FOUND AND ASSIMP_LIBRARIES)
@@ -2683,6 +2569,12 @@ IF(BUILD_TESTS)
 	TARGET_INCLUDE_DIRECTORIES(test_lua_events PRIVATE src/qcommon tests)
 	TARGET_LINK_LIBRARIES(test_lua_events PRIVATE qcommon Lua::lua)
 	ADD_TEST(NAME lua_events_tests COMMAND test_lua_events)
+
+	# Message Security Test
+	ADD_EXECUTABLE(test_msg_secure tests/test_msg_secure.c src/qcommon/msg_secure.c src/qcommon/q_shared.c)
+	TARGET_INCLUDE_DIRECTORIES(test_msg_secure PRIVATE src/qcommon tests)
+	TARGET_LINK_LIBRARIES(test_msg_secure PRIVATE qcommon)
+	ADD_TEST(NAME msg_secure_tests COMMAND test_msg_secure)
 
 	ADD_EXECUTABLE(test_info
 		tests/test_info.c
