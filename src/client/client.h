@@ -32,7 +32,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "keys.h"
 
 #ifdef USE_SDL
-struct SDL_Event;
+#ifdef USE_LOCAL_HEADERS
+#	include "SDL.h"
+#else
+#	include <SDL.h>
+#endif
 #endif
 
 #ifdef USE_CURL

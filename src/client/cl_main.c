@@ -22,7 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_main.c  -- client main loop
 
 #include "client.h"
+#ifdef USE_SDL
 #include "../sdl/sdl_glw.h"
+#endif
 #include <limits.h>
 #ifdef USE_CURL
 #include "cl_net_enhanced.h"
@@ -3519,6 +3521,7 @@ static void CL_InitRef( void ) {
 	char			dllName[ MAX_OSPATH ], *ospath;
 #endif
 
+	fprintf( stderr, "CL_InitRef: Function called!\n" );
 	CL_InitGLimp_Cvars();
 
 	Com_Printf( "----- Initializing Renderer ----\n" );
@@ -3578,6 +3581,9 @@ static void CL_InitRef( void ) {
 #endif
 
 	Com_Memset( &rimp, 0, sizeof( rimp ) );
+	
+	// DEBUG: Always print to verify this code path executes
+	Com_Printf( "CL_InitRef: rimp memset to zero, about to set function pointers\n" );
 
 	rimp.Cmd_AddCommand = Cmd_AddCommand;
 	rimp.Cmd_RemoveCommand = Cmd_RemoveCommand;
@@ -3653,13 +3659,18 @@ static void CL_InitRef( void ) {
 #endif
 
 	// Vulkan API
-#ifdef USE_VULKAN
+	// CRITICAL FIX: SDL backend provides Vulkan initialization functions
+	// These must be assigned to rimp so the renderer can use them
+	// Functions are declared in sdl_glw.h (included at top) when USE_VULKAN is defined
+	// They are implemented in sdl_glimp.c and linked via q3ui OBJECT library
+#if defined(USE_VULKAN) && defined(USE_SDL)
+	// The functions are conditionally declared in sdl_glw.h when USE_VULKAN is defined
+	// Since we're in a USE_VULKAN && USE_SDL block, they should be available
 	rimp.VKimp_Init = VKimp_Init;
 	rimp.VKimp_Shutdown = VKimp_Shutdown;
 	rimp.VK_GetInstanceProcAddr = VK_GetInstanceProcAddr;
 	rimp.VK_CreateSurface = VK_CreateSurface;
 #endif
-
 	ret = GetRefAPI( REF_API_VERSION, &rimp );
 
 	Com_Printf( "-------------------------------\n");

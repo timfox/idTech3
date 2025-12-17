@@ -2502,6 +2502,12 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	static refexport_t	re;
 
 	ri = *rimp;
+	
+	// Debug: Check if Vulkan function pointers were set
+	if ( ri.VKimp_Init == NULL ) {
+		ri.Printf( PRINT_ALL, "GetRefAPI: WARNING - ri.VKimp_Init is NULL! This means the client didn't set the function pointer.\n" );
+		ri.Printf( PRINT_ALL, "GetRefAPI: rimp.VKimp_Init was %p when passed to GetRefAPI\n", (void*)rimp->VKimp_Init );
+	}
 
 	Com_Memset( &re, 0, sizeof( re ) );
 
