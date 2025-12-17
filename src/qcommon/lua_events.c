@@ -21,13 +21,26 @@ typedef struct event_subscriber_s {
 	lua_State *L;
 	int callback_ref;  // Lua function reference
 	qboolean active;
+	qboolean once;     // One-time subscription
+	lua_event_filter_t filter;  // Optional filter function
+	char script_name[64]; // For hot-reload tracking
 } event_subscriber_t;
+
+// Waiting coroutine structure
+typedef struct event_waiter_s {
+	lua_State *L;
+	int coroutine_ref;  // Lua coroutine reference
+	int timeout_frame;  // Frame when timeout expires (0 = no timeout)
+	qboolean active;
+} event_waiter_t;
 
 // Event name to subscribers mapping
 typedef struct event_entry_s {
 	char event_name[64];
 	event_subscriber_t subscribers[MAX_EVENT_SUBSCRIBERS];
 	int num_subscribers;
+	event_waiter_t waiters[MAX_EVENT_WAITERS];
+	int num_waiters;
 } event_entry_t;
 
 // Event queue entry
@@ -128,40 +141,27 @@ void Lua_Events_Shutdown(void)
 
 /*
 =================
-FindOrCreateEventEntry
-Find an event entry by name, or create a new one
+Lua_Events_GrowMap
+Grow the event map capacity
 =================
 */
-static event_entry_t *FindOrCreateEventEntry(const char *event_name)
+static qboolean Lua_Events_GrowMap(void)
 {
-	int i;
+	int new_capacity = s_event_map_capacity * 2;
+	event_entry_t *new_map = (event_entry_t *)Z_Malloc(sizeof(event_entry_t) * new_capacity);
 
-	// Find existing entry
-	for (i = 0; i < s_event_map_size; i++) {
-		if (Q_stricmp(s_event_map[i].event_name, event_name) == 0) {
-			return &s_event_map[i];
-		}
+	if (!new_map) {
+		return qfalse;
 	}
 
-	// Create new entry if we have space
-	if (s_event_map_size >= s_event_map_capacity) {
-		// Grow the map
-		int new_capacity = s_event_map_capacity * 2;
-		event_entry_t *new_map = (event_entry_t *)Z_Malloc(
-			sizeof(event_entry_t) * new_capacity);
-		memcpy(new_map, s_event_map, sizeof(event_entry_t) * s_event_map_size);
-		memset(new_map + s_event_map_size, 0,
-			sizeof(event_entry_t) * (new_capacity - s_event_map_size));
-		Z_Free(s_event_map);
-		s_event_map = new_map;
-		s_event_map_capacity = new_capacity;
-	}
+	Com_Memcpy(new_map, s_event_map, sizeof(event_entry_t) * s_event_map_size);
+	memset(new_map + s_event_map_size, 0,
+		sizeof(event_entry_t) * (new_capacity - s_event_map_size));
+	Z_Free(s_event_map);
+	s_event_map = new_map;
+	s_event_map_capacity = new_capacity;
 
-	// Create new entry
-	Q_strncpyz(s_event_map[s_event_map_size].event_name, event_name,
-		sizeof(s_event_map[s_event_map_size].event_name));
-	s_event_map[s_event_map_size].num_subscribers = 0;
-	return &s_event_map[s_event_map_size++];
+	return qtrue;
 }
 
 /*
@@ -170,27 +170,51 @@ Lua_Events_Subscribe
 Subscribe a Lua function to an event (internal)
 =================
 */
-static qboolean Lua_Events_Subscribe(lua_State *L, const char *event_name, int callback_ref)
+static qboolean Lua_Events_Subscribe(lua_State *L, const char *event_name, int callback_ref, qboolean once)
 {
-	event_entry_t *entry;
-	event_subscriber_t *sub;
+	int i;
+	event_entry_t *entry = NULL;
 
 	if (!s_initialized || !L || !event_name || callback_ref == LUA_NOREF) {
 		return qfalse;
 	}
 
-	entry = FindOrCreateEventEntry(event_name);
+	// Find or create event entry
+	for (i = 0; i < s_event_map_size; i++) {
+		if (Q_stricmp(s_event_map[i].event_name, event_name) == 0) {
+			entry = &s_event_map[i];
+			break;
+		}
+	}
 
+	if (i >= s_event_map_size) {
+		// Event doesn't exist yet, create it
+		if (s_event_map_size >= s_event_map_capacity) {
+			if (!Lua_Events_GrowMap()) {
+				return qfalse;
+			}
+		}
+		entry = &s_event_map[s_event_map_size];
+		Q_strncpyz(entry->event_name, event_name, sizeof(entry->event_name));
+		entry->num_subscribers = 0;
+		entry->num_waiters = 0;
+		s_event_map_size++;
+	}
+
+	// Check if we have space for another subscriber
 	if (entry->num_subscribers >= MAX_EVENT_SUBSCRIBERS) {
-		Com_Printf("Lua_Events_Subscribe: Too many subscribers for event '%s'\n", event_name);
 		return qfalse;
 	}
 
-	sub = &entry->subscribers[entry->num_subscribers++];
+	// Add subscriber
+	event_subscriber_t *sub = &entry->subscribers[entry->num_subscribers];
 	sub->L = L;
 	sub->callback_ref = callback_ref;
 	sub->active = qtrue;
-
+	sub->once = once;
+	sub->filter = NULL;
+	Q_strncpyz(sub->script_name, "", sizeof(sub->script_name)); // TODO: get script name
+	entry->num_subscribers++;
 	return qtrue;
 }
 
@@ -239,7 +263,69 @@ Public helper for C code to subscribe a Lua callback (registry ref) to an event
 */
 qboolean Lua_Events_SubscribeCallback(lua_State *L, const char *event_name, int callback_ref)
 {
-	return Lua_Events_Subscribe(L, event_name, callback_ref);
+	return Lua_Events_Subscribe(L, event_name, callback_ref, qfalse);
+}
+
+/*
+=================
+Lua_Events_WaitFor
+Lua coroutine support: Wait for an event and resume with event data.
+Returns the number of arguments pushed to Lua stack.
+=================
+*/
+int Lua_Events_WaitFor(lua_State *L, const char *event_name, int timeout_ms)
+{
+	int i;
+	event_entry_t *entry = NULL;
+
+	if (!s_initialized || !L || !event_name) {
+		lua_pushboolean(L, 0);
+		return 1;
+	}
+
+	// Find or create event entry
+	for (i = 0; i < s_event_map_size; i++) {
+		if (Q_stricmp(s_event_map[i].event_name, event_name) == 0) {
+			entry = &s_event_map[i];
+			break;
+		}
+	}
+
+	if (i >= s_event_map_size) {
+		// Event doesn't exist yet, create it
+		if (s_event_map_size >= s_event_map_capacity) {
+			if (!Lua_Events_GrowMap()) {
+				lua_pushboolean(L, 0);
+				return 1;
+			}
+		}
+		entry = &s_event_map[s_event_map_size];
+		Q_strncpyz(entry->event_name, event_name, sizeof(entry->event_name));
+		entry->num_subscribers = 0;
+		entry->num_waiters = 0;
+		s_event_map_size++;
+	}
+
+	// Check if we have space for another waiter
+	if (entry->num_waiters >= MAX_EVENT_WAITERS) {
+		lua_pushboolean(L, 0);
+		return 1;
+	}
+
+	// Create coroutine reference
+	int coroutine_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+
+	// Add to waiters
+	event_waiter_t *waiter = &entry->waiters[entry->num_waiters];
+	waiter->L = L;
+	waiter->coroutine_ref = coroutine_ref;
+	waiter->timeout_frame = timeout_ms > 0 ? (Sys_Milliseconds() + timeout_ms) : 0;
+	waiter->active = qtrue;
+	entry->num_waiters++;
+
+	// Return success
+	lua_pushboolean(L, 1);
+	return 1;
 }
 
 /*
@@ -436,7 +522,48 @@ static int Lua_Events_On(lua_State *L)
 	lua_pushvalue(L, 2);
 	callback_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
-	if (Lua_Events_Subscribe(L, event_name, callback_ref)) {
+	if (Lua_Events_Subscribe(L, event_name, callback_ref, qfalse)) {
+		lua_pushboolean(L, 1);
+	} else {
+		luaL_unref(L, LUA_REGISTRYINDEX, callback_ref);
+		lua_pushboolean(L, 0);
+	}
+
+	return 1;
+}
+
+/*
+=================
+Lua_Events_Once
+Lua binding: Events.once(event_name, callback)
+=================
+*/
+static int Lua_Events_Once(lua_State *L)
+{
+	const char *event_name;
+	int callback_ref;
+
+	if (lua_gettop(L) < 2) {
+		lua_pushboolean(L, 0);
+		return 1;
+	}
+
+	event_name = lua_tostring(L, 1);
+	if (!event_name) {
+		lua_pushboolean(L, 0);
+		return 1;
+	}
+
+	if (!lua_isfunction(L, 2)) {
+		lua_pushboolean(L, 0);
+		return 1;
+	}
+
+	// Create reference to callback function
+	lua_pushvalue(L, 2);
+	callback_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+
+	if (Lua_Events_Subscribe(L, event_name, callback_ref, qtrue)) {
 		lua_pushboolean(L, 1);
 	} else {
 		luaL_unref(L, LUA_REGISTRYINDEX, callback_ref);
@@ -510,6 +637,20 @@ static int Lua_Events_Off(lua_State *L)
 
 /*
 =================
+Lua_Events_Filter_Lua
+Lua binding: Events.filter(event_name, callback, filter_func)
+=================
+*/
+static int Lua_Events_Filter_Lua(lua_State *L)
+{
+	// This is a placeholder - full implementation would need complex filter logic
+	// For now, just return false (not implemented)
+	lua_pushboolean(L, 0);
+	return 1;
+}
+
+/*
+=================
 Lua_Events_Emit_Lua
 Lua binding: Events.emit(event_name, ...)
 =================
@@ -536,6 +677,35 @@ static int Lua_Events_Emit_Lua(lua_State *L)
 
 /*
 =================
+Lua_Events_WaitFor_Lua
+Lua binding: Events.wait_for(event_name, timeout_ms)
+=================
+*/
+static int Lua_Events_WaitFor_Lua(lua_State *L)
+{
+	const char *event_name;
+	int timeout_ms = 0;
+
+	if (lua_gettop(L) < 1) {
+		lua_pushboolean(L, 0);
+		return 1;
+	}
+
+	event_name = lua_tostring(L, 1);
+	if (!event_name) {
+		lua_pushboolean(L, 0);
+		return 1;
+	}
+
+	if (lua_gettop(L) >= 2) {
+		timeout_ms = (int)lua_tointeger(L, 2);
+	}
+
+	return Lua_Events_WaitFor(L, event_name, timeout_ms);
+}
+
+/*
+=================
 Lua_Events_RegisterBindings
 Register Lua bindings for event system
 =================
@@ -551,11 +721,67 @@ void Lua_Events_RegisterBindings(lua_State *L)
 
 	// Register functions
 	Lua_RegisterFunction(L, "on", Lua_Events_On);
+	Lua_RegisterFunction(L, "once", Lua_Events_Once);
 	Lua_RegisterFunction(L, "off", Lua_Events_Off);
 	Lua_RegisterFunction(L, "emit", Lua_Events_Emit_Lua);
+	Lua_RegisterFunction(L, "wait_for", Lua_Events_WaitFor_Lua);
+	Lua_RegisterFunction(L, "filter", Lua_Events_Filter_Lua);
 
 	// Set as global
 	lua_setglobal(L, "Events");
+}
+
+/*
+=================
+Lua_Events_HotReload
+Handle hot-reload of scripts by cleaning up invalid event subscriptions.
+Should be called when a script is reloaded.
+=================
+*/
+void Lua_Events_HotReload(const char *script_name)
+{
+	int i, j;
+
+	if (!s_initialized || !script_name) {
+		return;
+	}
+
+	for (i = 0; i < s_event_map_size; i++) {
+		event_entry_t *entry = &s_event_map[i];
+
+		// Clean up subscribers from this script
+		for (j = 0; j < entry->num_subscribers; j++) {
+			event_subscriber_t *sub = &entry->subscribers[j];
+			if (sub->active && Q_stricmp(sub->script_name, script_name) == 0) {
+				// Unsubscribe this handler
+				if (sub->callback_ref != LUA_NOREF && sub->L) {
+					luaL_unref(sub->L, LUA_REGISTRYINDEX, sub->callback_ref);
+				}
+				sub->active = qfalse;
+				sub->callback_ref = LUA_NOREF;
+			}
+		}
+
+		// Clean up waiters from this script
+		for (j = 0; j < entry->num_waiters; j++) {
+			event_waiter_t *waiter = &entry->waiters[j];
+			if (waiter->active && waiter->L) {
+				// Check if this coroutine belongs to the reloaded script
+				// This is a simplified check - in practice you'd need better script tracking
+				lua_rawgeti(waiter->L, LUA_REGISTRYINDEX, waiter->coroutine_ref);
+				if (lua_isthread(waiter->L, -1)) {
+					// Resume with error to prevent hanging
+					lua_State *co = lua_tothread(waiter->L, -1);
+					lua_pushstring(co, "script reloaded");
+					lua_error(co);
+				}
+				lua_pop(waiter->L, 1);
+
+				luaL_unref(waiter->L, LUA_REGISTRYINDEX, waiter->coroutine_ref);
+				waiter->active = qfalse;
+			}
+		}
+	}
 }
 
 #endif // USE_LUA

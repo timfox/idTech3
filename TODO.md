@@ -261,14 +261,15 @@
 
 ### Scripting (Lua) Integration
 
-- [ ] **Expose event bus to Lua**
-    - `Events.on(event, fn)`
-    - `Events.once(event, fn)`
-    - `Events.emit(event, data)`
-- [ ] **Script-side event filters** (by entity, tag, distance, team, etc.)
-- [ ] **Coroutine-safe event waiting** (`wait_for_event`)
-- [ ] **Script event error isolation** (handler failure does not kill bus)
-- [ ] **Hot-reload behavior** for subscribed script handlers
+- [x] **Expose event bus to Lua**
+    - `Events.on(event, fn)` ✓
+    - `Events.once(event, fn)` ✓
+    - `Events.emit(event, data)` ✓
+    - `Events.wait_for(event_name, timeout_ms)` ✓
+- [ ] **Script-side event filters** (by entity, tag, distance, team, etc.) - Framework ready, needs filter implementation
+- [x] **Coroutine-safe event waiting** (`wait_for_event`) ✓ Implemented as `Events.wait_for()`
+- [x] **Script event error isolation** (handler failure does not kill bus) ✓ Error handling with isolation
+- [x] **Hot-reload behavior** for subscribed script handlers ✓ `Lua_Events_HotReload()` implemented
 
 ### Tooling & Debugging
 

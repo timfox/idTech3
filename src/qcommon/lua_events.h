@@ -25,6 +25,9 @@ and Lua scripts.
 // Maximum arguments per event
 #define MAX_EVENT_ARGS 8
 
+// Maximum waiting coroutines per event
+#define MAX_EVENT_WAITERS 32
+
 /*
 =================
 Lua_Events_Init
@@ -97,6 +100,51 @@ Unsubscribe a Lua function (by registry ref) from an event.
 =================
 */
 void Lua_Events_UnsubscribeCallback(lua_State *L, const char *event_name, int callback_ref);
+
+/*
+=================
+Lua_Events_SubscribeOnce
+Subscribe a Lua function to an event for one-time execution.
+Returns qtrue on success.
+=================
+*/
+qboolean Lua_Events_SubscribeOnce(lua_State *L, const char *event_name, int callback_ref);
+
+/*
+=================
+Lua_Events_WaitFor
+Lua coroutine support: Wait for an event and resume with event data.
+Returns the number of arguments pushed to Lua stack.
+=================
+*/
+int Lua_Events_WaitFor(lua_State *L, const char *event_name, int timeout_ms);
+
+/*
+=================
+Lua_Events_Filter
+Advanced event filtering support.
+Returns qtrue if the event should be delivered to the subscriber.
+=================
+*/
+typedef qboolean (*lua_event_filter_t)(lua_State *L, const char *event_name, int num_args, int *arg_refs);
+
+/*
+=================
+Lua_Events_SetFilter
+Set a filter function for an event subscription.
+Returns qtrue on success.
+=================
+*/
+qboolean Lua_Events_SetFilter(lua_State *L, const char *event_name, int callback_ref, lua_event_filter_t filter);
+
+/*
+=================
+Lua_Events_HotReload
+Handle hot-reload of scripts by cleaning up invalid event subscriptions.
+Should be called when a script is reloaded.
+=================
+*/
+void Lua_Events_HotReload(const char *script_name);
 
 #endif // USE_LUA
 

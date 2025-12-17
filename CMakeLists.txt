@@ -389,6 +389,10 @@ list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*vm_[alx].*.c")
 list(APPEND QCOMMON_SRCS src/qcommon/q_log.c)
 # Add performance counters
 list(APPEND QCOMMON_SRCS src/qcommon/performance_counters.c)
+# Add memory safety utilities
+list(APPEND QCOMMON_SRCS src/qcommon/q_memory_safety.c)
+# Add memory safety utilities
+list(APPEND QCOMMON_SRCS src/qcommon/q_memory_safety.c)
 # Add memory statistics tracking
 list(APPEND QCOMMON_SRCS src/qcommon/memory_stats.c)
 # Add VM hot reload system
@@ -2638,7 +2642,7 @@ IF(BUILD_RADIANT)
 ENDIF()
 
 # Unit tests
-OPTION(BUILD_TESTS "Build unit tests" OFF)
+OPTION(BUILD_TESTS "Build unit tests" ON)
 IF(BUILD_TESTS)
 	ENABLE_TESTING()
 	ADD_EXECUTABLE(test_qcommon tests/test_qcommon.c src/qcommon/q_shared.c)
@@ -2667,6 +2671,18 @@ IF(BUILD_TESTS)
 		TARGET_INCLUDE_DIRECTORIES(test_network_enet PRIVATE libs/enet/include)
 		ADD_TEST(NAME network_enet_tests COMMAND test_network_enet)
 	endif()
+
+	# Memory Safety Test
+	ADD_EXECUTABLE(test_memory_safety tests/test_memory_safety.c src/qcommon/q_memory_safety.c src/qcommon/q_shared.c)
+	TARGET_INCLUDE_DIRECTORIES(test_memory_safety PRIVATE src/qcommon tests)
+	TARGET_LINK_LIBRARIES(test_memory_safety PRIVATE qcommon)
+	ADD_TEST(NAME memory_safety_tests COMMAND test_memory_safety)
+
+	# Lua Events Test
+	ADD_EXECUTABLE(test_lua_events tests/test_lua_events.c src/qcommon/lua_events.c src/qcommon/q_shared.c)
+	TARGET_INCLUDE_DIRECTORIES(test_lua_events PRIVATE src/qcommon tests)
+	TARGET_LINK_LIBRARIES(test_lua_events PRIVATE qcommon Lua::lua)
+	ADD_TEST(NAME lua_events_tests COMMAND test_lua_events)
 
 	ADD_EXECUTABLE(test_info
 		tests/test_info.c
