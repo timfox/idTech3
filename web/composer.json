@@ -1,0 +1,11 @@
+{
+    "require": {
+        "php": ">=7.2",
+        "league/html-to-markdown": "^5.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "utils/"
+        }
+    }
+}

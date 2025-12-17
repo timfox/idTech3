@@ -22,3 +22,7 @@ RewriteCond %{REQUEST_URI} !\.woff2$
 
 # Redirect all other requests to index.php
 RewriteRule ^(.*)$ index.php [QSA,L]
+
+RewriteRule ^php2md$ utils/php2md.php [L]
+RewriteRule ^md2html$ utils/md2html.php [L]
+
