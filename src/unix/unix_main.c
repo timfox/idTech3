@@ -66,7 +66,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../qcommon/qcommon.h"
 #include "../renderers/renderercommon/tr_public.h"
 
-#include "linux_local.h" // bk001204
+#include "linux_local.h"
+#include "q_watchdog.h"
+#include "crash_handler.h" // bk001204
 
 #ifndef DEDICATED
 #include "../client/client.h"
@@ -359,6 +361,10 @@ void NORETURN FORMAT_PRINTF(1, 2) QDECL Sys_Error( const char *format, ... )
 #ifndef DEDICATED
 	CL_Shutdown( text, qtrue );
 #endif
+
+	// Shutdown watchdog and crash handler
+	Watchdog_Shutdown();
+	Crash_Shutdown();
 
 	fprintf( stderr, "Sys_Error: %s\n", text );
 

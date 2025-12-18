@@ -31,6 +31,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
 #include "linux_local.h"
+#include "q_watchdog.h"
+#include "crash_handler.h"
 #ifndef DEDICATED
 // Renderer-specific includes removed - linux_signals.c doesn't use renderer functionality
 #endif
@@ -68,6 +70,11 @@ static void signal_handler( int sig )
 #endif
 	SV_Shutdown( msg );
 	VM_Forced_Unload_Done();
+
+	// Shutdown watchdog and crash handler
+	Watchdog_Shutdown();
+	Crash_Shutdown();
+
 	Sys_Exit( 0 ); // send a 0 to avoid DOUBLE SIGNAL FAULT
 }
 

@@ -28,6 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "performance_counters.h"
 #include "crash_handler.h"
 #include "q_assert.h"
+#include "q_watchdog.h"
 #include "vm_hot_reload.h"
 #include "event_system.h"
 #include "q_memtrack.h"
@@ -81,6 +82,7 @@ fileHandle_t com_journalDataFile = FS_INVALID_HANDLE; // config files are writte
 cvar_t	*com_viewlog;
 cvar_t	*com_speeds;
 cvar_t	*com_developer;
+cvar_t	*com_safemode;
 cvar_t	*com_dedicated;
 cvar_t	*com_timescale;
 static cvar_t *com_fixedtime;
@@ -4065,6 +4067,19 @@ void Com_Init( char *commandLine ) {
 	// Initialize assert system
 	Assert_Init();
 
+	// Initialize watchdog system
+	Watchdog_Init();
+
+	// Check for safe mode boot
+	if (Crash_ShouldBootSafeMode()) {
+		Com_Printf(S_COLOR_YELLOW "Engine detected previous crash, booting in safe mode.\n");
+		Cvar_Set("vid_renderer", "-1"); // Use default renderer
+		Cvar_Set("r_fullscreen", "0");
+		Cvar_Set("r_mode", "3");     // 640x480
+		Cvar_Set("com_safemode", "1"); // Indicate safe mode active
+	}
+	Crash_ClearSafeModeFlag(); // Clear the flag after handling
+
 #if defined(_WIN32) && defined(_DEBUG)
 	com_noErrorInterrupt = Cvar_Get( "com_noErrorInterrupt", "0", 0 );
 #endif
@@ -4088,8 +4103,12 @@ void Com_Init( char *commandLine ) {
 
 	// get the developer cvar set as early as possible
 	Com_StartupVariable( "developer" );
-	com_developer = Cvar_Get( "developer", "0", CVAR_TEMP );
-	Cvar_CheckRange( com_developer, NULL, NULL, CV_INTEGER );
+com_developer = Cvar_Get( "developer", "0", CVAR_TEMP );
+Cvar_CheckRange( com_developer, NULL, NULL, CV_INTEGER );
+
+Com_StartupVariable( "safemode" );
+com_safemode = Cvar_Get( "com_safemode", "0", CVAR_ARCHIVE );
+Cvar_CheckRange( com_safemode, "0", "1", CV_INTEGER );
 
 	Com_StartupVariable( "vm_rtChecks" );
 	vm_rtChecks = Cvar_Get( "vm_rtChecks", "15", CVAR_INIT | CVAR_PROTECTED );

@@ -420,6 +420,8 @@ list(APPEND QCOMMON_SRCS src/qcommon/event_system.c)
 # Add crash handler and assert system
 list(APPEND QCOMMON_SRCS src/qcommon/crash_handler.c)
 list(APPEND QCOMMON_SRCS src/qcommon/q_assert.c)
+# Add watchdog system
+list(APPEND QCOMMON_SRCS src/qcommon/q_watchdog.c)
 list(APPEND QCOMMON_SRCS src/qcommon/files_v2.c)
 list(APPEND QCOMMON_SRCS src/qcommon/files_v2_impl.c)
 # Add wrapper files conditionally

@@ -44,18 +44,7 @@ void Assert_Init(void)
     g_assert_mode = (assertMode_t)assert_mode_cvar->integer;
 
     Com_Printf("Assert system initialized (mode: %d)\n", g_assert_mode);
-
-    // Check and clear safe mode flag if we are booting successfully
-    if (Crash_ShouldBootSafeMode()) {
-        Cvar_Set("vid_renderer", "-1"); // Use default renderer
-        Cvar_Set("r_fullscreen", "0");
-        Cvar_Set("r_mode", "3");     // 640x480
-        Cvar_Set("com_safemode", "1"); // Indicate safe mode active
-        Com_Printf(S_COLOR_YELLOW "Engine detected previous crash, booting in safe mode.\n");
-    }
-    Crash_ClearSafeModeFlag();
-}}
-
+}
 /*
 =================
 Assert_GetMode
