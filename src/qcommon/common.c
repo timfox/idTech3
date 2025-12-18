@@ -26,6 +26,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_log.h"
 #include "profiler.h"
 #include "performance_counters.h"
+#include "crash_handler.h"
+#include "q_assert.h"
 #include "vm_hot_reload.h"
 #include "event_system.h"
 #include "q_memtrack.h"
@@ -335,6 +337,10 @@ void FORMAT_PRINTF(1, 2) QDECL Com_Printf( const char *fmt, ... ) {
 			FS_Write( msg, len, logfile );
 		}
 	}
+
+	// Add to crash handler ring buffer for crash diagnostics
+	Crash_LogMessage(msg);
+
 	PROF_ZONE_END(prof_printf);
 }
 
@@ -4055,6 +4061,9 @@ void Com_Init( char *commandLine ) {
 
 	// Initialize event system
 	Event_Init();
+
+	// Initialize assert system
+	Assert_Init();
 
 #if defined(_WIN32) && defined(_DEBUG)
 	com_noErrorInterrupt = Cvar_Get( "com_noErrorInterrupt", "0", 0 );

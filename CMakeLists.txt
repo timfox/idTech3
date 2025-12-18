@@ -417,6 +417,9 @@ list(APPEND QCOMMON_SRCS src/qcommon/memory_stats.c)
 list(APPEND QCOMMON_SRCS src/qcommon/vm_hot_reload.c)
 # Add event system
 list(APPEND QCOMMON_SRCS src/qcommon/event_system.c)
+# Add crash handler and assert system
+list(APPEND QCOMMON_SRCS src/qcommon/crash_handler.c)
+list(APPEND QCOMMON_SRCS src/qcommon/q_assert.c)
 list(APPEND QCOMMON_SRCS src/qcommon/files_v2.c)
 list(APPEND QCOMMON_SRCS src/qcommon/files_v2_impl.c)
 # Add wrapper files conditionally
