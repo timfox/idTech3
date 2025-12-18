@@ -2409,8 +2409,8 @@ extern qboolean		com_fullyInitialized;
 			f->zipFile = qfalse;
 
 			if ( fs_debug->integer ) {
-				Com_Printf( "FS_FOpenFileRead: %s (found in '%s/%s')\n", filename,
-					dir->path, dir->gamedir );
+			Com_Printf( "FS_FOpenFileRead: %s (found in '%s/%s')\n", filename,
+				dir->path, dir->gamedir );
 			}
 
 			// C23 Improvement: Store in cache
@@ -5528,6 +5528,7 @@ static void FS_Startup( void ) {
 	// Use Sys_Print directly instead of Com_Printf to avoid triggering logging
 	// which might call filesystem functions during startup
 	Sys_Print( "----- FS_Startup -----\n" );
+	Com_Printf("fs_game: %s\n", fs_game->string);
 
 	fs_debug = Cvar_Get( "fs_debug", "0", 0 );
 	Cvar_SetDescription( fs_debug, "Debugging tool for the filesystem. Run the game in debug mode. Prints additional information regarding read files into the console." );

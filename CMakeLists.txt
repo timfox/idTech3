@@ -398,7 +398,74 @@ ENDIF()
 
 SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules)
 
-AUX_SOURCE_DIRECTORY(src/qcommon QCOMMON_SRCS)
+SET(QCOMMON_SRCS
+    src/qcommon/cm_load.c
+    src/qcommon/cm_patch.c
+    src/qcommon/cm_polylib.c
+    src/qcommon/cm_test.c
+    src/qcommon/cm_trace.c
+    src/qcommon/cmd.c
+    src/qcommon/common.c
+    src/qcommon/crash_handler.c
+    src/qcommon/cvar.c
+    src/qcommon/ecs.cpp
+    src/qcommon/ecs_systems.cpp
+    src/qcommon/entity_facade.cpp
+    src/qcommon/event_system.c
+    src/qcommon/files.c
+    src/qcommon/files_v2.c
+    src/qcommon/files_v2_impl.c
+    src/qcommon/freetype_wrapper.c
+    src/qcommon/history.c
+    src/qcommon/huffman.c
+    src/qcommon/huffman_static.c
+    src/qcommon/i18n.c
+    src/qcommon/job_queue.c
+    src/qcommon/job_system.c
+    src/qcommon/json_cjson.c
+    src/qcommon/keys.c
+    src/qcommon/lua_coroutine.c
+    src/qcommon/lua_debug.c
+    src/qcommon/lua_encounter.c
+    src/qcommon/lua_entity.cpp
+    src/qcommon/lua_events.c
+    src/qcommon/lua_game.cpp
+    src/qcommon/lua_renderer.c
+    src/qcommon/lua_sequence.c
+    src/qcommon/lua_sound.c
+    src/qcommon/lua_wrapper.c
+    src/qcommon/md4.c
+    src/qcommon/md5.c
+    src/qcommon/memory_stats.c
+    src/qcommon/msg.c
+    src/qcommon/msg_secure.c
+    src/qcommon/net_chan.c
+    src/qcommon/net_enet.c
+    src/qcommon/net_ip.c
+    src/qcommon/oop_services.cpp
+    src/qcommon/openssl_wrapper.c
+    src/qcommon/performance_counters.c
+    src/qcommon/puff.c
+    src/qcommon/q_assert.c
+    src/qcommon/q_log.c
+    src/qcommon/q_math.c
+    src/qcommon/q_memory_safety.c
+    src/qcommon/q_memtrack.c
+    src/qcommon/q_shared.c
+    src/qcommon/q_telemetry.c
+    src/qcommon/q_watchdog.c
+    src/qcommon/sqlite_wrapper.c
+    src/qcommon/syscall_registry.c
+    src/qcommon/thread_platform.c
+    src/qcommon/unzip.c
+    src/qcommon/vm.c
+    src/qcommon/vm_aarch64.c
+    src/qcommon/vm_armv7l.c
+    src/qcommon/vm_hot_reload.c
+    src/qcommon/vm_interpreted.c
+    src/qcommon/vm_x86.c
+    src/qcommon/zstd_compress.c
+)
 # exclude platform-dependent QVM bytecode compilers
 list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*vm_[alx].*.c")
 # Add structured logging system
@@ -2107,6 +2174,7 @@ ELSE()
 	ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 ENDIF()
 TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui)
+TARGET_INCLUDE_DIRECTORIES(${CNAME}${BINEXT} PRIVATE src/qcommon)
 IF(USE_UI2)
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ui2)
 ENDIF()
@@ -2333,6 +2401,7 @@ ENDIF()
 IF(BUILD_SERVER AND NOT ANDROID)
 	ADD_EXECUTABLE(${DNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 	TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE qcommon_ded botlib)
+TARGET_INCLUDE_DIRECTORIES(${DNAME}${BINEXT} PRIVATE src/qcommon)
 
 	IF(USE_SDL)
 		TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE ${SDL2_LINK_LIBS})
@@ -2584,6 +2653,19 @@ IF(BUILD_TESTS)
 	TARGET_INCLUDE_DIRECTORIES(test_info PRIVATE src/qcommon)
 	TARGET_INCLUDE_DIRECTORIES(test_info PRIVATE src)
 	ADD_TEST(NAME info_tests COMMAND test_info)
+
+	# Message Fuzzing Target
+	IF (CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+		ADD_EXECUTABLE(fuzz_msg src/qcommon/fuzz_msg.c src/qcommon/msg_fuzz.c)
+		TARGET_INCLUDE_DIRECTORIES(fuzz_msg PRIVATE src/qcommon)
+		TARGET_COMPILE_DEFINITIONS(fuzz_msg PRIVATE FUZZING_BUILD)
+		# Specific linker flags for libFuzzer
+		SET_TARGET_PROPERTIES(fuzz_msg PROPERTIES LINK_FLAGS "-fsanitize=fuzzer")
+		# Link against Huffman if needed by msg_fuzz.c (which should be minimal and avoid it)
+		# TARGET_LINK_LIBRARIES(fuzz_msg PRIVATE huffman)
+	ELSE()
+		message(STATUS "Skipping fuzz_msg target: libFuzzer requires Clang compiler.")
+	ENDIF()
 
 	ADD_EXECUTABLE(test_performance_counters
 		tests/test_performance_counters.c
