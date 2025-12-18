@@ -8,7 +8,15 @@ Tests the enhanced message handling with bounds checking.
 
 #include "test_framework.h"
 #include "../src/qcommon/msg_secure.h"
-#include "../src/qcommon/msg.h"
+
+// Mock stubs for external dependencies
+cvar_t *cl_shownet = NULL;
+
+void Com_Error(errorParm_t level, const char *error, ...) {
+    (void)level;
+    (void)error;
+    // Tests don't exit on error
+}
 
 // Test buffer
 #define TEST_BUFFER_SIZE 1024

@@ -152,7 +152,7 @@ void MSG_WriteBits( msg_t *msg, int value, int bits ) {
 }
 
 
-static int MSG_ReadBits( msg_t *msg, int bits ) {
+int MSG_ReadBits( msg_t *msg, int bits ) {
 	int		value;
 	qboolean	sgn;
 	int		i;

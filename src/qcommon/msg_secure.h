@@ -10,6 +10,7 @@ Enhanced network message handling with comprehensive bounds checking.
 #define __MSG_SECURE_H__
 
 #include "q_shared.h"
+#include "qcommon.h"
 
 // Enhanced MSG_WriteBits with bounds checking
 void MSG_WriteBits_Secure(msg_t *msg, int value, int bits, const char *context);

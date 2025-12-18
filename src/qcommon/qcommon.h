@@ -88,6 +88,7 @@ struct entityState_s;
 struct playerState_s;
 
 void MSG_WriteBits( msg_t *msg, int value, int bits );
+int MSG_ReadBits( msg_t *msg, int bits );
 
 void MSG_WriteChar (msg_t *sb, int c);
 void MSG_WriteByte (msg_t *sb, int c);

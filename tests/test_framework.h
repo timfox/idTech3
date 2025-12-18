@@ -132,6 +132,9 @@ static const char *current_test_name __attribute__((unused)) = NULL;
 		test_##name(); \
 	} while(0)
 
+// Pass macro (no-op, just for explicit test completion)
+#define PASS() do {} while(0)
+
 // Print test summary
 #define PRINT_TEST_SUMMARY() \
 	do { \

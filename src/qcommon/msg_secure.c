@@ -7,7 +7,6 @@ Enhanced network message handling with comprehensive bounds checking.
 */
 
 #include "msg_secure.h"
-#include "msg.h"  // Include the original msg.h for Huffman functions
 
 /*
 =================
