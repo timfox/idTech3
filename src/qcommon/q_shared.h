@@ -173,6 +173,38 @@ static_assert(__cplusplus >= 202002L, "C++23 or newer is required to build this 
 
 #endif
 
+// Reproducible build support - override __DATE__ and __TIME__ with SOURCE_DATE_EPOCH
+#ifdef SOURCE_DATE_EPOCH
+#include <string.h>
+
+// Convert SOURCE_DATE_EPOCH timestamp to date/time strings
+static inline const char* Q_ReproducibleDate(void) {
+    static char date_buf[12] = {0};
+    if (date_buf[0] == '\0') {
+        time_t epoch = (time_t)atol(SOURCE_DATE_EPOCH);
+        struct tm *tm = gmtime(&epoch);
+        strftime(date_buf, sizeof(date_buf), "%b %d %Y", tm);
+    }
+    return date_buf;
+}
+
+static inline const char* Q_ReproducibleTime(void) {
+    static char time_buf[9] = {0};
+    if (time_buf[0] == '\0') {
+        time_t epoch = (time_t)atol(SOURCE_DATE_EPOCH);
+        struct tm *tm = gmtime(&epoch);
+        strftime(time_buf, sizeof(time_buf), "%H:%M:%S", tm);
+    }
+    return time_buf;
+}
+
+#define Q_BUILD_DATE Q_ReproducibleDate()
+#define Q_BUILD_TIME Q_ReproducibleTime()
+#else
+#define Q_BUILD_DATE __DATE__
+#define Q_BUILD_TIME __TIME__
+#endif
+
 //endianness
 short ShortSwap( short l );
 int LongSwap( int l );

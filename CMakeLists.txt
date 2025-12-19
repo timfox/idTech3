@@ -397,6 +397,11 @@ IF(USE_STB_TRUETYPE)
 	add_compile_definitions(USE_STB_TRUETYPE)
 ENDIF()
 
+# Reproducible builds: pass SOURCE_DATE_EPOCH as compile definition if set
+IF(DEFINED ENV{SOURCE_DATE_EPOCH})
+	add_compile_definitions(SOURCE_DATE_EPOCH="$ENV{SOURCE_DATE_EPOCH}")
+ENDIF()
+
 SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules)
 
 SET(QCOMMON_SRCS

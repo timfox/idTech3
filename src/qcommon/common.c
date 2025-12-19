@@ -614,10 +614,8 @@ void Com_About_f( void ) {
 	Com_Printf( "%s\n", Q3_VERSION );
 	Com_Printf( "========================================\n" );
 	Com_Printf( "Platform: %s\n", PLATFORM_STRING );
-	Com_Printf( "Build Date: %s\n", __DATE__ );
-#ifdef __TIME__
-	Com_Printf( "Build Time: %s\n", __TIME__ );
-#endif
+	Com_Printf( "Build Date: %s\n", Q_BUILD_DATE );
+	Com_Printf( "Build Time: %s\n", Q_BUILD_TIME );
 	Com_Printf( "\n" );
 	Com_Printf( "Based on Quake III Arena engine\n" );
 	Com_Printf( "Enhanced with modern features\n" );
@@ -642,10 +640,8 @@ void Com_BuildInfo_f( void ) {
 	Com_Printf( "========================================\n" );
 	Com_Printf( "Version: %s\n", Q3_VERSION );
 	Com_Printf( "Platform: %s\n", PLATFORM_STRING );
-	Com_Printf( "Build Date: %s\n", __DATE__ );
-#ifdef __TIME__
-	Com_Printf( "Build Time: %s\n", __TIME__ );
-#endif
+	Com_Printf( "Build Date: %s\n", Q_BUILD_DATE );
+	Com_Printf( "Build Time: %s\n", Q_BUILD_TIME );
 #ifdef __GNUC__
 	Com_Printf( "Compiler: GCC %d.%d.%d\n", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__ );
 #elif defined(_MSC_VER)
@@ -4040,7 +4036,7 @@ void Com_Init( char *commandLine ) {
 	// get the initial time base
 	Sys_Milliseconds();
 
-	Com_Printf( "%s %s %s\n", SVN_VERSION, PLATFORM_STRING, __DATE__ );
+	Com_Printf( "%s %s %s\n", SVN_VERSION, PLATFORM_STRING, Q_BUILD_DATE );
 
 	// Ensure libc locale uses UTF-8 for case folding, wide char ops, etc.
 	Com_InitLocaleUTF8();
@@ -4294,7 +4290,7 @@ Cvar_CheckRange( com_safemode, "0", "1", CV_INTEGER );
 	Cmd_SetCommandCompletionFunc( "writeconfig", Cmd_CompleteWriteCfgName );
 	Cmd_AddCommand( "game_restart", Com_GameRestart_f );
 
-	s = va( "%s %s %s", Q3_VERSION, PLATFORM_STRING, __DATE__ );
+	s = va( "%s %s %s", Q3_VERSION, PLATFORM_STRING, Q_BUILD_DATE );
 	com_version = Cvar_Get( "version", s, CVAR_PROTECTED | CVAR_ROM | CVAR_SERVERINFO );
 	Cvar_SetDescription( com_version, "Read-only CVAR to see the version of the game." );
 

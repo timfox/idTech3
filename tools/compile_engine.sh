@@ -3,7 +3,8 @@
 # Compile Engine Script for id Tech 3 using CMake
 set -e
 
-# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean]
+# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet]
+# For reproducible builds: SOURCE_DATE_EPOCH=1609459200 ./compile_engine.sh
 # Notes:
 # - game_name only affects how we copy/rename into release (engine CMake target is fixed to idtech3)
 # - build type defaults to Release

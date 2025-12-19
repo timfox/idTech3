@@ -101,7 +101,7 @@
 
 ## Build & Platform Hardening
 
-- [ ] **Reproducible builds** (pinned toolchains, deterministic archives, `SOURCE_DATE_EPOCH`)
+- [x] **Reproducible builds** (pinned toolchains, deterministic archives, `SOURCE_DATE_EPOCH`)
 - [ ] **Package manager integration** (vcpkg/Conan presets; lockfile + CI cache)
 - [ ] **Compiler matrix** (GCC/Clang/MSVC, `-Werror` on CI, warning budgets)
 - [ ] **LTO/PGO toggles** (CMake options + docs + CI artifact)
