@@ -1,0 +1,142 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+
+#include "shader_constants.glsl"
+
+// GPU-accelerated text layout and positioning compute shader
+// Calculates glyph positions, kerning, and layout for efficient text rendering
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
+
+// Font glyph data buffer (read-only)
+struct GlyphInfo {
+    int width;          // Glyph width in pixels
+    int height;         // Glyph height in pixels
+    int xOffset;        // X offset for glyph positioning
+    int yOffset;        // Y offset for glyph positioning
+    int xAdvance;       // Advance width for next glyph
+    int kerning[256];   // Kerning offsets for character pairs
+};
+
+layout(set = 0, binding = 0) buffer GlyphBuffer {
+    GlyphInfo glyphs[];
+};
+
+// Input text buffer (character codes)
+layout(set = 0, binding = 1) buffer TextBuffer {
+    uint textData[];    // Character codes as uint
+};
+
+// Output glyph positions and data
+struct GlyphPosition {
+    vec2 position;      // Screen position for this glyph
+    vec2 size;          // Size of glyph quad
+    vec2 uvMin;         // UV coordinates for glyph texture
+    vec2 uvMax;         // UV coordinates for glyph texture
+    uint glyphIndex;    // Index of glyph in atlas
+    float advance;      // X advance for next character
+};
+
+layout(set = 0, binding = 2) buffer PositionBuffer {
+    GlyphPosition positions[];
+};
+
+// Layout parameters
+layout(set = 0, binding = 3) uniform LayoutParams {
+    vec2 startPosition;     // Starting position for text
+    float fontSize;         // Font size multiplier
+    float letterSpacing;    // Additional spacing between characters
+    float lineHeight;       // Line height multiplier
+    int maxChars;           // Maximum characters to process
+    int alignment;          // Text alignment (0=left, 1=center, 2=right)
+};
+
+// Word wrapping data
+layout(set = 0, binding = 4) buffer WordWrapBuffer {
+    float lineWidths[];     // Width of each line for alignment
+};
+
+// Calculate kerning between two characters
+float getKerning(int prevChar, int currChar, GlyphInfo glyph) {
+    if (prevChar < 0 || prevChar >= 256 || currChar < 0 || currChar >= 256) {
+        return 0.0;
+    }
+    return float(glyph.kerning[prevChar]) * fontSize / 64.0; // Convert from 26.6 fixed point
+}
+
+void main() {
+    uint charIndex = gl_GlobalInvocationID.x;
+
+    if (charIndex >= maxChars) {
+        return;
+    }
+
+    uint charCode = textData[charIndex];
+
+    // Handle special characters
+    if (charCode == 0) {
+        // Null terminator - end of text
+        return;
+    }
+
+    if (charCode == '\n' || charCode == '\r') {
+        // Line break - handled separately in line processing
+        positions[charIndex].glyphIndex = 0xFFFFFFFF; // Invalid glyph
+        positions[charIndex].advance = 0.0;
+        return;
+    }
+
+    // Get glyph information
+    GlyphInfo glyph = glyphs[charCode];
+
+    // Calculate position based on previous characters
+    vec2 currentPos = startPosition;
+    float totalAdvance = 0.0;
+
+    if (charIndex > 0) {
+        // Sum advances from previous characters on same line
+        for (uint i = 0; i < charIndex; i++) {
+            uint prevCode = textData[i];
+
+            // Skip line breaks when calculating horizontal position
+            if (prevCode != '\n' && prevCode != '\r') {
+                GlyphInfo prevGlyph = glyphs[prevCode];
+                totalAdvance += float(prevGlyph.xAdvance) * fontSize / 64.0;
+
+                // Add kerning if available
+                if (prevCode < 256) {
+                    totalAdvance += getKerning(int(prevCode), int(charCode), prevGlyph);
+                }
+
+                // Add letter spacing
+                totalAdvance += letterSpacing;
+            } else {
+                // Line break - reset horizontal position
+                totalAdvance = 0.0;
+                currentPos.y += lineHeight * fontSize;
+            }
+        }
+    }
+
+    currentPos.x += totalAdvance;
+
+    // Store glyph position data
+    positions[charIndex].position = currentPos;
+    positions[charIndex].size = vec2(float(glyph.width), float(glyph.height)) * fontSize / 64.0;
+    positions[charIndex].glyphIndex = charCode;
+
+    // Calculate UV coordinates (assuming atlas layout)
+    // This would need to be customized based on actual atlas packing
+    float atlasWidth = 1024.0;  // Example atlas size
+    float atlasHeight = 1024.0;
+
+    // Placeholder UV calculation - would need actual atlas coordinates
+    positions[charIndex].uvMin = vec2(0.0, 0.0);
+    positions[charIndex].uvMax = vec2(float(glyph.width) / atlasWidth, float(glyph.height) / atlasHeight);
+
+    // Store advance for next character
+    positions[charIndex].advance = float(glyph.xAdvance) * fontSize / 64.0 + letterSpacing;
+}

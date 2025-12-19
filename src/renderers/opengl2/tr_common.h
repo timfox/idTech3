@@ -117,6 +117,10 @@ extern	cvar_t	*r_fontAntialiasing;
 extern	cvar_t	*r_fontLCDFilter;
 extern	cvar_t	*r_fontKerning;
 extern	cvar_t	*r_fontSDFOutline;
+extern	cvar_t	*r_fontGPUSDF;
+extern	cvar_t	*r_fontGPUEffects;
+extern	cvar_t	*r_fontGPULayout;
+extern	cvar_t	*r_fontSDFOutline;
 
 float R_NoiseGet4f( float x, float y, float z, double t );
 void  R_NoiseInit( void );

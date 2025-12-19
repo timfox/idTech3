@@ -2067,6 +2067,20 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_fontSDFOutline, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_fontSDFOutline, "Enable SDF font outline/glow effects for better text readability." );
 
+	// GPU-accelerated font processing
+	r_fontGPUSDF = ri.Cvar_Get( "r_fontGPUSDF", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fontGPUSDF, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontGPUSDF, "Use GPU compute shaders for SDF font generation instead of CPU. Provides better performance for large fonts." );
+
+	// GPU font effects and processing
+	r_fontGPUEffects = ri.Cvar_Get( "r_fontGPUEffects", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fontGPUEffects, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontGPUEffects, "Enable GPU-accelerated font effects and transformations using compute shaders." );
+
+	r_fontGPULayout = ri.Cvar_Get( "r_fontGPULayout", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fontGPULayout, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontGPULayout, "Use GPU compute shaders for text layout and kerning calculations. Experimental feature." );
+
 	// Initialize font system
 	extern void R_InitFonts(void);
 	R_InitFonts();

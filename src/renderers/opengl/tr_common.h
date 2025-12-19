@@ -58,6 +58,7 @@ typedef struct image_s image_t;
 #define LIGHTMAP_NONE       -1
 
 extern glconfig_t	glConfig;		// outside of TR since it shouldn't be cleared during ref re-init
+extern	refimport_t		ri;
 
 // These variables should live inside glConfig but can't because of
 // compatibility issues to the original ID vms.  If you release a stand-alone
@@ -99,11 +100,7 @@ extern	cvar_t	*r_fontHinting;
 extern	cvar_t	*r_fontAntialiasing;
 extern	cvar_t	*r_fontLCDFilter;
 extern	cvar_t	*r_fontKerning;
-extern	cvar_t	*r_fontSDF;
-extern	cvar_t	*r_fontSDFSpread;
-extern	cvar_t	*r_fontSDFSmooth;
-extern	cvar_t	*r_fontLCDFilter;
-extern	cvar_t	*r_fontSDFOutline;
+// Font CVars are defined in each renderer individually
 
 float R_NoiseGet4f( float x, float y, float z, double t );
 void  R_NoiseInit( void );

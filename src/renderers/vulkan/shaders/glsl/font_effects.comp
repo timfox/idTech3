@@ -1,0 +1,137 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+
+#include "shader_constants.glsl"
+
+// GPU-accelerated font effects compute shader
+// Applies real-time transformations and effects to font textures
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// Input: Original font texture
+layout(set = 0, binding = 0) uniform sampler2D inputFontTexture;
+
+// Output: Processed font texture
+layout(set = 0, binding = 1, rgba8) uniform writeonly image2D outputFontTexture;
+
+// Effect parameters uniform buffer
+layout(set = 0, binding = 2) uniform FontEffectParams {
+    vec2 textureSize;       // Size of the font texture
+    float time;             // Current time for animations
+    int effectType;         // Type of effect to apply
+    vec4 effectParams;      // Effect-specific parameters
+    vec4 colorTint;         // Color tint to apply
+};
+
+void main() {
+    ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+
+    // Check bounds
+    if (pixelCoord.x >= int(textureSize.x) || pixelCoord.y >= int(textureSize.y)) {
+        return;
+    }
+
+    vec2 uv = vec2(pixelCoord) / textureSize;
+    vec4 texColor = texture(inputFontTexture, uv);
+
+    vec4 resultColor = texColor;
+
+    // Apply various font effects based on effectType
+    switch (effectType) {
+        case 0: // No effect - passthrough
+            resultColor = texColor;
+            break;
+
+        case 1: // Glow effect
+            {
+                float glowIntensity = effectParams.x;
+                float glowRadius = effectParams.y;
+
+                // Simple glow by expanding bright areas
+                float glow = 0.0;
+                for (int y = -2; y <= 2; y++) {
+                    for (int x = -2; x <= 2; x++) {
+                        vec2 offset = vec2(x, y) * glowRadius / textureSize;
+                        glow += texture(inputFontTexture, uv + offset).a;
+                    }
+                }
+                glow /= 25.0; // Average of 5x5 samples
+
+                resultColor.rgb += glow * glowIntensity * colorTint.rgb;
+                resultColor.a = max(resultColor.a, glow * glowIntensity);
+            }
+            break;
+
+        case 2: // Outline effect
+            {
+                float outlineWidth = effectParams.x;
+                vec4 outlineColor = vec4(effectParams.yzw, 1.0);
+
+                // Check for edges by sampling neighbors
+                float outline = 0.0;
+                for (int y = -1; y <= 1; y++) {
+                    for (int x = -1; x <= 1; x++) {
+                        if (x == 0 && y == 0) continue;
+                        vec2 offset = vec2(x, y) * outlineWidth / textureSize;
+                        outline += texture(inputFontTexture, uv + offset).a;
+                    }
+                }
+
+                // Create outline where text alpha is low but neighbors are high
+                float outlineAlpha = max(0.0, outline * 0.5 - texColor.a);
+                resultColor = mix(resultColor, outlineColor, outlineAlpha);
+            }
+            break;
+
+        case 3: // Animated wave effect
+            {
+                float waveAmplitude = effectParams.x;
+                float waveFrequency = effectParams.y;
+                float waveSpeed = effectParams.z;
+
+                // Apply vertical wave distortion
+                float waveOffset = sin(uv.x * waveFrequency + time * waveSpeed) * waveAmplitude;
+                vec2 distortedUV = uv + vec2(0.0, waveOffset / textureSize.y);
+
+                // Sample with distortion
+                resultColor = texture(inputFontTexture, distortedUV);
+            }
+            break;
+
+        case 4: // Color gradient effect
+            {
+                vec4 gradientStart = vec4(effectParams.x, effectParams.y, effectParams.z, 1.0);
+                vec4 gradientEnd = colorTint;
+
+                // Vertical gradient based on texture coordinate
+                float gradientFactor = uv.y;
+                vec4 gradientColor = mix(gradientStart, gradientEnd, gradientFactor);
+
+                resultColor.rgb *= gradientColor.rgb;
+            }
+            break;
+
+        case 5: // Pixelation effect
+            {
+                float pixelSize = effectParams.x;
+
+                // Quantize coordinates for pixelation effect
+                vec2 pixelatedUV = floor(uv * textureSize / pixelSize) * pixelSize / textureSize;
+                resultColor = texture(inputFontTexture, pixelatedUV);
+            }
+            break;
+
+        default:
+            resultColor = texColor;
+            break;
+    }
+
+    // Apply final color tint
+    resultColor *= colorTint;
+
+    // Write result
+    imageStore(outputFontTexture, pixelCoord, resultColor);
+}

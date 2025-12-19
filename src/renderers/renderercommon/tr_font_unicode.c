@@ -7,8 +7,20 @@ Unicode glyph mapping support for modern font rendering
 #include "../qcommon/q_shared.h"
 #include "../renderercommon/tr_public.h"
 #include "../renderer/tr_common.h"
+
+// Font CVars - defined in each renderer
+extern cvar_t *r_fontSDF;
+extern cvar_t *r_fontSDFSpread;
+extern cvar_t *r_fontSDFSmooth;
+extern cvar_t *r_fontLCDFilter;
+extern cvar_t *r_fontSDFOutline;
+extern cvar_t *r_fontGPUSDF;
+extern cvar_t *r_fontGPUEffects;
+extern cvar_t *r_fontGPULayout;
+
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
+// Renderer import interface - defined in renderer main file
 
 #ifdef USE_FREETYPE
 // FreeType types are declared in qcommon.h

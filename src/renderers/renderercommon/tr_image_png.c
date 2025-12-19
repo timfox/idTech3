@@ -1,4 +1,5 @@
 /*
+extern refimport_t ri;
 ===========================================================================
 ioquake3 png decoder
 Copyright (C) 2007,2008 Joerg Dietrich
@@ -23,7 +24,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "../renderercommon/tr_public.h"
 #include "../renderer/tr_common.h"
 // Renderer import interface - defined in renderer main file
-extern refimport_t ri;
 
 
 

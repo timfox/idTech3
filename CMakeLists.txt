@@ -1210,7 +1210,8 @@ if(NOT USE_OPENEXR OR NOT OpenEXR_FOUND)
 endif()
 # Note: FreeType-dependent files are included when USE_FREETYPE is defined
 # They have proper guards to compile to empty implementations when FreeType is not available
-AUX_SOURCE_DIRECTORY(src/renderer RENDERER_GL_SRCS)
+AUX_SOURCE_DIRECTORY(src/renderers/opengl RENDERER_GL_SRCS)
+list(APPEND RENDERER_GL_SRCS src/renderers/opengl/tr_main.c)
 AUX_SOURCE_DIRECTORY(src/renderers/vulkan RENDERER_VK_SRCS)
 
 # Vulkan experimental modules (work-in-progress). Keep OFF by default to ensure

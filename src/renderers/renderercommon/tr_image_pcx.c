@@ -1,4 +1,5 @@
 /*
+extern refimport_t ri;
 ===========================================================================
 Copyright (C) 1999-2005 Id Software, Inc.
               2008 Ludwig Nussel
@@ -25,7 +26,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../renderercommon/tr_public.h"
 #include "../renderer/tr_common.h"
 // Renderer import interface - defined in renderer main file
-extern refimport_t ri;
 
 
 

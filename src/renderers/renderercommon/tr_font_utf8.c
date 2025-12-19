@@ -10,12 +10,23 @@ UTF-8 and modern font rendering utilities
 #include "../renderercommon/tr_public.h"
 #include "../renderer/tr_common.h"
 
+// Font CVars - defined in each renderer
+extern cvar_t *r_fontSDF;
+extern cvar_t *r_fontSDFSpread;
+extern cvar_t *r_fontSDFSmooth;
+extern cvar_t *r_fontLCDFilter;
+extern cvar_t *r_fontSDFOutline;
+extern cvar_t *r_fontGPUSDF;
+extern cvar_t *r_fontGPUEffects;
+extern cvar_t *r_fontGPULayout;
+
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 
+// Renderer import interface - defined in renderer main file
+
 // Forward declaration for glyph access function
 glyphInfo_t *R_GetGlyphFromFont(fontInfo_t *font, int charCode);
-extern refimport_t ri;
 
 // Text style constants (if not defined elsewhere)
 #ifndef ITEM_TEXTSTYLE_SHADOWED

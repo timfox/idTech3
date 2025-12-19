@@ -13,13 +13,14 @@ stub loader that simply fails at runtime.
 #include "../qcommon/q_shared.h"
 #include "../renderercommon/tr_public.h"
 
+extern refimport_t ri;
+
 // We deliberately do not include tr_common.h here; the R_LoadEXR prototype
 // is provided there for the renderer frontends, but not needed for the
 // implementation.
 
 // Renderer import interface - defined in renderer main file
 extern "C" {
-extern refimport_t ri;
 }
 
 // Only use OpenEXR if the build system found it and defined USE_OPENEXR.

@@ -589,10 +589,10 @@ static void LoadTexture( int miplevel, int x, int y, int width, int height, cons
 	// Fix for font atlas row alignment: ensure GL_UNPACK_ALIGNMENT is 1 for 1-channel font textures
 	// Font atlases are 1 byte per pixel and need byte-aligned rows to prevent corruption
 	if (image->isFont) {
-		qglPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	} else {
 		// Restore default alignment for other textures
-		qglPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+		glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 	}
 
 	if ( subImage )
@@ -601,7 +601,7 @@ static void LoadTexture( int miplevel, int x, int y, int width, int height, cons
 		qglTexImage2D( GL_TEXTURE_2D, miplevel, image->internalFormat, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data );
 
 	// Always restore default alignment after texture upload
-	qglPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 }
 
 

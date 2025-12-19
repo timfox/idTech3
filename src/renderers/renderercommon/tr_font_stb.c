@@ -1,4 +1,5 @@
 /*
+extern refimport_t ri;
 ===========================================================================
 stb_truetype runtime font atlas builder (optional)
 
@@ -11,13 +12,24 @@ libs/stb/stb_truetype.h. Falls back to a stub otherwise.
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
 #include "../opengl/tr_common.h"
+
+// Font CVars - defined in each renderer
+extern cvar_t *r_fontSDF;
+extern cvar_t *r_fontSDFSpread;
+extern cvar_t *r_fontSDFSmooth;
+extern cvar_t *r_fontLCDFilter;
+extern cvar_t *r_fontSDFOutline;
+extern cvar_t *r_fontGPUSDF;
+extern cvar_t *r_fontGPUEffects;
+extern cvar_t *r_fontGPULayout;
+
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
+// Renderer import interface - defined in renderer main file
 
 #include "../opengl/tr_local.h"
 
 // Renderer import interface - defined in renderer main file
-extern refimport_t ri;
 
 
 #if defined(USE_STB_TRUETYPE) && (__has_include("../../libs/stb/stb_truetype.h") || __has_include("../../libs/cimgui/imgui/imstb_truetype.h"))

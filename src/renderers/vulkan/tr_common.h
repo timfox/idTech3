@@ -141,6 +141,9 @@ extern	cvar_t	*r_fontSDFSpread;
 extern	cvar_t	*r_fontSDFSmooth;
 extern	cvar_t	*r_fontLCDFilter;
 extern	cvar_t	*r_fontSDFOutline;
+extern	cvar_t	*r_fontGPUSDF;
+extern	cvar_t	*r_fontGPUEffects;
+extern	cvar_t	*r_fontGPULayout;
 
 /*
 =============================================================

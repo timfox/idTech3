@@ -72,18 +72,22 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../qcommon/qcommon.h"
 #include "tr_public.h"
 #include "../opengl/tr_common.h"
+
+// Font CVars - defined in each renderer
+extern cvar_t *r_fontSDF;
+extern cvar_t *r_fontSDFSpread;
+extern cvar_t *r_fontSDFSmooth;
+extern cvar_t *r_fontLCDFilter;
+extern cvar_t *r_fontSDFOutline;
+extern cvar_t *r_fontGPUSDF;
+extern cvar_t *r_fontGPUEffects;
+extern cvar_t *r_fontGPULayout;
+
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
-
 
 extern void R_IssuePendingRenderCommands( void );
 extern qhandle_t RE_RegisterShaderNoMip( const char *name );
-
-// Renderer import interface - defined in renderer main file
-extern refimport_t ri;
-
-// Renderer import interface - defined in renderer main file
-extern refimport_t ri;
 
 
 #ifdef USE_FREETYPE

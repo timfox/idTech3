@@ -1,4 +1,5 @@
 /*
+extern refimport_t ri;
 ===========================================================================
 Font fallback chain support for modern font rendering
 ===========================================================================
@@ -7,11 +8,22 @@ Font fallback chain support for modern font rendering
 #include "../qcommon/q_shared.h"
 #include "../renderercommon/tr_public.h"
 #include "../renderer/tr_common.h"
-// Renderer import interface - defined in renderer main file
-extern refimport_t ri;
+
+// Font CVars - defined in each renderer
+extern cvar_t *r_fontSDF;
+extern cvar_t *r_fontSDFSpread;
+extern cvar_t *r_fontSDFSmooth;
+extern cvar_t *r_fontLCDFilter;
+extern cvar_t *r_fontSDFOutline;
+extern cvar_t *r_fontGPUSDF;
+extern cvar_t *r_fontGPUEffects;
+extern cvar_t *r_fontGPULayout;
 
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
+// Renderer import interface - defined in renderer main file
+
+// Renderer import interface - defined in renderer main file
 
 #define MAX_FONT_FALLBACKS 4
 #define MAX_FONTS 6  // Match definition in tr_font.c

@@ -1,0 +1,110 @@
+#version 450
+#extension GL_GOOGLE_include_directive : enable
+
+#include "shader_constants.glsl"
+
+// GPU-accelerated SDF (Signed Distance Field) generation compute shader
+// Converts binary glyph bitmaps to distance fields for high-quality rendering
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// Input: Binary glyph bitmap (R8 format, 0.0 = outside, 1.0 = inside)
+layout(set = 0, binding = 0, r8) uniform readonly image2D inputBitmap;
+
+// Output: SDF texture (R8 format, 0.5 = contour, <0.5 = outside, >0.5 = inside)
+layout(set = 0, binding = 1, r8) uniform writeonly image2D outputSDF;
+
+// Uniform buffer with SDF generation parameters
+layout(set = 0, binding = 2) uniform SDFParams {
+    ivec2 textureSize;      // Size of the texture
+    ivec2 glyphRect;        // Rectangle containing the glyph (minX, minY, maxX, maxY)
+    float spread;           // SDF spread radius in pixels
+    float scale;            // Scale factor for the glyph
+};
+
+// Convert pixel coordinates to normalized distance
+float pixelToDistance(float pixelDistance, float spread) {
+    return (pixelDistance / spread) * 0.5 + 0.5;
+}
+
+// Convert normalized distance back to pixels
+float distanceToPixel(float normalizedDistance, float spread) {
+    return (normalizedDistance - 0.5) * spread;
+}
+
+// Sample the binary bitmap at a given position
+float sampleBitmap(ivec2 pos) {
+    if (pos.x < 0 || pos.x >= textureSize.x || pos.y < 0 || pos.y >= textureSize.y) {
+        return 0.0; // Outside bounds = background
+    }
+    return imageLoad(inputBitmap, pos).r;
+}
+
+// Optimized SDF computation using 8-point sampling pattern
+// This provides good quality with reasonable performance
+float computeSDF(ivec2 center) {
+    float centerValue = sampleBitmap(center);
+    float sign = centerValue > 0.5 ? -1.0 : 1.0; // Negative inside, positive outside
+
+    float minDist = spread * 2.0; // Initialize to maximum distance
+
+    // Use an efficient sampling pattern - check cardinal directions first
+    ivec2 directions[8] = ivec2[8](
+        ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1),  // Cardinal
+        ivec2(1, 1), ivec2(1, -1), ivec2(-1, 1), ivec2(-1, -1)  // Diagonal
+    );
+
+    // First pass: check immediate neighbors
+    for (int i = 0; i < 8; i++) {
+        ivec2 samplePos = center + directions[i];
+        float sampleValue = sampleBitmap(samplePos);
+
+        if (sampleValue != centerValue) {
+            float pixelDist = length(vec2(directions[i]));
+            if (pixelDist < abs(minDist)) {
+                minDist = pixelDist * sign;
+            }
+        }
+    }
+
+    // Second pass: expand search if needed
+    if (abs(minDist) > 1.5) {
+        for (int radius = 2; radius <= int(spread) && abs(minDist) > float(radius); radius++) {
+            // Sample in a diamond pattern for efficiency
+            for (int d = 0; d < 8; d++) {
+                ivec2 dir = directions[d];
+                ivec2 samplePos = center + dir * radius;
+
+                float sampleValue = sampleBitmap(samplePos);
+                if (sampleValue != centerValue) {
+                    float pixelDist = length(vec2(dir * radius));
+                    if (pixelDist < abs(minDist)) {
+                        minDist = pixelDist * sign;
+                    }
+                }
+            }
+        }
+    }
+
+    // Clamp to spread range and normalize
+    minDist = clamp(minDist, -spread, spread);
+    return pixelToDistance(minDist, spread);
+}
+
+void main() {
+    ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+
+    // Check if pixel is within glyph bounds for optimization
+    if (pixelCoord.x >= glyphRect.x && pixelCoord.x < glyphRect.z &&
+        pixelCoord.y >= glyphRect.y && pixelCoord.y < glyphRect.w) {
+
+        float sdfValue = computeSDF(pixelCoord);
+        imageStore(outputSDF, pixelCoord, vec4(sdfValue, 0.0, 0.0, 1.0));
+    } else {
+        // Outside glyph bounds - use neutral SDF value
+        imageStore(outputSDF, pixelCoord, vec4(0.5, 0.0, 0.0, 1.0));
+    }
+}
