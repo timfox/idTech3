@@ -454,6 +454,14 @@ flags: optional flags (future: bold, italic, etc.)
 =================
 */
 void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
+#ifdef USE_FREETYPE
+	// Ensure FreeType is initialized before trying to use it
+	extern qboolean FreeType_Init(void);
+	if (!FreeType_Init()) {
+		ri.Printf(PRINT_WARNING, "RE_RegisterFont: Failed to initialize FreeType.\n");
+	}
+#endif
+
 #ifdef BUILD_FREETYPE
 	FT_Face face;
 	int j, k, xOut, yOut, lastStart, imageNumber;
@@ -618,8 +626,17 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 #else
 	ftLibrary = FreeType_GetLibrary();
 	if (ftLibrary == NULL) {
-		ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType not initialized.\n");
-		return;
+		// Try to initialize FreeType if it hasn't been initialized yet
+		extern qboolean FreeType_Init(void);
+		if (!FreeType_Init()) {
+			ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType initialization failed.\n");
+			return;
+		}
+		ftLibrary = FreeType_GetLibrary();
+		if (ftLibrary == NULL) {
+			ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType not available after initialization.\n");
+			return;
+		}
 	}
 
 	len = ri.FS_ReadFile(fontName, &faceData);
@@ -821,7 +838,7 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 			}
 
 			//Com_sprintf (name, sizeof(name), "fonts/fontImage_%i_%i", imageNumber++, pointSize);
-			image = R_CreateImage(name, NULL, imageBuff, atlasSize, atlasSize, IMGFLAG_CLAMPTOEDGE );
+			image = R_CreateImage(name, NULL, imageBuff, atlasSize, atlasSize, IMGFLAG_CLAMPTOEDGE);
 			h = RE_RegisterShaderFromImage(name, LIGHTMAP_2D, image, qfalse);
 			for (j = lastStart; j < i; j++) {
 				font->glyphs[j].glyph = h;
@@ -936,11 +953,17 @@ void R_InitFreeType(void) {
 	ftLibrary = FreeType_GetLibrary();
 	if (!ftLibrary) {
 		ri.Printf(PRINT_WARNING, "R_InitFreeType: FreeType not available.\n");
+	} else {
+		// Clear font cache when FreeType becomes available to force re-registration
+		// with the new FreeType system (fonts that failed with stb_truetype can now load)
+		ri.Printf(PRINT_ALL, "R_InitFreeType: Clearing font cache to enable FreeType font loading\n");
+		fontCacheCount = 0;
+		for (int i = 0; i < MAX_FONT_CACHE; i++) {
+			fontCache[i].inUse = qfalse;
+		}
 	}
 #endif
 	registeredFontCount = 0;
-	// Don't clear font cache on init - allows fonts to persist across level changes
-	// fontCacheCount = 0; // Keep cache for better performance
 }
 
 

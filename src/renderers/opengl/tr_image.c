@@ -586,10 +586,22 @@ static GLint RawImage_GetInternalFormat( const byte *scan, int numPixels, qboole
 
 static void LoadTexture( int miplevel, int x, int y, int width, int height, const byte *data, qboolean subImage, image_t *image )
 {
+	// Fix for font atlas row alignment: ensure GL_UNPACK_ALIGNMENT is 1 for 1-channel font textures
+	// Font atlases are 1 byte per pixel and need byte-aligned rows to prevent corruption
+	if (image->isFont) {
+		qglPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	} else {
+		// Restore default alignment for other textures
+		qglPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	}
+
 	if ( subImage )
 		qglTexSubImage2D( GL_TEXTURE_2D, miplevel, x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data );
 	else
 		qglTexImage2D( GL_TEXTURE_2D, miplevel, image->internalFormat, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data );
+
+	// Always restore default alignment after texture upload
+	qglPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 }
 
 

@@ -6654,8 +6654,20 @@ void vk_upload_image_data( image_t *image, int x, int y, int width, int height, 
 	while (qtrue) {
 		Com_Memset(&region, 0, sizeof(region));
 		region.bufferOffset = buffer_size;
-		region.bufferRowLength = 0;
-		region.bufferImageHeight = 0;
+
+		// Fix for font atlas row alignment: ensure proper row pitch for 1-channel textures
+		// Font atlases are typically 1 byte per pixel and need explicit row length specification
+		if (image->isFont) {
+			// For font textures, set bufferRowLength to the original image width to handle row alignment
+			// This prevents "barcode-like" corruption from row padding mismatches
+			region.bufferRowLength = width;  // Original width before any mip reduction
+			region.bufferImageHeight = height;  // Original height before any mip reduction
+		} else {
+			// For normal textures, use 0 to indicate tightly packed data
+			region.bufferRowLength = 0;
+			region.bufferImageHeight = 0;
+		}
+
 		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		region.imageSubresource.mipLevel = num_regions;
 		region.imageSubresource.baseArrayLayer = 0;

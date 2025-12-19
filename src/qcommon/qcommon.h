@@ -330,8 +330,22 @@ void		Lua_Pop( lua_State *L, int n );
 #endif
 
 #ifdef USE_FREETYPE
-#include <ft2build.h>
-#include FT_FREETYPE_H
+// Forward declarations for FreeType types
+typedef struct FT_LibraryRec_ *FT_Library;
+typedef struct FT_FaceRec_ *FT_Face;
+typedef struct FT_GlyphSlotRec_ *FT_GlyphSlot;
+typedef struct FT_Outline_ FT_Outline;
+typedef struct FT_Bitmap_ FT_Bitmap;
+typedef struct FT_Vector_ FT_Vector;
+typedef signed long FT_Pos;
+typedef unsigned int FT_UInt;
+typedef unsigned long FT_ULong;
+typedef long FT_F26Dot6;
+typedef int FT_Error;
+typedef unsigned char FT_Byte;
+typedef long FT_Long;
+typedef int FT_Int32;
+// FT_Render_Mode is defined by FreeType headers
 qboolean	FreeType_Init( void );
 void		FreeType_Shutdown( void );
 FT_Library	FreeType_GetLibrary( void );
@@ -341,7 +355,7 @@ void		FreeType_DoneFace( FT_Face face );
 FT_Error	FreeType_SetCharSize( FT_Face face, FT_F26Dot6 char_width, FT_F26Dot6 char_height, FT_UInt horz_resolution, FT_UInt vert_resolution );
 FT_Error	FreeType_LoadGlyph( FT_Face face, FT_UInt glyph_index, FT_Int32 load_flags );
 FT_UInt		FreeType_GetCharIndex( FT_Face face, FT_ULong charcode );
-FT_Error	FreeType_RenderGlyph( FT_GlyphSlot slot, FT_Render_Mode render_mode );
+FT_Error	FreeType_RenderGlyph( FT_GlyphSlot slot, int render_mode );
 void		FreeType_OutlineTranslate( FT_Outline *outline, FT_Pos xDelta, FT_Pos yDelta );
 FT_Error	FreeType_OutlineGetBitmap( FT_Library library, FT_Outline *outline, const FT_Bitmap *abitmap );
 FT_Vector	FreeType_GetKerning( FT_Face face, FT_UInt left_glyph, FT_UInt right_glyph, FT_UInt kern_mode );

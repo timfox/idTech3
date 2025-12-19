@@ -34,24 +34,24 @@ Returns qtrue on success, qfalse on failure
 qboolean FreeType_Init(void)
 {
 	FT_Error error;
-	
+
 	if (freetype_initialized)
 		return qtrue;
-	
+
 	com_freetype_enabled = Cvar_Get("com_freetype_enabled", "1", CVAR_ARCHIVE | CVAR_LATCH);
 	Cvar_SetDescription(com_freetype_enabled, "Enable FreeType font rendering support (1 = enabled, 0 = disabled)");
-	
+
 	if (!com_freetype_enabled || !com_freetype_enabled->integer) {
 		Com_Printf("FreeType support disabled.\n");
 		return qfalse;
 	}
-	
+
 	error = FT_Init_FreeType(&ftLibrary);
 	if (error) {
 		Com_Printf("FreeType_Init: Unable to initialize FreeType library (error %d)\n", error);
 		return qfalse;
 	}
-	
+
 	freetype_initialized = qtrue;
 	Com_Printf("FreeType initialized successfully.\n");
 	return qtrue;
@@ -194,10 +194,10 @@ Render a glyph into a bitmap
 Returns FT_Err_Ok on success
 =================
 */
-FT_Error FreeType_RenderGlyph(FT_GlyphSlot slot, FT_Render_Mode render_mode)
+FT_Error FreeType_RenderGlyph(FT_GlyphSlot slot, int render_mode)
 {
 	if (!slot)
-		return FT_Err_Invalid_Glyph_Handle;
+                return FT_Err_Invalid_Slot_Handle;
 	
 	return FT_Render_Glyph(slot, render_mode);
 }
