@@ -7,6 +7,8 @@ GPU-based particle simulation and rendering for offloading CPU.
 */
 
 #include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 #include "vk.h"
 
 #ifdef USE_VULKAN

@@ -22,6 +22,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_shade.c
 
 #include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 
 /*
 

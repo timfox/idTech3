@@ -6,6 +6,8 @@ Optimized Math Functions Implementation
 
 #include <math.h>
 #include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 #include "tr_math_optimized.h"
 
 /*

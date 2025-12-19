@@ -20,6 +20,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 #include "../renderercommon/tr_frame_graph.h"
 
 /*
@@ -411,6 +413,12 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	if ( !tr.registered ) {
 		return;
 	}
+
+	// Update async font loading
+#ifdef USE_JOBSYSTEM
+	extern void RE_UpdateAsyncFonts(void);
+	RE_UpdateAsyncFonts();
+#endif
 
 	cmd = R_GetCommandBufferReserved( sizeof( *cmd ), 0 );
 	if ( !cmd ) {

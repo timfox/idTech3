@@ -1,6 +1,8 @@
 #include "vk_shadows.h"
 #include "vk.h"
 #include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 
 vk_shadow_t vk_shadow;
 

@@ -21,6 +21,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
+
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 
 /*
 

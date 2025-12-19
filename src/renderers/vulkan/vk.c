@@ -1,4 +1,6 @@
 #include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 #include "../../qcommon/performance_counters.h"
 #include "vk.h"
 #include <stdlib.h>

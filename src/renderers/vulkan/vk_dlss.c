@@ -8,6 +8,8 @@ The SDK provides functions like NVSDK_NGX_VULKAN_Init, NVSDK_NGX_VULKAN_Evaluate
 */
 
 #include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 #include "vk.h"
 
 #ifdef USE_VULKAN

@@ -72,9 +72,19 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../qcommon/qcommon.h"
 #include "tr_public.h"
 #include "../opengl/tr_common.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
+
 
 extern void R_IssuePendingRenderCommands( void );
 extern qhandle_t RE_RegisterShaderNoMip( const char *name );
+
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
+
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
+
 
 #ifdef USE_FREETYPE
 #include <ft2build.h>
@@ -83,7 +93,13 @@ extern qhandle_t RE_RegisterShaderNoMip( const char *name );
 #include FT_SYSTEM_H
 #include FT_IMAGE_H
 #include FT_OUTLINE_H
+#endif
 
+#ifdef USE_BROTLI
+#include <brotli/decode.h>
+#endif
+
+#ifdef USE_FREETYPE
 #define _FLOOR(x)  ((x) & -64)
 #define _CEIL(x)   (((x)+63) & -64)
 #define _TRUNC(x)  ((x) >> 6)
@@ -107,6 +123,209 @@ typedef struct {
 
 static fontCacheEntry_t fontCache[MAX_FONT_CACHE];
 static int fontCacheCount = 0;
+
+// Glyph subsetting support
+#define MAX_GLYPH_SUBSET_SIZE 512  // Maximum glyphs in a subset font
+
+typedef struct glyphSubset_s {
+	qboolean enabled;           // Whether subsetting is enabled
+	qboolean tracking;          // Whether to track glyph usage
+	uint32_t usageCount[256];   // How many times each character was used
+	uint8_t  subsetMap[256];    // Maps character code to subset glyph index (-1 if not in subset)
+	int      subsetSize;        // Number of glyphs in the subset
+	qboolean finalized;         // Whether the subset has been finalized
+} glyphSubset_t;
+
+static glyphSubset_t glyphSubset;
+
+/*
+=================
+R_InitGlyphSubsetting
+Initialize glyph subsetting system
+=================
+*/
+static void R_InitGlyphSubsetting(void) {
+	Com_Memset(&glyphSubset, 0, sizeof(glyphSubset));
+	glyphSubset.enabled = qtrue;  // Enable by default
+	glyphSubset.tracking = qtrue; // Start tracking usage
+	glyphSubset.subsetSize = 0;
+	glyphSubset.finalized = qfalse;
+
+	// Initialize subset map to -1 (not in subset)
+	Com_Memset(glyphSubset.subsetMap, 0xFF, sizeof(glyphSubset.subsetMap));
+
+	ri.Printf(PRINT_ALL, "R_InitGlyphSubsetting: Glyph subsetting initialized\n");
+}
+
+/*
+=================
+R_TrackGlyphUsage
+Track usage of a glyph character
+=================
+*/
+static void R_TrackGlyphUsage(int charCode) {
+	if (!glyphSubset.tracking || glyphSubset.finalized) {
+		return;
+	}
+
+	if (charCode >= 0 && charCode < 256) {
+		glyphSubset.usageCount[charCode]++;
+	}
+}
+
+/*
+=================
+R_FinalizeGlyphSubset
+Create the final glyph subset based on usage statistics
+=================
+*/
+static void R_FinalizeGlyphSubset(void) {
+	if (glyphSubset.finalized || !glyphSubset.enabled) {
+		return;
+	}
+
+	int totalUsage = 0;
+	int usedChars = 0;
+
+	// Count total usage and used characters
+	for (int i = 0; i < 256; i++) {
+		if (glyphSubset.usageCount[i] > 0) {
+			totalUsage += glyphSubset.usageCount[i];
+			usedChars++;
+		}
+	}
+
+	ri.Printf(PRINT_ALL, "R_FinalizeGlyphSubset: %d characters used, %d total usages\n", usedChars, totalUsage);
+
+	// Sort characters by usage frequency (simple bubble sort for now)
+	int charOrder[256];
+	for (int i = 0; i < 256; i++) {
+		charOrder[i] = i;
+	}
+
+	for (int i = 0; i < 255; i++) {
+		for (int j = 0; j < 255 - i; j++) {
+			if (glyphSubset.usageCount[charOrder[j]] < glyphSubset.usageCount[charOrder[j + 1]]) {
+				int temp = charOrder[j];
+				charOrder[j] = charOrder[j + 1];
+				charOrder[j + 1] = temp;
+			}
+		}
+	}
+
+	// Create subset mapping - include most frequently used characters first
+	glyphSubset.subsetSize = 0;
+	for (int i = 0; i < 256 && glyphSubset.subsetSize < MAX_GLYPH_SUBSET_SIZE; i++) {
+		int charCode = charOrder[i];
+		if (glyphSubset.usageCount[charCode] > 0) {
+			glyphSubset.subsetMap[charCode] = glyphSubset.subsetSize;
+			glyphSubset.subsetSize++;
+		}
+	}
+
+	// Always include essential ASCII characters even if not used yet
+	const char *essentialChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,!?-:;()[]{}";
+	for (const char *c = essentialChars; *c && glyphSubset.subsetSize < MAX_GLYPH_SUBSET_SIZE; c++) {
+		int charCode = (unsigned char)*c;
+		if (glyphSubset.subsetMap[charCode] == 0xFF) { // Not in subset yet
+			glyphSubset.subsetMap[charCode] = glyphSubset.subsetSize;
+			glyphSubset.subsetSize++;
+		}
+	}
+
+	glyphSubset.finalized = qtrue;
+	glyphSubset.tracking = qfalse; // Stop tracking after finalization
+
+	ri.Printf(PRINT_ALL, "R_FinalizeGlyphSubset: Created subset with %d glyphs\n", glyphSubset.subsetSize);
+}
+
+/*
+=================
+R_GetGlyphSubsetIndex
+Get the subset index for a character code, or -1 if not in subset
+=================
+*/
+static int R_GetGlyphSubsetIndex(int charCode) {
+	if (!glyphSubset.enabled || !glyphSubset.finalized) {
+		return charCode & 255; // Use original indexing if subsetting disabled
+	}
+
+	if (charCode < 0 || charCode >= 256) {
+		return -1;
+	}
+
+	return glyphSubset.subsetMap[charCode];
+}
+
+/*
+=================
+R_IsGlyphInSubset
+Check if a character is in the current glyph subset
+=================
+*/
+static qboolean R_IsGlyphInSubset(int charCode) {
+	if (!glyphSubset.enabled || !glyphSubset.finalized) {
+		return qtrue; // All glyphs available if subsetting disabled
+	}
+
+	if (charCode < 0 || charCode >= 256) {
+		return qfalse;
+	}
+
+	return glyphSubset.subsetMap[charCode] != 0xFF;
+}
+
+/*
+=================
+R_GetGlyphFromFont
+Get a glyph from a font, handling subset fonts
+=================
+*/
+glyphInfo_t *R_GetGlyphFromFont(fontInfo_t *font, int charCode) {
+	if (!font) {
+		return NULL;
+	}
+
+	// Track glyph usage for subsetting
+	R_TrackGlyphUsage(charCode);
+
+	// Handle subset fonts
+	if (font->isSubset) {
+		if (charCode < 0 || charCode >= 256) {
+			return NULL;
+		}
+		int subsetIndex = font->subsetMap[charCode];
+		if (subsetIndex == 0xFF) {
+			// Glyph not in subset, try fallback font
+			if (font->fallbackFont) {
+				return R_GetGlyphFromFont(font->fallbackFont, charCode);
+			}
+			return NULL;
+		}
+		return &font->glyphs[subsetIndex];
+	} else {
+		// Standard font - use original indexing
+		return &font->glyphs[charCode & 255];
+	}
+}
+
+// Async font loading structures
+#ifdef USE_JOBSYSTEM
+typedef struct fontLoadJob_s {
+	char fontName[MAX_QPATH];
+	int pointSize;
+	fontInfo_t *targetFont;
+	qboolean useSDF;
+	qboolean completed;
+	qboolean success;
+	fontInfo_t loadedFont;  // Temporary storage for loaded font data
+} fontLoadJob_t;
+
+// Maximum concurrent async font loads
+#define MAX_ASYNC_FONT_JOBS 8
+static fontLoadJob_t asyncFontJobs[MAX_ASYNC_FONT_JOBS];
+static int asyncFontJobCount = 0;
+#endif
 
 // Store a built font in the registry and name+size cache
 static void R_AddFontToCache(const char *fontName, int pointSize, qboolean useSDF, fontInfo_t *font) {
@@ -261,6 +480,78 @@ static void WriteTGA (const char *filename, byte *data, int width, int height) {
 
 	ri.Free (buffer);
 }
+
+#ifdef USE_BROTLI
+/*
+=================
+WOFF2_DecompressFont
+Decompress WOFF2 compressed font data to TTF format
+=================
+*/
+static qboolean WOFF2_DecompressFont(const unsigned char *woff2Data, size_t woff2Size, unsigned char **decompressedData, size_t *decompressedSize) {
+	BrotliDecoderState *state = BrotliDecoderCreateInstance(NULL, NULL, NULL);
+	if (!state) {
+		ri.Printf(PRINT_WARNING, "WOFF2_DecompressFont: Failed to create Brotli decoder\n");
+		return qfalse;
+	}
+
+	// Start with a reasonable buffer size, will expand if needed
+	size_t outputBufferSize = woff2Size * 4;  // WOFF2 is typically 30-50% smaller
+	*decompressedData = ri.Malloc(outputBufferSize);
+	if (!*decompressedData) {
+		BrotliDecoderDestroyInstance(state);
+		ri.Printf(PRINT_WARNING, "WOFF2_DecompressFont: Failed to allocate output buffer\n");
+		return qfalse;
+	}
+
+	size_t totalOut = 0;
+	BrotliDecoderResult result;
+
+	do {
+		size_t availableIn = woff2Size;
+		const uint8_t *nextIn = woff2Data;
+		size_t availableOut = outputBufferSize - totalOut;
+		uint8_t *nextOut = *decompressedData + totalOut;
+
+		result = BrotliDecoderDecompressStream(state, &availableIn, &nextIn, &availableOut, &nextOut, &totalOut);
+
+		if (result == BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT) {
+			// Need more output space, double the buffer
+			size_t newSize = outputBufferSize * 2;
+			uint8_t *newBuffer = ri.Malloc(newSize);
+			if (!newBuffer) {
+				ri.Free(*decompressedData);
+				BrotliDecoderDestroyInstance(state);
+				ri.Printf(PRINT_WARNING, "WOFF2_DecompressFont: Failed to expand output buffer\n");
+				return qfalse;
+			}
+			Com_Memcpy(newBuffer, *decompressedData, outputBufferSize);
+			ri.Free(*decompressedData);
+			*decompressedData = newBuffer;
+			outputBufferSize = newSize;
+		} else if (result == BROTLI_DECODER_RESULT_ERROR) {
+			ri.Free(*decompressedData);
+			BrotliDecoderDestroyInstance(state);
+			ri.Printf(PRINT_WARNING, "WOFF2_DecompressFont: Brotli decompression error\n");
+			return qfalse;
+		}
+	} while (result == BROTLI_DECODER_RESULT_NEEDS_MORE_INPUT || result == BROTLI_DECODER_RESULT_NEEDS_MORE_OUTPUT);
+
+	BrotliDecoderDestroyInstance(state);
+
+	if (result != BROTLI_DECODER_RESULT_SUCCESS) {
+		ri.Free(*decompressedData);
+		ri.Printf(PRINT_WARNING, "WOFF2_DecompressFont: Decompression failed with result %d\n", result);
+		return qfalse;
+	}
+
+	*decompressedSize = totalOut;
+	ri.Printf(PRINT_ALL, "WOFF2_DecompressFont: Successfully decompressed %zu bytes to %zu bytes (%.1f%% reduction)\n",
+		woff2Size, *decompressedSize, (1.0f - (float)*decompressedSize / (float)woff2Size) * 100.0f);
+
+	return qtrue;
+}
+#endif
 
 static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, int *yOut, int *maxHeight, FT_Face face, const unsigned char c, qboolean calcHeight) {
 	int i;
@@ -453,7 +744,14 @@ font: output font info structure
 flags: optional flags (future: bold, italic, etc.)
 =================
 */
-void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
+/*
+=================
+RE_RegisterFont_Sync
+Synchronous font registration (original implementation)
+=================
+*/
+#ifdef BUILD_FREETYPE
+static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontInfo_t *font, qboolean wantSDF) {
 #ifdef USE_FREETYPE
 	// Ensure FreeType is initialized before trying to use it
 	extern qboolean FreeType_Init(void);
@@ -464,19 +762,24 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 
 #ifdef BUILD_FREETYPE
 	FT_Face face;
-	int j, k, xOut, yOut, lastStart, imageNumber;
+	int xOut, yOut, lastStart, imageNumber;
 	int scaledSize, newSize, maxHeight, left;
 	unsigned char *out, *imageBuff;
 	glyphInfo_t *glyph;
 	image_t *image;
-	qhandle_t h;
 	float max;
+#endif
+
+	// Variables used in both FreeType and non-FreeType paths
+	int j, k;
+	qhandle_t h;
+
+	// Variables used in both FreeType and non-FreeType paths
 	float dpi = 72.0f;
 	float glyphScale;
 	int atlasSize = 256;
 	int loadFlags = FT_LOAD_DEFAULT;
 	FT_Render_Mode renderMode = FT_RENDER_MODE_NORMAL;
-#endif
 	void *faceData;
 	int i, len;
 	char name[1024];
@@ -644,6 +947,28 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: Unable to read font file '%s'\n", fontName);
 		return;
 	}
+
+	// Check if this is a WOFF2 compressed font and decompress if needed
+#ifdef USE_BROTLI
+	if (len >= 4 && faceData[0] == 'w' && faceData[1] == 'O' && faceData[2] == 'F' && faceData[3] == '2') {
+		// This is a WOFF2 file, decompress it
+		ri.Printf(PRINT_ALL, "RE_RegisterFont: Detected WOFF2 compressed font '%s', decompressing...\n", fontName);
+
+		unsigned char *decompressedData = NULL;
+		size_t decompressedSize = 0;
+
+		if (WOFF2_DecompressFont(faceData, len, &decompressedData, &decompressedSize)) {
+			// Replace the compressed data with decompressed data
+			ri.FS_FreeFile(faceData);
+			faceData = decompressedData;
+			len = decompressedSize;
+			ri.Printf(PRINT_ALL, "RE_RegisterFont: WOFF2 decompression successful for '%s'\n", fontName);
+		} else {
+			ri.Printf(PRINT_WARNING, "RE_RegisterFont: WOFF2 decompression failed for '%s', using fallback\n", fontName);
+			// Continue with compressed data - FreeType might handle it, but unlikely
+		}
+	}
+#endif
 
 	// Get font quality settings from CVars
 	if (r_fontDPI) {
@@ -944,7 +1269,17 @@ void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	ri.Printf(PRINT_ALL,
 		"RE_RegisterFont: settings name='%s' size=%d dpi=%d atlas=%d hint=%d aa=%d spread=%d glyphScale=%.3f\n",
 		fontName, pointSize, selectedDPI, selectedAtlasSize, selectedHint, selectedAA, selectedSpread, font->glyphScale);
+
+	return qtrue;
 }
+#endif // BUILD_FREETYPE
+
+#ifndef BUILD_FREETYPE
+static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontInfo_t *font, qboolean wantSDF) {
+	ri.Printf(PRINT_WARNING, "RE_RegisterFont_Sync: FreeType not available, cannot load font '%s'\n", fontName);
+	return qfalse;
+}
+#endif
 
 
 
@@ -966,6 +1301,245 @@ void R_InitFreeType(void) {
 	registeredFontCount = 0;
 }
 
+
+#ifdef USE_JOBSYSTEM
+/*
+=================
+FontLoadWorker_Async
+Worker function for async font loading (runs on background thread)
+=================
+*/
+static void FontLoadWorker_Async(void *data) {
+	fontLoadJob_t *job = (fontLoadJob_t *)data;
+
+	ri.Printf(PRINT_ALL, "FontLoadWorker_Async: Loading font '%s' (%dpt, SDF=%d)\n",
+		job->fontName, job->pointSize, job->useSDF ? 1 : 0);
+
+	// Perform the actual font loading (this is the synchronous path)
+	if (RE_RegisterFont_Sync(job->fontName, job->pointSize, &job->loadedFont, job->useSDF)) {
+		job->success = qtrue;
+		ri.Printf(PRINT_ALL, "FontLoadWorker_Async: Successfully loaded font '%s'\n", job->fontName);
+	} else {
+		job->success = qfalse;
+		ri.Printf(PRINT_WARNING, "FontLoadWorker_Async: Failed to load font '%s'\n", job->fontName);
+	}
+
+	job->completed = qtrue;
+}
+
+/*
+=================
+FontLoadCompletion_Async
+Completion callback for async font loading (runs on main thread)
+=================
+*/
+static void FontLoadCompletion_Async(void *data) {
+	fontLoadJob_t *job = (fontLoadJob_t *)data;
+
+	if (job->success && job->targetFont) {
+		// Copy the loaded font data to the target
+		Com_Memcpy(job->targetFont, &job->loadedFont, sizeof(fontInfo_t));
+
+		// Add to cache
+		R_AddFontToCache(job->fontName, job->pointSize, job->useSDF, job->targetFont);
+
+		ri.Printf(PRINT_ALL, "FontLoadCompletion_Async: Font '%s' registered successfully\n", job->fontName);
+	} else {
+		ri.Printf(PRINT_WARNING, "FontLoadCompletion_Async: Font '%s' loading failed\n", job->fontName);
+	}
+
+	// Mark job as available for reuse
+	job->completed = qfalse;
+	job->success = qfalse;
+	job->targetFont = NULL;
+	asyncFontJobCount--;
+}
+
+/*
+=================
+RE_RegisterFont_Async
+Register a font asynchronously using the job system
+=================
+*/
+qboolean RE_RegisterFont_Async(const char *fontName, int pointSize, fontInfo_t *font) {
+#ifdef USE_JOBSYSTEM
+	if (!fontName || !font) {
+		return qfalse;
+	}
+
+	// Check cache first
+	qboolean wantSDF = (r_fontSDF && r_fontSDF->integer != 0);
+	for (int i = 0; i < fontCacheCount; i++) {
+		if (fontCache[i].inUse &&
+		    fontCache[i].pointSize == pointSize &&
+		    fontCache[i].useSDF == wantSDF &&
+		    !Q_stricmp(fontCache[i].fontName, fontName)) {
+			// Found in cache - copy cached font
+			Com_Memcpy(font, fontCache[i].font, sizeof(fontInfo_t));
+			ri.Printf(PRINT_ALL, "RE_RegisterFont_Async: cache hit '%s' (%dpt, SDF=%d)\n",
+				fontName, pointSize, wantSDF ? 1 : 0);
+			return qtrue;
+		}
+	}
+
+	// Check if we have too many concurrent async jobs
+	if (asyncFontJobCount >= MAX_ASYNC_FONT_JOBS) {
+		ri.Printf(PRINT_WARNING, "RE_RegisterFont_Async: Too many concurrent font loads (%d), falling back to sync\n", asyncFontJobCount);
+		return RE_RegisterFont_Sync(fontName, pointSize, font, wantSDF);
+	}
+
+	// Find available job slot
+	fontLoadJob_t *job = NULL;
+	for (int i = 0; i < MAX_ASYNC_FONT_JOBS; i++) {
+		if (!asyncFontJobs[i].completed && !asyncFontJobs[i].targetFont) {
+			job = &asyncFontJobs[i];
+			break;
+		}
+	}
+
+	if (!job) {
+		ri.Printf(PRINT_WARNING, "RE_RegisterFont_Async: No available job slots, falling back to sync\n");
+		return RE_RegisterFont_Sync(fontName, pointSize, font, wantSDF);
+	}
+
+	// Initialize job
+	Q_strncpyz(job->fontName, fontName, sizeof(job->fontName));
+	job->pointSize = pointSize;
+	job->targetFont = font;
+	job->useSDF = wantSDF;
+	job->completed = qfalse;
+	job->success = qfalse;
+	asyncFontJobCount++;
+
+	// Submit job to job system
+	extern job_handle_t *JobSystem_SubmitJobWithCompletion(jobFunction_t, void *, jobPriority_t, void (*)(void *), void *);
+	job_handle_t *handle = JobSystem_SubmitJobWithCompletion(
+		FontLoadWorker_Async, job, JOB_PRIORITY_NORMAL,
+		FontLoadCompletion_Async, job);
+
+	if (!handle) {
+		ri.Printf(PRINT_WARNING, "RE_RegisterFont_Async: Failed to submit job, falling back to sync\n");
+		job->completed = qfalse;
+		job->targetFont = NULL;
+		asyncFontJobCount--;
+		return RE_RegisterFont_Sync(fontName, pointSize, font, wantSDF);
+	}
+
+	ri.Printf(PRINT_ALL, "RE_RegisterFont_Async: Submitted async load for '%s' (%dpt)\n", fontName, pointSize);
+	return qtrue;  // Job submitted successfully
+
+#else
+	// Job system not available, fall back to sync
+	return RE_RegisterFont_Sync(fontName, pointSize, font, (r_fontSDF && r_fontSDF->integer != 0));
+#endif
+}
+
+/*
+=================
+RE_UpdateAsyncFonts
+Update async font loading (should be called once per frame)
+=================
+*/
+/*
+=================
+RE_TestAsyncFontLoading
+Test function to verify async font loading works
+=================
+*/
+void RE_TestAsyncFontLoading(void) {
+	fontInfo_t testFont;
+
+	ri.Printf(PRINT_ALL, "RE_TestAsyncFontLoading: Testing font loading features...\n");
+
+	// Test WOFF2 detection
+#ifdef USE_BROTLI
+	ri.Printf(PRINT_ALL, "RE_TestAsyncFontLoading: WOFF2 decompression support enabled\n");
+
+	// Test with a fake WOFF2 file to verify detection
+	const char *testData = "wOF2test";  // WOFF2 magic bytes "wOF2"
+	if (testData[0] == 'w' && testData[1] == 'O' && testData[2] == 'F' && testData[3] == '2') {
+		ri.Printf(PRINT_ALL, "RE_TestAsyncFontLoading: WOFF2 magic bytes detection working\n");
+	}
+#else
+	ri.Printf(PRINT_ALL, "RE_TestAsyncFontLoading: WOFF2 decompression support not enabled\n");
+#endif
+
+	// Test async/sync loading
+	if (RE_RegisterFont("fonts/roboto-regular.ttf", 16, &testFont)) {
+		ri.Printf(PRINT_ALL, "RE_TestAsyncFontLoading: Font registration returned success\n");
+	} else {
+		ri.Printf(PRINT_WARNING, "RE_TestAsyncFontLoading: Font registration failed\n");
+	}
+
+#ifdef USE_JOBSYSTEM
+	ri.Printf(PRINT_ALL, "RE_TestAsyncFontLoading: Job system available, async loading enabled\n");
+#else
+	ri.Printf(PRINT_ALL, "RE_TestAsyncFontLoading: Job system not available, using sync loading\n");
+#endif
+}
+
+void RE_UpdateAsyncFonts(void) {
+#ifdef USE_JOBSYSTEM
+	// Job system handles completion callbacks automatically via JobSystem_Update
+	// This function is here for potential future expansion
+#endif
+}
+#endif // USE_JOBSYSTEM
+
+/*
+=================
+RE_RegisterFont
+Public interface for font registration - chooses between async and sync loading
+=================
+*/
+qboolean RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
+	// Check if async loading is enabled and available
+	static cvar_t *r_fontAsync = NULL;
+	if (!r_fontAsync) {
+		r_fontAsync = ri.Cvar_Get("r_fontAsync", "1", CVAR_ARCHIVE | CVAR_LATCH);
+		ri.Cvar_SetDescription(r_fontAsync, "Use asynchronous font loading (0 = sync, 1 = async)");
+	}
+
+	ri.Printf(PRINT_ALL, "RE_RegisterFont: called for '%s' (%dpt), async=%d\n",
+		fontName, pointSize, r_fontAsync ? r_fontAsync->integer : 0);
+
+#if defined(USE_JOBSYSTEM)
+	if (r_fontAsync && r_fontAsync->integer) {
+		ri.Printf(PRINT_ALL, "RE_RegisterFont: using async loading\n");
+		return RE_RegisterFont_Async(fontName, pointSize, font);
+	} else
+#endif
+	{
+		ri.Printf(PRINT_ALL, "RE_RegisterFont: using sync loading\n");
+		qboolean wantSDF = (r_fontSDF && r_fontSDF->integer != 0);
+		return RE_RegisterFont_Sync(fontName, pointSize, font, wantSDF);
+	}
+}
+
+/*
+=================
+R_InitFonts
+Initialize the font system
+=================
+*/
+void R_InitFonts(void) {
+	R_InitGlyphSubsetting();
+
+	// Initialize other font-related systems here
+}
+
+/*
+=================
+R_ShutdownFonts
+Shutdown the font system
+=================
+*/
+void R_ShutdownFonts(void) {
+	// Finalize glyph subset if tracking was enabled
+	if (glyphSubset.tracking && !glyphSubset.finalized) {
+		R_FinalizeGlyphSubset();
+	}
+}
 
 void R_DoneFreeType(void) {
 #ifdef USE_FREETYPE

@@ -22,6 +22,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_main.c -- main control flow for each frame
 
 #include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 #include "tr_math_optimized.h"
 
 #include <string.h> // memcpy
@@ -38,7 +40,7 @@ static const float s_flipMatrix[16] = {
 };
 
 
-refimport_t	ri;
+Q_EXPORT refimport_t	ri;
 
 // entities that will have procedurally generated surfaces will just
 // point at this for their sorting surface

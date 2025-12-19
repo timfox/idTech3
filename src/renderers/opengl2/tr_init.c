@@ -218,6 +218,7 @@ cvar_t	*r_fontHinting;
 cvar_t	*r_fontAntialiasing;
 cvar_t	*r_fontLCDFilter;
 cvar_t	*r_fontKerning;
+cvar_t	*r_fontSDFOutline;
 
 cvar_t	*r_marksOnTriangleMeshes;
 
@@ -1362,6 +1363,19 @@ static void R_Register( void )
 	ri.Cvar_CheckRange( r_fontKerning, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_fontKerning, "Enable font kerning for improved text spacing. Kerning adjusts spacing between character pairs (e.g., 'AV', 'To') for better readability." );
 
+	// Advanced SDF rendering options
+	r_fontLCDFilter = ri.Cvar_Get( "r_fontLCDFilter", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fontLCDFilter, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontLCDFilter, "Enable LCD subpixel rendering for improved text clarity on high-DPI displays." );
+
+	r_fontSDFOutline = ri.Cvar_Get( "r_fontSDFOutline", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fontSDFOutline, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontSDFOutline, "Enable SDF font outline/glow effects for better text readability." );
+
+	// Initialize font system
+	extern void R_InitFonts(void);
+	R_InitFonts();
+
 	r_nocurves = ri.Cvar_Get ("r_nocurves", "0", CVAR_CHEAT );
 	ri.Cvar_SetDescription( r_nocurves, "Set to 1 to disable drawing world bezier curves. Set to 0 to enable." );
 	r_drawworld = ri.Cvar_Get ("r_drawworld", "1", CVAR_CHEAT );
@@ -1577,13 +1591,13 @@ void R_Init( void ) {
 
 	R_InitVaos();
 
+	R_InitFreeType();
+
 	R_InitShaders();
 
 	R_InitSkins();
 
 	R_ModelInit();
-
-	R_InitFreeType();
 
 	R_InitQueries();
 

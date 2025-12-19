@@ -6,6 +6,8 @@ Implementation based on SIGGRAPH 2021 paper
 */
 
 #include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 #include "tr_math_optimized.h"
 #include "vk.h"
 #include "vk_gibs.h"

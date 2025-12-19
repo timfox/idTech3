@@ -105,7 +105,7 @@ typedef struct {
 #ifdef __USEA3D
 	void    (*A3D_RenderGeometry) (void *pVoidA3D, void *pVoidGeom, void *pVoidMat, void *pVoidGeomStatus);
 #endif
-	void	(*RegisterFont)(const char *fontName, int pointSize, fontInfo_t *font);
+	qboolean (*RegisterFont)(const char *fontName, int pointSize, fontInfo_t *font);
 	void	(*RemapShader)(const char *oldShader, const char *newShader, const char *offsetTime);
 	qboolean (*GetEntityToken)( char *buffer, int size );
 	qboolean (*inPVS)( const vec3_t p1, const vec3_t p2 );
@@ -237,7 +237,9 @@ typedef struct {
 
 } refimport_t;
 
-extern __attribute__((visibility("default"))) refimport_t ri;
+#ifndef USE_RENDERER_DLOPEN
+extern refimport_t ri;
+#endif
 
 // this is the only function actually exported at the linker level
 // If the module can't init to a valid rendering state, NULL will be

@@ -7,9 +7,11 @@ Unicode glyph mapping support for modern font rendering
 #include "../qcommon/q_shared.h"
 #include "../renderercommon/tr_public.h"
 #include "../renderer/tr_common.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 
 #ifdef USE_FREETYPE
-#include "../qcommon/freetype_wrapper.h"
+// FreeType types are declared in qcommon.h
 
 // Unicode code point to glyph index mapping cache
 #define MAX_UNICODE_CACHE 1024

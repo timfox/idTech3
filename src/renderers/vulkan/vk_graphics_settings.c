@@ -6,6 +6,8 @@
 #include "vk_physics.h"
 #include "vk_compute_raytracing.h"
 #include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 #include "../../qcommon/qcommon.h"
 #include <string.h>
 

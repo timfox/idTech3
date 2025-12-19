@@ -1,5 +1,7 @@
 #include "gltf_loader.h"
 #include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 #include "vk.h"
 #include <stdlib.h>
 #include <string.h>

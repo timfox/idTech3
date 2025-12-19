@@ -1,6 +1,8 @@
 #include "vk_ibl.h"
 #include "vk.h"
 #include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 #include "vk_material_system.h"
 
 vk_ibl_t vk_ibl;

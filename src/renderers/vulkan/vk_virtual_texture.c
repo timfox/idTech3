@@ -7,6 +7,8 @@ Virtual texturing allows handling massive textures by streaming texture pages on
 */
 
 #include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 #include "vk.h"
 
 #ifdef USE_VULKAN

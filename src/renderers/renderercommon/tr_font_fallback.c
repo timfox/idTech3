@@ -7,6 +7,11 @@ Font fallback chain support for modern font rendering
 #include "../qcommon/q_shared.h"
 #include "../renderercommon/tr_public.h"
 #include "../renderer/tr_common.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
+
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 
 #define MAX_FONT_FALLBACKS 4
 #define MAX_FONTS 6  // Match definition in tr_font.c

@@ -1478,6 +1478,10 @@ struct fontInfo_s {
   char familyName[64];      // font family name
   char styleName[64];       // font style name (Regular, Bold, Italic, etc.)
   fontInfo_t *fallbackFont; // fallback font for missing glyphs
+  // Glyph subsetting support
+  qboolean isSubset;        // true if this is a subset font
+  uint8_t subsetMap[256];   // maps character code to glyph index in subset (0xFF = not present)
+  int subsetSize;           // number of glyphs in the subset
 };
 
 #define Square(x) ((x)*(x))

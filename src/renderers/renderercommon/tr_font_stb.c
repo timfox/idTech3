@@ -11,7 +11,14 @@ libs/stb/stb_truetype.h. Falls back to a stub otherwise.
 #include "../qcommon/q_shared.h"
 #include "../qcommon/qcommon.h"
 #include "../opengl/tr_common.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
+
 #include "../opengl/tr_local.h"
+
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
+
 
 #if defined(USE_STB_TRUETYPE) && (__has_include("../../libs/stb/stb_truetype.h") || __has_include("../../libs/cimgui/imgui/imstb_truetype.h"))
 #define STB_TRUETYPE_IMPLEMENTATION

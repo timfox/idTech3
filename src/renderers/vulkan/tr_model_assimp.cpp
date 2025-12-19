@@ -10,6 +10,8 @@ one MD3-like surface. Animated bones/skins are not yet handled.
 */
 
 #include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 
 #ifdef USE_ASSIMP
 

@@ -99,6 +99,8 @@ layout (constant_id = 6) const int tex_mode = 0; // modulate, add (identity), ad
 layout (constant_id = 7) const int discard_mode = 0;
 layout (constant_id = 25) const int use_font_sdf = 0;
 layout (constant_id = 26) const float font_sdf_smooth = 0.25;
+layout (constant_id = 27) const int use_lcd_subpixel = 0;
+layout (constant_id = 28) const int use_sdf_outline = 0;
 
 // Additional specialization constants for optimization
 // These allow the compiler to optimize away unused code paths
@@ -668,11 +670,60 @@ void main() {
 	}
 #endif
 
-	// SDF font handling: convert stored distance to coverage
+	// Advanced SDF font handling with improved anti-aliasing and subpixel rendering
 	if ( use_font_sdf != 0 ) {
-		float alpha = smoothStep(0.5 - font_sdf_smooth, 0.5 + font_sdf_smooth, base.a);
-		base.rgb *= alpha;
-		base.a = alpha;
+		// Get texture derivatives for proper anti-aliasing
+		vec2 texSize = vec2(textureSize(texture0, 0));
+		vec2 dx = dFdx(frag_tex_coord0) * texSize;
+		vec2 dy = dFdy(frag_tex_coord0) * texSize;
+		float pixelDistance = length(vec2(length(dx), length(dy))) / sqrt(2.0);
+
+		// Enhanced SDF sampling with proper derivatives
+		float sdfValue = base.a;
+		float sdfWidth = fwidth(sdfValue) * 0.5;
+
+		// Improved smoothstep with derivative-based anti-aliasing
+		float alpha = smoothstep(0.5 - sdfWidth, 0.5 + sdfWidth, sdfValue);
+
+		// Optional: LCD subpixel rendering for high-DPI displays
+		// This provides RGB subpixel rendering on LCD panels
+		#if defined(USE_LCD_SUBPIXEL)
+		if (use_font_sdf == 2) {
+			// Sample subpixel positions for RGB channels
+			vec2 subpixelOffset = vec2(1.0/3.0, 0.0) / texSize.x;
+			float r = texture(texture0, frag_tex_coord0 - subpixelOffset).a;
+			float g = sdfValue; // Current sample is green
+			float b = texture(texture0, frag_tex_coord0 + subpixelOffset).a;
+
+			// Apply SDF smoothing to each channel
+			r = smoothstep(0.5 - sdfWidth, 0.5 + sdfWidth, r);
+			g = smoothstep(0.5 - sdfWidth, 0.5 + sdfWidth, g);
+			b = smoothstep(0.5 - sdfWidth, 0.5 + sdfWidth, b);
+
+			// Combine RGB channels
+			base.rgb = frag_color0.rgb * vec3(r, g, b);
+			base.a = (r + g + b) / 3.0;
+		} else
+		#endif
+		{
+			// Standard SDF rendering with improved anti-aliasing
+			base.rgb *= alpha;
+			base.a = alpha;
+		}
+
+		// Optional: Add slight outline/soft glow effect
+		#if defined(USE_SDF_OUTLINE)
+		if (use_font_sdf == 3) {
+			float outlineThreshold = 0.3;
+			float outlineAlpha = smoothstep(outlineThreshold - sdfWidth, outlineThreshold + sdfWidth, sdfValue);
+			outlineAlpha = max(0.0, outlineAlpha - alpha); // Only outline, not fill
+
+			// Outline color (can be customized)
+			vec3 outlineColor = vec3(0.2, 0.4, 1.0); // Blue outline
+			base.rgb = mix(base.rgb, outlineColor, outlineAlpha * 0.7);
+			base.a = max(base.a, outlineAlpha * 0.5);
+		}
+		#endif
 	}
 
 	// Early exit optimization: discard mode

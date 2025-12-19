@@ -10,6 +10,13 @@ UTF-8 and modern font rendering utilities
 #include "../renderercommon/tr_public.h"
 #include "../renderer/tr_common.h"
 
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
+
+// Forward declaration for glyph access function
+glyphInfo_t *R_GetGlyphFromFont(fontInfo_t *font, int charCode);
+extern refimport_t ri;
+
 // Text style constants (if not defined elsewhere)
 #ifndef ITEM_TEXTSTYLE_SHADOWED
 #define ITEM_TEXTSTYLE_SHADOWED 1
@@ -148,16 +155,20 @@ float RE_Text_Width_Improved(const char *text, float scale, fontInfo_t *font, in
 			}
 		}
 		
-		glyphInfo_t *		glyph = &font->glyphs[c & 255];
-		
-		// Check fallback chain if glyph is missing
-		if (glyph->glyph == 0 && font->fallbackFont) {
-			fontInfo_t *fallback = font->fallbackFont;
-			glyphInfo_t *fallbackGlyph = &fallback->glyphs[c & 255];
-			if (fallbackGlyph->glyph != 0) {
-				glyph = fallbackGlyph;
-				useScale = scale * fallback->glyphScale;
-			}
+		glyphInfo_t *glyph = R_GetGlyphFromFont(font, c);
+
+		if (!glyph) {
+			// Glyph not found in subset or fallback
+			s++;
+			count++;
+			continue;
+		}
+
+		// Calculate scale (may be adjusted for fallback fonts)
+		float useScale = scale;
+		if (glyph != &font->glyphs[c & 255] && font->fallbackFont) {
+			// Using fallback font
+			useScale = scale * font->fallbackFont->glyphScale;
 		}
 		
 		width += glyph->xSkip * useScale;
@@ -231,17 +242,14 @@ float RE_Text_Height_Improved(const char *text, float scale, fontInfo_t *font, i
 			continue;
 		}
 		
-		glyphInfo_t *		glyph = &font->glyphs[c & 255];
-		
-		// Check fallback chain if glyph is missing
-		if (glyph->glyph == 0 && font->fallbackFont) {
-			fontInfo_t *fallback = font->fallbackFont;
-			glyphInfo_t *fallbackGlyph = &fallback->glyphs[c & 255];
-			if (fallbackGlyph->glyph != 0) {
-				glyph = fallbackGlyph;
-			}
+		glyphInfo_t *glyph = R_GetGlyphFromFont(font, c);
+
+		if (!glyph) {
+			s++;
+			count++;
+			continue;
 		}
-		
+
 		if (glyph->height > maxHeight) {
 			maxHeight = glyph->height;
 		}

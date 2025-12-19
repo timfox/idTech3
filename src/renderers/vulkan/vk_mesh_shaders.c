@@ -7,6 +7,8 @@ Mesh shaders provide GPU-driven rendering with meshlet-based culling and LOD.
 */
 
 #include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 #include "vk.h"
 
 #ifdef USE_VULKAN

@@ -5,6 +5,8 @@ GPU-Driven Rendering Pipeline Implementation
 */
 
 #include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 #include "vk.h"
 #include "vk_gpu_culling.h"
 

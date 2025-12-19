@@ -442,6 +442,12 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 		return;
 	}
 
+	// Update async font loading
+#ifdef USE_JOBSYSTEM
+	extern void RE_UpdateAsyncFonts(void);
+	RE_UpdateAsyncFonts();
+#endif
+
 	cmd = R_GetCommandBufferReserved( sizeof( *cmd ), 0 );
 	if ( !cmd ) {
 		return;

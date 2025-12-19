@@ -6,6 +6,8 @@ Supports runtime material parameters and scripting
 */
 
 #include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 #include "vk.h"
 #include "vk_material_system.h"
 #include "vk_layered_materials.h"

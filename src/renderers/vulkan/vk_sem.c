@@ -1,6 +1,8 @@
 #include "vk_sem.h"
 #include "vk.h"
 #include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 #include "../../qcommon/qcommon.h"
 #include <string.h>
 

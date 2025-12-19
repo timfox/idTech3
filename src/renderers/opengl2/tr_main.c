@@ -37,7 +37,7 @@ static const float	s_flipMatrix[16] = {
 };
 
 
-refimport_t	ri;
+Q_EXPORT refimport_t	ri;
 
 // entities that will have procedurally generated surfaces will just
 // point at this for their sorting surface

@@ -17,6 +17,11 @@ stub loader that simply fails at runtime.
 // is provided there for the renderer frontends, but not needed for the
 // implementation.
 
+// Renderer import interface - defined in renderer main file
+extern "C" {
+extern refimport_t ri;
+}
+
 // Only use OpenEXR if the build system found it and defined USE_OPENEXR.
 #ifdef USE_OPENEXR
 

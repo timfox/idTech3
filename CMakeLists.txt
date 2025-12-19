@@ -365,6 +365,7 @@ OPTION(USE_ZSTD "" ON)
 OPTION(USE_ENET "" ON)
 OPTION(USE_SQLITE "" ON)
 OPTION(USE_FREETYPE "" ON)
+OPTION(USE_BROTLI "" ON)
 OPTION(USE_OPENSSL "" ON)
 OPTION(USE_AIML "Enable AIML 2.1 parser/interpreter support" ON)
 OPTION(USE_ENTT "Enable EnTT ECS system" ON)
@@ -1207,6 +1208,8 @@ AUX_SOURCE_DIRECTORY(src/renderers/renderercommon RENDERER_COMMON_SRCS)
 if(NOT USE_OPENEXR OR NOT OpenEXR_FOUND)
 	list(REMOVE_ITEM RENDERER_COMMON_SRCS src/renderers/renderercommon/tr_image_exr.cpp)
 endif()
+# Note: FreeType-dependent files are included when USE_FREETYPE is defined
+# They have proper guards to compile to empty implementations when FreeType is not available
 AUX_SOURCE_DIRECTORY(src/renderer RENDERER_GL_SRCS)
 AUX_SOURCE_DIRECTORY(src/renderers/vulkan RENDERER_VK_SRCS)
 
@@ -1300,18 +1303,21 @@ IF(USE_RENDERER_DLOPEN)
 	# Adding `src/renderers` to the include path keeps those includes resolving to `src/qcommon/...`.
 	target_include_directories(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/renderers)
 	TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_opengl${RENDEXT} m)
+	TARGET_LINK_OPTIONS(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE -Wl,--export-dynamic)
 
 	if(USE_VULKAN)
 		ADD_LIBRARY(${RENDERER_PREFIX}_vulkan${RENDEXT} SHARED ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
 		SET_TARGET_PROPERTIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES OUTPUT_NAME "${RENDERER_PREFIX}_vulkan${RENDEXT}" PREFIX "")
-		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_VULKAN)
+		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_VULKAN USE_FREETYPE)
 		# `src/renderers/renderercommon/*` uses legacy relative includes like "../qcommon/...".
 		# Adding `src/renderers` to the include path keeps those includes resolving to `src/qcommon/...`.
 		target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/renderers)
+		target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE /usr/include/freetype2)
 		IF(IDTECH3_VK_EXPERIMENTAL)
 			TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE IDTECH3_VK_EXPERIMENTAL)
 		ENDIF()
 		TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE m)
+		TARGET_LINK_OPTIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE -Wl,--export-dynamic)
 
 		# VMA (Vulkan Memory Allocator) - configure after target is created
 		IF(USE_VMA AND USE_VULKAN)
@@ -1357,7 +1363,8 @@ IF(USE_RENDERER_DLOPEN)
 	ELSE()
 		IF(USE_VULKAN)
 			ADD_LIBRARY(${RENDERER_PREFIX}_vulkan OBJECT ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS})
-			TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan PRIVATE USE_VULKAN)
+			TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan PRIVATE USE_VULKAN USE_FREETYPE)
+			TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan PRIVATE /usr/include/freetype2)
 		
 		# VMA (Vulkan Memory Allocator) - configure after target is created
 		IF(USE_VMA AND USE_VULKAN)
@@ -1620,10 +1627,23 @@ IF(USE_SQLITE)
 	ENDIF()
 ENDIF()
 
+IF(USE_BROTLI)
+	# Try pkg-config first for Brotli
+	pkg_check_modules(BROTLI libbrotlienc libbrotlidec QUIET)
+	IF(BROTLI_FOUND)
+		SET(BROTLI_INCLUDE_DIRS ${BROTLI_INCLUDE_DIRS})
+		SET(BROTLI_LIBRARIES ${BROTLI_LIBRARIES})
+		MESSAGE(STATUS "Brotli found: ${BROTLI_LIBRARIES}")
+	ELSE()
+		MESSAGE(WARNING "Brotli not found, WOFF2 font support will be disabled")
+		SET(USE_BROTLI OFF CACHE BOOL "" FORCE)
+	ENDIF()
+ENDIF()
+
 IF(USE_FREETYPE)
 	# Try CMake's find_package first
 	find_package(Freetype QUIET)
-	
+
 	# If not found, try manual search
 	IF(NOT Freetype_FOUND)
 		FIND_PATH(FREETYPE_INCLUDE_DIRS
@@ -1652,6 +1672,10 @@ IF(USE_FREETYPE)
 		TARGET_INCLUDE_DIRECTORIES(qcommon PUBLIC ${FREETYPE_INCLUDE_DIRS})
 		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_FREETYPE BUILD_FREETYPE)
 		TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE USE_FREETYPE)
+		IF(USE_BROTLI)
+			TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_BROTLI)
+			TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE USE_BROTLI)
+		ENDIF()
 		MESSAGE(STATUS "Freetype found: ${FREETYPE_LIBRARIES}")
 	ELSE()
 		MESSAGE(WARNING "Freetype not found, disabling Freetype support")
@@ -1889,7 +1913,7 @@ IF(USE_DAV1D)
 			SET(DAV1D_LIBRARIES ${DAV1D_LIBRARIES})
 		ENDIF()
 	ENDIF()
-	
+
 	# Manual search as fallback
 	IF(NOT DAV1D_FOUND)
 		FIND_PATH(DAV1D_INCLUDE_DIR
@@ -2345,6 +2369,13 @@ ENDIF()
 IF(USE_FREETYPE)
 	IF(Freetype_FOUND)
 		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ${FREETYPE_LIBRARIES})
+	ENDIF()
+ENDIF()
+
+IF(USE_BROTLI)
+	IF(BROTLI_FOUND)
+		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ${BROTLI_LIBRARIES})
+		MESSAGE(STATUS "Linking Brotli for WOFF2 support: ${BROTLI_LIBRARIES}")
 	ENDIF()
 ENDIF()
 

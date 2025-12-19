@@ -22,6 +22,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_marks.c -- polygon projection on the world polygons
 
 #include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
 //#include "assert.h"
 
 #define MAX_VERTS_ON_POLY		64
