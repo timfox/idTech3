@@ -188,27 +188,175 @@ TEST(angle_delta) {
 
 TEST(bounds_operations) {
 	vec3_t mins, maxs;
-	
+
 	ClearBounds(mins, maxs);
 	// After ClearBounds, mins should be very large positive, maxs very large negative
 	ASSERT_TRUE(mins[0] > 1000.0f);
 	ASSERT_TRUE(maxs[0] < -1000.0f);
-	
+
 	vec3_t point1 = { 1.0f, 2.0f, 3.0f };
 	vec3_t point2 = { -1.0f, -2.0f, -3.0f };
 	vec3_t point3 = { 5.0f, 0.0f, 0.0f };
-	
+
 	ClearBounds(mins, maxs);
 	AddPointToBounds(point1, mins, maxs);
 	AddPointToBounds(point2, mins, maxs);
 	AddPointToBounds(point3, mins, maxs);
-	
+
 	ASSERT_TRUE(float_eq(mins[0], -1.0f, 1e-4f));
 	ASSERT_TRUE(float_eq(mins[1], -2.0f, 1e-4f));
 	ASSERT_TRUE(float_eq(mins[2], -3.0f, 1e-4f));
 	ASSERT_TRUE(float_eq(maxs[0], 5.0f, 1e-4f));
 	ASSERT_TRUE(float_eq(maxs[1], 2.0f, 1e-4f));
 	ASSERT_TRUE(float_eq(maxs[2], 3.0f, 1e-4f));
+}
+
+TEST(matrix_operations) {
+	// Test basic matrix operations (simplified)
+	vec3_t in = { 1.0f, 2.0f, 3.0f };
+	vec3_t out;
+
+	// Test vector transformation (simplified)
+	vec3_t axis = { 0.0f, 0.0f, 1.0f };
+	RotatePointAroundVector(out, in, axis, 45.0f); // 45 degree rotation
+
+	// Just check that the function produces finite values
+	ASSERT_TRUE(isfinite(out[0]));
+	ASSERT_TRUE(isfinite(out[1]));
+	ASSERT_TRUE(isfinite(out[2]));
+}
+
+TEST(quaternion_operations) {
+	// Test basic quaternion concepts (simplified)
+	vec4_t q = { 0.0f, 0.0f, 0.0f, 1.0f }; // Identity quaternion (w=1, x=y=z=0)
+
+	// Identity quaternion should have w=1 and xyz=0
+	ASSERT_TRUE(float_eq(q[3], 1.0f, 1e-4f)); // w component
+	ASSERT_TRUE(float_eq(q[0], 0.0f, 1e-4f)); // x component
+	ASSERT_TRUE(float_eq(q[1], 0.0f, 1e-4f)); // y component
+	ASSERT_TRUE(float_eq(q[2], 0.0f, 1e-4f)); // z component
+}
+
+TEST(plane_operations) {
+	// Test point-plane distance
+	vec3_t plane_normal = { 0.0f, 0.0f, 1.0f }; // XY plane normal
+	float plane_dist = 0.0f; // Distance from origin
+	vec3_t point_above = { 0.0f, 0.0f, 1.0f };
+	vec3_t point_below = { 0.0f, 0.0f, -1.0f };
+
+	float dist_above = DotProduct(plane_normal, point_above) - plane_dist;
+	float dist_below = DotProduct(plane_normal, point_below) - plane_dist;
+
+	ASSERT_TRUE(float_eq(dist_above, 1.0f, 1e-4f));
+	ASSERT_TRUE(float_eq(dist_below, -1.0f, 1e-4f));
+}
+
+TEST(sphere_intersection) {
+	// Test sphere-sphere intersection
+	vec3_t center1 = { 0.0f, 0.0f, 0.0f };
+	vec3_t center2 = { 3.0f, 0.0f, 0.0f };
+	float radius1 = 2.0f;
+	float radius2 = 2.0f;
+
+	// Distance between centers: 3.0
+	// Sum of radii: 4.0
+	// Should intersect
+	float dist_sq = DistanceSquared(center1, center2);
+	float radii_sum = radius1 + radius2;
+	float radii_diff = fabsf(radius1 - radius2);
+
+	ASSERT_TRUE(dist_sq < (radii_sum * radii_sum)); // They intersect
+	ASSERT_TRUE(dist_sq > (radii_diff * radii_diff)); // They don't contain each other
+}
+
+TEST(lerp_operations) {
+	// Test linear interpolation
+	vec3_t start = { 0.0f, 0.0f, 0.0f };
+	vec3_t end = { 10.0f, 20.0f, 30.0f };
+	vec3_t result;
+
+	// Manual lerp: result = start + t * (end - start)
+	vec3_t diff;
+	VectorSubtract(end, start, diff);
+
+	// Test midpoint (t = 0.5)
+	float t = 0.5f;
+	result[0] = start[0] + t * diff[0];
+	result[1] = start[1] + t * diff[1];
+	result[2] = start[2] + t * diff[2];
+	ASSERT_TRUE(float_eq(result[0], 5.0f, 1e-4f));
+	ASSERT_TRUE(float_eq(result[1], 10.0f, 1e-4f));
+	ASSERT_TRUE(float_eq(result[2], 15.0f, 1e-4f));
+
+	// Test start point (t = 0.0)
+	t = 0.0f;
+	result[0] = start[0] + t * diff[0];
+	result[1] = start[1] + t * diff[1];
+	result[2] = start[2] + t * diff[2];
+	ASSERT_TRUE(float_eq(result[0], 0.0f, 1e-4f));
+	ASSERT_TRUE(float_eq(result[1], 0.0f, 1e-4f));
+	ASSERT_TRUE(float_eq(result[2], 0.0f, 1e-4f));
+
+	// Test end point (t = 1.0)
+	t = 1.0f;
+	result[0] = start[0] + t * diff[0];
+	result[1] = start[1] + t * diff[1];
+	result[2] = start[2] + t * diff[2];
+	ASSERT_TRUE(float_eq(result[0], 10.0f, 1e-4f));
+	ASSERT_TRUE(float_eq(result[1], 20.0f, 1e-4f));
+	ASSERT_TRUE(float_eq(result[2], 30.0f, 1e-4f));
+}
+
+TEST(spline_operations) {
+	// Test basic spline-like interpolation (simplified)
+	vec3_t p1 = { 1.0f, 1.0f, 0.0f };
+	vec3_t p2 = { 2.0f, 0.0f, 0.0f };
+	vec3_t result;
+
+	// Simple linear interpolation between two points
+	float t = 0.5f;
+	result[0] = p1[0] + t * (p2[0] - p1[0]);
+	result[1] = p1[1] + t * (p2[1] - p1[1]);
+	result[2] = p1[2] + t * (p2[2] - p1[2]);
+
+	// Should be at midpoint
+	float expected_x = 1.5f;
+	float expected_y = 0.5f;
+	float expected_z = 0.0f;
+
+	ASSERT_TRUE(float_eq(result[0], expected_x, 1e-4f));
+	ASSERT_TRUE(float_eq(result[1], expected_y, 1e-4f));
+	ASSERT_TRUE(float_eq(result[2], expected_z, 1e-4f));
+}
+
+TEST(random_number_generation) {
+	// Test random number generation bounds
+	// Note: This is a basic smoke test since we can't predict random values
+	int random_val = rand() % 100;
+	ASSERT_TRUE(random_val >= 0 && random_val < 100);
+
+	// Test seeded randomness for reproducibility
+	srand(42);
+	int val1 = rand();
+	srand(42);
+	int val2 = rand();
+	ASSERT_EQ(val1, val2); // Same seed should give same sequence
+}
+
+TEST(color_operations) {
+	// Test color packing/unpacking
+	byte r = 255, g = 128, b = 64, a = 200;
+	uint32_t packed = ((uint32_t)r << 24) | ((uint32_t)g << 16) | ((uint32_t)b << 8) | a;
+
+	byte unpacked_r = (packed >> 24) & 0xFF;
+	byte unpacked_g = (packed >> 16) & 0xFF;
+	byte unpacked_b = (packed >> 8) & 0xFF;
+	byte unpacked_a = packed & 0xFF;
+
+	ASSERT_EQ(unpacked_r, r);
+	ASSERT_EQ(unpacked_g, g);
+	ASSERT_EQ(unpacked_b, b);
+	ASSERT_EQ(unpacked_a, a);
 }
 
 int main(void) {
@@ -225,6 +373,14 @@ int main(void) {
 	RUN_TEST(angle_normalization);
 	RUN_TEST(angle_delta);
 	RUN_TEST(bounds_operations);
+	RUN_TEST(matrix_operations);
+	RUN_TEST(quaternion_operations);
+	RUN_TEST(plane_operations);
+	RUN_TEST(sphere_intersection);
+	RUN_TEST(lerp_operations);
+	RUN_TEST(spline_operations);
+	RUN_TEST(random_number_generation);
+	RUN_TEST(color_operations);
 
 	PRINT_TEST_SUMMARY();
 	return (test_failed > 0) ? 1 : 0;

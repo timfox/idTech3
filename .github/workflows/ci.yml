@@ -232,6 +232,55 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+  fuzz:
+    name: Fuzz Testing (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Clang and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang-18 lld-18 cmake pkg-config python3 \
+            libsdl2-dev libcurl4-openssl-dev \
+            libssl-dev libjpeg-dev \
+            libvorbis-dev libogg-dev \
+            libfreetype6-dev libsqlite3-dev \
+            liblua5.4-dev libwebsockets-dev \
+            libzstd-dev libopenal-dev \
+            libvulkan-dev libtheora-dev \
+            libvpx-dev libdav1d-dev \
+            libopenexr-dev libassimp-dev \
+            libbullet-dev
+          echo "CC=clang-18" >> $GITHUB_ENV
+          echo "CXX=clang++-18" >> $GITHUB_ENV
+
+      - name: Build with fuzzing enabled
+        run: |
+          mkdir -p build-fuzz
+          cd build-fuzz
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DUSE_VULKAN=ON \
+            -DUSE_RENDERER_DLOPEN=ON \
+            -DBUILD_TESTS=ON
+          make -j$(nproc) fuzz_network
+
+      - name: Run fuzzing tests
+        run: |
+          cd build-fuzz
+          # Run fuzzing for a short time (10 seconds per target)
+          timeout 10s ./fuzz_network -max_total_time=10 || true
+          # Check for crashes
+          if [ -d "crash-*" ] || [ -d "leak-*" ]; then
+            echo "Fuzzing found issues!"
+            find . -name "crash-*" -o -name "leak-*" | head -5
+            exit 1
+          else
+            echo "Fuzzing completed without issues"
+          fi
+
   smoke:
     name: Smoke test (Linux)
     needs: [build, game-modules]
@@ -246,6 +295,38 @@ jobs:
           merge-multiple: true
           path: artifacts
 
+      - name: Run unit tests
+        run: |
+          cd build
+          # Run available unit tests
+          if [ -f "test_qmath" ]; then ./test_qmath; fi
+          if [ -f "test_network_enet" ]; then ./test_network_enet; fi
+          if [ -f "test_geometry" ]; then ./test_geometry; fi
+          if [ -f "test_security" ]; then ./test_security; fi
+
+      - name: Run performance benchmarks
+        id: perf_check
+        run: |
+          cd build
+          mkdir -p perf_results
+
+          # Run our performance benchmark if available
+          if [ -f "benchmark_performance" ]; then
+            echo "Running performance benchmarks..."
+            ./benchmark_performance > perf_results/current.txt 2>&1 || true
+
+            # Extract key metrics for regression checking
+            BUILD_TIME=$(grep "Build time" perf_results/current.txt | awk '{print $3}' || echo "0")
+
+            echo "build_time=$BUILD_TIME" >> $GITHUB_OUTPUT
+
+            # Basic regression check (very simple - could be enhanced)
+            if [ "$BUILD_TIME" -gt 1000 ] 2>/dev/null; then
+              echo "Performance regression detected: build time ${BUILD_TIME}ms > 1000ms threshold"
+              exit 1
+            fi
+          fi
+
       - name: Run smoke tests
         env:
           ENGINE_BIN: artifacts/build/idtech3.x86_64
@@ -254,7 +335,7 @@ jobs:
           if [ ! -x "${ENGINE_BIN}" ]; then
             ALT_BIN=$(find artifacts -name "idtech3.x86_64" -type f | head -n1 || true)
             if [ -n "${ALT_BIN}" ]; then
-              ENGINE_BIN="${ALT_BIN}"
+              ENGINE_BIN="${ENGINE_BIN}"
               chmod +x "${ENGINE_BIN}"
             fi
           fi

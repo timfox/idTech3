@@ -112,48 +112,110 @@ jobs:
           cat "$RESULTS_FILE"
           echo "results_file=$RESULTS_FILE" >> $GITHUB_OUTPUT
       
-      - name: Compare with baseline
+      - name: Compare with baseline and check regressions
+        id: regression_check
         run: |
+          REGRESSION_FOUND=0
+          THRESHOLD_BUILD_TIME=10    # 10% build time increase allowed
+          THRESHOLD_BINARY_SIZE=5    # 5% binary size increase allowed
+          THRESHOLD_STARTUP_TIME=20  # 20% startup time increase allowed
+          THRESHOLD_MEMORY_KB=15     # 15% memory increase allowed
+
           if [ -f "benchmarks/baseline.json" ]; then
             echo "Comparing with baseline..."
-            # Simple comparison script
+            # Regression detection script
             python3 << EOF
           import json
           import sys
-          
+          import os
+
+          def check_regression(baseline_val, current_val, threshold_percent, metric_name):
+              try:
+                  baseline_val = float(baseline_val)
+                  current_val = float(current_val)
+                  if baseline_val == 0:
+                      return False, 0.0
+                  diff = ((current_val - baseline_val) / baseline_val) * 100
+                  return diff > threshold_percent, diff
+              except:
+                  return False, 0.0
+
           try:
               with open('benchmarks/baseline.json', 'r') as f:
                   baseline = json.load(f)
               with open('${{ steps.benchmarks.outputs.results_file }}', 'r') as f:
                   current = json.load(f)
-              
+
               baseline_metrics = baseline.get('metrics', {})
               current_metrics = current.get('metrics', {})
-              
+
               print("## Benchmark Comparison")
               print("")
-              
-              for key in ['build_time', 'binary_size', 'startup_time', 'memory_kb']:
+
+              regressions = []
+
+              # Check each metric for regressions
+              checks = [
+                  ('build_time', $THRESHOLD_BUILD_TIME, 'Build Time'),
+                  ('binary_size', $THRESHOLD_BINARY_SIZE, 'Binary Size'),
+                  ('startup_time', $THRESHOLD_STARTUP_TIME, 'Startup Time'),
+                  ('memory_kb', $THRESHOLD_MEMORY_KB, 'Memory Usage')
+              ]
+
+              for key, threshold, display_name in checks:
                   baseline_val = baseline_metrics.get(key, 0)
                   current_val = current_metrics.get(key, 0)
-                  
+
                   if baseline_val and current_val:
                       try:
                           baseline_val = float(baseline_val)
                           current_val = float(current_val)
                           diff = ((current_val - baseline_val) / baseline_val) * 100
-                          print(f"- **{key}**: {current_val:.2f} ({diff:+.1f}% vs baseline)")
+                          is_regression, _ = check_regression(baseline_val, current_val, threshold, key)
+                          if is_regression:
+                              regressions.append(f"{display_name}: {diff:+.1f}% (threshold: {threshold}%)")
+                          print(f"- **{display_name}**: {current_val:.2f} ({diff:+.1f}% vs baseline)")
                       except:
-                          print(f"- **{key}**: {current_val} (vs baseline: {baseline_val})")
+                          print(f"- **{display_name}**: {current_val} (vs baseline: {baseline_val})")
                   else:
-                      print(f"- **{key}**: {current_val}")
+                      print(f"- **{display_name}**: {current_val}")
+
+              # Write regression status to file
+              with open('regression_status.txt', 'w') as f:
+                  f.write('1' if regressions else '0')
+                  if regressions:
+                      f.write('\n' + '\n'.join(regressions))
+
+              if regressions:
+                  print("")
+                  print("## 🚨 Performance Regressions Detected!")
+                  for regression in regressions:
+                      print(f"- {regression}")
+                  sys.exit(1)
+              else:
+                  print("")
+                  print("✅ No performance regressions detected")
+
           except Exception as e:
               print(f"Error comparing: {e}")
+              sys.exit(1)
           EOF
+
+          # Read regression status and set output
+          if [ -f "regression_status.txt" ]; then
+            REGRESSION_FOUND=$(head -n1 regression_status.txt)
+            if [ "$REGRESSION_FOUND" = "1" ]; then
+              echo "Performance regressions detected!"
+              tail -n+2 regression_status.txt
+              exit 1
+            fi
+          fi
           else
             echo "No baseline found, saving current results as baseline..."
             cp "${{ steps.benchmarks.outputs.results_file }}" benchmarks/baseline.json || true
           fi
+
+          echo "regression_found=$REGRESSION_FOUND" >> $GITHUB_OUTPUT
       
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4

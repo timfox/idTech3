@@ -2753,5 +2753,97 @@ IF(BUILD_TESTS)
 	TARGET_COMPILE_DEFINITIONS(test_memory PRIVATE STANDALONE_TEST)
 	ADD_TEST(NAME memory_tests COMMAND test_memory)
 
+	# Geometry tests
+	ADD_EXECUTABLE(test_geometry
+		tests/test_geometry.c
+		src/qcommon/q_math.c
+		src/qcommon/q_shared.c
+	)
+	TARGET_INCLUDE_DIRECTORIES(test_geometry PRIVATE src/qcommon)
+	TARGET_INCLUDE_DIRECTORIES(test_geometry PRIVATE src)
+	TARGET_INCLUDE_DIRECTORIES(test_geometry PRIVATE tests)
+	IF(UNIX)
+		TARGET_LINK_LIBRARIES(test_geometry PRIVATE m)
+	ENDIF()
+	ADD_TEST(NAME geometry_tests COMMAND test_geometry)
+
+	# Security tests
+	ADD_EXECUTABLE(test_security
+		tests/test_security.c
+		src/qcommon/q_math.c
+		src/qcommon/q_shared.c
+	)
+	TARGET_INCLUDE_DIRECTORIES(test_security PRIVATE src/qcommon)
+	TARGET_INCLUDE_DIRECTORIES(test_security PRIVATE src)
+	TARGET_INCLUDE_DIRECTORIES(test_security PRIVATE tests)
+	IF(UNIX)
+		TARGET_LINK_LIBRARIES(test_security PRIVATE m)
+	ENDIF()
+	ADD_TEST(NAME security_tests COMMAND test_security)
+
+	# Performance benchmarks
+	ADD_EXECUTABLE(benchmark_performance
+		tests/benchmark_performance.c
+		src/qcommon/q_math.c
+		src/qcommon/q_shared.c
+	)
+	TARGET_INCLUDE_DIRECTORIES(benchmark_performance PRIVATE src/qcommon)
+	TARGET_INCLUDE_DIRECTORIES(benchmark_performance PRIVATE src)
+	TARGET_INCLUDE_DIRECTORIES(benchmark_performance PRIVATE tests)
+	IF(UNIX)
+		TARGET_LINK_LIBRARIES(benchmark_performance PRIVATE m)
+	ENDIF()
+
+	# Network fuzzing harness (AFL/libFuzzer compatible)
+	IF (CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+		ADD_EXECUTABLE(fuzz_network
+			tests/fuzz_network.c
+			src/qcommon/msg.c
+			src/qcommon/q_math.c
+			src/qcommon/q_shared.c
+		)
+		TARGET_INCLUDE_DIRECTORIES(fuzz_network PRIVATE src/qcommon)
+		TARGET_INCLUDE_DIRECTORIES(fuzz_network PRIVATE src)
+		TARGET_COMPILE_DEFINITIONS(fuzz_network PRIVATE USE_LIBFUZZER)
+		# libFuzzer flags
+		TARGET_COMPILE_OPTIONS(fuzz_network PRIVATE -fsanitize=fuzzer-no-link)
+		TARGET_LINK_OPTIONS(fuzz_network PRIVATE -fsanitize=fuzzer)
+		IF(UNIX)
+			TARGET_LINK_LIBRARIES(fuzz_network PRIVATE m)
+		ENDIF()
+	ELSE()
+		message(STATUS "Skipping fuzz_network target: requires Clang compiler for libFuzzer.")
+	ENDIF()
+
+# GUI testing framework - disabled due to linking dependencies
+# ADD_EXECUTABLE(test_gui_basic
+# 	tests/test_gui_basic.c
+# 	tests/test_gui_framework.c
+# 	src/qcommon/q_shared.c
+# 	src/qcommon/q_math.c
+# )
+# TARGET_INCLUDE_DIRECTORIES(test_gui_basic PRIVATE src/qcommon)
+# TARGET_INCLUDE_DIRECTORIES(test_gui_basic PRIVATE src)
+# TARGET_INCLUDE_DIRECTORIES(test_gui_basic PRIVATE tests)
+# TARGET_LINK_LIBRARIES(test_gui_basic PRIVATE qcommon)
+# IF(UNIX)
+# 	TARGET_LINK_LIBRARIES(test_gui_basic PRIVATE m)
+# ENDIF()
+# ADD_TEST(NAME gui_basic_tests COMMAND test_gui_basic)
+
+# Property-based testing (simplified)
+ADD_EXECUTABLE(test_property_based
+	tests/test_property_based_simple.c
+	src/qcommon/q_math.c
+	src/qcommon/q_shared.c
+)
+TARGET_INCLUDE_DIRECTORIES(test_property_based PRIVATE src/qcommon)
+TARGET_INCLUDE_DIRECTORIES(test_property_based PRIVATE src)
+TARGET_INCLUDE_DIRECTORIES(test_property_based PRIVATE tests)
+IF(UNIX)
+	TARGET_LINK_LIBRARIES(test_property_based PRIVATE m)
+ENDIF()
+ADD_TEST(NAME property_based_tests COMMAND test_property_based)
+
 	MESSAGE(STATUS "Unit tests enabled")
 ENDIF()
