@@ -1203,6 +1203,10 @@ ENDIF()
 # Note: `src/renderercommon/` contains compatibility shims; the real shared
 # renderer code lives under `src/renderers/renderercommon/`.
 AUX_SOURCE_DIRECTORY(src/renderers/renderercommon RENDERER_COMMON_SRCS)
+# Remove OpenEXR support if not available
+if(NOT USE_OPENEXR OR NOT OpenEXR_FOUND)
+	list(REMOVE_ITEM RENDERER_COMMON_SRCS src/renderers/renderercommon/tr_image_exr.cpp)
+endif()
 AUX_SOURCE_DIRECTORY(src/renderer RENDERER_GL_SRCS)
 AUX_SOURCE_DIRECTORY(src/renderers/vulkan RENDERER_VK_SRCS)
 
@@ -1297,35 +1301,39 @@ IF(USE_RENDERER_DLOPEN)
 	target_include_directories(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/renderers)
 	TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_opengl${RENDEXT} m)
 
-	ADD_LIBRARY(${RENDERER_PREFIX}_vulkan${RENDEXT} SHARED ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
-	SET_TARGET_PROPERTIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES OUTPUT_NAME "${RENDERER_PREFIX}_vulkan${RENDEXT}" PREFIX "")
-	TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_VULKAN)
-	# `src/renderers/renderercommon/*` uses legacy relative includes like "../qcommon/...".
-	# Adding `src/renderers` to the include path keeps those includes resolving to `src/qcommon/...`.
-	target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/renderers)
-	IF(IDTECH3_VK_EXPERIMENTAL)
-		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE IDTECH3_VK_EXPERIMENTAL)
-	ENDIF()
-	TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE m)
-	
-	# VMA (Vulkan Memory Allocator) - configure after target is created
-	IF(USE_VMA AND USE_VULKAN)
-		# Check if VMA header exists
-		IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/libs/vma/vk_mem_alloc.h)
-			TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VMA)
-			TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE libs/vma)
-			# Suppress warnings from third-party VMA library code
-			IF(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-				SET_SOURCE_FILES_PROPERTIES(src/renderers/vulkan/vk_vma.cpp PROPERTIES
-					COMPILE_FLAGS "-Wno-unused-parameter -Wno-unused-variable"
-				)
-			ENDIF()
-			MESSAGE(STATUS "VMA: Vulkan Memory Allocator enabled")
-		ELSE()
-			MESSAGE(WARNING "VMA: Header not found at libs/vma/vk_mem_alloc.h. Download it from https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator")
-			SET(USE_VMA OFF CACHE BOOL "" FORCE)
+	if(USE_VULKAN)
+		ADD_LIBRARY(${RENDERER_PREFIX}_vulkan${RENDEXT} SHARED ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
+		SET_TARGET_PROPERTIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES OUTPUT_NAME "${RENDERER_PREFIX}_vulkan${RENDEXT}" PREFIX "")
+		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_VULKAN)
+		# `src/renderers/renderercommon/*` uses legacy relative includes like "../qcommon/...".
+		# Adding `src/renderers` to the include path keeps those includes resolving to `src/qcommon/...`.
+		target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/renderers)
+		IF(IDTECH3_VK_EXPERIMENTAL)
+			TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE IDTECH3_VK_EXPERIMENTAL)
 		ENDIF()
-	ENDIF()
+		TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE m)
+
+		# VMA (Vulkan Memory Allocator) - configure after target is created
+		IF(USE_VMA AND USE_VULKAN)
+			# Check if VMA header exists
+			IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/libs/vma/vk_mem_alloc.h)
+				TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VMA)
+				TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE libs/vma)
+				# Suppress warnings from third-party VMA library code
+				IF(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+					SET_SOURCE_FILES_PROPERTIES(src/renderers/vulkan/vk_vma.cpp PROPERTIES
+						COMPILE_FLAGS "-Wno-unused-parameter -Wno-unused-variable"
+					)
+				ENDIF()
+				MESSAGE(STATUS "VMA: Vulkan Memory Allocator enabled")
+			ELSE()
+				MESSAGE(WARNING "VMA: Header not found at libs/vma/vk_mem_alloc.h. Download it from https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator")
+				SET(USE_VMA OFF CACHE BOOL "" FORCE)
+			ENDIF()
+		ENDIF()
+	else()
+		MESSAGE(STATUS "Vulkan renderer disabled (USE_VULKAN=OFF)")
+	endif()
 	
 	IF(WIN32 AND USE_D3D12)
 		ADD_LIBRARY(${RENDERER_PREFIX}_d3d12${RENDEXT} SHARED ${RENDERER_D3D12_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
@@ -2198,7 +2206,7 @@ endif()
 
 # When not using dlopen-based renderers, link the selected renderer directly.
 if(NOT USE_RENDERER_DLOPEN)
-	if(USE_VULKAN AND TARGET ${RENDERER_PREFIX}_vulkan)
+	if(RENDERER_DEFAULT STREQUAL "vulkan" AND USE_VULKAN AND TARGET ${RENDERER_PREFIX}_vulkan)
 		target_link_libraries(${CNAME}${BINEXT} PRIVATE ${RENDERER_PREFIX}_vulkan)
 		target_compile_definitions(${CNAME}${BINEXT} PRIVATE USE_VULKAN RENDERER_DEFAULT=${RENDERER_DEFAULT})
 		if(IDTECH3_VK_EXPERIMENTAL)
@@ -2207,6 +2215,13 @@ if(NOT USE_RENDERER_DLOPEN)
 	elseif(TARGET ${RENDERER_PREFIX}_opengl)
 		target_link_libraries(${CNAME}${BINEXT} PRIVATE ${RENDERER_PREFIX}_opengl)
 		target_compile_definitions(${CNAME}${BINEXT} PRIVATE RENDERER_DEFAULT=${RENDERER_DEFAULT})
+	elseif(USE_VULKAN AND TARGET ${RENDERER_PREFIX}_vulkan)
+		# Fallback to Vulkan if OpenGL not available
+		target_link_libraries(${CNAME}${BINEXT} PRIVATE ${RENDERER_PREFIX}_vulkan)
+		target_compile_definitions(${CNAME}${BINEXT} PRIVATE USE_VULKAN RENDERER_DEFAULT=${RENDERER_DEFAULT})
+		if(IDTECH3_VK_EXPERIMENTAL)
+			target_compile_definitions(${CNAME}${BINEXT} PRIVATE IDTECH3_VK_EXPERIMENTAL)
+		endif()
 	endif()
 endif()
 
