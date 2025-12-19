@@ -17,6 +17,7 @@ GAME_NAME="idtech3"
 BUILD_TYPE="Release"
 CLEAN=0
 COVERAGE=0
+QUIET=0
 
 normalize_build_type() {
     local arg=$(echo "$1" | tr '[:upper:]' '[:lower:]')
@@ -40,6 +41,10 @@ for arg in "$@"; do
     fi
     if [ "$arg" = "coverage" ] || [ "$arg" = "cov" ]; then
         COVERAGE=1
+        continue
+    fi
+    if [ "$arg" = "quiet" ] || [ "$arg" = "q" ]; then
+        QUIET=1
         continue
     fi
     # Anything else is treated as desired game name (for copied filenames)
@@ -76,7 +81,11 @@ else
 fi
 
 echo "Building with ${CORES} parallel jobs..."
-cmake --build . -- -j${CORES}
+if [ $QUIET -eq 1 ]; then
+    VERBOSE=0 cmake --build . -- -j${CORES} -s
+else
+    cmake --build . -- -j${CORES}
+fi
 
 echo ""
 echo "Build completed. Binaries are in $BUILD_DIR"
