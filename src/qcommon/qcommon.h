@@ -27,6 +27,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cm_public.h"
 #include "i18n.h"  // localization types (locVar_t) and APIs
 
+#ifdef USE_JOBSYSTEM
+#include "job_system.h"
+#endif
+
 //Ignore __attribute__ on non-gcc/clang platforms
 #if !defined(__GNUC__) && !defined(__clang__)
 #ifndef __attribute__

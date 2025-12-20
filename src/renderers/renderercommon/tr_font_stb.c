@@ -13,15 +13,7 @@ libs/stb/stb_truetype.h. Falls back to a stub otherwise.
 #include "../qcommon/qcommon.h"
 #include "../opengl/tr_common.h"
 
-// Font CVars - defined in each renderer
-extern cvar_t *r_fontSDF;
-extern cvar_t *r_fontSDFSpread;
-extern cvar_t *r_fontSDFSmooth;
-extern cvar_t *r_fontLCDFilter;
-extern cvar_t *r_fontSDFOutline;
-extern cvar_t *r_fontGPUSDF;
-extern cvar_t *r_fontGPUEffects;
-extern cvar_t *r_fontGPULayout;
+// Font CVars are accessed via ri.Cvar_Get
 
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
@@ -61,13 +53,19 @@ static void R_StbFree(void *ptr, void *user) { (void)user; if (!ptr) return; ri.
 // Select a sane atlas size based on CVar hints (mirrors FreeType path)
 static int R_SelectAtlasSize(void) {
 	int atlasSize = 512;
-	if (r_fontAtlasSize) {
-		atlasSize = r_fontAtlasSize->integer;
+	{
+		cvar_t *fontAtlasSize = ri.Cvar_Get("r_fontAtlasSize", "512", 0);
+		if (fontAtlasSize) {
+			atlasSize = fontAtlasSize->integer;
 		if (atlasSize < 256) atlasSize = 256;
 		else if (atlasSize > 512 && atlasSize < 1024) atlasSize = 512;
 		else if (atlasSize > 1024) atlasSize = 1024;
-		if (atlasSize != 256 && atlasSize != 512 && atlasSize != 1024) {
-			atlasSize = 512;
+			if (atlasSize < 256) atlasSize = 256;
+			else if (atlasSize > 512 && atlasSize < 1024) atlasSize = 512;
+			else if (atlasSize > 1024) atlasSize = 1024;
+			if (atlasSize != 256 && atlasSize != 512 && atlasSize != 1024) {
+				atlasSize = 512;
+			}
 		}
 	}
 	return atlasSize;
@@ -113,8 +111,10 @@ qboolean RE_RegisterFont_Stb(const char *fontName, int pointSize, fontInfo_t *fo
 	Com_Memset(atlas, 0, atlasSize * atlasSize);
 
 	// Decide path: SDF or grayscale
-	qboolean useSDF = (r_fontSDF && r_fontSDF->integer != 0);
-	int sdfSpread = (r_fontSDFSpread) ? r_fontSDFSpread->integer : 6;
+	cvar_t *fontSDF = ri.Cvar_Get("r_fontSDF", "0", 0);
+	qboolean useSDF = (fontSDF && fontSDF->integer != 0);
+	cvar_t *fontSDFSpread = ri.Cvar_Get("r_fontSDFSpread", "6", 0);
+	int sdfSpread = (fontSDFSpread) ? fontSDFSpread->integer : 6;
 	if (sdfSpread < 4) sdfSpread = 4;
 	if (sdfSpread > 32) sdfSpread = 32;
 
@@ -227,7 +227,9 @@ qboolean RE_RegisterFont_Stb(const char *fontName, int pointSize, fontInfo_t *fo
 		}
 
 		// Scale: match the FreeType convention (48pt reference at 72 dpi)
-		float dpi = (r_fontDPI && r_fontDPI->value > 0.0f) ? r_fontDPI->value : 72.0f;
+		{
+			cvar_t *fontDPI = ri.Cvar_Get("r_fontDPI", "72", 0);
+			float dpi = (fontDPI && fontDPI->value > 0.0f) ? fontDPI->value : 72.0f;
 		if (dpi < 72.0f) dpi = 72.0f;
 		if (dpi > 300.0f) dpi = 300.0f;
 		float glyphScale = 72.0f / dpi;
@@ -245,6 +247,7 @@ qboolean RE_RegisterFont_Stb(const char *fontName, int pointSize, fontInfo_t *fo
 		ri.FS_FreeFile(fileData);
 
 		return qtrue;
+		}
 	}
 
 	// Legacy grayscale path (non-SDF)
@@ -341,7 +344,8 @@ qboolean RE_RegisterFont_Stb(const char *fontName, int pointSize, fontInfo_t *fo
 	}
 
 	// Scale: match the FreeType convention (48pt reference at 72 dpi)
-	float dpi = (r_fontDPI && r_fontDPI->value > 0.0f) ? r_fontDPI->value : 72.0f;
+	cvar_t *fontDPI = ri.Cvar_Get("r_fontDPI", "72", 0);
+	float dpi = (fontDPI && fontDPI->value > 0.0f) ? fontDPI->value : 72.0f;
 	if (dpi < 72.0f) dpi = 72.0f;
 	if (dpi > 300.0f) dpi = 300.0f;
 	float glyphScale = 72.0f / dpi;

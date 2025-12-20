@@ -177,7 +177,7 @@ float RE_Text_Width_Improved(const char *text, float scale, fontInfo_t *font, in
 		width += glyph->xSkip * useScale;
 		
 		// Apply kerning if available and enabled
-		extern cvar_t *r_fontKerning;
+		
 		if (font->hasKerning && prevChar != 0 && c >= 32 && c <= 127) {
 			if (!r_fontKerning || r_fontKerning->integer != 0) {
 				int kerningOffset = font->glyphs[prevChar].kerning[c & 255];
@@ -365,7 +365,7 @@ void RE_Text_Paint_Improved(float x, float y, float scale, vec4_t color, const c
 		float xAdvance = glyph->xSkip * useScale;
 		
 		// Apply kerning if available and enabled
-		extern cvar_t *r_fontKerning;
+		
 		if (font->hasKerning && prevChar != 0 && c >= 32 && c <= 127) {
 			if (!r_fontKerning || r_fontKerning->integer != 0) {
 				int kerningOffset = font->glyphs[prevChar].kerning[c & 255];
@@ -471,7 +471,7 @@ void RE_Text_Paint_3D_Improved(float x, float y, float scale, vec4_t color, cons
 		float xAdvance = glyph->xSkip * useScale;
 		
 		// Apply kerning if available and enabled
-		extern cvar_t *r_fontKerning;
+		
 		if (font->hasKerning && prevChar != 0 && c >= 32 && c <= 127) {
 			if (!r_fontKerning || r_fontKerning->integer != 0) {
 				int kerningOffset = font->glyphs[prevChar].kerning[c & 255];

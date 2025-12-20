@@ -106,6 +106,9 @@ typedef struct {
 	void    (*A3D_RenderGeometry) (void *pVoidA3D, void *pVoidGeom, void *pVoidMat, void *pVoidGeomStatus);
 #endif
 	qboolean (*RegisterFont)(const char *fontName, int pointSize, fontInfo_t *font);
+	glyphInfo_t *(*R_GetGlyphFromFont)(fontInfo_t *font, int charCode);
+	void (*R_InitFonts)(void);
+	void (*R_ShutdownFonts)(void);
 	void	(*RemapShader)(const char *oldShader, const char *newShader, const char *offsetTime);
 	qboolean (*GetEntityToken)( char *buffer, int size );
 	qboolean (*inPVS)( const vec3_t p1, const vec3_t p2 );

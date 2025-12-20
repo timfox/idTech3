@@ -296,9 +296,12 @@ Returns width in 26.6 fractional pixels
 */
 FT_Pos FreeType_GetCharWidth(FT_Face face, FT_UInt glyph_index)
 {
-	if (!face || !face->glyph)
+	if (!face)
 		return 0;
-	
+
+	if (FT_Load_Glyph(face, glyph_index, FT_LOAD_DEFAULT) != 0)
+		return 0;
+
 	return face->glyph->metrics.horiAdvance;
 }
 
@@ -312,9 +315,12 @@ Returns height in 26.6 fractional pixels
 */
 FT_Pos FreeType_GetCharHeight(FT_Face face, FT_UInt glyph_index)
 {
-	if (!face || !face->glyph)
+	if (!face)
 		return 0;
-	
+
+	if (FT_Load_Glyph(face, glyph_index, FT_LOAD_DEFAULT) != 0)
+		return 0;
+
 	return face->glyph->metrics.height;
 }
 

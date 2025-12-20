@@ -8,15 +8,7 @@ Unicode glyph mapping support for modern font rendering
 #include "../renderercommon/tr_public.h"
 #include "../renderer/tr_common.h"
 
-// Font CVars - defined in each renderer
-extern cvar_t *r_fontSDF;
-extern cvar_t *r_fontSDFSpread;
-extern cvar_t *r_fontSDFSmooth;
-extern cvar_t *r_fontLCDFilter;
-extern cvar_t *r_fontSDFOutline;
-extern cvar_t *r_fontGPUSDF;
-extern cvar_t *r_fontGPUEffects;
-extern cvar_t *r_fontGPULayout;
+// Font CVars are accessed via ri.Cvar_Get
 
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;

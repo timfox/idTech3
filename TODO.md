@@ -23,12 +23,12 @@
 - [x] clang-format configuration in repo (see `.clang-format`)
 - [x] pre-commit hook for format enforcement (see `.git/hooks/pre-commit`)
 - [x] Static analysis tools (clang-tidy, cppcheck) integration (see `.clang-tidy`, `cppcheck.cfg`, `tools/run_clang_tidy.sh`, `tools/run_cppcheck.sh`, `docs/STATIC_ANALYSIS_WORKFLOW.md`)
-- [x] Clean compilation with zero warnings (fixed duplicate macro definitions, unused function warnings, ISO C compliance issues, variable initialization, cross-platform FreeType integration)
+- [x] Clean compilation with zero warnings (fixed duplicate macro definitions, unused function warnings, ISO C compliance issues, variable initialization, cross-platform FreeType integration, job_handle_t type resolution, variable shadowing, unused parameters in FreeType wrapper, missing function prototypes, removed dead code)
 - [x] Expand unit tests (math, memory, networking—expanded coverage: added vector operations, cross product, angle normalization, bounds operations, multiple packet tests, unreliable packet tests, property-based testing with 3300 test cases, comprehensive security tests - see `tests/test_qmath.c`, `tests/test_network_enet.c`, `tests/test_property_based_simple.c`, `tests/test_security.c`)
 - [x] Code coverage reporting (gcov/lcov) (see `CMakeLists.txt` ENABLE_COVERAGE option, `tools/run_coverage.sh`, `docs/CODE_COVERAGE.md`, gcovr and lcov support)
-- [x] Font rendering fixes for all renderers (fixed extern function declarations in text rendering, added R_InitFonts to Metal renderer, integrated FreeType library for proper font loading, resolved CVar linking conflicts between renderers, set up font assets in mymod)
+- [x] Font rendering fixes for all renderers (fixed extern function declarations in text rendering, added R_InitFonts to Metal renderer, integrated FreeType library for proper font loading, resolved CVar linking conflicts between renderers, set up font assets in mymod, enhanced UTF-8 Unicode support, improved kerning and glyph fallback handling)
 - [x] Vulkan renderer improvements (enabled experimental features, added bindless texture system, shader caching, async compilation framework, dynamic rendering support, GPU culling, mesh shaders, ray tracing, fixed font CVar linking issues - see `src/renderers/vulkan/`)
-- [x] Renderer selection fixes (changed default renderer to Vulkan, fixed OpenGL interface initialization by adding USE_OPENGL_API to renderer targets, improved renderer fallback logic)
+- [x] Renderer selection fixes (changed default renderer to Vulkan, fixed OpenGL interface initialization by adding USE_OPENGL_API to renderer targets, improved renderer fallback logic, resolved DLL symbol issues for font CVars)
 
 ## Developer Experience
 - [x] Asset pipeline tools support auto-conversion (see `tools/asset_conv`)

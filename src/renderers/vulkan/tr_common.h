@@ -129,21 +129,14 @@ unsigned int RE_GetGlyphIndexForUnicode(fontInfo_t *font, unsigned int codePoint
 glyphInfo_t *RE_FindUnicodeGlyphInFont(fontInfo_t *font, unsigned int codePoint);
 void RE_CacheUnicodeGlyph(unsigned int codePoint, unsigned int glyphIndex);
 void RE_ClearUnicodeCache(void);
+// Font CVars
+extern cvar_t *r_fontAtlasSize;
+extern cvar_t *r_fontDPI;
+extern cvar_t *r_fontHinting;
+extern cvar_t *r_fontAntialiasing;
+extern cvar_t *r_fontLCDFilter;
+extern cvar_t *r_fontKerning;
 
-extern	cvar_t	*r_fontAtlasSize;
-extern	cvar_t	*r_fontDPI;
-extern	cvar_t	*r_fontHinting;
-extern	cvar_t	*r_fontAntialiasing;
-extern	cvar_t	*r_fontLCDFilter;
-extern	cvar_t	*r_fontKerning;
-extern	cvar_t	*r_fontSDF;
-extern	cvar_t	*r_fontSDFSpread;
-extern	cvar_t	*r_fontSDFSmooth;
-extern	cvar_t	*r_fontLCDFilter;
-extern	cvar_t	*r_fontSDFOutline;
-extern	cvar_t	*r_fontGPUSDF;
-extern	cvar_t	*r_fontGPUEffects;
-extern	cvar_t	*r_fontGPULayout;
 
 /*
 =============================================================

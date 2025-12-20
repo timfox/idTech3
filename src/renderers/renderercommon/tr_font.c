@@ -73,21 +73,18 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_public.h"
 #include "../opengl/tr_common.h"
 
+// Forward declarations for public API functions
+glyphInfo_t *R_GetGlyphFromFont(fontInfo_t *font, int charCode);
+void R_InitFonts(void);
+void R_ShutdownFonts(void);
+
 #ifdef BUILD_FREETYPE
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_ERRORS_H
 #endif
 
-// Font CVars - defined in each renderer (optional)
-static cvar_t *r_fontSDF = NULL;
-static cvar_t *r_fontSDFSpread = NULL;
-static cvar_t *r_fontSDFSmooth = NULL;
-static cvar_t *r_fontLCDFilter = NULL;
-static cvar_t *r_fontSDFOutline = NULL;
-static cvar_t *r_fontGPUSDF = NULL;
-static cvar_t *r_fontGPUEffects = NULL;
-static cvar_t *r_fontGPULayout = NULL;
+// Font CVars are accessed via ri.Cvar_Get to avoid DLL symbol issues
 
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
@@ -95,19 +92,6 @@ extern refimport_t ri;
 extern void R_IssuePendingRenderCommands( void );
 extern qhandle_t RE_RegisterShaderNoMip( const char *name );
 
-// Font CVar registration function
-void R_RegisterFontCVars(cvar_t *sdf, cvar_t *sdfSpread, cvar_t *sdfSmooth,
-                        cvar_t *lcdf, cvar_t *sdfOutline, cvar_t *gpuSdf,
-                        cvar_t *gpuEffects, cvar_t *gpuLayout) {
-    r_fontSDF = sdf;
-    r_fontSDFSpread = sdfSpread;
-    r_fontSDFSmooth = sdfSmooth;
-    r_fontLCDFilter = lcdf;
-    r_fontSDFOutline = sdfOutline;
-    r_fontGPUSDF = gpuSdf;
-    r_fontGPUEffects = gpuEffects;
-    r_fontGPULayout = gpuLayout;
-}
 
 
 #ifdef USE_FREETYPE
@@ -269,7 +253,7 @@ R_GetGlyphSubsetIndex
 Get the subset index for a character code, or -1 if not in subset
 =================
 */
-static int R_GetGlyphSubsetIndex(int charCode) {
+static int __attribute__((unused)) R_GetGlyphSubsetIndex(int charCode) {
 	if (!glyphSubset.enabled || !glyphSubset.finalized) {
 		return charCode & 255; // Use original indexing if subsetting disabled
 	}
@@ -287,7 +271,7 @@ R_IsGlyphInSubset
 Check if a character is in the current glyph subset
 =================
 */
-static qboolean R_IsGlyphInSubset(int charCode) {
+static qboolean __attribute__((unused)) R_IsGlyphInSubset(int charCode) {
 	if (!glyphSubset.enabled || !glyphSubset.finalized) {
 		return qtrue; // All glyphs available if subsetting disabled
 	}
@@ -378,12 +362,7 @@ static void R_AddFontToCache(const char *fontName, int pointSize, qboolean useSD
 }
 
 #ifdef USE_FREETYPE
-// Font rendering quality CVars (extern declarations)
-extern cvar_t *r_fontAtlasSize;
-extern cvar_t *r_fontDPI;
-extern cvar_t *r_fontHinting;
-extern cvar_t *r_fontAntialiasing;
-extern cvar_t *r_fontLCDFilter;
+// Font CVars are accessed via ri.Cvar_Get
 
 static void R_GetGlyphInfo(FT_GlyphSlot glyph, int *left, int *right, int *width, int *top, int *bottom, int *height, int *pitch) {
 	*left  = _FLOOR( glyph->metrics.horiBearingX );
@@ -403,7 +382,7 @@ R_RenderGlyph_Improved
 Improved glyph rendering with better antialiasing and hinting options
 =================
 */
-static FT_Bitmap *R_RenderGlyph_Improved(FT_GlyphSlot glyph, glyphInfo_t* glyphOut, int loadFlags) {
+static FT_Bitmap *R_RenderGlyph_Improved(FT_GlyphSlot glyph, glyphInfo_t* glyphOut, int __attribute__((unused)) loadFlags) {
 	FT_Bitmap  *bit2;
 	int left, right, width, top, bottom, height, pitch, size;
 	FT_Error error;
@@ -444,17 +423,6 @@ static FT_Bitmap *R_RenderGlyph_Improved(FT_GlyphSlot glyph, glyphInfo_t* glyphO
 		ri.Printf(PRINT_ALL, "Non-outline fonts are not supported\n");
 	}
 	return NULL;
-}
-
-/*
-=================
-R_RenderGlyph
-=================
-Legacy glyph rendering function for compatibility
-=================
-*/
-static FT_Bitmap *R_RenderGlyph(FT_GlyphSlot glyph, glyphInfo_t* glyphOut) {
-	return R_RenderGlyph_Improved(glyph, glyphOut, FT_LOAD_DEFAULT);
 }
 
 static void WriteTGA (const char *filename, byte *data, int width, int height) {
@@ -584,7 +552,6 @@ static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, in
 	float scaled_width, scaled_height;
 	FT_Bitmap *bitmap = NULL;
 	int loadFlags = FT_LOAD_DEFAULT;
-	extern cvar_t *r_fontHinting;
 
 	Com_Memset(&glyph, 0, sizeof(glyphInfo_t));
 	// Initialize kerning array
@@ -592,8 +559,10 @@ static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, in
 	// make sure everything is here
 	if (face != NULL) {
 		// Use improved load flags based on hinting CVar
-		if (r_fontHinting) {
-			switch (r_fontHinting->integer) {
+		{
+			cvar_t *fontHinting = ri.Cvar_Get("r_fontHinting", "1", 0);
+			if (fontHinting) {
+				switch (fontHinting->integer) {
 				case 0: // None
 					loadFlags = FT_LOAD_NO_HINTING;
 					break;
@@ -609,6 +578,7 @@ static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, in
 				default:
 					loadFlags = FT_LOAD_DEFAULT;
 					break;
+				}
 			}
 		}
 		
@@ -644,14 +614,19 @@ static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, in
 
 		// Get atlas size from CVar (default to 256)
 		int atlasSize = 256;
-		extern cvar_t *r_fontAtlasSize;
-		if (r_fontAtlasSize) {
-			atlasSize = r_fontAtlasSize->integer;
+		{
+			cvar_t *fontAtlasSize = ri.Cvar_Get("r_fontAtlasSize", "256", 0);
+			if (fontAtlasSize) {
+				atlasSize = fontAtlasSize->integer;
 			if (atlasSize < 256) atlasSize = 256;
 			else if (atlasSize > 512 && atlasSize < 1024) atlasSize = 512;
 			else if (atlasSize > 1024) atlasSize = 1024;
-			if (atlasSize != 256 && atlasSize != 512 && atlasSize != 1024) {
-				atlasSize = 256;
+				if (atlasSize < 256) atlasSize = 256;
+				else if (atlasSize > 512 && atlasSize < 1024) atlasSize = 512;
+				else if (atlasSize > 1024) atlasSize = 1024;
+				if (atlasSize != 256 && atlasSize != 512 && atlasSize != 1024) {
+					atlasSize = 256;
+				}
 			}
 		}
 
@@ -784,30 +759,27 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 	}
 #endif
 
-#ifdef BUILD_FREETYPE
-	FT_Face face;
-	int xOut, yOut, lastStart, imageNumber;
-	int scaledSize, newSize, maxHeight, left;
-	unsigned char *out, *imageBuff;
-	glyphInfo_t *glyph;
-	image_t *image;
-	float max;
-#endif
-
 	// Variables used in both FreeType and non-FreeType paths
-	int j, k;
-	qhandle_t h;
-
-	// Variables used in both FreeType and non-FreeType paths
-	float dpi = 72.0f;
-	float glyphScale;
-	int atlasSize = 256;
-	int loadFlags = FT_LOAD_DEFAULT;
-	FT_Render_Mode renderMode = FT_RENDER_MODE_NORMAL;
 	void *faceData;
 	int i, len;
 	char name[1024];
-	qboolean useSDF = (r_fontSDF && r_fontSDF->integer != 0);
+
+#ifdef BUILD_FREETYPE
+	FT_Face __attribute__((unused)) face;
+	int __attribute__((unused)) xOut, __attribute__((unused)) yOut, __attribute__((unused)) lastStart, __attribute__((unused)) imageNumber;
+	int __attribute__((unused)) scaledSize, __attribute__((unused)) newSize, __attribute__((unused)) maxHeight, __attribute__((unused)) left;
+	unsigned char __attribute__((unused)) *out, __attribute__((unused)) *imageBuff;
+	glyphInfo_t __attribute__((unused)) *glyph;
+	image_t __attribute__((unused)) *image;
+	float __attribute__((unused)) max;
+	int __attribute__((unused)) loadFlags = FT_LOAD_DEFAULT;
+	FT_Render_Mode __attribute__((unused)) renderMode = FT_RENDER_MODE_NORMAL;
+	float __attribute__((unused)) dpi = 72.0f;
+	float __attribute__((unused)) glyphScale;
+	int __attribute__((unused)) atlasSize = 256;
+	qhandle_t __attribute__((unused)) h;
+	int __attribute__((unused)) j, __attribute__((unused)) k;
+#endif
 	qboolean fromCache = qfalse;
 	qboolean fromDat = qfalse;
 	qboolean fromStb = qfalse;
@@ -924,10 +896,12 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 	tryStb = qtrue;
 #endif
 	if (tryStb) {
-		int dbgAtlas = (r_fontAtlasSize) ? r_fontAtlasSize->integer : 512;
+		cvar_t *dbgFontAtlasSize = ri.Cvar_Get("r_fontAtlasSize", "512", 0);
+		int dbgAtlas = (dbgFontAtlasSize) ? dbgFontAtlasSize->integer : 512;
 		if (dbgAtlas < 256) dbgAtlas = 256;
 		if (dbgAtlas > 1024) dbgAtlas = 1024;
-		int dbgSpread = (r_fontSDFSpread) ? r_fontSDFSpread->integer : 6;
+		cvar_t *dbgSDFSpread = ri.Cvar_Get("r_fontSDFSpread", "6", 0);
+		int dbgSpread = (dbgSDFSpread) ? dbgSDFSpread->integer : 6;
 		ri.Printf(PRINT_ALL, "RE_RegisterFont: stb path begin '%s' size=%d atlasHint=%d spread=%d\n",
 			fontName, pointSize, dbgAtlas, dbgSpread);
 		if (RE_RegisterFont_Stb(fontName, pointSize, font)) {
@@ -995,15 +969,17 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 #endif
 
 	// Get font quality settings from CVars
-	if (r_fontDPI) {
-		dpi = r_fontDPI->value;
+	{
+		cvar_t *fontDPI = ri.Cvar_Get("r_fontDPI", "72", 0);
+		dpi = fontDPI->value;
 		if (dpi < 72.0f) dpi = 72.0f;
 		if (dpi > 300.0f) dpi = 300.0f;
 	}
 	selectedDPI = (int)dpi;
 	
-	if (r_fontAtlasSize) {
-		atlasSize = r_fontAtlasSize->integer;
+	{
+		cvar_t *fontAtlasSize = ri.Cvar_Get("r_fontAtlasSize", "256", 0);
+		atlasSize = fontAtlasSize->integer;
 		// Clamp to valid power-of-two sizes
 		if (atlasSize < 256) atlasSize = 256;
 		else if (atlasSize > 512 && atlasSize < 1024) atlasSize = 512;
@@ -1014,13 +990,16 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 		}
 	}
 	selectedAtlasSize = atlasSize;
-	if (r_fontSDFSpread) {
-		selectedSpread = r_fontSDFSpread->integer;
+	{
+		cvar_t *fontSDFSpread = ri.Cvar_Get("r_fontSDFSpread", "6", 0);
+		selectedSpread = fontSDFSpread->integer;
 	}
 
 	// Configure hinting based on CVar
-	if (r_fontHinting) {
-		switch (r_fontHinting->integer) {
+	{
+		cvar_t *fontHinting = ri.Cvar_Get("r_fontHinting", "1", 0);
+		if (fontHinting) {
+			switch (fontHinting->integer) {
 			case 0: // None
 				loadFlags = FT_LOAD_NO_HINTING;
 				selectedHint = 0;
@@ -1041,12 +1020,14 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 				loadFlags = FT_LOAD_DEFAULT;
 				selectedHint = -1;
 				break;
+			}
 		}
 	}
 
 	// Configure antialiasing
-	if (r_fontAntialiasing) {
-		if (r_fontAntialiasing->integer == 0) {
+	{
+		cvar_t *fontAntialiasing = ri.Cvar_Get("r_fontAntialiasing", "1", 0);
+		if (fontAntialiasing && fontAntialiasing->integer == 0) {
 			renderMode = FT_RENDER_MODE_MONO;
 			selectedAA = 0;
 		} else {
@@ -1079,9 +1060,9 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 		
 		// Search for bold/italic variant if requested
 		if (numFaces > 1 && (wantBold || wantItalic)) {
-			int i;
-			for (i = 0; i < numFaces; i++) {
-				if (FreeType_NewMemoryFace( faceData, len, i, &tempFace ) == 0) {
+			int faceIdx;
+			for (faceIdx = 0; faceIdx < numFaces; faceIdx++) {
+				if (FreeType_NewMemoryFace( faceData, len, faceIdx, &tempFace ) == 0) {
 					qboolean isBold = (tempFace->style_flags & FT_STYLE_FLAG_BOLD) != 0;
 					qboolean isItalic = (tempFace->style_flags & FT_STYLE_FLAG_ITALIC) != 0;
 					
@@ -1106,9 +1087,12 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 	// Set LCD filtering if enabled (requires FreeType 2.3.0+)
 	// Note: LCD filtering is typically used with LCD render mode, which we're not using here
 	// This is a placeholder for future enhancement
-	if (r_fontLCDFilter && r_fontLCDFilter->integer) {
-		// LCD filtering would be applied during glyph rendering
-		// For now, we use standard grayscale rendering
+	{
+		cvar_t *fontLCDFilter = ri.Cvar_Get("r_fontLCDFilter", "0", 0);
+		if (fontLCDFilter && fontLCDFilter->integer) {
+			// LCD filtering would be applied during glyph rendering
+			// For now, we use standard grayscale rendering
+		}
 	}
 
 	if (FreeType_SetCharSize( face, pointSize << 6, pointSize << 6, (FT_UInt)dpi, (FT_UInt)dpi)) {
@@ -1237,10 +1221,12 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 	
 	// Pre-calculate kerning for common character pairs if kerning is supported
 	// Check CVar to see if kerning should be enabled
-	extern cvar_t *r_fontKerning;
 	qboolean enableKerning = qtrue;
-	if (r_fontKerning && r_fontKerning->integer == 0) {
-		enableKerning = qfalse;
+	{
+		cvar_t *fontKerning = ri.Cvar_Get("r_fontKerning", "1", 0);
+		if (fontKerning && fontKerning->integer == 0) {
+			enableKerning = qfalse;
+		}
 	}
 	
 	if (font->hasKerning && enableKerning) {
@@ -1392,7 +1378,8 @@ qboolean RE_RegisterFont_Async(const char *fontName, int pointSize, fontInfo_t *
 	}
 
 	// Check cache first
-	qboolean wantSDF = (r_fontSDF && r_fontSDF->integer != 0);
+	cvar_t *fontSDF = ri.Cvar_Get("r_fontSDF", "0", 0);
+	qboolean wantSDF = (fontSDF && fontSDF->integer != 0);
 	for (int i = 0; i < fontCacheCount; i++) {
 		if (fontCache[i].inUse &&
 		    fontCache[i].pointSize == pointSize &&
@@ -1454,7 +1441,10 @@ qboolean RE_RegisterFont_Async(const char *fontName, int pointSize, fontInfo_t *
 
 #else
 	// Job system not available, fall back to sync
-	return RE_RegisterFont_Sync(fontName, pointSize, font, (r_fontSDF && r_fontSDF->integer != 0));
+	{
+		cvar_t *fontSDF = ri.Cvar_Get("r_fontSDF", "0", 0);
+		return RE_RegisterFont_Sync(fontName, pointSize, font, (fontSDF && fontSDF->integer != 0));
+	}
 #endif
 }
 
@@ -1535,7 +1525,8 @@ qboolean RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) 
 #endif
 	{
 		ri.Printf(PRINT_ALL, "RE_RegisterFont: using sync loading\n");
-		qboolean wantSDF = (r_fontSDF && r_fontSDF->integer != 0);
+		cvar_t *fontSDF = ri.Cvar_Get("r_fontSDF", "0", 0);
+		qboolean wantSDF = (fontSDF && fontSDF->integer != 0);
 		return RE_RegisterFont_Sync(fontName, pointSize, font, wantSDF);
 	}
 }
@@ -1549,7 +1540,23 @@ Initialize the font system
 void R_InitFonts(void) {
 	R_InitGlyphSubsetting();
 
-	// Initialize other font-related systems here
+#ifdef USE_FREETYPE
+	// Initialize FreeType if available
+	ftLibrary = FreeType_GetLibrary();
+	if (!ftLibrary) {
+		ri.Printf(PRINT_WARNING, "R_InitFonts: FreeType not available.\n");
+	} else {
+		// Clear font cache when FreeType becomes available to force re-registration
+		// with the new FreeType system (fonts that failed with stb_truetype can now load)
+		ri.Printf(PRINT_ALL, "R_InitFonts: FreeType initialized, clearing font cache for enhanced rendering\n");
+		fontCacheCount = 0;
+		for (int i = 0; i < MAX_FONT_CACHE; i++) {
+			fontCache[i].inUse = qfalse;
+		}
+	}
+#endif
+
+	ri.Printf(PRINT_ALL, "R_InitFonts: Enhanced font rendering system initialized\n");
 }
 
 /*
