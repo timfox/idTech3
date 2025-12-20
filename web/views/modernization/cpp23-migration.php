@@ -60,7 +60,7 @@ std::print("Device: {} {}, 0x{:04x}\n", vendor, model, deviceId);
 <h3>2. Optional Return Values (Medium Risk, High Safety)</h3>
 
 <h4>Current Pattern:</h4>
-<pre><code>// src/qcommon/ecs.cpp
+<pre><code>// src/common/ecs.cpp
 ecs_entity_t ECS_CreateEntity(void) {
     if (g_registry == nullptr) {
         return ECS_NULL_ENTITY;  // Magic value indicates failure
@@ -92,8 +92,8 @@ if (auto entity = ECS_CreateEntity()) {
 
 <h4>Files to Update:</h4>
 <ul>
-    <li><code>src/qcommon/ecs.cpp</code> - Entity creation/destruction</li>
-    <li><code>src/qcommon/ecs_systems.cpp</code> - System queries</li>
+    <li><code>src/common/ecs.cpp</code> - Entity creation/destruction</li>
+    <li><code>src/common/ecs_systems.cpp</code> - System queries</li>
     <li><code>src/server/sv_ecs.cpp</code> - Server-side ECS</li>
 </ul>
 

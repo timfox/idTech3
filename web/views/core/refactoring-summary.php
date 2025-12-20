@@ -9,7 +9,7 @@ $title = "Engine Refactoring Summary";
 <h2>High Priority Fixes (Completed)</h2>
 
 <h3>1. Fixed Unsafe <code>strcpy()</code> Usage</h3>
-<p><strong>File:</strong> <code>src/qcommon/common.c:1874</code></p>
+<p><strong>File:</strong> <code>src/common/common.c:1874</code></p>
 <ul>
     <li><strong>Before:</strong> Used unsafe <code>strcpy()</code> with no bounds checking</li>
     <li><strong>After:</strong> Replaced with <code>Q_strncpyz()</code> for safe string copying</li>
@@ -17,7 +17,7 @@ $title = "Engine Refactoring Summary";
 </ul>
 
 <h3>2. Modernized <code>Com_sprintf()</code></h3>
-<p><strong>File:</strong> <code>src/qcommon/q_shared.c:1729</code></p>
+<p><strong>File:</strong> <code>src/common/q_shared.c:1729</code></p>
 <ul>
     <li><strong>Before:</strong> Used <code>vsprintf()</code> which can overflow buffers</li>
     <li><strong>After:</strong> Uses <code>Q_vsnprintf()</code> with proper bounds checking</li>
@@ -25,7 +25,7 @@ $title = "Engine Refactoring Summary";
 </ul>
 
 <h3>3. Fixed <code>va()</code> Function</h3>
-<p><strong>File:</strong> <code>src/qcommon/q_shared.c:1779</code></p>
+<p><strong>File:</strong> <code>src/common/q_shared.c:1779</code></p>
 <ul>
     <li><strong>Before:</strong> Used unsafe <code>vsprintf()</code></li>
     <li><strong>After:</strong> Uses <code>Q_vsnprintf()</code> with buffer size checking</li>
@@ -35,7 +35,7 @@ $title = "Engine Refactoring Summary";
 <h2>Medium Priority Improvements (Completed)</h2>
 
 <h3>1. Standardized Error Handling</h3>
-<p><strong>File:</strong> <code>src/qcommon/q_error_helpers.h</code> (new)</p>
+<p><strong>File:</strong> <code>src/common/q_error_helpers.h</code> (new)</p>
 
 <p>Created a new header file with error handling helper macros:</p>
 <ul>
@@ -57,9 +57,9 @@ ERROR_IF_NULL(buffer, ERR_FATAL, "Failed to allocate buffer");
 
 <h4>Core Headers:</h4>
 <ul>
-    <li><code>src/qcommon/cm_patch.h</code> - Added <code>#ifndef __CM_PATCH_H__</code></li>
-    <li><code>src/qcommon/cm_polylib.h</code> - Added <code>#ifndef __CM_POLYLIB_H__</code></li>
-    <li><code>src/qcommon/cm_local.h</code> - Added <code>#ifndef __CM_LOCAL_H__</code></li>
+    <li><code>src/common/cm_patch.h</code> - Added <code>#ifndef __CM_PATCH_H__</code></li>
+    <li><code>src/common/cm_polylib.h</code> - Added <code>#ifndef __CM_POLYLIB_H__</code></li>
+    <li><code>src/common/cm_local.h</code> - Added <code>#ifndef __CM_LOCAL_H__</code></li>
     <li><code>src/server/server.h</code> - Added <code>#ifndef __SERVER_H__</code></li>
     <li><code>src/cgame/cg_public.h</code> - Added <code>#ifndef __CG_PUBLIC_H__</code></li>
 </ul>
@@ -159,11 +159,11 @@ ctest</code></pre>
 
 <h3>Core Engine Files</h3>
 <ul>
-    <li><code>src/qcommon/common.c</code> - Fixed <code>CopyString()</code> and added documentation</li>
-    <li><code>src/qcommon/q_shared.c</code> - Fixed <code>Com_sprintf()</code> and <code>va()</code>, added documentation</li>
-    <li><code>src/qcommon/cm_patch.h</code> - Added header guard</li>
-    <li><code>src/qcommon/cm_polylib.h</code> - Added header guard</li>
-    <li><code>src/qcommon/cm_local.h</code> - Added header guard</li>
+    <li><code>src/common/common.c</code> - Fixed <code>CopyString()</code> and added documentation</li>
+    <li><code>src/common/q_shared.c</code> - Fixed <code>Com_sprintf()</code> and <code>va()</code>, added documentation</li>
+    <li><code>src/common/cm_patch.h</code> - Added header guard</li>
+    <li><code>src/common/cm_polylib.h</code> - Added header guard</li>
+    <li><code>src/common/cm_local.h</code> - Added header guard</li>
 </ul>
 
 <h2>Impact</h2>

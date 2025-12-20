@@ -1225,7 +1225,7 @@ pause</code></pre>
 <div class="section">
     <h2>Step 7: Console Integration Hook</h2>
     
-    <h3>Modify src/qcommon/common.c</h3>
+    <h3>Modify src/common/common.c</h3>
     <div class="code-block">
         <pre><code>// Add include for CimGui
 #include "cimgui_integration.h"
@@ -1756,7 +1756,7 @@ src/cimgui_config.c         # Configuration implementation
 CMakeLists.txt              # Build system integration
 src/client/cl_main.c        # Initialization/shutdown
 src/client/cl_input.c       # Event processing
-src/qcommon/common.c        # Console capture
+src/common/common.c        # Console capture
 src/renderercommon/tr_*.c   # Render integration
 
 # Build scripts:

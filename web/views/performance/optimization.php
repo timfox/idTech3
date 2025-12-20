@@ -9,7 +9,7 @@ $title = "Optimization and Stability Guide";
 <h2>Existing Optimizations</h2>
 
 <h3>1. Filesystem Caching</h3>
-<p>File: <code>src/qcommon/files.c</code></p>
+<p>File: <code>src/common/files.c</code></p>
 
 <h4>Path Normalization Cache</h4>
 <p>Lines 335-356</p>
@@ -47,7 +47,7 @@ $title = "Optimization and Stability Guide";
 </ul>
 
 <h3>2. Memory Safety</h3>
-<p>Files: <code>src/qcommon/q_memtrack.h</code>, <code>docs/memory-safety.md</code></p>
+<p>Files: <code>src/common/q_memtrack.h</code>, <code>docs/memory-safety.md</code></p>
 
 <h4>Memory Tracking System</h4>
 <ul>
@@ -65,7 +65,7 @@ $title = "Optimization and Stability Guide";
 </ul>
 
 <h3>3. Error Handling</h3>
-<p>File: <code>src/qcommon/q_error_helpers.h</code></p>
+<p>File: <code>src/common/q_error_helpers.h</code></p>
 
 <h4>Defensive Programming Macros</h4>
 <ul>

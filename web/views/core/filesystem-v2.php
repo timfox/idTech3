@@ -506,15 +506,15 @@ fileHandle_t FS_FOpenFileWrite(const char *qpath) {
     
     <h3>Header Files</h3>
     <ul>
-        <li><code>src/qcommon/files_v2.h</code> - Public API and data structures</li>
-        <li><code>src/qcommon/files_internal.h</code> - Internal type definitions shared between files.c and files_v2.c</li>
+        <li><code>src/common/files_v2.h</code> - Public API and data structures</li>
+        <li><code>src/common/files_internal.h</code> - Internal type definitions shared between files.c and files_v2.c</li>
     </ul>
     
     <h3>Implementation Files</h3>
     <ul>
-        <li><code>src/qcommon/files_v2.c</code> - Core mount table management and file search</li>
-        <li><code>src/qcommon/files_v2_impl.c</code> - Write policy, sandboxing, mod management, console commands, and migration</li>
-        <li><code>src/qcommon/files.c</code> - Integration points with legacy filesystem</li>
+        <li><code>src/common/files_v2.c</code> - Core mount table management and file search</li>
+        <li><code>src/common/files_v2_impl.c</code> - Write policy, sandboxing, mod management, console commands, and migration</li>
+        <li><code>src/common/files.c</code> - Integration points with legacy filesystem</li>
     </ul>
     
     <h3>Test Files</h3>
