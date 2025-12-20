@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Compile Game Script for id Tech 3 mods
+# Compile Game Script for id Tech 3 mods, with robust CMake cache handling
 set -e
 
 # Usage: ./compile_game.sh [mod_name] [Debug|Release] [clean]
@@ -62,6 +62,24 @@ echo "Module sources: $MOD_SOURCE_DIR"
 echo "Release destination: $RELEASE_MOD_DIR"
 
 cd "$MOD_SOURCE_DIR"
+
+# Check for CMake cache source mismatch or cross-directory confusion and fix it
+CMAKE_CACHE="$MOD_BUILD_DIR/CMakeCache.txt"
+CMAKE_CACHE_DIR_OK=1
+if [ -f "$CMAKE_CACHE" ]; then
+    # Extract CMAKE_HOME_DIRECTORY and look for old/bad values
+    CACHE_SRC_DIR=$(grep '^CMAKE_HOME_DIRECTORY:INTERNAL=' "$CMAKE_CACHE" | head -n1 | cut -d= -f2)
+    if [ -n "$CACHE_SRC_DIR" ] && [ "$CACHE_SRC_DIR" != "$MOD_SOURCE_DIR" ]; then
+        echo ""
+        echo "Warning:"
+        echo "CMake cache source mismatch detected."
+        echo "  CMakeCache.txt: $CMAKE_CACHE"
+        echo "  Current source: $MOD_SOURCE_DIR"
+        echo "  Cached source:  $CACHE_SRC_DIR"
+        echo "Removing bad CMake cache. (This happens when moving or renaming mod/source directories.)"
+        rm -rf "$MOD_BUILD_DIR"
+    fi
+fi
 
 if [ $CLEAN -eq 1 ] && [ -d "$MOD_BUILD_DIR" ]; then
     echo "Cleaning old build directory..."
