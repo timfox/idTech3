@@ -2368,3 +2368,100 @@ const char *Com_SkipTokens( const char *s, int numTokens, const char *sep )
 	else
 		return s;
 }
+
+/*
+============
+Q_SafeAtoi
+
+Safely converts a string to an integer with bounds checking and error handling.
+Returns the parsed integer value, or defaultValue if parsing fails.
+Also sets *error to qtrue if parsing failed, qfalse otherwise.
+============
+*/
+int Q_SafeAtoi(const char *s, int defaultValue, qboolean *error) {
+	char *endptr;
+	long val;
+
+	if (!s || !*s) {
+		if (error) *error = qtrue;
+		return defaultValue;
+	}
+
+	// Skip leading whitespace
+	while (*s && (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r')) {
+		s++;
+	}
+
+	if (!*s) {
+		if (error) *error = qtrue;
+		return defaultValue;
+	}
+
+	// Use strtol for safe parsing
+	errno = 0;
+	val = strtol(s, &endptr, 10);
+
+	// Check for conversion errors
+	if (errno == ERANGE || val < INT_MIN || val > INT_MAX) {
+		if (error) *error = qtrue;
+		return defaultValue;
+	}
+
+	// Check if the entire string was consumed (no trailing garbage)
+	if (*endptr != '\0') {
+		if (error) *error = qtrue;
+		return defaultValue;
+	}
+
+	if (error) *error = qfalse;
+	return (int)val;
+}
+
+/*
+============
+Q_SafeAtol
+
+Safely converts a string to a long integer with bounds checking and error handling.
+Returns the parsed long value, or defaultValue if parsing fails.
+Also sets *error to qtrue if parsing failed, qfalse otherwise.
+============
+*/
+long Q_SafeAtol(const char *s, long defaultValue, qboolean *error) {
+	char *endptr;
+	long val;
+
+	if (!s || !*s) {
+		if (error) *error = qtrue;
+		return defaultValue;
+	}
+
+	// Skip leading whitespace
+	while (*s && (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r')) {
+		s++;
+	}
+
+	if (!*s) {
+		if (error) *error = qtrue;
+		return defaultValue;
+	}
+
+	// Use strtol for safe parsing
+	errno = 0;
+	val = strtol(s, &endptr, 10);
+
+	// Check for conversion errors
+	if (errno == ERANGE) {
+		if (error) *error = qtrue;
+		return defaultValue;
+	}
+
+	// Check if the entire string was consumed (no trailing garbage)
+	if (*endptr != '\0') {
+		if (error) *error = qtrue;
+		return defaultValue;
+	}
+
+	if (error) *error = qfalse;
+	return val;
+}
+

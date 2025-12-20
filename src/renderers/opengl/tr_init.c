@@ -1440,7 +1440,7 @@ static void GfxInfo( void )
 	{
 		const char *modefs = ri.Cvar_VariableString( "r_modeFullscreen" );
 		if ( *modefs )
-			mode = atoi( modefs );
+			mode = Q_SafeAtoi( modefs, 0, NULL );
 		else
 			mode = ri.Cvar_VariableIntegerValue( "r_mode" );
 		fs = fsstrings[1];

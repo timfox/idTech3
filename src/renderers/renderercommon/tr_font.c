@@ -705,6 +705,10 @@ static int fdOffset;
 static byte	*fdFile;
 
 static int readInt( void ) {
+	if (!fdFile) {
+		ri.Printf(PRINT_WARNING, "readInt: NULL fdFile\n");
+		return 0;
+	}
 	int i = ((unsigned int)fdFile[fdOffset] | ((unsigned int)fdFile[fdOffset+1]<<8) | ((unsigned int)fdFile[fdOffset+2]<<16) | ((unsigned int)fdFile[fdOffset+3]<<24));
 	fdOffset += 4;
 	return i;
@@ -717,6 +721,10 @@ typedef union {
 
 static float readFloat( void ) {
 	poor	me;
+	if (!fdFile) {
+		ri.Printf(PRINT_WARNING, "readFloat: NULL fdFile\n");
+		return 0.0f;
+	}
 #if defined Q3_BIG_ENDIAN
 	me.fred[0] = fdFile[fdOffset+3];
 	me.fred[1] = fdFile[fdOffset+2];
@@ -846,8 +854,15 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 	len = ri.FS_ReadFile(name, NULL);
 	if (!wantSDF && len == sizeof(fontInfo_t)) {
 		ri.FS_ReadFile(name, &faceData);
+		if (!faceData) {
+			ri.Printf(PRINT_WARNING, "RE_RegisterFont: Failed to load font file '%s'\n", name);
+			return qfalse;
+		}
 		fdOffset = 0;
 		fdFile = faceData;
+
+		// Ensure faceData is freed on any error path
+		qboolean faceDataLoaded = qtrue;
 		for(i=0; i<GLYPHS_PER_FONT; i++) {
 			font->glyphs[i].height		= readInt();
 			font->glyphs[i].top			= readInt();
@@ -861,7 +876,11 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 			font->glyphs[i].s2			= readFloat();
 			font->glyphs[i].t2			= readFloat();
 			font->glyphs[i].glyph		= readInt();
-			Q_strncpyz(font->glyphs[i].shaderName, (const char *)&fdFile[fdOffset], sizeof(font->glyphs[i].shaderName));
+			if (fdFile) {
+				Q_strncpyz(font->glyphs[i].shaderName, (const char *)&fdFile[fdOffset], sizeof(font->glyphs[i].shaderName));
+			} else {
+				Q_strncpyz(font->glyphs[i].shaderName, "", sizeof(font->glyphs[i].shaderName));
+			}
 			fdOffset += sizeof(font->glyphs[i].shaderName);
 		}
 		font->glyphScale = readFloat();
@@ -1516,6 +1535,11 @@ Public interface for font registration - chooses between async and sync loading
 =================
 */
 qboolean RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
+	if (!font) {
+		ri.Printf(PRINT_WARNING, "RE_RegisterFont: NULL font parameter\n");
+		return qfalse;
+	}
+
 	// Check if file system is ready before attempting to load fonts
 	// This prevents failures during early initialization when .pk3 files aren't loaded yet
 	if (!FS_Initialized() || FS_StartupInProgress()) {
@@ -1531,6 +1555,12 @@ qboolean RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) 
 	if (!r_fontAsync) {
 		r_fontAsync = ri.Cvar_Get("r_fontAsync", "1", CVAR_ARCHIVE | CVAR_LATCH);
 		ri.Cvar_SetDescription(r_fontAsync, "Use asynchronous font loading (0 = sync, 1 = async)");
+	}
+
+	// Validate file path for security
+	if ( !Q_ValidateFilePath( fontName ) ) {
+		ri.Printf( PRINT_WARNING, "RE_RegisterFont: Path traversal attempt blocked: %s\n", fontName );
+		return qfalse;
 	}
 
 	ri.Printf(PRINT_ALL, "RE_RegisterFont: called for '%s' (%dpt), async=%d\n",

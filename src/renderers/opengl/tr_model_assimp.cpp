@@ -49,6 +49,13 @@ extern "C" qhandle_t R_RegisterAssimpModel( const char *name, model_t *mod )
 	void *buffer;
 	int filesize;
 
+	// Validate file path for security
+	if ( !Q_ValidateFilePath( name ) ) {
+		ri.Printf( PRINT_WARNING, "R_RegisterAssimpModel: Path traversal attempt blocked: %s\n", name );
+		mod->type = MOD_BAD;
+		return 0;
+	}
+
 	// Read file through Quake 3's virtual file system
 	filesize = ri.FS_ReadFile( name, &buffer );
 	if ( !buffer || filesize <= 0 ) {

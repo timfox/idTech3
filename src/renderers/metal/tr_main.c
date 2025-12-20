@@ -106,6 +106,10 @@ RE_AddRefEntityToScene
 ================
 */
 void RE_AddRefEntityToScene(const refEntity_t *re, qboolean intShaderTime) {
+	if (!re) {
+		ri.Printf(PRINT_WARNING, "RE_AddRefEntityToScene: NULL refEntity_t parameter\n");
+		return;
+	}
 	// Add entity to scene
 }
 
@@ -115,6 +119,14 @@ RE_AddPolyToScene
 ================
 */
 void RE_AddPolyToScene(qhandle_t hShader, int numVerts, const polyVert_t *verts, int num) {
+	if (!verts) {
+		ri.Printf(PRINT_WARNING, "RE_AddPolyToScene: NULL polyVert_t parameter\n");
+		return;
+	}
+	if (numVerts <= 0) {
+		ri.Printf(PRINT_WARNING, "RE_AddPolyToScene: invalid numVerts %d\n", numVerts);
+		return;
+	}
 	// Add polygon to scene
 }
 
@@ -262,6 +274,10 @@ RE_RegisterFont
 void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	// Metal renderer doesn't have native font support, always fail
 	// This will cause the UI to fall back to alternative rendering methods
+	if (!font) {
+		ri.Printf(PRINT_WARNING, "RE_RegisterFont: NULL font parameter\n");
+		return;
+	}
 	Com_Memset(font, 0, sizeof(*font));
 }
 

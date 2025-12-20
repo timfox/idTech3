@@ -418,6 +418,12 @@ static qboolean R_LoadMD3( model_t *mod, int lod, void *buffer, int fileSize, co
 	int					version;
 	int					size;
 
+	// Additional security check for model files
+	if ( !Q_ValidateFilePath( mod_name ) ) {
+		ri.Printf( PRINT_WARNING, "R_LoadMD3: Invalid path for model: %s\n", mod_name );
+		return qfalse;
+	}
+
 	pinmodel = (md3Header_t *)buffer;
 
 	version = LittleLong( pinmodel->version );

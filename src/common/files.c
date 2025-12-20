@@ -2208,9 +2208,12 @@ extern qboolean		com_fullyInitialized;
 
 	if ( filename[0] == '\0' ) {
 		Com_Printf( "FS_FOpenFileRead: empty filename (ignored)\n" );
-		if ( file ) {
-			*file = 0;
-		}
+		return -1;
+	}
+
+	// Validate file path for security
+	if ( !Q_ValidateFilePath( filename ) ) {
+		Com_Printf( S_COLOR_RED "FS_FOpenFileRead: Path traversal attempt blocked: %s\n", filename );
 		return -1;
 	}
 
@@ -2884,6 +2887,12 @@ a null buffer will just return the file length without loading
 
 	if ( qpath == NULL || qpath[0] == '\0' ) {
 		Com_Error( ERR_FATAL, "FS_ReadFile with empty name" );
+	}
+
+	// Validate file path for security
+	if ( !Q_ValidateFilePath( qpath ) ) {
+		Com_Printf( S_COLOR_RED "FS_ReadFile: Path traversal attempt blocked: %s\n", qpath );
+		return -1;
 	}
 
 	buf = NULL;	// quiet compiler warning

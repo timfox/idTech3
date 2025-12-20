@@ -1596,4 +1596,32 @@ int HuffmanGetSymbol( unsigned int* symbol, const byte* buffer, int bitIndex );
 #include "job_system.h"
 #endif
 
+/*
+===============================================================================
+
+SECURITY FUNCTIONS
+
+===============================================================================
+*/
+
+/*
+============
+Q_ValidateFilePath
+
+Validates a file path to prevent directory traversal attacks.
+Returns qtrue if the path is safe, qfalse if it contains traversal attempts.
+============
+*/
+qboolean Q_ValidateFilePath(const char *path);
+
+/*
+============
+Q_SanitizeFilePath
+
+Sanitizes a file path by removing dangerous elements and ensuring it's safe.
+Returns a sanitized version of the path, or NULL if the path is too dangerous.
+============
+*/
+const char *Q_SanitizeFilePath(const char *path, char *output, int outputSize);
+
 #endif // _QCOMMON_H_

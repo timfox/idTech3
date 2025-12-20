@@ -62,7 +62,12 @@ client_t *SV_GetPlayerByHandle( void ) {
 	
 	if(!s[i])
 	{
-		int plid = atoi(s);
+		qboolean parseError;
+		int plid = Q_SafeAtoi(s, -1, &parseError);
+		if (parseError) {
+			Com_Printf( "Invalid player ID format: %s\n", s);
+			return NULL;
+		}
 
 		// Check for numeric playerid match
 		if(plid >= 0 && plid < sv.maxclients)
@@ -127,7 +132,12 @@ static client_t *SV_GetPlayerByNum( void ) {
 			return NULL;
 		}
 	}
-	idnum = atoi( s );
+	qboolean parseError;
+	idnum = Q_SafeAtoi(s, -1, &parseError);
+	if (parseError) {
+		Com_Printf( "Invalid client slot format: %s\n", s);
+		return NULL;
+	}
 	if ( idnum < 0 || idnum >= sv.maxclients ) {
 		Com_Printf( "Bad client slot: %i\n", idnum );
 		return NULL;
@@ -294,7 +304,12 @@ static void SV_MapRestart_f( void ) {
 	}
 
 	if ( Cmd_Argc() > 1 ) {
-		delay = atoi( Cmd_Argv(1) );
+		qboolean parseError;
+		delay = Q_SafeAtoi( Cmd_Argv(1), 5, &parseError );
+		if (parseError) {
+			Com_Printf( "Invalid delay format: %s, using default 5 seconds\n", Cmd_Argv(1) );
+			delay = 5;
+		}
 	} else {
 		delay = 5;
 	}
@@ -750,7 +765,12 @@ static void SV_RehashBans_f(void)
 			if(NET_StringToAdr(curpos + 2, &serverBans[index].ip, NA_UNSPEC))
 			{
 				serverBans[index].isexception = (curpos[0] != '0');
-				serverBans[index].subnet = atoi(maskpos);
+				qboolean parseError;
+				serverBans[index].subnet = Q_SafeAtoi(maskpos, 32, &parseError);
+				if (parseError) {
+					Com_Printf( "WARNING: Invalid subnet mask '%s', using 32\n", maskpos);
+					serverBans[index].subnet = 32;
+				}
 				
 				if(serverBans[index].ip.type == NA_IP &&
 				   (serverBans[index].subnet < 1 || serverBans[index].subnet > 32))
@@ -943,7 +963,12 @@ static void SV_AddBanToList(qboolean isexception)
 		
 		if(argc == 3)
 		{
-			mask = atoi(Cmd_Argv(2));
+			qboolean parseError;
+			mask = Q_SafeAtoi(Cmd_Argv(2), 32, &parseError);
+			if (parseError) {
+				Com_Printf( "WARNING: Invalid subnet mask '%s', using 32\n", Cmd_Argv(2));
+				mask = 32;
+			}
 			
 			if(ip.type == NA_IP)
 			{
@@ -1081,7 +1106,12 @@ static void SV_DelBanFromList(qboolean isexception)
 	}
 	else
 	{
-		todel = atoi(Cmd_Argv(1));
+		qboolean parseError;
+		todel = Q_SafeAtoi(Cmd_Argv(1), -1, &parseError);
+		if (parseError) {
+			Com_Printf( "Error: Invalid ban number format: %s\n", Cmd_Argv(1));
+			return;
+		}
 
 		if(todel < 1 || todel > serverBansCount)
 		{
@@ -1264,7 +1294,12 @@ static void SV_Status_f( void ) {
 			continue;
 
 		l = strlen( cl->name ) + 1;
-		strcpy( nc, cl->name );
+		// Ensure we don't overflow the names buffer
+		if (nc + l > names + sizeof(names)) {
+			Com_Printf( "WARNING: Names buffer overflow prevented for client %d\n", i );
+			continue;
+		}
+		Q_strncpyz( nc, cl->name, sizeof(names) - (nc - names) );
 		np[ i ] = nc; nc += l;			// name pointer in name buffer
 		nl[ i ] = SV_Strlen( cl->name );// name length without color sequences
 		if ( nl[ i ] > max_namelength )
@@ -1272,7 +1307,12 @@ static void SV_Status_f( void ) {
 
 		s = NET_AdrToString( &cl->netchan.remoteAddress );
 		l = strlen( s ) + 1;
-		strcpy( ac, s );
+		// Ensure we don't overflow the addrs buffer
+		if (ac + l > addrs + sizeof(addrs)) {
+			Com_Printf( "WARNING: Addresses buffer overflow prevented for client %d\n", i );
+			continue;
+		}
+		Q_strncpyz( ac, s, sizeof(addrs) - (ac - addrs) );
 		ap[ i ] = ac; ac += l;			// address pointer in address buffer
 		al[ i ] = l - 1;				// address length
 		if ( al[ i ] > max_addrlength )
@@ -1380,8 +1420,8 @@ static void SV_ConSay_f( void ) {
 		p++;
 	}
 
-	strcpy( text, "console: " );
-	strcat( text, p );
+	Q_strncpyz( text, "console: ", sizeof(text) );
+	Q_strcat( text, sizeof(text), p );
 
 	SV_SendServerCommand( NULL, "chat \"%s\"", text );
 }
@@ -1426,8 +1466,8 @@ static void SV_ConTell_f( void ) {
 		p++;
 	}
 
-	strcpy( text, S_COLOR_MAGENTA "console: " );
-	strcat( text, p );
+	Q_strncpyz( text, S_COLOR_MAGENTA "console: ", sizeof(text) );
+	Q_strcat( text, sizeof(text), p );
 
 	Com_Printf( "%s\n", text );
 	SV_SendServerCommand( cl, "chat \"%s\"", text );

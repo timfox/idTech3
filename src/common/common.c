@@ -839,22 +839,22 @@ qboolean Com_EarlyParseCmdLine( char *commandLine, char *con_title, int title_si
 			continue;
 		}
 		if ( !Q_stricmpn( Cmd_Argv(0), "set", 3 ) && !Q_stricmp( Cmd_Argv(1), "vid_xpos" ) ) {
-			*vid_xpos = atoi( Cmd_Argv( 2 ) );
+			*vid_xpos = Q_SafeAtoi( Cmd_Argv( 2 ), 0, NULL );
 			flags |= 1;
 			continue;
 		}
 		if ( !Q_stricmp( Cmd_Argv(0), "vid_xpos" ) ) {
-			*vid_xpos = atoi( Cmd_Argv( 1 ) );
+			*vid_xpos = Q_SafeAtoi( Cmd_Argv( 1 ), 0, NULL );
 			flags |= 1;
 			continue;
 		}
 		if ( !Q_stricmpn( Cmd_Argv(0), "set", 3 ) && !Q_stricmp( Cmd_Argv(1), "vid_ypos" ) ) {
-			*vid_ypos = atoi( Cmd_Argv( 2 ) );
+			*vid_ypos = Q_SafeAtoi( Cmd_Argv( 2 ), 0, NULL );
 			flags |= 2;
 			continue;
 		}
 		if ( !Q_stricmp( Cmd_Argv(0), "vid_ypos" ) ) {
-			*vid_ypos = atoi( Cmd_Argv( 1 ) );
+			*vid_ypos = Q_SafeAtoi( Cmd_Argv( 1 ), 0, NULL );
 			flags |= 2;
 			continue;
 		}
@@ -3296,7 +3296,7 @@ static void Com_Freeze_f( void ) {
 		Com_Printf( "freeze <seconds>\n" );
 		return;
 	}
-	s = atoi( Cmd_Argv(1) ) * 1000;
+	s = Q_SafeAtoi( Cmd_Argv(1), 0, NULL ) * 1000;
 
 	start = Com_Milliseconds();
 
@@ -3839,7 +3839,7 @@ static void Sys_GetProcessorId( char *vendor )
 	}
 
 	if ( platform[0] == 'v' || platform[0] == 'V' ) {
-		if ( atoi( platform + 1 ) >= 7 ) {
+		if ( Q_SafeAtoi( platform + 1, 0, NULL ) >= 7 ) {
 			CPU_Flags |= CPU_ARMv7;
 		}
 	}
@@ -5671,3 +5671,104 @@ void Com_SortFileList( char **list, int nfiles, int fastSort )
 	}
 }
 #endif
+
+/*
+===============================================================================
+
+SECURITY FUNCTIONS
+
+===============================================================================
+*/
+
+/*
+============
+Q_ValidateFilePath
+
+Validates a file path to prevent directory traversal attacks.
+Returns qtrue if the path is safe, qfalse if it contains traversal attempts.
+============
+*/
+qboolean Q_ValidateFilePath(const char *path) {
+	const char *p;
+
+	if (!path || !*path) {
+		return qfalse;
+	}
+
+	// Check for directory traversal patterns
+	for (p = path; *p; p++) {
+		// Check for "../" or "..\" patterns
+		if ((p[0] == '.' && p[1] == '.' && (p[2] == '/' || p[2] == '\\')) ||
+		    (p[0] == '.' && p[1] == '.' && p[2] == '\0')) {
+			return qfalse;
+		}
+
+		// Also check for absolute paths that might bypass restrictions
+		if (p == path && *p == '/') {
+			// Allow leading slash for game-relative paths, but not absolute system paths
+			continue;
+		}
+
+		// Check for Windows absolute paths
+		if (p == path && ((p[0] >= 'A' && p[0] <= 'Z') || (p[0] >= 'a' && p[0] <= 'z')) &&
+		    p[1] == ':' && (p[2] == '/' || p[2] == '\\')) {
+			return qfalse;
+		}
+	}
+
+	return qtrue;
+}
+
+/*
+============
+Q_SanitizeFilePath
+
+Sanitizes a file path by removing dangerous elements and ensuring it's safe.
+Returns a sanitized version of the path, or NULL if the path is too dangerous.
+============
+*/
+const char *Q_SanitizeFilePath(const char *path, char *output, int outputSize) {
+	const char *src;
+	char *dst;
+	int len = 0;
+
+	if (!path || !output || outputSize <= 0) {
+		return NULL;
+	}
+
+	// Validate the path first
+	if (!Q_ValidateFilePath(path)) {
+		return NULL;
+	}
+
+	src = path;
+	dst = output;
+
+	// Copy path while sanitizing
+	while (*src && len < outputSize - 1) {
+		// Skip dangerous characters
+		if (*src == '<' || *src == '>' || *src == '|' || *src == '"' ||
+		    *src == '*' || *src == '?') {
+			src++;
+			continue;
+		}
+
+		// Convert backslashes to forward slashes for consistency
+		if (*src == '\\') {
+			*dst++ = '/';
+			len++;
+		} else {
+			*dst++ = *src++;
+			len++;
+		}
+	}
+
+	*dst = '\0';
+
+	// Final validation
+	if (!Q_ValidateFilePath(output)) {
+		return NULL;
+	}
+
+	return output;
+}

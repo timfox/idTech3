@@ -170,6 +170,7 @@ static_assert(__cplusplus >= 202002L, "C++23 or newer is required to build this 
 #include <time.h>
 #include <ctype.h>
 #include <limits.h>
+#include <errno.h>
 
 #endif
 
@@ -925,6 +926,11 @@ int     Q_replace( const char *str1, const char *str2, char *src, int max_len );
 
 char	*Q_stradd( char *dst, const char *src );
 char	*Q_strncpy( char *dest, const char *src, int destsize );
+
+// Safe integer parsing functions (replacement for atoi/atol)
+int		Q_SafeAtoi( const char *s, int defaultValue, qboolean *error );
+long	Q_SafeAtol( const char *s, long defaultValue, qboolean *error );
+
 
 // strlen that discounts Quake color sequences
 int Q_PrintStrlen( const char *string );
