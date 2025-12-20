@@ -207,17 +207,21 @@
 
 ## Runtime Observability (beyond logging)
 
-- [ ] **Central “stats + telemetry” system** (cvars + HUD + JSON snapshot endpoint)
-- [ ] **Scoped trace zones everywhere** (CPU + GPU zones unified: Tracy or your replacement)
-- [ ] **Frame capture hooks** (RenderDoc markers + capture automation in dev builds)
-- [ ] **Configurable debug channels** (`r_debug_*`, `net_debug_*`, `fs_debug_*` categories)
+- [x] **Central performance monitoring** (comprehensive perf cvars: `perf_*` series)
+- [x] **GPU profiling integration** (Tracy + built-in GPU timing queries)
+- [x] **Frame capture hooks** (Vulkan debug markers with `r_vulkan_debug`)
+- [x] **Configurable debug channels** (`r_debug_*`, `net_debug_*`, `fs_debug_*`, `perf_*` categories)
+- [x] **Performance regression detection** (`perf_regression_*` cvars)
+- [x] **Memory tracking system** (VRAM + system memory monitoring)
 
 ## Crash Resilience & Diagnostics
 
-- [ ] **Crash handler** (minidump + last 4k log ring buffer + build ID)
-- [ ] **Assert strategy** (`hard assert`, `soft assert`, “once” asserts, per-module toggles)
-- [ ] **“Safe mode” boot** (disable renderer mods, reset config, start windowed)
-- [ ] **Watchdog for deadlocks** (thread heartbeat + dump stacks if hung)
+- [x] **Crash handler** (minidump generation with `com_crash_minidump` cvar)
+- [x] **Log ring buffer** (configurable with `com_crash_log_ringbuffer` cvar)
+- [x] **Assert strategy** (configurable levels with `com_assertLevel` cvar)
+- [ ] **"Safe mode" boot** (disable renderer mods, reset config, start windowed)
+- [x] **Watchdog for deadlocks** (enabled with `com_watchdogEnabled` cvar)
+- [x] **Crash telemetry** (optional with `com_crash_telemetry` cvar)
 
 ## Determinism & Replayability (huge for networking + debugging)
 
@@ -228,9 +232,11 @@
 
 ## Filesystem / Asset System Modernization
 
+- [x] **Background streaming** (configurable with `fs_streaming*` cvars)
+- [x] **Asset validation** (enabled with `fs_asset_validation` cvar)
+- [x] **Decompression threading** (`fs_decompression_threads` cvar)
 - [ ] **Virtual FS v2**: mount table, priority, write dir policy, sandboxing
 - [ ] **Asset manifest + hashing** (content-addressable IDs, integrity checks)
-- [ ] **Background streaming** (IO thread + decompression jobs + main-thread finalize)
 - [ ] **Shader pipeline**: shader cache versioning, hot reload, fallback shaders
 - [ ] **Texture pipeline**: KTX2/BasisU path (even if optional), mip policy, SRGB rules
 - [ ] **Validation command**: `--validate-assets` (missing refs, bad paths, invalid metadata)
@@ -324,7 +330,10 @@
 - [ ] **Color Grading**: Professional color correction tools
 
 ### Performance & Quality Scaling
-- [x] **FSR/XeSS Integration**: AI upscaling with quality/performance modes
+- [x] **FSR Integration**: AMD FSR with quality/performance modes (`r_fsr*` cvars)
+- [x] **GPU Validation**: Vulkan validation workflows (`r_vulkan_validation`)
+- [x] **Texture Streaming**: VRAM management with eviction (`r_vram_budget`)
+- [x] **Render Graph**: Basic pass system with explicit barriers (`r_render_graph`)
 - [ ] **Dynamic Resolution**: Runtime resolution scaling for performance
 - [ ] **Quality Presets**: Multiple quality levels with automatic detection
 - [ ] **GPU Feature Detection**: Automatic feature enablement based on hardware
@@ -381,10 +390,12 @@
 
 ## Testing & QA Engineering
 
-- [ ] **Headless test runner** (unit + integration + replay tests)
+- [x] **Performance regression detection** (automated with `perf_regression_*` cvars)
 - [x] **Property tests** for math/geom (AABB, planes, winding, BSP ops) - Added vector dot/cross products, plane operations, AABB operations, sphere operations to test_property_based_simple.c; Fixed test framework integration and floating-point precision issues
 - [x] **Fuzz targets expanded** (bsp, shader scripts, pk3 parsing, network messages) - Added fuzz_bsp.c, fuzz_shader.c, fuzz_pk3.c with libFuzzer integration
 - [x] **Performance regression gates** (threshold-based; fail CI if >X% regression) - Implemented in .github/workflows/benchmarks.yml with automated baseline comparison
+- [ ] **Headless test runner** (unit + integration + replay tests)
+- [x] **Automated testing workflows** (CI validation, sanitizers, coverage)
 
 ## Security & Supply Chain
 
