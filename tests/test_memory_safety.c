@@ -8,7 +8,7 @@ Memory Safety Tests - Standalone version
 #include "q_memory_safety_test.h"
 
 // Track last error for assertions
-static char g_last_error[1024] = {0};
+static char __attribute__((unused)) g_last_error[1024] = {0};
 
 // Tests
 TEST(q_strncpyz_safe_basic) {

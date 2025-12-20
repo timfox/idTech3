@@ -7,7 +7,7 @@ Memory Safety Functions - Standalone test implementation
 #include "q_memory_safety_test.h"
 
 // Com_Printf implementation for this translation unit
-void Com_Printf(const char *fmt, ...) {
+static void Com_Printf(const char *fmt, ...) {
     va_list argptr;
     va_start(argptr, fmt);
     vprintf(fmt, argptr);

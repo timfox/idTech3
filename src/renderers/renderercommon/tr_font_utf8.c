@@ -15,6 +15,9 @@ UTF-8 and modern font rendering utilities
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 
+// Font CVars - declared in renderer
+extern cvar_t *r_fontKerning;
+
 // Renderer import interface - defined in renderer main file
 
 // Forward declaration for glyph access function
@@ -127,7 +130,6 @@ float RE_Text_Width_Improved(const char *text, float scale, fontInfo_t *font, in
 		return 0.0f;
 	
 	float width = 0.0f;
-	float useScale = scale * font->glyphScale;
 	const unsigned char *s = (const unsigned char *)text;
 	int count = 0;
 	int len = strlen(text);

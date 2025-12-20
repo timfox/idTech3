@@ -294,6 +294,7 @@ int main(void) {
 	RUN_TEST(memory_zero_allocation);
 	RUN_TEST(memory_large_allocation);
 	RUN_TEST(memory_alignment);
+	RUN_TEST(memory_vector_operations);
 
 	PRINT_TEST_SUMMARY();
 	return (test_failed > 0) ? 1 : 0;
