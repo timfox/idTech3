@@ -263,6 +263,11 @@ static  const char  *basegame = ""; /* last value in array */
 
 static	char		fs_gamedir[MAX_OSPATH];	// this will be a single file name with no separators
 static	cvar_t		*fs_debug;
+static	cvar_t		*fs_streaming;
+static	cvar_t		*fs_streaming_budget;
+static	cvar_t		*fs_background_loading;
+static	cvar_t		*fs_asset_validation;
+static	cvar_t		*fs_decompression_threads;
 static	cvar_t		*fs_homepath;
 
 #ifdef __APPLE__

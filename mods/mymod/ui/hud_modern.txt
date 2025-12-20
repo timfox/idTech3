@@ -1,5 +1,5 @@
-// Modern HUD configuration with improved fonts
-// This file demonstrates how to use modern TrueType fonts in menus
+// Enhanced Modern HUD - Demonstrates Advanced UI Features
+// Showcases font rendering, UI enhancements, and modern menu system
 
 loadmenu {
 	menudef {
@@ -11,20 +11,65 @@ loadmenu {
 		outlineColor 0.5 0.5 0.5 1.0
 		background "menu/art/cut_frame"
 		cursor "ui/assets/3_cursor2"
-		
-		// Modern font configuration
-		// Use TrueType fonts for better quality and Unicode support
-		font "FX300.ttf" 16
-		smallFont "FX300.ttf" 12
-		bigFont "FX300.ttf" 24
-		
-		// Menu sounds
+
+		// =============================================================================
+		// ENHANCED FONT CONFIGURATION
+		// =============================================================================
+
+		// Primary fonts with enhanced rendering (requires r_fontQuality 2)
+		font "fonts/FX300.ttf" 16
+		smallFont "fonts/FX300.ttf" 12
+		bigFont "fonts/FX300.ttf" 24
+
+		// Specialized fonts for different UI elements
+		headerFont "fonts/2197 Heavy.ttf" 28
+		monoFont "fonts/roboto-regular.ttf" 14
+		gameFont "fonts/WO3.ttf" 18
+
+		// Font effects (requires UI enhancement features)
+		fontGlowColor 1.0 0.8 0.0 0.7    // Golden glow
+		fontOutlineColor 0.0 0.0 0.0 1.0 // Black outline
+		fontShadowColor 0.0 0.0 0.0 0.5  // Semi-transparent shadow
+
+		// =============================================================================
+		// ADVANCED UI FEATURES
+		// =============================================================================
+
+		// UI scaling and animation (requires ui_scale, ui_animationSpeed)
+		uiScale 1.0
+		uiAnimationSpeed 1.0
+		uiTransitionTime 0.3
+
+		// Background blur effects (requires ui_blur)
+		uiBlurEnabled 1
+		uiBlurRadius 3
+		uiBlurSigma 2.0
+
+		// Enhanced colors and themes
+		primaryColor 0.2 0.4 0.8 1.0      // Modern blue
+		secondaryColor 0.8 0.2 0.2 1.0    // Accent red
+		accentColor 1.0 0.8 0.0 1.0       // Golden accent
+		backgroundColor 0.1 0.1 0.15 0.9  // Dark blue background
+
+		// =============================================================================
+		// MENU SOUNDS & AUDIO
+		// =============================================================================
+
 		menuEnterSound "sound/misc/menu1.wav"
 		menuExitSound "sound/misc/menu3.wav"
 		itemFocusSound "sound/misc/menu2.wav"
 		menuBuzzSound "sound/misc/menu4.wav"
-		
-		// UI elements
+
+		// Enhanced audio feedback
+		menuHoverSound "sound/misc/menu2.wav"
+		menuClickSound "sound/misc/menu1.wav"
+		menuBackSound "sound/misc/menu3.wav"
+
+		// =============================================================================
+		// UI ELEMENTS & STYLING
+		// =============================================================================
+
+		// Enhanced UI elements
 		gradientBar "menu/art/gradientbar2"
 		fxBasePic "menu/art/fx_base"
 		fxPic[0] "menu/art/fx_red"
@@ -34,14 +79,85 @@ loadmenu {
 		fxPic[4] "menu/art/fx_blue"
 		fxPic[5] "menu/art/fx_cyan"
 		fxPic[6] "menu/art/fx_white"
+
+		// Modern scrollbar styling
 		scrollBar "menu/art/scrollbar_thumb"
 		scrollBarArrowDown "menu/art/scrollbar_arrow_down"
 		scrollBarArrowUp "menu/art/scrollbar_arrow_up"
 		scrollBarArrowLeft "menu/art/scrollbar_arrow_left"
 		scrollBarArrowRight "menu/art/scrollbar_arrow_right"
 		scrollBarThumb "menu/art/scrollbar_thumb"
+
+		// Enhanced slider controls
 		sliderBar "menu/art/slider2"
 		sliderThumb "menu/art/sliderbutt_1"
+		sliderTrackColor 0.3 0.3 0.3 1.0
+		sliderThumbColor 0.8 0.8 0.8 1.0
+
+		// =============================================================================
+		// HUD ENHANCEMENT FEATURES
+		// =============================================================================
+
+		// HUD scaling and positioning
+		hudScale 1.0
+		hudOffsetX 0
+		hudOffsetY 0
+
+		// HUD effects
+		hudGlow 1
+		hudBlur 0
+		hudOutline 1
+
+		// Crosshair enhancements
+		crosshairScale 1.0
+		crosshairGlow 0
+		crosshairPulse 0
+		crosshairColor 1.0 1.0 1.0 1.0
+
+		// =============================================================================
+		// RESPONSIVE DESIGN
+		// =============================================================================
+
+		// Adaptive layout for different resolutions
+		minResolution 1024 768
+		maxResolution 3840 2160
+		adaptiveScaling 1
+
+		// Touch-friendly sizing (for controller/Steam Deck)
+		touchScale 1.2
+		touchPadding 8
+
+		// =============================================================================
+		// ACCESSIBILITY FEATURES
+		// =============================================================================
+
+		// High contrast mode
+		highContrast 0
+		highContrastTextColor 1.0 1.0 1.0 1.0
+		highContrastBackgroundColor 0.0 0.0 0.0 1.0
+
+		// Font scaling for accessibility
+		accessibilityFontScale 1.0
+		minFontSize 12
+		maxFontSize 32
+
+		// Color blind support
+		colorBlindMode 0  // 0=normal, 1=protanopia, 2=deuteranopia, 3=tritanopia
+		colorBlindStrength 1.0
+
+		// =============================================================================
+		// PERFORMANCE OPTIMIZATIONS
+		// =============================================================================
+
+		// UI rendering optimizations
+		uiBatching 1          // Batch UI draw calls
+		uiInstancing 1        // Use instanced rendering
+		uiOcclusionCulling 1  // Cull occluded UI elements
+
+		// Font rendering optimizations
+		fontBatching 1        // Batch font rendering
+		fontCaching 1         // Cache rendered glyphs
+		fontStreaming 1       // Stream font data on demand
 	}
 }
 

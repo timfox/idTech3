@@ -146,6 +146,20 @@ cvar_t  *r_baseSpecular;
 	cvar_t	*r_bokeh_dof;
 	cvar_t	*r_bokeh_blades;
 
+	// Advanced texture and streaming cvars
+	cvar_t	*r_texture_streaming;
+	cvar_t	*r_vram_budget;
+	cvar_t	*r_texture_eviction;
+	cvar_t	*r_texture_mip_bias;
+	cvar_t	*r_texture_anisotropy;
+
+	// Advanced rendering pipeline cvars
+	cvar_t	*r_render_graph;
+	cvar_t	*r_explicit_barriers;
+	cvar_t	*r_async_compute;
+	cvar_t	*r_gpu_culling;
+	cvar_t	*r_parallel_rendering;
+
 	// Advanced shader and material cvars
 	cvar_t	*r_compute_shaders;
 	cvar_t	*r_advanced_materials;

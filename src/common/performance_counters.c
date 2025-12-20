@@ -16,6 +16,13 @@ Performance Counters Implementation
 #include <limits.h>
 #include <time.h>
 
+// Stub cvar_t for standalone testing
+typedef struct {
+    int integer;
+    float value;
+    char *string;
+} cvar_t;
+
 // Stub implementations for standalone testing
 void Com_Memset(void *dest, int value, size_t size) {
     memset(dest, value, size);
@@ -47,12 +54,16 @@ void Com_Printf(const char *fmt, ...) {
 // Global performance counters instance
 performanceCounters_t perfCounters;
 
-// Advanced performance monitoring cvars
-static cvar_t *perf_detailed_gpu;
-static cvar_t *perf_memory_tracking;
-static cvar_t *perf_frame_analysis;
-static cvar_t *perf_csv_output;
-static cvar_t *perf_alert_threshold;
+// Advanced performance monitoring cvars (reserved for future implementation)
+static cvar_t *perf_detailed_gpu __attribute__((unused));
+static cvar_t *perf_memory_tracking __attribute__((unused));
+static cvar_t *perf_frame_analysis __attribute__((unused));
+static cvar_t *perf_csv_output __attribute__((unused));
+static cvar_t *perf_alert_threshold __attribute__((unused));
+static cvar_t *perf_regression_detection __attribute__((unused));
+static cvar_t *perf_baseline_frames __attribute__((unused));
+static cvar_t *perf_regression_threshold __attribute__((unused));
+static cvar_t *perf_auto_adjust __attribute__((unused));
 
 /*
 ================
