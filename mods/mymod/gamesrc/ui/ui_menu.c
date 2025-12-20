@@ -562,13 +562,14 @@ void MainMenu_Cache( void )
 	MainMenu_LoadFontsFromConfig();
 
 	// Try to load the enhanced banner model
-	// Try multiple banner models and formats
+	// Try multiple banner models and formats - prioritize universally supported formats
+	// Order: MD3 (supported by all renderers), then renderer-specific formats
 	const char *banner_candidates[] = {
-		"models/mapobjects/banner/cube.obj",         // OBJ format (preferred)
-		"models/mapobjects/banner/cube",             // Cube without extension
-		MAIN_BANNER_MODEL,                           // banner5.md3
+		MAIN_BANNER_MODEL,                           // banner5.md3 (universally supported)
 		"models/mapobjects/banner/banner5",          // Try without extension
-		"models/mapobjects/banner/cube.md3",         // Cube MD3
+		"models/mapobjects/banner/cube.md3",         // Cube MD3 (universally supported)
+		"models/mapobjects/banner/cube.obj",         // OBJ format (OpenGL/Vulkan only)
+		"models/mapobjects/banner/cube",             // Cube without extension
 		"models/mapobjects/grenade.md3",             // Grenade model
 		"models/powerups/health/red.md3",            // Health pack
 		"models/misc/telep.md3",                     // Teleporter
@@ -583,12 +584,12 @@ void MainMenu_Cache( void )
 			Com_Printf( "MainMenu_Cache: Successfully loaded banner model '%s' (handle %d)\n", banner_candidates[i], s_main.bannerModel );
 			break;
 		} else {
-			Com_Printf( "MainMenu_Cache: Failed to load banner model '%s'\n", banner_candidates[i] );
+			Com_Printf( "MainMenu_Cache: Failed to load banner model '%s' (this may be normal during early initialization)\n", banner_candidates[i] );
 		}
 	}
 
 	if ( !s_main.bannerModel ) {
-		Com_Printf( "MainMenu_Cache: All banner models failed to load, using 2D fallback\n" );
+		Com_Printf( "MainMenu_Cache: All banner models failed to load, will use 2D fallback (this is normal if renderer is not fully initialized)\n" );
 	}
 }
 
@@ -762,32 +763,59 @@ static void Main_MenuDraw( void )
 	lightPos[1] += 20; // Position light slightly in front
 	trap_R_AddLightToScene( lightPos, 200.0f, 1.0f, 1.0f, 1.0f );
 
-	// add the model
+	// add the model - try lazy loading if not already loaded
+	qboolean triedLazyLoad = qfalse;
+	if ( !s_main.bannerModel ) {
+		// Try lazy loading of banner models
+		const char *banner_candidates[] = {
+			"models/mapobjects/banner/cube.obj",         // OBJ format (preferred)
+			"models/mapobjects/banner/cube",             // Cube without extension
+			MAIN_BANNER_MODEL,                           // banner5.md3
+			"models/mapobjects/banner/banner5",          // Try without extension
+			"models/mapobjects/banner/cube.md3",         // Cube MD3
+			"models/mapobjects/grenade.md3",             // Grenade model
+			"models/powerups/health/red.md3",            // Health pack
+			"models/misc/telep.md3",                     // Teleporter
+			"models/weapons2/rocketl/rocket.md3",        // Rocket
+			"models/players/sarge/head.md3",             // Player head
+			NULL
+		};
+
+		for (int i = 0; banner_candidates[i]; i++) {
+			s_main.bannerModel = trap_R_RegisterModel( banner_candidates[i] );
+			if ( s_main.bannerModel ) {
+				Com_Printf( "Main_MenuDraw: Lazy loaded banner model '%s' (handle %d)\n", banner_candidates[i], s_main.bannerModel );
+				triedLazyLoad = qtrue;
+				break;
+			}
+		}
+	}
+
 	if ( s_main.bannerModel ) {
 		memset( &ent, 0, sizeof(ent) );
 
 		adjust = 5.0 * sin( (float)uis.realtime / 5000 );
 		VectorSet( angles, 0, 180 + adjust, 0 );
 		AnglesToAxis( angles, ent.axis );
-		
+
 		// Scale the model - cube is 2x2x2 units, scale it up to be visible
 		// Scale axes to make model 25x larger (50x50x50 units)
 		VectorScale( ent.axis[0], 1.0f, ent.axis[0] );
 		VectorScale( ent.axis[1], 1.0f, ent.axis[1] );
 		VectorScale( ent.axis[2], 1.0f, ent.axis[2] );
 		ent.nonNormalizedAxes = qtrue;
-		
+
 		// Set frame for static model
 		ent.frame = 0;
 		ent.oldframe = 0;
 		ent.backlerp = 0;
-		
+
 		// Add some color modulation to make it more visible
 		ent.shader.rgba[0] = 255;
 		ent.shader.rgba[1] = 255;
 		ent.shader.rgba[2] = 255;
 		ent.shader.rgba[3] = 255;
-		
+
 		ent.hModel = s_main.bannerModel;
 		ent.reType = RT_MODEL;
 		VectorCopy( origin, ent.origin );
@@ -800,6 +828,9 @@ static void Main_MenuDraw( void )
 	} else {
 		// Fallback: Draw a 2D banner effect when 3D model fails to load
 		MainMenu_DrawFallbackBanner();
+		if ( !triedLazyLoad ) {
+			Com_Printf( "Main_MenuDraw: No banner model available, using 2D fallback\n" );
+		}
 	}
 
 	trap_R_RenderScene( &refdef );

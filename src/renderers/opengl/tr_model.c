@@ -79,10 +79,15 @@ static qhandle_t R_RegisterMD3(const char *name, model_t *mod)
 		}
 		
 		ident = LittleLong( *buf.u );
-		if ( ident == MD3_IDENT )
+		if ( ident == MD3_IDENT ) {
+			ri.Printf( PRINT_DEVELOPER, "%s: found MD3 file '%s', loading...\n", __func__, name );
 			loaded = R_LoadMD3( mod, lod, buf.v, fileSize, name );
-		else
-			ri.Printf( PRINT_WARNING,"%s: unknown fileid for %s\n", __func__, name );
+			if ( !loaded ) {
+				ri.Printf( PRINT_WARNING, "%s: R_LoadMD3 failed for '%s'\n", __func__, name );
+			}
+		} else {
+			ri.Printf( PRINT_WARNING,"%s: unknown fileid for %s (got 0x%08X, expected 0x%08X)\n", __func__, name, ident, MD3_IDENT );
+		}
 		
 		ri.FS_FreeFile( buf.v );
 
@@ -211,10 +216,21 @@ qhandle_t R_RegisterAssimpModel(const char *name, model_t *mod);
 static modelExtToLoaderMap_t modelLoaders[ ] =
 {
 	{ "tiki", R_RegisterTIKI },
+	{ "iqm",  R_RegisterIQM },
+	{ "mdr",  R_RegisterMDR },
+	{ "md3",  R_RegisterMD3 },
+	// Assimp-supported formats (static meshes only)
 	{ "obj",  R_RegisterAssimpModel },
-	{ "iqm", R_RegisterIQM },
-	{ "mdr", R_RegisterMDR },
-	{ "md3", R_RegisterMD3 }
+	{ "dae",  R_RegisterAssimpModel }, // COLLADA
+	{ "fbx",  R_RegisterAssimpModel }, // FBX
+	{ "gltf", R_RegisterAssimpModel }, // glTF
+	{ "glb",  R_RegisterAssimpModel }, // Binary glTF
+	{ "3ds",  R_RegisterAssimpModel }, // 3DS Max
+	{ "blend", R_RegisterAssimpModel }, // Blender
+	{ "ply",  R_RegisterAssimpModel }, // Polygon File Format
+	{ "stl",  R_RegisterAssimpModel }, // STL
+	{ "x3d",  R_RegisterAssimpModel }, // X3D
+	{ "ase",  R_RegisterAssimpModel }  // ASCII Scene Export
 };
 
 static int numModelLoaders = ARRAY_LEN(modelLoaders);
@@ -405,15 +421,17 @@ static qboolean R_LoadMD3( model_t *mod, int lod, void *buffer, int fileSize, co
 	pinmodel = (md3Header_t *)buffer;
 
 	version = LittleLong( pinmodel->version );
+	ri.Printf( PRINT_DEVELOPER, "%s: checking MD3 '%s' version=%i (expected %i)\n", __func__, mod_name, version, MD3_VERSION );
 	if ( version != MD3_VERSION ) {
 		ri.Printf( PRINT_WARNING, "%s: %s has wrong version (%i should be %i)\n", __func__, mod_name, version, MD3_VERSION );
 		return qfalse;
 	}
 
 	size = LittleLong( pinmodel->ofsEnd );
+	ri.Printf( PRINT_DEVELOPER, "%s: MD3 '%s' size=%i, fileSize=%i\n", __func__, mod_name, size, fileSize );
 
 	if ( size > fileSize ) {
-		ri.Printf( PRINT_WARNING, "%s: %s has corrupted header\n", __func__, mod_name );
+		ri.Printf( PRINT_WARNING, "%s: %s has corrupted header (size %i > fileSize %i)\n", __func__, mod_name, size, fileSize );
 		return qfalse;
 	}
 
@@ -435,6 +453,9 @@ static qboolean R_LoadMD3( model_t *mod, int lod, void *buffer, int fileSize, co
 	LL( hdr->ofsTags );
 	LL( hdr->ofsSurfaces );
 	LL( hdr->ofsEnd );
+
+	ri.Printf( PRINT_DEVELOPER, "%s: MD3 '%s' frames=%i, tags=%i, surfaces=%i, skins=%i\n",
+		__func__, mod_name, hdr->numFrames, hdr->numTags, hdr->numSurfaces, hdr->numSkins );
 
 	if ( hdr->numFrames < 1 ) {
 		ri.Printf( PRINT_WARNING, "%s: %s has no frames\n", __func__, mod_name );

@@ -942,7 +942,16 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 
 	len = ri.FS_ReadFile(fontName, &faceData);
 	if (len <= 0) {
-		ri.Printf(PRINT_WARNING, "RE_RegisterFont: Unable to read font file '%s'\n", fontName);
+		ri.Printf(PRINT_WARNING, "RE_RegisterFont: Unable to read font file '%s' (len=%d)\n", fontName, len);
+		// Try to check if file exists by attempting to read file size only
+		int testLen = ri.FS_ReadFile(fontName, NULL);
+		if (testLen > 0) {
+			ri.Printf(PRINT_WARNING, "RE_RegisterFont: File exists but couldn't allocate memory (size=%d bytes)\n", testLen);
+		} else if (testLen == 0) {
+			ri.Printf(PRINT_WARNING, "RE_RegisterFont: File is empty or not found\n");
+		} else {
+			ri.Printf(PRINT_WARNING, "RE_RegisterFont: File not found or file system error (error code=%d)\n", testLen);
+		}
 		return qfalse;
 	}
 
@@ -1507,6 +1516,16 @@ Public interface for font registration - chooses between async and sync loading
 =================
 */
 qboolean RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
+	// Check if file system is ready before attempting to load fonts
+	// This prevents failures during early initialization when .pk3 files aren't loaded yet
+	if (!FS_Initialized() || FS_StartupInProgress()) {
+		ri.Printf(PRINT_DEVELOPER, "RE_RegisterFont: File system not ready, deferring font load '%s' (%dpt)\n",
+			fontName, pointSize);
+		// Return false but don't mark as a hard failure - this will allow retry later
+		Com_Memset(font, 0, sizeof(*font));
+		return qfalse;
+	}
+
 	// Check if async loading is enabled and available
 	static cvar_t *r_fontAsync = NULL;
 	if (!r_fontAsync) {

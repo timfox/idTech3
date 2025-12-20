@@ -161,8 +161,23 @@ static void SV_Map_f( void ) {
 
 	cmd = Cmd_Argv(0);
 	map = Cmd_Argv(1);
+
+	// Handle the case where the command parsing is broken (e.g., "map map suspended" becomes "map map")
+	// Check if the map argument is the same as the command, which indicates parsing failure
+	if (map && cmd && !Q_stricmp(map, cmd)) {
+		// Try to get the actual map name from the next argument
+		const char *realMap = Cmd_Argv(2);
+		if (realMap && *realMap) {
+			Com_Printf( "WARNING: Command parsing issue detected, using map '%s' instead of '%s'\n", realMap, map );
+			map = realMap;
+		} else {
+			Com_Printf( "ERROR: Command parsing failed and no valid map name found\n" );
+			return;
+		}
+	}
+
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: SV_Map_f called with cmd=%s map=%s\n", cmd ? cmd : "<NULL>", map ? map : "<NULL>" );
+		Com_Printf( "SV_Map_f: loading map '%s'\n", map ? map : "<NULL>" );
 	}
 
 	// Track background maps for menu-like behavior (compat with Xash3D-style map_background)

@@ -106,6 +106,21 @@ extern "C" qhandle_t R_RegisterAssimpModel( const char *name, model_t *mod )
 	}
 
 	if ( totalVerts <= 0 || totalTris <= 0 ) {
+		ri.Printf( PRINT_WARNING, "R_RegisterAssimpModel: no valid geometry in '%s'\n", name );
+		mod->type = MOD_BAD;
+		return 0;
+	}
+
+	// Check against engine limits
+	if ( totalVerts >= SHADER_MAX_VERTEXES ) {
+		ri.Printf( PRINT_WARNING, "R_RegisterAssimpModel: '%s' has too many vertices (%i >= %i)\n",
+			name, totalVerts, SHADER_MAX_VERTEXES );
+		mod->type = MOD_BAD;
+		return 0;
+	}
+	if ( totalTris * 3 >= SHADER_MAX_INDEXES ) {
+		ri.Printf( PRINT_WARNING, "R_RegisterAssimpModel: '%s' has too many triangles (%i >= %i)\n",
+			name, totalTris, SHADER_MAX_INDEXES / 3 );
 		mod->type = MOD_BAD;
 		return 0;
 	}

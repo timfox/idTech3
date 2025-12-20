@@ -260,7 +260,9 @@ RE_RegisterFont
 ================
 */
 void RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
-	// Register font
+	// Metal renderer doesn't have native font support, always fail
+	// This will cause the UI to fall back to alternative rendering methods
+	Com_Memset(font, 0, sizeof(*font));
 }
 
 /*
