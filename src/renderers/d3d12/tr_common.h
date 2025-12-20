@@ -3,7 +3,7 @@
 
 #ifdef _WIN32
 
-#include "../qcommon/q_shared.h"
+#include "../common/q_shared.h"
 
 // Common renderer definitions for D3D12
 

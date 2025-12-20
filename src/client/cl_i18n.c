@@ -7,9 +7,9 @@ The actual i18n implementation is in qcommon/i18n.c
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
-#include "../qcommon/i18n.h"
+#include "../common/q_shared.h"
+#include "../common/qcommon.h"
+#include "../common/i18n.h"
 #include "client.h"
 
 // Client-side i18n is handled by the common i18n system

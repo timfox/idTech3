@@ -3,7 +3,7 @@
 #include "tr_local.h"
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
-#include "../../qcommon/qcommon.h"
+#include "../../common/qcommon.h"
 #include <string.h>
 
 vk_sem_t vk_sem;

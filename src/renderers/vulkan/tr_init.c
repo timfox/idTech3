@@ -100,6 +100,68 @@ cvar_t  *r_baseNormalX;
 cvar_t  *r_baseNormalY;
 cvar_t  *r_baseParallax;
 cvar_t  *r_baseSpecular;
+
+	// Safety and advanced feature cvars
+	cvar_t	*r_pbr_safe;
+	cvar_t	*r_vulkan_validation;
+	cvar_t	*r_vulkan_debug;
+
+	// Advanced visual effects cvars
+	cvar_t	*r_ssao;
+	cvar_t	*r_ssao_intensity;
+	cvar_t	*r_ssao_radius;
+	cvar_t	*r_dof;
+	cvar_t	*r_dof_focus;
+	cvar_t	*r_dof_range;
+	cvar_t	*r_motionBlur;
+	cvar_t	*r_motionBlur_intensity;
+	cvar_t	*r_colorCorrection;
+	cvar_t	*r_gammaCorrection;
+	cvar_t	*r_brightness;
+	cvar_t	*r_contrast;
+	cvar_t	*r_saturation;
+	cvar_t	*r_vignette;
+	cvar_t	*r_vignette_intensity;
+	cvar_t	*r_vignette_radius;
+
+	// Advanced rendering cvars
+	cvar_t	*r_temporal_aa;
+	cvar_t	*r_temporal_aa_sharpness;
+	cvar_t	*r_ssr;
+	cvar_t	*r_ssr_max_distance;
+	cvar_t	*r_ssr_thickness;
+	cvar_t	*r_fsr;
+	cvar_t	*r_fsr_quality;
+	cvar_t	*r_cas;
+	cvar_t	*r_cas_intensity;
+	cvar_t	*r_volumetric_lighting;
+	cvar_t	*r_volumetric_samples;
+	cvar_t	*r_chromatic_aberration;
+	cvar_t	*r_chromatic_intensity;
+	cvar_t	*r_film_grain;
+	cvar_t	*r_film_grain_intensity;
+	cvar_t	*r_auto_exposure;
+	cvar_t	*r_auto_exposure_speed;
+	cvar_t	*r_color_grading;
+	cvar_t	*r_bokeh_dof;
+	cvar_t	*r_bokeh_blades;
+
+	// Advanced shader and material cvars
+	cvar_t	*r_compute_shaders;
+	cvar_t	*r_advanced_materials;
+	cvar_t	*r_material_layers;
+	cvar_t	*r_procedural_textures;
+	cvar_t	*r_dynamic_lighting;
+	cvar_t	*r_light_probes;
+	cvar_t	*r_ibl_intensity;
+	cvar_t	*r_parallax_occlusion;
+	cvar_t	*r_tessellation;
+	cvar_t	*r_tessellation_factor;
+	cvar_t	*r_geometry_shaders;
+	cvar_t	*r_vertex_displacement;
+	cvar_t	*r_subsurface_scattering;
+	cvar_t	*r_translucency;
+
 #ifdef VK_CUBEMAP
 cvar_t	*r_cubeMapping;
 #endif
@@ -335,6 +397,8 @@ cvar_t	*r_fontAtlasSize;
 cvar_t	*r_fontDPI;
 cvar_t	*r_fontHinting;
 cvar_t	*r_fontAntialiasing;
+cvar_t	*r_fontQuality;
+cvar_t	*r_fontSubpixel;
 cvar_t	*r_fontLCDFilter;
 cvar_t	*r_fontKerning;
 cvar_t	*r_fontSDF;
@@ -1752,6 +1816,7 @@ static void R_Register( void )
 #endif
 #if defined (USE_VULKAN) && defined (USE_VK_PBR)
 	r_pbr = ri.Cvar_Get("r_pbr", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_pbr, "Enable physically based rendering (requires r_fbo 1)" );
 	ri.Cvar_SetDescription( r_pbr, "Enables Physically Based Rendering. \nRequires " S_COLOR_CYAN "\\r_fbo 1 \n" S_COLOR_GREEN "Advised " S_COLOR_CYAN "\\r_vbo 1 " S_COLOR_GREEN "for static world geometry " S_COLOR_WHITE "*optional" );
 
 	r_glint = ri.Cvar_Get( "r_glint", "0", CVAR_ARCHIVE );
@@ -1767,6 +1832,206 @@ static void R_Register( void )
 	r_baseSpecular	= ri.Cvar_Get( "r_baseSpecular",	"0.04",	CVAR_ARCHIVE | CVAR_LATCH );
 #ifdef VK_CUBEMAP
 	r_cubeMapping = ri.Cvar_Get( "r_cubeMapping", "0", CVAR_ARCHIVE | CVAR_LATCH );
+
+	// Safety cvars for advanced features
+	r_pbr_safe = ri.Cvar_Get( "r_pbr_safe", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_pbr_safe, "Enable PBR safety checks and automatic fallbacks" );
+
+	r_vulkan_validation = ri.Cvar_Get( "r_vulkan_validation", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_vulkan_validation, "Enable Vulkan validation layers (debug only, impacts performance)" );
+
+	r_vulkan_debug = ri.Cvar_Get( "r_vulkan_debug", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_vulkan_debug, "Enable Vulkan debug markers and naming" );
+
+	// Advanced visual effects cvars
+	r_ssao = ri.Cvar_Get( "r_ssao", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_ssao, "Enable screen space ambient occlusion (expensive, high visual quality)" );
+
+	r_ssao_intensity = ri.Cvar_Get( "r_ssao_intensity", "1.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_ssao_intensity, "SSAO intensity multiplier (0.1-3.0)" );
+
+	r_ssao_radius = ri.Cvar_Get( "r_ssao_radius", "0.5", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_ssao_radius, "SSAO sampling radius (0.1-2.0)" );
+
+	r_dof = ri.Cvar_Get( "r_dof", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_dof, "Enable depth of field effect" );
+
+	r_dof_focus = ri.Cvar_Get( "r_dof_focus", "512", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_dof_focus, "Depth of field focus distance" );
+
+	r_dof_range = ri.Cvar_Get( "r_dof_range", "1024", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_dof_range, "Depth of field focus range" );
+
+	r_motionBlur = ri.Cvar_Get( "r_motionBlur", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_motionBlur, "Enable motion blur effect" );
+
+	r_motionBlur_intensity = ri.Cvar_Get( "r_motionBlur_intensity", "0.5", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_motionBlur_intensity, "Motion blur intensity (0.0-1.0)" );
+
+	r_colorCorrection = ri.Cvar_Get( "r_colorCorrection", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_colorCorrection, "Enable color correction LUT" );
+
+	r_gammaCorrection = ri.Cvar_Get( "r_gammaCorrection", "1.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_gammaCorrection, "Gamma correction value (0.5-2.5)" );
+
+	r_brightness = ri.Cvar_Get( "r_brightness", "0.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_brightness, "Brightness adjustment (-1.0 to 1.0)" );
+
+	r_contrast = ri.Cvar_Get( "r_contrast", "1.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_contrast, "Contrast adjustment (0.5-2.0)" );
+
+	r_saturation = ri.Cvar_Get( "r_saturation", "1.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_saturation, "Saturation adjustment (0.0-2.0)" );
+
+	r_vignette = ri.Cvar_Get( "r_vignette", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_vignette, "Enable vignette effect" );
+
+	r_vignette_intensity = ri.Cvar_Get( "r_vignette_intensity", "0.3", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_vignette_intensity, "Vignette intensity (0.0-1.0)" );
+
+	r_vignette_radius = ri.Cvar_Get( "r_vignette_radius", "1.2", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_vignette_radius, "Vignette radius (0.5-2.0)" );
+
+	// Advanced rendering features
+	r_temporal_aa = ri.Cvar_Get( "r_temporal_aa", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_temporal_aa, "Enable temporal anti-aliasing (reduces temporal aliasing)" );
+
+	r_temporal_aa_sharpness = ri.Cvar_Get( "r_temporal_aa_sharpness", "0.5", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_temporal_aa_sharpness, "Temporal AA sharpness (0.0-1.0)" );
+
+	r_ssr = ri.Cvar_Get( "r_ssr", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_ssr, "Enable screen space reflections (expensive, high quality)" );
+
+	r_ssr_max_distance = ri.Cvar_Get( "r_ssr_max_distance", "50.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_ssr_max_distance, "SSR maximum reflection distance" );
+
+	r_ssr_thickness = ri.Cvar_Get( "r_ssr_thickness", "0.1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_ssr_thickness, "SSR surface thickness for ray marching" );
+
+	r_fsr = ri.Cvar_Get( "r_fsr", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_fsr, "Enable FidelityFX Super Resolution upscaling" );
+
+	r_fsr_quality = ri.Cvar_Get( "r_fsr_quality", "2", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_fsr_quality, "0", "3", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fsr_quality, "FSR quality mode (0=Ultra, 1=Quality, 2=Balanced, 3=Performance)" );
+
+	r_cas = ri.Cvar_Get( "r_cas", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_cas, "Enable FidelityFX Contrast Adaptive Sharpening" );
+
+	r_cas_intensity = ri.Cvar_Get( "r_cas_intensity", "0.5", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_cas_intensity, "CAS sharpening intensity (0.0-1.0)" );
+
+	r_volumetric_lighting = ri.Cvar_Get( "r_volumetric_lighting", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_volumetric_lighting, "Enable volumetric lighting effects" );
+
+	r_volumetric_samples = ri.Cvar_Get( "r_volumetric_samples", "64", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_volumetric_samples, "16", "256", CV_INTEGER );
+	ri.Cvar_SetDescription( r_volumetric_samples, "Number of volumetric lighting samples" );
+
+	r_chromatic_aberration = ri.Cvar_Get( "r_chromatic_aberration", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_chromatic_aberration, "Enable chromatic aberration effect" );
+
+	r_chromatic_intensity = ri.Cvar_Get( "r_chromatic_intensity", "0.5", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_chromatic_intensity, "Chromatic aberration intensity (0.0-2.0)" );
+
+	r_film_grain = ri.Cvar_Get( "r_film_grain", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_film_grain, "Enable film grain effect for cinematic look" );
+
+	r_film_grain_intensity = ri.Cvar_Get( "r_film_grain_intensity", "0.1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_film_grain_intensity, "Film grain intensity (0.0-1.0)" );
+
+	r_auto_exposure = ri.Cvar_Get( "r_auto_exposure", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_auto_exposure, "Enable automatic exposure adjustment" );
+
+	r_auto_exposure_speed = ri.Cvar_Get( "r_auto_exposure_speed", "1.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_auto_exposure_speed, "Auto exposure adjustment speed (0.1-10.0)" );
+
+	r_color_grading = ri.Cvar_Get( "r_color_grading", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_color_grading, "Enable color grading with 3D LUT" );
+
+	r_bokeh_dof = ri.Cvar_Get( "r_bokeh_dof", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_bokeh_dof, "Enable bokeh depth of field (high quality)" );
+
+	r_bokeh_blades = ri.Cvar_Get( "r_bokeh_blades", "6", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_bokeh_blades, "3", "9", CV_INTEGER );
+	ri.Cvar_SetDescription( r_bokeh_blades, "Number of bokeh aperture blades" );
+
+	// Texture streaming and VRAM management
+	r_texture_streaming = ri.Cvar_Get( "r_texture_streaming", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_texture_streaming, "Enable texture streaming for large texture sets" );
+
+	r_vram_budget = ri.Cvar_Get( "r_vram_budget", "1073741824", CVAR_ARCHIVE ); // 1GB default
+	ri.Cvar_SetDescription( r_vram_budget, "VRAM budget for texture streaming (bytes)" );
+
+	r_texture_eviction = ri.Cvar_Get( "r_texture_eviction", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_texture_eviction, "Enable texture eviction based on LRU" );
+
+	r_texture_mip_bias = ri.Cvar_Get( "r_texture_mip_bias", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_texture_mip_bias, "Global texture MIP bias for LOD adjustment" );
+
+	r_texture_anisotropy = ri.Cvar_Get( "r_texture_anisotropy", "16", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_texture_anisotropy, "1", "16", CV_INTEGER );
+	ri.Cvar_SetDescription( r_texture_anisotropy, "Anisotropic filtering level" );
+
+	// Render graph and pass system
+	r_render_graph = ri.Cvar_Get( "r_render_graph", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_render_graph, "Enable modern render graph system for explicit pass management" );
+
+	r_explicit_barriers = ri.Cvar_Get( "r_explicit_barriers", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_explicit_barriers, "Use explicit resource barriers in render graph" );
+
+	r_async_compute = ri.Cvar_Get( "r_async_compute", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_async_compute, "Enable async compute for post-processing and effects" );
+
+	r_gpu_culling = ri.Cvar_Get( "r_gpu_culling", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_gpu_culling, "Enable GPU-driven culling and LOD selection" );
+
+	r_parallel_rendering = ri.Cvar_Get( "r_parallel_rendering", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_parallel_rendering, "Enable parallel rendering techniques (experimental)" );
+
+	// Advanced shader and material cvars
+	r_compute_shaders = ri.Cvar_Get( "r_compute_shaders", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_compute_shaders, "Enable compute shader support for advanced effects" );
+
+	r_advanced_materials = ri.Cvar_Get( "r_advanced_materials", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_advanced_materials, "Enable advanced material system with layering" );
+
+	r_material_layers = ri.Cvar_Get( "r_material_layers", "4", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_material_layers, "1", "8", CV_INTEGER );
+	ri.Cvar_SetDescription( r_material_layers, "Maximum material layers for complex surfaces" );
+
+	r_procedural_textures = ri.Cvar_Get( "r_procedural_textures", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_procedural_textures, "Enable procedural texture generation" );
+
+	r_dynamic_lighting = ri.Cvar_Get( "r_dynamic_lighting", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_dynamic_lighting, "Enable dynamic lighting calculations" );
+
+	r_light_probes = ri.Cvar_Get( "r_light_probes", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_light_probes, "Enable light probe system for global illumination" );
+
+	r_ibl_intensity = ri.Cvar_Get( "r_ibl_intensity", "1.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_ibl_intensity, "Image-based lighting intensity multiplier" );
+
+	r_parallax_occlusion = ri.Cvar_Get( "r_parallax_occlusion", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_parallax_occlusion, "Enable parallax occlusion mapping" );
+
+	r_tessellation = ri.Cvar_Get( "r_tessellation", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_tessellation, "Enable hardware tessellation for geometry detail" );
+
+	r_tessellation_factor = ri.Cvar_Get( "r_tessellation_factor", "2.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_tessellation_factor, "Tessellation factor multiplier" );
+
+	r_geometry_shaders = ri.Cvar_Get( "r_geometry_shaders", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_geometry_shaders, "Enable geometry shader support" );
+
+	r_vertex_displacement = ri.Cvar_Get( "r_vertex_displacement", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_vertex_displacement, "Enable vertex displacement mapping" );
+
+	r_subsurface_scattering = ri.Cvar_Get( "r_subsurface_scattering", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_subsurface_scattering, "Enable subsurface scattering for translucent materials" );
+
+	r_translucency = ri.Cvar_Get( "r_translucency", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_translucency, "Enable translucent material rendering" );
 #endif
 #endif
 #ifdef USE_VULKAN_RAY_TRACING
@@ -1828,7 +2093,8 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_gibs_samples, "Number of ray samples per surfel update (1-64, higher = more accurate but slower, default 16)." );
 #endif
 	// Mesh shaders (VK_EXT_mesh_shader)
-	r_meshShaders = ri.Cvar_Get( "r_meshShaders", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	r_meshShaders = ri.Cvar_Get( "r_meshShaders", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_meshShaders, "Enable Vulkan mesh shaders (experimental, may reduce performance)" );
 	ri.Cvar_SetDescription( r_meshShaders, "Enable Vulkan mesh shaders (VK_EXT_mesh_shader). Requires a supported GPU/driver and vid_restart." );
 	r_meshletSize = ri.Cvar_Get( "r_meshletSize", "128", CVAR_ARCHIVE );
 	ri.Cvar_CheckRange( r_meshletSize, "32", "256", CV_INTEGER );
@@ -2058,6 +2324,14 @@ static void R_Register( void )
 	r_fontAntialiasing = ri.Cvar_Get( "r_fontAntialiasing", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_fontAntialiasing, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_fontAntialiasing, "Enable font antialiasing: 0 = Disabled (monochrome), 1 = Enabled (smooth)" );
+
+	r_fontQuality = ri.Cvar_Get( "r_fontQuality", "2", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fontQuality, "0", "2", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontQuality, "Font rendering quality: 0 = Fast, 1 = Normal, 2 = High" );
+
+	r_fontSubpixel = ri.Cvar_Get( "r_fontSubpixel", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fontSubpixel, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontSubpixel, "Enable subpixel font rendering (RGB LCD optimization)" );
 	
 	r_fontLCDFilter = ri.Cvar_Get( "r_fontLCDFilter", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_fontLCDFilter, "0", "1", CV_INTEGER );

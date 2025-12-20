@@ -1,0 +1,533 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Display texture in window &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/python_api/examples/renderdoc/display_window.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="Remote Capture and Replay" href="remote_capture.html" />
+    <link rel="prev" title="Decoding Mesh Data" href="decode_mesh.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../index.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../renderdoc_intro.html">Getting Started (python)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../qrenderdoc_intro.html">Getting Started (RenderDoc UI)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../dev_environment.html">Python development environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ui_extensions.html">Writing UI extensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../descriptors_bindings.html">Descriptors and Bindings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../basics.html">Basic Interfaces</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">renderdoc Examples</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="iter_actions.html">Iterate Action tree</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fetch_shader.html">Fetch Shader details</a></li>
+<li class="toctree-l3"><a class="reference internal" href="fetch_counters.html">Fetch GPU Counter Data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="save_texture.html">Save a texture to disk</a></li>
+<li class="toctree-l3"><a class="reference internal" href="decode_mesh.html">Decoding Mesh Data</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">Display texture in window</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#example-source">Example Source</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="remote_capture.html">Remote Capture and Replay</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../qrenderdoc/index.html">qrenderdoc examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../renderdoc/index.html">renderdoc python module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../qrenderdoc/index.html">qrenderdoc python module</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../how/index.html">How do I …?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../../index.html">Python API</a> &raquo;</li>
+        
+          <li><a href="index.html">renderdoc Examples</a> &raquo;</li>
+        
+      <li>Display texture in window</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/python_api/examples/renderdoc/display_window.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="display-texture-in-window">
+<h1>Display texture in window<a class="headerlink" href="#display-texture-in-window" title="Permalink to this headline">¶</a></h1>
+<p>In this example we will open a window and iterate through the capture on a loop, displaying the first colour output target on it.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This is intended for use with the python module directly, as the UI already has a texture viewer panel to do this with much more control. The principle is the same though and it can be useful reference of how to iterate over a capture.</p>
+</div>
+<p>To create a window we use tkinter, since it is provided with the Python distribution.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Use tkinter to create windows</span>
+<span class="kn">import</span> <span class="nn">tkinter</span>
+
+<span class="c1"># Create a simple window</span>
+<span class="n">window</span> <span class="o">=</span> <span class="n">tkinter</span><span class="o">.</span><span class="n">Tk</span><span class="p">()</span>
+<span class="n">window</span><span class="o">.</span><span class="n">geometry</span><span class="p">(</span><span class="s2">&quot;1280x720&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Next we need to determine which windowing systems the RenderDoc implementation supports, and create a <a class="reference internal" href="../../renderdoc/outputs.html#renderdoc.WindowingData" title="renderdoc.WindowingData"><code class="xref py py-class docutils literal notranslate"><span class="pre">WindowingData</span></code></a> object for the window we want to render to. For the purposes of this example we will look for Win32 since it’s the simplest to set up - needing only a window handle that we can get from tkinter easily. XCB/XLib require a display connection, which would be possible to get from another library such as Qt.</p>
+<p>Once we have the <a class="reference internal" href="../../renderdoc/outputs.html#renderdoc.WindowingData" title="renderdoc.WindowingData"><code class="xref py py-class docutils literal notranslate"><span class="pre">WindowingData</span></code></a>, we can create a <a class="reference internal" href="../../renderdoc/outputs.html#renderdoc.ReplayOutput" title="renderdoc.ReplayOutput"><code class="xref py py-class docutils literal notranslate"><span class="pre">ReplayOutput</span></code></a> using <a class="reference internal" href="../../renderdoc/replay.html#renderdoc.ReplayController.CreateOutput" title="renderdoc.ReplayController.CreateOutput"><code class="xref py py-meth docutils literal notranslate"><span class="pre">CreateOutput()</span></code></a>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Create renderdoc windowing data.</span>
+<span class="n">winsystems</span> <span class="o">=</span> <span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">WindowingSystem</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">controller</span><span class="o">.</span><span class="n">GetSupportedWindowSystems</span><span class="p">()]</span>
+
+<span class="c1"># Pass window system specific data here, See:</span>
+<span class="c1"># - renderdoc.CreateWin32WindowingData</span>
+<span class="c1"># - renderdoc.CreateXlibWindowingData</span>
+<span class="c1"># - renderdoc.CreateXCBWindowingData</span>
+
+<span class="c1"># This example code works on windows as that&#39;s simple to integrate with tkinter</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">rd</span><span class="o">.</span><span class="n">WindowingSystem</span><span class="o">.</span><span class="n">Win32</span> <span class="ow">in</span> <span class="n">winsystems</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Example requires Win32 windowing system: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">winsystems</span><span class="p">))</span>
+
+<span class="n">windata</span> <span class="o">=</span> <span class="n">rd</span><span class="o">.</span><span class="n">CreateWin32WindowingData</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">window</span><span class="o">.</span><span class="n">frame</span><span class="p">(),</span> <span class="mi">16</span><span class="p">))</span>
+
+<span class="c1"># Create a texture output on the window</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">CreateOutput</span><span class="p">(</span><span class="n">windata</span><span class="p">,</span> <span class="n">rd</span><span class="o">.</span><span class="n">ReplayOutputType</span><span class="o">.</span><span class="n">Texture</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>In order to iterate over all actions we need some global state first from <a class="reference internal" href="../../renderdoc/replay.html#renderdoc.ReplayController.GetTextures" title="renderdoc.ReplayController.GetTextures"><code class="xref py py-meth docutils literal notranslate"><span class="pre">GetTextures()</span></code></a> and <a class="reference internal" href="../../renderdoc/replay.html#renderdoc.ReplayController.GetRootActions" title="renderdoc.ReplayController.GetRootActions"><code class="xref py py-meth docutils literal notranslate"><span class="pre">GetRootActions()</span></code></a>, and we’ll also define a helper function to fetch a particular texture by resourceId, so that we can easily look up the details for a texture.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Fetch the list of textures</span>
+<span class="n">textures</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">GetTextures</span><span class="p">()</span>
+
+<span class="c1"># Fetch the list of actions</span>
+<span class="n">actions</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">GetRootActions</span><span class="p">()</span>
+
+<span class="c1"># Function to look up the texture descriptor for a given resourceId</span>
+<span class="k">def</span> <span class="nf">getTexture</span><span class="p">(</span><span class="n">texid</span><span class="p">):</span>
+    <span class="k">global</span> <span class="n">textures</span>
+    <span class="k">for</span> <span class="n">tex</span> <span class="ow">in</span> <span class="n">textures</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">tex</span><span class="o">.</span><span class="n">resourceId</span> <span class="o">==</span> <span class="n">texid</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">tex</span>
+    <span class="k">return</span> <span class="kc">None</span>
+</pre></div>
+</div>
+<p>We now define two callback functions - <code class="docutils literal notranslate"><span class="pre">paint</span></code> and <code class="docutils literal notranslate"><span class="pre">advance</span></code>. <code class="docutils literal notranslate"><span class="pre">paint</span></code> will be called every 33ms, it will display the output with the latest state using <a class="reference internal" href="../../renderdoc/outputs.html#renderdoc.ReplayOutput.Display" title="renderdoc.ReplayOutput.Display"><code class="xref py py-meth docutils literal notranslate"><span class="pre">Display()</span></code></a>. <code class="docutils literal notranslate"><span class="pre">advance</span></code> changes the current state to reflect a new action.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Our paint function will be called ever 33ms, to display the output</span>
+<span class="k">def</span> <span class="nf">paint</span><span class="p">():</span>
+    <span class="k">global</span> <span class="n">out</span><span class="p">,</span> <span class="n">window</span>
+    <span class="n">out</span><span class="o">.</span><span class="n">Display</span><span class="p">()</span>
+    <span class="n">window</span><span class="o">.</span><span class="n">after</span><span class="p">(</span><span class="mi">33</span><span class="p">,</span> <span class="n">paint</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Within <code class="docutils literal notranslate"><span class="pre">advance</span></code> we do a few things. First we move the current event to the current action’s <code class="docutils literal notranslate"><span class="pre">eventId</span></code>, using <a class="reference internal" href="../../renderdoc/replay.html#renderdoc.ReplayController.SetFrameEvent" title="renderdoc.ReplayController.SetFrameEvent"><code class="xref py py-meth docutils literal notranslate"><span class="pre">SetFrameEvent()</span></code></a>. Then we set up the texture display configuration with <a class="reference internal" href="../../renderdoc/outputs.html#renderdoc.ReplayOutput.SetTextureDisplay" title="renderdoc.ReplayOutput.SetTextureDisplay"><code class="xref py py-meth docutils literal notranslate"><span class="pre">SetTextureDisplay()</span></code></a>, to point to the first colour output at that action.</p>
+<p>When we update to a new texture, we fetch its details using our earlier <code class="docutils literal notranslate"><span class="pre">getTexture</span></code> and calculate a scale that keeps the texture fully visible on screen.</p>
+<p>Finally we move to the next action in the list for the next time <code class="docutils literal notranslate"><span class="pre">advance</span></code> is called.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Start on the first action</span>
+<span class="n">curact</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+<span class="n">loopcount</span> <span class="o">=</span> <span class="mi">0</span>
+
+<span class="c1"># The advance function will be called every 50ms, to move to the next action</span>
+<span class="k">def</span> <span class="nf">advance</span><span class="p">():</span>
+    <span class="k">global</span> <span class="n">out</span><span class="p">,</span> <span class="n">window</span><span class="p">,</span> <span class="n">curact</span><span class="p">,</span> <span class="n">actions</span><span class="p">,</span> <span class="n">loopcount</span>
+
+    <span class="c1"># Move to the current action</span>
+    <span class="n">controller</span><span class="o">.</span><span class="n">SetFrameEvent</span><span class="p">(</span><span class="n">curact</span><span class="o">.</span><span class="n">eventId</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+
+    <span class="c1"># Initialise a default TextureDisplay object</span>
+    <span class="n">disp</span> <span class="o">=</span> <span class="n">rd</span><span class="o">.</span><span class="n">TextureDisplay</span><span class="p">()</span>
+
+    <span class="c1"># Set the first colour output as the texture to display</span>
+    <span class="n">disp</span><span class="o">.</span><span class="n">resourceId</span> <span class="o">=</span> <span class="n">curact</span><span class="o">.</span><span class="n">outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="n">disp</span><span class="o">.</span><span class="n">resourceId</span> <span class="o">!=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResourceId</span><span class="o">.</span><span class="n">Null</span><span class="p">():</span>
+        <span class="c1"># Get the details of this texture</span>
+        <span class="n">texDetails</span> <span class="o">=</span> <span class="n">getTexture</span><span class="p">(</span><span class="n">disp</span><span class="o">.</span><span class="n">resourceId</span><span class="p">)</span>
+
+        <span class="c1"># Calculate the scale required in width and height</span>
+        <span class="n">widthScale</span> <span class="o">=</span> <span class="n">window</span><span class="o">.</span><span class="n">winfo_width</span><span class="p">()</span> <span class="o">/</span> <span class="n">texDetails</span><span class="o">.</span><span class="n">width</span>
+        <span class="n">heightScale</span> <span class="o">=</span> <span class="n">window</span><span class="o">.</span><span class="n">winfo_height</span><span class="p">()</span> <span class="o">/</span> <span class="n">texDetails</span><span class="o">.</span><span class="n">height</span>
+
+        <span class="c1"># Use the lower scale to fit the texture on the window</span>
+        <span class="n">disp</span><span class="o">.</span><span class="n">scale</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">widthScale</span><span class="p">,</span> <span class="n">heightScale</span><span class="p">)</span>
+
+        <span class="c1"># Update the texture display</span>
+        <span class="n">out</span><span class="o">.</span><span class="n">SetTextureDisplay</span><span class="p">(</span><span class="n">disp</span><span class="p">)</span>
+
+    <span class="c1"># Set the next action</span>
+    <span class="n">curact</span> <span class="o">=</span> <span class="n">curact</span><span class="o">.</span><span class="n">next</span>
+
+    <span class="c1"># If we have no next action, start again from the first</span>
+    <span class="k">if</span> <span class="n">curact</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">loopcount</span> <span class="o">=</span> <span class="n">loopcount</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="n">curact</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+    <span class="c1"># after 3 loops, quit</span>
+    <span class="k">if</span> <span class="n">loopcount</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="n">window</span><span class="o">.</span><span class="n">quit</span><span class="p">()</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">window</span><span class="o">.</span><span class="n">after</span><span class="p">(</span><span class="mi">50</span><span class="p">,</span> <span class="n">advance</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Once we have the callbacks defined, we call them once to initialise the display and set up the repeated callbacks, and start the tkinter main window loop.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># Start the callbacks</span>
+<span class="n">advance</span><span class="p">()</span>
+<span class="n">paint</span><span class="p">()</span>
+
+<span class="c1"># Start the main window loop</span>
+<span class="n">window</span><span class="o">.</span><span class="n">mainloop</span><span class="p">()</span>
+</pre></div>
+</div>
+<section id="example-source">
+<h2>Example Source<a class="headerlink" href="#example-source" title="Permalink to this headline">¶</a></h2>
+<p><a class="reference download internal" download="" href="../../../_downloads/3f4161c42b15e4d127af51789c5d3251/display_window.py"><code class="xref download docutils literal notranslate"><span class="pre">Download</span> <span class="pre">the</span> <span class="pre">example</span> <span class="pre">script</span></code></a>.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">sys</span>
+
+<span class="c1"># Import renderdoc if not already imported (e.g. in the UI)</span>
+<span class="k">if</span> <span class="s1">&#39;renderdoc&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">modules</span> <span class="ow">and</span> <span class="s1">&#39;_renderdoc&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">sys</span><span class="o">.</span><span class="n">modules</span><span class="p">:</span>
+	<span class="kn">import</span> <span class="nn">renderdoc</span>
+
+<span class="c1"># Alias renderdoc for legibility</span>
+<span class="n">rd</span> <span class="o">=</span> <span class="n">renderdoc</span>
+
+<span class="k">def</span> <span class="nf">loadCapture</span><span class="p">(</span><span class="n">filename</span><span class="p">):</span>
+	<span class="c1"># Open a capture file handle</span>
+	<span class="n">cap</span> <span class="o">=</span> <span class="n">rd</span><span class="o">.</span><span class="n">OpenCaptureFile</span><span class="p">()</span>
+
+	<span class="c1"># Open a particular file - see also OpenBuffer to load from memory</span>
+	<span class="n">result</span> <span class="o">=</span> <span class="n">cap</span><span class="o">.</span><span class="n">OpenFile</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+	<span class="c1"># Make sure the file opened successfully</span>
+	<span class="k">if</span> <span class="n">result</span> <span class="o">!=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResultCode</span><span class="o">.</span><span class="n">Succeeded</span><span class="p">:</span>
+		<span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Couldn&#39;t open file: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>
+
+	<span class="c1"># Make sure we can replay</span>
+	<span class="k">if</span> <span class="ow">not</span> <span class="n">cap</span><span class="o">.</span><span class="n">LocalReplaySupport</span><span class="p">():</span>
+		<span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Capture cannot be replayed&quot;</span><span class="p">)</span>
+
+	<span class="c1"># Initialise the replay</span>
+	<span class="n">result</span><span class="p">,</span><span class="n">controller</span> <span class="o">=</span> <span class="n">cap</span><span class="o">.</span><span class="n">OpenCapture</span><span class="p">(</span><span class="n">rd</span><span class="o">.</span><span class="n">ReplayOptions</span><span class="p">(),</span> <span class="kc">None</span><span class="p">)</span>
+
+	<span class="k">if</span> <span class="n">result</span> <span class="o">!=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResultCode</span><span class="o">.</span><span class="n">Succeeded</span><span class="p">:</span>
+		<span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Couldn&#39;t initialise replay: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>
+
+	<span class="k">return</span> <span class="n">cap</span><span class="p">,</span><span class="n">controller</span>
+
+<span class="k">if</span> <span class="s1">&#39;pyrenderdoc&#39;</span> <span class="ow">in</span> <span class="nb">globals</span><span class="p">():</span>
+	<span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;This sample should not be run within the RenderDoc UI&quot;</span><span class="p">)</span>
+<span class="k">else</span><span class="p">:</span>
+	<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">1</span><span class="p">:</span>
+		<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Usage: python3 </span><span class="si">{}</span><span class="s1"> filename.rdc&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+		<span class="n">sys</span><span class="o">.</span><span class="n">exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+	<span class="n">rd</span><span class="o">.</span><span class="n">InitialiseReplay</span><span class="p">(</span><span class="n">rd</span><span class="o">.</span><span class="n">GlobalEnvironment</span><span class="p">(),</span> <span class="p">[])</span>
+
+	<span class="n">cap</span><span class="p">,</span><span class="n">controller</span> <span class="o">=</span> <span class="n">loadCapture</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">argv</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+
+<span class="c1"># Use tkinter to create windows</span>
+<span class="kn">import</span> <span class="nn">tkinter</span>
+
+<span class="c1"># Create a simple window</span>
+<span class="n">window</span> <span class="o">=</span> <span class="n">tkinter</span><span class="o">.</span><span class="n">Tk</span><span class="p">()</span>
+<span class="n">window</span><span class="o">.</span><span class="n">geometry</span><span class="p">(</span><span class="s2">&quot;1280x720&quot;</span><span class="p">)</span>
+
+<span class="c1"># Create renderdoc windowing data.</span>
+<span class="n">winsystems</span> <span class="o">=</span> <span class="p">[</span><span class="n">rd</span><span class="o">.</span><span class="n">WindowingSystem</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">controller</span><span class="o">.</span><span class="n">GetSupportedWindowSystems</span><span class="p">()]</span>
+
+<span class="c1"># Pass window system specific data here, See:</span>
+<span class="c1"># - renderdoc.CreateWin32WindowingData</span>
+<span class="c1"># - renderdoc.CreateXlibWindowingData</span>
+<span class="c1"># - renderdoc.CreateXCBWindowingData</span>
+
+<span class="c1"># This example code works on windows as that&#39;s simple to integrate with tkinter</span>
+<span class="k">if</span> <span class="ow">not</span> <span class="n">rd</span><span class="o">.</span><span class="n">WindowingSystem</span><span class="o">.</span><span class="n">Win32</span> <span class="ow">in</span> <span class="n">winsystems</span><span class="p">:</span>
+    <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="s2">&quot;Example requires Win32 windowing system: &quot;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">winsystems</span><span class="p">))</span>
+
+<span class="n">windata</span> <span class="o">=</span> <span class="n">rd</span><span class="o">.</span><span class="n">CreateWin32WindowingData</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">window</span><span class="o">.</span><span class="n">frame</span><span class="p">(),</span> <span class="mi">16</span><span class="p">))</span>
+
+<span class="c1"># Create a texture output on the window</span>
+<span class="n">out</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">CreateOutput</span><span class="p">(</span><span class="n">windata</span><span class="p">,</span> <span class="n">rd</span><span class="o">.</span><span class="n">ReplayOutputType</span><span class="o">.</span><span class="n">Texture</span><span class="p">)</span>
+
+<span class="c1"># Fetch the list of textures</span>
+<span class="n">textures</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">GetTextures</span><span class="p">()</span>
+
+<span class="c1"># Fetch the list of actions</span>
+<span class="n">actions</span> <span class="o">=</span> <span class="n">controller</span><span class="o">.</span><span class="n">GetRootActions</span><span class="p">()</span>
+
+<span class="c1"># Function to look up the texture descriptor for a given resourceId</span>
+<span class="k">def</span> <span class="nf">getTexture</span><span class="p">(</span><span class="n">texid</span><span class="p">):</span>
+	<span class="k">global</span> <span class="n">textures</span>
+	<span class="k">for</span> <span class="n">tex</span> <span class="ow">in</span> <span class="n">textures</span><span class="p">:</span>
+		<span class="k">if</span> <span class="n">tex</span><span class="o">.</span><span class="n">resourceId</span> <span class="o">==</span> <span class="n">texid</span><span class="p">:</span>
+			<span class="k">return</span> <span class="n">tex</span>
+	<span class="k">return</span> <span class="kc">None</span>
+
+<span class="c1"># Our paint function will be called ever 33ms, to display the output</span>
+<span class="k">def</span> <span class="nf">paint</span><span class="p">():</span>
+	<span class="k">global</span> <span class="n">out</span><span class="p">,</span> <span class="n">window</span>
+	<span class="n">out</span><span class="o">.</span><span class="n">Display</span><span class="p">()</span>
+	<span class="n">window</span><span class="o">.</span><span class="n">after</span><span class="p">(</span><span class="mi">33</span><span class="p">,</span> <span class="n">paint</span><span class="p">)</span>
+
+<span class="c1"># Start on the first action</span>
+<span class="n">curact</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+<span class="n">loopcount</span> <span class="o">=</span> <span class="mi">0</span>
+
+<span class="c1"># The advance function will be called every 50ms, to move to the next action</span>
+<span class="k">def</span> <span class="nf">advance</span><span class="p">():</span>
+	<span class="k">global</span> <span class="n">out</span><span class="p">,</span> <span class="n">window</span><span class="p">,</span> <span class="n">curact</span><span class="p">,</span> <span class="n">actions</span><span class="p">,</span> <span class="n">loopcount</span>
+
+	<span class="c1"># Move to the current action</span>
+	<span class="n">controller</span><span class="o">.</span><span class="n">SetFrameEvent</span><span class="p">(</span><span class="n">curact</span><span class="o">.</span><span class="n">eventId</span><span class="p">,</span> <span class="kc">False</span><span class="p">)</span>
+
+	<span class="c1"># Initialise a default TextureDisplay object</span>
+	<span class="n">disp</span> <span class="o">=</span> <span class="n">rd</span><span class="o">.</span><span class="n">TextureDisplay</span><span class="p">()</span>
+
+	<span class="c1"># Set the first colour output as the texture to display</span>
+	<span class="n">disp</span><span class="o">.</span><span class="n">resourceId</span> <span class="o">=</span> <span class="n">curact</span><span class="o">.</span><span class="n">outputs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+	<span class="k">if</span> <span class="n">disp</span><span class="o">.</span><span class="n">resourceId</span> <span class="o">!=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResourceId</span><span class="o">.</span><span class="n">Null</span><span class="p">():</span>
+		<span class="c1"># Get the details of this texture</span>
+		<span class="n">texDetails</span> <span class="o">=</span> <span class="n">getTexture</span><span class="p">(</span><span class="n">disp</span><span class="o">.</span><span class="n">resourceId</span><span class="p">)</span>
+
+		<span class="c1"># Calculate the scale required in width and height</span>
+		<span class="n">widthScale</span> <span class="o">=</span> <span class="n">window</span><span class="o">.</span><span class="n">winfo_width</span><span class="p">()</span> <span class="o">/</span> <span class="n">texDetails</span><span class="o">.</span><span class="n">width</span>
+		<span class="n">heightScale</span> <span class="o">=</span> <span class="n">window</span><span class="o">.</span><span class="n">winfo_height</span><span class="p">()</span> <span class="o">/</span> <span class="n">texDetails</span><span class="o">.</span><span class="n">height</span>
+
+		<span class="c1"># Use the lower scale to fit the texture on the window</span>
+		<span class="n">disp</span><span class="o">.</span><span class="n">scale</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">widthScale</span><span class="p">,</span> <span class="n">heightScale</span><span class="p">)</span>
+
+		<span class="c1"># Update the texture display</span>
+		<span class="n">out</span><span class="o">.</span><span class="n">SetTextureDisplay</span><span class="p">(</span><span class="n">disp</span><span class="p">)</span>
+
+	<span class="c1"># Set the next action</span>
+	<span class="n">curact</span> <span class="o">=</span> <span class="n">curact</span><span class="o">.</span><span class="n">next</span>
+
+	<span class="c1"># If we have no next action, start again from the first</span>
+	<span class="k">if</span> <span class="n">curact</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+		<span class="n">loopcount</span> <span class="o">=</span> <span class="n">loopcount</span> <span class="o">+</span> <span class="mi">1</span>
+		<span class="n">curact</span> <span class="o">=</span> <span class="n">actions</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+	<span class="c1"># after 3 loops, quit</span>
+	<span class="k">if</span> <span class="n">loopcount</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+		<span class="n">window</span><span class="o">.</span><span class="n">quit</span><span class="p">()</span>
+	<span class="k">else</span><span class="p">:</span>
+		<span class="n">window</span><span class="o">.</span><span class="n">after</span><span class="p">(</span><span class="mi">50</span><span class="p">,</span> <span class="n">advance</span><span class="p">)</span>
+
+<span class="c1"># Start the callbacks</span>
+<span class="n">advance</span><span class="p">()</span>
+<span class="n">paint</span><span class="p">()</span>
+
+<span class="c1"># Start the main window loop</span>
+<span class="n">window</span><span class="o">.</span><span class="n">mainloop</span><span class="p">()</span>
+
+<span class="n">controller</span><span class="o">.</span><span class="n">Shutdown</span><span class="p">()</span>
+
+<span class="n">cap</span><span class="o">.</span><span class="n">Shutdown</span><span class="p">()</span>
+
+<span class="k">if</span> <span class="s1">&#39;pyrenderdoc&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="nb">globals</span><span class="p">():</span>
+	<span class="n">rd</span><span class="o">.</span><span class="n">ShutdownReplay</span><span class="p">()</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="remote_capture.html" class="btn btn-neutral float-right" title="Remote Capture and Replay" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="decode_mesh.html" class="btn btn-neutral float-left" title="Decoding Mesh Data" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

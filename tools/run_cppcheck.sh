@@ -53,7 +53,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --help         Show this help message"
             echo ""
             echo "Examples:"
-            echo "  $0 src/qcommon/*.c              # Analyze specific files"
+            echo "  $0 src/common/*.c              # Analyze specific files"
             echo "  $0 --html                       # Generate HTML report"
             echo "  $0 --quiet --text               # Quiet analysis with text output"
             exit 0
@@ -71,7 +71,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Add include paths
-CPPCHECK_OPTIONS="$CPPCHECK_OPTIONS -Isrc/ -Isrc/qcommon/ -Isrc/client/ -Isrc/server/ -Isrc/renderercommon/ -Isrc/renderervk/ -Isrc/renderer/ -Ilibs/"
+CPPCHECK_OPTIONS="$CPPCHECK_OPTIONS -Isrc/ -Isrc/common/ -Isrc/client/ -Isrc/server/ -Isrc/renderercommon/ -Isrc/renderervk/ -Isrc/renderer/ -Ilibs/"
 
 # Add platform and build defines
 CPPCHECK_OPTIONS="$CPPCHECK_OPTIONS -D__linux__ -DUSE_VULKAN -DUSE_OPENGL -DUSE_SDL -DQ3_VM"

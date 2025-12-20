@@ -1,0 +1,463 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Writing UI extensions &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/python_api/ui_extensions.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Descriptors and Bindings" href="descriptors_bindings.html" />
+    <link rel="prev" title="Python development environment" href="dev_environment.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="examples/renderdoc_intro.html">Getting Started (python)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/qrenderdoc_intro.html">Getting Started (RenderDoc UI)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dev_environment.html">Python development environment</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Writing UI extensions</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#first-steps">First steps</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#adding-a-window-and-capture-viewer">Adding a window and capture viewer</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#calling-onto-replay-thread">Calling onto replay thread</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#conclusion">Conclusion</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="descriptors_bindings.html">Descriptors and Bindings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/basics.html">Basic Interfaces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/renderdoc/index.html">renderdoc Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/qrenderdoc/index.html">qrenderdoc examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="renderdoc/index.html">renderdoc python module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qrenderdoc/index.html">qrenderdoc python module</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../how/index.html">How do I …?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">Python API</a> &raquo;</li>
+        
+      <li>Writing UI extensions</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/python_api/ui_extensions.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="writing-ui-extensions">
+<h1>Writing UI extensions<a class="headerlink" href="#writing-ui-extensions" title="Permalink to this headline">¶</a></h1>
+<p>This document outlines how to get started writing a UI extension. For information on how to configure, register and install a UI extension see <a class="reference internal" href="../how/how_python_extension.html"><span class="doc">How do I register a python extension?</span></a>.</p>
+<section id="first-steps">
+<h2>First steps<a class="headerlink" href="#first-steps" title="Permalink to this headline">¶</a></h2>
+<p>We start off with the basic registration function. Create an <code class="docutils literal notranslate"><span class="pre">__init__.py</span></code> in your extension’s root and fill it out:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">qrenderdoc</span> <span class="k">as</span> <span class="nn">qrd</span>
+
+<span class="n">extiface_version</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+
+<span class="k">def</span> <span class="nf">register</span><span class="p">(</span><span class="n">version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">qrd</span><span class="o">.</span><span class="n">CaptureContext</span><span class="p">):</span>
+    <span class="k">global</span> <span class="n">extiface_version</span>
+    <span class="n">extiface_version</span> <span class="o">=</span> <span class="n">version</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Registering my extension for RenderDoc version </span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">version</span><span class="p">))</span>
+
+<span class="k">def</span> <span class="nf">unregister</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Unregistering my extension&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Here we create the minimum <code class="docutils literal notranslate"><span class="pre">register()</span></code> and <code class="docutils literal notranslate"><span class="pre">unregister()</span></code> functions required for an extension to load, that just print a message. We store the interface version in a global which we can use in future to do version-checks if we want to be compatible with more than one RenderDoc version, since the python interface is not fully forwards and backwards compatible.</p>
+<p>This doesn’t really do much, let’s register a tool menu item:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">menu_callback</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">qrd</span><span class="o">.</span><span class="n">CaptureContext</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+    <span class="n">ctx</span><span class="o">.</span><span class="n">Extensions</span><span class="p">()</span><span class="o">.</span><span class="n">MessageDialog</span><span class="p">(</span><span class="s2">&quot;Hello from the extension!&quot;</span><span class="p">,</span> <span class="s2">&quot;Extension message&quot;</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">register</span><span class="p">(</span><span class="n">version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">qrd</span><span class="o">.</span><span class="n">CaptureContext</span><span class="p">):</span>
+    <span class="c1"># as above ...</span>
+
+    <span class="n">ctx</span><span class="o">.</span><span class="n">Extensions</span><span class="p">()</span><span class="o">.</span><span class="n">RegisterWindowMenu</span><span class="p">(</span><span class="n">qrd</span><span class="o">.</span><span class="n">WindowMenu</span><span class="o">.</span><span class="n">Tools</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;My extension&quot;</span><span class="p">],</span> <span class="n">menu_callback</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Now we have a new menu item which when clicked produces a popup message dialog!</p>
+<figure class="align-default" id="id1">
+<img alt="../_images/Step1.png" src="../_images/Step1.png" />
+<figcaption>
+<p><span class="caption-text">Python extension generating a message box</span><a class="headerlink" href="#id1" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>This is a good proof of concept, but really we want something more directly usable. Instead of showing a message box, let’s show a window which reacts to the selected action by showing a series of breadcrumbs for marker labels.</p>
+</section>
+<section id="adding-a-window-and-capture-viewer">
+<h2>Adding a window and capture viewer<a class="headerlink" href="#adding-a-window-and-capture-viewer" title="Permalink to this headline">¶</a></h2>
+<p>First we create a class to handle our window and to derive from <a class="reference internal" href="qrenderdoc/main.html#qrenderdoc.CaptureViewer" title="qrenderdoc.CaptureViewer"><code class="xref py py-class docutils literal notranslate"><span class="pre">qrenderdoc.CaptureViewer</span></code></a> to get callbacks for events.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">Window</span><span class="p">(</span><span class="n">qrd</span><span class="o">.</span><span class="n">CaptureViewer</span><span class="p">):</span>
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">qrd</span><span class="o">.</span><span class="n">CaptureContext</span><span class="p">,</span> <span class="n">version</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">mqt</span><span class="p">:</span> <span class="n">qrd</span><span class="o">.</span><span class="n">MiniQtHelper</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">Extensions</span><span class="p">()</span><span class="o">.</span><span class="n">GetMiniQtHelper</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span> <span class="o">=</span> <span class="n">ctx</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">version</span> <span class="o">=</span> <span class="n">version</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">topWindow</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mqt</span><span class="o">.</span><span class="n">CreateToplevelWidget</span><span class="p">(</span><span class="s2">&quot;Breadcrumbs&quot;</span><span class="p">,</span> <span class="k">lambda</span> <span class="n">c</span><span class="p">,</span> <span class="n">w</span><span class="p">,</span> <span class="n">d</span><span class="p">:</span> <span class="n">window_closed</span><span class="p">())</span>
+
+        <span class="n">ctx</span><span class="o">.</span><span class="n">AddCaptureViewer</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">OnCaptureLoaded</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">OnCaptureClosed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">OnSelectedEventChanged</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">OnEventChanged</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="k">pass</span>
+</pre></div>
+</div>
+<p>Here we implement stubs for the different events. More information on when they are sent can be found in the class documentation. We use the <a class="reference internal" href="qrenderdoc/extensions.html#qrenderdoc.MiniQtHelper" title="qrenderdoc.MiniQtHelper"><code class="xref py py-class docutils literal notranslate"><span class="pre">qrenderdoc.MiniQtHelper</span></code></a> to create a top-level window for ourselves with the ‘breadcrumbs’ title, then register oureslves as a capture viewer. The mini-Qt helper is useful to provide simple access to Qt widgets in a portable way from the RenderDoc UI, without relying on full Qt python bindings that may not be available depending on how RenderDoc was built.</p>
+<p>We will need to unregister ourselves as a capture viewer when the window is closed, which happens in the <code class="docutils literal notranslate"><span class="pre">window_closed()</span></code> callback that we’ll define later.</p>
+<p>An empty window is not very useful, so let’s give ourselves a label. More complex layouts and widgets are of course possible but for the moment we’ll keep it simple:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">vert</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mqt</span><span class="o">.</span><span class="n">CreateVerticalContainer</span><span class="p">()</span>
+<span class="bp">self</span><span class="o">.</span><span class="n">mqt</span><span class="o">.</span><span class="n">AddWidget</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">topWindow</span><span class="p">,</span> <span class="n">vert</span><span class="p">)</span>
+
+<span class="bp">self</span><span class="o">.</span><span class="n">breadcrumbs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mqt</span><span class="o">.</span><span class="n">CreateLabel</span><span class="p">()</span>
+
+<span class="bp">self</span><span class="o">.</span><span class="n">mqt</span><span class="o">.</span><span class="n">AddWidget</span><span class="p">(</span><span class="n">vert</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">breadcrumbs</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>And finally we can fill in the event functions to set the breadcrumbs. We use <code class="docutils literal notranslate"><span class="pre">&#64;1234</span></code> syntax for events which causes them to be clickable links that jump to that event. You can also convert a <a class="reference internal" href="renderdoc/resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">renderdoc.ResourceId</span></code></a> to a string with <code class="docutils literal notranslate"><span class="pre">str()</span></code> and it will similarly provide a link for that resource named with the current debug name.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">OnCaptureLoaded</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">mqt</span><span class="o">.</span><span class="n">SetWidgetText</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">breadcrumbs</span><span class="p">,</span> <span class="s2">&quot;Breadcrumbs:&quot;</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">OnCaptureClosed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">mqt</span><span class="o">.</span><span class="n">SetWidgetText</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">breadcrumbs</span><span class="p">,</span> <span class="s2">&quot;Breadcrumbs:&quot;</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">OnSelectedEventChanged</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+    <span class="k">pass</span>
+
+<span class="k">def</span> <span class="nf">OnEventChanged</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+    <span class="n">action</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ctx</span><span class="o">.</span><span class="n">GetAction</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+
+    <span class="n">breadcrumbs</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+
+    <span class="k">if</span> <span class="n">action</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">breadcrumbs</span> <span class="o">=</span> <span class="s1">&#39;@</span><span class="si">{}</span><span class="s1">: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">action</span><span class="o">.</span><span class="n">eventId</span><span class="p">,</span> <span class="n">action</span><span class="o">.</span><span class="n">customName</span><span class="p">)</span>
+
+        <span class="k">while</span> <span class="n">action</span><span class="o">.</span><span class="n">parent</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">action</span> <span class="o">=</span> <span class="n">action</span><span class="o">.</span><span class="n">parent</span>
+            <span class="n">breadcrumbs</span> <span class="o">=</span> <span class="s1">&#39;@</span><span class="si">{}</span><span class="s1">: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">action</span><span class="o">.</span><span class="n">eventId</span><span class="p">,</span> <span class="n">action</span><span class="o">.</span><span class="n">customName</span><span class="p">)</span> <span class="o">+</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span> <span class="o">+</span> <span class="n">breadcrumbs</span>
+
+    <span class="bp">self</span><span class="o">.</span><span class="n">mqt</span><span class="o">.</span><span class="n">SetWidgetText</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">breadcrumbs</span><span class="p">,</span> <span class="s2">&quot;Breadcrumbs:</span><span class="se">\n</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">breadcrumbs</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Finally we’ll register a new menu item to display the window. We only allow one window at once, so if it still exists we’ll just raise it. Otherwise we create a new one. This is also where we unregister the capture viewer:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Optional</span>
+
+
+<span class="n">cur_window</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Window</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+
+
+<span class="k">def</span> <span class="nf">window_closed</span><span class="p">():</span>
+    <span class="k">global</span> <span class="n">cur_window</span>
+    <span class="k">if</span> <span class="n">cur_window</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">cur_window</span><span class="o">.</span><span class="n">ctx</span><span class="o">.</span><span class="n">RemoveCaptureViewer</span><span class="p">(</span><span class="n">cur_window</span><span class="p">)</span>
+    <span class="n">cur_window</span> <span class="o">=</span> <span class="kc">None</span>
+
+
+<span class="k">def</span> <span class="nf">open_window_callback</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">qrd</span><span class="o">.</span><span class="n">CaptureContext</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+    <span class="k">global</span> <span class="n">cur_window</span>
+
+    <span class="n">mqt</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">Extensions</span><span class="p">()</span><span class="o">.</span><span class="n">GetMiniQtHelper</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="n">cur_window</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">cur_window</span> <span class="o">=</span> <span class="n">Window</span><span class="p">(</span><span class="n">ctx</span><span class="p">,</span> <span class="n">extiface_version</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">ctx</span><span class="o">.</span><span class="n">HasEventBrowser</span><span class="p">():</span>
+            <span class="n">ctx</span><span class="o">.</span><span class="n">AddDockWindow</span><span class="p">(</span><span class="n">cur_window</span><span class="o">.</span><span class="n">topWindow</span><span class="p">,</span> <span class="n">qrd</span><span class="o">.</span><span class="n">DockReference</span><span class="o">.</span><span class="n">TopOf</span><span class="p">,</span> <span class="n">ctx</span><span class="o">.</span><span class="n">GetEventBrowser</span><span class="p">()</span><span class="o">.</span><span class="n">Widget</span><span class="p">(),</span> <span class="mf">0.1</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">ctx</span><span class="o">.</span><span class="n">AddDockWindow</span><span class="p">(</span><span class="n">cur_window</span><span class="o">.</span><span class="n">topWindow</span><span class="p">,</span> <span class="n">qrd</span><span class="o">.</span><span class="n">DockReference</span><span class="o">.</span><span class="n">MainToolArea</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+
+    <span class="n">ctx</span><span class="o">.</span><span class="n">RaiseDockWindow</span><span class="p">(</span><span class="n">cur_window</span><span class="o">.</span><span class="n">topWindow</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">register</span><span class="p">(</span><span class="n">version</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">ctx</span><span class="p">:</span> <span class="n">qrd</span><span class="o">.</span><span class="n">CaptureContext</span><span class="p">):</span>
+    <span class="c1"># as above ...</span>
+
+    <span class="n">ctx</span><span class="o">.</span><span class="n">Extensions</span><span class="p">()</span><span class="o">.</span><span class="n">RegisterWindowMenu</span><span class="p">(</span><span class="n">qrd</span><span class="o">.</span><span class="n">WindowMenu</span><span class="o">.</span><span class="n">Window</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;Extension Window&quot;</span><span class="p">],</span> <span class="n">open_window_callback</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">unregister</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;Unregistering my extension&quot;</span><span class="p">)</span>
+
+    <span class="k">global</span> <span class="n">cur_window</span>
+
+    <span class="k">if</span> <span class="n">cur_window</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># The window_closed() callback will unregister the capture viewer</span>
+        <span class="n">cur_window</span><span class="o">.</span><span class="n">ctx</span><span class="o">.</span><span class="n">Extensions</span><span class="p">()</span><span class="o">.</span><span class="n">GetMiniQtHelper</span><span class="p">()</span><span class="o">.</span><span class="n">CloseToplevelWidget</span><span class="p">(</span><span class="n">cur_window</span><span class="o">.</span><span class="n">topWindow</span><span class="p">)</span>
+        <span class="n">cur_window</span> <span class="o">=</span> <span class="kc">None</span>
+</pre></div>
+</div>
+<p>With that we now have a new little breadcrumbs window that docks itself above our event browser to show where we are in the frame:</p>
+<figure class="align-default" id="id2">
+<img alt="../_images/Step2.png" src="../_images/Step2.png" />
+<figcaption>
+<p><span class="caption-text">Python extension showing the current action’s breadcrumbs</span><a class="headerlink" href="#id2" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+</section>
+<section id="calling-onto-replay-thread">
+<h2>Calling onto replay thread<a class="headerlink" href="#calling-onto-replay-thread" title="Permalink to this headline">¶</a></h2>
+<p>So far this has worked well, but we’re only using information available on the UI thread. A good amount of useful information is cached on the UI thread including the current pipeline state and actions, but for some work we might want to call into the underlying analysis functions. When we do this we must do it on the replay thread to avoid blocking the UI if the analysis work takes a long time.</p>
+<p>This can get quite complex so we will do something very simple, in the message box callback that we created earlier instead of displaying the message box immediately we will first figure out the minimum and maximum values for the current depth output or first colour output and display that.</p>
+<p>To start with we can identify the resource on the UI thread, so let’s do that:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">renderdoc</span> <span class="k">as</span> <span class="nn">rd</span>
+
+<span class="k">def</span> <span class="nf">menu_callback</span><span class="p">(</span><span class="n">ctx</span><span class="p">:</span> <span class="n">qrd</span><span class="o">.</span><span class="n">CaptureContext</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+    <span class="n">texid</span> <span class="o">=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResourceId</span><span class="o">.</span><span class="n">Null</span><span class="p">()</span>
+    <span class="n">depth</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">CurPipelineState</span><span class="p">()</span><span class="o">.</span><span class="n">GetDepthTarget</span><span class="p">()</span>
+
+    <span class="c1"># Prefer depth if possible</span>
+    <span class="k">if</span> <span class="n">depth</span><span class="o">.</span><span class="n">resourceId</span> <span class="o">!=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResourceId</span><span class="o">.</span><span class="n">Null</span><span class="p">():</span>
+        <span class="n">texid</span> <span class="o">=</span> <span class="n">depth</span><span class="o">.</span><span class="n">resourceId</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">cols</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">CurPipelineState</span><span class="p">()</span><span class="o">.</span><span class="n">GetOutputTargets</span><span class="p">()</span>
+
+        <span class="c1"># See if we can get the first colour target instead</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">cols</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">resourceId</span> <span class="o">!=</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResourceId</span><span class="o">.</span><span class="n">Null</span><span class="p">():</span>
+            <span class="n">texid</span> <span class="o">=</span> <span class="n">cols</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">resourceId</span>
+
+    <span class="k">if</span> <span class="n">texid</span> <span class="o">==</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResourceId</span><span class="o">.</span><span class="n">Null</span><span class="p">():</span>
+        <span class="n">ctx</span><span class="o">.</span><span class="n">Extensions</span><span class="p">()</span><span class="o">.</span><span class="n">MessageDialog</span><span class="p">(</span><span class="s2">&quot;Couldn&#39;t find any bound target!&quot;</span><span class="p">,</span> <span class="s2">&quot;Extension message&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+</pre></div>
+</div>
+<p>This all happens as before on the UI thread using UI-cached pipeline state data. If we can’t find a resource we just bail out, but otherwise we have <code class="docutils literal notranslate"><span class="pre">texid</span></code> with the texture we want to analyse.</p>
+<p>To do this we invoke onto a different thread twice - first the UI thread invokes onto the replay thread to calculate the minimum and maximum values. Then that callback invokes back onto the UI thread to display a message.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">if</span> <span class="n">texid</span> <span class="o">==</span> <span class="n">rd</span><span class="o">.</span><span class="n">ResourceId</span><span class="o">.</span><span class="n">Null</span><span class="p">():</span>
+    <span class="n">ctx</span><span class="o">.</span><span class="n">Extensions</span><span class="p">()</span><span class="o">.</span><span class="n">MessageDialog</span><span class="p">(</span><span class="s2">&quot;Couldn&#39;t find any bound target!&quot;</span><span class="p">,</span> <span class="s2">&quot;Extension message&quot;</span><span class="p">)</span>
+    <span class="k">return</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="n">mqt</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">Extensions</span><span class="p">()</span><span class="o">.</span><span class="n">GetMiniQtHelper</span><span class="p">()</span>
+    <span class="n">texname</span> <span class="o">=</span> <span class="n">ctx</span><span class="o">.</span><span class="n">GetResourceName</span><span class="p">(</span><span class="n">texid</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">get_minmax</span><span class="p">(</span><span class="n">r</span><span class="p">:</span> <span class="n">rd</span><span class="o">.</span><span class="n">ReplayController</span><span class="p">):</span>
+        <span class="n">minvals</span><span class="p">,</span> <span class="n">maxvals</span> <span class="o">=</span> <span class="n">r</span><span class="o">.</span><span class="n">GetMinMax</span><span class="p">(</span><span class="n">texid</span><span class="p">,</span> <span class="n">rd</span><span class="o">.</span><span class="n">Subresource</span><span class="p">(),</span> <span class="n">rd</span><span class="o">.</span><span class="n">CompType</span><span class="o">.</span><span class="n">Typeless</span><span class="p">)</span>
+
+        <span class="n">msg</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="si">{}</span><span class="s1"> has min </span><span class="si">{:.4}</span><span class="s1"> and max </span><span class="si">{:.4}</span><span class="s1"> in red&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">texname</span><span class="p">,</span> <span class="n">minvals</span><span class="o">.</span><span class="n">floatValue</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">maxvals</span><span class="o">.</span><span class="n">floatValue</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+
+        <span class="n">mqt</span><span class="o">.</span><span class="n">InvokeOntoUIThread</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">ctx</span><span class="o">.</span><span class="n">Extensions</span><span class="p">()</span><span class="o">.</span><span class="n">MessageDialog</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="s2">&quot;Extension message&quot;</span><span class="p">))</span>
+
+    <span class="n">ctx</span><span class="o">.</span><span class="n">Replay</span><span class="p">()</span><span class="o">.</span><span class="n">AsyncInvoke</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">get_minmax</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Now that we’ve done that correctly our extension will be able to run in-depth replay analysis without calling functions from the wrong thread or stalling the UI.</p>
+</section>
+<section id="conclusion">
+<h2>Conclusion<a class="headerlink" href="#conclusion" title="Permalink to this headline">¶</a></h2>
+<p>Hopefully now from that worked example you have an idea of the basics of writing UI extensions. More complex examples can be found at the <a class="reference external" href="https://github.com/baldurk/renderdoc-contrib">community contributed repository</a> and the source code for this extension is available in the <a class="reference external" href="https://github.com/baldurk/renderdoc/tree/v1.x/docs/python_api/ui_extension_tutorial">github repository</a></p>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="descriptors_bindings.html" class="btn btn-neutral float-right" title="Descriptors and Bindings" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="dev_environment.html" class="btn btn-neutral float-left" title="Python development environment" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

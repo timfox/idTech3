@@ -1,7 +1,7 @@
 #ifdef _WIN32
 
 #include "tr_local.h"
-#include "../qcommon/qcommon.h"
+#include "../common/qcommon.h"
 
 d3d12Renderer_t tr;
 

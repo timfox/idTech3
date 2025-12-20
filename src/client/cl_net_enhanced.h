@@ -18,7 +18,7 @@ or (at your option) any later version.
 #ifdef USE_CURL
 
 #include "cl_curl.h"
-#include "../qcommon/q_shared.h"
+#include "../common/q_shared.h"
 
 // HTTP/2 support
 #define NET_HTTP_VERSION_1_1     CURL_HTTP_VERSION_1_1

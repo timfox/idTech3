@@ -6,7 +6,7 @@ Computes positions and sizes for nodes using block/flex/absolute layout
 */
 
 #include "ui2_internal.h"
-#include "../qcommon/qcommon.h"
+#include "../common/qcommon.h"
 #include <algorithm>
 #include <climits>
 

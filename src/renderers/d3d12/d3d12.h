@@ -3,7 +3,7 @@
 
 #ifdef _WIN32
 
-#include "../qcommon/q_shared.h"
+#include "../common/q_shared.h"
 
 #ifdef __cplusplus
 #include <d3d12.h>

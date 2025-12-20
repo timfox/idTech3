@@ -37,8 +37,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <unistd.h>
 #include <sys/types.h>
 #include <time.h>
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "../common/q_shared.h"
+#include "../common/qcommon.h"
 #include "../renderers/opengl/qgl.h"
 #include "../renderercommon/tr_types.h"
 #include "unix_glw.h"

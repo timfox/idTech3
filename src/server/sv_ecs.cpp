@@ -9,8 +9,8 @@ Server-side ECS integration with svEntity_t bridge.
 #ifdef USE_ENTT
 
 #include "sv_ecs.h"
-#include "../qcommon/ecs_components.h"
-#include "../qcommon/ecs_internal.h"
+#include "../common/ecs_components.h"
+#include "../common/ecs_internal.h"
 #include <entt/entt.hpp>
 
 extern server_t sv;

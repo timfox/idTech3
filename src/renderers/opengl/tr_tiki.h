@@ -1,8 +1,8 @@
 #ifndef __TR_TIKI_H__
 #define __TR_TIKI_H__
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qfiles.h"
+#include "../common/q_shared.h"
+#include "../common/qfiles.h"
 
 // TIKI file format identifiers
 #define TIKI_IDENT			(('T'<<24)+('I'<<16)+('K'<<8)+'I')

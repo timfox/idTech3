@@ -48,7 +48,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --help         Show this help message"
             echo ""
             echo "Examples:"
-            echo "  $0 src/qcommon/*.c          # Analyze specific files"
+            echo "  $0 src/common/*.c          # Analyze specific files"
             echo "  $0 --fix src/client/*.c     # Fix issues in client code"
             echo "  $0 --quiet                   # Analyze all source files quietly"
             exit 0

@@ -4,8 +4,8 @@ BSP file fuzzing harness for AFL/libFuzzer
 ===============================================================================
 */
 
-#include "../src/qcommon/q_shared.h"
-#include "../src/qcommon/bsp.h"
+#include "../src/common/q_shared.h"
+#include "../src/common/bsp.h"
 
 // Mock implementations for fuzzing
 void Com_Error(errorParm_t level, const char *error, ...) {

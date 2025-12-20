@@ -3,7 +3,7 @@
 #import <UIKit/UIKit.h>
 #import <Foundation/Foundation.h>
 #import <GameController/GameController.h>
-#import "../qcommon/qcommon.h"
+#import "../common/qcommon.h"
 #import "macos_platform.h"
 
 @interface Quake3AppDelegate : UIResponder <UIApplicationDelegate>

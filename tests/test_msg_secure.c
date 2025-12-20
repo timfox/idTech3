@@ -7,7 +7,7 @@ Tests the enhanced message handling with bounds checking.
 */
 
 #include "test_framework.h"
-#include "../src/qcommon/msg_secure.h"
+#include "../src/common/msg_secure.h"
 
 // Mock stubs for external dependencies
 cvar_t *cl_shownet = NULL;

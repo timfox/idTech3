@@ -4,8 +4,8 @@ Network message fuzzing harness for AFL/libFuzzer
 ===============================================================================
 */
 
-#include "../src/qcommon/q_shared.h"
-#include "../src/qcommon/msg.h"
+#include "../src/common/q_shared.h"
+#include "../src/common/msg.h"
 
 // Mock implementations for fuzzing
 void Com_Error(errorParm_t level, const char *error, ...) {

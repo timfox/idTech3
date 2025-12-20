@@ -1,7 +1,7 @@
 #if defined(__APPLE__) && !defined(__ANDROID__)
 
 #import "macos_platform.h"
-#import "../qcommon/qcommon.h"
+#import "../common/qcommon.h"
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
 #ifdef TARGET_OS_IPHONE

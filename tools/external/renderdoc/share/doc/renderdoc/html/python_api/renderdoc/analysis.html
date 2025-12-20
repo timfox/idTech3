@@ -1,0 +1,2383 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>API Reference: Replay Analysis &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/python_api/renderdoc/analysis.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="API Reference: Formats" href="formats.html" />
+    <link rel="prev" title="API Reference: Replay Outputs" href="outputs.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../index.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../examples/renderdoc_intro.html">Getting Started (python)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/qrenderdoc_intro.html">Getting Started (RenderDoc UI)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dev_environment.html">Python development environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../ui_extensions.html">Writing UI extensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../descriptors_bindings.html">Descriptors and Bindings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/basics.html">Basic Interfaces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/renderdoc/index.html">renderdoc Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../examples/qrenderdoc/index.html">qrenderdoc examples</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="index.html">renderdoc python module</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="capturing.html">API Reference: Capturing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="replay.html">API Reference: Replay Control</a></li>
+<li class="toctree-l3"><a class="reference internal" href="outputs.html">API Reference: Replay Outputs</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">API Reference: Replay Analysis</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#frame-and-actions">Frame and Actions</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#debug-messages">Debug Messages</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#resource-usage">Resource Usage</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#texture-saving">Texture Saving</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pixel-history">Pixel History</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#shader-debuging">Shader Debuging</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="formats.html">API Reference: Formats</a></li>
+<li class="toctree-l3"><a class="reference internal" href="resources.html">API Reference: Resources</a></li>
+<li class="toctree-l3"><a class="reference internal" href="shaders.html">API Reference: Shaders</a></li>
+<li class="toctree-l3"><a class="reference internal" href="pipelines/index.html">API Reference: Pipeline State Objects</a></li>
+<li class="toctree-l3"><a class="reference internal" href="structured_data.html">API Reference: Structured Data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="counters.html">API Reference: Performance Counters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="frame_stats.html">API Reference: Frame Statistics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="utils.html">API Reference: Utilities</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../qrenderdoc/index.html">qrenderdoc python module</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../how/index.html">How do I …?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../index.html">Python API</a> &raquo;</li>
+        
+          <li><a href="index.html">renderdoc python module</a> &raquo;</li>
+        
+      <li>API Reference: Replay Analysis</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/python_api/renderdoc/analysis.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="api-reference-replay-analysis">
+<h1>API Reference: Replay Analysis<a class="headerlink" href="#api-reference-replay-analysis" title="Permalink to this headline">¶</a></h1>
+<p>This is the API reference for the functions, classes, and enums in the <code class="docutils literal notranslate"><span class="pre">renderdoc</span></code> module which represents the underlying interface that the UI is built on top of. For more high-level information and instructions on using the python API, see <a class="reference internal" href="../index.html"><span class="doc">Python API</span></a>.</p>
+<div class="contents local topic" id="sections">
+<p class="topic-title">Sections</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#frame-and-actions" id="id1">Frame and Actions</a></p></li>
+<li><p><a class="reference internal" href="#debug-messages" id="id2">Debug Messages</a></p></li>
+<li><p><a class="reference internal" href="#resource-usage" id="id3">Resource Usage</a></p></li>
+<li><p><a class="reference internal" href="#texture-saving" id="id4">Texture Saving</a></p></li>
+<li><p><a class="reference internal" href="#pixel-history" id="id5">Pixel History</a></p></li>
+<li><p><a class="reference internal" href="#shader-debuging" id="id6">Shader Debuging</a></p></li>
+</ul>
+</div>
+<section id="frame-and-actions">
+<h2><a class="toc-backref" href="#id1">Frame and Actions</a><a class="headerlink" href="#frame-and-actions" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.FrameDescription">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">FrameDescription</span></span><a class="headerlink" href="#renderdoc.FrameDescription" title="Permalink to this definition">¶</a></dt>
+<dd><p>Contains frame-level global information</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.FrameDescription.NoFrameNumber">
+<span class="sig-name descname"><span class="pre">NoFrameNumber</span></span><a class="headerlink" href="#renderdoc.FrameDescription.NoFrameNumber" title="Permalink to this definition">¶</a></dt>
+<dd><p>No frame number is available.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.FrameDescription.captureTime">
+<span class="sig-name descname"><span class="pre">captureTime</span></span><a class="headerlink" href="#renderdoc.FrameDescription.captureTime" title="Permalink to this definition">¶</a></dt>
+<dd><p>The time when the capture was created, as a unix timestamp in UTC.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.FrameDescription.compressedFileSize">
+<span class="sig-name descname"><span class="pre">compressedFileSize</span></span><a class="headerlink" href="#renderdoc.FrameDescription.compressedFileSize" title="Permalink to this definition">¶</a></dt>
+<dd><p>The total file size of the whole capture in bytes, before decompression.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.FrameDescription.debugMessages">
+<span class="sig-name descname"><span class="pre">debugMessages</span></span><a class="headerlink" href="#renderdoc.FrameDescription.debugMessages" title="Permalink to this definition">¶</a></dt>
+<dd><p>The debug messages that are not associated with any particular event.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="#renderdoc.DebugMessage" title="renderdoc.DebugMessage">DebugMessage</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.FrameDescription.fileOffset">
+<span class="sig-name descname"><span class="pre">fileOffset</span></span><a class="headerlink" href="#renderdoc.FrameDescription.fileOffset" title="Permalink to this definition">¶</a></dt>
+<dd><p>The offset into the file of the start of the frame.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Similarly to <a class="reference internal" href="#renderdoc.APIEvent.fileOffset" title="renderdoc.APIEvent.fileOffset"><code class="xref py py-data docutils literal notranslate"><span class="pre">APIEvent.fileOffset</span></code></a> this should only be used as a relative measure,
+as it is not a literal number of bytes from the start of the file on disk.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.FrameDescription.frameNumber">
+<span class="sig-name descname"><span class="pre">frameNumber</span></span><a class="headerlink" href="#renderdoc.FrameDescription.frameNumber" title="Permalink to this definition">¶</a></dt>
+<dd><p>Starting from frame #1 defined as the time from application startup to first present,
+this counts the frame number when the capture was made.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This value is only accurate if the capture was triggered through the default mechanism, if
+it was triggered from the application API it doesn’t correspond to anything and will be set to
+<a class="reference internal" href="#renderdoc.FrameDescription.NoFrameNumber" title="renderdoc.FrameDescription.NoFrameNumber"><code class="xref py py-data docutils literal notranslate"><span class="pre">NoFrameNumber</span></code></a>.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.FrameDescription.initDataSize">
+<span class="sig-name descname"><span class="pre">initDataSize</span></span><a class="headerlink" href="#renderdoc.FrameDescription.initDataSize" title="Permalink to this definition">¶</a></dt>
+<dd><p>The byte size of the section of the file that contains frame-initial contents.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.FrameDescription.persistentSize">
+<span class="sig-name descname"><span class="pre">persistentSize</span></span><a class="headerlink" href="#renderdoc.FrameDescription.persistentSize" title="Permalink to this definition">¶</a></dt>
+<dd><p>The byte size of the section of the file that must be kept in memory persistently.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.FrameDescription.stats">
+<span class="sig-name descname"><span class="pre">stats</span></span><a class="headerlink" href="#renderdoc.FrameDescription.stats" title="Permalink to this definition">¶</a></dt>
+<dd><p>The frame statistics.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="frame_stats.html#renderdoc.FrameStatistics" title="renderdoc.FrameStatistics">FrameStatistics</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.FrameDescription.uncompressedFileSize">
+<span class="sig-name descname"><span class="pre">uncompressedFileSize</span></span><a class="headerlink" href="#renderdoc.FrameDescription.uncompressedFileSize" title="Permalink to this definition">¶</a></dt>
+<dd><p>The total file size of the whole capture in bytes, after decompression.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">ActionDescription</span></span><a class="headerlink" href="#renderdoc.ActionDescription" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes the properties of an action.</p>
+<p>An action is a call such as a draw, a compute dispatch, clears, copies, resolves, etc. Any GPU event
+which may have deliberate visible side-effects to application-visible memory, typically resources
+such as textures and buffers. It also includes markers, which provide a user-generated annotation of
+events and actions.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.GetName">
+<span class="sig-name descname"><span class="pre">GetName</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">structuredFile</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.ActionDescription.GetName" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the name for this action, either from its custom name (see <a class="reference internal" href="#renderdoc.ActionDescription.customName" title="renderdoc.ActionDescription.customName"><code class="xref py py-data docutils literal notranslate"><span class="pre">customName</span></code></a>)
+or from the matching chunk in the structured data passed in.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="renderdoc.ActionDescription.GetName.params.structuredFile"></span><strong>structuredFile</strong><a class="paramlink headerlink reference internal" href="#renderdoc.ActionDescription.GetName.params.structuredFile">#</a> (<a class="reference internal" href="structured_data.html#renderdoc.SDFile" title="renderdoc.SDFile"><em>SDFile</em></a>) – The structured data file for the capture this action is from.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Returns the best available name for this action.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.IsFakeMarker">
+<span class="sig-name descname"><span class="pre">IsFakeMarker</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.ActionDescription.IsFakeMarker" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns whether or not this action corresponds to a fake marker added by
+<a class="reference internal" href="replay.html#renderdoc.ReplayController.AddFakeMarkers" title="renderdoc.ReplayController.AddFakeMarkers"><code class="xref py py-meth docutils literal notranslate"><span class="pre">ReplayController.AddFakeMarkers()</span></code></a>.</p>
+<p>Such actions may break expectations of event IDs and action IDs, so it is recommended to avoid
+processing them wherever possible.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>Returns whether or not this action is a fake marker.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.actionId">
+<span class="sig-name descname"><span class="pre">actionId</span></span><a class="headerlink" href="#renderdoc.ActionDescription.actionId" title="Permalink to this definition">¶</a></dt>
+<dd><p>A 1-based index of this action relative to other actions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.baseVertex">
+<span class="sig-name descname"><span class="pre">baseVertex</span></span><a class="headerlink" href="#renderdoc.ActionDescription.baseVertex" title="Permalink to this definition">¶</a></dt>
+<dd><p>For indexed drawcalls, the offset added to each index after fetching.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.children">
+<span class="sig-name descname"><span class="pre">children</span></span><a class="headerlink" href="#renderdoc.ActionDescription.children" title="Permalink to this definition">¶</a></dt>
+<dd><p>The child actions below this one, if it’s a marker region or multi-action.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="#renderdoc.ActionDescription" title="renderdoc.ActionDescription">ActionDescription</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.copyDestination">
+<span class="sig-name descname"><span class="pre">copyDestination</span></span><a class="headerlink" href="#renderdoc.ActionDescription.copyDestination" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> identifying the destination object in a copy, resolve or blit
+operation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.copyDestinationSubresource">
+<span class="sig-name descname"><span class="pre">copyDestinationSubresource</span></span><a class="headerlink" href="#renderdoc.ActionDescription.copyDestinationSubresource" title="Permalink to this definition">¶</a></dt>
+<dd><p>Which part of <a class="reference internal" href="#renderdoc.ActionDescription.copyDestination" title="renderdoc.ActionDescription.copyDestination"><code class="xref py py-data docutils literal notranslate"><span class="pre">copyDestination</span></code></a> is used.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="resources.html#renderdoc.Subresource" title="renderdoc.Subresource">Subresource</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.copySource">
+<span class="sig-name descname"><span class="pre">copySource</span></span><a class="headerlink" href="#renderdoc.ActionDescription.copySource" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> identifying the source object in a copy, resolve or blit
+operation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.copySourceSubresource">
+<span class="sig-name descname"><span class="pre">copySourceSubresource</span></span><a class="headerlink" href="#renderdoc.ActionDescription.copySourceSubresource" title="Permalink to this definition">¶</a></dt>
+<dd><p>Which part of <a class="reference internal" href="#renderdoc.ActionDescription.copySource" title="renderdoc.ActionDescription.copySource"><code class="xref py py-data docutils literal notranslate"><span class="pre">copySource</span></code></a> is used.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="resources.html#renderdoc.Subresource" title="renderdoc.Subresource">Subresource</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.customName">
+<span class="sig-name descname"><span class="pre">customName</span></span><a class="headerlink" href="#renderdoc.ActionDescription.customName" title="Permalink to this definition">¶</a></dt>
+<dd><p>The custom name of this action.</p>
+<p>For markers this will be a user-provided string. In most other cases this will be empty, and the
+name can be generated using structured data. The last listed event in <a class="reference internal" href="#renderdoc.ActionDescription.events" title="renderdoc.ActionDescription.events"><code class="xref py py-data docutils literal notranslate"><span class="pre">events</span></code></a> will correspond
+to the event for the overall action, and its chunk will contain a name and any parameters.</p>
+<p>Some actions will have a custom name generated for e.g. reading back and directly displaying
+indirect parameters or render pass parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.depthOut">
+<span class="sig-name descname"><span class="pre">depthOut</span></span><a class="headerlink" href="#renderdoc.ActionDescription.depthOut" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource used for depth output - see <a class="reference internal" href="#renderdoc.ActionDescription.outputs" title="renderdoc.ActionDescription.outputs"><code class="xref py py-data docutils literal notranslate"><span class="pre">outputs</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.dispatchBase">
+<span class="sig-name descname"><span class="pre">dispatchBase</span></span><a class="headerlink" href="#renderdoc.ActionDescription.dispatchBase" title="Permalink to this definition">¶</a></dt>
+<dd><p>The 3D base offset of the workgroup ID if the call allows an override, or 0 if not.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Tuple[int,int,int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.dispatchDimension">
+<span class="sig-name descname"><span class="pre">dispatchDimension</span></span><a class="headerlink" href="#renderdoc.ActionDescription.dispatchDimension" title="Permalink to this definition">¶</a></dt>
+<dd><p>The 3D number of workgroups to dispatch in a dispatch call.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Tuple[int,int,int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.dispatchThreadsDimension">
+<span class="sig-name descname"><span class="pre">dispatchThreadsDimension</span></span><a class="headerlink" href="#renderdoc.ActionDescription.dispatchThreadsDimension" title="Permalink to this definition">¶</a></dt>
+<dd><p>The 3D size of each workgroup in threads if the call allows an override, or 0 if not.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Tuple[int,int,int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.drawIndex">
+<span class="sig-name descname"><span class="pre">drawIndex</span></span><a class="headerlink" href="#renderdoc.ActionDescription.drawIndex" title="Permalink to this definition">¶</a></dt>
+<dd><p>The index of this action in an call with multiple draws, e.g. an indirect action.</p>
+<p>0 if not part of a multi-action.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.eventId">
+<span class="sig-name descname"><span class="pre">eventId</span></span><a class="headerlink" href="#renderdoc.ActionDescription.eventId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="#renderdoc.APIEvent.eventId" title="renderdoc.APIEvent.eventId"><code class="xref py py-data docutils literal notranslate"><span class="pre">eventId</span></code></a> that actually produced the action.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.events">
+<span class="sig-name descname"><span class="pre">events</span></span><a class="headerlink" href="#renderdoc.ActionDescription.events" title="Permalink to this definition">¶</a></dt>
+<dd><p>The events that happened since the previous action.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="#renderdoc.APIEvent" title="renderdoc.APIEvent">APIEvent</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.flags">
+<span class="sig-name descname"><span class="pre">flags</span></span><a class="headerlink" href="#renderdoc.ActionDescription.flags" title="Permalink to this definition">¶</a></dt>
+<dd><p>A set of <a class="reference internal" href="#renderdoc.ActionFlags" title="renderdoc.ActionFlags"><code class="xref py py-class docutils literal notranslate"><span class="pre">ActionFlags</span></code></a> properties describing what kind of action this is.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.ActionFlags" title="renderdoc.ActionFlags">ActionFlags</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.indexOffset">
+<span class="sig-name descname"><span class="pre">indexOffset</span></span><a class="headerlink" href="#renderdoc.ActionDescription.indexOffset" title="Permalink to this definition">¶</a></dt>
+<dd><p>For indexed drawcalls, the first index to fetch from the index buffer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.instanceOffset">
+<span class="sig-name descname"><span class="pre">instanceOffset</span></span><a class="headerlink" href="#renderdoc.ActionDescription.instanceOffset" title="Permalink to this definition">¶</a></dt>
+<dd><p>For instanced drawcalls, the offset applied before looking up instanced vertex inputs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.markerColor">
+<span class="sig-name descname"><span class="pre">markerColor</span></span><a class="headerlink" href="#renderdoc.ActionDescription.markerColor" title="Permalink to this definition">¶</a></dt>
+<dd><p>A RGBA color specified by a debug marker call.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="utils.html#renderdoc.FloatVector" title="renderdoc.FloatVector">FloatVector</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.next">
+<span class="sig-name descname"><span class="pre">next</span></span><a class="headerlink" href="#renderdoc.ActionDescription.next" title="Permalink to this definition">¶</a></dt>
+<dd><p>The next action in the frame, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if this is the last action in the frame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.ActionDescription" title="renderdoc.ActionDescription">ActionDescription</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.numIndices">
+<span class="sig-name descname"><span class="pre">numIndices</span></span><a class="headerlink" href="#renderdoc.ActionDescription.numIndices" title="Permalink to this definition">¶</a></dt>
+<dd><p>The number of indices or vertices as appropriate for a draw action. 0 if not used.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.numInstances">
+<span class="sig-name descname"><span class="pre">numInstances</span></span><a class="headerlink" href="#renderdoc.ActionDescription.numInstances" title="Permalink to this definition">¶</a></dt>
+<dd><p>The number of instances for a draw action. 0 if not used.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.outputs">
+<span class="sig-name descname"><span class="pre">outputs</span></span><a class="headerlink" href="#renderdoc.ActionDescription.outputs" title="Permalink to this definition">¶</a></dt>
+<dd><p>An 8-tuple of the <a class="reference internal" href="resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> ids for the color outputs, which can be used
+for very coarse bucketing of actions into similar passes by their outputs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Tuple[<a class="reference internal" href="resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a>,…]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.parent">
+<span class="sig-name descname"><span class="pre">parent</span></span><a class="headerlink" href="#renderdoc.ActionDescription.parent" title="Permalink to this definition">¶</a></dt>
+<dd><p>The parent of this action, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if there is no parent for this action.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.ActionDescription" title="renderdoc.ActionDescription">ActionDescription</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.previous">
+<span class="sig-name descname"><span class="pre">previous</span></span><a class="headerlink" href="#renderdoc.ActionDescription.previous" title="Permalink to this definition">¶</a></dt>
+<dd><p>The previous action in the frame, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if this is the first action in the
+frame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.ActionDescription" title="renderdoc.ActionDescription">ActionDescription</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ActionDescription.vertexOffset">
+<span class="sig-name descname"><span class="pre">vertexOffset</span></span><a class="headerlink" href="#renderdoc.ActionDescription.vertexOffset" title="Permalink to this definition">¶</a></dt>
+<dd><p>For non-indexed drawcalls, the offset applied before looking up each vertex input.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">ActionFlags</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.ActionFlags" title="Permalink to this definition">¶</a></dt>
+<dd><p>A set of flags describing the properties of a particular action. An action is a call
+such as a draw, a compute dispatch, clears, copies, resolves, etc. Any GPU event which may have
+deliberate visible side-effects to application-visible memory, typically resources such as textures
+and buffers. It also includes markers, which provide a user-generated annotation of events and
+actions.</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.NoFlags">
+<span class="sig-name descname"><span class="pre">NoFlags</span></span><a class="headerlink" href="#renderdoc.ActionFlags.NoFlags" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action has no special properties.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.Clear">
+<span class="sig-name descname"><span class="pre">Clear</span></span><a class="headerlink" href="#renderdoc.ActionFlags.Clear" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action is a clear call. See <a class="reference internal" href="#renderdoc.ActionFlags.ClearColor" title="renderdoc.ActionFlags.ClearColor"><code class="xref py py-data docutils literal notranslate"><span class="pre">ClearColor</span></code></a> and <a class="reference internal" href="#renderdoc.ActionFlags.ClearDepthStencil" title="renderdoc.ActionFlags.ClearDepthStencil"><code class="xref py py-data docutils literal notranslate"><span class="pre">ClearDepthStencil</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.Drawcall">
+<span class="sig-name descname"><span class="pre">Drawcall</span></span><a class="headerlink" href="#renderdoc.ActionFlags.Drawcall" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action renders primitives using the graphics pipeline.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.Dispatch">
+<span class="sig-name descname"><span class="pre">Dispatch</span></span><a class="headerlink" href="#renderdoc.ActionFlags.Dispatch" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action issues a number of compute workgroups.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.MeshDispatch">
+<span class="sig-name descname"><span class="pre">MeshDispatch</span></span><a class="headerlink" href="#renderdoc.ActionFlags.MeshDispatch" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action issues a number of mesh groups for a draw.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.CmdList">
+<span class="sig-name descname"><span class="pre">CmdList</span></span><a class="headerlink" href="#renderdoc.ActionFlags.CmdList" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action calls into a previously recorded child command list.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.SetMarker">
+<span class="sig-name descname"><span class="pre">SetMarker</span></span><a class="headerlink" href="#renderdoc.ActionFlags.SetMarker" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action inserts a single debugging marker.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.PushMarker">
+<span class="sig-name descname"><span class="pre">PushMarker</span></span><a class="headerlink" href="#renderdoc.ActionFlags.PushMarker" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action begins a debugging marker region that has children.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.PopMarker">
+<span class="sig-name descname"><span class="pre">PopMarker</span></span><a class="headerlink" href="#renderdoc.ActionFlags.PopMarker" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action ends a debugging marker region.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.Present">
+<span class="sig-name descname"><span class="pre">Present</span></span><a class="headerlink" href="#renderdoc.ActionFlags.Present" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action is a presentation call that hands a swapchain image to the presentation engine.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.MultiAction">
+<span class="sig-name descname"><span class="pre">MultiAction</span></span><a class="headerlink" href="#renderdoc.ActionFlags.MultiAction" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action is a multi-action that contains several specified child actions. Typically a MultiDraw
+or ExecuteIndirect on D3D12.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.Copy">
+<span class="sig-name descname"><span class="pre">Copy</span></span><a class="headerlink" href="#renderdoc.ActionFlags.Copy" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action performs a resource copy operation.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.Resolve">
+<span class="sig-name descname"><span class="pre">Resolve</span></span><a class="headerlink" href="#renderdoc.ActionFlags.Resolve" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action performs a resource resolve or blit operation.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.GenMips">
+<span class="sig-name descname"><span class="pre">GenMips</span></span><a class="headerlink" href="#renderdoc.ActionFlags.GenMips" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action performs a resource mip-generation operation.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.PassBoundary">
+<span class="sig-name descname"><span class="pre">PassBoundary</span></span><a class="headerlink" href="#renderdoc.ActionFlags.PassBoundary" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action marks the beginning or end of a render pass. See <a class="reference internal" href="#renderdoc.ActionFlags.BeginPass" title="renderdoc.ActionFlags.BeginPass"><code class="xref py py-data docutils literal notranslate"><span class="pre">BeginPass</span></code></a> and
+<a class="reference internal" href="#renderdoc.ActionFlags.EndPass" title="renderdoc.ActionFlags.EndPass"><code class="xref py py-data docutils literal notranslate"><span class="pre">EndPass</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.DispatchRay">
+<span class="sig-name descname"><span class="pre">DispatchRay</span></span><a class="headerlink" href="#renderdoc.ActionFlags.DispatchRay" title="Permalink to this definition">¶</a></dt>
+<dd><p>This action issues a number of rays.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.BuildAccStruct">
+<span class="sig-name descname"><span class="pre">BuildAccStruct</span></span><a class="headerlink" href="#renderdoc.ActionFlags.BuildAccStruct" title="Permalink to this definition">¶</a></dt>
+<dd><p>This action builds or copies to and implicitly fills an acceleration structure.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.Indexed">
+<span class="sig-name descname"><span class="pre">Indexed</span></span><a class="headerlink" href="#renderdoc.ActionFlags.Indexed" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action uses an index buffer.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.Instanced">
+<span class="sig-name descname"><span class="pre">Instanced</span></span><a class="headerlink" href="#renderdoc.ActionFlags.Instanced" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action uses instancing. This does not mean it renders more than one instanced, simply that
+it uses the instancing feature.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.Auto">
+<span class="sig-name descname"><span class="pre">Auto</span></span><a class="headerlink" href="#renderdoc.ActionFlags.Auto" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action interacts with stream-out to render all vertices previously written. This is a
+Direct3D 11 specific feature.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.Indirect">
+<span class="sig-name descname"><span class="pre">Indirect</span></span><a class="headerlink" href="#renderdoc.ActionFlags.Indirect" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action uses a buffer on the GPU to source some or all of its parameters in an indirect way.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.ClearColor">
+<span class="sig-name descname"><span class="pre">ClearColor</span></span><a class="headerlink" href="#renderdoc.ActionFlags.ClearColor" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action clears a color target.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.ClearDepthStencil">
+<span class="sig-name descname"><span class="pre">ClearDepthStencil</span></span><a class="headerlink" href="#renderdoc.ActionFlags.ClearDepthStencil" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action clears a depth-stencil target.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.BeginPass">
+<span class="sig-name descname"><span class="pre">BeginPass</span></span><a class="headerlink" href="#renderdoc.ActionFlags.BeginPass" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action marks the beginning of a render pass.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.EndPass">
+<span class="sig-name descname"><span class="pre">EndPass</span></span><a class="headerlink" href="#renderdoc.ActionFlags.EndPass" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action marks the end of a render pass.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ActionFlags.CommandBufferBoundary">
+<span class="sig-name descname"><span class="pre">CommandBufferBoundary</span></span><a class="headerlink" href="#renderdoc.ActionFlags.CommandBufferBoundary" title="Permalink to this definition">¶</a></dt>
+<dd><p>The action is a virtual marker added to show command buffer boundaries.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.APIEvent">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">APIEvent</span></span><a class="headerlink" href="#renderdoc.APIEvent" title="Permalink to this definition">¶</a></dt>
+<dd><p>An individual API-level event, generally corresponds one-to-one with an API call.</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.APIEvent.NoChunk">
+<span class="sig-name descname"><span class="pre">NoChunk</span></span><a class="headerlink" href="#renderdoc.APIEvent.NoChunk" title="Permalink to this definition">¶</a></dt>
+<dd><p>No chunk is available.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.APIEvent.chunkIndex">
+<span class="sig-name descname"><span class="pre">chunkIndex</span></span><a class="headerlink" href="#renderdoc.APIEvent.chunkIndex" title="Permalink to this definition">¶</a></dt>
+<dd><p>The chunk index for this function call in the structured file.</p>
+<p>If no chunk index is available this will be set to <a class="reference internal" href="#renderdoc.APIEvent.NoChunk" title="renderdoc.APIEvent.NoChunk"><code class="xref py py-data docutils literal notranslate"><span class="pre">NoChunk</span></code></a>. This will only happen for fake
+markers added to the capture after load.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.APIEvent.eventId">
+<span class="sig-name descname"><span class="pre">eventId</span></span><a class="headerlink" href="#renderdoc.APIEvent.eventId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The API event’s Event ID.</p>
+<p>This is a 1-based count of API events in the capture. The eventId is used as a reference point in
+many places in the API to represent where in the capture the ‘current state’ is, and to perform
+analysis in reference to the state at a particular point in the frame.</p>
+<p>eventIds are generally increasing, positive, and contiguous, with a few exceptions. These are when
+fake markers are added to a capture with <a class="reference internal" href="replay.html#renderdoc.ReplayController.AddFakeMarkers" title="renderdoc.ReplayController.AddFakeMarkers"><code class="xref py py-meth docutils literal notranslate"><span class="pre">ReplayController.AddFakeMarkers()</span></code></a>. Thus if strong
+eventId guarantees are desired, this function should be avoided.</p>
+<p>Also eventIds may not correspond directly to an actual function call - sometimes a function such as
+a multi action indirect will be one function call that expands to multiple events to allow inspection
+of results part way through the multi action.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.APIEvent.fileOffset">
+<span class="sig-name descname"><span class="pre">fileOffset</span></span><a class="headerlink" href="#renderdoc.APIEvent.fileOffset" title="Permalink to this definition">¶</a></dt>
+<dd><p>A byte offset in the data stream where this event happens.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>This should only be used as a relative measure, it is not a literal number of bytes from
+the start of the file on disk.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="debug-messages">
+<h2><a class="toc-backref" href="#id2">Debug Messages</a><a class="headerlink" href="#debug-messages" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.DebugMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">DebugMessage</span></span><a class="headerlink" href="#renderdoc.DebugMessage" title="Permalink to this definition">¶</a></dt>
+<dd><p>A debugging message from the API validation or internal analysis and error detection.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.DebugMessage.category">
+<span class="sig-name descname"><span class="pre">category</span></span><a class="headerlink" href="#renderdoc.DebugMessage.category" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="#renderdoc.MessageCategory" title="renderdoc.MessageCategory"><code class="xref py py-class docutils literal notranslate"><span class="pre">category</span></code></a> of this debug message.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.MessageCategory" title="renderdoc.MessageCategory">MessageCategory</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.DebugMessage.description">
+<span class="sig-name descname"><span class="pre">description</span></span><a class="headerlink" href="#renderdoc.DebugMessage.description" title="Permalink to this definition">¶</a></dt>
+<dd><p>The string contents of the message.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.DebugMessage.eventId">
+<span class="sig-name descname"><span class="pre">eventId</span></span><a class="headerlink" href="#renderdoc.DebugMessage.eventId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="#renderdoc.APIEvent.eventId" title="renderdoc.APIEvent.eventId"><code class="xref py py-data docutils literal notranslate"><span class="pre">eventId</span></code></a> where this debug message was found.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.DebugMessage.messageID">
+<span class="sig-name descname"><span class="pre">messageID</span></span><a class="headerlink" href="#renderdoc.DebugMessage.messageID" title="Permalink to this definition">¶</a></dt>
+<dd><p>An ID that identifies this particular debug message uniquely.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.DebugMessage.severity">
+<span class="sig-name descname"><span class="pre">severity</span></span><a class="headerlink" href="#renderdoc.DebugMessage.severity" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="#renderdoc.MessageSeverity" title="renderdoc.MessageSeverity"><code class="xref py py-class docutils literal notranslate"><span class="pre">severity</span></code></a> of this debug message.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.MessageSeverity" title="renderdoc.MessageSeverity">MessageSeverity</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.DebugMessage.source">
+<span class="sig-name descname"><span class="pre">source</span></span><a class="headerlink" href="#renderdoc.DebugMessage.source" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="#renderdoc.MessageSource" title="renderdoc.MessageSource"><code class="xref py py-class docutils literal notranslate"><span class="pre">source</span></code></a> of this debug message.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.MessageSource" title="renderdoc.MessageSource">MessageSource</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.MessageCategory">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">MessageCategory</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.MessageCategory" title="Permalink to this definition">¶</a></dt>
+<dd><p>The type of issue that a debug message is about.</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageCategory.Application_Defined">
+<span class="sig-name descname"><span class="pre">Application_Defined</span></span><a class="headerlink" href="#renderdoc.MessageCategory.Application_Defined" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message was generated by the application.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageCategory.Miscellaneous">
+<span class="sig-name descname"><span class="pre">Miscellaneous</span></span><a class="headerlink" href="#renderdoc.MessageCategory.Miscellaneous" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message doesn’t fall into any other pre-defined category.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageCategory.Initialization">
+<span class="sig-name descname"><span class="pre">Initialization</span></span><a class="headerlink" href="#renderdoc.MessageCategory.Initialization" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message is about initialisation or creation of objects.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageCategory.Cleanup">
+<span class="sig-name descname"><span class="pre">Cleanup</span></span><a class="headerlink" href="#renderdoc.MessageCategory.Cleanup" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message is about cleanup, destruction or shutdown of objects.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageCategory.Compilation">
+<span class="sig-name descname"><span class="pre">Compilation</span></span><a class="headerlink" href="#renderdoc.MessageCategory.Compilation" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message is about compilation of shaders.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageCategory.State_Creation">
+<span class="sig-name descname"><span class="pre">State_Creation</span></span><a class="headerlink" href="#renderdoc.MessageCategory.State_Creation" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message is about creating unified state objects.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageCategory.State_Setting">
+<span class="sig-name descname"><span class="pre">State_Setting</span></span><a class="headerlink" href="#renderdoc.MessageCategory.State_Setting" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message is about changing current pipeline state.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageCategory.State_Getting">
+<span class="sig-name descname"><span class="pre">State_Getting</span></span><a class="headerlink" href="#renderdoc.MessageCategory.State_Getting" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message is about fetching or retrieving current pipeline state.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageCategory.Resource_Manipulation">
+<span class="sig-name descname"><span class="pre">Resource_Manipulation</span></span><a class="headerlink" href="#renderdoc.MessageCategory.Resource_Manipulation" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message is about updating or changing a resource’s properties or contents.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageCategory.Execution">
+<span class="sig-name descname"><span class="pre">Execution</span></span><a class="headerlink" href="#renderdoc.MessageCategory.Execution" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message is about performing work.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageCategory.Shaders">
+<span class="sig-name descname"><span class="pre">Shaders</span></span><a class="headerlink" href="#renderdoc.MessageCategory.Shaders" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message is about the use, syntax, binding or linkage of shaders.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageCategory.Deprecated">
+<span class="sig-name descname"><span class="pre">Deprecated</span></span><a class="headerlink" href="#renderdoc.MessageCategory.Deprecated" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message is about the use of deprecated functionality.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageCategory.Undefined">
+<span class="sig-name descname"><span class="pre">Undefined</span></span><a class="headerlink" href="#renderdoc.MessageCategory.Undefined" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message is about the use of undefined behaviour.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageCategory.Portability">
+<span class="sig-name descname"><span class="pre">Portability</span></span><a class="headerlink" href="#renderdoc.MessageCategory.Portability" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message is about behaviour that could be or is not portable between different environments.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageCategory.Performance">
+<span class="sig-name descname"><span class="pre">Performance</span></span><a class="headerlink" href="#renderdoc.MessageCategory.Performance" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message is about performance problems or pitfalls.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.MessageSeverity">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">MessageSeverity</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.MessageSeverity" title="Permalink to this definition">¶</a></dt>
+<dd><p>How serious a debug message is</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageSeverity.High">
+<span class="sig-name descname"><span class="pre">High</span></span><a class="headerlink" href="#renderdoc.MessageSeverity.High" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message is very serious, indicating a guaranteed problem or major flaw.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageSeverity.Medium">
+<span class="sig-name descname"><span class="pre">Medium</span></span><a class="headerlink" href="#renderdoc.MessageSeverity.Medium" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message is somewhat serious, indicating a problem that should be addressed or investigated.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageSeverity.Low">
+<span class="sig-name descname"><span class="pre">Low</span></span><a class="headerlink" href="#renderdoc.MessageSeverity.Low" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message is not very serious. This indicates something that might indicate a problem.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageSeverity.Info">
+<span class="sig-name descname"><span class="pre">Info</span></span><a class="headerlink" href="#renderdoc.MessageSeverity.Info" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message is not about a problem but is purely informational.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.MessageSource">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">MessageSource</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.MessageSource" title="Permalink to this definition">¶</a></dt>
+<dd><p>Where a debug message was reported from</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageSource.API">
+<span class="sig-name descname"><span class="pre">API</span></span><a class="headerlink" href="#renderdoc.MessageSource.API" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message comes from the API’s debugging or validation layers.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageSource.RedundantAPIUse">
+<span class="sig-name descname"><span class="pre">RedundantAPIUse</span></span><a class="headerlink" href="#renderdoc.MessageSource.RedundantAPIUse" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message comes from detecting redundant API calls - calls with no side-effect or purpose, e.g.
+setting state that is already set.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageSource.IncorrectAPIUse">
+<span class="sig-name descname"><span class="pre">IncorrectAPIUse</span></span><a class="headerlink" href="#renderdoc.MessageSource.IncorrectAPIUse" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message comes from detecting incorrect use of the API.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageSource.GeneralPerformance">
+<span class="sig-name descname"><span class="pre">GeneralPerformance</span></span><a class="headerlink" href="#renderdoc.MessageSource.GeneralPerformance" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message comes from detecting general performance problems that are not hardware or platform
+specific.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageSource.GCNPerformance">
+<span class="sig-name descname"><span class="pre">GCNPerformance</span></span><a class="headerlink" href="#renderdoc.MessageSource.GCNPerformance" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message comes from detecting patterns that will cause performance problems on GCN-based
+hardware.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageSource.RuntimeWarning">
+<span class="sig-name descname"><span class="pre">RuntimeWarning</span></span><a class="headerlink" href="#renderdoc.MessageSource.RuntimeWarning" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message comes not from inspecting the log but something detected at runtime while in use,
+for example exceptions generated during shader debugging.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.MessageSource.UnsupportedConfiguration">
+<span class="sig-name descname"><span class="pre">UnsupportedConfiguration</span></span><a class="headerlink" href="#renderdoc.MessageSource.UnsupportedConfiguration" title="Permalink to this definition">¶</a></dt>
+<dd><p>This message comes from replaying a capture in an environment with insufficient capability to
+accurately reproduce the API work. Either this means the replay will be wrong, or it may be that
+depending on the exact API work some inaccuracies might happen.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="resource-usage">
+<h2><a class="toc-backref" href="#id3">Resource Usage</a><a class="headerlink" href="#resource-usage" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.EventUsage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">EventUsage</span></span><a class="headerlink" href="#renderdoc.EventUsage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes a particular use of a resource at a specific <a class="reference internal" href="#renderdoc.APIEvent.eventId" title="renderdoc.APIEvent.eventId"><code class="xref py py-data docutils literal notranslate"><span class="pre">eventId</span></code></a>.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.EventUsage.eventId">
+<span class="sig-name descname"><span class="pre">eventId</span></span><a class="headerlink" href="#renderdoc.EventUsage.eventId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="#renderdoc.APIEvent.eventId" title="renderdoc.APIEvent.eventId"><code class="xref py py-data docutils literal notranslate"><span class="pre">eventId</span></code></a> where this usage happened.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.EventUsage.usage">
+<span class="sig-name descname"><span class="pre">usage</span></span><a class="headerlink" href="#renderdoc.EventUsage.usage" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="#renderdoc.ResourceUsage" title="renderdoc.ResourceUsage"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceUsage</span></code></a> in question.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.ResourceUsage" title="renderdoc.ResourceUsage">ResourceUsage</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.EventUsage.view">
+<span class="sig-name descname"><span class="pre">view</span></span><a class="headerlink" href="#renderdoc.EventUsage.view" title="Permalink to this definition">¶</a></dt>
+<dd><p>An optional <a class="reference internal" href="resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> identifying the view through which the use happened.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">ResourceUsage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.ResourceUsage" title="Permalink to this definition">¶</a></dt>
+<dd><p>How a resource is being used in the pipeline at a particular point.</p>
+<p>Note that a resource may be used for more than one thing in one event, see <a class="reference internal" href="#renderdoc.EventUsage" title="renderdoc.EventUsage"><code class="xref py py-class docutils literal notranslate"><span class="pre">EventUsage</span></code></a>.</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.Unused">
+<span class="sig-name descname"><span class="pre">Unused</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.Unused" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is not being used.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.VertexBuffer">
+<span class="sig-name descname"><span class="pre">VertexBuffer</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.VertexBuffer" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a fixed-function vertex buffer input.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.IndexBuffer">
+<span class="sig-name descname"><span class="pre">IndexBuffer</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.IndexBuffer" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as an index buffer.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.VS_Constants">
+<span class="sig-name descname"><span class="pre">VS_Constants</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.VS_Constants" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used for constants in the <a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Vertex" title="renderdoc.ShaderStage.Vertex"><code class="xref py py-data docutils literal notranslate"><span class="pre">vertex</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.HS_Constants">
+<span class="sig-name descname"><span class="pre">HS_Constants</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.HS_Constants" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used for constants in the tessellation control or
+<a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Hull" title="renderdoc.ShaderStage.Hull"><code class="xref py py-data docutils literal notranslate"><span class="pre">hull</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.DS_Constants">
+<span class="sig-name descname"><span class="pre">DS_Constants</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.DS_Constants" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used for constants in the tessellation evaluation or
+<a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Domain" title="renderdoc.ShaderStage.Domain"><code class="xref py py-data docutils literal notranslate"><span class="pre">domain</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.GS_Constants">
+<span class="sig-name descname"><span class="pre">GS_Constants</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.GS_Constants" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used for constants in the <a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Geometry" title="renderdoc.ShaderStage.Geometry"><code class="xref py py-data docutils literal notranslate"><span class="pre">geometry</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.PS_Constants">
+<span class="sig-name descname"><span class="pre">PS_Constants</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.PS_Constants" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used for constants in the <a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Pixel" title="renderdoc.ShaderStage.Pixel"><code class="xref py py-data docutils literal notranslate"><span class="pre">pixel</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.CS_Constants">
+<span class="sig-name descname"><span class="pre">CS_Constants</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.CS_Constants" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used for constants in the <a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Compute" title="renderdoc.ShaderStage.Compute"><code class="xref py py-data docutils literal notranslate"><span class="pre">compute</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.TS_Constants">
+<span class="sig-name descname"><span class="pre">TS_Constants</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.TS_Constants" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a constants in the amplification or
+<a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Task" title="renderdoc.ShaderStage.Task"><code class="xref py py-data docutils literal notranslate"><span class="pre">task</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.MS_Constants">
+<span class="sig-name descname"><span class="pre">MS_Constants</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.MS_Constants" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a constants in the <a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Mesh" title="renderdoc.ShaderStage.Mesh"><code class="xref py py-data docutils literal notranslate"><span class="pre">mesh</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.All_Constants">
+<span class="sig-name descname"><span class="pre">All_Constants</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.All_Constants" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used for constants in all shader stages.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.StreamOut">
+<span class="sig-name descname"><span class="pre">StreamOut</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.StreamOut" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used for stream out/transform feedback storage after geometry processing.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.VS_Resource">
+<span class="sig-name descname"><span class="pre">VS_Resource</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.VS_Resource" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a read-only resource in the
+<a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Vertex" title="renderdoc.ShaderStage.Vertex"><code class="xref py py-data docutils literal notranslate"><span class="pre">vertex</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.HS_Resource">
+<span class="sig-name descname"><span class="pre">HS_Resource</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.HS_Resource" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a read-only resource in the tessellation control or
+<a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Hull" title="renderdoc.ShaderStage.Hull"><code class="xref py py-data docutils literal notranslate"><span class="pre">hull</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.DS_Resource">
+<span class="sig-name descname"><span class="pre">DS_Resource</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.DS_Resource" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a read-only resource in the tessellation evaluation or
+<a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Domain" title="renderdoc.ShaderStage.Domain"><code class="xref py py-data docutils literal notranslate"><span class="pre">domain</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.GS_Resource">
+<span class="sig-name descname"><span class="pre">GS_Resource</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.GS_Resource" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a read-only resource in the
+<a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Geometry" title="renderdoc.ShaderStage.Geometry"><code class="xref py py-data docutils literal notranslate"><span class="pre">geometry</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.PS_Resource">
+<span class="sig-name descname"><span class="pre">PS_Resource</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.PS_Resource" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a read-only resource in the
+<a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Pixel" title="renderdoc.ShaderStage.Pixel"><code class="xref py py-data docutils literal notranslate"><span class="pre">pixel</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.CS_Resource">
+<span class="sig-name descname"><span class="pre">CS_Resource</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.CS_Resource" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a read-only resource in the
+<a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Compute" title="renderdoc.ShaderStage.Compute"><code class="xref py py-data docutils literal notranslate"><span class="pre">compute</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.TS_Resource">
+<span class="sig-name descname"><span class="pre">TS_Resource</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.TS_Resource" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a read-only resource in the amplification or
+<a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Task" title="renderdoc.ShaderStage.Task"><code class="xref py py-data docutils literal notranslate"><span class="pre">task</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.MS_Resource">
+<span class="sig-name descname"><span class="pre">MS_Resource</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.MS_Resource" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a read-only resource in the
+<a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Mesh" title="renderdoc.ShaderStage.Mesh"><code class="xref py py-data docutils literal notranslate"><span class="pre">mesh</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.All_Resource">
+<span class="sig-name descname"><span class="pre">All_Resource</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.All_Resource" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a read-only resource in all shader stages.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.VS_RWResource">
+<span class="sig-name descname"><span class="pre">VS_RWResource</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.VS_RWResource" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a read-write resource in the
+<a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Vertex" title="renderdoc.ShaderStage.Vertex"><code class="xref py py-data docutils literal notranslate"><span class="pre">vertex</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.HS_RWResource">
+<span class="sig-name descname"><span class="pre">HS_RWResource</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.HS_RWResource" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a read-write resource in the tessellation control or
+<a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Hull" title="renderdoc.ShaderStage.Hull"><code class="xref py py-data docutils literal notranslate"><span class="pre">hull</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.DS_RWResource">
+<span class="sig-name descname"><span class="pre">DS_RWResource</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.DS_RWResource" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a read-write resource in the tessellation evaluation or
+<a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Domain" title="renderdoc.ShaderStage.Domain"><code class="xref py py-data docutils literal notranslate"><span class="pre">domain</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.GS_RWResource">
+<span class="sig-name descname"><span class="pre">GS_RWResource</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.GS_RWResource" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a read-write resource in the
+<a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Geometry" title="renderdoc.ShaderStage.Geometry"><code class="xref py py-data docutils literal notranslate"><span class="pre">geometry</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.PS_RWResource">
+<span class="sig-name descname"><span class="pre">PS_RWResource</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.PS_RWResource" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a read-write resource in the
+<a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Pixel" title="renderdoc.ShaderStage.Pixel"><code class="xref py py-data docutils literal notranslate"><span class="pre">pixel</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.CS_RWResource">
+<span class="sig-name descname"><span class="pre">CS_RWResource</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.CS_RWResource" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a read-write resource in the
+<a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Compute" title="renderdoc.ShaderStage.Compute"><code class="xref py py-data docutils literal notranslate"><span class="pre">compute</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.TS_RWResource">
+<span class="sig-name descname"><span class="pre">TS_RWResource</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.TS_RWResource" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a read-write resource in the amplification or
+<a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Task" title="renderdoc.ShaderStage.Task"><code class="xref py py-data docutils literal notranslate"><span class="pre">task</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.MS_RWResource">
+<span class="sig-name descname"><span class="pre">MS_RWResource</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.MS_RWResource" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a read-write resource in the
+<a class="reference internal" href="shaders.html#renderdoc.ShaderStage.Mesh" title="renderdoc.ShaderStage.Mesh"><code class="xref py py-data docutils literal notranslate"><span class="pre">mesh</span> <span class="pre">shader</span></code></a>.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.All_RWResource">
+<span class="sig-name descname"><span class="pre">All_RWResource</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.All_RWResource" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used as a read-write resource in all shader stages.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.InputTarget">
+<span class="sig-name descname"><span class="pre">InputTarget</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.InputTarget" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being read as an input target for reading from the target currently being written.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.ColorTarget">
+<span class="sig-name descname"><span class="pre">ColorTarget</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.ColorTarget" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being written to as a color output.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.DepthStencilTarget">
+<span class="sig-name descname"><span class="pre">DepthStencilTarget</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.DepthStencilTarget" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being written to and tested against as a depth-stencil output.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.Indirect">
+<span class="sig-name descname"><span class="pre">Indirect</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.Indirect" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being used for indirect arguments.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.Clear">
+<span class="sig-name descname"><span class="pre">Clear</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.Clear" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being cleared.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.Discard">
+<span class="sig-name descname"><span class="pre">Discard</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.Discard" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource contents are discarded explicitly or implicitly.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.GenMips">
+<span class="sig-name descname"><span class="pre">GenMips</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.GenMips" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is having mips generated for it.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.Resolve">
+<span class="sig-name descname"><span class="pre">Resolve</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.Resolve" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being resolved or blitted, as both source and destination.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.ResolveSrc">
+<span class="sig-name descname"><span class="pre">ResolveSrc</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.ResolveSrc" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being resolved or blitted from.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.ResolveDst">
+<span class="sig-name descname"><span class="pre">ResolveDst</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.ResolveDst" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being resolved or blitted to.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.Copy">
+<span class="sig-name descname"><span class="pre">Copy</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.Copy" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being copied, as both source and destination.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.CopySrc">
+<span class="sig-name descname"><span class="pre">CopySrc</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.CopySrc" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being copied from.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.CopyDst">
+<span class="sig-name descname"><span class="pre">CopyDst</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.CopyDst" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being copied to.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.Barrier">
+<span class="sig-name descname"><span class="pre">Barrier</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.Barrier" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is being specified in a barrier, as defined in Vulkan or Direct3D 12.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.ResourceUsage.CPUWrite">
+<span class="sig-name descname"><span class="pre">CPUWrite</span></span><a class="headerlink" href="#renderdoc.ResourceUsage.CPUWrite" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource is written from the CPU, either directly as mapped memory or indirectly via a
+synchronous update.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="renderdoc.ResUsage">
+<span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">ResUsage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stage</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.ResUsage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate the <code class="docutils literal notranslate"><span class="pre">ResourceUsage</span></code> value for read-only resource use at a given shader
+stage.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="renderdoc.ResUsage.params.stage"></span><strong>stage</strong><a class="paramlink headerlink reference internal" href="#renderdoc.ResUsage.params.stage">#</a> (<a class="reference internal" href="shaders.html#renderdoc.ShaderStage" title="renderdoc.ShaderStage"><em>ShaderStage</em></a>) – The shader stage.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The value for read-only resource usage at a given shader stage.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.ResourceUsage" title="renderdoc.ResourceUsage">ResourceUsage</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="renderdoc.RWResUsage">
+<span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">RWResUsage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stage</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.RWResUsage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate the <code class="docutils literal notranslate"><span class="pre">ResourceUsage</span></code> value for read-write resource use at a given shader
+stage.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="renderdoc.RWResUsage.params.stage"></span><strong>stage</strong><a class="paramlink headerlink reference internal" href="#renderdoc.RWResUsage.params.stage">#</a> (<a class="reference internal" href="shaders.html#renderdoc.ShaderStage" title="renderdoc.ShaderStage"><em>ShaderStage</em></a>) – The shader stage.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The value for read-write resource usage at a given shader stage.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.ResourceUsage" title="renderdoc.ResourceUsage">ResourceUsage</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="renderdoc.CBUsage">
+<span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">CBUsage</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">stage</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.CBUsage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate the <code class="docutils literal notranslate"><span class="pre">ResourceUsage</span></code> value for constant buffer use at a given shader stage.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><span class="target" id="renderdoc.CBUsage.params.stage"></span><strong>stage</strong><a class="paramlink headerlink reference internal" href="#renderdoc.CBUsage.params.stage">#</a> (<a class="reference internal" href="shaders.html#renderdoc.ShaderStage" title="renderdoc.ShaderStage"><em>ShaderStage</em></a>) – The shader stage.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The value for constant buffer usage at a given shader stage.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.ResourceUsage" title="renderdoc.ResourceUsage">ResourceUsage</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="texture-saving">
+<h2><a class="toc-backref" href="#id4">Texture Saving</a><a class="headerlink" href="#texture-saving" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.TextureSave">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">TextureSave</span></span><a class="headerlink" href="#renderdoc.TextureSave" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes a texture to save and how to map it to the destination file format.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.TextureSave.alpha">
+<span class="sig-name descname"><span class="pre">alpha</span></span><a class="headerlink" href="#renderdoc.TextureSave.alpha" title="Permalink to this definition">¶</a></dt>
+<dd><p>Controls handling of alpha channel, only relevant for file formats that don’t have
+alpha.</p>
+<p>It is an <a class="reference internal" href="#renderdoc.AlphaMapping" title="renderdoc.AlphaMapping"><code class="xref py py-class docutils literal notranslate"><span class="pre">AlphaMapping</span></code></a> that controls what behaviour to use.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.AlphaMapping" title="renderdoc.AlphaMapping">AlphaMapping</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.TextureSave.alphaCol">
+<span class="sig-name descname"><span class="pre">alphaCol</span></span><a class="headerlink" href="#renderdoc.TextureSave.alphaCol" title="Permalink to this definition">¶</a></dt>
+<dd><p>The background color if <a class="reference internal" href="#renderdoc.TextureSave.alpha" title="renderdoc.TextureSave.alpha"><code class="xref py py-data docutils literal notranslate"><span class="pre">alpha</span></code></a> is set to <a class="reference internal" href="#renderdoc.AlphaMapping.BlendToColor" title="renderdoc.AlphaMapping.BlendToColor"><code class="xref py py-attr docutils literal notranslate"><span class="pre">AlphaMapping.BlendToColor</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="utils.html#renderdoc.FloatVector" title="renderdoc.FloatVector">FloatVector</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.TextureSave.channelExtract">
+<span class="sig-name descname"><span class="pre">channelExtract</span></span><a class="headerlink" href="#renderdoc.TextureSave.channelExtract" title="Permalink to this definition">¶</a></dt>
+<dd><p>Selects a single component out of a texture to save as grayscale, or -1 to save all.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.TextureSave.comp">
+<span class="sig-name descname"><span class="pre">comp</span></span><a class="headerlink" href="#renderdoc.TextureSave.comp" title="Permalink to this definition">¶</a></dt>
+<dd><p>Controls black/white point mapping for output formats that are normal
+<a class="reference internal" href="formats.html#renderdoc.CompType.UNorm" title="renderdoc.CompType.UNorm"><code class="xref py py-attr docutils literal notranslate"><span class="pre">8-bit</span> <span class="pre">SRGB</span></code></a>, values are truncated so that values below the black point
+and above the white point are clamped, and the values in between are evenly distributed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.TextureComponentMapping" title="renderdoc.TextureComponentMapping">TextureComponentMapping</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.TextureSave.destType">
+<span class="sig-name descname"><span class="pre">destType</span></span><a class="headerlink" href="#renderdoc.TextureSave.destType" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="#renderdoc.FileType" title="renderdoc.FileType"><code class="xref py py-class docutils literal notranslate"><span class="pre">FileType</span></code></a> to use when saving to the destination file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.FileType" title="renderdoc.FileType">FileType</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.TextureSave.jpegQuality">
+<span class="sig-name descname"><span class="pre">jpegQuality</span></span><a class="headerlink" href="#renderdoc.TextureSave.jpegQuality" title="Permalink to this definition">¶</a></dt>
+<dd><p>The quality to use when saving to a <code class="docutils literal notranslate"><span class="pre">JPG</span></code> file. Valid values are between 1 and 100.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.TextureSave.mip">
+<span class="sig-name descname"><span class="pre">mip</span></span><a class="headerlink" href="#renderdoc.TextureSave.mip" title="Permalink to this definition">¶</a></dt>
+<dd><p>Selects the mip to be written out.</p>
+<p>If set to <code class="docutils literal notranslate"><span class="pre">-1</span></code> then all mips are written, where allowed by file format. If not allowed, mip 0 is
+written</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.TextureSave.resourceId">
+<span class="sig-name descname"><span class="pre">resourceId</span></span><a class="headerlink" href="#renderdoc.TextureSave.resourceId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> of the texture to save.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.TextureSave.sample">
+<span class="sig-name descname"><span class="pre">sample</span></span><a class="headerlink" href="#renderdoc.TextureSave.sample" title="Permalink to this definition">¶</a></dt>
+<dd><p>Controls mapping for multisampled textures (ignored if texture is not multisampled)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.TextureSampleMapping" title="renderdoc.TextureSampleMapping">TextureSampleMapping</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.TextureSave.slice">
+<span class="sig-name descname"><span class="pre">slice</span></span><a class="headerlink" href="#renderdoc.TextureSave.slice" title="Permalink to this definition">¶</a></dt>
+<dd><p>Controls mapping for arrayed textures (ignored if texture is not arrayed)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.TextureSliceMapping" title="renderdoc.TextureSliceMapping">TextureSliceMapping</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.TextureSave.typeCast">
+<span class="sig-name descname"><span class="pre">typeCast</span></span><a class="headerlink" href="#renderdoc.TextureSave.typeCast" title="Permalink to this definition">¶</a></dt>
+<dd><p>If possible interpret the texture with this type instead of its normal type.</p>
+<p>If set to <a class="reference internal" href="formats.html#renderdoc.CompType.Typeless" title="renderdoc.CompType.Typeless"><code class="xref py py-data docutils literal notranslate"><span class="pre">CompType.Typeless</span></code></a> then no cast is applied, otherwise where allowed the texture
+data will be reinterpreted - e.g. from unsigned integers to floats, or to unsigned normalised
+values.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="formats.html#renderdoc.CompType" title="renderdoc.CompType">CompType</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.FileType">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">FileType</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.FileType" title="Permalink to this definition">¶</a></dt>
+<dd><p>The format of an image file</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.FileType.DDS">
+<span class="sig-name descname"><span class="pre">DDS</span></span><a class="headerlink" href="#renderdoc.FileType.DDS" title="Permalink to this definition">¶</a></dt>
+<dd><p>A DDS file</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.FileType.PNG">
+<span class="sig-name descname"><span class="pre">PNG</span></span><a class="headerlink" href="#renderdoc.FileType.PNG" title="Permalink to this definition">¶</a></dt>
+<dd><p>A PNG file</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.FileType.JPG">
+<span class="sig-name descname"><span class="pre">JPG</span></span><a class="headerlink" href="#renderdoc.FileType.JPG" title="Permalink to this definition">¶</a></dt>
+<dd><p>A JPG file</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.FileType.BMP">
+<span class="sig-name descname"><span class="pre">BMP</span></span><a class="headerlink" href="#renderdoc.FileType.BMP" title="Permalink to this definition">¶</a></dt>
+<dd><p>A BMP file</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.FileType.TGA">
+<span class="sig-name descname"><span class="pre">TGA</span></span><a class="headerlink" href="#renderdoc.FileType.TGA" title="Permalink to this definition">¶</a></dt>
+<dd><p>A TGA file</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.FileType.HDR">
+<span class="sig-name descname"><span class="pre">HDR</span></span><a class="headerlink" href="#renderdoc.FileType.HDR" title="Permalink to this definition">¶</a></dt>
+<dd><p>An HDR file</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.FileType.EXR">
+<span class="sig-name descname"><span class="pre">EXR</span></span><a class="headerlink" href="#renderdoc.FileType.EXR" title="Permalink to this definition">¶</a></dt>
+<dd><p>An EXR file</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.FileType.Raw">
+<span class="sig-name descname"><span class="pre">Raw</span></span><a class="headerlink" href="#renderdoc.FileType.Raw" title="Permalink to this definition">¶</a></dt>
+<dd><p>Raw data, just the bytes of the image tightly packed with no metadata or compression/encoding</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.AlphaMapping">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">AlphaMapping</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.AlphaMapping" title="Permalink to this definition">¶</a></dt>
+<dd><p>What to do with the alpha channel from a texture while saving out to a file.</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.AlphaMapping.Discard">
+<span class="sig-name descname"><span class="pre">Discard</span></span><a class="headerlink" href="#renderdoc.AlphaMapping.Discard" title="Permalink to this definition">¶</a></dt>
+<dd><p>Completely discard the alpha channel and only write RGB to the file.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.AlphaMapping.BlendToColor">
+<span class="sig-name descname"><span class="pre">BlendToColor</span></span><a class="headerlink" href="#renderdoc.AlphaMapping.BlendToColor" title="Permalink to this definition">¶</a></dt>
+<dd><p>Blend to the primary background color using alpha.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.AlphaMapping.BlendToCheckerboard">
+<span class="sig-name descname"><span class="pre">BlendToCheckerboard</span></span><a class="headerlink" href="#renderdoc.AlphaMapping.BlendToCheckerboard" title="Permalink to this definition">¶</a></dt>
+<dd><p>Blend to a checkerboard pattern with the primary and secondary background colors.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.AlphaMapping.Preserve">
+<span class="sig-name descname"><span class="pre">Preserve</span></span><a class="headerlink" href="#renderdoc.AlphaMapping.Preserve" title="Permalink to this definition">¶</a></dt>
+<dd><p>Preserve the alpha channel and save it to the file by itself.</p>
+<p>This is only valid for file formats that support alpha channels.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.TextureComponentMapping">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">TextureComponentMapping</span></span><a class="headerlink" href="#renderdoc.TextureComponentMapping" title="Permalink to this definition">¶</a></dt>
+<dd><p>How to map components to normalised <code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">255]</span></code> for saving to 8-bit file formats.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.TextureComponentMapping.blackPoint">
+<span class="sig-name descname"><span class="pre">blackPoint</span></span><a class="headerlink" href="#renderdoc.TextureComponentMapping.blackPoint" title="Permalink to this definition">¶</a></dt>
+<dd><p>The value that should be mapped to <code class="docutils literal notranslate"><span class="pre">0</span></code></p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.TextureComponentMapping.whitePoint">
+<span class="sig-name descname"><span class="pre">whitePoint</span></span><a class="headerlink" href="#renderdoc.TextureComponentMapping.whitePoint" title="Permalink to this definition">¶</a></dt>
+<dd><p>The value that should be mapped to <code class="docutils literal notranslate"><span class="pre">255</span></code></p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.TextureSampleMapping">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">TextureSampleMapping</span></span><a class="headerlink" href="#renderdoc.TextureSampleMapping" title="Permalink to this definition">¶</a></dt>
+<dd><p>How to map multisampled textures for saving to non-multisampled file formats.</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.TextureSampleMapping.ResolveSamples">
+<span class="sig-name descname"><span class="pre">ResolveSamples</span></span><a class="headerlink" href="#renderdoc.TextureSampleMapping.ResolveSamples" title="Permalink to this definition">¶</a></dt>
+<dd><p>Value for <a class="reference internal" href="#renderdoc.TextureSampleMapping.sampleIndex" title="renderdoc.TextureSampleMapping.sampleIndex"><code class="xref py py-data docutils literal notranslate"><span class="pre">sampleIndex</span></code></a> if the samples should be averaged.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.TextureSampleMapping.mapToArray">
+<span class="sig-name descname"><span class="pre">mapToArray</span></span><a class="headerlink" href="#renderdoc.TextureSampleMapping.mapToArray" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the samples should be mapped to array slices. A multisampled array expands each slice
+in-place, so it would be slice 0: sample 0, slice 0: sample 1, slice 1: sample 0, etc.</p>
+<p>This then follows the mapping for array slices as with any other array texture. <a class="reference internal" href="#renderdoc.TextureSampleMapping.sampleIndex" title="renderdoc.TextureSampleMapping.sampleIndex"><code class="xref py py-data docutils literal notranslate"><span class="pre">sampleIndex</span></code></a>
+is ignored.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.TextureSampleMapping.sampleIndex">
+<span class="sig-name descname"><span class="pre">sampleIndex</span></span><a class="headerlink" href="#renderdoc.TextureSampleMapping.sampleIndex" title="Permalink to this definition">¶</a></dt>
+<dd><p>If <a class="reference internal" href="#renderdoc.TextureSampleMapping.mapToArray" title="renderdoc.TextureSampleMapping.mapToArray"><code class="xref py py-data docutils literal notranslate"><span class="pre">mapToArray</span></code></a> is <code class="docutils literal notranslate"><span class="pre">False</span></code> this selects which sample should be extracted to treat as a
+normal 2D image. If set to <a class="reference internal" href="#renderdoc.TextureSampleMapping.ResolveSamples" title="renderdoc.TextureSampleMapping.ResolveSamples"><code class="xref py py-data docutils literal notranslate"><span class="pre">ResolveSamples</span></code></a> then instead there’s a default average resolve.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.TextureSliceMapping">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">TextureSliceMapping</span></span><a class="headerlink" href="#renderdoc.TextureSliceMapping" title="Permalink to this definition">¶</a></dt>
+<dd><p>How to map array textures for saving to non-arrayed file formats.</p>
+<p>If <a class="reference internal" href="#renderdoc.TextureSliceMapping.sliceIndex" title="renderdoc.TextureSliceMapping.sliceIndex"><code class="xref py py-data docutils literal notranslate"><span class="pre">sliceIndex</span></code></a> is -1, <a class="reference internal" href="#renderdoc.TextureSliceMapping.cubeCruciform" title="renderdoc.TextureSliceMapping.cubeCruciform"><code class="xref py py-data docutils literal notranslate"><span class="pre">cubeCruciform</span></code></a> == <a class="reference internal" href="#renderdoc.TextureSliceMapping.slicesAsGrid" title="renderdoc.TextureSliceMapping.slicesAsGrid"><code class="xref py py-data docutils literal notranslate"><span class="pre">slicesAsGrid</span></code></a> == <code class="docutils literal notranslate"><span class="pre">False</span></code> and the file
+format doesn’t support saving all slices, only slice 0 is saved.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.TextureSliceMapping.cubeCruciform">
+<span class="sig-name descname"><span class="pre">cubeCruciform</span></span><a class="headerlink" href="#renderdoc.TextureSliceMapping.cubeCruciform" title="Permalink to this definition">¶</a></dt>
+<dd><p>Write out 6 slices in a cruciform pattern:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>     <span class="o">+----+</span>
+     <span class="o">|</span> <span class="o">+</span><span class="n">y</span> <span class="o">|</span>
+     <span class="o">|</span>    <span class="o">|</span>
+<span class="o">+----+----+----+----+</span>
+<span class="o">|</span> <span class="o">-</span><span class="n">x</span> <span class="o">|</span> <span class="o">+</span><span class="n">z</span> <span class="o">|</span> <span class="o">+</span><span class="n">x</span> <span class="o">|</span> <span class="o">-</span><span class="n">z</span> <span class="o">|</span>
+<span class="o">|</span>    <span class="o">|</span>    <span class="o">|</span>    <span class="o">|</span>    <span class="o">|</span>
+<span class="o">+----+----+----+----+</span>
+     <span class="o">|</span> <span class="o">-</span><span class="n">y</span> <span class="o">|</span>
+     <span class="o">|</span>    <span class="o">|</span>
+     <span class="o">+----+</span>
+</pre></div>
+</div>
+<p>With the gaps filled in with transparent black.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.TextureSliceMapping.sliceGridWidth">
+<span class="sig-name descname"><span class="pre">sliceGridWidth</span></span><a class="headerlink" href="#renderdoc.TextureSliceMapping.sliceGridWidth" title="Permalink to this definition">¶</a></dt>
+<dd><p>The width of a grid if <a class="reference internal" href="#renderdoc.TextureSliceMapping.slicesAsGrid" title="renderdoc.TextureSliceMapping.slicesAsGrid"><code class="xref py py-data docutils literal notranslate"><span class="pre">slicesAsGrid</span></code></a> is <code class="docutils literal notranslate"><span class="pre">True</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.TextureSliceMapping.sliceIndex">
+<span class="sig-name descname"><span class="pre">sliceIndex</span></span><a class="headerlink" href="#renderdoc.TextureSliceMapping.sliceIndex" title="Permalink to this definition">¶</a></dt>
+<dd><p>Selects the (depth/array) slice to save.</p>
+<p>If this is -1, then all slices are written out as detailed below. This is only supported in formats
+that don’t support slices natively, and will be done in RGBA8.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.TextureSliceMapping.slicesAsGrid">
+<span class="sig-name descname"><span class="pre">slicesAsGrid</span></span><a class="headerlink" href="#renderdoc.TextureSliceMapping.slicesAsGrid" title="Permalink to this definition">¶</a></dt>
+<dd><p>If <code class="docutils literal notranslate"><span class="pre">True</span></code>, write out the slices as a 2D grid with the width given in <a class="reference internal" href="#renderdoc.TextureSliceMapping.sliceGridWidth" title="renderdoc.TextureSliceMapping.sliceGridWidth"><code class="xref py py-data docutils literal notranslate"><span class="pre">sliceGridWidth</span></code></a>. Any
+empty slices in the grid are written as transparent black.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="pixel-history">
+<h2><a class="toc-backref" href="#id5">Pixel History</a><a class="headerlink" href="#pixel-history" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.PixelModification">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">PixelModification</span></span><a class="headerlink" href="#renderdoc.PixelModification" title="Permalink to this definition">¶</a></dt>
+<dd><p>An attempt to modify a pixel by a particular event.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.PixelModification.CheckDepthTestQuantised">
+<span class="sig-name descname"><span class="pre">CheckDepthTestQuantised</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">depthBits</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">depthFunc</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.PixelModification.CheckDepthTestQuantised" title="Permalink to this definition">¶</a></dt>
+<dd><p>Update the depth-test failure state based on known shader output depth value and
+preMod reference value, quantised to a certain number of depth bits with epsilon.</p>
+<p>This is primarily used internally and should not be needed to be called externally.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><span class="target" id="renderdoc.PixelModification.CheckDepthTestQuantised.params.depthBits"></span><strong>depthBits</strong><a class="paramlink headerlink reference internal" href="#renderdoc.PixelModification.CheckDepthTestQuantised.params.depthBits">#</a> (<em>int</em>) – How many bits are in the depth buffer: 16, 24 or 32.</p></li>
+<li><p><span class="target" id="renderdoc.PixelModification.CheckDepthTestQuantised.params.depthFunc"></span><strong>depthFunc</strong><a class="paramlink headerlink reference internal" href="#renderdoc.PixelModification.CheckDepthTestQuantised.params.depthFunc">#</a> (<a class="reference internal" href="pipelines/common.html#renderdoc.CompareFunction" title="renderdoc.CompareFunction"><em>CompareFunction</em></a>) – The comparison function active for the depth test</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.PixelModification.Passed">
+<span class="sig-name descname"><span class="pre">Passed</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.PixelModification.Passed" title="Permalink to this definition">¶</a></dt>
+<dd><p>Determine if this fragment passed all tests and wrote to the texture.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if it passed all tests, <code class="docutils literal notranslate"><span class="pre">False</span></code> if it failed any.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelModification.backfaceCulled">
+<span class="sig-name descname"><span class="pre">backfaceCulled</span></span><a class="headerlink" href="#renderdoc.PixelModification.backfaceCulled" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the backface culling test eliminated this fragment.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelModification.depthBoundsFailed">
+<span class="sig-name descname"><span class="pre">depthBoundsFailed</span></span><a class="headerlink" href="#renderdoc.PixelModification.depthBoundsFailed" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if depth bounds clipping eliminated this fragment.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelModification.depthClipped">
+<span class="sig-name descname"><span class="pre">depthClipped</span></span><a class="headerlink" href="#renderdoc.PixelModification.depthClipped" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if depth near/far clipping eliminated this fragment.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelModification.depthTestFailed">
+<span class="sig-name descname"><span class="pre">depthTestFailed</span></span><a class="headerlink" href="#renderdoc.PixelModification.depthTestFailed" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if depth testing eliminated this fragment.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelModification.directShaderWrite">
+<span class="sig-name descname"><span class="pre">directShaderWrite</span></span><a class="headerlink" href="#renderdoc.PixelModification.directShaderWrite" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if this event came as part of an arbitrary shader write.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelModification.eventId">
+<span class="sig-name descname"><span class="pre">eventId</span></span><a class="headerlink" href="#renderdoc.PixelModification.eventId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="#renderdoc.APIEvent.eventId" title="renderdoc.APIEvent.eventId"><code class="xref py py-data docutils literal notranslate"><span class="pre">eventId</span></code></a> where the modification happened.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelModification.fragIndex">
+<span class="sig-name descname"><span class="pre">fragIndex</span></span><a class="headerlink" href="#renderdoc.PixelModification.fragIndex" title="Permalink to this definition">¶</a></dt>
+<dd><p>A 0-based index of which fragment this modification corresponds to, in the case that
+multiple fragments from a single action wrote to a pixel.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelModification.postMod">
+<span class="sig-name descname"><span class="pre">postMod</span></span><a class="headerlink" href="#renderdoc.PixelModification.postMod" title="Permalink to this definition">¶</a></dt>
+<dd><p>The value of the texture after this fragment ran.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.ModificationValue" title="renderdoc.ModificationValue">ModificationValue</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelModification.preMod">
+<span class="sig-name descname"><span class="pre">preMod</span></span><a class="headerlink" href="#renderdoc.PixelModification.preMod" title="Permalink to this definition">¶</a></dt>
+<dd><p>The value of the texture before this fragment ran.</p>
+<p>This is valid only for the first fragment if multiple fragments in the same event write to the same
+pixel.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.ModificationValue" title="renderdoc.ModificationValue">ModificationValue</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelModification.predicationSkipped">
+<span class="sig-name descname"><span class="pre">predicationSkipped</span></span><a class="headerlink" href="#renderdoc.PixelModification.predicationSkipped" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if predicated rendering skipped this call.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelModification.primitiveID">
+<span class="sig-name descname"><span class="pre">primitiveID</span></span><a class="headerlink" href="#renderdoc.PixelModification.primitiveID" title="Permalink to this definition">¶</a></dt>
+<dd><p>The primitive that generated this fragment.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelModification.sampleMasked">
+<span class="sig-name descname"><span class="pre">sampleMasked</span></span><a class="headerlink" href="#renderdoc.PixelModification.sampleMasked" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the sample mask eliminated this fragment.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelModification.scissorClipped">
+<span class="sig-name descname"><span class="pre">scissorClipped</span></span><a class="headerlink" href="#renderdoc.PixelModification.scissorClipped" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if scissor clipping eliminated this fragment.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelModification.shaderDiscarded">
+<span class="sig-name descname"><span class="pre">shaderDiscarded</span></span><a class="headerlink" href="#renderdoc.PixelModification.shaderDiscarded" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the pixel shader executed a discard on this fragment.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelModification.shaderOut">
+<span class="sig-name descname"><span class="pre">shaderOut</span></span><a class="headerlink" href="#renderdoc.PixelModification.shaderOut" title="Permalink to this definition">¶</a></dt>
+<dd><p>The value that this fragment wrote from the pixel shader.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.ModificationValue" title="renderdoc.ModificationValue">ModificationValue</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelModification.stencilTestFailed">
+<span class="sig-name descname"><span class="pre">stencilTestFailed</span></span><a class="headerlink" href="#renderdoc.PixelModification.stencilTestFailed" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if stencil testing eliminated this fragment.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelModification.unboundPS">
+<span class="sig-name descname"><span class="pre">unboundPS</span></span><a class="headerlink" href="#renderdoc.PixelModification.unboundPS" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if no pixel shader was bound at this event. On D3D APIs this may also mean
+a pixel shader exists but declares no output for the corresponding target and so is skipped.</p>
+<p>On other APIs this is only reported if the pixel shader is entirely unbound but this means the
+output may have undefined values.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelModification.viewClipped">
+<span class="sig-name descname"><span class="pre">viewClipped</span></span><a class="headerlink" href="#renderdoc.PixelModification.viewClipped" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if viewport clipping eliminated this fragment.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.ModificationValue">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">ModificationValue</span></span><a class="headerlink" href="#renderdoc.ModificationValue" title="Permalink to this definition">¶</a></dt>
+<dd><p>The value of pixel output at a particular event.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.ModificationValue.IsValid">
+<span class="sig-name descname"><span class="pre">IsValid</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.ModificationValue.IsValid" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Returns</dt>
+<dd class="field-odd"><p>Returns whether or not this modification value is valid.</p>
+</dd>
+<dt class="field-even">Return type</dt>
+<dd class="field-even"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="renderdoc.ModificationValue.SetInvalid">
+<span class="sig-name descname"><span class="pre">SetInvalid</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#renderdoc.ModificationValue.SetInvalid" title="Permalink to this definition">¶</a></dt>
+<dd><p>Sets this modification value to be invalid.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ModificationValue.col">
+<span class="sig-name descname"><span class="pre">col</span></span><a class="headerlink" href="#renderdoc.ModificationValue.col" title="Permalink to this definition">¶</a></dt>
+<dd><p>The color value.</p>
+<p>If the modifications are for a color target, tthe contents will all be <code class="docutils literal notranslate"><span class="pre">0</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.PixelValue" title="renderdoc.PixelValue">PixelValue</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ModificationValue.depth">
+<span class="sig-name descname"><span class="pre">depth</span></span><a class="headerlink" href="#renderdoc.ModificationValue.depth" title="Permalink to this definition">¶</a></dt>
+<dd><p>The depth value.</p>
+<p>If depth is not available/in-use for this modification, it will be <code class="docutils literal notranslate"><span class="pre">-1.0</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.ModificationValue.stencil">
+<span class="sig-name descname"><span class="pre">stencil</span></span><a class="headerlink" href="#renderdoc.ModificationValue.stencil" title="Permalink to this definition">¶</a></dt>
+<dd><p>The stencil value.</p>
+<p>If stencil is not available for this modification, it will be negative. If stencil is not available
+at all and not in use then the stencil value will be <code class="docutils literal notranslate"><span class="pre">-1</span></code>. If stencil was in use but can’t be
+determined due to the pixel history implementation using stencil for its own purposes, the value
+will be <code class="docutils literal notranslate"><span class="pre">-2</span></code>. This will only happen when looking at multiple modifications from the same event.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.PixelValue">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">PixelValue</span></span><a class="headerlink" href="#renderdoc.PixelValue" title="Permalink to this definition">¶</a></dt>
+<dd><p>The contents of an RGBA pixel.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelValue.floatValue">
+<span class="sig-name descname"><span class="pre">floatValue</span></span><a class="headerlink" href="#renderdoc.PixelValue.floatValue" title="Permalink to this definition">¶</a></dt>
+<dd><p>The RGBA value interpreted as <code class="docutils literal notranslate"><span class="pre">float</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Tuple[float, float, float, float]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelValue.intValue">
+<span class="sig-name descname"><span class="pre">intValue</span></span><a class="headerlink" href="#renderdoc.PixelValue.intValue" title="Permalink to this definition">¶</a></dt>
+<dd><p>The RGBA value interpreted as 32-bit signed integer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Tuple[int, int, int, int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.PixelValue.uintValue">
+<span class="sig-name descname"><span class="pre">uintValue</span></span><a class="headerlink" href="#renderdoc.PixelValue.uintValue" title="Permalink to this definition">¶</a></dt>
+<dd><p>The RGBA value interpreted as 32-bit unsigned integer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Tuple[int, int, int, int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="shader-debuging">
+<h2><a class="toc-backref" href="#id6">Shader Debuging</a><a class="headerlink" href="#shader-debuging" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.DebugPixelInputs">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">DebugPixelInputs</span></span><a class="headerlink" href="#renderdoc.DebugPixelInputs" title="Permalink to this definition">¶</a></dt>
+<dd><p>Contains the properties used to select which fragment to debug, used as an input to DebugPixel.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.DebugPixelInputs.primitive">
+<span class="sig-name descname"><span class="pre">primitive</span></span><a class="headerlink" href="#renderdoc.DebugPixelInputs.primitive" title="Permalink to this definition">¶</a></dt>
+<dd><p>The primitive index.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.DebugPixelInputs.sample">
+<span class="sig-name descname"><span class="pre">sample</span></span><a class="headerlink" href="#renderdoc.DebugPixelInputs.sample" title="Permalink to this definition">¶</a></dt>
+<dd><p>The multi-sampled sample.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.DebugPixelInputs.view">
+<span class="sig-name descname"><span class="pre">view</span></span><a class="headerlink" href="#renderdoc.DebugPixelInputs.view" title="Permalink to this definition">¶</a></dt>
+<dd><p>The layered or multiview rendering view index.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="formats.html" class="btn btn-neutral float-right" title="API Reference: Formats" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="outputs.html" class="btn btn-neutral float-left" title="API Reference: Replay Outputs" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

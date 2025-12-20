@@ -1,0 +1,305 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>How do I generate an RGP profile? &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/how/how_rgp_profile.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="How do I register a python extension?" href="how_python_extension.html" />
+    <link rel="prev" title="How do I import or export a capture?" href="how_import_export.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../python_api/index.html">Python API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">How do I …?</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="how_capture_frame.html">How do I capture a frame?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_android_capture.html">How do I use RenderDoc on Android?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_filter_events.html">How do I filter visible events?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_debug_shader.html">How do I debug a shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_shader_debug_info.html">How do I use shader debug information?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_inspect_pixel.html">How do I inspect a pixel value?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_buffer_format.html">How do I specify a buffer format?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_view_texture.html">How do I view a specific texture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_object_details.html">How do I view details of an object?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_capture_callstack.html">How do I capture callstacks?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_custom_visualisation.html">How do I use a custom visualisation shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_edit_shader.html">How do I edit a shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_network_capture_replay.html">How do I capture and replay over a network?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_annotate_capture.html">How do I annotate a capture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_import_export.html">How do I import or export a capture?</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">How do I generate an RGP profile?</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#enabling-rgp-integration">Enabling RGP integration</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#generating-a-profile">Generating a profile</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#opening-a-previously-created-profile">Opening a previously created profile</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#correlating-information-between-renderdoc-and-rgp">Correlating information between RenderDoc and RGP</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="how_python_extension.html">How do I register a python extension?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_control_replay.html">How do I control the replay?</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">How do I …?</a> &raquo;</li>
+        
+      <li>How do I generate an RGP profile?</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/how/how_rgp_profile.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="how-do-i-generate-an-rgp-profile">
+<h1>How do I generate an RGP profile?<a class="headerlink" href="#how-do-i-generate-an-rgp-profile" title="Permalink to this headline">¶</a></h1>
+<p>RenderDoc has integration with AMD’s Radeon GPU Profiler. This allows you to generate an RGP profile from a RenderDoc capture, embed the profile in the capture file, and synchronise the view of the frames between RenderDoc and RGP.</p>
+<section id="enabling-rgp-integration">
+<h2>Enabling RGP integration<a class="headerlink" href="#enabling-rgp-integration" title="Permalink to this headline">¶</a></h2>
+<p>By default the RGP integration is disabled. To enable it go to the <span class="guilabel">Settings</span> window and in the <span class="guilabel">Core</span> section enable <span class="guilabel">Enable Radeon GPU Profiler integration</span>.</p>
+</section>
+<section id="generating-a-profile">
+<h2>Generating a profile<a class="headerlink" href="#generating-a-profile" title="Permalink to this headline">¶</a></h2>
+<p>To begin you will need to go to the <span class="guilabel">Tools</span> menu and select <span class="guilabel">Create new RGP Profile</span>. If this menu option isn’t available, you need to have the latest AMD drivers installed on your machine.</p>
+<p>Selecting this menu item will open a small popup and spend a few second creating the profile itself. After the profile is created, the RGP profiling tool will automatically open up.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you haven’t configured the path to the RGP tool, you will be prompted to here. Once the path has been configured successfully the tool will open.</p>
+</div>
+</section>
+<section id="opening-a-previously-created-profile">
+<h2>Opening a previously created profile<a class="headerlink" href="#opening-a-previously-created-profile" title="Permalink to this headline">¶</a></h2>
+<p>After generating a profile above, the RGP data is embedded in the <code class="docutils literal notranslate"><span class="pre">.rdc</span></code> file.</p>
+<p>Since RGP can open a profile on any machine without needing AMD drivers or hardware, this embedded RGP profile can be opened at any time by going to the <span class="guilabel">Tools</span> menu and select <span class="guilabel">Open RGP Profile</span>.</p>
+<p>The RGP tool will open just the same as if the profile was newly created.</p>
+</section>
+<section id="correlating-information-between-renderdoc-and-rgp">
+<h2>Correlating information between RenderDoc and RGP<a class="headerlink" href="#correlating-information-between-renderdoc-and-rgp" title="Permalink to this headline">¶</a></h2>
+<p>If using RGP version 1.2 or higher, once both tools are open they have a synchronised view of the underlying data.</p>
+<p>This means that within RGP you can select an event, right click and choose <span class="guilabel">Select RenderDoc Event</span>. This will bring RenderDoc to the foreground with the event selected. Similarly in RenderDoc you can right-click on an event in the event browser and choose <span class="guilabel">Select RGP Event</span> which will perform the same operation in reverse.</p>
+<figure class="align-default" id="id1">
+<img alt="../_images/SelectRGPEvent.png" src="../_images/SelectRGPEvent.png" />
+<figcaption>
+<p><span class="caption-text">Select an RGP event from RenderDoc</span><a class="headerlink" href="#id1" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<figure class="align-default" id="id2">
+<img alt="../_images/SelectRenderDocEvent.png" src="../_images/SelectRenderDocEvent.png" />
+<figcaption>
+<p><span class="caption-text">Select a RenderDoc event from RGP</span><a class="headerlink" href="#id2" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Since RGP and RenderDoc have different scopes, purposes, and views of the frame the numbering of events will not be the same between the two tools.</p>
+</div>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="how_python_extension.html" class="btn btn-neutral float-right" title="How do I register a python extension?" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="how_import_export.html" class="btn btn-neutral float-left" title="How do I import or export a capture?" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

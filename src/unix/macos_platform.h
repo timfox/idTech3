@@ -3,7 +3,7 @@
 
 #if defined(__APPLE__) && !defined(__ANDROID__)
 
-#include "../qcommon/q_shared.h"
+#include "../common/q_shared.h"
 
 #ifdef TARGET_OS_IPHONE
 // iOS platform definitions

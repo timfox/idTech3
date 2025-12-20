@@ -4,7 +4,7 @@ Performance Counters Tests
 ===========================================================================
 */
 
-#include "../src/qcommon/performance_counters.h"
+#include "../src/common/performance_counters.h"
 #include <time.h>
 #include <math.h>
 #include <stdio.h>

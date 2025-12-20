@@ -1,7 +1,7 @@
 #ifdef _WIN32
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "../common/q_shared.h"
+#include "../common/qcommon.h"
 #include "d3d12.h"
 #include <stdio.h>
 

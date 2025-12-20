@@ -10,7 +10,7 @@ stub loader that simply fails at runtime.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
+#include "../../common/q_shared.h"
 #include "../renderercommon/tr_public.h"
 
 extern refimport_t ri;

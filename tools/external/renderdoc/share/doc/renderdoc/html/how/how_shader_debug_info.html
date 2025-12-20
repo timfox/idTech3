@@ -1,0 +1,339 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>How do I use shader debug information? &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/how/how_shader_debug_info.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="How do I inspect a pixel value?" href="how_inspect_pixel.html" />
+    <link rel="prev" title="How do I debug a shader?" href="how_debug_shader.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../python_api/index.html">Python API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">How do I …?</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="how_capture_frame.html">How do I capture a frame?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_android_capture.html">How do I use RenderDoc on Android?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_filter_events.html">How do I filter visible events?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_debug_shader.html">How do I debug a shader?</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">How do I use shader debug information?</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#shader-search-paths">Shader search paths</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#manually-specifying-debug-shader-information">Manually Specifying debug shader information</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#see-also">See Also</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="how_inspect_pixel.html">How do I inspect a pixel value?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_buffer_format.html">How do I specify a buffer format?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_view_texture.html">How do I view a specific texture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_object_details.html">How do I view details of an object?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_capture_callstack.html">How do I capture callstacks?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_custom_visualisation.html">How do I use a custom visualisation shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_edit_shader.html">How do I edit a shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_network_capture_replay.html">How do I capture and replay over a network?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_annotate_capture.html">How do I annotate a capture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_import_export.html">How do I import or export a capture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_rgp_profile.html">How do I generate an RGP profile?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_python_extension.html">How do I register a python extension?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_control_replay.html">How do I control the replay?</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">How do I …?</a> &raquo;</li>
+        
+      <li>How do I use shader debug information?</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/how/how_shader_debug_info.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="how-do-i-use-shader-debug-information">
+<h1>How do I use shader debug information?<a class="headerlink" href="#how-do-i-use-shader-debug-information" title="Permalink to this headline">¶</a></h1>
+<p>RenderDoc makes extensive use of shader reflection and debug information to provide a smoother debugging experience. This kind of information gives names to anything in the shader interface such as constants, resource bindings, interpolated inputs and outputs. It includes better type information that in many cases is not available, and it can also even include embedded copies of the shader source which is used for source-level debugging.</p>
+<p>On most APIs this debug information adds up to a large amount of information which is not necessary for functionality, and so it can be optionally stripped out. Many shader compilation pipelines will do this automatically, so the information is lost by the time RenderDoc can intercept it at the API level. For this reason there are several ways to save either save the unstripped shader blob or just the debug information separately at compile time and provide ways for RenderDoc to correlate the stripped blob it sees passed to the API with the debug information on disk.</p>
+<p>If you did not deliberately strip out debug information and left it embedded in the blob, you do not need to do anything else and RenderDoc will find and use the information. If you used a compiler-based method of generating separate debug information you may need to specify search paths in the RenderDoc options but you do not need to follow any of these steps.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>OpenGL is effectively excluded from this consideration because it has no separate debug information, everything is generated from the source uploaded to the API. If the source has been stripped of information or obfuscated, this will have to be handled by your application.</p>
+</div>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>Since this debug information is stored separately, it is <em>not</em> part of the capture and so if the debug information is moved or deleted RenderDoc will not be able to find it and the capture will show only what is possible with no debug information.</p>
+</div>
+<section id="shader-search-paths">
+<h2>Shader search paths<a class="headerlink" href="#shader-search-paths" title="Permalink to this headline">¶</a></h2>
+<p>In the RenderDoc settings menu, under the <code class="docutils literal notranslate"><span class="pre">Core</span></code> category, you can specify shader debug search paths. These are the directories that will be searched to find separated debug information based on a path in the original shader.</p>
+<p>Each path can be set as ‘recursive’ or not, with the default being to treat it as recursive. This is explained below in the search priority list, but generally should be turned off for network shares or very large folders where listing all contained files recusively would be slow. The paths can be rearranged to provide a priority order.</p>
+<p>When searching for separate debug info based on a path in the stripped shader blob, RenderDoc follows the following algorithm. This is based on trying to match PIX’s behaviour which is the primary other tool that supports this, under the principle of least surprise. PIX’s search algorithm is deliberately undocumented and so this has been determined by reverse engineering, some tweaks have been made for usability.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If the filename is proceeded by <code class="docutils literal notranslate"><span class="pre">lz4#</span></code> then this will be stripped before consideration and the file will be considered lz4 compressed. This is a RenderDoc extension only possible when using manually-specified shader blobs and is not currently supported by any compiler.</p>
+</div>
+<p>In this algorithm the original path from the shader is referred to as a ‘filename’, but it may contain relative path elements and may not be only a filename.</p>
+<p>If the filename does not end in <code class="docutils literal notranslate"><span class="pre">.pdb</span></code> or <code class="docutils literal notranslate"><span class="pre">.PDB</span></code> then each time a file is checked, if it doesn’t exist then the suffix will be appended and checked again. This is for compatibility with PIX.</p>
+<p>If a file is found and the original shader has a debug hash for matching then that will be checked against the debug hash in the debug information. If there’s no match this is assumed to be a false positive and the search continues. Whether such a debug hash exists is compiler specific and may only happen in certain compiler versions (e.g. older versions of dxc do not produce this hash).</p>
+<ol class="arabic simple">
+<li><p>First if the filename is absolute, that file will be checked first.</p></li>
+<li><p>Next, each path specified in the search paths will be checked in order, appending the filename to the current search path.</p></li>
+<li><p>If no match is found and the filename does contain relative path entries, such as <code class="docutils literal notranslate"><span class="pre">foo/bar/filename.pdb</span></code> then the first entry will be dropped to produce <code class="docutils literal notranslate"><span class="pre">bar/filename.pdb</span></code> and the search paths will be checked again. This is for compatibility with PIX.</p></li>
+<li><p>If all search paths have been checked and the filename is just a filename with no path entries, then a recursive search happens. All search paths that are marked as ‘recursive’ will be searched exhaustively for all files under that path in any subdirectory via a depth-first search. This is for compatibility with PIX.</p></li>
+<li><p>The first time the desired filename is encountered, that debug information will be checked. If the debug information is not a match the search will stop and will not continue.</p></li>
+<li><p>It is believed that PIX will inspect all files at this stage for debug hash matches regardless of filename, RenderDoc does not do that for performance considerations.</p></li>
+</ol>
+</section>
+<section id="manually-specifying-debug-shader-information">
+<h2>Manually Specifying debug shader information<a class="headerlink" href="#manually-specifying-debug-shader-information" title="Permalink to this headline">¶</a></h2>
+<p>This section is about manually separating out and specifying shader debug information. If you use compiler-native methods such as the <code class="docutils literal notranslate"><span class="pre">-Fd</span></code> flag you can ignore this.</p>
+<p>Separated debug shader blobs can be specified using a path and an API-specific mechanism, if the separation has been done manually. The path itself can either be an absolute path, which will be used directly every time, or it can be a relative path which allows the blob identifier to be specified relative to customisable search folders. If using a relative path, it can be as simple as a filename.</p>
+<p>The search folders for shader debug info are specified in the settings window, under the <code class="docutils literal notranslate"><span class="pre">Core</span></code> category. You can configure as many search directories as you wish, and they will be searched in the listed order according to the above search algorithm.</p>
+<p>Using the D3D11 API you can specify the path at runtime:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">pathName</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;path/to/saved/blob.dxbc&quot;</span><span class="p">;</span><span class="w"> </span><span class="c1">// path name is in UTF-8</span>
+
+<span class="n">ID3D11VertexShader</span><span class="w"> </span><span class="o">*</span><span class="n">shader</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...;</span><span class="w"></span>
+
+<span class="c1">// GUID value in renderdoc_app.h</span>
+<span class="n">GUID</span><span class="w"> </span><span class="n">RENDERDOC_ShaderDebugMagicValue</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RENDERDOC_ShaderDebugMagicValue_struct</span><span class="p">;</span><span class="w"></span>
+
+<span class="c1">// string parameter must be NULL-terminated, and in UTF-8</span>
+<span class="n">shader</span><span class="o">-&gt;</span><span class="n">SetPrivateData</span><span class="p">(</span><span class="n">RENDERDOC_ShaderDebugMagicValue</span><span class="p">,</span><span class="w"></span>
+<span class="w">                       </span><span class="p">(</span><span class="n">UINT</span><span class="p">)</span><span class="n">pathName</span><span class="p">.</span><span class="n">length</span><span class="p">(),</span><span class="w"> </span><span class="n">pathName</span><span class="p">.</span><span class="n">c_str</span><span class="p">());</span><span class="w"></span>
+</pre></div>
+</div>
+<p>You can also specify it using the Vulkan API:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="w"> </span><span class="n">pathName</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;path/to/saved/blob.dxbc&quot;</span><span class="p">;</span><span class="w"> </span><span class="c1">// path name is in UTF-8</span>
+
+<span class="n">VkShaderModule</span><span class="w"> </span><span class="n">shaderModule</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...;</span><span class="w"></span>
+
+<span class="c1">// Both EXT_debug_marker and EXT_debug_utils can be used, this example uses</span>
+<span class="c1">// EXT_debug_utils as EXT_debug_marker is deprecated</span>
+<span class="n">VkDebugUtilsObjectTagInfoEXT</span><span class="w"> </span><span class="n">tagInfo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{</span><span class="n">VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_TAG_INFO_EXT</span><span class="p">};</span><span class="w"></span>
+<span class="n">tagInfo</span><span class="p">.</span><span class="n">objectType</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">VK_OBJECT_TYPE_SHADER_MODULE</span><span class="p">;</span><span class="w"></span>
+<span class="n">tagInfo</span><span class="p">.</span><span class="n">objectHandle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="kt">uint64_t</span><span class="p">)</span><span class="n">shaderModule</span><span class="p">;</span><span class="w"></span>
+<span class="c1">// tag value in renderdoc_app.h</span>
+<span class="n">tagInfo</span><span class="p">.</span><span class="n">tagName</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">RENDERDOC_ShaderDebugMagicValue_truncated</span><span class="p">;</span><span class="w"></span>
+<span class="n">tagInfo</span><span class="p">.</span><span class="n">pTag</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pathName</span><span class="p">.</span><span class="n">c_str</span><span class="p">();</span><span class="w"></span>
+<span class="n">tagInfo</span><span class="p">.</span><span class="n">tagSize</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">pathName</span><span class="p">.</span><span class="n">length</span><span class="p">();</span><span class="w"></span>
+
+<span class="n">vkSetDebugUtilsObjectTagEXT</span><span class="p">(</span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">tagInfo</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>On D3D11 and D3D12 it is also possible to set the path using the <code class="docutils literal notranslate"><span class="pre">PRIV</span></code> private data section in the DXBC container, either when using fxc or dxc. To do this set the above GUID as the first 16 bytes and then the path as a NULL terminated string immediately following it.</p>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="how_debug_shader.html"><span class="doc">How do I debug a shader?</span></a></p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="how_inspect_pixel.html" class="btn btn-neutral float-right" title="How do I inspect a pixel value?" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="how_debug_shader.html" class="btn btn-neutral float-left" title="How do I debug a shader?" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

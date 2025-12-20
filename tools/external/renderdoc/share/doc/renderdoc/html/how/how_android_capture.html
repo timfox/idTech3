@@ -1,0 +1,309 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>How do I use RenderDoc on Android? &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/how/how_android_capture.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="How do I filter visible events?" href="how_filter_events.html" />
+    <link rel="prev" title="How do I capture a frame?" href="how_capture_frame.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../python_api/index.html">Python API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">How do I …?</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="how_capture_frame.html">How do I capture a frame?</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">How do I use RenderDoc on Android?</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#quick-start">Quick start</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#avoiding-timeouts-on-certain-packages">Avoiding timeouts on certain packages</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#troubleshooting">Troubleshooting</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="how_filter_events.html">How do I filter visible events?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_debug_shader.html">How do I debug a shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_shader_debug_info.html">How do I use shader debug information?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_inspect_pixel.html">How do I inspect a pixel value?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_buffer_format.html">How do I specify a buffer format?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_view_texture.html">How do I view a specific texture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_object_details.html">How do I view details of an object?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_capture_callstack.html">How do I capture callstacks?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_custom_visualisation.html">How do I use a custom visualisation shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_edit_shader.html">How do I edit a shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_network_capture_replay.html">How do I capture and replay over a network?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_annotate_capture.html">How do I annotate a capture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_import_export.html">How do I import or export a capture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_rgp_profile.html">How do I generate an RGP profile?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_python_extension.html">How do I register a python extension?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_control_replay.html">How do I control the replay?</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">How do I …?</a> &raquo;</li>
+        
+      <li>How do I use RenderDoc on Android?</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/how/how_android_capture.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="how-do-i-use-renderdoc-on-android">
+<h1>How do I use RenderDoc on Android?<a class="headerlink" href="#how-do-i-use-renderdoc-on-android" title="Permalink to this headline">¶</a></h1>
+<p>RenderDoc contains support for Android for both Vulkan and OpenGL ES. It requires a couple of extra steps more than capturing on a desktop computer, but generally the workflow is very similar.</p>
+<p>The Android device must be running at least Android 6.0.</p>
+<p>RenderDoc requires some tools from the Android SDK to function. On windows these usually ship with the RenderDoc package, but if you are on Linux or you have trouble please see below in the Troubleshooting section about configuring your Android SDK.</p>
+<div class="admonition caution">
+<p class="admonition-title">Caution</p>
+<p>For RenderDoc’s android support, your package must be installed and it <strong>must be debuggable</strong>.</p>
+</div>
+<section id="quick-start">
+<h2>Quick start<a class="headerlink" href="#quick-start" title="Permalink to this headline">¶</a></h2>
+<p>Android is supported by using <a class="reference internal" href="how_network_capture_replay.html"><span class="doc">Remote Contexts</span></a> to debug applications on your device from a host computer. To begin, look at the bottom left of the normal RenderDoc UI to see the remote context selection dropdown:</p>
+<figure class="align-default">
+<img alt="../_images/android_remotecontext.png" src="../_images/android_remotecontext.png" />
+</figure>
+<p>By default when you start up, this is set to “Local” which means all capture and replay happens on the host computer. To switch to a connected android device, click the drop-down and select your device from the options:</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If you don’t see your android device listed, try waiting a few seconds as available devices are scanned every so often.</p>
+<p>If it still doesn’t appear after 10 seconds, check that you have your SDK configured correctly - see below in the Troubleshooting section.</p>
+</div>
+<p>Each device listed will likely have a <img alt="cross" src="../_images/cross.png" /> next to it, indicating that RenderDoc’s capture &amp; replay app is not yet running on the device. Select a device, and RenderDoc will check that RenderDoc’s app is installed and run it.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>After the app is installed once, it will not need to be reinstalled until you update your version of RenderDoc.</p>
+</div>
+<p>Once RenderDoc’s app is running, you are ready to capture and replay on android, and the drop-down will indicate the new active connection.</p>
+<figure class="align-default">
+<img alt="../_images/android_connected.png" src="../_images/android_connected.png" />
+</figure>
+<p>You can now use the RenderDoc UI as normal, and the entire workflow is exactly the same as you are used to on desktop, except that the capture and replay will happen on the selected android device. For example, when you click browse for an executable to run, it will list the installed packages.</p>
+<p>If your package is not debuggable, you will not generally be able to capture it with RenderDoc. Instead build a development copy of your package that has the debuggable flag. In UE4 this is done by unchecking “For Distribution” and in Unity this is done by building a “Development Mode” build.</p>
+<figure class="align-default">
+<img alt="../_images/android_browsepackages.png" src="../_images/android_browsepackages.png" />
+</figure>
+<p>Then once connected, you can trigger captures and open them as normal.</p>
+</section>
+<section id="avoiding-timeouts-on-certain-packages">
+<h2>Avoiding timeouts on certain packages<a class="headerlink" href="#avoiding-timeouts-on-certain-packages" title="Permalink to this headline">¶</a></h2>
+<p>If your package can take a long time to startup, you can go to the <a class="reference internal" href="../window/settings_window.html"><span class="doc">settings window</span></a> under the <span class="guilabel">Android</span> section and increase the <span class="guilabel">Max Connection Timeout</span>.</p>
+</section>
+<section id="troubleshooting">
+<h2>Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permalink to this headline">¶</a></h2>
+<p>RenderDoc assumes your device is already configured for debugging. Check that it appears in <code class="docutils literal notranslate"><span class="pre">adb</span> <span class="pre">devices</span></code>. <a class="reference external" href="https://developer.android.com/studio/run/device.html">See here</a> for instructions on how to configure that.</p>
+<p>If you have Android Studio open, it will interfere with RenderDoc’s debugging by attaching to the package itself. Either close it or disable adb integration in “Tools → Android → Enable ADB integration”.</p>
+<p>RenderDoc does its best to locate or provide necessary Android tools from the Android SDK. On Windows, these tools are shipped with the distributions and all that’s required is java - either in your <code class="docutils literal notranslate"><span class="pre">PATH</span></code> or via the <code class="docutils literal notranslate"><span class="pre">JAVA_HOME</span></code> environment variable. If these tools aren’t present then RenderDoc searches through <code class="docutils literal notranslate"><span class="pre">PATH</span></code> and other variables like <code class="docutils literal notranslate"><span class="pre">ANDROID_HOME</span></code> or <code class="docutils literal notranslate"><span class="pre">ANDROID_SDK_ROOT</span></code> to find the SDK. If you don’t have those environment variables set, you can browse to the SDK and JDK folders in the <a class="reference internal" href="../window/settings_window.html"><span class="doc">settings window</span></a> under the <span class="guilabel">Android</span> section.</p>
+<p>If something goes wrong with these steps, please <a class="reference external" href="https://github.com/baldurk/renderdoc/issues/new/choose">open an issue on GitHub</a>! The process should be as smooth as possible given Android’s platform limitations, so if you encounter problems then it may well be fixable.</p>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="how_filter_events.html" class="btn btn-neutral float-right" title="How do I filter visible events?" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="how_capture_frame.html" class="btn btn-neutral float-left" title="How do I capture a frame?" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

@@ -4,7 +4,7 @@ Shader script fuzzing harness for AFL/libFuzzer
 ===============================================================================
 */
 
-#include "../src/qcommon/q_shared.h"
+#include "../src/common/q_shared.h"
 #include "../src/renderercommon/tr_common.h"
 
 // Mock implementations for fuzzing

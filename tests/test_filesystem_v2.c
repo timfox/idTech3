@@ -5,9 +5,9 @@ Unit tests for Virtual Filesystem v2
 */
 
 #include "test_framework.h"
-#include "../src/qcommon/q_shared.h"
-#include "../src/qcommon/files_internal.h"  // For pack_t, fileHandleData_t, etc.
-#include "../src/qcommon/files_v2.h"
+#include "../src/common/q_shared.h"
+#include "../src/common/files_internal.h"  // For pack_t, fileHandleData_t, etc.
+#include "../src/common/files_v2.h"
 #include <string.h>
 #include <strings.h>  // for strcasecmp, strncasecmp
 #include <stdlib.h>

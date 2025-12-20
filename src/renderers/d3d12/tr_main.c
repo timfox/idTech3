@@ -1,7 +1,7 @@
 #ifdef _WIN32
 
 #include "tr_local.h"
-#include "../qcommon/qcommon.h"
+#include "../common/qcommon.h"
 
 // Placeholder implementations - to be expanded with full renderer functionality
 

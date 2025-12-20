@@ -5,7 +5,7 @@ Simple Property-Based Testing Implementation
 */
 
 #include "test_framework.h"
-#include "../src/qcommon/q_shared.h"
+#include "../src/common/q_shared.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>

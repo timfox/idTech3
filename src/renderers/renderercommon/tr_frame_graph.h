@@ -10,7 +10,7 @@ with resource aliasing and barriers.
 
 #pragma once
 
-#include "../../qcommon/q_shared.h"
+#include "../../common/q_shared.h"
 #include "tr_backend_iface.h"
 
 #ifdef __cplusplus

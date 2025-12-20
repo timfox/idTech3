@@ -23,8 +23,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "client.h"
 #define TRAP_EXTENSIONS_LIST cg_extensionTraps
-#include "../qcommon/vm_ext.h"
-#include "../qcommon/syscall_registry.h"
+#include "../common/vm_ext.h"
+#include "../common/syscall_registry.h"
 
 #include "../botlib/botlib.h"
 

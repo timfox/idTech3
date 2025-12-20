@@ -1,7 +1,7 @@
 #if defined(__APPLE__) && !defined(__ANDROID__)
 
 #import "metal.h"
-#import "../qcommon/qcommon.h"
+#import "../common/qcommon.h"
 #import <Metal/Metal.h>
 #import <MetalKit/MetalKit.h>
 #import <QuartzCore/CAMetalLayer.h>

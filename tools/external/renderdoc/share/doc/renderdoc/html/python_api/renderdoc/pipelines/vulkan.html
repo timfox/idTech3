@@ -1,0 +1,2578 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>API Reference: Vulkan Pipeline State &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../../../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/python_api/renderdoc/pipelines/vulkan.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../../../" src="../../../_static/documentation_options.js"></script>
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../../../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+    <link rel="next" title="API Reference: Common Pipeline State Abstraction" href="common.html" />
+    <link rel="prev" title="API Reference: OpenGL Pipeline State" href="gl.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../../../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../../../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../../index.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../../examples/renderdoc_intro.html">Getting Started (python)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/qrenderdoc_intro.html">Getting Started (RenderDoc UI)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../dev_environment.html">Python development environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../ui_extensions.html">Writing UI extensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../descriptors_bindings.html">Descriptors and Bindings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/basics.html">Basic Interfaces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/renderdoc/index.html">renderdoc Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../examples/qrenderdoc/index.html">qrenderdoc examples</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="../index.html">renderdoc python module</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="../capturing.html">API Reference: Capturing</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../replay.html">API Reference: Replay Control</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../outputs.html">API Reference: Replay Outputs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../analysis.html">API Reference: Replay Analysis</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../formats.html">API Reference: Formats</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../resources.html">API Reference: Resources</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../shaders.html">API Reference: Shaders</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="index.html">API Reference: Pipeline State Objects</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="d3d11.html">API Reference: D3D11 Pipeline State</a></li>
+<li class="toctree-l4"><a class="reference internal" href="d3d12.html">API Reference: D3D12 Pipeline State</a></li>
+<li class="toctree-l4"><a class="reference internal" href="gl.html">API Reference: OpenGL Pipeline State</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">API Reference: Vulkan Pipeline State</a></li>
+<li class="toctree-l4"><a class="reference internal" href="common.html">API Reference: Common Pipeline State Abstraction</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="../structured_data.html">API Reference: Structured Data</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../counters.html">API Reference: Performance Counters</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../frame_stats.html">API Reference: Frame Statistics</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../utils.html">API Reference: Utilities</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../qrenderdoc/index.html">qrenderdoc python module</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../../how/index.html">How do I …?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="../../index.html">Python API</a> &raquo;</li>
+        
+          <li><a href="../index.html">renderdoc python module</a> &raquo;</li>
+        
+          <li><a href="index.html">API Reference: Pipeline State Objects</a> &raquo;</li>
+        
+      <li>API Reference: Vulkan Pipeline State</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/python_api/renderdoc/pipelines/vulkan.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="api-reference-vulkan-pipeline-state">
+<h1>API Reference: Vulkan Pipeline State<a class="headerlink" href="#api-reference-vulkan-pipeline-state" title="Permalink to this headline">¶</a></h1>
+<p>This is the API reference for the functions, classes, and enums in the <code class="docutils literal notranslate"><span class="pre">renderdoc</span></code> module which represents the underlying interface that the UI is built on top of. For more high-level information and instructions on using the python API, see <a class="reference internal" href="../../index.html"><span class="doc">Python API</span></a>.</p>
+<div class="contents local topic" id="sections">
+<p class="topic-title">Sections</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="#pipeline-and-bindings" id="id1">Pipeline and Bindings</a></p></li>
+<li><p><a class="reference internal" href="#vertex-input" id="id2">Vertex Input</a></p></li>
+<li><p><a class="reference internal" href="#shader" id="id3">Shader</a></p></li>
+<li><p><a class="reference internal" href="#tessellation" id="id4">Tessellation</a></p></li>
+<li><p><a class="reference internal" href="#transform-feedback" id="id5">Transform Feedback</a></p></li>
+<li><p><a class="reference internal" href="#rasterizer" id="id6">Rasterizer</a></p></li>
+<li><p><a class="reference internal" href="#multisampling" id="id7">Multisampling</a></p></li>
+<li><p><a class="reference internal" href="#blending" id="id8">Blending</a></p></li>
+<li><p><a class="reference internal" href="#depth-stencil-state" id="id9">Depth/Stencil State</a></p></li>
+<li><p><a class="reference internal" href="#renderpass-and-framebuffer" id="id10">Renderpass and Framebuffer</a></p></li>
+<li><p><a class="reference internal" href="#image-states" id="id11">Image States</a></p></li>
+<li><p><a class="reference internal" href="#conditional-rendering" id="id12">Conditional Rendering</a></p></li>
+</ul>
+</div>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKState">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKState</span></span><a class="headerlink" href="#renderdoc.VKState" title="Permalink to this definition">¶</a></dt>
+<dd><p>The full current Vulkan pipeline state.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.colorBlend">
+<span class="sig-name descname"><span class="pre">colorBlend</span></span><a class="headerlink" href="#renderdoc.VKState.colorBlend" title="Permalink to this definition">¶</a></dt>
+<dd><p>The color blending configuration.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKColorBlendState" title="renderdoc.VKColorBlendState">VKColorBlendState</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.compute">
+<span class="sig-name descname"><span class="pre">compute</span></span><a class="headerlink" href="#renderdoc.VKState.compute" title="Permalink to this definition">¶</a></dt>
+<dd><p>The currently bound compute pipeline, if any.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKPipeline" title="renderdoc.VKPipeline">VKPipeline</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.computeShader">
+<span class="sig-name descname"><span class="pre">computeShader</span></span><a class="headerlink" href="#renderdoc.VKState.computeShader" title="Permalink to this definition">¶</a></dt>
+<dd><p>The compute shader stage.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKShader" title="renderdoc.VKShader">VKShader</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.conditionalRendering">
+<span class="sig-name descname"><span class="pre">conditionalRendering</span></span><a class="headerlink" href="#renderdoc.VKState.conditionalRendering" title="Permalink to this definition">¶</a></dt>
+<dd><p>The current conditional rendering state.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKConditionalRendering" title="renderdoc.VKConditionalRendering">VKConditionalRendering</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.currentPass">
+<span class="sig-name descname"><span class="pre">currentPass</span></span><a class="headerlink" href="#renderdoc.VKState.currentPass" title="Permalink to this definition">¶</a></dt>
+<dd><p>The current renderpass, subpass and framebuffer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKCurrentPass" title="renderdoc.VKCurrentPass">VKCurrentPass</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.depthStencil">
+<span class="sig-name descname"><span class="pre">depthStencil</span></span><a class="headerlink" href="#renderdoc.VKState.depthStencil" title="Permalink to this definition">¶</a></dt>
+<dd><p>The depth-stencil state.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKDepthStencil" title="renderdoc.VKDepthStencil">VKDepthStencil</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.fragmentShader">
+<span class="sig-name descname"><span class="pre">fragmentShader</span></span><a class="headerlink" href="#renderdoc.VKState.fragmentShader" title="Permalink to this definition">¶</a></dt>
+<dd><p>The fragment shader stage.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKShader" title="renderdoc.VKShader">VKShader</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.geometryShader">
+<span class="sig-name descname"><span class="pre">geometryShader</span></span><a class="headerlink" href="#renderdoc.VKState.geometryShader" title="Permalink to this definition">¶</a></dt>
+<dd><p>The geometry shader stage.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKShader" title="renderdoc.VKShader">VKShader</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.graphics">
+<span class="sig-name descname"><span class="pre">graphics</span></span><a class="headerlink" href="#renderdoc.VKState.graphics" title="Permalink to this definition">¶</a></dt>
+<dd><p>The currently bound graphics pipeline, if any.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKPipeline" title="renderdoc.VKPipeline">VKPipeline</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.images">
+<span class="sig-name descname"><span class="pre">images</span></span><a class="headerlink" href="#renderdoc.VKState.images" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resource states for the currently live resources.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="#renderdoc.VKImageData" title="renderdoc.VKImageData">VKImageData</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.inputAssembly">
+<span class="sig-name descname"><span class="pre">inputAssembly</span></span><a class="headerlink" href="#renderdoc.VKState.inputAssembly" title="Permalink to this definition">¶</a></dt>
+<dd><p>The input assembly stage.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKInputAssembly" title="renderdoc.VKInputAssembly">VKInputAssembly</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.meshShader">
+<span class="sig-name descname"><span class="pre">meshShader</span></span><a class="headerlink" href="#renderdoc.VKState.meshShader" title="Permalink to this definition">¶</a></dt>
+<dd><p>The mesh shader stage.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKShader" title="renderdoc.VKShader">VKShader</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.multisample">
+<span class="sig-name descname"><span class="pre">multisample</span></span><a class="headerlink" href="#renderdoc.VKState.multisample" title="Permalink to this definition">¶</a></dt>
+<dd><p>The multisampling configuration.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKMultiSample" title="renderdoc.VKMultiSample">VKMultiSample</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.pushconsts">
+<span class="sig-name descname"><span class="pre">pushconsts</span></span><a class="headerlink" href="#renderdoc.VKState.pushconsts" title="Permalink to this definition">¶</a></dt>
+<dd><p>The raw push constant data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bytes</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.rasterizer">
+<span class="sig-name descname"><span class="pre">rasterizer</span></span><a class="headerlink" href="#renderdoc.VKState.rasterizer" title="Permalink to this definition">¶</a></dt>
+<dd><p>The rasterization configuration.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKRasterizer" title="renderdoc.VKRasterizer">VKRasterizer</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.shaderMessages">
+<span class="sig-name descname"><span class="pre">shaderMessages</span></span><a class="headerlink" href="#renderdoc.VKState.shaderMessages" title="Permalink to this definition">¶</a></dt>
+<dd><p>The shader messages retrieved for this action.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="common.html#renderdoc.ShaderMessage" title="renderdoc.ShaderMessage">ShaderMessage</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.taskShader">
+<span class="sig-name descname"><span class="pre">taskShader</span></span><a class="headerlink" href="#renderdoc.VKState.taskShader" title="Permalink to this definition">¶</a></dt>
+<dd><p>The task shader stage.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKShader" title="renderdoc.VKShader">VKShader</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.tessControlShader">
+<span class="sig-name descname"><span class="pre">tessControlShader</span></span><a class="headerlink" href="#renderdoc.VKState.tessControlShader" title="Permalink to this definition">¶</a></dt>
+<dd><p>The tessellation control shader stage.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKShader" title="renderdoc.VKShader">VKShader</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.tessEvalShader">
+<span class="sig-name descname"><span class="pre">tessEvalShader</span></span><a class="headerlink" href="#renderdoc.VKState.tessEvalShader" title="Permalink to this definition">¶</a></dt>
+<dd><p>The tessellation evaluation shader stage.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKShader" title="renderdoc.VKShader">VKShader</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.tessellation">
+<span class="sig-name descname"><span class="pre">tessellation</span></span><a class="headerlink" href="#renderdoc.VKState.tessellation" title="Permalink to this definition">¶</a></dt>
+<dd><p>The tessellation stage.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKTessellation" title="renderdoc.VKTessellation">VKTessellation</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.transformFeedback">
+<span class="sig-name descname"><span class="pre">transformFeedback</span></span><a class="headerlink" href="#renderdoc.VKState.transformFeedback" title="Permalink to this definition">¶</a></dt>
+<dd><p>The transform feedback stage.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKTransformFeedback" title="renderdoc.VKTransformFeedback">VKTransformFeedback</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.vertexInput">
+<span class="sig-name descname"><span class="pre">vertexInput</span></span><a class="headerlink" href="#renderdoc.VKState.vertexInput" title="Permalink to this definition">¶</a></dt>
+<dd><p>The vertex input stage.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKVertexInput" title="renderdoc.VKVertexInput">VKVertexInput</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.vertexShader">
+<span class="sig-name descname"><span class="pre">vertexShader</span></span><a class="headerlink" href="#renderdoc.VKState.vertexShader" title="Permalink to this definition">¶</a></dt>
+<dd><p>The vertex shader stage.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKShader" title="renderdoc.VKShader">VKShader</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKState.viewportScissor">
+<span class="sig-name descname"><span class="pre">viewportScissor</span></span><a class="headerlink" href="#renderdoc.VKState.viewportScissor" title="Permalink to this definition">¶</a></dt>
+<dd><p>The viewport setup.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKViewState" title="renderdoc.VKViewState">VKViewState</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<section id="pipeline-and-bindings">
+<h2><a class="toc-backref" href="#id1">Pipeline and Bindings</a><a class="headerlink" href="#pipeline-and-bindings" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKPipeline">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKPipeline</span></span><a class="headerlink" href="#renderdoc.VKPipeline" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes the object and descriptor set bindings of a Vulkan pipeline object.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKPipeline.descriptorBuffers">
+<span class="sig-name descname"><span class="pre">descriptorBuffers</span></span><a class="headerlink" href="#renderdoc.VKPipeline.descriptorBuffers" title="Permalink to this definition">¶</a></dt>
+<dd><p>The bound descriptor buffers.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="#renderdoc.VKDescriptorBuffer" title="renderdoc.VKDescriptorBuffer">VKDescriptorBuffer</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKPipeline.descriptorSets">
+<span class="sig-name descname"><span class="pre">descriptorSets</span></span><a class="headerlink" href="#renderdoc.VKPipeline.descriptorSets" title="Permalink to this definition">¶</a></dt>
+<dd><p>The bound descriptor sets.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="#renderdoc.VKDescriptorSet" title="renderdoc.VKDescriptorSet">VKDescriptorSet</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKPipeline.flags">
+<span class="sig-name descname"><span class="pre">flags</span></span><a class="headerlink" href="#renderdoc.VKPipeline.flags" title="Permalink to this definition">¶</a></dt>
+<dd><p>The flags used to create the pipeline object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKPipeline.pipelineComputeLayoutResourceId">
+<span class="sig-name descname"><span class="pre">pipelineComputeLayoutResourceId</span></span><a class="headerlink" href="#renderdoc.VKPipeline.pipelineComputeLayoutResourceId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> of the compute pipeline layout object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKPipeline.pipelineFragmentLayoutResourceId">
+<span class="sig-name descname"><span class="pre">pipelineFragmentLayoutResourceId</span></span><a class="headerlink" href="#renderdoc.VKPipeline.pipelineFragmentLayoutResourceId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> of the fragment pipeline layout object.</p>
+<p>When not using pipeline libraries, this will be identical to <a class="reference internal" href="#renderdoc.VKPipeline.pipelinePreRastLayoutResourceId" title="renderdoc.VKPipeline.pipelinePreRastLayoutResourceId"><code class="xref py py-data docutils literal notranslate"><span class="pre">pipelinePreRastLayoutResourceId</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKPipeline.pipelinePreRastLayoutResourceId">
+<span class="sig-name descname"><span class="pre">pipelinePreRastLayoutResourceId</span></span><a class="headerlink" href="#renderdoc.VKPipeline.pipelinePreRastLayoutResourceId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> of the pre-rasterization pipeline layout object.</p>
+<p>When not using pipeline libraries, this will be identical to <a class="reference internal" href="#renderdoc.VKPipeline.pipelineFragmentLayoutResourceId" title="renderdoc.VKPipeline.pipelineFragmentLayoutResourceId"><code class="xref py py-data docutils literal notranslate"><span class="pre">pipelineFragmentLayoutResourceId</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKPipeline.pipelineResourceId">
+<span class="sig-name descname"><span class="pre">pipelineResourceId</span></span><a class="headerlink" href="#renderdoc.VKPipeline.pipelineResourceId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> of the pipeline object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKDescriptorSet">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKDescriptorSet</span></span><a class="headerlink" href="#renderdoc.VKDescriptorSet" title="Permalink to this definition">¶</a></dt>
+<dd><p>The contents of a descriptor set.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDescriptorSet.descriptorBufferByteOffset">
+<span class="sig-name descname"><span class="pre">descriptorBufferByteOffset</span></span><a class="headerlink" href="#renderdoc.VKDescriptorSet.descriptorBufferByteOffset" title="Permalink to this definition">¶</a></dt>
+<dd><p>The byte offset from the start of the descriptor buffer at index <a class="reference internal" href="#renderdoc.VKDescriptorSet.descriptorBufferIndex" title="renderdoc.VKDescriptorSet.descriptorBufferIndex"><code class="xref py py-data docutils literal notranslate"><span class="pre">descriptorBufferIndex</span></code></a> where this set’s data is.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDescriptorSet.descriptorBufferEmbeddedSamplers">
+<span class="sig-name descname"><span class="pre">descriptorBufferEmbeddedSamplers</span></span><a class="headerlink" href="#renderdoc.VKDescriptorSet.descriptorBufferEmbeddedSamplers" title="Permalink to this definition">¶</a></dt>
+<dd><p>Indicates if this is a virtual descriptor set for binding embedded immutable samplers.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDescriptorSet.descriptorBufferIndex">
+<span class="sig-name descname"><span class="pre">descriptorBufferIndex</span></span><a class="headerlink" href="#renderdoc.VKDescriptorSet.descriptorBufferIndex" title="Permalink to this definition">¶</a></dt>
+<dd><p>The index of the descriptor buffer to be used, or <code class="docutils literal notranslate"><span class="pre">-1</span></code> if no descriptor buffer is used.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDescriptorSet.descriptorSetResourceId">
+<span class="sig-name descname"><span class="pre">descriptorSetResourceId</span></span><a class="headerlink" href="#renderdoc.VKDescriptorSet.descriptorSetResourceId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> of the descriptor set object, if a real descriptor set is bound.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>If using descriptor buffers this value may be unset, see <a class="reference internal" href="#renderdoc.VKDescriptorSet.descriptorBufferIndex" title="renderdoc.VKDescriptorSet.descriptorBufferIndex"><code class="xref py py-data docutils literal notranslate"><span class="pre">descriptorBufferIndex</span></code></a>.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDescriptorSet.dynamicOffsets">
+<span class="sig-name descname"><span class="pre">dynamicOffsets</span></span><a class="headerlink" href="#renderdoc.VKDescriptorSet.dynamicOffsets" title="Permalink to this definition">¶</a></dt>
+<dd><p>A list of dynamic offsets to be applied to specific bindings, on top of the contents
+of their descriptors.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>The returned values from <code class="xref py py-meth docutils literal notranslate"><span class="pre">PipeState.GetConstantBuffer()</span></code> already have these offsets applied.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="#renderdoc.VKDynamicOffset" title="renderdoc.VKDynamicOffset">VKDynamicOffset</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDescriptorSet.layoutResourceId">
+<span class="sig-name descname"><span class="pre">layoutResourceId</span></span><a class="headerlink" href="#renderdoc.VKDescriptorSet.layoutResourceId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> of the descriptor set layout that matches this set.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDescriptorSet.pushDescriptor">
+<span class="sig-name descname"><span class="pre">pushDescriptor</span></span><a class="headerlink" href="#renderdoc.VKDescriptorSet.pushDescriptor" title="Permalink to this definition">¶</a></dt>
+<dd><p>Indicates if this is a virtual ‘push’ descriptor set.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKDescriptorBuffer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKDescriptorBuffer</span></span><a class="headerlink" href="#renderdoc.VKDescriptorBuffer" title="Permalink to this definition">¶</a></dt>
+<dd><p>A single descriptor buffer binding.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDescriptorBuffer.buffer">
+<span class="sig-name descname"><span class="pre">buffer</span></span><a class="headerlink" href="#renderdoc.VKDescriptorBuffer.buffer" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> of the buffer object being bound.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDescriptorBuffer.offset">
+<span class="sig-name descname"><span class="pre">offset</span></span><a class="headerlink" href="#renderdoc.VKDescriptorBuffer.offset" title="Permalink to this definition">¶</a></dt>
+<dd><p>The offset in bytes from the base of the buffer object to the start of the bound region.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDescriptorBuffer.pushBuffer">
+<span class="sig-name descname"><span class="pre">pushBuffer</span></span><a class="headerlink" href="#renderdoc.VKDescriptorBuffer.pushBuffer" title="Permalink to this definition">¶</a></dt>
+<dd><p>For push descriptors where a buffer is required, the <a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> of the push buffer object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDescriptorBuffer.pushDescriptor">
+<span class="sig-name descname"><span class="pre">pushDescriptor</span></span><a class="headerlink" href="#renderdoc.VKDescriptorBuffer.pushDescriptor" title="Permalink to this definition">¶</a></dt>
+<dd><p>Indicates if this is the ‘push’ descriptor buffer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDescriptorBuffer.resourceBuffer">
+<span class="sig-name descname"><span class="pre">resourceBuffer</span></span><a class="headerlink" href="#renderdoc.VKDescriptorBuffer.resourceBuffer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Indicates if this buffer can contain resources (buffers and images).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDescriptorBuffer.samplerBuffer">
+<span class="sig-name descname"><span class="pre">samplerBuffer</span></span><a class="headerlink" href="#renderdoc.VKDescriptorBuffer.samplerBuffer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Indicates if this buffer can contain samplers.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKDynamicOffset">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKDynamicOffset</span></span><a class="headerlink" href="#renderdoc.VKDynamicOffset" title="Permalink to this definition">¶</a></dt>
+<dd><p>A dynamic offset applied to a single descriptor access.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDynamicOffset.descriptorByteOffset">
+<span class="sig-name descname"><span class="pre">descriptorByteOffset</span></span><a class="headerlink" href="#renderdoc.VKDynamicOffset.descriptorByteOffset" title="Permalink to this definition">¶</a></dt>
+<dd><p>The offset in bytes to the descriptor in the storage.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDynamicOffset.dynamicBufferByteOffset">
+<span class="sig-name descname"><span class="pre">dynamicBufferByteOffset</span></span><a class="headerlink" href="#renderdoc.VKDynamicOffset.dynamicBufferByteOffset" title="Permalink to this definition">¶</a></dt>
+<dd><p>The dynamic offset to apply to the buffer in bytes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="vertex-input">
+<h2><a class="toc-backref" href="#id2">Vertex Input</a><a class="headerlink" href="#vertex-input" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKInputAssembly">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKInputAssembly</span></span><a class="headerlink" href="#renderdoc.VKInputAssembly" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes the vulkan input assembly configuration.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKInputAssembly.indexBuffer">
+<span class="sig-name descname"><span class="pre">indexBuffer</span></span><a class="headerlink" href="#renderdoc.VKInputAssembly.indexBuffer" title="Permalink to this definition">¶</a></dt>
+<dd><p>The index buffer binding.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKIndexBuffer" title="renderdoc.VKIndexBuffer">VKIndexBuffer</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKInputAssembly.primitiveRestartEnable">
+<span class="sig-name descname"><span class="pre">primitiveRestartEnable</span></span><a class="headerlink" href="#renderdoc.VKInputAssembly.primitiveRestartEnable" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if primitive restart is enabled for strip primitives.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKInputAssembly.topology">
+<span class="sig-name descname"><span class="pre">topology</span></span><a class="headerlink" href="#renderdoc.VKInputAssembly.topology" title="Permalink to this definition">¶</a></dt>
+<dd><p>The current primitive topology.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="common.html#renderdoc.Topology" title="renderdoc.Topology">Topology</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKIndexBuffer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKIndexBuffer</span></span><a class="headerlink" href="#renderdoc.VKIndexBuffer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes the Vulkan index buffer binding.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKIndexBuffer.byteOffset">
+<span class="sig-name descname"><span class="pre">byteOffset</span></span><a class="headerlink" href="#renderdoc.VKIndexBuffer.byteOffset" title="Permalink to this definition">¶</a></dt>
+<dd><p>The byte offset from the start of the buffer to the beginning of the index data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKIndexBuffer.byteSize">
+<span class="sig-name descname"><span class="pre">byteSize</span></span><a class="headerlink" href="#renderdoc.VKIndexBuffer.byteSize" title="Permalink to this definition">¶</a></dt>
+<dd><p>The byte size from the start offset to the end of the index data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKIndexBuffer.byteStride">
+<span class="sig-name descname"><span class="pre">byteStride</span></span><a class="headerlink" href="#renderdoc.VKIndexBuffer.byteStride" title="Permalink to this definition">¶</a></dt>
+<dd><p>The number of bytes for each index in the index buffer. Typically 2 or 4 bytes but
+it can be 0 if no index buffer is bound.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKIndexBuffer.resourceId">
+<span class="sig-name descname"><span class="pre">resourceId</span></span><a class="headerlink" href="#renderdoc.VKIndexBuffer.resourceId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> of the index buffer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKVertexInput">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKVertexInput</span></span><a class="headerlink" href="#renderdoc.VKVertexInput" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes the fixed-function vertex input fetch setup.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKVertexInput.attributes">
+<span class="sig-name descname"><span class="pre">attributes</span></span><a class="headerlink" href="#renderdoc.VKVertexInput.attributes" title="Permalink to this definition">¶</a></dt>
+<dd><p>The vertex attributes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="#renderdoc.VKVertexAttribute" title="renderdoc.VKVertexAttribute">VKVertexAttribute</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKVertexInput.bindings">
+<span class="sig-name descname"><span class="pre">bindings</span></span><a class="headerlink" href="#renderdoc.VKVertexInput.bindings" title="Permalink to this definition">¶</a></dt>
+<dd><p>The vertex bindings.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="#renderdoc.VKVertexBinding" title="renderdoc.VKVertexBinding">VKVertexBinding</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKVertexInput.vertexBuffers">
+<span class="sig-name descname"><span class="pre">vertexBuffers</span></span><a class="headerlink" href="#renderdoc.VKVertexInput.vertexBuffers" title="Permalink to this definition">¶</a></dt>
+<dd><p>The vertex buffers.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="#renderdoc.VKVertexBuffer" title="renderdoc.VKVertexBuffer">VKVertexBuffer</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKVertexAttribute">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKVertexAttribute</span></span><a class="headerlink" href="#renderdoc.VKVertexAttribute" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes the configuration of a single vertex attribute.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKVertexAttribute.binding">
+<span class="sig-name descname"><span class="pre">binding</span></span><a class="headerlink" href="#renderdoc.VKVertexAttribute.binding" title="Permalink to this definition">¶</a></dt>
+<dd><p>The vertex binding where data will be sourced from.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKVertexAttribute.byteOffset">
+<span class="sig-name descname"><span class="pre">byteOffset</span></span><a class="headerlink" href="#renderdoc.VKVertexAttribute.byteOffset" title="Permalink to this definition">¶</a></dt>
+<dd><p>The byte offset from the start of each vertex data in the <a class="reference internal" href="#renderdoc.VKVertexAttribute.binding" title="renderdoc.VKVertexAttribute.binding"><code class="xref py py-data docutils literal notranslate"><span class="pre">binding</span></code></a> to this attribute.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKVertexAttribute.format">
+<span class="sig-name descname"><span class="pre">format</span></span><a class="headerlink" href="#renderdoc.VKVertexAttribute.format" title="Permalink to this definition">¶</a></dt>
+<dd><p>The format describing how the input element is interpreted.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../formats.html#renderdoc.ResourceFormat" title="renderdoc.ResourceFormat">ResourceFormat</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKVertexAttribute.location">
+<span class="sig-name descname"><span class="pre">location</span></span><a class="headerlink" href="#renderdoc.VKVertexAttribute.location" title="Permalink to this definition">¶</a></dt>
+<dd><p>The location in the shader that is bound to this attribute.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKVertexBinding">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKVertexBinding</span></span><a class="headerlink" href="#renderdoc.VKVertexBinding" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes a vertex binding.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKVertexBinding.instanceDivisor">
+<span class="sig-name descname"><span class="pre">instanceDivisor</span></span><a class="headerlink" href="#renderdoc.VKVertexBinding.instanceDivisor" title="Permalink to this definition">¶</a></dt>
+<dd><p>The instance rate divisor.</p>
+<p>If this is <code class="docutils literal notranslate"><span class="pre">0</span></code> then every vertex gets the same value.</p>
+<p>If it’s <code class="docutils literal notranslate"><span class="pre">1</span></code> then one element is read for each instance, and for <code class="docutils literal notranslate"><span class="pre">N</span></code> greater than <code class="docutils literal notranslate"><span class="pre">1</span></code> then
+<code class="docutils literal notranslate"><span class="pre">N</span></code> instances read the same element before advancing.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKVertexBinding.perInstance">
+<span class="sig-name descname"><span class="pre">perInstance</span></span><a class="headerlink" href="#renderdoc.VKVertexBinding.perInstance" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the vertex data is instance-rate.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKVertexBinding.vertexBufferBinding">
+<span class="sig-name descname"><span class="pre">vertexBufferBinding</span></span><a class="headerlink" href="#renderdoc.VKVertexBinding.vertexBufferBinding" title="Permalink to this definition">¶</a></dt>
+<dd><p>The vertex binding where data will be sourced from.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKVertexBuffer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKVertexBuffer</span></span><a class="headerlink" href="#renderdoc.VKVertexBuffer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes a single Vulkan vertex buffer binding.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKVertexBuffer.byteOffset">
+<span class="sig-name descname"><span class="pre">byteOffset</span></span><a class="headerlink" href="#renderdoc.VKVertexBuffer.byteOffset" title="Permalink to this definition">¶</a></dt>
+<dd><p>The byte offset from the start of the buffer to the beginning of the vertex data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKVertexBuffer.byteSize">
+<span class="sig-name descname"><span class="pre">byteSize</span></span><a class="headerlink" href="#renderdoc.VKVertexBuffer.byteSize" title="Permalink to this definition">¶</a></dt>
+<dd><p>The size of the vertex buffer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKVertexBuffer.byteStride">
+<span class="sig-name descname"><span class="pre">byteStride</span></span><a class="headerlink" href="#renderdoc.VKVertexBuffer.byteStride" title="Permalink to this definition">¶</a></dt>
+<dd><p>The byte stride between the start of one set of vertex data and the next.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKVertexBuffer.resourceId">
+<span class="sig-name descname"><span class="pre">resourceId</span></span><a class="headerlink" href="#renderdoc.VKVertexBuffer.resourceId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> of the buffer bound to this slot.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="shader">
+<h2><a class="toc-backref" href="#id3">Shader</a><a class="headerlink" href="#shader" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKShader">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKShader</span></span><a class="headerlink" href="#renderdoc.VKShader" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes a Vulkan shader stage.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKShader.entryPoint">
+<span class="sig-name descname"><span class="pre">entryPoint</span></span><a class="headerlink" href="#renderdoc.VKShader.entryPoint" title="Permalink to this definition">¶</a></dt>
+<dd><p>The name of the entry point in the shader module that is used.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKShader.pushConstantRangeByteOffset">
+<span class="sig-name descname"><span class="pre">pushConstantRangeByteOffset</span></span><a class="headerlink" href="#renderdoc.VKShader.pushConstantRangeByteOffset" title="Permalink to this definition">¶</a></dt>
+<dd><p>The byte offset into the push constant data that is visible to this shader.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKShader.pushConstantRangeByteSize">
+<span class="sig-name descname"><span class="pre">pushConstantRangeByteSize</span></span><a class="headerlink" href="#renderdoc.VKShader.pushConstantRangeByteSize" title="Permalink to this definition">¶</a></dt>
+<dd><p>The number of bytes in the push constant data that is visible to this shader.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKShader.reflection">
+<span class="sig-name descname"><span class="pre">reflection</span></span><a class="headerlink" href="#renderdoc.VKShader.reflection" title="Permalink to this definition">¶</a></dt>
+<dd><p>The reflection data for this shader.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../shaders.html#renderdoc.ShaderReflection" title="renderdoc.ShaderReflection">ShaderReflection</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKShader.requiredSubgroupSize">
+<span class="sig-name descname"><span class="pre">requiredSubgroupSize</span></span><a class="headerlink" href="#renderdoc.VKShader.requiredSubgroupSize" title="Permalink to this definition">¶</a></dt>
+<dd><p>The required subgroup size specified for this shader at pipeline creation time.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKShader.resourceId">
+<span class="sig-name descname"><span class="pre">resourceId</span></span><a class="headerlink" href="#renderdoc.VKShader.resourceId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> of the shader module object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKShader.shaderObject">
+<span class="sig-name descname"><span class="pre">shaderObject</span></span><a class="headerlink" href="#renderdoc.VKShader.shaderObject" title="Permalink to this definition">¶</a></dt>
+<dd><p>Whether the shader is a shader object or shader module.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKShader.specializationData">
+<span class="sig-name descname"><span class="pre">specializationData</span></span><a class="headerlink" href="#renderdoc.VKShader.specializationData" title="Permalink to this definition">¶</a></dt>
+<dd><p>The provided specialization constant data. Shader constants store the byte offset into
+this buffer as their byteOffset. This data includes the applied specialization constants over the
+top of the default values, so it is safe to read any constant from here and get the correct current
+value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bytes</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKShader.specializationIds">
+<span class="sig-name descname"><span class="pre">specializationIds</span></span><a class="headerlink" href="#renderdoc.VKShader.specializationIds" title="Permalink to this definition">¶</a></dt>
+<dd><p>The specialization constant ID for each entry in the specialization constant block of
+reflection info. This corresponds to the constantID in VkSpecializationMapEntry, while the offset
+and size into specializationData can be obtained from the reflection info.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKShader.stage">
+<span class="sig-name descname"><span class="pre">stage</span></span><a class="headerlink" href="#renderdoc.VKShader.stage" title="Permalink to this definition">¶</a></dt>
+<dd><p>A <a class="reference internal" href="../shaders.html#renderdoc.ShaderStage" title="renderdoc.ShaderStage"><code class="xref py py-class docutils literal notranslate"><span class="pre">ShaderStage</span></code></a> identifying which stage this shader is bound to.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../shaders.html#renderdoc.ShaderStage" title="renderdoc.ShaderStage">ShaderStage</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="tessellation">
+<h2><a class="toc-backref" href="#id4">Tessellation</a><a class="headerlink" href="#tessellation" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKTessellation">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKTessellation</span></span><a class="headerlink" href="#renderdoc.VKTessellation" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes the state of the fixed-function tessellator.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKTessellation.domainOriginUpperLeft">
+<span class="sig-name descname"><span class="pre">domainOriginUpperLeft</span></span><a class="headerlink" href="#renderdoc.VKTessellation.domainOriginUpperLeft" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the tessellation domain origin is upper-left, <code class="docutils literal notranslate"><span class="pre">False</span></code> if lower-left.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKTessellation.numControlPoints">
+<span class="sig-name descname"><span class="pre">numControlPoints</span></span><a class="headerlink" href="#renderdoc.VKTessellation.numControlPoints" title="Permalink to this definition">¶</a></dt>
+<dd><p>The number of control points in each input patch.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="transform-feedback">
+<h2><a class="toc-backref" href="#id5">Transform Feedback</a><a class="headerlink" href="#transform-feedback" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKTransformFeedback">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKTransformFeedback</span></span><a class="headerlink" href="#renderdoc.VKTransformFeedback" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes the state of the fixed-function transform feedback.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKTransformFeedback.buffers">
+<span class="sig-name descname"><span class="pre">buffers</span></span><a class="headerlink" href="#renderdoc.VKTransformFeedback.buffers" title="Permalink to this definition">¶</a></dt>
+<dd><p>The bound transform feedback buffers.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="#renderdoc.VKXFBBuffer" title="renderdoc.VKXFBBuffer">VKXFBBuffer</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKTransformFeedback.rasterizedStream">
+<span class="sig-name descname"><span class="pre">rasterizedStream</span></span><a class="headerlink" href="#renderdoc.VKTransformFeedback.rasterizedStream" title="Permalink to this definition">¶</a></dt>
+<dd><p>Which stream-out stream is being used for rasterization.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKXFBBuffer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKXFBBuffer</span></span><a class="headerlink" href="#renderdoc.VKXFBBuffer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes a single transform feedback binding.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKXFBBuffer.active">
+<span class="sig-name descname"><span class="pre">active</span></span><a class="headerlink" href="#renderdoc.VKXFBBuffer.active" title="Permalink to this definition">¶</a></dt>
+<dd><p>A flag indicating if this buffer is active or not.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKXFBBuffer.bufferResourceId">
+<span class="sig-name descname"><span class="pre">bufferResourceId</span></span><a class="headerlink" href="#renderdoc.VKXFBBuffer.bufferResourceId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> of the bound data buffer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKXFBBuffer.byteOffset">
+<span class="sig-name descname"><span class="pre">byteOffset</span></span><a class="headerlink" href="#renderdoc.VKXFBBuffer.byteOffset" title="Permalink to this definition">¶</a></dt>
+<dd><p>The offset in bytes to the start of the data in the <a class="reference internal" href="#renderdoc.VKXFBBuffer.bufferResourceId" title="renderdoc.VKXFBBuffer.bufferResourceId"><code class="xref py py-data docutils literal notranslate"><span class="pre">bufferResourceId</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKXFBBuffer.byteSize">
+<span class="sig-name descname"><span class="pre">byteSize</span></span><a class="headerlink" href="#renderdoc.VKXFBBuffer.byteSize" title="Permalink to this definition">¶</a></dt>
+<dd><p>The size in bytes of the data buffer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKXFBBuffer.counterBufferOffset">
+<span class="sig-name descname"><span class="pre">counterBufferOffset</span></span><a class="headerlink" href="#renderdoc.VKXFBBuffer.counterBufferOffset" title="Permalink to this definition">¶</a></dt>
+<dd><p>The offset in bytes to the counter in the <a class="reference internal" href="#renderdoc.VKXFBBuffer.counterBufferResourceId" title="renderdoc.VKXFBBuffer.counterBufferResourceId"><code class="xref py py-data docutils literal notranslate"><span class="pre">counterBufferResourceId</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKXFBBuffer.counterBufferResourceId">
+<span class="sig-name descname"><span class="pre">counterBufferResourceId</span></span><a class="headerlink" href="#renderdoc.VKXFBBuffer.counterBufferResourceId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> of the buffer storing the counter value (if set).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="rasterizer">
+<h2><a class="toc-backref" href="#id6">Rasterizer</a><a class="headerlink" href="#rasterizer" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKViewportScissor">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKViewportScissor</span></span><a class="headerlink" href="#renderdoc.VKViewportScissor" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes a combined viewport and scissor region.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKViewportScissor.scissor">
+<span class="sig-name descname"><span class="pre">scissor</span></span><a class="headerlink" href="#renderdoc.VKViewportScissor.scissor" title="Permalink to this definition">¶</a></dt>
+<dd><p>The scissor.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="common.html#renderdoc.Scissor" title="renderdoc.Scissor">Scissor</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKViewportScissor.vp">
+<span class="sig-name descname"><span class="pre">vp</span></span><a class="headerlink" href="#renderdoc.VKViewportScissor.vp" title="Permalink to this definition">¶</a></dt>
+<dd><p>The viewport.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="common.html#renderdoc.Viewport" title="renderdoc.Viewport">Viewport</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKViewState">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKViewState</span></span><a class="headerlink" href="#renderdoc.VKViewState" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes the view state in the pipeline.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKViewState.depthNegativeOneToOne">
+<span class="sig-name descname"><span class="pre">depthNegativeOneToOne</span></span><a class="headerlink" href="#renderdoc.VKViewState.depthNegativeOneToOne" title="Permalink to this definition">¶</a></dt>
+<dd><p>Whether depth clip range is set to [-1, 1] through VK_EXT_depth_clip_control.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKViewState.discardRectangles">
+<span class="sig-name descname"><span class="pre">discardRectangles</span></span><a class="headerlink" href="#renderdoc.VKViewState.discardRectangles" title="Permalink to this definition">¶</a></dt>
+<dd><p>The discard rectangles, if enabled.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="#renderdoc.VKRenderArea" title="renderdoc.VKRenderArea">VKRenderArea</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKViewState.discardRectanglesExclusive">
+<span class="sig-name descname"><span class="pre">discardRectanglesExclusive</span></span><a class="headerlink" href="#renderdoc.VKViewState.discardRectanglesExclusive" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if a fragment in any one of the discard rectangles fails the discard test,
+and a fragment in none of them passes.</p>
+<p><code class="docutils literal notranslate"><span class="pre">False</span></code> if a fragment in any one of the discard rectangles passes the discard test,
+and a fragment in none of them is discarded.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>A <code class="docutils literal notranslate"><span class="pre">True</span></code> value and an empty list of <a class="reference internal" href="#renderdoc.VKViewState.discardRectangles" title="renderdoc.VKViewState.discardRectangles"><code class="xref py py-data docutils literal notranslate"><span class="pre">discardRectangles</span></code></a> means the test is effectively
+disabled, since with no rectangles no fragment can be inside one.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKViewState.viewportScissors">
+<span class="sig-name descname"><span class="pre">viewportScissors</span></span><a class="headerlink" href="#renderdoc.VKViewState.viewportScissors" title="Permalink to this definition">¶</a></dt>
+<dd><p>The bound viewports and scissors.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="#renderdoc.VKViewportScissor" title="renderdoc.VKViewportScissor">VKViewportScissor</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKRasterizer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKRasterizer</span></span><a class="headerlink" href="#renderdoc.VKRasterizer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes the rasterizer state in the pipeline.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRasterizer.conservativeRasterization">
+<span class="sig-name descname"><span class="pre">conservativeRasterization</span></span><a class="headerlink" href="#renderdoc.VKRasterizer.conservativeRasterization" title="Permalink to this definition">¶</a></dt>
+<dd><p>The active conservative rasterization mode.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="common.html#renderdoc.ConservativeRaster" title="renderdoc.ConservativeRaster">ConservativeRaster</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRasterizer.cullMode">
+<span class="sig-name descname"><span class="pre">cullMode</span></span><a class="headerlink" href="#renderdoc.VKRasterizer.cullMode" title="Permalink to this definition">¶</a></dt>
+<dd><p>The polygon <a class="reference internal" href="common.html#renderdoc.CullMode" title="renderdoc.CullMode"><code class="xref py py-class docutils literal notranslate"><span class="pre">CullMode</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="common.html#renderdoc.CullMode" title="renderdoc.CullMode">CullMode</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRasterizer.depthBias">
+<span class="sig-name descname"><span class="pre">depthBias</span></span><a class="headerlink" href="#renderdoc.VKRasterizer.depthBias" title="Permalink to this definition">¶</a></dt>
+<dd><p>The fixed depth bias value to apply to z-values.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRasterizer.depthBiasClamp">
+<span class="sig-name descname"><span class="pre">depthBiasClamp</span></span><a class="headerlink" href="#renderdoc.VKRasterizer.depthBiasClamp" title="Permalink to this definition">¶</a></dt>
+<dd><p>The clamp value for calculated depth bias from <a class="reference internal" href="#renderdoc.VKRasterizer.depthBias" title="renderdoc.VKRasterizer.depthBias"><code class="xref py py-data docutils literal notranslate"><span class="pre">depthBias</span></code></a> and
+<a class="reference internal" href="#renderdoc.VKRasterizer.slopeScaledDepthBias" title="renderdoc.VKRasterizer.slopeScaledDepthBias"><code class="xref py py-data docutils literal notranslate"><span class="pre">slopeScaledDepthBias</span></code></a></p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRasterizer.depthBiasEnable">
+<span class="sig-name descname"><span class="pre">depthBiasEnable</span></span><a class="headerlink" href="#renderdoc.VKRasterizer.depthBiasEnable" title="Permalink to this definition">¶</a></dt>
+<dd><p>Whether depth biasing is enabled.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRasterizer.depthClampEnable">
+<span class="sig-name descname"><span class="pre">depthClampEnable</span></span><a class="headerlink" href="#renderdoc.VKRasterizer.depthClampEnable" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if pixels outside of the near and far depth planes should be clamped and
+to <code class="docutils literal notranslate"><span class="pre">0.0</span></code> to <code class="docutils literal notranslate"><span class="pre">1.0</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRasterizer.depthClipEnable">
+<span class="sig-name descname"><span class="pre">depthClipEnable</span></span><a class="headerlink" href="#renderdoc.VKRasterizer.depthClipEnable" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if pixels outside of the near and far depth planes should be clipped.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>In Vulkan 1.0 this value was implicitly set to the opposite of <a class="reference internal" href="#renderdoc.VKRasterizer.depthClampEnable" title="renderdoc.VKRasterizer.depthClampEnable"><code class="xref py py-data docutils literal notranslate"><span class="pre">depthClampEnable</span></code></a>, but with
+later extensions &amp; versions it can be set independently.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRasterizer.extraPrimitiveOverestimationSize">
+<span class="sig-name descname"><span class="pre">extraPrimitiveOverestimationSize</span></span><a class="headerlink" href="#renderdoc.VKRasterizer.extraPrimitiveOverestimationSize" title="Permalink to this definition">¶</a></dt>
+<dd><p>The extra size in pixels to increase primitives by during conservative rasterization,
+in the x and y directions in screen space.</p>
+<p>See <code class="xref py py-data docutils literal notranslate"><span class="pre">conservativeRasterizationMode</span></code></p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRasterizer.fillMode">
+<span class="sig-name descname"><span class="pre">fillMode</span></span><a class="headerlink" href="#renderdoc.VKRasterizer.fillMode" title="Permalink to this definition">¶</a></dt>
+<dd><p>The polygon <a class="reference internal" href="common.html#renderdoc.FillMode" title="renderdoc.FillMode"><code class="xref py py-class docutils literal notranslate"><span class="pre">FillMode</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="common.html#renderdoc.FillMode" title="renderdoc.FillMode">FillMode</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRasterizer.frontCCW">
+<span class="sig-name descname"><span class="pre">frontCCW</span></span><a class="headerlink" href="#renderdoc.VKRasterizer.frontCCW" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if counter-clockwise polygons are front-facing.
+<code class="docutils literal notranslate"><span class="pre">False</span></code> if clockwise polygons are front-facing.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRasterizer.lineRasterMode">
+<span class="sig-name descname"><span class="pre">lineRasterMode</span></span><a class="headerlink" href="#renderdoc.VKRasterizer.lineRasterMode" title="Permalink to this definition">¶</a></dt>
+<dd><p>The line rasterization mode.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="common.html#renderdoc.LineRaster" title="renderdoc.LineRaster">LineRaster</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRasterizer.lineStippleFactor">
+<span class="sig-name descname"><span class="pre">lineStippleFactor</span></span><a class="headerlink" href="#renderdoc.VKRasterizer.lineStippleFactor" title="Permalink to this definition">¶</a></dt>
+<dd><p>The line stipple factor, or 0 if line stipple is disabled.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRasterizer.lineStipplePattern">
+<span class="sig-name descname"><span class="pre">lineStipplePattern</span></span><a class="headerlink" href="#renderdoc.VKRasterizer.lineStipplePattern" title="Permalink to this definition">¶</a></dt>
+<dd><p>The line stipple bit-pattern.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRasterizer.lineWidth">
+<span class="sig-name descname"><span class="pre">lineWidth</span></span><a class="headerlink" href="#renderdoc.VKRasterizer.lineWidth" title="Permalink to this definition">¶</a></dt>
+<dd><p>The fixed line width in pixels.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRasterizer.pipelineShadingRate">
+<span class="sig-name descname"><span class="pre">pipelineShadingRate</span></span><a class="headerlink" href="#renderdoc.VKRasterizer.pipelineShadingRate" title="Permalink to this definition">¶</a></dt>
+<dd><p>The current pipeline fragment shading rate. This will always be 1x1 when a fragment
+shading rate has not been specified.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Tuple[int,int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRasterizer.provokingVertexFirst">
+<span class="sig-name descname"><span class="pre">provokingVertexFirst</span></span><a class="headerlink" href="#renderdoc.VKRasterizer.provokingVertexFirst" title="Permalink to this definition">¶</a></dt>
+<dd><p>Whether the provoking vertex is the first one (default behaviour).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRasterizer.rasterizerDiscardEnable">
+<span class="sig-name descname"><span class="pre">rasterizerDiscardEnable</span></span><a class="headerlink" href="#renderdoc.VKRasterizer.rasterizerDiscardEnable" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if primitives should be discarded during rasterization.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRasterizer.shadingRateCombiners">
+<span class="sig-name descname"><span class="pre">shadingRateCombiners</span></span><a class="headerlink" href="#renderdoc.VKRasterizer.shadingRateCombiners" title="Permalink to this definition">¶</a></dt>
+<dd><p>The fragment shading rate combiners.</p>
+<p>The combiners are applied as follows, according to the Vulkan spec:</p>
+<blockquote>
+<div><p><code class="docutils literal notranslate"><span class="pre">intermediateRate</span> <span class="pre">=</span> <span class="pre">combiner[0]</span> <span class="pre">(</span> <span class="pre">pipelineShadingRate,</span>&#160; <span class="pre">shaderExportedShadingRate</span> <span class="pre">)</span></code>
+<code class="docutils literal notranslate"><span class="pre">finalRate</span>&#160;&#160;&#160;&#160;&#160;&#160;&#160; <span class="pre">=</span> <span class="pre">combiner[1]</span> <span class="pre">(</span> <span class="pre">intermediateRate,</span>&#160;&#160;&#160;&#160; <span class="pre">imageBasedShadingRate</span>&#160;&#160;&#160;&#160; <span class="pre">)</span></code></p>
+</div></blockquote>
+<p>Where the first input is from <a class="reference internal" href="#renderdoc.VKRasterizer.pipelineShadingRate" title="renderdoc.VKRasterizer.pipelineShadingRate"><code class="xref py py-data docutils literal notranslate"><span class="pre">pipelineShadingRate</span></code></a> and the second is the exported shading
+rate from the last pre-rasterization shader stage, which defaults to 1x1 if not exported.</p>
+<p>The intermediate result is then used as the first input to the second combiner, together with the
+shading rate sampled from the fragment shading rate attachment.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Tuple[<a class="reference internal" href="common.html#renderdoc.ShadingRateCombiner" title="renderdoc.ShadingRateCombiner">ShadingRateCombiner</a>,<a class="reference internal" href="common.html#renderdoc.ShadingRateCombiner" title="renderdoc.ShadingRateCombiner">ShadingRateCombiner</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRasterizer.slopeScaledDepthBias">
+<span class="sig-name descname"><span class="pre">slopeScaledDepthBias</span></span><a class="headerlink" href="#renderdoc.VKRasterizer.slopeScaledDepthBias" title="Permalink to this definition">¶</a></dt>
+<dd><p>The slope-scaled depth bias value to apply to z-values.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="multisampling">
+<h2><a class="toc-backref" href="#id7">Multisampling</a><a class="headerlink" href="#multisampling" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKMultiSample">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKMultiSample</span></span><a class="headerlink" href="#renderdoc.VKMultiSample" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes the multisampling state in the pipeline.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKMultiSample.minSampleShading">
+<span class="sig-name descname"><span class="pre">minSampleShading</span></span><a class="headerlink" href="#renderdoc.VKMultiSample.minSampleShading" title="Permalink to this definition">¶</a></dt>
+<dd><p>The minimum sample shading rate.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKMultiSample.rasterSamples">
+<span class="sig-name descname"><span class="pre">rasterSamples</span></span><a class="headerlink" href="#renderdoc.VKMultiSample.rasterSamples" title="Permalink to this definition">¶</a></dt>
+<dd><p>How many samples to use when rasterizing.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKMultiSample.sampleLocations">
+<span class="sig-name descname"><span class="pre">sampleLocations</span></span><a class="headerlink" href="#renderdoc.VKMultiSample.sampleLocations" title="Permalink to this definition">¶</a></dt>
+<dd><p>The custom sample locations configuration.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKSampleLocations" title="renderdoc.VKSampleLocations">VKSampleLocations</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKMultiSample.sampleMask">
+<span class="sig-name descname"><span class="pre">sampleMask</span></span><a class="headerlink" href="#renderdoc.VKMultiSample.sampleMask" title="Permalink to this definition">¶</a></dt>
+<dd><p>A mask that generated samples should be masked with using bitwise <code class="docutils literal notranslate"><span class="pre">AND</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKMultiSample.sampleShadingEnable">
+<span class="sig-name descname"><span class="pre">sampleShadingEnable</span></span><a class="headerlink" href="#renderdoc.VKMultiSample.sampleShadingEnable" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if rendering should happen at sample-rate frequency.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKSampleLocations">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKSampleLocations</span></span><a class="headerlink" href="#renderdoc.VKSampleLocations" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes state of custom sample locations in the pipeline.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKSampleLocations.customLocations">
+<span class="sig-name descname"><span class="pre">customLocations</span></span><a class="headerlink" href="#renderdoc.VKSampleLocations.customLocations" title="Permalink to this definition">¶</a></dt>
+<dd><p>The custom sample locations. Only x and y are valid, z and w are set to 0.0.</p>
+<p>If the list is empty then the standard sample pattern is in use.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="../utils.html#renderdoc.FloatVector" title="renderdoc.FloatVector">FloatVector</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKSampleLocations.gridHeight">
+<span class="sig-name descname"><span class="pre">gridHeight</span></span><a class="headerlink" href="#renderdoc.VKSampleLocations.gridHeight" title="Permalink to this definition">¶</a></dt>
+<dd><p>The height in pixels of the region configured.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKSampleLocations.gridWidth">
+<span class="sig-name descname"><span class="pre">gridWidth</span></span><a class="headerlink" href="#renderdoc.VKSampleLocations.gridWidth" title="Permalink to this definition">¶</a></dt>
+<dd><p>The width in pixels of the region configured.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="blending">
+<h2><a class="toc-backref" href="#id8">Blending</a><a class="headerlink" href="#blending" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKColorBlendState">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKColorBlendState</span></span><a class="headerlink" href="#renderdoc.VKColorBlendState" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes the pipeline blending state.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKColorBlendState.alphaToCoverageEnable">
+<span class="sig-name descname"><span class="pre">alphaToCoverageEnable</span></span><a class="headerlink" href="#renderdoc.VKColorBlendState.alphaToCoverageEnable" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if alpha-to-coverage should be used when blending to an MSAA target.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKColorBlendState.alphaToOneEnable">
+<span class="sig-name descname"><span class="pre">alphaToOneEnable</span></span><a class="headerlink" href="#renderdoc.VKColorBlendState.alphaToOneEnable" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if alpha-to-one should be used when blending to an MSAA target.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKColorBlendState.blendFactor">
+<span class="sig-name descname"><span class="pre">blendFactor</span></span><a class="headerlink" href="#renderdoc.VKColorBlendState.blendFactor" title="Permalink to this definition">¶</a></dt>
+<dd><p>The constant blend factor to use in blend equations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Tuple[float,float,float,float]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKColorBlendState.blends">
+<span class="sig-name descname"><span class="pre">blends</span></span><a class="headerlink" href="#renderdoc.VKColorBlendState.blends" title="Permalink to this definition">¶</a></dt>
+<dd><p>The blend operations for each target.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="common.html#renderdoc.ColorBlend" title="renderdoc.ColorBlend">ColorBlend</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="depth-stencil-state">
+<h2><a class="toc-backref" href="#id9">Depth/Stencil State</a><a class="headerlink" href="#depth-stencil-state" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKDepthStencil">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKDepthStencil</span></span><a class="headerlink" href="#renderdoc.VKDepthStencil" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes the pipeline depth-stencil state.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDepthStencil.backFace">
+<span class="sig-name descname"><span class="pre">backFace</span></span><a class="headerlink" href="#renderdoc.VKDepthStencil.backFace" title="Permalink to this definition">¶</a></dt>
+<dd><p>The stencil state for back-facing polygons.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="common.html#renderdoc.StencilFace" title="renderdoc.StencilFace">StencilFace</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDepthStencil.depthBoundsEnable">
+<span class="sig-name descname"><span class="pre">depthBoundsEnable</span></span><a class="headerlink" href="#renderdoc.VKDepthStencil.depthBoundsEnable" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if depth bounds tests should be applied.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDepthStencil.depthFunction">
+<span class="sig-name descname"><span class="pre">depthFunction</span></span><a class="headerlink" href="#renderdoc.VKDepthStencil.depthFunction" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="common.html#renderdoc.CompareFunction" title="renderdoc.CompareFunction"><code class="xref py py-class docutils literal notranslate"><span class="pre">CompareFunction</span></code></a> to use for testing depth values.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="common.html#renderdoc.CompareFunction" title="renderdoc.CompareFunction">CompareFunction</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDepthStencil.depthTestEnable">
+<span class="sig-name descname"><span class="pre">depthTestEnable</span></span><a class="headerlink" href="#renderdoc.VKDepthStencil.depthTestEnable" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if depth testing should be performed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDepthStencil.depthWriteEnable">
+<span class="sig-name descname"><span class="pre">depthWriteEnable</span></span><a class="headerlink" href="#renderdoc.VKDepthStencil.depthWriteEnable" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if depth values should be written to the depth target.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDepthStencil.frontFace">
+<span class="sig-name descname"><span class="pre">frontFace</span></span><a class="headerlink" href="#renderdoc.VKDepthStencil.frontFace" title="Permalink to this definition">¶</a></dt>
+<dd><p>The stencil state for front-facing polygons.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="common.html#renderdoc.StencilFace" title="renderdoc.StencilFace">StencilFace</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDepthStencil.maxDepthBounds">
+<span class="sig-name descname"><span class="pre">maxDepthBounds</span></span><a class="headerlink" href="#renderdoc.VKDepthStencil.maxDepthBounds" title="Permalink to this definition">¶</a></dt>
+<dd><p>The far plane bounding value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDepthStencil.minDepthBounds">
+<span class="sig-name descname"><span class="pre">minDepthBounds</span></span><a class="headerlink" href="#renderdoc.VKDepthStencil.minDepthBounds" title="Permalink to this definition">¶</a></dt>
+<dd><p>The near plane bounding value.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKDepthStencil.stencilTestEnable">
+<span class="sig-name descname"><span class="pre">stencilTestEnable</span></span><a class="headerlink" href="#renderdoc.VKDepthStencil.stencilTestEnable" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if stencil operations should be performed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="renderpass-and-framebuffer">
+<h2><a class="toc-backref" href="#id10">Renderpass and Framebuffer</a><a class="headerlink" href="#renderpass-and-framebuffer" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKCurrentPass">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKCurrentPass</span></span><a class="headerlink" href="#renderdoc.VKCurrentPass" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes the current pass instance at the current time.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKCurrentPass.colorFeedbackAllowed">
+<span class="sig-name descname"><span class="pre">colorFeedbackAllowed</span></span><a class="headerlink" href="#renderdoc.VKCurrentPass.colorFeedbackAllowed" title="Permalink to this definition">¶</a></dt>
+<dd><p>If feedback loops are allowed on color attachments</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKCurrentPass.depthFeedbackAllowed">
+<span class="sig-name descname"><span class="pre">depthFeedbackAllowed</span></span><a class="headerlink" href="#renderdoc.VKCurrentPass.depthFeedbackAllowed" title="Permalink to this definition">¶</a></dt>
+<dd><p>If feedback loops are allowed on depth attachments</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKCurrentPass.framebuffer">
+<span class="sig-name descname"><span class="pre">framebuffer</span></span><a class="headerlink" href="#renderdoc.VKCurrentPass.framebuffer" title="Permalink to this definition">¶</a></dt>
+<dd><p>The framebuffer that is currently being used.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKFramebuffer" title="renderdoc.VKFramebuffer">VKFramebuffer</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKCurrentPass.renderArea">
+<span class="sig-name descname"><span class="pre">renderArea</span></span><a class="headerlink" href="#renderdoc.VKCurrentPass.renderArea" title="Permalink to this definition">¶</a></dt>
+<dd><p>The render area that is currently being rendered to.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKRenderArea" title="renderdoc.VKRenderArea">VKRenderArea</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKCurrentPass.renderpass">
+<span class="sig-name descname"><span class="pre">renderpass</span></span><a class="headerlink" href="#renderdoc.VKCurrentPass.renderpass" title="Permalink to this definition">¶</a></dt>
+<dd><p>The renderpass and subpass that is currently active.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="#renderdoc.VKRenderPass" title="renderdoc.VKRenderPass">VKRenderPass</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKCurrentPass.stencilFeedbackAllowed">
+<span class="sig-name descname"><span class="pre">stencilFeedbackAllowed</span></span><a class="headerlink" href="#renderdoc.VKCurrentPass.stencilFeedbackAllowed" title="Permalink to this definition">¶</a></dt>
+<dd><p>If feedback loops are allowed on stencil attachments</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKRenderPass</span></span><a class="headerlink" href="#renderdoc.VKRenderPass" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes the setup of a renderpass and subpasses.</p>
+<dl class="py data">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.AttachmentUnused">
+<span class="sig-name descname"><span class="pre">AttachmentUnused</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.AttachmentUnused" title="Permalink to this definition">¶</a></dt>
+<dd><p>Alias for VK_ATTACHMENT_UNUSED, for use by the UI to know when a value in colorAttachmentLocations
+or colorAttachmentInputIndices is mapped to VK_ATTACHMENT_UNUSED.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.colorAttachmentInputIndices">
+<span class="sig-name descname"><span class="pre">colorAttachmentInputIndices</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.colorAttachmentInputIndices" title="Permalink to this definition">¶</a></dt>
+<dd><p>The color index-&gt;input index mapping set up by dynamic rendering local read.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.colorAttachmentLocations">
+<span class="sig-name descname"><span class="pre">colorAttachmentLocations</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.colorAttachmentLocations" title="Permalink to this definition">¶</a></dt>
+<dd><p>The color index-&gt;location mapping set up by dynamic rendering local read.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.colorAttachments">
+<span class="sig-name descname"><span class="pre">colorAttachments</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.colorAttachments" title="Permalink to this definition">¶</a></dt>
+<dd><p>The color attachments for the current subpass, as indices into the framebuffer
+attachments.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.depthInputAttachmentIndex">
+<span class="sig-name descname"><span class="pre">depthInputAttachmentIndex</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.depthInputAttachmentIndex" title="Permalink to this definition">¶</a></dt>
+<dd><p>Depth input attachment index if explicit (dynamic rendering).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.depthstencilAttachment">
+<span class="sig-name descname"><span class="pre">depthstencilAttachment</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.depthstencilAttachment" title="Permalink to this definition">¶</a></dt>
+<dd><p>An index into the framebuffer attachments for the depth-stencil attachment.</p>
+<p>If there is no depth-stencil attachment, this index is <code class="docutils literal notranslate"><span class="pre">-1</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.depthstencilResolveAttachment">
+<span class="sig-name descname"><span class="pre">depthstencilResolveAttachment</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.depthstencilResolveAttachment" title="Permalink to this definition">¶</a></dt>
+<dd><p>An index into the framebuffer attachments for the depth-stencil resolve attachment.</p>
+<p>If there is no depth-stencil resolve attachment, this index is <code class="docutils literal notranslate"><span class="pre">-1</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.dynamic">
+<span class="sig-name descname"><span class="pre">dynamic</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.dynamic" title="Permalink to this definition">¶</a></dt>
+<dd><p>Whether or not dynamic rendering is in use (no render pass or framebuffer objects).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.feedbackLoop">
+<span class="sig-name descname"><span class="pre">feedbackLoop</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.feedbackLoop" title="Permalink to this definition">¶</a></dt>
+<dd><p>Whether or not there is a potential feedback loop.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.fragmentDensityAttachment">
+<span class="sig-name descname"><span class="pre">fragmentDensityAttachment</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.fragmentDensityAttachment" title="Permalink to this definition">¶</a></dt>
+<dd><p>An index into the framebuffer attachments for the fragment density attachment.</p>
+<p>If there is no fragment density attachment, this index is <code class="docutils literal notranslate"><span class="pre">-1</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Only one at most of <a class="reference internal" href="#renderdoc.VKRenderPass.fragmentDensityAttachment" title="renderdoc.VKRenderPass.fragmentDensityAttachment"><code class="xref py py-data docutils literal notranslate"><span class="pre">fragmentDensityAttachment</span></code></a> and <a class="reference internal" href="#renderdoc.VKRenderPass.shadingRateAttachment" title="renderdoc.VKRenderPass.shadingRateAttachment"><code class="xref py py-data docutils literal notranslate"><span class="pre">shadingRateAttachment</span></code></a> will be
+set.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.fragmentDensityOffsets">
+<span class="sig-name descname"><span class="pre">fragmentDensityOffsets</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.fragmentDensityOffsets" title="Permalink to this definition">¶</a></dt>
+<dd><p>If VK_QCOM_fragment_density_map_offset is enabled, contains a list of offsets applied 
+to the fragment density map during rendering.</p>
+<p>If the list is empty, fdm_offset is disabled and rendering is as normal.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="common.html#renderdoc.Offset" title="renderdoc.Offset">Offset</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.inputAttachments">
+<span class="sig-name descname"><span class="pre">inputAttachments</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.inputAttachments" title="Permalink to this definition">¶</a></dt>
+<dd><p>The input attachments for the current subpass, as indices into the framebuffer
+attachments.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.isDepthInputAttachmentIndexImplicit">
+<span class="sig-name descname"><span class="pre">isDepthInputAttachmentIndexImplicit</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.isDepthInputAttachmentIndexImplicit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Whether or not depth input attachment index is implicit (dynamic rendering).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.isStencilInputAttachmentIndexImplicit">
+<span class="sig-name descname"><span class="pre">isStencilInputAttachmentIndexImplicit</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.isStencilInputAttachmentIndexImplicit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Whether or not stencil  input attachment index is implicit (dynamic rendering).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.multiviews">
+<span class="sig-name descname"><span class="pre">multiviews</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.multiviews" title="Permalink to this definition">¶</a></dt>
+<dd><p>If multiview is enabled, contains a list of view indices to be broadcast to during
+rendering.</p>
+<p>If the list is empty, multiview is disabled and rendering is as normal.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.resolveAttachments">
+<span class="sig-name descname"><span class="pre">resolveAttachments</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.resolveAttachments" title="Permalink to this definition">¶</a></dt>
+<dd><p>The resolve attachments for the current subpass, as indices into the framebuffer
+attachments.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.resourceId">
+<span class="sig-name descname"><span class="pre">resourceId</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.resourceId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> of the render pass.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.shadingRateAttachment">
+<span class="sig-name descname"><span class="pre">shadingRateAttachment</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.shadingRateAttachment" title="Permalink to this definition">¶</a></dt>
+<dd><p>An index into the framebuffer attachments for the fragment shading rate attachment.</p>
+<p>If there is no fragment shading rate attachment, this index is <code class="docutils literal notranslate"><span class="pre">-1</span></code>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Only one at most of <a class="reference internal" href="#renderdoc.VKRenderPass.fragmentDensityAttachment" title="renderdoc.VKRenderPass.fragmentDensityAttachment"><code class="xref py py-data docutils literal notranslate"><span class="pre">fragmentDensityAttachment</span></code></a> and <a class="reference internal" href="#renderdoc.VKRenderPass.shadingRateAttachment" title="renderdoc.VKRenderPass.shadingRateAttachment"><code class="xref py py-data docutils literal notranslate"><span class="pre">shadingRateAttachment</span></code></a> will be
+set.</p>
+</div>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.shadingRateTexelSize">
+<span class="sig-name descname"><span class="pre">shadingRateTexelSize</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.shadingRateTexelSize" title="Permalink to this definition">¶</a></dt>
+<dd><p>The size of the framebuffer region represented by each texel in
+<a class="reference internal" href="#renderdoc.VKRenderPass.shadingRateAttachment" title="renderdoc.VKRenderPass.shadingRateAttachment"><code class="xref py py-data docutils literal notranslate"><span class="pre">shadingRateAttachment</span></code></a>.</p>
+<p>For example if this is (2,2) then every texel in the attachment gives the shading rate of a 2x2
+block in the framebuffer so the shading rate attachment is half the size of the other attachments in
+each dimension.</p>
+<p>If no attachment is set in <a class="reference internal" href="#renderdoc.VKRenderPass.shadingRateAttachment" title="renderdoc.VKRenderPass.shadingRateAttachment"><code class="xref py py-data docutils literal notranslate"><span class="pre">shadingRateAttachment</span></code></a> this will be (1,1).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>Tuple[int,int]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.stencilInputAttachmentIndex">
+<span class="sig-name descname"><span class="pre">stencilInputAttachmentIndex</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.stencilInputAttachmentIndex" title="Permalink to this definition">¶</a></dt>
+<dd><p>Stencil input attachment index if explicit (dynamic rendering).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.subpass">
+<span class="sig-name descname"><span class="pre">subpass</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.subpass" title="Permalink to this definition">¶</a></dt>
+<dd><p>The index of the current active subpass.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.suspended">
+<span class="sig-name descname"><span class="pre">suspended</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.suspended" title="Permalink to this definition">¶</a></dt>
+<dd><p>Whether or not dynamic rendering is currently suspended.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderPass.tileOnlyMSAASampleCount">
+<span class="sig-name descname"><span class="pre">tileOnlyMSAASampleCount</span></span><a class="headerlink" href="#renderdoc.VKRenderPass.tileOnlyMSAASampleCount" title="Permalink to this definition">¶</a></dt>
+<dd><p>If VK_EXT_multisampled_render_to_single_sampled is enabled, contains the number of
+samples used to render this subpass.</p>
+<p>If the subpass is not internally multisampled, tileOnlyMSAASampleCount is set to 0.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKFramebuffer">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKFramebuffer</span></span><a class="headerlink" href="#renderdoc.VKFramebuffer" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes a framebuffer object and its attachments.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKFramebuffer.attachments">
+<span class="sig-name descname"><span class="pre">attachments</span></span><a class="headerlink" href="#renderdoc.VKFramebuffer.attachments" title="Permalink to this definition">¶</a></dt>
+<dd><p>The attachments of this framebuffer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="../shaders.html#renderdoc.Descriptor" title="renderdoc.Descriptor">Descriptor</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKFramebuffer.height">
+<span class="sig-name descname"><span class="pre">height</span></span><a class="headerlink" href="#renderdoc.VKFramebuffer.height" title="Permalink to this definition">¶</a></dt>
+<dd><p>The height of this framebuffer in pixels.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKFramebuffer.layers">
+<span class="sig-name descname"><span class="pre">layers</span></span><a class="headerlink" href="#renderdoc.VKFramebuffer.layers" title="Permalink to this definition">¶</a></dt>
+<dd><p>The number of layers in this framebuffer.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKFramebuffer.resourceId">
+<span class="sig-name descname"><span class="pre">resourceId</span></span><a class="headerlink" href="#renderdoc.VKFramebuffer.resourceId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> of the framebuffer object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKFramebuffer.width">
+<span class="sig-name descname"><span class="pre">width</span></span><a class="headerlink" href="#renderdoc.VKFramebuffer.width" title="Permalink to this definition">¶</a></dt>
+<dd><p>The width of this framebuffer in pixels.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKRenderArea">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKRenderArea</span></span><a class="headerlink" href="#renderdoc.VKRenderArea" title="Permalink to this definition">¶</a></dt>
+<dd><p>Describes a render area in the current framebuffer.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderArea.height">
+<span class="sig-name descname"><span class="pre">height</span></span><a class="headerlink" href="#renderdoc.VKRenderArea.height" title="Permalink to this definition">¶</a></dt>
+<dd><p>The height of the render area.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderArea.width">
+<span class="sig-name descname"><span class="pre">width</span></span><a class="headerlink" href="#renderdoc.VKRenderArea.width" title="Permalink to this definition">¶</a></dt>
+<dd><p>The width of the render area.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderArea.x">
+<span class="sig-name descname"><span class="pre">x</span></span><a class="headerlink" href="#renderdoc.VKRenderArea.x" title="Permalink to this definition">¶</a></dt>
+<dd><p>The X co-ordinate of the render area.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKRenderArea.y">
+<span class="sig-name descname"><span class="pre">y</span></span><a class="headerlink" href="#renderdoc.VKRenderArea.y" title="Permalink to this definition">¶</a></dt>
+<dd><p>The Y co-ordinate of the render area.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="image-states">
+<h2><a class="toc-backref" href="#id11">Image States</a><a class="headerlink" href="#image-states" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKImageData">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKImageData</span></span><a class="headerlink" href="#renderdoc.VKImageData" title="Permalink to this definition">¶</a></dt>
+<dd><p>Contains the current layout of all subresources in the image.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKImageData.layouts">
+<span class="sig-name descname"><span class="pre">layouts</span></span><a class="headerlink" href="#renderdoc.VKImageData.layouts" title="Permalink to this definition">¶</a></dt>
+<dd><p>The subresource regions in this resource.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>List[<a class="reference internal" href="#renderdoc.VKImageLayout" title="renderdoc.VKImageLayout">VKImageLayout</a>]</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKImageData.resourceId">
+<span class="sig-name descname"><span class="pre">resourceId</span></span><a class="headerlink" href="#renderdoc.VKImageData.resourceId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> of the image.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKImageLayout">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKImageLayout</span></span><a class="headerlink" href="#renderdoc.VKImageLayout" title="Permalink to this definition">¶</a></dt>
+<dd><p>Contains the layout of a range of subresources in an image.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKImageLayout.baseLayer">
+<span class="sig-name descname"><span class="pre">baseLayer</span></span><a class="headerlink" href="#renderdoc.VKImageLayout.baseLayer" title="Permalink to this definition">¶</a></dt>
+<dd><p>For 3D textures and texture arrays, the first slice used in the range.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKImageLayout.baseMip">
+<span class="sig-name descname"><span class="pre">baseMip</span></span><a class="headerlink" href="#renderdoc.VKImageLayout.baseMip" title="Permalink to this definition">¶</a></dt>
+<dd><p>The first mip level used in the range.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKImageLayout.name">
+<span class="sig-name descname"><span class="pre">name</span></span><a class="headerlink" href="#renderdoc.VKImageLayout.name" title="Permalink to this definition">¶</a></dt>
+<dd><p>The name of the current image state.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKImageLayout.numLayer">
+<span class="sig-name descname"><span class="pre">numLayer</span></span><a class="headerlink" href="#renderdoc.VKImageLayout.numLayer" title="Permalink to this definition">¶</a></dt>
+<dd><p>For 3D textures and texture arrays, the number of array slices in the range.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKImageLayout.numMip">
+<span class="sig-name descname"><span class="pre">numMip</span></span><a class="headerlink" href="#renderdoc.VKImageLayout.numMip" title="Permalink to this definition">¶</a></dt>
+<dd><p>The number of mip levels in the range.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="conditional-rendering">
+<h2><a class="toc-backref" href="#id12">Conditional Rendering</a><a class="headerlink" href="#conditional-rendering" title="Permalink to this headline">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="renderdoc.VKConditionalRendering">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">renderdoc.</span></span><span class="sig-name descname"><span class="pre">VKConditionalRendering</span></span><a class="headerlink" href="#renderdoc.VKConditionalRendering" title="Permalink to this definition">¶</a></dt>
+<dd><p>Contains the current conditional rendering state.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKConditionalRendering.bufferId">
+<span class="sig-name descname"><span class="pre">bufferId</span></span><a class="headerlink" href="#renderdoc.VKConditionalRendering.bufferId" title="Permalink to this definition">¶</a></dt>
+<dd><p>The <a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId"><code class="xref py py-class docutils literal notranslate"><span class="pre">ResourceId</span></code></a> of the buffer containing the predicate for conditional rendering.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p><a class="reference internal" href="../resources.html#renderdoc.ResourceId" title="renderdoc.ResourceId">ResourceId</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKConditionalRendering.byteOffset">
+<span class="sig-name descname"><span class="pre">byteOffset</span></span><a class="headerlink" href="#renderdoc.VKConditionalRendering.byteOffset" title="Permalink to this definition">¶</a></dt>
+<dd><p>The byte offset into buffer where the predicate is located.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>int</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKConditionalRendering.isInverted">
+<span class="sig-name descname"><span class="pre">isInverted</span></span><a class="headerlink" href="#renderdoc.VKConditionalRendering.isInverted" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if predicate result is inverted.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="renderdoc.VKConditionalRendering.isPassing">
+<span class="sig-name descname"><span class="pre">isPassing</span></span><a class="headerlink" href="#renderdoc.VKConditionalRendering.isPassing" title="Permalink to this definition">¶</a></dt>
+<dd><p><code class="docutils literal notranslate"><span class="pre">True</span></code> if the current predicate would render.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Type</dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="common.html" class="btn btn-neutral float-right" title="API Reference: Common Pipeline State Abstraction" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="gl.html" class="btn btn-neutral float-left" title="API Reference: OpenGL Pipeline State" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

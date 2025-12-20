@@ -8,7 +8,7 @@ C API for integration with id Tech 3 engine
 #ifndef __UI2_PUBLIC_H__
 #define __UI2_PUBLIC_H__
 
-#include "../qcommon/q_shared.h"
+#include "../common/q_shared.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -1,6 +1,6 @@
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
-#include "../qcommon/q_log.h"
+#include "../common/q_shared.h"
+#include "../common/qcommon.h"
+#include "../common/q_log.h"
 #include "snd_public.h"
 #include "snd_local.h"
 #include "snd_openal.h"
@@ -69,11 +69,11 @@ qboolean SndOpenAL_Init(void)
 	s_openal_3d = Cvar_Get("s_openal_3d", "1", CVAR_ARCHIVE);
 	Cvar_SetDescription(s_openal_3d, "Enable 3D positional audio with OpenAL");
 	
-	s_openal_occlusion = Cvar_Get("s_openal_occlusion", "1", CVAR_ARCHIVE);
-	Cvar_SetDescription(s_openal_occlusion, "Enable sound occlusion/obstruction");
-	
-	s_openal_reverb = Cvar_Get("s_openal_reverb", "1", CVAR_ARCHIVE);
-	Cvar_SetDescription(s_openal_reverb, "Enable reverb effects");
+	s_openal_occlusion = Cvar_Get("s_openal_occlusion", "0", CVAR_ARCHIVE);
+	Cvar_SetDescription(s_openal_occlusion, "Enable sound occlusion/obstruction (may impact performance)");
+
+	s_openal_reverb = Cvar_Get("s_openal_reverb", "0", CVAR_ARCHIVE);
+	Cvar_SetDescription(s_openal_reverb, "Enable reverb effects (may impact performance)");
 	
 	if (!s_openal_enabled->integer) {
 		return qfalse;

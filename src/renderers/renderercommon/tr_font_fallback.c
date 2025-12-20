@@ -5,7 +5,7 @@ Font fallback chain support for modern font rendering
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
+#include "../../common/q_shared.h"
 #include "../renderercommon/tr_public.h"
 #include "../renderer/tr_common.h"
 

@@ -9,8 +9,8 @@ Server-side ECS integration with svEntity_t bridge for network sync.
 #ifndef __SV_ECS_H__
 #define __SV_ECS_H__
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/ecs.h"
+#include "../common/q_shared.h"
+#include "../common/ecs.h"
 #include "server.h"
 
 #ifdef USE_ENTT

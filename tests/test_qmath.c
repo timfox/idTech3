@@ -5,7 +5,7 @@ Basic math utilities tests for q_math.c
 */
 
 #include "test_framework.h"
-#include "../src/qcommon/q_shared.h"
+#include "../src/common/q_shared.h"
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>

@@ -9,7 +9,7 @@ Server-specific ECS systems for network sync and server-side logic.
 #ifdef USE_ENTT
 
 #include "sv_ecs.h"
-#include "../qcommon/ecs_components.h"
+#include "../common/ecs_components.h"
 #include <entt/entt.hpp>
 
 extern server_t sv;

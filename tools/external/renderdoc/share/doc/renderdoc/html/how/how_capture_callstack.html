@@ -1,0 +1,308 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>How do I capture callstacks? &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/how/how_capture_callstack.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="How do I use a custom visualisation shader?" href="how_custom_visualisation.html" />
+    <link rel="prev" title="How do I view details of an object?" href="how_object_details.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../python_api/index.html">Python API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">How do I …?</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="how_capture_frame.html">How do I capture a frame?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_android_capture.html">How do I use RenderDoc on Android?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_filter_events.html">How do I filter visible events?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_debug_shader.html">How do I debug a shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_shader_debug_info.html">How do I use shader debug information?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_inspect_pixel.html">How do I inspect a pixel value?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_buffer_format.html">How do I specify a buffer format?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_view_texture.html">How do I view a specific texture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_object_details.html">How do I view details of an object?</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">How do I capture callstacks?</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#launching-capture">Launching Capture</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#replaying-the-capture">Replaying the capture</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="how_custom_visualisation.html">How do I use a custom visualisation shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_edit_shader.html">How do I edit a shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_network_capture_replay.html">How do I capture and replay over a network?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_annotate_capture.html">How do I annotate a capture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_import_export.html">How do I import or export a capture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_rgp_profile.html">How do I generate an RGP profile?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_python_extension.html">How do I register a python extension?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_control_replay.html">How do I control the replay?</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">How do I …?</a> &raquo;</li>
+        
+      <li>How do I capture callstacks?</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/how/how_capture_callstack.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="how-do-i-capture-callstacks">
+<h1>How do I capture callstacks?<a class="headerlink" href="#how-do-i-capture-callstacks" title="Permalink to this headline">¶</a></h1>
+<p>This page gives an overview of the callstack-capturing capability in RenderDoc, with details and important information about how to enable this.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
+<p>It can be useful when tracking down problems to have an idea of where each API call came from. In any non-trivial program it’s not necessarily obvious where every single call was made, and giving a code-side callstack up to the API entry point can pinpoint errant calls that are causing problems.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>On Windows the callstack gathering uses <code class="docutils literal notranslate"><span class="pre">dbghelp.dll</span></code>. If you’re using this dll for some other debugging functionality in your app it is highly recommended that you disable it, otherwise it can conflict and break RenderDoc’s callstack capture.</p>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Callstack gathering has a reasonable overhead during capture and can slow things down as well as cause more memory overhead. This can be mitigated with the ‘only action callstacks’ option that only lists callstacks for each action.</p>
+</div>
+</section>
+<section id="launching-capture">
+<h2>Launching Capture<a class="headerlink" href="#launching-capture" title="Permalink to this headline">¶</a></h2>
+<p>When launching a capture (as in <a class="reference internal" href="how_capture_frame.html"><span class="doc">How do I capture a frame?</span></a>) you should enable <span class="guilabel">Collect callstacks</span>. This will set RenderDoc to collect callstacks at every API entry point that will be serialised into the capture file.</p>
+<figure class="align-default" id="id1">
+<img alt="../_images/Callstacks.png" src="../_images/Callstacks.png" />
+<figcaption>
+<p><span class="caption-text">Collect Callstacks: Option enabled on the capture dialog.</span><a class="headerlink" href="#id1" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>If you wish to save some time &amp; overhead you can then enable <span class="guilabel">Only action stacks</span>. This will only collect callstacks when an action call is made. This can be a good-enough trade off that still gets you the information you need, at a lower cost. After this point you can run the program and capture as usual.</p>
+</section>
+<section id="replaying-the-capture">
+<h2>Replaying the capture<a class="headerlink" href="#replaying-the-capture" title="Permalink to this headline">¶</a></h2>
+<p>When the capture is loaded in RenderDoc the callstacks will be available in the API inspector. The bottom section of the dialog is a panel that can be expanded to show the callstack. Initially this section will indicate that symbols need to be resolved.</p>
+<figure class="align-default" id="id2">
+<img alt="../_images/NeedResolve.png" src="../_images/NeedResolve.png" />
+<figcaption>
+<p><span class="caption-text">Callstack section: The callstack section expanded in API inspector.</span><a class="headerlink" href="#id2" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>To resolve the symbols referenced in the capture, go to the <span class="guilabel">Tools</span> menu and select <span class="guilabel">Resolve Symbols</span>. If this menu option isn’t available the callstacks did not successfully collect in the capture file.</p>
+<p>The resolving symbols process may take some time the first few instances you use it, as it may have to download symbols from the Microsoft symbol server. Each module that is loaded in the application at the time of capture will be saved and its symbols searched for.</p>
+<p>By default a symbol server will be used, as well as a few default locations such as the location indicated in the PE metadata (i.e. the original build location). If a pdb cannot be found you will be prompted for the location of the pdb, and this new location will then be remembered for subsequent pdbs.</p>
+<figure class="align-default" id="id3">
+<img alt="../_images/NeedPDB.png" src="../_images/NeedPDB.png" />
+<figcaption>
+<p><span class="caption-text">PDB locate prompt: Prompt to locate a PDB that cannot be found.</span><a class="headerlink" href="#id3" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>If a PDB cannot be located then you have the option of permanently ignoring that PDB. This can be useful for third party libraries for which no PDB will ever be available. If you don’t ignore the PDB you will be prompted to locate it the next time you open a capture that references it. The list of ignored PDBs is given in the settings window in the UI, where you can remove a PDB from it.</p>
+<p>Once the symbols have been successfully resolved the callstack section of the API inspector will contain any callstack that was collected for the given action or API call. You can select and copy any levels and paste them elsewhere if you wish.</p>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="how_custom_visualisation.html" class="btn btn-neutral float-right" title="How do I use a custom visualisation shader?" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="how_object_details.html" class="btn btn-neutral float-left" title="How do I view details of an object?" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

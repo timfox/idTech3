@@ -7,7 +7,7 @@ GUI Testing Framework for id Tech 3
 #ifndef __TEST_GUI_FRAMEWORK_H__
 #define __TEST_GUI_FRAMEWORK_H__
 
-#include "../src/qcommon/q_shared.h"
+#include "../src/common/q_shared.h"
 
 // GUI test context
 typedef struct {

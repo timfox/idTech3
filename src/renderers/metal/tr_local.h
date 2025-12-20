@@ -3,9 +3,9 @@
 
 #if defined(__APPLE__) && !defined(__ANDROID__)
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qfiles.h"
-#include "../qcommon/qcommon.h"
+#include "../common/q_shared.h"
+#include "../common/qfiles.h"
+#include "../common/qcommon.h"
 #include "../renderercommon/tr_public.h"
 #include "tr_common.h"
 #include "metal.h"

@@ -23,11 +23,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "client.h"
 #include "cl_imgui_debug.h"
 #include "cl_net_enhanced.h"
-#include "../qcommon/q_memtrack.h"
-#include "../qcommon/q_log.h"
-#include "../qcommon/qcommon.h"
-#include "../qcommon/event_system.h"
-#include "../qcommon/performance_counters.h"
+#include "../common/q_memtrack.h"
+#include "../common/q_log.h"
+#include "../common/qcommon.h"
+#include "../common/event_system.h"
+#include "../common/performance_counters.h"
 
 #ifdef USE_CIMGUI
 

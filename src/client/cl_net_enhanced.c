@@ -16,7 +16,7 @@ or (at your option) any later version.
 
 #include "client.h"
 #include "cl_net_enhanced.h"
-#include "../qcommon/qcommon.h"
+#include "../common/qcommon.h"
 
 // Static variables
 static net_connection_pool_t connection_pool;

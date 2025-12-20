@@ -5,7 +5,7 @@ Info string helpers tests (Info_ValueForKey, Info_SetValueForKey, Info_RemoveKey
 */
 
 #include "test_framework.h"
-#include "../src/qcommon/q_shared.h"
+#include "../src/common/q_shared.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>

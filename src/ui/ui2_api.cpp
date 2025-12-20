@@ -22,7 +22,7 @@ extern "C" {
 }
 #endif
 
-#include "../qcommon/qcommon.h"
+#include "../common/qcommon.h"
 
 #ifdef __cplusplus
 

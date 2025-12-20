@@ -1,0 +1,317 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>How do I inspect a pixel value? &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/how/how_inspect_pixel.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="How do I specify a buffer format?" href="how_buffer_format.html" />
+    <link rel="prev" title="How do I use shader debug information?" href="how_shader_debug_info.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../python_api/index.html">Python API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">How do I …?</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="how_capture_frame.html">How do I capture a frame?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_android_capture.html">How do I use RenderDoc on Android?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_filter_events.html">How do I filter visible events?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_debug_shader.html">How do I debug a shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_shader_debug_info.html">How do I use shader debug information?</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">How do I inspect a pixel value?</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#selecting-appropriate-subresource">Selecting appropriate subresource</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#picking-a-pixel-value">Picking a Pixel Value</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pixel-context-display">Pixel Context Display</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pixel-history">Pixel History</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#see-also">See Also</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="how_buffer_format.html">How do I specify a buffer format?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_view_texture.html">How do I view a specific texture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_object_details.html">How do I view details of an object?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_capture_callstack.html">How do I capture callstacks?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_custom_visualisation.html">How do I use a custom visualisation shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_edit_shader.html">How do I edit a shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_network_capture_replay.html">How do I capture and replay over a network?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_annotate_capture.html">How do I annotate a capture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_import_export.html">How do I import or export a capture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_rgp_profile.html">How do I generate an RGP profile?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_python_extension.html">How do I register a python extension?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_control_replay.html">How do I control the replay?</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">How do I …?</a> &raquo;</li>
+        
+      <li>How do I inspect a pixel value?</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/how/how_inspect_pixel.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="how-do-i-inspect-a-pixel-value">
+<h1>How do I inspect a pixel value?<a class="headerlink" href="#how-do-i-inspect-a-pixel-value" title="Permalink to this headline">¶</a></h1>
+<p>When in the texture viewer you can inspect the pixel values to obtain the exact contents of any pixel in the texture.</p>
+<section id="selecting-appropriate-subresource">
+<h2>Selecting appropriate subresource<a class="headerlink" href="#selecting-appropriate-subresource" title="Permalink to this headline">¶</a></h2>
+<p>More details can be found in the <a class="reference internal" href="../window/texture_viewer.html"><span class="doc">Texture Viewer</span></a> page, but the first step is to select the appropriate subresource - array element, cubemap face or mip slice.</p>
+<p>The values that are picked out of the texture are always exact values, and will not be affected by the currently selected channels or range adaption control.</p>
+</section>
+<section id="picking-a-pixel-value">
+<h2>Picking a Pixel Value<a class="headerlink" href="#picking-a-pixel-value" title="Permalink to this headline">¶</a></h2>
+<p>At any point while hovering over the texture the status bar contains the current pixel location that the cursor is hovering over, as well as a basic color swatch to give some indication of where you are.</p>
+<figure class="align-default" id="id2">
+<img alt="../_images/HoverStatus.png" src="../_images/HoverStatus.png" />
+<figcaption>
+<p><span class="caption-text">Hover Status Bar: The status bar showing position and color</span><a class="headerlink" href="#id2" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>When the right mouse button is pressed, the currently hovered pixel value will be displayed with the current float precision settings - for more information on how to tune these look at the window reference for the <a class="reference internal" href="../window/settings_window.html"><span class="doc">Settings Window</span></a>.</p>
+<p>For depth textures the depth and stencil values will be displayed separately. The stencil value (as with any integer formatted texture) will be displayed as an integer.</p>
+<figure class="align-default" id="id3">
+<img alt="../_images/RMBStatus.png" src="../_images/RMBStatus.png" />
+<figcaption>
+<p><span class="caption-text">Picked Pixel: The value of a pixel that has been picked</span><a class="headerlink" href="#id3" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>If the right mouse button is just clicked, the picked pixel value will remain with the same value as the mouse moves. If you hold the right mouse button and drag, it will update as the mouse moves to allow some amount of refinement.</p>
+<p>To make fine adjustments by a single pixel at a time, it’s easiest to use the arrow keys on the keyboard. Pressing these will shift the picked location by a single pixel in each direction.</p>
+</section>
+<section id="pixel-context-display">
+<h2>Pixel Context Display<a class="headerlink" href="#pixel-context-display" title="Permalink to this headline">¶</a></h2>
+<p>Whenever a pixel is picked, the pixel context display is updated to surround the currently selected pixel. This dialog is by default docked in the bottom right of the texture viewer, next to the thumbnail strip.</p>
+<figure class="align-default" id="id4">
+<img alt="../_images/PixelContext.png" src="../_images/PixelContext.png" />
+<figcaption>
+<p><span class="caption-text">Pixel Context: The zoomed in context around the pixel currently selected</span><a class="headerlink" href="#id4" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>This context display shows a zoomed in view of the texture around the area that you’ve selected so that it’s easier to make small adjustments without zooming in and losing a sense of the whole texture.</p>
+<p>The pixel context viewer can also allow you to launch pixel debugging, if the API supports it. Once a pixel is picked the button below the context is activated which will launch the shader debugger. More information about this is available: <a class="reference internal" href="how_debug_shader.html"><span class="doc">How do I debug a shader?</span></a>.</p>
+<p>It also allows you to launch a pixel history view if supported, showing every modification to this pixel in the frame up to the current point.</p>
+</section>
+<section id="pixel-history">
+<span id="id1"></span><h2>Pixel History<a class="headerlink" href="#pixel-history" title="Permalink to this headline">¶</a></h2>
+<p>When you have a pixel selected, you can click ‘History’ to open up a pixel history view showing every modification to the selected texture from the start of the frame to the currently selected event.</p>
+<p>This display shows each modifying event as its own row, colored as to whether any modifications happened from this event or not - green for fragments that passed all pipeline tests, red for where fragments failed some test, and light gray for arbitrary shader writable resources where it’s unknown if there was a write.</p>
+<p>You can expand each event to see if there were multiple fragments, and see the shader output value from each fragment.</p>
+<p>Right clicking will allow you to launch the shader debugger at the given event for the selected pixel. If you select a particular fragment or primitive, this will be the fragment that is debugged.</p>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="../window/texture_viewer.html"><span class="doc">Texture Viewer</span></a></p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="how_buffer_format.html" class="btn btn-neutral float-right" title="How do I specify a buffer format?" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="how_shader_debug_info.html" class="btn btn-neutral float-left" title="How do I use shader debug information?" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

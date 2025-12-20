@@ -1,0 +1,309 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>How do I register a python extension? &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/how/how_python_extension.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="How do I control the replay?" href="how_control_replay.html" />
+    <link rel="prev" title="How do I generate an RGP profile?" href="how_rgp_profile.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../python_api/index.html">Python API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">How do I …?</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="how_capture_frame.html">How do I capture a frame?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_android_capture.html">How do I use RenderDoc on Android?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_filter_events.html">How do I filter visible events?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_debug_shader.html">How do I debug a shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_shader_debug_info.html">How do I use shader debug information?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_inspect_pixel.html">How do I inspect a pixel value?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_buffer_format.html">How do I specify a buffer format?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_view_texture.html">How do I view a specific texture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_object_details.html">How do I view details of an object?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_capture_callstack.html">How do I capture callstacks?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_custom_visualisation.html">How do I use a custom visualisation shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_edit_shader.html">How do I edit a shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_network_capture_replay.html">How do I capture and replay over a network?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_annotate_capture.html">How do I annotate a capture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_import_export.html">How do I import or export a capture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_rgp_profile.html">How do I generate an RGP profile?</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">How do I register a python extension?</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#creating-extensions">Creating extensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#enabling-extensions">Enabling extensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#writing-extensions">Writing extensions</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="how_control_replay.html">How do I control the replay?</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">How do I …?</a> &raquo;</li>
+        
+      <li>How do I register a python extension?</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/how/how_python_extension.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="how-do-i-register-a-python-extension">
+<h1>How do I register a python extension?<a class="headerlink" href="#how-do-i-register-a-python-extension" title="Permalink to this headline">¶</a></h1>
+<p>RenderDoc supports python extensions using the <a class="reference internal" href="../python_api/index.html"><span class="doc">existing python API</span></a>. These extensions can be configured to be persistent and load whenever the RenderDoc UI does, allowing users to extend the program with custom functionality.</p>
+<p>Example extensions can be found at the <a class="reference external" href="https://github.com/baldurk/renderdoc-contrib">community contributed repository</a>. More information on writing an extension is available at <a class="reference internal" href="../python_api/ui_extensions.html"><span class="doc">Writing UI extensions</span></a>.</p>
+<section id="creating-extensions">
+<h2>Creating extensions<a class="headerlink" href="#creating-extensions" title="Permalink to this headline">¶</a></h2>
+<p>Extensions are simply python modules located in the user’s RenderDoc config folder, with a json manifest. The config folder varies by platform, on Windows it’s <code class="docutils literal notranslate"><span class="pre">%APPDATA%\qrenderdoc\extensions</span></code> and on linux it’s <code class="docutils literal notranslate"><span class="pre">~/.local/share/qrenderdoc/extensions</span></code>. Each extension is a python module subfolder under this root. You can nest subfolders, e.g. <code class="docutils literal notranslate"><span class="pre">extensions/foo/bar/first</span></code> would be the extension <code class="docutils literal notranslate"><span class="pre">foo.bar.first</span></code>, and treated independently from <code class="docutils literal notranslate"><span class="pre">extensions/foo/bar/second</span></code>.</p>
+<p>Next to each python module’s <code class="docutils literal notranslate"><span class="pre">__init__.py</span></code> you should create a file <code class="docutils literal notranslate"><span class="pre">extension.json</span></code> following this template:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="w"></span>
+<span class="w">    </span><span class="nt">&quot;extension_api&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Extension name for users&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.0&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">&quot;minimum_renderdoc&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1.2&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">&quot;description&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;A longer description of your extension.\n\nIt can contain multiple lines&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">&quot;author&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Your name &lt;your@email.com&gt;&quot;</span><span class="p">,</span><span class="w"></span>
+<span class="w">    </span><span class="nt">&quot;url&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;url/to/repository&quot;</span><span class="w"></span>
+<span class="p">}</span><span class="w"></span>
+</pre></div>
+</div>
+<p>In this JSON the <code class="docutils literal notranslate"><span class="pre">extension_api</span></code> field is currently fixed to 1.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">minimum_renderdoc</span></code> field controls whether the extension can be enabled on a given RenderDoc version, and allows you to block incompatible versions of RenderDoc.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">name</span></code>, <code class="docutils literal notranslate"><span class="pre">description</span></code>, <code class="docutils literal notranslate"><span class="pre">version</span></code>, <code class="docutils literal notranslate"><span class="pre">author</span></code> and <code class="docutils literal notranslate"><span class="pre">url</span></code> fields are all informational and presented to users when listing installed extensions.</p>
+<p>Without this json manifest the extension will not be enumerated by RenderDoc and displayed to users.</p>
+</section>
+<section id="enabling-extensions">
+<h2>Enabling extensions<a class="headerlink" href="#enabling-extensions" title="Permalink to this headline">¶</a></h2>
+<p>To configure installed extensions, open the extension manager by opening the <span class="guilabel">Tools</span> menu and select <span class="guilabel">Manage Extensions</span>.</p>
+<figure class="align-default" id="id1">
+<img alt="../_images/ExtensionManager.png" src="../_images/ExtensionManager.png" />
+<figcaption>
+<p><span class="caption-text">Extension Manager: Configures installed extensions.</span><a class="headerlink" href="#id1" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>From here a list of all installed extensions is presented. By default extensions are not loaded, to load an extension either select it and press <span class="guilabel">Load</span> or else tick the box in the <span class="guilabel">Loaded</span> column in the list. As with python modules, once loaded an extension cannot be unloaded until the program is restarted.</p>
+<p>Once an extension is loaded to enable it permanently, tick the <span class="guilabel">Always Load</span> checkbox when the extension is selected. Once enabled this means the extension will always load when the UI starts without any user interaction. Extensions must be loaded first to ensure they can load without errors or crashes before enabling them to load at startup.</p>
+<p>A loaded extension can be reloaded by pressing the <span class="guilabel">Reload</span> button which will attempt to unload and load the extension again to refresh the code. This may break so if you encounter any problems it’s recommended that you restart the program to ensure a clean reload.</p>
+</section>
+<section id="writing-extensions">
+<h2>Writing extensions<a class="headerlink" href="#writing-extensions" title="Permalink to this headline">¶</a></h2>
+<p>A python extension when loaded will have a <code class="docutils literal notranslate"><span class="pre">register</span></code> function called in its module, and such a function must exist at global scope. It’s defined like so for Extension API v1:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">register</span><span class="p">(</span><span class="n">version</span><span class="p">,</span> <span class="n">pyrenderdoc</span><span class="p">):</span>
+    <span class="c1"># version is the RenderDoc Major.Minor version as a string, such as &quot;1.2&quot;</span>
+    <span class="c1"># pyrenderdoc is the CaptureContext handle, the same as the global available in the python shell</span>
+</pre></div>
+</div>
+<p>Optionally you can define an <code class="docutils literal notranslate"><span class="pre">unregister</span></code> function to be called if the extension is reloaded. This takes no parameters and is simply an opportunity to clean-up or remove anything persistent that shouldn’t hang around, before <code class="docutils literal notranslate"><span class="pre">register</span></code> is called again.</p>
+<p>Extensions use the full <a class="reference internal" href="../python_api/index.html"><span class="doc">python API</span></a> with all of the power that comes with it. There are interfaces geared specifically towards extensions in <a class="reference internal" href="../python_api/qrenderdoc/extensions.html"><span class="doc">the qrenderdoc module</span></a> which allow registering callbacks for menu items.</p>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="how_control_replay.html" class="btn btn-neutral float-right" title="How do I control the replay?" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="how_rgp_profile.html" class="btn btn-neutral float-left" title="How do I generate an RGP profile?" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

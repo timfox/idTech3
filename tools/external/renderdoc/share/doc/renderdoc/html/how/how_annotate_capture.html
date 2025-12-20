@@ -1,0 +1,439 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>How do I annotate a capture? &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/how/how_annotate_capture.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="How do I import or export a capture?" href="how_import_export.html" />
+    <link rel="prev" title="How do I capture and replay over a network?" href="how_network_capture_replay.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../python_api/index.html">Python API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">How do I …?</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="how_capture_frame.html">How do I capture a frame?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_android_capture.html">How do I use RenderDoc on Android?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_filter_events.html">How do I filter visible events?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_debug_shader.html">How do I debug a shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_shader_debug_info.html">How do I use shader debug information?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_inspect_pixel.html">How do I inspect a pixel value?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_buffer_format.html">How do I specify a buffer format?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_view_texture.html">How do I view a specific texture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_object_details.html">How do I view details of an object?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_capture_callstack.html">How do I capture callstacks?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_custom_visualisation.html">How do I use a custom visualisation shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_edit_shader.html">How do I edit a shader?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_network_capture_replay.html">How do I capture and replay over a network?</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">How do I annotate a capture?</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#application-provided-marker-regions">Application provided marker regions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#application-provided-object-names">Application provided object names</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#bookmarks">Bookmarks</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#resource-renaming">Resource Renaming</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#capture-comments">Capture Comments</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="how_import_export.html">How do I import or export a capture?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_rgp_profile.html">How do I generate an RGP profile?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_python_extension.html">How do I register a python extension?</a></li>
+<li class="toctree-l2"><a class="reference internal" href="how_control_replay.html">How do I control the replay?</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">How do I …?</a> &raquo;</li>
+        
+      <li>How do I annotate a capture?</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/how/how_annotate_capture.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="how-do-i-annotate-a-capture">
+<h1>How do I annotate a capture?<a class="headerlink" href="#how-do-i-annotate-a-capture" title="Permalink to this headline">¶</a></h1>
+<p>RenderDoc allows annotation of captures in two ways - annotations that you provide from your application along with the other graphics API calls that you make, and annotations that are made in the UI while analysing a capture and can be saved with it.</p>
+<p>The annotations provided with the graphics API calls from your application vary by the particular API and are documented below.</p>
+<p>Annotations made in the UI are also described below. These can be useful for example when investigating a bug or repro case and passing on your findings natively to someone else, instead of having to include additional text like ‘texture 148 is the buggy texture’ you can directly mark up the capture.</p>
+<p>All of the UI modifications can be saved with a capture. Pressing <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">Ctrl</kbd>-<kbd class="kbd docutils literal notranslate">S</kbd></kbd> or <span class="guilabel">File</span> → <span class="guilabel">Save</span> will save the capture with any changes that have been made to it in the UI. If you haven’t already saved a temporary capture, or the capture is on a remote context, this will need to you save it to a local path.</p>
+<section id="application-provided-marker-regions">
+<h2>Application provided marker regions<a class="headerlink" href="#application-provided-marker-regions" title="Permalink to this headline">¶</a></h2>
+<p>When calling graphics API functions from your code you can provide annotations to group regions of the frame under names, with a nested hierarchy.</p>
+<p>These markers are provided in an API specific way: D3D11 uses the <code class="docutils literal notranslate"><span class="pre">D3DPERF</span></code> or <code class="docutils literal notranslate"><span class="pre">ID3DUserDefinedAnnotation</span></code> APIs, D3D12 uses <code class="docutils literal notranslate"><span class="pre">SetMarker</span></code>/<code class="docutils literal notranslate"><span class="pre">BeginEvent</span></code>/<code class="docutils literal notranslate"><span class="pre">EndEvent</span></code> on lists or queues, OpenGL has many extensions but <code class="docutils literal notranslate"><span class="pre">KHR_debug</span></code> is guaranteed to always be available, and Vulkan uses <code class="docutils literal notranslate"><span class="pre">VK_EXT_debug_utils</span></code>.</p>
+<p>In APIs such as D3D12 and Vulkan with queues and command buffers, the markers are processed in submission order and are allowed to cross primary command buffers, so a single region can cross several command buffers. Secondary command buffers or bundles can contain markers but they must be self-contained and not imbalanced.</p>
+<p>Some of the APIs add the ability to provide a colour for a marker region, these colours are displayed in the <a class="reference internal" href="../window/event_browser.html"><span class="doc">Event Browser</span></a> window.</p>
+<figure class="align-default" id="id1">
+<img alt="../_images/EventBrowserRegions.png" src="../_images/EventBrowserRegions.png" />
+<figcaption>
+<p><span class="caption-text">Marker Regions: The Event browser showing several coloured marker regions.</span><a class="headerlink" href="#id1" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>Example code for D3D11:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">// The ``D3DPERF`` APIs are exported by ``d3d9.dll``, but can still be used in D3D11</span>
+<span class="c1">// for compatibility reasons</span>
+
+<span class="n">D3DPERF_BeginEvent</span><span class="p">(</span><span class="mh">0xffffffff</span><span class="p">,</span><span class="w"> </span><span class="sa">L</span><span class="s">&quot;Start of example&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="n">D3DPERF_BeginEvent</span><span class="p">(</span><span class="mh">0xff00ff00</span><span class="p">,</span><span class="w"> </span><span class="sa">L</span><span class="s">&quot;Sub section&quot;</span><span class="p">);</span><span class="w"></span>
+<span class="c1">// events inside the subsection</span>
+<span class="n">D3DPERF_EndEvent</span><span class="p">();</span><span class="w"></span>
+
+<span class="c1">// events outside the subsection</span>
+<span class="n">D3DPERF_EndEvent</span><span class="p">();</span><span class="w"></span>
+
+<span class="c1">// the newer ID3DUserDefinedAnnotation API is also supported</span>
+<span class="n">ID3DUserDefinedAnnotation</span><span class="w"> </span><span class="o">*</span><span class="n">annot</span><span class="p">;</span><span class="w"></span>
+<span class="n">immediateContext</span><span class="o">-&gt;</span><span class="n">QueryInterface</span><span class="p">(</span><span class="n">__uuidof</span><span class="p">(</span><span class="n">ID3DUserDefinedAnnotation</span><span class="p">),</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">**</span><span class="p">)</span><span class="o">&amp;</span><span class="n">annot</span><span class="p">);</span><span class="w"></span>
+
+<span class="n">annot</span><span class="o">-&gt;</span><span class="n">BeginEvent</span><span class="p">(</span><span class="sa">L</span><span class="s">&quot;Sub section 2&quot;</span><span class="p">)</span><span class="w"></span>
+
+<span class="n">annot</span><span class="o">-&gt;</span><span class="n">EndEvent</span><span class="p">();</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Example code for D3D12:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">// 1 for the first parameter means the data is an ANSI string. Pass 0 for a wchar string.</span>
+<span class="c1">// the length should include the NULL terminator</span>
+<span class="n">list</span><span class="o">-&gt;</span><span class="n">BeginEvent</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Begin Section&quot;</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="s">&quot;Begin Section&quot;</span><span class="p">));</span><span class="w"></span>
+
+<span class="n">list</span><span class="o">-&gt;</span><span class="n">EndEvent</span><span class="p">();</span><span class="w"></span>
+
+<span class="c1">// queue-level markers can be provided similarly.</span>
+</pre></div>
+</div>
+<p>Example code for OpenGL using the <code class="docutils literal notranslate"><span class="pre">KHR_debug</span></code> extension. Many other extensions exist in GL to provide markers and will be made available by RenderDoc too.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">// omitted code to initialise the extension function pointers</span>
+
+<span class="n">glPushDebugGroupKHR</span><span class="p">(</span><span class="n">GL_DEBUG_SOURCE_APPLICATION</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">-1</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Begin Section&quot;</span><span class="p">);</span><span class="w"></span>
+
+<span class="c1">// contents of section here</span>
+
+<span class="n">glPopDebugGroupKHR</span><span class="p">();</span><span class="w"></span>
+</pre></div>
+</div>
+<p>Example code for Vulkan using the <code class="docutils literal notranslate"><span class="pre">VK_EXT_debug_utils</span></code> extension:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">// omitted code to initialise the extension</span>
+
+<span class="n">VkCommandBuffer</span><span class="w"> </span><span class="n">cmd</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">...;</span><span class="w"></span>
+
+<span class="n">VkDebugUtilsLabelEXT</span><span class="w"> </span><span class="n">markerInfo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{};</span><span class="w"></span>
+<span class="n">markerInfo</span><span class="p">.</span><span class="n">sType</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT</span><span class="p">;</span><span class="w"></span>
+<span class="n">markerInfo</span><span class="p">.</span><span class="n">pLabelName</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;Begin Section&quot;</span><span class="p">;</span><span class="w"></span>
+<span class="n">vkCmdBeginDebugUtilsLabelEXT</span><span class="p">(</span><span class="n">cmd</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">markerInfo</span><span class="p">);</span><span class="w"></span>
+
+<span class="c1">// contents of section here</span>
+
+<span class="n">vkCmdEndDebugUtilsLabelEXT</span><span class="p">(</span><span class="n">cmd</span><span class="p">);</span><span class="w"></span>
+
+<span class="c1">// queue-level markers can be provided similarly.</span>
+</pre></div>
+</div>
+</section>
+<section id="application-provided-object-names">
+<h2>Application provided object names<a class="headerlink" href="#application-provided-object-names" title="Permalink to this headline">¶</a></h2>
+<p>Similar to the marker regions above, it is possible to give objects names via the graphics APIs and they will be displayed with those human-readable names instead of auto-generated names.</p>
+<p>When a resource with a custom name is bound to the pipeline it will be listed like so:</p>
+<figure class="align-default" id="id2">
+<img alt="../_images/NamedTex.png" src="../_images/NamedTex.png" />
+<figcaption>
+<p><span class="caption-text">Named Texture: The example texture bound with name displayed.</span><a class="headerlink" href="#id2" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>In a similar way any other resource can be named and this will be useful throughout the rest of the analysis. If a custom name is not provided, a default name will be generated - as seen above with the Render Pass and Framebuffer objects.</p>
+<p>Again the exact method varies by API, as given in the examples below.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>RenderDoc does not support names that change within a capture. A resource only has one name, which is the most recent one set.</p>
+</div>
+<p>Example code for D3D11 using the <code class="docutils literal notranslate"><span class="pre">SetPrivateData</span></code> function:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">// Creating an example resource - a 2D Texture.</span>
+<span class="n">ID3D11Texture2D</span><span class="w"> </span><span class="o">*</span><span class="n">tex2d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"></span>
+<span class="n">d3dDevice</span><span class="o">-&gt;</span><span class="n">CreateTexture2D</span><span class="p">(</span><span class="o">&amp;</span><span class="n">descriptor</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">tex2d</span><span class="p">);</span><span class="w"></span>
+
+<span class="c1">// Give the texture a useful name</span>
+<span class="n">tex2d</span><span class="o">-&gt;</span><span class="n">SetPrivateData</span><span class="p">(</span><span class="n">WKPDID_D3DDebugObjectName</span><span class="p">,</span><span class="w"> </span><span class="k">sizeof</span><span class="p">(</span><span class="s">&quot;Example Texture&quot;</span><span class="p">),</span><span class="w"> </span><span class="s">&quot;Example Texture&quot;</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>With D3D12 you can use the <code class="docutils literal notranslate"><span class="pre">SetName</span></code> function:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">// Creating an example resource - a 2D Texture.</span>
+<span class="n">ID3D12Resource</span><span class="w"> </span><span class="o">*</span><span class="n">tex2d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nb">NULL</span><span class="p">;</span><span class="w"></span>
+<span class="n">d3dDevice</span><span class="o">-&gt;</span><span class="n">CreateCommittedResource</span><span class="p">(</span><span class="o">&amp;</span><span class="n">heapProps</span><span class="p">,</span><span class="w"> </span><span class="n">heapFlags</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">descriptor</span><span class="p">,</span><span class="w"> </span><span class="n">initState</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">clearValue</span><span class="p">,</span><span class="w"> </span><span class="n">__uuidof</span><span class="p">(</span><span class="n">ID3D12Resource</span><span class="p">),</span><span class="w"> </span><span class="p">(</span><span class="kt">void</span><span class="w"> </span><span class="o">**</span><span class="p">)</span><span class="o">&amp;</span><span class="n">tex2d</span><span class="p">);</span><span class="w"></span>
+
+<span class="c1">// Give the texture a useful name</span>
+<span class="n">tex2d</span><span class="o">-&gt;</span><span class="n">SetName</span><span class="p">(</span><span class="sa">L</span><span class="s">&quot;Example Texture&quot;</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>In OpenGL this can be done with <code class="docutils literal notranslate"><span class="pre">GL_KHR_debug</span></code> with the function <code class="docutils literal notranslate"><span class="pre">glObjectLabel</span></code>.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">// Creating an example resource - a 2D Texture.</span>
+<span class="n">GLuint</span><span class="w"> </span><span class="n">tex2d</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="n">glGenTextures</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">tex2d</span><span class="p">);</span><span class="w"></span>
+<span class="n">glBindTexture</span><span class="p">(</span><span class="n">GL_TEXTURE_2D</span><span class="p">,</span><span class="w"> </span><span class="n">tex2d</span><span class="p">);</span><span class="w"></span>
+
+<span class="c1">// apply the name, -1 means NULL terminated</span>
+<span class="n">glObjectLabel</span><span class="p">(</span><span class="n">GL_TEXTURE</span><span class="p">,</span><span class="w"> </span><span class="n">tex2d</span><span class="p">,</span><span class="w"> </span><span class="mi">-1</span><span class="p">,</span><span class="w"> </span><span class="s">&quot;Example Texture&quot;</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>In Vulkan you can enable the <code class="docutils literal notranslate"><span class="pre">VK_EXT_debug_utils</span></code> extension, which is provided by RenderDoc, and use the <code class="docutils literal notranslate"><span class="pre">vkSetDebugUtilsObjectNameEXT</span></code> function.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">// create the image</span>
+<span class="n">VkImage</span><span class="w"> </span><span class="n">tex2d</span><span class="p">;</span><span class="w"></span>
+<span class="n">vkCreateImage</span><span class="p">(</span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">createInfo</span><span class="p">,</span><span class="w"> </span><span class="nb">NULL</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">tex2d</span><span class="p">);</span><span class="w"></span>
+
+<span class="c1">// set the name</span>
+<span class="n">VkDebugUtilsObjectNameInfoEXT</span><span class="w"> </span><span class="n">nameInfo</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">{};</span><span class="w"></span>
+<span class="n">nameInfo</span><span class="p">.</span><span class="n">sType</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT</span><span class="p">;</span><span class="w"></span>
+<span class="n">nameInfo</span><span class="p">.</span><span class="n">objectType</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">VK_OBJECT_TYPE_IMAGE</span><span class="p">;</span><span class="w"></span>
+<span class="n">nameInfo</span><span class="p">.</span><span class="n">objectHandle</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="kt">uint64_t</span><span class="p">)</span><span class="n">tex2d</span><span class="p">;</span><span class="w"> </span><span class="c1">// this cast may vary by platform/compiler</span>
+<span class="n">nameInfo</span><span class="p">.</span><span class="n">pObjectName</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;Off-screen color framebuffer&quot;</span><span class="p">;</span><span class="w"></span>
+<span class="n">vkSetDebugUtilsObjectNameEXT</span><span class="p">(</span><span class="n">device</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;</span><span class="n">nameInfo</span><span class="p">);</span><span class="w"></span>
+</pre></div>
+</div>
+<p>On D3D12 there is a RenderDoc extension provided with this interface, queried from an <code class="docutils literal notranslate"><span class="pre">ID3D12DescriptorHeap</span></code>:</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">MIDL_INTERFACE</span><span class="p">(</span><span class="s">&quot;52528c37-bfd9-4bbb-99ff-fdb7188619ce&quot;</span><span class="p">)</span><span class="w"></span>
+<span class="nl">IRenderDocDescriptorNamer</span><span class="w"> </span><span class="p">:</span><span class="w"> </span><span class="k">public</span><span class="w"> </span><span class="n">IUnknown</span><span class="w"></span>
+<span class="p">{</span><span class="w"></span>
+<span class="k">public</span><span class="o">:</span><span class="w"></span>
+<span class="w">  </span><span class="k">virtual</span><span class="w"> </span><span class="n">HRESULT</span><span class="w"> </span><span class="n">STDMETHODCALLTYPE</span><span class="w"> </span><span class="n">SetName</span><span class="p">(</span><span class="n">UINT</span><span class="w"> </span><span class="n">DescriptorIndex</span><span class="p">,</span><span class="w"> </span><span class="n">LPCSTR</span><span class="w"> </span><span class="n">Name</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">0</span><span class="p">;</span><span class="w"></span>
+<span class="p">};</span><span class="w"></span>
+</pre></div>
+</div>
+<p>This interface allows you to set a custom name for descriptors, if using SM6.6 style <code class="docutils literal notranslate"><span class="pre">ResourceDescriptorHeap[]</span></code> access for better debugging.</p>
+</section>
+<section id="bookmarks">
+<h2>Bookmarks<a class="headerlink" href="#bookmarks" title="Permalink to this headline">¶</a></h2>
+<p>The event browser allows you to make bookmarks on events of particular interest. This allows quick navigation of a frame or jumping back and forth between two events that may be quite separated.</p>
+<p>The <img alt="asterisk_orange" src="../_images/asterisk_orange.png" /> bookmark button will allow you to bookmark an event, the shortcut key is <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">Ctrl</kbd>-<kbd class="kbd docutils literal notranslate">B</kbd></kbd>. Once you have several bookmarks, you can jump between them by pressing the <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">Ctrl</kbd>-<kbd class="kbd docutils literal notranslate">1</kbd></kbd> to <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">Ctrl</kbd>-<kbd class="kbd docutils literal notranslate">0</kbd></kbd> shortcuts from anywhere in the UI, without any need to focus the event browser.</p>
+<figure class="align-default" id="id3">
+<img alt="../_images/BookmarksBar.png" src="../_images/BookmarksBar.png" />
+<figcaption>
+<p><span class="caption-text">Bookmarks bar: The bookmarks bar with several EIDs bookmarks.</span><a class="headerlink" href="#id3" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>When loading any capture with saved bookmarks they will be automatically populated into the UI. This will allow you to highlight particular problematic events and anyone opening the capture will be able to use the shortcuts above to jump immediately to where the problem is.</p>
+</section>
+<section id="resource-renaming">
+<h2>Resource Renaming<a class="headerlink" href="#resource-renaming" title="Permalink to this headline">¶</a></h2>
+<p>From within the <a class="reference internal" href="../window/resource_inspector.html"><span class="doc">Resource Inspector</span></a> window, you can rename any resource in the capture. Whether the resource already had a custom-specified name, or if it had a default-generated name, you can provide overrides at any time.</p>
+<p>To do so, simply select the resource in question in the resource inspector - either by clicking a link from where it is bound, or searching for it by name or type. Then click on the <span class="guilabel">Rename Resource</span> button next to the name, and it will open an editing textbox to let you change the name. When you’ve set the name, press <kbd class="kbd docutils literal notranslate">Enter</kbd> or click <span class="guilabel">Rename Resource</span> again. To cancel a rename, press <kbd class="kbd docutils literal notranslate">Escape</kbd> or click <span class="guilabel">Reset name</span> to restore the name to its original value.</p>
+<figure class="align-default" id="id4">
+<img alt="../_images/resource_rename.png" src="../_images/resource_rename.png" />
+<figcaption>
+<p><span class="caption-text">Resource Inspector: Renaming a resource in a capture.</span><a class="headerlink" href="#id4" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>As with bookmarks, these renames can be saved with a capture and are automatically used when loading the capture subsequently. This can be useful to point the way to which resources are causing problems, or specifically how a given resource with a more general name is being used in this particular capture.</p>
+</section>
+<section id="capture-comments">
+<h2>Capture Comments<a class="headerlink" href="#capture-comments" title="Permalink to this headline">¶</a></h2>
+<p>In the <a class="reference internal" href="../window/capture_comments.html"><span class="doc">Capture Comments</span></a> window there is a simple text field allowing you to store any arbitrary text you want within the capture. This could be notes on the environment or build version that was stored.</p>
+<p>By default, any capture that is newly opened that contains comments will show those comments first and foremost when opening. This behaviour can be disabled in the <a class="reference internal" href="../window/settings_window.html"><span class="doc">Settings Window</span></a>.</p>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="how_import_export.html" class="btn btn-neutral float-right" title="How do I import or export a capture?" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="how_network_capture_replay.html" class="btn btn-neutral float-left" title="How do I capture and replay over a network?" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

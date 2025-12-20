@@ -1,0 +1,402 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Quick Start &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/getting_started/quick_start.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="FAQ" href="faq.html" />
+    <link rel="prev" title="Getting started" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Getting started</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Quick Start</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#capturing-a-frame">Capturing a frame</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#renderdoc-in-app">RenderDoc in-app</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#renderdoc-layout">RenderDoc layout</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#texture-viewer">Texture Viewer</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#event-browser">Event Browser</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#api-inspector">API Inspector</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#timeline-bar">Timeline Bar</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#pipeline-state">Pipeline State</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#mesh-viewer">Mesh Viewer</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#closing-notes">Closing Notes</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="faq.html">FAQ</a></li>
+<li class="toctree-l2"><a class="reference internal" href="gotchas_known_issues.html">Gotchas &amp; Known Issues</a></li>
+<li class="toctree-l2"><a class="reference internal" href="features.html">Features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tips_tricks.html">Tips &amp; Tricks</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../python_api/index.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../how/index.html">How do I …?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">Getting started</a> &raquo;</li>
+        
+      <li>Quick Start</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/getting_started/quick_start.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="quick-start">
+<h1>Quick Start<a class="headerlink" href="#quick-start" title="Permalink to this headline">¶</a></h1>
+<p>This document serves as a brief introduction to how to use RenderDoc to capture and analyse your application. It doesn’t go into much detail about exactly what functionality is available for digging into things, as this can be found elsewhere. Instead it focuses on just the workflow from start to finish and roughly where to look for different things.</p>
+<p>For this tutorial we will be using the <code class="docutils literal notranslate"><span class="pre">debugmarker</span></code> sample from <a class="reference external" href="https://github.com/SaschaWillems/Vulkan">Sascha Willems’ Vulkan samples repository</a>..</p>
+<section id="capturing-a-frame">
+<h2>Capturing a frame<a class="headerlink" href="#capturing-a-frame" title="Permalink to this headline">¶</a></h2>
+<p>To capture a frame, begin by selecting <span class="guilabel">File</span> → <span class="guilabel">Launch Application</span>. By default this will open a new docked window where you can configure different settings that will be used when capturing. You may find this window is already available.</p>
+<figure class="align-default" id="id1">
+<img alt="../_images/QuickStart1.png" src="../_images/QuickStart1.png" />
+<figcaption>
+<p><span class="caption-text">Launching an executable</span><a class="headerlink" href="#id1" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>The defaults work pretty well in most situations, so you can just either browse to or drag in your exe into the Executable box. If the working directory box is empty then the executable’s directory will be used. Enter any command line you may need and click Launch to launch the application with RenderDoc.</p>
+<p>More details of the specific options and their functionality can be found in the details page for the <a class="reference internal" href="../window/capture_attach.html"><span class="doc">Capture Dialog</span></a>.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>You should choose the build of RenderDoc to match your OS - 64-bit for Windows x64 and vice-versa</p>
+<p>You can only capture a 64-bit process with a 64-bit build of RenderDoc. A 32-bit process can be captured by either build of RenderDoc.</p>
+</div>
+</section>
+<section id="renderdoc-in-app">
+<h2>RenderDoc in-app<a class="headerlink" href="#renderdoc-in-app" title="Permalink to this headline">¶</a></h2>
+<p>RenderDoc has a fairly minimal in-app overlay, just to indicate that RenderDoc has successfully loaded and is ready to capture a frame.</p>
+<p>When ready, press the Capture Key (<kbd class="kbd docutils literal notranslate">F12</kbd> or <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">Print</kbd> <kbd class="kbd docutils literal notranslate">Screen</kbd></kbd>) and the next frame after the keypress will be captured, and this will show up on the overlay to let you know that a frame has been successfully saved.</p>
+<figure class="align-default" id="id2">
+<img alt="../_images/QuickStart2.png" src="../_images/QuickStart2.png" />
+<figcaption>
+<p><span class="caption-text">The in-application RenderDoc Overlay</span><a class="headerlink" href="#id2" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>When the application exits, if you captured a frame it will automatically start to open in the RenderDoc UI. If you didn’t capture a frame then nothing will happen and the RenderDoc UI will be back as it was when you clicked Launch.</p>
+<p>If you made multiple captures you will see a thumbnail list that allows you to open (in the current instance or a new instance to compare side-by-side), save and delete them as you wish. You can also access this view while the program is still running, see <a class="reference internal" href="../window/capture_connection.html"><span class="doc">Capture Connection</span></a> for more information on taking multiple frame captures. Note however that for the simple use-case, you don’t need to worry about this!</p>
+</section>
+<section id="renderdoc-layout">
+<h2>RenderDoc layout<a class="headerlink" href="#renderdoc-layout" title="Permalink to this headline">¶</a></h2>
+<p>RenderDoc’s layout can be customised fairly heavily so this section will only cover the default layout. We’ll go over the windows that are open by default and how each can be used in analysing your program.</p>
+<p>Each of these windows has a section that is much more in depth and gives details about every function and feature, for the more complex windows such as the texture viewer you may well wish to skim these to get an idea of what is available and use them as reference in the future.</p>
+<section id="texture-viewer">
+<h3>Texture Viewer<a class="headerlink" href="#texture-viewer" title="Permalink to this headline">¶</a></h3>
+<figure class="align-default" id="id3">
+<img alt="../_images/QuickStart3.png" src="../_images/QuickStart3.png" />
+<figcaption>
+<p><span class="caption-text">The Texture Viewer</span><a class="headerlink" href="#id3" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>More details can be found on the <a class="reference internal" href="../window/texture_viewer.html"><span class="doc">Texture Viewer</span></a> page.</p>
+<p>The texture viewer does pretty much what you’d expect - it allows you to inspect textures and render targets in your application.</p>
+<p>There are various visualisation controls that allow you to select different channels, mip levels or other aspects of the texture, and more detail is available in the above page. Here we’ll just touch on the highlights:</p>
+<ul>
+<li><p>The thumbnail strip (by default to the right) lists either the output targets, or shader inputs bound and used at present. Selecting each of these (the red outline on the thumbnail indicating which is selected) will follow whatever resource is bound to that slot as you browse through the scene.</p>
+<p>E.g. if you select render target 0 then the texture display will update to show the currently bound render target 0 regardless of which texture that is. If the slot you are following becomes unbound or unused, the previous texture will still be displayed up until you select a different pipeline slot, or the slot is bound again. Unbound texture slots show up with <em>Unbound</em> listed under their thumbnail.</p>
+<p>To open a specific texture and watch it even as it changes slots or becomes unbound, you can open it in a new locked tab. Double click on it, right click on it and ‘open in new locked tab’, or <a class="reference internal" href="../how/how_view_texture.html"><span class="doc">open it by name</span></a>.</p>
+</li>
+<li><p>The format and dimensions of the texture are displayed on the status bar just below the texture display itself.
+Also on this status bar you can see the current pixel co-ordinate that you are hovering over, as well as the ‘picked’ pixel value which can be inspected by right clicking anywhere on the texture display.</p></li>
+<li><p>Further to this, there is a small zoomed section of context around the last picked pixel available in the bottom right of the texture viewer window. From here you can also launch the pixel history or debugger, as detailed in <a class="reference internal" href="../how/how_debug_shader.html"><span class="doc">How do I debug a shader?</span></a>.</p></li>
+<li><p>The last thing we will highlight is the range control. This is a fairly flexible tool that allows you to adjust the visible range in the image. This is particular useful when viewing HDR images with a range outside of <em>[0, 1]</em>.</p>
+<p>To use the range control you can drag the white and black points to make fine adjustments or type values to change the values of the white and black points (by default 0 and 1 respectively). There are also some useful controls to the right of the range control itself, which are detailed again in the <a class="reference internal" href="../window/texture_viewer.html"><span class="doc">Texture Viewer</span></a> page.</p>
+</li>
+</ul>
+</section>
+<section id="event-browser">
+<h3>Event Browser<a class="headerlink" href="#event-browser" title="Permalink to this headline">¶</a></h3>
+<figure class="align-default" id="id4">
+<img alt="../_images/QuickStart4.png" src="../_images/QuickStart4.png" />
+<figcaption>
+<p><span class="caption-text">The Event Browser</span><a class="headerlink" href="#id4" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>More details can be found on the <a class="reference internal" href="../window/event_browser.html"><span class="doc">Event Browser</span></a> page.</p>
+<p>The Event Browser is the primary method of stepping through the frame and browsing the events that occurred within. The first column EID (Event ID) indicates which event or API call this was in the frame, chronologically.</p>
+<p>By default the events which are listed here are those known as actions. Draws and dispatches are examples of actions, but also events that modify resources like clears and copies. State setting and other CPU-update calls like Maps are not included and are available in the API Calls view (see below). You can use the filter field to include or exclude events as you wish, for more information see <a class="reference internal" href="../how/how_filter_events.html"><span class="doc">How do I filter visible events?</span></a>.</p>
+<p>The columns can be customised and reordered, the <img alt="timeline_marker" src="../_images/timeline_marker.png" /> select columns button (or right-click) will allow you to choose which columns are displayed.</p>
+<p>Standard performance markers are available and create the hierarchy/labels as you would expect. These can be expanded or collapsed and keyboard browsing is available through normal controls - left and right go higher or lower in the hierarchy, and up and down goes up and down through siblings. For more information on these markers, see <a class="reference internal" href="../how/how_annotate_capture.html"><span class="doc">How do I annotate a capture?</span></a>.</p>
+<p>The ‘current’ event - i.e. the event at which we are inspecting the graphics state - is highlighted with a green Flag <img alt="flag_green" src="../_images/flag_green.png" /> and the row is highlighted. As any row is selected it immediately becomes the new current event.</p>
+<p>While the Event Browser is selected, you can press the shortcut keys <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">CTRL</kbd>-<kbd class="kbd docutils literal notranslate">F</kbd></kbd> to find <img alt="find" src="../_images/find.png" /> a given event or action. You can enter a number to jump to that given EID.</p>
+<p>The <img alt="asterisk_orange" src="../_images/asterisk_orange.png" /> bookmark button will allow you to bookmark an event, the shortcut key is <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">CTRL</kbd>-<kbd class="kbd docutils literal notranslate">B</kbd></kbd>.</p>
+<p>A list of bookmarked events will show up on a toolbar at the top of the event browser, they and the shortcut keys <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">CTRL</kbd>-<kbd class="kbd docutils literal notranslate">1</kbd></kbd>  to <kbd class="kbd compound docutils literal notranslate"><kbd class="kbd docutils literal notranslate">CTRL</kbd>-<kbd class="kbd docutils literal notranslate">0</kbd></kbd> will jump to the respective bookmarked EID. These shortcuts will work anywhere in the application.</p>
+<p>Bookmarks can be saved with the capture and shared with others. For more on this see the <a class="reference internal" href="../how/how_annotate_capture.html"><span class="doc">How do I annotate a capture?</span></a> page.</p>
+</section>
+<section id="api-inspector">
+<h3>API Inspector<a class="headerlink" href="#api-inspector" title="Permalink to this headline">¶</a></h3>
+<figure class="align-default" id="id5">
+<img alt="../_images/QuickStart5.png" src="../_images/QuickStart5.png" />
+<figcaption>
+<p><span class="caption-text">The API Calls + Callstack Panel</span><a class="headerlink" href="#id5" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>More details can be found on the <a class="reference internal" href="../window/api_inspector.html"><span class="doc">API Inspector</span></a> page.</p>
+<p>The API Calls window updates as a new event is selected. It shows the individual API calls and their parameters. If an action is selected, the list shows all API calls between the previous action and this action and the last entry in this list always corresponds to the action itself. Each row can be expanded to show the parameters that were passed to that API call.</p>
+<p>At the bottom of the window is an optional expandable section which shows the callstack (if available and recorded) from the application code into the API function.</p>
+<p>In order to view these callstacks you must first resolve the symbols recorded with the capture. To do this click on <span class="guilabel">Resolve Symbols</span> under the <span class="guilabel">Tools</span> menu. More details on this process can be found in the guide: <a class="reference internal" href="../how/how_capture_callstack.html"><span class="doc">How do I capture callstacks?</span></a>.</p>
+</section>
+<section id="timeline-bar">
+<h3>Timeline Bar<a class="headerlink" href="#timeline-bar" title="Permalink to this headline">¶</a></h3>
+<figure class="align-default" id="id6">
+<img alt="../_images/QuickStart6.png" src="../_images/QuickStart6.png" />
+<figcaption>
+<p><span class="caption-text">The Timeline Bar</span><a class="headerlink" href="#id6" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>More details can be found on the <a class="reference internal" href="../window/timeline_bar.html"><span class="doc">Timeline Bar</span></a> page.</p>
+<p>The timeline bar is essentially an alternate view of the frame, with the horizontal axis being time in the frame. The horizontal axis is scaled evenly by API calls, such that every API call has the same width at any given zoom level.</p>
+<p>The frame marker hierarchy is top-down in this case, and can be expanded or collapsed by clicking on each section. In this image, “Render Scene” and “Toon shading draw” are both expanded, but the other sections remain collapsed. Each action is rendered as a blue pip underneath the section of the hierarchy that it is a child of. The current action (if visible) is rendered as a green circle.</p>
+<p>There is a vertical line around the current action, as well as a <img alt="flag_green" src="../_images/flag_green.png" /> above, and a gray outline around the event where the mouse is hovering.</p>
+<p>When the currently selected texture is used in the frame, each action that references it draws a marker below the bar. The different colours of marker indicate whether the action at that point is writing to the texture, reading, both reading &amp; writing simultaneously, etc. If the markers are too close together they will space themselves to be readable and will not necessarily line up to a particular action unless you zoom in.</p>
+<p>This can be a very useful tool to trace data through a frame, as well as highlighting potential redundancy or errors if a target is being written to where it should not.</p>
+</section>
+<section id="pipeline-state">
+<h3>Pipeline State<a class="headerlink" href="#pipeline-state" title="Permalink to this headline">¶</a></h3>
+<figure class="align-default" id="id7">
+<img alt="../_images/QuickStart7.png" src="../_images/QuickStart7.png" />
+<figcaption>
+<p><span class="caption-text">The Pipeline State Viewer</span><a class="headerlink" href="#id7" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>More details can be found on the <a class="reference internal" href="../window/pipeline_state.html"><span class="doc">Pipeline State</span></a> page.</p>
+<p>The Pipeline State window is perhaps the most detailed but also the simplest to understand. This window simply lists every stateful aspect of the graphics pipeline and what value or object is present at the current event.</p>
+<p>By default the pipeline will not contain empty or unused entries - i.e. if a shader only reads from resources 0 and 1, even if something is bound to slot 2 it will not be displayed. Likewise say slots 3-128 are empty - they will also not be displayed. This behaviour can be modified by the <span class="guilabel">Show Unused Items</span> and <span class="guilabel">Show Empty Items</span> toggles on the toolbar. Show Unused will show slot 2 even if the shader does not read from it. Show Empty will show slots 3-128. This behaviour varies significantly by API since the shader binding model is often quite different.</p>
+<p>One important thing to note is that most things in the sections for each pipeline stage can be expanded to view in more detail. Look for the Go Icon (<img alt="go_arrow" src="../_images/action_hover.png" />) to indicate that a more detailed view is available. Typically this will mean for shaders the shader source/disassembly will be opened, for texture-type resources the texture viewer will open a new tab for that resource, and for buffers it will open either the Mesh Viewer window, a raw view of that buffer, or a popup with the constant contents - depending on where the buffer is bound.</p>
+<p>Another useful convention is that anywhere an API object is mentioned, its name is written in <em>bold</em> followed by a <img alt="link" src="../_images/link.png" />. This is a clickable link to the <a class="reference internal" href="../window/resource_inspector.html"><span class="doc">Resource Inspector</span></a> window which allows you to examine in more detail how the object is defined and what other API objects it is linked to.</p>
+<p>For more details, check out the how-to: <a class="reference internal" href="../how/how_object_details.html"><span class="doc">How do I view details of an object?</span></a>.</p>
+</section>
+<section id="mesh-viewer">
+<h3>Mesh Viewer<a class="headerlink" href="#mesh-viewer" title="Permalink to this headline">¶</a></h3>
+<figure class="align-default" id="id8">
+<img alt="../_images/QuickStart8.png" src="../_images/QuickStart8.png" />
+<figcaption>
+<p><span class="caption-text">Mesh Viewer</span><a class="headerlink" href="#id8" title="Permalink to this image">¶</a></p>
+</figcaption>
+</figure>
+<p>More details can be found on the <a class="reference internal" href="../window/mesh_viewer.html"><span class="doc">Mesh Viewer</span></a> page.</p>
+<p>Mesh Viewer allows you to inspect the geometry data as it passes through the pipeline. Both raw data in a grid view and 3D inspection is possible. The tabs in the preview window allow you to choose at which part of the pipeline you’d like to visualise the data.</p>
+<p>By default the preview shows a wireframe rendering of the mesh, but you can choose different visualisations. This can either be simple shading, a vertex exploder utility, or using a secondary attribute as color. Right clicking on any column allows you to choose the secondary attribute for rendering.</p>
+<p>You can also select which attribute is the position, in case either the auto-detection failed or you want to visualise another attribute like texture co-ordinates in 3D space.</p>
+<p>You can hold or click the right mouse button on the mesh preview to select the vertex in the mesh data tables.</p>
+<p>The default view for final vertex output data (which you can reset to with the reset button <img alt="arrow_undo" src="../_images/arrow_undo.png" />) shows the camera at the view origin looking out through the viewport. By default the output attempts to guess a perspective matrix from the output data, but this can be refined or changed to an orthographic view by opening up the options <img alt="cog" src="../_images/cog.png" /> and entering more accurate or corrected values.</p>
+</section>
+</section>
+<section id="closing-notes">
+<h2>Closing Notes<a class="headerlink" href="#closing-notes" title="Permalink to this headline">¶</a></h2>
+<p>Obviously what you accomplish in the program will vary a lot by what you need to investigate, but hopefully this gives you an overview of the functionality available. There are many more detailed features that are available, and the rest of this help will aid you in finding those.</p>
+<p>It is probably a good idea to check out the <a class="reference internal" href="tips_tricks.html"><span class="doc">Tips &amp; Tricks</span></a> page which lists several useful notes that aren’t obvious but might save you a lot of time.</p>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="faq.html" class="btn btn-neutral float-right" title="FAQ" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="index.html" class="btn btn-neutral float-left" title="Getting started" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

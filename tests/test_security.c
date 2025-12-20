@@ -5,7 +5,7 @@ Security hardening tests - Input validation and security checks
 */
 
 #include "test_framework.h"
-#include "../src/qcommon/q_shared.h"
+#include "../src/common/q_shared.h"
 #include <string.h>
 #include <stdlib.h>
 

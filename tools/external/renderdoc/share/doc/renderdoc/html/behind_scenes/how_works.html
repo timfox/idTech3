@@ -1,0 +1,279 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>How RenderDoc works &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/behind_scenes/how_works.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="OpenGL &amp; OpenGL ES Support" href="opengl_support.html" />
+    <link rel="prev" title="Analytics" href="analytics.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Behind the scenes</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="analytics.html">Analytics</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">How RenderDoc works</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#capturing-frames">Capturing Frames</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#replaying-analysing-captures">Replaying &amp; Analysing Captures</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="opengl_support.html">OpenGL &amp; OpenGL ES Support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="vulkan_support.html">Vulkan Support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="d3d12_support.html">D3D12 Support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="raytracing.html">Raytracing Support</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../python_api/index.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../how/index.html">How do I …?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">Behind the scenes</a> &raquo;</li>
+        
+      <li>How RenderDoc works</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/behind_scenes/how_works.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="how-renderdoc-works">
+<h1>How RenderDoc works<a class="headerlink" href="#how-renderdoc-works" title="Permalink to this headline">¶</a></h1>
+<p>RenderDoc works on very simple operating principles. This page outlines the basic idea behind its functioning to give people a better idea of what’s going on.</p>
+<section id="capturing-frames">
+<h2>Capturing Frames<a class="headerlink" href="#capturing-frames" title="Permalink to this headline">¶</a></h2>
+<p>Leaving aside the relatively uninteresting matter of injecting the RenderDoc DLL and calling functions to configure it in the target process, we begin by looking at how RenderDoc captures a capture file.</p>
+<p>We will use D3D11 as an example of a driver for RenderDoc - the driver layer is responsible both for faithfully capturing the application’s API usage, as well as then replaying and analysing it later. Essentially anything built on top of a driver layer can be used agnostically of the API the application in question is using.</p>
+<p>When the driver initialises it will hook into every entry point into the API such that when application uses the API it passes through the driver wrapper. In the case of D3D11 this is the <code class="docutils literal notranslate"><span class="pre">D3D11CreateDevice</span></code> and <code class="docutils literal notranslate"><span class="pre">CreateDXGIFactory</span></code> functions.</p>
+<p>After this point all accesses to the API remain wrapped and the driver essentially sets itself up as a “man-in-the-middle” between the application and the real API.</p>
+<p>The driver initialises in a background capture state. In this state it’s up to the specific implementation about what it serialises. As a general rule, creation and deletion type actions are always serialised, and data-upload calls can sometimes be serialised. In some cases the driver might choose to optimise out some of the data-upload calls and lazy initialise the contents of some resources to save on background overhead.</p>
+<p>This serialised data is stored in-memory in a chunk-based representation. Although it’s up to the driver implementation it is generally refcounted such that resources which end up becoming unbound and destroyed will have their memory overhead deleted.</p>
+<p>When the capture button is hit the driver will enter active capturing upon the beginning of the next frame. In this state every API call is serialised out in order and any initial contents and states are saved.</p>
+<p>Once the frame completes, this frame capture is serialised to disk along with the in-memory data for any resources that are referenced - by default resources which are not referenced are not included in the capture.</p>
+</section>
+<section id="replaying-analysing-captures">
+<h2>Replaying &amp; Analysing Captures<a class="headerlink" href="#replaying-analysing-captures" title="Permalink to this headline">¶</a></h2>
+<p>The replay process is ostensibly simple, but as with the capturing the devil is in the details.</p>
+<p>When replaying, the initial section of the capture (up to the beginning of the frame) is read and executed verbatim. Each resource created is mapped to the live version and vice versa so later parts of the capture can obtain the replayed representation of the original resource.</p>
+<p>RenderDoc then does an initial pass over the captured frame. This allows us to build up a list of all the actions, analyse dependencies and check which resources are used at each action for read, write, and so on. An internal tree is built up similar to what you see in the Event Browser &amp; API Inspector, as well as a linked list with the linear sequence of actions, since both representations are useful for iterating over the frame.</p>
+<p>After this point most work is done in response to user actions. The basic building block is replaying a partial frame. Most analysis tools are built out of either replaying up to the current event, replaying up to the event - not including the current action - and replaying <em>only</em> the current action.</p>
+<p>Care is taken to minimise this as much as possible as this tends to be the slowest operation given the overheads of serialisation and decoding the command stream.</p>
+<p>When replaying from the beginning of a frame (and not a partial subset of the frame) the initial states of all resources are applied, and the initial pipeline state is restored. Resources which did not have a serialised initial state (e.g. gbuffer textures) have an initial state saved before the first replay of the frame, and this is restored. That way you don’t get effects ‘leaking’ from later in a frame into an earlier point.</p>
+<p>For example, let’s assume the user has the ‘depth test’ overlay enabled, and selects a new event. This is the order of events that occur for the Texture Viewer - other viewers follow similar patterns, with a certain degree of sharing to reduce redundant replays:</p>
+<ol class="arabic simple">
+<li><p>The capture is replayed up to, but not including, the selected action. After doing this the current pipeline state and contents of all resources exactly match the state at the point of this action.</p></li>
+<li><p>We then save a copy of the pristine depth buffer, save the current pipeline state, and set the reversed depth test. Replacing the pixel shader with one that just writes red, we repeat the action to draw all the areas that fail the depth test.</p></li>
+<li><p>Restoring the depth buffer and repeating this with a pixel shader which writes green, we fill in the overlay. Both of these renders happen to an off-screen buffer.</p></li>
+<li><p>After restoring the pipeline state we finally replay the original action to get the final image.</p></li>
+<li><p>When we want to re-paint the viewed texture (either regular painting, or if the user changed a visualisation option which is just a constant buffer value) we bind the current render target as a resource and render it to the texture viewer control, then render the overlay texture on top of that.</p></li>
+</ol>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="opengl_support.html" class="btn btn-neutral float-right" title="OpenGL &amp; OpenGL ES Support" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="analytics.html" class="btn btn-neutral float-left" title="Analytics" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

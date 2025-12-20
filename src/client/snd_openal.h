@@ -1,7 +1,7 @@
 #ifndef __SND_OPENAL_H__
 #define __SND_OPENAL_H__
 
-#include "../qcommon/q_shared.h"
+#include "../common/q_shared.h"
 
 // Enhanced audio features using OpenAL
 #define SND_OPENAL_ENABLED		0x0001

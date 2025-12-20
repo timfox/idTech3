@@ -2,7 +2,7 @@
 
 #import <AppKit/AppKit.h>
 #import <Foundation/Foundation.h>
-#import "../qcommon/qcommon.h"
+#import "../common/qcommon.h"
 #import "macos_platform.h"
 
 // macOS-specific main function

@@ -6,7 +6,7 @@ Tokenizes and parses CSS-like syntax into style rules
 */
 
 #include "ui2_internal.h"
-#include "../qcommon/qcommon.h"
+#include "../common/qcommon.h"
 #include <cctype>
 #include <cstdlib>
 #include <string>

@@ -1,7 +1,7 @@
 #include "tr_local.h"
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
-#include "../../qcommon/performance_counters.h"
+#include "../../common/performance_counters.h"
 #include "vk.h"
 #include <stdlib.h>
 #include <unistd.h>
@@ -1564,6 +1564,72 @@ static void vk_alloc_staging_buffer( VkDeviceSize size )
 
 
 #ifdef USE_VK_VALIDATION
+// Enhanced debug callback for modern Vulkan validation
+static VKAPI_ATTR VkBool32 VKAPI_CALL vk_DebugCallback(
+	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+	VkDebugUtilsMessageTypeFlagsEXT messageType,
+	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+	void* pUserData)
+{
+	const char *severity = "INFO";
+
+	if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+		severity = S_COLOR_RED "VK ERROR";
+	} else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+		severity = S_COLOR_YELLOW "VK WARN";
+	} else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT) {
+		severity = S_COLOR_GREEN "VK INFO";
+	} else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT) {
+		severity = "VK VERBOSE";
+	}
+
+	const char *type = "GENERAL";
+	if (messageType & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) {
+		type = "VALIDATION";
+	} else if (messageType & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT) {
+		type = "PERFORMANCE";
+	}
+
+	ri.Printf(PRINT_ALL, "[%s %s] %s\n", severity, type, pCallbackData->pMessage);
+
+	// Continue execution for warnings/errors
+	return VK_FALSE;
+}
+
+// Set debug names for Vulkan objects for better debugging
+static void vk_SetObjectDebugNames(void) {
+	if (!qvkSetDebugUtilsObjectNameEXT || !r_vulkan_debug || !r_vulkan_debug->integer) {
+		return;
+	}
+
+	// Set names for key Vulkan objects
+	VkDebugUtilsObjectNameInfoEXT nameInfo = {
+		.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT
+	};
+
+	// Device
+	nameInfo.objectType = VK_OBJECT_TYPE_DEVICE;
+	nameInfo.objectHandle = (uint64_t)vk.device;
+	nameInfo.pObjectName = "Main Vulkan Device";
+	qvkSetDebugUtilsObjectNameEXT(vk.device, &nameInfo);
+
+	// Swapchain
+	nameInfo.objectType = VK_OBJECT_TYPE_SWAPCHAIN_KHR;
+	nameInfo.objectHandle = (uint64_t)vk.swapchain;
+	nameInfo.pObjectName = "Main Swapchain";
+	qvkSetDebugUtilsObjectNameEXT(vk.device, &nameInfo);
+
+	// Command pools
+	for (int i = 0; i < NUM_COMMAND_POOLS; i++) {
+		nameInfo.objectType = VK_OBJECT_TYPE_COMMAND_POOL;
+		nameInfo.objectHandle = (uint64_t)vk.commandPool[i];
+		Com_sprintf((char*)nameInfo.pObjectName, sizeof(nameInfo.pObjectName), "Command Pool %d", i);
+		qvkSetDebugUtilsObjectNameEXT(vk.device, &nameInfo);
+	}
+
+	ri.Printf(PRINT_ALL, "Vulkan object debug names set\n");
+}
+
 static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
 	VkDebugReportFlagsEXT flags,
 	VkDebugReportObjectTypeEXT object_type,
@@ -7110,6 +7176,34 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	// CRITICAL: When RT is enabled, RT composite already outputs sRGB (linearToSrgb conversion),
 	// so gamma correction should be skipped (gamma=1.0) to avoid double gamma correction.
 	// For non-RT paths, apply normal gamma correction.
+	// GPU validation and debugging enhancements
+	if (r_vulkan_validation && r_vulkan_validation->integer) {
+		// Enable Vulkan validation layers for debugging
+		if (!qvkCreateDebugUtilsMessengerEXT) {
+			ri.Printf(PRINT_WARNING, "Vulkan validation requested but VK_EXT_debug_utils not available\n");
+		} else {
+			// Set up debug messenger for validation
+			VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo = {
+				.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+				.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+								 VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT,
+				.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+							 VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+							 VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT,
+				.pfnUserCallback = vk_DebugCallback,
+				.pUserData = NULL
+			};
+
+			VK_CHECK(qvkCreateDebugUtilsMessengerEXT(vk.instance, &debugCreateInfo, NULL, &vk.debugMessenger));
+			ri.Printf(PRINT_ALL, "Vulkan validation layers enabled\n");
+		}
+	}
+
+	if (r_vulkan_debug && r_vulkan_debug->integer) {
+		// Set debug names for Vulkan objects
+		vk_SetObjectDebugNames();
+	}
+
 	// NOTE: We check RT state at pipeline creation time. Since r_raytracing uses CVAR_LATCH,
 	// it requires a restart to change, so the state is consistent. However, RT might not be
 	// used in every frame (e.g., menu-only frames), so we conservatively only set gamma=1.0

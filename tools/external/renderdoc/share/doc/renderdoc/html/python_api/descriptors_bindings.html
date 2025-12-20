@@ -1,0 +1,366 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Descriptors and Bindings &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/python_api/descriptors_bindings.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Basic Interfaces" href="examples/basics.html" />
+    <link rel="prev" title="Writing UI extensions" href="ui_extensions.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">Python API</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="examples/renderdoc_intro.html">Getting Started (python)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/qrenderdoc_intro.html">Getting Started (RenderDoc UI)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dev_environment.html">Python development environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ui_extensions.html">Writing UI extensions</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Descriptors and Bindings</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#overview">Overview</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#accessed-descriptors">Accessed Descriptors</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#descriptor-contents">Descriptor Contents</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#location-and-binding-information">Location and binding information</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#updating-from-old-code">Updating from old code</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#api-specific-information">API-specific information</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#d3d11">D3D11</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#opengl">OpenGL</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#d3d12">D3D12</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#vulkan">Vulkan</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="examples/basics.html">Basic Interfaces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/renderdoc/index.html">renderdoc Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/qrenderdoc/index.html">qrenderdoc examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="renderdoc/index.html">renderdoc python module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qrenderdoc/index.html">qrenderdoc python module</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../how/index.html">How do I …?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+          <li><a href="index.html">Python API</a> &raquo;</li>
+        
+      <li>Descriptors and Bindings</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/python_api/descriptors_bindings.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="descriptors-and-bindings">
+<h1>Descriptors and Bindings<a class="headerlink" href="#descriptors-and-bindings" title="Permalink to this headline">¶</a></h1>
+<p id="descriptor-abstraction">Access to descriptors or fixed resource bindings is an area of graphics APIs that varies significantly between each API. RenderDoc provides an abstracted interface which allows most code to be written in an API-agnostic way to determine what resources are used and their properties.</p>
+<p>Some allowances are provided for looking up API-specific information or interpreting the bindings with an API-specific lens if the code knows which API it is being used with.</p>
+<section id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
+<p>RenderDoc’s abstraction is generally speaking oriented around a modern API structure, with older APIs with fixed bindings mapped onto it with some fake/virtualised concepts. For this document we largely consider all APIs to have ‘descriptors’ though on OpenGL and D3D11 these may be fixed binding points.</p>
+<p>Generally speaking the principle is as follows:</p>
+<ol class="arabic simple">
+<li><p>Get the list of accessed descriptors.</p></li>
+<li><p>Get the contents of the referenced descriptors. This can be done in a batch call or individually.</p></li>
+<li><p>For each accessed descriptor look up the shader binding it refers to and correlate to the contents of the descriptor.</p></li>
+</ol>
+<p>There are helper functions available in the common pipeline state abstraction for doing most of this processing for you. If you only need to look at a list of resources and don’t need to know their specific binding points, this is the recommended solution. See for example <a class="reference internal" href="renderdoc/pipelines/common.html#renderdoc.PipeState.GetReadOnlyResources" title="renderdoc.PipeState.GetReadOnlyResources"><code class="xref py py-meth docutils literal notranslate"><span class="pre">renderdoc.PipeState.GetReadOnlyResources()</span></code></a>, <a class="reference internal" href="renderdoc/pipelines/common.html#renderdoc.PipeState.GetSamplers" title="renderdoc.PipeState.GetSamplers"><code class="xref py py-meth docutils literal notranslate"><span class="pre">renderdoc.PipeState.GetSamplers()</span></code></a>, etc. These are queried per shader stage. You still look up the matching shader binding to get reflection data but the accessed descriptor gives you a direct reference to the reflection binding.</p>
+</section>
+<section id="accessed-descriptors">
+<h2>Accessed Descriptors<a class="headerlink" href="#accessed-descriptors" title="Permalink to this headline">¶</a></h2>
+<p>At a given event, calling <a class="reference internal" href="renderdoc/replay.html#renderdoc.ReplayController.GetDescriptorAccess" title="renderdoc.ReplayController.GetDescriptorAccess"><code class="xref py py-meth docutils literal notranslate"><span class="pre">renderdoc.ReplayController.GetDescriptorAccess()</span></code></a> returns a list of all descriptors accessed at that event. These descriptors may be statically known to be accessed or they may be dynamically accessed, that information is not exposed.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>On OpenGL, shader reflection may list items which end up statically unused. These are reflected for informational purposes but the descriptor access will list them as statically unused.</p>
+</div>
+<p>The returned structure <a class="reference internal" href="renderdoc/shaders.html#renderdoc.DescriptorAccess" title="renderdoc.DescriptorAccess"><code class="xref py py-class docutils literal notranslate"><span class="pre">renderdoc.DescriptorAccess</span></code></a> gives information about which shader binding accessed which physical descriptor.</p>
+<p>The shader binding is identified by a shader stage, a descriptor type, an index, and an array element. The descriptor type can be categorised as sampler, constant block, read-only or read-write resource according to helper function <a class="reference internal" href="renderdoc/shaders.html#renderdoc.CategoryForDescriptorType" title="renderdoc.CategoryForDescriptorType"><code class="xref py py-func docutils literal notranslate"><span class="pre">renderdoc.CategoryForDescriptorType()</span></code></a> or per-type by <a class="reference internal" href="renderdoc/shaders.html#renderdoc.IsConstantBlockDescriptor" title="renderdoc.IsConstantBlockDescriptor"><code class="xref py py-func docutils literal notranslate"><span class="pre">renderdoc.IsConstantBlockDescriptor()</span></code></a> etc.</p>
+<p>For example if a texture “DiffuseTexture” was element <code class="docutils literal notranslate"><span class="pre">[2]</span></code> in the shader reflection’s <a class="reference internal" href="renderdoc/shaders.html#renderdoc.ShaderReflection.readOnlyResources" title="renderdoc.ShaderReflection.readOnlyResources"><code class="xref py py-data docutils literal notranslate"><span class="pre">renderdoc.ShaderReflection.readOnlyResources</span></code></a> list, the descriptor access would contain something like:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">access</span><span class="o">.</span><span class="n">stage</span> <span class="o">==</span> <span class="n">renderdoc</span><span class="o">.</span><span class="n">ShaderStage</span><span class="o">.</span><span class="n">Pixel</span>
+<span class="n">access</span><span class="o">.</span><span class="n">descriptorType</span> <span class="o">==</span> <span class="n">renderdoc</span><span class="o">.</span><span class="n">DescriptorType</span><span class="o">.</span><span class="n">Image</span>
+<span class="n">access</span><span class="o">.</span><span class="n">index</span> <span class="o">==</span> <span class="mi">2</span>
+<span class="n">access</span><span class="o">.</span><span class="n">arrayElement</span> <span class="o">==</span> <span class="mi">0</span>
+</pre></div>
+</div>
+<p>In this way the access can be correlated to a particular shader binding in the reflection list for display or analysis, or the accesses within a particular binding can be identified.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>On D3D12, it is possible for descriptor accesses to come directly from shader code with no binding or reflection information declared at all. In this case the <a class="reference internal" href="renderdoc/shaders.html#renderdoc.DescriptorAccess.index" title="renderdoc.DescriptorAccess.index"><code class="xref py py-data docutils literal notranslate"><span class="pre">renderdoc.DescriptorAccess.index</span></code></a> member will be set to <a class="reference internal" href="renderdoc/shaders.html#renderdoc.DescriptorAccess.NoShaderBinding" title="renderdoc.DescriptorAccess.NoShaderBinding"><code class="xref py py-data docutils literal notranslate"><span class="pre">renderdoc.DescriptorAccess.NoShaderBinding</span></code></a>.</p>
+</div>
+<p>The access also identifies the particular descriptor that was accessed. It does this by identifying the resource which contains the descriptor, the byte offset within that resource’s descriptor storage, and the byte size of the descriptor. This uniquely identifies a particular descriptor stored within a resource.</p>
+<p>For example, if the above diffuse texture accessed a descriptor in a descriptor set on Vulkan, the resulting properties may look like:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">access</span><span class="o">.</span><span class="n">descriptorStore</span> <span class="o">==</span> <span class="n">renderdoc</span><span class="o">.</span><span class="n">ResourceId</span><span class="p">(</span><span class="o">...</span><span class="p">)</span> <span class="c1"># ResourceId of a descriptor set</span>
+<span class="n">access</span><span class="o">.</span><span class="n">byteOffset</span> <span class="o">==</span> <span class="o">...</span> <span class="c1"># byte offset of descriptor</span>
+<span class="n">access</span><span class="o">.</span><span class="n">byteSize</span> <span class="o">==</span> <span class="o">...</span> <span class="c1"># byte size of descriptor</span>
+</pre></div>
+</div>
+<p>Your code should not make assumptions about the resource referred to by these accesses, nor the offset or size. These values should only be processed as opaque references when looking up descriptor contents.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>For Vulkan and D3D12 where descriptors are physical objects these will commonly identify descriptor sets or descriptor heaps as the resource. However for older APIs and for non-memory-backed descriptors on Vulkan and D3D12 the resource may be a virtual resource created by RenderDoc or may be stored within another object such as a pipeline. Your code does not have to do anything different to query descriptor contents out of these, but you should take care not to make assumptions about the resources referred to in this way.</p>
+</div>
+</section>
+<section id="descriptor-contents">
+<h2>Descriptor Contents<a class="headerlink" href="#descriptor-contents" title="Permalink to this headline">¶</a></h2>
+<p>Given the information above, any given descriptor access can be identified as referencing a given ‘physical’ descriptor within a descriptor storage object. To query the contents of that descriptor you can use the functions  <a class="reference internal" href="renderdoc/replay.html#renderdoc.ReplayController.GetDescriptors" title="renderdoc.ReplayController.GetDescriptors"><code class="xref py py-meth docutils literal notranslate"><span class="pre">renderdoc.ReplayController.GetDescriptors()</span></code></a> and <a class="reference internal" href="renderdoc/replay.html#renderdoc.ReplayController.GetSamplerDescriptors" title="renderdoc.ReplayController.GetSamplerDescriptors"><code class="xref py py-meth docutils literal notranslate"><span class="pre">renderdoc.ReplayController.GetSamplerDescriptors()</span></code></a>.</p>
+<p>These functions accept a single descriptor store to query from, and a series of ranges to allow potentially querying many descriptors at once. The returned descriptors are in a linear list corresponding to all ranges appended.</p>
+<p>RenderDoc defines two different descriptor structures - <a class="reference internal" href="renderdoc/shaders.html#renderdoc.Descriptor" title="renderdoc.Descriptor"><code class="xref py py-class docutils literal notranslate"><span class="pre">renderdoc.Descriptor</span></code></a> for most types of resource binding, and <a class="reference internal" href="renderdoc/shaders.html#renderdoc.SamplerDescriptor" title="renderdoc.SamplerDescriptor"><code class="xref py py-class docutils literal notranslate"><span class="pre">renderdoc.SamplerDescriptor</span></code></a> for samplers. On APIs that provide a combined sampler/image descriptor type the same descriptor can be queried in both fashions to obtain both pieces of information.</p>
+<p>Querying a pure sampler descriptor for normal contents, or vice-versa a buffer descriptor for sampler contents, is safe in either direction. The returned descriptor struct will be uninitialised/invalid.</p>
+<p>These structures contain a number of properties, only some of which are relevant given different API capabilities and descriptor types. It is expected that the user will look at the type of descriptor listed to determine which properties are relevant. Any API specific information which is not present or available will be initialised to a sensible default value.</p>
+</section>
+<section id="location-and-binding-information">
+<h2>Location and binding information<a class="headerlink" href="#location-and-binding-information" title="Permalink to this headline">¶</a></h2>
+<p>With the above process you can determine which bindings are used, which descriptors they reference, and the contents of those descriptors. However on most APIs there is additional API-specific binding or location information associated either with a binding or a descriptor which can be helpful to display or filter by.</p>
+<p>In the shader reflection, each binding contains two additional values: <code class="docutils literal notranslate"><span class="pre">fixedBindSetOrSpace</span></code> and <code class="docutils literal notranslate"><span class="pre">fixedBindNumber</span></code>. These values are entirely arbitrary and they serve no purpose within RenderDoc’s general APIs for accessing descriptors, as their interpretation is API-specific. On some APIs these values may not be set at all. They are provided for informational purposes for uses which may want to look up resources in a way only for their target API.</p>
+<p>Similarly, descriptors in a descriptor store may have locations associated. In the same way that you can query descriptor contents with <a class="reference internal" href="renderdoc/replay.html#renderdoc.ReplayController.GetDescriptors" title="renderdoc.ReplayController.GetDescriptors"><code class="xref py py-meth docutils literal notranslate"><span class="pre">renderdoc.ReplayController.GetDescriptors()</span></code></a> you can query locations with <a class="reference internal" href="renderdoc/replay.html#renderdoc.ReplayController.GetDescriptorLocations" title="renderdoc.ReplayController.GetDescriptorLocations"><code class="xref py py-meth docutils literal notranslate"><span class="pre">renderdoc.ReplayController.GetDescriptorLocations()</span></code></a> which returns a list of <a class="reference internal" href="renderdoc/shaders.html#renderdoc.DescriptorLogicalLocation" title="renderdoc.DescriptorLogicalLocation"><code class="xref py py-class docutils literal notranslate"><span class="pre">renderdoc.DescriptorLogicalLocation</span></code></a>.</p>
+<p>Again this information is API-specific and is not used for any lookups or processing, only for user display or API-specific details.</p>
+<p>The logical location contains a <code class="docutils literal notranslate"><span class="pre">fixedBindNumber</span></code> value, which depending on the API may match the binding in a shader reflection resource but is not guaranteed to. It also contains a mask of shader stages which can legally access it, the category of shader binding it may contain (if known), and a string which can be used for user display of this particular descriptor.</p>
+</section>
+<section id="updating-from-old-code">
+<h2>Updating from old code<a class="headerlink" href="#updating-from-old-code" title="Permalink to this headline">¶</a></h2>
+<p>Old code that accessed bindings via the <a class="reference internal" href="renderdoc/pipelines/common.html#renderdoc.PipeState" title="renderdoc.PipeState"><code class="xref py py-class docutils literal notranslate"><span class="pre">renderdoc.PipeState</span></code></a> should have minimal changes needed, only updating any references to members from the old <code class="docutils literal notranslate"><span class="pre">BoundResource</span></code> and <code class="docutils literal notranslate"><span class="pre">BoundResourceArray</span></code> classes to the new list of descriptors, as well as updating handling to process a flat list of descriptors rather than a two-level array.</p>
+<p>For porting code that accessed bindings directly from API-specific pipelines it is highly recommended to use the pipeline abstraction to query for used descriptors, and instead do API-specific processing via locations if necessary.</p>
+<p>To process bindings entirely from scratch without the abstraction you will need to determine the used descriptors and fetch the descriptor contents then use the locations to do any specific processing as needed.</p>
+</section>
+<section id="api-specific-information">
+<h2>API-specific information<a class="headerlink" href="#api-specific-information" title="Permalink to this headline">¶</a></h2>
+<p>This section provides information about API-specific details and how they are surfaced. This may change in future but generally is expected to be stable.</p>
+<section id="d3d11">
+<h3>D3D11<a class="headerlink" href="#d3d11" title="Permalink to this headline">¶</a></h3>
+<p>Descriptor access is determined at load time based on shader reflection, all resources are assumed to be used. The shader reflection <code class="docutils literal notranslate"><span class="pre">fixedBindNumber</span></code> gives the register number for each resource.</p>
+<p>A single fake descriptor storage object is used for all current bindings, with the descriptor offset identifying the binding. All descriptors are identically sized - this size is available in <a class="reference internal" href="renderdoc/resources.html#renderdoc.DescriptorStoreDescription.descriptorByteSize" title="renderdoc.DescriptorStoreDescription.descriptorByteSize"><code class="xref py py-data docutils literal notranslate"><span class="pre">renderdoc.DescriptorStoreDescription.descriptorByteSize</span></code></a> for the descriptor store.</p>
+<p>The descriptor location information gives the stage and category based on the binding, and the string name is an encoded <code class="docutils literal notranslate"><span class="pre">t0</span></code> or <code class="docutils literal notranslate"><span class="pre">b5</span></code> register declaration corresponding to the HLSL declarations.</p>
+<p>This means it is possible to iterate over all descriptors in a store without any access, and identify them according to the D3D11 binding spots. However if you do this note that UAVs have a descriptor per stage for ease of access, but as per D3D11’s binding model all non-compute stages share the same bindings so these will be duplicated for every stage.</p>
+</section>
+<section id="opengl">
+<h3>OpenGL<a class="headerlink" href="#opengl" title="Permalink to this headline">¶</a></h3>
+<p>Descriptor access is determined per-event based on a combination between shader reflection and querying current uniform values. Resources which are unused will be marked with <a class="reference internal" href="renderdoc/shaders.html#renderdoc.DescriptorAccess.staticallyUnused" title="renderdoc.DescriptorAccess.staticallyUnused"><code class="xref py py-data docutils literal notranslate"><span class="pre">renderdoc.DescriptorAccess.staticallyUnused</span></code></a> being set to <code class="docutils literal notranslate"><span class="pre">True</span></code>. The shader reflection <code class="docutils literal notranslate"><span class="pre">fixedBindNumber</span></code> will be set to 0 as the binding number is not necessarily fixed and could vary per-event.</p>
+<p>A single fake descriptor storage object is used for all current bindings, with the descriptor offset identifying the binding. All descriptors are identically sized - this size is available in <a class="reference internal" href="renderdoc/resources.html#renderdoc.DescriptorStoreDescription.descriptorByteSize" title="renderdoc.DescriptorStoreDescription.descriptorByteSize"><code class="xref py py-data docutils literal notranslate"><span class="pre">renderdoc.DescriptorStoreDescription.descriptorByteSize</span></code></a> for the descriptor store.</p>
+<p>The descriptor location information gives the stage and category based on the binding, and the string name will be a type and index something akin to <code class="docutils literal notranslate"><span class="pre">Tex2D</span> <span class="pre">3</span></code> or <code class="docutils literal notranslate"><span class="pre">SSBO</span> <span class="pre">5</span></code>.</p>
+<p>This means it is possible to iterate over all descriptors in a store without any access, and identify them according to the name given. The descriptor contents will also reflect this as unbound textures will still have the correct texture type when queried for their contents.</p>
+</section>
+<section id="d3d12">
+<h3>D3D12<a class="headerlink" href="#d3d12" title="Permalink to this headline">¶</a></h3>
+<p>Descriptor access is combined from non-arrayed access being calculated statically from reflection, and arrayed or direct-heap SM6.6 access being fetched at runtime per event. The shader reflection <code class="docutils literal notranslate"><span class="pre">fixedBindNumber</span></code> and <code class="docutils literal notranslate"><span class="pre">fixedBindSetOrSpace</span></code> gives the register number and register space for each resource.</p>
+<p>SM6.6 direct-heap access will be identified with a descriptor access with <a class="reference internal" href="renderdoc/shaders.html#renderdoc.DescriptorAccess.index" title="renderdoc.DescriptorAccess.index"><code class="xref py py-data docutils literal notranslate"><span class="pre">renderdoc.DescriptorAccess.index</span></code></a> set to <a class="reference internal" href="renderdoc/shaders.html#renderdoc.DescriptorAccess.NoShaderBinding" title="renderdoc.DescriptorAccess.NoShaderBinding"><code class="xref py py-data docutils literal notranslate"><span class="pre">renderdoc.DescriptorAccess.NoShaderBinding</span></code></a>.</p>
+<p>Descriptor storage is primarily in descriptor heap objects, however root constants, root descriptors, and static samplers will be stored elsewhere. The exact objects used as ‘virtual’ storage of these descriptor for querying should not be relied upon. Similarly the descriptor size is RenderDoc-defined and will not necessarily match the descriptor size used in D3D12 during capture.</p>
+<p>It is possible to query all descriptors for a descriptor heap without a descriptor access, however care should be taken to ensure that valid descriptor offsets and sizes are used. The parameters for these are available in <a class="reference internal" href="renderdoc/resources.html#renderdoc.DescriptorStoreDescription.descriptorByteSize" title="renderdoc.DescriptorStoreDescription.descriptorByteSize"><code class="xref py py-data docutils literal notranslate"><span class="pre">renderdoc.DescriptorStoreDescription.descriptorByteSize</span></code></a> for the descriptor store.</p>
+<p>Descriptor locations have their index listed as the <code class="docutils literal notranslate"><span class="pre">fixedBindNumber</span></code> and the string name is the SM6.6 indexed <code class="docutils literal notranslate"><span class="pre">ResourceDescriptorHeap[]</span></code> or <code class="docutils literal notranslate"><span class="pre">SamplerDescriptorHeap[]</span></code>. As descriptors are implicitly untyped and fully visible, there is no type or shader stage information in a descriptor’s location.</p>
+</section>
+<section id="vulkan">
+<h3>Vulkan<a class="headerlink" href="#vulkan" title="Permalink to this headline">¶</a></h3>
+<p>Descriptor access is combined from non-arrayed access being calculated statically from reflection, and arrayed access being fetched at runtime per event. The shader reflection <code class="docutils literal notranslate"><span class="pre">fixedBindNumber</span></code> and <code class="docutils literal notranslate"><span class="pre">fixedBindSetOrSpace</span></code> gives the binding number and set number for each resource.</p>
+<p>Descriptor storage is primarily in descriptor set objects, however push constants, specialisation constants, and immutable samplers will be stored elsewhere. The exact objects used as ‘virtual’ storage of these descriptor for querying should not be relied upon.</p>
+<p>It is possible to query all descriptors for a descriptor set without a descriptor access, however care should be taken to ensure that valid descriptor offsets and sizes are used. The parameters for these are available in <a class="reference internal" href="renderdoc/resources.html#renderdoc.DescriptorStoreDescription.descriptorByteSize" title="renderdoc.DescriptorStoreDescription.descriptorByteSize"><code class="xref py py-data docutils literal notranslate"><span class="pre">renderdoc.DescriptorStoreDescription.descriptorByteSize</span></code></a> for the descriptor store.</p>
+<p>Descriptor locations have their index listed the binding number within the set, and the string name will be the <code class="docutils literal notranslate"><span class="pre">bind[arrayIndex]</span></code> flattened value. The type will only reflect the most recently written descriptor data and may be undefined for unwritten descriptors, and the visible shader mask will be determined by the descriptor set layout visibility flags.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="examples/basics.html" class="btn btn-neutral float-right" title="Basic Interfaces" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="ui_extensions.html" class="btn btn-neutral float-left" title="Writing UI extensions" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

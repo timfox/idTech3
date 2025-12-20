@@ -9,8 +9,8 @@ libs/stb/stb_truetype.h. Falls back to a stub otherwise.
 ===========================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "../../common/q_shared.h"
+#include "../../common/qcommon.h"
 #include "../opengl/tr_common.h"
 
 // Font CVars are accessed via ri.Cvar_Get

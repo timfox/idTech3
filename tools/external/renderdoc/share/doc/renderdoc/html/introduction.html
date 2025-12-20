@@ -1,0 +1,285 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Introduction &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/introduction.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Credits &amp; Acknowledgements" href="credits_acknowledgements.html" />
+    <link rel="prev" title="RenderDoc" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Introduction</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#license">License</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#how-to-browse-this-documentation">How to browse this documentation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#important-notes">Important notes</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#documentation-and-tutorials">Documentation and Tutorials</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#contact-info-feedback-bug-reports">Contact info, Feedback, Bug reports</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#see-also">See Also</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="in_application_api.html">In-application API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="python_api/index.html">Python API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="how/index.html">How do I …?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Introduction</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/introduction.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="introduction">
+<h1>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h1>
+<img alt="_images/logo.png" class="align-center" src="_images/logo.png" />
+<p>Welcome to RenderDoc - a graphics debugger currently available for Vulkan, D3D11, D3D12, OpenGL, and OpenGL ES development on Windows, Linux, Android, and Nintendo Switch <sup>TM</sup>.</p>
+<p>This document serves as reference guide, introductory document and explanation of which features are available in RenderDoc and how to best use them.</p>
+<p>The latest information and discussion is always available on the <a class="reference external" href="https://github.com/baldurk/renderdoc">GitHub repository</a>.</p>
+<section id="license">
+<h2>License<a class="headerlink" href="#license" title="Permalink to this headline">¶</a></h2>
+<p>RenderDoc is released under the MIT license, so there are no restrictions on your use of it either commercially or non-commercially. This includes the source release available on <a class="reference external" href="https://github.com/baldurk/renderdoc">GitHub</a>.</p>
+<p>Details of the licenses of third party software used in RenderDoc are included in the LICENSE file in the RenderDoc directory as well as in the <a class="reference internal" href="credits_acknowledgements.html"><span class="doc">Credits &amp; Acknowledgements</span></a>.</p>
+</section>
+<section id="how-to-browse-this-documentation">
+<h2>How to browse this documentation<a class="headerlink" href="#how-to-browse-this-documentation" title="Permalink to this headline">¶</a></h2>
+<p>If you just want to dive straight in and learn how to get started using RenderDoc consider looking at the <a class="reference internal" href="getting_started/quick_start.html"><span class="doc">Quick Start</span></a> section which gives a simple introduction on how to get started. Afterwards there are reference pages on each of the windows available in RenderDoc which can be referred to as you use the program, or skimmed to get a feel for the functionality available.</p>
+<p>Those of you familiar with other graphics debuggers will likely find much of RenderDoc recognisable, you might want to check out the <a class="reference internal" href="getting_started/faq.html"><span class="doc">FAQ</span></a>, <a class="reference internal" href="getting_started/features.html"><span class="doc">Features</span></a>, <a class="reference internal" href="getting_started/tips_tricks.html"><span class="doc">Tips &amp; Tricks</span></a> or browse the <a class="reference internal" href="how/index.html"><span class="doc">How do I …?</span></a> sections which detail how some common tasks are accomplished.</p>
+<p>Regardless of your experience or patience for documentation it’s recommended that you read the <a class="reference internal" href="getting_started/gotchas_known_issues.html"><span class="doc">Gotchas &amp; Known Issues</span></a> as this details current limitations of the program.</p>
+</section>
+<section id="important-notes">
+<h2>Important notes<a class="headerlink" href="#important-notes" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p>RenderDoc is generally stable but you will still likely encounter bugs depending on your use case, especially as with graphics there is a lot of potential surface area and interactions. I am <em>always</em> happy to spend time to fix bugs, but bear in mind that I need information about how to reproduce your specific situation. If you’re able to provide public reproducible steps please file an issue on GitHub, or if you need to share information privately please <a class="reference external" href="mailto:baldurk&#37;&#52;&#48;baldurk&#46;org?subject=RenderDoc%20bug">email me</a>.</p></li>
+<li><p>On the other side of the coin, please do give feedback when RenderDoc works for you and request features that would make your life easier or improve your workflow.</p></li>
+<li><p>There are a few common issues you might run into, so if you have any problems check the <a class="reference internal" href="getting_started/faq.html"><span class="doc">FAQ</span></a>, or the <a class="reference external" href="https://github.com/baldurk/renderdoc/issues">GitHub issues list</a> to see if it’s been reported.</p></li>
+</ul>
+</section>
+<section id="documentation-and-tutorials">
+<h2>Documentation and Tutorials<a class="headerlink" href="#documentation-and-tutorials" title="Permalink to this headline">¶</a></h2>
+<p>Aside from the documentation that you are reading, I have recorded some <a class="reference external" href="http://www.youtube.com/user/baldurkarlsson/">YouTube video tutorials</a> showing the use of some basic features and an introduction/overview. Note that these are quite old, from the first release of RenderDoc, but the basic workflows and operation is still similar.</p>
+<p>There is also a great presentation by <a class="reference external" href="https://twitter.com/Icetigris">&#64;Icetigris</a> which goes into some details of how RenderDoc can be used in real world situations: <a class="reference external" href="https://docs.google.com/presentation/d/1LQUMIld4SGoQVthnhT1scoA3k4Sg0as14G4NeSiSgFU/">Slides are available here</a></p>
+</section>
+<section id="contact-info-feedback-bug-reports">
+<h2>Contact info, Feedback, Bug reports<a class="headerlink" href="#contact-info-feedback-bug-reports" title="Permalink to this headline">¶</a></h2>
+<p>If you want to get in touch with any feature requests, suggestions, comments etc then feel free to contact me: <a class="reference external" href="mailto:baldurk&#37;&#52;&#48;baldurk&#46;org?subject=RenderDoc%20feedback">Contact me</a>.</p>
+<p>Bug reports can be submitted directly <a class="reference external" href="mailto:baldurk&#37;&#52;&#48;baldurk&#46;org?subject=RenderDoc%20bug">via email</a>, or also on the <a class="reference external" href="https://github.com/baldurk/renderdoc/issues">GitHub issues list</a> where you can also find the full source code.</p>
+<p>The <a class="reference external" href="https://renderdoc.org/builds">Builds page</a> always has the latest stable build downloads, as well as builds made from the source code each night for the bleeding edge. Stable releases update every two months or so and are the typical releases to stick to for the most reliable experience.</p>
+</section>
+<section id="see-also">
+<h2>See Also<a class="headerlink" href="#see-also" title="Permalink to this headline">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference external" href="https://renderdoc.org/">RenderDoc Homepage</a></p></li>
+<li><p><a class="reference external" href="https://renderdoc.org/builds">Builds page</a></p></li>
+</ul>
+</section>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="credits_acknowledgements.html" class="btn btn-neutral float-right" title="Credits &amp; Acknowledgements" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="index.html" class="btn btn-neutral float-left" title="RenderDoc" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

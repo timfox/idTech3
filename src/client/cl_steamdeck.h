@@ -8,7 +8,7 @@ Steamworks SDK integration for Steam Deck features
 #ifndef __CL_STEAMDECK_H__
 #define __CL_STEAMDECK_H__
 
-#include "../qcommon/q_shared.h"
+#include "../common/q_shared.h"
 
 #ifdef USE_STEAMWORKS
 #include "steam/steam_api.h"

@@ -1,0 +1,16 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${prefix}/lib/x86_64-linux-gnu
+includedir=${prefix}/include
+
+target=x11
+api_version=1.0
+
+multihead=yes
+
+Name: GtkGLExt
+Description: OpenGL Extension to GTK+ (${target} target)
+Version: 1.2.0
+Requires: gdkglext-${target}-${api_version} gtk+-2.0
+Libs: -L${libdir} -lgtkglext-${target}-${api_version} 
+Cflags: -I${includedir}/gtkglext-${api_version} 

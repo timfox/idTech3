@@ -8,7 +8,7 @@ UI2 - Internal C++ Types and Structures
 #define __UI2_INTERNAL_H__
 
 #include "ui2_public.h"
-#include "../qcommon/q_shared.h"
+#include "../common/q_shared.h"
 #include <cstdint>
 #include <cstring>
 

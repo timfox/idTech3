@@ -2,7 +2,7 @@
 
 #import <UIKit/UIKit.h>
 #import <Foundation/Foundation.h>
-#import "../qcommon/qcommon.h"
+#import "../common/qcommon.h"
 #import "macos_platform.h"
 // Metal renderer will be initialized separately
 

@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
-#include "../../qcommon/performance_counters.h"
+#include "../../common/performance_counters.h"
 #include "vk.h"
 
 backEndData_t	*backEndData;

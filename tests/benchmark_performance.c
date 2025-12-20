@@ -5,7 +5,7 @@ Performance benchmarking harness for automated regression testing
 */
 
 #include "test_framework.h"
-#include "../src/qcommon/q_shared.h"
+#include "../src/common/q_shared.h"
 #include <time.h>
 #include <stdlib.h>
 #include <stdio.h>

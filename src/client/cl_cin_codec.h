@@ -1,7 +1,7 @@
 #ifndef CL_CIN_CODEC_H
 #define CL_CIN_CODEC_H
 
-#include "../qcommon/q_shared.h"
+#include "../common/q_shared.h"
 #include "../renderers/renderercommon/tr_types.h"  // For MAX_VIDEO_HANDLES
 
 // Video codec types (must be defined before cin_cache_s)

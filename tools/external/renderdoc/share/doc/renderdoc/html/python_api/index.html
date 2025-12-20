@@ -1,0 +1,365 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  
+  <meta charset="utf-8" />
+  
+  <meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <title>Python API &mdash; RenderDoc documentation</title>
+  
+
+  
+  <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="../_static/sphinx_paramlinks.css" type="text/css" />
+
+  
+  
+
+  
+  
+    <link rel="canonical" href="https://renderdoc.org/docs/python_api/index.html"/>
+  
+
+  
+
+  
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    
+    <script type="text/javascript" src="../_static/js/theme.js"></script>
+
+    
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Getting Started (python)" href="examples/renderdoc_intro.html" />
+    <link rel="prev" title="In-application API" href="../in_application_api.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="../index.html" class="icon icon-home"> RenderDoc
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                1.41
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../credits_acknowledgements.html">Credits &amp; Acknowledgements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../behind_scenes/index.html">Behind the scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../in_application_api.html">In-application API</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Python API</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="examples/renderdoc_intro.html">Getting Started (python)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/qrenderdoc_intro.html">Getting Started (RenderDoc UI)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dev_environment.html">Python development environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ui_extensions.html">Writing UI extensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="descriptors_bindings.html">Descriptors and Bindings</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/basics.html">Basic Interfaces</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/renderdoc/index.html">renderdoc Examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/qrenderdoc/index.html">qrenderdoc examples</a></li>
+<li class="toctree-l2"><a class="reference internal" href="renderdoc/index.html">renderdoc python module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="qrenderdoc/index.html">qrenderdoc python module</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../how/index.html">How do I …?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../window/index.html">Window reference</a></li>
+</ul>
+
+            
+          
+        </div>
+        
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">RenderDoc</a>
+        
+      </nav>
+      
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+          
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+        
+      <li>Python API</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            
+              <a href="https://github.com/baldurk/renderdoc/blob/v1.41/docs/python_api/index.rst" class="fa fa-github"> Edit on GitHub</a>
+            
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <section id="python-api">
+<h1>Python API<a class="headerlink" href="#python-api" title="Permalink to this headline">¶</a></h1>
+<p>RenderDoc exposes APIs to python at two different levels:</p>
+<ol class="arabic simple">
+<li><p>The <a class="reference internal" href="renderdoc/index.html"><span class="doc">base replay API</span></a>, the <code class="docutils literal notranslate"><span class="pre">renderdoc</span></code> module, which provides low level access to handling capture files, replaying frames and obtaining analysis information. The UI is built entirely on top of this API, so it provides the full power of RenderDoc, however is does not have many convenience abstractions.</p></li>
+<li><p>The <a class="reference internal" href="qrenderdoc/index.html"><span class="doc">RenderDoc UI API</span></a>, the <code class="docutils literal notranslate"><span class="pre">qrenderdoc</span></code> module, which exposes the abstractions and panels within the UI tool.</p></li>
+</ol>
+<p>Within RenderDoc - when either running scripts on the command line, or via the <a class="reference internal" href="../window/python_shell.html"><span class="doc">Python Shell</span></a> - both modules are pre-imported and available automatically.</p>
+<p>It is also possible to build the <code class="docutils literal notranslate"><span class="pre">renderdoc</span></code> module standalone which can be loaded into python and used for scripting directly without the UI program. Due to the inherent difficulty of distributing C python modules this isn’t included by default in distributed builds at the time of writing, but is generated by default in source builds - <code class="docutils literal notranslate"><span class="pre">renderdoc.pyd</span></code> on windows or <code class="docutils literal notranslate"><span class="pre">renderdoc.so</span></code> elsewhere. Use of this module is strictly a convenience and is not supported.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Due to Android being inherently an unstable and unreliable platform, using the python scripting on Android devices is not recommended or supported. It may work, but you’ll be on your own with any problems encountered as they are too likely to be caused by problems on Android.</p>
+</div>
+<p>You must use exactly the same version of python to load the module as was used to build it.</p>
+<p>On windows by default RenderDoc builds against python 3.6 which is what it’s distributed with.</p>
+<p>This can be overridden by setting an overridden path under the <code class="docutils literal notranslate"><span class="pre">Python</span> <span class="pre">Configuration</span></code> section in the properties of the <code class="docutils literal notranslate"><span class="pre">qrenderdoc</span></code> project and <code class="docutils literal notranslate"><span class="pre">pyrenderdoc_module</span></code>/<code class="docutils literal notranslate"><span class="pre">qrenderdoc_module</span></code> projects. It must point to a python installation.</p>
+<p>RenderDoc requires pythonXY.lib, include files such as include/Python.h, as well as a .zip of the standard library. If you installed python with an installer you have the first two, and can generate the standard library zip by zipping the contents of the Lib folder. If you downloaded the embeddable zip distribution you will only have the standard library zip, you need to obtain the include files and <code class="docutils literal notranslate"><span class="pre">.lib</span></code> file separately.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>RenderDoc only supports Python 3.4+, Python 2 is not supported.</p>
+</div>
+<p>This documentation contains information on getting started with the scripting, as well as tutorials and examples outline how to perform simple tasks.</p>
+<p>Each example has a simple motivating goal and shows how to achieve it using the interfaces provided. They will not show every possible use of the interfaces, but instead give a starting point to build on. Further information about exactly what functionality is available can be found in the API reference below as well as using the python built-in <code class="docutils literal notranslate"><span class="pre">help()</span></code> function.</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="examples/renderdoc_intro.html">Getting Started (python)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="examples/renderdoc_intro.html#loading-the-module">Loading the Module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/renderdoc_intro.html#loading-a-capture">Loading a Capture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/renderdoc_intro.html#accessing-capture-analysis">Accessing Capture Analysis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/renderdoc_intro.html#example-source">Example Source</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="examples/qrenderdoc_intro.html">Getting Started (RenderDoc UI)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="examples/qrenderdoc_intro.html#loading-a-capture">Loading a Capture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="examples/qrenderdoc_intro.html#accessing-capture-analysis">Accessing Capture Analysis</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="dev_environment.html">Python development environment</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="dev_environment.html#building-renderdoc">Building RenderDoc</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dev_environment.html#python-setup-for-vs-code">Python Setup for VS Code</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dev_environment.html#configuring-python-module-for-pycharm">Configuring python module for PyCharm</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dev_environment.html#python-setup-for-pycharm">Python Setup for PyCharm</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dev_environment.html#id1">Configuring python module for PyCharm</a></li>
+<li class="toctree-l2"><a class="reference internal" href="dev_environment.html#troubleshooting-pycharm">Troubleshooting PyCharm</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="ui_extensions.html">Writing UI extensions</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="ui_extensions.html#first-steps">First steps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ui_extensions.html#adding-a-window-and-capture-viewer">Adding a window and capture viewer</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ui_extensions.html#calling-onto-replay-thread">Calling onto replay thread</a></li>
+<li class="toctree-l2"><a class="reference internal" href="ui_extensions.html#conclusion">Conclusion</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="descriptors_bindings.html">Descriptors and Bindings</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="descriptors_bindings.html#overview">Overview</a></li>
+<li class="toctree-l2"><a class="reference internal" href="descriptors_bindings.html#accessed-descriptors">Accessed Descriptors</a></li>
+<li class="toctree-l2"><a class="reference internal" href="descriptors_bindings.html#descriptor-contents">Descriptor Contents</a></li>
+<li class="toctree-l2"><a class="reference internal" href="descriptors_bindings.html#location-and-binding-information">Location and binding information</a></li>
+<li class="toctree-l2"><a class="reference internal" href="descriptors_bindings.html#updating-from-old-code">Updating from old code</a></li>
+<li class="toctree-l2"><a class="reference internal" href="descriptors_bindings.html#api-specific-information">API-specific information</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="descriptors_bindings.html#d3d11">D3D11</a></li>
+<li class="toctree-l3"><a class="reference internal" href="descriptors_bindings.html#opengl">OpenGL</a></li>
+<li class="toctree-l3"><a class="reference internal" href="descriptors_bindings.html#d3d12">D3D12</a></li>
+<li class="toctree-l3"><a class="reference internal" href="descriptors_bindings.html#vulkan">Vulkan</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="examples/basics.html">Basic Interfaces</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="examples/basics.html#replay-basics">Replay Basics</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="examples/basics.html#replaycontroller">ReplayController</a></li>
+<li class="toctree-l3"><a class="reference internal" href="examples/basics.html#replayoutput">ReplayOutput</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="examples/basics.html#renderdoc-ui-basics">RenderDoc UI Basics</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="examples/renderdoc/index.html">renderdoc Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="examples/renderdoc/iter_actions.html">Iterate Action tree</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="examples/renderdoc/iter_actions.html#example-source">Example Source</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="examples/renderdoc/fetch_shader.html">Fetch Shader details</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="examples/renderdoc/fetch_shader.html#example-source">Example Source</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="examples/renderdoc/fetch_counters.html">Fetch GPU Counter Data</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="examples/renderdoc/fetch_counters.html#example-source">Example Source</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="examples/renderdoc/save_texture.html">Save a texture to disk</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="examples/renderdoc/save_texture.html#example-source">Example Source</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="examples/renderdoc/decode_mesh.html">Decoding Mesh Data</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="examples/renderdoc/decode_mesh.html#example-source">Example Source</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="examples/renderdoc/display_window.html">Display texture in window</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="examples/renderdoc/display_window.html#example-source">Example Source</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="examples/renderdoc/remote_capture.html">Remote Capture and Replay</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="examples/renderdoc/remote_capture.html#example-source">Example Source</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="examples/qrenderdoc/index.html">qrenderdoc examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="examples/qrenderdoc/show_buffer.html">Display buffer with format</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="examples/qrenderdoc/show_buffer.html#example-source">Example Source</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="renderdoc/index.html">renderdoc python module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="qrenderdoc/index.html">qrenderdoc python module</a></li>
+</ul>
+</div>
+</section>
+
+
+           </div>
+           
+          </div>
+          <footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+        <a href="examples/renderdoc_intro.html" class="btn btn-neutral float-right" title="Getting Started (python)" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="../in_application_api.html" class="btn btn-neutral float-left" title="In-application API" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &#169; Copyright 2025, Baldur Karlsson.
+
+    </p>
+  </div>
+    
+    
+    
+    Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    
+    provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+  
+
+  
+  
+    
+   
+
+</body>
+</html>

@@ -24,9 +24,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef __SERVER_H__
 #define __SERVER_H__
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
-#include "../qcommon/vm_local.h"
+#include "../common/q_shared.h"
+#include "../common/qcommon.h"
+#include "../common/vm_local.h"
 #include "../game/g_public.h"
 #include "../game/bg_public.h"
 

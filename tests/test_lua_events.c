@@ -7,7 +7,7 @@ Tests the Lua event bus functionality
 */
 
 #include "test_framework.h"
-#include "../src/qcommon/lua_events.h"
+#include "../src/common/lua_events.h"
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>

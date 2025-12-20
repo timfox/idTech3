@@ -6,7 +6,7 @@ Draws rectangles and text using Quake3e renderer
 */
 
 #include "ui2_internal.h"
-#include "../qcommon/q_shared.h"
+#include "../common/q_shared.h"
 #include <algorithm>
 
 #ifdef __cplusplus

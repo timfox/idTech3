@@ -1,7 +1,7 @@
 #if defined(__APPLE__) && !defined(__ANDROID__)
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "../common/q_shared.h"
+#include "../common/qcommon.h"
 #include "macos_platform.h"
 
 // Integration with existing engine initialization

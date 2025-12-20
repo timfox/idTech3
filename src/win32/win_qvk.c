@@ -32,8 +32,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #ifdef USE_VULKAN
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
+#include "../common/q_shared.h"
+#include "../common/qcommon.h"
 #include "../renderercommon/tr_types.h"
 #include "glw_win.h"
 #include "win_local.h"
