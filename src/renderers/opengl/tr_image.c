@@ -998,6 +998,57 @@ static const char *R_LoadImage( const char *name, byte **pic, int *width, int *h
 	return localName;
 }
 
+#ifdef USE_JOBSYSTEM
+// Async image loading structure
+typedef struct async_image_load_s {
+	const char *name;
+	byte **pic;
+	int *width;
+	int *height;
+	const char *result_name;
+	qboolean completed;
+} async_image_load_t;
+
+/*
+================
+R_LoadImage_Async_Worker
+
+Worker function for async image loading
+================
+*/
+static void R_LoadImage_Async_Worker(void *data) {
+	async_image_load_t *load = (async_image_load_t *)data;
+	load->result_name = R_LoadImage(load->name, load->pic, load->width, load->height);
+	load->completed = qtrue;
+}
+
+/*
+================
+R_LoadImage_Async
+
+Asynchronously load an image using the job system
+================
+*/
+job_handle_t *R_LoadImage_Async(const char *name, byte **pic, int *width, int *height, const char **result_name) {
+	// Allocate async load structure
+	async_image_load_t *load = ri.Malloc(sizeof(async_image_load_t));
+	load->name = name;
+	load->pic = pic;
+	load->width = width;
+	load->height = height;
+	load->result_name = NULL;
+	load->completed = qfalse;
+
+	// Submit job to job system
+	job_handle_t *handle = JobSystem_SubmitJobWithCompletion(
+		R_LoadImage_Async_Worker, load, JOB_PRIORITY_NORMAL,
+		ri.Free, load); // Free the load structure when complete
+
+	*result_name = NULL; // Will be set when job completes
+	return handle;
+}
+#endif
+
 
 /*
 ===============

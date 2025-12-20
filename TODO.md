@@ -16,7 +16,7 @@
 
 ## Multi-threading
 - [x] Thread pool for async operations (basic version present)
-- [ ] Expand to proper job system (asset loading, etc.)
+- [x] Expand to proper job system (added async file loading FS_ReadFile_Async, async image loading R_LoadImage_Async)
 - [ ] Add lock-free data structures (where applicable)
 
 ## Code Quality & Tooling

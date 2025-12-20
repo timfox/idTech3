@@ -2809,6 +2809,58 @@ qboolean FS_FileIsInPAK( const char *filename, int *pChecksum, char *pakName ) {
 }
 
 
+// Async file loading structures
+typedef struct async_load_s {
+	const char *filename;
+	void **buffer;
+	int *result;
+	qboolean completed;
+} async_load_t;
+
+/*
+================
+FS_ReadFile_Async_Worker
+
+Worker function for async file loading
+================
+*/
+static void FS_ReadFile_Async_Worker(void *data) {
+	async_load_t *load = (async_load_t *)data;
+	*load->result = FS_ReadFile(load->filename, load->buffer);
+	load->completed = qtrue;
+}
+
+/*
+================
+FS_ReadFile_Async
+
+Asynchronously load a file using the job system
+Returns job handle, or NULL if job system not available or sync fallback used
+================
+*/
+job_handle_t *FS_ReadFile_Async(const char *qpath, void **buffer, int *result) {
+#ifdef USE_JOBSYSTEM
+	// Allocate async load structure
+	async_load_t *load = Z_Malloc(sizeof(async_load_t));
+	load->filename = qpath;
+	load->buffer = buffer;
+	load->result = result;
+	load->completed = qfalse;
+	*result = -1; // Default to error
+
+	// Submit job to job system
+	job_handle_t *handle = JobSystem_SubmitJobWithCompletion(
+		FS_ReadFile_Async_Worker, load, JOB_PRIORITY_NORMAL,
+		Z_Free, load); // Free the load structure when complete
+
+	return handle;
+#else
+	// Fallback to synchronous loading
+	*result = FS_ReadFile(qpath, buffer);
+	return NULL;
+#endif
+}
+
 /*
 ============
 FS_ReadFile
