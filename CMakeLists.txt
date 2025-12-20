@@ -406,132 +406,132 @@ ENDIF()
 SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules)
 
 SET(QCOMMON_SRCS
-    src/qcommon/cm_load.c
-    src/qcommon/cm_patch.c
-    src/qcommon/cm_polylib.c
-    src/qcommon/cm_test.c
-    src/qcommon/cm_trace.c
-    src/qcommon/cmd.c
-    src/qcommon/common.c
-    src/qcommon/crash_handler.c
-    src/qcommon/cvar.c
-    src/qcommon/ecs.cpp
-    src/qcommon/ecs_systems.cpp
-    src/qcommon/entity_facade.cpp
-    src/qcommon/event_system.c
-    src/qcommon/files.c
-    src/qcommon/files_v2.c
-    src/qcommon/files_v2_impl.c
-    src/qcommon/freetype_wrapper.c
-    src/qcommon/history.c
-    src/qcommon/huffman.c
-    src/qcommon/huffman_static.c
-    src/qcommon/i18n.c
-    src/qcommon/job_queue.c
-    src/qcommon/job_system.c
-    src/qcommon/json_cjson.c
-    src/qcommon/keys.c
-    src/qcommon/lua_coroutine.c
-    src/qcommon/lua_debug.c
-    src/qcommon/lua_encounter.c
-    src/qcommon/lua_entity.cpp
-    src/qcommon/lua_events.c
-    src/qcommon/lua_game.cpp
-    src/qcommon/lua_renderer.c
-    src/qcommon/lua_sequence.c
-    src/qcommon/lua_sound.c
-    src/qcommon/lua_wrapper.c
-    src/qcommon/md4.c
-    src/qcommon/md5.c
-    src/qcommon/memory_stats.c
-    src/qcommon/msg.c
-    src/qcommon/msg_secure.c
-    src/qcommon/net_chan.c
-    src/qcommon/net_enet.c
-    src/qcommon/net_ip.c
-    src/qcommon/oop_services.cpp
-    src/qcommon/openssl_wrapper.c
-    src/qcommon/performance_counters.c
-    src/qcommon/puff.c
-    src/qcommon/q_assert.c
-    src/qcommon/q_log.c
-    src/qcommon/q_math.c
-    src/qcommon/q_memory_safety.c
-    src/qcommon/q_memtrack.c
-    src/qcommon/q_shared.c
-    src/qcommon/q_telemetry.c
-    src/qcommon/q_watchdog.c
-    src/qcommon/sqlite_wrapper.c
-    src/qcommon/syscall_registry.c
-    src/qcommon/thread_platform.c
-    src/qcommon/unzip.c
-    src/qcommon/vm.c
-    src/qcommon/vm_aarch64.c
-    src/qcommon/vm_armv7l.c
-    src/qcommon/vm_hot_reload.c
-    src/qcommon/vm_interpreted.c
-    src/qcommon/vm_x86.c
-    src/qcommon/zstd_compress.c
+    src/common/cm_load.c
+    src/common/cm_patch.c
+    src/common/cm_polylib.c
+    src/common/cm_test.c
+    src/common/cm_trace.c
+    src/common/cmd.c
+    src/common/common.c
+    src/common/crash_handler.c
+    src/common/cvar.c
+    src/common/ecs.cpp
+    src/common/ecs_systems.cpp
+    src/common/entity_facade.cpp
+    src/common/event_system.c
+    src/common/files.c
+    src/common/files_v2.c
+    src/common/files_v2_impl.c
+    src/common/freetype_wrapper.c
+    src/common/history.c
+    src/common/huffman.c
+    src/common/huffman_static.c
+    src/common/i18n.c
+    src/common/job_queue.c
+    src/common/job_system.c
+    src/common/json_cjson.c
+    src/common/keys.c
+    src/common/lua_coroutine.c
+    src/common/lua_debug.c
+    src/common/lua_encounter.c
+    src/common/lua_entity.cpp
+    src/common/lua_events.c
+    src/common/lua_game.cpp
+    src/common/lua_renderer.c
+    src/common/lua_sequence.c
+    src/common/lua_sound.c
+    src/common/lua_wrapper.c
+    src/common/md4.c
+    src/common/md5.c
+    src/common/memory_stats.c
+    src/common/msg.c
+    src/common/msg_secure.c
+    src/common/net_chan.c
+    src/common/net_enet.c
+    src/common/net_ip.c
+    src/common/oop_services.cpp
+    src/common/openssl_wrapper.c
+    src/common/performance_counters.c
+    src/common/puff.c
+    src/common/q_assert.c
+    src/common/q_log.c
+    src/common/q_math.c
+    src/common/q_memory_safety.c
+    src/common/q_memtrack.c
+    src/common/q_shared.c
+    src/common/q_telemetry.c
+    src/common/q_watchdog.c
+    src/common/sqlite_wrapper.c
+    src/common/syscall_registry.c
+    src/common/thread_platform.c
+    src/common/unzip.c
+    src/common/vm.c
+    src/common/vm_aarch64.c
+    src/common/vm_armv7l.c
+    src/common/vm_hot_reload.c
+    src/common/vm_interpreted.c
+    src/common/vm_x86.c
+    src/common/zstd_compress.c
 )
 # exclude platform-dependent QVM bytecode compilers
 list(FILTER QCOMMON_SRCS EXCLUDE REGEX ".*vm_[alx].*.c")
 # Add structured logging system
-list(APPEND QCOMMON_SRCS src/qcommon/q_log.c)
+list(APPEND QCOMMON_SRCS src/common/q_log.c)
 # Add performance counters
-list(APPEND QCOMMON_SRCS src/qcommon/performance_counters.c)
+list(APPEND QCOMMON_SRCS src/common/performance_counters.c)
 # Add memory safety utilities
-list(APPEND QCOMMON_SRCS src/qcommon/q_memory_safety.c)
+list(APPEND QCOMMON_SRCS src/common/q_memory_safety.c)
 # Add secure message functions
-list(APPEND QCOMMON_SRCS src/qcommon/msg_secure.c)
+list(APPEND QCOMMON_SRCS src/common/msg_secure.c)
 # Add secure message functions
-list(APPEND QCOMMON_SRCS src/qcommon/msg_secure.c)
+list(APPEND QCOMMON_SRCS src/common/msg_secure.c)
 # Add memory statistics tracking
-list(APPEND QCOMMON_SRCS src/qcommon/memory_stats.c)
+list(APPEND QCOMMON_SRCS src/common/memory_stats.c)
 # Add VM hot reload system
-list(APPEND QCOMMON_SRCS src/qcommon/vm_hot_reload.c)
+list(APPEND QCOMMON_SRCS src/common/vm_hot_reload.c)
 # Add event system
-list(APPEND QCOMMON_SRCS src/qcommon/event_system.c)
+list(APPEND QCOMMON_SRCS src/common/event_system.c)
 # Add crash handler and assert system
-list(APPEND QCOMMON_SRCS src/qcommon/crash_handler.c)
-list(APPEND QCOMMON_SRCS src/qcommon/q_assert.c)
+list(APPEND QCOMMON_SRCS src/common/crash_handler.c)
+list(APPEND QCOMMON_SRCS src/common/q_assert.c)
 # Add watchdog system
-list(APPEND QCOMMON_SRCS src/qcommon/q_watchdog.c)
-list(APPEND QCOMMON_SRCS src/qcommon/files_v2.c)
-list(APPEND QCOMMON_SRCS src/qcommon/files_v2_impl.c)
+list(APPEND QCOMMON_SRCS src/common/q_watchdog.c)
+list(APPEND QCOMMON_SRCS src/common/files_v2.c)
+list(APPEND QCOMMON_SRCS src/common/files_v2_impl.c)
 # Add wrapper files conditionally
 IF(USE_CJSON)
-	list(APPEND QCOMMON_SRCS src/qcommon/json_cjson.c)
+	list(APPEND QCOMMON_SRCS src/common/json_cjson.c)
 ENDIF()
 IF(USE_ZSTD)
-	list(APPEND QCOMMON_SRCS src/qcommon/zstd_compress.c)
+	list(APPEND QCOMMON_SRCS src/common/zstd_compress.c)
 ENDIF()
 IF(USE_ENET)
-	list(APPEND QCOMMON_SRCS src/qcommon/net_enet.c)
+	list(APPEND QCOMMON_SRCS src/common/net_enet.c)
 ENDIF()
 
 IF(USE_SQLITE)
-	list(APPEND QCOMMON_SRCS src/qcommon/sqlite_wrapper.c)
+	list(APPEND QCOMMON_SRCS src/common/sqlite_wrapper.c)
 ENDIF()
 
 IF(USE_OPENSSL)
-	list(APPEND QCOMMON_SRCS src/qcommon/openssl_wrapper.c)
+	list(APPEND QCOMMON_SRCS src/common/openssl_wrapper.c)
 ENDIF()
 
 
 IF(USE_AIML)
 	list(APPEND QCOMMON_SRCS
-		src/qcommon/aiml/aiml_parser.cpp
-		src/qcommon/aiml/aiml_interpreter.cpp
-		src/qcommon/aiml/aiml_c_api.cpp
+		src/common/aiml/aiml_parser.cpp
+		src/common/aiml/aiml_interpreter.cpp
+		src/common/aiml/aiml_c_api.cpp
 	)
 	ADD_COMPILE_DEFINITIONS(USE_AIML)
 ENDIF()
 
 # Internationalization (i18n) support
-list(APPEND QCOMMON_SRCS src/qcommon/i18n.c)
+list(APPEND QCOMMON_SRCS src/common/i18n.c)
 
 IF(USE_FREETYPE)
-	list(APPEND QCOMMON_SRCS src/qcommon/freetype_wrapper.c)
+	list(APPEND QCOMMON_SRCS src/common/freetype_wrapper.c)
 ENDIF()
 
 # EnTT ECS system
@@ -541,12 +541,12 @@ IF(USE_ENTT)
 	# Add compile definition
 	ADD_COMPILE_DEFINITIONS(USE_ENTT)
 	# Add C++ source files for ECS (will be created)
-	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/qcommon/ecs.cpp)
-		list(APPEND QCOMMON_SRCS src/qcommon/ecs.cpp)
-	ENDIF()
-	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/qcommon/ecs_systems.cpp)
-		list(APPEND QCOMMON_SRCS src/qcommon/ecs_systems.cpp)
-	ENDIF()
+IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/common/ecs.cpp)
+		list(APPEND QCOMMON_SRCS src/common/ecs.cpp)
+ENDIF()
+IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/common/ecs_systems.cpp)
+		list(APPEND QCOMMON_SRCS src/common/ecs_systems.cpp)
+ENDIF()
 	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/server/sv_ecs.cpp)
 		list(APPEND SERVER_SRCS src/server/sv_ecs.cpp)
 	ENDIF()
@@ -782,7 +782,7 @@ ENDIF()
 IF(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64")
 	SET(BINEXT .aarch64)
 	SET(RENDEXT _aarch64)
-	list(APPEND QCOMMON_SRCS src/qcommon/vm_aarch64.c)
+	list(APPEND QCOMMON_SRCS src/common/vm_aarch64.c)
 ELSEIF(CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86_64|x86|i*86")
 	# Default to 64-bit for x86 architectures
 	IF(WIN32)
@@ -791,11 +791,11 @@ ELSEIF(CMAKE_SYSTEM_PROCESSOR MATCHES "AMD64|x86_64|x86|i*86")
 		SET(BINEXT .x86_64)
 	ENDIF()
 	SET(RENDEXT _x86_64)
-	list(APPEND QCOMMON_SRCS src/qcommon/vm_x86.c)
+	list(APPEND QCOMMON_SRCS src/common/vm_x86.c)
 ELSEIF(CMAKE_SYSTEM_PROCESSOR MATCHES "arm*")
 	SET(BINEXT .arm)
 	SET(RENDEXT _arm)
-	list(APPEND QCOMMON_SRCS src/qcommon/vm_armv7l.c)
+	list(APPEND QCOMMON_SRCS src/common/vm_armv7l.c)
 ELSE()
 	TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE -DNO_VM_COMPILED)
 	TARGET_COMPILE_DEFINITIONS(qcommon_ded PRIVATE -DNO_VM_COMPILED)
@@ -820,7 +820,7 @@ list(REMOVE_ITEM SERVER_SRCS src/server/sv_rankings.c)
 
 # universal binary
 ADD_LIBRARY(qcommon OBJECT ${QCOMMON_SRCS} ${SERVER_SRCS})
-	TARGET_INCLUDE_DIRECTORIES(qcommon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/qcommon)
+	TARGET_INCLUDE_DIRECTORIES(qcommon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/common)
 IF(USE_JOBSYSTEM)
 	TARGET_COMPILE_DEFINITIONS(qcommon PRIVATE USE_JOBSYSTEM)
 ENDIF()
@@ -1304,9 +1304,9 @@ ENDIF()
 
 IF(USE_RENDERER_DLOPEN)
 	SET(AUX_SRCS
-		src/qcommon/q_shared.c
-		src/qcommon/puff.c
-		src/qcommon/q_math.c
+		src/common/q_shared.c
+		src/common/puff.c
+		src/common/q_math.c
 	)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_RENDERER_DLOPEN RENDERER_PREFIX="${RENDERER_PREFIX}" RENDERER_DEFAULT=${RENDERER_DEFAULT})
 
@@ -1561,10 +1561,10 @@ ENDIF()
 
 IF(USE_CURL)
 # Add telemetry system
-list(APPEND QCOMMON_SRCS src/qcommon/q_telemetry.c)
+list(APPEND QCOMMON_SRCS src/common/q_telemetry.c)
 
 # Add syscall registry system
-list(APPEND QCOMMON_SRCS src/qcommon/syscall_registry.c)
+list(APPEND QCOMMON_SRCS src/common/syscall_registry.c)
 	
 	# Try CMake's find_package first
 	find_package(CURL QUIET)
@@ -2241,7 +2241,7 @@ ELSE()
 ENDIF()
 TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui GL)
 TARGET_LINK_OPTIONS(${CNAME}${BINEXT} PRIVATE -Wl,--export-dynamic)
-TARGET_INCLUDE_DIRECTORIES(${CNAME}${BINEXT} PRIVATE src/qcommon)
+TARGET_INCLUDE_DIRECTORIES(${CNAME}${BINEXT} PRIVATE src/common)
 IF(USE_UI2)
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ui2)
 ENDIF()
@@ -2482,7 +2482,7 @@ ENDIF()
 IF(BUILD_SERVER AND NOT ANDROID)
 	ADD_EXECUTABLE(${DNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 	TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE qcommon_ded botlib)
-TARGET_INCLUDE_DIRECTORIES(${DNAME}${BINEXT} PRIVATE src/qcommon)
+TARGET_INCLUDE_DIRECTORIES(${DNAME}${BINEXT} PRIVATE src/common)
 
 	IF(USE_SDL)
 		TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE ${SDL2_LINK_LIBS})
@@ -2657,6 +2657,9 @@ IF(USE_VULKAN)
 	TARGET_COMPILE_DEFINITIONS(q3ui PRIVATE USE_VULKAN)
 ENDIF()
 
+# Add include directories for q3ui
+TARGET_INCLUDE_DIRECTORIES(q3ui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/src/client)
+
 # UI2 - Deterministic UI/Layout System (C++23)
 OPTION(USE_UI2 "Enable UI2 deterministic UI/layout system" OFF)
 IF(USE_UI2)
@@ -2692,17 +2695,17 @@ ENDIF()
 OPTION(BUILD_TESTS "Build unit tests" ON)
 IF(BUILD_TESTS)
 	ENABLE_TESTING()
-	ADD_EXECUTABLE(test_qcommon tests/test_qcommon.c src/qcommon/q_shared.c)
-	TARGET_INCLUDE_DIRECTORIES(test_qcommon PRIVATE src/qcommon)
+	ADD_EXECUTABLE(test_qcommon tests/test_qcommon.c src/common/q_shared.c)
+	TARGET_INCLUDE_DIRECTORIES(test_qcommon PRIVATE src/common)
 	TARGET_INCLUDE_DIRECTORIES(test_qcommon PRIVATE src)
 	ADD_TEST(NAME qcommon_tests COMMAND test_qcommon)
 
 	ADD_EXECUTABLE(test_qmath
 		tests/test_qmath.c
-		src/qcommon/q_math.c
-		src/qcommon/q_shared.c
+		src/common/q_math.c
+		src/common/q_shared.c
 	)
-	TARGET_INCLUDE_DIRECTORIES(test_qmath PRIVATE src/qcommon)
+	TARGET_INCLUDE_DIRECTORIES(test_qmath PRIVATE src/common)
 	TARGET_INCLUDE_DIRECTORIES(test_qmath PRIVATE src)
 	TARGET_INCLUDE_DIRECTORIES(test_qmath PRIVATE tests)
 	IF(UNIX)
@@ -2719,6 +2722,14 @@ IF(BUILD_TESTS)
 		ADD_TEST(NAME network_enet_tests COMMAND test_network_enet)
 	endif()
 
+# Snapshot Correctness Test - disabled due to MSG dependencies
+# ADD_EXECUTABLE(test_snapshot_correctness
+#	tests/test_snapshot_correctness.c
+#	src/common/msg.c
+# )
+# TARGET_INCLUDE_DIRECTORIES(test_snapshot_correctness PRIVATE src)
+# ADD_TEST(NAME snapshot_correctness_tests COMMAND test_snapshot_correctness)
+
 	# Memory Safety Test (standalone)
 	ADD_EXECUTABLE(test_memory_safety tests/test_memory_safety.c tests/q_memory_safety_impl.c)
 	TARGET_INCLUDE_DIRECTORIES(test_memory_safety PRIVATE tests)
@@ -2729,16 +2740,16 @@ IF(BUILD_TESTS)
 
 	ADD_EXECUTABLE(test_info
 		tests/test_info.c
-		src/qcommon/q_shared.c
+		src/common/q_shared.c
 	)
-	TARGET_INCLUDE_DIRECTORIES(test_info PRIVATE src/qcommon)
+	TARGET_INCLUDE_DIRECTORIES(test_info PRIVATE src/common)
 	TARGET_INCLUDE_DIRECTORIES(test_info PRIVATE src)
 	ADD_TEST(NAME info_tests COMMAND test_info)
 
 	# Message Fuzzing Target
 	IF (CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-		ADD_EXECUTABLE(fuzz_msg src/qcommon/fuzz_msg.c src/qcommon/msg_fuzz.c)
-		TARGET_INCLUDE_DIRECTORIES(fuzz_msg PRIVATE src/qcommon)
+		ADD_EXECUTABLE(fuzz_msg src/common/fuzz_msg.c src/common/msg_fuzz.c)
+		TARGET_INCLUDE_DIRECTORIES(fuzz_msg PRIVATE src/common)
 		TARGET_COMPILE_DEFINITIONS(fuzz_msg PRIVATE FUZZING_BUILD)
 		# Specific linker flags for libFuzzer
 		SET_TARGET_PROPERTIES(fuzz_msg PROPERTIES LINK_FLAGS "-fsanitize=fuzzer")
@@ -2751,7 +2762,7 @@ IF(BUILD_TESTS)
 	# BSP Fuzzing Target
 	IF (CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 		ADD_EXECUTABLE(fuzz_bsp tests/fuzz_bsp.c)
-		TARGET_INCLUDE_DIRECTORIES(fuzz_bsp PRIVATE src/qcommon)
+		TARGET_INCLUDE_DIRECTORIES(fuzz_bsp PRIVATE src/common)
 		TARGET_COMPILE_DEFINITIONS(fuzz_bsp PRIVATE FUZZING_BUILD)
 		SET_TARGET_PROPERTIES(fuzz_bsp PROPERTIES LINK_FLAGS "-fsanitize=fuzzer")
 	ELSE()
@@ -2761,7 +2772,7 @@ IF(BUILD_TESTS)
 	# Shader Fuzzing Target
 	IF (CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 		ADD_EXECUTABLE(fuzz_shader tests/fuzz_shader.c)
-		TARGET_INCLUDE_DIRECTORIES(fuzz_shader PRIVATE src/qcommon)
+		TARGET_INCLUDE_DIRECTORIES(fuzz_shader PRIVATE src/common)
 		TARGET_COMPILE_DEFINITIONS(fuzz_shader PRIVATE FUZZING_BUILD)
 		SET_TARGET_PROPERTIES(fuzz_shader PROPERTIES LINK_FLAGS "-fsanitize=fuzzer")
 	ELSE()
@@ -2771,7 +2782,7 @@ IF(BUILD_TESTS)
 	# PK3 Fuzzing Target
 	IF (CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 		ADD_EXECUTABLE(fuzz_pk3 tests/fuzz_pk3.c)
-		TARGET_INCLUDE_DIRECTORIES(fuzz_pk3 PRIVATE src/qcommon)
+		TARGET_INCLUDE_DIRECTORIES(fuzz_pk3 PRIVATE src/common)
 		TARGET_COMPILE_DEFINITIONS(fuzz_pk3 PRIVATE FUZZING_BUILD)
 		SET_TARGET_PROPERTIES(fuzz_pk3 PROPERTIES LINK_FLAGS "-fsanitize=fuzzer")
 	ELSE()
@@ -2780,15 +2791,15 @@ IF(BUILD_TESTS)
 
 	ADD_EXECUTABLE(test_performance_counters
 		tests/test_performance_counters.c
-		src/qcommon/performance_counters.c)
-	TARGET_INCLUDE_DIRECTORIES(test_performance_counters PRIVATE src/qcommon)
+		src/common/performance_counters.c)
+	TARGET_INCLUDE_DIRECTORIES(test_performance_counters PRIVATE src/common)
 	TARGET_INCLUDE_DIRECTORIES(test_performance_counters PRIVATE src)
 	TARGET_COMPILE_DEFINITIONS(test_performance_counters PRIVATE STANDALONE_TEST)
 	ADD_TEST(NAME performance_counters_tests COMMAND test_performance_counters)
 
 	ADD_EXECUTABLE(test_memory
 		tests/test_memory.c)
-	TARGET_INCLUDE_DIRECTORIES(test_memory PRIVATE src/qcommon)
+	TARGET_INCLUDE_DIRECTORIES(test_memory PRIVATE src/common)
 	TARGET_INCLUDE_DIRECTORIES(test_memory PRIVATE src)
 	TARGET_INCLUDE_DIRECTORIES(test_memory PRIVATE tests)
 	TARGET_COMPILE_DEFINITIONS(test_memory PRIVATE STANDALONE_TEST)
@@ -2798,11 +2809,11 @@ IF(BUILD_TESTS)
 
 	ADD_EXECUTABLE(test_filesystem_v2
 		tests/test_filesystem_v2.c
-		src/qcommon/files_v2.c
-		src/qcommon/files_v2_impl.c
-		src/qcommon/q_shared.c
+		src/common/files_v2.c
+		src/common/files_v2_impl.c
+		src/common/q_shared.c
 	)
-	TARGET_INCLUDE_DIRECTORIES(test_filesystem_v2 PRIVATE src/qcommon)
+	TARGET_INCLUDE_DIRECTORIES(test_filesystem_v2 PRIVATE src/common)
 	TARGET_INCLUDE_DIRECTORIES(test_filesystem_v2 PRIVATE src)
 	TARGET_INCLUDE_DIRECTORIES(test_filesystem_v2 PRIVATE tests)
 	ADD_TEST(NAME filesystem_v2_tests COMMAND test_filesystem_v2)
@@ -2812,10 +2823,10 @@ IF(BUILD_TESTS)
 	# Geometry tests
 	ADD_EXECUTABLE(test_geometry
 		tests/test_geometry.c
-		src/qcommon/q_math.c
-		src/qcommon/q_shared.c
+		src/common/q_math.c
+		src/common/q_shared.c
 	)
-	TARGET_INCLUDE_DIRECTORIES(test_geometry PRIVATE src/qcommon)
+	TARGET_INCLUDE_DIRECTORIES(test_geometry PRIVATE src/common)
 	TARGET_INCLUDE_DIRECTORIES(test_geometry PRIVATE src)
 	TARGET_INCLUDE_DIRECTORIES(test_geometry PRIVATE tests)
 	IF(UNIX)
@@ -2826,10 +2837,10 @@ IF(BUILD_TESTS)
 	# Security tests
 	ADD_EXECUTABLE(test_security
 		tests/test_security.c
-		src/qcommon/q_math.c
-		src/qcommon/q_shared.c
+		src/common/q_math.c
+		src/common/q_shared.c
 	)
-	TARGET_INCLUDE_DIRECTORIES(test_security PRIVATE src/qcommon)
+	TARGET_INCLUDE_DIRECTORIES(test_security PRIVATE src/common)
 	TARGET_INCLUDE_DIRECTORIES(test_security PRIVATE src)
 	TARGET_INCLUDE_DIRECTORIES(test_security PRIVATE tests)
 	IF(UNIX)
@@ -2840,10 +2851,10 @@ IF(BUILD_TESTS)
 	# Performance benchmarks
 	ADD_EXECUTABLE(benchmark_performance
 		tests/benchmark_performance.c
-		src/qcommon/q_math.c
-		src/qcommon/q_shared.c
+		src/common/q_math.c
+		src/common/q_shared.c
 	)
-	TARGET_INCLUDE_DIRECTORIES(benchmark_performance PRIVATE src/qcommon)
+	TARGET_INCLUDE_DIRECTORIES(benchmark_performance PRIVATE src/common)
 	TARGET_INCLUDE_DIRECTORIES(benchmark_performance PRIVATE src)
 	TARGET_INCLUDE_DIRECTORIES(benchmark_performance PRIVATE tests)
 	IF(UNIX)
@@ -2854,11 +2865,11 @@ IF(BUILD_TESTS)
 	IF (CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 		ADD_EXECUTABLE(fuzz_network
 			tests/fuzz_network.c
-			src/qcommon/msg.c
-			src/qcommon/q_math.c
-			src/qcommon/q_shared.c
+			src/common/msg.c
+			src/common/q_math.c
+			src/common/q_shared.c
 		)
-		TARGET_INCLUDE_DIRECTORIES(fuzz_network PRIVATE src/qcommon)
+		TARGET_INCLUDE_DIRECTORIES(fuzz_network PRIVATE src/common)
 		TARGET_INCLUDE_DIRECTORIES(fuzz_network PRIVATE src)
 		TARGET_COMPILE_DEFINITIONS(fuzz_network PRIVATE USE_LIBFUZZER)
 		# libFuzzer flags
@@ -2890,10 +2901,10 @@ IF(BUILD_TESTS)
 # Property-based testing (simplified)
 ADD_EXECUTABLE(test_property_based
 	tests/test_property_based_simple.c
-	src/qcommon/q_math.c
-	src/qcommon/q_shared.c
+	src/common/q_math.c
+	src/common/q_shared.c
 )
-TARGET_INCLUDE_DIRECTORIES(test_property_based PRIVATE src/qcommon)
+TARGET_INCLUDE_DIRECTORIES(test_property_based PRIVATE src/common)
 TARGET_INCLUDE_DIRECTORIES(test_property_based PRIVATE src)
 TARGET_INCLUDE_DIRECTORIES(test_property_based PRIVATE tests)
 IF(UNIX)
