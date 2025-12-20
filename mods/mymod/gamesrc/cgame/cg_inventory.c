@@ -8,7 +8,7 @@ Overlay menu for inventory management.
 
 #include "cg_local.h"
 #include "cg_inventory.h"
-#include "../../src/client/keycodes.h"
+#include <keycodes.h>
 
 static cg_inventory_ui_t cg_inventory_ui;
 

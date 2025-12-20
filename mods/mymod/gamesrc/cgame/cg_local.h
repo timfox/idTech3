@@ -20,9 +20,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 //
-#include "../common/q_shared.h"
+#include <q_shared.h>
 #include "../common/qcommon.h" // for dllSyscall_t / dllEntry_t
-#include "../../src/renderercommon/tr_types.h"
+#include <tr_types.h>
 #include "../game/bg_public.h"
 #include "cg_public.h"
 #include "cg_dialog.h"

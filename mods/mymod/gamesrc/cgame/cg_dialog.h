@@ -9,7 +9,7 @@ Renders dialog boxes with text, character names, and choices.
 #ifndef _CG_DIALOG_H
 #define _CG_DIALOG_H
 
-#include "../common/q_shared.h"
+#include <q_shared.h>
 #include "cg_public.h"
 
 #define MAX_DIALOG_CHOICES	4

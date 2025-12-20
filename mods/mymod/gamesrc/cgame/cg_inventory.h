@@ -9,7 +9,7 @@ Overlay menu for inventory management.
 #ifndef _CG_INVENTORY_H
 #define _CG_INVENTORY_H
 
-#include "../common/q_shared.h"
+#include <q_shared.h>
 #include "cg_public.h"
 
 #define MAX_INVENTORY_DISPLAY_ITEMS	64

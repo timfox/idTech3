@@ -29,7 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #else
 #define BG_PUBLIC_H 1
 
-#include "../common/q_shared.h"
+#include <q_shared.h>
 
 // Compatibility macros for OpenArena code
 #ifndef Q_strequal

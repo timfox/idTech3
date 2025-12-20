@@ -25,7 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef _G_LOCAL_H
 #define _G_LOCAL_H
 
-#include "../common/q_shared.h"
+#include <q_shared.h>
 
 // Compatibility: Q_strequal -> Q_streq
 #ifndef Q_strequal

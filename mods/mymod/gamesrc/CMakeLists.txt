@@ -30,14 +30,15 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../vm)
 # When built as a subproject (monolithic build), CMAKE_SOURCE_DIR points to the root engine dir,
 # so compute from the current source dir instead.
 if(NOT DEFINED ENGINE_ROOT)
-	get_filename_component(ENGINE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+	get_filename_component(ENGINE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
 endif()
 set(ENGINE_INCLUDE_DIRS
     ${ENGINE_ROOT}/src/common
     ${ENGINE_ROOT}/src/game
     ${ENGINE_ROOT}/src/cgame
     ${ENGINE_ROOT}/src/ui
-    ${ENGINE_ROOT}/src/renderercommon
+    ${ENGINE_ROOT}/src/client
+    ${ENGINE_ROOT}/src/renderers/renderercommon
 )
 
 message(STATUS "ENGINE_ROOT: ${ENGINE_ROOT}")

@@ -25,8 +25,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define BASEOA
 
-#include "../common/q_shared.h"
-#include "../../src/renderercommon/tr_types.h"
+#include <q_shared.h>
+#include <tr_types.h>
 //NOTE: include the ui_public.h from the new UI
 #include "../ui/ui_public.h" // bk001205 - yes, do have to use this
 //redefine to old API version

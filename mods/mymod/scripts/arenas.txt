@@ -1,0 +1,79 @@
+// MyMod Arena Configuration
+// This file defines the available maps and their game types
+
+{
+map "oa_dm1"
+longname "Outer Awakening DM1"
+type "0"
+num "1"
+}
+
+{
+map "oa_dm2"
+longname "Outer Awakening DM2"
+type "0"
+num "2"
+}
+
+{
+map "oa_dm3"
+longname "Outer Awakening DM3"
+type "0"
+num "3"
+}
+
+{
+map "oa_dm4"
+longname "Outer Awakening DM4"
+type "0"
+num "4"
+}
+
+{
+map "oa_dm5"
+longname "Outer Awakening DM5"
+type "0"
+num "5"
+}
+
+{
+map "oa_dm6"
+longname "Outer Awakening DM6"
+type "0"
+num "6"
+}
+
+{
+map "oa_dm7"
+longname "Outer Awakening DM7"
+type "0"
+num "7"
+}
+
+{
+map "oa_ctf2"
+longname "Outer Awakening CTF2"
+type "4"
+num "8"
+}
+
+{
+map "oa_bases3"
+longname "Outer Awakening Bases3"
+type "4"
+num "9"
+}
+
+{
+map "aggressor"
+longname "Aggressor"
+type "0"
+num "10"
+}
+
+{
+map "kaos"
+longname "Kaos"
+type "0"
+num "11"
+}

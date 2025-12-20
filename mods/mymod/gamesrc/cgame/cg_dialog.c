@@ -8,7 +8,7 @@ Renders dialog boxes with text, character names, and choices.
 
 #include "cg_local.h"
 #include "cg_dialog.h"
-#include "../../src/client/keycodes.h"
+#include <keycodes.h>
 
 static cg_dialog_t cg_dialog;
 

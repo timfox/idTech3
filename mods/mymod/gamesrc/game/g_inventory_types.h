@@ -9,7 +9,7 @@ Type definitions for the inventory system that don't depend on g_local.h
 #ifndef _G_INVENTORY_TYPES_H
 #define _G_INVENTORY_TYPES_H
 
-#include "../common/q_shared.h"
+#include <q_shared.h>
 
 #define MAX_INVENTORY_ITEMS		256
 #define MAX_ITEM_NAME			64

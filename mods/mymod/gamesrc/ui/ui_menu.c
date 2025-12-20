@@ -155,12 +155,18 @@ static void MainMenu_RegisterFontSafe( const char *path, int pointSize, fontInfo
 	}
 
 	Com_Printf( "MainMenu font %s: attempting to load %s (%dpt)\n", label ? label : "font", path, pointSize );
-	// Force use FX300.ttf for testing
-	trap_R_RegisterFont( "FX300.ttf", pointSize, outFont );
+	trap_R_RegisterFont( path, pointSize, outFont );
 	if ( FONT_LOADED( outFont ) ) {
-		Com_Printf( S_COLOR_GREEN "MainMenu font %s: loaded FX300.ttf (%dpt)\n", label ? label : "font", pointSize );
+		Com_Printf( S_COLOR_GREEN "MainMenu font %s: loaded %s (%dpt)\n", label ? label : "font", path, pointSize );
 	} else {
-		Com_Printf( S_COLOR_RED "MainMenu font %s: failed to load FX300.ttf (%dpt)\n", label ? label : "font", pointSize );
+		Com_Printf( S_COLOR_RED "MainMenu font %s: failed to load %s (%dpt), trying FX300.ttf fallback\n", label ? label : "font", path, pointSize );
+		// Try fallback to FX300.ttf
+		trap_R_RegisterFont( "FX300.ttf", pointSize, outFont );
+		if ( FONT_LOADED( outFont ) ) {
+			Com_Printf( S_COLOR_YELLOW "MainMenu font %s: loaded fallback FX300.ttf (%dpt)\n", label ? label : "font", pointSize );
+		} else {
+			Com_Printf( S_COLOR_RED "MainMenu font %s: failed to load FX300.ttf (%dpt)\n", label ? label : "font", pointSize );
+		}
 	}
 }
 
@@ -556,33 +562,42 @@ void MainMenu_Cache( void )
 	MainMenu_LoadFontsFromConfig();
 
 	// Try to load the enhanced banner model
-	s_main.bannerModel = trap_R_RegisterModel( MAIN_BANNER_MODEL );
-	if ( s_main.bannerModel ) {
-		Com_Printf( "MainMenu_Cache: Successfully loaded enhanced banner model '%s' (handle %d)\n", MAIN_BANNER_MODEL, s_main.bannerModel );
-	} else {
-		Com_Printf( "MainMenu_Cache: Failed to load enhanced banner model '%s', trying fallback\n", MAIN_BANNER_MODEL );
+	// Try multiple banner models and formats
+	const char *banner_candidates[] = {
+		"models/mapobjects/banner/cube.obj",         // OBJ format (preferred)
+		"models/mapobjects/banner/cube",             // Cube without extension
+		MAIN_BANNER_MODEL,                           // banner5.md3
+		"models/mapobjects/banner/banner5",          // Try without extension
+		"models/mapobjects/banner/cube.md3",         // Cube MD3
+		"models/mapobjects/grenade.md3",             // Grenade model
+		"models/powerups/health/red.md3",            // Health pack
+		"models/misc/telep.md3",                     // Teleporter
+		"models/weapons2/rocketl/rocket.md3",        // Rocket
+		"models/players/sarge/head.md3",             // Player head
+		NULL
+	};
 
-		// Try fallback models
-		const char *fallback_models[] = {
-			"models/mapobjects/banner/cube.md3",  // Simple cube model
-			"models/mapobjects/grenade.md3",     // Grenade model
-			"models/powerups/health/red.md3",    // Health pack
-			NULL
-		};
-
-		for (int i = 0; fallback_models[i]; i++) {
-			s_main.bannerModel = trap_R_RegisterModel( fallback_models[i] );
-			if ( s_main.bannerModel ) {
-				Com_Printf( "MainMenu_Cache: Using fallback banner model '%s' (handle %d)\n", fallback_models[i], s_main.bannerModel );
-				break;
-			}
-		}
-
-		if ( !s_main.bannerModel ) {
-			Com_Printf( "MainMenu_Cache: All banner models failed to load, using 2D fallback\n" );
+	for (int i = 0; banner_candidates[i]; i++) {
+		s_main.bannerModel = trap_R_RegisterModel( banner_candidates[i] );
+		if ( s_main.bannerModel ) {
+			Com_Printf( "MainMenu_Cache: Successfully loaded banner model '%s' (handle %d)\n", banner_candidates[i], s_main.bannerModel );
+			break;
+		} else {
+			Com_Printf( "MainMenu_Cache: Failed to load banner model '%s'\n", banner_candidates[i] );
 		}
 	}
+
+	if ( !s_main.bannerModel ) {
+		Com_Printf( "MainMenu_Cache: All banner models failed to load, using 2D fallback\n" );
+	}
 }
+
+/*
+===============
+MainMenu_DrawBannerParticles
+===============
+*/
+static void MainMenu_DrawBannerParticles( int x, int y, int w, int h, float time );
 
 /*
 ===============
@@ -639,12 +654,12 @@ static void MainMenu_DrawFallbackBanner( void )
 	color[2] = 1.0f;
 	color[3] = 1.0f;
 
-	UI_DrawString( x + w/2, y + h/2 - 20, "ENHANCED", UI_CENTER | UI_DROPSHADOW, color, 24 );
-	UI_DrawString( x + w/2, y + h/2 + 10, "ENGINE", UI_CENTER | UI_DROPSHADOW, color, 24 );
+	UI_DrawString( x + w/2, y + h/2 - 20, "ENHANCED", UI_CENTER | UI_DROPSHADOW, color );
+	UI_DrawString( x + w/2, y + h/2 + 10, "ENGINE", UI_CENTER | UI_DROPSHADOW, color );
 
 	// Draw version info
 	color[3] = 0.7f;
-	UI_DrawString( x + w/2, y + h - 30, "Modernized idTech3", UI_CENTER, color, 12 );
+	UI_DrawString( x + w/2, y + h - 30, "Modernized idTech3", UI_CENTER, color );
 
 	trap_R_SetColor( NULL );
 }
