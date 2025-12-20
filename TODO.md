@@ -1,5 +1,5 @@
 ## Structured Logging
-- [x] Migrate all logging to a structured logger with levels, categories, JSON output (see `src/qcommon/q_log.h/c`, `Com_Printf` routes through structured logger via `Q_Log_ComPrintf()`)
+- [x] Migrate all logging to a structured logger with levels, categories, JSON output (see `src/common/q_log.h/c`, `Com_Printf` routes through structured logger via `Q_Log_ComPrintf()`)
 - [x] Add log rotation and filtering (see `log_rotation_size`, `log_rotation_time`, `log_category_filter` CVars, implemented in `q_log.c`)
 - [x] Integrate with external logging/monitoring systems (syslog integration implemented, JSON format compatible with ELK/Loki/Splunk)
 
@@ -7,11 +7,11 @@
 - [x] ASan/UBSan supported via CMake option (`ENABLE_SANITIZERS`)
 - [x] Provide documented workflows for ASan/UBSan
 - [x] Add Valgrind/Dr. Memory integration for leak and error detection (see `tools/run_valgrind.sh`, `tools/run_drmemory.bat`, `valgrind.supp`, `docs/MEMORY_SAFETY_WORKFLOWS.md`)
-- [x] Add memory usage tracking/stats in engine (see `src/qcommon/memory_stats.h/c`, console command `memstats`, integrated with zone allocator)
+- [x] Add memory usage tracking/stats in engine (see `src/common/memory_stats.h/c`, console command `memstats`, integrated with zone allocator)
 
 ## Performance Profiling
-- [x] Tracy Profiler integration (see `CMakeLists.txt` USE_TRACY option, `src/qcommon/profiler.h`, integrated in `common.c`)
-- [x] Built-in performance counters: FPS, frame times, draw calls (see `src/qcommon/performance_counters.h/c`, integrated in renderer and engine)
+- [x] Tracy Profiler integration (see `CMakeLists.txt` USE_TRACY option, `src/common/profiler.h`, integrated in `common.c`)
+- [x] Built-in performance counters: FPS, frame times, draw calls (see `src/common/performance_counters.h/c`, integrated in renderer and engine)
 - [x] GPU timing queries for renderer (see `src/renderervk/vk.c` timing query implementation, integrated with performance counters via `Perf_UpdateGPUTiming()`)
 
 ## Multi-threading
@@ -32,7 +32,7 @@
 
 ## Developer Experience
 - [x] Asset pipeline tools support auto-conversion (see `tools/asset_conv`)
-- [x] Hot reloading for game code (QVM) (see `src/qcommon/vm_hot_reload.h/c`, `docs/VM_HOT_RELOAD.md`, `tools/build_and_reload_qvm.sh`)
+- [x] Hot reloading for game code (QVM) (see `src/common/vm_hot_reload.h/c`, `docs/VM_HOT_RELOAD.md`, `tools/build_and_reload_qvm.sh`)
 - [x] Improved debugging tools (ImGui debug overlays: Performance, Memory, Network, Renderer, CVar Browser, Console, Event System, Profiler - see `src/client/cl_imgui_debug.c`, `docs/imgui-debug-overlays.md`)
 - [x] Better pipeline automation and validation (see `tools/validate_assets.py`, `docs/ASSET_VALIDATION.md`, CI integration in `.github/workflows/ci.yml`)
 
@@ -220,7 +220,7 @@
 
 ### Core Event System
 
-- [x] **Define central event bus API (engine-level)** (see `src/qcommon/event_system.h/c`, `docs/EVENT_SYSTEM.md`)
+- [x] **Define central event bus API (engine-level)** (see `src/common/event_system.h/c`, `docs/EVENT_SYSTEM.md`)
     - `publish(event)` - implemented as `Event_Publish()`
     - `subscribe(event_type, handler, priority)` - implemented as `Event_Subscribe()`
     - `unsubscribe(handle)` - implemented as `Event_Unsubscribe()`
@@ -232,7 +232,7 @@
 
 ### Event Lifecycle & Timing
 
-- [x] **Explicit event phases** (see `src/qcommon/event_system.h/c`, `docs/EVENT_PHASES.md`)
+- [x] **Explicit event phases** (see `src/common/event_system.h/c`, `docs/EVENT_PHASES.md`)
     - immediate (same tick) - implemented via `Event_PublishImmediate()`
     - deferred (end of frame) - implemented via `Event_PublishDeferred()`
     - scheduled (future tick / time) - implemented via `Event_PublishScheduled(delayMs)`
