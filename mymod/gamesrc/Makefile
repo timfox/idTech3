@@ -21,7 +21,7 @@ endif
 
 # Compiler settings
 CC := gcc
-CFLAGS := -std=c11 -fPIC -fvisibility=hidden -Wall -Wextra -O2
+CFLAGS := -std=c23 -fPIC -fvisibility=hidden -Wall -Wextra -O2
 LDFLAGS := -shared -lm
 
 # Directories

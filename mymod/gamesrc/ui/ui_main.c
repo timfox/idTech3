@@ -311,6 +311,7 @@ UI_RegisterCvars
 =================
 */
 void UI_RegisterCvars( void ) {
+	Com_Printf("UI_RegisterCvars: mymod UI module loaded!\n");
 	int			i;
 	cvarTable_t	*cv;
 

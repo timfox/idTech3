@@ -14,9 +14,9 @@ loadmenu {
 		
 		// Modern font configuration
 		// Use TrueType fonts for better quality and Unicode support
-		font "fonts/roboto-regular.ttf" 16
-		smallFont "fonts/roboto-regular.ttf" 12
-		bigFont "fonts/roboto-bold.ttf" 24
+		font "FX300.ttf" 16
+		smallFont "FX300.ttf" 12
+		bigFont "FX300.ttf" 24
 		
 		// Menu sounds
 		menuEnterSound "sound/misc/menu1.wav"

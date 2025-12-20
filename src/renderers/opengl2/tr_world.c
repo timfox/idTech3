@@ -637,6 +637,11 @@ qboolean R_inPVS( const vec3_t p1, const vec3_t p2 ) {
 	const mnode_t *leaf;
 	const byte	*vis;
 
+	if ( !tr.world ) {
+		// No world loaded, assume points are visible
+		return qtrue;
+	}
+
 	leaf = R_PointInLeaf( p1 );
 	vis = ri.CM_ClusterPVS( leaf->cluster ); // why not R_ClusterPVS ??
 	leaf = R_PointInLeaf( p2 );

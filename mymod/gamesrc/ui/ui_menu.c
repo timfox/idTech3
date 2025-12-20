@@ -33,9 +33,9 @@ MAIN MENU
 
 #define MAINMENU_FONT_CONFIG          "fonts/fonts.cfg"
 #define MAINMENU_MAX_FALLBACKS        3
-#define MAINMENU_DEFAULT_TEXT_FONT    "fonts/roboto-regular.ttf"
-#define MAINMENU_DEFAULT_SMALL_FONT   "fonts/roboto-regular.ttf"
-#define MAINMENU_DEFAULT_BIG_FONT     "fonts/roboto-bold.ttf"
+#define MAINMENU_DEFAULT_TEXT_FONT    "FX300.ttf"
+#define MAINMENU_DEFAULT_SMALL_FONT   "FX300.ttf"
+#define MAINMENU_DEFAULT_BIG_FONT     "FX300.ttf"
 #define MAINMENU_DEFAULT_TEXT_SIZE    18
 #define MAINMENU_DEFAULT_SMALL_SIZE   14
 #define MAINMENU_DEFAULT_BIG_SIZE     26
@@ -61,7 +61,7 @@ typedef struct {
 #define ID_MODS					16
 #define ID_EXIT					17
 
-#define MAIN_BANNER_MODEL				"models/mapobjects/banner/cube.obj"
+#define MAIN_BANNER_MODEL				"models/mapobjects/banner/banner5.md3"
 #define MAIN_MENU_VERTICAL_SPACING		38  // Increased spacing for better readability
 #define MAIN_MENU_ANIMATION_SPEED		0.003f  // Animation speed multiplier
 #define MAIN_MENU_PULSE_INTENSITY		0.15f   // Pulse effect intensity
@@ -143,6 +143,7 @@ static void MainMenu_LinkFallbackChain( fontInfo_t *primary ) {
 }
 
 static void MainMenu_RegisterFontSafe( const char *path, int pointSize, fontInfo_t *outFont, const char *label ) {
+	Com_Printf( S_COLOR_YELLOW "DEBUG: MainMenu_RegisterFontSafe called with path='%s', label='%s'\n", path, label );
 	if ( !outFont ) {
 		return;
 	}
@@ -153,15 +154,18 @@ static void MainMenu_RegisterFontSafe( const char *path, int pointSize, fontInfo
 		return;
 	}
 
-	trap_R_RegisterFont( path, pointSize, outFont );
+	Com_Printf( "MainMenu font %s: attempting to load %s (%dpt)\n", label ? label : "font", path, pointSize );
+	// Force use FX300.ttf for testing
+	trap_R_RegisterFont( "FX300.ttf", pointSize, outFont );
 	if ( FONT_LOADED( outFont ) ) {
-		Com_Printf( "MainMenu font %s: loaded %s (%dpt)\n", label ? label : "font", path, pointSize );
+		Com_Printf( S_COLOR_GREEN "MainMenu font %s: loaded FX300.ttf (%dpt)\n", label ? label : "font", pointSize );
 	} else {
-		Com_Printf( "MainMenu font %s: failed to load %s (%dpt)\n", label ? label : "font", path, pointSize );
+		Com_Printf( S_COLOR_RED "MainMenu font %s: failed to load FX300.ttf (%dpt)\n", label ? label : "font", pointSize );
 	}
 }
 
 static void MainMenu_LoadFontsFromConfig( void ) {
+	Com_Printf("MainMenu_LoadFontsFromConfig: called\n");
 	if ( s_mainFonts.loaded ) {
 		return;
 	}
@@ -169,8 +173,11 @@ static void MainMenu_LoadFontsFromConfig( void ) {
 	memset( &s_mainFonts, 0, sizeof( s_mainFonts ) );
 
 	fileHandle_t f = 0;
+	Com_Printf( S_COLOR_RED "DEBUG: Trying to load fonts.cfg from '%s'\n", MAINMENU_FONT_CONFIG );
 	int len = trap_FS_FOpenFile( MAINMENU_FONT_CONFIG, &f, FS_READ );
+	Com_Printf( "DEBUG: FS_FOpenFile returned f=%d, len=%d\n", (int)f, len );
 	if ( !f || len <= 0 || len >= MAINMENU_FONT_BUFFER_SIZE ) {
+		Com_Printf( S_COLOR_RED "DEBUG: fonts.cfg not found or invalid, using defaults\n" );
 		if ( f ) {
 			trap_FS_FCloseFile( f );
 		}
