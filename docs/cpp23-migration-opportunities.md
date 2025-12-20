@@ -53,7 +53,7 @@ std::print("Device: {} {}, 0x{:04x}\n", vendor, model, deviceId);
 
 **Current Pattern:**
 ```cpp
-// src/qcommon/ecs.cpp
+// src/common/ecs.cpp
 ecs_entity_t ECS_CreateEntity(void) {
     if (g_registry == nullptr) {
         return ECS_NULL_ENTITY;  // Magic value indicates failure
@@ -85,8 +85,8 @@ if (auto entity = ECS_CreateEntity()) {
 ```
 
 **Files to Update:**
-- `src/qcommon/ecs.cpp` - Entity creation/destruction
-- `src/qcommon/ecs_systems.cpp` - System queries
+- `src/common/ecs.cpp` - Entity creation/destruction
+- `src/common/ecs_systems.cpp` - System queries
 - `src/server/sv_ecs.cpp` - Server-side ECS
 
 **Migration Strategy:**
@@ -192,7 +192,7 @@ R_FindImageFile(charArray);               // char array
 ```
 
 **Files to Update:**
-- `src/qcommon/ecs.cpp` - Component lookup functions
+- `src/common/ecs.cpp` - Component lookup functions
 - Any function taking `const char*` for read-only string parameters
 
 **Migration Strategy:**

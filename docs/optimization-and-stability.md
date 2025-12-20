@@ -32,7 +32,7 @@ This document outlines existing optimizations and safe stability improvements th
 
 ## Existing Optimizations
 
-### 1. Filesystem Caching (`src/qcommon/files.c`)
+### 1. Filesystem Caching (`src/common/files.c`)
 
 **Path Normalization Cache** (Lines 335-356)
 - Caches normalized file paths to avoid repeated string operations
@@ -57,7 +57,7 @@ This document outlines existing optimizations and safe stability improvements th
 - Max handles: 384
 - **Impact**: Reduces file open/close overhead
 
-### 2. Memory Safety (`src/qcommon/q_memtrack.h`, `docs/memory-safety.md`)
+### 2. Memory Safety (`src/common/q_memtrack.h`, `docs/memory-safety.md`)
 
 **Memory Tracking System**
 - Per-type memory tracking (HUNK, ZONE, TEMP, SOUND, RENDERER, etc.)
@@ -70,7 +70,7 @@ This document outlines existing optimizations and safe stability improvements th
 - UndefinedBehaviorSanitizer (UBSan) - detects undefined behavior
 - Build with: `cmake .. -DENABLE_ASAN=ON -DENABLE_UBSAN=ON`
 
-### 3. Error Handling (`src/qcommon/q_error_helpers.h`)
+### 3. Error Handling (`src/common/q_error_helpers.h`)
 
 **Defensive Programming Macros**
 - `RETURN_ON_ERROR()` - Early return on failure
@@ -78,7 +78,7 @@ This document outlines existing optimizations and safe stability improvements th
 - `RETURN_IF_NULL()` - Check NULL pointers
 - `ERROR_IF_NULL()` - Error on NULL pointers
 
-**Filesystem Safety** (`src/qcommon/files.c`)
+**Filesystem Safety** (`src/common/files.c`)
 - `FS_CheckInitialized()` - Prevents filesystem calls before initialization
 - `fs_startupInProgress` flag - Prevents recursive errors during startup
 - Safety checks in `FS_BuildOSPath()` - Handles uninitialized paths
@@ -96,7 +96,7 @@ This document outlines existing optimizations and safe stability improvements th
 ### 1. Additional NULL Checks (Low Risk)
 
 **Files to Improve:**
-- `src/qcommon/cm_*.c` - Collision detection
+- `src/common/cm_*.c` - Collision detection
 - `src/server/sv_*.c` - Server code
 - `src/client/cl_*.c` - Client code
 
@@ -240,10 +240,10 @@ _Static_assert(sizeof(entity_t) <= MAX_ENTITY_SIZE,
 1. **Game Logic** (`mymod/gamesrc/game/`, `mymod/gamesrc/cgame/`, `mymod/gamesrc/ui/`)
    - These are mod-specific and affect gameplay
    
-2. **Physics Calculations** (`src/qcommon/cm_*.c`)
+2. **Physics Calculations** (`src/common/cm_*.c`)
    - Changes can affect game balance
    
-3. **Network Protocol** (`src/qcommon/msg.c`, `src/qcommon/net_*.c`)
+3. **Network Protocol** (`src/common/msg.c`, `src/common/net_*.c`)
    - Changes break compatibility
    
 4. **Rendering Logic** (`src/renderer/`, `src/renderervk/`)

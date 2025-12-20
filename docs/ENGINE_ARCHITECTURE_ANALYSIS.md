@@ -165,7 +165,7 @@ Analysis of input validation, buffer handling, and external data processing.
 - **Occurrences:** 556 MSG_* calls across 23 files
 - **Evidence:**
   ```c
-  // src/qcommon/msg.c
+  // src/common/msg.c
   // MSG_ReadBits can read beyond buffer if malformed
   int MSG_ReadBits( msg_t *msg, int bits ) {
       // Limited validation before bit operations
@@ -180,7 +180,7 @@ Analysis of input validation, buffer handling, and external data processing.
 #### 4.2 File Format Parsing (HIGH)
 - **Problem:** ZIP/PK3 parsing in unzip.c with limited validation
 - **Impact:** Arbitrary code execution via crafted archive
-- **Evidence:** `src/qcommon/unzip.c` - inherited from zlib, needs hardening
+- **Evidence:** `src/common/unzip.c` - inherited from zlib, needs hardening
 - **Recommendation:** Use well-audited compression libraries
 
 #### 4.3 Command Injection (MEDIUM)

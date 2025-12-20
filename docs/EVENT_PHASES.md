@@ -194,5 +194,5 @@ void Com_Frame(void) {
 ## See Also
 
 - `docs/EVENT_SYSTEM.md` - General event system documentation
-- `src/qcommon/event_system.h` - Event system API
-- `src/qcommon/event_system.c` - Event system implementation
+- `src/common/event_system.h` - Event system API
+- `src/common/event_system.c` - Event system implementation

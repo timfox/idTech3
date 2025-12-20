@@ -75,7 +75,7 @@ if ( !Q_stricmp( key, "trap_Cvar_SetDescription_Q3E" ) )
 
 ### 2. VM Extension System
 
-**Location**: `src/qcommon/vm_ext.h`, `src/qcommon/vm.c`
+**Location**: `src/common/vm_ext.h`, `src/common/vm.c`
 
 **Current State**: Basic extension system exists via `VM_Ext_GetKey()`
 
@@ -91,7 +91,7 @@ if ( !Q_stricmp( key, "trap_Cvar_SetDescription_Q3E" ) )
 
 ### 3. Native DLL Fallback Behavior
 
-**Location**: `src/qcommon/vm.c` - `VM_Create()`
+**Location**: `src/common/vm.c` - `VM_Create()`
 
 **Current Behavior**: 
 ```c
@@ -139,7 +139,7 @@ case G_FS_READ:
 
 ### 5. VM Memory Management
 
-**Location**: `src/qcommon/vm.c` - `VM_LoadQVM()`
+**Location**: `src/common/vm.c` - `VM_LoadQVM()`
 
 **Current State**: 
 - Data segment allocation with guard pages
@@ -158,7 +158,7 @@ case G_FS_READ:
 
 ### 6. Floating-Point Behavior
 
-**Location**: `src/qcommon/vm_interpreted.c`
+**Location**: `src/common/vm_interpreted.c`
 
 **Current State**: IEEE 754 compliance improvements
 
@@ -174,7 +174,7 @@ case G_FS_READ:
 
 ### 7. File System Restrictions
 
-**Location**: `src/qcommon/files.c` - `FS_VM_OpenFile()`
+**Location**: `src/common/files.c` - `FS_VM_OpenFile()`
 
 **Current State**: QVMs have restricted file access
 
@@ -271,9 +271,9 @@ case G_FS_READ:
 
 ## Related Files
 
-- `src/qcommon/vm.c` - VM loading and management
-- `src/qcommon/vm_interpreted.c` - QVM interpreter
-- `src/qcommon/vm_ext.h` - Extension system
+- `src/common/vm.c` - VM loading and management
+- `src/common/vm_interpreted.c` - QVM interpreter
+- `src/common/vm_ext.h` - Extension system
 - `src/server/sv_game.c` - Game module syscalls
 - `src/client/cl_cgame.c` - CGame module syscalls
 - `src/client/cl_ui.c` - UI module syscalls

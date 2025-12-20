@@ -204,8 +204,8 @@ Potential future improvements:
 - `src/renderercommon/tr_font.c` - Main font rendering
 - `src/renderercommon/tr_font_utf8.c` - UTF-8 support (new)
 - `src/renderercommon/tr_font_fallback.c` - Fallback chains (new)
-- `src/qcommon/freetype_wrapper.c` - Enhanced FreeType integration
-- `src/qcommon/q_shared.h` - Updated data structures
+- `src/common/freetype_wrapper.c` - Enhanced FreeType integration
+- `src/common/q_shared.h` - Updated data structures
 - `src/renderer/tr_init.c` - CVar registration
 - `src/renderer2/tr_init.c` - CVar registration
 - `src/renderervk/tr_init.c` - CVar registration

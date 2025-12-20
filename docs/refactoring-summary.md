@@ -5,21 +5,21 @@ This document summarizes the refactoring work completed to improve code quality,
 ## High Priority Fixes (Completed)
 
 ### 1. Fixed Unsafe `strcpy()` Usage
-**File:** `src/qcommon/common.c:1874`
+**File:** `src/common/common.c:1874`
 
 - **Before:** Used unsafe `strcpy()` with no bounds checking
 - **After:** Replaced with `Q_strncpyz()` for safe string copying
 - **Impact:** Prevents potential buffer overflows
 
 ### 2. Modernized `Com_sprintf()` 
-**File:** `src/qcommon/q_shared.c:1729`
+**File:** `src/common/q_shared.c:1729`
 
 - **Before:** Used `vsprintf()` which can overflow buffers
 - **After:** Uses `Q_vsnprintf()` with proper bounds checking
 - **Impact:** Prevents buffer overflows in formatted string operations
 
 ### 3. Fixed `va()` Function
-**File:** `src/qcommon/q_shared.c:1779`
+**File:** `src/common/q_shared.c:1779`
 
 - **Before:** Used unsafe `vsprintf()`
 - **After:** Uses `Q_vsnprintf()` with buffer size checking
@@ -28,7 +28,7 @@ This document summarizes the refactoring work completed to improve code quality,
 ## Medium Priority Improvements (Completed)
 
 ### 1. Standardized Error Handling
-**File:** `src/qcommon/q_error_helpers.h` (new)
+**File:** `src/common/q_error_helpers.h` (new)
 
 Created a new header file with error handling helper macros:
 - `RETURN_ON_ERROR()` - Check condition and return early on failure
@@ -48,9 +48,9 @@ ERROR_IF_NULL(buffer, ERR_FATAL, "Failed to allocate buffer");
 Added header guards to prevent multiple inclusion:
 
 **Core Headers:**
-- `src/qcommon/cm_patch.h` - Added `#ifndef __CM_PATCH_H__`
-- `src/qcommon/cm_polylib.h` - Added `#ifndef __CM_POLYLIB_H__`
-- `src/qcommon/cm_local.h` - Added `#ifndef __CM_LOCAL_H__`
+- `src/common/cm_patch.h` - Added `#ifndef __CM_PATCH_H__`
+- `src/common/cm_polylib.h` - Added `#ifndef __CM_POLYLIB_H__`
+- `src/common/cm_local.h` - Added `#ifndef __CM_LOCAL_H__`
 - `src/server/server.h` - Added `#ifndef __SERVER_H__`
 - `src/cgame/cg_public.h` - Added `#ifndef __CG_PUBLIC_H__`
 
@@ -142,11 +142,11 @@ TEST(q_strncpyz_basic) {
 ## Files Modified
 
 ### Core Engine Files
-- `src/qcommon/common.c` - Fixed `CopyString()` and added documentation
-- `src/qcommon/q_shared.c` - Fixed `Com_sprintf()` and `va()`, added documentation
-- `src/qcommon/cm_patch.h` - Added header guard
-- `src/qcommon/cm_polylib.h` - Added header guard
-- `src/qcommon/cm_local.h` - Added header guard
+- `src/common/common.c` - Fixed `CopyString()` and added documentation
+- `src/common/q_shared.c` - Fixed `Com_sprintf()` and `va()`, added documentation
+- `src/common/cm_patch.h` - Added header guard
+- `src/common/cm_polylib.h` - Added header guard
+- `src/common/cm_local.h` - Added header guard
 - `src/server/server.h` - Added header guard
 - `src/cgame/cg_public.h` - Added header guard
 - `src/botlib/be_aas_route.h` - Added header guard
@@ -156,7 +156,7 @@ TEST(q_strncpyz_basic) {
 - `src/botlib/be_interface.c` - Fixed include order and unused parameter warnings
 
 ### New Files Created
-- `src/qcommon/q_error_helpers.h` - Error handling helper macros
+- `src/common/q_error_helpers.h` - Error handling helper macros
 - `tests/test_framework.h` - Unit test framework
 - `tests/test_qcommon.c` - Example unit tests
 - `tests/README.md` - Test documentation

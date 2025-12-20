@@ -8,7 +8,7 @@ The syscall registry system provides centralized management of syscall numbers a
 
 ### Centralized Registry
 
-**Location**: `src/qcommon/syscall_registry.h`, `src/qcommon/syscall_registry.c`
+**Location**: `src/common/syscall_registry.h`, `src/common/syscall_registry.c`
 
 The registry system provides:
 - **Unified extension lookup** across all VM modules (game, cgame, ui)
@@ -106,9 +106,9 @@ Legacy hardcoded extensions in `SV_GetValue()`, `CL_GetValue()`, `UI_GetValue()`
 
 ## Related Files
 
-- `src/qcommon/syscall_registry.h` - Registry header
-- `src/qcommon/syscall_registry.c` - Registry implementation
-- `src/qcommon/vm_ext.h` - Legacy extension system
+- `src/common/syscall_registry.h` - Registry header
+- `src/common/syscall_registry.c` - Registry implementation
+- `src/common/vm_ext.h` - Legacy extension system
 - `src/server/sv_game.c` - Game module syscalls
 - `src/client/cl_cgame.c` - CGame module syscalls
 - `src/client/cl_ui.c` - UI module syscalls

@@ -4,7 +4,7 @@ The engine now ships with a lightweight AIML 2.1 parser/interpreter written in C
 
 ## API surface
 
-Header: `src/qcommon/aiml/aiml_c_api.h`
+Header: `src/common/aiml/aiml_c_api.h`
 
 - `AIML_LoadFile(path)`: load an AIML file from the virtual filesystem (PK3-friendly).
 - `AIML_LoadBuffer(name, data)`: load AIML from an in-memory buffer.

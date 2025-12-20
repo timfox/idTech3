@@ -7,7 +7,7 @@ This document outlines the adoption of modern C/C++ language features in the id 
 ### C23 Features
 
 #### 1. `nullptr` instead of `NULL`
-- **Files Modified**: `src/qcommon/common.c`
+- **Files Modified**: `src/common/common.c`
 - **Rationale**: `nullptr` provides better type safety than `NULL`
 - **Compatibility**: C23 supports `nullptr` natively
 - **Examples**:
@@ -22,7 +22,7 @@ This document outlines the adoption of modern C/C++ language features in the id 
   ```
 
 #### 2. Designated Initializers
-- **Files Modified**: `src/qcommon/vm.c`
+- **Files Modified**: `src/common/vm.c`
 - **Rationale**: Designated initializers improve code readability and maintainability
 - **Examples**:
   ```c
@@ -34,7 +34,7 @@ This document outlines the adoption of modern C/C++ language features in the id 
   ```
 
 #### 3. Static Assertions
-- **Files Modified**: `src/qcommon/q_shared.h`, `src/qcommon/qcommon.h`
+- **Files Modified**: `src/common/q_shared.h`, `src/common/qcommon.h`
 - **Rationale**: Compile-time verification of critical assumptions
 - **Examples**:
   ```c

@@ -33,7 +33,7 @@ make
 
 ```bash
 # Run clang-tidy on specific files
-./tools/run_clang_tidy.sh src/qcommon/*.c
+./tools/run_clang_tidy.sh src/common/*.c
 
 # Run cppcheck with HTML report
 ./tools/run_cppcheck.sh --html
