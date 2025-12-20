@@ -9,6 +9,8 @@ typedef struct meshlet_info_s meshlet_info_t;
 
 // Constants for advanced systems
 #define MAX_STREAM_CELLS 256
+#define MAX_TIMELINE_SEMAPHORES 32
+#define MAX_BINDLESS_TEXTURES 4096
 
 // Full definitions needed for struct members
 // Stream cell structure
@@ -696,6 +698,14 @@ void vk_create_brfdlut( void );
 
 #ifdef USE_VBO
 void vk_release_vbo( void );
+
+// Vulkan performance systems
+qboolean vk_bindless_init(void);
+void vk_bindless_shutdown(void);
+qboolean vk_shader_cache_init(void);
+void vk_shader_cache_shutdown(void);
+qboolean vk_async_compile_init(void);
+void vk_async_compile_shutdown(void);
 #endif
 
 typedef struct vk_tess_s {
@@ -767,6 +777,18 @@ typedef struct {
 	VkImageView swapchain_image_views[MAX_SWAPCHAIN_IMAGES];
 	VkSemaphore swapchain_rendering_finished[MAX_SWAPCHAIN_IMAGES];
 	//uint32_t swapchain_image_index;
+
+	// Timeline semaphores for improved synchronization
+	VkSemaphore timeline_semaphore;
+	uint64_t timeline_value;
+
+	// Bindless texture system
+	qboolean bindless_supported;
+	VkDescriptorPool bindless_descriptor_pool;
+	VkDescriptorSetLayout bindless_set_layout;
+	VkDescriptorSet bindless_descriptor_set;
+	uint32_t bindless_texture_count;
+	VkSampler bindless_sampler;
 
 	VkCommandPool command_pool;
 #ifdef USE_UPLOAD_QUEUE

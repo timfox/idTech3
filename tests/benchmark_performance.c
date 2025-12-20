@@ -57,6 +57,7 @@ TEST(benchmark_vector_operations) {
 		vec3_t b = {4.0f, 5.0f, 6.0f};
 		vec3_t result;
 		VectorAdd(a, b, result);
+		(void)result; // Suppress unused variable warning
 	}
 
 	// Benchmark
@@ -193,8 +194,10 @@ TEST(benchmark_string_operations) {
 		strncpy(buffer, src, sizeof(buffer) - 1);
 		buffer[sizeof(buffer) - 1] = '\0'; // Ensure null termination
 		strncat(buffer, "_suffix", sizeof(buffer) - strlen(buffer) - 1);
-		strcmp(buffer, src);
-		strstr(buffer, "test");
+		int cmp_result = strcmp(buffer, src);
+		char *str_result = strstr(buffer, "test");
+		(void)cmp_result; // Suppress unused variable warning
+		(void)str_result; // Suppress unused variable warning
 
 		(void)len; // Suppress unused warning
 	}

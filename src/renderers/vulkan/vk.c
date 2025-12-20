@@ -41,6 +41,10 @@ typedef struct VkPhysicalDeviceMeshShaderFeaturesEXT {
 #include "vk_physics.h"
 #endif
 
+#include "vk_bindless.h"
+#include "vk_shader_cache.h"
+#include "vk_async_compile.h"
+
 extern cvar_t *r_frameTelemetry;
 extern cvar_t *r_procDressing;
 extern cvar_t *r_procDressingDensity;
@@ -4799,6 +4803,10 @@ static void vk_create_sync_primitives( void ) {
 	vk.image_uploaded = VK_NULL_HANDLE;
 	vk.aux_fence_wait = qfalse;
 #endif
+
+	// Timeline semaphore support - requires VK_KHR_timeline_semaphore extension
+	// TODO: Implement timeline semaphore support when extension is available
+	vk.timeline_semaphore = VK_NULL_HANDLE;
 }
 
 
@@ -5312,6 +5320,11 @@ void vk_initialize( void )
 	// Apply graphics settings after systems are initialized
 	VK_GraphicsSettings_ApplySettings();
 #endif
+
+	// Initialize new Vulkan performance systems
+	vk_bindless_init();
+	vk_shader_cache_init();
+	vk_async_compile_init();
 
 	vk.offscreenRender = qtrue;
 
@@ -6359,6 +6372,11 @@ __cleanup:
 	VK_DynamicRendering_Shutdown();
 	VK_GraphicsSettings_Shutdown();
 #endif
+
+	// Shutdown new Vulkan performance systems
+	vk_async_compile_shutdown();
+	vk_shader_cache_shutdown();
+	vk_bindless_shutdown();
 	// Shutdown GIBS before ray tracing
 #ifdef USE_VULKAN_RAY_TRACING
 	vk_gibs_shutdown();

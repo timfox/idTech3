@@ -93,7 +93,19 @@ static const char *current_test_name __attribute__((unused)) = NULL;
 		test_count++; \
 		if ((ptr) != NULL) { \
 			Com_Printf("FAIL: %s:%d: Expected NULL pointer\n", \
-				__FUNCTION__, __LINE__); \
+				__func__, __LINE__); \
+			test_failed++; \
+			return; \
+		} \
+		test_passed++; \
+	} while(0)
+
+#define ASSERT_FLOAT_EQ(a, b, tolerance) \
+	do { \
+		test_count++; \
+		if (fabsf((a) - (b)) > (tolerance)) { \
+			Com_Printf("FAIL: %s:%d: Expected %.9f, got %.9f (diff: %.9f)\n", \
+				__func__, __LINE__, (float)(b), (float)(a), fabsf((a) - (b))); \
 			test_failed++; \
 			return; \
 		} \

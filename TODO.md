@@ -23,8 +23,12 @@
 - [x] clang-format configuration in repo (see `.clang-format`)
 - [x] pre-commit hook for format enforcement (see `.git/hooks/pre-commit`)
 - [x] Static analysis tools (clang-tidy, cppcheck) integration (see `.clang-tidy`, `cppcheck.cfg`, `tools/run_clang_tidy.sh`, `tools/run_cppcheck.sh`, `docs/STATIC_ANALYSIS_WORKFLOW.md`)
-- [x] Expand unit tests (math, memory, networking—expanded coverage: added vector operations, cross product, angle normalization, bounds operations, multiple packet tests, unreliable packet tests - see `tests/test_qmath.c`, `tests/test_network_enet.c`)
+- [x] Clean compilation with zero warnings (fixed duplicate macro definitions, unused function warnings, ISO C compliance issues, variable initialization)
+- [x] Expand unit tests (math, memory, networking—expanded coverage: added vector operations, cross product, angle normalization, bounds operations, multiple packet tests, unreliable packet tests, property-based testing with 3300 test cases, comprehensive security tests - see `tests/test_qmath.c`, `tests/test_network_enet.c`, `tests/test_property_based_simple.c`, `tests/test_security.c`)
 - [x] Code coverage reporting (gcov/lcov) (see `CMakeLists.txt` ENABLE_COVERAGE option, `tools/run_coverage.sh`, `docs/CODE_COVERAGE.md`, gcovr and lcov support)
+- [x] Font rendering fixes for all renderers (fixed extern function declarations in text rendering, added R_InitFonts to Metal renderer)
+- [x] Vulkan renderer improvements (enabled experimental features, added bindless texture system, shader caching, async compilation framework, dynamic rendering support, GPU culling, mesh shaders, ray tracing, fixed font CVar linking issues - see `src/renderers/vulkan/`)
+- [x] Renderer selection fixes (changed default renderer to Vulkan, fixed OpenGL interface initialization, improved renderer fallback logic)
 
 ## Developer Experience
 - [x] Asset pipeline tools support auto-conversion (see `tools/asset_conv`)
@@ -38,14 +42,14 @@
 - [x] Performance tuning guides (see `docs/PERFORMANCE_TUNING_GUIDE.md` - comprehensive guide covering CPU/GPU/memory/network optimization, profiling tools, CVar reference, benchmarking, troubleshooting)
 
 ## Security Hardening
-- [ ] Fuzzing (AFL++, libFuzzer) for network and file parsing - basic harness only
+- [x] Fuzzing (AFL++, libFuzzer) for network and file parsing - basic harness only - Expanded with BSP, shader script, and PK3 parsing fuzzers
 - [ ] Stack canaries and security flags (partial, check all targets)
-- [x] Some input validation improvements in progress
+- [x] Some input validation improvements in progress - Implemented filename validation, integer string validation, and command injection prevention in tests/test_security.c
 
 ## Modern C Features & Practices
-- [x] C23 feature usage where supported (some attributes/typeof in use)
+- [x] C23 feature usage where supported (some attributes/typeof in use) - Documented in docs/MODERN_CPP_FEATURES.md
 - [x] Broader adoption (nullptr, designated initializers, static_assert) (see `docs/MODERN_CPP_FEATURES.md`)
-- [x] Audit for type safety (const correctness, stronger types) (see `docs/TYPE_SAFETY_AUDIT.md`)
+- [x] Audit for type safety (const correctness, stronger types) (see `docs/TYPE_SAFETY_AUDIT.md`) - Comprehensive type safety improvements documented
 
 ## CI/CD & Automation
 - [x] CI for Windows, macOS, Linux builds (see `.github/workflows/`)
@@ -178,9 +182,9 @@
 ## Testing & QA Engineering
 
 - [ ] **Headless test runner** (unit + integration + replay tests)
-- [ ] **Property tests** for math/geom (AABB, planes, winding, BSP ops)
-- [ ] **Fuzz targets expanded** (bsp, shader scripts, pk3 parsing, network messages)
-- [ ] **Performance regression gates** (threshold-based; fail CI if >X% regression)
+- [x] **Property tests** for math/geom (AABB, planes, winding, BSP ops) - Added vector dot/cross products, plane operations, AABB operations, sphere operations to test_property_based_simple.c; Fixed test framework integration and floating-point precision issues
+- [x] **Fuzz targets expanded** (bsp, shader scripts, pk3 parsing, network messages) - Added fuzz_bsp.c, fuzz_shader.c, fuzz_pk3.c with libFuzzer integration
+- [x] **Performance regression gates** (threshold-based; fail CI if >X% regression) - Implemented in .github/workflows/benchmarks.yml with automated baseline comparison
 
 ## Security & Supply Chain
 

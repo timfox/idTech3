@@ -73,21 +73,35 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_public.h"
 #include "../opengl/tr_common.h"
 
-// Font CVars - defined in each renderer
-extern cvar_t *r_fontSDF;
-extern cvar_t *r_fontSDFSpread;
-extern cvar_t *r_fontSDFSmooth;
-extern cvar_t *r_fontLCDFilter;
-extern cvar_t *r_fontSDFOutline;
-extern cvar_t *r_fontGPUSDF;
-extern cvar_t *r_fontGPUEffects;
-extern cvar_t *r_fontGPULayout;
+// Font CVars - defined in each renderer (optional)
+static cvar_t *r_fontSDF = NULL;
+static cvar_t *r_fontSDFSpread = NULL;
+static cvar_t *r_fontSDFSmooth = NULL;
+static cvar_t *r_fontLCDFilter = NULL;
+static cvar_t *r_fontSDFOutline = NULL;
+static cvar_t *r_fontGPUSDF = NULL;
+static cvar_t *r_fontGPUEffects = NULL;
+static cvar_t *r_fontGPULayout = NULL;
 
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 
 extern void R_IssuePendingRenderCommands( void );
 extern qhandle_t RE_RegisterShaderNoMip( const char *name );
+
+// Font CVar registration function
+void R_RegisterFontCVars(cvar_t *sdf, cvar_t *sdfSpread, cvar_t *sdfSmooth,
+                        cvar_t *lcdf, cvar_t *sdfOutline, cvar_t *gpuSdf,
+                        cvar_t *gpuEffects, cvar_t *gpuLayout) {
+    r_fontSDF = sdf;
+    r_fontSDFSpread = sdfSpread;
+    r_fontSDFSmooth = sdfSmooth;
+    r_fontLCDFilter = lcdf;
+    r_fontSDFOutline = sdfOutline;
+    r_fontGPUSDF = gpuSdf;
+    r_fontGPUEffects = gpuEffects;
+    r_fontGPULayout = gpuLayout;
+}
 
 
 #ifdef USE_FREETYPE

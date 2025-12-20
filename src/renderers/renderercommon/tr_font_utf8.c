@@ -10,15 +10,7 @@ UTF-8 and modern font rendering utilities
 #include "../renderercommon/tr_public.h"
 #include "../renderer/tr_common.h"
 
-// Font CVars - defined in each renderer
-extern cvar_t *r_fontSDF;
-extern cvar_t *r_fontSDFSpread;
-extern cvar_t *r_fontSDFSmooth;
-extern cvar_t *r_fontLCDFilter;
-extern cvar_t *r_fontSDFOutline;
-extern cvar_t *r_fontGPUSDF;
-extern cvar_t *r_fontGPUEffects;
-extern cvar_t *r_fontGPULayout;
+// Font CVars are registered through R_RegisterFontCVars()
 
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
@@ -299,7 +291,7 @@ void RE_Text_Paint_Improved(float x, float y, float scale, vec4_t color, const c
 {
 	if (!text || !font)
 		return;
-	
+
 	extern void RE_StretchPic(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader);
 	extern void RE_SetColor(const float *rgba);
 	
@@ -405,7 +397,7 @@ void RE_Text_Paint_3D_Improved(float x, float y, float scale, vec4_t color, cons
 	// This is similar to RE_Text_Paint_Improved but without coordinate adjustment
 	if (!text || !font)
 		return;
-	
+
 	extern void RE_StretchPic(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader);
 	extern void RE_SetColor(const float *rgba);
 	

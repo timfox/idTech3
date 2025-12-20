@@ -6,7 +6,8 @@
 cmake_minimum_required(VERSION 3.20)
 project(idtech3 C CXX ASM)
 
-# Find Lua globally
+# Find dependencies
+find_package(OpenGL QUIET)
 find_package(Lua QUIET)
 if(Lua_FOUND)
     # Create Lua::lua imported target for consistent linking across all targets
@@ -1138,6 +1139,7 @@ IF(USE_CIMGUI AND DEFINED CIMGUI_DIR)
 	if(USE_VULKAN)
 		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_VULKAN)
 	endif()
+	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_OPENGL_API)
 ENDIF()
 
 # cJSON library
@@ -1247,7 +1249,13 @@ IF(USE_CIMGUI AND DEFINED CIMGUI_DIR)
 	)
 ENDIF()
 
-list(APPEND RENDERER_VK_SRCS src/renderers/vulkan/vk_imgui.c)
+list(APPEND RENDERER_VK_SRCS
+	src/renderers/vulkan/vk_imgui.c
+	src/renderers/vulkan/vk_bindless.c
+	src/renderers/vulkan/vk_shader_cache.c
+	src/renderers/vulkan/vk_async_compile.c
+	src/renderers/vulkan/vk_dynamic_rendering.c
+)
 
 # DirectX 12 renderer (Windows only)
 IF(WIN32 AND USE_D3D12)
@@ -1308,8 +1316,8 @@ IF(USE_RENDERER_DLOPEN)
 	# `src/renderers/renderercommon/*` uses legacy relative includes like "../qcommon/...".
 	# Adding `src/renderers` to the include path keeps those includes resolving to `src/qcommon/...`.
 	target_include_directories(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/renderers)
-	TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_opengl${RENDEXT} m)
-	TARGET_LINK_OPTIONS(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE -Wl,--export-dynamic)
+	TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_opengl${RENDEXT} m /usr/lib/x86_64-linux-gnu/libGL.so.1)
+	TARGET_LINK_OPTIONS(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE -Wl,--export-dynamic -Wl,--unresolved-symbols=ignore-all)
 
 	if(USE_VULKAN)
 		ADD_LIBRARY(${RENDERER_PREFIX}_vulkan${RENDEXT} SHARED ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
@@ -2214,7 +2222,8 @@ IF(ANDROID)
 ELSE()
 	ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 ENDIF()
-TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui)
+TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE qcommon botlib client q3ui GL)
+TARGET_LINK_OPTIONS(${CNAME}${BINEXT} PRIVATE -Wl,--export-dynamic)
 TARGET_INCLUDE_DIRECTORIES(${CNAME}${BINEXT} PRIVATE src/qcommon)
 IF(USE_UI2)
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ui2)
@@ -2720,6 +2729,36 @@ IF(BUILD_TESTS)
 		# TARGET_LINK_LIBRARIES(fuzz_msg PRIVATE huffman)
 	ELSE()
 		message(STATUS "Skipping fuzz_msg target: libFuzzer requires Clang compiler.")
+	ENDIF()
+
+	# BSP Fuzzing Target
+	IF (CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+		ADD_EXECUTABLE(fuzz_bsp tests/fuzz_bsp.c)
+		TARGET_INCLUDE_DIRECTORIES(fuzz_bsp PRIVATE src/qcommon)
+		TARGET_COMPILE_DEFINITIONS(fuzz_bsp PRIVATE FUZZING_BUILD)
+		SET_TARGET_PROPERTIES(fuzz_bsp PROPERTIES LINK_FLAGS "-fsanitize=fuzzer")
+	ELSE()
+		message(STATUS "Skipping fuzz_bsp target: libFuzzer requires Clang compiler.")
+	ENDIF()
+
+	# Shader Fuzzing Target
+	IF (CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+		ADD_EXECUTABLE(fuzz_shader tests/fuzz_shader.c)
+		TARGET_INCLUDE_DIRECTORIES(fuzz_shader PRIVATE src/qcommon)
+		TARGET_COMPILE_DEFINITIONS(fuzz_shader PRIVATE FUZZING_BUILD)
+		SET_TARGET_PROPERTIES(fuzz_shader PROPERTIES LINK_FLAGS "-fsanitize=fuzzer")
+	ELSE()
+		message(STATUS "Skipping fuzz_shader target: libFuzzer requires Clang compiler.")
+	ENDIF()
+
+	# PK3 Fuzzing Target
+	IF (CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+		ADD_EXECUTABLE(fuzz_pk3 tests/fuzz_pk3.c)
+		TARGET_INCLUDE_DIRECTORIES(fuzz_pk3 PRIVATE src/qcommon)
+		TARGET_COMPILE_DEFINITIONS(fuzz_pk3 PRIVATE FUZZING_BUILD)
+		SET_TARGET_PROPERTIES(fuzz_pk3 PROPERTIES LINK_FLAGS "-fsanitize=fuzzer")
+	ELSE()
+		message(STATUS "Skipping fuzz_pk3 target: libFuzzer requires Clang compiler.")
 	ENDIF()
 
 	ADD_EXECUTABLE(test_performance_counters

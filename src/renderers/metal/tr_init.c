@@ -111,7 +111,11 @@ qboolean Metal_InitWindow(void *windowOrView) {
 	if (!Metal_CreateDepthStencilState()) {
 		Com_Printf("Metal: Warning - Depth stencil state creation failed\n");
 	}
-	
+
+	// Initialize font system
+	extern void R_InitFonts(void);
+	R_InitFonts();
+
 	tr.active = qtrue;
 	return qtrue;
 }

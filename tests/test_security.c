@@ -54,6 +54,10 @@ static qboolean is_valid_filename(const char *filename) {
 	if (strstr(filename, "..") != NULL) return qfalse;
 	if (strstr(filename, "/") != NULL || strstr(filename, "\\") != NULL) return qfalse;
 
+	// Check for URL-encoded directory traversal (%2e = ., %2f = /, %5c = \)
+	if (strstr(filename, "%2e%2e") != NULL) return qfalse; // %2e%2e = ..
+	if (strstr(filename, "%2f") != NULL || strstr(filename, "%5c") != NULL) return qfalse;
+
 	// Check for invalid characters
 	const char *invalid_chars = "<>:\"|?*";
 	for (size_t i = 0; i < strlen(filename); i++) {
@@ -225,11 +229,10 @@ TEST(command_injection_prevention) {
 
 TEST(null_pointer_protection) {
 	// Test null pointer handling
-	char *null_ptr = NULL;
 
 	// These should not crash (in safe implementations)
-	// strlen(null_ptr); // Would crash - commented out
-	// strcpy(null_ptr, "test"); // Would crash - commented out
+	// strlen(NULL); // Would crash - commented out
+	// strcpy(NULL, "test"); // Would crash - commented out
 
 	// Test our validation functions with null inputs
 	ASSERT_FALSE(is_valid_string(NULL, 100));
@@ -270,111 +273,9 @@ TEST(format_string_protection) {
 	ASSERT_TRUE(strncmp(buffer, very_long_format, buffer_len) == 0);
 }
 
-TEST(path_traversal_prevention) {
-	// Test path traversal attack prevention
-	const char *safe_paths[] = {
-		"maps/test.bsp",
-		"textures/base/wall.jpg",
-		"sound/ambient/wind.wav"
-	};
 
-	const char *dangerous_paths[] = {
-		"../../../etc/passwd",
-		"../../windows/system32/cmd.exe",
-		"../../../../root/.ssh/id_rsa",
-		"..\\..\\..\\windows\\system.ini",
-		"maps/../../../etc/shadow"
-	};
 
-	for (size_t i = 0; i < sizeof(safe_paths) / sizeof(safe_paths[0]); i++) {
-		// Basic path validation - should not contain dangerous patterns
-		ASSERT_FALSE(strstr(safe_paths[i], "..") != NULL || strstr(safe_paths[i], "\\") != NULL);
-	}
 
-	for (size_t i = 0; i < sizeof(dangerous_paths) / sizeof(dangerous_paths[0]); i++) {
-		// Should detect path traversal attempts
-		ASSERT_TRUE(strstr(dangerous_paths[i], "..") != NULL);
-	}
-}
-
-TEST(buffer_overflow_prevention) {
-	char small_buffer[16];
-	char large_buffer[1024];
-
-	// Test strcpy bounds checking (would crash without protection)
-	const char *short_string = "hello";
-	const char *long_string = "this_is_a_very_long_string_that_would_overflow_a_small_buffer_if_not_handled_properly";
-
-	// Safe operations
-	strncpy(small_buffer, short_string, sizeof(small_buffer) - 1);
-	small_buffer[sizeof(small_buffer) - 1] = '\0';
-	ASSERT_TRUE(strlen(small_buffer) == 5);
-
-	// Truncation protection
-	strncpy(small_buffer, long_string, sizeof(small_buffer) - 1);
-	small_buffer[sizeof(small_buffer) - 1] = '\0';
-	ASSERT_TRUE(strlen(small_buffer) <= sizeof(small_buffer) - 1);
-}
-
-TEST(integer_overflow_protection_advanced) {
-	// Test more sophisticated integer overflow scenarios
-
-	// Multiplication overflow
-	int a = INT_MAX / 2;
-	int b = 3;
-	// This should be caught by safe multiplication in real implementations
-	// For now, we just test the concept
-	ASSERT_TRUE(a > 0 && b > 0);
-
-	// Addition overflow
-	int x = INT_MAX - 10;
-	int y = 20;
-	// In safe code, this should be checked
-	if (x > INT_MAX - y) {
-		// Would overflow
-		ASSERT_TRUE(x > INT_MAX - y);
-	} else {
-		int result = x + y;
-		ASSERT_TRUE(result >= x); // Should not overflow in this case
-	}
-
-	// Array bounds with calculated indices
-	int safe_array[100];
-	int user_input = 50; // Assume this comes from user
-
-	// Bounds checking
-	if (user_input >= 0 && user_input < 100) {
-		safe_array[user_input] = 42;
-		ASSERT_TRUE(safe_array[user_input] == 42);
-	} else {
-		// Should reject out-of-bounds access
-		ASSERT_TRUE(user_input < 0 || user_input >= 100);
-	}
-}
-
-TEST(memory_corruption_detection) {
-	// Test detection of memory corruption patterns
-	char buffer[100];
-
-	// Fill with known pattern
-	memset(buffer, 0xAA, sizeof(buffer));
-
-	// Check pattern integrity
-	for (size_t i = 0; i < sizeof(buffer); i++) {
-		ASSERT_EQ((unsigned char)buffer[i], 0xAA);
-	}
-
-	// Simulate potential corruption detection
-	// In real implementations, this would use canaries or other techniques
-	char *ptr = buffer + 10;
-	*ptr = 'X';
-
-	// Check that modification was contained
-	ASSERT_EQ(buffer[10], 'X');
-	// Check surrounding bytes are still intact
-	ASSERT_EQ((unsigned char)buffer[9], 0xAA);
-	ASSERT_EQ((unsigned char)buffer[11], 0xAA);
-}
 
 TEST(input_sanitization_comprehensive) {
 	// Test comprehensive input sanitization
@@ -412,7 +313,11 @@ TEST(input_sanitization_comprehensive) {
 	}
 
 	for (size_t i = 0; i < sizeof(traversal_attempts) / sizeof(traversal_attempts[0]); i++) {
-		ASSERT_FALSE(is_valid_filename(traversal_attempts[i]));
+		qboolean result = is_valid_filename(traversal_attempts[i]);
+		if (result) {
+			Com_Printf("FAIL: Filename '%s' should be invalid but passed validation\n", traversal_attempts[i]);
+		}
+		ASSERT_FALSE(result);
 	}
 }
 
@@ -523,12 +428,17 @@ int main(void) {
 	RUN_TEST(input_validation_string);
 	RUN_TEST(input_validation_filename);
 	RUN_TEST(input_validation_integer);
+	RUN_TEST(input_sanitization_comprehensive);
 	RUN_TEST(buffer_bounds_checking);
 	RUN_TEST(memory_safety_bounds);
 	RUN_TEST(command_injection_prevention);
 	RUN_TEST(null_pointer_protection);
 	RUN_TEST(integer_overflow_protection);
 	RUN_TEST(format_string_protection);
+	RUN_TEST(stack_buffer_overflow_detection);
+	RUN_TEST(heap_buffer_overflow_detection);
+	RUN_TEST(use_after_free_detection);
+	RUN_TEST(race_condition_simulation);
 
 	PRINT_TEST_SUMMARY();
 

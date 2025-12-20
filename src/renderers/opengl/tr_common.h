@@ -98,9 +98,7 @@ extern	cvar_t	*r_fontAtlasSize;
 extern	cvar_t	*r_fontDPI;
 extern	cvar_t	*r_fontHinting;
 extern	cvar_t	*r_fontAntialiasing;
-extern	cvar_t	*r_fontLCDFilter;
 extern	cvar_t	*r_fontKerning;
-// Font CVars are defined in each renderer individually
 
 float R_NoiseGet4f( float x, float y, float z, double t );
 void  R_NoiseInit( void );

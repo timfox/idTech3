@@ -45,6 +45,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_common.h"
 #include "iqm.h"
 #include "qgl.h"
+#include "qgl_linked.h"
 
 // Forward declarations for TIKI model system
 struct tikiSurface_s;

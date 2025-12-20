@@ -271,7 +271,8 @@ typedef char GLchar;
 #define QGL_Swp_PROCS \
 	GLE( void,	glXSwapIntervalEXT, Display *dpy, GLXDrawable drawable, int interval ) \
 	GLE( int,	glXSwapIntervalMESA, unsigned interval ) \
-	GLE( int,	glXSwapIntervalSGI, int interval )
+	GLE( int,	glXSwapIntervalSGI, int interval ) \
+	GLEWEAK( void,	glPixelStorei, GLenum pname, GLint param )
 #endif
 
 #define QGL_LinX11_PROCS \
@@ -285,6 +286,7 @@ typedef char GLchar;
 #ifndef __APPLE__
 
 #define GLE( ret, name, ... ) extern ret ( APIENTRY * q##name )( __VA_ARGS__ );
+#define GLEWEAK( ret, name, ... ) extern ret ( APIENTRY * q##name )( __VA_ARGS__ ) __attribute__((weak));
 	QGL_Swp_PROCS
 #ifdef _WIN32
 	QGL_Win32_PROCS

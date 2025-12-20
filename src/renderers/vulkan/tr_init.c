@@ -245,6 +245,12 @@ cvar_t	*r_particles_maxCount;
 	cvar_t	*r_vk_debugClearColor;
 	cvar_t	*r_vk_debugUiOnly;
 	cvar_t	*r_vk_disableScreenMap;
+
+	// Vulkan performance and feature controls
+	cvar_t	*r_vk_bindlessTextures;
+	cvar_t	*r_vk_timelineSemaphores;
+	cvar_t	*r_vk_asyncShaderCompile;
+	cvar_t	*r_vk_dynamicRendering;
 #endif // USE_VULKAN
 
 cvar_t	*r_dlightBacks;
@@ -334,7 +340,6 @@ cvar_t	*r_fontKerning;
 cvar_t	*r_fontSDF;
 cvar_t	*r_fontSDFSpread;
 cvar_t	*r_fontSDFSmooth;
-cvar_t	*r_fontLCDFilter;
 cvar_t	*r_fontSDFOutline;
 
 cvar_t	*r_marksOnTriangleMeshes;
@@ -1906,6 +1911,19 @@ static void R_Register( void )
 
 	r_vk_disableScreenMap = ri.Cvar_Get( "r_vk_disableScreenMap", "0", CVAR_CHEAT );
 	ri.Cvar_SetDescription( r_vk_disableScreenMap, "Set to 1 to hard-disable the Vulkan screenMap/$currentRender path (forces UI to use blackImage). Useful for isolating device-lost/menu corruption issues." );
+
+	// Vulkan performance and feature controls
+	r_vk_bindlessTextures = ri.Cvar_Get( "r_vk_bindlessTextures", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_vk_bindlessTextures, "Enable bindless texture system for improved performance (requires VK_EXT_descriptor_indexing)." );
+
+	r_vk_timelineSemaphores = ri.Cvar_Get( "r_vk_timelineSemaphores", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_vk_timelineSemaphores, "Use timeline semaphores for better GPU-CPU synchronization (VK_KHR_timeline_semaphore)." );
+
+	r_vk_asyncShaderCompile = ri.Cvar_Get( "r_vk_asyncShaderCompile", "1", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_vk_asyncShaderCompile, "Enable asynchronous shader compilation for faster loading." );
+
+	r_vk_dynamicRendering = ri.Cvar_Get( "r_vk_dynamicRendering", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_vk_dynamicRendering, "Use dynamic rendering instead of render passes for modern Vulkan (VK_KHR_dynamic_rendering)." );
 	r_mapGreyScale = ri.Cvar_Get( "r_mapGreyScale", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_mapGreyScale, "-1", "1", CV_FLOAT );
 	ri.Cvar_SetDescription(r_mapGreyScale, "Desaturate world map textures only, works independently from \\r_greyscale, negative values only desaturate lightmaps.");
@@ -2080,6 +2098,14 @@ static void R_Register( void )
 	r_fontGPULayout = ri.Cvar_Get( "r_fontGPULayout", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_fontGPULayout, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_fontGPULayout, "Use GPU compute shaders for text layout and kerning calculations. Experimental feature." );
+
+	// Register font CVars with renderercommon
+	extern void R_RegisterFontCVars(cvar_t *sdf, cvar_t *sdfSpread, cvar_t *sdfSmooth,
+	                               cvar_t *lcdf, cvar_t *sdfOutline, cvar_t *gpuSdf,
+	                               cvar_t *gpuEffects, cvar_t *gpuLayout);
+	R_RegisterFontCVars(r_fontSDF, r_fontSDFSpread, r_fontSDFSmooth,
+	                   r_fontLCDFilter, r_fontSDFOutline, r_fontGPUSDF,
+	                   r_fontGPUEffects, r_fontGPULayout);
 
 	// Initialize font system
 	extern void R_InitFonts(void);

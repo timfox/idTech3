@@ -589,10 +589,10 @@ static void LoadTexture( int miplevel, int x, int y, int width, int height, cons
 	// Fix for font atlas row alignment: ensure GL_UNPACK_ALIGNMENT is 1 for 1-channel font textures
 	// Font atlases are 1 byte per pixel and need byte-aligned rows to prevent corruption
 	if (image->isFont) {
-		glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+		qglPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	} else {
 		// Restore default alignment for other textures
-		glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+		qglPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 	}
 
 	if ( subImage )

@@ -531,12 +531,15 @@ void *Sys_LoadLibrary( const char *name )
 		}
 	}
 
-	// Use RTLD_LAZY for game modules (ui, cgame, game) to allow trap_ functions
-	// to be resolved via dllEntry callback rather than at load time
+	// Use RTLD_LAZY for game modules (ui, cgame, game) and renderers to allow functions
+	// to be resolved later rather than at load time
 	// RTLD_NOW is used for other libraries that need immediate symbol resolution
 	int flags = RTLD_NOW;
 	if ( strstr( name, "ui" ) || strstr( name, "cgame" ) || strstr( name, "game" ) ) {
 		flags = RTLD_LAZY | RTLD_LOCAL;
+	}
+	if ( strstr( name, "opengl" ) || strstr( name, "vulkan" ) ) {
+		flags = RTLD_NOW | RTLD_GLOBAL;
 	}
 	
 	// Use basename when we've changed directory, so dlopen uses the correct path
