@@ -12,6 +12,29 @@ q_error_recovery.h - Enhanced Error Handling and Recovery System
 // Error history
 #define ERROR_HISTORY_SIZE 32
 
+// Error types
+typedef enum {
+    ERROR_TYPE_NONE,
+    ERROR_TYPE_MEMORY,
+    ERROR_TYPE_FILESYSTEM,
+    ERROR_TYPE_NETWORK,
+    ERROR_TYPE_RENDERING,
+    ERROR_TYPE_SCRIPTING,
+    ERROR_TYPE_INPUT,
+    ERROR_TYPE_SYSTEM,
+    ERROR_TYPE_UNKNOWN
+} error_type_t;
+
+// Recovery strategies
+typedef enum {
+    RECOVERY_STRATEGY_NONE,
+    RECOVERY_STRATEGY_RESTART,
+    RECOVERY_STRATEGY_DEGRADE,
+    RECOVERY_STRATEGY_RETRY,
+    RECOVERY_STRATEGY_SANDBOX,
+    RECOVERY_STRATEGY_SHUTDOWN
+} recovery_strategy_t;
+
 typedef struct {
     int timestamp;
     int error_type;
@@ -57,8 +80,8 @@ void ErrorRecovery_Init(void);
 void ErrorRecovery_Shutdown(void);
 
 // Error handling
-recovery_result_t ErrorRecovery_HandleError(int error_type, const char *error_message,
-                                          const char *context, qboolean is_fatal);
+recovery_result_t ErrorRecovery_HandleError(error_type_t error_type, const char *error_message,
+                                             const char *context, qboolean is_fatal);
 
 // Reporting and statistics
 void ErrorRecovery_GenerateReport(void);

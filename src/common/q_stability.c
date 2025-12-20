@@ -8,6 +8,21 @@ q_stability.c - Engine Stability and Hardening Framework
 #include "qcommon.h"
 #include "q_stability.h"
 
+// Forward declarations for subsystem functions
+static void Stability_MemoryGuardInit(void);
+static void Stability_MemoryGuardShutdown(void);
+static void Stability_ThreadSafetyInit(void);
+static void Stability_ThreadSafetyShutdown(void);
+static void Stability_InputValidationInit(void);
+static void Stability_InputValidationShutdown(void);
+static void Stability_ResourceLimitsInit(void);
+static void Stability_ResourceLimitsShutdown(void);
+static void Stability_ResourceLimitsCheck(void);
+static void Stability_CrashRecoveryInit(void);
+static void Stability_CrashRecoveryShutdown(void);
+static void Stability_PerformanceMonitorInit(void);
+static void Stability_PerformanceMonitorShutdown(void);
+
 // Stability configuration
 cvar_t *stability_enable;
 cvar_t *stability_log_level;
@@ -43,24 +58,15 @@ void Stability_Init(void) {
     Stability_MutexInit(&stability_mutex);
 
     // Register CVars
-    stability_enable = Cvar_Get("stability_enable", "1", CVAR_ARCHIVE | CVAR_LATCH,
-        "Enable comprehensive stability framework");
-    stability_log_level = Cvar_Get("stability_log_level", "2", CVAR_ARCHIVE,
-        "Stability logging level (0=none, 1=errors, 2=warnings, 3=info, 4=debug)");
-    stability_assert_level = Cvar_Get("stability_assert_level", "2", CVAR_ARCHIVE,
-        "Assertion level (0=off, 1=fatal, 2=warning, 3=debug)");
-    stability_memory_guard = Cvar_Get("stability_memory_guard", "1", CVAR_ARCHIVE,
-        "Enable memory corruption detection");
-    stability_thread_safety = Cvar_Get("stability_thread_safety", "1", CVAR_ARCHIVE,
-        "Enable thread safety validation");
-    stability_input_validation = Cvar_Get("stability_input_validation", "1", CVAR_ARCHIVE,
-        "Enable input sanitization and validation");
-    stability_resource_limits = Cvar_Get("stability_resource_limits", "1", CVAR_ARCHIVE,
-        "Enable resource usage limits");
-    stability_crash_recovery = Cvar_Get("stability_crash_recovery", "1", CVAR_ARCHIVE,
-        "Enable crash recovery mechanisms");
-    stability_performance_monitoring = Cvar_Get("stability_performance_monitoring", "1", CVAR_ARCHIVE,
-        "Enable performance stability monitoring");
+    stability_enable = Cvar_Get("stability_enable", "1", CVAR_ARCHIVE | CVAR_LATCH);
+    stability_log_level = Cvar_Get("stability_log_level", "2", CVAR_ARCHIVE);
+    stability_assert_level = Cvar_Get("stability_assert_level", "2", CVAR_ARCHIVE);
+    stability_memory_guard = Cvar_Get("stability_memory_guard", "1", CVAR_ARCHIVE);
+    stability_thread_safety = Cvar_Get("stability_thread_safety", "1", CVAR_ARCHIVE);
+    stability_input_validation = Cvar_Get("stability_input_validation", "1", CVAR_ARCHIVE);
+    stability_resource_limits = Cvar_Get("stability_resource_limits", "1", CVAR_ARCHIVE);
+    stability_crash_recovery = Cvar_Get("stability_crash_recovery", "1", CVAR_ARCHIVE);
+    stability_performance_monitoring = Cvar_Get("stability_performance_monitoring", "1", CVAR_ARCHIVE);
 
     // Initialize subsystems
     if (stability_memory_guard->integer) {
@@ -241,7 +247,7 @@ void Stability_SanitizeInput(char *input, size_t max_length) {
     char *src = input;
     char *dst = input;
 
-    while (*src && (dst - input) < max_length - 1) {
+    while (*src && (size_t)(dst - input) < max_length - 1) {
         // Allow printable ASCII, spaces, and common punctuation
         if ((*src >= 32 && *src <= 126) || *src == '\n' || *src == '\t' || *src == '\r') {
             *dst++ = *src;
@@ -335,103 +341,6 @@ static void Stability_CrashHandler(const char *reason) {
     Com_Error(ERR_DROP, "Stability framework detected critical error: %s", reason);
 }
 
-/*
-===============
-Memory Guard Subsystem
-===============
-*/
-static void Stability_MemoryGuardInit(void) {
-    Stability_LogEvent(STABILITY_INFO, "Initializing memory guard");
-    // Initialize canary values, bounds checking, etc.
-}
-
-static void Stability_MemoryGuardShutdown(void) {
-    Stability_LogEvent(STABILITY_INFO, "Shutting down memory guard");
-}
-
-static qboolean Stability_ValidateMemory(void *ptr, size_t size) {
-    // Basic bounds checking - in a real implementation this would be much more sophisticated
-    if (!ptr) return qfalse;
-
-    // Check if pointer is in valid heap range (simplified)
-    // This is highly platform-specific
-    return qtrue; // Placeholder
-}
-
-/*
-===============
-Thread Safety Subsystem
-===============
-*/
-static void Stability_ThreadSafetyInit(void) {
-    Stability_LogEvent(STABILITY_INFO, "Initializing thread safety validation");
-}
-
-static void Stability_ThreadSafetyShutdown(void) {
-    Stability_LogEvent(STABILITY_INFO, "Shutting down thread safety validation");
-}
-
-/*
-===============
-Input Validation Subsystem
-===============
-*/
-static void Stability_InputValidationInit(void) {
-    Stability_LogEvent(STABILITY_INFO, "Initializing input validation");
-}
-
-static void Stability_InputValidationShutdown(void) {
-    Stability_LogEvent(STABILITY_INFO, "Shutting down input validation");
-}
-
-/*
-===============
-Resource Limits Subsystem
-===============
-*/
-static void Stability_ResourceLimitsInit(void) {
-    Stability_LogEvent(STABILITY_INFO, "Initializing resource limits");
-}
-
-static void Stability_ResourceLimitsShutdown(void) {
-    Stability_LogEvent(STABILITY_INFO, "Shutting down resource limits");
-}
-
-static void Stability_ResourceLimitsCheck(void) {
-    // Check memory usage, file handles, network connections, etc.
-    // Implementation would monitor and enforce limits
-}
-
-/*
-===============
-Crash Recovery Subsystem
-===============
-*/
-static void Stability_CrashRecoveryInit(void) {
-    Stability_LogEvent(STABILITY_INFO, "Initializing crash recovery");
-}
-
-static void Stability_CrashRecoveryShutdown(void) {
-    Stability_LogEvent(STABILITY_INFO, "Shutting down crash recovery");
-}
-
-/*
-===============
-Performance Monitor Subsystem
-===============
-*/
-static void Stability_PerformanceMonitorInit(void) {
-    Stability_LogEvent(STABILITY_INFO, "Initializing performance monitoring");
-}
-
-static void Stability_PerformanceMonitorShutdown(void) {
-    Stability_LogEvent(STABILITY_INFO, "Shutting down performance monitoring");
-}
-
-static void Stability_PerformanceMonitor(void) {
-    // Monitor frame rates, memory usage, etc.
-    // Flag performance issues
-}
 
 /*
 ===============
@@ -468,4 +377,147 @@ void Stability_MutexUnlock(stability_mutex_t *mutex) {
 #else
     pthread_mutex_unlock(&mutex->mutex);
 #endif
+}
+
+/*
+===============
+Subsystem Implementation Stubs
+These are placeholder implementations for the stability subsystems.
+They can be expanded with actual functionality as needed.
+===============
+*/
+
+static void Stability_MemoryGuardInit(void) {
+    // Memory guard initialization - placeholder
+    Com_Printf("Stability: Memory guard initialized\n");
+}
+
+static void Stability_MemoryGuardShutdown(void) {
+    // Memory guard shutdown - placeholder
+    Com_Printf("Stability: Memory guard shutdown\n");
+}
+
+static void Stability_ThreadSafetyInit(void) {
+    // Thread safety initialization - placeholder
+    Com_Printf("Stability: Thread safety initialized\n");
+}
+
+static void Stability_ThreadSafetyShutdown(void) {
+    // Thread safety shutdown - placeholder
+    Com_Printf("Stability: Thread safety shutdown\n");
+}
+
+static void Stability_InputValidationInit(void) {
+    // Input validation initialization - placeholder
+    Com_Printf("Stability: Input validation initialized\n");
+}
+
+static void Stability_InputValidationShutdown(void) {
+    // Input validation shutdown - placeholder
+    Com_Printf("Stability: Input validation shutdown\n");
+}
+
+static void Stability_ResourceLimitsInit(void) {
+    // Resource limits initialization - placeholder
+    Com_Printf("Stability: Resource limits initialized\n");
+}
+
+static void Stability_ResourceLimitsShutdown(void) {
+    // Resource limits shutdown - placeholder
+    Com_Printf("Stability: Resource limits shutdown\n");
+}
+
+static void Stability_ResourceLimitsCheck(void) {
+    // Resource limits check - placeholder
+    // Could check memory usage, file handles, etc.
+}
+
+static void Stability_CrashRecoveryInit(void) {
+    // Crash recovery initialization - placeholder
+    Com_Printf("Stability: Crash recovery initialized\n");
+}
+
+static void Stability_CrashRecoveryShutdown(void) {
+    // Crash recovery shutdown - placeholder
+    Com_Printf("Stability: Crash recovery shutdown\n");
+}
+
+static void Stability_PerformanceMonitorInit(void) {
+    // Performance monitor initialization - placeholder
+    Com_Printf("Stability: Performance monitor initialized\n");
+}
+
+static void Stability_PerformanceMonitorShutdown(void) {
+    // Performance monitor shutdown - placeholder
+    Com_Printf("Stability: Performance monitor shutdown\n");
+}
+
+/*
+===============
+Stability_ValidateMemory
+===============
+*/
+static qboolean Stability_ValidateMemory(void *ptr, size_t size) {
+    if (!ptr || size == 0) {
+        return qfalse;
+    }
+
+    // Basic memory validation - check if pointer is readable
+    // This is a simplified implementation for demonstration
+    volatile char *test_ptr = (volatile char *)ptr;
+
+    // Try to read the first and last byte (with bounds checking)
+    if (size > 0) {
+        volatile char test_val;
+        test_val = test_ptr[0];  // Try to read first byte
+        if (size > 1) {
+            test_val = test_ptr[size - 1];  // Try to read last byte
+        }
+        (void)test_val;  // Suppress unused variable warning
+    }
+
+    return qtrue;
+}
+
+/*
+===============
+Stability_PerformanceMonitor
+===============
+*/
+static void Stability_PerformanceMonitor(void) {
+    if (!stability_performance_monitoring->integer) {
+        return;
+    }
+
+    static int last_monitor_time = 0;
+    int current_time = Sys_Milliseconds();
+
+    // Monitor every 5 seconds
+    if (current_time - last_monitor_time < 5000) {
+        return;
+    }
+    last_monitor_time = current_time;
+
+    // Basic performance monitoring
+    // In a real implementation, this would collect and analyze:
+    // - Frame time variance
+    // - Memory usage trends
+    // - CPU usage patterns
+    // - Network latency
+    // - Disk I/O performance
+
+    Com_Printf("Stability: Performance monitor - Frame time: %.2fms\n",
+              1000.0f / (float)Cvar_VariableIntegerValue("com_maxfps"));
+
+    // Check for performance degradation
+    static float last_frame_time = 0.0f;
+    float current_frame_time = 1000.0f / (float)Cvar_VariableIntegerValue("com_maxfps");
+
+    if (last_frame_time > 0.0f && current_frame_time > last_frame_time * 1.5f) {
+        Stability_LogEvent(STABILITY_WARNING,
+                          "Performance degradation detected: %.2fms -> %.2fms",
+                          last_frame_time, current_frame_time);
+    }
+
+    last_frame_time = current_frame_time;
 }

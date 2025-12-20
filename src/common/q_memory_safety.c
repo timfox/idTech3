@@ -8,20 +8,6 @@ q_memory_safety.c - Enhanced Memory Safety and Bounds Checking
 #include "qcommon.h"
 #include "q_memory_safety.h"
 
-// Memory safety configuration
-cvar_t *memory_safety_enable;
-cvar_t *memory_bounds_checking;
-cvar_t *memory_corruption_detection;
-cvar_t *memory_leak_detection;
-cvar_t *memory_canary_protection;
-cvar_t *memory_double_free_detection;
-cvar_t *memory_use_after_free_detection;
-cvar_t *memory_buffer_overflow_protection;
-
-// Memory safety statistics
-static memory_safety_stats_t memory_stats;
-static memory_safety_state_t memory_state;
-
 // Memory canary values
 #define MEMORY_CANARY_VALUE 0xDEADBEEF
 #define MEMORY_CANARY_SIZE 4
@@ -41,6 +27,26 @@ typedef struct memory_block_s {
 #define MEMORY_BLOCK_MAGIC 0xCAFEBABE
 #define MEMORY_BLOCK_OVERHEAD (sizeof(memory_block_t) + (MEMORY_CANARY_SIZE * MEMORY_CANARY_COUNT))
 
+// Forward declarations for static functions called before definition
+static qboolean MemorySafety_ValidateBlock(memory_block_t *block, void *user_ptr);
+static void MemorySafety_TrackAllocation(void *ptr, size_t size, const char *file, int line);
+static void MemorySafety_UntrackAllocation(void *ptr);
+
+
+// Memory safety configuration
+cvar_t *memory_safety_enable;
+cvar_t *memory_bounds_checking;
+cvar_t *memory_corruption_detection;
+cvar_t *memory_leak_detection;
+cvar_t *memory_canary_protection;
+cvar_t *memory_double_free_detection;
+cvar_t *memory_use_after_free_detection;
+cvar_t *memory_buffer_overflow_protection;
+
+// Memory safety statistics
+static memory_safety_stats_t memory_stats;
+static memory_safety_state_t memory_state;
+
 // Memory allocation tracking
 static memory_allocation_t *allocation_list = NULL;
 static int allocation_count = 0;
@@ -56,22 +62,14 @@ void MemorySafety_Init(void) {
     Com_Memset(&memory_state, 0, sizeof(memory_state));
 
     // Register CVars
-    memory_safety_enable = Cvar_Get("memory_safety_enable", "1", CVAR_ARCHIVE | CVAR_LATCH,
-        "Enable enhanced memory safety features");
-    memory_bounds_checking = Cvar_Get("memory_bounds_checking", "1", CVAR_ARCHIVE,
-        "Enable buffer bounds checking");
-    memory_corruption_detection = Cvar_Get("memory_corruption_detection", "1", CVAR_ARCHIVE,
-        "Enable memory corruption detection");
-    memory_leak_detection = Cvar_Get("memory_leak_detection", "1", CVAR_ARCHIVE,
-        "Enable memory leak detection");
-    memory_canary_protection = Cvar_Get("memory_canary_protection", "1", CVAR_ARCHIVE,
-        "Enable canary-based buffer overflow protection");
-    memory_double_free_detection = Cvar_Get("memory_double_free_detection", "1", CVAR_ARCHIVE,
-        "Enable double-free detection");
-    memory_use_after_free_detection = Cvar_Get("memory_use_after_free_detection", "1", CVAR_ARCHIVE,
-        "Enable use-after-free detection");
-    memory_buffer_overflow_protection = Cvar_Get("memory_buffer_overflow_protection", "1", CVAR_ARCHIVE,
-        "Enable buffer overflow protection");
+    memory_safety_enable = Cvar_Get("memory_safety_enable", "1", CVAR_ARCHIVE | CVAR_LATCH);
+    memory_bounds_checking = Cvar_Get("memory_bounds_checking", "1", CVAR_ARCHIVE);
+    memory_corruption_detection = Cvar_Get("memory_corruption_detection", "1", CVAR_ARCHIVE);
+    memory_leak_detection = Cvar_Get("memory_leak_detection", "1", CVAR_ARCHIVE);
+    memory_canary_protection = Cvar_Get("memory_canary_protection", "1", CVAR_ARCHIVE);
+    memory_double_free_detection = Cvar_Get("memory_double_free_detection", "1", CVAR_ARCHIVE);
+    memory_use_after_free_detection = Cvar_Get("memory_use_after_free_detection", "1", CVAR_ARCHIVE);
+    memory_buffer_overflow_protection = Cvar_Get("memory_buffer_overflow_protection", "1", CVAR_ARCHIVE);
 
     memory_state.initialized = qtrue;
     Com_Printf("Memory safety framework initialized\n");
@@ -97,7 +95,7 @@ void MemorySafety_Shutdown(void) {
     while (current) {
         memory_allocation_t *next = current->next;
         if (!current->freed) {
-            Com_Printf(S_COLOR_YELLOW "WARNING: Memory leak detected at %s:%d (%d bytes)\n",
+            Com_Printf(S_COLOR_YELLOW "WARNING: Memory leak detected at %s:%d (%zu bytes)\n",
                 current->file, current->line, current->size);
         }
         MemorySafety_Free(current);
@@ -122,7 +120,7 @@ void *MemorySafety_Malloc(size_t size, const char *file, int line) {
     void *raw_ptr = Z_Malloc(total_size);
 
     if (!raw_ptr) {
-        Com_Error(ERR_FATAL, "MemorySafety_Malloc: Failed to allocate %d bytes", total_size);
+        Com_Error(ERR_FATAL, "MemorySafety_Malloc: Failed to allocate %zu bytes", total_size);
         return NULL;
     }
 
@@ -313,7 +311,7 @@ qboolean MemorySafety_ValidatePointer(const void *ptr, size_t access_size, const
 
             // Check bounds
             if (access_size > allocation->size) {
-                Com_Printf(S_COLOR_RED "ERROR: Buffer overflow detected in %s (access %d, allocated %d)\n",
+                Com_Printf(S_COLOR_RED "ERROR: Buffer overflow detected in %s (access %zu, allocated %zu)\n",
                     context, access_size, allocation->size);
                 return qfalse;
             }
@@ -339,7 +337,7 @@ void MemorySafety_CheckLeaks(void) {
     memory_allocation_t *current = allocation_list;
     while (current) {
         if (!current->freed) {
-            Com_Printf(S_COLOR_YELLOW "MEMORY LEAK: %d bytes allocated at %s:%d\n",
+            Com_Printf(S_COLOR_YELLOW "MEMORY LEAK: %zu bytes allocated at %s:%d\n",
                 current->size, current->file, current->line);
             leak_count++;
             leak_size += current->size;
@@ -348,7 +346,7 @@ void MemorySafety_CheckLeaks(void) {
     }
 
     if (leak_count > 0) {
-        Com_Printf(S_COLOR_RED "MEMORY LEAKS DETECTED: %d leaks, %d bytes total\n",
+        Com_Printf(S_COLOR_RED "MEMORY LEAKS DETECTED: %d leaks, %zu bytes total\n",
             leak_count, leak_size);
         memory_stats.leak_count = leak_count;
         memory_stats.leak_size = leak_size;
@@ -379,7 +377,7 @@ void MemorySafety_DumpAllocations(void) {
 
     while (current && count < 50) {  // Limit output
         const char *status = current->freed ? "FREED" : "ACTIVE";
-        Com_Printf("%s: %d bytes at %s:%d (%d ms ago)\n",
+        Com_Printf("%s: %zu bytes at %s:%d (%d ms ago)\n",
             status, current->size, current->file, current->line,
             Sys_Milliseconds() - current->allocation_time);
         current = current->next;

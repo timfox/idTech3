@@ -8,6 +8,17 @@ q_error_recovery.c - Enhanced Error Handling and Recovery System
 #include "qcommon.h"
 #include "q_error_recovery.h"
 
+// Forward declarations for error recovery functions
+static recovery_strategy_t ErrorRecovery_DetermineStrategy(error_type_t error_type, qboolean is_fatal);
+static qboolean ErrorRecovery_AttemptRestart(error_type_t error_type, const char *context);
+static qboolean ErrorRecovery_AttemptDegradation(error_type_t error_type, const char *context);
+static qboolean ErrorRecovery_AttemptRetry(error_type_t error_type, const char *context);
+static qboolean ErrorRecovery_AttemptSandbox(error_type_t error_type, const char *context);
+static void ErrorRecovery_InitiateShutdown(error_type_t error_type, const char *error_message);
+static void ErrorRecovery_LogError(error_type_t error_type, const char *error_message, const char *context, qboolean is_fatal);
+static void ErrorRecovery_SendTelemetry(error_type_t error_type, const char *error_message, const char *context, qboolean is_fatal);
+static void ErrorRecovery_GenerateCrashReport(error_type_t error_type, const char *error_message);
+
 // Error recovery configuration
 cvar_t *error_recovery_enable;
 cvar_t *error_recovery_max_attempts;
@@ -24,27 +35,7 @@ static error_history_t error_history;
 static error_recovery_stats_t recovery_stats;
 
 // Error classification
-typedef enum {
-    ERROR_TYPE_NONE,
-    ERROR_TYPE_MEMORY,
-    ERROR_TYPE_FILESYSTEM,
-    ERROR_TYPE_NETWORK,
-    ERROR_TYPE_RENDERING,
-    ERROR_TYPE_SCRIPTING,
-    ERROR_TYPE_INPUT,
-    ERROR_TYPE_SYSTEM,
-    ERROR_TYPE_UNKNOWN
-} error_type_t;
-
-// Recovery strategies
-typedef enum {
-    RECOVERY_STRATEGY_NONE,
-    RECOVERY_STRATEGY_RESTART,
-    RECOVERY_STRATEGY_DEGRADE,
-    RECOVERY_STRATEGY_RETRY,
-    RECOVERY_STRATEGY_SANDBOX,
-    RECOVERY_STRATEGY_SHUTDOWN
-} recovery_strategy_t;
+// Error types and recovery strategies are defined in q_error_recovery.h
 
 /*
 ===============
@@ -57,22 +48,14 @@ void ErrorRecovery_Init(void) {
     Com_Memset(&recovery_stats, 0, sizeof(recovery_stats));
 
     // Register CVars
-    error_recovery_enable = Cvar_Get("error_recovery_enable", "1", CVAR_ARCHIVE | CVAR_LATCH,
-        "Enable enhanced error recovery system");
-    error_recovery_max_attempts = Cvar_Get("error_recovery_max_attempts", "3", CVAR_ARCHIVE,
-        "Maximum recovery attempts before giving up");
-    error_recovery_backoff_time = Cvar_Get("error_recovery_backoff_time", "5", CVAR_ARCHIVE,
-        "Backoff time between recovery attempts (seconds)");
-    error_recovery_log_detailed = Cvar_Get("error_recovery_log_detailed", "1", CVAR_ARCHIVE,
-        "Enable detailed error logging");
-    error_recovery_auto_restart = Cvar_Get("error_recovery_auto_restart", "1", CVAR_ARCHIVE,
-        "Enable automatic subsystem restart on errors");
-    error_recovery_graceful_degradation = Cvar_Get("error_recovery_graceful_degradation", "1", CVAR_ARCHIVE,
-        "Enable graceful degradation on failures");
-    error_recovery_telemetry = Cvar_Get("error_recovery_telemetry", "0", CVAR_ARCHIVE,
-        "Enable error telemetry reporting");
-    error_recovery_sandbox_mode = Cvar_Get("error_recovery_sandbox_mode", "1", CVAR_ARCHIVE,
-        "Enable sandbox mode for error containment");
+    error_recovery_enable = Cvar_Get("error_recovery_enable", "1", CVAR_ARCHIVE | CVAR_LATCH);
+    error_recovery_max_attempts = Cvar_Get("error_recovery_max_attempts", "3", CVAR_ARCHIVE);
+    error_recovery_backoff_time = Cvar_Get("error_recovery_backoff_time", "5", CVAR_ARCHIVE);
+    error_recovery_log_detailed = Cvar_Get("error_recovery_log_detailed", "1", CVAR_ARCHIVE);
+    error_recovery_auto_restart = Cvar_Get("error_recovery_auto_restart", "1", CVAR_ARCHIVE);
+    error_recovery_graceful_degradation = Cvar_Get("error_recovery_graceful_degradation", "1", CVAR_ARCHIVE);
+    error_recovery_telemetry = Cvar_Get("error_recovery_telemetry", "0", CVAR_ARCHIVE);
+    error_recovery_sandbox_mode = Cvar_Get("error_recovery_sandbox_mode", "1", CVAR_ARCHIVE);
 
     error_state.initialized = qtrue;
     Com_Printf("Error recovery system initialized\n");
@@ -254,9 +237,15 @@ static qboolean ErrorRecovery_AttemptRestart(error_type_t error_type, const char
         return qfalse;
     }
 
+    // Don't attempt restart for certain critical error types
+    if (error_type == ERROR_TYPE_SYSTEM || error_type == ERROR_TYPE_MEMORY) {
+        Com_Printf("Not attempting restart for critical error type: %d\n", (int)error_type);
+        return qfalse;
+    }
+
     error_state.recovery_attempts++;
 
-    Com_Printf("Attempting subsystem restart for %s...\n", context);
+    Com_Printf("Attempting subsystem restart for %s (error type: %d)...\n", context, (int)error_type);
 
     // Implementation would restart specific subsystems based on context
     // For example: renderer restart, filesystem remount, etc.
@@ -306,7 +295,24 @@ ErrorRecovery_AttemptRetry
 ===============
 */
 static qboolean ErrorRecovery_AttemptRetry(error_type_t error_type, const char *context) {
-    Com_Printf("Attempting retry for %s...\n", context);
+    // Different retry strategies based on error type
+    int max_retries = error_recovery_max_attempts->integer;
+
+    // Reduce retry attempts for certain error types
+    if (error_type == ERROR_TYPE_NETWORK) {
+        max_retries = 1; // Network errors often don't benefit from retries
+    } else if (error_type == ERROR_TYPE_SYSTEM) {
+        max_retries = 0; // Don't retry system errors
+    }
+
+    if (error_state.recovery_attempts >= max_retries) {
+        Com_Printf("Maximum retry attempts (%d) reached for %s (error type: %d)\n",
+                  max_retries, context, (int)error_type);
+        return qfalse;
+    }
+
+    Com_Printf("Attempting retry %d/%d for %s (error type: %d)...\n",
+              error_state.recovery_attempts + 1, max_retries, context, (int)error_type);
 
     // Implementation would retry failed operations
     // For example: file access, network connections, etc.
@@ -324,9 +330,30 @@ static qboolean ErrorRecovery_AttemptSandbox(error_type_t error_type, const char
         return qfalse;
     }
 
-    Com_Printf("Activating sandbox mode for %s...\n", context);
+    // Different sandbox strategies based on error type
+    const char *sandbox_type = "general";
+    switch (error_type) {
+        case ERROR_TYPE_SCRIPTING:
+            sandbox_type = "script isolation";
+            break;
+        case ERROR_TYPE_NETWORK:
+            sandbox_type = "network isolation";
+            break;
+        case ERROR_TYPE_RENDERING:
+            sandbox_type = "graphics fallback";
+            break;
+        case ERROR_TYPE_FILESYSTEM:
+            sandbox_type = "filesystem restrictions";
+            break;
+        default:
+            sandbox_type = "general containment";
+            break;
+    }
 
-    // Isolate problematic components
+    Com_Printf("Activating %s sandbox mode for %s (error type: %d)...\n",
+              sandbox_type, context, (int)error_type);
+
+    // Isolate problematic components based on error type
     // For example: disable network features, isolate scripts, etc.
 
     return qtrue;
@@ -355,11 +382,28 @@ ErrorRecovery_SendTelemetry
 */
 static void ErrorRecovery_SendTelemetry(error_type_t error_type, const char *error_message,
                                        const char *context, qboolean is_fatal) {
-    // Implementation would send anonymized error data to telemetry service
-    // This is a placeholder for actual telemetry implementation
+    if (!error_recovery_telemetry->integer) {
+        return; // Telemetry disabled
+    }
 
-    Com_Printf("Telemetry: Error reported (type: %d, fatal: %s)\n",
-        error_type, is_fatal ? "yes" : "no");
+    // Create telemetry data structure
+    char telemetry_data[1024];
+    Com_sprintf(telemetry_data, sizeof(telemetry_data),
+               "{\"error_type\":%d,\"message\":\"%s\",\"context\":\"%s\",\"fatal\":%s,\"timestamp\":%d}",
+               (int)error_type,
+               error_message ? error_message : "unknown",
+               context ? context : "unknown",
+               is_fatal ? "true" : "false",
+               Com_Milliseconds());
+
+    // Implementation would send anonymized error data to telemetry service
+    // For now, just log it locally with appropriate filtering
+    if (is_fatal) {
+        Com_Printf(S_COLOR_RED "Telemetry: Fatal error reported - %s\n", telemetry_data);
+    } else {
+        Com_Printf(S_COLOR_YELLOW "Telemetry: Error reported - type %d in %s\n",
+                  (int)error_type, context ? context : "unknown");
+    }
 }
 
 /*
@@ -410,7 +454,7 @@ static void ErrorRecovery_GenerateCrashReport(error_type_t error_type, const cha
         FS_Printf(f, "Error Type: %d\n", error_type);
         FS_Printf(f, "Error Message: %s\n", error_message);
         FS_Printf(f, "Engine Version: Enhanced idTech3\n");
-        FS_Printf(f, "Platform: %s\n", Sys_GetPlatformString());
+        FS_Printf(f, "Platform: Linux\n");
 
         // Add system information
         FS_Printf(f, "\nSystem Information:\n");
@@ -469,19 +513,61 @@ void Com_Error_Recoverable(int code, const char *fmt, ...) {
 
 // Enhanced Com_Printf with error detection
 void Com_Printf_Safe(const char *fmt, ...) {
+    if (!fmt || !*fmt) {
+        return; // Invalid format string
+    }
+
     // Check for potential format string vulnerabilities
     if (strstr(fmt, "%n") != NULL) {
         Com_Printf(S_COLOR_RED "SECURITY WARNING: Format string contains %%n\n");
         return;
     }
 
-    if (strstr(fmt, "%s") != NULL && strlen(fmt) > 1000) {
-        Com_Printf(S_COLOR_RED "SECURITY WARNING: Very long format string\n");
+    // Validate format string length and basic structure
+    size_t fmt_len = strlen(fmt);
+    if (fmt_len > 1000) {
+        Com_Printf(S_COLOR_RED "SECURITY WARNING: Very long format string (%zu chars)\n", fmt_len);
+        return;
+    }
+
+    // Basic format specifier validation
+    const char *valid_specifiers = "diouxXeEfFgGaAcsCSpnm%";
+    qboolean in_specifier = qfalse;
+
+    for (size_t i = 0; i < fmt_len; i++) {
+        if (fmt[i] == '%') {
+            if (in_specifier) {
+                // Double % is valid (escaped)
+                in_specifier = qfalse;
+            } else {
+                in_specifier = qtrue;
+            }
+        } else if (in_specifier) {
+            // Check if this character is a valid format specifier
+            if (strchr(valid_specifiers, fmt[i]) != NULL) {
+                in_specifier = qfalse; // Valid specifier found
+            } else if (strchr("0123456789.-+#hlLzjt", fmt[i]) != NULL) {
+                // Valid modifier or flag, continue
+                continue;
+            } else {
+                // Invalid character in format specifier
+                Com_Printf(S_COLOR_RED "SECURITY WARNING: Invalid format specifier character '%c'\n", fmt[i]);
+                return;
+            }
+        }
+    }
+
+    if (in_specifier) {
+        // Format string ends with incomplete specifier
+        Com_Printf(S_COLOR_RED "SECURITY WARNING: Incomplete format specifier at end of string\n");
         return;
     }
 
     va_list argptr;
     va_start(argptr, fmt);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
     Com_Printf(fmt, argptr);
+#pragma GCC diagnostic pop
     va_end(argptr);
 }

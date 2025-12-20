@@ -4977,11 +4977,6 @@ void Com_Frame( qboolean noDelay ) {
 
 	// Update stability framework
 	Stability_Frame();
-		
-		// Update sequence system
-		Lua_Sequence_Update(deltaTime);
-	}
-#endif
 
 #ifdef USE_CURL
 	// Update telemetry system

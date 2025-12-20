@@ -5,8 +5,14 @@ tr_font_effects.c - Advanced Font Effects and Rendering Implementation
 */
 
 #include "tr_font_effects.h"
-#include "tr_local.h"
-#include "qcommon.h"
+#include "tr_types.h"
+#include "../../common/qcommon.h"
+
+// Forward declarations
+static void R_RenderTextBasic(const font_render_context_t *context);
+
+// Font-related cvars
+extern cvar_t *r_fontSDF;
 
 // Font effects state
 static qboolean font_effects_initialized = qfalse;
@@ -14,7 +20,13 @@ static font_effect_params_t default_effects;
 
 // Font cache for performance
 #define FONT_CACHE_SIZE 1024
-static glyphInfo_t *font_glyph_cache[FONT_CACHE_SIZE];
+
+typedef struct font_cache_entry_s {
+    int char_code;
+    glyphInfo_t glyph;
+} font_cache_entry_t;
+
+static font_cache_entry_t font_glyph_cache[FONT_CACHE_SIZE];
 static int font_cache_hits = 0;
 static int font_cache_misses = 0;
 
@@ -34,7 +46,7 @@ void R_InitFontEffects(void) {
     R_InitFontCache();
 
     font_effects_initialized = qtrue;
-    ri.Printf(PRINT_ALL, "Font effects system initialized\n");
+    Com_Printf("Font effects system initialized\n");
 }
 
 /*
@@ -51,7 +63,7 @@ void R_ShutdownFontEffects(void) {
     R_ShutdownFontCache();
 
     font_effects_initialized = qfalse;
-    ri.Printf(PRINT_ALL, "Font effects system shutdown\n");
+    Com_Printf("Font effects system shutdown\n");
 }
 
 /*
@@ -336,7 +348,7 @@ void R_GetFontEffectDefaults(font_effect_params_t *params) {
 
     // Default shadow settings
     VectorSet(params->shadow_color, 0.0f, 0.0f, 0.0f);
-    VectorSet(params->shadow_offset, 1.0f, 1.0f);
+    VectorSet(params->shadow_offset, 1.0f, 1.0f, 0.0f);
     params->shadow_blur = 0.0f;
 
     // Default animation settings
@@ -346,8 +358,8 @@ void R_GetFontEffectDefaults(font_effect_params_t *params) {
 
     // Default transform settings
     params->rotation_angle = 0.0f;
-    VectorSet(params->scale, 1.0f, 1.0f);
-    VectorSet(params->skew, 0.0f, 0.0f);
+    VectorSet(params->scale, 1.0f, 1.0f, 1.0f);
+    VectorSet(params->skew, 0.0f, 0.0f, 0.0f);
 
     // Default flags
     params->flags = FONT_EFFECT_NONE;
@@ -388,8 +400,8 @@ R_GetTextBounds
 void R_GetTextBounds(const fontInfo_t *font, const char *text, int text_length,
                     float scale, vec2_t mins, vec2_t maxs) {
     if (!font || !text || text_length <= 0) {
-        VectorSet(mins, 0, 0);
-        VectorSet(maxs, 0, 0);
+        mins[0] = mins[1] = 0;
+        maxs[0] = maxs[1] = 0;
         return;
     }
 
@@ -412,7 +424,7 @@ R_GetTextAdvance
 void R_GetTextAdvance(const fontInfo_t *font, const char *text, int text_length,
                      float scale, vec2_t advance) {
     if (!font || !text) {
-        VectorSet(advance, 0, 0);
+        advance[0] = advance[1] = 0;
         return;
     }
 
@@ -483,8 +495,9 @@ R_GetFallbackFont
 ===============
 */
 fontInfo_t *R_GetFallbackFont(const fontInfo_t *primary_font, int char_code) {
-    // Implementation would find appropriate fallback font
+    // Implementation would find appropriate fallback font based on char_code
     // For now, return the primary font
+    (void)char_code; // Suppress unused parameter warning
     return (fontInfo_t *)primary_font;
 }
 
@@ -496,6 +509,7 @@ R_LoadLanguageFonts
 qboolean R_LoadLanguageFonts(const char *language_code) {
     // Implementation would load language-specific fonts
     // For now, return success
+    (void)language_code; // Suppress unused parameter warning
     return qtrue;
 }
 
@@ -529,10 +543,12 @@ glyphInfo_t *R_GetCachedGlyph(fontInfo_t *font, int char_code) {
     // Simple hash-based cache lookup
     unsigned int hash = (unsigned int)char_code % FONT_CACHE_SIZE;
 
-    glyphInfo_t *cached = font_glyph_cache[hash];
-    if (cached && cached->charCode == char_code) {
+    (void)font; // Suppress unused parameter warning - font context not needed for simple cache
+
+    font_cache_entry_t *cached = &font_glyph_cache[hash];
+    if (cached->char_code == char_code && cached->glyph.glyph != 0) {
         font_cache_hits++;
-        return cached;
+        return &cached->glyph;
     }
 
     font_cache_misses++;
@@ -547,6 +563,8 @@ R_StreamFontGlyphs
 void R_StreamFontGlyphs(fontInfo_t *font, const char *text) {
     // Implementation would stream glyphs on demand
     // For now, this is a placeholder
+    (void)font;   // Suppress unused parameter warning
+    (void)text;   // Suppress unused parameter warning
 }
 
 /*

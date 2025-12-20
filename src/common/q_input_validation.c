@@ -8,6 +8,9 @@ q_input_validation.c - Enhanced Input Validation and Sanitization
 #include "qcommon.h"
 #include "q_input_validation.h"
 
+// Forward declarations for static functions
+static qboolean InputValidation_ValidatePath(const char *path);
+
 // Input validation configuration
 cvar_t *input_validation_enable;
 cvar_t *input_validation_strict_mode;
@@ -45,24 +48,15 @@ void InputValidation_Init(void) {
     Com_Memset(&rate_limits, 0, sizeof(rate_limits));
 
     // Register CVars
-    input_validation_enable = Cvar_Get("input_validation_enable", "1", CVAR_ARCHIVE | CVAR_LATCH,
-        "Enable enhanced input validation and sanitization");
-    input_validation_strict_mode = Cvar_Get("input_validation_strict_mode", "0", CVAR_ARCHIVE,
-        "Enable strict input validation (reject suspicious input)");
-    input_validation_log_suspicious = Cvar_Get("input_validation_log_suspicious", "1", CVAR_ARCHIVE,
-        "Log suspicious input for monitoring");
-    input_validation_max_length = Cvar_Get("input_validation_max_length", "1024", CVAR_ARCHIVE,
-        "Maximum allowed input length");
-    input_validation_filter_unicode = Cvar_Get("input_validation_filter_unicode", "1", CVAR_ARCHIVE,
-        "Filter potentially dangerous Unicode characters");
-    input_validation_check_null_bytes = Cvar_Get("input_validation_check_null_bytes", "1", CVAR_ARCHIVE,
-        "Check for null byte injection attempts");
-    input_validation_validate_paths = Cvar_Get("input_validation_validate_paths", "1", CVAR_ARCHIVE,
-        "Validate file paths for directory traversal");
-    input_validation_sanitize_sql = Cvar_Get("input_validation_sanitize_sql", "1", CVAR_ARCHIVE,
-        "Sanitize input to prevent SQL injection");
-    input_validation_rate_limit = Cvar_Get("input_validation_rate_limit", "1", CVAR_ARCHIVE,
-        "Enable rate limiting for input commands");
+    input_validation_enable = Cvar_Get("input_validation_enable", "1", CVAR_ARCHIVE | CVAR_LATCH);
+    input_validation_strict_mode = Cvar_Get("input_validation_strict_mode", "0", CVAR_ARCHIVE);
+    input_validation_log_suspicious = Cvar_Get("input_validation_log_suspicious", "1", CVAR_ARCHIVE);
+    input_validation_max_length = Cvar_Get("input_validation_max_length", "1024", CVAR_ARCHIVE);
+    input_validation_filter_unicode = Cvar_Get("input_validation_filter_unicode", "1", CVAR_ARCHIVE);
+    input_validation_check_null_bytes = Cvar_Get("input_validation_check_null_bytes", "1", CVAR_ARCHIVE);
+    input_validation_validate_paths = Cvar_Get("input_validation_validate_paths", "1", CVAR_ARCHIVE);
+    input_validation_sanitize_sql = Cvar_Get("input_validation_sanitize_sql", "1", CVAR_ARCHIVE);
+    input_validation_rate_limit = Cvar_Get("input_validation_rate_limit", "1", CVAR_ARCHIVE);
 
     validation_state.initialized = qtrue;
     Com_Printf("Input validation system initialized\n");
@@ -110,11 +104,15 @@ validation_result_t InputValidation_ValidateString(const char *input, validation
 
     // Check length
     size_t length = strlen(input);
-    if (length > input_validation_max_length->integer) {
+    int max_len = input_validation_max_length->integer;
+    if (max_len < 0) {
+        max_len = 0; // Ensure non-negative length
+    }
+    if (length > (size_t)max_len) {
         result.valid = qfalse;
         result.error = VALIDATION_ERROR_TOO_LONG;
         Com_sprintf(result.message, sizeof(result.message),
-            "Input too long (%d > %d)", length, input_validation_max_length->integer);
+            "Input too long (%zu > %d)", length, max_len);
         goto validation_complete;
     }
 
@@ -236,7 +234,7 @@ void InputValidation_SanitizeString(char *output, size_t output_size, const char
         }
 
         if (flags & VALIDATION_FLAG_SANITIZE_PATH) {
-            if (c == '/' || c == '\\' || c == '..' || c == ':') {
+            if (c == '/' || c == '\\' || c == ':') {
                 c = '_';
             }
         }
@@ -316,7 +314,8 @@ rate_limit_result_t InputValidation_CheckRateLimit(int client_id, const char *co
         result.retry_after = RATE_LIMIT_WINDOW - (current_time - entry->timestamp);
 
         validation_stats.rate_limit_hits++;
-        Com_Printf(S_COLOR_YELLOW "Rate limit exceeded for client %d\n", client_id);
+        Com_Printf(S_COLOR_YELLOW "Rate limit exceeded for client %d, command: %s\n",
+                  client_id, command ? command : "unknown");
     }
 
     return result;
