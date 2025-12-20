@@ -554,12 +554,129 @@ MainMenu_Cache
 void MainMenu_Cache( void )
 {
 	MainMenu_LoadFontsFromConfig();
+
+	// Try to load the enhanced banner model
 	s_main.bannerModel = trap_R_RegisterModel( MAIN_BANNER_MODEL );
 	if ( s_main.bannerModel ) {
-		Com_Printf( "MainMenu_Cache: Successfully loaded banner model '%s' (handle %d)\n", MAIN_BANNER_MODEL, s_main.bannerModel );
+		Com_Printf( "MainMenu_Cache: Successfully loaded enhanced banner model '%s' (handle %d)\n", MAIN_BANNER_MODEL, s_main.bannerModel );
 	} else {
-		Com_Printf( "MainMenu_Cache: Failed to load banner model '%s'\n", MAIN_BANNER_MODEL );
+		Com_Printf( "MainMenu_Cache: Failed to load enhanced banner model '%s', trying fallback\n", MAIN_BANNER_MODEL );
+
+		// Try fallback models
+		const char *fallback_models[] = {
+			"models/mapobjects/banner/cube.md3",  // Simple cube model
+			"models/mapobjects/grenade.md3",     // Grenade model
+			"models/powerups/health/red.md3",    // Health pack
+			NULL
+		};
+
+		for (int i = 0; fallback_models[i]; i++) {
+			s_main.bannerModel = trap_R_RegisterModel( fallback_models[i] );
+			if ( s_main.bannerModel ) {
+				Com_Printf( "MainMenu_Cache: Using fallback banner model '%s' (handle %d)\n", fallback_models[i], s_main.bannerModel );
+				break;
+			}
+		}
+
+		if ( !s_main.bannerModel ) {
+			Com_Printf( "MainMenu_Cache: All banner models failed to load, using 2D fallback\n" );
+		}
 	}
+}
+
+/*
+===============
+MainMenu_DrawFallbackBanner
+===============
+*/
+static void MainMenu_DrawFallbackBanner( void )
+{
+	vec4_t color;
+	float alpha;
+	int x, y, w, h;
+
+	// Calculate banner position and size (centered, taking up reasonable screen space)
+	w = 400;
+	h = 200;
+	x = (640 - w) / 2;
+	y = 100;  // Position near top of screen
+
+	// Animated color and alpha for visual appeal
+	float time = (float)uis.realtime / 1000.0f;
+	alpha = 0.3f + 0.2f * sin(time * 0.5f);  // Pulsing alpha
+
+	// Create a gradient banner background
+	color[0] = 0.2f;  // Red
+	color[1] = 0.4f;  // Green
+	color[2] = 0.8f;  // Blue
+	color[3] = alpha; // Alpha
+
+	// Draw main banner background with rounded corners effect
+	trap_R_SetColor( color );
+	UI_FillRect( x, y, w, h, color );
+
+	// Add a glowing border
+	color[0] = 0.8f;
+	color[1] = 0.6f;
+	color[2] = 0.2f;
+	color[3] = alpha * 1.5f;
+
+	// Top border
+	UI_FillRect( x, y, w, 4, color );
+	// Bottom border
+	UI_FillRect( x, y + h - 4, w, 4, color );
+	// Left border
+	UI_FillRect( x, y, 4, h, color );
+	// Right border
+	UI_FillRect( x + w - 4, y, 4, h, color );
+
+	// Draw animated particles around the banner
+	MainMenu_DrawBannerParticles(x, y, w, h, time);
+
+	// Draw "Enhanced Engine" text in the center
+	color[0] = 1.0f;
+	color[1] = 1.0f;
+	color[2] = 1.0f;
+	color[3] = 1.0f;
+
+	UI_DrawString( x + w/2, y + h/2 - 20, "ENHANCED", UI_CENTER | UI_DROPSHADOW, color, 24 );
+	UI_DrawString( x + w/2, y + h/2 + 10, "ENGINE", UI_CENTER | UI_DROPSHADOW, color, 24 );
+
+	// Draw version info
+	color[3] = 0.7f;
+	UI_DrawString( x + w/2, y + h - 30, "Modernized idTech3", UI_CENTER, color, 12 );
+
+	trap_R_SetColor( NULL );
+}
+
+/*
+===============
+MainMenu_DrawBannerParticles
+===============
+*/
+static void MainMenu_DrawBannerParticles( int x, int y, int w, int h, float time )
+{
+	vec4_t color = {1.0f, 1.0f, 1.0f, 0.6f};
+	int i;
+
+	// Draw some animated particles around the banner
+	for (i = 0; i < 8; i++) {
+		float angle = (time + i * 0.5f) * 0.8f;
+		float radius = 60 + 20 * sin(time * 0.3f + i);
+		float px = x + w/2 + cos(angle) * radius;
+		float py = y + h/2 + sin(angle) * radius;
+
+		// Vary particle size and color
+		float size = 3 + 2 * sin(time * 2.0f + i);
+		color[0] = 0.5f + 0.5f * sin(time * 1.5f + i);  // Red variation
+		color[1] = 0.5f + 0.5f * sin(time * 1.7f + i);  // Green variation
+		color[2] = 0.5f + 0.5f * sin(time * 1.9f + i);  // Blue variation
+
+		trap_R_SetColor( color );
+		UI_FillRect( px - size/2, py - size/2, size, size, color );
+	}
+
+	trap_R_SetColor( NULL );
 }
 
 static sfxHandle_t ErrorMessage_Key([[maybe_unused]] int key)
@@ -666,12 +783,8 @@ static void Main_MenuDraw( void )
 
 		trap_R_AddRefEntityToScene( &ent );
 	} else {
-		// Debug: draw text if model failed to load
-		static int debugPrintTime = 0;
-		if ( uis.realtime > debugPrintTime + 5000 ) {
-			Com_Printf( "Main_MenuDraw: bannerModel is NULL, model not loaded\n" );
-			debugPrintTime = uis.realtime;
-		}
+		// Fallback: Draw a 2D banner effect when 3D model fails to load
+		MainMenu_DrawFallbackBanner();
 	}
 
 	trap_R_RenderScene( &refdef );

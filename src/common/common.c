@@ -23,6 +23,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include "q_stability.h"
+#include "q_memory_safety.h"
+#include "q_error_recovery.h"
+#include "q_input_validation.h"
 #include "q_log.h"
 #include "profiler.h"
 #include "performance_counters.h"
@@ -4091,6 +4095,11 @@ Com_Init
 =================
 */
 void Com_Init( char *commandLine ) {
+    // Initialize hardening systems in order of dependency
+    Stability_Init();
+    MemorySafety_Init();
+    ErrorRecovery_Init();
+    InputValidation_Init();
 	const char *s;
 	int	qport;
 
@@ -4962,8 +4971,12 @@ void Com_Frame( qboolean noDelay ) {
 		float deltaTime = msec / 1000.0f;
 		Lua_Coroutine_Update(deltaTime);
 		
-		// Update encounter system
-		Lua_Encounter_Update();
+	// Update encounter system
+	Lua_Encounter_Update();
+#endif
+
+	// Update stability framework
+	Stability_Frame();
 		
 		// Update sequence system
 		Lua_Sequence_Update(deltaTime);

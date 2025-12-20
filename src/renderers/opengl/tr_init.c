@@ -194,6 +194,27 @@ cvar_t	*r_saveFontData;
 cvar_t	*r_fontAtlasSize;
 cvar_t	*r_fontDPI;
 cvar_t	*r_fontHinting;
+cvar_t	*r_fontGlow;
+cvar_t	*r_fontGlowColor;
+cvar_t	*r_fontGlowIntensity;
+cvar_t	*r_fontOutline;
+cvar_t	*r_fontOutlineColor;
+cvar_t	*r_fontOutlineWidth;
+cvar_t	*r_fontShadow;
+cvar_t	*r_fontShadowColor;
+cvar_t	*r_fontShadowOffset;
+cvar_t	*r_fontShadowBlur;
+cvar_t	*r_fontAnimation;
+cvar_t	*r_fontAnimationSpeed;
+cvar_t	*r_fontTransform;
+cvar_t	*r_fontRotation;
+cvar_t	*r_fontScale;
+cvar_t	*r_fontUnicode;
+cvar_t	*r_fontFallback;
+cvar_t	*r_fontLanguage;
+cvar_t	*r_fontCacheSize;
+cvar_t	*r_fontPreload;
+cvar_t	*r_fontStreaming;
 cvar_t	*r_fontAntialiasing;
 cvar_t	*r_fontLCDFilter;
 cvar_t	*r_fontKerning;
@@ -1781,6 +1802,88 @@ static void R_Register( void )
 	r_fontGPULayout = ri.Cvar_Get( "r_fontGPULayout", "0", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_fontGPULayout, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription( r_fontGPULayout, "Use GPU compute shaders for text layout and kerning calculations. Experimental feature." );
+
+	// Font visual effects
+	r_fontGlow = ri.Cvar_Get( "r_fontGlow", "0", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_fontGlow, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontGlow, "Enable font glow effect for better text visibility in dark environments." );
+
+	r_fontGlowColor = ri.Cvar_Get( "r_fontGlowColor", "1.0 1.0 1.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_fontGlowColor, "RGB color for font glow effect (values 0.0-1.0)." );
+
+	r_fontGlowIntensity = ri.Cvar_Get( "r_fontGlowIntensity", "0.5", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_fontGlowIntensity, "0.0", "2.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fontGlowIntensity, "Intensity of font glow effect." );
+
+	r_fontOutline = ri.Cvar_Get( "r_fontOutline", "0", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_fontOutline, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontOutline, "Enable font outline effect for improved readability." );
+
+	r_fontOutlineColor = ri.Cvar_Get( "r_fontOutlineColor", "0.0 0.0 0.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_fontOutlineColor, "RGB color for font outline (values 0.0-1.0)." );
+
+	r_fontOutlineWidth = ri.Cvar_Get( "r_fontOutlineWidth", "1.0", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_fontOutlineWidth, "0.5", "3.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fontOutlineWidth, "Width of font outline in pixels." );
+
+	r_fontShadow = ri.Cvar_Get( "r_fontShadow", "0", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_fontShadow, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontShadow, "Enable font drop shadow effect." );
+
+	r_fontShadowColor = ri.Cvar_Get( "r_fontShadowColor", "0.0 0.0 0.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_fontShadowColor, "RGB color for font shadow (values 0.0-1.0)." );
+
+	r_fontShadowOffset = ri.Cvar_Get( "r_fontShadowOffset", "1.0 1.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_fontShadowOffset, "XY offset for font shadow in pixels." );
+
+	r_fontShadowBlur = ri.Cvar_Get( "r_fontShadowBlur", "0.0", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_fontShadowBlur, "0.0", "5.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fontShadowBlur, "Blur radius for font shadow effect." );
+
+	// Font animation and transformation
+	r_fontAnimation = ri.Cvar_Get( "r_fontAnimation", "0", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_fontAnimation, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontAnimation, "Enable animated font effects (pulsing, wave, etc.)." );
+
+	r_fontAnimationSpeed = ri.Cvar_Get( "r_fontAnimationSpeed", "1.0", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_fontAnimationSpeed, "0.1", "5.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fontAnimationSpeed, "Speed multiplier for font animations." );
+
+	r_fontTransform = ri.Cvar_Get( "r_fontTransform", "0", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_fontTransform, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontTransform, "Enable font transformation effects (rotation, scaling, skewing)." );
+
+	r_fontRotation = ri.Cvar_Get( "r_fontRotation", "0.0", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_fontRotation, "-180.0", "180.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_fontRotation, "Font rotation angle in degrees." );
+
+	r_fontScale = ri.Cvar_Get( "r_fontScale", "1.0 1.0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_fontScale, "XY scaling factors for font transformation." );
+
+	// Font multilingual and Unicode support
+	r_fontUnicode = ri.Cvar_Get( "r_fontUnicode", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fontUnicode, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontUnicode, "Enable full Unicode font support for international text." );
+
+	r_fontFallback = ri.Cvar_Get( "r_fontFallback", "1", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_fontFallback, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontFallback, "Enable automatic font fallback for missing glyphs." );
+
+	r_fontLanguage = ri.Cvar_Get( "r_fontLanguage", "en", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_fontLanguage, "Language code for font selection (affects glyph coverage)." );
+
+	// Font performance and caching
+	r_fontCacheSize = ri.Cvar_Get( "r_fontCacheSize", "64", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_fontCacheSize, "16", "512", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontCacheSize, "Maximum number of cached font textures (higher = more memory)." );
+
+	r_fontPreload = ri.Cvar_Get( "r_fontPreload", "1", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_fontPreload, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontPreload, "Preload common glyphs on font load for better performance." );
+
+	r_fontStreaming = ri.Cvar_Get( "r_fontStreaming", "0", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_fontStreaming, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_fontStreaming, "Stream font glyphs on demand instead of preloading (saves memory)." );
 
 	// Initialize font system
 	extern void R_InitFonts(void);

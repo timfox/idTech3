@@ -6,17 +6,137 @@ menuDef {
   visible 1
   rect 0 0 640 480
   focusColor 1 1 1 1
-  descText "Placeholder UI"
 
+  // Engine status display
   itemDef {
-    name "title"
+    name "engine_status"
     type ITEM_TYPE_TEXT
-    rect 50 50 200 30
-    text "Monolith Placeholder UI"
-    textscale 0.5
+    rect 50 50 500 30
+    text "Enhanced idTech3 Engine - Systems Loaded"
+    textscale 0.6
     textalign ITEM_ALIGN_LEFT
     textstyle 1
-    forecolor 1 1 1 1
+    forecolor 0 1 0 1  // Green text
+  }
+
+  itemDef {
+    name "lua_status"
+    type ITEM_TYPE_TEXT
+    rect 50 80 500 25
+    text "✓ Lua Scripting Engine Active"
+    textscale 0.4
+    textalign ITEM_ALIGN_LEFT
+    forecolor 1 1 0 1  // Yellow text
+  }
+
+  itemDef {
+    name "vulkan_status"
+    type ITEM_TYPE_TEXT
+    rect 50 105 500 25
+    text "✓ Vulkan/OpenGL Renderer Initialized"
+    textscale 0.4
+    textalign ITEM_ALIGN_LEFT
+    forecolor 0 1 1 1  // Cyan text
+  }
+
+  itemDef {
+    name "perf_status"
+    type ITEM_TYPE_TEXT
+    rect 50 130 500 25
+    text "✓ Performance Monitoring Ready"
+    textscale 0.4
+    textalign ITEM_ALIGN_LEFT
+    forecolor 1 0 1 1  // Magenta text
+  }
+
+  itemDef {
+    name "bot_ai_status"
+    type ITEM_TYPE_TEXT
+    rect 50 155 500 20
+    text "✓ Advanced Bot AI System Active"
+    textscale 0.35
+    textalign ITEM_ALIGN_LEFT
+    forecolor 0 0.8 1 1  // Cyan text
+  }
+
+  itemDef {
+    name "console_hint"
+    type ITEM_TYPE_TEXT
+    rect 50 160 500 20
+    text "Press ~ for console - Enhanced Lua demos available!"
+    textscale 0.3
+    textalign ITEM_ALIGN_LEFT
+    forecolor 1 1 1 0.7  // White with transparency
+  }
+
+  itemDef {
+    name "lua_demo_hint"
+    type ITEM_TYPE_TEXT
+    rect 50 180 500 15
+    text "Engine Demo: lua_exec require('examples/engine_demo'); demo()"
+    textscale 0.25
+    textalign ITEM_ALIGN_LEFT
+    forecolor 1 1 1 0.6
+  }
+
+  itemDef {
+    name "font_demo_hint"
+    type ITEM_TYPE_TEXT
+    rect 50 195 500 15
+    text "Font Demo: lua_exec require('font_demo'); run_font_demo()"
+    textscale 0.25
+    textalign ITEM_ALIGN_LEFT
+    forecolor 1 0.8 0 0.6  // Gold tint
+  }
+
+  itemDef {
+    name "bot_ai_hint"
+    type ITEM_TYPE_TEXT
+    rect 50 210 500 15
+    text "Bot AI Demo: lua_exec require('bot_ai_demo'); run_complete_demo()"
+    textscale 0.25
+    textalign ITEM_ALIGN_LEFT
+    forecolor 0 0.8 1 0.6  // Cyan tint
+  }
+
+  // Font Demo Button
+  itemDef {
+    name "font_demo_button"
+    type ITEM_TYPE_BUTTON
+    rect 50 220 200 30
+    text "Font Rendering Demo"
+    textscale 0.4
+    textalign ITEM_ALIGN_CENTER
+    textstyle 1
+    action {
+      play "sound/misc/menu2.wav"
+      lua_exec "require('font_demo'); run_font_demo()"
+    }
+    forecolor 1 0.8 0 1  // Gold color
+    backcolor 0.2 0.2 0.2 0.8
+    border 1
+    bordercolor 0.5 0.5 0.5 1
+    visible 1
+  }
+
+  // Bot AI Demo Button
+  itemDef {
+    name "bot_ai_demo_button"
+    type ITEM_TYPE_BUTTON
+    rect 50 260 200 30
+    text "Bot AI Demo"
+    textscale 0.4
+    textalign ITEM_ALIGN_CENTER
+    textstyle 1
+    action {
+      play "sound/misc/menu2.wav"
+      lua_exec "require('bot_ai_demo'); run_complete_demo()"
+    }
+    forecolor 0 0.8 1 1  // Cyan color
+    backcolor 0.2 0.2 0.2 0.8
+    border 1
+    bordercolor 0.5 0.5 0.5 1
+    visible 1
   }
 }
 

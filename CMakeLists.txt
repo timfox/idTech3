@@ -481,6 +481,14 @@ list(APPEND QCOMMON_SRCS src/common/q_log.c)
 list(APPEND QCOMMON_SRCS src/common/performance_counters.c)
 # Add memory safety utilities
 list(APPEND QCOMMON_SRCS src/common/q_memory_safety.c)
+# Add stability framework
+list(APPEND QCOMMON_SRCS src/common/q_stability.c)
+# Add error recovery system
+list(APPEND QCOMMON_SRCS src/common/q_error_recovery.c)
+# Add input validation system
+list(APPEND QCOMMON_SRCS src/common/q_input_validation.c)
+# Add font effects system
+list(APPEND QCOMMON_SRCS src/renderers/renderercommon/tr_font_effects.c)
 # Add secure message functions
 list(APPEND QCOMMON_SRCS src/common/msg_secure.c)
 # Add secure message functions

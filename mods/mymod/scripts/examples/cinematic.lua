@@ -288,6 +288,12 @@ function showcase_all_features()
 	print("=== ENGINE FEATURES SHOWCASE ===")
 	print("Starting comprehensive feature demonstration...")
 
+	-- Load all enhancement modules
+	local Powerups = require("examples/powerups")
+	local Weapons = require("examples/weapons")
+	local Environmental = require("examples/environmental_effects")
+	local Gameplay = require("examples/gameplay_demo")
+
 	-- Phase 1: Font and UI enhancements
 	Sequence.delay(1.0, function()
 		print("Phase 1: Font and UI Enhancements")
@@ -372,9 +378,29 @@ function showcase_all_features()
 		print("  ✓ Automatic Safe Mode Detection")
 	end)
 
-	-- Phase 6: Final demonstration
-	Sequence.delay(18.0, function()
-		print("Phase 6: Complete Feature Integration")
+	-- Phase 6: Gameplay systems demonstration
+	Sequence.delay(15.0, function()
+		print("Phase 6: Advanced Gameplay Systems")
+		if UI then
+			UI.show_notification("Gameplay Systems Active", 2.0, "info")
+		end
+
+		-- Demonstrate gameplay features
+		if Gameplay then
+			Gameplay.run_demo("powerup_madness")
+		end
+
+		print("Gameplay Features:")
+		print("  ⚔️ Advanced Weapon Systems (Plasma, Smart Rocket, Nano Blade)")
+		print("  🛡️ Dynamic Power-up System (Speed, Shield, Quad Damage)")
+		print("  🌍 Environmental Effects (Toxic, Radiation, Gravity Zones)")
+		print("  🌧️ Dynamic Weather System (Rain, Fog, Storms)")
+		print("  📈 Real-time Statistics & Leaderboards")
+	end)
+
+	-- Phase 7: Final demonstration
+	Sequence.delay(20.0, function()
+		print("Phase 7: Complete Feature Integration")
 		if UI then
 			UI.show_notification("All Systems Operational", 3.0, "success")
 			UI.show_subtitle("Engine Enhancement Complete - Ready for Development", 5.0)
@@ -383,17 +409,25 @@ function showcase_all_features()
 		print("=== FEATURE SHOWCASE COMPLETE ===")
 		print("All advanced features demonstrated successfully!")
 		print("")
-		print("Available features:")
+		print("🎯 COMPLETE FEATURE SET:")
 		print("  🎨 Advanced Rendering (PBR, SSAO, Bloom, Temporal AA)")
 		print("  🔤 TrueType Font System with Unicode support")
 		print("  🎮 Modern UI with animations and scaling")
 		print("  📊 Real-time Performance Monitoring")
 		print("  🛡️ Enterprise Stability & Crash Recovery")
 		print("  🎭 Lua Scripting with Event System")
+		print("  ⚔️ Advanced Weapon & Power-up Systems")
+		print("  🌍 Dynamic Environmental Effects")
 		print("  ⚡ GPU-Driven Rendering Pipeline")
 		print("  🎵 Enhanced Audio with HRTF support")
 		print("")
-		print("Use console commands to explore individual features!")
+		print("🎮 CONSOLE COMMANDS:")
+		print("  lua_exec require('examples/cinematic'); cinematic.showcase_all()")
+		print("  lua_exec require('examples/gameplay_demo'); gameplay.show_statistics()")
+		print("  lua_exec require('examples/powerups'); powerups.test_all()")
+		print("  lua_exec require('examples/weapons'); weapons.test_all()")
+		print("")
+		print("🚀 READY FOR GAME DEVELOPMENT!")
 	end)
 end
 

@@ -1,8 +1,6 @@
 /*
 ===========================================================================
-Memory Safety Utilities
-
-Enhanced string and buffer operations with bounds checking and validation.
+q_memory_safety.h - Enhanced Memory Safety and Bounds Checking
 ===========================================================================
 */
 
@@ -11,70 +9,70 @@ Enhanced string and buffer operations with bounds checking and validation.
 
 #include "q_shared.h"
 
-// Enhanced string operations with validation
-#ifdef __cplusplus
-extern "C" {
-#endif
+// Memory safety statistics
+typedef struct {
+    int total_allocations;
+    int total_frees;
+    int current_memory;
+    int peak_memory;
+    int leak_count;
+    int leak_size;
+    int corruption_detected;
+    int bounds_violations;
+} memory_safety_stats_t;
 
-// Safe string copy with validation - returns success/failure
-qboolean Q_strncpyz_safe(char *dest, const char *src, size_t destsize, const char *context);
+// Memory safety state
+typedef struct {
+    qboolean initialized;
+    qboolean bounds_checking_active;
+    qboolean corruption_detection_active;
+    qboolean leak_detection_active;
+} memory_safety_state_t;
 
-// Safe string concatenation with validation
-qboolean Q_strcat_safe(char *dest, const char *src, size_t destsize, const char *context);
+// Memory allocation tracking
+typedef struct memory_allocation_s {
+    void *ptr;
+    size_t size;
+    const char *file;
+    int line;
+    qboolean freed;
+    int allocation_time;
+    struct memory_allocation_s *next;
+} memory_allocation_t;
 
-// Safe sprintf with buffer validation
-int Q_snprintf_safe(char *dest, size_t destsize, const char *fmt, ...) __attribute__ ((format (printf, 3, 4)));
+// Function declarations
+void MemorySafety_Init(void);
+void MemorySafety_Shutdown(void);
 
-// Validate buffer size at compile time where possible
-#define Q_STATIC_ASSERT_BUFFER_SIZE(buf, expected_size) \
-    _Static_assert(sizeof(buf) >= (expected_size), "Buffer size mismatch")
+// Memory management with safety
+void *MemorySafety_Malloc(size_t size, const char *file, int line);
+void MemorySafety_Free(void *ptr);
 
-// Runtime buffer validation macro
-#define Q_VALIDATE_BUFFER(buf, required_size, context) \
-    do { \
-        if (!buf) { \
-            Com_Printf("ERROR: NULL buffer in %s at %s:%d\n", context, __FILE__, __LINE__); \
-            return qfalse; \
-        } \
-        if (sizeof(buf) < (required_size)) { \
-            Com_Printf("ERROR: Buffer too small (%zu < %zu) in %s at %s:%d\n", \
-                      sizeof(buf), (size_t)(required_size), context, __FILE__, __LINE__); \
-            return qfalse; \
-        } \
-    } while(0)
+// Validation functions
+qboolean MemorySafety_ValidatePointer(const void *ptr, size_t access_size, const char *context);
 
-// Enhanced Q_strncpyz that validates the destination buffer size
-#define Q_strncpyz_validated(dest, src, context) \
-    Q_strncpyz_safe((dest), (src), sizeof(dest), context)
+// Leak detection
+void MemorySafety_CheckLeaks(void);
 
-// Enhanced Com_sprintf that validates buffer size
-#define Com_sprintf_safe(dest, fmt, ...) \
-    Q_snprintf_safe((dest), sizeof(dest), fmt, ##__VA_ARGS__)
+// Statistics and debugging
+const memory_safety_stats_t *MemorySafety_GetStats(void);
+void MemorySafety_DumpAllocations(void);
 
-// Macro to check for truncation in string operations
-#define Q_CHECK_TRUNCATION(dest, src, context) \
-    do { \
-        size_t src_len = strlen(src); \
-        size_t dest_size = sizeof(dest); \
-        if (src_len >= dest_size) { \
-            Com_Printf("WARNING: String truncation in %s: %zu >= %zu bytes\n", \
-                      context, src_len, dest_size); \
-        } \
-    } while(0)
+// Safe standard library functions
+size_t MemorySafety_Strlcpy(char *dst, const char *src, size_t dstsize);
+size_t MemorySafety_Strlcat(char *dst, const char *src, size_t dstsize);
+void *MemorySafety_Memcpy(void *dst, const void *src, size_t n);
+void *MemorySafety_Memset(void *s, int c, size_t n);
 
-// Safe memory operations
-#define Q_memcpy_safe(dest, src, n, dest_size, context) \
-    do { \
-        if ((n) > (dest_size)) { \
-            Com_Printf("ERROR: memcpy bounds violation in %s: %zu > %zu\n", \
-                      context, (size_t)(n), (size_t)(dest_size)); \
-            Com_Error(ERR_DROP, "Memory bounds violation"); \
-        } \
-        memcpy((dest), (src), (n)); \
-    } while(0)
+// Convenience macros
+#define MEMORY_SAFETY_MALLOC(size) MemorySafety_Malloc(size, __FILE__, __LINE__)
+#define MEMORY_SAFETY_FREE(ptr) MemorySafety_Free(ptr)
 
-#ifdef __cplusplus
-}
-#endif
+#define MEMORY_SAFETY_VALIDATE_PTR(ptr, size) MemorySafety_ValidatePointer(ptr, size, #ptr)
+
+#define MEMORY_SAFETY_STRLCPY(dst, src, size) MemorySafety_Strlcpy(dst, src, size)
+#define MEMORY_SAFETY_STRLCAT(dst, src, size) MemorySafety_Strlcat(dst, src, size)
+#define MEMORY_SAFETY_MEMCPY(dst, src, n) MemorySafety_Memcpy(dst, src, n)
+#define MEMORY_SAFETY_MEMSET(s, c, n) MemorySafety_Memset(s, c, n)
 
 #endif // __Q_MEMORY_SAFETY_H__

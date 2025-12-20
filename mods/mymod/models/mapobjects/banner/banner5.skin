@@ -1,0 +1,15 @@
+// Banner5 skin file for enhanced banner model
+// Maps textures to model surfaces
+
+tag_origin,*default
+
+// Main banner surfaces
+banner_main,textures/mapobjects/banner/banner_main
+banner_trim,textures/mapobjects/banner/banner_trim
+banner_logo,textures/mapobjects/banner/banner_logo
+
+// Optional glow effects
+banner_glow,textures/mapobjects/banner/banner_glow
+
+// Metallic elements
+banner_metal,textures/mapobjects/banner/banner_metal
