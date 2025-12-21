@@ -33,9 +33,9 @@ MAIN MENU
 
 #define MAINMENU_FONT_CONFIG          "fonts/fonts.cfg"
 #define MAINMENU_MAX_FALLBACKS        3
-#define MAINMENU_DEFAULT_TEXT_FONT    "FX300.ttf"
-#define MAINMENU_DEFAULT_SMALL_FONT   "FX300.ttf"
-#define MAINMENU_DEFAULT_BIG_FONT     "FX300.ttf"
+#define MAINMENU_DEFAULT_TEXT_FONT    "fonts/FX300.ttf"
+#define MAINMENU_DEFAULT_SMALL_FONT   "fonts/FX300.ttf"
+#define MAINMENU_DEFAULT_BIG_FONT     "fonts/FX300.ttf"
 #define MAINMENU_DEFAULT_TEXT_SIZE    18
 #define MAINMENU_DEFAULT_SMALL_SIZE   14
 #define MAINMENU_DEFAULT_BIG_SIZE     26
@@ -155,23 +155,24 @@ static void MainMenu_RegisterFontSafe( const char *path, int pointSize, fontInfo
 	}
 
 	Com_Printf( "MainMenu font %s: attempting to load %s (%dpt)\n", label ? label : "font", path, pointSize );
+	Com_Printf( "DEBUG: trap_R_RegisterFont called with path='%s'\n", path );
 	trap_R_RegisterFont( path, pointSize, outFont );
 	if ( FONT_LOADED( outFont ) ) {
 		Com_Printf( S_COLOR_GREEN "MainMenu font %s: loaded %s (%dpt)\n", label ? label : "font", path, pointSize );
 	} else {
-		Com_Printf( S_COLOR_RED "MainMenu font %s: failed to load %s (%dpt), trying FX300.ttf fallback\n", label ? label : "font", path, pointSize );
-		// Try fallback to FX300.ttf
-		trap_R_RegisterFont( "FX300.ttf", pointSize, outFont );
+		Com_Printf( S_COLOR_RED "MainMenu font %s: failed to load %s (%dpt), trying fonts/FX300.ttf fallback\n", label ? label : "font", path, pointSize );
+		// Try fallback to fonts/FX300.ttf
+		trap_R_RegisterFont( "fonts/FX300.ttf", pointSize, outFont );
 		if ( FONT_LOADED( outFont ) ) {
-			Com_Printf( S_COLOR_YELLOW "MainMenu font %s: loaded fallback FX300.ttf (%dpt)\n", label ? label : "font", pointSize );
+			Com_Printf( S_COLOR_YELLOW "MainMenu font %s: loaded fallback fonts/FX300.ttf (%dpt)\n", label ? label : "font", pointSize );
 		} else {
-			Com_Printf( S_COLOR_RED "MainMenu font %s: failed to load FX300.ttf (%dpt)\n", label ? label : "font", pointSize );
+			Com_Printf( S_COLOR_RED "MainMenu font %s: failed to load fonts/FX300.ttf (%dpt)\n", label ? label : "font", pointSize );
 		}
 	}
 }
 
 static void MainMenu_LoadFontsFromConfig( void ) {
-	Com_Printf("MainMenu_LoadFontsFromConfig: called\n");
+	trap_Print("MainMenu_LoadFontsFromConfig: called (VERSION 3)\n");
 	if ( s_mainFonts.loaded ) {
 		return;
 	}
@@ -182,23 +183,41 @@ static void MainMenu_LoadFontsFromConfig( void ) {
 	Com_Printf( S_COLOR_RED "DEBUG: Trying to load fonts.cfg from '%s'\n", MAINMENU_FONT_CONFIG );
 	int len = trap_FS_FOpenFile( MAINMENU_FONT_CONFIG, &f, FS_READ );
 	Com_Printf( "DEBUG: FS_FOpenFile returned f=%d, len=%d\n", (int)f, len );
+	if (len > 0) {
+		Com_Printf( "DEBUG: fonts.cfg found, reading %d bytes\n", len );
+	} else {
+		Com_Printf( "DEBUG: fonts.cfg NOT found (len=%d)\n", len );
+	}
+	Com_Printf("DEBUG: f=%d, len=%d, MAINMENU_FONT_BUFFER_SIZE=%d\n", (int)f, len, MAINMENU_FONT_BUFFER_SIZE);
+	Com_Printf("DEBUG: !f=%d, len <= 0 =%d, len >= MAINMENU_FONT_BUFFER_SIZE=%d\n", !f, len <= 0, len >= MAINMENU_FONT_BUFFER_SIZE);
 	if ( !f || len <= 0 || len >= MAINMENU_FONT_BUFFER_SIZE ) {
 		Com_Printf( S_COLOR_RED "DEBUG: fonts.cfg not found or invalid, using defaults\n" );
 		if ( f ) {
 			trap_FS_FCloseFile( f );
 		}
-		MainMenu_RegisterFontSafe( MAINMENU_DEFAULT_TEXT_FONT, MAINMENU_DEFAULT_TEXT_SIZE, &s_mainFonts.textFont, "text" );
-		MainMenu_RegisterFontSafe( MAINMENU_DEFAULT_SMALL_FONT, MAINMENU_DEFAULT_SMALL_SIZE, &s_mainFonts.smallFont, "small" );
-		MainMenu_RegisterFontSafe( MAINMENU_DEFAULT_BIG_FONT, MAINMENU_DEFAULT_BIG_SIZE, &s_mainFonts.bigFont, "big" );
+		MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 16, &s_mainFonts.textFont, "text" );
+		MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 12, &s_mainFonts.smallFont, "small" );
+		MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 24, &s_mainFonts.bigFont, "big" );
 		s_mainFonts.loaded = FONT_LOADED( &s_mainFonts.textFont );
 		return;
 	}
+
+	// Skip parsing and just load fonts directly
+	Com_Printf("DEBUG: Skipping parsing, loading fonts directly\n");
+	trap_FS_FCloseFile( f );
+	MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 16, &s_mainFonts.textFont, "text" );
+	MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 12, &s_mainFonts.smallFont, "small" );
+	MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 24, &s_mainFonts.bigFont, "big" );
+	s_mainFonts.loaded = FONT_LOADED( &s_mainFonts.textFont );
+	Com_Printf("DEBUG: Direct font loading completed\n");
+	return;
 
 	static char buffer[MAINMENU_FONT_BUFFER_SIZE];
 	trap_FS_Read( buffer, len, f );
 	trap_FS_FCloseFile( f );
 
 	buffer[len] = '\0';
+	Com_Printf( "DEBUG: Read %d bytes, buffer starts with: '%.50s'\n", len, buffer );
 
 	const char *p = buffer;
 	const char *token;
@@ -208,28 +227,35 @@ static void MainMenu_LoadFontsFromConfig( void ) {
 		if ( !token[0] ) {
 			break;
 		}
+		Com_Printf( "DEBUG: Parsed token='%s'\n", token );
 
 		if ( Q_stricmp( token, "font" ) == 0 ) {
-			const char *fontName = COM_ParseExt( &p, qtrue );
-			const char *sizeTok  = COM_ParseExt( &p, qtrue );
+			const char *fontPath = COM_ParseExt( &p, qtrue );
+			const char *sizeTok = COM_ParseExt( &p, qtrue );
 			int pointSize = sizeTok[0] ? atoi( sizeTok ) : MAINMENU_DEFAULT_TEXT_SIZE;
-			MainMenu_RegisterFontSafe( fontName, pointSize, &s_mainFonts.textFont, "text" );
+			if ( fontPath && fontPath[0] ) {
+				MainMenu_RegisterFontSafe( fontPath, pointSize, &s_mainFonts.textFont, "text" );
+			}
 			continue;
 		}
 
 		if ( Q_stricmp( token, "smallFont" ) == 0 ) {
-			const char *fontName = COM_ParseExt( &p, qtrue );
-			const char *sizeTok  = COM_ParseExt( &p, qtrue );
+			const char *fontPath = COM_ParseExt( &p, qtrue );
+			const char *sizeTok = COM_ParseExt( &p, qtrue );
 			int pointSize = sizeTok[0] ? atoi( sizeTok ) : MAINMENU_DEFAULT_SMALL_SIZE;
-			MainMenu_RegisterFontSafe( fontName, pointSize, &s_mainFonts.smallFont, "small" );
+			if ( fontPath && fontPath[0] ) {
+				MainMenu_RegisterFontSafe( fontPath, pointSize, &s_mainFonts.smallFont, "small" );
+			}
 			continue;
 		}
 
 		if ( Q_stricmp( token, "bigFont" ) == 0 || Q_stricmp( token, "bigfont" ) == 0 ) {
-			const char *fontName = COM_ParseExt( &p, qtrue );
-			const char *sizeTok  = COM_ParseExt( &p, qtrue );
+			const char *fontPath = COM_ParseExt( &p, qtrue );
+			const char *sizeTok = COM_ParseExt( &p, qtrue );
 			int pointSize = sizeTok[0] ? atoi( sizeTok ) : MAINMENU_DEFAULT_BIG_SIZE;
-			MainMenu_RegisterFontSafe( fontName, pointSize, &s_mainFonts.bigFont, "big" );
+			if ( fontPath && fontPath[0] ) {
+				MainMenu_RegisterFontSafe( fontPath, pointSize, &s_mainFonts.bigFont, "big" );
+			}
 			continue;
 		}
 

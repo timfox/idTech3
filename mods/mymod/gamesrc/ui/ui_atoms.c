@@ -958,6 +958,7 @@ UI_Cache
 =================
 */
 static void UI_Cache_f( void ) {
+	trap_Print("UI_Cache_f: CALLED - LOADING FONTS NOW\n");
 	MainMenu_Cache();
 	InGame_Cache();
 	ConfirmMenu_Cache();
