@@ -129,5 +129,6 @@ Go to [Releases](../../releases) section to download the latest binaries for you
 * https://github.com/kennyalive/Quake-III-Arena-Kenny-Edition
 * https://github.com/OpenArena/engine
 * https://github.com/tomkidd/Quake3-iOS
+* https://github.com/NVIDIA/Q2RTX
 * https://github.com/TTimo/GtkRadiant
 * https://github.com/JKSunny/Quake3e
