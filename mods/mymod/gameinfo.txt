@@ -1,0 +1,22 @@
+// gameinfo.txt - Mod configuration file 
+// This file can be used to configure mod-specific settings
+
+"GameInfo"
+{
+    // Custom window title - if set, this will be used instead of "id Tech 3 - modname"
+    title "My Mod"
+
+    // Alternative: you can use 'game' instead of 'title'
+    // game "My Mod Name"
+
+    // Mod description
+    description "A custom mod for id Tech 3"
+}
+
+// Priority order for window titles:
+// 1. +set cl_title "Custom Title" (command line)
+// 2. title/game from gameinfo.txt
+// 3. "id Tech 3 - modname" (fallback)
+//
+// You can also override at runtime with:
+// /set cl_title "Your Custom Title"
