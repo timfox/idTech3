@@ -604,6 +604,11 @@ static void RB_BeginDrawingView( void ) {
 	SetViewportAndScissor();
 
 #ifdef USE_VULKAN
+	// Ensure a render pass is active before any drawing or clearing commands.
+	// vkCmdClearAttachments requires an active render pass.
+	if ( vk.renderPassIndex >= RENDER_PASS_COUNT ) {
+		vk_begin_main_render_pass();
+	}
 	vk_clear_depth( qtrue );
 #else
 	// ensures that depth writes are enabled for the depth clear
@@ -1559,7 +1564,11 @@ static const void *RB_DrawSurfs( const void *data ) {
 			}
 		}
 		
+		// Render pass should already be started in RB_DrawBuffer, but check anyway
+		// This check is now explicit for clarity and safety, but vk_begin_main_render_pass
+		// should ideally be called once per frame from RB_DrawBuffer().
 		if ( vk.renderPassIndex >= RENDER_PASS_COUNT ) {
+			ri.Printf( PRINT_WARNING, "RB_RenderDrawSurfList: Starting main render pass (unexpected code path)\n" );
 			vk_begin_main_render_pass();
 		}
 	}
@@ -1598,6 +1607,12 @@ static const void *RB_DrawBuffer( const void *data ) {
 
 	// force depth range and viewport/scissor updates
 	vk.cmd->depth_range = DEPTH_RANGE_COUNT;
+
+	// Start the main render pass early so that vk_clear_depth() can be called
+	// vkCmdClearAttachments requires an active render pass
+	if ( vk.renderPassIndex >= RENDER_PASS_COUNT ) {
+		vk_begin_main_render_pass();
+	}
 
 	if ( r_clear->integer && vk.clearAttachment ) {
 		const vec4_t color = {1, 0, 0.5, 1};
@@ -1795,6 +1810,11 @@ static const void *RB_ClearDepth( const void *data )
 	RB_EndSurface();
 
 #ifdef USE_VULKAN
+	// Ensure render pass is active before clearing depth
+	// vkCmdClearAttachments requires an active render pass
+	if ( vk.renderPassIndex >= RENDER_PASS_COUNT ) {
+		vk_begin_main_render_pass();
+	}
 	vk_clear_depth( r_shadows->integer == 2 ? qtrue : qfalse );
 #else
 	qglClear( GL_DEPTH_BUFFER_BIT );

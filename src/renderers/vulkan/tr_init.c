@@ -871,6 +871,7 @@ static void InitOpenGL( void )
 		R_InitExtensions();
 #endif
 
+#ifndef USE_VULKAN
 		glConfig.deviceSupportsGamma = qfalse;
 
 		ri.GLimp_InitGamma( &glConfig );
@@ -879,6 +880,7 @@ static void InitOpenGL( void )
 
 		if ( r_ignorehwgamma->integer )
 			glConfig.deviceSupportsGamma = qfalse;
+#endif
 
 		// print info
 		GfxInfo();

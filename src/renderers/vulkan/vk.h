@@ -306,11 +306,18 @@ typedef enum {
 
 typedef struct {
 	VkSamplerAddressMode address_mode; // clamp/repeat texture addressing mode
-	int gl_mag_filter;		// GL_XXX mag filter
-	int gl_min_filter;		// GL_XXX min filter
+	int vk_mag_filter;		// VK_XXX mag filter
+	int vk_min_filter;		// VK_XXX min filter
 	qboolean max_lod_1_0;	// fixed 1.0 lod
 	qboolean noAnisotropy;
 } Vk_Sampler_Def;
+
+#define VK_FILTER_NEAREST                   0
+#define VK_FILTER_LINEAR                    1
+#define VK_FILTER_NEAREST_MIPMAP_NEAREST    2
+#define VK_FILTER_LINEAR_MIPMAP_NEAREST     3
+#define VK_FILTER_NEAREST_MIPMAP_LINEAR     4
+#define VK_FILTER_LINEAR_MIPMAP_LINEAR      5
 
 typedef enum {
 	RENDER_PASS_MAIN = 0,

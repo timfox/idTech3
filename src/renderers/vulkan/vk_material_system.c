@@ -125,6 +125,20 @@ void vk_material_system_init( void )
 	}
 	
 	// Allocate descriptor set for material buffer
+	// Create descriptor set layout if it doesn't exist (for non-PBR builds)
+	if ( vk.set_layout_material == VK_NULL_HANDLE ) {
+		VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+		layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+		layoutInfo.bindingCount = 1;
+		VkDescriptorSetLayoutBinding binding = {};
+		binding.binding = 0;
+		binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+		binding.descriptorCount = 1;
+		binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		layoutInfo.pBindings = &binding;
+		VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &layoutInfo, NULL, &vk.set_layout_material ) );
+	}
+	
 	VkDescriptorSetAllocateInfo descAllocInfo = {};
 	descAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	descAllocInfo.descriptorPool = vk.descriptor_pool;

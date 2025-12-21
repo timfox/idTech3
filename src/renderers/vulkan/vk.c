@@ -395,7 +395,7 @@ typedef struct {
 } pipeline_binary_header_t;
 
 // Save pipeline binary to disk
-static void vk_pipeline_binary_save(VkPipeline pipeline, uint64_t pipeline_hash) {
+__attribute__((unused)) static void vk_pipeline_binary_save(VkPipeline pipeline, uint64_t pipeline_hash) {
 	if (!vk_advanced.pipelineBinaries || !qvkGetPipelineExecutablePropertiesKHR || !pipeline) {
 		return;
 	}
@@ -507,7 +507,7 @@ static qboolean vk_pipeline_binary_load(uint64_t pipeline_hash, void **binary_da
 }
 
 // Create pipeline from binary (placeholder - full implementation requires VK_KHR_pipeline_library)
-static VkPipeline vk_create_pipeline_from_binary(uint64_t pipeline_hash, VkPipelineLayout layout,
+__attribute__((unused)) static VkPipeline vk_create_pipeline_from_binary(uint64_t pipeline_hash, VkPipelineLayout layout,
 	VkRenderPass renderPass) {
 	(void)layout; // Framework - parameter reserved for future use
 	(void)renderPass; // Framework - parameter reserved for future use
@@ -1960,7 +1960,7 @@ Virtual Memory Management
 */
 
 // Allocate virtual memory (for sparse binding support)
-static qboolean vk_allocate_virtual_memory(VkDeviceSize size, VkDeviceSize *virtual_address) {
+__attribute__((unused)) static qboolean vk_allocate_virtual_memory(VkDeviceSize size, VkDeviceSize *virtual_address) {
 	if (!vk.virtual_memory.enabled || !vk.virtual_memory.sparse_binding_supported) {
 		return qfalse;
 	}
@@ -1978,7 +1978,7 @@ static qboolean vk_allocate_virtual_memory(VkDeviceSize size, VkDeviceSize *virt
 }
 
 // Free virtual memory
-static void vk_free_virtual_memory(VkDeviceSize size) {
+__attribute__((unused)) static void vk_free_virtual_memory(VkDeviceSize size) {
 	if (!vk.virtual_memory.enabled) {
 		return;
 	}
@@ -2019,7 +2019,7 @@ static void vk_init_resource_pool(void) {
 }
 
 // Get buffer from pool (placeholder - full implementation requires actual buffer creation)
-static VkBuffer vk_get_buffer_from_pool(VkDeviceSize size) {
+__attribute__((unused)) static VkBuffer vk_get_buffer_from_pool(VkDeviceSize size) {
 	if (!vk.resource_pools.enabled) {
 		return VK_NULL_HANDLE;
 	}
@@ -2049,7 +2049,7 @@ static VkBuffer vk_get_buffer_from_pool(VkDeviceSize size) {
 }
 
 // Return buffer to pool
-static void vk_return_buffer_to_pool(VkBuffer buffer, VkDeviceSize size) {
+__attribute__((unused)) static void vk_return_buffer_to_pool(VkBuffer buffer, VkDeviceSize size) {
 	if (!vk.resource_pools.enabled || buffer == VK_NULL_HANDLE) {
 		return;
 	}
@@ -2117,7 +2117,7 @@ static vk_async_compute_job_t vk_async_compute_jobs[16];
 static uint32_t vk_async_compute_job_count = 0;
 
 // Submit async compute work
-static qboolean vk_submit_async_compute(VkCommandBuffer cmd_buffer, qboolean wait_for_graphics) {
+__attribute__((unused)) static qboolean vk_submit_async_compute(VkCommandBuffer cmd_buffer, qboolean wait_for_graphics) {
 	if (!vk.compute_queue.supported || cmd_buffer == VK_NULL_HANDLE) {
 		return qfalse;
 	}
@@ -2267,7 +2267,7 @@ static void vk_hot_reload_init(void) {
 }
 
 // Check for shader file changes and reload if needed
-static void vk_check_shader_hot_reload(void) {
+__attribute__((unused)) static void vk_check_shader_hot_reload(void) {
 	if (!vk.hot_reload.enabled || !r_vk_hotReload || !r_vk_hotReload->integer) {
 		return;
 	}
@@ -2280,7 +2280,7 @@ static void vk_check_shader_hot_reload(void) {
 }
 
 // Reload a specific shader
-static qboolean vk_reload_shader(const char *shader_name) {
+__attribute__((unused)) static qboolean vk_reload_shader(const char *shader_name) {
 	if (!vk.hot_reload.enabled) {
 		return qfalse;
 	}
@@ -2298,7 +2298,7 @@ static qboolean vk_reload_shader(const char *shader_name) {
 }
 
 // Mark pipelines as dirty when shaders change
-static void vk_mark_pipelines_dirty(void) {
+__attribute__((unused)) static void vk_mark_pipelines_dirty(void) {
 	// Mark all pipelines for lazy recreation
 	// This would be called when shaders are reloaded
 	vk.hot_reload.pipelines_recreated = 0; // Reset counter
@@ -4226,39 +4226,39 @@ static VkSampler vk_find_sampler( const Vk_Sampler_Def *def ) {
 
 	address_mode = def->address_mode;
 
-	if (def->gl_mag_filter == GL_NEAREST) {
+	if (def->vk_mag_filter == VK_FILTER_NEAREST) {
 		mag_filter = VK_FILTER_NEAREST;
-	} else if (def->gl_mag_filter == GL_LINEAR) {
+	} else if (def->vk_mag_filter == VK_FILTER_LINEAR) {
 		mag_filter = VK_FILTER_LINEAR;
 	} else {
-		ri.Error(ERR_FATAL, "vk_find_sampler: invalid gl_mag_filter");
+		ri.Error(ERR_FATAL, "vk_find_sampler: invalid vk_mag_filter");
 		return VK_NULL_HANDLE;
 	}
 
 	maxLod = vk.maxLod;
 
-	if (def->gl_min_filter == GL_NEAREST) {
+	if (def->vk_min_filter == VK_FILTER_NEAREST) {
 		min_filter = VK_FILTER_NEAREST;
 		mipmap_mode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-		maxLod = 0.25f; // used to emulate OpenGL's GL_LINEAR/GL_NEAREST minification filter
-	} else if (def->gl_min_filter == GL_LINEAR) {
+		maxLod = 0.25f; // used to emulate OpenGL's VK_FILTER_LINEAR/VK_FILTER_NEAREST minification filter
+	} else if (def->vk_min_filter == VK_FILTER_LINEAR) {
 		min_filter = VK_FILTER_LINEAR;
 		mipmap_mode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-		maxLod = 0.25f; // used to emulate OpenGL's GL_LINEAR/GL_NEAREST minification filter
-	} else if (def->gl_min_filter == GL_NEAREST_MIPMAP_NEAREST) {
+		maxLod = 0.25f; // used to emulate OpenGL's VK_FILTER_LINEAR/VK_FILTER_NEAREST minification filter
+	} else if (def->vk_min_filter == VK_FILTER_NEAREST_MIPMAP_NEAREST) {
 		min_filter = VK_FILTER_NEAREST;
 		mipmap_mode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-	} else if (def->gl_min_filter == GL_LINEAR_MIPMAP_NEAREST) {
+	} else if (def->vk_min_filter == VK_FILTER_LINEAR_MIPMAP_NEAREST) {
 		min_filter = VK_FILTER_LINEAR;
 		mipmap_mode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
-	} else if (def->gl_min_filter == GL_NEAREST_MIPMAP_LINEAR) {
+	} else if (def->vk_min_filter == VK_FILTER_NEAREST_MIPMAP_LINEAR) {
 		min_filter = VK_FILTER_NEAREST;
 		mipmap_mode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-	} else if (def->gl_min_filter == GL_LINEAR_MIPMAP_LINEAR) {
+	} else if (def->vk_min_filter == VK_FILTER_LINEAR_MIPMAP_LINEAR) {
 		min_filter = VK_FILTER_LINEAR;
 		mipmap_mode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
 	} else {
-		ri.Error(ERR_FATAL, "vk_find_sampler: invalid gl_min_filter");
+		ri.Error(ERR_FATAL, "vk_find_sampler: invalid vk_min_filter");
 		return VK_NULL_HANDLE;
 	}
 
@@ -4332,8 +4332,8 @@ void vk_update_attachment_descriptors( void ) {
 
 		Com_Memset( &sd, 0, sizeof( sd ) );
 		// Always use linear filtering for color buffer when used for bloom/post-processing
-		// to avoid blocky artifacts. vk.blitFilter (which can be GL_NEAREST) is only for final blit to screen.
-		sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+		// to avoid blocky artifacts. vk.blitFilter (which can be VK_FILTER_NEAREST) is only for final blit to screen.
+		sd.vk_mag_filter = sd.vk_min_filter = VK_FILTER_LINEAR;
 		sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 		sd.max_lod_1_0 = qtrue;
 		sd.noAnisotropy = qtrue;
@@ -4355,7 +4355,7 @@ void vk_update_attachment_descriptors( void ) {
 		qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
 
 		// screenmap
-		sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+		sd.vk_mag_filter = sd.vk_min_filter = VK_FILTER_LINEAR;
 		sd.max_lod_1_0 = qfalse;
 		sd.noAnisotropy = qtrue;
 
@@ -4370,7 +4370,7 @@ void vk_update_attachment_descriptors( void ) {
 		if ( r_bloom->integer )
 		{
 			uint32_t i;
-			sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+			sd.vk_mag_filter = sd.vk_min_filter = VK_FILTER_LINEAR;
 			sd.max_lod_1_0 = qtrue;
 			sd.noAnisotropy = qtrue;
 			info.sampler = vk_find_sampler( &sd );
@@ -6268,9 +6268,9 @@ static void vk_set_render_scale( void )
 			}
 			// linear filtering
 			if ( scaleMode & 2 )
-				vk.blitFilter = GL_LINEAR;
+				vk.blitFilter = VK_FILTER_LINEAR;
 			else
-				vk.blitFilter = GL_NEAREST;
+				vk.blitFilter = VK_FILTER_NEAREST;
 		}
 
 		vk.windowAdjusted = qtrue;
@@ -6278,7 +6278,7 @@ static void vk_set_render_scale( void )
 
 	if ( r_fbo->integer && r_ext_supersample->integer && !r_renderScale->integer )
 	{
-		vk.blitFilter = GL_LINEAR;
+		vk.blitFilter = VK_FILTER_LINEAR;
 	}
 }
 
@@ -6350,7 +6350,7 @@ void vk_initialize( void )
 
 	vk.maxAnisotropy = props.limits.maxSamplerAnisotropy;
 
-	vk.blitFilter = GL_NEAREST;
+	vk.blitFilter = VK_FILTER_NEAREST;
 	vk.windowAdjusted = qfalse;
 	vk.blitX0 = vk.blitY0 = 0;
 
@@ -8448,20 +8448,20 @@ void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
 	if ( mipmap ) {
 		// Force trilinear filtering for lightmaps
 		if ( image->flags & IMGFLAG_LIGHTMAP ) {
-			sampler_def.gl_mag_filter = GL_LINEAR;
-			sampler_def.gl_min_filter = GL_LINEAR_MIPMAP_LINEAR;
+			sampler_def.vk_mag_filter = VK_FILTER_LINEAR;
+			sampler_def.vk_min_filter = VK_FILTER_LINEAR_MIPMAP_LINEAR;
 		} else {
-			sampler_def.gl_mag_filter = gl_filter_max;
-			sampler_def.gl_min_filter = gl_filter_min;
+			sampler_def.vk_mag_filter = gl_filter_max;
+			sampler_def.vk_min_filter = gl_filter_min;
 		}
 	} else {
 		// Use nearest filtering for fonts and other UI elements to prevent blurriness
 		if ( isFontTexture ) {
-			sampler_def.gl_mag_filter = GL_NEAREST;
-			sampler_def.gl_min_filter = GL_NEAREST;
+			sampler_def.vk_mag_filter = VK_FILTER_NEAREST;
+			sampler_def.vk_min_filter = VK_FILTER_NEAREST;
 		} else {
-			sampler_def.gl_mag_filter = GL_LINEAR;
-			sampler_def.gl_min_filter = GL_LINEAR;
+			sampler_def.vk_mag_filter = VK_FILTER_LINEAR;
+			sampler_def.vk_min_filter = VK_FILTER_LINEAR;
 		}
 		// no anisotropy without mipmaps
 		sampler_def.noAnisotropy = qtrue;
@@ -10632,6 +10632,25 @@ void vk_clear_depth( qboolean clear_stencil ) {
 	if ( vk_world.dirty_depth_attachment == 0 )
 		return;
 
+	// Safety check: ensure we have a valid command buffer and are in a render pass
+	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
+		ri.Printf( PRINT_WARNING, "vk_clear_depth: Invalid command buffer\n" );
+		return;
+	}
+
+	// Check if function pointer is valid
+	if ( !qvkCmdClearAttachments ) {
+		ri.Printf( PRINT_WARNING, "vk_clear_depth: qvkCmdClearAttachments function pointer is NULL\n" );
+		return;
+	}
+
+	// vkCmdClearAttachments can only be called inside a render pass
+	// If not in a render pass, skip the clear (depth will be cleared when render pass starts)
+	if ( vk.renderPassIndex >= RENDER_PASS_COUNT ) {
+		ri.Printf( PRINT_DEVELOPER, "vk_clear_depth: Skipping clear - not inside a render pass (index: %u)\n", vk.renderPassIndex );
+		return;
+	}
+
 	attachment.colorAttachment = 0;
 #ifdef USE_REVERSED_DEPTH
 	attachment.clearValue.depthStencil.depth = 0.0f;
@@ -10645,11 +10664,15 @@ void vk_clear_depth( qboolean clear_stencil ) {
 		attachment.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 	}
 
+	ri.Printf( PRINT_DEVELOPER, "vk_clear_depth: Attempting to clear depth (CmdBuffer: %p, RenderPassIndex: %u)\n", (void*)vk.cmd->command_buffer, vk.renderPassIndex );
+
 	get_scissor_rect( &clear_rect[0].rect );
 	clear_rect[0].baseArrayLayer = 0;
 	clear_rect[0].layerCount = 1;
 
 	qvkCmdClearAttachments( vk.cmd->command_buffer, 1, &attachment, 1, clear_rect );
+
+	ri.Printf( PRINT_DEVELOPER, "vk_clear_depth: Depth clear command submitted successfully.\n" );
 }
 
 
@@ -11659,7 +11682,7 @@ qboolean vk_capture_screenmap( void )
 	Vk_Sampler_Def sd;
 
 	Com_Memset( &sd, 0, sizeof( sd ) );
-	sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+	sd.vk_mag_filter = sd.vk_min_filter = VK_FILTER_LINEAR;
 	sd.max_lod_1_0 = qfalse; // Allow mipmaps if needed
 	sd.noAnisotropy = qtrue;
 	sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
@@ -11776,7 +11799,7 @@ qboolean vk_clear_screenmap( void )
 	Vk_Sampler_Def sd;
 
 	Com_Memset( &sd, 0, sizeof( sd ) );
-	sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+	sd.vk_mag_filter = sd.vk_min_filter = VK_FILTER_LINEAR;
 	sd.max_lod_1_0 = qfalse;
 	sd.noAnisotropy = qtrue;
 	sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
@@ -12278,7 +12301,7 @@ void vk_end_frame( void )
 			Vk_Sampler_Def sd;
 
 			Com_Memset( &sd, 0, sizeof( sd ) );
-			sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+			sd.vk_mag_filter = sd.vk_min_filter = VK_FILTER_LINEAR;
 			sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 			sd.max_lod_1_0 = qtrue;
 			sd.noAnisotropy = qtrue;
@@ -12352,7 +12375,7 @@ void vk_end_frame( void )
 					Vk_Sampler_Def sd;
 					
 					Com_Memset( &sd, 0, sizeof( sd ) );
-					sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+					sd.vk_mag_filter = sd.vk_min_filter = VK_FILTER_LINEAR;
 					sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 					sd.max_lod_1_0 = qtrue;
 					sd.noAnisotropy = qtrue;
@@ -12389,7 +12412,7 @@ void vk_end_frame( void )
 				Vk_Sampler_Def sd;
 
 				Com_Memset( &sd, 0, sizeof( sd ) );
-				sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+				sd.vk_mag_filter = sd.vk_min_filter = VK_FILTER_LINEAR;
 				sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 				sd.max_lod_1_0 = qtrue;
 				sd.noAnisotropy = qtrue;
@@ -12545,7 +12568,7 @@ void vk_end_frame( void )
 					Vk_Sampler_Def sd;
 					
 					Com_Memset( &sd, 0, sizeof( sd ) );
-					sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+					sd.vk_mag_filter = sd.vk_min_filter = VK_FILTER_LINEAR;
 					sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 					sd.max_lod_1_0 = qtrue;
 					sd.noAnisotropy = qtrue;

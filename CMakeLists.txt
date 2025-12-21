@@ -1481,6 +1481,9 @@ IF(UNIX)
 
 	IF(USE_SDL)
 		AUX_SOURCE_DIRECTORY(src/sdl Q3_UI_SRCS)
+		IF(USE_VULKAN)
+			list(REMOVE_ITEM Q3_UI_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/src/sdl/sdl_glimp.c)
+		ENDIF()
 	ELSE()
 		SET(Q3_UI_SRCS
 			src/unix/linux_glimp.c

@@ -577,6 +577,13 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 	{
 		const char *driverName;
 
+		// If using Vulkan, explicitly set the video driver to X11 to prevent implicit OpenGL backend loading
+		#ifdef USE_VULKAN
+		if ( vulkan ) {
+			SDL_SetHint( SDL_HINT_VIDEODRIVER, "x11" );
+		}
+		#endif
+
 		if ( SDL_Init( SDL_INIT_VIDEO ) != 0 )
 		{
 			Com_Printf( "SDL_Init( SDL_INIT_VIDEO ) FAILED (%s)\n", SDL_GetError() );
