@@ -1,0 +1,111 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D depthBuffer;
+layout(set = 0, binding = 1) uniform sampler2D normalBuffer;
+layout(set = 0, binding = 2) uniform sampler2D blueNoise;
+
+layout(set = 0, binding = 3, r8) uniform writeonly image2D outputImage;
+
+layout(push_constant) uniform SSAOConstants {
+    mat4 projectionMatrix;
+    mat4 invProjectionMatrix;
+    vec2 resolution;
+    vec2 invResolution;
+    float radius;
+    float bias;
+    float intensity;
+    int numSamples;
+} pc;
+
+// Reconstruct view position from depth
+vec3 reconstructViewPos(vec2 uv, float depth)
+{
+    vec4 clipPos = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+    vec4 viewPos = pc.invProjectionMatrix * clipPos;
+    return viewPos.xyz / viewPos.w;
+}
+
+// Generate sample points in hemisphere
+vec3 getSamplePoint(vec2 uv, int index)
+{
+    // Use blue noise for sample positions
+    vec2 noiseUV = uv + vec2(index % 4, index / 4) * pc.invResolution * 4.0;
+    vec3 noise = texture(blueNoise, noiseUV).xyz * 2.0 - 1.0;
+
+    // Create hemisphere sample
+    float r = sqrt(float(index + 0.5) / float(pc.numSamples));
+    float theta = float(index) * 2.0 * 3.14159 / float(pc.numSamples);
+
+    vec3 samplePoint;
+    samplePoint.x = r * cos(theta);
+    samplePoint.y = r * sin(theta);
+    samplePoint.z = sqrt(1.0 - r * r); // Ensure z is positive for hemisphere
+
+    // Rotate by noise
+    samplePoint = normalize(samplePoint + noise * 0.5);
+
+    return samplePoint;
+}
+
+void main()
+{
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+
+    float depth = texture(depthBuffer, uv).r;
+    if (depth >= 1.0) {
+        // Skybox/background - no occlusion
+        imageStore(outputImage, pixel, vec4(1.0));
+        return;
+    }
+
+    vec3 viewPos = reconstructViewPos(uv, depth);
+    vec3 viewNormal = normalize(texture(normalBuffer, uv).xyz * 2.0 - 1.0);
+
+    float occlusion = 0.0;
+
+    for (int i = 0; i < pc.numSamples; i++) {
+        // Get sample point in tangent space
+        vec3 samplePoint = getSamplePoint(uv, i);
+
+        // Transform to view space
+        vec3 viewSamplePoint = viewPos + samplePoint * pc.radius;
+
+        // Project back to screen space
+        vec4 projSamplePoint = pc.projectionMatrix * vec4(viewSamplePoint, 1.0);
+        projSamplePoint /= projSamplePoint.w;
+
+        // Convert to UV coordinates
+        vec2 sampleUV = projSamplePoint.xy * 0.5 + 0.5;
+
+        // Check bounds
+        if (sampleUV.x < 0.0 || sampleUV.x > 1.0 || sampleUV.y < 0.0 || sampleUV.y > 1.0) {
+            continue;
+        }
+
+        // Get sample depth
+        float sampleDepth = texture(depthBuffer, sampleUV).r;
+        vec3 sampleViewPos = reconstructViewPos(sampleUV, sampleDepth);
+
+        // Check if sample is occluded
+        float rangeCheck = smoothstep(0.0, 1.0, pc.radius / abs(viewPos.z - sampleViewPos.z));
+        if (sampleViewPos.z >= viewSamplePoint.z + pc.bias) {
+            occlusion += rangeCheck;
+        }
+    }
+
+    occlusion = 1.0 - (occlusion / float(pc.numSamples));
+    occlusion = pow(occlusion, pc.intensity);
+
+    imageStore(outputImage, pixel, vec4(occlusion));
+}

@@ -1017,6 +1017,8 @@ typedef struct {
 		VkShaderModule tonemap_comp;
 		VkShaderModule rt_relax_comp;
 		VkShaderModule style_comp;
+		VkShaderModule film_grain_comp;
+		VkShaderModule lens_distortion_comp;
 		
 		// GIBS compute shader modules
 		VkShaderModule gibs_spawn_comp;
@@ -1091,6 +1093,8 @@ typedef struct {
 	VkPipeline gamma_compute_pipeline;
 	VkPipeline tonemap_compute_pipeline;
 	VkPipeline style_compute_pipeline;
+	VkPipeline film_grain_compute_pipeline;
+	VkPipeline lens_distortion_compute_pipeline;
 	VkPipelineLayout compute_pipeline_layout;
 	VkDescriptorSetLayout compute_descriptor_set_layout;
 	VkDescriptorSet compute_descriptor_set;

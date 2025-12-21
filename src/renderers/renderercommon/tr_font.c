@@ -71,6 +71,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../common/q_shared.h"
 #include "../common/qcommon.h"
 #include "../common/q_scalability.h"
+#include <stdio.h>
 
 // Forward declarations
 static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontInfo_t *font, qboolean wantSDF);
@@ -1070,12 +1071,12 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 		R_AddFontToCache(fontName, pointSize, qfalse, font);
 		fromDat = qtrue;
 		ri.Printf(PRINT_ALL, "RE_RegisterFont: loaded legacy fontImage_%i.dat for '%s'\n", pointSize, fontName);
-		ri.FS_FreeFile(faceData);
+		ri.Free(faceData);
 		return qtrue;
 	}
 
 #ifdef USE_STB_TRUETYPE
-	qboolean tryStb = wantSDF;
+	qboolean tryStb = qtrue; // Force stb_truetype for now
 #ifndef USE_FREETYPE
 	tryStb = qtrue;
 #endif
@@ -1125,20 +1126,57 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 		}
 	}
 
+	ri.Printf(PRINT_ALL, "RE_RegisterFont: Attempting to read '%s'\n", fontName);
 	len = ri.FS_ReadFile(fontName, &faceData);
+	ri.Printf(PRINT_ALL, "RE_RegisterFont: FS_ReadFile returned len=%d for '%s'\n", len, fontName);
 	if (len <= 0) {
-		ri.Printf(PRINT_WARNING, "RE_RegisterFont: Unable to read font file '%s' (len=%d)\n", fontName, len);
-		// Try to check if file exists by attempting to read file size only
-		int testLen = ri.FS_ReadFile(fontName, NULL);
-		if (testLen > 0) {
-			ri.Printf(PRINT_WARNING, "RE_RegisterFont: File exists but couldn't allocate memory (size=%d bytes)\n", testLen);
-		} else if (testLen == 0) {
-			ri.Printf(PRINT_WARNING, "RE_RegisterFont: File is empty or not found\n");
+		ri.Printf(PRINT_WARNING, "RE_RegisterFont: FS_ReadFile failed for '%s', trying direct file access\n", fontName);
+
+		// Fallback: Try reading the file directly using standard C file I/O
+		FILE *fontFile = fopen(fontName, "rb");
+		if (fontFile) {
+			fseek(fontFile, 0, SEEK_END);
+			len = ftell(fontFile);
+			fseek(fontFile, 0, SEEK_SET);
+
+			if (len > 0) {
+				faceData = ri.Malloc(len);
+				if (faceData) {
+					size_t bytesRead = fread(faceData, 1, len, fontFile);
+					if (bytesRead == (size_t)len) {
+						ri.Printf(PRINT_ALL, "RE_RegisterFont: Successfully loaded font '%s' via direct file access (%d bytes)\n", fontName, len);
+						fclose(fontFile);
+						// Continue with the rest of the function
+					} else {
+						ri.Printf(PRINT_WARNING, "RE_RegisterFont: Failed to read font data from '%s'\n", fontName);
+						ri.Free(faceData);
+						faceData = NULL;
+						fclose(fontFile);
+						return qfalse;
+					}
+				} else {
+					ri.Printf(PRINT_WARNING, "RE_RegisterFont: Failed to allocate memory for font '%s' (%d bytes)\n", fontName, len);
+					fclose(fontFile);
+					return qfalse;
+				}
+			} else {
+				ri.Printf(PRINT_WARNING, "RE_RegisterFont: Font file '%s' is empty\n", fontName);
+				fclose(fontFile);
+				return qfalse;
+			}
 		} else {
-			ri.Printf(PRINT_WARNING, "RE_RegisterFont: File not found or file system error (error code=%d)\n", testLen);
+			ri.Printf(PRINT_WARNING, "RE_RegisterFont: Unable to open font file '%s' with direct access\n", fontName);
+			// Try to check if file exists by attempting to read file size only
+			int testLen = ri.FS_ReadFile(fontName, NULL);
+			if (testLen > 0) {
+				ri.Printf(PRINT_WARNING, "RE_RegisterFont: File exists in FS but couldn't allocate memory (size=%d bytes)\n", testLen);
+			} else if (testLen == 0) {
+				ri.Printf(PRINT_WARNING, "RE_RegisterFont: File is empty or not found in FS\n");
+			} else {
+				ri.Printf(PRINT_WARNING, "RE_RegisterFont: File not found in FS (error code=%d)\n", testLen);
+			}
+			return qfalse;
 		}
-		// faceData is NULL here, no cleanup needed
-		return qfalse;
 	}
 
 	// Check if this is a WOFF2 compressed font and decompress if needed
@@ -1152,7 +1190,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 
 		if (WOFF2_DecompressFont(faceData, len, &decompressedData, &decompressedSize)) {
 			// Replace the compressed data with decompressed data
-			ri.FS_FreeFile(faceData);
+			ri.Free(faceData);
 			faceData = decompressedData;
 			len = decompressedSize;
 			ri.Printf(PRINT_ALL, "RE_RegisterFont: WOFF2 decompression successful for '%s'\n", fontName);
@@ -1275,7 +1313,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 	// allocate on the stack first in case we fail
 	if (FreeType_NewMemoryFace( faceData, len, faceIndex, &face )) {
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType, unable to allocate new face.\n");
-		ri.FS_FreeFile(faceData);
+		ri.Free(faceData);
 		return qfalse;
 	}
 
@@ -1293,7 +1331,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 	if (FreeType_SetCharSize( face, pointSize << 6, pointSize << 6, (FT_UInt)dpi, (FT_UInt)dpi)) {
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType, unable to set face char size.\n");
 		FreeType_DoneFace(face);
-		ri.FS_FreeFile(faceData);
+		ri.Free(faceData);
 		return qfalse;
 	}
 
@@ -1306,7 +1344,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 	if (out == NULL) {
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: ri.Malloc failure during output image creation.\n");
 		FreeType_DoneFace(face);
-		ri.FS_FreeFile(faceData);
+		ri.Free(faceData);
 		return qfalse;
 	}
 	Com_Memset(out, 0, atlasSize * atlasSize);
@@ -1492,7 +1530,24 @@ void R_InitFreeType(void) {
 #ifdef USE_FREETYPE
 	ftLibrary = FreeType_GetLibrary();
 	if (!ftLibrary) {
-		ri.Printf(PRINT_WARNING, "R_InitFreeType: FreeType not available.\n");
+		// Try to initialize FreeType if not already done
+		extern qboolean FreeType_Init(void);
+		if (!FreeType_Init()) {
+			ri.Printf(PRINT_WARNING, "R_InitFreeType: FreeType not available.\n");
+		} else {
+			ftLibrary = FreeType_GetLibrary();
+			if (ftLibrary) {
+				// Clear font cache when FreeType becomes available to force re-registration
+				// with the new FreeType system (fonts that failed with stb_truetype can now load)
+				ri.Printf(PRINT_ALL, "R_InitFreeType: Clearing font cache to enable FreeType font loading\n");
+				fontCacheCount = 0;
+				for (int i = 0; i < maxFontCache; i++) {
+					fontCache[i].inUse = qfalse;
+				}
+			} else {
+				ri.Printf(PRINT_WARNING, "R_InitFreeType: FreeType initialization failed.\n");
+			}
+		}
 	} else {
 		// Clear font cache when FreeType becomes available to force re-registration
 		// with the new FreeType system (fonts that failed with stb_truetype can now load)

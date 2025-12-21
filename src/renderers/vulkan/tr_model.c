@@ -27,8 +27,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 extern refimport_t ri;
 
 // Function prototype for stub implementation
-qboolean RE_RegisterFont_Stb(const char *fontName, int pointSize, fontInfo_t *font);
-
 #define	LL(x) x=LittleLong(x)
 
 // Forward declarations for model loaders
@@ -1562,7 +1560,3 @@ void R_ModelBounds( qhandle_t handle, vec3_t mins, vec3_t maxs ) {
 }
 
 // Stub for font loading - Vulkan renderer doesn't support stb fonts yet
-qboolean RE_RegisterFont_Stb(const char *fontName, int pointSize, fontInfo_t *font) {
-	(void)fontName; (void)pointSize; (void)font;
-	return qfalse; // Not implemented for Vulkan
-}

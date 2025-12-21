@@ -490,7 +490,8 @@ list(APPEND QCOMMON_SRCS src/common/q_error_recovery.c)
 # Add input validation system
 list(APPEND QCOMMON_SRCS src/common/q_input_validation.c)
 # Add font effects system
-list(APPEND QCOMMON_SRCS src/renderers/renderercommon/tr_font_effects.c)
+# Font effects are renderer-specific, not common
+# list(APPEND QCOMMON_SRCS src/renderers/renderercommon/tr_font_effects.c)
 # Add secure message functions
 list(APPEND QCOMMON_SRCS src/common/msg_secure.c)
 # Add secure message functions
@@ -1225,6 +1226,15 @@ AUX_SOURCE_DIRECTORY(src/renderers/renderercommon RENDERER_COMMON_SRCS)
 if(NOT USE_OPENEXR OR NOT OpenEXR_FOUND)
 	list(REMOVE_ITEM RENDERER_COMMON_SRCS src/renderers/renderercommon/tr_image_exr.cpp)
 endif()
+# Add FreeType wrapper to renderer common sources when FreeType is enabled
+IF(USE_FREETYPE)
+	list(APPEND RENDERER_COMMON_SRCS src/common/freetype_wrapper.c)
+ENDIF()
+# Add stb_truetype font support for all renderers
+IF(USE_STB_TRUETYPE)
+	list(APPEND RENDERER_COMMON_SRCS src/renderers/opengl/tr_font_stb.c)
+	list(APPEND RENDERER_COMMON_SRCS src/renderers/renderercommon/tr_font_effects.c)
+ENDIF()
 # Note: FreeType-dependent files are included when USE_FREETYPE is defined
 # They have proper guards to compile to empty implementations when FreeType is not available
 AUX_SOURCE_DIRECTORY(src/renderers/opengl RENDERER_GL_SRCS)

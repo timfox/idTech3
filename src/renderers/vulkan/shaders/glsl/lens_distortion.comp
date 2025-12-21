@@ -1,0 +1,68 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D inputImage;
+layout(set = 0, binding = 1, rgba16f) uniform writeonly image2D outputImage;
+
+layout(push_constant) uniform LensDistortionConstants {
+    vec2 resolution;
+    vec2 invResolution;
+    vec2 center; // Center point for distortion (0.5, 0.5 = screen center)
+    float strength; // Distortion strength
+    float zoom; // Zoom factor to compensate for edge cropping
+    int mode; // 0=barrel, 1=pincushion, 2=both
+} pc;
+
+vec2 distort(vec2 uv, float strength) {
+    vec2 centerVec = uv - pc.center;
+    float dist = length(centerVec);
+
+    // Apply different distortion modes
+    float distortion;
+    if (pc.mode == 0) {
+        // Barrel distortion (fisheye effect)
+        distortion = dist * dist * strength;
+    } else if (pc.mode == 1) {
+        // Pincushion distortion
+        distortion = -dist * dist * strength;
+    } else {
+        // Complex distortion (combination)
+        float barrel = dist * dist * strength * 0.7;
+        float pincushion = -dist * dist * strength * 0.3;
+        distortion = barrel + pincushion;
+    }
+
+    // Apply zoom to compensate for edge distortion
+    vec2 distortedUV = uv + centerVec * distortion * pc.zoom;
+
+    return distortedUV;
+}
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+
+    // Apply lens distortion
+    vec2 distortedUV = distort(uv, pc.strength);
+
+    // Sample the distorted position
+    vec3 color = vec3(0.0);
+    if (distortedUV.x >= 0.0 && distortedUV.x <= 1.0 &&
+        distortedUV.y >= 0.0 && distortedUV.y <= 1.0) {
+        color = texture(inputImage, distortedUV).rgb;
+    } else {
+        // Edge darkening/vignette for areas outside the distorted bounds
+        color = texture(inputImage, uv).rgb * 0.1;
+    }
+
+    imageStore(outputImage, pixel, vec4(color, 1.0));
+}

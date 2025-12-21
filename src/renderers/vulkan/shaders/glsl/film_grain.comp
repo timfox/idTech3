@@ -1,0 +1,87 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D inputImage;
+layout(set = 0, binding = 1, rgba16f) uniform writeonly image2D outputImage;
+
+layout(push_constant) uniform FilmGrainConstants {
+    vec2 resolution;
+    vec2 invResolution;
+    float intensity;
+    float grainSize;
+    uint frameNumber;
+} pc;
+
+// Hash function for noise generation
+float hash(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+}
+
+// Simple noise function
+float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+
+    float a = hash(i);
+    float b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0));
+    float d = hash(i + vec2(1.0, 1.0));
+
+    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+// Film grain noise
+float filmGrain(vec2 uv, float time) {
+    vec2 p = uv * pc.grainSize;
+
+    // Add time-based animation
+    p += time * 0.1;
+
+    // Layer multiple octaves of noise
+    float n = noise(p);
+    n += noise(p * 2.0) * 0.5;
+    n += noise(p * 4.0) * 0.25;
+    n += noise(p * 8.0) * 0.125;
+
+    // Normalize and center around 0.5
+    n = n * 0.5 + 0.5;
+
+    return n;
+}
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+
+    // Sample input color
+    vec3 color = texture(inputImage, uv).rgb;
+
+    // Generate film grain
+    float time = float(pc.frameNumber) * 0.01;
+    float grain = filmGrain(uv, time);
+
+    // Apply grain to color (luma-based modulation)
+    float luma = dot(color, vec3(0.299, 0.587, 0.114));
+    float grainIntensity = (grain - 0.5) * 2.0; // Convert to [-1, 1] range
+    grainIntensity *= pc.intensity;
+
+    // Modulate color based on luminance
+    color += grainIntensity * (color / (luma + 0.001)); // Avoid division by zero
+
+    // Clamp to valid range
+    color = clamp(color, 0.0, 1.0);
+
+    imageStore(outputImage, pixel, vec4(color, 1.0));
+}

@@ -5761,6 +5761,8 @@ void vk_create_compute_post_process_pipelines( void )
 	vk.gamma_compute_pipeline = VK_NULL_HANDLE;
 	vk.tonemap_compute_pipeline = VK_NULL_HANDLE;
 	vk.style_compute_pipeline = VK_NULL_HANDLE;
+	vk.film_grain_compute_pipeline = VK_NULL_HANDLE;
+	vk.lens_distortion_compute_pipeline = VK_NULL_HANDLE;
 	
 	// Try to load compute shader modules if they're compiled
 	// The shader arrays are defined in shader_data.c (included at file scope, line 3214)
@@ -5797,7 +5799,28 @@ void vk_create_compute_post_process_pipelines( void )
 	if ( vk.modules.style_comp == VK_NULL_HANDLE ) {
 		vk.modules.style_comp = SHADER_MODULE( style_transfer_comp_spv );
 		SET_OBJECT_NAME( vk.modules.style_comp, "style-transfer compute shader module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
-		ri.Printf( PRINT_DEVELOPER, "VK: Loaded style-transfer compute shader module\n" );
+	}
+
+	// Try to load film grain compute shader if compiled
+	if ( vk.modules.film_grain_comp == VK_NULL_HANDLE ) {
+		vk.modules.film_grain_comp = SHADER_MODULE( film_grain_comp_spv );
+		if ( vk.modules.film_grain_comp != VK_NULL_HANDLE ) {
+			SET_OBJECT_NAME( vk.modules.film_grain_comp, "film grain compute shader module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+			ri.Printf( PRINT_DEVELOPER, "VK: Loaded film grain compute shader module\n" );
+		} else {
+			ri.Printf( PRINT_WARNING, "VK: film grain compute shader module missing; run shader compile step.\n" );
+		}
+	}
+
+	// Try to load lens distortion compute shader if compiled
+	if ( vk.modules.lens_distortion_comp == VK_NULL_HANDLE ) {
+		vk.modules.lens_distortion_comp = SHADER_MODULE( lens_distortion_comp_spv );
+		if ( vk.modules.lens_distortion_comp != VK_NULL_HANDLE ) {
+			SET_OBJECT_NAME( vk.modules.lens_distortion_comp, "lens distortion compute shader module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+			ri.Printf( PRINT_DEVELOPER, "VK: Loaded lens distortion compute shader module\n" );
+		} else {
+			ri.Printf( PRINT_WARNING, "VK: lens distortion compute shader module missing; run shader compile step.\n" );
+		}
 	}
 	
 	// Try to load ReLAX denoising compute shader if not already loaded
@@ -5818,7 +5841,7 @@ void vk_create_compute_post_process_pipelines( void )
 		shader_stage.module = vk.modules.gamma_comp;
 		shader_stage.pName = "main";
 		shader_stage.pSpecializationInfo = NULL;
-		
+
 		Com_Memset( &compute_info, 0, sizeof( compute_info ) );
 		compute_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
 		compute_info.pNext = NULL;
@@ -5827,7 +5850,7 @@ void vk_create_compute_post_process_pipelines( void )
 		compute_info.layout = vk.compute_pipeline_layout;
 		compute_info.basePipelineHandle = VK_NULL_HANDLE;
 		compute_info.basePipelineIndex = -1;
-		
+
 		result = qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &compute_info, NULL, &vk.gamma_compute_pipeline );
 		if ( result == VK_SUCCESS ) {
 			SET_OBJECT_NAME( vk.gamma_compute_pipeline, "gamma compute pipeline", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
@@ -5835,6 +5858,66 @@ void vk_create_compute_post_process_pipelines( void )
 		} else {
 			ri.Printf( PRINT_WARNING, "VK: Failed to create gamma compute pipeline: %d\n", result );
 			vk.gamma_compute_pipeline = VK_NULL_HANDLE;
+		}
+	}
+
+	// If film grain compute shader is available, create pipeline
+	if ( vk.modules.film_grain_comp != VK_NULL_HANDLE ) {
+		Com_Memset( &shader_stage, 0, sizeof( shader_stage ) );
+		shader_stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shader_stage.pNext = NULL;
+		shader_stage.flags = 0;
+		shader_stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+		shader_stage.module = vk.modules.film_grain_comp;
+		shader_stage.pName = "main";
+		shader_stage.pSpecializationInfo = NULL;
+
+		Com_Memset( &compute_info, 0, sizeof( compute_info ) );
+		compute_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+		compute_info.pNext = NULL;
+		compute_info.flags = 0;
+		compute_info.stage = shader_stage;
+		compute_info.layout = vk.compute_pipeline_layout;
+		compute_info.basePipelineHandle = VK_NULL_HANDLE;
+		compute_info.basePipelineIndex = -1;
+
+		result = qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &compute_info, NULL, &vk.film_grain_compute_pipeline );
+		if ( result == VK_SUCCESS ) {
+			SET_OBJECT_NAME( vk.film_grain_compute_pipeline, "film grain compute pipeline", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+			ri.Printf( PRINT_DEVELOPER, "VK: Created film grain compute pipeline\n" );
+		} else {
+			ri.Printf( PRINT_WARNING, "VK: Failed to create film grain compute pipeline: %d\n", result );
+			vk.film_grain_compute_pipeline = VK_NULL_HANDLE;
+		}
+	}
+
+	// If lens distortion compute shader is available, create pipeline
+	if ( vk.modules.lens_distortion_comp != VK_NULL_HANDLE ) {
+		Com_Memset( &shader_stage, 0, sizeof( shader_stage ) );
+		shader_stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shader_stage.pNext = NULL;
+		shader_stage.flags = 0;
+		shader_stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+		shader_stage.module = vk.modules.lens_distortion_comp;
+		shader_stage.pName = "main";
+		shader_stage.pSpecializationInfo = NULL;
+
+		Com_Memset( &compute_info, 0, sizeof( compute_info ) );
+		compute_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+		compute_info.pNext = NULL;
+		compute_info.flags = 0;
+		compute_info.stage = shader_stage;
+		compute_info.layout = vk.compute_pipeline_layout;
+		compute_info.basePipelineHandle = VK_NULL_HANDLE;
+		compute_info.basePipelineIndex = -1;
+
+		result = qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &compute_info, NULL, &vk.lens_distortion_compute_pipeline );
+		if ( result == VK_SUCCESS ) {
+			SET_OBJECT_NAME( vk.lens_distortion_compute_pipeline, "lens distortion compute pipeline", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+			ri.Printf( PRINT_DEVELOPER, "VK: Created lens distortion compute pipeline\n" );
+		} else {
+			ri.Printf( PRINT_WARNING, "VK: Failed to create lens distortion compute pipeline: %d\n", result );
+			vk.lens_distortion_compute_pipeline = VK_NULL_HANDLE;
 		}
 	}
 	
