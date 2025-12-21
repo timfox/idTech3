@@ -44,8 +44,11 @@
 	path = reference/vulkanexamples
 	url = https://github.com/SaschaWillems/Vulkan.git
 [submodule "radiant"]
-	path = radiant
+	path = tools/radiant
 	url = https://github.com/timfox/idTech3Radiant.git
+[submodule "openarena"]
+	path = mods/openarena
+	url = https://github.com/timfox/OpenArena.git
 [submodule "backend"]
 	path = backend
 	url = https://github.com/timfox/idTech3Backend.git
