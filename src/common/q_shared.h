@@ -827,7 +827,14 @@ float Q_atof( const char *str );
 #ifdef __cplusplus
 extern "C" {
 #endif
-float Com_Clamp( float min, float max, float value );
+// Modern clamp function with better implementation
+static inline float Com_Clamp(float min, float max, float value) {
+    // Use modern conditional expression with better readability
+    return (value < min) ? min : ((value > max) ? max : value);
+}
+
+// Legacy function for backward compatibility (deprecated)
+float Com_ClampLegacy(float min, float max, float value);
 
 char	*COM_SkipPath( char *pathname );
 const char	*COM_GetExtension( const char *name );

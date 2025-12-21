@@ -3686,7 +3686,7 @@ void	R_ShaderList_f (void) {
 
 #define	MAX_SHADER_FILES 16384
 
-static int loadShaderBuffers( char **shaderFiles, const int numShaderFiles, char **buffers )
+static int loadShaderBuffers( char **shaderFiles, const int numShaderFiles, char **buffers, const char *directory )
 {
 	char filename[MAX_QPATH+8];
 	char shaderName[MAX_QPATH];
@@ -3700,7 +3700,7 @@ static int loadShaderBuffers( char **shaderFiles, const int numShaderFiles, char
 	// load and parse shader files
 	for ( i = 0; i < numShaderFiles; i++ )
 	{
-		Com_sprintf( filename, sizeof( filename ), "scripts/%s", shaderFiles[i] );
+		Com_sprintf( filename, sizeof( filename ), "%s/%s", directory, shaderFiles[i] );
 		//ri.Printf( PRINT_DEVELOPER, "...loading '%s'\n", filename );
 		summand = ri.FS_ReadFile( filename, (void **)&buffers[i] );
 
@@ -3803,9 +3803,14 @@ Finds and loads all .shader files, combining them into
 a single large text block that can be scanned for shader names
 =====================
 */
+// Modern shader directory structure with legacy fallback
+// Prioritizes /shaders directory, falls back to /scripts for legacy mods
+#define SHADER_DIRECTORIES (const char*[]){"shaders", "scripts"}
+#define NUM_SHADER_DIRS 2
+
 static void ScanAndLoadShaderFiles( void )
 {
-	char **shaderFiles, **shaderxFiles;
+	char **shaderFiles = NULL, **shaderxFiles = NULL;
 	char *buffers[MAX_SHADER_FILES];
 	char *xbuffers[MAX_SHADER_FILES];
 	int numShaderFiles, numShaderxFiles;
@@ -3816,16 +3821,29 @@ static void ScanAndLoadShaderFiles( void )
 	int shaderTextHashTableSizes[MAX_SHADERTEXT_HASH], hash, size;
 
 	long sum = 0;
+	const char *shaderDirectory = NULL; // Track which directory shaders came from
 
-	// scan for legacy shader files
-	shaderFiles = ri.FS_ListFiles( "scripts", ".shader", &numShaderFiles );
+	// Initialize arrays
+	Com_Memset(buffers, 0, sizeof(buffers));
+	Com_Memset(xbuffers, 0, sizeof(xbuffers));
+	Com_Memset(shaderTextHashTableSizes, 0, sizeof(shaderTextHashTableSizes));
+	numShaderFiles = 0;
+	numShaderxFiles = 0;
 
-	if ( GL_ProgramAvailable() ) {
-		// if ARB shaders available - scan for extended shader files
-		shaderxFiles = ri.FS_ListFiles( "scripts", ".shaderx", &numShaderxFiles );
-	} else {
-		shaderxFiles = NULL;
-		numShaderxFiles = 0;
+	// Modern approach: check /shaders first, then /scripts for legacy compatibility
+	const char **dirs = SHADER_DIRECTORIES;
+	for (int dir_idx = 0; dir_idx < NUM_SHADER_DIRS; dir_idx++) {
+		const char *dir = dirs[dir_idx];
+		if (!shaderFiles) {
+			shaderFiles = ri.FS_ListFiles(dir, ".shader", &numShaderFiles);
+			if (shaderFiles && numShaderFiles > 0) {
+				shaderDirectory = dir; // Remember which directory had the shaders
+			}
+		}
+		if (GL_ProgramAvailable() && !shaderxFiles) {
+			shaderxFiles = ri.FS_ListFiles(dir, ".shaderx", &numShaderxFiles);
+		}
+		if (shaderFiles && (!GL_ProgramAvailable() || shaderxFiles)) break; // Found files in preferred directory
 	}
 
 	if ( (!shaderFiles || !numShaderFiles) && (!shaderxFiles || !numShaderxFiles) ) {
@@ -3841,8 +3859,8 @@ static void ScanAndLoadShaderFiles( void )
 	}
 
 	sum = 0;
-	sum += loadShaderBuffers( shaderxFiles, numShaderxFiles, xbuffers );
-	sum += loadShaderBuffers( shaderFiles, numShaderFiles, buffers );
+	sum += loadShaderBuffers( shaderxFiles, numShaderxFiles, xbuffers, shaderDirectory );
+	sum += loadShaderBuffers( shaderFiles, numShaderFiles, buffers, shaderDirectory );
 
 	// build single large buffer
 	s_shaderText = ri.Hunk_Alloc( sum + numShaderxFiles*2 + numShaderFiles*2 + 1, h_low );

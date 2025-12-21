@@ -588,7 +588,7 @@ static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, in
 	if (face != NULL) {
 		// Use improved load flags based on hinting CVar
 		{
-			cvar_t *fontHinting = ri.Cvar_Get("r_fontHinting", "1", 0);
+			cvar_t *fontHinting = ri.Cvar_Get("r_fontHinting", "2", 0);
 			if (fontHinting) {
 				switch (fontHinting->integer) {
 				case 0: // None
@@ -1230,7 +1230,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 
 	// Configure hinting based on CVar
 	{
-		cvar_t *fontHinting = ri.Cvar_Get("r_fontHinting", "1", 0);
+		cvar_t *fontHinting = ri.Cvar_Get("r_fontHinting", "2", 0);
 		if (fontHinting) {
 			switch (fontHinting->integer) {
 			case 0: // None

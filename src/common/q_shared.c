@@ -23,14 +23,37 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // q_shared.c -- stateless support routines that are included in each code dll
 #include "q_shared.h"
 
-float Com_Clamp( float min, float max, float value ) {
-	if ( value < min ) {
-		return min;
-	}
-	if ( value > max ) {
-		return max;
-	}
-	return value;
+// Modern C23/C++23 safety features
+#include <assert.h>
+
+// Static assertions for compile-time safety
+static_assert(sizeof(float) == 4, "float must be 32-bit IEEE 754");
+static_assert(sizeof(double) == 8, "double must be 64-bit IEEE 754");
+
+// Modern null pointer safety attributes (when supported)
+#ifdef __GNUC__
+#define Q_NONNULL __attribute__((nonnull))
+#define Q_NONNULL_PARAMS(...) __attribute__((nonnull(__VA_ARGS__)))
+#else
+#define Q_NONNULL
+#define Q_NONNULL_PARAMS(...)
+#endif
+
+// Bounds checking helper with modern attributes
+__attribute__((always_inline)) __attribute__((pure))
+static inline qboolean Q_IsValidString(const char *str, size_t max_len) {
+    if (!str) return qfalse;
+    size_t len = 0;
+    while (*str && len < max_len) {
+        str++;
+        len++;
+    }
+    return len < max_len; // Ensure null termination within bounds
+}
+
+// Legacy function implementation for backward compatibility
+float Com_ClampLegacy(float min, float max, float value) {
+    return Com_Clamp(min, max, value);
 }
 
 
@@ -39,16 +62,15 @@ float Com_Clamp( float min, float max, float value ) {
 COM_SkipPath
 ============
 */
-char *COM_SkipPath (char *pathname)
+Q_NONNULL_PARAMS(1)
+char *COM_SkipPath(char *pathname)
 {
-	char	*last;
-	
-	last = pathname;
-	while (*pathname)
-	{
-		if (*pathname=='/')
-			last = pathname+1;
-		pathname++;
+	char *last = pathname;
+
+	// Modern loop with better readability
+	for (; *pathname; pathname++) {
+		if (*pathname == '/')
+			last = pathname + 1;
 	}
 	return last;
 }
@@ -59,13 +81,18 @@ char *COM_SkipPath (char *pathname)
 COM_GetExtension
 ============
 */
-const char *COM_GetExtension( const char *name )
+Q_NONNULL_PARAMS(1)
+const char *COM_GetExtension(const char *name)
 {
-	const char *dot = strrchr(name, '.'), *slash;
-	if (dot && ((slash = strrchr(name, '/')) == NULL || slash < dot))
+	// Use modern const correctness and clearer logic
+	const char *dot = strrchr(name, '.');
+	const char *slash = strrchr(name, '/');
+
+	// Return extension only if dot exists and is after any path separator
+	if (dot && (!slash || slash < dot)) {
 		return dot + 1;
-	else
-		return "";
+	}
+	return ""; // Empty string for no extension
 }
 
 
@@ -1659,14 +1686,19 @@ char *Q_strupr( char *s1 ) {
 
 
 // never goes past bounds or leaves without a terminating 0
-void Q_strcat( char *restrict dest, int size, const char *restrict src ) {
-	int		l1;
+Q_NONNULL_PARAMS(1, 3)
+void Q_strcat(char *restrict dest, int size, const char *restrict src) {
+	const size_t dest_len = strlen(dest);
 
-	l1 = strlen( dest );
-	if ( l1 >= size ) {
-		Com_Error( ERR_FATAL, "Q_strcat: already overflowed" );
+	// Modern bounds checking with static assertion for safety
+	static_assert(sizeof(size_t) >= sizeof(int), "size_t must be at least as large as int");
+
+	if ((size_t)size <= dest_len) {
+		Com_Error(ERR_FATAL, "Q_strcat: destination buffer already full or invalid size");
 	}
-	Q_strncpyz( dest + l1, src, size - l1 );
+
+	const size_t remaining = size - dest_len;
+	Q_strncpyz(dest + dest_len, src, remaining);
 }
 
 
@@ -1876,37 +1908,45 @@ int Q_CountChar(const char *string, char tocount)
  * @note Truncates output if it exceeds buffer size
  * @note Prints warning if truncation occurs
  */
-int QDECL Com_sprintf( char *dest, int size, const char *fmt, ...)
+int QDECL Com_sprintf(char *dest, int size, const char *fmt, ...)
 {
-	int		len;
-	va_list	argptr;
-	char	bigbuffer[32000];	// big, but small enough to fit in PPC stack
+	va_list argptr;
+	char bigbuffer[32000]; // big, but small enough to fit in PPC stack
+	int len;
 
-	if ( !dest ) 
-	{
-		Com_Error( ERR_FATAL, "Com_sprintf: NULL dest" );
-#if	defined(_DEBUG) && defined(_WIN32)
-		DebugBreak();
-#endif
+	// Modern null pointer and size checking
+	if (!dest) {
+		Com_Error(ERR_FATAL, "Com_sprintf: NULL destination buffer");
 		return 0;
 	}
 
-	va_start( argptr, fmt );
-	len = Q_vsnprintf( bigbuffer, sizeof( bigbuffer ), fmt, argptr );
-	va_end( argptr );
-
-	if ( len >= (int)sizeof( bigbuffer ) || len < 0 ) 
-	{
-		Com_Error( ERR_FATAL, "Com_sprintf: overflowed bigbuffer" );
-#if	defined(_DEBUG) && defined(_WIN32)
-		DebugBreak();
-#endif
+	if (size <= 0) {
+		Com_Error(ERR_FATAL, "Com_sprintf: invalid buffer size %d", size);
 		return 0;
 	}
 
-	if ( len >= size ) 
-	{
-		Com_Printf( S_COLOR_YELLOW "Com_sprintf: overflow of %i in %i\n", len, size );
+	if (!fmt) {
+		Com_Error(ERR_FATAL, "Com_sprintf: NULL format string");
+		return 0;
+	}
+
+	va_start(argptr, fmt);
+	len = Q_vsnprintf(bigbuffer, sizeof(bigbuffer), fmt, argptr);
+	va_end(argptr);
+
+	// Modern bounds checking
+	if (len < 0) {
+		Com_Error(ERR_FATAL, "Com_sprintf: encoding error in format string");
+		return 0;
+	}
+
+	if ((size_t)len >= sizeof(bigbuffer)) {
+		Com_Error(ERR_FATAL, "Com_sprintf: format result too large for internal buffer");
+		return 0;
+	}
+
+	if (len >= size) {
+		Com_Printf(S_COLOR_YELLOW "Com_sprintf: overflow of %i in %i\n", len, size);
 #if	defined(_DEBUG) && defined(_WIN32)
 		DebugBreak();
 #endif

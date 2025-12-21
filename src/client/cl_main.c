@@ -3081,25 +3081,38 @@ static void CL_CheckUserinfo( void ) {
 CL_Frame
 ==================
 */
-void CL_Frame( int msec, int realMsec ) {
+// Modernized CL_Frame with better structure and safety
+void CL_Frame(int msec, int realMsec) {
+	// Parameter validation with modern bounds checking
+	if (msec < 0) {
+		Com_DPrintf("CL_Frame: negative msec value %d, clamping to 0\n", msec);
+		msec = 0;
+	}
+
+	if (realMsec < 0) {
+		Com_DPrintf("CL_Frame: negative realMsec value %d, clamping to 0\n", realMsec);
+		realMsec = 0;
+	}
 
 #ifdef USE_CURL
-	if ( download.cURL ) {
-		Com_DL_Perform( &download );
+	// Modern conditional compilation with better structure
+	if (download.cURL) {
+		Com_DL_Perform(&download);
 	}
-	
-	// Update rate limiting
+
+	// Update rate limiting with safety check
 	if (enhanced_initialized) {
 		NET_RateLimit_Update();
 	}
-	
+
 	// Service WebSocket connections
 #ifdef USE_WEBSOCKETS
 	NET_WebSocket_Service();
 #endif
 #endif
 
-	if ( !com_cl_running->integer ) {
+	// Early return with modern condition checking
+	if (!com_cl_running || !com_cl_running->integer) {
 		return;
 	}
 

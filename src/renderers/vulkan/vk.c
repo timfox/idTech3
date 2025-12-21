@@ -19,6 +19,26 @@ extern cvar_t *r_vrs_max_rate;
 #include <stdio.h>
 extern int setenv( const char *name, const char *value, int overwrite );
 
+// Modern C23/C++23 safety features for Vulkan renderer
+#include <assert.h>
+
+// Static assertions for Vulkan safety
+static_assert(sizeof(VkDeviceSize) >= sizeof(size_t), "VkDeviceSize must be at least as large as size_t");
+static_assert(VK_NULL_HANDLE == NULL, "VK_NULL_HANDLE must equal NULL for compatibility");
+
+// Modern attribute macros for Vulkan functions
+#ifdef __GNUC__
+#define VK_NONNULL __attribute__((nonnull))
+#define VK_NONNULL_PARAMS(...) __attribute__((nonnull(__VA_ARGS__)))
+#define VK_PURE __attribute__((pure))
+#define VK_CONST __attribute__((const))
+#else
+#define VK_NONNULL
+#define VK_NONNULL_PARAMS(...)
+#define VK_PURE
+#define VK_CONST
+#endif
+
 // Compatibility shim: some SDKs may not expose the EXT mesh shader feature struct/enum.
 #ifndef VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT
 #define VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT (VkStructureType)1000328000
@@ -338,20 +358,31 @@ PFN_vkGetBufferDeviceAddress							qvkGetBufferDeviceAddress;
 // forward declaration
 VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassIndex, uint32_t def_index );
 
-uint32_t find_memory_type( uint32_t memory_type_bits, VkMemoryPropertyFlags properties ) {
-	VkPhysicalDeviceMemoryProperties memory_properties;
-	uint32_t i;
+// Modernized memory type finding with better safety and error handling
+VK_NONNULL
+uint32_t find_memory_type(uint32_t memory_type_bits, VkMemoryPropertyFlags properties) {
+	VkPhysicalDeviceMemoryProperties memory_properties = {0};
 
-	qvkGetPhysicalDeviceMemoryProperties( vk.physical_device, &memory_properties );
+	// Modern Vulkan API call with safety check
+	if (!qvkGetPhysicalDeviceMemoryProperties) {
+		ri.Error(ERR_FATAL, "Vulkan: qvkGetPhysicalDeviceMemoryProperties function pointer is NULL");
+	}
 
-	for ( i = 0; i < memory_properties.memoryTypeCount; i++ ) {
-		if ((memory_type_bits & (1 << i)) != 0 &&
+	qvkGetPhysicalDeviceMemoryProperties(vk.physical_device, &memory_properties);
+
+	// Bounds checking with modern loop
+	const uint32_t max_types = memory_properties.memoryTypeCount;
+	for (uint32_t i = 0; i < max_types && i < VK_MAX_MEMORY_TYPES; i++) {
+		const uint32_t bit = (uint32_t)(1U << i);
+		if ((memory_type_bits & bit) != 0 &&
 			(memory_properties.memoryTypes[i].propertyFlags & properties) == properties) {
 			return i;
 		}
 	}
-	ri.Error( ERR_FATAL, "Vulkan: failed to find matching memory type with requested properties" );
-	return ~0U;
+
+	ri.Error(ERR_FATAL, "Vulkan: failed to find matching memory type with requested properties (bits: 0x%x, required: 0x%x)",
+		memory_type_bits, properties);
+	return ~0U; // Unreachable, but satisfies compiler
 }
 
 
@@ -506,46 +537,56 @@ static VkFlags get_composite_alpha( VkCompositeAlphaFlagsKHR flags )
 */
 
 
-static VkCommandBuffer begin_command_buffer( void )
+// Modernized command buffer creation with designated initializers
+VK_NONNULL
+static VkCommandBuffer begin_command_buffer(void)
 {
-	VkCommandBufferBeginInfo begin_info;
-	VkCommandBufferAllocateInfo alloc_info;
 	VkCommandBuffer command_buffer;
 
-	alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	alloc_info.pNext = NULL;
-	alloc_info.commandPool = vk.command_pool;
-	alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	alloc_info.commandBufferCount = 1;
-	VK_CHECK( qvkAllocateCommandBuffers( vk.device, &alloc_info, &command_buffer ) );
+	// Modern designated initializers for better readability and safety
+	const VkCommandBufferAllocateInfo alloc_info = {
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.pNext = NULL,
+		.commandPool = vk.command_pool,
+		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandBufferCount = 1
+	};
 
-	begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	begin_info.pNext = NULL;
-	begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-	begin_info.pInheritanceInfo = NULL;
+	VK_CHECK(qvkAllocateCommandBuffers(vk.device, &alloc_info, &command_buffer));
 
-	VK_CHECK( qvkBeginCommandBuffer( command_buffer, &begin_info ) );
+	const VkCommandBufferBeginInfo begin_info = {
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.pNext = NULL,
+		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+		.pInheritanceInfo = NULL
+	};
+
+	VK_CHECK(qvkBeginCommandBuffer(command_buffer, &begin_info));
 
 	return command_buffer;
 }
 
 
-static void end_command_buffer( VkCommandBuffer command_buffer, const char *location )
+// Modernized command buffer submission with better structure
+VK_NONNULL_PARAMS(1)
+static void end_command_buffer(VkCommandBuffer command_buffer, const char *location)
 {
-	(void)location;  // Suppress unused parameter warning
+	(void)location; // Suppress unused parameter warning
+
+	VK_CHECK(qvkEndCommandBuffer(command_buffer));
+
 #ifdef USE_UPLOAD_QUEUE
-	const VkPipelineStageFlags wait_dst_stage_mask = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-	VkSemaphore waits;
+	const VkPipelineStageFlags wait_dst_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 #endif
-	VkSubmitInfo submit_info;
-	VkCommandBuffer cmdbuf[1];
 
-	cmdbuf[0] = command_buffer;
+	// Modern array initialization
+	const VkCommandBuffer cmdbuf[] = {command_buffer};
 
-	VK_CHECK( qvkEndCommandBuffer( command_buffer ) );
-
-	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submit_info.pNext = NULL;
+	// Designated initializer for submit info
+	VkSubmitInfo submit_info = {
+		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.pNext = NULL
+	};
 #ifdef USE_UPLOAD_QUEUE
 	if ( vk.rendering_finished != VK_NULL_HANDLE ) {
 		waits = vk.rendering_finished;
