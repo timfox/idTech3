@@ -923,6 +923,7 @@ qboolean FS_Initialized( void );
 qboolean FS_StartupInProgress( void );
 
 void	FS_InitFilesystem ( void );
+qboolean FS_ReadGameInfoTitle( const char *modName, char *title, int titleSize );
 void	FS_Shutdown( qboolean closemfp );
 
 qboolean	FS_ConditionalRestart( int checksumFeed, qboolean clientRestart );

@@ -3529,6 +3529,26 @@ static void CL_InitRef( void ) {
 	char			dllName[ MAX_OSPATH ], *ospath;
 #endif
 
+		// Update window title from gameinfo.txt or mod name if not already set by user
+	const char *fs_game = Cvar_VariableString( "fs_game" );
+	if ( Q_streq( cl_title, CLIENT_WINDOW_TITLE ) && fs_game[0] != '\0' && Q_stricmp( fs_game, BASEGAME ) != 0 ) {
+		char customTitle[MAX_CVAR_VALUE_STRING] = {0};
+
+		// Try to read gameinfo.txt from mod directory
+		if ( FS_ReadGameInfoTitle( fs_game, customTitle, sizeof(customTitle) ) && customTitle[0] ) {
+			Q_strncpyz( cl_title, customTitle, sizeof( cl_title ) );
+			Com_Printf( "Updated window title from gameinfo.txt: '%s'\n", customTitle );
+		} else {
+			// Fallback to mod name
+			char modTitle[MAX_CVAR_VALUE_STRING];
+			Com_sprintf( modTitle, sizeof(modTitle), "id Tech 3 - %s", fs_game );
+			Q_strncpyz( cl_title, modTitle, sizeof( cl_title ) );
+			Com_Printf( "Updated window title to: '%s'\n", modTitle );
+		}
+	} else if ( !Q_streq( cl_title, CLIENT_WINDOW_TITLE ) ) {
+		Com_Printf( "Window title already set to: '%s'\n", cl_title );
+	}
+
 	fprintf( stderr, "CL_InitRef: ENTERING FUNCTION\n" );
 	Com_Printf( "DEBUG: CL_InitRef called\n" );
 	fprintf( stderr, "CL_InitRef: Function called!\n" );

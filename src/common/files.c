@@ -5861,6 +5861,158 @@ qboolean FS_IsPureChecksum( int sum )
 FS_Startup
 ================
 */
+/*
+================
+FS_ReadGameInfoTitle
+
+Reads gameinfo.txt from a mod directory and extracts the title.
+Returns qtrue if a title was found, qfalse otherwise.
+================
+*/
+qboolean FS_ReadGameInfoTitle( const char *modName, char *title, int titleSize ) {
+	char ospath[MAX_OSPATH];
+	char buffer[4096];
+	FILE *f;
+	int len;
+
+	if ( !modName || !*modName || !title || titleSize <= 0 ) {
+		return qfalse;
+	}
+
+
+	// Try basepath first - check both mods/modname and just modname
+	Com_sprintf( ospath, sizeof(ospath), "%s/mods/%s/gameinfo.txt", Cvar_VariableString( "fs_basepath" ), modName );
+	f = fopen( ospath, "rb" );
+	if ( !f ) {
+		// Try basepath without mods/ prefix
+		Com_sprintf( ospath, sizeof(ospath), "%s/%s/gameinfo.txt", Cvar_VariableString( "fs_basepath" ), modName );
+		f = fopen( ospath, "rb" );
+		if ( !f ) {
+			// Try homepath with mods/ prefix
+			Com_sprintf( ospath, sizeof(ospath), "%s/mods/%s/gameinfo.txt", Cvar_VariableString( "fs_homepath" ), modName );
+			f = fopen( ospath, "rb" );
+			if ( !f ) {
+				// Try homepath without mods/ prefix
+				Com_sprintf( ospath, sizeof(ospath), "%s/%s/gameinfo.txt", Cvar_VariableString( "fs_homepath" ), modName );
+				f = fopen( ospath, "rb" );
+				if ( !f ) {
+					// Try steampath if available
+					const char *steamPath = Cvar_VariableString( "fs_steampath" );
+					if ( steamPath[0] ) {
+						Com_sprintf( ospath, sizeof(ospath), "%s/mods/%s/gameinfo.txt", steamPath, modName );
+						f = fopen( ospath, "rb" );
+						if ( !f ) {
+							Com_sprintf( ospath, sizeof(ospath), "%s/%s/gameinfo.txt", steamPath, modName );
+							f = fopen( ospath, "rb" );
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if ( !f ) {
+		return qfalse;
+	}
+
+	len = fread( buffer, 1, sizeof(buffer) - 1, f );
+	fclose( f );
+
+	if ( len <= 0 ) {
+		return qfalse;
+	}
+
+	buffer[len] = 0;
+
+	// Parse the file for title/game keys (Source Engine style with sections)
+	const char *ptr = buffer;
+	char key[MAX_TOKEN_CHARS];
+	char value[MAX_TOKEN_CHARS];
+	qboolean inSection = qfalse;
+
+	while ( *ptr ) {
+		// Skip whitespace and newlines
+		while ( *ptr && (*ptr == ' ' || *ptr == '\t' || *ptr == '\n' || *ptr == '\r')) ptr++;
+
+		if ( !*ptr ) break;
+
+		// Skip comments
+		if ( *ptr == '/' && *(ptr + 1) == '/' ) {
+			while ( *ptr && *ptr != '\n' ) ptr++;
+			continue;
+		}
+
+		// Handle section start/end
+		if ( *ptr == '"' ) {
+			// Skip quoted section names like "GameInfo"
+			ptr++; // Skip opening quote
+			while ( *ptr && *ptr != '"' ) ptr++;
+			if ( *ptr == '"' ) ptr++; // Skip closing quote
+			continue;
+		} else if ( *ptr == '{' ) {
+			inSection = qtrue;
+			ptr++;
+			continue;
+		} else if ( *ptr == '}' ) {
+			inSection = qfalse;
+			ptr++;
+			continue;
+		}
+
+		// Only parse key-value pairs inside sections
+		if ( !inSection ) {
+			// Skip to end of line
+			while ( *ptr && *ptr != '\n' ) ptr++;
+			if ( *ptr == '\n' ) ptr++;
+			continue;
+		}
+
+		// Parse key (unquoted)
+		size_t i = 0;
+		while ( *ptr && *ptr != ' ' && *ptr != '\t' && *ptr != '\n' && *ptr != '\r' && i < sizeof(key) - 1 ) {
+			key[i++] = *ptr++;
+		}
+		key[i] = 0;
+
+		if ( i == 0 ) {
+			// Skip to end of line if no key found
+			while ( *ptr && *ptr != '\n' ) ptr++;
+			if ( *ptr == '\n' ) ptr++;
+			continue;
+		}
+
+		// Skip whitespace
+		while ( *ptr && (*ptr == ' ' || *ptr == '\t')) ptr++;
+
+		// Parse value (handle quoted strings)
+		i = 0;
+		if ( *ptr == '"' ) {
+			ptr++; // Skip opening quote
+			while ( *ptr && *ptr != '"' && i < sizeof(value) - 1 ) {
+				value[i++] = *ptr++;
+			}
+			if ( *ptr == '"' ) ptr++; // Skip closing quote
+		} else {
+			while ( *ptr && *ptr != ' ' && *ptr != '\t' && *ptr != '\n' && *ptr != '\r' && i < sizeof(value) - 1 ) {
+				value[i++] = *ptr++;
+			}
+		}
+		value[i] = 0;
+
+		// Check for title or game keys
+		if ( Q_streq( key, "title" ) || Q_streq( key, "game" ) ) {
+			Q_strncpyz( title, value, titleSize );
+			return qtrue;
+		}
+
+		// Skip to end of line
+		while ( *ptr && *ptr != '\n' ) ptr++;
+		if ( *ptr == '\n' ) ptr++;
+	}
+
+	return qfalse;
+}
+
 static void FS_Startup( void ) {
 	const char *homePath;
 	int i, start, end;
@@ -6145,6 +6297,7 @@ static void FS_Startup( void ) {
 
 	// Mark startup as complete - fs_searchpaths is now initialized
 	fs_startupInProgress = qfalse;
+
 
 #ifdef FS_MISSING
 	if (missingFiles == NULL) {
