@@ -2900,6 +2900,51 @@ IF(BUILD_TESTS)
 		TARGET_LINK_LIBRARIES(benchmark_performance PRIVATE m)
 	ENDIF()
 
+	# Vulkan test framework (static library for other tests to link against)
+	IF(USE_VULKAN)
+		ADD_LIBRARY(test_framework_vulkan STATIC
+			tests/test_framework_vulkan.c)
+		TARGET_INCLUDE_DIRECTORIES(test_framework_vulkan PRIVATE src/common)
+		TARGET_INCLUDE_DIRECTORIES(test_framework_vulkan PRIVATE src)
+		TARGET_INCLUDE_DIRECTORIES(test_framework_vulkan PRIVATE src/renderers)
+		TARGET_INCLUDE_DIRECTORIES(test_framework_vulkan PRIVATE tests)
+		TARGET_COMPILE_DEFINITIONS(test_framework_vulkan PRIVATE STANDALONE_TEST USE_VULKAN)
+		TARGET_LINK_LIBRARIES(test_framework_vulkan PRIVATE Vulkan::Vulkan)
+
+		# Vulkan memory tests
+		ADD_EXECUTABLE(test_vulkan_memory
+			tests/test_vulkan_memory.c)
+		TARGET_INCLUDE_DIRECTORIES(test_vulkan_memory PRIVATE src/common)
+		TARGET_INCLUDE_DIRECTORIES(test_vulkan_memory PRIVATE src)
+		TARGET_INCLUDE_DIRECTORIES(test_vulkan_memory PRIVATE src/renderers)
+		TARGET_INCLUDE_DIRECTORIES(test_vulkan_memory PRIVATE tests)
+		TARGET_COMPILE_DEFINITIONS(test_vulkan_memory PRIVATE STANDALONE_TEST USE_VULKAN)
+		TARGET_LINK_LIBRARIES(test_vulkan_memory PRIVATE test_framework_vulkan Vulkan::Vulkan)
+		ADD_TEST(NAME vulkan_memory_tests COMMAND test_vulkan_memory)
+
+		# Vulkan bindless tests
+		ADD_EXECUTABLE(test_vulkan_bindless
+			tests/test_vulkan_bindless.c)
+		TARGET_INCLUDE_DIRECTORIES(test_vulkan_bindless PRIVATE src/common)
+		TARGET_INCLUDE_DIRECTORIES(test_vulkan_bindless PRIVATE src)
+		TARGET_INCLUDE_DIRECTORIES(test_vulkan_bindless PRIVATE src/renderers)
+		TARGET_INCLUDE_DIRECTORIES(test_vulkan_bindless PRIVATE tests)
+		TARGET_COMPILE_DEFINITIONS(test_vulkan_bindless PRIVATE STANDALONE_TEST USE_VULKAN)
+		TARGET_LINK_LIBRARIES(test_vulkan_bindless PRIVATE test_framework_vulkan Vulkan::Vulkan)
+		ADD_TEST(NAME vulkan_bindless_tests COMMAND test_vulkan_bindless)
+
+		# Vulkan async compute tests
+		ADD_EXECUTABLE(test_vulkan_async_compute
+			tests/test_vulkan_async_compute.c)
+		TARGET_INCLUDE_DIRECTORIES(test_vulkan_async_compute PRIVATE src/common)
+		TARGET_INCLUDE_DIRECTORIES(test_vulkan_async_compute PRIVATE src)
+		TARGET_INCLUDE_DIRECTORIES(test_vulkan_async_compute PRIVATE src/renderers)
+		TARGET_INCLUDE_DIRECTORIES(test_vulkan_async_compute PRIVATE tests)
+		TARGET_COMPILE_DEFINITIONS(test_vulkan_async_compute PRIVATE STANDALONE_TEST USE_VULKAN)
+		TARGET_LINK_LIBRARIES(test_vulkan_async_compute PRIVATE test_framework_vulkan Vulkan::Vulkan)
+		ADD_TEST(NAME vulkan_async_compute_tests COMMAND test_vulkan_async_compute)
+	ENDIF()
+
 	# Network fuzzing harness (AFL/libFuzzer compatible)
 	IF (CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 		ADD_EXECUTABLE(fuzz_network

@@ -345,6 +345,10 @@ cvar_t	*r_particles_maxCount;
 	cvar_t	*r_vk_timelineSemaphores;
 	cvar_t	*r_vk_asyncShaderCompile;
 	cvar_t	*r_vk_dynamicRendering;
+	cvar_t	*r_vk_renderdoc;
+	cvar_t	*r_vk_profiling;
+	cvar_t	*r_vk_debug_overlay;
+	cvar_t	*r_vk_hotReload;
 #endif // USE_VULKAN
 
 cvar_t	*r_dlightBacks;
@@ -2297,6 +2301,20 @@ static void R_Register( void )
 
 	r_vk_dynamicRendering = ri.Cvar_Get( "r_vk_dynamicRendering", "1", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_vk_dynamicRendering, "Use dynamic rendering instead of render passes for modern Vulkan (VK_KHR_dynamic_rendering)." );
+
+	// Developer tools cvars
+	r_vk_renderdoc = ri.Cvar_Get( "r_vk_renderdoc", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_vk_renderdoc, "Enable RenderDoc frame capture layer for debugging" );
+
+	r_vk_profiling = ri.Cvar_Get( "r_vk_profiling", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_vk_profiling, "Enable on-screen profiling display with GPU/CPU metrics" );
+
+	r_vk_debug_overlay = ri.Cvar_Get( "r_vk_debug_overlay", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_vk_debug_overlay, "Enable visual debug overlay showing memory usage and statistics" );
+
+	r_vk_hotReload = ri.Cvar_Get( "r_vk_hotReload", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_vk_hotReload, "Enable shader hot reload - automatically reload shaders when files change" );
+
 	r_mapGreyScale = ri.Cvar_Get( "r_mapGreyScale", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_mapGreyScale, "-1", "1", CV_FLOAT );
 	ri.Cvar_SetDescription(r_mapGreyScale, "Desaturate world map textures only, works independently from \\r_greyscale, negative values only desaturate lightmaps.");

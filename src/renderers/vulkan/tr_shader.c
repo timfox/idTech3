@@ -31,6 +31,13 @@ static char *s_shaderText;
 static const char *s_extensionOffset;
 static int s_extendedShader;
 
+// Shader hot reload system
+extern cvar_t *r_vk_hotReload;
+// Framework: shader_hot_reload_initialized reserved for future implementation
+#if 0
+static qboolean shader_hot_reload_initialized = qfalse;
+#endif
+
 // the shader is parsed into these global variables, then copied into
 // dynamically allocated memory if it is valid.
 static	shaderStage_t	stages[MAX_SHADER_STAGES];

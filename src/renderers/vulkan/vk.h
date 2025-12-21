@@ -797,6 +797,14 @@ typedef struct {
 	VkDescriptorSet bindless_descriptor_set;
 	uint32_t bindless_texture_count;
 	VkSampler bindless_sampler;
+	
+	// Bindless buffer system
+	VkDescriptorPool bindless_buffer_descriptor_pool;
+	VkDescriptorSetLayout bindless_buffer_set_layout;
+	VkDescriptorSet bindless_buffer_descriptor_set;
+	uint32_t bindless_buffer_count;
+	uint32_t bindless_storage_buffer_count;
+	uint32_t bindless_uniform_buffer_count;
 
 	VkCommandPool command_pool;
 #ifdef USE_UPLOAD_QUEUE
@@ -956,6 +964,54 @@ typedef struct {
 		uint64_t frame_times[64]; // Ring buffer for frame times
 		uint32_t frame_time_index;
 	} timing;
+
+	// Enhanced profiling system
+	struct {
+		qboolean enabled;
+		// GPU profiling
+		double vertex_time_ms;
+		double fragment_time_ms;
+		double compute_time_ms;
+		uint64_t memory_bandwidth_bytes;
+		uint32_t texture_cache_hits;
+		uint32_t texture_cache_misses;
+		float gpu_utilization;
+		// CPU profiling
+		double render_thread_time_ms;
+		double command_recording_time_ms;
+		double resource_upload_time_ms;
+		double synchronization_wait_time_ms;
+		// Performance counters
+		uint32_t draw_calls_per_frame;
+		uint32_t triangles_per_frame;
+		uint32_t memory_allocations_per_frame;
+		// Historical data
+		double frame_time_history[128];
+		uint32_t frame_time_history_index;
+		float frame_time_variance;
+	} profiling;
+
+	// Debug overlay system
+	struct {
+		qboolean enabled;
+		uint32_t draw_calls;
+		uint32_t triangles;
+		VkDeviceSize gpu_memory_used;
+		VkDeviceSize gpu_memory_total;
+		VkDeviceSize texture_memory;
+		VkDeviceSize buffer_memory;
+		float frame_time_ms;
+		float frame_time_variance;
+	} debug_overlay;
+
+	// Shader hot reload system
+	struct {
+		qboolean enabled;
+		uint32_t shaders_reloaded;
+		uint32_t pipelines_recreated;
+		uint32_t reload_errors;
+		qboolean file_watcher_active;
+	} hot_reload;
 
 	//
 	// Shader modules.
@@ -1587,6 +1643,78 @@ typedef struct {
 	VkDeviceMemory vrsImageMemory;
 	VkDescriptorSetLayout vrsDescriptorSetLayout;
 	VkDescriptorSet vrsDescriptorSet;
+
+	// Memory defragmentation system
+	struct {
+		qboolean enabled;
+		float fragmentation_threshold; // Trigger defrag when fragmentation exceeds this (0.0-1.0)
+		uint32_t defrag_interval_frames; // Defrag every N frames (0 = disabled)
+		uint32_t frame_counter;
+		VkDeviceSize total_allocated;
+		VkDeviceSize total_used;
+		VkDeviceSize largest_free_block;
+		uint32_t free_block_count;
+	} memory_defrag;
+
+	// Virtual memory management
+	struct {
+		qboolean enabled;
+		qboolean sparse_binding_supported;
+		VkDeviceSize virtual_address_space_size;
+		VkDeviceSize allocated_virtual_size;
+		uint32_t sparse_binding_count;
+	} virtual_memory;
+
+	// Async compute queue
+	struct {
+		qboolean supported;
+		uint32_t queue_family_index;
+		VkQueue queue;
+		VkCommandPool command_pool;
+		VkCommandBuffer command_buffers[NUM_COMMAND_BUFFERS];
+		VkFence fences[NUM_COMMAND_BUFFERS];
+		uint32_t current_buffer_index;
+	} compute_queue;
+
+	// Resource pooling
+	struct {
+		qboolean enabled;
+		struct {
+			VkBuffer buffers[64]; // Small buffers (< 1MB)
+			VkDeviceMemory memory[64];
+			uint32_t count;
+			uint32_t free_count;
+			uint32_t free_indices[64];
+		} small_buffers;
+		struct {
+			VkBuffer buffers[32]; // Medium buffers (1MB - 16MB)
+			VkDeviceMemory memory[32];
+			uint32_t count;
+			uint32_t free_count;
+			uint32_t free_indices[32];
+		} medium_buffers;
+		struct {
+			VkBuffer buffers[16]; // Large buffers (> 16MB)
+			VkDeviceMemory memory[16];
+			uint32_t count;
+			uint32_t free_count;
+			uint32_t free_indices[16];
+		} large_buffers;
+	} resource_pools;
+
+	// Texture streaming priority queue
+	struct {
+		qboolean enabled;
+		struct {
+			image_t *image;
+			float priority; // Higher = more important
+			float distance; // View distance
+			uint32_t requested_mip_level;
+		} queue[256];
+		uint32_t queue_count;
+		VkDeviceSize memory_bandwidth_used;
+		VkDeviceSize memory_bandwidth_limit;
+	} texture_streaming;
 } Vk_Instance;
 
 typedef struct {

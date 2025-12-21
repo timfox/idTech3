@@ -15,6 +15,7 @@ Vulkan Bindless Texture System Header
 qboolean vk_bindless_init(void);
 void vk_bindless_shutdown(void);
 uint32_t vk_bindless_register_texture(VkImageView imageView);
+uint32_t vk_bindless_register_buffer(VkBuffer buffer, VkDescriptorType bufferType);
 
 #endif // USE_VULKAN
 
