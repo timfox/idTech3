@@ -16,3 +16,4 @@ q3ios/
 logs/
 reference/
 mods/mymod/vm/
+mods/mymod/vm/game.x86_64.so
