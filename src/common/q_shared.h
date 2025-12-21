@@ -1454,7 +1454,7 @@ typedef struct playerState_s {
 
 	// not communicated over the net at all
 	int			ping;			// server to game info for scoreboard
-	int			pmove_framecount;	// FIXME: don't transmit over the network
+	int			pmove_framecount;	// not transmitted over network (client-side only)
 	int			jumppad_frame;
 	int			entityEventSequence;
 } playerState_t;

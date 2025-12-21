@@ -48,10 +48,7 @@ static const char **shaderTextHashTable[MAX_SHADERTEXT_HASH];
 return a hash value for the filename
 ================
 */
-#ifdef __GNUCC__
-  #warning TODO: check if long is ok here
-#endif
-
+// Com_GenerateHashValue returns unsigned long, so use unsigned long for hash values
 #define generateHashValue Com_GenerateHashValue
 
 void RE_RemapShader(const char *shaderName, const char *newShaderName, const char *timeOffset) {
