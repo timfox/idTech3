@@ -44,7 +44,7 @@ for arg in "$@"; do
         COVERAGE=1
         continue
     fi
-    if [ "$arg" = "quiet" ] || [ "$arg" = "q" ]; then
+    if [ "$arg" = "quiet" ] || [ "$arg" = "-q" ] || [ "$arg" = "--quiet" ] || [ "$arg" = "q" ] || [ "$arg" = "silent" ] || [ "$arg" = "-s" ] || [ "$arg" = "--silent" ]; then
         QUIET=1
         continue
     fi
