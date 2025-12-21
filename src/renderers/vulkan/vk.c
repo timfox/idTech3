@@ -268,6 +268,7 @@ typedef struct VkPhysicalDeviceMeshShaderFeaturesEXT {
 #include "vk_physics.h"
 #endif
 
+#include "vk_commands.h"
 #include "vk_bindless.h"
 #include "vk_shader_cache.h"
 #include "vk_async_compile.h"
@@ -911,15 +912,8 @@ static VkCommandBuffer begin_command_buffer(void)
 	VkCommandBuffer command_buffer;
 
 	// Modern designated initializers for better readability and safety
-	const VkCommandBufferAllocateInfo alloc_info = {
-		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-		.pNext = NULL,
-		.commandPool = vk.command_pool,
-		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-		.commandBufferCount = 1
-	};
 
-	VK_CHECK(qvkAllocateCommandBuffers(vk.device, &alloc_info, &command_buffer));
+	command_buffer = *VK_AllocateCommandBuffers(vk.device, vk.command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1);
 
 	const VkCommandBufferBeginInfo begin_info = {
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -978,7 +972,7 @@ static void end_command_buffer(VkCommandBuffer command_buffer, const char *locat
 
 	vk_queue_wait_idle();
 
-	qvkFreeCommandBuffers( vk.device, vk.command_pool, 1, cmdbuf );
+	VK_FreeCommandBuffers( vk.device, vk.command_pool, 1, (VkCommandBuffer*)cmdbuf );
 }
 
 VkInstance VK_GetInstanceHandle( void )
@@ -2225,8 +2219,8 @@ static void vk_shutdown_async_compute(void) {
 
 	// Free command buffers
 	if (vk.compute_queue.command_pool != VK_NULL_HANDLE) {
-		qvkFreeCommandBuffers(vk.device, vk.compute_queue.command_pool, NUM_COMMAND_BUFFERS, vk.compute_queue.command_buffers);
-		qvkDestroyCommandPool(vk.device, vk.compute_queue.command_pool, NULL);
+		VK_FreeCommandBuffers(vk.device, vk.compute_queue.command_pool, NUM_COMMAND_BUFFERS, vk.compute_queue.command_buffers);
+		VK_DestroyCommandPool(vk.device, vk.compute_queue.command_pool);
 		vk.compute_queue.command_pool = VK_NULL_HANDLE;
 	}
 
@@ -6303,23 +6297,10 @@ void vk_initialize( void )
 		qvkGetDeviceQueue( vk.device, vk.compute_queue.queue_family_index, 0, &vk.compute_queue.queue );
 		
 		// Create compute command pool
-		VkCommandPoolCreateInfo pool_info = {
-			.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-			.pNext = NULL,
-			.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-			.queueFamilyIndex = vk.compute_queue.queue_family_index
-		};
-		VK_CHECK(qvkCreateCommandPool(vk.device, &pool_info, NULL, &vk.compute_queue.command_pool));
+		vk.compute_queue.command_pool = VK_CreateCommandPool(vk.device, vk.compute_queue.queue_family_index, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
 		// Allocate compute command buffers
-		VkCommandBufferAllocateInfo alloc_info = {
-			.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-			.pNext = NULL,
-			.commandPool = vk.compute_queue.command_pool,
-			.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-			.commandBufferCount = NUM_COMMAND_BUFFERS
-		};
-		VK_CHECK(qvkAllocateCommandBuffers(vk.device, &alloc_info, vk.compute_queue.command_buffers));
+		vk.compute_queue.command_buffers = VK_AllocateCommandBuffers(vk.device, vk.compute_queue.command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, NUM_COMMAND_BUFFERS);
 
 		// Create compute fences
 		VkFenceCreateInfo fence_info = {
@@ -6643,29 +6624,25 @@ void vk_initialize( void )
 	// Command pool.
 	//
 	{
-		VkCommandPoolCreateInfo desc;
 
-		desc.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-		desc.pNext = NULL;
-		desc.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		desc.queueFamilyIndex = vk.queue_family_index;
+		//desc.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+		//desc.pNext = NULL;
 
-		VK_CHECK( qvkCreateCommandPool( vk.device, &desc, NULL, &vk.command_pool ) );
+		vk.command_pool = VK_CreateCommandPool( vk.device, vk.queue_family_index, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT );
 
 		SET_OBJECT_NAME( vk.command_pool, "command pool", VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_POOL_EXT );
 	}
 
 #ifdef USE_UPLOAD_QUEUE
 	{
-		VkCommandBufferAllocateInfo alloc_info;
 
-		alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+		//alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
 		alloc_info.pNext = NULL;
 		alloc_info.commandPool = vk.command_pool;
 		alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
 		alloc_info.commandBufferCount = 1;
 
-		VK_CHECK( qvkAllocateCommandBuffers( vk.device, &alloc_info, &vk.staging_command_buffer ) );
+		vk.staging_command_buffer = *VK_AllocateCommandBuffers( vk.device, vk.command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1 );
 	}
 #endif
 
@@ -6673,16 +6650,16 @@ void vk_initialize( void )
 	// Command buffers and color attachments.
 	//
 	for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ )
-	{
-		VkCommandBufferAllocateInfo alloc_info;
+{
+VkCommandBufferAllocateInfo alloc_info = {
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.pNext = NULL,
+		.commandPool = vk.command_pool,
+		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandBufferCount = 1
+	};
 
-		alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		alloc_info.pNext = NULL;
-		alloc_info.commandPool = vk.command_pool;
-		alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		alloc_info.commandBufferCount = 1;
-
-		VK_CHECK( qvkAllocateCommandBuffers( vk.device, &alloc_info, &vk.tess[i].command_buffer ) );
+		vk.tess[i].command_buffer = *VK_AllocateCommandBuffers( vk.device, vk.command_pool, VK_COMMAND_BUFFER_LEVEL_PRIMARY, 1 );
 
 		//SET_OBJECT_NAME( vk.tess[i].command_buffer, va( "command buffer %i", i ), VK_DEBUG_REPORT_OBJECT_TYPE_COMMAND_BUFFER_EXT );
 	}
@@ -6692,7 +6669,7 @@ void vk_initialize( void )
 	//
 	{
 		VkDescriptorPoolSize pool_size[3];
-		VkDescriptorPoolCreateInfo desc;
+		VkDescriptorPoolCreateInfo descriptor_pool_ci;
 		uint32_t j, maxSets;
 
 		pool_size[0].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -6719,14 +6696,14 @@ void vk_initialize( void )
 			maxSets += pool_size[j].descriptorCount;
 		}
 
-		desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-		desc.pNext = NULL;
-		desc.flags = 0;
-		desc.maxSets = maxSets;
-		desc.poolSizeCount = ARRAY_LEN( pool_size );
-		desc.pPoolSizes = pool_size;
+		descriptor_pool_ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+		descriptor_pool_ci.pNext = NULL;
+		descriptor_pool_ci.flags = 0;
+		descriptor_pool_ci.maxSets = maxSets;
+		descriptor_pool_ci.poolSizeCount = ARRAY_LEN( pool_size );
+		descriptor_pool_ci.pPoolSizes = pool_size;
 
-		VK_CHECK( qvkCreateDescriptorPool( vk.device, &desc, NULL, &vk.descriptor_pool ) );
+		VK_CHECK( qvkCreateDescriptorPool( vk.device, &descriptor_pool_ci, NULL, &vk.descriptor_pool ) );
 	}
 
 #ifdef USE_VMA
@@ -6777,7 +6754,7 @@ void vk_initialize( void )
 	//
 	{
 		VkDescriptorSetLayout set_layouts[VK_DESC_COUNT];
-		VkPipelineLayoutCreateInfo desc;
+		VkPipelineLayoutCreateInfo pipeline_layout_ci;
 		VkPushConstantRange push_range;
 
 		push_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
@@ -6797,28 +6774,28 @@ void vk_initialize( void )
 		set_layouts[7] = vk.set_layout_sampler; // physicalMap
 		set_layouts[8] = vk.set_layout_sampler; // prefiltered envmap
 #endif
-		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		desc.pNext = NULL;
-		desc.flags = 0;
-		desc.setLayoutCount = (vk.maxBoundDescriptorSets >= VK_DESC_COUNT) ? VK_DESC_COUNT : 4;
-		desc.pSetLayouts = set_layouts;
-		desc.pushConstantRangeCount = 1;
-		desc.pPushConstantRanges = &push_range;
+		pipeline_layout_ci.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		pipeline_layout_ci.pNext = NULL;
+		pipeline_layout_ci.flags = 0;
+		pipeline_layout_ci.setLayoutCount = (vk.maxBoundDescriptorSets >= VK_DESC_COUNT) ? VK_DESC_COUNT : 4;
+		pipeline_layout_ci.pSetLayouts = set_layouts;
+		pipeline_layout_ci.pushConstantRangeCount = 1;
+		pipeline_layout_ci.pPushConstantRanges = &push_range;
 
-		VK_CHECK(qvkCreatePipelineLayout(vk.device, &desc, NULL, &vk.pipeline_layout));
+		VK_CHECK(qvkCreatePipelineLayout(vk.device, &pipeline_layout_ci, NULL, &vk.pipeline_layout));
 
 		// flare test pipeline
 		set_layouts[0] = vk.set_layout_storage; // dynamic storage buffer
 
-		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		desc.pNext = NULL;
-		desc.flags = 0;
-		desc.setLayoutCount = 1;
-		desc.pSetLayouts = set_layouts;
-		desc.pushConstantRangeCount = 1;
-		desc.pPushConstantRanges = &push_range;
+		pipeline_layout_ci.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		pipeline_layout_ci.pNext = NULL;
+		pipeline_layout_ci.flags = 0;
+		pipeline_layout_ci.setLayoutCount = 1;
+		pipeline_layout_ci.pSetLayouts = set_layouts;
+		pipeline_layout_ci.pushConstantRangeCount = 1;
+		pipeline_layout_ci.pPushConstantRanges = &push_range;
 
-		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_storage ) );
+		VK_CHECK( qvkCreatePipelineLayout( vk.device, &pipeline_layout_ci, NULL, &vk.pipeline_layout_storage ) );
 
 		// post-processing pipeline
 		set_layouts[0] = vk.set_layout_sampler; // sampler
@@ -6826,13 +6803,15 @@ void vk_initialize( void )
 		set_layouts[2] = vk.set_layout_sampler; // sampler
 		set_layouts[3] = vk.set_layout_sampler; // sampler
 
-		desc.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		desc.pNext = NULL;
-		desc.flags = 0;
-		desc.setLayoutCount = 1;
-		desc.pSetLayouts = set_layouts;
-		desc.pushConstantRangeCount = 0;
-		desc.pPushConstantRanges = NULL;
+		VkPipelineLayoutCreateInfo desc = {
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+			.pNext = NULL,
+			.flags = 0,
+			.setLayoutCount = 1,
+			.pSetLayouts = set_layouts,
+			.pushConstantRangeCount = 0,
+			.pPushConstantRanges = NULL
+		};
 
 		VK_CHECK( qvkCreatePipelineLayout( vk.device, &desc, NULL, &vk.pipeline_layout_post_process ) );
 
@@ -7765,7 +7744,7 @@ void vk_shutdown( refShutdownCode_t code )
 		vk.pipelineCache = VK_NULL_HANDLE;
 	}
 
-	qvkDestroyCommandPool( vk.device, vk.command_pool, NULL );
+	VK_DestroyCommandPool( vk.device, vk.command_pool );
 
 	qvkDestroyDescriptorPool(vk.device, vk.descriptor_pool, NULL);
 

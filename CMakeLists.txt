@@ -5,6 +5,7 @@
 # --- CMake minimum version and project initialization ---
 cmake_minimum_required(VERSION 3.20)
 project(idtech3 C CXX ASM)
+# Force re-evaluation
 
 # Find dependencies
 find_package(OpenGL QUIET)
@@ -1357,7 +1358,7 @@ IF(USE_RENDERER_DLOPEN)
 		ENDIF()
 		# `src/renderers/renderercommon/*` uses legacy relative includes like "../qcommon/...".
 		# Adding `src/renderers` to the include path keeps those includes resolving to `src/qcommon/...`.
-	target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/renderers)
+	target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/renderers ${CMAKE_CURRENT_SOURCE_DIR}/src/common ${CMAKE_CURRENT_SOURCE_DIR}/src/renderers/renderercommon)
 	IF(USE_FREETYPE)
 		target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE /usr/include/freetype2)
 	ENDIF()

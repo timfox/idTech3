@@ -1,7 +1,11 @@
 #pragma once
 
 #include "../renderercommon/vulkan/vulkan.h"
+#include "../common/q_shared.h"
+#include "../renderercommon/tr_public.h"
 #include "tr_common.h"
+typedef float vec_t;
+typedef vec_t mat4_t[16];
 
 // Forward declarations
 typedef struct material_params_s material_params_t;
@@ -1678,7 +1682,7 @@ typedef struct {
 		uint32_t queue_family_index;
 		VkQueue queue;
 		VkCommandPool command_pool;
-		VkCommandBuffer command_buffers[NUM_COMMAND_BUFFERS];
+		VkCommandBuffer *command_buffers;
 		VkFence fences[NUM_COMMAND_BUFFERS];
 		uint32_t current_buffer_index;
 	} compute_queue;
@@ -1755,3 +1759,8 @@ typedef struct {
 
 extern Vk_Instance	vk;				// shouldn't be cleared during ref re-init
 extern Vk_World		vk_world;		// this data is cleared during ref re-init
+
+extern PFN_vkCreateCommandPool qvkCreateCommandPool;
+extern PFN_vkDestroyCommandPool qvkDestroyCommandPool;
+extern PFN_vkAllocateCommandBuffers qvkAllocateCommandBuffers;
+extern PFN_vkFreeCommandBuffers qvkFreeCommandBuffers;
