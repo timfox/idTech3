@@ -679,6 +679,14 @@ void vk_particles_shutdown( void );
 void vk_particles_simulate( float deltaTime );
 void vk_particles_render( void );
 
+// Variable Rate Shading functions
+void vk_vrs_init( void );
+void vk_vrs_shutdown( void );
+void vk_vrs_create_resources( uint32_t width, uint32_t height );
+void vk_vrs_destroy_resources( void );
+void vk_vrs_generate_image( VkCommandBuffer cmdBuffer );
+void vk_vrs_apply_shading_rate( VkCommandBuffer cmdBuffer );
+
 void VBO_PrepareQueues( void );
 void VBO_RenderIBOItems( void );
 void VBO_ClearQueue( void );
@@ -1023,6 +1031,7 @@ typedef struct {
 	VkShaderModule auto_exposure_comp;
 	VkShaderModule checkerboard_interleave_comp;
 	VkShaderModule vignette_comp;
+	VkShaderModule vrs_generate_comp;
 		
 		// GIBS compute shader modules
 		VkShaderModule gibs_spawn_comp;
@@ -1103,6 +1112,7 @@ typedef struct {
 	VkPipeline auto_exposure_compute_pipeline;
 	VkPipeline checkerboard_interleave_compute_pipeline;
 	VkPipeline vignette_compute_pipeline;
+	VkPipeline vrs_generate_compute_pipeline;
 	VkPipelineLayout compute_pipeline_layout;
 	VkDescriptorSetLayout compute_descriptor_set_layout;
 	VkDescriptorSet compute_descriptor_set;
@@ -1253,6 +1263,17 @@ typedef struct {
 		float currentScale;
 		float smoothedScale;
 	} dynres;
+
+	// Variable Rate Shading (VRS)
+	struct {
+		qboolean supported;
+		qboolean enabled;
+		int mode;           // 0=disabled, 1=center-focused, 2=distance-based, 3=center+distance
+		float centerRadius; // Radius of high-quality center region (0.0-1.0)
+		float falloffStart; // Distance where quality decreases (0.0-1.0)
+		int minRate;        // Minimum shading rate (1, 2, 4)
+		int maxRate;        // Maximum shading rate (1, 2, 4)
+	} vrs;
 
 	renderPass_t renderPassIndex;
 
@@ -1406,7 +1427,7 @@ typedef struct {
 		VkDeviceMemory portalLightsBufferMemory;
 		VkDescriptorSetLayout portalLightsDescriptorSetLayout;
 		VkDescriptorSet portalLightsDescriptorSet;
-		
+
 		// TLAS update optimization
 		VkAccelerationStructureInstanceKHR *previousInstances; // Previous frame's instance transforms
 		uint32_t previousInstanceCount;
@@ -1559,6 +1580,13 @@ typedef struct {
 		
 		void *luaState;
 	} atmosphere;
+
+	// Variable Rate Shading resources
+	VkImage vrsImage;
+	VkImageView vrsImageView;
+	VkDeviceMemory vrsImageMemory;
+	VkDescriptorSetLayout vrsDescriptorSetLayout;
+	VkDescriptorSet vrsDescriptorSet;
 } Vk_Instance;
 
 typedef struct {

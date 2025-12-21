@@ -125,7 +125,7 @@ qboolean vk_shader_cache_init(void) {
 	ssize_t bytes_read = read(shader_cache_fd, &header, sizeof(header));
 
 	if (bytes_read == sizeof(header) &&
-		memcmp(header.magic, SHADER_CACHE_MAGIC, sizeof(header.magic)) == 0 &&
+		memcmp(header.magic, SHADER_CACHE_MAGIC, strlen(SHADER_CACHE_MAGIC) + 1) == 0 &&
 		header.version == SHADER_CACHE_VERSION &&
 		header.device_id == props.deviceID) {
 

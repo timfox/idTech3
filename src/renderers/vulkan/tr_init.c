@@ -148,6 +148,12 @@ cvar_t  *r_baseSpecular;
 	cvar_t	*r_vignette_intensity;
 	cvar_t	*r_vignette_radius;
 	cvar_t	*r_vignette_smoothness;
+	cvar_t	*r_vrs;
+	cvar_t	*r_vrs_mode;
+	cvar_t	*r_vrs_center_radius;
+	cvar_t	*r_vrs_falloff_start;
+	cvar_t	*r_vrs_min_rate;
+	cvar_t	*r_vrs_max_rate;
 	cvar_t	*r_vignette;
 	cvar_t	*r_vignette_intensity;
 	cvar_t	*r_vignette_inner_radius;
@@ -2010,6 +2016,27 @@ static void R_Register( void )
 
 	r_vignette_smoothness = ri.Cvar_Get( "r_vignette_smoothness", "0.2", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_vignette_smoothness, "Vignette effect smoothness (0.0-1.0)" );
+
+	r_vrs = ri.Cvar_Get( "r_vrs", "0", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_vrs, "Enable Variable Rate Shading (VRS) for performance optimization. Requires VRS-capable GPU." );
+
+	r_vrs_mode = ri.Cvar_Get( "r_vrs_mode", "1", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_vrs_mode, "0", "3", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vrs_mode, "VRS quality mode: 0=disabled, 1=center-focused, 2=distance-based, 3=center+distance." );
+
+	r_vrs_center_radius = ri.Cvar_Get( "r_vrs_center_radius", "0.6", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_vrs_center_radius, "VRS center region radius (0.0-1.0, higher = larger high-quality area)." );
+
+	r_vrs_falloff_start = ri.Cvar_Get( "r_vrs_falloff_start", "0.7", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_vrs_falloff_start, "VRS distance falloff start (0.0-1.0, normalized depth)." );
+
+	r_vrs_min_rate = ri.Cvar_Get( "r_vrs_min_rate", "1", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_vrs_min_rate, "1", "4", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vrs_min_rate, "VRS minimum shading rate (1, 2, 4 - higher = lower quality)." );
+
+	r_vrs_max_rate = ri.Cvar_Get( "r_vrs_max_rate", "4", CVAR_ARCHIVE );
+	ri.Cvar_CheckRange( r_vrs_max_rate, "1", "4", CV_INTEGER );
+	ri.Cvar_SetDescription( r_vrs_max_rate, "VRS maximum shading rate (1, 2, 4 - higher = lower quality)." );
 
 	r_vignette = ri.Cvar_Get( "r_vignette", "0", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_vignette, "Enable vignette post-processing effect" );

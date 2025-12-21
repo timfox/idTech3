@@ -1,6 +1,14 @@
 #include "tr_local.h"
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
+
+// VRS CVAR extern declarations
+extern cvar_t *r_vrs;
+extern cvar_t *r_vrs_mode;
+extern cvar_t *r_vrs_center_radius;
+extern cvar_t *r_vrs_falloff_start;
+extern cvar_t *r_vrs_min_rate;
+extern cvar_t *r_vrs_max_rate;
 #include "../../common/performance_counters.h"
 #include "vk.h"
 #ifdef USE_VULKAN_RAY_TRACING
@@ -2281,6 +2289,15 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			}
 		}
 
+		// Check VRS support
+		if ( fragmentShadingRate ) {
+			vk.vrs.supported = qtrue;
+			ri.Printf( PRINT_ALL, "...fragment shading rate (VRS) extension enabled\n" );
+		} else {
+			vk.vrs.supported = qfalse;
+			ri.Printf( PRINT_ALL, "...fragment shading rate (VRS) not supported\n" );
+		}
+
 		qvkGetPhysicalDeviceFeatures( physical_device, &device_features );
 
 		if ( device_features.fillModeNonSolid == VK_FALSE ) {
@@ -3844,7 +3861,7 @@ static void vk_create_shader_modules( void )
 	vk.modules.auto_exposure_comp = VK_NULL_HANDLE;
 	vk.modules.checkerboard_interleave_comp = VK_NULL_HANDLE;
 	vk.modules.vignette_comp = VK_NULL_HANDLE;
-	vk.modules.vignette_comp = VK_NULL_HANDLE;
+	vk.modules.vrs_generate_comp = VK_NULL_HANDLE;
 
 #ifdef USE_VULKAN_RAY_TRACING
 	if ( vk.modules.rt_composite_fs != VK_NULL_HANDLE ) {
@@ -4583,6 +4600,11 @@ static void vk_create_attachments( void )
     SET_OBJECT_NAME( vk.cubeMap.depth_image, "cubemap depth image", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
     SET_OBJECT_NAME( vk.cubeMap.depth_image_view, "cubemap depth image view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
 
+    // Create VRS resources if supported
+    if ( vk.vrs.supported ) {
+        vk_vrs_create_resources( gls.windowWidth, gls.windowHeight );
+    }
+
 }
 
 
@@ -5309,6 +5331,9 @@ void vk_initialize( void )
 	// Initialize mesh shaders
 	vk_mesh_shaders_init();
 
+	// Initialize Variable Rate Shading
+	vk_vrs_init();
+
 	// Optional experimental modules (WIP)
 #ifdef IDTECH3_VK_EXPERIMENTAL
 	// Initialize graphics settings system first
@@ -5775,6 +5800,7 @@ void vk_create_compute_post_process_pipelines( void )
 	vk.auto_exposure_compute_pipeline = VK_NULL_HANDLE;
 	vk.checkerboard_interleave_compute_pipeline = VK_NULL_HANDLE;
 	vk.vignette_compute_pipeline = VK_NULL_HANDLE;
+	vk.vrs_generate_compute_pipeline = VK_NULL_HANDLE;
 
 	// Initialize histogram and exposure buffers
 	/*
@@ -5888,6 +5914,17 @@ void vk_create_compute_post_process_pipelines( void )
 			ri.Printf( PRINT_DEVELOPER, "VK: Loaded vignette compute shader module\n" );
 		} else {
 			ri.Printf( PRINT_WARNING, "VK: vignette compute shader module missing; run shader compile step.\n" );
+		}
+	}
+
+	// Try to load VRS generate compute shader if compiled
+	if ( vk.modules.vrs_generate_comp == VK_NULL_HANDLE ) {
+		vk.modules.vrs_generate_comp = SHADER_MODULE( vrs_generate_comp_spv );
+		if ( vk.modules.vrs_generate_comp != VK_NULL_HANDLE ) {
+			SET_OBJECT_NAME( vk.modules.vrs_generate_comp, "VRS generate compute shader module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+			ri.Printf( PRINT_DEVELOPER, "VK: Loaded VRS generate compute shader module\n" );
+		} else {
+			ri.Printf( PRINT_WARNING, "VK: VRS generate compute shader module missing; run shader compile step.\n" );
 		}
 	}
 
@@ -6106,6 +6143,36 @@ void vk_create_compute_post_process_pipelines( void )
 		} else {
 			ri.Printf( PRINT_WARNING, "VK: Failed to create vignette compute pipeline: %d\n", result );
 			vk.vignette_compute_pipeline = VK_NULL_HANDLE;
+		}
+	}
+
+	// If VRS generate compute shader is available, create pipeline
+	if ( vk.modules.vrs_generate_comp != VK_NULL_HANDLE ) {
+		Com_Memset( &shader_stage, 0, sizeof( shader_stage ) );
+		shader_stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shader_stage.pNext = NULL;
+		shader_stage.flags = 0;
+		shader_stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+		shader_stage.module = vk.modules.vrs_generate_comp;
+		shader_stage.pName = "main";
+		shader_stage.pSpecializationInfo = NULL;
+
+		Com_Memset( &compute_info, 0, sizeof( compute_info ) );
+		compute_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+		compute_info.pNext = NULL;
+		compute_info.flags = 0;
+		compute_info.stage = shader_stage;
+		compute_info.layout = vk.compute_pipeline_layout;
+		compute_info.basePipelineHandle = VK_NULL_HANDLE;
+		compute_info.basePipelineIndex = -1;
+
+		result = qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &compute_info, NULL, &vk.vrs_generate_compute_pipeline );
+		if ( result == VK_SUCCESS ) {
+			SET_OBJECT_NAME( vk.vrs_generate_compute_pipeline, "VRS generate compute pipeline", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+			ri.Printf( PRINT_DEVELOPER, "VK: Created VRS generate compute pipeline\n" );
+		} else {
+			ri.Printf( PRINT_WARNING, "VK: Failed to create VRS generate compute pipeline: %d\n", result );
+			vk.vrs_generate_compute_pipeline = VK_NULL_HANDLE;
 		}
 	}
 
@@ -6663,6 +6730,8 @@ __cleanup:
 	vk_dlss_shutdown();
 
 	vk_mesh_shaders_shutdown();
+
+	vk_vrs_shutdown();
 
 	vk_virtual_texture_shutdown();
 	vk_advanced_materials_shutdown();
@@ -9865,6 +9934,9 @@ void vk_begin_main_render_pass( void )
 	//vk.renderScaleY = (float)vk.renderHeight / (float)glConfig.vidHeight;
 	vk.renderScaleX = vk.renderScaleY = 1.0f;
 
+	// Apply Variable Rate Shading if enabled
+	vk_vrs_apply_shading_rate( vk.cmd->command_buffer );
+
 	vk_begin_render_pass( vk.render_pass.main, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight );
 }
 
@@ -10665,6 +10737,8 @@ _retry:
 	// However, we need to ensure a render pass is started for the first draw command.
 	// The render pass will be started in RB_DrawBuffer() or RB_DrawSurfs() as needed.
 	if ( vk.renderPassIndex >= RENDER_PASS_COUNT ) {
+		// Generate VRS image before starting main render pass
+		vk_vrs_generate_image( vk.cmd->command_buffer );
 		vk_begin_main_render_pass();
 	}
 
@@ -12405,4 +12479,236 @@ void vk_generate_cubemaps( cubemap_t *cube )
 	// The transition at the start ensures it's ready for sampling during cubemap prefiltering.
 
 	vk_begin_main_render_pass();
+}
+
+// Variable Rate Shading (VRS) implementation
+void vk_vrs_init( void ) {
+	// VRS support will be determined during device creation
+	// For now, assume it's not supported until we check extensions
+	vk.vrs.supported = qfalse;
+	vk.vrs.enabled = qfalse;
+	vk.vrs.mode = 0;
+	vk.vrs.centerRadius = 0.6f;
+	vk.vrs.falloffStart = 0.7f;
+	vk.vrs.minRate = 1;
+	vk.vrs.maxRate = 4;
+
+	ri.Printf( PRINT_DEVELOPER, "Variable Rate Shading initialized (support checked at device creation)\n" );
+}
+
+void vk_vrs_shutdown( void ) {
+	vk_vrs_destroy_resources();
+}
+
+void vk_vrs_create_resources( uint32_t width, uint32_t height ) {
+	if ( !vk.vrs.supported || vk.vrsImage != VK_NULL_HANDLE ) {
+		return;
+	}
+
+	// Calculate VRS image size (must be 1/16th of render area for fragment shading rate)
+	uint32_t vrsWidth = (width + 15) / 16;   // Round up to nearest 16th
+	uint32_t vrsHeight = (height + 15) / 16;
+
+	VkImageCreateInfo imageInfo = {};
+	imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+	imageInfo.imageType = VK_IMAGE_TYPE_2D;
+	imageInfo.format = VK_FORMAT_R8_UINT;  // Fragment shading rate format
+	imageInfo.extent.width = vrsWidth;
+	imageInfo.extent.height = vrsHeight;
+	imageInfo.extent.depth = 1;
+	imageInfo.mipLevels = 1;
+	imageInfo.arrayLayers = 1;
+	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+	imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+	imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_FRAGMENT_SHADING_RATE_ATTACHMENT_BIT_KHR;
+	imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+	VK_CHECK( qvkCreateImage( vk.device, &imageInfo, NULL, &vk.vrsImage ) );
+
+	// Allocate memory
+	VkMemoryRequirements memRequirements;
+	qvkGetImageMemoryRequirements( vk.device, vk.vrsImage, &memRequirements );
+
+	VkMemoryAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = memRequirements.size;
+	allocInfo.memoryTypeIndex = find_memory_type( memRequirements.memoryTypeBits,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+
+	VK_CHECK( qvkAllocateMemory( vk.device, &allocInfo, NULL, &vk.vrsImageMemory ) );
+	VK_CHECK( qvkBindImageMemory( vk.device, vk.vrsImage, vk.vrsImageMemory, 0 ) );
+
+	// Create image view
+	VkImageViewCreateInfo viewInfo = {};
+	viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewInfo.image = vk.vrsImage;
+	viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+	viewInfo.format = VK_FORMAT_R8_UINT;
+	viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	viewInfo.subresourceRange.baseMipLevel = 0;
+	viewInfo.subresourceRange.levelCount = 1;
+	viewInfo.subresourceRange.baseArrayLayer = 0;
+	viewInfo.subresourceRange.layerCount = 1;
+
+	VK_CHECK( qvkCreateImageView( vk.device, &viewInfo, NULL, &vk.vrsImageView ) );
+
+	// Create descriptor set layout
+	VkDescriptorSetLayoutBinding binding = {};
+	binding.binding = 0;
+	binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	binding.descriptorCount = 1;
+	binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+	layoutInfo.bindingCount = 1;
+	layoutInfo.pBindings = &binding;
+
+	VK_CHECK( qvkCreateDescriptorSetLayout( vk.device, &layoutInfo, NULL, &vk.vrsDescriptorSetLayout ) );
+
+	// Allocate descriptor set
+	VkDescriptorSetAllocateInfo allocSetInfo = {};
+	allocSetInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		allocSetInfo.descriptorPool = vk.descriptor_pool;
+	allocSetInfo.descriptorSetCount = 1;
+	allocSetInfo.pSetLayouts = &vk.vrsDescriptorSetLayout;
+
+	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &allocSetInfo, &vk.vrsDescriptorSet ) );
+
+	// Update descriptor set
+	VkDescriptorImageInfo imageInfoDesc = {};
+	imageInfoDesc.imageView = vk.vrsImageView;
+	imageInfoDesc.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+	VkWriteDescriptorSet writeSet = {};
+	writeSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	writeSet.dstSet = vk.vrsDescriptorSet;
+	writeSet.dstBinding = 0;
+	writeSet.descriptorCount = 1;
+	writeSet.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+	writeSet.pImageInfo = &imageInfoDesc;
+
+	qvkUpdateDescriptorSets( vk.device, 1, &writeSet, 0, NULL );
+
+	SET_OBJECT_NAME( vk.vrsImage, "VRS image", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
+	SET_OBJECT_NAME( vk.vrsImageView, "VRS image view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
+
+	ri.Printf( PRINT_DEVELOPER, "Created VRS resources: %ux%u\n", vrsWidth, vrsHeight );
+}
+
+void vk_vrs_destroy_resources( void ) {
+	if ( vk.vrsDescriptorSet != VK_NULL_HANDLE ) {
+				qvkFreeDescriptorSets( vk.device, vk.descriptor_pool, 1, &vk.vrsDescriptorSet );
+		vk.vrsDescriptorSet = VK_NULL_HANDLE;
+	}
+
+	if ( vk.vrsDescriptorSetLayout != VK_NULL_HANDLE ) {
+		qvkDestroyDescriptorSetLayout( vk.device, vk.vrsDescriptorSetLayout, NULL );
+		vk.vrsDescriptorSetLayout = VK_NULL_HANDLE;
+	}
+
+	if ( vk.vrsImageView != VK_NULL_HANDLE ) {
+		qvkDestroyImageView( vk.device, vk.vrsImageView, NULL );
+		vk.vrsImageView = VK_NULL_HANDLE;
+	}
+
+	if ( vk.vrsImage != VK_NULL_HANDLE ) {
+		qvkDestroyImage( vk.device, vk.vrsImage, NULL );
+		vk.vrsImage = VK_NULL_HANDLE;
+	}
+
+	if ( vk.vrsImageMemory != VK_NULL_HANDLE ) {
+		qvkFreeMemory( vk.device, vk.vrsImageMemory, NULL );
+		vk.vrsImageMemory = VK_NULL_HANDLE;
+	}
+
+	ri.Printf( PRINT_DEVELOPER, "Destroyed VRS resources\n" );
+}
+
+void vk_vrs_generate_image( VkCommandBuffer cmdBuffer ) {
+	if ( !vk.vrs.supported || !vk.vrs.enabled || vk.vrs_generate_compute_pipeline == VK_NULL_HANDLE ) {
+		return;
+	}
+
+	// Transition VRS image to general layout for compute write
+	record_image_layout_transition( cmdBuffer, vk.vrsImage, VK_IMAGE_ASPECT_COLOR_BIT,
+		VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, 0 );
+
+	// Bind pipeline and descriptor set
+	qvkCmdBindPipeline( cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.vrs_generate_compute_pipeline );
+	qvkCmdBindDescriptorSets( cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+		vk.compute_pipeline_layout, 0, 1, &vk.compute_descriptor_set, 0, NULL );
+
+	// Update VRS parameters from CVARs
+	if ( r_vrs && r_vrs->integer ) {
+		vk.vrs.enabled = qtrue;
+		vk.vrs.mode = Com_Clamp( 0, 3, r_vrs_mode ? r_vrs_mode->integer : 1 );
+		vk.vrs.centerRadius = Com_Clamp( 0.0f, 1.0f, r_vrs_center_radius ? r_vrs_center_radius->value : 0.6f );
+		vk.vrs.falloffStart = Com_Clamp( 0.0f, 1.0f, r_vrs_falloff_start ? r_vrs_falloff_start->value : 0.7f );
+		vk.vrs.minRate = Com_Clamp( 1, 4, r_vrs_min_rate ? r_vrs_min_rate->integer : 1 );
+		vk.vrs.maxRate = Com_Clamp( 1, 4, r_vrs_max_rate ? r_vrs_max_rate->integer : 4 );
+	} else {
+		vk.vrs.enabled = qfalse;
+	}
+
+	if ( !vk.vrs.enabled ) {
+		return;
+	}
+
+	// Push constants
+	struct {
+		float resolution[2];
+		float invResolution[2];
+		int vrsMode;
+		float centerRadius;
+		float falloffStart;
+		int minRate;
+		int maxRate;
+	} vrsConstants;
+
+	vrsConstants.resolution[0] = (float)vk.renderWidth;
+	vrsConstants.resolution[1] = (float)vk.renderHeight;
+	vrsConstants.invResolution[0] = 1.0f / (float)vk.renderWidth;
+	vrsConstants.invResolution[1] = 1.0f / (float)vk.renderHeight;
+	vrsConstants.vrsMode = vk.vrs.mode;
+	vrsConstants.centerRadius = vk.vrs.centerRadius;
+	vrsConstants.falloffStart = vk.vrs.falloffStart;
+	vrsConstants.minRate = vk.vrs.minRate;
+	vrsConstants.maxRate = vk.vrs.maxRate;
+
+	qvkCmdPushConstants( cmdBuffer, vk.compute_pipeline_layout,
+		VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( vrsConstants ), &vrsConstants );
+
+	// Bind VRS descriptor set
+	qvkCmdBindDescriptorSets( cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+		vk.compute_pipeline_layout, 1, 1, &vk.vrsDescriptorSet, 0, NULL );
+
+	// Dispatch compute shader
+	uint32_t groupCountX = (vk.renderWidth + 7) / 8;
+	uint32_t groupCountY = (vk.renderHeight + 7) / 8;
+	qvkCmdDispatch( cmdBuffer, groupCountX, groupCountY, 1 );
+
+	// Add barrier to ensure VRS image is ready for use
+	VkMemoryBarrier barrier = {};
+	barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+	barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+	barrier.dstAccessMask = VK_ACCESS_FRAGMENT_SHADING_RATE_ATTACHMENT_READ_BIT_KHR;
+
+	qvkCmdPipelineBarrier( cmdBuffer,
+		VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+		0, 1, &barrier, 0, NULL, 0, NULL );
+}
+
+void vk_vrs_apply_shading_rate( VkCommandBuffer cmdBuffer ) {
+	(void)cmdBuffer; // Suppress unused parameter warning
+
+	if ( !vk.vrs.supported || !vk.vrs.enabled ) {
+		return;
+	}
+
+	// For now, just ensure VRS is enabled. The actual shading rate application
+	// happens through the render pass attachment setup.
+	// TODO: Implement proper VRS attachment in render pass
 }

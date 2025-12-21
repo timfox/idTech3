@@ -1,0 +1,82 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision mediump float;
+precision mediump int;
+
+#include "shader_constants.glsl"
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D depthBuffer;
+layout(set = 0, binding = 1, r8ui) uniform writeonly uimage2D vrsImage;
+
+layout(push_constant) uniform VRSConstants {
+    vec2 resolution;
+    vec2 invResolution;
+    int vrsMode;        // 0=disabled, 1=center-focused, 2=distance-based, 3=center+distance
+    float centerRadius; // Radius of high-quality center region (0.0-1.0)
+    float falloffStart; // Distance where quality starts to decrease (0.0-1.0)
+    float minRate;      // Minimum shading rate (1, 2, 4)
+    float maxRate;      // Maximum shading rate (1, 2, 4)
+} pc;
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+
+    uint shadingRate = uint(pc.maxRate); // Default to highest quality
+
+    if (pc.vrsMode > 0) {
+        // Calculate distance from screen center
+        vec2 center = vec2(0.5, 0.5);
+        vec2 position = uv - center;
+        float distanceFromCenter = length(position);
+
+        // Sample depth for distance-based shading
+        float depth = texture(depthBuffer, uv).r;
+        float linearDepth = depth; // Assuming depth is already linear
+
+        // Apply VRS logic based on mode
+        float qualityFactor = 1.0;
+
+        if (pc.vrsMode == 1 || pc.vrsMode == 3) {
+            // Center-focused: higher quality in center, lower at edges
+            if (distanceFromCenter > pc.centerRadius) {
+                float falloff = smoothstep(pc.centerRadius, 1.0, distanceFromCenter);
+                qualityFactor *= (1.0 - falloff * 0.7); // Reduce quality by up to 70% at edges
+            }
+        }
+
+        if (pc.vrsMode == 2 || pc.vrsMode == 3) {
+            // Distance-based: lower quality for distant objects
+            if (linearDepth > pc.falloffStart) {
+                float depthFalloff = smoothstep(pc.falloffStart, 1.0, linearDepth);
+                qualityFactor *= (1.0 - depthFalloff * 0.5); // Reduce quality by up to 50% for distant objects
+            }
+        }
+
+        // Convert quality factor to shading rate
+        // qualityFactor of 1.0 = highest quality (rate 1)
+        // qualityFactor of 0.0 = lowest quality (rate maxRate)
+        float rateFloat = mix(float(pc.minRate), float(pc.maxRate), 1.0 - qualityFactor);
+        shadingRate = uint(clamp(rateFloat, float(pc.minRate), float(pc.maxRate)));
+    }
+
+    // Vulkan shading rate encoding (KHR_fragment_shading_rate)
+    // Rate 1 = 0x0, Rate 2 = 0x1, Rate 4 = 0x2
+    uint encodedRate;
+    if (shadingRate == 1) {
+        encodedRate = 0x0; // 1x1
+    } else if (shadingRate == 2) {
+        encodedRate = 0x1; // 1x2 or 2x1
+    } else {
+        encodedRate = 0x2; // 2x2
+    }
+
+    imageStore(vrsImage, pixel, uvec4(encodedRate));
+}
