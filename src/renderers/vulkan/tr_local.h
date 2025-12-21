@@ -63,6 +63,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../renderercommon/tr_backend_iface.h"
 #include "tr_common.h"
 #include "iqm.h"
+#include "../opengl/tr_tiki.h"
 
 
 #ifdef USE_CIMGUI
@@ -1081,12 +1082,16 @@ typedef struct model_s {
 	int			dataSize;	// just for listing purposes
 	bmodel_t	*bmodel;		// only if type == MOD_BRUSH
 	md3Header_t	*md3[MD3_MAX_LODS];	// only if type == MOD_MESH
-	void	*modelData;			// only if type == (MOD_MDR | MOD_IQM)
+	union {
+		mdrHeader_t	*mdr;		// only if type == MOD_MDR
+		iqmData_t	*iqm;		// only if type == MOD_IQM
+		tikiData_t	*tiki;		// only if type == MOD_TIKI
+	} modelData;
 
 	int			 numLods;
 } model_t;
 
-#define	MAX_MOD_KNOWN	1024
+// MAX_MOD_KNOWN is now dynamic - see Scalability_GetMaxModels()
 
 void		R_ModelInit (void);
 model_t		*R_GetModelByHandle( qhandle_t hModel );
@@ -1379,7 +1384,7 @@ typedef struct {
 	// put large tables at the end, so most elements will be
 	// within the +/32K indexed range on risc processors
 	//
-	model_t					*models[MAX_MOD_KNOWN];
+	model_t					**models;		// Dynamically allocated array
 	int						numModels;
 
 	int						numImages;

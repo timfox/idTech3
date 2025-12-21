@@ -1047,6 +1047,7 @@ const char *FS_ReferencedPakPureChecksums( int maxlen );
 // back from clients for pure validation 
 
 void FS_ClearPakReferences( int flags );
+void FS_PreloadCriticalResources( void );
 // clears referenced booleans on loaded pk3s
 
 void FS_PureServerSetReferencedPaks( const char *pakSums, const char *pakNames );

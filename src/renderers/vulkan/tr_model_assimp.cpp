@@ -21,6 +21,9 @@ extern refimport_t ri;
 #include <assimp/postprocess.h>
 
 static inline void Assimp_EncodeLatLng( const aiVector3D &n, short *outNormal ) {
+	constexpr float LAT_SCALE = 32767.0f / (2.0f * 3.141592653589793f);
+	constexpr float LNG_SCALE = 32767.0f / 3.141592653589793f;
+
 	float lat, lng;
 	if ( n.x == 0.0f && n.y == 0.0f ) {
 		lat = 0.0f;
@@ -29,8 +32,8 @@ static inline void Assimp_EncodeLatLng( const aiVector3D &n, short *outNormal ) 
 		lat = atan2f( n.y, n.x );
 		lng = acosf( Com_Clamp( -1.0f, 1.0f, n.z ) );
 	}
-	int ilat = (int)( lat * (32767.0f / (2.0f * (float)M_PI) ) ) & 0xFFFF;
-	int ilng = (int)( lng * (32767.0f / (float)M_PI) ) & 0xFFFF;
+	int ilat = (int)( lat * LAT_SCALE ) & 0xFFFF;
+	int ilng = (int)( lng * LNG_SCALE ) & 0xFFFF;
 	*outNormal = (short)( ( ilat << 8 ) | ( ilng & 0xFF ) );
 }
 

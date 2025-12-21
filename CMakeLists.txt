@@ -2708,6 +2708,25 @@ IF(BUILD_TESTS)
 	TARGET_INCLUDE_DIRECTORIES(test_qcommon PRIVATE src)
 	ADD_TEST(NAME qcommon_tests COMMAND test_qcommon)
 
+	ADD_EXECUTABLE(test_string_safety tests/test_string_safety.c src/common/q_shared.c)
+	TARGET_INCLUDE_DIRECTORIES(test_string_safety PRIVATE src/common)
+	TARGET_INCLUDE_DIRECTORIES(test_string_safety PRIVATE src)
+	TARGET_INCLUDE_DIRECTORIES(test_string_safety PRIVATE tests)
+	ADD_TEST(NAME string_safety_tests COMMAND test_string_safety)
+
+	ADD_EXECUTABLE(test_renderer_decoupling tests/test_renderer_decoupling.c src/renderers/renderercommon/tr_mock.c src/common/q_shared.c)
+	TARGET_INCLUDE_DIRECTORIES(test_renderer_decoupling PRIVATE src/common)
+	TARGET_INCLUDE_DIRECTORIES(test_renderer_decoupling PRIVATE src/renderers/renderercommon)
+	TARGET_INCLUDE_DIRECTORIES(test_renderer_decoupling PRIVATE src)
+	TARGET_INCLUDE_DIRECTORIES(test_renderer_decoupling PRIVATE tests)
+	ADD_TEST(NAME renderer_decoupling_tests COMMAND test_renderer_decoupling)
+
+	ADD_EXECUTABLE(test_scalability tests/test_scalability.c src/common/q_scalability.c src/common/q_shared.c)
+	TARGET_INCLUDE_DIRECTORIES(test_scalability PRIVATE src/common)
+	TARGET_INCLUDE_DIRECTORIES(test_scalability PRIVATE src)
+	TARGET_INCLUDE_DIRECTORIES(test_scalability PRIVATE tests)
+	ADD_TEST(NAME scalability_tests COMMAND test_scalability)
+
 	ADD_EXECUTABLE(test_qmath
 		tests/test_qmath.c
 		src/common/q_math.c

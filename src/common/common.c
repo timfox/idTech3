@@ -38,6 +38,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_memtrack.h"
 #include "memory_stats.h"
 #include "i18n.h"
+#include "q_scalability.h"
+#include "q_asset_loaders.h"
 #include <locale.h>
 #include <ctype.h>
 #ifdef USE_CURL
@@ -443,13 +445,17 @@ Both client and server can use this, and it will
 do the appropriate things.
 =============
 */
-void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t code, const char *fmt, ... ) {
-	va_list		argptr;
-	static int	lastErrorTime;
-	static int	errorCount;
-	int			currentTime;
-	char		debugMsg[1024];
+static char *errorContext = NULL;
 
+void Com_SetErrorContext( const char *context ) {
+	errorContext = (char *)context;
+}
+
+void Com_ClearErrorContext( void ) {
+	errorContext = NULL;
+}
+
+static void Com_HandlePlatformErrorDebugging( errorParm_t code ) {
 #if defined(_WIN32) && defined(_DEBUG)
 	if ( code != ERR_DISCONNECT && code != ERR_NEED_CD ) {
 		if ( !com_noErrorInterrupt->integer ) {
@@ -458,6 +464,83 @@ void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t code, const char 
 		}
 	}
 #endif
+}
+
+// Enhanced logging system
+static const char *log_level_names[] = {
+	"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
+};
+
+static const char *log_category_names[] = {
+	"GENERAL", "RENDERER", "FILESYSTEM", "NETWORK", "GAME", "SOUND", "PERFORMANCE"
+};
+
+void Com_Log(log_level_t level, log_category_t category, const char *fmt, ...) {
+	va_list argptr;
+	char msg[2048];
+	static cvar_t *log_level = NULL;
+	static cvar_t *log_categories = NULL;
+
+	if (!log_level) {
+		log_level = Cvar_Get("com_logLevel", "2", CVAR_ARCHIVE); // Default to WARNING
+	}
+	if (!log_categories) {
+		log_categories = Cvar_Get("com_logCategories", "127", CVAR_ARCHIVE); // All categories enabled
+	}
+
+	if (level < log_level->integer) {
+		return; // Filter out messages below the current log level
+	}
+
+	if (!(log_categories->integer & (1 << category))) {
+		return; // Category is disabled
+	}
+
+	va_start(argptr, fmt);
+	Q_vsnprintf(msg, sizeof(msg), fmt, argptr);
+	va_end(argptr);
+
+	Com_Printf("[%s] [%s] %s\n", log_level_names[level], log_category_names[category], msg);
+}
+
+#define MAX_TIMING_STACK 32
+static struct {
+	const char *operation;
+	int start_time;
+} timing_stack[MAX_TIMING_STACK];
+static int timing_stack_depth = 0;
+
+void Com_StartTiming(const char *operation) {
+	if (timing_stack_depth < MAX_TIMING_STACK) {
+		timing_stack[timing_stack_depth].operation = operation;
+		timing_stack[timing_stack_depth].start_time = Sys_Milliseconds();
+		timing_stack_depth++;
+	}
+}
+
+void Com_EndTiming(const char *operation) {
+	if (timing_stack_depth > 0) {
+		timing_stack_depth--;
+		int duration = Sys_Milliseconds() - timing_stack[timing_stack_depth].start_time;
+
+		Com_Log(LOG_LEVEL_DEBUG, LOG_CATEGORY_PERFORMANCE,
+			"Operation '%s' completed in %d ms", operation, duration);
+	}
+}
+
+void Com_LogPerformance(const char *operation, int duration_ms) {
+	Com_Log(LOG_LEVEL_INFO, LOG_CATEGORY_PERFORMANCE,
+		"Performance: %s took %d ms", operation, duration_ms);
+}
+
+void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t code, const char *fmt, ... ) {
+	va_list		argptr;
+	static int	lastErrorTime;
+	static int	errorCount;
+	int			currentTime;
+	char		debugMsg[1024];
+
+	Com_HandlePlatformErrorDebugging( code );
 
 	if ( com_errorEntered ) {
 		// Prevent hard recursion: bail out hard to satisfy noreturn contract
@@ -492,7 +575,12 @@ void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t code, const char 
 	va_start( argptr, fmt );
 	Q_vsnprintf( debugMsg, sizeof( debugMsg ), fmt, argptr );
 	va_end( argptr );
-	Sys_Print( va( "Com_Error: code=%d msg=\"%s\"\n", code, debugMsg ) );
+
+	if ( errorContext ) {
+		Sys_Print( va( "Com_Error: context=\"%s\" code=%d msg=\"%s\"\n", errorContext, code, debugMsg ) );
+	} else {
+		Sys_Print( va( "Com_Error: code=%d msg=\"%s\"\n", code, debugMsg ) );
+	}
 
 	va_start( argptr, fmt );
 #ifdef NDEBUG
@@ -3013,7 +3101,7 @@ static sysEvent_t Com_GetSystemEvent( void )
 
 		len = strlen( s ) + 1;
 		b = Z_Malloc( len );
-		strcpy( b, s );
+		Q_strncpyz( b, s, len );
 		Sys_QueEvent( evTime, SE_CONSOLE, 0, 0, len, b );
 	}
 
@@ -3271,7 +3359,7 @@ Just throw a fatal error to
 test error shutdown procedures
 =============
 */
-static void __attribute__((__noreturn__)) Com_Error_f (void) {
+static void Com_Error_f (void) [[noreturn]] {
 	if ( Cmd_Argc() > 1 ) {
 		Com_Error( ERR_DROP, "Testing drop error" );
 	} else {
@@ -3483,7 +3571,7 @@ qboolean Com_CDKeyValidate( const char *key, const char *checksum ) {
 		}
 	}
 
-	sprintf(chs, "%02x", sum);
+	Com_sprintf(chs, sizeof(chs), "%02x", sum);
 
 	if (checksum && !Q_stricmp(chs, checksum)) {
 		return qtrue;
@@ -3553,7 +3641,7 @@ void Com_AppendCDKey( const char *filename ) {
 	FS_FCloseFile( f );
 
 	if ( Com_CDKeyValidate(buffer, NULL)) {
-		strcat( &cl_cdkey[16], buffer );
+		Q_strcat( &cl_cdkey[16], sizeof(cl_cdkey) - 16, buffer );
 	} else {
 		Q_strncpyz( &cl_cdkey[16], "                ", 17 );
 	}
@@ -3748,19 +3836,19 @@ static void Sys_GetProcessorId( char *vendor )
 			vendor = Q_stradd( vendor, vendor_str );
 			if (print_flags) {
 				// print features
-				strcat(vendor, " w/");
+				Q_strcat(vendor, 128 - strlen(vendor), " w/");
 				if (print_flags & CPU_FCOM)
-					strcat(vendor, " CMOV");
+					Q_strcat(vendor, 128 - strlen(vendor), " CMOV");
 				if (print_flags & CPU_MMX)
-					strcat(vendor, " MMX");
+					Q_strcat(vendor, 128 - strlen(vendor), " MMX");
 				if (print_flags & CPU_SSE)
-					strcat(vendor, " SSE");
+					Q_strcat(vendor, 128 - strlen(vendor), " SSE");
 				if (print_flags & CPU_SSE2)
-					strcat(vendor, " SSE2");
+					Q_strcat(vendor, 128 - strlen(vendor), " SSE2");
 				//if ( CPU_Flags & CPU_SSE3 )
-				//	strcat( vendor, " SSE3" );
+				//	Q_strcat(vendor, 128 - strlen(vendor), " SSE3");
 				if (print_flags & CPU_SSE41)
-					strcat(vendor, " SSE4.1");
+					Q_strcat(vendor, 128 - strlen(vendor), " SSE4.1");
 			}
 		}
 	}
@@ -4122,6 +4210,10 @@ void Com_Init( char *commandLine ) {
 	Com_InitPushEvent();
 
 	Com_InitSmallZoneMemory();
+
+	// Initialize platform abstraction layer
+	Platform_Init();
+
 	Cvar_Init();
 
 	// Initialize performance counters
@@ -4138,6 +4230,12 @@ void Com_Init( char *commandLine ) {
 
 	// Initialize watchdog system
 	Watchdog_Init();
+
+	// Initialize scalability system
+	Scalability_Init();
+
+	// Initialize asset loader system
+	Asset_LoadersInit();
 
 	// Check for safe mode boot
 	if (Crash_ShouldBootSafeMode()) {
@@ -5690,28 +5788,63 @@ Returns qtrue if the path is safe, qfalse if it contains traversal attempts.
 */
 qboolean Q_ValidateFilePath(const char *path) {
 	const char *p;
+	qboolean hasDotDot = qfalse;
 
 	if (!path || !*path) {
 		return qfalse;
 	}
 
-	// Check for directory traversal patterns
+	// Check length to prevent extremely long paths
+	if (strlen(path) >= MAX_QPATH) {
+		return qfalse;
+	}
+
+	// Check for directory traversal patterns and other security issues
 	for (p = path; *p; p++) {
-		// Check for "../" or "..\" patterns
-		if ((p[0] == '.' && p[1] == '.' && (p[2] == '/' || p[2] == '\\')) ||
-		    (p[0] == '.' && p[1] == '.' && p[2] == '\0')) {
+		// Check for "../" or "..\" patterns (directory traversal)
+		if (p[0] == '.' && p[1] == '.' &&
+		    (p[2] == '/' || p[2] == '\\' || p[2] == '\0')) {
+			hasDotDot = qtrue;
+			continue; // Allow but track - we'll decide based on context
+		}
+
+		// Check for absolute Unix paths
+		if (p == path && *p == '/') {
+			// Reject absolute system paths, but allow game-relative paths
+			if (strlen(path) > 1 && path[1] != '/') {
+				return qfalse; // Absolute path
+			}
+		}
+
+		// Check for Windows absolute paths (C:\, D:\, etc.)
+		if (p == path && ((p[0] >= 'A' && p[0] <= 'Z') || (p[0] >= 'a' && p[0] <= 'z')) &&
+		    p[1] == ':' && (p[2] == '/' || p[2] == '\\' || p[2] == '\0')) {
 			return qfalse;
 		}
 
-		// Also check for absolute paths that might bypass restrictions
-		if (p == path && *p == '/') {
-			// Allow leading slash for game-relative paths, but not absolute system paths
-			continue;
+		// Check for UNC paths (\\server\share)
+		if (p == path && p[0] == '\\' && p[1] == '\\') {
+			return qfalse;
 		}
 
-		// Check for Windows absolute paths
-		if (p == path && ((p[0] >= 'A' && p[0] <= 'Z') || (p[0] >= 'a' && p[0] <= 'z')) &&
-		    p[1] == ':' && (p[2] == '/' || p[2] == '\\')) {
+		// Check for control characters (security risk)
+		if (*p < 32 && *p != '\t' && *p != '\n' && *p != '\r') {
+			return qfalse;
+		}
+
+		// Check for potentially dangerous characters
+		if (strchr("*?\"<>|", *p)) {
+			return qfalse;
+		}
+	}
+
+	// Allow .. in specific safe contexts (like shader paths), but generally block
+	if (hasDotDot) {
+		// Only allow .. in paths that are clearly game-controlled (like shaders/)
+		if (!Q_stristr(path, "scripts/") &&
+		    !Q_stristr(path, "models/") &&
+		    !Q_stristr(path, "sound/") &&
+		    !Q_stristr(path, "textures/")) {
 			return qfalse;
 		}
 	}

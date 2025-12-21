@@ -155,7 +155,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define OS_STRING "linux"
 #define ID_INLINE inline
 
-#endif // __linux___
+#endif // __linux__
+
 
 // =============================== BSD =====================================
 

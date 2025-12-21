@@ -448,6 +448,12 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	RE_UpdateAsyncFonts();
 #endif
 
+	// Update streaming system
+#ifdef USE_JOBSYSTEM
+	extern void R_UpdateStreaming(void);
+	R_UpdateStreaming();
+#endif
+
 	cmd = R_GetCommandBufferReserved( sizeof( *cmd ), 0 );
 	if ( !cmd ) {
 		return;

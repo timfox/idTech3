@@ -264,6 +264,51 @@ typedef unsigned char byte;
 
 typedef enum { qfalse = 0, qtrue } qboolean;
 
+// ============================== Platform Abstraction ==============================
+
+// Platform capabilities and defaults
+typedef enum {
+    PLATFORM_UNKNOWN,
+    PLATFORM_WINDOWS,
+    PLATFORM_LINUX,
+    PLATFORM_MACOS,
+    PLATFORM_BSD,
+    PLATFORM_ANDROID
+} platform_type_t;
+
+typedef struct {
+    platform_type_t type;
+    const char *os_string;
+    const char *dll_extension;
+    char path_separator;
+    char path_separator_foreign;
+    const char *newline;
+    qboolean case_insensitive_filesystem;
+    qboolean supports_unicode;
+} platform_info_t;
+
+// Get current platform information
+const platform_info_t *Platform_GetInfo(void);
+
+// Platform-specific initialization
+void Platform_Init(void);
+
+// Platform-specific file operations
+qboolean Platform_IsCaseInsensitiveFilesystem(void);
+int Platform_GetMaxFileDescriptors(void);
+void Platform_SetMaxFileDescriptors(int max_fds);
+
+// Platform-specific string conversions
+char *Platform_NormalizePath(char *path);
+const char *Platform_GetNewline(void);
+
+// Legacy macros for backward compatibility
+#define Q_IsCaseInsensitiveFilesystem() Platform_IsCaseInsensitiveFilesystem()
+#define Q_GetMaxFileDescriptors() Platform_GetMaxFileDescriptors()
+#define Q_SetMaxFileDescriptors(max) Platform_SetMaxFileDescriptors(max)
+#define Q_NormalizePath(path) Platform_NormalizePath(path)
+#define Q_GetNewline() Platform_GetNewline()
+
 typedef union floatint_u
 {
 	int32_t i;
@@ -1007,7 +1052,63 @@ int Info_RemoveKey( char *s, const char *key );
 #ifdef __cplusplus
 extern "C" {
 #endif
+void Com_SetErrorContext( const char *context );
+void Com_ClearErrorContext( void );
 void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t level, const char *fmt, ... );
+
+// Enhanced logging and telemetry
+typedef enum {
+	LOG_LEVEL_DEBUG,
+	LOG_LEVEL_INFO,
+	LOG_LEVEL_WARNING,
+	LOG_LEVEL_ERROR,
+	LOG_LEVEL_CRITICAL,
+	LOG_LEVEL_COUNT
+} log_level_t;
+
+typedef enum {
+	LOG_CATEGORY_GENERAL,
+	LOG_CATEGORY_RENDERER,
+	LOG_CATEGORY_FILESYSTEM,
+	LOG_CATEGORY_NETWORK,
+	LOG_CATEGORY_GAME,
+	LOG_CATEGORY_SOUND,
+	LOG_CATEGORY_PERFORMANCE,
+	LOG_CATEGORY_INPUT,
+	LOG_CATEGORY_PHYSICS,
+	LOG_CATEGORY_AI,
+	LOG_CATEGORY_SCRIPT,
+	LOG_CATEGORY_MEMORY,
+	LOG_CATEGORY_SERVER,
+	LOG_CATEGORY_CLIENT,
+	LOG_CATEGORY_COUNT
+} log_category_t;
+
+void Com_Log(log_level_t level, log_category_t category, const char *fmt, ...) FORMAT_PRINTF(3, 4);
+void Com_LogPerformance(const char *operation, int duration_ms);
+void Com_StartTiming(const char *operation);
+void Com_EndTiming(const char *operation);
+
+// RAII-style resource management for C
+typedef struct {
+    void *resource;
+    void (*cleanup)(void *);
+} scoped_resource_t;
+
+static inline scoped_resource_t make_scoped_resource(void *resource, void (*cleanup)(void *)) {
+    scoped_resource_t sr = { resource, cleanup };
+    return sr;
+}
+
+static inline void scoped_resource_free(scoped_resource_t *sr) {
+    if (sr->resource && sr->cleanup) {
+        sr->cleanup(sr->resource);
+        sr->resource = NULL;
+    }
+}
+
+#define SCOPED_RESOURCE(name, alloc_expr, cleanup_func) \
+    scoped_resource_t name __attribute__((cleanup(scoped_resource_free))) = make_scoped_resource(alloc_expr, cleanup_func)
 void FORMAT_PRINTF(1, 2) QDECL Com_Printf( const char *msg, ... );
 #ifdef __cplusplus
 }

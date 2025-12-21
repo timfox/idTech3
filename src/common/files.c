@@ -214,26 +214,18 @@ or configs will never get loaded from disk!
 // every time a new demo pk3 file is built, this checksum must be updated.
 // the easiest way to get it is to just run the game and see what it spits out
 #define	DEMO_PAK0_CHECKSUM	2985612116u
-// C23 Improvement: Use standard [[maybe_unused]] attribute
-// Note: GCC 15+ may report C23 but doesn't fully support C23 attributes yet
-// Use compiler-specific extensions which are more reliable
-#if defined(__GNUC__) || defined(__clang__)
-	// Use GCC/Clang extension which is well-supported
-static const unsigned pak_checksums[] __attribute__((unused)) = {
-#else
-	// No attribute support for other compilers
-	static const unsigned pak_checksums[] = {
-#endif
-	1566731103u,
-	298122907u,
-	412165236u,
-	2991495316u,
-	1197932710u,
-	4087071573u,
-	3709064859u,
-	908855077u,
-	977125798u
-};
+// Pak checksums for validation (currently unused)
+// static const unsigned pak_checksums[] = {
+// 	1566731103u,
+// 	298122907u,
+// 	412165236u,
+// 	2991495316u,
+// 	1197932710u,
+// 	4087071573u,
+// 	3709064859u,
+// 	908855077u,
+// 	977125798u
+// };
 
 // if this is defined, the executable positively won't work with any paks other
 // than the demo pak, even if productid is present.  This is only used for our
@@ -290,6 +282,182 @@ static	cvar_t		*fs_pathCache;			// Enable path resolution caching
 static	cvar_t		*fs_existenceCache;		// Enable file existence caching
 static	cvar_t		*fs_cacheSize;			// Cache size (default: 1024)
 
+// Resource cache for frequently accessed files
+#define FS_RESOURCE_CACHE_SIZE 64
+#define FS_RESOURCE_CACHE_MAX_SIZE (1024 * 1024)  // 1MB max per cached resource
+
+typedef struct {
+	char name[MAX_QPATH];
+	void *data;
+	int size;
+	int accessCount;  // For LRU eviction
+	int lastAccessTime;
+} fs_resource_cache_entry_t;
+
+static fs_resource_cache_entry_t fs_resourceCache[FS_RESOURCE_CACHE_SIZE];
+static int fs_resourceCacheCount = 0;
+static int fs_resourceCacheTime = 0;
+static cvar_t *fs_resourceCacheEnabled;  // Enable resource caching
+
+/*
+================
+FS_ResourceCacheFind
+
+Find a cached resource by name
+================
+*/
+static fs_resource_cache_entry_t *FS_ResourceCacheFind(const char *name) {
+	if (!fs_resourceCacheEnabled || !fs_resourceCacheEnabled->integer) {
+		return NULL;
+	}
+
+	for (int i = 0; i < fs_resourceCacheCount; i++) {
+		if (Q_stricmp(fs_resourceCache[i].name, name) == 0) {
+			// Update access statistics
+			fs_resourceCache[i].accessCount++;
+			fs_resourceCache[i].lastAccessTime = fs_resourceCacheTime++;
+			return &fs_resourceCache[i];
+		}
+	}
+	return NULL;
+}
+
+/*
+================
+FS_ResourceCacheEvictLRU
+
+Evict the least recently used cache entry
+================
+*/
+static void FS_ResourceCacheEvictLRU(void) {
+	if (fs_resourceCacheCount == 0) {
+		return;
+	}
+
+	int oldestIndex = 0;
+	int oldestTime = fs_resourceCache[0].lastAccessTime;
+
+	for (int i = 1; i < fs_resourceCacheCount; i++) {
+		if (fs_resourceCache[i].lastAccessTime < oldestTime) {
+			oldestTime = fs_resourceCache[i].lastAccessTime;
+			oldestIndex = i;
+		}
+	}
+
+	// Free the oldest entry
+	if (fs_resourceCache[oldestIndex].data) {
+		Z_Free(fs_resourceCache[oldestIndex].data);
+		fs_resourceCache[oldestIndex].data = NULL;
+	}
+
+	// Remove from cache by shifting remaining entries
+	for (int i = oldestIndex; i < fs_resourceCacheCount - 1; i++) {
+		fs_resourceCache[i] = fs_resourceCache[i + 1];
+	}
+
+	fs_resourceCacheCount--;
+}
+
+/*
+================
+FS_ResourceCacheAdd
+
+Add a resource to the cache
+================
+*/
+static void FS_ResourceCacheAdd(const char *name, void *data, int size) {
+	if (!fs_resourceCacheEnabled || !fs_resourceCacheEnabled->integer) {
+		return;
+	}
+
+	if (!data || size <= 0 || size > FS_RESOURCE_CACHE_MAX_SIZE) {
+		return;
+	}
+
+	// Check if already cached
+	if (FS_ResourceCacheFind(name)) {
+		return;
+	}
+
+	// Evict if cache is full
+	if (fs_resourceCacheCount >= FS_RESOURCE_CACHE_SIZE) {
+		FS_ResourceCacheEvictLRU();
+	}
+
+	// Add new entry
+	fs_resource_cache_entry_t *entry = &fs_resourceCache[fs_resourceCacheCount++];
+	Q_strncpyz(entry->name, name, sizeof(entry->name));
+	entry->data = Z_Malloc(size);
+	Com_Memcpy(entry->data, data, size);
+	entry->size = size;
+	entry->accessCount = 1;
+	entry->lastAccessTime = fs_resourceCacheTime++;
+}
+
+/*
+================
+FS_ResourceCacheGet
+
+Get a cached resource, returning a copy of the data
+================
+*/
+static int FS_ResourceCacheGet(const char *name, void **buffer) {
+	fs_resource_cache_entry_t *entry = FS_ResourceCacheFind(name);
+	if (!entry) {
+		return -1;
+	}
+
+	*buffer = Z_Malloc(entry->size);
+	Com_Memcpy(*buffer, entry->data, entry->size);
+	return entry->size;
+}
+
+static qboolean FS_ResourceCacheEnabled(void) {
+	return fs_resourceCacheEnabled && fs_resourceCacheEnabled->integer;
+}
+
+/*
+================
+FS_PreloadCriticalResources
+
+Preload commonly used resources to reduce loading stalls during gameplay
+================
+*/
+void FS_PreloadCriticalResources(void) {
+	static const char *criticalResources[] = {
+		"menu/art/font1_prop.tga",
+		"menu/art/font2_prop.tga",
+		"gfx/2d/bigchars.tga",
+		"gfx/2d/consolechars.tga",
+		"menu/medals/medal_impressive.png",
+		"menu/medals/medal_excellent.png",
+		"menu/medals/medal_gauntlet.png",
+		"menu/art/unknownmap.tga",
+		"menu/art/back_0.tga",
+		"menu/art/back_1.tga",
+		"gfx/misc/console01.tga",
+		"gfx/misc/console02.tga",
+		NULL
+	};
+
+	if (!FS_ResourceCacheEnabled()) {
+		return;
+	}
+
+	Com_Printf("Preloading critical resources...\n");
+
+	for (int i = 0; criticalResources[i]; i++) {
+		void *buffer;
+		int len = FS_ReadFile(criticalResources[i], &buffer);
+		if (len > 0) {
+			Com_DPrintf("Preloaded: %s (%d bytes)\n", criticalResources[i], len);
+			// FS_ReadFile already added it to cache if appropriate
+		}
+	}
+
+	Com_Printf("Critical resource preloading complete\n");
+}
+
 // Case-insensitive file lookups (TODO: Address case sensitivity issues)
 static	cvar_t		*fs_caseInsensitive;	// Enable case-insensitive file lookups
 
@@ -298,7 +466,7 @@ static	cvar_t		*fs_caseInsensitive;	// Enable case-insensitive file lookups
 #define FS_PATH_NORM_CACHE_MASK (FS_PATH_NORM_CACHE_SIZE - 1)
 
 // C23 Improvement: Static assertion to ensure cache size is a power of 2
-_Static_assert( (FS_PATH_NORM_CACHE_SIZE & (FS_PATH_NORM_CACHE_SIZE - 1)) == 0,
+static_assert( (FS_PATH_NORM_CACHE_SIZE & (FS_PATH_NORM_CACHE_SIZE - 1)) == 0,
 	"FS_PATH_NORM_CACHE_SIZE must be a power of 2 for efficient hashing" );
 
 typedef struct fs_path_norm_cache_entry_s {
@@ -321,6 +489,7 @@ static	int			fs_readCount;			// total bytes read
 static	qboolean	fs_startupInProgress = qfalse;	// Track if FS_Startup is running
 static	int			fs_loadCount;			// total files read
 static	int			fs_loadStack;			// total files in memory
+static	int			fs_activeAsyncLoads;	// active async file loads
 static	int			fs_packFiles;			// total number of files in all loaded packs
 
 static	int			fs_pk3dirCount;			// total number of pk3 directories in searchpath
@@ -334,7 +503,7 @@ int			fs_checksumFeed;  // Exported in files_internal.h
 fileHandleData_t	fsh[MAX_FILE_HANDLES];  // Exported in files_internal.h
 
 // C23 Improvement: Static assertion to ensure MAX_FILE_HANDLES is reasonable
-_Static_assert( MAX_FILE_HANDLES > 0 && MAX_FILE_HANDLES <= 4096, 
+static_assert( MAX_FILE_HANDLES > 0 && MAX_FILE_HANDLES <= 4096, 
 	"MAX_FILE_HANDLES must be between 1 and 4096" );
 
 // C23 Filesystem Improvements: Path Resolution Cache
@@ -342,7 +511,7 @@ _Static_assert( MAX_FILE_HANDLES > 0 && MAX_FILE_HANDLES <= 4096,
 #define FS_PATH_CACHE_MASK (FS_PATH_CACHE_SIZE_DEFAULT - 1)
 
 // C23 Improvement: Static assertion to ensure cache size is a power of 2
-_Static_assert( (FS_PATH_CACHE_SIZE_DEFAULT & (FS_PATH_CACHE_SIZE_DEFAULT - 1)) == 0,
+static_assert( (FS_PATH_CACHE_SIZE_DEFAULT & (FS_PATH_CACHE_SIZE_DEFAULT - 1)) == 0,
 	"FS_PATH_CACHE_SIZE_DEFAULT must be a power of 2 for efficient hashing" );
 
 typedef struct fs_path_cache_entry_s {
@@ -365,7 +534,7 @@ static int						fs_pathCacheMisses = 0;
 #define FS_EXISTENCE_CACHE_MASK (FS_EXISTENCE_CACHE_SIZE_DEFAULT - 1)
 
 // C23 Improvement: Static assertion to ensure cache size is a power of 2
-_Static_assert( (FS_EXISTENCE_CACHE_SIZE_DEFAULT & (FS_EXISTENCE_CACHE_SIZE_DEFAULT - 1)) == 0,
+static_assert( (FS_EXISTENCE_CACHE_SIZE_DEFAULT & (FS_EXISTENCE_CACHE_SIZE_DEFAULT - 1)) == 0,
 	"FS_EXISTENCE_CACHE_SIZE_DEFAULT must be a power of 2 for efficient hashing" );
 
 typedef struct fs_existence_cache_entry_s {
@@ -490,6 +659,38 @@ return load stack
 int FS_LoadStack( void ) {
 	return fs_loadStack;
 }
+
+/*
+================
+FS_GetActiveAsyncLoads
+
+Returns the number of active asynchronous file loads
+================
+*/
+// static int FS_GetActiveAsyncLoads(void) {
+// 	return fs_activeAsyncLoads;
+// }
+
+/*
+================
+FS_WaitForAsyncLoad
+
+Wait for a specific async load job to complete
+Returns the result of the load operation
+================
+*/
+// static int FS_WaitForAsyncLoad(job_handle_t *job) {
+// 	if (!job) {
+// 	 return -1;
+// 	}
+//
+// 	// Wait for job completion
+// 	JobSystem_WaitForJob(job, -1); // Wait indefinitely
+//
+// 	// The result should already be set by the worker function
+// 	// Return a generic success indicator since we don't have direct access to the result
+// 	return 0;
+// }
 
 
 /*
@@ -635,7 +836,7 @@ FS_BuildOSPath
 Qpath may have either forward or backwards slashes
 ===================
 */
-char *FS_BuildOSPath( const char *base, const char *game, const char *qpath ) {
+char *FS_BuildOSPath( const char *restrict base, const char *restrict game, const char *restrict qpath ) {
 	char	temp[MAX_OSPATH*2+1];
 	static char ospath[2][sizeof(temp)+MAX_OSPATH];
 	static int toggle;
@@ -2834,8 +3035,19 @@ Worker function for async file loading
 */
 static void FS_ReadFile_Async_Worker(void *data) {
 	async_load_t *load = (async_load_t *)data;
+
+	// Perform the file read
 	*load->result = FS_ReadFile(load->filename, load->buffer);
 	load->completed = qtrue;
+
+	// Decrement active load counter
+	if (fs_activeAsyncLoads > 0) {
+		fs_activeAsyncLoads--;
+	}
+
+	// Log completion for debugging
+	Com_DPrintf("FS_ReadFile_Async_Worker: Completed loading '%s' (%d bytes)\n",
+		load->filename, *load->result);
 }
 
 /*
@@ -2847,19 +3059,58 @@ Returns job handle, or NULL if job system not available or sync fallback used
 ================
 */
 job_handle_t *FS_ReadFile_Async(const char *qpath, void **buffer, int *result) {
+	// Input validation
+	if (!qpath || !*qpath || !buffer || !result) {
+		Com_Printf(S_COLOR_RED "FS_ReadFile_Async: Invalid parameters\n");
+		if (result) *result = -1;
+		return NULL;
+	}
+
+	// Security check
+	if (!Q_ValidateFilePath(qpath)) {
+		Com_Printf(S_COLOR_RED "FS_ReadFile_Async: Path traversal attempt blocked: %s\n", qpath);
+		*result = -1;
+		return NULL;
+	}
+
 #ifdef USE_JOBSYSTEM
-	// Allocate async load structure
+	// Allocate async load structure with error handling
 	async_load_t *load = Z_Malloc(sizeof(async_load_t));
+	if (!load) {
+		Com_Printf(S_COLOR_RED "FS_ReadFile_Async: Failed to allocate async load structure\n");
+		*result = -1;
+		return NULL;
+	}
+
 	load->filename = qpath;
 	load->buffer = buffer;
 	load->result = result;
 	load->completed = qfalse;
 	*result = -1; // Default to error
 
-	// Submit job to job system
+	// Determine appropriate job priority based on file type
+	jobPriority_t priority = JOB_PRIORITY_NORMAL;
+
+	// High priority for critical game files
+	if (Q_stristr(qpath, ".bsp") || Q_stristr(qpath, ".shader") ||
+	    Q_stristr(qpath, ".arena") || Q_stristr(qpath, ".cfg")) {
+		priority = JOB_PRIORITY_HIGH;
+	}
+	// Low priority for optional assets
+	else if (Q_stristr(qpath, ".jpg") || Q_stristr(qpath, ".png") ||
+	         Q_stristr(qpath, ".wav") || Q_stristr(qpath, ".mp3")) {
+		priority = JOB_PRIORITY_LOW;
+	}
+
+	// Submit job to job system with appropriate priority
 	job_handle_t *handle = JobSystem_SubmitJobWithCompletion(
-		FS_ReadFile_Async_Worker, load, JOB_PRIORITY_NORMAL,
+		FS_ReadFile_Async_Worker, load, priority,
 		Z_Free, load); // Free the load structure when complete
+
+	if (handle) {
+		// Track active async loads for resource management
+		fs_activeAsyncLoads++;
+	}
 
 	return handle;
 #else
@@ -2893,6 +3144,17 @@ a null buffer will just return the file length without loading
 	if ( !Q_ValidateFilePath( qpath ) ) {
 		Com_Printf( S_COLOR_RED "FS_ReadFile: Path traversal attempt blocked: %s\n", qpath );
 		return -1;
+	}
+
+	// Check resource cache first for frequently accessed files
+	if (buffer && FS_ResourceCacheEnabled()) {
+		len = FS_ResourceCacheGet(qpath, buffer);
+		if (len >= 0) {
+			fs_loadCount++;
+			fs_loadStack++;
+			Com_DPrintf("FS_ReadFile: '%s' loaded from resource cache (%d bytes)\n", qpath, len);
+			return len;
+		}
 	}
 
 	buf = NULL;	// quiet compiler warning
@@ -2996,6 +3258,18 @@ a null buffer will just return the file length without loading
 		(void)FS_Write( buf, len, com_journalDataFile );
 		FS_Flush( com_journalDataFile );
 	}
+
+	// Cache the file if it's small enough and caching is enabled
+	if (FS_ResourceCacheEnabled() && len > 0 && len <= FS_RESOURCE_CACHE_MAX_SIZE) {
+		// Only cache certain file types that are frequently accessed
+		const char *ext = COM_GetExtension(qpath);
+		if (ext && (Q_stricmp(ext, "tga") == 0 || Q_stricmp(ext, "jpg") == 0 ||
+					Q_stricmp(ext, "png") == 0 || Q_stricmp(ext, "shader") == 0 ||
+					Q_stricmp(ext, "cfg") == 0 || Q_stricmp(ext, "txt") == 0)) {
+			FS_ResourceCacheAdd(qpath, buf, len);
+		}
+	}
+
 	return len;
 }
 
@@ -3540,8 +3814,8 @@ static qboolean FS_LoadPakFromFile( FILE *f )
 	pack->pakBasename = (char*)( pack->pakFilename + pk.pakNameLen );
 	pack->headerLongs = (int*)( pack->pakBasename + pakBaseLen );
 
-	strcpy( pack->pakFilename, pakName );
-	strcpy( pack->pakBasename, pakBase );
+	Q_strncpyz( pack->pakFilename, pakName, pk.pakNameLen );
+	Q_strncpyz( pack->pakBasename, pakBase, pakBaseLen );
 
 	if ( fread( namePtr, pk.namesLen, 1, f ) != 1 )
 	{
@@ -3900,7 +4174,7 @@ pack_t *FS_LoadZipFile( const char *zipfile )
 			unzGetCurrentFileInfoPosition( uf, &curFile->pos );
 			curFile->size = file_info.uncompressed_size;
 			curFile->name = namePtr;
-			strcpy( curFile->name, filename_inzip );
+			Q_strncpyz( curFile->name, filename_inzip, MAX_ZPATH );
 			namePtr += strlen( filename_inzip ) + 1;
 
 			// update hash table
@@ -4053,7 +4327,7 @@ static int FS_ReturnPath( const char *zname, char *zpath, int *depth ) {
 		}
 		at++;
 	}
-	strcpy(zpath, zname);
+	Q_strncpyz(zpath, zname, MAX_ZPATH);
 	zpath[len] = '\0';
 	*depth = newdep;
 
@@ -4063,9 +4337,10 @@ static int FS_ReturnPath( const char *zname, char *zpath, int *depth ) {
 
 char *FS_CopyString( const char *in ) {
 	char *out;
-	//out = S_Malloc( strlen( in ) + 1 );
-	out = Z_Malloc( strlen( in ) + 1 );
-	strcpy( out, in );
+	int len = (int)strlen( in ) + 1;
+	//out = S_Malloc( len );
+	out = Z_Malloc( len );
+	Q_strncpyz( out, in, len );
 	return out;
 }
 
@@ -4131,7 +4406,7 @@ Returns a unique list of files that match the given criteria
 from all search paths
 ===============
 */
-static char **FS_ListFilteredFiles( const char *path, const char *extension, const char *filter, int *numfiles, int flags ) {
+static char **FS_ListFilteredFiles( const char *restrict path, const char *restrict extension, const char *restrict filter, int *restrict numfiles, int flags ) {
 	int				nfiles;
 	char			**listCopy;
 	char			*list[MAX_FOUND_FILES];
@@ -4352,7 +4627,7 @@ int	FS_GetFileList( const char *path, const char *extension, char *listbuf, int 
 	for (i =0; i < nFiles; i++) {
 		nLen = strlen(pFiles[i]) + 1;
 		if (nTotal + nLen + 1 < bufsize) {
-			strcpy(listbuf, pFiles[i]);
+			Q_strncpyz(listbuf, pFiles[i], nLen);
 			listbuf += nLen;
 			nTotal += nLen;
 		}
@@ -4662,9 +4937,9 @@ static int FS_GetModList( char *listbuf, int bufsize ) {
 			nDescLen = strlen( description ) + 1;
 
 			if ( nTotal + nLen + 1 + nDescLen + 1 < bufsize ) {
-				strcpy( listbuf, name );
+				Q_strncpyz( listbuf, name, nLen );
 				listbuf += nLen;
-				strcpy( listbuf, description );
+				Q_strncpyz( listbuf, description, nDescLen );
 				listbuf += nDescLen;
 				nTotal += nLen + nDescLen;
 				nMods++;
@@ -5031,8 +5306,8 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 	search->dir->path = (char*)( search->dir + 1 );
 	search->dir->gamedir = (char*)( search->dir->path + path_len );
 
-	strcpy( search->dir->path, path );
-	strcpy( search->dir->gamedir, dir );
+	Q_strncpyz( search->dir->path, path, path_len );
+	Q_strncpyz( search->dir->gamedir, dir, dir_len );
 	gamedir = search->dir->gamedir;
 
 	search->next = fs_searchpaths;
@@ -5138,8 +5413,8 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 			search->dir->gamedir = (char*)( search->dir->path + path_len );
 			search->policy = DIR_ALLOW;
 
-			strcpy( search->dir->path, curpath );				// c:\quake3\baseq3
-			strcpy( search->dir->gamedir, pakdirs[ pakdirsi ] );// mypak.pk3dir
+			Q_strncpyz( search->dir->path, curpath, path_len );				// c:\quake3\baseq3
+			Q_strncpyz( search->dir->gamedir, pakdirs[ pakdirsi ], dir_len );// mypak.pk3dir
 
 			search->next = fs_searchpaths;
 			fs_searchpaths = search;
@@ -5699,15 +5974,13 @@ static void FS_Startup( void ) {
 	Cvar_SetDescription( fs_existenceCache, "Enable file existence caching to reduce I/O overhead (C23 improvement)" );
 	
 	fs_cacheSize = Cvar_Get( "fs_cacheSize", "1024", CVAR_ARCHIVE );
+
+	fs_resourceCacheEnabled = Cvar_Get( "fs_resourceCache", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( fs_resourceCacheEnabled, "Enable resource caching for frequently accessed files" );
 	
-	// TODO: Case-insensitive file lookups - default based on platform
-	#ifdef _WIN32
-		fs_caseInsensitive = Cvar_Get( "fs_caseInsensitive", "1", CVAR_ARCHIVE );
-	#elif defined(__APPLE__)
-		fs_caseInsensitive = Cvar_Get( "fs_caseInsensitive", "1", CVAR_ARCHIVE );
-	#else
-		fs_caseInsensitive = Cvar_Get( "fs_caseInsensitive", "0", CVAR_ARCHIVE );
-	#endif
+	// Case-insensitive file lookups - default based on platform
+	fs_caseInsensitive = Cvar_Get( "fs_caseInsensitive",
+		Platform_IsCaseInsensitiveFilesystem() ? "1" : "0", CVAR_ARCHIVE );
 	Cvar_SetDescription( fs_caseInsensitive, "Enable case-insensitive file lookups for directory files (default: 1 on Windows/macOS, 0 on Linux)" );
 	Cvar_SetDescription( fs_cacheSize, "Size of filesystem caches (C23 improvement)" );
 	
@@ -6020,9 +6293,9 @@ const char *FS_LoadedPakChecksums( qboolean *overflowed ) {
 			continue;
 
 		if ( info[0] )
-			len = sprintf( buf, " %i", search->pack->checksum );
+			len = Com_sprintf( buf, sizeof(buf), " %i", search->pack->checksum );
 		else
-			len = sprintf( buf, "%i", search->pack->checksum );
+			len = Com_sprintf( buf, sizeof(buf), "%i", search->pack->checksum );
 
 		if ( s + len > max ) {
 			*overflowed = qtrue;
@@ -6305,7 +6578,7 @@ void FS_PureServerSetLoadedPaks( const char *pakSums, const char *pakNames ) {
 	FS_SetDirPolicy( c ? DIR_DENY : DIR_ALLOW );
 
 	for ( i = 0 ; i < c ; i++ ) {
-		fs_serverPaks[i] = atoi( Cmd_Argv( i ) );
+		fs_serverPaks[i] = Q_SafeAtoi( Cmd_Argv( i ), 0, NULL );
 	}
 
 	if ( fs_numServerPaks ) {
@@ -6423,9 +6696,8 @@ void FS_InitFilesystem( void ) {
 	Com_StartupVariable( "fs_locked" );
 #endif
 
-#ifdef _WIN32
- 	_setmaxstdio( 2048 );
-#endif
+	// Set platform-specific maximum file descriptors
+	Platform_SetMaxFileDescriptors(Platform_GetMaxFileDescriptors());
 
 	// try to start up normally
 	FS_Restart( 0 );
@@ -6482,6 +6754,9 @@ void FS_Restart( int checksumFeed ) {
 		Com_Printf( "WARNING: default.cfg not found. Using engine defaults.\n" );
 		Com_Printf( "  Note: Create default.cfg in your %s directory to set default settings.\n", BASEGAME );
 	}
+
+	// Preload critical resources to reduce loading stalls
+	FS_PreloadCriticalResources();
 
 	// new check before safeMode
 	if ( Q_stricmp(fs_gamedirvar->string, lastValidGame) && execConfig ) {

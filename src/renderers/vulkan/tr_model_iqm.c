@@ -661,7 +661,7 @@ qboolean R_LoadIQM( model_t *mod, void *buffer, int filesize, const char *mod_na
 
 	mod->type = MOD_IQM;
 	iqmData = (iqmData_t *)ri.Hunk_Alloc( size, h_low );
-	mod->modelData = iqmData;
+	mod->modelData.iqm = iqmData;
 
 	// fill header
 	iqmData->num_vertexes = ( header->num_meshes > 0 ) ? header->num_vertexes : 0;

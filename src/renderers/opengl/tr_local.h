@@ -23,6 +23,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef TR_LOCAL_H
 #define TR_LOCAL_H
 
+#define TR_GLOBALS_DEFINED
+
 #define USE_LEGACY_DLIGHTS	// vq3 dynamic lights
 #define USE_PMLIGHT			// promode dynamic lights via \r_dlightMode 1|2
 #define MAX_REAL_DLIGHTS	(MAX_DLIGHTS*2)
@@ -44,6 +46,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../renderercommon/tr_backend_iface.h"
 #include "tr_common.h"
 #include "iqm.h"
+#include "tr_tiki.h"
 #include "qgl.h"
 #include "qgl_linked.h"
 
@@ -980,9 +983,16 @@ typedef struct model_s {
 	int			dataSize;	// just for listing purposes
 	bmodel_t	*bmodel;		// only if type == MOD_BRUSH
 	md3Header_t	*md3[MD3_MAX_LODS];	// only if type == MOD_MESH
-	void	*modelData;			// only if type == (MOD_MDR | MOD_IQM | MOD_TIKI)
+	union {
+		mdrHeader_t	*mdr;		// only if type == MOD_MDR
+		iqmData_t	*iqm;		// only if type == MOD_IQM
+		tikiData_t	*tiki;		// only if type == MOD_TIKI
+	} modelData;
 
 	int			 numLods;
+
+	// Hash table linkage for fast name lookups
+	struct model_s *nextHash;
 } model_t;
 
 #define	MAX_MOD_KNOWN	1024
@@ -1253,6 +1263,10 @@ typedef struct {
 	//
 	model_t					*models[MAX_MOD_KNOWN];
 	int						numModels;
+
+	// Model name hash table for fast lookups
+#define MODEL_HASH_SIZE 256
+	model_t					*modelHashTable[MODEL_HASH_SIZE];
 
 	int						numImages;
 	image_t					*images[MAX_DRAWIMAGES];

@@ -74,7 +74,7 @@ const char *COM_GetExtension( const char *name )
 COM_StripExtension
 ============
 */
-void COM_StripExtension( const char *in, char *out, int destsize )
+void COM_StripExtension( const char *restrict in, char *restrict out, int destsize )
 {
 	const char *dot = strrchr(in, '.'), *slash;
 
@@ -122,7 +122,7 @@ if path doesn't have an extension, then append
  the specified one (which should include the .)
 ==================
 */
-void COM_DefaultExtension( char *path, int maxSize, const char *extension )
+void COM_DefaultExtension( char *restrict path, int maxSize, const char *restrict extension )
 {
 	const char *dot = strrchr(path, '.'), *slash;
 	if (dot && ((slash = strrchr(path, '/')) == NULL || slash < dot))
@@ -1002,7 +1002,7 @@ void SkipRestOfLine( const char **data ) {
 }
 
 
-void Parse1DMatrix( const char **buf_p, int x, float *m ) {
+void Parse1DMatrix( const char ** restrict buf_p, int x, float * restrict m ) {
 	const char	*token;
 	int		i;
 
@@ -1017,7 +1017,7 @@ void Parse1DMatrix( const char **buf_p, int x, float *m ) {
 }
 
 
-void Parse2DMatrix( const char **buf_p, int y, int x, float *m ) {
+void Parse2DMatrix( const char ** restrict buf_p, int y, int x, float * restrict m ) {
 	int		i;
 
 	COM_MatchToken( buf_p, "(" );
@@ -1030,7 +1030,7 @@ void Parse2DMatrix( const char **buf_p, int y, int x, float *m ) {
 }
 
 
-void Parse3DMatrix( const char **buf_p, int z, int y, int x, float *m ) {
+void Parse3DMatrix( const char ** restrict buf_p, int z, int y, int x, float * restrict m ) {
 	int		i;
 
 	COM_MatchToken( buf_p, "(" );
@@ -1292,6 +1292,37 @@ qboolean Q_isintegral( float f )
     return (int)f == f;
 }
 
+/*
+============
+Scoped Allocation Pattern
+
+Provides RAII-like resource management for C code.
+Usage:
+    SCOPED_ALLOC(void *, buffer, Z_Malloc(size), Z_Free);
+    if (!buffer) return qfalse;
+    // use buffer...
+    return qtrue; // automatically freed
+============
+*/
+#define SCOPED_ALLOC(type, name, alloc_expr, free_func) \
+    type name __attribute__((cleanup(free_func##_cleanup))) = alloc_expr
+
+#ifdef Q3_VM
+static inline void Z_Free_cleanup(void **ptr) {
+    if (*ptr) {
+        Z_Free(*ptr);
+        *ptr = NULL;
+    }
+}
+
+static inline void ri_FS_FreeFile_cleanup(void **ptr) {
+    if (*ptr) {
+        ri.FS_FreeFile(*ptr);
+        *ptr = NULL;
+    }
+}
+#endif
+
 
 #ifdef _WIN32
 /*
@@ -1339,7 +1370,7 @@ Safe strncpy that ensures a trailing zero
 @note Calls Com_Error(ERR_FATAL) if dest or src is NULL, or destsize < 1
 =============
 */
-void Q_strncpyz( char *dest, const char *src, int destsize ) 
+void Q_strncpyz( char * restrict dest, const char * restrict src, int destsize ) 
 {
 	if ( !dest ) 
 	{
@@ -1389,7 +1420,7 @@ Allows src and dest to be overlapped for QVM compatibility purposes
 @note Handles overlapping buffers correctly
 =============
 */
-char *Q_strncpy( char *dest, const char *src, int destsize )
+char *Q_strncpy( char * restrict dest, const char * restrict src, int destsize )
 {
 	const char *s = src;
 	char *start = dest;
@@ -1628,7 +1659,7 @@ char *Q_strupr( char *s1 ) {
 
 
 // never goes past bounds or leaves without a terminating 0
-void Q_strcat( char *dest, int size, const char *src ) {
+void Q_strcat( char *restrict dest, int size, const char *restrict src ) {
 	int		l1;
 
 	l1 = strlen( dest );
@@ -1639,7 +1670,7 @@ void Q_strcat( char *dest, int size, const char *src ) {
 }
 
 
-char *Q_stradd( char *dst, const char *src )
+char *Q_stradd( char * restrict dst, const char * restrict src )
 {
 	char c;
 	while ( (c = *src++) != '\0' )
@@ -1924,7 +1955,7 @@ Com_TruncateLongString
 Assumes buffer is at least TRUNCATE_LENGTH big
 ============
 */
-void Com_TruncateLongString( char *buffer, const char *s )
+void Com_TruncateLongString( char *restrict buffer, const char *restrict s )
 {
 	int length = strlen( s );
 
@@ -2294,7 +2325,7 @@ qboolean Info_SetValueForKey_s( char *s, int slen, const char *key, const char *
 		return qfalse;
 	}
 
-	strcpy( s + len1, newi );
+	Q_strncpyz( s + len1, newi, slen - len1 );
 	return qtrue;
 }
 
@@ -2463,5 +2494,124 @@ long Q_SafeAtol(const char *s, long defaultValue, qboolean *error) {
 
 	if (error) *error = qfalse;
 	return val;
+}
+
+/*
+===============================================================================
+
+PLATFORM ABSTRACTION
+
+===============================================================================
+*/
+
+static platform_info_t platform_info;
+
+const platform_info_t *Platform_GetInfo(void) {
+    return &platform_info;
+}
+
+void Platform_Init(void) {
+    // Initialize platform information based on compile-time defines
+    Com_Memset(&platform_info, 0, sizeof(platform_info));
+
+#if defined(_WIN32)
+    platform_info.type = PLATFORM_WINDOWS;
+    platform_info.os_string = OS_STRING;
+    platform_info.dll_extension = ".dll";
+    platform_info.path_separator = '\\';
+    platform_info.path_separator_foreign = '/';
+    platform_info.newline = "\r\n";
+    platform_info.case_insensitive_filesystem = qtrue;
+    platform_info.supports_unicode = qtrue;
+#elif defined(__APPLE__)
+    platform_info.type = PLATFORM_MACOS;
+    platform_info.os_string = "macos";
+    platform_info.dll_extension = ".dylib";
+    platform_info.path_separator = '/';
+    platform_info.path_separator_foreign = '\\';
+    platform_info.newline = "\n";
+    platform_info.case_insensitive_filesystem = qtrue;  // HFS+ is case-insensitive by default
+    platform_info.supports_unicode = qtrue;
+#elif defined(__ANDROID__)
+    platform_info.type = PLATFORM_ANDROID;
+    platform_info.os_string = "android";
+    platform_info.dll_extension = ".so";
+    platform_info.path_separator = '/';
+    platform_info.path_separator_foreign = '\\';
+    platform_info.newline = "\n";
+    platform_info.case_insensitive_filesystem = qfalse;
+    platform_info.supports_unicode = qtrue;
+#elif defined(__linux__)
+    platform_info.type = PLATFORM_LINUX;
+    platform_info.os_string = "linux";
+    platform_info.dll_extension = ".so";
+    platform_info.path_separator = '/';
+    platform_info.path_separator_foreign = '\\';
+    platform_info.newline = "\n";
+    platform_info.case_insensitive_filesystem = qfalse;
+    platform_info.supports_unicode = qtrue;
+#elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
+    platform_info.type = PLATFORM_BSD;
+    #if defined(__FreeBSD__)
+    platform_info.os_string = "freebsd";
+    #elif defined(__NetBSD__)
+    platform_info.os_string = "netbsd";
+    #else
+    platform_info.os_string = "openbsd";
+    #endif
+    platform_info.dll_extension = ".so";
+    platform_info.path_separator = '/';
+    platform_info.path_separator_foreign = '\\';
+    platform_info.newline = "\n";
+    platform_info.case_insensitive_filesystem = qfalse;
+    platform_info.supports_unicode = qtrue;
+#else
+    platform_info.type = PLATFORM_UNKNOWN;
+    platform_info.os_string = "unknown";
+    platform_info.dll_extension = ".so";
+    platform_info.path_separator = '/';
+    platform_info.path_separator_foreign = '\\';
+    platform_info.newline = "\n";
+    platform_info.case_insensitive_filesystem = qfalse;
+    platform_info.supports_unicode = qfalse;
+#endif
+}
+
+qboolean Platform_IsCaseInsensitiveFilesystem(void) {
+    return platform_info.case_insensitive_filesystem;
+}
+
+int Platform_GetMaxFileDescriptors(void) {
+#if defined(_WIN32)
+    return 2048;  // Windows default
+#else
+    return 1024;  // Unix-like systems
+#endif
+}
+
+void Platform_SetMaxFileDescriptors(int max_fds) {
+#if defined(_WIN32)
+    _setmaxstdio(max_fds);
+#else
+    // Unix systems typically don't need explicit setting
+    (void)max_fds;  // Suppress unused parameter warning
+#endif
+}
+
+char *Platform_NormalizePath(char *path) {
+    if (!path) return NULL;
+
+    char *p = path;
+    while (*p) {
+        if (*p == platform_info.path_separator_foreign) {
+            *p = platform_info.path_separator;
+        }
+        p++;
+    }
+    return path;
+}
+
+const char *Platform_GetNewline(void) {
+    return platform_info.newline;
 }
 

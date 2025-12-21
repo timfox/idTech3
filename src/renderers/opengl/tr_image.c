@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 // tr_image.c
 #include "tr_local.h"
+#include "../../common/job_system.h"
 
 static byte	s_intensitytable[256];
 static byte	s_gammatable[256];
@@ -378,6 +379,12 @@ static void R_MipMap2( unsigned * const out, unsigned * const in, int inWidth, i
 	outWidth = inWidth >> 1;
 	outHeight = inHeight >> 1;
 
+	// Check for potential integer overflow in allocation
+	if (outWidth > INT_MAX / 4 || outHeight > INT_MAX / (outWidth * 4)) {
+		ri.Printf(PRINT_WARNING, "R_ResampleTexture: Image dimensions too large (%dx%d)\n", outWidth, outHeight);
+		return qfalse;
+	}
+
 	if ( out == in )
 		temp = ri.Hunk_AllocateTempMemory( outWidth * outHeight * 4 );
 	else
@@ -655,6 +662,11 @@ static void Upload32( byte *data, int x, int y, int width, int height, image_t *
 
 	if ( scaled_width != width || scaled_height != height ) {
 		if ( data ) {
+			// Check for potential integer overflow in allocation
+			if (scaled_width > INT_MAX / 4 || scaled_height > INT_MAX / (scaled_width * 4)) {
+				ri.Printf(PRINT_WARNING, "R_CreateImage: Scaled image dimensions too large (%dx%d)\n", scaled_width, scaled_height);
+				return NULL;
+			}
 			resampledBuffer = ri.Hunk_AllocateTempMemory( scaled_width * scaled_height * 4 );
 			ResampleTexture( (unsigned*)data, width, height, (unsigned*)resampledBuffer, scaled_width, scaled_height );
 			data = resampledBuffer;
@@ -802,10 +814,10 @@ image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int widt
 
 	image = ri.Hunk_Alloc( sizeof( *image ) + namelen + namelen2, h_low );
 	image->imgName = (char *)( image + 1 );
-	strcpy( image->imgName, name );
+	Q_strncpyz( image->imgName, name, namelen );
 	if ( namelen2 ) {
 		image->imgName2 = image->imgName + namelen;
-		strcpy( image->imgName2, name2 );
+		Q_strncpyz( image->imgName2, name2, namelen2 );
 	} else {
 		image->imgName2 = image->imgName; 
 	}
@@ -1049,6 +1061,123 @@ job_handle_t *R_LoadImage_Async(const char *name, byte **pic, int *width, int *h
 }
 #endif
 
+/*
+================
+R_UpdateAsyncImages
+
+Update any pending async image loads
+================
+*/
+static void R_UpdateAsyncImages(void) {
+#ifdef USE_JOBSYSTEM
+	// Job system handles completion callbacks automatically
+	// This function is here for potential future expansion
+#endif
+}
+
+// Streaming system for predictive asset loading
+#ifdef USE_JOBSYSTEM
+#define MAX_STREAMING_IMAGES 8
+static struct {
+	char name[MAX_QPATH];
+	job_handle_t *handle;
+	qboolean active;
+} streamingImages[MAX_STREAMING_IMAGES];
+#endif
+
+/*
+================
+R_StreamImage
+
+Predictively load an image that might be needed soon
+================
+*/
+static void R_StreamImage(const char *name) {
+#ifdef USE_JOBSYSTEM
+	if (!name || !*name) {
+		return;
+	}
+
+	// Check if already streaming
+	for (int i = 0; i < MAX_STREAMING_IMAGES; i++) {
+		if (streamingImages[i].active &&
+			Q_stricmp(streamingImages[i].name, name) == 0) {
+			return; // Already streaming
+		}
+	}
+
+	// Check if already loaded
+	if (R_FindImageFile(name, IMGFLAG_NONE)) {
+		return; // Already loaded
+	}
+
+	// Find free slot
+	int slot = -1;
+	for (int i = 0; i < MAX_STREAMING_IMAGES; i++) {
+		if (!streamingImages[i].active) {
+			slot = i;
+			break;
+		}
+	}
+
+	if (slot == -1) {
+		ri.Printf(PRINT_DEVELOPER, "R_StreamImage: No free streaming slots for %s\n", name);
+		return;
+	}
+
+	// Start async load
+	Q_strncpyz(streamingImages[slot].name, name, sizeof(streamingImages[slot].name));
+	streamingImages[slot].active = qtrue;
+
+	byte *pic = NULL;
+	int width, height;
+	const char *result_name;
+
+	streamingImages[slot].handle = R_LoadImage_Async(name, &pic, &width, &height, &result_name);
+
+	if (!streamingImages[slot].handle) {
+		ri.Printf(PRINT_DEVELOPER, "R_StreamImage: Failed to start async load for %s\n", name);
+		streamingImages[slot].active = qfalse;
+		return;
+	}
+
+	ri.Printf(PRINT_DEVELOPER, "R_StreamImage: Started streaming %s\n", name);
+}
+#endif
+
+#ifndef USE_JOBSYSTEM
+static void R_StreamImage([[maybe_unused]] const char *name) {
+	// No-op when job system not available
+}
+#endif
+
+/*
+================
+R_UpdateStreaming
+
+Update streaming system and complete any finished loads
+================
+*/
+#ifdef USE_JOBSYSTEM
+static void R_UpdateStreaming(void) {
+	for (int i = 0; i < MAX_STREAMING_IMAGES; i++) {
+		if (streamingImages[i].active && streamingImages[i].handle) {
+			// Check if job is complete
+			if (streamingImages[i].handle->completed) {
+				ri.Printf(PRINT_DEVELOPER, "R_UpdateStreaming: Completed streaming %s\n", streamingImages[i].name);
+				streamingImages[i].active = qfalse;
+				streamingImages[i].handle = NULL;
+			}
+		}
+	}
+}
+#endif
+
+#ifndef USE_JOBSYSTEM
+static void R_UpdateStreaming(void) {
+	// No-op when job system not available
+}
+#endif
 
 /*
 ===============
@@ -1856,6 +1985,11 @@ qhandle_t RE_RegisterSkin( const char *name ) {
 	}
 
 	// copy surfaces to skin
+	// Check for potential integer overflow in allocation
+	if (skin->numSurfaces > INT_MAX / sizeof(skinSurface_t)) {
+		ri.Printf(PRINT_WARNING, "R_LoadSkin: Too many surfaces in skin '%s'\n", name);
+		return 0;
+	}
 	skin->surfaces = ri.Hunk_Alloc( skin->numSurfaces * sizeof( skinSurface_t ), h_low );
 	memcpy( skin->surfaces, parseSurfaces, skin->numSurfaces * sizeof( skinSurface_t ) );
 

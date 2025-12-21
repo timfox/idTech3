@@ -115,10 +115,11 @@ extern qhandle_t RE_RegisterShaderNoMip( const char *name );
 static FT_Library ftLibrary = NULL;  
 #endif
 
-#define MAX_FONTS 6
-#define MAX_FONT_CACHE 32  // Extended cache for better performance
+// Dynamic font limits
+static int maxFonts = 0;
+static int maxFontCache = 0;
 static int registeredFontCount = 0;
-static fontInfo_t registeredFont[MAX_FONTS];
+static fontInfo_t *registeredFont = NULL;
 
 // Font cache entry for name+size lookup
 typedef struct {
@@ -129,7 +130,7 @@ typedef struct {
 	qboolean useSDF;
 } fontCacheEntry_t;
 
-static fontCacheEntry_t fontCache[MAX_FONT_CACHE];
+static fontCacheEntry_t *fontCache = NULL;
 static int fontCacheCount = 0;
 
 // Glyph subsetting support
@@ -145,6 +146,15 @@ typedef struct glyphSubset_s {
 } glyphSubset_t;
 
 static glyphSubset_t glyphSubset;
+
+// Comparator function for qsort - sorts characters by usage frequency (descending)
+static int CompareCharUsage(const void *a, const void *b) {
+	int charA = *(const int *)a;
+	int charB = *(const int *)b;
+	int usageA = glyphSubset.usageCount[charA];
+	int usageB = glyphSubset.usageCount[charB];
+	return usageB - usageA; // Sort descending by usage
+}
 
 /*
 =================
@@ -205,21 +215,14 @@ static void R_FinalizeGlyphSubset(void) {
 
 	ri.Printf(PRINT_ALL, "R_FinalizeGlyphSubset: %d characters used, %d total usages\n", usedChars, totalUsage);
 
-	// Sort characters by usage frequency (simple bubble sort for now)
+	// Sort characters by usage frequency
 	int charOrder[256];
 	for (int i = 0; i < 256; i++) {
 		charOrder[i] = i;
 	}
 
-	for (int i = 0; i < 255; i++) {
-		for (int j = 0; j < 255 - i; j++) {
-			if (glyphSubset.usageCount[charOrder[j]] < glyphSubset.usageCount[charOrder[j + 1]]) {
-				int temp = charOrder[j];
-				charOrder[j] = charOrder[j + 1];
-				charOrder[j + 1] = temp;
-			}
-		}
-	}
+	// Use qsort for efficient sorting (O(n log n) vs O(n^2))
+	qsort(charOrder, 256, sizeof(int), CompareCharUsage);
 
 	// Create subset mapping - include most frequently used characters first
 	glyphSubset.subsetSize = 0;
@@ -253,7 +256,7 @@ R_GetGlyphSubsetIndex
 Get the subset index for a character code, or -1 if not in subset
 =================
 */
-static int __attribute__((unused)) R_GetGlyphSubsetIndex(int charCode) {
+static int R_GetGlyphSubsetIndex(int charCode) [[maybe_unused]] {
 	if (!glyphSubset.enabled || !glyphSubset.finalized) {
 		return charCode & 255; // Use original indexing if subsetting disabled
 	}
@@ -271,7 +274,7 @@ R_IsGlyphInSubset
 Check if a character is in the current glyph subset
 =================
 */
-static qboolean __attribute__((unused)) R_IsGlyphInSubset(int charCode) {
+static qboolean R_IsGlyphInSubset(int charCode) [[maybe_unused]] {
 	if (!glyphSubset.enabled || !glyphSubset.finalized) {
 		return qtrue; // All glyphs available if subsetting disabled
 	}
@@ -339,14 +342,15 @@ static int asyncFontJobCount = 0;
 static void R_AddFontToCache(const char *fontName, int pointSize, qboolean useSDF, fontInfo_t *font) {
 	int slot = registeredFontCount;
 
-	if (registeredFontCount >= MAX_FONTS) {
-		ri.Printf(PRINT_WARNING, "RE_RegisterFont: Too many fonts registered already.\n");
+	if (registeredFontCount >= maxFonts) {
+		ri.Printf(PRINT_WARNING, "RE_RegisterFont: Too many fonts registered already (%d/%d).\n",
+			registeredFontCount, maxFonts);
 		return;
 	}
 
 	Com_Memcpy(&registeredFont[slot], font, sizeof(fontInfo_t));
 
-	if (fontCacheCount < MAX_FONT_CACHE) {
+	if (fontCacheCount < maxFontCache) {
 		fontCacheEntry_t *entry = &fontCache[fontCacheCount++];
 		Q_strncpyz(entry->fontName, fontName, sizeof(entry->fontName));
 		entry->pointSize = pointSize;
@@ -393,12 +397,21 @@ static FT_Bitmap *R_RenderGlyph_Improved(FT_GlyphSlot glyph, glyphInfo_t* glyphO
 		size   = pitch*height; 
 
 		bit2 = ri.Malloc(sizeof(FT_Bitmap));
+		if (!bit2) {
+			ri.Printf(PRINT_WARNING, "R_RenderGlyph_Improved: Failed to allocate FT_Bitmap\n");
+			return NULL;
+		}
 
 		bit2->width      = width;
 		bit2->rows       = height;
 		bit2->pitch      = pitch;
 		bit2->pixel_mode = ft_pixel_mode_grays;
 		bit2->buffer     = ri.Malloc(pitch*height);
+		if (!bit2->buffer) {
+			ri.Printf(PRINT_WARNING, "R_RenderGlyph_Improved: Failed to allocate bitmap buffer\n");
+			ri.Free(bit2);
+			return NULL;
+		}
 		bit2->num_grays = 256;
 
 		Com_Memset( bit2->buffer, 0, size );
@@ -433,6 +446,10 @@ static void WriteTGA (const char *filename, byte *data, int width, int height) {
 	unsigned char  *src, *dst;
 
 	buffer = ri.Malloc(width*height*4 + 18);
+	if (!buffer) {
+		ri.Printf(PRINT_WARNING, "WriteTGA: Failed to allocate buffer for %s\n", filename);
+		return;
+	}
 	Com_Memset (buffer, 0, 18);
 	buffer[2] = 2;		// uncompressed type
 	buffer[12] = width&255;
@@ -453,6 +470,11 @@ static void WriteTGA (const char *filename, byte *data, int width, int height) {
 
 	// flip upside down
 	flip = (unsigned char *)ri.Malloc(width*4);
+	if (!flip) {
+		ri.Printf(PRINT_WARNING, "WriteTGA: Failed to allocate flip buffer for %s\n", filename);
+		ri.Free(buffer);
+		return;
+	}
 	for(row = 0; row < height/2; row++)
 	{
 		src = buffer + 18 + row * 4 * width;
@@ -753,6 +775,141 @@ flags: optional flags (future: bold, italic, etc.)
 */
 /*
 =================
+R_FontFallbackChain
+Comprehensive fallback chain when primary font loading methods fail
+=================
+*/
+static qboolean R_FontFallbackChain(const char *fontName, int pointSize, fontInfo_t *font, qboolean wantSDF) {
+	ri.Printf(PRINT_ALL, "R_FontFallbackChain: Attempting fallback loading for '%s' (%dpt)\n", fontName, pointSize);
+
+	// Fallback 1: Try different file extensions
+	const char *extensions[] = { ".ttf", ".otf", ".woff", ".woff2" };
+	char altFontName[MAX_QPATH];
+
+	for (int i = 0; i < ARRAY_LEN(extensions); i++) {
+		COM_StripExtension(fontName, altFontName, sizeof(altFontName));
+		Q_strcat(altFontName, sizeof(altFontName), extensions[i]);
+
+		if (Q_stricmp(altFontName, fontName) != 0) { // Don't try the same file twice
+			ri.Printf(PRINT_ALL, "R_FontFallbackChain: Trying extension '%s'\n", extensions[i]);
+			if (RE_RegisterFont_Sync(altFontName, pointSize, font, wantSDF)) {
+				ri.Printf(PRINT_ALL, "R_FontFallbackChain: Success with extension '%s'\n", extensions[i]);
+				return qtrue;
+			}
+		}
+	}
+
+	// Fallback 2: Try common fallback fonts
+	const char *fallbackFonts[] = {
+		"fonts/DejaVuSans.ttf",
+		"fonts/Vera.ttf",
+		"fonts/FreeSans.ttf",
+		"fonts/LiberationSans-Regular.ttf",
+		"fonts/Arial.ttf",
+		"fonts/sans.ttf"
+	};
+
+	for (int i = 0; i < ARRAY_LEN(fallbackFonts); i++) {
+		ri.Printf(PRINT_ALL, "R_FontFallbackChain: Trying fallback font '%s'\n", fallbackFonts[i]);
+		if (RE_RegisterFont_Sync(fallbackFonts[i], pointSize, font, wantSDF)) {
+			ri.Printf(PRINT_WARNING, "R_FontFallbackChain: Using fallback font '%s' instead of '%s'\n",
+				fallbackFonts[i], fontName);
+			return qtrue;
+		}
+	}
+
+	// Fallback 3: Try built-in bitmap fonts (legacy .dat files)
+	char datName[MAX_QPATH];
+	Com_sprintf(datName, sizeof(datName), "fonts/fontImage_%i.dat", pointSize);
+	ri.Printf(PRINT_ALL, "R_FontFallbackChain: Trying legacy bitmap font '%s'\n", datName);
+
+	void *datData;
+	int datLen = ri.FS_ReadFile(datName, &datData);
+	if (datLen > 0) {
+		if (R_LoadFontFromDat(datData, datLen, font)) {
+			ri.Printf(PRINT_WARNING, "R_FontFallbackChain: Using legacy bitmap font '%s' instead of '%s'\n",
+				datName, fontName);
+			ri.FS_FreeFile(datData);
+			return qtrue;
+		}
+		ri.FS_FreeFile(datData);
+	}
+
+	// Fallback 4: Generate a simple built-in font
+	ri.Printf(PRINT_WARNING, "R_FontFallbackChain: All font loading methods failed for '%s', generating built-in font\n", fontName);
+	return R_GenerateBuiltInFont(pointSize, font);
+}
+
+/*
+=================
+R_LoadFontFromDat
+Load font from legacy .dat file format
+=================
+*/
+static qboolean R_LoadFontFromDat(void *data, int len, fontInfo_t *font) {
+	if (!data || len <= 0 || !font) {
+		return qfalse;
+	}
+
+	// Legacy .dat format loading would go here
+	// For now, return false to indicate this isn't implemented
+	// In a real implementation, this would parse the binary .dat format
+	return qfalse;
+}
+
+/*
+=================
+R_GenerateBuiltInFont
+Generate a simple built-in font as last resort
+=================
+*/
+static qboolean R_GenerateBuiltInFont(int pointSize, fontInfo_t *font) {
+	if (!font) {
+		return qfalse;
+	}
+
+	// Initialize font structure with minimal data
+	Com_Memset(font, 0, sizeof(fontInfo_t));
+
+	font->pointSize = pointSize;
+	font->glyphScale = pointSize / 48.0f; // Scale relative to 48pt reference
+
+	// Set up basic glyph information for ASCII characters
+	for (int i = 0; i < GLYPHS_PER_FONT && i < 128; i++) {
+		font->glyphs[i].width = pointSize / 2;  // Approximate character width
+		font->glyphs[i].height = pointSize;     // Character height
+		font->glyphs[i].xSkip = pointSize / 2;  // Advance width
+		font->glyphs[i].xOffset = 0;
+		font->glyphs[i].yOffset = 0;
+		font->glyphs[i].s = 0;
+		font->glyphs[i].t = 0;
+		font->glyphs[i].s2 = 0;
+		font->glyphs[i].t2 = 0;
+		font->glyphs[i].glyph = 0; // No actual glyph data
+	}
+
+	// Create a simple shader for the font
+	char shaderName[MAX_QPATH];
+	Com_sprintf(shaderName, sizeof(shaderName), "builtinFont_%d", pointSize);
+	font->shader = re.RegisterShader(shaderName);
+
+	if (font->shader == 0) {
+		// Create a basic white shader if registration fails
+		font->shader = re.RegisterShader("white");
+	}
+
+	font->isSDF = qfalse; // Not an SDF font
+	font->sdfSpread = 0;
+	font->hasKerning = qfalse;
+
+	Q_strncpyz(font->name, "built-in", sizeof(font->name));
+
+	ri.Printf(PRINT_WARNING, "R_GenerateBuiltInFont: Generated minimal built-in font (%dpt)\n", pointSize);
+	return qtrue;
+}
+
+/*
+=================
 RE_RegisterFont_Sync
 Synchronous font registration (original implementation)
 =================
@@ -933,8 +1090,8 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 			return qtrue;
 		}
 #ifndef USE_FREETYPE
-		ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType not available and stb_truetype failed for '%s'\n", fontName);
-		return qfalse;
+		// Try comprehensive fallback when FreeType is not available
+		return R_FontFallbackChain(fontName, pointSize, font, wantSDF);
 #else
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: stb_truetype failed for '%s', falling back to FreeType\n", fontName);
 #endif
@@ -942,20 +1099,21 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 #endif
 
 #ifndef USE_FREETYPE
-	ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType code not available\n");
+	// Try comprehensive fallback when FreeType is not available
+	return R_FontFallbackChain(fontName, pointSize, font, wantSDF);
 #else
 	ftLibrary = FreeType_GetLibrary();
 	if (ftLibrary == NULL) {
 		// Try to initialize FreeType if it hasn't been initialized yet
 		extern qboolean FreeType_Init(void);
 		if (!FreeType_Init()) {
-			ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType initialization failed.\n");
-			return qfalse;
+			ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType initialization failed, trying fallback.\n");
+			return R_FontFallbackChain(fontName, pointSize, font, wantSDF);
 		}
 		ftLibrary = FreeType_GetLibrary();
 		if (ftLibrary == NULL) {
-			ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType not available after initialization.\n");
-			return qfalse;
+			ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType not available after initialization, trying fallback.\n");
+			return R_FontFallbackChain(fontName, pointSize, font, wantSDF);
 		}
 	}
 
@@ -971,6 +1129,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 		} else {
 			ri.Printf(PRINT_WARNING, "RE_RegisterFont: File not found or file system error (error code=%d)\n", testLen);
 		}
+		// faceData is NULL here, no cleanup needed
 		return qfalse;
 	}
 
@@ -1383,7 +1542,30 @@ static void FontLoadCompletion_Async(void *data) {
 
 		ri.Printf(PRINT_ALL, "FontLoadCompletion_Async: Font '%s' registered successfully\n", job->fontName);
 	} else {
-		ri.Printf(PRINT_WARNING, "FontLoadCompletion_Async: Font '%s' loading failed\n", job->fontName);
+		ri.Printf(PRINT_WARNING, "FontLoadCompletion_Async: Font '%s' async loading failed, attempting sync fallback\n", job->fontName);
+
+		// Attempt synchronous fallback loading
+		if (job->targetFont) {
+			qboolean syncResult = RE_RegisterFont_Sync(job->fontName, job->pointSize, job->targetFont, job->useSDF);
+			if (syncResult) {
+				ri.Printf(PRINT_ALL, "FontLoadCompletion_Async: Sync fallback successful for '%s'\n", job->fontName);
+				R_AddFontToCache(job->fontName, job->pointSize, job->useSDF, job->targetFont);
+	} else {
+		ri.Printf(PRINT_ERROR, "FontLoadCompletion_Async: Both async and sync loading failed for '%s'\n", job->fontName);
+		// Clear target font to indicate failure
+		Com_Memset(job->targetFont, 0, sizeof(fontInfo_t));
+
+		// Try built-in font as last resort
+		if (R_GenerateBuiltInFont(job->pointSize, job->targetFont)) {
+			ri.Printf(PRINT_WARNING, "FontLoadCompletion_Async: Using built-in font as last resort for '%s'\n", job->fontName);
+			R_AddFontToCache(job->fontName, job->pointSize, job->useSDF, job->targetFont);
+		} else {
+			ri.Printf(PRINT_ERROR, "FontLoadCompletion_Async: All font loading methods failed for '%s'\n", job->fontName);
+		}
+	}
+		} else {
+			ri.Printf(PRINT_ERROR, "FontLoadCompletion_Async: No target font provided for fallback\n");
+		}
 	}
 
 	// Mark job as available for reuse
@@ -1401,7 +1583,12 @@ Register a font asynchronously using the job system
 */
 qboolean RE_RegisterFont_Async(const char *fontName, int pointSize, fontInfo_t *font) {
 #ifdef USE_JOBSYSTEM
-	if (!fontName || !font) {
+	if (!font) {
+		ri.Printf(PRINT_WARNING, "RE_RegisterFont_Async: NULL font parameter\n");
+		return qfalse;
+	}
+	if (!fontName) {
+		ri.Printf(PRINT_WARNING, "RE_RegisterFont_Async: NULL fontName parameter\n");
 		return qfalse;
 	}
 
@@ -1536,14 +1723,14 @@ Public interface for font registration - chooses between async and sync loading
 */
 qboolean RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
 	if (!font) {
-		ri.Printf(PRINT_WARNING, "RE_RegisterFont: NULL font parameter\n");
+		ri.Printf(PRINT_ALL, "RE_RegisterFont: NULL font parameter\n");
 		return qfalse;
 	}
 
 	// Check if file system is ready before attempting to load fonts
 	// This prevents failures during early initialization when .pk3 files aren't loaded yet
 	if (!FS_Initialized() || FS_StartupInProgress()) {
-		ri.Printf(PRINT_DEVELOPER, "RE_RegisterFont: File system not ready, deferring font load '%s' (%dpt)\n",
+		ri.Printf(PRINT_ALL, "RE_RegisterFont: File system not ready, deferring font load '%s' (%dpt)\n",
 			fontName, pointSize);
 		// Return false but don't mark as a hard failure - this will allow retry later
 		Com_Memset(font, 0, sizeof(*font));
@@ -1587,6 +1774,36 @@ Initialize the font system
 =================
 */
 void R_InitFonts(void) {
+	// Allocate dynamic arrays based on scalability limits
+	maxFonts = Scalability_GetMaxFonts();
+	maxFontCache = Scalability_GetMaxFontCache();
+
+	if (maxFonts <= 0) maxFonts = DEFAULT_MAX_FONTS;
+	if (maxFontCache <= 0) maxFontCache = DEFAULT_MAX_FONT_CACHE;
+
+	// Allocate font arrays
+	if (!registeredFont) {
+		registeredFont = ri.Hunk_Alloc(maxFonts * sizeof(fontInfo_t), h_low);
+		if (!registeredFont) {
+			ri.Error(ERR_FATAL, "R_InitFonts: Failed to allocate font array");
+			return;
+		}
+		Com_Memset(registeredFont, 0, maxFonts * sizeof(fontInfo_t));
+	}
+
+	if (!fontCache) {
+		fontCache = ri.Hunk_Alloc(maxFontCache * sizeof(fontCacheEntry_t), h_low);
+		if (!fontCache) {
+			ri.Error(ERR_FATAL, "R_InitFonts: Failed to allocate font cache");
+			return;
+		}
+		Com_Memset(fontCache, 0, maxFontCache * sizeof(fontCacheEntry_t));
+	}
+
+	// Reset counters
+	registeredFontCount = 0;
+	fontCacheCount = 0;
+
 	R_InitGlyphSubsetting();
 
 #ifdef USE_FREETYPE
@@ -1598,14 +1815,14 @@ void R_InitFonts(void) {
 		// Clear font cache when FreeType becomes available to force re-registration
 		// with the new FreeType system (fonts that failed with stb_truetype can now load)
 		ri.Printf(PRINT_ALL, "R_InitFonts: FreeType initialized, clearing font cache for enhanced rendering\n");
-		fontCacheCount = 0;
-		for (int i = 0; i < MAX_FONT_CACHE; i++) {
+		for (int i = 0; i < maxFontCache; i++) {
 			fontCache[i].inUse = qfalse;
 		}
 	}
 #endif
 
-	ri.Printf(PRINT_ALL, "R_InitFonts: Enhanced font rendering system initialized\n");
+	ri.Printf(PRINT_ALL, "R_InitFonts: Enhanced font rendering system initialized (max fonts: %d, cache: %d)\n",
+		maxFonts, maxFontCache);
 }
 
 /*

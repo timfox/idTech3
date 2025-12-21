@@ -458,3 +458,86 @@ void JobSystem_Update(void)
 	}
 }
 
+/*
+=================
+ParallelFor_JobFunc
+Job function for parallel for loop
+=================
+*/
+typedef struct {
+	parallel_for_func_t func;
+	void *userData;
+	int start_index;
+	int end_index;
+} parallel_for_job_data_t;
+
+static void ParallelFor_JobFunc(void *data) {
+	parallel_for_job_data_t *job_data = (parallel_for_job_data_t *)data;
+
+	for (int i = job_data->start_index; i < job_data->end_index; i++) {
+		job_data->func(i, job_data->userData);
+	}
+}
+
+/*
+=================
+JobSystem_ParallelFor
+Execute a function in parallel across a range
+=================
+*/
+qboolean JobSystem_ParallelFor(int start, int end, parallel_for_func_t func, void *userData) {
+	if (!s_initialized || start >= end) {
+		return qfalse;
+	}
+
+	int total_iterations = end - start;
+	int num_workers = s_num_workers;
+
+	if (num_workers <= 0) {
+		// Fallback to single-threaded execution
+		for (int i = start; i < end; i++) {
+			func(i, userData);
+		}
+		return qtrue;
+	}
+
+	// Divide work among workers
+	int iterations_per_worker = total_iterations / num_workers;
+	int remaining_iterations = total_iterations % num_workers;
+
+	job_handle_t **handles = (job_handle_t **)Z_Malloc(sizeof(job_handle_t *) * num_workers);
+	int handle_count = 0;
+
+	int current_start = start;
+
+	for (int i = 0; i < num_workers; i++) {
+		int worker_iterations = iterations_per_worker + (i < remaining_iterations ? 1 : 0);
+
+		if (worker_iterations > 0) {
+			parallel_for_job_data_t *job_data = (parallel_for_job_data_t *)Z_Malloc(sizeof(parallel_for_job_data_t));
+			job_data->func = func;
+			job_data->userData = userData;
+			job_data->start_index = current_start;
+			job_data->end_index = current_start + worker_iterations;
+
+			handles[handle_count] = JobSystem_SubmitJob(ParallelFor_JobFunc, job_data, JOB_PRIORITY_NORMAL);
+			handle_count++;
+
+			current_start += worker_iterations;
+		}
+	}
+
+	// Wait for all jobs to complete
+	for (int i = 0; i < handle_count; i++) {
+		JobSystem_WaitForJob(handles[i], 0);
+	}
+
+	// Cleanup
+	for (int i = 0; i < handle_count; i++) {
+		// Note: Job handles are automatically freed by the job system
+	}
+	Z_Free(handles);
+
+	return qtrue;
+}
+

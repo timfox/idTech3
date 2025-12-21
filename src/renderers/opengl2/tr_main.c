@@ -1917,7 +1917,7 @@ void R_RenderPshadowMaps(const refdef_t *fd)
 				case MOD_MDR:
 				{
 					// FIXME: never actually tested this
-					mdrHeader_t *header = model->modelData;
+					mdrHeader_t *header = model->modelData.mdr;
 					int frameSize = (size_t)( &((mdrFrame_t *)0)->bones[ header->numBones ] );
 					mdrFrame_t *frame = ( mdrFrame_t * ) ( ( byte * ) header + header->ofsFrames + frameSize * ent->e.frame);
 
@@ -1927,7 +1927,7 @@ void R_RenderPshadowMaps(const refdef_t *fd)
 				case MOD_IQM:
 				{
 					// FIXME: never actually tested this
-					iqmData_t *data = model->modelData;
+					iqmData_t *data = model->modelData.iqm;
 					vec3_t diag;
 					float *framebounds;
 

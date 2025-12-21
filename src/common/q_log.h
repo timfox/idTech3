@@ -25,32 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "q_shared.h"
 
-// Log levels
-typedef enum {
-	LOG_LEVEL_DEBUG = 0,
-	LOG_LEVEL_INFO = 1,
-	LOG_LEVEL_WARN = 2,
-	LOG_LEVEL_ERROR = 3,
-	LOG_LEVEL_FATAL = 4,
-	LOG_LEVEL_COUNT
-} log_level_t;
-
-// Log categories
-typedef enum {
-	LOG_CATEGORY_GENERAL = 0,
-	LOG_CATEGORY_CLIENT,
-	LOG_CATEGORY_SERVER,
-	LOG_CATEGORY_RENDERER,
-	LOG_CATEGORY_NETWORK,
-	LOG_CATEGORY_FILESYSTEM,
-	LOG_CATEGORY_SOUND,
-	LOG_CATEGORY_INPUT,
-	LOG_CATEGORY_PHYSICS,
-	LOG_CATEGORY_AI,
-	LOG_CATEGORY_SCRIPT,
-	LOG_CATEGORY_MEMORY,
-	LOG_CATEGORY_COUNT
-} log_category_t;
+// Log levels and categories are defined in q_shared.h
 
 // Output formats
 typedef enum {
@@ -79,7 +54,7 @@ void QDECL Q_Log(log_level_t level, log_category_t category, const char *file, i
 // Convenience macros
 #define Q_LogDebug(category, fmt, ...)	Q_Log(LOG_LEVEL_DEBUG, category, __FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
 #define Q_LogInfo(category, fmt, ...)	Q_Log(LOG_LEVEL_INFO, category, __FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
-#define Q_LogWarn(category, fmt, ...)	Q_Log(LOG_LEVEL_WARN, category, __FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
+#define Q_LogWarn(category, fmt, ...)	Q_Log(LOG_LEVEL_WARNINGING, category, __FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
 #define Q_LogError(category, fmt, ...)	Q_Log(LOG_LEVEL_ERROR, category, __FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
 #define Q_LogFatal(category, fmt, ...)	Q_Log(LOG_LEVEL_FATAL, category, __FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
 
@@ -92,36 +67,36 @@ void QDECL Q_Log(log_level_t level, log_category_t category, const char *file, i
 // Level+category helpers for common subsystems
 #define LOG_GENERAL(level, fmt, ...)	Q_Log(level, LOG_CATEGORY_GENERAL, __FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
 #define LOG_GENERAL_INFO(fmt, ...)		LOG_GENERAL(LOG_LEVEL_INFO, fmt, ##__VA_ARGS__)
-#define LOG_GENERAL_WARN(fmt, ...)		LOG_GENERAL(LOG_LEVEL_WARN, fmt, ##__VA_ARGS__)
+#define LOG_GENERAL_WARN(fmt, ...)		LOG_GENERAL(LOG_LEVEL_WARNINGING, fmt, ##__VA_ARGS__)
 #define LOG_GENERAL_ERROR(fmt, ...)		LOG_GENERAL(LOG_LEVEL_ERROR, fmt, ##__VA_ARGS__)
 
 #define LOG_RENDERER(level, fmt, ...)	Q_Log(level, LOG_CATEGORY_RENDERER, __FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
 #define LOG_RENDERER_INFO(fmt, ...)		LOG_RENDERER(LOG_LEVEL_INFO, fmt, ##__VA_ARGS__)
-#define LOG_RENDERER_WARN(fmt, ...)		LOG_RENDERER(LOG_LEVEL_WARN, fmt, ##__VA_ARGS__)
+#define LOG_RENDERER_WARN(fmt, ...)		LOG_RENDERER(LOG_LEVEL_WARNING, fmt, ##__VA_ARGS__)
 
 #define LOG_NETWORK(level, fmt, ...)	Q_Log(level, LOG_CATEGORY_NETWORK, __FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
 #define LOG_NETWORK_INFO(fmt, ...)		LOG_NETWORK(LOG_LEVEL_INFO, fmt, ##__VA_ARGS__)
-#define LOG_NETWORK_WARN(fmt, ...)		LOG_NETWORK(LOG_LEVEL_WARN, fmt, ##__VA_ARGS__)
+#define LOG_NETWORK_WARN(fmt, ...)		LOG_NETWORK(LOG_LEVEL_WARNING, fmt, ##__VA_ARGS__)
 
 #define LOG_FILESYSTEM(level, fmt, ...)	Q_Log(level, LOG_CATEGORY_FILESYSTEM, __FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
 #define LOG_FILESYSTEM_INFO(fmt, ...)	LOG_FILESYSTEM(LOG_LEVEL_INFO, fmt, ##__VA_ARGS__)
-#define LOG_FILESYSTEM_WARN(fmt, ...)	LOG_FILESYSTEM(LOG_LEVEL_WARN, fmt, ##__VA_ARGS__)
+#define LOG_FILESYSTEM_WARN(fmt, ...)	LOG_FILESYSTEM(LOG_LEVEL_WARNING, fmt, ##__VA_ARGS__)
 
 #define LOG_SOUND(level, fmt, ...)		Q_Log(level, LOG_CATEGORY_SOUND, __FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
 #define LOG_SOUND_INFO(fmt, ...)		LOG_SOUND(LOG_LEVEL_INFO, fmt, ##__VA_ARGS__)
-#define LOG_SOUND_WARN(fmt, ...)		LOG_SOUND(LOG_LEVEL_WARN, fmt, ##__VA_ARGS__)
+#define LOG_SOUND_WARN(fmt, ...)		LOG_SOUND(LOG_LEVEL_WARNING, fmt, ##__VA_ARGS__)
 
 #define LOG_INPUT(level, fmt, ...)		Q_Log(level, LOG_CATEGORY_INPUT, __FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
 #define LOG_INPUT_INFO(fmt, ...)		LOG_INPUT(LOG_LEVEL_INFO, fmt, ##__VA_ARGS__)
-#define LOG_INPUT_WARN(fmt, ...)		LOG_INPUT(LOG_LEVEL_WARN, fmt, ##__VA_ARGS__)
+#define LOG_INPUT_WARN(fmt, ...)		LOG_INPUT(LOG_LEVEL_WARNING, fmt, ##__VA_ARGS__)
 
 #define LOG_SCRIPT(level, fmt, ...)		Q_Log(level, LOG_CATEGORY_SCRIPT, __FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
 #define LOG_SCRIPT_INFO(fmt, ...)		LOG_SCRIPT(LOG_LEVEL_INFO, fmt, ##__VA_ARGS__)
-#define LOG_SCRIPT_WARN(fmt, ...)		LOG_SCRIPT(LOG_LEVEL_WARN, fmt, ##__VA_ARGS__)
+#define LOG_SCRIPT_WARN(fmt, ...)		LOG_SCRIPT(LOG_LEVEL_WARNING, fmt, ##__VA_ARGS__)
 
 #define LOG_MEMORY(level, fmt, ...)		Q_Log(level, LOG_CATEGORY_MEMORY, __FILE__, __LINE__, __func__, fmt, ##__VA_ARGS__)
 #define LOG_MEMORY_INFO(fmt, ...)		LOG_MEMORY(LOG_LEVEL_INFO, fmt, ##__VA_ARGS__)
-#define LOG_MEMORY_WARN(fmt, ...)		LOG_MEMORY(LOG_LEVEL_WARN, fmt, ##__VA_ARGS__)
+#define LOG_MEMORY_WARN(fmt, ...)		LOG_MEMORY(LOG_LEVEL_WARNING, fmt, ##__VA_ARGS__)
 
 // Filtering functions
 void Q_Log_SetLevel(log_level_t level);

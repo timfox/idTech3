@@ -34,6 +34,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_common.h"
 #include "tr_extratypes.h"
 #include "tr_extramath.h"
+#include "../opengl/iqm.h"
+#include "../opengl/tr_tiki.h"
 #include "tr_fbo.h"
 #include "tr_postprocess.h"
 #include "iqm.h"
@@ -1323,7 +1325,10 @@ typedef struct model_s {
 	int			dataSize;	// just for listing purposes
 	bmodel_t	*bmodel;		// only if type == MOD_BRUSH
 	mdvModel_t	*mdv[MD3_MAX_LODS];	// only if type == MOD_MESH
-	void	*modelData;			// only if type == (MOD_MDR | MOD_IQM)
+	union {
+		mdrHeader_t	*mdr;		// only if type == MOD_MDR
+		iqmData_t	*iqm;		// only if type == MOD_IQM
+	} modelData;
 
 	int			 numLods;
 } model_t;

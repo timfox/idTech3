@@ -50,7 +50,7 @@ static qhandle_t R_RegisterMD3(const char *name, model_t *mod)
 
 	numLoaded = 0;
 
-	strcpy(filename, name);
+	Q_strncpyz(filename, name, sizeof(filename));
 
 	fext = strchr(filename, '.');
 	if(!fext)
@@ -266,11 +266,71 @@ model_t *R_AllocModel( void ) {
 	}
 
 	mod = ri.Hunk_Alloc( sizeof( *tr.models[tr.numModels] ), h_low );
+	if (!mod) {
+		ri.Printf(PRINT_WARNING, "R_AllocModel: Failed to allocate memory for model\n");
+		return NULL;
+	}
 	mod->index = tr.numModels;
 	tr.models[tr.numModels] = mod;
 	tr.numModels++;
 
 	return mod;
+}
+
+/*
+====================
+R_ModelHashKey
+
+Generate a hash key for model name lookups
+====================
+*/
+static unsigned int R_ModelHashKey(const char *name) {
+	unsigned int hash = 0;
+	int i;
+
+	for (i = 0; name[i]; i++) {
+		hash = hash * 33 + tolower(name[i]);
+	}
+	return hash % MODEL_HASH_SIZE;
+}
+
+/*
+====================
+R_AddModelToHash
+
+Add a model to the hash table
+====================
+*/
+static void R_AddModelToHash(model_t *mod) {
+	unsigned int hash;
+
+	if (!mod || !mod->name || !mod->name[0]) {
+		return;
+	}
+
+	hash = R_ModelHashKey(mod->name);
+	mod->nextHash = tr.modelHashTable[hash];
+	tr.modelHashTable[hash] = mod;
+}
+
+/*
+====================
+R_FindModelInHash
+
+Find a model in the hash table
+====================
+*/
+static model_t *R_FindModelInHash(const char *name) {
+	unsigned int hash;
+	model_t *mod;
+
+	hash = R_ModelHashKey(name);
+	for (mod = tr.modelHashTable[hash]; mod; mod = mod->nextHash) {
+		if (!Q_stricmp(mod->name, name)) {
+			return mod;
+		}
+	}
+	return NULL;
 }
 
 /*
@@ -285,7 +345,123 @@ optimization to prevent disk rescanning if they are
 asked for again.
 ====================
 */
+// Model loading job for async loading
+typedef struct {
+	char name[MAX_QPATH];
+	model_t *mod;
+	qboolean completed;
+	qboolean success;
+} modelLoadJob_t;
+
+#define MAX_ASYNC_MODEL_JOBS 4
+static modelLoadJob_t asyncModelJobs[MAX_ASYNC_MODEL_JOBS];
+static int asyncModelJobCount = 0;
+
+static void ModelLoadWorker_Async(void *data) {
+	modelLoadJob_t *job = (modelLoadJob_t *)data;
+
+	// Perform the actual model loading (this is the synchronous path)
+	qhandle_t hModel = RE_RegisterModel_Sync(job->name);
+	if (hModel) {
+		job->success = qtrue;
+		job->mod = tr.models[hModel];
+	} else {
+		job->success = qfalse;
+	}
+
+	job->completed = qtrue;
+}
+
+static void ModelLoadCompletion_Async(void *data) {
+	modelLoadJob_t *job = (modelLoadJob_t *)data;
+
+	if (job->success) {
+		ri.Printf(PRINT_DEVELOPER, "ModelLoadCompletion_Async: Model '%s' loaded successfully\n", job->name);
+	} else {
+		ri.Printf(PRINT_WARNING, "ModelLoadCompletion_Async: Failed to load model '%s'\n", job->name);
+	}
+
+	// Mark job as available for reuse
+	job->completed = qfalse;
+	job->success = qfalse;
+	asyncModelJobCount--;
+}
+
+/*
+=================
+RE_RegisterModel
+
+Public interface for model registration - chooses between async and sync loading
+=================
+*/
 qhandle_t RE_RegisterModel( const char *name ) {
+#ifdef USE_JOBSYSTEM
+	// Check for async loading preference
+	static cvar_t *r_modelAsync = NULL;
+	if (!r_modelAsync) {
+		r_modelAsync = ri.Cvar_Get("r_modelAsync", "1", CVAR_ARCHIVE | CVAR_LATCH);
+		ri.Cvar_SetDescription(r_modelAsync, "Use asynchronous model loading (0 = sync, 1 = async)");
+	}
+
+	if (r_modelAsync && r_modelAsync->integer) {
+		return RE_RegisterModel_Async(name);
+	}
+#endif
+
+	// Fall back to synchronous loading
+	return RE_RegisterModel_Sync(name);
+}
+
+qhandle_t RE_RegisterModel_Async(const char *name) {
+#ifdef USE_JOBSYSTEM
+	// Check if we have too many concurrent async jobs
+	if (asyncModelJobCount >= MAX_ASYNC_MODEL_JOBS) {
+		ri.Printf(PRINT_DEVELOPER, "RE_RegisterModel_Async: Too many concurrent model loads (%d), using sync\n", asyncModelJobCount);
+		return RE_RegisterModel_Sync(name);
+	}
+
+	// Find available job slot
+	modelLoadJob_t *job = NULL;
+	for (int i = 0; i < MAX_ASYNC_MODEL_JOBS; i++) {
+		if (!asyncModelJobs[i].completed) {
+			job = &asyncModelJobs[i];
+			break;
+		}
+	}
+
+	if (!job) {
+		ri.Printf(PRINT_WARNING, "RE_RegisterModel_Async: No available job slots, using sync\n");
+		return RE_RegisterModel_Sync(name);
+	}
+
+	// Initialize job
+	Q_strncpyz(job->name, name, sizeof(job->name));
+	job->completed = qfalse;
+	job->success = qfalse;
+	asyncModelJobCount++;
+
+	// Submit job to job system
+	extern job_handle_t *JobSystem_SubmitJobWithCompletion(jobFunction_t, void *, jobPriority_t, void (*)(void *), void *);
+	job_handle_t *handle = JobSystem_SubmitJobWithCompletion(
+		ModelLoadWorker_Async, job, JOB_PRIORITY_NORMAL,
+		ModelLoadCompletion_Async, job);
+
+	if (!handle) {
+		ri.Printf(PRINT_WARNING, "RE_RegisterModel_Async: Failed to submit job, using sync\n");
+		job->completed = qfalse;
+		asyncModelJobCount--;
+		return RE_RegisterModel_Sync(name);
+	}
+
+	ri.Printf(PRINT_DEVELOPER, "RE_RegisterModel_Async: Submitted async load for '%s'\n", name);
+	return 0; // Async loading - handle will be resolved later
+#else
+	// Fallback to synchronous loading
+	return RE_RegisterModel_Sync(name);
+#endif
+}
+
+qhandle_t RE_RegisterModel_Sync( const char *name ) {
 	model_t		*mod;
 	qhandle_t	hModel;
 	qboolean	orgNameFailed = qfalse;
@@ -306,16 +482,14 @@ qhandle_t RE_RegisterModel( const char *name ) {
 	}
 
 	//
-	// search the currently loaded models
+	// search the currently loaded models using hash table
 	//
-	for ( hModel = 1 ; hModel < tr.numModels; hModel++ ) {
-		mod = tr.models[hModel];
-		if ( !strcmp( mod->name, name ) ) {
-			if( mod->type == MOD_BAD ) {
-				return 0;
-			}
-			return hModel;
+	mod = R_FindModelInHash(name);
+	if (mod) {
+		if (mod->type == MOD_BAD) {
+			return 0;
 		}
+		return mod->index;
 	}
 
 	// allocate a new model_t
@@ -392,6 +566,8 @@ qhandle_t RE_RegisterModel( const char *name ) {
 						name, altName );
 			}
 
+			// Add successfully loaded model to hash table for fast lookups
+			R_AddModelToHash(mod);
 			break;
 		}
 	}
@@ -417,6 +593,11 @@ static qboolean R_LoadMD3( model_t *mod, int lod, void *buffer, int fileSize, co
 	md3Tag_t			*tag;
 	int					version;
 	int					size;
+
+	if ( !buffer ) {
+		ri.Printf( PRINT_WARNING, "%s: NULL buffer for %s\n", __func__, mod_name );
+		return qfalse;
+	}
 
 	// Additional security check for model files
 	if ( !Q_ValidateFilePath( mod_name ) ) {
@@ -695,7 +876,7 @@ static qboolean R_LoadMDR( model_t *mod, void *buffer, int filesize, const char 
 	}
 
 	mod->dataSize += size;
-	mod->modelData = mdr = ri.Hunk_Alloc( size, h_low );
+	mod->modelData.mdr = mdr = ri.Hunk_Alloc( size, h_low );
 
 	// Copy all the values over from the file and fix endian issues in the process, if necessary.
 	
@@ -1134,11 +1315,11 @@ int R_LerpTag( orientation_t *tag, qhandle_t handle, int startFrame, int endFram
 	{
 		if(model->type == MOD_MDR)
 		{
-			start = R_GetAnimTag((mdrHeader_t *) model->modelData, startFrame, tagName, &start_space);
-			end = R_GetAnimTag((mdrHeader_t *) model->modelData, endFrame, tagName, &end_space);
+			start = R_GetAnimTag(model->modelData.mdr, startFrame, tagName, &start_space);
+			end = R_GetAnimTag(model->modelData.mdr, endFrame, tagName, &end_space);
 		}
 		else if( model->type == MOD_IQM ) {
-			return R_IQMLerpTag( tag, model->modelData,
+			return R_IQMLerpTag( tag, model->modelData.iqm,
 					startFrame, endFrame,
 					frac, tagName );
 		} else {
@@ -1203,17 +1384,17 @@ void R_ModelBounds( qhandle_t handle, vec3_t mins, vec3_t maxs ) {
 		mdrHeader_t	*header;
 		mdrFrame_t	*frame;
 
-		header = (mdrHeader_t *)model->modelData;
+		header = model->modelData.mdr;
 		frame = (mdrFrame_t *) ((byte *)header + header->ofsFrames);
 
 		VectorCopy( frame->bounds[0], mins );
 		VectorCopy( frame->bounds[1], maxs );
-		
+
 		return;
 	} else if(model->type == MOD_IQM) {
 		iqmData_t *iqmData;
-		
-		iqmData = model->modelData;
+
+		iqmData = model->modelData.iqm;
 
 		if(iqmData->bounds)
 		{

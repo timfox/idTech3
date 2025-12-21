@@ -22,10 +22,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_models.c -- model loading and caching
 
 #include "tr_local.h"
+#include "../../common/q_scalability.h"
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 
 #define	LL(x) x=LittleLong(x)
+
+// Forward declarations for model loaders
+qhandle_t R_RegisterTIKI(const char *name, model_t *mod);
+qhandle_t R_RegisterAssimpModel(const char *name, model_t *mod);
 
 static qboolean R_LoadMD3(model_t *mod, int lod, void *buffer, int fileSize, const char *name );
 static qboolean R_LoadMDR(model_t *mod, void *buffer, int filesize, const char *name );
@@ -51,7 +56,7 @@ static qhandle_t R_RegisterMD3(const char *name, model_t *mod)
 
 	numLoaded = 0;
 
-	strcpy(filename, name);
+	Q_strncpyz(filename, name, sizeof(filename));
 
 	fext = strchr(filename, '.');
 	if(!fext)
@@ -80,10 +85,14 @@ static qhandle_t R_RegisterMD3(const char *name, model_t *mod)
 		}
 		
 		ident = LittleLong( *buf.u );
-		if ( ident == MD3_IDENT )
+		if ( ident == MD3_IDENT ) {
 			loaded = R_LoadMD3( mod, lod, buf.v, fileSize, name );
-		else
-			ri.Printf( PRINT_WARNING,"%s: unknown fileid for %s\n", __func__, name );
+			if ( !loaded ) {
+				ri.Printf( PRINT_WARNING, "%s: R_LoadMD3 failed for '%s' (LOD %d)\n", __func__, name, lod );
+			}
+		} else {
+			ri.Printf( PRINT_WARNING,"%s: unknown fileid for %s (got 0x%08X, expected 0x%08X)\n", __func__, name, ident, MD3_IDENT );
+		}
 		
 		ri.FS_FreeFile( buf.v );
 
@@ -209,10 +218,22 @@ qhandle_t R_RegisterAssimpModel(const char *name, model_t *mod);
 // when there are multiple models of different formats available
 static modelExtToLoaderMap_t modelLoaders[ ] =
 {
-	{ "obj", R_RegisterAssimpModel },
-	{ "iqm", R_RegisterIQM },
-	{ "mdr", R_RegisterMDR },
-	{ "md3", R_RegisterMD3 }
+	{ "tiki", R_RegisterTIKI },
+	{ "iqm",  R_RegisterIQM },
+	{ "mdr",  R_RegisterMDR },
+	{ "md3",  R_RegisterMD3 },
+	// Assimp-supported formats (static meshes only)
+	{ "obj",  R_RegisterAssimpModel },
+	{ "dae",  R_RegisterAssimpModel }, // COLLADA
+	{ "fbx",  R_RegisterAssimpModel }, // FBX
+	{ "gltf", R_RegisterAssimpModel }, // glTF
+	{ "glb",  R_RegisterAssimpModel }, // Binary glTF
+	{ "3ds",  R_RegisterAssimpModel }, // 3DS Max
+	{ "blend", R_RegisterAssimpModel }, // Blender
+	{ "ply",  R_RegisterAssimpModel }, // Polygon File Format
+	{ "stl",  R_RegisterAssimpModel }, // STL
+	{ "x3d",  R_RegisterAssimpModel }, // X3D
+	{ "ase",  R_RegisterAssimpModel }  // ASCII Scene Export
 };
 
 static int numModelLoaders = ARRAY_LEN(modelLoaders);
@@ -223,16 +244,22 @@ static int numModelLoaders = ARRAY_LEN(modelLoaders);
 ** R_GetModelByHandle
 */
 model_t	*R_GetModelByHandle( qhandle_t index ) {
-	model_t		*mod;
+	return R_GetModelByHandle_Context(NULL, index);
+}
+
+/*
+** R_GetModelByHandle_Context
+** Context-aware version that can work with local state
+*/
+model_t	*R_GetModelByHandle_Context( renderer_context_t *ctx, qhandle_t index ) {
+	trGlobals_t *tr_ctx = GET_TR_CTX(ctx);
 
 	// out of range gets the default model
-	if ( index < 1 || index >= tr.numModels ) {
-		return tr.models[0];
+	if ( index < 1 || index >= tr_ctx->numModels ) {
+		return tr_ctx->models[0];
 	}
 
-	mod = tr.models[index];
-
-	return mod;
+	return tr_ctx->models[index];
 }
 
 //===============================================================================
@@ -241,16 +268,36 @@ model_t	*R_GetModelByHandle( qhandle_t index ) {
 ** R_AllocModel
 */
 model_t *R_AllocModel( void ) {
-	model_t		*mod;
+	return R_AllocModel_Context(NULL);
+}
 
-	if ( tr.numModels >= MAX_MOD_KNOWN ) {
+/*
+** R_AllocModel_Context
+** Context-aware version that can work with local state
+*/
+model_t *R_AllocModel_Context( renderer_context_t *ctx ) {
+	trGlobals_t *tr_ctx = GET_TR_CTX(ctx);
+	refimport_t *ri_ctx = GET_RI_CTX(ctx);
+
+	int maxModels = Scalability_GetMaxModels();
+	if (maxModels <= 0) {
+		maxModels = DEFAULT_MAX_MODELS;
+	}
+
+	if ( tr_ctx->numModels >= maxModels ) {
+		R_CTX_Printf(ctx, PRINT_WARNING, "R_AllocModel: Maximum models (%d) reached\n", maxModels);
 		return NULL;
 	}
 
-	mod = ri.Hunk_Alloc( sizeof( *tr.models[tr.numModels] ), h_low );
-	mod->index = tr.numModels;
-	tr.models[tr.numModels] = mod;
-	tr.numModels++;
+	model_t *mod = (model_t *)ri_ctx->Hunk_Alloc( sizeof( *tr_ctx->models[tr_ctx->numModels] ), h_low );
+	if (!mod) {
+		R_CTX_Printf(ctx, PRINT_WARNING, "R_AllocModel: Hunk_Alloc failed\n");
+		return NULL;
+	}
+
+	mod->index = tr_ctx->numModels;
+	tr_ctx->models[tr_ctx->numModels] = mod;
+	tr_ctx->numModels++;
 
 	return mod;
 }
@@ -358,6 +405,7 @@ qhandle_t RE_RegisterModel( const char *name ) {
 
 	// Try and find a suitable match using all
 	// the model formats supported
+	qboolean triedFallbacks = qfalse;
 	for( i = 0; i < numModelLoaders; i++ )
 	{
 		if (i == orgLoader)
@@ -378,11 +426,296 @@ qhandle_t RE_RegisterModel( const char *name ) {
 
 			break;
 		}
+		triedFallbacks = qtrue;
+	}
+
+	// If no format worked, try error recovery mechanisms
+	if (!hModel && triedFallbacks) {
+		hModel = R_ModelLoadingErrorRecovery(name, mod);
 	}
 
 	return hModel;
 }
 
+/*
+=================
+R_ModelLoadingErrorRecovery
+Comprehensive error recovery for failed model loading
+=================
+*/
+static qhandle_t R_ModelLoadingErrorRecovery(const char *originalName, model_t *mod) {
+	char recoveryName[MAX_QPATH];
+	qhandle_t hModel = 0;
+
+	ri.Printf(PRINT_WARNING, "R_ModelLoadingErrorRecovery: Attempting recovery for '%s'\n", originalName);
+
+	// Recovery 1: Try common model names
+	const char *commonModels[] = {
+		"models/player/default.md3",
+		"models/error.md3",
+		"models/box.md3",
+		"models/cube.md3"
+	};
+
+	for (int i = 0; i < ARRAY_LEN(commonModels); i++) {
+		ri.Printf(PRINT_ALL, "R_ModelLoadingErrorRecovery: Trying fallback model '%s'\n", commonModels[i]);
+		hModel = RE_RegisterModel(commonModels[i]);
+		if (hModel) {
+			ri.Printf(PRINT_WARNING, "R_ModelLoadingErrorRecovery: Using fallback model '%s' instead of '%s'\n",
+				commonModels[i], originalName);
+			break;
+		}
+	}
+
+	// Recovery 2: Generate a procedural model if all else fails
+	if (!hModel) {
+		ri.Printf(PRINT_WARNING, "R_ModelLoadingErrorRecovery: Generating procedural error model for '%s'\n", originalName);
+		hModel = R_GenerateErrorModel(mod);
+		if (hModel) {
+			ri.Printf(PRINT_WARNING, "R_ModelLoadingErrorRecovery: Using generated error model for '%s'\n", originalName);
+		}
+	}
+
+	return hModel;
+}
+
+/*
+=================
+R_GenerateErrorModel
+Generate a simple procedural model for error recovery
+=================
+*/
+static qhandle_t R_GenerateErrorModel(model_t *mod) {
+	// Create a simple cube model for error visualization
+	// This would generate vertex/index data for a basic cube
+	// For now, return 0 to indicate failure - in a full implementation,
+	// this would create actual geometry
+
+	ri.Printf(PRINT_WARNING, "R_GenerateErrorModel: Procedural model generation not implemented\n");
+	return 0;
+}
+
+/*
+=================
+R_ValidateMD3Data
+Comprehensive MD3 data integrity validation
+=================
+*/
+static qboolean R_ValidateMD3Data( const md3Header_t *hdr, int fileSize, const char *mod_name ) {
+	// Basic header validation
+	if (hdr->ident != LittleLong(MD3_IDENT)) {
+		ri.Printf(PRINT_WARNING, "%s: %s has invalid MD3 ident (0x%x)\n", __func__, mod_name, LittleLong(hdr->ident));
+		return qfalse;
+	}
+
+	if (hdr->version != LittleLong(MD3_VERSION)) {
+		ri.Printf(PRINT_WARNING, "%s: %s has wrong version (%i should be %i)\n", __func__, mod_name,
+			LittleLong(hdr->version), MD3_VERSION);
+		return qfalse;
+	}
+
+	// Size validation
+	int claimedSize = LittleLong(hdr->ofsEnd);
+	if (claimedSize > fileSize || claimedSize <= 0) {
+		ri.Printf(PRINT_WARNING, "%s: %s has invalid size (%d, file size %d)\n", __func__, mod_name, claimedSize, fileSize);
+		return qfalse;
+	}
+
+	// Bounds checking for all offsets
+	int numFrames = LittleLong(hdr->numFrames);
+	int numTags = LittleLong(hdr->numTags);
+	int numSurfaces = LittleLong(hdr->numSurfaces);
+	int numSkins = LittleLong(hdr->numSkins);
+
+	int ofsFrames = LittleLong(hdr->ofsFrames);
+	int ofsTags = LittleLong(hdr->ofsTags);
+	int ofsSurfaces = LittleLong(hdr->ofsSurfaces);
+	int ofsEnd = LittleLong(hdr->ofsEnd);
+
+	// Validate counts are reasonable (prevent integer overflow attacks)
+	if (numFrames <= 0 || numFrames > 10000) {
+		ri.Printf(PRINT_WARNING, "%s: %s has invalid frame count (%d)\n", __func__, mod_name, numFrames);
+		return qfalse;
+	}
+
+	if (numTags < 0 || numTags > 1000) {
+		ri.Printf(PRINT_WARNING, "%s: %s has invalid tag count (%d)\n", __func__, mod_name, numTags);
+		return qfalse;
+	}
+
+	if (numSurfaces <= 0 || numSurfaces > 1000) {
+		ri.Printf(PRINT_WARNING, "%s: %s has invalid surface count (%d)\n", __func__, mod_name, numSurfaces);
+		return qfalse;
+	}
+
+	if (numSkins < 0 || numSkins > 1000) {
+		ri.Printf(PRINT_WARNING, "%s: %s has invalid skin count (%d)\n", __func__, mod_name, numSkins);
+		return qfalse;
+	}
+
+	// Validate offset ranges
+	if (ofsFrames < sizeof(md3Header_t) || ofsFrames >= claimedSize) {
+		ri.Printf(PRINT_WARNING, "%s: %s has invalid frame offset (%d)\n", __func__, mod_name, ofsFrames);
+		return qfalse;
+	}
+
+	if (ofsTags < sizeof(md3Header_t) || ofsTags >= claimedSize) {
+		ri.Printf(PRINT_WARNING, "%s: %s has invalid tag offset (%d)\n", __func__, mod_name, ofsTags);
+		return qfalse;
+	}
+
+	if (ofsSurfaces < sizeof(md3Header_t) || ofsSurfaces >= claimedSize) {
+		ri.Printf(PRINT_WARNING, "%s: %s has invalid surface offset (%d)\n", __func__, mod_name, ofsSurfaces);
+		return qfalse;
+	}
+
+	// Check for buffer overflows in data sections
+	size_t framesSize = (size_t)numFrames * sizeof(md3Frame_t);
+	if ((size_t)ofsFrames + framesSize > (size_t)claimedSize) {
+		ri.Printf(PRINT_WARNING, "%s: %s frame data extends beyond file (%d + %d > %d)\n",
+			__func__, mod_name, ofsFrames, (int)framesSize, claimedSize);
+		return qfalse;
+	}
+
+	size_t tagsSize = (size_t)numTags * (size_t)numFrames * sizeof(md3Tag_t);
+	if ((size_t)ofsTags + tagsSize > (size_t)claimedSize) {
+		ri.Printf(PRINT_WARNING, "%s: %s tag data extends beyond file (%d + %d > %d)\n",
+			__func__, mod_name, ofsTags, (int)tagsSize, claimedSize);
+		return qfalse;
+	}
+
+	// Basic surface validation (we'll do deeper validation when loading)
+	if (ofsSurfaces + (size_t)numSurfaces * sizeof(md3Surface_t) > (size_t)claimedSize) {
+		ri.Printf(PRINT_WARNING, "%s: %s surface headers extend beyond file\n", __func__, mod_name);
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+=================
+R_ValidateMD3Surface
+Validate individual MD3 surface data integrity
+=================
+*/
+static qboolean R_ValidateMD3Surface( const md3Surface_t *surf, const md3Header_t *hdr, int fileSize, const char *mod_name, int surfaceIndex ) {
+	// Basic surface header validation
+	if (surf->ident != LittleLong(MD3_IDENT)) {
+		ri.Printf(PRINT_WARNING, "%s: %s surface %d has invalid ident (0x%x)\n",
+			__func__, mod_name, surfaceIndex, LittleLong(surf->ident));
+		return qfalse;
+	}
+
+	int numFrames = LittleLong(surf->numFrames);
+	int numShaders = LittleLong(surf->numShaders);
+	int numTriangles = LittleLong(surf->numTriangles);
+	int numVerts = LittleLong(surf->numVerts);
+
+	// Validate surface matches model
+	if (numFrames != hdr->numFrames) {
+		ri.Printf(PRINT_WARNING, "%s: %s surface %d frame count mismatch (%d vs %d)\n",
+			__func__, mod_name, surfaceIndex, numFrames, hdr->numFrames);
+		return qfalse;
+	}
+
+	// Validate reasonable bounds
+	if (numShaders < 0 || numShaders > 1000) {
+		ri.Printf(PRINT_WARNING, "%s: %s surface %d has invalid shader count (%d)\n",
+			__func__, mod_name, surfaceIndex, numShaders);
+		return qfalse;
+	}
+
+	if (numTriangles <= 0 || numTriangles > 100000) {
+		ri.Printf(PRINT_WARNING, "%s: %s surface %d has invalid triangle count (%d)\n",
+			__func__, mod_name, surfaceIndex, numTriangles);
+		return qfalse;
+	}
+
+	if (numVerts <= 0 || numVerts > 100000) {
+		ri.Printf(PRINT_WARNING, "%s: %s surface %d has invalid vertex count (%d)\n",
+			__func__, mod_name, surfaceIndex, numVerts);
+		return qfalse;
+	}
+
+	// Validate offsets are within bounds
+	int ofsTriangles = LittleLong(surf->ofsTriangles);
+	int ofsShaders = LittleLong(surf->ofsShaders);
+	int ofsSt = LittleLong(surf->ofsSt);
+	int ofsXyzNormals = LittleLong(surf->ofsXyzNormals);
+	int ofsEnd = LittleLong(surf->ofsEnd);
+
+	const byte *surfStart = (const byte *)surf;
+	const byte *fileStart = (const byte *)hdr;
+
+	size_t surfOffset = surfStart - fileStart;
+
+	if (ofsEnd <= 0 || (size_t)(surfOffset + ofsEnd) > (size_t)fileSize) {
+		ri.Printf(PRINT_WARNING, "%s: %s surface %d has invalid end offset (%d)\n",
+			__func__, mod_name, surfaceIndex, ofsEnd);
+		return qfalse;
+	}
+
+	// Validate data section offsets
+	if (ofsTriangles < 0 || (size_t)(surfOffset + ofsTriangles) >= (size_t)fileSize) {
+		ri.Printf(PRINT_WARNING, "%s: %s surface %d has invalid triangle offset (%d)\n",
+			__func__, mod_name, surfaceIndex, ofsTriangles);
+		return qfalse;
+	}
+
+	if (ofsShaders < 0 || (size_t)(surfOffset + ofsShaders) >= (size_t)fileSize) {
+		ri.Printf(PRINT_WARNING, "%s: %s surface %d has invalid shader offset (%d)\n",
+			__func__, mod_name, surfaceIndex, ofsShaders);
+		return qfalse;
+	}
+
+	if (ofsSt < 0 || (size_t)(surfOffset + ofsSt) >= (size_t)fileSize) {
+		ri.Printf(PRINT_WARNING, "%s: %s surface %d has invalid ST offset (%d)\n",
+			__func__, mod_name, surfaceIndex, ofsSt);
+		return qfalse;
+	}
+
+	if (ofsXyzNormals < 0 || (size_t)(surfOffset + ofsXyzNormals) >= (size_t)fileSize) {
+		ri.Printf(PRINT_WARNING, "%s: %s surface %d has invalid XYZ offset (%d)\n",
+			__func__, mod_name, surfaceIndex, ofsXyzNormals);
+		return qfalse;
+	}
+
+	// Validate data sizes don't overflow file
+	size_t trianglesSize = (size_t)numTriangles * sizeof(md3Triangle_t);
+	if ((size_t)(surfOffset + ofsTriangles) + trianglesSize > (size_t)fileSize) {
+		ri.Printf(PRINT_WARNING, "%s: %s surface %d triangle data extends beyond file\n", __func__, mod_name, surfaceIndex);
+		return qfalse;
+	}
+
+	size_t shadersSize = (size_t)numShaders * sizeof(md3Shader_t);
+	if ((size_t)(surfOffset + ofsShaders) + shadersSize > (size_t)fileSize) {
+		ri.Printf(PRINT_WARNING, "%s: %s surface %d shader data extends beyond file\n", __func__, mod_name, surfaceIndex);
+		return qfalse;
+	}
+
+	size_t stSize = (size_t)numVerts * sizeof(md3St_t);
+	if ((size_t)(surfOffset + ofsSt) + stSize > (size_t)fileSize) {
+		ri.Printf(PRINT_WARNING, "%s: %s surface %d ST data extends beyond file\n", __func__, mod_name, surfaceIndex);
+		return qfalse;
+	}
+
+	size_t xyzSize = (size_t)numVerts * (size_t)numFrames * sizeof(md3XyzNormal_t);
+	if ((size_t)(surfOffset + ofsXyzNormals) + xyzSize > (size_t)fileSize) {
+		ri.Printf(PRINT_WARNING, "%s: %s surface %d XYZ data extends beyond file\n", __func__, mod_name, surfaceIndex);
+		return qfalse;
+	}
+
+	// Validate surface name (should be null-terminated)
+	char surfaceName[MD3_MAX_PATH];
+	Q_strncpyz(surfaceName, surf->name, sizeof(surfaceName));
+	if (strlen(surfaceName) >= sizeof(surf->name)) {
+		ri.Printf(PRINT_WARNING, "%s: %s surface %d has unterminated name\n", __func__, mod_name, surfaceIndex);
+		return qfalse;
+	}
+
+	return qtrue;
+}
 
 /*
 =================
@@ -402,20 +735,23 @@ static qboolean R_LoadMD3( model_t *mod, int lod, void *buffer, int fileSize, co
 	int					version;
 	int					size;
 
+	if ( !buffer ) {
+		Com_SetErrorContext( va( "Loading model '%s'", mod_name ) );
+		ri.Printf( PRINT_WARNING, "%s: NULL buffer for %s\n", __func__, mod_name );
+		return qfalse;
+	}
+
 	pinmodel = (md3Header_t *)buffer;
 
-	version = LittleLong( pinmodel->version );
-	if ( version != MD3_VERSION ) {
-		ri.Printf( PRINT_WARNING, "%s: %s has wrong version (%i should be %i)\n", __func__, mod_name, version, MD3_VERSION );
+	// Comprehensive data validation
+	if (!R_ValidateMD3Data(pinmodel, fileSize, mod_name)) {
 		return qfalse;
 	}
 
+	version = LittleLong( pinmodel->version );
 	size = LittleLong( pinmodel->ofsEnd );
 
-	if ( size > fileSize ) {
-		ri.Printf( PRINT_WARNING, "%s: %s has corrupted header\n", __func__, mod_name );
-		return qfalse;
-	}
+	// Additional validation passed, proceed with loading
 
 	mod->type = MOD_MESH;
 	mod->dataSize += size;
@@ -493,6 +829,11 @@ static qboolean R_LoadMD3( model_t *mod, int lod, void *buffer, int fileSize, co
 	// swap all the surfaces
 	surf = (md3Surface_t *) ( (byte *)hdr + hdr->ofsSurfaces );
 	for ( i = 0 ; i < hdr->numSurfaces; i++) {
+
+		// Validate surface integrity before processing
+		if (!R_ValidateMD3Surface(surf, hdr, fileSize, mod_name, i)) {
+			return qfalse;
+		}
 
 		LL(surf->ident);
 		LL(surf->flags);
@@ -673,7 +1014,7 @@ static qboolean R_LoadMDR( model_t *mod, void *buffer, int filesize, const char 
 	}
 
 	mod->dataSize += size;
-	mod->modelData = mdr = ri.Hunk_Alloc( size, h_low );
+	mod->modelData.mdr = mdr = ri.Hunk_Alloc( size, h_low );
 
 	// Copy all the values over from the file and fix endian issues in the process, if necessary.
 	
@@ -983,6 +1324,20 @@ R_ModelInit
 */
 void R_ModelInit( void ) {
 	model_t		*mod;
+	int maxModels;
+
+	// Get dynamic limit from scalability system
+	maxModels = Scalability_GetMaxModels();
+	if (maxModels <= 0) {
+		maxModels = DEFAULT_MAX_MODELS; // Fallback
+	}
+
+	// Allocate dynamic model array
+	tr.models = ri.Hunk_Alloc( maxModels * sizeof(model_t *), h_low );
+	if (!tr.models) {
+		ri.Error(ERR_FATAL, "R_ModelInit: Failed to allocate model array");
+		return;
+	}
 
 	// leave a space for NULL model
 	tr.numModels = 0;
@@ -1112,11 +1467,11 @@ int R_LerpTag( orientation_t *tag, qhandle_t handle, int startFrame, int endFram
 	{
 		if(model->type == MOD_MDR)
 		{
-			start = R_GetAnimTag((mdrHeader_t *) model->modelData, startFrame, tagName, &start_space);
-			end = R_GetAnimTag((mdrHeader_t *) model->modelData, endFrame, tagName, &end_space);
+			start = R_GetAnimTag(model->modelData.mdr, startFrame, tagName, &start_space);
+			end = R_GetAnimTag(model->modelData.mdr, endFrame, tagName, &end_space);
 		}
 		else if( model->type == MOD_IQM ) {
-			return R_IQMLerpTag( tag, model->modelData,
+			return R_IQMLerpTag( tag, model->modelData.iqm,
 					startFrame, endFrame,
 					frac, tagName );
 		} else {

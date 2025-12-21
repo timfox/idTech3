@@ -26,8 +26,238 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vulkan/vulkan.h"
 
 #define	REF_API_VERSION		9
+#define MAX_MOD_KNOWN		1024
 
 struct ImDrawData;
+
+// Forward declarations for dependency injection
+struct refimport_s;
+struct trGlobals_s;
+struct model_s;
+struct renderer_services_s;
+
+// Type aliases for forward declarations
+typedef struct model_s model_t;
+typedef struct renderer_services_s renderer_services_t;
+
+// Minimal trGlobals_t definition for testing (only if not already defined)
+#ifndef TR_GLOBALS_DEFINED
+typedef struct trGlobals_s {
+	int numModels;
+	model_t *models[MAX_MOD_KNOWN];
+} trGlobals_t;
+#endif
+
+// imgFlags_t is defined in renderer-specific headers
+
+// Renderer context for dependency injection
+typedef struct renderer_context_s {
+	struct refimport_s *ri;           // Import functions
+	struct trGlobals_s *globals;      // Global renderer state (can be NULL for testing)
+	void *backend_data;               // Backend-specific data
+	const renderer_services_t *services; // Service interface
+} renderer_context_t;
+
+// Context-aware renderer functions that don't rely on global state
+typedef struct context_aware_renderer_api_s {
+	// Model management
+	qhandle_t (*RegisterModel)(renderer_context_t *ctx, const char *name);
+	model_t *(*GetModelByHandle)(renderer_context_t *ctx, qhandle_t handle);
+	void (*ModelBounds)(renderer_context_t *ctx, qhandle_t model, vec3_t mins, vec3_t maxs);
+
+	// Shader management
+	qhandle_t (*RegisterShader)(renderer_context_t *ctx, const char *name);
+	qhandle_t (*RegisterShaderNoMip)(renderer_context_t *ctx, const char *name);
+
+	// Skin management
+	qhandle_t (*RegisterSkin)(renderer_context_t *ctx, const char *name);
+
+	// Image management
+	qhandle_t (*RegisterImage)(renderer_context_t *ctx, const char *name, int flags);
+
+	// Font management
+	qhandle_t (*RegisterFont)(renderer_context_t *ctx, const char *fontName, int pointSize, fontInfo_t *font);
+
+	// Scene management
+	void (*ClearScene)(renderer_context_t *ctx);
+	void (*AddRefEntityToScene)(renderer_context_t *ctx, const refEntity_t *re);
+	void (*AddPolyToScene)(renderer_context_t *ctx, qhandle_t hShader, int numVerts, const polyVert_t *verts);
+	void (*AddLightToScene)(renderer_context_t *ctx, const vec3_t org, float intensity, float r, float g, float b);
+	void (*RenderScene)(renderer_context_t *ctx, const refdef_t *fd);
+
+	// World management
+	void (*SetWorldVisData)(renderer_context_t *ctx, const byte *vis);
+	void (*MarkLeaves)(renderer_context_t *ctx);
+
+	// Backend operations
+	void (*BeginFrame)(renderer_context_t *ctx, stereoFrame_t stereoFrame);
+	void (*EndFrame)(renderer_context_t *ctx, int *frontEndMsec, int *backEndMsec);
+} context_aware_renderer_api_t;
+
+// Service interfaces to reduce coupling
+typedef struct renderer_services_s {
+	// File system services
+	int (*FS_ReadFile)(const char *qpath, void **buffer);
+	void (*FS_FreeFile)(void *buffer);
+	int (*FS_WriteFile)(const char *qpath, const void *buffer, int size);
+
+	// Memory management
+	void *(*Hunk_Alloc)(int size, ha_pref pref);
+	void *(*Hunk_AllocateTempMemory)(int size);
+	void (*Hunk_FreeTempMemory)(void *block);
+	void *(*Malloc)(int bytes);
+	void (*Free)(void *buf);
+
+	// Console and error reporting
+	void (*Printf)(int level, const char *fmt, ...);
+	void (*Error)(errorParm_t level, const char *fmt, ...);
+
+	// CVars
+	cvar_t *(*Cvar_Get)(const char *name, const char *value, int flags);
+	float (*Cvar_VariableFloat)(const char *name);
+	int (*Cvar_VariableInteger)(const char *name);
+	const char *(*Cvar_VariableString)(const char *name);
+
+	// Command system
+	void (*Cmd_AddCommand)(const char *name, void (*function)(void));
+	void (*Cmd_RemoveCommand)(const char *name);
+	int (*Cmd_Argc)(void);
+	const char *(*Cmd_Argv)(int arg);
+
+	// Timing
+	int (*Milliseconds)(void);
+	int64_t (*Microseconds)(void);
+
+	// OpenGL/Vulkan specific (backend dependent)
+	void (*GLimp_Init)(qboolean fixedFunction);
+	void (*GLimp_Shutdown)(qboolean unloadDLL);
+	void (*GLimp_EndFrame)(void);
+	void (*GLimp_LogComment)(char *comment);
+} renderer_services_t;
+
+// Function to get the default services implementation
+const renderer_services_t *R_GetDefaultServices(void);
+
+// Function to create a renderer context
+renderer_context_t *R_CreateContext(const renderer_services_t *services);
+void R_DestroyContext(renderer_context_t *context);
+
+// Testable renderer functions that don't rely on global state
+typedef struct testable_renderer_api_s {
+	// Model registration
+	qhandle_t (*RegisterModel)(const char *name);
+	void (*ModelBounds)(qhandle_t model, vec3_t mins, vec3_t maxs);
+
+	// Shader registration
+	qhandle_t (*RegisterShader)(const char *name);
+	qhandle_t (*RegisterShaderNoMip)(const char *name);
+
+	// Skin registration
+	qhandle_t (*RegisterSkin)(const char *name);
+
+	// Image registration
+	qhandle_t (*RegisterImage)(const char *name, int flags);
+
+	// Font registration
+	qhandle_t (*RegisterFont)(const char *fontName, int pointSize, fontInfo_t *font);
+
+	// Scene management
+	void (*ClearScene)(void);
+	void (*AddRefEntityToScene)(const refEntity_t *re);
+	void (*AddPolyToScene)(qhandle_t hShader, int numVerts, const polyVert_t *verts);
+	void (*AddLightToScene)(const vec3_t org, float intensity, float r, float g, float b);
+	void (*AddAdditiveLightToScene)(const vec3_t org, float intensity, float r, float g, float b);
+
+	// Rendering
+	void (*RenderScene)(const refdef_t *fd);
+
+	// Utility functions
+	void (*SetColor)(const float *rgba);
+	void (*DrawStretchPic)(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader);
+	void (*DrawRotatedPic)(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader, float angle);
+	void (*DrawStretchPicGradient)(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader, const float *gradientColor, int gradientType);
+	void (*DrawStretchRaw)(int x, int y, int w, int h, int cols, int rows, const byte *data, int client, qboolean dirty);
+	void (*UploadCinematic)(int w, int h, int cols, int rows, const byte *data, int client, qboolean dirty);
+
+	// 2D rendering
+	void (*DrawString)(int x, int y, const char *str, int style, vec4_t color);
+	void (*DrawStringExt)(int x, int y, const char *str, int style, vec4_t color, qboolean forceColor, qboolean shadow);
+	void (*DrawChar)(int x, int y, int ch, int style, vec4_t color);
+
+	// World interaction
+	void (*RemapShader)(const char *oldShader, const char *newShader, const char *offsetTime);
+	qboolean (*GetEntityToken)(char *buffer, int size);
+	qboolean (*inPVS)(const vec3_t p1, const vec3_t p2);
+	void (*TakeVideoFrame)(int h, int w, byte *captureBuffer, byte *encodeBuffer, qboolean motionJpeg);
+
+	// Performance monitoring
+	void (*ThrottleBackend)(void);
+	void (*FinishBloom)(void);
+	void (*SetColorMappings)(void);
+} testable_renderer_api_t;
+
+// Get the testable renderer API (can be mocked for testing)
+const testable_renderer_api_t *R_GetTestableAPI(void);
+
+// Get the context-aware renderer API
+const context_aware_renderer_api_t *R_GetContextAwareAPI(void);
+
+// Context-aware versions of core renderer functions
+// These functions work with a renderer context instead of global state
+model_t *R_GetModelByHandle_Context(renderer_context_t *ctx, qhandle_t handle);
+model_t *R_AllocModel_Context(renderer_context_t *ctx);
+qhandle_t R_RegisterModel_Context(renderer_context_t *ctx, const char *name);
+
+// Macros for context-aware programming
+// These allow functions to work with either global state or context state
+
+#define GET_TR_CTX(ctx) ((ctx) && (ctx)->globals ? (ctx)->globals : &tr)
+#define GET_RI_CTX(ctx) ((ctx) && (ctx)->ri ? (ctx)->ri : &ri)
+#define GET_SERVICES_CTX(ctx) ((ctx) && (ctx)->services ? (ctx)->services : R_GetDefaultServices())
+
+// Context-aware logging
+#define R_CTX_Printf(ctx, level, ...) \
+	do { \
+		const renderer_services_t *svc = GET_SERVICES_CTX(ctx); \
+		if (svc && svc->Printf) { \
+			svc->Printf(level, __VA_ARGS__); \
+		} \
+	} while(0)
+
+#define R_CTX_Error(ctx, ...) \
+	do { \
+		const renderer_services_t *svc = GET_SERVICES_CTX(ctx); \
+		if (svc && svc->Error) { \
+			svc->Error(__VA_ARGS__); \
+		} \
+	} while(0)
+
+// Mock API for testing (doesn't require graphics hardware)
+const testable_renderer_api_t *R_GetMockAPI(void);
+
+// Context-aware mock API for testing
+const context_aware_renderer_api_t *R_GetContextAwareMockAPI(void);
+
+// Mock state control functions
+void R_Mock_ResetState(void);
+int R_Mock_GetRegisteredModelCount(void);
+int R_Mock_GetRegisteredShaderCount(void);
+int R_Mock_GetRegisteredSkinCount(void);
+qboolean R_Mock_WasSceneCleared(void);
+int R_Mock_GetEntitiesAdded(void);
+int R_Mock_GetPolysAdded(void);
+int R_Mock_GetLightsAdded(void);
+qboolean R_Mock_WasSceneRendered(void);
+
+// Context-aware mock state control functions
+void R_Context_Mock_ResetState(void);
+int R_Context_Mock_GetRegisteredModelCount(void);
+int R_Context_Mock_GetRegisteredShaderCount(void);
+qboolean R_Context_Mock_WasSceneCleared(void);
+int R_Context_Mock_GetEntitiesAdded(void);
+int R_Context_Mock_GetPolysAdded(void);
+int R_Context_Mock_GetLightsAdded(void);
+qboolean R_Context_Mock_WasSceneRendered(void);
 
 //
 // these are the functions exported by the refresh module

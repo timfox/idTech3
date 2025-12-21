@@ -161,6 +161,40 @@ SV_Map_f
 Restart the server on a different map
 ==================
 */
+/*
+=================
+SV_ValidateMapName
+Validate map name for security and correctness
+=================
+*/
+static qboolean SV_ValidateMapName(const char *mapName) {
+	if (!mapName || !*mapName) {
+		return qfalse;
+	}
+
+	// Check length
+	if (strlen(mapName) >= MAX_QPATH) {
+		Com_Printf( S_COLOR_RED "SV_Map_f: Map name too long\n" );
+		return qfalse;
+	}
+
+	// Check for path traversal attempts
+	if (strstr(mapName, "..") || strstr(mapName, "/") || strstr(mapName, "\\")) {
+		Com_Printf( S_COLOR_RED "SV_Map_f: Invalid characters in map name: %s\n", mapName );
+		return qfalse;
+	}
+
+	// Check for control characters
+	for (const char *c = mapName; *c; c++) {
+		if (*c < 32 || *c > 126) {
+			Com_Printf( S_COLOR_RED "SV_Map_f: Invalid character in map name: %s\n", mapName );
+			return qfalse;
+		}
+	}
+
+	return qtrue;
+}
+
 static void SV_Map_f( void ) {
 	const char		*cmd;
 	const char		*map;
@@ -172,18 +206,29 @@ static void SV_Map_f( void ) {
 	cmd = Cmd_Argv(0);
 	map = Cmd_Argv(1);
 
+	// Input validation and sanitization
+	if (!cmd || !*cmd) {
+		Com_Printf( "SV_Map_f: Invalid command\n" );
+		return;
+	}
+
 	// Handle the case where the command parsing is broken (e.g., "map map suspended" becomes "map map")
 	// Check if the map argument is the same as the command, which indicates parsing failure
 	if (map && cmd && !Q_stricmp(map, cmd)) {
 		// Try to get the actual map name from the next argument
 		const char *realMap = Cmd_Argv(2);
-		if (realMap && *realMap) {
+		if (realMap && *realMap && SV_ValidateMapName(realMap)) {
 			Com_Printf( "WARNING: Command parsing issue detected, using map '%s' instead of '%s'\n", realMap, map );
 			map = realMap;
 		} else {
 			Com_Printf( "ERROR: Command parsing failed and no valid map name found\n" );
 			return;
 		}
+	}
+
+	// Validate the map name
+	if (!SV_ValidateMapName(map)) {
+		return;
 	}
 
 	if ( !FS_StartupInProgress() ) {

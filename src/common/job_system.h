@@ -109,5 +109,17 @@ Should be called once per frame
 */
 void JobSystem_Update(void);
 
+/*
+=================
+JobSystem_ParallelFor
+Execute a function in parallel across a range
+index: Current iteration index
+userData: User data passed to function
+=================
+*/
+typedef void (*parallel_for_func_t)(int index, void *userData);
+
+qboolean JobSystem_ParallelFor(int start, int end, parallel_for_func_t func, void *userData);
+
 #endif // __JOB_SYSTEM_H__
 
