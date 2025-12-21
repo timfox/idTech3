@@ -382,7 +382,7 @@ static void R_MipMap2( unsigned * const out, unsigned * const in, int inWidth, i
 	// Check for potential integer overflow in allocation
 	if (outWidth > INT_MAX / 4 || outHeight > INT_MAX / (outWidth * 4)) {
 		ri.Printf(PRINT_WARNING, "R_ResampleTexture: Image dimensions too large (%dx%d)\n", outWidth, outHeight);
-		return qfalse;
+		return;
 	}
 
 	if ( out == in )
@@ -665,7 +665,7 @@ static void Upload32( byte *data, int x, int y, int width, int height, image_t *
 			// Check for potential integer overflow in allocation
 			if (scaled_width > INT_MAX / 4 || scaled_height > INT_MAX / (scaled_width * 4)) {
 				ri.Printf(PRINT_WARNING, "R_CreateImage: Scaled image dimensions too large (%dx%d)\n", scaled_width, scaled_height);
-				return NULL;
+				return;
 			}
 			resampledBuffer = ri.Hunk_AllocateTempMemory( scaled_width * scaled_height * 4 );
 			ResampleTexture( (unsigned*)data, width, height, (unsigned*)resampledBuffer, scaled_width, scaled_height );
@@ -1068,12 +1068,12 @@ R_UpdateAsyncImages
 Update any pending async image loads
 ================
 */
-static void R_UpdateAsyncImages(void) {
-#ifdef USE_JOBSYSTEM
-	// Job system handles completion callbacks automatically
-	// This function is here for potential future expansion
-#endif
-}
+// static void R_UpdateAsyncImages(void) {
+// #ifdef USE_JOBSYSTEM
+// 	// Job system handles completion callbacks automatically
+// 	// This function is here for potential future expansion
+// #endif
+// }
 
 // Streaming system for predictive asset loading
 #ifdef USE_JOBSYSTEM
@@ -1092,8 +1092,8 @@ R_StreamImage
 Predictively load an image that might be needed soon
 ================
 */
-static void R_StreamImage(const char *name) {
 #ifdef USE_JOBSYSTEM
+// static void R_StreamImage(const char *name) {
 	if (!name || !*name) {
 		return;
 	}
@@ -1142,41 +1142,12 @@ static void R_StreamImage(const char *name) {
 	}
 
 	ri.Printf(PRINT_DEVELOPER, "R_StreamImage: Started streaming %s\n", name);
-}
-#endif
-
-#ifndef USE_JOBSYSTEM
-static void R_StreamImage([[maybe_unused]] const char *name) {
-	// No-op when job system not available
-}
-#endif
-
-/*
-================
-R_UpdateStreaming
-
-Update streaming system and complete any finished loads
-================
-*/
-#ifdef USE_JOBSYSTEM
-static void R_UpdateStreaming(void) {
-	for (int i = 0; i < MAX_STREAMING_IMAGES; i++) {
-		if (streamingImages[i].active && streamingImages[i].handle) {
-			// Check if job is complete
-			if (streamingImages[i].handle->completed) {
-				ri.Printf(PRINT_DEVELOPER, "R_UpdateStreaming: Completed streaming %s\n", streamingImages[i].name);
-				streamingImages[i].active = qfalse;
-				streamingImages[i].handle = NULL;
-			}
-		}
-	}
-}
-#endif
-
-#ifndef USE_JOBSYSTEM
-static void R_UpdateStreaming(void) {
-	// No-op when job system not available
-}
+// }
+#else
+// static void R_StreamImage(const char *name) {
+// 	// No-op when job system not available
+// 	(void)name; // Suppress unused parameter warning
+// }
 #endif
 
 /*
@@ -1986,7 +1957,7 @@ qhandle_t RE_RegisterSkin( const char *name ) {
 
 	// copy surfaces to skin
 	// Check for potential integer overflow in allocation
-	if (skin->numSurfaces > INT_MAX / sizeof(skinSurface_t)) {
+	if (skin->numSurfaces > INT_MAX / (int)sizeof(skinSurface_t)) {
 		ri.Printf(PRINT_WARNING, "R_LoadSkin: Too many surfaces in skin '%s'\n", name);
 		return 0;
 	}

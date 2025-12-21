@@ -23,8 +23,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef TR_LOCAL_H
 #define TR_LOCAL_H
 
-#define TR_GLOBALS_DEFINED
-
 #define USE_LEGACY_DLIGHTS	// vq3 dynamic lights
 #define USE_PMLIGHT			// promode dynamic lights via \r_dlightMode 1|2
 #define MAX_REAL_DLIGHTS	(MAX_DLIGHTS*2)
@@ -39,10 +37,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <assert.h>
 
+#define TR_GLOBALS_DEFINED
+
 #include "../../common/q_shared.h"
 #include "../../common/qfiles.h"
 #include "../../common/qcommon.h"
-#include "../renderercommon/tr_public.h"
 #include "../renderercommon/tr_backend_iface.h"
 #include "tr_common.h"
 #include "iqm.h"
@@ -1173,7 +1172,7 @@ typedef struct {
 } backEndState_t;
 
 /*
-** trGlobals_t 
+** trGlobals_t
 **
 ** Most renderer globals are defined here.
 ** backend functions should never modify any of these fields,
@@ -1294,6 +1293,10 @@ typedef struct {
 	qboolean				vertexLightingAllowed;
 
 } trGlobals_t;
+
+#define TR_GLOBALS_DEFINED
+
+#include "../renderercommon/tr_public.h"
 
 extern backEndState_t	backEnd;
 extern trGlobals_t	tr;

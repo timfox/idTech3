@@ -79,9 +79,9 @@ TEST(Q_strncpyz_bounds_checking) {
 	Q_strncpyz(dest, "verylongstring", sizeof(dest));
 	ASSERT_STR_EQ(dest, "verylongs");
 
-	// Test with exact size
+	// Test with exact size - should truncate to fit
 	Q_strncpyz(dest, "exactly9ch", sizeof(dest));
-	ASSERT_STR_EQ(dest, "exactly9ch");
+	ASSERT_STR_EQ(dest, "exactly9c");
 }
 
 TEST(Q_strncpyz_null_handling) {

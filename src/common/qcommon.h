@@ -1613,7 +1613,11 @@ Validates a file path to prevent directory traversal attacks.
 Returns qtrue if the path is safe, qfalse if it contains traversal attempts.
 ============
 */
+#ifdef __cplusplus
+extern "C" qboolean Q_ValidateFilePath(const char *path);
+#else
 qboolean Q_ValidateFilePath(const char *path);
+#endif
 
 /*
 ============

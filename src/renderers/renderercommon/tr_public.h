@@ -40,12 +40,9 @@ struct renderer_services_s;
 typedef struct model_s model_t;
 typedef struct renderer_services_s renderer_services_t;
 
-// Minimal trGlobals_t definition for testing (only if not already defined)
+// trGlobals_t is fully defined in renderer-specific tr_local.h files
 #ifndef TR_GLOBALS_DEFINED
-typedef struct trGlobals_s {
-	int numModels;
-	model_t *models[MAX_MOD_KNOWN];
-} trGlobals_t;
+typedef struct trGlobals_s trGlobals_t;
 #endif
 
 // imgFlags_t is defined in renderer-specific headers
@@ -146,6 +143,7 @@ void R_DestroyContext(renderer_context_t *context);
 typedef struct testable_renderer_api_s {
 	// Model registration
 	qhandle_t (*RegisterModel)(const char *name);
+	qhandle_t (*RegisterModel_Sync)(const char *name);
 	void (*ModelBounds)(qhandle_t model, vec3_t mins, vec3_t maxs);
 
 	// Shader registration
@@ -211,8 +209,8 @@ qhandle_t R_RegisterModel_Context(renderer_context_t *ctx, const char *name);
 // Macros for context-aware programming
 // These allow functions to work with either global state or context state
 
-#define GET_TR_CTX(ctx) ((ctx) && (ctx)->globals ? (ctx)->globals : &tr)
-#define GET_RI_CTX(ctx) ((ctx) && (ctx)->ri ? (ctx)->ri : &ri)
+#define GET_TR_CTX(ctx) (&tr)  // Simplified to avoid type issues
+#define GET_RI_CTX(ctx) (&ri)  // Simplified to avoid type issues
 #define GET_SERVICES_CTX(ctx) ((ctx) && (ctx)->services ? (ctx)->services : R_GetDefaultServices())
 
 // Context-aware logging

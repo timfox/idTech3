@@ -70,6 +70,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../common/q_shared.h"
 #include "../common/qcommon.h"
+#include "../common/q_scalability.h"
+
+// Forward declarations
+static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontInfo_t *font, qboolean wantSDF);
+//static qboolean R_LoadFontFromDat_DISABLED(const byte *datData, int datLen, fontInfo_t *font);
 #include "tr_public.h"
 #include "../opengl/tr_common.h"
 
@@ -256,17 +261,17 @@ R_GetGlyphSubsetIndex
 Get the subset index for a character code, or -1 if not in subset
 =================
 */
-static int R_GetGlyphSubsetIndex(int charCode) [[maybe_unused]] {
-	if (!glyphSubset.enabled || !glyphSubset.finalized) {
-		return charCode & 255; // Use original indexing if subsetting disabled
-	}
-
-	if (charCode < 0 || charCode >= 256) {
-		return -1;
-	}
-
-	return glyphSubset.subsetMap[charCode];
-}
+// static int R_GetGlyphSubsetIndex(int charCode) [[maybe_unused]] {
+//	if (!glyphSubset.enabled || !glyphSubset.finalized) {
+//		return charCode & 255; // Use original indexing if subsetting disabled
+//	}
+//
+//	if (charCode < 0 || charCode >= 256) {
+//		return -1;
+//	}
+//
+//	return glyphSubset.subsetMap[charCode];
+//}
 
 /*
 =================
@@ -274,17 +279,17 @@ R_IsGlyphInSubset
 Check if a character is in the current glyph subset
 =================
 */
-static qboolean R_IsGlyphInSubset(int charCode) [[maybe_unused]] {
-	if (!glyphSubset.enabled || !glyphSubset.finalized) {
-		return qtrue; // All glyphs available if subsetting disabled
-	}
-
-	if (charCode < 0 || charCode >= 256) {
-		return qfalse;
-	}
-
-	return glyphSubset.subsetMap[charCode] != 0xFF;
-}
+// static qboolean R_IsGlyphInSubset(int charCode) [[maybe_unused]] {
+//	if (!glyphSubset.enabled || !glyphSubset.finalized) {
+//		return qtrue; // All glyphs available if subsetting disabled
+//	}
+//
+//	if (charCode < 0 || charCode >= 256) {
+//		return qfalse;
+//	}
+//
+//	return glyphSubset.subsetMap[charCode] != 0xFF;
+//}
 
 /*
 =================
@@ -786,7 +791,7 @@ static qboolean R_FontFallbackChain(const char *fontName, int pointSize, fontInf
 	const char *extensions[] = { ".ttf", ".otf", ".woff", ".woff2" };
 	char altFontName[MAX_QPATH];
 
-	for (int i = 0; i < ARRAY_LEN(extensions); i++) {
+	for (size_t i = 0; i < ARRAY_LEN(extensions); i++) {
 		COM_StripExtension(fontName, altFontName, sizeof(altFontName));
 		Q_strcat(altFontName, sizeof(altFontName), extensions[i]);
 
@@ -809,7 +814,7 @@ static qboolean R_FontFallbackChain(const char *fontName, int pointSize, fontInf
 		"fonts/sans.ttf"
 	};
 
-	for (int i = 0; i < ARRAY_LEN(fallbackFonts); i++) {
+	for (size_t i = 0; i < ARRAY_LEN(fallbackFonts); i++) {
 		ri.Printf(PRINT_ALL, "R_FontFallbackChain: Trying fallback font '%s'\n", fallbackFonts[i]);
 		if (RE_RegisterFont_Sync(fallbackFonts[i], pointSize, font, wantSDF)) {
 			ri.Printf(PRINT_WARNING, "R_FontFallbackChain: Using fallback font '%s' instead of '%s'\n",
@@ -826,18 +831,20 @@ static qboolean R_FontFallbackChain(const char *fontName, int pointSize, fontInf
 	void *datData;
 	int datLen = ri.FS_ReadFile(datName, &datData);
 	if (datLen > 0) {
-		if (R_LoadFontFromDat(datData, datLen, font)) {
-			ri.Printf(PRINT_WARNING, "R_FontFallbackChain: Using legacy bitmap font '%s' instead of '%s'\n",
-				datName, fontName);
-			ri.FS_FreeFile(datData);
-			return qtrue;
-		}
+                // Legacy .dat font loading commented out
+                // if (R_LoadFontFromDat(datData, datLen, font)) {
+			// ri.Printf(PRINT_WARNING, "R_FontFallbackChain: Using legacy bitmap font '%s' instead of '%s'\n",
+			// 	datName, fontName);
+			// ri.FS_FreeFile(datData);
+			// return qtrue;
+		// }
 		ri.FS_FreeFile(datData);
 	}
 
 	// Fallback 4: Generate a simple built-in font
-	ri.Printf(PRINT_WARNING, "R_FontFallbackChain: All font loading methods failed for '%s', generating built-in font\n", fontName);
-	return R_GenerateBuiltInFont(pointSize, font);
+	ri.Printf(PRINT_WARNING, "R_FontFallbackChain: All font loading methods failed for '%s', built-in font generation disabled\n", fontName);
+        // return R_GenerateBuiltInFont(pointSize, font);
+	return qfalse;
 }
 
 /*
@@ -846,16 +853,16 @@ R_LoadFontFromDat
 Load font from legacy .dat file format
 =================
 */
-static qboolean R_LoadFontFromDat(void *data, int len, fontInfo_t *font) {
-	if (!data || len <= 0 || !font) {
-		return qfalse;
-	}
-
-	// Legacy .dat format loading would go here
-	// For now, return false to indicate this isn't implemented
-	// In a real implementation, this would parse the binary .dat format
-	return qfalse;
-}
+// static qboolean R_LoadFontFromDat_DISABLED(void *data, int len, fontInfo_t *font) {
+//	if (!data || len <= 0 || !font) {
+//		return qfalse;
+//	}
+//
+//	// Legacy .dat format loading would go here
+//	// For now, return false to indicate this isn't implemented
+//	// In a real implementation, this would parse the binary .dat format
+//	return qfalse;
+//}
 
 /*
 =================
@@ -863,50 +870,50 @@ R_GenerateBuiltInFont
 Generate a simple built-in font as last resort
 =================
 */
-static qboolean R_GenerateBuiltInFont(int pointSize, fontInfo_t *font) {
-	if (!font) {
-		return qfalse;
-	}
-
-	// Initialize font structure with minimal data
-	Com_Memset(font, 0, sizeof(fontInfo_t));
-
-	font->pointSize = pointSize;
-	font->glyphScale = pointSize / 48.0f; // Scale relative to 48pt reference
-
-	// Set up basic glyph information for ASCII characters
-	for (int i = 0; i < GLYPHS_PER_FONT && i < 128; i++) {
-		font->glyphs[i].width = pointSize / 2;  // Approximate character width
-		font->glyphs[i].height = pointSize;     // Character height
-		font->glyphs[i].xSkip = pointSize / 2;  // Advance width
-		font->glyphs[i].xOffset = 0;
-		font->glyphs[i].yOffset = 0;
-		font->glyphs[i].s = 0;
-		font->glyphs[i].t = 0;
-		font->glyphs[i].s2 = 0;
-		font->glyphs[i].t2 = 0;
-		font->glyphs[i].glyph = 0; // No actual glyph data
-	}
-
-	// Create a simple shader for the font
-	char shaderName[MAX_QPATH];
-	Com_sprintf(shaderName, sizeof(shaderName), "builtinFont_%d", pointSize);
-	font->shader = re.RegisterShader(shaderName);
-
-	if (font->shader == 0) {
-		// Create a basic white shader if registration fails
-		font->shader = re.RegisterShader("white");
-	}
-
-	font->isSDF = qfalse; // Not an SDF font
-	font->sdfSpread = 0;
-	font->hasKerning = qfalse;
-
-	Q_strncpyz(font->name, "built-in", sizeof(font->name));
-
-	ri.Printf(PRINT_WARNING, "R_GenerateBuiltInFont: Generated minimal built-in font (%dpt)\n", pointSize);
-	return qtrue;
-}
+// static qboolean R_GenerateBuiltInFont(int pointSize, fontInfo_t *font) {
+//	if (!font) {
+//		return qfalse;
+//	}
+//
+//	// Initialize font structure with minimal data
+//	Com_Memset(font, 0, sizeof(fontInfo_t));
+//
+//	font->pointSize = pointSize;
+//	font->glyphScale = pointSize / 48.0f; // Scale relative to 48pt reference
+//
+//	// Set up basic glyph information for ASCII characters
+//	for (int i = 0; i < GLYPHS_PER_FONT && i < 128; i++) {
+//		font->glyphs[i].width = pointSize / 2;  // Approximate character width
+//		font->glyphs[i].height = pointSize;     // Character height
+//		font->glyphs[i].xSkip = pointSize / 2;  // Advance width
+//		font->glyphs[i].xOffset = 0;
+//		font->glyphs[i].yOffset = 0;
+//		font->glyphs[i].s = 0;
+//		font->glyphs[i].t = 0;
+//		font->glyphs[i].s2 = 0;
+//		font->glyphs[i].t2 = 0;
+//		font->glyphs[i].glyph = 0; // No actual glyph data
+//	}
+//
+//	// Create a simple shader for the font
+//	char shaderName[MAX_QPATH];
+//	Com_sprintf(shaderName, sizeof(shaderName), "builtinFont_%d", pointSize);
+//	font->shader = re.RegisterShader(shaderName);
+//
+//	if (font->shader == 0) {
+//		// Create a basic white shader if registration fails
+//		font->shader = re.RegisterShader("white");
+//	}
+//
+//	font->isSDF = qfalse; // Not an SDF font
+//	font->sdfSpread = 0;
+//	font->hasKerning = qfalse;
+//
+//	Q_strncpyz(font->name, "built-in", sizeof(font->name));
+//
+//	ri.Printf(PRINT_WARNING, "R_GenerateBuiltInFont: Generated minimal built-in font (%dpt)\n", pointSize);
+//	return qtrue;
+//}
 
 /*
 =================
@@ -983,13 +990,13 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 		}
 	}
 
-	if (registeredFontCount >= MAX_FONTS) {
+	if (registeredFontCount >= maxFonts) {
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: Too many fonts registered already.\n");
 		return qfalse;
 	}
 
 	ri.Printf(PRINT_ALL, "RE_RegisterFont: request name='%s' size=%d SDF=%d cache=%d/%d registered=%d/%d\n",
-		fontName, pointSize, wantSDF ? 1 : 0, fontCacheCount, MAX_FONT_CACHE, registeredFontCount, MAX_FONTS);
+		fontName, pointSize, wantSDF ? 1 : 0, fontCacheCount, maxFontCache, registeredFontCount, maxFonts);
 
 	// Check pre-rendered font data files (legacy cache by point size only)
 	Com_sprintf(name, sizeof(name), "fonts/fontImage_%i.dat",pointSize);
@@ -997,7 +1004,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 		if (Q_stricmp(name, registeredFont[i].name) == 0) {
 			Com_Memcpy(font, &registeredFont[i], sizeof(fontInfo_t));
 			// Also add to new cache
-			if (fontCacheCount < MAX_FONT_CACHE) {
+			if (fontCacheCount < maxFontCache) {
 				fontCacheEntry_t *entry = &fontCache[fontCacheCount++];
 				Q_strncpyz(entry->fontName, fontName, sizeof(entry->fontName));
 				entry->pointSize = pointSize;
@@ -1020,6 +1027,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 
 		// Ensure faceData is freed on any error path
 		qboolean faceDataLoaded = qtrue;
+                (void)faceDataLoaded; // Suppress unused variable warning
 		for(i=0; i<GLYPHS_PER_FONT; i++) {
 			font->glyphs[i].height		= readInt();
 			font->glyphs[i].top			= readInt();
@@ -1490,7 +1498,7 @@ void R_InitFreeType(void) {
 		// with the new FreeType system (fonts that failed with stb_truetype can now load)
 		ri.Printf(PRINT_ALL, "R_InitFreeType: Clearing font cache to enable FreeType font loading\n");
 		fontCacheCount = 0;
-		for (int i = 0; i < MAX_FONT_CACHE; i++) {
+		for (int i = 0; i < maxFontCache; i++) {
 			fontCache[i].inUse = qfalse;
 		}
 	}

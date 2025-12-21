@@ -56,7 +56,7 @@ qboolean R_LoadTIKI(model_t *mod, void *buffer, int filesize, const char *mod_na
 	mod->type = MOD_TIKI;
 	mod->dataSize += size;
 	tikiData = (tikiData_t *)ri.Hunk_Alloc(sizeof(tikiData_t), h_low);
-	mod->modelData = tikiData;
+	mod->modelData.tiki = tikiData;
 	
 	// Allocate and copy header
 	tiki = (tikiHeader_t *)ri.Hunk_Alloc(size, h_low);

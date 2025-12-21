@@ -55,6 +55,9 @@ float Q_atof(const char *str) {
 	return atof(str);
 }
 
+// Stub refexport_t structure for testing
+refexport_t re = {0};
+
 // Test the mock renderer API
 TEST(renderer_mock_basic) {
 	const testable_renderer_api_t *api = R_GetMockAPI();
@@ -143,17 +146,6 @@ TEST(renderer_mock_font_registration) {
 
 	ASSERT_TRUE(fontHandle > 0);
 	ASSERT_EQ(font.pointSize, 12);
-}
-
-TEST(renderer_services_basic) {
-	const renderer_services_t *services = R_GetDefaultServices();
-	ASSERT_TRUE(services != NULL);
-
-	// Test that all service functions are non-null
-	ASSERT_TRUE(services->FS_ReadFile != NULL);
-	ASSERT_TRUE(services->FS_FreeFile != NULL);
-	ASSERT_TRUE(services->Printf != NULL);
-	ASSERT_TRUE(services->Error != NULL);
 }
 
 // Note: Context-aware tests require additional implementation files

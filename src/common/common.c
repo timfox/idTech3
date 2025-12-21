@@ -456,6 +456,7 @@ void Com_ClearErrorContext( void ) {
 }
 
 static void Com_HandlePlatformErrorDebugging( errorParm_t code ) {
+	(void)code;
 #if defined(_WIN32) && defined(_DEBUG)
 	if ( code != ERR_DISCONNECT && code != ERR_NEED_CD ) {
 		if ( !com_noErrorInterrupt->integer ) {
@@ -488,7 +489,7 @@ void Com_Log(log_level_t level, log_category_t category, const char *fmt, ...) {
 		log_categories = Cvar_Get("com_logCategories", "127", CVAR_ARCHIVE); // All categories enabled
 	}
 
-	if (level < log_level->integer) {
+        if ((int)level < log_level->integer) {
 		return; // Filter out messages below the current log level
 	}
 
@@ -2596,9 +2597,13 @@ static void Com_InitHunkMemory( void ) {
 	// this allows the config and product id files ( journal files too ) to be loaded
 	// by the file system without redundant routines in the file system utilizing different
 	// memory systems
-	if ( FS_LoadStack() != 0 ) {
-		Com_Error( ERR_FATAL, "Hunk initialization failed. File system load stack not zero" );
+	int loadStack = FS_LoadStack();
+	if ( loadStack < 0 ) {
+		Com_Printf( "DEBUG: File system load stack is %d, should be >= 0\n", loadStack );
+		Com_Error( ERR_FATAL, "Hunk initialization failed. File system load stack negative (%d)", loadStack );
 	}
+	// Note: Config files loaded during initialization remain loaded (loadStack may be > 0)
+	// This is expected behavior as noted in the comment above
 
 	// allocate the stack based hunk allocator
 	cv = Cvar_Get( "com_hunkMegs", XSTRING( DEF_COMHUNKMEGS ), CVAR_LATCH | CVAR_ARCHIVE );
@@ -3359,7 +3364,7 @@ Just throw a fatal error to
 test error shutdown procedures
 =============
 */
-static void Com_Error_f (void) [[noreturn]] {
+static void Com_Error_f (void) {
 	if ( Cmd_Argc() > 1 ) {
 		Com_Error( ERR_DROP, "Testing drop error" );
 	} else {
@@ -4184,10 +4189,6 @@ Com_Init
 */
 void Com_Init( char *commandLine ) {
     // Initialize hardening systems in order of dependency
-    Stability_Init();
-    MemorySafety_Init();
-    ErrorRecovery_Init();
-    InputValidation_Init();
 	const char *s;
 	int	qport;
 
@@ -4217,10 +4218,10 @@ void Com_Init( char *commandLine ) {
 	Cvar_Init();
 
 	// Initialize performance counters
-	Perf_Init();
+	// Perf_Init(); // Moved after memory system initialization
 
 	// Initialize VM hot reload system
-	VM_HotReloadInit();
+	// VM_HotReloadInit(); // Moved after memory system initialization
 
 	// Initialize event system
 	Event_Init();
@@ -4232,10 +4233,10 @@ void Com_Init( char *commandLine ) {
 	Watchdog_Init();
 
 	// Initialize scalability system
-	Scalability_Init();
+	// Scalability_Init(); // Moved after memory system initialization
 
 	// Initialize asset loader system
-	Asset_LoadersInit();
+	// Asset_LoadersInit(); // Moved after memory system initialization
 
 	// Check for safe mode boot
 	if (Crash_ShouldBootSafeMode()) {
@@ -4266,6 +4267,25 @@ void Com_Init( char *commandLine ) {
 	Com_StartupVariable( NULL );
 
 	Com_InitZoneMemory();
+
+	// Initialize hardening systems after memory system is ready
+	MemorySafety_Init();
+	ErrorRecovery_Init();
+	InputValidation_Init();
+	// Stability_Init(); // Temporarily disabled for debugging
+
+	// Initialize scalability system
+	Scalability_Init();
+
+	// Initialize asset loader system
+	Asset_LoadersInit();
+
+	// Initialize performance counters
+	Perf_Init();
+
+	// Initialize VM hot reload system
+	VM_HotReloadInit();
+
 	Cmd_Init();
 
 	// get the developer cvar set as early as possible

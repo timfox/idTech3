@@ -304,7 +304,7 @@ Add a model to the hash table
 static void R_AddModelToHash(model_t *mod) {
 	unsigned int hash;
 
-	if (!mod || !mod->name || !mod->name[0]) {
+	if (!mod || !mod->name[0]) {
 		return;
 	}
 
@@ -354,38 +354,38 @@ typedef struct {
 } modelLoadJob_t;
 
 #define MAX_ASYNC_MODEL_JOBS 4
-static modelLoadJob_t asyncModelJobs[MAX_ASYNC_MODEL_JOBS];
-static int asyncModelJobCount = 0;
+// static modelLoadJob_t asyncModelJobs[MAX_ASYNC_MODEL_JOBS];
+// static int asyncModelJobCount = 0;
 
-static void ModelLoadWorker_Async(void *data) {
-	modelLoadJob_t *job = (modelLoadJob_t *)data;
+// static void ModelLoadWorker_Async(void *data) {
+// 	modelLoadJob_t *job = (modelLoadJob_t *)data;
 
-	// Perform the actual model loading (this is the synchronous path)
-	qhandle_t hModel = RE_RegisterModel_Sync(job->name);
-	if (hModel) {
-		job->success = qtrue;
-		job->mod = tr.models[hModel];
-	} else {
-		job->success = qfalse;
-	}
+// 	// Perform the actual model loading (this is the synchronous path)
+// 	qhandle_t hModel = RE_RegisterModel_Sync(job->name);
+// 	if (hModel) {
+// 		job->success = qtrue;
+// 		job->mod = tr.models[hModel];
+// 	} else {
+// 		job->success = qfalse;
+// 	}
 
-	job->completed = qtrue;
-}
+// 	job->completed = qtrue;
+// }
 
-static void ModelLoadCompletion_Async(void *data) {
-	modelLoadJob_t *job = (modelLoadJob_t *)data;
+// static void ModelLoadCompletion_Async(void *data) {
+// 	modelLoadJob_t *job = (modelLoadJob_t *)data;
 
-	if (job->success) {
-		ri.Printf(PRINT_DEVELOPER, "ModelLoadCompletion_Async: Model '%s' loaded successfully\n", job->name);
-	} else {
-		ri.Printf(PRINT_WARNING, "ModelLoadCompletion_Async: Failed to load model '%s'\n", job->name);
-	}
+// 	if (job->success) {
+// 		ri.Printf(PRINT_DEVELOPER, "ModelLoadCompletion_Async: Model '%s' loaded successfully\n", job->name);
+// 	} else {
+// 		ri.Printf(PRINT_WARNING, "ModelLoadCompletion_Async: Failed to load model '%s'\n", job->name);
+// 	}
 
-	// Mark job as available for reuse
-	job->completed = qfalse;
-	job->success = qfalse;
-	asyncModelJobCount--;
-}
+// 	// Mark job as available for reuse
+// 	job->completed = qfalse;
+// 	job->success = qfalse;
+// 	asyncModelJobCount--;
+// }
 
 /*
 =================
@@ -394,72 +394,60 @@ RE_RegisterModel
 Public interface for model registration - chooses between async and sync loading
 =================
 */
+static qhandle_t RE_RegisterModel_Sync( const char *name );
 qhandle_t RE_RegisterModel( const char *name ) {
-#ifdef USE_JOBSYSTEM
-	// Check for async loading preference
-	static cvar_t *r_modelAsync = NULL;
-	if (!r_modelAsync) {
-		r_modelAsync = ri.Cvar_Get("r_modelAsync", "1", CVAR_ARCHIVE | CVAR_LATCH);
-		ri.Cvar_SetDescription(r_modelAsync, "Use asynchronous model loading (0 = sync, 1 = async)");
-	}
-
-	if (r_modelAsync && r_modelAsync->integer) {
-		return RE_RegisterModel_Async(name);
-	}
-#endif
-
-	// Fall back to synchronous loading
+	// Use synchronous loading (async functionality commented out)
 	return RE_RegisterModel_Sync(name);
 }
 
-qhandle_t RE_RegisterModel_Async(const char *name) {
-#ifdef USE_JOBSYSTEM
-	// Check if we have too many concurrent async jobs
-	if (asyncModelJobCount >= MAX_ASYNC_MODEL_JOBS) {
-		ri.Printf(PRINT_DEVELOPER, "RE_RegisterModel_Async: Too many concurrent model loads (%d), using sync\n", asyncModelJobCount);
-		return RE_RegisterModel_Sync(name);
-	}
+// qhandle_t RE_RegisterModel_Async(const char *name) {
+// #ifdef USE_JOBSYSTEM
+// 	// Check if we have too many concurrent async jobs
+// 	if (asyncModelJobCount >= MAX_ASYNC_MODEL_JOBS) {
+// 		ri.Printf(PRINT_DEVELOPER, "RE_RegisterModel_Async: Too many concurrent model loads (%d), using sync\n", asyncModelJobCount);
+// 		return RE_RegisterModel_Sync(name);
+// 	}
 
-	// Find available job slot
-	modelLoadJob_t *job = NULL;
-	for (int i = 0; i < MAX_ASYNC_MODEL_JOBS; i++) {
-		if (!asyncModelJobs[i].completed) {
-			job = &asyncModelJobs[i];
-			break;
-		}
-	}
+// 	// Find available job slot
+// 	modelLoadJob_t *job = NULL;
+// 	for (int i = 0; i < MAX_ASYNC_MODEL_JOBS; i++) {
+// 		if (!asyncModelJobs[i].completed) {
+// 			job = &asyncModelJobs[i];
+// 			break;
+// 		}
+// 	}
 
-	if (!job) {
-		ri.Printf(PRINT_WARNING, "RE_RegisterModel_Async: No available job slots, using sync\n");
-		return RE_RegisterModel_Sync(name);
-	}
+// 	if (!job) {
+// 		ri.Printf(PRINT_WARNING, "RE_RegisterModel_Async: No available job slots, using sync\n");
+// 		return RE_RegisterModel_Sync(name);
+// 	}
 
-	// Initialize job
-	Q_strncpyz(job->name, name, sizeof(job->name));
-	job->completed = qfalse;
-	job->success = qfalse;
-	asyncModelJobCount++;
+// 	// Initialize job
+// 	Q_strncpyz(job->name, name, sizeof(job->name));
+// 	job->completed = qfalse;
+// 	job->success = qfalse;
+// 	asyncModelJobCount++;
 
-	// Submit job to job system
-	extern job_handle_t *JobSystem_SubmitJobWithCompletion(jobFunction_t, void *, jobPriority_t, void (*)(void *), void *);
-	job_handle_t *handle = JobSystem_SubmitJobWithCompletion(
-		ModelLoadWorker_Async, job, JOB_PRIORITY_NORMAL,
-		ModelLoadCompletion_Async, job);
+// 	// Submit job to job system
+// 	extern job_handle_t *JobSystem_SubmitJobWithCompletion(jobFunction_t, void *, jobPriority_t, void (*)(void *), void *);
+// 	job_handle_t *handle = JobSystem_SubmitJobWithCompletion(
+// 		ModelLoadWorker_Async, job, JOB_PRIORITY_NORMAL,
+// 		ModelLoadCompletion_Async, job);
 
-	if (!handle) {
-		ri.Printf(PRINT_WARNING, "RE_RegisterModel_Async: Failed to submit job, using sync\n");
-		job->completed = qfalse;
-		asyncModelJobCount--;
-		return RE_RegisterModel_Sync(name);
-	}
+// 	if (!handle) {
+// 		ri.Printf(PRINT_WARNING, "RE_RegisterModel_Async: Failed to submit job, using sync\n");
+// 		job->completed = qfalse;
+// 		asyncModelJobCount--;
+// 		return RE_RegisterModel_Sync(name);
+// 	}
 
-	ri.Printf(PRINT_DEVELOPER, "RE_RegisterModel_Async: Submitted async load for '%s'\n", name);
-	return 0; // Async loading - handle will be resolved later
-#else
-	// Fallback to synchronous loading
-	return RE_RegisterModel_Sync(name);
-#endif
-}
+// 	ri.Printf(PRINT_DEVELOPER, "RE_RegisterModel_Async: Submitted async load for '%s'\n", name);
+// 	return 0; // Async loading - handle will be resolved later
+// #else
+// 	// Fallback to synchronous loading
+// 	return RE_RegisterModel_Sync(name);
+// #endif
+// }
 
 qhandle_t RE_RegisterModel_Sync( const char *name ) {
 	model_t		*mod;

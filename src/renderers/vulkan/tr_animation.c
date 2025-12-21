@@ -192,7 +192,7 @@ void R_MDRAddAnimSurfaces( trRefEntity_t *ent ) {
 	int				cull;
 	qboolean	personalModel;
 
-	header = (mdrHeader_t *) tr.currentModel->modelData;
+	header = tr.currentModel->modelData.mdr;
 
 	personalModel = (ent->e.renderfx & RF_THIRD_PERSON) && (tr.viewParms.portalView == PV_NONE);
 

@@ -99,7 +99,7 @@ void R_TIKIAddAnimSurfaces(trRefEntity_t *ent)
 	if (!tr.currentModel || tr.currentModel->type != MOD_TIKI)
 		return;
 	
-	tikiData = (tikiData_t *)tr.currentModel->modelData;
+	tikiData = tr.currentModel->modelData.tiki;
 	if (!tikiData || !tikiData->header)
 		return;
 	
@@ -194,7 +194,7 @@ void RB_TIKISurfaceAnim(tikiSurface_t *surface)
 	if (!surface || !tr.currentModel || tr.currentModel->type != MOD_TIKI)
 		return;
 	
-	tikiData = (tikiData_t *)tr.currentModel->modelData;
+	tikiData = tr.currentModel->modelData.tiki;
 	if (!tikiData || !tikiData->header)
 		return;
 	

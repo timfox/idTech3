@@ -59,6 +59,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../../common/q_shared.h"
 #include "../../common/qfiles.h"
 #include "../../common/qcommon.h"
+#define TR_GLOBALS_DEFINED
 #include "../renderercommon/tr_public.h"
 #include "../renderercommon/tr_backend_iface.h"
 #include "tr_common.h"
@@ -1286,7 +1287,7 @@ typedef struct convolveCubemapCommand_s {
 } convolveCubemapCommand_t;
 
 /*
-** trGlobals_t 
+** trGlobals_t
 **
 ** Most renderer globals are defined here.
 ** backend functions should never modify any of these fields,
@@ -1420,6 +1421,9 @@ typedef struct {
 	qboolean				vertexLightingAllowed;
 } trGlobals_t;
 
+#define TR_GLOBALS_DEFINED
+
+#include "../renderercommon/tr_public.h"
 
 extern backEndState_t	backEnd;
 extern trGlobals_t	tr;

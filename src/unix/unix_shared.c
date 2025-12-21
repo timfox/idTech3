@@ -37,6 +37,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../common/qcommon.h"
 #include "linux_local.h"
 
+// Function prototypes for scalability system
+int Sys_GetPhysicalMemoryMB(void);
+int Sys_GetNumCPUCores(void);
+
 //=============================================================================
 
 /*
@@ -689,3 +693,12 @@ qboolean Sys_SetAffinityMask( const uint64_t mask )
 	}
 }
 #endif // USE_AFFINITY_MASK
+
+// Stub implementations for scalability system
+int Sys_GetPhysicalMemoryMB(void) {
+	return 4096; // Default to 4GB
+}
+
+int Sys_GetNumCPUCores(void) {
+	return 4; // Default to 4 cores
+}

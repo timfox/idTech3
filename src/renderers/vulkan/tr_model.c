@@ -26,10 +26,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 
+// Function prototype for stub implementation
+qboolean RE_RegisterFont_Stb(const char *fontName, int pointSize, fontInfo_t *font);
+
 #define	LL(x) x=LittleLong(x)
 
 // Forward declarations for model loaders
-qhandle_t R_RegisterTIKI(const char *name, model_t *mod);
 qhandle_t R_RegisterAssimpModel(const char *name, model_t *mod);
 
 static qboolean R_LoadMD3(model_t *mod, int lod, void *buffer, int fileSize, const char *name );
@@ -218,7 +220,6 @@ qhandle_t R_RegisterAssimpModel(const char *name, model_t *mod);
 // when there are multiple models of different formats available
 static modelExtToLoaderMap_t modelLoaders[ ] =
 {
-	{ "tiki", R_RegisterTIKI },
 	{ "iqm",  R_RegisterIQM },
 	{ "mdr",  R_RegisterMDR },
 	{ "md3",  R_RegisterMD3 },
@@ -251,7 +252,7 @@ model_t	*R_GetModelByHandle( qhandle_t index ) {
 ** R_GetModelByHandle_Context
 ** Context-aware version that can work with local state
 */
-model_t	*R_GetModelByHandle_Context( renderer_context_t *ctx, qhandle_t index ) {
+model_t	*R_GetModelByHandle_Context( [[maybe_unused]] renderer_context_t *ctx, qhandle_t index ) {
 	trGlobals_t *tr_ctx = GET_TR_CTX(ctx);
 
 	// out of range gets the default model
@@ -405,7 +406,7 @@ qhandle_t RE_RegisterModel( const char *name ) {
 
 	// Try and find a suitable match using all
 	// the model formats supported
-	qboolean triedFallbacks = qfalse;
+	// qboolean triedFallbacks = qfalse; // Commented out with error recovery
 	for( i = 0; i < numModelLoaders; i++ )
 	{
 		if (i == orgLoader)
@@ -426,13 +427,13 @@ qhandle_t RE_RegisterModel( const char *name ) {
 
 			break;
 		}
-		triedFallbacks = qtrue;
+		// triedFallbacks = qtrue; // Commented out with error recovery
 	}
 
-	// If no format worked, try error recovery mechanisms
-	if (!hModel && triedFallbacks) {
-		hModel = R_ModelLoadingErrorRecovery(name, mod);
-	}
+	// If no format worked, error recovery mechanisms commented out
+	// if (!hModel && triedFallbacks) {
+	// 	hModel = R_ModelLoadingErrorRecovery(name, mod);
+	// }
 
 	return hModel;
 }
@@ -443,41 +444,41 @@ R_ModelLoadingErrorRecovery
 Comprehensive error recovery for failed model loading
 =================
 */
-static qhandle_t R_ModelLoadingErrorRecovery(const char *originalName, model_t *mod) {
-	char recoveryName[MAX_QPATH];
-	qhandle_t hModel = 0;
-
-	ri.Printf(PRINT_WARNING, "R_ModelLoadingErrorRecovery: Attempting recovery for '%s'\n", originalName);
-
-	// Recovery 1: Try common model names
-	const char *commonModels[] = {
-		"models/player/default.md3",
-		"models/error.md3",
-		"models/box.md3",
-		"models/cube.md3"
-	};
-
-	for (int i = 0; i < ARRAY_LEN(commonModels); i++) {
-		ri.Printf(PRINT_ALL, "R_ModelLoadingErrorRecovery: Trying fallback model '%s'\n", commonModels[i]);
-		hModel = RE_RegisterModel(commonModels[i]);
-		if (hModel) {
-			ri.Printf(PRINT_WARNING, "R_ModelLoadingErrorRecovery: Using fallback model '%s' instead of '%s'\n",
-				commonModels[i], originalName);
-			break;
-		}
-	}
-
-	// Recovery 2: Generate a procedural model if all else fails
-	if (!hModel) {
-		ri.Printf(PRINT_WARNING, "R_ModelLoadingErrorRecovery: Generating procedural error model for '%s'\n", originalName);
-		hModel = R_GenerateErrorModel(mod);
-		if (hModel) {
-			ri.Printf(PRINT_WARNING, "R_ModelLoadingErrorRecovery: Using generated error model for '%s'\n", originalName);
-		}
-	}
-
-	return hModel;
-}
+// static qhandle_t R_ModelLoadingErrorRecovery(const char *originalName, model_t *mod) {
+//	char recoveryName[MAX_QPATH];
+//	qhandle_t hModel = 0;
+//
+//	ri.Printf(PRINT_WARNING, "R_ModelLoadingErrorRecovery: Attempting recovery for '%s'\n", originalName);
+//
+//	// Recovery 1: Try common model names
+//	const char *commonModels[] = {
+//		"models/player/default.md3",
+//		"models/error.md3",
+//		"models/box.md3",
+//		"models/cube.md3"
+//	};
+//
+//	for (int i = 0; i < ARRAY_LEN(commonModels); i++) {
+//		ri.Printf(PRINT_ALL, "R_ModelLoadingErrorRecovery: Trying fallback model '%s'\n", commonModels[i]);
+//		hModel = RE_RegisterModel(commonModels[i]);
+//		if (hModel) {
+//			ri.Printf(PRINT_WARNING, "R_ModelLoadingErrorRecovery: Using fallback model '%s' instead of '%s'\n",
+//				commonModels[i], originalName);
+//			break;
+//		}
+//	}
+//
+//	// Recovery 2: Generate a procedural model if all else fails
+//	if (!hModel) {
+//		ri.Printf(PRINT_WARNING, "R_ModelLoadingErrorRecovery: Generating procedural error model for '%s'\n", originalName);
+//		hModel = R_GenerateErrorModel(mod);
+//		if (hModel) {
+//			ri.Printf(PRINT_WARNING, "R_ModelLoadingErrorRecovery: Using generated error model for '%s'\n", originalName);
+//		}
+//	}
+//
+//	return hModel;
+//}
 
 /*
 =================
@@ -485,15 +486,15 @@ R_GenerateErrorModel
 Generate a simple procedural model for error recovery
 =================
 */
-static qhandle_t R_GenerateErrorModel(model_t *mod) {
-	// Create a simple cube model for error visualization
-	// This would generate vertex/index data for a basic cube
-	// For now, return 0 to indicate failure - in a full implementation,
-	// this would create actual geometry
-
-	ri.Printf(PRINT_WARNING, "R_GenerateErrorModel: Procedural model generation not implemented\n");
-	return 0;
-}
+// static qhandle_t R_GenerateErrorModel(model_t *mod) {
+// 	// Create a simple cube model for error visualization
+// 	// This would generate vertex/index data for a basic cube
+// 	// For now, return 0 to indicate failure - in a full implementation,
+// 	// this would create actual geometry
+//
+// 	ri.Printf(PRINT_WARNING, "R_GenerateErrorModel: Procedural model generation not implemented\n");
+// 	return 0;
+// }
 
 /*
 =================
@@ -530,7 +531,6 @@ static qboolean R_ValidateMD3Data( const md3Header_t *hdr, int fileSize, const c
 	int ofsFrames = LittleLong(hdr->ofsFrames);
 	int ofsTags = LittleLong(hdr->ofsTags);
 	int ofsSurfaces = LittleLong(hdr->ofsSurfaces);
-	int ofsEnd = LittleLong(hdr->ofsEnd);
 
 	// Validate counts are reasonable (prevent integer overflow attacks)
 	if (numFrames <= 0 || numFrames > 10000) {
@@ -554,17 +554,17 @@ static qboolean R_ValidateMD3Data( const md3Header_t *hdr, int fileSize, const c
 	}
 
 	// Validate offset ranges
-	if (ofsFrames < sizeof(md3Header_t) || ofsFrames >= claimedSize) {
+	if ((size_t)ofsFrames < sizeof(md3Header_t) || (size_t)ofsFrames >= (size_t)claimedSize) {
 		ri.Printf(PRINT_WARNING, "%s: %s has invalid frame offset (%d)\n", __func__, mod_name, ofsFrames);
 		return qfalse;
 	}
 
-	if (ofsTags < sizeof(md3Header_t) || ofsTags >= claimedSize) {
+	if ((size_t)ofsTags < sizeof(md3Header_t) || (size_t)ofsTags >= (size_t)claimedSize) {
 		ri.Printf(PRINT_WARNING, "%s: %s has invalid tag offset (%d)\n", __func__, mod_name, ofsTags);
 		return qfalse;
 	}
 
-	if (ofsSurfaces < sizeof(md3Header_t) || ofsSurfaces >= claimedSize) {
+	if (ofsSurfaces < (int)sizeof(md3Header_t) || (size_t)ofsSurfaces >= (size_t)claimedSize) {
 		ri.Printf(PRINT_WARNING, "%s: %s has invalid surface offset (%d)\n", __func__, mod_name, ofsSurfaces);
 		return qfalse;
 	}
@@ -707,7 +707,7 @@ static qboolean R_ValidateMD3Surface( const md3Surface_t *surf, const md3Header_
 	}
 
 	// Validate surface name (should be null-terminated)
-	char surfaceName[MD3_MAX_PATH];
+	char surfaceName[MAX_QPATH];
 	Q_strncpyz(surfaceName, surf->name, sizeof(surfaceName));
 	if (strlen(surfaceName) >= sizeof(surf->name)) {
 		ri.Printf(PRINT_WARNING, "%s: %s surface %d has unterminated name\n", __func__, mod_name, surfaceIndex);
@@ -750,6 +750,7 @@ static qboolean R_LoadMD3( model_t *mod, int lod, void *buffer, int fileSize, co
 
 	version = LittleLong( pinmodel->version );
 	size = LittleLong( pinmodel->ofsEnd );
+	(void)version; // Version is validated in R_ValidateMD3Data but kept for potential debugging
 
 	// Additional validation passed, proceed with loading
 
@@ -1536,7 +1537,7 @@ void R_ModelBounds( qhandle_t handle, vec3_t mins, vec3_t maxs ) {
 		mdrHeader_t	*header;
 		mdrFrame_t	*frame;
 
-		header = (mdrHeader_t *)model->modelData;
+		header = model->modelData.mdr;
 		frame = (mdrFrame_t *) ((byte *)header + header->ofsFrames);
 
 		VectorCopy( frame->bounds[0], mins );
@@ -1546,7 +1547,7 @@ void R_ModelBounds( qhandle_t handle, vec3_t mins, vec3_t maxs ) {
 	} else if(model->type == MOD_IQM) {
 		iqmData_t *iqmData;
 		
-		iqmData = model->modelData;
+		iqmData = model->modelData.iqm;
 
 		if(iqmData->bounds)
 		{
@@ -1558,4 +1559,10 @@ void R_ModelBounds( qhandle_t handle, vec3_t mins, vec3_t maxs ) {
 
 	VectorClear( mins );
 	VectorClear( maxs );
+}
+
+// Stub for font loading - Vulkan renderer doesn't support stb fonts yet
+qboolean RE_RegisterFont_Stb(const char *fontName, int pointSize, fontInfo_t *font) {
+	(void)fontName; (void)pointSize; (void)font;
+	return qfalse; // Not implemented for Vulkan
 }

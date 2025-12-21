@@ -407,7 +407,7 @@ static int FS_ResourceCacheGet(const char *name, void **buffer) {
 		return -1;
 	}
 
-	*buffer = Z_Malloc(entry->size);
+	*buffer = Hunk_AllocateTempMemory(entry->size);
 	Com_Memcpy(*buffer, entry->data, entry->size);
 	return entry->size;
 }
@@ -452,6 +452,7 @@ void FS_PreloadCriticalResources(void) {
 		if (len > 0) {
 			Com_DPrintf("Preloaded: %s (%d bytes)\n", criticalResources[i], len);
 			// FS_ReadFile already added it to cache if appropriate
+			// Buffers remain loaded in memory for performance
 		}
 	}
 
@@ -3151,8 +3152,7 @@ a null buffer will just return the file length without loading
 		len = FS_ResourceCacheGet(qpath, buffer);
 		if (len >= 0) {
 			fs_loadCount++;
-			fs_loadStack++;
-			Com_DPrintf("FS_ReadFile: '%s' loaded from resource cache (%d bytes)\n", qpath, len);
+			// Don't increment fs_loadStack for cached loads - cache owns the data
 			return len;
 		}
 	}
@@ -3284,7 +3284,9 @@ void FS_FreeFile( void *buffer ) {
 	if ( !buffer ) {
 		Com_Error( ERR_FATAL, "FS_FreeFile( NULL )" );
 	}
-	fs_loadStack--;
+	if (fs_loadStack > 0) {
+		fs_loadStack--;
+	}
 
 	Hunk_FreeTempMemory( buffer );
 

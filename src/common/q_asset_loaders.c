@@ -311,7 +311,7 @@ void Asset_SetConfigPath(const char *path) {
 
 // Add custom search path
 qboolean Asset_AddSearchPath(const char *path) {
-	if (!path || assetPaths.numCustomPaths >= ARRAY_LEN(assetPaths.customPaths)) {
+        if (!path || (size_t)assetPaths.numCustomPaths >= ARRAY_LEN(assetPaths.customPaths)) {
 		return qfalse;
 	}
 
@@ -422,45 +422,49 @@ void Asset_RegisterBuiltInLoaders(void) {
 // Stub implementations for built-in loaders (to be implemented)
 qhandle_t Asset_LoadMD3(const char *name) {
 	Com_Printf("Asset_LoadMD3: %s (stub implementation)\n", name);
-	return re.RegisterModel(name); // Fallback to engine
+	return 0; // No renderer available in common code
 }
 
 qhandle_t Asset_LoadMDR(const char *name) {
 	Com_Printf("Asset_LoadMDR: %s (stub implementation)\n", name);
-	return re.RegisterModel(name); // Fallback to engine
+	return 0; // No renderer available in common code // Fallback to engine
 }
 
 qhandle_t Asset_LoadIQM(const char *name) {
 	Com_Printf("Asset_LoadIQM: %s (stub implementation)\n", name);
-	return re.RegisterModel(name); // Fallback to engine
+	return 0; // No renderer available in common code // Fallback to engine
 }
 
 qhandle_t Asset_LoadOBJ(const char *name) {
 	Com_Printf("Asset_LoadOBJ: %s (stub implementation)\n", name);
-	return re.RegisterModel(name); // Fallback to engine
+	return 0; // No renderer available in common code // Fallback to engine
 }
 
 qhandle_t Asset_LoadShaderFile(const char *name) {
 	Com_Printf("Asset_LoadShaderFile: %s (stub implementation)\n", name);
-	return re.RegisterShader(name); // Fallback to engine
+	return 0; // No renderer available in common code // Fallback to engine
 }
 
 qhandle_t Asset_LoadTGA(const char *name, int flags) {
+	(void)flags;
 	Com_Printf("Asset_LoadTGA: %s (stub implementation)\n", name);
-	return re.RegisterShaderNoMip(name); // Fallback to engine
+	return 0; // No renderer available in common code // Fallback to engine
 }
 
 qhandle_t Asset_LoadJPG(const char *name, int flags) {
+	(void)flags;
 	Com_Printf("Asset_LoadJPG: %s (stub implementation)\n", name);
-	return re.RegisterShaderNoMip(name); // Fallback to engine
+	return 0; // No renderer available in common code // Fallback to engine
 }
 
 qhandle_t Asset_LoadPNG(const char *name, int flags) {
+	(void)flags;
 	Com_Printf("Asset_LoadPNG: %s (stub implementation)\n", name);
-	return re.RegisterShaderNoMip(name); // Fallback to engine
+	return 0; // No renderer available in common code
 }
 
 qhandle_t Asset_LoadTTF(const char *fontName, int pointSize, fontInfo_t *font) {
+	(void)pointSize; (void)font;
 	Com_Printf("Asset_LoadTTF: %s (stub implementation)\n", fontName);
-	return re.RegisterFont(fontName, pointSize, font); // Fallback to engine
+	return 0; // No renderer available in common code
 }

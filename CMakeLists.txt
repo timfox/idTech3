@@ -459,6 +459,8 @@ SET(QCOMMON_SRCS
     src/common/q_memory_safety.c
     src/common/q_memtrack.c
     src/common/q_shared.c
+    src/common/q_scalability.c
+    src/common/q_asset_loaders.c
     src/common/q_telemetry.c
     src/common/q_watchdog.c
     src/common/sqlite_wrapper.c

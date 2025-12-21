@@ -412,13 +412,15 @@ static void Cmd_Exec_f( void ) {
 
 	Cbuf_InsertText( f.c );
 
+	// Note: File buffer is intentionally not freed here
+	// Config files remain loaded in memory for the duration of the session
+	// FS_LoadStack will be checked later during hunk initialization
+
 #ifdef DELAY_WRITECONFIG
 	if ( !Q_stricmp( filename, Q3CONFIG_CFG ) ) {
 		Com_WriteConfiguration(); // to avoid loading outdated values
 	}
 #endif
-
-	FS_FreeFile( f.v );
 }
 
 

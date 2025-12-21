@@ -11,15 +11,13 @@ libs/stb/stb_truetype.h. Falls back to a stub otherwise.
 
 #include "../../common/q_shared.h"
 #include "../../common/qcommon.h"
-#include "../opengl/tr_common.h"
+#include "../opengl/tr_local.h"
+#include "tr_common.h"
 
 // Font CVars are accessed via ri.Cvar_Get
 
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
-// Renderer import interface - defined in renderer main file
-
-#include "../opengl/tr_local.h"
 
 // Renderer import interface - defined in renderer main file
 
