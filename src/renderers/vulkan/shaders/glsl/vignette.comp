@@ -1,52 +1,58 @@
 #version 460
 #extension GL_GOOGLE_include_directive : enable
 
-precision highp float;
-precision highp int;
+precision mediump float;
+precision mediump int;
+
+#include "shader_constants.glsl"
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(set = 0, binding = 0) uniform sampler2D inputImage;
-
-layout(set = 0, binding = 1, rgba16f) uniform writeonly image2D outputImage;
+layout(set = 0, binding = 1, rgba8) uniform mediump writeonly image2D outputImage;
 
 layout(push_constant) uniform VignetteConstants {
     vec2 resolution;
     vec2 invResolution;
-    vec2 center; // Vignette center (0.5, 0.5 = screen center)
-    float innerRadius; // Inner radius (no darkening)
-    float outerRadius; // Outer radius (full darkening)
-    float intensity; // Vignette intensity (0.0-1.0)
-    vec3 color; // Vignette color tint
+    float intensity;
+    float radius;
+    float smoothness;
+    int mode; // 0 = circular, 1 = rounded rectangle
 } pc;
 
-void main()
-{
+void main() {
     ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
     if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
         return;
     }
-    
+
     vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
-    
-    // Calculate distance from center
-    vec2 dir = uv - pc.center;
-    float dist = length(dir);
-    
-    // Calculate vignette factor
-    float vignette = 1.0;
-    if (dist > pc.innerRadius) {
-        float t = (dist - pc.innerRadius) / (pc.outerRadius - pc.innerRadius);
-        t = clamp(t, 0.0, 1.0);
-        vignette = 1.0 - smoothstep(0.0, 1.0, t) * pc.intensity;
-    }
-    
-    // Sample color
     vec3 color = texture(inputImage, uv).rgb;
-    
-    // Apply vignette
-    color = mix(color * pc.color, color, vignette);
-    
+
+    // Calculate vignette
+    vec2 center = vec2(0.5, 0.5);
+    vec2 position = uv - center;
+
+    float vignette = 1.0;
+
+    if (pc.mode == 0) {
+        // Circular vignette
+        float dist = length(position);
+        vignette = 1.0 - smoothstep(pc.radius - pc.smoothness, pc.radius + pc.smoothness, dist);
+    } else {
+        // Rounded rectangle vignette
+        vec2 rectDist = abs(position) - (center - vec2(pc.radius));
+        float dist = length(max(rectDist, vec2(0.0))) + min(max(rectDist.x, rectDist.y), 0.0);
+        vignette = 1.0 - smoothstep(pc.radius - pc.smoothness, pc.radius + pc.smoothness, dist);
+    }
+
+    // Apply intensity and clamp
+    vignette = mix(1.0, vignette, pc.intensity);
+    vignette = clamp(vignette, 0.0, 1.0);
+
+    // Apply vignette to color
+    color *= vignette;
+
+    // Output the result
     imageStore(outputImage, pixel, vec4(color, 1.0));
 }
-

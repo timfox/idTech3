@@ -1,0 +1,12 @@
+// Test material file for Q2RTX-style material definitions
+textures/e1u2/metal1_1:
+    texture_base textures/e1u2/metal1_1.tga
+    roughness_override 0.3
+    metallic 0.8
+    is_light 0
+
+textures/e1u2/brick1_1:
+    texture_base textures/e1u2/brick1_1.tga
+    roughness_override 0.8
+    metallic 0.0
+    base_factor 1.2

@@ -3,6 +3,9 @@
 extern refimport_t ri;
 #include "../../common/performance_counters.h"
 #include "vk.h"
+#ifdef USE_VULKAN_RAY_TRACING
+#include "vk_portal_lights.h"
+#endif
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -3837,6 +3840,11 @@ static void vk_create_shader_modules( void )
 	// if shaders are compiled
 	vk.modules.gamma_comp = VK_NULL_HANDLE;
 	vk.modules.tonemap_comp = VK_NULL_HANDLE;
+	vk.modules.histogram_comp = VK_NULL_HANDLE;
+	vk.modules.auto_exposure_comp = VK_NULL_HANDLE;
+	vk.modules.checkerboard_interleave_comp = VK_NULL_HANDLE;
+	vk.modules.vignette_comp = VK_NULL_HANDLE;
+	vk.modules.vignette_comp = VK_NULL_HANDLE;
 
 #ifdef USE_VULKAN_RAY_TRACING
 	if ( vk.modules.rt_composite_fs != VK_NULL_HANDLE ) {
@@ -5763,7 +5771,23 @@ void vk_create_compute_post_process_pipelines( void )
 	vk.style_compute_pipeline = VK_NULL_HANDLE;
 	vk.film_grain_compute_pipeline = VK_NULL_HANDLE;
 	vk.lens_distortion_compute_pipeline = VK_NULL_HANDLE;
-	
+	vk.histogram_compute_pipeline = VK_NULL_HANDLE;
+	vk.auto_exposure_compute_pipeline = VK_NULL_HANDLE;
+	vk.checkerboard_interleave_compute_pipeline = VK_NULL_HANDLE;
+	vk.vignette_compute_pipeline = VK_NULL_HANDLE;
+
+	// Initialize histogram and exposure buffers
+	/*
+	vk.histogramBuffer = VK_NULL_HANDLE;
+	vk.histogramBufferMemory = VK_NULL_HANDLE;
+	vk.exposureBuffer = VK_NULL_HANDLE;
+	vk.exposureBufferMemory = VK_NULL_HANDLE;
+	vk.histogramDescriptorSetLayout = VK_NULL_HANDLE;
+	vk.histogramDescriptorSet = VK_NULL_HANDLE;
+	vk.autoExposureDescriptorSetLayout = VK_NULL_HANDLE;
+	vk.autoExposureDescriptorSet = VK_NULL_HANDLE;
+	*/
+
 	// Try to load compute shader modules if they're compiled
 	// The shader arrays are defined in shader_data.c (included at file scope, line 3214)
 	// Note: Shaders must be compiled first: cd src/renderervk/shaders && ./compile.sh
@@ -5822,7 +5846,51 @@ void vk_create_compute_post_process_pipelines( void )
 			ri.Printf( PRINT_WARNING, "VK: lens distortion compute shader module missing; run shader compile step.\n" );
 		}
 	}
-	
+
+	// Try to load histogram compute shader if compiled
+	if ( vk.modules.histogram_comp == VK_NULL_HANDLE ) {
+		vk.modules.histogram_comp = SHADER_MODULE( histogram_comp_spv );
+		if ( vk.modules.histogram_comp != VK_NULL_HANDLE ) {
+			SET_OBJECT_NAME( vk.modules.histogram_comp, "histogram compute shader module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+			ri.Printf( PRINT_DEVELOPER, "VK: Loaded histogram compute shader module\n" );
+		} else {
+			ri.Printf( PRINT_WARNING, "VK: histogram compute shader module missing; run shader compile step.\n" );
+		}
+	}
+
+	// Try to load auto exposure compute shader if compiled
+	if ( vk.modules.auto_exposure_comp == VK_NULL_HANDLE ) {
+		vk.modules.auto_exposure_comp = SHADER_MODULE( auto_exposure_comp_spv );
+		if ( vk.modules.auto_exposure_comp != VK_NULL_HANDLE ) {
+			SET_OBJECT_NAME( vk.modules.auto_exposure_comp, "auto exposure compute shader module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+			ri.Printf( PRINT_DEVELOPER, "VK: Loaded auto exposure compute shader module\n" );
+		} else {
+			ri.Printf( PRINT_WARNING, "VK: auto exposure compute shader module missing; run shader compile step.\n" );
+		}
+	}
+
+	// Try to load checkerboard interleave compute shader if compiled
+	if ( vk.modules.checkerboard_interleave_comp == VK_NULL_HANDLE ) {
+		vk.modules.checkerboard_interleave_comp = SHADER_MODULE( checkerboard_interleave_comp_spv );
+		if ( vk.modules.checkerboard_interleave_comp != VK_NULL_HANDLE ) {
+			SET_OBJECT_NAME( vk.modules.checkerboard_interleave_comp, "checkerboard interleave compute shader module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+			ri.Printf( PRINT_DEVELOPER, "VK: Loaded checkerboard interleave compute shader module\n" );
+		} else {
+			ri.Printf( PRINT_WARNING, "VK: checkerboard interleave compute shader module missing; run shader compile step.\n" );
+		}
+	}
+
+	// Try to load vignette compute shader if compiled
+	if ( vk.modules.vignette_comp == VK_NULL_HANDLE ) {
+		vk.modules.vignette_comp = SHADER_MODULE( vignette_comp_spv );
+		if ( vk.modules.vignette_comp != VK_NULL_HANDLE ) {
+			SET_OBJECT_NAME( vk.modules.vignette_comp, "vignette compute shader module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
+			ri.Printf( PRINT_DEVELOPER, "VK: Loaded vignette compute shader module\n" );
+		} else {
+			ri.Printf( PRINT_WARNING, "VK: vignette compute shader module missing; run shader compile step.\n" );
+		}
+	}
+
 	// Try to load ReLAX denoising compute shader if not already loaded
 	// NOTE: rt_relax_comp_spv must be compiled first via: cd src/renderervk/shaders && ./compile.sh
 	if ( vk.rayTracingSupported && vk.modules.rt_relax_comp == VK_NULL_HANDLE ) {
@@ -5920,7 +5988,127 @@ void vk_create_compute_post_process_pipelines( void )
 			vk.lens_distortion_compute_pipeline = VK_NULL_HANDLE;
 		}
 	}
-	
+
+	// If histogram compute shader is available, create pipeline
+	if ( vk.modules.histogram_comp != VK_NULL_HANDLE ) {
+		Com_Memset( &shader_stage, 0, sizeof( shader_stage ) );
+		shader_stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shader_stage.pNext = NULL;
+		shader_stage.flags = 0;
+		shader_stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+		shader_stage.module = vk.modules.histogram_comp;
+		shader_stage.pName = "main";
+		shader_stage.pSpecializationInfo = NULL;
+
+		Com_Memset( &compute_info, 0, sizeof( compute_info ) );
+		compute_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+		compute_info.pNext = NULL;
+		compute_info.flags = 0;
+		compute_info.stage = shader_stage;
+		compute_info.layout = vk.compute_pipeline_layout;
+		compute_info.basePipelineHandle = VK_NULL_HANDLE;
+		compute_info.basePipelineIndex = -1;
+
+		result = qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &compute_info, NULL, &vk.histogram_compute_pipeline );
+		if ( result == VK_SUCCESS ) {
+			SET_OBJECT_NAME( vk.histogram_compute_pipeline, "histogram compute pipeline", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+			ri.Printf( PRINT_DEVELOPER, "VK: Created histogram compute pipeline\n" );
+		} else {
+			ri.Printf( PRINT_WARNING, "VK: Failed to create histogram compute pipeline: %d\n", result );
+			vk.histogram_compute_pipeline = VK_NULL_HANDLE;
+		}
+	}
+
+	// If auto exposure compute shader is available, create pipeline
+	if ( vk.modules.auto_exposure_comp != VK_NULL_HANDLE ) {
+		Com_Memset( &shader_stage, 0, sizeof( shader_stage ) );
+		shader_stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shader_stage.pNext = NULL;
+		shader_stage.flags = 0;
+		shader_stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+		shader_stage.module = vk.modules.auto_exposure_comp;
+		shader_stage.pName = "main";
+		shader_stage.pSpecializationInfo = NULL;
+
+		Com_Memset( &compute_info, 0, sizeof( compute_info ) );
+		compute_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+		compute_info.pNext = NULL;
+		compute_info.flags = 0;
+		compute_info.stage = shader_stage;
+		compute_info.layout = vk.compute_pipeline_layout;
+		compute_info.basePipelineHandle = VK_NULL_HANDLE;
+		compute_info.basePipelineIndex = -1;
+
+		result = qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &compute_info, NULL, &vk.auto_exposure_compute_pipeline );
+		if ( result == VK_SUCCESS ) {
+			SET_OBJECT_NAME( vk.auto_exposure_compute_pipeline, "auto exposure compute pipeline", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+			ri.Printf( PRINT_DEVELOPER, "VK: Created auto exposure compute pipeline\n" );
+		} else {
+			ri.Printf( PRINT_WARNING, "VK: Failed to create auto exposure compute pipeline: %d\n", result );
+			vk.auto_exposure_compute_pipeline = VK_NULL_HANDLE;
+		}
+	}
+
+	// If checkerboard interleave compute shader is available, create pipeline
+	if ( vk.modules.checkerboard_interleave_comp != VK_NULL_HANDLE ) {
+		Com_Memset( &shader_stage, 0, sizeof( shader_stage ) );
+		shader_stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shader_stage.pNext = NULL;
+		shader_stage.flags = 0;
+		shader_stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+		shader_stage.module = vk.modules.checkerboard_interleave_comp;
+		shader_stage.pName = "main";
+		shader_stage.pSpecializationInfo = NULL;
+
+		Com_Memset( &compute_info, 0, sizeof( compute_info ) );
+		compute_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+		compute_info.pNext = NULL;
+		compute_info.flags = 0;
+		compute_info.stage = shader_stage;
+		compute_info.layout = vk.compute_pipeline_layout;
+		compute_info.basePipelineHandle = VK_NULL_HANDLE;
+		compute_info.basePipelineIndex = -1;
+
+		result = qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &compute_info, NULL, &vk.checkerboard_interleave_compute_pipeline );
+		if ( result == VK_SUCCESS ) {
+			SET_OBJECT_NAME( vk.checkerboard_interleave_compute_pipeline, "checkerboard interleave compute pipeline", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+			ri.Printf( PRINT_DEVELOPER, "VK: Created checkerboard interleave compute pipeline\n" );
+		} else {
+			ri.Printf( PRINT_WARNING, "VK: Failed to create checkerboard interleave compute pipeline: %d\n", result );
+			vk.checkerboard_interleave_compute_pipeline = VK_NULL_HANDLE;
+		}
+	}
+
+	// If vignette compute shader is available, create pipeline
+	if ( vk.modules.vignette_comp != VK_NULL_HANDLE ) {
+		Com_Memset( &shader_stage, 0, sizeof( shader_stage ) );
+		shader_stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+		shader_stage.pNext = NULL;
+		shader_stage.flags = 0;
+		shader_stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+		shader_stage.module = vk.modules.vignette_comp;
+		shader_stage.pName = "main";
+		shader_stage.pSpecializationInfo = NULL;
+
+		Com_Memset( &compute_info, 0, sizeof( compute_info ) );
+		compute_info.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+		compute_info.pNext = NULL;
+		compute_info.flags = 0;
+		compute_info.stage = shader_stage;
+		compute_info.layout = vk.compute_pipeline_layout;
+		compute_info.basePipelineHandle = VK_NULL_HANDLE;
+		compute_info.basePipelineIndex = -1;
+
+		result = qvkCreateComputePipelines( vk.device, vk.pipelineCache, 1, &compute_info, NULL, &vk.vignette_compute_pipeline );
+		if ( result == VK_SUCCESS ) {
+			SET_OBJECT_NAME( vk.vignette_compute_pipeline, "vignette compute pipeline", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
+			ri.Printf( PRINT_DEVELOPER, "VK: Created vignette compute pipeline\n" );
+		} else {
+			ri.Printf( PRINT_WARNING, "VK: Failed to create vignette compute pipeline: %d\n", result );
+			vk.vignette_compute_pipeline = VK_NULL_HANDLE;
+		}
+	}
+
 	// If style compute shader is available, create pipeline
 	if ( vk.modules.style_comp != VK_NULL_HANDLE ) {
 		Com_Memset( &shader_stage, 0, sizeof( shader_stage ) );
@@ -6445,6 +6633,9 @@ __cleanup:
 	vk_atmosphere_shutdown();
 	vk_cell_streaming_shutdown();
 	vk_material_system_shutdown();
+#ifdef USE_VULKAN_RAY_TRACING
+	vk_portal_lights_shutdown();
+#endif
 	vk_gpu_culling_shutdown();
 	// Shutdown advanced rendering systems
 #ifdef IDTECH3_VK_EXPERIMENTAL
@@ -10313,6 +10504,15 @@ void vk_begin_frame( void )
 	if ( vk.materialSystem.enabled && vk.materialSystem.initialized ) {
 		vk_material_system_update();
 	}
+	// Portal lights system
+#ifdef USE_VULKAN_RAY_TRACING
+	if ( vk.rayTracingSupported && !portalSystem.initialized ) {
+		vk_portal_lights_init();
+	}
+	if ( portalSystem.enabled && portalSystem.initialized ) {
+		vk_portal_lights_update_lights();
+	}
+#endif
 	// Update atmosphere system
 	if ( vk.atmosphere.enabled && vk.atmosphere.initialized ) {
 		vk_atmosphere_update();

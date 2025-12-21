@@ -97,6 +97,9 @@ void vk_material_system_init( void );
 void vk_material_system_shutdown( void );
 void vk_material_system_update( void );
 
+// Material file integration
+void vk_material_apply_file_properties( uint32_t materialIndex, const char* textureName );
+
 // Material parameter access
 void vk_material_set_wetness( uint32_t materialIndex, float wetness );
 void vk_material_set_damage( uint32_t materialIndex, float damage );

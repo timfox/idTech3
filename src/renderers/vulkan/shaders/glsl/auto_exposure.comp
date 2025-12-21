@@ -17,7 +17,7 @@ layout(std430, binding = 1) restrict buffer ExposureBuffer {
     float currentExposure;
     float targetExposure;
     float adaptationRate;
-};
+} exposureBuffer;
 
 layout(push_constant) uniform AutoExposureConstants {
     float targetLuminance; // Target middle gray (typically 0.18)
@@ -65,15 +65,15 @@ void main()
     newTargetExposure = clamp(newTargetExposure, pc.minExposure, pc.maxExposure);
     
     // Smooth adaptation
-    float currentTarget = ExposureBuffer.targetExposure;
+    float currentTarget = exposureBuffer.targetExposure;
     float adaptedTarget = mix(currentTarget, newTargetExposure, pc.adaptationSpeed);
-    
-    ExposureBuffer.targetExposure = adaptedTarget;
-    
+
+    exposureBuffer.targetExposure = adaptedTarget;
+
     // Smooth current exposure towards target
-    float currentExp = ExposureBuffer.currentExposure;
-    float newExposure = mix(currentExp, adaptedTarget, ExposureBuffer.adaptationRate);
-    
-    ExposureBuffer.currentExposure = newExposure;
+    float currentExp = exposureBuffer.currentExposure;
+    float newExposure = mix(currentExp, adaptedTarget, exposureBuffer.adaptationRate);
+
+    exposureBuffer.currentExposure = newExposure;
 }
 

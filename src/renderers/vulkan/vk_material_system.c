@@ -10,6 +10,7 @@ Supports runtime material parameters and scripting
 extern refimport_t ri;
 #include "vk.h"
 #include "vk_material_system.h"
+#include "vk_material_parser.h"
 #include "vk_layered_materials.h"
 
 #ifdef USE_VULKAN
@@ -156,6 +157,10 @@ void vk_material_system_init( void )
 	// Initialize layered materials (pilot feature)
 	vk_layered_materials_init( vk.materialSystem.materialCapacity );
 
+	// Initialize material file parser and load .mat files
+	vk_material_parser_init();
+	vk_material_parser_load_files();
+
 	vk.materialSystem.initialized = qtrue;
 }
 
@@ -187,6 +192,10 @@ void vk_material_system_shutdown( void )
 	vk.materialSystem.materialCount = 0;
 	
 	vk_layered_materials_shutdown();
+
+	// Shutdown material parser
+	vk_material_parser_shutdown();
+
 	vk.materialSystem.initialized = qfalse;
 	ri.Printf( PRINT_ALL, "Material system: Shutdown complete\n" );
 }
@@ -372,6 +381,32 @@ void vk_material_set_flags( uint32_t materialIndex, uint32_t flags )
 Get Material Parameters
 =============================================================================
 */
+// Apply material file properties to a material
+void vk_material_apply_file_properties( uint32_t materialIndex, const char* textureName )
+{
+	if ( !vk.materialSystem.initialized || !textureName || !*textureName ) {
+		return;
+	}
+
+	// Look up material file entry
+	const materialEntry_t* entry = vk_material_parser_find_entry( textureName );
+	if ( !entry ) {
+		return;
+	}
+
+	// Get material parameters
+	material_params_t* params = vk_material_get_params( materialIndex );
+	if ( !params ) {
+		return;
+	}
+
+	// Apply properties from material file
+	vk_material_parser_apply_to_material( entry, textureName, params );
+
+	ri.Printf( PRINT_DEVELOPER, "Applied material file properties to material %u (%s)\n",
+			   materialIndex, textureName );
+}
+
 material_params_t *vk_material_get_params( uint32_t materialIndex )
 {
 	if ( !vk.materialSystem.initialized || materialIndex >= vk.materialSystem.materialCapacity ) {

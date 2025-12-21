@@ -1,0 +1,93 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision mediump float;
+precision mediump int;
+
+#include "shader_constants.glsl"
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D inputImage1;
+layout(set = 0, binding = 1) uniform sampler2D inputImage2;
+layout(set = 0, binding = 2, rgba8) uniform mediump writeonly image2D outputImage;
+
+layout(push_constant) uniform CheckerboardConstants {
+    vec2 resolution;
+    vec2 invResolution;
+    int mode;  // 0=interleave, 1=multi-GPU, 2=special surfaces
+    int gpuIndex;  // For multi-GPU setups
+    float temporalPhase;  // For temporal effects
+} pc;
+
+// Checkerboard pattern functions
+bool isCheckerboardBlack(vec2 coord, int gpuIndex) {
+    ivec2 pixel = ivec2(coord);
+    int pattern = (pixel.x + pixel.y + gpuIndex) % 2;
+    return pattern == 0;
+}
+
+bool isCheckerboardWhite(vec2 coord, int gpuIndex) {
+    return !isCheckerboardBlack(coord, gpuIndex);
+}
+
+// Temporal checkerboard for anti-aliasing
+bool isTemporalCheckerboard(vec2 coord, float phase) {
+    ivec2 pixel = ivec2(coord);
+    float temporalPattern = sin(phase) * 0.5 + 0.5;
+    int pattern = int(temporalPattern * 2.0) % 2;
+    return ((pixel.x + pixel.y) % 2) == pattern;
+}
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+    vec3 color = vec3(0.0);
+
+    switch (pc.mode) {
+        case 0: { // Interleave mode - combine two input images
+            vec3 color1 = texture(inputImage1, uv).rgb;
+            vec3 color2 = texture(inputImage2, uv).rgb;
+
+            // Simple average for now (could be more sophisticated)
+            color = (color1 + color2) * 0.5;
+            break;
+        }
+
+        case 1: { // Multi-GPU mode
+            // Each GPU renders alternating checkerboard pattern
+            if (isCheckerboardBlack(uv * pc.resolution, pc.gpuIndex)) {
+                // This GPU's pixels - sample from inputImage1
+                color = texture(inputImage1, uv).rgb;
+            } else {
+                // Other GPU's pixels - sample from inputImage2 or reconstruct
+                color = texture(inputImage2, uv).rgb;
+            }
+            break;
+        }
+
+        case 2: { // Special surfaces mode (water/glass)
+            // Use temporal checkerboard for special surfaces
+            if (isTemporalCheckerboard(uv * pc.resolution, pc.temporalPhase)) {
+                color = texture(inputImage1, uv).rgb;
+            } else {
+                // Could apply different effects for special surfaces
+                color = texture(inputImage2, uv).rgb;
+            }
+            break;
+        }
+
+        default: {
+            // Default to inputImage1
+            color = texture(inputImage1, uv).rgb;
+            break;
+        }
+    }
+
+    // Output the final color
+    imageStore(outputImage, pixel, vec4(color, 1.0));
+}

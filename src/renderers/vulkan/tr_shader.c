@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "tr_local.h"
+#include "vk_material_parser.h"
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 
@@ -4008,8 +4009,18 @@ static shader_t *FinishShader( void ) {
 				pStage->tessFlags |= TESS_PBR;
 				shader.hasPBR = qtrue;
 
-				if ( hasLightmapStage ) 
+				if ( hasLightmapStage )
 					def.vk_pbr_flags |= PBR_HAS_LIGHTMAP;
+
+				// Check for material file overrides
+				if (pStage->bundle[0].image[0] && pStage->bundle[0].image[0]->imgName) {
+					const materialEntry_t* entry = vk_material_parser_find_entry(pStage->bundle[0].image[0]->imgName);
+					if (entry) {
+						vk_material_parser_apply_to_shader_stage(entry, pStage);
+						ri.Printf(PRINT_DEVELOPER, "Applied material file properties to shader stage for %s\n",
+								 pStage->bundle[0].image[0]->imgName);
+					}
+				}
 
 				// move this to ubo ..
 				Vector4Copy( pStage->specularScale, def.specularScale );

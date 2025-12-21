@@ -142,6 +142,16 @@ cvar_t  *r_baseSpecular;
 	cvar_t	*r_film_grain_intensity;
 	cvar_t	*r_auto_exposure;
 	cvar_t	*r_auto_exposure_speed;
+	cvar_t	*r_checkerboard;
+	cvar_t	*r_checkerboard_temporal;
+	cvar_t	*r_vignette;
+	cvar_t	*r_vignette_intensity;
+	cvar_t	*r_vignette_radius;
+	cvar_t	*r_vignette_smoothness;
+	cvar_t	*r_vignette;
+	cvar_t	*r_vignette_intensity;
+	cvar_t	*r_vignette_inner_radius;
+	cvar_t	*r_vignette_outer_radius;
 	cvar_t	*r_color_grading;
 	cvar_t	*r_bokeh_dof;
 	cvar_t	*r_bokeh_blades;
@@ -1982,6 +1992,36 @@ static void R_Register( void )
 
 	r_auto_exposure_speed = ri.Cvar_Get( "r_auto_exposure_speed", "1.0", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_auto_exposure_speed, "Auto exposure adjustment speed (0.1-10.0)" );
+
+	r_checkerboard = ri.Cvar_Get( "r_checkerboard", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_checkerboard, "Enable checkerboard rendering (0=disabled, 1=multi-GPU, 2=special surfaces)" );
+
+	r_checkerboard_temporal = ri.Cvar_Get( "r_checkerboard_temporal", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_checkerboard_temporal, "Enable temporal checkerboard accumulation" );
+
+	r_vignette = ri.Cvar_Get( "r_vignette", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_vignette, "Enable vignette effect (0=disabled, 1=circular, 2=rounded rectangle)" );
+
+	r_vignette_intensity = ri.Cvar_Get( "r_vignette_intensity", "0.5", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_vignette_intensity, "Vignette effect intensity (0.0-1.0)" );
+
+	r_vignette_radius = ri.Cvar_Get( "r_vignette_radius", "0.75", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_vignette_radius, "Vignette effect radius (0.0-2.0)" );
+
+	r_vignette_smoothness = ri.Cvar_Get( "r_vignette_smoothness", "0.2", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_vignette_smoothness, "Vignette effect smoothness (0.0-1.0)" );
+
+	r_vignette = ri.Cvar_Get( "r_vignette", "0", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_vignette, "Enable vignette post-processing effect" );
+
+	r_vignette_intensity = ri.Cvar_Get( "r_vignette_intensity", "0.5", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_vignette_intensity, "Vignette intensity (0.0-1.0)" );
+
+	r_vignette_inner_radius = ri.Cvar_Get( "r_vignette_inner_radius", "0.3", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_vignette_inner_radius, "Vignette inner radius (0.0-1.0, relative to screen)" );
+
+	r_vignette_outer_radius = ri.Cvar_Get( "r_vignette_outer_radius", "1.2", CVAR_ARCHIVE );
+	ri.Cvar_SetDescription( r_vignette_outer_radius, "Vignette outer radius (0.0-2.0, relative to screen)" );
 
 	r_color_grading = ri.Cvar_Get( "r_color_grading", "0", CVAR_ARCHIVE );
 	ri.Cvar_SetDescription( r_color_grading, "Enable color grading with 3D LUT" );

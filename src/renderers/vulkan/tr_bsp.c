@@ -26,6 +26,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 extern refimport_t ri;
 #ifdef USE_VULKAN
 #include "vk.h"
+#ifdef USE_VULKAN_RAY_TRACING
+#include "vk_portal_lights.h"
+#endif
 
 #ifdef VK_CUBEMAP
 #define JSON_IMPLEMENTATION
@@ -2829,6 +2832,11 @@ void RE_LoadWorldMap( const char *name ) {
 
 #ifdef USE_VBO
 	R_BuildWorldVBO( s_worldData.surfaces, s_worldData.numsurfaces );
+#endif
+
+	// Load portal lights for this map
+#ifdef USE_VULKAN_RAY_TRACING
+	vk_portal_lights_load_map( s_worldData.baseName );
 #endif
 
 	tr.mapLoading = qfalse;
