@@ -653,6 +653,8 @@ CIMGUI_API void igTextUnformatted(const char* text,const char* text_end)
 {
     return ImGui::TextUnformatted(text,text_end);
 }
+#pragma clang diagnostic ignored "-Wformat-nonliteral"
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
 CIMGUI_API void igText(const char* fmt,...)
 {
     va_list args;
@@ -660,16 +662,24 @@ CIMGUI_API void igText(const char* fmt,...)
     ImGui::TextV(fmt,args);
     va_end(args);
 }
+#pragma clang diagnostic warning "-Wformat-nonliteral"
+#pragma GCC diagnostic warning "-Wformat-nonliteral"
 #ifdef CIMGUI_VARGS0
 CIMGUI_API void igText0(const char* fmt)
 {
     return igText(fmt);
 }
 #endif
+#pragma clang diagnostic ignored "-Wformat-nonliteral"
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
 CIMGUI_API void igTextV(const char* fmt,va_list args)
 {
     return ImGui::TextV(fmt,args);
 }
+#pragma clang diagnostic warning "-Wformat-nonliteral"
+#pragma GCC diagnostic warning "-Wformat-nonliteral"
+#pragma clang diagnostic ignored "-Wformat-nonliteral"
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
 CIMGUI_API void igTextColored(const ImVec4_c col,const char* fmt,...)
 {
     va_list args;
@@ -677,16 +687,24 @@ CIMGUI_API void igTextColored(const ImVec4_c col,const char* fmt,...)
     ImGui::TextColoredV(ConvertToCPP_ImVec4(col),fmt,args);
     va_end(args);
 }
+#pragma clang diagnostic warning "-Wformat-nonliteral"
+#pragma GCC diagnostic warning "-Wformat-nonliteral"
 #ifdef CIMGUI_VARGS0
 CIMGUI_API void igTextColored0(const ImVec4_c col,const char* fmt)
 {
     return igTextColored(col,fmt);
 }
 #endif
+#pragma clang diagnostic ignored "-Wformat-nonliteral"
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
 CIMGUI_API void igTextColoredV(const ImVec4_c col,const char* fmt,va_list args)
 {
     return ImGui::TextColoredV(ConvertToCPP_ImVec4(col),fmt,args);
 }
+#pragma clang diagnostic warning "-Wformat-nonliteral"
+#pragma GCC diagnostic warning "-Wformat-nonliteral"
+#pragma clang diagnostic ignored "-Wformat-nonliteral"
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
 CIMGUI_API void igTextDisabled(const char* fmt,...)
 {
     va_list args;
@@ -694,16 +712,22 @@ CIMGUI_API void igTextDisabled(const char* fmt,...)
     ImGui::TextDisabledV(fmt,args);
     va_end(args);
 }
+#pragma clang diagnostic warning "-Wformat-nonliteral"
+#pragma GCC diagnostic warning "-Wformat-nonliteral"
 #ifdef CIMGUI_VARGS0
 CIMGUI_API void igTextDisabled0(const char* fmt)
 {
     return igTextDisabled(fmt);
 }
 #endif
+#pragma clang diagnostic ignored "-Wformat-nonliteral"
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
 CIMGUI_API void igTextDisabledV(const char* fmt,va_list args)
 {
     return ImGui::TextDisabledV(fmt,args);
 }
+#pragma clang diagnostic warning "-Wformat-nonliteral"
+#pragma GCC diagnostic warning "-Wformat-nonliteral"
 CIMGUI_API void igTextWrapped(const char* fmt,...)
 {
     va_list args;
