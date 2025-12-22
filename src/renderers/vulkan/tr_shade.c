@@ -591,14 +591,14 @@ Blends a fog texture on top of everything else
 static void RB_FogPass( qboolean rebindIndex ) {
 	uint32_t pipeline = vk.fog_pipelines[tess.shader->fogPass - 1][tess.shader->cullType][tess.shader->polygonOffset];
 #ifdef USE_FOG_ONLY
-	int fog_stage;
+	int local_fog_stage;
 
 	// fog parameters
 	vk_bind_pipeline( pipeline );
 	if ( rebindIndex ) {
 		vk_bind_index();
 	}
-	VK_SetFogParams( &uniform, &fog_stage );
+	VK_SetFogParams( &uniform, &local_fog_stage );
 	vk_push_uniform( &uniform );
 	vk_update_descriptor( VK_DESC_FOG_ONLY, tr.fogImage->descriptor );
 	vk_draw_geometry( DEPTH_RANGE_NORMAL, qtrue );
@@ -993,10 +993,13 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	qboolean is_pbr_surface;
 #endif
 	uint32_t pipeline;
+	int local_fog_stage;
 	int fog_stage;
 	qboolean pushUniform;
 
 	vk_bind_index();
+
+	fog_stage = 0;
 
 	tess_flags = input->shader->tessFlags;
 
@@ -1006,14 +1009,16 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 #ifdef USE_FOG_COLLAPSE
 	if ( fogCollapse ) {
-		VK_SetFogParams( &uniform, &fog_stage );
+		VK_SetFogParams( &uniform, &local_fog_stage );
+		fog_stage = local_fog_stage;
 		VectorCopy( backEnd.or.viewOrigin, uniform.eyePos );
 		vk_update_descriptor( VK_DESC_FOG_COLLAPSE, tr.fogImage->descriptor );
 		pushUniform = qtrue;
 	} else
 #endif
 	{
-		fog_stage = 0;
+		local_fog_stage = 0;
+		fog_stage = local_fog_stage;
 		if ( tess_flags & TESS_VPOS ) {
 			VectorCopy( backEnd.or.viewOrigin, uniform.eyePos );
 			tess_flags &= ~TESS_VPOS;
@@ -1280,11 +1285,12 @@ uint32_t vk_push_uniform( const vkUniform_t *uniform_data ) {
 void VK_LightingPass( void )
 {
 	static uint32_t uniform_offset;
-	static int fog_stage;
+	static int lighting_fog_stage;
 	uint32_t pipeline;
 	const shaderStage_t *pStage;
 	cullType_t cull;
-	int abs_light;
+	int local_abs_light;
+	int local_fog_stage;
 
 	if ( tess.shader->lightingStage < 0 )
 		return;
@@ -1295,7 +1301,7 @@ void VK_LightingPass( void )
 	if ( tess.dlightUpdateParams ) {
 
 		// fog parameters
-		VK_SetFogParams( &uniform, &fog_stage );
+		VK_SetFogParams( &uniform, &local_fog_stage );
 		// light parameters
 		VK_SetLightParams( &uniform, tess.light );
 
@@ -1316,15 +1322,15 @@ void VK_LightingPass( void )
 		}
 	}
 
-	abs_light = /* (pStage->stateBits & GLS_ATEST_BITS) && */ (cull == CT_TWO_SIDED) ? 1 : 0;
+	local_abs_light = /* (pStage->stateBits & GLS_ATEST_BITS) && */ (cull == CT_TWO_SIDED) ? 1 : 0;
 
-	if ( fog_stage )
+	if ( lighting_fog_stage )
 		vk_update_descriptor( VK_DESC_FOG_DLIGHT, tr.fogImage->descriptor );
 
 	if ( tess.light->linear )
-		pipeline = vk.dlight1_pipelines_x[cull][tess.shader->polygonOffset][fog_stage][abs_light];
+		pipeline = vk.dlight1_pipelines_x[cull][tess.shader->polygonOffset][lighting_fog_stage][local_abs_light];
 	else
-		pipeline = vk.dlight_pipelines_x[cull][tess.shader->polygonOffset][fog_stage][abs_light];
+		pipeline = vk.dlight_pipelines_x[cull][tess.shader->polygonOffset][lighting_fog_stage][local_abs_light];
 
 	GL_SelectTexture( 0 );
 	R_BindAnimatedImage( &pStage->bundle[ tess.shader->lightingBundle ] );

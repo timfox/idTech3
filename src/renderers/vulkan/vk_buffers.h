@@ -7,8 +7,6 @@
 #include "vk.h"
 
 #ifdef USE_VMA
-#include "vk_mem_alloc.h"
-
 // VMA buffer allocation structures
 typedef struct {
     VmaAllocation allocation;

@@ -3,6 +3,7 @@
 
 #include <vulkan/vulkan.h>
 #include <stdint.h>
+#include "../common/q_shared.h"
 
 // Synchronization primitives management
 void vk_create_sync_primitives(void);

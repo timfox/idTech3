@@ -5,7 +5,6 @@
 #include <stdint.h>
 #include "q_shared.h"
 #include "tr_common.h"
-#include "vk.h"
 
 // Memory management structures (extracted from Vk_Instance)
 typedef struct {
@@ -65,10 +64,7 @@ typedef struct {
     VkDeviceSize memory_bandwidth_limit;
 } vk_texture_streaming_t;
 
-typedef struct {
-    VkDeviceMemory memory;
-    VkDeviceSize used;
-} ImageChunk;
+// ImageChunk is now defined in vk.h
 
 // Memory management function declarations
 void vk_allocate_image_chunk(void);

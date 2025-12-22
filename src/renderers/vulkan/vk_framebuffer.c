@@ -13,8 +13,8 @@ extern PFN_vkDestroyFramebuffer qvkDestroyFramebuffer;
 
 // Utility functions
 extern const char *va(const char *format, ...);
-extern char *Com_Memcpy(void *dest, const void *src, size_t count);
-extern void Com_Memset(void *dest, int c, size_t count);
+extern void *Com_Memcpy(void *dest, const void *src, size_t count);
+extern void *Com_Memset(void *dest, int c, size_t count);
 
 // Forward declarations for external structures
 extern cvar_t *r_fbo;
@@ -72,11 +72,9 @@ void vk_end_post_bloom_render_pass(void) {
 
 // Framebuffer state queries
 qboolean vk_has_framebuffers(void) {
-    return vk.swapchain_image_count > 0;
+    return (qboolean)(vk.swapchain_image_count > 0);
 }
 
 uint32_t vk_get_framebuffer_count(void) {
     return vk.swapchain_image_count;
 }
-
-#endif // __VK_FRAMEBUFFER_H__

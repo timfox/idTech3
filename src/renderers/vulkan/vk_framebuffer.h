@@ -2,6 +2,7 @@
 #define __VK_FRAMEBUFFER_H__
 
 #include <vulkan/vulkan.h>
+#include "vk.h"
 
 // Framebuffer and render pass management function declarations
 void vk_create_render_passes(void);

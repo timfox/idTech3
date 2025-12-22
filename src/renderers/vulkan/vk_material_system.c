@@ -357,14 +357,14 @@ void vk_material_set_corruption( uint32_t materialIndex, float corruption )
 Set Material Magic Glow
 =============================================================================
 */
-void vk_material_set_magic_glow( uint32_t materialIndex, float glow, const vec3_t color )
+void vk_material_set_magic_glow( uint32_t materialIndex, float glow, const vec3_t glowColor )
 {
 	if ( !vk.materialSystem.initialized || materialIndex >= vk.materialSystem.materialCapacity ) {
 		return;
 	}
 	
 	materialParams[materialIndex].magicGlow = Com_Clamp( 0.0f, 1.0f, glow );
-	VectorCopy( color, materialParams[materialIndex].magicColor );
+	VectorCopy( glowColor, materialParams[materialIndex].magicColor );
 	
 	if ( glow > 0.01f ) {
 		materialParams[materialIndex].flags |= MATERIAL_MAGICAL;

@@ -318,12 +318,12 @@ void vk_atmosphere_set_exposure( float exposure, float transitionTime )
 Set Fog
 =============================================================================
 */
-void vk_atmosphere_set_fog( float density, float start, float end, const vec3_t color, float transitionTime )
+void vk_atmosphere_set_fog( float density, float start, float end, const vec3_t fogColor, float transitionTime )
 {
 	vk.atmosphere.targetParams.fogDensity = density;
 	vk.atmosphere.targetParams.fogStart = start;
 	vk.atmosphere.targetParams.fogEnd = end;
-	VectorCopy( color, vk.atmosphere.targetParams.fogColor );
+	VectorCopy( fogColor, vk.atmosphere.targetParams.fogColor );
 	vk.atmosphere.transitionDuration = transitionTime;
 	vk.atmosphere.transitionTime = 0.0f;
 	Com_Memcpy( &vk.atmosphere.baseParams, &vk.atmosphere.currentParams, sizeof( atmosphere_params_t ) );
@@ -349,9 +349,9 @@ void vk_atmosphere_set_bloom( float intensity, float threshold, float size, floa
 Set Color Tint
 =============================================================================
 */
-void vk_atmosphere_set_color_tint( const vec3_t color, float transitionTime )
+void vk_atmosphere_set_color_tint( const vec3_t tintColor, float transitionTime )
 {
-	VectorCopy( color, vk.atmosphere.targetParams.colorTint );
+	VectorCopy( tintColor, vk.atmosphere.targetParams.colorTint );
 	vk.atmosphere.transitionDuration = transitionTime;
 	vk.atmosphere.transitionTime = 0.0f;
 	Com_Memcpy( &vk.atmosphere.baseParams, &vk.atmosphere.currentParams, sizeof( atmosphere_params_t ) );

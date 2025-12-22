@@ -83,7 +83,7 @@ static void flatten_layers( const layered_material_t *mat, material_params_t *ou
 	vec3_t emissive = { 0.0f, 0.0f, 0.0f };
 	float roughness = 0.5f;
 	float metallic = 0.0f;
-	float normalScale = 1.0f;
+	float local_normalScale = 1.0f;
 	float clearcoat = 0.0f;
 	float clearcoatRoughness = 0.25f;
 	float anisotropy = 0.0f;
@@ -105,7 +105,7 @@ static void flatten_layers( const layered_material_t *mat, material_params_t *ou
 	VectorCopy( first->color, baseColor );
 	roughness = first->roughness;
 	metallic = first->metallic;
-	normalScale = first->normalScale;
+	local_normalScale = first->normalScale;
 	emissive[0] = emissive[1] = emissive[2] = first->emissiveStrength;
 	estimate_layer_cost( first, &cost );
 	weightSum = clamp01f( first->weight );
@@ -121,7 +121,7 @@ static void flatten_layers( const layered_material_t *mat, material_params_t *ou
 			}
 			roughness = lerpf( roughness, layer->roughness, w );
 			metallic = lerpf( metallic, layer->metallic, w );
-			normalScale = lerpf( normalScale, layer->normalScale, w );
+			local_normalScale = lerpf( local_normalScale, layer->normalScale, w );
 			if ( layer->type == LAYER_TYPE_CLEARCOAT ) {
 				float candidate = clamp01f( layer->weight );
 				clearcoat = ( clearcoat > candidate ) ? clearcoat : candidate;
@@ -132,7 +132,7 @@ static void flatten_layers( const layered_material_t *mat, material_params_t *ou
 			}
 			if ( layer->type == LAYER_TYPE_DETAIL || layer->type == LAYER_TYPE_CUSTOM ) {
 				microfacet = lerpf( microfacet, clamp01f( layer->emissiveStrength ), w ); // reuse emissiveStrength as microfacet hint
-				microfacetSharpness = lerpf( microfacetSharpness, 1.0f + layer->normalScale * 0.5f, w );
+				microfacetSharpness = lerpf( microfacetSharpness, 1.0f + local_normalScale * 0.5f, w );
 			}
 			estimate_layer_cost( layer, &cost );
 		}
@@ -146,7 +146,7 @@ static void flatten_layers( const layered_material_t *mat, material_params_t *ou
 	VectorCopy( emissive, outParams->emissive );
 	outParams->roughness = roughness;
 	outParams->metallic = metallic;
-	outParams->normalScale = normalScale;
+	outParams->normalScale = local_normalScale;
 	outParams->clearcoat = clearcoat;
 	outParams->clearcoatRoughness = clearcoatRoughness;
 	outParams->anisotropy = clamp01f( anisotropy );

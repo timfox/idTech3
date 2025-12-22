@@ -1294,7 +1294,7 @@ typedef struct convolveCubemapCommand_s {
 ** but may read fields that aren't dynamically modified
 ** by the frontend.
 */
-typedef struct {
+typedef struct trGlobals_s {
 	qboolean				registered;		// cleared at shutdown, set at beginRegistration
 	qboolean				inited;			// cleared at shutdown, set at InitOpenGL
 
@@ -1436,10 +1436,7 @@ extern glstatic_t gls;
 
 extern void myGlMultMatrix(const float *a, const float *b, float *out);
 
-#ifdef USE_VULKAN
-extern Vk_Instance	vk;				// shouldn't be cleared during ref re-init
-extern Vk_World		vk_world;		// this data is cleared during ref re-init
-#endif
+// Vk_Instance and Vk_World are declared in vk.h
 
 //
 // cvars

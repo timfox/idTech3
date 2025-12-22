@@ -170,7 +170,7 @@ void vk_gpu_culling_begin_frame( void )
 Add Instance for GPU Culling
 =============================================================================
 */
-void vk_gpu_culling_add_instance( const mat4_t modelMatrix, uint32_t entityIndex, const vec4_t color )
+void vk_gpu_culling_add_instance( const mat4_t modelMatrix, uint32_t entityIndex, const vec4_t instanceColor )
 {
 	if ( !vk.gpuCulling.enabled || !vk.gpuCulling.initialized ) {
 		return;
@@ -183,7 +183,7 @@ void vk_gpu_culling_add_instance( const mat4_t modelMatrix, uint32_t entityIndex
 	
 	gpu_instance_t *instance = &gpuInstances[gpuInstanceWriteIndex];
 	Matrix16Copy( modelMatrix, instance->modelMatrix );
-	Vector4Copy( color, instance->color );
+	Vector4Copy( instanceColor, instance->color );
 	instance->entityIndex = entityIndex;
 	instance->flags = 0;
 	instance->lodBias = 0.0f;

@@ -1,17 +1,58 @@
 #pragma once
 
-#include "../renderercommon/vulkan/vulkan.h"
-#include "../common/q_shared.h"
-#include "../renderercommon/tr_public.h"
-#include "tr_common.h"
-#include "vk_memory.h"
-#include "vk_compute.h"
-#include "vk_buffers.h"
-#include "vk_pipeline.h"
-#include "vk_framebuffer.h"
-#include "vk_sync.h"
 typedef float vec_t;
 typedef vec_t mat4_t[16];
+
+// Vulkan-specific constants
+#define MAX_SWAPCHAIN_IMAGES 8
+#define MAX_ATTACHMENTS_IN_POOL 32
+#define MAX_VK_PIPELINES 1024
+#define MAX_VK_SAMPLERS 256
+#define MAX_IMAGE_CHUNKS 16
+
+// Swapchain image count constants for different presentation modes
+#define MIN_SWAPCHAIN_IMAGES_IMM 2
+#define MIN_SWAPCHAIN_IMAGES_MAILBOX 3
+#define MIN_SWAPCHAIN_IMAGES_FIFO 2
+#define MIN_SWAPCHAIN_IMAGES_FIFO_0 2
+
+// Vulkan filter constants (if not defined by headers)
+#ifndef VK_FILTER_NEAREST_MIPMAP_NEAREST
+#define VK_FILTER_NEAREST_MIPMAP_NEAREST VK_FILTER_NEAREST
+#endif
+#ifndef VK_FILTER_LINEAR_MIPMAP_NEAREST
+#define VK_FILTER_LINEAR_MIPMAP_NEAREST VK_FILTER_LINEAR
+#endif
+#ifndef VK_FILTER_NEAREST_MIPMAP_LINEAR
+#define VK_FILTER_NEAREST_MIPMAP_LINEAR VK_FILTER_NEAREST
+#endif
+#ifndef VK_FILTER_LINEAR_MIPMAP_LINEAR
+#define VK_FILTER_LINEAR_MIPMAP_LINEAR VK_FILTER_LINEAR
+#endif
+
+// Buffer size constants
+#define VERTEX_BUFFER_SIZE (64 * 1024 * 1024)      // 64MB
+#define STAGING_BUFFER_SIZE (32 * 1024 * 1024)     // 32MB
+#define VERTEX_BUFFER_SIZE_HI (128 * 1024 * 1024)  // 128MB
+#define STAGING_BUFFER_SIZE_HI (64 * 1024 * 1024)  // 64MB
+#define IMAGE_CHUNK_SIZE (256 * 1024 * 1024)       // 256MB
+
+// Primitive topology constants (if not defined by headers)
+#ifndef LINE_LIST
+#define LINE_LIST VK_PRIMITIVE_TOPOLOGY_LINE_LIST
+#endif
+#ifndef POINT_LIST
+#define POINT_LIST VK_PRIMITIVE_TOPOLOGY_POINT_LIST
+#endif
+#ifndef TRIANGLE_STRIP
+#define TRIANGLE_STRIP VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
+#endif
+
+// Forward declarations
+typedef struct {
+    VkDeviceMemory memory;
+    VkDeviceSize used;
+} ImageChunk;
 
 // Render pass types (needed by vk_pipeline.h)
 typedef enum {
@@ -21,6 +62,29 @@ typedef enum {
 	RENDER_PASS_CUBEMAP,
 	RENDER_PASS_COUNT
 } renderPass_t;
+
+#include "../renderercommon/vulkan/vulkan.h"
+#include "../common/q_shared.h"
+#include "../renderercommon/tr_public.h"
+#include "tr_common.h"
+
+// Depth range modes for viewport depth control
+typedef enum {
+	DEPTH_RANGE_NORMAL,		// [0..1]
+	DEPTH_RANGE_ZERO,		// [0..0]
+	DEPTH_RANGE_ONE,		// [1..1]
+	DEPTH_RANGE_WEAPON,		// [0..0.3]
+	DEPTH_RANGE_COUNT
+} Vk_Depth_Range;
+
+// VMA must be included before other headers that use it
+#ifdef USE_VMA
+#include "vk_mem_alloc.h"
+#endif
+
+#include "vk_memory.h"
+#include "vk_compute.h"
+#include "vk_buffers.h"
 
 typedef enum {
 	TYPE_COLOR_BLACK,
@@ -109,6 +173,13 @@ typedef enum {
 
 } Vk_Shader_Type;
 
+// used with cg_shadows == 2
+typedef enum {
+	SHADOW_DISABLED,
+	SHADOW_EDGES,
+	SHADOW_FS_QUAD
+} Vk_Shadow_Phase;
+
 typedef struct {
 	Vk_Shader_Type shader_type;
 	unsigned int state_bits; // GLS_XXX flags
@@ -141,7 +212,34 @@ typedef struct {
 	int vk_mag_filter;		// VK_XXX mag filter
 	int vk_min_filter;		// VK_XXX min filter
 	qboolean max_lod_1_0;	// fixed 1.0 lod
+	qboolean noAnisotropy;	// disable anisotropic filtering
 } Vk_Sampler_Def;
+
+// Filter definition for cubemap prefiltering
+typedef struct filterDef_s {
+	uint32_t target;
+
+	VkFormat format;
+	uint32_t size;
+	uint32_t mipLevels;
+
+	VkRenderPass		renderpass;
+	VkPipeline			pipeline;
+	VkPipelineLayout	pipeline_layout;
+
+	struct {
+		VkShaderModule	*vs_module;
+		VkShaderModule	*gm_module;
+		VkShaderModule	*fs_module;
+	} shaders;
+
+	struct {
+		VkImage			image;
+		VkImageView		view;
+		VkDeviceMemory	memory;
+		VkFramebuffer	framebuffer;
+	} offscreen;
+} filterDef;
 
 #include "vk_pipeline.h"
 
@@ -153,6 +251,30 @@ typedef struct meshlet_info_s meshlet_info_t;
 #define MAX_STREAM_CELLS 256
 #define MAX_TIMELINE_SEMAPHORES 32
 #define MAX_BINDLESS_TEXTURES 4096
+
+// Bloom system constants
+#define VK_NUM_BLOOM_PASSES 4
+
+// Descriptor set indices
+#define VK_DESC_UNIFORM 0
+#define VK_DESC_TEXTURE_BASE 1
+#define VK_DESC_COUNT 10
+
+// Uniform descriptor bindings
+#define VK_DESC_UNIFORM_MAIN_BINDING 0
+#define VK_DESC_UNIFORM_CAMERA_BINDING 1
+#define VK_DESC_UNIFORM_COUNT 2
+
+// Other descriptor indices
+#define VK_DESC_FOG_ONLY 4
+#define VK_DESC_FOG_COLLAPSE 4
+#define VK_DESC_FOG_DLIGHT 4
+#define VK_DESC_PBR_BRDFLUT 5
+#define VK_DESC_PBR_NORMAL 6
+#define VK_DESC_PBR_PHYSICAL 7
+#define VK_DESC_PBR_CUBEMAP 8
+#define VK_DESC_MATERIAL_PARAMS 9
+#define VK_DESC_STORAGE 10
 
 // Full definitions needed for struct members
 // Stream cell structure
@@ -197,14 +319,23 @@ struct atmosphere_params_s {
 	float fogHeightFalloff;
 	float bloomIntensity;
 	float bloomThreshold;
-
+	float bloomSize;
+	vec3_t colorTint;
+	float colorTemperature;
+	float dofFocusDistance;
+	float dofBlurRadius;
+	float timeOfDay;
+	float weatherIntensity;
+	uint32_t flags;
+};
+typedef struct atmosphere_params_s atmosphere_params_t;
 
 // Meshlet metadata (CPU-side)
-struct meshlet_info_s {
+typedef struct meshlet_info_s {
 	uint32_t firstIndex;
 	uint32_t indexCount;
 	uint32_t vertexCount;
-};
+} meshlet_info_t;
 
 // Procedural dressing limits
 #define VK_MAX_PROC_RULES     64
@@ -217,6 +348,10 @@ typedef enum {
 	PROC_RULE_VOLUME,
 	PROC_RULE_SPLINE
 } proc_rule_type_t;
+
+// Vulkan debugging functions
+void vk_set_object_name(uint64_t obj, const char *name, VkDebugReportObjectTypeEXT type);
+
 
 typedef struct proc_biome_s {
 	char name[32];
@@ -252,46 +387,6 @@ extern PFN_vkCmdSetViewport qvkCmdSetViewport;
 extern PFN_vkCmdSetScissor  qvkCmdSetScissor;
 #endif
 
-// used with cg_shadows == 2
-// used with cg_shadows == 2
-typedef enum {
-	SHADOW_DISABLED,
-	SHADOW_EDGES,
-	SHADOW_FS_QUAD
-} Vk_Shadow_Phase;
-
-// Depth range modes for viewport depth control
-typedef enum {
-	DEPTH_RANGE_NORMAL,		// [0..1]
-	DEPTH_RANGE_ZERO,		// [0..0]
-	DEPTH_RANGE_ONE,		// [1..1]
-	DEPTH_RANGE_WEAPON,		// [0..0.3]
-	DEPTH_RANGE_COUNT
-} Vk_Depth_Range;
-	Vk_Shader_Type shader_type;
-	unsigned int state_bits; // GLS_XXX flags
-	cullType_t face_culling;
-	qboolean polygon_offset;
-	qboolean mirror;
-	Vk_Shadow_Phase shadow_phase;
-	VkPrimitiveTopology primitives;
-	int line_width;
-	int fog_stage; // off, fog-in / fog-out
-	int abs_light;
-	int allow_discard;
-	int use_font_sdf;
-	float font_sdf_smooth;
-
-#ifdef USE_VK_PBR
-	uint32_t				vk_pbr_flags;
-	vec4_t					specularScale;
-	vec4_t					normalScale;
-#endif
-	int acff; // none, rgb, rgba, alpha
-	struct {
-		byte rgb;
-		byte alpha;
-	} color;
 
 typedef struct VK_Pipeline {
 	Vk_Pipeline_Def def;
@@ -511,6 +606,13 @@ void vk_create_compute_post_process_pipelines( void );
 void vk_create_pipelines( void );
 VkPipeline vk_gen_pipeline( uint32_t index );
 void vk_bind_generated_shaders( void );
+
+// Framebuffer and synchronization management
+void vk_create_framebuffers( void );
+void vk_destroy_framebuffers( void );
+void vk_create_sync_primitives( void );
+void vk_destroy_sync_primitives( void );
+void vk_create_prefilter_framebuffer( filterDef *def );
 
 //
 // Rendering setup.
@@ -1633,3 +1735,5 @@ extern PFN_vkCreateCommandPool qvkCreateCommandPool;
 extern PFN_vkDestroyCommandPool qvkDestroyCommandPool;
 extern PFN_vkAllocateCommandBuffers qvkAllocateCommandBuffers;
 extern PFN_vkFreeCommandBuffers qvkFreeCommandBuffers;
+
+#include "tr_local.h"

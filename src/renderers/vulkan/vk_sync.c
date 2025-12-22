@@ -14,8 +14,7 @@ extern PFN_vkWaitForFences qvkWaitForFences;
 extern PFN_vkResetFences qvkResetFences;
 
 // Utility functions
-extern char *Com_Memcpy(void *dest, const void *src, size_t count);
-extern void Com_Memset(void *dest, int c, size_t count);
+// Com_Memcpy and Com_Memset are defined in q_shared.h
 
 // Synchronization primitives creation and destruction
 void vk_create_sync_primitives(void) {
@@ -161,5 +160,3 @@ __attribute__((unused)) float vk_get_gpu_timing_result(const char *name) {
     ri.Printf(PRINT_DEVELOPER, "Vulkan: GPU timing result requested for: %s\n", name ? name : "unnamed");
     return 0.0f;
 }
-
-#endif // __VK_SYNC_H__

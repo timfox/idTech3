@@ -1,12 +1,14 @@
 #include "vk_memory.h"
-#include "../renderercommon/tr_public.h"
 #include "vk.h"
 #include <string.h>
 
 // Forward declarations for functions used from vk.c
+extern void vk_set_object_name(uint64_t obj, const char *name, VkDebugReportObjectTypeEXT type);
+#define SET_OBJECT_NAME(obj,objName,objType) vk_set_object_name( (uint64_t)(obj), (objName), (objType) )
 extern uint32_t find_memory_type(uint32_t memory_type_bits, VkMemoryPropertyFlags properties);
 extern void vk_wait_idle(void);
-extern char *va(const char *format, ...);
+// va is defined in q_shared.h
+extern refimport_t ri;
 
 void vk_allocate_image_chunk(void) {
 	if (vk_world.num_image_chunks == 0) {
@@ -237,7 +239,7 @@ void vk_clean_staging_buffer(void) {
 #endif
 }
 
-void vk_flush_staging_buffer(qboolean final) {
+void vk_flush_staging_buffer(__attribute__((unused)) qboolean final) {
 #ifdef USE_UPLOAD_QUEUE
 	const VkPipelineStageFlags wait_dst_stage_mask = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 	VkSemaphore waits;
