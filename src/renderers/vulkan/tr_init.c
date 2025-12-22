@@ -3096,7 +3096,7 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 	re.DrawStretchRaw = RE_StretchRaw;
 	re.UploadCinematic = RE_UploadCinematic;
 
-	re.RegisterFont = RE_RegisterFont;
+	re.RegisterFont = RE_RegisterFont_Vulkan;
 	re.RemapShader = RE_RemapShader;
 	re.GetEntityToken = RE_GetEntityToken;
 	re.inPVS = R_inPVS;

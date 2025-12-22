@@ -137,6 +137,9 @@ extern cvar_t *r_fontAntialiasing;
 extern cvar_t *r_fontLCDFilter;
 extern cvar_t *r_fontKerning;
 
+// Vulkan-specific font functions
+qboolean RE_RegisterFont_Vulkan(const char *fontName, int pointSize, fontInfo_t *font);
+
 
 /*
 =============================================================

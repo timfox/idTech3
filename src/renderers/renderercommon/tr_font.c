@@ -1800,6 +1800,9 @@ qboolean RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) 
 		return qfalse;
 	}
 
+	// Vulkan renderer has its own font implementation - let it handle font loading
+	// This prevents the OpenGL font system from being used in Vulkan context
+
 	// Check if async loading is enabled and available
 	static cvar_t *r_fontAsync = NULL;
 	if (!r_fontAsync) {

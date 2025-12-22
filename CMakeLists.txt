@@ -1248,6 +1248,7 @@ option(IDTECH3_VK_EXPERIMENTAL "Build experimental Vulkan renderer modules" OFF)
 if(NOT IDTECH3_VK_EXPERIMENTAL)
 	list(REMOVE_ITEM RENDERER_VK_SRCS
 		src/renderers/vulkan/gltf_loader.c
+		src/renderers/vulkan/tr_font_vk.c
 		src/renderers/vulkan/vk_compute_raytracing.c
 		src/renderers/vulkan/vk_dynamic_rendering.c
 		src/renderers/vulkan/vk_graphics_settings.c
