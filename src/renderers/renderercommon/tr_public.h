@@ -484,4 +484,8 @@ typedef	refexport_t* (QDECL *GetRefAPI_t) (int apiVersion, refimport_t * rimp);
 refexport_t*GetRefAPI( int apiVersion, refimport_t *rimp );
 #endif
 
+// Safe shader loading functions
+const char *R_GetSafeShaderText(int *size);
+void R_ShutdownSafeShaderLoadContext(void);
+
 #endif	// __TR_PUBLIC_H

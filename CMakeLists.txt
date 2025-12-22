@@ -1255,6 +1255,8 @@ IF(USE_STB_TRUETYPE)
 	list(APPEND RENDERER_COMMON_SRCS src/renderers/opengl/tr_font_stb.c)
 	list(APPEND RENDERER_COMMON_SRCS src/renderers/renderercommon/tr_font_effects.c)
 ENDIF()
+# Always include tr_services.c for safe shader loading
+list(APPEND RENDERER_COMMON_SRCS src/renderers/renderercommon/tr_services.c)
 # Note: FreeType-dependent files are included when USE_FREETYPE is defined
 # They have proper guards to compile to empty implementations when FreeType is not available
 AUX_SOURCE_DIRECTORY(src/renderers/opengl RENDERER_GL_SRCS)

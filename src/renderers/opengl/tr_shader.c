@@ -3686,123 +3686,6 @@ void	R_ShaderList_f (void) {
 
 #define	MAX_SHADER_FILES 16384
 
-static int loadShaderBuffers( char **shaderFiles, const int numShaderFiles, char **buffers, const char *directory )
-{
-	char filename[MAX_QPATH+8];
-	char shaderName[MAX_QPATH];
-	const char *p, *token;
-	long summand, sum = 0;
-	int shaderLine;
-	int i;
-	const char *shaderStart;
-	qboolean denyErrors;
-
-	// load and parse shader files
-	for ( i = 0; i < numShaderFiles; i++ )
-	{
-		Com_sprintf( filename, sizeof( filename ), "%s/%s", directory, shaderFiles[i] );
-
-		// Skip known problematic shader files that cause memory corruption
-		if (strcmp(shaderFiles[i], "weapon_chaingun.shader") == 0 ||
-		    strcmp(shaderFiles[i], "oanew.shader") == 0 ||
-		    strcmp(shaderFiles[i], "newmenu.shader") == 0) {
-			ri.Printf( PRINT_WARNING, "Skipping known problematic shader file '%s'\n", shaderFiles[i] );
-			buffers[i] = NULL;
-			continue;
-		}
-
-		//ri.Printf( PRINT_DEVELOPER, "...loading '%s'\n", filename );
-		summand = ri.FS_ReadFile( filename, (void **)&buffers[i] );
-
-		if ( !buffers[i] )
-			ri.Error( ERR_DROP, "Couldn't load %s", filename );
-
-		// comment some buggy shaders from pak0
-		if ( summand == 35910 && strcmp( shaderFiles[i], "sky.shader" ) == 0 )
-		{
-			if ( memcmp( buffers[i] + 0x3D3E, "\tcloudparms ", 12 ) == 0 )
-			{
-				memcpy( buffers[i] + 0x27D7, "/*", 2 );
-				memcpy( buffers[i] + 0x2A93, "*/", 2 );
-
-				memcpy( buffers[i] + 0x3CA9, "/*", 2 );
-				memcpy( buffers[i] + 0x3FC2, "*/", 2 );
-			}
-		}
-		else if ( summand == 116073 && strcmp( shaderFiles[i], "sfx.shader" ) == 0 )
-		{
-			if ( memcmp( buffers[i] + 93457, "textures/sfx/xfinalfog\r\n", 24 ) == 0 )
-			{
-				memcpy( buffers[i] + 93457, "/*", 2 );
-				memcpy( buffers[i] + 93663, "*/", 2 );
-			}
-		}
-
-		p = buffers[i];
-		COM_BeginParseSession( filename );
-
-		shaderStart = NULL;
-		denyErrors = qfalse;
-
-		while ( 1 )
-		{
-			token = COM_ParseExt( &p, qtrue );
-
-			if ( !*token )
-				break;
-
-			Q_strncpyz( shaderName, token, sizeof( shaderName ) );
-			shaderLine = COM_GetCurrentParseLine();
-
-			token = COM_ParseExt( &p, qtrue );
-			if ( token[0] != '{' || token[1] != '\0' )
-			{
-				ri.Printf( PRINT_DEVELOPER, "File %s: shader \"%s\" " \
-					"on line %d missing opening brace", filename, shaderName, shaderLine );
-				if ( token[0] )
-					ri.Printf( PRINT_DEVELOPER, " (found \"%s\" on line %d)\n", token, COM_GetCurrentParseLine() );
-				else
-					ri.Printf( PRINT_DEVELOPER, "\n" );
-
-				if ( denyErrors || !p )
-				{
-					ri.Printf( PRINT_WARNING, "Ignoring entire file '%s' due to error.\n", filename );
-					ri.FS_FreeFile( buffers[i] );
-					buffers[i] = NULL;
-					break;
-				}
-
-				SkipRestOfLine( &p );
-				shaderStart = p;
-				continue;
-			}
-
-			if ( !SkipBracedSection( &p, 1 ) )
-			{
-				ri.Printf(PRINT_WARNING, "WARNING: Ignoring shader file %s. Shader \"%s\" " \
-					"on line %d missing closing brace.\n", filename, shaderName, shaderLine );
-				ri.FS_FreeFile( buffers[i] );
-				buffers[i] = NULL;
-				break;
-			}
-
-			denyErrors = qtrue;
-		}
-
-		if ( buffers[ i ] ) {
-			if ( shaderStart ) {
-				summand -= (shaderStart - buffers[i]);
-				if ( summand >= 0 ) {
-					memmove( buffers[i], shaderStart, summand + 1 );
-				}
-			}
-			//sum += summand;
-			sum += COM_Compress( buffers[ i ] );
-		}
-	}
-
-	return sum;
-}
 
 
 /*
@@ -3826,52 +3709,7 @@ Load and validate shader files one at a time to maintain proper temp memory LIFO
 Returns the total size of all valid shader content.
 ====================
 */
-static long processShaderBuffersSequentially(char **shaderFiles, int numShaderFiles,
-											char **buffers, const char *directory)
-{
-	char filename[MAX_QPATH+8];
-	long sum = 0;
-	int i;
 
-	// Process shader files one at a time
-	for (i = 0; i < numShaderFiles; i++) {
-		if (!shaderFiles[i]) continue;
-
-		Com_sprintf(filename, sizeof(filename), "%s/%s", directory, shaderFiles[i]);
-
-		// Load one file at a time
-		long summand = ri.FS_ReadFile(filename, (void **)&buffers[i]);
-
-		if (!buffers[i]) {
-			ri.Error(ERR_DROP, "Couldn't load %s", filename);
-			continue;
-		}
-
-		// Skip validation to avoid temp memory corruption during loading
-		// Validation will happen later during actual shader parsing
-		sum += summand;
-
-		// If file is valid, add to total size
-		if (buffers[i]) {
-			sum += summand;
-		}
-	}
-
-	return sum;
-}
-
-static void ScanAndLoadShaderFiles( void )
-{
-	// TEMPORARY WORKAROUND: Skip shader file loading to prevent memory corruption crashes
-	// This disables loading of external shader files but keeps internal shaders working
-	ri.Printf( PRINT_WARNING, "External shader file loading disabled to prevent crashes\n" );
-	ri.Printf( PRINT_WARNING, "Only internal shaders will be available\n" );
-
-	// Initialize minimal shader text for internal shaders only
-	s_shaderText = ri.Hunk_Alloc( 1, h_low );
-	s_shaderText[0] = '\0';
-	s_extensionOffset = s_shaderText;
-}
 
 
 /*
@@ -3971,8 +3809,7 @@ void R_InitShaders( void ) {
 	}
 
 	// Clean up the safe loading context
-	extern void R_ShutdownShaderLoadContext(void);
-	R_ShutdownShaderLoadContext();
+	R_ShutdownSafeShaderLoadContext();
 
 	CreateExternalShaders();
 }

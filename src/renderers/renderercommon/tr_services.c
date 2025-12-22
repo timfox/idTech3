@@ -66,6 +66,7 @@ static shaderLoadContext_t shaderLoadCtx;
 
 // Forward declarations for renderer-specific functions
 void ScanAndLoadShaderFiles_Safe(void);
+const char *R_GetSafeShaderText(int *size);
 
 /*
 ====================
@@ -89,7 +90,8 @@ R_ShutdownShaderLoadContext
 Clean up the safe shader loading context
 ====================
 */
-static void R_ShutdownShaderLoadContext(void) {
+void R_ShutdownSafeShaderLoadContext(void) {
+	ri.Printf(PRINT_ALL, "R_ShutdownShaderLoadContext called\n");
 	if (!shaderLoadCtx.initialized) {
 		return;
 	}
@@ -97,15 +99,13 @@ static void R_ShutdownShaderLoadContext(void) {
 	// Free all loaded file buffers
 	for (int i = 0; i < shaderLoadCtx.numFiles; i++) {
 		if (shaderLoadCtx.fileBuffers[i]) {
-			ri.Free(shaderLoadCtx.fileBuffers[i]);
+			ri.FS_FreeFile(shaderLoadCtx.fileBuffers[i]);
 			shaderLoadCtx.fileBuffers[i] = NULL;
 		}
 	}
 
-	if (shaderLoadCtx.combinedText) {
-		ri.Free(shaderLoadCtx.combinedText);
-		shaderLoadCtx.combinedText = NULL;
-	}
+	// combinedText is allocated from hunk, don't free it manually
+	shaderLoadCtx.combinedText = NULL;
 
 	if (shaderLoadCtx.fileBuffers) {
 		ri.Free(shaderLoadCtx.fileBuffers);
@@ -183,8 +183,8 @@ static qboolean R_CombineShaderFilesSafe(void) {
 		totalSize += shaderLoadCtx.fileSizes[i] + 2; // +2 for "\n" separator
 	}
 
-	// Allocate combined buffer
-	shaderLoadCtx.combinedText = (char *)ri.Malloc(totalSize + 1);
+	// Allocate combined buffer from hunk (like original code)
+	shaderLoadCtx.combinedText = (char *)ri.Hunk_Alloc(totalSize + 1, h_low);
 	if (!shaderLoadCtx.combinedText) {
 		return qfalse;
 	}
@@ -210,21 +210,21 @@ R_ParseShaderTextSafe
 Parse shader text without using temp memory allocations
 ====================
 */
-static qboolean R_ParseShaderTextSafe(const char *text, const char *filename, int lineNum) {
+static qboolean R_ParseShaderTextSafe(const char *text) {
 	if (!text || !*text) {
 		return qfalse;
 	}
 
-	// Use a local parse context to avoid temp memory allocations
+	// Basic syntax validation - check for matching braces
 	const char *parseText = text;
 
-	// Skip whitespace and comments at the start
+	// Skip whitespace at the start
 	while (*parseText && (*parseText == ' ' || *parseText == '\t' || *parseText == '\n' || *parseText == '\r')) {
 		parseText++;
 	}
 
-	if (!*parseText || *parseText == '/' || *parseText != '{') {
-		// Not a valid shader start, skip
+	if (!*parseText || *parseText != '{') {
+		// Not a valid shader start
 		return qfalse;
 	}
 
@@ -241,10 +241,6 @@ static qboolean R_ParseShaderTextSafe(const char *text, const char *filename, in
 		// Unmatched braces
 		return qfalse;
 	}
-
-	// At this point, we have valid shader text from parseText to braceEnd
-	// In a full implementation, we would create the actual shader object here
-	// For now, we just validate the syntax
 
 	return qtrue;
 }
@@ -277,7 +273,6 @@ static void R_ProcessShaderFilesSafe(void) {
 		// Check for shader name
 		if (*text != '/' && *text != '{' && *text != '}') {
 			// Found potential shader name
-			const char *shaderStart = text;
 			int startLine = lineNum;
 
 			// Skip to end of line or opening brace
@@ -287,7 +282,7 @@ static void R_ProcessShaderFilesSafe(void) {
 
 			if (*text == '{') {
 				// Found shader definition
-				if (!R_ParseShaderTextSafe(text, "combined_shaders", startLine)) {
+				if (!R_ParseShaderTextSafe(text)) {
 					ri.Printf(PRINT_WARNING, "Failed to parse shader at line %d\n", startLine);
 				}
 
@@ -366,7 +361,7 @@ void ScanAndLoadShaderFiles_Safe(void) {
 
 	if (!shaderFiles || numShaderFiles == 0) {
 		ri.Printf(PRINT_WARNING, "No shader files found\n");
-		R_ShutdownShaderLoadContext();
+		R_ShutdownSafeShaderLoadContext();
 		return;
 	}
 
@@ -397,7 +392,7 @@ void ScanAndLoadShaderFiles_Safe(void) {
 	// Combine all loaded files
 	if (!R_CombineShaderFilesSafe()) {
 		ri.Printf(PRINT_WARNING, "Failed to combine shader files\n");
-		R_ShutdownShaderLoadContext();
+		R_ShutdownSafeShaderLoadContext();
 		return;
 	}
 

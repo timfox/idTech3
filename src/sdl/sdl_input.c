@@ -65,7 +65,8 @@ static cvar_t *j_up_axis;
 static cvar_t *cl_consoleKeys;
 
 static int in_eventTime = 0;
-static qboolean mouse_focus;
+static qboolean mouse_focus = qtrue; // Assume mouse focus for windowed mode
+static int mouseX = 0, mouseY = 0; // Track absolute mouse position for UI
 
 #define CTRL(a) ((a)-'a'+1)
 
@@ -411,13 +412,32 @@ static void IN_ActivateMouse( void )
 	{
 		IN_GobbleMouseEvents();
 
+	// Set mouse mode based on current catcher
+	int catcher = Key_GetCatcher();
+		if ( catcher & KEYCATCH_UI ) {
+			// UI mode: absolute positioning, visible cursor
+			if (SDL_GetRelativeMouseMode()) {
+				// Switching from relative to absolute mode - sync UI cursor with actual mouse
+				int x, y;
+				SDL_GetMouseState(&x, &y);
+				mouseX = x;
+				mouseY = y;
+				// Send initial position sync to UI (assume UI cursor starts at 0,0)
+				Com_QueueEvent( Sys_Milliseconds(), SE_MOUSE, x, y, 0, NULL );
+			}
+			SDL_SetRelativeMouseMode( SDL_FALSE );
+			SDL_SetWindowGrab( SDL_window, SDL_FALSE );
+			SDL_ShowCursor( SDL_TRUE );
+	} else {
+		// Game mode: relative positioning, grabbed cursor
 		SDL_SetRelativeMouseMode( in_mouse->integer == 1 ? SDL_TRUE : SDL_FALSE );
 		SDL_SetWindowGrab( SDL_window, SDL_TRUE );
-
 		if ( glw_state.isFullscreen )
 			SDL_ShowCursor( SDL_FALSE );
-
+		else
+			SDL_ShowCursor( SDL_TRUE );
 		SDL_WarpMouseInWindow( SDL_window, glw_state.window_width / 2, glw_state.window_height / 2 );
+	}
 
 #ifdef DEBUG_EVENTS
 		Com_Printf( "%4i %s\n", Sys_Milliseconds(), __func__ );
@@ -1262,7 +1282,15 @@ void HandleEvents( void )
 				{
 					if( !e.motion.xrel && !e.motion.yrel )
 						break;
-					Com_QueueEvent( in_eventTime, SE_MOUSE, e.motion.xrel, e.motion.yrel, 0, NULL );
+
+					// Update absolute mouse position for UI mode
+					if ( !(Key_GetCatcher() & KEYCATCH_UI) ) {
+						// Game mode: send deltas
+						Com_QueueEvent( in_eventTime, SE_MOUSE, e.motion.xrel, e.motion.yrel, 0, NULL );
+					} else {
+						// UI mode: send unscaled deltas (UI accumulates internally)
+						Com_QueueEvent( in_eventTime, SE_MOUSE, e.motion.xrel, e.motion.yrel, 0, NULL );
+					}
 				}
 				break;
 
@@ -1344,7 +1372,7 @@ void HandleEvents( void )
 														break;
 					// mouse focus:
 					case SDL_WINDOWEVENT_ENTER: mouse_focus = qtrue; break;
-					case SDL_WINDOWEVENT_LEAVE: if ( glw_state.isFullscreen ) mouse_focus = qfalse; break;
+					case SDL_WINDOWEVENT_LEAVE: mouse_focus = qfalse; break;
 				}
 				break;
 			default:
@@ -1374,11 +1402,11 @@ IN_Frame
 */
 void IN_Frame( void )
 {
+	int catcher = Key_GetCatcher();
 #ifdef USE_JOYSTICK
 	IN_JoyMove();
 #endif
-
-	if ( Key_GetCatcher() & KEYCATCH_CONSOLE ) {
+	if ( catcher & KEYCATCH_CONSOLE ) {
 		// temporarily deactivate if not in the game and
 		// running on the desktop with multimonitor configuration
 		if ( !glw_state.isFullscreen || glw_state.monitorCount > 1 ) {
@@ -1387,7 +1415,18 @@ void IN_Frame( void )
 		}
 	}
 
-	if ( !gw_active || !mouse_focus || in_nograb->integer ) {
+	// Special case: always activate mouse when UI is active, as UI interaction requires mouse
+	if (catcher & KEYCATCH_UI) {
+		IN_ActivateMouse();
+		return;
+	}
+
+	// In windowed mode, don't require window focus for mouse activation
+	if ( (!gw_active || !mouse_focus) && glw_state.isFullscreen ) {
+		IN_DeactivateMouse();
+		return;
+	}
+	if ( in_nograb->integer ) {
 		IN_DeactivateMouse();
 		return;
 	}

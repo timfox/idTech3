@@ -1588,7 +1588,6 @@ void		RE_RemapShader(const char *oldShader, const char *newShader, const char *t
 // Safe shader loading system
 void		ScanAndLoadShaderFiles_Safe( void );
 const char *R_GetSafeShaderText(int *size);
-void		R_ShutdownShaderLoadContext( void );
 
 
 //
