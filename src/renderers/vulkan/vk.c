@@ -91,7 +91,7 @@ typedef struct {
     qboolean pipelineBinaries;        // VK_KHR_pipeline_executable_properties
 } vk_advanced_features_t;
 
-static vk_advanced_features_t vk_advanced = {0};
+vk_advanced_features_t vk_advanced = {0};
 
 // DLSS/FSR upscaling support
 typedef struct {
@@ -9745,4 +9745,12 @@ void vk_vrs_apply_shading_rate( VkCommandBuffer cmdBuffer ) {
 	qvkCmdSetFragmentShadingRateKHR(cmdBuffer, &fragmentSize, combinerOps);
 
 	ri.Printf(PRINT_ALL, "Applied VRS shading rate: %dx%d\n", fragmentSize.width, fragmentSize.height);
+}
+
+void vk_wait_idle( void ) {
+	VK_CHECK( qvkDeviceWaitIdle( vk.device ) );
+}
+
+void vk_queue_wait_idle( void ) {
+	VK_CHECK( qvkQueueWaitIdle( vk.queue ) );
 }

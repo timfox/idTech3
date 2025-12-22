@@ -786,6 +786,14 @@ Comprehensive fallback chain when primary font loading methods fail
 =================
 */
 static qboolean R_FontFallbackChain(const char *fontName, int pointSize, fontInfo_t *font, qboolean wantSDF) {
+	// Prevent infinite recursion
+	static qboolean inFontFallback = qfalse;
+	if (inFontFallback) {
+		ri.Printf(PRINT_ALL, "R_FontFallbackChain: blocked recursive call for '%s'\n", fontName);
+		return qfalse;
+	}
+	inFontFallback = qtrue;
+
 	ri.Printf(PRINT_ALL, "R_FontFallbackChain: Attempting fallback loading for '%s' (%dpt)\n", fontName, pointSize);
 
 	// Fallback 1: Try different file extensions
@@ -845,6 +853,7 @@ static qboolean R_FontFallbackChain(const char *fontName, int pointSize, fontInf
 	// Fallback 4: Generate a simple built-in font
 	ri.Printf(PRINT_WARNING, "R_FontFallbackChain: All font loading methods failed for '%s', built-in font generation disabled\n", fontName);
         // return R_GenerateBuiltInFont(pointSize, font);
+	inFontFallback = qfalse; // Reset recursion flag
 	return qfalse;
 }
 
@@ -924,6 +933,13 @@ Synchronous font registration (original implementation)
 */
 #ifdef BUILD_FREETYPE
 static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontInfo_t *font, qboolean wantSDF) {
+	// Prevent infinite recursion when called from R_FontFallbackChain
+	static qboolean inFallbackChain = qfalse;
+	if (inFallbackChain) {
+		return qfalse;
+	}
+	inFallbackChain = qtrue;
+
 #ifdef USE_FREETYPE
 	// Ensure FreeType is initialized before trying to use it
 	extern qboolean FreeType_Init(void);
@@ -1099,16 +1115,18 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 			return qtrue;
 		}
 #ifndef USE_FREETYPE
-		// Try comprehensive fallback when FreeType is not available
-		return R_FontFallbackChain(fontName, pointSize, font, wantSDF);
+	// Try comprehensive fallback when FreeType is not available
+	inFallbackChain = qfalse; // Reset before fallback
+	return R_FontFallbackChain(fontName, pointSize, font, wantSDF);
 #else
-		ri.Printf(PRINT_WARNING, "RE_RegisterFont: stb_truetype failed for '%s', falling back to FreeType\n", fontName);
+	ri.Printf(PRINT_WARNING, "RE_RegisterFont: stb_truetype failed for '%s', falling back to FreeType\n", fontName);
 #endif
 	}
 #endif
 
 #ifndef USE_FREETYPE
 	// Try comprehensive fallback when FreeType is not available
+	inFallbackChain = qfalse; // Reset before fallback
 	return R_FontFallbackChain(fontName, pointSize, font, wantSDF);
 #else
 	ftLibrary = FreeType_GetLibrary();
@@ -1117,6 +1135,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 		extern qboolean FreeType_Init(void);
 		if (!FreeType_Init()) {
 			ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType initialization failed, trying fallback.\n");
+			inFallbackChain = qfalse; // Reset before fallback
 			return R_FontFallbackChain(fontName, pointSize, font, wantSDF);
 		}
 		ftLibrary = FreeType_GetLibrary();
@@ -1513,6 +1532,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 		"RE_RegisterFont: settings name='%s' size=%d dpi=%d atlas=%d hint=%d aa=%d spread=%d glyphScale=%.3f\n",
 		fontName, pointSize, selectedDPI, selectedAtlasSize, selectedHint, selectedAA, selectedSpread, font->glyphScale);
 
+	inFallbackChain = qfalse; // Reset recursion flag
 	return qtrue;
 }
 #endif // BUILD_FREETYPE
