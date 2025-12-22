@@ -55,26 +55,28 @@ color_msg("${COL_STEP}"  "-- Compiler: ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER
 # ------------------------------------------------------------------------------
 # Language Standard Configuration
 # ------------------------------------------------------------------------------
-# Set C23 standard for GCC/Clang, C17 for MSVC (fallback for compatibility)
-IF(MSVC)
-    SET(CMAKE_C_STANDARD 17)
-    MESSAGE(STATUS "Using C17 standard for MSVC compatibility")
-ELSE()
+# Set C17 as default for broad compatibility, C23 for GCC/Clang
+IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     SET(CMAKE_C_STANDARD 23)
+    SET(CMAKE_C_STANDARD_REQUIRED ON)
     MESSAGE(STATUS "Using C23 standard")
+ELSE()
+    SET(CMAKE_C_STANDARD 17)
+    SET(CMAKE_C_STANDARD_REQUIRED OFF)  # Allow fallback for MSVC
+    MESSAGE(STATUS "Using C17 standard (MSVC or other compiler)")
 ENDIF()
-SET(CMAKE_C_STANDARD_REQUIRED ON)
 SET(CMAKE_C_EXTENSIONS OFF)
 
-# Set C++23 standard for GCC/Clang, C++17 for MSVC (fallback for compatibility)
-IF(MSVC)
-    SET(CMAKE_CXX_STANDARD 17)
-    MESSAGE(STATUS "Using C++17 standard for MSVC compatibility")
-ELSE()
+# Set C++17 as default for broad compatibility, C++23 for GCC/Clang
+IF(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     SET(CMAKE_CXX_STANDARD 23)
+    SET(CMAKE_CXX_STANDARD_REQUIRED ON)
     MESSAGE(STATUS "Using C++23 standard")
+ELSE()
+    SET(CMAKE_CXX_STANDARD 17)
+    SET(CMAKE_CXX_STANDARD_REQUIRED OFF)  # Allow fallback for MSVC
+    MESSAGE(STATUS "Using C++17 standard (MSVC or other compiler)")
 ENDIF()
-SET(CMAKE_CXX_STANDARD_REQUIRED ON)
 SET(CMAKE_CXX_EXTENSIONS OFF)
 
 # Enable modern compiler warnings for better code quality
