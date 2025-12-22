@@ -4,12 +4,12 @@ Encounter and Sequence Authoring System Implementation
 =============================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/q_common.h"
+#include "../common/q_shared.h"
+#include "../common/qcommon.h"
 #include "g_local.h"
 #include "encounter_system.h"
 #ifdef USE_LUA
-#include "../qcommon/lua_encounter.h"
+#include "../common/lua_encounter.h"
 #endif
 
 #define MAX_ENCOUNTERS 64

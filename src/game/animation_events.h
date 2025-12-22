@@ -7,7 +7,7 @@ Provides gameplay hooks for animation-driven events (hit frames, parry windows)
 
 #pragma once
 
-#include "../qcommon/q_shared.h"
+#include "../common/q_shared.h"
 
 // Animation event types
 typedef enum {

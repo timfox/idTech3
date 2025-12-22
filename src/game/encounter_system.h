@@ -7,7 +7,7 @@ Provides Lua-based encounter orchestration and world state management
 
 #pragma once
 
-#include "../qcommon/q_shared.h"
+#include "../common/q_shared.h"
 
 // Encounter state
 typedef enum {

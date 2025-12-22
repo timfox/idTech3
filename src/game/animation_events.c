@@ -4,8 +4,8 @@ Animation Event System Implementation
 =============================================================================
 */
 
-#include "../qcommon/q_shared.h"
-#include "../qcommon/q_common.h"
+#include "../common/q_shared.h"
+#include "../common/qcommon.h"
 #include "g_local.h"
 #include "animation_events.h"
 

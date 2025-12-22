@@ -1,7 +1,7 @@
 #ifndef __G_DIALOGUE_H__
 #define __G_DIALOGUE_H__
 
-#include "../qcommon/q_shared.h"
+#include "../common/q_shared.h"
 
 #define MAX_DIALOGUE_NAME		64
 #define MAX_DIALOGUE_TEXT		512

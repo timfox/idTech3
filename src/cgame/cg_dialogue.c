@@ -1,6 +1,6 @@
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
-#include "../qcommon/i18n.h"
+#include "../common/q_shared.h"
+#include "../common/qcommon.h"
+#include "../common/i18n.h"
 #include "cg_local.h"
 #include "cg_dialogue.h"
 

@@ -1,7 +1,7 @@
 #if defined(__APPLE__) && !defined(__ANDROID__)
 
 #include "tr_local.h"
-#include "../qcommon/qcommon.h"
+#include "../common/qcommon.h"
 #include "../renderer/tr_common.h" // For imgFlags_t
 #import "metal.h"
 #import <Metal/Metal.h>

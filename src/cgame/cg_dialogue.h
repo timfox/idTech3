@@ -1,7 +1,7 @@
 #ifndef __CG_DIALOGUE_H__
 #define __CG_DIALOGUE_H__
 
-#include "../qcommon/q_shared.h"
+#include "../common/q_shared.h"
 
 #define MAX_DIALOGUE_DISPLAY		8
 #define DIALOGUE_TEXT_WIDTH		600

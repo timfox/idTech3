@@ -1,6 +1,6 @@
-#include "../qcommon/q_shared.h"
-#include "../qcommon/qcommon.h"
-#include "../qcommon/i18n.h"
+#include "../common/q_shared.h"
+#include "../common/qcommon.h"
+#include "../common/i18n.h"
 
 // Game-side i18n is handled by the common i18n system
 // This file exists for potential game-specific extensions
