@@ -10,7 +10,7 @@ extern void vk_wait_idle(void);
 // va is defined in q_shared.h
 extern refimport_t ri;
 
-void vk_allocate_image_chunk(void) {
+qboolean vk_allocate_image_chunk(void) {
 	if (vk_world.num_image_chunks == 0) {
 		VkMemoryAllocateInfo alloc_info = {
 			.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
@@ -20,18 +20,25 @@ void vk_allocate_image_chunk(void) {
 		};
 
 		VkDeviceMemory memory;
-		VK_CHECK(qvkAllocateMemory(vk.device, &alloc_info, NULL, &memory));
+		VkResult result = qvkAllocateMemory(vk.device, &alloc_info, NULL, &memory);
+
+		if (result != VK_SUCCESS) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Failed to allocate image memory chunk (%u MB): %s\n",
+				(uint32_t)(vk.image_chunk_size / (1024 * 1024)), vk_result_string(result));
+			return qfalse;
+		}
 
 		ImageChunk *chunk = &vk_world.image_chunks[0];
 		chunk->memory = memory;
 		chunk->used = 0; // Start with no used space
 
-		SET_OBJECT_NAME(memory, "preallocated image memory chunk 0", VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT);
+		// SET_OBJECT_NAME(memory, "preallocated image memory chunk 0", VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT);
 
 		vk_world.num_image_chunks = 1;
 		ri.Printf(PRINT_ALL, "...preallocated first image memory chunk (%u MB)\n",
 			(uint32_t)(vk.image_chunk_size / (1024 * 1024)));
 	}
+	return qtrue;
 }
 
 void vk_calculate_fragmentation_metrics(void) {

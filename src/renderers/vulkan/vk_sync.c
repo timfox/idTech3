@@ -117,8 +117,10 @@ __attribute__((unused)) void vk_timeline_signal(uint64_t value) {
 }
 
 // Synchronization2 operations (VK_KHR_synchronization2) - framework
-__attribute__((unused)) void vk_sync2_pipeline_barrier(const VkDependencyInfo *dependency_info) {
+void vk_sync2_pipeline_barrier(const VkDependencyInfo *dependency_info) {
     // TODO: Implement Synchronization2 pipeline barrier
+    // Suppress unused parameter warning for framework function
+    (void)dependency_info;
     ri.Printf(PRINT_DEVELOPER, "Vulkan: Synchronization2 pipeline barrier requested\n");
 }
 
@@ -126,12 +128,12 @@ __attribute__((unused)) void vk_sync2_pipeline_barrier(const VkDependencyInfo *d
 void vk_update_frame_timing(void) {
     // Basic frame timing update
     static uint32_t frame_count = 0;
-    static double last_time = 0.0;
 
     frame_count++;
 
     // TODO: Implement proper frame timing with high-precision timers
     // For now, this is a framework that can be extended
+    // Note: last_time variable removed until proper timing implementation
 }
 
 float vk_get_frame_time(void) {

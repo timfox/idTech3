@@ -3492,7 +3492,7 @@ static void vk_create_special_pipelines( void )
 
 void vk_create_pipelines( void )
 {
-	// Create Vulkan attachments if FBO is active
+	// Create Vulkan attachments with improved error handling
 	vk_create_attachments();
 	vk_create_special_pipelines();
 }
@@ -3688,25 +3688,30 @@ static void vk_alloc_attachments( void )
 }
 
 
-static void vk_add_attachment_desc( VkImage desc, VkImageView *image_view, VkImageUsageFlags usage, VkMemoryRequirements *reqs, VkFormat image_format, VkImageAspectFlags aspect_flags, VkImageLayout image_layout
+static qboolean vk_add_attachment_desc( VkImage desc, VkImageView *image_view, VkImageUsageFlags usage, VkMemoryRequirements *reqs, VkFormat image_format, VkImageAspectFlags aspect_flags, VkImageLayout image_layout
 #ifdef USE_VK_PBR
 	, VkImageViewType view_type )
 #endif
 {
 	if ( num_attachments >= ARRAY_LEN( attachments ) ) {
-		ri.Error( ERR_FATAL, "Attachments array overflow" );
-	} else {
-		attachments[ num_attachments ].descriptor = desc;
-		attachments[ num_attachments ].image_view = image_view;
-		attachments[ num_attachments ].viewType = view_type;
-		attachments[ num_attachments ].usage = usage;
-		attachments[ num_attachments ].reqs = *reqs;
-		attachments[ num_attachments ].aspect_flags = aspect_flags;
-		attachments[ num_attachments ].image_layout = image_layout;
-		attachments[ num_attachments ].image_format = image_format;
-		attachments[ num_attachments ].memory_offset = 0;
-		num_attachments++;
+		ri.Printf(PRINT_WARNING, "Vulkan: Attachments array overflow (%d >= %ld)\n", num_attachments, ARRAY_LEN(attachments));
+		return qfalse;
 	}
+
+	attachments[ num_attachments ].descriptor = desc;
+	attachments[ num_attachments ].image_view = image_view;
+#ifdef USE_VK_PBR
+	attachments[ num_attachments ].viewType = view_type;
+#endif
+	attachments[ num_attachments ].usage = usage;
+	attachments[ num_attachments ].reqs = *reqs;
+	attachments[ num_attachments ].aspect_flags = aspect_flags;
+	attachments[ num_attachments ].image_layout = image_layout;
+	attachments[ num_attachments ].image_format = image_format;
+	attachments[ num_attachments ].memory_offset = 0;
+	num_attachments++;
+
+	return qtrue;
 }
 
 
@@ -3737,18 +3742,26 @@ static void vk_get_image_memory_erquirements( VkImage image, VkMemoryRequirement
 }
 
 
-static void create_color_attachment( 
-	uint32_t width, uint32_t height, 
+static qboolean create_color_attachment(
+	uint32_t width, uint32_t height,
 	VkSampleCountFlagBits samples, VkFormat format,
-	VkImageUsageFlags usage, VkImage *image, 
-	VkImageView *image_view, VkImageLayout image_layout, 
+	VkImageUsageFlags usage, VkImage *image,
+	VkImageView *image_view, VkImageLayout image_layout,
 	qboolean multisample, VkImageCreateFlags flags )
 {
 	VkImageCreateInfo create_desc;
 	VkMemoryRequirements memory_requirements;
+	VkResult result;
 
 	if ( multisample && !( usage & VK_IMAGE_USAGE_SAMPLED_BIT ) )
 		usage |= VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT;
+
+	// Validate parameters
+	if (width == 0 || height == 0 || format == VK_FORMAT_UNDEFINED) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Invalid parameters for color attachment (%dx%d, format=%d)\n",
+			width, height, format);
+		return qfalse;
+	}
 
 	// create color image
 	create_desc.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -3768,7 +3781,13 @@ static void create_color_attachment(
 	create_desc.queueFamilyIndexCount = 0;
 	create_desc.pQueueFamilyIndices = NULL;
 	create_desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	VK_CHECK( qvkCreateImage( vk.device, &create_desc, NULL, image ) );
+
+	result = qvkCreateImage( vk.device, &create_desc, NULL, image );
+	if (result != VK_SUCCESS) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to create color image (%dx%d): %s\n",
+			width, height, vk_result_string(result));
+		return qfalse;
+	}
 
 	vk_get_image_memory_erquirements( *image, &memory_requirements );
 
@@ -3777,18 +3796,38 @@ static void create_color_attachment(
 
 	if ( flags & VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT )
 		view_type = VK_IMAGE_VIEW_TYPE_CUBE;
-	vk_add_attachment_desc( *image, image_view, usage, &memory_requirements, format, VK_IMAGE_ASPECT_COLOR_BIT, image_layout, view_type );
+
+	if (!vk_add_attachment_desc( *image, image_view, usage, &memory_requirements, format, VK_IMAGE_ASPECT_COLOR_BIT, image_layout, view_type )) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to add color attachment descriptor\n");
+		qvkDestroyImage(vk.device, *image, NULL);
+		*image = VK_NULL_HANDLE;
+		return qfalse;
+	}
 #else
-	vk_add_attachment_desc( *image, image_view, usage, &memory_requirements, format, VK_IMAGE_ASPECT_COLOR_BIT, image_layout );
+	if (!vk_add_attachment_desc( *image, image_view, usage, &memory_requirements, format, VK_IMAGE_ASPECT_COLOR_BIT, image_layout )) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to add color attachment descriptor\n");
+		qvkDestroyImage(vk.device, *image, NULL);
+		*image = VK_NULL_HANDLE;
+		return qfalse;
+	}
 #endif
+
+	return qtrue;
 }
 
 
-static void create_depth_attachment( uint32_t width, uint32_t height, VkSampleCountFlagBits samples, VkImage *image, VkImageView *image_view, qboolean allowTransient )
+static qboolean create_depth_attachment( uint32_t width, uint32_t height, VkSampleCountFlagBits samples, VkImage *image, VkImageView *image_view, qboolean allowTransient )
 {
 	VkImageCreateInfo create_desc;
 	VkMemoryRequirements memory_requirements;
 	VkImageAspectFlags image_aspect_flags;
+	VkResult result;
+
+	// Validate parameters
+	if (width == 0 || height == 0) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Invalid parameters for depth attachment (%dx%d)\n", width, height);
+		return qfalse;
+	}
 
 	// create depth image
 	create_desc.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -3816,50 +3855,151 @@ static void create_depth_attachment( uint32_t width, uint32_t height, VkSampleCo
 	if ( glConfig.stencilBits > 0 )
 		image_aspect_flags |= VK_IMAGE_ASPECT_STENCIL_BIT;
 
-	VK_CHECK( qvkCreateImage( vk.device, &create_desc, NULL, image ) );
+	result = qvkCreateImage( vk.device, &create_desc, NULL, image );
+	if (result != VK_SUCCESS) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to create depth image (%dx%d): %s\n",
+			width, height, vk_result_string(result));
+		return qfalse;
+	}
 
 	vk_get_image_memory_erquirements( *image, &memory_requirements );
 
 #ifdef USE_VK_PBR
-	vk_add_attachment_desc( *image, image_view, create_desc.usage, &memory_requirements, vk.depth_format, image_aspect_flags, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_VIEW_TYPE_2D );
+	if (!vk_add_attachment_desc( *image, image_view, create_desc.usage, &memory_requirements, vk.depth_format, image_aspect_flags, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, VK_IMAGE_VIEW_TYPE_2D )) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to add depth attachment descriptor\n");
+		qvkDestroyImage(vk.device, *image, NULL);
+		*image = VK_NULL_HANDLE;
+		return qfalse;
+	}
 #else
-	vk_add_attachment_desc( *image, image_view, create_desc.usage, &memory_requirements, vk.depth_format, image_aspect_flags, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL );
+	if (!vk_add_attachment_desc( *image, image_view, create_desc.usage, &memory_requirements, vk.depth_format, image_aspect_flags, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL )) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to add depth attachment descriptor\n");
+		qvkDestroyImage(vk.device, *image, NULL);
+		*image = VK_NULL_HANDLE;
+		return qfalse;
+	}
 #endif
+
+	return qtrue;
 }
 
 
 static void vk_create_attachments( void )
 {
-	// Basic safety checks
-	if (vk.device == VK_NULL_HANDLE || !vk.active) {
+
+	// Comprehensive safety checks
+	if (vk.device == VK_NULL_HANDLE) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Cannot create attachments - device not initialized\n");
 		return;
 	}
 
-	// Only create basic attachments to avoid complex initialization issues
+	if (!vk.active) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Cannot create attachments - Vulkan not active\n");
+		return;
+	}
+
+	if (vk.color_format == VK_FORMAT_UNDEFINED || vk.depth_format == VK_FORMAT_UNDEFINED) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Cannot create attachments - formats not initialized\n");
+		return;
+	}
+
+	if (vk.physical_device == VK_NULL_HANDLE) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Cannot create attachments - physical device not available\n");
+		return;
+	}
+
+	// Check that global config is initialized
+	if (glConfig.vidWidth == 0 || glConfig.vidHeight == 0) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Cannot create attachments - display not initialized\n");
+		return;
+	}
+
+	// Validate attachment sizes
+	if (glConfig.vidWidth > 16384 || glConfig.vidHeight > 16384) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Attachment size too large (%dx%d), clamping to 16384x16384\n",
+			glConfig.vidWidth, glConfig.vidHeight);
+		glConfig.vidWidth = glConfig.vidWidth > 16384 ? 16384 : glConfig.vidWidth;
+		glConfig.vidHeight = glConfig.vidHeight > 16384 ? 16384 : glConfig.vidHeight;
+	}
+
+	ri.Printf(PRINT_ALL, "Vulkan: Creating attachments (%dx%d)\n", glConfig.vidWidth, glConfig.vidHeight);
+
+	// Clear and prepare attachment pool
 	vk_clear_attachment_pool();
 
-	// Preallocate memory chunk
+	// Initialize image chunk size if needed
 	if (vk.image_chunk_size == 0) {
 		vk.image_chunk_size = IMAGE_CHUNK_SIZE;
 	}
+
+	// Pre-allocate memory chunk with error handling
 	vk_allocate_image_chunk();
 
-	// Create basic color and depth attachments
+	// Create color attachment
 	create_color_attachment(glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
-		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
 		&vk.color_image, &vk.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0);
 
+	// Create depth attachment
 	create_depth_attachment(glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT,
 		&vk.depth_image, &vk.depth_image_view, qfalse);
 
-	// Set up basic attachment descriptors
+	// Create additional attachments if FBO is active
+	if (vk.fboActive) {
+		// Screen space effects buffer
+		if (vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT) {
+			create_color_attachment(vk.screenMapWidth, vk.screenMapHeight, vk.screenMapSamples, vk.color_format,
+				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+				&vk.screenMap.color_image_msaa, &vk.screenMap.color_image_view_msaa, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0);
+		}
+
+		// Screen space resolve buffer
+		create_color_attachment(vk.screenMapWidth, vk.screenMapHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
+			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+			&vk.screenMap.color_image, &vk.screenMap.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0);
+
+		// Screen space depth buffer
+		create_depth_attachment(vk.screenMapWidth, vk.screenMapHeight, vk.screenMapSamples,
+			&vk.screenMap.depth_image, &vk.screenMap.depth_image_view, qtrue);
+
+		// MSAA color buffer if needed
+		if (vk.msaaActive) {
+			create_color_attachment(glConfig.vidWidth, glConfig.vidHeight, vkSamples, vk.color_format,
+				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &vk.msaa_image, &vk.msaa_image_view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0);
+		}
+	}
+
+	// Allocate attachment descriptors
 	vk_alloc_attachments();
 
-	// Basic naming for debugging
-	SET_OBJECT_NAME(vk.color_image, "color attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
-	SET_OBJECT_NAME(vk.color_image_view, "color attachment view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT);
-	SET_OBJECT_NAME(vk.depth_image, "depth attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
-	SET_OBJECT_NAME(vk.depth_image_view, "depth attachment view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT);
+	// Set up debugging names for all successfully created resources
+	if (vk.color_image != VK_NULL_HANDLE) {
+		SET_OBJECT_NAME(vk.color_image, "color attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
+	}
+	if (vk.color_image_view != VK_NULL_HANDLE) {
+		SET_OBJECT_NAME(vk.color_image_view, "color attachment view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT);
+	}
+	if (vk.depth_image != VK_NULL_HANDLE) {
+		SET_OBJECT_NAME(vk.depth_image, "depth attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
+	}
+	if (vk.depth_image_view != VK_NULL_HANDLE) {
+		SET_OBJECT_NAME(vk.depth_image_view, "depth attachment view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT);
+	}
+
+	// Additional debugging names for advanced features
+	if (vk.fboActive) {
+		if (vk.screenMap.color_image != VK_NULL_HANDLE) {
+			SET_OBJECT_NAME(vk.screenMap.color_image, "screenmap color", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
+		}
+		if (vk.screenMap.depth_image != VK_NULL_HANDLE) {
+			SET_OBJECT_NAME(vk.screenMap.depth_image, "screenmap depth", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
+		}
+		if (vk.msaaActive && vk.msaa_image != VK_NULL_HANDLE) {
+			SET_OBJECT_NAME(vk.msaa_image, "msaa color", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
+		}
+	}
+
+	ri.Printf(PRINT_ALL, "Vulkan: Attachments created successfully\n");
 }
 
 

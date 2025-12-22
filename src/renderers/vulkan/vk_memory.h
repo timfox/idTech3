@@ -67,7 +67,7 @@ typedef struct {
 // ImageChunk is now defined in vk.h
 
 // Memory management function declarations
-void vk_allocate_image_chunk(void);
+qboolean vk_allocate_image_chunk(void);
 void vk_calculate_fragmentation_metrics(void);
 void vk_check_defragmentation(void);
 void vk_init_resource_pool(void);

@@ -81,8 +81,15 @@ void vk_pipeline_cache_load(void **data_out, size_t *size_out) {
     if (len > 0) {
         *data_out = Z_Malloc(len);
         if (*data_out) {
-            fread(*data_out, 1, len, f);
-            *size_out = len;
+            size_t bytes_read = fread(*data_out, 1, len, f);
+            if (bytes_read == (size_t)len) {
+                *size_out = len;
+            } else {
+                ri.Printf(PRINT_WARNING, "Vulkan: Failed to read %ld bytes from pipeline cache file (read %zu)\n", (long)len, bytes_read);
+                Z_Free(*data_out);
+                *data_out = NULL;
+                *size_out = 0;
+            }
         }
     }
 
@@ -301,28 +308,7 @@ __attribute__((unused)) qboolean vk_reload_shader(const char *shader_name) {
     return qtrue;
 }
 
-// SHADER_MODULE function for creating shader modules from SPIR-V data
-static VkShaderModule SHADER_MODULE_FUNC(const uint8_t *bytes, const int count) {
-    VkShaderModuleCreateInfo desc;
-    VkShaderModule module;
-
-    if (count % 4 != 0) {
-        ri.Error(ERR_FATAL, "Vulkan: SPIR-V binary buffer size is not a multiple of 4");
-    }
-
-    desc.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    desc.pNext = NULL;
-    desc.flags = 0;
-    desc.codeSize = count;
-    desc.pCode = (const uint32_t*)bytes;
-
-    VK_CHECK(qvkCreateShaderModule(vk.device, &desc, NULL, &module));
-
-    return module;
-}
-
-// SHADER_MODULE macro
-#define SHADER_MODULE(name) SHADER_MODULE_FUNC((const uint8_t*)name,sizeof(name))
+// SHADER_MODULE function moved to vk.c where it's actually used
 
 // Object naming macro
 #define SET_OBJECT_NAME(obj,objName,objType) vk_set_object_name( (uint64_t)(obj), (objName), (objType) )
