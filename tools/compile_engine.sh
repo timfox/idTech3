@@ -83,7 +83,7 @@ fi
 
 echo "Building with ${CORES} parallel jobs..."
 if [ $QUIET -eq 1 ]; then
-    VERBOSE=0 cmake --build . -- -j${CORES} -s
+    cmake --build . -- -j${CORES} -s
 else
     cmake --build . -- -j${CORES}
 fi
