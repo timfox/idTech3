@@ -48,7 +48,7 @@ void vk_destroy_framebuffers(void) {
 }
 
 // Prefilter framebuffer creation - placeholder for now
-void vk_create_prefilter_framebuffer(filterDef *def) {
+void vk_create_prefilter_framebuffer(__attribute__((unused)) filterDef *def) {
     // TODO: Implement prefilter framebuffer creation for PBR
     ri.Printf(PRINT_ALL, "Vulkan: Prefilter framebuffer creation - placeholder\n");
 }

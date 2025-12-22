@@ -1089,6 +1089,11 @@ IF(USE_CIMGUI)
 		target_compile_definitions(imgui_shared PUBLIC IMGUI_USER_CONFIG="cimconfig.h")
 		target_compile_features(imgui_shared PUBLIC cxx_std_17)
 		set_target_properties(imgui_shared PROPERTIES OUTPUT_NAME "imgui_shared")
+		# Suppress clang pragma warnings for cimgui (GCC doesn't recognize clang pragmas)
+		target_compile_options(imgui_shared PRIVATE
+			$<$<C_COMPILER_ID:GNU>:-Wno-unknown-pragmas>
+			$<$<CXX_COMPILER_ID:GNU>:-Wno-unknown-pragmas>
+		)
 		list(APPEND CLIENT_SRCS ${CIMGUI_DIR}/cimgui_impl.cpp)
 		# Only include SDL backend when SDL is enabled (CI may build with USE_SDL=0).
 		if(USE_SDL)
