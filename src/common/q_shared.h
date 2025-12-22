@@ -828,10 +828,7 @@ float Q_atof( const char *str );
 extern "C" {
 #endif
 // Modern clamp function with better implementation
-static inline float Com_Clamp(float min, float max, float value) {
-    // Use modern conditional expression with better readability
-    return (value < min) ? min : ((value > max) ? max : value);
-}
+float Com_Clamp(float min, float max, float value);
 
 // Legacy function for backward compatibility (deprecated)
 float Com_ClampLegacy(float min, float max, float value);

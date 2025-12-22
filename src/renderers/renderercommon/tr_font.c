@@ -933,6 +933,7 @@ Synchronous font registration (original implementation)
 */
 #ifdef BUILD_FREETYPE
 static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontInfo_t *font, qboolean wantSDF) {
+
 	// Prevent infinite recursion when called from R_FontFallbackChain
 	static qboolean inFallbackChain = qfalse;
 	if (inFallbackChain) {

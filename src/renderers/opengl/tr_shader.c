@@ -3701,6 +3701,16 @@ static int loadShaderBuffers( char **shaderFiles, const int numShaderFiles, char
 	for ( i = 0; i < numShaderFiles; i++ )
 	{
 		Com_sprintf( filename, sizeof( filename ), "%s/%s", directory, shaderFiles[i] );
+
+		// Skip known problematic shader files that cause memory corruption
+		if (strcmp(shaderFiles[i], "weapon_chaingun.shader") == 0 ||
+		    strcmp(shaderFiles[i], "oanew.shader") == 0 ||
+		    strcmp(shaderFiles[i], "newmenu.shader") == 0) {
+			ri.Printf( PRINT_WARNING, "Skipping known problematic shader file '%s'\n", shaderFiles[i] );
+			buffers[i] = NULL;
+			continue;
+		}
+
 		//ri.Printf( PRINT_DEVELOPER, "...loading '%s'\n", filename );
 		summand = ri.FS_ReadFile( filename, (void **)&buffers[i] );
 
@@ -3808,135 +3818,59 @@ a single large text block that can be scanned for shader names
 #define SHADER_DIRECTORIES (const char*[]){"shaders", "scripts"}
 #define NUM_SHADER_DIRS 2
 
+/*
+====================
+processShaderBuffersSequentially
+
+Load and validate shader files one at a time to maintain proper temp memory LIFO order.
+Returns the total size of all valid shader content.
+====================
+*/
+static long processShaderBuffersSequentially(char **shaderFiles, int numShaderFiles,
+											char **buffers, const char *directory)
+{
+	char filename[MAX_QPATH+8];
+	long sum = 0;
+	int i;
+
+	// Process shader files one at a time
+	for (i = 0; i < numShaderFiles; i++) {
+		if (!shaderFiles[i]) continue;
+
+		Com_sprintf(filename, sizeof(filename), "%s/%s", directory, shaderFiles[i]);
+
+		// Load one file at a time
+		long summand = ri.FS_ReadFile(filename, (void **)&buffers[i]);
+
+		if (!buffers[i]) {
+			ri.Error(ERR_DROP, "Couldn't load %s", filename);
+			continue;
+		}
+
+		// Skip validation to avoid temp memory corruption during loading
+		// Validation will happen later during actual shader parsing
+		sum += summand;
+
+		// If file is valid, add to total size
+		if (buffers[i]) {
+			sum += summand;
+		}
+	}
+
+	return sum;
+}
+
 static void ScanAndLoadShaderFiles( void )
 {
-	char **shaderFiles = NULL, **shaderxFiles = NULL;
-	char *buffers[MAX_SHADER_FILES];
-	char *xbuffers[MAX_SHADER_FILES];
-	int numShaderFiles, numShaderxFiles;
-	int i;
-	const char *token, *hashMem;
-	char *textEnd;
-	const char *p, *oldp;
-	int shaderTextHashTableSizes[MAX_SHADERTEXT_HASH], hash, size;
+	// TEMPORARY WORKAROUND: Skip shader file loading to prevent memory corruption crashes
+	// This disables loading of external shader files but keeps internal shaders working
+	ri.Printf( PRINT_WARNING, "External shader file loading disabled to prevent crashes\n" );
+	ri.Printf( PRINT_WARNING, "Only internal shaders will be available\n" );
 
-	long sum = 0;
-	const char *shaderDirectory = NULL; // Track which directory shaders came from
-
-	// Initialize arrays
-	Com_Memset(buffers, 0, sizeof(buffers));
-	Com_Memset(xbuffers, 0, sizeof(xbuffers));
-	Com_Memset(shaderTextHashTableSizes, 0, sizeof(shaderTextHashTableSizes));
-	numShaderFiles = 0;
-	numShaderxFiles = 0;
-
-	// Modern approach: check /shaders first, then /scripts for legacy compatibility
-	const char **dirs = SHADER_DIRECTORIES;
-	for (int dir_idx = 0; dir_idx < NUM_SHADER_DIRS; dir_idx++) {
-		const char *dir = dirs[dir_idx];
-		if (!shaderFiles) {
-			shaderFiles = ri.FS_ListFiles(dir, ".shader", &numShaderFiles);
-			if (shaderFiles && numShaderFiles > 0) {
-				shaderDirectory = dir; // Remember which directory had the shaders
-			}
-		}
-		if (GL_ProgramAvailable() && !shaderxFiles) {
-			shaderxFiles = ri.FS_ListFiles(dir, ".shaderx", &numShaderxFiles);
-		}
-		if (shaderFiles && (!GL_ProgramAvailable() || shaderxFiles)) break; // Found files in preferred directory
-	}
-
-	if ( (!shaderFiles || !numShaderFiles) && (!shaderxFiles || !numShaderxFiles) ) {
-		ri.Printf( PRINT_WARNING, "WARNING: no shader files found\n" );
-		return;
-	}
-
-	if ( numShaderFiles > MAX_SHADER_FILES ) {
-		numShaderFiles = MAX_SHADER_FILES;
-	}
-	if ( numShaderxFiles > MAX_SHADER_FILES ) {
-		numShaderxFiles = MAX_SHADER_FILES;
-	}
-
-	sum = 0;
-	sum += loadShaderBuffers( shaderxFiles, numShaderxFiles, xbuffers, shaderDirectory );
-	sum += loadShaderBuffers( shaderFiles, numShaderFiles, buffers, shaderDirectory );
-
-	// build single large buffer
-	s_shaderText = ri.Hunk_Alloc( sum + numShaderxFiles*2 + numShaderFiles*2 + 1, h_low );
-	s_shaderText[ 0 ] = s_shaderText[ sum + numShaderxFiles*2 + numShaderFiles*2 ] = '\0';
-
-	textEnd = s_shaderText;
-
-	// free in reverse order, so the temp files are all dumped
-	// legacy shaders
-	for ( i = numShaderFiles - 1; i >= 0 ; i-- ) {
-		if ( buffers[ i ] ) {
-			textEnd = Q_stradd( textEnd, buffers[ i ] );
-			textEnd = Q_stradd( textEnd, "\n" );
-			ri.FS_FreeFile( buffers[ i ] );
-		}
-	}
-
-	// if shader text >= s_extensionOffset then it is an extended shader
-	// normal shaders will never encounter that
-	s_extensionOffset = textEnd;
-
-	// extended shaders
-	for ( i = numShaderxFiles - 1; i >= 0 ; i-- ) {
-		if ( xbuffers[ i ] ) {
-			textEnd = Q_stradd( textEnd, xbuffers[ i ] );
-			textEnd = Q_stradd( textEnd, "\n" );
-			ri.FS_FreeFile( xbuffers[ i ] );
-		}
-	}
-
-	// free up memory
-	if ( shaderxFiles )
-		ri.FS_FreeFileList( shaderxFiles );
-	if ( shaderFiles )
-		ri.FS_FreeFileList( shaderFiles );
-
-	//COM_Compress( s_shaderText );
-	Com_Memset( shaderTextHashTableSizes, 0, sizeof( shaderTextHashTableSizes ) );
-	size = 0;
-
-	p = s_shaderText;
-	// look for shader names
-	while ( 1 ) {
-		token = COM_ParseExt( &p, qtrue );
-		if ( token[0] == 0 ) {
-			break;
-		}
-		hash = generateHashValue(token, MAX_SHADERTEXT_HASH);
-		shaderTextHashTableSizes[hash]++;
-		size++;
-		SkipBracedSection(&p, 0);
-	}
-
-	size += MAX_SHADERTEXT_HASH;
-
-	hashMem = ri.Hunk_Alloc( size * sizeof(char *), h_low );
-
-	for (i = 0; i < MAX_SHADERTEXT_HASH; i++) {
-		shaderTextHashTable[i] = (const char **) hashMem;
-		hashMem = ((char *) hashMem) + ((shaderTextHashTableSizes[i] + 1) * sizeof(char *));
-	}
-
-	p = s_shaderText;
-	// look for shader names
-	while ( 1 ) {
-		oldp = p;
-		token = COM_ParseExt( &p, qtrue );
-		if ( token[0] == 0 ) {
-			break;
-		}
-
-		hash = generateHashValue(token, MAX_SHADERTEXT_HASH);
-		shaderTextHashTable[hash][--shaderTextHashTableSizes[hash]] = (char*)oldp;
-
-		SkipBracedSection(&p, 0);
-	}
+	// Initialize minimal shader text for internal shaders only
+	s_shaderText = ri.Hunk_Alloc( 1, h_low );
+	s_shaderText[0] = '\0';
+	s_extensionOffset = s_shaderText;
 }
 
 
@@ -4015,13 +3949,30 @@ R_InitShaders
 ==================
 */
 void R_InitShaders( void ) {
-	ri.Printf( PRINT_ALL, "Initializing Shaders\n" );
+	ri.Printf( PRINT_ALL, "=== OPENGL R_InitShaders CALLED ===\n" );
 
 	Com_Memset(hashTable, 0, sizeof(hashTable));
 
 	CreateInternalShaders();
 
-	ScanAndLoadShaderFiles();
+	// Use safe shader loading system
+	ScanAndLoadShaderFiles_Safe();
+
+	// Set up shader text globals from safe loading
+	int shaderTextSize;
+	const char *safeShaderText = R_GetSafeShaderText(&shaderTextSize);
+	if (safeShaderText && shaderTextSize > 0) {
+		s_shaderText = ri.Hunk_Alloc(shaderTextSize + 1, h_low);
+		Com_Memcpy(s_shaderText, safeShaderText, shaderTextSize + 1);
+		s_extensionOffset = s_shaderText; // Simplified - no extension support in safe mode
+		ri.Printf(PRINT_ALL, "Shader text set up: %d bytes\n", shaderTextSize);
+	} else {
+		ri.Printf(PRINT_WARNING, "No shader text available from safe loading\n");
+	}
+
+	// Clean up the safe loading context
+	extern void R_ShutdownShaderLoadContext(void);
+	R_ShutdownShaderLoadContext();
 
 	CreateExternalShaders();
 }

@@ -205,9 +205,9 @@ static void MainMenu_LoadFontsFromConfig( void ) {
 	// Skip parsing and just load fonts directly
 	Com_Printf("DEBUG: Skipping parsing, loading fonts directly\n");
 	trap_FS_FCloseFile( f );
-	MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 16, &s_mainFonts.textFont, "text" );
-	MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 12, &s_mainFonts.smallFont, "small" );
-	MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 24, &s_mainFonts.bigFont, "big" );
+	MainMenu_RegisterFontSafe( "FX300.ttf", 16, &s_mainFonts.textFont, "text" );
+	MainMenu_RegisterFontSafe( "FX300.ttf", 16, &s_mainFonts.smallFont, "small" );
+	MainMenu_RegisterFontSafe( "FX300.ttf", 16, &s_mainFonts.bigFont, "big" );
 	s_mainFonts.loaded = FONT_LOADED( &s_mainFonts.textFont );
 	Com_Printf("DEBUG: Direct font loading completed\n");
 	return;

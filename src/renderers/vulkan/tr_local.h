@@ -1785,6 +1785,10 @@ void		R_InitShaders( void );
 void		R_ShaderList_f( void );
 void		RE_RemapShader(const char *oldShader, const char *newShader, const char *timeOffset);
 
+// Safe shader loading system
+void		ScanAndLoadShaderFiles_Safe( void );
+const char *R_GetSafeShaderText(int *size);
+
 #ifdef USE_VK_PBR
 qboolean vk_create_phyisical_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );
 qboolean vk_create_normal_texture( shaderStage_t *stage, const char *albedoMapName, imgFlags_t flags );

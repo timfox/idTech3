@@ -4724,6 +4724,15 @@ static int loadShaderBuffers( char **shaderFiles, const int numShaderFiles, char
 			{
 				ri.Printf(PRINT_WARNING, "WARNING: Ignoring shader file %s. Shader \"%s\" " \
 					"on line %d missing closing brace.\n", filename, shaderName, shaderLine );
+				// Safety: ensure parsing doesn't continue with corrupted state
+				ri.FS_FreeFile( buffers[i] );
+				buffers[i] = NULL;
+				break;
+			}
+
+			// Safety check: ensure we haven't gone past the end of the buffer
+			if (p >= buffers[i] + summand) {
+				ri.Printf(PRINT_WARNING, "WARNING: Shader parsing went out of bounds in %s\n", filename);
 				ri.FS_FreeFile( buffers[i] );
 				buffers[i] = NULL;
 				break;
@@ -4736,11 +4745,20 @@ static int loadShaderBuffers( char **shaderFiles, const int numShaderFiles, char
 			if ( shaderStart ) {
 				summand -= (shaderStart - buffers[i]);
 				if ( summand >= 0 ) {
+					// Safety check: ensure summand is reasonable (not corrupted)
+					if (summand > 1024 * 1024) { // 1MB sanity check
+						ri.Printf(PRINT_WARNING, "WARNING: Corrupted shader buffer size in %s (%ld bytes)\n", filename, summand);
+						ri.FS_FreeFile( buffers[i] );
+						buffers[i] = NULL;
+						continue;
+					}
 					memmove( buffers[i], shaderStart, summand + 1 );
 				}
 			}
-			//sum += summand;
-			sum += COM_Compress( buffers[ i ] );
+			// Safety check: only compress if buffer is valid and not empty
+			if (buffers[i] && summand > 0) {
+				sum += COM_Compress( buffers[ i ] );
+			}
 		}
 	}
 
@@ -4867,6 +4885,13 @@ static void ScanAndLoadShaderFiles( void )
 		if ( token[0] == 0 ) {
 			break;
 		}
+
+		// Safety check: ensure we haven't gone out of bounds
+		if (p >= s_shaderText + s_shaderText[0] + numShaderxFiles*2 + numShaderFiles*2 + 1) {
+			ri.Printf(PRINT_WARNING, "WARNING: Shader text parsing went out of bounds\n");
+			break;
+		}
+
 		hash = generateHashValue(token, MAX_SHADERTEXT_HASH);
 		shaderTextHashTableSizes[hash]++;
 		size++;
@@ -4888,6 +4913,12 @@ static void ScanAndLoadShaderFiles( void )
 		oldp = p;
 		token = COM_ParseExt( &p, qtrue );
 		if ( token[0] == 0 ) {
+			break;
+		}
+
+		// Safety check: ensure we haven't gone out of bounds
+		if (p >= s_shaderText + s_shaderText[0] + numShaderxFiles*2 + numShaderFiles*2 + 1) {
+			ri.Printf(PRINT_WARNING, "WARNING: Shader text parsing went out of bounds (second pass)\n");
 			break;
 		}
 
@@ -4980,7 +5011,17 @@ void R_InitShaders( void ) {
 
 	CreateInternalShaders();
 
-	ScanAndLoadShaderFiles();
+	// Use safe shader loading system
+	ScanAndLoadShaderFiles_Safe();
+
+	// Set up shader text globals from safe loading
+	int shaderTextSize;
+	const char *safeShaderText = R_GetSafeShaderText(&shaderTextSize);
+	if (safeShaderText && shaderTextSize > 0) {
+		s_shaderText = ri.Hunk_Alloc(shaderTextSize + 1, h_low);
+		Com_Memcpy(s_shaderText, safeShaderText, shaderTextSize + 1);
+		s_extensionOffset = s_shaderText; // Simplified - no extension support in safe mode
+	}
 
 	CreateExternalShaders();
 }

@@ -1585,6 +1585,11 @@ void		R_InitShaders( void );
 void		R_ShaderList_f( void );
 void		RE_RemapShader(const char *oldShader, const char *newShader, const char *timeOffset);
 
+// Safe shader loading system
+void		ScanAndLoadShaderFiles_Safe( void );
+const char *R_GetSafeShaderText(int *size);
+void		R_ShutdownShaderLoadContext( void );
+
 
 //
 // tr_surface.c

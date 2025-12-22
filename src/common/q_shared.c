@@ -52,6 +52,11 @@ static inline qboolean Q_IsValidString(const char *str, size_t max_len) {
 }
 
 // Legacy function implementation for backward compatibility
+float Com_Clamp(float min, float max, float value) {
+    // Use modern conditional expression with better readability
+    return (value < min) ? min : ((value > max) ? max : value);
+}
+
 float Com_ClampLegacy(float min, float max, float value) {
     return Com_Clamp(min, max, value);
 }

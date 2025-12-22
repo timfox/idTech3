@@ -40,6 +40,381 @@ static void R_Default_Hunk_FreeTempMemory(void *block) {
 	ri.Hunk_FreeTempMemory(block);
 }
 
+/*
+====================
+Shader Memory Management System
+
+A memory-safe shader loading system that avoids temp memory corruption.
+This system uses regular malloc/free instead of hunk temp memory during
+shader file loading and parsing to prevent LIFO violations.
+====================
+*/
+
+#define MAX_SHADER_FILES_SAFE 256  // Maximum shader files for safe loading
+
+typedef struct shaderLoadContext_s {
+	char **fileBuffers;      // Array of loaded file buffers
+	int *fileSizes;         // Array of file sizes
+	int numFiles;          // Number of loaded files
+	int maxFiles;          // Maximum capacity
+	char *combinedText;    // Final combined shader text
+	int combinedSize;      // Size of combined text
+	qboolean initialized;  // Whether context is initialized
+} shaderLoadContext_t;
+
+static shaderLoadContext_t shaderLoadCtx;
+
+// Forward declarations for renderer-specific functions
+void ScanAndLoadShaderFiles_Safe(void);
+
+/*
+====================
+R_InitShaderLoadContext
+
+Initialize the safe shader loading context
+====================
+*/
+static void R_InitShaderLoadContext(void) {
+	Com_Memset(&shaderLoadCtx, 0, sizeof(shaderLoadCtx));
+	shaderLoadCtx.maxFiles = MAX_SHADER_FILES_SAFE;
+	shaderLoadCtx.fileBuffers = (char **)ri.Malloc(sizeof(char *) * shaderLoadCtx.maxFiles);
+	shaderLoadCtx.fileSizes = (int *)ri.Malloc(sizeof(int) * shaderLoadCtx.maxFiles);
+	shaderLoadCtx.initialized = qtrue;
+}
+
+/*
+====================
+R_ShutdownShaderLoadContext
+
+Clean up the safe shader loading context
+====================
+*/
+static void R_ShutdownShaderLoadContext(void) {
+	if (!shaderLoadCtx.initialized) {
+		return;
+	}
+
+	// Free all loaded file buffers
+	for (int i = 0; i < shaderLoadCtx.numFiles; i++) {
+		if (shaderLoadCtx.fileBuffers[i]) {
+			ri.Free(shaderLoadCtx.fileBuffers[i]);
+			shaderLoadCtx.fileBuffers[i] = NULL;
+		}
+	}
+
+	if (shaderLoadCtx.combinedText) {
+		ri.Free(shaderLoadCtx.combinedText);
+		shaderLoadCtx.combinedText = NULL;
+	}
+
+	if (shaderLoadCtx.fileBuffers) {
+		ri.Free(shaderLoadCtx.fileBuffers);
+		shaderLoadCtx.fileBuffers = NULL;
+	}
+
+	if (shaderLoadCtx.fileSizes) {
+		ri.Free(shaderLoadCtx.fileSizes);
+		shaderLoadCtx.fileSizes = NULL;
+	}
+
+	shaderLoadCtx.initialized = qfalse;
+}
+
+/*
+====================
+R_LoadShaderFileSafe
+
+Load a single shader file using safe memory management
+====================
+*/
+static qboolean R_LoadShaderFileSafe(const char *filename, int *fileIndex) {
+	if (!shaderLoadCtx.initialized || shaderLoadCtx.numFiles >= shaderLoadCtx.maxFiles) {
+		return qfalse;
+	}
+
+	// Use FS_ReadFile with NULL buffer to get file size first
+	int fileSize = ri.FS_ReadFile(filename, NULL);
+	if (fileSize <= 0) {
+		return qfalse;
+	}
+
+	// Allocate buffer using regular malloc (not temp memory)
+	char *buffer = (char *)ri.Malloc(fileSize + 1);
+	if (!buffer) {
+		return qfalse;
+	}
+
+	// Load the actual file content
+	int actualSize = ri.FS_ReadFile(filename, (void **)&buffer);
+	if (actualSize != fileSize || actualSize <= 0) {
+		ri.Free(buffer);
+		return qfalse;
+	}
+
+	buffer[fileSize] = '\0'; // Null terminate
+
+	// Store in context
+	int index = shaderLoadCtx.numFiles++;
+	shaderLoadCtx.fileBuffers[index] = buffer;
+	shaderLoadCtx.fileSizes[index] = fileSize;
+
+	if (fileIndex) {
+		*fileIndex = index;
+	}
+
+	return qtrue;
+}
+
+/*
+====================
+R_CombineShaderFilesSafe
+
+Combine all loaded shader files into a single text block
+====================
+*/
+static qboolean R_CombineShaderFilesSafe(void) {
+	if (!shaderLoadCtx.initialized || shaderLoadCtx.numFiles == 0) {
+		return qfalse;
+	}
+
+	// Calculate total size needed
+	int totalSize = 0;
+	for (int i = 0; i < shaderLoadCtx.numFiles; i++) {
+		totalSize += shaderLoadCtx.fileSizes[i] + 2; // +2 for "\n" separator
+	}
+
+	// Allocate combined buffer
+	shaderLoadCtx.combinedText = (char *)ri.Malloc(totalSize + 1);
+	if (!shaderLoadCtx.combinedText) {
+		return qfalse;
+	}
+
+	// Combine all files
+	char *dest = shaderLoadCtx.combinedText;
+	for (int i = 0; i < shaderLoadCtx.numFiles; i++) {
+		Com_Memcpy(dest, shaderLoadCtx.fileBuffers[i], shaderLoadCtx.fileSizes[i]);
+		dest += shaderLoadCtx.fileSizes[i];
+		*dest++ = '\n';
+	}
+	*dest = '\0';
+
+	shaderLoadCtx.combinedSize = totalSize;
+
+	return qtrue;
+}
+
+/*
+====================
+R_ParseShaderTextSafe
+
+Parse shader text without using temp memory allocations
+====================
+*/
+static qboolean R_ParseShaderTextSafe(const char *text, const char *filename, int lineNum) {
+	if (!text || !*text) {
+		return qfalse;
+	}
+
+	// Use a local parse context to avoid temp memory allocations
+	const char *parseText = text;
+
+	// Skip whitespace and comments at the start
+	while (*parseText && (*parseText == ' ' || *parseText == '\t' || *parseText == '\n' || *parseText == '\r')) {
+		parseText++;
+	}
+
+	if (!*parseText || *parseText == '/' || *parseText != '{') {
+		// Not a valid shader start, skip
+		return qfalse;
+	}
+
+	// Find the matching closing brace
+	const char *braceEnd = parseText;
+	int braceCount = 1;
+	while (*braceEnd && braceCount > 0) {
+		braceEnd++;
+		if (*braceEnd == '{') braceCount++;
+		else if (*braceEnd == '}') braceCount--;
+	}
+
+	if (braceCount != 0) {
+		// Unmatched braces
+		return qfalse;
+	}
+
+	// At this point, we have valid shader text from parseText to braceEnd
+	// In a full implementation, we would create the actual shader object here
+	// For now, we just validate the syntax
+
+	return qtrue;
+}
+
+/*
+====================
+R_ProcessShaderFilesSafe
+
+Process all loaded shader files safely
+====================
+*/
+static void R_ProcessShaderFilesSafe(void) {
+	if (!shaderLoadCtx.initialized || !shaderLoadCtx.combinedText) {
+		return;
+	}
+
+	// Parse the combined shader text without temp memory allocations
+	const char *text = shaderLoadCtx.combinedText;
+	int lineNum = 1;
+
+	while (*text) {
+		// Skip whitespace and comments
+		while (*text && (*text == ' ' || *text == '\t' || *text == '\n' || *text == '\r')) {
+			if (*text == '\n') lineNum++;
+			text++;
+		}
+
+		if (!*text) break;
+
+		// Check for shader name
+		if (*text != '/' && *text != '{' && *text != '}') {
+			// Found potential shader name
+			const char *shaderStart = text;
+			int startLine = lineNum;
+
+			// Skip to end of line or opening brace
+			while (*text && *text != '\n' && *text != '{') {
+				text++;
+			}
+
+			if (*text == '{') {
+				// Found shader definition
+				if (!R_ParseShaderTextSafe(text, "combined_shaders", startLine)) {
+					ri.Printf(PRINT_WARNING, "Failed to parse shader at line %d\n", startLine);
+				}
+
+				// Skip the shader block
+				int braceCount = 1;
+				text++; // Skip opening brace
+				while (*text && braceCount > 0) {
+					if (*text == '{') braceCount++;
+					else if (*text == '}') braceCount--;
+					if (*text == '\n') lineNum++;
+					text++;
+				}
+			}
+		} else {
+			// Skip line
+			while (*text && *text != '\n') {
+				text++;
+			}
+			if (*text == '\n') {
+				text++;
+				lineNum++;
+			}
+		}
+	}
+}
+
+/*
+====================
+ScanAndLoadShaderFiles_Safe
+
+Safe implementation of shader file loading that avoids temp memory corruption.
+This replaces the renderer-specific implementations.
+====================
+*/
+/*
+====================
+R_GetSafeShaderText
+
+Returns the combined shader text from safe loading.
+Renderer should copy this to s_shaderText and set up s_extensionOffset.
+====================
+*/
+const char *R_GetSafeShaderText(int *size) {
+	if (!shaderLoadCtx.initialized || !shaderLoadCtx.combinedText) {
+		if (size) *size = 0;
+		return NULL;
+	}
+
+	if (size) *size = shaderLoadCtx.combinedSize;
+	return shaderLoadCtx.combinedText;
+}
+
+void ScanAndLoadShaderFiles_Safe(void) {
+	char **shaderFiles = NULL;
+	int numShaderFiles = 0;
+
+	ri.Printf(PRINT_ALL, "=== SAFE SHADER LOADING STARTED ===\n");
+
+	// Initialize safe loading context
+	R_InitShaderLoadContext();
+
+	// Find shader files
+	const char *shaderDirs[] = {"shaders", "scripts"};
+	const int numDirs = sizeof(shaderDirs) / sizeof(shaderDirs[0]);
+
+	for (int dirIdx = 0; dirIdx < numDirs; dirIdx++) {
+		const char *dir = shaderDirs[dirIdx];
+		char **dirFiles = ri.FS_ListFiles(dir, ".shader", &numShaderFiles);
+
+		if (dirFiles && numShaderFiles > 0) {
+			shaderFiles = dirFiles;
+			ri.Printf(PRINT_ALL, "Found %d shader files in %s/\n", numShaderFiles, dir);
+			break;
+		}
+	}
+
+	if (!shaderFiles || numShaderFiles == 0) {
+		ri.Printf(PRINT_WARNING, "No shader files found\n");
+		R_ShutdownShaderLoadContext();
+		return;
+	}
+
+	// Limit to safe maximum
+	if (numShaderFiles > MAX_SHADER_FILES_SAFE) {
+		numShaderFiles = MAX_SHADER_FILES_SAFE;
+		ri.Printf(PRINT_WARNING, "Limited to %d shader files for safe loading\n", MAX_SHADER_FILES_SAFE);
+	}
+
+	// Load all shader files safely
+	int loadedCount = 0;
+	for (int i = 0; i < numShaderFiles; i++) {
+		char filename[MAX_QPATH];
+		Com_sprintf(filename, sizeof(filename), "%s/%s", shaderFiles[i] ? "shaders" : "scripts", shaderFiles[i]);
+
+		if (R_LoadShaderFileSafe(filename, NULL)) {
+			loadedCount++;
+		} else {
+			ri.Printf(PRINT_DEVELOPER, "Failed to load shader file: %s\n", filename);
+		}
+	}
+
+	ri.Printf(PRINT_ALL, "Successfully loaded %d/%d shader files\n", loadedCount, numShaderFiles);
+
+	// Free the file list
+	ri.FS_FreeFileList(shaderFiles);
+
+	// Combine all loaded files
+	if (!R_CombineShaderFilesSafe()) {
+		ri.Printf(PRINT_WARNING, "Failed to combine shader files\n");
+		R_ShutdownShaderLoadContext();
+		return;
+	}
+
+	ri.Printf(PRINT_ALL, "Combined shader text size: %d bytes\n", shaderLoadCtx.combinedSize);
+
+	// Process the combined shader text (validate syntax)
+	R_ProcessShaderFilesSafe();
+
+	// Note: Combined text remains available via R_GetSafeShaderText()
+	// Renderer-specific code should copy this to s_shaderText and set up s_extensionOffset
+
+	ri.Printf(PRINT_ALL, "=== SAFE SHADER LOADING COMPLETED ===\n");
+
+	// Don't shut down context here - renderer needs to access the data
+	// R_ShutdownShaderLoadContext() should be called by renderer after copying data
+}
+
 static void *R_Default_Malloc(int bytes) {
 	return ri.Malloc(bytes);
 }

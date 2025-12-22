@@ -466,6 +466,9 @@ typedef struct {
 	PFN_vkVoidFunction	(*VK_GetInstanceProcAddr)( VkInstance instance, const char *name );
 	qboolean (*VK_CreateSurface)( VkInstance instance, VkSurfaceKHR *pSurface );
 
+	// Safe shader loading system
+	void	(*ScanAndLoadShaderFiles_Safe)( void );
+
 } refimport_t;
 
 #ifndef USE_RENDERER_DLOPEN

@@ -4361,7 +4361,17 @@ void R_InitShaders( void ) {
 
 	CreateInternalShaders();
 
-	ScanAndLoadShaderFiles();
+	// Use safe shader loading system
+	ScanAndLoadShaderFiles_Safe();
+
+	// Set up shader text globals from safe loading
+	int shaderTextSize;
+	const char *safeShaderText = R_GetSafeShaderText(&shaderTextSize);
+	if (safeShaderText && shaderTextSize > 0) {
+		s_shaderText = ri.Hunk_Alloc(shaderTextSize + 1, h_low);
+		Com_Memcpy(s_shaderText, safeShaderText, shaderTextSize + 1);
+		s_extensionOffset = s_shaderText; // Simplified - no extension support in safe mode
+	}
 
 	CreateExternalShaders();
 }
