@@ -4,147 +4,23 @@
 #include "../common/q_shared.h"
 #include "../renderercommon/tr_public.h"
 #include "tr_common.h"
+#include "vk_memory.h"
+#include "vk_compute.h"
+#include "vk_buffers.h"
+#include "vk_pipeline.h"
+#include "vk_framebuffer.h"
+#include "vk_sync.h"
 typedef float vec_t;
 typedef vec_t mat4_t[16];
 
-// Forward declarations
-typedef struct material_params_s material_params_t;
-typedef struct meshlet_info_s meshlet_info_t;
-
-// Constants for advanced systems
-#define MAX_STREAM_CELLS 256
-#define MAX_TIMELINE_SEMAPHORES 32
-#define MAX_BINDLESS_TEXTURES 4096
-
-// Full definitions needed for struct members
-// Stream cell structure
-struct stream_cell_s {
-	int32_t cellX, cellY, cellZ;  // Cell coordinates
-	vec3_t worldMin, worldMax;     // World space bounds
-	uint32_t state;                // Current state
-	uint32_t priority;              // Load priority (lower = higher priority)
-	
-	// Asset references
-	uint32_t modelCount;
-	qhandle_t *models;
-	uint32_t textureCount;
-	image_t **textures;
-	
-	// Memory usage tracking
-	uint32_t memoryUsed;
-	uint32_t lastAccessFrame;
-};
-typedef struct stream_cell_s stream_cell_t;
-
-// Atmosphere preset enum
-enum atmosphere_preset_e {
-	ATMOSPHERE_BRUTAL,
-	ATMOSPHERE_MYSTERIOUS,
-	ATMOSPHERE_COMBAT,
-	ATMOSPHERE_CALM,
-	ATMOSPHERE_CUSTOM
-};
-typedef enum atmosphere_preset_e atmosphere_preset_t;
-
-// Atmosphere parameters structure
-struct atmosphere_params_s {
-	float exposure;
-	float contrast;
-	float saturation;
-	float brightness;
-	float fogDensity;
-	float fogStart;
-	float fogEnd;
-	vec3_t fogColor;
-	float fogHeightFalloff;
-	float bloomIntensity;
-	float bloomThreshold;
-	float bloomSize;
-	vec3_t colorTint;
-	float colorTemperature;
-	float dofFocusDistance;
-	float dofBlurRadius;
-	float timeOfDay;
-	float weatherIntensity;
-	uint32_t flags;
-};
-typedef struct atmosphere_params_s atmosphere_params_t;
-
-#ifdef USE_CIMGUI
-struct ImDrawData;
-#endif
-
-// Vulkan Memory Allocator (VMA)
-#ifdef USE_VMA
-// VMA types and function declarations (implementation is in vk.c)
-#define VMA_STATIC_VULKAN_FUNCTIONS 0
-#define VMA_DYNAMIC_VULKAN_FUNCTIONS 1
-#define VMA_VULKAN_VERSION 1000000 // Vulkan 1.0
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
-#include "vk_mem_alloc.h"
-#pragma GCC diagnostic pop
-#endif
-
-#define MAX_SWAPCHAIN_IMAGES 8
-#define MIN_SWAPCHAIN_IMAGES_IMM 3
-#define MIN_SWAPCHAIN_IMAGES_FIFO   3
-#define MIN_SWAPCHAIN_IMAGES_FIFO_0 4
-#define MIN_SWAPCHAIN_IMAGES_MAILBOX 3
-
-#define MAX_VK_SAMPLERS 32
-#define MAX_VK_PIPELINES ((1024 + 128)*2)
-
-#define VERTEX_BUFFER_SIZE     (4 * 1024 * 1024)  /* by default */
-#define VERTEX_BUFFER_SIZE_HI  (8 * 1024 * 1024)
-
-#define STAGING_BUFFER_SIZE    (2 * 1024 * 1024)  /* by default */
-#define STAGING_BUFFER_SIZE_HI (128 * 1024 * 1024) /* enough for max.texture size upload with all mip levels at once - supports up to 16k textures */
-
-#define IMAGE_CHUNK_SIZE (1024 * 1024 * 1024) /* 1GB - increased to support high-resolution textures (4k, 8k, 16k) */
-#define MAX_IMAGE_CHUNKS 56
-
-#define NUM_COMMAND_BUFFERS 2	// number of command buffers / render semaphores / framebuffer sets
-
-#define USE_REVERSED_DEPTH
-
-//#define USE_UPLOAD_QUEUE
-
-#define VK_NUM_BLOOM_PASSES 4
-
-#ifndef _DEBUG
-#define USE_DEDICATED_ALLOCATION
-#endif
-//#define MIN_IMAGE_ALIGN (128*1024)
-#define MAX_ATTACHMENTS_IN_POOL (11+VK_NUM_BLOOM_PASSES*2+16) // depth + msaa + msaa-resolve + depth-resolve + screenmap.msaa + screenmap.resolve + screenmap.depth + bloom_extract + blur pairs + cubemap + capture + PBR + path tracing + headroom
-
-#define VK_DESC_STORAGE      0
-#define VK_DESC_UNIFORM      0
-#define VK_DESC_TEXTURE0     1
-#define VK_DESC_TEXTURE1     2
-#define VK_DESC_TEXTURE2     3
-#define VK_DESC_FOG_COLLAPSE 4
-
-#ifdef USE_VK_PBR
-	typedef float mat4_t[16];
-	#define VK_DESC_PBR_BRDFLUT				5
-	#define VK_DESC_PBR_NORMAL				6
-	#define VK_DESC_PBR_PHYSICAL			7
-	#define VK_DESC_PBR_CUBEMAP				8
-	#define VK_DESC_MATERIAL_PARAMS			9
-	#define VK_DESC_COUNT	10
-#else
-	#define VK_DESC_COUNT   5
-#endif
-
-#define VK_DESC_TEXTURE_BASE VK_DESC_TEXTURE0
-#define VK_DESC_FOG_ONLY     VK_DESC_TEXTURE1
-#define VK_DESC_FOG_DLIGHT   VK_DESC_TEXTURE1
-
-
-#define VK_DESC_UNIFORM_MAIN_BINDING		0
-#define VK_DESC_UNIFORM_CAMERA_BINDING		1
-#define VK_DESC_UNIFORM_COUNT				2
+// Render pass types (needed by vk_pipeline.h)
+typedef enum {
+	RENDER_PASS_MAIN = 0,
+	RENDER_PASS_SCREENMAP,
+	RENDER_PASS_POST_BLOOM,
+	RENDER_PASS_CUBEMAP,
+	RENDER_PASS_COUNT
+} renderPass_t;
 
 typedef enum {
 	TYPE_COLOR_BLACK,
@@ -233,6 +109,96 @@ typedef enum {
 
 } Vk_Shader_Type;
 
+typedef struct {
+	Vk_Shader_Type shader_type;
+	unsigned int state_bits; // GLS_XXX flags
+	cullType_t face_culling;
+	qboolean polygon_offset;
+	qboolean mirror;
+	Vk_Shadow_Phase shadow_phase;
+	VkPrimitiveTopology primitives;
+	int line_width;
+	int fog_stage; // off, fog-in / fog-out
+	int abs_light;
+	int allow_discard;
+	int use_font_sdf;
+	float font_sdf_smooth;
+
+#ifdef USE_VK_PBR
+	uint32_t				vk_pbr_flags;
+	vec4_t					specularScale;
+	vec4_t					normalScale;
+#endif
+	int acff; // none, rgb, rgba, alpha
+	struct {
+		byte rgb;
+		byte alpha;
+	} color;
+} Vk_Pipeline_Def;
+
+typedef struct {
+	VkSamplerAddressMode address_mode; // clamp/repeat texture addressing mode
+	int vk_mag_filter;		// VK_XXX mag filter
+	int vk_min_filter;		// VK_XXX min filter
+	qboolean max_lod_1_0;	// fixed 1.0 lod
+} Vk_Sampler_Def;
+
+#include "vk_pipeline.h"
+
+// Forward declarations
+typedef struct material_params_s material_params_t;
+typedef struct meshlet_info_s meshlet_info_t;
+
+// Constants for advanced systems
+#define MAX_STREAM_CELLS 256
+#define MAX_TIMELINE_SEMAPHORES 32
+#define MAX_BINDLESS_TEXTURES 4096
+
+// Full definitions needed for struct members
+// Stream cell structure
+struct stream_cell_s {
+	int32_t cellX, cellY, cellZ;  // Cell coordinates
+	vec3_t worldMin, worldMax;     // World space bounds
+	uint32_t state;                // Current state
+	uint32_t priority;              // Load priority (lower = higher priority)
+	
+	// Asset references
+	uint32_t modelCount;
+	qhandle_t *models;
+	uint32_t textureCount;
+	image_t **textures;
+	
+	// Memory usage tracking
+	uint32_t memoryUsed;
+	uint32_t lastAccessFrame;
+};
+typedef struct stream_cell_s stream_cell_t;
+
+// Atmosphere preset enum
+enum atmosphere_preset_e {
+	ATMOSPHERE_BRUTAL,
+	ATMOSPHERE_MYSTERIOUS,
+	ATMOSPHERE_COMBAT,
+	ATMOSPHERE_CALM,
+	ATMOSPHERE_CUSTOM
+};
+typedef enum atmosphere_preset_e atmosphere_preset_t;
+
+// Atmosphere parameters structure
+struct atmosphere_params_s {
+	float exposure;
+	float contrast;
+	float saturation;
+	float brightness;
+	float fogDensity;
+	float fogStart;
+	float fogEnd;
+	vec3_t fogColor;
+	float fogHeightFalloff;
+	float bloomIntensity;
+	float bloomThreshold;
+
+
 // Meshlet metadata (CPU-side)
 struct meshlet_info_s {
 	uint32_t firstIndex;
@@ -287,58 +253,28 @@ extern PFN_vkCmdSetScissor  qvkCmdSetScissor;
 #endif
 
 // used with cg_shadows == 2
+// used with cg_shadows == 2
 typedef enum {
 	SHADOW_DISABLED,
 	SHADOW_EDGES,
-	SHADOW_FS_QUAD,
+	SHADOW_FS_QUAD
 } Vk_Shadow_Phase;
 
-typedef enum {
-	TRIANGLE_LIST = 0,
-	TRIANGLE_STRIP,
-	LINE_LIST,
-	POINT_LIST
-} Vk_Primitive_Topology;
-
+// Depth range modes for viewport depth control
 typedef enum {
 	DEPTH_RANGE_NORMAL,		// [0..1]
 	DEPTH_RANGE_ZERO,		// [0..0]
 	DEPTH_RANGE_ONE,		// [1..1]
 	DEPTH_RANGE_WEAPON,		// [0..0.3]
 	DEPTH_RANGE_COUNT
-}  Vk_Depth_Range;
-
-typedef struct {
-	VkSamplerAddressMode address_mode; // clamp/repeat texture addressing mode
-	int vk_mag_filter;		// VK_XXX mag filter
-	int vk_min_filter;		// VK_XXX min filter
-	qboolean max_lod_1_0;	// fixed 1.0 lod
-	qboolean noAnisotropy;
-} Vk_Sampler_Def;
-
-#define VK_FILTER_NEAREST                   0
-#define VK_FILTER_LINEAR                    1
-#define VK_FILTER_NEAREST_MIPMAP_NEAREST    2
-#define VK_FILTER_LINEAR_MIPMAP_NEAREST     3
-#define VK_FILTER_NEAREST_MIPMAP_LINEAR     4
-#define VK_FILTER_LINEAR_MIPMAP_LINEAR      5
-
-typedef enum {
-	RENDER_PASS_MAIN = 0,
-	RENDER_PASS_SCREENMAP,
-	RENDER_PASS_POST_BLOOM,
-	RENDER_PASS_CUBEMAP,
-	RENDER_PASS_COUNT
-} renderPass_t;
-
-typedef struct {
+} Vk_Depth_Range;
 	Vk_Shader_Type shader_type;
 	unsigned int state_bits; // GLS_XXX flags
 	cullType_t face_culling;
 	qboolean polygon_offset;
 	qboolean mirror;
 	Vk_Shadow_Phase shadow_phase;
-	Vk_Primitive_Topology primitives;
+	VkPrimitiveTopology primitives;
 	int line_width;
 	int fog_stage; // off, fog-in / fog-out
 	int abs_light;
@@ -356,7 +292,6 @@ typedef struct {
 		byte rgb;
 		byte alpha;
 	} color;
-} Vk_Pipeline_Def;
 
 typedef struct VK_Pipeline {
 	Vk_Pipeline_Def def;
@@ -1655,83 +1590,17 @@ typedef struct {
 	VkDescriptorSetLayout vrsDescriptorSetLayout;
 	VkDescriptorSet vrsDescriptorSet;
 
-	// Memory defragmentation system
-	struct {
-		qboolean enabled;
-		float fragmentation_threshold; // Trigger defrag when fragmentation exceeds this (0.0-1.0)
-		uint32_t defrag_interval_frames; // Defrag every N frames (0 = disabled)
-		uint32_t frame_counter;
-		VkDeviceSize total_allocated;
-		VkDeviceSize total_used;
-		VkDeviceSize largest_free_block;
-		uint32_t free_block_count;
-	} memory_defrag;
+	vk_memory_defrag_t memory_defrag;
 
-	// Virtual memory management
-	struct {
-		qboolean enabled;
-		qboolean sparse_binding_supported;
-		VkDeviceSize virtual_address_space_size;
-		VkDeviceSize allocated_virtual_size;
-		uint32_t sparse_binding_count;
-	} virtual_memory;
+	vk_virtual_memory_t virtual_memory;
 
-	// Async compute queue
-	struct {
-		qboolean supported;
-		uint32_t queue_family_index;
-		VkQueue queue;
-		VkCommandPool command_pool;
-		VkCommandBuffer *command_buffers;
-		VkFence fences[NUM_COMMAND_BUFFERS];
-		uint32_t current_buffer_index;
-	} compute_queue;
+	vk_compute_queue_t compute_queue;
 
-	// Resource pooling
-	struct {
-		qboolean enabled;
-		struct {
-			VkBuffer buffers[64]; // Small buffers (< 1MB)
-			VkDeviceMemory memory[64];
-			uint32_t count;
-			uint32_t free_count;
-			uint32_t free_indices[64];
-		} small_buffers;
-		struct {
-			VkBuffer buffers[32]; // Medium buffers (1MB - 16MB)
-			VkDeviceMemory memory[32];
-			uint32_t count;
-			uint32_t free_count;
-			uint32_t free_indices[32];
-		} medium_buffers;
-		struct {
-			VkBuffer buffers[16]; // Large buffers (> 16MB)
-			VkDeviceMemory memory[16];
-			uint32_t count;
-			uint32_t free_count;
-			uint32_t free_indices[16];
-		} large_buffers;
-	} resource_pools;
+	vk_resource_pool_t resource_pools;
 
-	// Texture streaming priority queue
-	struct {
-		qboolean enabled;
-		struct {
-			image_t *image;
-			float priority; // Higher = more important
-			float distance; // View distance
-			uint32_t requested_mip_level;
-		} queue[256];
-		uint32_t queue_count;
-		VkDeviceSize memory_bandwidth_used;
-		VkDeviceSize memory_bandwidth_limit;
-	} texture_streaming;
+	vk_texture_streaming_t texture_streaming;
 } Vk_Instance;
 
-typedef struct {
-	VkDeviceMemory memory;
-	VkDeviceSize used;
-} ImageChunk;
 
 // Vk_World contains vulkan resources/state requested by the game code.
 // It is reinitialized on a map change.

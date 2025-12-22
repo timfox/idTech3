@@ -33,7 +33,7 @@ static intptr_t (QDECL *syscall)( intptr_t arg, ... ) = (intptr_t (QDECL *)( int
 
 Q_EXPORT void dllEntry( intptr_t (QDECL  *syscallptr)( intptr_t arg,... ) ) {
 	syscall = syscallptr;
-	trap_Print("UI MODULE DLLENTRY: LOADED SUCCESSFULLY\n");
+	trap_Print("UI MODULE ENTRY: LOADED SUCCESSFULLY\n");
 }
 
 // Monolithic build: export with unique name for static linking
