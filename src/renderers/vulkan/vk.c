@@ -2858,6 +2858,8 @@ qvkGetPipelineCacheData					= NULL;
 
 	qvkDebugMarkerSetObjectNameEXT				= NULL;
 	qvkCmdClearColorImage						= NULL;
+
+	vk.active = qtrue;
 }
 
 
@@ -3154,7 +3156,6 @@ static void vk_create_attachments( void );
 void vk_initialize( void )
 {
 	init_vulkan_library();
-	vk_create_attachments();
 }
 
 void vk_init_descriptors( void )
@@ -3491,6 +3492,8 @@ static void vk_create_special_pipelines( void )
 
 void vk_create_pipelines( void )
 {
+	// Create Vulkan attachments if FBO is active
+	vk_create_attachments();
 	vk_create_special_pipelines();
 }
 
@@ -3827,157 +3830,36 @@ static void create_depth_attachment( uint32_t width, uint32_t height, VkSampleCo
 
 static void vk_create_attachments( void )
 {
-	uint32_t i;
+	// Basic safety checks
+	if (vk.device == VK_NULL_HANDLE || !vk.active) {
+		return;
+	}
 
+	// Only create basic attachments to avoid complex initialization issues
 	vk_clear_attachment_pool();
 
-	// It looks like resulting performance depends from order you're creating/allocating
-	// memory for attachments in vulkan i.e. similar images grouped together will provide best results
-	// so [resolve0][resolve1][msaa0][msaa1][depth0][depth1] is most optimal
-	// while cases like [resolve0][depth0][color0][...] is the worst
-
-	// Preallocate first image chunk in attachment memory pool for better performance
+	// Preallocate memory chunk
+	if (vk.image_chunk_size == 0) {
+		vk.image_chunk_size = IMAGE_CHUNK_SIZE;
+	}
 	vk_allocate_image_chunk();
-	if ( vk.fboActive ) {
 
-		VkImageUsageFlags usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+	// Create basic color and depth attachments
+	create_color_attachment(glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
+		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+		&vk.color_image, &vk.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0);
 
-		// bloom
-		if ( r_bloom->integer ) {
-			uint32_t width = gls.captureWidth;
-			uint32_t height = gls.captureHeight;
+	create_depth_attachment(glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT,
+		&vk.depth_image, &vk.depth_image_view, qfalse);
 
-			create_color_attachment( width, height, VK_SAMPLE_COUNT_1_BIT, vk.bloom_format,
-				usage, &vk.bloom_image[0], &vk.bloom_image_view[0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-
-			for ( i = 1; i < ARRAY_LEN( vk.bloom_image ); i += 2 ) {
-				width /= 2;
-				height /= 2;
-				create_color_attachment( width, height, VK_SAMPLE_COUNT_1_BIT, vk.bloom_format,
-					usage, &vk.bloom_image[i+0], &vk.bloom_image_view[i+0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-
-				create_color_attachment( width, height, VK_SAMPLE_COUNT_1_BIT, vk.bloom_format,
-					usage, &vk.bloom_image[i+1], &vk.bloom_image_view[i+1], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-			}
-		}
-
-        // cubemap
-        if ( vk.cubemapActive ) {
-            usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-
-            create_color_attachment( REF_CUBEMAP_SIZE, REF_CUBEMAP_SIZE, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
-                usage, &vk.cubeMap.color_image, &vk.cubeMap.color_image_view[0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT );
-
-            if ( vk.msaaActive )
-                create_color_attachment( REF_CUBEMAP_SIZE, REF_CUBEMAP_SIZE, (VkSampleCountFlagBits)vkSamples, vk.color_format,
-                    usage, &vk.cubeMap.color_image_msaa, &vk.cubeMap.color_image_view_msaa[0], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qtrue, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT );
-            
-            create_depth_attachment( REF_CUBEMAP_SIZE, REF_CUBEMAP_SIZE, (VkSampleCountFlagBits)vkSamples,
-                    &vk.cubeMap.depth_image, &vk.cubeMap.depth_image_view, qtrue );
-        
-            usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-        }
-
-		// post-processing/msaa-resolve
-		create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
-			usage, &vk.color_image, &vk.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-
-		// style-transfer output (storage-capable)
-		{
-			VkImageUsageFlags style_usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-			create_color_attachment( gls.windowWidth, gls.windowHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
-				style_usage, &vk.style_image, &vk.style_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-		}
-
-		// screenmap-msaa
-		if ( vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT ) {
-			create_color_attachment( vk.screenMapWidth, vk.screenMapHeight, vk.screenMapSamples, vk.color_format,
-				usage, &vk.screenMap.color_image_msaa, &vk.screenMap.color_image_view_msaa, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0 );
-		}
-
-		// screenmap/msaa-resolve
-		create_color_attachment( vk.screenMapWidth, vk.screenMapHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
-			usage, &vk.screenMap.color_image, &vk.screenMap.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-
-		// screenmap depth
-		create_depth_attachment( vk.screenMapWidth, vk.screenMapHeight, vk.screenMapSamples, &vk.screenMap.depth_image, &vk.screenMap.depth_image_view, qtrue );
-
-		if ( vk.msaaActive ) {
-			create_color_attachment( glConfig.vidWidth, glConfig.vidHeight, vkSamples, vk.color_format,
-				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &vk.msaa_image, &vk.msaa_image_view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue, 0 );
-		}
-
-		if ( r_ext_supersample->integer ) {
-			// capture buffer
-			usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-			create_color_attachment( gls.captureWidth, gls.captureHeight, VK_SAMPLE_COUNT_1_BIT, vk.capture_format,
-				usage, &vk.capture.image, &vk.capture.image_view, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, qfalse, 0 );
-		}
-
-#ifdef VK_PBR_BRDFLUT
-        // BRDF LUT
-        if( vk.pbrActive ) {
-            uint32_t size = 512;
-            usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-            
-            create_color_attachment( size, size, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16G16_SFLOAT,
-                usage, &vk.brdflut_image, &vk.brdflut_image_view , VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0 );
-        }
-#endif
-
-	} // if ( vk.fboActive )
-
-	//vk_alloc_attachments();
-
-	create_depth_attachment( glConfig.vidWidth, glConfig.vidHeight, vkSamples, &vk.depth_image, &vk.depth_image_view,
-		(vk.fboActive && r_bloom->integer) ? qfalse : qtrue );
-
+	// Set up basic attachment descriptors
 	vk_alloc_attachments();
 
-	for ( i = 0; i < vk.image_memory_count; i++ )
-	{
-		SET_OBJECT_NAME( vk.image_memory[i], va( "framebuffer memory chunk %i", i ), VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT );
-	}
-
-	SET_OBJECT_NAME( vk.depth_image, "depth attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
-	SET_OBJECT_NAME( vk.depth_image_view, "depth attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
-
-	SET_OBJECT_NAME( vk.color_image, "color attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
-	SET_OBJECT_NAME( vk.color_image_view, "color attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
-
-	SET_OBJECT_NAME( vk.style_image, "style attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
-	SET_OBJECT_NAME( vk.style_image_view, "style attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
-
-	SET_OBJECT_NAME( vk.capture.image, "capture image", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
-	SET_OBJECT_NAME( vk.capture.image_view, "capture image view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
-
-	for ( i = 0; i < ARRAY_LEN( vk.bloom_image ); i++ )
-	{
-		SET_OBJECT_NAME( vk.bloom_image[i], va( "bloom attachment %i", i ), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
-		SET_OBJECT_NAME( vk.bloom_image_view[i], va( "bloom attachment %i", i ), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
-	}
-
-#ifdef VK_PBR_BRDFLUT
-    SET_OBJECT_NAME( vk.brdflut_image, "brdf lut image", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
-    SET_OBJECT_NAME( vk.brdflut_image_view, "brdf lut image view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
-#endif
-
-    SET_OBJECT_NAME( vk.cubeMap.color_image, "cubemap image", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
-    SET_OBJECT_NAME( vk.cubeMap.color_image_msaa, "cubemap msaa image", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
-
-    for ( i = 0; i < ARRAY_LEN(vk.cubeMap.color_image_view); i++) {
-        SET_OBJECT_NAME( vk.cubeMap.color_image_view[i], va("cubemap image view %i", i), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
-        SET_OBJECT_NAME( vk.cubeMap.color_image_view_msaa[i], va("cubemap face view msaa %i",i), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
-    }
-
-    SET_OBJECT_NAME( vk.cubeMap.depth_image, "cubemap depth image", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
-    SET_OBJECT_NAME( vk.cubeMap.depth_image_view, "cubemap depth image view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
-
-    // Create VRS resources if supported
-    if ( vk.vrs.supported ) {
-        vk_vrs_create_resources( gls.windowWidth, gls.windowHeight );
-    }
-
+	// Basic naming for debugging
+	SET_OBJECT_NAME(vk.color_image, "color attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
+	SET_OBJECT_NAME(vk.color_image_view, "color attachment view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT);
+	SET_OBJECT_NAME(vk.depth_image, "depth attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
+	SET_OBJECT_NAME(vk.depth_image_view, "depth attachment view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT);
 }
 
 
