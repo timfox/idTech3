@@ -4,13 +4,16 @@
 precision highp float;
 precision highp int;
 
+const float PI = 3.14159265359;
+
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
 layout(set = 0, binding = 0) uniform sampler2D colorBuffer;
 layout(set = 0, binding = 1) uniform sampler2D depthBuffer;
 layout(set = 0, binding = 2) uniform sampler2D cocBuffer; // Circle of confusion
+layout(set = 0, binding = 3) uniform sampler2D bokehSprite; // Custom bokeh sprite texture
 
-layout(set = 0, binding = 3, rgba16f) uniform writeonly image2D outputImage;
+layout(set = 0, binding = 4, rgba16f) uniform writeonly image2D outputImage;
 
 layout(push_constant) uniform DOFConstants {
     vec2 resolution;
@@ -19,6 +22,8 @@ layout(push_constant) uniform DOFConstants {
     float focalRange;
     float aperture;
     int numSamples;
+    int bokehShape; // 0=circular, 1=hexagonal, 2=sprite
+    float bokehRotation; // Rotation for sprite bokeh
 } pc;
 
 // Sample with bokeh shape
@@ -26,27 +31,56 @@ vec3 sampleBokeh(vec2 uv, float coc)
 {
     vec3 color = vec3(0.0);
     float totalWeight = 0.0;
-    
+
     // Number of samples based on circle of confusion
     int samples = min(pc.numSamples, int(ceil(coc * 10.0)));
     samples = max(4, samples); // Minimum 4 samples
-    
+
     for (int i = 0; i < samples; i++) {
-        // Generate sample position in circle
-        float angle = (float(i) / float(samples)) * 2.0 * PI;
-        float radius = coc * sqrt(float(i) / float(samples));
-        
-        vec2 offset = vec2(cos(angle), sin(angle)) * radius * pc.invResolution;
+        vec2 offset;
+        float weight = 1.0;
+
+        if (pc.bokehShape == 1) {
+            // Hexagonal bokeh
+            float angle = (float(i) / float(samples)) * 2.0 * PI;
+            // Create hexagonal pattern by adjusting angles
+            angle = floor(angle / (PI/3.0)) * (PI/3.0) + (PI/6.0);
+            float radius = coc * sqrt(float(i) / float(samples));
+            offset = vec2(cos(angle), sin(angle)) * radius * pc.invResolution;
+        } else if (pc.bokehShape == 2) {
+            // Sprite-based bokeh - sample from custom texture
+            float u = (float(i % 8) + 0.5) / 8.0;
+            float v = (float(i / 8) + 0.5) / 8.0;
+
+            // Rotate the sprite sampling
+            float cosRot = cos(pc.bokehRotation);
+            float sinRot = sin(pc.bokehRotation);
+            vec2 rotatedUV = vec2(
+                u * cosRot - v * sinRot,
+                u * sinRot + v * cosRot
+            );
+
+            // Scale by circle of confusion
+            offset = (rotatedUV - 0.5) * coc * 2.0 * pc.invResolution;
+
+            // Sample weight from sprite texture
+            weight = texture(bokehSprite, vec2(u, v)).r;
+        } else {
+            // Circular bokeh (default)
+            float angle = (float(i) / float(samples)) * 2.0 * PI;
+            float radius = coc * sqrt(float(i) / float(samples));
+            offset = vec2(cos(angle), sin(angle)) * radius * pc.invResolution;
+        }
+
         vec2 sampleUV = uv + offset;
-        
+
         if (sampleUV.x >= 0.0 && sampleUV.x <= 1.0 && sampleUV.y >= 0.0 && sampleUV.y <= 1.0) {
             vec3 sampleColor = texture(colorBuffer, sampleUV).rgb;
-            float weight = 1.0;
             color += sampleColor * weight;
             totalWeight += weight;
         }
     }
-    
+
     if (totalWeight > 0.001) {
         return color / totalWeight;
     }

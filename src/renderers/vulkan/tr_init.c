@@ -479,6 +479,7 @@ int		max_polyverts;
 #ifdef USE_VULKAN
 
 #include "vk.h"
+#include "vk_post_process.h"
 Vk_Instance vk;
 Vk_World	vk_world;
 
@@ -2898,6 +2899,13 @@ void R_Init( void ) {
 
 #ifdef USE_VULKAN
 	vk_create_pipelines();
+
+	// Initialize enhanced post-processing system
+	vk_init_enhanced_post_processing();
+	if (!vk_create_enhanced_post_process_pipelines()) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to create some enhanced post-processing pipelines\n");
+	}
+
 #ifdef VK_PBR_BRDFLUT
 	vk_create_brfdlut();
 #endif

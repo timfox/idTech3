@@ -1,0 +1,92 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D colorBuffer;
+layout(set = 0, binding = 1) uniform sampler2D depthBuffer;
+layout(set = 0, binding = 2) uniform sampler2D heatMask; // Heat intensity mask
+layout(set = 0, binding = 3) uniform sampler2D noiseTexture;
+
+layout(set = 0, binding = 4, rgba16f) uniform writeonly image2D outputImage;
+
+layout(push_constant) uniform HeatDistortionConstants {
+    vec2 resolution;
+    vec2 invResolution;
+    float time;
+    float distortionStrength;
+    float heatWaveFrequency;
+    float heatWaveSpeed;
+    int numSamples;
+    float atmosphericDistortion;
+    vec3 atmosphericTint;
+} pc;
+
+// Generate heat distortion offset
+vec2 getHeatOffset(vec2 uv, float heatIntensity)
+{
+    // Create animated noise for heat waves
+    vec2 noiseUV = uv * pc.heatWaveFrequency + vec2(0.0, pc.time * pc.heatWaveSpeed);
+    vec2 noise = texture(noiseTexture, noiseUV).rg * 2.0 - 1.0;
+
+    // Additional octaves for more complex distortion
+    vec2 noiseUV2 = uv * pc.heatWaveFrequency * 2.0 + vec2(pc.time * pc.heatWaveSpeed * 0.7, 0.0);
+    vec2 noise2 = texture(noiseTexture, noiseUV2).rg * 2.0 - 1.0;
+
+    // Combine noise layers
+    vec2 distortion = (noise * 0.7 + noise2 * 0.3) * heatIntensity * pc.distortionStrength;
+
+    return distortion;
+}
+
+void main()
+{
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+
+    // Sample heat intensity
+    float heatIntensity = texture(heatMask, uv).r;
+
+    // Add atmospheric heat distortion (distance-based)
+    float depth = texture(depthBuffer, uv).r;
+    float atmosphericHeat = pc.atmosphericDistortion * (1.0 - depth);
+
+    heatIntensity = max(heatIntensity, atmosphericHeat);
+
+    vec3 color = texture(colorBuffer, uv).rgb;
+
+    if (heatIntensity > 0.001) {
+        // Apply heat distortion
+        vec2 distortion = getHeatOffset(uv, heatIntensity);
+
+        // Sample distorted position
+        vec2 distortedUV = uv + distortion;
+        distortedUV = clamp(distortedUV, vec2(0.0), vec2(1.0));
+
+        vec3 distortedColor = texture(colorBuffer, distortedUV).rgb;
+
+        // Blend based on heat intensity
+        color = mix(color, distortedColor, heatIntensity * 0.8);
+
+        // Add chromatic aberration to heat distortion
+        vec2 caOffset = distortion * 0.5;
+        vec2 caUV1 = clamp(uv + caOffset, vec2(0.0), vec2(1.0));
+        vec2 caUV2 = clamp(uv - caOffset, vec2(0.0), vec2(1.0));
+
+        // Slight color separation
+        color.r = mix(color.r, texture(colorBuffer, caUV1).r, heatIntensity * 0.3);
+        color.b = mix(color.b, texture(colorBuffer, caUV2).b, heatIntensity * 0.3);
+
+        // Add atmospheric tinting
+        color = mix(color, pc.atmosphericTint, atmosphericHeat * 0.2);
+    }
+
+    imageStore(outputImage, pixel, vec4(color, 1.0));
+}

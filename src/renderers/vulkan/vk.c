@@ -37,6 +37,7 @@ extern cvar_t *r_dither;
 extern cvar_t *r_vk_hotReload;
 #include "../../common/performance_counters.h"
 #include "vk.h"
+#include "vk_post_process.h"
 #ifdef USE_VULKAN_RAY_TRACING
 #include "vk_portal_lights.h"
 #endif
@@ -3238,6 +3239,48 @@ void vk_init_descriptors( void )
 			}
 		}
 
+		// Allocate enhanced post-processing descriptor sets
+		if ( vk.ssao_descriptor_layout != VK_NULL_HANDLE ) {
+			alloc.pSetLayouts = &vk.ssao_descriptor_layout;
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssao_descriptor ) );
+			SET_OBJECT_NAME( vk.ssao_descriptor, "SSAO descriptor set", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
+		}
+		if ( vk.ssr_descriptor_layout != VK_NULL_HANDLE ) {
+			alloc.pSetLayouts = &vk.ssr_descriptor_layout;
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssr_descriptor ) );
+			SET_OBJECT_NAME( vk.ssr_descriptor, "SSR descriptor set", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
+		}
+		if ( vk.bloom_descriptor_layout != VK_NULL_HANDLE ) {
+			alloc.pSetLayouts = &vk.bloom_descriptor_layout;
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.bloom_descriptor ) );
+			SET_OBJECT_NAME( vk.bloom_descriptor, "Bloom descriptor set", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
+		}
+		if ( vk.dof_descriptor_layout != VK_NULL_HANDLE ) {
+			alloc.pSetLayouts = &vk.dof_descriptor_layout;
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.dof_descriptor ) );
+			SET_OBJECT_NAME( vk.dof_descriptor, "DoF descriptor set", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
+		}
+		if ( vk.velocity_tiles_descriptor_layout != VK_NULL_HANDLE ) {
+			alloc.pSetLayouts = &vk.velocity_tiles_descriptor_layout;
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.velocity_tiles_descriptor ) );
+			SET_OBJECT_NAME( vk.velocity_tiles_descriptor, "Velocity tiles descriptor set", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
+		}
+		if ( vk.motion_blur_descriptor_layout != VK_NULL_HANDLE ) {
+			alloc.pSetLayouts = &vk.motion_blur_descriptor_layout;
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.motion_blur_descriptor ) );
+			SET_OBJECT_NAME( vk.motion_blur_descriptor, "Motion blur descriptor set", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
+		}
+		if ( vk.color_grading_descriptor_layout != VK_NULL_HANDLE ) {
+			alloc.pSetLayouts = &vk.color_grading_descriptor_layout;
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.color_grading_descriptor ) );
+			SET_OBJECT_NAME( vk.color_grading_descriptor, "Color grading descriptor set", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
+		}
+		if ( vk.heat_distortion_descriptor_layout != VK_NULL_HANDLE ) {
+			alloc.pSetLayouts = &vk.heat_distortion_descriptor_layout;
+			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.heat_distortion_descriptor ) );
+			SET_OBJECT_NAME( vk.heat_distortion_descriptor, "Heat distortion descriptor set", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
+		}
+
 		alloc.descriptorSetCount = 1;
 		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.screenMap.color_descriptor ) ); // screenmap
 
@@ -4032,6 +4075,9 @@ void vk_release_resources( void ) {
 	vk.pipelines_count = vk.pipelines_world_base;
 
 	VK_CHECK( qvkResetDescriptorPool( vk.device, vk.descriptor_pool, 0 ) );
+
+	// Shutdown enhanced post-processing system
+	vk_shutdown_enhanced_post_processing();
 
 	if ( vk_world.num_image_chunks > 1 ) {
 		// if we allocated more than 2 image chunks - use doubled default size

@@ -221,4 +221,22 @@ void vk_bind_generated_shaders( void ){
     vk_set_shader_name( vk.modules.frag.gen[1][2][0][1], "frag_pbr_tx2_fog" );
     vk.modules.frag.gen[1][2][1][1] = SHADER_MODULE( frag_pbr_tx2_cl_fog );
     vk_set_shader_name( vk.modules.frag.gen[1][2][1][1], "frag_pbr_tx2_cl_fog" );
+
+    // Enhanced post-processing compute shaders
+    vk.modules.ssao_comp = SHADER_MODULE( ssao_comp );
+    vk_set_shader_name( vk.modules.ssao_comp, "ssao_comp" );
+    vk.modules.ssr_comp = SHADER_MODULE( ssr_comp_spv );
+    vk_set_shader_name( vk.modules.ssr_comp, "ssr_comp" );
+    vk.modules.bloom_comp = SHADER_MODULE( bloom_comp_spv );
+    vk_set_shader_name( vk.modules.bloom_comp, "bloom_comp" );
+    vk.modules.depth_of_field_comp = SHADER_MODULE( depth_of_field_comp );
+    vk_set_shader_name( vk.modules.depth_of_field_comp, "depth_of_field_comp" );
+    vk.modules.motion_blur_comp = SHADER_MODULE( motion_blur_comp_spv );
+    vk_set_shader_name( vk.modules.motion_blur_comp, "motion_blur_comp" );
+    vk.modules.velocity_tiles_comp = SHADER_MODULE( velocity_tiles_comp );
+    vk_set_shader_name( vk.modules.velocity_tiles_comp, "velocity_tiles_comp" );
+    vk.modules.color_grading_comp = SHADER_MODULE( color_grading_comp_spv );
+    vk_set_shader_name( vk.modules.color_grading_comp, "color_grading_comp" );
+    vk.modules.heat_distortion_comp = SHADER_MODULE( heat_distortion_comp );
+    vk_set_shader_name( vk.modules.heat_distortion_comp, "heat_distortion_comp" );
 }

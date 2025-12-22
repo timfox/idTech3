@@ -902,6 +902,89 @@ typedef struct {
 
 	VkDescriptorSet bloom_image_descriptor[1+VK_NUM_BLOOM_PASSES*2];
 
+	// Enhanced post-processing resources
+	VkImage ssao_image;
+	VkImageView ssao_image_view;
+
+	VkImage ssr_image;
+	VkImageView ssr_image_view;
+
+	VkImage dof_image;
+	VkImageView dof_image_view;
+
+	VkImage coc_image;
+	VkImageView coc_image_view;
+
+	VkImage bokeh_sprite_image;
+	VkImageView bokeh_sprite_image_view;
+
+	VkImage motion_blur_image;
+	VkImageView motion_blur_image_view;
+
+	VkImage velocity_image;
+	VkImageView velocity_image_view;
+
+	VkImage velocity_tiles_image;
+	VkImageView velocity_tiles_image_view;
+
+	VkImage color_grading_image;
+	VkImageView color_grading_image_view;
+
+	VkImage lut_image;
+	VkImageView lut_image_view;
+
+	VkImage heat_distortion_image;
+	VkImageView heat_distortion_image_view;
+
+	VkImage heat_mask_image;
+	VkImageView heat_mask_image_view;
+
+	VkImage noise_image;
+	VkImageView noise_image_view;
+
+	// Blue noise for SSAO/SSR
+	VkImage blue_noise_image;
+	VkImageView blue_noise_image_view;
+
+	// Post-processing pipelines and layouts
+	VkPipeline ssao_pipeline;
+	VkPipeline ssr_pipeline;
+	VkPipeline bloom_pipeline;
+	VkPipeline dof_pipeline;
+	VkPipeline motion_blur_pipeline;
+	VkPipeline velocity_tiles_pipeline;
+	VkPipeline color_grading_pipeline;
+	VkPipeline heat_distortion_pipeline;
+
+	VkPipelineLayout ssao_layout;
+	VkPipelineLayout ssr_layout;
+	VkPipelineLayout bloom_layout;
+	VkPipelineLayout dof_layout;
+	VkPipelineLayout motion_blur_layout;
+	VkPipelineLayout velocity_tiles_layout;
+	VkPipelineLayout color_grading_layout;
+	VkPipelineLayout heat_distortion_layout;
+
+	// Post-processing descriptor set layouts
+	VkDescriptorSetLayout ssao_descriptor_layout;
+	VkDescriptorSetLayout ssr_descriptor_layout;
+	VkDescriptorSetLayout bloom_descriptor_layout;
+	VkDescriptorSetLayout dof_descriptor_layout;
+	VkDescriptorSetLayout motion_blur_descriptor_layout;
+	VkDescriptorSetLayout velocity_tiles_descriptor_layout;
+	VkDescriptorSetLayout color_grading_descriptor_layout;
+	VkDescriptorSetLayout heat_distortion_descriptor_layout;
+
+	// Post-processing descriptor sets
+	VkDescriptorSet ssao_descriptor;
+	VkDescriptorSet ssr_descriptor;
+	VkDescriptorSet bloom_descriptor;
+	VkDescriptorSet dof_descriptor;
+	VkDescriptorSet motion_blur_descriptor;
+	VkDescriptorSet velocity_tiles_descriptor;
+	VkDescriptorSet color_grading_descriptor;
+	VkDescriptorSet heat_distortion_descriptor;
+
 	VkImage depth_image;
 	VkImageView depth_image_view;
 
@@ -1135,6 +1218,15 @@ typedef struct {
 	VkShaderModule auto_exposure_comp;
 	VkShaderModule checkerboard_interleave_comp;
 	VkShaderModule vignette_comp;
+		// Enhanced post-processing effects
+		VkShaderModule ssao_comp;
+		VkShaderModule ssr_comp;
+		VkShaderModule bloom_comp;
+		VkShaderModule depth_of_field_comp;
+		VkShaderModule motion_blur_comp;
+		VkShaderModule velocity_tiles_comp;
+		VkShaderModule color_grading_comp;
+		VkShaderModule heat_distortion_comp;
 	VkShaderModule vrs_generate_comp;
 		
 		// GIBS compute shader modules
