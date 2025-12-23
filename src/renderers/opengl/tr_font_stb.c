@@ -224,14 +224,14 @@ qboolean RE_RegisterFont_Stb(const char *fontName, int pointSize, fontInfo_t *fo
 			}
 		}
 
-		// Scale: match the FreeType convention (48pt reference at 72 dpi)
+		// Scale: match the FreeType convention (24pt reference at 72 dpi)
 		{
 			cvar_t *fontDPI = ri.Cvar_Get("r_fontDPI", "72", 0);
 			float dpi = (fontDPI && fontDPI->value > 0.0f) ? fontDPI->value : 72.0f;
 		if (dpi < 72.0f) dpi = 72.0f;
 		if (dpi > 300.0f) dpi = 300.0f;
 		float glyphScale = 72.0f / dpi;
-		glyphScale *= 48.0f / (float)pointSize;
+		glyphScale *= 24.0f / (float)pointSize;
 
 		font->glyphScale = glyphScale;
 		Q_strncpyz(font->name, fontName, sizeof(font->name));
@@ -341,13 +341,13 @@ qboolean RE_RegisterFont_Stb(const char *fontName, int pointSize, fontInfo_t *fo
 		g->t2 = (float)pcData->y1 / atlasSize;
 	}
 
-	// Scale: match the FreeType convention (48pt reference at 72 dpi)
+	// Scale: match the FreeType convention (24pt reference at 72 dpi)
 	cvar_t *fontDPI = ri.Cvar_Get("r_fontDPI", "72", 0);
 	float dpi = (fontDPI && fontDPI->value > 0.0f) ? fontDPI->value : 72.0f;
 	if (dpi < 72.0f) dpi = 72.0f;
 	if (dpi > 300.0f) dpi = 300.0f;
 	float glyphScale = 72.0f / dpi;
-	glyphScale *= 48.0f / (float)pointSize;
+	glyphScale *= 24.0f / (float)pointSize;
 
 	font->glyphScale = glyphScale;
 	Q_strncpyz(font->name, fontName, sizeof(font->name));

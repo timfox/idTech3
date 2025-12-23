@@ -1460,8 +1460,8 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 	// change the scale to be relative to 1 based on configured DPI ( so dpi of 144 means a scale of .5 )
 	glyphScale = 72.0f / dpi;
 
-	// we also need to adjust the scale based on point size relative to 48 points as the ui scaling is based on a 48 point font
-	glyphScale *= 48.0f / pointSize;
+	// we also need to adjust the scale based on point size relative to 24 points as the ui scaling is based on a 24 point font
+	glyphScale *= 24.0f / pointSize;
 
 	registeredFont[registeredFontCount].glyphScale = glyphScale;
 	font->glyphScale = glyphScale;

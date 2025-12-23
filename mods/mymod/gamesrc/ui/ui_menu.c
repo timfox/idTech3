@@ -240,7 +240,7 @@ static void MainMenu_DrawMenuItem( void *ptr ) {
 	float measuredWidth = MainMenu_TextWidth( t->string, sizeScale, font ? font : &s_mainFonts.textFont );
 	float measuredHeight;
 	if ( font && FONT_LOADED( font ) ) {
-		measuredHeight = font->glyphs['A'].imageHeight * sizeScale;
+		measuredHeight = trap_R_Font_Height( font, sizeScale );
 	} else {
 		measuredHeight = PROP_HEIGHT * sizeScale;
 	}
@@ -280,7 +280,7 @@ static void MainMenu_DrawMenuItem( void *ptr ) {
 		color[3] = text_color_highlight[3];
 	}
 
-	MainMenu_TextPaint( x, y, sizeScale, color, t->string, style | UI_DROPSHADOW, font );
+	MainMenu_TextPaint( x, y, sizeScale, color, t->string, ( style & ~( UI_CENTER | UI_RIGHT ) ) | UI_DROPSHADOW, font );
 }
 
 
