@@ -111,6 +111,8 @@ void R_InitFreeType( void );
 void R_DoneFreeType( void );
 qboolean RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font);
 
+#include "../renderercommon/tr_font_enhanced.h"
+
 // Modern font rendering functions
 float RE_Text_Width_Improved(const char *text, float scale, fontInfo_t *font, int limit);
 float RE_Text_Height_Improved(const char *text, float scale, fontInfo_t *font, int limit);

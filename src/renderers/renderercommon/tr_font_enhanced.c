@@ -7,6 +7,7 @@ tr_font_enhanced.c - Modern High-Quality Font Rendering
 #include "../../common/q_shared.h"
 #include "../renderercommon/tr_public.h"
 #include "../../common/qcommon.h"
+#include "tr_font_enhanced.h"
 
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;

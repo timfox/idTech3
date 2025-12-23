@@ -2040,10 +2040,20 @@ int FS_OpenFileInPak( fileHandle_t *file, pack_t *pak, fileInPack_t *pakFile, qb
 	}
 
 	if ( uniqueFILE ) {
+		if ( !pak->pakFilename || !pak->pakFilename[0] ) {
+			Com_Printf( S_COLOR_RED "Empty pakFilename for %s!\n", pak->pakBasename );
+			*file = FS_INVALID_HANDLE;
+			return -1;
+		}
 		// open a new file on the pakfile
 		temp = unzReOpen( pak->pakFilename, pak->handle );
 		if ( temp == NULL ) {
-			Com_Printf( S_COLOR_RED "Couldn't reopen %s", pak->pakFilename );
+			char cwd[MAX_OSPATH];
+			if (!getcwd(cwd, sizeof(cwd))) cwd[0] = '\0';
+			Com_Printf( S_COLOR_RED "Couldn't reopen %s (path: '%s', handle: %p, CWD: %s)\n", 
+				pak->pakBasename ? pak->pakBasename : "NULL", 
+				pak->pakFilename ? pak->pakFilename : "NULL", 
+				pak->handle, cwd );
 			*file = FS_INVALID_HANDLE;
 			return -1;
 		}
@@ -3541,6 +3551,10 @@ static pack_t *FS_LoadCachedPK3( const char *zipfile )
 
 static void FS_InsertPK3ToCache( pack_t *pak )
 {
+	if ( !pak->pakFilename || !pak->pakFilename[0] ) {
+		Com_Printf( S_COLOR_YELLOW "FS_InsertPK3ToCache: empty pakFilename ignored\n" );
+		return;
+	}
 	if ( Sys_GetFileStats( pak->pakFilename, &pak->size, &pak->mtime, &pak->ctime ) )
 	{
 		FS_AddToCache( pak );
@@ -3749,6 +3763,11 @@ static qboolean FS_LoadPakFromFile( FILE *f )
 	if ( fread( pakName, pk.pakNameLen, 1, f ) != 1 )
 	{
 		//Com_Printf( "error reading pakname\n" );
+		return qfalse;
+	}
+
+	if ( !pakName[0] ) {
+		Com_Printf( S_COLOR_YELLOW "FS_LoadPakFromFile: empty pakName in cache ignored\n" );
 		return qfalse;
 	}
 
@@ -4068,6 +4087,11 @@ pack_t *FS_LoadZipFile( const char *zipfile )
 		return pack; // loaded from cache
 	}
 #endif
+
+	if ( !zipfile || !zipfile[0] ) {
+		Com_Printf( S_COLOR_YELLOW "FS_LoadZipFile: empty filename ignored\n" );
+		return NULL;
+	}
 
 	// extract basename from zip path
 	basename = strrchr( zipfile, PATH_SEP );
