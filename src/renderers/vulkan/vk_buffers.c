@@ -21,8 +21,6 @@ VmaAllocation vk_geometry_buffer_memory_vma = VK_NULL_HANDLE;
 extern Vk_Instance vk;  // Main Vulkan instance
 extern uint32_t find_memory_type(uint32_t memory_type_bits, VkMemoryPropertyFlags properties);
 extern const char *vk_result_string(VkResult result);
-extern VkCommandBuffer begin_command_buffer(void);
-extern void end_command_buffer(VkCommandBuffer command_buffer, const char *func);
 extern const char *va(const char *format, ...);
 
 // Vulkan function pointer extern declarations

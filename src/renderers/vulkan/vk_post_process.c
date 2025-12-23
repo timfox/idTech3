@@ -49,45 +49,11 @@ cvar_t *r_pp_motion_blur_tiles;
 cvar_t *r_pp_color_grading;
 cvar_t *r_pp_heat_distortion;
 
-// Pipeline objects for enhanced effects (extern declarations)
-extern VkPipeline ssao_pipeline;
-extern VkPipeline ssr_pipeline;
-extern VkPipeline bloom_pipeline;
-extern VkPipeline dof_pipeline;
-extern VkPipeline motion_blur_pipeline;
-extern VkPipeline velocity_tiles_pipeline;
-extern VkPipeline color_grading_pipeline;
-extern VkPipeline heat_distortion_pipeline;
+// All Vulkan resources are accessed via the vk struct
 
-// Pipeline layouts (extern declarations)
-extern VkPipelineLayout ssao_layout;
-extern VkPipelineLayout ssr_layout;
-extern VkPipelineLayout bloom_layout;
-extern VkPipelineLayout dof_layout;
-extern VkPipelineLayout motion_blur_layout;
-extern VkPipelineLayout velocity_tiles_layout;
-extern VkPipelineLayout color_grading_layout;
-extern VkPipelineLayout heat_distortion_layout;
+// All Vulkan resources are accessed via the vk struct
 
-// Descriptor set layouts (extern declarations)
-extern VkDescriptorSetLayout ssao_descriptor_layout;
-extern VkDescriptorSetLayout ssr_descriptor_layout;
-extern VkDescriptorSetLayout bloom_descriptor_layout;
-extern VkDescriptorSetLayout dof_descriptor_layout;
-extern VkDescriptorSetLayout motion_blur_descriptor_layout;
-extern VkDescriptorSetLayout velocity_tiles_descriptor_layout;
-extern VkDescriptorSetLayout color_grading_descriptor_layout;
-extern VkDescriptorSetLayout heat_distortion_descriptor_layout;
-
-// Descriptor sets for temporary resources (extern declarations)
-extern VkDescriptorSet ssao_descriptor;
-extern VkDescriptorSet ssr_descriptor;
-extern VkDescriptorSet bloom_descriptor;
-extern VkDescriptorSet dof_descriptor;
-extern VkDescriptorSet motion_blur_descriptor;
-extern VkDescriptorSet velocity_tiles_descriptor;
-extern VkDescriptorSet color_grading_descriptor;
-extern VkDescriptorSet heat_distortion_descriptor;
+// All Vulkan resources are accessed via the vk struct
 
 /*
 ===============
@@ -139,71 +105,71 @@ vk_shutdown_enhanced_post_processing
 void vk_shutdown_enhanced_post_processing(void)
 {
     // Destroy pipelines
-    if (ssao_pipeline != VK_NULL_HANDLE) {
-        qvkDestroyPipeline(vk.device, ssao_pipeline, NULL);
-        ssao_pipeline = VK_NULL_HANDLE;
+    if (vk.ssao_pipeline != VK_NULL_HANDLE) {
+        qvkDestroyPipeline(vk.device, vk.ssao_pipeline, NULL);
+        vk.ssao_pipeline = VK_NULL_HANDLE;
     }
-    if (ssr_pipeline != VK_NULL_HANDLE) {
-        qvkDestroyPipeline(vk.device, ssr_pipeline, NULL);
-        ssr_pipeline = VK_NULL_HANDLE;
+    if (vk.ssr_pipeline != VK_NULL_HANDLE) {
+        qvkDestroyPipeline(vk.device, vk.ssr_pipeline, NULL);
+        vk.ssr_pipeline = VK_NULL_HANDLE;
     }
-    if (bloom_pipeline != VK_NULL_HANDLE) {
-        qvkDestroyPipeline(vk.device, bloom_pipeline, NULL);
-        bloom_pipeline = VK_NULL_HANDLE;
+    if (vk.bloom_pipeline != VK_NULL_HANDLE) {
+        qvkDestroyPipeline(vk.device, vk.bloom_pipeline, NULL);
+        vk.bloom_pipeline = VK_NULL_HANDLE;
     }
-    if (dof_pipeline != VK_NULL_HANDLE) {
-        qvkDestroyPipeline(vk.device, dof_pipeline, NULL);
-        dof_pipeline = VK_NULL_HANDLE;
+    if (vk.dof_pipeline != VK_NULL_HANDLE) {
+        qvkDestroyPipeline(vk.device, vk.dof_pipeline, NULL);
+        vk.dof_pipeline = VK_NULL_HANDLE;
     }
-    if (motion_blur_pipeline != VK_NULL_HANDLE) {
-        qvkDestroyPipeline(vk.device, motion_blur_pipeline, NULL);
-        motion_blur_pipeline = VK_NULL_HANDLE;
+    if (vk.motion_blur_pipeline != VK_NULL_HANDLE) {
+        qvkDestroyPipeline(vk.device, vk.motion_blur_pipeline, NULL);
+        vk.motion_blur_pipeline = VK_NULL_HANDLE;
     }
-    if (velocity_tiles_pipeline != VK_NULL_HANDLE) {
-        qvkDestroyPipeline(vk.device, velocity_tiles_pipeline, NULL);
-        velocity_tiles_pipeline = VK_NULL_HANDLE;
+    if (vk.velocity_tiles_pipeline != VK_NULL_HANDLE) {
+        qvkDestroyPipeline(vk.device, vk.velocity_tiles_pipeline, NULL);
+        vk.velocity_tiles_pipeline = VK_NULL_HANDLE;
     }
-    if (color_grading_pipeline != VK_NULL_HANDLE) {
-        qvkDestroyPipeline(vk.device, color_grading_pipeline, NULL);
-        color_grading_pipeline = VK_NULL_HANDLE;
+    if (vk.color_grading_pipeline != VK_NULL_HANDLE) {
+        qvkDestroyPipeline(vk.device, vk.color_grading_pipeline, NULL);
+        vk.color_grading_pipeline = VK_NULL_HANDLE;
     }
-    if (heat_distortion_pipeline != VK_NULL_HANDLE) {
-        qvkDestroyPipeline(vk.device, heat_distortion_pipeline, NULL);
-        heat_distortion_pipeline = VK_NULL_HANDLE;
+    if (vk.heat_distortion_pipeline != VK_NULL_HANDLE) {
+        qvkDestroyPipeline(vk.device, vk.heat_distortion_pipeline, NULL);
+        vk.heat_distortion_pipeline = VK_NULL_HANDLE;
     }
 
     // Destroy pipeline layouts
-    if (ssao_layout != VK_NULL_HANDLE) {
-        qvkDestroyPipelineLayout(vk.device, ssao_layout, NULL);
-        ssao_layout = VK_NULL_HANDLE;
+    if (vk.ssao_layout != VK_NULL_HANDLE) {
+        qvkDestroyPipelineLayout(vk.device, vk.ssao_layout, NULL);
+        vk.ssao_layout = VK_NULL_HANDLE;
     }
-    if (ssr_layout != VK_NULL_HANDLE) {
-        qvkDestroyPipelineLayout(vk.device, ssr_layout, NULL);
-        ssr_layout = VK_NULL_HANDLE;
+    if (vk.ssr_layout != VK_NULL_HANDLE) {
+        qvkDestroyPipelineLayout(vk.device, vk.ssr_layout, NULL);
+        vk.ssr_layout = VK_NULL_HANDLE;
     }
-    if (bloom_layout != VK_NULL_HANDLE) {
-        qvkDestroyPipelineLayout(vk.device, bloom_layout, NULL);
-        bloom_layout = VK_NULL_HANDLE;
+    if (vk.bloom_layout != VK_NULL_HANDLE) {
+        qvkDestroyPipelineLayout(vk.device, vk.bloom_layout, NULL);
+        vk.bloom_layout = VK_NULL_HANDLE;
     }
-    if (dof_layout != VK_NULL_HANDLE) {
-        qvkDestroyPipelineLayout(vk.device, dof_layout, NULL);
-        dof_layout = VK_NULL_HANDLE;
+    if (vk.dof_layout != VK_NULL_HANDLE) {
+        qvkDestroyPipelineLayout(vk.device, vk.dof_layout, NULL);
+        vk.dof_layout = VK_NULL_HANDLE;
     }
-    if (motion_blur_layout != VK_NULL_HANDLE) {
-        qvkDestroyPipelineLayout(vk.device, motion_blur_layout, NULL);
-        motion_blur_layout = VK_NULL_HANDLE;
+    if (vk.motion_blur_layout != VK_NULL_HANDLE) {
+        qvkDestroyPipelineLayout(vk.device, vk.motion_blur_layout, NULL);
+        vk.motion_blur_layout = VK_NULL_HANDLE;
     }
-    if (velocity_tiles_layout != VK_NULL_HANDLE) {
-        qvkDestroyPipelineLayout(vk.device, velocity_tiles_layout, NULL);
-        velocity_tiles_layout = VK_NULL_HANDLE;
+    if (vk.velocity_tiles_layout != VK_NULL_HANDLE) {
+        qvkDestroyPipelineLayout(vk.device, vk.velocity_tiles_layout, NULL);
+        vk.velocity_tiles_layout = VK_NULL_HANDLE;
     }
-    if (color_grading_layout != VK_NULL_HANDLE) {
-        qvkDestroyPipelineLayout(vk.device, color_grading_layout, NULL);
-        color_grading_layout = VK_NULL_HANDLE;
+    if (vk.color_grading_layout != VK_NULL_HANDLE) {
+        qvkDestroyPipelineLayout(vk.device, vk.color_grading_layout, NULL);
+        vk.color_grading_layout = VK_NULL_HANDLE;
     }
-    if (heat_distortion_layout != VK_NULL_HANDLE) {
-        qvkDestroyPipelineLayout(vk.device, heat_distortion_layout, NULL);
-        heat_distortion_layout = VK_NULL_HANDLE;
+    if (vk.heat_distortion_layout != VK_NULL_HANDLE) {
+        qvkDestroyPipelineLayout(vk.device, vk.heat_distortion_layout, NULL);
+        vk.heat_distortion_layout = VK_NULL_HANDLE;
     }
 }
 
@@ -262,7 +228,7 @@ qboolean vk_create_ssao_pipeline(void)
     layoutInfo.bindingCount = ARRAY_LEN(bindings);
     layoutInfo.pBindings = bindings;
 
-    if (qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &ssao_descriptor_layout) != VK_SUCCESS) {
+    if (qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &vk.ssao_descriptor_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create SSAO descriptor set layout\n");
         return qfalse;
     }
@@ -271,20 +237,20 @@ qboolean vk_create_ssao_pipeline(void)
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &ssao_descriptor_layout;
+    pipelineLayoutInfo.pSetLayouts = &vk.ssao_descriptor_layout;
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &(VkPushConstantRange){
         VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ssaoConfig_t)
     };
 
-    if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &ssao_layout) != VK_SUCCESS) {
+    if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &vk.ssao_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create SSAO pipeline layout\n");
         return qfalse;
     }
 
     // Create pipeline
-    ssao_pipeline = vk_create_compute_pipeline(vk.modules.ssao_comp, ssao_layout, "SSAO");
-    return ssao_pipeline != VK_NULL_HANDLE;
+    vk.ssao_pipeline = vk_create_compute_pipeline(vk.modules.ssao_comp, vk.ssao_layout, "SSAO");
+    return vk.ssao_pipeline != VK_NULL_HANDLE;
 }
 
 /*
@@ -313,7 +279,7 @@ qboolean vk_create_ssr_pipeline(void)
     layoutInfo.bindingCount = ARRAY_LEN(bindings);
     layoutInfo.pBindings = bindings;
 
-    if (qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &ssr_descriptor_layout) != VK_SUCCESS) {
+    if (qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &vk.ssr_descriptor_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create SSR descriptor set layout\n");
         return qfalse;
     }
@@ -322,20 +288,20 @@ qboolean vk_create_ssr_pipeline(void)
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &ssr_descriptor_layout;
+    pipelineLayoutInfo.pSetLayouts = &vk.ssr_descriptor_layout;
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &(VkPushConstantRange){
         VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ssrConfig_t)
     };
 
-    if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &ssr_layout) != VK_SUCCESS) {
+    if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &vk.ssr_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create SSR pipeline layout\n");
         return qfalse;
     }
 
     // Create pipeline
-    ssr_pipeline = vk_create_compute_pipeline(vk.modules.ssr_comp, ssr_layout, "SSR");
-    return ssr_pipeline != VK_NULL_HANDLE;
+    vk.ssr_pipeline = vk_create_compute_pipeline(vk.modules.ssr_comp, vk.ssr_layout, "SSR");
+    return vk.ssr_pipeline != VK_NULL_HANDLE;
 }
 
 /*
@@ -361,7 +327,7 @@ qboolean vk_create_bloom_pipeline(void)
     layoutInfo.bindingCount = ARRAY_LEN(bindings);
     layoutInfo.pBindings = bindings;
 
-    if (qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &bloom_descriptor_layout) != VK_SUCCESS) {
+    if (qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &vk.bloom_descriptor_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create bloom descriptor set layout\n");
         return qfalse;
     }
@@ -370,20 +336,20 @@ qboolean vk_create_bloom_pipeline(void)
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &bloom_descriptor_layout;
+    pipelineLayoutInfo.pSetLayouts = &vk.bloom_descriptor_layout;
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &(VkPushConstantRange){
         VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(bloomConfig_t)
     };
 
-    if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &bloom_layout) != VK_SUCCESS) {
+    if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &vk.bloom_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create bloom pipeline layout\n");
         return qfalse;
     }
 
     // Create pipeline
-    bloom_pipeline = vk_create_compute_pipeline(vk.modules.bloom_comp, bloom_layout, "Bloom");
-    return bloom_pipeline != VK_NULL_HANDLE;
+    vk.bloom_pipeline = vk_create_compute_pipeline(vk.modules.bloom_comp, vk.bloom_layout, "Bloom");
+    return vk.bloom_pipeline != VK_NULL_HANDLE;
 }
 
 /*
@@ -412,7 +378,7 @@ qboolean vk_create_dof_pipeline(void)
     layoutInfo.bindingCount = ARRAY_LEN(bindings);
     layoutInfo.pBindings = bindings;
 
-    if (qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &dof_descriptor_layout) != VK_SUCCESS) {
+    if (qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &vk.dof_descriptor_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create DoF descriptor set layout\n");
         return qfalse;
     }
@@ -421,20 +387,20 @@ qboolean vk_create_dof_pipeline(void)
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &dof_descriptor_layout;
+    pipelineLayoutInfo.pSetLayouts = &vk.dof_descriptor_layout;
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &(VkPushConstantRange){
         VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(dofConfig_t)
     };
 
-    if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &dof_layout) != VK_SUCCESS) {
+    if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &vk.dof_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create DoF pipeline layout\n");
         return qfalse;
     }
 
     // Create pipeline
-    dof_pipeline = vk_create_compute_pipeline(vk.modules.depth_of_field_comp, dof_layout, "Depth of Field");
-    return dof_pipeline != VK_NULL_HANDLE;
+    vk.dof_pipeline = vk_create_compute_pipeline(vk.modules.depth_of_field_comp, vk.dof_layout, "Depth of Field");
+    return vk.dof_pipeline != VK_NULL_HANDLE;
 }
 
 /*
@@ -461,7 +427,7 @@ qboolean vk_create_velocity_tiles_pipeline(void)
     layoutInfo.bindingCount = ARRAY_LEN(bindings);
     layoutInfo.pBindings = bindings;
 
-    if (qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &velocity_tiles_descriptor_layout) != VK_SUCCESS) {
+    if (qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &vk.velocity_tiles_descriptor_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create velocity tiles descriptor set layout\n");
         return qfalse;
     }
@@ -470,20 +436,20 @@ qboolean vk_create_velocity_tiles_pipeline(void)
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &velocity_tiles_descriptor_layout;
+    pipelineLayoutInfo.pSetLayouts = &vk.velocity_tiles_descriptor_layout;
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &(VkPushConstantRange){
         VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(vec4_t) * 2 // tileResolution, invTileResolution, pixelsPerTile, invPixelsPerTile
     };
 
-    if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &velocity_tiles_layout) != VK_SUCCESS) {
+    if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &vk.velocity_tiles_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create velocity tiles pipeline layout\n");
         return qfalse;
     }
 
     // Create pipeline
-    velocity_tiles_pipeline = vk_create_compute_pipeline(vk.modules.velocity_tiles_comp, velocity_tiles_layout, "Velocity Tiles");
-    return velocity_tiles_pipeline != VK_NULL_HANDLE;
+    vk.velocity_tiles_pipeline = vk_create_compute_pipeline(vk.modules.velocity_tiles_comp, vk.velocity_tiles_layout, "Velocity Tiles");
+    return vk.velocity_tiles_pipeline != VK_NULL_HANDLE;
 }
 
 /*
@@ -512,7 +478,7 @@ qboolean vk_create_motion_blur_pipeline(void)
     layoutInfo.bindingCount = ARRAY_LEN(bindings);
     layoutInfo.pBindings = bindings;
 
-    if (qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &motion_blur_descriptor_layout) != VK_SUCCESS) {
+    if (qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &vk.motion_blur_descriptor_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create motion blur descriptor set layout\n");
         return qfalse;
     }
@@ -521,20 +487,20 @@ qboolean vk_create_motion_blur_pipeline(void)
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &motion_blur_descriptor_layout;
+    pipelineLayoutInfo.pSetLayouts = &vk.motion_blur_descriptor_layout;
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &(VkPushConstantRange){
         VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(motionBlurConfig_t)
     };
 
-    if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &motion_blur_layout) != VK_SUCCESS) {
+    if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &vk.motion_blur_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create motion blur pipeline layout\n");
         return qfalse;
     }
 
     // Create pipeline
-    motion_blur_pipeline = vk_create_compute_pipeline(vk.modules.motion_blur_comp, motion_blur_layout, "Motion Blur");
-    return motion_blur_pipeline != VK_NULL_HANDLE;
+    vk.motion_blur_pipeline = vk_create_compute_pipeline(vk.modules.motion_blur_comp, vk.motion_blur_layout, "Motion Blur");
+    return vk.motion_blur_pipeline != VK_NULL_HANDLE;
 }
 
 /*
@@ -561,7 +527,7 @@ qboolean vk_create_color_grading_pipeline(void)
     layoutInfo.bindingCount = ARRAY_LEN(bindings);
     layoutInfo.pBindings = bindings;
 
-    if (qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &color_grading_descriptor_layout) != VK_SUCCESS) {
+    if (qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &vk.color_grading_descriptor_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create color grading descriptor set layout\n");
         return qfalse;
     }
@@ -570,20 +536,20 @@ qboolean vk_create_color_grading_pipeline(void)
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &color_grading_descriptor_layout;
+    pipelineLayoutInfo.pSetLayouts = &vk.color_grading_descriptor_layout;
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &(VkPushConstantRange){
         VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(colorGradingConfig_t)
     };
 
-    if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &color_grading_layout) != VK_SUCCESS) {
+    if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &vk.color_grading_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create color grading pipeline layout\n");
         return qfalse;
     }
 
     // Create pipeline
-    color_grading_pipeline = vk_create_compute_pipeline(vk.modules.color_grading_comp, color_grading_layout, "Color Grading");
-    return color_grading_pipeline != VK_NULL_HANDLE;
+    vk.color_grading_pipeline = vk_create_compute_pipeline(vk.modules.color_grading_comp, vk.color_grading_layout, "Color Grading");
+    return vk.color_grading_pipeline != VK_NULL_HANDLE;
 }
 
 /*
@@ -612,7 +578,7 @@ qboolean vk_create_heat_distortion_pipeline(void)
     layoutInfo.bindingCount = ARRAY_LEN(bindings);
     layoutInfo.pBindings = bindings;
 
-    if (qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &heat_distortion_descriptor_layout) != VK_SUCCESS) {
+    if (qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &vk.heat_distortion_descriptor_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create heat distortion descriptor set layout\n");
         return qfalse;
     }
@@ -621,20 +587,20 @@ qboolean vk_create_heat_distortion_pipeline(void)
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &heat_distortion_descriptor_layout;
+    pipelineLayoutInfo.pSetLayouts = &vk.heat_distortion_descriptor_layout;
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &(VkPushConstantRange){
         VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(heatDistortionConfig_t)
     };
 
-    if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &heat_distortion_layout) != VK_SUCCESS) {
+    if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &vk.heat_distortion_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create heat distortion pipeline layout\n");
         return qfalse;
     }
 
     // Create pipeline
-    heat_distortion_pipeline = vk_create_compute_pipeline(vk.modules.heat_distortion_comp, heat_distortion_layout, "Heat Distortion");
-    return heat_distortion_pipeline != VK_NULL_HANDLE;
+    vk.heat_distortion_pipeline = vk_create_compute_pipeline(vk.modules.heat_distortion_comp, vk.heat_distortion_layout, "Heat Distortion");
+    return vk.heat_distortion_pipeline != VK_NULL_HANDLE;
 }
 
 /*
@@ -709,7 +675,7 @@ qboolean vk_ssao_pass(const ssaoConfig_t *config __attribute__((unused)))
 {
     // TODO: Implement full SSAO pass when Vulkan resources are available
     // For now, this is a placeholder that will be implemented in the next phase
-    if (ssao_pipeline == VK_NULL_HANDLE) {
+    if (vk.ssao_pipeline == VK_NULL_HANDLE) {
         return qfalse; // Pipeline not created yet
     }
     return qtrue; // Success placeholder
@@ -723,7 +689,7 @@ vk_ssr_pass
 qboolean vk_ssr_pass(const ssrConfig_t *config __attribute__((unused)))
 {
     // TODO: Implement full SSR pass when Vulkan resources are available
-    if (ssr_pipeline == VK_NULL_HANDLE) {
+    if (vk.ssr_pipeline == VK_NULL_HANDLE) {
         return qfalse; // Pipeline not created yet
     }
     return qtrue; // Success placeholder
@@ -737,7 +703,7 @@ vk_bloom_pass
 qboolean vk_bloom_pass(const bloomConfig_t *config __attribute__((unused)))
 {
     // TODO: Implement enhanced bloom pass when Vulkan resources are available
-    if (bloom_pipeline == VK_NULL_HANDLE) {
+    if (vk.bloom_pipeline == VK_NULL_HANDLE) {
         return qfalse; // Pipeline not created yet
     }
     return qtrue; // Success placeholder
@@ -750,7 +716,7 @@ vk_dof_pass
 */
 qboolean vk_dof_pass(const dofConfig_t *config __attribute__((unused)))
 {
-    if (dof_pipeline == VK_NULL_HANDLE || dof_layout == VK_NULL_HANDLE) {
+    if (vk.dof_pipeline == VK_NULL_HANDLE || vk.dof_layout == VK_NULL_HANDLE) {
         ri.Printf(PRINT_WARNING, "DoF pipeline not initialized\n");
         return qfalse;
     }
@@ -787,18 +753,18 @@ qboolean vk_dof_pass(const dofConfig_t *config __attribute__((unused)))
     };
 
     VkWriteDescriptorSet writes[] = {
-        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = dof_descriptor, .dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &colorInfo },
-        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = dof_descriptor, .dstBinding = 1, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &depthInfo },
-        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = dof_descriptor, .dstBinding = 2, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &cocInfo },
-        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = dof_descriptor, .dstBinding = 3, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &bokehInfo },
-        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = dof_descriptor, .dstBinding = 4, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .pImageInfo = &outputInfo }
+        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.dof_descriptor, .dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &colorInfo },
+        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.dof_descriptor, .dstBinding = 1, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &depthInfo },
+        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.dof_descriptor, .dstBinding = 2, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &cocInfo },
+        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.dof_descriptor, .dstBinding = 3, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &bokehInfo },
+        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.dof_descriptor, .dstBinding = 4, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .pImageInfo = &outputInfo }
     };
 
     qvkUpdateDescriptorSets(vk.device, ARRAY_LEN(writes), writes, 0, NULL);
 
     // Bind pipeline
-    qvkCmdBindPipeline(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, dof_pipeline);
-    qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, dof_layout, 0, 1, &dof_descriptor, 0, NULL);
+    qvkCmdBindPipeline(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.dof_pipeline);
+    qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.dof_layout, 0, 1, &vk.dof_descriptor, 0, NULL);
 
     // Push constants
     dofConfig_t pushConstants = *config;
@@ -807,7 +773,7 @@ qboolean vk_dof_pass(const dofConfig_t *config __attribute__((unused)))
     pushConstants.invResolution[0] = 1.0f / glConfig.vidWidth;
     pushConstants.invResolution[1] = 1.0f / glConfig.vidHeight;
 
-    qvkCmdPushConstants(vk.cmd->command_buffer, dof_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(dofConfig_t), &pushConstants);
+    qvkCmdPushConstants(vk.cmd->command_buffer, vk.dof_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(dofConfig_t), &pushConstants);
 
     // Dispatch
     uint32_t groupCountX = (glConfig.vidWidth + 7) / 8;
@@ -824,7 +790,7 @@ vk_motion_blur_pass
 */
 qboolean vk_motion_blur_pass(const motionBlurConfig_t *config __attribute__((unused)))
 {
-    if (motion_blur_pipeline == VK_NULL_HANDLE || motion_blur_layout == VK_NULL_HANDLE) {
+    if (vk.motion_blur_pipeline == VK_NULL_HANDLE || vk.motion_blur_layout == VK_NULL_HANDLE) {
         ri.Printf(PRINT_WARNING, "Motion blur pipeline not initialized\n");
         return qfalse;
     }
@@ -850,15 +816,15 @@ qboolean vk_motion_blur_pass(const motionBlurConfig_t *config __attribute__((unu
         };
 
         VkWriteDescriptorSet velocityWrites[] = {
-            { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = velocity_tiles_descriptor, .dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &velocityInfo },
-            { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = velocity_tiles_descriptor, .dstBinding = 1, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &depthInfo },
-            { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = velocity_tiles_descriptor, .dstBinding = 2, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .pImageInfo = &tilesOutputInfo }
+            { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.velocity_tiles_descriptor, .dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &velocityInfo },
+            { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.velocity_tiles_descriptor, .dstBinding = 1, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &depthInfo },
+            { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.velocity_tiles_descriptor, .dstBinding = 2, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .pImageInfo = &tilesOutputInfo }
         };
 
         qvkUpdateDescriptorSets(vk.device, ARRAY_LEN(velocityWrites), velocityWrites, 0, NULL);
 
-        qvkCmdBindPipeline(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, velocity_tiles_pipeline);
-        qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, velocity_tiles_layout, 0, 1, &velocity_tiles_descriptor, 0, NULL);
+        qvkCmdBindPipeline(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.velocity_tiles_pipeline);
+        qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.velocity_tiles_layout, 0, 1, &vk.velocity_tiles_descriptor, 0, NULL);
 
         // Push constants for velocity tiles
         struct {
@@ -877,7 +843,7 @@ qboolean vk_motion_blur_pass(const motionBlurConfig_t *config __attribute__((unu
         velocityPushConstants.invPixelsPerTile[0] = 1.0f / config->tileSize[0];
         velocityPushConstants.invPixelsPerTile[1] = 1.0f / config->tileSize[1];
 
-        qvkCmdPushConstants(vk.cmd->command_buffer, velocity_tiles_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(velocityPushConstants), &velocityPushConstants);
+        qvkCmdPushConstants(vk.cmd->command_buffer, vk.velocity_tiles_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(velocityPushConstants), &velocityPushConstants);
 
         uint32_t tileGroupCountX = (uint32_t)velocityPushConstants.tileResolution[0];
         uint32_t tileGroupCountY = (uint32_t)velocityPushConstants.tileResolution[1];
@@ -931,17 +897,17 @@ qboolean vk_motion_blur_pass(const motionBlurConfig_t *config __attribute__((unu
     };
 
     VkWriteDescriptorSet writes[] = {
-        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = motion_blur_descriptor, .dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &colorInfo },
-        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = motion_blur_descriptor, .dstBinding = 1, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &velocityInfo },
-        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = motion_blur_descriptor, .dstBinding = 2, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &depthInfo },
-        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = motion_blur_descriptor, .dstBinding = 3, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &tilesInfo },
-        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = motion_blur_descriptor, .dstBinding = 4, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .pImageInfo = &outputInfo }
+        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.motion_blur_descriptor, .dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &colorInfo },
+        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.motion_blur_descriptor, .dstBinding = 1, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &velocityInfo },
+        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.motion_blur_descriptor, .dstBinding = 2, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &depthInfo },
+        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.motion_blur_descriptor, .dstBinding = 3, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &tilesInfo },
+        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.motion_blur_descriptor, .dstBinding = 4, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .pImageInfo = &outputInfo }
     };
 
     qvkUpdateDescriptorSets(vk.device, ARRAY_LEN(writes), writes, 0, NULL);
 
-    qvkCmdBindPipeline(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, motion_blur_pipeline);
-    qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, motion_blur_layout, 0, 1, &motion_blur_descriptor, 0, NULL);
+    qvkCmdBindPipeline(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.motion_blur_pipeline);
+    qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.motion_blur_layout, 0, 1, &vk.motion_blur_descriptor, 0, NULL);
 
     // Push constants
     motionBlurConfig_t pushConstants = *config;
@@ -950,7 +916,7 @@ qboolean vk_motion_blur_pass(const motionBlurConfig_t *config __attribute__((unu
     pushConstants.invResolution[0] = 1.0f / glConfig.vidWidth;
     pushConstants.invResolution[1] = 1.0f / glConfig.vidHeight;
 
-    qvkCmdPushConstants(vk.cmd->command_buffer, motion_blur_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(motionBlurConfig_t), &pushConstants);
+    qvkCmdPushConstants(vk.cmd->command_buffer, vk.motion_blur_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(motionBlurConfig_t), &pushConstants);
 
     uint32_t groupCountX = (glConfig.vidWidth + 7) / 8;
     uint32_t groupCountY = (glConfig.vidHeight + 7) / 8;
@@ -966,7 +932,7 @@ vk_color_grading_pass
 */
 qboolean vk_color_grading_pass(const colorGradingConfig_t *config __attribute__((unused)))
 {
-    if (color_grading_pipeline == VK_NULL_HANDLE || color_grading_layout == VK_NULL_HANDLE) {
+    if (vk.color_grading_pipeline == VK_NULL_HANDLE || vk.color_grading_layout == VK_NULL_HANDLE) {
         ri.Printf(PRINT_WARNING, "Color grading pipeline not initialized\n");
         return qfalse;
     }
@@ -991,16 +957,16 @@ qboolean vk_color_grading_pass(const colorGradingConfig_t *config __attribute__(
     };
 
     VkWriteDescriptorSet writes[] = {
-        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = color_grading_descriptor, .dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &inputInfo },
-        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = color_grading_descriptor, .dstBinding = 1, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &lutInfo },
-        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = color_grading_descriptor, .dstBinding = 2, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .pImageInfo = &outputInfo }
+        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.color_grading_descriptor, .dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &inputInfo },
+        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.color_grading_descriptor, .dstBinding = 1, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &lutInfo },
+        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.color_grading_descriptor, .dstBinding = 2, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .pImageInfo = &outputInfo }
     };
 
     qvkUpdateDescriptorSets(vk.device, ARRAY_LEN(writes), writes, 0, NULL);
 
     // Bind pipeline
-    qvkCmdBindPipeline(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, color_grading_pipeline);
-    qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, color_grading_layout, 0, 1, &color_grading_descriptor, 0, NULL);
+    qvkCmdBindPipeline(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.color_grading_pipeline);
+    qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.color_grading_layout, 0, 1, &vk.color_grading_descriptor, 0, NULL);
 
     // Push constants
     colorGradingConfig_t pushConstants = *config;
@@ -1009,7 +975,7 @@ qboolean vk_color_grading_pass(const colorGradingConfig_t *config __attribute__(
     pushConstants.invResolution[0] = 1.0f / glConfig.vidWidth;
     pushConstants.invResolution[1] = 1.0f / glConfig.vidHeight;
 
-    qvkCmdPushConstants(vk.cmd->command_buffer, color_grading_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(colorGradingConfig_t), &pushConstants);
+    qvkCmdPushConstants(vk.cmd->command_buffer, vk.color_grading_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(colorGradingConfig_t), &pushConstants);
 
     // Dispatch
     uint32_t groupCountX = (glConfig.vidWidth + 7) / 8;
@@ -1026,7 +992,7 @@ vk_heat_distortion_pass
 */
 qboolean vk_heat_distortion_pass(const heatDistortionConfig_t *config __attribute__((unused)))
 {
-    if (heat_distortion_pipeline == VK_NULL_HANDLE || heat_distortion_layout == VK_NULL_HANDLE) {
+    if (vk.heat_distortion_pipeline == VK_NULL_HANDLE || vk.heat_distortion_layout == VK_NULL_HANDLE) {
         ri.Printf(PRINT_WARNING, "Heat distortion pipeline not initialized\n");
         return qfalse;
     }
@@ -1063,18 +1029,18 @@ qboolean vk_heat_distortion_pass(const heatDistortionConfig_t *config __attribut
     };
 
     VkWriteDescriptorSet writes[] = {
-        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = heat_distortion_descriptor, .dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &colorInfo },
-        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = heat_distortion_descriptor, .dstBinding = 1, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &depthInfo },
-        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = heat_distortion_descriptor, .dstBinding = 2, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &heatMaskInfo },
-        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = heat_distortion_descriptor, .dstBinding = 3, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &noiseInfo },
-        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = heat_distortion_descriptor, .dstBinding = 4, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .pImageInfo = &outputInfo }
+        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.heat_distortion_descriptor, .dstBinding = 0, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &colorInfo },
+        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.heat_distortion_descriptor, .dstBinding = 1, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &depthInfo },
+        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.heat_distortion_descriptor, .dstBinding = 2, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &heatMaskInfo },
+        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.heat_distortion_descriptor, .dstBinding = 3, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, .pImageInfo = &noiseInfo },
+        { .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, .dstSet = vk.heat_distortion_descriptor, .dstBinding = 4, .descriptorCount = 1, .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, .pImageInfo = &outputInfo }
     };
 
     qvkUpdateDescriptorSets(vk.device, ARRAY_LEN(writes), writes, 0, NULL);
 
     // Bind pipeline
-    qvkCmdBindPipeline(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, heat_distortion_pipeline);
-    qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, heat_distortion_layout, 0, 1, &heat_distortion_descriptor, 0, NULL);
+    qvkCmdBindPipeline(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.heat_distortion_pipeline);
+    qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.heat_distortion_layout, 0, 1, &vk.heat_distortion_descriptor, 0, NULL);
 
     // Push constants
     heatDistortionConfig_t pushConstants = *config;
@@ -1083,7 +1049,7 @@ qboolean vk_heat_distortion_pass(const heatDistortionConfig_t *config __attribut
     pushConstants.invResolution[0] = 1.0f / glConfig.vidWidth;
     pushConstants.invResolution[1] = 1.0f / glConfig.vidHeight;
 
-    qvkCmdPushConstants(vk.cmd->command_buffer, heat_distortion_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(heatDistortionConfig_t), &pushConstants);
+    qvkCmdPushConstants(vk.cmd->command_buffer, vk.heat_distortion_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(heatDistortionConfig_t), &pushConstants);
 
     // Dispatch
     uint32_t groupCountX = (glConfig.vidWidth + 7) / 8;

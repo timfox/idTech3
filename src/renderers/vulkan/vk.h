@@ -1824,6 +1824,10 @@ typedef struct {
 extern Vk_Instance	vk;				// shouldn't be cleared during ref re-init
 extern Vk_World		vk_world;		// this data is cleared during ref re-init
 
+// Command buffer management functions
+VkCommandBuffer begin_command_buffer(void);
+void end_command_buffer(VkCommandBuffer command_buffer, const char *location);
+
 extern PFN_vkCreateCommandPool qvkCreateCommandPool;
 extern PFN_vkDestroyCommandPool qvkDestroyCommandPool;
 extern PFN_vkAllocateCommandBuffers qvkAllocateCommandBuffers;

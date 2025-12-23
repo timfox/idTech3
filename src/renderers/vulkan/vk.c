@@ -715,7 +715,7 @@ static VkFlags get_composite_alpha( VkCompositeAlphaFlagsKHR flags )
 
 // Modernized command buffer creation with designated initializers
 VK_NONNULL
-static VkCommandBuffer begin_command_buffer(void)
+VkCommandBuffer begin_command_buffer(void)
 {
 	VkCommandBuffer command_buffer;
 
@@ -738,7 +738,7 @@ static VkCommandBuffer begin_command_buffer(void)
 
 // Modernized command buffer submission with better structure
 VK_NONNULL_PARAMS(1)
-static void end_command_buffer(VkCommandBuffer command_buffer, const char *location)
+void end_command_buffer(VkCommandBuffer command_buffer, const char *location)
 {
 	(void)location; // Suppress unused parameter warning
 
@@ -9828,6 +9828,43 @@ void vk_vrs_apply_shading_rate( VkCommandBuffer cmdBuffer ) {
 	qvkCmdSetFragmentShadingRateKHR(cmdBuffer, &fragmentSize, combinerOps);
 
 	ri.Printf(PRINT_ALL, "Applied VRS shading rate: %dx%d\n", fragmentSize.width, fragmentSize.height);
+}
+
+void vk_shutdown( refShutdownCode_t code ) {
+	ri.Printf( PRINT_ALL, "vk_shutdown( %i )\n", code );
+
+	// Shutdown in reverse order of initialization
+	if ( code != REF_KEEP_CONTEXT ) {
+		// Shutdown all Vulkan subsystems
+		vk_shutdown_enhanced_post_processing();
+
+		// Shutdown ray tracing if enabled
+#ifdef USE_VULKAN_RAY_TRACING
+		if ( vk.rayTracingSupported ) {
+			vk_shutdown_raytracing();
+		}
+#endif
+
+		// Shutdown async compute
+		vk_shutdown_async_compute();
+
+		// Shutdown resource pools
+		vk_shutdown_resource_pool();
+
+		// Clear Vulkan instance data
+		if ( code != REF_KEEP_WINDOW ) {
+			// Full shutdown - clear everything
+			Com_Memset( &vk, 0, sizeof( vk ) );
+		}
+	}
+}
+
+void vk_get_gpu_timing_stats( double *avg_frame_time_ms, double *min_frame_time_ms, double *max_frame_time_ms ) {
+	// Stub implementation for GPU timing stats
+	// TODO: Implement proper GPU timing query collection
+	*avg_frame_time_ms = 16.67;  // ~60 FPS
+	*min_frame_time_ms = 16.67;
+	*max_frame_time_ms = 16.67;
 }
 
 void vk_wait_idle( void ) {

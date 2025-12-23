@@ -154,6 +154,12 @@ static void CL_ImGui_RenderOverlay( void )
 		return;
 	}
 
+	// Ensure backend is ready before using ImGui functions
+	if ( !CL_ImGui_EnsureBackend() )
+	{
+		return;
+	}
+
 	if ( cl_imgui.showDemo && cl_imgui.showDemo->integer )
 	{
 		bool open = true;

@@ -3353,6 +3353,59 @@ most world construction surfaces.
 
 ===============
 */
+
+/*
+===============
+R_NormalizeShaderPath
+
+Normalizes shader paths to prevent issues with absolute Windows paths
+from model files that were created on Windows systems.
+===============
+*/
+static const char *R_NormalizeShaderPath( const char *name ) {
+	static char normalizedName[MAX_QPATH];
+	const char *filename;
+
+	// Check for Windows absolute paths (drive letter followed by colon and backslash)
+	if (name && strlen(name) >= 3 &&
+		((name[0] >= 'A' && name[0] <= 'Z') || (name[0] >= 'a' && name[0] <= 'z')) &&
+		name[1] == ':' && (name[2] == '\\' || name[2] == '/')) {
+
+		// Extract just the filename from the path
+		filename = strrchr(name, '\\');
+		if (!filename) {
+			filename = strrchr(name, '/');
+		}
+		if (filename) {
+			filename++; // Skip the path separator
+		} else {
+			// If no path separator found, use the whole string after drive letter
+			filename = name + 2;
+			if (*filename == '\\' || *filename == '/') {
+				filename++;
+			}
+		}
+
+		// Copy the normalized path
+		Q_strncpyz(normalizedName, filename, sizeof(normalizedName));
+
+		// Convert backslashes to forward slashes
+		char *p = normalizedName;
+		while (*p) {
+			if (*p == '\\') {
+				*p = '/';
+			}
+			p++;
+		}
+
+		ri.Printf( PRINT_DEVELOPER, "R_NormalizeShaderPath: converted '%s' to '%s'\n", name, normalizedName );
+		return normalizedName;
+	}
+
+	// Path is already relative, return as-is
+	return name;
+}
+
 shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImage ) {
 	char		strippedName[MAX_QPATH];
 	unsigned long hash;
@@ -3363,6 +3416,9 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 	if ( name[0] == '\0' ) {
 		return tr.defaultShader;
 	}
+
+	// Normalize the shader path to handle Windows absolute paths from model files
+	name = R_NormalizeShaderPath(name);
 
 	// use (fullbright) vertex lighting if the bsp file doesn't have
 	// lightmaps
