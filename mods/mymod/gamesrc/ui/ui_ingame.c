@@ -366,9 +366,9 @@ void UI_InGameMenu( void ) {
 	// force as top level menu
 	uis.menusp = 0;  
 
-	// set menu cursor to a nice location
-	uis.cursorx = 319;
-	uis.cursory = 80;
+	// set menu cursor to a nice location (convert virtual coordinates to native)
+	uis.cursorx = 319 * uis.xscale + uis.bias;
+	uis.cursory = 80 * uis.yscale;
 
 	InGame_MenuInit();
 	UI_PushMenu( &s_ingame.menu );

@@ -883,18 +883,19 @@ void UI_MouseEvent( int dx, int dy )
 	if (!uis.activemenu)
 		return;
 
-	// update mouse screen position
-	uis.cursorx += dx;
-	if (uis.cursorx < -uis.bias)
-		uis.cursorx = -uis.bias;
-	else if (uis.cursorx > SCREEN_WIDTH+uis.bias)
-		uis.cursorx = SCREEN_WIDTH+uis.bias;
+	// update mouse screen position at native resolution (1:1 mapping)
+	// Scale mouse deltas by inverse of virtual scaling to match native resolution
+	uis.cursorx += dx / uis.xscale;
+	if (uis.cursorx < 0)
+		uis.cursorx = 0;
+	else if (uis.cursorx > uis.glconfig.vidWidth)
+		uis.cursorx = uis.glconfig.vidWidth;
 
-	uis.cursory += dy;
+	uis.cursory += dy / uis.yscale;
 	if (uis.cursory < 0)
 		uis.cursory = 0;
-	else if (uis.cursory > SCREEN_HEIGHT)
-		uis.cursory = SCREEN_HEIGHT;
+	else if (uis.cursory > uis.glconfig.vidHeight)
+		uis.cursory = uis.glconfig.vidHeight;
 
 	// region test the active menu items
 	for (i=0; i<uis.activemenu->nitems; i++)
@@ -904,10 +905,11 @@ void UI_MouseEvent( int dx, int dy )
 		if (m->flags & (QMF_GRAYED|QMF_INACTIVE))
 			continue;
 
-		if ((uis.cursorx < m->left) ||
-			(uis.cursorx > m->right) ||
-			(uis.cursory < m->top) ||
-			(uis.cursory > m->bottom))
+		// Convert UI element bounds from virtual to native coordinates for comparison
+		if ((uis.cursorx < m->left * uis.xscale + uis.bias) ||
+			(uis.cursorx > m->right * uis.xscale + uis.bias) ||
+			(uis.cursory < m->top * uis.yscale) ||
+			(uis.cursory > m->bottom * uis.yscale))
 		{
 			// cursor out of item bounds
 			continue;
@@ -1270,15 +1272,18 @@ void UI_Refresh( int realtime )
 		}
 	}
 
-	// draw cursor
+	// draw cursor (convert native coordinates back to virtual for drawing)
 	UI_SetColor( NULL );
-	UI_DrawHandlePic( uis.cursorx-16, uis.cursory-16, 32, 32, uis.cursor);
+	UI_DrawHandlePic( uis.cursorx / uis.xscale - 16, uis.cursory / uis.yscale - 16, 32, 32, uis.cursor);
 
 #ifndef NDEBUG
 	if (uis.debug)
 	{
-		// cursor coordinates
-		UI_DrawString( 0, 0, va("(%d,%d)",uis.cursorx,uis.cursory), UI_LEFT|UI_SMALLFONT, colorRed );
+		// cursor coordinates (native/virtual)
+		UI_DrawString( 0, 0, va("(%d,%d) native / (%.0f,%.0f) virtual",
+			uis.cursorx, uis.cursory,
+			uis.cursorx / uis.xscale, uis.cursory / uis.yscale),
+			UI_LEFT|UI_SMALLFONT, colorRed );
 	}
 #endif
 
@@ -1300,10 +1305,16 @@ void UI_DrawTextBox (int x, int y, int width, int lines)
 
 qboolean UI_CursorInRect (int x, int y, int width, int height)
 {
-	if (uis.cursorx < x ||
-		uis.cursory < y ||
-		uis.cursorx > x+width ||
-		uis.cursory > y+height)
+	// Convert virtual coordinates to native for comparison with native mouse coordinates
+	float nativeX = x * uis.xscale + uis.bias;
+	float nativeY = y * uis.yscale;
+	float nativeWidth = width * uis.xscale;
+	float nativeHeight = height * uis.yscale;
+
+	if (uis.cursorx < nativeX ||
+		uis.cursory < nativeY ||
+		uis.cursorx > nativeX + nativeWidth ||
+		uis.cursory > nativeY + nativeHeight)
 		return qfalse;
 
 	return qtrue;

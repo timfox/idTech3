@@ -305,7 +305,8 @@ static sfxHandle_t UI_TeamOrdersMenu_Key( int key )
 		x = l->generic.left;
 		y = l->generic.top;
 		if( UI_CursorInRect( x, y, l->generic.right - x, l->generic.bottom - y ) ) {
-			index = (uis.cursory - y) / PROP_HEIGHT;
+			// Convert native mouse coordinates to virtual space for index calculation
+			index = (uis.cursory / uis.yscale - y) / PROP_HEIGHT;
 			l->oldvalue = l->curvalue;
 			l->curvalue = index;
 

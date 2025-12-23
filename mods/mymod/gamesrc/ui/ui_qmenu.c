@@ -613,7 +613,8 @@ static sfxHandle_t Slider_Key( menuslider_s *s, int key )
 	switch (key)
 	{
 		case K_MOUSE1:
-			x           = uis.cursorx - s->generic.x - 2*SMALLCHAR_WIDTH;
+			// Convert native mouse coordinates to virtual space for slider calculation
+			x           = (uis.cursorx - uis.bias) / uis.xscale - s->generic.x - 2*SMALLCHAR_WIDTH;
 			oldvalue    = s->curvalue;
 			s->curvalue = (x/(float)(SLIDER_RANGE*SMALLCHAR_WIDTH)) * (s->maxvalue-s->minvalue) + s->minvalue;
 
@@ -981,9 +982,10 @@ sfxHandle_t ScrollList_Key( menulist_s *l, int key )
 				}
 				if (UI_CursorInRect( x, y, w, l->height*SMALLCHAR_HEIGHT ))
 				{
-					cursorx = (uis.cursorx - x)/SMALLCHAR_WIDTH;
+					// Convert native mouse coordinates back to virtual space for text cursor calculation
+					cursorx = ((uis.cursorx - uis.bias) / uis.xscale - x)/SMALLCHAR_WIDTH;
 					column = cursorx / (l->width + l->seperation);
-					cursory = (uis.cursory - y)/SMALLCHAR_HEIGHT;
+					cursory = (uis.cursory / uis.yscale - y)/SMALLCHAR_HEIGHT;
 					index = column * l->height + cursory;
 					if (l->top + index < l->numitems)
 					{
