@@ -620,6 +620,7 @@ typedef struct image_s {
 	uint32_t	layers;
 	VkImage		handle;
 	VkImageView	view;
+	VkDeviceMemory memory;		// Allocated device memory for the image
 	// Descriptor set that contains single descriptor used to access the given image.
 	// It is updated only once during image initialization.
 	VkDescriptorSet descriptor;

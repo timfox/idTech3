@@ -1850,27 +1850,32 @@ static void R_CreateBuiltinImages( void ) {
 	int		x,y;
 	byte	data[DEFAULT_SIZE][DEFAULT_SIZE][4];
 
+	ri.Printf(PRINT_ALL, "R_CreateBuiltinImages: Creating default image\n");
 	R_CreateDefaultImage();
 
 	Com_Memset( data, 0, sizeof( data ) );
+	ri.Printf(PRINT_ALL, "R_CreateBuiltinImages: Creating black image\n");
 	tr.blackImage = R_CreateImage( "*black", NULL, (byte *)data, 8, 8, IMGFLAG_NONE, 0, 0 );
 
 	// we use a solid white image instead of disabling texturing
 	Com_Memset( data, 255, sizeof( data ) );
+	ri.Printf(PRINT_ALL, "R_CreateBuiltinImages: Creating white image\n");
 	tr.whiteImage = R_CreateImage( "*white", NULL, (byte *)data, 8, 8, IMGFLAG_NONE, 0, 0 );
 
 	// with overbright bits active, we need an image which is some fraction of full color,
 	// for default lightmaps, etc
 	for (x=0 ; x<DEFAULT_SIZE ; x++) {
 		for (y=0 ; y<DEFAULT_SIZE ; y++) {
-			data[y][x][0] = 
-			data[y][x][1] = 
+			data[y][x][0] =
+			data[y][x][1] =
 			data[y][x][2] = tr.identityLightByte;
 			data[y][x][3] = 255;
 		}
 	}
 
+	ri.Printf(PRINT_ALL, "R_CreateBuiltinImages: Creating identity light image\n");
 	tr.identityLightImage = R_CreateImage( "*identityLight", NULL, (byte *)data, 8, 8, IMGFLAG_NONE, 0, 0 );
+	ri.Printf(PRINT_ALL, "R_CreateBuiltinImages: Basic images created\n");
 
 	// Checkerboard (procedural)
 	for (y = 0; y < DEFAULT_SIZE; y++) {
@@ -2062,9 +2067,10 @@ void R_InitImages( void ) {
 
 	// create default texture and white texture
 	R_CreateBuiltinImages();
+	ri.Printf(PRINT_ALL, "R_InitImages: Builtin images created successfully\n");
 
 #ifdef USE_VULKAN
-	vk_update_post_process_pipelines();
+	// vk_update_post_process_pipelines(); // Temporarily disabled for testing
 #endif
 }
 

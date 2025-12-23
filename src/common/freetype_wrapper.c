@@ -89,7 +89,7 @@ FT_Library FreeType_GetLibrary(void)
 {
 	if (!freetype_initialized || !com_freetype_enabled || !com_freetype_enabled->integer)
 		return NULL;
-	
+
 	return ftLibrary;
 }
 

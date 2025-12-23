@@ -30,7 +30,7 @@ extern PFN_vkCmdPipelineBarrier qvkCmdPipelineBarrier;
 extern PFN_vkCmdPushConstants qvkCmdPushConstants;
 
 // Utility functions
-extern const char *vk_result_to_string(VkResult result);
+extern const char *vk_result_string(VkResult result);
 #define SET_OBJECT_NAME(obj, name, type) vk_set_object_name((uint64_t)(obj), (name), (type))
 extern void vk_set_object_name(uint64_t obj, const char *name, VkDebugReportObjectTypeEXT type);
 
@@ -104,6 +104,11 @@ vk_shutdown_enhanced_post_processing
 */
 void vk_shutdown_enhanced_post_processing(void)
 {
+    // Safety check - ensure Vulkan device is valid
+    if (!vk.active || vk.device == VK_NULL_HANDLE || qvkDestroyPipeline == NULL) {
+        return;
+    }
+
     // Destroy pipelines
     if (vk.ssao_pipeline != VK_NULL_HANDLE) {
         qvkDestroyPipeline(vk.device, vk.ssao_pipeline, NULL);
@@ -192,7 +197,7 @@ VkPipeline vk_create_compute_pipeline(VkShaderModule computeShader, VkPipelineLa
     VkResult result = qvkCreateComputePipelines(vk.device, VK_NULL_HANDLE, 1, &createInfo, NULL, &pipeline);
 
     if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "Vulkan: Failed to create %s pipeline: %s\n", name, vk_result_to_string(result));
+        ri.Printf(PRINT_ERROR, "Vulkan: Failed to create %s pipeline: %s\n", name, vk_result_string(result));
         return VK_NULL_HANDLE;
     }
 

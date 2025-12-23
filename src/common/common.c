@@ -597,9 +597,14 @@ void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t code, const char 
 	Q_vsnprintf( com_errorMessage, sizeof( com_errorMessage ), fmt, argptr );
 #else
 	// In debug builds, include file and line information for better debugging
-	char temp[sizeof(com_errorMessage)];
+	char temp[sizeof(com_errorMessage) - 256]; // Reserve space for file/line info
 	Q_vsnprintf( temp, sizeof( temp ), fmt, argptr );
-	Q_snprintf( com_errorMessage, sizeof( com_errorMessage ), "%s [%s:%d]", temp, __FILE__, __LINE__ );
+	// Use a safer approach to avoid truncation warnings
+	int len = Q_snprintf( com_errorMessage, sizeof( com_errorMessage ), "%s [%s:%d]", temp, __FILE__, __LINE__ );
+	if (len >= (int)sizeof(com_errorMessage)) {
+		// Truncation occurred, ensure null termination
+		com_errorMessage[sizeof(com_errorMessage) - 1] = '\0';
+	}
 #endif
 	va_end( argptr );
 

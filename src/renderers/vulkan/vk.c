@@ -47,15 +47,65 @@ extern cvar_t *r_vk_hotReload;
 extern int setenv( const char *name, const char *value, int overwrite );
 
 // Modern C23/C++23 safety features for Vulkan renderer
+static void vk_create_descriptor_set_layouts(void);
 #include <assert.h>
 
 // Static assertions for Vulkan safety
 static_assert(sizeof(VkDeviceSize) >= sizeof(size_t), "VkDeviceSize must be at least as large as size_t");
-// Note: VK_NULL_HANDLE is defined as 0 or ((void*)0), which may not be a compile-time constant
-// This assertion is checked at runtime instead
-#if 0
-static_assert(VK_NULL_HANDLE == NULL, "VK_NULL_HANDLE must equal NULL for compatibility");
+static_assert(sizeof(VkDeviceAddress) >= sizeof(uintptr_t), "VkDeviceAddress must be able to hold pointer values");
+
+// Runtime safety checks for Vulkan compatibility
+static inline void vk_safety_checks(void) {
+    // Ensure VK_NULL_HANDLE compatibility
+    if (VK_NULL_HANDLE != NULL) {
+        ri.Printf(PRINT_WARNING, "VK_NULL_HANDLE != NULL - this may cause compatibility issues\n");
+    }
+}
+
+// Modern bounds checking for array operations
+static inline qboolean vk_bounds_check(size_t index, size_t max, const char *array_name) {
+    if (index >= max) {
+        ri.Printf(PRINT_ERROR, "Vulkan: Array index %zu out of bounds for %s (max %zu)\n", index, array_name, max);
+        return qfalse;
+    }
+    return qtrue;
+}
+
+// Safe Vulkan handle validation
+static inline qboolean vk_validate_handle(void *handle, const char *handle_name) {
+    if (handle == VK_NULL_HANDLE || handle == NULL) {
+        ri.Printf(PRINT_ERROR, "Vulkan: Invalid %s handle (NULL)\n", handle_name);
+        return qfalse;
+    }
+    return qtrue;
+}
+
+// Modern Vulkan performance monitoring
+static inline void vk_performance_marker_begin(VkCommandBuffer cmd, const char *name) {
+#ifdef USE_VK_VALIDATION
+    if (qvkCmdBeginDebugUtilsLabelEXT && name && cmd != VK_NULL_HANDLE) {
+        VkDebugUtilsLabelEXT label = {
+            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
+            .pLabelName = name,
+            .color = {0.0f, 1.0f, 0.0f, 1.0f} // Green for performance markers
+        };
+        qvkCmdBeginDebugUtilsLabelEXT(cmd, &label);
+    }
+#else
+    (void)cmd; // Suppress unused parameter warning
+    (void)name;
 #endif
+}
+
+static inline void vk_performance_marker_end(VkCommandBuffer cmd) {
+#ifdef USE_VK_VALIDATION
+    if (qvkCmdEndDebugUtilsLabelEXT && cmd != VK_NULL_HANDLE) {
+        qvkCmdEndDebugUtilsLabelEXT(cmd);
+    }
+#else
+    (void)cmd; // Suppress unused parameter warning
+#endif
+}
 
 // Modern attribute macros for Vulkan functions
 #ifdef __GNUC__
@@ -1404,11 +1454,13 @@ static void create_instance( void )
 	appInfo.applicationVersion = 0x0;
 	appInfo.pEngineName = NULL;
 	appInfo.engineVersion = 0x0;
-#ifdef _DEBUG
-	appInfo.apiVersion = VK_API_VERSION_1_1;
-#else
-	appInfo.apiVersion = VK_API_VERSION_1_0;
-#endif
+// Use Vulkan 1.3 for modern features like dynamic rendering, synchronization2, etc.
+// Vulkan 1.3 provides:
+// - VK_KHR_dynamic_rendering (core)
+// - VK_KHR_synchronization2 (core)
+// - VK_EXT_descriptor_buffer (optional)
+// - Improved performance and safety features
+appInfo.apiVersion = VK_API_VERSION_1_3;
 
 	// create instance
 	desc.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -2302,6 +2354,9 @@ static void init_vulkan_library( void )
 
 	Com_Memset( &vk, 0, sizeof( vk ) );
 
+	// Run safety checks on Vulkan initialization
+	vk_safety_checks();
+
 #ifdef USE_VULKAN
 	// Allow forcing a specific ICD via cvar (maps to VK_ICD_FILENAMES).
 	if ( r_vk_icd && r_vk_icd->string && r_vk_icd->string[0] ) {
@@ -2729,6 +2784,130 @@ static void init_vulkan_library( void )
 	}
 
 	INIT_DEVICE_FUNCTION_EXT(vkCmdClearColorImage)
+
+	// Create the main descriptor pool
+	{
+		VkDescriptorPoolSize pool_sizes[] = {
+			{ VK_DESCRIPTOR_TYPE_SAMPLER, 1024 },
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4096 },
+			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 4096 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1024 },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1024 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1024 },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1024 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1024 },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 256 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 256 },
+			{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 256 }
+		};
+
+		VkDescriptorPoolCreateInfo pool_info = {
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+			.pNext = NULL,
+			.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT,
+			.maxSets = 8192,
+			.poolSizeCount = ARRAY_LEN(pool_sizes),
+			.pPoolSizes = pool_sizes
+		};
+
+		VK_CHECK(qvkCreateDescriptorPool(vk.device, &pool_info, NULL, &vk.descriptor_pool));
+
+		// Create descriptor set layouts
+		vk_create_descriptor_set_layouts();
+	}
+
+	vk.active = qtrue;
+}
+
+static void vk_create_descriptor_set_layouts(void) {
+	// Create sampler layout
+	{
+		VkDescriptorSetLayoutBinding binding = {
+			.binding = 0,
+			.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.pImmutableSamplers = NULL
+		};
+
+		VkDescriptorSetLayoutCreateInfo layoutInfo = {
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+			.bindingCount = 1,
+			.pBindings = &binding
+		};
+
+		VK_CHECK(qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &vk.set_layout_sampler));
+	}
+
+	// Create uniform layout
+	{
+		VkDescriptorSetLayoutBinding bindings[2];
+		uint32_t bindingCount = 1;
+
+		bindings[0] = (VkDescriptorSetLayoutBinding){
+			.binding = 0,
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+			.pImmutableSamplers = NULL
+		};
+
+		// Camera uniform binding for uniform layout
+		bindings[1] = (VkDescriptorSetLayoutBinding){
+			.binding = 1,
+			.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+			.pImmutableSamplers = NULL
+		};
+		bindingCount = 2;
+
+		VkDescriptorSetLayoutCreateInfo layoutInfo = {
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+			.bindingCount = bindingCount,
+			.pBindings = bindings
+		};
+
+		VK_CHECK(qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &vk.set_layout_uniform));
+	}
+
+	// Create storage layout
+	{
+		VkDescriptorSetLayoutBinding binding = {
+			.binding = 0,
+			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+			.pImmutableSamplers = NULL
+		};
+
+		VkDescriptorSetLayoutCreateInfo layoutInfo = {
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+			.bindingCount = 1,
+			.pBindings = &binding
+		};
+
+		VK_CHECK(qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &vk.set_layout_storage));
+	}
+
+	// Create material layout (if material system is enabled)
+	if (r_materialSystem && r_materialSystem->integer) {
+		VkDescriptorSetLayoutBinding binding = {
+			.binding = 0,
+			.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+			.descriptorCount = 1,
+			.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+			.pImmutableSamplers = NULL
+		};
+
+		VkDescriptorSetLayoutCreateInfo layoutInfo = {
+			.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+			.bindingCount = 1,
+			.pBindings = &binding
+		};
+
+		VK_CHECK(qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &vk.set_layout_material));
+	}
 }
 
 #undef INIT_INSTANCE_FUNCTION
@@ -2762,6 +2941,7 @@ static void __attribute__((unused)) deinit_instance_functions( void )
 	qvkDestroyDebugReportCallbackEXT = NULL;
 #endif
 }
+
 
 
 static void __attribute__((unused)) deinit_device_functions( void )
@@ -2859,8 +3039,6 @@ qvkGetPipelineCacheData					= NULL;
 
 	qvkDebugMarkerSetObjectNameEXT				= NULL;
 	qvkCmdClearColorImage						= NULL;
-
-	vk.active = qtrue;
 }
 
 
@@ -3163,6 +3341,9 @@ static void vk_create_attachments( void );
 
 void vk_initialize( void )
 {
+	if ( vk.active ) {
+		return;
+	}
 	init_vulkan_library();
 }
 
@@ -3173,13 +3354,34 @@ void vk_init_descriptors( void )
 	VkWriteDescriptorSet desc;
 	uint32_t i;
 
+
 	alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
 	alloc.pNext = NULL;
 	alloc.descriptorPool = vk.descriptor_pool;
 	alloc.descriptorSetCount = 1;
 	alloc.pSetLayouts = &vk.set_layout_storage;
 
-	VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.storage.descriptor ) );
+
+	// Validate before allocation
+	if (vk.descriptor_pool == VK_NULL_HANDLE) {
+		ri.Printf(PRINT_ERROR, "vk_init_descriptors: descriptor_pool is NULL!\n");
+		return;
+	}
+	if (vk.set_layout_storage == VK_NULL_HANDLE) {
+		ri.Printf(PRINT_ERROR, "vk_init_descriptors: set_layout_storage is NULL!\n");
+		return;
+	}
+	if (qvkAllocateDescriptorSets == NULL) {
+		ri.Printf(PRINT_ERROR, "vk_init_descriptors: qvkAllocateDescriptorSets function pointer is NULL!\n");
+		return;
+	}
+
+	VkResult result = qvkAllocateDescriptorSets( vk.device, &alloc, &vk.storage.descriptor );
+	if (result != VK_SUCCESS) {
+		ri.Printf(PRINT_ERROR, "vk_init_descriptors: qvkAllocateDescriptorSets failed: %s\n", vk_result_string(result));
+		return;
+	}
+
 
 	// Allocate ray tracing descriptor set if supported
 	if ( vk.rayTracingSupported && vk.rt.initialized && vk.rt.raytracingDescriptorSetLayout != VK_NULL_HANDLE ) {
@@ -4178,7 +4380,32 @@ void vk_create_image( image_t *image, int width, int height, int mip_levels ) {
 
 		VK_CHECK( qvkCreateImage( vk.device, &desc, NULL, &image->handle ) );
 
-		// allocate_and_bind_image_memory( image->handle ); // TODO: Reimplement or remove
+		// Allocate and bind memory for the image
+		{
+			VkMemoryRequirements mem_reqs;
+			VkMemoryAllocateInfo alloc_info = {0};
+			uint32_t memory_type;
+
+			qvkGetImageMemoryRequirements( vk.device, image->handle, &mem_reqs );
+
+			alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+			alloc_info.allocationSize = mem_reqs.size;
+
+			memory_type = find_memory_type( mem_reqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+			if ( memory_type == ~0U ) {
+				ri.Error( ERR_FATAL, "Vulkan: No suitable memory type found for image" );
+			}
+
+			alloc_info.memoryTypeIndex = memory_type;
+
+			VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &image->memory ) );
+			VK_CHECK( qvkBindImageMemory( vk.device, image->handle, image->memory, 0 ) );
+
+			// Track image memory for cleanup
+			if ( vk.image_memory_count < ARRAY_LEN( vk.image_memory ) ) {
+				vk.image_memory[ vk.image_memory_count++ ] = image->memory;
+			}
+		}
 	}
 
 	// create image view
@@ -9833,29 +10060,50 @@ void vk_vrs_apply_shading_rate( VkCommandBuffer cmdBuffer ) {
 void vk_shutdown( refShutdownCode_t code ) {
 	ri.Printf( PRINT_ALL, "vk_shutdown( %i )\n", code );
 
-	// Shutdown in reverse order of initialization
+	// Shutdown in reverse order of initialization with error handling
 	if ( code != REF_KEEP_CONTEXT ) {
-		// Shutdown all Vulkan subsystems
-		vk_shutdown_enhanced_post_processing();
+		// Shutdown all Vulkan subsystems safely
+		if (vk.active && vk.device != VK_NULL_HANDLE) {
+			ri.Printf(PRINT_ALL, "vk_shutdown: Shutting down Vulkan subsystems...\n");
 
-		// Shutdown ray tracing if enabled
+			// Wait for device idle first before destroying resources
+			if (qvkDeviceWaitIdle) {
+				VkResult result = qvkDeviceWaitIdle(vk.device);
+				if (result != VK_SUCCESS) {
+					ri.Printf(PRINT_WARNING, "vk_shutdown: qvkDeviceWaitIdle failed: %s\n", vk_result_string(result));
+				}
+			}
+
+			// Shutdown enhanced post processing
+			vk_shutdown_enhanced_post_processing();
+
+			// Shutdown ray tracing if enabled
 #ifdef USE_VULKAN_RAY_TRACING
-		if ( vk.rayTracingSupported ) {
-			vk_shutdown_raytracing();
-		}
+			if ( vk.rayTracingSupported ) {
+				vk_shutdown_raytracing();
+			}
 #endif
 
-		// Shutdown async compute
-		vk_shutdown_async_compute();
+			// Shutdown async compute
+			vk_shutdown_async_compute();
 
-		// Shutdown resource pools
-		vk_shutdown_resource_pool();
+			// Shutdown resource pools
+			vk_shutdown_resource_pool();
 
-		// Clear Vulkan instance data
+			// Mark Vulkan as inactive after cleanup
+			vk.active = qfalse;
+		}
+
+		// Clear Vulkan instance data based on shutdown level
 		if ( code != REF_KEEP_WINDOW ) {
+			ri.Printf(PRINT_ALL, "vk_shutdown: Full cleanup - clearing Vulkan instance data\n");
 			// Full shutdown - clear everything
 			Com_Memset( &vk, 0, sizeof( vk ) );
+		} else {
+			ri.Printf(PRINT_ALL, "vk_shutdown: Partial cleanup - keeping window context\n");
 		}
+	} else {
+		ri.Printf(PRINT_ALL, "vk_shutdown: Keeping Vulkan context (REF_KEEP_CONTEXT)\n");
 	}
 }
 

@@ -47,6 +47,7 @@ static void VkInfo_f( void );
 static void GfxInfo( void );
 static void VarInfo( void );
 static void GL_SetDefaultState( void );
+void R_InitExtensions( void );
 
 cvar_t	*r_flareSize;
 cvar_t	*r_flareFade;
@@ -586,34 +587,28 @@ static qboolean R_HaveExtension( const char *ext )
 /*
 ** R_InitExtensions
 */
-static void R_InitExtensions( void )
+void R_InitExtensions( void )
 {
-	GLint max_texture_size = 0;
-	float version;
-	size_t len;
+	// Query Vulkan device properties instead of OpenGL
+	VkPhysicalDeviceProperties props;
+	qvkGetPhysicalDeviceProperties(vk.physical_device, &props);
 
-	if ( !qglGetString( GL_EXTENSIONS ) )
-	{
-		ri.Error( ERR_FATAL, "OpenGL installation is broken. Please fix video drivers and/or restart your system" );
-	}
+	// Set vendor and device info
+	Q_strncpyz( glConfig.vendor_string, props.deviceName, sizeof( glConfig.vendor_string ) );
+	Q_strncpyz( glConfig.renderer_string, "Vulkan", sizeof( glConfig.renderer_string ) );
+	Q_snprintf( glConfig.version_string, sizeof( glConfig.version_string ), "%u.%u.%u",
+		VK_VERSION_MAJOR(props.apiVersion), VK_VERSION_MINOR(props.apiVersion), VK_VERSION_PATCH(props.apiVersion) );
 
-	// get our config strings
-	Q_strncpyz( glConfig.vendor_string, (char *)qglGetString (GL_VENDOR), sizeof( glConfig.vendor_string ) );
-	Q_strncpyz( glConfig.renderer_string, (char *)qglGetString (GL_RENDERER), sizeof( glConfig.renderer_string ) );
-	len = strlen( glConfig.renderer_string );
-	if ( len && glConfig.renderer_string[ len - 1 ] == '\n' )
-		glConfig.renderer_string[ len - 1 ] = '\0';
-	Q_strncpyz( glConfig.version_string, (char *)qglGetString( GL_VERSION ), sizeof( glConfig.version_string ) );
+	// Build extensions string from Vulkan device
+	glConfig.extensions_string[0] = '\0';
+	// Note: Could enumerate device extensions here if needed
 
-	Q_strncpyz( gl_extensions, (char *)qglGetString( GL_EXTENSIONS ), sizeof( gl_extensions ) );
-	Q_strncpyz( glConfig.extensions_string, gl_extensions, sizeof( glConfig.extensions_string ) );
+	gl_version = (int)(VK_VERSION_MAJOR(props.apiVersion) * 10.001);
 
-	version = Q_atof( (const char *)qglGetString( GL_VERSION ) );
-	gl_version = (int)(version * 10.001);
-
-	glConfig.textureCompression = TC_NONE;
-
-	glConfig.textureEnvAddAvailable = qfalse;
+	// Vulkan-specific config
+	glConfig.numTextureUnits = 32; // Reasonable default for Vulkan descriptor sets
+	glConfig.textureCompression = TC_NONE; // Vulkan handles compression differently
+	glConfig.textureEnvAddAvailable = qfalse; // Not applicable to Vulkan
 
 	textureFilterAnisotropic = qfalse;
 	maxAnisotropy = 0;
@@ -621,38 +616,33 @@ static void R_InitExtensions( void )
 	qglLockArraysEXT = NULL;
 	qglUnlockArraysEXT = NULL;
 
-	glConfig.numTextureUnits = 1;
+	// glConfig.numTextureUnits already set above for Vulkan
 	qglMultiTexCoord2fARB = NULL;
 	qglActiveTextureARB = NULL;
 	qglClientActiveTextureARB = NULL;
 
 	gl_clamp_mode = GL_CLAMP; // by default
 
-	// OpenGL driver constants
-	qglGetIntegerv( GL_MAX_TEXTURE_SIZE, &max_texture_size );
-	glConfig.maxTextureSize = max_texture_size;
+	// Vulkan device limits
+	glConfig.maxTextureSize = props.limits.maxImageDimension2D;
 
-	// stubbed or broken drivers may have reported 0...
+	// Ensure reasonable limits
 	if ( glConfig.maxTextureSize <= 0 )
-		glConfig.maxTextureSize = 0;
+		glConfig.maxTextureSize = 16384; // Default to 16K if not reported
 	else if ( glConfig.maxTextureSize > MAX_TEXTURE_SIZE )
 		glConfig.maxTextureSize = MAX_TEXTURE_SIZE; // ResampleTexture() relies on that maximum
 
 	if ( !r_allowExtensions->integer )
 	{
-		ri.Printf( PRINT_ALL, "*** IGNORING OPENGL EXTENSIONS ***\n" );
+		ri.Printf( PRINT_ALL, "*** IGNORING VULKAN EXTENSIONS ***\n" );
 		return;
 	}
 
-	ri.Printf( PRINT_ALL, "Initializing OpenGL extensions\n" );
+	ri.Printf( PRINT_ALL, "Initializing Vulkan features\n" );
 
-	if ( R_HaveExtension( "GL_EXT_texture_edge_clamp" ) || R_HaveExtension( "GL_SGIS_texture_edge_clamp" ) ) {
-		gl_clamp_mode = GL_CLAMP_TO_EDGE;
-		ri.Printf( PRINT_ALL, "...using GL_EXT_texture_edge_clamp\n" );
-	} else {
-		ri.Printf( PRINT_ALL, "...GL_EXT_texture_edge_clamp not found\n" );
-		ri.Printf( PRINT_ALL, S_COLOR_YELLOW "...Degraded texture support likely!\n" );
-	}
+	// Vulkan has CLAMP_TO_EDGE as standard
+	gl_clamp_mode = GL_CLAMP_TO_EDGE;
+	ri.Printf( PRINT_ALL, "...using Vulkan CLAMP_TO_EDGE\n" );
 
 	// GL_EXT_texture_compression_s3tc
 	if ( R_HaveExtension( "GL_ARB_texture_compression" ) &&
@@ -858,6 +848,8 @@ static void InitOpenGL( void )
 		}
 
 		vk_initialize();
+
+		R_InitExtensions();
 #else
 		const char *err;
 
@@ -2893,9 +2885,6 @@ void R_Init( void ) {
 
 	InitOpenGL();
 
-	R_InitImages();
-
-	VarInfo();
 
 #ifdef USE_VULKAN
 	vk_create_pipelines();

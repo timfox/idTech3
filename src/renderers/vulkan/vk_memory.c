@@ -11,6 +11,11 @@ extern void vk_wait_idle(void);
 extern refimport_t ri;
 
 qboolean vk_allocate_image_chunk(void) {
+	// Ensure image_chunk_size is initialized
+	if (vk.image_chunk_size == 0) {
+		vk.image_chunk_size = IMAGE_CHUNK_SIZE;
+	}
+
 	if (vk_world.num_image_chunks == 0) {
 		VkMemoryAllocateInfo alloc_info = {
 			.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,

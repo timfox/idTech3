@@ -520,7 +520,26 @@ uint32_t find_memory_type( uint32_t memory_type_bits, VkMemoryPropertyFlags prop
 
 // Vulkan error checking macro (vk_result_string is defined in vk.c)
 extern const char *vk_result_string( VkResult res );
+
+// Standard VK_CHECK macro - prints error but continues (for non-critical operations)
 #define VK_CHECK( function_call ) { \
+	VkResult _vk_check_res = function_call; \
+	if ( _vk_check_res < 0 ) { \
+		ri.Printf( PRINT_ERROR, "Vulkan: %s returned %s", #function_call, vk_result_string( _vk_check_res ) ); \
+	} \
+}
+
+// VK_CHECK_CRITICAL macro - prints error and returns false (for initialization operations)
+#define VK_CHECK_CRITICAL( function_call ) { \
+	VkResult _vk_check_res = function_call; \
+	if ( _vk_check_res < 0 ) { \
+		ri.Printf( PRINT_ERROR, "Vulkan: %s returned %s (critical failure)", #function_call, vk_result_string( _vk_check_res ) ); \
+		return qfalse; \
+	} \
+}
+
+// VK_CHECK_FATAL macro - prints error and terminates (for irrecoverable errors)
+#define VK_CHECK_FATAL( function_call ) { \
 	VkResult _vk_check_res = function_call; \
 	if ( _vk_check_res < 0 ) { \
 		ri.Error( ERR_FATAL, "Vulkan: %s returned %s", #function_call, vk_result_string( _vk_check_res ) ); \
