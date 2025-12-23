@@ -356,7 +356,7 @@ static void Q_Log_FormatText(log_level_t level, log_category_t category, const c
 		filename = file;
 	}
 	
-	Com_sprintf(buffer, buffer_size, "[%s] [%s] [%s] %s:%d %s() - %s\n",
+	Q_snprintf(buffer, buffer_size, "[%s] [%s] [%s] %s:%d %s() - %s\n",
 		timestamp,
 		Q_Log_GetLevelName(level),
 		Q_Log_GetCategoryName(category),
@@ -404,7 +404,7 @@ static void Q_Log_FormatJSON(log_level_t level, log_category_t category, const c
 	}
 	escaped_message[j] = '\0';
 	
-	Com_sprintf(buffer, buffer_size,
+	Q_snprintf(buffer, buffer_size,
 		"{\"timestamp\":\"%s\",\"level\":\"%s\",\"category\":\"%s\",\"file\":\"%s\",\"line\":%d,\"function\":\"%s\",\"message\":\"%s\"}\n",
 		timestamp,
 		Q_Log_GetLevelName(level),
@@ -444,9 +444,9 @@ static void Q_Log_FormatPlain(log_level_t level, log_category_t category, const 
 	// Plain format: just source location and message (no timestamp/level/category prefixes)
 	if ( line == 0 && filename && !Q_stricmp( filename, "compat" ) ) {
 		// Compatibility-originated logs (e.g., Com_Printf) get message only
-		Com_sprintf(buffer, buffer_size, "%s\n", message);
+		Q_snprintf(buffer, buffer_size, "%s\n", message);
 	} else {
-		Com_sprintf(buffer, buffer_size, "%s:%d %s() - %s\n",
+		Q_snprintf(buffer, buffer_size, "%s:%d %s() - %s\n",
 			filename,
 			line,
 			func ? func : "unknown",
@@ -611,7 +611,7 @@ Q_Log
 void QDECL Q_Log(log_level_t level, log_category_t category, const char *file, int line, const char *func, const char *fmt, ...) {
 	va_list argptr;
 	char message[MAX_LOG_MESSAGE];
-	char formatted[MAX_LOG_MESSAGE];
+	char formatted[MAX_LOG_MESSAGE * 2];
 	int len;
 	
 	if (log_state.in_log) {

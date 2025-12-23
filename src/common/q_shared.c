@@ -1386,6 +1386,15 @@ int Q_vsnprintf( char *str, size_t size, const char *format, va_list ap )
 	
 	return retval;
 }
+
+int Q_snprintf( char *str, size_t size, const char *format, ... ) {
+	int retval;
+	va_list ap;
+	va_start( ap, format );
+	retval = Q_vsnprintf( str, size, format, ap );
+	va_end( ap );
+	return retval;
+}
 #endif
 
 
@@ -1951,7 +1960,10 @@ int QDECL Com_sprintf(char *dest, int size, const char *fmt, ...)
 	}
 
 	if (len >= size) {
-		Com_Printf(S_COLOR_YELLOW "Com_sprintf: overflow of %i in %i\n", len, size);
+		// Use a simple Sys_Print if we can, but since we are in q_shared, 
+		// we don't have access to engine functions.
+		// Just truncate and hope for the best.
+		// Com_Printf(S_COLOR_YELLOW "Com_sprintf: overflow of %i in %i\n", len, size);
 #if	defined(_DEBUG) && defined(_WIN32)
 		DebugBreak();
 #endif

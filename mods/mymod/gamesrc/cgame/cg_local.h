@@ -90,9 +90,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define STAT_MINUS			10	// num frame for '-' stats digit
 
 #define	ICON_SIZE			48
-#ifndef CHAR_WIDTH
+#undef CHAR_WIDTH
 #define	CHAR_WIDTH			32
-#endif
+#undef CHAR_HEIGHT
 #define	CHAR_HEIGHT			48
 #define	TEXT_ICON_SPACE		4
 

@@ -1298,14 +1298,19 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 		return FloatAsInt( ceil( VMF(1) ) );
 
 	case UI_PC_ADD_GLOBAL_DEFINE:
+		if (!botlib_export) return 0;
 		return botlib_export->PC_AddGlobalDefine( VMA(1) );
 	case UI_PC_LOAD_SOURCE:
+		if (!botlib_export) return 0;
 		return botlib_export->PC_LoadSourceHandle( VMA(1) );
 	case UI_PC_FREE_SOURCE:
+		if (!botlib_export) return 0;
 		return botlib_export->PC_FreeSourceHandle( args[1] );
 	case UI_PC_READ_TOKEN:
+		if (!botlib_export) return 0;
 		return botlib_export->PC_ReadTokenHandle( args[1], VMA(2) );
 	case UI_PC_SOURCE_FILE_AND_LINE:
+		if (!botlib_export) return 0;
 		return botlib_export->PC_SourceFileAndLine( args[1], VMA(2), VMA(3) );
 
 	case UI_S_STOPBACKGROUNDTRACK:

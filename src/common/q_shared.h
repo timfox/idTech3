@@ -235,8 +235,10 @@ float FloatSwap( const float *f );
 		// vsnprintf is ISO/IEC 9899:1999
 		// abstracting this to make it portable
 		int Q_vsnprintf( char *str, size_t size, const char *format, va_list ap );
+		int Q_snprintf( char *str, size_t size, const char *format, ... ) __attribute__ ((format (printf, 3, 4)));
 	#else
 		#define Q_vsnprintf vsnprintf
+		#define Q_snprintf snprintf
 	#endif
 #endif
 

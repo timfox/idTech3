@@ -28,7 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../botlib/botlib.h"
 
-botlib_export_t	*botlib_export;
+extern botlib_export_t	*botlib_export;
 
 // Extension traps for VM_Ext system (legacy compatibility)
 // New extensions should be registered in syscall_registry.c

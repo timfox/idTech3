@@ -447,6 +447,9 @@ do the appropriate things.
 */
 static char *errorContext = NULL;
 
+#include "../botlib/botlib.h"
+botlib_export_t	*botlib_export;
+
 void Com_SetErrorContext( const char *context ) {
 	errorContext = (char *)context;
 }
@@ -594,7 +597,7 @@ void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t code, const char 
 	// In debug builds, include file and line information for better debugging
 	char temp[sizeof(com_errorMessage)];
 	Q_vsnprintf( temp, sizeof( temp ), fmt, argptr );
-	Com_sprintf( com_errorMessage, sizeof( com_errorMessage ), "%s [%s:%d]", temp, __FILE__, __LINE__ );
+	Q_snprintf( com_errorMessage, sizeof( com_errorMessage ), "%s [%s:%d]", temp, __FILE__, __LINE__ );
 #endif
 	va_end( argptr );
 
@@ -4191,6 +4194,50 @@ static void Com_SetAffinityMask( const char *str )
 Com_Init
 =================
 */
+// Shared BotLib support for client and server
+static void Com_BotImport_Print( int type, const char *fmt, ... ) {
+	va_list argptr;
+	char msg[2048];
+	(void)type;
+	va_start(argptr, fmt);
+	Q_vsnprintf(msg, sizeof(msg), fmt, argptr);
+	va_end(argptr);
+	Com_Printf("%s", msg);
+}
+
+static void *Com_BotImport_GetMemory(int size) {
+	return Z_TagMalloc( size, TAG_BOTLIB );
+}
+
+static void Com_BotImport_FreeMemory(void *ptr) {
+	Z_Free(ptr);
+}
+
+static void *Com_BotImport_HunkAlloc( int size ) {
+	return Hunk_Alloc( size, h_high );
+}
+
+void Com_InitBotLib(void) {
+	botlib_import_t	botlib_import;
+
+	if (botlib_export) return;
+
+	Com_Memset(&botlib_import, 0, sizeof(botlib_import));
+	botlib_import.Print = Com_BotImport_Print;
+	botlib_import.GetMemory = Com_BotImport_GetMemory;
+	botlib_import.FreeMemory = Com_BotImport_FreeMemory;
+	botlib_import.AvailableMemory = Z_AvailableMemory;
+	botlib_import.HunkAlloc = Com_BotImport_HunkAlloc;
+	botlib_import.FS_FOpenFile = FS_FOpenFileByMode;
+	botlib_import.FS_Read = FS_Read;
+	botlib_import.FS_Write = FS_Write;
+	botlib_import.FS_FCloseFile = FS_FCloseFile;
+	botlib_import.FS_Seek = FS_Seek;
+	botlib_import.Sys_Milliseconds = Sys_Milliseconds;
+
+	botlib_export = (botlib_export_t *)GetBotLibAPI( BOTLIB_API_VERSION, &botlib_import );
+}
+
 void Com_Init( char *commandLine ) {
     // Initialize hardening systems in order of dependency
 	const char *s;
@@ -4710,6 +4757,8 @@ Cvar_SetDescription( cg_screenFlash, "Enable screen flash effects" );
 	com_fullyInitialized = qtrue;
 
 	Com_Printf( "--- Common Initialization Complete ---\n" );
+
+	Com_InitBotLib();
 
 #ifdef USE_CJSON
 	JSON_Init();
