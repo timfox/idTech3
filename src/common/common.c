@@ -144,6 +144,8 @@ cvar_t	*ui_blurRadius;
 cvar_t	*ui_mainMenuGlow;
 cvar_t	*ui_mainMenuParticles;
 cvar_t	*ui_mainMenuScanlines;
+cvar_t	*ui_hideSystemCursor;
+cvar_t	*ui_cursorSize;
 
 // HUD enhancement cvars
 cvar_t	*cg_hudScale;
@@ -4578,6 +4580,12 @@ Cvar_CheckRange( com_safemode, "0", "1", CV_INTEGER );
 
 	ui_mainMenuScanlines = Cvar_Get( "ui_mainMenuScanlines", "0", CVAR_ARCHIVE );
 	Cvar_SetDescription( ui_mainMenuScanlines, "Enable retro scanline effects on main menu" );
+
+	ui_hideSystemCursor = Cvar_Get( "ui_hideSystemCursor", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( ui_hideSystemCursor, "Hide system cursor when UI is active (0=off, 1=on)" );
+
+	ui_cursorSize = Cvar_Get( "ui_cursorSize", "32", CVAR_ARCHIVE );
+	Cvar_SetDescription( ui_cursorSize, "Size of the UI cursor (e.g., 32, 48, 64)" );
 
 // HUD enhancement cvars
 cg_hudScale = Cvar_Get( "cg_hudScale", "1.0", CVAR_ARCHIVE );

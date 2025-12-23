@@ -1243,7 +1243,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 	selectedDPI = (int)dpi;
 	
 	{
-		cvar_t *fontAtlasSize = ri.Cvar_Get("r_fontAtlasSize", "256", 0);
+		cvar_t *fontAtlasSize = ri.Cvar_Get("r_fontAtlasSize", "512", 0);
 		atlasSize = fontAtlasSize->integer;
 		// Clamp to valid power-of-two sizes
 		if (atlasSize < 256) atlasSize = 256;

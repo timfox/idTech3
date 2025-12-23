@@ -209,7 +209,7 @@ static void MainMenu_TextPaint( float x, float y, float scale, vec4_t color, con
 
 	// The engine Font_DrawString expects absolute pixel coordinates and handles 
 	// alignment and colors internally. We need to pass the UI scale.
-	trap_R_Font_DrawString( adjX, adjY, text, color, scale * uis.xscale, font, style );
+	trap_R_Font_DrawString( adjX, adjY, text, color, scale, font, style );
 }
 
 static void MainMenu_DrawMenuItem( void *ptr ) {

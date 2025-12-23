@@ -331,6 +331,10 @@ void	trap_S_StartBackgroundTrack( const char *intro, const char *loop ) {
 	syscall( UI_S_STARTBACKGROUNDTRACK, intro, loop );
 }
 
+void trap_S_ShowMouse( qboolean show ) {
+	syscall( UI_S_SHOWMOUSE, show );
+}
+
 int trap_RealTime(qtime_t *qtime) {
 	return syscall( UI_REAL_TIME, qtime );
 }

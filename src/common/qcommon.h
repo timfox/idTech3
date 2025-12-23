@@ -1266,6 +1266,8 @@ extern	cvar_t	*cl_paused;
 extern	cvar_t	*cl_packetdelay;
 extern	cvar_t	*com_cl_running;
 extern	cvar_t	*com_yieldCPU;
+extern	cvar_t	*ui_hideSystemCursor;
+extern	cvar_t	*ui_cursorSize;
 #endif
 
 extern	cvar_t	*vm_rtChecks;

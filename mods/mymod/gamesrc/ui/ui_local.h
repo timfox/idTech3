@@ -764,6 +764,7 @@ void			trap_S_StartLocalSound( sfxHandle_t sfx, int channelNum );
 sfxHandle_t	trap_S_RegisterSound( const char *sample, qboolean compressed );
 void			trap_S_StopBackgroundTrack( void );
 void			trap_S_StartBackgroundTrack( const char *intro, const char *loop );
+void			trap_S_ShowMouse( qboolean show );
 void			trap_Key_KeynumToStringBuf( int keynum, char *buf, int buflen );
 void			trap_Key_GetBindingBuf( int keynum, char *buf, int buflen );
 void			trap_Key_SetBinding( int keynum, const char *binding );

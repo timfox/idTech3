@@ -1243,7 +1243,14 @@ void UI_Refresh( int realtime )
 	uis.realtime  = realtime;
 
 	if ( !( trap_Key_GetCatcher() & KEYCATCH_UI ) ) {
+		if ( ui_hideSystemCursor && ui_hideSystemCursor->integer ) {
+			trap_S_ShowMouse( qtrue );
+		}
 		return;
+	}
+
+	if ( ui_hideSystemCursor && ui_hideSystemCursor->integer ) {
+		trap_S_ShowMouse( qfalse );
 	}
 
 	UI_UpdateCvars();
@@ -1274,7 +1281,8 @@ void UI_Refresh( int realtime )
 
 	// draw cursor (convert native coordinates back to virtual for drawing)
 	UI_SetColor( NULL );
-	UI_DrawHandlePic( uis.cursorx / uis.xscale - 16, uis.cursory / uis.yscale - 16, 32, 32, uis.cursor);
+	float cursorSize = ui_cursorSize ? ui_cursorSize->value : 32.0f;
+	UI_DrawHandlePic( ( uis.cursorx - uis.bias ) / uis.xscale - (cursorSize * 0.5f), uis.cursory / uis.yscale - (cursorSize * 0.5f), cursorSize, cursorSize, uis.cursor);
 
 #ifndef NDEBUG
 	if (uis.debug)
