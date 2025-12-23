@@ -205,9 +205,9 @@ static void MainMenu_LoadFontsFromConfig( void ) {
 	// Skip parsing and just load fonts directly
 	Com_Printf("DEBUG: Skipping parsing, loading fonts directly\n");
 	trap_FS_FCloseFile( f );
-	MainMenu_RegisterFontSafe( "FX300.ttf", 16, &s_mainFonts.textFont, "text" );
-	MainMenu_RegisterFontSafe( "FX300.ttf", 16, &s_mainFonts.smallFont, "small" );
-	MainMenu_RegisterFontSafe( "FX300.ttf", 16, &s_mainFonts.bigFont, "big" );
+	MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 16, &s_mainFonts.textFont, "text" );
+	MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 16, &s_mainFonts.smallFont, "small" );
+	MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 16, &s_mainFonts.bigFont, "big" );
 	s_mainFonts.loaded = FONT_LOADED( &s_mainFonts.textFont );
 	Com_Printf("DEBUG: Direct font loading completed\n");
 	return;
@@ -855,7 +855,7 @@ static void Main_MenuDraw( void )
 		// Fallback: Draw a 2D banner effect when 3D model fails to load
 		MainMenu_DrawFallbackBanner();
 		if ( !triedLazyLoad ) {
-			Com_Printf( "Main_MenuDraw: No banner model available, using 2D fallback\n" );
+			Com_Printf( "Main_MenuDraw: bannerModel is NULL, model not loaded (using 2D fallback)\n" );
 		}
 	}
 

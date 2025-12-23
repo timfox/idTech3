@@ -1445,8 +1445,8 @@ static void CG_RegisterGraphics(void) {
 	cgs.media.flagShaders[1] = trap_R_RegisterShaderNoMip("ui/assets/statusbar/flag_capture.tga");
 	cgs.media.flagShaders[2] = trap_R_RegisterShaderNoMip("ui/assets/statusbar/flag_missing.tga");
 
-	trap_R_RegisterModel("models/players/sorceress/lower.mdr");
-	trap_R_RegisterModel("models/players/sorceress/upper.mdr");
+	trap_R_RegisterModel("models/players/sorceress/lower.md3");
+	trap_R_RegisterModel("models/players/sorceress/upper.md3");
 	trap_R_RegisterModel("models/players/sorceress/head.md3");
 
 #endif

@@ -666,7 +666,7 @@ static qboolean CG_RegisterClientModelname(clientInfo_t *ci, const char *modelNa
 	// leilei - onepiece model loading for certain maps or WIP animation debug
 	ci->onepiece = 0;
 	if (cg_enableFS.integer) {
-		Com_sprintf(filename, sizeof ( filename), "models/playerfs/%s/tris.mdr", modelName);
+		Com_sprintf(filename, sizeof ( filename), "models/playerfs/%s/tris.md3", modelName);
 		ci->legsModel = trap_R_RegisterModel(filename);
 		if (ci->legsModel) {
 			FSloaded = 1;
@@ -684,10 +684,10 @@ static qboolean CG_RegisterClientModelname(clientInfo_t *ci, const char *modelNa
 
 	// load the usual model
 	if (FSloaded == 0) {
-		Com_sprintf(filename, sizeof ( filename), "models/players/%s/lower.mdr", modelName);
+		Com_sprintf(filename, sizeof ( filename), "models/players/%s/lower.md3", modelName);
 		ci->legsModel = trap_R_RegisterModel(filename);
 		if (!ci->legsModel) {
-			Com_sprintf(filename, sizeof ( filename), "models/players/characters/%s/lower.mdr", modelName);
+			Com_sprintf(filename, sizeof ( filename), "models/players/characters/%s/lower.md3", modelName);
 			ci->legsModel = trap_R_RegisterModel(filename);
 			if (!ci->legsModel) {
 				Com_sprintf(filename, sizeof ( filename), "models/players/%s/lower.md3", modelName);
@@ -703,10 +703,10 @@ static qboolean CG_RegisterClientModelname(clientInfo_t *ci, const char *modelNa
 			}
 		}
 
-		Com_sprintf(filename, sizeof ( filename), "models/players/%s/upper.mdr", modelName);
+		Com_sprintf(filename, sizeof ( filename), "models/players/%s/upper.md3", modelName);
 		ci->torsoModel = trap_R_RegisterModel(filename);
 		if (!ci->torsoModel) {
-			Com_sprintf(filename, sizeof ( filename), "models/players/characters/%s/upper.mdr", modelName);
+			Com_sprintf(filename, sizeof ( filename), "models/players/characters/%s/upper.md3", modelName);
 			ci->torsoModel = trap_R_RegisterModel(filename);
 			if (!ci->torsoModel) {
 				Com_sprintf(filename, sizeof ( filename), "models/players/%s/upper.md3", modelName);
@@ -725,14 +725,14 @@ static qboolean CG_RegisterClientModelname(clientInfo_t *ci, const char *modelNa
 	} // enableFS
 
 	if (headName[0] == '*') {
-		Com_sprintf(filename, sizeof ( filename), "models/players/heads/%s/%s.mdr", &headModelName[1], &headModelName[1]);
+		Com_sprintf(filename, sizeof ( filename), "models/players/heads/%s/%s.md3", &headModelName[1], &headModelName[1]);
 	} else {
-		Com_sprintf(filename, sizeof ( filename), "models/players/%s/head.mdr", headName);
+		Com_sprintf(filename, sizeof ( filename), "models/players/%s/head.md3", headName);
 	}
 	ci->headModel = trap_R_RegisterModel(filename);
 	// if the head model could not be found and we didn't load from the heads folder try to load from there
 	if (!ci->headModel && headName[0] != '*') {
-		Com_sprintf(filename, sizeof ( filename), "models/players/heads/%s/%s.mdr", headModelName, headModelName);
+		Com_sprintf(filename, sizeof ( filename), "models/players/heads/%s/%s.md3", headModelName, headModelName);
 		ci->headModel = trap_R_RegisterModel(filename);
 	}
 	if (!ci->headModel) {
