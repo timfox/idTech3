@@ -128,20 +128,6 @@ static fontInfo_t *MainMenu_SelectFontForStyle( int style ) {
 	return NULL;
 }
 
-static void MainMenu_LinkFallbackChain( fontInfo_t *primary ) {
-	if ( !primary ) {
-		return;
-	}
-
-	fontInfo_t *current = primary;
-	for ( int i = 0; i < s_mainFonts.fallbackCount; i++ ) {
-		if ( FONT_LOADED( &s_mainFonts.fallbackFonts[i] ) ) {
-			current->fallbackFont = &s_mainFonts.fallbackFonts[i];
-			current = current->fallbackFont;
-		}
-	}
-}
-
 static void MainMenu_RegisterFontSafe( const char *path, int pointSize, fontInfo_t *outFont, const char *label ) {
 	Com_Printf( S_COLOR_YELLOW "DEBUG: MainMenu_RegisterFontSafe called with path='%s', label='%s'\n", path, label );
 	if ( !outFont ) {
