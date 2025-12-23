@@ -1587,10 +1587,12 @@ int CIN_PlayCinematic( const char *arg, int x, int y, int w, int h, int systemBi
 		cinTable[currentHandle].fileName[0] = '\0';
 		return -1;
 	}
-	
+
+	Com_Printf("CIN_PlayCinematic: codec detection successful, detectedCodec = %d\n", detectedCodec);
 	cinTable[currentHandle].codec = detectedCodec;
 	Com_DPrintf("CIN_PlayCinematic: detected codec %s for %s\n", codecInfo->name, name);
-	
+	Com_Printf("CIN_PlayCinematic: initializing codec %d\n", detectedCodec);
+
 	// Initialize codec-specific handlers
 	switch (detectedCodec) {
 		case CODEC_ROQ:
@@ -1603,7 +1605,9 @@ int CIN_PlayCinematic( const char *arg, int x, int y, int w, int h, int systemBi
 #ifdef USE_THEORA
 		case CODEC_THEORA:
 			// Reset file position after header read
+			Com_Printf("CIN_PlayCinematic: Seeking to beginning of file for Theora\n");
 			FS_Seek(cinTable[currentHandle].iFile, 0, FS_SEEK_SET);
+			Com_Printf("CIN_PlayCinematic: About to call Theora_Init\n");
 			if (!Theora_Init(currentHandle)) {
 				Com_Printf("CIN_PlayCinematic: failed to initialize Theora decoder\n");
 				Com_Printf("  File may not be a valid Theora video or may be corrupted\n");

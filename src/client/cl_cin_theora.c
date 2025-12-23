@@ -39,13 +39,13 @@ static size_t Theora_ReadOggPage(int handle, ogg_page *page) {
 	char *buffer;
 	int bytes;
 	size_t ret = 0;
-	
-	if (!data || !data->initialized) return 0;
-	
+
+	if (!data) return 0;
+
 	// Get buffer from Ogg sync
 	buffer = ogg_sync_buffer(&data->ogg_sync, 4096);
 	if (!buffer) return 0;
-	
+
 	// Read from file
 	bytes = FS_Read((byte *)buffer, 4096, cinTable[handle].iFile);
 	if (bytes <= 0) return 0;
@@ -109,7 +109,7 @@ qboolean Theora_Init(int handle) {
 	theora_data_t *data;
 	ogg_page ogg_page;
 	ogg_packet ogg_packet;
-	
+
 	if (handle < 0 || handle >= MAX_VIDEO_HANDLES) return qfalse;
 	
 	// Allocate codec data
@@ -169,7 +169,7 @@ qboolean Theora_Init(int handle) {
 		Theora_Shutdown(handle);
 		return qfalse;
 	}
-	
+
 	// Set up video dimensions
 	cinTable[handle].CIN_WIDTH = data->theora_info.frame_width;
 	cinTable[handle].CIN_HEIGHT = data->theora_info.frame_height;
