@@ -3017,6 +3017,13 @@ static VkSampler vk_find_sampler( const Vk_Sampler_Def *def ) {
 		maxLod = 1.0f;
 	}
 
+	// For font textures without mipmaps, force maxLod=0.0f to only sample from base mip level
+	// This prevents blurriness and chunky block artifacts from mipmap sampling
+	if ( def->isFontTexture && mipmap_mode == VK_SAMPLER_MIPMAP_MODE_NEAREST && 
+	     (def->vk_min_filter == VK_FILTER_NEAREST || def->vk_min_filter == VK_FILTER_LINEAR) ) {
+		maxLod = 0.0f;
+	}
+
 	lodBias = Com_Clamp( -2.0f, 2.0f, r_textureLodBias ? r_textureLodBias->value : 0.0f );
 
 	desc.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -4177,6 +4184,31 @@ void vk_create_image( image_t *image, int width, int height, int mip_levels ) {
 	// create image view
 	{
 		VkImageViewCreateInfo desc;
+		qboolean isFontTexture = qfalse;
+
+		// Detect font textures to ensure image view only includes base mip level
+		// This prevents accidental mipmap sampling for fonts
+		if ( image->imgName && mip_levels == 1 ) {
+			const char *name = image->imgName;
+			if ( Q_stristr( name, "font" ) != NULL || 
+			     Q_stristr( name, "fontImage" ) != NULL ||
+			     Q_stristr( name, "menu/art" ) != NULL ||
+			     Q_stristr( name, "gfx/2d" ) != NULL ||
+			     Q_stristr( name, "bigchars" ) != NULL ||
+			     Q_stristr( name, "charset" ) != NULL ) {
+				isFontTexture = qtrue;
+			} else if ( image->width > 0 && image->height > 0 ) {
+				// Also check for small non-mipmap textures that look like fonts
+				if ( ( image->width <= 512 && image->height <= 512 ) &&
+				     ( image->width == image->height || 
+				       ( image->width <= 256 && image->height <= 256 ) ) ) {
+					if ( image->wrapClampMode == VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE ||
+					     image->wrapClampMode == VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER ) {
+						isFontTexture = qtrue;
+					}
+				}
+			}
+		}
 
 		desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		desc.pNext = NULL;
@@ -4187,7 +4219,9 @@ void vk_create_image( image_t *image, int width, int height, int mip_levels ) {
 		desc.components = textureMapTypes[image->type].swizzle;
 		desc.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		desc.subresourceRange.baseMipLevel = 0;
-		desc.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+		// For font textures without mipmaps, explicitly set levelCount=1 to prevent mip sampling
+		// For other textures, use VK_REMAINING_MIP_LEVELS to include all mip levels
+		desc.subresourceRange.levelCount = (isFontTexture && mip_levels == 1) ? 1 : VK_REMAINING_MIP_LEVELS;
 		desc.subresourceRange.baseArrayLayer = 0;
 		desc.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
 
@@ -4475,6 +4509,9 @@ void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
 		// no anisotropy without mipmaps
 		sampler_def.noAnisotropy = qtrue;
 	}
+
+	// Pass font texture flag to sampler so it can set maxLod=0.0f for fonts without mipmaps
+	sampler_def.isFontTexture = isFontTexture;
 
 	image_info.sampler = vk_find_sampler( &sampler_def );
 	image_info.imageView = image->view;

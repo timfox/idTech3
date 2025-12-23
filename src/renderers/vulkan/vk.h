@@ -213,6 +213,7 @@ typedef struct {
 	int vk_min_filter;		// VK_XXX min filter
 	qboolean max_lod_1_0;	// fixed 1.0 lod
 	qboolean noAnisotropy;	// disable anisotropic filtering
+	qboolean isFontTexture;	// font/UI texture - force maxLod=0.0f when no mipmaps
 } Vk_Sampler_Def;
 
 // Filter definition for cubemap prefiltering
