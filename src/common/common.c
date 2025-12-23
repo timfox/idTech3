@@ -545,7 +545,11 @@ void NORETURN FORMAT_PRINTF(2, 3) QDECL Com_Error( errorParm_t code, const char 
 
 	if ( com_errorEntered ) {
 		// Prevent hard recursion: bail out hard to satisfy noreturn contract
-		Sys_Error( "Recursive Com_Error: %s", fmt ? fmt : "<null>" );
+		char recursionMsg[1024];
+		va_start( argptr, fmt );
+		Q_vsnprintf( recursionMsg, sizeof( recursionMsg ), fmt, argptr );
+		va_end( argptr );
+		Sys_Error( "Recursive Com_Error: %s", recursionMsg );
 	}
 
 	com_errorEntered = qtrue;
