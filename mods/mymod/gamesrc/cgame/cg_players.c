@@ -666,7 +666,7 @@ static qboolean CG_RegisterClientModelname(clientInfo_t *ci, const char *modelNa
 	// leilei - onepiece model loading for certain maps or WIP animation debug
 	ci->onepiece = 0;
 	if (cg_enableFS.integer) {
-		Com_sprintf(filename, sizeof ( filename), "models/playerfs/%s/tris.md3", modelName);
+		Com_sprintf(filename, sizeof ( filename), "models/players/%s/tris.md3", modelName);
 		ci->legsModel = trap_R_RegisterModel(filename);
 		if (ci->legsModel) {
 			FSloaded = 1;

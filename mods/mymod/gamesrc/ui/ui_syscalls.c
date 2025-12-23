@@ -285,6 +285,20 @@ void	trap_R_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) 
 	syscall(UI_R_REGISTERFONT, fontName, pointSize, font );
 }
 
+float	trap_R_Font_Height(fontInfo_t *font, float scale) {
+	int temp = syscall( UI_R_FONT_HEIGHT, font, PASSFLOAT(scale) );
+	return *(float*)&temp;
+}
+
+float	trap_R_Font_Width(const char *text, float scale, fontInfo_t *font) {
+	int temp = syscall( UI_R_FONT_WIDTH, text, PASSFLOAT(scale), font );
+	return *(float*)&temp;
+}
+
+void	trap_R_Font_DrawString(float x, float y, const char *text, const vec4_t color, float scale, fontInfo_t *font, int style) {
+	syscall( UI_R_FONT_DRAWSTRING, PASSFLOAT(x), PASSFLOAT(y), text, color, PASSFLOAT(scale), font, style );
+}
+
 void	trap_R_ModelBounds( clipHandle_t model, vec3_t mins, vec3_t maxs ) {
 	syscall( UI_R_MODELBOUNDS, model, mins, maxs );
 }

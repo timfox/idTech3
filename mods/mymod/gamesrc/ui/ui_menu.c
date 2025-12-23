@@ -172,162 +172,21 @@ static void MainMenu_RegisterFontSafe( const char *path, int pointSize, fontInfo
 }
 
 static void MainMenu_LoadFontsFromConfig( void ) {
-	trap_Print("MainMenu_LoadFontsFromConfig: called (VERSION 3)\n");
+	trap_Print("MainMenu_LoadFontsFromConfig: called (REFACTORED)\n");
 	if ( s_mainFonts.loaded ) {
 		return;
 	}
 
 	memset( &s_mainFonts, 0, sizeof( s_mainFonts ) );
 
-	fileHandle_t f = 0;
-	Com_Printf( S_COLOR_RED "DEBUG: Trying to load fonts.cfg from '%s'\n", MAINMENU_FONT_CONFIG );
-	int len = trap_FS_FOpenFile( MAINMENU_FONT_CONFIG, &f, FS_READ );
-	Com_Printf( "DEBUG: FS_FOpenFile returned f=%d, len=%d\n", (int)f, len );
-	if (len > 0) {
-		Com_Printf( "DEBUG: fonts.cfg found, reading %d bytes\n", len );
-	} else {
-		Com_Printf( "DEBUG: fonts.cfg NOT found (len=%d)\n", len );
-	}
-	Com_Printf("DEBUG: f=%d, len=%d, MAINMENU_FONT_BUFFER_SIZE=%d\n", (int)f, len, MAINMENU_FONT_BUFFER_SIZE);
-	Com_Printf("DEBUG: !f=%d, len <= 0 =%d, len >= MAINMENU_FONT_BUFFER_SIZE=%d\n", !f, len <= 0, len >= MAINMENU_FONT_BUFFER_SIZE);
-	if ( !f || len <= 0 || len >= MAINMENU_FONT_BUFFER_SIZE ) {
-		Com_Printf( S_COLOR_RED "DEBUG: fonts.cfg not found or invalid, using defaults\n" );
-		if ( f ) {
-			trap_FS_FCloseFile( f );
-		}
-		MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 16, &s_mainFonts.textFont, "text" );
-		MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 12, &s_mainFonts.smallFont, "small" );
-		MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 24, &s_mainFonts.bigFont, "big" );
-		s_mainFonts.loaded = FONT_LOADED( &s_mainFonts.textFont );
-		return;
-	}
-
-	// Skip parsing and just load fonts directly
-	Com_Printf("DEBUG: Skipping parsing, loading fonts directly\n");
-	trap_FS_FCloseFile( f );
+	// For now, use hardcoded defaults to ensure consistency
+	// In the future, we can restore the flexible parsing
 	MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 16, &s_mainFonts.textFont, "text" );
-	MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 16, &s_mainFonts.smallFont, "small" );
-	MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 16, &s_mainFonts.bigFont, "big" );
+	MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 12, &s_mainFonts.smallFont, "small" );
+	MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 24, &s_mainFonts.bigFont, "big" );
+
 	s_mainFonts.loaded = FONT_LOADED( &s_mainFonts.textFont );
-	Com_Printf("DEBUG: Direct font loading completed\n");
-	return;
-
-	static char buffer[MAINMENU_FONT_BUFFER_SIZE];
-	trap_FS_Read( buffer, len, f );
-	trap_FS_FCloseFile( f );
-
-	buffer[len] = '\0';
-	Com_Printf( "DEBUG: Read %d bytes, buffer starts with: '%.50s'\n", len, buffer );
-
-	const char *p = buffer;
-	const char *token;
-
-	while ( 1 ) {
-		token = COM_ParseExt( &p, qtrue );
-		if ( !token[0] ) {
-			break;
-		}
-		Com_Printf( "DEBUG: Parsed token='%s'\n", token );
-
-		if ( Q_stricmp( token, "font" ) == 0 ) {
-			const char *fontPath = COM_ParseExt( &p, qtrue );
-			const char *sizeTok = COM_ParseExt( &p, qtrue );
-			int pointSize = sizeTok[0] ? atoi( sizeTok ) : MAINMENU_DEFAULT_TEXT_SIZE;
-			if ( fontPath && fontPath[0] ) {
-				MainMenu_RegisterFontSafe( fontPath, pointSize, &s_mainFonts.textFont, "text" );
-			}
-			continue;
-		}
-
-		if ( Q_stricmp( token, "smallFont" ) == 0 ) {
-			const char *fontPath = COM_ParseExt( &p, qtrue );
-			const char *sizeTok = COM_ParseExt( &p, qtrue );
-			int pointSize = sizeTok[0] ? atoi( sizeTok ) : MAINMENU_DEFAULT_SMALL_SIZE;
-			if ( fontPath && fontPath[0] ) {
-				MainMenu_RegisterFontSafe( fontPath, pointSize, &s_mainFonts.smallFont, "small" );
-			}
-			continue;
-		}
-
-		if ( Q_stricmp( token, "bigFont" ) == 0 || Q_stricmp( token, "bigfont" ) == 0 ) {
-			const char *fontPath = COM_ParseExt( &p, qtrue );
-			const char *sizeTok = COM_ParseExt( &p, qtrue );
-			int pointSize = sizeTok[0] ? atoi( sizeTok ) : MAINMENU_DEFAULT_BIG_SIZE;
-			if ( fontPath && fontPath[0] ) {
-				MainMenu_RegisterFontSafe( fontPath, pointSize, &s_mainFonts.bigFont, "big" );
-			}
-			continue;
-		}
-
-		if ( Q_stricmp( token, "fontFallback" ) == 0 ) {
-			const char *primary = COM_ParseExt( &p, qtrue );
-			const char *sizeTok = COM_ParseExt( &p, qtrue );
-			int pointSize = sizeTok[0] ? atoi( sizeTok ) : MAINMENU_DEFAULT_TEXT_SIZE;
-
-			if ( primary && primary[0] ) {
-				MainMenu_RegisterFontSafe( primary, pointSize, &s_mainFonts.textFont, "text" );
-			}
-
-			s_mainFonts.fallbackCount = 0;
-			while ( s_mainFonts.fallbackCount < MAINMENU_MAX_FALLBACKS ) {
-				const char *fb = COM_ParseExt( &p, qfalse );
-				if ( !fb[0] || fb[0] == '\n' ) {
-					break;
-				}
-				MainMenu_RegisterFontSafe( fb, pointSize, &s_mainFonts.fallbackFonts[s_mainFonts.fallbackCount], "fallback" );
-				s_mainFonts.fallbackCount++;
-			}
-			continue;
-		}
-	}
-
-	MainMenu_LinkFallbackChain( &s_mainFonts.textFont );
-	s_mainFonts.loaded = FONT_LOADED( &s_mainFonts.textFont );
-}
-
-static int MainMenu_DecodeUTF8( const unsigned char **textPtr ) {
-	const unsigned char *s = *textPtr;
-	if ( !s || !*s ) {
-		return -1;
-	}
-
-	unsigned char c = *s;
-	if ( c < 0x80 ) {
-		(*textPtr)++;
-		return c;
-	}
-
-	if ( ( c & 0xE0 ) == 0xC0 && ( s[1] & 0xC0 ) == 0x80 ) {
-		int code = ( ( c & 0x1F ) << 6 ) | ( s[1] & 0x3F );
-		(*textPtr) += 2;
-		return code;
-	}
-
-	if ( ( c & 0xF0 ) == 0xE0 && ( s[1] & 0xC0 ) == 0x80 && ( s[2] & 0xC0 ) == 0x80 ) {
-		int code = ( ( c & 0x0F ) << 12 ) | ( ( s[1] & 0x3F ) << 6 ) | ( s[2] & 0x3F );
-		(*textPtr) += 3;
-		return code;
-	}
-
-	(*textPtr)++;
-	return -1;
-}
-
-static glyphInfo_t *MainMenu_FindGlyph( fontInfo_t **font, int ch ) {
-	if ( !font || !*font || !FONT_CHAR_VALID( ch ) ) {
-		return NULL;
-	}
-
-	fontInfo_t *cur = *font;
-	while ( cur ) {
-		glyphInfo_t *glyph = &cur->glyphs[ch];
-		if ( glyph && glyph->glyph ) {
-			*font = cur;
-			return glyph;
-		}
-		cur = cur->fallbackFont;
-	}
-	return &(*font)->glyphs[ch];
+	Com_Printf("DEBUG: Font loading completed\n");
 }
 
 static float MainMenu_TextWidth( const char *text, float scale, fontInfo_t *baseFont ) {
@@ -335,53 +194,16 @@ static float MainMenu_TextWidth( const char *text, float scale, fontInfo_t *base
 		return 0.0f;
 	}
 
-	if ( !baseFont || !FONT_LOADED( baseFont ) ) {
+	if ( !baseFont ) {
+		baseFont = &s_mainFonts.textFont;
+	}
+
+	if ( !FONT_LOADED( baseFont ) ) {
 		// Fallback to legacy proportional metrics if modern font isn't available
 		return UI_ProportionalStringWidth( text ) * scale;
 	}
 
-	float width = 0.0f;
-	int prev = -1;
-	const unsigned char *s = (const unsigned char *)text;
-
-	while ( *s ) {
-		if ( Q_IsColorString( (const char *)s ) ) {
-			s += 2;
-			continue;
-		}
-
-		int code = MainMenu_DecodeUTF8( &s );
-		if ( code < 0 || code >= GLYPHS_PER_FONT ) {
-			continue;
-		}
-
-		fontInfo_t *useFont = baseFont;
-		glyphInfo_t *glyph = MainMenu_FindGlyph( &useFont, code );
-		if ( !glyph ) {
-			continue;
-		}
-
-		float useScale = scale * useFont->glyphScale;
-		if ( useFont->hasKerning && prev >= 0 && prev < 256 ) {
-			width += glyph->kerning[prev] * useScale;
-		}
-
-		width += glyph->xSkip * useScale;
-		prev = code;
-	}
-
-	return width;
-}
-
-static void MainMenu_DrawGlyph( float x, float y, float useScale, const glyphInfo_t *glyph, const vec4_t color ) {
-	float adjX = x;
-	float adjY = y - glyph->top * useScale;
-	float w    = glyph->imageWidth * useScale;
-	float h    = glyph->imageHeight * useScale;
-
-	UI_AdjustFrom640( &adjX, &adjY, &w, &h );
-	trap_R_SetColor( color );
-	trap_R_DrawStretchPic( adjX, adjY, w, h, glyph->s, glyph->t, glyph->s2, glyph->t2, glyph->glyph );
+	return trap_R_Font_Width( text, scale, baseFont );
 }
 
 static void MainMenu_TextPaint( float x, float y, float scale, vec4_t color, const char *text, int style, fontInfo_t *baseFont ) {
@@ -395,60 +217,13 @@ static void MainMenu_TextPaint( float x, float y, float scale, vec4_t color, con
 		return;
 	}
 
-	float sizeScale = scale > 0.0f ? scale : 1.0f;
-	float width = MainMenu_TextWidth( text, sizeScale, font );
-	if ( style & UI_CENTER ) {
-		x -= width * 0.5f;
-	} else if ( style & UI_RIGHT ) {
-		x -= width;
-	}
+	// Adjust coordinates for 640x480 virtual space
+	float adjX = x, adjY = y, w = 0, h = 0;
+	UI_AdjustFrom640( &adjX, &adjY, &w, &h );
 
-	vec4_t drawColor;
-	Vector4Copy( color, drawColor );
-
-	const unsigned char *s = (const unsigned char *)text;
-	int prev = -1;
-
-	qboolean drawShadow = ( style & UI_DROPSHADOW ) ? qtrue : qfalse;
-	float shadowOfs = 2.0f;
-
-	while ( *s ) {
-		if ( Q_IsColorString( (const char *)s ) ) {
-			VectorCopy( g_color_table[ColorIndex( s[1] )], drawColor );
-			drawColor[3] = color[3];
-			s += 2;
-			continue;
-		}
-
-		int code = MainMenu_DecodeUTF8( &s );
-		if ( code < 0 || code >= GLYPHS_PER_FONT ) {
-			continue;
-		}
-
-		fontInfo_t *useFont = font;
-		glyphInfo_t *glyph = MainMenu_FindGlyph( &useFont, code );
-		if ( !glyph ) {
-			continue;
-		}
-
-		float useScale = sizeScale * useFont->glyphScale;
-
-		if ( drawShadow ) {
-			vec4_t shadowColor = { 0, 0, 0, drawColor[3] };
-			MainMenu_DrawGlyph( x + shadowOfs, y + shadowOfs, useScale, glyph, shadowColor );
-		}
-
-		MainMenu_DrawGlyph( x, y, useScale, glyph, drawColor );
-
-		if ( useFont->hasKerning && prev >= 0 && prev < 256 ) {
-			x += glyph->kerning[prev] * useScale;
-		}
-
-		x += glyph->xSkip * useScale;
-		prev = code;
-	}
-
-	trap_R_SetColor( NULL );
+	// The engine Font_DrawString expects absolute pixel coordinates and handles 
+	// alignment and colors internally. We need to pass the UI scale.
+	trap_R_Font_DrawString( adjX, adjY, text, color, scale * uis.xscale, font, style );
 }
 
 static void MainMenu_DrawMenuItem( void *ptr ) {

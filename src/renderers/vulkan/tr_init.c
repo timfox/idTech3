@@ -3109,6 +3109,9 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 #else
 	re.RegisterFont = RE_RegisterFont;
 #endif
+	re.Font_Height = RE_Font_Height;
+	re.Font_Width = RE_Font_Width;
+	re.Font_DrawString = RE_Font_DrawString;
 	re.RemapShader = RE_RemapShader;
 	re.GetEntityToken = RE_GetEntityToken;
 	re.inPVS = R_inPVS;

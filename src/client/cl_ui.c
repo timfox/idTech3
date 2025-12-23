@@ -1252,6 +1252,16 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 		re.RegisterFont( VMA(1), args[2], VMA(3));
 		return 0;
 
+	case UI_R_FONT_HEIGHT:
+		return FloatAsInt( re.Font_Height( VMA(1), VMF(2) ) );
+
+	case UI_R_FONT_WIDTH:
+		return FloatAsInt( re.Font_Width( VMA(1), VMF(2), VMA(3) ) );
+
+	case UI_R_FONT_DRAWSTRING:
+		re.Font_DrawString( VMF(1), VMF(2), VMA(3), VMA(4), VMF(5), VMA(6), (int)args[7] );
+		return 0;
+
 	// shared syscalls
 
 	case TRAP_MEMSET:

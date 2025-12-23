@@ -984,6 +984,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 
 	if (!fontName) {
 		ri.Printf(PRINT_ALL, "RE_RegisterFont: called with empty name\n");
+		inFallbackChain = qfalse;
 		return qfalse;
 	}
 
@@ -1004,12 +1005,14 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 			fromCache = qtrue;
 			ri.Printf(PRINT_ALL, "RE_RegisterFont: cache hit '%s' (%dpt, SDF=%d)\n",
 				fontName, pointSize, wantSDF ? 1 : 0);
+			inFallbackChain = qfalse;
 			return qtrue;
 		}
 	}
 
 	if (registeredFontCount >= maxFonts) {
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: Too many fonts registered already.\n");
+		inFallbackChain = qfalse;
 		return qfalse;
 	}
 
@@ -1029,6 +1032,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 				entry->font = &registeredFont[i];
 				entry->inUse = qtrue;
 			}
+			inFallbackChain = qfalse;
 			return qtrue;
 		}
 	}
@@ -1038,6 +1042,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 		ri.FS_ReadFile(name, &faceData);
 		if (!faceData) {
 			ri.Printf(PRINT_WARNING, "RE_RegisterFont: Failed to load font file '%s'\n", name);
+			inFallbackChain = qfalse;
 			return qfalse;
 		}
 		fdOffset = 0;
@@ -1089,6 +1094,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 		fromDat = qtrue;
 		ri.Printf(PRINT_ALL, "RE_RegisterFont: loaded legacy fontImage_%i.dat for '%s'\n", pointSize, fontName);
 		ri.Free(faceData);
+		inFallbackChain = qfalse;
 		return qtrue;
 	}
 
@@ -1113,6 +1119,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 			atlasPages = 1; // stb path always uses a single atlas page
 			ri.Printf(PRINT_ALL, "RE_RegisterFont: stb_truetype baked '%s' (%dpt, SDF=%d)\n",
 				fontName, pointSize, wantSDF ? 1 : 0);
+			inFallbackChain = qfalse;
 			return qtrue;
 		}
 #ifndef USE_FREETYPE
@@ -1142,6 +1149,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 		ftLibrary = FreeType_GetLibrary();
 		if (ftLibrary == NULL) {
 			ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType not available after initialization, trying fallback.\n");
+			inFallbackChain = qfalse;
 			return R_FontFallbackChain(fontName, pointSize, font, wantSDF);
 		}
 	}
@@ -1172,16 +1180,19 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 						ri.Free(faceData);
 						faceData = NULL;
 						fclose(fontFile);
+						inFallbackChain = qfalse;
 						return qfalse;
 					}
 				} else {
 					ri.Printf(PRINT_WARNING, "RE_RegisterFont: Failed to allocate memory for font '%s' (%d bytes)\n", fontName, len);
 					fclose(fontFile);
+					inFallbackChain = qfalse;
 					return qfalse;
 				}
 			} else {
 				ri.Printf(PRINT_WARNING, "RE_RegisterFont: Font file '%s' is empty\n", fontName);
 				fclose(fontFile);
+				inFallbackChain = qfalse;
 				return qfalse;
 			}
 		} else {
@@ -1195,6 +1206,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 			} else {
 				ri.Printf(PRINT_WARNING, "RE_RegisterFont: File not found in FS (error code=%d)\n", testLen);
 			}
+			inFallbackChain = qfalse;
 			return qfalse;
 		}
 	}

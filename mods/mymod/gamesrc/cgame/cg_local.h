@@ -2077,6 +2077,9 @@ void		testPrintFloat( char *string, float f );
 
 int			trap_MemoryRemaining( void );
 void		trap_R_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font);
+float		trap_R_Font_Height(fontInfo_t *font, float scale);
+float		trap_R_Font_Width(const char *text, float scale, fontInfo_t *font);
+void		trap_R_Font_DrawString(float x, float y, const char *text, const vec4_t color, float scale, fontInfo_t *font, int style);
 qboolean	trap_Key_IsDown( int keynum );
 int			trap_Key_GetCatcher( void );
 void		trap_Key_SetCatcher( int catcher );

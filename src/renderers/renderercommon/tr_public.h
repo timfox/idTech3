@@ -337,6 +337,12 @@ typedef struct {
 	glyphInfo_t *(*R_GetGlyphFromFont)(fontInfo_t *font, int charCode);
 	void (*R_InitFonts)(void);
 	void (*R_ShutdownFonts)(void);
+
+	// Enhanced font rendering
+	float (*Font_Height)(fontInfo_t *font, float scale);
+	float (*Font_Width)(const char *text, float scale, fontInfo_t *font);
+	void (*Font_DrawString)(float x, float y, const char *text, const vec4_t color, float scale, fontInfo_t *font, int style);
+
 	void	(*RemapShader)(const char *oldShader, const char *newShader, const char *offsetTime);
 	qboolean (*GetEntityToken)( char *buffer, int size );
 	qboolean (*inPVS)( const vec3_t p1, const vec3_t p2 );
