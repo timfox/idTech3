@@ -884,14 +884,13 @@ void UI_MouseEvent( int dx, int dy )
 		return;
 
 	// update mouse screen position at native resolution (1:1 mapping)
-	// Scale mouse deltas by inverse of virtual scaling to match native resolution
-	uis.cursorx += dx / uis.xscale;
+	uis.cursorx += dx;
 	if (uis.cursorx < 0)
 		uis.cursorx = 0;
 	else if (uis.cursorx > uis.glconfig.vidWidth)
 		uis.cursorx = uis.glconfig.vidWidth;
 
-	uis.cursory += dy / uis.yscale;
+	uis.cursory += dy;
 	if (uis.cursory < 0)
 		uis.cursory = 0;
 	else if (uis.cursory > uis.glconfig.vidHeight)
@@ -1129,6 +1128,9 @@ void UI_Init( void ) {
 
 	uis.activemenu = NULL;
 	uis.menusp     = 0;
+
+	uis.cursorx = uis.glconfig.vidWidth / 2;
+	uis.cursory = uis.glconfig.vidHeight / 2;
 }
 
 /*
@@ -1242,15 +1244,15 @@ void UI_Refresh( int realtime )
 	uis.frametime = realtime - uis.realtime;
 	uis.realtime  = realtime;
 
-	if ( !( trap_Key_GetCatcher() & KEYCATCH_UI ) ) {
-		if ( ui_hideSystemCursor && ui_hideSystemCursor->integer ) {
-			trap_S_ShowMouse( qtrue );
-		}
-		return;
-	}
+    qboolean ui_active = ( trap_Key_GetCatcher() & KEYCATCH_UI ) != 0;
 
-	if ( ui_hideSystemCursor && ui_hideSystemCursor->integer ) {
-		trap_S_ShowMouse( qfalse );
+    // Control system cursor visibility based on ui_hideSystemCursor CVar
+    if ( ui_hideSystemCursor.integer ) {
+        trap_S_ShowMouse( !ui_active ); // Hide if UI is active, show if not
+    }
+
+	if ( !ui_active ) {
+		return;
 	}
 
 	UI_UpdateCvars();
@@ -1281,7 +1283,8 @@ void UI_Refresh( int realtime )
 
 	// draw cursor (convert native coordinates back to virtual for drawing)
 	UI_SetColor( NULL );
-	float cursorSize = ui_cursorSize ? ui_cursorSize->value : 32.0f;
+	float cursorSize = ui_cursorSize.value;
+	if (cursorSize <= 0) cursorSize = 32.0f;
 	UI_DrawHandlePic( ( uis.cursorx - uis.bias ) / uis.xscale - (cursorSize * 0.5f), uis.cursory / uis.yscale - (cursorSize * 0.5f), cursorSize, cursorSize, uis.cursor);
 
 #ifndef NDEBUG

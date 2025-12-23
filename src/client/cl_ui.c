@@ -1319,6 +1319,9 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 	case UI_S_STARTBACKGROUNDTRACK:
 		S_StartBackgroundTrack( VMA(1), VMA(2));
 		return 0;
+	case UI_S_SHOWMOUSE:
+		IN_ShowMouse( args[1] );
+		return 0;
 
 	case UI_REAL_TIME:
 		return Com_RealTime( VMA(1) );

@@ -5,4 +5,3 @@ static void vk_set_shader_name( VkShaderModule shader, const char *name ) {
 }
 
 void vk_bind_generated_shaders( void ){
-}

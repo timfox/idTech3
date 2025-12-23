@@ -65,6 +65,7 @@ extern cvar_t *in_nograb;
 void IN_Init( void );
 void IN_Shutdown( void );
 void IN_Frame( void );
+void IN_ShowMouse( qboolean show );
 
 // signals.c
 void InitSig( void );

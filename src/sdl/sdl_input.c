@@ -39,6 +39,7 @@ static SDL_Joystick *stick = NULL;
 
 static qboolean mouseAvailable = qfalse;
 static qboolean mouseActive = qfalse;
+static qboolean in_showMouse = qtrue;
 
 static cvar_t *in_mouse;
 
@@ -400,34 +401,51 @@ static void IN_GobbleMouseEvents( void )
 
 /*
 ===============
+IN_ShowMouse
+===============
+*/
+void IN_ShowMouse( qboolean show ) {
+	in_showMouse = show;
+	if ( mouseActive ) {
+		if ( Key_GetCatcher() & KEYCATCH_UI ) {
+			SDL_ShowCursor( in_showMouse ? SDL_TRUE : SDL_FALSE );
+		}
+	}
+}
+
+/*
+===============
 IN_ActivateMouse
 ===============
 */
 static void IN_ActivateMouse( void )
 {
-	if ( !mouseAvailable )
+	if ( !mouseAvailable || !SDL_window || !in_mouse || !in_nograb )
 		return;
 
-	if ( !mouseActive )
+	static int lastCatcher = -1;
+	int catcher = Key_GetCatcher();
+
+	if ( !mouseActive || catcher != lastCatcher || in_mouse->modified )
 	{
+		in_mouse->modified = qfalse;
+		lastCatcher = catcher;
+
 		IN_GobbleMouseEvents();
 
 	// Set mouse mode based on current catcher
-	int catcher = Key_GetCatcher();
 		if ( catcher & KEYCATCH_UI ) {
 			// UI mode: absolute positioning, visible cursor
 			if (SDL_GetRelativeMouseMode()) {
-				// Switching from relative to absolute mode - sync UI cursor with actual mouse
+				// Switching from relative to absolute mode
 				int x, y;
 				SDL_GetMouseState(&x, &y);
 				mouseX = x;
 				mouseY = y;
-				// Send initial position sync to UI (assume UI cursor starts at 0,0)
-				Com_QueueEvent( Sys_Milliseconds(), SE_MOUSE, x, y, 0, NULL );
 			}
 			SDL_SetRelativeMouseMode( SDL_FALSE );
 			SDL_SetWindowGrab( SDL_window, SDL_FALSE );
-			SDL_ShowCursor( SDL_TRUE );
+			SDL_ShowCursor( in_showMouse ? SDL_TRUE : SDL_FALSE );
 	} else {
 		// Game mode: relative positioning, grabbed cursor
 		SDL_SetRelativeMouseMode( in_mouse->integer == 1 ? SDL_TRUE : SDL_FALSE );
@@ -474,7 +492,7 @@ static void IN_DeactivateMouse( void )
 {
 	const char* drv = SDL_GetCurrentVideoDriver();
 
-	if ( !mouseAvailable )
+	if ( !mouseAvailable || !SDL_window || !in_mouse || !in_nograb )
 		return;
 
 	if ( mouseActive )
@@ -1426,7 +1444,7 @@ void IN_Frame( void )
 		IN_DeactivateMouse();
 		return;
 	}
-	if ( in_nograb->integer ) {
+	if ( in_nograb && in_nograb->integer ) {
 		IN_DeactivateMouse();
 		return;
 	}

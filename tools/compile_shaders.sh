@@ -11,8 +11,8 @@ cd "$SCRIPT_DIR"
 
 # If called from anywhere, always operate relative to /tools/
 TOOLS_DIR="$SCRIPT_DIR"
-GLSL_DIR="$SCRIPT_DIR/glsl"
-SPIRV_DIR="$SCRIPT_DIR/../src/renderervk/shaders"   # output goes to src/renderervk/shaders/
+GLSL_DIR="$SCRIPT_DIR/../src/renderers/vulkan/shaders/glsl"  # shaders are in src/renderers/vulkan/shaders/glsl/
+SPIRV_DIR="$SCRIPT_DIR/../src/renderers/vulkan/shaders"     # output goes to src/renderers/vulkan/shaders/
 TMP_FILE="$SPIRV_DIR/data.spv"
 OUT_DATA="$SPIRV_DIR/shader_data.c"
 OUT_BINDING="$SPIRV_DIR/shader_binding.c"
@@ -28,24 +28,28 @@ mkdir -p "$SPIRV_DIR"
 mkdir -p "$TOOLS_DIR"
 
 # Build bin2hex if needed
-if [ ! -f "$TOOLS_DIR/bin2hex" ]; then
-    if [ -f "$TOOLS_DIR/bin2hex.c" ]; then
+BIN2HEX_SRC="$SPIRV_DIR/tools/bin2hex.c"
+BIN2HEX_EXE="$SPIRV_DIR/tools/bin2hex"
+if [ ! -f "$BIN2HEX_EXE" ]; then
+    if [ -f "$BIN2HEX_SRC" ]; then
         echo "Building bin2hex..."
-        if gcc -o "$TOOLS_DIR/bin2hex" "$TOOLS_DIR/bin2hex.c" -lm 2>/dev/null; then
+        if gcc -o "$BIN2HEX_EXE" "$BIN2HEX_SRC" -lm 2>/dev/null; then
             echo "  bin2hex built successfully"
         else
             echo "Warning: Failed to build bin2hex. Shader data conversion may fail."
         fi
     else
-        echo "Warning: bin2hex.c not found. Shader data conversion may fail."
+        echo "Warning: bin2hex.c not found in $BIN2HEX_SRC. Shader data conversion may fail."
     fi
 fi
 
 # Build bindshader if needed
-if [ ! -f "$TOOLS_DIR/bindshader" ]; then
-    if [ -f "$TOOLS_DIR/bindshader.c" ]; then
+BINDSHADER_SRC="$SPIRV_DIR/tools/bindshader.c"
+BINDSHADER_EXE="$SPIRV_DIR/tools/bindshader"
+if [ ! -f "$BINDSHADER_EXE" ]; then
+    if [ -f "$BINDSHADER_SRC" ]; then
         echo "Building bindshader..."
-        gcc -o "$TOOLS_DIR/bindshader" "$TOOLS_DIR/bindshader.c" -lm
+        gcc -o "$BINDSHADER_EXE" "$BINDSHADER_SRC" -lm
     fi
 fi
 
@@ -67,8 +71,8 @@ for f in "$GLSL_DIR"/*.frag; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .frag)
         glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1
-        if [ -f "$TOOLS_DIR/bin2hex" ]; then
-            "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_frag_spv"
+        if [ -f "$BIN2HEX_EXE" ]; then
+            "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "${basename}_frag_spv"
         fi
         rm -f "$TMP_FILE"
     fi
@@ -80,8 +84,8 @@ for f in "$GLSL_DIR"/*.vert; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .vert)
         glslangValidator -S vert -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1
-        if [ -f "$TOOLS_DIR/bin2hex" ]; then
-            "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_vert_spv"
+        if [ -f "$BIN2HEX_EXE" ]; then
+            "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "${basename}_vert_spv"
         fi
         rm -f "$TMP_FILE"
     fi
@@ -93,8 +97,8 @@ for f in "$GLSL_DIR"/*.geom; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .geom)
         glslangValidator -S geom -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1
-        if [ -f "$TOOLS_DIR/bin2hex" ]; then
-            "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_geom_spv"
+        if [ -f "$BIN2HEX_EXE" ]; then
+            "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "${basename}_geom_spv"
         fi
         rm -f "$TMP_FILE"
     fi
@@ -109,8 +113,8 @@ for f in "$GLSL_DIR"/*.comp; do
         if grep -q "GL_EXT_ray_tracing" "$f" 2>/dev/null; then
             # Ray tracing compute shaders need vulkan1.2 target environment
             if glslangValidator -S comp --target-env vulkan1.2 -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
-                if [ -f "$TOOLS_DIR/bin2hex" ] && [ -f "$TMP_FILE" ]; then
-                    "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_comp_spv"
+                if [ -f "$BIN2HEX_EXE" ] && [ -f "$TMP_FILE" ]; then
+                    "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "${basename}_comp_spv"
                 fi
             else
                 echo "Warning: Failed to compile ray tracing compute shader: $f"
@@ -118,8 +122,8 @@ for f in "$GLSL_DIR"/*.comp; do
         else
             # Standard compute shaders
             if glslangValidator -S comp -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
-                if [ -f "$TOOLS_DIR/bin2hex" ] && [ -f "$TMP_FILE" ]; then
-                    "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_comp_spv"
+                if [ -f "$BIN2HEX_EXE" ] && [ -f "$TMP_FILE" ]; then
+                    "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "${basename}_comp_spv"
                 fi
             fi
         fi
@@ -134,8 +138,8 @@ for f in "$GLSL_DIR"/*.rgen; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .rgen)
         if glslangValidator -S rgen --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
-            if [ -f "$TOOLS_DIR/bin2hex" ] && [ -f "$TMP_FILE" ]; then
-                "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_rgen_spv"
+            if [ -f "$BIN2HEX_EXE" ] && [ -f "$TMP_FILE" ]; then
+                "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "${basename}_rgen_spv"
             fi
         fi
         rm -f "$TMP_FILE"
@@ -146,8 +150,8 @@ for f in "$GLSL_DIR"/*.rmiss; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .rmiss)
         if glslangValidator -S rmiss --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
-            if [ -f "$TOOLS_DIR/bin2hex" ] && [ -f "$TMP_FILE" ]; then
-                "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_rmiss_spv"
+            if [ -f "$BIN2HEX_EXE" ] && [ -f "$TMP_FILE" ]; then
+                "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "${basename}_rmiss_spv"
             fi
         fi
         rm -f "$TMP_FILE"
@@ -158,8 +162,8 @@ for f in "$GLSL_DIR"/*.rchit; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .rchit)
         if glslangValidator -S rchit --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
-            if [ -f "$TOOLS_DIR/bin2hex" ] && [ -f "$TMP_FILE" ]; then
-                "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_rchit_spv"
+            if [ -f "$BIN2HEX_EXE" ] && [ -f "$TMP_FILE" ]; then
+                "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "${basename}_rchit_spv"
             fi
         fi
         rm -f "$TMP_FILE"
@@ -170,8 +174,8 @@ for f in "$GLSL_DIR"/*.rahit; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .rahit)
         if glslangValidator -S rahit --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
-            if [ -f "$TOOLS_DIR/bin2hex" ] && [ -f "$TMP_FILE" ]; then
-                "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "${basename}_rahit_spv"
+            if [ -f "$BIN2HEX_EXE" ] && [ -f "$TMP_FILE" ]; then
+                "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "${basename}_rahit_spv"
             fi
         fi
         rm -f "$TMP_FILE"
@@ -180,52 +184,52 @@ done
 
 # Compile template shaders
 echo "Compiling template shaders..."
-if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
+if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$BIN2HEX_EXE" ]; then
     # Depth-fragment shader
     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/gen_frag.tmpl" -DUSE_CLX_IDENT -DUSE_ATEST -DUSE_DF >/dev/null 2>&1
-    "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "frag_tx0_df"
+    "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "frag_tx0_df"
     rm -f "$TMP_FILE"
 
     # Lighting shader variations
     glslangValidator -S vert -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/light_vert.tmpl" >/dev/null 2>&1
-    "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "vert_light" 2>/dev/null
+    "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "vert_light" 2>/dev/null
     rm -f "$TMP_FILE"
 
     glslangValidator -S vert -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/light_vert.tmpl" -DUSE_FOG >/dev/null 2>&1
-    "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "vert_light_fog" 2>/dev/null
+    "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "vert_light_fog" 2>/dev/null
     rm -f "$TMP_FILE"
 
     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/light_frag.tmpl" >/dev/null 2>&1
-    "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "frag_light" 2>/dev/null
+    "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "frag_light" 2>/dev/null
     rm -f "$TMP_FILE"
 
     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/light_frag.tmpl" -DUSE_FOG >/dev/null 2>&1
-    "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "frag_light_fog" 2>/dev/null
+    "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "frag_light_fog" 2>/dev/null
     rm -f "$TMP_FILE"
 
     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/light_frag.tmpl" -DUSE_LINE >/dev/null 2>&1
-    "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "frag_light_line" 2>/dev/null
+    "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "frag_light_line" 2>/dev/null
     rm -f "$TMP_FILE"
 
     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/light_frag.tmpl" -DUSE_LINE -DUSE_FOG >/dev/null 2>&1
-    "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "frag_light_line_fog" 2>/dev/null
+    "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "frag_light_line_fog" 2>/dev/null
     rm -f "$TMP_FILE"
 
     # Entity color shaders
     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/gen_frag.tmpl" -DUSE_ENT_COLOR -DUSE_ATEST >/dev/null 2>&1
-    "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "frag_tx0_ent" 2>/dev/null
+    "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "frag_tx0_ent" 2>/dev/null
     rm -f "$TMP_FILE"
 
     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/gen_frag.tmpl" -DUSE_ENT_COLOR -DUSE_ATEST -DUSE_FOG >/dev/null 2>&1
-    "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "frag_tx0_ent_fog" 2>/dev/null
+    "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "frag_tx0_ent_fog" 2>/dev/null
     rm -f "$TMP_FILE"
 
     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/gen_frag.tmpl" -DUSE_ENT_COLOR -DUSE_ATEST -DUSE_VK_PBR >/dev/null 2>&1
-    "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "frag_pbr_tx0_ent" 2>/dev/null
+    "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "frag_pbr_tx0_ent" 2>/dev/null
     rm -f "$TMP_FILE"
 
     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/gen_frag.tmpl" -DUSE_ENT_COLOR -DUSE_ATEST -DUSE_FOG -DUSE_VK_PBR >/dev/null 2>&1
-    "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "frag_pbr_tx0_ent_fog" 2>/dev/null
+    "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "frag_pbr_tx0_ent_fog" 2>/dev/null
     rm -f "$TMP_FILE"
 
     # Compile identity/fixed shader variations (matches Windows batch script)
@@ -280,7 +284,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
                         compile_flags="$sh_flag $tx_flag $mode_flag $env_flag $fog_flag"
                         glslangValidator -S vert -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/gen_vert.tmpl" $compile_flags >/dev/null 2>&1
                         if [ $? -eq 0 ] && [ -f "$TMP_FILE" ]; then
-                            "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "$vert_name" 2>/dev/null
+                            "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "$vert_name" 2>/dev/null
                             # Generate binding code
                             echo "    vk.modules.vert.${mode_id}[${sh_idx}][${tx_idx}][${env_idx}][${fog_idx}] = SHADER_MODULE( ${vert_name} );" >> "$OUT_BINDING"
                             echo "    vk_set_shader_name( vk.modules.vert.${mode_id}[${sh_idx}][${tx_idx}][${env_idx}][${fog_idx}], \"${vert_name}\" );" >> "$OUT_BINDING"
@@ -339,7 +343,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
                     frag_name="frag_${sh_id}${tx_id}_${mode_id}${fog_id}"
                     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/gen_frag.tmpl" $compile_flags >/dev/null 2>&1
                     if [ $? -eq 0 ] && [ -f "$TMP_FILE" ]; then
-                        "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "$frag_name" 2>/dev/null
+                        "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "$frag_name" 2>/dev/null
                         # Generate binding code
                         echo "    vk.modules.frag.${mode_id}[${sh_idx}][${tx_idx}][${fog_idx}] = SHADER_MODULE( ${frag_name} );" >> "$OUT_BINDING"
                         echo "    vk_set_shader_name( vk.modules.frag.${mode_id}[${sh_idx}][${tx_idx}][${fog_idx}], \"${frag_name}\" );" >> "$OUT_BINDING"
@@ -396,7 +400,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
                     compile_flags="$sh_flag $tx_flag $env_flag $fog_flag"
                     glslangValidator -S vert -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/gen_vert.tmpl" $compile_flags >/dev/null 2>&1
                     if [ $? -eq 0 ] && [ -f "$TMP_FILE" ]; then
-                        "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "$vert_name" 2>/dev/null
+                        "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "$vert_name" 2>/dev/null
                         # Generate binding code
                         echo "    vk.modules.vert.gen[${sh_idx}][${tx_idx}][0][${env_idx}][${fog_idx}] = SHADER_MODULE( ${vert_name} );" >> "$OUT_BINDING"
                         echo "    vk_set_shader_name( vk.modules.vert.gen[${sh_idx}][${tx_idx}][0][${env_idx}][${fog_idx}], \"${vert_name}\" );" >> "$OUT_BINDING"
@@ -414,7 +418,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
                         compile_flags="$sh_flag $tx_flag $cl_flag $env_flag $fog_flag"
                         glslangValidator -S vert -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/gen_vert.tmpl" $compile_flags >/dev/null 2>&1
                         if [ $? -eq 0 ] && [ -f "$TMP_FILE" ]; then
-                            "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "$vert_name" 2>/dev/null
+                            "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "$vert_name" 2>/dev/null
                             # Generate binding code
                             echo "    vk.modules.vert.gen[${sh_idx}][${tx_idx}][1][${env_idx}][${fog_idx}] = SHADER_MODULE( ${vert_name} );" >> "$OUT_BINDING"
                             echo "    vk_set_shader_name( vk.modules.vert.gen[${sh_idx}][${tx_idx}][1][${env_idx}][${fog_idx}], \"${vert_name}\" );" >> "$OUT_BINDING"
@@ -467,7 +471,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
                 frag_name="frag_${sh_id}${tx_id}${fog_id}"
                 glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/gen_frag.tmpl" $compile_flags >/dev/null 2>&1
                 if [ $? -eq 0 ] && [ -f "$TMP_FILE" ]; then
-                    "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "$frag_name" 2>/dev/null
+                    "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "$frag_name" 2>/dev/null
                     # Generate binding code
                     echo "    vk.modules.frag.gen[${sh_idx}][${tx_idx}][0][${fog_idx}] = SHADER_MODULE( ${frag_name} );" >> "$OUT_BINDING"
                     echo "    vk_set_shader_name( vk.modules.frag.gen[${sh_idx}][${tx_idx}][0][${fog_idx}], \"${frag_name}\" );" >> "$OUT_BINDING"
@@ -485,7 +489,7 @@ if [ -f "$GLSL_DIR/gen_frag.tmpl" ] && [ -f "$TOOLS_DIR/bin2hex" ]; then
                     compile_flags="$sh_flag $tx_flag $cl_flag $fog_flag"
                     glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$GLSL_DIR/gen_frag.tmpl" $compile_flags >/dev/null 2>&1
                     if [ $? -eq 0 ] && [ -f "$TMP_FILE" ]; then
-                        "$TOOLS_DIR/bin2hex" "$TMP_FILE" "+$OUT_DATA" "$frag_name" 2>/dev/null
+                        "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "$frag_name" 2>/dev/null
                         # Generate binding code
                         echo "    vk.modules.frag.gen[${sh_idx}][${tx_idx}][1][${fog_idx}] = SHADER_MODULE( ${frag_name} );" >> "$OUT_BINDING"
                         echo "    vk_set_shader_name( vk.modules.frag.gen[${sh_idx}][${tx_idx}][1][${fog_idx}], \"${frag_name}\" );" >> "$OUT_BINDING"

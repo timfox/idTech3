@@ -110,6 +110,8 @@ extern vmCvar_t ui_server16;
 //extern vmCvar_t ui_cdkey;
 //extern vmCvar_t ui_cdkeychecked;
 extern vmCvar_t ui_setupchecked;
+extern vmCvar_t ui_hideSystemCursor;
+extern vmCvar_t ui_cursorSize;
 //new in beta 23:
 extern vmCvar_t ui_browserOnlyHumans;
 extern vmCvar_t ui_browserHidePrivate;

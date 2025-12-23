@@ -494,6 +494,7 @@ qboolean CL_ImGui_WantCaptureKeyboard( void );
 //
 // cl_input
 //
+void IN_ShowMouse( qboolean show );
 void CL_InitInput( void );
 void CL_ClearInput( void );
 void CL_SendCmd( void );

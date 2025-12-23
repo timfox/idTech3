@@ -205,6 +205,8 @@ vmCvar_t ui_server16;
 vmCvar_t        ui_browserOnlyHumans;
 //new in beta 37:
 vmCvar_t        ui_setupchecked;
+vmCvar_t        ui_hideSystemCursor;
+vmCvar_t        ui_cursorSize;
 
 vmCvar_t ui_browserHidePrivate;
 
@@ -299,6 +301,8 @@ static cvarTable_t cvarTable[] = {
 	{ &ui_browserOnlyHumans, "ui_browserOnlyHumans", "0", CVAR_ARCHIVE },
 	{ &ui_setupchecked, "ui_setupchecked", "0", CVAR_ARCHIVE },
 	{ &ui_browserHidePrivate, "ui_browserHidePrivate", "1", CVAR_ARCHIVE },
+	{ &ui_hideSystemCursor, "ui_hideSystemCursor", "1", CVAR_ARCHIVE },
+	{ &ui_cursorSize, "ui_cursorSize", "32", CVAR_ARCHIVE },
 	{ NULL, "g_localTeamPref", "", 0 }
 };
 

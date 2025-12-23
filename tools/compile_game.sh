@@ -180,6 +180,28 @@ package_pk3() {
     cd "$MOD_ROOT"
 
     echo "Packaging ${MOD_NAME}.pk3 ..."
+
+    # Verbose output: list contents and details before packaging
+    echo "Included in pk3:"
+    for inc in "${INCLUDES[@]}"; do
+        if [ -d "$MOD_ROOT/$inc" ]; then
+            # List files recursively for this directory
+            echo " [DIR] $inc"
+            find "$inc" -type f | while IFS= read -r file; do
+                # Print with indent and size
+                if [ -f "$file" ]; then
+                    size=$(stat -c%s "$file" 2>/dev/null || stat -f%z "$file")
+                    printf "   - %s (%s bytes)\n" "$file" "$size"
+                fi
+            done
+        elif [ -f "$MOD_ROOT/$inc" ]; then
+            size=$(stat -c%s "$MOD_ROOT/$inc" 2>/dev/null || stat -f%z "$MOD_ROOT/$inc")
+            echo " [FILE] $inc ($size bytes)"
+        else
+            echo " [??] $inc (not found?)"
+        fi
+    done
+
     zip -r "$RELEASE_PK3" "${INCLUDES[@]}" \
         -x "gamesrc/*" "gamesrc/**" \
            "build/*" "build/**" \
