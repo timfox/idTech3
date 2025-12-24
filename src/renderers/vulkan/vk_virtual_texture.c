@@ -29,15 +29,15 @@ typedef struct {
 		uint32_t *pageResidency; // Track which pages are loaded (page ID)
 		uint64_t *pageLastAccess; // Last access time for LRU eviction
 		uint32_t *pageLRUOrder; // LRU order (0 = most recently used)
-		uint32_t cacheSize; // Number of pages currently in cache
+		atomic_uint_t cacheSize; // Number of pages currently in cache
 		uint32_t cacheCapacity; // Maximum pages in cache
-		uint64_t accessCounter; // Monotonically increasing access counter
+		atomic_uint64_t accessCounter; // Monotonically increasing access counter
 	} cache;
 	
 	// Page streaming
 	struct {
 		uint32_t *requestQueue; // Pages requested for loading (packed: pageX | (pageY << 16) | (mipLevel << 24))
-		uint32_t requestCount;
+		atomic_uint_t requestCount;
 		uint32_t requestCapacity;
 		qboolean streamingActive; // Is streaming thread active
 	} streaming;
@@ -97,11 +97,11 @@ void vk_virtual_texture_init( void )
 	// Initialize request queue
 	vk_vt.streaming.requestCapacity = 1024;
 	vk_vt.streaming.requestQueue = (uint32_t *)ri.Malloc( vk_vt.streaming.requestCapacity * sizeof( uint32_t ) );
-	vk_vt.streaming.requestCount = 0;
+	atomic_store_explicit(&vk_vt.streaming.requestCount, 0, memory_order_relaxed);
 	vk_vt.streaming.streamingActive = qfalse;
 	
-	vk_vt.cache.accessCounter = 0;
-	vk_vt.cache.cacheSize = 0;
+	atomic_store_explicit(&vk_vt.cache.accessCounter, 0, memory_order_relaxed);
+	atomic_store_explicit(&vk_vt.cache.cacheSize, 0, memory_order_relaxed);
 	
 	ri.Printf( PRINT_DEVELOPER, "Virtual texturing initialized (page size: %u, cache: %u pages, %u MB)\n", 
 		pageSize, vk_vt.cache.cacheCapacity, cacheSizeMB );
@@ -119,7 +119,8 @@ void vk_virtual_texture_shutdown( void )
 	vk_vt.streaming.streamingActive = qfalse;
 	
 	// Destroy all cached pages
-	for ( uint32_t i = 0; i < vk_vt.cache.cacheSize; i++ ) {
+	uint32_t cache_size = atomic_load_explicit(&vk_vt.cache.cacheSize, memory_order_relaxed);
+	for ( uint32_t i = 0; i < cache_size; i++ ) {
 		if ( vk_vt.cache.pageViews[i] != VK_NULL_HANDLE ) {
 			qvkDestroyImageView( vk.device, vk_vt.cache.pageViews[i], NULL );
 			vk_vt.cache.pageViews[i] = VK_NULL_HANDLE;
@@ -184,7 +185,8 @@ void vk_virtual_texture_shutdown( void )
 // Find page in cache (returns cache slot index or -1 if not found)
 static int32_t vk_vt_find_page_in_cache( uint32_t pageID )
 {
-	for ( uint32_t i = 0; i < vk_vt.cache.cacheSize; i++ ) {
+	uint32_t cache_size = atomic_load_explicit(&vk_vt.cache.cacheSize, memory_order_relaxed);
+	for ( uint32_t i = 0; i < cache_size; i++ ) {
 		if ( vk_vt.cache.pageResidency[i] == pageID ) {
 			return (int32_t)i;
 		}
@@ -195,15 +197,16 @@ static int32_t vk_vt_find_page_in_cache( uint32_t pageID )
 // Find LRU page slot (least recently used)
 static __attribute__((unused)) uint32_t vk_vt_find_lru_slot( void )
 {
-	if ( vk_vt.cache.cacheSize < vk_vt.cache.cacheCapacity ) {
+	uint32_t cache_size = atomic_load_explicit(&vk_vt.cache.cacheSize, memory_order_relaxed);
+	if ( cache_size < vk_vt.cache.cacheCapacity ) {
 		// Cache not full, return next free slot
-		return vk_vt.cache.cacheSize;
+		return cache_size;
 	}
 	
 	// Find slot with oldest access time
 	uint32_t lruSlot = 0;
 	uint64_t oldestAccess = vk_vt.cache.pageLastAccess[0];
-	for ( uint32_t i = 1; i < vk_vt.cache.cacheSize; i++ ) {
+	for ( uint32_t i = 1; i < cache_size; i++ ) {
 		if ( vk_vt.cache.pageLastAccess[i] < oldestAccess ) {
 			oldestAccess = vk_vt.cache.pageLastAccess[i];
 			lruSlot = i;
@@ -215,7 +218,7 @@ static __attribute__((unused)) uint32_t vk_vt_find_lru_slot( void )
 // Update LRU order when page is accessed
 static __attribute__((unused)) void vk_vt_update_lru( uint32_t slotIndex )
 {
-	vk_vt.cache.pageLastAccess[slotIndex] = ++vk_vt.cache.accessCounter;
+	vk_vt.cache.pageLastAccess[slotIndex] = atomic_fetch_add_explicit(&vk_vt.cache.accessCounter, 1, memory_order_relaxed) + 1;
 }
 
 // Request a texture page for loading
@@ -234,27 +237,29 @@ void vk_virtual_texture_request_page( uint32_t pageX, uint32_t pageY, uint32_t m
 	}
 	
 	// Check if already in request queue
-	for ( uint32_t i = 0; i < vk_vt.streaming.requestCount; i++ ) {
+	uint32_t request_count = atomic_load_explicit(&vk_vt.streaming.requestCount, memory_order_relaxed);
+	for ( uint32_t i = 0; i < request_count; i++ ) {
 		if ( vk_vt.streaming.requestQueue[i] == pageID ) {
 			return; // Already requested
 		}
 	}
 	
 	// Add to request queue
-	if ( vk_vt.streaming.requestCount >= vk_vt.streaming.requestCapacity ) {
+	if ( request_count >= vk_vt.streaming.requestCapacity ) {
 		// Queue full, resize
 		uint32_t newCapacity = vk_vt.streaming.requestCapacity * 2;
 		uint32_t *newQueue = (uint32_t *)ri.Malloc( newCapacity * sizeof( uint32_t ) );
 		if ( vk_vt.streaming.requestQueue ) {
 			Com_Memcpy( newQueue, vk_vt.streaming.requestQueue, 
-				vk_vt.streaming.requestCount * sizeof( uint32_t ) );
+				request_count * sizeof( uint32_t ) );
 			ri.Free( vk_vt.streaming.requestQueue );
 		}
 		vk_vt.streaming.requestQueue = newQueue;
 		vk_vt.streaming.requestCapacity = newCapacity;
 	}
 	
-	vk_vt.streaming.requestQueue[vk_vt.streaming.requestCount++] = pageID;
+	vk_vt.streaming.requestQueue[request_count] = pageID;
+	atomic_fetch_add_explicit(&vk_vt.streaming.requestCount, 1, memory_order_relaxed);
 }
 
 // Update page table (call from compute shader or CPU)

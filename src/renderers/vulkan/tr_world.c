@@ -69,33 +69,33 @@ static qboolean	R_CullGrid( srfGridMesh_t *cv ) {
 	// check for trivial reject
 	if ( sphereCull == CULL_OUT )
 	{
-		tr.pc.c_sphere_cull_patch_out++;
+		atomic_fetch_add_explicit(&tr.pc.c_sphere_cull_patch_out, 1, memory_order_relaxed);
 		return qtrue;
 	}
 	// check bounding box if necessary
 	else if ( sphereCull == CULL_CLIP )
 	{
-		tr.pc.c_sphere_cull_patch_clip++;
+		atomic_fetch_add_explicit(&tr.pc.c_sphere_cull_patch_clip, 1, memory_order_relaxed);
 
 		boxCull = R_CullLocalBox( cv->meshBounds );
 
 		if ( boxCull == CULL_OUT ) 
 		{
-			tr.pc.c_box_cull_patch_out++;
+			atomic_fetch_add_explicit(&tr.pc.c_box_cull_patch_out, 1, memory_order_relaxed);
 			return qtrue;
 		}
 		else if ( boxCull == CULL_IN )
 		{
-			tr.pc.c_box_cull_patch_in++;
+			atomic_fetch_add_explicit(&tr.pc.c_box_cull_patch_in, 1, memory_order_relaxed);
 		}
 		else
 		{
-			tr.pc.c_box_cull_patch_clip++;
+			atomic_fetch_add_explicit(&tr.pc.c_box_cull_patch_clip, 1, memory_order_relaxed);
 		}
 	}
 	else
 	{
-		tr.pc.c_sphere_cull_patch_in++;
+		atomic_fetch_add_explicit(&tr.pc.c_sphere_cull_patch_in, 1, memory_order_relaxed);
 	}
 
 	return qfalse;
@@ -262,7 +262,7 @@ static int R_DlightFace( srfSurfaceFace_t *face, int dlightBits ) {
 	}
 
 	if ( !dlightBits ) {
-		tr.pc.c_dlightSurfacesCulled++;
+		atomic_fetch_add_explicit(&tr.pc.c_dlightSurfacesCulled, 1, memory_order_relaxed);
 	}
 
 	face->dlightBits = dlightBits;
@@ -291,7 +291,7 @@ static int R_DlightGrid( srfGridMesh_t *grid, int dlightBits ) {
 	}
 
 	if ( !dlightBits ) {
-		tr.pc.c_dlightSurfacesCulled++;
+		atomic_fetch_add_explicit(&tr.pc.c_dlightSurfacesCulled, 1, memory_order_relaxed);
 	}
 
 	grid->dlightBits = dlightBits;
@@ -324,7 +324,7 @@ static int R_DlightTrisurf( srfTriangles_t *surf, int dlightBits ) {
 	}
 
 	if ( !dlightBits ) {
-		tr.pc.c_dlightSurfacesCulled++;
+		atomic_fetch_add_explicit(&tr.pc.c_dlightSurfacesCulled, 1, memory_order_relaxed);
 	}
 
 	grid->dlightBits = dlightBits;
@@ -354,7 +354,7 @@ static int R_DlightSurface( msurface_t *surf, int dlightBits ) {
 	}
 
 	if ( dlightBits ) {
-		tr.pc.c_dlightSurfaces++;
+		atomic_fetch_add_explicit(&tr.pc.c_dlightSurfaces, 1, memory_order_relaxed);
 	}
 
 	return dlightBits;
@@ -434,7 +434,7 @@ static void R_AddLitSurface( msurface_t *surf, const dlight_t *light )
 	surf->lightCount = tr.lightCount;
 
 	if ( R_LightCullSurface( surf->data, light ) ) {
-		tr.pc.c_lit_culls++;
+		atomic_fetch_add_explicit(&tr.pc.c_lit_culls, 1, memory_order_relaxed);
 		return;
 	}
 
@@ -493,7 +493,7 @@ static void R_RecursiveLightNode( const mnode_t* node )
 
 	} while ( 1 );
 
-	tr.pc.c_lit_leafs++;
+	atomic_fetch_add_explicit(&tr.pc.c_lit_leafs, 1, memory_order_relaxed);
 
 	// add the individual surfaces
 	c = node->nummarksurfaces;
@@ -700,7 +700,7 @@ static void R_RecursiveWorldNode( mnode_t *node, unsigned int planeBits, unsigne
 		int			c;
 		msurface_t	*surf, **mark;
 
-		tr.pc.c_leafs++;
+		atomic_fetch_add_explicit(&tr.pc.c_leafs, 1, memory_order_relaxed);
 
 		// add to z buffer bounds
 		if ( node->mins[0] < tr.viewParms.visBounds[0][0] ) {
@@ -937,10 +937,10 @@ void R_AddWorldSurfaces( void ) {
 		dl = &tr.viewParms.dlights[i];	
 		dl->head = dl->tail = NULL;
 		if ( R_CullDlight( dl ) == CULL_OUT ) {
-			tr.pc.c_light_cull_out++;
+			atomic_fetch_add_explicit(&tr.pc.c_light_cull_out, 1, memory_order_relaxed);
 			continue;
 		}
-		tr.pc.c_light_cull_in++;
+		atomic_fetch_add_explicit(&tr.pc.c_light_cull_in, 1, memory_order_relaxed);
 		tr.lightCount++;
 		tr.light = dl;
 		R_RecursiveLightNode( tr.world->nodes );

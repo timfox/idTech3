@@ -1170,7 +1170,7 @@ image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int widt
 	image->next = hashTable[ hash ];
 	hashTable[ hash ] = image;
 
-	tr.images[ tr.numImages++ ] = image;
+	tr.images[ atomic_fetch_add_explicit(&tr.numImages, 1, memory_order_relaxed) ] = image;
 
 	image->flags = flags;
 	image->width = width;

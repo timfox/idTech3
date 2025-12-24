@@ -76,6 +76,13 @@ void vk_create_image(image_t *image, int width, int height, int mip_levels) {
     VK_CHECK(qvkAllocateMemory(vk.device, &alloc_info, NULL, &memory));
     vk_track_allocation(memory_requirements.size);
 
+    // Track GPU memory allocation for leak detection
+    vk_track_gpu_allocation(memory, memory_requirements.size, memory_type,
+                           image->imgName, "vk_images.cpp:create_color_attachment");
+
+    // Record memory access for bandwidth profiling
+    vk_record_memory_access((void*)memory, memory_requirements.size, image->imgName, qtrue);
+
     VK_CHECK(qvkBindImageMemory(vk.device, image->handle, memory, 0));
 
     image->memory = memory;
@@ -129,6 +136,9 @@ void vk_destroy_image(image_t *image) {
         VkMemoryRequirements memory_requirements;
         qvkGetImageMemoryRequirements(vk.device, image->handle, &memory_requirements);
         vk_track_free(memory_requirements.size);
+
+        // Track GPU memory deallocation
+        vk_track_gpu_free(image->memory);
 
         qvkFreeMemory(vk.device, image->memory, NULL);
         image->memory = VK_NULL_HANDLE;

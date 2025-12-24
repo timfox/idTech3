@@ -9,6 +9,7 @@ Performance Counters - FPS, frame times, draw calls
 
 #ifndef STANDALONE_TEST
 #include "q_shared.h"
+#include "thread_platform.h"
 #else
 // Minimal definitions for standalone testing
 #include <stddef.h>
@@ -17,6 +18,14 @@ typedef uint8_t qboolean;
 typedef int qhandle_t;
 #define qfalse 0
 #define qtrue 1
+
+// Atomic stubs for standalone test
+typedef volatile int atomic_int_t;
+#define ATOMIC_INCREMENT(ptr) (*(ptr))++
+#define ATOMIC_DECREMENT(ptr) (*(ptr))--
+#define ATOMIC_ADD(ptr, val) (*(ptr)) += (val)
+#define atomic_load_explicit(ptr, order) *(ptr)
+#define atomic_store_explicit(ptr, val, order) *(ptr) = (val)
 
 // Forward declarations
 typedef enum {
@@ -37,8 +46,8 @@ void Com_Printf(const char *fmt, ...);
 // Performance counter structure
 typedef struct {
 	// FPS calculation
-	int frameCount;
-	int lastFPSUpdate;
+	atomic_int_t frameCount;
+	atomic_int_t lastFPSUpdate;
 	float currentFPS;
 	float averageFPS;
 
@@ -49,8 +58,8 @@ typedef struct {
 	float averageFrameTime;
 
 	// Draw call counters
-	int drawCallsThisFrame;
-	int totalDrawCalls;
+	atomic_int_t drawCallsThisFrame;
+	atomic_int_t totalDrawCalls;
 	int minDrawCallsPerFrame;
 	int maxDrawCallsPerFrame;
 	float averageDrawCallsPerFrame;

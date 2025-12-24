@@ -1150,21 +1150,21 @@ extern	int			gl_filter_min, gl_filter_max;
 ** performanceCounters_t
 */
 typedef struct {
-	int		c_sphere_cull_patch_in, c_sphere_cull_patch_clip, c_sphere_cull_patch_out;
-	int		c_box_cull_patch_in, c_box_cull_patch_clip, c_box_cull_patch_out;
-	int		c_sphere_cull_md3_in, c_sphere_cull_md3_clip, c_sphere_cull_md3_out;
-	int		c_box_cull_md3_in, c_box_cull_md3_clip, c_box_cull_md3_out;
+	atomic_uint_t		c_sphere_cull_patch_in, c_sphere_cull_patch_clip, c_sphere_cull_patch_out;
+	atomic_uint_t		c_box_cull_patch_in, c_box_cull_patch_clip, c_box_cull_patch_out;
+	atomic_uint_t		c_sphere_cull_md3_in, c_sphere_cull_md3_clip, c_sphere_cull_md3_out;
+	atomic_uint_t		c_box_cull_md3_in, c_box_cull_md3_clip, c_box_cull_md3_out;
 
-	int		c_leafs;
-	int		c_dlightSurfaces;
-	int		c_dlightSurfacesCulled;
+	atomic_uint_t		c_leafs;
+	atomic_uint_t		c_dlightSurfaces;
+	atomic_uint_t		c_dlightSurfacesCulled;
 #ifdef USE_PMLIGHT
-	int		c_light_cull_out;
-	int		c_light_cull_in;
-	int		c_lit_leafs;
-	int		c_lit_surfs;
-	int		c_lit_culls;
-	int		c_lit_masks;
+	atomic_uint_t		c_light_cull_out;
+	atomic_uint_t		c_light_cull_in;
+	atomic_uint_t		c_lit_leafs;
+	atomic_uint_t		c_lit_surfs;
+	atomic_uint_t		c_lit_culls;
+	atomic_uint_t		c_lit_masks;
 #endif
 } frontEndCounters_t;
 
@@ -1196,24 +1196,24 @@ typedef struct glstatic_s {
 } glstatic_t;
 
 typedef struct {
-	int		c_surfaces, c_shaders, c_vertexes, c_indexes, c_totalIndexes;
+	atomic_uint_t		c_surfaces, c_shaders, c_vertexes, c_indexes, c_totalIndexes;
 	float	c_overDraw;
 	
-	int		c_dlightVertexes;
-	int		c_dlightIndexes;
+	atomic_uint_t		c_dlightVertexes;
+	atomic_uint_t		c_dlightIndexes;
 
-	int		c_flareAdds;
-	int		c_flareTests;
-	int		c_flareRenders;
+	atomic_uint_t		c_flareAdds;
+	atomic_uint_t		c_flareTests;
+	atomic_uint_t		c_flareRenders;
 
 	int		msec;			// total msec for backend run
 #ifdef USE_PMLIGHT
-	int		c_lit_batches;
-	int		c_lit_vertices;
-	int		c_lit_indices;
-	int		c_lit_indices_latecull_in;
-	int		c_lit_indices_latecull_out;
-	int		c_lit_vertices_lateculltest;
+	atomic_uint_t		c_lit_batches;
+	atomic_uint_t		c_lit_vertices;
+	atomic_uint_t		c_lit_indices;
+	atomic_uint_t		c_lit_indices_latecull_in;
+	atomic_uint_t		c_lit_indices_latecull_out;
+	atomic_uint_t		c_lit_vertices_lateculltest;
 #endif
 } backEndCounters_t;
 
@@ -1387,15 +1387,15 @@ typedef struct trGlobals_s {
 	// within the +/32K indexed range on risc processors
 	//
 	model_t					**models;		// Dynamically allocated array
-	int						numModels;
+	atomic_uint_t						numModels;
 
-	int						numImages;
+	atomic_uint_t						numImages;
 	image_t					*images[MAX_DRAWIMAGES];
 
 	// shader indexes from other modules will be looked up in tr.shaders[]
 	// shader indexes from drawsurfs will be looked up in sortedShaders[]
 	// lower indexed sortedShaders must be rendered first (opaque surfaces before translucent)
-	int						numShaders;
+	atomic_uint_t						numShaders;
 	shader_t				*shaders[MAX_SHADERS];
 	shader_t				*sortedShaders[MAX_SHADERS];
 

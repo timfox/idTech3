@@ -1,9 +1,7 @@
 /*
-===========================================================================
+=================
 Job Queue Implementation
-
-Lock-free work-stealing queue for multi-threaded job execution.
-===========================================================================
+=================
 */
 
 #include "q_shared.h"
@@ -23,15 +21,15 @@ qboolean JobQueue_Init(job_queue_t *queue, int max_size)
 		return qfalse;
 	}
 
-	queue->head = NULL;
-	queue->tail = NULL;
-	#ifdef _WIN32
-		queue->count = 0;
-	#else
-		atomic_init(&queue->count, 0);
-	#endif
-	queue->max_size = max_size;
+    // Ensure max_size is a power of 2 for LF_Queue
+    int size = 1;
+    while (size < max_size) size <<= 1;
 
+    if (!LF_Queue_Init(&queue->queue, size)) {
+        return qfalse;
+    }
+
+	queue->max_size = size;
 	return qtrue;
 }
 
@@ -48,20 +46,12 @@ void JobQueue_Shutdown(job_queue_t *queue)
 	}
 
 	// Free remaining jobs
-	job_t *job = queue->head;
-	while (job) {
-		job_t *next = job->next;
-		Z_Free(job);
-		job = next;
-	}
+    job_t *job;
+    while (LF_Queue_Dequeue(&queue->queue, (void**)&job)) {
+        Z_Free(job);
+    }
 
-	queue->head = NULL;
-	queue->tail = NULL;
-	#ifdef _WIN32
-		queue->count = 0;
-	#else
-		atomic_store(&queue->count, 0);
-	#endif
+    LF_Queue_Shutdown(&queue->queue);
 }
 
 /*
@@ -76,28 +66,7 @@ qboolean JobQueue_Enqueue(job_queue_t *queue, job_t *job)
 		return qfalse;
 	}
 
-	#ifdef _WIN32
-	int current = queue->count;
-	#else
-	int current = atomic_load(&queue->count);
-	#endif
-
-	if (current >= queue->max_size) {
-		return qfalse;
-	}
-
-	// Simple enqueue (not fully lock-free, but good enough for our use)
-	if (queue->tail) {
-		queue->tail->next = job;
-		queue->tail = job;
-	} else {
-		queue->head = job;
-		queue->tail = job;
-	}
-
-	ATOMIC_INCREMENT(&queue->count);
-
-	return qtrue;
+    return LF_Queue_Enqueue(&queue->queue, job);
 }
 
 /*
@@ -108,29 +77,15 @@ Remove a job from the queue (thread-safe)
 */
 job_t *JobQueue_Dequeue(job_queue_t *queue)
 {
-	#ifdef _WIN32
-	int current = queue ? queue->count : 0;
-	#else
-	int current = (queue ? atomic_load(&queue->count) : 0);
-	#endif
-
-	if (!queue || current == 0) {
+	if (!queue) {
 		return NULL;
 	}
 
-	job_t *job = queue->head;
-	if (!job) {
-		return NULL;
-	}
-
-	queue->head = job->next;
-	if (!queue->head) {
-		queue->tail = NULL;
-	}
-
-	ATOMIC_DECREMENT(&queue->count);
-
-	return job;
+    job_t *job = NULL;
+    if (LF_Queue_Dequeue(&queue->queue, (void**)&job)) {
+        return job;
+    }
+	return NULL;
 }
 
 /*
@@ -141,8 +96,7 @@ Steal a job from another thread's queue (work-stealing)
 */
 job_t *JobQueue_Steal(job_queue_t *queue)
 {
-	// For now, same as dequeue
-	// Can be enhanced with proper lock-free algorithms
+    // For MPMC queue, Steal is same as Dequeue
 	return JobQueue_Dequeue(queue);
 }
 
@@ -157,10 +111,5 @@ int JobQueue_GetCount(job_queue_t *queue)
 	if (!queue) {
 		return 0;
 	}
-	#ifdef _WIN32
-	return queue->count;
-	#else
-	return atomic_load(&queue->count);
-	#endif
+    return (int)LF_Queue_GetCount(&queue->queue);
 }
-

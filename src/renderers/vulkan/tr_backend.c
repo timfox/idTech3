@@ -690,7 +690,7 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 #endif
 	depthRange = qfalse;
 
-	backEnd.pc.c_surfaces += numDrawSurfs;
+	atomic_fetch_add_explicit(&backEnd.pc.c_surfaces, numDrawSurfs, memory_order_relaxed);
 
 	for (i = 0, drawSurf = drawSurfs ; i < numDrawSurfs ; i++, drawSurf++) {
 		if ( drawSurf->sort == oldSort ) {
@@ -1851,6 +1851,10 @@ static const void *RB_ClearColor( const void *data )
 static const void *RB_ImGuiDraw( const void *data )
 {
 	const imguiDrawCommand_t *cmd = (const imguiDrawCommand_t *)data;
+
+	// Render performance HUD overlay
+	vk_render_performance_hud();
+
 	VK_ImGui_RenderDrawData( cmd->drawData );
 	return (const void *)( cmd + 1 );
 }

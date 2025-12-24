@@ -9,16 +9,17 @@ Memory Usage Statistics Tracking
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include "thread_platform.h"
 
 // Memory statistics per tag
 typedef struct {
-	int64_t current;		// Current bytes allocated
-	int64_t peak;			// Peak bytes allocated
-	int64_t total_allocated;	// Total bytes ever allocated
-	int64_t total_freed;		// Total bytes ever freed
-	int allocations;		// Number of allocations
-	int frees;				// Number of frees
-	int blocks;				// Current number of blocks
+	atomic_int64_t current;		// Current bytes allocated
+	atomic_int64_t peak;			// Peak bytes allocated
+	atomic_int64_t total_allocated;	// Total bytes ever allocated
+	atomic_int64_t total_freed;		// Total bytes ever freed
+	atomic_int_t allocations;		// Number of allocations
+	atomic_int_t frees;				// Number of frees
+	atomic_int_t blocks;				// Current number of blocks
 } memtag_stats_t;
 
 // Initialize memory statistics tracking

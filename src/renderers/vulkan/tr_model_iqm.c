@@ -1023,7 +1023,7 @@ static int R_CullIQM( const iqmData_t *data, const trRefEntity_t *ent ) {
 	int		i;
 
 	if (!data->bounds) {
-		tr.pc.c_box_cull_md3_clip++;
+		atomic_fetch_add_explicit(&tr.pc.c_box_cull_md3_clip, 1, memory_order_relaxed);
 		return CULL_CLIP;
 	}
 
@@ -1040,14 +1040,14 @@ static int R_CullIQM( const iqmData_t *data, const trRefEntity_t *ent ) {
 	switch ( R_CullLocalBox( bounds ) )
 	{
 	case CULL_IN:
-		tr.pc.c_box_cull_md3_in++;
+		atomic_fetch_add_explicit(&tr.pc.c_box_cull_md3_in, 1, memory_order_relaxed);
 		return CULL_IN;
 	case CULL_CLIP:
-		tr.pc.c_box_cull_md3_clip++;
+		atomic_fetch_add_explicit(&tr.pc.c_box_cull_md3_clip, 1, memory_order_relaxed);
 		return CULL_CLIP;
 	case CULL_OUT:
 	default:
-		tr.pc.c_box_cull_md3_out++;
+		atomic_fetch_add_explicit(&tr.pc.c_box_cull_md3_out, 1, memory_order_relaxed);
 		return CULL_OUT;
 	}
 }

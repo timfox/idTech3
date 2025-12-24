@@ -20,16 +20,29 @@ typedef struct worker_thread_s {
 	int thread_index;
 	qboolean running;
 	volatile qboolean should_stop;
-	mutex_t queue_mutex;
+	mutex_t wait_mutex;
 	condition_t work_available;
 } worker_thread_t;
 
 // Global job system state
 static worker_thread_t s_workers[MAX_WORKER_THREADS];
 static int s_num_workers = 0;
+static atomic_int_t s_active_workers;
 static job_queue_t s_global_queue;
 static mutex_t s_global_mutex;
 static condition_t s_global_condition;
+static condition_t s_scaling_condition;
+static mutex_t s_scaling_mutex;
+
+// Load balancer state
+static qboolean s_lb_enabled = qtrue;
+static int s_min_workers = 1;
+static int s_max_workers = MAX_WORKER_THREADS;
+static uint64_t s_last_scaling_time = 0;
+static const int SCALING_INTERVAL_MS = 100; // Evaluate scaling every 100ms
+static float s_avg_job_latency = 0.0f;
+static float s_worker_utilization = 0.0f;
+
 // Main-thread completion queue
 #define MAX_COMPLETIONS 1024
 typedef struct completion_s {
@@ -41,8 +54,8 @@ static int s_completion_head = 0;
 static int s_completion_tail = 0;
 static mutex_t s_completion_mutex;
 static qboolean s_initialized = qfalse;
-static volatile int s_pending_jobs = 0;
-static volatile int s_completed_jobs = 0;
+static atomic_int_t s_pending_jobs;
+static atomic_int_t s_completed_jobs;
 
 // Job pool for allocation (reserved for future use)
 // #define JOB_POOL_SIZE 1024
@@ -61,30 +74,33 @@ static THREAD_RETURN THREAD_CALL WorkerThread_Main(void *arg)
 	TracyCZoneCtx zone_main;
 	
 	while (!worker->should_stop) {
+		// Load balancing: check if this thread should be active
+		MUTEX_LOCK(s_scaling_mutex);
+		while (worker->thread_index >= atomic_load_explicit(&s_active_workers, memory_order_acquire) && !worker->should_stop) {
+			CONDITION_WAIT(s_scaling_condition, s_scaling_mutex);
+		}
+		MUTEX_UNLOCK(s_scaling_mutex);
+
+		if (worker->should_stop) break;
+
 		job_t *job = NULL;
 		
-		// Try to get job from local queue first
-		MUTEX_LOCK(worker->queue_mutex);
+		// Try to get job from local queue first (LOCK-FREE)
 		job = JobQueue_Dequeue(&worker->local_queue);
-		MUTEX_UNLOCK(worker->queue_mutex);
 		
-		// If no local job, try global queue
+		// If no local job, try global queue (LOCK-FREE)
 		if (!job) {
-			MUTEX_LOCK(s_global_mutex);
 			job = JobQueue_Dequeue(&s_global_queue);
-			MUTEX_UNLOCK(s_global_mutex);
 		}
 		
-		// If still no job, try work-stealing from other threads
+		// If still no job, try work-stealing from other threads (LOCK-FREE)
 		if (!job) {
 			for (int i = 0; i < s_num_workers; i++) {
 				if (i == worker->thread_index) {
 					continue;
 				}
 				
-				MUTEX_LOCK(s_workers[i].queue_mutex);
 				job = JobQueue_Steal(&s_workers[i].local_queue);
-				MUTEX_UNLOCK(s_workers[i].queue_mutex);
 				
 				if (job) {
 					break;
@@ -122,15 +138,15 @@ static THREAD_RETURN THREAD_CALL WorkerThread_Main(void *arg)
 				MUTEX_UNLOCK(s_completion_mutex);
 			}
 			
-			ATOMIC_DECREMENT(&s_pending_jobs);
-			ATOMIC_INCREMENT(&s_completed_jobs);
+			atomic_fetch_sub_explicit(&s_pending_jobs, 1, memory_order_relaxed);
+			atomic_fetch_add_explicit(&s_completed_jobs, 1, memory_order_relaxed);
 			
 			Z_Free(job);
 		} else {
 			// No work available, wait for signal
-			MUTEX_LOCK(worker->queue_mutex);
-			CONDITION_WAIT(worker->work_available, worker->queue_mutex);
-			MUTEX_UNLOCK(worker->queue_mutex);
+			MUTEX_LOCK(worker->wait_mutex);
+			CONDITION_WAIT(worker->work_available, worker->wait_mutex);
+			MUTEX_UNLOCK(worker->wait_mutex);
 		}
 	}
 	
@@ -172,7 +188,11 @@ qboolean JobSystem_Init(int num_threads)
 
 	MUTEX_INIT(s_global_mutex);
 	CONDITION_INIT(s_global_condition);
+	MUTEX_INIT(s_scaling_mutex);
+	CONDITION_INIT(s_scaling_condition);
 	MUTEX_INIT(s_completion_mutex);
+
+	atomic_init(&s_active_workers, s_num_workers); // Start with all threads active
 
 	// Initialize worker threads
 	for (int i = 0; i < s_num_workers; i++) {
@@ -185,19 +205,22 @@ qboolean JobSystem_Init(int num_threads)
 				CONDITION_SIGNAL(s_workers[j].work_available);
 				Thread_Join(s_workers[j].handle);
 				JobQueue_Shutdown(&s_workers[j].local_queue);
-				MUTEX_DESTROY(s_workers[j].queue_mutex);
+				MUTEX_DESTROY(s_workers[j].wait_mutex);
 				CONDITION_DESTROY(s_workers[j].work_available);
 			}
-			JobQueue_Shutdown(&s_global_queue);
-			MUTEX_DESTROY(s_global_mutex);
-			CONDITION_DESTROY(s_global_condition);
+	JobQueue_Shutdown(&s_global_queue);
+	MUTEX_DESTROY(s_global_mutex);
+	CONDITION_DESTROY(s_global_condition);
+	MUTEX_DESTROY(s_scaling_mutex);
+			CONDITION_DESTROY(s_scaling_condition);
+			MUTEX_DESTROY(s_completion_mutex);
 			return qfalse;
 		}
 
 		worker->thread_index = i;
 		worker->running = qtrue;
 		worker->should_stop = qfalse;
-		MUTEX_INIT(worker->queue_mutex);
+		MUTEX_INIT(worker->wait_mutex);
 		CONDITION_INIT(worker->work_available);
 
 		char thread_name[32];
@@ -207,25 +230,27 @@ qboolean JobSystem_Init(int num_threads)
 			Com_Printf("JobSystem_Init: Failed to create worker thread %d\n", i);
 			// Cleanup
 			JobQueue_Shutdown(&worker->local_queue);
-			MUTEX_DESTROY(worker->queue_mutex);
 			CONDITION_DESTROY(worker->work_available);
 			for (int j = 0; j < i; j++) {
 				s_workers[j].should_stop = qtrue;
 				CONDITION_SIGNAL(s_workers[j].work_available);
 				Thread_Join(s_workers[j].handle);
 				JobQueue_Shutdown(&s_workers[j].local_queue);
-				MUTEX_DESTROY(s_workers[j].queue_mutex);
+				MUTEX_DESTROY(s_workers[j].wait_mutex);
 				CONDITION_DESTROY(s_workers[j].work_available);
 			}
-			JobQueue_Shutdown(&s_global_queue);
-			MUTEX_DESTROY(s_global_mutex);
-			CONDITION_DESTROY(s_global_condition);
+	JobQueue_Shutdown(&s_global_queue);
+	MUTEX_DESTROY(s_global_mutex);
+	CONDITION_DESTROY(s_global_condition);
+	MUTEX_DESTROY(s_scaling_mutex);
+			CONDITION_DESTROY(s_scaling_condition);
+			MUTEX_DESTROY(s_completion_mutex);
 			return qfalse;
 		}
 	}
 
-	s_pending_jobs = 0;
-	s_completed_jobs = 0;
+	atomic_init(&s_pending_jobs, 0);
+	atomic_init(&s_completed_jobs, 0);
 	s_initialized = qtrue;
 
 	Com_Printf("JobSystem_Init: Initialized with %d worker threads\n", s_num_workers);
@@ -246,22 +271,27 @@ void JobSystem_Shutdown(void)
 	}
 
 	// Signal all workers to stop
+	MUTEX_LOCK(s_scaling_mutex);
 	for (int i = 0; i < s_num_workers; i++) {
 		s_workers[i].should_stop = qtrue;
 		CONDITION_SIGNAL(s_workers[i].work_available);
 	}
+	CONDITION_BROADCAST(s_scaling_condition);
+	MUTEX_UNLOCK(s_scaling_mutex);
 
 	// Wait for all workers to finish
 	for (int i = 0; i < s_num_workers; i++) {
 		Thread_Join(s_workers[i].handle);
 		JobQueue_Shutdown(&s_workers[i].local_queue);
-		MUTEX_DESTROY(s_workers[i].queue_mutex);
+		MUTEX_DESTROY(s_workers[i].wait_mutex);
 		CONDITION_DESTROY(s_workers[i].work_available);
 	}
 
 	JobQueue_Shutdown(&s_global_queue);
 	MUTEX_DESTROY(s_global_mutex);
 	CONDITION_DESTROY(s_global_condition);
+	MUTEX_DESTROY(s_scaling_mutex);
+	CONDITION_DESTROY(s_scaling_condition);
 	MUTEX_DESTROY(s_completion_mutex);
 
 	s_num_workers = 0;
@@ -322,26 +352,26 @@ job_handle_t *JobSystem_SubmitJobWithCompletion(jobFunction_t function, void *da
 	qboolean enqueued = qfalse;
 
 	if (worker_index < s_num_workers) {
-		MUTEX_LOCK(s_workers[worker_index].queue_mutex);
 		enqueued = JobQueue_Enqueue(&s_workers[worker_index].local_queue, job);
 		if (enqueued) {
+			MUTEX_LOCK(s_workers[worker_index].wait_mutex);
 			CONDITION_SIGNAL(s_workers[worker_index].work_available);
+			MUTEX_UNLOCK(s_workers[worker_index].wait_mutex);
 		}
-		MUTEX_UNLOCK(s_workers[worker_index].queue_mutex);
 	}
 
 	if (!enqueued) {
 		// Fall back to global queue
-		MUTEX_LOCK(s_global_mutex);
 		enqueued = JobQueue_Enqueue(&s_global_queue, job);
 		if (enqueued) {
+			MUTEX_LOCK(s_global_mutex); // We still need this mutex for the global condition
 			CONDITION_BROADCAST(s_global_condition);
+			MUTEX_UNLOCK(s_global_mutex);
 		}
-		MUTEX_UNLOCK(s_global_mutex);
 	}
 
 	if (enqueued) {
-		ATOMIC_INCREMENT(&s_pending_jobs);
+		atomic_fetch_add_explicit(&s_pending_jobs, 1, memory_order_relaxed);
 		return handle;
 	} else {
 		Z_Free(job);
@@ -423,7 +453,80 @@ Get number of pending jobs
 */
 int JobSystem_GetPendingJobCount(void)
 {
-	return s_pending_jobs;
+	return atomic_load_explicit(&s_pending_jobs, memory_order_relaxed);
+}
+
+/*
+=================
+JobSystem_AnalyzeWorkload
+Internal: Adjust worker count based on pending jobs and latency
+=================
+*/
+static void JobSystem_AnalyzeWorkload(void) {
+	if (!s_lb_enabled || !s_initialized) return;
+
+	uint64_t now = Sys_Milliseconds();
+	if (now - s_last_scaling_time < SCALING_INTERVAL_MS) return;
+	s_last_scaling_time = now;
+
+	int pending = atomic_load_explicit(&s_pending_jobs, memory_order_relaxed);
+	int active = atomic_load_explicit(&s_active_workers, memory_order_relaxed);
+
+	// Calculate target workers based on workload
+	int target = active;
+
+	// Heuristic:
+	// If pending jobs > 2x current active workers, scale up
+	// If pending jobs < 0.5x current active workers, scale down
+	if (pending > active * 2 && active < s_num_workers && active < s_max_workers) {
+		target = active + 1;
+	} else if (pending < active / 2 && active > s_min_workers) {
+		target = active - 1;
+	}
+
+	if (target != active) {
+		MUTEX_LOCK(s_scaling_mutex);
+		atomic_store_explicit(&s_active_workers, target, memory_order_release);
+		if (target > active) {
+			CONDITION_BROADCAST(s_scaling_condition);
+		}
+		MUTEX_UNLOCK(s_scaling_mutex);
+		
+		Com_DPrintf("JobSystem: Scaled %s to %d workers (pending jobs: %d)\n", 
+			target > active ? "up" : "down", target, pending);
+	}
+
+	// Update stats for reporting
+	s_worker_utilization = (float)pending / (float)(s_num_workers * 10); // Very rough estimate
+	if (s_worker_utilization > 1.0f) s_worker_utilization = 1.0f;
+}
+
+void JobSystem_SetLoadBalancerEnabled(qboolean enabled) {
+	s_lb_enabled = enabled;
+	if (!enabled) {
+		MUTEX_LOCK(s_scaling_mutex);
+		atomic_store_explicit(&s_active_workers, s_num_workers, memory_order_release);
+		CONDITION_BROADCAST(s_scaling_condition);
+		MUTEX_UNLOCK(s_scaling_mutex);
+	}
+}
+
+int JobSystem_GetActiveWorkerCount(void) {
+	return atomic_load_explicit(&s_active_workers, memory_order_relaxed);
+}
+
+void JobSystem_SetWorkerRange(int min_workers, int max_workers) {
+	s_min_workers = Com_Clamp(1, s_num_workers, min_workers);
+	s_max_workers = Com_Clamp(s_min_workers, s_num_workers, max_workers);
+}
+
+void JobSystem_PrintLoadBalancerStats(void) {
+	Com_Printf("=== Job System Load Balancer ===\n");
+	Com_Printf("Enabled: %s\n", s_lb_enabled ? "YES" : "NO");
+	Com_Printf("Workers: %d active / %d total (Range: %d-%d)\n", 
+		atomic_load_explicit(&s_active_workers, memory_order_relaxed), s_num_workers, s_min_workers, s_max_workers);
+	Com_Printf("Pending Jobs: %d\n", atomic_load_explicit(&s_pending_jobs, memory_order_relaxed));
+	Com_Printf("Estimated Utilization: %.1f%%\n", s_worker_utilization * 100.0f);
 }
 
 /*
@@ -432,11 +535,20 @@ JobSystem_Update
 Update job system (process completed jobs, etc.)
 =================
 */
+void JobSystem_SetWorkerAffinity(int worker_index, uint64_t mask) {
+	if (!s_initialized || worker_index < 0 || worker_index >= s_num_workers) return;
+	Thread_SetAffinity(s_workers[worker_index].handle, mask);
+	Com_DPrintf("JobSystem: Worker %d affinity set to 0x%llx\n", worker_index, (unsigned long long)mask);
+}
+
 void JobSystem_Update(void)
 {
 	if (!s_initialized) {
 		return;
 	}
+
+	// Dynamic scaling
+	JobSystem_AnalyzeWorkload();
 
 	for (;;) {
 		void (*fn)(void *) = NULL;

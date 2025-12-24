@@ -1528,7 +1528,7 @@ void R_AddLitSurf( surfaceType_t *surface, shader_t *shader, int fogIndex )
 		return;
 	}
 
-	tr.pc.c_lit_surfs++;
+	atomic_fetch_add_explicit(&tr.pc.c_lit_surfs, 1, memory_order_relaxed);
 
 	litsurf = &tr.refdef.litSurfs[ tr.refdef.numLitSurfs++ ];
 

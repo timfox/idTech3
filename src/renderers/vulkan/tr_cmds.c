@@ -26,35 +26,108 @@ extern refimport_t ri;
 
 /*
 =====================
+R_ClearPerformanceCounters
+=====================
+*/
+static void R_ClearPerformanceCounters( void ) {
+	atomic_store_explicit(&tr.pc.c_sphere_cull_patch_in, 0, memory_order_relaxed);
+	atomic_store_explicit(&tr.pc.c_sphere_cull_patch_clip, 0, memory_order_relaxed);
+	atomic_store_explicit(&tr.pc.c_sphere_cull_patch_out, 0, memory_order_relaxed);
+	atomic_store_explicit(&tr.pc.c_box_cull_patch_in, 0, memory_order_relaxed);
+	atomic_store_explicit(&tr.pc.c_box_cull_patch_clip, 0, memory_order_relaxed);
+	atomic_store_explicit(&tr.pc.c_box_cull_patch_out, 0, memory_order_relaxed);
+	atomic_store_explicit(&tr.pc.c_sphere_cull_md3_in, 0, memory_order_relaxed);
+	atomic_store_explicit(&tr.pc.c_sphere_cull_md3_clip, 0, memory_order_relaxed);
+	atomic_store_explicit(&tr.pc.c_sphere_cull_md3_out, 0, memory_order_relaxed);
+	atomic_store_explicit(&tr.pc.c_box_cull_md3_in, 0, memory_order_relaxed);
+	atomic_store_explicit(&tr.pc.c_box_cull_md3_clip, 0, memory_order_relaxed);
+	atomic_store_explicit(&tr.pc.c_box_cull_md3_out, 0, memory_order_relaxed);
+	atomic_store_explicit(&tr.pc.c_leafs, 0, memory_order_relaxed);
+	atomic_store_explicit(&tr.pc.c_dlightSurfaces, 0, memory_order_relaxed);
+	atomic_store_explicit(&tr.pc.c_dlightSurfacesCulled, 0, memory_order_relaxed);
+#ifdef USE_PMLIGHT
+	atomic_store_explicit(&tr.pc.c_light_cull_out, 0, memory_order_relaxed);
+	atomic_store_explicit(&tr.pc.c_light_cull_in, 0, memory_order_relaxed);
+	atomic_store_explicit(&tr.pc.c_lit_leafs, 0, memory_order_relaxed);
+	atomic_store_explicit(&tr.pc.c_lit_surfs, 0, memory_order_relaxed);
+	atomic_store_explicit(&tr.pc.c_lit_culls, 0, memory_order_relaxed);
+	atomic_store_explicit(&tr.pc.c_lit_masks, 0, memory_order_relaxed);
+#endif
+}
+
+/*
+=====================
+RB_ClearPerformanceCounters
+=====================
+*/
+static void RB_ClearPerformanceCounters( void ) {
+	atomic_store_explicit(&backEnd.pc.c_surfaces, 0, memory_order_relaxed);
+	atomic_store_explicit(&backEnd.pc.c_shaders, 0, memory_order_relaxed);
+	atomic_store_explicit(&backEnd.pc.c_vertexes, 0, memory_order_relaxed);
+	atomic_store_explicit(&backEnd.pc.c_indexes, 0, memory_order_relaxed);
+	atomic_store_explicit(&backEnd.pc.c_totalIndexes, 0, memory_order_relaxed);
+	backEnd.pc.c_overDraw = 0;
+	atomic_store_explicit(&backEnd.pc.c_dlightVertexes, 0, memory_order_relaxed);
+	atomic_store_explicit(&backEnd.pc.c_dlightIndexes, 0, memory_order_relaxed);
+	atomic_store_explicit(&backEnd.pc.c_flareAdds, 0, memory_order_relaxed);
+	atomic_store_explicit(&backEnd.pc.c_flareTests, 0, memory_order_relaxed);
+	atomic_store_explicit(&backEnd.pc.c_flareRenders, 0, memory_order_relaxed);
+#ifdef USE_PMLIGHT
+	atomic_store_explicit(&backEnd.pc.c_lit_batches, 0, memory_order_relaxed);
+	atomic_store_explicit(&backEnd.pc.c_lit_vertices, 0, memory_order_relaxed);
+	atomic_store_explicit(&backEnd.pc.c_lit_indices, 0, memory_order_relaxed);
+	atomic_store_explicit(&backEnd.pc.c_lit_indices_latecull_in, 0, memory_order_relaxed);
+	atomic_store_explicit(&backEnd.pc.c_lit_indices_latecull_out, 0, memory_order_relaxed);
+	atomic_store_explicit(&backEnd.pc.c_lit_vertices_lateculltest, 0, memory_order_relaxed);
+#endif
+}
+
+/*
+=====================
 R_PerformanceCounters
 =====================
 */
 static void R_PerformanceCounters( void ) {
 	if ( !r_speeds->integer ) {
 		// clear the counters even if we aren't printing
-		Com_Memset( &tr.pc, 0, sizeof( tr.pc ) );
-		Com_Memset( &backEnd.pc, 0, sizeof( backEnd.pc ) );
+		R_ClearPerformanceCounters();
+		RB_ClearPerformanceCounters();
 		return;
 	}
 
 	if (r_speeds->integer == 1) {
 		ri.Printf (PRINT_ALL, "%i/%i shaders/surfs %i leafs %i verts %i/%i tris %.2f mtex\n",
-			backEnd.pc.c_shaders, backEnd.pc.c_surfaces, tr.pc.c_leafs, backEnd.pc.c_vertexes, 
-			backEnd.pc.c_indexes/3, backEnd.pc.c_totalIndexes/3, R_SumOfUsedImages()/1000000.0); 
+			(int)atomic_load_explicit(&backEnd.pc.c_shaders, memory_order_relaxed), 
+			(int)atomic_load_explicit(&backEnd.pc.c_surfaces, memory_order_relaxed), 
+			(int)atomic_load_explicit(&tr.pc.c_leafs, memory_order_relaxed), 
+			(int)atomic_load_explicit(&backEnd.pc.c_vertexes, memory_order_relaxed), 
+			(int)atomic_load_explicit(&backEnd.pc.c_indexes, memory_order_relaxed)/3, 
+			(int)atomic_load_explicit(&backEnd.pc.c_totalIndexes, memory_order_relaxed)/3, 
+			R_SumOfUsedImages()/1000000.0); 
 	} else if (r_speeds->integer == 2) {
 		ri.Printf (PRINT_ALL, "(patch) %i sin %i sclip  %i sout %i bin %i bclip %i bout\n",
-			tr.pc.c_sphere_cull_patch_in, tr.pc.c_sphere_cull_patch_clip, tr.pc.c_sphere_cull_patch_out, 
-			tr.pc.c_box_cull_patch_in, tr.pc.c_box_cull_patch_clip, tr.pc.c_box_cull_patch_out );
+			(int)atomic_load_explicit(&tr.pc.c_sphere_cull_patch_in, memory_order_relaxed), 
+			(int)atomic_load_explicit(&tr.pc.c_sphere_cull_patch_clip, memory_order_relaxed), 
+			(int)atomic_load_explicit(&tr.pc.c_sphere_cull_patch_out, memory_order_relaxed), 
+			(int)atomic_load_explicit(&tr.pc.c_box_cull_patch_in, memory_order_relaxed), 
+			(int)atomic_load_explicit(&tr.pc.c_box_cull_patch_clip, memory_order_relaxed), 
+			(int)atomic_load_explicit(&tr.pc.c_box_cull_patch_out, memory_order_relaxed) );
 		ri.Printf (PRINT_ALL, "(md3) %i sin %i sclip  %i sout %i bin %i bclip %i bout\n",
-			tr.pc.c_sphere_cull_md3_in, tr.pc.c_sphere_cull_md3_clip, tr.pc.c_sphere_cull_md3_out, 
-			tr.pc.c_box_cull_md3_in, tr.pc.c_box_cull_md3_clip, tr.pc.c_box_cull_md3_out );
+			(int)atomic_load_explicit(&tr.pc.c_sphere_cull_md3_in, memory_order_relaxed), 
+			(int)atomic_load_explicit(&tr.pc.c_sphere_cull_md3_clip, memory_order_relaxed), 
+			(int)atomic_load_explicit(&tr.pc.c_sphere_cull_md3_out, memory_order_relaxed), 
+			(int)atomic_load_explicit(&tr.pc.c_box_cull_md3_in, memory_order_relaxed), 
+			(int)atomic_load_explicit(&tr.pc.c_box_cull_md3_clip, memory_order_relaxed), 
+			(int)atomic_load_explicit(&tr.pc.c_box_cull_md3_out, memory_order_relaxed) );
 	} else if (r_speeds->integer == 3) {
 		ri.Printf (PRINT_ALL, "viewcluster: %i\n", tr.viewCluster );
 	} else if (r_speeds->integer == 4) {
-		if ( backEnd.pc.c_dlightVertexes ) {
+		if ( atomic_load_explicit(&backEnd.pc.c_dlightVertexes, memory_order_relaxed) ) {
 			ri.Printf (PRINT_ALL, "dlight srf:%i  culled:%i  verts:%i  tris:%i\n", 
-				tr.pc.c_dlightSurfaces, tr.pc.c_dlightSurfacesCulled,
-				backEnd.pc.c_dlightVertexes, backEnd.pc.c_dlightIndexes / 3 );
+				(int)atomic_load_explicit(&tr.pc.c_dlightSurfaces, memory_order_relaxed), 
+				(int)atomic_load_explicit(&tr.pc.c_dlightSurfacesCulled, memory_order_relaxed),
+				(int)atomic_load_explicit(&backEnd.pc.c_dlightVertexes, memory_order_relaxed), 
+				(int)atomic_load_explicit(&backEnd.pc.c_dlightIndexes, memory_order_relaxed) / 3 );
 		}
 	} 
 	else if (r_speeds->integer == 5 )
@@ -64,11 +137,13 @@ static void R_PerformanceCounters( void ) {
 	else if (r_speeds->integer == 6 )
 	{
 		ri.Printf( PRINT_ALL, "flare adds:%i tests:%i renders:%i\n", 
-			backEnd.pc.c_flareAdds, backEnd.pc.c_flareTests, backEnd.pc.c_flareRenders );
+			(int)atomic_load_explicit(&backEnd.pc.c_flareAdds, memory_order_relaxed), 
+			(int)atomic_load_explicit(&backEnd.pc.c_flareTests, memory_order_relaxed), 
+			(int)atomic_load_explicit(&backEnd.pc.c_flareRenders, memory_order_relaxed) );
 	}
 
-	Com_Memset( &tr.pc, 0, sizeof( tr.pc ) );
-	Com_Memset( &backEnd.pc, 0, sizeof( backEnd.pc ) );
+	R_ClearPerformanceCounters();
+	RB_ClearPerformanceCounters();
 }
 
 

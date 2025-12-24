@@ -1,59 +1,9 @@
 #pragma once
 
-// Include Vulkan headers first for type definitions
 #include <vulkan/vulkan.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-typedef float vec_t;
-typedef vec_t mat4_t[16];
-
-// Vulkan-specific constants
-#define MAX_SWAPCHAIN_IMAGES 8
-#define MAX_ATTACHMENTS_IN_POOL 32
-#define MAX_VK_PIPELINES 1024
-#define MAX_VK_SAMPLERS 256
-#define MAX_IMAGE_CHUNKS 16
-
-// Swapchain image count constants for different presentation modes
-#define MIN_SWAPCHAIN_IMAGES_IMM 2
-#define MIN_SWAPCHAIN_IMAGES_MAILBOX 3
-#define MIN_SWAPCHAIN_IMAGES_FIFO 2
-#define MIN_SWAPCHAIN_IMAGES_FIFO_0 2
-
-// Vulkan filter constants (if not defined by headers)
-#ifndef VK_FILTER_NEAREST_MIPMAP_NEAREST
-#define VK_FILTER_NEAREST_MIPMAP_NEAREST VK_FILTER_NEAREST
-#endif
-#ifndef VK_FILTER_LINEAR_MIPMAP_NEAREST
-#define VK_FILTER_LINEAR_MIPMAP_NEAREST VK_FILTER_LINEAR
-#endif
-#ifndef VK_FILTER_NEAREST_MIPMAP_LINEAR
-#define VK_FILTER_NEAREST_MIPMAP_LINEAR VK_FILTER_NEAREST
-#endif
-#ifndef VK_FILTER_LINEAR_MIPMAP_LINEAR
-#define VK_FILTER_LINEAR_MIPMAP_LINEAR VK_FILTER_LINEAR
-#endif
-
-// Buffer size constants
-#define VERTEX_BUFFER_SIZE (64 * 1024 * 1024)      // 64MB
-#define STAGING_BUFFER_SIZE (32 * 1024 * 1024)     // 32MB
-#define VERTEX_BUFFER_SIZE_HI (128 * 1024 * 1024)  // 128MB
-#define STAGING_BUFFER_SIZE_HI (64 * 1024 * 1024)  // 64MB
-#define IMAGE_CHUNK_SIZE (256 * 1024 * 1024)       // 256MB
-
-// Primitive topology constants (if not defined by headers)
-#ifndef LINE_LIST
-#define LINE_LIST VK_PRIMITIVE_TOPOLOGY_LINE_LIST
-#endif
-#ifndef POINT_LIST
-#define POINT_LIST VK_PRIMITIVE_TOPOLOGY_POINT_LIST
-#endif
-#ifndef TRIANGLE_STRIP
-#define TRIANGLE_STRIP VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
-#endif
+#include "../common/q_shared.h"
+#include "../renderercommon/tr_public.h"
+#include "tr_common.h"
 
 // Forward declarations
 typedef struct {
@@ -61,32 +11,24 @@ typedef struct {
     VkDeviceSize used;
 } ImageChunk;
 
-// Memory tracking for leak detection
-typedef struct {
-    uint32_t allocations;
-    uint32_t frees;
-    uint32_t current_allocations;
-    VkDeviceSize total_allocated_bytes;
-    VkDeviceSize total_freed_bytes;
-} vk_memory_stats_t;
+// Enable upload queue functionality for proper staging buffer management
+#define USE_UPLOAD_QUEUE
 
-extern vk_memory_stats_t vk_memory_stats;
+// VMA must be included before other headers that use it
+#ifdef USE_VMA
+#include "vk_mem_alloc.h"
+#endif
 
-// Render pass types (needed by vk_pipeline.h)
+// Render pass types
 typedef enum {
-	RENDER_PASS_MAIN = 0,
+	RENDER_PASS_MAIN,
 	RENDER_PASS_SCREENMAP,
-	RENDER_PASS_POST_BLOOM,
 	RENDER_PASS_CUBEMAP,
 	RENDER_PASS_COUNT
 } renderPass_t;
 
-#include "../common/q_shared.h"
-#include "../renderercommon/tr_public.h"
-#include "tr_common.h"
-
-// Enable upload queue functionality for proper staging buffer management
-#define USE_UPLOAD_QUEUE
+typedef float vec_t;
+typedef vec_t mat4_t[16];
 
 // Depth range modes for viewport depth control
 typedef enum {
@@ -96,15 +38,6 @@ typedef enum {
 	DEPTH_RANGE_WEAPON,		// [0..0.3]
 	DEPTH_RANGE_COUNT
 } Vk_Depth_Range;
-
-// VMA must be included before other headers that use it
-#ifdef USE_VMA
-#include "vk_mem_alloc.h"
-#endif
-
-#include "vk_memory.h"
-#include "vk_compute.h"
-#include "vk_buffers.h"
 
 typedef enum {
 	TYPE_COLOR_BLACK,
@@ -262,7 +195,59 @@ typedef struct filterDef_s {
 	} offscreen;
 } filterDef;
 
+#include "vk_memory.h"
+#include "vk_compute.h"
+#include "vk_buffers.h"
 #include "vk_pipeline.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// Vulkan-specific constants
+#define MAX_SWAPCHAIN_IMAGES 8
+#define MAX_ATTACHMENTS_IN_POOL 32
+#define MAX_VK_PIPELINES 1024
+#define MAX_VK_SAMPLERS 256
+#define MAX_IMAGE_CHUNKS 16
+
+// Swapchain image count constants for different presentation modes
+#define MIN_SWAPCHAIN_IMAGES_IMM 2
+#define MIN_SWAPCHAIN_IMAGES_MAILBOX 3
+#define MIN_SWAPCHAIN_IMAGES_FIFO 2
+#define MIN_SWAPCHAIN_IMAGES_FIFO_0 2
+
+// Vulkan filter constants (if not defined by headers)
+#ifndef VK_FILTER_NEAREST_MIPMAP_NEAREST
+#define VK_FILTER_NEAREST_MIPMAP_NEAREST VK_FILTER_NEAREST
+#endif
+#ifndef VK_FILTER_LINEAR_MIPMAP_NEAREST
+#define VK_FILTER_LINEAR_MIPMAP_NEAREST VK_FILTER_LINEAR
+#endif
+#ifndef VK_FILTER_NEAREST_MIPMAP_LINEAR
+#define VK_FILTER_NEAREST_MIPMAP_LINEAR VK_FILTER_NEAREST
+#endif
+#ifndef VK_FILTER_LINEAR_MIPMAP_LINEAR
+#define VK_FILTER_LINEAR_MIPMAP_LINEAR VK_FILTER_LINEAR
+#endif
+
+// Buffer size constants
+#define VERTEX_BUFFER_SIZE (64 * 1024 * 1024)      // 64MB
+#define STAGING_BUFFER_SIZE (32 * 1024 * 1024)     // 32MB
+#define VERTEX_BUFFER_SIZE_HI (128 * 1024 * 1024)  // 128MB
+#define STAGING_BUFFER_SIZE_HI (64 * 1024 * 1024)  // 64MB
+#define IMAGE_CHUNK_SIZE (256 * 1024 * 1024)       // 256MB
+
+// Primitive topology constants (if not defined by headers)
+#ifndef LINE_LIST
+#define LINE_LIST VK_PRIMITIVE_TOPOLOGY_LINE_LIST
+#endif
+#ifndef POINT_LIST
+#define POINT_LIST VK_PRIMITIVE_TOPOLOGY_POINT_LIST
+#endif
+#ifndef TRIANGLE_STRIP
+#define TRIANGLE_STRIP VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
+#endif
 
 // Forward declarations
 typedef struct material_params_s material_params_t;
@@ -406,6 +391,9 @@ typedef struct proc_instance_s {
 #ifdef USE_VULKAN
 extern PFN_vkCmdSetViewport qvkCmdSetViewport;
 extern PFN_vkCmdSetScissor  qvkCmdSetScissor;
+extern PFN_vkCmdWriteTimestamp qvkCmdWriteTimestamp;
+extern PFN_vkCmdBeginQuery qvkCmdBeginQuery;
+extern PFN_vkCmdEndQuery qvkCmdEndQuery;
 #endif
 
 
@@ -584,6 +572,7 @@ extern PFN_vkCmdEndRenderPass qvkCmdEndRenderPass;
 extern PFN_vkWaitForFences qvkWaitForFences;
 extern PFN_vkResetFences qvkResetFences;
 extern PFN_vkResetCommandBuffer qvkResetCommandBuffer;
+extern PFN_vkResetQueryPool qvkResetQueryPool;
 extern PFN_vkEndCommandBuffer qvkEndCommandBuffer;
 extern PFN_vkQueueSubmit qvkQueueSubmit;
 extern PFN_vkCmdDispatch qvkCmdDispatch;
@@ -600,7 +589,9 @@ extern PFN_vkCreateFence qvkCreateFence;
 extern PFN_vkCreateImage qvkCreateImage;
 extern PFN_vkCreateImageView qvkCreateImageView;
 extern PFN_vkCreatePipelineLayout qvkCreatePipelineLayout;
+extern PFN_vkCreateQueryPool qvkCreateQueryPool;
 extern PFN_vkGetPipelineCacheData qvkGetPipelineCacheData;
+extern PFN_vkGetQueryPoolResults qvkGetQueryPoolResults;
 extern PFN_vkDestroyBuffer qvkDestroyBuffer;
 extern PFN_vkDestroyCommandPool qvkDestroyCommandPool;
 extern PFN_vkDestroyDescriptorSetLayout qvkDestroyDescriptorSetLayout;
@@ -609,6 +600,7 @@ extern PFN_vkDestroyDescriptorPool qvkDestroyDescriptorPool;
 extern PFN_vkDestroyFence qvkDestroyFence;
 extern PFN_vkDestroyImage qvkDestroyImage;
 extern PFN_vkDestroyImageView qvkDestroyImageView;
+extern PFN_vkDestroyQueryPool qvkDestroyQueryPool;
 extern PFN_vkDestroyPipeline qvkDestroyPipeline;
 extern PFN_vkDestroyPipelineLayout qvkDestroyPipelineLayout;
 extern PFN_vkDestroySampler qvkDestroySampler;
@@ -650,10 +642,6 @@ void vk_destroy_samplers( void );
 uint32_t vk_find_pipeline_ext( uint32_t base, const Vk_Pipeline_Def *def, qboolean use );
 void vk_get_pipeline_def( uint32_t pipeline, Vk_Pipeline_Def *def );
 
-void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_t height );
-void vk_create_compute_post_process_pipelines( void );
-void vk_create_pipelines( void );
-VkPipeline vk_gen_pipeline( uint32_t index );
 void vk_bind_generated_shaders( void );
 
 // Framebuffer and synchronization management
@@ -676,7 +664,6 @@ void vk_end_frame( void );
 void vk_present_frame( void );
 
 void vk_end_render_pass( void );
-void vk_barrier_final_image_to_shader_read( VkImage image );
 void vk_begin_main_render_pass( void );
 void vk_begin_post_bloom_render_pass( void );
 void vk_begin_bloom_extract_render_pass( void );
@@ -711,6 +698,15 @@ void vk_update_uniform_descriptor( VkDescriptorSet descriptor, VkBuffer buffer )
 extern void vk_track_allocation(VkDeviceSize size);
 extern void vk_track_free(VkDeviceSize size);
 
+// VRAM monitoring and leak detection
+extern void vk_init_vram_stats(void);
+extern void vk_track_gpu_allocation(VkDeviceMemory memory, VkDeviceSize size, uint32_t memory_type,
+                                   const char *resource_name, const char *allocation_site);
+extern void vk_track_gpu_free(VkDeviceMemory memory);
+extern void vk_detect_memory_leaks(void);
+extern void vk_print_vram_stats(void);
+extern qboolean vk_perform_defragmentation(void);
+
 // Post-processing
 qboolean vk_init_post_processing(void);
 
@@ -725,8 +721,6 @@ void vk_update_performance_stats(void);
 
 // GPU timing queries
 void vk_get_gpu_timing_stats( double *avg_frame_time_ms, double *min_frame_time_ms, double *max_frame_time_ms );
-
-void vk_update_post_process_pipelines( void );
 
 const char *vk_format_string( VkFormat format );
 
@@ -813,7 +807,6 @@ void vk_destroy_cubemap_prefilter( void );
 #endif
 
 #ifdef VK_PBR_BRDFLUT
-void vk_create_brdflut_pipeline( void );
 void vk_create_brfdlut( void );
 #endif
 
@@ -1853,11 +1846,56 @@ typedef struct {
 
 	vk_virtual_memory_t virtual_memory;
 
-	vk_compute_queue_t compute_queue;
+	vk_compute_manager_t compute_manager;
 
 	vk_resource_pool_t resource_pools;
 
 	vk_texture_streaming_t texture_streaming;
+
+	// GPU Memory tracking and VRAM monitoring
+	vk_memory_tracker_t memory_tracker;
+	vk_vram_stats_t vram_stats;
+
+	// Lock-free memory allocators for high-performance concurrent allocation
+	vk_lock_free_memory_manager_t lock_free_manager;
+
+	// Arena allocators for scoped memory management
+	vk_arena_manager_t arena_manager;
+
+	// Memory advisor for intelligent layout optimization
+	vk_memory_advisor_t memory_advisor;
+
+	// Cache-conscious data structures for optimal CPU cache utilization
+	vk_cache_structures_manager_t cache_manager;
+
+	// Render graph profiler for detailed performance analysis
+	vk_render_profiler_t render_profiler;
+
+	// Memory bandwidth profiler for cache analysis and access pattern optimization
+	vk_memory_bandwidth_profiler_t memory_bandwidth_profiler;
+
+	// Parallel processing profiler for thread utilization and synchronization tracking
+	vk_parallel_profiler_t parallel_profiler;
+
+	// Shader performance analyzer for instruction count, register usage, and optimization suggestions
+	vk_shader_performance_analyzer_t shader_performance_analyzer;
+
+	// Asset loading profiler for streaming performance and I/O bottleneck identification
+	vk_asset_loading_profiler_t asset_loading_profiler;
+
+#ifdef USE_CIMGUI
+	// Performance HUD for real-time overlay with bottleneck highlighting and recommendations
+	vk_performance_hud_t performance_hud;
+#endif
+
+	// Automated performance regression detector for CI-based performance gates
+	vk_performance_regression_detector_t performance_regression_detector;
+
+	// Heatmap visualizer for performance data visualization (optimization focus areas)
+	vk_heatmap_visualizer_t heatmap_visualizer;
+
+	// Current performance preset
+	vk_performance_preset_t current_perf_preset;
 } Vk_Instance;
 
 

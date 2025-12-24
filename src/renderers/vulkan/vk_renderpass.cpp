@@ -223,6 +223,16 @@ void vk_begin_specific_render_pass(VkRenderPass render_pass, VkFramebuffer frame
 // End render pass
 void vk_end_render_pass(void) {
     qvkCmdEndRenderPass(vk.cmd->command_buffer);
+
+    // End profiling for current render pass
+    // Note: In a more sophisticated implementation, we would track the current pass
+    // For now, we'll profile the most recent pass that was started
+    if (vk.render_profiler.current_pass_count > 0) {
+        vk_render_pass_profile_t *pass = &vk.render_profiler.current_passes[vk.render_profiler.current_pass_count - 1];
+        if (pass->end_time == 0) { // Not yet ended
+            vk_profile_pass_end(pass->name, pass->draw_calls, pass->vertices_submitted);
+        }
+    }
 }
 
 // Transition to next subpass
@@ -236,6 +246,9 @@ void vk_begin_bloom_extract_render_pass(void) {
         !vk_validate_handle(vk.framebuffers.bloom_extract, "bloom extract framebuffer")) {
         return;
     }
+
+    // Start profiling for bloom extract pass
+    vk_profile_pass_start("BloomExtract", 1);
 
     VkClearValue clear_value = {.color = {{0.0f, 0.0f, 0.0f, 0.0f}}};
     VkRenderPassBeginInfo render_pass_info = {

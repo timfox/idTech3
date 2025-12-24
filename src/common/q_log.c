@@ -70,11 +70,12 @@ static struct {
 	
 	// Deferred logging queue (for when filesystem is not ready)
 	deferred_log_message_t deferred_queue[MAX_DEFERRED_MESSAGES];
-	int deferred_count;
+	atomic_int_t deferred_count;
 	qboolean defer_logging;	// Set to true when filesystem is restarting
 	
-	// Thread safety (simple for now)
-	qboolean in_log;
+	// Thread safety
+	mutex_t log_mutex;
+	atomic_int_t in_log;
 } log_state;
 
 // CVars
@@ -466,12 +467,13 @@ Flush all deferred log messages when filesystem becomes ready
 ================
 */
 static void Q_Log_FlushDeferred(void) {
-	if (log_state.deferred_count == 0) {
+	int count = atomic_load_explicit(&log_state.deferred_count, memory_order_relaxed);
+	if (count == 0) {
 		return;
 	}
 	
 	// Write all deferred messages
-	for (int i = 0; i < log_state.deferred_count; i++) {
+	for (int i = 0; i < count; i++) {
 		deferred_log_message_t *msg = &log_state.deferred_queue[i];
 		if (log_state.output_flags & LOG_OUTPUT_FILE) {
 			Q_Log_WriteToFile(msg->message, msg->len);
@@ -482,7 +484,7 @@ static void Q_Log_FlushDeferred(void) {
 	}
 	
 	// Clear the queue
-	log_state.deferred_count = 0;
+	atomic_store_explicit(&log_state.deferred_count, 0, memory_order_relaxed);
 	log_state.defer_logging = qfalse;
 }
 
@@ -493,17 +495,18 @@ Queue a message for later writing when filesystem is ready
 ================
 */
 static void Q_Log_DeferMessage(const char *message, int len, log_level_t level, log_category_t category) {
-	if (log_state.deferred_count >= MAX_DEFERRED_MESSAGES) {
+	int count = atomic_load_explicit(&log_state.deferred_count, memory_order_relaxed);
+	if (count >= MAX_DEFERRED_MESSAGES) {
 		// Queue is full - drop oldest message (FIFO)
 		// Shift all messages left by one
-		for (int i = 0; i < log_state.deferred_count - 1; i++) {
+		for (int i = 0; i < count - 1; i++) {
 			log_state.deferred_queue[i] = log_state.deferred_queue[i + 1];
 		}
-		log_state.deferred_count--;
+		count--;
 	}
 	
 	// Add new message to end of queue
-	deferred_log_message_t *msg = &log_state.deferred_queue[log_state.deferred_count];
+	deferred_log_message_t *msg = &log_state.deferred_queue[count];
 	Q_strncpyz(msg->message, message, sizeof(msg->message));
 	{
 		size_t maxlen = sizeof(msg->message) - 1;
@@ -512,7 +515,7 @@ static void Q_Log_DeferMessage(const char *message, int len, log_level_t level, 
 	}
 	msg->level = level;
 	msg->category = category;
-	log_state.deferred_count++;
+	atomic_store_explicit(&log_state.deferred_count, count + 1, memory_order_relaxed);
 	log_state.defer_logging = qtrue;
 }
 
@@ -614,7 +617,7 @@ void QDECL Q_Log(log_level_t level, log_category_t category, const char *file, i
 	char formatted[MAX_LOG_MESSAGE * 2];
 	int len;
 	
-	if (log_state.in_log) {
+	if (atomic_load_explicit(&log_state.in_log, memory_order_relaxed)) {
 		// Prevent recursion
 		return;
 	}
@@ -623,7 +626,8 @@ void QDECL Q_Log(log_level_t level, log_category_t category, const char *file, i
 		return;
 	}
 	
-	log_state.in_log = qtrue;
+	atomic_store_explicit(&log_state.in_log, 1, memory_order_relaxed);
+    MUTEX_LOCK(log_state.log_mutex);
 	
 	// Format the message
 	va_start(argptr, fmt);
@@ -704,7 +708,8 @@ void QDECL Q_Log(log_level_t level, log_category_t category, const char *file, i
 		}
 	}
 	
-	log_state.in_log = qfalse;
+    MUTEX_UNLOCK(log_state.log_mutex);
+	atomic_store_explicit(&log_state.in_log, 0, memory_order_relaxed);
 }
 
 /*
@@ -718,9 +723,12 @@ void Q_Log_Init(void) {
 	}
 	
 	Com_Memset(&log_state, 0, sizeof(log_state));
-	log_state.deferred_count = 0;
+	atomic_init(&log_state.deferred_count, 0);
 	log_state.defer_logging = qfalse;
 	
+    MUTEX_INIT(log_state.log_mutex);
+    atomic_init(&log_state.in_log, 0);
+
 	// Register CVars
 	log_enable = Cvar_Get("log_enable", "1", CVAR_ARCHIVE | CVAR_LATCH);
 	Cvar_SetDescription(log_enable, "Enable structured logging (0=disabled, 1=enabled)");
@@ -843,6 +851,8 @@ void Q_Log_Shutdown(void) {
 		log_state.file_handle = FS_INVALID_HANDLE;
 	}
 	
+    MUTEX_DESTROY(log_state.log_mutex);
+
 #ifndef _WIN32
 	if (log_state.output_flags & LOG_OUTPUT_SYSLOG) {
 		closelog();

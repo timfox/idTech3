@@ -6,6 +6,10 @@
 #include "q_shared.h"
 #include "vk.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Shader hot reload structures
 typedef struct {
     char filename[MAX_QPATH];
@@ -61,5 +65,9 @@ void get_viewport_rect(VkRect2D *r);
 
 // Pipeline barrier utilities
 void vk_barrier_final_image_to_shader_read(VkImage image);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __VK_PIPELINE_H__

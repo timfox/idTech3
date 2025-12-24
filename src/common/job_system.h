@@ -121,5 +121,16 @@ typedef void (*parallel_for_func_t)(int index, void *userData);
 
 qboolean JobSystem_ParallelFor(int start, int end, parallel_for_func_t func, void *userData);
 
+/*
+=================
+Load Balancing API
+=================
+*/
+void JobSystem_SetLoadBalancerEnabled(qboolean enabled);
+int JobSystem_GetActiveWorkerCount(void);
+void JobSystem_PrintLoadBalancerStats(void);
+void JobSystem_SetWorkerRange(int min_workers, int max_workers);
+void JobSystem_SetWorkerAffinity(int worker_index, uint64_t mask);
+
 #endif // __JOB_SYSTEM_H__
 

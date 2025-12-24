@@ -3289,7 +3289,7 @@ static shader_t *GeneratePermanentShader( void ) {
 	tr.sortedShaders[ tr.numShaders ] = newShader;
 	newShader->sortedIndex = tr.numShaders;
 
-	tr.numShaders++;
+	atomic_fetch_add_explicit(&tr.numShaders, 1, memory_order_relaxed);
 
 	for ( i = 0 ; i < newShader->numUnfoggedPasses ; i++ ) {
 		if ( !stages[i].active ) {

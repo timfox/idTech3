@@ -4,7 +4,15 @@
 #include <vulkan/vulkan.h>
 #include <stdint.h>
 #include "q_shared.h"
-#include "vk.h"
+#include "vk_compute.h"
+
+#ifdef USE_VMA
+#include "vk_mem_alloc.h"
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifdef USE_VMA
 // VMA buffer allocation structures
@@ -23,5 +31,9 @@ void vk_create_geometry_buffers(VkDeviceSize size);
 void vk_create_storage_buffer(uint32_t size);
 void vk_release_vbo(void);
 qboolean vk_alloc_vbo(const byte *vbo_data, int vbo_size);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __VK_BUFFERS_H__

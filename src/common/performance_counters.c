@@ -154,13 +154,15 @@ void Perf_Frame(int frameTimeMs) {
 	perfCounters.averageFrameTime = totalFrameTime / perfCounters.frameTimeHistoryCount;
 
 	// Update FPS
-	perfCounters.frameCount++;
-	int timeSinceLastUpdate = currentTime - perfCounters.lastFPSUpdate;
+	ATOMIC_INCREMENT(&perfCounters.frameCount);
+	int frameCount = atomic_load_explicit(&perfCounters.frameCount, memory_order_relaxed);
+	int lastFPSUpdate = atomic_load_explicit(&perfCounters.lastFPSUpdate, memory_order_relaxed);
+	int timeSinceLastUpdate = currentTime - lastFPSUpdate;
 
 	if (timeSinceLastUpdate >= 1000) { // Update FPS once per second
-		perfCounters.currentFPS = (float)perfCounters.frameCount / (timeSinceLastUpdate / 1000.0f);
-		perfCounters.frameCount = 0;
-		perfCounters.lastFPSUpdate = currentTime;
+		perfCounters.currentFPS = (float)frameCount / (timeSinceLastUpdate / 1000.0f);
+		atomic_store_explicit(&perfCounters.frameCount, 0, memory_order_relaxed);
+		atomic_store_explicit(&perfCounters.lastFPSUpdate, currentTime, memory_order_relaxed);
 
 		// Update average FPS (simple moving average)
 		if (perfCounters.averageFPS == 0.0f) {
@@ -171,28 +173,29 @@ void Perf_Frame(int frameTimeMs) {
 	}
 
 	// Update draw call history
-	perfCounters.drawCallHistory[perfCounters.drawCallHistoryIndex] = perfCounters.drawCallsThisFrame;
+	int drawCallsThisFrame = atomic_load_explicit(&perfCounters.drawCallsThisFrame, memory_order_relaxed);
+	perfCounters.drawCallHistory[perfCounters.drawCallHistoryIndex] = drawCallsThisFrame;
 	perfCounters.drawCallHistoryIndex = (perfCounters.drawCallHistoryIndex + 1) % PERF_HISTORY_SIZE;
 	if (perfCounters.drawCallHistoryCount < PERF_HISTORY_SIZE) {
 		perfCounters.drawCallHistoryCount++;
 	}
 
 	// Update draw call stats
-	if (perfCounters.drawCallsThisFrame < perfCounters.minDrawCallsPerFrame) {
-		perfCounters.minDrawCallsPerFrame = perfCounters.drawCallsThisFrame;
+	if (drawCallsThisFrame < perfCounters.minDrawCallsPerFrame) {
+		perfCounters.minDrawCallsPerFrame = drawCallsThisFrame;
 	}
-	if (perfCounters.drawCallsThisFrame > perfCounters.maxDrawCallsPerFrame) {
-		perfCounters.maxDrawCallsPerFrame = perfCounters.drawCallsThisFrame;
+	if (drawCallsThisFrame > perfCounters.maxDrawCallsPerFrame) {
+		perfCounters.maxDrawCallsPerFrame = drawCallsThisFrame;
 	}
 
 	// Calculate average draw calls
-	int totalDrawCalls = 0;
+	int totalDrawCallsInHistory = 0;
 	for (int i = 0; i < perfCounters.drawCallHistoryCount; i++) {
-		totalDrawCalls += perfCounters.drawCallHistory[i];
+		totalDrawCallsInHistory += perfCounters.drawCallHistory[i];
 	}
-	perfCounters.averageDrawCallsPerFrame = (float)totalDrawCalls / perfCounters.drawCallHistoryCount;
+	perfCounters.averageDrawCallsPerFrame = (float)totalDrawCallsInHistory / perfCounters.drawCallHistoryCount;
 
-	perfCounters.totalDrawCalls += perfCounters.drawCallsThisFrame;
+	ATOMIC_ADD(&perfCounters.totalDrawCalls, drawCallsThisFrame);
 }
 
 /*
@@ -201,7 +204,7 @@ Perf_CountDrawCall
 ================
 */
 void Perf_CountDrawCall(void) {
-	perfCounters.drawCallsThisFrame++;
+	ATOMIC_INCREMENT(&perfCounters.drawCallsThisFrame);
 }
 
 /*
@@ -210,7 +213,7 @@ Perf_ResetFrameCounters
 ================
 */
 void Perf_ResetFrameCounters(void) {
-	perfCounters.drawCallsThisFrame = 0;
+	atomic_store_explicit(&perfCounters.drawCallsThisFrame, 0, memory_order_relaxed);
 }
 
 /*

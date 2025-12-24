@@ -266,6 +266,8 @@ typedef unsigned char byte;
 
 typedef enum { qfalse = 0, qtrue } qboolean;
 
+#include "thread_platform.h"
+
 // ============================== Platform Abstraction ==============================
 
 // Platform capabilities and defaults
@@ -1198,8 +1200,8 @@ struct cvar_s {
 	char		*resetString;		// cvar_restart will reset to this value
 	char		*latchedString;		// for CVAR_LATCH vars
 	int			flags;
-	qboolean	modified;			// set each time the cvar is changed
-	int			modificationCount;	// incremented each time the cvar is changed
+	atomic_int_t modified;			// set each time the cvar is changed
+	atomic_int_t modificationCount;	// incremented each time the cvar is changed
 	float		value;				// Q_atof( string )
 	int			integer;			// atoi( string )
 	cvarValidator_t validator;

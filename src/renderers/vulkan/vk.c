@@ -587,6 +587,8 @@ PFN_vkCmdClearColorImage								qvkCmdClearColorImage;
 
 // GPU timing query function pointers
 PFN_vkCmdWriteTimestamp							qvkCmdWriteTimestamp;
+PFN_vkCmdBeginQuery								qvkCmdBeginQuery;
+PFN_vkCmdEndQuery									qvkCmdEndQuery;
 PFN_vkGetQueryPoolResults						qvkGetQueryPoolResults;
 PFN_vkResetQueryPool								qvkResetQueryPool;
 
@@ -1793,7 +1795,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 
 		// select queue family with presentation and graphics support
 		vk.queue_family_index = ~0U;
-		vk.compute_queue.queue_family_index = ~0U;
+		vk.compute_manager.queue_family_index = ~0U;
 		for (i = 0; i < queue_family_count; i++) {
 			VkBool32 presentation_supported;
 			VK_CHECK( qvkGetPhysicalDeviceSurfaceSupportKHR( physical_device, i, vk_surface, &presentation_supported ) );
@@ -1803,17 +1805,17 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			}
 
 			// Look for dedicated compute queue (compute but not graphics)
-			if (vk.compute_queue.queue_family_index == ~0U &&
+			if (vk.compute_manager.queue_family_index == ~0U &&
 				(queue_families[i].queueFlags & VK_QUEUE_COMPUTE_BIT) != 0 &&
 				(queue_families[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0) {
-				vk.compute_queue.queue_family_index = i;
+				vk.compute_manager.queue_family_index = i;
 			}
 		}
 
 		// Fallback to graphics queue if no dedicated compute queue found
-		if (vk.compute_queue.queue_family_index == ~0U && vk.queue_family_index != ~0U) {
+		if (vk.compute_manager.queue_family_index == ~0U && vk.queue_family_index != ~0U) {
 			if ((queue_families[vk.queue_family_index].queueFlags & VK_QUEUE_COMPUTE_BIT) != 0) {
-				vk.compute_queue.queue_family_index = vk.queue_family_index;
+				vk.compute_manager.queue_family_index = vk.queue_family_index;
 			}
 		}
 
@@ -2127,22 +2129,18 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		queue_create_infos[0] = queue_desc;
 
 		// Add compute queue if it's different from graphics queue
-		if (vk.compute_queue.queue_family_index != ~0U && 
-			vk.compute_queue.queue_family_index != vk.queue_family_index) {
+		if (vk.compute_manager.queue_family_index != ~0U && 
+			vk.compute_manager.queue_family_index != vk.queue_family_index) {
 			VkDeviceQueueCreateInfo compute_queue_desc = {
 				.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
 				.pNext = NULL,
 				.flags = 0,
-				.queueFamilyIndex = vk.compute_queue.queue_family_index,
+				.queueFamilyIndex = vk.compute_manager.queue_family_index,
 				.queueCount = 1,
 				.pQueuePriorities = &priority
 			};
 			queue_create_infos[1] = compute_queue_desc;
 			queue_create_info_count = 2;
-			vk.compute_queue.supported = qtrue;
-		} else if (vk.compute_queue.queue_family_index == vk.queue_family_index) {
-			// Same queue family, can use same queue or get second queue
-			vk.compute_queue.supported = qtrue;
 		}
 
 		Com_Memset( &features, 0, sizeof( features ) );
@@ -2392,6 +2390,11 @@ static void init_vulkan_library( void )
 	Com_Memset( &vk, 0, sizeof( vk ) );
 	ri.Printf(PRINT_ALL, "DEBUG: init_vulkan_library memset completed\n");
 
+	// TEMPORARY: Return early to isolate crash
+	ri.Printf(PRINT_ALL, "DEBUG: Returning early from init_vulkan_library for debugging\n");
+	vk.active = qtrue;
+	return;
+
 	// Run safety checks on Vulkan initialization
 	vk_safety_checks();
 
@@ -2636,6 +2639,85 @@ static void init_vulkan_library( void )
 			selected_index, candidates[selected_index].properties.deviceName,
 			candidates[selected_index].reason);
 
+		// Initialize VRAM statistics after physical device selection
+		vk_init_vram_stats();
+
+		// Initialize memory defragmentation system
+		vk_init_memory_defragmentation();
+
+		// Initialize hierarchical memory pool system
+		if (!vk_init_memory_pool_system()) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize memory pool system\n");
+		}
+
+		// Initialize lock-free memory manager for high-performance concurrent allocation
+		if (!vk_init_lock_free_memory_manager()) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize lock-free memory manager\n");
+		}
+
+		// Initialize arena memory manager for scoped memory management
+		if (!vk_init_arena_manager()) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize arena memory manager\n");
+		}
+
+		// Initialize memory advisor for intelligent layout optimization
+		if (!vk_init_memory_advisor()) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize memory advisor\n");
+		}
+
+		// Initialize render graph profiler for detailed performance analysis
+		if (!vk_init_render_profiler()) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize render profiler\n");
+		}
+
+		// Initialize memory bandwidth profiler for cache analysis and access pattern optimization
+		if (!vk_init_memory_bandwidth_profiler()) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize memory bandwidth profiler\n");
+		}
+
+		// Initialize parallel processing profiler for thread utilization and synchronization tracking
+		if (!vk_init_parallel_profiler()) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize parallel profiler\n");
+		}
+
+		// Initialize shader performance analyzer for instruction count, register usage, and optimization suggestions
+		if (!vk_init_shader_performance_analyzer()) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize shader performance analyzer\n");
+		}
+
+		// Initialize asset loading profiler for streaming performance and I/O bottleneck identification
+		if (!vk_init_asset_loading_profiler()) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize asset loading profiler\n");
+		}
+
+		// Initialize performance HUD for real-time overlay with bottleneck highlighting and recommendations
+		if (!vk_init_performance_hud()) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize performance HUD\n");
+		}
+
+		// Initialize automated performance regression detector for CI-based performance gates
+		if (!vk_init_performance_regression_detector()) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize performance regression detector\n");
+		}
+
+		// Initialize heatmap visualizer for performance data visualization
+		if (!vk_init_heatmap_visualizer()) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize heatmap visualizer\n");
+		}
+
+		// Initialize GPU-Async compute manager for asynchronous job scheduling
+		if (!vk_init_compute_manager()) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize GPU-Async compute manager\n");
+		}
+
+		// Set default performance preset
+		vk.current_perf_preset = VK_PERF_PRESET_MEDIUM;
+
+		// Initialize cache-conscious data structures manager
+		if (!vk_init_cache_structures_manager()) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize cache structures manager\n");
+		}
+
 		// Enhanced device information reporting
 		const VkPhysicalDeviceProperties *device_props = &candidates[selected_index].properties;
 		ri.Printf(PRINT_ALL, "...device type: %s\n", vk_get_device_type_string(device_props->deviceType));
@@ -2713,6 +2795,8 @@ static void init_vulkan_library( void )
 	INIT_DEVICE_FUNCTION(vkCmdSetScissor)
 	INIT_DEVICE_FUNCTION(vkCmdSetViewport)
 	INIT_DEVICE_FUNCTION_EXT(vkCmdWriteTimestamp)
+	INIT_DEVICE_FUNCTION_EXT(vkCmdBeginQuery)
+	INIT_DEVICE_FUNCTION_EXT(vkCmdEndQuery)
 	INIT_DEVICE_FUNCTION(vkGetQueryPoolResults)
 	// vkResetQueryPool was added in Vulkan 1.2. Treat it as optional:
 	// older loaders or drivers may not expose it even if the header does.
@@ -2861,22 +2945,26 @@ static void init_vulkan_library( void )
 	}
 
 	// Initialize main graphics queue
+	ri.Printf(PRINT_ALL, "DEBUG: About to initialize graphics queue\n");
 	if (vk.queue_family_index != ~0U) {
+		ri.Printf(PRINT_ALL, "DEBUG: Calling qvkGetDeviceQueue for graphics queue\n");
 		qvkGetDeviceQueue(vk.device, vk.queue_family_index, 0, &vk.queue);
+		ri.Printf(PRINT_ALL, "DEBUG: qvkGetDeviceQueue returned\n");
 		if (vk.queue == VK_NULL_HANDLE) {
 			ri.Printf(PRINT_WARNING, "Vulkan: Failed to get graphics queue\n");
 		} else {
 			ri.Printf(PRINT_ALL, "Vulkan: Graphics queue initialized\n");
 		}
+	} else {
+		ri.Printf(PRINT_WARNING, "DEBUG: Invalid queue family index\n");
 	}
 	ri.Printf(PRINT_ALL, "DEBUG: After graphics queue init\n");
 
-	// Initialize compute queue if supported and different
-	if (vk.compute_queue.supported && vk.compute_queue.queue_family_index != ~0U) {
-		qvkGetDeviceQueue(vk.device, vk.compute_queue.queue_family_index, 0, &vk.compute_queue.queue);
-		if (vk.compute_queue.queue == VK_NULL_HANDLE) {
+	// Initialize compute queue
+	if (vk.compute_manager.queue_family_index != ~0U) {
+		qvkGetDeviceQueue(vk.device, vk.compute_manager.queue_family_index, 0, &vk.compute_manager.queue);
+		if (vk.compute_manager.queue == VK_NULL_HANDLE) {
 			ri.Printf(PRINT_WARNING, "Vulkan: Failed to get compute queue\n");
-			vk.compute_queue.supported = qfalse;
 		} else {
 			ri.Printf(PRINT_ALL, "Vulkan: Compute queue initialized\n");
 		}
@@ -2894,14 +2982,23 @@ static void init_vulkan_library( void )
 			.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
 			.queueFamilyIndex = vk.queue_family_index
 		};
+		ri.Printf(PRINT_ALL, "DEBUG: pool_info.sType = %u, queueFamilyIndex = %u\n",
+			pool_info.sType, pool_info.queueFamilyIndex);
 		ri.Printf(PRINT_ALL, "DEBUG: Calling qvkCreateCommandPool\n");
-		VK_CHECK(qvkCreateCommandPool(vk.device, &pool_info, NULL, &vk.command_pool));
+		VkResult result = qvkCreateCommandPool(vk.device, &pool_info, NULL, &vk.command_pool);
+		ri.Printf(PRINT_ALL, "DEBUG: qvkCreateCommandPool returned with result = %d\n", result);
+		if (result != VK_SUCCESS) {
+			ri.Printf(PRINT_ERROR, "Vulkan: Failed to create command pool: %d\n", result);
+			return;
+		}
 		ri.Printf(PRINT_ALL, "Vulkan: Main command pool created\n");
 	} else {
 		ri.Printf(PRINT_ERROR, "DEBUG: Skipping command pool creation - invalid handles\n");
 	}
 
+	ri.Printf(PRINT_ALL, "DEBUG: About to set vk.active = qtrue\n");
 	vk.active = qtrue;
+	ri.Printf(PRINT_ALL, "DEBUG: vk.active set successfully, init_vulkan_library ending\n");
 }
 
 static void vk_create_pipeline_layouts(void) {
@@ -2992,6 +3089,8 @@ static void vk_create_pipeline_layouts(void) {
 		ri.Printf(PRINT_ALL, "Vulkan: BRDF LUT pipeline layout created\n");
 	}
 #endif
+
+	ri.Printf(PRINT_ALL, "DEBUG: vk_create_pipeline_layouts completed successfully\n");
 }
 
 static void vk_create_descriptor_set_layouts(void) {
@@ -3103,6 +3202,7 @@ static void __attribute__((unused)) deinit_instance_functions( void )
 	qvkGetDeviceProcAddr = NULL;
 	qvkGetPhysicalDeviceFeatures = NULL;
 	qvkGetPhysicalDeviceFormatProperties = NULL;
+	qvkGetQueryPoolResults = NULL;
 	qvkGetPhysicalDeviceMemoryProperties = NULL;
 	qvkGetPhysicalDeviceProperties = NULL;
 	qvkGetPhysicalDeviceQueueFamilyProperties = NULL;
@@ -3149,11 +3249,15 @@ static void __attribute__((unused)) deinit_device_functions( void )
 	qvkCmdPushConstants							= NULL;
 	qvkCmdSetBlendConstants						= NULL;
 	qvkCmdSetDepthBias							= NULL;
+	qvkCmdWriteTimestamp						= NULL;
+	qvkCmdBeginQuery								= NULL;
+	qvkCmdEndQuery								= NULL;
 	qvkCmdSetScissor							= NULL;
 	qvkCmdSetViewport							= NULL;
 	qvkCreateBuffer								= NULL;
 	qvkCreateCommandPool						= NULL;
 	qvkCreateDescriptorPool						= NULL;
+	qvkCreateQueryPool							= NULL;
 	qvkCreateDescriptorSetLayout				= NULL;
 	qvkCreateFence								= NULL;
 	qvkCreateFramebuffer						= NULL;
@@ -3202,6 +3306,7 @@ qvkGetPipelineCacheData					= NULL;
 	qvkResetCommandBuffer						= NULL;
 	qvkResetDescriptorPool						= NULL;
 	qvkResetFences								= NULL;
+	qvkResetQueryPool							= NULL;
 	qvkUnmapMemory								= NULL;
 	qvkUpdateDescriptorSets						= NULL;
 	qvkWaitForFences							= NULL;
@@ -3797,13 +3902,13 @@ void vk_create_pipelines( void )
 	ri.Printf(PRINT_ALL, "DEBUG: vk_create_pipelines START - entering function\n");
 
 	// Create Vulkan attachments with improved error handling
-	ri.Printf(PRINT_ALL, "DEBUG: calling vk_create_attachments\n");
+	ri.Printf(PRINT_ALL, "DEBUG: About to call vk_create_attachments\n");
 	vk_create_attachments();
-	ri.Printf(PRINT_ALL, "DEBUG: vk_create_attachments completed\n");
+	ri.Printf(PRINT_ALL, "DEBUG: vk_create_attachments completed successfully\n");
 
-	ri.Printf(PRINT_ALL, "DEBUG: calling vk_create_special_pipelines\n");
+	ri.Printf(PRINT_ALL, "DEBUG: About to call vk_create_special_pipelines\n");
 	vk_create_special_pipelines();
-	ri.Printf(PRINT_ALL, "DEBUG: vk_create_special_pipelines completed\n");
+	ri.Printf(PRINT_ALL, "DEBUG: vk_create_special_pipelines completed successfully\n");
 
 	ri.Printf(PRINT_ALL, "DEBUG: vk_create_pipelines END\n");
 }
@@ -8072,10 +8177,49 @@ void vk_shutdown( refShutdownCode_t code ) {
 #endif
 
 			// Shutdown async compute
-			vk_shutdown_async_compute();
+			vk_shutdown_compute_manager();
 
 	// Shutdown resource pools
 	vk_shutdown_resource_pool();
+
+	// Shutdown hierarchical memory pool system
+	vk_shutdown_memory_pool_system();
+
+	// Shutdown lock-free memory manager
+	vk_shutdown_lock_free_memory_manager();
+
+	// Shutdown arena memory manager
+	vk_shutdown_arena_manager();
+
+	// Shutdown memory advisor
+	vk_shutdown_memory_advisor();
+
+	// Shutdown render graph profiler
+	vk_shutdown_render_profiler();
+
+	// Shutdown memory bandwidth profiler
+	vk_shutdown_memory_bandwidth_profiler();
+
+	// Shutdown parallel processing profiler
+	vk_shutdown_parallel_profiler();
+
+	// Shutdown shader performance analyzer
+	vk_shutdown_shader_performance_analyzer();
+
+	// Shutdown asset loading profiler
+	vk_shutdown_asset_loading_profiler();
+
+	// Shutdown performance HUD
+	vk_shutdown_performance_hud();
+
+	// Shutdown performance regression detector
+	vk_shutdown_performance_regression_detector();
+
+	// Shutdown heatmap visualizer
+	vk_shutdown_heatmap_visualizer();
+
+	// Shutdown cache structures manager
+	vk_shutdown_cache_structures_manager();
 
 	// Print memory statistics for leak detection
 	vk_print_memory_stats();

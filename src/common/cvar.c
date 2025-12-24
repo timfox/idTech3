@@ -29,6 +29,9 @@ static cvar_t	*cvar_cheats;
 static cvar_t	*cvar_developer;
 int			cvar_modifiedFlags;
 
+static mutex_t cvar_mutex;
+static qboolean cvar_initialized = qfalse;
+
 #define	MAX_CVARS	2048
 static cvar_t	cvar_indexes[MAX_CVARS];
 static int		cvar_numIndexes;
@@ -220,14 +223,21 @@ unsigned Cvar_Flags( const char *var_name )
 {
 	const cvar_t *var;
 	
-	if ( ( var = Cvar_FindVar( var_name ) ) == NULL )
+    MUTEX_LOCK(cvar_mutex);
+	if ( ( var = Cvar_FindVar( var_name ) ) == NULL ) {
+        MUTEX_UNLOCK(cvar_mutex);
 		return CVAR_NONEXISTENT;
+    }
 	else
 	{
-		if ( var->modified )
+		if ( atomic_load_explicit(&var->modified, memory_order_relaxed) ) {
+            MUTEX_UNLOCK(cvar_mutex);
 			return var->flags | CVAR_MODIFIED;
-		else
+        }
+		else {
+            MUTEX_UNLOCK(cvar_mutex);
 			return var->flags;
+        }
 	}
 }
 
@@ -372,11 +382,14 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 		Com_Error( ERR_FATAL, "Cvar_Get: NULL parameter" );
 	}
 
+    MUTEX_LOCK(cvar_mutex);
+
 	if ( !Cvar_ValidateName( var_name ) ) {
 		Com_Printf( "invalid cvar name string: %s\n", var_name ? var_name : "(null)" );
 		if ( var_name ) {
 			var_name = "BADNAME";
 		} else {
+            MUTEX_UNLOCK(cvar_mutex);
 			Com_Error( ERR_FATAL, "Cvar_Get: NULL var_name after validation check" );
 			return NULL; // Never reached
 		}
@@ -477,6 +490,7 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 		// SERVERINFO get sent to clients
 		cvar_modifiedFlags |= flags;
 
+        MUTEX_UNLOCK(cvar_mutex);
 		return var;
 	}
 
@@ -493,9 +507,12 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 
 	if(index >= MAX_CVARS)
 	{
-		if(!com_errorEntered)
+		if(!com_errorEntered) {
+            MUTEX_UNLOCK(cvar_mutex);
 			Com_Error(ERR_FATAL, "Error: Too many cvars, cannot create a new one!");
+        }
 
+        MUTEX_UNLOCK(cvar_mutex);
 		return NULL;
 	}
 	
@@ -506,8 +523,8 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 		
 	var->name = CopyString( var_name );
 	var->string = CopyString( var_value );
-	var->modified = qtrue;
-	var->modificationCount = 1;
+	atomic_store_explicit(&var->modified, 1, memory_order_relaxed);
+	atomic_store_explicit(&var->modificationCount, 1, memory_order_relaxed);
 	var->value = Q_atof( var->string );
 	var->integer = atoi( var->string );
 	var->resetString = CopyString( var_value );
@@ -541,6 +558,7 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 	 // sort on write
 	cvar_sort = qtrue;
 
+    MUTEX_UNLOCK(cvar_mutex);
 	return var;
 }
 
@@ -657,6 +675,8 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 		return NULL; // Never reached, but helps compiler
 	}
 
+    MUTEX_LOCK(cvar_mutex);
+
 	if ( !Cvar_ValidateName( var_name ) )
 	{
 		Com_Printf( "invalid cvar name string: %s\n", var_name );
@@ -673,13 +693,19 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 	var = Cvar_FindVar( var_name );
 	if ( !var )
 	{
-		if ( !value )
+		if ( !value ) {
+            MUTEX_UNLOCK(cvar_mutex);
 			return NULL;
+        }
 		// create it
-		if ( !force )
+		if ( !force ) {
+            MUTEX_UNLOCK(cvar_mutex);
 			return Cvar_Get( var_name, value, CVAR_USER_CREATED );
-		else
+        }
+		else {
+            MUTEX_UNLOCK(cvar_mutex);
 			return Cvar_Get( var_name, value, 0 );
+        }
 	}
 
 	if ( var->flags & (CVAR_ROM | CVAR_INIT | CVAR_CHEAT | CVAR_DEVELOPER) && !force )
@@ -687,24 +713,28 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 		if ( var->flags & CVAR_ROM )
 		{
 			Com_Printf( "%s is read only.\n", var_name );
+            MUTEX_UNLOCK(cvar_mutex);
 			return var;
 		}
 
 		if ( var->flags & CVAR_INIT )
 		{
 			Com_Printf( "%s is write protected.\n", var_name );
+            MUTEX_UNLOCK(cvar_mutex);
 			return var;
 		}
 
 		if ( (var->flags & CVAR_CHEAT) && !cvar_cheats->integer )
 		{
 			Com_Printf( "%s is cheat protected.\n", var_name );
+            MUTEX_UNLOCK(cvar_mutex);
 			return var;
 		}
 
 		if ( (var->flags & CVAR_DEVELOPER) && !cvar_developer->integer )
 		{
 			Com_Printf( "%s can be set only in developer mode.\n", var_name );
+            MUTEX_UNLOCK(cvar_mutex);
 			return var;
 		}
 	}
@@ -720,14 +750,19 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 		{
 			Z_Free( var->latchedString );
 			var->latchedString = NULL;
+            MUTEX_UNLOCK(cvar_mutex);
 			return var;
 		}
 
-		if ( strcmp( value, var->latchedString ) == 0 )
+		if ( strcmp( value, var->latchedString ) == 0 ) {
+            MUTEX_UNLOCK(cvar_mutex);
 			return var;
+        }
 	}
-	else if ( strcmp( value, var->string ) == 0 )
+	else if ( strcmp( value, var->string ) == 0 ) {
+        MUTEX_UNLOCK(cvar_mutex);
 		return var;
+    }
 
 	// note what types of cvars have been modified (userinfo, archive, serverinfo, systeminfo)
 	cvar_modifiedFlags |= var->flags;
@@ -738,21 +773,26 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 		{
 			if ( var->latchedString )
 			{
-				if ( strcmp( value, var->latchedString ) == 0 )
+				if ( strcmp( value, var->latchedString ) == 0 ) {
+                    MUTEX_UNLOCK(cvar_mutex);
 					return var;
+                }
 				Z_Free( var->latchedString );
 			}
 			else
 			{
-				if ( strcmp( value, var->string ) == 0 )
+				if ( strcmp( value, var->string ) == 0 ) {
+                    MUTEX_UNLOCK(cvar_mutex);
 					return var;
+                }
 			}
 
 			Com_Printf( "%s will be changed upon restarting.\n", var_name );
 			var->latchedString = CopyString( value );
-			var->modified = qtrue;
-			var->modificationCount++;
+			atomic_store_explicit(&var->modified, 1, memory_order_relaxed);
+			ATOMIC_INCREMENT(&var->modificationCount);
 			cvar_group[ var->group ] = 1;
+            MUTEX_UNLOCK(cvar_mutex);
 			return var;
 		}
 	}
@@ -770,11 +810,13 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 		}
 	}
 
-	if ( strcmp( value, var->string ) == 0 )
+	if ( strcmp( value, var->string ) == 0 ) {
+        MUTEX_UNLOCK(cvar_mutex);
 		return var; // not changed
+    }
 
-	var->modified = qtrue;
-	var->modificationCount++;
+	atomic_store_explicit(&var->modified, 1, memory_order_relaxed);
+	ATOMIC_INCREMENT(&var->modificationCount);
 	cvar_group[ var->group ] = 1;
 	
 	Z_Free( var->string ); // free the old value string
@@ -783,6 +825,7 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 	var->value = Q_atof( var->string );
 	var->integer = atoi( var->string );
 
+    MUTEX_UNLOCK(cvar_mutex);
 	return var;
 }
 
@@ -2161,6 +2204,9 @@ Reads in all archived cvars
 */
 void Cvar_Init (void)
 {
+    MUTEX_INIT(cvar_mutex);
+    cvar_initialized = qtrue;
+
 	Com_Memset(cvar_indexes, '\0', sizeof(cvar_indexes));
 	Com_Memset(hashTable, '\0', sizeof(hashTable));
 

@@ -463,7 +463,7 @@ static void ProjectDlightTexture( void ) {
 
 			VectorSubtract( origin, tess.xyz[i], dist );
 
-			backEnd.pc.c_dlightVertexes++;
+			atomic_fetch_add_explicit(&backEnd.pc.c_dlightVertexes, 1, memory_order_relaxed);
 
 			texCoords[0] = 0.5f + dist[0] * scale;
 			texCoords[1] = 0.5f + dist[1] * scale;
@@ -563,8 +563,8 @@ static void ProjectDlightTexture( void ) {
 
 		R_DrawElements( numIndexes, hitIndexes );
 #endif
-		backEnd.pc.c_totalIndexes += numIndexes;
-		backEnd.pc.c_dlightIndexes += numIndexes;
+		atomic_fetch_add_explicit(&backEnd.pc.c_totalIndexes, numIndexes, memory_order_relaxed);
+		atomic_fetch_add_explicit(&backEnd.pc.c_dlightIndexes, numIndexes, memory_order_relaxed);
 	}
 
 #ifdef USE_VULKAN
@@ -1561,17 +1561,17 @@ void RB_EndSurface( void ) {
 	//
 #ifdef USE_PMLIGHT
 	if ( tess.dlightPass ) {
-		backEnd.pc.c_lit_batches++;
-		backEnd.pc.c_lit_vertices += tess.numVertexes;
-		backEnd.pc.c_lit_indices += tess.numIndexes;
+		atomic_fetch_add_explicit(&backEnd.pc.c_lit_batches, 1, memory_order_relaxed);
+		atomic_fetch_add_explicit(&backEnd.pc.c_lit_vertices, tess.numVertexes, memory_order_relaxed);
+		atomic_fetch_add_explicit(&backEnd.pc.c_lit_indices, tess.numIndexes, memory_order_relaxed);
 	} else
 #endif
 	{
-		backEnd.pc.c_shaders++;
-		backEnd.pc.c_vertexes += tess.numVertexes;
-		backEnd.pc.c_indexes += tess.numIndexes;
+		atomic_fetch_add_explicit(&backEnd.pc.c_shaders, 1, memory_order_relaxed);
+		atomic_fetch_add_explicit(&backEnd.pc.c_vertexes, tess.numVertexes, memory_order_relaxed);
+		atomic_fetch_add_explicit(&backEnd.pc.c_indexes, tess.numIndexes, memory_order_relaxed);
 	}
-	backEnd.pc.c_totalIndexes += tess.numIndexes * tess.numPasses;
+	atomic_fetch_add_explicit(&backEnd.pc.c_totalIndexes, tess.numIndexes * tess.numPasses, memory_order_relaxed);
 
 	//
 	// call off to shader specific tess end function

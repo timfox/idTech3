@@ -165,6 +165,31 @@ void vk_end_frame(void) {
     vk.cmd->waitForFence = qtrue;
     vk.frame_count++;
 
+    // Check for memory defragmentation opportunity
+    vk_check_defragmentation();
+
+    // Update hierarchical memory pool system
+    vk_update_memory_pool_system();
+
+    // Reset frame arena for next frame
+    vk_reset_frame_arena();
+
+    // Update memory advisor
+    vk_update_memory_advisor();
+
+    // Update GPU-Async compute manager (cleanup completed jobs)
+    vk_update_compute_manager();
+
+    // End frame profiling
+    vk_profile_frame_end();
+
+    // Sample memory bandwidth and analyze access patterns
+    vk_sample_memory_bandwidth();
+    vk_analyze_memory_access_patterns();
+
+    // Sample thread utilization for parallel processing analysis
+    vk_sample_thread_utilization();
+
     ri.Printf(PRINT_ALL, "Vulkan: Frame %d ended\n", vk.frame_count);
 }
 

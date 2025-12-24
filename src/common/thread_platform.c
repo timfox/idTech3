@@ -223,6 +223,50 @@ void Thread_Sleep(int ms)
 
 /*
 =================
+Thread_SetAffinity
+Set thread affinity (CPU core pinning)
+=================
+*/
+void Thread_SetAffinity(thread_handle_t handle, uint64_t mask)
+{
+#ifdef _WIN32
+	SetThreadAffinityMask(handle, (DWORD_PTR)mask);
+#else
+	cpu_set_t cpuset;
+	CPU_ZERO(&cpuset);
+	for (int i = 0; i < 64; i++) {
+		if (mask & ((uint64_t)1 << i)) {
+			CPU_SET(i, &cpuset);
+		}
+	}
+	pthread_setaffinity_np(handle, sizeof(cpu_set_t), &cpuset);
+#endif
+}
+
+/*
+=================
+Thread_SetCurrentAffinity
+Set affinity for current thread
+=================
+*/
+void Thread_SetCurrentAffinity(uint64_t mask)
+{
+#ifdef _WIN32
+	SetThreadAffinityMask(GetCurrentThread(), (DWORD_PTR)mask);
+#else
+	cpu_set_t cpuset;
+	CPU_ZERO(&cpuset);
+	for (int i = 0; i < 64; i++) {
+		if (mask & ((uint64_t)1 << i)) {
+			CPU_SET(i, &cpuset);
+		}
+	}
+	pthread_setaffinity_np(pthread_self(), sizeof(cpu_set_t), &cpuset);
+#endif
+}
+
+/*
+=================
 Thread_GetCurrentID
 Get current thread ID
 =================
@@ -248,8 +292,60 @@ int Sys_GetCPUCount(void)
 	SYSTEM_INFO sysinfo;
 	GetSystemInfo(&sysinfo);
 	return sysinfo.dwNumberOfProcessors;
-#else
+	#else
 	return sysconf(_SC_NPROCESSORS_ONLN);
 #endif
+}
+
+/*
+===========================================================================
+Spin Locks
+===========================================================================
+*/
+
+void SpinLock_Init(spinlock_t *lock) {
+    if (!lock) return;
+    atomic_init(&lock->lock, 0);
+}
+
+void SpinLock_Lock(spinlock_t *lock) {
+    if (!lock) return;
+    
+    int expected = 0;
+    int spin_count = 0;
+    
+    while (!atomic_compare_exchange_weak_explicit(&lock->lock, &expected, 1, 
+                                                memory_order_acquire, memory_order_relaxed)) {
+        expected = 0;
+        
+        // Adaptive spinning
+        spin_count++;
+        if (spin_count < 1024) {
+            // CPU specific hint for spin loops
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__) || defined(_M_IX86)
+            __builtin_ia32_pause();
+#elif defined(__aarch64__) || defined(_M_ARM64)
+            __asm__ __volatile__("yield");
+#endif
+        } else if (spin_count < 2048) {
+            Thread_Yield();
+        } else {
+            Thread_Sleep(0); // Force context switch
+            spin_count = 1024; // Reset to intermediate spinning
+        }
+    }
+}
+
+qboolean SpinLock_TryLock(spinlock_t *lock) {
+    if (!lock) return qfalse;
+    
+    int expected = 0;
+    return atomic_compare_exchange_strong_explicit(&lock->lock, &expected, 1,
+                                                 memory_order_acquire, memory_order_relaxed);
+}
+
+void SpinLock_Unlock(spinlock_t *lock) {
+    if (!lock) return;
+    atomic_store_explicit(&lock->lock, 0, memory_order_release);
 }
 

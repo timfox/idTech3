@@ -60,13 +60,18 @@ void MemStats_Alloc(memtag_t tag, int size) {
 	}
 	
 	memtag_stats_t *stats = &memtag_stats[tag];
-	stats->current += size;
-	stats->total_allocated += size;
-	stats->allocations++;
-	stats->blocks++;
+	ATOMIC_ADD64(&stats->current, size);
+	ATOMIC_ADD64(&stats->total_allocated, size);
+	ATOMIC_INCREMENT(&stats->allocations);
+	ATOMIC_INCREMENT(&stats->blocks);
 	
-	if (stats->current > stats->peak) {
-		stats->peak = stats->current;
+	int64_t current = atomic_load_explicit(&stats->current, memory_order_relaxed);
+    int64_t peak = atomic_load_explicit(&stats->peak, memory_order_relaxed);
+	while (current > peak) {
+        if (ATOMIC_COMPARE_EXCHANGE(&stats->peak, current, peak)) {
+            break;
+        }
+        peak = atomic_load_explicit(&stats->peak, memory_order_relaxed);
 	}
 }
 
@@ -85,11 +90,11 @@ void MemStats_Free(memtag_t tag, int size) {
 	}
 	
 	memtag_stats_t *stats = &memtag_stats[tag];
-	stats->current -= size;
-	stats->total_freed += size;
-	stats->frees++;
-	if (stats->blocks > 0) {
-		stats->blocks--;
+	ATOMIC_ADD64(&stats->current, -size);
+	ATOMIC_ADD64(&stats->total_freed, size);
+	ATOMIC_INCREMENT(&stats->frees);
+	if (atomic_load_explicit(&stats->blocks, memory_order_relaxed) > 0) {
+		ATOMIC_DECREMENT(&stats->blocks);
 	}
 }
 
@@ -103,7 +108,14 @@ void MemStats_GetTagStats(memtag_t tag, memtag_stats_t *stats) {
 		return;
 	}
 	
-	Com_Memcpy(stats, &memtag_stats[tag], sizeof(memtag_stats_t));
+    memtag_stats_t *src = &memtag_stats[tag];
+    stats->current = atomic_load_explicit(&src->current, memory_order_relaxed);
+    stats->peak = atomic_load_explicit(&src->peak, memory_order_relaxed);
+    stats->total_allocated = atomic_load_explicit(&src->total_allocated, memory_order_relaxed);
+    stats->total_freed = atomic_load_explicit(&src->total_freed, memory_order_relaxed);
+    stats->allocations = atomic_load_explicit(&src->allocations, memory_order_relaxed);
+    stats->frees = atomic_load_explicit(&src->frees, memory_order_relaxed);
+    stats->blocks = atomic_load_explicit(&src->blocks, memory_order_relaxed);
 }
 
 /*
@@ -122,13 +134,16 @@ void MemStats_GetTotalStats(memtag_stats_t *stats) {
 		if (i == TAG_FREE) {
 			continue;
 		}
-		stats->current += memtag_stats[i].current;
-		stats->peak += memtag_stats[i].peak;
-		stats->total_allocated += memtag_stats[i].total_allocated;
-		stats->total_freed += memtag_stats[i].total_freed;
-		stats->allocations += memtag_stats[i].allocations;
-		stats->frees += memtag_stats[i].frees;
-		stats->blocks += memtag_stats[i].blocks;
+        memtag_stats_t tag_stats;
+        MemStats_GetTagStats((memtag_t)i, &tag_stats);
+
+		stats->current += tag_stats.current;
+		stats->peak += tag_stats.peak;
+		stats->total_allocated += tag_stats.total_allocated;
+		stats->total_freed += tag_stats.total_freed;
+		stats->allocations += tag_stats.allocations;
+		stats->frees += tag_stats.frees;
+		stats->blocks += tag_stats.blocks;
 	}
 }
 

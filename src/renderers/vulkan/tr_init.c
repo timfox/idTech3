@@ -27,6 +27,7 @@ extern refimport_t ri;
 #include "../renderercommon/tr_backend_iface.h"
 #ifdef USE_VULKAN
 #include "vk_layered_materials.h"
+#include "../common/job_system.h"
 extern const rb_backend_iface_t *RB_VK_GetBackendInterface( void );
 #endif
 
@@ -43,6 +44,49 @@ glstatic_t	gls;
 
 #ifdef USE_VULKAN
 static void VkInfo_f( void );
+static void R_VRAMStats_f( void );
+static void R_Defrag_f( void );
+static void R_DefragStats_f( void );
+static void R_PoolStats_f( void );
+static void R_LockFreeStats_f( void );
+static void R_ArenaStats_f( void );
+static void R_MemoryAdvisorStats_f( void );
+static void R_MemoryAdvisorAnalyze_f( void );
+static void R_MemoryAdvisorEnable_f( void );
+static void R_CacheStats_f( void );
+static void R_RenderProfilerStats_f( void );
+static void R_RenderProfilerDetail_f( void );
+static void R_BottleneckAnalysis_f( void );
+static void R_MemoryBandwidthStats_f( void );
+static void R_MemoryCacheStats_f( void );
+static void R_LayoutOptimization_f( void );
+static void R_ApplyMemoryOptimizations_f( void );
+static void R_ParallelStats_f( void );
+static void R_ThreadUtilization_f( void );
+static void R_SyncOverhead_f( void );
+static void R_ParallelEfficiency_f( void );
+static void R_ShaderPerformance_f( void );
+static void R_ShaderOptimizations_f( void );
+static void R_ShaderInstructions_f( void );
+static void R_ShaderRegisters_f( void );
+static void R_AssetLoadingStats_f( void );
+static void R_IOPerformanceStats_f( void );
+static void R_StreamingStats_f( void );
+static void R_AssetLoadingBottlenecks_f( void );
+static void R_PerformanceHUD_f( void );
+static void R_HeatmapStats_f( void );
+static void R_HeatmapMode_f( void );
+static void R_HeatmapClear_f( void );
+static void R_PerformanceSnapshot_f( void );
+static void R_PerformanceBaseline_f( void );
+static void R_PerformanceReport_f( void );
+static void R_PerformancePreset_f( void );
+static void R_ComputeStats_f( void );
+static void R_ComputeEnable_f( void );
+static void R_ComputeTasks_f( void );
+static void R_JobStats_f( void );
+static void R_JobScale_f( void );
+static void R_JobAffinity_f( void );
 #endif
 static void GfxInfo( void );
 static void VarInfo( void );
@@ -155,6 +199,10 @@ cvar_t  *r_baseSpecular;
 	cvar_t	*r_vrs_falloff_start;
 	cvar_t	*r_vrs_min_rate;
 	cvar_t	*r_vrs_max_rate;
+	cvar_t	*r_job_affinity;
+	cvar_t	*r_render_affinity;
+	cvar_t	*r_audio_affinity;
+	cvar_t	*r_physics_affinity;
 	cvar_t	*r_vignette;
 	cvar_t	*r_vignette_intensity;
 	cvar_t	*r_vignette_inner_radius;
@@ -1845,6 +1893,49 @@ static void R_Register( void )
 	ri.Cmd_AddCommand( "shaderlist", R_ShaderList_f );
 	ri.Cmd_AddCommand( "skinlist", R_SkinList_f );
 	ri.Cmd_AddCommand( "modellist", R_Modellist_f );
+	ri.Cmd_AddCommand( "vramstats", R_VRAMStats_f );
+	ri.Cmd_AddCommand( "defrag", R_Defrag_f );
+	ri.Cmd_AddCommand( "defragstats", R_DefragStats_f );
+	ri.Cmd_AddCommand( "poolstats", R_PoolStats_f );
+	ri.Cmd_AddCommand( "lfstats", R_LockFreeStats_f );
+	ri.Cmd_AddCommand( "arenastats", R_ArenaStats_f );
+	ri.Cmd_AddCommand( "memadvstats", R_MemoryAdvisorStats_f );
+	ri.Cmd_AddCommand( "memadvanalyze", R_MemoryAdvisorAnalyze_f );
+	ri.Cmd_AddCommand( "memadvenable", R_MemoryAdvisorEnable_f );
+	ri.Cmd_AddCommand( "cachestats", R_CacheStats_f );
+	ri.Cmd_AddCommand( "renderprof", R_RenderProfilerStats_f );
+	ri.Cmd_AddCommand( "renderprofdetail", R_RenderProfilerDetail_f );
+	ri.Cmd_AddCommand( "bottleneck", R_BottleneckAnalysis_f );
+	ri.Cmd_AddCommand( "membandwidth", R_MemoryBandwidthStats_f );
+	ri.Cmd_AddCommand( "memcachestats", R_MemoryCacheStats_f );
+	ri.Cmd_AddCommand( "layoutopt", R_LayoutOptimization_f );
+	ri.Cmd_AddCommand( "applymemopt", R_ApplyMemoryOptimizations_f );
+	ri.Cmd_AddCommand( "parallelstats", R_ParallelStats_f );
+	ri.Cmd_AddCommand( "threadutil", R_ThreadUtilization_f );
+	ri.Cmd_AddCommand( "syncoverhead", R_SyncOverhead_f );
+	ri.Cmd_AddCommand( "paralleleff", R_ParallelEfficiency_f );
+	ri.Cmd_AddCommand( "shaderperf", R_ShaderPerformance_f );
+	ri.Cmd_AddCommand( "shaderopt", R_ShaderOptimizations_f );
+	ri.Cmd_AddCommand( "shaderinst", R_ShaderInstructions_f );
+	ri.Cmd_AddCommand( "shaderregs", R_ShaderRegisters_f );
+	ri.Cmd_AddCommand( "assetstats", R_AssetLoadingStats_f );
+	ri.Cmd_AddCommand( "iostats", R_IOPerformanceStats_f );
+	ri.Cmd_AddCommand( "streamingstats", R_StreamingStats_f );
+	ri.Cmd_AddCommand( "assetbottlenecks", R_AssetLoadingBottlenecks_f );
+	ri.Cmd_AddCommand( "performancehud", R_PerformanceHUD_f );
+	ri.Cmd_AddCommand( "heatmapstats", R_HeatmapStats_f );
+	ri.Cmd_AddCommand( "heatmapmode", R_HeatmapMode_f );
+	ri.Cmd_AddCommand( "heatmapclear", R_HeatmapClear_f );
+	ri.Cmd_AddCommand( "perfsnapshot", R_PerformanceSnapshot_f );
+	ri.Cmd_AddCommand( "perfbaseline", R_PerformanceBaseline_f );
+	ri.Cmd_AddCommand( "perfreport", R_PerformanceReport_f );
+	ri.Cmd_AddCommand( "perfpreset", R_PerformancePreset_f );
+	ri.Cmd_AddCommand( "computestats", R_ComputeStats_f );
+	ri.Cmd_AddCommand( "computeenable", R_ComputeEnable_f );
+	ri.Cmd_AddCommand( "computetasks", R_ComputeTasks_f );
+	ri.Cmd_AddCommand( "jobstats", R_JobStats_f );
+	ri.Cmd_AddCommand( "jobscale", R_JobScale_f );
+	ri.Cmd_AddCommand( "jobaffinity", R_JobAffinity_f );
 	ri.Cmd_AddCommand( "screenshot", R_ScreenShot_f );
 	ri.Cmd_AddCommand( "screenshotJPEG", R_ScreenShot_f );
 	ri.Cmd_AddCommand( "screenshotBMP", R_ScreenShot_f );
@@ -2069,6 +2160,25 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_vrs_min_rate, "VRS minimum shading rate (1, 2, 4 - higher = lower quality)." );
 
 	r_vrs_max_rate = ri.Cvar_Get( "r_vrs_max_rate", "4", CVAR_ARCHIVE );
+
+	r_job_affinity = ri.Cvar_Get( "r_job_affinity", "0", CVAR_ARCHIVE );
+	r_render_affinity = ri.Cvar_Get( "r_render_affinity", "0", CVAR_ARCHIVE );
+	r_audio_affinity = ri.Cvar_Get( "r_audio_affinity", "0", CVAR_ARCHIVE );
+	r_physics_affinity = ri.Cvar_Get( "r_physics_affinity", "0", CVAR_ARCHIVE );
+
+	// Apply initial job system affinity if set
+	if (r_job_affinity->integer != 0) {
+		int workers = JobSystem_GetNumWorkers();
+		for (int i = 0; i < workers; i++) {
+			JobSystem_SetWorkerAffinity(i, (uint64_t)r_job_affinity->integer);
+		}
+	}
+
+	// Apply render thread affinity if set
+	if (r_render_affinity->integer != 0) {
+		Thread_SetCurrentAffinity((uint64_t)r_render_affinity->integer);
+		ri.Printf(PRINT_ALL, "Vulkan: Render thread affinity set to 0x%llx\n", (unsigned long long)r_render_affinity->integer);
+	}
 	ri.Cvar_CheckRange( r_vrs_max_rate, "1", "4", CV_INTEGER );
 	ri.Cvar_SetDescription( r_vrs_max_rate, "VRS maximum shading rate (1, 2, 4 - higher = lower quality)." );
 
@@ -3159,4 +3269,417 @@ refexport_t *GetRefAPI ( int apiVersion, refimport_t *rimp ) {
 #endif
 
 	return &re;
+}
+
+// VRAM statistics command
+void R_VRAMStats_f(void) {
+	vk_print_vram_stats();
+	vk_detect_memory_leaks();
+}
+
+// Manual defragmentation command
+void R_Defrag_f(void) {
+	if (vk_perform_defragmentation()) {
+		ri.Printf(PRINT_ALL, "Manual defragmentation completed\n");
+	} else {
+		ri.Printf(PRINT_ALL, "Defragmentation not needed or failed\n");
+	}
+}
+
+// Defragmentation statistics command
+void R_DefragStats_f(void) {
+	ri.Printf(PRINT_ALL, "=== Memory Defragmentation Statistics ===\n");
+	ri.Printf(PRINT_ALL, "Enabled: %s\n", vk.memory_defrag.enabled ? "Yes" : "No");
+	ri.Printf(PRINT_ALL, "Vulkan Defrag Extension: %s\n",
+		vk.memory_defrag.vk_defrag_supported ? "Supported" : "Not Available");
+	ri.Printf(PRINT_ALL, "Fragmentation Threshold: %.1f%%\n",
+		vk.memory_defrag.fragmentation_threshold * 100.0f);
+	ri.Printf(PRINT_ALL, "Defrag Interval: %u frames\n", vk.memory_defrag.defrag_interval_frames);
+	ri.Printf(PRINT_ALL, "Frame Counter: %u\n", vk.memory_defrag.frame_counter);
+	ri.Printf(PRINT_ALL, "Defrag Operations: %u\n", vk.memory_defrag.defrag_operations);
+	ri.Printf(PRINT_ALL, "In Progress: %s\n", vk.memory_defrag.defrag_in_progress ? "Yes" : "No");
+
+	vk_calculate_fragmentation_metrics();
+	float fragmentation = 0.0f;
+	if (vk.memory_defrag.total_allocated > 0) {
+		fragmentation = 1.0f - ((float)vk.memory_defrag.total_used / (float)vk.memory_defrag.total_allocated);
+	}
+
+	ri.Printf(PRINT_ALL, "Current Fragmentation: %.2f%%\n", fragmentation * 100.0f);
+	ri.Printf(PRINT_ALL, "Total Allocated: %lu MB\n",
+		(unsigned long)(vk.memory_defrag.total_allocated / (1024 * 1024)));
+	ri.Printf(PRINT_ALL, "Total Used: %lu MB\n",
+		(unsigned long)(vk.memory_defrag.total_used / (1024 * 1024)));
+	ri.Printf(PRINT_ALL, "Largest Free Block: %lu MB\n",
+		(unsigned long)(vk.memory_defrag.largest_free_block / (1024 * 1024)));
+	ri.Printf(PRINT_ALL, "Free Blocks: %u\n", vk.memory_defrag.free_block_count);
+}
+
+// Pool statistics command
+void R_PoolStats_f(void) {
+	vk_print_pool_statistics();
+}
+
+// Lock-free allocator statistics command
+void R_LockFreeStats_f(void) {
+	vk_print_lock_free_stats();
+}
+
+// Arena statistics command
+void R_ArenaStats_f(void) {
+	vk_print_arena_stats();
+}
+
+// Memory advisor statistics command
+void R_MemoryAdvisorStats_f(void) {
+	vk_print_memory_advisor_stats();
+}
+
+// Memory advisor force analysis command
+void R_MemoryAdvisorAnalyze_f(void) {
+	vk_force_memory_analysis();
+}
+
+// Memory advisor enable/disable auto optimization command
+void R_MemoryAdvisorEnable_f(void) {
+	if (ri.Cmd_Argc() < 2) {
+		ri.Printf(PRINT_ALL, "Usage: memadvenable <0|1>\n");
+		return;
+	}
+
+	int enabled = atoi(ri.Cmd_Argv(1));
+	vk_set_memory_advisor_auto_optimization(enabled ? qtrue : qfalse);
+}
+
+// Cache structures statistics command
+void R_CacheStats_f(void) {
+	vk_print_cache_structures_stats();
+}
+
+// Render profiler statistics command
+void R_RenderProfilerStats_f(void) {
+	vk_print_render_profiler_stats();
+}
+
+// Render profiler detailed statistics command
+void R_RenderProfilerDetail_f(void) {
+	ri.Printf(PRINT_ALL, "=== Detailed Render Profiler Statistics ===\n");
+
+	if (!vk.render_profiler.enabled || !vk.render_profiler.initialized) {
+		ri.Printf(PRINT_ALL, "Render profiler not initialized\n");
+		return;
+	}
+
+	ri.Printf(PRINT_ALL, "Detailed Profiling: %s\n",
+		vk.render_profiler.detailed_profiling ? "Enabled" : "Disabled");
+	ri.Printf(PRINT_ALL, "Frames Recorded: %lu\n", (unsigned long)vk.render_profiler.total_frames_recorded);
+	ri.Printf(PRINT_ALL, "Current Bottleneck: %s (Severity: %.1f%%)\n",
+		vk.render_profiler.current_bottleneck != BOTTLENECK_NONE ?
+		(vk.render_profiler.current_bottleneck == BOTTLENECK_CPU_BOUND ? "CPU Bound" :
+		 vk.render_profiler.current_bottleneck == BOTTLENECK_GPU_FRAGMENT ? "Fragment Shader" :
+		 vk.render_profiler.current_bottleneck == BOTTLENECK_GPU_VERTEX ? "Vertex Shader" :
+		 vk.render_profiler.current_bottleneck == BOTTLENECK_MEMORY_PRESSURE ? "Memory Pressure" :
+		 vk.render_profiler.current_bottleneck == BOTTLENECK_DRAW_CALL_BATCHING ? "Draw Calls" :
+		 "Other") : "None",
+		vk.render_profiler.bottleneck_severity * 100.0f);
+
+	// Show detailed pass information for recent frames
+	int max_frames_to_show = vk.render_profiler.max_frames < 5 ? vk.render_profiler.max_frames : 5;
+	for (int f = 0; f < max_frames_to_show; f++) {
+		int frame_idx = (vk.render_profiler.current_frame_index - 1 - f + vk.render_profiler.max_frames) % vk.render_profiler.max_frames;
+		vk_frame_profile_t *frame = &vk.render_profiler.frame_history[frame_idx];
+
+		if (frame->frame_number == 0) continue; // Empty frame
+
+		ri.Printf(PRINT_ALL, "\nFrame %lu (%.2f ms):\n", (unsigned long)frame->frame_number, frame->frame_time_ms);
+
+		for (uint32_t p = 0; p < frame->pass_count; p++) {
+			vk_render_pass_profile_t *pass = &frame->passes[p];
+			uint64_t gpu_time_ns = (pass->gpu_end_time - pass->gpu_start_time) * vk.render_profiler.gpu_timestamp_period;
+			double gpu_time_ms = gpu_time_ns / 1000000.0;
+
+			ri.Printf(PRINT_ALL, "  %s: CPU %.2f ms, GPU %.2f ms, %u draws, %u verts",
+				pass->name, (pass->end_time - pass->start_time) / 1000000.0,
+				gpu_time_ms, pass->draw_calls, pass->vertices_submitted);
+
+			if (pass->bottleneck_score > 0.5f) {
+				ri.Printf(PRINT_ALL, " [BOTTLENECK]");
+			}
+			ri.Printf(PRINT_ALL, "\n");
+		}
+	}
+}
+
+// Bottleneck analysis command
+void R_BottleneckAnalysis_f(void) {
+	ri.Printf(PRINT_ALL, "=== Bottleneck Analysis ===\n");
+
+	if (!vk.render_profiler.enabled || !vk.render_profiler.initialized) {
+		ri.Printf(PRINT_ALL, "Render profiler not initialized\n");
+		return;
+	}
+
+	// Analyze recent frame
+	uint32_t recent_frame_idx = (vk.render_profiler.current_frame_index - 1 + vk.render_profiler.max_frames) % vk.render_profiler.max_frames;
+	vk_frame_profile_t *frame = &vk.render_profiler.frame_history[recent_frame_idx];
+
+	if (frame->frame_number == 0) {
+		ri.Printf(PRINT_ALL, "No frame data available\n");
+		return;
+	}
+
+	ri.Printf(PRINT_ALL, "Analyzing Frame %lu (%.2f ms total):\n",
+		(unsigned long)frame->frame_number, frame->frame_time_ms);
+	ri.Printf(PRINT_ALL, "Primary Bottleneck: %s\n", frame->primary_bottleneck);
+	ri.Printf(PRINT_ALL, "Bottleneck Severity: %.1f%%\n", frame->bottleneck_severity * 100.0f);
+	ri.Printf(PRINT_ALL, "Performance Rating: %s\n", frame->performance_rating);
+
+	// Detailed recommendations
+	ri.Printf(PRINT_ALL, "\nRecommendations:\n");
+
+	if (frame->bottleneck_severity < 0.3f) {
+		ri.Printf(PRINT_ALL, "- Performance is good, no major bottlenecks detected\n");
+	} else if (strcmp(frame->primary_bottleneck, "CPU Bound") == 0) {
+		ri.Printf(PRINT_ALL, "- Reduce CPU-side work: optimize data preparation and state changes\n");
+		ri.Printf(PRINT_ALL, "- Consider using compute shaders for CPU-intensive tasks\n");
+		ri.Printf(PRINT_ALL, "- Profile CPU hotspots with detailed CPU profiler\n");
+	} else if (strcmp(frame->primary_bottleneck, "Fragment Shader Bound") == 0) {
+		ri.Printf(PRINT_ALL, "- Reduce overdraw: use depth pre-pass or better culling\n");
+		ri.Printf(PRINT_ALL, "- Optimize fragment shaders: reduce texture lookups and complex math\n");
+		ri.Printf(PRINT_ALL, "- Consider lower resolution rendering or MSAA instead of complex shaders\n");
+	} else if (strcmp(frame->primary_bottleneck, "Vertex Shader Bound") == 0) {
+		ri.Printf(PRINT_ALL, "- Reduce vertex count through LOD or mesh optimization\n");
+		ri.Printf(PRINT_ALL, "- Simplify vertex shaders or use vertex shader variants\n");
+		ri.Printf(PRINT_ALL, "- Consider GPU instancing for repeated geometry\n");
+	} else if (strcmp(frame->primary_bottleneck, "Memory Pressure") == 0) {
+		ri.Printf(PRINT_ALL, "- Reduce texture memory usage: compress textures or use smaller formats\n");
+		ri.Printf(PRINT_ALL, "- Implement texture streaming or virtual texturing\n");
+		ri.Printf(PRINT_ALL, "- Check for memory leaks with 'vramstats' command\n");
+	} else if (strcmp(frame->primary_bottleneck, "Draw Call Batching") == 0) {
+		ri.Printf(PRINT_ALL, "- Batch draw calls: group by material and shader\n");
+		ri.Printf(PRINT_ALL, "- Use instancing for repeated objects\n");
+		ri.Printf(PRINT_ALL, "- Consider bindless rendering techniques\n");
+	}
+
+	// Show most expensive passes
+	ri.Printf(PRINT_ALL, "\nMost Expensive Passes:\n");
+	for (uint32_t i = 0; i < frame->pass_count && i < 3; i++) {
+		vk_render_pass_profile_t *pass = &frame->passes[i];
+		uint64_t gpu_time_ns = (pass->gpu_end_time - pass->gpu_start_time) * vk.render_profiler.gpu_timestamp_period;
+		double gpu_time_ms = gpu_time_ns / 1000000.0;
+
+		ri.Printf(PRINT_ALL, "- %s: %.2f ms GPU time", pass->name, gpu_time_ms);
+		if (pass->bottleneck_type && strlen(pass->bottleneck_type) > 0) {
+			ri.Printf(PRINT_ALL, " (%s)", pass->bottleneck_type);
+		}
+		if (pass->optimization_hint && strlen(pass->optimization_hint) > 0) {
+			ri.Printf(PRINT_ALL, "\n    Hint: %s", pass->optimization_hint);
+		}
+		ri.Printf(PRINT_ALL, "\n");
+    }
+}
+
+// Parallel processing statistics command
+void R_ParallelStats_f(void) {
+	vk_print_parallel_stats();
+}
+
+// Thread utilization statistics command
+void R_ThreadUtilization_f(void) {
+	vk_print_thread_utilization();
+}
+
+// Synchronization overhead statistics command
+void R_SyncOverhead_f(void) {
+	vk_print_synchronization_overhead();
+}
+
+// Parallel efficiency analysis command
+void R_ParallelEfficiency_f(void) {
+	vk_print_parallel_efficiency();
+}
+
+// Shader performance statistics command
+void R_ShaderPerformance_f(void) {
+	vk_print_shader_performance_stats();
+}
+
+// Shader optimization suggestions command
+void R_ShaderOptimizations_f(void) {
+	vk_print_shader_optimization_suggestions();
+}
+
+// Shader instruction analysis command
+void R_ShaderInstructions_f(void) {
+	vk_print_shader_instruction_analysis();
+}
+
+// Shader register usage command
+void R_ShaderRegisters_f(void) {
+	vk_print_shader_register_usage();
+}
+
+// Asset loading statistics command
+void R_AssetLoadingStats_f(void) {
+	vk_print_asset_loading_stats();
+}
+
+// I/O performance statistics command
+void R_IOPerformanceStats_f(void) {
+	vk_print_io_performance_stats();
+}
+
+// Streaming statistics command
+void R_StreamingStats_f(void) {
+	vk_print_streaming_stats();
+}
+
+// Asset loading bottlenecks command
+void R_AssetLoadingBottlenecks_f(void) {
+	vk_print_asset_loading_bottlenecks();
+}
+
+// Performance HUD toggle command
+void R_PerformanceHUD_f(void) {
+	vk_toggle_performance_hud();
+}
+
+// Heatmap statistics command
+void R_HeatmapStats_f(void) {
+	vk_print_heatmap_stats();
+}
+
+// Heatmap mode selection command
+void R_HeatmapMode_f(void) {
+	if (ri.Cmd_Argc() < 2) {
+		ri.Printf(PRINT_ALL, "Usage: heatmapmode <0-%d>\n", VK_HEATMAP_LAYER_COUNT - 1);
+		return;
+	}
+	vk_set_heatmap_mode(atoi(ri.Cmd_Argv(1)));
+}
+
+// Heatmap clear command
+void R_HeatmapClear_f(void) {
+	if (ri.Cmd_Argc() < 2) {
+		for (int i = 0; i < VK_HEATMAP_LAYER_COUNT; i++) {
+			vk_clear_heatmap(i);
+		}
+		ri.Printf(PRINT_ALL, "Cleared all heatmap layers\n");
+	} else {
+		vk_clear_heatmap(atoi(ri.Cmd_Argv(1)));
+	}
+}
+
+// Performance snapshot command
+void R_PerformanceSnapshot_f(void) {
+	const char *scenario = ri.Cmd_Argc() > 1 ? ri.Cmd_Argv(1) : "manual";
+	vk_capture_performance_snapshot(scenario);
+}
+
+// Performance baseline command
+void R_PerformanceBaseline_f(void) {
+	const char *scenario = ri.Cmd_Argc() > 1 ? ri.Cmd_Argv(1) : "manual";
+	vk_save_performance_baseline(scenario);
+}
+
+// Performance regression report command
+void R_PerformanceReport_f(void) {
+	const char *scenario = ri.Cmd_Argc() > 1 ? ri.Cmd_Argv(1) : "manual";
+	vk_compare_against_baseline(scenario);
+	vk_print_performance_regression_report();
+}
+
+// Performance preset command
+void R_PerformancePreset_f(void) {
+	if (ri.Cmd_Argc() < 2) {
+		vk_print_performance_presets_info();
+		ri.Printf(PRINT_ALL, "Usage: perfpreset <0-%d> (Potato, Low, Medium, High, Ultra)\n", VK_PERF_PRESET_COUNT - 1);
+		return;
+	}
+	vk_apply_performance_preset((vk_performance_preset_t)atoi(ri.Cmd_Argv(1)));
+}
+
+// Compute stats command
+void R_ComputeStats_f(void) {
+	vk_print_compute_stats();
+}
+
+// Compute enable/disable command
+void R_ComputeEnable_f(void) {
+	if (ri.Cmd_Argc() < 2) {
+		ri.Printf(PRINT_ALL, "Usage: computeenable <0|1>\n");
+		return;
+	}
+	vk_set_compute_enabled(atoi(ri.Cmd_Argv(1)) ? qtrue : qfalse);
+}
+
+// Compute task graph command
+void R_ComputeTasks_f(void) {
+	vk_print_compute_task_graph();
+}
+
+// Job system stats command
+void R_JobStats_f(void) {
+	JobSystem_PrintLoadBalancerStats();
+}
+
+// Job system scaling command
+void R_JobScale_f(void) {
+	if (ri.Cmd_Argc() < 2) {
+		ri.Printf(PRINT_ALL, "Usage: jobscale <enable|disable|min <val>|max <val>>\n");
+		return;
+	}
+	const char *cmd = ri.Cmd_Argv(1);
+	if (!Q_stricmp(cmd, "enable")) {
+		JobSystem_SetLoadBalancerEnabled(qtrue);
+	} else if (!Q_stricmp(cmd, "disable")) {
+		JobSystem_SetLoadBalancerEnabled(qfalse);
+	} else if (!Q_stricmp(cmd, "min")) {
+		if (ri.Cmd_Argc() < 3) return;
+		JobSystem_SetWorkerRange(atoi(ri.Cmd_Argv(2)), 16);
+	} else if (!Q_stricmp(cmd, "max")) {
+		if (ri.Cmd_Argc() < 3) return;
+		JobSystem_SetWorkerRange(1, atoi(ri.Cmd_Argv(2)));
+	}
+}
+
+// Job system affinity command
+void R_JobAffinity_f(void) {
+	if (ri.Cmd_Argc() < 3) {
+		ri.Printf(PRINT_ALL, "Usage: jobaffinity <worker_index|all> <mask_hex>\n");
+		ri.Printf(PRINT_ALL, "Example: jobaffinity all 0xF (cores 0-3)\n");
+		return;
+	}
+	
+	const char *target = ri.Cmd_Argv(1);
+	uint64_t mask = (uint64_t)strtoull(ri.Cmd_Argv(2), NULL, 16);
+	
+	if (!Q_stricmp(target, "all")) {
+		int workers = JobSystem_GetNumWorkers();
+		for (int i = 0; i < workers; i++) {
+			JobSystem_SetWorkerAffinity(i, mask);
+		}
+	} else {
+		JobSystem_SetWorkerAffinity(atoi(target), mask);
+	}
+}
+
+// Memory bandwidth statistics command
+void R_MemoryBandwidthStats_f(void) {
+	vk_print_memory_bandwidth_stats();
+}
+
+// Memory cache statistics command
+void R_MemoryCacheStats_f(void) {
+	vk_print_cache_performance_stats();
+}
+
+// Layout optimization recommendations command
+void R_LayoutOptimization_f(void) {
+	vk_print_layout_optimization_recommendations();
+}
+
+// Apply memory optimizations command
+void R_ApplyMemoryOptimizations_f(void) {
+	vk_apply_memory_optimizations();
 }

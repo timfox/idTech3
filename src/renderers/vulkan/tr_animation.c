@@ -67,15 +67,15 @@ static int R_MDRCullModel( mdrHeader_t *header, const trRefEntity_t *ent ) {
 				// we do. After all, the purpose of mdrs are not that different, are they?
 				
 				case CULL_OUT:
-					tr.pc.c_sphere_cull_md3_out++;
+					atomic_fetch_add_explicit(&tr.pc.c_sphere_cull_md3_out, 1, memory_order_relaxed);
 					return CULL_OUT;
 
 				case CULL_IN:
-					tr.pc.c_sphere_cull_md3_in++;
+					atomic_fetch_add_explicit(&tr.pc.c_sphere_cull_md3_in, 1, memory_order_relaxed);
 					return CULL_IN;
 
 				case CULL_CLIP:
-					tr.pc.c_sphere_cull_md3_clip++;
+					atomic_fetch_add_explicit(&tr.pc.c_sphere_cull_md3_clip, 1, memory_order_relaxed);
 					break;
 			}
 		}
@@ -94,17 +94,17 @@ static int R_MDRCullModel( mdrHeader_t *header, const trRefEntity_t *ent ) {
 			{
 				if ( sphereCull == CULL_OUT )
 				{
-					tr.pc.c_sphere_cull_md3_out++;
+					atomic_fetch_add_explicit(&tr.pc.c_sphere_cull_md3_out, 1, memory_order_relaxed);
 					return CULL_OUT;
 				}
 				else if ( sphereCull == CULL_IN )
 				{
-					tr.pc.c_sphere_cull_md3_in++;
+					atomic_fetch_add_explicit(&tr.pc.c_sphere_cull_md3_in, 1, memory_order_relaxed);
 					return CULL_IN;
 				}
 				else
 				{
-					tr.pc.c_sphere_cull_md3_clip++;
+					atomic_fetch_add_explicit(&tr.pc.c_sphere_cull_md3_clip, 1, memory_order_relaxed);
 				}
 			}
 		}
@@ -119,14 +119,14 @@ static int R_MDRCullModel( mdrHeader_t *header, const trRefEntity_t *ent ) {
 	switch ( R_CullLocalBox( bounds ) )
 	{
 		case CULL_IN:
-			tr.pc.c_box_cull_md3_in++;
+			atomic_fetch_add_explicit(&tr.pc.c_box_cull_md3_in, 1, memory_order_relaxed);
 			return CULL_IN;
 		case CULL_CLIP:
-			tr.pc.c_box_cull_md3_clip++;
+			atomic_fetch_add_explicit(&tr.pc.c_box_cull_md3_clip, 1, memory_order_relaxed);
 			return CULL_CLIP;
 		case CULL_OUT:
 		default:
-			tr.pc.c_box_cull_md3_out++;
+			atomic_fetch_add_explicit(&tr.pc.c_box_cull_md3_out, 1, memory_order_relaxed);
 			return CULL_OUT;
 	}
 }

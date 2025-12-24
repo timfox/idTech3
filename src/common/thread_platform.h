@@ -9,18 +9,31 @@ Provides unified threading API across Windows, Linux, macOS.
 #ifndef __THREAD_PLATFORM_H__
 #define __THREAD_PLATFORM_H__
 
-#include "q_shared.h"
+#include <stdint.h>
 
 #ifdef _WIN32
 	#include <windows.h>
 	#include <process.h>
+    
+    typedef int qboolean;
+    #define qfalse 0
+    #define qtrue 1
 	
 	typedef HANDLE thread_handle_t;
 	typedef CRITICAL_SECTION mutex_t;
 	typedef CONDITION_VARIABLE condition_t;
 	typedef SRWLOCK rwlock_t;
 	typedef volatile LONG atomic_int_t;
+	typedef volatile ULONG atomic_uint_t;
+	typedef volatile LONGLONG atomic_int64_t;
+	typedef volatile ULONGLONG atomic_uint64_t;
+	typedef volatile ULONG_PTR atomic_uintptr_t;
 	
+    // Spin Lock
+    typedef struct {
+        atomic_int_t lock;
+    } spinlock_t;
+    
 	#define THREAD_CALL WINAPI
 	#define THREAD_RETURN DWORD
 	
@@ -40,10 +53,39 @@ Provides unified threading API across Windows, Linux, macOS.
 	#define ATOMIC_ADD(ptr, val) InterlockedAdd((LONG volatile*)(ptr), (val))
 	#define ATOMIC_COMPARE_EXCHANGE(ptr, exchange, compare) \
 		(InterlockedCompareExchange((LONG volatile*)(ptr), (exchange), (compare)) == (compare))
+
+    #define ATOMIC_ADD64(ptr, val) InterlockedAdd64((LONGLONG volatile*)(ptr), (val))
+    #define ATOMIC_INCREMENT64(ptr) InterlockedIncrement64((LONGLONG volatile*)(ptr))
+    #define ATOMIC_DECREMENT64(ptr) InterlockedDecrement64((LONGLONG volatile*)(ptr))
+
+    // C11-like memory ordering for Windows
+    typedef enum {
+        memory_order_relaxed,
+        memory_order_consume,
+        memory_order_acquire,
+        memory_order_release,
+        memory_order_acq_rel,
+        memory_order_seq_cst
+    } memory_order_t;
+
+    #define atomic_init(ptr, val) *(ptr) = (val)
+    #define atomic_load_explicit(ptr, order) *(ptr)
+    #define atomic_store_explicit(ptr, val, order) *(ptr) = (val)
+    #define atomic_compare_exchange_weak_explicit(ptr, expected, desired, success, failure) \
+        (InterlockedCompareExchange((LONG volatile*)(ptr), (desired), *(expected)) == *(expected) ? \
+        (*(expected) = *(expected), qtrue) : (*(expected) = *(ptr), qfalse))
+    #define atomic_fetch_add_explicit(ptr, val, order) InterlockedExchangeAdd((LONG volatile*)(ptr), (val))
+    #define atomic_fetch_sub_explicit(ptr, val, order) InterlockedExchangeAdd((LONG volatile*)(ptr), -(val))
+    #define atomic_exchange_explicit(ptr, val, order) InterlockedExchange((LONG volatile*)(ptr), (val))
+
 #else
 	#include <pthread.h>
 	#include <unistd.h>
 	#include <stdatomic.h>
+    
+    #ifndef __Q_SHARED_H
+    typedef enum { qfalse = 0, qtrue } qboolean;
+    #endif
 	
 	typedef pthread_t thread_handle_t;
 	typedef pthread_mutex_t mutex_t;
@@ -51,7 +93,17 @@ Provides unified threading API across Windows, Linux, macOS.
 	// Some libpthread builds hide pthread_rwlock_t behind feature macros; fall back to mutex when unavailable.
 	typedef pthread_mutex_t rwlock_t;
 	typedef atomic_int atomic_int_t;
+	typedef atomic_uint atomic_uint_t;
+    typedef atomic_long atomic_int64_t;
+	typedef atomic_ulong atomic_uint64_t;
+	typedef atomic_uintptr_t atomic_uintptr_t;
+    typedef memory_order memory_order_t;
 	
+    // Spin Lock
+    typedef struct {
+        atomic_int_t lock;
+    } spinlock_t;
+    
 	#define THREAD_CALL
 	#define THREAD_RETURN void*
 	
@@ -71,6 +123,20 @@ Provides unified threading API across Windows, Linux, macOS.
 	#define ATOMIC_ADD(ptr, val) atomic_fetch_add((ptr), (val))
 	#define ATOMIC_COMPARE_EXCHANGE(ptr, exchange, compare) \
 		atomic_compare_exchange_strong((ptr), &(compare), (exchange))
+
+    #define ATOMIC_ADD64(ptr, val) atomic_fetch_add((ptr), (val))
+    #define ATOMIC_INCREMENT64(ptr) atomic_fetch_add((ptr), 1)
+    #define ATOMIC_DECREMENT64(ptr) atomic_fetch_sub((ptr), 1)
+
+    // Standard C11 atomics are used directly when available
+    #define atomic_init(ptr, val) atomic_init(ptr, val)
+    #define atomic_load_explicit(ptr, order) atomic_load_explicit(ptr, order)
+    #define atomic_store_explicit(ptr, val, order) atomic_store_explicit(ptr, val, order)
+    #define atomic_compare_exchange_weak_explicit(ptr, expected, desired, success, failure) \
+        atomic_compare_exchange_weak_explicit(ptr, expected, desired, success, failure)
+    #define atomic_fetch_add_explicit(ptr, val, order) atomic_fetch_add_explicit(ptr, val, order)
+    #define atomic_fetch_sub_explicit(ptr, val, order) atomic_fetch_sub_explicit(ptr, val, order)
+    #define atomic_exchange_explicit(ptr, val, order) atomic_exchange_explicit(ptr, val, order)
 #endif
 
 // Thread priority levels
@@ -149,6 +215,26 @@ Get number of CPU cores
 =================
 */
 int Sys_GetCPUCount(void);
+
+/*
+=================
+Thread_SetAffinity
+Set thread affinity (CPU core pinning)
+mask: Bitmask of CPU cores (1 << core_index)
+=================
+*/
+void Thread_SetAffinity(thread_handle_t handle, uint64_t mask);
+void Thread_SetCurrentAffinity(uint64_t mask);
+
+/*
+=================
+Spin Locks
+=================
+*/
+void SpinLock_Init(spinlock_t *lock);
+void SpinLock_Lock(spinlock_t *lock);
+qboolean SpinLock_TryLock(spinlock_t *lock);
+void SpinLock_Unlock(spinlock_t *lock);
 
 #endif // __THREAD_PLATFORM_H__
 
