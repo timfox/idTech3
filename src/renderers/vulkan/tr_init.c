@@ -575,7 +575,7 @@ void QDECL Com_Printf( const char *fmt, ... )
 /*
 ** R_HaveExtension
 */
-static qboolean R_HaveExtension( const char *ext )
+__attribute__((used)) static qboolean R_HaveExtension( const char * /*ext*/ )
 {
 #ifdef USE_VULKAN
 	return qfalse;
@@ -838,7 +838,9 @@ static void InitOpenGL( void )
 		}
 
 		// This function is responsible for initializing a valid Vulkan subsystem.
+		ri.Printf(PRINT_ALL, "DEBUG: About to call ri.VKimp_Init\n");
 		ri.VKimp_Init( &glConfig );
+		ri.Printf(PRINT_ALL, "DEBUG: ri.VKimp_Init completed successfully\n");
 
 		gls.windowWidth = glConfig.vidWidth;
 		gls.windowHeight = glConfig.vidHeight;
@@ -2920,7 +2922,9 @@ void R_Init( void ) {
 
 
 #ifdef USE_VULKAN
+	ri.Printf(PRINT_ALL, "DEBUG: About to call vk_create_pipelines\n");
 	vk_create_pipelines();
+	ri.Printf(PRINT_ALL, "DEBUG: vk_create_pipelines returned successfully\n");
 
 	// Initialize enhanced post-processing system
 	vk_init_enhanced_post_processing();

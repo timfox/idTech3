@@ -3,6 +3,7 @@
 #include "vk_memory.h"
 #include "../renderercommon/tr_public.h"
 #include "vk.h"
+#include <math.h>
 
 // Renderer interface
 extern refimport_t ri;
@@ -103,7 +104,7 @@ void vk_create_image_view(image_t *image, VkImageViewType view_type, VkImageAspe
     desc.components.a = VK_COMPONENT_SWIZZLE_A;
     desc.subresourceRange.aspectMask = aspect;
     desc.subresourceRange.baseMipLevel = 0;
-    desc.subresourceRange.levelCount = image->numMips;
+    desc.subresourceRange.levelCount = (uint32_t)(floor(log2(image->width))) + 1;
     desc.subresourceRange.baseArrayLayer = 0;
     desc.subresourceRange.layerCount = 1;
 
@@ -177,7 +178,7 @@ void vk_upload_image_data(image_t *image, int x, int y, int width, int height, i
 
         num_regions++;
 
-        if (num_regions >= (size_t)mipmaps || (width == 1 && height == 1) || num_regions >= ARRAY_LEN(regions))
+        if (static_cast<size_t>(num_regions) >= static_cast<size_t>(mipmaps) || (width == 1 && height == 1) || static_cast<size_t>(num_regions) >= ARRAY_LEN(regions))
             break;
 
         x >>= 1;
@@ -193,12 +194,12 @@ void vk_upload_image_data(image_t *image, int x, int y, int width, int height, i
         // wait for vkQueueSubmit() completion before new upload
     }
 
-    if (vk.staging_buffer.size - vk.staging_buffer.offset < buffer_size) {
+    if (vk.staging_buffer.size - vk.staging_buffer.offset < static_cast<VkDeviceSize>(buffer_size)) {
         // try to flush staging buffer and reset offset
         vk_flush_staging_buffer(qfalse);
     }
 
-    if (vk.staging_buffer.size /* - vk_world.staging_buffer_offset */ < buffer_size) {
+    if (vk.staging_buffer.size /* - vk_world.staging_buffer_offset */ < static_cast<VkDeviceSize>(buffer_size)) {
         // if still not enough - reallocate staging buffer
         vk_alloc_staging_buffer(buffer_size);
     }

@@ -237,20 +237,20 @@ static void vk_create_descriptor_set_layouts(void) {
     {
         VkDescriptorSetLayoutBinding bindings[2];
 
-        bindings[0] = (VkDescriptorSetLayoutBinding){
+        bindings[0] = VkDescriptorSetLayoutBinding{
             .binding = 0,
             .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
             .descriptorCount = 1,
             .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-            .pImmutableSamplers = NULL
+            .pImmutableSamplers = nullptr
         };
 
-        bindings[1] = (VkDescriptorSetLayoutBinding){
+        bindings[1] = VkDescriptorSetLayoutBinding{
             .binding = 1,
             .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC,
             .descriptorCount = 1,
             .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-            .pImmutableSamplers = NULL
+            .pImmutableSamplers = nullptr
         };
 
         VkDescriptorSetLayoutCreateInfo desc = {
@@ -305,8 +305,8 @@ static void vk_create_descriptor_set_layouts(void) {
             .pBindings = &binding
         };
 
-        VK_CHECK(qvkCreateDescriptorSetLayout(vk.device, &desc, NULL, &vk.compute_set_layout_storage));
-        SET_OBJECT_NAME(vk.compute_set_layout_storage, "compute storage layout", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT_EXT);
+        VK_CHECK(qvkCreateDescriptorSetLayout(vk.device, &desc, NULL, &vk.compute_descriptor_set_layout));
+        SET_OBJECT_NAME(vk.compute_descriptor_set_layout, "compute storage layout", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_LAYOUT_EXT);
     }
 }
 
@@ -320,6 +320,12 @@ static void vk_create_pipeline_layouts(void) {
             vk.set_layout_storage
         };
 
+        VkPushConstantRange push_constant_range = {
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
+            .offset = 0,
+            .size = sizeof(float) * 16 // MVP matrix
+        };
+
         VkPipelineLayoutCreateInfo desc = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
             .pNext = NULL,
@@ -327,11 +333,7 @@ static void vk_create_pipeline_layouts(void) {
             .setLayoutCount = 3,
             .pSetLayouts = layouts,
             .pushConstantRangeCount = 1,
-            .pPushConstantRanges = &(VkPushConstantRange){
-                .stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
-                .offset = 0,
-                .size = sizeof(float) * 16 // MVP matrix
-            }
+            .pPushConstantRanges = &push_constant_range
         };
 
         VK_CHECK(qvkCreatePipelineLayout(vk.device, &desc, NULL, &vk.pipeline_layout));
@@ -340,7 +342,7 @@ static void vk_create_pipeline_layouts(void) {
 
     // Storage pipeline layout (for compute)
     {
-        VkDescriptorSetLayout layouts[1] = { vk.compute_set_layout_storage };
+        VkDescriptorSetLayout layouts[1] = { vk.compute_descriptor_set_layout };
 
         VkPipelineLayoutCreateInfo desc = {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
@@ -445,12 +447,14 @@ void vk_update_attachment_descriptors(void) {
         }
     }
 
-    // brdf
-    if (vk.brdflut_image_view != VK_NULL_HANDLE) {
-        info.imageView = vk.brdflut_image_view;
-        desc.dstSet = vk.brdflut_image_descriptor;
-        qvkUpdateDescriptorSets(vk.device, 1, &desc, 0, NULL);
-    }
+#ifdef VK_PBR_BRDFLUT
+    // brdf - TODO: implement BRDF LUT descriptor updates
+    // if (vk.brdflut_image_view != VK_NULL_HANDLE) {
+    //     info.imageView = vk.brdflut_image_view;
+    //     desc.dstSet = vk.brdflut_image_descriptor;
+    //     qvkUpdateDescriptorSets(vk.device, 1, &desc, 0, NULL);
+    // }
+#endif
 
     // cubemap
     if (vk.cubeMap.color_image_view[0] != VK_NULL_HANDLE) {

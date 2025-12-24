@@ -6,6 +6,9 @@
 // Renderer interface
 extern refimport_t ri;
 
+// Memory tracking
+vk_memory_stats_t vk_memory_stats = {0};
+
 // Memory tracking functions
 extern void vk_track_allocation(VkDeviceSize size);
 extern void vk_track_free(VkDeviceSize size);

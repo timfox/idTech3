@@ -32,7 +32,6 @@ extern PFN_vkCmdPipelineBarrier qvkCmdPipelineBarrier;
 extern PFN_vkGetPipelineExecutablePropertiesKHR qvkGetPipelineExecutablePropertiesKHR;
 
 // Utility functions
-extern const char *va(const char *format, ...);
 // Com_Memcpy and Com_Memset are defined in q_shared.h
 extern void *Z_Malloc(int size);
 extern void Z_Free(void *ptr);

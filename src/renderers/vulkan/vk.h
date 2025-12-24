@@ -1,5 +1,12 @@
 #pragma once
 
+// Include Vulkan headers first for type definitions
+#include <vulkan/vulkan.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef float vec_t;
 typedef vec_t mat4_t[16];
 
@@ -54,6 +61,17 @@ typedef struct {
     VkDeviceSize used;
 } ImageChunk;
 
+// Memory tracking for leak detection
+typedef struct {
+    uint32_t allocations;
+    uint32_t frees;
+    uint32_t current_allocations;
+    VkDeviceSize total_allocated_bytes;
+    VkDeviceSize total_freed_bytes;
+} vk_memory_stats_t;
+
+extern vk_memory_stats_t vk_memory_stats;
+
 // Render pass types (needed by vk_pipeline.h)
 typedef enum {
 	RENDER_PASS_MAIN = 0,
@@ -63,10 +81,12 @@ typedef enum {
 	RENDER_PASS_COUNT
 } renderPass_t;
 
-#include <vulkan/vulkan.h>
 #include "../common/q_shared.h"
 #include "../renderercommon/tr_public.h"
 #include "tr_common.h"
+
+// Enable upload queue functionality for proper staging buffer management
+#define USE_UPLOAD_QUEUE
 
 // Depth range modes for viewport depth control
 typedef enum {
@@ -501,6 +521,8 @@ void vk_release_resources( void );
 
 void vk_wait_idle( void );
 void vk_queue_wait_idle( void );
+qboolean vk_wait_staging_buffer( void );
+qboolean create_color_attachment(uint32_t width, uint32_t height, VkSampleCountFlagBits samples, VkFormat format, VkImageUsageFlags usage, VkImage *image, VkImageView *image_view, VkImageLayout image_layout, qboolean multisample, VkImageCreateFlags flags);
 
 VkInstance VK_GetInstanceHandle( void );
 VkSampleCountFlagBits VK_GetMsaaSampleCount( void );
@@ -557,6 +579,13 @@ extern PFN_vkCmdBindIndexBuffer qvkCmdBindIndexBuffer;
 extern PFN_vkCmdBindPipeline qvkCmdBindPipeline;
 extern PFN_vkCmdBindVertexBuffers qvkCmdBindVertexBuffers;
 extern PFN_vkCmdClearColorImage qvkCmdClearColorImage;
+extern PFN_vkCmdBeginRenderPass qvkCmdBeginRenderPass;
+extern PFN_vkCmdEndRenderPass qvkCmdEndRenderPass;
+extern PFN_vkWaitForFences qvkWaitForFences;
+extern PFN_vkResetFences qvkResetFences;
+extern PFN_vkResetCommandBuffer qvkResetCommandBuffer;
+extern PFN_vkEndCommandBuffer qvkEndCommandBuffer;
+extern PFN_vkQueueSubmit qvkQueueSubmit;
 extern PFN_vkCmdDispatch qvkCmdDispatch;
 extern PFN_vkCmdDrawIndexed qvkCmdDrawIndexed;
 extern PFN_vkCmdDrawIndexedIndirect qvkCmdDrawIndexedIndirect;
@@ -677,6 +706,22 @@ void vk_update_descriptor( uint32_t index, VkDescriptorSet descriptor );
 void vk_update_descriptor_offset( int index, uint32_t offset );
 void vk_bind_descriptor_sets( void );
 void vk_update_uniform_descriptor( VkDescriptorSet descriptor, VkBuffer buffer );
+
+// Memory tracking
+extern void vk_track_allocation(VkDeviceSize size);
+extern void vk_track_free(VkDeviceSize size);
+
+// Post-processing
+qboolean vk_init_post_processing(void);
+
+// Performance counters
+extern void Perf_CountDrawCall(void);
+
+// Validation utilities
+qboolean vk_validate_handle(void *handle, const char *handle_name);
+
+// Performance monitoring
+void vk_update_performance_stats(void);
 
 // GPU timing queries
 void vk_get_gpu_timing_stats( double *avg_frame_time_ms, double *min_frame_time_ms, double *max_frame_time_ms );
@@ -1851,5 +1896,9 @@ extern PFN_vkCreateCommandPool qvkCreateCommandPool;
 extern PFN_vkDestroyCommandPool qvkDestroyCommandPool;
 extern PFN_vkAllocateCommandBuffers qvkAllocateCommandBuffers;
 extern PFN_vkFreeCommandBuffers qvkFreeCommandBuffers;
+
+#ifdef __cplusplus
+}
+#endif
 
 #include "tr_local.h"

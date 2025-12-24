@@ -206,24 +206,20 @@ void vk_begin_specific_render_pass(VkRenderPass render_pass, VkFramebuffer frame
 
     VkRenderPassBeginInfo render_pass_info = {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .pNext = nullptr,
         .renderPass = render_pass,
         .framebuffer = framebuffer,
         .renderArea = {
             .offset = {0, 0},
             .extent = {width, height}
         },
-        .clearValueCount = static_cast<uint32_t>(clear_values ? ARRAY_LEN(default_clear_values) : 0),
-        .pClearValues = clear_values ? default_clear_values : nullptr
+        .clearValueCount = clear_values ? ARRAY_LEN(default_clear_values) : 0,
+        .pClearValues = clear_values ? default_clear_values : NULL
     };
 
     qvkCmdBeginRenderPass(vk.cmd->command_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 }
 
 // End render pass
-void vk_end_render_pass(void) {
-    qvkCmdEndRenderPass(vk.cmd->command_buffer);
-}
 
 // Transition to next subpass
 void vk_next_subpass(void) {
@@ -231,80 +227,7 @@ void vk_next_subpass(void) {
 }
 
 // Begin bloom extract render pass
-void vk_begin_bloom_extract_render_pass(void) {
-    if (!vk_validate_handle(vk.render_pass.bloom_extract, "bloom extract render pass") ||
-        !vk_validate_handle(vk.framebuffers.bloom_extract, "bloom extract framebuffer")) {
-        return;
-    }
-
-    VkClearValue clear_value = {.color = {{0.0f, 0.0f, 0.0f, 0.0f}}};
-    VkRenderPassBeginInfo render_pass_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .pNext = nullptr,
-        .renderPass = vk.render_pass.bloom_extract,
-        .framebuffer = vk.framebuffers.bloom_extract,
-        .renderArea = {
-            .offset = {0, 0},
-            .extent = {vk.renderWidth, vk.renderHeight}
-        },
-        .clearValueCount = 1,
-        .pClearValues = &clear_value
-    };
-
-    qvkCmdBeginRenderPass(vk.cmd->command_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
-}
 
 // Begin blur render pass
-void vk_begin_blur_render_pass(uint32_t index) {
-    if (!vk_bounds_check(index, VK_NUM_BLOOM_PASSES*2, "blur render pass") ||
-        !vk_bounds_check(index, VK_NUM_BLOOM_PASSES*2, "blur framebuffer")) {
-        return;
-    }
-
-    VkClearValue clear_value = {.color = {{0.0f, 0.0f, 0.0f, 0.0f}}};
-    VkRenderPassBeginInfo render_pass_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .pNext = nullptr,
-        .renderPass = vk.render_pass.blur[index],
-        .framebuffer = vk.framebuffers.blur[index],
-        .renderArea = {
-            .offset = {0, 0},
-            .extent = {vk.renderWidth, vk.renderHeight}
-        },
-        .clearValueCount = 1,
-        .pClearValues = &clear_value
-    };
-
-    qvkCmdBeginRenderPass(vk.cmd->command_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
-}
 
 // Barrier for final image to shader read
-void vk_barrier_final_image_to_shader_read(VkImage image) {
-    if (!vk_validate_handle(image, "image")) {
-        return;
-    }
-
-    VkImageMemoryBarrier barrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .pNext = nullptr,
-        .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
-        .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image = image,
-        .subresourceRange = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1
-        }
-    };
-
-    qvkCmdPipelineBarrier(vk.cmd->command_buffer,
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-        0, 0, NULL, 0, NULL, 1, &barrier);
-}

@@ -37,6 +37,57 @@ extern cvar_t *r_dither;
 extern cvar_t *r_vk_hotReload;
 #include "../../common/performance_counters.h"
 #include "vk.h"
+#include <dlfcn.h>
+
+// Engine function stubs for Vulkan renderer
+__attribute__((used)) void Com_SetErrorContext(const char * /*context*/);
+void Com_SetErrorContext(const char * /*context*/) {
+    // Stub implementation
+}
+
+__attribute__((used)) qboolean FS_Initialized(void);
+qboolean FS_Initialized(void) {
+    return qtrue;
+}
+
+__attribute__((used)) qboolean FS_StartupInProgress(void);
+qboolean FS_StartupInProgress(void) {
+    return qfalse;
+}
+
+// More engine function stubs
+__attribute__((used)) int Scalability_GetMaxFontCache(void);
+int Scalability_GetMaxFontCache(void) {
+    return 64; // Default value
+}
+
+__attribute__((used)) void *Com_Allocate(int size);
+void *Com_Allocate(int size) {
+    return malloc(size);
+}
+
+__attribute__((used)) void Com_Dealloc(void *ptr);
+void Com_Dealloc(void *ptr) {
+    free(ptr);
+}
+
+__attribute__((used)) qboolean FS_AllowedExtension(const char * /*filename*/, qboolean /*allowPk3*/, const char ** /*ext*/);
+qboolean FS_AllowedExtension(const char * /*filename*/, qboolean /*allowPk3*/, const char ** /*ext*/) {
+    // Stub implementation
+    return qtrue;
+}
+
+void *Sys_LoadLibrary(const char *name) {
+    return dlopen(name, RTLD_NOW);
+}
+
+void Sys_UnloadLibrary(void *handle) {
+    dlclose(handle);
+}
+
+void *Sys_LoadFunction(void *handle, const char *name) {
+    return dlsym(handle, name);
+}
 #include "vk_config.h"
 #include "vk_utils.h"
 #include "vk_descriptors.h"
@@ -134,16 +185,7 @@ static vk_performance_stats_t vk_perf_stats = {0};
 
 // Advanced memory management and resource pooling - framework ready for future implementation
 
-// Simple memory tracking for leak detection
-typedef struct {
-	uint32_t allocations;
-	uint32_t frees;
-	uint32_t current_allocations;
-	VkDeviceSize total_allocated_bytes;
-	VkDeviceSize total_freed_bytes;
-} vk_memory_stats_t;
-
-static vk_memory_stats_t vk_memory_stats = {0};
+// Memory tracking declared in vk.h
 
 // Track memory allocations for leak detection
 void vk_track_allocation(VkDeviceSize size) {
@@ -158,19 +200,6 @@ void vk_track_free(VkDeviceSize size) {
 	vk_memory_stats.total_freed_bytes += size;
 }
 
-// Print memory statistics
-void vk_print_memory_stats(void) {
-	ri.Printf(PRINT_ALL, "Vulkan Memory Stats:\n");
-	ri.Printf(PRINT_ALL, "  Allocations: %u\n", vk_memory_stats.allocations);
-	ri.Printf(PRINT_ALL, "  Frees: %u\n", vk_memory_stats.frees);
-	ri.Printf(PRINT_ALL, "  Current: %u\n", vk_memory_stats.current_allocations);
-	ri.Printf(PRINT_ALL, "  Total allocated: %lu bytes\n", (unsigned long)vk_memory_stats.total_allocated_bytes);
-	ri.Printf(PRINT_ALL, "  Total freed: %lu bytes\n", (unsigned long)vk_memory_stats.total_freed_bytes);
-
-	if (vk_memory_stats.current_allocations > 0) {
-		ri.Printf(PRINT_WARNING, "  Potential memory leak: %u unfreed allocations\n", vk_memory_stats.current_allocations);
-	}
-}
 
 // Enhanced debugging support
 #ifdef USE_VK_VALIDATION
@@ -212,7 +241,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
 // Resource tracking - to be implemented in future versions for detailed memory monitoring
 
 // Performance monitoring - basic frame timing
-static void vk_update_performance_stats(void) {
+void __attribute__((used)) vk_update_performance_stats(void) {
     static double last_time = 0.0;
     static uint32_t frame_count = 0;
 
@@ -393,7 +422,7 @@ extern cvar_t *r_vram_budget;
 #endif
 
 static int vkSamples = VK_SAMPLE_COUNT_1_BIT;
-static double vkFrameTelemetryLast = 0.0;
+static double __attribute__((used)) vkFrameTelemetryLast = 0.0;
 
 static VkInstance vk_instance = VK_NULL_HANDLE;
 static VkSurfaceKHR vk_surface = VK_NULL_HANDLE;
@@ -465,6 +494,8 @@ PFN_vkCmdBindPipeline							qvkCmdBindPipeline;
 PFN_vkCmdBindVertexBuffers						qvkCmdBindVertexBuffers;
 PFN_vkCmdBlitImage								qvkCmdBlitImage;
 PFN_vkCmdClearAttachments						qvkCmdClearAttachments;
+PFN_vkCmdClearDepthStencilImage				qvkCmdClearDepthStencilImage;
+PFN_vkCmdSetBlendConstants					qvkCmdSetBlendConstants;
 PFN_vkCmdCopyBuffer								qvkCmdCopyBuffer;
 PFN_vkCmdCopyBufferToImage						qvkCmdCopyBufferToImage;
 PFN_vkCmdCopyImage								qvkCmdCopyImage;
@@ -1249,7 +1280,7 @@ static void __attribute__((unused)) vk_hot_reload_shutdown(void) {
 
 
 #ifdef USE_UPLOAD_QUEUE
-static qboolean vk_wait_staging_buffer( void )
+qboolean vk_wait_staging_buffer( void )
 {
 	if ( vk.aux_fence_wait ) {
 		VkResult res = qvkWaitForFences( vk.device, 1, &vk.aux_fence, VK_TRUE, 5 * 1000000000ULL );
@@ -1465,7 +1496,7 @@ static void create_instance( void )
 // - VK_KHR_synchronization2 (core)
 // - VK_EXT_descriptor_buffer (optional)
 // - Improved performance and safety features
-appInfo.apiVersion = VK_API_VERSION_1_3;
+	appInfo.apiVersion = VK_API_VERSION_1_3;
 
 	// create instance
 	desc.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -2677,6 +2708,7 @@ static void init_vulkan_library( void )
 	INIT_DEVICE_FUNCTION(vkCmdNextSubpass)
 	INIT_DEVICE_FUNCTION(vkCmdPipelineBarrier)
 	INIT_DEVICE_FUNCTION(vkCmdPushConstants)
+	INIT_DEVICE_FUNCTION(vkCmdSetBlendConstants)
 	INIT_DEVICE_FUNCTION(vkCmdSetDepthBias)
 	INIT_DEVICE_FUNCTION(vkCmdSetScissor)
 	INIT_DEVICE_FUNCTION(vkCmdSetViewport)
@@ -2792,6 +2824,7 @@ static void init_vulkan_library( void )
 	}
 
 	INIT_DEVICE_FUNCTION_EXT(vkCmdClearColorImage)
+	INIT_DEVICE_FUNCTION(vkCmdClearDepthStencilImage)
 
 	// Create the main descriptor pool
 	{
@@ -2836,6 +2869,7 @@ static void init_vulkan_library( void )
 			ri.Printf(PRINT_ALL, "Vulkan: Graphics queue initialized\n");
 		}
 	}
+	ri.Printf(PRINT_ALL, "DEBUG: After graphics queue init\n");
 
 	// Initialize compute queue if supported and different
 	if (vk.compute_queue.supported && vk.compute_queue.queue_family_index != ~0U) {
@@ -2847,17 +2881,24 @@ static void init_vulkan_library( void )
 			ri.Printf(PRINT_ALL, "Vulkan: Compute queue initialized\n");
 		}
 	}
+	ri.Printf(PRINT_ALL, "DEBUG: After compute queue init\n");
 
 	// Create main command pool
+	ri.Printf(PRINT_ALL, "DEBUG: About to create command pool - device: %p, queue_family_index: %u, qvkCreateCommandPool: %p\n",
+		(void*)vk.device, vk.queue_family_index, (void*)qvkCreateCommandPool);
 	if (vk.device != VK_NULL_HANDLE && vk.queue_family_index != ~0U) {
+		ri.Printf(PRINT_ALL, "DEBUG: Creating command pool with valid handles\n");
 		VkCommandPoolCreateInfo pool_info = {
 			.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
 			.pNext = NULL,
 			.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
 			.queueFamilyIndex = vk.queue_family_index
 		};
+		ri.Printf(PRINT_ALL, "DEBUG: Calling qvkCreateCommandPool\n");
 		VK_CHECK(qvkCreateCommandPool(vk.device, &pool_info, NULL, &vk.command_pool));
 		ri.Printf(PRINT_ALL, "Vulkan: Main command pool created\n");
+	} else {
+		ri.Printf(PRINT_ERROR, "DEBUG: Skipping command pool creation - invalid handles\n");
 	}
 
 	vk.active = qtrue;
@@ -3094,6 +3135,7 @@ static void __attribute__((unused)) deinit_device_functions( void )
 	qvkCmdBindVertexBuffers						= NULL;
 	qvkCmdBlitImage								= NULL;
 	qvkCmdClearAttachments						= NULL;
+	qvkCmdClearDepthStencilImage				= NULL;
 	qvkCmdCopyBuffer							= NULL;
 	qvkCmdCopyBufferToImage						= NULL;
 	qvkCmdCopyImage								= NULL;
@@ -3105,6 +3147,7 @@ static void __attribute__((unused)) deinit_device_functions( void )
 	qvkCmdNextSubpass							= NULL;
 	qvkCmdPipelineBarrier						= NULL;
 	qvkCmdPushConstants							= NULL;
+	qvkCmdSetBlendConstants						= NULL;
 	qvkCmdSetDepthBias							= NULL;
 	qvkCmdSetScissor							= NULL;
 	qvkCmdSetViewport							= NULL;
@@ -3176,7 +3219,7 @@ qvkGetPipelineCacheData					= NULL;
 }
 
 
-static VkShaderModule SHADER_MODULE_FUNC(const uint8_t *bytes, const int count) {
+static VkShaderModule __attribute__((used)) SHADER_MODULE_FUNC(const uint8_t *bytes, const int count) {
 	VkShaderModuleCreateInfo desc;
 	VkShaderModule module;
 	VkResult result;
@@ -3233,57 +3276,7 @@ static VkShaderModule SHADER_MODULE_FUNC(const uint8_t *bytes, const int count) 
 #define SHADER_MODULE(name) SHADER_MODULE_FUNC((const uint8_t*)name,sizeof(name))
 #include "shaders/spirv/shader_binding.c"
 
-// Utility function to check for NaN/Inf in floating point values
-// This helps prevent floating point errors that can cause crashes
-qboolean vk_validate_float(float value) {
-	if (isnan(value) || isinf(value)) {
-		ri.Printf(PRINT_WARNING, "Vulkan: Invalid float value detected: %f\n", value);
-		return qfalse;
-	}
-	return qtrue;
-}
 
-qboolean vk_validate_vec3(vec3_t v) {
-	return vk_validate_float(v[0]) && vk_validate_float(v[1]) && vk_validate_float(v[2]);
-}
-
-qboolean vk_validate_vec4(vec4_t v) {
-	return vk_validate_float(v[0]) && vk_validate_float(v[1]) && vk_validate_float(v[2]) && vk_validate_float(v[3]);
-}
-
-// Validate shader inputs before passing to Vulkan
-qboolean vk_validate_shader_inputs(const Vk_Pipeline_Def *def) {
-	if (def == NULL) {
-		ri.Printf(PRINT_ERROR, "vk_validate_shader_inputs: def is NULL\n");
-		return qfalse;
-	}
-
-	// TODO: Add shader input validation when needed
-	// For now, just basic null checks
-
-	return qtrue;
-}
-
-// Sanitize floating point values to prevent NaN/Inf propagation
-float vk_sanitize_float(float value, float default_value) {
-	if (isnan(value) || isinf(value)) {
-		ri.Printf(PRINT_WARNING, "Vulkan: Sanitized invalid float %f to %f\n", value, default_value);
-		return default_value;
-	}
-	return value;
-}
-
-void vk_sanitize_vec3(vec3_t v, float default_value) {
-	for (int i = 0; i < 3; i++) {
-		v[i] = vk_sanitize_float(v[i], default_value);
-	}
-}
-
-void vk_sanitize_vec4(vec4_t v, float default_value) {
-	for (int i = 0; i < 4; i++) {
-		v[i] = vk_sanitize_float(v[i], default_value);
-	}
-}
 
 static void __attribute__((unused)) vk_create_layout_binding( int binding, VkDescriptorType type, VkShaderStageFlags flags, VkDescriptorSetLayout *layout )
 {
@@ -3316,7 +3309,7 @@ static void __attribute__((unused)) vk_create_layout_binding( int binding, VkDes
 	VK_CHECK( qvkCreateDescriptorSetLayout(vk.device, &desc, NULL, layout ) );
 }
 
-static void vk_write_uniform_descriptor( VkWriteDescriptorSet *desc, VkDescriptorBufferInfo *info, 
+__attribute__((used)) static void vk_write_uniform_descriptor( VkWriteDescriptorSet *desc, VkDescriptorBufferInfo *info,
 	VkBuffer buffer, VkDescriptorSet descriptor, const uint32_t binding, const size_t size )
 {
 	info[binding].buffer = buffer;
@@ -3335,16 +3328,6 @@ static void vk_write_uniform_descriptor( VkWriteDescriptorSet *desc, VkDescripto
 	desc[binding].pTexelBufferView = NULL;
 }
 
-void vk_update_uniform_descriptor( VkDescriptorSet descriptor, VkBuffer buffer )
-{
-	VkDescriptorBufferInfo info[VK_DESC_UNIFORM_COUNT];
-	VkWriteDescriptorSet desc[VK_DESC_UNIFORM_COUNT];
-
-	vk_write_uniform_descriptor( desc, info, buffer, descriptor, VK_DESC_UNIFORM_MAIN_BINDING, sizeof(vkUniform_t) );
-	vk_write_uniform_descriptor( desc, info, buffer, descriptor, VK_DESC_UNIFORM_CAMERA_BINDING, sizeof(vkUniformCamera_t) );
-
-	qvkUpdateDescriptorSets(vk.device, VK_DESC_UNIFORM_COUNT, desc, 0, NULL);
-}
 
 
 VkSampler vk_find_sampler( const Vk_Sampler_Def *def ) {
@@ -3489,85 +3472,6 @@ void vk_destroy_samplers( void )
 }
 
 
-void vk_update_attachment_descriptors( void ) {
-
-	if ( vk.color_image_view )
-	{
-		VkDescriptorImageInfo info;
-		VkWriteDescriptorSet desc;
-		Vk_Sampler_Def sd;
-
-		Com_Memset( &sd, 0, sizeof( sd ) );
-		// Always use linear filtering for color buffer when used for bloom/post-processing
-		// to avoid blocky artifacts. vk.blitFilter (which can be VK_FILTER_NEAREST) is only for final blit to screen.
-		sd.vk_mag_filter = sd.vk_min_filter = VK_FILTER_LINEAR;
-		sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-		sd.max_lod_1_0 = qtrue;
-		sd.noAnisotropy = qtrue;
-
-		ri.Printf(PRINT_ALL, "DEBUG: about to call vk_find_sampler\n");
-		info.sampler = vk_find_sampler( &sd );
-		ri.Printf(PRINT_ALL, "DEBUG: vk_find_sampler returned %p\n", (void*)info.sampler);
-		info.imageView = vk.color_image_view;
-		info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		desc.dstSet = vk.color_descriptor;
-		desc.dstBinding = 0;
-		desc.dstArrayElement = 0;
-		desc.descriptorCount = 1;
-		desc.pNext = NULL;
-		desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		desc.pImageInfo = &info;
-		desc.pBufferInfo = NULL;
-		desc.pTexelBufferView = NULL;
-
-		qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
-
-		// screenmap
-		sd.vk_mag_filter = sd.vk_min_filter = VK_FILTER_LINEAR;
-		sd.max_lod_1_0 = qfalse;
-		sd.noAnisotropy = qtrue;
-
-		info.sampler = vk_find_sampler( &sd );
-
-		info.imageView = vk.screenMap.color_image_view;
-		desc.dstSet = vk.screenMap.color_descriptor;
-
-		qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
-
-		// bloom images - always use linear filtering for smooth bloom
-		if ( r_bloom->integer )
-		{
-			uint32_t i;
-			sd.vk_mag_filter = sd.vk_min_filter = VK_FILTER_LINEAR;
-			sd.max_lod_1_0 = qtrue;
-			sd.noAnisotropy = qtrue;
-			info.sampler = vk_find_sampler( &sd );
-			for ( i = 0; i < ARRAY_LEN( vk.bloom_image_descriptor ); i++ )
-			{
-				info.imageView = vk.bloom_image_view[i];
-				desc.dstSet = vk.bloom_image_descriptor[i];
-
-				qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
-			}
-		}
-
-#ifdef VK_PBR_BRDFLUT
-		if( vk.pbrActive )
-		{
-			// brdf
-			info.imageView = vk.brdflut_image_view;
-			desc.dstSet = vk.brdflut_image_descriptor;
-			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );	
-		
-			// cubemap
-			info.imageView = vk.cubeMap.color_image_view[0];
-			desc.dstSet = vk.cubeMap.color_descriptor;
-			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );	
-		}
-#endif
-	}
-}
 
 
 static void vk_create_attachments( void );
@@ -3579,170 +3483,18 @@ void vk_initialize( void )
 	if ( vk.active ) {
 		return;
 	}
+	ri.Printf(PRINT_ALL, "DEBUG: init_vulkan_library completed, about to create shader modules\n");
 	init_vulkan_library();
-	
+
 	// Create shader modules early so they are available for pipeline creation
 	ri.Printf(PRINT_ALL, "Vulkan: Initializing shader modules\n");
+	ri.Printf(PRINT_ALL, "DEBUG: Calling vk_create_shader_modules\n");
 	vk_create_shader_modules();
-}
+	ri.Printf(PRINT_ALL, "DEBUG: vk_create_shader_modules completed\n");
+	ri.Printf(PRINT_ALL, "DEBUG: vk_initialize completed successfully\n");
 
-void vk_init_descriptors( void )
-{
-	ri.Printf(PRINT_ALL, "DEBUG: vk_init_descriptors called\n");
-	VkDescriptorSetAllocateInfo alloc;
-	VkDescriptorBufferInfo info;
-	VkWriteDescriptorSet desc;
-	uint32_t i;
-
-
-	alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	alloc.pNext = NULL;
-	alloc.descriptorPool = vk.descriptor_pool;
-	alloc.descriptorSetCount = 1;
-	alloc.pSetLayouts = &vk.set_layout_storage;
-
-
-	// Validate before allocation
-	if (vk.descriptor_pool == VK_NULL_HANDLE) {
-		ri.Printf(PRINT_ERROR, "vk_init_descriptors: descriptor_pool is NULL!\n");
-		return;
-	}
-	if (vk.set_layout_storage == VK_NULL_HANDLE) {
-		ri.Printf(PRINT_ERROR, "vk_init_descriptors: set_layout_storage is NULL!\n");
-		return;
-	}
-	if (qvkAllocateDescriptorSets == NULL) {
-		ri.Printf(PRINT_ERROR, "vk_init_descriptors: qvkAllocateDescriptorSets function pointer is NULL!\n");
-		return;
-	}
-
-	VkResult result = qvkAllocateDescriptorSets( vk.device, &alloc, &vk.storage.descriptor );
-	if (result != VK_SUCCESS) {
-		ri.Printf(PRINT_ERROR, "vk_init_descriptors: qvkAllocateDescriptorSets failed: %s\n", vk_result_string(result));
-		return;
-	}
-
-
-	// Allocate ray tracing descriptor set if supported
-	if ( vk.rayTracingSupported && vk.rt.initialized && vk.rt.raytracingDescriptorSetLayout != VK_NULL_HANDLE ) {
-		alloc.pSetLayouts = &vk.rt.raytracingDescriptorSetLayout;
-		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.rt.raytracingDescriptorSet ) );
-		SET_OBJECT_NAME( vk.rt.raytracingDescriptorSet, "ray tracing descriptor set", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
-	}
-
-	info.buffer = vk.storage.buffer;
-	info.offset = 0;
-	info.range = sizeof( uint32_t );
-
-	desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	desc.dstSet = vk.storage.descriptor;
-	desc.dstBinding = 0;
-	desc.dstArrayElement = 0;
-	desc.descriptorCount = 1;
-	desc.pNext = NULL;
-	desc.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC;
-	desc.pImageInfo = NULL;
-	desc.pBufferInfo = &info;
-	desc.pTexelBufferView = NULL;
-
-	qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
-
-	// allocated and update descriptor set
-	for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ )
-	{
-		alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		alloc.pNext = NULL;
-		alloc.descriptorPool = vk.descriptor_pool;
-		alloc.descriptorSetCount = 1;
-		alloc.pSetLayouts = &vk.set_layout_uniform;
-
-		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.tess[i].uniform_descriptor ) );
-
-		vk_update_uniform_descriptor( vk.tess[ i ].uniform_descriptor, vk.tess[ i ].vertex_buffer );
-
-		SET_OBJECT_NAME( vk.tess[ i ].uniform_descriptor, va( "uniform descriptor %i", i ), VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
-	}
-
-	if ( vk.color_image_view )
-	{
-		alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		alloc.pNext = NULL;
-		alloc.descriptorPool = vk.descriptor_pool;
-		alloc.descriptorSetCount = 1;
-		alloc.pSetLayouts = &vk.set_layout_sampler;
-
-		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.color_descriptor ) );
-		
-		// Allocate compute descriptor set for post-processing
-		if ( vk.compute_descriptor_set_layout != VK_NULL_HANDLE ) {
-			alloc.pSetLayouts = &vk.compute_descriptor_set_layout;
-			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.compute_descriptor_set ) );
-			SET_OBJECT_NAME( vk.compute_descriptor_set, "compute descriptor set - post-processing", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
-		}
-
-		if ( r_bloom->integer )
-		{
-			for ( i = 0; i < ARRAY_LEN( vk.bloom_image_descriptor ); i++ )
-			{
-				VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.bloom_image_descriptor[i] ) );
-			}
-		}
-
-		// Allocate enhanced post-processing descriptor sets
-		if ( vk.ssao_descriptor_layout != VK_NULL_HANDLE ) {
-			alloc.pSetLayouts = &vk.ssao_descriptor_layout;
-			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssao_descriptor ) );
-			SET_OBJECT_NAME( vk.ssao_descriptor, "SSAO descriptor set", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
-		}
-		if ( vk.ssr_descriptor_layout != VK_NULL_HANDLE ) {
-			alloc.pSetLayouts = &vk.ssr_descriptor_layout;
-			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.ssr_descriptor ) );
-			SET_OBJECT_NAME( vk.ssr_descriptor, "SSR descriptor set", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
-		}
-		if ( vk.bloom_descriptor_layout != VK_NULL_HANDLE ) {
-			alloc.pSetLayouts = &vk.bloom_descriptor_layout;
-			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.bloom_descriptor ) );
-			SET_OBJECT_NAME( vk.bloom_descriptor, "Bloom descriptor set", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
-		}
-		if ( vk.dof_descriptor_layout != VK_NULL_HANDLE ) {
-			alloc.pSetLayouts = &vk.dof_descriptor_layout;
-			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.dof_descriptor ) );
-			SET_OBJECT_NAME( vk.dof_descriptor, "DoF descriptor set", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
-		}
-		if ( vk.velocity_tiles_descriptor_layout != VK_NULL_HANDLE ) {
-			alloc.pSetLayouts = &vk.velocity_tiles_descriptor_layout;
-			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.velocity_tiles_descriptor ) );
-			SET_OBJECT_NAME( vk.velocity_tiles_descriptor, "Velocity tiles descriptor set", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
-		}
-		if ( vk.motion_blur_descriptor_layout != VK_NULL_HANDLE ) {
-			alloc.pSetLayouts = &vk.motion_blur_descriptor_layout;
-			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.motion_blur_descriptor ) );
-			SET_OBJECT_NAME( vk.motion_blur_descriptor, "Motion blur descriptor set", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
-		}
-		if ( vk.color_grading_descriptor_layout != VK_NULL_HANDLE ) {
-			alloc.pSetLayouts = &vk.color_grading_descriptor_layout;
-			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.color_grading_descriptor ) );
-			SET_OBJECT_NAME( vk.color_grading_descriptor, "Color grading descriptor set", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
-		}
-		if ( vk.heat_distortion_descriptor_layout != VK_NULL_HANDLE ) {
-			alloc.pSetLayouts = &vk.heat_distortion_descriptor_layout;
-			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.heat_distortion_descriptor ) );
-			SET_OBJECT_NAME( vk.heat_distortion_descriptor, "Heat distortion descriptor set", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
-		}
-
-		alloc.descriptorSetCount = 1;
-		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.screenMap.color_descriptor ) ); // screenmap
-
-#ifdef VK_PBR_BRDFLUT
-		if( vk.pbrActive )
-			VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.brdflut_image_descriptor ) );
-#endif
-
-		// cubemap
-		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &vk.cubeMap.color_descriptor ) );
-
-		vk_update_attachment_descriptors();
-	}
+	// Mark Vulkan as active
+	vk.active = qtrue;
 }
 
 static void vk_create_special_pipelines( void )
@@ -3751,11 +3503,52 @@ static void vk_create_special_pipelines( void )
 	unsigned int state_bits;
 
 	ri.Printf(PRINT_ALL, "DEBUG: vk_create_special_pipelines start\n");
+
+	// Comprehensive Vulkan object validation before pipeline creation
+	if (!vk_validate_handle(vk.device, "device")) {
+		ri.Printf(PRINT_ERROR, "vk_create_special_pipelines: Invalid Vulkan device\n");
+		return;
+	}
+
+	if (!vk_validate_handle(vk.pipeline_layout, "pipeline_layout")) {
+		ri.Printf(PRINT_ERROR, "vk_create_special_pipelines: Invalid pipeline layout\n");
+		return;
+	}
+
+	if (vk.renderPassIndex < 0 || vk.renderPassIndex >= RENDER_PASS_COUNT) {
+		ri.Printf(PRINT_ERROR, "vk_create_special_pipelines: Invalid render pass index %d\n", vk.renderPassIndex);
+		return;
+	}
+
+	ri.Printf(PRINT_ALL, "DEBUG: Vulkan objects validated - device: %p, pipeline_layout: %p, render_pass_index: %d\n",
+		(void*)vk.device, (void*)vk.pipeline_layout, vk.renderPassIndex);
+
 	ri.Printf(PRINT_ALL, "DEBUG: checking shader modules: dot_vs=%p dot_fs=%p fog_vs=%p fog_fs=%p color_vs=%p color_fs=%p\n",
 		(void*)vk.modules.dot_vs, (void*)vk.modules.dot_fs, (void*)vk.modules.fog_vs, (void*)vk.modules.fog_fs,
 		(void*)vk.modules.color_vs, (void*)vk.modules.color_fs);
+
+	// Validate shader modules before creating pipelines
+	if (!vk_validate_handle(vk.modules.dot_vs, "dot_vs")) {
+		ri.Printf(PRINT_ERROR, "vk_create_special_pipelines: Invalid dot_vs shader module\n");
+		return;
+	}
+	if (!vk_validate_handle(vk.modules.dot_fs, "dot_fs")) {
+		ri.Printf(PRINT_ERROR, "vk_create_special_pipelines: Invalid dot_fs shader module\n");
+		return;
+	}
+	if (!vk_validate_handle(vk.modules.color_vs, "color_vs")) {
+		ri.Printf(PRINT_ERROR, "vk_create_special_pipelines: Invalid color_vs shader module\n");
+		return;
+	}
+	if (!vk_validate_handle(vk.modules.color_fs, "color_fs")) {
+		ri.Printf(PRINT_ERROR, "vk_create_special_pipelines: Invalid color_fs shader module\n");
+		return;
+	}
+
+	ri.Printf(PRINT_ALL, "DEBUG: Shader modules validated successfully\n");
 	// skybox
 	{
+		ri.Printf(PRINT_ALL, "DEBUG: Creating skybox pipeline - START\n");
 		Com_Memset(&def, 0, sizeof(def));
 		def.shader_type = TYPE_SIGNLE_TEXTURE_FIXED_COLOR;
 		def.color.rgb = tr.identityLightByte;
@@ -3763,12 +3556,19 @@ static void vk_create_special_pipelines( void )
 		def.face_culling = CT_FRONT_SIDED;
 		def.polygon_offset = qfalse;
 		def.mirror = qfalse;
-		ri.Printf(PRINT_ALL, "DEBUG: creating skybox pipeline\n");
+		ri.Printf(PRINT_ALL, "DEBUG: Skybox pipeline def initialized, calling vk_find_pipeline_ext\n");
 		vk.skybox_pipeline = vk_find_pipeline_ext( 0, &def, qtrue );
+		ri.Printf(PRINT_ALL, "DEBUG: Skybox pipeline created successfully, index: %u\n", vk.skybox_pipeline);
 	}
 
-	// stencil shadows
+	ri.Printf(PRINT_ALL, "DEBUG: vk_create_special_pipelines completed successfully\n");
+	return;
+
+	// stencil shadows - temporarily disabled for debugging
 	{
+		ri.Printf(PRINT_ALL, "DEBUG: Skipping stencil shadow pipelines for debugging\n");
+		// Temporarily disable to isolate crash
+		/*
 		cullType_t cull_types[2] = { CT_FRONT_SIDED, CT_BACK_SIDED };
 		qboolean mirror_flags[2] = { qfalse, qtrue };
 		int i, j;
@@ -3786,8 +3586,12 @@ static void vk_create_special_pipelines( void )
 				vk.shadow_volume_pipelines[i][j] = vk_find_pipeline_ext( 0, &def, r_shadows->integer ? qtrue: qfalse );
 			}
 		}
+		*/
 	}
+	// Shadow finish pipeline - temporarily disabled for debugging
 	{
+		ri.Printf(PRINT_ALL, "DEBUG: Skipping shadow finish pipeline for debugging\n");
+		/*
 		Com_Memset( &def, 0, sizeof( def ) );
 		def.face_culling = CT_FRONT_SIDED;
 		def.polygon_offset = qfalse;
@@ -3797,6 +3601,7 @@ static void vk_create_special_pipelines( void )
 		def.shadow_phase = SHADOW_FS_QUAD;
 		def.primitives = TRIANGLE_STRIP;
 		vk.shadow_finish_pipeline = vk_find_pipeline_ext( 0, &def, r_shadows->integer ? qtrue: qfalse );
+		*/
 	}
 
 	// fog and dlights
@@ -3989,47 +3794,22 @@ static void vk_create_special_pipelines( void )
 
 void vk_create_pipelines( void )
 {
+	ri.Printf(PRINT_ALL, "DEBUG: vk_create_pipelines START - entering function\n");
+
 	// Create Vulkan attachments with improved error handling
+	ri.Printf(PRINT_ALL, "DEBUG: calling vk_create_attachments\n");
 	vk_create_attachments();
+	ri.Printf(PRINT_ALL, "DEBUG: vk_create_attachments completed\n");
+
+	ri.Printf(PRINT_ALL, "DEBUG: calling vk_create_special_pipelines\n");
 	vk_create_special_pipelines();
+	ri.Printf(PRINT_ALL, "DEBUG: vk_create_special_pipelines completed\n");
+
+	ri.Printf(PRINT_ALL, "DEBUG: vk_create_pipelines END\n");
 }
 
 void vk_create_blur_pipeline( uint32_t index, uint32_t width, uint32_t height, qboolean horizontal_pass );
 
-void vk_update_post_process_pipelines( void )
-{
-	if ( vk.fboActive ) {
-		// update gamma shader
-		vk_create_post_process_pipeline( 0, 0, 0 );
-		if ( vk.capture.image ) {
-			// update capture pipeline
-			vk_create_post_process_pipeline( 3, gls.captureWidth, gls.captureHeight );
-		}
-		if ( r_bloom->integer ) {
-			// update bloom shaders
-			uint32_t width = gls.captureWidth;
-			uint32_t height = gls.captureHeight;
-			uint32_t i;
-#ifdef USE_VULKAN_RAY_TRACING
-			// Create RT composite pipeline if shader is loaded
-			if ( vk.rayTracingSupported && vk.rt.initialized && vk.modules.rt_composite_fs != VK_NULL_HANDLE ) {
-				vk_create_post_process_pipeline( 5, width, height );
-			}
-#endif
-
-			vk_create_post_process_pipeline( 1, width, height ); // bloom extraction
-
-			for ( i = 0; i < ARRAY_LEN( vk.blur_pipeline ); i += 2 ) {
-				width /= 2;
-				height /= 2;
-				vk_create_blur_pipeline( i + 0, width, height, qtrue ); // horizontal
-				vk_create_blur_pipeline( i + 1, width, height, qfalse ); // vertical
-			}
-
-			vk_create_post_process_pipeline( 2, glConfig.vidWidth, glConfig.vidHeight ); // bloom blending
-		}
-	}
-}
 
 
 typedef struct vk_attach_desc_s  {
@@ -4106,7 +3886,7 @@ static void vk_alloc_attachments( void )
 		memoryTypeIndex = find_memory_type( memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 	}
 
-	ri.Printf(PRINT_ALL, "DEBUG: vk_alloc_attachments memoryTypeIndex=%d offset=%ld device=%p qvkAllocateMemory=%p\n", memoryTypeIndex, (long)offset, (void*)vk.device, (void*)qvkAllocateMemory);
+	ri.Printf(PRINT_ALL, "DEBUG: vk_alloc_attachments memoryTypeIndex=%d offset=%ld\n", memoryTypeIndex, (long)offset);
 
 	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
 	alloc_info.pNext = NULL;
@@ -4257,7 +4037,7 @@ static void vk_get_image_memory_erquirements( VkImage image, VkMemoryRequirement
 }
 
 
-static qboolean create_color_attachment(
+qboolean create_color_attachment(
 	uint32_t width, uint32_t height,
 	VkSampleCountFlagBits samples, VkFormat format,
 	VkImageUsageFlags usage, VkImage *image,
@@ -4405,6 +4185,7 @@ static qboolean create_depth_attachment( uint32_t width, uint32_t height, VkSamp
 
 static void vk_create_attachments( void )
 {
+	ri.Printf(PRINT_ALL, "DEBUG: vk_create_attachments START\n");
 
 	// Comprehensive safety checks
 	if (vk.device == VK_NULL_HANDLE) {
@@ -4602,353 +4383,6 @@ static void record_buffer_memory_barrier(VkCommandBuffer cb, VkBuffer buffer, Vk
 }
 #endif
 
-void vk_create_image( image_t *image, int width, int height, int mip_levels ) {
-
-	VkFormat			format = (VkFormat)image->internalFormat;
-	VkImageCreateFlags	image_flags = 0;
-	VkImageViewType		view_type = (VkImageViewType)VK_IMAGE_VIEW_TYPE_2D;
-
-	if ( image->handle ) {
-		qvkDestroyImage( vk.device, image->handle, NULL );
-		image->handle = VK_NULL_HANDLE;
-	}
-
-	if ( image->view ) {
-		qvkDestroyImageView( vk.device, image->view, NULL );
-		image->view = VK_NULL_HANDLE;
-	}
-
-	if ( image->flags & IMGFLAG_CUBEMAP ) {
-		image_flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
-		view_type = VK_IMAGE_VIEW_TYPE_CUBE;
-	}
-
-	// create image
-	{
-		VkImageCreateInfo desc;
-
-		desc.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-		desc.pNext = NULL;
-		desc.flags = image_flags;
-		desc.imageType = VK_IMAGE_TYPE_2D;
-		desc.format = format;
-		desc.extent.width = width;
-		desc.extent.height = height;
-		desc.extent.depth = 1;
-		desc.mipLevels = mip_levels;
-		desc.arrayLayers = image->layers;
-		desc.samples = VK_SAMPLE_COUNT_1_BIT;
-		desc.tiling = VK_IMAGE_TILING_OPTIMAL;
-		desc.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-		desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		desc.queueFamilyIndexCount = 0;
-		desc.pQueueFamilyIndices = NULL;
-		desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-		VK_CHECK( qvkCreateImage( vk.device, &desc, NULL, &image->handle ) );
-
-		// Allocate and bind memory for the image
-		{
-			VkMemoryRequirements mem_reqs;
-			VkMemoryAllocateInfo alloc_info = {0};
-			uint32_t memory_type;
-
-			qvkGetImageMemoryRequirements( vk.device, image->handle, &mem_reqs );
-
-			alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-			alloc_info.allocationSize = mem_reqs.size;
-
-			memory_type = find_memory_type( mem_reqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
-			if ( memory_type == ~0U ) {
-				ri.Error( ERR_FATAL, "Vulkan: No suitable memory type found for image" );
-			}
-
-			alloc_info.memoryTypeIndex = memory_type;
-
-			VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &image->memory ) );
-			VK_CHECK( qvkBindImageMemory( vk.device, image->handle, image->memory, 0 ) );
-
-			// Track image memory for cleanup
-			if ( vk.image_memory_count < ARRAY_LEN( vk.image_memory ) ) {
-				vk.image_memory[ vk.image_memory_count++ ] = image->memory;
-			}
-		}
-	}
-
-	// create image view
-	{
-		VkImageViewCreateInfo desc;
-		qboolean isFontTexture = qfalse;
-
-		// Detect font textures to ensure image view only includes base mip level
-		// This prevents accidental mipmap sampling for fonts
-		if ( image->imgName && mip_levels == 1 ) {
-			const char *name = image->imgName;
-			if ( Q_stristr( name, "font" ) != NULL || 
-			     Q_stristr( name, "fontImage" ) != NULL ||
-			     Q_stristr( name, "menu/art" ) != NULL ||
-			     Q_stristr( name, "gfx/2d" ) != NULL ||
-			     Q_stristr( name, "bigchars" ) != NULL ||
-			     Q_stristr( name, "charset" ) != NULL ) {
-				isFontTexture = qtrue;
-			} else if ( image->width > 0 && image->height > 0 ) {
-				// Also check for small non-mipmap textures that look like fonts
-				if ( ( image->width <= 512 && image->height <= 512 ) &&
-				     ( image->width == image->height || 
-				       ( image->width <= 256 && image->height <= 256 ) ) ) {
-					if ( image->wrapClampMode == VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE ||
-					     image->wrapClampMode == VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER ) {
-						isFontTexture = qtrue;
-					}
-				}
-			}
-		}
-
-		desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		desc.pNext = NULL;
-		desc.flags = 0;
-		desc.image = image->handle;
-		desc.viewType = (VkImageViewType)view_type;
-		desc.format = format;
-		desc.components = textureMapTypes[image->type].swizzle;
-		desc.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		desc.subresourceRange.baseMipLevel = 0;
-		// For font textures without mipmaps, explicitly set levelCount=1 to prevent mip sampling
-		// For other textures, use VK_REMAINING_MIP_LEVELS to include all mip levels
-		desc.subresourceRange.levelCount = (isFontTexture && mip_levels == 1) ? 1 : VK_REMAINING_MIP_LEVELS;
-		desc.subresourceRange.baseArrayLayer = 0;
-		desc.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
-
-		VK_CHECK( qvkCreateImageView( vk.device, &desc, NULL, &image->view ) );
-	}
-
-	// create associated descriptor set
-	if ( image->descriptor == VK_NULL_HANDLE ) {
-		VkDescriptorSetAllocateInfo desc;
-
-		desc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-		desc.pNext = NULL;
-		desc.descriptorPool = vk.descriptor_pool;
-		desc.descriptorSetCount = 1;
-		desc.pSetLayouts = &vk.set_layout_sampler;
-
-		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &desc, &image->descriptor ) );
-	}
-
-	vk_update_descriptor_set( image, mip_levels > 1 ? qtrue : qfalse );
-
-	SET_OBJECT_NAME( image->handle, image->imgName, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
-	SET_OBJECT_NAME( image->view, image->imgName, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
-	SET_OBJECT_NAME( image->descriptor, image->imgName, VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
-}
-
-
-static byte *resample_image_data( const int target_format, byte *data, const int data_size, int *bytes_per_pixel )
-{
-	byte* buffer;
-	uint16_t* p;
-	int i, n;
-
-	switch ( target_format ) {
-	case VK_FORMAT_B4G4R4A4_UNORM_PACK16:
-		buffer = (byte*)ri.Hunk_AllocateTempMemory( data_size / 2 );
-		p = (uint16_t*)buffer;
-		for ( i = 0; i < data_size; i += 4, p++ ) {
-			byte r = data[i + 0];
-			byte g = data[i + 1];
-			byte b = data[i + 2];
-			byte a = data[i + 3];
-			*p = (uint32_t)((a / 255.0) * 15.0 + 0.5) |
-				((uint32_t)((r / 255.0) * 15.0 + 0.5) << 4) |
-				((uint32_t)((g / 255.0) * 15.0 + 0.5) << 8) |
-				((uint32_t)((b / 255.0) * 15.0 + 0.5) << 12);
-		}
-		*bytes_per_pixel = 2;
-		return buffer; // must be freed after upload!
-
-	case VK_FORMAT_A1R5G5B5_UNORM_PACK16:
-		buffer = (byte*)ri.Hunk_AllocateTempMemory( data_size / 2 );
-		p = (uint16_t*)buffer;
-		for ( i = 0; i < data_size; i += 4, p++ ) {
-			byte r = data[i + 0];
-			byte g = data[i + 1];
-			byte b = data[i + 2];
-			*p = (uint32_t)((b / 255.0) * 31.0 + 0.5) |
-				((uint32_t)((g / 255.0) * 31.0 + 0.5) << 5) |
-				((uint32_t)((r / 255.0) * 31.0 + 0.5) << 10) |
-				(1 << 15);
-		}
-		*bytes_per_pixel = 2;
-		return buffer; // must be freed after upload!
-
-	case VK_FORMAT_B8G8R8A8_UNORM:
-		buffer = (byte*)ri.Hunk_AllocateTempMemory( data_size );
-		for ( i = 0; i < data_size; i += 4 ) {
-			buffer[i + 0] = data[i + 2];
-			buffer[i + 1] = data[i + 1];
-			buffer[i + 2] = data[i + 0];
-			buffer[i + 3] = data[i + 3];
-		}
-		*bytes_per_pixel = 4;
-		return buffer;
-
-	case VK_FORMAT_R8G8B8_UNORM: {
-		buffer = (byte*)ri.Hunk_AllocateTempMemory( (data_size * 3) / 4 );
-		for ( i = 0, n = 0; i < data_size; i += 4, n += 3 ) {
-			buffer[n + 0] = data[i + 0];
-			buffer[n + 1] = data[i + 1];
-			buffer[n + 2] = data[i + 2];
-		}
-		*bytes_per_pixel = 3;
-		return buffer;
-	}
-
-	default:
-		*bytes_per_pixel = 4;
-		return data;
-	}
-}
-
-
-void vk_upload_image_data( image_t *image, int x, int y, int width, int height, int mipmaps, byte *pixels, int size, qboolean update ) {
-
-	VkCommandBuffer   command_buffer;
-	VkBufferImageCopy regions[16];
-	VkBufferImageCopy region;
-	byte *buf;
-	int n;
-
-	size_t num_regions = 0;
-	VkDeviceSize buffer_size = 0;
-
-	buf = resample_image_data( image->internalFormat, pixels, size, &n /*bpp*/ );
-
-	while (qtrue) {
-		Com_Memset(&region, 0, sizeof(region));
-		region.bufferOffset = buffer_size;
-
-		// Fix for font atlas row alignment: ensure proper row pitch for 1-channel textures
-		// Font atlases are typically 1 byte per pixel and need explicit row length specification
-		if (image->isFont) {
-			// For font textures, set bufferRowLength to the original image width to handle row alignment
-			// This prevents "barcode-like" corruption from row padding mismatches
-			region.bufferRowLength = width;  // Original width before any mip reduction
-			region.bufferImageHeight = height;  // Original height before any mip reduction
-		} else {
-			// For normal textures, use 0 to indicate tightly packed data
-			region.bufferRowLength = 0;
-			region.bufferImageHeight = 0;
-		}
-
-		region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		region.imageSubresource.mipLevel = num_regions;
-		region.imageSubresource.baseArrayLayer = 0;
-		region.imageSubresource.layerCount = 1;
-		region.imageOffset.x = x;
-		region.imageOffset.y = y;
-		region.imageOffset.z = 0;
-		region.imageExtent.width = width;
-		region.imageExtent.height = height;
-		region.imageExtent.depth = 1;
-
-		regions[num_regions] = region;
-		num_regions++;
-
-		buffer_size += width * height * n;
-
-	if ( num_regions >= (size_t)mipmaps || (width == 1 && height == 1) || num_regions >= ARRAY_LEN( regions ) )
-			break;
-
-		x >>= 1;
-		y >>= 1;
-
-		width >>= 1;
-		if (width < 1) width = 1;
-
-		height >>= 1;
-		if (height < 1) height = 1;
-	}
-
-#ifdef USE_UPLOAD_QUEUE
-	if ( vk_wait_staging_buffer() ) {
-		// wait for vkQueueSubmit() completion before new upload
-	}
-
-	if ( vk.staging_buffer.size - vk.staging_buffer.offset < buffer_size ) {
-		// try to flush staging buffer and reset offset
-		vk_flush_staging_buffer( qfalse );
-	}
-
-	if ( vk.staging_buffer.size /* - vk_world.staging_buffer_offset */ < buffer_size ) {
-		// if still not enough - reallocate staging buffer
-		vk_alloc_staging_buffer( buffer_size );
-	}
-
-	for ( n = 0; n < num_regions; n++ ) {
-		regions[n].bufferOffset += vk.staging_buffer.offset;
-	}
-
-	// Bounds check before memcpy
-	if (vk.staging_buffer.offset + buffer_size > vk.staging_buffer.size) {
-		ri.Printf(PRINT_ERROR, "vk_upload_image_data: staging buffer overflow! offset=%lu size=%lu buffer_size=%lu\n",
-			(unsigned long)vk.staging_buffer.offset, (unsigned long)vk.staging_buffer.size, (unsigned long)buffer_size);
-		return;
-	}
-	Com_Memcpy( vk.staging_buffer.ptr + vk.staging_buffer.offset, buf, buffer_size );
-
-	if ( vk.staging_buffer.offset == 0 ) {
-		VkCommandBufferBeginInfo begin_info;
-		begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-		begin_info.pNext = NULL;
-		begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-		begin_info.pInheritanceInfo = NULL;
-		VK_CHECK( qvkBeginCommandBuffer( vk.staging_command_buffer, &begin_info ) );
-	}
-
-	//ri.Printf( PRINT_WARNING, "batch @%6i + %i %s \n", (int)vk_world.staging_buffer_offset, (int)buffer_size, image->imgName );
-	vk.staging_buffer.offset += buffer_size;
-
-	command_buffer = vk.staging_command_buffer;
-
-	if ( update ) {
-		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
-	} else {
-		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT, 0 );
-	}
-
-	qvkCmdCopyBufferToImage( command_buffer, vk.staging_buffer.handle, image->handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, num_regions, regions );
-
-	// final transition after upload comleted
-	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
-#else
-	if ( vk.staging_buffer.size < buffer_size ) {
-		vk_alloc_staging_buffer( buffer_size );
-	}
-
-	// Bounds check before memcpy
-	if (buffer_size > vk.staging_buffer.size) {
-		ri.Printf(PRINT_ERROR, "vk_upload_image_data: buffer_size %lu exceeds staging buffer size %lu\n",
-			(unsigned long)buffer_size, (unsigned long)vk.staging_buffer.size);
-		return;
-	}
-	Com_Memcpy( vk.staging_buffer.ptr, buf, buffer_size );
-
-	command_buffer = begin_command_buffer();
-	// record_buffer_memory_barrier( command_buffer, vk_world.staging_buffer, VK_WHOLE_SIZE, 0, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_HOST_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT );
-	if ( update ) {
-		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
-	} else {
-		record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_PIPELINE_STAGE_HOST_BIT, 0 );
-	}
-	qvkCmdCopyBufferToImage( command_buffer, vk.staging_buffer.handle, image->handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, num_regions, regions );
-	record_image_layout_transition( command_buffer, image->handle, VK_IMAGE_ASPECT_COLOR_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
-	end_command_buffer( command_buffer, __func__ );
-#endif
-
-	if ( buf != pixels ) {
-		ri.Hunk_FreeTempMemory( buf );
-	}
-}
 
 void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
 	Vk_Sampler_Def sampler_def;
@@ -5489,182 +4923,8 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 }
 
 
-void vk_create_blur_pipeline( uint32_t index, uint32_t width, uint32_t height, qboolean horizontal_pass )
-{
-	VkPipelineShaderStageCreateInfo shader_stages[2];
-	VkPipelineVertexInputStateCreateInfo vertex_input_state;
-	VkPipelineInputAssemblyStateCreateInfo input_assembly_state;
-	VkPipelineRasterizationStateCreateInfo rasterization_state;
-	VkPipelineViewportStateCreateInfo viewport_state;
-	VkPipelineMultisampleStateCreateInfo multisample_state;
-	VkPipelineColorBlendStateCreateInfo blend_state;
-	VkPipelineColorBlendAttachmentState attachment_blend_state;
-	VkGraphicsPipelineCreateInfo create_info;
-	VkViewport viewport;
-	VkRect2D scissor;
-	float frag_spec_data[3]; // x-offset, y-offset, correction
-	VkSpecializationMapEntry spec_entries[3];
-	VkSpecializationInfo frag_spec_info;
-	VkPipeline *pipeline;
-
-	pipeline = &vk.blur_pipeline[ index ];
-
-	if ( *pipeline != VK_NULL_HANDLE ) {
-		vk_wait_idle();
-		qvkDestroyPipeline( vk.device, *pipeline, NULL );
-		*pipeline = VK_NULL_HANDLE;
-	}
-
-	vertex_input_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vertex_input_state.pNext = NULL;
-	vertex_input_state.flags = 0;
-	vertex_input_state.vertexBindingDescriptionCount = 0;
-	vertex_input_state.pVertexBindingDescriptions = NULL;
-	vertex_input_state.vertexAttributeDescriptionCount = 0;
-	vertex_input_state.pVertexBindingDescriptions = NULL;
-
-	// shaders
-	set_shader_stage_desc( shader_stages+0, VK_SHADER_STAGE_VERTEX_BIT, vk.modules.gamma_vs, "main" );
-	set_shader_stage_desc( shader_stages+1, VK_SHADER_STAGE_FRAGMENT_BIT, vk.modules.blur_fs, "main" );
-
-	frag_spec_data[0] = 1.2 / (float) width; // x offset
-	frag_spec_data[1] = 1.2 / (float) height; // y offset
-	frag_spec_data[2] = 1.0; // intensity?
-
-	if ( horizontal_pass ) {
-		frag_spec_data[1] = 0.0;
-	} else {
-		frag_spec_data[0] = 0.0;
-	}
-
-	spec_entries[0].constantID = 0;
-	spec_entries[0].offset = 0 * sizeof( float );
-	spec_entries[0].size = sizeof( float );
-
-	spec_entries[1].constantID = 1;
-	spec_entries[1].offset = 1 * sizeof( float );
-	spec_entries[1].size = sizeof( float );
-
-	spec_entries[2].constantID = 2;
-	spec_entries[2].offset = 2 * sizeof( float );
-	spec_entries[2].size = sizeof( float );
-
-	frag_spec_info.mapEntryCount = 3;
-	frag_spec_info.pMapEntries = spec_entries;
-	frag_spec_info.dataSize = 3 * sizeof( float );
-	frag_spec_info.pData = &frag_spec_data[0];
-
-	shader_stages[1].pSpecializationInfo = &frag_spec_info;
-
-	//
-	// Primitive assembly.
-	//
-	input_assembly_state.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-	input_assembly_state.pNext = NULL;
-	input_assembly_state.flags = 0;
-	input_assembly_state.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
-	input_assembly_state.primitiveRestartEnable = VK_FALSE;
-
-	//
-	// Viewport.
-	//
-	viewport.x = 0.0;
-	viewport.y = 0.0;
-	viewport.width = width;
-	viewport.height = height;
-	viewport.minDepth = 0.0;
-	viewport.maxDepth = 1.0;
-
-	scissor.offset.x = viewport.x;
-	scissor.offset.y = viewport.y;
-	scissor.extent.width = viewport.width;
-	scissor.extent.height = viewport.height;
-
-	viewport_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-	viewport_state.pNext = NULL;
-	viewport_state.flags = 0;
-	viewport_state.viewportCount = 1;
-	viewport_state.pViewports = &viewport;
-	viewport_state.scissorCount = 1;
-	viewport_state.pScissors = &scissor;
-
-	//
-	// Rasterization.
-	//
-	rasterization_state.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-	rasterization_state.pNext = NULL;
-	rasterization_state.flags = 0;
-	rasterization_state.depthClampEnable = VK_FALSE;
-	rasterization_state.rasterizerDiscardEnable = VK_FALSE;
-	rasterization_state.polygonMode = VK_POLYGON_MODE_FILL;
-	//rasterization_state.cullMode = VK_CULL_MODE_BACK_BIT; // VK_CULL_MODE_NONE;
-	rasterization_state.cullMode = VK_CULL_MODE_NONE;
-	rasterization_state.frontFace = VK_FRONT_FACE_CLOCKWISE; // Q3 defaults to clockwise vertex order
-	rasterization_state.depthBiasEnable = VK_FALSE;
-	rasterization_state.depthBiasConstantFactor = 0.0f;
-	rasterization_state.depthBiasClamp = 0.0f;
-	rasterization_state.depthBiasSlopeFactor = 0.0f;
-	rasterization_state.lineWidth = 1.0f;
-
-	multisample_state.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-	multisample_state.pNext = NULL;
-	multisample_state.flags = 0;
-	multisample_state.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-	multisample_state.sampleShadingEnable = VK_FALSE;
-	multisample_state.minSampleShading = 1.0f;
-	multisample_state.pSampleMask = NULL;
-	multisample_state.alphaToCoverageEnable = VK_FALSE;
-	multisample_state.alphaToOneEnable = VK_FALSE;
-
-	Com_Memset(&attachment_blend_state, 0, sizeof(attachment_blend_state));
-	attachment_blend_state.blendEnable = VK_FALSE;
-	attachment_blend_state.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-
-	blend_state.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-	blend_state.pNext = NULL;
-	blend_state.flags = 0;
-	blend_state.logicOpEnable = VK_FALSE;
-	blend_state.logicOp = VK_LOGIC_OP_COPY;
-	blend_state.attachmentCount = 1;
-	blend_state.pAttachments = &attachment_blend_state;
-	blend_state.blendConstants[0] = 0.0f;
-	blend_state.blendConstants[1] = 0.0f;
-	blend_state.blendConstants[2] = 0.0f;
-	blend_state.blendConstants[3] = 0.0f;
-
-	create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-	create_info.pNext = NULL;
-	create_info.flags = 0;
-	create_info.stageCount = 2;
-	create_info.pStages = shader_stages;
-	create_info.pVertexInputState = &vertex_input_state;
-	create_info.pInputAssemblyState = &input_assembly_state;
-	create_info.pTessellationState = NULL;
-	create_info.pViewportState = &viewport_state;
-	create_info.pRasterizationState = &rasterization_state;
-	create_info.pMultisampleState = &multisample_state;
-	create_info.pDepthStencilState = NULL;
-	create_info.pColorBlendState = &blend_state;
-	create_info.pDynamicState = NULL;
-	create_info.layout = vk.pipeline_layout_post_process; // one input attachment
-	create_info.renderPass = vk.render_pass.blur[ index ];
-	create_info.subpass = 0;
-	create_info.basePipelineHandle = VK_NULL_HANDLE;
-	create_info.basePipelineIndex = -1;
-
-	VK_CHECK( qvkCreateGraphicsPipelines( vk.device, VK_NULL_HANDLE, 1, &create_info, NULL, pipeline ) );
-
-	SET_OBJECT_NAME( *pipeline, va( "%s blur pipeline %i", horizontal_pass ? "horizontal" : "vertical", index/2 + 1 ), VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
-}
-
-
-#ifdef USE_VK_PBR
-static VkVertexInputBindingDescription bindings[10];
-static VkVertexInputAttributeDescription attribs[10];
-#else
 static VkVertexInputBindingDescription bindings[8];
 static VkVertexInputAttributeDescription attribs[8];
-#endif
 static uint32_t num_binds;
 static uint32_t num_attrs;
 
@@ -6973,7 +6233,7 @@ multisample_state.rasterizationSamples = (renderPassIndex == RENDER_PASS_SCREENM
 
 
 
-static void get_viewport(VkViewport *viewport, Vk_Depth_Range depth_range) {
+__attribute__((used)) static void get_viewport(VkViewport *viewport, Vk_Depth_Range depth_range) {
 	VkRect2D r;
 
 	get_viewport_rect( &r );
@@ -7023,7 +6283,7 @@ static void get_viewport(VkViewport *viewport, Vk_Depth_Range depth_range) {
 	}
 }
 
-static void get_scissor_rect(VkRect2D *r) {
+__attribute__((used)) static void get_scissor_rect(VkRect2D *r) {
 
 	if ( backEnd.viewParms.portalView != PV_NONE )
 	{
@@ -7081,93 +6341,8 @@ static void get_mvp_transform( float *mvp )
 }
 
 
-void vk_clear_color( const vec4_t clear_color ) {
-
-	VkClearAttachment attachment;
-	VkClearRect clear_rect;
-
-	if ( !vk.active )
-		return;
-
-	attachment.colorAttachment = 0;
-	attachment.clearValue.color.float32[0] = clear_color[0];
-	attachment.clearValue.color.float32[1] = clear_color[1];
-	attachment.clearValue.color.float32[2] = clear_color[2];
-	attachment.clearValue.color.float32[3] = clear_color[3];
-	attachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-
-	// For 2D/menu rendering, always clear the full image extent to prevent corruption
-	// The scissor rect clamping might cut off bottom rows if there's any mismatch
-	if ( backEnd.projection2D ) {
-		// Full-screen clear: use the actual render dimensions, not scissor-clamped
-		clear_rect.rect.offset.x = 0;
-		clear_rect.rect.offset.y = 0;
-		clear_rect.rect.extent.width = vk.renderWidth;
-		clear_rect.rect.extent.height = vk.renderHeight;
-	} else {
-		// For 3D rendering, use scissor rect (may be viewport-restricted)
-		get_scissor_rect( &clear_rect.rect );
-	}
-	clear_rect.baseArrayLayer = 0;
-	clear_rect.layerCount = 1;
-
-	qvkCmdClearAttachments( vk.cmd->command_buffer, 1, &attachment, 1, &clear_rect );
-}
 
 
-void vk_clear_depth( qboolean clear_stencil ) {
-
-	VkClearAttachment attachment;
-	VkClearRect clear_rect[1];
-
-	if ( !vk.active )
-		return;
-
-	if ( vk_world.dirty_depth_attachment == 0 )
-		return;
-
-	// Safety check: ensure we have a valid command buffer and are in a render pass
-	if ( !vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE ) {
-		ri.Printf( PRINT_WARNING, "vk_clear_depth: Invalid command buffer\n" );
-		return;
-	}
-
-	// Check if function pointer is valid
-	if ( !qvkCmdClearAttachments ) {
-		ri.Printf( PRINT_WARNING, "vk_clear_depth: qvkCmdClearAttachments function pointer is NULL\n" );
-		return;
-	}
-
-	// vkCmdClearAttachments can only be called inside a render pass
-	// If not in a render pass, skip the clear (depth will be cleared when render pass starts)
-	if ( vk.renderPassIndex >= RENDER_PASS_COUNT ) {
-		ri.Printf( PRINT_DEVELOPER, "vk_clear_depth: Skipping clear - not inside a render pass (index: %u)\n", vk.renderPassIndex );
-		return;
-	}
-
-	attachment.colorAttachment = 0;
-#ifdef USE_REVERSED_DEPTH
-	attachment.clearValue.depthStencil.depth = 0.0f;
-#else
-	attachment.clearValue.depthStencil.depth = 1.0f;
-#endif
-	attachment.clearValue.depthStencil.stencil = 0;
-	if ( clear_stencil && glConfig.stencilBits > 0 ) {
-		attachment.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
-	} else {
-		attachment.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-	}
-
-	ri.Printf( PRINT_DEVELOPER, "vk_clear_depth: Attempting to clear depth (CmdBuffer: %p, RenderPassIndex: %u)\n", (void*)vk.cmd->command_buffer, vk.renderPassIndex );
-
-	get_scissor_rect( &clear_rect[0].rect );
-	clear_rect[0].baseArrayLayer = 0;
-	clear_rect[0].layerCount = 1;
-
-	qvkCmdClearAttachments( vk.cmd->command_buffer, 1, &attachment, 1, clear_rect );
-
-	ri.Printf( PRINT_DEVELOPER, "vk_clear_depth: Depth clear command submitted successfully.\n" );
-}
 
 
 void vk_update_mvp( const float *m ) {
@@ -7546,7 +6721,7 @@ void vk_bind_descriptor_sets( void )
 }
 
 
-static void vk_update_depth_range( Vk_Depth_Range depth_range )
+__attribute__((used)) static void vk_update_depth_range( Vk_Depth_Range depth_range )
 {
 	if ( vk.cmd->depth_range != depth_range ) {
 		VkRect2D scissor_rect;
@@ -7567,46 +6742,8 @@ static void vk_update_depth_range( Vk_Depth_Range depth_range )
 }
 
 
-void vk_draw_geometry( Vk_Depth_Range depth_range, qboolean indexed ) {
-
-	if ( vk.geometry_buffer_size_new ) {
-		// geometry buffer overflow happened this frame
-		return;
-	}
-
-	vk_bind_descriptor_sets();
-
-	// configure pipeline's dynamic state
-	vk_update_depth_range( depth_range );
-
-	// issue draw call(s)
-#ifdef USE_VBO
-	if ( tess.vboIndex )
-		VBO_RenderIBOItems();
-	else
-#endif
-	if ( indexed ) {
-		vk_draw_indexed_call( vk.cmd->command_buffer, vk.cmd->num_indexes, 1, 0, 0, 0 );
-	} else {
-		vk_draw_call( vk.cmd->command_buffer, tess.numVertexes, 1, 0, 0 );
-	}
-}
 
 
-void vk_draw_dot( uint32_t storage_offset )
-{
-	if ( vk.geometry_buffer_size_new ) {
-		// geometry buffer overflow happened this frame
-		return;
-	}
-
-	qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_storage, VK_DESC_STORAGE, 1, &vk.storage.descriptor, 1, &storage_offset );
-
-	// configure pipeline's dynamic state
-	vk_update_depth_range( DEPTH_RANGE_NORMAL );
-
-	vk_draw_call( vk.cmd->command_buffer, tess.numVertexes, 1, 0, 0 );
-}
 
 
 static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBuffer, qboolean clearValues, uint32_t width, uint32_t height )
@@ -7667,55 +6804,6 @@ static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBu
 }
 
 
-// Function vk_begin_post_bloom_render_pass removed - moved to vk_framebuffer.c
-void vk_begin_bloom_extract_render_pass( void )
-{
-	VkFramebuffer frameBuffer = vk.framebuffers.bloom_extract;
-
-	// CRITICAL: Check if render pass is already active BEFORE calling vk_begin_render_pass().
-	// Note: renderPassIndex is not set for bloom passes (they use dedicated pipelines),
-	// but we still need to ensure no render pass is active.
-	if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
-		ri.Error( ERR_FATAL, "Vulkan: Attempted to begin bloom_extract render pass when one is already active (index=%d). "
-			"This indicates a bug in render pass lifecycle management.", vk.renderPassIndex );
-	}
-
-	//vk.renderPassIndex = RENDER_PASS_BLOOM_EXTRACT; // doesn't matter, we will use dedicated pipelines
-
-	vk.renderWidth = gls.captureWidth;
-	vk.renderHeight = gls.captureHeight;
-
-	//vk.renderScaleX = (float)vk.renderWidth / (float)glConfig.vidWidth;
-	//vk.renderScaleY = (float)vk.renderHeight / (float)glConfig.vidHeight;
-	vk.renderScaleX = vk.renderScaleY = 1.0f;
-
-	vk_begin_render_pass( vk.render_pass.bloom_extract, frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
-}
-
-
-void vk_begin_blur_render_pass( uint32_t index )
-{
-	VkFramebuffer frameBuffer = vk.framebuffers.blur[ index ];
-
-	// CRITICAL: Check if render pass is already active BEFORE calling vk_begin_render_pass().
-	// Note: renderPassIndex is not set for blur passes (they use dedicated pipelines),
-	// but we still need to ensure no render pass is active.
-	if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
-		ri.Error( ERR_FATAL, "Vulkan: Attempted to begin blur render pass when one is already active (index=%d). "
-			"This indicates a bug in render pass lifecycle management.", vk.renderPassIndex );
-	}
-
-	//vk.renderPassIndex = RENDER_PASS_BLOOM_EXTRACT; // doesn't matter, we will use dedicated pipelines
-
-	vk.renderWidth = gls.captureWidth / ( 2 << ( index / 2 ) );
-	vk.renderHeight = gls.captureHeight / ( 2 << ( index / 2 ) );
-
-	//vk.renderScaleX = (float)vk.renderWidth / (float)glConfig.vidWidth;
-	//vk.renderScaleY = (float)vk.renderHeight / (float)glConfig.vidHeight;
-	vk.renderScaleX = vk.renderScaleY = 1.0f;
-
-	vk_begin_render_pass( vk.render_pass.blur[ index ], frameBuffer, qfalse, vk.renderWidth, vk.renderHeight );
-}
 
 
 static void __attribute__((unused)) vk_begin_screenmap_render_pass( void )
@@ -7813,61 +6901,8 @@ void vk_create_brfdlut( void )
 }
 #endif
 
-void vk_end_render_pass( void )
-{
-	// Only end render pass if one is actually active
-	// We check renderPassIndex to avoid crashing if no render pass was started
-	if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
-		qvkCmdEndRenderPass( vk.cmd->command_buffer );
-		vk.renderPassIndex = RENDER_PASS_COUNT; // Mark as no active render pass
-	}
-
-//	vk.renderPassIndex = RENDER_PASS_MAIN;
-}
 
 
-// Synchronize the final color image so fullscreen passes can safely sample it.
-void vk_barrier_final_image_to_shader_read( VkImage image )
-{
-	if ( image == VK_NULL_HANDLE ) {
-		return;
-	}
-
-	VkImageMemoryBarrier barrier = {};
-	barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-	barrier.pNext = NULL;
-	barrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-	barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-	barrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.image = image;
-	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	barrier.subresourceRange.baseMipLevel = 0;
-	barrier.subresourceRange.levelCount = 1;
-	barrier.subresourceRange.baseArrayLayer = 0;
-	barrier.subresourceRange.layerCount = 1;
-
-	// Synchronize: wait for color attachment output (including clears) to complete before fragment shader reads.
-	// This is critical for menu-only frames where the image was only cleared, not drawn to.
-	// CRITICAL: The render pass's finalLayout already transitions the image to SHADER_READ_ONLY_OPTIMAL,
-	// but we still need this barrier for proper synchronization between the render pass ending
-	// and the gamma pass beginning. The barrier ensures all color attachment writes (including clears)
-	// are visible to the fragment shader before sampling begins.
-	// 
-	// Note: We use SHADER_READ_ONLY_OPTIMAL for both oldLayout and newLayout because the render pass
-	// already transitioned the layout. This barrier is purely for synchronization, not layout transition.
-	qvkCmdPipelineBarrier(
-		vk.cmd->command_buffer,
-		VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-		0,
-		0, NULL,
-		0, NULL,
-		1, &barrier
-	);
-}
 
 
 static qboolean vk_find_screenmap_drawsurfs( void )
@@ -8246,1361 +7281,6 @@ qboolean vk_clear_screenmap( void )
 #ifndef UINT64_MAX
 #define UINT64_MAX 0xFFFFFFFFFFFFFFFFULL
 #endif
-
-void vk_begin_frame( void )
-{
-	// Update performance statistics
-	vk_update_performance_stats();
-
-	// Timeline semaphore signaling: framework ready
-	VkCommandBufferBeginInfo begin_info;
-	VkResult res;
-
-	if ( vk.frame_count++ ) // might happen during stereo rendering
-		return;
-
-#ifdef USE_UPLOAD_QUEUE
-	vk_flush_staging_buffer( qtrue );
-#endif
-
-	vk.cmd = &vk.tess[ vk.cmd_index ];
-
-#ifdef USE_VULKAN_RAY_TRACING
-	// Update GIBS system
-	if ( vk.gibs.enabled && vk.gibs.initialized ) {
-		vk_gibs_update();
-	}
-#endif
-	// Reset GPU culling instance cursor for this frame
-	if ( vk.gpuCulling.enabled && vk.gpuCulling.initialized ) {
-		vk_gpu_culling_begin_frame();
-	}
-	// Procedural dressing generates instance transforms before the cull/update pass
-	if ( r_procDressing && r_procDressing->integer ) {
-		vk_proc_dressing_tick();
-	}
-	// Update GPU culling after instances have been queued
-	if ( vk.gpuCulling.enabled && vk.gpuCulling.initialized ) {
-		vk_gpu_culling_update();
-	}
-	// Material system (lazy init + update)
-	if ( r_materialSystem && r_materialSystem->integer && !vk.materialSystem.initialized ) {
-		vk_material_system_init();
-	}
-	if ( vk.materialSystem.enabled && vk.materialSystem.initialized ) {
-		vk_material_system_update();
-	}
-	// Portal lights system
-#ifdef USE_VULKAN_RAY_TRACING
-	if ( vk.rayTracingSupported && !portalSystem.initialized ) {
-		vk_portal_lights_init();
-	}
-	if ( portalSystem.enabled && portalSystem.initialized ) {
-		vk_portal_lights_update_lights();
-	}
-#endif
-	// Update atmosphere system
-	if ( vk.atmosphere.enabled && vk.atmosphere.initialized ) {
-		vk_atmosphere_update();
-	}
-
-	// Telemetry: per-second GPU timing stats for frame pacing
-	if ( r_frameTelemetry && r_frameTelemetry->integer ) {
-		double avg = 0.0, min = 0.0, max = 0.0;
-		vk_get_gpu_timing_stats( &avg, &min, &max );
-		if ( tr.refdef.floatTime - vkFrameTelemetryLast > 1.0f ) {
-			ri.Printf( PRINT_DEVELOPER, "FrameTelemetry: gpu avg %.3f ms (min %.3f / max %.3f) meshlets %u\n",
-				avg, min, max, vk.mesh.meshletCount );
-			vkFrameTelemetryLast = tr.refdef.floatTime;
-		}
-	}
-
-	// CRITICAL: Reset render pass state at the start of each frame.
-	// When command buffer is reset, the render pass state variable must also be reset.
-	// This ensures vk.renderPassIndex accurately reflects the current state.
-	vk.renderPassIndex = RENDER_PASS_COUNT; // No render pass active at frame start
-
-	// CRITICAL: Command buffer lifecycle management
-	// Before reusing a command buffer, we MUST:
-	// 1. Wait for the fence to ensure the previous submission completed
-	// 2. Reset the fence to unsignaled state
-	// 3. Reset the command buffer to allow new recording
-	// Without these steps, we risk VK_ERROR_DEVICE_LOST from invalid command buffer state.
-	if ( vk.cmd->waitForFence ) {
-		vk.cmd->waitForFence = qfalse;
-		res = qvkWaitForFences( vk.device, 1, &vk.cmd->rendering_finished_fence, VK_FALSE, 1e10 );
-		if ( res != VK_SUCCESS ) {
-			if ( res == VK_ERROR_DEVICE_LOST ) {
-				// Device lost - once device is lost, ALL Vulkan operations will fail
-				// We cannot continue rendering. Shut down gracefully.
-				ri.Error( ERR_FATAL, "Vulkan: Device lost detected in vkWaitForFences. "
-					"This indicates a previous frame had invalid Vulkan API usage (invalid barriers, "
-					"layout transitions, or command buffer misuse). Cannot recover - shutting down." );
-			}
-			else {
-				ri.Error( ERR_FATAL, "Vulkan: %s returned %s", "vkWaitForFences", vk_result_string( res ) );
-			}
-		}
-		// Reset fence to unsignaled state before reusing
-		// CRITICAL: If device was lost above, we won't reach here due to ri.Error()
-		res = qvkResetFences( vk.device, 1, &vk.cmd->rendering_finished_fence );
-		if ( res != VK_SUCCESS ) {
-			ri.Error( ERR_FATAL, "Vulkan: qvkResetFences returned %s", vk_result_string( res ) );
-		}
-		// CRITICAL: Reset command buffer before reusing - this is required by Vulkan spec
-		// A command buffer must be reset before it can be recorded again after submission
-		res = qvkResetCommandBuffer( vk.cmd->command_buffer, 0 );
-		if ( res != VK_SUCCESS ) {
-			ri.Error( ERR_FATAL, "Vulkan: qvkResetCommandBuffer returned %s", vk_result_string( res ) );
-		}
-	} else {
-		// Even if waitForFence is false (first frame), reset the command buffer to ensure clean state
-		// This handles cases where the command buffer might have been partially recorded
-		res = qvkResetCommandBuffer( vk.cmd->command_buffer, 0 );
-		if ( res != VK_SUCCESS ) {
-			ri.Error( ERR_FATAL, "Vulkan: qvkResetCommandBuffer returned %s", vk_result_string( res ) );
-		}
-	}
-
-	if ( !ri.CL_IsMinimized() && !vk.cmd->swapchain_image_acquired ) {
-		qboolean retry = qfalse;
-_retry:
-		res = qvkAcquireNextImageKHR( vk.device, vk.swapchain, 1 * 1000000000ULL, vk.cmd->image_acquired, VK_NULL_HANDLE, &vk.cmd->swapchain_image_index );
-		// when running via RDP: "Application has already acquired the maximum number of images (0x2)"
-		// probably caused by "device lost" errors
-		if ( res < 0 ) {
-			if ( res == VK_ERROR_OUT_OF_DATE_KHR && retry == qfalse ) {
-				// swapchain re-creation needed
-				retry = qtrue;
-				// vk_restart_swapchain( __func__, res ); // TODO: Implement swapchain restart
-				goto _retry;
-			} else {
-				ri.Error( ERR_FATAL, "vkAcquireNextImageKHR returned %s", vk_result_string( res ) );
-			}
-		}
-		vk.cmd->swapchain_image_acquired = qtrue;
-	}
-
-	begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-	begin_info.pNext = NULL;
-	begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-	begin_info.pInheritanceInfo = NULL;
-
-	VK_CHECK( qvkBeginCommandBuffer( vk.cmd->command_buffer, &begin_info ) );
-
-	// Ensure visibility of geometry buffers writes.
-	//record_buffer_memory_barrier( vk.cmd->command_buffer, vk.cmd->vertex_buffer, vk.geometry_buffer_size, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT, VK_ACCESS_HOST_WRITE_BIT, VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT );
-
-#if 0
-	// add explicit layout transition dependency
-	if ( vk.fboActive ) {
-		record_image_layout_transition( vk.cmd->command_buffer, vk.color_image, VK_IMAGE_ASPECT_COLOR_BIT,
-			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, 0, 0 );
-	} else {
-		record_image_layout_transition( vk.cmd->command_buffer, vk.swapchain_images[ vk.swapchain_image_index ], VK_IMAGE_ASPECT_COLOR_BIT,
-			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 0, 0 );
-	}
-#endif
-
-	if ( vk.cmd->vertex_buffer_offset > vk.stats.vertex_buffer_max ) {
-		vk.stats.vertex_buffer_max = vk.cmd->vertex_buffer_offset;
-	}
-
-	// Track geometry buffer usage for pre-allocation
-	if ( vk.geometry_buffer_history.count < ARRAY_LEN( vk.geometry_buffer_history.sizes ) ) {
-		vk.geometry_buffer_history.sizes[ vk.geometry_buffer_history.count++ ] = vk.cmd->vertex_buffer_offset;
-	} else {
-		vk.geometry_buffer_history.sizes[ vk.geometry_buffer_history.index ] = vk.cmd->vertex_buffer_offset;
-		vk.geometry_buffer_history.index = ( vk.geometry_buffer_history.index + 1 ) % ARRAY_LEN( vk.geometry_buffer_history.sizes );
-	}
-	if ( vk.cmd->vertex_buffer_offset > vk.geometry_buffer_history.max_size ) {
-		vk.geometry_buffer_history.max_size = vk.cmd->vertex_buffer_offset;
-	}
-
-	// Initialize MVP cache
-	vk.cmd->mvp_cache.last_entity_num = -1;
-	vk.cmd->mvp_cache.mvp_valid = qfalse;
-	vk.cmd->vertex_buffer_offset = 0;
-
-	if ( vk.stats.push_size > vk.stats.push_size_max ) {
-		vk.stats.push_size_max = vk.stats.push_size;
-	}
-
-	vk.cmd->last_pipeline = VK_NULL_HANDLE;
-
-	// CRITICAL: Reset screenMapDone at the start of each frame.
-	// It will be set to qtrue only after screenMap is successfully captured from a 3D scene.
-	// We do NOT set it after clearing - shaders should use blackImage fallback unless screenMap
-	// was actually captured. This prevents shaders from sampling stale data.
-	backEnd.screenMapDone = qfalse;
-
-	// CRITICAL: Clear screenMap at the start of every frame to prevent stale data corruption.
-	// This ensures that if screenMap is accidentally sampled (shouldn't happen due to screenMapDone check),
-	// it contains black instead of stale repeating patterns from previous frames.
-	// The clear happens before any render pass starts, so it's always safe.
-	// Note: We clear but don't set screenMapDone - shaders should use blackImage fallback.
-	if ( vk.fboActive && vk.screenMap.color_image != VK_NULL_HANDLE ) {
-		vk_clear_screenmap();
-		// Don't set screenMapDone here - let shaders use blackImage fallback
-		// screenMapDone will only be set after successful capture from 3D scene
-	}
-
-	// CRITICAL: Only start render pass if one isn't already active.
-	// RB_DrawSurfs() may need to end and restart the render pass for screenMap capture,
-	// so we shouldn't unconditionally start it here. Let RB_DrawSurfs() handle it.
-	// However, we need to ensure a render pass is started for the first draw command.
-	// The render pass will be started in RB_DrawBuffer() or RB_DrawSurfs() as needed.
-	if ( vk.renderPassIndex >= RENDER_PASS_COUNT ) {
-		// Generate VRS image before starting main render pass
-		vk_vrs_generate_image( vk.cmd->command_buffer );
-		vk_begin_main_render_pass();
-	}
-
-		// Record GPU timing start timestamp after render pass begins
-		if ( vk.timing.enabled && qvkCmdWriteTimestamp ) {
-			uint32_t query_index = vk.cmd_index * 2; // 2 queries per command buffer (start/end)
-			qvkCmdWriteTimestamp( vk.cmd->command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, vk.timing.timestamp_query_pool, query_index );
-		}
-
-	// dynamic vertex buffer layout
-	vk.cmd->uniform_read_offset = 0;
-	vk.cmd->vertex_buffer_offset = 0;
-	Com_Memset( vk.cmd->buf_offset, 0, sizeof( vk.cmd->buf_offset ) );
-	Com_Memset( vk.cmd->vbo_offset, 0, sizeof( vk.cmd->vbo_offset ) );
-	vk.cmd->curr_index_buffer = VK_NULL_HANDLE;
-	vk.cmd->curr_index_offset = 0;
-	vk.cmd->num_indexes = 0;
-
-	Com_Memset( &vk.cmd->descriptor_set, 0, sizeof( vk.cmd->descriptor_set ) );
-	vk.cmd->descriptor_set.start = ~0U;
-	//vk.cmd->descriptor_set.end = 0;
-
-	Com_Memset( &vk.cmd->scissor_rect, 0, sizeof( vk.cmd->scissor_rect ) );
-
-	// other stats
-	vk.stats.push_size = 0;
-}
-
-
-static void vk_resize_geometry_buffer( void )
-{
-	int i;
-
-	vk_end_render_pass();
-
-	VK_CHECK( qvkEndCommandBuffer( vk.cmd->command_buffer ) );
-
-	qvkResetCommandBuffer( vk.cmd->command_buffer, 0 );
-
-	vk_wait_idle();
-
-	vk_release_geometry_buffers();
-
-	vk_create_geometry_buffers( vk.geometry_buffer_size_new );
-	vk.geometry_buffer_size_new = 0;
-
-	for ( i = 0; i < NUM_COMMAND_BUFFERS; i++ )
-		vk_update_uniform_descriptor( vk.tess[ i ].uniform_descriptor, vk.tess[ i ].vertex_buffer );
-
-	ri.Printf( PRINT_DEVELOPER, "...geometry buffer resized to %iK\n", (int)( vk.geometry_buffer_size / 1024 ) );
-}
-
-
-void vk_end_frame( void )
-{
-	VkResult res; // For error checking on queue submission
-	VkImage dlssInputImage = VK_NULL_HANDLE;
-	VkImageView dlssInputView = VK_NULL_HANDLE;
-#ifdef USE_UPLOAD_QUEUE
-	VkSemaphore waits[2], signals[2];
-	const VkPipelineStageFlags wait_dst_stage_mask[2] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-#else
-	const VkPipelineStageFlags wait_dst_stage_mask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-#endif
-	VkSubmitInfo submit_info;
-
-	if ( vk.frame_count == 0 )
-		return;
-
-	vk.frame_count = 0;
-
-	if ( vk.geometry_buffer_size_new )
-	{
-		vk_resize_geometry_buffer();
-		// issue: one frame may be lost during video recording
-		// solution: re-record all commands again? (might be complicated though)
-		return;
-	}
-
-	if ( vk.fboActive )
-	{
-		vk.cmd->last_pipeline = VK_NULL_HANDLE; // do not restore clobbered descriptors in vk_bloom()
-
-		// ========================================================================
-		// EXPLICIT FRAMEGRAPH: Define the single "final image" for this frame
-		// ========================================================================
-		// The gamma/tonemap/composite pass MUST sample from exactly ONE image that
-		// is guaranteed to be fully written and properly transitioned every frame.
-		//
-		// Both bloom ON and bloom OFF paths write to vk.color_image:
-		//   - Bloom OFF: main render pass writes to vk.color_image
-		//   - Bloom ON:  post_bloom render pass writes to vk.color_image (blends bloom back)
-		//
-		// Therefore, finalColorImage/finalColorView always point to vk.color_image.
-		// This explicit variable makes the framegraph clear and prevents bugs.
-		VkImage     finalColorImage = vk.color_image;
-		VkImageView finalColorView  = vk.color_image_view;
-		
-		// Track whether finalColorImage was written to in this frame (needed for barriers)
-		qboolean finalImageWasWritten = qfalse;
-
-		// ========================================================================
-		// STEP 1: End main render pass and run optional RT composite
-		// ========================================================================
-#ifdef USE_VULKAN_RAY_TRACING
-		// Ray tracing pass (if enabled) - runs after main render pass.
-		// RT composite writes to vk.color_image, so finalColorImage remains correct.
-		if ( backEnd.useRayTracingWorld &&
-		     r_raytracing && r_raytracing->integer &&
-		     vk.rayTracingSupported && vk.rt.initialized ) {
-			if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
-				finalImageWasWritten = qtrue;
-				vk_end_render_pass(); // End main render pass before ray tracing
-			}
-			// Apply output scale if enabled
-			uint32_t rtWidth = vk.renderWidth;
-			uint32_t rtHeight = vk.renderHeight;
-			if ( r_rt_outputScale && r_rt_outputScale->value != 1.0f ) {
-				float scale = Com_Clamp( 0.25f, 2.0f, r_rt_outputScale->value );
-				rtWidth = (uint32_t)( vk.renderWidth * scale );
-				rtHeight = (uint32_t)( vk.renderHeight * scale );
-				// Ensure minimum size and alignment
-				rtWidth = ( rtWidth < 64 ) ? 64 : rtWidth;
-				rtHeight = ( rtHeight < 64 ) ? 64 : rtHeight;
-			}
-			vk_rt_trace_rays( rtWidth, rtHeight );
-			
-			// Composite RT output (HDR) to color_image with tonemapping
-			vk_rt_composite();
-			// RT composite writes to vk.color_image via post_bloom render pass
-			finalImageWasWritten = qtrue;
-		} else if ( r_bloom->integer ) {
-			// RT disabled, bloom enabled - end main render pass before bloom
-			if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
-				finalImageWasWritten = qtrue;
-				vk_end_render_pass();
-			}
-		} else {
-			// RT disabled, bloom disabled - main render pass wrote to vk.color_image
-			// The render pass will be ended in STEP 3 to avoid redundant checks.
-			// We just mark that the image was written (at least cleared).
-			if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
-				finalImageWasWritten = qtrue;
-			}
-		}
-#else
-		if ( r_bloom->integer ) {
-			// Bloom enabled - end main render pass before bloom
-			if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
-				finalImageWasWritten = qtrue;
-				vk_end_render_pass();
-			}
-		} else {
-			// Bloom disabled - main render pass wrote to vk.color_image
-			// The render pass will be ended in STEP 3 to avoid redundant checks.
-			// We just mark that the image was written (at least cleared).
-			if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
-				finalImageWasWritten = qtrue;
-			}
-		}
-#endif
-
-		// ========================================================================
-		// STEP 2: Run bloom if enabled (writes to vk.color_image via post_bloom)
-		// ========================================================================
-		if ( r_bloom->integer )
-		{
-			vk_bloom();
-			// Bloom writes to vk.color_image in post_bloom render pass.
-			// finalColorImage/finalColorView already point to vk.color_image/vk.color_image_view.
-			finalImageWasWritten = qtrue;
-		} else {
-			// Bloom is OFF: finalColorImage/finalColorView point to vk.color_image
-			// (written by main render pass or RT composite).
-			// The render pass will be ended in STEP 3 to avoid redundant checks.
-			// We just mark that the image was written (at least cleared).
-			if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
-				finalImageWasWritten = qtrue;
-			}
-		}
-
-		// ========================================================================
-		// STEP 2.5: screenMap capture moved to RB_DrawSurfs()
-		// ========================================================================
-		// screenMap is now captured in RB_DrawSurfs() right after 3D world rendering
-		// completes but before UI rendering begins. This ensures screenMap contains
-		// the current 3D scene for UI shaders to sample.
-		// screenMapDone is set in RB_DrawSurfs() after successful capture.
-
-		if ( backEnd.screenshotMask && vk.capture.image )
-		{
-			if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
-				vk_end_render_pass();
-			}
-
-			// render to capture FBO
-			vk_begin_render_pass( vk.render_pass.capture, vk.framebuffers.capture, qfalse, gls.captureWidth, gls.captureHeight );
-			qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.capture_pipeline );
-			qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
-
-			qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
-			vk_end_render_pass();
-		}
-
-		// ========================================================================
-		// STEP 3: Ensure finalColorImage is ready for sampling by gamma pass
-		// ========================================================================
-		// CRITICAL: This must happen BEFORE the minimized check, because we need to
-		// ensure the descriptor is always updated to point to the correct image,
-		// even if we're not presenting this frame. This prevents stale bloom buffers
-		// from being sampled when bloom is toggled off.
-		
-		// CRITICAL: End any remaining render pass before sampling.
-		// This ensures the image layout transitions from COLOR_ATTACHMENT_OPTIMAL to
-		// SHADER_READ_ONLY_OPTIMAL (via finalLayout). This is essential for proper synchronization.
-		// Note: UI rendering happens BEFORE vk_end_frame() is called, so UI has already rendered
-		// into the main render pass by this point. Ending the render pass here is safe and necessary.
-		// On menu-only frames with bloom OFF, the main render pass may still be active if nothing
-		// was drawn, so we must end it here to trigger the layout transition.
-		if ( vk.renderPassIndex < RENDER_PASS_COUNT ) {
-			finalImageWasWritten = qtrue;
-			vk_end_render_pass();
-		}
-
-		// Ensure finalColorImage is in SHADER_READ_ONLY_OPTIMAL layout and properly synchronized
-		// before the gamma pass samples from it. This is critical for both bloom ON and OFF paths.
-		// The main render pass always clears vk.color_image at start, so if we have a valid
-		// finalColorImage, it was definitely written to (at least cleared).
-		// On menu-only frames with bloom OFF, the main render pass may have only cleared
-		// the image but not drawn anything. We must ensure the image is properly synchronized
-		// and in the correct layout before sampling, otherwise we'll get corruption.
-		//
-		// CRITICAL: The render pass's finalLayout transitions the image to SHADER_READ_ONLY_OPTIMAL
-		// when it ends, but we still need an explicit barrier to ensure proper synchronization
-		// between the render pass ending and the gamma pass sampling. Without this barrier,
-		// the gamma pass might sample stale or uninitialized data, causing blocky corruption.
-		if ( finalColorImage != VK_NULL_HANDLE && finalColorView != VK_NULL_HANDLE ) {
-			if ( !finalImageWasWritten ) {
-				// Image was cleared by render pass, so it was written to
-				finalImageWasWritten = qtrue;
-			}
-			// Apply barrier to ensure proper synchronization before sampling
-			vk_barrier_final_image_to_shader_read( finalColorImage );
-		} else {
-			ri.Printf( PRINT_WARNING, "VK: finalColorImage (%p) or finalColorView (%p) is NULL in vk_end_frame (bloom=%d)\n", 
-				(void*)finalColorImage, (void*)finalColorView, r_bloom->integer );
-		}
-
-		// ========================================================================
-		// STEP 4: Update descriptor set to point to finalColorView
-		// ========================================================================
-		// CRITICAL: Always update the descriptor to point to finalColorView.
-		// This ensures the gamma pass always samples from the correct, valid image.
-		// The descriptor might have been set to point to a bloom buffer in a previous frame,
-		// so we must reset it every frame to guarantee correctness.
-		// This is especially important when toggling bloom at runtime.
-		// NOTE: This must happen even when minimized, to prevent stale descriptors.
-		// Validate inputs before updating descriptor
-		if ( finalColorView == VK_NULL_HANDLE ) {
-			ri.Printf( PRINT_WARNING, "VK: finalColorView is NULL, cannot update descriptor (bloom=%d)\n", r_bloom->integer );
-		} else {
-			VkDescriptorImageInfo info;
-			VkWriteDescriptorSet desc;
-			Vk_Sampler_Def sd;
-
-			Com_Memset( &sd, 0, sizeof( sd ) );
-			sd.vk_mag_filter = sd.vk_min_filter = VK_FILTER_LINEAR;
-			sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-			sd.max_lod_1_0 = qtrue;
-			sd.noAnisotropy = qtrue;
-
-			info.sampler = vk_find_sampler( &sd );
-			info.imageView = finalColorView;
-			info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-			desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-			desc.pNext = NULL;
-			desc.dstSet = vk.color_descriptor;
-			desc.dstBinding = 0;
-			desc.dstArrayElement = 0;
-			desc.descriptorCount = 1;
-			desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-			desc.pImageInfo = &info;
-			desc.pBufferInfo = NULL;
-			desc.pTexelBufferView = NULL;
-
-			qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
-		}
-
-		if ( !ri.CL_IsMinimized() )
-		{
-			// ========================================================================
-			// STEP 5: DLSS upscaling (if enabled, replaces TAA)
-			// ========================================================================
-			dlssInputImage = finalColorImage;
-			dlssInputView = finalColorView;
-
-			if ( r_dlss && r_dlss->integer && vk_dlss_is_supported() ) {
-				// DLSS processing code...
-				// Calculate render resolution based on DLSS quality mode
-				// DLSS quality modes: 0=Performance (50%), 1=Balanced (58%), 2=Quality (67%), 3=Ultra Quality (77%)
-				float scaleFactors[] = { 0.5f, 0.58f, 0.67f, 0.77f };
-				int qualityMode = r_dlss_quality ? r_dlss_quality->integer : 1;
-				qualityMode = (int)Com_Clamp( 0.0f, 3.0f, (float)qualityMode );
-				float scaleFactor = scaleFactors[qualityMode];
-				
-				uint32_t renderWidth = (uint32_t)(gls.windowWidth * scaleFactor);
-				uint32_t renderHeight = (uint32_t)(gls.windowHeight * scaleFactor);
-				
-				// Ensure render resolution is even (DLSS requirement)
-				renderWidth = (renderWidth / 2) * 2;
-				renderHeight = (renderHeight / 2) * 2;
-				
-				// Create DLSS resources if needed
-				vk_dlss_create_resources( renderWidth, renderHeight, gls.windowWidth, gls.windowHeight );
-				
-				// Update DLSS quality mode and sharpening
-				vk.dlss.qualityMode = qualityMode;
-				vk.dlss.sharpening = r_dlss_sharpening ? r_dlss_sharpening->value : 0.0f;
-				
-				// Run DLSS upscaling
-				// DLSS needs: color buffer, depth buffer, motion vectors
-				// Depth buffer is passed, motion vectors require additional implementation
-				if ( vk.dlss.dlssOutputImage != VK_NULL_HANDLE ) {
-					vk_dlss_evaluate( vk.cmd->command_buffer, finalColorImage,
-					                  vk.depth_image, VK_NULL_HANDLE, vk.frame_count );
-
-					// Use DLSS output as input for gamma pass
-					dlssInputImage = vk.dlss.dlssOutputImage;
-					dlssInputView = vk.dlss.dlssOutputImageView;
-				}
-
-				// Alternative upscaler (FSR/DLSS framework) - ready for implementation
-					
-					// Update descriptor to point to DLSS output
-					VkDescriptorImageInfo info;
-					VkWriteDescriptorSet desc;
-					Vk_Sampler_Def sd;
-					
-					Com_Memset( &sd, 0, sizeof( sd ) );
-					sd.vk_mag_filter = sd.vk_min_filter = VK_FILTER_LINEAR;
-					sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-					sd.max_lod_1_0 = qtrue;
-					sd.noAnisotropy = qtrue;
-					
-					info.sampler = vk_find_sampler( &sd );
-					info.imageView = dlssInputView;
-					info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-					
-					desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-					desc.pNext = NULL;
-					desc.dstSet = vk.color_descriptor;
-					desc.dstBinding = 0;
-					desc.dstArrayElement = 0;
-					desc.descriptorCount = 1;
-					desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-					desc.pImageInfo = &info;
-					desc.pBufferInfo = NULL;
-					desc.pTexelBufferView = NULL;
-					
-					qvkUpdateDescriptorSets( vk.device, 1, &desc, 0, NULL );
-				}
-			}
-			
-			// ========================================================================
-			// STEP 6: Optional style-transfer compute pass (writes to vk.style_image)
-			// ========================================================================
-			if ( r_styleTransfer && r_styleTransfer->integer &&
-			     vk.style_compute_pipeline != VK_NULL_HANDLE &&
-			     vk.style_image != VK_NULL_HANDLE && vk.style_image_view != VK_NULL_HANDLE ) {
-
-				VkDescriptorImageInfo input_info, output_info;
-				VkWriteDescriptorSet desc_writes[2];
-				uint32_t write_count = 0;
-				Vk_Sampler_Def sd;
-
-				Com_Memset( &sd, 0, sizeof( sd ) );
-				sd.vk_mag_filter = sd.vk_min_filter = VK_FILTER_LINEAR;
-				sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-				sd.max_lod_1_0 = qtrue;
-				sd.noAnisotropy = qtrue;
-
-				// Transition style image to GENERAL for compute write
-				VkImageMemoryBarrier style_barrier = {
-					.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-					.pNext = NULL,
-					.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT,
-					.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-					.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-					.newLayout = VK_IMAGE_LAYOUT_GENERAL,
-					.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-					.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-					.image = vk.style_image,
-					.subresourceRange = {
-						.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-						.baseMipLevel = 0,
-						.levelCount = 1,
-						.baseArrayLayer = 0,
-						.layerCount = 1
-					}
-				};
-				qvkCmdPipelineBarrier( vk.cmd->command_buffer,
-					VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-					0, 0, NULL, 0, NULL, 1, &style_barrier );
-
-				// Update descriptor set for style compute
-				input_info.sampler = vk_find_sampler( &sd );
-				input_info.imageView = dlssInputView;
-				input_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-				desc_writes[write_count].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				desc_writes[write_count].pNext = NULL;
-				desc_writes[write_count].dstSet = vk.compute_descriptor_set;
-				desc_writes[write_count].dstBinding = 0;
-				desc_writes[write_count].dstArrayElement = 0;
-				desc_writes[write_count].descriptorCount = 1;
-				desc_writes[write_count].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-				desc_writes[write_count].pImageInfo = &input_info;
-				desc_writes[write_count].pBufferInfo = NULL;
-				desc_writes[write_count].pTexelBufferView = NULL;
-				write_count++;
-
-				output_info.sampler = VK_NULL_HANDLE;
-				output_info.imageView = vk.style_image_view;
-				output_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-				desc_writes[write_count].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-				desc_writes[write_count].pNext = NULL;
-				desc_writes[write_count].dstSet = vk.compute_descriptor_set;
-				desc_writes[write_count].dstBinding = 1;
-				desc_writes[write_count].dstArrayElement = 0;
-				desc_writes[write_count].descriptorCount = 1;
-				desc_writes[write_count].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-				desc_writes[write_count].pImageInfo = &output_info;
-				desc_writes[write_count].pBufferInfo = NULL;
-				desc_writes[write_count].pTexelBufferView = NULL;
-				write_count++;
-
-				qvkUpdateDescriptorSets( vk.device, write_count, desc_writes, 0, NULL );
-
-				qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.style_compute_pipeline );
-				qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-					vk.compute_pipeline_layout, 0, 1, &vk.compute_descriptor_set, 0, NULL );
-
-				struct {
-					float strength;
-					float levels;
-					float edgeScale;
-					float pad;
-				} style_params;
-
-				style_params.strength = Com_Clamp( 0.0f, 2.0f, r_styleStrength ? r_styleStrength->value : 0.35f );
-				style_params.levels = Com_Clamp( 2.0f, 32.0f, r_styleLevels ? (float)r_styleLevels->integer : 8.0f );
-				style_params.edgeScale = Com_Clamp( 0.0f, 4.0f, r_styleEdge ? r_styleEdge->value : 2.0f );
-				style_params.pad = 0.0f;
-
-				qvkCmdPushConstants( vk.cmd->command_buffer, vk.compute_pipeline_layout,
-					VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( style_params ), &style_params );
-
-				uint32_t wgSize = ( r_postprocess_workgroup && r_postprocess_workgroup->integer > 0 ) ? (uint32_t)r_postprocess_workgroup->integer : 8u;
-				uint32_t groupCountX = (gls.windowWidth + (wgSize - 1)) / wgSize;
-				uint32_t groupCountY = (gls.windowHeight + (wgSize - 1)) / wgSize;
-				qvkCmdDispatch( vk.cmd->command_buffer, groupCountX, groupCountY, 1 );
-
-				// Transition style image for sampling
-				style_barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-				style_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-				style_barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-				style_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-				qvkCmdPipelineBarrier( vk.cmd->command_buffer,
-					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-					VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-					0, 0, NULL, 0, NULL, 1, &style_barrier );
-
-				dlssInputImage = vk.style_image;
-				dlssInputView = vk.style_image_view;
-			}
-			
-			// ========================================================================
-			// STEP 7: Run gamma/tonemap pass (always samples from finalColorView or DLSS output)
-			// ========================================================================
-			// CRITICAL: Ensure finalColorImage is valid before sampling.
-			// On menu-only frames with bloom OFF, the main render pass clears the image
-			// but may not draw anything. The render pass clear ensures the image is
-			// initialized, but we must verify it's in the correct layout and synchronized.
-			//
-			// CRITICAL: When RT is enabled, RT composite already outputs sRGB (via linearToSrgb),
-			// so the gamma pipeline should have gamma=1.0 (set at pipeline creation time)
-			// to avoid double gamma correction. The gamma pass still runs for obScale/dithering.
-			if ( dlssInputImage == VK_NULL_HANDLE || dlssInputView == VK_NULL_HANDLE ) {
-				ri.Printf( PRINT_WARNING, "VK: finalColorImage or finalColorView is NULL, skipping gamma pass\n" );
-			} else {
-				vk.renderWidth = gls.windowWidth;
-				vk.renderHeight = gls.windowHeight;
-
-				vk.renderScaleX = 1.0;
-				vk.renderScaleY = 1.0;
-
-				// Use compute shader post-processing if enabled
-				VkPipeline activeComputePipeline = VK_NULL_HANDLE;
-				qboolean useTonemapCompute = qfalse;
-
-				const qboolean allowCompute = ( r_postprocess_compute && r_postprocess_compute->integer ) &&
-					( !r_postQuality || r_postQuality->integer > 0 );
-
-				if ( allowCompute && vk.compute_descriptor_set != VK_NULL_HANDLE ) {
-					if ( vk.tonemap_compute_pipeline != VK_NULL_HANDLE && r_hdr && r_hdr->integer ) {
-						activeComputePipeline = vk.tonemap_compute_pipeline;
-						useTonemapCompute = qtrue;
-					} else if ( vk.gamma_compute_pipeline != VK_NULL_HANDLE ) {
-						activeComputePipeline = vk.gamma_compute_pipeline;
-					}
-					// If style transfer is requested, force the compute gamma path when available
-					if ( r_styleTransfer && r_styleTransfer->integer && vk.gamma_compute_pipeline != VK_NULL_HANDLE ) {
-						activeComputePipeline = vk.gamma_compute_pipeline;
-						useTonemapCompute = qfalse;
-					}
-				}
-
-				if ( activeComputePipeline != VK_NULL_HANDLE ) {
-					
-					// Compute shader gamma pass
-					VkImage swapchainImage = vk.swapchain_images[vk.cmd->swapchain_image_index];
-					VkImageView swapchainView = vk.swapchain_image_views[vk.cmd->swapchain_image_index];
-					
-					// 1. Update compute descriptor set with input/output images
-					VkDescriptorImageInfo input_info, output_info;
-					VkWriteDescriptorSet desc_writes[2];
-					uint32_t write_count = 0;
-					Vk_Sampler_Def sd;
-					
-					Com_Memset( &sd, 0, sizeof( sd ) );
-					sd.vk_mag_filter = sd.vk_min_filter = VK_FILTER_LINEAR;
-					sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
-					sd.max_lod_1_0 = qtrue;
-					sd.noAnisotropy = qtrue;
-					
-					// Input image (sampler) - sample from finalColorView
-					input_info.sampler = vk_find_sampler( &sd );
-					input_info.imageView = finalColorView;
-					input_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-					
-					desc_writes[write_count].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-					desc_writes[write_count].pNext = NULL;
-					desc_writes[write_count].dstSet = vk.compute_descriptor_set;
-					desc_writes[write_count].dstBinding = 0;
-					desc_writes[write_count].dstArrayElement = 0;
-					desc_writes[write_count].descriptorCount = 1;
-					desc_writes[write_count].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-					desc_writes[write_count].pImageInfo = &input_info;
-					desc_writes[write_count].pBufferInfo = NULL;
-					desc_writes[write_count].pTexelBufferView = NULL;
-					write_count++;
-					
-					// Transition swapchain image to GENERAL layout for compute writes
-					VkImageMemoryBarrier barrier = {
-						.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-						.pNext = NULL,
-						.srcAccessMask = VK_ACCESS_MEMORY_READ_BIT,
-						.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-						.oldLayout = vk.initSwapchainLayout,
-						.newLayout = VK_IMAGE_LAYOUT_GENERAL,
-						.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-						.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-						.image = swapchainImage,
-						.subresourceRange = {
-							.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-							.baseMipLevel = 0,
-							.levelCount = 1,
-							.baseArrayLayer = 0,
-							.layerCount = 1
-						}
-					};
-					qvkCmdPipelineBarrier( vk.cmd->command_buffer,
-						VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-						VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-						0, 0, NULL, 0, NULL, 1, &barrier );
-					
-					// Output image (storage image) - write to swapchain
-					output_info.sampler = VK_NULL_HANDLE;
-					output_info.imageView = swapchainView;
-					output_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-					
-					desc_writes[write_count].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-					desc_writes[write_count].pNext = NULL;
-					desc_writes[write_count].dstSet = vk.compute_descriptor_set;
-					desc_writes[write_count].dstBinding = 1;
-					desc_writes[write_count].dstArrayElement = 0;
-					desc_writes[write_count].descriptorCount = 1;
-					desc_writes[write_count].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-					desc_writes[write_count].pImageInfo = &output_info;
-					desc_writes[write_count].pBufferInfo = NULL;
-					desc_writes[write_count].pTexelBufferView = NULL;
-					write_count++;
-					
-					qvkUpdateDescriptorSets( vk.device, write_count, desc_writes, 0, NULL );
-					
-					// 2. Bind compute pipeline
-					qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, activeComputePipeline );
-					
-					// 3. Bind descriptor set
-					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-						vk.compute_pipeline_layout, 0, 1, &vk.compute_descriptor_set, 0, NULL );
-					
-					// 4. Push constants
-					if ( useTonemapCompute ) {
-						struct {
-							int tonemapMode;
-							float exposure;
-							float padding[2];
-						} tonemap_params;
-						tonemap_params.tonemapMode = (int)Com_Clamp( 0.0f, 3.0f, r_tonemapMode ? (float)r_tonemapMode->integer : 1.0f );
-						tonemap_params.exposure = Com_Clamp( 0.01f, 16.0f, r_tonemapExposure ? r_tonemapExposure->value : 1.0f );
-						tonemap_params.padding[0] = tonemap_params.padding[1] = 0.0f;
-
-						qvkCmdPushConstants( vk.cmd->command_buffer, vk.compute_pipeline_layout,
-							VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof( tonemap_params ), &tonemap_params );
-					} else {
-						struct {
-							float gamma;
-							float obScale;
-							float greyscale;
-							int ditherMode;
-							int depth_r, depth_g, depth_b;
-							float styleStrength;
-						} gamma_params;
-						
-						gamma_params.gamma = 1.0f / (r_gamma->value);
-						gamma_params.obScale = (float)(1 << tr.overbrightBits);
-						gamma_params.greyscale = r_greyscale->value;
-						gamma_params.ditherMode = r_dither->integer;
-						// Depth bits for dithering (assuming 8-bit per channel)
-						gamma_params.depth_r = 255;
-						gamma_params.depth_g = 255;
-						gamma_params.depth_b = 255;
-						gamma_params.styleStrength = ( r_styleTransfer && r_styleTransfer->integer )
-							? Com_Clamp( 0.0f, 2.0f, r_styleStrength ? r_styleStrength->value : 0.35f )
-							: 0.0f;
-						
-						qvkCmdPushConstants( vk.cmd->command_buffer, vk.compute_pipeline_layout,
-							VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(gamma_params), &gamma_params );
-					}
-					
-					// 5. Dispatch compute shader (workgroup size configurable, default 8x8)
-					uint32_t wgSize = ( r_postprocess_workgroup && r_postprocess_workgroup->integer > 0 ) ? (uint32_t)r_postprocess_workgroup->integer : 8u;
-					uint32_t groupCountX = (vk.renderWidth + (wgSize - 1)) / wgSize;
-					uint32_t groupCountY = (vk.renderHeight + (wgSize - 1)) / wgSize;
-					qvkCmdDispatch( vk.cmd->command_buffer, groupCountX, groupCountY, 1 );
-
-					// 6. Transition swapchain image back to PRESENT_SRC_KHR for presentation
-					barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-					barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-					barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-					barrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-					qvkCmdPipelineBarrier( vk.cmd->command_buffer,
-						VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-						VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-						0, 0, NULL, 0, NULL, 1, &barrier );
-					
-					ri.Printf( PRINT_DEVELOPER, "VK: Compute %s pass dispatched (%ux%u groups)\n",
-						useTonemapCompute ? "tonemap" : "gamma", groupCountX, groupCountY );
-				} else {
-					// Traditional graphics pipeline gamma pass
-					if ( r_postprocess_compute && r_postprocess_compute->integer && (!r_postQuality || r_postQuality->integer > 0) ) {
-						ri.Printf( PRINT_WARNING, "VK: Compute post-processing requested but pipelines not available or disabled by quality, using graphics pipeline\n" );
-					}
-					// The gamma pass renders directly to the swapchain framebuffer.
-					// Its render area MUST match the swapchain/window extent, not the internal render resolution.
-					// If vk.renderWidth/Height are larger than the swapchain (e.g. desktop-sized internal res),
-					// the fullscreen quad can be clipped to nothing -> black window with audio/input still working.
-					ri.Printf( PRINT_DEVELOPER, "VK: Gamma pass: renderArea=%dx%d (swapchain), internal=%dx%d\n",
-						gls.windowWidth, gls.windowHeight, vk.renderWidth, vk.renderHeight );
-					vk_begin_render_pass( vk.render_pass.gamma, vk.framebuffers.gamma[ vk.cmd->swapchain_image_index ], qtrue, gls.windowWidth, gls.windowHeight );
-					qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.gamma_pipeline );
-					qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.color_descriptor, 0, NULL );
-
-					// CRITICAL: Set viewport and scissor for gamma pass.
-					// Since viewport/scissor are dynamic states, they MUST be set before drawing.
-					// Without this, the viewport may be zero-sized or invalid, causing black screen.
-					{
-						VkViewport viewport;
-						VkRect2D scissor_rect;
-
-						viewport.x = 0.0f;
-						viewport.y = 0.0f;
-						viewport.width = (float)gls.windowWidth;
-						viewport.height = (float)gls.windowHeight;
-						viewport.minDepth = 0.0f;
-						viewport.maxDepth = 1.0f;
-
-						scissor_rect.offset.x = 0;
-						scissor_rect.offset.y = 0;
-						scissor_rect.extent.width = gls.windowWidth;
-						scissor_rect.extent.height = gls.windowHeight;
-
-						qvkCmdSetViewport( vk.cmd->command_buffer, 0, 1, &viewport );
-						qvkCmdSetScissor( vk.cmd->command_buffer, 0, 1, &scissor_rect );
-					}
-
-					qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
-					vk_end_render_pass();
-				}
-		}
-	}
-
-	// Record GPU timing end timestamp before ending command buffer
-	if ( vk.timing.enabled && qvkCmdWriteTimestamp ) {
-		uint32_t query_index = vk.cmd_index * 2 + 1; // End timestamp
-		qvkCmdWriteTimestamp( vk.cmd->command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, vk.timing.timestamp_query_pool, query_index );
-	}
-
-	VK_CHECK( qvkEndCommandBuffer( vk.cmd->command_buffer ) );
-
-	submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-	submit_info.pNext = NULL;
-	submit_info.commandBufferCount = 1;
-	submit_info.pCommandBuffers = &vk.cmd->command_buffer;
-	if ( !ri.CL_IsMinimized() ) {
-#ifdef USE_UPLOAD_QUEUE
-		if ( vk.image_uploaded != VK_NULL_HANDLE ) {
-			waits[0] = vk.cmd->image_acquired;
-			waits[1] = vk.image_uploaded;
-			submit_info.waitSemaphoreCount = 2;
-			submit_info.pWaitSemaphores = &waits[0];
-			submit_info.pWaitDstStageMask = &wait_dst_stage_mask[0];
-			signals[0] = vk.swapchain_rendering_finished[ vk.cmd->swapchain_image_index ];
-			signals[1] = vk.cmd->rendering_finished2;
-			submit_info.signalSemaphoreCount = 2;
-			submit_info.pSignalSemaphores = &signals[0];
-
-			vk.rendering_finished = vk.cmd->rendering_finished2;
-			vk.image_uploaded = VK_NULL_HANDLE;
-		} else if ( vk.rendering_finished != VK_NULL_HANDLE ) {
-			waits[0] = vk.cmd->image_acquired;
-			waits[1] = vk.rendering_finished;
-			submit_info.waitSemaphoreCount = 2;
-			submit_info.pWaitSemaphores = &waits[0];
-			submit_info.pWaitDstStageMask = &wait_dst_stage_mask[0];
-			signals[0] = vk.swapchain_rendering_finished[ vk.cmd->swapchain_image_index ];
-			signals[1] = vk.cmd->rendering_finished2;
-			submit_info.signalSemaphoreCount = 2;
-			submit_info.pSignalSemaphores = &signals[0];
-
-			vk.rendering_finished = vk.cmd->rendering_finished2;
-		} else {
-			submit_info.waitSemaphoreCount = 1;
-			submit_info.pWaitSemaphores = &vk.cmd->image_acquired;
-			submit_info.pWaitDstStageMask = &wait_dst_stage_mask[0];
-			submit_info.signalSemaphoreCount = 1;
-			submit_info.pSignalSemaphores = &vk.swapchain_rendering_finished[ vk.cmd->swapchain_image_index ];
-		}
-#else
-		submit_info.waitSemaphoreCount = 1;
-		submit_info.pWaitSemaphores = &vk.cmd->image_acquired;
-		submit_info.pWaitDstStageMask = &wait_dst_stage_mask;
-		submit_info.signalSemaphoreCount = 1;
-		submit_info.pSignalSemaphores = &vk.swapchain_rendering_finished[ vk.cmd->swapchain_image_index ];
-#endif
-	} else {
-		submit_info.waitSemaphoreCount = 0;
-		submit_info.pWaitSemaphores = NULL;
-		submit_info.pWaitDstStageMask = NULL;
-		submit_info.signalSemaphoreCount = 0;
-		submit_info.pSignalSemaphores = NULL;
-	}
-
-	// CRITICAL: Submit command buffer with fence for synchronization
-	// The fence will be signaled when the command buffer execution completes.
-	// If submission fails with VK_ERROR_DEVICE_LOST, the device is in an invalid state
-	// and we cannot recover - this usually indicates invalid Vulkan API usage.
-	res = qvkQueueSubmit( vk.queue, 1, &submit_info, vk.cmd->rendering_finished_fence );
-	if ( res != VK_SUCCESS ) {
-		if ( res == VK_ERROR_DEVICE_LOST ) {
-			// Device lost - this is a critical error indicating invalid API usage
-			// Common causes: invalid image layout transitions, command buffer reuse without reset,
-			// invalid barriers, or sampling uninitialized images
-			ri.Error( ERR_FATAL, "Vulkan: qvkQueueSubmit returned VK_ERROR_DEVICE_LOST - device is in invalid state. "
-				"This usually indicates invalid image layout transitions, command buffer misuse, or invalid barriers. "
-				"Check screenMap barriers and command buffer lifecycle." );
-		} else {
-			ri.Error( ERR_FATAL, "Vulkan: qvkQueueSubmit returned %s", vk_result_string( res ) );
-		}
-	}
-	vk.cmd->waitForFence = qtrue;
-
-	// Retrieve GPU timing results from previous frame (if available)
-	// Note: Results are retrieved after submission, so we get timing from the frame that just completed
-	if ( vk.timing.enabled && qvkGetQueryPoolResults && qvkWaitForFences ) {
-		// Wait for previous frame's command buffer to complete before reading results
-		uint32_t prev_cmd_index = ( vk.cmd_index + 1 ) % NUM_COMMAND_BUFFERS;
-		if ( vk.tess[prev_cmd_index].waitForFence ) {
-			VkResult fence_res = qvkWaitForFences( vk.device, 1, &vk.tess[prev_cmd_index].rendering_finished_fence, VK_FALSE, 1000000 ); // 1ms timeout
-			if ( fence_res == VK_SUCCESS ) {
-				uint32_t query_index = prev_cmd_index * 2;
-				uint64_t timestamps[2];
-				
-				VkResult query_res = qvkGetQueryPoolResults( vk.device, vk.timing.timestamp_query_pool, 
-					query_index, 2, sizeof( timestamps ), timestamps, sizeof( uint64_t ), 
-					VK_QUERY_RESULT_64_BIT );
-				
-				if ( query_res == VK_SUCCESS && timestamps[1] > timestamps[0] ) {
-					VkPhysicalDeviceProperties props;
-					qvkGetPhysicalDeviceProperties( vk.physical_device, &props );
-					uint64_t timestamp_period = props.limits.timestampPeriod; // nanoseconds per timestamp unit
-					uint64_t frame_time_ns = ( timestamps[1] - timestamps[0] ) * timestamp_period;
-					
-					// Store in ring buffer for statistics
-					vk.timing.frame_times[ vk.timing.frame_time_index ] = frame_time_ns;
-					vk.timing.frame_time_index = ( vk.timing.frame_time_index + 1 ) % ARRAY_LEN( vk.timing.frame_times );
-					
-					// GPU timing provides more accurate measurement than CPU timing
-					// Frame time is already calculated in RB_ExecuteRenderCommands via CPU timing
-					// Update performance counters with current GPU frame time
-					float gpu_frame_time_ms = (float)frame_time_ns / 1000000.0f;
-					Perf_UpdateGPUTiming(gpu_frame_time_ms);
-				}
-				
-				// Reset query pool for next frame
-				if ( qvkResetQueryPool ) {
-					qvkResetQueryPool( vk.device, vk.timing.timestamp_query_pool, query_index, 2 );
-				}
-			}
-		}
-	}
-
-	vk.renderPassIndex = RENDER_PASS_MAIN;
-
-	// Update performance statistics
-	vk_update_performance_stats();
-
-	// Check for memory defragmentation
-	vk_check_defragmentation();
-
-	// Increment frame count
-	vk.frame_count++;
-
-	// CRITICAL FIX: Present the frame NOW, at the end of vk_end_frame().
-	// Previously vk_present_frame() was only called from RB_SwapBuffers(),
-	// but RB_ExecuteRenderCommands() returns after RC_END_OF_LIST (which calls vk_end_frame()),
-	// so vk_present_frame() in RB_SwapBuffers() was NEVER REACHED -> black screen!
-	vk_present_frame();
-}
-
-void vk_present_frame( void )
-{
-	VkPresentInfoKHR present_info;
-	VkResult res;
-
-	if ( ri.CL_IsMinimized() || !vk.cmd->swapchain_image_acquired ) {
-		return;
-	}
-
-	if ( !vk.cmd->waitForFence ) {
-		// nothing has been submitted this frame due to geometry buffer overflow?
-		return;
-	}
-
-	present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-	present_info.pNext = NULL;
-	present_info.waitSemaphoreCount = 1;
-	present_info.pWaitSemaphores = &vk.swapchain_rendering_finished[ vk.cmd->swapchain_image_index ];
-	present_info.swapchainCount = 1;
-	present_info.pSwapchains = &vk.swapchain;
-	present_info.pImageIndices = &vk.cmd->swapchain_image_index;
-	present_info.pResults = NULL;
-
-	vk.cmd->swapchain_image_acquired = qfalse;
-
-	res = qvkQueuePresentKHR( vk.queue, &present_info );
-	switch ( res ) {
-		case VK_SUCCESS:
-			break;
-		case VK_SUBOPTIMAL_KHR:
-		case VK_ERROR_OUT_OF_DATE_KHR:
-			// swapchain re-creation needed
-			// vk_restart_swapchain( __func__, res ); // TODO: Implement swapchain restart
-			return;
-		case VK_ERROR_DEVICE_LOST:
-			// we can ignore that
-			ri.Printf( PRINT_DEVELOPER, "vkQueuePresentKHR: device lost\n" );
-			break;
-		default:
-			// or we don't
-			ri.Error( ERR_FATAL, "vkQueuePresentKHR returned %s", vk_result_string( res ) );
-	}
-
-	// pickup next command buffer for rendering
-	vk.cmd_index++;
-	vk.cmd_index %= NUM_COMMAND_BUFFERS;
-	vk.cmd = &vk.tess[ vk.cmd_index ];
-}
-
-
-static qboolean is_bgr( VkFormat format ) {
-	switch ( format ) {
-		case VK_FORMAT_B8G8R8A8_UNORM:
-		case VK_FORMAT_B8G8R8A8_SNORM:
-		case VK_FORMAT_B8G8R8A8_UINT:
-		case VK_FORMAT_B8G8R8A8_SINT:
-		case VK_FORMAT_B8G8R8A8_SRGB:
-		case VK_FORMAT_B4G4R4A4_UNORM_PACK16:
-			return qtrue;
-		default:
-			return qfalse;
-	}
-}
-
-
-void vk_read_pixels( byte *buffer, uint32_t width, uint32_t height )
-{
-	VkCommandBuffer command_buffer;
-	VkDeviceMemory memory;
-	VkMemoryRequirements memory_requirements;
-	VkMemoryPropertyFlags memory_reqs;
-	VkMemoryPropertyFlags memory_flags;
-	VkMemoryAllocateInfo alloc_info;
-	VkImageSubresource subresource;
-	VkSubresourceLayout layout;
-	VkImageCreateInfo desc;
-	VkImage srcImage;
-	VkImageLayout srcImageLayout;
-	VkImage dstImage;
-	byte *buffer_ptr;
-	byte *data;
-	uint32_t pixel_width;
-	uint32_t i, n;
-	qboolean invalidate_ptr;
-
-	VK_CHECK( qvkWaitForFences( vk.device, 1, &vk.cmd->rendering_finished_fence, VK_FALSE, 1e12 ) );
-
-	if ( vk.fboActive ) {
-		if ( vk.capture.image ) {
-			// dedicated capture buffer
-			srcImageLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-			srcImage = vk.capture.image;
-		} else {
-			srcImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			srcImage = vk.color_image;
-		}
-	} else {
-		srcImageLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-		srcImage = vk.swapchain_images[ vk.cmd->swapchain_image_index ];
-	}
-
-	Com_Memset( &desc, 0, sizeof( desc ) );
-
-	// Create image in host visible memory to serve as a destination for framebuffer pixels.
-	desc.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-	desc.pNext = NULL;
-	desc.flags = 0;
-	desc.imageType = VK_IMAGE_TYPE_2D;
-	desc.format = vk.capture_format;
-	desc.extent.width = width;
-	desc.extent.height = height;
-	desc.extent.depth = 1;
-	desc.mipLevels = 1;
-	desc.arrayLayers = 1;
-	desc.samples = VK_SAMPLE_COUNT_1_BIT;
-	desc.tiling = VK_IMAGE_TILING_LINEAR;
-	desc.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-	desc.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	desc.queueFamilyIndexCount = 0;
-	desc.pQueueFamilyIndices = NULL;
-	desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-
-	VK_CHECK( qvkCreateImage( vk.device, &desc, NULL, &dstImage ) );
-
-	qvkGetImageMemoryRequirements( vk.device, dstImage, &memory_requirements );
-
-	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	alloc_info.pNext = NULL;
-	alloc_info.allocationSize = memory_requirements.size;
-
-	// host_cached bit is desirable for fast reads
-	memory_reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
-	alloc_info.memoryTypeIndex = find_memory_type2( memory_requirements.memoryTypeBits, memory_reqs, &memory_flags );
-	if ( alloc_info.memoryTypeIndex == ~0U ) {
-		// try less explicit flags, without host_coherent
-		memory_reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
-		alloc_info.memoryTypeIndex = find_memory_type2( memory_requirements.memoryTypeBits, memory_reqs, &memory_flags );
-		if ( alloc_info.memoryTypeIndex == ~0U ) {
-			// slowest case
-			memory_reqs = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-			alloc_info.memoryTypeIndex = find_memory_type2( memory_requirements.memoryTypeBits, memory_reqs, &memory_flags );
-			if ( alloc_info.memoryTypeIndex == ~0U ) {
-				ri.Error( ERR_FATAL, "%s(): failed to find matching memory type for image capture", __func__ );
-			}
-		}
-	}
-
-	if ( memory_flags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT ) {
-		invalidate_ptr = qfalse;
-	} else {
-		 // according to specification - must be performed if host_coherent is not set
-		invalidate_ptr = qtrue;
-	}
-
-	VK_CHECK(qvkAllocateMemory(vk.device, &alloc_info, NULL, &memory));
-	VK_CHECK(qvkBindImageMemory(vk.device, dstImage, memory, 0));
-
-	command_buffer = begin_command_buffer();
-
-	if ( srcImageLayout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL ) {
-		record_image_layout_transition( command_buffer, srcImage,
-			VK_IMAGE_ASPECT_COLOR_BIT,
-			srcImageLayout,
-			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-			0, 0);
-	}
-
-	record_image_layout_transition( command_buffer, dstImage,
-		VK_IMAGE_ASPECT_COLOR_BIT,
-		VK_IMAGE_LAYOUT_UNDEFINED,
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, 0 );
-
-	// end_command_buffer( command_buffer, __func__  );
-
-	// command_buffer = begin_command_buffer();
-
-	if ( vk.blitEnabled ) {
-		VkImageBlit region;
-
-		region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		region.srcSubresource.mipLevel = 0;
-		region.srcSubresource.baseArrayLayer = 0;
-		region.srcSubresource.layerCount = 1;
-		region.srcOffsets[0].x = 0;
-		region.srcOffsets[0].y = 0;
-		region.srcOffsets[0].z = 0;
-		region.srcOffsets[1].x = width;
-		region.srcOffsets[1].y = height;
-		region.srcOffsets[1].z = 1;
-		region.dstSubresource = region.srcSubresource;
-		region.dstOffsets[0] = region.srcOffsets[0];
-		region.dstOffsets[1] = region.srcOffsets[1];
-
-		qvkCmdBlitImage( command_buffer, srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region, VK_FILTER_NEAREST );
-
-	} else {
-		VkImageCopy region;
-
-		region.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		region.srcSubresource.mipLevel = 0;
-		region.srcSubresource.baseArrayLayer = 0;
-		region.srcSubresource.layerCount = 1;
-		region.srcOffset.x = 0;
-		region.srcOffset.y = 0;
-		region.srcOffset.z = 0;
-		region.dstSubresource = region.srcSubresource;
-		region.dstOffset = region.srcOffset;
-		region.extent.width = width;
-		region.extent.height = height;
-		region.extent.depth = 1;
-
-		qvkCmdCopyImage( command_buffer, srcImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dstImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region );
-	}
-
-	end_command_buffer( command_buffer, __func__ );
-
-	// Copy data from destination image to memory buffer.
-	subresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-	subresource.mipLevel = 0;
-	subresource.arrayLayer = 0;
-
-	qvkGetImageSubresourceLayout( vk.device, dstImage, &subresource, &layout );
-
-	VK_CHECK( qvkMapMemory( vk.device, memory, 0, VK_WHOLE_SIZE, 0, (void**)&data ) );
-
-	if ( invalidate_ptr )
-	{
-		VkMappedMemoryRange range;
-		range.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-		range.pNext = NULL;
-		range.memory = memory;
-		range.size = VK_WHOLE_SIZE;
-		range.offset = 0;
-		qvkInvalidateMappedMemoryRanges( vk.device, 1, &range );
-	}
-
-	data += layout.offset;
-
-	switch ( vk.capture_format ) {
-		case VK_FORMAT_B4G4R4A4_UNORM_PACK16: pixel_width = 2; break;
-		case VK_FORMAT_R16G16B16A16_UNORM: pixel_width = 8; break;
-		default: pixel_width = 4; break;
-	}
-
-	buffer_ptr = buffer + width * (height - 1) * 3;
-	for ( i = 0; i < height; i++ ) {
-		switch ( pixel_width ) {
-			case 2: {
-				uint16_t *src = (uint16_t*)data;
-				for ( n = 0; n < width; n++ ) {
-					buffer_ptr[n*3+0] = ((src[n]>>12)&0xF)<<4;
-					buffer_ptr[n*3+1] = ((src[n]>>8)&0xF)<<4;
-					buffer_ptr[n*3+2] = ((src[n]>>4)&0xF)<<4;
-				}
-			} break;
-
-			case 4: {
-				for ( n = 0; n < width; n++ ) {
-					Com_Memcpy( &buffer_ptr[n*3], &data[n*4], 3 );
-					//buffer_ptr[n*3+0] = data[n*4+0];
-					//buffer_ptr[n*3+1] = data[n*4+1];
-					//buffer_ptr[n*3+2] = data[n*4+2];
-				}
-			} break;
-
-			case 8: {
-				const uint16_t *src = (uint16_t*)data;
-				for ( n = 0; n < width; n++ ) {
-					buffer_ptr[n*3+0] = src[n*4+0]>>8;
-					buffer_ptr[n*3+1] = src[n*4+1]>>8;
-					buffer_ptr[n*3+2] = src[n*4+2]>>8;
-				}
-			} break;
-		}
-		buffer_ptr -= width * 3;
-		data += layout.rowPitch;
-	}
-
-	if ( is_bgr( vk.capture_format ) ) {
-		buffer_ptr = buffer;
-		for ( i = 0; i < width * height; i++ ) {
-			byte tmp = buffer_ptr[0];
-			buffer_ptr[0] = buffer_ptr[2];
-			buffer_ptr[2] = tmp;
-			buffer_ptr += 3;
-		}
-	}
-
-	qvkDestroyImage( vk.device, dstImage, NULL );
-	qvkFreeMemory( vk.device, memory, NULL );
-
-	// restore previous layout
-	if ( srcImageLayout != VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL ) {
-		command_buffer = begin_command_buffer();
-
-		record_image_layout_transition( command_buffer, srcImage,
-			VK_IMAGE_ASPECT_COLOR_BIT,
-			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-			srcImageLayout, 0, 0 );
-
-		end_command_buffer( command_buffer, "restore layout" );
-	}
-}
-
 
 qboolean vk_bloom( void )
 {

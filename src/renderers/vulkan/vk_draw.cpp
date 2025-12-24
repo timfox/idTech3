@@ -4,11 +4,13 @@
 #include "vk_pipeline.h"
 #include "../renderercommon/tr_public.h"
 #include "vk.h"
+#include "../../common/performance_counters.h"
 
 // Renderer interface
 extern refimport_t ri;
 
 // Vulkan function pointer extern declarations
+extern PFN_vkCmdSetBlendConstants qvkCmdSetBlendConstants;
 extern PFN_vkCmdDraw qvkCmdDraw;
 extern PFN_vkCmdDrawIndexed qvkCmdDrawIndexed;
 extern PFN_vkCmdBindVertexBuffers qvkCmdBindVertexBuffers;
@@ -48,12 +50,12 @@ void vk_draw_geometry(Vk_Depth_Range depth_range, qboolean indexed) {
 #ifdef USE_VBO
     if (vk.geometry_buffer_size_new) {
         VkBuffer vertex_buffers[1] = {vk.vbo.vertex_buffer};
-        VkDeviceSize vertex_offset[1] = {vk.geometry_offset};
+        VkDeviceSize vertex_offset[1] = {vk.cmd->vertex_buffer_offset};
 
         qvkCmdBindVertexBuffers(vk.cmd->command_buffer, 0, 1, vertex_buffers, vertex_offset);
 
         if (indexed) {
-            qvkCmdBindIndexBuffer(vk.cmd->command_buffer, vk.vbo.index_buffer, vk.index_offset, VK_INDEX_TYPE_UINT32);
+            qvkCmdBindIndexBuffer(vk.cmd->command_buffer, vk.cmd->curr_index_buffer, vk.cmd->curr_index_offset, VK_INDEX_TYPE_UINT32);
         }
     } else
 #endif
@@ -64,7 +66,7 @@ void vk_draw_geometry(Vk_Depth_Range depth_range, qboolean indexed) {
         qvkCmdBindVertexBuffers(vk.cmd->command_buffer, 0, 1, vertex_buffers, vertex_offset);
 
         if (indexed) {
-            qvkCmdBindIndexBuffer(vk.cmd->command_buffer, vk.vbo.index_buffer, 0, VK_INDEX_TYPE_UINT32);
+            qvkCmdBindIndexBuffer(vk.cmd->command_buffer, vk.cmd->curr_index_buffer, 0, VK_INDEX_TYPE_UINT32);
         }
     }
 
@@ -72,7 +74,7 @@ void vk_draw_geometry(Vk_Depth_Range depth_range, qboolean indexed) {
         vk_update_uniform_descriptor(vk.cmd->uniform_descriptor, vk.vbo.vertex_buffer);
     }
 
-    vk_update_depth_range(depth_range);
+    vk_set_depth_range(depth_range);
 
     if (indexed) {
         vk_draw_indexed_call(vk.cmd->command_buffer, vk.cmd->num_indexes, 1, 0, 0, 0);
@@ -82,19 +84,19 @@ void vk_draw_geometry(Vk_Depth_Range depth_range, qboolean indexed) {
 }
 
 // Draw dot (for debugging)
-void vk_draw_dot(uint32_t storage_offset) {
+void vk_draw_dot(uint32_t /*storage_offset*/) {
     if (!vk_validate_handle(vk.cmd->command_buffer, "command buffer")) {
         return;
     }
 
     if (vk.geometry_buffer_size_new) {
         VkBuffer vertex_buffers[1] = {vk.vbo.vertex_buffer};
-        VkDeviceSize vertex_offset[1] = {vk.geometry_offset};
+        VkDeviceSize vertex_offset[1] = {vk.cmd->vertex_buffer_offset};
 
         qvkCmdBindVertexBuffers(vk.cmd->command_buffer, 0, 1, vertex_buffers, vertex_offset);
     }
 
-    vk_update_depth_range(DEPTH_RANGE_NORMAL);
+    vk_set_depth_range(DEPTH_RANGE_NORMAL);
 
     vk_draw_call(vk.cmd->command_buffer, tess.numVertexes, 1, 0, 0);
 }
@@ -174,6 +176,7 @@ void vk_begin_render_pass(VkRenderPass render_pass, VkFramebuffer framebuffer,
 
     VkRenderPassBeginInfo render_pass_info = {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        .pNext = nullptr,
         .renderPass = render_pass,
         .framebuffer = framebuffer,
         .renderArea = {
@@ -187,10 +190,6 @@ void vk_begin_render_pass(VkRenderPass render_pass, VkFramebuffer framebuffer,
     qvkCmdBeginRenderPass(vk.cmd->command_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 }
 
-// End current render pass
-void vk_end_render_pass(void) {
-    qvkCmdEndRenderPass(vk.cmd->command_buffer);
-}
 
 // Set blend constants
 void vk_set_blend_constants(float r, float g, float b, float a) {

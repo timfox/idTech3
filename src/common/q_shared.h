@@ -1034,7 +1034,13 @@ qint64 Long64NoSwap( qint64 ll );
 float FloatNoSwap( const float *f );
 unsigned int crc32_buffer( const byte *buf, unsigned int len );
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 const char *QDECL va( const char *format, ... ) __attribute__ ((format( printf, 1, 2 )));
+#ifdef __cplusplus
+}
+#endif
 
 #define TRUNCATE_LENGTH	64
 void Com_TruncateLongString( char *buffer, const char *s );

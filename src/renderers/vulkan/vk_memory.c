@@ -157,7 +157,7 @@ VkBuffer vk_get_buffer_from_pool(VkDeviceSize size) {
 			return vk.resource_pools.small_buffers.buffers[index];
 		} else if (vk.resource_pools.small_buffers.count < ARRAY_LEN(vk.resource_pools.small_buffers.buffers)) {
 			// Allocate new buffer
-			uint32_t index = vk.resource_pools.small_buffers.count++;
+			vk.resource_pools.small_buffers.count++;
 			// For now, just return null - proper implementation would allocate here
 			// This prevents crashes but doesn't provide pooling yet
 			return VK_NULL_HANDLE;
@@ -169,7 +169,7 @@ VkBuffer vk_get_buffer_from_pool(VkDeviceSize size) {
 			return vk.resource_pools.medium_buffers.buffers[index];
 		} else if (vk.resource_pools.medium_buffers.count < ARRAY_LEN(vk.resource_pools.medium_buffers.buffers)) {
 			// Allocate new buffer
-			uint32_t index = vk.resource_pools.medium_buffers.count++;
+			vk.resource_pools.medium_buffers.count++;
 			return VK_NULL_HANDLE;
 		}
 	} else { // > 16MB
@@ -179,7 +179,7 @@ VkBuffer vk_get_buffer_from_pool(VkDeviceSize size) {
 			return vk.resource_pools.large_buffers.buffers[index];
 		} else if (vk.resource_pools.large_buffers.count < ARRAY_LEN(vk.resource_pools.large_buffers.buffers)) {
 			// Allocate new buffer
-			uint32_t index = vk.resource_pools.large_buffers.count++;
+			vk.resource_pools.large_buffers.count++;
 			return VK_NULL_HANDLE;
 		}
 	}

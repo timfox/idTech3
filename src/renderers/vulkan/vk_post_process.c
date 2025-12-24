@@ -13,6 +13,7 @@ extern refimport_t ri;
 #ifdef USE_VULKAN
 #include "vk.h"
 #include "vk_post_process.h"
+#include "vk_postprocess.h"
 
 // Vulkan function pointers (extern declarations)
 extern PFN_vkCreateComputePipelines qvkCreateComputePipelines;
@@ -616,6 +617,16 @@ vk_create_enhanced_post_process_pipelines
 qboolean vk_create_enhanced_post_process_pipelines(void)
 {
     qboolean success = qtrue;
+
+    // Ensure bloom resources exist before creating pipelines
+    if (r_pp_bloom && r_pp_bloom->integer && vk.renderWidth > 0 && vk.renderHeight > 0 && vk.color_format != VK_FORMAT_UNDEFINED) {
+        if (vk.bloom_image[0] == VK_NULL_HANDLE) {
+            if (!vk_create_bloom_resources()) {
+                ri.Printf(PRINT_ERROR, "Failed to create bloom resources for pipelines\n");
+                success = qfalse;
+            }
+        }
+    }
 
     success &= vk_create_ssao_pipeline();
     success &= vk_create_ssr_pipeline();

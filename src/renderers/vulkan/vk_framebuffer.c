@@ -12,7 +12,6 @@ extern PFN_vkCreateFramebuffer qvkCreateFramebuffer;
 extern PFN_vkDestroyFramebuffer qvkDestroyFramebuffer;
 
 // Utility functions
-extern const char *va(const char *format, ...);
 extern void *Com_Memcpy(void *dest, const void *src, size_t count);
 extern void *Com_Memset(void *dest, int c, size_t count);
 

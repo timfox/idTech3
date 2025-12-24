@@ -8,6 +8,9 @@
 // Renderer interface
 extern refimport_t ri;
 
+// Vulkan function pointer for depth stencil clearing
+extern PFN_vkCmdClearDepthStencilImage qvkCmdClearDepthStencilImage;
+
 // Vulkan function pointer extern declarations
 extern PFN_vkAcquireNextImageKHR qvkAcquireNextImageKHR;
 extern PFN_vkQueuePresentKHR qvkQueuePresentKHR;
@@ -46,7 +49,7 @@ void vk_begin_frame(void) {
         return;
     }
 
-    vk.swapchain_image_index = image_index;
+    vk.cmd->swapchain_image_index = image_index;
     vk.tess[vk.cmd_index].swapchain_image_acquired = qtrue;
 
     // Update performance statistics
@@ -55,7 +58,9 @@ void vk_begin_frame(void) {
     // Begin command buffer
     VkCommandBufferBeginInfo begin_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT
+        .pNext = nullptr,
+        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+        .pInheritanceInfo = nullptr
     };
 
     result = qvkBeginCommandBuffer(vk.tess[vk.cmd_index].command_buffer, &begin_info);
@@ -70,6 +75,7 @@ void vk_begin_frame(void) {
     // Transition swapchain image to color attachment
     VkImageMemoryBarrier barrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .pNext = nullptr,
         .srcAccessMask = 0,
         .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
@@ -79,7 +85,9 @@ void vk_begin_frame(void) {
         .image = vk.swapchain_images[image_index],
         .subresourceRange = {
             .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
             .levelCount = 1,
+            .baseArrayLayer = 0,
             .layerCount = 1
         }
     };
@@ -104,16 +112,19 @@ void vk_end_frame(void) {
     // Transition swapchain image to present layout
     VkImageMemoryBarrier barrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .pNext = nullptr,
         .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
         .dstAccessMask = 0,
         .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
         .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image = vk.swapchain_images[vk.swapchain_image_index],
+        .image = vk.swapchain_images[vk.cmd->swapchain_image_index],
         .subresourceRange = {
             .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
             .levelCount = 1,
+            .baseArrayLayer = 0,
             .layerCount = 1
         }
     };
@@ -135,13 +146,14 @@ void vk_end_frame(void) {
 
     VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .pNext = nullptr,
         .waitSemaphoreCount = 1,
         .pWaitSemaphores = &vk.cmd->image_acquired,
         .pWaitDstStageMask = &wait_stage,
         .commandBufferCount = 1,
         .pCommandBuffers = &vk.cmd->command_buffer,
         .signalSemaphoreCount = 1,
-        .pSignalSemaphores = &vk.cmd->rendering_finished
+        .pSignalSemaphores = &vk.cmd->rendering_finished2
     };
 
     result = qvkQueueSubmit(vk.queue, 1, &submit_info, vk.cmd->rendering_finished_fence);
@@ -175,11 +187,13 @@ void vk_present_frame(void) {
     // Present the frame
     VkPresentInfoKHR present_info = {
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+        .pNext = nullptr,
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &vk.cmd->rendering_finished,
+        .pWaitSemaphores = &vk.cmd->rendering_finished2,
         .swapchainCount = 1,
         .pSwapchains = &vk.swapchain,
-        .pImageIndices = &vk.swapchain_image_index
+        .pImageIndices = &vk.cmd->swapchain_image_index,
+        .pResults = nullptr
     };
 
     VkResult result = qvkQueuePresentKHR(vk.queue, &present_info);
@@ -243,11 +257,13 @@ void vk_clear_color(const vec4_t clear_color) {
 
     VkImageSubresourceRange range = {
         .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+        .baseMipLevel = 0,
         .levelCount = 1,
+        .baseArrayLayer = 0,
         .layerCount = 1
     };
 
-    qvkCmdClearColorImage(vk.cmd->command_buffer, vk.swapchain_images[vk.swapchain_image_index],
+    qvkCmdClearColorImage(vk.cmd->command_buffer, vk.swapchain_images[vk.cmd->swapchain_image_index],
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_value, 1, &range);
 }
 
@@ -264,7 +280,9 @@ void vk_clear_depth(qboolean clear_stencil) {
 
     VkImageSubresourceRange range = {
         .aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT,
+        .baseMipLevel = 0,
         .levelCount = 1,
+        .baseArrayLayer = 0,
         .layerCount = 1
     };
 
@@ -272,7 +290,7 @@ void vk_clear_depth(qboolean clear_stencil) {
         range.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
     }
 
-    qvkCmdClearDepthStencilImage(vk.cmd->command_buffer, vk.depth_image.handle,
+    qvkCmdClearDepthStencilImage(vk.cmd->command_buffer, vk.depth_image,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clear_value, 1, &range);
 }
 

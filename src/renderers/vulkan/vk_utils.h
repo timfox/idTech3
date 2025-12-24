@@ -3,6 +3,10 @@
 
 #include "vk.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Safety and validation functions
 void vk_safety_checks(void);
 qboolean vk_bounds_check(size_t index, size_t max, const char *array_name);
@@ -25,5 +29,9 @@ qboolean vk_validate_shader_inputs(const Vk_Pipeline_Def *def);
 
 // Memory statistics
 void vk_print_memory_stats(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __VK_UTILS_H__
