@@ -141,17 +141,15 @@
 - [ ] **Automated Packaging**: Multi-platform installer generation
 - [ ] **Update System**: Incremental patch generation and distribution
 - [ ] **Content Delivery**: CDN integration for asset streaming
-- [ ] **DRM Integration**: Digital rights management and anti-tamper systems
 
 ### DevOps Integration
-- [ ] **Containerization**: Docker-based build environments and deployment
 - [ ] **Infrastructure as Code**: Automated environment provisioning
 - [ ] **Monitoring Integration**: Build metrics and performance tracking
 - [ ] **Security Scanning**: Automated vulnerability detection and patching
 
 ## Feature Improvements & Expansions
-- [ ] Better audio system (OpenAL Soft planned, still using legacy)
-- [ ] Improved physics (investigate bullet3 or similar)
+- [ ] Better audio system (OpenAL)
+- [ ] Improved physics (bullet3)
 - [ ] Improved networking (DTLS/NAT traversal candidates under review)
 
 ## OOP / Entity Architecture
@@ -434,7 +432,7 @@
 - [ ] **Content Streaming**: On-demand asset downloading and caching
 - [ ] **DRM-Free Options**: Flexible licensing and distribution options
 
-## Scripting (your Lua plan) — missing “engine contracts”
+## Scripting with Lua
 
 - [ ] **Stable C API boundary for Lua bindings** (no direct engine internals)
 - [ ] **Deterministic script execution rules** (what runs in tick vs frame)
@@ -442,14 +440,10 @@
 - [ ] **Error containment** (script errors don’t kill engine; quarantine failing coroutine)
 - [ ] **Save/load for scripts** (serialize coroutine/encounter state or define reset policy)
 
----
-
 ### Shippability Meta
 
 - [ ] Add **priorities + phases** to every section (P0 ship blocker / P1 / P2 nice-to-have)
 - [ ] Add a **Definition of Done template** per feature (tests, docs, CI, perf impact, debug toggles)
-
-## Future Vision: Next-Generation Features
 
 ### AI-Assisted Development
 - [ ] **AI Code Generation**: ML-assisted code completion and optimization suggestions
@@ -486,8 +480,6 @@
 - [ ] **Carbon-Aware Computing**: Environmentally conscious resource usage
 - [ ] **Efficient Algorithms**: Research-backed optimization techniques
 - [ ] **Long-Term Support**: Extended platform support and backwards compatibility
-
----
 
 ## Event-Driven Architecture (EDA)
 
@@ -592,7 +584,40 @@
     - UI reacting to gameplay
 - [ ] **EDA + ECS interaction diagram**
 
----
-
-
-
+- [ ] **Radiant TODOs**
+    - Review `/tools/radiant` for outstanding technical debt
+    - Extract and track unfinished items from code `TODO`/`FIXME` comments
+    - Document Radiant-specific tooling or editor needs
+    - Align Radiant codebase TODOs with this central tracker
+    - Audit Radiant UI widgets for missing features & consistency
+    - Implement automated tests for core Radiant tools
+    - Improve error feedback and diagnostics in Radiant tools
+    - Add support for custom user plugins in the Radiant editor
+    - Upgrade Radiant scripting interface for better mod integration
+    - Refactor key modules for maintainability and extensibility
+    - Enhance Radiant documentation (extend SDK/API reference)
+    - Link Radiant event system notifications to debug/trace panels
+    - Review and optimize Radiant startup and resource loading times
+    
+    - Define MVP feature set for Radiant Editor
+    - Establish user stories for editor workflows (map editing, entity placement, etc.)
+    - Implement undo/redo system
+    - Develop selection and manipulation tools (move, rotate, scale)
+    - Integrate event-driven architecture into editor core
+    - Create extensible property inspector for entities
+    - Add layer and grouping support
+    - Design UI/UX mockups and gather feedback
+    - Implement grid/snapping and alignment features
+    - Provide real-time preview and live editing capabilities
+    - Integrate asset browser and drag-and-drop support
+    - Set up hot-reload for scripting or plugins
+    - Develop serialization and deserialization for editor state
+    - Allow keyboard shortcuts and configurable keymaps
+    - Write unit and integration tests for editor components
+    - Perform regression testing with complex scenes
+    - Stress-test loading/saving very large projects
+    - Validate correct event emission when editing
+    - Set up automated build & deployment pipeline for editor binaries
+    - Document editor API and scripting interfaces
+    - Create getting started and advanced usage guides
+    - Gather and triage user feedback during testing/beta
