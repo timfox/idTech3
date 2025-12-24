@@ -451,6 +451,7 @@ SET(QCOMMON_SRCS
     src/common/common.c
     src/common/crash_handler.c
     src/common/cvar.c
+    src/common/q_lockfree.c
     src/common/ecs.cpp
     src/common/ecs_systems.cpp
     src/common/entity_facade.cpp
