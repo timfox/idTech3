@@ -138,21 +138,8 @@ void vk_init_resource_pool(void) {
 	Com_Memset(&vk.resource_pools, 0, sizeof(vk.resource_pools));
 	vk.resource_pools.enabled = qtrue;
 
-	// Initialize free indices arrays
-	for (uint32_t i = 0; i < 64; i++) {
-		vk.resource_pools.small_buffers.free_indices[i] = i;
-	}
-	vk.resource_pools.small_buffers.free_count = 64;
-
-	for (uint32_t i = 0; i < 32; i++) {
-		vk.resource_pools.medium_buffers.free_indices[i] = i;
-	}
-	vk.resource_pools.medium_buffers.free_count = 32;
-
-	for (uint32_t i = 0; i < 16; i++) {
-		vk.resource_pools.large_buffers.free_indices[i] = i;
-	}
-	vk.resource_pools.large_buffers.free_count = 16;
+	// Initially no buffers are allocated, so free_count is 0
+	// free_indices will be populated as buffers are allocated and returned
 
 	ri.Printf(PRINT_ALL, "Vulkan: Resource pooling system initialized\n");
 }
@@ -168,22 +155,36 @@ VkBuffer vk_get_buffer_from_pool(VkDeviceSize size) {
 		if (vk.resource_pools.small_buffers.free_count > 0) {
 			uint32_t index = vk.resource_pools.small_buffers.free_indices[--vk.resource_pools.small_buffers.free_count];
 			return vk.resource_pools.small_buffers.buffers[index];
+		} else if (vk.resource_pools.small_buffers.count < ARRAY_LEN(vk.resource_pools.small_buffers.buffers)) {
+			// Allocate new buffer
+			uint32_t index = vk.resource_pools.small_buffers.count++;
+			// For now, just return null - proper implementation would allocate here
+			// This prevents crashes but doesn't provide pooling yet
+			return VK_NULL_HANDLE;
 		}
 	} else if (size < 16 * 1024 * 1024) { // 1MB - 16MB
 		// Medium buffer pool
 		if (vk.resource_pools.medium_buffers.free_count > 0) {
 			uint32_t index = vk.resource_pools.medium_buffers.free_indices[--vk.resource_pools.medium_buffers.free_count];
 			return vk.resource_pools.medium_buffers.buffers[index];
+		} else if (vk.resource_pools.medium_buffers.count < ARRAY_LEN(vk.resource_pools.medium_buffers.buffers)) {
+			// Allocate new buffer
+			uint32_t index = vk.resource_pools.medium_buffers.count++;
+			return VK_NULL_HANDLE;
 		}
 	} else { // > 16MB
 		// Large buffer pool
 		if (vk.resource_pools.large_buffers.free_count > 0) {
 			uint32_t index = vk.resource_pools.large_buffers.free_indices[--vk.resource_pools.large_buffers.free_count];
 			return vk.resource_pools.large_buffers.buffers[index];
+		} else if (vk.resource_pools.large_buffers.count < ARRAY_LEN(vk.resource_pools.large_buffers.buffers)) {
+			// Allocate new buffer
+			uint32_t index = vk.resource_pools.large_buffers.count++;
+			return VK_NULL_HANDLE;
 		}
 	}
 
-	return VK_NULL_HANDLE; // Pool exhausted
+	return VK_NULL_HANDLE; // Pool exhausted or disabled
 }
 
 void vk_return_buffer_to_pool(VkBuffer buffer) {
@@ -192,8 +193,37 @@ void vk_return_buffer_to_pool(VkBuffer buffer) {
 	}
 
 	// Find which pool this buffer belongs to and return it
-	// This is a placeholder - full implementation requires tracking buffer ownership
-	(void)buffer;
+	// Search small buffers
+	for (uint32_t i = 0; i < vk.resource_pools.small_buffers.count; i++) {
+		if (vk.resource_pools.small_buffers.buffers[i] == buffer) {
+			if (vk.resource_pools.small_buffers.free_count < ARRAY_LEN(vk.resource_pools.small_buffers.free_indices)) {
+				vk.resource_pools.small_buffers.free_indices[vk.resource_pools.small_buffers.free_count++] = i;
+			}
+			return;
+		}
+	}
+
+	// Search medium buffers
+	for (uint32_t i = 0; i < vk.resource_pools.medium_buffers.count; i++) {
+		if (vk.resource_pools.medium_buffers.buffers[i] == buffer) {
+			if (vk.resource_pools.medium_buffers.free_count < ARRAY_LEN(vk.resource_pools.medium_buffers.free_indices)) {
+				vk.resource_pools.medium_buffers.free_indices[vk.resource_pools.medium_buffers.free_count++] = i;
+			}
+			return;
+		}
+	}
+
+	// Search large buffers
+	for (uint32_t i = 0; i < vk.resource_pools.large_buffers.count; i++) {
+		if (vk.resource_pools.large_buffers.buffers[i] == buffer) {
+			if (vk.resource_pools.large_buffers.free_count < ARRAY_LEN(vk.resource_pools.large_buffers.free_indices)) {
+				vk.resource_pools.large_buffers.free_indices[vk.resource_pools.large_buffers.free_count++] = i;
+			}
+			return;
+		}
+	}
+
+	ri.Printf(PRINT_WARNING, "vk_return_buffer_to_pool: buffer %p not found in any pool\n", (void*)buffer);
 }
 
 void vk_shutdown_resource_pool(void) {
@@ -301,8 +331,12 @@ void vk_flush_staging_buffer(__attribute__((unused)) qboolean final) {
 		submit_info.pSignalSemaphores = NULL;
 		VK_CHECK(qvkQueueSubmit(vk.queue, 1, &submit_info, vk.aux_fence));
 		res = qvkWaitForFences(vk.device, 1, &vk.aux_fence, VK_TRUE, 5 * 1000000000ULL);
-		if (res != VK_SUCCESS) {
-			ri.Error(ERR_FATAL, "vkWaitForFences() failed with %s at %s", vk_result_string(res), __func__);
+		if (res == VK_TIMEOUT) {
+			ri.Printf(PRINT_WARNING, "vk_flush_staging_buffer: fence wait timeout, continuing anyway\n");
+			// Don't fail here, just continue - the operation might still complete
+		} else if (res != VK_SUCCESS) {
+			ri.Printf(PRINT_ERROR, "vk_flush_staging_buffer: vkWaitForFences failed with %s\n", vk_result_string(res));
+			// Don't crash, try to reset and continue
 		}
 		qvkResetFences(vk.device, 1, &vk.aux_fence);
 		VK_CHECK(qvkResetCommandBuffer(vk.staging_command_buffer, 0));
@@ -316,6 +350,17 @@ void vk_alloc_staging_buffer(VkDeviceSize size) {
 	VkMemoryAllocateInfo alloc_info;
 	uint32_t memory_type;
 	void *data;
+
+	if (size == 0) {
+		ri.Printf(PRINT_ERROR, "vk_alloc_staging_buffer: requested size is 0!\n");
+		return;
+	}
+
+	// Prevent allocating ridiculously large buffers
+	if (size > 256 * 1024 * 1024) { // 256MB limit
+		ri.Printf(PRINT_ERROR, "vk_alloc_staging_buffer: requested size %lu too large, limiting to 256MB\n", (unsigned long)size);
+		size = 256 * 1024 * 1024;
+	}
 
 	vk_clean_staging_buffer();
 

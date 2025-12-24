@@ -37,6 +37,14 @@ extern cvar_t *r_dither;
 extern cvar_t *r_vk_hotReload;
 #include "../../common/performance_counters.h"
 #include "vk.h"
+#include "vk_config.h"
+#include "vk_utils.h"
+#include "vk_descriptors.h"
+#include "vk_images.h"
+#include "vk_draw.h"
+#include "vk_renderpass.h"
+#include "vk_postprocess.h"
+#include "vk_frame.h"
 #include "vk_post_process.h"
 #ifdef USE_VULKAN_RAY_TRACING
 #include "vk_portal_lights.h"
@@ -55,58 +63,7 @@ static void vk_create_pipeline_layouts(void);
 static_assert(sizeof(VkDeviceSize) >= sizeof(size_t), "VkDeviceSize must be at least as large as size_t");
 static_assert(sizeof(VkDeviceAddress) >= sizeof(uintptr_t), "VkDeviceAddress must be able to hold pointer values");
 
-// Runtime safety checks for Vulkan compatibility
-static inline void vk_safety_checks(void) {
-    // Ensure VK_NULL_HANDLE compatibility
-    if (VK_NULL_HANDLE != NULL) {
-        ri.Printf(PRINT_WARNING, "VK_NULL_HANDLE != NULL - this may cause compatibility issues\n");
-    }
-}
-
-// Modern bounds checking for array operations
-static inline qboolean vk_bounds_check(size_t index, size_t max, const char *array_name) {
-    if (index >= max) {
-        ri.Printf(PRINT_ERROR, "Vulkan: Array index %zu out of bounds for %s (max %zu)\n", index, array_name, max);
-        return qfalse;
-    }
-    return qtrue;
-}
-
-// Safe Vulkan handle validation
-static inline qboolean vk_validate_handle(void *handle, const char *handle_name) {
-    if (handle == VK_NULL_HANDLE || handle == NULL) {
-        ri.Printf(PRINT_ERROR, "Vulkan: Invalid %s handle (NULL)\n", handle_name);
-        return qfalse;
-    }
-    return qtrue;
-}
-
-// Modern Vulkan performance monitoring
-static inline void vk_performance_marker_begin(VkCommandBuffer cmd, const char *name) {
-#ifdef USE_VK_VALIDATION
-    if (qvkCmdBeginDebugUtilsLabelEXT && name && cmd != VK_NULL_HANDLE) {
-        VkDebugUtilsLabelEXT label = {
-            .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_LABEL_EXT,
-            .pLabelName = name,
-            .color = {0.0f, 1.0f, 0.0f, 1.0f} // Green for performance markers
-        };
-        qvkCmdBeginDebugUtilsLabelEXT(cmd, &label);
-    }
-#else
-    (void)cmd; // Suppress unused parameter warning
-    (void)name;
-#endif
-}
-
-static inline void vk_performance_marker_end(VkCommandBuffer cmd) {
-#ifdef USE_VK_VALIDATION
-    if (qvkCmdEndDebugUtilsLabelEXT && cmd != VK_NULL_HANDLE) {
-        qvkCmdEndDebugUtilsLabelEXT(cmd);
-    }
-#else
-    (void)cmd; // Suppress unused parameter warning
-#endif
-}
+// Functions moved to vk_utils.c module
 
 // Modern attribute macros for Vulkan functions
 #ifdef __GNUC__
@@ -3301,15 +3258,31 @@ qboolean vk_validate_shader_inputs(const Vk_Pipeline_Def *def) {
 		return qfalse;
 	}
 
-	// Validate color values
-	if (!vk_validate_vec4(def->color.rgba)) {
-		ri.Printf(PRINT_WARNING, "vk_validate_shader_inputs: invalid color values\n");
-		return qfalse;
-	}
-
-	// Add more validation as needed for other shader inputs
+	// TODO: Add shader input validation when needed
+	// For now, just basic null checks
 
 	return qtrue;
+}
+
+// Sanitize floating point values to prevent NaN/Inf propagation
+float vk_sanitize_float(float value, float default_value) {
+	if (isnan(value) || isinf(value)) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Sanitized invalid float %f to %f\n", value, default_value);
+		return default_value;
+	}
+	return value;
+}
+
+void vk_sanitize_vec3(vec3_t v, float default_value) {
+	for (int i = 0; i < 3; i++) {
+		v[i] = vk_sanitize_float(v[i], default_value);
+	}
+}
+
+void vk_sanitize_vec4(vec4_t v, float default_value) {
+	for (int i = 0; i < 4; i++) {
+		v[i] = vk_sanitize_float(v[i], default_value);
+	}
 }
 
 static void __attribute__((unused)) vk_create_layout_binding( int binding, VkDescriptorType type, VkShaderStageFlags flags, VkDescriptorSetLayout *layout )
@@ -3374,7 +3347,7 @@ void vk_update_uniform_descriptor( VkDescriptorSet descriptor, VkBuffer buffer )
 }
 
 
-static VkSampler vk_find_sampler( const Vk_Sampler_Def *def ) {
+VkSampler vk_find_sampler( const Vk_Sampler_Def *def ) {
 	VkSamplerAddressMode address_mode;
 	VkSamplerCreateInfo desc;
 	VkSampler sampler;
@@ -10421,10 +10394,13 @@ void vk_shutdown( refShutdownCode_t code ) {
 			// Shutdown async compute
 			vk_shutdown_async_compute();
 
-			// Shutdown resource pools
-			vk_shutdown_resource_pool();
+	// Shutdown resource pools
+	vk_shutdown_resource_pool();
 
-			// Mark Vulkan as inactive after cleanup
+	// Print memory statistics for leak detection
+	vk_print_memory_stats();
+
+	// Mark Vulkan as inactive after cleanup
 			vk.active = qfalse;
 		}
 

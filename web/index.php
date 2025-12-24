@@ -71,6 +71,7 @@ ini_set('error_log', __DIR__ . '/error.log');
                     <li><a href="getting-started/build-instructions">Build Instructions</a></li>
                     <li><a href="getting-started/configuration">Configuration</a></li>
                     <li><a href="getting-started/quick-start">Quick Start Guide</a></li>
+                    <li><a href="configurable-naming">Configurable Naming Tutorial</a> - Brand your game/mod</li>
                 </ul>
             </div>
 

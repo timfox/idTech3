@@ -349,8 +349,28 @@ if(USE_SDL)
 	endif()
 endif()
 
-set(CNAME "idtech3" CACHE STRING "Main executable/library name")
-set(DNAME "idtech3.server" CACHE STRING "Dedicated server executable name")
+# Application naming configuration
+# Check for command line mod name override
+if(DEFINED MOD_NAME AND NOT "${MOD_NAME}" STREQUAL "")
+    set(ENGINE_NAME "${MOD_NAME}" CACHE STRING "Engine display name")
+    set(CNAME "${MOD_NAME_LOWER}" CACHE STRING "Main executable/library name")
+    set(DNAME "${MOD_NAME_LOWER}.server" CACHE STRING "Dedicated server executable name")
+    # Generate package name from mod name
+    string(TOLOWER "${MOD_NAME}" MOD_NAME_LOWER)
+    string(REGEX REPLACE "[^a-z0-9]" "" MOD_NAME_CLEAN "${MOD_NAME_LOWER}")
+    set(APP_PACKAGE_NAME "com.${MOD_NAME_CLEAN}.game" CACHE STRING "Android package name")
+    set(APP_DISPLAY_NAME "${MOD_NAME}" CACHE STRING "Application display name")
+else()
+    set(ENGINE_NAME "idTech3" CACHE STRING "Engine display name")
+    set(CNAME "idtech3" CACHE STRING "Main executable/library name")
+    set(DNAME "idtech3.server" CACHE STRING "Dedicated server executable name")
+    set(APP_PACKAGE_NAME "com.idtech3.engine" CACHE STRING "Android package name")
+    set(APP_DISPLAY_NAME "${ENGINE_NAME}" CACHE STRING "Application display name")
+endif()
+
+# Allow direct override of display name
+set(APP_DISPLAY_NAME "${APP_DISPLAY_NAME}" CACHE STRING "Application display name (overrides ENGINE_NAME)")
+set(APP_PACKAGE_NAME "${APP_PACKAGE_NAME}" CACHE STRING "Android package name")
 
 SET(RENDERER_PREFIX ${CNAME})
 set(RENDERER_DEFAULT "opengl" CACHE STRING "Default renderer (opengl, vulkan, opengl2, d3d12, metal)")
@@ -371,6 +391,7 @@ OPTION(USE_VULKAN "" ON)
 OPTION(USE_VMA "Enable Vulkan Memory Allocator (VMA) for better memory management" ON)
 OPTION(USE_D3D12 "Enable DirectX 12 renderer (Windows only)" ON)
 OPTION(USE_METAL "Enable Metal renderer (macOS/iOS only)" ON)
+OPTION(USE_ANDROID "Enable Android platform support" ON)
 OPTION(USE_SYSTEM_JPEG "" OFF)
 OPTION(USE_RENDERER_DLOPEN "" ON)
 OPTION(USE_OPENEXR "Enable OpenEXR (.exr) image support" ON)
@@ -1496,7 +1517,13 @@ IF(USE_CIMGUI AND TARGET imgui_shared)
 ENDIF()
 
 # common function, window system
-IF(UNIX)
+IF(ANDROID)
+	# Android-specific sources (C++23)
+	SET (Q3_SRCS
+		src/unix/android_main.cpp
+		src/unix/unix_shared.c
+		src/unix/linux_signals.c)
+ELSEIF(UNIX)
 	SET (Q3_SRCS
 		src/unix/unix_main.c
 		src/unix/unix_shared.c

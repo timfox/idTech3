@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>idTech3 Documentation</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #fafbfc;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #2c3e50;
+            margin: 0;
+            font-size: 2.5em;
+        }
+        .header p {
+            color: #666;
+            margin: 10px 0 0 0;
+        }
+        .content {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .doc-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .doc-item {
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            padding: 20px;
+            transition: all 0.2s ease;
+        }
+        .doc-item:hover {
+            border-color: #3498db;
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
+        }
+        .doc-item h3 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+        .doc-item p {
+            margin: 0 0 15px 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .doc-link {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            padding: 8px 16px;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 500;
+            transition: background 0.2s ease;
+        }
+        .doc-link:hover {
+            background: #2980b9;
+            color: white;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e1e4e8;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .badge {
+            display: inline-block;
+            background: #27ae60;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 500;
+            margin-left: 8px;
+        }
+        .section {
+            margin-bottom: 40px;
+        }
+        .section h2 {
+            color: #2c3e50;
+            border-bottom: 1px solid #bdc3c7;
+            padding-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>idTech3 Documentation</h1>
+        <p>Complete Documentation Library</p>
+        <p style="font-size: 0.9em; color: #666;">Generated from Markdown sources using md2web.sh</p>
+    </div>
+
+    <div class="content">
+        <div class="section">
+            <h2>Getting Started</h2>
+            <div class="doc-list">
+                <div class="doc-item">
+                    <h3>Configurable Naming Tutorial <span class="badge">NEW</span></h3>
+                    <p>Learn how to create branded applications for different games and mods using idTech3's configurable naming system.</p>
+                    <a href="configurable-naming.html" class="doc-link">Read Tutorial</a>
+                </div>
+                <div class="doc-item">
+                    <h3>Installation Guide</h3>
+                    <p>Step-by-step instructions for setting up the idTech3 engine development environment.</p>
+                    <a href="installation.html" class="doc-link">View Guide</a>
+                </div>
+                <div class="doc-item">
+                    <h3>Build Instructions</h3>
+                    <p>Complete build instructions for all supported platforms and configurations.</p>
+                    <a href="build-instructions.html" class="doc-link">Build Guide</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Advanced Topics</h2>
+            <div class="doc-list">
+                <div class="doc-item">
+                    <h3>Modern C++ Features</h3>
+                    <p>Overview of modern C++ features integrated into the idTech3 engine.</p>
+                    <a href="modern-cpp-features.html" class="doc-link">Learn More</a>
+                </div>
+                <div class="doc-item">
+                    <h3>Memory Safety</h3>
+                    <p>Memory safety improvements and debugging tools in the engine.</p>
+                    <a href="memory-safety.html" class="doc-link">Safety Guide</a>
+                </div>
+                <div class="doc-item">
+                    <h3>Vulkan Renderer</h3>
+                    <p>Detailed information about the Vulkan graphics renderer implementation.</p>
+                    <a href="vulkan.html" class="doc-link">Renderer Docs</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>All Documentation</h2>
+            <p>This offline documentation archive contains all available documentation converted from Markdown sources. Use the links above for the most commonly accessed guides, or browse all available documentation below.</p>
+
+            <div style="margin-top: 20px; padding: 20px; background: #f8f9fa; border-radius: 6px;">
+                <h4 style="margin-top: 0; color: #666;">📂 Documentation Files</h4>
+                <p style="margin-bottom: 0; color: #666;">All documentation files are available in this directory. Click any .html file to view the documentation.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Generated by md2web.sh - idTech3 Documentation System</p>
+        <p><a href="https://github.com/idtech3">idTech3 Project on GitHub</a></p>
+        <p style="font-size: 0.8em; color: #999;">Last updated: $(date)</p>
+    </div>
+
+    <script>
+        // Simple search functionality
+        function searchDocs() {
+            const term = prompt('Search documentation:');
+            if (term) {
+                // Simple client-side search - could be enhanced
+                alert('Search functionality would go here. For now, browse the files directly.');
+            }
+        }
+
+        // Add search button to header
+        document.addEventListener('DOMContentLoaded', function() {
+            const header = document.querySelector('.header');
+            const searchBtn = document.createElement('button');
+            searchBtn.textContent = '🔍 Search Docs';
+            searchBtn.style.cssText = 'background:#3498db;color:white;border:none;padding:8px 16px;border-radius:4px;cursor:pointer;margin-top:10px;';
+            searchBtn.onclick = searchDocs;
+            header.appendChild(searchBtn);
+        });
+    </script>
+</body>
+</html>

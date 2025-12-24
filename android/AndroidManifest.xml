@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.idtech3.engine"
+    android:versionCode="1"
+    android:versionName="1.0">
+
+    <!-- Android 8.0+ requirements -->
+    <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="33" />
+
+    <!-- Permissions -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Features -->
+    <uses-feature android:name="android.hardware.touchscreen" android:required="true" />
+    <uses-feature android:name="android.hardware.gamepad" android:required="false" />
+    <uses-feature android:name="android.hardware.vulkan.level" android:version="1" android:required="true" />
+
+    <application
+        android:label="@string/app_name"
+        android:hasCode="true"
+        android:debuggable="true"
+        android:allowBackup="true"
+        android:fullBackupContent="true"
+        android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+        android:usesCleartextTraffic="true">
+
+        <activity
+            android:name=".IdTech3Activity"
+            android:label="@string/app_name"
+            android:configChanges="orientation|keyboardHidden|screenSize|smallestScreenSize|screenLayout|uiMode"
+            android:launchMode="singleTask"
+            android:screenOrientation="landscape"
+            android:exported="true">
+
+            <meta-data android:name="android.app.lib_name" android:value="quake3e" />
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- File associations -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="file" />
+                <data android:mimeType="application/zip" />
+                <data android:pathPattern="*.pk3" />
+            </intent-filter>
+
+        </activity>
+
+        <!-- File provider for sharing -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+    </application>
+
+</manifest>

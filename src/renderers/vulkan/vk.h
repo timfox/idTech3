@@ -63,7 +63,7 @@ typedef enum {
 	RENDER_PASS_COUNT
 } renderPass_t;
 
-#include "../renderercommon/vulkan/vulkan.h"
+#include <vulkan/vulkan.h>
 #include "../common/q_shared.h"
 #include "../renderercommon/tr_public.h"
 #include "tr_common.h"

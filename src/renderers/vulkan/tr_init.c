@@ -480,6 +480,8 @@ int		max_polyverts;
 #ifdef USE_VULKAN
 
 #include "vk.h"
+#include "vk_renderpass.h"
+#include "vk_postprocess.h"
 #include "vk_post_process.h"
 Vk_Instance vk;
 Vk_World	vk_world;
@@ -909,6 +911,17 @@ static void InitOpenGL( void )
 	}
 	if ( vk.active ) {
 		vk_init_descriptors();
+
+		// Initialize modularized systems
+		if (!vk_create_main_render_pass()) {
+			ri.Error( ERR_FATAL, "Failed to create main render pass" );
+		}
+		if (!vk_create_screenmap_render_pass()) {
+			ri.Error( ERR_FATAL, "Failed to create screenmap render pass" );
+		}
+		if (!vk_init_post_processing()) {
+			ri.Error( ERR_FATAL, "Failed to initialize post-processing" );
+		}
 	} else {
 		ri.Error( ERR_FATAL, "Recursive error during Vulkan initialization" );
 	}
