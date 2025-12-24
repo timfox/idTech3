@@ -100,18 +100,22 @@ void RB_AddQuadStampExt( const vec3_t origin, const vec3_t left, const vec3_t up
 	tess.xyz[ndx][0] = origin[0] + left[0] + up[0];
 	tess.xyz[ndx][1] = origin[1] + left[1] + up[1];
 	tess.xyz[ndx][2] = origin[2] + left[2] + up[2];
+	tess.xyz[ndx][3] = 1;
 
 	tess.xyz[ndx+1][0] = origin[0] - left[0] + up[0];
 	tess.xyz[ndx+1][1] = origin[1] - left[1] + up[1];
 	tess.xyz[ndx+1][2] = origin[2] - left[2] + up[2];
+	tess.xyz[ndx+1][3] = 1;
 
 	tess.xyz[ndx+2][0] = origin[0] - left[0] - up[0];
 	tess.xyz[ndx+2][1] = origin[1] - left[1] - up[1];
 	tess.xyz[ndx+2][2] = origin[2] - left[2] - up[2];
+	tess.xyz[ndx+2][3] = 1;
 
 	tess.xyz[ndx+3][0] = origin[0] + left[0] - up[0];
 	tess.xyz[ndx+3][1] = origin[1] + left[1] - up[1];
 	tess.xyz[ndx+3][2] = origin[2] + left[2] - up[2];
+	tess.xyz[ndx+3][3] = 1;
 
 	// constant normal all the way around
 	VectorSubtract( vec3_origin, backEnd.viewParms.or.axis[0], normal );
@@ -119,6 +123,7 @@ void RB_AddQuadStampExt( const vec3_t origin, const vec3_t left, const vec3_t up
 	tess.normal[ndx][0] = tess.normal[ndx+1][0] = tess.normal[ndx+2][0] = tess.normal[ndx+3][0] = normal[0];
 	tess.normal[ndx][1] = tess.normal[ndx+1][1] = tess.normal[ndx+2][1] = tess.normal[ndx+3][1] = normal[1];
 	tess.normal[ndx][2] = tess.normal[ndx+1][2] = tess.normal[ndx+2][2] = tess.normal[ndx+3][2] = normal[2];
+	tess.normal[ndx][3] = tess.normal[ndx+1][3] = tess.normal[ndx+2][3] = tess.normal[ndx+3][3] = 0;
 	
 	// standard square texture coordinates
 	tess.texCoords[0][ndx+0][0] = tess.texCoords[1][ndx+0][0] = s1;
@@ -192,18 +197,22 @@ void RB_AddQuadStamp2( float x, float y, float w, float h, float s1, float t1, f
 	tess.xyz[numVerts + 0][0] = x;
 	tess.xyz[numVerts + 0][1] = y;
 	tess.xyz[numVerts + 0][2] = 0;
+	tess.xyz[numVerts + 0][3] = 1;
 
 	tess.xyz[numVerts + 1][0] = x + w;
 	tess.xyz[numVerts + 1][1] = y;
 	tess.xyz[numVerts + 1][2] = 0;
+	tess.xyz[numVerts + 1][3] = 1;
 
 	tess.xyz[numVerts + 2][0] = x + w;
 	tess.xyz[numVerts + 2][1] = y + h;
 	tess.xyz[numVerts + 2][2] = 0;
+	tess.xyz[numVerts + 2][3] = 1;
 
 	tess.xyz[numVerts + 3][0] = x;
 	tess.xyz[numVerts + 3][1] = y + h;
 	tess.xyz[numVerts + 3][2] = 0;
+	tess.xyz[numVerts + 3][3] = 1;
 
 	tess.texCoords[0][numVerts + 0][0] = s1;
 	tess.texCoords[0][numVerts + 0][1] = t1;
@@ -286,6 +295,7 @@ static void RB_SurfacePolychain( const srfPoly_t *p ) {
 	numv = tess.numVertexes;
 	for ( i = 0; i < p->numVerts; i++ ) {
 		VectorCopy( p->verts[i].xyz, tess.xyz[numv] );
+		tess.xyz[numv][3] = 1;
 		tess.texCoords[0][numv][0] = p->verts[i].st[0];
 		tess.texCoords[0][numv][1] = p->verts[i].st[1];
 		tess.vertexColors[numv] = p->verts[ i ].modulate;
@@ -382,6 +392,7 @@ static void RB_SurfaceTriangles( const srfTriangles_t *srf ) {
 		xyz[0] = dv->xyz[0];
 		xyz[1] = dv->xyz[1];
 		xyz[2] = dv->xyz[2];
+		xyz[3] = 1;
 
 #ifdef USE_TESS_NEEDS_NORMAL
 		if ( tess.needsNormal )
@@ -390,6 +401,7 @@ static void RB_SurfaceTriangles( const srfTriangles_t *srf ) {
 			normal[0] = dv->normal[0];
 			normal[1] = dv->normal[1];
 			normal[2] = dv->normal[2];
+			normal[3] = 0;
 		}
 
 #ifdef USE_VK_PBR
@@ -1290,6 +1302,7 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 				xyz[0] = dv->xyz[0];
 				xyz[1] = dv->xyz[1];
 				xyz[2] = dv->xyz[2];
+				xyz[3] = 1;
 				texCoords0[0] = dv->st[0];
 				texCoords0[1] = dv->st[1];
 #ifdef USE_TESS_NEEDS_ST2
@@ -1307,6 +1320,7 @@ static void RB_SurfaceGrid( srfGridMesh_t *cv ) {
 					normal[0] = dv->normal[0];
 					normal[1] = dv->normal[1];
 					normal[2] = dv->normal[2];
+					normal[3] = 0;
 					normal += 4;
 				}
 

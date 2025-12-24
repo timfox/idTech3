@@ -11,8 +11,13 @@ libs/stb/stb_truetype.h. Falls back to a stub otherwise.
 
 #include "../../common/q_shared.h"
 #include "../../common/qcommon.h"
+#ifdef USE_VULKAN
+#include "../vulkan/tr_local.h"
+#include "../vulkan/tr_common.h"
+#else
 #include "../opengl/tr_local.h"
 #include "tr_common.h"
+#endif
 
 // Font CVars are accessed via ri.Cvar_Get
 
@@ -208,12 +213,21 @@ qboolean RE_RegisterFont_Stb(const char *fontName, int pointSize, fontInfo_t *fo
 
 		char shaderName[MAX_QPATH];
 		Com_sprintf(shaderName, sizeof(shaderName), "fonts/fontImage_stb_sdf_%i", pointSize);
+#ifdef USE_VULKAN
+		image_t *image = R_CreateImage(shaderName, NULL, imageBuff, atlasSize, atlasSize, IMGFLAG_CLAMPTOEDGE, 0, 0);
+		if (image) {
+			image->isFont = qtrue;
+			image->isSDF = qtrue;
+			image->sdfSpread = (float)sdfSpread;
+		}
+#else
 		image_t *image = R_CreateImage(shaderName, NULL, imageBuff, atlasSize, atlasSize, IMGFLAG_CLAMPTOEDGE);
 		if (image) {
 			image->isFont = qtrue;
 			image->isSDF = qtrue;
 			image->sdfSpread = (float)sdfSpread;
 		}
+#endif
 		qhandle_t h = RE_RegisterShaderFromImage(shaderName, LIGHTMAP_2D, image, qfalse);
 
 		// Fill glyph handles
@@ -304,7 +318,11 @@ qboolean RE_RegisterFont_Stb(const char *fontName, int pointSize, fontInfo_t *fo
 	// Upload image
 	char shaderName[MAX_QPATH];
 	Com_sprintf(shaderName, sizeof(shaderName), "fonts/fontImage_stb_%i", pointSize);
+#ifdef USE_VULKAN
+	image_t *image = R_CreateImage(shaderName, NULL, imageBuff, atlasSize, atlasSize, IMGFLAG_CLAMPTOEDGE, 0, 0);
+#else
 	image_t *image = R_CreateImage(shaderName, NULL, imageBuff, atlasSize, atlasSize, IMGFLAG_CLAMPTOEDGE);
+#endif
 	if (image) {
 		image->isFont = qtrue;
 		image->isSDF = qfalse;

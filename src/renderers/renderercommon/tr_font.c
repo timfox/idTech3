@@ -22,7 +22,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_font.c
 // 
 //
-// The font system uses FreeType 2.x to render TrueType fonts for use within the game.
+#include <stdio.h>
+#include "../common/q_shared.h"
+#include "../common/qcommon.h"
+
+void R_InitFonts(void); // Forward declaration
 // As of this writing ( Nov, 2000 ) Team Arena uses these fonts for all of the ui and 
 // about 90% of the cgame presentation. A few areas of the CGAME were left uses the old 
 // fonts since the code is shared with standard Q3A.
@@ -75,9 +79,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 // Forward declarations
 static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontInfo_t *font, qboolean wantSDF);
+qboolean RE_RegisterFont_Stb(const char *fontName, int pointSize, fontInfo_t *font);
 //static qboolean R_LoadFontFromDat_DISABLED(const byte *datData, int datLen, fontInfo_t *font);
 #include "tr_public.h"
+#ifdef USE_VULKAN
+#include "../vulkan/tr_common.h"
+#else
 #include "../opengl/tr_common.h"
+#endif
 
 // Forward declarations for public API functions
 glyphInfo_t *R_GetGlyphFromFont(fontInfo_t *font, int charCode);
@@ -94,6 +103,15 @@ void R_ShutdownFonts(void);
 
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
+
+static void R_Trace(void) {
+    static qboolean traced = qfalse;
+    if (!traced) {
+        traced = qtrue;
+        fprintf(stderr, "DEBUG: tr_font.c (renderercommon) compiled at " __DATE__ " " __TIME__ "\n");
+        ri.Printf(PRINT_ALL, "DEBUG: tr_font.c (renderercommon) compiled at " __DATE__ " " __TIME__ "\n");
+    }
+}
 
 extern void R_IssuePendingRenderCommands( void );
 extern qhandle_t RE_RegisterShaderNoMip( const char *name );
@@ -573,7 +591,7 @@ static qboolean WOFF2_DecompressFont(const unsigned char *woff2Data, size_t woff
 }
 #endif
 
-static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, int *yOut, int *maxHeight, FT_Face face, const unsigned char c, qboolean calcHeight) {
+static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, int *yOut, int *maxHeight, FT_Face face, const unsigned char c, qboolean calcHeight, int atlasSize) {
 	int i;
 	static glyphInfo_t glyph;
 	unsigned char *src, *dst;
@@ -628,35 +646,8 @@ static glyphInfo_t *RE_ConstructGlyphInfo(unsigned char *imageOut, int *xOut, in
 			return &glyph;
 		}
 
-/*
-		// need to convert to power of 2 sizes so we do not get 
-		// any scaling from the gl upload
-		for (scaled_width = 1 ; scaled_width < glyph.pitch ; scaled_width<<=1)
-			;
-		for (scaled_height = 1 ; scaled_height < glyph.height ; scaled_height<<=1)
-			;
-*/
-
 		scaled_width = glyph.pitch;
 		scaled_height = glyph.height;
-
-		// Get atlas size from CVar (default to 256)
-		int atlasSize = 256;
-		{
-			cvar_t *fontAtlasSize = ri.Cvar_Get("r_fontAtlasSize", "256", 0);
-			if (fontAtlasSize) {
-				atlasSize = fontAtlasSize->integer;
-			if (atlasSize < 256) atlasSize = 256;
-			else if (atlasSize > 512 && atlasSize < 1024) atlasSize = 512;
-			else if (atlasSize > 1024) atlasSize = 1024;
-				if (atlasSize < 256) atlasSize = 256;
-				else if (atlasSize > 512 && atlasSize < 1024) atlasSize = 512;
-				else if (atlasSize > 1024) atlasSize = 1024;
-				if (atlasSize != 256 && atlasSize != 512 && atlasSize != 1024) {
-					atlasSize = 256;
-				}
-			}
-		}
 
 		// we need to make sure we fit
 		if (*xOut + scaled_width + 1 >= atlasSize - 1) {
@@ -1251,7 +1242,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 		else if (atlasSize > 1024) atlasSize = 1024;
 		// Ensure power of two
 		if (atlasSize != 256 && atlasSize != 512 && atlasSize != 1024) {
-			atlasSize = 256;
+			atlasSize = 512;
 		}
 	}
 	selectedAtlasSize = atlasSize;
@@ -1332,7 +1323,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 					qboolean isItalic = (tempFace->style_flags & FT_STYLE_FLAG_ITALIC) != 0;
 					
 					if ((!wantBold || isBold) && (!wantItalic || isItalic)) {
-						faceIndex = i;
+						faceIndex = faceIdx;
 						FreeType_DoneFace(tempFace);
 						break;
 					}
@@ -1360,6 +1351,18 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 		}
 	}
 
+	// Use configured DPI if available
+	dpi = 96.0f;
+	{
+		cvar_t *fontDPI = ri.Cvar_Get("r_fontDPI", "96", 0);
+		if (fontDPI && fontDPI->value > 0.0f) {
+			dpi = fontDPI->value;
+		}
+		if (dpi < 72.0f) dpi = 72.0f;
+		if (dpi > 300.0f) dpi = 300.0f;
+	}
+	selectedDPI = (int)dpi;
+
 	if (FreeType_SetCharSize( face, pointSize << 6, pointSize << 6, (FT_UInt)dpi, (FT_UInt)dpi)) {
 		ri.Printf(PRINT_WARNING, "RE_RegisterFont: FreeType, unable to set face char size.\n");
 		FreeType_DoneFace(face);
@@ -1384,7 +1387,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 	maxHeight = 0;
 
 	for (i = GLYPH_START; i <= GLYPH_END; i++) {
-		RE_ConstructGlyphInfo(out, &xOut, &yOut, &maxHeight, face, (unsigned char)i, qtrue);
+		RE_ConstructGlyphInfo(out, &xOut, &yOut, &maxHeight, face, (unsigned char)i, qtrue, atlasSize);
 	}
 
 	xOut = 0;
@@ -1399,7 +1402,7 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 			// upload/save current image buffer
 			xOut = yOut = -1;
 		} else {
-			glyph = RE_ConstructGlyphInfo(out, &xOut, &yOut, &maxHeight, face, (unsigned char)i, qfalse);
+			glyph = RE_ConstructGlyphInfo(out, &xOut, &yOut, &maxHeight, face, (unsigned char)i, qfalse, atlasSize);
 		}
 
 		if (xOut == -1 || yOut == -1)  {
@@ -1436,7 +1439,11 @@ static qboolean RE_RegisterFont_Sync(const char *fontName, int pointSize, fontIn
 			}
 
 			//Com_sprintf (name, sizeof(name), "fonts/fontImage_%i_%i", imageNumber++, pointSize);
+#ifdef USE_VULKAN
+			image = R_CreateImage(name, NULL, imageBuff, atlasSize, atlasSize, IMGFLAG_CLAMPTOEDGE, 0, 0);
+#else
 			image = R_CreateImage(name, NULL, imageBuff, atlasSize, atlasSize, IMGFLAG_CLAMPTOEDGE);
+#endif
 			h = RE_RegisterShaderFromImage(name, LIGHTMAP_2D, image, qfalse);
 			for (j = lastStart; j < i; j++) {
 				font->glyphs[j].glyph = h;
@@ -1818,6 +1825,7 @@ Public interface for font registration - chooses between async and sync loading
 =================
 */
 qboolean RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
+    R_Trace();
 	if (!font) {
 		ri.Printf(PRINT_ALL, "RE_RegisterFont: NULL font parameter\n");
 		return qfalse;
@@ -1839,30 +1847,56 @@ qboolean RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) 
 	// Check if async loading is enabled and available
 	static cvar_t *r_fontAsync = NULL;
 	if (!r_fontAsync) {
+#ifdef USE_VULKAN
+		r_fontAsync = ri.Cvar_Get("r_fontAsync", "0", CVAR_ARCHIVE | CVAR_LATCH);
+#else
 		r_fontAsync = ri.Cvar_Get("r_fontAsync", "1", CVAR_ARCHIVE | CVAR_LATCH);
+#endif
 		ri.Cvar_SetDescription(r_fontAsync, "Use asynchronous font loading (0 = sync, 1 = async)");
 	}
 
+	// Font aliasing for improved text rendering - redirect FX300.ttf to Roboto fonts
+	const char *actualFontName = fontName;
+	if (Q_stricmp(fontName, "FX300.ttf") == 0 || 
+	    Q_stricmp(fontName, "fonts/FX300.ttf") == 0 ||
+	    Q_stricmp(fontName, "16") == 0 ||
+	    Q_stricmp(fontName, "12") == 0 ||
+	    Q_stricmp(fontName, "24") == 0 ||
+	    Q_stricmp(fontName, "text") == 0 ||
+	    Q_stricmp(fontName, "small") == 0 ||
+	    Q_stricmp(fontName, "big") == 0) {
+		// Use Roboto fonts for better quality, especially for smaller text
+		if (pointSize <= 14) {
+			actualFontName = "fonts/roboto-regular.ttf"; // Better for small text
+		} else if (pointSize >= 20) {
+			actualFontName = "fonts/roboto-bold.ttf"; // Better for large text
+		} else {
+			actualFontName = "fonts/roboto-regular.ttf"; // Default to regular
+		}
+		ri.Printf(PRINT_ALL, "RE_RegisterFont: ALIASING '%s' (%dpt) → '%s'\n",
+			fontName, pointSize, actualFontName);
+	}
+
 	// Validate file path for security
-	if ( !Q_ValidateFilePath( fontName ) ) {
-		ri.Printf( PRINT_WARNING, "RE_RegisterFont: Path traversal attempt blocked: %s\n", fontName );
+	if ( !Q_ValidateFilePath( actualFontName ) ) {
+		ri.Printf( PRINT_WARNING, "RE_RegisterFont: Path traversal attempt blocked: %s\n", actualFontName );
 		return qfalse;
 	}
 
 	ri.Printf(PRINT_ALL, "RE_RegisterFont: called for '%s' (%dpt), async=%d\n",
-		fontName, pointSize, r_fontAsync ? r_fontAsync->integer : 0);
+		actualFontName, pointSize, r_fontAsync ? r_fontAsync->integer : 0);
 
 #if defined(USE_JOBSYSTEM)
 	if (r_fontAsync && r_fontAsync->integer) {
 		ri.Printf(PRINT_ALL, "RE_RegisterFont: using async loading\n");
-		return RE_RegisterFont_Async(fontName, pointSize, font);
+		return RE_RegisterFont_Async(actualFontName, pointSize, font);
 	} else
 #endif
 	{
 		ri.Printf(PRINT_ALL, "RE_RegisterFont: using sync loading\n");
 		cvar_t *fontSDF = ri.Cvar_Get("r_fontSDF", "0", 0);
 		qboolean wantSDF = (fontSDF && fontSDF->integer != 0);
-		return RE_RegisterFont_Sync(fontName, pointSize, font, wantSDF);
+		return RE_RegisterFont_Sync(actualFontName, pointSize, font, wantSDF);
 	}
 }
 

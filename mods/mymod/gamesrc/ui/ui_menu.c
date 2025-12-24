@@ -129,30 +129,62 @@ static fontInfo_t *MainMenu_SelectFontForStyle( int style ) {
 }
 
 static void MainMenu_RegisterFontSafe( const char *path, int pointSize, fontInfo_t *outFont, const char *label ) {
+	const char *actualPath = path;
+
 	Com_Printf( S_COLOR_YELLOW "DEBUG: MainMenu_RegisterFontSafe called with path='%s', label='%s'\n", path, label );
+
+	// Map numeric font names to Roboto fonts
+	if ( Q_stricmp( path, "16" ) == 0 || Q_stricmp( path, "text" ) == 0 ) {
+		actualPath = "fonts/roboto-regular.ttf";
+	} else if ( Q_stricmp( path, "12" ) == 0 || Q_stricmp( path, "small" ) == 0 ) {
+		actualPath = "fonts/roboto-regular.ttf"; // Specifically requested for small text
+	} else if ( Q_stricmp( path, "24" ) == 0 || Q_stricmp( path, "big" ) == 0 ) {
+		actualPath = "fonts/roboto-bold.ttf";
+	} else if ( Q_stricmp( path, "font1_prop.tga" ) == 0 || Q_stricmp( path, "font2_prop.tga" ) == 0 ) {
+		actualPath = "fonts/roboto-regular.ttf"; // Fallback fonts also use Roboto
+	} else if ( Q_stricmp( path, "fonts/FX300.ttf" ) == 0 ) {
+		actualPath = "fonts/roboto-regular.ttf"; // Override FX300 with Roboto
+	}
+
 	if ( !outFont ) {
 		return;
 	}
 
 	memset( outFont, 0, sizeof( *outFont ) );
-	if ( !path || !path[0] ) {
+	if ( !actualPath || !actualPath[0] ) {
 		Com_Printf( "MainMenu font %s: missing path\n", label ? label : "unknown" );
 		return;
 	}
 
-	Com_Printf( "MainMenu font %s: attempting to load %s (%dpt)\n", label ? label : "font", path, pointSize );
-	Com_Printf( "DEBUG: trap_R_RegisterFont called with path='%s'\n", path );
-	trap_R_RegisterFont( path, pointSize, outFont );
+	Com_Printf( "MainMenu font %s: attempting to load %s (%dpt) [mapped from %s]\n",
+		label ? label : "font", actualPath, pointSize, path );
+	trap_R_RegisterFont( actualPath, pointSize, outFont );
 	if ( FONT_LOADED( outFont ) ) {
-		Com_Printf( S_COLOR_GREEN "MainMenu font %s: loaded %s (%dpt)\n", label ? label : "font", path, pointSize );
+		Com_Printf( S_COLOR_GREEN "MainMenu font %s: loaded %s (%dpt)\n", label ? label : "font", actualPath, pointSize );
 	} else {
-		Com_Printf( S_COLOR_RED "MainMenu font %s: failed to load %s (%dpt), trying fonts/FX300.ttf fallback\n", label ? label : "font", path, pointSize );
-		// Try fallback to fonts/FX300.ttf
-		trap_R_RegisterFont( "fonts/FX300.ttf", pointSize, outFont );
-		if ( FONT_LOADED( outFont ) ) {
-			Com_Printf( S_COLOR_YELLOW "MainMenu font %s: loaded fallback fonts/FX300.ttf (%dpt)\n", label ? label : "font", pointSize );
+		Com_Printf( S_COLOR_RED "MainMenu font %s: failed to load %s (%dpt), trying Roboto fallback\n", label ? label : "font", actualPath, pointSize );
+		// Try Roboto fallback first
+		const char *fallbackPath = NULL;
+		if ( pointSize <= 14 ) {
+			fallbackPath = "fonts/roboto-regular.ttf"; // Small text
+		} else if ( pointSize >= 20 ) {
+			fallbackPath = "fonts/roboto-bold.ttf"; // Large text
 		} else {
-			Com_Printf( S_COLOR_RED "MainMenu font %s: failed to load fonts/FX300.ttf (%dpt)\n", label ? label : "font", pointSize );
+			fallbackPath = "fonts/roboto-regular.ttf"; // Medium text
+		}
+
+		trap_R_RegisterFont( fallbackPath, pointSize, outFont );
+		if ( FONT_LOADED( outFont ) ) {
+			Com_Printf( S_COLOR_YELLOW "MainMenu font %s: loaded Roboto fallback %s (%dpt)\n", label ? label : "font", fallbackPath, pointSize );
+		} else {
+			Com_Printf( S_COLOR_RED "MainMenu font %s: Roboto fallback failed, trying FX300.ttf\n", label ? label : "font" );
+			// Final fallback to FX300
+			trap_R_RegisterFont( "fonts/FX300.ttf", pointSize, outFont );
+			if ( FONT_LOADED( outFont ) ) {
+				Com_Printf( S_COLOR_YELLOW "MainMenu font %s: loaded FX300.ttf fallback (%dpt)\n", label ? label : "font", pointSize );
+			} else {
+				Com_Printf( S_COLOR_RED "MainMenu font %s: all fallbacks failed (%dpt)\n", label ? label : "font", pointSize );
+			}
 		}
 	}
 }
@@ -167,9 +199,9 @@ static void MainMenu_LoadFontsFromConfig( void ) {
 
 	// For now, use hardcoded defaults to ensure consistency
 	// In the future, we can restore the flexible parsing
-	MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 16, &s_mainFonts.textFont, "text" );
-	MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 12, &s_mainFonts.smallFont, "small" );
-	MainMenu_RegisterFontSafe( "fonts/FX300.ttf", 24, &s_mainFonts.bigFont, "big" );
+	MainMenu_RegisterFontSafe( "fonts/roboto-regular.ttf", 16, &s_mainFonts.textFont, "text" );
+	MainMenu_RegisterFontSafe( "fonts/roboto-regular.ttf", 12, &s_mainFonts.smallFont, "small" );
+	MainMenu_RegisterFontSafe( "fonts/roboto-bold.ttf", 24, &s_mainFonts.bigFont, "big" );
 
 	s_mainFonts.loaded = FONT_LOADED( &s_mainFonts.textFont );
 	Com_Printf("DEBUG: Font loading completed\n");

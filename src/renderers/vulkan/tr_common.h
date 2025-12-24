@@ -83,6 +83,8 @@ extern cvar_t *r_texturebits;			// number of desired texture bits
 
 extern cvar_t *r_drawBuffer;
 
+extern cvar_t *r_saveFontData;
+
 extern cvar_t *r_allowExtensions;				// global enable/disable of OpenGL extensions
 extern cvar_t *r_ext_compressed_textures;		// these control use of specific extensions
 extern cvar_t *r_ext_multitexture;
@@ -110,6 +112,7 @@ qhandle_t RE_RegisterShaderFromImage(const char *name, int lightmapIndex, image_
 void R_InitFreeType( void );
 void R_DoneFreeType( void );
 qboolean RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font);
+qboolean RE_RegisterFont_Stb(const char *fontName, int pointSize, fontInfo_t *font);
 
 #include "../renderercommon/tr_font_enhanced.h"
 

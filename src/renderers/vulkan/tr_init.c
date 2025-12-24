@@ -570,17 +570,23 @@ void QDECL Com_Printf( const char *fmt, ... )
 #endif
 
 
-#ifndef USE_VULKAN
 /*
 ** R_HaveExtension
 */
 static qboolean R_HaveExtension( const char *ext )
 {
+#ifdef USE_VULKAN
+	return qfalse;
+#else
+	if ( !gl_extensions ) {
+		return qfalse;
+	}
 	const char *ptr = Q_stristr( gl_extensions, ext );
 	if (ptr == NULL)
 		return qfalse;
 	ptr += strlen(ext);
 	return ((*ptr == ' ') || (*ptr == '\0'));  // verify its complete string.
+#endif
 }
 
 
@@ -589,6 +595,7 @@ static qboolean R_HaveExtension( const char *ext )
 */
 void R_InitExtensions( void )
 {
+#ifdef USE_VULKAN
 	// Query Vulkan device properties instead of OpenGL
 	VkPhysicalDeviceProperties props;
 	qvkGetPhysicalDeviceProperties(vk.physical_device, &props);
@@ -613,6 +620,7 @@ void R_InitExtensions( void )
 	textureFilterAnisotropic = qfalse;
 	maxAnisotropy = 0;
 
+#ifndef USE_VULKAN
 	qglLockArraysEXT = NULL;
 	qglUnlockArraysEXT = NULL;
 
@@ -621,7 +629,8 @@ void R_InitExtensions( void )
 	qglActiveTextureARB = NULL;
 	qglClientActiveTextureARB = NULL;
 
-	gl_clamp_mode = GL_CLAMP; // by default
+	gl_clamp_mode = 0; // Use numeric constant for GL_CLAMP equivalent if needed
+#endif
 
 	// Vulkan device limits
 	glConfig.maxTextureSize = props.limits.maxImageDimension2D;
@@ -640,9 +649,20 @@ void R_InitExtensions( void )
 
 	ri.Printf( PRINT_ALL, "Initializing Vulkan features\n" );
 
-	// Vulkan has CLAMP_TO_EDGE as standard
-	gl_clamp_mode = GL_CLAMP_TO_EDGE;
+	// Vulkan has CLAMP_TO_EDGE equivalent
+	gl_clamp_mode = 3; // Use numeric constant for GL_CLAMP_TO_EDGE equivalent if needed
 	ri.Printf( PRINT_ALL, "...using Vulkan CLAMP_TO_EDGE\n" );
+#else
+	if ( !r_allowExtensions->integer )
+	{
+		ri.Printf( PRINT_ALL, "*** IGNORING OPENGL EXTENSIONS ***\n" );
+		glConfig.textureCompression = TC_NONE;
+		glConfig.textureEnvAddAvailable = qfalse;
+		glConfig.maxTextureSize = 0;
+		return;
+	}
+
+	ri.Printf( PRINT_ALL, "Initializing OpenGL extensions\n" );
 
 	// GL_EXT_texture_compression_s3tc
 	if ( R_HaveExtension( "GL_ARB_texture_compression" ) &&
@@ -782,8 +802,8 @@ void R_InitExtensions( void )
 	{
 		ri.Printf( PRINT_ALL, "...GL_EXT_texture_filter_anisotropic not found\n" );
 	}
-}
 #endif
+}
 
 
 /*
@@ -2426,7 +2446,7 @@ static void R_Register( void )
 	r_saveFontData = ri.Cvar_Get( "r_saveFontData", "0", 0 );
 	
 	// Font rendering quality CVars
-	r_fontAtlasSize = ri.Cvar_Get( "r_fontAtlasSize", "256", CVAR_ARCHIVE | CVAR_LATCH );
+	r_fontAtlasSize = ri.Cvar_Get( "r_fontAtlasSize", "512", CVAR_ARCHIVE | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_fontAtlasSize, "256", "1024", CV_INTEGER );
 	ri.Cvar_SetDescription( r_fontAtlasSize, "Font texture atlas size in pixels. Larger sizes allow more glyphs per texture but use more memory. Valid values: 256, 512, 1024" );
 	
