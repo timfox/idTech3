@@ -3653,12 +3653,13 @@ ENDIF()
 ADD_TEST(NAME performance_regression_tests COMMAND test_performance_regression)
 
 ADD_EXECUTABLE(test_compatibility
+	tests/test_compatibility.c
 	src/common/compatibility_test.c
-	tests/test_compatibility.c)
+	src/common/q_shared.c
+	src/common/cmd.c)
 TARGET_INCLUDE_DIRECTORIES(test_compatibility PRIVATE src/common)
 TARGET_INCLUDE_DIRECTORIES(test_compatibility PRIVATE src)
 TARGET_COMPILE_DEFINITIONS(test_compatibility PRIVATE STANDALONE_TEST)
-TARGET_LINK_LIBRARIES(test_compatibility PRIVATE common)
 TARGET_SOURCES(test_compatibility PRIVATE tests/test_stubs.c)
 SET_SOURCE_FILES_PROPERTIES(src/common/compatibility_test.c PROPERTIES COMPILE_FLAGS "-w")
 SET_SOURCE_FILES_PROPERTIES(tests/test_compatibility.c PROPERTIES COMPILE_FLAGS "-w")
@@ -3683,13 +3684,15 @@ ADD_TEST(NAME asset_validation_tests COMMAND test_asset_validation)
 
 ADD_EXECUTABLE(test_binary_analysis
 	tests/test_binary_analysis.c
-	src/common/binary_analysis.c)
+	src/common/binary_analysis.c
+	src/common/q_shared.c
+	src/common/cmd.c)
 TARGET_INCLUDE_DIRECTORIES(test_binary_analysis PRIVATE src/common)
 TARGET_INCLUDE_DIRECTORIES(test_binary_analysis PRIVATE src)
 TARGET_COMPILE_DEFINITIONS(test_binary_analysis PRIVATE STANDALONE_TEST)
-TARGET_LINK_LIBRARIES(test_binary_analysis PRIVATE common)
 TARGET_SOURCES(test_binary_analysis PRIVATE tests/test_stubs.c)
 SET_SOURCE_FILES_PROPERTIES(src/common/binary_analysis.c PROPERTIES COMPILE_FLAGS "-w")
+SET_SOURCE_FILES_PROPERTIES(tests/test_binary_analysis.c PROPERTIES COMPILE_FLAGS "-w")
 IF(UNIX)
 	TARGET_LINK_LIBRARIES(test_binary_analysis PRIVATE m)
 ENDIF()
@@ -3710,13 +3713,15 @@ ADD_TEST(NAME update_system_tests COMMAND test_update_system)
 
 ADD_EXECUTABLE(test_package_generator
 	tests/test_package_generator.c
-	src/common/package_generator.c)
+	src/common/package_generator.c
+	src/common/q_shared.c
+	src/common/cmd.c)
 TARGET_INCLUDE_DIRECTORIES(test_package_generator PRIVATE src/common)
 TARGET_INCLUDE_DIRECTORIES(test_package_generator PRIVATE src)
 TARGET_COMPILE_DEFINITIONS(test_package_generator PRIVATE STANDALONE_TEST)
-TARGET_LINK_LIBRARIES(test_package_generator PRIVATE common)
 TARGET_SOURCES(test_package_generator PRIVATE tests/test_stubs.c)
 SET_SOURCE_FILES_PROPERTIES(src/common/package_generator.c PROPERTIES COMPILE_FLAGS "-w")
+SET_SOURCE_FILES_PROPERTIES(tests/test_package_generator.c PROPERTIES COMPILE_FLAGS "-w")
 IF(UNIX)
 	TARGET_LINK_LIBRARIES(test_package_generator PRIVATE m)
 ENDIF()

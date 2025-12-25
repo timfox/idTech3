@@ -15,8 +15,6 @@
 void Com_Printf(const char *fmt, ...);
 void Com_DPrintf(const char *fmt, ...);
 void Com_Error(errorParm_t level, const char *fmt, ...);
-int Q_stricmp(const char *s1, const char *s2);
-void Q_strncpyz(char *dest, const char *src, int destsize);
 int Sys_Milliseconds(void);
 int Com_Milliseconds(void);
 void Com_Quit_f(void);
@@ -26,10 +24,6 @@ void *Sys_LoadFunction(void *handle, const char *name);
 float sqrtf(float x);
 void Z_Free(void *ptr);
 qboolean Q_ValidateFilePath(const char *path);
-qboolean FS_Initialized(void);
-qboolean FS_StartupInProgress(void);
-int Cmd_Argc(void);
-char *Cmd_Argv(int arg);
 
 // Global variables
 cvar_t *com_developer = NULL;
@@ -63,17 +57,6 @@ void Com_Error(errorParm_t level, const char *fmt, ...) {
     exit(1);
 }
 
-// Stub for Q_stricmp
-int Q_stricmp(const char *s1, const char *s2) {
-    return strcasecmp(s1, s2);
-}
-
-// Stub for Q_strncpyz
-void Q_strncpyz(char *dest, const char *src, int destsize) {
-    if (destsize <= 0) return;
-    strncpy(dest, src, destsize - 1);
-    dest[destsize - 1] = '\0';
-}
 
 // Stub for Sys_Milliseconds
 int Sys_Milliseconds(void) {
@@ -129,24 +112,78 @@ qboolean Q_ValidateFilePath(const char *path) {
     return qtrue; // Accept all paths for testing
 }
 
-// Stub for FS_Initialized
-qboolean FS_Initialized(void) {
-    return qtrue;
+// Stub for CL_ForwardCommandToServer
+void CL_ForwardCommandToServer(const char* cmd) {
+    Q_UNUSED(cmd);
 }
 
-// Stub for FS_StartupInProgress
-qboolean FS_StartupInProgress(void) {
+// Stub for Field_CompleteFilename
+void Field_CompleteFilename(const char* dir, const char* ext, qboolean stripExt, qboolean allowNonPureFiles) {
+    Q_UNUSED(dir);
+    Q_UNUSED(ext);
+    Q_UNUSED(stripExt);
+    Q_UNUSED(allowNonPureFiles);
+}
+
+// Stub for CopyString
+char* CopyString(const char* in) {
+    if (!in) return NULL;
+    size_t len = strlen(in) + 1;
+    char* out = (char*)malloc(len);
+    if (out) {
+        strcpy(out, in);
+    }
+    return out;
+}
+
+// Stub for S_Malloc
+void* S_Malloc(int size) {
+    return malloc(size);
+}
+
+// Game-specific stubs
+qboolean Cvar_Command(void) {
     return qfalse;
 }
 
-// Stub for Cmd_Argc
-int Cmd_Argc(void) {
-    return 1;
+qboolean com_cl_running = qfalse;
+qboolean com_sv_running = qfalse;
+
+void UI_GameCommand(void) {}
+void CL_GameCommand(void) {}
+void SV_GameCommand(void) {}
+
+void Cvar_CompleteCvarName(char* args, int argNum) {
+    Q_UNUSED(args);
+    Q_UNUSED(argNum);
 }
 
-// Stub for Cmd_Argv
-char *Cmd_Argv(int arg) {
-    static char *dummy = "test";
-    Q_UNUSED(arg); // Suppress unused parameter warning for now
-    return dummy;
+// Cvar stubs
+const char* Cvar_VariableString(const char* var_name) {
+    Q_UNUSED(var_name);
+    return "";
 }
+
+// Filesystem stubs
+void FS_BypassPure(void) {}
+int FS_ReadFile(const char* qpath, void** buffer) {
+    Q_UNUSED(qpath);
+    Q_UNUSED(buffer);
+    return -1; // File not found
+}
+void FS_RestorePure(void) {}
+void Com_WriteConfiguration(void) {}
+
+// Utility stubs
+float Q_atof(const char* str) {
+    if (!str) return 0.0f;
+    return (float)atof(str);
+}
+
+int Com_Filter(char* filter, char* name, int casesensitive) {
+    Q_UNUSED(filter);
+    Q_UNUSED(name);
+    Q_UNUSED(casesensitive);
+    return 0;
+}
+

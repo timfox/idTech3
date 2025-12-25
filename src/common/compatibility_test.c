@@ -173,10 +173,10 @@ Platform Detection
 =============================================================================
 */
 
-qboolean Compatibility_DetectPlatform(platform_info_t* info) {
+qboolean Compatibility_DetectPlatform(compatibility_platform_info_t* info) {
     if (!info) return qfalse;
 
-    memset(info, 0, sizeof(platform_info_t));
+    memset(info, 0, sizeof(compatibility_platform_info_t));
 
     // Detect OS and platform type
 #ifdef _WIN32

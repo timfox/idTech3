@@ -411,8 +411,33 @@ typedef enum {
     PLATFORM_LINUX,
     PLATFORM_MACOS,
     PLATFORM_BSD,
-    PLATFORM_ANDROID
+    PLATFORM_ANDROID,
+    PLATFORM_COUNT
 } platform_type_t;
+
+// Architecture types
+typedef enum {
+    ARCH_UNKNOWN = 0,
+    ARCH_X86,
+    ARCH_X86_64,
+    ARCH_ARM,
+    ARCH_ARM64,
+    ARCH_RISCV,
+    ARCH_PPC,
+    ARCH_PPC64,
+    ARCH_S390X,
+    ARCH_COUNT
+} architecture_type_t;
+
+// Compiler types
+typedef enum {
+    COMPILER_UNKNOWN = 0,
+    COMPILER_GCC,
+    COMPILER_CLANG,
+    COMPILER_MSVC,
+    COMPILER_EMSCRIPTEN,
+    COMPILER_COUNT
+} compiler_type_t;
 
 typedef struct {
     platform_type_t type;

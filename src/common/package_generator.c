@@ -29,6 +29,7 @@ Multi-platform installer and package generation framework.
 // Forward declarations for functions used before definition
 qboolean PackageGenerator_ValidateConfig(const package_config_t* config, package_generation_result_t* result);
 void PackageGenerator_GeneratePackageName(const package_config_t* config, package_type_t type, char* name, size_t size);
+void PackageGenerator_GeneratePackageName(const package_config_t* config, package_type_t type, char* name, size_t size) {
 qboolean PackageGenerator_CopyFilesToStaging(const package_config_t* config, const char* staging_dir);
 qboolean PackageGenerator_CreateZipArchive(const char* source_dir, const char* output_file);
 qboolean PackageGenerator_CreateTarGzArchive(const char* source_dir, const char* output_file);
@@ -692,11 +693,16 @@ void PackageGenerator_GeneratePackageName(const package_config_t* config,
                   PackageGenerator_GetArchitectureName(config->target_architecture));
     }
 
+    char extension[16];
+    if (!PackageGenerator_GetPackageExtension(type, extension, sizeof(extension))) {
+        Q_strncpyz(extension, ".unknown", sizeof(extension));
+    }
+
     Q_snprintf(name, size, "%s_%s%s%s",
                config->package_name,
                config->package_version,
                arch_suffix,
-               PackageGenerator_GetPackageExtension(type));
+               extension);
 }
 
 qboolean PackageGenerator_CopyFilesToStaging(const package_config_t* config,

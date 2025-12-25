@@ -8,7 +8,6 @@ Automated cross-platform and cross-hardware validation tests.
 
 #include "q_shared.h"
 #include "compatibility_test.h"
-#include "cross_platform_test.h"
 #include <stdio.h>
 
 // Forward declarations for functions used in tests
@@ -34,7 +33,7 @@ static qboolean test_compatibility_initialization(void) {
 static qboolean test_platform_detection(void) {
     printf("Testing platform detection...\n");
 
-    platform_info_t info;
+    compatibility_platform_info_t info;
     if (!Compatibility_DetectPlatform(&info)) {
         printf("FAILED: Could not detect platform information\n");
         return qfalse;

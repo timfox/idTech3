@@ -24,19 +24,6 @@ typedef enum {
     PLATFORM_COUNT
 } platform_type_t;
 
-// Architecture types
-typedef enum {
-    ARCH_UNKNOWN = 0,
-    ARCH_X86,
-    ARCH_X86_64,
-    ARCH_ARM,
-    ARCH_ARM64,
-    ARCH_RISCV,
-    ARCH_PPC,
-    ARCH_PPC64,
-    ARCH_S390X,
-    ARCH_COUNT
-} architecture_type_t;
 
 // Compiler types
 typedef enum {

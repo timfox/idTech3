@@ -11,7 +11,6 @@ compatibility verification and feature detection.
 #define __COMPATIBILITY_TEST_H__
 
 #include "q_shared.h"
-#include "cross_platform_test.h"
 
 // Platform compatibility levels
 typedef enum {
@@ -64,7 +63,7 @@ typedef struct {
     uint64_t total_memory_mb;
     char locale[16];
     char timezone[32];
-} platform_info_t;
+} compatibility_platform_info_t;
 
 // Hardware capabilities
 typedef struct {
@@ -140,7 +139,7 @@ typedef struct {
 // Compatibility testing system
 typedef struct {
     qboolean initialized;
-    platform_info_t platform_info;
+    compatibility_platform_info_t platform_info;
     hardware_capabilities_t hardware_caps;
     feature_support_t* feature_matrix;
     uint32_t feature_count;
@@ -166,7 +165,7 @@ qboolean Compatibility_Init(void);
 void Compatibility_Shutdown(void);
 
 // Platform Detection
-qboolean Compatibility_DetectPlatform(platform_info_t* info);
+qboolean Compatibility_DetectPlatform(compatibility_platform_info_t* info);
 qboolean Compatibility_DetectHardware(hardware_capabilities_t* caps);
 const char* Compatibility_GetPlatformName(platform_type_t platform);
 const char* Compatibility_GetArchitectureName(architecture_type_t arch);
