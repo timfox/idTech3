@@ -75,7 +75,13 @@ typedef enum {
 
 // Basic type definitions needed for structs and inline functions
 typedef unsigned char byte;
-typedef enum { qfalse = 0, qtrue } qboolean;
+#ifdef __cplusplus  // For C++23 mode
+typedef bool qboolean;
+#define qtrue true
+#define qfalse false
+#else  // Fallback for pure C or legacy
+typedef enum { qfalse, qtrue } qboolean;
+#endif
 
 // Type-safe file handle
 typedef struct {
