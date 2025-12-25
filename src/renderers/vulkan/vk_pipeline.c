@@ -175,7 +175,7 @@ __attribute__((unused)) void vk_pipeline_binary_save(VkPipeline pipeline, uint64
 
 	// Get device properties for binary validation
 	VkPhysicalDeviceProperties props;
-	qvkGetPhysicalDeviceProperties(vk.physical_device, &props);
+	vkGetPhysicalDeviceProperties(vk.physical_device, &props);
 
 	// Create binary directory if it doesn't exist
 	// Note: This is a simplified implementation - full version would use platform-specific directory creation
@@ -219,7 +219,7 @@ __attribute__((unused)) qboolean vk_pipeline_binary_load(uint64_t pipeline_hash,
 	}
 
 	VkPhysicalDeviceProperties props;
-	qvkGetPhysicalDeviceProperties(vk.physical_device, &props);
+	vkGetPhysicalDeviceProperties(vk.physical_device, &props);
 	if (header.device_vendor_id != props.vendorID || header.device_id != props.deviceID) {
 		fclose(f);
 		return qfalse; // Binary from different device

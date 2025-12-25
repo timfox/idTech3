@@ -30,17 +30,15 @@ void QDECL Com_Error( errorParm_t level, const char *fmt, ... ) {
 }
 
 // Basic memory management stubs - should be overridden
-void *Z_Malloc( int size, int tag, qboolean zeroed, int align ) {
-    (void)tag;
-    (void)align;
-    return zeroed ? calloc( 1, size ) : malloc( size );
+void *Z_Malloc( int size ) {
+    return calloc( 1, size ); // Always zeroed as per header comment
 }
 
 void Z_Free( void *ptr ) {
     free( ptr );
 }
 
-void *Z_TagMalloc( int size, int tag ) {
+void *Z_TagMalloc( int size, memtag_t tag ) {
     (void)tag;
     return malloc( size );
 }
@@ -82,16 +80,19 @@ void FS_WriteConfiguration( void ) {
 }
 
 // Basic UI stubs
-void UI_GameCommand( void ) {
-    // Stub
+qboolean UI_GameCommand( void ) {
+    // Stub - return false to indicate command not handled
+    return qfalse;
 }
 
-void CL_GameCommand( void ) {
-    // Stub
+qboolean CL_GameCommand( void ) {
+    // Stub - return false to indicate command not handled
+    return qfalse;
 }
 
-void SV_GameCommand( void ) {
-    // Stub
+qboolean SV_GameCommand( void ) {
+    // Stub - return false to indicate command not handled
+    return qfalse;
 }
 
 // Basic field stubs
@@ -103,20 +104,28 @@ void Field_Clear( field_t *field ) {
     }
 }
 
-void Field_CompleteFilename( void ) {
-    // Stub
+void Field_CompleteFilename( const char *dir, const char *ext, qboolean stripExt, int flags ) {
+    // Stub - unused parameters
+    (void)dir;
+    (void)ext;
+    (void)stripExt;
+    (void)flags;
 }
 
-void Field_CompleteCommand( void ) {
-    // Stub
+void Field_CompleteCommand( const char *cmd, qboolean doCommands, qboolean doCvars ) {
+    // Stub - unused parameters
+    (void)cmd;
+    (void)doCommands;
+    (void)doCvars;
 }
 
 void Field_CompleteKeyname( void ) {
     // Stub
 }
 
-void Field_CompleteKeyBind( void ) {
-    // Stub
+void Field_CompleteKeyBind( int key ) {
+    // Stub - unused parameter
+    (void)key;
 }
 
 // Basic command stubs
@@ -124,7 +133,7 @@ int Cmd_Argc( void ) {
     return 1;
 }
 
-char *Cmd_Argv( int arg ) {
+const char *Cmd_Argv( int arg ) {
     static char dummy[] = "dummy";
     (void)arg;
     return dummy;

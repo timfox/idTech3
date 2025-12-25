@@ -873,20 +873,40 @@ typedef struct {
     // Post-processing descriptor sets
     VkDescriptorSetLayout ssao_descriptor_layout;  // Added
     VkDescriptorSet ssao_descriptor;  // Added
+    VkPipeline ssao_pipeline;  // Added
     VkDescriptorSetLayout ssr_descriptor_layout;  // Added
     VkDescriptorSet ssr_descriptor;  // Added
+    VkPipeline ssr_pipeline;  // Added
     VkDescriptorSetLayout bloom_descriptor_layout;  // Added
     VkDescriptorSet bloom_descriptor;  // Added
+    VkPipeline bloom_pipeline;  // Added
     VkDescriptorSetLayout dof_descriptor_layout;  // Added
     VkDescriptorSet dof_descriptor;  // Added
+    VkPipeline dof_pipeline;  // Added
     VkDescriptorSetLayout velocity_tiles_descriptor_layout;  // Added
     VkDescriptorSet velocity_tiles_descriptor;  // Added
+    VkImage velocity_tiles_image;  // Added
+    VkImageView velocity_image_view;  // Added
+    VkImageView velocity_tiles_image_view;  // Added
+    VkImageView motion_blur_image_view;  // Added
+    VkPipelineLayout velocity_tiles_layout;  // Added
     VkDescriptorSetLayout motion_blur_descriptor_layout;  // Added
     VkDescriptorSet motion_blur_descriptor;  // Added
+    VkPipeline motion_blur_pipeline;  // Added
+    VkPipelineLayout motion_blur_layout;  // Added
     VkDescriptorSetLayout color_grading_descriptor_layout;  // Added
     VkDescriptorSet color_grading_descriptor;  // Added
+    VkPipelineLayout color_grading_layout;  // Added
+    VkPipeline color_grading_pipeline;  // Added
+    VkImageView lut_image_view;  // Added
+    VkImageView color_grading_image_view;  // Added
     VkDescriptorSetLayout heat_distortion_descriptor_layout;  // Added
     VkDescriptorSet heat_distortion_descriptor;  // Added
+    VkImageView heat_distortion_image_view;  // Added
+    VkPipeline heat_distortion_pipeline;  // Added
+    VkPipelineLayout heat_distortion_layout;  // Added
+    VkImageView heat_mask_image_view;  // Added
+    VkImageView noise_image_view;  // Added
 
     // Cubemap system
     struct {
@@ -1077,6 +1097,7 @@ typedef struct {
         shader_file_watch_t* shader_file_watch_list;  // Corrected name
         uint32_t shader_file_watch_count;  // Corrected name
         qboolean pipelines_recreated;
+        uint32_t shaders_reloaded;
     } hot_reload;
 
     // Frame management
@@ -1089,6 +1110,18 @@ typedef struct {
     VkImageView depth_image_view; // Added
     VkImage msaa_image;        // Added
     VkImageView msaa_image_view; // Added
+
+    // Procedural dressing system
+    struct {
+        qboolean enabled;
+        qboolean initialized;
+        qboolean dirty;
+        uint32_t biomeCount;
+        uint32_t ruleCount;
+        uint32_t instanceCount;
+        proc_biome_t biomes[16];
+        proc_rule_t rules[64];
+    } procDressing;
 } Vk_Instance;
 
 // Global Vulkan instance
@@ -1250,6 +1283,8 @@ void vk_track_gpu_free(VkDeviceMemory memory);
 
 // Utility functions
 uint32_t find_memory_type(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+void vk_mark_pipelines_dirty(void);
+void vk_bind_generated_shaders(void);
 
 // Memory and performance systems
 void vk_init_vram_stats(void);

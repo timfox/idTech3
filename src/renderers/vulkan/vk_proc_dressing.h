@@ -1,29 +1,64 @@
 /*
 =============================================================================
-Procedural Dressing System
+Procedural Dressing System Header
 
-Generates instancing directives from paint/spline/volume rules and pushes
-precomputed transforms into the GPU instancing path.
+Type definitions and constants for the procedural dressing system.
 =============================================================================
 */
 
-#pragma once
+#ifndef __VK_PROC_DRESSING_H__
+#define __VK_PROC_DRESSING_H__
 
-#include "tr_local.h"
-#include "vk.h"
-#include "vk_gpu_culling.h"
+#include "q_shared.h"
 
-#ifdef USE_VULKAN
-
-#define VK_MAX_PROC_RULES     64
-#define VK_MAX_PROC_BIOMES    8
+// Maximum number of procedural instances
 #define VK_MAX_PROC_INSTANCES 65536
 
-void vk_proc_dressing_init( void );
-void vk_proc_dressing_shutdown( void );
-void vk_proc_dressing_tick( void ); // called each frame before gpu culling upload
-void vk_proc_dressing_mark_dirty( void );
+// Rule types
+typedef enum {
+    PROC_RULE_PAINT,    // Paint sphere rule
+    PROC_RULE_VOLUME,   // AABB volume rule
+    PROC_RULE_SPLINE    // Spline-based rule
+} proc_rule_type_t;
 
-#endif // USE_VULKAN
+// Procedural biome definition
+typedef struct {
+    char name[32];
+    vec3_t tint;
+    float scaleRange[2];      // Min/max scale multiplier
+    float densityMultiplier;  // Density adjustment
+    int materialIndex;        // Material/material to use
+} proc_biome_t;
 
+// Procedural rule definition
+typedef struct {
+    proc_rule_type_t type;
+    union {
+        struct { // Paint rule
+            vec3_t a;        // Center position
+            float radius;    // Paint radius
+        };
+        struct { // Volume rule
+            vec3_t mins;     // AABB min
+            vec3_t maxs;     // AABB max
+        };
+        struct { // Spline rule
+            vec3_t a;        // Start point
+            vec3_t b;        // End point
+            float radius;    // Spline radius
+        };
+    };
+    float density;      // Instances per unit area/volume
+    float jitter;       // Position randomization [0,1]
+    int biomeId;        // Which biome to use
+    int maxInstances;   // Maximum instances for this rule
+} proc_rule_t;
 
+// Procedural instance
+typedef struct {
+    mat4_t transform;   // Model matrix
+    int biomeId;        // Biome this instance belongs to
+    vec4_t color;       // Tint color (RGBA)
+} proc_instance_t;
+
+#endif // __VK_PROC_DRESSING_H__

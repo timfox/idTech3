@@ -284,3 +284,4 @@ void Perf_DisplayInfo_f(void) {
 	Perf_GetInfoString(info, sizeof(info));
 	Com_Printf("Performance Counters:\n%s\n", info);
 }
+#endif // STANDALONE_TEST

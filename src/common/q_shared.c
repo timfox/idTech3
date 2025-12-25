@@ -2672,3 +2672,73 @@ const char *Platform_GetNewline(void) {
     return platform_info.newline;
 }
 
+//============================================================================
+
+/*
+==============
+Q_atof
+==============
+*/
+float Q_atof( const char *str ) {
+    float sign;
+    float value;
+    int c;
+
+    if (!str) return 0;
+
+    // skip whitespace
+    while (*str <= ' ') {
+        if (!*str) return 0;
+        str++;
+    }
+
+    // check sign
+    switch (*str) {
+    case '+':
+        str++;
+        sign = 1;
+        break;
+    case '-':
+        str++;
+        sign = -1;
+        break;
+    default:
+        sign = 1;
+        break;
+    }
+
+    // read digits
+    value = 0;
+    c = *str;
+    if (c != '.') {
+        do {
+            c = *str++;
+            if (c < '0' || c > '9') break;
+            c -= '0';
+            value = value * 10 + c;
+        } while (1);
+    } else {
+        str++;
+    }
+
+    // check for decimal point
+    if (c == '.') {
+        float fraction = 0;
+        float decimal = 1;
+
+        do {
+            c = *str++;
+            if (c < '0' || c > '9') break;
+            c -= '0';
+            decimal *= 10;
+            fraction = fraction * 10 + c;
+        } while (1);
+
+        value += fraction / decimal;
+    }
+
+    // not handling 10e10 notation...
+
+    return value * sign;
+}
+

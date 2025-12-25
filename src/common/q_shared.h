@@ -73,6 +73,8 @@ typedef enum {
     FILE_MODE_COUNT
 } file_mode_t;
 
+// Memory allocation tags for tracking memory usage - defined in qcommon.h
+
 // Basic type definitions needed for structs and inline functions
 typedef unsigned char byte;
 
