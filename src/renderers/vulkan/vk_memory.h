@@ -3,6 +3,7 @@
 
 #include <vulkan/vulkan.h>
 #include <stdint.h>
+#include <stdatomic.h>
 #include "q_shared.h"
 #include "tr_common.h"
 
@@ -71,9 +72,6 @@ typedef struct {
     atomic_uint64_t total_freed_bytes;
 } vk_memory_stats_t;
 
-extern vk_memory_stats_t vk_memory_stats;
-extern vk_vram_stats_t vk_vram_stats;
-extern vk_memory_tracker_t vk_memory_tracker;
 
 // Memory allocation entry for defragmentation tracking
 typedef struct vk_memory_block_s {
@@ -1112,6 +1110,11 @@ typedef struct vk_shader_performance_analyzer_s {
     uint64_t total_instructions_analyzed; // Total instructions analyzed
     uint64_t analysis_time_ns;          // Time spent analyzing
 
+    // Performance counters (atomic for thread safety)
+    atomic_uint_t shaders_with_warnings;    // Shaders with performance warnings
+    atomic_uint_t critical_performance_issues; // Critical performance issues
+    atomic_uint_t total_registers_tracked; // Total registers being tracked
+
     const char *debug_name;
 } vk_shader_performance_analyzer_t;
 
@@ -1500,97 +1503,20 @@ typedef struct vk_heatmap_visualizer_s {
 } vk_heatmap_visualizer_t;
 
 // Render profiler API functions
-extern qboolean vk_init_render_profiler(void);
-extern void vk_shutdown_render_profiler(void);
-extern void vk_profile_pass_start(const char *pass_name, uint32_t pass_id);
-extern void vk_profile_pass_end(const char *pass_name, uint32_t draw_calls, uint32_t vertices);
-extern void vk_profile_frame_end(void);
-extern void vk_print_render_profiler_stats(void);
-extern void vk_set_detailed_profiling(qboolean enabled);
 
 // Memory Bandwidth Profiler API
-extern qboolean vk_init_memory_bandwidth_profiler(void);
-extern void vk_shutdown_memory_bandwidth_profiler(void);
-extern void vk_record_memory_access(void *address, VkDeviceSize size, const char *resource_name, qboolean is_write);
-extern void vk_sample_memory_bandwidth(void);
-extern void vk_analyze_memory_access_patterns(void);
-extern void vk_print_memory_bandwidth_stats(void);
-extern void vk_print_cache_performance_stats(void);
-extern void vk_print_layout_optimization_recommendations(void);
-extern void vk_apply_memory_optimizations(void);
-extern void vk_set_bandwidth_profiling_enabled(qboolean enabled);
 
 // Parallel Processing Profiler API
-extern qboolean vk_init_parallel_profiler(void);
-extern void vk_shutdown_parallel_profiler(void);
-extern void vk_profile_thread_start(const char *thread_name, uint32_t thread_id);
-extern void vk_profile_thread_end(uint32_t thread_id);
-extern void vk_profile_sync_operation(const char *operation_name, uint64_t wait_time_ns);
-extern void vk_profile_lock_acquire(const char *lock_name, uint32_t thread_id);
-extern void vk_profile_lock_release(const char *lock_name, uint32_t thread_id);
-extern void vk_profile_work_submit(const char *work_name, uint32_t thread_count);
-extern void vk_profile_work_complete(const char *work_name);
-extern void vk_sample_thread_utilization(void);
-extern void vk_print_parallel_stats(void);
-extern void vk_print_thread_utilization(void);
-extern void vk_print_synchronization_overhead(void);
-extern void vk_print_parallel_efficiency(void);
-extern void vk_set_parallel_profiling_enabled(qboolean enabled);
 
 // Shader Performance Analysis API
-extern qboolean vk_init_shader_performance_analyzer(void);
-extern void vk_shutdown_shader_performance_analyzer(void);
-extern void vk_analyze_shader_performance(const char *shader_name, const uint32_t *spirv_code, size_t code_size, VkShaderStageFlagBits stage);
-extern void vk_print_shader_performance_stats(void);
-extern void vk_print_shader_optimization_suggestions(void);
-extern void vk_print_shader_instruction_analysis(void);
-extern void vk_print_shader_register_usage(void);
-extern void vk_set_shader_analysis_enabled(qboolean enabled);
 
 // Asset Loading Profiler API
-extern qboolean vk_init_asset_loading_profiler(void);
-extern void vk_shutdown_asset_loading_profiler(void);
-extern void vk_profile_asset_load_start(const char *asset_name, const char *asset_type, VkDeviceSize expected_size);
-extern void vk_profile_asset_load_end(const char *asset_name, VkDeviceSize actual_size, qboolean success);
-extern void vk_profile_io_operation(const char *operation_name, VkDeviceSize bytes_transferred, uint64_t operation_time_ns);
-extern void vk_profile_streaming_request(const char *asset_name, uint32_t mip_level, qboolean is_high_priority);
-extern void vk_profile_streaming_complete(const char *asset_name, uint32_t mip_level, VkDeviceSize bytes_loaded);
-extern void vk_sample_asset_loading_performance(void);
-extern void vk_print_asset_loading_stats(void);
-extern void vk_print_io_performance_stats(void);
-extern void vk_print_streaming_stats(void);
-extern void vk_print_asset_loading_bottlenecks(void);
-extern void vk_set_asset_loading_profiling_enabled(qboolean enabled);
 
 // Performance HUD API
-extern qboolean vk_init_performance_hud(void);
-extern void vk_shutdown_performance_hud(void);
-extern void vk_render_performance_hud(void);
-extern void vk_toggle_performance_hud(void);
-extern void vk_set_performance_hud_enabled(qboolean enabled);
-extern qboolean vk_is_performance_hud_enabled(void);
 
 // Automated Performance Regression Detection API
-extern qboolean vk_init_performance_regression_detector(void);
-extern void vk_shutdown_performance_regression_detector(void);
-extern void vk_capture_performance_snapshot(const char *scenario_name);
-extern void vk_save_performance_baseline(const char *scenario_name);
-extern void vk_compare_against_baseline(const char *scenario_name);
-extern void vk_print_performance_regression_report(void);
-extern void vk_export_performance_metrics(const char *file_path);
-extern void vk_set_performance_regression_threshold(float threshold_percentage);
-extern qboolean vk_did_performance_regress(void);
 
 // Heatmap Visualization API
-extern qboolean vk_init_heatmap_visualizer(void);
-extern void vk_shutdown_heatmap_visualizer(void);
-extern void vk_record_heatmap_sample(float x, float y, float intensity, uint32_t layer_type);
-extern void vk_generate_heatmap_texture(uint32_t layer_type);
-extern void vk_render_heatmap_overlay(void);
-extern void vk_clear_heatmap(uint32_t layer_type);
-extern void vk_set_heatmap_enabled(qboolean enabled);
-extern void vk_set_heatmap_mode(uint32_t mode);
-extern void vk_print_heatmap_stats(void);
 
 // Performance Presets API
 typedef enum vk_performance_preset_e {
@@ -1602,10 +1528,6 @@ typedef enum vk_performance_preset_e {
     VK_PERF_PRESET_COUNT
 } vk_performance_preset_t;
 
-extern void vk_apply_performance_preset(vk_performance_preset_t preset);
-extern const char *vk_get_performance_preset_name(vk_performance_preset_t preset);
-extern vk_performance_preset_t vk_get_current_performance_preset(void);
-extern void vk_print_performance_presets_info(void);
 
 // Memory pool allocation entry for tracking
 typedef struct vk_pool_allocation_s {
@@ -1743,30 +1665,20 @@ typedef struct {
 // ImageChunk is now defined in vk.h
 
 // Memory management function declarations
-qboolean vk_allocate_image_chunk(void);
-void vk_init_memory_defragmentation(void);
 void vk_calculate_fragmentation_metrics(void);
 qboolean vk_perform_defragmentation(void);
-void vk_check_defragmentation(void);
 
 // Hierarchical Memory Pool System
-qboolean vk_init_memory_pool_system(void);
 void *vk_pool_allocate(VkDeviceSize size, VkDeviceSize alignment, const char *debug_name);
 void vk_pool_deallocate(void *ptr);
-void vk_update_memory_pool_system(void);
 void vk_print_pool_statistics(void);
-void vk_shutdown_memory_pool_system(void);
 
 // Lock-Free Memory Allocators
-qboolean vk_init_lock_free_memory_manager(void);
 void *vk_lock_free_alloc(VkDeviceSize size, const char *debug_name);
 qboolean vk_lock_free_free(void *ptr);
 void vk_print_lock_free_stats(void);
-void vk_shutdown_lock_free_memory_manager(void);
 
 // Arena Allocators
-qboolean vk_init_arena_manager(void);
-void vk_reset_frame_arena(void);
 void vk_reset_render_arena(void);
 void vk_reset_asset_arena(void);
 void *vk_frame_alloc(VkDeviceSize size);
@@ -1777,19 +1689,14 @@ vk_memory_arena_t *vk_create_dynamic_arena(VkDeviceSize size, const char *name);
 void vk_destroy_dynamic_arena(vk_memory_arena_t *arena);
 void *vk_arena_alloc_from(vk_memory_arena_t *arena, VkDeviceSize size);
 void vk_print_arena_stats(void);
-void vk_shutdown_arena_manager(void);
 
 // Memory Advisor
-qboolean vk_init_memory_advisor(void);
 void vk_record_memory_advisor_access(void *address, VkDeviceSize offset, const char *resource_name);
-void vk_update_memory_advisor(void);
 void vk_print_memory_advisor_stats(void);
 void vk_set_memory_advisor_auto_optimization(qboolean enabled);
 void vk_force_memory_analysis(void);
-void vk_shutdown_memory_advisor(void);
 
 // Cache-Conscious Data Structures
-qboolean vk_init_cache_structures_manager(void);
 qboolean vk_cache_array_init(vk_cache_array_t *array, VkDeviceSize element_size, uint32_t initial_capacity, const char *debug_name);
 qboolean vk_cache_array_resize(vk_cache_array_t *array, uint32_t new_capacity);
 qboolean vk_cache_array_push(vk_cache_array_t *array, const void *element);
@@ -1800,14 +1707,11 @@ void vk_cache_array_destroy(vk_cache_array_t *array);
 qboolean vk_cache_hash_map_init(vk_cache_hash_map_t *map, VkDeviceSize key_size, VkDeviceSize value_size, uint32_t initial_capacity, uint32_t (*hash_func)(const void*, VkDeviceSize), qboolean (*equals_func)(const void*, const void*, VkDeviceSize), const char *debug_name);
 qboolean vk_cache_queue_init(vk_cache_queue_t *queue, VkDeviceSize element_size, uint32_t capacity, const char *debug_name);
 void vk_print_cache_structures_stats(void);
-void vk_shutdown_cache_structures_manager(void);
 void vk_init_resource_pool(void);
-void vk_shutdown_resource_pool(void);
 VkBuffer vk_get_buffer_from_pool(VkDeviceSize size);
 void vk_return_buffer_to_pool(VkBuffer buffer);
 void vk_alloc_staging_buffer(VkDeviceSize size);
 void vk_flush_staging_buffer(qboolean final);
-void vk_clean_staging_buffer(void);
 
 #ifdef __cplusplus
 }

@@ -10,12 +10,7 @@
 extern "C" {
 #endif
 
-// Shader hot reload structures
-typedef struct {
-    char filename[MAX_QPATH];
-    uint64_t last_modified;
-    uint32_t shader_count;
-} shader_file_watch_t;
+// Shader hot reload structures (defined in vk.h)
 
 // Pipeline binary header for disk storage
 typedef struct {
@@ -26,16 +21,7 @@ typedef struct {
 	VkDeviceSize binary_size;
 } pipeline_binary_header_t;
 
-// Pipeline management function declarations
-void vk_create_shader_modules(void);
-void vk_create_pipelines(void);
-void vk_create_brdflut_pipeline(void);
-void vk_create_compute_post_process_pipelines(void);
-void vk_create_post_process_pipeline(int program_index, uint32_t width, uint32_t height);
-void vk_create_blur_pipeline(uint32_t index, uint32_t width, uint32_t height, qboolean horizontal_pass);
-void vk_update_post_process_pipelines(void);
-void vk_destroy_pipelines(qboolean resetCounter);
-void vk_mark_pipelines_dirty(void);
+// Pipeline management function declarations (prototypes moved to vk.h to avoid linkage conflicts)
 
 // Pipeline allocation and lookup functions are declared in vk.h
 

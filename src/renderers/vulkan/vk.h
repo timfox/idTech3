@@ -29,11 +29,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <vulkan/vulkan.h>
 #include "../../common/q_shared.h"  // For qboolean, vec3_t, vec4_t, byte, etc.
+#include "vk_compute.h"
 
 // VMA (Vulkan Memory Allocator) - conditional include
 #ifdef USE_VMA
 #include <vk_mem_alloc.h>
 #endif
+
+#include "vk_memory.h"
 
 // ImGui includes (when available) - commented out due to build issues
 // #ifdef USE_CIMGUI
@@ -43,13 +46,82 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // Forward declarations for renderer types
 typedef struct image_s image_t;
 
+// Material parameter structure (full definition from vk_material_system.h)
+typedef struct material_params_s {
+	// Dynamic state
+	float wetness;          // 0.0 = dry, 1.0 = fully wet
+	float damage;           // 0.0 = pristine, 1.0 = destroyed
+	float corruption;       // 0.0 = clean, 1.0 = corrupted
+	float magicGlow;        // 0.0 = no glow, 1.0 = full glow
+	float temperature;      // Temperature for thermal effects
+	float time;             // Time-based animation parameter
+
+	vec3_t magicColor;      // Magical glow color
+	float _pad0;
+	vec3_t damageColor;     // Damage tint color
+	float _pad1;
+
+	// Layered/PBR baseline
+	vec3_t albedo;          // Base color
+	vec3_t baseColor;       // Alternative base color
+	float roughness;        // Surface roughness
+	float metallic;         // Metallic factor
+	float ao;               // Ambient occlusion
+	vec3_t emissive;        // Emissive color
+	float emissiveStrength; // Emissive intensity
+	vec3_t normal;          // Normal map influence
+	float normalScale;      // Normal scale
+	float height;           // Height/displacement
+
+	// Advanced material properties
+	float subsurface;       // Subsurface scattering
+	vec3_t subsurfaceColor; // Subsurface scattering color
+	float microfacet;       // Microfacet intensity
+	float microfacetSharpness; // Microfacet sharpness
+	float layerWeight;      // Layer blending weight
+	float specular;         // Specular intensity
+	float specularTint;     // Specular color tint
+	float anisotropic;      // Anisotropic factor
+	float anisotropy;       // Anisotropy value (-1..1)
+	vec3_t anisotropyDir;   // Anisotropic direction
+	float sheen;            // Sheen intensity
+	vec3_t sheenColor;      // Sheen color
+	float sheenTint;        // Sheen color tint
+	float clearcoat;        // Clearcoat intensity
+	float clearcoatRoughness; // Clearcoat roughness
+
+	// Special effects
+	float iridescence;      // Iridescence factor
+	float iridescenceIOR;   // Iridescence index of refraction
+	float transmission;     // Transmission factor
+	float ior;              // Index of refraction
+
+	// Texture layer blending
+	float layerBlend[8];    // Blend factors for up to 8 layers
+	vec3_t layerTint[8];    // Tint colors for layers
+	float layerOpacity[8];  // Opacity for layers
+
+	// Runtime state
+	uint32_t flags;         // Material flags
+	uint32_t stateHash;     // Hash of current state for caching
+	uint32_t layerCount;    // Number of active layers
+	uint32_t debugFlags;    // Debug flags
+	float layerCost;        // Estimated GPU cost of this stack
+	float animationPhase;   // Animation phase
+	float _pad2[2];         // Align to 16-byte boundary for std430
+} material_params_t;
+
+// Meshlet information structure
+typedef struct {
+    uint32_t firstIndex;
+    uint32_t indexCount;
+    uint32_t vertexCount;
+} meshlet_info_t;
+
 // Forward declaration for ImGui types
 struct ImDrawData;
 
-// Dear ImGui types (for heatmap visualizer)
-typedef struct ImVec4 {
-    float x, y, z, w;
-} ImVec4;
+// Dear ImGui types defined in cimgui.h
 
 // Vulkan filter constants (for compatibility)
 #ifndef VK_FILTER_NEAREST_MIPMAP_NEAREST
@@ -251,6 +323,13 @@ typedef struct {
     } mvp_cache;
 
     VkDeviceSize waitForFence;
+
+    // Frame synchronization
+    VkFence rendering_finished_fence;
+    VkSemaphore rendering_finished2;
+    VkSemaphore image_acquired;
+    qboolean swapchain_image_acquired;
+    uint32_t swapchain_image_index;
 } vk_cmd_t;
 
 // World structure for Vulkan
@@ -398,9 +477,21 @@ typedef struct {
 // Stream cell structure for cell streaming
 typedef struct stream_cell_s {
     int x, y, z;
+    int cellX, cellY, cellZ;  // Aliases for x, y, z
     qboolean loaded;
-    VkDeviceSize memory_usage;
+    VkDeviceSize memoryUsed;
+    int state;
+    int modelCount;
+    qhandle_t *models;
+    void *textures;
+    int textureCount;
+    vec3_t worldMin;
+    vec3_t worldMax;
+    float priority;
+    uint32_t lastAccessFrame;
 } stream_cell_t;
+
+#include "vk_cell_streaming.h"
 
 // Atmosphere parameters structure
 typedef struct atmosphere_params_s {
@@ -413,6 +504,25 @@ typedef struct atmosphere_params_s {
     float mie_asymmetry;
     float ground_albedo;
     float atmosphere_height;
+    vec3_t colorTint;
+    float timeOfDay;
+    vec3_t fogColor;
+    float bloomIntensity;
+    float bloomThreshold;
+    float bloomSize;
+    float exposure;
+    float fogDensity;
+    float fogStart;
+    float fogEnd;
+    uint32_t flags;
+    float dofBlurRadius;
+    float weatherIntensity;
+    float colorTemperature;
+    float dofFocusDistance;
+    float brightness;
+    float fogHeightFalloff;
+    float contrast;
+    float saturation;
 } atmosphere_params_t;
 
 // Atmosphere preset type
@@ -420,8 +530,17 @@ typedef enum {
     ATMOSPHERE_PRESET_EARTH,
     ATMOSPHERE_PRESET_MARS,
     ATMOSPHERE_PRESET_VENUS,
-    ATMOSPHERE_PRESET_CUSTOM
+    ATMOSPHERE_PRESET_CUSTOM,
+    ATMOSPHERE_CALM
 } atmosphere_preset_t;
+
+// Atmosphere preset constant for backward compatibility
+#define ATMOSPHERE_CUSTOM ATMOSPHERE_PRESET_CUSTOM
+
+// Descriptor count for flares
+#define VK_DESC_COUNT 8
+
+// Performance presets (defined in vk_memory.h)
 
 // Cubemap filter definition structure
 typedef struct {
@@ -496,110 +615,50 @@ typedef struct {
     VkDescriptorSetLayout bindless_buffer_set_layout;
 
     // Advanced profiling systems
-    struct {
-        qboolean enabled;
-        qboolean initialized;
-        uint64_t thread_start_times[32];
-        uint64_t thread_end_times[32];
-        uint32_t active_thread_count;
-        uint64_t total_sync_time;
-        uint64_t total_compute_time;
-        uint64_t total_memory_time;
-    } parallel_profiler;
+    vk_parallel_profiler_t parallel_profiler;
 
-    struct {
-        qboolean enabled;
-        qboolean initialized;
-        uint32_t shaders_with_warnings;
-        uint32_t critical_performance_issues;
-        uint32_t total_registers_tracked;
-    } shader_performance_analyzer;
+    vk_shader_performance_analyzer_t shader_performance_analyzer;
 
-    struct {
-        qboolean enabled;
-        qboolean initialized;
-        uint64_t total_load_time_ns;
-        uint32_t total_assets_loaded;
-        struct {
-            qboolean io_bottleneck;
-            qboolean streaming_bottleneck;
-            uint64_t avg_io_wait_time;
-            uint64_t avg_streaming_wait_time;
-        } bottlenecks;
-    } asset_loading_profiler;
+    vk_asset_loading_profiler_t asset_loading_profiler;
 
-    struct {
-        qboolean enabled;
-        qboolean initialized;
-        qboolean visible;
-        uint64_t last_update_time;
-        uint32_t frame_count;
-        float frame_time_avg;
-        float frame_time_min;
-        float frame_time_max;
-        float fps_average;
-        struct {
-            float update_interval;
-        } config;
-    } performance_hud;
+    vk_performance_hud_t performance_hud;
 
-    struct {
-        qboolean initialized;
-        qboolean enabled;
-        float regression_threshold;
-        uint32_t total_regressions_detected;
-    } performance_regression_detector;
+    vk_performance_regression_detector_t performance_regression_detector;
 
-    struct {
-        qboolean enabled;
-        qboolean initialized;
-        uint32_t current_mode;
-        struct {
-            VkImage texture;
-            VkDeviceMemory texture_memory;
-            VkImageView texture_view;
-            uint32_t width, height;
-            VkFormat format;
-        } layers[8];
-        ImVec4 gradient_colors[256];
-    } heatmap_visualizer;
+    vk_heatmap_visualizer_t heatmap_visualizer;
 
-    struct {
-        qboolean enabled;
-        VkDeviceSize used_vram;
-        VkDeviceSize max_used_vram;
-        VkDeviceSize total_vram;
-    } vram_stats;
+    vk_vram_stats_t vram_stats;
 
-    struct {
-        qboolean enabled;
-        uint32_t num_pool_levels;
-        VkDeviceSize total_memory_allocated;
-        VkDeviceSize total_memory_used;
-    } resource_pools;
+    vk_resource_pool_t resource_pools;
 
-    struct {
-        qboolean enabled;
-        uint64_t total_allocations;
-    } lock_free_manager;
+    vk_lock_free_memory_manager_t lock_free_manager;
 
-    struct {
-        qboolean enabled;
-        VkDeviceSize total_allocated_bytes;
-    } arena_manager;
+    vk_arena_manager_t arena_manager;
 
-    struct {
-        qboolean enabled;
-        uint64_t total_memory_accesses;
-        uint32_t optimizations_applied;
-    } memory_advisor;
+    vk_cache_structures_manager_t cache_structures_manager;
 
+    vk_memory_advisor_t memory_advisor;
+
+    vk_memory_bandwidth_profiler_t memory_bandwidth_profiler;
+
+    vk_memory_defrag_t memory_defrag;
+
+    // Mesh shader support
     struct {
-        qboolean enabled;
-        struct {
-            float peak_bandwidth;
-        } bandwidth_stats;
-    } memory_bandwidth_profiler;
+        qboolean active;
+        qboolean meshShaderSupported;
+        qboolean taskShaderSupported;
+        qboolean useFallback;
+        VkShaderModule mesh_task;
+        VkShaderModule mesh_mesh;
+        VkPipeline meshShaderPipeline;
+        VkPipelineLayout meshShaderPipelineLayout;
+        VkDescriptorSetLayout meshShaderDescriptorSetLayout;
+        VkDescriptorSet meshShaderDescriptorSet;
+        meshlet_info_t *meshlets;
+        uint32_t meshletCount;
+        uint32_t meshletCapacity;
+    } mesh;
 
     // Performance preset
     int current_perf_preset;
@@ -634,6 +693,7 @@ typedef struct {
     uint32_t pipelines_count;
     struct {
         VkPipeline handle[3]; // RENDER_PASS_COUNT handles
+        Vk_Pipeline_Def def;  // Pipeline definition
     } pipelines[32]; // Various pipeline types
     VkPipeline surface_debug_pipeline_solid;
     VkPipeline surface_debug_pipeline_outline;
@@ -708,9 +768,95 @@ typedef struct {
     qboolean blitEnabled;
     qboolean dedicatedAllocation;
     qboolean fragmentStores;
+    qboolean wideLines;
+
+    // Compute shader support
+    vk_compute_manager_t compute_manager;
+    VkSemaphore timeline_semaphore;
+
+    // Atmosphere rendering
+    struct {
+        atmosphere_params_t baseParams;
+        atmosphere_params_t targetParams;
+        atmosphere_params_t currentParams;
+        float transitionTime;
+        float transitionDuration;
+        atmosphere_preset_t currentPreset;
+        qboolean enabled;
+        qboolean initialized;
+        VkBuffer atmosphereBuffer;
+        VkDeviceMemory atmosphereBufferMemory;
+    } atmosphere;
+
+    // Debug markers support
+    qboolean debugMarkers;
+
+    // GPU culling support
+    struct {
+        qboolean enabled;
+        qboolean initialized;
+        uint32_t drawCommandCount;
+        VkBuffer drawCommandBuffer;
+        VkDeviceMemory drawCommandBufferMemory;
+        uint32_t visibleInstanceCount;
+        uint32_t instanceCount;
+        uint32_t instanceCapacity;
+        VkBuffer instanceBuffer;
+        VkDeviceMemory instanceBufferMemory;
+        VkDeviceAddress instanceBufferAddress;
+        VkBuffer cullDataBuffer;
+        VkDeviceMemory cullDataBufferMemory;
+        VkPipeline cullPipeline;
+        VkPipelineLayout cullPipelineLayout;
+        VkDescriptorSet cullDescriptorSet;
+    } gpuCulling;
+
+    // Storage alignment for flare structures
+    VkDeviceSize storage_alignment;
+
+    // DLSS (Deep Learning Super Sampling) support
+    struct {
+        qboolean supported;
+        qboolean initialized;
+        uint32_t renderWidth;
+        uint32_t renderHeight;
+        uint32_t outputWidth;
+        uint32_t outputHeight;
+        uint32_t qualityMode;
+        qboolean sharpeningEnabled;
+        float sharpening;
+        void *dlssContext;
+        VkImage dlssMotionVectorImage;
+        VkDeviceMemory dlssMotionVectorImageMemory;
+        VkImageView dlssMotionVectorImageView;
+        VkImage dlssOutputImage;
+        VkDeviceMemory dlssOutputImageMemory;
+        VkImageView dlssOutputImageView;
+        VkImage dlssDepthImage;
+        VkDeviceMemory dlssDepthImageMemory;
+        VkImageView dlssDepthImageView;
+    } dlss;
+
+    // Cell streaming system
+    struct {
+        qboolean enabled;
+        qboolean initialized;
+        uint32_t cellCount;
+        uint32_t activeCellCount;
+        int32_t currentCellX, currentCellY, currentCellZ;
+        uint32_t loadQueueCount;
+        uint32_t unloadQueueCount;
+        uint32_t frameCounter;
+        uint32_t cellsLoadedThisFrame;
+        uint32_t cellsUnloadedThisFrame;
+        stream_cell_t cells[MAX_STREAM_CELLS];
+        uint32_t loadQueue[MAX_STREAM_CELLS];
+        uint32_t unloadQueue[MAX_STREAM_CELLS];
+    } cellStreaming;
     VkDescriptorSetLayout set_layout_sampler;
     VkDescriptorSetLayout set_layout_uniform;  // Added
     VkDescriptorSetLayout set_layout_storage;  // Added
+    VkDescriptorSetLayout set_layout_material; // Added
 
     // Bloom system
     VkPipeline bloom_extract_pipeline;
@@ -791,13 +937,7 @@ typedef struct {
     } storage;
 
     // Performance profiling
-    struct {
-        qboolean enabled;
-        uint32_t timestamp_queries[2];
-        struct {
-            double avg_frame_time;
-        } performance_trend;
-    } render_profiler;
+    vk_render_profiler_t render_profiler;
 
     // Samplers
     struct {
@@ -822,8 +962,14 @@ typedef struct {
     VkDescriptorSet brdflut_image_descriptor;
     struct {
         VkDescriptorSet materialDescriptorSet;
+        VkBuffer materialBuffer;
+        VkDeviceMemory materialBufferMemory;
+        VkDeviceAddress materialBufferAddress;
         qboolean enabled;
         qboolean initialized;
+        uint32_t materialCount;
+        uint32_t materialCapacity;
+        material_params_t *materialParams;
     } materialSystem;
 
     // VBO system
@@ -841,6 +987,7 @@ typedef struct {
         VkDeviceMemory memory;
         VkDeviceSize size;
         void* ptr;
+        VkDeviceSize offset;
     } staging_buffer;
 
     // Additional state
@@ -886,9 +1033,6 @@ typedef struct {
         VkDeviceSize total_allocated_bytes;
         VkDeviceSize total_freed_bytes;
     } vk_memory_stats;
-    struct {
-        // Performance statistics
-    } vk_perf_stats;
 
     // Swapchain
     VkSwapchainKHR swapchain;
@@ -971,13 +1115,13 @@ void vk_reset_descriptor(uint32_t binding);
 qboolean vk_capture_screenmap(void);
 qboolean vk_clear_screenmap(void);
 void vk_render_performance_hud(void);
-void VK_ImGui_RenderDrawData(const void* drawData);
+void VK_ImGui_RenderDrawData(const ImDrawData* drawData);
 uint32_t vk_push_uniform(const vkUniform_t* uniform_data);
 uint32_t vk_append_uniform(const void* uniform_data, size_t size, uint32_t min_offset);
 void vk_bind_lighting(int lighting_stage, int lighting_bundle);
 void vk_set_depth_range(Vk_Depth_Range depth_range);
 void vk_update_mvp(void* transform);
-Vk_Pipeline_Def* vk_get_pipeline_def(VkPipeline pipeline, Vk_Pipeline_Def* def);
+void vk_get_pipeline_def(VkPipeline pipeline, Vk_Pipeline_Def *def);
 VkPipeline vk_find_pipeline_ext(int base_pipeline, Vk_Pipeline_Def* def, qboolean create_if_missing);
 void vk_wait_idle(void);
 void vk_queue_wait_idle(void);
@@ -1013,6 +1157,7 @@ void vk_shutdown_compute_manager(void);
 void vk_shutdown_resource_pool(void);
 void vk_clean_staging_buffer(void);
 qboolean vk_allocate_image_chunk(void);
+void vk_create_shader_modules(void);
 void vk_shutdown_memory_pool_system(void);
 void vk_shutdown_lock_free_memory_manager(void);
 void vk_shutdown_arena_manager(void);
@@ -1042,6 +1187,7 @@ extern PFN_vkCreateSampler qvkCreateSampler;
 extern PFN_vkGetPhysicalDeviceFeatures2KHR qvkGetPhysicalDeviceFeatures2KHR;
 extern PFN_vkCreateDescriptorSetLayout qvkCreateDescriptorSetLayout;
 extern PFN_vkCreateDescriptorPool qvkCreateDescriptorPool;
+extern PFN_vkCreateCommandPool qvkCreateCommandPool;
 extern PFN_vkDestroyCommandPool qvkDestroyCommandPool;
 extern PFN_vkAllocateCommandBuffers qvkAllocateCommandBuffers;
 extern PFN_vkFreeCommandBuffers qvkFreeCommandBuffers;
@@ -1062,6 +1208,64 @@ extern PFN_vkAllocateMemory qvkAllocateMemory;
 extern PFN_vkBindBufferMemory qvkBindBufferMemory;
 extern PFN_vkUpdateDescriptorSets qvkUpdateDescriptorSets;
 extern PFN_vkMapMemory qvkMapMemory;
+extern PFN_vkUnmapMemory qvkUnmapMemory;
 extern PFN_vkFreeMemory qvkFreeMemory;
+extern PFN_vkCmdBeginRenderPass qvkCmdBeginRenderPass;
+extern PFN_vkCreatePipelineLayout qvkCreatePipelineLayout;
+extern PFN_vkCmdClearColorImage qvkCmdClearColorImage;
+extern PFN_vkCmdPipelineBarrier qvkCmdPipelineBarrier;
+extern PFN_vkCmdDrawIndexedIndirect qvkCmdDrawIndexedIndirect;
+extern PFN_vkCmdBindPipeline qvkCmdBindPipeline;
+extern PFN_vkCmdBindDescriptorSets qvkCmdBindDescriptorSets;
+extern PFN_vkCmdDispatch qvkCmdDispatch;
+extern PFN_vkGetBufferDeviceAddress qvkGetBufferDeviceAddress;
+
+// Performance and debugging systems
+qboolean vk_init_performance_hud(void);
+qboolean vk_init_performance_regression_detector(void);
+qboolean vk_init_heatmap_visualizer(void);
+qboolean vk_init_compute_manager(void);
+qboolean vk_init_cache_structures_manager(void);
+qboolean vk_init_memory_bandwidth_profiler(void);
+qboolean vk_init_parallel_profiler(void);
+qboolean vk_init_shader_performance_analyzer(void);
+qboolean vk_init_asset_loading_profiler(void);
+
+// DLSS functions
+void vk_dlss_destroy_resources(void);
+
+// Drawing functions
+void vk_draw_dot(uint32_t storage_offset);
+void vk_bind_descriptor_sets(void);
+
+// ImGui backend functions
+VkInstance VK_GetInstanceHandle(void);
+VkSampleCountFlagBits VK_GetMsaaSampleCount(void);
+void VK_ImGui_RenderDrawData(const ImDrawData* drawData);
+
+// Memory tracking functions
+void vk_track_gpu_allocation(VkDeviceMemory memory, VkDeviceSize size, uint32_t memory_type, const char *resource_name, const char *allocation_site);
+void vk_record_memory_access(void *address, VkDeviceSize size, const char *resource_name, qboolean is_write);
+void vk_track_gpu_free(VkDeviceMemory memory);
+
+// Utility functions
+uint32_t find_memory_type(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+
+// Memory and performance systems
+void vk_init_vram_stats(void);
+void vk_init_memory_defragmentation(void);
+qboolean vk_init_memory_pool_system(void);
+qboolean vk_init_lock_free_memory_manager(void);
+qboolean vk_init_arena_manager(void);
+qboolean vk_init_memory_advisor(void);
+qboolean vk_init_render_profiler(void);
+void vk_update_memory_pool_system(void);
+void vk_reset_frame_arena(void);
+void vk_update_memory_advisor(void);
+void vk_profile_frame_end(void);
+void vk_sample_memory_bandwidth(void);
+void vk_analyze_memory_access_patterns(void);
+void vk_sample_thread_utilization(void);
+void vk_check_defragmentation(void);
 
 #endif // VK_H

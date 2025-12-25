@@ -78,9 +78,9 @@ void vk_mesh_shaders_init( void )
 	// Check if mesh shader extension is available
 	// First, check if extension was enabled during device creation
 	// Then try to load the function pointers
-	qvkCmdDrawMeshTasksEXT = (PFN_vkCmdDrawMeshTasksEXT)qvkGetDeviceProcAddr( vk.device, "vkCmdDrawMeshTasksEXT" );
-	qvkCmdDrawMeshTasksIndirectEXT = (PFN_vkCmdDrawMeshTasksIndirectEXT)qvkGetDeviceProcAddr( vk.device, "vkCmdDrawMeshTasksIndirectEXT" );
-	qvkCmdDrawMeshTasksIndirectCountEXT = (PFN_vkCmdDrawMeshTasksIndirectCountEXT)qvkGetDeviceProcAddr( vk.device, "vkCmdDrawMeshTasksIndirectCountEXT" );
+	qvkCmdDrawMeshTasksEXT = (PFN_vkCmdDrawMeshTasksEXT)vkGetDeviceProcAddr( vk.device, "vkCmdDrawMeshTasksEXT" );
+	qvkCmdDrawMeshTasksIndirectEXT = (PFN_vkCmdDrawMeshTasksIndirectEXT)vkGetDeviceProcAddr( vk.device, "vkCmdDrawMeshTasksIndirectEXT" );
+	qvkCmdDrawMeshTasksIndirectCountEXT = (PFN_vkCmdDrawMeshTasksIndirectCountEXT)vkGetDeviceProcAddr( vk.device, "vkCmdDrawMeshTasksIndirectCountEXT" );
 
 	if ( qvkCmdDrawMeshTasksEXT ) {
 		meshShadersSupported = qtrue;

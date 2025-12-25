@@ -25,46 +25,46 @@ struct material_params_s;
 #define MATERIAL_HAS_LAYERS  0x40
 
 // Material parameter structure (full definition)
-struct material_params_s {
-	// Dynamic state
-	float wetness;          // 0.0 = dry, 1.0 = fully wet
-	float damage;           // 0.0 = pristine, 1.0 = destroyed
-	float corruption;       // 0.0 = clean, 1.0 = corrupted
-	float magicGlow;        // 0.0 = no glow, 1.0 = full glow
-	float temperature;      // Temperature for thermal effects
-	float time;             // Time-based animation parameter
-
-	vec3_t magicColor;      // Magical glow color
-	float _pad0;
-	vec3_t damageColor;     // Damage tint color
-	float _pad1;
-
-	// Layered/PBR baseline
-	vec3_t baseColor;
-	float roughness;
-	vec3_t emissive;
-	float metallic;
-	float normalScale;
-	float clearcoat;
-	float clearcoatRoughness;
-	float anisotropy;          // -1..1, 0 = isotropic
-	vec3_t anisotropyDir;      // tangent-space direction
-	float sheen;               // 0..1
-	vec3_t sheenColor;         // sheen tint
-	float subsurface;          // 0..1
-	vec3_t subsurfaceColor;    // SSS color
-	float microfacet;          // 0..1 strength to tighten/spec highlight
-	float microfacetSharpness; // exponent modifier (>0, 1=neutral, <1 softer, >1 sharper)
-	float layerWeight;
-
-	// Metadata
-	uint32_t flags;         // Material flags (includes MATERIAL_HAS_LAYERS)
-	uint32_t stateHash;     // Hash of current state for caching
-	uint32_t layerCount;    // Number of contributing layers
-	uint32_t debugFlags;
-	float layerCost;        // Estimated GPU cost of this stack
-	float _pad2[3];         // Align to 16-byte boundary for std430
-};
+//// struct material_params_s {  // Moved to vk.h
+//	// Dynamic state
+//	float wetness;          // 0.0 = dry, 1.0 = fully wet
+//	float damage;           // 0.0 = pristine, 1.0 = destroyed
+//	float corruption;       // 0.0 = clean, 1.0 = corrupted
+//	float magicGlow;        // 0.0 = no glow, 1.0 = full glow
+//	float temperature;      // Temperature for thermal effects
+//	float time;             // Time-based animation parameter
+//
+//	vec3_t magicColor;      // Magical glow color
+//	float _pad0;
+//	vec3_t damageColor;     // Damage tint color
+//	float _pad1;
+//
+//	// Layered/PBR baseline
+//	vec3_t baseColor;
+//	float roughness;
+//	vec3_t emissive;
+//	float metallic;
+//	float normalScale;
+//	float clearcoat;
+//	float clearcoatRoughness;
+//	float anisotropy;          // -1..1, 0 = isotropic
+//	vec3_t anisotropyDir;      // tangent-space direction
+//	float sheen;               // 0..1
+//	vec3_t sheenColor;         // sheen tint
+//	float subsurface;          // 0..1
+//	vec3_t subsurfaceColor;    // SSS color
+//	float microfacet;          // 0..1 strength to tighten/spec highlight
+//	float microfacetSharpness; // exponent modifier (>0, 1=neutral, <1 softer, >1 sharper)
+//	float layerWeight;
+//
+//	// Metadata
+//	uint32_t flags;         // Material flags (includes MATERIAL_HAS_LAYERS)
+//	uint32_t stateHash;     // Hash of current state for caching
+//	uint32_t layerCount;    // Number of contributing layers
+//	uint32_t debugFlags;
+//	float layerCost;        // Estimated GPU cost of this stack
+//	float _pad2[3];         // Align to 16-byte boundary for std430
+//};
 
 // Material system state
 typedef struct {

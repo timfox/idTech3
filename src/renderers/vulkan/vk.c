@@ -1,4 +1,5 @@
 #include "tr_local.h"
+#include "vk_memory.h"
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 
@@ -1186,7 +1187,7 @@ static void __attribute__((unused)) vk_create_swapchain( VkPhysicalDevice physic
 		for ( i = 0; i < vk.swapchain_image_count; i++ ) {
 			record_image_layout_transition( command_buffer, vk.swapchain_images[i],
 				VK_IMAGE_ASPECT_COLOR_BIT,
-				VK_IMAGE_LAYOUT_UNDEFINED, vk.initSwapchainLayout, 0, 0 );
+				VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 0, 0 );
 		}
 
 		end_command_buffer( command_buffer, __func__ );
@@ -1684,26 +1685,31 @@ static qboolean vk_select_surface_format( VkPhysicalDevice physical_device, VkSu
 		uint32_t i;
 		for ( i = 0; i < format_count; i++ ) {
 			if ( ( candidates[i].format == base_bgr || candidates[i].format == base_rgb ) && candidates[i].colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR ) {
-				vk.base_format = candidates[i];
+				vk.base_format.format = candidates[i].format;
+				vk.base_format.colorSpace = candidates[i].colorSpace;
 				break;
 			}
 		}
 		if ( i == format_count ) {
-			vk.base_format = candidates[0];
+			vk.base_format.format = candidates[0].format;
+			vk.base_format.colorSpace = candidates[0].colorSpace;
 		}
 		for ( i = 0; i < format_count; i++ ) {
 			if ( ( candidates[i].format == ext_bgr || candidates[i].format == ext_rgb ) && candidates[i].colorSpace == VK_COLORSPACE_SRGB_NONLINEAR_KHR ) {
-				vk.present_format = candidates[i];
+				vk.present_format.format = candidates[i].format;
+				vk.present_format.colorSpace = candidates[i].colorSpace;
 				break;
 			}
 		}
 		if ( i == format_count ) {
-			vk.present_format = vk.base_format;
+			vk.present_format.format = vk.base_format.format;
+			vk.present_format.colorSpace = vk.base_format.colorSpace;
 		}
 	}
 
 	if ( !r_fbo->integer ) {
-		vk.present_format = vk.base_format;
+		vk.present_format.format = vk.base_format.format;
+		vk.present_format.colorSpace = vk.base_format.colorSpace;
 	}
 
 	ri.Free( candidates );
@@ -2167,7 +2173,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 #endif
 		if ( r_ext_texture_filter_anisotropic->integer && device_features.samplerAnisotropy ) {
 			features.samplerAnisotropy = VK_TRUE;
-			vk.samplerAnisotropy = qtrue;
+                        vk.samplers.samplerAnisotropy = qtrue;
 		}
 
 		device_desc.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -3481,7 +3487,7 @@ VkSampler vk_find_sampler( const Vk_Sampler_Def *def ) {
 		mag_filter = VK_FILTER_LINEAR;
 	}
 
-	maxLod = vk.maxLod;
+        maxLod = vk.samplers.maxLod;
 
 	if (def->vk_min_filter == VK_FILTER_NEAREST) {
 		min_filter = VK_FILTER_NEAREST;
@@ -3538,7 +3544,7 @@ VkSampler vk_find_sampler( const Vk_Sampler_Def *def ) {
 		desc.anisotropyEnable = VK_FALSE;
 		desc.maxAnisotropy = 1.0f;
 	} else {
-		desc.anisotropyEnable = (r_ext_texture_filter_anisotropic->integer && vk.samplerAnisotropy) ? VK_TRUE : VK_FALSE;
+                desc.anisotropyEnable = (r_ext_texture_filter_anisotropic->integer && vk.samplers.samplerAnisotropy) ? VK_TRUE : VK_FALSE;
 		if ( desc.anisotropyEnable ) {
 			desc.maxAnisotropy = MIN( r_ext_max_anisotropy->integer, vk.maxAnisotropy );
 		}
@@ -3547,7 +3553,7 @@ VkSampler vk_find_sampler( const Vk_Sampler_Def *def ) {
 	desc.compareEnable = VK_FALSE;
 	desc.compareOp = VK_COMPARE_OP_ALWAYS;
 	desc.minLod = 0.0f;
-	desc.maxLod = (maxLod == vk.maxLod) ? VK_LOD_CLAMP_NONE : maxLod;
+        desc.maxLod = (maxLod == vk.samplers.maxLod) ? VK_LOD_CLAMP_NONE : maxLod;
 	desc.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
 	desc.unnormalizedCoordinates = VK_FALSE;
 
@@ -3659,7 +3665,7 @@ static void vk_create_special_pipelines( void )
 		def.color.rgb = tr.identityLightByte;
 		def.color.alpha = tr.identityLightByte;
 		def.face_culling = CT_FRONT_SIDED;
-		def.polygon_offset = qfalse;
+		def.polygonOffset = qfalse;
 		def.mirror = qfalse;
 		ri.Printf(PRINT_ALL, "DEBUG: Skybox pipeline def initialized, calling vk_find_pipeline_ext\n");
 		vk.skybox_pipeline = vk_find_pipeline_ext( 0, &def, qtrue );
@@ -3679,7 +3685,7 @@ static void vk_create_special_pipelines( void )
 		int i, j;
 
 		Com_Memset(&def, 0, sizeof(def));
-		def.polygon_offset = qfalse;
+		def.polygonOffset = qfalse;
 		def.state_bits = 0;
 		def.shader_type = TYPE_SINGLE_TEXTURE;
 		def.shadow_phase = SHADOW_EDGES;
@@ -3699,7 +3705,7 @@ static void vk_create_special_pipelines( void )
 		/*
 		Com_Memset( &def, 0, sizeof( def ) );
 		def.face_culling = CT_FRONT_SIDED;
-		def.polygon_offset = qfalse;
+		def.polygonOffset = qfalse;
 		def.state_bits = GLS_DEPTHMASK_TRUE | GLS_SRCBLEND_DST_COLOR | GLS_DSTBLEND_ZERO;
 		def.shader_type = TYPE_SINGLE_TEXTURE;
 		def.mirror = qfalse;

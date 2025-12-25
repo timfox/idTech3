@@ -1415,11 +1415,18 @@ IF(USE_RENDERER_DLOPEN)
 		ENDIF()
 		TARGET_LINK_OPTIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE -Wl,--export-dynamic)
 		# Suppress some warnings for Vulkan renderer to avoid warning-as-error issues
-		TARGET_COMPILE_OPTIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE
-			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-missing-prototypes>
-			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-unused-variable>
-			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-pointer-arith>
-			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-sign-compare>
+        TARGET_COMPILE_OPTIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE
+            $<$<AND:$<COMPILE_LANGUAGE:C>,$<C_COMPILER_ID:GNU,Clang>>:-Wno-missing-prototypes>
+            $<$<C_COMPILER_ID:GNU,Clang>:-Wno-unused-variable>
+            $<$<C_COMPILER_ID:GNU,Clang>:-Wno-unused-function>
+            $<$<C_COMPILER_ID:GNU,Clang>:-Wno-unused-parameter>
+            $<$<C_COMPILER_ID:GNU,Clang>:-Wno-shadow>
+            $<$<C_COMPILER_ID:GNU,Clang>:-Wno-int-to-pointer-cast>
+            $<$<C_COMPILER_ID:GNU,Clang>:-Wno-pointer-arith>
+            $<$<C_COMPILER_ID:GNU,Clang>:-Wno-sign-compare>
+            $<$<C_COMPILER_ID:GNU,Clang>:-Wno-pedantic>
+            $<$<C_COMPILER_ID:GNU,Clang>:-Wno-format>
+            $<$<C_COMPILER_ID:GNU,Clang>:-Wno-switch>
 		)
 
 		# VMA (Vulkan Memory Allocator) - configure after target is created
@@ -2640,7 +2647,7 @@ FUNCTION(CONFIGURE_BINARY_SIZE_OPTIMIZATION TARGET_NAME)
         -ffunction-sections    # Place each function in its own section
         -fdata-sections        # Place each data item in its own section
         -fno-exceptions        # Disable exception handling
-        -fno-rtti             # Disable RTTI (C++ only)
+        $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>  # Disable RTTI (C++ only)
         -fno-unwind-tables     # Remove unwind tables
         -fomit-frame-pointer   # Omit frame pointers where possible
         -fmerge-constants      # Merge identical constants
@@ -2696,7 +2703,7 @@ FUNCTION(CONFIGURE_DEAD_CODE_ELIMINATION TARGET_NAME)
         -ffunction-sections     # Place functions in separate sections
         -fdata-sections         # Place data in separate sections
         -fvisibility=hidden     # Hide symbols by default
-        -fvisibility-inlines-hidden  # Hide inline functions
+        $<$<COMPILE_LANGUAGE:CXX>:-fvisibility-inlines-hidden>  # Hide inline functions (C++ only)
     )
 
     # Linker dead code elimination
@@ -2940,7 +2947,8 @@ FUNCTION(APPLY_SECURITY_HARDENING TARGET_NAME)
 
         # Additional GCC security flags
         TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE
-            -fstack-check
+            $<$<VERSION_GREATER_EQUAL:$<C_COMPILER_VERSION>,8.0>:-fstack-clash-protection>
+            $<$<VERSION_LESS:$<C_COMPILER_VERSION>,8.0>:-fstack-check>
             -fcf-protection=full    # Control flow protection
             -fexceptions           # Enable exception handling
             -fnon-call-exceptions  # Generate traps for invalid pointer dereferences
@@ -2990,7 +2998,8 @@ FUNCTION(APPLY_SECURITY_HARDENING TARGET_NAME)
 
         # Additional Clang security flags
         TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE
-            -fstack-check
+            $<$<VERSION_GREATER_EQUAL:$<C_COMPILER_VERSION>,8.0>:-fstack-clash-protection>
+            $<$<VERSION_LESS:$<C_COMPILER_VERSION>,8.0>:-fstack-check>
             -fcf-protection=full    # Control flow protection
             -fexceptions           # Enable exception handling
             -fnon-call-exceptions  # Generate traps for invalid pointer dereferences

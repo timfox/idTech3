@@ -17,6 +17,12 @@ extern void vk_wait_idle(void);
 // va is defined in q_shared.h
 extern refimport_t ri;
 
+// Forward declarations for atomic functions
+static inline uint64_t atomic_load_u64_atomic(const atomic_uint64_t *ptr);
+static inline uint32_t atomic_load_u32_atomic(const atomic_uint_t *ptr);
+static inline void atomic_increment_u64(atomic_uint64_t *ptr);
+static inline void atomic_increment_u32(atomic_uint_t *ptr);
+
 qboolean vk_allocate_image_chunk(void) {
 	// Ensure image_chunk_size is initialized
 	if (vk.image_chunk_size == 0) {
@@ -40,9 +46,8 @@ qboolean vk_allocate_image_chunk(void) {
 			return qfalse;
 		}
 
-		ImageChunk *chunk = &vk_world.image_chunks[0];
-		chunk->memory = memory;
-		chunk->used = 0; // Start with no used space
+		vk_world.image_chunks[0].memory = memory;
+		vk_world.image_chunks[0].used = 0; // Start with no used space
 
 		// SET_OBJECT_NAME(memory, "preallocated image memory chunk 0", VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT);
 
@@ -85,13 +90,13 @@ void vk_init_memory_defragmentation(void) {
 
     // Try to load defragmentation functions
     vk.memory_defrag.vkCreateDeferredOperationKHR =
-        (PFN_vkCreateDeferredOperationKHR)qvkGetDeviceProcAddr(vk.device, "vkCreateDeferredOperationKHR");
-    vk.memory_defrag.vkDeferredOperationJoinKHR =
-        (PFN_vkDeferredOperationJoinKHR)qvkGetDeviceProcAddr(vk.device, "vkDeferredOperationJoinKHR");
-    vk.memory_defrag.vkGetDeferredOperationResultKHR =
-        (PFN_vkGetDeferredOperationResultKHR)qvkGetDeviceProcAddr(vk.device, "vkGetDeferredOperationResultKHR");
-    vk.memory_defrag.vkDestroyDeferredOperationKHR =
-        (PFN_vkDestroyDeferredOperationKHR)qvkGetDeviceProcAddr(vk.device, "vkDestroyDeferredOperationKHR");
+        (PFN_vkCreateDeferredOperationKHR)vkGetDeviceProcAddr(vk.device, "vkCreateDeferredOperationKHR");
+        vk.memory_defrag.vkDeferredOperationJoinKHR =
+        (PFN_vkDeferredOperationJoinKHR)vkGetDeviceProcAddr(vk.device, "vkDeferredOperationJoinKHR");
+        vk.memory_defrag.vkGetDeferredOperationResultKHR =
+        (PFN_vkGetDeferredOperationResultKHR)vkGetDeviceProcAddr(vk.device, "vkGetDeferredOperationResultKHR");
+        vk.memory_defrag.vkDestroyDeferredOperationKHR =
+        (PFN_vkDestroyDeferredOperationKHR)vkGetDeviceProcAddr(vk.device, "vkDestroyDeferredOperationKHR");
 
     if (vk.memory_defrag.vkCreateDeferredOperationKHR &&
         vk.memory_defrag.vkDeferredOperationJoinKHR &&
@@ -230,8 +235,8 @@ void vk_check_defragmentation(void) {
 		// Check threshold-based defragmentation
 		vk_calculate_fragmentation_metrics();
 		float fragmentation = 0.0f;
-		uint64_t total_alloc = atomic_load_explicit(&vk.memory_defrag.total_allocated, memory_order_relaxed);
-		uint64_t total_use = atomic_load_explicit(&vk.memory_defrag.total_used, memory_order_relaxed);
+		uint64_t total_alloc = atomic_load_u64_atomic(&vk.memory_defrag.total_allocated);
+		uint64_t total_use = atomic_load_u64_atomic(&vk.memory_defrag.total_used);
 		if (total_alloc > 0) {
 			fragmentation = 1.0f - ((float)total_use / (float)total_alloc);
 		}
@@ -471,7 +476,7 @@ void vk_alloc_staging_buffer(VkDeviceSize size) {
 
 	vk_clean_staging_buffer();
 
-	vk.staging_buffer.size = MAX(size, STAGING_BUFFER_SIZE);
+	vk.staging_buffer.size = MAX(size, 16 * 1024 * 1024); // 16MB staging buffer
 	vk.staging_buffer.size = PAD(vk.staging_buffer.size, 1024 * 1024);
 
 	buffer_desc.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -1016,6 +1021,22 @@ static inline uint64_t atomic_load_u64(const volatile uint64_t *ptr) {
     return __atomic_load_n((volatile uint64_t*)ptr, __ATOMIC_ACQUIRE);
 }
 
+static inline uint64_t atomic_load_u64_atomic(const atomic_uint64_t *ptr) {
+    return atomic_load_explicit(ptr, memory_order_acquire);
+}
+
+static inline uint32_t atomic_load_u32_atomic(const atomic_uint_t *ptr) {
+    return atomic_load_explicit(ptr, memory_order_acquire);
+}
+
+static inline void atomic_increment_u64(atomic_uint64_t *ptr) {
+    atomic_fetch_add_explicit(ptr, 1, memory_order_acq_rel);
+}
+
+static inline void atomic_increment_u32(atomic_uint_t *ptr) {
+    atomic_fetch_add_explicit(ptr, 1, memory_order_acq_rel);
+}
+
 static inline void atomic_store_u64(volatile uint64_t *ptr, uint64_t value) {
     __atomic_store_n(ptr, value, __ATOMIC_RELEASE);
 }
@@ -1321,10 +1342,10 @@ void vk_print_lock_free_stats(void) {
 
     ri.Printf(PRINT_ALL, "=== Lock-Free Memory Manager Statistics ===\n");
 
-    uint64_t total_allocs = atomic_load_u64(&vk.lock_free_manager.total_allocations);
-    uint64_t total_deallocs = atomic_load_u64(&vk.lock_free_manager.total_deallocations);
-    uint64_t cache_hits = atomic_load_u64(&vk.lock_free_manager.cache_hits);
-    uint64_t cache_misses = atomic_load_u64(&vk.lock_free_manager.cache_misses);
+    uint64_t total_allocs = atomic_load_u64_atomic(&vk.lock_free_manager.total_allocations);
+    uint64_t total_deallocs = atomic_load_u64_atomic(&vk.lock_free_manager.total_deallocations);
+    uint64_t cache_hits = atomic_load_u64_atomic(&vk.lock_free_manager.cache_hits);
+    uint64_t cache_misses = atomic_load_u64_atomic(&vk.lock_free_manager.cache_misses);
 
     ri.Printf(PRINT_ALL, "Total Operations: alloc=%lu, dealloc=%lu\n",
         (unsigned long)total_allocs, (unsigned long)total_deallocs);
@@ -1349,10 +1370,10 @@ void vk_print_lock_free_stats(void) {
 
     for (int i = 0; i < 3; i++) {
         const vk_lock_free_allocator_t *alloc = allocators[i];
-        uint32_t free_blocks = atomic_load_u32(&alloc->free_blocks);
-        uint64_t allocs = atomic_load_u64(&alloc->allocations);
-        uint64_t deallocs = atomic_load_u64(&alloc->deallocations);
-        uint64_t contended = atomic_load_u64(&alloc->contended_allocs);
+        uint32_t free_blocks = atomic_load_u32_atomic(&alloc->free_blocks);
+        uint64_t allocs = atomic_load_u64_atomic(&alloc->allocations);
+        uint64_t deallocs = atomic_load_u64_atomic(&alloc->deallocations);
+        uint64_t contended = atomic_load_u64_atomic(&alloc->contended_allocs);
 
         ri.Printf(PRINT_ALL, "%s Allocator (%s): %u/%u blocks free, alloc=%lu, dealloc=%lu, contended=%lu\n",
             names[i], alloc->debug_name, free_blocks, alloc->total_blocks,
@@ -2419,7 +2440,7 @@ qboolean vk_cache_queue_init(vk_cache_queue_t *queue, VkDeviceSize element_size,
 
 // Initialize cache structures manager
 qboolean vk_init_cache_structures_manager(void) {
-    if (vk.cache_manager.initialized) {
+    if (vk.cache_structures_manager.initialized) {
         return qtrue;
     }
 
@@ -2427,46 +2448,46 @@ qboolean vk_init_cache_structures_manager(void) {
 
     // Initialize temporary pools
     for (uint32_t i = 0; i < 16; i++) {
-        if (!vk_cache_array_init(&vk.cache_manager.temp_array_pool[i], 1, 64, NULL)) {
+        if (!vk_cache_array_init(&vk.cache_structures_manager.temp_array_pool[i], 1, 64, NULL)) {
             ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize temp array pool\n");
             return qfalse;
         }
     }
 
-    atomic_init(&vk.cache_manager.temp_array_count, 16);
+    atomic_init(&vk.cache_structures_manager.temp_array_count, 16);
 
     // Hash maps for temporary use
     for (uint32_t i = 0; i < 8; i++) {
-        if (!vk_cache_hash_map_init(&vk.cache_manager.temp_hash_pool[i], sizeof(uint32_t),
+        if (!vk_cache_hash_map_init(&vk.cache_structures_manager.temp_hash_pool[i], sizeof(uint32_t),
                                   sizeof(uint32_t), 32, vk_hash_uint32, vk_equals_uint32, NULL)) {
             ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize temp hash pool\n");
             return qfalse;
         }
     }
 
-    atomic_init(&vk.cache_manager.temp_hash_count, 8);
+    atomic_init(&vk.cache_structures_manager.temp_hash_count, 8);
 
     // Queues for temporary use
     for (uint32_t i = 0; i < 8; i++) {
-        if (!vk_cache_queue_init(&vk.cache_manager.temp_queue_pool[i], sizeof(void*), 32, NULL)) {
+        if (!vk_cache_queue_init(&vk.cache_structures_manager.temp_queue_pool[i], sizeof(void*), 32, NULL)) {
             ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize temp queue pool\n");
             return qfalse;
         }
     }
 
-    atomic_init(&vk.cache_manager.temp_queue_count, 8);
+    atomic_init(&vk.cache_structures_manager.temp_queue_count, 8);
 
     // Initialize statistics
-    atomic_init(&vk.cache_manager.cache_misses_avoided, 0);
-    atomic_init(&vk.cache_manager.prefetch_operations, 0);
-    atomic_init(&vk.cache_manager.false_sharing_avoided, 0);
-    atomic_init(&vk.cache_manager.data_locality_improvements, 0);
-    atomic_init(&vk.cache_manager.total_allocated, 0);
-    atomic_init(&vk.cache_manager.cache_aligned_allocated, 0);
+    atomic_init(&vk.cache_structures_manager.cache_misses_avoided, 0);
+    atomic_init(&vk.cache_structures_manager.prefetch_operations, 0);
+    atomic_init(&vk.cache_structures_manager.false_sharing_avoided, 0);
+    atomic_init(&vk.cache_structures_manager.data_locality_improvements, 0);
+    atomic_init(&vk.cache_structures_manager.total_allocated, 0);
+    atomic_init(&vk.cache_structures_manager.cache_aligned_allocated, 0);
 
-    vk.cache_manager.enabled = qtrue;
-    vk.cache_manager.initialized = qtrue;
-    vk.cache_manager.debug_name = "cache_structures_manager";
+    vk.cache_structures_manager.enabled = qtrue;
+    vk.cache_structures_manager.initialized = qtrue;
+    vk.cache_structures_manager.debug_name = "cache_structures_manager";
 
     ri.Printf(PRINT_ALL, "Vulkan: Cache-conscious data structures manager initialized\n");
 
@@ -2475,36 +2496,36 @@ qboolean vk_init_cache_structures_manager(void) {
 
 // Shutdown cache structures manager
 void vk_shutdown_cache_structures_manager(void) {
-    if (!vk.cache_manager.initialized) {
+    if (!vk.cache_structures_manager.initialized) {
         return;
     }
 
     ri.Printf(PRINT_ALL, "Vulkan: Shutting down cache-conscious data structures manager\n");
 
     // Cleanup temporary pools
-    for (uint32_t i = 0; i < vk.cache_manager.temp_array_count; i++) {
-        vk_cache_array_destroy(&vk.cache_manager.temp_array_pool[i]);
+    for (uint32_t i = 0; i < vk.cache_structures_manager.temp_array_count; i++) {
+        vk_cache_array_destroy(&vk.cache_structures_manager.temp_array_pool[i]);
     }
 
-    for (uint32_t i = 0; i < vk.cache_manager.temp_hash_count; i++) {
-        if (vk.cache_manager.temp_hash_pool[i].keys) ri.Free(vk.cache_manager.temp_hash_pool[i].keys);
-        if (vk.cache_manager.temp_hash_pool[i].values) ri.Free(vk.cache_manager.temp_hash_pool[i].values);
-        if (vk.cache_manager.temp_hash_pool[i].metadata) ri.Free(vk.cache_manager.temp_hash_pool[i].metadata);
+    for (uint32_t i = 0; i < vk.cache_structures_manager.temp_hash_count; i++) {
+        if (vk.cache_structures_manager.temp_hash_pool[i].keys) ri.Free(vk.cache_structures_manager.temp_hash_pool[i].keys);
+        if (vk.cache_structures_manager.temp_hash_pool[i].values) ri.Free(vk.cache_structures_manager.temp_hash_pool[i].values);
+        if (vk.cache_structures_manager.temp_hash_pool[i].metadata) ri.Free(vk.cache_structures_manager.temp_hash_pool[i].metadata);
     }
 
-    for (uint32_t i = 0; i < vk.cache_manager.temp_queue_count; i++) {
-        if (vk.cache_manager.temp_queue_pool[i].buffer) {
-            ri.Free(vk.cache_manager.temp_queue_pool[i].buffer);
+    for (uint32_t i = 0; i < vk.cache_structures_manager.temp_queue_count; i++) {
+        if (vk.cache_structures_manager.temp_queue_pool[i].buffer) {
+            ri.Free(vk.cache_structures_manager.temp_queue_pool[i].buffer);
         }
     }
 
-    vk.cache_manager.initialized = qfalse;
+    vk.cache_structures_manager.initialized = qfalse;
     ri.Printf(PRINT_ALL, "Vulkan: Cache-conscious data structures manager shutdown complete\n");
 }
 
 // Print cache structures statistics
 void vk_print_cache_structures_stats(void) {
-    if (!vk.cache_manager.enabled || !vk.cache_manager.initialized) {
+    if (!vk.cache_structures_manager.enabled || !vk.cache_structures_manager.initialized) {
         ri.Printf(PRINT_ALL, "Cache structures manager not initialized\n");
         return;
     }
@@ -2512,32 +2533,31 @@ void vk_print_cache_structures_stats(void) {
     ri.Printf(PRINT_ALL, "=== Cache-Conscious Data Structures Statistics ===\n");
     ri.Printf(PRINT_ALL, "Performance Improvements:\n");
     ri.Printf(PRINT_ALL, "  Cache misses avoided: %lu\n",
-        (unsigned long)atomic_load_explicit(&vk.cache_manager.cache_misses_avoided, memory_order_relaxed));
+        (unsigned long)atomic_load_explicit(&vk.cache_structures_manager.cache_misses_avoided, memory_order_relaxed));
     ri.Printf(PRINT_ALL, "  Prefetch operations: %lu\n",
-        (unsigned long)atomic_load_explicit(&vk.cache_manager.prefetch_operations, memory_order_relaxed));
+        (unsigned long)atomic_load_explicit(&vk.cache_structures_manager.prefetch_operations, memory_order_relaxed));
     ri.Printf(PRINT_ALL, "  False sharing avoided: %lu\n",
-        (unsigned long)atomic_load_explicit(&vk.cache_manager.false_sharing_avoided, memory_order_relaxed));
+        (unsigned long)atomic_load_explicit(&vk.cache_structures_manager.cache_misses_avoided, memory_order_relaxed));
     ri.Printf(PRINT_ALL, "  Data locality improvements: %lu\n",
-        (unsigned long)atomic_load_explicit(&vk.cache_manager.data_locality_improvements, memory_order_relaxed));
+        (unsigned long)atomic_load_explicit(&vk.cache_structures_manager.data_locality_improvements, memory_order_relaxed));
 
     ri.Printf(PRINT_ALL, "Memory Usage:\n");
     ri.Printf(PRINT_ALL, "  Total allocated: %lu bytes\n",
-        (unsigned long)atomic_load_explicit(&vk.cache_manager.total_allocated, memory_order_relaxed));
+        (unsigned long)atomic_load_explicit(&vk.cache_structures_manager.total_allocated, memory_order_relaxed));
     ri.Printf(PRINT_ALL, "  Cache-aligned allocated: %lu bytes (%.1f%%)\n",
-        (unsigned long)atomic_load_explicit(&vk.cache_manager.cache_aligned_allocated, memory_order_relaxed),
-        atomic_load_explicit(&vk.cache_manager.total_allocated, memory_order_relaxed) > 0 ? 
-        (float)atomic_load_explicit(&vk.cache_manager.cache_aligned_allocated, memory_order_relaxed) / 
-        (float)atomic_load_explicit(&vk.cache_manager.total_allocated, memory_order_relaxed) * 100.0f : 0.0f);
-        (unsigned long)(vk.cache_manager.total_allocated / (1024 * 1024)));
+        (unsigned long)atomic_load_explicit(&vk.cache_structures_manager.cache_aligned_allocated, memory_order_relaxed),
+        atomic_load_explicit(&vk.cache_structures_manager.total_allocated, memory_order_relaxed) > 0 ?
+        (float)atomic_load_explicit(&vk.cache_structures_manager.cache_aligned_allocated, memory_order_relaxed) /
+        (float)atomic_load_explicit(&vk.cache_structures_manager.total_allocated, memory_order_relaxed) * 100.0f : 0.0f);
     ri.Printf(PRINT_ALL, "  Cache-aligned allocated: %lu MB (%.1f%%)\n",
-        (unsigned long)(vk.cache_manager.cache_aligned_allocated / (1024 * 1024)),
-        vk.cache_manager.total_allocated > 0 ?
-        (float)vk.cache_manager.cache_aligned_allocated / vk.cache_manager.total_allocated * 100.0f : 0.0f);
+        (unsigned long)(vk.cache_structures_manager.cache_aligned_allocated / (1024 * 1024)),
+        vk.cache_structures_manager.total_allocated > 0 ?
+        (float)vk.cache_structures_manager.cache_aligned_allocated / vk.cache_structures_manager.total_allocated * 100.0f : 0.0f);
 
     ri.Printf(PRINT_ALL, "Pool Status:\n");
-    ri.Printf(PRINT_ALL, "  Temp arrays: %u available\n", vk.cache_manager.temp_array_count);
-    ri.Printf(PRINT_ALL, "  Temp hash maps: %u available\n", vk.cache_manager.temp_hash_count);
-    ri.Printf(PRINT_ALL, "  Temp queues: %u available\n", vk.cache_manager.temp_queue_count);
+    ri.Printf(PRINT_ALL, "  Temp arrays: %u available\n", vk.cache_structures_manager.temp_array_count);
+    ri.Printf(PRINT_ALL, "  Temp hash maps: %u available\n", vk.cache_structures_manager.temp_hash_count);
+    ri.Printf(PRINT_ALL, "  Temp queues: %u available\n", vk.cache_structures_manager.temp_queue_count);
 }
 
 // Render Graph Profiler Implementation
@@ -2553,7 +2573,7 @@ static qboolean vk_init_timestamp_queries(vk_timestamp_query_t *queries, uint32_
         .pipelineStatistics = 0
     };
 
-    VkResult result = qvkCreateQueryPool(vk.device, &create_info, NULL, &queries->query_pool);
+    VkResult result = vkCreateQueryPool(vk.device, &create_info, NULL, &queries->query_pool);
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_WARNING, "Vulkan: Failed to create timestamp query pool: %s\n",
             vk_result_string(result));
@@ -2566,14 +2586,14 @@ static qboolean vk_init_timestamp_queries(vk_timestamp_query_t *queries, uint32_
     queries->available = qfalse;
 
     if (!queries->timestamps) {
-        qvkDestroyQueryPool(vk.device, queries->query_pool, NULL);
+        vkDestroyQueryPool(vk.device, queries->query_pool, NULL);
         return qfalse;
     }
 
     memset(queries->timestamps, 0, sizeof(uint64_t) * query_count);
 
     // Reset query pool
-    qvkResetQueryPool(vk.device, queries->query_pool, 0, query_count);
+    vkResetQueryPool(vk.device, queries->query_pool, 0, query_count);
 
     return qtrue;
 }
@@ -2597,7 +2617,7 @@ static qboolean vk_init_pipeline_stats(vk_pipeline_stats_t *stats, VkQueryPipeli
         .pipelineStatistics = flags
     };
 
-    VkResult result = qvkCreateQueryPool(vk.device, &create_info, NULL, &stats->query_pool);
+    VkResult result = vkCreateQueryPool(vk.device, &create_info, NULL, &stats->query_pool);
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_WARNING, "Vulkan: Failed to create pipeline statistics query pool: %s\n",
             vk_result_string(result));
@@ -2610,14 +2630,14 @@ static qboolean vk_init_pipeline_stats(vk_pipeline_stats_t *stats, VkQueryPipeli
     stats->available = qfalse;
 
     if (!stats->statistics) {
-        qvkDestroyQueryPool(vk.device, stats->query_pool, NULL);
+        vkDestroyQueryPool(vk.device, stats->query_pool, NULL);
         return qfalse;
     }
 
     memset(stats->statistics, 0, sizeof(uint64_t) * stat_count);
 
     // Reset query pool
-    qvkResetQueryPool(vk.device, stats->query_pool, 0, stat_count);
+    vkResetQueryPool(vk.device, stats->query_pool, 0, stat_count);
 
     return qtrue;
 }
@@ -2739,10 +2759,10 @@ void vk_shutdown_render_profiler(void) {
     // Destroy GPU query pools
     if (vk.render_profiler.detailed_profiling) {
         if (vk.render_profiler.timestamp_queries.query_pool != VK_NULL_HANDLE) {
-            qvkDestroyQueryPool(vk.device, vk.render_profiler.timestamp_queries.query_pool, NULL);
+            vkDestroyQueryPool(vk.device, vk.render_profiler.timestamp_queries.query_pool, NULL);
         }
         if (vk.render_profiler.pipeline_stats.query_pool != VK_NULL_HANDLE) {
-            qvkDestroyQueryPool(vk.device, vk.render_profiler.pipeline_stats.query_pool, NULL);
+            vkDestroyQueryPool(vk.device, vk.render_profiler.pipeline_stats.query_pool, NULL);
         }
     }
 
@@ -2798,7 +2818,7 @@ void vk_profile_pass_start(const char *pass_name, uint32_t pass_id) {
         vk.render_profiler.timestamp_queries.current_query < vk.render_profiler.timestamp_queries.query_count) {
 
         uint32_t query_index = vk.render_profiler.timestamp_queries.current_query++;
-        qvkCmdWriteTimestamp(vk.cmd->command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+        vkCmdWriteTimestamp(vk.cmd->command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                            vk.render_profiler.timestamp_queries.query_pool, query_index);
         pass->gpu_start_time = query_index;
     }
@@ -2807,7 +2827,7 @@ void vk_profile_pass_start(const char *pass_name, uint32_t pass_id) {
     if (vk.render_profiler.detailed_profiling &&
         vk.render_profiler.pipeline_stats.query_pool != VK_NULL_HANDLE) {
 
-        qvkCmdBeginQuery(vk.cmd->command_buffer, vk.render_profiler.pipeline_stats.query_pool,
+        vkCmdBeginQuery(vk.cmd->command_buffer, vk.render_profiler.pipeline_stats.query_pool,
                         pass_index, 0);
     }
 }
@@ -2835,7 +2855,7 @@ void vk_profile_pass_end(const char *pass_name, uint32_t draw_calls, uint32_t ve
                 vk.render_profiler.timestamp_queries.current_query < vk.render_profiler.timestamp_queries.query_count) {
 
                 uint32_t query_index = vk.render_profiler.timestamp_queries.current_query++;
-                qvkCmdWriteTimestamp(vk.cmd->command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                vkCmdWriteTimestamp(vk.cmd->command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                                    vk.render_profiler.timestamp_queries.query_pool, query_index);
                 pass->gpu_end_time = query_index;
             }
@@ -2844,7 +2864,7 @@ void vk_profile_pass_end(const char *pass_name, uint32_t draw_calls, uint32_t ve
             if (vk.render_profiler.detailed_profiling &&
                 vk.render_profiler.pipeline_stats.query_pool != VK_NULL_HANDLE) {
 
-                qvkCmdEndQuery(vk.cmd->command_buffer, vk.render_profiler.pipeline_stats.query_pool, i);
+                vkCmdEndQuery(vk.cmd->command_buffer, vk.render_profiler.pipeline_stats.query_pool, i);
             }
 
             return;
@@ -3042,7 +3062,7 @@ void vk_profile_frame_end(void) {
         vk_timestamp_query_t *timestamps = &vk.render_profiler.timestamp_queries;
 
         // Check if results are available (from previous frame)
-        VkResult result = qvkGetQueryPoolResults(vk.device, timestamps->query_pool, 0,
+        VkResult result = vkGetQueryPoolResults(vk.device, timestamps->query_pool, 0,
                                                timestamps->current_query, sizeof(uint64_t) * timestamps->current_query,
                                                timestamps->timestamps, sizeof(uint64_t),
                                                VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
@@ -3062,7 +3082,7 @@ void vk_profile_frame_end(void) {
         }
 
         // Reset timestamp queries for next frame
-        qvkResetQueryPool(vk.device, timestamps->query_pool, 0, timestamps->query_count);
+        vkResetQueryPool(vk.device, timestamps->query_pool, 0, timestamps->query_count);
         timestamps->current_query = 0;
         timestamps->available = qfalse;
     }

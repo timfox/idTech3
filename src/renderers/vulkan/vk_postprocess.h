@@ -18,7 +18,6 @@ void vk_apply_bloom(void);
 
 // Pipeline creation
 void vk_create_blur_pipeline(uint32_t index, uint32_t width, uint32_t height, qboolean horizontal_pass);
-void vk_update_post_process_pipelines(void);
 
 // Effects
 void vk_apply_tone_mapping(void);
