@@ -8,6 +8,7 @@ Multi-platform installer and package generation framework.
 
 #include "package_generator.h"
 #include "q_shared.h"
+#include "qcommon.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,6 +25,16 @@ Multi-platform installer and package generation framework.
 #include <libgen.h>
 #define PATH_SEPARATOR "/"
 #endif
+
+// Forward declarations for functions used before definition
+qboolean PackageGenerator_CreateTarGzArchive(const char* source_dir, const char* output_file);
+qboolean PackageGenerator_GenerateNSISInstaller(const package_config_t* config, package_generation_result_t* result);
+qboolean PackageGenerator_GenerateWiXInstaller(const package_config_t* config, package_generation_result_t* result);
+qboolean PackageGenerator_GenerateDEBPackage(const package_config_t* config, package_generation_result_t* result);
+qboolean PackageGenerator_GenerateRPMPackage(const package_config_t* config, package_generation_result_t* result);
+qboolean PackageGenerator_GenerateAppImage(const package_config_t* config, package_generation_result_t* result);
+qboolean PackageGenerator_GenerateDMGPackage(const package_config_t* config, package_generation_result_t* result);
+qboolean PackageGenerator_GeneratePKGPackage(const package_config_t* config, package_generation_result_t* result);
 
 // Global packaging system
 packaging_system_t packaging_system = {0};

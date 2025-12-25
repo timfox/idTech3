@@ -8,10 +8,15 @@ Automated performance regression detection with simplified interface.
 
 #include "performance_regression.h"
 #include "q_shared.h"
+#include "qcommon.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+
+// Forward declarations
+static qboolean Regression_GetBaseline(const char* test_name, performance_measurement_t* baseline);
+static void Regression_FinishCurrentTest(void);
 
 // Global regression testing system
 regression_system_t regression_system = {0};

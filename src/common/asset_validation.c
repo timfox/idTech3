@@ -8,6 +8,7 @@ Automated asset correctness and optimization checking framework.
 
 #include "asset_validation.h"
 #include "q_shared.h"
+#include "qcommon.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

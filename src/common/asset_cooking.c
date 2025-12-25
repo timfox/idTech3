@@ -8,6 +8,7 @@ Automated asset processing and optimization system.
 
 #include "asset_cooking.h"
 #include "q_shared.h"
+#include "qcommon.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

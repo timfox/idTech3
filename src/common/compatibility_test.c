@@ -9,6 +9,7 @@ compatibility verification and feature detection.
 
 #include "compatibility_test.h"
 #include "q_shared.h"
+#include "qcommon.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

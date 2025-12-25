@@ -36,6 +36,9 @@ cvar_t *s_muteWhenUnfocused;
 
 static soundInterface_t si;
 
+// Function declarations
+void S_AudioThreads_f( void );
+
 /*
 =================
 S_ValidateInterface

@@ -1513,7 +1513,7 @@ char *Q_strncpy( char * restrict dest, const char * restrict src, int destsize )
 Q_stricmpn
 =============
 */
-int Q_stricmpn( const char *s1, const char *s2, int n ) {
+int Q_stricmpn( const char *s1, const char *s2, size_t n ) {
 	int		c1, c2;
 
 	if ( s1 == NULL ) {
@@ -1557,7 +1557,7 @@ int Q_stricmpn( const char *s1, const char *s2, int n ) {
 Q_strnicmp
 =============
 */
-int Q_strnicmp( const char *s1, const char *s2, int n ) {
+int Q_strnicmp( const char *s1, const char *s2, size_t n ) {
 	int c1, c2;
 
 	if ( s1 == NULL ) {
@@ -1591,7 +1591,7 @@ int Q_strnicmp( const char *s1, const char *s2, int n ) {
 }
 
 
-int Q_strncmp( const char *s1, const char *s2, int n ) {
+int Q_strncmp( const char *s1, const char *s2, size_t n ) {
 	int		c1, c2;
 	
 	do {
@@ -1759,7 +1759,7 @@ const char *Q_stristr( const char *s, const char *find)
 }
 
 
-int Q_replace( const char *str1, const char *str2, char *src, int max_len ) 
+int Q_replace( const char *str1, const char *str2, char *src, size_t max_len ) 
 {
 	int len1, len2, d, count;
 	const char *s0, *s1, *s2, *max;

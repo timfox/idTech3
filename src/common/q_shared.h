@@ -73,6 +73,10 @@ typedef enum {
     FILE_MODE_COUNT
 } file_mode_t;
 
+// Basic type definitions needed for structs and inline functions
+typedef unsigned char byte;
+typedef enum { qfalse = 0, qtrue } qboolean;
+
 // Type-safe file handle
 typedef struct {
     void *handle;        // Platform-specific file handle
@@ -80,6 +84,11 @@ typedef struct {
     pathname_t path;
     qboolean valid;
 } file_handle_t;
+
+// Forward declarations for functions used in inline functions
+#include <string.h>
+#include <stdint.h>
+int Q_stricmp(const char *s1, const char *s2);
 
 // Type-safe file operations
 static inline qboolean File_IsValidPath(const char *path) {
@@ -145,12 +154,12 @@ typedef struct {
 // Type-safe network operations with bounds checking
 static inline qboolean Net_IsValidAddress(const net_address_t *addr) {
     if (!addr) return qfalse;
-    return addr->ip != 0 && addr->port != 0;
+    return (qboolean)(addr->ip != 0 && addr->port != 0);
 }
 
 static inline qboolean Net_IsValidPacket(const net_packet_t *packet) {
     if (!packet) return qfalse;
-    return packet->size > 0 && packet->size <= sizeof(packet->data);
+    return (qboolean)(packet->size > 0 && packet->size <= sizeof(packet->data));
 }
 
 static inline qboolean Net_PacketWrite(net_packet_t *packet, const void *data, size_t size) {
@@ -279,6 +288,11 @@ static inline qboolean Net_PacketRead(net_packet_t *packet, void *data, size_t s
 #include <limits.h>
 #include <errno.h>
 
+#if defined(__cplusplus)
+#include <cstddef>
+#include <cstdint>
+#endif
+
 #endif
 
 // Reproducible build support - override __DATE__ and __TIME__ with SOURCE_DATE_EPOCH
@@ -370,8 +384,6 @@ int Q_longjmp_c(void *, int);
 #endif
 
 typedef unsigned char byte;
-
-typedef enum { qfalse = 0, qtrue } qboolean;
 
 #include "thread_platform.h"
 
@@ -1136,6 +1148,12 @@ char	*Q_strlwr( char *s1 );
 char	*Q_strupr( char *s1 );
 const char	*Q_stristr( const char *s, const char *find);
 
+// Forward declarations for string functions
+void	Q_strncpyz( char *dest, const char *src, int destsize );
+void	Q_strcat( char *dest, int size, const char *src );
+char	*Q_stradd( char *dst, const char *src );
+char	*Q_strncpy( char *dest, const char *src, int destsize );
+
 // Type-safe string operations with bounds checking
 static inline qboolean Q_strncpyz_safe(char *dest, size_t dest_size, const char *src) {
     if (!dest || dest_size == 0) return qfalse;
@@ -1161,11 +1179,9 @@ qboolean Q_isintegral( float f );
 #ifdef __cplusplus
 extern "C" {
 #endif
-void	Q_strncpyz( char *dest, const char *src, int destsize );
 #ifdef __cplusplus
 }
 #endif
-void	Q_strcat( char *dest, int size, const char *src );
 
 // Type-safe memory operations with bounds checking
 typedef struct {
@@ -1204,9 +1220,6 @@ static inline char* Q_strncpy_safe(char *dest, size_t dest_size, const char *src
     size_t copy_len = (src_len < dest_size - 1) ? src_len : dest_size - 1;
     return Q_strncpy(dest, src, copy_len);
 }
-
-char	*Q_stradd( char *dst, const char *src );
-char	*Q_strncpy( char *dest, const char *src, int destsize );
 
 // Safe integer parsing functions (replacement for atoi/atol)
 int		Q_SafeAtoi( const char *s, int defaultValue, qboolean *error );
@@ -1395,14 +1408,14 @@ static inline qboolean Cvar_IsValidValue(cvar_type_t type, const char *value) {
 
         case CVAR_TYPE_FLOAT:
             // Basic float validation (could be more sophisticated)
-            return (atof(value) != 0.0f || strcmp(value, "0") == 0 || strcmp(value, "0.0") == 0);
+            return (qboolean)(atof(value) != 0.0f || strcmp(value, "0") == 0 || strcmp(value, "0.0") == 0);
 
         case CVAR_TYPE_BOOL:
-            return (Q_stricmp(value, "0") == 0 || Q_stricmp(value, "1") == 0 ||
+            return (qboolean)(Q_stricmp(value, "0") == 0 || Q_stricmp(value, "1") == 0 ||
                     Q_stricmp(value, "true") == 0 || Q_stricmp(value, "false") == 0);
 
         case CVAR_TYPE_STRING:
-            return strlen(value) < 1024; // Reasonable string length limit
+            return (qboolean)(strlen(value) < 1024); // Reasonable string length limit
 
         default:
             return qfalse;

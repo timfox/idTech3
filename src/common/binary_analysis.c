@@ -8,6 +8,7 @@ Automated security scanning and optimization analysis framework.
 
 #include "binary_analysis.h"
 #include "q_shared.h"
+#include "qcommon.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1087,7 +1088,7 @@ qboolean BinaryAnalysis_GetOptimizationStatus(char* status, size_t status_size) 
     return qtrue;
 }
 
-uint32_t BinaryAnalysis_AutoFixAll(void) {
+int BinaryAnalysis_AutoFixAll(void) {
     // Placeholder - actual implementation would require binary modification tools
     return 0;
 }

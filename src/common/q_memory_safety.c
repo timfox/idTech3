@@ -22,13 +22,13 @@ typedef struct memory_block_s {
     uint32_t canary_after;
     qboolean freed;
     uint32_t magic;  // For validation
-} memory_block_t;
+} memory_block_header_t;
 
 #define MEMORY_BLOCK_MAGIC 0xCAFEBABE
-#define MEMORY_BLOCK_OVERHEAD (sizeof(memory_block_t) + (MEMORY_CANARY_SIZE * MEMORY_CANARY_COUNT))
+#define MEMORY_BLOCK_OVERHEAD (sizeof(memory_block_header_t) + (MEMORY_CANARY_SIZE * MEMORY_CANARY_COUNT))
 
 // Forward declarations for static functions called before definition
-static qboolean MemorySafety_ValidateBlock(memory_block_t *block, void *user_ptr);
+static qboolean MemorySafety_ValidateBlock(memory_block_header_t *block, void *user_ptr);
 static void MemorySafety_TrackAllocation(void *ptr, size_t size, const char *file, int line);
 static void MemorySafety_UntrackAllocation(void *ptr);
 
@@ -125,7 +125,7 @@ void *MemorySafety_Malloc(size_t size, const char *file, int line) {
     }
 
     // Set up memory block header
-    memory_block_t *block = (memory_block_t *)raw_ptr;
+    memory_block_header_t *block = (memory_block_header_t *)raw_ptr;
     block->size = size;
     block->canary_before = MEMORY_CANARY_VALUE;
     block->file = file;
@@ -135,11 +135,11 @@ void *MemorySafety_Malloc(size_t size, const char *file, int line) {
     block->magic = MEMORY_BLOCK_MAGIC;
 
     // Set canaries
-    uint32_t *canary_after = (uint32_t *)((char *)raw_ptr + sizeof(memory_block_t) + size);
+    uint32_t *canary_after = (uint32_t *)((char *)raw_ptr + sizeof(memory_block_header_t) + size);
     *canary_after = MEMORY_CANARY_VALUE;
 
     // Get user pointer
-    void *user_ptr = (char *)raw_ptr + sizeof(memory_block_t);
+    void *user_ptr = (char *)raw_ptr + sizeof(memory_block_header_t);
 
     // Track allocation
     MemorySafety_TrackAllocation(user_ptr, size, file, line);
@@ -170,7 +170,7 @@ void MemorySafety_Free(void *ptr) {
     }
 
     // Get block header
-    memory_block_t *block = (memory_block_t *)((char *)ptr - sizeof(memory_block_t));
+    memory_block_header_t *block = (memory_block_header_t *)((char *)ptr - sizeof(memory_block_header_t));
 
     // Validate block
     if (!MemorySafety_ValidateBlock(block, ptr)) {
@@ -207,7 +207,7 @@ void MemorySafety_Free(void *ptr) {
 MemorySafety_ValidateBlock
 ===============
 */
-static qboolean MemorySafety_ValidateBlock(memory_block_t *block, void *user_ptr) {
+static qboolean MemorySafety_ValidateBlock(memory_block_header_t *block, void *user_ptr) {
     // Check magic number
     if (block->magic != MEMORY_BLOCK_MAGIC) {
         Com_Printf(S_COLOR_RED "ERROR: Invalid memory block magic (0x%08X)\n", block->magic);
