@@ -2358,10 +2358,442 @@ if(NOT USE_RENDERER_DLOPEN)
 	endif()
 endif()
 
+# Security hardening options
+OPTION(ENABLE_SECURITY_HARDENING "Enable comprehensive security hardening flags" ON)
+OPTION(ENABLE_STACK_PROTECTOR "Enable stack canaries/protection" ON)
+OPTION(ENABLE_ADDRESS_SANITIZER "Enable AddressSanitizer for memory error detection" OFF)
+OPTION(ENABLE_STACK_CLASH_PROTECTION "Enable stack clash protection" ON)
+OPTION(ENABLE_FORTIFY_SOURCE "Enable fortified source functions" ON)
+OPTION(ENABLE_RELRO "Enable read-only relocations" ON)
+OPTION(ENABLE_PIE "Enable position independent executable" ON)
+
+# Incremental build options
+OPTION(ENABLE_CCACHE "Enable ccache for faster incremental builds" ON)
+OPTION(ENABLE_NINJA "Prefer Ninja build system for faster incremental builds" ON)
+OPTION(ENABLE_BUILD_CACHE "Enable build cache for incremental builds" ON)
+OPTION(ENABLE_DEPENDENCY_GRAPH "Generate dependency graph for analysis" OFF)
+OPTION(ENABLE_INCREMENTAL_STATS "Enable incremental build statistics" ON)
+
 # Monolithic build support: link game module targets directly
 OPTION(COMBINED_MONOLITH "Build monolithic executable with game modules linked statically" OFF)
 OPTION(MONOLITH_USE_LTO "Enable link-time optimization for monolithic builds" OFF)
 OPTION(MONOLITH_USE_GC_SECTIONS "Enable function/data section GC for monolithic builds" ON)
+
+# Build optimization options
+OPTION(ENABLE_LTO "Enable Link-Time Optimization" ON)
+OPTION(ENABLE_BUILD_OPTIMIZATION "Enable comprehensive build optimizations" ON)
+OPTION(ENABLE_BINARY_SIZE_OPTIMIZATION "Enable binary size reduction techniques" ON)
+OPTION(ENABLE_DEAD_CODE_ELIMINATION "Enable aggressive dead code elimination" ON)
+OPTION(ENABLE_PROFILE_GUIDED_OPTIMIZATION "Enable Profile-Guided Optimization support" OFF)
+OPTION(ENABLE_BINARY_COMPRESSION "Enable binary compression (UPX)" OFF)
+OPTION(ENABLE_BUILD_PERFORMANCE_MONITORING "Monitor build performance and size" ON)
+
+# ============================================================================
+# Incremental Build System Implementation
+# ============================================================================
+
+# Function to detect and configure ccache
+FUNCTION(CONFIGURE_CCACHE)
+    IF(NOT ENABLE_CCACHE)
+        RETURN()
+    ENDIF()
+
+    FIND_PROGRAM(CCACHE_PROGRAM ccache)
+    IF(CCACHE_PROGRAM)
+        MESSAGE(STATUS "ccache found: ${CCACHE_PROGRAM}")
+
+        # Set ccache as compiler launcher
+        SET(CMAKE_C_COMPILER_LAUNCHER ${CCACHE_PROGRAM} PARENT_SCOPE)
+        SET(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM} PARENT_SCOPE)
+
+        # Configure ccache settings
+        SET(ENV{CCACHE_MAXSIZE} "5G")
+        SET(ENV{CCACHE_COMPRESS} "true")
+        SET(ENV{CCACHE_COMPRESSLEVEL} "6")
+        SET(ENV{CCACHE_CPP2} "true")
+        SET(ENV{CCACHE_HARDLINK} "true")
+        SET(ENV{CCACHE_SLOPPINESS} "include_file_ctime,include_file_mtime")
+
+        # Set cache directory
+        SET(CCACHE_DIR "${CMAKE_BINARY_DIR}/.ccache" CACHE PATH "ccache directory")
+        SET(ENV{CCACHE_DIR} "${CCACHE_DIR}")
+
+        # Create ccache directory
+        FILE(MAKE_DIRECTORY ${CCACHE_DIR})
+
+        MESSAGE(STATUS "ccache configured with cache directory: ${CCACHE_DIR}")
+    ELSE()
+        MESSAGE(WARNING "ccache not found. Install ccache for faster incremental builds.")
+        SET(ENABLE_CCACHE OFF CACHE BOOL "" FORCE)
+    ENDIF()
+ENDFUNCTION()
+
+# Function to configure Ninja build system
+FUNCTION(CONFIGURE_NINJA)
+    IF(NOT ENABLE_NINJA)
+        RETURN()
+    ENDIF()
+
+    # Check if Ninja is available
+    FIND_PROGRAM(NINJA_EXECUTABLE ninja)
+    IF(NINJA_EXECUTABLE)
+        MESSAGE(STATUS "Ninja found: ${NINJA_EXECUTABLE}")
+
+        # Set Ninja as preferred generator
+        SET(CMAKE_GENERATOR "Ninja" CACHE INTERNAL "" FORCE)
+
+        # Configure Ninja-specific options
+        SET(CMAKE_MAKE_PROGRAM ${NINJA_EXECUTABLE} CACHE FILEPATH "" FORCE)
+
+        MESSAGE(STATUS "Using Ninja build system for faster incremental builds")
+    ELSE()
+        MESSAGE(WARNING "Ninja not found. Install ninja for faster incremental builds.")
+        SET(ENABLE_NINJA OFF CACHE BOOL "" FORCE)
+    ENDIF()
+ENDFUNCTION()
+
+# Function to configure build cache
+FUNCTION(CONFIGURE_BUILD_CACHE)
+    IF(NOT ENABLE_BUILD_CACHE)
+        RETURN()
+    ENDIF()
+
+    # Enable CMake build cache
+    SET(CMAKE_CACHEFILE_DIR "${CMAKE_BINARY_DIR}/.cmake_cache" CACHE PATH "CMake cache directory")
+    FILE(MAKE_DIRECTORY ${CMAKE_CACHEFILE_DIR})
+
+    # Configure cache variables for faster rebuilds
+    SET(CMAKE_<LANG>_COMPILER_LAUNCHER ${CMAKE_<LANG>_COMPILER_LAUNCHER} CACHE STRING "" FORCE)
+    SET(CMAKE_<LANG>_LINKER_LAUNCHER ${CMAKE_<LANG>_LINKER_LAUNCHER} CACHE STRING "" FORCE)
+
+    MESSAGE(STATUS "Build cache enabled with directory: ${CMAKE_CACHEFILE_DIR}")
+ENDFUNCTION()
+
+# Function to generate dependency graph
+FUNCTION(GENERATE_DEPENDENCY_GRAPH)
+    IF(NOT ENABLE_DEPENDENCY_GRAPH)
+        RETURN()
+    ENDIF()
+
+    SET(GRAPH_FILE "${CMAKE_BINARY_DIR}/dependency_graph.dot")
+    SET(GRAPH_PNG "${CMAKE_BINARY_DIR}/dependency_graph.png")
+
+    # Generate DOT file for dependency graph
+    FILE(WRITE ${GRAPH_FILE} "digraph DependencyGraph {\n")
+    FILE(APPEND ${GRAPH_FILE} "  rankdir=LR;\n")
+    FILE(APPEND ${GRAPH_FILE} "  node [shape=box];\n\n")
+
+    # Add main executable dependencies
+    IF(TARGET ${CNAME}${BINEXT})
+        FILE(APPEND ${GRAPH_FILE} "  \"${CNAME}${BINEXT}\" [fillcolor=lightblue, style=filled];\n")
+
+        # Add renderer dependencies
+        IF(TARGET ${RENDERER_PREFIX}_opengl${RENDEXT})
+            FILE(APPEND ${GRAPH_FILE} "  \"${CNAME}${BINEXT}\" -> \"${RENDERER_PREFIX}_opengl${RENDEXT}\";\n")
+        ENDIF()
+        IF(TARGET ${RENDERER_PREFIX}_vulkan${RENDEXT})
+            FILE(APPEND ${GRAPH_FILE} "  \"${CNAME}${BINEXT}\" -> \"${RENDERER_PREFIX}_vulkan${RENDEXT}\";\n")
+        ENDIF()
+    ENDIF()
+
+    FILE(APPEND ${GRAPH_FILE} "}\n")
+
+    # Try to generate PNG if graphviz is available
+    FIND_PROGRAM(DOT_EXECUTABLE dot)
+    IF(DOT_EXECUTABLE)
+        ADD_CUSTOM_COMMAND(
+            OUTPUT ${GRAPH_PNG}
+            COMMAND ${DOT_EXECUTABLE} -Tpng ${GRAPH_FILE} -o ${GRAPH_PNG}
+            DEPENDS ${GRAPH_FILE}
+            COMMENT "Generating dependency graph PNG"
+        )
+        ADD_CUSTOM_TARGET(dependency_graph DEPENDS ${GRAPH_PNG})
+        MESSAGE(STATUS "Dependency graph will be generated: ${GRAPH_PNG}")
+    ELSE()
+        MESSAGE(STATUS "Dependency graph DOT file: ${GRAPH_FILE}")
+        MESSAGE(WARNING "Graphviz not found. Install graphviz to generate PNG dependency graph.")
+    ENDIF()
+ENDFUNCTION()
+
+# Function to setup incremental build monitoring
+FUNCTION(SETUP_INCREMENTAL_MONITORING)
+    IF(NOT ENABLE_INCREMENTAL_STATS)
+        RETURN()
+    ENDIF()
+
+    # Create build timing scripts
+    SET(BUILD_START_SCRIPT "${CMAKE_BINARY_DIR}/build_start.sh")
+    SET(BUILD_END_SCRIPT "${CMAKE_BINARY_DIR}/build_end.sh")
+    SET(BUILD_STATS_FILE "${CMAKE_BINARY_DIR}/build_stats.txt")
+
+    FILE(WRITE ${BUILD_START_SCRIPT}
+        "#!/bin/bash\n"
+        "echo \"Build started at: \$(date)\" > ${BUILD_STATS_FILE}\n"
+        "echo \"Build start time: \$(date +%s)\" >> ${BUILD_STATS_FILE}\n"
+    )
+
+    FILE(WRITE ${BUILD_END_SCRIPT}
+        "#!/bin/bash\n"
+        "echo \"Build ended at: \$(date)\" >> ${BUILD_STATS_FILE}\n"
+        "echo \"Build end time: \$(date +%s)\" >> ${BUILD_STATS_FILE}\n"
+        "START_TIME=\$(grep 'Build start time:' ${BUILD_STATS_FILE} | cut -d: -f2)\n"
+        "END_TIME=\$(grep 'Build end time:' ${BUILD_STATS_FILE} | tail -1 | cut -d: -f2)\n"
+        "if [ -n \"\$START_TIME\" ] && [ -n \"\$END_TIME\" ]; then\n"
+        "    DURATION=\$((END_TIME - START_TIME))\n"
+        "    echo \"Build duration: \${DURATION} seconds\" >> ${BUILD_STATS_FILE}\n"
+        "    echo \"Incremental build completed in \${DURATION} seconds\"\n"
+        "fi\n"
+    )
+
+    FILE(CHMOD ${BUILD_START_SCRIPT} PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
+    FILE(CHMOD ${BUILD_END_SCRIPT} PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE)
+
+    MESSAGE(STATUS "Incremental build monitoring enabled")
+    MESSAGE(STATUS "Build statistics: ${BUILD_STATS_FILE}")
+ENDFUNCTION()
+
+# Configure incremental build components
+CONFIGURE_CCACHE()
+CONFIGURE_NINJA()
+CONFIGURE_BUILD_CACHE()
+GENERATE_DEPENDENCY_GRAPH()
+SETUP_INCREMENTAL_MONITORING()
+
+# ============================================================================
+# Integrate Incremental Build Monitor Script
+# ============================================================================
+
+# Include the incremental build monitor script if it exists
+if(EXISTS "${CMAKE_SOURCE_DIR}/scripts/incremental_build_monitor.cmake")
+    include(${CMAKE_SOURCE_DIR}/scripts/incremental_build_monitor.cmake)
+    setup_incremental_build_monitor()
+else()
+    message(WARNING "Incremental build monitor script not found: scripts/incremental_build_monitor.cmake")
+endif()
+
+# Display incremental build status
+IF(ENABLE_CCACHE OR ENABLE_NINJA OR ENABLE_BUILD_CACHE)
+    MESSAGE(STATUS "============================================================")
+    MESSAGE(STATUS "Incremental Build Configuration:")
+    MESSAGE(STATUS "  ccache: ${ENABLE_CCACHE}")
+    MESSAGE(STATUS "  Ninja: ${ENABLE_NINJA}")
+    MESSAGE(STATUS "  Build Cache: ${ENABLE_BUILD_CACHE}")
+    MESSAGE(STATUS "  Dependency Graph: ${ENABLE_DEPENDENCY_GRAPH}")
+    MESSAGE(STATUS "  Build Statistics: ${ENABLE_INCREMENTAL_STATS}")
+    MESSAGE(STATUS "============================================================")
+ENDIF()
+
+# ============================================================================
+# Security Hardening Implementation
+# ============================================================================
+
+# Function to apply security hardening flags to a target
+FUNCTION(APPLY_SECURITY_HARDENING TARGET_NAME)
+    IF(NOT ENABLE_SECURITY_HARDENING)
+        RETURN()
+    ENDIF()
+
+    MESSAGE(STATUS "Applying security hardening to target: ${TARGET_NAME}")
+
+    # Compiler-specific security flags
+    IF(CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        # GCC-specific flags
+        IF(ENABLE_STACK_PROTECTOR)
+            TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -fstack-protector-strong)
+            TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE -fstack-protector-strong)
+        ENDIF()
+
+        IF(ENABLE_STACK_CLASH_PROTECTION)
+            TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -fstack-clash-protection)
+        ENDIF()
+
+        IF(ENABLE_FORTIFY_SOURCE)
+            TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -D_FORTIFY_SOURCE=2)
+        ENDIF()
+
+        IF(ENABLE_PIE)
+            TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -fPIE)
+            TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE -pie)
+        ENDIF()
+
+        # AddressSanitizer (mutually exclusive with other sanitizers for production)
+        IF(ENABLE_ADDRESS_SANITIZER)
+            TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -fsanitize=address -fsanitize-address-use-after-scope)
+            TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE -fsanitize=address)
+        ENDIF()
+
+        # Additional GCC security flags
+        TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE
+            -fstack-check
+            -fcf-protection=full    # Control flow protection
+            -fexceptions           # Enable exception handling
+            -fnon-call-exceptions  # Generate traps for invalid pointer dereferences
+            -fno-delete-null-pointer-checks  # Keep null pointer checks
+            -fno-omit-frame-pointer  # Keep frame pointers for stack traces
+        )
+
+        # Linker security flags
+        IF(ENABLE_RELRO)
+            TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE
+                -Wl,-z,relro,-z,now      # Read-only relocations, full RELRO
+                -Wl,-z,noexecstack       # Non-executable stack
+                -Wl,-z,noexecheap        # Non-executable heap (if supported)
+            )
+        ENDIF()
+
+        TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE
+            -Wl,--as-needed            # Only link libraries that are actually used
+            -Wl,--no-undefined         # Reject undefined symbols at link time
+        )
+
+    ELSEIF(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        # Clang-specific flags
+        IF(ENABLE_STACK_PROTECTOR)
+            TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -fstack-protector-strong)
+            TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE -fstack-protector-strong)
+        ENDIF()
+
+        IF(ENABLE_STACK_CLASH_PROTECTION)
+            TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -fstack-clash-protection)
+        ENDIF()
+
+        IF(ENABLE_FORTIFY_SOURCE)
+            TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -D_FORTIFY_SOURCE=2)
+        ENDIF()
+
+        IF(ENABLE_PIE)
+            TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -fPIE)
+            TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE -pie)
+        ENDIF()
+
+        # AddressSanitizer
+        IF(ENABLE_ADDRESS_SANITIZER)
+            TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -fsanitize=address -fsanitize-address-use-after-scope)
+            TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE -fsanitize=address)
+        ENDIF()
+
+        # Additional Clang security flags
+        TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE
+            -fstack-check
+            -fcf-protection=full    # Control flow protection
+            -fexceptions           # Enable exception handling
+            -fnon-call-exceptions  # Generate traps for invalid pointer dereferences
+            -fno-omit-frame-pointer  # Keep frame pointers for stack traces
+        )
+
+        # Linker security flags
+        IF(ENABLE_RELRO)
+            TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE
+                -Wl,-z,relro,-z,now      # Read-only relocations, full RELRO
+                -Wl,-z,noexecstack       # Non-executable stack
+                -Wl,-z,noexecheap        # Non-executable heap (if supported)
+            )
+        ENDIF()
+
+        TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE
+            -Wl,--as-needed            # Only link libraries that are actually used
+            -Wl,--no-undefined         # Reject undefined symbols at link time
+        )
+
+    ELSEIF(MSVC)
+        # MSVC-specific flags
+        IF(ENABLE_STACK_PROTECTOR)
+            TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE /GS)  # Buffer security check
+        ENDIF()
+
+        # MSVC security flags
+        TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE
+            /guard:cf                 # Control Flow Guard
+            /guard:ehcont            # EH Continuation Guard
+            /sdl                     # Security Development Lifecycle checks
+            /DYNAMICBASE             # Address space layout randomization
+            /HIGHENTROPYVA           # High entropy ASLR
+        )
+
+        TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE
+            /NXCOMPAT                # Data Execution Prevention
+            /SAFESEH                 # Safe exception handlers
+            /guard:cf                # Control Flow Guard
+        )
+    ENDIF()
+
+    # Common security flags for all compilers
+    TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE
+        -U_FORTIFY_SOURCE  # Undefine first to avoid conflicts
+        -D_FORTIFY_SOURCE=2
+    )
+
+    # Disable optimizations that might interfere with security
+    TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE
+        -fno-strict-overflow     # Prevent undefined behavior from signed overflow
+        -fno-delete-null-pointer-checks  # Keep null pointer checks
+        -fwrapv                  # Defined signed overflow behavior
+    )
+
+    MESSAGE(STATUS "Security hardening applied to ${TARGET_NAME}")
+ENDFUNCTION()
+
+# ============================================================================
+# Apply Security Hardening to All Targets
+# ============================================================================
+
+# Apply to main executable
+IF(TARGET ${CNAME}${BINEXT})
+    APPLY_SECURITY_HARDENING(${CNAME}${BINEXT})
+    MESSAGE(STATUS "Applied security hardening to main executable: ${CNAME}${BINEXT}")
+ENDIF()
+
+# Apply to renderer libraries
+IF(TARGET ${RENDERER_PREFIX}_opengl${RENDEXT})
+    APPLY_SECURITY_HARDENING(${RENDERER_PREFIX}_opengl${RENDEXT})
+    MESSAGE(STATUS "Applied security hardening to OpenGL renderer: ${RENDERER_PREFIX}_opengl${RENDEXT}")
+ENDIF()
+
+IF(TARGET ${RENDERER_PREFIX}_vulkan${RENDEXT})
+    APPLY_SECURITY_HARDENING(${RENDERER_PREFIX}_vulkan${RENDEXT})
+    MESSAGE(STATUS "Applied security hardening to Vulkan renderer: ${RENDERER_PREFIX}_vulkan${RENDEXT}")
+ENDIF()
+
+IF(TARGET ${RENDERER_PREFIX}_d3d12${RENDEXT})
+    APPLY_SECURITY_HARDENING(${RENDERER_PREFIX}_d3d12${RENDEXT})
+    MESSAGE(STATUS "Applied security hardening to D3D12 renderer: ${RENDERER_PREFIX}_d3d12${RENDEXT}")
+ENDIF()
+
+IF(TARGET ${RENDERER_PREFIX}_metal${RENDEXT})
+    APPLY_SECURITY_HARDENING(${RENDERER_PREFIX}_metal${RENDEXT})
+    MESSAGE(STATUS "Applied security hardening to Metal renderer: ${RENDERER_PREFIX}_metal${RENDEXT}")
+ENDIF()
+
+# Apply to static renderer objects (non-dlopen builds)
+IF(NOT USE_RENDERER_DLOPEN)
+    IF(TARGET ${RENDERER_PREFIX}_opengl)
+        APPLY_SECURITY_HARDENING(${RENDERER_PREFIX}_opengl)
+    ENDIF()
+    IF(TARGET ${RENDERER_PREFIX}_vulkan)
+        APPLY_SECURITY_HARDENING(${RENDERER_PREFIX}_vulkan)
+    ENDIF()
+    IF(TARGET ${RENDERER_PREFIX}_d3d12)
+        APPLY_SECURITY_HARDENING(${RENDERER_PREFIX}_d3d12)
+    ENDIF()
+    IF(TARGET ${RENDERER_PREFIX}_metal)
+        APPLY_SECURITY_HARDENING(${RENDERER_PREFIX}_metal)
+    ENDIF()
+ENDIF()
+
+# Display security hardening status
+IF(ENABLE_SECURITY_HARDENING)
+    MESSAGE(STATUS "============================================================")
+    MESSAGE(STATUS "Security Hardening Status:")
+    MESSAGE(STATUS "  Stack Protector: ${ENABLE_STACK_PROTECTOR}")
+    MESSAGE(STATUS "  Address Sanitizer: ${ENABLE_ADDRESS_SANITIZER}")
+    MESSAGE(STATUS "  Stack Clash Protection: ${ENABLE_STACK_CLASH_PROTECTION}")
+    MESSAGE(STATUS "  Fortify Source: ${ENABLE_FORTIFY_SOURCE}")
+    MESSAGE(STATUS "  RELRO: ${ENABLE_RELRO}")
+    MESSAGE(STATUS "  PIE: ${ENABLE_PIE}")
+    MESSAGE(STATUS "============================================================")
+ELSE()
+    MESSAGE(STATUS "Security hardening disabled (ENABLE_SECURITY_HARDENING=OFF)")
+ENDIF()
 IF(COMBINED_MONOLITH)
 	ADD_DEFINITIONS(-DCOMBINED_MONOLITH)
 	IF(BUILD_SHARED_LIBS)
@@ -3050,5 +3482,39 @@ IF(UNIX)
 ENDIF()
 ADD_TEST(NAME property_based_tests COMMAND test_property_based)
 
-	MESSAGE(STATUS "Unit tests enabled")
+	# Apply security hardening to test executables
+	APPLY_SECURITY_HARDENING(test_performance_counters)
+	APPLY_SECURITY_HARDENING(test_memory)
+	APPLY_SECURITY_HARDENING(test_filesystem_v2)
+	APPLY_SECURITY_HARDENING(test_geometry)
+	APPLY_SECURITY_HARDENING(test_security)
+	APPLY_SECURITY_HARDENING(benchmark_performance)
+	APPLY_SECURITY_HARDENING(test_property_based)
+
+	# Apply to fuzzing targets if they exist
+	IF(TARGET fuzz_bsp)
+		APPLY_SECURITY_HARDENING(fuzz_bsp)
+	ENDIF()
+	IF(TARGET fuzz_shader)
+		APPLY_SECURITY_HARDENING(fuzz_shader)
+	ENDIF()
+	IF(TARGET fuzz_pk3)
+		APPLY_SECURITY_HARDENING(fuzz_pk3)
+	ENDIF()
+	IF(TARGET fuzz_network)
+		APPLY_SECURITY_HARDENING(fuzz_network)
+	ENDIF()
+
+	# Apply to Vulkan test targets if they exist
+	IF(TARGET test_vulkan_memory)
+		APPLY_SECURITY_HARDENING(test_vulkan_memory)
+	ENDIF()
+	IF(TARGET test_vulkan_bindless)
+		APPLY_SECURITY_HARDENING(test_vulkan_bindless)
+	ENDIF()
+	IF(TARGET test_vulkan_async_compute)
+		APPLY_SECURITY_HARDENING(test_vulkan_async_compute)
+	ENDIF()
+
+	MESSAGE(STATUS "Unit tests enabled with security hardening")
 ENDIF()

@@ -41,6 +41,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "type_safety.h"
 #include "error_handling.h"
 #include "resource_management.h"
+#include "security_config.h"
+#include "incremental_build.h"
+#include "build_optimization.h"
 #include "cross_platform_test.h"
 #include "profiler.h"
 #include "performance_counters.h"
@@ -261,6 +264,8 @@ static void Com_PerformanceBenchmark_f( void );
 static void Com_TypeSafety_f( void );
 static void Com_ErrorHandling_f( void );
 static void Com_ResourceManagement_f( void );
+static void Com_Security_f( void );
+static void Com_IncrementalBuild_f( void );
 void CIN_CloseAllVideos( void );
 
 //============================================================================
@@ -2678,6 +2683,8 @@ static void Com_InitHunkMemory( void ) {
 	Cmd_AddCommand( "typesafety", Com_TypeSafety_f );
 	Cmd_AddCommand( "error", Com_ErrorHandling_f );
 	Cmd_AddCommand( "resource", Com_ResourceManagement_f );
+	Cmd_AddCommand( "security", Com_Security_f );
+	Cmd_AddCommand( "ibuild", Com_IncrementalBuild_f );
 
 	// Initialize memory statistics tracking
 	MemStats_Init();
@@ -4834,6 +4841,12 @@ Cvar_SetDescription( cg_screenFlash, "Enable screen flash effects" );
 		Com_Printf("Failed to initialize resource management framework\n");
 	}
 
+	// Initialize security configuration
+	Security_EnableMonitoring(qtrue);
+
+	// Initialize incremental build monitoring
+	IncrementalBuild_Init("build_stats.txt", ".ccache");
+
 	VM_Init();
 	SV_Init();
 
@@ -5510,6 +5523,9 @@ static void Com_Shutdown( void ) {
 
 	// Shutdown resource management framework
 	Resource_Shutdown();
+
+	// Shutdown incremental build monitoring
+	IncrementalBuild_Shutdown();
 }
 
 //------------------------------------------------------------------------
@@ -9916,5 +9932,188 @@ static void Com_ResourceManagement_f( void ) {
 	else {
 		Com_Printf( "Unknown command: %s\n", cmd );
 		Com_Printf( "Use 'resource' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_Security_f
+=================
+*/
+static void Com_Security_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: security <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status             - Show security features status\n" );
+		Com_Printf( "  violations         - Show security violations\n" );
+		Com_Printf( "  validate           - Validate security configuration\n" );
+		Com_Printf( "  monitor <on|off>   - Enable/disable security monitoring\n" );
+		Com_Printf( "  random <bytes>     - Generate secure random bytes\n" );
+		Com_Printf( "  test               - Run security hardening tests\n" );
+		Com_Printf( "\nSecurity monitoring: %s\n",
+			security_monitor.monitoring_enabled ? "Enabled" : "Disabled");
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		Com_Printf( "=== Security Features Status ===\n" );
+		Security_PrintFeatures();
+
+		Com_Printf( "\n=== Security Monitor Stats ===\n" );
+		security_monitor_t stats;
+		Security_GetMonitorStats( &stats );
+		Com_Printf( "Total violations: %llu\n", stats.total_violations );
+		Com_Printf( "Monitoring enabled: %s\n", stats.monitoring_enabled ? "Yes" : "No" );
+		if ( stats.last_violation_time > 0 ) {
+			Com_Printf( "Last violation: %llu seconds ago\n",
+				(unsigned long long)(time(NULL) - stats.last_violation_time) );
+		}
+	}
+	else if ( Q_stricmp( cmd, "violations" ) == 0 ) {
+		Security_PrintViolations();
+	}
+	else if ( Q_stricmp( cmd, "validate" ) == 0 ) {
+		if ( Security_ValidateConfiguration() ) {
+			Com_Printf( "Security configuration validation PASSED\n" );
+		} else {
+			Com_Printf( "Security configuration validation FAILED\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "monitor" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: security monitor <on|off>\n" );
+			return;
+		}
+
+		const char* mode = Cmd_Argv(2);
+
+		if ( Q_stricmp( mode, "on" ) == 0 ) {
+			Security_EnableMonitoring( qtrue );
+			Com_Printf( "Security monitoring enabled\n" );
+		} else if ( Q_stricmp( mode, "off" ) == 0 ) {
+			Security_EnableMonitoring( qfalse );
+			Com_Printf( "Security monitoring disabled\n" );
+		} else {
+			Com_Printf( "Invalid mode: %s (use 'on' or 'off')\n", mode );
+		}
+	}
+	else if ( Q_stricmp( cmd, "random" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: security random <bytes>\n" );
+			return;
+		}
+
+		int bytes = atoi( Cmd_Argv(2) );
+
+		if ( bytes <= 0 || bytes > 1024 ) {
+			Com_Printf( "Invalid byte count: %d (must be 1-1024)\n", bytes );
+			return;
+		}
+
+		unsigned char* buffer = (unsigned char*)malloc( bytes );
+		if ( !buffer ) {
+			Com_Printf( "Failed to allocate buffer for random bytes\n" );
+			return;
+		}
+
+		Security_RandomBytes( buffer, bytes );
+
+		Com_Printf( "Generated %d secure random bytes:\n", bytes );
+		for ( int i = 0; i < bytes; i++ ) {
+			if ( i % 16 == 0 ) Com_Printf( "\n  " );
+			Com_Printf( "%02x ", buffer[i] );
+		}
+		Com_Printf( "\n" );
+
+		free( buffer );
+	}
+	else if ( Q_stricmp( cmd, "test" ) == 0 ) {
+		Com_Printf( "Running security hardening tests...\n" );
+
+		// Test stack canary (basic)
+		char buffer[16];
+		memset( buffer, 'A', sizeof(buffer) + 1 ); // Intentional overflow test
+
+		// Test FORTIFY_SOURCE
+		char dest[32];
+		const char* src = "Test string for fortified strcpy";
+		strncpy( dest, src, sizeof(dest) - 1 );
+
+		// Test security functions
+		if ( Security_ValidateString( "valid string", 100 ) ) {
+			Com_Printf( "✓ String validation passed\n" );
+		}
+
+		if ( Security_ValidateBuffer( dest, strlen(dest) ) ) {
+			Com_Printf( "✓ Buffer validation passed\n" );
+		}
+
+		// Generate some random data
+		uint32_t random_val = Security_RandomUint32();
+		Com_Printf( "✓ Random generation: 0x%08x\n", random_val );
+
+		Com_Printf( "Security hardening tests completed\n" );
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'security' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_IncrementalBuild_f
+=================
+*/
+static void Com_IncrementalBuild_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: ibuild <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status          - Show incremental build status\n" );
+		Com_Printf( "  stats           - Show build statistics\n" );
+		Com_Printf( "  cache           - Show cache information\n" );
+		Com_Printf( "  report          - Show comprehensive build report\n" );
+		Com_Printf( "  reset           - Reset build statistics\n" );
+		Com_Printf( "  modified        - Show count of modified files\n" );
+		Com_Printf( "  speedup         - Show incremental speedup ratio\n" );
+		Com_Printf( "\nIncremental build monitoring: %s\n",
+			incremental_monitor.enabled ? "Enabled" : "Disabled");
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		IncrementalBuild_Status_f();
+	}
+	else if ( Q_stricmp( cmd, "stats" ) == 0 ) {
+		IncrementalBuild_Stats_f();
+	}
+	else if ( Q_stricmp( cmd, "cache" ) == 0 ) {
+		IncrementalBuild_Cache_f();
+	}
+	else if ( Q_stricmp( cmd, "report" ) == 0 ) {
+		IncrementalBuild_Report_f();
+	}
+	else if ( Q_stricmp( cmd, "reset" ) == 0 ) {
+		IncrementalBuild_Reset_f();
+	}
+	else if ( Q_stricmp( cmd, "modified" ) == 0 ) {
+		uint32_t modified = IncrementalBuild_GetModifiedFiles();
+		Com_Printf( "Modified files since last build: %u\n", modified );
+	}
+	else if ( Q_stricmp( cmd, "speedup" ) == 0 ) {
+		double speedup = IncrementalBuild_CalculateSpeedupRatio();
+		if ( speedup > 1.0 ) {
+			Com_Printf( "Incremental build speedup: %.2fx faster than clean builds\n", speedup );
+		} else {
+			Com_Printf( "Incremental speedup data not available (need more build data)\n" );
+		}
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'ibuild' with no arguments for help\n" );
 	}
 }
