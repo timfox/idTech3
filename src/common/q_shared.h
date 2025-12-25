@@ -75,12 +75,18 @@ typedef enum {
 
 // Basic type definitions needed for structs and inline functions
 typedef unsigned char byte;
-#ifdef __cplusplus  // For C++23 mode
+#ifdef __cplusplus  // For C++ mode
 typedef bool qboolean;
 #define qtrue true
 #define qfalse false
-#else  // Fallback for pure C or legacy
+#else  // For C mode - use native _Bool when available
+# if __STDC_VERSION__ >= 199901L  // C99 and later have _Bool
+typedef _Bool qboolean;
+#define qtrue ((_Bool)1)
+#define qfalse ((_Bool)0)
+# else  // Fallback for pre-C99 compilers
 typedef enum { qfalse, qtrue } qboolean;
+# endif
 #endif
 
 // Type-safe file handle

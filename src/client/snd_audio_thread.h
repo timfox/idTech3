@@ -39,14 +39,7 @@ typedef struct mixing_work_data_s {
     int num_channels;
 } mixing_work_data_t;
 
-// Function declarations
-qboolean AudioThread_IsThreadEnabled(audio_thread_type_t type);
-void AudioThread_SubmitMixingWork(void* workData);
-void AudioThread_WaitForThread(audio_thread_type_t type);
-void AudioThread_Init(void);
-void AudioThread_Shutdown(void);
-qboolean AudioThread_EnableThread(audio_thread_type_t type);
-void AudioThread_DisableThread(audio_thread_type_t type);
+// Function declarations removed - see API section below
 
 // Audio thread data
 typedef struct {

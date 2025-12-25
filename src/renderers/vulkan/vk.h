@@ -84,6 +84,19 @@ typedef enum {
 // Bloom system constants
 #define VK_NUM_BLOOM_PASSES            3
 
+// Vulkan error checking macro
+#define VK_CHECK(x) do { VkResult err = x; if (err) { ri.Error(ERR_FATAL, "Vulkan error %d at %s:%d", err, __FILE__, __LINE__); } } while (0)
+
+// Shader file watch structure for hot reloading
+typedef struct shader_file_watch_s {
+    char *filename;
+    time_t last_modified;
+    qboolean needs_reload;
+} shader_file_watch_t;
+
+// Missing function declarations
+void VK_ImGui_NotifySwapchainChanged(void);
+
 // Cubemap filter targets
 #define IRRADIANCE_TARGET              0
 #define PREFILTEREDENV_TARGET          1
@@ -250,23 +263,48 @@ typedef struct {
 #define TYPE_MULTI_TEXTURE_ADD2_FIXED_COLOR 10
 #define TYPE_MULTI_TEXTURE_ADD2 11
 #define TYPE_MULTI_TEXTURE_MUL3 14
-#define TYPE_MULTI_TEXTURE_ADD3_1_1 15
-#define TYPE_MULTI_TEXTURE_ADD3 16
-#define TYPE_BLEND2_MUL 17
-#define TYPE_BLEND2_ADD 18
-#define TYPE_BLEND2_ALPHA 19
-#define TYPE_BLEND2_ONE_MINUS_ALPHA 20
-#define TYPE_BLEND2_MIX_ALPHA 21
-#define TYPE_BLEND2_MIX_ONE_MINUS_ALPHA 22
-#define TYPE_BLEND2_DST_COLOR_SRC_ALPHA 23
-#define TYPE_BLEND3_MUL 24
-#define TYPE_BLEND3_ADD 25
-#define TYPE_BLEND3_ALPHA 26
-#define TYPE_BLEND3_ONE_MINUS_ALPHA 27
-#define TYPE_BLEND3_MIX_ONE_MINUS_ALPHA 28
-#define TYPE_BLEND3_MIX_ALPHA 29
-#define TYPE_BLEND3_DST_COLOR_SRC_ALPHA 30
-#define TYPE_GENERIC_BEGIN     31
+#define TYPE_MULTI_TEXTURE_MUL3_ENV 15
+#define TYPE_MULTI_TEXTURE_ADD3_1_1 16
+#define TYPE_MULTI_TEXTURE_ADD3 17
+#define TYPE_MULTI_TEXTURE_ADD3_1_1_ENV 18
+#define TYPE_MULTI_TEXTURE_ADD3_ENV 19
+#define TYPE_BLEND2_MUL 20
+#define TYPE_BLEND2_ADD 21
+#define TYPE_BLEND2_ALPHA 22
+#define TYPE_BLEND2_ONE_MINUS_ALPHA 23
+#define TYPE_BLEND2_MIX_ALPHA 24
+#define TYPE_BLEND2_MIX_ONE_MINUS_ALPHA 25
+#define TYPE_BLEND2_DST_COLOR_SRC_ALPHA 26
+#define TYPE_BLEND2_ONE_MINUS_ALPHA_ENV 27
+#define TYPE_BLEND2_MIX_ALPHA_ENV 28
+#define TYPE_BLEND2_MIX_ONE_MINUS_ALPHA_ENV 29
+#define TYPE_BLEND2_DST_COLOR_SRC_ALPHA_ENV 30
+#define TYPE_BLEND2_ADD_ENV 31
+#define TYPE_BLEND2_MUL_ENV 32
+#define TYPE_BLEND2_ALPHA_ENV 33
+#define TYPE_BLEND3_MUL 34
+#define TYPE_BLEND3_ADD 35
+#define TYPE_BLEND3_ALPHA 36
+#define TYPE_BLEND3_ONE_MINUS_ALPHA 37
+#define TYPE_BLEND3_MUL_ENV 38
+#define TYPE_BLEND3_ALPHA_ENV 39
+#define TYPE_BLEND3_ONE_MINUS_ALPHA_ENV 40
+#define TYPE_BLEND3_MIX_ONE_MINUS_ALPHA 41
+#define TYPE_BLEND3_MIX_ONE_MINUS_ALPHA_ENV 42
+#define TYPE_BLEND3_MIX_ALPHA 43
+#define TYPE_BLEND3_MIX_ALPHA_ENV 44
+#define TYPE_BLEND3_DST_COLOR_SRC_ALPHA 45
+#define TYPE_BLEND3_DST_COLOR_SRC_ALPHA_ENV 46
+#define TYPE_BLEND3_ADD_ENV 47
+#define TYPE_FOG_ONLY          48
+#define USE_FOG_ONLY           48
+#define TYPE_DOT               49
+#define TYPE_COLOR_RED         50
+#define TYPE_COLOR_GREEN       51
+#define TYPE_COLOR_BLUE        52
+#define TYPE_COLOR_WHITE       53
+#define TYPE_COLOR_BLACK       54
+#define TYPE_GENERIC_BEGIN     56
 #define TYPE_GENERIC_END       100
 
 // Shadow phases
@@ -282,6 +320,16 @@ typedef struct {
 #define LINE_STRIP      4
 #define POINT_LIST      5
 
+// Vulkan constants
+#define MIN_SWAPCHAIN_IMAGES_FIFO 3
+#define MIN_SWAPCHAIN_IMAGES_IMM 2
+#define MIN_SWAPCHAIN_IMAGES_MAILBOX 3
+#define MIN_SWAPCHAIN_IMAGES_FIFO_0 1
+#define MAX_SWAPCHAIN_IMAGES 8
+
+// Vulkan function pointers
+extern PFN_vkGetPhysicalDeviceProperties2KHR qvkGetPhysicalDeviceProperties2KHR;
+
 // Vulkan sampler definition structure
 typedef struct {
     VkFilter vk_mag_filter;
@@ -290,6 +338,34 @@ typedef struct {
     qboolean noAnisotropy;
     VkSamplerAddressMode address_mode;
 } Vk_Sampler_Def;
+
+// Stream cell structure for cell streaming
+typedef struct stream_cell_s {
+    int x, y, z;
+    qboolean loaded;
+    VkDeviceSize memory_usage;
+} stream_cell_t;
+
+// Atmosphere parameters structure
+typedef struct atmosphere_params_s {
+    vec3_t sun_direction;
+    vec3_t sun_intensity;
+    float rayleigh_scale_height;
+    float mie_scale_height;
+    vec3_t rayleigh_scattering;
+    vec3_t mie_scattering;
+    float mie_asymmetry;
+    float ground_albedo;
+    float atmosphere_height;
+} atmosphere_params_t;
+
+// Atmosphere preset type
+typedef enum {
+    ATMOSPHERE_PRESET_EARTH,
+    ATMOSPHERE_PRESET_MARS,
+    ATMOSPHERE_PRESET_VENUS,
+    ATMOSPHERE_PRESET_CUSTOM
+} atmosphere_preset_t;
 
 // Cubemap filter definition structure
 typedef struct {
@@ -330,6 +406,8 @@ typedef struct {
         VkShaderModule fixed[2][2][2]; // Fixed shader variants
         VkShaderModule ident1[2][2][2]; // Identity shader variants
         VkShaderModule ent[2][2][2]; // Entity shader variants
+        VkShaderModule light[2][2]; // Light shader variants
+        VkShaderModule gen0_df; // Depth fragment shader
     } frag;
 
     // Vertex shader modules (complex structure for various shader combinations)
@@ -337,6 +415,7 @@ typedef struct {
         VkShaderModule gen[2][2][2][2][2]; // Multi-dimensional array for shader variants
         VkShaderModule fixed[2][2][2][2]; // Fixed shader variants
         VkShaderModule ident1[2][2][2][2]; // Identity shader variants
+        VkShaderModule light[2]; // Light vertex shader variants
     } vert;
 } vk_modules_t;
 
@@ -540,6 +619,62 @@ typedef struct {
     struct {
         uint32_t push_size;
     } stats;
+    struct {
+        // Memory statistics
+        uint32_t allocations;
+        uint32_t frees;
+        uint32_t current_allocations;
+        VkDeviceSize total_allocated_bytes;
+        VkDeviceSize total_freed_bytes;
+    } vk_memory_stats;
+    struct {
+        // Performance statistics
+    } vk_perf_stats;
+
+    // Swapchain
+    VkSwapchainKHR swapchain;
+    VkImage *swapchain_images;
+    VkImageView *swapchain_image_views;
+    VkSemaphore *swapchain_rendering_finished;
+    uint32_t swapchain_image_count;
+    struct {
+        VkFormat format;
+        VkColorSpaceKHR colorSpace;
+    } present_format;
+    struct {
+        VkFormat format;
+        VkColorSpaceKHR colorSpace;
+    } base_format;
+    VkFormat depth_format;
+    VkDescriptorSet initSwapchainLayout;
+
+    // Profiling
+    struct {
+        qboolean enabled;
+        uint64_t frame_start_time;
+        uint64_t frame_end_time;
+        double frame_time_history[128];
+        uint32_t frame_time_history_index;
+        double frame_time_ms;
+        double frame_time_variance;
+    } profiling;
+
+    // Debug overlay
+    struct {
+        qboolean enabled;
+        VkPipeline pipeline;
+        VkDescriptorSet descriptor_set;
+        float frame_time_ms;
+        double frame_time_variance;
+    } debug_overlay;
+
+    // Hot reload
+    struct {
+        qboolean enabled;
+        shader_file_watch_t *watched_files;
+        uint32_t num_watched_files;
+        qboolean pipelines_recreated;
+    } hot_reload;
 } Vk_Instance;
 
 // Global Vulkan instance

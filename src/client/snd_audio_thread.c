@@ -46,7 +46,7 @@ static THREAD_RETURN THREAD_CALL AudioThreadWorker(void* arg) {
             timeout.tv_sec = 0;
             timeout.tv_nsec = 1000000; // 1ms
 
-            CONDITION_TIMED_WAIT(thread->work_available, thread->work_mutex, &timeout);
+            CONDITION_TIMED_WAIT(thread->work_available, thread->work_mutex, 1); // 1ms timeout
         }
         MUTEX_UNLOCK(thread->work_mutex);
 
