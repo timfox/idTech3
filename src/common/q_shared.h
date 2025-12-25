@@ -63,6 +63,47 @@ typedef char teamname_t[MAX_TEAMNAME];
 typedef char filename_t[256];
 typedef char pathname_t[1024];
 
+// Type-safe file operations with bounds checking
+typedef enum {
+    FILE_MODE_READ,
+    FILE_MODE_WRITE,
+    FILE_MODE_APPEND,
+    FILE_MODE_READ_BINARY,
+    FILE_MODE_WRITE_BINARY,
+    FILE_MODE_COUNT
+} file_mode_t;
+
+// Type-safe file handle
+typedef struct {
+    void *handle;        // Platform-specific file handle
+    file_mode_t mode;
+    pathname_t path;
+    qboolean valid;
+} file_handle_t;
+
+// Type-safe file operations
+static inline qboolean File_IsValidPath(const char *path) {
+    if (!path) return qfalse;
+    if (strlen(path) >= sizeof(pathname_t)) return qfalse;
+    // Check for path traversal attempts
+    if (strstr(path, "..") != NULL) return qfalse;
+    return qtrue;
+}
+
+static inline qboolean File_IsSafeExtension(const char *filename, const char *allowed_exts[]) {
+    if (!filename || !allowed_exts) return qfalse;
+
+    const char *ext = strrchr(filename, '.');
+    if (!ext) return qfalse;
+
+    for (int i = 0; allowed_exts[i] != NULL; i++) {
+        if (Q_stricmp(ext + 1, allowed_exts[i]) == 0) {
+            return qtrue;
+        }
+    }
+    return qfalse;
+}
+
 // Type-safe buffer operations
 typedef struct {
     char *data;
@@ -87,6 +128,44 @@ static inline qboolean Buffer_Read(buffer_t *buf, void *data, size_t size) {
 
 #define GAMENAME_FOR_MASTER		"Quake3Arena"
 #define HEARTBEAT_FOR_MASTER	"QuakeArena-1"
+
+// Type-safe networking operations
+typedef struct {
+    uint32_t ip;      // IPv4 address in network byte order
+    uint16_t port;    // Port in network byte order
+} net_address_t;
+
+typedef struct {
+    uint8_t data[1400];  // Maximum packet size
+    size_t size;
+    net_address_t from;
+    uint64_t timestamp;
+} net_packet_t;
+
+// Type-safe network operations with bounds checking
+static inline qboolean Net_IsValidAddress(const net_address_t *addr) {
+    if (!addr) return qfalse;
+    return addr->ip != 0 && addr->port != 0;
+}
+
+static inline qboolean Net_IsValidPacket(const net_packet_t *packet) {
+    if (!packet) return qfalse;
+    return packet->size > 0 && packet->size <= sizeof(packet->data);
+}
+
+static inline qboolean Net_PacketWrite(net_packet_t *packet, const void *data, size_t size) {
+    if (!packet || !data || packet->size + size > sizeof(packet->data)) return qfalse;
+    memcpy(packet->data + packet->size, data, size);
+    packet->size += size;
+    return qtrue;
+}
+
+static inline qboolean Net_PacketRead(net_packet_t *packet, void *data, size_t size) {
+    if (!packet || !data || packet->size + size > sizeof(packet->data)) return qfalse;
+    memcpy(data, packet->data + packet->size, size);
+    packet->size += size;
+    return qtrue;
+}
 
 #define DEMOEXT	"dm_"			// standard demo extension
 
@@ -1088,7 +1167,43 @@ void	Q_strncpyz( char *dest, const char *src, int destsize );
 #endif
 void	Q_strcat( char *dest, int size, const char *src );
 
-int     Q_replace( const char *str1, const char *str2, char *src, int max_len );
+// Type-safe memory operations with bounds checking
+typedef struct {
+    void *data;
+    size_t size;
+    size_t alignment;
+} memory_block_t;
+
+// Type-safe memory allocation with alignment and bounds checking
+static inline void* Q_MallocSafe(size_t size, size_t alignment) {
+    if (size == 0) return NULL;
+    if (alignment == 0) alignment = sizeof(void*); // Default alignment
+    // This would use a type-safe allocator - for now return NULL to indicate not implemented
+    return NULL;
+}
+
+static inline void Q_FreeSafe(void *ptr) {
+    if (ptr) {
+        // Type-safe deallocation would go here
+    }
+}
+
+int     Q_replace( const char *str1, const char *str2, char *src, size_t max_len );
+
+// Type-safe string operations with size_t and bounds checking
+static inline char* Q_stradd_safe(char *dst, size_t dst_size, const char *src) {
+    if (!dst || !src || dst_size == 0) return dst;
+    size_t dst_len = strlen(dst);
+    size_t src_len = strlen(src);
+    if (dst_len + src_len >= dst_size) return dst; // Would overflow
+    return Q_stradd(dst, src);
+}
+
+static inline char* Q_strncpy_safe(char *dest, size_t dest_size, const char *src, size_t src_len) {
+    if (!dest || !src || dest_size == 0) return dest;
+    size_t copy_len = (src_len < dest_size - 1) ? src_len : dest_size - 1;
+    return Q_strncpy(dest, src, copy_len);
+}
 
 char	*Q_stradd( char *dst, const char *src );
 char	*Q_strncpy( char *dest, const char *src, int destsize );
@@ -1241,6 +1356,58 @@ void FORMAT_PRINTF(1, 2) QDECL Com_Printf( const char *msg, ... );
 }
 #endif
 
+
+// Type-safe console variable operations
+typedef enum {
+    CVAR_TYPE_STRING,
+    CVAR_TYPE_INT,
+    CVAR_TYPE_FLOAT,
+    CVAR_TYPE_BOOL,
+    CVAR_TYPE_COUNT
+} cvar_type_t;
+
+// Type-safe console variable access with bounds checking
+static inline qboolean Cvar_IsValidName(const char *name) {
+    if (!name || strlen(name) == 0) return qfalse;
+    if (strlen(name) > 64) return qfalse; // Reasonable name length limit
+    // Check for valid characters
+    for (const char *c = name; *c; c++) {
+        if (!((*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') ||
+              (*c >= '0' && *c <= '9') || *c == '_')) {
+            return qfalse;
+        }
+    }
+    return qtrue;
+}
+
+static inline qboolean Cvar_IsValidValue(cvar_type_t type, const char *value) {
+    if (!value) return qfalse;
+
+    switch (type) {
+        case CVAR_TYPE_INT:
+            // Check if string represents a valid integer
+            if (value[0] == '\0') return qfalse;
+            if (value[0] == '-' || value[0] == '+') value++;
+            for (const char *c = value; *c; c++) {
+                if (*c < '0' || *c > '9') return qfalse;
+            }
+            return qtrue;
+
+        case CVAR_TYPE_FLOAT:
+            // Basic float validation (could be more sophisticated)
+            return (atof(value) != 0.0f || strcmp(value, "0") == 0 || strcmp(value, "0.0") == 0);
+
+        case CVAR_TYPE_BOOL:
+            return (Q_stricmp(value, "0") == 0 || Q_stricmp(value, "1") == 0 ||
+                    Q_stricmp(value, "true") == 0 || Q_stricmp(value, "false") == 0);
+
+        case CVAR_TYPE_STRING:
+            return strlen(value) < 1024; // Reasonable string length limit
+
+        default:
+            return qfalse;
+    }
+}
 
 /*
 ==========================================================

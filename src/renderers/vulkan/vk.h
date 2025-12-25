@@ -71,6 +71,274 @@ static inline qboolean Vk_ValidateColorAttachmentDesc(const color_attachment_des
     return Vk_ValidateImageDimensions(desc->width, desc->height, 1);
 }
 
+// Type-safe shader operations
+typedef enum {
+    SHADER_TYPE_VERTEX,
+    SHADER_TYPE_FRAGMENT,
+    SHADER_TYPE_GEOMETRY,
+    SHADER_TYPE_COMPUTE,
+    SHADER_TYPE_TESSELLATION_CONTROL,
+    SHADER_TYPE_TESSELLATION_EVALUATION,
+    SHADER_TYPE_COUNT
+} shader_type_t;
+
+// Type-safe shader compilation with validation
+typedef struct {
+    const char *source_code;
+    size_t source_length;
+    shader_type_t type;
+    const char *entry_point;
+    const char *defines[32];  // Preprocessor defines
+    uint32_t define_count;
+} shader_compile_desc_t;
+
+// Type-safe shader validation
+static inline qboolean Shader_IsValidCompileDesc(const shader_compile_desc_t *desc) {
+    if (!desc || !desc->source_code || desc->source_length == 0) return qfalse;
+    if (desc->type >= SHADER_TYPE_COUNT) return qfalse;
+    if (desc->define_count > 32) return qfalse;
+    return qtrue;
+}
+
+static inline qboolean Shader_IsValidEntryPoint(const char *entry_point) {
+    if (!entry_point) return qfalse;
+    // Basic validation - could be more sophisticated
+    return strlen(entry_point) > 0 && strlen(entry_point) < 64;
+}
+
+// Type-safe pipeline operations
+typedef enum {
+    PIPELINE_TYPE_GRAPHICS,
+    PIPELINE_TYPE_COMPUTE,
+    PIPELINE_TYPE_RAY_TRACING,
+    PIPELINE_TYPE_COUNT
+} pipeline_type_t;
+
+// Type-safe pipeline creation with validation
+typedef struct {
+    pipeline_type_t type;
+    VkPipelineCreateFlags flags;
+    uint32_t stage_count;
+    VkPipelineShaderStageCreateInfo *stages;
+    VkPipelineVertexInputStateCreateInfo *vertex_input;
+    VkPipelineInputAssemblyStateCreateInfo *input_assembly;
+    VkPipelineTessellationStateCreateInfo *tessellation;
+    VkPipelineViewportStateCreateInfo *viewport;
+    VkPipelineRasterizationStateCreateInfo *rasterization;
+    VkPipelineMultisampleStateCreateInfo *multisample;
+    VkPipelineDepthStencilStateCreateInfo *depth_stencil;
+    VkPipelineColorBlendStateCreateInfo *color_blend;
+    VkPipelineDynamicStateCreateInfo *dynamic_state;
+    VkPipelineLayout layout;
+    VkRenderPass render_pass;
+    uint32_t subpass;
+    VkPipeline base_pipeline;
+    int32_t base_pipeline_index;
+} pipeline_create_desc_t;
+
+// Type-safe pipeline validation
+static inline qboolean Pipeline_IsValidCreateDesc(const pipeline_create_desc_t *desc) {
+    if (!desc) return qfalse;
+    if (desc->type >= PIPELINE_TYPE_COUNT) return qfalse;
+    if (desc->stage_count == 0 || !desc->stages) return qfalse;
+    if (desc->type == PIPELINE_TYPE_GRAPHICS && !desc->render_pass) return qfalse;
+    return qtrue;
+}
+
+// Type-safe descriptor operations
+typedef struct {
+    VkDescriptorType type;
+    uint32_t binding;
+    uint32_t count;
+    VkShaderStageFlags stages;
+    VkSampler *immutable_samplers;
+} descriptor_binding_desc_t;
+
+// Type-safe descriptor set layout creation
+typedef struct {
+    uint32_t binding_count;
+    descriptor_binding_desc_t *bindings;
+    VkDescriptorSetLayoutCreateFlags flags;
+} descriptor_set_layout_desc_t;
+
+// Type-safe descriptor validation
+static inline qboolean Descriptor_IsValidBinding(const descriptor_binding_desc_t *binding) {
+    if (!binding) return qfalse;
+    if (binding->count == 0) return qfalse;
+    if (binding->type >= VK_DESCRIPTOR_TYPE_END_RANGE) return qfalse;
+    return qtrue;
+}
+
+static inline qboolean Descriptor_IsValidLayoutDesc(const descriptor_set_layout_desc_t *desc) {
+    if (!desc) return qfalse;
+    if (desc->binding_count > 32) return qfalse; // Reasonable limit
+    for (uint32_t i = 0; i < desc->binding_count; i++) {
+        if (!Descriptor_IsValidBinding(&desc->bindings[i])) return qfalse;
+    }
+    return qtrue;
+}
+
+// Type-safe command buffer operations
+typedef enum {
+    COMMAND_BUFFER_LEVEL_PRIMARY,
+    COMMAND_BUFFER_LEVEL_SECONDARY,
+    COMMAND_BUFFER_LEVEL_COUNT
+} command_buffer_level_t;
+
+// Type-safe command buffer state tracking
+typedef struct {
+    VkCommandBuffer buffer;
+    command_buffer_level_t level;
+    VkCommandBufferUsageFlags usage_flags;
+    qboolean is_recording;
+    qboolean has_render_pass;
+    uint32_t draw_calls;
+    uint32_t dispatch_calls;
+} command_buffer_state_t;
+
+// Type-safe command buffer operations with state tracking
+static inline qboolean CommandBuffer_IsValidState(const command_buffer_state_t *state) {
+    if (!state || !state->buffer) return qfalse;
+    if (state->level >= COMMAND_BUFFER_LEVEL_COUNT) return qfalse;
+    return qtrue;
+}
+
+static inline void CommandBuffer_RecordDrawCall(command_buffer_state_t *state) {
+    if (state && state->is_recording) {
+        state->draw_calls++;
+    }
+}
+
+static inline void CommandBuffer_RecordDispatchCall(command_buffer_state_t *state) {
+    if (state && state->is_recording) {
+        state->dispatch_calls++;
+    }
+}
+
+// Type-safe render pass operations
+typedef struct {
+    VkRenderPass render_pass;
+    uint32_t attachment_count;
+    VkClearValue *clear_values;
+    VkRect2D render_area;
+    qboolean has_depth_stencil;
+} render_pass_state_t;
+
+// Type-safe render pass validation
+static inline qboolean RenderPass_IsValidState(const render_pass_state_t *state) {
+    if (!state || !state->render_pass) return qfalse;
+    if (state->attachment_count > 16) return qfalse; // Reasonable limit
+    return qtrue;
+}
+
+// Type-safe memory barrier operations
+typedef struct {
+    VkPipelineStageFlags src_stage_mask;
+    VkPipelineStageFlags dst_stage_mask;
+    VkDependencyFlags dependency_flags;
+    uint32_t memory_barrier_count;
+    VkMemoryBarrier *memory_barriers;
+    uint32_t buffer_barrier_count;
+    VkBufferMemoryBarrier *buffer_barriers;
+    uint32_t image_barrier_count;
+    VkImageMemoryBarrier *image_barriers;
+} memory_barrier_desc_t;
+
+// Type-safe memory barrier validation
+static inline qboolean MemoryBarrier_IsValidDesc(const memory_barrier_desc_t *desc) {
+    if (!desc) return qfalse;
+    if (desc->memory_barrier_count > 8) return qfalse; // Reasonable limits
+    if (desc->buffer_barrier_count > 16) return qfalse;
+    if (desc->image_barrier_count > 16) return qfalse;
+    return qtrue;
+}
+
+// Type-safe resource management
+typedef enum {
+    RESOURCE_TYPE_BUFFER,
+    RESOURCE_TYPE_IMAGE,
+    RESOURCE_TYPE_SAMPLER,
+    RESOURCE_TYPE_COUNT
+} resource_type_t;
+
+// Type-safe resource tracking
+typedef struct {
+    resource_type_t type;
+    union {
+        VkBuffer buffer;
+        VkImage image;
+        VkSampler sampler;
+    } handle;
+    VkDeviceMemory memory;
+    VkDeviceSize size;
+    VkDeviceSize alignment;
+    const char *debug_name;
+    uint64_t allocation_time;
+    qboolean is_bound;
+} vulkan_resource_t;
+
+// Type-safe resource validation
+static inline qboolean Resource_IsValid(const vulkan_resource_t *resource) {
+    if (!resource) return qfalse;
+    if (resource->type >= RESOURCE_TYPE_COUNT) return qfalse;
+    if (resource->size == 0) return qfalse;
+    return qtrue;
+}
+
+// Type-safe texture operations
+typedef struct {
+    VkImage image;
+    VkImageView view;
+    VkSampler sampler;
+    VkFormat format;
+    VkImageLayout layout;
+    uint32_t width;
+    uint32_t height;
+    uint32_t mip_levels;
+    uint32_t layer_count;
+    VkImageUsageFlags usage;
+    VkMemoryPropertyFlags memory_properties;
+} texture_resource_t;
+
+// Type-safe texture validation
+static inline qboolean Texture_IsValid(const texture_resource_t *texture) {
+    if (!texture) return qfalse;
+    if (!texture->image || !texture->view) return qfalse;
+    if (texture->width == 0 || texture->height == 0) return qfalse;
+    if (texture->format == VK_FORMAT_UNDEFINED) return qfalse;
+    return Vk_ValidateImageDimensions(texture->width, texture->height, texture->mip_levels);
+}
+
+// Type-safe buffer operations
+typedef struct {
+    VkBuffer buffer;
+    VkDeviceMemory memory;
+    VkDeviceSize size;
+    VkDeviceSize alignment;
+    VkBufferUsageFlags usage;
+    VkMemoryPropertyFlags memory_properties;
+    void *mapped_data;
+    qboolean is_mapped;
+} buffer_resource_t;
+
+// Type-safe buffer validation
+static inline qboolean Buffer_IsValid(const buffer_resource_t *buffer) {
+    if (!buffer) return qfalse;
+    if (!buffer->buffer || buffer->size == 0) return qfalse;
+    if (buffer->is_mapped && !buffer->mapped_data) return qfalse;
+    return qtrue;
+}
+
+static inline qboolean Buffer_CanMap(const buffer_resource_t *buffer) {
+    if (!Buffer_IsValid(buffer)) return qfalse;
+    return (buffer->memory_properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0;
+}
+
+static inline VkDeviceSize Buffer_GetAlignedSize(VkDeviceSize size, VkDeviceSize alignment) {
+    if (alignment == 0) return size;
+    return (size + alignment - 1) & ~(alignment - 1);
+}
+
 typedef enum {
 	TYPE_COLOR_BLACK,
 	TYPE_COLOR_WHITE,

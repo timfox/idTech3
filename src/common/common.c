@@ -38,6 +38,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "code_quality.h"
 #include "technical_debt.h"
 #include "performance_benchmark.h"
+#include "type_safety.h"
+#include "error_handling.h"
+#include "resource_management.h"
 #include "cross_platform_test.h"
 #include "profiler.h"
 #include "performance_counters.h"
@@ -255,6 +258,9 @@ static void Com_ThreadSafetyTest_f( void );
 static void Com_CodeQuality_f( void );
 static void Com_TechnicalDebt_f( void );
 static void Com_PerformanceBenchmark_f( void );
+static void Com_TypeSafety_f( void );
+static void Com_ErrorHandling_f( void );
+static void Com_ResourceManagement_f( void );
 void CIN_CloseAllVideos( void );
 
 //============================================================================
@@ -2669,6 +2675,9 @@ static void Com_InitHunkMemory( void ) {
 	Cmd_AddCommand( "quality", Com_CodeQuality_f );
 	Cmd_AddCommand( "debt", Com_TechnicalDebt_f );
 	Cmd_AddCommand( "benchmark", Com_PerformanceBenchmark_f );
+	Cmd_AddCommand( "typesafety", Com_TypeSafety_f );
+	Cmd_AddCommand( "error", Com_ErrorHandling_f );
+	Cmd_AddCommand( "resource", Com_ResourceManagement_f );
 
 	// Initialize memory statistics tracking
 	MemStats_Init();
@@ -4810,6 +4819,21 @@ Cvar_SetDescription( cg_screenFlash, "Enable screen flash effects" );
 		Com_Printf("Failed to initialize performance benchmarking system\n");
 	}
 
+	// Initialize type safety framework
+	if (!TypeSafety_Init()) {
+		Com_Printf("Failed to initialize type safety framework\n");
+	}
+
+	// Initialize error handling framework
+	if (!Error_Init()) {
+		Com_Printf("Failed to initialize error handling framework\n");
+	}
+
+	// Initialize resource management framework
+	if (!Resource_Init()) {
+		Com_Printf("Failed to initialize resource management framework\n");
+	}
+
 	VM_Init();
 	SV_Init();
 
@@ -5477,6 +5501,15 @@ static void Com_Shutdown( void ) {
 
 	// Shutdown performance benchmarking system
 	Benchmark_Shutdown();
+
+	// Shutdown type safety framework
+	TypeSafety_Shutdown();
+
+	// Shutdown error handling framework
+	Error_Shutdown();
+
+	// Shutdown resource management framework
+	Resource_Shutdown();
 }
 
 //------------------------------------------------------------------------
@@ -9391,5 +9424,497 @@ static void Com_PerformanceBenchmark_f( void ) {
 	else {
 		Com_Printf( "Unknown command: %s\n", cmd );
 		Com_Printf( "Use 'benchmark' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_TypeSafety_f
+=================
+*/
+static void Com_TypeSafety_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: typesafety <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status           - Show type safety system status\n" );
+		Com_Printf( "  stats            - Show type safety validation statistics\n" );
+		Com_Printf( "  violations       - Report type safety violations\n" );
+		Com_Printf( "  reset            - Reset type safety statistics\n" );
+		Com_Printf( "  test             - Run type safety validation tests\n" );
+		Com_Printf( "  benchmark        - Run type safety performance benchmark\n" );
+		Com_Printf( "  audit            - Run comprehensive type safety audit\n" );
+		Com_Printf( "  validate-qshared - Validate q_shared.h type definitions\n" );
+		Com_Printf( "  validate-vulkan  - Validate Vulkan renderer type definitions\n" );
+		Com_Printf( "\nSystem Status: Initialized\n" );
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		Com_Printf( "=== Type Safety Framework Status ===\n" );
+		Com_Printf( "Initialized: Yes\n" );
+
+		type_safety_stats_t stats;
+		TypeSafety_GetStats( &stats );
+
+		Com_Printf( "\nValidation Statistics:\n" );
+		Com_Printf( "  Total validations: %llu\n", stats.total_validations );
+		Com_Printf( "  Failed validations: %llu\n", stats.failed_validations );
+		Com_Printf( "  Null pointer checks: %llu\n", stats.null_pointer_checks );
+		Com_Printf( "  Bounds checks: %llu\n", stats.bounds_checks );
+		Com_Printf( "  Range checks: %llu\n", stats.range_checks );
+		Com_Printf( "  String checks: %llu\n", stats.string_checks );
+		Com_Printf( "  Memory checks: %llu\n", stats.memory_checks );
+
+		if ( stats.total_validations > 0 ) {
+			float failure_rate = (float)stats.failed_validations / (float)stats.total_validations * 100.0f;
+			Com_Printf( "  Failure rate: %.2f%%\n", failure_rate );
+		}
+	}
+	else if ( Q_stricmp( cmd, "stats" ) == 0 ) {
+		TypeSafety_ReportViolations();
+	}
+	else if ( Q_stricmp( cmd, "violations" ) == 0 ) {
+		TypeSafety_ReportViolations();
+	}
+	else if ( Q_stricmp( cmd, "reset" ) == 0 ) {
+		TypeSafety_ResetStats();
+		Com_Printf( "Type safety statistics reset\n" );
+	}
+	else if ( Q_stricmp( cmd, "test" ) == 0 ) {
+		if ( TypeSafety_RunValidationTests() ) {
+			Com_Printf( "Type safety validation tests PASSED\n" );
+		} else {
+			Com_Printf( "Type safety validation tests FAILED\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "benchmark" ) == 0 ) {
+		if ( TypeSafety_RunPerformanceBenchmark() ) {
+			Com_Printf( "Type safety performance benchmark completed\n" );
+		} else {
+			Com_Printf( "Type safety performance benchmark failed\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "audit" ) == 0 ) {
+		if ( TypeSafety_RunFullAudit() ) {
+			Com_Printf( "Comprehensive type safety audit PASSED\n" );
+		} else {
+			Com_Printf( "Comprehensive type safety audit FAILED\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "validate-qshared" ) == 0 ) {
+		if ( TypeSafety_ValidateQSharedTypes() ) {
+			Com_Printf( "q_shared.h type validation PASSED\n" );
+		} else {
+			Com_Printf( "q_shared.h type validation FAILED\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "validate-vulkan" ) == 0 ) {
+		if ( TypeSafety_ValidateVulkanTypes() ) {
+			Com_Printf( "Vulkan renderer type validation PASSED\n" );
+		} else {
+			Com_Printf( "Vulkan renderer type validation FAILED\n" );
+		}
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'typesafety' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_ErrorHandling_f
+=================
+*/
+static void Com_ErrorHandling_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: error <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status             - Show error handling system status\n" );
+		Com_Printf( "  stats              - Show error statistics\n" );
+		Com_Printf( "  violations         - Report error violations summary\n" );
+		Com_Printf( "  reset              - Reset error statistics\n" );
+		Com_Printf( "  test <code> <message> - Generate test error\n" );
+		Com_Printf( "  log <enable|disable> - Enable/disable error logging\n" );
+		Com_Printf( "  stacktrace <enable|disable> - Enable/disable stack traces\n" );
+		Com_Printf( "  fatal-exit <enable|disable> - Enable/disable exit on fatal errors\n" );
+		Com_Printf( "  rate-limit <count> - Set max errors per second\n" );
+		Com_Printf( "  log-file <filename> - Set error log file\n" );
+		Com_Printf( "\nSystem Status: %s\n",
+			error_system.initialized ? "Initialized" : "Not initialized");
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		Com_Printf( "=== Error Handling System Status ===\n" );
+		Com_Printf( "Initialized: %s\n", error_system.initialized ? "Yes" : "No" );
+
+		if ( error_system.initialized ) {
+			Com_Printf( "Stack Traces: %s\n", error_system.stack_traces_enabled ? "Enabled" : "Disabled" );
+			Com_Printf( "Error Logging: %s\n", error_system.error_logging_enabled ? "Enabled" : "Disabled" );
+			Com_Printf( "Fatal Errors Exit: %s\n", error_system.fatal_errors_exit ? "Enabled" : "Disabled" );
+			Com_Printf( "Rate Limit: %d errors/second\n", error_system.max_errors_per_second );
+			Com_Printf( "Log File: %s\n", error_system.log_file );
+			Com_Printf( "Total Errors: %llu\n", error_system.total_errors );
+
+			const error_context_t* last_error = Error_GetLastError();
+			if ( last_error ) {
+				Com_Printf( "Last Error: %s (%s)\n",
+					last_error->message, Error_GetSeverityString(last_error->severity) );
+			}
+		}
+	}
+	else if ( Q_stricmp( cmd, "stats" ) == 0 ) {
+		Com_Printf( "=== Error Statistics ===\n" );
+
+		error_statistics_t stats;
+		Error_GetStatistics( &stats );
+
+		Com_Printf( "Total errors handled: %llu\n", stats.total_errors_handled );
+
+		Com_Printf( "\nBy Severity:\n" );
+		for ( int i = 0; i < ERROR_SEVERITY_COUNT; i++ ) {
+			uint64_t count = Error_GetCountBySeverity( (error_severity_t)i );
+			if ( count > 0 ) {
+				Com_Printf( "  %s: %llu\n", Error_GetSeverityString( (error_severity_t)i ), count );
+			}
+		}
+
+		Com_Printf( "\nBy Category:\n" );
+		for ( int i = 0; i < ERROR_CATEGORY_COUNT; i++ ) {
+			uint64_t count = Error_GetCountByCategory( (error_category_t)i );
+			if ( count > 0 ) {
+				Com_Printf( "  %s: %llu\n", Error_GetCategoryString( (error_category_t)i ), count );
+			}
+		}
+	}
+	else if ( Q_stricmp( cmd, "violations" ) == 0 ) {
+		Error_ReportViolations();
+	}
+	else if ( Q_stricmp( cmd, "reset" ) == 0 ) {
+		Error_ResetStatistics();
+		Com_Printf( "Error statistics reset\n" );
+	}
+	else if ( Q_stricmp( cmd, "test" ) == 0 ) {
+		if ( Cmd_Argc() < 4 ) {
+			Com_Printf( "Usage: error test <code> <message>\n" );
+			Com_Printf( "Example: error test 2 \"Test error message\"\n" );
+			return;
+		}
+
+		int code = atoi( Cmd_Argv(2) );
+		const char* message = Cmd_Argv(3);
+
+		if ( code < 0 || code >= ERROR_CODE_COUNT ) {
+			Com_Printf( "Invalid error code: %d (must be 0-%d)\n", code, ERROR_CODE_COUNT - 1 );
+			return;
+		}
+
+		Error_ReportSimple( (error_code_t)code, message );
+		Com_Printf( "Test error reported\n" );
+	}
+	else if ( Q_stricmp( cmd, "log" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: error log <enable|disable>\n" );
+			return;
+		}
+
+		const char* mode = Cmd_Argv(2);
+
+		if ( Q_stricmp( mode, "enable" ) == 0 ) {
+			error_system.error_logging_enabled = qtrue;
+			Com_Printf( "Error logging enabled\n" );
+		} else if ( Q_stricmp( mode, "disable" ) == 0 ) {
+			error_system.error_logging_enabled = qfalse;
+			Com_Printf( "Error logging disabled\n" );
+		} else {
+			Com_Printf( "Invalid mode: %s (use 'enable' or 'disable')\n", mode );
+		}
+	}
+	else if ( Q_stricmp( cmd, "stacktrace" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: error stacktrace <enable|disable>\n" );
+			return;
+		}
+
+		const char* mode = Cmd_Argv(2);
+
+		if ( Q_stricmp( mode, "enable" ) == 0 ) {
+			error_system.stack_traces_enabled = qtrue;
+			Com_Printf( "Stack trace capture enabled\n" );
+		} else if ( Q_stricmp( mode, "disable" ) == 0 ) {
+			error_system.stack_traces_enabled = qfalse;
+			Com_Printf( "Stack trace capture disabled\n" );
+		} else {
+			Com_Printf( "Invalid mode: %s (use 'enable' or 'disable')\n", mode );
+		}
+	}
+	else if ( Q_stricmp( cmd, "fatal-exit" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: error fatal-exit <enable|disable>\n" );
+			return;
+		}
+
+		const char* mode = Cmd_Argv(2);
+
+		if ( Q_stricmp( mode, "enable" ) == 0 ) {
+			error_system.fatal_errors_exit = qtrue;
+			Com_Printf( "Fatal error exit enabled\n" );
+		} else if ( Q_stricmp( mode, "disable" ) == 0 ) {
+			error_system.fatal_errors_exit = qfalse;
+			Com_Printf( "Fatal error exit disabled\n" );
+		} else {
+			Com_Printf( "Invalid mode: %s (use 'enable' or 'disable')\n", mode );
+		}
+	}
+	else if ( Q_stricmp( cmd, "rate-limit" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: error rate-limit <count>\n" );
+			return;
+		}
+
+		int limit = atoi( Cmd_Argv(2) );
+
+		if ( limit < 0 || limit > 10000 ) {
+			Com_Printf( "Invalid rate limit: %d (must be 0-10000)\n", limit );
+			return;
+		}
+
+		error_system.max_errors_per_second = limit;
+		Com_Printf( "Error rate limit set to %d per second\n", limit );
+	}
+	else if ( Q_stricmp( cmd, "log-file" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: error log-file <filename>\n" );
+			return;
+		}
+
+		const char* filename = Cmd_Argv(2);
+		Q_strncpyz( error_system.log_file, filename, sizeof( error_system.log_file ) );
+		Com_Printf( "Error log file set to: %s\n", filename );
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'error' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_ResourceManagement_f
+=================
+*/
+static void Com_ResourceManagement_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: resource <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status             - Show resource management status\n" );
+		Com_Printf( "  stats              - Show resource statistics\n" );
+		Com_Printf( "  scopes             - Show resource scope tree\n" );
+		Com_Printf( "  leaks              - Detect and report resource leaks\n" );
+		Com_Printf( "  cleanup            - Force cleanup of current scope\n" );
+		Com_Printf( "  create-scope <name> - Create a new resource scope\n" );
+		Com_Printf( "  enter-scope <name> - Enter an existing scope\n" );
+		Com_Printf( "  exit-scope         - Exit current scope\n" );
+		Com_Printf( "  alloc-mem <size> <name> - Allocate managed memory\n" );
+		Com_Printf( "  open-file <filename> <mode> <name> - Open managed file\n" );
+		Com_Printf( "  reset-stats        - Reset resource statistics\n" );
+		Com_Printf( "  auto-cleanup <on|off> - Enable/disable automatic cleanup\n" );
+		Com_Printf( "  leak-detection <on|off> - Enable/disable leak detection\n" );
+		Com_Printf( "\nSystem Status: %s\n",
+			resource_manager.current_scope ? "Initialized" : "Not initialized");
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		Com_Printf( "=== Resource Management Status ===\n" );
+		Com_Printf( "Initialized: %s\n", resource_manager.current_scope ? "Yes" : "No" );
+
+		if ( resource_manager.current_scope ) {
+			Com_Printf( "Current Scope: %s\n", resource_manager.current_scope->scope_name );
+			Com_Printf( "Active Scopes: %u\n", resource_manager.active_scopes );
+			Com_Printf( "Total Allocated Resources: %llu\n", resource_manager.total_allocated_resources );
+			Com_Printf( "Auto Cleanup: %s\n", resource_manager.auto_cleanup_enabled ? "Enabled" : "Disabled" );
+			Com_Printf( "Leak Detection: %s\n", resource_manager.leak_detection_enabled ? "Enabled" : "Disabled" );
+
+			if ( resource_manager.current_scope->resource_count > 0 ) {
+				Com_Printf( "\nCurrent Scope Resources (%u):\n", resource_manager.current_scope->resource_count );
+				for ( uint32_t i = 0; i < resource_manager.current_scope->resource_count; i++ ) {
+					resource_handle_t *handle = resource_manager.current_scope->resources[i];
+					if ( handle ) {
+						Com_Printf( "  %s: %s\n",
+							Resource_GetTypeString( handle->type ),
+							handle->resource_name ? handle->resource_name : "unnamed" );
+					}
+				}
+			}
+		}
+	}
+	else if ( Q_stricmp( cmd, "stats" ) == 0 ) {
+		resource_statistics_t stats;
+		Resource_GetStatistics( &stats );
+
+		Com_Printf( "=== Resource Statistics ===\n" );
+		Com_Printf( "Total Allocations: %llu\n", stats.total_allocations );
+		Com_Printf( "Total Deallocations: %llu\n", stats.total_deallocations );
+		Com_Printf( "Current Allocations: %llu\n", stats.current_allocations );
+		Com_Printf( "Peak Allocations: %llu\n", stats.peak_allocations );
+		Com_Printf( "Allocation Failures: %llu\n", stats.allocation_failures );
+		Com_Printf( "Cleanup Failures: %llu\n", stats.cleanup_failures );
+
+		Com_Printf( "\nBy Resource Type:\n" );
+		for ( int i = 0; i < RESOURCE_TYPE_COUNT; i++ ) {
+			resource_statistics_t type_stats;
+			Resource_GetStatisticsByType( (resource_type_t)i, &type_stats );
+			if ( type_stats.total_allocations > 0 ) {
+				Com_Printf( "  %s: %llu allocations\n",
+					Resource_GetTypeString( (resource_type_t)i ),
+					type_stats.total_allocations );
+			}
+		}
+	}
+	else if ( Q_stricmp( cmd, "scopes" ) == 0 ) {
+		Resource_PrintScopeTree();
+	}
+	else if ( Q_stricmp( cmd, "leaks" ) == 0 ) {
+		Resource_ReportLeaks();
+	}
+	else if ( Q_stricmp( cmd, "cleanup" ) == 0 ) {
+		if ( resource_manager.current_scope ) {
+			Resource_CleanupAllInScope( resource_manager.current_scope );
+			Com_Printf( "Cleaned up %u resources in current scope\n",
+				resource_manager.current_scope->resource_count );
+		} else {
+			Com_Printf( "No active scope to clean up\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "create-scope" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: resource create-scope <name>\n" );
+			return;
+		}
+
+		const char* scope_name = Cmd_Argv(2);
+		resource_scope_t *scope = Resource_CreateScope( scope_name );
+
+		if ( scope ) {
+			Com_Printf( "Created resource scope: %s\n", scope_name );
+		} else {
+			Com_Printf( "Failed to create resource scope\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "enter-scope" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: resource enter-scope <name>\n" );
+			return;
+		}
+
+		const char* scope_name = Cmd_Argv(2);
+
+		// Find the scope (simplified - would need proper scope registry)
+		resource_scope_t *scope = NULL;
+		if ( resource_manager.current_scope->parent_scope &&
+			 Q_stricmp( resource_manager.current_scope->parent_scope->scope_name, scope_name ) == 0 ) {
+			scope = resource_manager.current_scope->parent_scope;
+		}
+
+		if ( scope ) {
+			Resource_EnterScope( scope );
+			Com_Printf( "Entered resource scope: %s\n", scope_name );
+		} else {
+			Com_Printf( "Resource scope not found: %s\n", scope_name );
+		}
+	}
+	else if ( Q_stricmp( cmd, "exit-scope" ) == 0 ) {
+		if ( resource_manager.current_scope && resource_manager.current_scope != resource_manager.global_scope ) {
+			const char* scope_name = resource_manager.current_scope->scope_name;
+			Resource_ExitScope();
+			Com_Printf( "Exited resource scope: %s\n", scope_name );
+		} else {
+			Com_Printf( "Cannot exit global scope or no active scope\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "alloc-mem" ) == 0 ) {
+		if ( Cmd_Argc() < 4 ) {
+			Com_Printf( "Usage: resource alloc-mem <size> <name>\n" );
+			return;
+		}
+
+		size_t size = atoi( Cmd_Argv(2) );
+		const char* name = Cmd_Argv(3);
+
+		resource_handle_t *handle = Resource_AllocateMemory( size, name );
+		if ( handle ) {
+			Com_Printf( "Allocated %zu bytes of managed memory: %s\n", size, name );
+		} else {
+			Com_Printf( "Failed to allocate managed memory\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "open-file" ) == 0 ) {
+		if ( Cmd_Argc() < 5 ) {
+			Com_Printf( "Usage: resource open-file <filename> <mode> <name>\n" );
+			return;
+		}
+
+		const char* filename = Cmd_Argv(2);
+		const char* mode = Cmd_Argv(3);
+		const char* name = Cmd_Argv(4);
+
+		resource_handle_t *handle = Resource_OpenFile( filename, mode, name );
+		if ( handle ) {
+			Com_Printf( "Opened managed file '%s' as %s\n", filename, name );
+		} else {
+			Com_Printf( "Failed to open managed file: %s\n", filename );
+		}
+	}
+	else if ( Q_stricmp( cmd, "reset-stats" ) == 0 ) {
+		Resource_ResetStatistics();
+		Com_Printf( "Resource statistics reset\n" );
+	}
+	else if ( Q_stricmp( cmd, "auto-cleanup" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: resource auto-cleanup <on|off>\n" );
+			return;
+		}
+
+		const char* mode = Cmd_Argv(2);
+
+		if ( Q_stricmp( mode, "on" ) == 0 ) {
+			resource_manager.auto_cleanup_enabled = qtrue;
+			Com_Printf( "Automatic resource cleanup enabled\n" );
+		} else if ( Q_stricmp( mode, "off" ) == 0 ) {
+			resource_manager.auto_cleanup_enabled = qfalse;
+			Com_Printf( "Automatic resource cleanup disabled\n" );
+		} else {
+			Com_Printf( "Invalid mode: %s (use 'on' or 'off')\n", mode );
+		}
+	}
+	else if ( Q_stricmp( cmd, "leak-detection" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: resource leak-detection <on|off>\n" );
+			return;
+		}
+
+		const char* mode = Cmd_Argv(2);
+
+		if ( Q_stricmp( mode, "on" ) == 0 ) {
+			resource_manager.leak_detection_enabled = qtrue;
+			Com_Printf( "Resource leak detection enabled\n" );
+		} else if ( Q_stricmp( mode, "off" ) == 0 ) {
+			resource_manager.leak_detection_enabled = qfalse;
+			Com_Printf( "Resource leak detection disabled\n" );
+		} else {
+			Com_Printf( "Invalid mode: %s (use 'on' or 'off')\n", mode );
+		}
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'resource' with no arguments for help\n" );
 	}
 }
