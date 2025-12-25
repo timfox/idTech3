@@ -141,7 +141,7 @@ Draws triangle outlines for debugging
 */
 static void DrawTris( const shaderCommands_t *input ) {
 #ifdef USE_VULKAN
-	uint32_t pipeline;
+	VkPipeline pipeline;
 
 	if ( (r_showtris->integer == 1 || r_wireframe->integer == 1) && backEnd.drawConsole )
 		return;
@@ -416,7 +416,7 @@ static void ProjectDlightTexture( void ) {
 	byte	*colors;
 	byte	clipBits[SHADER_MAX_VERTEXES];
 #ifdef USE_VULKAN
-	uint32_t pipeline;
+	VkPipeline pipeline;
 	qboolean rebindIndex = qfalse;
 #else
 	float	texCoordsArray[SHADER_MAX_VERTEXES][2];
@@ -589,7 +589,7 @@ Blends a fog texture on top of everything else
 */
 #ifdef USE_VULKAN
 static void RB_FogPass( qboolean rebindIndex ) {
-	uint32_t pipeline = vk.fog_pipelines[tess.shader->fogPass - 1][tess.shader->cullType][tess.shader->polygonOffset];
+	VkPipeline pipeline = vk.fog_pipelines[tess.shader->fogPass - 1][tess.shader->cullType][tess.shader->polygonOffset];
 #ifdef USE_FOG_ONLY
 	int local_fog_stage;
 
@@ -992,7 +992,7 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 #ifdef USE_VK_PBR
 	qboolean is_pbr_surface;
 #endif
-	uint32_t pipeline;
+	VkPipeline pipeline;
 	int local_fog_stage;
 	int fog_stage;
 	qboolean pushUniform;
@@ -1286,7 +1286,7 @@ void VK_LightingPass( void )
 {
 	static uint32_t uniform_offset;
 	static int lighting_fog_stage;
-	uint32_t pipeline;
+	VkPipeline pipeline;
 	const shaderStage_t *pStage;
 	cullType_t cull;
 	int local_abs_light;

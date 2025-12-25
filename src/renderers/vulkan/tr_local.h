@@ -410,11 +410,11 @@ typedef struct {
 	uint32_t		tessFlags;
 	uint32_t		numTexBundles;
 
-	uint32_t		vk_pipeline[2]; // normal,fogged
-	uint32_t		vk_mirror_pipeline[2];
+	VkPipeline		vk_pipeline[2]; // normal,fogged
+	VkPipeline		vk_mirror_pipeline[2];
 
-	uint32_t		vk_pipeline_df; // depthFragment
-	uint32_t		vk_mirror_pipeline_df;
+	VkPipeline		vk_pipeline_df; // depthFragment
+	VkPipeline		vk_mirror_pipeline_df;
 #ifdef USE_VK_PBR
 	uint32_t		vk_pbr_flags;
 	image_t			*normalMap;
