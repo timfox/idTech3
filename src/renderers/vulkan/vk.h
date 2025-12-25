@@ -23,7 +23,24 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef VK_H
 #define VK_H
 
+#ifdef __cplusplus
+#include <ctime>
+#endif
+
 #include <vulkan/vulkan.h>
+#include "../../common/q_shared.h"  // For qboolean, vec3_t, vec4_t, byte, etc.
+
+// Vulkan filter constants (for compatibility)
+#ifndef VK_FILTER_NEAREST_MIPMAP_NEAREST
+#define VK_FILTER_NEAREST_MIPMAP_NEAREST ((VkFilter)6)
+#define VK_FILTER_LINEAR_MIPMAP_NEAREST  ((VkFilter)7)
+#define VK_FILTER_NEAREST_MIPMAP_LINEAR  ((VkFilter)8)
+#define VK_FILTER_LINEAR_MIPMAP_LINEAR   ((VkFilter)9)
+#endif
+
+// Missing Vulkan constants
+#define MAX_VK_SAMPLERS 256
+#define NUM_COMMAND_BUFFERS 2
 
 // Forward declarations
 struct cubemap_s;
@@ -296,15 +313,30 @@ typedef struct {
 #define TYPE_BLEND3_DST_COLOR_SRC_ALPHA 45
 #define TYPE_BLEND3_DST_COLOR_SRC_ALPHA_ENV 46
 #define TYPE_BLEND3_ADD_ENV 47
-#define TYPE_FOG_ONLY          48
-#define USE_FOG_ONLY           48
-#define TYPE_DOT               49
-#define TYPE_COLOR_RED         50
-#define TYPE_COLOR_GREEN       51
-#define TYPE_COLOR_BLUE        52
-#define TYPE_COLOR_WHITE       53
-#define TYPE_COLOR_BLACK       54
-#define TYPE_GENERIC_BEGIN     56
+#define TYPE_MULTI_TEXTURE_MUL2_IDENTITY 48
+#define TYPE_MULTI_TEXTURE_MUL2_IDENTITY_ENV 49
+#define TYPE_MULTI_TEXTURE_ADD2_FIXED_COLOR 50
+#define TYPE_MULTI_TEXTURE_ADD2_FIXED_COLOR_ENV 51
+#define TYPE_MULTI_TEXTURE_MUL2_FIXED_COLOR 52
+#define TYPE_MULTI_TEXTURE_MUL2_FIXED_COLOR_ENV 53
+#define TYPE_MULTI_TEXTURE_MUL2_ENV 54
+#define TYPE_MULTI_TEXTURE_ADD2_1_1_ENV 55
+#define TYPE_MULTI_TEXTURE_ADD2_ENV 56
+#define TYPE_SINGLE_TEXTURE_LIGHTING_LINEAR 57
+#define TYPE_SINGLE_TEXTURE_FIXED_COLOR_ENV 58
+#define TYPE_SINGLE_TEXTURE_ENT_COLOR_ENV 59
+#define TYPE_SINGLE_TEXTURE_ENV 60
+#define TYPE_SINGLE_TEXTURE_IDENTITY_ENV 61
+#define TYPE_MULTI_TEXTURE_ADD2_IDENTITY_ENV 62
+#define TYPE_FOG_ONLY          63
+#define USE_FOG_ONLY           63
+#define TYPE_DOT               64
+#define TYPE_COLOR_RED         65
+#define TYPE_COLOR_GREEN       66
+#define TYPE_COLOR_BLUE        67
+#define TYPE_COLOR_WHITE       68
+#define TYPE_COLOR_BLACK       69
+#define TYPE_GENERIC_BEGIN     71
 #define TYPE_GENERIC_END       100
 
 // Shadow phases
@@ -423,6 +455,13 @@ typedef struct {
 typedef struct {
     qboolean active;
     VkInstance instance;
+
+    // Bindless support
+    qboolean bindless_supported;
+    uint32_t bindless_texture_count;
+    uint32_t bindless_buffer_count;
+    uint32_t bindless_storage_buffer_count;
+    uint32_t bindless_uniform_buffer_count;
     VkPhysicalDevice physical_device;
     VkDevice device;
     VkQueue queue;
@@ -512,6 +551,8 @@ typedef struct {
     VkDescriptorSet color_descriptor;
     VkFormat color_format;
     VkDescriptorSetLayout set_layout_sampler;
+    VkDescriptorSetLayout set_layout_uniform;  // Added
+    VkDescriptorSetLayout set_layout_storage;  // Added
 
     // Bloom system
     VkPipeline bloom_extract_pipeline;
@@ -519,14 +560,34 @@ typedef struct {
     VkPipelineLayout pipeline_layout_post_process;
     VkPipelineLayout pipeline_layout_blend;
     VkDescriptorSet bloom_image_descriptor[6];
+    VkImageView bloom_image_view[6];  // Added missing bloom_image_view
 
     // BRDF LUT
     VkPipeline brdflut_pipeline;
     VkPipelineLayout pipeline_layout_brdflut;
 
+    // Post-processing descriptor sets
+    VkDescriptorSetLayout ssao_descriptor_layout;  // Added
+    VkDescriptorSet ssao_descriptor;  // Added
+    VkDescriptorSetLayout ssr_descriptor_layout;  // Added
+    VkDescriptorSet ssr_descriptor;  // Added
+    VkDescriptorSetLayout bloom_descriptor_layout;  // Added
+    VkDescriptorSet bloom_descriptor;  // Added
+    VkDescriptorSetLayout dof_descriptor_layout;  // Added
+    VkDescriptorSet dof_descriptor;  // Added
+    VkDescriptorSetLayout velocity_tiles_descriptor_layout;  // Added
+    VkDescriptorSet velocity_tiles_descriptor;  // Added
+    VkDescriptorSetLayout motion_blur_descriptor_layout;  // Added
+    VkDescriptorSet motion_blur_descriptor;  // Added
+    VkDescriptorSetLayout color_grading_descriptor_layout;  // Added
+    VkDescriptorSet color_grading_descriptor;  // Added
+    VkDescriptorSetLayout heat_distortion_descriptor_layout;  // Added
+    VkDescriptorSet heat_distortion_descriptor;  // Added
+
     // Cubemap system
     struct {
         VkImage color_image;
+        VkImageView color_image_view;  // Added missing color_image_view
         VkDescriptorSet color_descriptor;
     } cubeMap;
 
@@ -550,9 +611,26 @@ typedef struct {
     VkDescriptorSet vrsDescriptorSet;
     VkPipeline vrs_generate_compute_pipeline;
 
+    // Ray tracing
+    qboolean rayTracingSupported;  // Added
+    struct {
+        qboolean initialized;
+        VkDescriptorSetLayout raytracingDescriptorSetLayout;
+        VkDescriptorSet raytracingDescriptorSet;
+    } rt;  // Added
+
     // Compute pipeline
     VkPipelineLayout compute_pipeline_layout;
     VkDescriptorSet compute_descriptor_set;
+    VkDescriptorSetLayout compute_descriptor_set_layout;  // Added
+
+    // Storage buffer
+    struct {
+        VkBuffer buffer;  // Added missing storage buffer
+        VkDeviceMemory memory;
+        VkDescriptorSet descriptor;
+        void* buffer_ptr;  // Added missing buffer_ptr
+    } storage;
 
     // Performance profiling
     struct {
@@ -563,9 +641,13 @@ typedef struct {
     struct {
         VkSampler samplers[64];
         Vk_Sampler_Def def[64];
+        VkSampler handle[64];  // Added missing handle array
         int count;
         int filter_min;
         int filter_max;
+        float maxLod;  // Added missing maxLod
+        qboolean samplerAnisotropy;  // Added missing samplerAnisotropy
+        float maxAnisotropy;  // Added missing maxAnisotropy
     } samplers;
 
     // Capture system
@@ -587,8 +669,17 @@ typedef struct {
         VkBuffer vertex_buffer;
         VkBuffer index_buffer;
         VkDeviceMemory memory;
+        VkDeviceMemory buffer_memory;  // Added missing buffer_memory
         VkDeviceSize size;
     } vbo;
+
+    // Staging buffer
+    struct {
+        VkBuffer handle;  // Added missing staging_buffer
+        VkDeviceMemory memory;
+        VkDeviceSize size;
+        void* ptr;
+    } staging_buffer;
 
     // Additional state
     uint32_t uniform_alignment;
@@ -671,10 +762,18 @@ typedef struct {
     // Hot reload
     struct {
         qboolean enabled;
-        shader_file_watch_t *watched_files;
-        uint32_t num_watched_files;
+        shader_file_watch_t* shader_file_watch_list;  // Corrected name
+        uint32_t shader_file_watch_count;  // Corrected name
         qboolean pipelines_recreated;
     } hot_reload;
+
+    // Frame management
+    uint32_t frame_count;  // Added
+    uint32_t cmd_index;  // Added
+    vk_cmd_t tess[2];  // Added command buffer array
+
+    // Depth image
+    VkImage depth_image;  // Added
 } Vk_Instance;
 
 // Global Vulkan instance
@@ -759,5 +858,10 @@ void vk_shutdown_cache_structures_manager(void);
 // Memory tracking functions
 void vk_track_allocation(VkDeviceSize size);
 void vk_track_free(VkDeviceSize size);
+
+// Missing utility functions
+const char* vk_result_string(VkResult result);
+VkCommandBuffer begin_command_buffer(void);
+void end_command_buffer(VkCommandBuffer command_buffer, const char* function_name);
 
 #endif // VK_H

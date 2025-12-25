@@ -49,7 +49,6 @@ void Com_Printf(const char *fmt, ...) {
     vprintf(fmt, argptr);
     va_end(argptr);
 }
-#endif
 
 // Global performance counters instance
 performanceCounters_t perfCounters;
