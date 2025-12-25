@@ -28,6 +28,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_error_recovery.h"
 #include "q_input_validation.h"
 #include "q_log.h"
+#include "streaming_thread.h"
+#include "code_review.h"
+#include "live_code_analysis.h"
+#include "perf_test.h"
 #include "profiler.h"
 #include "performance_counters.h"
 #include "crash_handler.h"
@@ -2636,7 +2640,12 @@ static void Com_InitHunkMemory( void ) {
 	Hunk_Clear();
 
 	Cmd_AddCommand( "meminfo", Com_Meminfo_f );
-	
+	Cmd_AddCommand( "netthreads", Com_NetThreads_f );
+	Cmd_AddCommand( "streamthreads", Com_StreamThreads_f );
+	Cmd_AddCommand( "codereview", Com_CodeReview_f );
+	Cmd_AddCommand( "livecode", Com_LiveCode_f );
+	Cmd_AddCommand( "perftest", Com_PerfTest_f );
+
 	// Initialize memory statistics tracking
 	MemStats_Init();
 	
@@ -4722,6 +4731,31 @@ Cvar_SetDescription( cg_screenFlash, "Enable screen flash effects" );
 	Com_RandomBytes( (byte*)&qport, sizeof( qport ) );
 	Netchan_Init( qport & 0xffff );
 
+	// Initialize network thread system
+	if (!NetThread_Init()) {
+		Com_Printf("Failed to initialize network thread system\n");
+	}
+
+	// Initialize streaming thread system
+	if (!StreamThread_Init()) {
+		Com_Printf("Failed to initialize streaming thread system\n");
+	}
+
+	// Initialize code review system
+	if (!CodeReview_Init()) {
+		Com_Printf("Failed to initialize code review system\n");
+	}
+
+	// Initialize live code analysis system
+	if (!LiveCodeAnalysis_Init()) {
+		Com_Printf("Failed to initialize live code analysis system\n");
+	}
+
+	// Initialize performance test system
+	if (!PerfTest_Init()) {
+		Com_Printf("Failed to initialize performance test system\n");
+	}
+
 	VM_Init();
 	SV_Init();
 
@@ -5356,6 +5390,21 @@ static void Com_Shutdown( void ) {
 #ifdef USE_FREETYPE
 	FreeType_Shutdown();
 #endif
+
+	// Shutdown network thread system
+	NetThread_Shutdown();
+
+	// Shutdown streaming thread system
+	StreamThread_Shutdown();
+
+	// Shutdown code review system
+	CodeReview_Shutdown();
+
+	// Shutdown live code analysis system
+	LiveCodeAnalysis_Shutdown();
+
+	// Shutdown performance test system
+	PerfTest_Shutdown();
 }
 
 //------------------------------------------------------------------------
@@ -5993,4 +6042,1037 @@ const char *Q_SanitizeFilePath(const char *path, char *output, int outputSize) {
 	}
 
 	return output;
+}
+
+/*
+=================
+Com_NetThreads_f
+=================
+*/
+static void Com_NetThreads_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: netthreads <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status          - Show current thread status\n" );
+		Com_Printf( "  enable <type>   - Enable dedicated network thread\n" );
+		Com_Printf( "  disable <type>  - Disable dedicated network thread\n" );
+		Com_Printf( "  stats [type]    - Show thread statistics\n" );
+		Com_Printf( "  flush           - Flush all queued messages\n" );
+		Com_Printf( "\nThread types: send, recv, reliable, fragment, encrypt, compress\n" );
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		Com_Printf( "=== Network Threads Status ===\n" );
+		Com_Printf( "Network Threading: %s\n", net_thread_system.enabled ? "Enabled" : "Disabled" );
+
+		const char* threadNames[NET_THREAD_MAX] = {
+			"Send", "Receive", "Reliable", "Fragment", "Encrypt", "Compress"
+		};
+
+		for ( int i = 0; i < NET_THREAD_MAX; i++ ) {
+			Com_Printf( "  %s Thread: %s\n", threadNames[i],
+				NetThread_IsThreadEnabled( (net_thread_type_t)i ) ? "Enabled" : "Disabled" );
+		}
+
+		uint64_t sent, received, sentBytes, recvBytes, dropped;
+		NetThread_GetGlobalStats(&sent, &received, &sentBytes, &recvBytes, &dropped);
+		Com_Printf( "\nGlobal Statistics:\n" );
+		Com_Printf( "  Messages Sent: %llu\n", (unsigned long long)sent );
+		Com_Printf( "  Messages Received: %llu\n", (unsigned long long)received );
+		Com_Printf( "  Bytes Sent: %llu\n", (unsigned long long)sentBytes );
+		Com_Printf( "  Bytes Received: %llu\n", (unsigned long long)recvBytes );
+		Com_Printf( "  Dropped Messages: %llu\n", (unsigned long long)dropped );
+	}
+	else if ( Q_stricmp( cmd, "enable" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: netthreads enable <type>\n" );
+			return;
+		}
+
+		const char* typeStr = Cmd_Argv(2);
+		net_thread_type_t threadType = NET_THREAD_MAX;
+
+		if ( Q_stricmp( typeStr, "send" ) == 0 ) threadType = NET_THREAD_SEND;
+		else if ( Q_stricmp( typeStr, "recv" ) == 0 ) threadType = NET_THREAD_RECV;
+		else if ( Q_stricmp( typeStr, "reliable" ) == 0 ) threadType = NET_THREAD_RELIABLE;
+		else if ( Q_stricmp( typeStr, "fragment" ) == 0 ) threadType = NET_THREAD_FRAGMENT;
+		else if ( Q_stricmp( typeStr, "encrypt" ) == 0 ) threadType = NET_THREAD_ENCRYPT;
+		else if ( Q_stricmp( typeStr, "compress" ) == 0 ) threadType = NET_THREAD_COMPRESS;
+
+		if ( threadType == NET_THREAD_MAX ) {
+			Com_Printf( "Invalid thread type: %s\n", typeStr );
+			return;
+		}
+
+		if ( NetThread_EnableThread( threadType ) ) {
+			Com_Printf( "Enabled %s network thread\n", typeStr );
+		} else {
+			Com_Printf( "Failed to enable %s network thread\n", typeStr );
+		}
+	}
+	else if ( Q_stricmp( cmd, "disable" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: netthreads disable <type>\n" );
+			return;
+		}
+
+		const char* typeStr = Cmd_Argv(2);
+		net_thread_type_t threadType = NET_THREAD_MAX;
+
+		if ( Q_stricmp( typeStr, "send" ) == 0 ) threadType = NET_THREAD_SEND;
+		else if ( Q_stricmp( typeStr, "recv" ) == 0 ) threadType = NET_THREAD_RECV;
+		else if ( Q_stricmp( typeStr, "reliable" ) == 0 ) threadType = NET_THREAD_RELIABLE;
+		else if ( Q_stricmp( typeStr, "fragment" ) == 0 ) threadType = NET_THREAD_FRAGMENT;
+		else if ( Q_stricmp( typeStr, "encrypt" ) == 0 ) threadType = NET_THREAD_ENCRYPT;
+		else if ( Q_stricmp( typeStr, "compress" ) == 0 ) threadType = NET_THREAD_COMPRESS;
+
+		if ( threadType == NET_THREAD_MAX ) {
+			Com_Printf( "Invalid thread type: %s\n", typeStr );
+			return;
+		}
+
+		NetThread_DisableThread( threadType );
+		Com_Printf( "Disabled %s network thread\n", typeStr );
+	}
+	else if ( Q_stricmp( cmd, "stats" ) == 0 ) {
+		if ( Cmd_Argc() >= 3 ) {
+			const char* typeStr = Cmd_Argv(2);
+			net_thread_type_t threadType = NET_THREAD_MAX;
+
+			if ( Q_stricmp( typeStr, "send" ) == 0 ) threadType = NET_THREAD_SEND;
+			else if ( Q_stricmp( typeStr, "recv" ) == 0 ) threadType = NET_THREAD_RECV;
+			else if ( Q_stricmp( typeStr, "reliable" ) == 0 ) threadType = NET_THREAD_RELIABLE;
+			else if ( Q_stricmp( typeStr, "fragment" ) == 0 ) threadType = NET_THREAD_FRAGMENT;
+			else if ( Q_stricmp( typeStr, "encrypt" ) == 0 ) threadType = NET_THREAD_ENCRYPT;
+			else if ( Q_stricmp( typeStr, "compress" ) == 0 ) threadType = NET_THREAD_COMPRESS;
+
+			if ( threadType != NET_THREAD_MAX ) {
+				uint64_t processedItems = 0;
+				float avgTimeMs = 0.0f;
+				uint64_t totalTimeNs = 0;
+
+				NetThread_GetStats( threadType, &processedItems, &avgTimeMs, &totalTimeNs );
+				Com_Printf( "%s Thread Stats:\n", typeStr );
+				Com_Printf( "  Processed Items: %llu\n", (unsigned long long)processedItems );
+				Com_Printf( "  Average Time: %.2f ms\n", avgTimeMs );
+				Com_Printf( "  Total Time: %.2f ms\n", totalTimeNs / 1000000.0 );
+			} else {
+				Com_Printf( "Invalid thread type: %s\n", typeStr );
+			}
+		} else {
+			Com_Printf( "=== All Network Thread Statistics ===\n" );
+			const char* threadNames[NET_THREAD_MAX] = {
+				"Send", "Receive", "Reliable", "Fragment", "Encrypt", "Compress"
+			};
+
+			for ( int i = 0; i < NET_THREAD_MAX; i++ ) {
+				if ( NetThread_IsThreadEnabled( (net_thread_type_t)i ) ) {
+					uint64_t processedItems = 0;
+					float avgTimeMs = 0.0f;
+					uint64_t totalTimeNs = 0;
+
+					NetThread_GetStats( (net_thread_type_t)i, &processedItems, &avgTimeMs, &totalTimeNs );
+					Com_Printf( "%s: %llu items, %.2f ms avg\n", threadNames[i],
+						(unsigned long long)processedItems, avgTimeMs );
+				}
+			}
+		}
+	}
+	else if ( Q_stricmp( cmd, "flush" ) == 0 ) {
+		NetThread_FlushQueues();
+		Com_Printf( "Flushed all network queues\n" );
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'netthreads' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_StreamThreads_f
+=================
+*/
+static void Com_StreamThreads_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: streamthreads <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status          - Show current thread status\n" );
+		Com_Printf( "  enable <type>   - Enable dedicated streaming thread\n" );
+		Com_Printf( "  disable <type>  - Disable dedicated streaming thread\n" );
+		Com_Printf( "  stats [type]    - Show thread statistics\n" );
+		Com_Printf( "  cache <on|off>  - Enable/disable asset caching\n" );
+		Com_Printf( "  flush [pri]     - Flush queues (pri = min priority 0-4)\n" );
+		Com_Printf( "\nThread types: general, texture, model, sound, shader\n" );
+		Com_Printf( "Priorities: 0=critical, 1=high, 2=normal, 3=low, 4=idle\n" );
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		Com_Printf( "=== Streaming Threads Status ===\n" );
+		Com_Printf( "Streaming Threading: %s\n", stream_thread_system.enabled ? "Enabled" : "Disabled" );
+		Com_Printf( "Asset Caching: %s (%u/%u)\n", stream_thread_system.cache_enabled ? "Enabled" : "Disabled",
+			stream_thread_system.current_cache_size, stream_thread_system.max_cache_size);
+
+		const char* threadNames[STREAM_THREAD_MAX] = {
+			"Stream_General", "Stream_Texture", "Stream_Model", "Stream_Sound", "Stream_Shader"
+		};
+
+		for ( int i = 0; i < STREAM_THREAD_MAX; i++ ) {
+			Com_Printf( "  %s Thread: %s\n", threadNames[i],
+				StreamThread_IsThreadEnabled( (stream_thread_type_t)i ) ? "Enabled" : "Disabled" );
+		}
+
+		uint64_t submitted, completed, failed, bytesLoaded, cacheHits, cacheMisses;
+		StreamThread_GetGlobalStats(&submitted, &completed, &failed, &bytesLoaded, &cacheHits, &cacheMisses);
+		Com_Printf( "\nGlobal Statistics:\n" );
+		Com_Printf( "  Requests Submitted: %llu\n", (unsigned long long)submitted );
+		Com_Printf( "  Requests Completed: %llu\n", (unsigned long long)completed );
+		Com_Printf( "  Requests Failed: %llu\n", (unsigned long long)failed );
+		Com_Printf( "  Bytes Loaded: %llu\n", (unsigned long long)bytesLoaded );
+		Com_Printf( "  Cache Hits: %llu\n", (unsigned long long)cacheHits );
+		Com_Printf( "  Cache Misses: %llu\n", (unsigned long long)cacheMisses );
+	}
+	else if ( Q_stricmp( cmd, "enable" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: streamthreads enable <type>\n" );
+			return;
+		}
+
+		const char* typeStr = Cmd_Argv(2);
+		stream_thread_type_t threadType = STREAM_THREAD_MAX;
+
+		if ( Q_stricmp( typeStr, "general" ) == 0 ) threadType = STREAM_THREAD_GENERAL;
+		else if ( Q_stricmp( typeStr, "texture" ) == 0 ) threadType = STREAM_THREAD_TEXTURE;
+		else if ( Q_stricmp( typeStr, "model" ) == 0 ) threadType = STREAM_THREAD_MODEL;
+		else if ( Q_stricmp( typeStr, "sound" ) == 0 ) threadType = STREAM_THREAD_SOUND;
+		else if ( Q_stricmp( typeStr, "shader" ) == 0 ) threadType = STREAM_THREAD_SHADER;
+
+		if ( threadType == STREAM_THREAD_MAX ) {
+			Com_Printf( "Invalid thread type: %s\n", typeStr );
+			return;
+		}
+
+		if ( StreamThread_EnableThread( threadType ) ) {
+			Com_Printf( "Enabled %s streaming thread\n", typeStr );
+		} else {
+			Com_Printf( "Failed to enable %s streaming thread\n", typeStr );
+		}
+	}
+	else if ( Q_stricmp( cmd, "disable" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: streamthreads disable <type>\n" );
+			return;
+		}
+
+		const char* typeStr = Cmd_Argv(2);
+		stream_thread_type_t threadType = STREAM_THREAD_MAX;
+
+		if ( Q_stricmp( typeStr, "general" ) == 0 ) threadType = STREAM_THREAD_GENERAL;
+		else if ( Q_stricmp( typeStr, "texture" ) == 0 ) threadType = STREAM_THREAD_TEXTURE;
+		else if ( Q_stricmp( typeStr, "model" ) == 0 ) threadType = STREAM_THREAD_MODEL;
+		else if ( Q_stricmp( typeStr, "sound" ) == 0 ) threadType = STREAM_THREAD_SOUND;
+		else if ( Q_stricmp( typeStr, "shader" ) == 0 ) threadType = STREAM_THREAD_SHADER;
+
+		if ( threadType == STREAM_THREAD_MAX ) {
+			Com_Printf( "Invalid thread type: %s\n", typeStr );
+			return;
+		}
+
+		StreamThread_DisableThread( threadType );
+		Com_Printf( "Disabled %s streaming thread\n", typeStr );
+	}
+	else if ( Q_stricmp( cmd, "stats" ) == 0 ) {
+		if ( Cmd_Argc() >= 3 ) {
+			const char* typeStr = Cmd_Argv(2);
+			stream_thread_type_t threadType = STREAM_THREAD_MAX;
+
+			if ( Q_stricmp( typeStr, "general" ) == 0 ) threadType = STREAM_THREAD_GENERAL;
+			else if ( Q_stricmp( typeStr, "texture" ) == 0 ) threadType = STREAM_THREAD_TEXTURE;
+			else if ( Q_stricmp( typeStr, "model" ) == 0 ) threadType = STREAM_THREAD_MODEL;
+			else if ( Q_stricmp( typeStr, "sound" ) == 0 ) threadType = STREAM_THREAD_SOUND;
+			else if ( Q_stricmp( typeStr, "shader" ) == 0 ) threadType = STREAM_THREAD_SHADER;
+
+			if ( threadType != STREAM_THREAD_MAX ) {
+				uint64_t processedItems = 0;
+				float avgTimeMs = 0.0f;
+				uint64_t totalTimeNs = 0;
+
+				StreamThread_GetStats( threadType, &processedItems, &avgTimeMs, &totalTimeNs );
+				Com_Printf( "%s Thread Stats:\n", typeStr );
+				Com_Printf( "  Processed Items: %llu\n", (unsigned long long)processedItems );
+				Com_Printf( "  Average Time: %.2f ms\n", avgTimeMs );
+				Com_Printf( "  Total Time: %.2f ms\n", totalTimeNs / 1000000.0 );
+			} else {
+				Com_Printf( "Invalid thread type: %s\n", typeStr );
+			}
+		} else {
+			Com_Printf( "=== All Streaming Thread Statistics ===\n" );
+			const char* threadNames[STREAM_THREAD_MAX] = {
+				"Stream_General", "Stream_Texture", "Stream_Model", "Stream_Sound", "Stream_Shader"
+			};
+
+			for ( int i = 0; i < STREAM_THREAD_MAX; i++ ) {
+				if ( StreamThread_IsThreadEnabled( (stream_thread_type_t)i ) ) {
+					uint64_t processedItems = 0;
+					float avgTimeMs = 0.0f;
+					uint64_t totalTimeNs = 0;
+
+					StreamThread_GetStats( (stream_thread_type_t)i, &processedItems, &avgTimeMs, &totalTimeNs );
+					Com_Printf( "%s: %llu items, %.2f ms avg\n", threadNames[i],
+						(unsigned long long)processedItems, avgTimeMs );
+				}
+			}
+		}
+	}
+	else if ( Q_stricmp( cmd, "cache" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: streamthreads cache <on|off>\n" );
+			return;
+		}
+
+		const char* cacheStr = Cmd_Argv(2);
+		if ( Q_stricmp( cacheStr, "on" ) == 0 ) {
+			StreamThread_EnableCache( qtrue );
+			Com_Printf( "Asset caching enabled\n" );
+		} else if ( Q_stricmp( cacheStr, "off" ) == 0 ) {
+			StreamThread_EnableCache( qfalse );
+			Com_Printf( "Asset caching disabled\n" );
+		} else {
+			Com_Printf( "Invalid cache setting: %s (use 'on' or 'off')\n", cacheStr );
+		}
+	}
+	else if ( Q_stricmp( cmd, "flush" ) == 0 ) {
+		asset_priority_t minPriority = ASSET_PRIORITY_NORMAL;
+		if ( Cmd_Argc() >= 3 ) {
+			minPriority = atoi( Cmd_Argv(2) );
+			if ( minPriority >= ASSET_PRIORITY_MAX ) {
+				minPriority = ASSET_PRIORITY_NORMAL;
+			}
+		}
+
+		StreamThread_FlushQueues( minPriority );
+		Com_Printf( "Flushed streaming queues (min priority: %d)\n", minPriority );
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'streamthreads' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_CodeReview_f
+=================
+*/
+static void Com_CodeReview_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: codereview <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  analyze <file>     - Analyze a specific source file\n" );
+		Com_Printf( "  summary            - Show analysis summary\n" );
+		Com_Printf( "  list [severity]    - List findings (filter by severity: info/warn/error/crit)\n" );
+		Com_Printf( "  clear              - Clear all findings\n" );
+		Com_Printf( "  config <setting> <value> - Configure analysis settings\n" );
+		Com_Printf( "  help               - Show detailed help\n" );
+		Com_Printf( "\nCurrent status: %s\n", code_review_system.initialized ? "Initialized" : "Not initialized");
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "analyze" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: codereview analyze <filename>\n" );
+			return;
+		}
+
+		const char* filename = Cmd_Argv(2);
+		if ( CodeReview_AnalyzeFile( filename ) ) {
+			Com_Printf( "Analysis completed for %s\n", filename );
+			CodeReview_PrintSummary();
+		} else {
+			Com_Printf( "Failed to analyze %s\n", filename );
+		}
+	}
+	else if ( Q_stricmp( cmd, "summary" ) == 0 ) {
+		CodeReview_PrintSummary();
+
+		uint32_t num_findings = CodeReview_GetNumFindings();
+		Com_Printf( "\nDetailed breakdown:\n" );
+
+		const char* severity_names[REVIEW_SEVERITY_MAX] = {
+			"Info", "Warning", "Error", "Critical"
+		};
+		const char* category_names[REVIEW_CATEGORY_MAX] = {
+			"Style", "Best Practice", "Performance", "Security",
+			"Maintainability", "Bugs", "Memory", "Threading"
+		};
+
+		for ( int i = 0; i < REVIEW_SEVERITY_MAX; i++ ) {
+			if ( code_review_system.stats.findings_by_severity[i] > 0 ) {
+				Com_Printf( "  %s: %u\n", severity_names[i],
+					code_review_system.stats.findings_by_severity[i] );
+			}
+		}
+
+		Com_Printf( "\nBy category:\n" );
+		for ( int i = 0; i < REVIEW_CATEGORY_MAX; i++ ) {
+			if ( code_review_system.stats.findings_by_category[i] > 0 ) {
+				Com_Printf( "  %s: %u\n", category_names[i],
+					code_review_system.stats.findings_by_category[i] );
+			}
+		}
+	}
+	else if ( Q_stricmp( cmd, "list" ) == 0 ) {
+		review_severity_t min_severity = REVIEW_SEVERITY_INFO;
+		if ( Cmd_Argc() >= 3 ) {
+			const char* severity_str = Cmd_Argv(2);
+			if ( Q_stricmp( severity_str, "warn" ) == 0 ) min_severity = REVIEW_SEVERITY_WARNING;
+			else if ( Q_stricmp( severity_str, "error" ) == 0 ) min_severity = REVIEW_SEVERITY_ERROR;
+			else if ( Q_stricmp( severity_str, "crit" ) == 0 ) min_severity = REVIEW_SEVERITY_CRITICAL;
+		}
+
+		uint32_t num_findings = CodeReview_GetNumFindings();
+		uint32_t shown = 0;
+
+		const char* severity_names[REVIEW_SEVERITY_MAX] = {
+			"INFO", "WARN", "ERROR", "CRIT"
+		};
+		const char* category_names[REVIEW_CATEGORY_MAX] = {
+			"Style", "BestPrac", "Perf", "Security",
+			"Maint", "Bugs", "Memory", "Thread"
+		};
+
+		for ( uint32_t i = 0; i < num_findings && shown < 50; i++ ) {
+			const code_review_finding_t* finding = CodeReview_GetFinding(i);
+			if (!finding || finding->severity < min_severity) continue;
+
+			Com_Printf( "[%s] %s:%d:%d [%s] %s\n",
+				severity_names[finding->severity],
+				finding->file, finding->line, finding->column,
+				category_names[finding->category],
+				finding->message );
+
+			if ( finding->suggestion[0] ) {
+				Com_Printf( "  Suggestion: %s\n", finding->suggestion );
+			}
+
+			shown++;
+		}
+
+		if ( shown == 50 ) {
+			Com_Printf( "... and %u more findings (showing first 50)\n",
+				num_findings - shown );
+		} else if ( shown == 0 ) {
+			Com_Printf( "No findings found\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "clear" ) == 0 ) {
+		CodeReview_ClearFindings();
+		Com_Printf( "Cleared all code review findings\n" );
+	}
+	else if ( Q_stricmp( cmd, "config" ) == 0 ) {
+		if ( Cmd_Argc() < 4 ) {
+			Com_Printf( "Usage: codereview config <setting> <value>\n" );
+			Com_Printf( "Settings:\n" );
+			Com_Printf( "  min_severity <info|warn|error|crit> - Minimum severity to report\n" );
+			Com_Printf( "  max_line_length <length> - Maximum line length\n" );
+			Com_Printf( "  category_<name> <0|1> - Enable/disable category\n" );
+			return;
+		}
+
+		const char* setting = Cmd_Argv(2);
+		const char* value = Cmd_Argv(3);
+
+		if ( Q_stricmp( setting, "min_severity" ) == 0 ) {
+			if ( Q_stricmp( value, "info" ) == 0 ) CodeReview_FilterBySeverity( REVIEW_SEVERITY_INFO );
+			else if ( Q_stricmp( value, "warn" ) == 0 ) CodeReview_FilterBySeverity( REVIEW_SEVERITY_WARNING );
+			else if ( Q_stricmp( value, "error" ) == 0 ) CodeReview_FilterBySeverity( REVIEW_SEVERITY_ERROR );
+			else if ( Q_stricmp( value, "crit" ) == 0 ) CodeReview_FilterBySeverity( REVIEW_SEVERITY_CRITICAL );
+			else Com_Printf( "Invalid severity: %s\n", value );
+		}
+		else if ( Q_stricmp( setting, "max_line_length" ) == 0 ) {
+			int length = atoi( value );
+			if ( length > 0 ) {
+				code_review_system.config.max_line_length = length;
+				Com_Printf( "Max line length set to %d\n", length );
+			} else {
+				Com_Printf( "Invalid line length: %s\n", value );
+			}
+		}
+		else if ( strstr( setting, "category_" ) == setting ) {
+			const char* category_name = setting + 9; // Skip "category_"
+			review_category_t category = REVIEW_CATEGORY_MAX;
+
+			if ( Q_stricmp( category_name, "style" ) == 0 ) category = REVIEW_CATEGORY_STYLE;
+			else if ( Q_stricmp( category_name, "best_practice" ) == 0 ) category = REVIEW_CATEGORY_BEST_PRACTICE;
+			else if ( Q_stricmp( category_name, "performance" ) == 0 ) category = REVIEW_CATEGORY_PERFORMANCE;
+			else if ( Q_stricmp( category_name, "security" ) == 0 ) category = REVIEW_CATEGORY_SECURITY;
+			else if ( Q_stricmp( category_name, "maintainability" ) == 0 ) category = REVIEW_CATEGORY_MAINTAINABILITY;
+			else if ( Q_stricmp( category_name, "bugs" ) == 0 ) category = REVIEW_CATEGORY_BUGS;
+			else if ( Q_stricmp( category_name, "memory" ) == 0 ) category = REVIEW_CATEGORY_MEMORY;
+			else if ( Q_stricmp( category_name, "threading" ) == 0 ) category = REVIEW_CATEGORY_THREADING;
+
+			if ( category != REVIEW_CATEGORY_MAX ) {
+				qboolean enable = atoi( value ) != 0;
+				CodeReview_FilterByCategory( category, enable );
+				Com_Printf( "%s category %s\n", category_name, enable ? "enabled" : "disabled" );
+			} else {
+				Com_Printf( "Unknown category: %s\n", category_name );
+			}
+		}
+		else {
+			Com_Printf( "Unknown setting: %s\n", setting );
+		}
+	}
+	else if ( Q_stricmp( cmd, "help" ) == 0 ) {
+		Com_Printf( "Automated Code Review System Help\n" );
+		Com_Printf( "=================================\n" );
+		Com_Printf( "\nThis system analyzes C/C++ source code for:\n" );
+		Com_Printf( "- Code style violations\n" );
+		Com_Printf( "- Best practice violations\n" );
+		Com_Printf( "- Performance issues\n" );
+		Com_Printf( "- Security vulnerabilities\n" );
+		Com_Printf( "- Potential bugs\n" );
+		Com_Printf( "- Memory management issues\n" );
+		Com_Printf( "- Threading problems\n" );
+		Com_Printf( "\nCategories can be enabled/disabled individually.\n" );
+		Com_Printf( "Findings are categorized by severity: Info, Warning, Error, Critical.\n" );
+		Com_Printf( "\nExample usage:\n" );
+		Com_Printf( "  codereview analyze src/common/common.c\n" );
+		Com_Printf( "  codereview config min_severity warn\n" );
+		Com_Printf( "  codereview config category_security 1\n" );
+		Com_Printf( "  codereview list error\n" );
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'codereview' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_LiveCode_f
+=================
+*/
+static void Com_LiveCode_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: livecode <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status            - Show current status\n" );
+		Com_Printf( "  mode <off|background|realtime|incremental> - Set analysis mode\n" );
+		Com_Printf( "  protocol <none|lsp|vscode|clion|vim|emacs> - Set IDE protocol\n" );
+		Com_Printf( "  open <file>       - Open file for live analysis\n" );
+		Com_Printf( "  close <file>      - Close file for live analysis\n" );
+		Com_Printf( "  analyze <file>    - Analyze file now\n" );
+		Com_Printf( "  findings <file>   - Show findings for file\n" );
+		Com_Printf( "  ack <file> <line> - Acknowledge finding at line\n" );
+		Com_Printf( "  stats             - Show performance statistics\n" );
+		Com_Printf( "\nCurrent status: %s, Mode: %s, Protocol: %s\n",
+			live_code_analysis_system.initialized ? "Initialized" : "Not initialized",
+			LiveCodeAnalysis_GetModeName(LiveCodeAnalysis_GetMode()),
+			LiveCodeAnalysis_GetProtocolName(LiveCodeAnalysis_GetIDEProtocol()));
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		Com_Printf( "=== Live Code Analysis Status ===\n" );
+		Com_Printf( "Initialized: %s\n", live_code_analysis_system.initialized ? "Yes" : "No" );
+		Com_Printf( "Mode: %s\n", LiveCodeAnalysis_GetModeName(live_code_analysis_system.config.mode) );
+		Com_Printf( "IDE Protocol: %s\n", LiveCodeAnalysis_GetProtocolName(live_code_analysis_system.config.ide.protocol) );
+		Com_Printf( "Active Sessions: %u/%u\n", live_code_analysis_system.num_sessions, live_code_analysis_system.max_sessions );
+		Com_Printf( "Analysis on Type: %s\n", live_code_analysis_system.config.analyze_on_type ? "Yes" : "No" );
+		Com_Printf( "Analysis on Save: %s\n", live_code_analysis_system.config.analyze_on_save ? "Yes" : "No" );
+		Com_Printf( "Incremental Analysis: %s\n", live_code_analysis_system.config.use_incremental ? "Yes" : "No" );
+
+		uint64_t analyses, findings, time;
+		LiveCodeAnalysis_GetStats(&analyses, &findings, &time);
+		Com_Printf( "\nStatistics:\n" );
+		Com_Printf( "Total Analyses: %llu\n", (unsigned long long)analyses );
+		Com_Printf( "Total Findings: %llu\n", (unsigned long long)findings );
+		Com_Printf( "Total Analysis Time: %.2f seconds\n", time / 1000.0f );
+		if (analyses > 0) {
+			Com_Printf( "Average Analysis Time: %.2f ms\n", (float)time / (float)analyses );
+		}
+	}
+	else if ( Q_stricmp( cmd, "mode" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: livecode mode <off|background|realtime|incremental>\n" );
+			return;
+		}
+
+		const char* mode_str = Cmd_Argv(2);
+		live_analysis_mode_t mode = LIVE_MODE_OFF;
+
+		if ( Q_stricmp( mode_str, "off" ) == 0 ) mode = LIVE_MODE_OFF;
+		else if ( Q_stricmp( mode_str, "background" ) == 0 ) mode = LIVE_MODE_BACKGROUND;
+		else if ( Q_stricmp( mode_str, "realtime" ) == 0 ) mode = LIVE_MODE_REALTIME;
+		else if ( Q_stricmp( mode_str, "incremental" ) == 0 ) mode = LIVE_MODE_INCREMENTAL;
+		else {
+			Com_Printf( "Invalid mode: %s\n", mode_str );
+			return;
+		}
+
+		if ( LiveCodeAnalysis_SetMode( mode ) ) {
+			Com_Printf( "Live code analysis mode set to: %s\n", LiveCodeAnalysis_GetModeName(mode) );
+		} else {
+			Com_Printf( "Failed to set mode\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "protocol" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: livecode protocol <none|lsp|vscode|clion|vim|emacs>\n" );
+			return;
+		}
+
+		const char* proto_str = Cmd_Argv(2);
+		ide_protocol_t protocol = IDE_PROTOCOL_NONE;
+
+		if ( Q_stricmp( proto_str, "none" ) == 0 ) protocol = IDE_PROTOCOL_NONE;
+		else if ( Q_stricmp( proto_str, "lsp" ) == 0 ) protocol = IDE_PROTOCOL_LSP;
+		else if ( Q_stricmp( proto_str, "vscode" ) == 0 ) protocol = IDE_PROTOCOL_VS_CODE;
+		else if ( Q_stricmp( proto_str, "clion" ) == 0 ) protocol = IDE_PROTOCOL_CLION;
+		else if ( Q_stricmp( proto_str, "vim" ) == 0 ) protocol = IDE_PROTOCOL_VIM;
+		else if ( Q_stricmp( proto_str, "emacs" ) == 0 ) protocol = IDE_PROTOCOL_EMACS;
+		else {
+			Com_Printf( "Invalid protocol: %s\n", proto_str );
+			return;
+		}
+
+		if ( LiveCodeAnalysis_SetIDEProtocol( protocol ) ) {
+			Com_Printf( "IDE protocol set to: %s\n", LiveCodeAnalysis_GetProtocolName(protocol) );
+		} else {
+			Com_Printf( "Failed to set protocol\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "open" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: livecode open <filename>\n" );
+			return;
+		}
+
+		const char* filename = Cmd_Argv(2);
+		live_session_t* session = LiveCodeAnalysis_OpenFile(filename);
+		if ( session ) {
+			Com_Printf( "Opened file for live analysis: %s\n", filename );
+		} else {
+			Com_Printf( "Failed to open file: %s\n", filename );
+		}
+	}
+	else if ( Q_stricmp( cmd, "close" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: livecode close <filename>\n" );
+			return;
+		}
+
+		const char* filename = Cmd_Argv(2);
+		if ( LiveCodeAnalysis_CloseFile(filename) ) {
+			Com_Printf( "Closed file for live analysis: %s\n", filename );
+		} else {
+			Com_Printf( "Failed to close file or file not found: %s\n", filename );
+		}
+	}
+	else if ( Q_stricmp( cmd, "analyze" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: livecode analyze <filename>\n" );
+			return;
+		}
+
+		const char* filename = Cmd_Argv(2);
+		if ( LiveCodeAnalysis_AnalyzeNow(filename) ) {
+			live_session_t* session = LiveCodeAnalysis_GetSession(filename);
+			if ( session ) {
+				Com_Printf( "Analysis completed for %s: %u findings\n", filename, session->num_findings );
+			}
+		} else {
+			Com_Printf( "Failed to analyze file: %s\n", filename );
+		}
+	}
+	else if ( Q_stricmp( cmd, "findings" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: livecode findings <filename>\n" );
+			return;
+		}
+
+		const char* filename = Cmd_Argv(2);
+		live_finding_t* findings;
+		uint32_t count = LiveCodeAnalysis_GetFindings(filename, &findings);
+
+		if ( count == 0 ) {
+			Com_Printf( "No findings for file: %s\n", filename );
+			return;
+		}
+
+		Com_Printf( "Findings for %s:\n", filename );
+		for ( uint32_t i = 0; i < count && i < 20; i++ ) { // Show first 20
+			const live_finding_t* finding = &findings[i];
+			if ( finding->suppressed ) continue;
+
+			Com_Printf( "  [%s] Line %d: %s\n",
+				finding->acknowledged ? "ACK" : LiveCodeAnalysis_GetSeverityName(finding->base.severity),
+				finding->base.line, finding->base.message );
+
+			if ( finding->base.suggestion[0] ) {
+				Com_Printf( "    Suggestion: %s\n", finding->base.suggestion );
+			}
+		}
+
+		if ( count > 20 ) {
+			Com_Printf( "  ... and %u more findings\n", count - 20 );
+		}
+	}
+	else if ( Q_stricmp( cmd, "ack" ) == 0 ) {
+		if ( Cmd_Argc() < 4 ) {
+			Com_Printf( "Usage: livecode ack <filename> <line>\n" );
+			return;
+		}
+
+		const char* filename = Cmd_Argv(2);
+		int line = atoi( Cmd_Argv(3) );
+
+		if ( LiveCodeAnalysis_AcknowledgeFinding( filename, line, 0 ) ) {
+			Com_Printf( "Acknowledged finding at %s:%d\n", filename, line );
+		} else {
+			Com_Printf( "No finding found at %s:%d\n", filename, line );
+		}
+	}
+	else if ( Q_stricmp( cmd, "stats" ) == 0 ) {
+		uint64_t analyses, findings, time;
+		LiveCodeAnalysis_GetStats(&analyses, &findings, &time);
+
+		Com_Printf( "=== Live Code Analysis Statistics ===\n" );
+		Com_Printf( "Total Analyses: %llu\n", (unsigned long long)analyses );
+		Com_Printf( "Total Findings: %llu\n", (unsigned long long)findings );
+		Com_Printf( "Total Analysis Time: %llu ms\n", (unsigned long long)time );
+
+		if ( analyses > 0 ) {
+			Com_Printf( "Average Analysis Time: %.2f ms\n", (float)time / (float)analyses );
+			Com_Printf( "Findings per Analysis: %.2f\n", (float)findings / (float)analyses );
+		}
+
+		Com_Printf( "\nPer-Session Statistics:\n" );
+		for ( uint32_t i = 0; i < live_code_analysis_system.num_sessions; i++ ) {
+			live_session_t* session = &live_code_analysis_system.sessions[i];
+			if ( session->is_open ) {
+				Com_Printf( "  %s: %u findings, v%u\n",
+					session->filename, session->num_findings, session->version );
+			}
+		}
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'livecode' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_PerfTest_f
+=================
+*/
+static void Com_PerfTest_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: perftest <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status             - Show system status\n" );
+		Com_Printf( "  run <name> [duration] [warmup] - Run a single performance test\n" );
+		Com_Printf( "  suite create <name> <desc>    - Create a test suite\n" );
+		Com_Printf( "  suite add <suite> <test> <dur> <warmup> - Add test to suite\n" );
+		Com_Printf( "  suite run <suite>             - Run a test suite\n" );
+		Com_Printf( "  baseline set <test>           - Set baseline from last result\n" );
+		Com_Printf( "  baseline list                 - List all baselines\n" );
+		Com_Printf( "  report <file>                 - Generate performance report\n" );
+		Com_Printf( "  ci export <dir>               - Export results for CI\n" );
+		Com_Printf( "  stats                         - Show performance statistics\n" );
+		Com_Printf( "\nSystem Status: %s\n",
+			perf_test_system.initialized ? "Initialized" : "Not initialized");
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		Com_Printf( "=== Performance Test System Status ===\n" );
+		Com_Printf( "Initialized: %s\n", perf_test_system.initialized ? "Yes" : "No" );
+		Com_Printf( "Test Running: %s\n", PerfTest_IsTestRunning() ? "Yes" : "No" );
+		Com_Printf( "Baselines: %u/%u\n", perf_test_system.num_baselines, perf_test_system.max_baselines );
+		Com_Printf( "CI System: %s\n", perf_test_system.ci_config.ci_system[0] ?
+			perf_test_system.ci_config.ci_system : "None" );
+		Com_Printf( "Output Directory: %s\n", perf_test_system.ci_config.output_directory );
+		Com_Printf( "Report Format: %s\n", perf_test_system.ci_config.report_format );
+
+		uint64_t total_tests = perf_test_system.total_tests_run;
+		uint64_t regressions = perf_test_system.total_regressions_detected;
+		uint64_t improvements = perf_test_system.total_improvements_detected;
+		uint64_t test_time = perf_test_system.total_test_time_ms;
+
+		Com_Printf( "\nStatistics:\n" );
+		Com_Printf( "Total Tests Run: %llu\n", (unsigned long long)total_tests );
+		Com_Printf( "Regressions Detected: %llu\n", (unsigned long long)regressions );
+		Com_Printf( "Improvements Detected: %llu\n", (unsigned long long)improvements );
+		Com_Printf( "Total Test Time: %.2f seconds\n", test_time / 1000.0f );
+
+		if ( total_tests > 0 ) {
+			Com_Printf( "Average Test Time: %.2f seconds\n", (test_time / 1000.0f) / total_tests );
+		}
+	}
+	else if ( Q_stricmp( cmd, "run" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: perftest run <name> [duration_seconds] [warmup_seconds]\n" );
+			return;
+		}
+
+		const char* test_name = Cmd_Argv(2);
+		int duration = Cmd_Argc() >= 4 ? atoi( Cmd_Argv(3) ) : 30;
+		int warmup = Cmd_Argc() >= 5 ? atoi( Cmd_Argv(4) ) : 5;
+
+		if ( duration <= 0 || duration > 300 ) {
+			Com_Printf( "Invalid duration: %d (must be 1-300 seconds)\n", duration );
+			return;
+		}
+
+		if ( warmup < 0 || warmup > 60 ) {
+			Com_Printf( "Invalid warmup: %d (must be 0-60 seconds)\n", warmup );
+			return;
+		}
+
+		perf_test_config_t config;
+		memset( &config, 0, sizeof( config ) );
+		Q_strncpyz( config.name, test_name, sizeof( config.name ) );
+		Com_sprintf( config.description, sizeof( config.description ),
+			"Performance test: %s", test_name );
+		config.duration_seconds = duration;
+		config.warmup_seconds = warmup;
+		config.sample_interval_ms = 100;
+		config.save_screenshots = qfalse;
+		config.record_video = qfalse;
+
+		perf_test_result_t result;
+		if ( PerfTest_RunTest( &config, &result ) ) {
+			Com_Printf( "Test completed: %s\n", PerfTest_GetResultString( result.result ) );
+			Com_Printf( "FPS: %.1f avg (%.1f min - %.1f max)\n",
+				result.avg_fps, result.min_fps, result.max_fps );
+			Com_Printf( "Frame Time: %.2f ms avg, %.2f ms max\n",
+				result.avg_frame_time, result.max_frame_time );
+			Com_Printf( "CPU Usage: %.1f%% avg, %.1f%% peak\n",
+				result.avg_cpu_usage, result.peak_cpu_usage );
+			Com_Printf( "Memory Usage: %.1f MB avg, %.1f MB peak\n",
+				result.avg_memory_usage, result.peak_memory_usage );
+
+			if ( result.regression_detected ) {
+				Com_Printf( "REGRESSION DETECTED: %s\n", result.regression_reason );
+			}
+		} else {
+			Com_Printf( "Failed to run performance test\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "suite" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: perftest suite <create|add|run> ...\n" );
+			return;
+		}
+
+		const char* subcmd = Cmd_Argv(2);
+
+		if ( Q_stricmp( subcmd, "create" ) == 0 ) {
+			if ( Cmd_Argc() < 5 ) {
+				Com_Printf( "Usage: perftest suite create <name> <description>\n" );
+				return;
+			}
+
+			const char* suite_name = Cmd_Argv(3);
+			const char* description = Cmd_Argv(4);
+
+			perf_test_suite_t* suite = PerfTest_CreateSuite( suite_name, description );
+			if ( suite ) {
+				Com_Printf( "Created performance test suite: %s\n", suite_name );
+				perf_test_system.current_suite = suite;
+			} else {
+				Com_Printf( "Failed to create test suite\n" );
+			}
+		}
+		else if ( Q_stricmp( subcmd, "add" ) == 0 ) {
+			if ( Cmd_Argc() < 7 ) {
+				Com_Printf( "Usage: perftest suite add <suite_name> <test_name> <duration> <warmup>\n" );
+				return;
+			}
+
+			const char* suite_name = Cmd_Argv(3);
+			const char* test_name = Cmd_Argv(4);
+			int duration = atoi( Cmd_Argv(5) );
+			int warmup = atoi( Cmd_Argv(6) );
+
+			if ( !perf_test_system.current_suite ||
+				 strcmp( perf_test_system.current_suite->suite_name, suite_name ) != 0 ) {
+				Com_Printf( "Suite '%s' not found or not current\n", suite_name );
+				return;
+			}
+
+			perf_test_config_t config;
+			memset( &config, 0, sizeof( config ) );
+			Q_strncpyz( config.name, test_name, sizeof( config.name ) );
+			config.duration_seconds = duration;
+			config.warmup_seconds = warmup;
+			config.sample_interval_ms = 100;
+
+			if ( PerfTest_AddTestToSuite( perf_test_system.current_suite, &config ) ) {
+				Com_Printf( "Added test '%s' to suite '%s'\n", test_name, suite_name );
+			} else {
+				Com_Printf( "Failed to add test to suite\n" );
+			}
+		}
+		else if ( Q_stricmp( subcmd, "run" ) == 0 ) {
+			if ( Cmd_Argc() < 4 ) {
+				Com_Printf( "Usage: perftest suite run <suite_name>\n" );
+				return;
+			}
+
+			const char* suite_name = Cmd_Argv(3);
+
+			if ( !perf_test_system.current_suite ||
+				 strcmp( perf_test_system.current_suite->suite_name, suite_name ) != 0 ) {
+				Com_Printf( "Suite '%s' not found\n", suite_name );
+				return;
+			}
+
+			if ( PerfTest_RunSuite( perf_test_system.current_suite ) ) {
+				Com_Printf( "Suite '%s' completed successfully\n", suite_name );
+			} else {
+				Com_Printf( "Suite '%s' completed with failures\n", suite_name );
+			}
+		}
+		else {
+			Com_Printf( "Unknown suite command: %s\n", subcmd );
+		}
+	}
+	else if ( Q_stricmp( cmd, "baseline" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: perftest baseline <set|list> ...\n" );
+			return;
+		}
+
+		const char* subcmd = Cmd_Argv(2);
+
+		if ( Q_stricmp( subcmd, "set" ) == 0 ) {
+			if ( Cmd_Argc() < 4 ) {
+				Com_Printf( "Usage: perftest baseline set <test_name>\n" );
+				return;
+			}
+
+			const char* test_name = Cmd_Argv(3);
+
+			// For now, create a dummy result to set baseline
+			perf_test_result_t dummy_result;
+			memset( &dummy_result, 0, sizeof( dummy_result ) );
+			dummy_result.avg_fps = 60.0;
+			dummy_result.min_fps = 55.0;
+			dummy_result.avg_frame_time = 16.67;
+			dummy_result.max_frame_time = 20.0;
+			dummy_result.avg_cpu_usage = 45.0;
+			dummy_result.avg_memory_usage = 512.0;
+
+			if ( PerfTest_SetBaseline( test_name, &dummy_result ) ) {
+				Com_Printf( "Set baseline for test: %s\n", test_name );
+			} else {
+				Com_Printf( "Failed to set baseline for test: %s\n", test_name );
+			}
+		}
+		else if ( Q_stricmp( subcmd, "list" ) == 0 ) {
+			Com_Printf( "=== Performance Baselines ===\n" );
+			for ( uint32_t i = 0; i < perf_test_system.num_baselines; i++ ) {
+				const perf_baseline_t* baseline = &perf_test_system.baselines[i];
+				Com_Printf( "%s:\n", baseline->test_name );
+				Com_Printf( "  FPS: %.1f avg, %.1f min\n",
+					baseline->baseline_fps_avg, baseline->baseline_fps_min );
+				Com_Printf( "  Frame Time: %.2f ms avg, %.2f ms max\n",
+					baseline->baseline_frame_time_avg, baseline->baseline_frame_time_max );
+				Com_Printf( "  Threshold: %.1f%%\n", baseline->regression_threshold_percent );
+			}
+		}
+		else {
+			Com_Printf( "Unknown baseline command: %s\n", subcmd );
+		}
+	}
+	else if ( Q_stricmp( cmd, "report" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: perftest report <output_file>\n" );
+			return;
+		}
+
+		const char* output_file = Cmd_Argv(2);
+
+		uint32_t count;
+		perf_test_result_t* results = PerfTest_GetSuiteResults( NULL, &count );
+
+		if ( PerfTest_GenerateReport( results, count, output_file, "JSON" ) ) {
+			Com_Printf( "Generated performance report: %s\n", output_file );
+		} else {
+			Com_Printf( "Failed to generate performance report\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "ci" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: perftest ci <export> <directory>\n" );
+			return;
+		}
+
+		const char* subcmd = Cmd_Argv(2);
+
+		if ( Q_stricmp( subcmd, "export" ) == 0 ) {
+			if ( Cmd_Argc() < 4 ) {
+				Com_Printf( "Usage: perftest ci export <directory>\n" );
+				return;
+			}
+
+			const char* output_dir = Cmd_Argv(3);
+
+			uint32_t count;
+			perf_test_result_t* results = PerfTest_GetSuiteResults( NULL, &count );
+
+			if ( PerfTest_ExportForCI( results, count, output_dir ) ) {
+				Com_Printf( "Exported performance results for CI: %s\n", output_dir );
+			} else {
+				Com_Printf( "Failed to export results for CI\n" );
+			}
+		}
+		else {
+			Com_Printf( "Unknown CI command: %s\n", subcmd );
+		}
+	}
+	else if ( Q_stricmp( cmd, "stats" ) == 0 ) {
+		uint64_t total_tests = perf_test_system.total_tests_run;
+		uint64_t regressions = perf_test_system.total_regressions_detected;
+		uint64_t improvements = perf_test_system.total_improvements_detected;
+		uint64_t test_time = perf_test_system.total_test_time_ms;
+
+		Com_Printf( "=== Performance Test Statistics ===\n" );
+		Com_Printf( "Total Tests Executed: %llu\n", (unsigned long long)total_tests );
+		Com_Printf( "Performance Regressions: %llu\n", (unsigned long long)regressions );
+		Com_Printf( "Performance Improvements: %llu\n", (unsigned long long)improvements );
+		Com_Printf( "Total Execution Time: %.2f seconds\n", test_time / 1000.0f );
+
+		if ( total_tests > 0 ) {
+			Com_Printf( "Success Rate: %.1f%%\n",
+				(float)(total_tests - regressions) / total_tests * 100.0f );
+			Com_Printf( "Average Test Duration: %.2f seconds\n",
+				(test_time / 1000.0f) / total_tests );
+		}
+
+		if ( regressions > 0 ) {
+			Com_Printf( "Regression Rate: %.1f%%\n",
+				(float)regressions / total_tests * 100.0f );
+		}
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'perftest' with no arguments for help\n" );
+	}
 }

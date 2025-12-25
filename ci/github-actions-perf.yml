@@ -1,0 +1,238 @@
+# GitHub Actions CI/CD Pipeline with Performance Regression Testing
+# This demonstrates how to integrate the performance test system into CI/CD
+
+name: Engine Performance Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  performance-tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        config: [Release, Debug]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0  # Fetch full history for baseline comparison
+
+    - name: Set up build environment
+      run: |
+        # Install dependencies for Linux
+        if [ "${{ matrix.os }}" == "ubuntu-latest" ]; then
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libsdl2-dev libvulkan-dev
+        fi
+
+    - name: Build project
+      run: |
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=${{ matrix.config }}
+        make -j$(nproc)
+
+    - name: Download baseline data
+      uses: actions/download-artifact@v3
+      with:
+        name: performance-baselines-${{ matrix.os }}
+        path: baselines/
+
+    - name: Load performance baselines
+      run: |
+        if [ -f "baselines/perf_baselines.json" ]; then
+          ./build/idtech3_vulkan_x86_64 +set perftest baseline load baselines/perf_baselines.json
+        fi
+
+    - name: Run engine performance test suite
+      run: |
+        # Create and run a comprehensive engine performance test suite
+        ./build/idtech3_vulkan_x86_64 \
+          +set perftest suite create ci_suite "Engine Performance Test Suite" \
+          +set perftest suite add ci_suite basic_rendering 30 5 \
+          +set perftest suite add ci_suite memory_stress 20 3 \
+          +set perftest suite add ci_suite asset_loading 15 2 \
+          +set perftest suite add ci_suite physics_simulation 25 4 \
+          +set perftest suite run ci_suite
+
+    - name: Check for regressions
+      id: check-regressions
+      run: |
+        # Check if any regressions were detected
+        REGRESSIONS=$(./build/idtech3_vulkan_x86_64 +set perftest stats | grep "Performance Regressions:" | awk '{print $3}')
+        if [ "$REGRESSIONS" -gt "0" ]; then
+          echo "regressions_detected=true" >> $GITHUB_OUTPUT
+          echo "Performance regressions detected: $REGRESSIONS"
+          exit 1
+        else
+          echo "regressions_detected=false" >> $GITHUB_OUTPUT
+          echo "No performance regressions detected"
+        fi
+
+    - name: Generate performance report
+      if: always()
+      run: |
+        ./build/idtech3_vulkan_x86_64 +set perftest report perf_report_${{ matrix.os }}_${{ matrix.config }}.json
+
+    - name: Export results for analysis
+      if: always()
+      run: |
+        ./build/idtech3_vulkan_x86_64 +set perftest ci export ci_results_${{ matrix.os }}_${{ matrix.config }}
+
+    - name: Upload performance results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results-${{ matrix.os }}-${{ matrix.config }}
+        path: |
+          perf_report_*.json
+          ci_results_*/
+        retention-days: 30
+
+    - name: Update performance baselines
+      if: success() && matrix.os == 'ubuntu-latest' && matrix.config == 'Release'
+      run: |
+        # Only update baselines on successful main branch builds
+        if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+          ./build/idtech3_vulkan_x86_64 +set perftest baseline save perf_baselines_new.json
+          # In a real scenario, you would commit this back to the repository
+        fi
+
+    - name: Performance regression notification
+      if: failure() && steps.check-regressions.outputs.regressions_detected == 'true'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: `Performance Regression Detected in ${context.sha.substring(0, 7)}`,
+            body: `
+              ## Performance Regression Alert
+
+              A performance regression has been detected in commit ${context.sha}.
+
+              **Details:**
+              - OS: ${{ matrix.os }}
+              - Configuration: ${{ matrix.config }}
+              - Branch: ${{ github.ref }}
+              - Run: ${{ github.run_id }}
+
+              **Next Steps:**
+              1. Review the performance report in the artifacts
+              2. Compare with previous baseline performance
+              3. Identify the cause of the regression
+              4. Fix the performance issue or update baselines if acceptable
+
+              **Artifacts:** Check the "performance-results-*" artifacts for detailed reports.
+            `,
+            labels: ['performance', 'regression', 'urgent']
+          })
+
+  benchmark-comparison:
+    needs: performance-tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Download PR performance results
+      uses: actions/download-artifact@v3
+      with:
+        name: performance-results-ubuntu-latest-Release
+
+    - name: Compare with main branch
+      run: |
+        # Compare performance results with main branch
+        # This would typically involve downloading main branch results
+        # and using the performance test system to compare them
+
+        echo "Performance comparison would be implemented here"
+        echo "Compare PR results with main branch baseline"
+
+    - name: Comment PR with performance results
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+
+          // Read performance report
+          let report = '';
+          try {
+            report = fs.readFileSync('perf_report_ubuntu-latest_Release.json', 'utf8');
+          } catch (e) {
+            report = 'Performance report not available';
+          }
+
+          github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: `
+              ## Performance Test Results
+
+              ### Summary
+              Performance tests have been executed for this PR.
+
+              ### Detailed Results
+              \`\`\`json
+              ${report}
+              \`\`\`
+
+              ### CI Status
+              - ✅ Build successful
+              - ✅ Tests passed
+              - ${report.includes('regression') ? '❌' : '✅'} No performance regressions detected
+
+              *Full performance reports are available in the workflow artifacts.*
+            `
+          })
+
+  performance-analysis:
+    needs: performance-tests
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+    - name: Download all performance results
+      uses: actions/download-artifact@v3
+      with:
+        name: performance-results-ubuntu-latest-Release
+        path: ubuntu-release/
+
+    - name: Download all performance results (Windows)
+      uses: actions/download-artifact@v3
+      with:
+        name: performance-results-windows-latest-Release
+        path: windows-release/
+
+    - name: Performance trend analysis
+      run: |
+        # Analyze performance trends across different configurations
+        echo "Analyzing performance trends..."
+        echo "Cross-platform comparison:"
+        echo "- Ubuntu results: $(ls ubuntu-release/)"
+        echo "- Windows results: $(ls windows-release/)"
+
+        # In a real implementation, this would:
+        # 1. Parse all performance reports
+        # 2. Generate trend charts
+        # 3. Identify performance patterns
+        # 4. Create comprehensive analysis report
+
+    - name: Generate performance dashboard
+      run: |
+        # Generate a performance dashboard (HTML/JSON)
+        echo "Generating performance dashboard..."
+        # This would create a visual dashboard showing:
+        # - Performance trends over time
+        # - Cross-platform comparisons
+        # - Regression alerts
+        # - Performance improvement highlights

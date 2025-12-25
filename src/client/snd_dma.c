@@ -1268,7 +1268,26 @@ static void S_Update_( int msec ) {
 
 	SNDDMA_BeginPainting();
 
-	S_PaintChannels( endtime );
+	// Use audio thread for mixing if available, otherwise do it synchronously
+	if (AudioThread_IsThreadEnabled(AUDIO_THREAD_MIXING)) {
+		// Submit mixing work to audio thread
+		mixing_work_data_t* mix_data = (mixing_work_data_t*)ri.Hunk_AllocateTempMemory(sizeof(mixing_work_data_t));
+		mix_data->start_time = s_paintedtime;
+		mix_data->end_time = endtime;
+		mix_data->channels = s_channels;
+		mix_data->num_channels = MAX_CHANNELS;
+
+		AudioThread_SubmitMixingWork(mix_data);
+
+		// For now, wait for completion to maintain compatibility
+		// In a full implementation, this would be asynchronous
+		AudioThread_WaitForThread(AUDIO_THREAD_MIXING);
+
+		ri.Hunk_FreeTempMemory(mix_data);
+	} else {
+		// Synchronous mixing (original behavior)
+		S_PaintChannels( endtime );
+	}
 
 	SNDDMA_Submit();
 

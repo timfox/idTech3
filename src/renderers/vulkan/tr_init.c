@@ -48,6 +48,7 @@ static void R_VRAMStats_f( void );
 static void R_Defrag_f( void );
 static void R_DefragStats_f( void );
 static void R_PoolStats_f( void );
+static void R_RenderThreads_f( void );
 static void R_LockFreeStats_f( void );
 static void R_ArenaStats_f( void );
 static void R_MemoryAdvisorStats_f( void );
@@ -102,6 +103,8 @@ cvar_t	*r_railCoreWidth;
 cvar_t	*r_railSegmentLength;
 
 cvar_t	*r_detailTextures;
+
+cvar_t	*r_multithreaded_rendering;
 
 cvar_t	*r_znear;
 cvar_t	*r_zproj;
@@ -979,6 +982,18 @@ static void InitOpenGL( void )
 
 	// set default state
 	GL_SetDefaultState();
+
+#ifdef USE_VULKAN
+	// Initialize multi-threaded rendering system
+	VK_MultithreadedRendering_Init();
+
+	// Enable dedicated threads for different rendering phases
+	if (r_multithreaded_rendering->integer) {
+		VK_MultithreadedRendering_EnableDedicatedThread(RENDER_THREAD_GEOMETRY);
+		VK_MultithreadedRendering_EnableDedicatedThread(RENDER_THREAD_LIGHTING);
+		VK_MultithreadedRendering_EnableDedicatedThread(RENDER_THREAD_COMMAND_GEN);
+	}
+#endif
 
 	tr.inited = qtrue;
 }
@@ -1943,6 +1958,7 @@ static void R_Register( void )
 #ifdef USE_VULKAN
 	ri.Cmd_AddCommand( "vkinfo", VkInfo_f );
 	ri.Cmd_AddCommand( "vk_memstats", VkMemStats_f );
+	ri.Cmd_AddCommand( "renderthreads", R_RenderThreads_f );
 #endif
 
 	//
@@ -1983,6 +1999,9 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_colorMipLevels, "Debugging tool to artificially color different mipmap levels so that they are more apparent." );
 	r_detailTextures = ri.Cvar_Get( "r_detailtextures", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_detailTextures, "Enables usage of shader stages flagged as detail." );
+	r_multithreaded_rendering = ri.Cvar_Get( "r_multithreaded_rendering", "1", CVAR_ARCHIVE | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_multithreaded_rendering, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_multithreaded_rendering, "Enable dedicated rendering threads for different rendering phases." );
 	r_texturebits = ri.Cvar_Get( "r_texturebits", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_texturebits, "Number of texture bits per texture." );
 
@@ -3682,4 +3701,163 @@ void R_LayoutOptimization_f(void) {
 // Apply memory optimizations command
 void R_ApplyMemoryOptimizations_f(void) {
 	vk_apply_memory_optimizations();
+}
+
+// Render threads management command
+void R_RenderThreads_f(void) {
+	if (ri.Cmd_Argc() < 2) {
+		ri.Printf(PRINT_ALL, "Usage: renderthreads <command> [args]\n");
+		ri.Printf(PRINT_ALL, "Commands:\n");
+		ri.Printf(PRINT_ALL, "  status          - Show current thread status\n");
+		ri.Printf(PRINT_ALL, "  enable <type>   - Enable dedicated thread for specific type\n");
+		ri.Printf(PRINT_ALL, "  disable <type>  - Disable dedicated thread for specific type\n");
+		ri.Printf(PRINT_ALL, "  stats [type]    - Show thread statistics\n");
+		ri.Printf(PRINT_ALL, "  wait [type]     - Wait for specific thread or all threads\n");
+		ri.Printf(PRINT_ALL, "\nThread types: geometry, lighting, shadows, postprocess, commandgen, assetload, compute\n");
+		return;
+	}
+
+	const char* cmd = ri.Cmd_Argv(1);
+
+	if (Q_stricmp(cmd, "status") == 0) {
+		ri.Printf(PRINT_ALL, "=== Rendering Threads Status ===\n");
+		ri.Printf(PRINT_ALL, "Multi-threaded Rendering: %s\n",
+			VK_MultithreadedRendering_IsEnabled() ? "Enabled" : "Disabled");
+		ri.Printf(PRINT_ALL, "Thread Count: %d\n", VK_MultithreadedRendering_GetThreadCount());
+
+		const char* threadNames[RENDER_THREAD_MAX] = {
+			"Geometry", "Lighting", "Shadows", "PostProcess", "CommandGen", "AssetLoading", "Compute"
+		};
+
+		for (int i = 0; i < RENDER_THREAD_MAX; i++) {
+			ri.Printf(PRINT_ALL, "  %s Thread: %s\n", threadNames[i],
+				VK_MultithreadedRendering_IsDedicatedThreadEnabled((vk_render_thread_type_t)i) ? "Enabled" : "Disabled");
+		}
+	}
+	else if (Q_stricmp(cmd, "enable") == 0) {
+		if (ri.Cmd_Argc() < 3) {
+			ri.Printf(PRINT_ALL, "Usage: renderthreads enable <type>\n");
+			return;
+		}
+
+		const char* typeStr = ri.Cmd_Argv(2);
+		vk_render_thread_type_t threadType = RENDER_THREAD_MAX;
+
+		if (Q_stricmp(typeStr, "geometry") == 0) threadType = RENDER_THREAD_GEOMETRY;
+		else if (Q_stricmp(typeStr, "lighting") == 0) threadType = RENDER_THREAD_LIGHTING;
+		else if (Q_stricmp(typeStr, "shadows") == 0) threadType = RENDER_THREAD_SHADOWS;
+		else if (Q_stricmp(typeStr, "postprocess") == 0) threadType = RENDER_THREAD_POST_PROCESS;
+		else if (Q_stricmp(typeStr, "commandgen") == 0) threadType = RENDER_THREAD_COMMAND_GEN;
+		else if (Q_stricmp(typeStr, "assetload") == 0) threadType = RENDER_THREAD_ASSET_LOADING;
+		else if (Q_stricmp(typeStr, "compute") == 0) threadType = RENDER_THREAD_COMPUTE;
+
+		if (threadType == RENDER_THREAD_MAX) {
+			ri.Printf(PRINT_ALL, "Invalid thread type: %s\n", typeStr);
+			return;
+		}
+
+		if (VK_MultithreadedRendering_EnableDedicatedThread(threadType)) {
+			ri.Printf(PRINT_ALL, "Enabled %s thread\n", typeStr);
+		} else {
+			ri.Printf(PRINT_ALL, "Failed to enable %s thread\n", typeStr);
+		}
+	}
+	else if (Q_stricmp(cmd, "disable") == 0) {
+		if (ri.Cmd_Argc() < 3) {
+			ri.Printf(PRINT_ALL, "Usage: renderthreads disable <type>\n");
+			return;
+		}
+
+		const char* typeStr = ri.Cmd_Argv(2);
+		vk_render_thread_type_t threadType = RENDER_THREAD_MAX;
+
+		if (Q_stricmp(typeStr, "geometry") == 0) threadType = RENDER_THREAD_GEOMETRY;
+		else if (Q_stricmp(typeStr, "lighting") == 0) threadType = RENDER_THREAD_LIGHTING;
+		else if (Q_stricmp(typeStr, "shadows") == 0) threadType = RENDER_THREAD_SHADOWS;
+		else if (Q_stricmp(typeStr, "postprocess") == 0) threadType = RENDER_THREAD_POST_PROCESS;
+		else if (Q_stricmp(typeStr, "commandgen") == 0) threadType = RENDER_THREAD_COMMAND_GEN;
+		else if (Q_stricmp(typeStr, "assetload") == 0) threadType = RENDER_THREAD_ASSET_LOADING;
+		else if (Q_stricmp(typeStr, "compute") == 0) threadType = RENDER_THREAD_COMPUTE;
+
+		if (threadType == RENDER_THREAD_MAX) {
+			ri.Printf(PRINT_ALL, "Invalid thread type: %s\n", typeStr);
+			return;
+		}
+
+		VK_MultithreadedRendering_DisableDedicatedThread(threadType);
+		ri.Printf(PRINT_ALL, "Disabled %s thread\n", typeStr);
+	}
+	else if (Q_stricmp(cmd, "stats") == 0) {
+		if (ri.Cmd_Argc() >= 3) {
+			const char* typeStr = ri.Cmd_Argv(2);
+			vk_render_thread_type_t threadType = RENDER_THREAD_MAX;
+
+			if (Q_stricmp(typeStr, "geometry") == 0) threadType = RENDER_THREAD_GEOMETRY;
+			else if (Q_stricmp(typeStr, "lighting") == 0) threadType = RENDER_THREAD_LIGHTING;
+			else if (Q_stricmp(typeStr, "shadows") == 0) threadType = RENDER_THREAD_SHADOWS;
+			else if (Q_stricmp(typeStr, "postprocess") == 0) threadType = RENDER_THREAD_POST_PROCESS;
+			else if (Q_stricmp(typeStr, "commandgen") == 0) threadType = RENDER_THREAD_COMMAND_GEN;
+			else if (Q_stricmp(typeStr, "assetload") == 0) threadType = RENDER_THREAD_ASSET_LOADING;
+			else if (Q_stricmp(typeStr, "compute") == 0) threadType = RENDER_THREAD_COMPUTE;
+
+			if (threadType != RENDER_THREAD_MAX) {
+				uint64_t processedItems = 0;
+				float avgTimeMs = 0.0f;
+				uint64_t waitTimeNs = 0;
+
+				VK_MultithreadedRendering_GetThreadStats(threadType, &processedItems, &avgTimeMs, &waitTimeNs);
+				ri.Printf(PRINT_ALL, "%s Thread Stats:\n", typeStr);
+				ri.Printf(PRINT_ALL, "  Processed Items: %llu\n", (unsigned long long)processedItems);
+				ri.Printf(PRINT_ALL, "  Average Time: %.2f ms\n", avgTimeMs);
+				ri.Printf(PRINT_ALL, "  Total Wait Time: %.2f ms\n", waitTimeNs / 1000000.0);
+			} else {
+				ri.Printf(PRINT_ALL, "Invalid thread type: %s\n", typeStr);
+			}
+		} else {
+			ri.Printf(PRINT_ALL, "=== All Thread Statistics ===\n");
+			const char* threadNames[RENDER_THREAD_MAX] = {
+				"Geometry", "Lighting", "Shadows", "PostProcess", "CommandGen", "AssetLoading", "Compute"
+			};
+
+			for (int i = 0; i < RENDER_THREAD_MAX; i++) {
+				if (VK_MultithreadedRendering_IsDedicatedThreadEnabled((vk_render_thread_type_t)i)) {
+					uint64_t processedItems = 0;
+					float avgTimeMs = 0.0f;
+					uint64_t waitTimeNs = 0;
+
+					VK_MultithreadedRendering_GetThreadStats((vk_render_thread_type_t)i, &processedItems, &avgTimeMs, &waitTimeNs);
+					ri.Printf(PRINT_ALL, "%s: %llu items, %.2f ms avg\n", threadNames[i],
+						(unsigned long long)processedItems, avgTimeMs);
+				}
+			}
+		}
+	}
+	else if (Q_stricmp(cmd, "wait") == 0) {
+		if (ri.Cmd_Argc() >= 3) {
+			const char* typeStr = ri.Cmd_Argv(2);
+			vk_render_thread_type_t threadType = RENDER_THREAD_MAX;
+
+			if (Q_stricmp(typeStr, "geometry") == 0) threadType = RENDER_THREAD_GEOMETRY;
+			else if (Q_stricmp(typeStr, "lighting") == 0) threadType = RENDER_THREAD_LIGHTING;
+			else if (Q_stricmp(typeStr, "shadows") == 0) threadType = RENDER_THREAD_SHADOWS;
+			else if (Q_stricmp(typeStr, "postprocess") == 0) threadType = RENDER_THREAD_POST_PROCESS;
+			else if (Q_stricmp(typeStr, "commandgen") == 0) threadType = RENDER_THREAD_COMMAND_GEN;
+			else if (Q_stricmp(typeStr, "assetload") == 0) threadType = RENDER_THREAD_ASSET_LOADING;
+			else if (Q_stricmp(typeStr, "compute") == 0) threadType = RENDER_THREAD_COMPUTE;
+
+			if (threadType != RENDER_THREAD_MAX) {
+				VK_MultithreadedRendering_WaitForThread(threadType);
+				ri.Printf(PRINT_ALL, "Waited for %s thread to complete\n", typeStr);
+			} else {
+				ri.Printf(PRINT_ALL, "Invalid thread type: %s\n", typeStr);
+			}
+		} else {
+			VK_MultithreadedRendering_WaitForAllThreads();
+			ri.Printf(PRINT_ALL, "Waited for all rendering threads to complete\n");
+		}
+	}
+	else {
+		ri.Printf(PRINT_ALL, "Unknown command: %s\n", cmd);
+		ri.Printf(PRINT_ALL, "Use 'renderthreads' with no arguments for help\n");
+	}
 }

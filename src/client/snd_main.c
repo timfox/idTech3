@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "snd_local.h"
 #include "snd_public.h"
 #include "snd_openal.h"
+#include "snd_audio_thread.h"
 
 cvar_t *s_volume;
 cvar_t *s_musicVolume;
@@ -430,6 +431,10 @@ void S_Init( void )
 	Cvar_CheckRange( s_muteWhenMinimized, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( s_muteWhenMinimized, "Mutes all audio while game is minimized." );
 
+	// Audio threading CVars
+	Cvar_Get( "s_audio_threading", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( Cvar_Get( "s_audio_threading", "1", CVAR_ARCHIVE ), "Enable audio threading for low-latency processing." );
+
 	cv = Cvar_Get( "s_initsound", "1", 0 );
 	Cvar_SetDescription( cv, "Whether or not to startup the sound system." );
 	if ( !cv->integer ) {
@@ -444,6 +449,7 @@ void S_Init( void )
 		Cmd_AddCommand( "s_list", S_SoundList );
 		Cmd_AddCommand( "s_stop", S_StopAllSounds );
 		Cmd_AddCommand( "s_info", S_SoundInfo );
+		Cmd_AddCommand( "audiothreads", S_AudioThreads_f );
 
 		if ( !started ) {
 			started = S_Base_Init( &si );
@@ -456,6 +462,14 @@ void S_Init( void )
 
 			S_SoundInfo();
 			Com_Printf( "Sound initialization successful.\n" );
+
+			// Initialize audio thread system
+			if (!AudioThread_Init()) {
+				Com_Printf( "Audio thread system initialization failed.\n" );
+			} else {
+				// Enable mixing thread by default for low-latency audio processing
+				AudioThread_EnableThread(AUDIO_THREAD_MIXING);
+			}
 		} else {
 			Com_Printf( "Sound initialization failed.\n" );
 		}
@@ -464,6 +478,158 @@ void S_Init( void )
 	Com_Printf( "--------------------------------\n");
 }
 
+
+/*
+=================
+S_AudioThreads_f
+=================
+*/
+void S_AudioThreads_f( void ) {
+	if ( ri.Cmd_Argc() < 2 ) {
+		ri.Printf( PRINT_ALL, "Usage: audiothreads <command> [args]\n" );
+		ri.Printf( PRINT_ALL, "Commands:\n" );
+		ri.Printf( PRINT_ALL, "  status          - Show current thread status\n" );
+		ri.Printf( PRINT_ALL, "  enable <type>   - Enable dedicated audio thread\n" );
+		ri.Printf( PRINT_ALL, "  disable <type>  - Disable dedicated audio thread\n" );
+		ri.Printf( PRINT_ALL, "  stats [type]    - Show thread statistics\n" );
+		ri.Printf( PRINT_ALL, "  wait [type]     - Wait for thread completion\n" );
+		ri.Printf( PRINT_ALL, "\nThread types: mixing, spatial, streaming, effects\n" );
+		return;
+	}
+
+	const char* cmd = ri.Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		ri.Printf( PRINT_ALL, "=== Audio Threads Status ===\n" );
+		ri.Printf( PRINT_ALL, "Audio Threading: %s\n", audio_thread_system.enabled ? "Enabled" : "Disabled" );
+		ri.Printf( PRINT_ALL, "Active Threads: %d\n", atomic_load_explicit(&audio_thread_system.active_threads, memory_order_relaxed) );
+
+		const char* threadNames[AUDIO_THREAD_MAX] = {
+			"Mixing", "Spatial", "Streaming", "Effects"
+		};
+
+		for ( int i = 0; i < AUDIO_THREAD_MAX; i++ ) {
+			ri.Printf( PRINT_ALL, "  %s Thread: %s\n", threadNames[i],
+				AudioThread_IsThreadEnabled( (audio_thread_type_t)i ) ? "Enabled" : "Disabled" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "enable" ) == 0 ) {
+		if ( ri.Cmd_Argc() < 3 ) {
+			ri.Printf( PRINT_ALL, "Usage: audiothreads enable <type>\n" );
+			return;
+		}
+
+		const char* typeStr = ri.Cmd_Argv(2);
+		audio_thread_type_t threadType = AUDIO_THREAD_MAX;
+
+		if ( Q_stricmp( typeStr, "mixing" ) == 0 ) threadType = AUDIO_THREAD_MIXING;
+		else if ( Q_stricmp( typeStr, "spatial" ) == 0 ) threadType = AUDIO_THREAD_SPATIAL;
+		else if ( Q_stricmp( typeStr, "streaming" ) == 0 ) threadType = AUDIO_THREAD_STREAMING;
+		else if ( Q_stricmp( typeStr, "effects" ) == 0 ) threadType = AUDIO_THREAD_EFFECTS;
+
+		if ( threadType == AUDIO_THREAD_MAX ) {
+			ri.Printf( PRINT_ALL, "Invalid thread type: %s\n", typeStr );
+			return;
+		}
+
+		if ( AudioThread_EnableThread( threadType ) ) {
+			ri.Printf( PRINT_ALL, "Enabled %s audio thread\n", typeStr );
+		} else {
+			ri.Printf( PRINT_ALL, "Failed to enable %s audio thread\n", typeStr );
+		}
+	}
+	else if ( Q_stricmp( cmd, "disable" ) == 0 ) {
+		if ( ri.Cmd_Argc() < 3 ) {
+			ri.Printf( PRINT_ALL, "Usage: audiothreads disable <type>\n" );
+			return;
+		}
+
+		const char* typeStr = ri.Cmd_Argv(2);
+		audio_thread_type_t threadType = AUDIO_THREAD_MAX;
+
+		if ( Q_stricmp( typeStr, "mixing" ) == 0 ) threadType = AUDIO_THREAD_MIXING;
+		else if ( Q_stricmp( typeStr, "spatial" ) == 0 ) threadType = AUDIO_THREAD_SPATIAL;
+		else if ( Q_stricmp( typeStr, "streaming" ) == 0 ) threadType = AUDIO_THREAD_STREAMING;
+		else if ( Q_stricmp( typeStr, "effects" ) == 0 ) threadType = AUDIO_THREAD_EFFECTS;
+
+		if ( threadType == AUDIO_THREAD_MAX ) {
+			ri.Printf( PRINT_ALL, "Invalid thread type: %s\n", typeStr );
+			return;
+		}
+
+		AudioThread_DisableThread( threadType );
+		ri.Printf( PRINT_ALL, "Disabled %s audio thread\n", typeStr );
+	}
+	else if ( Q_stricmp( cmd, "stats" ) == 0 ) {
+		if ( ri.Cmd_Argc() >= 3 ) {
+			const char* typeStr = ri.Cmd_Argv(2);
+			audio_thread_type_t threadType = AUDIO_THREAD_MAX;
+
+			if ( Q_stricmp( typeStr, "mixing" ) == 0 ) threadType = AUDIO_THREAD_MIXING;
+			else if ( Q_stricmp( typeStr, "spatial" ) == 0 ) threadType = AUDIO_THREAD_SPATIAL;
+			else if ( Q_stricmp( typeStr, "streaming" ) == 0 ) threadType = AUDIO_THREAD_STREAMING;
+			else if ( Q_stricmp( typeStr, "effects" ) == 0 ) threadType = AUDIO_THREAD_EFFECTS;
+
+			if ( threadType != AUDIO_THREAD_MAX ) {
+				uint64_t processedItems = 0;
+				float avgTimeMs = 0.0f;
+				uint64_t totalTimeNs = 0;
+
+				AudioThread_GetStats( threadType, &processedItems, &avgTimeMs, &totalTimeNs );
+				ri.Printf( PRINT_ALL, "%s Thread Stats:\n", typeStr );
+				ri.Printf( PRINT_ALL, "  Processed Items: %llu\n", (unsigned long long)processedItems );
+				ri.Printf( PRINT_ALL, "  Average Time: %.2f ms\n", avgTimeMs );
+				ri.Printf( PRINT_ALL, "  Total Time: %.2f ms\n", totalTimeNs / 1000000.0 );
+			} else {
+				ri.Printf( PRINT_ALL, "Invalid thread type: %s\n", typeStr );
+			}
+		} else {
+			ri.Printf( PRINT_ALL, "=== All Audio Thread Statistics ===\n" );
+			const char* threadNames[AUDIO_THREAD_MAX] = {
+				"Mixing", "Spatial", "Streaming", "Effects"
+			};
+
+			for ( int i = 0; i < AUDIO_THREAD_MAX; i++ ) {
+				if ( AudioThread_IsThreadEnabled( (audio_thread_type_t)i ) ) {
+					uint64_t processedItems = 0;
+					float avgTimeMs = 0.0f;
+					uint64_t totalTimeNs = 0;
+
+					AudioThread_GetStats( (audio_thread_type_t)i, &processedItems, &avgTimeMs, &totalTimeNs );
+					ri.Printf( PRINT_ALL, "%s: %llu items, %.2f ms avg\n", threadNames[i],
+						(unsigned long long)processedItems, avgTimeMs );
+				}
+			}
+			ri.Printf( PRINT_ALL, "Total Frames: %llu\n",
+				(unsigned long long)atomic_load_explicit(&audio_thread_system.total_audio_frames_processed, memory_order_relaxed) );
+		}
+	}
+	else if ( Q_stricmp( cmd, "wait" ) == 0 ) {
+		if ( ri.Cmd_Argc() >= 3 ) {
+			const char* typeStr = ri.Cmd_Argv(2);
+			audio_thread_type_t threadType = AUDIO_THREAD_MAX;
+
+			if ( Q_stricmp( typeStr, "mixing" ) == 0 ) threadType = AUDIO_THREAD_MIXING;
+			else if ( Q_stricmp( typeStr, "spatial" ) == 0 ) threadType = AUDIO_THREAD_SPATIAL;
+			else if ( Q_stricmp( typeStr, "streaming" ) == 0 ) threadType = AUDIO_THREAD_STREAMING;
+			else if ( Q_stricmp( typeStr, "effects" ) == 0 ) threadType = AUDIO_THREAD_EFFECTS;
+
+			if ( threadType != AUDIO_THREAD_MAX ) {
+				AudioThread_WaitForThread( threadType );
+				ri.Printf( PRINT_ALL, "Waited for %s audio thread\n", typeStr );
+			} else {
+				ri.Printf( PRINT_ALL, "Invalid thread type: %s\n", typeStr );
+			}
+		} else {
+			AudioThread_WaitForAllThreads();
+			ri.Printf( PRINT_ALL, "Waited for all audio threads\n" );
+		}
+	}
+	else {
+		ri.Printf( PRINT_ALL, "Unknown command: %s\n", cmd );
+		ri.Printf( PRINT_ALL, "Use 'audiothreads' with no arguments for help\n" );
+	}
+}
 
 /*
 =================
@@ -491,8 +657,12 @@ void S_Shutdown( void )
 	Cmd_RemoveCommand( "s_list" );
 	Cmd_RemoveCommand( "s_stop" );
 	Cmd_RemoveCommand( "s_info" );
+	Cmd_RemoveCommand( "audiothreads" );
 
 	S_CodecShutdown();
+
+	// Shutdown audio thread system
+	AudioThread_Shutdown();
 
 	cls.soundStarted = qfalse;
 }

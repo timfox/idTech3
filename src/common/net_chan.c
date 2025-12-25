@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include "net_threads.h"
 
 /*
 
@@ -262,7 +263,19 @@ void Netchan_Transmit( netchan_t *chan, int length, const byte *data ) {
 
 	MSG_WriteData( &send, data, length );
 
-	// send the datagram
+	// Use network thread system if enabled
+	if (NetThread_IsThreadEnabled(NET_THREAD_SEND)) {
+		// Queue message for threaded sending
+		if (NetThread_QueueSendMessage(&chan->remoteAddress, &send, chan->sock)) {
+			// Store send time and size of this packet for rate control
+			chan->lastSentTime = Sys_Milliseconds();
+			chan->lastSentSize = send.cursize;
+			return;
+		}
+		// Fall through to synchronous sending if queuing failed
+	}
+
+	// send the datagram synchronously
 	NET_SendPacket( chan->sock, send.cursize, send.data, &chan->remoteAddress );
 
 	// Store send time and size of this packet for rate control
