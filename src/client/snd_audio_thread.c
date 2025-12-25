@@ -101,12 +101,6 @@ Audio Processing Functions
 =============================================================================
 */
 
-typedef struct {
-    int start_time;
-    int end_time;
-    channel_t* channels;
-    int num_channels;
-} mixing_work_data_t;
 
 void AudioThread_ProcessMixing(void* data) {
     mixing_work_data_t* mix_data = (mixing_work_data_t*)data;

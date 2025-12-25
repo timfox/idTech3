@@ -85,8 +85,8 @@ typedef enum {
 #define VK_NUM_BLOOM_PASSES            3
 
 // Cubemap filter targets
-#define IRRADIANCE                     0
-#define PREFILTEREDENV                 1
+#define IRRADIANCE_TARGET              0
+#define PREFILTEREDENV_TARGET          1
 
 // Cubemap size
 #define REF_CUBEMAP_SIZE               256
@@ -166,11 +166,13 @@ typedef struct {
 // Command buffer structure
 typedef struct {
     VkCommandBuffer command_buffer;
+    VkBuffer vertex_buffer;
     VkDeviceSize vertex_buffer_offset;
     void* vertex_buffer_ptr;
-    uint32_t buf_offset[8];
-    uint32_t vbo_offset[8];
+    VkDeviceSize buf_offset[8];
+    VkDeviceSize vbo_offset[8];
     uint32_t uniform_camera_item_size;
+    uint32_t num_indexes;
     VkBuffer curr_index_buffer;
     VkDeviceSize curr_index_offset;
     Vk_Depth_Range depth_range;
@@ -219,6 +221,7 @@ typedef struct {
     int fog_stage;
     int acff;
     qboolean mirror;
+    int shadow_phase;
     vec4_t normalScale;
     vec4_t specularScale;
     struct {
@@ -228,6 +231,9 @@ typedef struct {
     int allow_discard;
     int state_bits;
     int face_culling;
+    float line_width;
+    int abs_light;
+    int primitives;
 } Vk_Pipeline_Def;
 
 // Shader type constants
@@ -263,6 +269,19 @@ typedef struct {
 #define TYPE_GENERIC_BEGIN     31
 #define TYPE_GENERIC_END       100
 
+// Shadow phases
+#define SHADOW_DISABLED  -1
+#define SHADOW_EDGES     0
+#define SHADOW_FS_QUAD   1
+
+// Primitive types
+#define TRIANGLE_LIST   0
+#define TRIANGLE_STRIP  1
+#define TRIANGLE_FAN    2
+#define LINE_LIST       3
+#define LINE_STRIP      4
+#define POINT_LIST      5
+
 // Vulkan sampler definition structure
 typedef struct {
     VkFilter vk_mag_filter;
@@ -283,6 +302,7 @@ typedef struct {
     VkFormat format;
     uint32_t size;
     uint32_t mipLevels;
+    VkRenderPass renderpass;
     struct {
         VkRenderPass renderpass;
         VkFramebuffer framebuffer;
@@ -303,6 +323,21 @@ typedef struct {
     VkShaderModule filtercube_vs, filtercube_gm;
     VkShaderModule irradiancecube_fs, prefilterenvmap_fs;
     VkShaderModule bloom_fs, blend_fs, gamma_fs;
+
+    // Fragment shader modules (complex structure for various shader combinations)
+    struct {
+        VkShaderModule gen[2][2][2][2]; // Multi-dimensional array for shader variants
+        VkShaderModule fixed[2][2][2]; // Fixed shader variants
+        VkShaderModule ident1[2][2][2]; // Identity shader variants
+        VkShaderModule ent[2][2][2]; // Entity shader variants
+    } frag;
+
+    // Vertex shader modules (complex structure for various shader combinations)
+    struct {
+        VkShaderModule gen[2][2][2][2][2]; // Multi-dimensional array for shader variants
+        VkShaderModule fixed[2][2][2][2]; // Fixed shader variants
+        VkShaderModule ident1[2][2][2][2]; // Identity shader variants
+    } vert;
 } vk_modules_t;
 
 // Main Vulkan instance structure
@@ -320,10 +355,19 @@ typedef struct {
     struct {
         VkRenderPass main;
         VkRenderPass screenmap;
+        VkRenderPass cubemap;
+        VkRenderPass bloom_extract;
+        VkRenderPass post_bloom;
+        VkRenderPass capture;
+        VkRenderPass brdflut;
+        VkRenderPass gamma;
     } render_pass;
 
     // Pipelines
     VkPipelineLayout pipeline_layout;
+    VkPipelineLayout pipeline_layout_storage;
+    VkPipelineCache pipelineCache;
+    uint32_t pipeline_create_count;
     VkPipeline pipelines[32]; // Various pipeline types
     VkPipeline surface_debug_pipeline_solid;
     VkPipeline surface_debug_pipeline_outline;
@@ -345,6 +389,8 @@ typedef struct {
     struct {
         VkImage image;
         VkImageView view;
+        VkImage color_image;
+        VkImageView color_image_view;
         VkDescriptorSet descriptor;
         VkDescriptorSet color_descriptor;
     } screenMap;
@@ -386,6 +432,7 @@ typedef struct {
     VkImageView color_image_view;
     VkDescriptorSet color_descriptor;
     VkFormat color_format;
+    VkDescriptorSetLayout set_layout_sampler;
 
     // Bloom system
     VkPipeline bloom_extract_pipeline;
@@ -456,6 +503,14 @@ typedef struct {
         qboolean initialized;
     } materialSystem;
 
+    // VBO system
+    struct {
+        VkBuffer vertex_buffer;
+        VkBuffer index_buffer;
+        VkDeviceMemory memory;
+        VkDeviceSize size;
+    } vbo;
+
     // Additional state
     uint32_t uniform_alignment;
     uint32_t uniform_item_size;
@@ -463,6 +518,11 @@ typedef struct {
     uint32_t camera_ubo_offset;
     VkDeviceSize vertex_buffer_offset;
     VkDeviceSize geometry_buffer_size;
+    VkDeviceSize geometry_buffer_size_new;
+    struct {
+        VkDeviceSize sizes[8];
+        uint32_t count;
+    } geometry_buffer_history;
     uint32_t maxBoundDescriptorSets;
     qboolean clearAttachment;
     VkPipeline images_debug_pipeline;
@@ -471,9 +531,15 @@ typedef struct {
     VkPipeline skybox_pipeline;
     VkPipeline surface_beam_pipeline;
     VkPipeline surface_axis_pipeline;
+    VkPipeline blur_pipeline;
     qboolean cubemapActive;
     qboolean fboActive;
     qboolean offscreenRender;
+
+    // Statistics
+    struct {
+        uint32_t push_size;
+    } stats;
 } Vk_Instance;
 
 // Global Vulkan instance
@@ -528,10 +594,7 @@ void vk_vrs_create_resources(uint32_t width, uint32_t height);
 void vk_vrs_destroy_resources(void);
 void vk_vrs_generate_image(VkCommandBuffer cmdBuffer);
 void vk_vrs_apply_shading_rate(VkCommandBuffer cmdBuffer);
-void vk_create_prefilter_renderpass(filterDef* def);
 void vk_create_prefilter_framebuffer(filterDef* def);
-void vk_create_prefilter_pipeline(filterDef* def);
-void vk_copy_to_cubemap(filterDef* def, VkImage* image, uint32_t mipLevel, uint32_t size);
 VkSampler vk_find_sampler(const Vk_Sampler_Def* def);
 void vk_destroy_samplers(void);
 void vk_update_attachment_descriptors(void);
@@ -550,6 +613,7 @@ void vk_shutdown_memory_advisor(void);
 void vk_shutdown_render_profiler(void);
 void vk_shutdown_memory_bandwidth_profiler(void);
 void vk_shutdown_parallel_profiler(void);
+void vk_get_gpu_timing_stats( double *avg_frame_time_ms, double *min_frame_time_ms, double *max_frame_time_ms );
 void vk_shutdown_shader_performance_analyzer(void);
 void vk_shutdown_asset_loading_profiler(void);
 void vk_shutdown_performance_hud(void);

@@ -3931,7 +3931,7 @@ typedef struct vk_attach_desc_s  {
 	VkFormat image_format;
 } vk_attach_desc_t;
 
-static vk_attach_desc_t attachments[ MAX_ATTACHMENTS_IN_POOL ];
+static vk_attach_desc_t attachments[ MAX_ATTACHMENTS_IN_POOL ] Q_UNUSED(attachments);
 static uint32_t num_attachments = 0;
 
 
@@ -6122,7 +6122,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	rasterization_state.frontFace = VK_FRONT_FACE_CLOCKWISE; // Q3 defaults to clockwise vertex order
 
 	 // depth bias state
-	if ( def->polygon_offset ) {
+        if ( def->polygonOffset ) {
 		rasterization_state.depthBiasEnable = VK_TRUE;
 		rasterization_state.depthBiasClamp = 0.0f;
 #ifdef USE_REVERSED_DEPTH
@@ -6338,6 +6338,13 @@ multisample_state.rasterizationSamples = (renderPassIndex == RENDER_PASS_SCREENM
 
 
 
+__attribute__((used)) static void get_viewport_rect(VkRect2D *r) {
+	r->offset.x = 0;
+	r->offset.y = 0;
+	r->extent.width = vk.renderWidth;
+	r->extent.height = vk.renderHeight;
+}
+
 __attribute__((used)) static void get_viewport(VkViewport *viewport, Vk_Depth_Range depth_range) {
 	VkRect2D r;
 
@@ -6450,7 +6457,7 @@ static void get_mvp_transform( float *mvp )
 
 
 
-void vk_update_mvp( const float *m ) {
+void vk_update_mvp( void *m ) {
 	float push_constants[16]; // mvp transform
 
 	//
@@ -6597,7 +6604,7 @@ void vk_bind_index( void )
 }
 
 
-void vk_bind_index_ext( const int numIndexes, const uint32_t *indexes )
+void vk_bind_index_ext( uint32_t numIndexes, uint32_t *indexes )
 {
 	uint32_t offset	= vk_tess_index( numIndexes, indexes );
 	if ( offset != ~0U ) {
@@ -6762,9 +6769,9 @@ void vk_bind_lighting( int stage, int bundle )
 }
 
 
-void vk_reset_descriptor( int index )
+void vk_reset_descriptor( uint32_t binding )
 {
-	vk.cmd->descriptor_set.current[ index ] = VK_NULL_HANDLE;
+	vk.cmd->descriptor_set.current[ binding ] = VK_NULL_HANDLE;
 }
 
 
@@ -6784,9 +6791,9 @@ void vk_update_descriptor( uint32_t index, VkDescriptorSet descriptor )
 	vk.cmd->descriptor_set.current[ index ] = descriptor;
 }
 
-void vk_update_descriptor_offset( int index, uint32_t offset )
+void vk_update_descriptor_offset( uint32_t binding, uint32_t offset )
 {
-	vk.cmd->descriptor_set.offset[ index ] = offset;
+	vk.cmd->descriptor_set.offset[ binding ] = offset;
 }
 
 
@@ -7414,28 +7421,28 @@ qboolean vk_bloom( void )
 	for ( i = 0; i < VK_NUM_BLOOM_PASSES*2; i+=2 ) {
 		// horizontal blur
 		vk_begin_blur_render_pass( i+0 );
-		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+0] );
+		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.bloom_blend_pipeline );
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[i+0], 0, NULL );
 		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 		vk_end_render_pass();
 
 		// vectical blur
 		vk_begin_blur_render_pass( i+1 );
-		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+1] );
+		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.bloom_blend_pipeline );
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[i+1], 0, NULL );
 		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 		vk_end_render_pass();
 #if 0
 		// horizontal blur
 		vk_begin_blur_render_pass( i+0 );
-		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+0] );
+		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.bloom_blend_pipeline );
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[i+2], 0, NULL );
 		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 		vk_end_render_pass();
 
 		// vectical blur
 		vk_begin_blur_render_pass( i+1 );
-		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.blur_pipeline[i+1] );
+		qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.bloom_blend_pipeline );
 		qvkCmdBindDescriptorSets( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk.pipeline_layout_post_process, 0, 1, &vk.bloom_image_descriptor[i+1], 0, NULL );
 		qvkCmdDraw( vk.cmd->command_buffer, 4, 1, 0, 0 );
 		vk_end_render_pass();
@@ -7494,7 +7501,7 @@ qboolean vk_bloom( void )
 	return qtrue;
 }
 
-enum Target { IRRADIANCE = 0, PREFILTEREDENV = 1 };
+// Target defines are in vk.h
 
 
 static filterDef prefilters[2];
@@ -7584,7 +7591,7 @@ static void vk_create_prefilter_pipeline( filterDef *def )
 	pipeline_layout.setLayoutCount = 1;
 	pipeline_layout.pSetLayouts = &vk.set_layout_sampler;
 
-	if ( def->target == PREFILTEREDENV ) {
+	if ( def->target == PREFILTEREDENV_TARGET ) {
 		push_range.size = sizeof(float);
 		pipeline_layout.pushConstantRangeCount = 1;
 		pipeline_layout.pPushConstantRanges = &push_range;
@@ -7671,7 +7678,7 @@ void vk_create_cubemap_prefilter( void )
 
 	Com_Memset( &prefilters, 0, sizeof( prefilters ) );
 
-	for ( i = 0; i < PREFILTEREDENV + 1; i++ ) 
+	for ( i = 0; i < PREFILTEREDENV_TARGET + 1; i++ ) 
 	{
 		def = &prefilters[i];
 
@@ -7680,13 +7687,13 @@ void vk_create_cubemap_prefilter( void )
 		def->shaders.gm_module = &vk.modules.filtercube_gm;
 
 		switch ( def->target ) {
-			case IRRADIANCE:
+			case IRRADIANCE_TARGET:
 				def->format = VK_FORMAT_R32G32B32A32_SFLOAT;
 				def->size = 64;
 				def->shaders.fs_module = &vk.modules.irradiancecube_fs;
 				def->mipLevels = (uint32_t)(floor(log2(def->size))) + 1;
 				break;
-			case PREFILTEREDENV:
+			case PREFILTEREDENV_TARGET:
 				def->format = VK_FORMAT_R16G16B16A16_SFLOAT;
 				def->size = 256;
 				def->shaders.fs_module = &vk.modules.prefilterenvmap_fs;
@@ -7705,7 +7712,7 @@ void vk_destroy_cubemap_prefilter( void ){
 	uint32_t	i;
 	filterDef	*def;
 
-	for ( i = 0; i < PREFILTEREDENV + 1; i++ ) 
+	for ( i = 0; i < PREFILTEREDENV_TARGET + 1; i++ ) 
 	{
 		def = &prefilters[i];
 
@@ -7810,13 +7817,13 @@ void vk_generate_cubemaps( cubemap_t *cube )
 		0, 0 );
 	end_command_buffer( command_buffer, __func__  );
 
-	for ( i = 0; i < PREFILTEREDENV + 1; i++ ) 
+	for ( i = 0; i < PREFILTEREDENV_TARGET + 1; i++ ) 
 	{
 		def = &prefilters[i];
 
 		switch ( def->target ) {
-			case IRRADIANCE: cubemap = cube->irradiance_image; break;
-			case PREFILTEREDENV: cubemap = cube->prefiltered_image; break;
+			case IRRADIANCE_TARGET: cubemap = cube->irradiance_image; break;
+			case PREFILTEREDENV_TARGET: cubemap = cube->prefiltered_image; break;
 			default: cubemap = NULL; break;
 		}
 		if (!cubemap) {
@@ -7860,7 +7867,7 @@ void vk_generate_cubemaps( cubemap_t *cube )
 			// render scene from cube face's point of view
 			qvkCmdBeginRenderPass(vk.cmd->command_buffer, &begin_info, VK_SUBPASS_CONTENTS_INLINE);
 
-			if ( def->target == PREFILTEREDENV ) {
+			if ( def->target == PREFILTEREDENV_TARGET ) {
 				float roughness = (float)j / (float)(def->mipLevels - 1);
 				qvkCmdPushConstants( vk.cmd->command_buffer, def->pipeline_layout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(roughness), &roughness );
 			}

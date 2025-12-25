@@ -1414,6 +1414,12 @@ IF(USE_RENDERER_DLOPEN)
 			TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE /usr/lib/x86_64-linux-gnu/libfreetype.so)
 		ENDIF()
 		TARGET_LINK_OPTIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE -Wl,--export-dynamic)
+		# Suppress some warnings for Vulkan renderer to avoid warning-as-error issues
+		TARGET_COMPILE_OPTIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE
+			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-missing-prototypes>
+			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-unused-variable>
+			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-pointer-arith>
+		)
 
 		# VMA (Vulkan Memory Allocator) - configure after target is created
 		IF(USE_VMA AND USE_VULKAN)

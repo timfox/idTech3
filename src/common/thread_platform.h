@@ -118,7 +118,10 @@ Provides unified threading API across Windows, Linux, macOS.
 	#define CONDITION_WAIT(cond, mutex) pthread_cond_wait(&(cond), &(mutex))
 	#define CONDITION_TIMED_WAIT(cond, mutex, timeout_ms) do { \
 		struct timespec ts; \
-		clock_gettime(CLOCK_REALTIME, &ts); \
+		struct timeval tv; \
+		gettimeofday(&tv, NULL); \
+		ts.tv_sec = tv.tv_sec; \
+		ts.tv_nsec = tv.tv_usec * 1000; \
 		ts.tv_nsec += (timeout_ms) * 1000000; \
 		if (ts.tv_nsec >= 1000000000) { \
 			ts.tv_sec += ts.tv_nsec / 1000000000; \
