@@ -14,6 +14,9 @@ Tests for stack canaries, security flags, and memory protection features.
 #include <setjmp.h>
 #include <unistd.h>
 
+// Forward declaration for main function
+extern int main(int argc, char* argv[]);
+
 // Test framework
 #define TEST_ASSERT(condition, message) \
     do { \

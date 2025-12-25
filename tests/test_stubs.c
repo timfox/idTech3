@@ -175,11 +175,6 @@ void FS_RestorePure(void) {}
 void Com_WriteConfiguration(void) {}
 
 // Utility stubs
-float Q_atof(const char* str) {
-    if (!str) return 0.0f;
-    return (float)atof(str);
-}
-
 int Com_Filter(char* filter, char* name, int casesensitive) {
     Q_UNUSED(filter);
     Q_UNUSED(name);

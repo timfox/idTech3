@@ -3771,14 +3771,15 @@ TARGET_COMPILE_DEFINITIONS(test_filesystem_v2 PRIVATE STANDALONE_TEST)
 	ADD_TEST(NAME geometry_tests COMMAND test_geometry)
 
 	# Security tests
-	ADD_EXECUTABLE(test_security
-		tests/test_security.c
-		src/common/q_math.c
-		src/common/q_shared.c
-	)
-	TARGET_INCLUDE_DIRECTORIES(test_security PRIVATE src/common)
-	TARGET_INCLUDE_DIRECTORIES(test_security PRIVATE src)
-	TARGET_INCLUDE_DIRECTORIES(test_security PRIVATE tests)
+ADD_EXECUTABLE(test_security
+	tests/test_security.c
+	src/common/q_math.c
+	src/common/q_shared.c
+)
+TARGET_INCLUDE_DIRECTORIES(test_security PRIVATE src/common)
+TARGET_INCLUDE_DIRECTORIES(test_security PRIVATE src)
+TARGET_INCLUDE_DIRECTORIES(test_security PRIVATE tests)
+TARGET_SOURCES(test_security PRIVATE tests/test_stubs.c)
 	IF(UNIX)
 		TARGET_LINK_LIBRARIES(test_security PRIVATE m)
 	ENDIF()
