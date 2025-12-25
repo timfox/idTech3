@@ -1202,10 +1202,16 @@ char	*Q_strupr( char *s1 );
 const char	*Q_stristr( const char *s, const char *find);
 
 // Forward declarations for string functions
+#ifdef __cplusplus
+extern "C" {
+#endif
 void	Q_strncpyz( char *dest, const char *src, int destsize );
 void	Q_strcat( char *dest, int size, const char *src );
 char	*Q_stradd( char *dst, const char *src );
 char	*Q_strncpy( char *dest, const char *src, int destsize );
+#ifdef __cplusplus
+}
+#endif
 
 // Type-safe string operations with bounds checking
 static inline qboolean Q_strncpyz_safe(char *dest, size_t dest_size, const char *src) {

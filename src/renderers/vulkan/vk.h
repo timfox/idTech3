@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include <vulkan/vulkan.h>
 #include "../../common/q_shared.h"  // For qboolean, vec3_t, vec4_t, byte, etc.
+#include "vk_proc_dressing.h"
 #include "vk_compute.h"
 
 // VMA (Vulkan Memory Allocator) - conditional include
@@ -462,6 +463,7 @@ typedef struct {
 #define MAX_SWAPCHAIN_IMAGES 8
 
 // Vulkan function pointers
+extern PFN_vkGetPhysicalDeviceProperties qvkGetPhysicalDeviceProperties;
 extern PFN_vkGetPhysicalDeviceProperties2KHR qvkGetPhysicalDeviceProperties2KHR;
 
 // Vulkan sampler definition structure
@@ -592,6 +594,16 @@ typedef struct {
         VkShaderModule ident1[2][2][2][2]; // Identity shader variants
         VkShaderModule light[2]; // Light vertex shader variants
     } vert;
+
+    // Compute shader modules
+    VkShaderModule velocity_tiles_comp; // Added
+    VkShaderModule motion_blur_comp; // Added
+    VkShaderModule color_grading_comp; // Added
+    VkShaderModule heat_distortion_comp; // Added
+    VkShaderModule bloom_comp; // Added
+    VkShaderModule depth_of_field_comp; // Added
+    VkShaderModule ssao_comp; // Added
+    VkShaderModule ssr_comp; // Added
 } vk_modules_t;
 
 // Main Vulkan instance structure
@@ -679,6 +691,7 @@ typedef struct {
         VkRenderPass cubemap;
         VkRenderPass bloom_extract;
         VkRenderPass post_bloom;
+        VkRenderPass blur[4];
         VkRenderPass capture;
         VkRenderPass brdflut;
         VkRenderPass gamma;
@@ -750,6 +763,8 @@ typedef struct {
         VkFramebuffer screenmap;
         VkFramebuffer cubemap[6];
         VkFramebuffer brdflut;
+        VkFramebuffer bloom_extract;
+        VkFramebuffer blur[4];
     } framebuffers;
     uint32_t renderWidth;
     uint32_t renderHeight;
@@ -883,6 +898,21 @@ typedef struct {
     VkDescriptorSetLayout dof_descriptor_layout;  // Added
     VkDescriptorSet dof_descriptor;  // Added
     VkPipeline dof_pipeline;  // Added
+    VkPipelineLayout dof_layout;  // Added
+    VkPipelineLayout bloom_layout;  // Added
+    VkPipelineLayout ssao_layout;  // Added
+    VkPipelineLayout ssr_layout;  // Added
+    VkImageView coc_image_view;  // Added
+    VkImageView bokeh_sprite_image_view;  // Added
+    VkImageView dof_image_view;  // Added
+
+    // Bloom system
+    VkImage bloom_image[4];  // Added
+    VkPipeline blur_pipeline[6];  // Added
+
+    // Motion blur system
+    VkPipeline velocity_tiles_pipeline;  // Added
+
     VkDescriptorSetLayout velocity_tiles_descriptor_layout;  // Added
     VkDescriptorSet velocity_tiles_descriptor;  // Added
     VkImage velocity_tiles_image;  // Added
@@ -1034,7 +1064,6 @@ typedef struct {
     VkPipeline skybox_pipeline;
     VkPipeline surface_beam_pipeline;
     VkPipeline surface_axis_pipeline;
-    VkPipeline blur_pipeline;
     VkPipeline capture_pipeline;
     VkPipeline gamma_pipeline;
     qboolean cubemapActive;
@@ -1285,6 +1314,12 @@ void vk_track_gpu_free(VkDeviceMemory memory);
 uint32_t find_memory_type(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 void vk_mark_pipelines_dirty(void);
 void vk_bind_generated_shaders(void);
+uint32_t vk_tess_index(uint32_t numIndexes, const void *src);
+void vk_bind_index_buffer(VkBuffer buffer, uint32_t offset);
+void vk_draw_indexed(uint32_t indexCount, uint32_t firstIndex);
+qboolean create_color_attachment(uint32_t width, uint32_t height, VkSampleCountFlagBits samples, VkFormat format, VkImageUsageFlags usage, VkImage *image, VkImageView *image_view, VkImageLayout image_layout, qboolean multisample, VkImageCreateFlags flags);
+qboolean vk_gpu_culling_is_enabled(void);
+void vk_gpu_culling_add_instance(const float *transform, uint32_t biomeId, const float *color);
 
 // Memory and performance systems
 void vk_init_vram_stats(void);
@@ -1302,5 +1337,7 @@ void vk_sample_memory_bandwidth(void);
 void vk_analyze_memory_access_patterns(void);
 void vk_sample_thread_utilization(void);
 void vk_check_defragmentation(void);
+void vk_profile_pass_start(const char* name, uint32_t drawCallCount);
+void vk_profile_pass_end(const char* name, uint32_t drawCalls, uint32_t vertices);
 
 #endif // VK_H

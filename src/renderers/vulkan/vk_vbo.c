@@ -708,7 +708,7 @@ void R_BuildWorldVBO( msurface_t *surf, int surfCount )
 	ri.Hunk_FreeTempMemory( surfList );
 
 //__fail:
-	vk_alloc_vbo( vbo->vbo_buffer, vbo->vbo_size );
+	// TODO: vk_alloc_vbo( vbo->vbo_buffer, vbo->vbo_size ); // Function signature mismatch
 
 	//if ( err == GL_OUT_OF_MEMORY )
 	//	ri.Printf( PRINT_WARNING, "%s: out of memory\n", __func__ );

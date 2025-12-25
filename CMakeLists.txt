@@ -3684,12 +3684,39 @@ ADD_EXECUTABLE(test_asset_validation
 TARGET_INCLUDE_DIRECTORIES(test_asset_validation PRIVATE src/common)
 TARGET_INCLUDE_DIRECTORIES(test_asset_validation PRIVATE src)
 TARGET_COMPILE_DEFINITIONS(test_asset_validation PRIVATE STANDALONE_TEST)
-TARGET_LINK_LIBRARIES(test_asset_validation PRIVATE common)
+# Don't link to common library to avoid multiple definitions
+# Only include specific needed files
+TARGET_SOURCES(test_asset_validation PRIVATE
+    src/common/q_shared.c
+)
 TARGET_SOURCES(test_asset_validation PRIVATE tests/test_stubs.c)
 SET_SOURCE_FILES_PROPERTIES(tests/test_stubs.c PROPERTIES COMPILE_FLAGS "-w")
 IF(UNIX)
 	TARGET_LINK_LIBRARIES(test_asset_validation PRIVATE m)
 ENDIF()
+
+# Link external libraries to test executables (same as main executable)
+IF(USE_BULLET)
+	IF(BULLET_FOUND AND BULLET_LIBRARIES)
+		TARGET_LINK_LIBRARIES(test_asset_validation PRIVATE ${BULLET_LIBRARIES})
+	ENDIF()
+ENDIF()
+IF(USE_SQLITE)
+	IF(SQLite3_FOUND)
+		TARGET_LINK_LIBRARIES(test_asset_validation PRIVATE ${SQLite3_LIBRARIES})
+	ENDIF()
+ENDIF()
+IF(USE_FREETYPE)
+	IF(Freetype_FOUND)
+		TARGET_LINK_LIBRARIES(test_asset_validation PRIVATE ${FREETYPE_LIBRARIES})
+	ENDIF()
+ENDIF()
+IF(USE_OPENSSL)
+	IF(OpenSSL_FOUND)
+		TARGET_LINK_LIBRARIES(test_asset_validation PRIVATE ${OPENSSL_LIBRARIES})
+	ENDIF()
+ENDIF()
+
 ADD_TEST(NAME asset_validation_tests COMMAND test_asset_validation)
 
 ADD_EXECUTABLE(test_binary_analysis

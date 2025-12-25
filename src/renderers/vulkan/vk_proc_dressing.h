@@ -35,18 +35,18 @@ typedef struct {
     proc_rule_type_t type;
     union {
         struct { // Paint rule
-            vec3_t a;        // Center position
+            vec3_t center;   // Center position
             float radius;    // Paint radius
-        };
+        } paint;
         struct { // Volume rule
             vec3_t mins;     // AABB min
             vec3_t maxs;     // AABB max
-        };
+        } volume;
         struct { // Spline rule
-            vec3_t a;        // Start point
-            vec3_t b;        // End point
+            vec3_t start;    // Start point
+            vec3_t end;      // End point
             float radius;    // Spline radius
-        };
+        } spline;
     };
     float density;      // Instances per unit area/volume
     float jitter;       // Position randomization [0,1]
@@ -56,9 +56,9 @@ typedef struct {
 
 // Procedural instance
 typedef struct {
-    mat4_t transform;   // Model matrix
-    int biomeId;        // Biome this instance belongs to
-    vec4_t color;       // Tint color (RGBA)
+    float transform[16]; // Model matrix (4x4)
+    int biomeId;         // Biome this instance belongs to
+    vec4_t color;        // Tint color (RGBA)
 } proc_instance_t;
 
 #endif // __VK_PROC_DRESSING_H__

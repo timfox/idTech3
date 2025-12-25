@@ -88,8 +88,8 @@ static void seed_rules( void )
 	// Paint rule around origin (hero space)
 	proc_rule_t paint = { 0 };
 	paint.type = PROC_RULE_PAINT;
-	VectorClear( paint.a );
-	paint.radius = 25.0f;
+	VectorClear( paint.paint.center );
+	paint.paint.radius = 25.0f;
 	paint.density = 0.08f;
 	paint.jitter = 0.5f;
 	paint.biomeId = 0;
@@ -99,8 +99,8 @@ static void seed_rules( void )
 	// Volume rule for backdrop dressing
 	proc_rule_t volume = { 0 };
 	volume.type = PROC_RULE_VOLUME;
-	VectorSet( volume.mins, -40.0f, -40.0f, -2.0f );
-	VectorSet( volume.maxs, 40.0f, 40.0f, 8.0f );
+	VectorSet( volume.volume.mins, -40.0f, -40.0f, -2.0f );
+	VectorSet( volume.volume.maxs, 40.0f, 40.0f, 8.0f );
 	volume.density = 0.015f;
 	volume.jitter = 0.25f;
 	volume.biomeId = 1;
@@ -132,19 +132,19 @@ static void add_instance( const vec3_t pos, float scale, uint32_t biomeId, const
 
 static void generate_from_paint( const proc_rule_t *rule, uint32_t seed )
 {
-	const float area = M_PI * rule->radius * rule->radius;
+	const float area = M_PI * rule->paint.radius * rule->paint.radius;
 	const float density = rule->density * ( r_procDressingDensity ? r_procDressingDensity->value : 1.0f );
 	const float targetF = Com_Clamp( 0.0f, (float)rule->maxInstances, area * density );
 	const uint32_t target = (uint32_t)targetF;
 	const proc_biome_t *biome = get_biome( rule->biomeId );
 
 	for ( uint32_t i = 0; i < target && vk.procDressing.instanceCount < VK_MAX_PROC_INSTANCES; ++i ) {
-		const float r = rule->radius * sqrtf( hash_float01( seed + i ) );
+		const float r = rule->paint.radius * sqrtf( hash_float01( seed + i ) );
 		const float theta = hash_float01( seed + i * 3 + 7 ) * (float)( 2.0 * M_PI );
 		vec3_t pos;
-		pos[0] = rule->a[0] + r * cosf( theta );
-		pos[1] = rule->a[1] + r * sinf( theta );
-		pos[2] = rule->a[2];
+		pos[0] = rule->paint.center[0] + r * cosf( theta );
+		pos[1] = rule->paint.center[1] + r * sinf( theta );
+		pos[2] = rule->paint.center[2];
 
 		const float jitter = ( hash_float01( seed + i * 5 + 13 ) - 0.5f ) * rule->jitter;
 		pos[2] += jitter;
@@ -158,7 +158,7 @@ static void generate_from_paint( const proc_rule_t *rule, uint32_t seed )
 static void generate_from_volume( const proc_rule_t *rule, uint32_t seed )
 {
 	vec3_t extents;
-	VectorSubtract( rule->maxs, rule->mins, extents );
+	VectorSubtract( rule->volume.maxs, rule->volume.mins, extents );
 	const float area = extents[0] * extents[1];
 	const float density = rule->density * ( r_procDressingDensity ? r_procDressingDensity->value : 1.0f );
 	const float targetF = Com_Clamp( 0.0f, (float)rule->maxInstances, area * density );
@@ -167,9 +167,9 @@ static void generate_from_volume( const proc_rule_t *rule, uint32_t seed )
 
 	for ( uint32_t i = 0; i < target && vk.procDressing.instanceCount < VK_MAX_PROC_INSTANCES; ++i ) {
 		vec3_t pos;
-		pos[0] = rule->mins[0] + hash_float01( seed + i * 3 + 1 ) * extents[0];
-		pos[1] = rule->mins[1] + hash_float01( seed + i * 5 + 3 ) * extents[1];
-		pos[2] = rule->mins[2] + hash_float01( seed + i * 7 + 5 ) * extents[2];
+		pos[0] = rule->volume.mins[0] + hash_float01( seed + i * 3 + 1 ) * extents[0];
+		pos[1] = rule->volume.mins[1] + hash_float01( seed + i * 5 + 3 ) * extents[1];
+		pos[2] = rule->volume.mins[2] + hash_float01( seed + i * 7 + 5 ) * extents[2];
 
 		const float scaleRand = hash_float01( seed + i * 9 + 11 );
 		const float scale = lerpf( biome->scaleRange[0], biome->scaleRange[1], scaleRand );
@@ -180,21 +180,21 @@ static void generate_from_volume( const proc_rule_t *rule, uint32_t seed )
 static void generate_from_spline( const proc_rule_t *rule, uint32_t seed )
 {
 	vec3_t delta;
-	VectorSubtract( rule->b, rule->a, delta );
+	VectorSubtract( rule->spline.end, rule->spline.start, delta );
 	const float length = VectorLength( delta );
 	const float density = rule->density * ( r_procDressingDensity ? r_procDressingDensity->value : 1.0f );
-	const float targetF = Com_Clamp( 0.0f, (float)rule->maxInstances, length * rule->radius * 2.0f * density );
+	const float targetF = Com_Clamp( 0.0f, (float)rule->maxInstances, length * rule->spline.radius * 2.0f * density );
 	const uint32_t target = (uint32_t)targetF;
 	const proc_biome_t *biome = get_biome( rule->biomeId );
 
 	for ( uint32_t i = 0; i < target && vk.procDressing.instanceCount < VK_MAX_PROC_INSTANCES; ++i ) {
 		const float t = hash_float01( seed + i * 13 + 3 );
 		vec3_t pos;
-		VectorMA( rule->a, t, delta, pos );
+		VectorMA( rule->spline.start, t, delta, pos );
 
 		// Scatter within radius
 		const float angle = hash_float01( seed + i * 17 + 9 ) * (float)( 2.0 * M_PI );
-		const float offset = rule->radius * ( hash_float01( seed + i * 19 + 11 ) - 0.5f );
+		const float offset = rule->spline.radius * ( hash_float01( seed + i * 19 + 11 ) - 0.5f );
 		pos[0] += cosf( angle ) * offset;
 		pos[1] += sinf( angle ) * offset;
 
