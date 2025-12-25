@@ -2571,6 +2571,313 @@ else()
     message(WARNING "Incremental build monitor script not found: scripts/incremental_build_monitor.cmake")
 endif()
 
+# ============================================================================
+# Build Optimization System Implementation
+# ============================================================================
+
+# Function to configure Link-Time Optimization (LTO)
+FUNCTION(CONFIGURE_LTO TARGET_NAME)
+    IF(NOT ENABLE_LTO)
+        RETURN()
+    ENDIF()
+
+    MESSAGE(STATUS "Configuring LTO for target: ${TARGET_NAME}")
+
+    IF(CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        # GCC LTO configuration
+        TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -flto -flto-partition=none)
+        TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE -flto -flto-partition=none)
+
+        # Additional GCC LTO optimizations
+        TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE
+            -fwhole-program         # Whole program optimization
+            -fipa-pta               # Interprocedural points-to analysis
+            -fipa-reference         # Interprocedural reference analysis
+        )
+
+    ELSEIF(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        # Clang LTO configuration
+        TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -flto)
+        TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE -flto)
+
+        # ThinLTO for faster compilation (Clang-specific)
+        OPTION(USE_THINLTO "Use ThinLTO instead of full LTO for faster builds" ON)
+        IF(USE_THINLTO)
+            TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -flto=thin)
+            TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE -flto=thin)
+            MESSAGE(STATUS "Using ThinLTO for faster incremental builds")
+        ENDIF()
+
+    ELSEIF(MSVC)
+        # MSVC LTO configuration
+        TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE /GL)  # Whole program optimization
+        TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE /LTCG)   # Link-time code generation
+    ENDIF()
+
+    MESSAGE(STATUS "LTO configured for ${TARGET_NAME}")
+ENDFUNCTION()
+
+# Function to configure binary size optimizations
+FUNCTION(CONFIGURE_BINARY_SIZE_OPTIMIZATION TARGET_NAME)
+    IF(NOT ENABLE_BINARY_SIZE_OPTIMIZATION)
+        RETURN()
+    ENDIF()
+
+    MESSAGE(STATUS "Configuring binary size optimization for target: ${TARGET_NAME}")
+
+    # Common size optimization flags
+    TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE
+        -Os                    # Optimize for size
+        -ffunction-sections    # Place each function in its own section
+        -fdata-sections        # Place each data item in its own section
+        -fno-exceptions        # Disable exception handling
+        -fno-rtti             # Disable RTTI (C++ only)
+        -fno-unwind-tables     # Remove unwind tables
+        -fomit-frame-pointer   # Omit frame pointers where possible
+        -fmerge-constants      # Merge identical constants
+        -fmerge-all-constants  # Merge all constants
+    )
+
+    # Linker optimizations for size
+    TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE
+        -Wl,--gc-sections      # Garbage collect unused sections
+        -Wl,--as-needed        # Only link libraries that are actually used
+        -Wl,--strip-all        # Strip all symbols (for release builds)
+        -Wl,--sort-common      # Sort common symbols by size
+        -Wl,--sort-section=alignment  # Sort sections by alignment
+    )
+
+    # Additional optimizations based on compiler
+    IF(CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE
+            -fipa-ra                # Interprocedural register allocation
+            -fipa-reference         # Interprocedural reference analysis
+            -fipa-pure-const        # Interprocedural pure/const analysis
+            -fshrink-wrap           # Shrink-wrap code around function calls
+            -fshrink-wrap-separate  # Separate shrink-wrapping
+        )
+
+        TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE
+            -Wl,--icf=all          # Identical Code Folding
+            -Wl,--print-gc-sections # Show garbage collected sections
+        )
+
+    ELSEIF(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE
+            -fvectorize-slp        # Enable SLP vectorization
+        )
+
+        TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE
+            -Wl,--icf=all          # Identical Code Folding
+        )
+    ENDIF()
+
+    MESSAGE(STATUS "Binary size optimization configured for ${TARGET_NAME}")
+ENDFUNCTION()
+
+# Function to configure dead code elimination
+FUNCTION(CONFIGURE_DEAD_CODE_ELIMINATION TARGET_NAME)
+    IF(NOT ENABLE_DEAD_CODE_ELIMINATION)
+        RETURN()
+    ENDIF()
+
+    MESSAGE(STATUS "Configuring dead code elimination for target: ${TARGET_NAME}")
+
+    # Aggressive dead code elimination
+    TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE
+        -ffunction-sections     # Place functions in separate sections
+        -fdata-sections         # Place data in separate sections
+        -fvisibility=hidden     # Hide symbols by default
+        -fvisibility-inlines-hidden  # Hide inline functions
+    )
+
+    # Linker dead code elimination
+    TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE
+        -Wl,--gc-sections       # Remove unused sections
+        -Wl,--print-gc-sections # Show what was removed (debug)
+        -Wl,--discard-all       # Discard local symbols
+        -Wl,--discard-locals    # Discard temporary local symbols
+    )
+
+    # Additional compiler-specific optimizations
+    IF(CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE
+            -fwhole-program       # Whole program optimization
+            -fipa-pta             # Points-to analysis
+            -fdevirtualize-at-ltrans # Devirtualization at link time
+        )
+    ENDIF()
+
+    MESSAGE(STATUS "Dead code elimination configured for ${TARGET_NAME}")
+ENDFUNCTION()
+
+# Function to configure Profile-Guided Optimization (PGO)
+FUNCTION(CONFIGURE_PGO TARGET_NAME)
+    IF(NOT ENABLE_PROFILE_GUIDED_OPTIMIZATION)
+        RETURN()
+    ENDIF()
+
+    MESSAGE(STATUS "Configuring PGO for target: ${TARGET_NAME}")
+
+    # PGO requires two-stage compilation
+    OPTION(PGO_INSTRUMENT "Build with PGO instrumentation" OFF)
+    OPTION(PGO_USE_PROFILE "Use PGO profile data for optimization" OFF)
+
+    IF(PGO_INSTRUMENT)
+        # Instrumentation phase
+        TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -fprofile-generate)
+        TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE -fprofile-generate)
+
+        MESSAGE(STATUS "PGO: Instrumentation phase configured")
+
+    ELSEIF(PGO_USE_PROFILE)
+        # Optimization phase
+        TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -fprofile-use -fprofile-correction)
+        TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE -fprofile-use)
+
+        MESSAGE(STATUS "PGO: Optimization phase configured")
+
+    ELSE()
+        MESSAGE(WARNING "PGO enabled but neither PGO_INSTRUMENT nor PGO_USE_PROFILE is set")
+    ENDIF()
+ENDFUNCTION()
+
+# Function to configure binary compression
+FUNCTION(CONFIGURE_BINARY_COMPRESSION TARGET_NAME)
+    IF(NOT ENABLE_BINARY_COMPRESSION)
+        RETURN()
+    ENDIF()
+
+    # Find UPX (Ultimate Packer for eXecutables)
+    FIND_PROGRAM(UPX_EXECUTABLE upx)
+    IF(UPX_EXECUTABLE)
+        MESSAGE(STATUS "UPX found: ${UPX_EXECUTABLE}")
+
+        # Add UPX compression as post-build step
+        ADD_CUSTOM_COMMAND(TARGET ${TARGET_NAME} POST_BUILD
+            COMMAND ${UPX_EXECUTABLE} --best --lzma $<TARGET_FILE:${TARGET_NAME}>
+            COMMENT "Compressing binary with UPX"
+        )
+
+        MESSAGE(STATUS "Binary compression configured for ${TARGET_NAME}")
+    ELSE()
+        MESSAGE(WARNING "UPX not found. Install UPX for binary compression.")
+        SET(ENABLE_BINARY_COMPRESSION OFF CACHE BOOL "" FORCE)
+    ENDIF()
+ENDFUNCTION()
+
+# Function to monitor build performance and size
+FUNCTION(MONITOR_BUILD_OPTIMIZATION TARGET_NAME)
+    IF(NOT ENABLE_BUILD_PERFORMANCE_MONITORING)
+        RETURN()
+    ENDIF()
+
+    # Get build start time
+    STRING(TIMESTAMP BUILD_START_TIME "%s" UTC)
+
+    # Add post-build analysis
+    ADD_CUSTOM_COMMAND(TARGET ${TARGET_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND}
+            -D TARGET_FILE=$<TARGET_FILE:${TARGET_NAME}>
+            -D BUILD_START_TIME=${BUILD_START_TIME}
+            -D CMAKE_BINARY_DIR=${CMAKE_BINARY_DIR}
+            -P ${CMAKE_SOURCE_DIR}/scripts/analyze_build_optimization.cmake
+        COMMENT "Analyzing build optimization results"
+    )
+ENDFUNCTION()
+
+# ============================================================================
+# Apply Build Optimizations to All Targets
+# ============================================================================
+
+# Apply optimizations to main executable
+IF(TARGET ${CNAME}${BINEXT})
+    CONFIGURE_LTO(${CNAME}${BINEXT})
+    CONFIGURE_BINARY_SIZE_OPTIMIZATION(${CNAME}${BINEXT})
+    CONFIGURE_DEAD_CODE_ELIMINATION(${CNAME}${BINEXT})
+    CONFIGURE_PGO(${CNAME}${BINEXT})
+    CONFIGURE_BINARY_COMPRESSION(${CNAME}${BINEXT})
+    MONITOR_BUILD_OPTIMIZATION(${CNAME}${BINEXT})
+    MESSAGE(STATUS "Applied build optimizations to main executable: ${CNAME}${BINEXT}")
+ENDIF()
+
+# Apply optimizations to renderer libraries
+IF(TARGET ${RENDERER_PREFIX}_opengl${RENDEXT})
+    CONFIGURE_LTO(${RENDERER_PREFIX}_opengl${RENDEXT})
+    CONFIGURE_BINARY_SIZE_OPTIMIZATION(${RENDERER_PREFIX}_opengl${RENDEXT})
+    CONFIGURE_DEAD_CODE_ELIMINATION(${RENDERER_PREFIX}_opengl${RENDEXT})
+    MONITOR_BUILD_OPTIMIZATION(${RENDERER_PREFIX}_opengl${RENDEXT})
+    MESSAGE(STATUS "Applied build optimizations to OpenGL renderer: ${RENDERER_PREFIX}_opengl${RENDEXT}")
+ENDIF()
+
+IF(TARGET ${RENDERER_PREFIX}_vulkan${RENDEXT})
+    CONFIGURE_LTO(${RENDERER_PREFIX}_vulkan${RENDEXT})
+    CONFIGURE_BINARY_SIZE_OPTIMIZATION(${RENDERER_PREFIX}_vulkan${RENDEXT})
+    CONFIGURE_DEAD_CODE_ELIMINATION(${RENDERER_PREFIX}_vulkan${RENDEXT})
+    MONITOR_BUILD_OPTIMIZATION(${RENDERER_PREFIX}_vulkan${RENDEXT})
+    MESSAGE(STATUS "Applied build optimizations to Vulkan renderer: ${RENDERER_PREFIX}_vulkan${RENDEXT}")
+ENDIF()
+
+# Apply to other renderers if they exist
+IF(TARGET ${RENDERER_PREFIX}_d3d12${RENDEXT})
+    CONFIGURE_LTO(${RENDERER_PREFIX}_d3d12${RENDEXT})
+    CONFIGURE_BINARY_SIZE_OPTIMIZATION(${RENDERER_PREFIX}_d3d12${RENDEXT})
+    CONFIGURE_DEAD_CODE_ELIMINATION(${RENDERER_PREFIX}_d3d12${RENDEXT})
+    MONITOR_BUILD_OPTIMIZATION(${RENDERER_PREFIX}_d3d12${RENDEXT})
+    MESSAGE(STATUS "Applied build optimizations to D3D12 renderer: ${RENDERER_PREFIX}_d3d12${RENDEXT}")
+ENDIF()
+
+IF(TARGET ${RENDERER_PREFIX}_metal${RENDEXT})
+    CONFIGURE_LTO(${RENDERER_PREFIX}_metal${RENDEXT})
+    CONFIGURE_BINARY_SIZE_OPTIMIZATION(${RENDERER_PREFIX}_metal${RENDEXT})
+    CONFIGURE_DEAD_CODE_ELIMINATION(${RENDERER_PREFIX}_metal${RENDEXT})
+    MONITOR_BUILD_OPTIMIZATION(${RENDERER_PREFIX}_metal${RENDEXT})
+    MESSAGE(STATUS "Applied build optimizations to Metal renderer: ${RENDERER_PREFIX}_metal${RENDEXT}")
+ENDIF()
+
+# Apply to static renderer objects (non-dlopen builds)
+IF(NOT USE_RENDERER_DLOPEN)
+    IF(TARGET ${RENDERER_PREFIX}_opengl)
+        CONFIGURE_LTO(${RENDERER_PREFIX}_opengl)
+        CONFIGURE_BINARY_SIZE_OPTIMIZATION(${RENDERER_PREFIX}_opengl)
+        CONFIGURE_DEAD_CODE_ELIMINATION(${RENDERER_PREFIX}_opengl)
+        MONITOR_BUILD_OPTIMIZATION(${RENDERER_PREFIX}_opengl)
+    ENDIF()
+    IF(TARGET ${RENDERER_PREFIX}_vulkan)
+        CONFIGURE_LTO(${RENDERER_PREFIX}_vulkan)
+        CONFIGURE_BINARY_SIZE_OPTIMIZATION(${RENDERER_PREFIX}_vulkan)
+        CONFIGURE_DEAD_CODE_ELIMINATION(${RENDERER_PREFIX}_vulkan)
+        MONITOR_BUILD_OPTIMIZATION(${RENDERER_PREFIX}_vulkan)
+    ENDIF()
+    IF(TARGET ${RENDERER_PREFIX}_d3d12)
+        CONFIGURE_LTO(${RENDERER_PREFIX}_d3d12)
+        CONFIGURE_BINARY_SIZE_OPTIMIZATION(${RENDERER_PREFIX}_d3d12)
+        CONFIGURE_DEAD_CODE_ELIMINATION(${RENDERER_PREFIX}_d3d12)
+        MONITOR_BUILD_OPTIMIZATION(${RENDERER_PREFIX}_d3d12)
+    ENDIF()
+    IF(TARGET ${RENDERER_PREFIX}_metal)
+        CONFIGURE_LTO(${RENDERER_PREFIX}_metal)
+        CONFIGURE_BINARY_SIZE_OPTIMIZATION(${RENDERER_PREFIX}_metal)
+        CONFIGURE_DEAD_CODE_ELIMINATION(${RENDERER_PREFIX}_metal)
+        MONITOR_BUILD_OPTIMIZATION(${RENDERER_PREFIX}_metal)
+    ENDIF()
+ENDIF()
+
+# Display build optimization status
+IF(ENABLE_BUILD_OPTIMIZATION)
+    MESSAGE(STATUS "============================================================")
+    MESSAGE(STATUS "Build Optimization Configuration:")
+    MESSAGE(STATUS "  LTO: ${ENABLE_LTO}")
+    MESSAGE(STATUS "  Binary Size Optimization: ${ENABLE_BINARY_SIZE_OPTIMIZATION}")
+    MESSAGE(STATUS "  Dead Code Elimination: ${ENABLE_DEAD_CODE_ELIMINATION}")
+    MESSAGE(STATUS "  PGO: ${ENABLE_PROFILE_GUIDED_OPTIMIZATION}")
+    MESSAGE(STATUS "  Binary Compression: ${ENABLE_BINARY_COMPRESSION}")
+    MESSAGE(STATUS "  Build Monitoring: ${ENABLE_BUILD_PERFORMANCE_MONITORING}")
+    MESSAGE(STATUS "============================================================")
+ELSE()
+    MESSAGE(STATUS "Build optimizations disabled (ENABLE_BUILD_OPTIMIZATION=OFF)")
+ENDIF()
+
 # Display incremental build status
 IF(ENABLE_CCACHE OR ENABLE_NINJA OR ENABLE_BUILD_CACHE)
     MESSAGE(STATUS "============================================================")
@@ -3322,6 +3629,54 @@ IF(BUILD_TESTS)
 	TARGET_COMPILE_DEFINITIONS(test_performance_counters PRIVATE STANDALONE_TEST)
 	ADD_TEST(NAME performance_counters_tests COMMAND test_performance_counters)
 
+	ADD_EXECUTABLE(test_performance_regression
+		tests/test_performance_regression.c
+		src/common/performance_regression.c)
+	TARGET_INCLUDE_DIRECTORIES(test_performance_regression PRIVATE src/common)
+	TARGET_INCLUDE_DIRECTORIES(test_performance_regression PRIVATE src)
+	TARGET_COMPILE_DEFINITIONS(test_performance_regression PRIVATE STANDALONE_TEST)
+	ADD_TEST(NAME performance_regression_tests COMMAND test_performance_regression)
+
+	ADD_EXECUTABLE(test_compatibility
+		tests/test_compatibility.c
+		src/common/compatibility_test.c)
+	TARGET_INCLUDE_DIRECTORIES(test_compatibility PRIVATE src/common)
+	TARGET_INCLUDE_DIRECTORIES(test_compatibility PRIVATE src)
+	TARGET_COMPILE_DEFINITIONS(test_compatibility PRIVATE STANDALONE_TEST)
+	ADD_TEST(NAME compatibility_tests COMMAND test_compatibility)
+
+	ADD_EXECUTABLE(test_asset_validation
+		tests/test_asset_validation.c
+		src/common/asset_validation.c)
+	TARGET_INCLUDE_DIRECTORIES(test_asset_validation PRIVATE src/common)
+	TARGET_INCLUDE_DIRECTORIES(test_asset_validation PRIVATE src)
+	TARGET_COMPILE_DEFINITIONS(test_asset_validation PRIVATE STANDALONE_TEST)
+	ADD_TEST(NAME asset_validation_tests COMMAND test_asset_validation)
+
+	ADD_EXECUTABLE(test_binary_analysis
+		tests/test_binary_analysis.c
+		src/common/binary_analysis.c)
+	TARGET_INCLUDE_DIRECTORIES(test_binary_analysis PRIVATE src/common)
+	TARGET_INCLUDE_DIRECTORIES(test_binary_analysis PRIVATE src)
+	TARGET_COMPILE_DEFINITIONS(test_binary_analysis PRIVATE STANDALONE_TEST)
+	ADD_TEST(NAME binary_analysis_tests COMMAND test_binary_analysis)
+
+	ADD_EXECUTABLE(test_update_system
+		tests/test_update_system.c
+		src/common/update_system.c)
+	TARGET_INCLUDE_DIRECTORIES(test_update_system PRIVATE src/common)
+	TARGET_INCLUDE_DIRECTORIES(test_update_system PRIVATE src)
+	TARGET_COMPILE_DEFINITIONS(test_update_system PRIVATE STANDALONE_TEST)
+	ADD_TEST(NAME update_system_tests COMMAND test_update_system)
+
+	ADD_EXECUTABLE(test_package_generator
+		tests/test_package_generator.c
+		src/common/package_generator.c)
+	TARGET_INCLUDE_DIRECTORIES(test_package_generator PRIVATE src/common)
+	TARGET_INCLUDE_DIRECTORIES(test_package_generator PRIVATE src)
+	TARGET_COMPILE_DEFINITIONS(test_package_generator PRIVATE STANDALONE_TEST)
+	ADD_TEST(NAME package_generator_tests COMMAND test_package_generator)
+
 	ADD_EXECUTABLE(test_memory
 		tests/test_memory.c)
 	TARGET_INCLUDE_DIRECTORIES(test_memory PRIVATE src/common)
@@ -3484,6 +3839,12 @@ ADD_TEST(NAME property_based_tests COMMAND test_property_based)
 
 	# Apply security hardening to test executables
 	APPLY_SECURITY_HARDENING(test_performance_counters)
+	APPLY_SECURITY_HARDENING(test_performance_regression)
+	APPLY_SECURITY_HARDENING(test_compatibility)
+	APPLY_SECURITY_HARDENING(test_asset_validation)
+	APPLY_SECURITY_HARDENING(test_binary_analysis)
+	APPLY_SECURITY_HARDENING(test_update_system)
+	APPLY_SECURITY_HARDENING(test_package_generator)
 	APPLY_SECURITY_HARDENING(test_memory)
 	APPLY_SECURITY_HARDENING(test_filesystem_v2)
 	APPLY_SECURITY_HARDENING(test_geometry)

@@ -38,12 +38,19 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "code_quality.h"
 #include "technical_debt.h"
 #include "performance_benchmark.h"
+#include "performance_regression.h"
+#include "compatibility_test.h"
+#include "asset_validation.h"
+#include "binary_analysis.h"
+#include "update_system.h"
+#include "package_generator.h"
 #include "type_safety.h"
 #include "error_handling.h"
 #include "resource_management.h"
 #include "security_config.h"
 #include "incremental_build.h"
 #include "build_optimization.h"
+#include "asset_cooking.h"
 #include "cross_platform_test.h"
 #include "profiler.h"
 #include "performance_counters.h"
@@ -261,11 +268,19 @@ static void Com_ThreadSafetyTest_f( void );
 static void Com_CodeQuality_f( void );
 static void Com_TechnicalDebt_f( void );
 static void Com_PerformanceBenchmark_f( void );
+static void Com_PerformanceRegression_f( void );
+static void Com_CompatibilityTest_f( void );
+static void Com_AssetValidation_f( void );
+static void Com_BinaryAnalysis_f( void );
+static void Com_UpdateSystem_f( void );
+static void Com_PackageGenerator_f( void );
 static void Com_TypeSafety_f( void );
 static void Com_ErrorHandling_f( void );
 static void Com_ResourceManagement_f( void );
 static void Com_Security_f( void );
 static void Com_IncrementalBuild_f( void );
+static void Com_BuildOptimization_f( void );
+static void Com_AssetCooking_f( void );
 void CIN_CloseAllVideos( void );
 
 //============================================================================
@@ -2680,11 +2695,19 @@ static void Com_InitHunkMemory( void ) {
 	Cmd_AddCommand( "quality", Com_CodeQuality_f );
 	Cmd_AddCommand( "debt", Com_TechnicalDebt_f );
 	Cmd_AddCommand( "benchmark", Com_PerformanceBenchmark_f );
+	Cmd_AddCommand( "regression", Com_PerformanceRegression_f );
+	Cmd_AddCommand( "compatibility", Com_CompatibilityTest_f );
+	Cmd_AddCommand( "validate", Com_AssetValidation_f );
+	Cmd_AddCommand( "analyze", Com_BinaryAnalysis_f );
+	Cmd_AddCommand( "update", Com_UpdateSystem_f );
+	Cmd_AddCommand( "package", Com_PackageGenerator_f );
 	Cmd_AddCommand( "typesafety", Com_TypeSafety_f );
 	Cmd_AddCommand( "error", Com_ErrorHandling_f );
 	Cmd_AddCommand( "resource", Com_ResourceManagement_f );
 	Cmd_AddCommand( "security", Com_Security_f );
 	Cmd_AddCommand( "ibuild", Com_IncrementalBuild_f );
+	Cmd_AddCommand( "bopt", Com_BuildOptimization_f );
+	Cmd_AddCommand( "cook", Com_AssetCooking_f );
 
 	// Initialize memory statistics tracking
 	MemStats_Init();
@@ -4826,6 +4849,36 @@ Cvar_SetDescription( cg_screenFlash, "Enable screen flash effects" );
 		Com_Printf("Failed to initialize performance benchmarking system\n");
 	}
 
+	// Initialize performance regression testing system
+	if (!Regression_Init("performance_baseline.txt")) {
+		Com_Printf("Failed to initialize performance regression testing system\n");
+	}
+
+	// Initialize comprehensive compatibility testing system
+	if (!Compatibility_Init()) {
+		Com_Printf("Failed to initialize compatibility testing system\n");
+	}
+
+	// Initialize asset validation system
+	if (!AssetValidation_Init()) {
+		Com_Printf("Failed to initialize asset validation system\n");
+	}
+
+	// Initialize binary analysis system
+	if (!BinaryAnalysis_Init()) {
+		Com_Printf("Failed to initialize binary analysis system\n");
+	}
+
+	// Initialize update system
+	if (!UpdateSystem_Init()) {
+		Com_Printf("Failed to initialize update system\n");
+	}
+
+	// Initialize automated packaging system
+	if (!PackageGenerator_Init()) {
+		Com_Printf("Failed to initialize automated packaging system\n");
+	}
+
 	// Initialize type safety framework
 	if (!TypeSafety_Init()) {
 		Com_Printf("Failed to initialize type safety framework\n");
@@ -4846,6 +4899,12 @@ Cvar_SetDescription( cg_screenFlash, "Enable screen flash effects" );
 
 	// Initialize incremental build monitoring
 	IncrementalBuild_Init("build_stats.txt", ".ccache");
+
+	// Initialize build optimization monitoring
+	BuildOptimization_Init("build_optimization_stats.txt", "build_optimization_report.txt");
+
+	// Initialize asset cooking pipeline
+	AssetCooking_Init("assets/source", "assets/cooked", "assets/cache");
 
 	VM_Init();
 	SV_Init();
@@ -5515,6 +5574,24 @@ static void Com_Shutdown( void ) {
 	// Shutdown performance benchmarking system
 	Benchmark_Shutdown();
 
+	// Shutdown performance regression testing system
+	Regression_Shutdown();
+
+	// Shutdown comprehensive compatibility testing system
+	Compatibility_Shutdown();
+
+	// Shutdown asset validation system
+	AssetValidation_Shutdown();
+
+	// Shutdown binary analysis system
+	BinaryAnalysis_Shutdown();
+
+	// Shutdown update system
+	UpdateSystem_Shutdown();
+
+	// Shutdown automated packaging system
+	PackageGenerator_Shutdown();
+
 	// Shutdown type safety framework
 	TypeSafety_Shutdown();
 
@@ -5526,6 +5603,12 @@ static void Com_Shutdown( void ) {
 
 	// Shutdown incremental build monitoring
 	IncrementalBuild_Shutdown();
+
+	// Shutdown build optimization monitoring
+	BuildOptimization_Shutdown();
+
+	// Shutdown asset cooking pipeline
+	AssetCooking_Shutdown();
 }
 
 //------------------------------------------------------------------------
@@ -10115,5 +10198,665 @@ static void Com_IncrementalBuild_f( void ) {
 	else {
 		Com_Printf( "Unknown command: %s\n", cmd );
 		Com_Printf( "Use 'ibuild' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_BuildOptimization_f
+=================
+*/
+static void Com_BuildOptimization_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: bopt <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status          - Show build optimization status\n" );
+		Com_Printf( "  metrics         - Show current build metrics\n" );
+		Com_Printf( "  report          - Generate optimization report\n" );
+		Com_Printf( "  analyze         - Show binary analysis\n" );
+		Com_Printf( "  reset           - Reset optimization statistics\n" );
+		Com_Printf( "  effective       - Check if optimizations are effective\n" );
+		Com_Printf( "  size            - Show binary size information\n" );
+		Com_Printf( "\nBuild optimization monitoring: %s\n",
+			build_optimization_monitor.enabled ? "Enabled" : "Disabled");
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		BuildOptimization_Status_f();
+	}
+	else if ( Q_stricmp( cmd, "metrics" ) == 0 ) {
+		BuildOptimization_Metrics_f();
+	}
+	else if ( Q_stricmp( cmd, "report" ) == 0 ) {
+		BuildOptimization_Report_f();
+	}
+	else if ( Q_stricmp( cmd, "analyze" ) == 0 ) {
+		BuildOptimization_Analyze_f();
+	}
+	else if ( Q_stricmp( cmd, "reset" ) == 0 ) {
+		BuildOptimization_Reset_f();
+	}
+	else if ( Q_stricmp( cmd, "effective" ) == 0 ) {
+		qboolean effective = BuildOptimization_IsOptimizationEffective();
+		Com_Printf( "Build optimizations are %seffective\n", effective ? "" : "not ");
+	}
+	else if ( Q_stricmp( cmd, "size" ) == 0 ) {
+		uint64_t avg_size = BuildOptimization_GetAverageBinarySize();
+		uint64_t current_size = build_optimization_monitor.current_metrics.binary_size_bytes;
+		double reduction = BuildOptimization_GetSizeReduction();
+
+		Com_Printf( "=== Binary Size Information ===\n" );
+		Com_Printf( "Current Size: %.2f MB (%llu bytes)\n",
+			current_size / (1024.0 * 1024.0), current_size );
+		Com_Printf( "Average Size: %.2f MB (%llu bytes)\n",
+			avg_size / (1024.0 * 1024.0), avg_size );
+		Com_Printf( "Size Reduction: %.1f%%\n", reduction );
+		Com_Printf( "===============================\n" );
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'bopt' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_AssetCooking_f
+=================
+*/
+static void Com_AssetCooking_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: cook <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status          - Show cooking pipeline status\n" );
+		Com_Printf( "  cook <asset> [quality] [type] - Cook single asset\n" );
+		Com_Printf( "  batch           - Process all queued cooking jobs\n" );
+		Com_Printf( "  quality <level> - Set cooking quality (potato/low/medium/high/ultra)\n" );
+		Com_Printf( "  platform <type> - Set target platform (desktop/mobile/console/web)\n" );
+		Com_Printf( "  stats           - Show cooking statistics\n" );
+		Com_Printf( "  report          - Generate cooking report\n" );
+		Com_Printf( "  cache           - Show cache information\n" );
+		Com_Printf( "  reset           - Reset cooking statistics\n" );
+		Com_Printf( "\nAsset cooking pipeline: %s\n",
+			cooking_pipeline.enabled ? "Enabled" : "Disabled");
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		AssetCooking_Status_f();
+	}
+	else if ( Q_stricmp( cmd, "cook" ) == 0 ) {
+		AssetCooking_Cook_f();
+	}
+	else if ( Q_stricmp( cmd, "batch" ) == 0 ) {
+		AssetCooking_BatchCook_f();
+	}
+	else if ( Q_stricmp( cmd, "quality" ) == 0 ) {
+		AssetCooking_Quality_f();
+	}
+	else if ( Q_stricmp( cmd, "platform" ) == 0 ) {
+		AssetCooking_Platform_f();
+	}
+	else if ( Q_stricmp( cmd, "stats" ) == 0 ) {
+		AssetCooking_PrintStatistics();
+	}
+	else if ( Q_stricmp( cmd, "report" ) == 0 ) {
+		AssetCooking_Report_f();
+	}
+	else if ( Q_stricmp( cmd, "cache" ) == 0 ) {
+		AssetCooking_Cache_f();
+	}
+	else if ( Q_stricmp( cmd, "reset" ) == 0 ) {
+		AssetCooking_ResetStatistics();
+		Com_Printf( "Asset cooking statistics reset\n" );
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'cook' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_PerformanceRegression_f
+=================
+*/
+static void Com_PerformanceRegression_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: regression <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status              - Show regression testing status\n" );
+		Com_Printf( "  run <test_name>     - Run specific regression test\n" );
+		Com_Printf( "  runall              - Run all regression tests\n" );
+		Com_Printf( "  add-rendering <map> <quality> - Add rendering performance test\n" );
+		Com_Printf( "  add-memory <size_kb> <count> - Add memory stress test\n" );
+		Com_Printf( "  add-io <file> <size_mb> - Add I/O benchmark test\n" );
+		Com_Printf( "  list                - List configured tests\n" );
+		Com_Printf( "  results             - Show test results\n" );
+		Com_Printf( "  summary             - Show test summary\n" );
+		Com_Printf( "  save <file>         - Save results to file\n" );
+		Com_Printf( "  load <file>         - Load results from file\n" );
+		Com_Printf( "  baseline update <test> - Update baseline for test\n" );
+		Com_Printf( "  baseline reset <test> - Reset baseline for test\n" );
+		Com_Printf( "  ci-check            - Check CI thresholds\n" );
+		Com_Printf( "  ci-report <file>    - Generate CI report\n" );
+		Com_Printf( "  cancel              - Cancel currently running test\n" );
+		Com_Printf( "\nSystem Status: %s\n",
+			regression_system.initialized ? "Initialized" : "Not initialized");
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		Com_Printf( "=== Performance Regression Status ===\n" );
+		Com_Printf( "Initialized: %s\n", regression_system.initialized ? "Yes" : "No" );
+
+		if ( regression_system.initialized ) {
+			Com_Printf( "Tests configured: %u/%u\n", regression_system.test_count, regression_system.max_tests );
+			Com_Printf( "Results available: %u/%u\n", regression_system.result_count, regression_system.max_results );
+			Com_Printf( "Currently testing: %s\n", regression_system.currently_testing ?
+				regression_system.current_test : "None" );
+			Com_Printf( "Auto baseline update: %s\n", regression_system.auto_update_baseline ? "Enabled" : "Disabled" );
+			Com_Printf( "Baseline file: %s\n", regression_system.baseline_file );
+			Com_Printf( "Regression threshold: %.1f%%\n", regression_system.regression_threshold );
+		}
+	}
+	else if ( Q_stricmp( cmd, "run" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: regression run <test_name>\n" );
+			return;
+		}
+
+		const char* test_name = Cmd_Argv(2);
+
+		if ( Regression_RunTest( test_name ) ) {
+			Com_Printf( "Started regression test: %s\n", test_name );
+		} else {
+			Com_Printf( "Failed to start regression test: %s\n", test_name );
+		}
+	}
+	else if ( Q_stricmp( cmd, "runall" ) == 0 ) {
+		if ( Regression_RunAllTests() ) {
+			Com_Printf( "Started all regression tests\n" );
+		} else {
+			Com_Printf( "Failed to start regression tests\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "add-rendering" ) == 0 ) {
+		if ( Cmd_Argc() < 4 ) {
+			Com_Printf( "Usage: regression add-rendering <map> <quality>\n" );
+			Com_Printf( "Quality: 0=Potato, 1=Low, 2=Medium, 3=High, 4=Ultra\n" );
+			return;
+		}
+
+		const char* map_name = Cmd_Argv(2);
+		int quality = atoi( Cmd_Argv(3) );
+
+		if ( Regression_AddStandardRenderingTest( map_name, quality ) ) {
+			Com_Printf( "Added rendering regression test for %s at quality %d\n", map_name, quality );
+		} else {
+			Com_Printf( "Failed to add rendering regression test\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "add-memory" ) == 0 ) {
+		if ( Cmd_Argc() < 4 ) {
+			Com_Printf( "Usage: regression add-memory <size_kb> <count>\n" );
+			return;
+		}
+
+		int size_kb = atoi( Cmd_Argv(2) );
+		int count = atoi( Cmd_Argv(3) );
+
+		if ( Regression_AddMemoryStressTest( size_kb * 1024, count ) ) {
+			Com_Printf( "Added memory stress test (%d KB x %d)\n", size_kb, count );
+		} else {
+			Com_Printf( "Failed to add memory stress test\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "add-io" ) == 0 ) {
+		if ( Cmd_Argc() < 4 ) {
+			Com_Printf( "Usage: regression add-io <file> <size_mb>\n" );
+			return;
+		}
+
+		const char* test_file = Cmd_Argv(2);
+		int size_mb = atoi( Cmd_Argv(3) );
+
+		if ( Regression_AddIOBenchmarkTest( test_file, size_mb * 1024 * 1024 ) ) {
+			Com_Printf( "Added I/O benchmark test for %s (%d MB)\n", test_file, size_mb );
+		} else {
+			Com_Printf( "Failed to add I/O benchmark test\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "list" ) == 0 ) {
+		Com_Printf( "=== Configured Regression Tests ===\n" );
+
+		for ( uint32_t i = 0; i < regression_system.test_count; i++ ) {
+			const regression_test_config_t* test = &regression_system.tests[i];
+			Com_Printf( "%s: %s\n", test->test_name, test->description );
+			Com_Printf( "  Warmup: %d frames, Measure: %d frames\n",
+				test->warmup_frames, test->measurement_frames );
+			Com_Printf( "  FPS Threshold: %.1f, Regression Threshold: %.1f%%\n",
+				test->fps_threshold, test->regression_threshold );
+		}
+
+		if ( regression_system.test_count == 0 ) {
+			Com_Printf( "No regression tests configured\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "results" ) == 0 ) {
+		Regression_PrintDetailedResults();
+	}
+	else if ( Q_stricmp( cmd, "summary" ) == 0 ) {
+		Regression_PrintTestSummary();
+	}
+	else if ( Q_stricmp( cmd, "save" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: regression save <filename>\n" );
+			return;
+		}
+
+		const char* filename = Cmd_Argv(2);
+
+		if ( Regression_SaveResults( filename ) ) {
+			Com_Printf( "Results saved to: %s\n", filename );
+		} else {
+			Com_Printf( "Failed to save results\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "load" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: regression load <filename>\n" );
+			return;
+		}
+
+		const char* filename = Cmd_Argv(2);
+
+		if ( Regression_LoadResults( filename ) ) {
+			Com_Printf( "Results loaded from: %s\n", filename );
+		} else {
+			Com_Printf( "Failed to load results\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "baseline" ) == 0 ) {
+		if ( Cmd_Argc() < 4 ) {
+			Com_Printf( "Usage: regression baseline <update|reset> <test_name>\n" );
+			return;
+		}
+
+		const char* action = Cmd_Argv(2);
+		const char* test_name = Cmd_Argv(3);
+
+		if ( Q_stricmp( action, "update" ) == 0 ) {
+			if ( Regression_UpdateBaseline( test_name ) ) {
+				Com_Printf( "Updated baseline for test: %s\n", test_name );
+			} else {
+				Com_Printf( "Failed to update baseline for test: %s\n", test_name );
+			}
+		}
+		else if ( Q_stricmp( action, "reset" ) == 0 ) {
+			if ( Regression_ResetBaseline( test_name ) ) {
+				Com_Printf( "Reset baseline for test: %s\n", test_name );
+			} else {
+				Com_Printf( "Failed to reset baseline for test: %s\n", test_name );
+			}
+		}
+		else {
+			Com_Printf( "Unknown baseline action: %s\n", action );
+		}
+	}
+	else if ( Q_stricmp( cmd, "ci-check" ) == 0 ) {
+		qboolean passed = Regression_CheckCIThresholds();
+		Com_Printf( "CI Check Result: %s\n", passed ? "PASSED" : "FAILED" );
+
+		if ( Regression_HasRegressions() ) {
+			int regression_count = Regression_GetRegressionCount();
+			Com_Printf( "Regressions detected: %d\n", regression_count );
+		}
+	}
+	else if ( Q_stricmp( cmd, "ci-report" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: regression ci-report <filename>\n" );
+			return;
+		}
+
+		const char* filename = Cmd_Argv(2);
+
+		if ( Regression_GenerateCIReport( filename ) ) {
+			Com_Printf( "CI report generated: %s\n", filename );
+		} else {
+			Com_Printf( "Failed to generate CI report\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "cancel" ) == 0 ) {
+		if ( Regression_CancelCurrentTest() ) {
+			Com_Printf( "Cancelled currently running test\n" );
+		} else {
+			Com_Printf( "No test currently running\n" );
+		}
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'regression' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_CompatibilityTest_f
+=================
+*/
+static void Com_CompatibilityTest_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: compatibility <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status              - Show compatibility system status\n" );
+		Com_Printf( "  test <type>         - Run specific compatibility test\n" );
+		Com_Printf( "  runall              - Run all compatibility tests\n" );
+		Com_Printf( "  info                - Show platform and hardware information\n" );
+		Com_Printf( "  features            - Show feature support matrix\n" );
+		Com_Printf( "  results             - Show test results\n" );
+		Com_Printf( "  report              - Generate compatibility report\n" );
+		Com_Printf( "  benchmark           - Run compatibility benchmark\n" );
+		Com_Printf( "  check               - Check minimum requirements\n" );
+		Com_Printf( "\nSystem Status: %s\n",
+			compatibility_system.initialized ? "Initialized" : "Not initialized");
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		Compatibility_Status_f();
+	}
+	else if ( Q_stricmp( cmd, "test" ) == 0 ) {
+		Compatibility_Test_f();
+	}
+	else if ( Q_stricmp( cmd, "runall" ) == 0 ) {
+		Com_Printf( "Running all compatibility tests...\n" );
+		qboolean result = Compatibility_RunComprehensiveTest();
+		Com_Printf( "Overall result: %s\n", result ? "COMPATIBLE" : "INCOMPATIBLE" );
+	}
+	else if ( Q_stricmp( cmd, "info" ) == 0 ) {
+		Compatibility_PrintPlatformInfo();
+		Compatibility_PrintHardwareInfo();
+	}
+	else if ( Q_stricmp( cmd, "features" ) == 0 ) {
+		Compatibility_PrintFeatureMatrix();
+	}
+	else if ( Q_stricmp( cmd, "results" ) == 0 ) {
+		Compatibility_PrintTestResults();
+	}
+	else if ( Q_stricmp( cmd, "report" ) == 0 ) {
+		Compatibility_Report_f();
+	}
+	else if ( Q_stricmp( cmd, "benchmark" ) == 0 ) {
+		Compatibility_Benchmark_f();
+	}
+	else if ( Q_stricmp( cmd, "check" ) == 0 ) {
+		qboolean met = Compatibility_CheckMinimumRequirements();
+		Com_Printf( "Minimum requirements: %s\n", met ? "MET" : "NOT MET" );
+
+		if (!met) {
+			Com_Printf( "This platform may not run the application properly.\n" );
+			Com_Printf( "Check the compatibility report for details.\n" );
+		}
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'compatibility' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_AssetValidation_f
+=================
+*/
+static void Com_AssetValidation_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: validate <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status              - Show validation system status\n" );
+		Com_Printf( "  validate <asset> [type] - Validate single asset\n" );
+		Com_Printf( "  batch <dir> [type]  - Validate all assets in directory\n" );
+		Com_Printf( "  results             - Show validation results\n" );
+		Com_Printf( "  report <file> [fmt] - Generate validation report\n" );
+		Com_Printf( "  stats               - Show validation statistics\n" );
+		Com_Printf( "  autofix             - Attempt to auto-fix issues\n" );
+		Com_Printf( "  clear               - Clear all validation results\n" );
+		Com_Printf( "\nSystem Status: %s\n",
+			asset_validation.initialized ? "Initialized" : "Not initialized");
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		AssetValidation_Status_f();
+	}
+	else if ( Q_stricmp( cmd, "validate" ) == 0 ) {
+		AssetValidation_Validate_f();
+	}
+	else if ( Q_stricmp( cmd, "batch" ) == 0 ) {
+		AssetValidation_BatchValidate_f();
+	}
+	else if ( Q_stricmp( cmd, "results" ) == 0 ) {
+		AssetValidation_PrintResults();
+	}
+	else if ( Q_stricmp( cmd, "report" ) == 0 ) {
+		AssetValidation_Report_f();
+	}
+	else if ( Q_stricmp( cmd, "stats" ) == 0 ) {
+		AssetValidation_Stats_f();
+	}
+	else if ( Q_stricmp( cmd, "autofix" ) == 0 ) {
+		AssetValidation_AutoFix_f();
+	}
+	else if ( Q_stricmp( cmd, "clear" ) == 0 ) {
+		AssetValidation_ClearResults();
+		Com_Printf( "Validation results cleared\n" );
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'validate' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_BinaryAnalysis_f
+=================
+*/
+static void Com_BinaryAnalysis_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: analyze <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status              - Show analysis system status\n" );
+		Com_Printf( "  analyze <binary>    - Analyze single binary\n" );
+		Com_Printf( "  batch <directory>   - Analyze all binaries in directory\n" );
+		Com_Printf( "  report <file> [fmt] - Generate analysis report\n" );
+		Com_Printf( "  stats               - Show analysis statistics\n" );
+		Com_Printf( "  security            - Show security analysis summary\n" );
+		Com_Printf( "  autofix             - Attempt to auto-fix issues\n" );
+		Com_Printf( "  ci-check            - Check CI security gates\n" );
+		Com_Printf( "  clear               - Clear all analysis results\n" );
+		Com_Printf( "\nSystem Status: %s\n",
+			binary_analysis.initialized ? "Initialized" : "Not initialized");
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		BinaryAnalysis_Status_f();
+	}
+	else if ( Q_stricmp( cmd, "analyze" ) == 0 ) {
+		BinaryAnalysis_Analyze_f();
+	}
+	else if ( Q_stricmp( cmd, "batch" ) == 0 ) {
+		BinaryAnalysis_BatchAnalyze_f();
+	}
+	else if ( Q_stricmp( cmd, "report" ) == 0 ) {
+		BinaryAnalysis_Report_f();
+	}
+	else if ( Q_stricmp( cmd, "stats" ) == 0 ) {
+		BinaryAnalysis_Stats_f();
+	}
+	else if ( Q_stricmp( cmd, "security" ) == 0 ) {
+		BinaryAnalysis_PrintSecuritySummary();
+	}
+	else if ( Q_stricmp( cmd, "autofix" ) == 0 ) {
+		BinaryAnalysis_AutoFix_f();
+	}
+	else if ( Q_stricmp( cmd, "ci-check" ) == 0 ) {
+		qboolean passed = BinaryAnalysis_CheckCISecurityGates();
+		char status[32];
+		BinaryAnalysis_GetSecurityStatus(status, sizeof(status));
+		Com_Printf( "CI Security Check: %s (%s)\n", passed ? "PASSED" : "FAILED", status );
+
+		if (!passed) {
+			Com_Printf( "CI pipeline should fail due to security issues\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "clear" ) == 0 ) {
+		BinaryAnalysis_ClearResults();
+		Com_Printf( "Analysis results cleared\n" );
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'analyze' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_UpdateSystem_f
+=================
+*/
+static void Com_UpdateSystem_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: update <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status              - Show update system status\n" );
+		Com_Printf( "  check               - Check for available updates\n" );
+		Com_Printf( "  download <id>       - Download specific update\n" );
+		Com_Printf( "  apply <id>          - Apply downloaded update\n" );
+		Com_Printf( "  rollback <id>       - Rollback applied update\n" );
+		Com_Printf( "  config              - Show update configuration\n" );
+		Com_Printf( "  report <file> [fmt] - Generate update report\n" );
+		Com_Printf( "  stats               - Show update statistics\n" );
+		Com_Printf( "  cancel              - Cancel current operation\n" );
+		Com_Printf( "  clear               - Clear update results\n" );
+		Com_Printf( "\nSystem Status: %s\n",
+			update_system.initialized ? "Initialized" : "Not initialized");
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		UpdateSystem_Status_f();
+	}
+	else if ( Q_stricmp( cmd, "check" ) == 0 ) {
+		UpdateSystem_Check_f();
+	}
+	else if ( Q_stricmp( cmd, "download" ) == 0 ) {
+		UpdateSystem_Download_f();
+	}
+	else if ( Q_stricmp( cmd, "apply" ) == 0 ) {
+		UpdateSystem_Apply_f();
+	}
+	else if ( Q_stricmp( cmd, "rollback" ) == 0 ) {
+		UpdateSystem_Rollback_f();
+	}
+	else if ( Q_stricmp( cmd, "config" ) == 0 ) {
+		UpdateSystem_Config_f();
+	}
+	else if ( Q_stricmp( cmd, "report" ) == 0 ) {
+		UpdateSystem_Report_f();
+	}
+	else if ( Q_stricmp( cmd, "stats" ) == 0 ) {
+		UpdateSystem_PrintStatistics();
+	}
+	else if ( Q_stricmp( cmd, "cancel" ) == 0 ) {
+		if (update_system.current_status == UPDATE_STATUS_DOWNLOADING) {
+			UpdateSystem_CancelDownload();
+			Com_Printf( "Download cancelled\n" );
+		} else if (update_system.current_status == UPDATE_STATUS_APPLYING) {
+			UpdateSystem_CancelUpdateApplication();
+			Com_Printf( "Update application cancelled\n" );
+		} else {
+			Com_Printf( "No operation to cancel\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "clear" ) == 0 ) {
+		UpdateSystem_ClearResults();
+		Com_Printf( "Update results cleared\n" );
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'update' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_PackageGenerator_f
+=================
+*/
+static void Com_PackageGenerator_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: package <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status              - Show packaging system status\n" );
+		Com_Printf( "  generate <name> [platform] [type] - Generate package\n" );
+		Com_Printf( "  batch               - Generate packages for all platforms\n" );
+		Com_Printf( "  validate <package>  - Validate package integrity\n" );
+		Com_Printf( "  report <file> [fmt] - Generate packaging report\n" );
+		Com_Printf( "  list                - List generated packages\n" );
+		Com_Printf( "  stats               - Show packaging statistics\n" );
+		Com_Printf( "  clear               - Clear package results\n" );
+		Com_Printf( "\nSystem Status: %s\n",
+			packaging_system.initialized ? "Initialized" : "Not initialized");
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		PackageGenerator_Status_f();
+	}
+	else if ( Q_stricmp( cmd, "generate" ) == 0 ) {
+		PackageGenerator_Generate_f();
+	}
+	else if ( Q_stricmp( cmd, "batch" ) == 0 ) {
+		PackageGenerator_BatchGenerate_f();
+	}
+	else if ( Q_stricmp( cmd, "validate" ) == 0 ) {
+		PackageGenerator_Validate_f();
+	}
+	else if ( Q_stricmp( cmd, "report" ) == 0 ) {
+		PackageGenerator_Report_f();
+	}
+	else if ( Q_stricmp( cmd, "list" ) == 0 ) {
+		PackageGenerator_List_f();
+	}
+	else if ( Q_stricmp( cmd, "stats" ) == 0 ) {
+		PackageGenerator_PrintStatistics();
+	}
+	else if ( Q_stricmp( cmd, "clear" ) == 0 ) {
+		PackageGenerator_ClearResults();
+		Com_Printf( "Package results cleared\n" );
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'package' with no arguments for help\n" );
 	}
 }
