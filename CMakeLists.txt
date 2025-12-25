@@ -1419,6 +1419,7 @@ IF(USE_RENDERER_DLOPEN)
 			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-missing-prototypes>
 			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-unused-variable>
 			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-pointer-arith>
+			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-sign-compare>
 		)
 
 		# VMA (Vulkan Memory Allocator) - configure after target is created

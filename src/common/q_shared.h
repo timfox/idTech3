@@ -75,15 +75,26 @@ typedef enum {
 
 // Basic type definitions needed for structs and inline functions
 typedef unsigned char byte;
+
+// Include stdbool.h for C99+ to get native bool support
+#if !defined(__cplusplus) && __STDC_VERSION__ >= 199901L
+#include <stdbool.h>
+#endif
+
+// Use native bool as the primary boolean type, keep qboolean for mod compatibility
 #ifdef __cplusplus  // For C++ mode
-typedef bool qboolean;
+typedef bool qboolean;  // Keep qboolean for backward compatibility
 #define qtrue true
 #define qfalse false
-#else  // For C mode - use native _Bool when available
-# if __STDC_VERSION__ >= 199901L  // C99 and later have _Bool
-typedef _Bool qboolean;
-#define qtrue ((_Bool)1)
-#define qfalse ((_Bool)0)
+#else  // For C mode
+# if __STDC_VERSION__ >= 202311L  // C23 has native bool keyword
+typedef bool qboolean;  // Keep qboolean for backward compatibility
+#define qtrue true
+#define qfalse false
+# elif __STDC_VERSION__ >= 199901L  // C99 and later have _Bool via stdbool.h
+typedef bool qboolean;  // Keep qboolean for backward compatibility (bool is _Bool)
+#define qtrue true
+#define qfalse false
 # else  // Fallback for pre-C99 compilers
 typedef enum { qfalse, qtrue } qboolean;
 # endif

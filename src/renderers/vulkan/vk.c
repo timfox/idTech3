@@ -3737,7 +3737,7 @@ static void vk_create_special_pipelines( void )
 				def.face_culling = j; // cullType_t value
 
 				for ( k = 0; k < 2; k++ ) {
-					def.polygon_offset = polygon_offset_array[ k ];
+                                        def.polygonOffset = polygon_offset_array[ k ];
 #ifdef USE_FOG_ONLY
 					def.shader_type = TYPE_FOG_ONLY;
 #else
@@ -3765,7 +3765,7 @@ static void vk_create_special_pipelines( void )
 		for (i = 0; i < 3; i++) { // cullType
 			def.face_culling = i;
 			for ( j = 0; j < 2; j++ ) { // polygonOffset
-				def.polygon_offset = polygon_offset_array[j];
+                                def.polygonOffset = polygon_offset_array[j];
 				for ( k = 0; k < 2; k++ ) {
 					def.fog_stage = k; // fogStage
 					for ( l = 0; l < 2; l++ ) {
@@ -3931,7 +3931,7 @@ typedef struct vk_attach_desc_s  {
 	VkFormat image_format;
 } vk_attach_desc_t;
 
-static vk_attach_desc_t attachments[ MAX_ATTACHMENTS_IN_POOL ] Q_UNUSED(attachments);
+static vk_attach_desc_t attachments[ MAX_ATTACHMENTS_IN_POOL ];
 static uint32_t num_attachments = 0;
 
 
