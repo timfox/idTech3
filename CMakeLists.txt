@@ -866,8 +866,8 @@ TARGET_COMPILE_DEFINITIONS(botlib PRIVATE BOTLIB)
 AUX_SOURCE_DIRECTORY(src/server SERVER_SRCS)
 list(REMOVE_ITEM SERVER_SRCS src/server/sv_rankings.c)
 
-# universal binary
-ADD_LIBRARY(common OBJECT ${QCOMMON_SRCS} ${SERVER_SRCS})
+# universal binary - common library should only contain truly common code
+ADD_LIBRARY(common OBJECT ${QCOMMON_SRCS})
 	TARGET_INCLUDE_DIRECTORIES(common PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/common)
 IF(USE_JOBSYSTEM)
 	TARGET_COMPILE_DEFINITIONS(common PRIVATE USE_JOBSYSTEM)
@@ -2810,11 +2810,12 @@ ENDIF()
 
 # Apply optimizations to renderer libraries
 IF(TARGET ${RENDERER_PREFIX}_opengl${RENDEXT})
-    CONFIGURE_LTO(${RENDERER_PREFIX}_opengl${RENDEXT})
+    # Skip LTO for dlopen renderers as it conflicts with --unresolved-symbols=ignore-all
+    # CONFIGURE_LTO(${RENDERER_PREFIX}_opengl${RENDEXT})
     CONFIGURE_BINARY_SIZE_OPTIMIZATION(${RENDERER_PREFIX}_opengl${RENDEXT})
     CONFIGURE_DEAD_CODE_ELIMINATION(${RENDERER_PREFIX}_opengl${RENDEXT})
-    MONITOR_BUILD_OPTIMIZATION(${RENDERER_PREFIX}_opengl${RENDEXT})
-    MESSAGE(STATUS "Applied build optimizations to OpenGL renderer: ${RENDERER_PREFIX}_opengl${RENDEXT}")
+    # MONITOR_BUILD_OPTIMIZATION(${RENDERER_PREFIX}_opengl${RENDEXT})  # Disabled - script missing
+    MESSAGE(STATUS "Applied build optimizations to OpenGL renderer: ${RENDERER_PREFIX}_opengl${RENDEXT} (LTO disabled for dlopen compatibility)")
 ENDIF()
 
 IF(TARGET ${RENDERER_PREFIX}_vulkan${RENDEXT})
@@ -3636,13 +3637,20 @@ IF(BUILD_TESTS)
 	TARGET_COMPILE_DEFINITIONS(test_performance_counters PRIVATE STANDALONE_TEST)
 	ADD_TEST(NAME performance_counters_tests COMMAND test_performance_counters)
 
-	ADD_EXECUTABLE(test_performance_regression
-		tests/test_performance_regression.c
-		src/common/performance_regression.c)
-	TARGET_INCLUDE_DIRECTORIES(test_performance_regression PRIVATE src/common)
-	TARGET_INCLUDE_DIRECTORIES(test_performance_regression PRIVATE src)
-	TARGET_COMPILE_DEFINITIONS(test_performance_regression PRIVATE STANDALONE_TEST)
-	ADD_TEST(NAME performance_regression_tests COMMAND test_performance_regression)
+ADD_EXECUTABLE(test_performance_regression
+	tests/test_performance_regression.c
+	src/common/performance_regression.c)
+TARGET_INCLUDE_DIRECTORIES(test_performance_regression PRIVATE src/common)
+TARGET_INCLUDE_DIRECTORIES(test_performance_regression PRIVATE src)
+TARGET_COMPILE_DEFINITIONS(test_performance_regression PRIVATE STANDALONE_TEST)
+TARGET_COMPILE_OPTIONS(test_performance_regression PRIVATE -w)
+TARGET_LINK_LIBRARIES(test_performance_regression PRIVATE common)
+# Add stub implementations for test executables
+TARGET_SOURCES(test_performance_regression PRIVATE tests/test_stubs.c)
+IF(UNIX)
+	TARGET_LINK_LIBRARIES(test_performance_regression PRIVATE m)
+ENDIF()
+ADD_TEST(NAME performance_regression_tests COMMAND test_performance_regression)
 
 	ADD_EXECUTABLE(test_compatibility
 		tests/test_compatibility.c
@@ -3652,13 +3660,19 @@ IF(BUILD_TESTS)
 	TARGET_COMPILE_DEFINITIONS(test_compatibility PRIVATE STANDALONE_TEST)
 	ADD_TEST(NAME compatibility_tests COMMAND test_compatibility)
 
-	ADD_EXECUTABLE(test_asset_validation
-		tests/test_asset_validation.c
-		src/common/asset_validation.c)
-	TARGET_INCLUDE_DIRECTORIES(test_asset_validation PRIVATE src/common)
-	TARGET_INCLUDE_DIRECTORIES(test_asset_validation PRIVATE src)
-	TARGET_COMPILE_DEFINITIONS(test_asset_validation PRIVATE STANDALONE_TEST)
-	ADD_TEST(NAME asset_validation_tests COMMAND test_asset_validation)
+ADD_EXECUTABLE(test_asset_validation
+	tests/test_asset_validation.c
+	src/common/asset_validation.c)
+TARGET_INCLUDE_DIRECTORIES(test_asset_validation PRIVATE src/common)
+TARGET_INCLUDE_DIRECTORIES(test_asset_validation PRIVATE src)
+TARGET_COMPILE_DEFINITIONS(test_asset_validation PRIVATE STANDALONE_TEST)
+TARGET_LINK_LIBRARIES(test_asset_validation PRIVATE common)
+TARGET_SOURCES(test_asset_validation PRIVATE tests/test_stubs.c)
+SET_SOURCE_FILES_PROPERTIES(tests/test_stubs.c PROPERTIES COMPILE_FLAGS "-w")
+IF(UNIX)
+	TARGET_LINK_LIBRARIES(test_asset_validation PRIVATE m)
+ENDIF()
+ADD_TEST(NAME asset_validation_tests COMMAND test_asset_validation)
 
 	ADD_EXECUTABLE(test_binary_analysis
 		tests/test_binary_analysis.c
@@ -3694,17 +3708,23 @@ IF(BUILD_TESTS)
 		TARGET_LINK_LIBRARIES(test_memory PRIVATE m)
 	ENDIF()
 
-	ADD_EXECUTABLE(test_filesystem_v2
-		tests/test_filesystem_v2.c
-		src/common/files_v2.c
-		src/common/files_v2_impl.c
-		src/common/q_shared.c
-	)
-	TARGET_INCLUDE_DIRECTORIES(test_filesystem_v2 PRIVATE src/common)
-	TARGET_INCLUDE_DIRECTORIES(test_filesystem_v2 PRIVATE src)
-	TARGET_INCLUDE_DIRECTORIES(test_filesystem_v2 PRIVATE tests)
-	ADD_TEST(NAME filesystem_v2_tests COMMAND test_filesystem_v2)
-	TARGET_COMPILE_DEFINITIONS(test_memory PRIVATE STANDALONE_TEST)
+ADD_EXECUTABLE(test_filesystem_v2
+	tests/test_filesystem_v2.c
+	src/common/files_v2.c
+	src/common/files_v2_impl.c
+	src/common/q_shared.c
+)
+TARGET_INCLUDE_DIRECTORIES(test_filesystem_v2 PRIVATE src/common)
+TARGET_INCLUDE_DIRECTORIES(test_filesystem_v2 PRIVATE src)
+TARGET_INCLUDE_DIRECTORIES(test_filesystem_v2 PRIVATE tests)
+TARGET_LINK_LIBRARIES(test_filesystem_v2 PRIVATE common)
+TARGET_SOURCES(test_filesystem_v2 PRIVATE tests/test_stubs.c)
+SET_SOURCE_FILES_PROPERTIES(tests/test_stubs.c PROPERTIES COMPILE_FLAGS "-w")
+IF(UNIX)
+	TARGET_LINK_LIBRARIES(test_filesystem_v2 PRIVATE m)
+ENDIF()
+ADD_TEST(NAME filesystem_v2_tests COMMAND test_filesystem_v2)
+TARGET_COMPILE_DEFINITIONS(test_filesystem_v2 PRIVATE STANDALONE_TEST)
 	ADD_TEST(NAME memory_tests COMMAND test_memory)
 
 	# Geometry tests
