@@ -1,0 +1,406 @@
+# GitHub Actions CI/CD Pipeline with Code Quality Gates
+# This demonstrates automated code quality analysis and gate enforcement
+
+name: Code Quality Gates
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run code quality analysis weekly
+    - cron: '0 5 * * 1'
+
+jobs:
+  # Code Quality Analysis
+  code-quality-analysis:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+        compiler: [gcc, clang]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up dependencies (Ubuntu)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake libsdl2-dev libvulkan-dev libopenal-dev libcurl4-openssl-dev sqlite3 libsqlite3-dev
+
+        # Install specific compiler
+        if [ "${{ matrix.compiler }}" = "clang" ]; then
+          sudo apt-get install -y clang
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
+        fi
+
+    - name: Configure build for code quality analysis
+      run: |
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Debug \
+                 -DENABLE_CODE_QUALITY_ANALYSIS=ON \
+                 -DCMAKE_C_FLAGS="-O0 -g" \
+                 -DCMAKE_CXX_FLAGS="-O0 -g"
+
+    - name: Build project for analysis
+      run: |
+        cd build
+        make -j$(nproc)
+
+    - name: Run code quality analysis
+      run: |
+        cd build
+        # Run full code quality analysis
+        ./idtech3_vulkan_x86_64 +set quality analyze
+
+    - name: Export code quality results
+      if: always()
+      run: |
+        mkdir -p quality_results
+        cd build
+        ./idtech3_vulkan_x86_64 +set quality export ../quality_results
+
+    - name: Upload code quality results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: code-quality-results-${{ matrix.os }}-${{ matrix.compiler }}
+        path: quality_results/
+        retention-days: 30
+
+  # Code Quality Gate Enforcement
+  quality-gate-check:
+    needs: code-quality-analysis
+    runs-on: ubuntu-22.04
+    if: always()
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Download quality analysis results
+      uses: actions/download-artifact@v3
+      with:
+        name: code-quality-results-ubuntu-22.04-gcc
+        path: quality_results/
+
+    - name: Set up dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake libsdl2-dev libvulkan-dev libopenal-dev libcurl4-openssl-dev sqlite3 libsqlite3-dev
+
+    - name: Configure build for gate checking
+      run: |
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Debug \
+                 -DENABLE_CODE_QUALITY_ANALYSIS=ON
+
+    - name: Build project
+      run: |
+        cd build
+        make -j$(nproc)
+
+    - name: Check code quality gates
+      run: |
+        cd build
+        # Run CI gate check
+        ./idtech3_vulkan_x86_64 +set quality ci-check
+      id: gate-check
+
+    - name: Quality Gate Status
+      run: |
+        if [ "${{ steps.gate-check.outcome }}" = "success" ]; then
+          echo "✅ All code quality gates passed!"
+          echo "::set-output name=quality-gates::passed"
+        else
+          echo "❌ Code quality gates failed!"
+          echo "::set-output name=quality-gates::failed"
+          exit 1
+        fi
+
+  # Code Quality Metrics Tracking
+  quality-metrics-tracking:
+    needs: quality-gate-check
+    runs-on: ubuntu-22.04
+    if: always()
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake libsdl2-dev libvulkan-dev libopenal-dev libcurl4-openssl-dev sqlite3 libsqlite3-dev
+
+    - name: Configure build for metrics
+      run: |
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Debug \
+                 -DENABLE_CODE_QUALITY_ANALYSIS=ON
+
+    - name: Build project
+      run: |
+        cd build
+        make -j$(nproc)
+
+    - name: Generate quality metrics report
+      run: |
+        cd build
+        # Generate detailed quality report
+        ./idtech3_vulkan_x86_64 +set quality report quality_report.json json
+        ./idtech3_vulkan_x86_64 +set quality report quality_report.html html
+
+    - name: Analyze quality trends
+      run: |
+        echo "=== Code Quality Metrics Analysis ==="
+
+        # Extract key metrics from the analysis
+        cd build
+
+        # Get current analysis results
+        ./idtech3_vulkan_x86_64 +set quality analyze > analysis_output.txt 2>&1
+
+        # Extract coverage percentage
+        COVERAGE=$(grep "Overall Coverage:" analysis_output.txt | grep -o "[0-9]\+\.[0-9]\+" || echo "0")
+        echo "Coverage: ${COVERAGE}%"
+
+        # Extract complexity metrics
+        MAX_COMPLEXITY=$(grep "Maximum Complexity:" analysis_output.txt | grep -o "[0-9]\+" || echo "0")
+        AVG_COMPLEXITY=$(grep "Average Complexity:" analysis_output.txt | grep -o "[0-9]\+\.[0-9]\+" || echo "0")
+        echo "Max Complexity: ${MAX_COMPLEXITY}"
+        echo "Avg Complexity: ${AVG_COMPLEXITY}"
+
+        # Extract maintainability
+        MAINTAINABILITY=$(grep "Maintainability Index:" analysis_output.txt | grep -o "[0-9]\+\.[0-9]\+" || echo "0")
+        echo "Maintainability Index: ${MAINTAINABILITY}"
+
+        # Determine quality level
+        if (( $(echo "$COVERAGE >= 80" | bc -l) )) && (( $(echo "$MAINTAINABILITY >= 50" | bc -l) )) && [ "$MAX_COMPLEXITY" -le 15 ]; then
+          echo "🏆 Code Quality: EXCELLENT"
+          echo "::set-output name=quality-level::excellent"
+        elif (( $(echo "$COVERAGE >= 70" | bc -l) )) && (( $(echo "$MAINTAINABILITY >= 40" | bc -l) )) && [ "$MAX_COMPLEXITY" -le 20 ]; then
+          echo "✅ Code Quality: GOOD"
+          echo "::set-output name=quality-level::good"
+        elif (( $(echo "$COVERAGE >= 60" | bc -l) )) && (( $(echo "$MAINTAINABILITY >= 30" | bc -l) )) && [ "$MAX_COMPLEXITY" -le 25 ]; then
+          echo "⚠️  Code Quality: NEEDS IMPROVEMENT"
+          echo "::set-output name=quality-level::needs-improvement"
+        else
+          echo "❌ Code Quality: POOR"
+          echo "::set-output name=quality-level::poor"
+        fi
+
+    - name: Upload quality reports
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: code-quality-reports
+        path: |
+          build/quality_report.json
+          build/quality_report.html
+          build/analysis_output.txt
+        retention-days: 90
+
+  # Incremental Quality Analysis for PRs
+  incremental-quality-check:
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'pull_request'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Get changed files
+      id: changed-files
+      run: |
+        # Get list of changed files in this PR
+        CHANGED_FILES=$(git diff --name-only HEAD~1 || git diff --name-only origin/${{ github.base_ref }})
+        echo "Changed files: $CHANGED_FILES"
+
+        # Filter for source files
+        SRC_FILES=""
+        for file in $CHANGED_FILES; do
+          if [[ $file =~ \.(c|cpp|h|hpp)$ ]]; then
+            SRC_FILES="$SRC_FILES $file"
+          fi
+        done
+
+        echo "Source files changed: $SRC_FILES"
+        echo "::set-output name=src-files::$SRC_FILES"
+        echo "::set-output name=has-src-changes::$(if [ -n "$SRC_FILES" ]; then echo 'true'; else echo 'false'; fi)"
+
+    - name: Set up dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake libsdl2-dev libvulkan-dev libopenal-dev libcurl4-openssl-dev sqlite3 libsqlite3-dev
+
+    - name: Configure build for incremental analysis
+      run: |
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Debug \
+                 -DENABLE_CODE_QUALITY_ANALYSIS=ON
+
+    - name: Build project
+      run: |
+        cd build
+        make -j$(nproc)
+
+    - name: Run incremental quality analysis
+      if: steps.changed-files.outputs.has-src-changes == 'true'
+      run: |
+        cd build
+
+        # Run incremental analysis on changed files
+        CHANGED_FILES="${{ steps.changed-files.outputs.src-files }}"
+        if [ -n "$CHANGED_FILES" ]; then
+          ./idtech3_vulkan_x86_64 +set quality incremental $CHANGED_FILES
+        fi
+
+    - name: Run full analysis if no source changes
+      if: steps.changed-files.outputs.has-src-changes == 'false'
+      run: |
+        cd build
+        ./idtech3_vulkan_x86_64 +set quality analyze
+
+  # Code Quality Badge Generation
+  quality-badge-generation:
+    needs: quality-metrics-tracking
+    runs-on: ubuntu-22.04
+    if: always()
+
+    steps:
+    - name: Determine quality badge color
+      run: |
+        # This would generate a badge based on quality metrics
+        # For now, create a simple badge
+        QUALITY_LEVEL="${{ needs.quality-metrics-tracking.outputs.quality-level }}"
+
+        case $QUALITY_LEVEL in
+          excellent)
+            COLOR="brightgreen"
+            ;;
+          good)
+            COLOR="green"
+            ;;
+          needs-improvement)
+            COLOR="yellow"
+            ;;
+          poor)
+            COLOR="red"
+            ;;
+          *)
+            COLOR="lightgrey"
+            ;;
+        esac
+
+        echo "Badge color: $COLOR"
+        echo "::set-output name=badge-color::$COLOR"
+
+    - name: Generate quality badge
+      run: |
+        # Generate a simple SVG badge
+        cat > code_quality_badge.svg << EOF
+        <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="120" height="20" role="img" aria-labelledby="title">
+          <title>Code Quality</title>
+          <linearGradient id="s" x2="0" y2="100%">
+            <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+            <stop offset="1" stop-opacity=".1"/>
+          </linearGradient>
+          <clipPath id="r">
+            <rect width="120" height="20" rx="3" fill="#fff"/>
+          </clipPath>
+          <g clip-path="url(#r)">
+            <rect width="69" height="20" fill="#555"/>
+            <rect x="69" width="51" height="20" fill="#${{ steps.badge-determination.outputs.badge-color }}"/>
+            <rect width="120" height="20" fill="url(#s)"/>
+          </g>
+          <g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110">
+            <text x="355" y="140" transform="scale(.1)" textLength="590">Code Quality</text>
+            <text x="935" y="140" transform="scale(.1)" textLength="410">${{ needs.quality-metrics-tracking.outputs.quality-level }}</text>
+          </g>
+        </svg>
+        EOF
+
+    - name: Upload quality badge
+      uses: actions/upload-artifact@v3
+      with:
+        name: code-quality-badge
+        path: code_quality_badge.svg
+        retention-days: 90
+
+  # Quality Gate Enforcement Final Check
+  quality-gate-final:
+    needs: [quality-gate-check, quality-metrics-tracking, incremental-quality-check]
+    runs-on: ubuntu-22.04
+    if: always()
+
+    steps:
+    - name: Determine final quality gate status
+      run: |
+        # Check if all quality-related jobs passed
+        GATE_CHECK="${{ needs.quality-gate-check.result }}"
+        METRICS_CHECK="${{ needs.quality-metrics-tracking.result }}"
+        INCREMENTAL_CHECK="${{ needs.incremental-quality-check.result }}"
+
+        echo "Gate Check: $GATE_CHECK"
+        echo "Metrics Check: $METRICS_CHECK"
+        echo "Incremental Check: $INCREMENTAL_CHECK"
+
+        if [ "$GATE_CHECK" = "success" ] && [ "$METRICS_CHECK" = "success" ] && [ "$INCREMENTAL_CHECK" = "success" ]; then
+          echo "🎉 All code quality checks passed!"
+          echo "::set-output name=final-status::passed"
+        else
+          echo "💥 Some code quality checks failed!"
+          echo "::set-output name=final-status::failed"
+          exit 1
+        fi
+
+    - name: Comment quality results on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+
+          let qualityReport = 'Code quality analysis completed.\n\n';
+
+          // Check final status
+          const finalStatus = '${{ steps.final-status.outputs.final-status }}';
+          const qualityLevel = '${{ needs.quality-metrics-tracking.outputs.quality-level }}';
+
+          if (finalStatus === 'passed') {
+            qualityReport += '✅ **All code quality gates passed!**\n\n';
+          } else {
+            qualityReport += '❌ **Code quality issues detected**\n\n';
+          }
+
+          qualityReport += `**Quality Level:** ${qualityLevel.toUpperCase()}\n\n`;
+          qualityReport += '### Quality Metrics\n';
+          qualityReport += '- Code coverage analysis\n';
+          qualityReport += '- Cyclomatic complexity check\n';
+          qualityReport += '- Maintainability index evaluation\n';
+          qualityReport += '- Code duplication detection\n\n';
+          qualityReport += '### Gates Checked\n';
+          qualityReport += '- Minimum coverage requirements\n';
+          qualityReport += '- Maximum complexity limits\n';
+          qualityReport += '- Maintainability thresholds\n';
+          qualityReport += '- Code duplication limits\n\n';
+          qualityReport += '*Detailed reports are available in the workflow artifacts.*';
+
+          github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: qualityReport
+          })
+
+    - name: Fail CI if quality gates failed
+      if: steps.final-status.outputs.final-status == 'failed'
+      run: |
+        echo "Code quality gates failed - blocking merge"
+        exit 1

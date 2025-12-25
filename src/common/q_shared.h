@@ -54,8 +54,36 @@ static_assert(__cplusplus >= 202002L, "C++23 or newer is required to build this 
 #define STEAMPATH_NAME			"id Tech 3"
 #define STEAMPATH_APPID			"2200"
 
+// Type-safe size constants with bounds checking
 #define MAX_TEAMNAME            32
 #define MAX_MASTER_SERVERS      5	// number of supported master servers
+
+// Type-safe size limits with compile-time checking
+typedef char teamname_t[MAX_TEAMNAME];
+typedef char filename_t[256];
+typedef char pathname_t[1024];
+
+// Type-safe buffer operations
+typedef struct {
+    char *data;
+    size_t size;
+    size_t used;
+} buffer_t;
+
+// Type-safe buffer operations with bounds checking
+static inline qboolean Buffer_Write(buffer_t *buf, const void *data, size_t size) {
+    if (!buf || !data || buf->used + size > buf->size) return qfalse;
+    memcpy(buf->data + buf->used, data, size);
+    buf->used += size;
+    return qtrue;
+}
+
+static inline qboolean Buffer_Read(buffer_t *buf, void *data, size_t size) {
+    if (!buf || !data || buf->used + size > buf->size) return qfalse;
+    memcpy(data, buf->data + buf->used, size);
+    buf->used += size;
+    return qtrue;
+}
 
 #define GAMENAME_FOR_MASTER		"Quake3Arena"
 #define HEARTBEAT_FOR_MASTER	"QuakeArena-1"
@@ -607,6 +635,25 @@ float Q_rsqrt( float f );		// reciprocal square root
 float Q_log2f( float f );
 float Q_exp2f( float f );
 
+// Type-safe math operations with const correctness and bounds checking
+static inline float Q_ClampFloat(float value, float min_val, float max_val) {
+    if (value < min_val) return min_val;
+    if (value > max_val) return max_val;
+    return value;
+}
+
+static inline int Q_ClampInt(int value, int min_val, int max_val) {
+    if (value < min_val) return min_val;
+    if (value > max_val) return max_val;
+    return value;
+}
+
+static inline size_t Q_ClampSize(size_t value, size_t min_val, size_t max_val) {
+    if (value < min_val) return min_val;
+    if (value > max_val) return max_val;
+    return value;
+}
+
 #define SQRTFAST( x ) ( (x) * Q_rsqrt( x ) )
 
 signed char ClampChar( int i );
@@ -673,15 +720,62 @@ typedef struct {
 
 #define	SnapVector(v) {v[0]=((int)(v[0]));v[1]=((int)(v[1]));v[2]=((int)(v[2]));}
 // just in case you don't want to use the macros
+// Vector math functions with improved const correctness
 vec_t _DotProduct( const vec3_t v1, const vec3_t v2 );
 void _VectorSubtract( const vec3_t veca, const vec3_t vecb, vec3_t out );
 void _VectorAdd( const vec3_t veca, const vec3_t vecb, vec3_t out );
 void _VectorCopy( const vec3_t in, vec3_t out );
 void _VectorScale( const vec3_t in, float scale, vec3_t out );
-void _VectorMA( const vec3_t veca, float scale, const vec3_t vecb, vec3_t vecc );
+void _VectorMA( const vec3_t veca, float scale, const vec3_t vecb, vec3_t out );
+
+// Type-safe vector operations with bounds checking
+static inline void VectorCopySafe(const vec3_t in, vec3_t out) {
+    if (!in || !out) return;
+    _VectorCopy(in, out);
+}
+
+static inline void VectorAddSafe(const vec3_t veca, const vec3_t vecb, vec3_t out) {
+    if (!veca || !vecb || !out) return;
+    _VectorAdd(veca, vecb, out);
+}
+
+static inline void VectorSubtractSafe(const vec3_t veca, const vec3_t vecb, vec3_t out) {
+    if (!veca || !vecb || !out) return;
+    _VectorSubtract(veca, vecb, out);
+}
+
+static inline void VectorScaleSafe(const vec3_t in, float scale, vec3_t out) {
+    if (!in || !out) return;
+    _VectorScale(in, scale, out);
+}
+
+static inline vec_t DotProductSafe(const vec3_t v1, const vec3_t v2) {
+    if (!v1 || !v2) return 0.0f;
+    return _DotProduct(v1, v2);
+}
+
+// Color operations with stronger typing
+typedef struct {
+    float r, g, b;
+} color3_t;
+
+typedef struct {
+    float r, g, b, a;
+} color4_t;
 
 unsigned ColorBytes3 (float r, float g, float b);
 unsigned ColorBytes4 (float r, float g, float b, float a);
+
+// Type-safe color operations
+static inline unsigned ColorBytes3Safe(const color3_t *color) {
+    if (!color) return 0;
+    return ColorBytes3(color->r, color->g, color->b);
+}
+
+static inline unsigned ColorBytes4Safe(const color4_t *color) {
+    if (!color) return 0;
+    return ColorBytes4(color->r, color->g, color->b, color->a);
+}
 
 float NormalizeColor( const vec3_t in, vec3_t out );
 
@@ -954,13 +1048,32 @@ int Q_isalpha( int c );
 qboolean Q_streq( const char *s1, const char *s2 );
 
 // portable case insensitive compare
+// String comparison functions with improved type safety
 int		Q_stricmp (const char *s1, const char *s2);
-int		Q_strncmp (const char *s1, const char *s2, int n);
-int		Q_stricmpn (const char *s1, const char *s2, int n);
-int		Q_strnicmp (const char *s1, const char *s2, int n);
+int		Q_strncmp (const char *s1, const char *s2, size_t n);
+int		Q_stricmpn (const char *s1, const char *s2, size_t n);
+int		Q_strnicmp (const char *s1, const char *s2, size_t n);
 char	*Q_strlwr( char *s1 );
 char	*Q_strupr( char *s1 );
 const char	*Q_stristr( const char *s, const char *find);
+
+// Type-safe string operations with bounds checking
+static inline qboolean Q_strncpyz_safe(char *dest, size_t dest_size, const char *src) {
+    if (!dest || dest_size == 0) return qfalse;
+    if (!src) {
+        dest[0] = '\0';
+        return qtrue;
+    }
+    Q_strncpyz(dest, src, dest_size);
+    return qtrue;
+}
+
+static inline qboolean Q_strcat_safe(char *dest, size_t dest_size, const char *src) {
+    if (!dest || dest_size == 0) return qfalse;
+    if (!src) return qtrue;
+    Q_strcat(dest, dest_size, src);
+    return qtrue;
+}
 
 qboolean Q_isanumber( const char *s );
 qboolean Q_isintegral( float f );

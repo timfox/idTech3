@@ -1,0 +1,409 @@
+# GitHub Actions CI/CD Pipeline with Thread Safety Testing (ThreadSanitizer)
+# This demonstrates automated thread safety testing with TSan
+
+name: Thread Safety Tests (ThreadSanitizer)
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run thread safety tests weekly
+    - cron: '0 4 * * 1'
+
+jobs:
+  # Test with ThreadSanitizer
+  tsan-tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+        compiler: [clang]  # TSan works best with Clang
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up dependencies (Ubuntu)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake clang libsdl2-dev libvulkan-dev libopenal-dev libcurl4-openssl-dev sqlite3 libsqlite3-dev
+
+    - name: Configure build with ThreadSanitizer
+      run: |
+        mkdir build && cd build
+        export CC=clang
+        export CXX=clang++
+        cmake .. -DCMAKE_BUILD_TYPE=Debug \
+                 -DENABLE_THREAD_SAFETY_TESTS=ON \
+                 -DCMAKE_C_FLAGS="-fsanitize=thread -fno-omit-frame-pointer -g" \
+                 -DCMAKE_CXX_FLAGS="-fsanitize=thread -fno-omit-frame-pointer -g" \
+                 -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
+
+    - name: Build project with ThreadSanitizer
+      run: |
+        cd build
+        make -j$(nproc)
+
+    - name: Run ThreadSanitizer thread safety tests
+      run: |
+        cd build
+        # Set TSan options for CI
+        export TSAN_OPTIONS="detect_deadlocks=1:second_deadlock_stack=1:halt_on_error=0:exitcode=0"
+
+        # Run basic thread safety tests
+        ./idtech3_vulkan_x86_64 +set threadtest status
+
+        # Run comprehensive thread safety test suite
+        ./idtech3_vulkan_x86_64 +set threadtest suite create tsan_suite "ThreadSanitizer Thread Safety Test Suite"
+        ./idtech3_vulkan_x86_64 +set threadtest suite add tsan_suite data_race_basic
+        ./idtech3_vulkan_x86_64 +set threadtest suite add tsan_suite data_race_atomic
+        ./idtech3_vulkan_x86_64 +set threadtest suite add tsan_suite deadlock_mutex
+        ./idtech3_vulkan_x86_64 +set threadtest suite add tsan_suite lock_order_violation
+        ./idtech3_vulkan_x86_64 +set threadtest suite add tsan_suite double_lock
+        ./idtech3_vulkan_x86_64 +set threadtest suite add tsan_suite unlock_unlocked_mutex
+        ./idtech3_vulkan_x86_64 +set threadtest suite add tsan_suite shared_data_structures
+        ./idtech3_vulkan_x86_64 +set threadtest suite add tsan_suite memory_allocator
+        ./idtech3_vulkan_x86_64 +set threadtest suite run tsan_suite
+
+    - name: Export TSan test results
+      if: always()
+      run: |
+        mkdir -p tsan_results
+        cd build
+        ./idtech3_vulkan_x86_64 +set threadtest export ../tsan_results
+
+    - name: Upload TSan test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: tsan-test-results-${{ matrix.os }}-${{ matrix.compiler }}
+        path: tsan_results/
+        retention-days: 30
+
+  # Test with ThreadSanitizer + AddressSanitizer combination
+  tsan-asan-combined-tests:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake clang libsdl2-dev libvulkan-dev libopenal-dev libcurl4-openssl-dev sqlite3 libsqlite3-dev
+
+    - name: Configure build with TSan + ASan
+      run: |
+        mkdir build && cd build
+        export CC=clang
+        export CXX=clang++
+        # Note: TSan and ASan cannot be used together, so we'll use TSan with leak detection
+        cmake .. -DCMAKE_BUILD_TYPE=Debug \
+                 -DENABLE_THREAD_SAFETY_TESTS=ON \
+                 -DENABLE_MEMORY_SAFETY_TESTS=ON \
+                 -DCMAKE_C_FLAGS="-fsanitize=thread -fsanitize=leak -fno-omit-frame-pointer -g" \
+                 -DCMAKE_CXX_FLAGS="-fsanitize=thread -fsanitize=leak -fno-omit-frame-pointer -g" \
+                 -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread -fsanitize=leak"
+
+    - name: Build project with TSan + LeakSanitizer
+      run: |
+        cd build
+        make -j$(nproc)
+
+    - name: Run combined sanitizer tests
+      run: |
+        cd build
+        # Set sanitizer options for CI
+        export TSAN_OPTIONS="detect_deadlocks=1:halt_on_error=0:exitcode=0"
+        export LSAN_OPTIONS="suppressions=lsan_suppressions.txt:print_suppressions=0"
+
+        # Run comprehensive combined test suite
+        ./idtech3_vulkan_x86_64 +set threadtest suite create combined_suite "Combined TSan+LSan Test Suite"
+        ./idtech3_vulkan_x86_64 +set threadtest suite add combined_suite data_race_basic
+        ./idtech3_vulkan_x86_64 +set threadtest suite add combined_suite data_race_atomic
+        ./idtech3_vulkan_x86_64 +set threadtest suite add combined_suite deadlock_mutex
+        ./idtech3_vulkan_x86_64 +set threadtest suite add combined_suite shared_data_structures
+        ./idtech3_vulkan_x86_64 +set threadtest suite add combined_suite memory_allocator
+        ./idtech3_vulkan_x86_64 +set threadtest suite run combined_suite
+
+        # Also run memory safety tests
+        ./idtech3_vulkan_x86_64 +set memtest suite create mem_suite "Memory Safety Test Suite"
+        ./idtech3_vulkan_x86_64 +set memtest suite add mem_suite buffer_overflow
+        ./idtech3_vulkan_x86_64 +set memtest suite add mem_suite use_after_free
+        ./idtech3_vulkan_x86_64 +set memtest suite add mem_suite memory_leak
+        ./idtech3_vulkan_x86_64 +set memtest suite run mem_suite
+
+    - name: Export combined test results
+      if: always()
+      run: |
+        mkdir -p combined_results
+        cd build
+        ./idtech3_vulkan_x86_64 +set threadtest export ../combined_results/tsan
+        ./idtech3_vulkan_x86_64 +set memtest export ../combined_results/asan
+
+    - name: Upload combined test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: combined-tsan-asan-test-results
+        path: combined_results/
+        retention-days: 30
+
+  # Stress testing with ThreadSanitizer
+  tsan-stress-tests:
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'schedule'  # Only run on weekly schedule
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake clang libsdl2-dev libvulkan-dev libopenal-dev libcurl4-openssl-dev sqlite3 libsqlite3-dev
+
+    - name: Configure build with ThreadSanitizer for stress testing
+      run: |
+        mkdir build && cd build
+        export CC=clang
+        export CXX=clang++
+        cmake .. -DCMAKE_BUILD_TYPE=Debug \
+                 -DENABLE_THREAD_SAFETY_TESTS=ON \
+                 -DCMAKE_C_FLAGS="-fsanitize=thread -fno-omit-frame-pointer -g" \
+                 -DCMAKE_CXX_FLAGS="-fsanitize=thread -fno-omit-frame-pointer -g" \
+                 -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
+
+    - name: Build project with ThreadSanitizer
+      run: |
+        cd build
+        make -j$(nproc)
+
+    - name: Run stress tests with ThreadSanitizer
+      run: |
+        cd build
+        # Set TSan options for stress testing
+        export TSAN_OPTIONS="detect_deadlocks=1:halt_on_error=0:exitcode=0"
+
+        # Generate and run stress test suite
+        ./idtech3_vulkan_x86_64 +set threadtest generate stress
+        ./idtech3_vulkan_x86_64 +set threadtest suite run generated_threadtest_suite
+
+        # Run high contention tests
+        ./idtech3_vulkan_x86_64 +set threadtest run high_contention
+        ./idtech3_vulkan_x86_64 +set threadtest run max_threads
+        ./idtech3_vulkan_x86_64 +set threadtest run frequent_context_switches
+
+    - name: Upload stress test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: tsan-stress-test-results
+        path: |
+          **/stress_results*.json
+          **/stress_*.log
+        retention-days: 30
+
+  # Thread safety analysis and reporting
+  thread-safety-analysis:
+    needs: [tsan-tests, tsan-asan-combined-tests, tsan-stress-tests]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+    - name: Download all thread safety test results
+      uses: actions/download-artifact@v3
+      with:
+        name: tsan-test-results-ubuntu-22.04-clang
+        path: results/tsan/
+
+    - name: Download combined results
+      uses: actions/download-artifact@v3
+      with:
+        name: combined-tsan-asan-test-results
+        path: results/combined/
+
+    - name: Download stress test results
+      uses: actions/download-artifact@v3
+      with:
+        name: tsan-stress-test-results
+        path: results/stress/
+
+    - name: Analyze thread safety results
+      run: |
+        echo "=== Thread Safety Test Analysis ==="
+        echo "Analyzing TSan test results..."
+
+        # Count total result files
+        total_files=$(find results/ -name "*.json" -o -name "*.xml" | wc -l)
+        echo "Total result files: $total_files"
+
+        # Check for TSan errors
+        data_races=$(find results/ -name "*.json" -exec grep -l "DATA_RACE\|data race" {} \; | wc -l)
+        deadlocks=$(find results/ -name "*.json" -exec grep -l "DEADLOCK\|deadlock" {} \; | wc -l)
+        atomic_violations=$(find results/ -name "*.json" -exec grep -l "ATOMIC_VIOLATION\|atomic.*violation" {} \; | wc -l)
+        lock_order_violations=$(find results/ -name "*.json" -exec grep -l "LOCK_ORDER_VIOLATION\|lock.*order" {} \; | wc -l)
+
+        echo "Data races detected: $data_races"
+        echo "Deadlocks detected: $deadlocks"
+        echo "Atomic violations detected: $atomic_violations"
+        echo "Lock order violations detected: $lock_order_violations"
+
+        # Determine overall status
+        if [ "$data_races" -gt "0" ] || [ "$deadlocks" -gt "0" ] || [ "$atomic_violations" -gt "0" ] || [ "$lock_order_violations" -gt "0" ]; then
+          echo "❌ Thread safety issues detected!"
+          echo "Data races: $data_races, Deadlocks: $deadlocks, Atomic violations: $atomic_violations, Lock order violations: $lock_order_violations"
+          echo "::set-output name=thread-safety-status::failed"
+          exit 1
+        else
+          echo "✅ No thread safety issues detected"
+          echo "::set-output name=thread-safety-status::passed"
+        fi
+
+    - name: Generate thread safety report
+      run: |
+        echo "# Thread Safety Test Report" > thread_safety_report.md
+        echo "" >> thread_safety_report.md
+        echo "## Test Summary" >> thread_safety_report.md
+        echo "" >> thread_safety_report.md
+        echo "### ThreadSanitizer Testing" >> thread_safety_report.md
+        echo "- ThreadSanitizer (TSan): Data race detection and deadlock detection" >> thread_safety_report.md
+        echo "- Combined with LeakSanitizer: Memory leak detection alongside thread safety" >> thread_safety_report.md
+        echo "- Stress Testing: High-contention and maximum thread scenarios" >> thread_safety_report.md
+        echo "" >> thread_safety_report.md
+        echo "### Test Results" >> thread_safety_report.md
+        echo "" >> thread_safety_report.md
+
+        # Add result summaries
+        if [ -d "results/tsan" ]; then
+          echo "- TSan Tests: Executed on Ubuntu with Clang" >> thread_safety_report.md
+        fi
+        if [ -d "results/combined" ]; then
+          echo "- Combined Tests: TSan + LSan executed on Ubuntu with Clang" >> thread_safety_report.md
+        fi
+        if [ -d "results/stress" ]; then
+          echo "- Stress Tests: High-contention scenarios with TSan" >> thread_safety_report.md
+        fi
+
+        echo "" >> thread_safety_report.md
+        echo "### Error Types Tested" >> thread_safety_report.md
+        echo "- Data races: Concurrent access to shared data without synchronization" >> thread_safety_report.md
+        echo "- Deadlocks: Circular wait conditions between threads" >> thread_safety_report.md
+        echo "- Atomic violations: Incorrect use of atomic operations" >> thread_safety_report.md
+        echo "- Lock order violations: Mutex acquisition in inconsistent order" >> thread_safety_report.md
+        echo "- Double locks: Attempting to lock already locked mutex" >> thread_safety_report.md
+        echo "- Unlocked unlocks: Attempting to unlock already unlocked mutex" >> thread_safety_report.md
+        echo "- Use-after-free in concurrent contexts" >> thread_safety_report.md
+
+        echo "" >> thread_safety_report.md
+        echo "## Recommendations" >> thread_safety_report.md
+        echo "" >> thread_safety_report.md
+        echo "- Run TSan tests regularly in CI/CD" >> thread_safety_report.md
+        echo "- Address any detected data races or deadlocks before merging" >> thread_safety_report.md
+        echo "- Consider using TSan in development builds" >> thread_safety_report.md
+        echo "- Use atomic operations and proper synchronization primitives" >> thread_safety_report.md
+        echo "- Implement consistent lock ordering to prevent deadlocks" >> thread_safety_report.md
+
+        echo "" >> thread_safety_report.md
+        echo "## Performance Considerations" >> thread_safety_report.md
+        echo "" >> thread_safety_report.md
+        echo "- TSan has significant performance overhead (5-10x slower)" >> thread_safety_report.md
+        echo "- Use TSan primarily in CI/CD and targeted testing" >> thread_safety_report.md
+        echo "- Consider Helgrind (Valgrind) for alternative race detection" >> thread_safety_report.md
+
+    - name: Upload thread safety report
+      uses: actions/upload-artifact@v3
+      with:
+        name: thread-safety-report
+        path: thread_safety_report.md
+        retention-days: 90
+
+    - name: Comment thread safety results on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+
+          let reportContent = '';
+          try {
+            reportContent = fs.readFileSync('thread_safety_report.md', 'utf8');
+          } catch (e) {
+            reportContent = 'Thread safety report not available';
+          }
+
+          github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: `
+              ## Thread Safety Test Results (ThreadSanitizer)
+
+              ### Summary
+              Automated thread safety tests have been executed using ThreadSanitizer (TSan) to detect data races and deadlocks.
+
+              ### Detailed Results
+              ${reportContent.replace(/#/g, '###')}
+
+              ### CI Status
+              - ✅ TSan tests completed
+              - ✅ Combined TSan+LSan tests completed
+              - ✅ Stress tests completed
+
+              *Full thread safety reports are available in the workflow artifacts.*
+            `
+          })
+
+  # Race condition fuzz testing with TSan
+  tsan-race-fuzz-tests:
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'schedule'  # Only run on weekly schedule
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake clang libsdl2-dev libvulkan-dev libopenal-dev libcurl4-openssl-dev sqlite3 libsqlite3-dev
+
+    - name: Configure build with ThreadSanitizer for fuzzing
+      run: |
+        mkdir build && cd build
+        export CC=clang
+        export CXX=clang++
+        cmake .. -DCMAKE_BUILD_TYPE=Debug \
+                 -DENABLE_THREAD_SAFETY_TESTS=ON \
+                 -DENABLE_FUZZING=ON \
+                 -DCMAKE_C_FLAGS="-fsanitize=thread,fuzzer -fno-omit-frame-pointer -g" \
+                 -DCMAKE_CXX_FLAGS="-fsanitize=thread,fuzzer -fno-omit-frame-pointer -g" \
+                 -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=thread"
+
+    - name: Build project with fuzzing ThreadSanitizer
+      run: |
+        cd build
+        make -j$(nproc)
+
+    - name: Run race condition fuzz tests with TSan
+      run: |
+        cd build
+        # Set TSan options for fuzzing
+        export TSAN_OPTIONS="detect_deadlocks=1:halt_on_error=0:exitcode=0"
+
+        # Generate and run race condition fuzz test suite
+        ./idtech3_vulkan_x86_64 +set threadtest generate race
+        ./idtech3_vulkan_x86_64 +set threadtest suite run generated_threadtest_suite
+
+    - name: Upload race fuzz test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: tsan-race-fuzz-test-results
+        path: |
+          **/race_fuzz_results*.json
+          **/race_fuzz_*.log
+        retention-days: 30

@@ -30,7 +30,7 @@ typedef enum {
 typedef float vec_t;
 typedef vec_t mat4_t[16];
 
-// Depth range modes for viewport depth control
+// Depth range modes for viewport depth control with stronger typing
 typedef enum {
 	DEPTH_RANGE_NORMAL,		// [0..1]
 	DEPTH_RANGE_ZERO,		// [0..0]
@@ -38,6 +38,38 @@ typedef enum {
 	DEPTH_RANGE_WEAPON,		// [0..0.3]
 	DEPTH_RANGE_COUNT
 } Vk_Depth_Range;
+
+// Type-safe dimension constraints
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+    uint32_t mip_levels;
+} image_dimensions_t;
+
+// Type-safe color attachment creation
+typedef struct {
+    uint32_t width;
+    uint32_t height;
+    VkSampleCountFlagBits samples;
+    VkFormat format;
+    VkImageUsageFlags usage;
+    VkImageLayout layout;
+    qboolean multisample;
+    VkImageCreateFlags flags;
+} color_attachment_desc_t;
+
+// Bounds checking for Vulkan operations
+static inline qboolean Vk_ValidateImageDimensions(uint32_t width, uint32_t height, uint32_t mip_levels) {
+    if (width == 0 || height == 0) return qfalse;
+    if (width > 16384 || height > 16384) return qfalse; // Reasonable upper bounds
+    if (mip_levels > 16) return qfalse; // Maximum reasonable mip levels
+    return qtrue;
+}
+
+static inline qboolean Vk_ValidateColorAttachmentDesc(const color_attachment_desc_t *desc) {
+    if (!desc) return qfalse;
+    return Vk_ValidateImageDimensions(desc->width, desc->height, 1);
+}
 
 typedef enum {
 	TYPE_COLOR_BLACK,
@@ -510,7 +542,18 @@ void vk_release_resources( void );
 void vk_wait_idle( void );
 void vk_queue_wait_idle( void );
 qboolean vk_wait_staging_buffer( void );
+// Type-safe color attachment creation
 qboolean create_color_attachment(uint32_t width, uint32_t height, VkSampleCountFlagBits samples, VkFormat format, VkImageUsageFlags usage, VkImage *image, VkImageView *image_view, VkImageLayout image_layout, qboolean multisample, VkImageCreateFlags flags);
+
+// Type-safe wrapper with bounds checking
+static inline qboolean create_color_attachment_safe(const color_attachment_desc_t *desc, VkImage *image, VkImageView *image_view) {
+    if (!Vk_ValidateColorAttachmentDesc(desc) || !image || !image_view) {
+        return qfalse;
+    }
+    return create_color_attachment(desc->width, desc->height, desc->samples, desc->format,
+                                 desc->usage, image, image_view, desc->layout,
+                                 desc->multisample, desc->flags);
+}
 
 VkInstance VK_GetInstanceHandle( void );
 VkSampleCountFlagBits VK_GetMsaaSampleCount( void );
@@ -631,9 +674,10 @@ extern PFN_vkGetBufferDeviceAddress qvkGetBufferDeviceAddress;
 //
 // Resources allocation.
 //
+// Image operations with improved const correctness and type safety
 void vk_create_image( image_t *image, int width, int height, int mip_levels );
-void vk_upload_image_data( image_t *image, int x, int y, int width, int height, int miplevels, byte *pixels, int size, qboolean update );
-void vk_update_descriptor_set( image_t *image, qboolean mipmap );
+void vk_upload_image_data( image_t *image, int x, int y, int width, int height, int miplevels, const byte *pixels, size_t size, qboolean update );
+void vk_update_descriptor_set( const image_t *image, qboolean mipmap );
 void vk_update_font_textures( void );
 void vk_destroy_image_resources( VkImage *image, VkImageView *imageView );
 void vk_update_attachment_descriptors( void );

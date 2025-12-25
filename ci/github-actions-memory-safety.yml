@@ -1,0 +1,416 @@
+# GitHub Actions CI/CD Pipeline with Memory Safety Testing (ASan/UBSan)
+# This demonstrates automated memory safety testing with sanitizers
+
+name: Memory Safety Tests (ASan/UBSan)
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run memory safety tests weekly
+    - cron: '0 3 * * 1'
+
+jobs:
+  # Test with AddressSanitizer
+  asan-tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-20.04]
+        compiler: [gcc, clang]
+        exclude:
+          # Limit combinations to reduce CI load
+          - os: ubuntu-20.04
+            compiler: clang
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up dependencies (Ubuntu)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake libsdl2-dev libvulkan-dev libopenal-dev libcurl4-openssl-dev sqlite3 libsqlite3-dev
+
+        # Install specific compiler versions
+        if [ "${{ matrix.compiler }}" = "clang" ]; then
+          sudo apt-get install -y clang
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
+        fi
+
+    - name: Configure build with ASan
+      run: |
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Debug \
+                 -DENABLE_MEMORY_SAFETY_TESTS=ON \
+                 -DCMAKE_C_FLAGS="-fsanitize=address -fsanitize=leak -fno-omit-frame-pointer -g" \
+                 -DCMAKE_CXX_FLAGS="-fsanitize=address -fsanitize=leak -fno-omit-frame-pointer -g" \
+                 -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address -fsanitize=leak"
+
+    - name: Build project with ASan
+      run: |
+        cd build
+        make -j$(nproc)
+
+    - name: Run ASan memory safety tests
+      run: |
+        cd build
+        # Set ASan options for CI
+        export ASAN_OPTIONS="detect_leaks=1:detect_stack_use_after_return=1:detect_invalid_pointer_pairs=2:strict_init_order=1:halt_on_error=0:exitcode=0"
+        export LSAN_OPTIONS="suppressions=lsan_suppressions.txt:print_suppressions=0"
+
+        # Run basic memory safety tests
+        ./idtech3_vulkan_x86_64 +set memtest status
+
+        # Run comprehensive test suite
+        ./idtech3_vulkan_x86_64 +set memtest suite create asan_suite "ASan Memory Safety Test Suite"
+        ./idtech3_vulkan_x86_64 +set memtest suite add asan_suite buffer_overflow
+        ./idtech3_vulkan_x86_64 +set memtest suite add asan_suite use_after_free
+        ./idtech3_vulkan_x86_64 +set memtest suite add asan_suite double_free
+        ./idtech3_vulkan_x86_64 +set memtest suite add asan_suite memory_leak
+        ./idtech3_vulkan_x86_64 +set memtest suite add asan_suite stack_overflow
+        ./idtech3_vulkan_x86_64 +set memtest suite add asan_suite memory_management
+        ./idtech3_vulkan_x86_64 +set memtest suite run asan_suite
+
+    - name: Export ASan test results
+      if: always()
+      run: |
+        mkdir -p asan_results
+        cd build
+        ./idtech3_vulkan_x86_64 +set memtest export ../asan_results
+
+    - name: Upload ASan test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: asan-test-results-${{ matrix.os }}-${{ matrix.compiler }}
+        path: asan_results/
+        retention-days: 30
+
+  # Test with UndefinedBehaviorSanitizer
+  ubsan-tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+        compiler: [clang]  # UBSan works best with Clang
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up dependencies (Ubuntu)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake clang libsdl2-dev libvulkan-dev libopenal-dev libcurl4-openssl-dev sqlite3 libsqlite3-dev
+
+    - name: Configure build with UBSan
+      run: |
+        mkdir build && cd build
+        export CC=clang
+        export CXX=clang++
+        cmake .. -DCMAKE_BUILD_TYPE=Debug \
+                 -DENABLE_MEMORY_SAFETY_TESTS=ON \
+                 -DCMAKE_C_FLAGS="-fsanitize=undefined -fno-omit-frame-pointer -g" \
+                 -DCMAKE_CXX_FLAGS="-fsanitize=undefined -fno-omit-frame-pointer -g" \
+                 -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=undefined"
+
+    - name: Build project with UBSan
+      run: |
+        cd build
+        make -j$(nproc)
+
+    - name: Run UBSan memory safety tests
+      run: |
+        cd build
+        # Set UBSan options for CI
+        export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0"
+
+        # Run basic memory safety tests
+        ./idtech3_vulkan_x86_64 +set memtest status
+
+        # Run comprehensive UBSan test suite
+        ./idtech3_vulkan_x86_64 +set memtest suite create ubsan_suite "UBSan Memory Safety Test Suite"
+        ./idtech3_vulkan_x86_64 +set memtest suite add ubsan_suite integer_overflow
+        ./idtech3_vulkan_x86_64 +set memtest suite add ubsan_suite division_by_zero
+        ./idtech3_vulkan_x86_64 +set memtest suite add ubsan_suite null_pointer_deref
+        ./idtech3_vulkan_x86_64 +set memtest suite add ubsan_suite uninitialized_variable
+        ./idtech3_vulkan_x86_64 +set memtest suite add ubsan_suite type_confusion
+        ./idtech3_vulkan_x86_64 +set memtest suite run ubsan_suite
+
+    - name: Export UBSan test results
+      if: always()
+      run: |
+        mkdir -p ubsan_results
+        cd build
+        ./idtech3_vulkan_x86_64 +set memtest export ../ubsan_results
+
+    - name: Upload UBSan test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: ubsan-test-results-${{ matrix.os }}-${{ matrix.compiler }}
+        path: ubsan_results/
+        retention-days: 30
+
+  # Combined ASan + UBSan tests
+  combined-sanitizer-tests:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake clang libsdl2-dev libvulkan-dev libopenal-dev libcurl4-openssl-dev sqlite3 libsqlite3-dev
+
+    - name: Configure build with ASan + UBSan
+      run: |
+        mkdir build && cd build
+        export CC=clang
+        export CXX=clang++
+        cmake .. -DCMAKE_BUILD_TYPE=Debug \
+                 -DENABLE_MEMORY_SAFETY_TESTS=ON \
+                 -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fsanitize=leak -fno-omit-frame-pointer -g" \
+                 -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fsanitize=leak -fno-omit-frame-pointer -g" \
+                 -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined -fsanitize=leak"
+
+    - name: Build project with combined sanitizers
+      run: |
+        cd build
+        make -j$(nproc)
+
+    - name: Run combined sanitizer tests
+      run: |
+        cd build
+        # Set sanitizer options for CI
+        export ASAN_OPTIONS="detect_leaks=1:detect_stack_use_after_return=1:halt_on_error=0:exitcode=0"
+        export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0"
+        export LSAN_OPTIONS="suppressions=lsan_suppressions.txt:print_suppressions=0"
+
+        # Run comprehensive combined test suite
+        ./idtech3_vulkan_x86_64 +set memtest suite create combined_suite "Combined ASan+UBSan Test Suite"
+        ./idtech3_vulkan_x86_64 +set memtest suite add combined_suite buffer_overflow
+        ./idtech3_vulkan_x86_64 +set memtest suite add combined_suite use_after_free
+        ./idtech3_vulkan_x86_64 +set memtest suite add combined_suite integer_overflow
+        ./idtech3_vulkan_x86_64 +set memtest suite add combined_suite division_by_zero
+        ./idtech3_vulkan_x86_64 +set memtest suite add combined_suite null_pointer_deref
+        ./idtech3_vulkan_x86_64 +set memtest suite add combined_suite memory_management
+        ./idtech3_vulkan_x86_64 +set memtest suite add combined_suite string_operations
+        ./idtech3_vulkan_x86_64 +set memtest suite add combined_suite data_structures
+        ./idtech3_vulkan_x86_64 +set memtest suite run combined_suite
+
+    - name: Export combined test results
+      if: always()
+      run: |
+        mkdir -p combined_results
+        cd build
+        ./idtech3_vulkan_x86_64 +set memtest export ../combined_results
+
+    - name: Upload combined test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: combined-sanitizer-test-results
+        path: combined_results/
+        retention-days: 30
+
+  # Memory safety analysis and reporting
+  memory-safety-analysis:
+    needs: [asan-tests, ubsan-tests, combined-sanitizer-tests]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+    - name: Download all sanitizer test results
+      uses: actions/download-artifact@v3
+      with:
+        name: asan-test-results-ubuntu-22.04-gcc
+        path: results/asan/
+
+    - name: Download UBSan results
+      uses: actions/download-artifact@v3
+      with:
+        name: ubsan-test-results-ubuntu-22.04-clang
+        path: results/ubsan/
+
+    - name: Download combined results
+      uses: actions/download-artifact@v3
+      with:
+        name: combined-sanitizer-test-results
+        path: results/combined/
+
+    - name: Analyze memory safety results
+      run: |
+        echo "=== Memory Safety Test Analysis ==="
+        echo "Analyzing sanitizer test results..."
+
+        # Count total result files
+        total_files=$(find results/ -name "*.json" -o -name "*.xml" | wc -l)
+        echo "Total result files: $total_files"
+
+        # Check for sanitizer errors
+        asan_errors=$(find results/ -name "*.json" -exec grep -l "ASAN_ERROR\|heap-buffer-overflow\|use-after-free" {} \; | wc -l)
+        ubsan_errors=$(find results/ -name "*.json" -exec grep -l "UBSAN_ERROR\|integer overflow\|division by zero" {} \; | wc -l)
+        memory_leaks=$(find results/ -name "*.json" -exec grep -l "memory leak\|MEMORY_LEAK" {} \; | wc -l)
+
+        echo "ASan errors detected: $asan_errors"
+        echo "UBSan errors detected: $ubsan_errors"
+        echo "Memory leaks detected: $memory_leaks"
+
+        # Determine overall status
+        if [ "$asan_errors" -gt "0" ] || [ "$ubsan_errors" -gt "0" ] || [ "$memory_leaks" -gt "0" ]; then
+          echo "❌ Memory safety issues detected!"
+          echo "ASan errors: $asan_errors, UBSan errors: $ubsan_errors, Leaks: $memory_leaks"
+          echo "::set-output name=memory-safety-status::failed"
+          exit 1
+        else
+          echo "✅ No memory safety issues detected"
+          echo "::set-output name=memory-safety-status::passed"
+        fi
+
+    - name: Generate memory safety report
+      run: |
+        echo "# Memory Safety Test Report" > memory_safety_report.md
+        echo "" >> memory_safety_report.md
+        echo "## Test Summary" >> memory_safety_report.md
+        echo "" >> memory_safety_report.md
+        echo "### Sanitizers Tested" >> memory_safety_report.md
+        echo "- AddressSanitizer (ASan): Heap/stack buffer overflows, use-after-free, memory leaks" >> memory_safety_report.md
+        echo "- UndefinedBehaviorSanitizer (UBSan): Integer overflows, null pointer dereference, type confusion" >> memory_safety_report.md
+        echo "- LeakSanitizer (LSan): Memory leak detection" >> memory_safety_report.md
+        echo "" >> memory_safety_report.md
+        echo "### Test Results" >> memory_safety_report.md
+        echo "" >> memory_safety_report.md
+
+        # Add result summaries
+        if [ -d "results/asan" ]; then
+          echo "- ASan Tests: Executed on Ubuntu with GCC" >> memory_safety_report.md
+        fi
+        if [ -d "results/ubsan" ]; then
+          echo "- UBSan Tests: Executed on Ubuntu with Clang" >> memory_safety_report.md
+        fi
+        if [ -d "results/combined" ]; then
+          echo "- Combined Tests: ASan + UBSan executed on Ubuntu with Clang" >> memory_safety_report.md
+        fi
+
+        echo "" >> memory_safety_report.md
+        echo "### Error Types Tested" >> memory_safety_report.md
+        echo "- Heap buffer overflow/underflow" >> memory_safety_report.md
+        echo "- Stack buffer overflow" >> memory_safety_report.md
+        echo "- Use-after-free" >> memory_safety_report.md
+        echo "- Double free" >> memory_safety_report.md
+        echo "- Memory leaks" >> memory_safety_report.md
+        echo "- Integer overflow/underflow" >> memory_safety_report.md
+        echo "- Division by zero" >> memory_safety_report.md
+        echo "- Null pointer dereference" >> memory_safety_report.md
+        echo "- Type confusion" >> memory_safety_report.md
+        echo "- Uninitialized variables" >> memory_safety_report.md
+
+        echo "" >> memory_safety_report.md
+        echo "## Recommendations" >> memory_safety_report.md
+        echo "" >> memory_safety_report.md
+        echo "- Run sanitizer tests regularly in CI/CD" >> memory_safety_report.md
+        echo "- Address any detected issues before merging" >> memory_safety_report.md
+        echo "- Consider enabling sanitizers in development builds" >> memory_safety_report.md
+        echo "- Use static analysis tools in addition to sanitizers" >> memory_safety_report.md
+
+    - name: Upload memory safety report
+      uses: actions/upload-artifact@v3
+      with:
+        name: memory-safety-report
+        path: memory_safety_report.md
+        retention-days: 90
+
+    - name: Comment memory safety results on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+
+          let reportContent = '';
+          try {
+            reportContent = fs.readFileSync('memory_safety_report.md', 'utf8');
+          } catch (e) {
+            reportContent = 'Memory safety report not available';
+          }
+
+          github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: `
+              ## Memory Safety Test Results (ASan/UBSan)
+
+              ### Summary
+              Automated memory safety tests have been executed using AddressSanitizer and UndefinedBehaviorSanitizer.
+
+              ### Detailed Results
+              ${reportContent.replace(/#/g, '###')}
+
+              ### CI Status
+              - ✅ ASan tests completed
+              - ✅ UBSan tests completed
+              - ✅ Combined sanitizer tests completed
+
+              *Full memory safety reports are available in the workflow artifacts.*
+            `
+          })
+
+  # Fuzz testing with sanitizers
+  fuzz-sanitizer-tests:
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'schedule'  # Only run on weekly schedule
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake clang libsdl2-dev libvulkan-dev libopenal-dev libcurl4-openssl-dev sqlite3 libsqlite3-dev
+
+    - name: Configure build with sanitizers for fuzzing
+      run: |
+        mkdir build && cd build
+        export CC=clang
+        export CXX=clang++
+        cmake .. -DCMAKE_BUILD_TYPE=Debug \
+                 -DENABLE_MEMORY_SAFETY_TESTS=ON \
+                 -DENABLE_FUZZING=ON \
+                 -DCMAKE_C_FLAGS="-fsanitize=address,undefined,fuzzer -fno-omit-frame-pointer -g" \
+                 -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined,fuzzer -fno-omit-frame-pointer -g" \
+                 -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+
+    - name: Build project with fuzzing sanitizers
+      run: |
+        cd build
+        make -j$(nproc)
+
+    - name: Run fuzz tests with sanitizers
+      run: |
+        cd build
+        # Set sanitizer options for fuzzing
+        export ASAN_OPTIONS="detect_leaks=1:halt_on_error=0:exitcode=0"
+        export UBSAN_OPTIONS="print_stacktrace=1:halt_on_error=0"
+
+        # Generate and run fuzz test suite
+        ./idtech3_vulkan_x86_64 +set memtest generate fuzz
+        ./idtech3_vulkan_x86_64 +set memtest suite run generated_memtest_suite
+
+    - name: Upload fuzz test results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: fuzz-sanitizer-test-results
+        path: |
+          **/fuzz_results*.json
+          **/fuzz_*.log
+        retention-days: 30

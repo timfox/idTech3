@@ -128,15 +128,7 @@ Provides unified threading API across Windows, Linux, macOS.
     #define ATOMIC_INCREMENT64(ptr) atomic_fetch_add((ptr), 1)
     #define ATOMIC_DECREMENT64(ptr) atomic_fetch_sub((ptr), 1)
 
-    // Standard C11 atomics are used directly when available
-    #define atomic_init(ptr, val) atomic_init(ptr, val)
-    #define atomic_load_explicit(ptr, order) atomic_load_explicit(ptr, order)
-    #define atomic_store_explicit(ptr, val, order) atomic_store_explicit(ptr, val, order)
-    #define atomic_compare_exchange_weak_explicit(ptr, expected, desired, success, failure) \
-        atomic_compare_exchange_weak_explicit(ptr, expected, desired, success, failure)
-    #define atomic_fetch_add_explicit(ptr, val, order) atomic_fetch_add_explicit(ptr, val, order)
-    #define atomic_fetch_sub_explicit(ptr, val, order) atomic_fetch_sub_explicit(ptr, val, order)
-    #define atomic_exchange_explicit(ptr, val, order) atomic_exchange_explicit(ptr, val, order)
+    // Standard C11 atomics are available - no need to redefine them
 #endif
 
 // Thread priority levels

@@ -29,9 +29,16 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_input_validation.h"
 #include "q_log.h"
 #include "streaming_thread.h"
+#include "net_threads.h"
 #include "code_review.h"
 #include "live_code_analysis.h"
 #include "perf_test.h"
+#include "memory_safety_test.h"
+#include "thread_safety_test.h"
+#include "code_quality.h"
+#include "technical_debt.h"
+#include "performance_benchmark.h"
+#include "cross_platform_test.h"
 #include "profiler.h"
 #include "performance_counters.h"
 #include "crash_handler.h"
@@ -237,6 +244,17 @@ static char com_errorMessage[ MAXPRINTMSG ];
 
 static void Com_Shutdown( void );
 static void Com_WriteConfig_f( void );
+static void Com_NetThreads_f( void );
+static void Com_StreamThreads_f( void );
+static void Com_CodeReview_f( void );
+static void Com_LiveCode_f( void );
+static void Com_PerfTest_f( void );
+static void Com_CrossPlatformTest_f( void );
+static void Com_MemorySafetyTest_f( void );
+static void Com_ThreadSafetyTest_f( void );
+static void Com_CodeQuality_f( void );
+static void Com_TechnicalDebt_f( void );
+static void Com_PerformanceBenchmark_f( void );
 void CIN_CloseAllVideos( void );
 
 //============================================================================
@@ -2645,6 +2663,12 @@ static void Com_InitHunkMemory( void ) {
 	Cmd_AddCommand( "codereview", Com_CodeReview_f );
 	Cmd_AddCommand( "livecode", Com_LiveCode_f );
 	Cmd_AddCommand( "perftest", Com_PerfTest_f );
+	Cmd_AddCommand( "crosstest", Com_CrossPlatformTest_f );
+	Cmd_AddCommand( "memtest", Com_MemorySafetyTest_f );
+	Cmd_AddCommand( "threadtest", Com_ThreadSafetyTest_f );
+	Cmd_AddCommand( "quality", Com_CodeQuality_f );
+	Cmd_AddCommand( "debt", Com_TechnicalDebt_f );
+	Cmd_AddCommand( "benchmark", Com_PerformanceBenchmark_f );
 
 	// Initialize memory statistics tracking
 	MemStats_Init();
@@ -4756,6 +4780,36 @@ Cvar_SetDescription( cg_screenFlash, "Enable screen flash effects" );
 		Com_Printf("Failed to initialize performance test system\n");
 	}
 
+	// Initialize cross-platform test system
+	if (!CrossPlatformTest_Init()) {
+		Com_Printf("Failed to initialize cross-platform test system\n");
+	}
+
+	// Initialize memory safety test system
+	if (!MemorySafetyTest_Init()) {
+		Com_Printf("Failed to initialize memory safety test system\n");
+	}
+
+	// Initialize thread safety test system
+	if (!ThreadSafetyTest_Init()) {
+		Com_Printf("Failed to initialize thread safety test system\n");
+	}
+
+	// Initialize code quality analysis system
+	if (!CodeQuality_Init()) {
+		Com_Printf("Failed to initialize code quality analysis system\n");
+	}
+
+	// Initialize technical debt tracking system
+	if (!TechnicalDebt_Init()) {
+		Com_Printf("Failed to initialize technical debt tracking system\n");
+	}
+
+	// Initialize performance benchmarking system
+	if (!Benchmark_Init()) {
+		Com_Printf("Failed to initialize performance benchmarking system\n");
+	}
+
 	VM_Init();
 	SV_Init();
 
@@ -5405,6 +5459,24 @@ static void Com_Shutdown( void ) {
 
 	// Shutdown performance test system
 	PerfTest_Shutdown();
+
+	// Shutdown cross-platform test system
+	CrossPlatformTest_Shutdown();
+
+	// Shutdown memory safety test system
+	MemorySafetyTest_Shutdown();
+
+	// Shutdown thread safety test system
+	ThreadSafetyTest_Shutdown();
+
+	// Shutdown code quality analysis system
+	CodeQuality_Shutdown();
+
+	// Shutdown technical debt tracking system
+	TechnicalDebt_Shutdown();
+
+	// Shutdown performance benchmarking system
+	Benchmark_Shutdown();
 }
 
 //------------------------------------------------------------------------
@@ -7074,5 +7146,2250 @@ static void Com_PerfTest_f( void ) {
 	else {
 		Com_Printf( "Unknown command: %s\n", cmd );
 		Com_Printf( "Use 'perftest' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_CrossPlatformTest_f
+=================
+*/
+static void Com_CrossPlatformTest_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: crosstest <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status             - Show system status and platform info\n" );
+		Com_Printf( "  detect             - Detect and display platform information\n" );
+		Com_Printf( "  run <test_name>    - Run a specific cross-platform test\n" );
+		Com_Printf( "  suite create <name> <desc> - Create a test suite\n" );
+		Com_Printf( "  suite add <suite> <test>   - Add test to suite\n" );
+		Com_Printf( "  suite run <suite>          - Run a test suite\n" );
+		Com_Printf( "  generate <type>            - Generate tests (platform/arch/compiler)\n" );
+		Com_Printf( "  results                    - Show test results\n" );
+		Com_Printf( "  export <dir>               - Export results for CI\n" );
+		Com_Printf( "  validate                   - Validate platform compatibility\n" );
+		Com_Printf( "\nSystem Status: %s\n",
+			cross_platform_test_system.initialized ? "Initialized" : "Not initialized");
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		Com_Printf( "=== Cross-Platform Test System Status ===\n" );
+		Com_Printf( "Initialized: %s\n", cross_platform_test_system.initialized ? "Yes" : "No" );
+
+		if ( cross_platform_test_system.initialized ) {
+			platform_info_t* platform = &cross_platform_test_system.current_platform;
+			Com_Printf( "Platform: %s %s\n", platform->name, platform->version );
+			Com_Printf( "Architecture: %s (%d-bit)\n",
+				platform->arch.name, platform->arch.bits );
+			Com_Printf( "Compiler: %s %s\n",
+				platform->compiler.name, platform->compiler.version );
+
+			platform_capabilities_t* caps = &platform->capabilities;
+			Com_Printf( "Capabilities:\n" );
+			Com_Printf( "  Graphics: Vulkan=%s OpenGL=%s Metal=%s DirectX=%s\n",
+				caps->has_vulkan ? "Yes" : "No",
+				caps->has_opengl ? "Yes" : "No",
+				caps->has_metal ? "Yes" : "No",
+				caps->has_directx ? "Yes" : "No" );
+			Com_Printf( "  Audio: %s\n", caps->has_audio ? "Yes" : "No" );
+			Com_Printf( "  Networking: %s\n", caps->has_networking ? "Yes" : "No" );
+			Com_Printf( "  Memory: %.1f GB total, %.1f GB available\n",
+				caps->total_memory / (1024.0 * 1024.0 * 1024.0),
+				caps->available_memory / (1024.0 * 1024.0 * 1024.0) );
+		}
+
+		Com_Printf( "\nStatistics:\n" );
+		Com_Printf( "Total Tests Run: %u\n", cross_platform_test_system.total_tests_run );
+		Com_Printf( "Passed: %u\n", cross_platform_test_system.total_passed );
+		Com_Printf( "Failed: %u\n", cross_platform_test_system.total_failed );
+		Com_Printf( "Skipped: %u\n", cross_platform_test_system.total_skipped );
+		Com_Printf( "Timeouts: %u\n", cross_platform_test_system.total_timeouts );
+		Com_Printf( "Crashes: %u\n", cross_platform_test_system.total_crashes );
+	}
+	else if ( Q_stricmp( cmd, "detect" ) == 0 ) {
+		platform_info_t info;
+		if ( CrossPlatformTest_DetectPlatform( &info ) ) {
+			Com_Printf( "=== Platform Detection Results ===\n" );
+			Com_Printf( "Platform: %s\n", info.name );
+			Com_Printf( "Architecture: %s (%d-bit, %s endian)\n",
+				info.arch.name, info.arch.bits,
+				info.arch.little_endian ? "little" : "big" );
+			Com_Printf( "Compiler: %s %s\n", info.compiler.name, info.compiler.version );
+
+			Com_Printf( "\nCompiler Features:\n" );
+			Com_Printf( "  C11 Support: %s\n", info.compiler.supports_c11 ? "Yes" : "No" );
+			Com_Printf( "  C23 Support: %s\n", info.compiler.supports_c23 ? "Yes" : "No" );
+			Com_Printf( "  C++11 Support: %s\n", info.compiler.supports_cpp11 ? "Yes" : "No" );
+			Com_Printf( "  C++23 Support: %s\n", info.compiler.supports_cpp23 ? "Yes" : "No" );
+
+			Com_Printf( "\nArchitecture Features:\n" );
+			Com_Printf( "  SIMD Support: %s\n", info.arch.supports_simd ? "Yes" : "No" );
+			Com_Printf( "  64-bit Atomic Support: %s\n", info.arch.supports_atomic64 ? "Yes" : "No" );
+
+			Com_Printf( "\nPlatform Capabilities:\n" );
+			Com_Printf( "  Threads: %s (%d max)\n",
+				info.capabilities.has_threads ? "Yes" : "No",
+				info.capabilities.max_threads );
+			Com_Printf( "  Unicode: %s\n", info.capabilities.has_unicode ? "Yes" : "No" );
+			Com_Printf( "  Large Files: %s\n", info.capabilities.has_large_files ? "Yes" : "No" );
+		} else {
+			Com_Printf( "Failed to detect platform information\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "run" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: crosstest run <test_name>\n" );
+			Com_Printf( "Available tests:\n" );
+			Com_Printf( "  basic_functionality\n" );
+			Com_Printf( "  memory_management\n" );
+			Com_Printf( "  threading\n" );
+			Com_Printf( "  file_system\n" );
+			Com_Printf( "  network_basic\n" );
+			Com_Printf( "  graphics_api\n" );
+			Com_Printf( "  audio_api\n" );
+			Com_Printf( "  large_file_support\n" );
+			Com_Printf( "  unicode_support\n" );
+			Com_Printf( "  time_and_date\n" );
+			Com_Printf( "  math_precision\n" );
+			return;
+		}
+
+		const char* test_name = Cmd_Argv(2);
+
+		cross_platform_test_config_t config;
+		memset( &config, 0, sizeof( config ) );
+		Q_strncpyz( config.test_name, test_name, sizeof( config.test_name ) );
+		Com_sprintf( config.description, sizeof( config.description ),
+			"Cross-platform test: %s", test_name );
+		config.timeout_seconds = 30;
+
+		cross_platform_test_result_t result;
+		if ( CrossPlatformTest_RunTest( &config, &result ) ) {
+			Com_Printf( "Test completed: %s\n", CrossPlatformTest_GetResultString( result.result ) );
+			Com_Printf( "Duration: %.2f seconds\n", result.duration_ms / 1000.0f );
+
+			if ( result.error_message[0] ) {
+				Com_Printf( "Error: %s\n", result.error_message );
+			}
+		} else {
+			Com_Printf( "Failed to run cross-platform test\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "suite" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: crosstest suite <create|add|run> ...\n" );
+			return;
+		}
+
+		const char* subcmd = Cmd_Argv(2);
+
+		if ( Q_stricmp( subcmd, "create" ) == 0 ) {
+			if ( Cmd_Argc() < 5 ) {
+				Com_Printf( "Usage: crosstest suite create <name> <description>\n" );
+				return;
+			}
+
+			const char* suite_name = Cmd_Argv(3);
+			const char* description = Cmd_Argv(4);
+
+			cross_platform_test_suite_t* suite = CrossPlatformTest_CreateSuite( suite_name, description );
+			if ( suite ) {
+				Com_Printf( "Created cross-platform test suite: %s\n", suite_name );
+				cross_platform_test_system.current_suite = suite;
+			} else {
+				Com_Printf( "Failed to create test suite\n" );
+			}
+		}
+		else if ( Q_stricmp( subcmd, "add" ) == 0 ) {
+			if ( Cmd_Argc() < 5 ) {
+				Com_Printf( "Usage: crosstest suite add <suite_name> <test_name>\n" );
+				return;
+			}
+
+			const char* suite_name = Cmd_Argv(3);
+			const char* test_name = Cmd_Argv(4);
+
+			if ( !cross_platform_test_system.current_suite ||
+				 strcmp( cross_platform_test_system.current_suite->suite_name, suite_name ) != 0 ) {
+				Com_Printf( "Suite '%s' not found or not current\n", suite_name );
+				return;
+			}
+
+			cross_platform_test_config_t config;
+			memset( &config, 0, sizeof( config ) );
+			Q_strncpyz( config.test_name, test_name, sizeof( config.test_name ) );
+			config.timeout_seconds = 30;
+
+			if ( CrossPlatformTest_AddTestToSuite( cross_platform_test_system.current_suite, &config ) ) {
+				Com_Printf( "Added test '%s' to suite '%s'\n", test_name, suite_name );
+			} else {
+				Com_Printf( "Failed to add test to suite\n" );
+			}
+		}
+		else if ( Q_stricmp( subcmd, "run" ) == 0 ) {
+			if ( Cmd_Argc() < 4 ) {
+				Com_Printf( "Usage: crosstest suite run <suite_name>\n" );
+				return;
+			}
+
+			const char* suite_name = Cmd_Argv(3);
+
+			if ( !cross_platform_test_system.current_suite ||
+				 strcmp( cross_platform_test_system.current_suite->suite_name, suite_name ) != 0 ) {
+				Com_Printf( "Suite '%s' not found\n", suite_name );
+				return;
+			}
+
+			if ( CrossPlatformTest_RunSuite( cross_platform_test_system.current_suite ) ) {
+				Com_Printf( "Suite '%s' completed successfully\n", suite_name );
+			} else {
+				Com_Printf( "Suite '%s' completed with failures\n", suite_name );
+			}
+		}
+		else {
+			Com_Printf( "Unknown suite command: %s\n", subcmd );
+		}
+	}
+	else if ( Q_stricmp( cmd, "generate" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: crosstest generate <platform|arch|compiler>\n" );
+			return;
+		}
+
+		const char* type = Cmd_Argv(2);
+		const char* suite_name = "generated_suite";
+
+		cross_platform_test_suite_t* suite = CrossPlatformTest_CreateSuite(
+			suite_name, "Auto-generated cross-platform test suite" );
+
+		if ( !suite ) {
+			Com_Printf( "Failed to create test suite\n" );
+			return;
+		}
+
+		qboolean success = qfalse;
+
+		if ( Q_stricmp( type, "platform" ) == 0 ) {
+			success = CrossPlatformTest_GeneratePlatformTests( suite );
+			Com_Printf( "Generated platform-specific tests\n" );
+		} else if ( Q_stricmp( type, "arch" ) == 0 ) {
+			success = CrossPlatformTest_GenerateArchitectureTests( suite );
+			Com_Printf( "Generated architecture-specific tests\n" );
+		} else if ( Q_stricmp( type, "compiler" ) == 0 ) {
+			success = CrossPlatformTest_GenerateCompilerTests( suite );
+			Com_Printf( "Generated compiler-specific tests\n" );
+		} else {
+			Com_Printf( "Unknown generation type: %s\n", type );
+			return;
+		}
+
+		if ( success ) {
+			cross_platform_test_system.current_suite = suite;
+			Com_Printf( "Test suite '%s' created with %u tests\n",
+				suite_name, suite->num_tests );
+		} else {
+			Com_Printf( "Failed to generate tests\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "results" ) == 0 ) {
+		cross_platform_test_result_t* results;
+		uint32_t count = CrossPlatformTest_GetResults( &results );
+
+		if ( count == 0 ) {
+			Com_Printf( "No test results available\n" );
+			return;
+		}
+
+		Com_Printf( "=== Cross-Platform Test Results ===\n" );
+		for ( uint32_t i = 0; i < count && i < 20; i++ ) { // Show first 20
+			const cross_platform_test_result_t* result = &results[i];
+			Com_Printf( "%s: %s (%.2fs)",
+				result->test_name,
+				CrossPlatformTest_GetResultString( result->result ),
+				result->duration_ms / 1000.0f );
+
+			if ( result->error_message[0] ) {
+				Com_Printf( " - %s", result->error_message );
+			}
+			Com_Printf( "\n" );
+		}
+
+		if ( count > 20 ) {
+			Com_Printf( "... and %u more results\n", count - 20 );
+		}
+	}
+	else if ( Q_stricmp( cmd, "export" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: crosstest export <directory>\n" );
+			return;
+		}
+
+		const char* export_dir = Cmd_Argv(2);
+
+		if ( CrossPlatformTest_ExportForCI( export_dir ) ) {
+			Com_Printf( "Exported cross-platform test results to: %s\n", export_dir );
+		} else {
+			Com_Printf( "Failed to export test results\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "validate" ) == 0 ) {
+		Com_Printf( "=== Platform Compatibility Validation ===\n" );
+
+		qboolean requirements_met = CrossPlatformTest_CheckMinimumRequirements();
+		Com_Printf( "Minimum Requirements: %s\n", requirements_met ? "MET" : "NOT MET" );
+
+		qboolean platform_valid = CrossPlatformTest_ValidatePlatformCompatibility();
+		Com_Printf( "Platform Compatibility: %s\n", platform_valid ? "VALID" : "INVALID" );
+
+		qboolean caps_ok = CrossPlatformTest_TestPlatformCapabilities();
+		Com_Printf( "Platform Capabilities: %s\n", caps_ok ? "OK" : "ISSUES DETECTED" );
+
+		qboolean arch_ok = CrossPlatformTest_TestArchitectureFeatures();
+		Com_Printf( "Architecture Features: %s\n", arch_ok ? "OK" : "ISSUES DETECTED" );
+
+		qboolean compiler_ok = CrossPlatformTest_TestCompilerFeatures();
+		Com_Printf( "Compiler Features: %s\n", compiler_ok ? "OK" : "ISSUES DETECTED" );
+
+		qboolean overall = requirements_met && platform_valid && caps_ok && arch_ok && compiler_ok;
+		Com_Printf( "\nOverall Compatibility: %s\n", overall ? "COMPATIBLE" : "NOT COMPATIBLE" );
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'crosstest' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_MemorySafetyTest_f
+=================
+*/
+static void Com_MemorySafetyTest_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: memtest <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status             - Show system status and sanitizer info\n" );
+		Com_Printf( "  enable <asan|ubsan|lsan> - Enable specific sanitizer\n" );
+		Com_Printf( "  disable <asan|ubsan|lsan> - Disable specific sanitizer\n" );
+		Com_Printf( "  strict <on|off>   - Set strict mode (warnings as errors)\n" );
+		Com_Printf( "  run <test_name>    - Run a specific memory safety test\n" );
+		Com_Printf( "  suite create <name> <desc> - Create a test suite\n" );
+		Com_Printf( "  suite add <suite> <test>   - Add test to suite\n" );
+		Com_Printf( "  suite run <suite>          - Run a test suite\n" );
+		Com_Printf( "  generate <fuzz|boundary|concurrency> - Generate test suites\n" );
+		Com_Printf( "  results                    - Show test results\n" );
+		Com_Printf( "  export <dir>               - Export results for CI\n" );
+		Com_Printf( "  report <file>              - Generate detailed report\n" );
+		Com_Printf( "\nSystem Status: %s\n",
+			memory_safety_test_system.initialized ? "Initialized" : "Not initialized");
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		Com_Printf( "=== Memory Safety Test System Status ===\n" );
+		Com_Printf( "Initialized: %s\n", memory_safety_test_system.initialized ? "Yes" : "No" );
+
+		if ( memory_safety_test_system.initialized ) {
+			Com_Printf( "ASan: %s (%s)\n",
+				memory_safety_test_system.asan_available ? "Available" : "Not Available",
+				memory_safety_test_system.asan_version);
+			Com_Printf( "UBSan: %s (%s)\n",
+				memory_safety_test_system.ubsan_available ? "Available" : "Not Available",
+				memory_safety_test_system.ubsan_version);
+			Com_Printf( "LSan: %s (%s)\n",
+				memory_safety_test_system.lsan_available ? "Available" : "Not Available",
+				memory_safety_test_system.lsan_version);
+		}
+
+		Com_Printf( "\nStatistics:\n" );
+		Com_Printf( "Total Tests Run: %u\n", memory_safety_test_system.total_tests_run );
+		Com_Printf( "Passed: %u\n", memory_safety_test_system.total_passed );
+		Com_Printf( "ASan Errors: %u\n", memory_safety_test_system.total_asan_errors );
+		Com_Printf( "UBSan Errors: %u\n", memory_safety_test_system.total_ubsan_errors );
+		Com_Printf( "Leaks Detected: %u\n", memory_safety_test_system.total_leaks_detected );
+		Com_Printf( "Crashes: %u\n", memory_safety_test_system.total_crashes );
+	}
+	else if ( Q_stricmp( cmd, "enable" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: memtest enable <asan|ubsan|lsan>\n" );
+			return;
+		}
+
+		const char* sanitizer = Cmd_Argv(2);
+		qboolean success = qfalse;
+
+		if ( Q_stricmp( sanitizer, "asan" ) == 0 ) {
+			success = MemorySafetyTest_EnableASan();
+			Com_Printf( "ASan %s\n", success ? "enabled" : "failed to enable" );
+		} else if ( Q_stricmp( sanitizer, "ubsan" ) == 0 ) {
+			success = MemorySafetyTest_EnableUBSan();
+			Com_Printf( "UBSan %s\n", success ? "enabled" : "failed to enable" );
+		} else if ( Q_stricmp( sanitizer, "lsan" ) == 0 ) {
+			success = MemorySafetyTest_EnableLSan();
+			Com_Printf( "LSan %s\n", success ? "enabled" : "failed to enable" );
+		} else {
+			Com_Printf( "Unknown sanitizer: %s\n", sanitizer );
+		}
+	}
+	else if ( Q_stricmp( cmd, "disable" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: memtest disable <asan|ubsan|lsan>\n" );
+			return;
+		}
+
+		const char* sanitizer = Cmd_Argv(2);
+		// Note: Disabling sanitizers at runtime is not always possible
+		Com_Printf( "Sanitizer disabling not supported at runtime: %s\n", sanitizer );
+		Com_Printf( "Sanitizers must be disabled at compile time.\n" );
+	}
+	else if ( Q_stricmp( cmd, "strict" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: memtest strict <on|off>\n" );
+			return;
+		}
+
+		const char* mode = Cmd_Argv(2);
+		qboolean strict = qfalse;
+
+		if ( Q_stricmp( mode, "on" ) == 0 ) {
+			strict = qtrue;
+		} else if ( Q_stricmp( mode, "off" ) == 0 ) {
+			strict = qfalse;
+		} else {
+			Com_Printf( "Invalid mode: %s (use 'on' or 'off')\n", mode );
+			return;
+		}
+
+		if ( MemorySafetyTest_SetStrictMode( strict ) ) {
+			Com_Printf( "Strict mode %s\n", strict ? "enabled" : "disabled" );
+		} else {
+			Com_Printf( "Failed to set strict mode\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "run" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: memtest run <test_name>\n" );
+			Com_Printf( "Available tests:\n" );
+			Com_Printf( "  buffer_overflow\n" );
+			Com_Printf( "  use_after_free\n" );
+			Com_Printf( "  double_free\n" );
+			Com_Printf( "  memory_leak\n" );
+			Com_Printf( "  integer_overflow\n" );
+			Com_Printf( "  division_by_zero\n" );
+			Com_Printf( "  null_pointer_deref\n" );
+			Com_Printf( "  uninitialized_variable\n" );
+			Com_Printf( "  type_confusion\n" );
+			Com_Printf( "  stack_overflow\n" );
+			Com_Printf( "  file_operations\n" );
+			Com_Printf( "  network_operations\n" );
+			Com_Printf( "  thread_operations\n" );
+			Com_Printf( "  memory_management\n" );
+			Com_Printf( "  string_operations\n" );
+			Com_Printf( "  data_structures\n" );
+			return;
+		}
+
+		const char* test_name = Cmd_Argv(2);
+
+		memory_safety_test_config_t config;
+		memset( &config, 0, sizeof( config ) );
+		Q_strncpyz( config.test_name, test_name, sizeof( config.test_name ) );
+		Q_strncpyz( config.description, "Manual memory safety test", sizeof( config.description ) );
+		config.enable_asan = memory_safety_test_system.asan_available;
+		config.enable_ubsan = memory_safety_test_system.ubsan_available;
+		config.enable_lsan = memory_safety_test_system.lsan_available;
+		config.timeout_seconds = 30;
+
+		memory_safety_test_result_t result;
+		if ( MemorySafetyTest_RunTest( &config, &result ) ) {
+			Com_Printf( "Test completed: %s\n", MemorySafetyTest_GetResultString( result.result ) );
+			Com_Printf( "Duration: %.2f seconds\n", result.duration_ms / 1000.0f );
+
+			if ( result.error_count > 0 ) {
+				Com_Printf( "Detected %u error(s):\n", result.error_count );
+				for ( uint32_t i = 0; i < result.error_count && i < 5; i++ ) {
+					const sanitizer_error_t* error = &result.errors[i];
+					Com_Printf( "  %s: %s\n", error->error_type, error->description );
+				}
+			}
+
+			Com_Printf( "Memory Usage: Peak %.1f MB, %llu allocations, %llu frees\n",
+				result.peak_heap_usage / (1024.0 * 1024.0),
+				(unsigned long long)result.total_allocations,
+				(unsigned long long)result.total_frees );
+		} else {
+			Com_Printf( "Failed to run memory safety test\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "suite" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: memtest suite <create|add|run> ...\n" );
+			return;
+		}
+
+		const char* subcmd = Cmd_Argv(2);
+
+		if ( Q_stricmp( subcmd, "create" ) == 0 ) {
+			if ( Cmd_Argc() < 5 ) {
+				Com_Printf( "Usage: memtest suite create <name> <description>\n" );
+				return;
+			}
+
+			const char* suite_name = Cmd_Argv(3);
+			const char* description = Cmd_Argv(4);
+
+			memory_safety_test_suite_t* suite = MemorySafetyTest_CreateSuite( suite_name, description );
+			if ( suite ) {
+				Com_Printf( "Created memory safety test suite: %s\n", suite_name );
+				memory_safety_test_system.current_suite = suite;
+			} else {
+				Com_Printf( "Failed to create test suite\n" );
+			}
+		}
+		else if ( Q_stricmp( subcmd, "add" ) == 0 ) {
+			if ( Cmd_Argc() < 5 ) {
+				Com_Printf( "Usage: memtest suite add <suite_name> <test_name>\n" );
+				return;
+			}
+
+			const char* suite_name = Cmd_Argv(3);
+			const char* test_name = Cmd_Argv(4);
+
+			if ( !memory_safety_test_system.current_suite ||
+				 strcmp( memory_safety_test_system.current_suite->suite_name, suite_name ) != 0 ) {
+				Com_Printf( "Suite '%s' not found or not current\n", suite_name );
+				return;
+			}
+
+			memory_safety_test_config_t config;
+			memset( &config, 0, sizeof( config ) );
+			Q_strncpyz( config.test_name, test_name, sizeof( config.test_name ) );
+			config.enable_asan = memory_safety_test_system.asan_available;
+			config.enable_ubsan = memory_safety_test_system.ubsan_available;
+			config.enable_lsan = memory_safety_test_system.lsan_available;
+			config.timeout_seconds = 30;
+
+			if ( MemorySafetyTest_AddTestToSuite( memory_safety_test_system.current_suite, &config ) ) {
+				Com_Printf( "Added test '%s' to suite '%s'\n", test_name, suite_name );
+			} else {
+				Com_Printf( "Failed to add test to suite\n" );
+			}
+		}
+		else if ( Q_stricmp( subcmd, "run" ) == 0 ) {
+			if ( Cmd_Argc() < 4 ) {
+				Com_Printf( "Usage: memtest suite run <suite_name>\n" );
+				return;
+			}
+
+			const char* suite_name = Cmd_Argv(3);
+
+			if ( !memory_safety_test_system.current_suite ||
+				 strcmp( memory_safety_test_system.current_suite->suite_name, suite_name ) != 0 ) {
+				Com_Printf( "Suite '%s' not found\n", suite_name );
+				return;
+			}
+
+			if ( MemorySafetyTest_RunSuite( memory_safety_test_system.current_suite ) ) {
+				Com_Printf( "Suite '%s' completed successfully\n", suite_name );
+			} else {
+				Com_Printf( "Suite '%s' completed with failures\n", suite_name );
+			}
+		}
+		else {
+			Com_Printf( "Unknown suite command: %s\n", subcmd );
+		}
+	}
+	else if ( Q_stricmp( cmd, "generate" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: memtest generate <fuzz|boundary|concurrency>\n" );
+			return;
+		}
+
+		const char* type = Cmd_Argv(2);
+		const char* suite_name = "generated_memtest_suite";
+
+		memory_safety_test_suite_t* suite = MemorySafetyTest_CreateSuite(
+			suite_name, "Auto-generated memory safety test suite" );
+
+		if ( !suite ) {
+			Com_Printf( "Failed to create test suite\n" );
+			return;
+		}
+
+		qboolean success = qfalse;
+
+		if ( Q_stricmp( type, "fuzz" ) == 0 ) {
+			success = MemorySafetyTest_GenerateFuzzTests( suite );
+			Com_Printf( "Generated fuzz tests\n" );
+		} else if ( Q_stricmp( type, "boundary" ) == 0 ) {
+			success = MemorySafetyTest_GenerateBoundaryTests( suite );
+			Com_Printf( "Generated boundary tests\n" );
+		} else if ( Q_stricmp( type, "concurrency" ) == 0 ) {
+			success = MemorySafetyTest_GenerateConcurrencyTests( suite );
+			Com_Printf( "Generated concurrency tests\n" );
+		} else {
+			Com_Printf( "Unknown generation type: %s\n", type );
+			return;
+		}
+
+		if ( success ) {
+			memory_safety_test_system.current_suite = suite;
+			Com_Printf( "Test suite '%s' created with %u tests\n",
+				suite_name, suite->num_tests );
+		} else {
+			Com_Printf( "Failed to generate tests\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "results" ) == 0 ) {
+		memory_safety_test_result_t* results;
+		uint32_t count = MemorySafetyTest_GetResults( &results );
+
+		if ( count == 0 ) {
+			Com_Printf( "No test results available\n" );
+			return;
+		}
+
+		Com_Printf( "=== Memory Safety Test Results ===\n" );
+		for ( uint32_t i = 0; i < count && i < 20; i++ ) { // Show first 20
+			const memory_safety_test_result_t* result = &results[i];
+			Com_Printf( "%-20s: %s (%.2fs) - %u errors\n",
+				result->test_name,
+				MemorySafetyTest_GetResultString( result->result ),
+				result->duration_ms / 1000.0f,
+				result->error_count );
+		}
+
+		if ( count > 20 ) {
+			Com_Printf( "... and %u more results\n", count - 20 );
+		}
+	}
+	else if ( Q_stricmp( cmd, "export" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: memtest export <directory>\n" );
+			return;
+		}
+
+		const char* export_dir = Cmd_Argv(2);
+
+		if ( MemorySafetyTest_ExportForCI( export_dir ) ) {
+			Com_Printf( "Exported memory safety test results to: %s\n", export_dir );
+		} else {
+			Com_Printf( "Failed to export test results\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "report" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: memtest report <output_file>\n" );
+			return;
+		}
+
+		const char* output_file = Cmd_Argv(2);
+
+		if ( MemorySafetyTest_GenerateReport( output_file, "JSON" ) ) {
+			Com_Printf( "Generated memory safety report: %s\n", output_file );
+		} else {
+			Com_Printf( "Failed to generate report\n" );
+		}
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'memtest' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_ThreadSafetyTest_f
+=================
+*/
+static void Com_ThreadSafetyTest_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: threadtest <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status             - Show system status and TSan info\n" );
+		Com_Printf( "  enable <tsan|deadlock|race> - Enable specific detection\n" );
+		Com_Printf( "  disable <tsan|deadlock|race> - Disable specific detection\n" );
+		Com_Printf( "  strict <on|off>   - Set strict mode (warnings as errors)\n" );
+		Com_Printf( "  run <test_name>    - Run a specific thread safety test\n" );
+		Com_Printf( "  suite create <name> <desc> - Create a test suite\n" );
+		Com_Printf( "  suite add <suite> <test>   - Add test to suite\n" );
+		Com_Printf( "  suite run <suite>          - Run a test suite\n" );
+		Com_Printf( "  generate <race|deadlock|stress> - Generate test suites\n" );
+		Com_Printf( "  results                    - Show test results\n" );
+		Com_Printf( "  export <dir>               - Export results for CI\n" );
+		Com_Printf( "  report <file>              - Generate detailed report\n" );
+		Com_Printf( "\nSystem Status: %s\n",
+			thread_safety_test_system.initialized ? "Initialized" : "Not initialized");
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		Com_Printf( "=== Thread Safety Test System Status ===\n" );
+		Com_Printf( "Initialized: %s\n", thread_safety_test_system.initialized ? "Yes" : "No" );
+
+		if ( thread_safety_test_system.initialized ) {
+			Com_Printf( "TSan: %s (%s)\n",
+				thread_safety_test_system.tsan_available ? "Available" : "Not Available",
+				thread_safety_test_system.tsan_version);
+			Com_Printf( "Deadlock Detection: %s\n",
+				thread_safety_test_system.supports_deadlock_detection ? "Supported" : "Not Supported");
+			Com_Printf( "Race Detection: %s\n",
+				thread_safety_test_system.tsan_available ? "Available" : "Not Available");
+			Com_Printf( "Max Threads: %d\n", thread_safety_test_system.max_supported_threads);
+		}
+
+		Com_Printf( "\nStatistics:\n" );
+		Com_Printf( "Total Tests Run: %u\n", thread_safety_test_system.total_tests_run );
+		Com_Printf( "Race Conditions: %u\n", thread_safety_test_system.total_races_detected );
+		Com_Printf( "Deadlocks: %u\n", thread_safety_test_system.total_deadlocks_detected );
+		Com_Printf( "Atomic Violations: %u\n", thread_safety_test_system.total_atomic_violations );
+		Com_Printf( "Crashes: %u\n", thread_safety_test_system.total_crashes );
+	}
+	else if ( Q_stricmp( cmd, "enable" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: threadtest enable <tsan|deadlock|race>\n" );
+			return;
+		}
+
+		const char* detector = Cmd_Argv(2);
+		qboolean success = qfalse;
+
+		if ( Q_stricmp( detector, "tsan" ) == 0 ) {
+			success = ThreadSafetyTest_EnableTSan();
+			Com_Printf( "TSan %s\n", success ? "enabled" : "failed to enable" );
+		} else if ( Q_stricmp( detector, "deadlock" ) == 0 ) {
+			success = ThreadSafetyTest_EnableDeadlockDetection();
+			Com_Printf( "Deadlock detection %s\n", success ? "enabled" : "failed to enable" );
+		} else if ( Q_stricmp( detector, "race" ) == 0 ) {
+			success = ThreadSafetyTest_EnableRaceDetection();
+			Com_Printf( "Race detection %s\n", success ? "enabled" : "failed to enable" );
+		} else {
+			Com_Printf( "Unknown detector: %s\n", detector );
+		}
+	}
+	else if ( Q_stricmp( cmd, "disable" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: threadtest disable <tsan|deadlock|race>\n" );
+			return;
+		}
+
+		const char* detector = Cmd_Argv(2);
+		// Note: Disabling detectors at runtime is not always possible
+		Com_Printf( "Detector disabling not supported at runtime: %s\n", detector );
+		Com_Printf( "Detectors must be disabled at compile time.\n" );
+	}
+	else if ( Q_stricmp( cmd, "strict" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: threadtest strict <on|off>\n" );
+			return;
+		}
+
+		const char* mode = Cmd_Argv(2);
+		qboolean strict = qfalse;
+
+		if ( Q_stricmp( mode, "on" ) == 0 ) {
+			strict = qtrue;
+		} else if ( Q_stricmp( mode, "off" ) == 0 ) {
+			strict = qfalse;
+		} else {
+			Com_Printf( "Invalid mode: %s (use 'on' or 'off')\n", mode );
+			return;
+		}
+
+		if ( ThreadSafetyTest_SetStrictMode( strict ) ) {
+			Com_Printf( "Strict mode %s\n", strict ? "enabled" : "disabled" );
+		} else {
+			Com_Printf( "Failed to set strict mode\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "run" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: threadtest run <test_name>\n" );
+			Com_Printf( "Available tests:\n" );
+			Com_Printf( "  data_race_basic\n" );
+			Com_Printf( "  data_race_atomic\n" );
+			Com_Printf( "  deadlock_mutex\n" );
+			Com_Printf( "  deadlock_rwlock\n" );
+			Com_Printf( "  lock_order_violation\n" );
+			Com_Printf( "  use_after_free_concurrent\n" );
+			Com_Printf( "  double_lock\n" );
+			Com_Printf( "  unlock_unlocked_mutex\n" );
+			Com_Printf( "  condition_variable_race\n" );
+			Com_Printf( "  semaphore_race\n" );
+			Com_Printf( "  memory_allocator\n" );
+			Com_Printf( "  shared_data_structures\n" );
+			Com_Printf( "  thread_pool\n" );
+			Com_Printf( "  high_contention\n" );
+			return;
+		}
+
+		const char* test_name = Cmd_Argv(2);
+
+		thread_safety_test_config_t config;
+		memset( &config, 0, sizeof( config ) );
+		Q_strncpyz( config.test_name, test_name, sizeof( config.test_name ) );
+		Q_strncpyz( config.description, "Manual thread safety test", sizeof( config.description ) );
+		config.enable_tsan = thread_safety_test_system.tsan_available;
+		config.enable_deadlock_detection = thread_safety_test_system.supports_deadlock_detection;
+		config.enable_race_detection = thread_safety_test_system.tsan_available;
+		config.num_threads = 4;
+		config.iterations = 1000;
+		config.timeout_seconds = 30;
+
+		thread_safety_test_result_t result;
+		if ( ThreadSafetyTest_RunTest( &config, &result ) ) {
+			Com_Printf( "Test completed: %s\n", ThreadSafetyTest_GetResultString( result.result ) );
+			Com_Printf( "Duration: %.2f seconds\n", result.duration_ms / 1000.0f );
+
+			if ( result.error_count > 0 ) {
+				Com_Printf( "Detected %u error(s):\n", result.error_count );
+				for ( uint32_t i = 0; i < result.error_count && i < 5; i++ ) {
+					const tsan_error_t* error = &result.errors[i];
+					Com_Printf( "  %s: %s\n", ThreadSafetyTest_GetTSanErrorString( error->error_type ), error->description );
+				}
+			}
+
+			Com_Printf( "Threads Created: %d\n", result.num_threads_created );
+			Com_Printf( "Iterations: %d\n", result.test_iterations_completed );
+		} else {
+			Com_Printf( "Failed to run thread safety test\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "suite" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: threadtest suite <create|add|run> ...\n" );
+			return;
+		}
+
+		const char* subcmd = Cmd_Argv(2);
+
+		if ( Q_stricmp( subcmd, "create" ) == 0 ) {
+			if ( Cmd_Argc() < 5 ) {
+				Com_Printf( "Usage: threadtest suite create <name> <description>\n" );
+				return;
+			}
+
+			const char* suite_name = Cmd_Argv(3);
+			const char* description = Cmd_Argv(4);
+
+			thread_safety_test_suite_t* suite = ThreadSafetyTest_CreateSuite( suite_name, description );
+			if ( suite ) {
+				Com_Printf( "Created thread safety test suite: %s\n", suite_name );
+				thread_safety_test_system.current_suite = suite;
+			} else {
+				Com_Printf( "Failed to create test suite\n" );
+			}
+		}
+		else if ( Q_stricmp( subcmd, "add" ) == 0 ) {
+			if ( Cmd_Argc() < 5 ) {
+				Com_Printf( "Usage: threadtest suite add <suite_name> <test_name>\n" );
+				return;
+			}
+
+			const char* suite_name = Cmd_Argv(3);
+			const char* test_name = Cmd_Argv(4);
+
+			if ( !thread_safety_test_system.current_suite ||
+				 strcmp( thread_safety_test_system.current_suite->suite_name, suite_name ) != 0 ) {
+				Com_Printf( "Suite '%s' not found or not current\n", suite_name );
+				return;
+			}
+
+			thread_safety_test_config_t config;
+			memset( &config, 0, sizeof( config ) );
+			Q_strncpyz( config.test_name, test_name, sizeof( config.test_name ) );
+			config.enable_tsan = thread_safety_test_system.tsan_available;
+			config.enable_deadlock_detection = thread_safety_test_system.supports_deadlock_detection;
+			config.enable_race_detection = thread_safety_test_system.tsan_available;
+			config.num_threads = 4;
+			config.iterations = 1000;
+			config.timeout_seconds = 30;
+
+			if ( ThreadSafetyTest_AddTestToSuite( thread_safety_test_system.current_suite, &config ) ) {
+				Com_Printf( "Added test '%s' to suite '%s'\n", test_name, suite_name );
+			} else {
+				Com_Printf( "Failed to add test to suite\n" );
+			}
+		}
+		else if ( Q_stricmp( subcmd, "run" ) == 0 ) {
+			if ( Cmd_Argc() < 4 ) {
+				Com_Printf( "Usage: threadtest suite run <suite_name>\n" );
+				return;
+			}
+
+			const char* suite_name = Cmd_Argv(3);
+
+			if ( !thread_safety_test_system.current_suite ||
+				 strcmp( thread_safety_test_system.current_suite->suite_name, suite_name ) != 0 ) {
+				Com_Printf( "Suite '%s' not found\n", suite_name );
+				return;
+			}
+
+			if ( ThreadSafetyTest_RunSuite( thread_safety_test_system.current_suite ) ) {
+				Com_Printf( "Suite '%s' completed successfully\n", suite_name );
+			} else {
+				Com_Printf( "Suite '%s' completed with failures\n", suite_name );
+			}
+		}
+		else {
+			Com_Printf( "Unknown suite command: %s\n", subcmd );
+		}
+	}
+	else if ( Q_stricmp( cmd, "generate" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: threadtest generate <race|deadlock|stress>\n" );
+			return;
+		}
+
+		const char* type = Cmd_Argv(2);
+		const char* suite_name = "generated_threadtest_suite";
+
+		thread_safety_test_suite_t* suite = ThreadSafetyTest_CreateSuite(
+			suite_name, "Auto-generated thread safety test suite" );
+
+		if ( !suite ) {
+			Com_Printf( "Failed to create test suite\n" );
+			return;
+		}
+
+		qboolean success = qfalse;
+
+		if ( Q_stricmp( type, "race" ) == 0 ) {
+			success = ThreadSafetyTest_GenerateRaceConditionTests( suite );
+			Com_Printf( "Generated race condition tests\n" );
+		} else if ( Q_stricmp( type, "deadlock" ) == 0 ) {
+			success = ThreadSafetyTest_GenerateDeadlockTests( suite );
+			Com_Printf( "Generated deadlock tests\n" );
+		} else if ( Q_stricmp( type, "stress" ) == 0 ) {
+			success = ThreadSafetyTest_GenerateStressTests( suite );
+			Com_Printf( "Generated stress tests\n" );
+		} else {
+			Com_Printf( "Unknown generation type: %s\n", type );
+			return;
+		}
+
+		if ( success ) {
+			thread_safety_test_system.current_suite = suite;
+			Com_Printf( "Test suite '%s' created with %u tests\n",
+				suite_name, suite->num_tests );
+		} else {
+			Com_Printf( "Failed to generate tests\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "results" ) == 0 ) {
+		thread_safety_test_result_t* results;
+		uint32_t count = ThreadSafetyTest_GetResults( &results );
+
+		if ( count == 0 ) {
+			Com_Printf( "No test results available\n" );
+			return;
+		}
+
+		Com_Printf( "=== Thread Safety Test Results ===\n" );
+		for ( uint32_t i = 0; i < count && i < 20; i++ ) { // Show first 20
+			const thread_safety_test_result_t* result = &results[i];
+			Com_Printf( "%-25s: %s (%.2fs) - %u errors, %d threads\n",
+				result->test_name,
+				ThreadSafetyTest_GetResultString( result->result ),
+				result->duration_ms / 1000.0f,
+				result->error_count,
+				result->num_threads_created );
+		}
+
+		if ( count > 20 ) {
+			Com_Printf( "... and %u more results\n", count - 20 );
+		}
+	}
+	else if ( Q_stricmp( cmd, "export" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: threadtest export <directory>\n" );
+			return;
+		}
+
+		const char* export_dir = Cmd_Argv(2);
+
+		if ( ThreadSafetyTest_ExportForCI( export_dir ) ) {
+			Com_Printf( "Exported thread safety test results to: %s\n", export_dir );
+		} else {
+			Com_Printf( "Failed to export test results\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "report" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: threadtest report <output_file>\n" );
+			return;
+		}
+
+		const char* output_file = Cmd_Argv(2);
+
+		if ( ThreadSafetyTest_GenerateReport( output_file, "JSON" ) ) {
+			Com_Printf( "Generated thread safety report: %s\n", output_file );
+		} else {
+			Com_Printf( "Failed to generate report\n" );
+		}
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'threadtest' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_CodeQuality_f
+=================
+*/
+static void Com_CodeQuality_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: quality <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status             - Show system status and gate info\n" );
+		Com_Printf( "  analyze            - Run full code quality analysis\n" );
+		Com_Printf( "  incremental <files> - Run incremental analysis on changed files\n" );
+		Com_Printf( "  gates              - List all quality gates\n" );
+		Com_Printf( "  gate add <name> <metric> <min> <max> - Add custom gate\n" );
+		Com_Printf( "  gate remove <name> - Remove gate\n" );
+		Com_Printf( "  gate enable <name> - Enable gate\n" );
+		Com_Printf( "  gate disable <name> - Disable gate\n" );
+		Com_Printf( "  gate threshold <name> <min> <max> - Set gate thresholds\n" );
+		Com_Printf( "  coverage           - Show coverage analysis results\n" );
+		Com_Printf( "  complexity         - Show complexity analysis results\n" );
+		Com_Printf( "  results            - Show latest analysis results\n" );
+		Com_Printf( "  export <dir>       - Export results for CI\n" );
+		Com_Printf( "  report <file> <format> - Generate detailed report\n" );
+		Com_Printf( "  config load <file> - Load quality configuration\n" );
+		Com_Printf( "  config save <file> - Save current configuration\n" );
+		Com_Printf( "  strict <on|off>    - Set strict mode\n" );
+		Com_Printf( "  ci-check           - Check if CI gates pass\n" );
+		Com_Printf( "\nSystem Status: %s\n",
+			code_quality_system.initialized ? "Initialized" : "Not initialized");
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		Com_Printf( "=== Code Quality Analysis System Status ===\n" );
+		Com_Printf( "Initialized: %s\n", code_quality_system.initialized ? "Yes" : "No" );
+		Com_Printf( "Strict Mode: %s\n", code_quality_system.strict_mode ? "On" : "Off" );
+
+		if ( code_quality_system.initialized ) {
+			Com_Printf( "Quality Gates: %u\n", code_quality_system.gate_count );
+			Com_Printf( "Min Coverage: %.1f%%\n", code_quality_system.min_coverage_percentage );
+			Com_Printf( "Max Complexity: %d\n", code_quality_system.max_cyclomatic_complexity );
+			Com_Printf( "Min Maintainability: %.1f\n", code_quality_system.min_maintainability_index );
+			Com_Printf( "Max Duplication: %.1f%%\n", code_quality_system.max_duplication_percentage );
+
+			Com_Printf( "\nStatistics:\n" );
+			Com_Printf( "Total Analyses Run: %u\n", code_quality_system.total_analyses_run );
+			Com_Printf( "Gates Passed: %u\n", code_quality_system.total_gates_passed );
+			Com_Printf( "Gates Failed: %u\n", code_quality_system.total_gates_failed );
+		}
+	}
+	else if ( Q_stricmp( cmd, "analyze" ) == 0 ) {
+		code_quality_analysis_t analysis;
+		memset( &analysis, 0, sizeof( analysis ) );
+
+		if ( CodeQuality_RunAnalysis( &analysis ) ) {
+			Com_Printf( "Code quality analysis completed: %s\n", CodeQuality_GetResultString( analysis.result ) );
+			Com_Printf( "Duration: %.2f seconds\n", analysis.duration_ms / 1000.0f );
+
+			Com_Printf( "\nCoverage Metrics:\n" );
+			Com_Printf( "  Overall Coverage: %.1f%%\n", analysis.overall_coverage );
+			Com_Printf( "  Files Analyzed: %d\n", analysis.total_files );
+			Com_Printf( "  Functions Covered: %d/%d\n", analysis.covered_functions, analysis.total_functions );
+
+			Com_Printf( "\nComplexity Metrics:\n" );
+			Com_Printf( "  Average Complexity: %.1f\n", analysis.average_complexity );
+			Com_Printf( "  Maximum Complexity: %d\n", analysis.max_complexity );
+			Com_Printf( "  Functions Above Threshold: %d\n", analysis.functions_above_threshold );
+
+			Com_Printf( "\nQuality Scores:\n" );
+			Com_Printf( "  Maintainability Index: %.1f\n", analysis.maintainability_index );
+			Com_Printf( "  Code Duplication: %.1f%%\n", analysis.duplication_percentage );
+			Com_Printf( "  Style Score: %.1f\n", analysis.style_score );
+			Com_Printf( "  Security Score: %.1f\n", analysis.security_score );
+
+			if ( analysis.failed_gate_count > 0 ) {
+				Com_Printf( "\nFailed Gates (%u):\n", analysis.failed_gate_count );
+				for ( uint32_t i = 0; i < analysis.failed_gate_count && i < 5; i++ ) {
+					const quality_gate_config_t* gate = &analysis.failed_gates[i];
+					Com_Printf( "  %s: %s (%s)\n",
+						gate->gate_name,
+						gate->description,
+						gate->blocking ? "BLOCKING" : "WARNING" );
+				}
+			} else {
+				Com_Printf( "\nAll quality gates passed!\n" );
+			}
+
+			// Clean up analysis data
+			if ( analysis.coverage_data ) free( analysis.coverage_data );
+			if ( analysis.complexity_data ) free( analysis.complexity_data );
+			if ( analysis.failed_gates ) free( analysis.failed_gates );
+		} else {
+			Com_Printf( "Failed to run code quality analysis\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "incremental" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: quality incremental <file1> [file2] ...\n" );
+			return;
+		}
+
+		// Collect changed files
+		const char* changed_files[32];
+		uint32_t file_count = 0;
+
+		for ( int i = 2; i < Cmd_Argc() && file_count < 32; i++ ) {
+			changed_files[file_count++] = Cmd_Argv(i);
+		}
+
+		code_quality_analysis_t analysis;
+		memset( &analysis, 0, sizeof( analysis ) );
+		Q_strncpyz( analysis.analysis_name, "Incremental Code Quality Analysis", sizeof( analysis.analysis_name ) );
+
+		if ( CodeQuality_RunIncrementalAnalysis( changed_files, file_count, &analysis ) ) {
+			Com_Printf( "Incremental analysis completed: %s\n", CodeQuality_GetResultString( analysis.result ) );
+			Com_Printf( "Files analyzed: %u\n", file_count );
+
+			// Clean up
+			if ( analysis.coverage_data ) free( analysis.coverage_data );
+			if ( analysis.complexity_data ) free( analysis.complexity_data );
+			if ( analysis.failed_gates ) free( analysis.failed_gates );
+		} else {
+			Com_Printf( "Failed to run incremental analysis\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "gates" ) == 0 ) {
+		Com_Printf( "=== Quality Gates ===\n" );
+
+		for ( uint32_t i = 0; i < code_quality_system.gate_count; i++ ) {
+			const quality_gate_config_t* gate = &code_quality_system.gates[i];
+			Com_Printf( "%-20s: %s\n", gate->gate_name, gate->description );
+			Com_Printf( "  Metric: %s\n", CodeQuality_GetMetricString( gate->metric_type ) );
+			Com_Printf( "  Thresholds: Min=%.1f, Max=%.1f\n",
+				gate->minimum_threshold, gate->maximum_threshold );
+			Com_Printf( "  Status: %s (%s)\n",
+				gate->enabled ? "Enabled" : "Disabled",
+				gate->blocking ? "Blocking" : "Warning" );
+			Com_Printf( "\n" );
+		}
+
+		Com_Printf( "Total Gates: %u\n", code_quality_system.gate_count );
+	}
+	else if ( Q_stricmp( cmd, "gate" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: quality gate <add|remove|enable|disable|threshold> ...\n" );
+			return;
+		}
+
+		const char* subcmd = Cmd_Argv(2);
+
+		if ( Q_stricmp( subcmd, "add" ) == 0 ) {
+			if ( Cmd_Argc() < 7 ) {
+				Com_Printf( "Usage: quality gate add <name> <metric> <min> <max>\n" );
+				Com_Printf( "Metrics: coverage, complexity, maintainability, duplication, style, security\n" );
+				return;
+			}
+
+			const char* gate_name = Cmd_Argv(3);
+			const char* metric_str = Cmd_Argv(4);
+			float min_threshold = atof( Cmd_Argv(5) );
+			float max_threshold = atof( Cmd_Argv(6) );
+
+			quality_metric_type_t metric_type;
+			if ( Q_stricmp( metric_str, "coverage" ) == 0 ) metric_type = QUALITY_METRIC_COVERAGE;
+			else if ( Q_stricmp( metric_str, "complexity" ) == 0 ) metric_type = QUALITY_METRIC_COMPLEXITY;
+			else if ( Q_stricmp( metric_str, "maintainability" ) == 0 ) metric_type = QUALITY_METRIC_MAINTAINABILITY;
+			else if ( Q_stricmp( metric_str, "duplication" ) == 0 ) metric_type = QUALITY_METRIC_DUPLICATION;
+			else if ( Q_stricmp( metric_str, "style" ) == 0 ) metric_type = QUALITY_METRIC_STYLE;
+			else if ( Q_stricmp( metric_str, "security" ) == 0 ) metric_type = QUALITY_METRIC_SECURITY;
+			else {
+				Com_Printf( "Unknown metric: %s\n", metric_str );
+				return;
+			}
+
+			quality_gate_config_t gate;
+			memset( &gate, 0, sizeof( gate ) );
+			Q_strncpyz( gate.gate_name, gate_name, sizeof( gate.gate_name ) );
+			Q_strncpyz( gate.description, "Custom quality gate", sizeof( gate.description ) );
+			gate.metric_type = metric_type;
+			gate.minimum_threshold = min_threshold;
+			gate.maximum_threshold = max_threshold;
+			gate.enabled = qtrue;
+			gate.blocking = qtrue;
+			gate.priority = 5;
+
+			if ( CodeQuality_AddGate( &gate ) ) {
+				Com_Printf( "Added quality gate: %s\n", gate_name );
+			} else {
+				Com_Printf( "Failed to add quality gate\n" );
+			}
+		}
+		else if ( Q_stricmp( subcmd, "remove" ) == 0 ) {
+			if ( Cmd_Argc() < 4 ) {
+				Com_Printf( "Usage: quality gate remove <name>\n" );
+				return;
+			}
+
+			const char* gate_name = Cmd_Argv(3);
+
+			if ( CodeQuality_RemoveGate( gate_name ) ) {
+				Com_Printf( "Removed quality gate: %s\n", gate_name );
+			} else {
+				Com_Printf( "Failed to remove quality gate: %s\n", gate_name );
+			}
+		}
+		else if ( Q_stricmp( subcmd, "enable" ) == 0 ) {
+			if ( Cmd_Argc() < 4 ) {
+				Com_Printf( "Usage: quality gate enable <name>\n" );
+				return;
+			}
+
+			const char* gate_name = Cmd_Argv(3);
+
+			if ( CodeQuality_EnableGate( gate_name ) ) {
+				Com_Printf( "Enabled quality gate: %s\n", gate_name );
+			} else {
+				Com_Printf( "Failed to enable quality gate: %s\n", gate_name );
+			}
+		}
+		else if ( Q_stricmp( subcmd, "disable" ) == 0 ) {
+			if ( Cmd_Argc() < 4 ) {
+				Com_Printf( "Usage: quality gate disable <name>\n" );
+				return;
+			}
+
+			const char* gate_name = Cmd_Argv(3);
+
+			if ( CodeQuality_DisableGate( gate_name ) ) {
+				Com_Printf( "Disabled quality gate: %s\n", gate_name );
+			} else {
+				Com_Printf( "Failed to disable quality gate: %s\n", gate_name );
+			}
+		}
+		else if ( Q_stricmp( subcmd, "threshold" ) == 0 ) {
+			if ( Cmd_Argc() < 6 ) {
+				Com_Printf( "Usage: quality gate threshold <name> <min> <max>\n" );
+				return;
+			}
+
+			const char* gate_name = Cmd_Argv(3);
+			float min_threshold = atof( Cmd_Argv(4) );
+			float max_threshold = atof( Cmd_Argv(5) );
+
+			if ( CodeQuality_SetGateThreshold( gate_name, min_threshold, max_threshold ) ) {
+				Com_Printf( "Set thresholds for gate '%s': min=%.1f, max=%.1f\n",
+					gate_name, min_threshold, max_threshold );
+			} else {
+				Com_Printf( "Failed to set gate thresholds\n" );
+			}
+		}
+		else {
+			Com_Printf( "Unknown gate command: %s\n", subcmd );
+		}
+	}
+	else if ( Q_stricmp( cmd, "coverage" ) == 0 ) {
+		Com_Printf( "Coverage analysis not yet implemented (requires test execution)\n" );
+		Com_Printf( "Use 'quality analyze' to run full analysis with coverage metrics\n" );
+	}
+	else if ( Q_stricmp( cmd, "complexity" ) == 0 ) {
+		Com_Printf( "Complexity analysis not yet implemented\n" );
+		Com_Printf( "Use 'quality analyze' to run full analysis with complexity metrics\n" );
+	}
+	else if ( Q_stricmp( cmd, "results" ) == 0 ) {
+		Com_Printf( "Latest analysis results not available\n" );
+		Com_Printf( "Run 'quality analyze' to generate results\n" );
+	}
+	else if ( Q_stricmp( cmd, "export" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: quality export <directory>\n" );
+			return;
+		}
+
+		const char* export_dir = Cmd_Argv(2);
+
+		// Run analysis first to get results
+		code_quality_analysis_t analysis;
+		memset( &analysis, 0, sizeof( analysis ) );
+
+		if ( CodeQuality_RunAnalysis( &analysis ) ) {
+			if ( CodeQuality_ExportForCI( &analysis, export_dir ) ) {
+				Com_Printf( "Exported code quality results to: %s\n", export_dir );
+			} else {
+				Com_Printf( "Failed to export results\n" );
+			}
+
+			// Clean up
+			if ( analysis.coverage_data ) free( analysis.coverage_data );
+			if ( analysis.complexity_data ) free( analysis.complexity_data );
+			if ( analysis.failed_gates ) free( analysis.failed_gates );
+		} else {
+			Com_Printf( "Failed to run analysis for export\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "report" ) == 0 ) {
+		if ( Cmd_Argc() < 4 ) {
+			Com_Printf( "Usage: quality report <output_file> <format>\n" );
+			Com_Printf( "Formats: json, xml, html, text\n" );
+			return;
+		}
+
+		const char* output_file = Cmd_Argv(2);
+		const char* format = Cmd_Argv(3);
+
+		// Run analysis first to get results
+		code_quality_analysis_t analysis;
+		memset( &analysis, 0, sizeof( analysis ) );
+
+		if ( CodeQuality_RunAnalysis( &analysis ) ) {
+			if ( CodeQuality_GenerateReport( &analysis, output_file, format ) ) {
+				Com_Printf( "Generated code quality report: %s (%s)\n", output_file, format );
+			} else {
+				Com_Printf( "Failed to generate report\n" );
+			}
+
+			// Clean up
+			if ( analysis.coverage_data ) free( analysis.coverage_data );
+			if ( analysis.complexity_data ) free( analysis.complexity_data );
+			if ( analysis.failed_gates ) free( analysis.failed_gates );
+		} else {
+			Com_Printf( "Failed to run analysis for report generation\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "config" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: quality config <load|save> <file>\n" );
+			return;
+		}
+
+		const char* subcmd = Cmd_Argv(2);
+
+		if ( Q_stricmp( subcmd, "load" ) == 0 ) {
+			if ( Cmd_Argc() < 4 ) {
+				Com_Printf( "Usage: quality config load <file>\n" );
+				return;
+			}
+
+			const char* config_file = Cmd_Argv(3);
+
+			if ( CodeQuality_LoadConfig( config_file ) ) {
+				Com_Printf( "Loaded quality configuration from: %s\n", config_file );
+			} else {
+				Com_Printf( "Failed to load configuration\n" );
+			}
+		}
+		else if ( Q_stricmp( subcmd, "save" ) == 0 ) {
+			if ( Cmd_Argc() < 4 ) {
+				Com_Printf( "Usage: quality config save <file>\n" );
+				return;
+			}
+
+			const char* config_file = Cmd_Argv(3);
+
+			if ( CodeQuality_SaveConfig( config_file ) ) {
+				Com_Printf( "Saved quality configuration to: %s\n", config_file );
+			} else {
+				Com_Printf( "Failed to save configuration\n" );
+			}
+		}
+		else {
+			Com_Printf( "Unknown config command: %s\n", subcmd );
+		}
+	}
+	else if ( Q_stricmp( cmd, "strict" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: quality strict <on|off>\n" );
+			return;
+		}
+
+		const char* mode = Cmd_Argv(2);
+		qboolean strict = qfalse;
+
+		if ( Q_stricmp( mode, "on" ) == 0 ) {
+			strict = qtrue;
+		} else if ( Q_stricmp( mode, "off" ) == 0 ) {
+			strict = qfalse;
+		} else {
+			Com_Printf( "Invalid mode: %s (use 'on' or 'off')\n", mode );
+			return;
+		}
+
+		if ( CodeQuality_SetStrictMode( strict ) ) {
+			Com_Printf( "Strict mode %s\n", strict ? "enabled" : "disabled" );
+		} else {
+			Com_Printf( "Failed to set strict mode\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "ci-check" ) == 0 ) {
+		// Run analysis and check CI gates
+		code_quality_analysis_t analysis;
+		memset( &analysis, 0, sizeof( analysis ) );
+
+		if ( CodeQuality_RunAnalysis( &analysis ) ) {
+			qboolean ci_pass = CodeQuality_CheckCIGates( &analysis );
+
+			Com_Printf( "CI Gate Check: %s\n", ci_pass ? "PASS" : "FAIL" );
+
+			if ( analysis.failed_gate_count > 0 ) {
+				Com_Printf( "Blocking Issues:\n" );
+				for ( uint32_t i = 0; i < analysis.failed_gate_count; i++ ) {
+					const quality_gate_config_t* gate = &analysis.failed_gates[i];
+					if ( gate->blocking ) {
+						Com_Printf( "  ❌ %s: %s\n", gate->gate_name, gate->description );
+					}
+				}
+			} else {
+				Com_Printf( "✅ All blocking quality gates passed\n" );
+			}
+
+			// Clean up
+			if ( analysis.coverage_data ) free( analysis.coverage_data );
+			if ( analysis.complexity_data ) free( analysis.complexity_data );
+			if ( analysis.failed_gates ) free( analysis.failed_gates );
+		} else {
+			Com_Printf( "CI Gate Check: FAIL (analysis error)\n" );
+		}
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'quality' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_TechnicalDebt_f
+=================
+*/
+static void Com_TechnicalDebt_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: debt <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status             - Show debt tracking status and metrics\n" );
+		Com_Printf( "  list               - List all debt items\n" );
+		Com_Printf( "  add <id> <title> <category> <severity> - Add new debt item\n" );
+		Com_Printf( "  resolve <id> [notes] - Mark debt item as resolved\n" );
+		Com_Printf( "  assign <id> <assignee> - Assign debt item to person\n" );
+		Com_Printf( "  update <id> <field> <value> - Update debt item field\n" );
+		Com_Printf( "  remove <id>       - Remove debt item\n" );
+		Com_Printf( "  metrics            - Show current debt metrics\n" );
+		Com_Printf( "  trends [days]      - Show debt trends over time\n" );
+		Com_Printf( "  predict <months>   - Predict future debt levels\n" );
+		Com_Printf( "  alerts             - Check for debt alerts\n" );
+		Com_Printf( "  analyze            - Run automated debt analysis\n" );
+		Com_Printf( "  history            - Show debt history\n" );
+		Com_Printf( "  export <dir>       - Export debt data for CI\n" );
+		Com_Printf( "  report <file> <format> - Generate debt report\n" );
+		Com_Printf( "  config load <file> - Load debt configuration\n" );
+		Com_Printf( "  config save <file> - Save current configuration\n" );
+		Com_Printf( "  auto <on|off>      - Enable/disable auto tracking\n" );
+		Com_Printf( "  alerts <on|off>    - Enable/disable alerts\n" );
+		Com_Printf( "  thresholds <critical> <high> - Set alert thresholds\n" );
+		Com_Printf( "\nSystem Status: %s\n",
+			technical_debt_system.initialized ? "Initialized" : "Not initialized");
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		Com_Printf( "=== Technical Debt Tracking Status ===\n" );
+		Com_Printf( "Initialized: %s\n", technical_debt_system.initialized ? "Yes" : "No" );
+		Com_Printf( "Auto Tracking: %s\n", technical_debt_system.auto_tracking_enabled ? "Enabled" : "Disabled" );
+		Com_Printf( "Alerts: %s\n", technical_debt_system.alerts_enabled ? "Enabled" : "Disabled" );
+
+		if ( technical_debt_system.initialized ) {
+			Com_Printf( "Debt Items: %u\n", technical_debt_system.num_debt_items );
+			Com_Printf( "History Points: %u\n", technical_debt_system.num_history_points );
+			Com_Printf( "Alert Thresholds: Critical=%d, High=%d\n",
+				technical_debt_system.alert_threshold_critical,
+				technical_debt_system.alert_threshold_high );
+			Com_Printf( "Retention Policy: %d days\n", technical_debt_system.history_retention_days );
+
+			// Show current metrics summary
+			const debt_metrics_t* metrics = &technical_debt_system.current_metrics;
+			char health_status[32];
+			TechnicalDebt_GetDebtHealthStatus(metrics, health_status, sizeof(health_status));
+
+			Com_Printf( "\nCurrent Metrics:\n" );
+			Com_Printf( "  Health Status: %s\n", health_status );
+			Com_Printf( "  Total Debt Score: %.1f\n", metrics->total_debt_score );
+			Com_Printf( "  Unresolved Items: %d\n", metrics->unresolved_items );
+			Com_Printf( "  Critical Items: %d\n", metrics->critical_items );
+			Com_Printf( "  Debt Velocity: %.2f/day\n", metrics->debt_velocity );
+		}
+	}
+	else if ( Q_stricmp( cmd, "list" ) == 0 ) {
+		debt_item_t* items;
+		uint32_t count = TechnicalDebt_GetItems( &items );
+
+		Com_Printf( "=== Technical Debt Items (%u total) ===\n", count );
+
+		for ( uint32_t i = 0; i < count && i < 50; i++ ) { // Show first 50
+			const debt_item_t* item = &items[i];
+			Com_Printf( "%-15s: %s (%s/%s)\n",
+				item->item_id,
+				item->title,
+				TechnicalDebt_GetCategoryString( item->category ),
+				TechnicalDebt_GetSeverityString( item->severity ) );
+
+			if ( item->resolved ) {
+				Com_Printf( "  Status: RESOLVED\n" );
+			} else {
+				Com_Printf( "  Status: ACTIVE (Priority: %d)\n", item->priority_score );
+				if ( item->assigned_to[0] ) {
+					Com_Printf( "  Assigned to: %s\n", item->assigned_to );
+				}
+				if ( item->estimated_effort > 0 ) {
+					Com_Printf( "  Estimated effort: %.1f hours\n", item->estimated_effort );
+				}
+			}
+			Com_Printf( "\n" );
+		}
+
+		if ( count > 50 ) {
+			Com_Printf( "... and %u more items\n", count - 50 );
+		}
+	}
+	else if ( Q_stricmp( cmd, "add" ) == 0 ) {
+		if ( Cmd_Argc() < 6 ) {
+			Com_Printf( "Usage: debt add <id> <title> <category> <severity>\n" );
+			Com_Printf( "Categories: quality, complexity, coverage, maintainability, duplication, security, performance, architecture, documentation\n" );
+			Com_Printf( "Severities: low, medium, high, critical\n" );
+			return;
+		}
+
+		const char* item_id = Cmd_Argv(2);
+		const char* title = Cmd_Argv(3);
+		const char* category_str = Cmd_Argv(4);
+		const char* severity_str = Cmd_Argv(5);
+
+		debt_category_t category;
+		if ( Q_stricmp( category_str, "quality" ) == 0 ) category = DEBT_CATEGORY_CODE_QUALITY;
+		else if ( Q_stricmp( category_str, "complexity" ) == 0 ) category = DEBT_CATEGORY_COMPLEXITY;
+		else if ( Q_stricmp( category_str, "coverage" ) == 0 ) category = DEBT_CATEGORY_COVERAGE;
+		else if ( Q_stricmp( category_str, "maintainability" ) == 0 ) category = DEBT_CATEGORY_MAINTAINABILITY;
+		else if ( Q_stricmp( category_str, "duplication" ) == 0 ) category = DEBT_CATEGORY_DUPLICATION;
+		else if ( Q_stricmp( category_str, "security" ) == 0 ) category = DEBT_CATEGORY_SECURITY;
+		else if ( Q_stricmp( category_str, "performance" ) == 0 ) category = DEBT_CATEGORY_PERFORMANCE;
+		else if ( Q_stricmp( category_str, "architecture" ) == 0 ) category = DEBT_CATEGORY_ARCHITECTURE;
+		else if ( Q_stricmp( category_str, "documentation" ) == 0 ) category = DEBT_CATEGORY_DOCUMENTATION;
+		else {
+			Com_Printf( "Unknown category: %s\n", category_str );
+			return;
+		}
+
+		debt_severity_t severity;
+		if ( Q_stricmp( severity_str, "low" ) == 0 ) severity = DEBT_SEVERITY_LOW;
+		else if ( Q_stricmp( severity_str, "medium" ) == 0 ) severity = DEBT_SEVERITY_MEDIUM;
+		else if ( Q_stricmp( severity_str, "high" ) == 0 ) severity = DEBT_SEVERITY_HIGH;
+		else if ( Q_stricmp( severity_str, "critical" ) == 0 ) severity = DEBT_SEVERITY_CRITICAL;
+		else {
+			Com_Printf( "Unknown severity: %s\n", severity_str );
+			return;
+		}
+
+		debt_item_t item;
+		memset( &item, 0, sizeof( item ) );
+		Q_strncpyz( item.item_id, item_id, sizeof( item.item_id ) );
+		Q_strncpyz( item.title, title, sizeof( item.title ) );
+		Q_strncpyz( item.description, "Added via console command", sizeof( item.description ) );
+		item.category = category;
+		item.severity = severity;
+
+		if ( TechnicalDebt_AddItem( &item ) ) {
+			Com_Printf( "Added technical debt item: %s\n", item_id );
+		} else {
+			Com_Printf( "Failed to add technical debt item\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "resolve" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: debt resolve <id> [resolution_notes]\n" );
+			return;
+		}
+
+		const char* item_id = Cmd_Argv(2);
+		const char* notes = (Cmd_Argc() >= 4) ? Cmd_Argv(3) : NULL;
+
+		if ( TechnicalDebt_ResolveItem( item_id, notes ) ) {
+			Com_Printf( "Resolved technical debt item: %s\n", item_id );
+		} else {
+			Com_Printf( "Failed to resolve technical debt item: %s\n", item_id );
+		}
+	}
+	else if ( Q_stricmp( cmd, "assign" ) == 0 ) {
+		if ( Cmd_Argc() < 4 ) {
+			Com_Printf( "Usage: debt assign <id> <assignee>\n" );
+			return;
+		}
+
+		const char* item_id = Cmd_Argv(2);
+		const char* assignee = Cmd_Argv(3);
+
+		if ( TechnicalDebt_AssignItem( item_id, assignee ) ) {
+			Com_Printf( "Assigned technical debt item '%s' to %s\n", item_id, assignee );
+		} else {
+			Com_Printf( "Failed to assign technical debt item\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "update" ) == 0 ) {
+		if ( Cmd_Argc() < 5 ) {
+			Com_Printf( "Usage: debt update <id> <field> <value>\n" );
+			Com_Printf( "Fields: title, description, severity, effort, tags\n" );
+			return;
+		}
+
+		const char* item_id = Cmd_Argv(2);
+		const char* field = Cmd_Argv(3);
+		const char* value = Cmd_Argv(4);
+
+		debt_item_t updates;
+		memset( &updates, 0, sizeof( updates ) );
+
+		if ( Q_stricmp( field, "title" ) == 0 ) {
+			Q_strncpyz( updates.title, value, sizeof( updates.title ) );
+		} else if ( Q_stricmp( field, "description" ) == 0 ) {
+			Q_strncpyz( updates.description, value, sizeof( updates.description ) );
+		} else if ( Q_stricmp( field, "severity" ) == 0 ) {
+			if ( Q_stricmp( value, "low" ) == 0 ) updates.severity = DEBT_SEVERITY_LOW;
+			else if ( Q_stricmp( value, "medium" ) == 0 ) updates.severity = DEBT_SEVERITY_MEDIUM;
+			else if ( Q_stricmp( value, "high" ) == 0 ) updates.severity = DEBT_SEVERITY_HIGH;
+			else if ( Q_stricmp( value, "critical" ) == 0 ) updates.severity = DEBT_SEVERITY_CRITICAL;
+			else {
+				Com_Printf( "Unknown severity: %s\n", value );
+				return;
+			}
+		} else if ( Q_stricmp( field, "effort" ) == 0 ) {
+			updates.estimated_effort = atof( value );
+		} else if ( Q_stricmp( field, "tags" ) == 0 ) {
+			Q_strncpyz( updates.tags, value, sizeof( updates.tags ) );
+		} else {
+			Com_Printf( "Unknown field: %s\n", field );
+			return;
+		}
+
+		if ( TechnicalDebt_UpdateItem( item_id, &updates ) ) {
+			Com_Printf( "Updated technical debt item '%s'\n", item_id );
+		} else {
+			Com_Printf( "Failed to update technical debt item\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "remove" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: debt remove <id>\n" );
+			return;
+		}
+
+		const char* item_id = Cmd_Argv(2);
+
+		if ( TechnicalDebt_RemoveItem( item_id ) ) {
+			Com_Printf( "Removed technical debt item: %s\n", item_id );
+		} else {
+			Com_Printf( "Failed to remove technical debt item: %s\n", item_id );
+		}
+	}
+	else if ( Q_stricmp( cmd, "metrics" ) == 0 ) {
+		debt_metrics_t metrics;
+		if ( TechnicalDebt_CalculateMetrics( &metrics ) ) {
+			Com_Printf( "=== Technical Debt Metrics ===\n" );
+			Com_Printf( "Overall Debt Score: %.1f\n", metrics.total_debt_score );
+			Com_Printf( "Total Debt Items: %d (%d unresolved)\n",
+				metrics.total_debt_items, metrics.unresolved_items );
+			Com_Printf( "Critical Items: %d\n", metrics.critical_items );
+			Com_Printf( "High Priority Items: %d\n", metrics.high_priority_items );
+
+			Com_Printf( "\nEffort Tracking:\n" );
+			Com_Printf( "Estimated Effort: %.1f hours\n", metrics.total_estimated_effort );
+			Com_Printf( "Actual Effort: %.1f hours\n", metrics.total_actual_effort );
+			Com_Printf( "Effort Efficiency: %.1f%%\n", metrics.effort_efficiency * 100 );
+
+			Com_Printf( "\nTrends:\n" );
+			Com_Printf( "Debt Velocity: %.2f points/day\n", metrics.debt_velocity );
+			Com_Printf( "Paydown Rate: %.2f items/day\n", metrics.debt_paydown_rate );
+
+			Com_Printf( "\nQuality Integration:\n" );
+			Com_Printf( "Code Coverage: %.1f%%\n", metrics.code_coverage );
+			Com_Printf( "Avg Complexity: %.1f\n", metrics.avg_complexity );
+			Com_Printf( "Maintainability: %.1f\n", metrics.maintainability_index );
+			Com_Printf( "Duplication: %.1f%%\n", metrics.duplication_percentage );
+		} else {
+			Com_Printf( "Failed to calculate debt metrics\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "trends" ) == 0 ) {
+		int days = 30; // Default 30 days
+		if ( Cmd_Argc() >= 3 ) {
+			days = atoi( Cmd_Argv(2) );
+		}
+
+		debt_metrics_t trends;
+		if ( TechnicalDebt_AnalyzeTrends( &trends, days ) ) {
+			Com_Printf( "=== Debt Trends (last %d days) ===\n", days );
+			Com_Printf( "Debt Velocity: %.2f points/day\n", trends.debt_velocity );
+			Com_Printf( "Paydown Rate: %.2f items/day\n", trends.debt_paydown_rate );
+
+			if ( trends.debt_velocity > 0 ) {
+				Com_Printf( "⚠️  Debt is accumulating at %.1f points per day\n", trends.debt_velocity );
+			} else if ( trends.debt_velocity < -1 ) {
+				Com_Printf( "✅ Debt is being reduced at %.1f points per day\n", -trends.debt_velocity );
+			} else {
+				Com_Printf( "📊 Debt level is stable\n" );
+			}
+		} else {
+			Com_Printf( "Insufficient historical data for trend analysis\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "predict" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: debt predict <months>\n" );
+			return;
+		}
+
+		int months = atoi( Cmd_Argv(2) );
+		float projected_score;
+
+		if ( TechnicalDebt_PredictFutureDebt( &projected_score, months ) ) {
+			Com_Printf( "Projected debt score in %d months: %.1f\n", months, projected_score );
+			Com_Printf( "Current debt score: %.1f\n", technical_debt_system.current_metrics.total_debt_score );
+
+			float change = projected_score - technical_debt_system.current_metrics.total_debt_score;
+			if ( change > 10 ) {
+				Com_Printf( "⚠️  Significant debt increase projected\n" );
+			} else if ( change < -10 ) {
+				Com_Printf( "✅ Debt reduction projected\n" );
+			} else {
+				Com_Printf( "📊 Debt level projected to remain stable\n" );
+			}
+		} else {
+			Com_Printf( "Failed to predict future debt levels\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "alerts" ) == 0 ) {
+		char alert_message[2048];
+		if ( TechnicalDebt_CheckAlerts( alert_message, sizeof( alert_message ) ) ) {
+			Com_Printf( "Technical Debt Alerts:\n%s\n", alert_message );
+		} else {
+			Com_Printf( "No technical debt alerts at this time\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "analyze" ) == 0 ) {
+		if ( TechnicalDebt_RunAutomatedAnalysis() ) {
+			Com_Printf( "Automated technical debt analysis completed\n" );
+
+			// Show updated metrics
+			const debt_metrics_t* metrics = &technical_debt_system.current_metrics;
+			Com_Printf( "Current debt score: %.1f (%d unresolved items)\n",
+				metrics->total_debt_score, metrics->unresolved_items );
+		} else {
+			Com_Printf( "Failed to run automated debt analysis\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "history" ) == 0 ) {
+		debt_history_point_t* history;
+		uint32_t count = TechnicalDebt_GetHistory( &history );
+
+		Com_Printf( "=== Debt History (%u points) ===\n", count );
+
+		for ( uint32_t i = 0; i < count && i < 20; i++ ) { // Show last 20
+			const debt_history_point_t* point = &history[count - 1 - i]; // Most recent first
+			uint64_t age_hours = (Sys_Milliseconds() - point->timestamp) / (1000 * 60 * 60);
+
+			Com_Printf( "%.1f hours ago: Score=%.1f, Items=%d, Critical=%d\n",
+				age_hours / 1.0f,
+				point->metrics.total_debt_score,
+				point->metrics.unresolved_items,
+				point->metrics.critical_items );
+		}
+	}
+	else if ( Q_stricmp( cmd, "export" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: debt export <directory>\n" );
+			return;
+		}
+
+		const char* export_dir = Cmd_Argv(2);
+
+		if ( TechnicalDebt_ExportForCI( export_dir ) ) {
+			Com_Printf( "Exported technical debt data to: %s\n", export_dir );
+		} else {
+			Com_Printf( "Failed to export debt data\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "report" ) == 0 ) {
+		if ( Cmd_Argc() < 4 ) {
+			Com_Printf( "Usage: debt report <output_file> <format>\n" );
+			Com_Printf( "Formats: json, html, csv, text\n" );
+			return;
+		}
+
+		const char* output_file = Cmd_Argv(2);
+		const char* format = Cmd_Argv(3);
+
+		if ( TechnicalDebt_GenerateReport( output_file, format ) ) {
+			Com_Printf( "Generated technical debt report: %s (%s)\n", output_file, format );
+		} else {
+			Com_Printf( "Failed to generate debt report\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "config" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: debt config <load|save> <file>\n" );
+			return;
+		}
+
+		const char* subcmd = Cmd_Argv(2);
+
+		if ( Q_stricmp( subcmd, "load" ) == 0 ) {
+			if ( Cmd_Argc() < 4 ) {
+				Com_Printf( "Usage: debt config load <file>\n" );
+				return;
+			}
+
+			const char* config_file = Cmd_Argv(3);
+
+			if ( TechnicalDebt_LoadConfig( config_file ) ) {
+				Com_Printf( "Loaded technical debt configuration from: %s\n", config_file );
+			} else {
+				Com_Printf( "Failed to load debt configuration\n" );
+			}
+		}
+		else if ( Q_stricmp( subcmd, "save" ) == 0 ) {
+			if ( Cmd_Argc() < 4 ) {
+				Com_Printf( "Usage: debt config save <file>\n" );
+				return;
+			}
+
+			const char* config_file = Cmd_Argv(3);
+
+			if ( TechnicalDebt_SaveConfig( config_file ) ) {
+				Com_Printf( "Saved technical debt configuration to: %s\n", config_file );
+			} else {
+				Com_Printf( "Failed to save debt configuration\n" );
+			}
+		}
+		else {
+			Com_Printf( "Unknown config command: %s\n", subcmd );
+		}
+	}
+	else if ( Q_stricmp( cmd, "auto" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: debt auto <on|off>\n" );
+			return;
+		}
+
+		const char* mode = Cmd_Argv(2);
+		qboolean enable = qfalse;
+
+		if ( Q_stricmp( mode, "on" ) == 0 ) {
+			enable = qtrue;
+		} else if ( Q_stricmp( mode, "off" ) == 0 ) {
+			enable = qfalse;
+		} else {
+			Com_Printf( "Invalid mode: %s (use 'on' or 'off')\n", mode );
+			return;
+		}
+
+		if ( TechnicalDebt_EnableAutoTracking( enable ) ) {
+			Com_Printf( "Auto tracking %s\n", enable ? "enabled" : "disabled" );
+		} else {
+			Com_Printf( "Failed to set auto tracking\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "alerts" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: debt alerts <on|off>\n" );
+			return;
+		}
+
+		const char* mode = Cmd_Argv(2);
+		// Note: This conflicts with the alerts checking command above
+		// This sets alert enable/disable, the other checks alerts
+		Com_Printf( "Use 'debt alerts' without arguments to check alerts\n" );
+		Com_Printf( "Alerts are currently %s\n",
+			technical_debt_system.alerts_enabled ? "enabled" : "disabled" );
+	}
+	else if ( Q_stricmp( cmd, "thresholds" ) == 0 ) {
+		if ( Cmd_Argc() < 4 ) {
+			Com_Printf( "Usage: debt thresholds <critical> <high>\n" );
+			return;
+		}
+
+		int critical = atoi( Cmd_Argv(2) );
+		int high = atoi( Cmd_Argv(3) );
+
+		if ( TechnicalDebt_SetAlertThresholds( critical, high ) ) {
+			Com_Printf( "Set alert thresholds: critical=%d, high=%d\n", critical, high );
+		} else {
+			Com_Printf( "Failed to set alert thresholds\n" );
+		}
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'debt' with no arguments for help\n" );
+	}
+}
+
+/*
+=================
+Com_PerformanceBenchmark_f
+=================
+*/
+static void Com_PerformanceBenchmark_f( void ) {
+	if ( Cmd_Argc() < 2 ) {
+		Com_Printf( "Usage: benchmark <command> [args]\n" );
+		Com_Printf( "Commands:\n" );
+		Com_Printf( "  status              - Show benchmarking system status\n" );
+		Com_Printf( "  create <suite_name> - Create a new benchmark suite\n" );
+		Com_Printf( "  list                - List all benchmark suites\n" );
+		Com_Printf( "  add-rendering <suite> <map> <quality> - Add rendering benchmark\n" );
+		Com_Printf( "  add-memory <suite> <alloc_size> <count> - Add memory benchmark\n" );
+		Com_Printf( "  add-io <suite> <file> <size_mb> - Add I/O benchmark\n" );
+		Com_Printf( "  run <suite_name>    - Run a benchmark suite\n" );
+		Com_Printf( "  results             - Show recent benchmark results\n" );
+		Com_Printf( "  compare <baseline> <current> - Compare benchmark results\n" );
+		Com_Printf( "  report <format>     - Generate benchmark report\n" );
+		Com_Printf( "  export <dir>        - Export results for CI\n" );
+		Com_Printf( "  baseline update <id> - Update baseline for benchmark\n" );
+		Com_Printf( "  baseline reset <id> - Reset baseline for benchmark\n" );
+		Com_Printf( "  hardware            - Show detected hardware configuration\n" );
+		Com_Printf( "  cancel              - Cancel currently running benchmark\n" );
+		Com_Printf( "\nSystem Status: %s\n",
+			benchmark_system.initialized ? "Initialized" : "Not initialized");
+		return;
+	}
+
+	const char* cmd = Cmd_Argv(1);
+
+	if ( Q_stricmp( cmd, "status" ) == 0 ) {
+		Com_Printf( "=== Performance Benchmarking Status ===\n" );
+		Com_Printf( "Initialized: %s\n", benchmark_system.initialized ? "Yes" : "No" );
+
+		if ( benchmark_system.initialized ) {
+			Com_Printf( "Suites: %u/%u\n", benchmark_system.suite_count, benchmark_system.max_suites );
+			Com_Printf( "Results: %u/%u\n", benchmark_system.result_count, benchmark_system.max_results );
+			Com_Printf( "Auto Baseline Update: %s\n", benchmark_system.auto_baseline_update ? "Enabled" : "Disabled" );
+			Com_Printf( "Regression Alerts: %s\n", benchmark_system.enable_regression_alerts ? "Enabled" : "Disabled" );
+			Com_Printf( "Hardware Profiling: %s\n", benchmark_system.enable_hardware_profiling ? "Enabled" : "Disabled" );
+			Com_Printf( "Currently Running: %s\n", benchmark_system.currently_running ? benchmark_system.current_benchmark : "None" );
+
+			if ( benchmark_system.cpu_cores > 0 ) {
+				Com_Printf( "\nHardware Configuration:\n" );
+				Com_Printf( "  CPU: %s (%d cores)\n", benchmark_system.cpu_model, benchmark_system.cpu_cores );
+				Com_Printf( "  RAM: %d MB\n", benchmark_system.ram_mb );
+				Com_Printf( "  GPU: %s (%d MB VRAM)\n", benchmark_system.gpu_model, benchmark_system.vram_mb );
+			}
+		}
+	}
+	else if ( Q_stricmp( cmd, "create" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: benchmark create <suite_name>\n" );
+			return;
+		}
+
+		const char* suite_name = Cmd_Argv(2);
+		benchmark_suite_t* suite = Benchmark_CreateSuite( suite_name, va("Benchmark suite: %s", suite_name) );
+
+		if ( suite ) {
+			Com_Printf( "Created benchmark suite: %s\n", suite_name );
+		} else {
+			Com_Printf( "Failed to create benchmark suite\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "list" ) == 0 ) {
+		Com_Printf( "=== Benchmark Suites ===\n" );
+
+		for ( uint32_t i = 0; i < benchmark_system.suite_count; i++ ) {
+			const benchmark_suite_t* suite = &benchmark_system.suites[i];
+			Com_Printf( "%s: %s (%u benchmarks)\n",
+				suite->suite_name, suite->description, suite->benchmark_count );
+		}
+
+		if ( benchmark_system.suite_count == 0 ) {
+			Com_Printf( "No benchmark suites defined\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "add-rendering" ) == 0 ) {
+		if ( Cmd_Argc() < 5 ) {
+			Com_Printf( "Usage: benchmark add-rendering <suite> <map> <quality>\n" );
+			Com_Printf( "Quality presets: 0=Potato, 1=Low, 2=Medium, 3=High, 4=Ultra\n" );
+			return;
+		}
+
+		const char* suite_name = Cmd_Argv(2);
+		const char* map_name = Cmd_Argv(3);
+		int quality = atoi( Cmd_Argv(4) );
+
+		// Find suite
+		benchmark_suite_t* suite = NULL;
+		for ( uint32_t i = 0; i < benchmark_system.suite_count; i++ ) {
+			if ( Q_stricmp( benchmark_system.suites[i].suite_name, suite_name ) == 0 ) {
+				suite = &benchmark_system.suites[i];
+				break;
+			}
+		}
+
+		if ( !suite ) {
+			Com_Printf( "Benchmark suite not found: %s\n", suite_name );
+			return;
+		}
+
+		if ( Benchmark_AddRenderingBenchmark( suite, map_name, quality ) ) {
+			Com_Printf( "Added rendering benchmark to suite %s\n", suite_name );
+		} else {
+			Com_Printf( "Failed to add rendering benchmark\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "add-memory" ) == 0 ) {
+		if ( Cmd_Argc() < 5 ) {
+			Com_Printf( "Usage: benchmark add-memory <suite> <alloc_size> <count>\n" );
+			return;
+		}
+
+		const char* suite_name = Cmd_Argv(2);
+		int alloc_size = atoi( Cmd_Argv(3) );
+		int count = atoi( Cmd_Argv(4) );
+
+		// Find suite
+		benchmark_suite_t* suite = NULL;
+		for ( uint32_t i = 0; i < benchmark_system.suite_count; i++ ) {
+			if ( Q_stricmp( benchmark_system.suites[i].suite_name, suite_name ) == 0 ) {
+				suite = &benchmark_system.suites[i];
+				break;
+			}
+		}
+
+		if ( !suite ) {
+			Com_Printf( "Benchmark suite not found: %s\n", suite_name );
+			return;
+		}
+
+		if ( Benchmark_AddMemoryBenchmark( suite, alloc_size, count ) ) {
+			Com_Printf( "Added memory benchmark to suite %s\n", suite_name );
+		} else {
+			Com_Printf( "Failed to add memory benchmark\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "add-io" ) == 0 ) {
+		if ( Cmd_Argc() < 5 ) {
+			Com_Printf( "Usage: benchmark add-io <suite> <file> <size_mb>\n" );
+			return;
+		}
+
+		const char* suite_name = Cmd_Argv(2);
+		const char* test_file = Cmd_Argv(3);
+		int size_mb = atoi( Cmd_Argv(4) );
+
+		// Find suite
+		benchmark_suite_t* suite = NULL;
+		for ( uint32_t i = 0; i < benchmark_system.suite_count; i++ ) {
+			if ( Q_stricmp( benchmark_system.suites[i].suite_name, suite_name ) == 0 ) {
+				suite = &benchmark_system.suites[i];
+				break;
+			}
+		}
+
+		if ( !suite ) {
+			Com_Printf( "Benchmark suite not found: %s\n", suite_name );
+			return;
+		}
+
+		if ( Benchmark_AddIOBenchmark( suite, test_file, size_mb ) ) {
+			Com_Printf( "Added I/O benchmark to suite %s\n", suite_name );
+		} else {
+			Com_Printf( "Failed to add I/O benchmark\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "run" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: benchmark run <suite_name>\n" );
+			return;
+		}
+
+		const char* suite_name = Cmd_Argv(2);
+
+		// Find suite
+		benchmark_suite_t* suite = NULL;
+		for ( uint32_t i = 0; i < benchmark_system.suite_count; i++ ) {
+			if ( Q_stricmp( benchmark_system.suites[i].suite_name, suite_name ) == 0 ) {
+				suite = &benchmark_system.suites[i];
+				break;
+			}
+		}
+
+		if ( !suite ) {
+			Com_Printf( "Benchmark suite not found: %s\n", suite_name );
+			return;
+		}
+
+		Com_Printf( "Starting benchmark suite: %s\n", suite_name );
+
+		if ( Benchmark_RunSuite( suite ) ) {
+			Com_Printf( "Benchmark suite completed successfully\n" );
+		} else {
+			Com_Printf( "Benchmark suite failed or had regressions\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "results" ) == 0 ) {
+		benchmark_result_t* results;
+		uint32_t count = Benchmark_GetResults( &results );
+
+		Com_Printf( "=== Recent Benchmark Results (%u total) ===\n", count );
+
+		for ( uint32_t i = 0; i < count && i < 20; i++ ) { // Show last 20
+			const benchmark_result_t* result = &results[count - 1 - i]; // Most recent first
+			uint64_t age_minutes = (Sys_Milliseconds() - result->start_time) / (1000 * 60);
+
+			Com_Printf( "%.1f minutes ago: %s (%s) - %.2fs",
+				age_minutes / 1.0f,
+				result->benchmark_id,
+				Benchmark_GetResultString( result->result ),
+				result->duration_ms / 1000.0f );
+
+			if ( result->overall_score > 0 ) {
+				Com_Printf( " - Score: %.1f", result->overall_score );
+			}
+
+			if ( result->has_regression ) {
+				Com_Printf( " ⚠️ REGRESSION" );
+			}
+
+			Com_Printf( "\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "compare" ) == 0 ) {
+		if ( Cmd_Argc() < 4 ) {
+			Com_Printf( "Usage: benchmark compare <baseline_run_id> <current_run_id>\n" );
+			return;
+		}
+
+		const char* baseline_id = Cmd_Argv(2);
+		const char* current_id = Cmd_Argv(3);
+
+		const benchmark_result_t* baseline = Benchmark_GetResultById( baseline_id );
+		const benchmark_result_t* current = Benchmark_GetResultById( current_id );
+
+		if ( !baseline || !current ) {
+			Com_Printf( "Benchmark result not found\n" );
+			return;
+		}
+
+		char regression_report[2048];
+		if ( Benchmark_DetectRegressions( current, baseline, regression_report, sizeof( regression_report ) ) ) {
+			Com_Printf( "Performance Regressions Detected:\n%s\n", regression_report );
+		} else {
+			Com_Printf( "No significant performance regressions detected\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "report" ) == 0 ) {
+		const char* format = "text";
+		if ( Cmd_Argc() >= 3 ) {
+			format = Cmd_Argv(2);
+		}
+
+		benchmark_result_t* results;
+		uint32_t count = Benchmark_GetResults( &results );
+
+		if ( count > 0 ) {
+			char report_file[256];
+			Com_sprintf( report_file, sizeof( report_file ), "benchmark_report.%s", format );
+
+			if ( Benchmark_GenerateReport( results, count, report_file, format ) ) {
+				Com_Printf( "Generated benchmark report: %s\n", report_file );
+			} else {
+				Com_Printf( "Failed to generate benchmark report\n" );
+			}
+		} else {
+			Com_Printf( "No benchmark results available\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "export" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: benchmark export <directory>\n" );
+			return;
+		}
+
+		const char* export_dir = Cmd_Argv(2);
+
+		benchmark_result_t* results;
+		uint32_t count = Benchmark_GetResults( &results );
+
+		if ( Benchmark_ExportForCI( results, count, export_dir ) ) {
+			Com_Printf( "Exported benchmark results to: %s\n", export_dir );
+		} else {
+			Com_Printf( "Failed to export benchmark results\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "baseline" ) == 0 ) {
+		if ( Cmd_Argc() < 3 ) {
+			Com_Printf( "Usage: benchmark baseline <update|reset> <benchmark_id>\n" );
+			return;
+		}
+
+		const char* subcmd = Cmd_Argv(2);
+		const char* benchmark_id = Cmd_Argv(3);
+
+		if ( Q_stricmp( subcmd, "update" ) == 0 ) {
+			// Find most recent result for this benchmark
+			benchmark_result_t* results;
+			uint32_t count = Benchmark_GetResults( &results );
+
+			const benchmark_result_t* latest_result = NULL;
+			for ( uint32_t i = 0; i < count; i++ ) {
+				if ( Q_stricmp( results[i].benchmark_id, benchmark_id ) == 0 ) {
+					if ( !latest_result || results[i].start_time > latest_result->start_time ) {
+						latest_result = &results[i];
+					}
+				}
+			}
+
+			if ( latest_result ) {
+				if ( Benchmark_UpdateBaseline( benchmark_id, latest_result ) ) {
+					Com_Printf( "Updated baseline for benchmark: %s\n", benchmark_id );
+				} else {
+					Com_Printf( "Failed to update baseline\n" );
+				}
+			} else {
+				Com_Printf( "No results found for benchmark: %s\n", benchmark_id );
+			}
+		}
+		else if ( Q_stricmp( subcmd, "reset" ) == 0 ) {
+			if ( Benchmark_ResetBaseline( benchmark_id ) ) {
+				Com_Printf( "Reset baseline for benchmark: %s\n", benchmark_id );
+			} else {
+				Com_Printf( "Failed to reset baseline\n" );
+			}
+		}
+		else {
+			Com_Printf( "Unknown baseline command: %s\n", subcmd );
+		}
+	}
+	else if ( Q_stricmp( cmd, "hardware" ) == 0 ) {
+		char hardware_info[512];
+		if ( Benchmark_ProfileHardware( hardware_info, sizeof( hardware_info ) ) ) {
+			Com_Printf( "Hardware Configuration:\n%s\n", hardware_info );
+		} else {
+			Com_Printf( "Failed to profile hardware\n" );
+		}
+	}
+	else if ( Q_stricmp( cmd, "cancel" ) == 0 ) {
+		if ( Benchmark_CancelCurrentBenchmark() ) {
+			Com_Printf( "Cancelled currently running benchmark\n" );
+		} else {
+			Com_Printf( "No benchmark currently running\n" );
+		}
+	}
+	else {
+		Com_Printf( "Unknown command: %s\n", cmd );
+		Com_Printf( "Use 'benchmark' with no arguments for help\n" );
 	}
 }

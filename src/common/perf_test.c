@@ -6,6 +6,7 @@ Automated performance validation and regression testing for CI/CD pipelines.
 =============================================================================
 */
 
+#include "q_shared.h"
 #include "perf_test.h"
 #include "qcommon.h"
 #include <string.h>
@@ -452,7 +453,7 @@ qboolean PerfTest_RunSuite(perf_test_suite_t* suite) {
 }
 
 perf_test_result_t* PerfTest_GetSuiteResults(perf_test_suite_t* suite, uint32_t* count) {
-    Q_UNUSED(suite); // For now, return global results
+    (void)suite; // For now, return global results
     if (count) *count = perf_test_system.max_results;
     return perf_test_system.current_results;
 }
@@ -780,7 +781,7 @@ uint64_t PerfTest_GetTimestamp(void) {
     return Sys_Milliseconds() * 1000ULL; // Convert to microseconds
 }
 
-const char* PerfTest_GetResultString(perf_test_result_t result) {
+const char* PerfTest_GetResultString(perf_result_type_t result) {
     switch (result) {
         case PERF_RESULT_SUCCESS: return "SUCCESS";
         case PERF_RESULT_FAILURE: return "FAILURE";

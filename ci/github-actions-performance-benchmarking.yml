@@ -1,0 +1,597 @@
+# GitHub Actions CI/CD Pipeline with Automated Performance Benchmarking
+# This demonstrates automated performance regression detection
+
+name: Performance Benchmarking
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run performance benchmarks weekly and monthly
+    - cron: '0 4 * * 1'   # Weekly on Monday at 4 AM
+    - cron: '0 5 1 * *'   # Monthly on 1st at 5 AM
+  workflow_dispatch:
+    inputs:
+      benchmark_suite:
+        description: 'Benchmark suite to run'
+        required: false
+        default: 'standard'
+        type: choice
+        options:
+          - standard
+          - extended
+          - rendering
+          - memory
+          - io
+          - custom
+      update_baselines:
+        description: 'Update performance baselines'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  # Performance Benchmarking
+  performance-benchmarking:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+        include:
+          - os: ubuntu-22.04
+            display: ':99'
+            resolution: '1920x1080x24'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0  # Full history for performance tracking
+
+    - name: Set up dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake libsdl2-dev libvulkan-dev libopenal-dev libcurl4-openssl-dev sqlite3 libsqlite3-dev
+
+    - name: Set up display for GUI testing
+      if: matrix.os == 'ubuntu-22.04'
+      run: |
+        sudo apt-get install -y xvfb
+        sudo /usr/bin/Xvfb ${{ matrix.display }} -screen 0 ${{ matrix.resolution }} &
+        sleep 3
+
+    - name: Configure build for benchmarking
+      run: |
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release \
+                 -DENABLE_PERFORMANCE_BENCHMARKING=ON \
+                 -DENABLE_CODE_QUALITY_ANALYSIS=ON \
+                 -DENABLE_TECHNICAL_DEBT_TRACKING=ON \
+                 -DBENCHMARK_AUTO_BASELINE_UPDATE=${{ github.event.inputs.update_baselines || 'false' }}
+
+    - name: Build project for benchmarking
+      run: |
+        cd build
+        make -j$(nproc)
+
+    - name: Get commit and branch information
+      id: commit-info
+      run: |
+        COMMIT_HASH=$(git rev-parse HEAD)
+        BRANCH_NAME=$(git branch --show-current)
+        if [ -z "$BRANCH_NAME" ]; then
+          BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+        fi
+
+        echo "::set-output name=commit-hash::$COMMIT_HASH"
+        echo "::set-output name=branch-name::$BRANCH_NAME"
+
+    - name: Set up benchmark environment
+      run: |
+        cd build
+        # Configure benchmark system
+        export DISPLAY=${{ matrix.display }}
+
+        # Set benchmark parameters based on input or defaults
+        BENCHMARK_SUITE="${{ github.event.inputs.benchmark_suite || 'standard' }}"
+
+        case "$BENCHMARK_SUITE" in
+          "standard")
+            # Create standard benchmark suite
+            ./idtech3_vulkan_x86_64 +set benchmark create standard_suite 2>/dev/null
+            ./idtech3_vulkan_x86_64 +set benchmark add-rendering standard_suite q3dm1 2 2>/dev/null
+            ./idtech3_vulkan_x86_64 +set benchmark add-memory standard_suite 1024 1000 2>/dev/null
+            ./idtech3_vulkan_x86_64 +set benchmark add-io standard_suite test_file.dat 50 2>/dev/null
+            ;;
+          "rendering")
+            # Rendering-focused benchmarks
+            ./idtech3_vulkan_x86_64 +set benchmark create rendering_suite 2>/dev/null
+            ./idtech3_vulkan_x86_64 +set benchmark add-rendering rendering_suite q3dm1 0 2>/dev/null
+            ./idtech3_vulkan_x86_64 +set benchmark add-rendering rendering_suite q3dm1 2 2>/dev/null
+            ./idtech3_vulkan_x86_64 +set benchmark add-rendering rendering_suite q3dm1 4 2>/dev/null
+            ;;
+          "memory")
+            # Memory-focused benchmarks
+            ./idtech3_vulkan_x86_64 +set benchmark create memory_suite 2>/dev/null
+            ./idtech3_vulkan_x86_64 +set benchmark add-memory memory_suite 64 10000 2>/dev/null
+            ./idtech3_vulkan_x86_64 +set benchmark add-memory memory_suite 1024 1000 2>/dev/null
+            ./idtech3_vulkan_x86_64 +set benchmark add-memory memory_suite 65536 100 2>/dev/null
+            ;;
+          "io")
+            # I/O-focused benchmarks
+            ./idtech3_vulkan_x86_64 +set benchmark create io_suite 2>/dev/null
+            ./idtech3_vulkan_x86_64 +set benchmark add-io io_suite small_file.dat 1 2>/dev/null
+            ./idtech3_vulkan_x86_64 +set benchmark add-io io_suite medium_file.dat 100 2>/dev/null
+            ./idtech3_vulkan_x86_64 +set benchmark add-io io_suite large_file.dat 1000 2>/dev/null
+            ;;
+          "extended")
+            # Extended comprehensive benchmarks
+            ./idtech3_vulkan_x86_64 +set benchmark create extended_suite 2>/dev/null
+            ./idtech3_vulkan_x86_64 +set benchmark add-rendering extended_suite q3dm1 1 2>/dev/null
+            ./idtech3_vulkan_x86_64 +set benchmark add-rendering extended_suite q3dm1 3 2>/dev/null
+            ./idtech3_vulkan_x86_64 +set benchmark add-memory extended_suite 512 2000 2>/dev/null
+            ./idtech3_vulkan_x86_64 +set benchmark add-io extended_suite test_data.dat 200 2>/dev/null
+            ;;
+        esac
+
+        echo "BENCHMARK_SUITE=$BENCHMARK_SUITE" >> $GITHUB_ENV
+        echo "Configured benchmark suite: $BENCHMARK_SUITE"
+
+    - name: Run performance benchmarks
+      run: |
+        cd build
+        export DISPLAY=${{ matrix.display }}
+
+        BENCHMARK_SUITE="${{ github.event.inputs.benchmark_suite || 'standard' }}"
+        SUITE_NAME="${BENCHMARK_SUITE}_suite"
+
+        echo "Running benchmark suite: $SUITE_NAME"
+        START_TIME=$(date +%s)
+
+        # Run the benchmark suite
+        if ./idtech3_vulkan_x86_64 +set benchmark run "$SUITE_NAME" 2>&1; then
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
+          echo "Benchmark suite completed successfully in $DURATION seconds"
+
+          # Check results
+          ./idtech3_vulkan_x86_64 +set benchmark results | tail -20
+
+          echo "::set-output name=benchmark-success::true"
+          echo "::set-output name=benchmark-duration::$DURATION"
+        else
+          echo "Benchmark suite failed or had regressions"
+          ./idtech3_vulkan_x86_64 +set benchmark results | tail -20
+          echo "::set-output name=benchmark-success::false"
+          exit 1
+        fi
+
+    - name: Analyze benchmark results
+      if: always()
+      run: |
+        cd build
+        export DISPLAY=${{ matrix.display }}
+
+        echo "=== Benchmark Analysis ==="
+
+        # Get benchmark status
+        ./idtech3_vulkan_x86_64 +set benchmark status
+
+        # Check for regressions
+        echo ""
+        echo "Regression Check:"
+        ./idtech3_vulkan_x86_64 +set benchmark results | grep -i regression || echo "No regressions detected"
+
+        # Generate performance summary
+        ./idtech3_vulkan_x86_64 +set benchmark results > benchmark_results.txt
+
+        # Extract key metrics
+        PASSED=$(grep -c "PASS" benchmark_results.txt 2>/dev/null || echo "0")
+        FAILED=$(grep -c "FAIL\|REGRESSION" benchmark_results.txt 2>/dev/null || echo "0")
+        REGRESSIONS=$(grep -c "REGRESSION" benchmark_results.txt 2>/dev/null || echo "0")
+        TOTAL=$((PASSED + FAILED))
+
+        echo "Performance Summary:" > benchmark_summary.txt
+        echo "- Total Benchmarks: $TOTAL" >> benchmark_summary.txt
+        echo "- Passed: $PASSED" >> benchmark_summary.txt
+        echo "- Failed/Regressions: $FAILED" >> benchmark_summary.txt
+        echo "- Performance Regressions: $REGRESSIONS" >> benchmark_summary.txt
+
+        if [ "$REGRESSIONS" -gt "0" ]; then
+          echo "- Status: REGRESSION ⚠️" >> benchmark_summary.txt
+          echo "::set-output name=has-regression::true"
+        elif [ "$FAILED" -gt "0" ]; then
+          echo "- Status: FAILED ❌" >> benchmark_summary.txt
+          echo "::set-output name=has-regression::false"
+        else
+          echo "- Status: PASSED ✅" >> benchmark_summary.txt
+          echo "::set-output name=has-regression::false"
+        fi
+
+        cat benchmark_summary.txt
+
+    - name: Export benchmark data
+      if: always()
+      run: |
+        mkdir -p benchmark_results
+        cd build
+
+        # Export detailed results for CI
+        ./idtech3_vulkan_x86_64 +set benchmark export ../benchmark_results 2>/dev/null || echo "Export failed"
+
+        # Copy summary files
+        cp benchmark_results.txt ../benchmark_results/
+        cp ../benchmark_summary.txt ../benchmark_results/
+
+        # Generate JSON report for CI tools
+        ./idtech3_vulkan_x86_64 +set benchmark report json 2>/dev/null || echo "JSON report failed"
+        mv benchmark_report.json ../benchmark_results/ 2>/dev/null || true
+
+    - name: Upload benchmark results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-benchmark-results
+        path: benchmark_results/
+        retention-days: 90
+
+    - name: Update performance baselines
+      if: github.event.inputs.update_baselines == true && steps.analyze.outputs.has-regression == false
+      run: |
+        cd build
+        export DISPLAY=${{ matrix.display }}
+
+        echo "Updating performance baselines..."
+
+        # Update baselines for all benchmarks in the suite
+        BENCHMARK_SUITE="${{ github.event.inputs.benchmark_suite || 'standard' }}"
+        SUITE_NAME="${BENCHMARK_SUITE}_suite"
+
+        # This would need to be implemented to update baselines for all benchmarks
+        # For now, just log the intention
+        echo "Baselines would be updated here for suite: $SUITE_NAME"
+
+    - name: Performance regression alert
+      if: steps.analyze.outputs.has-regression == true
+      run: |
+        echo "🚨 PERFORMANCE REGRESSION DETECTED! 🚨"
+        echo ""
+        echo "Performance benchmarks have detected significant regressions."
+        echo "Please review the benchmark results and address performance issues."
+        echo ""
+        echo "Common causes of performance regressions:"
+        echo "- Memory leaks or increased memory usage"
+        echo "- Inefficient algorithms or data structures"
+        echo "- Lock contention or synchronization issues"
+        echo "- Shader compilation or rendering pipeline changes"
+        echo "- Asset loading or I/O performance degradation"
+        echo ""
+        echo "Check the benchmark results artifact for detailed analysis."
+
+    - name: Generate performance trend analysis
+      if: always()
+      run: |
+        echo "=== Performance Trend Analysis ===" > performance_trends.txt
+
+        # This would compare against historical data
+        # For now, just show current results
+        echo "Current Benchmark Results:" >> performance_trends.txt
+        if [ -f "build/benchmark_results.txt" ]; then
+          cat build/benchmark_results.txt >> performance_trends.txt
+        fi
+
+        echo "" >> performance_trends.txt
+        echo "Trend Analysis Notes:" >> performance_trends.txt
+        echo "- Automated trend analysis requires historical baseline data" >> performance_trends.txt
+        echo "- Set up regular benchmark runs to establish performance trends" >> performance_trends.txt
+        echo "- Use baseline updates to track intended performance changes" >> performance_trends.txt
+
+    - name: Upload performance trends
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-trend-analysis
+        path: performance_trends.txt
+        retention-days: 90
+
+  # Performance Comparison and Validation
+  performance-validation:
+    needs: performance-benchmarking
+    runs-on: ubuntu-22.04
+    if: always()
+
+    steps:
+    - name: Download benchmark results
+      uses: actions/download-artifact@v3
+      with:
+        name: performance-benchmark-results
+        path: benchmark_results/
+
+    - name: Validate performance requirements
+      run: |
+        echo "=== Performance Validation ==="
+
+        # Check if results exist
+        if [ ! -f "benchmark_results/benchmark_results.txt" ]; then
+          echo "❌ No benchmark results found"
+          echo "::set-output name=validation-passed::false"
+          exit 1
+        fi
+
+        # Analyze results
+        RESULTS_FILE="benchmark_results/benchmark_results.txt"
+
+        # Check for any failures or regressions
+        if grep -q "REGRESSION\|FAIL" "$RESULTS_FILE"; then
+          echo "❌ Performance validation FAILED - Regressions or failures detected"
+          echo "::set-output name=validation-passed::false"
+
+          echo ""
+          echo "Issues found:"
+          grep -n "REGRESSION\|FAIL" "$RESULTS_FILE"
+        else
+          echo "✅ Performance validation PASSED"
+          echo "::set-output name=validation-passed::true"
+        fi
+
+        # Performance requirements check
+        echo ""
+        echo "Performance Requirements Check:"
+
+        # Example checks (customize based on project requirements)
+        FPS_COUNT=$(grep -c "rendering_fps.*PASS" "$RESULTS_FILE" 2>/dev/null || echo "0")
+        MEMORY_COUNT=$(grep -c "memory_.*PASS" "$RESULTS_FILE" 2>/dev/null || echo "0")
+        IO_COUNT=$(grep -c "io_.*PASS" "$RESULTS_FILE" 2>/dev/null || echo "0")
+
+        if [ "$FPS_COUNT" -gt "0" ]; then
+          echo "✅ Rendering performance: $FPS_COUNT benchmarks passed"
+        fi
+
+        if [ "$MEMORY_COUNT" -gt "0" ]; then
+          echo "✅ Memory performance: $MEMORY_COUNT benchmarks passed"
+        fi
+
+        if [ "$IO_COUNT" -gt "0" ]; then
+          echo "✅ I/O performance: $IO_COUNT benchmarks passed"
+        fi
+
+    - name: Generate performance report
+      if: always()
+      run: |
+        echo "# Performance Benchmarking Report" > performance_report.md
+        echo "" >> performance_report.md
+        echo "## Summary" >> performance_report.md
+        echo "" >> performance_report.md
+
+        if [ -f "benchmark_results/benchmark_summary.txt" ]; then
+          cat benchmark_results/benchmark_summary.txt >> performance_report.md
+        else
+          echo "No benchmark summary available" >> performance_report.md
+        fi
+
+        echo "" >> performance_report.md
+        echo "## Details" >> performance_report.md
+        echo "" >> performance_report.md
+
+        if [ -f "benchmark_results/benchmark_results.txt" ]; then
+          echo "\`\`\`" >> performance_report.md
+          cat benchmark_results/benchmark_results.txt >> performance_report.md
+          echo "\`\`\`" >> performance_report.md
+        fi
+
+        echo "" >> performance_report.md
+        echo "## CI Information" >> performance_report.md
+        echo "- **Run:** ${{ github.run_id }}" >> performance_report.md
+        echo "- **Commit:** ${{ github.sha }}" >> performance_report.md
+        echo "- **Branch:** ${{ github.ref }}" >> performance_report.md
+        echo "- **Triggered by:** ${{ github.event_name }}" >> performance_report.md
+
+    - name: Upload performance report
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-validation-report
+        path: performance_report.md
+        retention-days: 90
+
+    - name: Performance requirements check
+      if: steps.validation.outputs.validation-passed == false
+      run: |
+        echo "❌ PERFORMANCE REQUIREMENTS NOT MET ❌"
+        echo ""
+        echo "The following performance requirements have not been satisfied:"
+        echo ""
+        if [ -f "benchmark_results/benchmark_results.txt" ]; then
+          grep -A 2 -B 2 "REGRESSION\|FAIL" benchmark_results/benchmark_results.txt || echo "See benchmark results for details"
+        fi
+        echo ""
+        echo "Please address the performance issues before merging."
+        exit 1
+
+  # Performance History and Trends
+  performance-history:
+    needs: [performance-benchmarking, performance-validation]
+    runs-on: ubuntu-22.04
+    if: always()
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Download current results
+      uses: actions/download-artifact@v3
+      with:
+        name: performance-benchmark-results
+        path: current_results/
+
+    - name: Analyze performance history
+      run: |
+        echo "=== Performance History Analysis ==="
+
+        # This would typically compare against stored historical data
+        # For now, establish a baseline structure
+
+        mkdir -p performance_history
+
+        # Store current results for future comparison
+        cp -r current_results/* performance_history/
+
+        # Add metadata
+        echo "timestamp: $(date +%s)" > performance_history/metadata.txt
+        echo "commit: ${{ github.sha }}" >> performance_history/metadata.txt
+        echo "branch: ${{ github.ref }}" >> performance_history/metadata.txt
+        echo "run_id: ${{ github.run_id }}" >> performance_history/metadata.txt
+
+        # Generate baseline if this is the first run
+        if [ ! -f "performance_history/baseline/benchmark_results.txt" ]; then
+          echo "Creating initial performance baseline..."
+          mkdir -p performance_history/baseline
+          cp current_results/* performance_history/baseline/
+
+          echo "Baseline created. Future runs will be compared against this baseline." > performance_history/baseline/README.md
+        fi
+
+        # Compare with baseline (if exists)
+        if [ -f "performance_history/baseline/benchmark_results.txt" ]; then
+          echo ""
+          echo "Baseline Comparison:"
+          echo "Note: Automated baseline comparison requires additional implementation"
+          echo "to properly track and compare performance metrics over time."
+        fi
+
+    - name: Store performance history
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-history-data
+        path: performance_history/
+        retention-days: 365  # Keep performance history longer
+
+  # Final Performance Assessment
+  performance-assessment:
+    needs: [performance-benchmarking, performance-validation, performance-history]
+    runs-on: ubuntu-22.04
+    if: always()
+
+    steps:
+    - name: Generate final assessment
+      run: |
+        echo "# Performance Benchmarking Assessment" > final_assessment.md
+        echo "" >> final_assessment.md
+
+        # Overall status
+        VALIDATION_PASSED="${{ needs.performance-validation.outputs.validation-passed }}"
+        HAS_REGRESSION="${{ needs.performance-benchmarking.outputs.has-regression }}"
+
+        if [ "$VALIDATION_PASSED" = "true" ] && [ "$HAS_REGRESSION" = "false" ]; then
+          echo "## ✅ PASSED" >> final_assessment.md
+          echo "" >> final_assessment.md
+          echo "All performance benchmarks passed successfully." >> final_assessment.md
+        else
+          echo "## ❌ FAILED" >> final_assessment.md
+          echo "" >> final_assessment.md
+          echo "Performance benchmarks detected issues that need attention." >> final_assessment.md
+        fi
+
+        echo "" >> final_assessment.md
+        echo "## Assessment Details" >> final_assessment.md
+        echo "" >> final_assessment.md
+        echo "- **Validation Status:** $VALIDATION_PASSED" >> final_assessment.md
+        echo "- **Regressions Detected:** $HAS_REGRESSION" >> final_assessment.md
+        echo "- **Benchmark Duration:** ${{ needs.performance-benchmarking.outputs.benchmark-duration }} seconds" >> final_assessment.md
+        echo "- **Benchmark Suite:** ${{ github.event.inputs.benchmark_suite || 'standard' }}" >> final_assessment.md
+        echo "" >> final_assessment.md
+
+        echo "## Recommendations" >> final_assessment.md
+        echo "" >> final_assessment.md
+
+        if [ "$HAS_REGRESSION" = "true" ]; then
+          echo "### 🚨 Critical Actions Required" >> final_assessment.md
+          echo "- Investigate and fix detected performance regressions immediately" >> final_assessment.md
+          echo "- Review recent code changes for performance impacts" >> final_assessment.md
+          echo "- Consider reverting problematic changes if regressions are severe" >> final_assessment.md
+          echo "- Update performance baselines after fixes are implemented" >> final_assessment.md
+        fi
+
+        if [ "$VALIDATION_PASSED" = "false" ]; then
+          echo "### ⚠️ Performance Issues Detected" >> final_assessment.md
+          echo "- Address failed benchmark tests" >> final_assessment.md
+          echo "- Review performance requirements and thresholds" >> final_assessment.md
+          echo "- Consider performance optimizations for affected areas" >> final_assessment.md
+        fi
+
+        if [ "$VALIDATION_PASSED" = "true" ] && [ "$HAS_REGRESSION" = "false" ]; then
+          echo "### ✅ Performance Status Good" >> final_assessment.md
+          echo "- Continue monitoring performance with regular benchmarks" >> final_assessment.md
+          echo "- Consider updating baselines if performance has improved significantly" >> final_assessment.md
+          echo "- Performance requirements are being met" >> final_assessment.md
+        fi
+
+        echo "" >> final_assessment.md
+        echo "## Automated Analysis" >> final_assessment.md
+        echo "This assessment was generated automatically by the CI/CD performance benchmarking pipeline." >> final_assessment.md
+
+    - name: Upload final assessment
+      uses: actions/upload-artifact@v3
+      with:
+        name: final-performance-assessment
+        path: final_assessment.md
+        retention-days: 90
+
+    - name: Comment assessment on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+
+          let assessment = '## Performance Benchmarking Assessment\n\n';
+
+          const validationPassed = '${{ needs.performance-validation.outputs.validation-passed }}';
+          const hasRegression = '${{ needs.performance-benchmarking.outputs.has-regression }}';
+
+          if (validationPassed === 'true' && hasRegression === 'false') {
+            assessment += '✅ **PASSED** - All performance benchmarks successful\n\n';
+          } else {
+            assessment += '❌ **FAILED** - Performance issues detected\n\n';
+          }
+
+          assessment += '### Details\n';
+          assessment += `- Validation: ${validationPassed}\n`;
+          assessment += `- Regressions: ${hasRegression}\n`;
+          assessment += `- Duration: ${{ needs.performance-benchmarking.outputs.benchmark-duration }}s\n`;
+          assessment += `- Suite: ${{ github.event.inputs.benchmark_suite || 'standard' }}\n\n`;
+
+          if (hasRegression === 'true') {
+            assessment += '⚠️ **Performance regressions detected.** Please review benchmark results.\n\n';
+          }
+
+          assessment += '*Detailed results are available in workflow artifacts.*';
+
+          github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: assessment
+          })
+
+    - name: Block merge on performance failures
+      if: needs.performance-validation.outputs.validation-passed == false || needs.performance-benchmarking.outputs.has-regression == true
+      run: |
+        echo "🚫 BLOCKING MERGE: Performance requirements not met"
+        echo ""
+        echo "Performance benchmarking has detected issues that prevent merging:"
+        echo ""
+        if [ "${{ needs.performance-validation.outputs.validation-passed }}" = "false" ]; then
+          echo "- Performance validation failed"
+        fi
+        if [ "${{ needs.performance-benchmarking.outputs.has-regression }}" = "true" ]; then
+          echo "- Performance regressions detected"
+        fi
+        echo ""
+        echo "Please address the performance issues before proceeding with the merge."
+        echo "Check the workflow artifacts for detailed benchmark results and analysis."
+        exit 1

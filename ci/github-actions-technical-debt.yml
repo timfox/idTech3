@@ -1,0 +1,558 @@
+# GitHub Actions CI/CD Pipeline with Technical Debt Tracking
+# This demonstrates automated technical debt monitoring and alerting
+
+name: Technical Debt Tracking
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run debt analysis weekly and monthly
+    - cron: '0 6 * * 1'   # Weekly on Monday
+    - cron: '0 7 1 * *'   # Monthly on 1st
+
+jobs:
+  # Technical Debt Analysis
+  technical-debt-analysis:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0  # Full history for debt tracking
+
+    - name: Set up dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake libsdl2-dev libvulkan-dev libopenal-dev libcurl4-openssl-dev sqlite3 libsqlite3-dev
+
+    - name: Configure build for debt analysis
+      run: |
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Debug \
+                 -DENABLE_CODE_QUALITY_ANALYSIS=ON \
+                 -DENABLE_TECHNICAL_DEBT_TRACKING=ON
+
+    - name: Build project for analysis
+      run: |
+        cd build
+        make -j$(nproc)
+
+    - name: Get commit information
+      id: commit-info
+      run: |
+        COMMIT_HASH=$(git rev-parse HEAD)
+        BRANCH_NAME=$(git branch --show-current)
+        if [ -z "$BRANCH_NAME" ]; then
+          BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+        fi
+
+        echo "::set-output name=commit-hash::$COMMIT_HASH"
+        echo "::set-output name=branch-name::$BRANCH_NAME"
+
+    - name: Run technical debt analysis
+      run: |
+        cd build
+        # Run automated debt analysis
+        ./idtech3_vulkan_x86_64 +set debt analyze
+
+        # Record history point
+        ./idtech3_vulkan_x86_64 +set debt record "${{ steps.commit-info.outputs.commit-hash }}" "${{ steps.commit-info.outputs.branch-name }}"
+
+    - name: Check debt alerts
+      run: |
+        cd build
+        # Check for any debt alerts
+        ./idtech3_vulkan_x86_64 +set debt alerts
+
+    - name: Export debt data
+      if: always()
+      run: |
+        mkdir -p debt_results
+        cd build
+        ./idtech3_vulkan_x86_64 +set debt export ../debt_results
+
+    - name: Upload debt analysis results
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: technical-debt-results
+        path: debt_results/
+        retention-days: 90
+
+    - name: Generate debt trend report
+      if: always()
+      run: |
+        cd build
+        # Generate trend analysis
+        ./idtech3_vulkan_x86_64 +set debt trends 30 > debt_trends.txt
+        ./idtech3_vulkan_x86_64 +set debt predict 3 >> debt_trends.txt
+
+    - name: Upload debt trends
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: debt-trends-report
+        path: build/debt_trends.txt
+        retention-days: 90
+
+  # Debt Trend Analysis and Forecasting
+  debt-trend-analysis:
+    needs: technical-debt-analysis
+    runs-on: ubuntu-22.04
+    if: always()
+
+    steps:
+    - name: Download debt results
+      uses: actions/download-artifact@v3
+      with:
+        name: technical-debt-results
+        path: debt_results/
+
+    - name: Download trend reports
+      uses: actions/download-artifact@v3
+      with:
+        name: debt-trends-report
+        path: debt_trends/
+
+    - name: Analyze debt trends
+      run: |
+        echo "=== Technical Debt Trend Analysis ==="
+
+        # Check if we have trend data
+        if [ -f "debt_trends/debt_trends.txt" ]; then
+          echo "Debt trend analysis available:"
+          cat debt_trends/debt_trends.txt
+
+          # Extract key metrics
+          DEBT_VELOCITY=$(grep "Debt Velocity:" debt_trends/debt_trends.txt | grep -o "[0-9.-]\+" || echo "0")
+          PAYDOWN_RATE=$(grep "Paydown Rate:" debt_trends/debt_trends.txt | grep -o "[0-9.-]\+" || echo "0")
+
+          echo "Debt Velocity: $DEBT_VELOCITY points/day"
+          echo "Paydown Rate: $PAYDOWN_RATE items/day"
+
+          # Determine trend status
+          if (( $(echo "$DEBT_VELOCITY > 2.0" | bc -l 2>/dev/null || echo "0") )); then
+            echo "🚨 CRITICAL: Debt is accumulating rapidly!"
+            echo "::set-output name=trend-status::critical"
+          elif (( $(echo "$DEBT_VELOCITY > 0.5" | bc -l 2>/dev/null || echo "0") )); then
+            echo "⚠️  WARNING: Debt is slowly increasing"
+            echo "::set-output name=trend-status::warning"
+          elif (( $(echo "$PAYDOWN_RATE > 0.1" | bc -l 2>/dev/null || echo "0") )); then
+            echo "✅ PROGRESS: Debt is being reduced"
+            echo "::set-output name=trend-status::improving"
+          else
+            echo "📊 STABLE: Debt level is stable"
+            echo "::set-output name=trend-status::stable"
+          fi
+
+          echo "::set-output name=debt-velocity::$DEBT_VELOCITY"
+          echo "::set-output name=paydown-rate::$PAYDOWN_RATE"
+        else
+          echo "No trend data available yet"
+          echo "::set-output name=trend-status::no-data"
+        fi
+
+    - name: Generate debt forecast
+      run: |
+        echo "=== Debt Forecast Analysis ==="
+
+        # Extract forecast data if available
+        if [ -f "debt_trends/debt_trends.txt" ]; then
+          FORECAST_3M=$(grep "Projected debt score in 3 months:" debt_trends/debt_trends.txt | grep -o "[0-9.]\+" || echo "0")
+          CURRENT_SCORE=$(grep "Current debt score:" debt_trends/debt_trends.txt | grep -o "[0-9.]\+" || echo "0")
+
+          if [ "$FORECAST_3M" != "0" ] && [ "$CURRENT_SCORE" != "0" ]; then
+            CHANGE=$(echo "$FORECAST_3M - $CURRENT_SCORE" | bc -l 2>/dev/null || echo "0")
+            PERCENT_CHANGE=$(echo "($CHANGE / $CURRENT_SCORE) * 100" | bc -l 2>/dev/null || echo "0")
+
+            echo "Current Debt Score: $CURRENT_SCORE"
+            echo "3-Month Forecast: $FORECAST_3M"
+            echo "Projected Change: $CHANGE points ($PERCENT_CHANGE%)"
+
+            if (( $(echo "$PERCENT_CHANGE > 20" | bc -l 2>/dev/null || echo "0") )); then
+              echo "🚨 FORECAST: Significant debt increase expected"
+            elif (( $(echo "$PERCENT_CHANGE < -10" | bc -l 2>/dev/null || echo "0") )); then
+              echo "✅ FORECAST: Debt reduction expected"
+            else
+              echo "📊 FORECAST: Debt level expected to remain stable"
+            fi
+          fi
+        fi
+
+  # Debt Health Assessment
+  debt-health-assessment:
+    needs: [technical-debt-analysis, debt-trend-analysis]
+    runs-on: ubuntu-22.04
+    if: always()
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential cmake libsdl2-dev libvulkan-dev libopenal-dev libcurl4-openssl-dev sqlite3 libsqlite3-dev
+
+    - name: Configure build for health assessment
+      run: |
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Debug \
+                 -DENABLE_CODE_QUALITY_ANALYSIS=ON \
+                 -DENABLE_TECHNICAL_DEBT_TRACKING=ON
+
+    - name: Build project
+      run: |
+        cd build
+        make -j$(nproc)
+
+    - name: Assess debt health status
+      run: |
+        cd build
+        # Get current debt metrics
+        ./idtech3_vulkan_x86_64 +set debt metrics > debt_health.txt
+
+        # Extract key health indicators
+        DEBT_SCORE=$(grep "Overall Debt Score:" debt_health.txt | grep -o "[0-9.]\+" || echo "0")
+        UNRESOLVED=$(grep "unresolved" debt_health.txt | grep -o "[0-9]\+" | head -1 || echo "0")
+        CRITICAL=$(grep "Critical Items:" debt_health.txt | grep -o "[0-9]\+" || echo "0")
+        VELOCITY=$(grep "Debt Velocity:" debt_health.txt | grep -o "[0-9.-]\+" || echo "0")
+
+        echo "Debt Score: $DEBT_SCORE"
+        echo "Unresolved Items: $UNRESOLVED"
+        echo "Critical Items: $CRITICAL"
+        echo "Debt Velocity: $VELOCITY"
+
+        # Determine health status
+        if [ "$CRITICAL" -gt "5" ] || (( $(echo "$DEBT_SCORE > 300" | bc -l 2>/dev/null || echo "0") )) || (( $(echo "$VELOCITY > 3" | bc -l 2>/dev/null || echo "0") )); then
+          HEALTH_STATUS="unhealthy"
+          HEALTH_COLOR="red"
+          HEALTH_MESSAGE="🚨 UNHEALTHY: Critical debt issues detected"
+        elif [ "$CRITICAL" -gt "2" ] || (( $(echo "$DEBT_SCORE > 150" | bc -l 2>/dev/null || echo "0") )) || (( $(echo "$VELOCITY > 1" | bc -l 2>/dev/null || echo "0") )); then
+          HEALTH_STATUS="concerning"
+          HEALTH_COLOR="orange"
+          HEALTH_MESSAGE="⚠️  CONCERNING: Debt levels need attention"
+        elif (( $(echo "$DEBT_SCORE > 50" | bc -l 2>/dev/null || echo "0") )) || [ "$UNRESOLVED" -gt "10" ]; then
+          HEALTH_STATUS="moderate"
+          HEALTH_COLOR="yellow"
+          HEALTH_MESSAGE="📊 MODERATE: Some debt accumulation"
+        else
+          HEALTH_STATUS="healthy"
+          HEALTH_COLOR="green"
+          HEALTH_MESSAGE="✅ HEALTHY: Debt levels are manageable"
+        fi
+
+        echo "Health Status: $HEALTH_STATUS"
+        echo "Health Color: $HEALTH_COLOR"
+        echo "$HEALTH_MESSAGE"
+
+        echo "::set-output name=health-status::$HEALTH_STATUS"
+        echo "::set-output name=health-color::$HEALTH_COLOR"
+        echo "::set-output name=health-message::$HEALTH_MESSAGE"
+        echo "::set-output name=debt-score::$DEBT_SCORE"
+        echo "::set-output name=critical-items::$CRITICAL"
+
+    - name: Generate debt health badge
+      run: |
+        HEALTH_COLOR="${{ steps.health-assessment.outputs.health-color }}"
+        HEALTH_STATUS="${{ steps.health-assessment.outputs.health-status }}"
+        DEBT_SCORE="${{ steps.health-assessment.outputs.debt-score }}"
+
+        # Generate SVG badge
+        cat > debt_health_badge.svg << EOF
+        <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="140" height="20" role="img" aria-labelledby="title">
+          <title>Technical Debt</title>
+          <linearGradient id="s" x2="0" y2="100%">
+            <stop offset="0" stop-color="#bbb" stop-opacity=".1"/>
+            <stop offset="1" stop-opacity=".1"/>
+          </linearGradient>
+          <clipPath id="r">
+            <rect width="140" height="20" rx="3" fill="#fff"/>
+          </clipPath>
+          <g clip-path="url(#r)">
+            <rect width="79" height="20" fill="#555"/>
+            <rect x="79" width="61" height="20" fill="#${HEALTH_COLOR}"/>
+            <rect width="140" height="20" fill="url(#s)"/>
+          </g>
+          <g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110">
+            <text x="400" y="140" transform="scale(.1)" textLength="730">Tech Debt</text>
+            <text x="1085" y="140" transform="scale(.1)" textLength="510">${DEBT_SCORE}</text>
+          </g>
+        </svg>
+        EOF
+
+        echo "Generated debt health badge"
+
+    - name: Upload debt health badge
+      uses: actions/upload-artifact@v3
+      with:
+        name: debt-health-badge
+        path: debt_health_badge.svg
+        retention-days: 90
+
+    - name: Debt health assessment summary
+      run: |
+        echo "## Technical Debt Health Assessment" > debt_health_summary.md
+        echo "" >> debt_health_summary.md
+        echo "**Status:** ${{ steps.health-assessment.outputs.health-message }}" >> debt_health_summary.md
+        echo "" >> debt_health_summary.md
+        echo "### Key Metrics" >> debt_health_summary.md
+        echo "- **Debt Score:** ${{ steps.health-assessment.outputs.debt-score }}" >> debt_health_summary.md
+        echo "- **Critical Items:** ${{ steps.health-assessment.outputs.critical-items }}" >> debt_health_summary.md
+        echo "- **Trend Status:** ${{ needs.debt-trend-analysis.outputs.trend-status }}" >> debt_health_summary.md
+        echo "- **Velocity:** ${{ needs.debt-trend-analysis.outputs.debt-velocity }} points/day" >> debt_health_summary.md
+        echo "" >> debt_health_summary.md
+        echo "### Recommendations" >> debt_health_summary.md
+
+        HEALTH_STATUS="${{ steps.health-assessment.outputs.health-status }}"
+        TREND_STATUS="${{ needs.debt-trend-analysis.outputs.trend-status }}"
+
+        if [ "$HEALTH_STATUS" = "unhealthy" ]; then
+          echo "- 🚨 **URGENT:** Address critical debt items immediately" >> debt_health_summary.md
+          echo "- 📈 **TREND:** Focus on debt reduction strategies" >> debt_health_summary.md
+        elif [ "$HEALTH_STATUS" = "concerning" ]; then
+          echo "- ⚠️  **PRIORITY:** Schedule debt reduction sprints" >> debt_health_summary.md
+          echo "- 📊 **MONITOR:** Track debt velocity closely" >> debt_health_summary.md
+        elif [ "$TREND_STATUS" = "critical" ] || [ "$TREND_STATUS" = "warning" ]; then
+          echo "- 📈 **TREND:** Implement debt reduction practices" >> debt_health_summary.md
+          echo "- 🎯 **GOAL:** Stabilize or reduce debt accumulation" >> debt_health_summary.md
+        else
+          echo "- ✅ **MAINTAIN:** Continue current debt management practices" >> debt_health_summary.md
+          echo "- 🎯 **GOAL:** Keep debt levels under control" >> debt_health_summary.md
+        fi
+
+        echo "" >> debt_health_summary.md
+        echo "### Automated Analysis" >> debt_health_summary.md
+        echo "This assessment was generated automatically as part of the CI/CD pipeline." >> debt_health_summary.md
+
+    - name: Upload debt health summary
+      uses: actions/upload-artifact@v3
+      with:
+        name: debt-health-summary
+        path: debt_health_summary.md
+        retention-days: 90
+
+  # PR Debt Impact Analysis
+  pr-debt-impact:
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'pull_request'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Get changed files
+      id: changed-files
+      run: |
+        # Get files changed in this PR
+        CHANGED_FILES=$(git diff --name-only HEAD~1 2>/dev/null || git diff --name-only origin/${{ github.base_ref }} 2>/dev/null || echo "")
+        SRC_FILES=""
+
+        # Filter for source files
+        for file in $CHANGED_FILES; do
+          if [[ $file =~ \.(c|cpp|h|hpp)$ ]]; then
+            SRC_FILES="$SRC_FILES $file"
+          fi
+        done
+
+        echo "Source files changed: $SRC_FILES"
+        echo "::set-output name=src-files::$SRC_FILES"
+        echo "::set-output name=has-changes::$(if [ -n "$SRC_FILES" ]; then echo 'true'; else echo 'false'; fi)"
+
+    - name: Analyze PR debt impact
+      if: steps.changed-files.outputs.has-changes == 'true'
+      run: |
+        echo "=== PR Debt Impact Analysis ==="
+        SRC_FILES="${{ steps.changed-files.outputs.src-files }}"
+
+        # Analyze complexity of changed files (simplified)
+        TOTAL_COMPLEXITY=0
+        FILE_COUNT=0
+
+        for file in $SRC_FILES; do
+          if [ -f "$file" ]; then
+            echo "Analyzing: $file"
+
+            # Simple complexity estimate (lines of code)
+            LINES=$(wc -l < "$file" 2>/dev/null || echo "0")
+            echo "  Lines: $LINES"
+
+            # Estimate complexity impact
+            if [ "$LINES" -gt "500" ]; then
+              echo "  ⚠️  HIGH IMPACT: Large file modification"
+              TOTAL_COMPLEXITY=$((TOTAL_COMPLEXITY + 3))
+            elif [ "$LINES" -gt "100" ]; then
+              echo "  📊 MEDIUM IMPACT: Moderate file modification"
+              TOTAL_COMPLEXITY=$((TOTAL_COMPLEXITY + 2))
+            else
+              echo "  ✅ LOW IMPACT: Small file modification"
+              TOTAL_COMPLEXITY=$((TOTAL_COMPLEXITY + 1))
+            fi
+
+            FILE_COUNT=$((FILE_COUNT + 1))
+          fi
+        done
+
+        # Calculate debt impact
+        if [ $FILE_COUNT -gt 0 ]; then
+          AVG_IMPACT=$((TOTAL_COMPLEXITY / FILE_COUNT))
+          echo ""
+          echo "PR Debt Impact Summary:"
+          echo "- Files changed: $FILE_COUNT"
+          echo "- Average complexity impact: $AVG_IMPACT/5"
+
+          if [ $AVG_IMPACT -ge 4 ]; then
+            echo "🚨 HIGH DEBT IMPACT: Consider breaking down this PR"
+            echo "::set-output name=debt-impact::high"
+          elif [ $AVG_IMPACT -ge 3 ]; then
+            echo "⚠️  MEDIUM DEBT IMPACT: Review for potential debt introduction"
+            echo "::set-output name=debt-impact::medium"
+          else
+            echo "✅ LOW DEBT IMPACT: Minimal debt risk"
+            echo "::set-output name=debt-impact::low"
+          fi
+        else
+          echo "No source files changed in this PR"
+          echo "::set-output name=debt-impact::none"
+        fi
+
+  # Final Debt Assessment and Reporting
+  debt-final-assessment:
+    needs: [technical-debt-analysis, debt-health-assessment, pr-debt-impact]
+    runs-on: ubuntu-22.04
+    if: always()
+
+    steps:
+    - name: Generate final debt assessment
+      run: |
+        echo "# Technical Debt Assessment Report" > final_debt_report.md
+        echo "" >> final_debt_report.md
+        echo "## Executive Summary" >> final_debt_report.md
+        echo "" >> final_debt_report.md
+
+        # Health status
+        HEALTH_MESSAGE="${{ needs.debt-health-assessment.outputs.health-message }}"
+        echo "### Health Status" >> final_debt_report.md
+        echo "$HEALTH_MESSAGE" >> final_debt_report.md
+        echo "" >> final_debt_report.md
+
+        # Key metrics
+        echo "### Key Metrics" >> final_debt_report.md
+        echo "- **Debt Score:** ${{ needs.debt-health-assessment.outputs.debt-score }}" >> final_debt_report.md
+        echo "- **Critical Items:** ${{ needs.debt-health-assessment.outputs.critical-items }}" >> final_debt_report.md
+        echo "- **Trend Status:** ${{ needs.debt-trend-analysis.outputs.trend-status }}" >> final_debt_report.md
+        echo "" >> final_debt_report.md
+
+        # PR impact (if applicable)
+        if [ "${{ github.event_name }}" = "pull_request" ] && [ "${{ needs.pr-debt-impact.outputs.debt-impact }}" != "none" ]; then
+          echo "### PR Impact Assessment" >> final_debt_report.md
+          echo "Debt Impact Level: ${{ needs.pr-debt-impact.outputs.debt-impact }}" >> final_debt_report.md
+          echo "" >> final_debt_report.md
+        fi
+
+        # Recommendations
+        echo "## Recommendations" >> final_debt_report.md
+        echo "" >> final_debt_report.md
+
+        HEALTH_STATUS="${{ needs.debt-health-assessment.outputs.health-status }}"
+        TREND_STATUS="${{ needs.debt-trend-analysis.outputs.trend-status }}"
+        PR_IMPACT="${{ needs.pr-debt-impact.outputs.debt-impact }}"
+
+        if [ "$HEALTH_STATUS" = "unhealthy" ] || [ "$TREND_STATUS" = "critical" ]; then
+          echo "### 🚨 Critical Actions Required" >> final_debt_report.md
+          echo "- Immediately address all critical debt items" >> final_debt_report.md
+          echo "- Implement debt reduction sprints" >> final_debt_report.md
+          echo "- Consider technical debt as blocking criterion for releases" >> final_debt_report.md
+          echo "" >> final_debt_report.md
+        fi
+
+        if [ "$PR_IMPACT" = "high" ]; then
+          echo "### 📋 PR Review Recommendations" >> final_debt_report.md
+          echo "- Request PR author to address introduced debt" >> final_debt_report.md
+          echo "- Consider breaking down large changes" >> final_debt_report.md
+          echo "- Schedule technical debt review meeting" >> final_debt_report.md
+          echo "" >> final_debt_report.md
+        fi
+
+        echo "### 📊 Continuous Improvement" >> final_debt_report.md
+        echo "- Regular debt analysis and monitoring" >> final_debt_report.md
+        echo "- Code review focus on debt prevention" >> final_debt_report.md
+        echo "- Automated quality gate enforcement" >> final_debt_report.md
+        echo "" >> final_debt_report.md
+
+        # Assessment metadata
+        echo "## Assessment Details" >> final_debt_report.md
+        echo "- **Analysis Time:** $(date)" >> final_debt_report.md
+        echo "- **Commit:** ${{ github.sha }}" >> final_debt_report.md
+        echo "- **Branch:** ${{ github.ref }}" >> final_debt_report.md
+        echo "- **CI Run:** ${{ github.run_id }}" >> final_debt_report.md
+
+    - name: Upload final debt report
+      uses: actions/upload-artifact@v3
+      with:
+        name: final-debt-assessment
+        path: final_debt_report.md
+        retention-days: 90
+
+    - name: Comment debt assessment on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+
+          let debtReport = '## Technical Debt Assessment\n\n';
+
+          const healthStatus = '${{ needs.debt-health-assessment.outputs.health-message }}';
+          const debtScore = '${{ needs.debt-health-assessment.outputs.debt-score }}';
+          const prImpact = '${{ needs.pr-debt-impact.outputs.debt-impact }}';
+
+          debtReport += `**Health Status:** ${healthStatus}\n`;
+          debtReport += `**Debt Score:** ${debtScore}\n`;
+
+          if (prImpact !== 'none') {
+            debtReport += `**PR Impact:** ${prImpact.toUpperCase()}\n`;
+          }
+
+          debtReport += '\n### Automated Analysis Results\n';
+          debtReport += '- ✅ Debt metrics calculated\n';
+          debtReport += '- ✅ Trend analysis completed\n';
+          debtReport += '- ✅ Health assessment performed\n';
+
+          if (prImpact !== 'none') {
+            debtReport += '- ✅ PR impact evaluated\n';
+          }
+
+          debtReport += '\n*Detailed reports are available in the workflow artifacts.*';
+
+          github.rest.issues.createComment({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            body: debtReport
+          })
+
+    - name: Fail CI on critical debt levels
+      if: needs.debt-health-assessment.outputs.health-status == 'unhealthy'
+      run: |
+        echo "❌ Critical technical debt levels detected - failing CI"
+        echo "Debt Score: ${{ needs.debt-health-assessment.outputs.debt-score }}"
+        echo "Critical Items: ${{ needs.debt-health-assessment.outputs.critical-items }}"
+        echo ""
+        echo "Please address critical technical debt items before proceeding."
+        exit 1
+
+    - name: Warn on concerning debt levels
+      if: needs.debt-health-assessment.outputs.health-status == 'concerning'
+      run: |
+        echo "⚠️  Concerning technical debt levels detected"
+        echo "Consider scheduling time to address technical debt accumulation."

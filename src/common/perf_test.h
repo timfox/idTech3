@@ -20,7 +20,7 @@ typedef enum {
     PERF_RESULT_IMPROVEMENT,    // Performance improvement detected
     PERF_RESULT_INCONCLUSIVE,   // Test results inconclusive
     PERF_RESULT_ERROR           // Test execution error
-} perf_test_result_t;
+} perf_result_type_t;
 
 // Performance metric types
 typedef enum {
@@ -63,7 +63,7 @@ typedef struct {
 // Performance test result
 typedef struct {
     char test_name[64];         // Test name
-    perf_test_result_t result;  // Overall result
+    perf_result_type_t result;  // Overall result
     uint64_t start_time;        // Test start timestamp
     uint64_t end_time;          // Test end timestamp
     uint32_t sample_count;      // Number of samples collected
@@ -225,7 +225,7 @@ qboolean PerfTest_UploadResults(const char* results_file);
 
 // Utility Functions
 uint64_t PerfTest_GetTimestamp(void);
-const char* PerfTest_GetResultString(perf_test_result_t result);
+const char* PerfTest_GetResultString(perf_result_type_t result);
 const char* PerfTest_GetMetricString(perf_metric_type_t metric);
 qboolean PerfTest_ValidateConfig(const perf_test_config_t* config);
 
