@@ -11,6 +11,7 @@ compatibility verification and feature detection.
 #define __COMPATIBILITY_TEST_H__
 
 #include "q_shared.h"
+#include "cross_platform_test.h"
 
 // Platform compatibility levels
 typedef enum {
@@ -18,7 +19,8 @@ typedef enum {
     COMPATIBILITY_MINIMAL,         // Minimal functionality
     COMPATIBILITY_BASIC,           // Basic features work
     COMPATIBILITY_FULL,            // Full functionality
-    COMPATIBILITY_OPTIMAL          // Optimal performance/features
+    COMPATIBILITY_OPTIMAL,         // Optimal performance/features
+    COMPATIBILITY_COUNT
 } compatibility_level_t;
 
 // Hardware categories

@@ -8,7 +8,11 @@ Automated cross-platform and cross-hardware validation tests.
 
 #include "q_shared.h"
 #include "compatibility_test.h"
+#include "cross_platform_test.h"
 #include <stdio.h>
+
+// Forward declarations for functions used in tests
+const char* Compatibility_GetArchitectureName(architecture_type_t arch);
 
 static qboolean test_compatibility_initialization(void) {
     printf("Testing compatibility system initialization...\n");

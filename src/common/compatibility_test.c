@@ -13,6 +13,9 @@ compatibility verification and feature detection.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+// Forward declarations
+const char* Compatibility_GetCompilerName(compiler_type_t compiler);
 #include <sys/utsname.h>
 #include <unistd.h>
 

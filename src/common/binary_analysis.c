@@ -26,6 +26,9 @@ Automated security scanning and optimization analysis framework.
 #include <sys/mman.h>
 #endif
 
+// Forward declarations
+int BinaryAnalysis_AutoFixAll(void);
+
 // Global binary analysis system
 binary_analysis_system_t binary_analysis = {0};
 
