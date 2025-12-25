@@ -3806,7 +3806,7 @@ static shader_t *FinishShader( void ) {
 
 		Com_Memset( &def, 0, sizeof( def ) );
 		def.face_culling = shader.cullType;
-		def.polygon_offset = shader.polygonOffset;
+                def.polygonOffset = shader.polygonOffset;
 
 		if ( (stages[0].stateBits & GLS_DEPTHMASK_TRUE) == 0 ) {
 			def.allow_discard = 1;
@@ -3960,18 +3960,18 @@ static shader_t *FinishShader( void ) {
 
 				default:
 					pStage->tessFlags = TESS_RGBA0 | TESS_ST0;
-					def.shader_type = TYPE_SIGNLE_TEXTURE;
+					def.shader_type = TYPE_SINGLE_TEXTURE;
 					if ( pStage->bundle[0].adjustColorsForFog == ACFF_NONE || fogCollapse ) {
 						if ( pStage->bundle[0].rgbGen == CGEN_IDENTITY ) {
 							if ( pStage->bundle[0].alphaGen == AGEN_SKIP ) {
 								pStage->tessFlags = TESS_ST0;
-								def.shader_type = TYPE_SIGNLE_TEXTURE_IDENTITY;
+								def.shader_type = TYPE_SINGLE_TEXTURE_IDENTITY;
 							}
 						}
 						else if ( pStage->bundle[0].rgbGen == CGEN_IDENTITY_LIGHTING ) {
 							if ( pStage->bundle[0].alphaGen == AGEN_SKIP || pStage->bundle[0].alphaGen == AGEN_IDENTITY ) {
 								pStage->tessFlags = TESS_ST0;
-								def.shader_type = TYPE_SIGNLE_TEXTURE_FIXED_COLOR;
+								def.shader_type = TYPE_SINGLE_TEXTURE_FIXED_COLOR;
 								def.color.rgb = tr.identityLightByte;
 								def.color.alpha = pStage->bundle[0].alphaGen == AGEN_IDENTITY ? 255 : tr.identityLightByte;
 							}
@@ -3979,7 +3979,7 @@ static shader_t *FinishShader( void ) {
 						else if ( pStage->bundle[0].rgbGen == CGEN_ENTITY ) {
 							if ( pStage->bundle[0].alphaGen == AGEN_ENTITY || pStage->bundle[0].alphaGen == AGEN_SKIP || pStage->bundle[0].alphaGen == AGEN_IDENTITY ) {
 								pStage->tessFlags = TESS_ST0 | TESS_ENT0;
-								def.shader_type = TYPE_SIGNLE_TEXTURE_ENT_COLOR;
+								def.shader_type = TYPE_SINGLE_TEXTURE_ENT_COLOR;
 							}
 						}
 					}
@@ -4042,10 +4042,10 @@ static shader_t *FinishShader( void ) {
 				#ifdef USE_VK_PBR
 					def.vk_pbr_flags = 0;
 				#endif
-				def.shader_type = TYPE_SIGNLE_TEXTURE_DF;
+				def.shader_type = TYPE_SINGLE_TEXTURE_DF;
 				pStage->vk_pipeline_df = vk_find_pipeline_ext( 0, &def, qtrue );
 				def.mirror = qtrue;
-				def.shader_type = TYPE_SIGNLE_TEXTURE_DF;
+				def.shader_type = TYPE_SINGLE_TEXTURE_DF;
 				pStage->vk_mirror_pipeline_df = vk_find_pipeline_ext( 0, &def, qfalse );
 			}
 

@@ -21,8 +21,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 // snd_local.h -- private sound definitions
 
+#ifndef __SND_LOCAL_H__
+#define __SND_LOCAL_H__
 
 #include "../common/q_shared.h"
+#include "../renderers/renderercommon/tr_public.h"
+
+// Renderer interface for sound system
+extern refimport_t ri;
 #include "../common/qcommon.h"
 #include "snd_public.h"
 
@@ -264,3 +270,5 @@ void S_Base_Respatialize( int entityNum, const vec3_t head, vec3_t axis[3], int 
 // snd_mix.c - mixing functions
 void S_WriteLinearBlastStereo16( void );
 void S_TransferStereo16( unsigned long *pbuf, int endtime );
+
+#endif // __SND_LOCAL_H__

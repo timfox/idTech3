@@ -45,6 +45,7 @@ Provides unified threading API across Windows, Linux, macOS.
 	#define CONDITION_INIT(cond) InitializeConditionVariable(&(cond))
 	#define CONDITION_DESTROY(cond) (void)0  // Windows doesn't need destroy
 	#define CONDITION_WAIT(cond, mutex) SleepConditionVariableCS(&(cond), &(mutex), INFINITE)
+	#define CONDITION_TIMED_WAIT(cond, mutex, timeout_ms) SleepConditionVariableCS(&(cond), &(mutex), (timeout_ms))
 	#define CONDITION_SIGNAL(cond) WakeConditionVariable(&(cond))
 	#define CONDITION_BROADCAST(cond) WakeAllConditionVariable(&(cond))
 	
@@ -115,6 +116,16 @@ Provides unified threading API across Windows, Linux, macOS.
 	#define CONDITION_INIT(cond) pthread_cond_init(&(cond), NULL)
 	#define CONDITION_DESTROY(cond) pthread_cond_destroy(&(cond))
 	#define CONDITION_WAIT(cond, mutex) pthread_cond_wait(&(cond), &(mutex))
+	#define CONDITION_TIMED_WAIT(cond, mutex, timeout_ms) do { \
+		struct timespec ts; \
+		clock_gettime(CLOCK_REALTIME, &ts); \
+		ts.tv_nsec += (timeout_ms) * 1000000; \
+		if (ts.tv_nsec >= 1000000000) { \
+			ts.tv_sec += ts.tv_nsec / 1000000000; \
+			ts.tv_nsec %= 1000000000; \
+		} \
+		pthread_cond_timedwait(&(cond), &(mutex), &ts); \
+	} while(0)
 	#define CONDITION_SIGNAL(cond) pthread_cond_signal(&(cond))
 	#define CONDITION_BROADCAST(cond) pthread_cond_broadcast(&(cond))
 	

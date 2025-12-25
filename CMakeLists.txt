@@ -2660,7 +2660,6 @@ FUNCTION(CONFIGURE_BINARY_SIZE_OPTIMIZATION TARGET_NAME)
         )
 
         TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE
-            -Wl,--icf=all          # Identical Code Folding
             -Wl,--print-gc-sections # Show garbage collected sections
         )
 
@@ -2670,7 +2669,7 @@ FUNCTION(CONFIGURE_BINARY_SIZE_OPTIMIZATION TARGET_NAME)
         )
 
         TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE
-            -Wl,--icf=all          # Identical Code Folding
+            # Identical Code Folding not supported by all linkers
         )
     ENDIF()
 

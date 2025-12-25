@@ -27,6 +27,20 @@ typedef struct {
     void (*work_function)(void* data);
     void* work_data;
     uint64_t submit_time;
+} audio_work_item_t;
+
+// Mixing work data structure
+typedef struct {
+    uint64_t start_time;
+    uint64_t end_time;
+    channel_t* channels;
+    int num_channels;
+} mixing_work_data_t;
+
+// Function declarations
+qboolean AudioThread_IsThreadEnabled(audio_thread_type_t type);
+void AudioThread_SubmitMixingWork(mixing_work_data_t* mix_data);
+void AudioThread_WaitForThread(audio_thread_type_t type);
     audio_thread_type_t thread_type;
     int priority; // 0 = highest, higher numbers = lower priority
 } audio_work_item_t;

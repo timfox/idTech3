@@ -5155,9 +5155,9 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			fs_module = vk.modules.frag.light[1][0];
 			break;
 
-		case TYPE_SIGNLE_TEXTURE_DF:
+		case TYPE_SINGLE_TEXTURE_DF:
 			state_bits |= GLS_DEPTHMASK_TRUE;
-			ri.Printf(PRINT_ALL, "DEBUG: TYPE_SIGNLE_TEXTURE_DF vs=%p fs=%p use_pbr=%d\n",
+			ri.Printf(PRINT_ALL, "DEBUG: TYPE_SINGLE_TEXTURE_DF vs=%p fs=%p use_pbr=%d\n",
 				(void*)vk.modules.vert.ident1[use_pbr][0][0][0],
 				(void*)vk.modules.frag.gen0_df, use_pbr);
 			vs_module = vk.modules.vert.ident1[use_pbr][0][0][0];
@@ -5342,7 +5342,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			fs_module = vk.modules.frag.light[1][0];
 			break;
 
-		case TYPE_SIGNLE_TEXTURE_DF:
+		case TYPE_SINGLE_TEXTURE_DF:
 			state_bits |= GLS_DEPTHMASK_TRUE;
 			vs_module = vk.modules.vert.ident1[0][0][0][0];
 			fs_module = vk.modules.frag.gen0_df;
@@ -5519,7 +5519,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		switch ( def->shader_type ) {
 			case TYPE_FOG_ONLY:
 			case TYPE_DOT:
-			case TYPE_SIGNLE_TEXTURE_DF:
+			case TYPE_SINGLE_TEXTURE_DF:
 			case TYPE_COLOR_BLACK:
 			case TYPE_COLOR_WHITE:
 			case TYPE_COLOR_GREEN:
@@ -5820,7 +5820,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			push_attr( 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT );
 			break;
 
-		case TYPE_SIGNLE_TEXTURE_DF:
+		case TYPE_SINGLE_TEXTURE_DF:
 		case TYPE_SIGNLE_TEXTURE_IDENTITY:
 		case TYPE_SIGNLE_TEXTURE_FIXED_COLOR:
 		case TYPE_SIGNLE_TEXTURE_ENT_COLOR:
@@ -6200,7 +6200,7 @@ multisample_state.rasterizationSamples = (renderPassIndex == RENDER_PASS_SCREENM
 	Com_Memset(&attachment_blend_state, 0, sizeof(attachment_blend_state));
 	attachment_blend_state.blendEnable = (state_bits & (GLS_SRCBLEND_BITS | GLS_DSTBLEND_BITS)) ? VK_TRUE : VK_FALSE;
 
-	if (def->shadow_phase == SHADOW_EDGES || def->shader_type == TYPE_SIGNLE_TEXTURE_DF)
+	if (def->shadow_phase == SHADOW_EDGES || def->shader_type == TYPE_SINGLE_TEXTURE_DF)
 		attachment_blend_state.colorWriteMask = 0;
 	else
 		attachment_blend_state.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;

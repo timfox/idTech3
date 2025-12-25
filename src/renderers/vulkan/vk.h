@@ -28,6 +28,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // Forward declarations
 struct cubemap_s;
 typedef struct cubemap_s cubemap_t;
+struct material_params_s;
+typedef struct material_params_s material_params_t;
 
 // Forward declarations
 struct vk_render_pass_s;
@@ -59,7 +61,8 @@ typedef enum {
 #define TESS_RGBA1     (1 << 6)
 #define TESS_RGBA2     (1 << 7)
 #define TESS_PBR       (1 << 8)
-#define TESS_VPOS      (1 << 9)
+#define TESS_ENV       (1 << 9)
+#define TESS_VPOS      (1 << 11)
 #define TESS_ENT0      (1 << 10)
 
 // VK_DESC descriptor binding indices
@@ -92,8 +95,10 @@ typedef enum {
 #define PBR_HAS_NORMALMAP               (1 << 0)
 #define PBR_HAS_PHYSICALMAP             (1 << 1)
 #define PBR_HAS_SPECULARMAP             (1 << 2)
+#define PBR_HAS_LIGHTMAP                (1 << 3)
 
 // Physical map types
+#define PHYS_NONE                       -1
 #define PHYS_METALROUGH                 0
 #define PHYS_SPECGLOSS                  1
 #define PHYS_RMO                        2
@@ -215,10 +220,48 @@ typedef struct {
     int acff;
     qboolean mirror;
     vec4_t normalScale;
+    vec4_t specularScale;
+    struct {
+        int rgb;
+        int alpha;
+    } color;
+    int allow_discard;
+    int state_bits;
+    int face_culling;
 } Vk_Pipeline_Def;
 
 // Shader type constants
 #define TYPE_SINGLE_TEXTURE_DF 0
+#define TYPE_SINGLE_TEXTURE 1
+#define TYPE_SINGLE_TEXTURE_IDENTITY 2
+#define TYPE_SINGLE_TEXTURE_FIXED_COLOR 3
+#define TYPE_SINGLE_TEXTURE_ENT_COLOR 4
+#define TYPE_MULTI_TEXTURE_MUL2 5
+#define TYPE_MULTI_TEXTURE_MUL2_IDENTITY 6
+#define TYPE_MULTI_TEXTURE_MUL2_FIXED_COLOR 7
+#define TYPE_MULTI_TEXTURE_ADD2_1_1 8
+#define TYPE_MULTI_TEXTURE_ADD2_IDENTITY 9
+#define TYPE_MULTI_TEXTURE_ADD2_FIXED_COLOR 10
+#define TYPE_MULTI_TEXTURE_ADD2 11
+#define TYPE_MULTI_TEXTURE_MUL3 14
+#define TYPE_MULTI_TEXTURE_ADD3_1_1 15
+#define TYPE_MULTI_TEXTURE_ADD3 16
+#define TYPE_BLEND2_MUL 17
+#define TYPE_BLEND2_ADD 18
+#define TYPE_BLEND2_ALPHA 19
+#define TYPE_BLEND2_ONE_MINUS_ALPHA 20
+#define TYPE_BLEND2_MIX_ALPHA 21
+#define TYPE_BLEND2_MIX_ONE_MINUS_ALPHA 22
+#define TYPE_BLEND2_DST_COLOR_SRC_ALPHA 23
+#define TYPE_BLEND3_MUL 24
+#define TYPE_BLEND3_ADD 25
+#define TYPE_BLEND3_ALPHA 26
+#define TYPE_BLEND3_ONE_MINUS_ALPHA 27
+#define TYPE_BLEND3_MIX_ONE_MINUS_ALPHA 28
+#define TYPE_BLEND3_MIX_ALPHA 29
+#define TYPE_BLEND3_DST_COLOR_SRC_ALPHA 30
+#define TYPE_GENERIC_BEGIN     31
+#define TYPE_GENERIC_END       100
 
 // Vulkan sampler definition structure
 typedef struct {
@@ -420,8 +463,14 @@ typedef struct {
     uint32_t camera_ubo_offset;
     VkDeviceSize vertex_buffer_offset;
     VkDeviceSize geometry_buffer_size;
+    uint32_t maxBoundDescriptorSets;
     qboolean clearAttachment;
     VkPipeline images_debug_pipeline;
+    VkPipeline shadow_finish_pipeline;
+    VkPipeline shadow_volume_pipelines[2][2];
+    VkPipeline skybox_pipeline;
+    VkPipeline surface_beam_pipeline;
+    VkPipeline surface_axis_pipeline;
     qboolean cubemapActive;
     qboolean fboActive;
     qboolean offscreenRender;

@@ -232,6 +232,9 @@ static inline qboolean Net_PacketRead(net_packet_t *packet, void *data, size_t s
 #define UNUSED_VAR
 #endif
 
+// Macro to suppress unused parameter warnings
+#define Q_UNUSED(x) (void)(x)
+
 #if (defined _MSC_VER)
 #define Q_EXPORT __declspec(dllexport)
 #elif (defined __SUNPRO_C)

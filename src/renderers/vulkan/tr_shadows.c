@@ -148,7 +148,7 @@ void RB_ShadowTessEnd( void ) {
 	int		numTris;
 	vec3_t	lightDir;
 #ifdef USE_VULKAN
-	uint32_t pipeline[2];
+	VkPipeline pipeline[2];
 #else
 	GLboolean rgba[4];
 #endif
