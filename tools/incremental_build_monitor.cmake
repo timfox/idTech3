@@ -202,7 +202,7 @@ function(setup_incremental_build_monitor)
     add_custom_target(build_end
         COMMAND ${CMAKE_COMMAND}
             -D CMAKE_BINARY_DIR=${CMAKE_BINARY_DIR}
-            -P ${CMAKE_SOURCE_DIR}/scripts/incremental_build_monitor.cmake
+            -P ${CMAKE_SOURCE_DIR}/tools/incremental_build_monitor.cmake
             --end-build
         COMMENT "Finalizing build and generating report"
     )
