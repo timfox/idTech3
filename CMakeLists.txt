@@ -1,11 +1,9 @@
 # ==============================================================================
-# id Tech 3 Build System - Modern CMake Configuration
+# id Tech 3 Build System - CMake Configuration
 # ==============================================================================
 
-# --- CMake minimum version and project initialization ---
 cmake_minimum_required(VERSION 3.20)
 project(idtech3 C CXX ASM)
-# Force re-evaluation
 
 # Find dependencies
 find_package(OpenGL QUIET)
@@ -18,7 +16,7 @@ if(Lua_FOUND)
             INTERFACE_INCLUDE_DIRECTORIES "${LUA_INCLUDE_DIRS}"
             INTERFACE_LINK_LIBRARIES "${LUA_LIBRARIES}"
         )
-        message(STATUS "Created Lua::lua imported target with includes: ${LUA_INCLUDE_DIRS}, libs: ${LUA_LIBRARIES}")
+        message(STATUS "Created Lua::lua imported target with includes: ${LUA_INCLUDE_DIRS} libs: ${LUA_LIBRARIES}")
     endif()
 else()
     message(WARNING "Lua not found - Lua integration will be disabled")
