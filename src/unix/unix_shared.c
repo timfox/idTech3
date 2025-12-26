@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <unistd.h>
 #include <sys/mman.h>
 #include <sys/time.h>
+#include <time.h>
 #include <pwd.h>
 #include <dlfcn.h>
 #include <libgen.h>
@@ -726,3 +727,38 @@ void SV_Shutdown( const char *finalmsg ) {
 // Global variables expected by SDL input
 qboolean gw_active = qtrue;
 qboolean gw_minimized = qfalse;
+
+// Missing system functions for Unix
+qboolean Sys_LowPhysicalMemory( void ) {
+    return qfalse;  // Assume we have enough memory
+}
+
+const char *Sys_DefaultBasePath( void ) {
+    return ".";  // Current directory as base path
+}
+
+void Sys_Print( const char *msg ) {
+    printf("%s", msg);
+}
+
+void Sys_Sleep( int msec ) {
+    usleep(msec * 1000);  // Convert milliseconds to microseconds
+}
+
+void Sys_SnapVector( float *v ) {
+    // Stub - no snapping needed for Unix
+    Q_UNUSED(v);
+}
+
+void Sys_BeginProfiling( void ) {
+    // Stub - no profiling support
+}
+
+int64_t Sys_Microseconds( void ) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (int64_t)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+}
+
+// Global variables
+int time_game = 0;

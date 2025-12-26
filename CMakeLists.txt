@@ -1539,10 +1539,13 @@ IF(ANDROID)
 		src/unix/unix_shared.c
 		src/unix/linux_signals.c)
 ELSEIF(UNIX)
+	AUX_SOURCE_DIRECTORY(src/server SERVER_SRCS)
+	list(REMOVE_ITEM SERVER_SRCS src/server/sv_rankings.c)
 	SET (Q3_SRCS
 		src/unix/unix_main.c
 		src/unix/unix_shared.c
-		src/unix/linux_signals.c)
+		src/unix/linux_signals.c
+		${SERVER_SRCS})
 
 	IF(USE_SDL)
 		AUX_SOURCE_DIRECTORY(src/sdl Q3_UI_SRCS)
@@ -3645,6 +3648,7 @@ IF(BUILD_TESTS)
 	TARGET_INCLUDE_DIRECTORIES(test_performance_counters PRIVATE src/common)
 	TARGET_INCLUDE_DIRECTORIES(test_performance_counters PRIVATE src)
 	TARGET_COMPILE_DEFINITIONS(test_performance_counters PRIVATE STANDALONE_TEST)
+	TARGET_SOURCES(test_performance_counters PRIVATE tests/test_stubs.c)
 	ADD_TEST(NAME performance_counters_tests COMMAND test_performance_counters)
 
 ADD_EXECUTABLE(test_performance_regression
@@ -3680,7 +3684,8 @@ ADD_TEST(NAME compatibility_tests COMMAND test_compatibility)
 
 ADD_EXECUTABLE(test_asset_validation
 	tests/test_asset_validation.c
-	src/common/asset_validation.c)
+	src/common/asset_validation.c
+	src/common/cmd.c)
 TARGET_INCLUDE_DIRECTORIES(test_asset_validation PRIVATE src/common)
 TARGET_INCLUDE_DIRECTORIES(test_asset_validation PRIVATE src)
 TARGET_COMPILE_DEFINITIONS(test_asset_validation PRIVATE STANDALONE_TEST)
@@ -3704,6 +3709,8 @@ ENDIF()
 IF(USE_SQLITE)
 	IF(SQLite3_FOUND)
 		TARGET_LINK_LIBRARIES(test_asset_validation PRIVATE ${SQLite3_LIBRARIES})
+		TARGET_LINK_LIBRARIES(test_performance_regression PRIVATE ${SQLite3_LIBRARIES})
+		TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ${SQLite3_LIBRARIES})
 	ENDIF()
 ENDIF()
 IF(USE_FREETYPE)
