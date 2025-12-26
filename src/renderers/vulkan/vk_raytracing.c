@@ -448,7 +448,7 @@ static void vk_rt_load_blue_noise_array( void )
 	ri.Printf( PRINT_ALL, "Loaded blue noise texture array: %u layers (%ux%u each)\n", loaded_count, BLUE_NOISE_WIDTH, BLUE_NOISE_HEIGHT );
 }
 
-void vk_rt_init( void )
+void vk_rt_init(void)
 {
 	if ( !vk.rayTracingSupported ) {
 		return;
@@ -562,7 +562,7 @@ void vk_rt_init( void )
 }
 
 
-void vk_rt_shutdown( void )
+void vk_rt_shutdown(void)
 {
 	if ( !vk.rayTracingSupported || !vk.rt.initialized ) {
 		return;

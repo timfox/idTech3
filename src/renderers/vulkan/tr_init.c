@@ -83,6 +83,13 @@ cvar_t	*r_drawentities;
 cvar_t	*r_shadows;
 cvar_t	*r_portalOnly;
 
+// RTX (Ray Tracing) cvars
+cvar_t	*r_raytracing;
+cvar_t	*r_rt_samples;
+cvar_t	*r_rt_maxDepth;
+cvar_t	*r_rt_debugMagenta;
+cvar_t	*r_rt_tlasUpdateMode;
+
 // Vulkan-specific globals will be defined in vk.h
 
 static void VK_GfxInfo(void) {
@@ -218,6 +225,22 @@ static void R_Register( void ) {
 
     r_portalOnly = ri.Cvar_Get( "r_portalOnly", "0", CVAR_CHEAT );
     ri.Cvar_SetDescription( r_portalOnly, "Only draw portals." );
+
+    // RTX (Ray Tracing) cvars
+    r_raytracing = ri.Cvar_Get( "r_raytracing", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    ri.Cvar_SetDescription( r_raytracing, "Enable Vulkan ray tracing." );
+
+    r_rt_samples = ri.Cvar_Get( "r_rt_samples", "1", CVAR_ARCHIVE_ND );
+    ri.Cvar_SetDescription( r_rt_samples, "Number of ray tracing samples per pixel." );
+
+    r_rt_maxDepth = ri.Cvar_Get( "r_rt_maxDepth", "2", CVAR_ARCHIVE_ND );
+    ri.Cvar_SetDescription( r_rt_maxDepth, "Maximum ray tracing recursion depth." );
+
+    r_rt_debugMagenta = ri.Cvar_Get( "r_rt_debugMagenta", "0", CVAR_CHEAT );
+    ri.Cvar_SetDescription( r_rt_debugMagenta, "Fill ray tracing output with magenta for debugging." );
+
+    r_rt_tlasUpdateMode = ri.Cvar_Get( "r_rt_tlasUpdateMode", "1", CVAR_ARCHIVE_ND );
+    ri.Cvar_SetDescription( r_rt_tlasUpdateMode, "TLAS update mode (0=never, 1=on demand, 2=every frame)." );
 }
 
 static void RE_Shutdown( refShutdownCode_t code ) {

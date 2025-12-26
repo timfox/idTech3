@@ -3593,6 +3593,13 @@ void vk_initialize( void )
 	ri.Printf(PRINT_ALL, "DEBUG: Calling vk_create_shader_modules\n");
 	vk_create_shader_modules();
 	ri.Printf(PRINT_ALL, "DEBUG: vk_create_shader_modules completed\n");
+
+	// Initialize ray tracing if supported
+	if (vk.rayTracingSupported) {
+		ri.Printf(PRINT_ALL, "Vulkan: Initializing ray tracing\n");
+		vk_rt_init();
+	}
+
 	ri.Printf(PRINT_ALL, "DEBUG: vk_initialize completed successfully\n");
 
 	// Mark Vulkan as active

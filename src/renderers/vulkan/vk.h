@@ -1321,6 +1321,11 @@ qboolean create_color_attachment(uint32_t width, uint32_t height, VkSampleCountF
 qboolean vk_gpu_culling_is_enabled(void);
 void vk_gpu_culling_add_instance(const float *transform, uint32_t biomeId, const float *color);
 
+// Ray tracing functions
+void vk_rt_init(void);
+void vk_rt_shutdown(void);
+void vk_rt_trace_rays(uint32_t width, uint32_t height);
+
 // Memory and performance systems
 void vk_init_vram_stats(void);
 void vk_init_memory_defragmentation(void);

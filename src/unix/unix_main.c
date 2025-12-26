@@ -2,6 +2,7 @@
 #include "../client/client.h"
 #include <stdio.h>
 #include <unistd.h>
+#include <time.h>
 
 int main(int argc, char *argv[]) {
     (void)argc;  // Suppress unused parameter warning
@@ -13,10 +14,20 @@ int main(int argc, char *argv[]) {
 
     printf("Engine initialized successfully\n");
 
-    // Simple test: keep the engine running for a few seconds
-    sleep(10);
+    // Main game loop with frame processing
+    int frameCount = 0;
+    while (frameCount < 10) {
+        frameCount++;
+        printf("Processing frame %d\n", frameCount);
 
-    printf("Engine shutting down...\n");
+        // Run a frame
+        Com_Frame(qfalse);
+
+        // Small delay between frames
+        sleep(1);
+    }
+
+    printf("Test completed, engine shutting down...\n");
 
     return 0;
 }

@@ -1286,10 +1286,11 @@ AUX_SOURCE_DIRECTORY(src/renderers/vulkan RENDERER_VK_SRCS)
 # Vulkan experimental modules (work-in-progress). Keep OFF by default to ensure
 # the default Vulkan build stays compatible with the engine APIs/structures.
 option(IDTECH3_VK_EXPERIMENTAL "Build experimental Vulkan renderer modules" OFF)
-if(NOT IDTECH3_VK_EXPERIMENTAL)
+	if(NOT IDTECH3_VK_EXPERIMENTAL)
 	list(REMOVE_ITEM RENDERER_VK_SRCS
 		src/renderers/vulkan/gltf_loader.c
 		src/renderers/vulkan/tr_font_vk.c
+		src/renderers/vulkan/tr_image.c
 		src/renderers/vulkan/vk_compute_raytracing.c
 		src/renderers/vulkan/vk_dynamic_rendering.c
 		src/renderers/vulkan/vk_graphics_settings.c
@@ -1392,11 +1393,13 @@ IF(USE_RENDERER_DLOPEN)
 	TARGET_LINK_OPTIONS(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE -Wl,--export-dynamic -Wl,--unresolved-symbols=ignore-all)
 
 	if(USE_VULKAN)
-		# Use simplified RTX Vulkan renderer
-		set(RTX_VK_SRCS
-			src/renderers/vulkan/tr_rtx.c
+		# Create minimal RTX Vulkan renderer with actual RTX implementation
+		set(RTX_VULKAN_SRCS
+			src/renderers/vulkan/tr_rtx_minimal.c
+			src/renderers/vulkan/vk_raytracing.c
 		)
-		ADD_LIBRARY(${RENDERER_PREFIX}_vulkan${RENDEXT} SHARED ${RTX_VK_SRCS})
+		# RTX uses its own Vulkan initialization, no need for complex vk.c
+		ADD_LIBRARY(${RENDERER_PREFIX}_vulkan${RENDEXT} SHARED ${RTX_VULKAN_SRCS})
 		SET_TARGET_PROPERTIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES OUTPUT_NAME "${RENDERER_PREFIX}_vulkan${RENDEXT}" PREFIX "")
 		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_VULKAN USE_FREETYPE)
 		IF(USE_FREETYPE)

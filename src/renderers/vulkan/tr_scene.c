@@ -568,6 +568,13 @@ void RE_RenderScene( const refdef_t *fd ) {
 	}
 #endif
 
+	// Perform ray tracing if enabled
+#ifdef USE_VULKAN_RAY_TRACING
+	if (vk.active && vk.rayTracingSupported && r_raytracing && r_raytracing->integer) {
+		vk_rt_trace_rays(tr.refdef.width, tr.refdef.height);
+	}
+#endif
+
 	RE_EndScene();
 
 	tr.frontEndMsec += ri.Milliseconds() - startTime;
