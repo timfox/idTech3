@@ -1556,6 +1556,7 @@ extern cvar_t	*r_ext_supersample;
 extern cvar_t	*r_renderWidth;
 extern cvar_t	*r_renderHeight;
 extern cvar_t	*r_renderScale;
+extern cvar_t	*r_dynamicResolution;
 extern cvar_t	*r_dynRes_enable;
 extern cvar_t	*r_dynRes_minScale;
 extern cvar_t	*r_dynRes_maxScale;

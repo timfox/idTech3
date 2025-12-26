@@ -157,7 +157,7 @@ void QDECL SourceWarning(source_t *source, const char *fmt, ...)  __attribute__ 
 #ifdef BSPC
 // some of BSPC source does include game/q_shared.h and some does not
 // we define pc_token_s pc_token_t if needed (yes, it's ugly)
-#ifndef __Q_SHARED_H
+#ifndef __Q_SHARED_CORE_H__
 #define MAX_TOKENLENGTH		1024
 typedef struct pc_token_s
 {

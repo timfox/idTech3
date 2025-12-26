@@ -95,7 +95,7 @@ skin_t *R_GetSkinByHandle(qhandle_t handle) {
 
 // Note: Vulkan initialization is handled by the engine, not by the renderer
 
-static void vk_shutdown(void) {
+static void vk_shutdown_local(void) {
     ri.Printf(PRINT_ALL, "Vulkan Renderer: Shutting down...\n");
 
     // TODO: Clean up Vulkan resources if needed
@@ -107,7 +107,7 @@ static void vk_shutdown(void) {
 
 void RE_Shutdown(refShutdownCode_t code) {
     ri.Printf(PRINT_ALL, "Vulkan Renderer: Shutdown (%i)\n", code);
-    vk_shutdown();
+    vk_shutdown_local();
 }
 
 void RE_BeginRegistration(glconfig_t *glconfigOut) {

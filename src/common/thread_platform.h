@@ -84,7 +84,7 @@ Provides unified threading API across Windows, Linux, macOS.
 	#include <unistd.h>
 	#include <stdatomic.h>
     
-    #ifndef __Q_SHARED_H
+    #ifndef __Q_SHARED_CORE_H__
     typedef enum { qfalse = 0, qtrue } qboolean;
     #endif
 	

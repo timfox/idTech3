@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #include "../renderercommon/tr_backend_iface.h"
 #include "../../common/q_shared.h"
+#include "vk.h"
 #include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
@@ -58,9 +59,10 @@ qboolean RE_GetEntityToken( char *buffer, int size );
 void RE_TakeVideoFrame( int width, int height, byte *captureBuffer, byte *encodeBuffer, qboolean motionJpeg );
 qboolean RE_RegisterFont( const char *fontName, int pointSize, fontInfo_t *font );
 void RE_AddParticle( const vec3_t origin, const vec3_t velocity, const vec3_t color, float size, float life, qhandle_t shader );
+qboolean RE_InPVS( const vec3_t p1, const vec3_t p2 );
 
-void R_MarkFragments( int numPoints, const vec3_t *points, const vec3_t projection,
-                   int maxPoints, vec3_t *pointBuffer, int maxFragments, markFragment_t *fragmentBuffer );
+int R_MarkFragments( int numPoints, const vec3_t *points, const vec3_t projection,
+                   int maxPoints, vec3_t pointBuffer, int maxFragments, markFragment_t *fragmentBuffer );
 int R_LerpTag( orientation_t *tag, qhandle_t model, int startFrame, int endFrame,
              float frac, const char *tagName );
 void R_ModelBounds( qhandle_t model, vec3_t mins, vec3_t maxs );
@@ -154,6 +156,16 @@ RE_AddParticle
 void RE_AddParticle( const vec3_t origin, const vec3_t velocity, const vec3_t color, float size, float life, qhandle_t shader ) {
     // Particle rendering stub
     (void)origin; (void)velocity; (void)color; (void)size; (void)life; (void)shader;
+}
+
+/*
+================
+RE_InPVS
+================
+*/
+qboolean RE_InPVS( const vec3_t p1, const vec3_t p2 ) {
+    (void)p1; (void)p2;
+    return qtrue;
 }
 
 /*
@@ -319,6 +331,7 @@ refexport_t *GetRefAPI( int apiVersion, refimport_t *rimp ) {
     re.RemapShader = RE_RemapShader;
     re.GetEntityToken = RE_GetEntityToken;
     re.TakeVideoFrame = RE_TakeVideoFrame;
+    re.inPVS = RE_InPVS;
 
     return &re;
 }

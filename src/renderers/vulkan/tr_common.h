@@ -108,11 +108,19 @@ qhandle_t RE_RegisterShader( const char *name );
 qhandle_t RE_RegisterShaderNoMip( const char *name );
 qhandle_t RE_RegisterShaderFromImage(const char *name, int lightmapIndex, image_t *image, qboolean mipRawImage);
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // font stuff
 void R_InitFreeType( void );
 void R_DoneFreeType( void );
 qboolean RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font);
 qboolean RE_RegisterFont_Stb(const char *fontName, int pointSize, fontInfo_t *font);
+
+#ifdef __cplusplus
+}
+#endif
 
 #include "../renderercommon/tr_font_enhanced.h"
 
@@ -142,8 +150,16 @@ extern cvar_t *r_fontAntialiasing;
 extern cvar_t *r_fontLCDFilter;
 extern cvar_t *r_fontKerning;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Vulkan-specific font functions
 qboolean RE_RegisterFont_Vulkan(const char *fontName, int pointSize, fontInfo_t *font);
+
+#ifdef __cplusplus
+}
+#endif
 
 
 /*

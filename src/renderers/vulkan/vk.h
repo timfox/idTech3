@@ -651,6 +651,11 @@ typedef struct {
 
     vk_vram_stats_t vram_stats;
 
+    struct {
+        float fps;
+        float frame_time_ms;
+    } performance;
+
     vk_resource_pool_t resource_pools;
 
     vk_lock_free_memory_manager_t lock_free_manager;
@@ -1237,6 +1242,7 @@ float ByteToFloat(byte b);
 float sRGBtoRGB(float srgb);
 byte FloatToByte(float f);
 void VBO_PrepareQueues(void);
+void vk_shutdown( refShutdownCode_t code );
 void vk_shutdown_compute_manager(void);
 void vk_shutdown_resource_pool(void);
 void vk_clean_staging_buffer(void);

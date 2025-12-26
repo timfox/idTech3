@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <stdio.h>
 #include "../common/q_shared.h"
 #include "../common/qcommon.h"
+#include "../common/q_scalability.h"
 
 void R_InitFonts(void); // Forward declaration
 // As of this writing ( Nov, 2000 ) Team Arena uses these fonts for all of the ui and 
@@ -72,9 +73,6 @@ void R_InitFonts(void); // Forward declaration
 // uncheck the exclude from build check box in the FreeType2 area of the Renderer project. 
 
 
-#include "../common/q_shared.h"
-#include "../common/qcommon.h"
-#include "../common/q_scalability.h"
 #include <stdio.h>
 
 // Forward declarations
