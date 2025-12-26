@@ -2790,15 +2790,15 @@ FUNCTION(MONITOR_BUILD_OPTIMIZATION TARGET_NAME)
     # Get build start time
     STRING(TIMESTAMP BUILD_START_TIME "%s" UTC)
 
-    # Add post-build analysis
-    ADD_CUSTOM_COMMAND(TARGET ${TARGET_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND}
-            -D TARGET_FILE=$<TARGET_FILE:${TARGET_NAME}>
-            -D BUILD_START_TIME=${BUILD_START_TIME}
-            -D CMAKE_BINARY_DIR=${CMAKE_BINARY_DIR}
-            -P ${CMAKE_SOURCE_DIR}/scripts/analyze_build_optimization.cmake
-        COMMENT "Analyzing build optimization results"
-    )
+    # Add post-build analysis (disabled - script not found)
+    # ADD_CUSTOM_COMMAND(TARGET ${TARGET_NAME} POST_BUILD
+    #     COMMAND ${CMAKE_COMMAND}
+    #         -D TARGET_FILE=$<TARGET_FILE:${TARGET_NAME}>
+    #         -D BUILD_START_TIME=${BUILD_START_TIME}
+    #         -D CMAKE_BINARY_DIR=${CMAKE_BINARY_DIR}
+    #     -P ${CMAKE_SOURCE_DIR}/scripts/analyze_build_optimization.cmake
+    #     COMMENT "Analyzing build optimization results"
+    # )
 ENDFUNCTION()
 
 # ============================================================================

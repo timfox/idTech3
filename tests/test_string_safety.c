@@ -51,11 +51,6 @@ qboolean Q_ValidateFilePath(const char *path) {
 	return qtrue;
 }
 
-// Stub implementation of Q_atof for testing
-float Q_atof(const char *str) {
-	return atof(str);
-}
-
 TEST(Q_strncpyz_basic) {
 	char dest[32];
 

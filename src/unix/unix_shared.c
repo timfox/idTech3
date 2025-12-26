@@ -702,3 +702,27 @@ int Sys_GetPhysicalMemoryMB(void) {
 int Sys_GetNumCPUCores(void) {
 	return 4; // Default to 4 cores
 }
+
+// Stub implementations for monolithic build
+void Sys_QueEvent( int evTime, sysEventType_t evType, int value, int value2, int ptrLength, void *ptr ) {
+	// Stub implementation - in monolithic build, events are handled differently
+	Q_UNUSED(evTime);
+	Q_UNUSED(evType);
+	Q_UNUSED(value);
+	Q_UNUSED(value2);
+	Q_UNUSED(ptrLength);
+	Q_UNUSED(ptr);
+}
+
+void Sys_Exit( int code ) {
+	exit(code);
+}
+
+void SV_Shutdown( const char *finalmsg ) {
+	// Stub implementation
+	Q_UNUSED(finalmsg);
+}
+
+// Global variables expected by SDL input
+qboolean gw_active = qtrue;
+qboolean gw_minimized = qfalse;

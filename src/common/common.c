@@ -7,6 +7,7 @@ Basic functions used throughout the engine.
 */
 
 #include "qcommon.h"
+#include "../renderers/renderercommon/tr_public.h"
 #include <stdio.h>
 #include <stdarg.h>
 
@@ -168,4 +169,57 @@ int Com_Milliseconds( void ) {
 // Basic Com_Quit_f
 void Com_Quit_f( void ) {
     exit( 0 );
+}
+
+// Additional stubs for monolithic build
+qboolean Com_HasPatterns( const char *str ) {
+    Q_UNUSED(str);
+    return qfalse;
+}
+
+int Com_FilterPath( const char *filter, const char *name ) {
+    Q_UNUSED(filter);
+    Q_UNUSED(name);
+    return 1;
+}
+
+qboolean Com_FilterExt( const char *filter, const char *name ) {
+    Q_UNUSED(filter);
+    Q_UNUSED(name);
+    return qtrue;
+}
+
+void Com_SortList( char** list, int n ) {
+    Q_UNUSED(list);
+    Q_UNUSED(n);
+    // Stub implementation - no sorting
+}
+
+// Developer printf - only prints if developer cvar is set
+void Com_DPrintf( const char *fmt, ... ) {
+    // Stub implementation - always print for monolithic build
+    va_list argptr;
+    va_start( argptr, fmt );
+    vprintf( fmt, argptr );
+    va_end( argptr );
+}
+
+// System error - terminates the program
+void Sys_Error( const char *error, ... ) {
+    va_list argptr;
+    va_start( argptr, error );
+    vfprintf( stderr, error, argptr );
+    va_end( argptr );
+    exit( 1 );
+}
+
+// Global variables expected by the engine
+char cl_title[ MAX_CVAR_VALUE_STRING ] = "idtech3";
+
+// Renderer interface stub for monolithic build
+refimport_t ri = {0};
+
+// Sound spatialization stub
+void S_Spatialize( void ) {
+    // Stub implementation
 }

@@ -1108,25 +1108,6 @@ static int Q_isfinite( float f )
 }
 
 
-/*
-================
-Q_atof
-================
-*/
-float Q_atof( const char *str )
-{
-	float f;
-
-	f = atof( str );
-
-	// modern C11-like implementations of atof() may return INF or NAN
-	// which breaks all FP code where such values getting passed
-	// and effectively corrupts range checks for cvars as well
-	if ( !Q_isfinite( f ) )
-		return 0.0f;
-
-	return f;
-}
 
 
 /*

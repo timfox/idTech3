@@ -40,6 +40,16 @@ extern cvar_t *r_vk_hotReload;
 #include "vk.h"
 #include <dlfcn.h>
 
+// Define the global Vulkan instance
+Vk_Instance vk;
+
+// Define global cvars used by Vulkan renderer
+cvar_t *r_vk_profiling = NULL;
+cvar_t *r_vk_debug_overlay = NULL;
+
+// Define glConfig for compatibility (Vulkan renderer uses its own config but some shared code expects this)
+glconfig_t glConfig;
+
 // Engine function stubs for Vulkan renderer
 __attribute__((used)) void Com_SetErrorContext(const char * /*context*/);
 void Com_SetErrorContext(const char * /*context*/) {

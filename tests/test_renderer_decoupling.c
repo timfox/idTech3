@@ -51,10 +51,6 @@ void Com_Error(errorParm_t level, const char *fmt, ...) {
 	exit(1);
 }
 
-float Q_atof(const char *str) {
-	return atof(str);
-}
-
 // Stub refexport_t structure for testing
 refexport_t re = {0};
 

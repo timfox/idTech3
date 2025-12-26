@@ -71,19 +71,6 @@ void Com_Error(errorParm_t level, const char *fmt, ...) {
     exit(1);
 }
 
-// Stub for Cmd_Argc - return 1 (program name only)
-int Cmd_Argc(void) {
-    return 1;
-}
-
-// Stub for Cmd_Argv - return program name for index 0, empty string otherwise
-char *Cmd_Argv(int arg) {
-    if (arg == 0) {
-        return (char*)"test_asset_validation";
-    }
-    return (char*)"";
-}
-
 // Stub for Com_DPrintf - developer printf
 void Com_DPrintf(const char *fmt, ...) {
     Q_UNUSED(fmt);
@@ -356,5 +343,57 @@ int Sys_GetFileStats(const char *filename, void *stats) {
 
 void Hunk_ClearTempMemory(void) {
     // Stub - do nothing
+}
+
+// Additional stubs for cmd.c dependencies
+const char *Cvar_VariableString(const char *var_name) {
+    Q_UNUSED(var_name);
+    return "";
+}
+
+void FS_BypassPure(void) {
+    // Stub - do nothing
+}
+
+int FS_ReadFile(const char* qpath, void** buffer) {
+    Q_UNUSED(qpath);
+    Q_UNUSED(buffer);
+    return -1;
+}
+
+void FS_RestorePure(void) {
+    // Stub - do nothing
+}
+
+void Z_Free(void *ptr) {
+    free(ptr);
+}
+
+qboolean Cvar_Command(void) {
+    return qfalse;
+}
+
+void UI_GameCommand(void) {
+    // Stub - do nothing
+}
+
+void CL_GameCommand(void) {
+    // Stub - do nothing
+}
+
+void SV_GameCommand(void) {
+    // Stub - do nothing
+}
+
+void Cvar_CompleteCvarName(char *args, int argNum) {
+    Q_UNUSED(args);
+    Q_UNUSED(argNum);
+}
+
+void Field_CompleteFilename(const char* dir, const char* ext, qboolean stripExt, qboolean allowNonPureFiles) {
+    Q_UNUSED(dir);
+    Q_UNUSED(ext);
+    Q_UNUSED(stripExt);
+    Q_UNUSED(allowNonPureFiles);
 }
 

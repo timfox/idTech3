@@ -26,7 +26,6 @@ void Cvar_CommandCompletion(void (*callback)(const char *s));
 void Sys_RandomBytes(byte *data, int size);
 cvar_t *Cvar_Get(const char *name, const char *value, int flags);
 void Z_Free(void *ptr);
-float Q_atof(const char *str);
 qboolean Q_Log_IsEnabled(log_level_t level, log_category_t category);
 void Q_Log_Flush(void);
 void FS_ForceFlush(qhandle_t f);
@@ -92,10 +91,6 @@ void Z_Free(void *ptr) {
 }
 
 // Additional mocks for all dependencies
-float Q_atof(const char *str) {
-	return atof(str);
-}
-
 qboolean Q_Log_IsEnabled(log_level_t level, log_category_t category) {
 	(void)level; (void)category;
 	return qtrue; // Enable all logging for tests

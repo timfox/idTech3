@@ -45,11 +45,6 @@ void Com_Error(errorParm_t level, const char *error, ...) {
 	exit(1);
 }
 
-// Mock Q_atof for testing
-float Q_atof(const char *str) {
-	return (float)atof(str);
-}
-
 TEST(q_strncpyz_basic) {
 	char dest[64];
 	const char *src = "hello";
