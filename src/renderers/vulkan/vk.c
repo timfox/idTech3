@@ -3,26 +3,7 @@
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 
-// VRS CVAR extern declarations
-extern cvar_t *r_vrs;
-extern cvar_t *r_vrs_mode;
-extern cvar_t *r_vrs_center_radius;
-extern cvar_t *r_vrs_falloff_start;
-extern cvar_t *r_vrs_min_rate;
-extern cvar_t *r_vrs_max_rate;
-extern cvar_t *r_vk_profiling;
-extern cvar_t *r_vk_debug_overlay;
-
-// Other CVAR extern declarations
-extern cvar_t *r_vk_disableScreenMap;
-extern cvar_t *r_procDressing;
-extern cvar_t *r_materialSystem;
-extern cvar_t *r_frameTelemetry;
-extern cvar_t *r_bloom;
-extern cvar_t *r_dlss;
-extern cvar_t *r_dlss_quality;
-extern cvar_t *r_dlss_sharpening;
-extern cvar_t *r_styleTransfer;
+// CVAR declarations are now handled in tr_init.c
 extern cvar_t *r_styleStrength;
 extern cvar_t *r_styleLevels;
 extern cvar_t *r_styleEdge;
@@ -6974,7 +6955,7 @@ void vk_begin_cubemap_render_pass( void )
 
     vk_begin_render_pass(vk.render_pass.cubemap, frameBuffer, qtrue, vk.renderWidth, vk.renderHeight);
 
-    Com_Printf("render cube face %d\n", backEnd.viewParms.targetCubeLayer );
+    ri.Printf(PRINT_ALL, "render cube face %d\n", backEnd.viewParms.targetCubeLayer );
 }
 
 #endif
