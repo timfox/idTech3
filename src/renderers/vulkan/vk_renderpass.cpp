@@ -1,9 +1,7 @@
-extern "C" {
+#include "tr_local.h"
 #include "vk_renderpass.h"
 #include "vk_utils.h"
-#include "../renderercommon/tr_public.h"
 #include "vk.h"
-}
 
 // Renderer interface
 extern refimport_t ri;
@@ -288,6 +286,33 @@ extern "C" void vk_begin_blur_render_pass(uint32_t index) {
         },
         .clearValueCount = 1,
         .pClearValues = &clear_value
+    };
+
+    qvkCmdBeginRenderPass(vk.cmd->command_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+// Begin main render pass
+extern "C" void vk_begin_main_render_pass(void) {
+    if (!vk_validate_handle(vk.render_pass.main, "main render pass") ||
+        !vk_validate_handle(vk.framebuffers.main[vk.cmd->swapchain_image_index], "main framebuffer")) {
+        return;
+    }
+
+    VkClearValue clear_values[2];
+    clear_values[0].color = {{0.0f, 0.0f, 0.0f, 1.0f}};
+    clear_values[1].depthStencil = {1.0f, 0};
+
+    VkRenderPassBeginInfo render_pass_info = {
+        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
+        .pNext = nullptr,
+        .renderPass = vk.render_pass.main,
+        .framebuffer = vk.framebuffers.main[vk.cmd->swapchain_image_index],
+        .renderArea = {
+            .offset = {0, 0},
+            .extent = {vk.renderWidth, vk.renderHeight}
+        },
+        .clearValueCount = 2,
+        .pClearValues = clear_values
     };
 
     qvkCmdBeginRenderPass(vk.cmd->command_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);

@@ -1,8 +1,6 @@
-extern "C" {
+#include "tr_local.h"
 #include "vk_config.h"
 #include "vk_config_private.h"
-#include "../renderercommon/tr_public.h"
-}
 
 // Renderer interface
 extern refimport_t ri;

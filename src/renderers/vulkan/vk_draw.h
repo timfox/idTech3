@@ -3,6 +3,10 @@
 
 #include "vk.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Drawing and rendering functions
 #ifdef USE_VBO
 void vk_draw_indexed(uint32_t indexCount, uint32_t firstIndex);
@@ -25,5 +29,9 @@ void vk_set_depth_range(Vk_Depth_Range depth_range);
 
 // Blend state
 void vk_set_blend_constants(float r, float g, float b, float a);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __VK_DRAW_H__

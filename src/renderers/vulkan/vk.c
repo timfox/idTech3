@@ -24,6 +24,9 @@ extern cvar_t *r_vk_hotReload;
 // Define the global Vulkan instance
 Vk_Instance vk;
 
+// Define the global Vulkan world
+vk_world_t vk_world;
+
 // Define global cvars used by Vulkan renderer
 cvar_t *r_vk_profiling = NULL;
 cvar_t *r_vk_debug_overlay = NULL;
@@ -51,6 +54,16 @@ qboolean FS_StartupInProgress(void) {
 __attribute__((used)) int Scalability_GetMaxFontCache(void);
 int Scalability_GetMaxFontCache(void) {
     return 64; // Default value
+}
+
+__attribute__((used)) int Scalability_GetMaxModels(void);
+int Scalability_GetMaxModels(void) {
+    return 1024;
+}
+
+__attribute__((used)) void R_SetColorMappings(void);
+void R_SetColorMappings(void) {
+    // Stub for Vulkan
 }
 
 __attribute__((used)) void *Com_Allocate(int size);
@@ -233,7 +246,10 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
 // Resource tracking - to be implemented in future versions for detailed memory monitoring
 
 // Performance monitoring - basic frame timing
-void __attribute__((used)) vk_update_performance_stats(void) {
+#ifdef __cplusplus
+extern "C"
+#endif
+void vk_update_performance_stats(void) {
     static double last_time = 0.0;
     static uint32_t frame_count = 0;
 

@@ -4,8 +4,7 @@ Vulkan Renderer - q2rtx-style Implementation
 ===========================================================================
 */
 
-#include "../renderercommon/tr_public.h"
-#include "../../common/q_shared.h"
+#include "tr_local.h"
 #include <dlfcn.h>
 
 #include "vk.h"
@@ -29,11 +28,9 @@ cvar_t *r_vk_debug2D = NULL;
 cvar_t *r_debugSurface = NULL;
 
 // Define gls and glState since they are declared extern in tr_local.h
+// Stub global state for compatibility
 glstatic_t gls = {0};
 glstate_t glState = {0};
-
-// Vulkan specific globals
-struct world_s *vk_world = NULL;
 
 // Stub cvars for compatibility
 cvar_t *r_skipBackEnd = NULL;
@@ -48,8 +45,8 @@ cvar_t *r_flareSize = NULL;
 cvar_t *r_flareCoeff = NULL;
 
 // Stub functions for missing Vulkan functionality
-void vk_draw_dot(const vec3_t org, float radius, const vec4_t color) {
-    Q_UNUSED(org); Q_UNUSED(radius); Q_UNUSED(color);
+void vk_draw_dot(uint32_t storage_offset) {
+    Q_UNUSED(storage_offset);
 }
 
 // Stub functions for missing Vulkan functionality

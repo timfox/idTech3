@@ -1,8 +1,8 @@
+#include "tr_local.h"
 #include "vk_frame.h"
 #include "vk_renderpass.h"
 #include "vk_utils.h"
 #include "vk_postprocess.h"
-#include "../renderercommon/tr_public.h"
 #include "vk.h"
 
 // Renderer interface
@@ -24,7 +24,7 @@ extern PFN_vkEndCommandBuffer qvkEndCommandBuffer;
 extern shaderCommands_t tess;
 
 // Performance tracking
-extern void vk_update_performance_stats(void);
+extern "C" void vk_update_performance_stats(void);
 
 // Begin frame
 extern "C" void vk_begin_frame(void) {

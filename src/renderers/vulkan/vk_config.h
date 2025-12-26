@@ -35,10 +35,18 @@ extern cvar_t *r_greyscale;
 extern cvar_t *r_dither;
 extern cvar_t *r_vk_hotReload;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Configuration management functions
 void vk_config_init(void);
 void vk_config_shutdown(void);
 qboolean vk_config_validate(void);
 qboolean vk_config_has_advanced_features(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __VK_CONFIG_H__

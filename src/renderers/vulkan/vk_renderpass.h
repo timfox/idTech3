@@ -3,6 +3,10 @@
 
 #include "vk.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Render pass creation and management
 qboolean vk_create_main_render_pass(void);
 qboolean vk_create_screenmap_render_pass(void);
@@ -25,5 +29,9 @@ void vk_begin_blur_render_pass(uint32_t index);
 
 // Memory barriers
 void vk_barrier_final_image_to_shader_read(VkImage image);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __VK_RENDERPASS_H__

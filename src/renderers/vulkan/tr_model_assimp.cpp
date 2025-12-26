@@ -9,16 +9,20 @@ one MD3-like surface. Animated bones/skins are not yet handled.
 ===========================================================================
 */
 
-#include "tr_local.h"
-// Renderer import interface - defined in renderer main file
-extern refimport_t ri;
-
 #ifdef USE_ASSIMP
 
 // Assimp headers
 #include <assimp/scene.h>
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
+
+#endif
+
+#include "tr_local.h"
+// Renderer import interface - defined in renderer main file
+extern refimport_t ri;
+
+#ifdef USE_ASSIMP
 
 static inline void Assimp_EncodeLatLng( const aiVector3D &n, short *outNormal ) {
 	constexpr float LAT_SCALE = 32767.0f / (2.0f * 3.141592653589793f);

@@ -90,6 +90,25 @@ cvar_t	*r_rt_maxDepth;
 cvar_t	*r_rt_debugMagenta;
 cvar_t	*r_rt_tlasUpdateMode;
 
+// Additional common cvars
+cvar_t	*r_gamma;
+cvar_t	*r_intensity;
+cvar_t	*r_lightmap;
+cvar_t	*r_showsky;
+cvar_t	*r_detailTextures;
+cvar_t	*r_ext_multitexture;
+cvar_t	*r_railCoreWidth;
+cvar_t	*r_railSegmentLength;
+cvar_t	*r_railWidth;
+cvar_t	*r_wireframe;
+cvar_t	*r_shownormals;
+cvar_t	*r_speeds;
+cvar_t	*r_textureMode;
+cvar_t	*r_marksOnTriangleMeshes;
+cvar_t	*r_dlightBacks;
+cvar_t	*r_debugSort;
+cvar_t	*r_showtris;
+
 // Vulkan-specific globals will be defined in vk.h
 
 static void VK_GfxInfo(void) {

@@ -1,11 +1,9 @@
-extern "C" {
+#include "tr_local.h"
 #include "vk_draw.h"
 #include "vk_utils.h"
 #include "vk_descriptors.h"
 #include "vk_pipeline.h"
-#include "../renderercommon/tr_public.h"
 #include "vk.h"
-}
 #include "../../common/performance_counters.h"
 
 // Renderer interface

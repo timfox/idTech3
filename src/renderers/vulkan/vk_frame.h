@@ -3,6 +3,10 @@
 
 #include "vk.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Frame management
 void vk_begin_frame(void);
 void vk_end_frame(void);
@@ -17,5 +21,9 @@ void vk_clear_depth(qboolean clear_stencil);
 
 // Pixel reading
 void vk_read_pixels(byte *buffer, uint32_t width, uint32_t height);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __VK_FRAME_H__

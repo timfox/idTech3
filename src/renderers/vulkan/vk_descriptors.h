@@ -3,6 +3,10 @@
 
 #include "vk.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Descriptor management functions
 qboolean vk_create_descriptor_pool(void);
 void vk_init_descriptors(void);
@@ -11,5 +15,9 @@ void vk_update_uniform_descriptor(VkDescriptorSet descriptor, VkBuffer buffer);
 
 // Sampler management (moved from vk.c)
 VkSampler vk_find_sampler(const Vk_Sampler_Def *def);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __VK_DESCRIPTORS_H__

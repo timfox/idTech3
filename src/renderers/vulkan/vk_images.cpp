@@ -1,10 +1,8 @@
-extern "C" {
+#include "tr_local.h"
 #include "vk_images.h"
 #include "vk_utils.h"
 #include "vk_memory.h"
-#include "../renderercommon/tr_public.h"
 #include "vk.h"
-}
 #include <math.h>
 
 // Renderer interface
@@ -148,10 +146,10 @@ extern "C" void vk_destroy_image(image_t *image) {
 }
 
 // Upload image data to GPU
-extern "C" void vk_upload_image_data(image_t *image, int x, int y, int width, int height, int mipmaps, byte *pixels, int size, qboolean update) {
+extern "C" void vk_upload_image_data(image_t *image, int x, int y, int width, int height, int layers, const void *data, int data_size, qboolean update) {
     VkBufferImageCopy regions[16];
     int num_regions = 0;
-    int buffer_size = size;
+    int buffer_size = data_size;
     VkCommandBuffer command_buffer;
     int w = width;
     int h = height;
@@ -160,12 +158,13 @@ extern "C" void vk_upload_image_data(image_t *image, int x, int y, int width, in
         return;
     }
 
-    if (pixels == NULL && size > 0) {
-        ri.Printf(PRINT_ERROR, "vk_upload_image_data: pixels is NULL but size > 0\n");
+    if (data == NULL && data_size > 0) {
+        ri.Printf(PRINT_ERROR, "vk_upload_image_data: data is NULL but size > 0\n");
         return;
     }
 
     // Calculate number of mip levels
+    int mipmaps = layers;
     if (mipmaps == 0) {
         mipmaps = 1;
     }
@@ -226,7 +225,7 @@ extern "C" void vk_upload_image_data(image_t *image, int x, int y, int width, in
             (unsigned long)vk.staging_buffer.offset, (unsigned long)vk.staging_buffer.size, (unsigned long)buffer_size);
         return;
     }
-    Com_Memcpy(vk.staging_buffer.ptr + vk.staging_buffer.offset, pixels, buffer_size);
+    Com_Memcpy(vk.staging_buffer.ptr + vk.staging_buffer.offset, data, buffer_size);
 
     if (vk.staging_buffer.offset == 0) {
         VkCommandBufferBeginInfo begin_info;
@@ -266,7 +265,7 @@ extern "C" void vk_upload_image_data(image_t *image, int x, int y, int width, in
             (unsigned long)buffer_size, (unsigned long)vk.staging_buffer.size);
         return;
     }
-    Com_Memcpy(vk.staging_buffer.ptr, pixels, buffer_size);
+    Com_Memcpy(vk.staging_buffer.ptr, data, buffer_size);
 
     command_buffer = begin_command_buffer();
     // record_buffer_memory_barrier( command_buffer, vk_world.staging_buffer, VK_WHOLE_SIZE, 0, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_ACCESS_HOST_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT );

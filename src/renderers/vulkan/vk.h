@@ -46,6 +46,9 @@ typedef struct ImDrawData ImDrawData;
 extern "C" {
 #endif
 
+// Forward declarations for renderer types
+typedef struct image_s image_t;
+
 // Scene management constants
 #ifndef MAX_REFENTITIES
 #define MAX_REFENTITIES		1024  // Match OpenGL renderer capacity
@@ -767,6 +770,7 @@ typedef struct {
     // Render state
     qboolean msaaActive;
     struct {
+        VkFramebuffer main[MAX_SWAPCHAIN_IMAGES];
         VkFramebuffer screenmap;
         VkFramebuffer cubemap[6];
         VkFramebuffer brdflut;

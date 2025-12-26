@@ -1281,7 +1281,75 @@ list(APPEND RENDERER_COMMON_SRCS src/renderers/renderercommon/tr_services.c)
 # They have proper guards to compile to empty implementations when FreeType is not available
 AUX_SOURCE_DIRECTORY(src/renderers/opengl RENDERER_GL_SRCS)
 list(APPEND RENDERER_GL_SRCS src/renderers/opengl/tr_main.c)
-AUX_SOURCE_DIRECTORY(src/renderers/vulkan RENDERER_VK_SRCS)
+SET(RENDERER_VK_SRCS
+	src/renderers/vulkan/tr_animation.c
+	src/renderers/vulkan/tr_backend.c
+	src/renderers/vulkan/tr_bsp.c
+	src/renderers/vulkan/tr_cmds.c
+	src/renderers/vulkan/tr_curve.c
+	src/renderers/vulkan/tr_image.c
+	src/renderers/vulkan/tr_init.c
+	src/renderers/vulkan/tr_light.c
+	src/renderers/vulkan/tr_lightclusters.c
+	src/renderers/vulkan/tr_main.c
+	src/renderers/vulkan/tr_marks.c
+	src/renderers/vulkan/tr_math_optimized.c
+	src/renderers/vulkan/tr_mesh.c
+	src/renderers/vulkan/tr_model.c
+	src/renderers/vulkan/tr_model_iqm.c
+	src/renderers/vulkan/tr_rtx.c
+	src/renderers/vulkan/tr_scene.c
+	src/renderers/vulkan/tr_shade.c
+	src/renderers/vulkan/tr_shade_calc.c
+	src/renderers/vulkan/tr_shader.c
+	src/renderers/vulkan/tr_shadows.c
+	src/renderers/vulkan/tr_sky.c
+	src/renderers/vulkan/tr_surface.c
+	src/renderers/vulkan/tr_world.c
+	src/renderers/vulkan/vk.c
+	src/renderers/vulkan/vk_memory.c
+	src/renderers/vulkan/vk_vbo.c
+	src/renderers/vulkan/vk_flares.c
+	src/renderers/vulkan/vk_utils.c
+	src/renderers/vulkan/vk_commands.c
+	src/renderers/vulkan/vk_pipeline.c
+	src/renderers/vulkan/vk_material_parser.c
+	src/renderers/vulkan/vk_material_system.c
+	src/renderers/vulkan/vk_advanced_materials.c
+	src/renderers/vulkan/vk_atmosphere.c
+	src/renderers/vulkan/vk_buffers.c
+	src/renderers/vulkan/vk_cell_streaming.c
+	src/renderers/vulkan/vk_compute.c
+	src/renderers/vulkan/vk_dlss.c
+	src/renderers/vulkan/vk_framebuffer.c
+	src/renderers/vulkan/vk_gibs.c
+	src/renderers/vulkan/vk_gpu_culling.c
+	src/renderers/vulkan/vk_gpu_memory.c
+	src/renderers/vulkan/vk_layered_materials.c
+	src/renderers/vulkan/vk_mesh_shaders.c
+	src/renderers/vulkan/vk_particles.c
+	src/renderers/vulkan/vk_portal_lights.c
+	src/renderers/vulkan/vk_post_process.c
+	src/renderers/vulkan/vk_proc_dressing.c
+	src/renderers/vulkan/vk_raytracing.c
+	src/renderers/vulkan/vk_renderpass.c
+	src/renderers/vulkan/vk_scene_graph.c
+	src/renderers/vulkan/vk_sync.c
+	src/renderers/vulkan/vk_virtual_texture.c
+	src/renderers/vulkan/vk_imgui.c
+	src/renderers/vulkan/vk_bindless.c
+	src/renderers/vulkan/vk_shader_cache.c
+	src/renderers/vulkan/vk_async_compile.c
+	src/renderers/vulkan/vk_dynamic_rendering.c
+	src/renderers/vulkan/vk_frame.cpp
+	src/renderers/vulkan/vk_images.cpp
+	src/renderers/vulkan/vk_draw.cpp
+	src/renderers/vulkan/vk_descriptors.cpp
+	src/renderers/vulkan/vk_renderpass.cpp
+	src/renderers/vulkan/vk_postprocess.cpp
+	src/renderers/vulkan/vk_config.cpp
+	src/renderers/vulkan/tr_model_assimp.cpp
+)
 
 # Vulkan experimental modules (work-in-progress). Keep ON by default for prioritized
 # Vulkan RTX implementation development.
@@ -1312,22 +1380,6 @@ IF(USE_CIMGUI AND DEFINED CIMGUI_DIR)
 		${CIMGUI_IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
 	)
 ENDIF()
-
-list(APPEND RENDERER_VK_SRCS
-	src/renderers/vulkan/vk_imgui.c
-	src/renderers/vulkan/vk_bindless.c
-	src/renderers/vulkan/vk_shader_cache.c
-	src/renderers/vulkan/vk_async_compile.c
-	src/renderers/vulkan/vk_dynamic_rendering.c
-	src/renderers/vulkan/vk_frame.cpp
-	src/renderers/vulkan/vk_images.cpp
-	src/renderers/vulkan/vk_draw.cpp
-	src/renderers/vulkan/vk_descriptors.cpp
-	src/renderers/vulkan/vk_renderpass.cpp
-	src/renderers/vulkan/vk_postprocess.cpp
-	src/renderers/vulkan/vk_config.cpp
-	src/renderers/vulkan/tr_model_assimp.cpp
-)
 
 # DirectX 12 renderer (Windows only)
 IF(WIN32 AND USE_D3D12)
@@ -2836,7 +2888,7 @@ IF(TARGET ${RENDERER_PREFIX}_opengl${RENDEXT})
 ENDIF()
 
 IF(TARGET ${RENDERER_PREFIX}_vulkan${RENDEXT})
-    CONFIGURE_LTO(${RENDERER_PREFIX}_vulkan${RENDEXT})
+    # CONFIGURE_LTO(${RENDERER_PREFIX}_vulkan${RENDEXT})
     CONFIGURE_BINARY_SIZE_OPTIMIZATION(${RENDERER_PREFIX}_vulkan${RENDEXT})
     CONFIGURE_DEAD_CODE_ELIMINATION(${RENDERER_PREFIX}_vulkan${RENDEXT})
     MONITOR_BUILD_OPTIMIZATION(${RENDERER_PREFIX}_vulkan${RENDEXT})

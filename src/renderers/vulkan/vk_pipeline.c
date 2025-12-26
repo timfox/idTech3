@@ -1,5 +1,5 @@
+#include "tr_local.h"
 #include "vk_pipeline.h"
-#include "../renderercommon/tr_public.h"
 #include "vk.h"
 #include "vk_commands.h"
 #include "vk_memory.h"
@@ -10,7 +10,6 @@
 
 // Renderer interface
 extern refimport_t ri;
-extern backEndState_t backEnd;
 extern cvar_t *r_vk_hotReload;
 
 // Vulkan function pointer extern declarations
