@@ -2642,11 +2642,11 @@ SETUP_INCREMENTAL_MONITORING()
 # ============================================================================
 
 # Include the incremental build monitor script if it exists
-if(EXISTS "${CMAKE_SOURCE_DIR}/scripts/incremental_build_monitor.cmake")
-    include(${CMAKE_SOURCE_DIR}/scripts/incremental_build_monitor.cmake)
+if(EXISTS "${CMAKE_SOURCE_DIR}/tools/incremental_build_monitor.cmake")
+    include(${CMAKE_SOURCE_DIR}/tools/incremental_build_monitor.cmake)
     setup_incremental_build_monitor()
 else()
-    message(WARNING "Incremental build monitor script not found: scripts/incremental_build_monitor.cmake")
+    message(WARNING "Incremental build monitor script not found: tools/incremental_build_monitor.cmake")
 endif()
 
 # ============================================================================
@@ -2857,7 +2857,7 @@ FUNCTION(MONITOR_BUILD_OPTIMIZATION TARGET_NAME)
     #         -D TARGET_FILE=$<TARGET_FILE:${TARGET_NAME}>
     #         -D BUILD_START_TIME=${BUILD_START_TIME}
     #         -D CMAKE_BINARY_DIR=${CMAKE_BINARY_DIR}
-    #     -P ${CMAKE_SOURCE_DIR}/scripts/analyze_build_optimization.cmake
+    #     -P ${CMAKE_SOURCE_DIR}/tools/analyze_build_optimization.cmake
     #     COMMENT "Analyzing build optimization results"
     # )
 ENDFUNCTION()
