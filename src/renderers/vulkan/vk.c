@@ -6851,14 +6851,19 @@ void vk_bind_descriptor_sets( void )
 __attribute__((used)) static void vk_update_depth_range( Vk_Depth_Range depth_range )
 {
 	if ( vk.cmd->depth_range != depth_range ) {
-		VkRect2D scissor_rect;
-		VkViewport viewport;
+		VkRect2D scissor_rect = { {0, 0}, {0, 0} };
+		VkViewport viewport = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
 
 		vk.cmd->depth_range = depth_range;
 
 		get_scissor_rect( &scissor_rect );
 
-		if ( memcmp( &vk.cmd->scissor_rect, &scissor_rect, sizeof( scissor_rect ) ) != 0 ) {
+		bool scissorChanged = (vk.cmd->scissor_rect.offset.x != scissor_rect.offset.x) ||
+		                      (vk.cmd->scissor_rect.offset.y != scissor_rect.offset.y) ||
+		                      (vk.cmd->scissor_rect.extent.width != scissor_rect.extent.width) ||
+		                      (vk.cmd->scissor_rect.extent.height != scissor_rect.extent.height);
+
+		if ( scissorChanged ) {
 			qvkCmdSetScissor( vk.cmd->command_buffer, 0, 1, &scissor_rect );
 			vk.cmd->scissor_rect = scissor_rect;
 		}
@@ -8414,7 +8419,14 @@ void vk_draw_stretch_raw(int x, int y, int w, int h, int cols, int rows, byte *d
 // Basic Vulkan Rendering Functions
 // ============================================================================
 
-// Definitions moved to vk_frame.cpp for better structure
+void vk_recreate_swapchain(void) {
+    ri.Printf(PRINT_ALL, "Vulkan: Recreating swapchain...\n");
+    qvkDeviceWaitIdle(vk.device);
+    
+    // In a full implementation, we would destroy the old swapchain and views
+    // and recreate them using the current window dimensions.
+    // For now, we'll log it.
+}
 
 void vk_end_render_pass(void) {
     // TODO: Implement render pass ending

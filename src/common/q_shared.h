@@ -27,10 +27,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // A user mod should never modify this file
 
 #if defined(__cplusplus)
-static_assert(__cplusplus >= 202002L, "C++23 or newer is required to build this codebase.");
+static_assert(__cplusplus >= 202302L, "C++23 or newer is required to build this codebase.");
 #else
 # if defined(__STDC_VERSION__)
-#  if __STDC_VERSION__ < 202000L
+#  if __STDC_VERSION__ < 202311L
 #   error "C23 or newer is required to build this codebase."
 #  endif
 # else
@@ -85,19 +85,21 @@ typedef unsigned char byte;
 
 // Use native bool as the primary boolean type, keep qboolean for mod compatibility
 #ifdef __cplusplus  // For C++ mode
-typedef bool qboolean;  // Keep qboolean for backward compatibility
+using qboolean = bool;
 #define qtrue true
 #define qfalse false
 #else  // For C mode
 # if __STDC_VERSION__ >= 202311L  // C23 has native bool keyword
-typedef bool qboolean;  // Keep qboolean for backward compatibility
+typedef bool qboolean;
 #define qtrue true
 #define qfalse false
-# elif __STDC_VERSION__ >= 199901L  // C99 and later have _Bool via stdbool.h
-typedef bool qboolean;  // Keep qboolean for backward compatibility (bool is _Bool)
+# else  // Fallback for pre-C23 compilers
+#include <stdbool.h>
+typedef bool qboolean;
 #define qtrue true
 #define qfalse false
-# else  // Fallback for pre-C99 compilers
+# endif
+#endif
 typedef enum { qfalse, qtrue } qboolean;
 # endif
 #endif
@@ -1054,6 +1056,7 @@ void MatrixMultiply(float in1[3][3], float in2[3][3], float out[3][3]);
 void AngleVectors( const vec3_t angles, vec3_t forward, vec3_t right, vec3_t up);
 void PerpendicularVector( vec3_t dst, const vec3_t src );
 int Q_isnan( float x );
+int Q_isfinite( float f );
 float Q_atof( const char *str );
 
 #ifndef MAX

@@ -476,10 +476,10 @@ void Con_ForEachLine( void (*callback)(const char *line, void *userData), void *
 		}
 
 		// Copy line text
-		for ( j = 0 ; j < con.linewidth ; j++ ) {
+		for ( j = 0 ; j < con.linewidth && j < MAX_CONSOLE_WIDTH ; j++ ) {
 			line[j] = text[j] & 0xFF;
 		}
-		line[con.linewidth] = '\0';
+		line[MIN(con.linewidth, MAX_CONSOLE_WIDTH)] = '\0';
 		
 		// Trim trailing spaces
 		for ( j = con.linewidth - 1 ; j >= 0 ; j-- ) {

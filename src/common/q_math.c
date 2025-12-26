@@ -30,6 +30,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 
 #include "q_shared.h"
+#include <math.h>
 
 const vec3_t	vec3_origin = {0,0,0};
 vec3_t	axisDefault[3] = { { 1, 0, 0 }, { 0, 1, 0 }, { 0, 0, 1 } };
@@ -843,6 +844,14 @@ vec_t VectorNormalize( vec3_t v ) {
 		v[0] *= ilength;
 		v[1] *= ilength;
 		v[2] *= ilength;
+
+		// Validation to catch NaN/Inf issues early
+		if ( !Q_isfinite( v[0] ) || Q_isnan( v[0] ) ||
+			 !Q_isfinite( v[1] ) || Q_isnan( v[1] ) ||
+			 !Q_isfinite( v[2] ) || Q_isnan( v[2] ) ) {
+			VectorClear( v );
+			return 0;
+		}
 	}
 		
 	return length;
@@ -862,12 +871,19 @@ vec_t VectorNormalize2( const vec3_t v, vec3_t out) {
 		out[0] = v[0]*ilength;
 		out[1] = v[1]*ilength;
 		out[2] = v[2]*ilength;
+
+		// Validation to catch NaN/Inf issues early
+		if ( !Q_isfinite( out[0] ) || Q_isnan( out[0] ) ||
+			 !Q_isfinite( out[1] ) || Q_isnan( out[1] ) ||
+			 !Q_isfinite( out[2] ) || Q_isnan( out[2] ) ) {
+			VectorClear( out );
+			return 0;
+		}
 	} else {
 		VectorClear( out );
 	}
 		
 	return length;
-
 }
 
 void _VectorMA( const vec3_t veca, float scale, const vec3_t vecb, vec3_t vecc) {
@@ -1046,40 +1062,24 @@ void PerpendicularVector( vec3_t dst, const vec3_t src )
 ================
 Q_isnan
 
-Don't pass doubles to this
+Modern C23/C++23 implementation using <math.h>
 ================
 */
 int Q_isnan( float x )
 {
-	floatint_t fi;
-
-	fi.f = x;
-	fi.u &= 0x7FFFFFFF;
-	fi.u = 0x7F800000 - fi.u;
-
-	return (int)( fi.u >> 31 );
+	return isnan( x );
 }
-//------------------------------------------------------------------------
-
 
 /*
 ================
 Q_isfinite
+
+Modern C23/C++23 implementation using <math.h>
 ================
 */
-static int Q_isfinite( float f )
+int Q_isfinite( float f )
 {
-	floatint_t fi;
-	fi.f = f;
-
-	if ( fi.u == 0xFF800000 || fi.u == 0x7F800000 )
-		return 0; // -INF or +INF
-
-	fi.u = 0x7F800000 - (fi.u & 0x7FFFFFFF);
-	if ( (int)( fi.u >> 31 ) )
-		return 0; // -NAN or +NAN
-
-	return 1;
+	return isfinite( f );
 }
 
 

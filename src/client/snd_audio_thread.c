@@ -42,11 +42,7 @@ static THREAD_RETURN THREAD_CALL AudioThreadWorker(void* arg) {
         while (atomic_load_explicit(&thread->work_available_count, memory_order_relaxed) == 0 &&
                !thread->should_exit) {
             // Wait with 1ms timeout for low latency
-            struct timespec timeout;
-            timeout.tv_sec = 0;
-            timeout.tv_nsec = 1000000; // 1ms
-
-            CONDITION_TIMED_WAIT(thread->work_available, thread->work_mutex, 1); // 1ms timeout
+            CONDITION_TIMED_WAIT(thread->work_available, thread->work_mutex, 1);
         }
         MUTEX_UNLOCK(thread->work_mutex);
 
@@ -308,11 +304,11 @@ static void SubmitAudioWork(audio_thread_type_t threadType, void* workData,
     workItem->thread_type = threadType;
     workItem->priority = priority;
 
-    // Add to queue
+    // Add to queue in priority order
     SpinLock_Lock(&thread->queue_lock);
 
-    int available_count = atomic_load_explicit(&thread->work_available_count, memory_order_relaxed);
-    if (available_count >= thread->work_queue_size) {
+    int count = atomic_load_explicit(&thread->work_available_count, memory_order_relaxed);
+    if (count >= thread->work_queue_size) {
         // Queue full - execute immediately as fallback
         SpinLock_Unlock(&thread->queue_lock);
         workFunction(workData);
@@ -320,10 +316,31 @@ static void SubmitAudioWork(audio_thread_type_t threadType, void* workData,
         return;
     }
 
+    int head = atomic_load_explicit(&thread->work_queue_head, memory_order_relaxed);
     int tail = atomic_load_explicit(&thread->work_queue_tail, memory_order_relaxed);
-    memcpy(&thread->work_queue[tail], workItem, sizeof(audio_work_item_t));
-    atomic_store_explicit(&thread->work_queue_tail,
-                        (tail + 1) % thread->work_queue_size, memory_order_relaxed);
+
+    // Find insertion point based on priority
+    int insert_idx = tail;
+    for (int i = 0; i < count; i++) {
+        int idx = (head + i) % thread->work_queue_size;
+        if (AudioWorkItemCompare(workItem, &thread->work_queue[idx]) < 0) {
+            insert_idx = idx;
+            break;
+        }
+    }
+
+    // Shift items to make room
+    if (insert_idx != tail) {
+        int items_to_move = (tail - insert_idx + thread->work_queue_size) % thread->work_queue_size;
+        for (int i = 0; i < items_to_move; i++) {
+            int src_idx = (tail - 1 - i + thread->work_queue_size) % thread->work_queue_size;
+            int dst_idx = (tail - i + thread->work_queue_size) % thread->work_queue_size;
+            thread->work_queue[dst_idx] = thread->work_queue[src_idx];
+        }
+    }
+
+    thread->work_queue[insert_idx] = *workItem;
+    atomic_store_explicit(&thread->work_queue_tail, (tail + 1) % thread->work_queue_size, memory_order_relaxed);
     atomic_fetch_add_explicit(&thread->work_available_count, 1, memory_order_relaxed);
 
     SpinLock_Unlock(&thread->queue_lock);

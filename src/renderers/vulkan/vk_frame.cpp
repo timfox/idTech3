@@ -24,7 +24,20 @@ extern PFN_vkEndCommandBuffer qvkEndCommandBuffer;
 extern shaderCommands_t tess;
 
 // Performance tracking
-extern "C" void vk_update_performance_stats(void);
+extern "C" void vk_update_performance_stats(void) {
+    static int last_frame_time = 0;
+    int current_time = ri.Milliseconds();
+    int frame_time = current_time - last_frame_time;
+    last_frame_time = current_time;
+
+    if (frame_time > 0) {
+        vk.performance.fps = 1000.0f / (float)frame_time;
+        vk.performance.frame_time_ms = (float)frame_time;
+    }
+
+    // Update GPU timing if available
+    // TODO: Implement GPU timestamp query processing
+}
 
 // Begin frame
 extern "C" void vk_begin_frame(void) {
@@ -39,10 +52,30 @@ extern "C" void vk_begin_frame(void) {
     result = qvkAcquireNextImageKHR(vk.device, vk.swapchain, UINT64_MAX,
         vk.tess[vk.cmd_index].image_acquired, VK_NULL_HANDLE, &image_index);
 
+    // Handle dynamic resolution
+    if (r_dynamicResolution && r_dynamicResolution->integer) {
+        float scale = 1.0f;
+        if (vk.performance.fps < 60.0f) {
+            scale = 0.75f;
+        } else if (vk.performance.fps > 70.0f) {
+            scale = 1.0f;
+        }
+        
+        uint32_t targetWidth = (uint32_t)(glConfig.vidWidth * scale);
+        uint32_t targetHeight = (uint32_t)(glConfig.vidHeight * scale);
+        
+        if (targetWidth != vk.renderWidth || targetHeight != vk.renderHeight) {
+            vk.renderWidth = targetWidth;
+            vk.renderHeight = targetHeight;
+            ri.Printf(PRINT_ALL, "Vulkan: Dynamic resolution scale set to %.2f (%dx%d)\n", 
+                scale, vk.renderWidth, vk.renderHeight);
+        }
+    }
+
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
         // Swapchain needs recreation
         ri.Printf(PRINT_WARNING, "Vulkan: Swapchain needs recreation (result=%d)\n", result);
-        // TODO: Handle swapchain recreation
+        vk_recreate_swapchain();
         return;
     } else if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "vk_begin_frame: Failed to acquire swapchain image: %s\n", vk_result_string(result));

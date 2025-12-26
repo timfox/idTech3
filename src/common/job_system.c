@@ -40,8 +40,8 @@ static int s_min_workers = 1;
 static int s_max_workers = MAX_WORKER_THREADS;
 static uint64_t s_last_scaling_time = 0;
 static const int SCALING_INTERVAL_MS = 100; // Evaluate scaling every 100ms
-static float s_avg_job_latency = 0.0f;
-static float s_worker_utilization = 0.0f;
+static float [[maybe_unused]] s_avg_job_latency = 0.0f;
+static float [[maybe_unused]] s_worker_utilization = 0.0f;
 
 // Main-thread completion queue
 #define MAX_COMPLETIONS 1024

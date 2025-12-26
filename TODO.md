@@ -11,7 +11,7 @@
 - [ ] **Ray Tracing (Hardware)**: Optimize BVH builds and pipeline for Vulkan/DXR.
 - [ ] **Mesh Shaders**: Implementation for modern GPU geometry pipelines.
 - [ ] **Material System**: Layered materials and procedural shader support.
-- [ ] **Dynamic Resolution**: Runtime resolution scaling for performance stability.
+- [x] **Dynamic Resolution**: Runtime resolution scaling for performance stability.
 
 ## Filesystem & Assets
 - [ ] **Virtual FS v2**: Improved mount table and priority system.
@@ -21,7 +21,7 @@
 ## Developer Experience & Tooling
 - [ ] **Radiant Editor**: Focus on stability, undo/redo, and modern entity inspection.
 - [x] **In-game Debugging**: Expand ImGui overlays for deeper subsystem inspection.
-- [x] **Crash Resilience**: Improve "Safe mode" boot and automated minidump reporting.
+- [x] **Crash Resilience**: Improved "Safe mode" boot connected to crash handler.
 
 ## Platform & Compatibility
 - [ ] **Steam Deck**: Controller glyphs and seamless virtual keyboard integration.

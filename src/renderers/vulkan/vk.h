@@ -1185,6 +1185,7 @@ void vk_begin_cubemap_render_pass(void);
 void vk_end_render_pass(void);
 void vk_begin_frame(void);
 void vk_end_frame(void);
+void vk_recreate_swapchain(void);
 void vk_bind_index(void);
 void vk_bind_index_ext(uint32_t numIndexes, uint32_t* hitIndexes);
 void vk_bind_pipeline(VkPipeline pipeline);
