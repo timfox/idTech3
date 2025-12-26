@@ -454,6 +454,48 @@ static void Cmd_CompleteTxtName(const char *args, int argNum ) {
 
 /*
 ================
+Con_ForEachLine
+================
+*/
+void Con_ForEachLine( void (*callback)(const char *line, void *userData), void *userData ) {
+	int i, j;
+	char line[MAX_CONSOLE_WIDTH + 1];
+	short *text;
+
+	for ( i = 0 ; i < con.totallines ; i++ ) {
+		text = &con.text[ ((con.current - i + con.totallines) % con.totallines) * con.linewidth ];
+		
+		// Skip empty lines
+		for ( j = 0 ; j < con.linewidth ; j++ ) {
+			if ( ( text[j] & 0xFF ) != ' ' ) {
+				break;
+			}
+		}
+		if ( j == con.linewidth ) {
+			continue;
+		}
+
+		// Copy line text
+		for ( j = 0 ; j < con.linewidth ; j++ ) {
+			line[j] = text[j] & 0xFF;
+		}
+		line[con.linewidth] = '\0';
+		
+		// Trim trailing spaces
+		for ( j = con.linewidth - 1 ; j >= 0 ; j-- ) {
+			if ( line[j] == ' ' ) {
+				line[j] = '\0';
+			} else {
+				break;
+			}
+		}
+
+		callback( line, userData );
+	}
+}
+
+/*
+================
 Con_Init
 ================
 */

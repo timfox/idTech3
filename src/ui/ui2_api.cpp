@@ -306,7 +306,16 @@ void UI2_Text(ui2Context_t *ctx, const char *tag, const char *text) {
 	if (ctx->currentNode >= 0) {
 		UiNode *node = &ctx->nodes[ctx->currentNode];
 		node->isText = true;
-		node->text = text;  // TODO: Copy to arena
+		
+		// Copy text to arena to ensure it persists until end of frame
+		size_t len = std::strlen(text);
+		char *arenaText = (char *)Arena_Alloc(ctx, len + 1);
+		if (arenaText) {
+			std::memcpy(arenaText, text, len + 1);
+			node->text = arenaText;
+		} else {
+			node->text = ""; // Fallback to empty string on allocation failure
+		}
 	}
 	
 	UI2_EndNode(ctx);

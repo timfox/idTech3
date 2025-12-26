@@ -335,7 +335,38 @@ static const char *Cvar_Validate( cvar_t *var, const char *value, qboolean warn 
 			}
 		} // Q_isanumber
 	} // CV_INTEGER || CV_FLOAT
-	// TODO: stringlist
+	else if ( var->validator == CV_STRINGLIST ) {
+		if ( var->mins ) {
+			const char *list = var->mins;
+			const char *found = NULL;
+			char item[MAX_CVAR_VALUE_STRING];
+			const char *p = list;
+
+			while ( *p ) {
+				const char *start = p;
+				while ( *p && *p != ';' ) p++;
+				size_t len = p - start;
+				if ( len >= sizeof( item ) ) len = sizeof( item ) - 1;
+				Com_Memcpy( item, start, len );
+				item[len] = '\0';
+
+				if ( !Q_stricmp( item, value ) ) {
+					found = start;
+					// Use exact casing from the list if possible, or just accept it
+					// For now, just mark as found
+					break;
+				}
+				if ( *p == ';' ) p++;
+			}
+
+			if ( !found ) {
+				if ( warn ) {
+					Com_Printf( "WARNING: cvar '%s' value '%s' is not in allowed list (%s)", var->name, value, var->mins );
+				}
+				limit = var->resetString;
+			}
+		}
+	}
 	else if ( var->validator == CV_FSPATH ) {
 		// check for directory traversal patterns
 		if ( FS_InvalidGameDir( value ) ) {
@@ -1298,7 +1329,9 @@ static void Cvar_Op( funcType_t ftype, int *ival, float *fval )
 		case FT_MOD:
 			if ( imod ) {
 				*ival %= imod;
-				*fval = (float)( (int)*fval % imod ); // FIXME: use float
+			}
+			if ( fmod ) {
+				*fval = fmodf( *fval, fmod );
 			}
 			break;
 

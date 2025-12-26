@@ -453,6 +453,19 @@ void CL_ImGui_Debug_ShowCVarBrowser(void) {
 
 /*
 ================
+CL_ImGui_Debug_ConsoleLineCallback
+================
+*/
+static void CL_ImGui_Debug_ConsoleLineCallback(const char *line, void *userData) {
+	const char *filter = (const char *)userData;
+	if (filter[0] != '\0' && !Q_stristr(line, filter)) {
+		return;
+	}
+	igTextUnformatted(line, NULL);
+}
+
+/*
+================
 CL_ImGui_Debug_ShowConsoleOverlay
 ================
 */
@@ -478,10 +491,9 @@ void CL_ImGui_Debug_ShowConsoleOverlay(void) {
 	
 	igSeparator();
 	
-	// Console output (simplified - would need to hook into console system)
+	// Console output
 	if (igBeginChild_Str("##consoleoutput", (ImVec2){0, -30}, false, 0)) {
-		igText("Console output would appear here");
-		igText("(Full integration requires console system hooks)");
+		Con_ForEachLine(CL_ImGui_Debug_ConsoleLineCallback, console_filter);
 		
 		if (console_auto_scroll) {
 			igSetScrollHereY(1.0f);
@@ -494,8 +506,15 @@ void CL_ImGui_Debug_ShowConsoleOverlay(void) {
 	
 	// Command input
 	static char command_input[256] = "";
-	igInputText("##command", command_input, sizeof(command_input), 
-		ImGuiInputTextFlags_EnterReturnsTrue, NULL, NULL);
+	if (igInputText("##command", command_input, sizeof(command_input), 
+		ImGuiInputTextFlags_EnterReturnsTrue, NULL, NULL)) {
+		if (command_input[0] != '\0') {
+			Cbuf_AddText(command_input);
+			Cbuf_AddText("\n");
+			command_input[0] = '\0';
+		}
+		igSetKeyboardFocusHere(-1); // Keep focus on input after enter
+	}
 	
 	igSameLine(0, 10);
 	if (igButton("Execute", (ImVec2){0, 0})) {

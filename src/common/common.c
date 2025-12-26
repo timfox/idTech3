@@ -9,6 +9,7 @@ Basic functions used throughout the engine.
 #include "qcommon.h"
 #include "net_threads.h"
 #include "performance_counters.h"
+#include "crash_handler.h"
 #include "../renderers/renderercommon/tr_public.h"
 #include <stdio.h>
 #include <stdarg.h>
@@ -251,7 +252,9 @@ void Com_StartupVariable( const char *match ) {
 void Com_GameRestart( int checksumFeed, qboolean clientRestart ) {
     Q_UNUSED(checksumFeed); Q_UNUSED(clientRestart);
 }
-qboolean Com_SafeMode( void ) { return qfalse; }
+qboolean Com_SafeMode( void ) {
+    return Crash_ShouldBootSafeMode();
+}
 void Com_RunAndTimeServerPacket( const netadr_t *evFrom, msg_t *buf ) {
     Q_UNUSED(evFrom); Q_UNUSED(buf);
 }

@@ -43,6 +43,65 @@ qboolean PackageGenerator_GenerateAppImage(const package_config_t* config, packa
 qboolean PackageGenerator_GenerateDMGPackage(const package_config_t* config, package_generation_result_t* result);
 qboolean PackageGenerator_GeneratePKGPackage(const package_config_t* config, package_generation_result_t* result);
 
+// Internal helper functions
+static qboolean PackageGenerator_CopyFile(const char* src, const char* dst) {
+    FILE* fsrc = fopen(src, "rb");
+    if (!fsrc) return qfalse;
+    FILE* fdst = fopen(dst, "wb");
+    if (!fdst) {
+        fclose(fsrc);
+        return qfalse;
+    }
+    char buf[16384];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf), fsrc)) > 0) {
+        if (fwrite(buf, 1, n, fdst) != n) {
+            fclose(fsrc);
+            fclose(fdst);
+            return qfalse;
+        }
+    }
+    fclose(fsrc);
+    fclose(fdst);
+    return qtrue;
+}
+
+static uint32_t PackageGenerator_CopyDir(const char* src, const char* dst) {
+    DIR* dir = opendir(src);
+    if (!dir) return 0;
+    
+    // Create destination directory
+#ifdef _WIN32
+    _mkdir(dst);
+#else
+    mkdir(dst, 0755);
+#endif
+
+    uint32_t fileCount = 0;
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != NULL) {
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+        
+        char src_path[MAX_OSPATH];
+        char dst_path[MAX_OSPATH];
+        Com_sprintf(src_path, sizeof(src_path), "%s/%s", src, entry->d_name);
+        Com_sprintf(dst_path, sizeof(dst_path), "%s/%s", dst, entry->d_name);
+        
+        struct stat st;
+        if (stat(src_path, &st) == 0) {
+            if (S_ISDIR(st.st_mode)) {
+                fileCount += PackageGenerator_CopyDir(src_path, dst_path);
+            } else if (S_ISREG(st.st_mode)) {
+                if (PackageGenerator_CopyFile(src_path, dst_path)) {
+                    fileCount++;
+                }
+            }
+        }
+    }
+    closedir(dir);
+    return fileCount;
+}
+
 // Global packaging system
 packaging_system_t packaging_system = {0};
 
@@ -614,11 +673,13 @@ qboolean PackageGenerator_GeneratePortablePackage(const package_config_t* config
     mkdir(config->build_directory, 0755);
     mkdir(staging_dir, 0755);
 
-    if (!PackageGenerator_CopyFilesToStaging(config, staging_dir)) {
-        Q_strncpyz(result->error_message, "Failed to copy files to staging area",
+    uint32_t fileCount = PackageGenerator_CopyDir(config->source_directory, staging_dir);
+    if (fileCount == 0) {
+        Q_strncpyz(result->error_message, "Failed to copy files to staging area or source is empty",
                   sizeof(result->error_message));
         return qfalse;
     }
+    result->file_count = fileCount;
 
     // Create archive
     qboolean success = qfalse;
@@ -634,13 +695,10 @@ qboolean PackageGenerator_GeneratePortablePackage(const package_config_t* config
         if (stat(result->package_path, &st) == 0) {
             result->package_size = st.st_size;
         }
-
-        // Count files (simplified)
-        result->file_count = 10; // Placeholder - would count actual files
     }
 
-    // Clean up staging area
-    // Implementation would remove staging directory
+    // Clean up staging area (optional - keeping for debug if needed, but in production we'd remove)
+    // For now we leave it as the config build_directory cleanup is handled in shutdown
 
     return success;
 }
@@ -706,10 +764,11 @@ void PackageGenerator_GeneratePackageName(const package_config_t* config,
 
 qboolean PackageGenerator_CopyFilesToStaging(const package_config_t* config,
                                            const char* staging_dir) {
-    // Simplified implementation - would recursively copy files
-    // from source directory to staging directory
+    if (!config || !staging_dir) return qfalse;
+    
     Com_Printf("Copying files from %s to %s\n", config->source_directory, staging_dir);
-    return qtrue;
+    uint32_t count = PackageGenerator_CopyDir(config->source_directory, staging_dir);
+    return count > 0;
 }
 
 qboolean PackageGenerator_CreateZipArchive(const char* source_dir, const char* output_file) {
@@ -942,9 +1001,15 @@ Checksum and Signing (Stub Implementations)
 */
 
 qboolean PackageGenerator_GenerateChecksum(const char* file_path, char* checksum, size_t size) {
-    // Simplified implementation - would use SHA256
-    Q_strncpyz(checksum, "sha256-placeholder-checksum", size);
-    return qtrue;
+    if (!file_path || !checksum || size == 0) return qfalse;
+
+    char *md5 = Com_MD5File(file_path, 0, NULL, 0);
+    if (md5) {
+        Q_strncpyz(checksum, md5, size);
+        return qtrue;
+    }
+
+    return qfalse;
 }
 
 qboolean PackageGenerator_SignPackage(const char* package_path,

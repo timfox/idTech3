@@ -128,10 +128,15 @@ Sys_LowPhysicalMemory()
 */
 qboolean Sys_LowPhysicalMemory( void )
 {
-	//MEMORYSTATUS stat;
-	//GlobalMemoryStatus (&stat);
-	//return (stat.dwTotalPhys <= MEM_THRESHOLD) ? qtrue : qfalse;
-	return qfalse; // bk001207 - FIXME
+	long pages = sysconf( _SC_PHYS_PAGES );
+	long page_size = sysconf( _SC_PAGE_SIZE );
+
+	if ( pages == -1 || page_size == -1 )
+	{
+		return qfalse;
+	}
+
+	return ( (unsigned long long)pages * page_size <= MEM_THRESHOLD ) ? qtrue : qfalse;
 }
 
 
@@ -310,6 +315,7 @@ void NORETURN Sys_Quit( void )
 void Sys_Init( void )
 {
 	Cvar_Set( "arch", OS_STRING " " ARCH_STRING );
+	ttycon = Cvar_Get( "ttycon", "1", CVAR_ARCHIVE );
 	//IN_Init();   // rcg08312005 moved into glimp.
 }
 
@@ -386,7 +392,6 @@ tty_err Sys_ConsoleInputInit( void )
 	fcntl( STDIN_FILENO, F_SETFL, stdin_flags | O_NONBLOCK );
 	stdin_active = qtrue;
 
-	// FIXME TTimo initialize this in Sys_Init or something?
 	if ( !ttycon || !ttycon->integer )
 	{
 		ttycon_on = qfalse;

@@ -203,7 +203,13 @@ static void Netchan_EnqueueFragments( const netchan_t *chan, const int length, c
 		// enqueue the datagram
 		NET_QueuePacket( chan->sock, send.cursize, send.data, &chan->remoteAddress, 0 /*offset*/ );
 
-		// TODO: add showpackets debug info
+		if ( showpackets->integer ) {
+			Com_Printf ("%s send %4i : s=%i fragment=%i,%i\n"
+				, netsrcString[ chan->sock ]
+				, send.cursize
+				, chan->outgoingSequence | FRAGMENT_BIT
+				, unsentFragmentStart, fragmentLength);
+		}
 
 		unsentFragmentStart += fragmentLength;
 
@@ -331,7 +337,12 @@ void Netchan_Enqueue( netchan_t *chan, int length, const byte *data ) {
 	// enqueue the datagram
 	NET_QueuePacket( chan->sock, send.cursize, send.data, &chan->remoteAddress, 0 /*offset*/ );
 
-	// TODO: add showpackets debug info
+	if ( showpackets->integer ) {
+		Com_Printf ("%s send %4i : s=%i\n"
+			, netsrcString[ chan->sock ]
+			, send.cursize
+			, chan->outgoingSequence);
+	}
 }
 
 

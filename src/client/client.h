@@ -533,6 +533,7 @@ void Con_CheckResize( void );
 void Con_Init( void );
 void Con_Shutdown( void );
 void Con_ToggleConsole_f( void );
+void Con_ForEachLine( void (*callback)(const char *line, void *userData), void *userData );
 void Con_ClearNotify( void );
 void Con_RunConsole( void );
 void Con_DrawConsole( void );

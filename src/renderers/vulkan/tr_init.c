@@ -260,6 +260,10 @@ static void R_Register( void ) {
 
     r_rt_tlasUpdateMode = ri.Cvar_Get( "r_rt_tlasUpdateMode", "1", CVAR_ARCHIVE_ND );
     ri.Cvar_SetDescription( r_rt_tlasUpdateMode, "TLAS update mode (0=never, 1=on demand, 2=every frame)." );
+
+    r_textureMode = ri.Cvar_Get( "r_textureMode", "GL_LINEAR_MIPMAP_LINEAR", CVAR_ARCHIVE );
+    ri.Cvar_CheckRange( r_textureMode, "GL_NEAREST;GL_LINEAR;GL_NEAREST_MIPMAP_NEAREST;GL_LINEAR_MIPMAP_NEAREST;GL_NEAREST_MIPMAP_LINEAR;GL_LINEAR_MIPMAP_LINEAR", NULL, CV_STRINGLIST );
+    ri.Cvar_SetDescription( r_textureMode, "Texture interpolation mode." );
 }
 
 static void RE_Shutdown( refShutdownCode_t code ) {
@@ -321,7 +325,7 @@ refexport_t *GetRefAPI(int apiVersion, refimport_t *rimp) {
     re.RegisterShaderNoMip = RE_RegisterShaderNoMip;
     re.LoadWorld = RE_LoadWorldMap;
     re.SetWorldVisData = RE_SetWorldVisData;
-    // re.EndRegistration = RE_EndRegistration;  // Function doesn't exist
+    re.EndRegistration = RE_EndRegistration;
 
     re.BeginFrame = RE_BeginFrame;
     re.EndFrame = RE_EndFrame;
@@ -333,7 +337,7 @@ refexport_t *GetRefAPI(int apiVersion, refimport_t *rimp) {
     re.ClearScene = RE_ClearScene;
     re.AddRefEntityToScene = RE_AddRefEntityToScene;
     re.AddPolyToScene = RE_AddPolyToScene;
-    // re.AddParticle = RE_AddParticle;  // Function doesn't exist
+    re.AddParticle = RE_AddParticle;
     re.AddLightToScene = RE_AddLightToScene;
     re.RenderScene = RE_RenderScene;
 
@@ -394,17 +398,16 @@ qboolean Q_ValidateFilePath(const char *path) {
 }
 
 // Stub implementations for missing renderer functions
+void RE_EndRegistration(void) {
+    ri.Printf(PRINT_ALL, "Vulkan Renderer: EndRegistration\n");
+    tr.registered = qtrue;
+}
+
 qboolean RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
-    // Stub implementation - font registration not implemented in Vulkan renderer yet
-    (void)fontName; (void)pointSize; (void)font;
-    return qfalse;
+    return RE_RegisterFont_Vulkan(fontName, pointSize, font);
 }
 
 void vk_draw_geometry(Vk_Depth_Range depth_range, qboolean indexed) {
     // Stub implementation - geometry drawing not implemented yet
     (void)depth_range; (void)indexed;
-}
-
-void vk_end_frame(void) {
-    // Stub implementation - frame ending not implemented yet
 }

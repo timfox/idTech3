@@ -1533,6 +1533,7 @@ typedef enum {
 	CV_FLOAT,
 	CV_INTEGER,
 	CV_FSPATH,
+	CV_STRINGLIST,
 	CV_MAX,
 } cvarValidator_t;
 

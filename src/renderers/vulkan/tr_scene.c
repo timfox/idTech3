@@ -579,3 +579,15 @@ void RE_RenderScene( const refdef_t *fd ) {
 
 	tr.frontEndMsec += ri.Milliseconds() - startTime;
 }
+
+/*
+=====================
+RE_AddParticle
+=====================
+*/
+void RE_AddParticle( const vec3_t origin, const vec3_t velocity, const vec3_t color, float size, float life, qhandle_t shader ) {
+	// CPU particle implementation - stub
+	// In a full implementation, this would add a particle to a CPU-side buffer
+	// which is then uploaded to the GPU or rendered as sprites.
+	(void)origin; (void)velocity; (void)color; (void)size; (void)life; (void)shader;
+}

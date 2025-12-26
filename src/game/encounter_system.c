@@ -247,12 +247,11 @@ void G_Encounter_Start( encounter_t *encounter )
 	}
 	
 	// Execute Lua script if present
-	// TODO: Integrate with Lua system to execute encounter script
-	// Example: if (encounter->scriptName[0] != '\0' && encounter->luaState) {
-	//     lua_getglobal(encounter->luaState, "onEncounterStart");
-	//     lua_pushstring(encounter->luaState, encounter->name);
-	//     lua_call(encounter->luaState, 1, 0);
-	// }
+#ifdef USE_LUA
+	if ( encounter->scriptName[0] != '\0' ) {
+		Lua_Encounter_StartByName( encounter->name );
+	}
+#endif
 	
 	// Spawn initial wave of enemies
 	encounter->currentWave = 0;
@@ -560,11 +559,14 @@ Register Lua Functions
 */
 void G_EncounterSystem_RegisterLuaFunctions( void *luaState )
 {
-	// TODO: Register Lua functions for encounter system
-	// Example:
-	// lua_register(luaState, "EncounterDefine", lua_encounter_define);
-	// lua_register(luaState, "SequenceDefine", lua_sequence_define);
-	// lua_register(luaState, "WorldStateSet", lua_world_state_set);
-	// lua_register(luaState, "EncounterSpawnEnemy", lua_encounter_spawn_enemy);
+#ifdef USE_LUA
+	lua_State *L = (lua_State *)luaState;
+	
+	// Bridge to the common Lua encounter system bindings
+	Lua_Encounter_RegisterBindings( L );
+	
+	// Add game-specific bindings if needed
+	// For example, spawning enemies from Lua within an encounter context
+#endif
 }
 

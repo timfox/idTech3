@@ -398,6 +398,128 @@ static int Lua_Entity_AttachScript_Lua(lua_State *L)
 
 /*
 =================
+Lua_Entity_Spawn_Lua
+Lua binding: Entity.spawn(classname, x, y, z) -> entity_id
+=================
+*/
+static int Lua_Entity_Spawn_Lua(lua_State *L)
+{
+#ifdef USE_ENTT
+	const char *classname = lua_tostring(L, 1);
+	float x = (float)luaL_optnumber(L, 2, 0.0);
+	float y = (float)luaL_optnumber(L, 3, 0.0);
+	float z = (float)luaL_optnumber(L, 4, 0.0);
+
+	if (!classname) {
+		lua_pushinteger(L, (lua_Integer)ECS_NULL_ENTITY);
+		return 1;
+	}
+
+	entt::entity e = ECS::GetRegistry().create();
+	
+	// Add TransformComponent
+	auto &transform = ECS::GetRegistry().emplace<TransformComponent>(e);
+	VectorSet(transform.position, x, y, z);
+	VectorSet(transform.rotation, 0, 0, 0);
+	VectorSet(transform.scale, 1, 1, 1);
+
+	// Add other components as needed by classname
+	// This is a placeholder for a real factory
+	
+	lua_pushinteger(L, (lua_Integer)static_cast<ecs_entity_t>(e));
+	return 1;
+#else
+	lua_pushinteger(L, (lua_Integer)ECS_NULL_ENTITY);
+	return 1;
+#endif
+}
+
+/*
+=================
+Lua_Entity_Remove_Lua
+Lua binding: Entity.remove(entity_id)
+=================
+*/
+static int Lua_Entity_Remove_Lua(lua_State *L)
+{
+#ifdef USE_ENTT
+	ecs_entity_t entity = (ecs_entity_t)luaL_checkinteger(L, 1);
+	if (ECS_IsValid(entity)) {
+		ECS::GetRegistry().destroy(static_cast<entt::entity>(entity));
+		lua_pushboolean(L, 1);
+	} else {
+		lua_pushboolean(L, 0);
+	}
+	return 1;
+#else
+	lua_pushboolean(L, 0);
+	return 1;
+#endif
+}
+
+/*
+=================
+Lua_Entity_GetPosition_Lua
+Lua binding: Entity.get_position(entity_id) -> x, y, z
+=================
+*/
+static int Lua_Entity_GetPosition_Lua(lua_State *L)
+{
+#ifdef USE_ENTT
+	ecs_entity_t entity = (ecs_entity_t)luaL_checkinteger(L, 1);
+	if (ECS_IsValid(entity)) {
+		entt::entity e = static_cast<entt::entity>(entity);
+		if (ECS::GetRegistry().all_of<TransformComponent>(e)) {
+			auto &transform = ECS::GetRegistry().get<TransformComponent>(e);
+			lua_pushnumber(L, transform.position[0]);
+			lua_pushnumber(L, transform.position[1]);
+			lua_pushnumber(L, transform.position[2]);
+			return 3;
+		}
+	}
+#endif
+	lua_pushnil(L);
+	lua_pushnil(L);
+	lua_pushnil(L);
+	return 3;
+}
+
+/*
+=================
+Lua_Entity_SetPosition_Lua
+Lua binding: Entity.set_position(entity_id, x, y, z)
+=================
+*/
+static int Lua_Entity_SetPosition_Lua(lua_State *L)
+{
+#ifdef USE_ENTT
+	ecs_entity_t entity = (ecs_entity_t)luaL_checkinteger(L, 1);
+	float x = (float)luaL_checknumber(L, 2);
+	float y = (float)luaL_checknumber(L, 3);
+	float z = (float)luaL_checknumber(L, 4);
+
+	if (ECS_IsValid(entity)) {
+		entt::entity e = static_cast<entt::entity>(entity);
+		if (ECS::GetRegistry().all_of<TransformComponent>(e)) {
+			auto &transform = ECS::GetRegistry().get<TransformComponent>(e);
+			VectorSet(transform.position, x, y, z);
+			
+			// Mark for network sync if it has a NetworkComponent
+			if (ECS::GetRegistry().all_of<NetworkComponent>(e)) {
+				ECS::GetRegistry().get<NetworkComponent>(e).needsSync = qtrue;
+			}
+			
+			lua_pushboolean(L, 1);
+			return 1;
+		}
+	}
+#endif
+	lua_pushboolean(L, 0);
+	return 1;
+}
+
+/*
+=================
 Lua_Entity_RegisterBindings
 Register Lua bindings for entity system
 =================
@@ -413,6 +535,10 @@ void Lua_Entity_RegisterBindings(lua_State *L)
 
 	// Register functions
 	Lua_RegisterFunction(L, "attach_script", Lua_Entity_AttachScript_Lua);
+	Lua_RegisterFunction(L, "spawn", Lua_Entity_Spawn_Lua);
+	Lua_RegisterFunction(L, "remove", Lua_Entity_Remove_Lua);
+	Lua_RegisterFunction(L, "get_position", Lua_Entity_GetPosition_Lua);
+	Lua_RegisterFunction(L, "set_position", Lua_Entity_SetPosition_Lua);
 
 	// Set as global
 	lua_setglobal(L, "Entity");

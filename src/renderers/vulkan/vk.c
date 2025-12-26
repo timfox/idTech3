@@ -8411,18 +8411,10 @@ void vk_draw_stretch_raw(int x, int y, int w, int h, int cols, int rows, byte *d
 }
 
 // ============================================================================
-// Basic Vulkan Rendering Functions (stubs)
+// Basic Vulkan Rendering Functions
 // ============================================================================
 
-void vk_clear_depth(qboolean clear) {
-    Q_UNUSED(clear);
-    // TODO: Implement depth clearing
-}
-
-void vk_clear_color(const vec4_t color) {
-    Q_UNUSED(color);
-    // TODO: Implement color clearing
-}
+// Definitions moved to vk_frame.cpp for better structure
 
 void vk_end_render_pass(void) {
     // TODO: Implement render pass ending

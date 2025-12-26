@@ -492,6 +492,18 @@ static bool parsePropertyValue(Tokenizer &tok, Token &token, Style &style, const
 			return true;
 		}
 		return false;
+	} else if (std::strcmp(propName, "border-width") == 0) {
+		if (token.type == TokenType::Number) {
+			style.borderWidth = token.intValue;
+			Token next = nextToken(tok);
+			if (next.type == TokenType::Identifier && std::string(next.start, next.length) != "px") {
+				tok.current = next.start;
+			}
+		}
+	} else if (std::strcmp(propName, "border-color") == 0) {
+		if (token.type == TokenType::Hash) {
+			style.borderColor = parseColor(token);
+		}
 	}
 	
 	// Consume token (for properties that don't explicitly return)

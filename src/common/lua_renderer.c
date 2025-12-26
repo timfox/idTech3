@@ -240,11 +240,8 @@ static int Lua_RendererCreateProceduralShader(lua_State *L)
 	baseShader = -1;
 	if (lua_gettop(L) >= 2) {
 		baseShaderName = lua_tostring(L, 2);
-		if (baseShaderName) {
-			// Use renderer interface to register shader
-			// Note: This requires renderer to be initialized
-			// For now, we'll use -1 (no base shader) if renderer isn't available
-			baseShader = -1; // TODO: Access via renderer interface
+		if (baseShaderName && *baseShaderName) {
+			baseShader = RE_RegisterShaderNoMip(baseShaderName);
 		}
 	}
 	
