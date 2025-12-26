@@ -17,7 +17,7 @@ Basic functions used throughout the engine.
 void FS_WriteConfiguration( void );
 void Cmd_Shutdown( void );
 void S_Spatialize( void );
-void BotDrawDebugPolygons( void );
+// BotDrawDebugPolygons is implemented in server code
 void FS_MountTable_IsActive( void );
 void FS_WritePolicy_GetMount( void );
 void FS_Sandbox_ValidateOperation( void );

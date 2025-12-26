@@ -719,9 +719,15 @@ void Sys_Exit( int code ) {
 	exit(code);
 }
 
-void SV_Shutdown( const char *finalmsg ) {
-	// Stub implementation
-	Q_UNUSED(finalmsg);
+// SV_Shutdown is implemented in server code
+
+// Sys_SetStatus - set status text (Unix implementation)
+void QDECL Sys_SetStatus( const char *format, ... ) {
+	va_list argptr;
+	va_start( argptr, format );
+	// On Unix, we can print to console or do nothing
+	// This is mainly used for Windows system tray/status display
+	va_end( argptr );
 }
 
 // Global variables expected by SDL input

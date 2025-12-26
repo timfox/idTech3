@@ -9,6 +9,22 @@ Automated performance regression detection tests.
 #include "q_shared.h"
 #include "performance_regression.h"
 #include <stdio.h>
+#include <time.h>
+
+// Stub for Sys_Milliseconds
+int Sys_Milliseconds(void) {
+    return (int)(clock() * 1000 / CLOCKS_PER_SEC);
+}
+
+// Stubs for library functions
+void *Sys_LoadFunction(void *handle, const char *name) {
+    (void)handle; (void)name;
+    return NULL;
+}
+
+void Sys_UnloadLibrary(void *handle) {
+    (void)handle;
+}
 
 static qboolean test_regression_initialization(void) {
     printf("Testing regression system initialization...\n");

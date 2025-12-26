@@ -10,6 +10,22 @@ Incremental patch generation and distribution tests.
 #include "update_system.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
+
+// Stub for Sys_Milliseconds
+int Sys_Milliseconds(void) {
+    return (int)(clock() * 1000 / CLOCKS_PER_SEC);
+}
+
+// Stubs for library functions
+void *Sys_LoadFunction(void *handle, const char *name) {
+    (void)handle; (void)name;
+    return NULL;
+}
+
+void Sys_UnloadLibrary(void *handle) {
+    (void)handle;
+}
 
 static qboolean test_update_system_initialization(void) {
     printf("Testing update system initialization...\n");

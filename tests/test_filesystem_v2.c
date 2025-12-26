@@ -14,6 +14,9 @@ Unit tests for Virtual Filesystem v2
 #include <stdio.h>
 #include <stdarg.h>
 
+// Stub typedef for job_handle_t when job system is not available
+typedef struct job_handle_s job_handle_t;
+
 // Undefine macros that we need to implement as functions
 #undef Com_Memset
 
