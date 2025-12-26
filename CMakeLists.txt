@@ -1395,7 +1395,7 @@ IF(USE_RENDERER_DLOPEN)
 	if(USE_VULKAN)
 		# Create minimal RTX Vulkan renderer with actual RTX implementation
 		set(RTX_VULKAN_SRCS
-			src/renderers/vulkan/tr_rtx_minimal.c
+			src/renderers/vulkan/tr_rtx.c
 			src/renderers/vulkan/vk_raytracing.c
 		)
 		# RTX uses its own Vulkan initialization, no need for complex vk.c
@@ -3834,6 +3834,17 @@ TARGET_SOURCES(test_security PRIVATE tests/test_stubs.c)
 		TARGET_LINK_LIBRARIES(test_security PRIVATE m)
 	ENDIF()
 	ADD_TEST(NAME security_tests COMMAND test_security)
+
+	# RTX renderer test
+	ADD_EXECUTABLE(test_rtx
+		src/test_rtx.c
+	)
+	TARGET_INCLUDE_DIRECTORIES(test_rtx PRIVATE src/common)
+	TARGET_INCLUDE_DIRECTORIES(test_rtx PRIVATE src)
+	TARGET_INCLUDE_DIRECTORIES(test_rtx PRIVATE src/renderers/renderercommon)
+	TARGET_LINK_LIBRARIES(test_rtx common ${CMAKE_DL_LIBS})
+	TARGET_COMPILE_DEFINITIONS(test_rtx PRIVATE STANDALONE_TEST)
+	ADD_TEST(NAME rtx_tests COMMAND test_rtx)
 
 	# Performance benchmarks
 	ADD_EXECUTABLE(benchmark_performance

@@ -47,6 +47,18 @@ void QDECL Com_Error( errorParm_t level, const char *fmt, ... ) {
     exit( level );  // Basic implementation - real implementation should handle error levels
 }
 
+// Basic Com_Frame implementation - stub for minimal engine
+void Com_Frame( qboolean noDelay ) {
+    // Basic frame processing stub
+    // In a real engine, this would handle client/server frame updates
+    (void)noDelay;
+}
+
+// Com_FrameInit stub
+void Com_FrameInit( void ) {
+    // Initialize frame processing
+}
+
 // Basic memory management stubs - should be overridden
 void *Z_Malloc( int size ) {
     return calloc( 1, size ); // Always zeroed as per header comment
