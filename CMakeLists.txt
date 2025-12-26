@@ -3642,14 +3642,13 @@ IF(BUILD_TESTS)
 		message(STATUS "Skipping fuzz_pk3 target: libFuzzer requires Clang compiler.")
 	ENDIF()
 
-	ADD_EXECUTABLE(test_performance_counters
+ADD_EXECUTABLE(test_performance_counters
 		tests/test_performance_counters.c
 		src/common/performance_counters.c)
-	TARGET_INCLUDE_DIRECTORIES(test_performance_counters PRIVATE src/common)
-	TARGET_INCLUDE_DIRECTORIES(test_performance_counters PRIVATE src)
-	TARGET_COMPILE_DEFINITIONS(test_performance_counters PRIVATE STANDALONE_TEST)
-	TARGET_SOURCES(test_performance_counters PRIVATE tests/test_stubs.c)
-	ADD_TEST(NAME performance_counters_tests COMMAND test_performance_counters)
+TARGET_INCLUDE_DIRECTORIES(test_performance_counters PRIVATE src/common)
+TARGET_INCLUDE_DIRECTORIES(test_performance_counters PRIVATE src)
+TARGET_COMPILE_DEFINITIONS(test_performance_counters PRIVATE STANDALONE_TEST)
+ADD_TEST(NAME performance_counters_tests COMMAND test_performance_counters)
 
 ADD_EXECUTABLE(test_performance_regression
 	tests/test_performance_regression.c
@@ -3659,8 +3658,7 @@ TARGET_INCLUDE_DIRECTORIES(test_performance_regression PRIVATE src)
 TARGET_COMPILE_DEFINITIONS(test_performance_regression PRIVATE STANDALONE_TEST)
 TARGET_COMPILE_OPTIONS(test_performance_regression PRIVATE -w)
 TARGET_LINK_LIBRARIES(test_performance_regression PRIVATE common)
-# Add stub implementations for test executables
-TARGET_SOURCES(test_performance_regression PRIVATE tests/test_stubs.c)
+# test_performance_regression links against common library which provides all needed functions
 IF(UNIX)
 	TARGET_LINK_LIBRARIES(test_performance_regression PRIVATE m)
 ENDIF()
@@ -3786,12 +3784,12 @@ ADD_EXECUTABLE(test_filesystem_v2
 	src/common/files_v2.c
 	src/common/files_v2_impl.c
 	src/common/q_shared.c
+	src/common/files.c
 )
 TARGET_INCLUDE_DIRECTORIES(test_filesystem_v2 PRIVATE src/common)
 TARGET_INCLUDE_DIRECTORIES(test_filesystem_v2 PRIVATE src)
 TARGET_INCLUDE_DIRECTORIES(test_filesystem_v2 PRIVATE tests)
-TARGET_LINK_LIBRARIES(test_filesystem_v2 PRIVATE common)
-TARGET_SOURCES(test_filesystem_v2 PRIVATE tests/test_stubs.c)
+# test_filesystem_v2 uses its own stubs and doesn't link against common to avoid conflicts
 SET_SOURCE_FILES_PROPERTIES(tests/test_stubs.c PROPERTIES COMPILE_FLAGS "-w")
 IF(UNIX)
 	TARGET_LINK_LIBRARIES(test_filesystem_v2 PRIVATE m)

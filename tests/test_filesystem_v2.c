@@ -19,7 +19,7 @@ Unit tests for Virtual Filesystem v2
 
 // Forward declarations for mock functions
 void *Com_Memset(void *dest, int val, size_t count);
-float Q_atof(const char *str);
+// Q_atof is provided by common library
 qboolean FS_PakIsPure(const pack_t *pack);
 int FS_OpenFileInPak(fileHandle_t *file, pack_t *pak, fileInPack_t *pakFile, qboolean uniqueFILE);
 pack_t *FS_LoadZipFile(const char *zipfile);
@@ -29,8 +29,7 @@ fileHandle_t FS_HandleForFile(void);
 void FS_InitHandle(fileHandleData_t *fd);
 qboolean FS_FilenameCompare(const char *s1, const char *s2);
 FILE *Sys_FOpen(const char *ospath, const char *mode);
-int Cmd_Argc(void);
-const char *Cmd_Argv(int arg);
+// Cmd functions are provided by common library
 void Cmd_AddCommand(const char *cmd_name, xcommand_t function);
 
 // Mock functions needed by files_v2.c
@@ -94,10 +93,7 @@ void *Com_Memset(void *dest, int val, size_t count) {
 // Note: Com_sprintf, Q_strncpyz, Q_stricmp, Q_stricmpn, Com_GenerateHashValue
 // are already defined in q_shared.c, so we don't redefine them here
 
-// Mock Q_atof
-float Q_atof(const char *str) {
-	return (float)atof(str);
-}
+// Q_atof is provided by common library
 
 // Mock functions from files.c that files_v2.c needs
 qboolean FS_PakIsPure(const pack_t *pack) {
@@ -154,15 +150,7 @@ FILE *Sys_FOpen(const char *ospath, const char *mode) {
 	return NULL;  // Mock - return NULL for tests
 }
 
-// Mock Cmd functions
-int Cmd_Argc(void) {
-	return 0;
-}
-
-const char *Cmd_Argv(int arg) {
-	(void)arg;
-	return "";
-}
+// Cmd functions are provided by common library
 
 void Cmd_AddCommand(const char *cmd_name, xcommand_t function) {
 	(void)cmd_name;

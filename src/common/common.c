@@ -179,7 +179,6 @@ void S_Spatialize( void ) {
 
 // Additional global variable stubs for monolithic build
 int CPU_Flags = 0;
-void BotDrawDebugPolygons( void ) { /* Stub */ }
 int Com_Filter( const char *filter, const char *name ) {
     Q_UNUSED(filter); Q_UNUSED(name);
     return 0;
@@ -277,7 +276,6 @@ void Field_AutoComplete( field_t *edit ) {
     Q_UNUSED(edit);
 }
 void Perf_DisplayInfo_f( void ) { /* Stub */ }
-void SV_Frame( int msec ) { Q_UNUSED(msec); /* Stub */ }
 void FS_MountTable_IsActive( void ) { /* Stub */ }
 void FS_WritePolicy_GetMount( void ) { /* Stub */ }
 void FS_Sandbox_ValidateOperation( void ) { /* Stub */ }
