@@ -1,6 +1,8 @@
+extern "C" {
 #include "vk_config.h"
 #include "vk_config_private.h"
 #include "../renderercommon/tr_public.h"
+}
 
 // Renderer interface
 extern refimport_t ri;
@@ -39,12 +41,12 @@ extern cvar_t *r_vk_hotReload;
 
 // Initialize Vulkan CVARs
 // Note: CVars are registered in tr_init.c, this function is for any Vulkan-specific initialization
-void vk_config_init(void) {
+extern "C" void vk_config_init(void) {
     ri.Printf(PRINT_ALL, "Vulkan: Configuration initialized\n");
 }
 
 // Shutdown Vulkan CVARs
-void vk_config_shutdown(void) {
+extern "C" void vk_config_shutdown(void) {
     // CVARs are automatically managed by the engine, no explicit cleanup needed
     ri.Printf(PRINT_ALL, "Vulkan: Configuration variables shut down\n");
 }

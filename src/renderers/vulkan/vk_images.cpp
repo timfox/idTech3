@@ -1,8 +1,10 @@
+extern "C" {
 #include "vk_images.h"
 #include "vk_utils.h"
 #include "vk_memory.h"
 #include "../renderercommon/tr_public.h"
 #include "vk.h"
+}
 #include <math.h>
 
 // Renderer interface
@@ -32,7 +34,7 @@ static void record_image_layout_transition(VkCommandBuffer command_buffer, VkIma
     VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask);
 
 // Create Vulkan image
-void vk_create_image(image_t *image, int width, int height, int mip_levels) {
+extern "C" void vk_create_image(image_t *image, int width, int height, int mip_levels) {
     VkFormat format = (VkFormat)image->internalFormat;
     VkImageCreateInfo desc;
     VkMemoryRequirements memory_requirements;
@@ -92,7 +94,7 @@ void vk_create_image(image_t *image, int width, int height, int mip_levels) {
 }
 
 // Create image view
-void vk_create_image_view(image_t *image, VkImageViewType view_type, VkImageAspectFlags aspect) {
+extern "C" void vk_create_image_view(image_t *image, VkImageViewType view_type, VkImageAspectFlags aspect) {
     VkImageViewCreateInfo desc;
 
     if (!vk_validate_handle(image->handle, "image")) {
@@ -121,7 +123,7 @@ void vk_create_image_view(image_t *image, VkImageViewType view_type, VkImageAspe
 }
 
 // Destroy image and associated resources
-void vk_destroy_image(image_t *image) {
+extern "C" void vk_destroy_image(image_t *image) {
     if (image->view != VK_NULL_HANDLE) {
         qvkDestroyImageView(vk.device, image->view, NULL);
         image->view = VK_NULL_HANDLE;
@@ -146,7 +148,7 @@ void vk_destroy_image(image_t *image) {
 }
 
 // Upload image data to GPU
-void vk_upload_image_data(image_t *image, int x, int y, int width, int height, int mipmaps, byte *pixels, int size, qboolean update) {
+extern "C" void vk_upload_image_data(image_t *image, int x, int y, int width, int height, int mipmaps, byte *pixels, int size, qboolean update) {
     VkBufferImageCopy regions[16];
     int num_regions = 0;
     int buffer_size = size;

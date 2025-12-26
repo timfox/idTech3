@@ -1,3 +1,4 @@
+extern "C" {
 #include "vk_postprocess.h"
 #include "vk_renderpass.h"
 #include "vk_utils.h"
@@ -5,6 +6,7 @@
 #include "../renderercommon/tr_public.h"
 #include "vk.h"
 #include "../opengl2/tr_extramath.h"
+}
 
 // Renderer interface
 extern refimport_t ri;
@@ -60,7 +62,7 @@ qboolean vk_init_post_processing(void) {
 }
 
 // Shutdown post-processing system
-void vk_shutdown_post_processing(void) {
+extern "C" void vk_shutdown_post_processing(void) {
     ri.Printf(PRINT_ALL, "Vulkan: Shutting down post-processing system\n");
 
     // Destroy bloom resources
@@ -99,7 +101,7 @@ qboolean vk_create_bloom_resources(void) {
 }
 
 // Destroy bloom resources
-void vk_destroy_bloom_resources(void) {
+extern "C" void vk_destroy_bloom_resources(void) {
     // Destroy all bloom images
     for (int i = 0; i < 1+VK_NUM_BLOOM_PASSES*2; i++) {
         vk_destroy_image_resources(&vk.bloom_image[i], &vk.bloom_image_view[i]);
@@ -145,7 +147,7 @@ static void vk_update_bloom_descriptors(void) {
 }
 
 // Apply bloom effect
-void vk_apply_bloom(void) {
+extern "C" void vk_apply_bloom(void) {
     if (!r_bloom || !r_bloom->integer) {
         return;
     }
@@ -172,7 +174,7 @@ void vk_apply_bloom(void) {
 }
 
 // Create blur pipeline (compute shader based)
-void vk_create_blur_pipeline(uint32_t index, uint32_t width, uint32_t height, qboolean horizontal_pass) {
+extern "C" void vk_create_blur_pipeline(uint32_t index, uint32_t width, uint32_t height, qboolean horizontal_pass) {
     if (!vk_bounds_check(index, VK_NUM_BLOOM_PASSES*2, "blur pipeline")) {
         return;
     }
@@ -184,7 +186,7 @@ void vk_create_blur_pipeline(uint32_t index, uint32_t width, uint32_t height, qb
 }
 
 // Update post-processing pipelines
-void vk_update_post_process_pipelines(void) {
+extern "C" void vk_update_post_process_pipelines(void) {
     // Update pipelines based on current settings
     if (r_bloom && r_bloom->integer) {
         vk_update_bloom_descriptors();
@@ -194,14 +196,14 @@ void vk_update_post_process_pipelines(void) {
 }
 
 // Apply tone mapping
-void vk_apply_tone_mapping(void) {
+extern "C" void vk_apply_tone_mapping(void) {
     // Apply HDR tone mapping if enabled
     // This would bind appropriate pipeline and dispatch compute shader
     ri.Printf(PRINT_ALL, "Vulkan: Tone mapping applied (stub)\n");
 }
 
 // Apply gamma correction
-void vk_apply_gamma_correction(void) {
+extern "C" void vk_apply_gamma_correction(void) {
     // Apply gamma correction to final image
     ri.Printf(PRINT_ALL, "Vulkan: Gamma correction applied (stub)\n");
 }

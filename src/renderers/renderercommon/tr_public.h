@@ -25,6 +25,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_types.h"
 #include "vulkan/vulkan.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define	REF_API_VERSION		9
 #define MAX_MOD_KNOWN		1024
 
@@ -493,5 +497,9 @@ refexport_t*GetRefAPI( int apiVersion, refimport_t *rimp );
 // Safe shader loading functions
 const char *R_GetSafeShaderText(int *size);
 void R_ShutdownSafeShaderLoadContext(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif	// __TR_PUBLIC_H

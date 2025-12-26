@@ -715,50 +715,11 @@ void Sys_QueEvent( int evTime, sysEventType_t evType, int value, int value2, int
 	Q_UNUSED(ptr);
 }
 
-void Sys_Exit( int code ) {
-	exit(code);
-}
-
 // SV_Shutdown is implemented in server code
-
-// Sys_SetStatus - set status text (Unix implementation)
-void QDECL Sys_SetStatus( const char *format, ... ) {
-	va_list argptr;
-	va_start( argptr, format );
-	// On Unix, we can print to console or do nothing
-	// This is mainly used for Windows system tray/status display
-	va_end( argptr );
-}
 
 // Global variables expected by SDL input
 qboolean gw_active = qtrue;
 qboolean gw_minimized = qfalse;
-
-// Missing system functions for Unix
-qboolean Sys_LowPhysicalMemory( void ) {
-    return qfalse;  // Assume we have enough memory
-}
-
-const char *Sys_DefaultBasePath( void ) {
-    return ".";  // Current directory as base path
-}
-
-void Sys_Print( const char *msg ) {
-    printf("%s", msg);
-}
-
-void Sys_Sleep( int msec ) {
-    usleep(msec * 1000);  // Convert milliseconds to microseconds
-}
-
-void Sys_SnapVector( float *v ) {
-    // Stub - no snapping needed for Unix
-    Q_UNUSED(v);
-}
-
-void Sys_BeginProfiling( void ) {
-    // Stub - no profiling support
-}
 
 int64_t Sys_Microseconds( void ) {
     struct timespec ts;

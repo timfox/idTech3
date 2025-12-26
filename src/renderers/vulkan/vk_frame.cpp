@@ -27,7 +27,7 @@ extern shaderCommands_t tess;
 extern void vk_update_performance_stats(void);
 
 // Begin frame
-void vk_begin_frame(void) {
+extern "C" void vk_begin_frame(void) {
     VkResult result;
     uint32_t image_index;
 
@@ -101,7 +101,7 @@ void vk_begin_frame(void) {
 }
 
 // End frame
-void vk_end_frame(void) {
+extern "C" void vk_end_frame(void) {
     // Apply post-processing effects
     if (vk_has_post_processing()) {
         vk_apply_bloom();
@@ -194,7 +194,7 @@ void vk_end_frame(void) {
 }
 
 // Present frame
-void vk_present_frame(void) {
+extern "C" void vk_present_frame(void) {
     if (!vk_validate_handle(vk.swapchain, "swapchain")) {
         return;
     }
@@ -269,7 +269,7 @@ void vk_resize_frame_resources(uint32_t width, uint32_t height) {
 }
 
 // Clear color buffer
-void vk_clear_color(const vec4_t clear_color) {
+extern "C" void vk_clear_color(const vec4_t clear_color) {
     if (!vk_validate_handle(vk.cmd->command_buffer, "command buffer")) {
         return;
     }
@@ -293,7 +293,7 @@ void vk_clear_color(const vec4_t clear_color) {
 }
 
 // Clear depth buffer
-void vk_clear_depth(qboolean clear_stencil) {
+extern "C" void vk_clear_depth(qboolean clear_stencil) {
     if (!vk_validate_handle(vk.cmd->command_buffer, "command buffer")) {
         return;
     }

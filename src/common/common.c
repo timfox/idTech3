@@ -169,14 +169,6 @@ void Com_DPrintf( const char *fmt, ... ) {
     va_end( argptr );
 }
 
-// System error - terminates the program
-void Sys_Error( const char *error, ... ) {
-    va_list argptr;
-    va_start( argptr, error );
-    vfprintf( stderr, error, argptr );
-    va_end( argptr );
-    exit( 1 );
-}
 
 // Global variables expected by the engine
 char cl_title[ MAX_CVAR_VALUE_STRING ] = "idtech3";
@@ -306,6 +298,24 @@ qboolean NetThread_IsThreadEnabled(net_thread_type_t threadType) {
 }
 qboolean NetThread_QueueSendMessage(const netadr_t* address, const msg_t* message, int flags) {
     Q_UNUSED(address); Q_UNUSED(message); Q_UNUSED(flags);
+    return qfalse;
+}
+
+/*
+============
+Com_EarlyParseCmdLine
+
+Early command line parsing for console title and window position.
+Returns qtrue if special parsing was done, qfalse otherwise.
+============
+*/
+qboolean Com_EarlyParseCmdLine( char *commandLine, char *con_title, int title_size, int *vid_xpos, int *vid_ypos ) {
+    Q_UNUSED(commandLine);
+    Q_UNUSED(con_title);
+    Q_UNUSED(title_size);
+    Q_UNUSED(vid_xpos);
+    Q_UNUSED(vid_ypos);
+    // Stub implementation - no special early parsing
     return qfalse;
 }
 

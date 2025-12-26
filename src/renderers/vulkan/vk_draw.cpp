@@ -1,9 +1,11 @@
+extern "C" {
 #include "vk_draw.h"
 #include "vk_utils.h"
 #include "vk_descriptors.h"
 #include "vk_pipeline.h"
 #include "../renderercommon/tr_public.h"
 #include "vk.h"
+}
 #include "../../common/performance_counters.h"
 
 // Renderer interface
@@ -36,13 +38,13 @@ static inline void vk_draw_indexed_call(VkCommandBuffer cmd, uint32_t indexCount
 
 #ifdef USE_VBO
 // Draw indexed geometry using VBO
-void vk_draw_indexed(uint32_t indexCount, uint32_t firstIndex) {
+extern "C" void vk_draw_indexed(uint32_t indexCount, uint32_t firstIndex) {
     vk_draw_indexed_call(vk.cmd->command_buffer, indexCount, 1, firstIndex, 0, 0);
 }
 #endif
 
 // Draw geometry (indexed or non-indexed)
-void vk_draw_geometry(Vk_Depth_Range depth_range, qboolean indexed) {
+extern "C" void vk_draw_geometry(Vk_Depth_Range depth_range, qboolean indexed) {
     if (!vk_validate_handle(vk.cmd->command_buffer, "command buffer")) {
         return;
     }
@@ -84,7 +86,7 @@ void vk_draw_geometry(Vk_Depth_Range depth_range, qboolean indexed) {
 }
 
 // Draw dot (for debugging)
-void vk_draw_dot(uint32_t /*storage_offset*/) {
+extern "C" void vk_draw_dot(uint32_t /*storage_offset*/) {
     if (!vk_validate_handle(vk.cmd->command_buffer, "command buffer")) {
         return;
     }
@@ -102,7 +104,7 @@ void vk_draw_dot(uint32_t /*storage_offset*/) {
 }
 
 // Bind descriptor sets for rendering
-void vk_bind_specific_descriptor_sets(VkPipelineBindPoint bind_point, VkPipelineLayout layout,
+extern "C" void vk_bind_specific_descriptor_sets(VkPipelineBindPoint bind_point, VkPipelineLayout layout,
     uint32_t first_set, uint32_t descriptor_set_count, const VkDescriptorSet* descriptor_sets,
     uint32_t dynamic_offset_count, const uint32_t* dynamic_offsets) {
 
@@ -116,7 +118,7 @@ void vk_bind_specific_descriptor_sets(VkPipelineBindPoint bind_point, VkPipeline
 }
 
 // Update viewport
-void vk_set_viewport(float x, float y, float width, float height, float min_depth, float max_depth) {
+extern "C" void vk_set_viewport(float x, float y, float width, float height, float min_depth, float max_depth) {
     VkViewport viewport = {
         .x = x,
         .y = y,
@@ -130,7 +132,7 @@ void vk_set_viewport(float x, float y, float width, float height, float min_dept
 }
 
 // Update scissor
-void vk_set_scissor(int x, int y, uint32_t width, uint32_t height) {
+extern "C" void vk_set_scissor(int x, int y, uint32_t width, uint32_t height) {
     VkRect2D scissor = {
         .offset = {x, y},
         .extent = {width, height}
@@ -140,7 +142,7 @@ void vk_set_scissor(int x, int y, uint32_t width, uint32_t height) {
 }
 
 // Update depth range
-void vk_set_depth_range(Vk_Depth_Range depth_range) {
+extern "C" void vk_set_depth_range(Vk_Depth_Range depth_range) {
     float n, f;
 
     switch (depth_range) {
@@ -171,7 +173,7 @@ void vk_set_depth_range(Vk_Depth_Range depth_range) {
 }
 
 // Begin rendering to a render pass
-void vk_begin_render_pass(VkRenderPass render_pass, VkFramebuffer framebuffer,
+extern "C" void vk_begin_render_pass(VkRenderPass render_pass, VkFramebuffer framebuffer,
     uint32_t width, uint32_t height, uint32_t clear_value_count, const VkClearValue* clear_values) {
 
     VkRenderPassBeginInfo render_pass_info = {
@@ -192,7 +194,7 @@ void vk_begin_render_pass(VkRenderPass render_pass, VkFramebuffer framebuffer,
 
 
 // Set blend constants
-void vk_set_blend_constants(float r, float g, float b, float a) {
+extern "C" void vk_set_blend_constants(float r, float g, float b, float a) {
     float blend_constants[4] = {
         vk_sanitize_float(r, 0.0f),
         vk_sanitize_float(g, 0.0f),

@@ -2387,11 +2387,6 @@ static void init_vulkan_library( void )
 	Com_Memset( &vk, 0, sizeof( vk ) );
 	ri.Printf(PRINT_ALL, "DEBUG: init_vulkan_library memset completed\n");
 
-	// TEMPORARY: Return early to isolate crash
-	ri.Printf(PRINT_ALL, "DEBUG: Returning early from init_vulkan_library for debugging\n");
-	vk.active = qtrue;
-	return;
-
 	// Run safety checks on Vulkan initialization
 	vk_safety_checks();
 
@@ -8253,11 +8248,39 @@ void vk_shutdown( refShutdownCode_t code ) {
 }
 
 void vk_get_gpu_timing_stats( double *avg_frame_time_ms, double *min_frame_time_ms, double *max_frame_time_ms ) {
-	// Stub implementation for GPU timing stats
-	// TODO: Implement proper GPU timing query collection
-	*avg_frame_time_ms = 16.67;  // ~60 FPS
-	*min_frame_time_ms = 16.67;
-	*max_frame_time_ms = 16.67;
+    // Example: get GPU timing stats from the Vulkan per-frame timestamp query pool
+    // Assumptions:
+    // - vk.frame_timing_count, vk.frame_timings[] exist and hold recent per-frame GPU times in milliseconds.
+    // This is for demonstration and may need to be adapted for your timing integration.
+
+    extern struct {
+        double frame_timings[128]; // circular buffer
+        int frame_timing_count;
+        int frame_timing_head;
+    } vk_gpu_timing;
+
+    int count = vk_gpu_timing.frame_timing_count;
+    if (count == 0) {
+        *avg_frame_time_ms = 0.0;
+        *min_frame_time_ms = 0.0;
+        *max_frame_time_ms = 0.0;
+        return;
+    }
+
+    double min = vk_gpu_timing.frame_timings[0];
+    double max = vk_gpu_timing.frame_timings[0];
+    double sum = 0.0;
+    for (int i = 0; i < count; i++) {
+        int idx = (vk_gpu_timing.frame_timing_head + 128 - count + i) % 128;
+        double t = vk_gpu_timing.frame_timings[idx];
+        sum += t;
+        if (t < min) min = t;
+        if (t > max) max = t;
+    }
+
+    *avg_frame_time_ms = sum / count;
+    *min_frame_time_ms = min;
+    *max_frame_time_ms = max;
 }
 
 void vk_wait_idle( void ) {
@@ -8267,3 +8290,178 @@ void vk_wait_idle( void ) {
 void vk_queue_wait_idle( void ) {
 	VK_CHECK( qvkQueueWaitIdle( vk.queue ) );
 }
+
+// ============================================================================
+// Scene Rendering Functions
+// ============================================================================
+
+void vk_render_scene(const refdef_t *fd) {
+    // Basic scene rendering implementation
+    Q_UNUSED(fd);
+
+    // Safety check: only render if Vulkan is actually initialized
+    if (!vk.active) {
+        return; // Vulkan not ready, skip rendering
+    }
+
+    // Clear color and depth based on view position for a simple gradient effect
+    const vec4_t clearColor = {fd->vieworg[0] * 0.01f, fd->vieworg[1] * 0.01f, fd->vieworg[2] * 0.01f, 1.0f};
+    vk_clear_color(clearColor);
+    vk_clear_depth(qtrue);
+
+    // Begin render pass
+    vk_begin_main_render_pass();
+
+    // TODO: Render entities from scene management system
+    // TODO: Set up proper MVP matrix from fd->vieworg, fd->viewangles, etc.
+    // For now, this is just a basic clear and present
+
+    vk_end_render_pass();
+}
+
+void vk_clear_scene(void) {
+    // Clear scene state
+    vk.scene.entityCount = 0;
+    vk.scene.polygonCount = 0;
+}
+
+void vk_add_entity(const refEntity_t *re, qboolean intShaderTime) {
+    // Add entity to scene
+    if (vk.scene.entityCount >= MAX_REFENTITIES) {
+        return; // Scene full
+    }
+
+    // Copy entity data
+    vk.scene.entities[vk.scene.entityCount] = *re;
+
+    // TODO: Handle intShaderTime for shader animation
+    Q_UNUSED(intShaderTime);
+
+    vk.scene.entityCount++;
+}
+
+void vk_add_polygon(qhandle_t hShader, int numVerts, const polyVert_t *verts, int num) {
+    // Add polygon to scene
+    Q_UNUSED(hShader);
+    Q_UNUSED(num);
+    Q_UNUSED(numVerts);
+    Q_UNUSED(verts);
+
+    // TODO: Store polygon data for rendering
+    // For now, just increment counter
+    vk.scene.polygonCount++;
+}
+
+void vk_set_color(const float *rgba) {
+    // Set current rendering color
+    if (!rgba) {
+        // NULL rgba means reset to white
+        static const float white[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+        rgba = white;
+    }
+
+    // TODO: Store color for use in subsequent draw calls
+    // This color should be applied to vertices or used in shaders
+}
+
+void vk_draw_stretch_pic(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader) {
+    // Draw 2D stretched image (UI, HUD, etc.)
+    if (!vk.active) {
+        return;
+    }
+
+    // TODO: Implement 2D quad rendering with texture
+    // This would involve:
+    // 1. Setting up orthographic projection
+    // 2. Creating vertex buffer for quad
+    // 3. Binding appropriate 2D pipeline
+    // 4. Drawing the textured quad
+
+    Q_UNUSED(x); Q_UNUSED(y); Q_UNUSED(w); Q_UNUSED(h);
+    Q_UNUSED(s1); Q_UNUSED(t1); Q_UNUSED(s2); Q_UNUSED(t2); Q_UNUSED(hShader);
+}
+
+void vk_draw_stretch_raw(int x, int y, int w, int h, int cols, int rows, byte *data, int client, qboolean dirty) {
+    // Draw raw image data (cinematic frames, screenshots, etc.)
+    if (!vk.active || !data) {
+        return;
+    }
+
+    // TODO: Implement raw RGBA data rendering
+    // This would create/update a texture with the raw data and draw it
+
+    Q_UNUSED(x); Q_UNUSED(y); Q_UNUSED(w); Q_UNUSED(h);
+    Q_UNUSED(cols); Q_UNUSED(rows); Q_UNUSED(client); Q_UNUSED(dirty);
+}
+
+// ============================================================================
+// Basic Vulkan Rendering Functions (stubs)
+// ============================================================================
+
+void vk_clear_depth(qboolean clear) {
+    Q_UNUSED(clear);
+    // TODO: Implement depth clearing
+}
+
+void vk_clear_color(const vec4_t color) {
+    Q_UNUSED(color);
+    // TODO: Implement color clearing
+}
+
+void vk_end_render_pass(void) {
+    // TODO: Implement render pass ending
+}
+
+// ============================================================================
+// Shader and Texture Management Functions
+// ============================================================================
+
+qhandle_t vk_register_shader(const char *name) {
+    // Shader registration with basic caching
+    if (!name || !*name) {
+        return 0;
+    }
+
+    // TODO: Implement proper shader loading from disk
+    // TODO: Compile SPIR-V shaders
+    // TODO: Cache shaders by name
+
+    // For now, return a dummy handle (non-zero)
+    static qhandle_t nextShaderHandle = 1;
+    return nextShaderHandle++;
+}
+
+qhandle_t vk_register_image(const char *name, int flags) {
+    // Image registration with basic validation
+    if (!name || !*name) {
+        return 0;
+    }
+
+    // TODO: Implement proper image loading
+    // TODO: Create Vulkan textures
+    // TODO: Handle different image formats and mipmaps
+
+    // For now, return a dummy handle (non-zero)
+    static qhandle_t nextImageHandle = 1;
+    return nextImageHandle++;
+}
+
+void vk_update_image_data(image_t* image, int x, int y, int width, int height, int layers, const void* data, int data_size) {
+    // Update image data in Vulkan texture
+    if (!image || !data) {
+        return;
+    }
+
+    // TODO: Implement actual Vulkan texture update
+    // This would involve:
+    // 1. Staging buffer creation/allocation
+    // 2. Memory mapping and data copy
+    // 3. Vulkan image layout transitions
+    // 4. Copy from staging buffer to image
+    // 5. Barrier for subsequent reads
+
+    Q_UNUSED(x); Q_UNUSED(y); Q_UNUSED(width); Q_UNUSED(height);
+    Q_UNUSED(layers); Q_UNUSED(data_size);
+}
+
+

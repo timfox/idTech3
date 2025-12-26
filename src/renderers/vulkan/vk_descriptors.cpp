@@ -1,8 +1,10 @@
+extern "C" {
 #include "vk_descriptors.h"
 #include "vk_utils.h"
 #include "../renderercommon/tr_public.h"
 #include "vk.h"
 #include "vk_memory.h"
+}
 
 // Renderer interface
 extern refimport_t ri;
@@ -380,7 +382,7 @@ static void vk_write_uniform_descriptor(VkWriteDescriptorSet *desc, VkDescriptor
 }
 
 // Update uniform descriptor
-void vk_update_uniform_descriptor(VkDescriptorSet descriptor, VkBuffer buffer)
+extern "C" void vk_update_uniform_descriptor(VkDescriptorSet descriptor, VkBuffer buffer)
 {
     VkDescriptorBufferInfo info[2];
     VkWriteDescriptorSet desc[2];
@@ -392,7 +394,7 @@ void vk_update_uniform_descriptor(VkDescriptorSet descriptor, VkBuffer buffer)
 }
 
 // Update attachment descriptors
-void vk_update_attachment_descriptors(void) {
+extern "C" void vk_update_attachment_descriptors(void) {
     if (!vk.color_image_view) {
         return;
     }
@@ -468,7 +470,7 @@ void vk_update_attachment_descriptors(void) {
 }
 
 // Initialize descriptors
-void vk_init_descriptors(void) {
+extern "C" void vk_init_descriptors(void) {
     ri.Printf(PRINT_ALL, "DEBUG: vk_init_descriptors called\n");
 
     VkDescriptorSetAllocateInfo alloc;

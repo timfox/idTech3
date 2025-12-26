@@ -7,7 +7,6 @@ Implements region-based world streaming for larger, contiguous levels
 
 #pragma once
 
-#include "tr_local.h"
 #include "vk.h"
 
 #ifdef USE_VULKAN

@@ -62,9 +62,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define TR_GLOBALS_DEFINED
 #include "../renderercommon/tr_public.h"
 #include "../renderercommon/tr_backend_iface.h"
-#include "tr_common.h"
+#include "vk.h"
 #include "iqm.h"
 #include "../opengl/tr_tiki.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 
 #ifdef USE_CIMGUI
@@ -2295,5 +2299,9 @@ extern void VBO_Flush( void );
 #endif
 
 int R_GetLightmapCoords( const int lightmapIndex, float *x, float *y );
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif //TR_LOCAL_H

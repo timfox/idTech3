@@ -1,287 +1,308 @@
 /*
 ===========================================================================
-Vulkan RTX Renderer
-
-Complete Vulkan renderer implementation with RTX ray tracing support.
+Vulkan Renderer - q2rtx-style Implementation
 ===========================================================================
 */
 
 #include "../renderercommon/tr_public.h"
 #include "../../common/q_shared.h"
-#include <stdarg.h>
-#include <string.h>
-#include <stdlib.h>
+#include <dlfcn.h>
+
+#include "vk.h"
 
 // Engine interface - will be set by GetRefAPI
 static refimport_t ri;
 
+// Stub cvars for compatibility (Vulkan renderer doesn't use these directly)
+cvar_t *r_dynamiclight = NULL;
+cvar_t *r_showImages = NULL;
+cvar_t *r_zproj = NULL;
+cvar_t *r_stereoSeparation = NULL;
+cvar_t *r_znear = NULL;
+cvar_t *r_drawworld = NULL;
+cvar_t *r_lockpvs = NULL;
+cvar_t *r_showcluster = NULL;
+cvar_t *r_novis = NULL;
+cvar_t *r_clear = NULL;
+cvar_t *r_clearcoat = NULL;
+cvar_t *r_vk_debug2D = NULL;
+cvar_t *r_debugSurface = NULL;
+
+// Define gls and glState since they are declared extern in tr_local.h
+glstatic_t gls = {0};
+glstate_t glState = {0};
+
+// Vulkan specific globals
+struct world_s *vk_world = NULL;
+
+// Stub cvars for compatibility
+cvar_t *r_skipBackEnd = NULL;
+cvar_t *r_finish = NULL;
+cvar_t *r_teleporterFlash = NULL;
+cvar_t *r_vk_debugClearColor = NULL;
+cvar_t *r_vk_debugUiOnly = NULL;
+cvar_t *r_drawSun = NULL;
+cvar_t *r_flares = NULL;
+cvar_t *r_flareFade = NULL;
+cvar_t *r_flareSize = NULL;
+cvar_t *r_flareCoeff = NULL;
+
+// Stub functions for missing Vulkan functionality
+void vk_draw_dot(const vec3_t org, float radius, const vec4_t color) {
+    Q_UNUSED(org); Q_UNUSED(radius); Q_UNUSED(color);
+}
+
+// Stub functions for missing Vulkan functionality
+void RB_TakeScreenshot(int x, int y, int width, int height, const char *fileName) {
+    Q_UNUSED(x); Q_UNUSED(y); Q_UNUSED(width); Q_UNUSED(height); Q_UNUSED(fileName);
+}
+
+void RB_TakeScreenshotJPEG(int x, int y, int width, int height, const char *fileName) {
+    Q_UNUSED(x); Q_UNUSED(y); Q_UNUSED(width); Q_UNUSED(height); Q_UNUSED(fileName);
+}
+
+void RB_TakeScreenshotBMP(int x, int y, int width, int height, const char *fileName, int clipboard) {
+    Q_UNUSED(x); Q_UNUSED(y); Q_UNUSED(width); Q_UNUSED(height);
+    Q_UNUSED(fileName); Q_UNUSED(clipboard);
+}
+
+// Note: Cvars are handled by the engine, not declared here
+
+// Stub functions for missing Vulkan functionality
+image_t *R_CreateImage(const char *name, const char *name2, byte *pic, int width, int height, imgFlags_t flags, int format, uint32_t type) {
+    Q_UNUSED(name);
+    Q_UNUSED(name2);
+    Q_UNUSED(pic);
+    Q_UNUSED(width);
+    Q_UNUSED(height);
+    Q_UNUSED(flags);
+    Q_UNUSED(format);
+    Q_UNUSED(type);
+    return NULL;
+}
+
+const void *RB_TakeVideoFrameCmd(const void *data) {
+    Q_UNUSED(data);
+    return NULL;
+}
+
+// Stub functions for missing Vulkan functionality
+skin_t *R_GetSkinByHandle(qhandle_t handle) {
+    Q_UNUSED(handle);
+    return NULL;
+}
+
 // ============================================================================
-// Renderer State and Configuration
+// Vulkan-specific functions
 // ============================================================================
 
-// RTX-specific cvars
-static cvar_t *r_raytracing = NULL;
-static cvar_t *r_rt_samples = NULL;
-static cvar_t *r_rt_maxDepth = NULL;
-static cvar_t *r_rt_debugMagenta = NULL;
-static cvar_t *r_rt_tlasUpdateMode = NULL;
+// Note: Vulkan initialization is handled by the engine, not by the renderer
 
-// Core renderer cvars
-static cvar_t *r_verbose = NULL;
-static cvar_t *r_norefresh = NULL;
-static cvar_t *r_drawentities = NULL;
-static cvar_t *r_drawworld = NULL;
-static cvar_t *r_speeds = NULL;
-static cvar_t *r_fullbright = NULL;
-static cvar_t *r_dynamiclight = NULL;
+static void vk_shutdown(void) {
+    ri.Printf(PRINT_ALL, "Vulkan Renderer: Shutting down...\n");
+
+    // TODO: Clean up Vulkan resources if needed
+}
 
 // ============================================================================
-// Utility Functions
+// Renderer Interface Implementation
 // ============================================================================
 
-static void safe_strncpy(char *dest, const char *src, int destsize) {
-    if (!dest || destsize < 1) return;
-    if (!src) {
-        *dest = 0;
-        return;
+void RE_Shutdown(refShutdownCode_t code) {
+    ri.Printf(PRINT_ALL, "Vulkan Renderer: Shutdown (%i)\n", code);
+    vk_shutdown();
+}
+
+void RE_BeginRegistration(glconfig_t *glconfigOut) {
+    ri.Printf(PRINT_ALL, "Vulkan Renderer: BeginRegistration\n");
+
+    // Initialize scene management if Vulkan is active
+    if (vk.active) {
+        vk.scene.initialized = qtrue;
+        vk.scene.entityCount = 0;
+        vk.scene.polygonCount = 0;
     }
 
-    strncpy(dest, src, destsize - 1);
-    dest[destsize - 1] = 0;
+    // Fill in Vulkan config
+    Com_Memset(&glConfig, 0, sizeof(glConfig));
+    glConfig.colorBits = 32;
+    glConfig.depthBits = 24;
+    glConfig.stencilBits = 8;
+    glConfig.deviceSupportsGamma = qtrue;
+    glConfig.textureCompression = TC_S3TC;
+    glConfig.textureEnvAddAvailable = qtrue;
+    glConfig.maxTextureSize = 4096;
+    glConfig.displayFrequency = 60;
+    glConfig.isFullscreen = qfalse;
+    glConfig.stereoEnabled = qfalse;
+    glConfig.vidWidth = 1024;
+    glConfig.vidHeight = 768;
+
+    *glconfigOut = glConfig;
 }
 
-// ============================================================================
-// Core Renderer Functions
-// ============================================================================
-
-static void RE_Shutdown(refShutdownCode_t code) {
-    ri.Printf(PRINT_ALL, "Vulkan RTX Renderer: Shutdown (code: %d)\n", code);
-
-    // Shutdown RTX systems
-    if (r_raytracing && r_raytracing->integer) {
-        // vk_rt_shutdown();
-        ri.Printf(PRINT_ALL, "RTX systems shut down\n");
-    }
-
-    ri.Printf(PRINT_ALL, "Vulkan RTX Renderer shutdown complete\n");
+qhandle_t RE_RegisterModel(const char *name) {
+    // Stub - return invalid handle
+    Q_UNUSED(name);
+    return 0;
 }
 
-static void RE_BeginRegistration(glconfig_t *glconfigOut) {
-    ri.Printf(PRINT_ALL, "Vulkan RTX Renderer: Beginning registration\n");
-
-    // Initialize core renderer cvars
-    r_verbose = ri.Cvar_Get("r_verbose", "0", CVAR_CHEAT);
-    r_norefresh = ri.Cvar_Get("r_norefresh", "0", CVAR_CHEAT);
-    r_drawentities = ri.Cvar_Get("r_drawentities", "1", CVAR_CHEAT);
-    r_drawworld = ri.Cvar_Get("r_drawworld", "1", CVAR_CHEAT);
-    r_speeds = ri.Cvar_Get("r_speeds", "0", CVAR_CHEAT);
-    r_fullbright = ri.Cvar_Get("r_fullbright", "0", CVAR_CHEAT | CVAR_LATCH);
-    r_dynamiclight = ri.Cvar_Get("r_dynamiclight", "1", CVAR_ARCHIVE_ND);
-
-    // RTX-specific cvars
-    r_raytracing = ri.Cvar_Get("r_raytracing", "0", CVAR_ARCHIVE_ND | CVAR_LATCH);
-    r_rt_samples = ri.Cvar_Get("r_rt_samples", "1", CVAR_ARCHIVE_ND);
-    r_rt_maxDepth = ri.Cvar_Get("r_rt_maxDepth", "2", CVAR_ARCHIVE_ND);
-    r_rt_debugMagenta = ri.Cvar_Get("r_rt_debugMagenta", "0", CVAR_CHEAT);
-    r_rt_tlasUpdateMode = ri.Cvar_Get("r_rt_tlasUpdateMode", "1", CVAR_ARCHIVE_ND);
-
-    // Fill in config
-    if (glconfigOut) {
-        Com_Memset(glconfigOut, 0, sizeof(*glconfigOut));
-        glconfigOut->vidWidth = 1024;
-        glconfigOut->vidHeight = 768;
-        glconfigOut->windowAspect = (float)glconfigOut->vidWidth / (float)glconfigOut->vidHeight;
-
-        // Set renderer name
-        safe_strncpy(glconfigOut->renderer_string, "Vulkan RTX",
-                    sizeof(glconfigOut->renderer_string));
-        safe_strncpy(glconfigOut->version_string, "1.0.0",
-                    sizeof(glconfigOut->version_string));
-
-        // Set capabilities
-        glconfigOut->colorBits = 32;
-        glconfigOut->depthBits = 24;
-        glconfigOut->stencilBits = 8;
-        glconfigOut->deviceSupportsGamma = qtrue;
-        glconfigOut->textureCompression = TC_S3TC;
-        glconfigOut->textureEnvAddAvailable = qtrue;
-
-        ri.Printf(PRINT_ALL, "Vulkan RTX Renderer initialized: %s\n", glconfigOut->renderer_string);
-        ri.Printf(PRINT_ALL, "RTX capability: %d\n", r_raytracing->integer);
-    }
-
-    ri.Printf(PRINT_ALL, "Vulkan RTX Renderer registration complete\n");
+qhandle_t RE_RegisterSkin(const char *name) {
+    // Stub - return invalid handle
+    Q_UNUSED(name);
+    return 0;
 }
 
-static void RE_EndRegistration(void) {
-    ri.Printf(PRINT_ALL, "Vulkan RTX Renderer: End registration\n");
-
-    // Initialize Vulkan and RTX systems
-    // vk_initialize();
-    // if (r_raytracing->integer) vk_rt_init();
-
-    ri.Printf(PRINT_ALL, "Renderer systems initialized\n");
+qhandle_t RE_RegisterShader(const char *name) {
+    // Register shader with Vulkan backend
+    return vk_register_shader(name);
 }
 
-static void RE_BeginFrame(stereoFrame_t stereoFrame) {
-    (void)stereoFrame;
-    // Begin frame processing
-    // vk_begin_frame();
+qhandle_t RE_RegisterShaderNoMip(const char *name) {
+    // Register shader (no mip) with Vulkan backend
+    return vk_register_shader(name);
 }
 
-static void RE_EndFrame(int *frontEndMsec, int *backEndMsec) {
-    // End frame processing
-    // vk_end_frame();
+void RE_LoadWorldMap(const char *name) {
+    ri.Printf(PRINT_ALL, "Vulkan Renderer: LoadWorldMap %s\n", name);
+}
 
-    // Performance monitoring
-    if (r_speeds->integer) {
-        static int frameCount = 0;
-        static int lastTime = 0;
-        int currentTime = ri.Milliseconds();
+void RE_SetWorldVisData(const byte *vis) {
+    // Stub
+    Q_UNUSED(vis);
+}
 
-        frameCount++;
-        if (currentTime - lastTime > 1000) {
-            float fps = (float)frameCount / ((currentTime - lastTime) / 1000.0f);
-            ri.Printf(PRINT_ALL, "%0.1f fps\n", fps);
-            frameCount = 0;
-            lastTime = currentTime;
-        }
-    }
+void RE_EndRegistration(void) {
+    ri.Printf(PRINT_ALL, "Vulkan Renderer: EndRegistration\n");
+}
 
+void RE_BeginFrame(stereoFrame_t stereoFrame) {
+    // Stub
+    Q_UNUSED(stereoFrame);
+
+    vk_begin_frame();
+}
+
+void RE_EndFrame(int *frontEndMsec, int *backEndMsec) {
+    vk_end_frame();
+
+    // Stub timing
     if (frontEndMsec) *frontEndMsec = 0;
     if (backEndMsec) *backEndMsec = 0;
 }
 
-static void RE_ClearScene(void) {
-    // Clear scene data
-    // vk_clear_scene();
+int R_LightForPoint(vec3_t point, vec3_t ambientLight, vec3_t directedLight, vec3_t lightDir) {
+    // Return basic lighting
+    VectorSet(ambientLight, 0.5f, 0.5f, 0.5f);
+    VectorSet(directedLight, 0.5f, 0.5f, 0.5f);
+    VectorSet(lightDir, 0, 0, -1);
+    Q_UNUSED(point);
+    return 0;
 }
 
-static void RE_AddRefEntityToScene(const refEntity_t *re, qboolean intShaderTime) {
-    if (!re || !r_drawentities->integer) return;
+void RE_AddAdditiveLightToScene(const vec3_t org, float intensity, float r, float g, float b) {
+    // Stub
+    Q_UNUSED(org); Q_UNUSED(intensity); Q_UNUSED(r); Q_UNUSED(g); Q_UNUSED(b);
+}
 
+void RE_AddLightToScene(const vec3_t org, float intensity, float r, float g, float b) {
+    // Stub
+    Q_UNUSED(org); Q_UNUSED(intensity); Q_UNUSED(r); Q_UNUSED(g); Q_UNUSED(b);
+}
+
+void RE_RenderScene(const refdef_t *fd) {
+    // Render the 3D scene
+    if (vk.active) {
+        vk_render_scene(fd);
+    }
+    // If Vulkan not active, rendering is skipped (no fallback needed for basic operation)
+}
+
+void RE_ClearScene(void) {
+    // Clear the scene
+    if (vk.active) {
+        vk_clear_scene();
+    }
+}
+
+void RE_AddRefEntityToScene(const refEntity_t *re, qboolean intShaderTime) {
     // Add entity to scene
-    // vk_add_entity_to_scene(re, intShaderTime);
+    if (vk.active && re) {
+        vk_add_entity(re, intShaderTime);
+    }
 }
 
-static void RE_AddPolyToScene(qhandle_t hShader, int numVerts, const polyVert_t *verts, int num) {
-    (void)hShader; (void)numVerts; (void)verts; (void)num;
+void RE_AddPolyToScene(qhandle_t hShader, int numVerts, const polyVert_t *verts, int num) {
     // Add polygon to scene
-    // vk_add_poly_to_scene(hShader, numVerts, verts, num);
-}
-
-static void RE_AddLightToScene(const vec3_t org, float intensity, float r, float g, float b) {
-    if (!r_dynamiclight->integer) return;
-
-    // Add light to scene with RTX processing
-    // vk_add_light_to_scene(org, intensity, r, g, b);
-}
-
-static void RE_RenderScene(const refdef_t *fd) {
-    if (!fd) return;
-    if (r_norefresh->integer) return;
-
-    // Traditional Vulkan rendering path
-    // vk_render_scene_traditional(fd);
-
-    // RTX ray tracing path
-    if (r_raytracing && r_raytracing->integer) {
-        ri.Printf(PRINT_ALL, "Rendering with RTX enabled\n");
-
-        // RTX pipeline
-        // vk_rt_trace_primary_rays(fd);
-        // vk_rt_trace_reflections(fd);
-        // vk_rt_compute_direct_lighting(fd);
-        // vk_rt_compute_indirect_lighting(fd);
-        // vk_apply_post_processing(fd);
-    }
-
-    // Debug visualization
-    if (r_rt_debugMagenta->integer) {
-        // vk_draw_debug_overlays(fd);
+    if (vk.active && verts && numVerts > 0) {
+        vk_add_polygon(hShader, numVerts, verts, num);
     }
 }
 
-static void RE_SetColor(const float *rgba) {
-    (void)rgba;
-    // Set rendering color
-    // vk_set_color(rgba);
+void RE_SetColor(const float *rgba) {
+    // Set current rendering color
+    if (vk.active) {
+        vk_set_color(rgba);
+    }
 }
 
-static void RE_StretchPic(float x, float y, float w, float h,
-                          float s1, float t1, float s2, float t2, qhandle_t hShader) {
-    // Draw stretched picture
-    // vk_draw_stretch_pic(x, y, w, h, s1, t1, s2, t2, hShader);
+void RE_StretchPic(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader) {
+    // Draw 2D stretched image
+    if (vk.active) {
+        vk_draw_stretch_pic(x, y, w, h, s1, t1, s2, t2, hShader);
+    }
 }
 
-// ============================================================================
-// Resource Management Functions
-// ============================================================================
-
-static qhandle_t RE_RegisterModel(const char *name) {
-    // Model registration
-    return 0;
+void RE_StretchRaw(int x, int y, int w, int h, int cols, int rows, byte *data, int client, qboolean dirty) {
+    // Draw raw image data
+    if (vk.active && data) {
+        vk_draw_stretch_raw(x, y, w, h, cols, rows, data, client, dirty);
+    }
 }
 
-static qhandle_t RE_RegisterSkin(const char *name) {
-    // Skin registration
-    return 0;
+void RE_UploadCinematic(int w, int h, int cols, int rows, byte *data, int client, qboolean dirty) {
+    // Stub
+    Q_UNUSED(w); Q_UNUSED(h); Q_UNUSED(cols); Q_UNUSED(rows);
+    Q_UNUSED(data); Q_UNUSED(client); Q_UNUSED(dirty);
 }
 
-static qhandle_t RE_RegisterShader(const char *name) {
-    // Shader registration
-    return 0;
+void RE_RemapShader(const char *oldShader, const char *newShader, const char *timeOffset) {
+    // Stub
+    Q_UNUSED(oldShader); Q_UNUSED(newShader); Q_UNUSED(timeOffset);
 }
 
-static qhandle_t RE_RegisterShaderNoMip(const char *name) {
-    // Shader registration without mipmaps
-    return 0;
+qboolean RE_GetEntityToken(char *buffer, int size) {
+    // Stub
+    Q_UNUSED(buffer); Q_UNUSED(size);
+    return qfalse;
 }
 
-static void RE_LoadWorldMap(const char *name) {
-    // Load world map
-    // vk_load_world(name);
-}
-
-static void RE_SetWorldVisData(const byte *vis) {
-    // Set world visibility data
-    // vk_set_world_vis(vis);
-}
-
-static int R_LightForPoint(vec3_t point, vec3_t ambientLight, vec3_t directedLight, vec3_t lightDir) {
-    // Calculate lighting at point
-    return 0;
-}
-
-static void RE_AddAdditiveLightToScene(const vec3_t org, float intensity, float r, float g, float b) {
-    // Add additive light
-    // vk_add_additive_light(org, intensity, r, g, b);
+void RE_TakeVideoFrame(int width, int height, byte *captureBuffer, byte *encodeBuffer, qboolean motionJpeg) {
+    // Stub
+    Q_UNUSED(width); Q_UNUSED(height); Q_UNUSED(captureBuffer);
+    Q_UNUSED(encodeBuffer); Q_UNUSED(motionJpeg);
 }
 
 // ============================================================================
-// Renderer Export Interface
+// GetRefAPI - Main renderer entry point
 // ============================================================================
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-Q_EXPORT refexport_t* QDECL GetRefAPI( int apiVersion, refimport_t *rimp ) {
+Q_EXPORT refexport_t* QDECL GetRefAPI(int apiVersion, refimport_t *rimp) {
     static refexport_t re;
 
-    ri.Printf(PRINT_ALL, "Vulkan RTX Renderer: GetRefAPI called (API version: %d)\n", apiVersion);
+    ri.Printf(PRINT_ALL, "Vulkan Renderer: GetRefAPI called (API version: %d)\n", apiVersion);
 
-    if ( !rimp ) {
+    if (!rimp) {
         ri.Printf(PRINT_ALL, "GetRefAPI: NULL refimport_t\n");
         return NULL;
     }
 
     ri = *rimp;
 
-    Com_Memset( &re, 0, sizeof( re ) );
+    Com_Memset(&re, 0, sizeof(re));
 
-    if ( apiVersion != REF_API_VERSION ) {
-        ri.Printf(PRINT_ALL, "Vulkan RTX Renderer: Mismatched REF_API_VERSION: expected %i, got %i\n", REF_API_VERSION, apiVersion );
+    if (apiVersion != REF_API_VERSION) {
+        ri.Printf(PRINT_ALL, "Vulkan Renderer: Mismatched REF_API_VERSION: expected %i, got %i\n", REF_API_VERSION, apiVersion);
         return NULL;
     }
 
@@ -304,15 +325,15 @@ Q_EXPORT refexport_t* QDECL GetRefAPI( int apiVersion, refimport_t *rimp ) {
     re.RenderScene = RE_RenderScene;
     re.SetColor = RE_SetColor;
     re.DrawStretchPic = RE_StretchPic;
+    re.DrawStretchRaw = RE_StretchRaw;
+    re.UploadCinematic = RE_UploadCinematic;
+    re.RemapShader = RE_RemapShader;
+    re.GetEntityToken = RE_GetEntityToken;
+    re.TakeVideoFrame = RE_TakeVideoFrame;
     re.BeginFrame = RE_BeginFrame;
     re.EndFrame = RE_EndFrame;
 
-    ri.Printf(PRINT_ALL, "Vulkan RTX Renderer: API interface initialized successfully\n");
-    ri.Printf(PRINT_ALL, "Renderer features: RTX=%d\n", r_raytracing ? r_raytracing->integer : 0);
+    ri.Printf(PRINT_ALL, "Vulkan Renderer: API interface initialized successfully\n");
 
     return &re;
 }
-
-#ifdef __cplusplus
-}
-#endif

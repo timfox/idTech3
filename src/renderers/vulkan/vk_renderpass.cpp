@@ -1,7 +1,9 @@
+extern "C" {
 #include "vk_renderpass.h"
 #include "vk_utils.h"
 #include "../renderercommon/tr_public.h"
 #include "vk.h"
+}
 
 // Renderer interface
 extern refimport_t ri;
@@ -182,21 +184,21 @@ VkFramebuffer vk_create_framebuffer(VkRenderPass render_pass, uint32_t attachmen
 }
 
 // Destroy framebuffer
-void vk_destroy_framebuffer(VkFramebuffer framebuffer) {
+extern "C" void vk_destroy_framebuffer(VkFramebuffer framebuffer) {
     if (framebuffer != VK_NULL_HANDLE) {
         qvkDestroyFramebuffer(vk.device, framebuffer, NULL);
     }
 }
 
 // Destroy render pass
-void vk_destroy_render_pass(VkRenderPass render_pass) {
+extern "C" void vk_destroy_render_pass(VkRenderPass render_pass) {
     if (render_pass != VK_NULL_HANDLE) {
         qvkDestroyRenderPass(vk.device, render_pass, NULL);
     }
 }
 
 // Begin render pass
-void vk_begin_specific_render_pass(VkRenderPass render_pass, VkFramebuffer framebuffer,
+extern "C" void vk_begin_specific_render_pass(VkRenderPass render_pass, VkFramebuffer framebuffer,
     qboolean clear_values, uint32_t width, uint32_t height) {
 
     if (!vk_validate_handle(render_pass, "render pass") ||
@@ -221,7 +223,7 @@ void vk_begin_specific_render_pass(VkRenderPass render_pass, VkFramebuffer frame
 }
 
 // End render pass
-void vk_end_render_pass(void) {
+extern "C" void vk_end_render_pass(void) {
     qvkCmdEndRenderPass(vk.cmd->command_buffer);
 
     // End profiling for current render pass
@@ -236,12 +238,12 @@ void vk_end_render_pass(void) {
 }
 
 // Transition to next subpass
-void vk_next_subpass(void) {
+extern "C" void vk_next_subpass(void) {
     qvkCmdNextSubpass(vk.cmd->command_buffer, VK_SUBPASS_CONTENTS_INLINE);
 }
 
 // Begin bloom extract render pass
-void vk_begin_bloom_extract_render_pass(void) {
+extern "C" void vk_begin_bloom_extract_render_pass(void) {
     if (!vk_validate_handle(vk.render_pass.bloom_extract, "bloom extract render pass") ||
         !vk_validate_handle(vk.framebuffers.bloom_extract, "bloom extract framebuffer")) {
         return;
@@ -268,7 +270,7 @@ void vk_begin_bloom_extract_render_pass(void) {
 }
 
 // Begin blur render pass
-void vk_begin_blur_render_pass(uint32_t index) {
+extern "C" void vk_begin_blur_render_pass(uint32_t index) {
     if (!vk_bounds_check(index, VK_NUM_BLOOM_PASSES*2, "blur render pass") ||
         !vk_bounds_check(index, VK_NUM_BLOOM_PASSES*2, "blur framebuffer")) {
         return;
@@ -292,7 +294,7 @@ void vk_begin_blur_render_pass(uint32_t index) {
 }
 
 // Barrier for final image to shader read
-void vk_barrier_final_image_to_shader_read(VkImage image) {
+extern "C" void vk_barrier_final_image_to_shader_read(VkImage image) {
     if (!vk_validate_handle(image, "image")) {
         return;
     }

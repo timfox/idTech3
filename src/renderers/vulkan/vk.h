@@ -39,13 +39,19 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "vk_memory.h"
 
-// ImGui includes (when available) - commented out due to build issues
-// #ifdef USE_CIMGUI
-// #include <cimgui.h>
-// #endif
+// ImGui forward declaration
+typedef struct ImDrawData ImDrawData;
 
-// Forward declarations for renderer types
-typedef struct image_s image_t;
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// Scene management constants
+#ifndef MAX_REFENTITIES
+#define MAX_REFENTITIES		1024  // Match OpenGL renderer capacity
+#endif
+#define MAX_VERTS			16384
+#define MAX_INDICES			16384
 
 // Material parameter structure (full definition from vk_material_system.h)
 typedef struct material_params_s {
@@ -493,7 +499,8 @@ typedef struct stream_cell_s {
     uint32_t lastAccessFrame;
 } stream_cell_t;
 
-#include "vk_cell_streaming.h"
+#define MAX_STREAM_CELLS 256
+
 
 // Atmosphere parameters structure
 typedef struct atmosphere_params_s {
@@ -1140,6 +1147,16 @@ typedef struct {
     VkImage msaa_image;        // Added
     VkImageView msaa_image_view; // Added
 
+    // Scene management
+    struct {
+        qboolean initialized;
+        uint32_t entityCount;
+        uint32_t polygonCount;
+        refEntity_t entities[MAX_REFENTITIES];
+        polyVert_t polygonVerts[MAX_VERTS];
+        uint32_t polygonIndexes[MAX_INDICES];
+    } scene;
+
     // Procedural dressing system
     struct {
         qboolean enabled;
@@ -1319,7 +1336,6 @@ void vk_bind_index_buffer(VkBuffer buffer, uint32_t offset);
 void vk_draw_indexed(uint32_t indexCount, uint32_t firstIndex);
 qboolean create_color_attachment(uint32_t width, uint32_t height, VkSampleCountFlagBits samples, VkFormat format, VkImageUsageFlags usage, VkImage *image, VkImageView *image_view, VkImageLayout image_layout, qboolean multisample, VkImageCreateFlags flags);
 qboolean vk_gpu_culling_is_enabled(void);
-void vk_gpu_culling_add_instance(const float *transform, uint32_t biomeId, const float *color);
 
 // Ray tracing functions
 void vk_rt_init(void);
@@ -1344,5 +1360,23 @@ void vk_sample_thread_utilization(void);
 void vk_check_defragmentation(void);
 void vk_profile_pass_start(const char* name, uint32_t drawCallCount);
 void vk_profile_pass_end(const char* name, uint32_t drawCalls, uint32_t vertices);
+
+// Scene rendering functions
+void vk_render_scene(const refdef_t *fd);
+void vk_clear_scene(void);
+void vk_add_entity(const refEntity_t *re, qboolean intShaderTime);
+void vk_add_polygon(qhandle_t hShader, int numVerts, const polyVert_t *verts, int num);
+void vk_set_color(const float *rgba);
+void vk_draw_stretch_pic(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader);
+void vk_draw_stretch_raw(int x, int y, int w, int h, int cols, int rows, byte *data, int client, qboolean dirty);
+
+// Shader and texture management
+qhandle_t vk_register_shader(const char *name);
+qhandle_t vk_register_image(const char *name, int flags);
+void vk_update_image_data(image_t* image, int x, int y, int width, int height, int layers, const void* data, int data_size);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // VK_H

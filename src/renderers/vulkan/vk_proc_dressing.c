@@ -13,6 +13,7 @@ pipeline (if enabled).
 extern refimport_t ri;
 #include "vk.h"
 #include "vk_proc_dressing.h"
+#include "vk_gpu_culling.h"
 
 #ifdef USE_VULKAN
 

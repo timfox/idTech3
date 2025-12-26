@@ -1283,9 +1283,9 @@ AUX_SOURCE_DIRECTORY(src/renderers/opengl RENDERER_GL_SRCS)
 list(APPEND RENDERER_GL_SRCS src/renderers/opengl/tr_main.c)
 AUX_SOURCE_DIRECTORY(src/renderers/vulkan RENDERER_VK_SRCS)
 
-# Vulkan experimental modules (work-in-progress). Keep OFF by default to ensure
-# the default Vulkan build stays compatible with the engine APIs/structures.
-option(IDTECH3_VK_EXPERIMENTAL "Build experimental Vulkan renderer modules" OFF)
+# Vulkan experimental modules (work-in-progress). Keep ON by default for prioritized
+# Vulkan RTX implementation development.
+option(IDTECH3_VK_EXPERIMENTAL "Build experimental Vulkan renderer modules" ON)
 	if(NOT IDTECH3_VK_EXPERIMENTAL)
 	list(REMOVE_ITEM RENDERER_VK_SRCS
 		src/renderers/vulkan/gltf_loader.c
@@ -1319,6 +1319,14 @@ list(APPEND RENDERER_VK_SRCS
 	src/renderers/vulkan/vk_shader_cache.c
 	src/renderers/vulkan/vk_async_compile.c
 	src/renderers/vulkan/vk_dynamic_rendering.c
+	src/renderers/vulkan/vk_frame.cpp
+	src/renderers/vulkan/vk_images.cpp
+	src/renderers/vulkan/vk_draw.cpp
+	src/renderers/vulkan/vk_descriptors.cpp
+	src/renderers/vulkan/vk_renderpass.cpp
+	src/renderers/vulkan/vk_postprocess.cpp
+	src/renderers/vulkan/vk_config.cpp
+	src/renderers/vulkan/tr_model_assimp.cpp
 )
 
 # DirectX 12 renderer (Windows only)
@@ -1393,13 +1401,7 @@ IF(USE_RENDERER_DLOPEN)
 	TARGET_LINK_OPTIONS(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE -Wl,--export-dynamic -Wl,--unresolved-symbols=ignore-all)
 
 	if(USE_VULKAN)
-		# Create minimal RTX Vulkan renderer with actual RTX implementation
-		set(RTX_VULKAN_SRCS
-			src/renderers/vulkan/tr_rtx.c
-			src/renderers/vulkan/vk_raytracing.c
-		)
-		# RTX uses its own Vulkan initialization, no need for complex vk.c
-		ADD_LIBRARY(${RENDERER_PREFIX}_vulkan${RENDEXT} SHARED ${RTX_VULKAN_SRCS})
+		ADD_LIBRARY(${RENDERER_PREFIX}_vulkan${RENDEXT} SHARED ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
 		SET_TARGET_PROPERTIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES OUTPUT_NAME "${RENDERER_PREFIX}_vulkan${RENDEXT}" PREFIX "")
 		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_VULKAN USE_FREETYPE)
 		IF(USE_FREETYPE)
@@ -2337,7 +2339,7 @@ ELSE()
 ENDIF()
 TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE common botlib client q3ui GL)
 TARGET_LINK_OPTIONS(${CNAME}${BINEXT} PRIVATE -Wl,--export-dynamic)
-TARGET_INCLUDE_DIRECTORIES(${CNAME}${BINEXT} PRIVATE src/common)
+TARGET_INCLUDE_DIRECTORIES(${CNAME}${BINEXT} PRIVATE src/common src)
 IF(USE_UI2)
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ui2)
 ENDIF()
@@ -2717,7 +2719,6 @@ FUNCTION(CONFIGURE_DEAD_CODE_ELIMINATION TARGET_NAME)
     # Linker dead code elimination
     TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE
         -Wl,--gc-sections       # Remove unused sections
-        -Wl,--print-gc-sections # Show what was removed (debug)
         -Wl,--discard-all       # Discard local symbols
         -Wl,--discard-locals    # Discard temporary local symbols
     )
