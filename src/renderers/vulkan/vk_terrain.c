@@ -724,10 +724,15 @@ void vk_terrain_paint_material(int x, int y, int material_index, int radius, flo
     // TODO: Implement material painting
 }
 
-vec3_t vk_terrain_get_normal(int x, int y) {
-    vec3_t normal = {0, 1, 0};
+void vk_terrain_get_normal(int x, int y, vec3_t out_normal) {
+    (void)x; (void)y;
+    if (!out_normal) {
+        return;
+    }
     // TODO: Return actual normal
-    return normal;
+    out_normal[0] = 0.0f;
+    out_normal[1] = 1.0f;
+    out_normal[2] = 0.0f;
 }
 
 qboolean vk_terrain_trace(const vec3_t start, const vec3_t end, vec3_t hit_pos) {

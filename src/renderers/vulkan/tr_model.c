@@ -22,7 +22,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // tr_models.c -- model loading and caching
 
 #include "tr_local.h"
-#include "../../common/q_scalability.h"
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 
@@ -278,9 +277,9 @@ model_t *R_AllocModel_Context( renderer_context_t *ctx ) {
 	trGlobals_t *tr_ctx = GET_TR_CTX(ctx);
 	refimport_t *ri_ctx = GET_RI_CTX(ctx);
 
-	int maxModels = Scalability_GetMaxModels();
-	if (maxModels <= 0) {
-		maxModels = DEFAULT_MAX_MODELS;
+	int maxModels = MAX_MOD_KNOWN;
+	if ( maxModels <= 0 ) {
+		maxModels = 1024;
 	}
 
 	if ( tr_ctx->numModels >= maxModels ) {
@@ -1325,10 +1324,11 @@ void R_ModelInit( void ) {
 	model_t		*mod;
 	int maxModels;
 
-	// Get dynamic limit from scalability system
-	maxModels = Scalability_GetMaxModels();
-	if (maxModels <= 0) {
-		maxModels = DEFAULT_MAX_MODELS; // Fallback
+	// Renderer DLLs should not depend on engine-side scalability system symbols.
+	// Use the renderer-side limit instead.
+	maxModels = MAX_MOD_KNOWN;
+	if ( maxModels <= 0 ) {
+		maxModels = 1024;
 	}
 
 	// Allocate dynamic model array

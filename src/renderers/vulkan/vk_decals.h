@@ -12,6 +12,10 @@ Dynamic decal rendering for bullet holes, scorch marks, and surface effects
 
 #ifdef USE_VULKAN
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define MAX_DECALS 1024
 #define MAX_DECAL_VERTICES 4096
 #define MAX_DECAL_INDICES 6144
@@ -127,5 +131,9 @@ qboolean vk_decals_trace_surface(const vec3_t start, const vec3_t end, vec3_t po
 extern cvar_t *r_decals;
 extern cvar_t *r_decalsMax;
 extern cvar_t *r_decalsFadeTime;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // USE_VULKAN

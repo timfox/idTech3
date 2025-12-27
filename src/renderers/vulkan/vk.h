@@ -1423,6 +1423,7 @@ float ByteToFloat(byte b);
 float sRGBtoRGB(float srgb);
 byte FloatToByte(float f);
 void VBO_PrepareQueues(void);
+void vk_initialize( void );
 void vk_shutdown( refShutdownCode_t code );
 void vk_shutdown_compute_manager(void);
 void vk_shutdown_resource_pool(void);

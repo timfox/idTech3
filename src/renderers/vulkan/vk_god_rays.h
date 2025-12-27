@@ -12,6 +12,10 @@ Volumetric light scattering effects for atmospheric lighting
 
 #ifdef USE_VULKAN
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define MAX_LIGHT_SOURCES 16
 #define GOD_RAYS_SAMPLES 64
 
@@ -97,5 +101,9 @@ extern cvar_t *r_godRaysWeight;
 extern cvar_t *r_godRaysDecay;
 extern cvar_t *r_godRaysExposure;
 extern cvar_t *r_godRaysSamples;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // USE_VULKAN

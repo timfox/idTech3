@@ -12,6 +12,10 @@ Async texture upload system for improved performance
 
 #ifdef USE_VULKAN
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define MAX_PBO_BUFFERS 8
 #define MAX_PBO_SIZE (8 * 1024 * 1024)  // 8MB per buffer
 
@@ -94,5 +98,9 @@ void vk_pbo_get_stats(uint64_t *total_uploads, uint64_t *total_bytes, float *avg
 extern cvar_t *r_pbo;
 extern cvar_t *r_pboBuffers;
 extern cvar_t *r_pboAsync;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // USE_VULKAN

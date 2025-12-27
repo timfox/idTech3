@@ -12,6 +12,10 @@ Advanced volumetric fog rendering with height-based density and lighting
 
 #ifdef USE_VULKAN
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Volumetric fog parameters
 typedef struct {
     float density;              // Base fog density
@@ -77,5 +81,9 @@ extern cvar_t *r_volumetricFogFalloff;
 extern cvar_t *r_volumetricFogSamples;
 extern cvar_t *r_volumetricFogScattering;
 extern cvar_t *r_volumetricFogAbsorption;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // USE_VULKAN

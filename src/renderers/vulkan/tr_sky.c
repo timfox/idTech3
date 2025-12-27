@@ -198,7 +198,12 @@ static void ClipSkyPolygon (int nump, vec3_t vecs, int stage)
 	// clip it
 	sides[i] = sides[0];
 	dists[i] = dists[0];
-	VectorCopy (vecs, (vecs+(i*3)) );
+	// Copy first vertex to the end to simplify the edge loop.
+	// Avoid VectorCopy here: both args derive from the same base pointer and
+	// some compilers warn about potential overlap even though i==nump.
+	vecs[i * 3 + 0] = vecs[0];
+	vecs[i * 3 + 1] = vecs[1];
+	vecs[i * 3 + 2] = vecs[2];
 	newc[0] = newc[1] = 0;
 
 	for (i=0, v = vecs ; i<nump ; i++, v+=3)

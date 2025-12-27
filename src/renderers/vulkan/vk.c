@@ -27,9 +27,7 @@ Vk_Instance vk;
 // Define the global Vulkan world
 vk_world_t vk_world;
 
-// Define global cvars used by Vulkan renderer
-cvar_t *r_vk_profiling = NULL;
-cvar_t *r_vk_debug_overlay = NULL;
+// Global cvars are defined/registered in tr_init.c
 
 // Define glConfig for compatibility (Vulkan renderer uses its own config but some shared code expects this)
 glconfig_t glConfig;
@@ -43,9 +41,7 @@ void Com_SetErrorContext(const char *context) {
 // Memory and file system functions are now handled by tr_services.c
 
 
-void R_SetColorMappings(void) {
-    // Vulkan uses its own color mapping system but some shared code expects this
-}
+// R_SetColorMappings is implemented in shared renderer code (see tr_image.c).
 
 void *Com_Allocate(int size) {
     return malloc(size);
@@ -229,67 +225,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
 
 // Resource tracking - to be implemented in future versions for detailed memory monitoring
 
-// Performance monitoring - basic frame timing
-#ifdef __cplusplus
-extern "C"
-#endif
-void vk_update_performance_stats(void) {
-    static double last_time = 0.0;
-    static uint32_t frame_count = 0;
-
-    double current_time = ri.Milliseconds() / 1000.0;
-
-    if (last_time == 0.0) {
-        last_time = current_time;
-        return;
-    }
-
-    double delta_time = current_time - last_time;
-    frame_count++;
-
-    // Update FPS every second
-    if (delta_time >= 1.0) {
-        vk_perf_stats.fps = (uint32_t)(frame_count / delta_time);
-        frame_count = 0;
-        last_time = current_time;
-    }
-
-    // Enhanced profiling if enabled
-    if (r_vk_profiling && r_vk_profiling->integer) {
-        vk.profiling.enabled = qtrue;
-        
-        // Update frame time history
-        double frame_time = delta_time * 1000.0; // Convert to milliseconds
-        vk.profiling.frame_time_history[vk.profiling.frame_time_history_index] = frame_time;
-        vk.profiling.frame_time_history_index = (vk.profiling.frame_time_history_index + 1) % 128;
-
-        // Calculate frame time variance
-        double sum = 0.0;
-        double sum_sq = 0.0;
-        uint32_t count = 0;
-        for (uint32_t i = 0; i < 128; i++) {
-            if (vk.profiling.frame_time_history[i] > 0.0) {
-                sum += vk.profiling.frame_time_history[i];
-                sum_sq += vk.profiling.frame_time_history[i] * vk.profiling.frame_time_history[i];
-                count++;
-            }
-        }
-        if (count > 0) {
-            double mean = sum / count;
-            double variance = (sum_sq / count) - (mean * mean);
-            vk.profiling.frame_time_variance = (float)variance;
-        }
-
-        // Update debug overlay stats
-        if (r_vk_debug_overlay && r_vk_debug_overlay->integer) {
-            vk.debug_overlay.enabled = qtrue;
-            vk.debug_overlay.frame_time_ms = (float)frame_time;
-            vk.debug_overlay.frame_time_variance = vk.profiling.frame_time_variance;
-        }
-    } else {
-        vk.profiling.enabled = qfalse;
-    }
-}
+// vk_update_performance_stats is implemented in vk_frame.cpp.
 
 // Timeline semaphore management functions
 // Timeline semaphore framework - ready for future implementation
@@ -348,7 +284,6 @@ typedef struct VkPhysicalDeviceMeshShaderFeaturesEXT {
 #include "vk_material_system.h"
 #include "vk_cell_streaming.h"
 #include "vk_atmosphere.h"
-#include "vk_fsr.h"
 #ifdef IDTECH3_VK_EXPERIMENTAL
 #include "vk_ibl.h"
 #include "vk_shadows.h"
@@ -366,6 +301,10 @@ typedef struct VkPhysicalDeviceMeshShaderFeaturesEXT {
 #include "vk_bindless.h"
 #include "vk_shader_cache.h"
 #include "vk_async_compile.h"
+
+// FSR integration lives in vk_fsr.c; avoid including AMD reference headers here
+qboolean vk_fsr_init(void);
+void vk_fsr_shutdown(void);
 
 // Pipeline binary function pointers (VK_KHR_pipeline_executable_properties) - forward declaration
 PFN_vkGetPipelineExecutablePropertiesKHR		qvkGetPipelineExecutablePropertiesKHR;
@@ -3427,6 +3366,9 @@ void vk_write_uniform_descriptor( VkWriteDescriptorSet *desc, VkDescriptorBuffer
 
 
 
+// NOTE: vk_find_sampler is implemented in `vk_descriptors.cpp`.
+// This older copy is kept disabled to avoid duplicate symbols.
+#if 0
 VkSampler vk_find_sampler( const Vk_Sampler_Def *def ) {
 	VkSamplerAddressMode address_mode;
 	VkSamplerCreateInfo desc;
@@ -3553,6 +3495,7 @@ VkSampler vk_find_sampler( const Vk_Sampler_Def *def ) {
 
 	return sampler;
 }
+#endif
 
 
 void vk_destroy_samplers( void )
@@ -6379,12 +6322,16 @@ multisample_state.rasterizationSamples = (renderPassIndex == RENDER_PASS_SCREENM
 
 
 
+// NOTE: get_viewport_rect is implemented in `vk_pipeline.c`.
+// Keep this copy disabled to avoid duplicate symbols.
+#if 0
 void get_viewport_rect(VkRect2D *r) {
 	r->offset.x = 0;
 	r->offset.y = 0;
 	r->extent.width = vk.renderWidth;
 	r->extent.height = vk.renderHeight;
 }
+#endif
 
 void get_viewport(VkViewport *viewport, Vk_Depth_Range depth_range) {
 	VkRect2D r;
@@ -6623,12 +6570,14 @@ static inline void vk_draw_indexed_call(VkCommandBuffer cmd, uint32_t indexCount
 	qvkCmdDrawIndexed(cmd, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 }
 
+#if 0
 #ifdef USE_VBO
 void vk_draw_indexed( uint32_t indexCount, uint32_t firstIndex )
 {
 	vk_draw_indexed_call( vk.cmd->command_buffer, indexCount, 1, firstIndex, 0, 0 );
 }
 #endif
+#endif // 0
 
 
 void vk_bind_index( void )
@@ -8465,9 +8414,7 @@ void vk_recreate_swapchain(void) {
     // For now, we'll log it.
 }
 
-void vk_end_render_pass(void) {
-    // TODO: Implement render pass ending
-}
+// vk_end_render_pass is implemented in vk_renderpass.c.
 
 // ============================================================================
 // Shader and Texture Management Functions

@@ -171,7 +171,9 @@ static void tty_FlushIn( void )
 //   (there may be a way to find out if '\b' alone would work though)
 static void tty_Back( void )
 {
-	(void)write( STDOUT_FILENO, "\b \b", 3 );
+	if ( write( STDOUT_FILENO, "\b \b", 3 ) < 0 ) {
+		// ignore
+	}
 }
 
 
@@ -214,11 +216,15 @@ void tty_Show( void )
 		ttycon_hide--;
 		if ( ttycon_hide == 0 )
 		{
-			(void)write( STDOUT_FILENO, "]", 1 ); // -EC-
+			if ( write( STDOUT_FILENO, "]", 1 ) < 0 ) {
+				// ignore
+			}
 
 			if ( tty_con.cursor > 0 )
 			{
-				(void)write( STDOUT_FILENO, tty_con.buffer, tty_con.cursor );
+				if ( write( STDOUT_FILENO, tty_con.buffer, tty_con.cursor ) < 0 ) {
+					// ignore
+				}
 			}
 		}
 	}
@@ -486,7 +492,9 @@ char *Sys_ConsoleInput( void )
 						s++;
 					Q_strncpyz( text, s, sizeof( text ) );
 					Field_Clear( &tty_con );
-					(void)write( STDOUT_FILENO, "\n]", 2 );
+					if ( write( STDOUT_FILENO, "\n]", 2 ) < 0 ) {
+						// ignore
+					}
 					return text;
 				}
 
@@ -541,10 +549,14 @@ char *Sys_ConsoleInput( void )
 
 				if ( key == 12 ) // clear teaminal
 				{
-					(void)write( STDOUT_FILENO, "\033c]", 3 );
+					if ( write( STDOUT_FILENO, "\033c]", 3 ) < 0 ) {
+						// ignore
+					}
 					if ( tty_con.cursor )
 					{
-						(void)write( STDOUT_FILENO, tty_con.buffer, tty_con.cursor );
+						if ( write( STDOUT_FILENO, tty_con.buffer, tty_con.cursor ) < 0 ) {
+							// ignore
+						}
 					}
 					tty_FlushIn();
 					return NULL;
@@ -560,7 +572,9 @@ char *Sys_ConsoleInput( void )
 			tty_con.buffer[ tty_con.cursor ] = key;
 			tty_con.cursor++;
 			// print the current line (this is differential)
-			(void)write( STDOUT_FILENO, &key, 1 );
+			if ( write( STDOUT_FILENO, &key, 1 ) < 0 ) {
+				// ignore
+			}
 		}
 		return NULL;
 	}
@@ -785,7 +799,9 @@ void Sys_Print( const char *msg )
 		len = out - printmsg;
 	}
 
-	(void)write( STDERR_FILENO, printmsg, len );
+	if ( write( STDERR_FILENO, printmsg, len ) < 0 ) {
+		// ignore
+	}
 
 	if ( ttycon_on )
 	{

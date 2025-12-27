@@ -129,6 +129,56 @@ cvar_t	*r_dlightBacks;
 cvar_t	*r_debugSort;
 cvar_t	*r_showtris;
 
+// Additional legacy/shared cvars referenced by common renderer code paths
+cvar_t	*r_znear;
+cvar_t	*r_zproj;
+cvar_t	*r_stereoSeparation;
+cvar_t	*r_skipBackEnd;
+cvar_t	*r_showImages;
+cvar_t	*r_clear;
+cvar_t	*r_finish;
+cvar_t	*r_dynamiclight;
+cvar_t	*r_drawworld;
+cvar_t	*r_lockpvs;
+cvar_t	*r_showcluster;
+cvar_t	*r_novis;
+cvar_t	*r_vk_debug2D;
+cvar_t	*r_vk_debugClearColor;
+cvar_t	*r_vk_debugUiOnly;
+cvar_t	*r_debugSurface;
+cvar_t	*r_teleporterFlash;
+cvar_t	*r_drawSun;
+cvar_t	*r_flares;
+cvar_t	*r_flareFade;
+cvar_t	*r_flareSize;
+cvar_t	*r_flareCoeff;
+
+// Shared/legacy renderer globals expected by the Vulkan renderer code
+cvar_t	*r_nobind;
+cvar_t	*r_roundImagesDown;
+cvar_t	*r_colorMipLevels;
+cvar_t	*r_picmip;
+cvar_t	*r_nomip;
+cvar_t	*r_simpleMipMaps;
+cvar_t	*r_overBrightBits;
+cvar_t	*r_mapOverBrightBits;
+cvar_t	*r_dither;
+cvar_t	*r_pbr;
+cvar_t	*r_offsetUnits;
+cvar_t	*r_offsetFactor;
+cvar_t	*r_directedScale;
+cvar_t	*r_debugLight;
+cvar_t	*r_lodbias;
+cvar_t	*r_facePlaneCull;
+cvar_t	*r_dlightSaturation;
+cvar_t	*r_dlightIntensity;
+cvar_t	*r_dlightScale;
+
+static cvar_t *r_maxpolys;
+static cvar_t *r_maxpolyverts;
+int max_polys;
+int max_polyverts;
+
 /*
 ================
 RE_EndRegistration
@@ -139,24 +189,7 @@ void RE_EndRegistration( void ) {
     tr.registered = qtrue;
 }
 
-/*
-================
-RE_RegisterFont
-================
-*/
-qboolean RE_RegisterFont( const char *fontName, int pointSize, fontInfo_t *font ) {
-    return RE_RegisterFont_Vulkan( fontName, pointSize, font );
-}
-
-/*
-================
-RE_AddParticle
-================
-*/
-void RE_AddParticle( const vec3_t origin, const vec3_t velocity, const vec3_t color, float size, float life, qhandle_t shader ) {
-    // Particle rendering stub
-    (void)origin; (void)velocity; (void)color; (void)size; (void)life; (void)shader;
-}
+// RE_RegisterFont and RE_AddParticle are implemented in other compilation units.
 
 /*
 ================
@@ -278,6 +311,82 @@ static void R_Register( void ) {
     r_dlightBacks = ri.Cvar_Get( "r_dlightBacks", "1", CVAR_CHEAT );
     r_debugSort = ri.Cvar_Get( "r_debugSort", "0", CVAR_CHEAT );
     r_showtris = ri.Cvar_Get( "r_showtris", "0", CVAR_CHEAT );
+
+    // Texture/debug controls used by shared renderer code
+    r_nobind = ri.Cvar_Get( "r_nobind", "0", CVAR_CHEAT );
+    r_roundImagesDown = ri.Cvar_Get( "r_roundImagesDown", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_colorMipLevels = ri.Cvar_Get( "r_colorMipLevels", "0", CVAR_LATCH );
+    r_picmip = ri.Cvar_Get( "r_picmip", "0", CVAR_ARCHIVE | CVAR_LATCH );
+    r_nomip = ri.Cvar_Get( "r_nomip", "0", CVAR_ARCHIVE | CVAR_LATCH );
+    r_simpleMipMaps = ri.Cvar_Get( "r_simpleMipMaps", "1", CVAR_ARCHIVE | CVAR_LATCH );
+
+    r_overBrightBits = ri.Cvar_Get( "r_overBrightBits", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_mapOverBrightBits = ri.Cvar_Get( "r_mapOverBrightBits", "2", CVAR_ARCHIVE_ND | CVAR_LATCH );
+
+    r_dither = ri.Cvar_Get( "r_dither", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_pbr = ri.Cvar_Get( "r_pbr", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+
+    r_offsetUnits = ri.Cvar_Get( "r_offsetUnits", "-1", CVAR_CHEAT );
+    r_offsetFactor = ri.Cvar_Get( "r_offsetFactor", "-2", CVAR_CHEAT );
+
+    r_directedScale = ri.Cvar_Get( "r_directedScale", "1", CVAR_CHEAT );
+    r_debugLight = ri.Cvar_Get( "r_debugLight", "0", CVAR_CHEAT );
+    r_lodbias = ri.Cvar_Get( "r_lodbias", "0", CVAR_ARCHIVE_ND );
+    r_facePlaneCull = ri.Cvar_Get( "r_facePlaneCull", "1", CVAR_ARCHIVE_ND );
+
+    r_dlightSaturation = ri.Cvar_Get( "r_dlightSaturation", "1", CVAR_ARCHIVE_ND );
+    r_dlightIntensity = ri.Cvar_Get( "r_dlightIntensity", "1", CVAR_ARCHIVE_ND );
+    r_dlightScale = ri.Cvar_Get( "r_dlightScale", "1", CVAR_ARCHIVE_ND );
+
+    // Poly buffer limits
+    r_maxpolys = ri.Cvar_Get( "r_maxpolys", "6000", CVAR_LATCH );
+    r_maxpolyverts = ri.Cvar_Get( "r_maxpolyverts", "30000", CVAR_LATCH );
+    max_polys = r_maxpolys->integer;
+    if ( max_polys < MAX_POLYS ) {
+        max_polys = MAX_POLYS;
+    }
+    max_polyverts = r_maxpolyverts->integer;
+    if ( max_polyverts < MAX_POLYVERTS ) {
+        max_polyverts = MAX_POLYVERTS;
+    }
+
+    // Additional shared/legacy controls used by common renderer code
+    r_znear = ri.Cvar_Get( "r_znear", "4", CVAR_CHEAT );
+    r_zproj = ri.Cvar_Get( "r_zproj", "64", CVAR_ARCHIVE );
+    r_stereoSeparation = ri.Cvar_Get( "r_stereoSeparation", "64", CVAR_ARCHIVE );
+
+    r_skipBackEnd = ri.Cvar_Get( "r_skipBackEnd", "0", CVAR_CHEAT );
+    r_showImages = ri.Cvar_Get( "r_showImages", "0", CVAR_CHEAT );
+    r_clear = ri.Cvar_Get( "r_clear", "0", CVAR_CHEAT );
+    r_finish = ri.Cvar_Get( "r_finish", "0", CVAR_CHEAT );
+    r_dynamiclight = ri.Cvar_Get( "r_dynamiclight", "1", CVAR_ARCHIVE );
+    r_drawworld = ri.Cvar_Get( "r_drawworld", "1", CVAR_CHEAT );
+    r_lockpvs = ri.Cvar_Get( "r_lockpvs", "0", CVAR_CHEAT );
+    r_showcluster = ri.Cvar_Get( "r_showcluster", "0", CVAR_CHEAT );
+    r_novis = ri.Cvar_Get( "r_novis", "0", CVAR_CHEAT );
+
+    r_vk_debug2D = ri.Cvar_Get( "r_vk_debug2D", "0", CVAR_CHEAT );
+    r_vk_debugClearColor = ri.Cvar_Get( "r_vk_debugClearColor", "0", CVAR_CHEAT );
+    r_vk_debugUiOnly = ri.Cvar_Get( "r_vk_debugUiOnly", "0", CVAR_CHEAT );
+
+    r_debugSurface = ri.Cvar_Get( "r_debugSurface", "0", CVAR_CHEAT );
+    r_teleporterFlash = ri.Cvar_Get( "r_teleporterFlash", "1", CVAR_ARCHIVE );
+    r_drawSun = ri.Cvar_Get( "r_drawSun", "1", CVAR_ARCHIVE );
+    r_flares = ri.Cvar_Get( "r_flares", "1", CVAR_ARCHIVE );
+    r_flareFade = ri.Cvar_Get( "r_flareFade", "7", CVAR_ARCHIVE );
+    r_flareSize = ri.Cvar_Get( "r_flareSize", "40", CVAR_ARCHIVE );
+    r_flareCoeff = ri.Cvar_Get( "r_flareCoeff", "1", CVAR_ARCHIVE );
+}
+
+void R_Init( void ) {
+    static qboolean initialized = qfalse;
+    if ( initialized ) {
+        return;
+    }
+    initialized = qtrue;
+
+    R_Register();
+    vk_initialize();
 }
 
 /*
@@ -336,28 +445,4 @@ refexport_t *GetRefAPI( int apiVersion, refimport_t *rimp ) {
     return &re;
 }
 
-// ============================================================================
-// Helper stubs for missing engine functions in this translation unit
-// ============================================================================
-
-void Com_Printf( const char *fmt, ... ) {
-    va_list argptr;
-    char msg[4096];
-    va_start( argptr, fmt );
-    vsnprintf( msg, sizeof( msg ), fmt, argptr );
-    va_end( argptr );
-    ri.Printf( PRINT_ALL, "%s", msg );
-}
-
-void Q_strncpyz( char *dest, const char *src, int destsize ) {
-    if ( !dest || destsize < 1 ) return;
-    if ( !src ) { *dest = 0; return; }
-    strncpy( dest, src, destsize - 1 );
-    dest[destsize - 1] = 0;
-}
-
-
-// Global stubs that don't belong to refexport_t but are needed by other Vulkan modules
-void vk_draw_geometry( Vk_Depth_Range depth_range, qboolean indexed ) {
-    (void)depth_range; (void)indexed;
-}
+// (Helper stubs removed: these functions are provided by other compilation units.)

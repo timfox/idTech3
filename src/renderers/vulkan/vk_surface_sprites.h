@@ -12,6 +12,10 @@ Particle-like effects attached to surfaces (grass, debris, flowers, etc.)
 
 #ifdef USE_VULKAN
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define MAX_SURFACE_SPRITE_TYPES 64
 #define MAX_SURFACE_SPRITES 8192
 #define SURFACE_SPRITE_BATCH_SIZE 1024
@@ -134,5 +138,9 @@ extern cvar_t *r_surfaceSprites;
 extern cvar_t *r_surfaceSpritesMax;
 extern cvar_t *r_surfaceSpritesDistance;
 extern cvar_t *r_surfaceSpritesWind;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // USE_VULKAN

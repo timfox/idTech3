@@ -12,6 +12,10 @@ Heightmap-based terrain with LOD, material blending, and editing capabilities
 
 #ifdef USE_VULKAN
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define TERRAIN_MAX_SIZE 2048
 #define TERRAIN_MAX_LOD_LEVELS 6
 #define TERRAIN_PATCH_SIZE 64
@@ -137,7 +141,7 @@ void vk_terrain_set_material_weight(int x, int y, int material_index, float weig
 void vk_terrain_paint_material(int x, int y, int material_index, int radius, float strength);
 
 // Utility functions
-vec3_t vk_terrain_get_normal(int x, int y);
+void vk_terrain_get_normal(int x, int y, vec3_t out_normal);
 qboolean vk_terrain_trace(const vec3_t start, const vec3_t end, vec3_t hit_pos);
 void vk_terrain_get_height_range(float *min_height, float *max_height);
 
@@ -147,5 +151,9 @@ extern cvar_t *r_terrainLod;
 extern cvar_t *r_terrainGridSize;
 extern cvar_t *r_terrainPatchSize;
 extern cvar_t *r_terrainMaterials;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // USE_VULKAN

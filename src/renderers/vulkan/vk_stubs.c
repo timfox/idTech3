@@ -1,9 +1,30 @@
 
 #include "tr_local.h"
 
+// Stub global GL state expected by shared renderer code paths.
+glstatic_t gls = {0};
+glstate_t glState = {0};
+
+// Stub screenshot/video capture helpers expected by shared renderer code.
+void RB_TakeScreenshot(int x, int y, int width, int height, const char *fileName) {
+    (void)x; (void)y; (void)width; (void)height; (void)fileName;
+}
+
+void RB_TakeScreenshotJPEG(int x, int y, int width, int height, const char *fileName) {
+    (void)x; (void)y; (void)width; (void)height; (void)fileName;
+}
+
+void RB_TakeScreenshotBMP(int x, int y, int width, int height, const char *fileName, int clipboard) {
+    (void)x; (void)y; (void)width; (void)height; (void)fileName; (void)clipboard;
+}
+
+const void *RB_TakeVideoFrameCmd(const void *data) {
+    (void)data;
+    return NULL;
+}
+
 // Stubs for CVARs that are expected by the renderer but defined in the engine
 cvar_t *r_texturebits;
-cvar_t *r_colorMipLevels;
 cvar_t *r_defaultImage;
 cvar_t *r_ambientScale;
 cvar_t *r_lodscale;
@@ -66,10 +87,6 @@ cvar_t *r_rt_denoiseVarianceAlpha;
 cvar_t *r_rt_denoiseIterations;
 cvar_t *r_rt_denoise;
 cvar_t *r_rt_temporal;
-cvar_t *r_rt_samples;
-cvar_t *r_rt_maxDepth;
-cvar_t *r_rt_debugMagenta;
-cvar_t *r_rt_tlasUpdateMode;
 cvar_t *r_rt_temporalAlpha;
 cvar_t *r_rt_blasCompaction;
 cvar_t *r_rt_blasReuse;
@@ -80,6 +97,78 @@ cvar_t *r_rt_adaptiveSampling;
 cvar_t *r_rt_gi;
 cvar_t *r_rt_giBounces;
 cvar_t *r_rt_giIntensity;
+
+// ---------------------------------------------------------------------------
+// Optional subsystems (temporarily stubbed so the Vulkan build links)
+// ---------------------------------------------------------------------------
+
+void vk_volumetric_fog_init(void) {}
+void vk_volumetric_fog_shutdown(void) {}
+void vk_volumetric_fog_update(void) {}
+void vk_volumetric_fog_render(void) {}
+
+void vk_decals_init(void) {}
+void vk_decals_shutdown(void) {}
+void vk_decals_update(void) {}
+void vk_decals_render(void) {}
+
+// ---------------------------------------------------------------------------
+// PBO stubs (wiring exists, full implementation pending)
+// ---------------------------------------------------------------------------
+
+cvar_t *r_pbo = NULL;
+cvar_t *r_pboBuffers = NULL;
+cvar_t *r_pboAsync = NULL;
+
+void vk_pbo_init(void) {
+    if (!r_pbo) {
+        r_pbo = ri.Cvar_Get("r_pbo", "0", CVAR_ARCHIVE);
+    }
+    if (!r_pboBuffers) {
+        r_pboBuffers = ri.Cvar_Get("r_pboBuffers", "4", CVAR_ARCHIVE);
+    }
+    if (!r_pboAsync) {
+        r_pboAsync = ri.Cvar_Get("r_pboAsync", "1", CVAR_ARCHIVE);
+    }
+}
+
+void vk_pbo_shutdown(void) {}
+qboolean vk_pbo_is_available(void) { return qfalse; }
+void vk_pbo_wait_all_uploads(void) {}
+void vk_pbo_update(void) {}
+qboolean vk_pbo_upload_texture_sync(const void *data, VkDeviceSize size,
+                                    VkImage dst_image, VkImageLayout final_layout,
+                                    const VkBufferImageCopy *region) {
+    (void)data; (void)size; (void)dst_image; (void)final_layout; (void)region;
+    return qfalse;
+}
+
+// ---------------------------------------------------------------------------
+// God rays stubs (wiring exists, full implementation pending)
+// ---------------------------------------------------------------------------
+
+void vk_god_rays_init(void) {}
+void vk_god_rays_shutdown(void) {}
+void vk_god_rays_update(void) {}
+void vk_god_rays_render(VkCommandBuffer cmd_buffer) { (void)cmd_buffer; }
+
+// ---------------------------------------------------------------------------
+// Terrain stubs (wiring exists, full implementation pending)
+// ---------------------------------------------------------------------------
+
+void vk_terrain_init(void) {}
+void vk_terrain_shutdown(void) {}
+void vk_terrain_update(void) {}
+void vk_terrain_render(void) {}
+
+// ---------------------------------------------------------------------------
+// Surface sprites stubs (wiring exists, full implementation pending)
+// ---------------------------------------------------------------------------
+
+void vk_surface_sprites_init(void) {}
+void vk_surface_sprites_shutdown(void) {}
+void vk_surface_sprites_update(void) {}
+void vk_surface_sprites_render(void) {}
 
 // Global timing
 vk_gpu_timing_t vk_gpu_timing;

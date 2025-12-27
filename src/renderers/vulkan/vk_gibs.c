@@ -130,16 +130,8 @@ void vk_gibs_init( void )
 	
 	ri.Printf( PRINT_ALL, "GIBS: Initialized with capacity for %u surfels\n", vk.gibs.surfelCapacity );
 	
-	// Create uniform buffer for GIBS
-	VkBufferCreateInfo uniformBufferInfo = {};
-	uniformBufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	uniformBufferInfo.size = sizeof( GIBSUniformBuffer );
-	uniformBufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-	uniformBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	
-	// Note: Uniform buffer will be created when pipelines are created
-	// For now, just mark as initialized
-	
+	// Note: Uniform buffer will be created when pipelines are created.
+	// For now, just mark as initialized.
 	vk.gibs.initialized = qtrue;
 }
 
@@ -644,32 +636,27 @@ void vk_gibs_update( void )
 		extern backEndState_t backEnd;
 		
 		// Get view inverse matrix (use optimized inversion for better numerical stability)
-		if ( backEnd.viewParms.world.modelViewMatrix ) {
+		{
+			// modelViewMatrix is a value (not a pointer); keep the code branchless.
 			mat4_t viewMatrix;
 			Com_Memcpy( viewMatrix, backEnd.viewParms.world.modelViewMatrix, sizeof( mat4_t ) );
 			Matrix16InverseOptimized( viewMatrix, gibsUniformData.viewInverse );
-		} else {
-			Matrix16Identity( gibsUniformData.viewInverse );
 		}
 		
 		// Get projection inverse matrix (projection matrices are not affine, use general inversion)
 		// Matrix16InverseOptimized handles both affine and non-affine matrices correctly
-		if ( backEnd.viewParms.projectionMatrix ) {
+		{
+			// projectionMatrix is a value (not a pointer); keep the code branchless.
 			mat4_t projMatrix;
 			Com_Memcpy( projMatrix, backEnd.viewParms.projectionMatrix, sizeof( mat4_t ) );
 			// Projection matrices are not affine (bottom row is not [0,0,0,1])
 			// Matrix16InverseOptimized will use the general 4x4 inversion path
 			Matrix16InverseOptimized( projMatrix, gibsUniformData.projInverse );
-		} else {
-			Matrix16Identity( gibsUniformData.projInverse );
 		}
 		
 		// Get camera position
-		if ( backEnd.viewParms.or.origin ) {
-			VectorCopy( backEnd.viewParms.or.origin, gibsUniformData.cameraPos );
-		} else {
-			VectorClear( gibsUniformData.cameraPos );
-		}
+		// origin is a value (not a pointer)
+		VectorCopy( backEnd.viewParms.or.origin, gibsUniformData.cameraPos );
 		
 		gibsUniformData.time = tr.refdef.floatTime;
 		gibsUniformData.surfelCount = vk.gibs.surfelCount;
