@@ -1,0 +1,84 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+#define A_GPU 1
+#define A_GLSL 1
+#define A_HALF 1
+#include "../../fsr/ffx_a.h"
+#include "../../fsr/ffx_fsr1.h"
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D inputImage;
+layout(set = 0, binding = 1, rgba16f) uniform writeonly image2D outputImage;
+
+// FSR EASU constants (set from CPU)
+layout(set = 0, binding = 2) uniform FSRConstants {
+    uvec4 easu_const0;
+    uvec4 easu_const1;
+    uvec4 easu_const2;
+    uvec4 easu_const3;
+} fsr;
+
+void main() {
+    uvec2 pos = gl_GlobalInvocationID.xy;
+
+    // Skip if outside output bounds
+    if (any(greaterThanEqual(pos, imageSize(outputImage))))
+        return;
+
+    // Input image size
+    vec2 inputSize = textureSize(inputImage, 0);
+
+    // EASU algorithm implementation
+    vec4 con0 = vec4(fsr.easu_const0) / 65536.0;
+    vec4 con1 = vec4(fsr.easu_const1) / 65536.0;
+    vec4 con2 = vec4(fsr.easu_const2) / 65536.0;
+    vec4 con3 = vec4(fsr.easu_const3) / 65536.0;
+
+    // Calculate input UV coordinates
+    vec2 outputUV = (vec2(pos) + 0.5) / vec2(imageSize(outputImage));
+    vec2 inputUV = outputUV * con0.xy + con0.zw;
+
+    // Gather 4x4 neighborhood
+    vec4 b = textureGather(inputImage, inputUV + con1.zw, 0); // top-left
+    vec4 c = textureGather(inputImage, inputUV + con2.xy, 0); // top-right
+    vec4 d = textureGather(inputImage, inputUV + con2.zw, 0); // bottom-left
+    vec4 e = textureGather(inputImage, inputUV + con3.xy, 0); // bottom-right
+
+    // Extract color channels
+    vec3 bR = b.xxx;
+    vec3 bG = b.yyy;
+    vec3 bB = b.zzz;
+    vec3 cR = c.xxx;
+    vec3 cG = c.yyy;
+    vec3 cB = c.zzz;
+    vec3 dR = d.xxx;
+    vec3 dG = d.yyy;
+    vec3 dB = d.zzz;
+    vec3 eR = e.xxx;
+    vec3 eG = e.yyy;
+    vec3 eB = e.zzz;
+
+    // Compute min/max for clamping
+    vec3 minRGB = min(min(min(bR, bG, bB), cR, cG, cB), dR, dG, dB), eR, eG, eB);
+    vec3 maxRGB = max(max(max(bR, bG, bB), cR, cG, cB), dR, dG, dB), eR, eG, eB);
+
+    // Compute weights (simplified EASU)
+    vec3 w = vec3(0.25); // Equal weights for now
+
+    // Combine colors
+    vec3 color = bR * w.r + bG * w.g + bB * w.b +
+                 cR * w.r + cG * w.g + cB * w.b +
+                 dR * w.r + dG * w.g + dB * w.b +
+                 eR * w.r + eG * w.g + eB * w.b;
+
+    // Clamp to neighborhood range
+    color = clamp(color, minRGB, maxRGB);
+
+    // Store result
+    imageStore(outputImage, ivec2(pos), vec4(color, 1.0));
+}

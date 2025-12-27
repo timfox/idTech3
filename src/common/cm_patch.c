@@ -910,8 +910,8 @@ static void CM_AddFacetBevels( facet_t *facet ) {
 	for ( j = 0 ; j < w->numpoints ; j++ )
 	{
 		k = (j+1)%w->numpoints;
-		VectorCopy( w->p[j], d1 );
-		VectorCopy( w->p[k], d2 );
+		d1[0] = w->p[j][0]; d1[1] = w->p[j][1]; d1[2] = w->p[j][2];
+		d2[0] = w->p[k][0]; d2[1] = w->p[k][1]; d2[2] = w->p[k][2];
 		VectorSubtractDP( d1, d2, vec );
 		//if it's a degenerate edge
 		if ( VectorNormalizeDP( vec ) < 0.5 )

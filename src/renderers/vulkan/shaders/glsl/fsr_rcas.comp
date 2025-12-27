@@ -1,0 +1,52 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+#define A_GPU 1
+#define A_GLSL 1
+#define A_HALF 1
+#include "../../fsr/ffx_a.h"
+#include "../../fsr/ffx_fsr1.h"
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D inputImage;
+layout(set = 0, binding = 1, rgba16f) uniform writeonly image2D outputImage;
+
+// FSR RCAS constants (set from CPU)
+layout(set = 0, binding = 2) uniform FSRConstants {
+    uvec4 rcas_const0;
+} fsr;
+
+void main() {
+    uvec2 pos = gl_GlobalInvocationID.xy;
+
+    // Skip if outside output bounds
+    if (any(greaterThanEqual(pos, imageSize(outputImage))))
+        return;
+
+    vec2 uv = (vec2(pos) + 0.5) / vec2(imageSize(outputImage));
+
+    // RCAS algorithm - simplified implementation
+    vec4 con = vec4(fsr.rcas_const0) / 65536.0;
+
+    // Sample 3x3 neighborhood
+    vec3 a = texture(inputImage, uv + vec2(-1.0, -1.0) / textureSize(inputImage, 0).xy).rgb;
+    vec3 b = texture(inputImage, uv + vec2( 0.0, -1.0) / textureSize(inputImage, 0).xy).rgb;
+    vec3 c = texture(inputImage, uv + vec2( 1.0, -1.0) / textureSize(inputImage, 0).xy).rgb;
+    vec3 d = texture(inputImage, uv + vec2(-1.0,  0.0) / textureSize(inputImage, 0).xy).rgb;
+    vec3 e = texture(inputImage, uv).rgb; // center
+    vec3 f = texture(inputImage, uv + vec2( 1.0,  0.0) / textureSize(inputImage, 0).xy).rgb;
+    vec3 g = texture(inputImage, uv + vec2(-1.0,  1.0) / textureSize(inputImage, 0).xy).rgb;
+    vec3 h = texture(inputImage, uv + vec2( 0.0,  1.0) / textureSize(inputImage, 0).xy).rgb;
+    vec3 i = texture(inputImage, uv + vec2( 1.0,  1.0) / textureSize(inputImage, 0).xy).rgb;
+
+    // Contrast-adaptive sharpening
+    vec3 bSharp = b * (1.0 + con.x) - (a + c + d + f + g + h + i) * con.x * 0.125;
+    vec3 color = clamp(bSharp, 0.0, 1.0);
+
+    // Store result
+    imageStore(outputImage, ivec2(pos), vec4(color, 1.0));
+}

@@ -40,16 +40,16 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 static ID_INLINE double DotProductDPf( const float *v1, const float *v2 ) {
 	double x[3], y[3];
-	VectorCopy( v1, x );
-	VectorCopy( v2, y );
+	x[0] = v1[0]; x[1] = v1[1]; x[2] = v1[2];
+	y[0] = v2[0]; y[1] = v2[1]; y[2] = v2[2];
 	return x[0]*y[0]+x[1]*y[1]+x[2]*y[2];
 }
 
 
 static ID_INLINE void CrossProductDP( const vec3_t v1, const vec3_t v2, vec3_t cross ) {
 	double d1[3], d2[3];
-	VectorCopy( v1, d1 );
-	VectorCopy( v2, d2 );
+	d1[0] = v1[0]; d1[1] = v1[1]; d1[2] = v1[2];
+	d2[0] = v2[0]; d2[1] = v2[1]; d2[2] = v2[2];
 	cross[0] = d1[1]*d2[2] - d1[2]*d2[1];
 	cross[1] = d1[2]*d2[0] - d1[0]*d2[2];
 	cross[2] = d1[0]*d2[1] - d1[1]*d2[0];
@@ -59,7 +59,7 @@ static ID_INLINE void CrossProductDP( const vec3_t v1, const vec3_t v2, vec3_t c
 static ID_INLINE vec_t VectorNormalizeDP( vec3_t v ) {
 	double	length, ilength, d[3];
 
-	VectorCopy( v, d );
+	d[0] = v[0]; d[1] = v[1]; d[2] = v[2];
 	length = d[0]*d[0] + d[1]*d[1] + d[2]*d[2];
 
 	if ( length ) {
@@ -71,7 +71,7 @@ static ID_INLINE vec_t VectorNormalizeDP( vec3_t v ) {
 		v[1] = d[1] * ilength;
 		v[2] = d[2] * ilength;
 	}
-		
+
 	return length;
 }
 

@@ -49,6 +49,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "qgl.h"
 #include "qgl_linked.h"
 
+// 4-component vector math functions (missing from OpenGL renderer)
+#define DotProduct4(a,b)        ((a)[0]*(b)[0] + (a)[1]*(b)[1] + (a)[2]*(b)[2] + (a)[3]*(b)[3])
+#define VectorScale4(a,b,c)     ((c)[0]=(a)[0]*(b),(c)[1]=(a)[1]*(b),(c)[2]=(a)[2]*(b),(c)[3]=(a)[3]*(b))
+
 // Forward declarations for TIKI model system
 struct tikiSurface_s;
 typedef struct tikiSurface_s tikiSurface_t;

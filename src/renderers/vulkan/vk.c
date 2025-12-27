@@ -356,6 +356,7 @@ typedef struct VkPhysicalDeviceMeshShaderFeaturesEXT {
 #include "vk_material_system.h"
 #include "vk_cell_streaming.h"
 #include "vk_atmosphere.h"
+#include "vk_fsr.h"
 #ifdef IDTECH3_VK_EXPERIMENTAL
 #include "vk_ibl.h"
 #include "vk_shadows.h"
@@ -3600,6 +3601,11 @@ void vk_initialize( void )
 	if (vk.rayTracingSupported) {
 		ri.Printf(PRINT_ALL, "Vulkan: Initializing ray tracing\n");
 		vk_rt_init();
+	}
+
+	// Initialize FSR (FidelityFX Super Resolution)
+	if (!vk_fsr_init()) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize FSR\n");
 	}
 
 	ri.Printf(PRINT_ALL, "DEBUG: vk_initialize completed successfully\n");
@@ -8192,6 +8198,9 @@ void vk_shutdown( refShutdownCode_t code ) {
 
 			// Shutdown enhanced post processing
 			vk_shutdown_enhanced_post_processing();
+
+			// Shutdown FSR
+			vk_fsr_shutdown();
 
 			// Shutdown ray tracing if enabled
 #ifdef USE_VULKAN_RAY_TRACING

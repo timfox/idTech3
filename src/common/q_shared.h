@@ -812,26 +812,9 @@ void ByteToDir( int b, vec3_t dir );
 #define SGN(x) (((x) >= 0) ? !!(x) : -1)
 #endif
 
-#if	1
-
-#define DotProduct(x,y)			((x)[0]*(y)[0]+(x)[1]*(y)[1]+(x)[2]*(y)[2])
-#define VectorSubtract(a,b,c)	((c)[0]=(a)[0]-(b)[0],(c)[1]=(a)[1]-(b)[1],(c)[2]=(a)[2]-(b)[2])
-#define VectorAdd(a,b,c)		((c)[0]=(a)[0]+(b)[0],(c)[1]=(a)[1]+(b)[1],(c)[2]=(a)[2]+(b)[2])
-#define VectorCopy(a,b)			((b)[0]=(a)[0],(b)[1]=(a)[1],(b)[2]=(a)[2])
-#define	VectorScale(v, s, o)	((o)[0]=(v)[0]*(s),(o)[1]=(v)[1]*(s),(o)[2]=(v)[2]*(s))
-#define	VectorMA(v, s, b, o)	((o)[0]=(v)[0]+(b)[0]*(s),(o)[1]=(v)[1]+(b)[1]*(s),(o)[2]=(v)[2]+(b)[2]*(s))
-
-#define DotProduct4(a,b)		((a)[0]*(b)[0] + (a)[1]*(b)[1] + (a)[2]*(b)[2] + (a)[3]*(b)[3])
-#define VectorScale4(a,b,c)		((c)[0]=(a)[0]*(b),(c)[1]=(a)[1]*(b),(c)[2]=(a)[2]*(b),(c)[3]=(a)[3]*(b))
-
 #define Vector2Set( v, x, y )        ( ( v )[ 0 ] = ( x ),( v )[ 1 ] = ( y ) )
 #define Vector2Copy( a,b )           ( ( b )[ 0 ] = ( a )[ 0 ],( b )[ 1 ] = ( a )[ 1 ] )
 #define Vector2Subtract( a,b,c )     ( ( c )[ 0 ] = ( a )[ 0 ] - ( b )[ 0 ],( c )[ 1 ] = ( a )[ 1 ] - ( b )[ 1 ] )
-
-#ifdef USE_VK_PBR
-#endif
-
-#else
 
 #define DotProduct(x,y)			_DotProduct(x,y)
 #define VectorSubtract(a,b,c)	_VectorSubtract(a,b,c)
@@ -839,8 +822,6 @@ void ByteToDir( int b, vec3_t dir );
 #define VectorCopy(a,b)			_VectorCopy(a,b)
 #define	VectorScale(v, s, o)	_VectorScale(v,s,o)
 #define	VectorMA(v, s, b, o)	_VectorMA(v,s,b,o)
-
-#endif
 
 #ifdef Q3_VM
 #ifdef VectorCopy
@@ -947,14 +928,18 @@ static ID_INLINE vec_t VectorLengthSquared( const vec3_t v ) {
 static ID_INLINE vec_t Distance( const vec3_t p1, const vec3_t p2 ) {
 	vec3_t	v;
 
-	VectorSubtract (p2, p1, v);
+	v[0] = p2[0] - p1[0];
+	v[1] = p2[1] - p1[1];
+	v[2] = p2[2] - p1[2];
 	return VectorLength( v );
 }
 
 static ID_INLINE vec_t DistanceSquared( const vec3_t p1, const vec3_t p2 ) {
 	vec3_t	v;
 
-	VectorSubtract (p2, p1, v);
+	v[0] = p2[0] - p1[0];
+	v[1] = p2[1] - p1[1];
+	v[2] = p2[2] - p1[2];
 	return v[0]*v[0] + v[1]*v[1] + v[2]*v[2];
 }
 

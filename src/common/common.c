@@ -72,10 +72,6 @@ int time_frontend = 0;
 // Timing variables - com_frameTime is extern in qcommon.h
 int com_frameTime = 0;
 
-// SDL/Input state stubs - moved to platform-specific files where needed
-// qboolean gw_active = qtrue;
-// qboolean gw_minimized = qfalse;
-
 __attribute__((visibility("hidden"))) char rconPassword2[ MAX_CVAR_VALUE_STRING ] = {0};
 
 /*
@@ -197,19 +193,20 @@ void Com_Frame( qboolean noDelay ) {
 }
 
 // Memory management stubs
-void *Z_Malloc( int size ) { return calloc( 1, size ); }
+void *Z_Malloc( int size ) { return calloc( 1, (size_t)size ); }
 void Z_Free( void *ptr ) { if (ptr) free( ptr ); }
-void *Z_TagMalloc( int size, memtag_t tag ) { (void)tag; return malloc( size ); }
-void *Hunk_AllocateTempMemory( int size ) { return calloc( 1, size + 16 ); }
+void *Z_TagMalloc( int size, memtag_t tag ) { (void)tag; return malloc( (size_t)size ); }
+void *Hunk_AllocateTempMemory( int size ) { return calloc( 1, (size_t)size + 16 ); }
 void Hunk_FreeTempMemory( void *ptr ) { if (ptr) free( ptr ); }
 int Hunk_MemoryRemaining( void ) { return 1024 * 1024; }
-void *Hunk_Alloc( int size, ha_pref pref ) { (void)pref; return malloc(size); }
+void *Hunk_Alloc( int size, ha_pref pref ) { (void)pref; return malloc((size_t)size); }
 void Hunk_Clear( void ) { }
 void Hunk_ClearToMark( void ) { }
 void Hunk_SetMark( void ) { }
 qboolean Hunk_CheckMark( void ) { return qtrue; }
 void Hunk_ClearTempMemory( void ) { }
 int Z_AvailableMemory( void ) { return 64 * 1024 * 1024; }
+void Z_LogHeap( void ) { }
 
 // Timing
 int Com_Milliseconds( void ) {
@@ -271,36 +268,6 @@ qboolean Com_EarlyParseCmdLine( char *commandLine, char *con_title, int title_si
 
 void Com_WriteConfiguration( void ) { }
 void Com_StartupVariable( const char *match ) { (void)match; }
-
-void S_Spatialize( void *ch ) { (void)ch; }
-void Field_AutoComplete( field_t *edit ) { (void)edit; }
-void Field_CompleteFilename( const char *dir, const char *ext, qboolean stripExt, int flags ) { (void)dir; (void)ext; (void)stripExt; (void)flags; }
-void Field_CompleteCommand( const char *cmd, qboolean doCommands, qboolean doCvars ) { (void)cmd; (void)doCommands; (void)doCvars; }
-void Field_CompleteKeyname( void ) { }
-void Field_CompleteKeyBind( int key ) { (void)key; }
-void Info_Print( const char *s ) { printf("%s", s); }
-void Com_BeginRedirect (char *buffer, int buffersize, void (*flush)(const char *)) { (void)buffer; (void)buffersize; (void)flush; }
-void Com_EndRedirect( void ) { }
-void *S_Malloc( int size ) { return malloc(size); }
-int Z_FreeTags( memtag_t tag ) { (void)tag; return 0; }
-int Com_Filter( const char *filter, const char *name ) { (void)filter; (void)name; return 0; }
-qboolean Com_HasPatterns( const char *str ) { (void)str; return qfalse; }
-int Com_FilterPath( const char *filter, const char *name ) { (void)filter; (void)name; return 1; }
-qboolean Com_FilterExt( const char *filter, const char *name ) { (void)filter; (void)name; return qtrue; }
-void Com_SortList( char** list, int n ) { (void)list; (void)n; }
-unsigned int Com_TouchMemory( void ) { return 0; }
-void Com_RandomBytes( byte *buffer, int len ) { for (int i = 0; i < len; i++) buffer[i] = rand() % 256; }
-qboolean FS_MountTable_IsActive( void ) { return qfalse; }
-fsMount_t *FS_WritePolicy_GetMount( const char *qpath ) { (void)qpath; return NULL; }
-qboolean FS_Sandbox_ValidateOperation( const char *qpath, fsMount_t *mount, qboolean isWrite ) { (void)qpath; (void)mount; (void)isWrite; return qtrue; }
-qboolean Q_ValidateFilePath( const char *path ) { (void)path; return qtrue; }
-int FS_Mount_FindFile( const char *qpath, fileHandle_t *file, fsMount_t **outMount, pack_t **outPak, fileInPack_t **outPakFile ) { (void)qpath; (void)file; (void)outMount; (void)outPak; (void)outPakFile; return -1; }
-void FS_MountTable_Shutdown( void ) { }
-void FS_MountTable_Init( void ) { }
-void FS_MigrateLegacySearchPaths( void ) { }
-void FS_Mount_RegisterCommands( void ) { }
-qboolean NetThread_IsThreadEnabled(net_thread_type_t threadType) { (void)threadType; return qfalse; }
-qboolean NetThread_QueueSendMessage(const netadr_t* address, const msg_t* message, int flags) { (void)address; (void)message; (void)flags; return qfalse; }
 
 // Sys_QueEvent moved to platform-specific files (unix_shared.c, etc.)
 // void Sys_QueEvent( int time, sysEventType_t type, int value, int value2, int ptrLength, void *ptr ) { ... }
