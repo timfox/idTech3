@@ -244,9 +244,8 @@ qboolean vk_create_ssao_pipeline(void)
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &vk.ssao_descriptor_layout;
     pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &(VkPushConstantRange){
-        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ssaoConfig_t)
-    };
+    VkPushConstantRange ssaoPushRange = { VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ssaoConfig_t) };
+    pipelineLayoutInfo.pPushConstantRanges = &ssaoPushRange;
 
     if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &vk.ssao_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create SSAO pipeline layout\n");
@@ -295,9 +294,8 @@ qboolean vk_create_ssr_pipeline(void)
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &vk.ssr_descriptor_layout;
     pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &(VkPushConstantRange){
-        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ssrConfig_t)
-    };
+    VkPushConstantRange ssrPushRange = { VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(ssrConfig_t) };
+    pipelineLayoutInfo.pPushConstantRanges = &ssrPushRange;
 
     if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &vk.ssr_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create SSR pipeline layout\n");
@@ -343,9 +341,8 @@ qboolean vk_create_bloom_pipeline(void)
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &vk.bloom_descriptor_layout;
     pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &(VkPushConstantRange){
-        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(bloomConfig_t)
-    };
+    VkPushConstantRange bloomPushRange = { VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(bloomConfig_t) };
+    pipelineLayoutInfo.pPushConstantRanges = &bloomPushRange;
 
     if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &vk.bloom_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create bloom pipeline layout\n");
@@ -394,9 +391,8 @@ qboolean vk_create_dof_pipeline(void)
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &vk.dof_descriptor_layout;
     pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &(VkPushConstantRange){
-        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(dofConfig_t)
-    };
+    VkPushConstantRange dofPushRange = { VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(dofConfig_t) };
+    pipelineLayoutInfo.pPushConstantRanges = &dofPushRange;
 
     if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &vk.dof_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create DoF pipeline layout\n");
@@ -443,9 +439,8 @@ qboolean vk_create_velocity_tiles_pipeline(void)
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &vk.velocity_tiles_descriptor_layout;
     pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &(VkPushConstantRange){
-        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(vec4_t) * 2 // tileResolution, invTileResolution, pixelsPerTile, invPixelsPerTile
-    };
+    VkPushConstantRange velocityTilesPushRange = { VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(vec4_t) * 2 }; // tileResolution, invTileResolution, pixelsPerTile, invPixelsPerTile
+    pipelineLayoutInfo.pPushConstantRanges = &velocityTilesPushRange;
 
     if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &vk.velocity_tiles_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create velocity tiles pipeline layout\n");
@@ -494,9 +489,8 @@ qboolean vk_create_motion_blur_pipeline(void)
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &vk.motion_blur_descriptor_layout;
     pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &(VkPushConstantRange){
-        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(motionBlurConfig_t)
-    };
+    VkPushConstantRange motionBlurPushRange = { VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(motionBlurConfig_t) };
+    pipelineLayoutInfo.pPushConstantRanges = &motionBlurPushRange;
 
     if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &vk.motion_blur_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create motion blur pipeline layout\n");
@@ -543,9 +537,8 @@ qboolean vk_create_color_grading_pipeline(void)
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &vk.color_grading_descriptor_layout;
     pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &(VkPushConstantRange){
-        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(colorGradingConfig_t)
-    };
+    VkPushConstantRange colorGradingPushRange = { VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(colorGradingConfig_t) };
+    pipelineLayoutInfo.pPushConstantRanges = &colorGradingPushRange;
 
     if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &vk.color_grading_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create color grading pipeline layout\n");
@@ -594,9 +587,8 @@ qboolean vk_create_heat_distortion_pipeline(void)
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &vk.heat_distortion_descriptor_layout;
     pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &(VkPushConstantRange){
-        VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(heatDistortionConfig_t)
-    };
+    VkPushConstantRange heatDistortionPushRange = { VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(heatDistortionConfig_t) };
+    pipelineLayoutInfo.pPushConstantRanges = &heatDistortionPushRange;
 
     if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &vk.heat_distortion_layout) != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Failed to create heat distortion pipeline layout\n");

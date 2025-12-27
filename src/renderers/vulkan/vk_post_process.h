@@ -20,6 +20,10 @@ Contains definitions for advanced post-processing effects including:
 #include "vk.h"
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Post-processing effect flags
 typedef enum {
     PP_EFFECT_SSAO         = (1 << 0),
@@ -174,5 +178,9 @@ extern cvar_t *r_pp_motion_blur;
 extern cvar_t *r_pp_motion_blur_tiles;
 extern cvar_t *r_pp_color_grading;
 extern cvar_t *r_pp_heat_distortion;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // VK_POST_PROCESS_H

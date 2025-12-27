@@ -4,6 +4,8 @@
 #include "vk_utils.h"
 #include "vk_images.h"
 #include "vk.h"
+// C++ helpers
+#include <algorithm>
 
 // Renderer interface
 extern refimport_t ri;
@@ -207,7 +209,7 @@ extern "C" void vk_apply_gamma_correction(void) {
 
 // Post-processing quality settings
 int vk_get_post_process_quality(void) {
-    return r_postQuality ? CLAMP(0, 4, r_postQuality->integer) : 2;
+    return r_postQuality ? std::clamp(r_postQuality->integer, 0, 4) : 2;
 }
 
 // Check if post-processing is enabled
