@@ -770,11 +770,12 @@ qboolean CM_ClusterVisible( int cluster1, int cluster2 ) {
 		return qfalse;
 	}
 
-	if ( !cm.vis || cluster1 == cluster2 ) {
+	if ( !cm.visibility || cluster1 == cluster2 ) {
 		return qtrue;
 	}
 
-	return !!(cm.vis->data[cluster1 * cm.vis->rowSize + cluster2 >> 3] & (1 << (cluster2 & 7)));
+	const byte *row = cm.vised ? (cm.visibility + cluster1 * cm.clusterBytes) : cm.visibility;
+	return (row[cluster2 >> 3] & (1 << (cluster2 & 7))) != 0;
 }
 
 

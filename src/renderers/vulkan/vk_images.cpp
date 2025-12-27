@@ -2,6 +2,7 @@
 #include "vk_images.h"
 #include "vk_utils.h"
 #include "vk_memory.h"
+#include "vk_pbo.h"
 #include "vk.h"
 #include <math.h>
 
@@ -161,6 +162,30 @@ extern "C" void vk_upload_image_data(image_t *image, int x, int y, int width, in
     if (data == NULL && data_size > 0) {
         ri.Printf(PRINT_ERROR, "vk_upload_image_data: data is NULL but size > 0\n");
         return;
+    }
+
+    // Try PBO system first if available and enabled
+    if (vk_pbo_is_available() && r_pbo->integer) {
+        VkBufferImageCopy region = {
+            .bufferOffset = 0,
+            .bufferRowLength = 0,
+            .bufferImageHeight = 0,
+            .imageSubresource = {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .mipLevel = 0,
+                .baseArrayLayer = 0,
+                .layerCount = 1
+            },
+            .imageOffset = {x, y, 0},
+            .imageExtent = {(uint32_t)width, (uint32_t)height, 1}
+        };
+
+        VkImageLayout final_layout = update ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+        if (vk_pbo_upload_texture_sync(data, data_size, image->handle, final_layout, &region)) {
+            return; // PBO upload succeeded
+        }
+        // Fall back to traditional upload if PBO fails
     }
 
     // Calculate number of mip levels

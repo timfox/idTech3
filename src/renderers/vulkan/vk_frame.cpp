@@ -4,6 +4,11 @@
 #include "vk_utils.h"
 #include "vk_postprocess.h"
 #include "vk_volumetric_fog.h"
+#include "vk_decals.h"
+#include "vk_god_rays.h"
+#include "vk_pbo.h"
+#include "vk_terrain.h"
+#include "vk_surface_sprites.h"
 #include "vk.h"
 
 #include "vk_fsr.h"
@@ -122,11 +127,32 @@ extern "C" void vk_begin_frame(void) {
 
 // End frame
 extern "C" void vk_end_frame(void) {
+    // Update PBO system
+    vk_pbo_update();
+
+    // Update terrain system
+    vk_terrain_update();
+
     // Update volumetric fog parameters
     vk_volumetric_fog_update();
 
     // Apply volumetric fog before post-processing
     vk_volumetric_fog_render();
+
+    // Render terrain
+    vk_terrain_render();
+
+    // Update and render surface sprites
+    vk_surface_sprites_update();
+    vk_surface_sprites_render();
+
+    // Update and render decals
+    vk_decals_update();
+    vk_decals_render();
+
+    // Update and render god rays
+    vk_god_rays_update();
+    vk_god_rays_render(vk.cmd->command_buffer);
 
     // Apply post-processing effects
     if (vk_has_post_processing()) {

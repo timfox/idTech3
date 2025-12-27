@@ -79,6 +79,11 @@ void *Sys_LoadFunction(void *handle, const char *name) {
 #include "vk_renderpass.h"
 #include "vk_postprocess.h"
 #include "vk_volumetric_fog.h"
+#include "vk_decals.h"
+#include "vk_god_rays.h"
+#include "vk_pbo.h"
+#include "vk_terrain.h"
+#include "vk_surface_sprites.h"
 #include "vk_frame.h"
 #include "vk_post_process.h"
 #ifdef USE_VULKAN_RAY_TRACING
@@ -3597,6 +3602,21 @@ void vk_initialize( void )
 
 	// Initialize volumetric fog system
 	vk_volumetric_fog_init();
+
+	// Initialize decals system
+	vk_decals_init();
+
+	// Initialize god rays system
+	vk_god_rays_init();
+
+	// Initialize PBO system
+	vk_pbo_init();
+
+	// Initialize terrain system
+	vk_terrain_init();
+
+	// Initialize surface sprites system
+	vk_surface_sprites_init();
 
 	ri.Printf(PRINT_ALL, "DEBUG: vk_initialize completed successfully\n");
 
@@ -8203,6 +8223,21 @@ void vk_shutdown( refShutdownCode_t code ) {
 
 			// Shutdown volumetric fog
 			vk_volumetric_fog_shutdown();
+
+			// Shutdown decals
+			vk_decals_shutdown();
+
+			// Shutdown god rays
+			vk_god_rays_shutdown();
+
+			// Shutdown PBO system
+			vk_pbo_shutdown();
+
+			// Shutdown terrain system
+			vk_terrain_shutdown();
+
+			// Shutdown surface sprites system
+			vk_surface_sprites_shutdown();
 
 			// Shutdown ray tracing if enabled
 #ifdef USE_VULKAN_RAY_TRACING

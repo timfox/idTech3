@@ -79,8 +79,5 @@ void CM_DrawDebugSurface( void (*drawPoly)(int color, int numPoints, float *poin
 #ifdef __cplusplus
 }
 #endif
-<<<<<<< Current (Your changes)
-=======
 
 #endif // __CM_PUBLIC_H__
->>>>>>> Incoming (Background Agent changes)
