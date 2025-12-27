@@ -636,6 +636,7 @@ typedef struct {
     VkShaderModule rt_closesthit_rchit; // Added
     VkShaderModule gibs_spawn_comp; // Added
     VkShaderModule gibs_update_comp; // Added
+    VkShaderModule volumetric_fog_comp; // Volumetric fog compute shader
 } vk_modules_t;
 
 // Main Vulkan instance structure

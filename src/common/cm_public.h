@@ -20,7 +20,15 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 
+#ifndef __CM_PUBLIC_H__
+#define __CM_PUBLIC_H__
+#pragma once
+
 #include "qfiles.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 
 void		CM_LoadMap( const char *name, qboolean clientload, int *checksum);
@@ -67,3 +75,12 @@ int			CM_WriteAreaBits( byte *buffer, int area );
 
 // cm_patch.c
 void CM_DrawDebugSurface( void (*drawPoly)(int color, int numPoints, float *points) );
+
+#ifdef __cplusplus
+}
+#endif
+<<<<<<< Current (Your changes)
+=======
+
+#endif // __CM_PUBLIC_H__
+>>>>>>> Incoming (Background Agent changes)

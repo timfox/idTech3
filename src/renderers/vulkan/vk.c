@@ -78,6 +78,7 @@ void *Sys_LoadFunction(void *handle, const char *name) {
 #include "vk_draw.h"
 #include "vk_renderpass.h"
 #include "vk_postprocess.h"
+#include "vk_volumetric_fog.h"
 #include "vk_frame.h"
 #include "vk_post_process.h"
 #ifdef USE_VULKAN_RAY_TRACING
@@ -3593,6 +3594,9 @@ void vk_initialize( void )
 	if (!vk_fsr_init()) {
 		ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize FSR\n");
 	}
+
+	// Initialize volumetric fog system
+	vk_volumetric_fog_init();
 
 	ri.Printf(PRINT_ALL, "DEBUG: vk_initialize completed successfully\n");
 
@@ -8196,6 +8200,9 @@ void vk_shutdown( refShutdownCode_t code ) {
 
 			// Shutdown FSR
 			vk_fsr_shutdown();
+
+			// Shutdown volumetric fog
+			vk_volumetric_fog_shutdown();
 
 			// Shutdown ray tracing if enabled
 #ifdef USE_VULKAN_RAY_TRACING

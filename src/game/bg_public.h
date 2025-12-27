@@ -28,6 +28,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef _BG_PUBLIC_H
 #define _BG_PUBLIC_H
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define	GAME_VERSION		BASEGAME "-1"
 
 #define	DEFAULT_GRAVITY		800
@@ -741,5 +745,9 @@ qboolean	BG_PlayerTouchesItem( playerState_t *ps, entityState_t *item, int atTim
 #define KAMI_SHOCKWAVE_MAXRADIUS		1320
 #define KAMI_BOOMSPHERE_MAXRADIUS		720
 #define KAMI_SHOCKWAVE2_MAXRADIUS		704
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // _BG_PUBLIC_H

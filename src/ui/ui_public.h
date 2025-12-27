@@ -25,6 +25,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../common/qcommon.h" // For COM_TRAP_GETVALUE
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define UI_API_VERSION	6
 
 typedef struct {
@@ -202,5 +206,9 @@ typedef enum {
 	
 	UI_EXPORT_LAST,
 } uiExport_t;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

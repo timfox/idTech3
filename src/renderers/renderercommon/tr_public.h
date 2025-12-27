@@ -33,14 +33,7 @@ extern "C" {
 qboolean Q_ValidateFilePath( const char *path );
 const char *Sys_DefaultBasePath( void );
 
-<<<<<<< Current (Your changes)
 // Additional stub functions needed by renderers
-unsigned int Com_TouchMemory(void);
-
-#ifdef __cplusplus
-}
-#endif
-=======
 // Memory management
 void *Z_Malloc(int size);
 void Z_Free(void *ptr);
@@ -53,10 +46,10 @@ void Com_DPrintf(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
 // CVAR management
 cvar_t *Cvar_Get( const char *var_name, const char *value, int flags );
 void Cvar_SetDescription( cvar_t *var, const char *description );
->>>>>>> Incoming (Background Agent changes)
 
 // Additional stub functions needed by renderers
 unsigned int Com_TouchMemory(void);
+unsigned Com_BlockChecksum(const void *buffer, int length);
 qboolean Com_HasPatterns(const char *str);
 int Com_Filter(const char *filter, const char *name);
 int Com_FilterPath(const char *filter, const char *name);

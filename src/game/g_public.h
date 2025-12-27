@@ -25,6 +25,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../common/qcommon.h" // For COM_TRAP_GETVALUE
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define	GAME_API_VERSION	8
 
 // entity->svFlags
@@ -442,4 +446,8 @@ typedef enum {
 
 	GAME_EXPORT_LAST
 } gameExport_t;
+
+#ifdef __cplusplus
+}
+#endif
 

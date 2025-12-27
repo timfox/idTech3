@@ -100,7 +100,7 @@ void main()
         if (density > 0.001) {
             // Calculate transmittance
             float extinction = density * (pc.scattering + pc.absorption);
-            vec3 stepTransmittance = exp(-extinction * stepSize);
+            vec3 stepTransmittance = vec3(exp(-extinction * stepSize));
             transmittance *= stepTransmittance;
             
             // Calculate scattering (simplified - would use phase function)

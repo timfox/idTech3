@@ -3,6 +3,7 @@
 #include "vk_renderpass.h"
 #include "vk_utils.h"
 #include "vk_postprocess.h"
+#include "vk_volumetric_fog.h"
 #include "vk.h"
 
 #include "vk_fsr.h"
@@ -121,6 +122,12 @@ extern "C" void vk_begin_frame(void) {
 
 // End frame
 extern "C" void vk_end_frame(void) {
+    // Update volumetric fog parameters
+    vk_volumetric_fog_update();
+
+    // Apply volumetric fog before post-processing
+    vk_volumetric_fog_render();
+
     // Apply post-processing effects
     if (vk_has_post_processing()) {
         vk_apply_bloom();

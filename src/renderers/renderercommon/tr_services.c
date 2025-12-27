@@ -768,15 +768,6 @@ to the refimport interface.
 */
 
 // Memory and file system functions are handled by the refimport interface
-<<<<<<< Current (Your changes)
-
-// Scalability functions are not declared in renderer header
-
-// Additional stub implementations for missing functions
-unsigned int Com_TouchMemory(void) {
-    return 0;
-}
-=======
 
 // Scalability functions are not declared in renderer header
 
@@ -808,7 +799,6 @@ void Com_DPrintf(const char *fmt, ...) {
     va_start(argptr, fmt);
     Q_vsnprintf(msg, sizeof(msg), fmt, argptr);
     va_end(argptr);
->>>>>>> Incoming (Background Agent changes)
 
     ri.Printf(PRINT_DEVELOPER, "%s", msg);
 }
