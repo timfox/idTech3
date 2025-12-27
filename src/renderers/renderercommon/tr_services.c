@@ -727,6 +727,116 @@ void R_DestroyContext(renderer_context_t *context) {
 //// 	R_Testable_FinishBloom
 //// 	// R_Testable_SetColorMappings // Commented out due to API mismatch
 //// };
+
+/*
+====================
+Q_ValidateFilePath
+
+Validates that a file path doesn't contain invalid characters
+Used by both OpenGL and Vulkan renderers for security
+====================
+*/
+qboolean Q_ValidateFilePath( const char *path ) {
+    if ( !path || !*path ) return qfalse;
+    const char *invalid = "<>:\"|?*";
+    while ( *invalid ) {
+        if ( strchr( path, *invalid ) ) return qfalse;
+        invalid++;
+    }
+    return qtrue;
+}
+
+/*
+====================
+Vector Math Functions
+
+These are needed by both OpenGL and Vulkan renderers
+====================
+*/
+void _VectorCopy( const vec3_t in, vec3_t out ) {
+	out[0] = in[0];
+	out[1] = in[1];
+	out[2] = in[2];
+}
+
+void _VectorAdd( const vec3_t veca, const vec3_t vecb, vec3_t out ) {
+	out[0] = veca[0] + vecb[0];
+	out[1] = veca[1] + vecb[1];
+	out[2] = veca[2] + vecb[2];
+}
+
+void _VectorSubtract( const vec3_t veca, const vec3_t vecb, vec3_t out ) {
+	out[0] = veca[0] - vecb[0];
+	out[1] = veca[1] - vecb[1];
+	out[2] = veca[2] - vecb[2];
+}
+
+void _VectorScale( const vec3_t in, float scale, vec3_t out ) {
+	out[0] = in[0] * scale;
+	out[1] = in[1] * scale;
+	out[2] = in[2] * scale;
+}
+
+void _VectorMA( const vec3_t veca, float scale, const vec3_t vecb, vec3_t out ) {
+	out[0] = veca[0] + scale * vecb[0];
+	out[1] = veca[1] + scale * vecb[1];
+	out[2] = veca[2] + scale * vecb[2];
+}
+
+/*
+====================
+Engine Function Stubs
+
+These functions are defined in the common library but needed by renderers.
+Since renderers are built as shared libraries, we provide stubs that delegate
+to the refimport interface.
+====================
+*/
+
+// Memory management - delegate to refimport
+void *Z_Malloc( int size ) {
+    return ri.Hunk_Alloc(size, h_low);
+}
+
+void Z_Free( void *ptr ) {
+    // Note: refimport doesn't have a direct free function
+    // This is a limitation - memory allocated by renderers should be freed by renderers
+    (void)ptr; // Suppress unused parameter warning
+}
+
+// Debug printing - delegate to refimport
+void QDECL Com_DPrintf( const char *fmt, ... ) {
+    // For renderers, delegate to ri.Printf - renderers typically don't filter developer prints
+    va_list argptr;
+    char msg[4096];
+
+    va_start(argptr, fmt);
+    vsnprintf(msg, sizeof(msg), fmt, argptr);
+    va_end(argptr);
+
+    ri.Printf(PRINT_ALL, "%s", msg);
+}
+
+// File system functions - delegate to refimport
+qboolean FS_Initialized( void ) {
+    // This is a bit of a hack - we can't directly check FS initialization
+    // Return true assuming FS is initialized when renderer loads
+    return qtrue;
+}
+
+qboolean FS_StartupInProgress( void ) {
+    // Return false assuming startup is complete when renderer loads
+    return qfalse;
+}
+
+// Scalability functions - provide defaults
+int Scalability_GetMaxFonts(void) {
+    return 32; // Default value
+}
+
+int Scalability_GetMaxFontCache(void) {
+    return 1024 * 1024; // Default 1MB
+}
 //
 //// const testable_renderer_api_t *R_GetTestableAPI(void) {
 //// 	return &testable_api;

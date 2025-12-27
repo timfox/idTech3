@@ -25,6 +25,25 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_types.h"
 #include "vulkan/vulkan.h"
 
+// Vector math functions needed by renderers
+void _VectorCopy( const vec3_t in, vec3_t out );
+void _VectorAdd( const vec3_t veca, const vec3_t vecb, vec3_t out );
+void _VectorSubtract( const vec3_t veca, const vec3_t vecb, vec3_t out );
+void _VectorScale( const vec3_t in, float scale, vec3_t out );
+void _VectorMA( const vec3_t veca, float scale, const vec3_t vecb, vec3_t out );
+
+// File path validation
+qboolean Q_ValidateFilePath( const char *path );
+
+// Engine function stubs for renderers
+void *Z_Malloc( int size );
+void Z_Free( void *ptr );
+void QDECL Com_DPrintf( const char *fmt, ... );
+qboolean FS_Initialized( void );
+qboolean FS_StartupInProgress( void );
+int Scalability_GetMaxFonts(void);
+int Scalability_GetMaxFontCache(void);
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -356,15 +356,6 @@ void Q_strncpyz( char *dest, const char *src, int destsize ) {
     dest[destsize - 1] = 0;
 }
 
-qboolean Q_ValidateFilePath( const char *path ) {
-    if ( !path || !*path ) return qfalse;
-    const char *invalid = "<>:\"|?*";
-    while ( *invalid ) {
-        if ( strchr( path, *invalid ) ) return qfalse;
-        invalid++;
-    }
-    return qtrue;
-}
 
 // Global stubs that don't belong to refexport_t but are needed by other Vulkan modules
 void vk_draw_geometry( Vk_Depth_Range depth_range, qboolean indexed ) {
