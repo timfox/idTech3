@@ -1331,9 +1331,18 @@ qboolean vk_init_asset_loading_profiler(void);
 // DLSS functions
 void vk_dlss_destroy_resources(void);
 
+// Unified descriptor write functions
+void vk_write_uniform_descriptor( VkWriteDescriptorSet *desc, VkDescriptorBufferInfo *info, VkBuffer buffer, VkDescriptorSet descriptor, const uint32_t binding, const size_t size );
+VkShaderModule vk_create_shader_module(const uint8_t *bytes, const int count);
+#define SHADER_MODULE(name) vk_create_shader_module((const uint8_t*)name,sizeof(name))
+
 // Drawing functions
 void vk_draw_dot(uint32_t storage_offset);
 void vk_bind_descriptor_sets(void);
+void get_viewport_rect(VkRect2D *r);
+void get_viewport(VkViewport *viewport, Vk_Depth_Range depth_range);
+void get_scissor_rect(VkRect2D *r);
+void vk_update_depth_range(Vk_Depth_Range depth_range);
 
 // ImGui backend functions
 VkInstance VK_GetInstanceHandle(void);

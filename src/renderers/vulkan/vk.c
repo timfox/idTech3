@@ -34,51 +34,43 @@ cvar_t *r_vk_debug_overlay = NULL;
 // Define glConfig for compatibility (Vulkan renderer uses its own config but some shared code expects this)
 glconfig_t glConfig;
 
-// Engine function stubs for Vulkan renderer
-__attribute__((used)) void Com_SetErrorContext(const char * /*context*/);
-void Com_SetErrorContext(const char * /*context*/) {
-    // Stub implementation
+// Engine function stubs for Vulkan renderer - integrated with engine interface
+void Com_SetErrorContext(const char *context) {
+    // Forward to engine if possible, otherwise print
+    ri.Printf(PRINT_ALL, "Error Context: %s\n", context);
 }
 
-__attribute__((used)) qboolean FS_Initialized(void);
 qboolean FS_Initialized(void) {
+    // Engine provides this, but we need a symbol if linked into standalone tools
     return qtrue;
 }
 
-__attribute__((used)) qboolean FS_StartupInProgress(void);
 qboolean FS_StartupInProgress(void) {
     return qfalse;
 }
 
-// More engine function stubs
-__attribute__((used)) int Scalability_GetMaxFontCache(void);
 int Scalability_GetMaxFontCache(void) {
-    return 64; // Default value
+    return 64;
 }
 
-__attribute__((used)) int Scalability_GetMaxModels(void);
 int Scalability_GetMaxModels(void) {
     return 1024;
 }
 
-__attribute__((used)) void R_SetColorMappings(void);
 void R_SetColorMappings(void) {
-    // Stub for Vulkan
+    // Vulkan uses its own color mapping system but some shared code expects this
 }
 
-__attribute__((used)) void *Com_Allocate(int size);
 void *Com_Allocate(int size) {
     return malloc(size);
 }
 
-__attribute__((used)) void Com_Dealloc(void *ptr);
 void Com_Dealloc(void *ptr) {
     free(ptr);
 }
 
-__attribute__((used)) qboolean FS_AllowedExtension(const char * /*filename*/, qboolean /*allowPk3*/, const char ** /*ext*/);
-qboolean FS_AllowedExtension(const char * /*filename*/, qboolean /*allowPk3*/, const char ** /*ext*/) {
-    // Stub implementation
+qboolean FS_AllowedExtension(const char *filename, qboolean allowPk3, const char **ext) {
+    (void)filename; (void)allowPk3; (void)ext;
     return qtrue;
 }
 
@@ -3332,40 +3324,40 @@ qvkGetPipelineCacheData					= NULL;
 }
 
 
-static VkShaderModule __attribute__((used)) SHADER_MODULE_FUNC(const uint8_t *bytes, const int count) {
+VkShaderModule vk_create_shader_module(const uint8_t *bytes, const int count) {
 	VkShaderModuleCreateInfo desc;
 	VkShaderModule module;
 	VkResult result;
 
 	if (count <= 0) {
-		ri.Printf(PRINT_ERROR, "SHADER_MODULE_FUNC: invalid count %d\n", count);
+		ri.Printf(PRINT_ERROR, "vk_create_shader_module: invalid count %d\n", count);
 		return VK_NULL_HANDLE;
 	}
 
 	if (bytes == NULL) {
-		ri.Printf(PRINT_ERROR, "SHADER_MODULE_FUNC: bytes is NULL!\n");
+		ri.Printf(PRINT_ERROR, "vk_create_shader_module: bytes is NULL!\n");
 		return VK_NULL_HANDLE;
 	}
 
 	if (count % 4 != 0) {
-		ri.Printf(PRINT_ERROR, "SHADER_MODULE_FUNC: SPIR-V binary buffer size %d is not a multiple of 4\n", count);
+		ri.Printf(PRINT_ERROR, "vk_create_shader_module: SPIR-V binary buffer size %d is not a multiple of 4\n", count);
 		return VK_NULL_HANDLE;
 	}
 
 	// Validate SPIR-V magic number (first 4 bytes should be 0x07230203)
 	uint32_t magic = *(const uint32_t*)bytes;
 	if (magic != 0x07230203) {
-		ri.Printf(PRINT_ERROR, "SHADER_MODULE_FUNC: invalid SPIR-V magic number 0x%08x\n", magic);
+		ri.Printf(PRINT_ERROR, "vk_create_shader_module: invalid SPIR-V magic number 0x%08x\n", magic);
 		return VK_NULL_HANDLE;
 	}
 
 	if (vk.device == VK_NULL_HANDLE) {
-		ri.Printf(PRINT_ERROR, "SHADER_MODULE_FUNC: Vulkan device is NULL!\n");
+		ri.Printf(PRINT_ERROR, "vk_create_shader_module: Vulkan device is NULL!\n");
 		return VK_NULL_HANDLE;
 	}
 
 	if (qvkCreateShaderModule == NULL) {
-		ri.Printf(PRINT_ERROR, "SHADER_MODULE_FUNC: qvkCreateShaderModule function pointer is NULL!\n");
+		ri.Printf(PRINT_ERROR, "vk_create_shader_module: qvkCreateShaderModule function pointer is NULL!\n");
 		return VK_NULL_HANDLE;
 	}
 
@@ -3377,7 +3369,7 @@ static VkShaderModule __attribute__((used)) SHADER_MODULE_FUNC(const uint8_t *by
 
 	result = qvkCreateShaderModule(vk.device, &desc, NULL, &module);
 	if (result != VK_SUCCESS) {
-		ri.Printf(PRINT_ERROR, "SHADER_MODULE_FUNC: qvkCreateShaderModule failed: %s\n", vk_result_string(result));
+		ri.Printf(PRINT_ERROR, "vk_create_shader_module: qvkCreateShaderModule failed: %s\n", vk_result_string(result));
 		return VK_NULL_HANDLE;
 	}
 
@@ -3385,8 +3377,7 @@ static VkShaderModule __attribute__((used)) SHADER_MODULE_FUNC(const uint8_t *by
 }
 
 // Shader data and binding includes
-#include "shaders/spirv/shader_data.c"
-#define SHADER_MODULE(name) SHADER_MODULE_FUNC((const uint8_t*)name,sizeof(name))
+#include "shaders/shader_data.c"
 #include "shaders/spirv/shader_binding.c"
 
 
@@ -3422,7 +3413,7 @@ static void __attribute__((unused)) vk_create_layout_binding( int binding, VkDes
 	VK_CHECK( qvkCreateDescriptorSetLayout(vk.device, &desc, NULL, layout ) );
 }
 
-__attribute__((used)) static void vk_write_uniform_descriptor( VkWriteDescriptorSet *desc, VkDescriptorBufferInfo *info,
+void vk_write_uniform_descriptor( VkWriteDescriptorSet *desc, VkDescriptorBufferInfo *info,
 	VkBuffer buffer, VkDescriptorSet descriptor, const uint32_t binding, const size_t size )
 {
 	info[binding].buffer = buffer;
@@ -6363,14 +6354,14 @@ multisample_state.rasterizationSamples = (renderPassIndex == RENDER_PASS_SCREENM
 
 
 
-__attribute__((used)) static void get_viewport_rect(VkRect2D *r) {
+void get_viewport_rect(VkRect2D *r) {
 	r->offset.x = 0;
 	r->offset.y = 0;
 	r->extent.width = vk.renderWidth;
 	r->extent.height = vk.renderHeight;
 }
 
-__attribute__((used)) static void get_viewport(VkViewport *viewport, Vk_Depth_Range depth_range) {
+void get_viewport(VkViewport *viewport, Vk_Depth_Range depth_range) {
 	VkRect2D r;
 
 	get_viewport_rect( &r );
@@ -6420,7 +6411,7 @@ __attribute__((used)) static void get_viewport(VkViewport *viewport, Vk_Depth_Ra
 	}
 }
 
-__attribute__((used)) static void get_scissor_rect(VkRect2D *r) {
+void get_scissor_rect(VkRect2D *r) {
 
 	if ( backEnd.viewParms.portalView != PV_NONE )
 	{
@@ -6858,7 +6849,7 @@ void vk_bind_descriptor_sets( void )
 }
 
 
-__attribute__((used)) static void vk_update_depth_range( Vk_Depth_Range depth_range )
+void vk_update_depth_range( Vk_Depth_Range depth_range )
 {
 	if ( vk.cmd->depth_range != depth_range ) {
 		VkRect2D scissor_rect = { {0, 0}, {0, 0} };
@@ -6937,12 +6928,8 @@ static void vk_begin_render_pass( VkRenderPass renderPass, VkFramebuffer frameBu
 
 	qvkCmdBeginRenderPass( vk.cmd->command_buffer, &render_pass_begin_info, VK_SUBPASS_CONTENTS_INLINE );
 
-	// Note: renderPassIndex is set by the caller BEFORE calling this function.
-	// This allows the caller to set the index before beginning the pass, which is needed
-	// for proper tracking. The check for active render pass happens in the caller.
-
 	vk.cmd->last_pipeline = VK_NULL_HANDLE;
-	vk.cmd->depth_range = DEPTH_RANGE_COUNT;
+	vk_update_depth_range( DEPTH_RANGE_NORMAL );
 }
 
 

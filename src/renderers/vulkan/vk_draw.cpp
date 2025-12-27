@@ -141,33 +141,7 @@ extern "C" void vk_set_scissor(int x, int y, uint32_t width, uint32_t height) {
 
 // Update depth range
 extern "C" void vk_set_depth_range(Vk_Depth_Range depth_range) {
-    float n, f;
-
-    switch (depth_range) {
-        case DEPTH_RANGE_NORMAL:
-            n = 0.0f;
-            f = 1.0f;
-            break;
-        case DEPTH_RANGE_ZERO:
-            n = 0.0f;
-            f = 0.0f;
-            break;
-        case DEPTH_RANGE_ONE:
-            n = 1.0f;
-            f = 1.0f;
-            break;
-        case DEPTH_RANGE_WEAPON:
-            n = 0.0f;
-            f = 0.3f;
-            break;
-        default:
-            ri.Printf(PRINT_WARNING, "vk_update_depth_range: unknown depth range %d\n", depth_range);
-            n = 0.0f;
-            f = 1.0f;
-            break;
-    }
-
-    vk_set_viewport(0, 0, vk.renderWidth, vk.renderHeight, n, f);
+    vk_update_depth_range(depth_range);
 }
 
 // Begin rendering to a render pass

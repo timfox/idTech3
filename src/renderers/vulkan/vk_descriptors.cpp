@@ -359,25 +359,7 @@ static void vk_create_pipeline_layouts(void) {
     }
 }
 
-// Write uniform descriptor helper
-static void vk_write_uniform_descriptor(VkWriteDescriptorSet *desc, VkDescriptorBufferInfo *info,
-    VkBuffer buffer, VkDescriptorSet descriptor, const uint32_t binding, const size_t size)
-{
-    info[binding].buffer = buffer;
-    info[binding].offset = 0;
-    info[binding].range = size;
-
-    desc[binding].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    desc[binding].dstSet = descriptor;
-    desc[binding].dstBinding = binding;
-    desc[binding].dstArrayElement = 0;
-    desc[binding].descriptorCount = 1;
-    desc[binding].pNext = NULL;
-    desc[binding].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC;
-    desc[binding].pImageInfo = NULL;
-    desc[binding].pBufferInfo = &info[binding];
-    desc[binding].pTexelBufferView = NULL;
-}
+// Unified descriptor write function from vk.c is used
 
 // Update uniform descriptor
 extern "C" void vk_update_uniform_descriptor(VkDescriptorSet descriptor, VkBuffer buffer)

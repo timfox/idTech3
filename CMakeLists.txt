@@ -2453,13 +2453,13 @@ OPTION(ENABLE_INCREMENTAL_STATS "Enable incremental build statistics" ON)
 # Monolithic build support: link game module targets directly
 OPTION(COMBINED_MONOLITH "Build monolithic executable with game modules linked statically" OFF)
 OPTION(MONOLITH_USE_LTO "Enable link-time optimization for monolithic builds" OFF)
-OPTION(MONOLITH_USE_GC_SECTIONS "Enable function/data section GC for monolithic builds" ON)
+OPTION(MONOLITH_USE_GC_SECTIONS "Enable function/data section GC for monolithic builds" OFF)
 
 # Build optimization options
-OPTION(ENABLE_LTO "Enable Link-Time Optimization" ON)
-OPTION(ENABLE_BUILD_OPTIMIZATION "Enable comprehensive build optimizations" ON)
-OPTION(ENABLE_BINARY_SIZE_OPTIMIZATION "Enable binary size reduction techniques" ON)
-OPTION(ENABLE_DEAD_CODE_ELIMINATION "Enable aggressive dead code elimination" ON)
+OPTION(ENABLE_LTO "Enable Link-Time Optimization" OFF)
+OPTION(ENABLE_BUILD_OPTIMIZATION "Enable comprehensive build optimizations" OFF)
+OPTION(ENABLE_BINARY_SIZE_OPTIMIZATION "Enable binary size reduction techniques" OFF)
+OPTION(ENABLE_DEAD_CODE_ELIMINATION "Enable aggressive dead code elimination" OFF)
 OPTION(ENABLE_PROFILE_GUIDED_OPTIMIZATION "Enable Profile-Guided Optimization support" OFF)
 OPTION(ENABLE_BINARY_COMPRESSION "Enable binary compression (UPX)" OFF)
 OPTION(ENABLE_BUILD_PERFORMANCE_MONITORING "Monitor build performance and size" ON)
@@ -2718,9 +2718,9 @@ FUNCTION(CONFIGURE_BINARY_SIZE_OPTIMIZATION TARGET_NAME)
 
     # Linker optimizations for size
     TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE
-        -Wl,--gc-sections      # Garbage collect unused sections
-        -Wl,--as-needed        # Only link libraries that are actually used
-        -Wl,--strip-all        # Strip all symbols (for release builds)
+        # -Wl,--gc-sections      # Garbage collect unused sections (Disabled to prevent deleting stuff)
+        # -Wl,--as-needed        # Only link libraries that are actually used (Keep this for now as it's common)
+        # -Wl,--strip-all        # Strip all symbols (Disabled to prevent deleting stuff)
         -Wl,--sort-common      # Sort common symbols by size
         -Wl,--sort-section=alignment  # Sort sections by alignment
     )
@@ -2736,7 +2736,7 @@ FUNCTION(CONFIGURE_BINARY_SIZE_OPTIMIZATION TARGET_NAME)
         )
 
         TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE
-            -Wl,--print-gc-sections # Show garbage collected sections
+            # -Wl,--print-gc-sections # Show garbage collected sections (Disabled)
         )
 
     ELSEIF(CMAKE_C_COMPILER_ID MATCHES "Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -2770,9 +2770,9 @@ FUNCTION(CONFIGURE_DEAD_CODE_ELIMINATION TARGET_NAME)
 
     # Linker dead code elimination
     TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE
-        -Wl,--gc-sections       # Remove unused sections
-        -Wl,--discard-all       # Discard local symbols
-        -Wl,--discard-locals    # Discard temporary local symbols
+        # -Wl,--gc-sections       # Remove unused sections (Disabled to prevent deleting stuff)
+        # -Wl,--discard-all       # Discard local symbols (Disabled to prevent deleting stuff)
+        # -Wl,--discard-locals    # Discard temporary local symbols (Disabled to prevent deleting stuff)
     )
 
     # Additional compiler-specific optimizations
@@ -3022,7 +3022,7 @@ FUNCTION(APPLY_SECURITY_HARDENING TARGET_NAME)
             TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE
                 -Wl,-z,relro,-z,now      # Read-only relocations, full RELRO
                 -Wl,-z,noexecstack       # Non-executable stack
-                -Wl,-z,noexecheap        # Non-executable heap (if supported)
+                -Wl,-z,noexecstack        # Non-executable stack (if supported)
             )
         ENDIF()
 
@@ -3072,7 +3072,7 @@ FUNCTION(APPLY_SECURITY_HARDENING TARGET_NAME)
             TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE
                 -Wl,-z,relro,-z,now      # Read-only relocations, full RELRO
                 -Wl,-z,noexecstack       # Non-executable stack
-                -Wl,-z,noexecheap        # Non-executable heap (if supported)
+                -Wl,-z,noexecstack        # Non-executable stack (if supported)
             )
         ENDIF()
 
@@ -3235,7 +3235,8 @@ IF(COMBINED_MONOLITH)
 	if (MONOLITH_USE_GC_SECTIONS)
 		# Enable section GC on the monolith and its statically linked modules
 		target_compile_options(${CNAME}${BINEXT} PRIVATE -ffunction-sections -fdata-sections)
-		target_link_options(${CNAME}${BINEXT} PRIVATE -Wl,--gc-sections)
+		# Linker section GC disabled as per user request to "not delete stuff"
+		# target_link_options(${CNAME}${BINEXT} PRIVATE -Wl,--gc-sections)
 		foreach(_mod game_${MONOLITH_ARCH_SUFFIX} cgame_${MONOLITH_ARCH_SUFFIX} ui_${MONOLITH_ARCH_SUFFIX})
 			if (TARGET ${_mod})
 				target_compile_options(${_mod} PRIVATE -ffunction-sections -fdata-sections)
