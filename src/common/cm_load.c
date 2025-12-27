@@ -761,6 +761,22 @@ int CM_NumClusters( void ) {
 	return cm.numClusters;
 }
 
+int CM_ClusterSize( void ) {
+	return (cm.numClusters + 31) & ~31; // Round up to 32-bit boundary
+}
+
+qboolean CM_ClusterVisible( int cluster1, int cluster2 ) {
+	if ( cluster1 < 0 || cluster1 >= cm.numClusters || cluster2 < 0 || cluster2 >= cm.numClusters ) {
+		return qfalse;
+	}
+
+	if ( !cm.vis || cluster1 == cluster2 ) {
+		return qtrue;
+	}
+
+	return !!(cm.vis->data[cluster1 * cm.vis->rowSize + cluster2 >> 3] & (1 << (cluster2 & 7)));
+}
+
 
 int CM_NumInlineModels( void ) {
 	return cm.numSubModels;
