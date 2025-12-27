@@ -32,14 +32,12 @@ extern "C" {
 // File path validation
 qboolean Q_ValidateFilePath( const char *path );
 
-// Engine function stubs for renderers
-void *Z_Malloc( int size );
-void Z_Free( void *ptr );
-void QDECL Com_DPrintf( const char *fmt, ... );
-qboolean FS_Initialized( void );
-qboolean FS_StartupInProgress( void );
-int Scalability_GetMaxFonts(void);
-int Scalability_GetMaxFontCache(void);
+// Additional stub functions needed by renderers
+unsigned int Com_TouchMemory(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 // Additional stub functions
 unsigned int Com_TouchMemory(void);

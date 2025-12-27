@@ -793,49 +793,13 @@ to the refimport interface.
 ====================
 */
 
-// Memory management - delegate to refimport
-void *Z_Malloc( int size ) {
-    return ri.Hunk_Alloc(size, h_low);
-}
+// Memory and file system functions are handled by the refimport interface
 
-void Z_Free( void *ptr ) {
-    // Note: refimport doesn't have a direct free function
-    // This is a limitation - memory allocated by renderers should be freed by renderers
-    (void)ptr; // Suppress unused parameter warning
-}
+// Scalability functions are not declared in renderer header
 
-// Debug printing - delegate to refimport
-void QDECL Com_DPrintf( const char *fmt, ... ) {
-    // For renderers, delegate to ri.Printf - renderers typically don't filter developer prints
-    va_list argptr;
-    char msg[4096];
-
-    va_start(argptr, fmt);
-    vsnprintf(msg, sizeof(msg), fmt, argptr);
-    va_end(argptr);
-
-    ri.Printf(PRINT_ALL, "%s", msg);
-}
-
-// File system functions - delegate to refimport
-qboolean FS_Initialized( void ) {
-    // This is a bit of a hack - we can't directly check FS initialization
-    // Return true assuming FS is initialized when renderer loads
-    return qtrue;
-}
-
-qboolean FS_StartupInProgress( void ) {
-    // Return false assuming startup is complete when renderer loads
-    return qfalse;
-}
-
-// Scalability functions - provide defaults
-int Scalability_GetMaxFonts(void) {
-    return 32; // Default value
-}
-
-int Scalability_GetMaxFontCache(void) {
-    return 1024 * 1024; // Default 1MB
+// Additional stub implementations for missing functions
+unsigned int Com_TouchMemory(void) {
+    return 0;
 }
 
 // Additional stub implementations for missing functions
