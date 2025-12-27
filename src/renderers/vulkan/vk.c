@@ -40,22 +40,8 @@ void Com_SetErrorContext(const char *context) {
     ri.Printf(PRINT_ALL, "Error Context: %s\n", context);
 }
 
-qboolean FS_Initialized(void) {
-    // Engine provides this, but we need a symbol if linked into standalone tools
-    return qtrue;
-}
+// Memory and file system functions are now handled by tr_services.c
 
-qboolean FS_StartupInProgress(void) {
-    return qfalse;
-}
-
-int Scalability_GetMaxFontCache(void) {
-    return 64;
-}
-
-int Scalability_GetMaxModels(void) {
-    return 1024;
-}
 
 void R_SetColorMappings(void) {
     // Vulkan uses its own color mapping system but some shared code expects this
@@ -4371,6 +4357,15 @@ static void vk_create_attachments( void )
 	create_depth_attachment(glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT,
 		&vk.depth_image, &vk.depth_image_view, qfalse);
 
+	// Create upscaling target images (for FSR/DLSS output)
+	for (int i = 0; i < 2; i++) {
+		create_color_attachment(glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16G16B16A16_SFLOAT,
+			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+			&vk.upscale.image[i], &vk.upscale.view[i], VK_IMAGE_LAYOUT_GENERAL, qfalse, 0);
+		SET_OBJECT_NAME(vk.upscale.image[i], va("upscale image %d", i), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
+		SET_OBJECT_NAME(vk.upscale.view[i], va("upscale image view %d", i), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT);
+	}
+
 	// Create additional attachments if FBO is active
 	if (vk.fboActive) {
 		// Screen space effects buffer
@@ -8205,7 +8200,7 @@ void vk_shutdown( refShutdownCode_t code ) {
 			// Shutdown ray tracing if enabled
 #ifdef USE_VULKAN_RAY_TRACING
 			if ( vk.rayTracingSupported ) {
-				vk_shutdown_raytracing();
+				vk_rt_shutdown();
 			}
 #endif
 
@@ -8279,12 +8274,6 @@ void vk_get_gpu_timing_stats( double *avg_frame_time_ms, double *min_frame_time_
     // Assumptions:
     // - vk.frame_timing_count, vk.frame_timings[] exist and hold recent per-frame GPU times in milliseconds.
     // This is for demonstration and may need to be adapted for your timing integration.
-
-    extern struct {
-        double frame_timings[128]; // circular buffer
-        int frame_timing_count;
-        int frame_timing_head;
-    } vk_gpu_timing;
 
     int count = vk_gpu_timing.frame_timing_count;
     if (count == 0) {

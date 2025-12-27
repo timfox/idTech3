@@ -70,7 +70,7 @@ echo "Compiling fragment shaders..."
 for f in "$GLSL_DIR"/*.frag; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .frag)
-        glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1
+        glslangValidator -S frag -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f"
         if [ -f "$BIN2HEX_EXE" ]; then
             "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "${basename}_frag_spv"
         fi
@@ -83,7 +83,7 @@ echo "Compiling vertex shaders..."
 for f in "$GLSL_DIR"/*.vert; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .vert)
-        glslangValidator -S vert -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1
+        glslangValidator -S vert -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f"
         if [ -f "$BIN2HEX_EXE" ]; then
             "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "${basename}_vert_spv"
         fi
@@ -112,7 +112,7 @@ for f in "$GLSL_DIR"/*.comp; do
         # Check if shader uses ray tracing extensions (GIBS shaders)
         if grep -q "GL_EXT_ray_tracing" "$f" 2>/dev/null; then
             # Ray tracing compute shaders need vulkan1.2 target environment
-            if glslangValidator -S comp --target-env vulkan1.2 -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
+            if glslangValidator -S comp --target-env vulkan1.2 -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f"; then
                 if [ -f "$BIN2HEX_EXE" ] && [ -f "$TMP_FILE" ]; then
                     "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "${basename}_comp_spv"
                 fi
@@ -121,7 +121,7 @@ for f in "$GLSL_DIR"/*.comp; do
             fi
         else
             # Standard compute shaders
-            if glslangValidator -S comp -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
+            if glslangValidator -S comp -V -I"$GLSL_DIR" -o "$TMP_FILE" "$f"; then
                 if [ -f "$BIN2HEX_EXE" ] && [ -f "$TMP_FILE" ]; then
                     "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "${basename}_comp_spv"
                 fi
@@ -137,7 +137,7 @@ echo "Compiling ray tracing shaders..."
 for f in "$GLSL_DIR"/*.rgen; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .rgen)
-        if glslangValidator -S rgen --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
+        if glslangValidator -S rgen --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f"; then
             if [ -f "$BIN2HEX_EXE" ] && [ -f "$TMP_FILE" ]; then
                 "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "${basename}_rgen_spv"
             fi
@@ -149,7 +149,7 @@ done
 for f in "$GLSL_DIR"/*.rmiss; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .rmiss)
-        if glslangValidator -S rmiss --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
+        if glslangValidator -S rmiss --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f"; then
             if [ -f "$BIN2HEX_EXE" ] && [ -f "$TMP_FILE" ]; then
                 "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "${basename}_rmiss_spv"
             fi
@@ -161,7 +161,7 @@ done
 for f in "$GLSL_DIR"/*.rchit; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .rchit)
-        if glslangValidator -S rchit --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
+        if glslangValidator -S rchit --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f"; then
             if [ -f "$BIN2HEX_EXE" ] && [ -f "$TMP_FILE" ]; then
                 "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "${basename}_rchit_spv"
             fi
@@ -173,7 +173,7 @@ done
 for f in "$GLSL_DIR"/*.rahit; do
     if [ -f "$f" ]; then
         basename=$(basename "$f" .rahit)
-        if glslangValidator -S rahit --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f" >/dev/null 2>&1; then
+        if glslangValidator -S rahit --target-env vulkan1.2 -V -DUSE_BLUE_NOISE -I"$GLSL_DIR" -o "$TMP_FILE" "$f"; then
             if [ -f "$BIN2HEX_EXE" ] && [ -f "$TMP_FILE" ]; then
                 "$BIN2HEX_EXE" "$TMP_FILE" "+$OUT_DATA" "${basename}_rahit_spv"
             fi

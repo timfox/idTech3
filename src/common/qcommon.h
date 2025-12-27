@@ -770,7 +770,13 @@ modules of the program.
 
 */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 cvar_t *Cvar_Get( const char *var_name, const char *value, int flags );
+#ifdef __cplusplus
+}
+#endif
 // creates the variable if it doesn't exist, or returns the existing one
 // if it exists, the value will not be changed, but flags will be ORed in
 // that allows variables to be unarchived without needing bitflags
@@ -839,8 +845,14 @@ const char *Cvar_InfoString_Big( int bit, qboolean *truncated );
 // in their flags ( CVAR_USERINFO, CVAR_SERVERINFO, CVAR_SYSTEMINFO, etc )
 void	Cvar_InfoStringBuffer( int bit, char *buff, int buffsize );
 void	Cvar_CheckRange( cvar_t *cv, const char *minVal, const char *maxVal, cvarValidator_t type );
+#ifdef __cplusplus
+extern "C" {
+#endif
 void	Cvar_SetDescription( cvar_t *var, const char *var_description );
 void	Cvar_SetDescription2( const char *var_name, const char *var_description );
+#ifdef __cplusplus
+}
+#endif
 
 void	Cvar_SetGroup( cvar_t *var, cvarGroup_t group );
 int		Cvar_CheckGroup( cvarGroup_t group );
@@ -1172,49 +1184,40 @@ extern	int	CPU_Flags;
 #define	MAXPRINTMSG	8192
 
 char		*CopyString( const char *in );
-void		Info_Print( const char *s );
-
-void		Com_BeginRedirect (char *buffer, int buffersize, void (*flush)(const char *));
-void		Com_EndRedirect( void );
 #ifdef __cplusplus
 extern "C" {
 #endif
+void		Info_Print( const char *s );
+unsigned	Com_BlockChecksum( const void *buffer, int length );
+
+void		Com_BeginRedirect (char *buffer, int buffersize, void (*flush)(const char *));
+void		Com_EndRedirect( void );
+
 void 		QDECL Com_Printf( const char *fmt, ... ) __attribute__ ((format (printf, 1, 2)));
-#ifdef __cplusplus
-}
-#endif
+
 void 		QDECL Com_DPrintf( const char *fmt, ... ) __attribute__ ((format (printf, 1, 2)));
 void 		Com_Quit_f( void );
 void 		Com_Help_f( void );
 void 		Com_About_f( void );
-void 		Com_BuildInfo_f( void );
-void		Com_GameRestart( int checksumFeed, qboolean clientRestart );
-
-int			Com_EventLoop( void );
-int			Com_Milliseconds( void );	// will be journaled properly
-
-// MD4 functions
-unsigned	Com_BlockChecksum( const void *buffer, int length );
-
-// MD5 functions
-
-char		*Com_MD5File(const char *filename, int length, const char *prefix, int prefix_len);
-char		*Com_MD5Buf( const char *data, int length, const char *data2, int length2 );
-
-// stateless challenge functions
-void		Com_MD5Init( void );
-int			Com_MD5Addr( const netadr_t *addr, int timestamp );
-
-qboolean	Com_CDKeyValidate( const char *key, const char *checksum );
-void		Com_ReadCDKey( const char *filename );
-void		Com_AppendCDKey( const char *filename );
-qboolean	Com_EarlyParseCmdLine( char *commandLine, char *con_title, int title_size, int *vid_xpos, int *vid_ypos );
-int			Com_Split( char *in, char **out, int outsz, int delim );
 
 int			Com_Filter( const char *filter, const char *name );
 qboolean	Com_FilterExt( const char *filter, const char *name );
 qboolean	Com_HasPatterns( const char *str );
 int			Com_FilterPath( const char *filter, const char *name );
+#ifdef __cplusplus
+}
+#endif
+int			Com_EventLoop( void );
+int			Com_Milliseconds( void );	// will be journaled properly
+void		Com_GameRestart( int checksumFeed, qboolean clientRestart );
+char		*Com_MD5Buf( const char *data, int length, const char *data2, int length2 );
+qboolean	Com_EarlyParseCmdLine( char *commandLine, char *con_title, int title_size, int *vid_xpos, int *vid_ypos );
+
+// stateless challenge functions
+void		Com_MD5Init( void );
+int			Com_MD5Addr( const netadr_t *addr, int timestamp );
+
+void 		Com_BuildInfo_f( void );
 int			Com_RealTime(qtime_t *qtime);
 qboolean	Com_SafeMode( void );
 void		Com_RunAndTimeServerPacket( const netadr_t *evFrom, msg_t *buf );
@@ -1576,7 +1579,13 @@ FILE	*Sys_FOpen( const char *ospath, const char *mode );
 qboolean Sys_ResetReadOnlyAttribute( const char *ospath );
 
 const char *Sys_Pwd( void );
+#ifdef __cplusplus
+extern "C" {
+#endif
 const char *Sys_DefaultBasePath( void );
+#ifdef __cplusplus
+}
+#endif
 const char *Sys_DefaultHomePath( void );
 const char *Sys_SteamPath( void );
 

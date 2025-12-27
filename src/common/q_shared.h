@@ -648,6 +648,7 @@ void Snd_Memset (void* dest, const int val, const size_t count);
 
 #define Com_Memset memset
 #define Com_Memcpy memcpy
+#define Com_Memcmp memcmp
 
 #define CIN_system	1
 #define CIN_loop	2
@@ -847,12 +848,23 @@ typedef struct {
 #define	SnapVector(v) {v[0]=((int)(v[0]));v[1]=((int)(v[1]));v[2]=((int)(v[2]));}
 // just in case you don't want to use the macros
 // Vector math functions with improved const correctness
+#ifdef __cplusplus
+extern "C" {
+#endif
 vec_t _DotProduct( const vec3_t v1, const vec3_t v2 );
 void _VectorSubtract( const vec3_t veca, const vec3_t vecb, vec3_t out );
 void _VectorAdd( const vec3_t veca, const vec3_t vecb, vec3_t out );
 void _VectorCopy( const vec3_t in, vec3_t out );
 void _VectorScale( const vec3_t in, float scale, vec3_t out );
 void _VectorMA( const vec3_t veca, float scale, const vec3_t vecb, vec3_t out );
+void _VectorScale4( const float *v, float s, float *o );
+float _DotProduct4( const float *v1, const float *v2 );
+#ifdef __cplusplus
+}
+#endif
+
+#define VectorScale4(v,s,o) _VectorScale4(v,s,o)
+#define DotProduct4(v1,v2) _DotProduct4(v1,v2)
 
 // Type-safe vector operations with bounds checking
 static inline void VectorCopySafe(const vec3_t in, vec3_t out) {
@@ -1149,9 +1161,15 @@ qboolean Com_GetHashColor( const char *str, byte *color );
 const char *Com_SkipTokens( const char *s, int numTokens, const char *sep );
 const char *Com_SkipCharset( const char *s, const char *sep );
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 void Com_RandomBytes( byte *string, int len );
 
 void Com_SortList( char** list, int n );
+#ifdef __cplusplus
+}
+#endif
 
 // mode parm for FS_FOpenFile
 typedef enum {
@@ -1940,6 +1958,9 @@ typedef enum {
 #define GLYPHS_PER_FONT GLYPH_END - GLYPH_START + 1
 typedef struct {
   int height;       // number of scan lines
+  int width;        // glyph width
+  int xOffset;      // x offset
+  int yOffset;      // y offset
   int top;          // top of glyph in buffer
   int bottom;       // bottom of glyph in buffer
   int pitch;        // width for copying
@@ -1962,6 +1983,9 @@ struct fontInfo_s {
   glyphInfo_t glyphs [GLYPHS_PER_FONT];
   float glyphScale;
   char name[MAX_QPATH];
+  int height;
+  int tall;
+  qhandle_t shader;
   // Modern font rendering additions
   qboolean isSDF;           // true when atlas stores distance field
   float sdfSpread;          // spread (in pixels) used to generate SDF

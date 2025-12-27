@@ -3668,6 +3668,9 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 	rimp.Hunk_FreeTempMemory = Hunk_FreeTempMemory;
 
 	rimp.CM_ClusterPVS = CM_ClusterPVS;
+	rimp.CM_NumClusters = CM_NumClusters;
+	rimp.CM_ClusterSize = CM_ClusterSize;
+	rimp.CM_ClusterVisible = CM_ClusterVisible;
 	rimp.CM_DrawDebugSurface = CM_DrawDebugSurface;
 
 	rimp.FS_ReadFile = FS_ReadFile;

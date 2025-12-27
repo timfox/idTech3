@@ -31,15 +31,31 @@ extern "C" {
 
 // File path validation
 qboolean Q_ValidateFilePath( const char *path );
+const char *Sys_DefaultBasePath( void );
 
+<<<<<<< Current (Your changes)
 // Additional stub functions needed by renderers
 unsigned int Com_TouchMemory(void);
 
 #ifdef __cplusplus
 }
 #endif
+=======
+// Memory management
+void *Z_Malloc(int size);
+void Z_Free(void *ptr);
 
-// Additional stub functions
+// Error handling
+void NORETURN Com_Error(errorParm_t level, const char *fmt, ...) __attribute__ ((format (printf, 2, 3)));
+void Com_Printf(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
+void Com_DPrintf(const char *fmt, ...) __attribute__ ((format (printf, 1, 2)));
+
+// CVAR management
+cvar_t *Cvar_Get( const char *var_name, const char *value, int flags );
+void Cvar_SetDescription( cvar_t *var, const char *description );
+>>>>>>> Incoming (Background Agent changes)
+
+// Additional stub functions needed by renderers
 unsigned int Com_TouchMemory(void);
 qboolean Com_HasPatterns(const char *str);
 int Com_Filter(const char *filter, const char *name);
@@ -53,16 +69,11 @@ void Com_BeginRedirect(char *buffer, int buffersize, void (*flush)(const char *)
 void Com_EndRedirect(void);
 void *S_Malloc(int size);
 struct channel_s;
-typedef struct channel_s channel_t;
-void S_Spatialize(channel_t *ch);
-
-#ifdef __cplusplus
-}
-#endif
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+void S_Spatialize(struct channel_s *ch);
+qboolean FS_Initialized(void);
+qboolean FS_StartupInProgress(void);
+int Scalability_GetMaxFonts(void);
+int Scalability_GetMaxFontCache(void);
 
 #define	REF_API_VERSION		9
 #define MAX_MOD_KNOWN		1024
@@ -461,6 +472,9 @@ typedef struct {
 
 	void	(*Cmd_ExecuteText)( cbufExec_t exec_when, const char *text );
 
+	int		(*CM_NumClusters)(void);
+	int		(*CM_ClusterSize)(void);
+	qboolean (*CM_ClusterVisible)(int cluster1, int cluster2);
 	byte	*(*CM_ClusterPVS)(int cluster);
 
 	// visualization for debugging collision detection
@@ -516,9 +530,7 @@ typedef struct {
 
 } refimport_t;
 
-#ifndef USE_RENDERER_DLOPEN
-extern refimport_t ri;
-#endif
+Q_EXPORT extern refimport_t ri;
 
 // this is the only function actually exported at the linker level
 // If the module can't init to a valid rendering state, NULL will be

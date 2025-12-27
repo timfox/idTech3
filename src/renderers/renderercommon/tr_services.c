@@ -11,7 +11,11 @@ and core engine systems.
 #include "../../common/q_shared.h"
 
 // Forward declarations
+#ifdef USE_RENDERER_DLOPEN
+extern Q_EXPORT refimport_t ri;
+#else
 extern refimport_t ri;
+#endif
 extern trGlobals_t tr;
 
 // Default service implementations that delegate to global state
@@ -753,36 +757,6 @@ Vector Math Functions
 These are duplicated here for renderer shared libraries
 ====================
 */
-void _VectorCopy( const float *in, float *out ) {
-	out[0] = in[0];
-	out[1] = in[1];
-	out[2] = in[2];
-}
-
-void _VectorAdd( const float *veca, const float *vecb, float *out ) {
-	out[0] = veca[0] + vecb[0];
-	out[1] = veca[1] + vecb[1];
-	out[2] = veca[2] + vecb[2];
-}
-
-void _VectorSubtract( const float *veca, const float *vecb, float *out ) {
-	out[0] = veca[0] - vecb[0];
-	out[1] = veca[1] - vecb[1];
-	out[2] = veca[2] - vecb[2];
-}
-
-void _VectorScale( const float *in, float scale, float *out ) {
-	out[0] = in[0] * scale;
-	out[1] = in[1] * scale;
-	out[2] = in[2] * scale;
-}
-
-void _VectorMA( const float *veca, float scale, const float *vecb, float *out ) {
-	out[0] = veca[0] + scale * vecb[0];
-	out[1] = veca[1] + scale * vecb[1];
-	out[2] = veca[2] + scale * vecb[2];
-}
-
 /*
 ====================
 Engine Function Stubs
@@ -794,6 +768,15 @@ to the refimport interface.
 */
 
 // Memory and file system functions are handled by the refimport interface
+<<<<<<< Current (Your changes)
+
+// Scalability functions are not declared in renderer header
+
+// Additional stub implementations for missing functions
+unsigned int Com_TouchMemory(void) {
+    return 0;
+}
+=======
 
 // Scalability functions are not declared in renderer header
 
@@ -802,9 +785,32 @@ unsigned int Com_TouchMemory(void) {
     return 0;
 }
 
-// Additional stub implementations for missing functions
-unsigned int Com_TouchMemory(void) {
+unsigned Com_BlockChecksum(const void *buffer, int length) {
+    (void)buffer; (void)length;
     return 0;
+}
+
+void Com_Printf(const char *fmt, ...) {
+    va_list argptr;
+    char msg[MAXPRINTMSG];
+
+    va_start(argptr, fmt);
+    Q_vsnprintf(msg, sizeof(msg), fmt, argptr);
+    va_end(argptr);
+
+    ri.Printf(PRINT_ALL, "%s", msg);
+}
+
+void Com_DPrintf(const char *fmt, ...) {
+    va_list argptr;
+    char msg[MAXPRINTMSG];
+
+    va_start(argptr, fmt);
+    Q_vsnprintf(msg, sizeof(msg), fmt, argptr);
+    va_end(argptr);
+>>>>>>> Incoming (Background Agent changes)
+
+    ri.Printf(PRINT_DEVELOPER, "%s", msg);
 }
 
 qboolean Com_HasPatterns(const char *str) {
@@ -855,11 +861,61 @@ void Com_EndRedirect(void) {
     // No-op
 }
 
+qboolean FS_Initialized(void) {
+    return qtrue;
+}
+
+qboolean FS_StartupInProgress(void) {
+    return qfalse;
+}
+
+const char *Sys_DefaultBasePath(void) {
+    return ".";
+}
+
+int Scalability_GetMaxFonts(void) {
+    return 32;
+}
+
+int Scalability_GetMaxFontCache(void) {
+    return 64;
+}
+
+void *Z_Malloc(int size) {
+    return ri.Malloc(size);
+}
+
+void Z_Free(void *ptr) {
+    ri.Free(ptr);
+}
+
+void Com_Error(errorParm_t level, const char *fmt, ...) {
+    va_list argptr;
+    char msg[MAXPRINTMSG];
+
+    va_start(argptr, fmt);
+    Q_vsnprintf(msg, sizeof(msg), fmt, argptr);
+    va_end(argptr);
+
+    ri.Error(level, "%s", msg);
+}
+
+cvar_t *Cvar_Get( const char *var_name, const char *value, int flags ) {
+    return ri.Cvar_Get(var_name, value, flags);
+}
+
+void Cvar_SetDescription( cvar_t *var, const char *description ) {
+    if (ri.Cvar_SetDescription) {
+        ri.Cvar_SetDescription(var, description);
+    }
+}
+
 void *S_Malloc(int size) {
     return malloc((size_t)size);
 }
 
-void S_Spatialize(channel_t *ch) {
+struct channel_s;
+void S_Spatialize(struct channel_s *ch) {
     (void)ch;
     // No-op for renderers
 }

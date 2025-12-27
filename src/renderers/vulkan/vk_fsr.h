@@ -1,9 +1,10 @@
 #ifndef VK_FSR_H_
 #define VK_FSR_H_
 
+#include "../../common/q_shared.h"
 #include "vulkan/vulkan.h"
-#include "../fsr/ffx_a.h"
-#include "../fsr/ffx_fsr1.h"
+#include "fsr/ffx_a.h"
+#include "fsr/ffx_fsr1.h"
 
 // FSR pipeline types
 typedef enum {
@@ -40,12 +41,16 @@ typedef struct {
     VkPipelineLayout pipeline_layout;
     VkDescriptorSetLayout descriptor_layout;
     VkDescriptorPool descriptor_pool;
-    VkDescriptorSet descriptor_set;
+    VkDescriptorSet descriptor_sets[2]; // EASU and RCAS
     VkBuffer constants_buffer;
     VkDeviceMemory constants_memory;
     void* constants_mapped;
     qboolean initialized;
 } vk_fsr_state_t;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // Function declarations
 qboolean vk_fsr_init(void);
@@ -65,5 +70,15 @@ extern cvar_t *r_fsr_enable;
 extern cvar_t *r_fsr_easu;
 extern cvar_t *r_fsr_rcas;
 extern cvar_t *r_fsr_sharpness;
+
+// SPIR-V shader data
+extern const unsigned char fsr_easu_comp_spv[];
+extern const unsigned int fsr_easu_comp_spv_size;
+extern const unsigned char fsr_rcas_comp_spv[];
+extern const unsigned int fsr_rcas_comp_spv_size;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // VK_FSR_H_

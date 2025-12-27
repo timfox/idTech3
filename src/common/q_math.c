@@ -921,11 +921,15 @@ void _VectorScale( const vec3_t in, vec_t scale, vec3_t out ) {
 	out[2] = in[2]*scale;
 }
 
-void Vector4Scale( const vec4_t in, vec_t scale, vec4_t out ) {
+void _VectorScale4( const float *in, float scale, float *out ) {
 	out[0] = in[0]*scale;
 	out[1] = in[1]*scale;
 	out[2] = in[2]*scale;
 	out[3] = in[3]*scale;
+}
+
+float _DotProduct4( const float *v1, const float *v2 ) {
+	return v1[0]*v2[0] + v1[1]*v2[1] + v1[2]*v2[2] + v1[3]*v2[3];
 }
 
 

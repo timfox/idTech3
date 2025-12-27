@@ -49,35 +49,8 @@ void main() {
     vec4 d = textureGather(inputImage, inputUV + con2.zw, 0); // bottom-left
     vec4 e = textureGather(inputImage, inputUV + con3.xy, 0); // bottom-right
 
-    // Extract color channels
-    vec3 bR = b.xxx;
-    vec3 bG = b.yyy;
-    vec3 bB = b.zzz;
-    vec3 cR = c.xxx;
-    vec3 cG = c.yyy;
-    vec3 cB = c.zzz;
-    vec3 dR = d.xxx;
-    vec3 dG = d.yyy;
-    vec3 dB = d.zzz;
-    vec3 eR = e.xxx;
-    vec3 eG = e.yyy;
-    vec3 eB = e.zzz;
-
-    // Compute min/max for clamping
-    vec3 minRGB = min(min(min(bR, bG, bB), cR, cG, cB), dR, dG, dB), eR, eG, eB);
-    vec3 maxRGB = max(max(max(bR, bG, bB), cR, cG, cB), dR, dG, dB), eR, eG, eB);
-
-    // Compute weights (simplified EASU)
-    vec3 w = vec3(0.25); // Equal weights for now
-
-    // Combine colors
-    vec3 color = bR * w.r + bG * w.g + bB * w.b +
-                 cR * w.r + cG * w.g + cB * w.b +
-                 dR * w.r + dG * w.g + dB * w.b +
-                 eR * w.r + eG * w.g + eB * w.b;
-
-    // Clamp to neighborhood range
-    color = clamp(color, minRGB, maxRGB);
+    // Extract color channels (simplified)
+    vec3 color = (b.rgb + c.rgb + d.rgb + e.rgb) * 0.25;
 
     // Store result
     imageStore(outputImage, ivec2(pos), vec4(color, 1.0));

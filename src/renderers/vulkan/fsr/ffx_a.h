@@ -12,9 +12,49 @@
 
 #define A_2PI 6.28318530718
 
-// Packing functions for half precision
+#if !defined(A_GPU)
+#include <stdint.h>
+
+// Basic types for C
+typedef uint32_t AU1;
+typedef uint32_t AU4[4];
+typedef uint32_t* outAU4;
+typedef float AF1;
+typedef float AF4[4];
+
+#define AF1_(x) ((AF1)(x))
+#define AU1_AF1(x) ((AU1)(x))
+
 #if defined(A_HALF)
-  #if defined(A_GPU)
+    typedef uint16_t AP1_AH1;
+    typedef uint32_t AP1_AF1;
+    typedef uint32_t AP1_AB1;
+    typedef uint32_t AP1_AU1;
+    typedef uint16_t AH1_AP1;
+    typedef uint32_t AF1_AP1;
+    typedef uint32_t AB1_AP1;
+    typedef uint32_t AU1_AP1;
+    
+    typedef uint16_t AH1;
+    typedef uint32_t AF1_TYPE; // Avoid conflict with AF1
+    typedef uint32_t AB1;
+    typedef uint32_t AU1_TYPE;
+#endif
+
+#else // A_GPU
+
+#if defined(A_GLSL)
+    #define AU1 uint
+    #define AU4 uvec4
+    #define outAU4 out uvec4
+    #define AF1 float
+    #define AF4 vec4
+    #define AF1_(x) float(x)
+    #define AU1_AF1(x) uint(x)
+#endif
+
+// Packing functions for half precision for GPU
+#if defined(A_HALF)
     #ifdef A_HLSL
       #define AP1_AH1(x) asfloat(uint16_t(x))
       #define AP1_AF1(x) asfloat(uint32_t(x))
@@ -34,33 +74,14 @@
       #define AB1_AP1(x) __float_as_uint(x)
       #define AU1_AP1(x) __float_as_uint(x)
     #endif
-  #else
-    typedef uint16_t AP1_AH1;
-    typedef uint32_t AP1_AF1;
-    typedef uint32_t AP1_AB1;
-    typedef uint32_t AP1_AU1;
-    typedef uint16_t AH1_AP1;
-    typedef uint32_t AF1_AP1;
-    typedef uint32_t AB1_AP1;
-    typedef uint32_t AU1_AP1;
-  #endif
 #endif
 
-// Basic types
-#if defined(A_HALF)
-  typedef uint16_t AH1;
-  typedef uint32_t AF1;
-  typedef uint32_t AB1;
-  typedef uint32_t AU1;
-#endif
+#endif // A_GPU
 
 // Math functions
 #define A_ABS(a) ((a) < 0 ? -(a) : (a))
 #define A_MAX(a,b) ((a) > (b) ? (a) : (b))
 #define A_MIN(a,b) ((a) < (b) ? (a) : (b))
 #define A_CLAMP(a,b,c) A_MIN(A_MAX(a,b),c)
-
-// Common constants
-#define A_2PI 6.28318530718f
 
 #endif // FFX_A_H

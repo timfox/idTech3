@@ -5,6 +5,8 @@
 #include "vk_postprocess.h"
 #include "vk.h"
 
+#include "vk_fsr.h"
+
 // Renderer interface
 extern refimport_t ri;
 
@@ -19,8 +21,11 @@ extern PFN_vkWaitForFences qvkWaitForFences;
 extern PFN_vkResetFences qvkResetFences;
 extern PFN_vkBeginCommandBuffer qvkBeginCommandBuffer;
 extern PFN_vkEndCommandBuffer qvkEndCommandBuffer;
+extern PFN_vkCmdPipelineBarrier qvkCmdPipelineBarrier;
+extern PFN_vkCmdBlitImage qvkCmdBlitImage;
 
 // External references
+extern glconfig_t glConfig;
 extern shaderCommands_t tess;
 
 // Performance tracking
@@ -125,12 +130,79 @@ extern "C" void vk_end_frame(void) {
 
     // Apply FSR (FidelityFX Super Resolution) after post-processing but before UI
     if (vk_fsr_is_enabled()) {
-        vk_fsr_update_constants(vk.renderWidth, vk.renderHeight, vk.extent_unscaled.width, vk.extent_unscaled.height);
+        vk_fsr_update_constants(vk.renderWidth, vk.renderHeight, glConfig.vidWidth, glConfig.vidHeight);
 
-        // Apply EASU upscaling followed by RCAS sharpening
-        // Note: This would need proper image handles and barriers in a full implementation
-        // For now, this demonstrates the integration point
-        ri.Printf(PRINT_ALL, "Vulkan: FSR framework integrated (needs image handles for full implementation)\n");
+        // 1. EASU: Upscale color_image -> upscale.image[0]
+        // color_image is already in SHADER_READ_ONLY_OPTIMAL from main render pass
+        vk_fsr_apply_easu(vk.cmd->command_buffer, vk.color_image, vk.color_image_view, vk.upscale.image[0], vk.upscale.view[0]);
+
+        // 2. Barrier for EASU output -> RCAS input
+        VkImageMemoryBarrier easu_barrier = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .pNext = nullptr,
+            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+            .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+            .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = vk.upscale.image[0],
+            .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+        };
+        qvkCmdPipelineBarrier(vk.cmd->command_buffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &easu_barrier);
+
+        // 3. RCAS: Sharpen upscale.image[0] -> upscale.image[1]
+        vk_fsr_apply_rcas(vk.cmd->command_buffer, vk.upscale.image[0], vk.upscale.view[0], vk.upscale.image[1], vk.upscale.view[1]);
+
+        // 4. Barrier for RCAS output -> Transfer source
+        VkImageMemoryBarrier rcas_barrier = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .pNext = nullptr,
+            .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+            .oldLayout = VK_IMAGE_LAYOUT_GENERAL,
+            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = vk.upscale.image[1],
+            .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+        };
+        qvkCmdPipelineBarrier(vk.cmd->command_buffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &rcas_barrier);
+
+        // 5. Blit result to swapchain
+        VkImageBlit blit = {};
+        blit.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+        blit.srcOffsets[0] = { 0, 0, 0 };
+        blit.srcOffsets[1] = { (int32_t)glConfig.vidWidth, (int32_t)glConfig.vidHeight, 1 };
+        blit.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+        blit.dstOffsets[0] = { 0, 0, 0 };
+        blit.dstOffsets[1] = { (int32_t)glConfig.vidWidth, (int32_t)glConfig.vidHeight, 1 };
+
+        // Transition swapchain image to TRANSFER_DST_OPTIMAL
+        VkImageMemoryBarrier swapchain_barrier = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .pNext = nullptr,
+            .srcAccessMask = 0,
+            .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = vk.swapchain_images[vk.cmd->swapchain_image_index],
+            .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+        };
+        qvkCmdPipelineBarrier(vk.cmd->command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &swapchain_barrier);
+
+        qvkCmdBlitImage(vk.cmd->command_buffer, vk.upscale.image[1], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        vk.swapchain_images[vk.cmd->swapchain_image_index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        1, &blit, VK_FILTER_LINEAR);
+
+        // Transition swapchain image to COLOR_ATTACHMENT_OPTIMAL for UI
+        swapchain_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        swapchain_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        swapchain_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        swapchain_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        qvkCmdPipelineBarrier(vk.cmd->command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, &swapchain_barrier);
     }
 
     // Transition swapchain image to present layout

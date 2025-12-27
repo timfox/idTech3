@@ -32,21 +32,12 @@ void main() {
     // RCAS algorithm - simplified implementation
     vec4 con = vec4(fsr.rcas_const0) / 65536.0;
 
-    // Sample 3x3 neighborhood
-    vec3 a = texture(inputImage, uv + vec2(-1.0, -1.0) / textureSize(inputImage, 0).xy).rgb;
-    vec3 b = texture(inputImage, uv + vec2( 0.0, -1.0) / textureSize(inputImage, 0).xy).rgb;
-    vec3 c = texture(inputImage, uv + vec2( 1.0, -1.0) / textureSize(inputImage, 0).xy).rgb;
-    vec3 d = texture(inputImage, uv + vec2(-1.0,  0.0) / textureSize(inputImage, 0).xy).rgb;
-    vec3 e = texture(inputImage, uv).rgb; // center
-    vec3 f = texture(inputImage, uv + vec2( 1.0,  0.0) / textureSize(inputImage, 0).xy).rgb;
-    vec3 g = texture(inputImage, uv + vec2(-1.0,  1.0) / textureSize(inputImage, 0).xy).rgb;
-    vec3 h = texture(inputImage, uv + vec2( 0.0,  1.0) / textureSize(inputImage, 0).xy).rgb;
-    vec3 i = texture(inputImage, uv + vec2( 1.0,  1.0) / textureSize(inputImage, 0).xy).rgb;
+    // Sample center
+    vec3 color = texture(inputImage, uv).rgb;
 
-    // Contrast-adaptive sharpening
-    vec3 bSharp = b * (1.0 + con.x) - (a + c + d + f + g + h + i) * con.x * 0.125;
-    vec3 color = clamp(bSharp, 0.0, 1.0);
-
+    // Contrast-adaptive sharpening (simplified)
+    // Just a placeholder for now, actual RCAS is more complex
+    
     // Store result
     imageStore(outputImage, ivec2(pos), vec4(color, 1.0));
 }

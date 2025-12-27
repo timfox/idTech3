@@ -46,6 +46,10 @@ typedef struct ImDrawData ImDrawData;
 extern "C" {
 #endif
 
+void vk_set_object_name( uint64_t obj, const char *objName, VkDebugReportObjectTypeEXT objType );
+#define SET_OBJECT_NAME(obj,objName,objType) vk_set_object_name( (uint64_t)(obj), (objName), (objType) )
+void Perf_CountDrawCall( void );
+
 // Forward declarations for renderer types
 typedef struct image_s image_t;
 
@@ -266,7 +270,7 @@ static const textureMapType_t textureMapTypes[] = {
 
 // Vulkan uniform structures
 typedef struct {
-    vec3_t eyePos;
+    vec4_t eyePos;
     vec4_t ent_color[32];
     struct {
         float color[32][4];
@@ -299,14 +303,22 @@ typedef struct {
     float viewOrigin[4]; // w component is 0.0
 } vkUniformCamera_t;
 
+typedef struct {
+    double frame_timings[128]; // circular buffer
+    int frame_timing_count;
+    int frame_timing_head;
+} vk_gpu_timing_t;
+
+extern vk_gpu_timing_t vk_gpu_timing;
+
 // Command buffer structure
 typedef struct {
     VkCommandBuffer command_buffer;
     VkBuffer vertex_buffer;
     VkDeviceSize vertex_buffer_offset;
     void* vertex_buffer_ptr;
-    VkDeviceSize buf_offset[8];
-    VkDeviceSize vbo_offset[8];
+    VkDeviceSize buf_offset[16];
+    VkDeviceSize vbo_offset[16];
     uint32_t uniform_camera_item_size;
     uint32_t num_indexes;
     VkBuffer curr_index_buffer;
@@ -539,15 +551,15 @@ typedef struct atmosphere_params_s {
 
 // Atmosphere preset type
 typedef enum {
-    ATMOSPHERE_PRESET_EARTH,
-    ATMOSPHERE_PRESET_MARS,
-    ATMOSPHERE_PRESET_VENUS,
-    ATMOSPHERE_PRESET_CUSTOM,
-    ATMOSPHERE_CALM
+    ATMOSPHERE_BRUTAL,
+    ATMOSPHERE_MYSTERIOUS,
+    ATMOSPHERE_COMBAT,
+    ATMOSPHERE_CALM,
+    ATMOSPHERE_NUM_PRESETS
 } atmosphere_preset_t;
 
 // Atmosphere preset constant for backward compatibility
-#define ATMOSPHERE_CUSTOM ATMOSPHERE_PRESET_CUSTOM
+#define ATMOSPHERE_CUSTOM ATMOSPHERE_BRUTAL // Fallback
 
 // Descriptor count for flares
 #define VK_DESC_COUNT 8
@@ -616,6 +628,14 @@ typedef struct {
     VkShaderModule depth_of_field_comp; // Added
     VkShaderModule ssao_comp; // Added
     VkShaderModule ssr_comp; // Added
+    VkShaderModule rt_composite_fs; // Added
+    VkShaderModule rt_composite_vs; // Added
+    VkShaderModule rt_relax_comp; // Added
+    VkShaderModule rt_primary_rays_rgen; // Added
+    VkShaderModule rt_miss_rmiss; // Added
+    VkShaderModule rt_closesthit_rchit; // Added
+    VkShaderModule gibs_spawn_comp; // Added
+    VkShaderModule gibs_update_comp; // Added
 } vk_modules_t;
 
 // Main Vulkan instance structure
@@ -991,17 +1011,154 @@ typedef struct {
     VkPipeline vrs_generate_compute_pipeline;
 
     // Ray tracing
-    qboolean rayTracingSupported;  // Added
+    qboolean rayTracingSupported;
     struct {
         qboolean initialized;
+        VkPhysicalDeviceRayTracingPipelinePropertiesKHR properties;
+        
+        // Acceleration Structures
+        uint32_t blasCapacity;
+        uint32_t blasCount;
+        VkAccelerationStructureKHR *blas;
+        VkBuffer *blasBuffers;
+        VkDeviceMemory *blasMemory;
+        uint64_t *blasHashes;
+        VkAccelerationStructureKHR *blasCompacted;
+        VkBuffer *blasCompactedBuffers;
+        VkDeviceMemory *blasCompactedMemory;
+        qboolean *blasNeedsCompaction;
+        uint32_t *blasUnusedSlots;
+        uint32_t unusedSlotCount;
+
+        VkAccelerationStructureKHR tlas;
+        VkBuffer tlasBuffer;
+        VkDeviceMemory tlasMemory;
+        VkDeviceAddress tlasDeviceAddress;
+        qboolean tlasNeedsRebuild;
+        qboolean tlasAllowsUpdate;
+
+        // SBT (Shader Binding Table)
+        VkBuffer sbtBuffer;
+        VkDeviceMemory sbtMemory;
+        VkStridedDeviceAddressRegionKHR raygenShaderBindingTable;
+        VkStridedDeviceAddressRegionKHR missShaderBindingTable;
+        VkStridedDeviceAddressRegionKHR hitShaderBindingTable;
+        VkStridedDeviceAddressRegionKHR callableShaderBindingTable;
+        uint32_t raygenRegionOffset;
+        uint32_t missRegionOffset;
+        uint32_t hitRegionOffset;
+        uint32_t callableRegionOffset;
+        uint32_t raygenRegionSize;
+        uint32_t missRegionSize;
+        uint32_t hitRegionSize;
+        uint32_t callableRegionSize;
+
+        // Pipeline
+        VkPipeline pipeline;
+        VkPipelineLayout pipelineLayout;
+        VkDescriptorSetLayout descriptorSetLayout;
+        VkDescriptorPool descriptorPool;
+        VkDescriptorSet descriptorSet;
+
+        // Raytracing pipeline (alias used in some places)
+        VkPipeline raytracingPipeline;
+        VkPipelineLayout raytracingPipelineLayout;
         VkDescriptorSetLayout raytracingDescriptorSetLayout;
         VkDescriptorSet raytracingDescriptorSet;
-    } rt;  // Added
+
+        // Resources
+        VkBuffer scratchBuffer;
+        VkDeviceMemory scratchMemory;
+        VkDeviceSize scratchBufferSize;
+
+        VkBuffer uniformBuffer;
+        VkDeviceMemory uniformBufferMemory;
+
+        // RT Output Image
+        VkImage outputImage;
+        VkImageView outputImageView;
+        VkDeviceMemory outputImageMemory;
+        uint32_t outputImageWidth;
+        uint32_t outputImageHeight;
+
+        // Temporal / History
+        VkImage historyImage;
+        VkImageView historyImageView;
+        VkDeviceMemory historyImageMemory;
+        VkImage motionVectorImage;
+        VkImageView motionVectorImageView;
+        VkDeviceMemory motionVectorImageMemory;
+
+        // Denoise Buffers
+        VkImage denoiseNormalBuffer;
+        VkDeviceMemory denoiseNormalBufferMemory;
+        VkImageView denoiseNormalBufferView;
+        VkImage denoiseDepthBuffer;
+        VkDeviceMemory denoiseDepthBufferMemory;
+        VkImageView denoiseDepthBufferView;
+        VkImage denoiseVarianceBuffer;
+        VkDeviceMemory denoiseVarianceBufferMemory;
+        VkImageView denoiseVarianceBufferView;
+        VkImage denoiseHistoryBuffer;
+        VkDeviceMemory denoiseHistoryBufferMemory;
+        VkImageView denoiseHistoryBufferView;
+
+        // Denoise Pipeline
+        VkPipeline denoiseComputePipeline;
+        VkPipelineLayout denoisePipelineLayout;
+        VkDescriptorSetLayout denoiseDescriptorSetLayout;
+        VkDescriptorSet denoiseDescriptorSet;
+
+        // Composite resources
+        VkPipeline compositePipeline;
+        VkPipelineLayout compositePipelineLayout;
+        VkDescriptorSetLayout compositeDescriptorSetLayout;
+        VkDescriptorPool compositeDescriptorPool;
+
+        // Previous frame state
+        float previousViewInverse[16];
+        float previousProjInverse[16];
+        vec3_t previousCameraPos;
+        qboolean previousMatricesValid;
+        VkAccelerationStructureInstanceKHR *previousInstances;
+        uint32_t previousInstanceCount;
+
+        image_t *blueNoiseTexture;
+    } rt;
+
+    // GIBS system
+    struct {
+        qboolean enabled;
+        qboolean initialized;
+        uint32_t surfelCapacity;
+        uint32_t surfelCount;
+        uint32_t activeSurfelCount;
+        uint32_t updatedSurfelCount;
+        uint32_t frameCounter;
+        uint32_t updateFrameOffset;
+        VkBuffer surfelBuffer;
+        VkDeviceMemory surfelBufferMemory;
+        VkDeviceAddress surfelBufferAddress;
+        VkBuffer surfelIndirectBuffer;
+        VkDeviceMemory surfelIndirectBufferMemory;
+        VkBuffer uniformBuffer;
+        VkDeviceMemory uniformBufferMemory;
+        VkPipeline updatePipeline;
+        VkPipelineLayout updatePipelineLayout;
+        VkDescriptorSetLayout updateDescriptorSetLayout;
+        VkDescriptorSet updateDescriptorSet;
+        VkPipeline spawnPipeline;
+        VkPipelineLayout spawnPipelineLayout;
+        VkDescriptorSetLayout spawnDescriptorSetLayout;
+        VkDescriptorSet spawnDescriptorSet;
+    } gibs;
 
     // Compute pipeline
     VkPipelineLayout compute_pipeline_layout;
     VkDescriptorSet compute_descriptor_set;
     VkDescriptorSetLayout compute_descriptor_set_layout;  // Added
+    VkPipeline rt_composite_pipeline; // Added
+    VkDescriptorSet rt_composite_descriptor; // Added
 
     // Storage buffer
     struct {
@@ -1064,6 +1221,14 @@ typedef struct {
         void* ptr;
         VkDeviceSize offset;
     } staging_buffer;
+
+    // Upscaling resources (FSR/DLSS)
+    struct {
+        VkImage image[2];
+        VkImageView view[2];
+        VkDescriptorSet descriptor;
+        qboolean active;
+    } upscale;
 
     // Additional state
     uint32_t uniform_alignment;
@@ -1186,6 +1351,12 @@ typedef struct {
         proc_biome_t biomes[16];
         proc_rule_t rules[64];
     } procDressing;
+
+    // Portal lights system
+    VkBuffer portalLightsBuffer;
+    VkDeviceMemory portalLightsBufferMemory;
+    VkDescriptorSetLayout portalLightsDescriptorSetLayout;
+    VkDescriptorSet portalLightsDescriptorSet;
 } Vk_Instance;
 
 // Global Vulkan instance
@@ -1300,12 +1471,18 @@ extern PFN_vkDestroyImage qvkDestroyImage;
 extern PFN_vkDestroyDescriptorSetLayout qvkDestroyDescriptorSetLayout;
 extern PFN_vkDestroySampler qvkDestroySampler;
 extern PFN_vkDestroyDescriptorPool qvkDestroyDescriptorPool;
+extern PFN_vkCreateShaderModule qvkCreateShaderModule;
+extern PFN_vkDestroyShaderModule qvkDestroyShaderModule;
+extern PFN_vkCreateComputePipelines qvkCreateComputePipelines;
+extern PFN_vkDestroyPipeline qvkDestroyPipeline;
+extern PFN_vkDestroyPipelineLayout qvkDestroyPipelineLayout;
 extern PFN_vkCreateBuffer qvkCreateBuffer;
 extern PFN_vkDestroyBuffer qvkDestroyBuffer;
 extern PFN_vkGetBufferMemoryRequirements qvkGetBufferMemoryRequirements;
 extern PFN_vkAllocateMemory qvkAllocateMemory;
 extern PFN_vkBindBufferMemory qvkBindBufferMemory;
 extern PFN_vkUpdateDescriptorSets qvkUpdateDescriptorSets;
+extern PFN_vkFreeDescriptorSets qvkFreeDescriptorSets;
 extern PFN_vkMapMemory qvkMapMemory;
 extern PFN_vkUnmapMemory qvkUnmapMemory;
 extern PFN_vkFreeMemory qvkFreeMemory;
@@ -1317,7 +1494,25 @@ extern PFN_vkCmdDrawIndexedIndirect qvkCmdDrawIndexedIndirect;
 extern PFN_vkCmdBindPipeline qvkCmdBindPipeline;
 extern PFN_vkCmdBindDescriptorSets qvkCmdBindDescriptorSets;
 extern PFN_vkCmdDispatch qvkCmdDispatch;
+extern PFN_vkCmdPushConstants qvkCmdPushConstants;
+extern PFN_vkCmdBlitImage qvkCmdBlitImage;
+extern PFN_vkCmdTraceRaysKHR qvkCmdTraceRaysKHR;
+extern PFN_vkCmdCopyImage qvkCmdCopyImage;
+extern PFN_vkCmdDraw qvkCmdDraw;
+extern PFN_vkCmdCopyBufferToImage qvkCmdCopyBufferToImage;
+extern PFN_vkBeginCommandBuffer qvkBeginCommandBuffer;
+extern PFN_vkEndCommandBuffer qvkEndCommandBuffer;
+extern PFN_vkQueueSubmit qvkQueueSubmit;
 extern PFN_vkGetBufferDeviceAddress qvkGetBufferDeviceAddress;
+
+// Ray tracing extensions
+extern PFN_vkCreateRayTracingPipelinesKHR qvkCreateRayTracingPipelinesKHR;
+extern PFN_vkGetRayTracingShaderGroupHandlesKHR qvkGetRayTracingShaderGroupHandlesKHR;
+extern PFN_vkGetAccelerationStructureBuildSizesKHR qvkGetAccelerationStructureBuildSizesKHR;
+extern PFN_vkCreateAccelerationStructureKHR qvkCreateAccelerationStructureKHR;
+extern PFN_vkGetAccelerationStructureDeviceAddressKHR qvkGetAccelerationStructureDeviceAddressKHR;
+extern PFN_vkCmdBuildAccelerationStructuresKHR qvkCmdBuildAccelerationStructuresKHR;
+extern PFN_vkDestroyAccelerationStructureKHR qvkDestroyAccelerationStructureKHR;
 
 // Performance and debugging systems
 qboolean vk_init_performance_hud(void);
@@ -1358,6 +1553,7 @@ void vk_track_gpu_free(VkDeviceMemory memory);
 
 // Utility functions
 uint32_t find_memory_type(uint32_t typeFilter, VkMemoryPropertyFlags properties);
+VkShaderModule vk_create_shader_module(const uint8_t *bytes, const int count);
 void vk_mark_pipelines_dirty(void);
 void vk_bind_generated_shaders(void);
 uint32_t vk_tess_index(uint32_t numIndexes, const void *src);

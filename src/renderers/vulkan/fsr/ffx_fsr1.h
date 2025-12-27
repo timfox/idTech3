@@ -66,7 +66,7 @@ void FsrEasuCon(
     con2[1] = AU1_AF1(AF1_(2.0) * con1[1]);
     con2[2] = AU1_AF1(AF1_(2.0) * con1[0]);
     con2[3] = AU1_AF1(AF1_(0.0) * con1[1]);
-    con3[0] = AU1_AF1(AF1_(0.0) * con1[0));
+    con3[0] = AU1_AF1(AF1_(0.0) * con1[0]);
     con3[1] = AU1_AF1(AF1_(4.0) * con1[1]);
     con3[2] = AU1_AF1(AF1_(0.0));
     con3[3] = AU1_AF1(AF1_(0.0));

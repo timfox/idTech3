@@ -10,6 +10,24 @@ Based on Quake-III-Arena-R reference implementation
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 #include "vk.h"
+#include "tr_math_optimized.h"
+#include "vk_framebuffer.h"
+
+// Forward declarations for ray tracing functions
+void vk_rt_create_denoise_resources( uint32_t width, uint32_t height );
+void vk_rt_destroy_denoise_resources( void );
+void vk_rt_denoise( uint32_t width, uint32_t height );
+void vk_rt_create_denoise_pipeline( void );
+void vk_rt_update_composite_descriptor_set( void );
+void vk_rt_create_composite_descriptor_set( void );
+void vk_rt_composite( void );
+
+// Forward declarations for local functions
+static void vk_rt_create_temporal_buffers( uint32_t width, uint32_t height );
+static void vk_rt_create_descriptor_set_layout( void );
+static void vk_rt_create_pipeline_layout( void );
+static void vk_rt_create_shader_binding_table( void );
+static void vk_rt_destroy_temporal_buffers( void );
 
 #ifdef USE_VULKAN
 
@@ -367,14 +385,14 @@ static void vk_rt_load_blue_noise_array( void )
 	}
 
 	// Create command buffer for upload
-	VkCommandBufferAllocateInfo allocInfo = {};
-	allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-	allocInfo.commandPool = vk.command_pool;
-	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-	allocInfo.commandBufferCount = 1;
+	VkCommandBufferAllocateInfo cbAllocInfo = {};
+	cbAllocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	cbAllocInfo.commandPool = vk.command_pool;
+	cbAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	cbAllocInfo.commandBufferCount = 1;
 
 	VkCommandBuffer command_buffer;
-	VK_CHECK( qvkAllocateCommandBuffers( vk.device, &allocInfo, &command_buffer ) );
+	VK_CHECK( qvkAllocateCommandBuffers( vk.device, &cbAllocInfo, &command_buffer ) );
 
 	VkCommandBufferBeginInfo beginInfo = {};
 	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1824,7 +1842,7 @@ void vk_rt_update_descriptor_set( void )
 	if ( vk.rt.blueNoiseTexture && vk.rt.blueNoiseTexture->view != VK_NULL_HANDLE ) {
 		Vk_Sampler_Def sd;
 		Com_Memset( &sd, 0, sizeof( sd ) );
-		sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+		sd.vk_mag_filter = sd.vk_min_filter = VK_FILTER_LINEAR;
 		sd.address_mode = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 		sd.max_lod_1_0 = qtrue;
 		sd.noAnisotropy = qtrue;
@@ -1906,12 +1924,10 @@ static void vk_rt_update_uniform_buffer( void )
 	// Get view matrix from backEnd and invert it (use optimized inversion)
 	mat4_t viewInverse;
 	extern backEndState_t backEnd;
-	if ( backEnd.viewParms.world.modelViewMatrix ) {
+	{
 		mat4_t viewMatrix;
 		Com_Memcpy( viewMatrix, backEnd.viewParms.world.modelViewMatrix, sizeof(mat4_t) );
 		Matrix16InverseOptimized( viewMatrix, viewInverse );
-	} else {
-		Matrix16Identity( viewInverse );
 	}
 	Com_Memcpy( data, viewInverse, sizeof(float) * 16 );
 	data += 16;
@@ -1919,26 +1935,19 @@ static void vk_rt_update_uniform_buffer( void )
 	// projInverse (mat4 = 16 floats)
 	// Get projection matrix from backEnd and invert it (use optimized inversion)
 	mat4_t projInverse;
-	if ( backEnd.viewParms.projectionMatrix ) {
+	{
 		mat4_t projMatrix;
 		Com_Memcpy( projMatrix, backEnd.viewParms.projectionMatrix, sizeof(mat4_t) );
 		Matrix16InverseOptimized( projMatrix, projInverse );
-	} else {
-		Matrix16Identity( projInverse );
 	}
 	Com_Memcpy( data, projInverse, sizeof(float) * 16 );
 	data += 16;
 
 	// cameraPos (vec4 = 4 floats)
-	if ( backEnd.refdef.vieworg ) {
+	{
 		data[0] = backEnd.refdef.vieworg[0];
 		data[1] = backEnd.refdef.vieworg[1];
 		data[2] = backEnd.refdef.vieworg[2];
-		data[3] = 1.0f;
-	} else {
-		data[0] = 0.0f;
-		data[1] = 0.0f;
-		data[2] = 0.0f;
 		data[3] = 1.0f;
 	}
 	data += 4;
@@ -1949,10 +1958,8 @@ static void vk_rt_update_uniform_buffer( void )
 	data += 2;
 
 	// time (float)
-	if ( &backEnd.refdef ) {
+	{
 		data[0] = (float)backEnd.refdef.time;
-	} else {
-		data[0] = 0.0f;
 	}
 	data += 1;
 
@@ -2041,10 +2048,8 @@ static void vk_rt_update_uniform_buffer( void )
 	// Store current matrices for next frame
 	Com_Memcpy( vk.rt.previousViewInverse, viewInverse, sizeof(mat4_t) );
 	Com_Memcpy( vk.rt.previousProjInverse, projInverse, sizeof(mat4_t) );
-	if ( backEnd.refdef.vieworg ) {
+	{
 		VectorCopy( backEnd.refdef.vieworg, vk.rt.previousCameraPos );
-	} else {
-		VectorClear( vk.rt.previousCameraPos );
 	}
 	vk.rt.previousMatricesValid = qtrue;
 }
@@ -3005,7 +3010,7 @@ void vk_rt_update_composite_descriptor_set( void )
 
 	Vk_Sampler_Def sd;
 	Com_Memset( &sd, 0, sizeof( sd ) );
-	sd.gl_mag_filter = sd.gl_min_filter = GL_LINEAR;
+	sd.vk_mag_filter = sd.vk_min_filter = VK_FILTER_LINEAR;
 	sd.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 	sd.max_lod_1_0 = qtrue;
 	sd.noAnisotropy = qtrue;

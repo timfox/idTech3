@@ -1302,6 +1302,9 @@ SET(RENDERER_VK_SRCS
 	src/renderers/vulkan/tr_surface.c
 	src/renderers/vulkan/tr_world.c
 	src/renderers/vulkan/vk.c
+	src/renderers/vulkan/vk_stubs.c
+	src/renderers/vulkan/vk_fsr.c
+	src/renderers/vulkan/tr_font_vk.c
 	src/renderers/vulkan/vk_memory.c
 	src/renderers/vulkan/vk_vbo.c
 	src/renderers/vulkan/vk_flares.c
@@ -1340,7 +1343,6 @@ SET(RENDERER_VK_SRCS
 	src/renderers/vulkan/vk_images.cpp
 	src/renderers/vulkan/vk_draw.cpp
 	src/renderers/vulkan/vk_descriptors.cpp
-	src/renderers/vulkan/vk_renderpass.cpp
 	src/renderers/vulkan/vk_postprocess.cpp
 	src/renderers/vulkan/vk_config.cpp
 	src/renderers/vulkan/tr_model_assimp.cpp

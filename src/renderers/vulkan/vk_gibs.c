@@ -15,7 +15,7 @@ extern refimport_t ri;
 #ifdef USE_VULKAN_RAY_TRACING
 
 // Forward declarations
-extern orientationr_t backEnd;
+extern backEndState_t backEnd;
 extern trGlobals_t tr;
 
 // CVars
@@ -247,11 +247,13 @@ void vk_gibs_create_pipelines( void )
 	// Load shader modules (shaders must be compiled first via compile.sh)
 	// The shader arrays are defined in shader_data.c (included in vk.c)
 	extern const uint8_t gibs_spawn_comp_spv[];
+	extern const uint32_t gibs_spawn_comp_spv_size;
 	extern const uint8_t gibs_update_comp_spv[];
+	extern const uint32_t gibs_update_comp_spv_size;
 	
 	// Try to load spawn shader module
 	if ( vk.modules.gibs_spawn_comp == VK_NULL_HANDLE ) {
-		vk.modules.gibs_spawn_comp = SHADER_MODULE( gibs_spawn_comp_spv );
+		vk.modules.gibs_spawn_comp = vk_create_shader_module( gibs_spawn_comp_spv, gibs_spawn_comp_spv_size );
 		if ( vk.modules.gibs_spawn_comp != VK_NULL_HANDLE ) {
 			SET_OBJECT_NAME( vk.modules.gibs_spawn_comp, "GIBS spawn compute shader module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 			ri.Printf( PRINT_DEVELOPER, "GIBS: Loaded spawn compute shader module\n" );
@@ -262,7 +264,7 @@ void vk_gibs_create_pipelines( void )
 	
 	// Try to load update shader module
 	if ( vk.modules.gibs_update_comp == VK_NULL_HANDLE ) {
-		vk.modules.gibs_update_comp = SHADER_MODULE( gibs_update_comp_spv );
+		vk.modules.gibs_update_comp = vk_create_shader_module( gibs_update_comp_spv, gibs_update_comp_spv_size );
 		if ( vk.modules.gibs_update_comp != VK_NULL_HANDLE ) {
 			SET_OBJECT_NAME( vk.modules.gibs_update_comp, "GIBS update compute shader module", VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT );
 			ri.Printf( PRINT_DEVELOPER, "GIBS: Loaded update compute shader module\n" );

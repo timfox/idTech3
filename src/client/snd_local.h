@@ -99,7 +99,7 @@ typedef struct loopSound_s {
 	int			framenum;
 } loopSound_t;
 
-typedef struct
+typedef struct channel_s
 {
 	int			allocTime;
 	int			startSample;	// START_SAMPLE_IMMEDIATE = set immediately on next mix

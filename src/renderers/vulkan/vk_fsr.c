@@ -1,467 +1,307 @@
 #include "vk_fsr.h"
-#include "vk.h"
 #include "tr_local.h"
-#include "qvk.h"
+#include "vk.h"
 
-// CVARs
-cvar_t *r_fsr_enable = NULL;
-cvar_t *r_fsr_easu = NULL;
-cvar_t *r_fsr_rcas = NULL;
-cvar_t *r_fsr_sharpness = NULL;
+#define A_CPU
+#include "fsr/ffx_a.h"
+#include "fsr/ffx_fsr1.h"
+
+extern refimport_t ri;
+extern cvar_t *r_hdr;
+extern glconfig_t glConfig;
 
 // Global FSR state
 static vk_fsr_state_t vk_fsr_state = {0};
 
-// Forward declarations for shader data
-extern unsigned char fsr_easu_comp_spv[];
-extern unsigned int fsr_easu_comp_spv_size;
-extern unsigned char fsr_rcas_comp_spv[];
-extern unsigned int fsr_rcas_comp_spv_size;
+// Forward declarations for shader data from shader_data.c
+extern const unsigned char fsr_easu_comp_spv[];
+extern const unsigned int fsr_easu_comp_spv_size;
+extern const unsigned char fsr_rcas_comp_spv[];
+extern const unsigned int fsr_rcas_comp_spv_size;
 
-// Initialize FSR CVARs
-static void vk_fsr_init_cvars(void) {
-    r_fsr_enable = ri.Cvar_Get("r_fsr_enable", "0", CVAR_ARCHIVE);
-    r_fsr_easu = ri.Cvar_Get("r_fsr_easu", "1", CVAR_ARCHIVE);
-    r_fsr_rcas = ri.Cvar_Get("r_fsr_rcas", "1", CVAR_ARCHIVE);
-    r_fsr_sharpness = ri.Cvar_Get("r_fsr_sharpness", "0.2", CVAR_ARCHIVE);
-}
-
-// Create descriptor set layout for FSR
-static qboolean vk_fsr_create_descriptor_layout(void) {
-    VkDescriptorSetLayoutBinding bindings[] = {
-        {
-            .binding = 0,
-            .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-            .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-        },
-        {
-            .binding = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-            .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-        },
-        {
-            .binding = 2,
-            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-        }
-    };
-
-    VkDescriptorSetLayoutCreateInfo layout_info = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = LENGTH(bindings),
-        .pBindings = bindings,
-    };
-
-    VK_CHECK(qvkCreateDescriptorSetLayout(vk.device, &layout_info, NULL,
-                                         &vk_fsr_state.descriptor_layout));
-
-    return qtrue;
-}
-
-// Create pipeline layout for FSR
-static qboolean vk_fsr_create_pipeline_layout(void) {
-    VkPipelineLayoutCreateInfo pipeline_layout_info = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = 1,
-        .pSetLayouts = &vk_fsr_state.descriptor_layout,
-    };
-
-    VK_CHECK(qvkCreatePipelineLayout(vk.device, &pipeline_layout_info, NULL,
-                                   &vk_fsr_state.pipeline_layout));
-
-    return qtrue;
-}
-
-// Create descriptor pool and set for FSR
-static qboolean vk_fsr_create_descriptor_pool(void) {
-    VkDescriptorPoolSize pool_sizes[] = {
-        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 }
-    };
-
-    VkDescriptorPoolCreateInfo pool_info = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .maxSets = 1,
-        .poolSizeCount = LENGTH(pool_sizes),
-        .pPoolSizes = pool_sizes
-    };
-
-    VK_CHECK(qvkCreateDescriptorPool(vk.device, &pool_info, NULL, &vk_fsr_state.descriptor_pool));
-
-    VkDescriptorSetAllocateInfo alloc_info = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .descriptorPool = vk_fsr_state.descriptor_pool,
-        .descriptorSetCount = 1,
-        .pSetLayouts = &vk_fsr_state.descriptor_layout
-    };
-
-    VK_CHECK(qvkAllocateDescriptorSets(vk.device, &alloc_info, &vk_fsr_state.descriptor_set));
-
-    return qtrue;
-}
-
-// Create constants buffer for FSR
-static qboolean vk_fsr_create_constants_buffer(void) {
-    VkBufferCreateInfo buffer_info = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-        .size = sizeof(vk_fsr_easu_constants_t) + sizeof(vk_fsr_rcas_constants_t),
-        .usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-    };
-
-    VK_CHECK(qvkCreateBuffer(vk.device, &buffer_info, NULL, &vk_fsr_state.constants_buffer));
-
-    VkMemoryRequirements mem_reqs;
-    qvkGetBufferMemoryRequirements(vk.device, vk_fsr_state.constants_buffer, &mem_reqs);
-
-    VkMemoryAllocateInfo alloc_info = {
-        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .allocationSize = mem_reqs.size,
-        .memoryTypeIndex = find_memory_type(mem_reqs.memoryTypeBits,
-                                          VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                          VK_MEMORY_PROPERTY_HOST_COHERENT_BIT),
-    };
-
-    VK_CHECK(qvkAllocateMemory(vk.device, &alloc_info, NULL, &vk_fsr_state.constants_memory));
-    VK_CHECK(qvkBindBufferMemory(vk.device, vk_fsr_state.constants_buffer,
-                               vk_fsr_state.constants_memory, 0));
-
-    VK_CHECK(qvkMapMemory(vk.device, vk_fsr_state.constants_memory, 0,
-                        buffer_info.size, 0, &vk_fsr_state.constants_mapped));
-
-    return qtrue;
-}
-
-// Create compute pipelines for FSR
-qboolean vk_fsr_create_pipelines(void) {
-    if (!vk_fsr_create_descriptor_layout()) {
-        return qfalse;
-    }
-
-    if (!vk_fsr_create_pipeline_layout()) {
-        return qfalse;
-    }
-
-    if (!vk_fsr_create_descriptor_pool()) {
-        return qfalse;
-    }
-
-    if (!vk_fsr_create_constants_buffer()) {
-        return qfalse;
-    }
-
-    // Create shader modules
-    VkShaderModuleCreateInfo easu_module_info = {
-        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-        .codeSize = fsr_easu_comp_spv_size,
-        .pCode = (uint32_t*)fsr_easu_comp_spv,
-    };
-
-    VkShaderModuleCreateInfo rcas_module_info = {
-        .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-        .codeSize = fsr_rcas_comp_spv_size,
-        .pCode = (uint32_t*)fsr_rcas_comp_spv,
-    };
-
-    VkShaderModule easu_module, rcas_module;
-    VK_CHECK(qvkCreateShaderModule(vk.device, &easu_module_info, NULL, &easu_module));
-    VK_CHECK(qvkCreateShaderModule(vk.device, &rcas_module_info, NULL, &rcas_module));
-
-    // Create pipelines
-    VkComputePipelineCreateInfo pipeline_infos[FSR_NUM_PIPELINES] = {
-        [FSR_EASU_TO_RCAS] = {
-            .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-            .stage = {
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                .stage = VK_SHADER_STAGE_COMPUTE_BIT,
-                .module = easu_module,
-                .pName = "main",
-            },
-            .layout = vk_fsr_state.pipeline_layout,
-        },
-        [FSR_EASU_TO_DISPLAY] = {
-            .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-            .stage = {
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                .stage = VK_SHADER_STAGE_COMPUTE_BIT,
-                .module = easu_module,
-                .pName = "main",
-            },
-            .layout = vk_fsr_state.pipeline_layout,
-        },
-        [FSR_RCAS_AFTER_EASU] = {
-            .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-            .stage = {
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                .stage = VK_SHADER_STAGE_COMPUTE_BIT,
-                .module = rcas_module,
-                .pName = "main",
-            },
-            .layout = vk_fsr_state.pipeline_layout,
-        },
-        [FSR_RCAS_AFTER_TAAU] = {
-            .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-            .stage = {
-                .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-                .stage = VK_SHADER_STAGE_COMPUTE_BIT,
-                .module = rcas_module,
-                .pName = "main",
-            },
-            .layout = vk_fsr_state.pipeline_layout,
-        },
-    };
-
-    VK_CHECK(qvkCreateComputePipelines(vk.device, VK_NULL_HANDLE, FSR_NUM_PIPELINES,
-                                     pipeline_infos, NULL, vk_fsr_state.pipelines));
-
-    // Cleanup shader modules
-    qvkDestroyShaderModule(vk.device, easu_module, NULL);
-    qvkDestroyShaderModule(vk.device, rcas_module, NULL);
-
-    return qtrue;
-}
-
-// Initialize FSR system
-qboolean vk_fsr_init(void) {
-    ri.Printf(PRINT_ALL, "Vulkan: Initializing FSR (FidelityFX Super Resolution)\n");
-
-    vk_fsr_init_cvars();
-
-    if (!vk_fsr_create_pipelines()) {
-        ri.Printf(PRINT_ERROR, "Vulkan: Failed to create FSR pipelines\n");
-        return qfalse;
-    }
-
-    vk_fsr_state.initialized = qtrue;
-    ri.Printf(PRINT_ALL, "Vulkan: FSR initialized successfully\n");
-
-    return qtrue;
-}
-
-// Shutdown FSR system
-void vk_fsr_shutdown(void) {
-    ri.Printf(PRINT_ALL, "Vulkan: Shutting down FSR\n");
-
-    if (vk_fsr_state.constants_mapped) {
-        qvkUnmapMemory(vk.device, vk_fsr_state.constants_memory);
-        vk_fsr_state.constants_mapped = NULL;
-    }
-
-    if (vk_fsr_state.constants_buffer != VK_NULL_HANDLE) {
-        qvkDestroyBuffer(vk.device, vk_fsr_state.constants_buffer, NULL);
-        vk_fsr_state.constants_buffer = VK_NULL_HANDLE;
-    }
-
-    if (vk_fsr_state.constants_memory != VK_NULL_HANDLE) {
-        qvkFreeMemory(vk.device, vk_fsr_state.constants_memory, NULL);
-        vk_fsr_state.constants_memory = VK_NULL_HANDLE;
-    }
-
-    vk_fsr_destroy_pipelines();
-
-    if (vk_fsr_state.descriptor_pool != VK_NULL_HANDLE) {
-        qvkDestroyDescriptorPool(vk.device, vk_fsr_state.descriptor_pool, NULL);
-        vk_fsr_state.descriptor_pool = VK_NULL_HANDLE;
-    }
-
-    if (vk_fsr_state.pipeline_layout != VK_NULL_HANDLE) {
-        qvkDestroyPipelineLayout(vk.device, vk_fsr_state.pipeline_layout, NULL);
-        vk_fsr_state.pipeline_layout = VK_NULL_HANDLE;
-    }
-
-    if (vk_fsr_state.descriptor_layout != VK_NULL_HANDLE) {
-        qvkDestroyDescriptorSetLayout(vk.device, vk_fsr_state.descriptor_layout, NULL);
-        vk_fsr_state.descriptor_layout = VK_NULL_HANDLE;
-    }
-
-    vk_fsr_state.initialized = qfalse;
-    ri.Printf(PRINT_ALL, "Vulkan: FSR shut down\n");
-}
-
-// Destroy FSR pipelines
 void vk_fsr_destroy_pipelines(void) {
     for (int i = 0; i < FSR_NUM_PIPELINES; i++) {
-        if (vk_fsr_state.pipelines[i] != VK_NULL_HANDLE) {
+        if (vk_fsr_state.pipelines[i]) {
             qvkDestroyPipeline(vk.device, vk_fsr_state.pipelines[i], NULL);
             vk_fsr_state.pipelines[i] = VK_NULL_HANDLE;
         }
     }
 }
 
-// Check if FSR is enabled
-qboolean vk_fsr_is_enabled(void) {
-    if (!vk_fsr_state.initialized || r_fsr_enable->integer == 0) {
-        return qfalse;
-    }
+static qboolean vk_fsr_create_pipeline_layout(void) {
+    VkDescriptorSetLayoutBinding bindings[3] = {0};
+    
+    // Input image (combined sampler)
+    bindings[0].binding = 0;
+    bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[0].descriptorCount = 1;
+    bindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    
+    // Output image (storage)
+    bindings[1].binding = 1;
+    bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    bindings[1].descriptorCount = 1;
+    bindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    
+    // Constants buffer
+    bindings[2].binding = 2;
+    bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    bindings[2].descriptorCount = 1;
+    bindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-    // Only apply when upscaling
-    if (vk.extent_render.width >= vk.extent_unscaled.width ||
-        vk.extent_render.height >= vk.extent_unscaled.height) {
-        return qfalse;
-    }
+    VkDescriptorSetLayoutCreateInfo layout_info = {0};
+    layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layout_info.bindingCount = 3;
+    layout_info.pBindings = bindings;
 
-    return (r_fsr_easu->integer != 0) || (r_fsr_rcas->integer != 0);
+    VK_CHECK(qvkCreateDescriptorSetLayout(vk.device, &layout_info, NULL, &vk_fsr_state.descriptor_layout));
+
+    VkPipelineLayoutCreateInfo pipeline_layout_info = {0};
+    pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipeline_layout_info.setLayoutCount = 1;
+    pipeline_layout_info.pSetLayouts = &vk_fsr_state.descriptor_layout;
+
+    VK_CHECK(qvkCreatePipelineLayout(vk.device, &pipeline_layout_info, NULL, &vk_fsr_state.pipeline_layout));
+
+    return qtrue;
 }
 
-// Update FSR constants
+static qboolean vk_fsr_create_descriptor_pool(void) {
+    VkDescriptorPoolSize pool_sizes[3] = {
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 2 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2 }
+    };
+
+    VkDescriptorPoolCreateInfo pool_info = {0};
+    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.maxSets = 2; // One for EASU, one for RCAS
+    pool_info.poolSizeCount = 3;
+    pool_info.pPoolSizes = pool_sizes;
+
+    VK_CHECK(qvkCreateDescriptorPool(vk.device, &pool_info, NULL, &vk_fsr_state.descriptor_pool));
+
+    VkDescriptorSetAllocateInfo alloc_info = {0};
+    alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    alloc_info.descriptorPool = vk_fsr_state.descriptor_pool;
+    alloc_info.descriptorSetCount = 1;
+    alloc_info.pSetLayouts = &vk_fsr_state.descriptor_layout;
+
+    VK_CHECK(qvkAllocateDescriptorSets(vk.device, &alloc_info, &vk_fsr_state.descriptor_sets[0]));
+    VK_CHECK(qvkAllocateDescriptorSets(vk.device, &alloc_info, &vk_fsr_state.descriptor_sets[1]));
+
+    return qtrue;
+}
+
+static qboolean vk_fsr_create_constants_buffer(void) {
+    VkBufferCreateInfo buffer_info = {0};
+    buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buffer_info.size = sizeof(vk_fsr_easu_constants_t) + sizeof(vk_fsr_rcas_constants_t);
+    buffer_info.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VK_CHECK(qvkCreateBuffer(vk.device, &buffer_info, NULL, &vk_fsr_state.constants_buffer));
+
+    VkMemoryRequirements mem_reqs;
+    qvkGetBufferMemoryRequirements(vk.device, vk_fsr_state.constants_buffer, &mem_reqs);
+
+    VkMemoryAllocateInfo alloc_info = {0};
+    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    alloc_info.allocationSize = mem_reqs.size;
+    alloc_info.memoryTypeIndex = find_memory_type(mem_reqs.memoryTypeBits, 
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    VK_CHECK(qvkAllocateMemory(vk.device, &alloc_info, NULL, &vk_fsr_state.constants_memory));
+    VK_CHECK(qvkBindBufferMemory(vk.device, vk_fsr_state.constants_buffer, vk_fsr_state.constants_memory, 0));
+    VK_CHECK(qvkMapMemory(vk.device, vk_fsr_state.constants_memory, 0, buffer_info.size, 0, &vk_fsr_state.constants_mapped));
+
+    return qtrue;
+}
+
+qboolean vk_fsr_create_pipelines(void) {
+    VkShaderModule easu_module = vk_create_shader_module(fsr_easu_comp_spv, fsr_easu_comp_spv_size);
+    VkShaderModule rcas_module = vk_create_shader_module(fsr_rcas_comp_spv, fsr_rcas_comp_spv_size);
+
+    if (easu_module == VK_NULL_HANDLE || rcas_module == VK_NULL_HANDLE) {
+        return qfalse;
+    }
+
+    VkComputePipelineCreateInfo pipeline_infos[FSR_NUM_PIPELINES] = {0};
+    
+    for (int i = 0; i < 2; i++) {
+        pipeline_infos[i].sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+        pipeline_infos[i].stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        pipeline_infos[i].stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+        pipeline_infos[i].stage.module = easu_module;
+        pipeline_infos[i].stage.pName = "main";
+        pipeline_infos[i].layout = vk_fsr_state.pipeline_layout;
+    }
+
+    for (int i = 2; i < 4; i++) {
+        pipeline_infos[i].sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+        pipeline_infos[i].stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        pipeline_infos[i].stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+        pipeline_infos[i].stage.module = rcas_module;
+        pipeline_infos[i].stage.pName = "main";
+        pipeline_infos[i].layout = vk_fsr_state.pipeline_layout;
+    }
+
+    VK_CHECK(qvkCreateComputePipelines(vk.device, VK_NULL_HANDLE, FSR_NUM_PIPELINES,
+                                     pipeline_infos, NULL, vk_fsr_state.pipelines));
+
+    qvkDestroyShaderModule(vk.device, easu_module, NULL);
+    qvkDestroyShaderModule(vk.device, rcas_module, NULL);
+
+    return qtrue;
+}
+
+qboolean vk_fsr_init(void) {
+    ri.Printf(PRINT_ALL, "Vulkan: Initializing FSR\n");
+
+    r_fsr_enable = ri.Cvar_Get("r_fsr_enable", "0", CVAR_ARCHIVE);
+    r_fsr_easu = ri.Cvar_Get("r_fsr_easu", "1", CVAR_ARCHIVE);
+    r_fsr_rcas = ri.Cvar_Get("r_fsr_rcas", "1", CVAR_ARCHIVE);
+    r_fsr_sharpness = ri.Cvar_Get("r_fsr_sharpness", "0.5", CVAR_ARCHIVE);
+
+    if (!vk_fsr_create_pipeline_layout()) return qfalse;
+    if (!vk_fsr_create_descriptor_pool()) return qfalse;
+    if (!vk_fsr_create_constants_buffer()) return qfalse;
+    if (!vk_fsr_create_pipelines()) return qfalse;
+
+    vk_fsr_state.initialized = qtrue;
+    return qtrue;
+}
+
+void vk_fsr_shutdown(void) {
+    if (!vk_fsr_state.initialized) return;
+
+    vk_fsr_destroy_pipelines();
+
+    if (vk_fsr_state.constants_mapped) {
+        qvkUnmapMemory(vk.device, vk_fsr_state.constants_memory);
+    }
+    if (vk_fsr_state.constants_buffer) {
+        qvkDestroyBuffer(vk.device, vk_fsr_state.constants_buffer, NULL);
+    }
+    if (vk_fsr_state.constants_memory) {
+        qvkFreeMemory(vk.device, vk_fsr_state.constants_memory, NULL);
+    }
+    if (vk_fsr_state.descriptor_pool) {
+        qvkDestroyDescriptorPool(vk.device, vk_fsr_state.descriptor_pool, NULL);
+    }
+    if (vk_fsr_state.descriptor_layout) {
+        qvkDestroyDescriptorSetLayout(vk.device, vk_fsr_state.descriptor_layout, NULL);
+    }
+    if (vk_fsr_state.pipeline_layout) {
+        qvkDestroyPipelineLayout(vk.device, vk_fsr_state.pipeline_layout, NULL);
+    }
+
+    memset(&vk_fsr_state, 0, sizeof(vk_fsr_state));
+}
+
+qboolean vk_fsr_is_enabled(void) {
+    if (!vk_fsr_state.initialized || !r_fsr_enable || !r_fsr_enable->integer) {
+        return qfalse;
+    }
+    return qtrue;
+}
+
 void vk_fsr_update_constants(uint32_t render_width, uint32_t render_height,
                            uint32_t display_width, uint32_t display_height) {
-    if (!vk_fsr_state.initialized || !vk_fsr_state.constants_mapped) {
-        return;
-    }
+    if (!vk_fsr_state.initialized) return;
 
-    // Set EASU constants
-    vk_fsr_easu_constants_t* easu_consts = (vk_fsr_easu_constants_t*)vk_fsr_state.constants_mapped;
-    FsrEasuCon(easu_consts->easu_const0, easu_consts->easu_const1,
-               easu_consts->easu_const2, easu_consts->easu_const3,
-               render_width, render_height,
-               render_width, render_height,
-               display_width, display_height);
+    vk_fsr_easu_constants_t easu_con;
+    FsrEasuCon(easu_con.easu_const0, easu_con.easu_const1, easu_con.easu_const2, easu_con.easu_const3,
+               (AF1)render_width, (AF1)render_height, 
+               (AF1)render_width, (AF1)render_height,
+               (AF1)display_width, (AF1)display_height);
 
-    // Set RCAS constants
-    vk_fsr_rcas_constants_t* rcas_consts = (vk_fsr_rcas_constants_t*)
-        ((char*)vk_fsr_state.constants_mapped + sizeof(vk_fsr_easu_constants_t));
-    FsrRcasCon(rcas_consts->rcas_const0, r_fsr_sharpness->value);
+    vk_fsr_rcas_constants_t rcas_con;
+    FsrRcasCon(rcas_con.rcas_const0, r_fsr_sharpness->value);
+
+    memcpy(vk_fsr_state.constants_mapped, &easu_con, sizeof(easu_con));
+    memcpy((uint8_t*)vk_fsr_state.constants_mapped + sizeof(easu_con), &rcas_con, sizeof(rcas_con));
 }
 
-// Apply EASU upscaling
+static void vk_fsr_update_descriptor_set(VkDescriptorSet set, VkImageView input_view, VkImageView output_view, VkDeviceSize buffer_offset, VkDeviceSize buffer_range) {
+    Vk_Sampler_Def sampler_def = {0};
+    sampler_def.vk_min_filter = VK_FILTER_LINEAR;
+    sampler_def.vk_mag_filter = VK_FILTER_LINEAR;
+    sampler_def.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    VkSampler sampler = vk_find_sampler(&sampler_def);
+
+    VkDescriptorImageInfo input_info = {0};
+    input_info.sampler = sampler;
+    input_info.imageView = input_view;
+    input_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkDescriptorImageInfo output_info = {0};
+    output_info.imageView = output_view;
+    output_info.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    VkDescriptorBufferInfo buffer_info = {0};
+    buffer_info.buffer = vk_fsr_state.constants_buffer;
+    buffer_info.offset = buffer_offset;
+    buffer_info.range = buffer_range;
+
+    VkWriteDescriptorSet writes[3] = {0};
+    
+    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[0].dstSet = set;
+    writes[0].dstBinding = 0;
+    writes[0].descriptorCount = 1;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[0].pImageInfo = &input_info;
+
+    writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[1].dstSet = set;
+    writes[1].dstBinding = 1;
+    writes[1].descriptorCount = 1;
+    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    writes[1].pImageInfo = &output_info;
+
+    writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[2].dstSet = set;
+    writes[2].dstBinding = 2;
+    writes[2].descriptorCount = 1;
+    writes[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writes[2].pBufferInfo = &buffer_info;
+
+    qvkUpdateDescriptorSets(vk.device, 3, writes, 0, NULL);
+}
+
 void vk_fsr_apply_easu(VkCommandBuffer cmd_buf, VkImage input_image,
                       VkImageView input_view, VkImage output_image, VkImageView output_view) {
-    if (!vk_fsr_is_enabled() || !r_fsr_easu->integer) {
-        return;
-    }
+    (void)input_image; (void)output_image;
+    if (!vk_fsr_is_enabled() || !r_fsr_easu->integer) return;
 
-    // Update descriptor set for EASU pass
-    VkDescriptorImageInfo input_info = {
-        .sampler = VK_NULL_HANDLE,
-        .imageView = input_view,
-        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-    };
+    vk_fsr_update_descriptor_set(vk_fsr_state.descriptor_sets[0], input_view, output_view, 0, sizeof(vk_fsr_easu_constants_t));
 
-    VkDescriptorImageInfo output_info = {
-        .sampler = VK_NULL_HANDLE,
-        .imageView = output_view,
-        .imageLayout = VK_IMAGE_LAYOUT_GENERAL
-    };
-
-    VkDescriptorBufferInfo buffer_info = {
-        .buffer = vk_fsr_state.constants_buffer,
-        .offset = 0,
-        .range = sizeof(vk_fsr_easu_constants_t)
-    };
-
-    VkWriteDescriptorSet writes[3] = {
-        {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = vk_fsr_state.descriptor_set,
-            .dstBinding = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-            .pImageInfo = &input_info
-        },
-        {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = vk_fsr_state.descriptor_set,
-            .dstBinding = 1,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-            .pImageInfo = &output_info
-        },
-        {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = vk_fsr_state.descriptor_set,
-            .dstBinding = 2,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .pBufferInfo = &buffer_info
-        }
-    };
-
-    qvkUpdateDescriptorSets(vk.device, 3, writes, 0, NULL);
-
-    // Bind pipeline and descriptor set
-    VkPipeline easu_pipeline = qvk.surf_is_hdr ?
+    VkPipeline easu_pipeline = (r_hdr && r_hdr->integer) ?
         vk_fsr_state.pipelines[FSR_EASU_TO_RCAS] : vk_fsr_state.pipelines[FSR_EASU_TO_DISPLAY];
+
     qvkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE, easu_pipeline);
-    qvkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE,
-                           vk_fsr_state.pipeline_layout, 0, 1, &vk_fsr_state.descriptor_set, 0, NULL);
+    qvkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE, vk_fsr_state.pipeline_layout, 0, 1, &vk_fsr_state.descriptor_sets[0], 0, NULL);
 
-    // Calculate dispatch size
-    uint32_t dispatch_x = (vk.extent_unscaled.width + 15) / 16;
-    uint32_t dispatch_y = (vk.extent_unscaled.height + 15) / 16;
-
+    uint32_t dispatch_x = (glConfig.vidWidth + 7) / 8;
+    uint32_t dispatch_y = (glConfig.vidHeight + 7) / 8;
     qvkCmdDispatch(cmd_buf, dispatch_x, dispatch_y, 1);
 }
 
-// Apply RCAS sharpening
 void vk_fsr_apply_rcas(VkCommandBuffer cmd_buf, VkImage input_image,
                       VkImageView input_view, VkImage output_image, VkImageView output_view) {
-    if (!vk_fsr_is_enabled() || !r_fsr_rcas->integer) {
-        return;
-    }
+    (void)input_image; (void)output_image;
+    if (!vk_fsr_is_enabled() || !r_fsr_rcas->integer) return;
 
-    // Update descriptor set for RCAS pass
-    VkDescriptorImageInfo input_info = {
-        .sampler = VK_NULL_HANDLE,
-        .imageView = input_view,
-        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-    };
+    vk_fsr_update_descriptor_set(vk_fsr_state.descriptor_sets[1], input_view, output_view, sizeof(vk_fsr_easu_constants_t), sizeof(vk_fsr_rcas_constants_t));
 
-    VkDescriptorImageInfo output_info = {
-        .sampler = VK_NULL_HANDLE,
-        .imageView = output_view,
-        .imageLayout = VK_IMAGE_LAYOUT_GENERAL
-    };
-
-    VkDescriptorBufferInfo buffer_info = {
-        .buffer = vk_fsr_state.constants_buffer,
-        .offset = sizeof(vk_fsr_easu_constants_t),
-        .range = sizeof(vk_fsr_rcas_constants_t)
-    };
-
-    VkWriteDescriptorSet writes[3] = {
-        {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = vk_fsr_state.descriptor_set,
-            .dstBinding = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
-            .pImageInfo = &input_info
-        },
-        {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = vk_fsr_state.descriptor_set,
-            .dstBinding = 1,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-            .pImageInfo = &output_info
-        },
-        {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = vk_fsr_state.descriptor_set,
-            .dstBinding = 2,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .pBufferInfo = &buffer_info
-        }
-    };
-
-    qvkUpdateDescriptorSets(vk.device, 3, writes, 0, NULL);
-
-    // Bind pipeline and descriptor set
-    VkPipeline rcas_pipeline = qvk.surf_is_hdr ?
+    VkPipeline rcas_pipeline = (r_hdr && r_hdr->integer) ?
         vk_fsr_state.pipelines[FSR_RCAS_AFTER_EASU] : vk_fsr_state.pipelines[FSR_RCAS_AFTER_TAAU];
+
     qvkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE, rcas_pipeline);
-    qvkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE,
-                           vk_fsr_state.pipeline_layout, 0, 1, &vk_fsr_state.descriptor_set, 0, NULL);
+    qvkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE, vk_fsr_state.pipeline_layout, 0, 1, &vk_fsr_state.descriptor_sets[1], 0, NULL);
 
-    // Calculate dispatch size
-    uint32_t dispatch_x = (vk.extent_unscaled.width + 15) / 16;
-    uint32_t dispatch_y = (vk.extent_unscaled.height + 15) / 16;
-
-    qvkCmdDispatch(cmd_buf, dispatch_x, dispatch_y, 1);
+    uint32_t dispatch_x_rcas = (glConfig.vidWidth + 7) / 8;
+    uint32_t dispatch_y_rcas = (glConfig.vidHeight + 7) / 8;
+    qvkCmdDispatch(cmd_buf, dispatch_x_rcas, dispatch_y_rcas, 1);
 }

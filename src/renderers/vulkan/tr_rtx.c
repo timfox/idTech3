@@ -10,7 +10,11 @@ Vulkan Renderer - q2rtx-style Implementation
 #include "vk.h"
 
 // Engine interface - will be set by GetRefAPI
+#ifdef USE_RENDERER_DLOPEN
+// ri is now defined in tr_services.c
+#else
 static refimport_t ri;
+#endif
 
 // Stub cvars for compatibility (Vulkan renderer doesn't use these directly)
 cvar_t *r_dynamiclight = NULL;

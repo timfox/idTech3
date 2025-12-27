@@ -17,11 +17,10 @@ extern refimport_t ri;
 
 static portalLightSystem_t portalSystem;
 
-// Forward declarations for BSP access
-extern int CM_ClusterSize(void);
-extern int CM_NumClusters(void);
-extern qboolean CM_ClusterVisible(int cluster1, int cluster2);
-extern const byte* CM_ClusterPVS(int cluster);
+// Forward declarations for local functions
+qboolean vk_portal_lights_create_buffer(void);
+void vk_portal_lights_destroy_buffer(void);
+void vk_portal_lights_update_buffer(void);
 
 // Parse sky cluster file for a given map
 static void parse_sky_clusters(const char* mapName) {
@@ -74,7 +73,7 @@ static void parse_sky_clusters(const char* mapName) {
 		char* token = strtok(trimmed, " \t");
 		while (token && portalSystem.numSkyClusters < MAX_SKY_CLUSTERS) {
 			int clusterId = atoi(token);
-			if (clusterId >= 0 && clusterId < CM_NumClusters()) {
+			if (clusterId >= 0 && clusterId < ri.CM_NumClusters()) {
 				skyCluster_t* cluster = &portalSystem.skyClusters[portalSystem.numSkyClusters++];
 				cluster->clusterId = clusterId;
 				cluster->isSky = qtrue;  // Assume sky for now (could be extended for lava)
@@ -252,7 +251,7 @@ qboolean vk_portal_lights_create_buffer(void) {
 	// Allocate descriptor set
 	VkDescriptorSetAllocateInfo allocSetInfo = {};
 	allocSetInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-	allocSetInfo.descriptorPool = vk.descriptorPool;
+	allocSetInfo.descriptorPool = vk.descriptor_pool;
 	allocSetInfo.descriptorSetCount = 1;
 	allocSetInfo.pSetLayouts = &vk.portalLightsDescriptorSetLayout;
 
@@ -311,7 +310,7 @@ void vk_portal_lights_update_buffer(void) {
 // Destroy portal lights buffer
 void vk_portal_lights_destroy_buffer(void) {
 	if (vk.portalLightsDescriptorSet != VK_NULL_HANDLE) {
-		qvkFreeDescriptorSets(vk.device, vk.descriptorPool, 1, &vk.portalLightsDescriptorSet);
+		qvkFreeDescriptorSets(vk.device, vk.descriptor_pool, 1, &vk.portalLightsDescriptorSet);
 		vk.portalLightsDescriptorSet = VK_NULL_HANDLE;
 	}
 

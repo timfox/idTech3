@@ -18,7 +18,8 @@ Basic functions used throughout the engine.
 #include <time.h>
 
 // Forward declarations for stubs to satisfy -Wmissing-prototypes
-void S_Spatialize( void *ch );
+struct channel_s;
+void S_Spatialize( struct channel_s *ch );
 void Com_FrameInit( void );
 void FS_MountTable_Init( void );
 void FS_MountTable_Shutdown( void );
@@ -38,7 +39,7 @@ int FS_Mount_FindFile( const char *qpath, fileHandle_t *file, fsMount_t **outMou
 
 // Global variables expected by the engine
 char cl_title[ MAX_CVAR_VALUE_STRING ] = "idtech3";
-refimport_t ri = {0};
+Q_EXPORT refimport_t ri = {0};
 int CPU_Flags = 0;
 void *botlib_export = NULL;
 char cl_cdkey[34] = "000000000000000000000000000000000";
@@ -268,6 +269,29 @@ qboolean Com_EarlyParseCmdLine( char *commandLine, char *con_title, int title_si
 
 void Com_WriteConfiguration( void ) { }
 void Com_StartupVariable( const char *match ) { (void)match; }
+
+// Missing engine stubs
+void S_Spatialize( struct channel_s *ch ) { (void)ch; }
+void Field_CompleteCommand( const char *cmd, qboolean doCommands, qboolean doCvars ) { (void)cmd; (void)doCommands; (void)doCvars; }
+void Com_BeginRedirect (char *buffer, int buffersize, void (*flush)(const char *)) { (void)buffer; (void)buffersize; (void)flush; }
+void Com_EndRedirect( void ) { }
+void *S_Malloc( int size ) { return malloc( (size_t)size ); }
+int Z_FreeTags( memtag_t tag ) { (void)tag; return 0; }
+unsigned int Com_TouchMemory( void ) { return 0; }
+void Com_RandomBytes( byte *buffer, int len ) { (void)buffer; (void)len; }
+void Info_Print( const char *s ) { (void)s; }
+qboolean Q_ValidateFilePath( const char *path ) { (void)path; return qtrue; }
+qboolean Com_HasPatterns( const char *str ) { (void)str; return qfalse; }
+int Com_Filter( const char *filter, const char *name ) { (void)filter; (void)name; return 0; }
+int Com_FilterPath( const char *filter, const char *name ) { (void)filter; (void)name; return 1; }
+qboolean Com_FilterExt( const char *filter, const char *name ) { (void)filter; (void)name; return qtrue; }
+void Com_SortList( char **list, int n ) { (void)list; (void)n; }
+void Field_CompleteFilename( const char *dir, const char *ext, qboolean stripExt, int flags ) { (void)dir; (void)ext; (void)stripExt; (void)flags; }
+void Field_AutoComplete( field_t *field ) { (void)field; }
+void Field_CompleteKeyname( void ) { }
+void Field_CompleteKeyBind( int key ) { (void)key; }
+qboolean NetThread_IsThreadEnabled( net_thread_type_t threadType ) { (void)threadType; return qfalse; }
+qboolean NetThread_QueueSendMessage( const netadr_t *to, const msg_t *msg, int flags ) { (void)to; (void)msg; (void)flags; return qfalse; }
 
 // Sys_QueEvent moved to platform-specific files (unix_shared.c, etc.)
 // void Sys_QueEvent( int time, sysEventType_t type, int value, int value2, int ptrLength, void *ptr ) { ... }
