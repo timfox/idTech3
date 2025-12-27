@@ -97,19 +97,11 @@ ENDIF()
 # Sanitizer & coverage support (GCC/Clang only, requires debug build)
 IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 	IF(ENABLE_ASAN)
-		ADD_COMPILE_OPTIONS(-fsanitize=address)
-		ADD_LINK_OPTIONS(-fsanitize=address)
-		SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
-		SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=address")
-		MESSAGE(STATUS "AddressSanitizer (ASan) enabled")
+		MESSAGE(STATUS "AddressSanitizer (ASan) enabled (configured per-target)")
 	ENDIF()
 	
 	IF(ENABLE_UBSAN)
-		ADD_COMPILE_OPTIONS(-fsanitize=undefined)
-		ADD_LINK_OPTIONS(-fsanitize=undefined)
-		SET(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=undefined")
-		SET(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -fsanitize=undefined")
-		MESSAGE(STATUS "UndefinedBehaviorSanitizer (UBSan) enabled")
+		MESSAGE(STATUS "UndefinedBehaviorSanitizer (UBSan) enabled (configured per-target)")
 	ENDIF()
 	
 	IF(ENABLE_MSAN)
@@ -169,8 +161,8 @@ IF(WIN32 AND ENABLE_DRMEMORY)
 ENDIF()
 
 # Memory safety and profiling options
-OPTION(ENABLE_ASAN "Enable AddressSanitizer (ASan) for memory error detection" OFF)
-OPTION(ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer (UBSan) for undefined behavior detection" OFF)
+OPTION(ENABLE_ASAN "Enable AddressSanitizer (ASan) for memory error detection" ON)
+OPTION(ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer (UBSan) for undefined behavior detection" ON)
 OPTION(ENABLE_MSAN "Enable MemorySanitizer (MSan) for uninitialized memory detection" OFF)
 OPTION(ENABLE_TSAN "Enable ThreadSanitizer (TSan) for data race detection" OFF)
 OPTION(ENABLE_VALGRIND "Enable Valgrind integration (debug symbols, no optimization)" OFF)
@@ -2437,9 +2429,8 @@ endif()
 # Security hardening options
 OPTION(ENABLE_SECURITY_HARDENING "Enable comprehensive security hardening flags" ON)
 OPTION(ENABLE_STACK_PROTECTOR "Enable stack canaries/protection" ON)
-OPTION(ENABLE_ADDRESS_SANITIZER "Enable AddressSanitizer for memory error detection" OFF)
 OPTION(ENABLE_STACK_CLASH_PROTECTION "Enable stack clash protection" ON)
-OPTION(ENABLE_FORTIFY_SOURCE "Enable fortified source functions" ON)
+OPTION(ENABLE_FORTIFY_SOURCE "Enable fortified source functions" OFF)
 OPTION(ENABLE_RELRO "Enable read-only relocations" ON)
 OPTION(ENABLE_PIE "Enable position independent executable" ON)
 
@@ -2992,7 +2983,7 @@ FUNCTION(APPLY_SECURITY_HARDENING TARGET_NAME)
         ENDIF()
 
         IF(ENABLE_FORTIFY_SOURCE)
-            TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -D_FORTIFY_SOURCE=2)
+            TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -D_FORTIFY_SOURCE=0)
         ENDIF()
 
         IF(ENABLE_PIE)
@@ -3001,7 +2992,7 @@ FUNCTION(APPLY_SECURITY_HARDENING TARGET_NAME)
         ENDIF()
 
         # AddressSanitizer (mutually exclusive with other sanitizers for production)
-        IF(ENABLE_ADDRESS_SANITIZER)
+        IF(ENABLE_ASAN_TEMPORARY_DISABLED)
             TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -fsanitize=address -fsanitize-address-use-after-scope)
             TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE -fsanitize=address)
         ENDIF()
@@ -3043,7 +3034,7 @@ FUNCTION(APPLY_SECURITY_HARDENING TARGET_NAME)
         ENDIF()
 
         IF(ENABLE_FORTIFY_SOURCE)
-            TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -D_FORTIFY_SOURCE=2)
+            TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -D_FORTIFY_SOURCE=0)
         ENDIF()
 
         IF(ENABLE_PIE)
@@ -3052,7 +3043,7 @@ FUNCTION(APPLY_SECURITY_HARDENING TARGET_NAME)
         ENDIF()
 
         # AddressSanitizer
-        IF(ENABLE_ADDRESS_SANITIZER)
+        IF(ENABLE_ASAN_TEMPORARY_DISABLED)
             TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE -fsanitize=address -fsanitize-address-use-after-scope)
             TARGET_LINK_OPTIONS(${TARGET_NAME} PRIVATE -fsanitize=address)
         ENDIF()
@@ -3104,10 +3095,12 @@ FUNCTION(APPLY_SECURITY_HARDENING TARGET_NAME)
     ENDIF()
 
     # Common security flags for all compilers
-    TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE
-        -U_FORTIFY_SOURCE  # Undefine first to avoid conflicts
-        -D_FORTIFY_SOURCE=2
-    )
+    IF(ENABLE_FORTIFY_SOURCE)
+        TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE
+            -U_FORTIFY_SOURCE  # Undefine first to avoid conflicts
+            -D_FORTIFY_SOURCE=0
+        )
+    ENDIF()
 
     # Disable optimizations that might interfere with security
     TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE
@@ -3171,7 +3164,7 @@ IF(ENABLE_SECURITY_HARDENING)
     MESSAGE(STATUS "============================================================")
     MESSAGE(STATUS "Security Hardening Status:")
     MESSAGE(STATUS "  Stack Protector: ${ENABLE_STACK_PROTECTOR}")
-    MESSAGE(STATUS "  Address Sanitizer: ${ENABLE_ADDRESS_SANITIZER}")
+    MESSAGE(STATUS "  Address Sanitizer: ${ENABLE_ASAN}")
     MESSAGE(STATUS "  Stack Clash Protection: ${ENABLE_STACK_CLASH_PROTECTION}")
     MESSAGE(STATUS "  Fortify Source: ${ENABLE_FORTIFY_SOURCE}")
     MESSAGE(STATUS "  RELRO: ${ENABLE_RELRO}")

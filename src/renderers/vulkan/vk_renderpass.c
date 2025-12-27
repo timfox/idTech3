@@ -19,6 +19,7 @@ extern PFN_vkCmdNextSubpass qvkCmdNextSubpass;
 extern void vk_set_object_name(uint64_t obj, const char *name, VkDebugReportObjectTypeEXT type);
 #define SET_OBJECT_NAME(obj,objName,objType) vk_set_object_name( (uint64_t)(obj), (objName), (objType) )
 
+
 // Clear color values for different render passes
 static const VkClearValue main_clear_values[] = {
     {.color = {{0.0f, 0.0f, 0.0f, 1.0f}}},
@@ -206,19 +207,6 @@ void vk_begin_specific_render_pass(VkRenderPass render_pass, VkFramebuffer frame
         return;
     }
 
-    const VkClearValue *pClearValues = NULL;
-    uint32_t clearValueCount = 0;
-
-    if (clear_values) {
-        if (render_pass == vk.render_pass.main) {
-            pClearValues = main_clear_values;
-            clearValueCount = ARRAY_LEN(main_clear_values);
-        } else {
-            pClearValues = &color_clear_value;
-            clearValueCount = 1;
-        }
-    }
-
     VkRenderPassBeginInfo render_pass_info = {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         .renderPass = render_pass,
@@ -227,8 +215,8 @@ void vk_begin_specific_render_pass(VkRenderPass render_pass, VkFramebuffer frame
             .offset = {0, 0},
             .extent = {width, height}
         },
-        .clearValueCount = clearValueCount,
-        .pClearValues = pClearValues
+        .clearValueCount = clear_values ? ARRAY_LEN(main_clear_values) : 0,
+        .pClearValues = clear_values ? main_clear_values : NULL
     };
 
     qvkCmdBeginRenderPass(vk.cmd->command_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);

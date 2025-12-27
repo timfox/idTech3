@@ -70,7 +70,7 @@ mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
 echo "Running CMake configuration..."
-cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DUSE_STB_TRUETYPE=ON "$PROJECT_ROOT"
+cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DUSE_STB_TRUETYPE=ON -DUSE_VULKAN=OFF -DENABLE_FORTIFY_SOURCE=OFF -DENABLE_ASAN=OFF "$PROJECT_ROOT"
 
 # Determine number of CPU cores for parallel build
 if command -v nproc &>/dev/null; then

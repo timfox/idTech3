@@ -334,6 +334,10 @@ static void FS_ResourceCacheEvictLRU(void) {
 		return;
 	}
 
+	if (fs_resourceCacheCount <= 0) {
+		return;
+	}
+
 	int oldestIndex = 0;
 	int oldestTime = fs_resourceCache[0].lastAccessTime;
 
@@ -385,6 +389,9 @@ static void FS_ResourceCacheAdd(const char *name, void *data, int size) {
 	}
 
 	// Add new entry
+	if (fs_resourceCacheCount < 0 || fs_resourceCacheCount >= FS_RESOURCE_CACHE_SIZE) {
+		fs_resourceCacheCount = 0; // Should not happen with EvictLRU above
+	}
 	fs_resource_cache_entry_t *entry = &fs_resourceCache[fs_resourceCacheCount++];
 	Q_strncpyz(entry->name, name, sizeof(entry->name));
 	entry->data = Z_Malloc(size);
@@ -424,6 +431,11 @@ Preload commonly used resources to reduce loading stalls during gameplay
 ================
 */
 void FS_PreloadCriticalResources(void) {
+	return; // Disabled to debug buffer overflow
+}
+
+#if 0
+void FS_PreloadCriticalResources_Disabled(void) {
 	static const char *criticalResources[] = {
 		"menu/art/font1_prop.tga",
 		"menu/art/font2_prop.tga",
@@ -458,6 +470,7 @@ void FS_PreloadCriticalResources(void) {
 
 	Com_Printf("Critical resource preloading complete\n");
 }
+#endif
 
 // Case-insensitive file lookups (TODO: Address case sensitivity issues)
 static	cvar_t		*fs_caseInsensitive;	// Enable case-insensitive file lookups
@@ -2760,6 +2773,10 @@ Properly handles partial reads
 
 	FS_CheckInitialized();
 
+	if ( !buffer ) {
+		Com_Error( ERR_FATAL, "FS_Read: NULL buffer" );
+	}
+
 	if ( f <= 0 || f >= MAX_FILE_HANDLES ) {
 		return 0;
 	}
@@ -3232,6 +3249,20 @@ a null buffer will just return the file length without loading
 		return -1;
 	}
 
+	if ( len < 0 ) {
+		Com_Printf( "FS_ReadFile: %s has negative length %ld\n", qpath, len );
+		FS_FCloseFile( h );
+		if ( buffer ) *buffer = NULL;
+		return -1;
+	}
+
+	if ( len > 0x7FFFFFFF ) {
+		Com_Printf( "FS_ReadFile: %s is too large (%ld bytes)\n", qpath, len );
+		FS_FCloseFile( h );
+		if ( buffer ) *buffer = NULL;
+		return -1;
+	}
+
 	if ( !buffer ) {
 		if ( isConfig ) {
 			Com_DPrintf( "Writing len for %s to journal file.\n", qpath );
@@ -3244,8 +3275,14 @@ a null buffer will just return the file length without loading
 		return len;
 	}
 
+	Com_Printf( "FS_ReadFile: Loading %s\n", qpath );
+	Com_DPrintf( "FS_ReadFile: %s, len %ld\n", qpath, len );
 	buf = Hunk_AllocateTempMemory( len + 1 );
 	*buffer = buf;
+
+	if ( !buf ) {
+		Com_Error( ERR_FATAL, "FS_ReadFile: Hunk_AllocateTempMemory failed for %ld bytes", len + 1 );
+	}
 
 	// C23 Improvement: Check return value ([[nodiscard]] attribute ensures this)
 	if ( FS_Read( buf, len, h ) != len ) {
@@ -6153,7 +6190,7 @@ static void FS_Startup( void ) {
 	
 	fs_cacheSize = Cvar_Get( "fs_cacheSize", "1024", CVAR_ARCHIVE );
 
-	fs_resourceCacheEnabled = Cvar_Get( "fs_resourceCache", "1", CVAR_ARCHIVE );
+	fs_resourceCacheEnabled = Cvar_Get( "fs_resourceCache", "0", CVAR_ARCHIVE );
 	Cvar_SetDescription( fs_resourceCacheEnabled, "Enable resource caching for frequently accessed files" );
 	
 	// Case-insensitive file lookups - default based on platform

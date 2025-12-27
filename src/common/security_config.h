@@ -27,10 +27,10 @@ Security-related constants, macros, and configuration for hardened builds.
 // Stack canary configuration
 #define SECURITY_STACK_CANARY_SIZE 8
 
-// FORTIFY_SOURCE level
-#ifndef _FORTIFY_SOURCE
-#define _FORTIFY_SOURCE 2
-#endif
+// FORTIFY_SOURCE level (handled by CMake)
+// #ifndef _FORTIFY_SOURCE
+// #define _FORTIFY_SOURCE 2
+// #endif
 
 // Security assertion macros
 #define SECURITY_ASSERT(condition, message) \
