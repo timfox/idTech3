@@ -9,6 +9,7 @@
 #include "vk_pbo.h"
 #include "vk_terrain.h"
 #include "vk_surface_sprites.h"
+#include "vk_world_effects.h"
 #include "vk.h"
 
 #include "vk_fsr.h"
@@ -130,6 +131,9 @@ extern "C" void vk_end_frame(void) {
     // Update PBO system
     vk_pbo_update();
 
+    // Update world effects (wind/weather orchestration)
+    vk_world_effects_update();
+
     // Update terrain system
     vk_terrain_update();
 
@@ -141,6 +145,9 @@ extern "C" void vk_end_frame(void) {
 
     // Render terrain
     vk_terrain_render();
+
+    // Render world effects (placeholder/no-op for now)
+    vk_world_effects_render();
 
     // Update and render surface sprites
     vk_surface_sprites_update();

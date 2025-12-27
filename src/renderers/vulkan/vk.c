@@ -80,6 +80,7 @@ void *Sys_LoadFunction(void *handle, const char *name) {
 #include "vk_pbo.h"
 #include "vk_terrain.h"
 #include "vk_surface_sprites.h"
+#include "vk_world_effects.h"
 #include "vk_frame.h"
 #include "vk_post_process.h"
 #ifdef USE_VULKAN_RAY_TRACING
@@ -3310,6 +3311,7 @@ VkShaderModule vk_create_shader_module(const uint8_t *bytes, const int count) {
 
 // Shader data and binding includes
 #include "shaders/shader_data.c"
+#include "shaders/spirv/shader_data.c"
 #include "shaders/spirv/shader_binding.c"
 
 
@@ -3560,6 +3562,9 @@ void vk_initialize( void )
 
 	// Initialize surface sprites system
 	vk_surface_sprites_init();
+
+	// Initialize world effects system
+	vk_world_effects_init();
 
 	ri.Printf(PRINT_ALL, "DEBUG: vk_initialize completed successfully\n");
 
@@ -8187,6 +8192,9 @@ void vk_shutdown( refShutdownCode_t code ) {
 
 			// Shutdown surface sprites system
 			vk_surface_sprites_shutdown();
+
+			// Shutdown world effects system
+			vk_world_effects_shutdown();
 
 			// Shutdown ray tracing if enabled
 #ifdef USE_VULKAN_RAY_TRACING

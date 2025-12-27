@@ -63,13 +63,19 @@ void vk_volumetric_fog_init(void) {
     memset(&vf_system, 0, sizeof(vf_system));
 
     // Register CVars
-    r_volumetricFog = ri.Cvar_Get("r_volumetricFog", "1", CVAR_ARCHIVE);
+    // Off by default until the compute path is fully validated.
+    r_volumetricFog = ri.Cvar_Get("r_volumetricFog", "0", CVAR_ARCHIVE);
     r_volumetricFogDensity = ri.Cvar_Get("r_volumetricFogDensity", "0.01", CVAR_ARCHIVE);
     r_volumetricFogHeight = ri.Cvar_Get("r_volumetricFogHeight", "0.0", CVAR_ARCHIVE);
     r_volumetricFogFalloff = ri.Cvar_Get("r_volumetricFogFalloff", "0.001", CVAR_ARCHIVE);
     r_volumetricFogSamples = ri.Cvar_Get("r_volumetricFogSamples", "64", CVAR_ARCHIVE);
     r_volumetricFogScattering = ri.Cvar_Get("r_volumetricFogScattering", "0.1", CVAR_ARCHIVE);
     r_volumetricFogAbsorption = ri.Cvar_Get("r_volumetricFogAbsorption", "0.05", CVAR_ARCHIVE);
+
+    if (!r_volumetricFog->integer) {
+        // Keep the system uninitialized; update/render will no-op.
+        return;
+    }
 
     // Set default parameters
     vf_system.params.density = r_volumetricFogDensity->value;
@@ -82,7 +88,8 @@ void vk_volumetric_fog_init(void) {
     vf_system.params.noiseSpeed = 0.1f;
     vf_system.params.lightIntensity = 1.0f;
     VectorSet(vf_system.params.lightColor, 1.0f, 1.0f, 1.0f);
-    vf_system.params.enabled = r_volumetricFog->integer != 0;
+    vf_system.enabled = qtrue;
+    vf_system.params.enabled = qtrue;
     vf_system.params.heightFog = qtrue;
     vf_system.params.animated = qtrue;
 
@@ -151,67 +158,19 @@ void vk_volumetric_fog_render(void) {
     }
 
     // Bind pipeline
-    qvkCmdBindPipeline(vk.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vf_system.pipeline);
+    qvkCmdBindPipeline(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vf_system.pipeline);
 
     // Bind descriptor set
-    qvkCmdBindDescriptorSets(vk.command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+    qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
                             vf_system.pipelineLayout, 0, 1, &vf_system.descriptorSet, 0, NULL);
 
-    // Push constants
-    struct {
-        matrix_t projectionMatrix;
-        matrix_t viewMatrix;
-        matrix_t invProjectionMatrix;
-        matrix_t invViewMatrix;
-        vec2_t resolution;
-        vec2_t invResolution;
-        vec3_t cameraPos;
-        vec3_t lightDir;
-        vec3_t lightColor;
-        float lightIntensity;
-        float fogDensity;
-        float fogHeight;
-        float fogFalloff;
-        int numSamples;
-        float scattering;
-        float absorption;
-        float time;
-    } pushConstants;
-
-    // Set up matrices
-    MatrixCopy(vk.projection_matrix, pushConstants.projectionMatrix);
-    MatrixCopy(vk.view_matrix, pushConstants.viewMatrix);
-    MatrixInverse(pushConstants.projectionMatrix, pushConstants.invProjectionMatrix);
-    MatrixInverse(pushConstants.viewMatrix, pushConstants.invViewMatrix);
-
-    pushConstants.resolution[0] = (float)vk.renderWidth;
-    pushConstants.resolution[1] = (float)vk.renderHeight;
-    pushConstants.invResolution[0] = 1.0f / vk.renderWidth;
-    pushConstants.invResolution[1] = 1.0f / vk.renderHeight;
-
-    VectorCopy(vk.refdef.vieworg, pushConstants.cameraPos);
-
-    // Get light direction (simplified - use main directional light)
-    VectorSet(pushConstants.lightDir, 0.0f, -1.0f, 0.5f);
-    VectorNormalize(pushConstants.lightDir);
-
-    VectorCopy(vf_system.params.lightColor, pushConstants.lightColor);
-    pushConstants.lightIntensity = vf_system.params.lightIntensity;
-    pushConstants.fogDensity = vf_system.params.density;
-    pushConstants.fogHeight = vf_system.params.height;
-    pushConstants.fogFalloff = vf_system.params.falloff;
-    pushConstants.numSamples = vf_system.params.numSamples;
-    pushConstants.scattering = vf_system.params.scattering;
-    pushConstants.absorption = vf_system.params.absorption;
-    pushConstants.time = vk.refdef.floatTime;
-
-    qvkCmdPushConstants(vk.command_buffer, vf_system.pipelineLayout,
-                       VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pushConstants), &pushConstants);
+    // TODO: Push constants once the compute path is fully integrated with the
+    // renderer's camera + matrix conventions.
 
     // Dispatch compute shader
     uint32_t groupCountX = (vk.renderWidth + 7) / 8;
     uint32_t groupCountY = (vk.renderHeight + 7) / 8;
-    qvkCmdDispatch(vk.command_buffer, groupCountX, groupCountY, 1);
+    qvkCmdDispatch(vk.cmd->command_buffer, groupCountX, groupCountY, 1);
 }
 
 // Set volumetric fog parameters
@@ -473,20 +432,13 @@ static void vk_create_volumetric_fog_pipeline(void) {
         return;
     }
 
-    // Push constant range
-    VkPushConstantRange pushConstantRange = {
-        .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-        .offset = 0,
-        .size = sizeof(matrix_t) * 4 + sizeof(vec2_t) * 2 + sizeof(vec3_t) * 3 + sizeof(float) * 7 + sizeof(int)
-    };
-
     // Pipeline layout
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = 1,
         .pSetLayouts = &vf_system.descriptorSetLayout,
-        .pushConstantRangeCount = 1,
-        .pPushConstantRanges = &pushConstantRange
+        .pushConstantRangeCount = 0,
+        .pPushConstantRanges = NULL
     };
 
     result = qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &vf_system.pipelineLayout);
@@ -531,8 +483,7 @@ static void vk_create_volumetric_fog_pipeline(void) {
     // Create shader module from embedded data
     extern const unsigned char volumetric_fog_comp_spv[];
     VkShaderModule shaderModule = SHADER_MODULE(volumetric_fog_comp_spv);
-
-    if (result != VK_SUCCESS) {
+    if (shaderModule == VK_NULL_HANDLE) {
         ri.Printf(PRINT_ERROR, "vk_create_volumetric_fog_pipeline: Failed to create shader module\n");
         return;
     }

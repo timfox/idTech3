@@ -99,7 +99,12 @@ cvar_t *r_rt_giBounces;
 cvar_t *r_rt_giIntensity;
 
 // ---------------------------------------------------------------------------
-// Optional subsystems (temporarily stubbed so the Vulkan build links)
+// Optional subsystems are compiled from their respective translation units.
+// (No stubs needed here.)
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Work-in-progress subsystems (keep stubbed until integrated)
 // ---------------------------------------------------------------------------
 
 void vk_volumetric_fog_init(void) {}
@@ -112,58 +117,15 @@ void vk_decals_shutdown(void) {}
 void vk_decals_update(void) {}
 void vk_decals_render(void) {}
 
-// ---------------------------------------------------------------------------
-// PBO stubs (wiring exists, full implementation pending)
-// ---------------------------------------------------------------------------
-
-cvar_t *r_pbo = NULL;
-cvar_t *r_pboBuffers = NULL;
-cvar_t *r_pboAsync = NULL;
-
-void vk_pbo_init(void) {
-    if (!r_pbo) {
-        r_pbo = ri.Cvar_Get("r_pbo", "0", CVAR_ARCHIVE);
-    }
-    if (!r_pboBuffers) {
-        r_pboBuffers = ri.Cvar_Get("r_pboBuffers", "4", CVAR_ARCHIVE);
-    }
-    if (!r_pboAsync) {
-        r_pboAsync = ri.Cvar_Get("r_pboAsync", "1", CVAR_ARCHIVE);
-    }
-}
-
-void vk_pbo_shutdown(void) {}
-qboolean vk_pbo_is_available(void) { return qfalse; }
-void vk_pbo_wait_all_uploads(void) {}
-void vk_pbo_update(void) {}
-qboolean vk_pbo_upload_texture_sync(const void *data, VkDeviceSize size,
-                                    VkImage dst_image, VkImageLayout final_layout,
-                                    const VkBufferImageCopy *region) {
-    (void)data; (void)size; (void)dst_image; (void)final_layout; (void)region;
-    return qfalse;
-}
-
-// ---------------------------------------------------------------------------
-// God rays stubs (wiring exists, full implementation pending)
-// ---------------------------------------------------------------------------
-
 void vk_god_rays_init(void) {}
 void vk_god_rays_shutdown(void) {}
 void vk_god_rays_update(void) {}
 void vk_god_rays_render(VkCommandBuffer cmd_buffer) { (void)cmd_buffer; }
 
-// ---------------------------------------------------------------------------
-// Terrain stubs (wiring exists, full implementation pending)
-// ---------------------------------------------------------------------------
-
 void vk_terrain_init(void) {}
 void vk_terrain_shutdown(void) {}
 void vk_terrain_update(void) {}
 void vk_terrain_render(void) {}
-
-// ---------------------------------------------------------------------------
-// Surface sprites stubs (wiring exists, full implementation pending)
-// ---------------------------------------------------------------------------
 
 void vk_surface_sprites_init(void) {}
 void vk_surface_sprites_shutdown(void) {}

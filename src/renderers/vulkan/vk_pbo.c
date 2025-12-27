@@ -27,7 +27,6 @@ static qboolean vk_execute_texture_upload(int buffer_index);
 
 // Utility functions
 extern void vk_set_object_name(uint64_t obj, const char *name, VkDebugReportObjectTypeEXT type);
-#define SET_OBJECT_NAME(obj, objName, objType) vk_set_object_name((uint64_t)(obj), (objName), (objType))
 
 // Vulkan function pointers
 extern PFN_vkCreateBuffer qvkCreateBuffer;
@@ -62,11 +61,16 @@ void vk_pbo_init(void) {
     memset(&pbo_system, 0, sizeof(pbo_system));
 
     // Register CVars
-    r_pbo = ri.Cvar_Get("r_pbo", "1", CVAR_ARCHIVE);
+    // Off by default until the upload path is fully validated.
+    r_pbo = ri.Cvar_Get("r_pbo", "0", CVAR_ARCHIVE);
     r_pboBuffers = ri.Cvar_Get("r_pboBuffers", "4", CVAR_ARCHIVE);
     r_pboAsync = ri.Cvar_Get("r_pboAsync", "1", CVAR_ARCHIVE);
 
-    int num_buffers = ri.Min(r_pboBuffers->integer, MAX_PBO_BUFFERS);
+    if (!r_pbo->integer) {
+        return;
+    }
+
+    int num_buffers = MIN(r_pboBuffers->integer, MAX_PBO_BUFFERS);
     if (num_buffers <= 0) {
         num_buffers = 4;
     }
@@ -175,8 +179,8 @@ qboolean vk_pbo_upload_texture_sync(const void *data, VkDeviceSize size,
 
     int buffer_index = vk_find_available_buffer(size);
     if (buffer_index == -1) {
-        // Fall back to synchronous upload using a temporary staging buffer
-        return vk_upload_image_data(dst_image, 0, data, size, region, final_layout);
+        // No available staging buffer right now.
+        return qfalse;
     }
 
     // For sync uploads, we can reuse the async path but wait for completion
@@ -254,7 +258,7 @@ void vk_pbo_get_stats(uint64_t *total_uploads, uint64_t *total_bytes, float *avg
 // Create Vulkan resources for PBO system
 static qboolean vk_create_pbo_resources(void) {
     VkResult result;
-    int num_buffers = ri.Min(r_pboBuffers->integer, MAX_PBO_BUFFERS);
+    int num_buffers = MIN(r_pboBuffers->integer, MAX_PBO_BUFFERS);
 
     // Create staging buffers
     for (int i = 0; i < num_buffers; i++) {
@@ -354,7 +358,7 @@ static qboolean vk_create_pbo_resources(void) {
 
 // Destroy Vulkan resources for PBO system
 static void vk_destroy_pbo_resources(void) {
-    int num_buffers = ri.Min(r_pboBuffers->integer, MAX_PBO_BUFFERS);
+    int num_buffers = MIN(r_pboBuffers->integer, MAX_PBO_BUFFERS);
 
     // Destroy semaphores and fences
     for (int i = 0; i < num_buffers; i++) {
@@ -399,7 +403,7 @@ static void vk_destroy_pbo_resources(void) {
 
 // Find an available buffer for upload
 static int vk_find_available_buffer(VkDeviceSize required_size) {
-    int num_buffers = ri.Min(r_pboBuffers->integer, MAX_PBO_BUFFERS);
+    int num_buffers = MIN(r_pboBuffers->integer, MAX_PBO_BUFFERS);
 
     // Check if we have a round-robin buffer available
     for (int attempts = 0; attempts < num_buffers; attempts++) {

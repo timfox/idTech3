@@ -37,7 +37,6 @@ static void vk_project_lights_to_screen(void);
 
 // Utility functions
 extern void vk_set_object_name(uint64_t obj, const char *name, VkDebugReportObjectTypeEXT type);
-#define SET_OBJECT_NAME(obj, objName, objType) vk_set_object_name((uint64_t)(obj), (objName), (objType))
 
 // Vulkan function pointers
 extern PFN_vkCreateGraphicsPipelines qvkCreateGraphicsPipelines;
@@ -64,12 +63,17 @@ void vk_god_rays_init(void) {
     memset(&gr_system, 0, sizeof(gr_system));
 
     // Register CVars
-    r_godRays = ri.Cvar_Get("r_godRays", "1", CVAR_ARCHIVE);
+    // Off by default until the compute path is fully validated.
+    r_godRays = ri.Cvar_Get("r_godRays", "0", CVAR_ARCHIVE);
     r_godRaysDensity = ri.Cvar_Get("r_godRaysDensity", "0.5", CVAR_ARCHIVE);
     r_godRaysWeight = ri.Cvar_Get("r_godRaysWeight", "0.1", CVAR_ARCHIVE);
     r_godRaysDecay = ri.Cvar_Get("r_godRaysDecay", "0.95", CVAR_ARCHIVE);
     r_godRaysExposure = ri.Cvar_Get("r_godRaysExposure", "0.1", CVAR_ARCHIVE);
     r_godRaysSamples = ri.Cvar_Get("r_godRaysSamples", "64", CVAR_ARCHIVE);
+
+    if (!r_godRays->integer) {
+        return;
+    }
 
     // Set default parameters
     gr_system.params.density = r_godRaysDensity->value;
@@ -572,64 +576,19 @@ static void vk_update_god_rays_descriptors(void) {
 
 // Detect bright lights automatically
 static void vk_detect_bright_lights(void) {
-    // This would analyze the rendered scene to find bright light sources
-    // For now, we'll use a simple approach - add the sun and some basic lights
-
-    // Clear existing lights
+    // TODO: Implement light detection (requires access to view/projection transforms).
     vk_god_rays_clear_lights();
-
-    // Add sun if visible
-    vec3_t sun_screen;
-    if (project_sun_to_screen(gr_system.sun_position, sun_screen)) {
-        vk_god_rays_set_sun(gr_system.sun_position, gr_system.sun_color, gr_system.sun_intensity);
-    }
-
-    // TODO: Add dynamic light detection from scene entities
 }
 
 // Project lights to screen space
 static void vk_project_lights_to_screen(void) {
-    for (int i = 0; i < gr_system.num_lights; i++) {
-        god_rays_light_t *light = &gr_system.lights[i];
-
-        if (!light->active) {
-            continue;
-        }
-
-        // Project world position to screen space
-        vec4_t clip_pos;
-        MatrixTransform4(vk.view_matrix, light->position, clip_pos);
-        clip_pos[3] = 1.0f;
-
-        vec4_t proj_pos;
-        MatrixTransform4(vk.projection_matrix, clip_pos, proj_pos);
-
-        if (proj_pos[3] > 0.0f) {
-            light->screen_pos[0] = (proj_pos[0] / proj_pos[3] + 1.0f) * 0.5f;
-            light->screen_pos[1] = (proj_pos[1] / proj_pos[3] + 1.0f) * 0.5f;
-        } else {
-            // Light is behind camera
-            light->active = qfalse;
-        }
-    }
+    // TODO: Implement projection (requires access to view/projection transforms).
 }
 
 // Helper function to project sun to screen (simplified)
 static qboolean project_sun_to_screen(const vec3_t world_pos, vec3_t screen_pos) {
-    vec4_t clip_pos;
-    MatrixTransform4(vk.view_matrix, world_pos, clip_pos);
-    clip_pos[3] = 1.0f;
-
-    vec4_t proj_pos;
-    MatrixTransform4(vk.projection_matrix, clip_pos, proj_pos);
-
-    if (proj_pos[3] > 0.0f) {
-        screen_pos[0] = (proj_pos[0] / proj_pos[3] + 1.0f) * 0.5f;
-        screen_pos[1] = (proj_pos[1] / proj_pos[3] + 1.0f) * 0.5f;
-        screen_pos[2] = proj_pos[2] / proj_pos[3];
-        return qtrue;
-    }
-
+    (void)world_pos;
+    (void)screen_pos;
     return qfalse;
 }
 

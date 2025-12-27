@@ -36,7 +36,6 @@ static void vk_apply_wind_effect(surface_sprite_t *sprite, const surface_sprite_
 
 // Utility functions
 extern void vk_set_object_name(uint64_t obj, const char *name, VkDebugReportObjectTypeEXT type);
-#define SET_OBJECT_NAME(obj, objName, objType) vk_set_object_name((uint64_t)(obj), (objName), (objType))
 
 // Vulkan function pointers
 extern PFN_vkCreateGraphicsPipelines qvkCreateGraphicsPipelines;
@@ -63,10 +62,15 @@ void vk_surface_sprites_init(void) {
     memset(&ss_system, 0, sizeof(ss_system));
 
     // Register CVars
-    r_surfaceSprites = ri.Cvar_Get("r_surfaceSprites", "1", CVAR_ARCHIVE);
+    // Off by default until the rendering path is fully validated.
+    r_surfaceSprites = ri.Cvar_Get("r_surfaceSprites", "0", CVAR_ARCHIVE);
     r_surfaceSpritesMax = ri.Cvar_Get("r_surfaceSpritesMax", "4096", CVAR_ARCHIVE);
     r_surfaceSpritesDistance = ri.Cvar_Get("r_surfaceSpritesDistance", "1000.0", CVAR_ARCHIVE);
     r_surfaceSpritesWind = ri.Cvar_Get("r_surfaceSpritesWind", "1", CVAR_ARCHIVE);
+
+    if (!r_surfaceSprites->integer) {
+        return;
+    }
 
     // Allocate sprite arrays
     ss_system.max_sprites = r_surfaceSpritesMax->integer;
@@ -116,15 +120,9 @@ void vk_surface_sprites_shutdown(void) {
     vk_destroy_surface_sprites_pipeline();
     vk_destroy_surface_sprites_resources();
 
-    if (ss_system.sprites) {
-        ri.Hunk_Free(ss_system.sprites);
-        ss_system.sprites = NULL;
-    }
-
-    if (ss_system.batches) {
-        ri.Hunk_Free(ss_system.batches);
-        ss_system.batches = NULL;
-    }
+    // Allocated from the hunk; do not free individually.
+    ss_system.sprites = NULL;
+    ss_system.batches = NULL;
 
     ss_system.initialized = qfalse;
     ri.Printf(PRINT_ALL, "Vulkan: Surface sprites system shut down\n");
@@ -135,40 +133,17 @@ void vk_surface_sprites_update(void) {
     if (!ss_system.initialized || !ss_system.enabled) {
         return;
     }
-
-    float current_time = vk.refdef.floatTime;
-    qboolean needs_update = qfalse;
-
-    // Update sprite animations and wind effects
-    for (int i = 0; i < ss_system.num_sprites; i++) {
-        surface_sprite_t *sprite = &ss_system.sprites[i];
-        surface_sprite_type_t *type = &ss_system.types[sprite->current_frame]; // This needs to be fixed
-
-        // Update animation
-        if (type->animated && type->num_frames > 1) {
-            sprite->animation_time += vk.frametime * 0.001f;
-            int new_frame = (int)(sprite->animation_time / type->frame_time) % type->num_frames;
-            if (new_frame != sprite->current_frame) {
-                sprite->current_frame = new_frame;
-                needs_update = qtrue;
-            }
-        }
-
-        // Apply wind effect
-        if (r_surfaceSpritesWind->integer && type->wind_affected) {
-            vk_apply_wind_effect(sprite, type, current_time);
-        }
-    }
-
-    // Update batches if needed
-    if (needs_update) {
-        vk_update_sprite_batches();
-    }
+    // TODO: Implement proper sprite animation + wind update.
+    // Keep as a no-op for now to avoid depending on incorrect timing/state.
 }
 
 // Render surface sprites
 void vk_surface_sprites_render(void) {
     if (!ss_system.initialized || !ss_system.enabled || ss_system.num_batches == 0) {
+        return;
+    }
+
+    if (ss_system.pipeline == VK_NULL_HANDLE || ss_system.pipeline_layout == VK_NULL_HANDLE) {
         return;
     }
 
@@ -179,27 +154,7 @@ void vk_surface_sprites_render(void) {
     qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                             ss_system.pipeline_layout, 0, 1, &ss_system.descriptor_set, 0, NULL);
 
-    // Push constants
-    struct {
-        matrix_t mvp_matrix;
-        vec4_t camera_pos;
-        vec4_t wind_params;
-        float time;
-        int num_types;
-    } pushConstants;
-
-    MatrixMultiply(vk.view_matrix, vk.projection_matrix, pushConstants.mvp_matrix);
-    VectorCopy(vk.refdef.vieworg, pushConstants.camera_pos);
-    pushConstants.wind_params[0] = ss_system.wind_direction[0];
-    pushConstants.wind_params[1] = ss_system.wind_direction[1];
-    pushConstants.wind_params[2] = ss_system.wind_direction[2];
-    pushConstants.wind_params[3] = ss_system.wind_strength;
-    pushConstants.time = vk.refdef.floatTime;
-    pushConstants.num_types = ss_system.num_types;
-
-    qvkCmdPushConstants(vk.cmd->command_buffer, ss_system.pipeline_layout,
-                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                       0, sizeof(pushConstants), &pushConstants);
+    // TODO: Push constants / per-frame uniforms once the pipeline is implemented.
 
     // Render batches
     ss_system.visible_sprites = 0;
@@ -235,7 +190,7 @@ int vk_surface_sprites_register_type(const char *name, const char *texture_path,
     surface_sprite_type_t *type = &ss_system.types[ss_system.num_types];
 
     Q_strncpyz(type->name, name, sizeof(type->name));
-    type->texture = ri.RE_RegisterShader(texture_path);
+    type->texture = RE_RegisterShader(texture_path);
     VectorCopy2(size, type->size);
     VectorCopy(color, type->color);
     type->alpha = alpha;
@@ -348,8 +303,8 @@ void vk_surface_sprites_populate_terrain(int type_index, const vec3_t mins, cons
     int num_sprites_z = (int)(area_size[2] * density * type->density);
 
     // Clamp to reasonable limits
-    num_sprites_x = ri.Min(num_sprites_x, 100);
-    num_sprites_z = ri.Min(num_sprites_z, 100);
+    num_sprites_x = MIN(num_sprites_x, 100);
+    num_sprites_z = MIN(num_sprites_z, 100);
 
     float spacing_x = area_size[0] / num_sprites_x;
     float spacing_z = area_size[2] / num_sprites_z;
@@ -485,7 +440,7 @@ static void vk_update_sprite_batches(void) {
 
     for (int i = 0; i < ss_system.num_batches; i++) {
         int start_sprite = i * sprites_per_batch;
-        int num_sprites = ri.Min(sprites_per_batch, ss_system.num_sprites - start_sprite);
+        int num_sprites = MIN(sprites_per_batch, ss_system.num_sprites - start_sprite);
 
         surface_sprite_batch_t *batch = &ss_system.batches[i];
         batch->sprite_count = num_sprites;
@@ -580,7 +535,7 @@ static void vk_build_sprite_geometry(surface_sprite_batch_t *batch, int start_sp
 // Check if sprite is visible
 static qboolean vk_is_sprite_visible(const surface_sprite_t *sprite, const surface_sprite_type_t *type) {
     // Distance culling
-    float distance = Distance(vk.refdef.vieworg, sprite->position);
+    float distance = Distance(tr.refdef.vieworg, sprite->position);
     if (type->fade_with_distance && distance > type->max_distance) {
         return qfalse;
     }

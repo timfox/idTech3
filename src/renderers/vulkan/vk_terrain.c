@@ -39,7 +39,6 @@ static void vk_upload_heightmap_texture(void);
 
 // Utility functions
 extern void vk_set_object_name(uint64_t obj, const char *name, VkDebugReportObjectTypeEXT type);
-#define SET_OBJECT_NAME(obj, objName, objType) vk_set_object_name((uint64_t)(obj), (objName), (objType))
 
 // Vulkan function pointers
 extern PFN_vkCreateGraphicsPipelines qvkCreateGraphicsPipelines;
@@ -66,11 +65,16 @@ void vk_terrain_init(void) {
     memset(&terrain_system, 0, sizeof(terrain_system));
 
     // Register CVars
-    r_terrain = ri.Cvar_Get("r_terrain", "1", CVAR_ARCHIVE);
+    // Off by default until the rendering path is fully validated.
+    r_terrain = ri.Cvar_Get("r_terrain", "0", CVAR_ARCHIVE);
     r_terrainLod = ri.Cvar_Get("r_terrainLod", "1", CVAR_ARCHIVE);
     r_terrainGridSize = ri.Cvar_Get("r_terrainGridSize", "1024", CVAR_ARCHIVE);
     r_terrainPatchSize = ri.Cvar_Get("r_terrainPatchSize", "64", CVAR_ARCHIVE);
     r_terrainMaterials = ri.Cvar_Get("r_terrainMaterials", "4", CVAR_ARCHIVE);
+
+    if (!r_terrain->integer) {
+        return;
+    }
 
     // Set default configuration
     terrain_system.grid_size = r_terrainGridSize->integer;
@@ -124,15 +128,9 @@ void vk_terrain_shutdown(void) {
     vk_destroy_terrain_pipeline();
     vk_destroy_terrain_resources();
 
-    // Free heightmap data
-    if (terrain_system.heightmap.heights) {
-        ri.Hunk_Free(terrain_system.heightmap.heights);
-        terrain_system.heightmap.heights = NULL;
-    }
-    if (terrain_system.heightmap.normals) {
-        ri.Hunk_Free(terrain_system.heightmap.normals);
-        terrain_system.heightmap.normals = NULL;
-    }
+    // Allocated from the hunk; do not free individually.
+    terrain_system.heightmap.heights = NULL;
+    terrain_system.heightmap.normals = NULL;
 
     terrain_system.initialized = qfalse;
     ri.Printf(PRINT_ALL, "Vulkan: Terrain system shut down\n");
@@ -154,6 +152,10 @@ void vk_terrain_render(void) {
         return;
     }
 
+    if (terrain_system.pipeline == VK_NULL_HANDLE || terrain_system.pipeline_layout == VK_NULL_HANDLE) {
+        return;
+    }
+
     // Bind pipeline
     qvkCmdBindPipeline(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, terrain_system.pipeline);
 
@@ -161,40 +163,7 @@ void vk_terrain_render(void) {
     qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                             terrain_system.pipeline_layout, 0, 1, &terrain_system.descriptor_set, 0, NULL);
 
-    // Push constants
-    struct {
-        matrix_t mvp_matrix;
-        vec4_t camera_pos;
-        vec4_t light_dir;
-        vec4_t material_scales[TERRAIN_MAX_MATERIALS];
-        vec4_t material_tints[TERRAIN_MAX_MATERIALS];
-        float time;
-        int num_materials;
-    } pushConstants;
-
-    MatrixMultiply(vk.view_matrix, vk.projection_matrix, pushConstants.mvp_matrix);
-    VectorCopy(vk.refdef.vieworg, pushConstants.camera_pos);
-    VectorSet(pushConstants.light_dir, 0.0f, -1.0f, 0.5f);
-    VectorNormalize(pushConstants.light_dir);
-
-    pushConstants.time = vk.refdef.floatTime;
-    pushConstants.num_materials = terrain_system.num_materials;
-
-    // Set material parameters
-    for (int i = 0; i < terrain_system.num_materials; i++) {
-        terrain_material_t *mat = &terrain_system.materials[i];
-        pushConstants.material_scales[i][0] = mat->scale_u;
-        pushConstants.material_scales[i][1] = mat->scale_v;
-        pushConstants.material_scales[i][2] = mat->blend_strength;
-        pushConstants.material_scales[i][3] = 0.0f;
-
-        VectorCopy(mat->tint_color, pushConstants.material_tints[i]);
-        pushConstants.material_tints[i][3] = 1.0f;
-    }
-
-    qvkCmdPushConstants(vk.cmd->command_buffer, terrain_system.pipeline_layout,
-                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                       0, sizeof(pushConstants), &pushConstants);
+    // TODO: Push constants / per-frame uniforms once the pipeline is implemented.
 
     // Render visible patches
     for (int i = 0; i < terrain_system.num_patches; i++) {
@@ -243,13 +212,9 @@ qboolean vk_terrain_generate_heightmap(int width, int height, float scale) {
         return qfalse;
     }
 
-    // Free existing heightmap
-    if (terrain_system.heightmap.heights) {
-        ri.Hunk_Free(terrain_system.heightmap.heights);
-    }
-    if (terrain_system.heightmap.normals) {
-        ri.Hunk_Free(terrain_system.heightmap.normals);
-    }
+    // Allocated from the hunk; do not free individually.
+    terrain_system.heightmap.heights = NULL;
+    terrain_system.heightmap.normals = NULL;
 
     terrain_system.heightmap.width = width;
     terrain_system.heightmap.height = height;
@@ -298,8 +263,8 @@ void vk_terrain_set_material(int index, const char *diffuse_path, const char *no
 
     terrain_material_t *mat = &terrain_system.materials[index];
 
-    mat->diffuse_texture = ri.RE_RegisterShader(diffuse_path);
-    mat->normal_texture = ri.RE_RegisterShader(normal_path);
+    mat->diffuse_texture = RE_RegisterShader(diffuse_path);
+    mat->normal_texture = RE_RegisterShader(normal_path);
     mat->scale_u = scale_u;
     mat->scale_v = scale_v;
     mat->blend_strength = 1.0f;
@@ -313,7 +278,7 @@ void vk_terrain_set_material(int index, const char *diffuse_path, const char *no
 // Update LOD for all patches
 void vk_terrain_update_lod(void) {
     vec3_t camera_pos;
-    VectorCopy(vk.refdef.vieworg, camera_pos);
+    VectorCopy(tr.refdef.vieworg, camera_pos);
 
     for (int i = 0; i < terrain_system.num_patches; i++) {
         terrain_patch_t *patch = &terrain_system.patches[i];
@@ -571,8 +536,8 @@ static void vk_build_patch_geometry(terrain_patch_t *patch, int lod_level) {
             int grid_y = patch->y * TERRAIN_PATCH_SIZE + y * step;
 
             // Clamp to heightmap bounds
-            grid_x = ri.Min(grid_x, terrain_system.heightmap.width - 1);
-            grid_y = ri.Min(grid_y, terrain_system.heightmap.height - 1);
+            grid_x = MIN(grid_x, terrain_system.heightmap.width - 1);
+            grid_y = MIN(grid_y, terrain_system.heightmap.height - 1);
 
             float height = terrain_system.heightmap.heights[grid_y * terrain_system.heightmap.width + grid_x];
 
@@ -622,10 +587,7 @@ static void vk_build_patch_geometry(terrain_patch_t *patch, int lod_level) {
     patch->maxs[1] = terrain_system.heightmap.max_height;
     patch->maxs[2] = patch_world_z + terrain_system.patch_size_world;
 
-    // Free temporary buffers
-    ri.Hunk_Free(vertices);
-    ri.Hunk_Free(indices);
-    ri.Hunk_Free(weights);
+    // Temporary buffers are hunk-allocated; do not free individually.
 }
 
 // Load heightmap from file

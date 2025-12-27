@@ -37,7 +37,6 @@ static int vk_find_free_decal_slot(void);
 
 // Utility functions
 extern void vk_set_object_name(uint64_t obj, const char *name, VkDebugReportObjectTypeEXT type);
-#define SET_OBJECT_NAME(obj, objName, objType) vk_set_object_name((uint64_t)(obj), (objName), (objType))
 
 // Vulkan function pointers
 extern PFN_vkCreateGraphicsPipelines qvkCreateGraphicsPipelines;
@@ -64,9 +63,14 @@ void vk_decals_init(void) {
     memset(&ds_system, 0, sizeof(ds_system));
 
     // Register CVars
-    r_decals = ri.Cvar_Get("r_decals", "1", CVAR_ARCHIVE);
+    // Off by default until the rendering path is fully validated.
+    r_decals = ri.Cvar_Get("r_decals", "0", CVAR_ARCHIVE);
     r_decalsMax = ri.Cvar_Get("r_decalsMax", "512", CVAR_ARCHIVE);
     r_decalsFadeTime = ri.Cvar_Get("r_decalsFadeTime", "5.0", CVAR_ARCHIVE);
+
+    if (!r_decals->integer) {
+        return;
+    }
 
     // Allocate vertex/index buffers
     ds_system.vertices = ri.Hunk_Alloc(MAX_DECAL_VERTICES * sizeof(vec4_t), h_low);
@@ -122,7 +126,7 @@ void vk_decals_update(void) {
         return;
     }
 
-    float current_time = vk.refdef.floatTime;
+    float current_time = tr.refdef.floatTime;
     qboolean needs_update = qfalse;
 
     for (int i = 0; i < MAX_DECALS; i++) {
@@ -177,20 +181,7 @@ void vk_decals_render(void) {
     qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                             ds_system.pipeline_layout, 0, 1, &ds_system.descriptor_set, 0, NULL);
 
-    // Push constants (view/projection matrices)
-    struct {
-        matrix_t mvp_matrix;
-        vec4_t view_pos;
-        float time;
-    } pushConstants;
-
-    MatrixMultiply(vk.view_matrix, vk.projection_matrix, pushConstants.mvp_matrix);
-    VectorCopy(vk.refdef.vieworg, pushConstants.view_pos);
-    pushConstants.time = vk.refdef.floatTime;
-
-    qvkCmdPushConstants(vk.cmd->command_buffer, ds_system.pipeline_layout,
-                       VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-                       0, sizeof(pushConstants), &pushConstants);
+    // TODO: Push constants / per-frame uniforms once the pipeline is implemented.
 
     // Render decals
     int vertex_offset = 0;
@@ -258,7 +249,7 @@ int vk_decals_create_decal(decal_type_t type, const vec3_t position, const vec3_
     decal->angle = angle;
     decal->lifetime = lifetime;
     decal->fade_time = r_decalsFadeTime->value;
-    decal->start_time = vk.refdef.floatTime;
+    decal->start_time = tr.refdef.floatTime;
     VectorCopy4(color, decal->color);
     decal->alpha = 1.0f;
     decal->material_index = 0; // Default material
@@ -473,22 +464,13 @@ static void vk_create_decal_pipeline(void) {
         return;
     }
 
-    // Push constant ranges
-    VkPushConstantRange pushConstantRanges[] = {
-        {
-            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-            .offset = 0,
-            .size = sizeof(matrix_t) + sizeof(vec4_t) + sizeof(float)
-        }
-    };
-
     // Pipeline layout
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = 1,
         .pSetLayouts = &ds_system.descriptor_layout,
-        .pushConstantRangeCount = ARRAY_LEN(pushConstantRanges),
-        .pPushConstantRanges = pushConstantRanges
+        .pushConstantRangeCount = 0,
+        .pPushConstantRanges = NULL
     };
 
     result = qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &ds_system.pipeline_layout);

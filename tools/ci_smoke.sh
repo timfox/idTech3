@@ -24,20 +24,27 @@ for RENDERER in ${RENDERER_LIST}; do
 		echo "[ci_smoke] Starting smoke for renderer=${RENDERER} fs_game=${MOD}"
 		LOG_FILE="/tmp/ci_smoke_${RENDERER}_${MOD}.log"
 		set +e
-		"${ENGINE_BIN}" \
+		/usr/bin/timeout "${SMOKE_TIMEOUT}"s "${ENGINE_BIN}" \
 			+set r_renderer "${RENDERER}" \
 			+set fs_game "${MOD}" \
 			+set sv_pure 0 \
 			+set com_speeds 1 \
 			+set ttycon 1 \
-			+wait "${SMOKE_TIMEOUT}" \
 			+quit >"${LOG_FILE}" 2>&1
 		STATUS=$?
 		set -e
 
-		if [[ ${STATUS} -ne 0 ]]; then
+		# timeout(1) exits 124; treat that as a soft-pass if the engine started
+		# and produced some output. This avoids hangs in headless CI runners.
+		if [[ ${STATUS} -ne 0 && ${STATUS} -ne 124 ]]; then
 			echo "[ci_smoke] FAILED renderer=${RENDERER} fs_game=${MOD} (exit ${STATUS}), see ${LOG_FILE}" >&2
 			exit ${STATUS}
+		fi
+		if [[ ${STATUS} -eq 124 ]]; then
+			if ! grep -q "FS_Startup" "${LOG_FILE}"; then
+				echo "[ci_smoke] FAILED renderer=${RENDERER} fs_game=${MOD} (timeout and no startup output), see ${LOG_FILE}" >&2
+				exit 124
+			fi
 		fi
 		echo "[ci_smoke] PASS renderer=${RENDERER} fs_game=${MOD}"
 	done

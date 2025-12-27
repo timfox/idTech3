@@ -125,6 +125,16 @@ echo ""
 echo "Copying engine binaries and renderer .so files to $RELEASE_DIR..."
 mkdir -p "$RELEASE_DIR"
 
+# Game data (minimal): ensure base/default.cfg exists in release.
+# The engine reads base/default.cfg very early (before +set fs_game is applied).
+if [ -d "$PROJECT_ROOT/base" ]; then
+  mkdir -p "$RELEASE_DIR/base"
+  # Copy only small text assets; keep this conservative.
+  if [ -f "$PROJECT_ROOT/base/default.cfg" ]; then
+    cp -f "$PROJECT_ROOT/base/default.cfg" "$RELEASE_DIR/base/default.cfg"
+  fi
+fi
+
 # Client
 if [ -f "$BUILD_DIR/idtech3.x86_64" ]; then
   cp -f "$BUILD_DIR/idtech3.x86_64" "$RELEASE_DIR/${GAME_NAME}.x86_64"

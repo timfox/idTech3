@@ -1329,6 +1329,8 @@ SET(RENDERER_VK_SRCS
 	src/renderers/vulkan/vk_layered_materials.c
 	src/renderers/vulkan/vk_mesh_shaders.c
 	src/renderers/vulkan/vk_particles.c
+	src/renderers/vulkan/vk_pbo.c
+	src/renderers/vulkan/vk_world_effects.c
 	src/renderers/vulkan/vk_portal_lights.c
 	src/renderers/vulkan/vk_post_process.cpp
 	src/renderers/vulkan/vk_proc_dressing.c
