@@ -216,9 +216,96 @@ int Com_Milliseconds( void ) {
 
 void Com_FrameInit( void ) { }
 
-// CD Key
-void Com_ReadCDKey( const char *filename ) { (void)filename; }
-void Com_AppendCDKey( const char *filename ) { (void)filename; }
+// ============================================================================
+// CD Key system
+// ============================================================================
+// Quake3-style cdkey file name used by the filesystem startup code.
+// Stored under fs_homepath/<game>/q3key
+#define Q3KEY_FILENAME "q3key"
+
+static int Com_CollectCDKeyChars( const char *in, char *out, int outSize ) {
+	int j = 0;
+	if ( !in || !out || outSize <= 0 ) {
+		return 0;
+	}
+	while ( *in && j < outSize - 1 ) {
+		const char c = *in++;
+		if ( ( c >= '0' && c <= '9' ) ||
+		     ( c >= 'a' && c <= 'z' ) ||
+		     ( c >= 'A' && c <= 'Z' ) ) {
+			out[j++] = c;
+		}
+	}
+	out[j] = '\0';
+	return j;
+}
+
+static void Com_ReadCDKeyFromFile( const char *game, char *outKey16 ) {
+	const char *home;
+	char *ospath;
+	FILE *f;
+	char buf[256];
+
+	if ( !outKey16 ) {
+		return;
+	}
+	outKey16[0] = '\0';
+
+	home = Cvar_VariableString( "fs_homepath" );
+	if ( !home || !home[0] ) {
+		home = Sys_DefaultHomePath();
+	}
+
+	ospath = FS_BuildOSPath( home, game, Q3KEY_FILENAME );
+	f = Sys_FOpen( ospath, "rb" );
+	if ( !f ) {
+		return;
+	}
+
+	// Read first line / chunk
+	memset( buf, 0, sizeof( buf ) );
+	(void)fread( buf, 1, sizeof( buf ) - 1, f );
+	fclose( f );
+
+	// Extract first 16 alphanumeric chars
+	{
+		char cleaned[64];
+		const int n = Com_CollectCDKeyChars( buf, cleaned, sizeof( cleaned ) );
+		if ( n >= 16 ) {
+			memcpy( outKey16, cleaned, 16 );
+			outKey16[16] = '\0';
+		}
+	}
+}
+
+void Com_ReadCDKey( const char *filename ) {
+	char key16[17];
+
+	// Default key remains all zeros if nothing found.
+	Com_ReadCDKeyFromFile( filename, key16 );
+	if ( key16[0] ) {
+		memcpy( cl_cdkey, key16, 16 );
+		cl_cdkey[32] = '\0';
+	}
+}
+
+void Com_AppendCDKey( const char *filename ) {
+#ifndef STANDALONE
+	// Only append mod-specific portion if UI says unique cdkeys are used.
+	if ( !UI_usesUniqueCDKey() ) {
+		return;
+	}
+#endif
+
+	{
+		char key16[17];
+		Com_ReadCDKeyFromFile( filename, key16 );
+		if ( key16[0] ) {
+			memcpy( &cl_cdkey[16], key16, 16 );
+			cl_cdkey[32] = '\0';
+		}
+	}
+}
 
 // Game state
 void Com_GameRestart( int checksumFeed, qboolean clientRestart ) { (void)checksumFeed; (void)clientRestart; }

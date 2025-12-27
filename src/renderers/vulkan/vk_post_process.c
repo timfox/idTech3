@@ -32,7 +32,6 @@ extern PFN_vkCmdPushConstants qvkCmdPushConstants;
 
 // Utility functions
 extern const char *vk_result_string(VkResult result);
-#define SET_OBJECT_NAME(obj, name, type) vk_set_object_name((uint64_t)(obj), (name), (type))
 extern void vk_set_object_name(uint64_t obj, const char *name, VkDebugReportObjectTypeEXT type);
 
 #endif

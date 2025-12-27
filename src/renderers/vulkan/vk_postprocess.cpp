@@ -4,7 +4,6 @@
 #include "vk_utils.h"
 #include "vk_images.h"
 #include "vk.h"
-#include "../opengl2/tr_extramath.h"
 
 // Renderer interface
 extern refimport_t ri;
@@ -15,7 +14,7 @@ extern cvar_t *r_postQuality;
 
 // Utility functions
 extern void vk_set_object_name(uint64_t obj, const char *name, VkDebugReportObjectTypeEXT type);
-#define SET_OBJECT_NAME(obj,objName,objType) vk_set_object_name( (uint64_t)(obj), (objName), (objType) )
+// Use SET_OBJECT_NAME from vk.h
 
 // Vulkan function pointer extern declarations
 extern PFN_vkCreateGraphicsPipelines qvkCreateGraphicsPipelines;
