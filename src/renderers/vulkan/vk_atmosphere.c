@@ -135,6 +135,37 @@ void vk_atmosphere_init( void )
 	Com_Memcpy( &vk.atmosphere.targetParams, &atmospherePresets[ATMOSPHERE_CALM], sizeof( atmosphere_params_t ) );
 	Com_Memcpy( &vk.atmosphere.baseParams, &atmospherePresets[ATMOSPHERE_CALM], sizeof( atmosphere_params_t ) );
 	
+	vk.atmosphere.noiseTexture = R_RegisterImage( "textures/common/noise", IMGFLAG_CLAMPTOEDGE | IMGFLAG_NOMIPMAP );
+	if ( !vk.atmosphere.noiseTexture ) {
+		ri.Printf( PRINT_WARNING, "Atmosphere system: Failed to load noise texture for volumetric fog.\n" );
+	}
+
+	// Load volumetric fog shaders manually if they are not in the bundled data
+	if ( vk.modules.volumetric_fog_comp == VK_NULL_HANDLE ) {
+		void *buffer;
+		int size = ri.FS_ReadFile( "src/renderers/vulkan/shaders/spirv/volumetric_fog_comp.spv", &buffer );
+		if ( size > 0 ) {
+			vk.modules.volumetric_fog_comp = vk_create_shader_module( (const uint8_t *)buffer, size );
+			ri.FS_FreeFile( buffer );
+		}
+	}
+	if ( vk.modules.volumetric_fog_composite_frag == VK_NULL_HANDLE ) {
+		void *buffer;
+		int size = ri.FS_ReadFile( "src/renderers/vulkan/shaders/spirv/volumetric_fog_composite_frag.spv", &buffer );
+		if ( size > 0 ) {
+			vk.modules.volumetric_fog_composite_frag = vk_create_shader_module( (const uint8_t *)buffer, size );
+			ri.FS_FreeFile( buffer );
+		}
+	}
+	if ( vk.modules.post_vert == VK_NULL_HANDLE ) {
+		void *buffer;
+		int size = ri.FS_ReadFile( "src/renderers/vulkan/shaders/spirv/post_vert.spv", &buffer );
+		if ( size > 0 ) {
+			vk.modules.post_vert = vk_create_shader_module( (const uint8_t *)buffer, size );
+			ri.FS_FreeFile( buffer );
+		}
+	}
+
 	// Create GPU buffer for atmosphere parameters
 	VkBufferCreateInfo bufferInfo = {};
 	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -160,6 +191,9 @@ void vk_atmosphere_init( void )
 	ri.Printf( PRINT_ALL, "Atmosphere system: Initialized\n" );
 	
 	vk.atmosphere.initialized = qtrue;
+
+	// Initialize volumetric fog
+	vk_volumetric_fog_init();
 }
 
 /*
@@ -183,6 +217,9 @@ void vk_atmosphere_shutdown( void )
 		vk.atmosphere.atmosphereBufferMemory = VK_NULL_HANDLE;
 	}
 	
+	// Shutdown volumetric fog
+	vk_volumetric_fog_shutdown();
+
 	vk.atmosphere.initialized = qfalse;
 	ri.Printf( PRINT_ALL, "Atmosphere system: Shutdown complete\n" );
 }

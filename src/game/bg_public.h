@@ -201,9 +201,15 @@ typedef struct {
 	int			pmove_nextgen;
 } pmove_t;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 // if a full pmove isn't done on the client, you can just update the angles
 void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd );
 void Pmove (pmove_t *pmove);
+#ifdef __cplusplus
+}
+#endif
 
 //===================================================================================
 
@@ -650,6 +656,9 @@ typedef struct gitem_s {
 	char		*sounds;		// string of all sounds this item will use
 } gitem_t;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 // included in both the game dll and the client
 extern	gitem_t	bg_itemlist[];
 extern	int		bg_numItems;
@@ -661,6 +670,9 @@ gitem_t	*BG_FindItemForHoldable( holdable_t pw );
 #define	ITEM_INDEX(x) ((x)-bg_itemlist)
 
 qboolean	BG_CanItemBeGrabbed( int gametype, const entityState_t *ent, const playerState_t *ps );
+#ifdef __cplusplus
+}
+#endif
 
 
 // g_dmflags->integer flags
@@ -703,6 +715,9 @@ typedef enum {
 
 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 void	BG_EvaluateTrajectory( const trajectory_t *tr, int atTime, vec3_t result );
 void	BG_EvaluateTrajectoryDelta( const trajectory_t *tr, int atTime, vec3_t result );
 
@@ -714,6 +729,9 @@ void	BG_PlayerStateToEntityState( playerState_t *ps, entityState_t *s, qboolean 
 void	BG_PlayerStateToEntityStateExtraPolate( playerState_t *ps, entityState_t *s, int time, qboolean snap );
 
 qboolean	BG_PlayerTouchesItem( playerState_t *ps, entityState_t *item, int atTime );
+#ifdef __cplusplus
+}
+#endif
 
 
 #define ARENAS_PER_TIER		4

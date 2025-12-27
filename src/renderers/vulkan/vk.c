@@ -5314,6 +5314,11 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			fs_module = vk.modules.dot_fs;
 			break;
 
+		case TYPE_VOLUMETRIC_FOG_COMPOSITE:
+			vs_module = vk.modules.post_vert;
+			fs_module = vk.modules.volumetric_fog_composite_frag;
+			break;
+
 		default:
 			ri.Error(ERR_DROP, "create_pipeline: unknown shader type %i\n", def->shader_type);
 			return 0;
@@ -5489,6 +5494,11 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		case TYPE_DOT:
 			vs_module = vk.modules.dot_vs;
 			fs_module = vk.modules.dot_fs;
+			break;
+
+		case TYPE_VOLUMETRIC_FOG_COMPOSITE:
+			vs_module = vk.modules.post_vert;
+			fs_module = vk.modules.volumetric_fog_composite_frag;
 			break;
 
 		default:

@@ -355,10 +355,16 @@ static inline const char* Q_ReproducibleTime(void) {
 #define Q_BUILD_TIME __TIME__
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 //endianness
 short ShortSwap( short l );
 int LongSwap( int l );
 float FloatSwap( const float *f );
+#ifdef __cplusplus
+}
+#endif
 
 #include "q_platform.h"
 
@@ -463,6 +469,9 @@ typedef struct {
     qboolean supports_unicode;
 } platform_info_t;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 // Get current platform information
 const platform_info_t *Platform_GetInfo(void);
 
@@ -477,6 +486,9 @@ void Platform_SetMaxFileDescriptors(int max_fds);
 // Platform-specific string conversions
 char *Platform_NormalizePath(char *path);
 const char *Platform_GetNewline(void);
+#ifdef __cplusplus
+}
+#endif
 
 // Legacy macros for backward compatibility
 #define Q_IsCaseInsensitiveFilesystem() Platform_IsCaseInsensitiveFilesystem()
@@ -901,6 +913,9 @@ typedef struct {
     float r, g, b, a;
 } color4_t;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 unsigned ColorBytes3 (float r, float g, float b);
 unsigned ColorBytes4 (float r, float g, float b, float a);
 
@@ -1054,6 +1069,9 @@ void PerpendicularVector( vec3_t dst, const vec3_t src );
 int Q_isnan( float x );
 int Q_isfinite( float f );
 float Q_atof( const char *str );
+#ifdef __cplusplus
+}
+#endif
 
 #ifndef MAX
 #define MAX(x,y) ((x)>(y)?(x):(y))
@@ -1083,6 +1101,9 @@ void	COM_DefaultExtension( char *path, int maxSize, const char *extension );
 }
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 unsigned long Com_GenerateHashValue( const char *fname, const unsigned int size );
 
 void	COM_BeginParseSession( const char *name );
@@ -1095,6 +1116,9 @@ void	COM_ParseWarning( const char *format, ... ) __attribute__ ((format (printf,
 //int		COM_ParseInfos( const char *buf, int max, char infos[][MAX_INFO_STRING] );
 
 char	*COM_ParseComplex( const char **data_p, qboolean allowLineBreak );
+#ifdef __cplusplus
+}
+#endif
 
 typedef enum {
 	TK_GENEGIC = 0, // for single-char tokens
@@ -1189,6 +1213,9 @@ typedef enum {
 
 extern const byte locase[ 256 ];
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 int Q_isprint( int c );
 int Q_islower( int c );
 int Q_isupper( int c );
@@ -1205,6 +1232,9 @@ int		Q_strnicmp (const char *s1, const char *s2, size_t n);
 char	*Q_strlwr( char *s1 );
 char	*Q_strupr( char *s1 );
 const char	*Q_stristr( const char *s, const char *find);
+#ifdef __cplusplus
+}
+#endif
 
 // Forward declarations for string functions
 #ifdef __cplusplus
@@ -1354,6 +1384,9 @@ void Com_TruncateLongString( char *buffer, const char *s );
 
 //=============================================
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 //
 // key / value info strings
 //
@@ -1366,6 +1399,9 @@ qboolean Info_Validate( const char *s );
 qboolean Info_ValidateKeyValue( const char *s );
 const char *Info_NextPair( const char *s, char *key, char *value );
 int Info_RemoveKey( char *s, const char *key );
+#ifdef __cplusplus
+}
+#endif
 
 // this is only here so the functions in q_shared.c and bg_*.c can link
 #ifdef __cplusplus

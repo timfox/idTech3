@@ -5,685 +5,429 @@ Volumetric Fog System Implementation
 */
 
 #include "tr_local.h"
-#include "vk_volumetric_fog.h"
-#include "vk_utils.h"
-#include "vk_images.h"
-#include "vk_pipeline.h"
 #include "vk.h"
-
-// Embedded shader data
-extern const unsigned char volumetric_fog_comp_spv[];
+#include "vk_atmosphere.h"
+#include "vk_post_process.h"
 
 #ifdef USE_VULKAN
 
-// CVars
-cvar_t *r_volumetricFog;
-cvar_t *r_volumetricFogDensity;
-cvar_t *r_volumetricFogHeight;
-cvar_t *r_volumetricFogFalloff;
-cvar_t *r_volumetricFogSamples;
-cvar_t *r_volumetricFogScattering;
-cvar_t *r_volumetricFogAbsorption;
+extern cvar_t *r_volumetricFog;
+extern cvar_t *r_volumetricFogSamples;
+extern cvar_t *r_volumetricFogScattering;
+extern cvar_t *r_volumetricFogAbsorption;
+extern cvar_t *r_volumetricFogDensity;
+extern cvar_t *r_volumetricFogHeight;
+extern cvar_t *r_volumetricFogFalloff;
 
-// Global system state
-static volumetric_fog_system_t vf_system;
+typedef struct {
+    float projectionMatrix[16];
+    float viewMatrix[16];
+    float invProjectionMatrix[16];
+    float invViewMatrix[16];
+    float resolution[2];
+    float invResolution[2];
+    float cameraPos[3];
+    float _pad0;
+    float lightDir[3];
+    float _pad1;
+    float lightColor[3];
+    float lightIntensity;
+    float fogDensity;
+    float fogHeight;
+    float fogFalloff;
+    int numSamples;
+    float scattering;
+    float absorption;
+} volumetric_fog_pc_t;
 
-// Forward declarations
-static qboolean vk_create_volumetric_fog_resources(void);
-static void vk_destroy_volumetric_fog_resources(void);
-static void vk_create_volumetric_fog_pipeline(void);
-static void vk_destroy_volumetric_fog_pipeline(void);
-static void vk_generate_noise_texture(void);
-static void vk_update_volumetric_fog_descriptors(void);
+void vk_volumetric_fog_init(void)
+{
+    if (!r_volumetricFog->integer) return;
 
-// Utility functions
-extern void vk_set_object_name(uint64_t obj, const char *name, VkDebugReportObjectTypeEXT type);
-#define SET_OBJECT_NAME(obj, objName, objType) vk_set_object_name((uint64_t)(obj), (objName), (objType))
+    ri.Printf(PRINT_ALL, "Initializing volumetric fog system...\n");
 
-// Vulkan function pointers
-extern PFN_vkCreateComputePipelines qvkCreateComputePipelines;
-extern PFN_vkDestroyPipeline qvkDestroyPipeline;
-extern PFN_vkCreatePipelineLayout qvkCreatePipelineLayout;
-extern PFN_vkDestroyPipelineLayout qvkDestroyPipelineLayout;
-extern PFN_vkCreateDescriptorSetLayout qvkCreateDescriptorSetLayout;
-extern PFN_vkDestroyDescriptorSetLayout qvkDestroyDescriptorSetLayout;
-extern PFN_vkCreateDescriptorPool qvkCreateDescriptorPool;
-extern PFN_vkDestroyDescriptorPool qvkDestroyDescriptorPool;
-extern PFN_vkAllocateDescriptorSets qvkAllocateDescriptorSets;
-extern PFN_vkUpdateDescriptorSets qvkUpdateDescriptorSets;
-extern PFN_vkCmdBindPipeline qvkCmdBindPipeline;
-extern PFN_vkCmdBindDescriptorSets qvkCmdBindDescriptorSets;
-extern PFN_vkCmdDispatch qvkCmdDispatch;
-extern PFN_vkCmdPushConstants qvkCmdPushConstants;
+    // Create output image
+    VkImageCreateInfo imageInfo = { VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+    imageInfo.extent.width = vk.renderWidth;
+    imageInfo.extent.height = vk.renderHeight;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-// Initialize volumetric fog system
-void vk_volumetric_fog_init(void) {
-    ri.Printf(PRINT_ALL, "Vulkan: Initializing volumetric fog system\n");
+    VK_CHECK(qvkCreateImage(vk.device, &imageInfo, NULL, &vk.atmosphere.volumetricFogImage));
 
-    memset(&vf_system, 0, sizeof(vf_system));
-
-    // Register CVars
-    // Off by default until the compute path is fully validated.
-    r_volumetricFog = ri.Cvar_Get("r_volumetricFog", "0", CVAR_ARCHIVE);
-    r_volumetricFogDensity = ri.Cvar_Get("r_volumetricFogDensity", "0.01", CVAR_ARCHIVE);
-    r_volumetricFogHeight = ri.Cvar_Get("r_volumetricFogHeight", "0.0", CVAR_ARCHIVE);
-    r_volumetricFogFalloff = ri.Cvar_Get("r_volumetricFogFalloff", "0.001", CVAR_ARCHIVE);
-    r_volumetricFogSamples = ri.Cvar_Get("r_volumetricFogSamples", "64", CVAR_ARCHIVE);
-    r_volumetricFogScattering = ri.Cvar_Get("r_volumetricFogScattering", "0.1", CVAR_ARCHIVE);
-    r_volumetricFogAbsorption = ri.Cvar_Get("r_volumetricFogAbsorption", "0.05", CVAR_ARCHIVE);
-
-    if (!r_volumetricFog->integer) {
-        // Keep the system uninitialized; update/render will no-op.
-        return;
-    }
-
-    // Set default parameters
-    vf_system.params.density = r_volumetricFogDensity->value;
-    vf_system.params.height = r_volumetricFogHeight->value;
-    vf_system.params.falloff = r_volumetricFogFalloff->value;
-    vf_system.params.scattering = r_volumetricFogScattering->value;
-    vf_system.params.absorption = r_volumetricFogAbsorption->value;
-    vf_system.params.numSamples = r_volumetricFogSamples->integer;
-    vf_system.params.noiseScale = 0.1f;
-    vf_system.params.noiseSpeed = 0.1f;
-    vf_system.params.lightIntensity = 1.0f;
-    VectorSet(vf_system.params.lightColor, 1.0f, 1.0f, 1.0f);
-    vf_system.enabled = qtrue;
-    vf_system.params.enabled = qtrue;
-    vf_system.params.heightFog = qtrue;
-    vf_system.params.animated = qtrue;
-
-    vf_system.noiseSize = 64; // 64x64x64 noise texture
-
-    // Create resources
-    if (!vk_create_volumetric_fog_resources()) {
-        ri.Printf(PRINT_ERROR, "Vulkan: Failed to create volumetric fog resources\n");
-        return;
-    }
-
-    // Create pipeline
-    vk_create_volumetric_fog_pipeline();
-
-    // Generate noise texture
-    vk_generate_noise_texture();
-
-    // Update descriptors
-    vk_update_volumetric_fog_descriptors();
-
-    vf_system.initialized = qtrue;
-    ri.Printf(PRINT_ALL, "Vulkan: Volumetric fog system initialized\n");
-}
-
-// Shutdown volumetric fog system
-void vk_volumetric_fog_shutdown(void) {
-    ri.Printf(PRINT_ALL, "Vulkan: Shutting down volumetric fog system\n");
-
-    vk_destroy_volumetric_fog_pipeline();
-    vk_destroy_volumetric_fog_resources();
-
-    if (vf_system.noiseData) {
-        ri.Free(vf_system.noiseData);
-        vf_system.noiseData = NULL;
-    }
-
-    vf_system.initialized = qfalse;
-    ri.Printf(PRINT_ALL, "Vulkan: Volumetric fog system shut down\n");
-}
-
-// Update volumetric fog parameters
-void vk_volumetric_fog_update(void) {
-    if (!vf_system.initialized || !vf_system.enabled) {
-        return;
-    }
-
-    // Update parameters from CVars
-    vf_system.params.density = r_volumetricFogDensity->value;
-    vf_system.params.height = r_volumetricFogHeight->value;
-    vf_system.params.falloff = r_volumetricFogFalloff->value;
-    vf_system.params.scattering = r_volumetricFogScattering->value;
-    vf_system.params.absorption = r_volumetricFogAbsorption->value;
-    vf_system.params.numSamples = r_volumetricFogSamples->integer;
-    vf_system.params.enabled = r_volumetricFog->integer != 0;
-}
-
-// Render volumetric fog
-void vk_volumetric_fog_render(void) {
-    if (!vf_system.initialized || !vf_system.enabled) {
-        return;
-    }
-
-    // Ensure we have valid dimensions
-    if (vk.renderWidth == 0 || vk.renderHeight == 0) {
-        return;
-    }
-
-    // Bind pipeline
-    qvkCmdBindPipeline(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vf_system.pipeline);
-
-    // Bind descriptor set
-    qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                            vf_system.pipelineLayout, 0, 1, &vf_system.descriptorSet, 0, NULL);
-
-    // TODO: Push constants once the compute path is fully integrated with the
-    // renderer's camera + matrix conventions.
-
-    // Dispatch compute shader
-    uint32_t groupCountX = (vk.renderWidth + 7) / 8;
-    uint32_t groupCountY = (vk.renderHeight + 7) / 8;
-    qvkCmdDispatch(vk.cmd->command_buffer, groupCountX, groupCountY, 1);
-}
-
-// Set volumetric fog parameters
-void vk_volumetric_fog_set_params(const volumetric_fog_params_t *params) {
-    if (!params) return;
-
-    memcpy(&vf_system.params, params, sizeof(volumetric_fog_params_t));
-}
-
-// Get volumetric fog parameters
-void vk_volumetric_fog_get_params(volumetric_fog_params_t *params) {
-    if (!params) return;
-
-    memcpy(params, &vf_system.params, sizeof(volumetric_fog_params_t));
-}
-
-// Create Vulkan resources for volumetric fog
-static qboolean vk_create_volumetric_fog_resources(void) {
-    VkResult result;
-
-    // Create fog image
-    VkImageCreateInfo imageInfo = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-        .imageType = VK_IMAGE_TYPE_2D,
-        .format = VK_FORMAT_R16G16B16A16_SFLOAT,
-        .extent = { vk.renderWidth, vk.renderHeight, 1 },
-        .mipLevels = 1,
-        .arrayLayers = 1,
-        .samples = VK_SAMPLE_COUNT_1_BIT,
-        .tiling = VK_IMAGE_TILING_OPTIMAL,
-        .usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
-    };
-
-    result = qvkCreateImage(vk.device, &imageInfo, NULL, &vf_system.fogImage);
-    if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "vk_create_volumetric_fog_resources: Failed to create fog image\n");
-        return qfalse;
-    }
-
-    SET_OBJECT_NAME(vf_system.fogImage, "volumetric_fog_image", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
-
-    // Allocate memory for fog image
     VkMemoryRequirements memReqs;
-    qvkGetImageMemoryRequirements(vk.device, vf_system.fogImage, &memReqs);
+    qvkGetImageMemoryRequirements(vk.device, vk.atmosphere.volumetricFogImage, &memReqs);
 
-    VkMemoryAllocateInfo allocInfo = {
-        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .allocationSize = memReqs.size,
-        .memoryTypeIndex = find_memory_type(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
-    };
-
-    result = qvkAllocateMemory(vk.device, &allocInfo, NULL, &vf_system.fogImageMemory);
-    if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "vk_create_volumetric_fog_resources: Failed to allocate fog image memory\n");
-        return qfalse;
-    }
-
-    qvkBindImageMemory(vk.device, vf_system.fogImage, vf_system.fogImageMemory, 0);
-
-    // Create fog image view
-    VkImageViewCreateInfo viewInfo = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        .image = vf_system.fogImage,
-        .viewType = VK_IMAGE_VIEW_TYPE_2D,
-        .format = VK_FORMAT_R16G16B16A16_SFLOAT,
-        .subresourceRange = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1
-        }
-    };
-
-    result = qvkCreateImageView(vk.device, &viewInfo, NULL, &vf_system.fogImageView);
-    if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "vk_create_volumetric_fog_resources: Failed to create fog image view\n");
-        return qfalse;
-    }
-
-    // Create noise texture (3D)
-    VkImageCreateInfo noiseImageInfo = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-        .imageType = VK_IMAGE_TYPE_3D,
-        .format = VK_FORMAT_R8_UNORM,
-        .extent = { (uint32_t)vf_system.noiseSize, (uint32_t)vf_system.noiseSize, (uint32_t)vf_system.noiseSize },
-        .mipLevels = 1,
-        .arrayLayers = 1,
-        .samples = VK_SAMPLE_COUNT_1_BIT,
-        .tiling = VK_IMAGE_TILING_OPTIMAL,
-        .usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-        .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
-    };
-
-    result = qvkCreateImage(vk.device, &noiseImageInfo, NULL, &vf_system.noiseTexture);
-    if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "vk_create_volumetric_fog_resources: Failed to create noise texture\n");
-        return qfalse;
-    }
-
-    SET_OBJECT_NAME(vf_system.noiseTexture, "volumetric_fog_noise_texture", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
-
-    // Allocate memory for noise texture
-    qvkGetImageMemoryRequirements(vk.device, vf_system.noiseTexture, &memReqs);
-
+    VkMemoryAllocateInfo allocInfo = { VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
     allocInfo.allocationSize = memReqs.size;
     allocInfo.memoryTypeIndex = find_memory_type(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
-    result = qvkAllocateMemory(vk.device, &allocInfo, NULL, &vf_system.noiseTextureMemory);
-    if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "vk_create_volumetric_fog_resources: Failed to allocate noise texture memory\n");
-        return qfalse;
-    }
+    VK_CHECK(qvkAllocateMemory(vk.device, &allocInfo, NULL, &vk.atmosphere.volumetricFogImageMemory));
+    qvkBindImageMemory(vk.device, vk.atmosphere.volumetricFogImage, vk.atmosphere.volumetricFogImageMemory, 0);
 
-    qvkBindImageMemory(vk.device, vf_system.noiseTexture, vf_system.noiseTextureMemory, 0);
+    VkImageViewCreateInfo viewInfo = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+    viewInfo.image = vk.atmosphere.volumetricFogImage;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.layerCount = 1;
 
-    // Create noise texture view
-    VkImageViewCreateInfo noiseViewInfo = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        .image = vf_system.noiseTexture,
-        .viewType = VK_IMAGE_VIEW_TYPE_3D,
-        .format = VK_FORMAT_R8_UNORM,
-        .subresourceRange = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1
+    VK_CHECK(qvkCreateImageView(vk.device, &viewInfo, NULL, &vk.atmosphere.volumetricFogImageView));
+
+    // Create descriptor set layout
+    VkDescriptorSetLayoutBinding bindings[3] = {};
+    
+    // depthBuffer
+    bindings[0].binding = 0;
+    bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[0].descriptorCount = 1;
+    bindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    
+    // noiseTexture
+    bindings[1].binding = 1;
+    bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[1].descriptorCount = 1;
+    bindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    
+    // outputImage
+    bindings[2].binding = 2;
+    bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    bindings[2].descriptorCount = 1;
+    bindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+    layoutInfo.bindingCount = 3;
+    layoutInfo.pBindings = bindings;
+
+    VK_CHECK(qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &vk.atmosphere.volumetricFogDescriptorLayout));
+
+    // Create pipeline layout
+    VkPushConstantRange pushConstantRange = {};
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    pushConstantRange.offset = 0;
+    pushConstantRange.size = sizeof(volumetric_fog_pc_t);
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &vk.atmosphere.volumetricFogDescriptorLayout;
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
+
+    VK_CHECK(qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &vk.atmosphere.volumetricFogLayout));
+
+    // Load shader if needed
+    if (vk.modules.volumetric_fog_comp == VK_NULL_HANDLE) {
+        void *buffer;
+        int size = ri.FS_ReadFile("src/renderers/vulkan/shaders/spirv/volumetric_fog_comp.spv", &buffer);
+        if (size > 0) {
+            vk.modules.volumetric_fog_comp = vk_create_shader_module((const uint8_t*)buffer, size);
+            ri.FS_FreeFile(buffer);
         }
-    };
-
-    result = qvkCreateImageView(vk.device, &noiseViewInfo, NULL, &vf_system.noiseTextureView);
-    if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "vk_create_volumetric_fog_resources: Failed to create noise texture view\n");
-        return qfalse;
     }
 
-    // Create samplers
-    VkSamplerCreateInfo samplerInfo = {
-        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-        .magFilter = VK_FILTER_LINEAR,
-        .minFilter = VK_FILTER_LINEAR,
-        .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
-        .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-        .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-        .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
-        .anisotropyEnable = VK_FALSE,
-        .maxAnisotropy = 1.0f,
-        .compareEnable = VK_FALSE,
-        .compareOp = VK_COMPARE_OP_ALWAYS,
-        .minLod = 0.0f,
-        .maxLod = 1.0f,
-        .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
-        .unnormalizedCoordinates = VK_FALSE
-    };
-
-    result = qvkCreateSampler(vk.device, &samplerInfo, NULL, &vf_system.fogSampler);
-    if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "vk_create_volumetric_fog_resources: Failed to create fog sampler\n");
-        return qfalse;
-    }
-
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT; // For 3D texture
-    result = qvkCreateSampler(vk.device, &samplerInfo, NULL, &vf_system.noiseSampler);
-    if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "vk_create_volumetric_fog_resources: Failed to create noise sampler\n");
-        return qfalse;
-    }
-
-    ri.Printf(PRINT_ALL, "Vulkan: Volumetric fog resources created successfully\n");
-    return qtrue;
-}
-
-// Destroy Vulkan resources for volumetric fog
-static void vk_destroy_volumetric_fog_resources(void) {
-    if (vf_system.fogSampler) {
-        qvkDestroySampler(vk.device, vf_system.fogSampler, NULL);
-        vf_system.fogSampler = VK_NULL_HANDLE;
-    }
-
-    if (vf_system.noiseSampler) {
-        qvkDestroySampler(vk.device, vf_system.noiseSampler, NULL);
-        vf_system.noiseSampler = VK_NULL_HANDLE;
-    }
-
-    if (vf_system.fogImageView) {
-        qvkDestroyImageView(vk.device, vf_system.fogImageView, NULL);
-        vf_system.fogImageView = VK_NULL_HANDLE;
-    }
-
-    if (vf_system.noiseTextureView) {
-        qvkDestroyImageView(vk.device, vf_system.noiseTextureView, NULL);
-        vf_system.noiseTextureView = VK_NULL_HANDLE;
-    }
-
-    if (vf_system.fogImage) {
-        qvkDestroyImage(vk.device, vf_system.fogImage, NULL);
-        vf_system.fogImage = VK_NULL_HANDLE;
-    }
-
-    if (vf_system.noiseTexture) {
-        qvkDestroyImage(vk.device, vf_system.noiseTexture, NULL);
-        vf_system.noiseTexture = VK_NULL_HANDLE;
-    }
-
-    if (vf_system.fogImageMemory) {
-        qvkFreeMemory(vk.device, vf_system.fogImageMemory, NULL);
-        vf_system.fogImageMemory = VK_NULL_HANDLE;
-    }
-
-    if (vf_system.noiseTextureMemory) {
-        qvkFreeMemory(vk.device, vf_system.noiseTextureMemory, NULL);
-        vf_system.noiseTextureMemory = VK_NULL_HANDLE;
-    }
-}
-
-// Create compute pipeline for volumetric fog
-static void vk_create_volumetric_fog_pipeline(void) {
-    // Descriptor set layout
-    VkDescriptorSetLayoutBinding bindings[] = {
-        // Depth buffer
-        {
-            .binding = 0,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-            .pImmutableSamplers = NULL
-        },
-        // Noise texture
-        {
-            .binding = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-            .pImmutableSamplers = NULL
-        },
-        // Output image
-        {
-            .binding = 2,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-            .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
-            .pImmutableSamplers = NULL
-        }
-    };
-
-    VkDescriptorSetLayoutCreateInfo layoutInfo = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = ARRAY_LEN(bindings),
-        .pBindings = bindings
-    };
-
-    VkResult result = qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &vf_system.descriptorSetLayout);
-    if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "vk_create_volumetric_fog_pipeline: Failed to create descriptor set layout\n");
-        return;
-    }
-
-    // Pipeline layout
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = 1,
-        .pSetLayouts = &vf_system.descriptorSetLayout,
-        .pushConstantRangeCount = 0,
-        .pPushConstantRanges = NULL
-    };
-
-    result = qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &vf_system.pipelineLayout);
-    if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "vk_create_volumetric_fog_pipeline: Failed to create pipeline layout\n");
-        return;
-    }
-
-    // Descriptor pool
-    VkDescriptorPoolSize poolSizes[] = {
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 }
-    };
-
-    VkDescriptorPoolCreateInfo poolInfo = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .poolSizeCount = ARRAY_LEN(poolSizes),
-        .pPoolSizes = poolSizes,
-        .maxSets = 1
-    };
-
-    result = qvkCreateDescriptorPool(vk.device, &poolInfo, NULL, &vf_system.descriptorPool);
-    if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "vk_create_volumetric_fog_pipeline: Failed to create descriptor pool\n");
-        return;
+    // Create pipeline
+    if (vk.modules.volumetric_fog_comp != VK_NULL_HANDLE) {
+        vk.atmosphere.volumetricFogPipeline = vk_create_compute_pipeline(vk.modules.volumetric_fog_comp, vk.atmosphere.volumetricFogLayout, "Volumetric Fog");
+    } else {
+        ri.Printf(PRINT_WARNING, "Volumetric fog compute shader not found!\n");
     }
 
     // Allocate descriptor set
-    VkDescriptorSetAllocateInfo allocInfo = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .descriptorPool = vf_system.descriptorPool,
-        .descriptorSetCount = 1,
-        .pSetLayouts = &vf_system.descriptorSetLayout
-    };
+    VkDescriptorSetAllocateInfo descriptorAllocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+    descriptorAllocInfo.descriptorPool = vk.descriptor_pool;
+    descriptorAllocInfo.descriptorSetCount = 1;
+    descriptorAllocInfo.pSetLayouts = &vk.atmosphere.volumetricFogDescriptorLayout;
 
-    result = qvkAllocateDescriptorSets(vk.device, &allocInfo, &vf_system.descriptorSet);
-    if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "vk_create_volumetric_fog_pipeline: Failed to allocate descriptor set\n");
-        return;
+    VK_CHECK(qvkAllocateDescriptorSets(vk.device, &descriptorAllocInfo, &vk.atmosphere.volumetricFogDescriptorSet));
+
+    // Update descriptor set
+    Vk_Sampler_Def samplerDef = {0};
+    samplerDef.vk_min_filter = VK_FILTER_LINEAR;
+    samplerDef.vk_mag_filter = VK_FILTER_LINEAR;
+    samplerDef.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    VkSampler sampler = vk_find_sampler(&samplerDef);
+
+    VkDescriptorImageInfo depthInfo = {0};
+    depthInfo.sampler = sampler;
+    depthInfo.imageView = vk.depth_image_view;
+    depthInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+    VkDescriptorImageInfo noiseInfo = {0};
+    noiseInfo.sampler = sampler;
+    if (vk.atmosphere.noiseTexture) {
+        noiseInfo.imageView = vk.atmosphere.noiseTexture->view;
+    } else {
+        noiseInfo.imageView = tr.whiteImage->view;
     }
+    noiseInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-    // Create shader module from embedded data
-    extern const unsigned char volumetric_fog_comp_spv[];
-    VkShaderModule shaderModule = SHADER_MODULE(volumetric_fog_comp_spv);
-    if (shaderModule == VK_NULL_HANDLE) {
-        ri.Printf(PRINT_ERROR, "vk_create_volumetric_fog_pipeline: Failed to create shader module\n");
-        return;
-    }
+    VkDescriptorImageInfo outputInfo = {0};
+    outputInfo.imageView = vk.atmosphere.volumetricFogImageView;
+    outputInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-    // Create compute pipeline
-    VkComputePipelineCreateInfo pipelineInfo = {
-        .sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-        .stage = {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_COMPUTE_BIT,
-            .module = shaderModule,
-            .pName = "main"
-        },
-        .layout = vf_system.pipelineLayout
-    };
+    VkWriteDescriptorSet writes[3] = {0};
+    
+    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[0].dstSet = vk.atmosphere.volumetricFogDescriptorSet;
+    writes[0].dstBinding = 0;
+    writes[0].descriptorCount = 1;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[0].pImageInfo = &depthInfo;
 
-    result = qvkCreateComputePipelines(vk.device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &vf_system.pipeline);
-    qvkDestroyShaderModule(vk.device, shaderModule, NULL);
+    writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[1].dstSet = vk.atmosphere.volumetricFogDescriptorSet;
+    writes[1].dstBinding = 1;
+    writes[1].descriptorCount = 1;
+    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[1].pImageInfo = &noiseInfo;
 
-    if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "vk_create_volumetric_fog_pipeline: Failed to create compute pipeline\n");
-        return;
-    }
+    writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[2].dstSet = vk.atmosphere.volumetricFogDescriptorSet;
+    writes[2].dstBinding = 2;
+    writes[2].descriptorCount = 1;
+    writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    writes[2].pImageInfo = &outputInfo;
 
-    SET_OBJECT_NAME(vf_system.pipeline, "volumetric_fog_pipeline", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT);
-}
+    qvkUpdateDescriptorSets(vk.device, 3, writes, 0, NULL);
 
-// Destroy compute pipeline for volumetric fog
-static void vk_destroy_volumetric_fog_pipeline(void) {
-    if (vf_system.pipeline) {
-        qvkDestroyPipeline(vk.device, vf_system.pipeline, NULL);
-        vf_system.pipeline = VK_NULL_HANDLE;
-    }
+    // Create composite descriptor set layout
+    VkDescriptorSetLayoutBinding compositeBindings[2] = {};
+    
+    // colorBuffer (Storage Image)
+    compositeBindings[0].binding = 0;
+    compositeBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    compositeBindings[0].descriptorCount = 1;
+    compositeBindings[0].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    
+    // fogBuffer (Sampled Image)
+    compositeBindings[1].binding = 1;
+    compositeBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    compositeBindings[1].descriptorCount = 1;
+    compositeBindings[1].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-    if (vf_system.pipelineLayout) {
-        qvkDestroyPipelineLayout(vk.device, vf_system.pipelineLayout, NULL);
-        vf_system.pipelineLayout = VK_NULL_HANDLE;
-    }
+    VkDescriptorSetLayoutCreateInfo compositeLayoutInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+    compositeLayoutInfo.bindingCount = 2;
+    compositeLayoutInfo.pBindings = compositeBindings;
 
-    if (vf_system.descriptorSetLayout) {
-        qvkDestroyDescriptorSetLayout(vk.device, vf_system.descriptorSetLayout, NULL);
-        vf_system.descriptorSetLayout = VK_NULL_HANDLE;
-    }
+    VK_CHECK(qvkCreateDescriptorSetLayout(vk.device, &compositeLayoutInfo, NULL, &vk.atmosphere.compositeDescriptorLayout));
 
-    if (vf_system.descriptorPool) {
-        qvkDestroyDescriptorPool(vk.device, vf_system.descriptorPool, NULL);
-        vf_system.descriptorPool = VK_NULL_HANDLE;
-    }
-}
+    // Create composite pipeline layout
+    VkPipelineLayoutCreateInfo compositePipelineLayoutInfo = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+    compositePipelineLayoutInfo.setLayoutCount = 1;
+    compositePipelineLayoutInfo.pSetLayouts = &vk.atmosphere.compositeDescriptorLayout;
 
-// Generate 3D noise texture for volumetric fog
-static void vk_generate_noise_texture(void) {
-    int size = vf_system.noiseSize;
-    int totalSize = size * size * size;
+    VK_CHECK(qvkCreatePipelineLayout(vk.device, &compositePipelineLayoutInfo, NULL, &vk.atmosphere.compositeLayout));
 
-    vf_system.noiseData = ri.Malloc(totalSize);
-
-    // Generate 3D Perlin-like noise
-    for (int z = 0; z < size; z++) {
-        for (int y = 0; y < size; y++) {
-            for (int x = 0; x < size; x++) {
-                // Simple noise function - could be improved with proper Perlin noise
-                float nx = (float)x / size;
-                float ny = (float)y / size;
-                float nz = (float)z / size;
-
-                // Combine multiple octaves
-                float noise = 0.0f;
-                float amplitude = 1.0f;
-                float frequency = 1.0f;
-
-                for (int octave = 0; octave < 4; octave++) {
-                    noise += sinf(nx * frequency * 6.28f) * cosf(ny * frequency * 6.28f) * sinf(nz * frequency * 6.28f) * amplitude;
-                    amplitude *= 0.5f;
-                    frequency *= 2.0f;
-                }
-
-                // Normalize to 0-1 range
-                noise = (noise + 1.0f) * 0.5f;
-                vf_system.noiseData[z * size * size + y * size + x] = (uint8_t)(noise * 255.0f);
-            }
+    // Load composite shader
+    if (vk.modules.volumetric_fog_composite_comp == VK_NULL_HANDLE) {
+        void *buffer;
+        int size = ri.FS_ReadFile("src/renderers/vulkan/shaders/spirv/volumetric_fog_composite_comp.spv", &buffer);
+        if (size > 0) {
+            vk.modules.volumetric_fog_composite_comp = vk_create_shader_module((const uint8_t*)buffer, size);
+            ri.FS_FreeFile(buffer);
         }
     }
 
-    // Upload to GPU
-    VkBuffer stagingBuffer;
-    VkDeviceMemory stagingMemory;
-    create_staging_buffer(totalSize, &stagingBuffer, &stagingMemory);
+    // Create composite pipeline
+    if (vk.modules.volumetric_fog_composite_comp != VK_NULL_HANDLE) {
+        vk.atmosphere.compositePipeline = vk_create_compute_pipeline(vk.modules.volumetric_fog_composite_comp, vk.atmosphere.compositeLayout, "Volumetric Fog Composite");
+    }
 
-    void *data;
-    qvkMapMemory(vk.device, stagingMemory, 0, totalSize, 0, &data);
-    memcpy(data, vf_system.noiseData, totalSize);
-    qvkUnmapMemory(vk.device, stagingMemory);
+    // Allocate composite descriptor set
+    VkDescriptorSetAllocateInfo compositeDescriptorAllocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+    compositeDescriptorAllocInfo.descriptorPool = vk.descriptor_pool;
+    compositeDescriptorAllocInfo.descriptorSetCount = 1;
+    compositeDescriptorAllocInfo.pSetLayouts = &vk.atmosphere.compositeDescriptorLayout;
 
-    // Copy to image
-    VkCommandBuffer cmdBuf = begin_command_buffer();
+    VK_CHECK(qvkAllocateDescriptorSets(vk.device, &compositeDescriptorAllocInfo, &vk.atmosphere.compositeDescriptorSet));
 
-    // Transition noise texture to transfer dst
-    VkImageMemoryBarrier barrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .srcAccessMask = 0,
-        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image = vf_system.noiseTexture,
-        .subresourceRange = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1
-        }
-    };
+    vk.atmosphere.initialized = qtrue;
+    ri.Printf(PRINT_ALL, "Volumetric fog system: Initialized\n");
+}
 
-    qvkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                         0, 0, NULL, 0, NULL, 1, &barrier);
+void vk_volumetric_fog_shutdown(void)
+{
+    if (!vk.atmosphere.initialized) return;
 
-    // Copy buffer to image
-    VkBufferImageCopy region = {
-        .bufferOffset = 0,
-        .bufferRowLength = 0,
-        .bufferImageHeight = 0,
-        .imageSubresource = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .mipLevel = 0,
-            .baseArrayLayer = 0,
-            .layerCount = 1
-        },
-        .imageExtent = { (uint32_t)size, (uint32_t)size, (uint32_t)size }
-    };
+    if (vk.atmosphere.volumetricFogPipeline != VK_NULL_HANDLE) {
+        qvkDestroyPipeline(vk.device, vk.atmosphere.volumetricFogPipeline, NULL);
+        vk.atmosphere.volumetricFogPipeline = VK_NULL_HANDLE;
+    }
+    if (vk.atmosphere.volumetricFogLayout != VK_NULL_HANDLE) {
+        qvkDestroyPipelineLayout(vk.device, vk.atmosphere.volumetricFogLayout, NULL);
+        vk.atmosphere.volumetricFogLayout = VK_NULL_HANDLE;
+    }
+    if (vk.atmosphere.volumetricFogDescriptorLayout != VK_NULL_HANDLE) {
+        qvkDestroyDescriptorSetLayout(vk.device, vk.atmosphere.volumetricFogDescriptorLayout, NULL);
+        vk.atmosphere.volumetricFogDescriptorLayout = VK_NULL_HANDLE;
+    }
+    if (vk.atmosphere.volumetricFogImage != VK_NULL_HANDLE) {
+        qvkDestroyImage(vk.device, vk.atmosphere.volumetricFogImage, NULL);
+        vk.atmosphere.volumetricFogImage = VK_NULL_HANDLE;
+    }
+    if (vk.atmosphere.volumetricFogImageView != VK_NULL_HANDLE) {
+        qvkDestroyImageView(vk.device, vk.atmosphere.volumetricFogImageView, NULL);
+        vk.atmosphere.volumetricFogImageView = VK_NULL_HANDLE;
+    }
+    if (vk.atmosphere.volumetricFogImageMemory != VK_NULL_HANDLE) {
+        qvkFreeMemory(vk.device, vk.atmosphere.volumetricFogImageMemory, NULL);
+        vk.atmosphere.volumetricFogImageMemory = VK_NULL_HANDLE;
+    }
 
-    qvkCmdCopyBufferToImage(cmdBuf, stagingBuffer, vf_system.noiseTexture,
-                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+    if (vk.atmosphere.compositePipeline != VK_NULL_HANDLE) {
+        qvkDestroyPipeline(vk.device, vk.atmosphere.compositePipeline, NULL);
+        vk.atmosphere.compositePipeline = VK_NULL_HANDLE;
+    }
+    if (vk.atmosphere.compositeLayout != VK_NULL_HANDLE) {
+        qvkDestroyPipelineLayout(vk.device, vk.atmosphere.compositeLayout, NULL);
+        vk.atmosphere.compositeLayout = VK_NULL_HANDLE;
+    }
+    if (vk.atmosphere.compositeDescriptorLayout != VK_NULL_HANDLE) {
+        qvkDestroyDescriptorSetLayout(vk.device, vk.atmosphere.compositeDescriptorLayout, NULL);
+        vk.atmosphere.compositeDescriptorLayout = VK_NULL_HANDLE;
+    }
 
-    // Transition to shader read
-    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    vk.atmosphere.initialized = qfalse;
+}
+
+void vk_volumetric_fog_render(VkCommandBuffer cmdBuffer)
+{
+    if (!r_volumetricFog->integer || !vk.atmosphere.initialized || vk.atmosphere.volumetricFogPipeline == VK_NULL_HANDLE) return;
+
+    // Transition output image to GENERAL for writing
+    VkImageMemoryBarrier barrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = vk.atmosphere.volumetricFogImage;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.layerCount = 1;
+    barrier.srcAccessMask = 0;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+
+    qvkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
+
+    // Bind pipeline and descriptor sets
+    qvkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.atmosphere.volumetricFogPipeline);
+    qvkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.atmosphere.volumetricFogLayout, 0, 1, &vk.atmosphere.volumetricFogDescriptorSet, 0, NULL);
+
+    // Prepare push constants
+    volumetric_fog_pc_t pc = {0};
+    Com_Memcpy(pc.projectionMatrix, vk.cmd->mvp.projection, sizeof(pc.projectionMatrix));
+    Com_Memcpy(pc.viewMatrix, vk.cmd->mvp.view, sizeof(pc.viewMatrix));
+    // Calculate inverses
+    Matrix16Inverse(pc.projectionMatrix, pc.invProjectionMatrix);
+    Matrix16Inverse(pc.viewMatrix, pc.invViewMatrix);
+
+    pc.resolution[0] = (float)vk.renderWidth;
+    pc.resolution[1] = (float)vk.renderHeight;
+    pc.invResolution[0] = 1.0f / (float)vk.renderWidth;
+    pc.invResolution[1] = 1.0f / (float)vk.renderHeight;
+    
+    VectorCopy(backEnd.viewParms.vieworg, pc.cameraPos);
+    VectorCopy(tr.sunDirection, pc.lightDir);
+    VectorCopy(tr.sunLight, pc.lightColor);
+    pc.lightIntensity = 1.0f;
+
+    pc.fogDensity = r_volumetricFogDensity->value;
+    pc.fogHeight = r_volumetricFogHeight->value;
+    pc.fogFalloff = r_volumetricFogFalloff->value;
+    pc.numSamples = r_volumetricFogSamples->integer;
+    pc.scattering = r_volumetricFogScattering->value;
+    pc.absorption = r_volumetricFogAbsorption->value;
+
+    qvkCmdPushConstants(cmdBuffer, vk.atmosphere.volumetricFogLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(pc), &pc);
+
+    // Dispatch
+    uint32_t groupCountX = (vk.renderWidth + 7) / 8;
+    uint32_t groupCountY = (vk.renderHeight + 7) / 8;
+    qvkCmdDispatch(cmdBuffer, groupCountX, groupCountY, 1);
+
+    // Transition output image to SHADER_READ_ONLY_OPTIMAL for sampling in composite
+    barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
     barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-    qvkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                         0, 0, NULL, 0, NULL, 1, &barrier);
+    qvkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_BIT, VK_PIPELINE_STAGE_COMPUTE_BIT, 0, 0, NULL, 0, NULL, 1, &barrier);
 
-    end_command_buffer(cmdBuf);
+    // Transition color image to GENERAL for writing in composite
+    VkImageMemoryBarrier colorBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    colorBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    colorBarrier.oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    colorBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    colorBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    colorBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    colorBarrier.image = vk.color_image;
+    colorBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    colorBarrier.subresourceRange.levelCount = 1;
+    colorBarrier.subresourceRange.layerCount = 1;
+    colorBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    colorBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT;
 
-    // Cleanup staging buffer
-    qvkDestroyBuffer(vk.device, stagingBuffer, NULL);
-    qvkFreeMemory(vk.device, stagingMemory, NULL);
-}
+    qvkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_BIT, 0, 0, NULL, 0, NULL, 1, &colorBarrier);
 
-// Update descriptor sets for volumetric fog
-static void vk_update_volumetric_fog_descriptors(void) {
-    VkDescriptorImageInfo depthInfo = {
-        .sampler = vk.depth_sampler,
-        .imageView = vk.depth_image_view,
-        .imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
-    };
+    // Perform composite
+    // Update composite descriptor set with latest color image
+    Vk_Sampler_Def samplerDef = {0};
+    samplerDef.vk_min_filter = VK_FILTER_LINEAR;
+    samplerDef.vk_mag_filter = VK_FILTER_LINEAR;
+    samplerDef.address_mode = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    VkSampler sampler = vk_find_sampler(&samplerDef);
 
-    VkDescriptorImageInfo noiseInfo = {
-        .sampler = vf_system.noiseSampler,
-        .imageView = vf_system.noiseTextureView,
-        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-    };
+    VkDescriptorImageInfo colorInfo = {0};
+    colorInfo.sampler = VK_NULL_HANDLE;
+    colorInfo.imageView = vk.color_image_view;
+    colorInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-    VkDescriptorImageInfo outputInfo = {
-        .sampler = VK_NULL_HANDLE,
-        .imageView = vf_system.fogImageView,
-        .imageLayout = VK_IMAGE_LAYOUT_GENERAL
-    };
+    VkDescriptorImageInfo fogInfo = {0};
+    fogInfo.sampler = sampler;
+    fogInfo.imageView = vk.atmosphere.volumetricFogImageView;
+    fogInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
-    VkWriteDescriptorSet writes[] = {
-        {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = vf_system.descriptorSet,
-            .dstBinding = 0,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .pImageInfo = &depthInfo
-        },
-        {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = vf_system.descriptorSet,
-            .dstBinding = 1,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            .pImageInfo = &noiseInfo
-        },
-        {
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = vf_system.descriptorSet,
-            .dstBinding = 2,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
-            .pImageInfo = &outputInfo
-        }
-    };
+    VkWriteDescriptorSet compositeWrites[2] = {0};
+    compositeWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    compositeWrites[0].dstSet = vk.atmosphere.compositeDescriptorSet;
+    compositeWrites[0].dstBinding = 0;
+    compositeWrites[0].descriptorCount = 1;
+    compositeWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    compositeWrites[0].pImageInfo = &colorInfo;
 
-    qvkUpdateDescriptorSets(vk.device, ARRAY_LEN(writes), writes, 0, NULL);
+    compositeWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    compositeWrites[1].dstSet = vk.atmosphere.compositeDescriptorSet;
+    compositeWrites[1].dstBinding = 1;
+    compositeWrites[1].descriptorCount = 1;
+    compositeWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    compositeWrites[1].pImageInfo = &fogInfo;
+
+    qvkUpdateDescriptorSets(vk.device, 2, compositeWrites, 0, NULL);
+
+    // Bind composite pipeline and descriptor set
+    qvkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.atmosphere.compositePipeline);
+    qvkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.atmosphere.compositeLayout, 0, 1, &vk.atmosphere.compositeDescriptorSet, 0, NULL);
+
+    // Dispatch composite
+    qvkCmdDispatch(cmdBuffer, groupCountX, groupCountY, 1);
+
+    // Transition color image back to SHADER_READ_ONLY_OPTIMAL
+    colorBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    colorBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    colorBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    colorBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    qvkCmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &colorBarrier);
 }
 
 #endif // USE_VULKAN

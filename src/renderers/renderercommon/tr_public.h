@@ -33,7 +33,6 @@ extern "C" {
 qboolean Q_ValidateFilePath( const char *path );
 const char *Sys_DefaultBasePath( void );
 
-// Additional stub functions needed by renderers
 // Memory management
 void *Z_Malloc(int size);
 void Z_Free(void *ptr);
@@ -49,7 +48,9 @@ void Cvar_SetDescription( cvar_t *var, const char *description );
 
 // Additional stub functions needed by renderers
 unsigned int Com_TouchMemory(void);
-unsigned Com_BlockChecksum(const void *buffer, int length);
+
+// Additional stub functions needed by renderers
+unsigned int Com_TouchMemory(void);
 qboolean Com_HasPatterns(const char *str);
 int Com_Filter(const char *filter, const char *name);
 int Com_FilterPath(const char *filter, const char *name);

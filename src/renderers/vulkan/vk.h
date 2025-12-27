@@ -175,7 +175,8 @@ typedef enum {
     RENDER_PASS_MAIN = 0,
     RENDER_PASS_SCREENMAP = 1,
     RENDER_PASS_CUBEMAP = 2,
-    RENDER_PASS_COUNT = 3
+    RENDER_PASS_POST_PROCESS = 3,
+    RENDER_PASS_COUNT = 4
 } renderPass_t;
 
 // TESS flags for vertex attribute binding
@@ -460,6 +461,7 @@ typedef struct {
 #define TYPE_COLOR_BLUE        67
 #define TYPE_COLOR_WHITE       68
 #define TYPE_COLOR_BLACK       69
+#define TYPE_VOLUMETRIC_FOG_COMPOSITE 70
 #define TYPE_GENERIC_BEGIN     71
 #define TYPE_GENERIC_END       100
 
@@ -547,6 +549,12 @@ typedef struct atmosphere_params_s {
     float fogHeightFalloff;
     float contrast;
     float saturation;
+    // Volumetric fog parameters
+    float volumetricScattering;
+    float volumetricAbsorption;
+    int volumetricSamples;
+    float volumetricHeight;
+    float volumetricFalloff;
 } atmosphere_params_t;
 
 // Atmosphere preset type
@@ -636,7 +644,13 @@ typedef struct {
     VkShaderModule rt_closesthit_rchit; // Added
     VkShaderModule gibs_spawn_comp; // Added
     VkShaderModule gibs_update_comp; // Added
+<<<<<<< Current (Your changes)
     VkShaderModule volumetric_fog_comp; // Volumetric fog compute shader
+=======
+    VkShaderModule volumetric_fog_comp; // Added
+    VkShaderModule volumetric_fog_composite_comp; // Added
+    VkShaderModule post_vert; // Added
+>>>>>>> Incoming (Background Agent changes)
 } vk_modules_t;
 
 // Main Vulkan instance structure

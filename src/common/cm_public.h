@@ -31,6 +31,10 @@ extern "C" {
 #endif
 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void		CM_LoadMap( const char *name, qboolean clientload, int *checksum);
 void		CM_ClearMap( void );
 clipHandle_t CM_InlineModel( int index );		// 0 = world, 1 + are bmodels
@@ -79,5 +83,8 @@ void CM_DrawDebugSurface( void (*drawPoly)(int color, int numPoints, float *poin
 #ifdef __cplusplus
 }
 #endif
+<<<<<<< Current (Your changes)
 
 #endif // __CM_PUBLIC_H__
+=======
+>>>>>>> Incoming (Background Agent changes)

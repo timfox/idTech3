@@ -33,14 +33,39 @@ typedef struct {
 	VkBuffer atmosphereBuffer;
 	VkDeviceMemory atmosphereBufferMemory;
 	
+	// Volumetric Fog resources
+	VkPipeline volumetricFogPipeline;
+	VkPipelineLayout volumetricFogLayout;
+	VkDescriptorSetLayout volumetricFogDescriptorLayout;
+	VkDescriptorSet volumetricFogDescriptorSet;
+	VkImage volumetricFogImage;
+	VkImageView volumetricFogImageView;
+	VkDeviceMemory volumetricFogImageMemory;
+	image_t *noiseTexture;
+
+	// Composite resources
+	VkPipeline compositePipeline;
+	VkPipelineLayout compositeLayout;
+	VkDescriptorSetLayout compositeDescriptorLayout;
+	VkDescriptorSet compositeDescriptorSet;
+
 	// Scripting interface
 	void *luaState;
 } atmosphere_system_t;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // External API
 void vk_atmosphere_init( void );
 void vk_atmosphere_shutdown( void );
 void vk_atmosphere_update( void );
+
+// Volumetric Fog API
+void vk_volumetric_fog_init( void );
+void vk_volumetric_fog_shutdown( void );
+void vk_volumetric_fog_render( VkCommandBuffer cmdBuffer );
 
 // Preset control
 void vk_atmosphere_set_preset( atmosphere_preset_t preset, float transitionTime );
@@ -55,6 +80,10 @@ void vk_atmosphere_set_time_of_day( float timeOfDay, float transitionTime );
 
 // Scripting interface
 void vk_atmosphere_register_lua_functions( void *luaState );
+
+#ifdef __cplusplus
+}
+#endif
 
 // CVars
 extern cvar_t *r_atmosphere;

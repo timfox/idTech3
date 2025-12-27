@@ -88,6 +88,10 @@ cvar_t	*r_materialSystem;
 cvar_t	*r_dynamicResolution;
 cvar_t	*r_frameTelemetry;
 cvar_t	*r_bloom;
+cvar_t	*r_volumetricFog;
+cvar_t	*r_volumetricFogSamples;
+cvar_t	*r_volumetricFogScattering;
+cvar_t	*r_volumetricFogAbsorption;
 cvar_t	*r_dlss;
 cvar_t	*r_dlss_quality;
 cvar_t	*r_dlss_sharpening;
@@ -263,6 +267,19 @@ static void R_Register( void ) {
     r_dynamicResolution = ri.Cvar_Get( "r_dynamicResolution", "0", CVAR_ARCHIVE_ND );
     r_frameTelemetry = ri.Cvar_Get( "r_frameTelemetry", "0", CVAR_ARCHIVE_ND );
     r_bloom = ri.Cvar_Get( "r_bloom", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    
+    r_volumetricFog = ri.Cvar_Get( "r_volumetricFog", "0", CVAR_ARCHIVE_ND );
+    ri.Cvar_SetDescription( r_volumetricFog, "Enable advanced volumetric fog system." );
+    
+    r_volumetricFogSamples = ri.Cvar_Get( "r_volumetricFogSamples", "64", CVAR_ARCHIVE_ND );
+    ri.Cvar_SetDescription( r_volumetricFogSamples, "Number of samples for volumetric fog ray marching." );
+    
+    r_volumetricFogScattering = ri.Cvar_Get( "r_volumetricFogScattering", "0.5", CVAR_ARCHIVE_ND );
+    ri.Cvar_SetDescription( r_volumetricFogScattering, "Scattering coefficient for volumetric fog." );
+    
+    r_volumetricFogAbsorption = ri.Cvar_Get( "r_volumetricFogAbsorption", "0.1", CVAR_ARCHIVE_ND );
+    ri.Cvar_SetDescription( r_volumetricFogAbsorption, "Absorption coefficient for volumetric fog." );
+
     r_dlss = ri.Cvar_Get( "r_dlss", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
     r_dlss_quality = ri.Cvar_Get( "r_dlss_quality", "3", CVAR_ARCHIVE_ND );
     r_dlss_sharpening = ri.Cvar_Get( "r_dlss_sharpening", "0.5", CVAR_ARCHIVE_ND );

@@ -1,0 +1,23 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(set = 0, binding = 0, rgba16f) uniform image2D colorBuffer;
+layout(set = 0, binding = 1) uniform sampler2D fogBuffer;
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = imageSize(colorBuffer);
+    
+    if (pixel.x >= size.x || pixel.y >= size.y) return;
+    
+    vec2 uv = (vec2(pixel) + 0.5) / vec2(size);
+    
+    vec4 sceneColor = imageLoad(colorBuffer, pixel);
+    vec4 fogColor = texture(fogBuffer, uv);
+    
+    // fogColor.rgb = scattering, fogColor.a = transmittance
+    vec3 finalColor = sceneColor.rgb * fogColor.a + fogColor.rgb;
+    
+    imageStore(colorBuffer, pixel, vec4(finalColor, sceneColor.a));
+}
