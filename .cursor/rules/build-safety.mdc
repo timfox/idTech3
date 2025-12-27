@@ -1,0 +1,20 @@
+---
+name: build-safety
+description: Rule to enforce safe build practices and existing conventions.
+---
+
+# Build Safety Guidelines
+
+- After making any change to `src/` or `renderers/`, you **must** run `./compile_engine.sh` to ensure the build is healthy.
+- Keep your diffs small and focused; do not refactor large sections unless specifically required.
+- Avoid breaking changes to the public renderer ABI. If such a change is truly necessary:
+  - Update all affected code on both sides of the ABI.
+  - Clearly document the change and rationale.
+- Reuse established code patterns and functions; do **not** introduce new APIs unless thorough investigation shows none exist.
+- For changes involving Vulkan code:
+  - Validate the build with `./compile_engine.sh vulkan`.
+  - Manually check for `VK_ERROR_DEVICE_LOST` issues; do not introduce new sources of this error.
+
+# Summary
+
+These practices prevent accidental breakage, reduce review complexity, and maintain code reliability across supported renderers.
