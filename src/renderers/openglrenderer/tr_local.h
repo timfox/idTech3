@@ -41,6 +41,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../../qcommon/qfiles.h"
 #include "../../qcommon/qcommon.h"
 #include "../rendercommon/tr_public.h"
+#ifdef USE_VBO
+//#define USE_VBO_GRID		/* put SF_GRID to VBO */
+#endif
 #include "tr_common.h"
 #include "iqm.h"
 #include "qgl.h"
