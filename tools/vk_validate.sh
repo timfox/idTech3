@@ -7,7 +7,7 @@
 # Usage:
 #   ./tools/vk_validate.sh [engine_binary] [args...]
 # Example:
-#   ./tools/vk_validate.sh ./release/idtech3.x86_64.so +set r_renderer vulkan
+#   ./tools/vk_validate.sh ./release/idtech3.x86_64 +set r_renderer vulkan
 #
 # Notes:
 # - Requires the Vulkan SDK runtime layers to be installed
@@ -16,7 +16,7 @@
 
 set -euo pipefail
 
-ENGINE_BIN="${1:-./release/idtech3.x86_64.so}"
+ENGINE_BIN="${1:-./release/idtech3.x86_64}"
 shift || true
 
 # Recommended layer set for dev: validation + best practices + sync

@@ -8,7 +8,7 @@ set -euo pipefail
 ROOT="/home/tim/Desktop/idtech3"
 BUILD_DIR="${BUILD_DIR:-${ROOT}/build}"
 SOLIB_PATH="${ROOT}/release"
-EXE="${SOLIB_PATH}/idtech3.x86_64.so"
+EXE="${SOLIB_PATH}/idtech3.x86_64"
 LOG_DIR="${LOG_DIR:-${ROOT}/logs}"
 GAME="${GAME:-mymod}"
 VK_VALIDATION="${VK_VALIDATION:-1}"

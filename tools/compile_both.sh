@@ -21,7 +21,7 @@ if [ -f "$ROOT_DIR/$MODNAME/autoexec.cfg" ]; then
 fi
 
 # Run the game with explicit paths so the mod assets/autoexec are found
-"$ROOT_DIR"/release/idtech3.x86_64.so \
+"$ROOT_DIR"/release/idtech3.x86_64 \
   +set fs_basepath "$ROOT_DIR/release" \
   +set fs_homepath "$ROOT_DIR/release" \
   +set fs_game "$MODNAME"

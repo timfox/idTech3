@@ -4,13 +4,13 @@
 # across a set of mods, and captures logs per mod.
 #
 # Env:
-#   ENGINE_BIN      - path to engine binary (default: release/idtech3.x86_64.so)
+#   ENGINE_BIN      - path to engine binary (default: release/idtech3.x86_64)
 #   MOD_LIST        - space-separated fs_game list (default: "mymod blacksun")
 #   SMOKE_TIMEOUT   - seconds to wait before quit (default: 10)
 #   VK_VALIDATE_LOG - optional log file path; if unset uses /tmp/ci_vk_smoke_<mod>.log
 #
 # Example:
-#   ENGINE_BIN=./release/idtech3.x86_64.so MOD_LIST="mymod" ./tools/ci_vk_smoke.sh
+#   ENGINE_BIN=./release/idtech3.x86_64 MOD_LIST="mymod" ./tools/ci_vk_smoke.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

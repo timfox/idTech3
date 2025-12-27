@@ -3,7 +3,7 @@
 cd /home/tim/Desktop/idtech3/release
 
 # Start the game in background
-./idtech3.x86_64.so +set fs_game mymod +set r_mode 6 +set r_fullscreen 0 +set vid_xpos 100 +set vid_ypos 100 &
+./idtech3.x86_64 +set fs_game mymod +set r_mode 6 +set r_fullscreen 0 +set vid_xpos 100 +set vid_ypos 100 &
 GAME_PID=$!
 
 # Wait a moment for the window to appear

@@ -4,10 +4,10 @@ echo "🔍 Looking for the id Tech 3 game window..."
 echo ""
 
 # Check if the game is running
-if ! pgrep -f "idtech3.x86_64.so" >/dev/null; then
+if ! pgrep -f "idtech3.x86_64" >/dev/null; then
     echo "❌ Game is not running. Please start it first with:"
     echo "   cd /home/tim/Desktop/idtech3/release"
-    echo "   ./idtech3.x86_64.so +set fs_game mymod +set r_mode 6 +set r_fullscreen 0"
+    echo "   ./idtech3.x86_64 +set fs_game mymod +set r_mode 6 +set r_fullscreen 0"
     exit 1
 fi
 
