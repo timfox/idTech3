@@ -212,6 +212,9 @@ GLimp_SetMode
 */
 static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qboolean vulkan )
 {
+#ifndef USE_VULKAN
+	(void)vulkan;
+#endif
 	glconfig_t *config = glw_state.config;
 	int perChannelColorBits;
 	int colorBits, depthBits, stencilBits;

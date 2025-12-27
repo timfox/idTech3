@@ -1280,6 +1280,9 @@ extern	int		time_game;
 extern	int		time_frontend;
 extern	int		time_backend;		// renderer backend time
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 extern	int		com_frameTime;
 
 #ifndef DEDICATED
@@ -1292,6 +1295,9 @@ extern	qboolean	com_errorEntered;
 extern	fileHandle_t	com_journalDataFile;
 
 extern	char	rconPassword2[ MAX_CVAR_VALUE_STRING ];
+#ifdef __cplusplus
+}
+#endif
 
 typedef enum {
 	TAG_FREE,
@@ -1339,9 +1345,19 @@ void *Z_TagMallocDebug( int size, memtag_t tag, char *label, char *file, int lin
 void *Z_MallocDebug( int size, char *label, char *file, int line );			// returns 0 filled memory
 void *S_MallocDebug( int size, char *label, char *file, int line );			// returns 0 filled memory
 #else
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void *Z_TagMalloc( int size, memtag_t tag );	// NOT 0 filled memory
 void *Z_Malloc( int size );			// returns 0 filled memory
 void *S_Malloc( int size );			// NOT 0 filled memory only for small allocations
+#ifdef __cplusplus
+}
+#endif
+#endif
+#ifdef __cplusplus
+extern "C" {
 #endif
 void Z_Free( void *ptr );
 int Z_FreeTags( memtag_t tag );
@@ -1365,6 +1381,9 @@ void Com_Init( char *commandLine );
 void Com_InitBotLib(void);
 void Com_FrameInit( void );
 void Com_Frame( qboolean noDelay );
+#ifdef __cplusplus
+}
+#endif
 
 /*
 ==============================================================
@@ -1373,6 +1392,10 @@ CLIENT / SERVER SYSTEMS
 
 ==============================================================
 */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 //
 // client interface
@@ -1461,6 +1484,10 @@ void SV_RemoveDedicatedCommands( void );
 //
 qboolean UI_GameCommand( void );
 qboolean UI_usesUniqueCDKey(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 /*
 ==============================================================

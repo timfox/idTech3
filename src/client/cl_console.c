@@ -479,7 +479,11 @@ void Con_ForEachLine( void (*callback)(const char *line, void *userData), void *
 		for ( j = 0 ; j < con.linewidth && j < MAX_CONSOLE_WIDTH ; j++ ) {
 			line[j] = text[j] & 0xFF;
 		}
-		line[MIN(con.linewidth, MAX_CONSOLE_WIDTH)] = '\0';
+		
+		int endIdx = con.linewidth;
+		if (endIdx > MAX_CONSOLE_WIDTH) endIdx = MAX_CONSOLE_WIDTH;
+		if (endIdx < 0) endIdx = 0;
+		line[endIdx] = '\0';
 		
 		// Trim trailing spaces
 		for ( j = con.linewidth - 1 ; j >= 0 ; j-- ) {

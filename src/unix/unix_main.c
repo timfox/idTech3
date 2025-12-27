@@ -171,7 +171,7 @@ static void tty_FlushIn( void )
 //   (there may be a way to find out if '\b' alone would work though)
 static void tty_Back( void )
 {
-	write( STDOUT_FILENO, "\b \b", 3 );
+	(void)write( STDOUT_FILENO, "\b \b", 3 );
 }
 
 
@@ -214,11 +214,11 @@ void tty_Show( void )
 		ttycon_hide--;
 		if ( ttycon_hide == 0 )
 		{
-			write( STDOUT_FILENO, "]", 1 ); // -EC-
+			(void)write( STDOUT_FILENO, "]", 1 ); // -EC-
 
 			if ( tty_con.cursor > 0 )
 			{
-				write( STDOUT_FILENO, tty_con.buffer, tty_con.cursor );
+				(void)write( STDOUT_FILENO, tty_con.buffer, tty_con.cursor );
 			}
 		}
 	}
@@ -259,6 +259,7 @@ set attributes if user did CTRL+Z and then does fg again.
 */
 void CON_SigCont( int signum )
 {
+	Q_UNUSED(signum);
 	Sys_ConsoleInputInit();
 }
 
@@ -267,6 +268,7 @@ void CON_SigTStp( int signum )
 {
 	sigset_t mask;
 
+	Q_UNUSED(signum);
 	tty_FlushIn();
 	Sys_ConsoleInputShutdown();
 
@@ -355,6 +357,7 @@ void NORETURN FORMAT_PRINTF(1, 2) QDECL Sys_Error( const char *format, ... )
 
 void floating_point_exception_handler( int whatever )
 {
+	Q_UNUSED(whatever);
 	signal( SIGFPE, floating_point_exception_handler );
 }
 
@@ -483,7 +486,7 @@ char *Sys_ConsoleInput( void )
 						s++;
 					Q_strncpyz( text, s, sizeof( text ) );
 					Field_Clear( &tty_con );
-					write( STDOUT_FILENO, "\n]", 2 );
+					(void)write( STDOUT_FILENO, "\n]", 2 );
 					return text;
 				}
 
@@ -538,10 +541,10 @@ char *Sys_ConsoleInput( void )
 
 				if ( key == 12 ) // clear teaminal
 				{
-					write( STDOUT_FILENO, "\ec]", 3 );
+					(void)write( STDOUT_FILENO, "\033c]", 3 );
 					if ( tty_con.cursor )
 					{
-						write( STDOUT_FILENO, tty_con.buffer, tty_con.cursor );
+						(void)write( STDOUT_FILENO, tty_con.buffer, tty_con.cursor );
 					}
 					tty_FlushIn();
 					return NULL;
@@ -551,13 +554,13 @@ char *Sys_ConsoleInput( void )
 				tty_FlushIn();
 				return NULL;
 			}
-			if ( tty_con.cursor >= sizeof( text ) - 1 )
+			if ( (size_t)tty_con.cursor >= sizeof( text ) - 1 )
 				return NULL;
 			// push regular character
 			tty_con.buffer[ tty_con.cursor ] = key;
 			tty_con.cursor++;
 			// print the current line (this is differential)
-			write( STDOUT_FILENO, &key, 1 );
+			(void)write( STDOUT_FILENO, &key, 1 );
 		}
 		return NULL;
 	}
@@ -697,7 +700,7 @@ static const struct Q3ToAnsiColorTable_s
 
 
 static const char *getANSIcolor( char Q3color ) {
-	int i;
+	size_t i;
 	for ( i = 0; i < ARRAY_LEN( tty_colorTable ); i++ ) {
 		if ( Q3color == tty_colorTable[ i ].Q3color ) {
 			return tty_colorTable[ i ].ANSIcolor;
@@ -782,7 +785,7 @@ void Sys_Print( const char *msg )
 		len = out - printmsg;
 	}
 
-	write( STDERR_FILENO, printmsg, len );
+	(void)write( STDERR_FILENO, printmsg, len );
 
 	if ( ttycon_on )
 	{
@@ -793,6 +796,7 @@ void Sys_Print( const char *msg )
 
 void QDECL Sys_SetStatus( const char *format, ... )
 {
+	Q_UNUSED(format);
 	return;
 }
 
