@@ -123,6 +123,16 @@ extern "C" void vk_end_frame(void) {
         vk_apply_gamma_correction();
     }
 
+    // Apply FSR (FidelityFX Super Resolution) after post-processing but before UI
+    if (vk_fsr_is_enabled()) {
+        vk_fsr_update_constants(vk.renderWidth, vk.renderHeight, vk.extent_unscaled.width, vk.extent_unscaled.height);
+
+        // Apply EASU upscaling followed by RCAS sharpening
+        // Note: This would need proper image handles and barriers in a full implementation
+        // For now, this demonstrates the integration point
+        ri.Printf(PRINT_ALL, "Vulkan: FSR framework integrated (needs image handles for full implementation)\n");
+    }
+
     // Transition swapchain image to present layout
     VkImageMemoryBarrier barrier = {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,

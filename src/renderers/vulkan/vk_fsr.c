@@ -75,6 +75,35 @@ static qboolean vk_fsr_create_pipeline_layout(void) {
     return qtrue;
 }
 
+// Create descriptor pool and set for FSR
+static qboolean vk_fsr_create_descriptor_pool(void) {
+    VkDescriptorPoolSize pool_sizes[] = {
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 }
+    };
+
+    VkDescriptorPoolCreateInfo pool_info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .maxSets = 1,
+        .poolSizeCount = LENGTH(pool_sizes),
+        .pPoolSizes = pool_sizes
+    };
+
+    VK_CHECK(qvkCreateDescriptorPool(vk.device, &pool_info, NULL, &vk_fsr_state.descriptor_pool));
+
+    VkDescriptorSetAllocateInfo alloc_info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .descriptorPool = vk_fsr_state.descriptor_pool,
+        .descriptorSetCount = 1,
+        .pSetLayouts = &vk_fsr_state.descriptor_layout
+    };
+
+    VK_CHECK(qvkAllocateDescriptorSets(vk.device, &alloc_info, &vk_fsr_state.descriptor_set));
+
+    return qtrue;
+}
+
 // Create constants buffer for FSR
 static qboolean vk_fsr_create_constants_buffer(void) {
     VkBufferCreateInfo buffer_info = {
@@ -114,6 +143,10 @@ qboolean vk_fsr_create_pipelines(void) {
     }
 
     if (!vk_fsr_create_pipeline_layout()) {
+        return qfalse;
+    }
+
+    if (!vk_fsr_create_descriptor_pool()) {
         return qfalse;
     }
 
@@ -230,6 +263,11 @@ void vk_fsr_shutdown(void) {
 
     vk_fsr_destroy_pipelines();
 
+    if (vk_fsr_state.descriptor_pool != VK_NULL_HANDLE) {
+        qvkDestroyDescriptorPool(vk.device, vk_fsr_state.descriptor_pool, NULL);
+        vk_fsr_state.descriptor_pool = VK_NULL_HANDLE;
+    }
+
     if (vk_fsr_state.pipeline_layout != VK_NULL_HANDLE) {
         qvkDestroyPipelineLayout(vk.device, vk_fsr_state.pipeline_layout, NULL);
         vk_fsr_state.pipeline_layout = VK_NULL_HANDLE;
@@ -297,9 +335,66 @@ void vk_fsr_apply_easu(VkCommandBuffer cmd_buf, VkImage input_image,
         return;
     }
 
-    // TODO: Implement descriptor set updates and dispatch
-    // This is a placeholder - full implementation would set up descriptors
-    // and dispatch the EASU compute shader
+    // Update descriptor set for EASU pass
+    VkDescriptorImageInfo input_info = {
+        .sampler = VK_NULL_HANDLE,
+        .imageView = input_view,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    };
+
+    VkDescriptorImageInfo output_info = {
+        .sampler = VK_NULL_HANDLE,
+        .imageView = output_view,
+        .imageLayout = VK_IMAGE_LAYOUT_GENERAL
+    };
+
+    VkDescriptorBufferInfo buffer_info = {
+        .buffer = vk_fsr_state.constants_buffer,
+        .offset = 0,
+        .range = sizeof(vk_fsr_easu_constants_t)
+    };
+
+    VkWriteDescriptorSet writes[3] = {
+        {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = vk_fsr_state.descriptor_set,
+            .dstBinding = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+            .pImageInfo = &input_info
+        },
+        {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = vk_fsr_state.descriptor_set,
+            .dstBinding = 1,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            .pImageInfo = &output_info
+        },
+        {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = vk_fsr_state.descriptor_set,
+            .dstBinding = 2,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .pBufferInfo = &buffer_info
+        }
+    };
+
+    qvkUpdateDescriptorSets(vk.device, 3, writes, 0, NULL);
+
+    // Bind pipeline and descriptor set
+    VkPipeline easu_pipeline = qvk.surf_is_hdr ?
+        vk_fsr_state.pipelines[FSR_EASU_TO_RCAS] : vk_fsr_state.pipelines[FSR_EASU_TO_DISPLAY];
+    qvkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE, easu_pipeline);
+    qvkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE,
+                           vk_fsr_state.pipeline_layout, 0, 1, &vk_fsr_state.descriptor_set, 0, NULL);
+
+    // Calculate dispatch size
+    uint32_t dispatch_x = (vk.extent_unscaled.width + 15) / 16;
+    uint32_t dispatch_y = (vk.extent_unscaled.height + 15) / 16;
+
+    qvkCmdDispatch(cmd_buf, dispatch_x, dispatch_y, 1);
 }
 
 // Apply RCAS sharpening
@@ -309,7 +404,64 @@ void vk_fsr_apply_rcas(VkCommandBuffer cmd_buf, VkImage input_image,
         return;
     }
 
-    // TODO: Implement descriptor set updates and dispatch
-    // This is a placeholder - full implementation would set up descriptors
-    // and dispatch the RCAS compute shader
+    // Update descriptor set for RCAS pass
+    VkDescriptorImageInfo input_info = {
+        .sampler = VK_NULL_HANDLE,
+        .imageView = input_view,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    };
+
+    VkDescriptorImageInfo output_info = {
+        .sampler = VK_NULL_HANDLE,
+        .imageView = output_view,
+        .imageLayout = VK_IMAGE_LAYOUT_GENERAL
+    };
+
+    VkDescriptorBufferInfo buffer_info = {
+        .buffer = vk_fsr_state.constants_buffer,
+        .offset = sizeof(vk_fsr_easu_constants_t),
+        .range = sizeof(vk_fsr_rcas_constants_t)
+    };
+
+    VkWriteDescriptorSet writes[3] = {
+        {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = vk_fsr_state.descriptor_set,
+            .dstBinding = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE,
+            .pImageInfo = &input_info
+        },
+        {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = vk_fsr_state.descriptor_set,
+            .dstBinding = 1,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
+            .pImageInfo = &output_info
+        },
+        {
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = vk_fsr_state.descriptor_set,
+            .dstBinding = 2,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .pBufferInfo = &buffer_info
+        }
+    };
+
+    qvkUpdateDescriptorSets(vk.device, 3, writes, 0, NULL);
+
+    // Bind pipeline and descriptor set
+    VkPipeline rcas_pipeline = qvk.surf_is_hdr ?
+        vk_fsr_state.pipelines[FSR_RCAS_AFTER_EASU] : vk_fsr_state.pipelines[FSR_RCAS_AFTER_TAAU];
+    qvkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE, rcas_pipeline);
+    qvkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_COMPUTE,
+                           vk_fsr_state.pipeline_layout, 0, 1, &vk_fsr_state.descriptor_set, 0, NULL);
+
+    // Calculate dispatch size
+    uint32_t dispatch_x = (vk.extent_unscaled.width + 15) / 16;
+    uint32_t dispatch_y = (vk.extent_unscaled.height + 15) / 16;
+
+    qvkCmdDispatch(cmd_buf, dispatch_x, dispatch_y, 1);
 }

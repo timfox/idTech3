@@ -1,3 +1,10 @@
+// FSR (FidelityFX Super Resolution) shaders - placeholder until compiled
+// TODO: Compile fsr_easu.comp and fsr_rcas.comp to generate actual SPIR-V data
+const unsigned char fsr_easu_comp_spv[1024] = {0}; // Placeholder
+const unsigned int fsr_easu_comp_spv_size = 1024;
+const unsigned char fsr_rcas_comp_spv[1024] = {0}; // Placeholder
+const unsigned int fsr_rcas_comp_spv_size = 1024;
+
 const unsigned char meshlet_task_spv[432] = {
 	0x03, 0x02, 0x23, 0x07, 0x00, 0x00, 0x01, 0x00, 0x0B, 0x00, 0x08, 0x00, 0x0D, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x11, 0x00, 0x02, 0x00, 0x92, 0x14, 0x00, 0x00, 0x0A, 0x00, 0x06, 0x00,

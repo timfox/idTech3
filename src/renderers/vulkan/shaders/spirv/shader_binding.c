@@ -21,6 +21,8 @@ void vk_bind_generated_shaders( void ){
     vk.modules.gamma_fs = SHADER_MODULE(gamma_frag_spv);
     vk.modules.brdflut_fs = SHADER_MODULE(brdflut_frag_spv);
     vk.modules.bloom_comp = SHADER_MODULE(bloom_comp_spv);
+    vk.modules.fsr_easu_comp = SHADER_MODULE(fsr_easu_comp_spv);
+    vk.modules.fsr_rcas_comp = SHADER_MODULE(fsr_rcas_comp_spv);
 
     vk_set_shader_name(vk.modules.dot_vs, "dot_vs");
     vk_set_shader_name(vk.modules.dot_fs, "dot_fs");

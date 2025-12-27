@@ -611,6 +611,8 @@ typedef struct {
     VkShaderModule color_grading_comp; // Added
     VkShaderModule heat_distortion_comp; // Added
     VkShaderModule bloom_comp; // Added
+    VkShaderModule fsr_easu_comp; // FSR EASU upscaling
+    VkShaderModule fsr_rcas_comp; // FSR RCAS sharpening
     VkShaderModule depth_of_field_comp; // Added
     VkShaderModule ssao_comp; // Added
     VkShaderModule ssr_comp; // Added
