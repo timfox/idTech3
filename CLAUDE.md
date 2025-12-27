@@ -6,6 +6,8 @@
 - Clean: ./compile_engine.sh clean <mode>
 
 ## Repo constraints
+- Use C23 and C++23 methodologies.
+- Lean into C++ usage.
 - Renderer boundary is sensitive: avoid changing public interfaces unless required.
 - Prefer small diffs and incremental fixes.
 
