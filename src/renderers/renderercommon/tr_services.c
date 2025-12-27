@@ -750,34 +750,34 @@ qboolean Q_ValidateFilePath( const char *path ) {
 ====================
 Vector Math Functions
 
-These are needed by both OpenGL and Vulkan renderers
+These are duplicated here for renderer shared libraries
 ====================
 */
-void _VectorCopy( const vec3_t in, vec3_t out ) {
+void _VectorCopy( const float *in, float *out ) {
 	out[0] = in[0];
 	out[1] = in[1];
 	out[2] = in[2];
 }
 
-void _VectorAdd( const vec3_t veca, const vec3_t vecb, vec3_t out ) {
+void _VectorAdd( const float *veca, const float *vecb, float *out ) {
 	out[0] = veca[0] + vecb[0];
 	out[1] = veca[1] + vecb[1];
 	out[2] = veca[2] + vecb[2];
 }
 
-void _VectorSubtract( const vec3_t veca, const vec3_t vecb, vec3_t out ) {
+void _VectorSubtract( const float *veca, const float *vecb, float *out ) {
 	out[0] = veca[0] - vecb[0];
 	out[1] = veca[1] - vecb[1];
 	out[2] = veca[2] - vecb[2];
 }
 
-void _VectorScale( const vec3_t in, float scale, vec3_t out ) {
+void _VectorScale( const float *in, float scale, float *out ) {
 	out[0] = in[0] * scale;
 	out[1] = in[1] * scale;
 	out[2] = in[2] * scale;
 }
 
-void _VectorMA( const vec3_t veca, float scale, const vec3_t vecb, vec3_t out ) {
+void _VectorMA( const float *veca, float scale, const float *vecb, float *out ) {
 	out[0] = veca[0] + scale * vecb[0];
 	out[1] = veca[1] + scale * vecb[1];
 	out[2] = veca[2] + scale * vecb[2];
@@ -836,6 +836,68 @@ int Scalability_GetMaxFonts(void) {
 
 int Scalability_GetMaxFontCache(void) {
     return 1024 * 1024; // Default 1MB
+}
+
+// Additional stub implementations for missing functions
+unsigned int Com_TouchMemory(void) {
+    return 0;
+}
+
+qboolean Com_HasPatterns(const char *str) {
+    (void)str;
+    return qfalse;
+}
+
+int Com_Filter(const char *filter, const char *name) {
+    (void)filter; (void)name;
+    return 0;
+}
+
+int Com_FilterPath(const char *filter, const char *name) {
+    (void)filter; (void)name;
+    return 1;
+}
+
+qboolean Com_FilterExt(const char *filter, const char *name) {
+    (void)filter; (void)name;
+    return qtrue;
+}
+
+void Com_SortList(char **list, int n) {
+    (void)list; (void)n;
+    // No-op for renderers
+}
+
+void Info_Print(const char *s) {
+    ri.Printf(PRINT_ALL, "%s", s);
+}
+
+int Z_FreeTags(memtag_t tag) {
+    (void)tag;
+    return 0;
+}
+
+void Com_RandomBytes(byte *buffer, int len) {
+    for (int i = 0; i < len; i++) {
+        buffer[i] = (byte)(rand() % 256);
+    }
+}
+
+void Com_BeginRedirect(char *buffer, int buffersize, void (*flush)(const char *)) {
+    (void)buffer; (void)buffersize; (void)flush;
+}
+
+void Com_EndRedirect(void) {
+    // No-op
+}
+
+void *S_Malloc(int size) {
+    return malloc((size_t)size);
+}
+
+void S_Spatialize(channel_t *ch) {
+    (void)ch;
+    // No-op for renderers
 }
 //
 //// const testable_renderer_api_t *R_GetTestableAPI(void) {

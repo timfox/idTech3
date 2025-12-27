@@ -25,12 +25,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_types.h"
 #include "vulkan/vulkan.h"
 
-// Vector math functions needed by renderers
-void _VectorCopy( const vec3_t in, vec3_t out );
-void _VectorAdd( const vec3_t veca, const vec3_t vecb, vec3_t out );
-void _VectorSubtract( const vec3_t veca, const vec3_t vecb, vec3_t out );
-void _VectorScale( const vec3_t in, float scale, vec3_t out );
-void _VectorMA( const vec3_t veca, float scale, const vec3_t vecb, vec3_t out );
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // File path validation
 qboolean Q_ValidateFilePath( const char *path );
@@ -43,6 +40,27 @@ qboolean FS_Initialized( void );
 qboolean FS_StartupInProgress( void );
 int Scalability_GetMaxFonts(void);
 int Scalability_GetMaxFontCache(void);
+
+// Additional stub functions
+unsigned int Com_TouchMemory(void);
+qboolean Com_HasPatterns(const char *str);
+int Com_Filter(const char *filter, const char *name);
+int Com_FilterPath(const char *filter, const char *name);
+qboolean Com_FilterExt(const char *filter, const char *name);
+void Com_SortList(char **list, int n);
+void Info_Print(const char *s);
+int Z_FreeTags(memtag_t tag);
+void Com_RandomBytes(byte *buffer, int len);
+void Com_BeginRedirect(char *buffer, int buffersize, void (*flush)(const char *));
+void Com_EndRedirect(void);
+void *S_Malloc(int size);
+struct channel_s;
+typedef struct channel_s channel_t;
+void S_Spatialize(channel_t *ch);
+
+#ifdef __cplusplus
+}
+#endif
 
 #ifdef __cplusplus
 extern "C" {
