@@ -20,10 +20,12 @@ extern void vk_set_object_name(uint64_t obj, const char *name, VkDebugReportObje
 #define SET_OBJECT_NAME(obj,objName,objType) vk_set_object_name( (uint64_t)(obj), (objName), (objType) )
 
 // Clear color values for different render passes
-static const VkClearValue default_clear_values[] = {
+static const VkClearValue main_clear_values[] = {
     {.color = {{0.0f, 0.0f, 0.0f, 1.0f}}},
-    {.color = {{0.0f, 0.0f, 0.0f, 0.0f}}},
+    {.depthStencil = {1.0f, 0}}
 };
+
+static const VkClearValue color_clear_value = {.color = {{0.0f, 0.0f, 0.0f, 1.0f}}};
 
 // Create main render pass
 qboolean vk_create_main_render_pass(void) {
@@ -204,6 +206,19 @@ void vk_begin_specific_render_pass(VkRenderPass render_pass, VkFramebuffer frame
         return;
     }
 
+    const VkClearValue *pClearValues = NULL;
+    uint32_t clearValueCount = 0;
+
+    if (clear_values) {
+        if (render_pass == vk.render_pass.main) {
+            pClearValues = main_clear_values;
+            clearValueCount = ARRAY_LEN(main_clear_values);
+        } else {
+            pClearValues = &color_clear_value;
+            clearValueCount = 1;
+        }
+    }
+
     VkRenderPassBeginInfo render_pass_info = {
         .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
         .renderPass = render_pass,
@@ -212,14 +227,17 @@ void vk_begin_specific_render_pass(VkRenderPass render_pass, VkFramebuffer frame
             .offset = {0, 0},
             .extent = {width, height}
         },
-        .clearValueCount = clear_values ? ARRAY_LEN(default_clear_values) : 0,
-        .pClearValues = clear_values ? default_clear_values : NULL
+        .clearValueCount = clearValueCount,
+        .pClearValues = pClearValues
     };
 
     qvkCmdBeginRenderPass(vk.cmd->command_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
 }
 
 // End render pass
+void vk_end_render_pass(void) {
+    qvkCmdEndRenderPass(vk.cmd->command_buffer);
+}
 
 // Transition to next subpass
 void vk_next_subpass(void) {
@@ -227,7 +245,42 @@ void vk_next_subpass(void) {
 }
 
 // Begin bloom extract render pass
+void vk_begin_bloom_extract_render_pass(void) {
+    vk_begin_specific_render_pass(vk.render_pass.bloom_extract, vk.framebuffers.bloom_extract, qtrue, vk.renderWidth / 2, vk.renderHeight / 2);
+}
 
 // Begin blur render pass
+void vk_begin_blur_render_pass(uint32_t index) {
+    if (index >= 4) return;
+    uint32_t w = (vk.renderWidth / 2) >> (index + 1);
+    uint32_t h = (vk.renderHeight / 2) >> (index + 1);
+    if (w < 1) w = 1;
+    if (h < 1) h = 1;
+    vk_begin_specific_render_pass(vk.render_pass.blur[index], vk.framebuffers.blur[index], qtrue, w, h);
+}
 
 // Barrier for final image to shader read
+void vk_barrier_final_image_to_shader_read(VkImage image) {
+    VkImageMemoryBarrier barrier = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+        .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = image,
+        .subresourceRange = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1
+        }
+    };
+
+    qvkCmdPipelineBarrier(vk.cmd->command_buffer,
+        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        0, 0, NULL, 0, NULL, 1, &barrier);
+}

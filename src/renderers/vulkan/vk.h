@@ -957,9 +957,16 @@ typedef struct {
     // Cubemap system
     struct {
         VkImage color_image;
-        VkImageView color_image_view;  // Added missing color_image_view
+        VkImageView color_image_view;  // For sampling (Cube type)
+        VkImageView face_views[6];     // For rendering (2D type per layer)
         VkDescriptorSet color_descriptor;
     } cubeMap;
+
+    // BRDF LUT
+    struct {
+        VkImage image;
+        VkImageView view;
+    } brdflut;
 
     // Shader modules
     vk_modules_t modules;

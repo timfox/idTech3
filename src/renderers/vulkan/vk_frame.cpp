@@ -105,30 +105,11 @@ extern "C" void vk_begin_frame(void) {
     // Set up render area
     vk.cmd = &vk.tess[vk.cmd_index];
 
-    // Transition swapchain image to color attachment
-    VkImageMemoryBarrier barrier = {
-        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-        .pNext = nullptr,
-        .srcAccessMask = 0,
-        .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-        .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image = vk.swapchain_images[image_index],
-        .subresourceRange = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1
-        }
-    };
+    // Transition offscreen color image to color attachment if needed
+    // (Render pass will handle this if initialLayout is UNDEFINED)
 
-    qvkCmdPipelineBarrier(vk.cmd->command_buffer,
-        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-        VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-        0, 0, NULL, 0, NULL, 1, &barrier);
+    // Begin main render pass
+    vk_begin_main_render_pass();
 
     ri.Printf(PRINT_ALL, "Vulkan: Frame %d begun\n", vk.frame_count);
 }
