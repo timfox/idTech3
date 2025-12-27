@@ -487,7 +487,7 @@ typedef struct fs_path_norm_cache_entry_s {
 	char			base[MAX_OSPATH];
 	char			game[MAX_OSPATH];
 	char			qpath[MAX_ZPATH];
-	char			normalized[MAX_OSPATH*2+1];
+	char			normalized[MAX_OSPATH*3+1];
 	uint32_t		hash;
 	qboolean		valid;
 	int				lastAccess;
@@ -856,7 +856,7 @@ char *FS_BuildOSPath( const char *restrict base, const char *restrict game, cons
 	static int toggle;
 	const char *gameToUse;
 	const char *baseToUse;
-	char	cachedPath[MAX_OSPATH*2+1];
+	char	cachedPath[MAX_OSPATH*3+1];
 	
 	// Safety check: base must be valid
 	if ( !base ) {
@@ -2283,7 +2283,7 @@ static qboolean FS_LookupPathNormCache( const char *base, const char *game, cons
 					// Cache hit
 					fs_pathNormCacheHits++;
 					entry->lastAccess = Sys_Milliseconds();
-					Q_strncpyz( outPath, entry->normalized, MAX_OSPATH*2+1 );
+					Q_strncpyz( outPath, entry->normalized, MAX_OSPATH*3+1 );
 					return qtrue;
 				}
 			}

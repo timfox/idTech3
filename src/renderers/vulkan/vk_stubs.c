@@ -110,7 +110,7 @@ cvar_t *r_rt_giIntensity;
 void vk_volumetric_fog_init(void) {}
 void vk_volumetric_fog_shutdown(void) {}
 void vk_volumetric_fog_update(void) {}
-void vk_volumetric_fog_render(void) {}
+void vk_volumetric_fog_render(VkCommandBuffer cmdBuffer) {}
 
 void vk_decals_init(void) {}
 void vk_decals_shutdown(void) {}

@@ -142,7 +142,7 @@ extern "C" void vk_end_frame(void) {
     vk_volumetric_fog_update();
 
     // Apply volumetric fog before post-processing
-    vk_volumetric_fog_render();
+    vk_volumetric_fog_render(vk.cmd->command_buffer);
 
     // Render terrain
     vk_terrain_render();
@@ -164,7 +164,7 @@ extern "C" void vk_end_frame(void) {
 
     // Apply post-processing effects
     if (vk_has_post_processing()) {
-        vk_volumetric_fog_render();
+        vk_volumetric_fog_render(vk.cmd->command_buffer);
         vk_apply_bloom();
         vk_apply_tone_mapping();
         vk_apply_gamma_correction();

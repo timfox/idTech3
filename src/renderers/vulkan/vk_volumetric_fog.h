@@ -69,7 +69,7 @@ typedef struct {
 void vk_volumetric_fog_init(void);
 void vk_volumetric_fog_shutdown(void);
 void vk_volumetric_fog_update(void);
-void vk_volumetric_fog_render(void);
+void vk_volumetric_fog_render(VkCommandBuffer cmdBuffer);
 void vk_volumetric_fog_set_params(const volumetric_fog_params_t *params);
 void vk_volumetric_fog_get_params(volumetric_fog_params_t *params);
 
