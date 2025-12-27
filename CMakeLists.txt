@@ -1292,7 +1292,10 @@ SET(RENDERER_VK_SRCS
 	src/renderers/vulkan/tr_mesh.c
 	src/renderers/vulkan/tr_model.c
 	src/renderers/vulkan/tr_model_iqm.c
-	src/renderers/vulkan/tr_rtx.c
+	# NOTE: tr_rtx.c is a standalone q2rtx-style experimental renderer stub and
+	# defines symbols that conflict with the main Vulkan renderer.
+	# Keep it out of the build unless/ until it is namespaced and integrated.
+	# src/renderers/vulkan/tr_rtx.c
 	src/renderers/vulkan/tr_scene.c
 	src/renderers/vulkan/tr_shade.c
 	src/renderers/vulkan/tr_shade_calc.c

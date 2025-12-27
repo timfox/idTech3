@@ -264,7 +264,10 @@ static void Com_ReadCDKeyFromFile( const char *game, char *outKey16 ) {
 
 	// Read first line / chunk
 	memset( buf, 0, sizeof( buf ) );
-	(void)fread( buf, 1, sizeof( buf ) - 1, f );
+	{
+		const size_t n = fread( buf, 1, sizeof( buf ) - 1, f );
+		(void)n; // ignore short reads; we will parse whatever we got
+	}
 	fclose( f );
 
 	// Extract first 16 alphanumeric chars

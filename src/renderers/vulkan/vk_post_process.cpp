@@ -185,7 +185,7 @@ vk_create_compute_pipeline
 */
 VkPipeline vk_create_compute_pipeline(VkShaderModule computeShader, VkPipelineLayout layout, const char *name)
 {
-    VkComputePipelineCreateInfo createInfo = {0};
+    VkComputePipelineCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
     createInfo.stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     createInfo.stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -228,7 +228,7 @@ qboolean vk_create_ssao_pipeline(void)
         {4, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},          // outputImage
     };
 
-    VkDescriptorSetLayoutCreateInfo layoutInfo = {0};
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = ARRAY_LEN(bindings);
     layoutInfo.pBindings = bindings;
@@ -239,7 +239,7 @@ qboolean vk_create_ssao_pipeline(void)
     }
 
     // Create pipeline layout
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &vk.ssao_descriptor_layout;
@@ -278,7 +278,7 @@ qboolean vk_create_ssr_pipeline(void)
         {4, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},          // outputImage
     };
 
-    VkDescriptorSetLayoutCreateInfo layoutInfo = {0};
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = ARRAY_LEN(bindings);
     layoutInfo.pBindings = bindings;
@@ -289,7 +289,7 @@ qboolean vk_create_ssr_pipeline(void)
     }
 
     // Create pipeline layout
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &vk.ssr_descriptor_layout;
@@ -325,7 +325,7 @@ qboolean vk_create_bloom_pipeline(void)
         {1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},          // output_image
     };
 
-    VkDescriptorSetLayoutCreateInfo layoutInfo = {0};
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = ARRAY_LEN(bindings);
     layoutInfo.pBindings = bindings;
@@ -336,7 +336,7 @@ qboolean vk_create_bloom_pipeline(void)
     }
 
     // Create pipeline layout
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &vk.bloom_descriptor_layout;
@@ -375,7 +375,7 @@ qboolean vk_create_dof_pipeline(void)
         {4, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},          // outputImage
     };
 
-    VkDescriptorSetLayoutCreateInfo layoutInfo = {0};
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = ARRAY_LEN(bindings);
     layoutInfo.pBindings = bindings;
@@ -386,7 +386,7 @@ qboolean vk_create_dof_pipeline(void)
     }
 
     // Create pipeline layout
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &vk.dof_descriptor_layout;
@@ -423,7 +423,7 @@ qboolean vk_create_velocity_tiles_pipeline(void)
         {2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},          // velocityTiles
     };
 
-    VkDescriptorSetLayoutCreateInfo layoutInfo = {0};
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = ARRAY_LEN(bindings);
     layoutInfo.pBindings = bindings;
@@ -434,7 +434,7 @@ qboolean vk_create_velocity_tiles_pipeline(void)
     }
 
     // Create pipeline layout
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &vk.velocity_tiles_descriptor_layout;
@@ -473,7 +473,7 @@ qboolean vk_create_motion_blur_pipeline(void)
         {4, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},          // outputImage
     };
 
-    VkDescriptorSetLayoutCreateInfo layoutInfo = {0};
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = ARRAY_LEN(bindings);
     layoutInfo.pBindings = bindings;
@@ -484,7 +484,7 @@ qboolean vk_create_motion_blur_pipeline(void)
     }
 
     // Create pipeline layout
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &vk.motion_blur_descriptor_layout;
@@ -521,7 +521,7 @@ qboolean vk_create_color_grading_pipeline(void)
         {2, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},          // outputImage
     };
 
-    VkDescriptorSetLayoutCreateInfo layoutInfo = {0};
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = ARRAY_LEN(bindings);
     layoutInfo.pBindings = bindings;
@@ -532,7 +532,7 @@ qboolean vk_create_color_grading_pipeline(void)
     }
 
     // Create pipeline layout
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &vk.color_grading_descriptor_layout;
@@ -571,7 +571,7 @@ qboolean vk_create_heat_distortion_pipeline(void)
         {4, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1, VK_SHADER_STAGE_COMPUTE_BIT, NULL},          // outputImage
     };
 
-    VkDescriptorSetLayoutCreateInfo layoutInfo = {0};
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = ARRAY_LEN(bindings);
     layoutInfo.pBindings = bindings;
@@ -582,7 +582,7 @@ qboolean vk_create_heat_distortion_pipeline(void)
     }
 
     // Create pipeline layout
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {0};
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &vk.heat_distortion_descriptor_layout;
