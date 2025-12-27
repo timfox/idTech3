@@ -33,16 +33,16 @@ extern refimport_t ri;
 typedef struct ImDrawData ImDrawData;
 #endif
 
-glconfig_t	glConfig;
-qboolean	nonPowerOfTwoTextures;
-qboolean	textureFilterAnisotropic;
-int			maxAnisotropy;
+__attribute__((visibility("hidden"))) glconfig_t	glConfig;
+__attribute__((visibility("hidden"))) qboolean	nonPowerOfTwoTextures;
+__attribute__((visibility("hidden"))) qboolean	textureFilterAnisotropic;
+__attribute__((visibility("hidden"))) int			maxAnisotropy;
 int			gl_version;
 int			gl_clamp_mode;	// GL_CLAMP or GL_CLAMP_TO_EGGE
 
-glstate_t	glState;
+__attribute__((visibility("hidden"))) glstate_t	glState;
 
-glstatic_t	gls;
+__attribute__((visibility("hidden"))) glstatic_t	gls;
 
 static void GfxInfo( void );
 static void VarInfo( void );

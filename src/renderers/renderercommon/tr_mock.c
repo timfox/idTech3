@@ -95,7 +95,7 @@ static qhandle_t R_Context_Mock_RegisterModel(renderer_context_t *ctx, const cha
 	return context_mock_state.context_registered_models;
 }
 
-static model_t *R_Context_Mock_GetModelByHandle([[maybe_unused]] renderer_context_t *ctx, qhandle_t handle) {
+static model_t *R_Context_Mock_GetModelByHandle(UNUSED_VAR renderer_context_t *ctx, qhandle_t handle) {
 	// Return a mock model structure
 	static model_t mock_model;
 	mock_model.index = handle;
@@ -104,31 +104,31 @@ static model_t *R_Context_Mock_GetModelByHandle([[maybe_unused]] renderer_contex
 	return &mock_model;
 }
 
-static void R_Context_Mock_ModelBounds([[maybe_unused]] renderer_context_t *ctx, [[maybe_unused]] qhandle_t model, vec3_t mins, vec3_t maxs) {
+static void R_Context_Mock_ModelBounds(UNUSED_VAR renderer_context_t *ctx, UNUSED_VAR qhandle_t model, vec3_t mins, vec3_t maxs) {
 	// Return mock bounds
 	VectorSet(mins, -5, -5, -5);
 	VectorSet(maxs, 5, 5, 5);
 }
 
-static qhandle_t R_Context_Mock_RegisterShader([[maybe_unused]] renderer_context_t *ctx, [[maybe_unused]] const char *name) {
+static qhandle_t R_Context_Mock_RegisterShader(UNUSED_VAR renderer_context_t *ctx, UNUSED_VAR const char *name) {
 	context_mock_state.context_registered_shaders++;
 	return context_mock_state.context_registered_shaders;
 }
 
-static qhandle_t R_Context_Mock_RegisterShaderNoMip([[maybe_unused]] renderer_context_t *ctx, [[maybe_unused]] const char *name) {
+static qhandle_t R_Context_Mock_RegisterShaderNoMip(UNUSED_VAR renderer_context_t *ctx, UNUSED_VAR const char *name) {
 	context_mock_state.context_registered_shaders++;
 	return context_mock_state.context_registered_shaders;
 }
 
-static qhandle_t R_Context_Mock_RegisterSkin([[maybe_unused]] renderer_context_t *ctx, [[maybe_unused]] const char *name) {
+static qhandle_t R_Context_Mock_RegisterSkin(UNUSED_VAR renderer_context_t *ctx, UNUSED_VAR const char *name) {
 	return 1;
 }
 
-static qhandle_t R_Context_Mock_RegisterImage([[maybe_unused]] renderer_context_t *ctx, [[maybe_unused]] const char *name, [[maybe_unused]] imgFlags_t flags) {
+static qhandle_t R_Context_Mock_RegisterImage(UNUSED_VAR renderer_context_t *ctx, UNUSED_VAR const char *name, UNUSED_VAR imgFlags_t flags) {
 	return 1;
 }
 
-static qhandle_t R_Context_Mock_RegisterFont([[maybe_unused]] renderer_context_t *ctx, const char *fontName, int pointSize, fontInfo_t *font) {
+static qhandle_t R_Context_Mock_RegisterFont(UNUSED_VAR renderer_context_t *ctx, const char *fontName, int pointSize, fontInfo_t *font) {
 	if (font) {
 		font->pointSize = pointSize;
 		Q_strncpyz(font->name, fontName, sizeof(font->name));
@@ -136,7 +136,7 @@ static qhandle_t R_Context_Mock_RegisterFont([[maybe_unused]] renderer_context_t
 	return 1;
 }
 
-static void R_Context_Mock_ClearScene([[maybe_unused]] renderer_context_t *ctx) {
+static void R_Context_Mock_ClearScene(UNUSED_VAR renderer_context_t *ctx) {
 	context_mock_state.context_scene_cleared = qtrue;
 	context_mock_state.context_entities_added = 0;
 	context_mock_state.context_polys_added = 0;
@@ -144,35 +144,35 @@ static void R_Context_Mock_ClearScene([[maybe_unused]] renderer_context_t *ctx) 
 	context_mock_state.context_scene_rendered = qfalse;
 }
 
-static void R_Context_Mock_AddRefEntityToScene([[maybe_unused]] renderer_context_t *ctx, [[maybe_unused]] const refEntity_t *re) {
+static void R_Context_Mock_AddRefEntityToScene(UNUSED_VAR renderer_context_t *ctx, UNUSED_VAR const refEntity_t *re) {
 	context_mock_state.context_entities_added++;
 }
 
-static void R_Context_Mock_AddPolyToScene([[maybe_unused]] renderer_context_t *ctx, [[maybe_unused]] qhandle_t hShader, [[maybe_unused]] int numVerts, [[maybe_unused]] const polyVert_t *verts) {
+static void R_Context_Mock_AddPolyToScene(UNUSED_VAR renderer_context_t *ctx, UNUSED_VAR qhandle_t hShader, UNUSED_VAR int numVerts, UNUSED_VAR const polyVert_t *verts) {
 	context_mock_state.context_polys_added++;
 }
 
-static void R_Context_Mock_AddLightToScene([[maybe_unused]] renderer_context_t *ctx, [[maybe_unused]] const vec3_t org, [[maybe_unused]] float intensity, [[maybe_unused]] float r, [[maybe_unused]] float g, [[maybe_unused]] float b) {
+static void R_Context_Mock_AddLightToScene(UNUSED_VAR renderer_context_t *ctx, UNUSED_VAR const vec3_t org, UNUSED_VAR float intensity, UNUSED_VAR float r, UNUSED_VAR float g, UNUSED_VAR float b) {
 	context_mock_state.context_lights_added++;
 }
 
-static void R_Context_Mock_RenderScene([[maybe_unused]] renderer_context_t *ctx, [[maybe_unused]] const refdef_t *fd) {
+static void R_Context_Mock_RenderScene(UNUSED_VAR renderer_context_t *ctx, UNUSED_VAR const refdef_t *fd) {
 	context_mock_state.context_scene_rendered = qtrue;
 }
 
-static void R_Context_Mock_SetWorldVisData([[maybe_unused]] renderer_context_t *ctx, [[maybe_unused]] const byte *vis) {
+static void R_Context_Mock_SetWorldVisData(UNUSED_VAR renderer_context_t *ctx, UNUSED_VAR const byte *vis) {
 	// Mock implementation
 }
 
-static void R_Context_Mock_MarkLeaves([[maybe_unused]] renderer_context_t *ctx) {
+static void R_Context_Mock_MarkLeaves(UNUSED_VAR renderer_context_t *ctx) {
 	// Mock implementation
 }
 
-static void R_Context_Mock_BeginFrame([[maybe_unused]] renderer_context_t *ctx, [[maybe_unused]] stereoFrame_t stereoFrame) {
+static void R_Context_Mock_BeginFrame(UNUSED_VAR renderer_context_t *ctx, UNUSED_VAR stereoFrame_t stereoFrame) {
 	// Mock implementation
 }
 
-static void R_Context_Mock_EndFrame([[maybe_unused]] renderer_context_t *ctx, int *frontEndMsec, int *backEndMsec) {
+static void R_Context_Mock_EndFrame(UNUSED_VAR renderer_context_t *ctx, int *frontEndMsec, int *backEndMsec) {
 	// Mock implementation
 	if (frontEndMsec) *frontEndMsec = 10;
 	if (backEndMsec) *backEndMsec = 5;
@@ -239,37 +239,37 @@ qboolean R_Mock_WasSceneRendered(void) {
 }
 
 // Mock renderer API implementations
-qhandle_t R_Mock_RegisterModel([[maybe_unused]] const char *name) {
+qhandle_t R_Mock_RegisterModel(UNUSED_VAR const char *name) {
 	mock_state.registered_models++;
 	return mock_state.registered_models;
 }
 
-qhandle_t R_Mock_RegisterModel_Sync([[maybe_unused]] const char *name) {
+qhandle_t R_Mock_RegisterModel_Sync(UNUSED_VAR const char *name) {
 	mock_state.registered_models++;
 	return mock_state.registered_models;
 }
 
-void R_Mock_ModelBounds([[maybe_unused]] qhandle_t model, vec3_t mins, vec3_t maxs) {
+void R_Mock_ModelBounds(UNUSED_VAR qhandle_t model, vec3_t mins, vec3_t maxs) {
 	VectorSet(mins, -10, -10, -10);
 	VectorSet(maxs, 10, 10, 10);
 }
 
-qhandle_t R_Mock_RegisterShader([[maybe_unused]] const char *name) {
+qhandle_t R_Mock_RegisterShader(UNUSED_VAR const char *name) {
 	mock_state.registered_shaders++;
 	return mock_state.registered_shaders;
 }
 
-qhandle_t R_Mock_RegisterShaderNoMip([[maybe_unused]] const char *name) {
+qhandle_t R_Mock_RegisterShaderNoMip(UNUSED_VAR const char *name) {
 	mock_state.registered_shaders++;
 	return mock_state.registered_shaders;
 }
 
-qhandle_t R_Mock_RegisterSkin([[maybe_unused]] const char *name) {
+qhandle_t R_Mock_RegisterSkin(UNUSED_VAR const char *name) {
 	mock_state.registered_skins++;
 	return mock_state.registered_skins;
 }
 
-qhandle_t R_Mock_RegisterImage([[maybe_unused]] const char *name, [[maybe_unused]] int flags) {
+qhandle_t R_Mock_RegisterImage(UNUSED_VAR const char *name, UNUSED_VAR int flags) {
 	return 1;
 }
 
@@ -285,75 +285,75 @@ void R_Mock_ClearScene(void) {
 	mock_state.scene_cleared = qtrue;
 }
 
-void R_Mock_AddRefEntityToScene([[maybe_unused]] const refEntity_t *re) {
+void R_Mock_AddRefEntityToScene(UNUSED_VAR const refEntity_t *re) {
 	mock_state.entities_added++;
 }
 
-void R_Mock_AddPolyToScene([[maybe_unused]] qhandle_t hShader, [[maybe_unused]] int numVerts, [[maybe_unused]] const polyVert_t *verts) {
+void R_Mock_AddPolyToScene(UNUSED_VAR qhandle_t hShader, UNUSED_VAR int numVerts, UNUSED_VAR const polyVert_t *verts) {
 	mock_state.polys_added++;
 }
 
-void R_Mock_AddLightToScene([[maybe_unused]] const vec3_t org, [[maybe_unused]] float intensity, [[maybe_unused]] float r, [[maybe_unused]] float g, [[maybe_unused]] float b) {
+void R_Mock_AddLightToScene(UNUSED_VAR const vec3_t org, UNUSED_VAR float intensity, UNUSED_VAR float r, UNUSED_VAR float g, UNUSED_VAR float b) {
 	mock_state.lights_added++;
 }
 
-void R_Mock_AddAdditiveLightToScene([[maybe_unused]] const vec3_t org, [[maybe_unused]] float intensity, [[maybe_unused]] float r, [[maybe_unused]] float g, [[maybe_unused]] float b) {
+void R_Mock_AddAdditiveLightToScene(UNUSED_VAR const vec3_t org, UNUSED_VAR float intensity, UNUSED_VAR float r, UNUSED_VAR float g, UNUSED_VAR float b) {
 	mock_state.lights_added++;
 }
 
-void R_Mock_RenderScene([[maybe_unused]] const refdef_t *fd) {
+void R_Mock_RenderScene(UNUSED_VAR const refdef_t *fd) {
 	mock_state.scene_rendered = qtrue;
 }
 
-void R_Mock_SetColor([[maybe_unused]] const float *rgba) {
+void R_Mock_SetColor(UNUSED_VAR const float *rgba) {
 	// Stub
 }
 
-void R_Mock_DrawStretchPic([[maybe_unused]] float x, [[maybe_unused]] float y, [[maybe_unused]] float w, [[maybe_unused]] float h, [[maybe_unused]] float s1, [[maybe_unused]] float t1, [[maybe_unused]] float s2, [[maybe_unused]] float t2, [[maybe_unused]] qhandle_t hShader) {
+void R_Mock_DrawStretchPic(UNUSED_VAR float x, UNUSED_VAR float y, UNUSED_VAR float w, UNUSED_VAR float h, UNUSED_VAR float s1, UNUSED_VAR float t1, UNUSED_VAR float s2, UNUSED_VAR float t2, UNUSED_VAR qhandle_t hShader) {
 	// Stub
 }
 
-void R_Mock_DrawRotatedPic([[maybe_unused]] float x, [[maybe_unused]] float y, [[maybe_unused]] float w, [[maybe_unused]] float h, [[maybe_unused]] float s1, [[maybe_unused]] float t1, [[maybe_unused]] float s2, [[maybe_unused]] float t2, [[maybe_unused]] qhandle_t hShader, [[maybe_unused]] float angle) {
+void R_Mock_DrawRotatedPic(UNUSED_VAR float x, UNUSED_VAR float y, UNUSED_VAR float w, UNUSED_VAR float h, UNUSED_VAR float s1, UNUSED_VAR float t1, UNUSED_VAR float s2, UNUSED_VAR float t2, UNUSED_VAR qhandle_t hShader, UNUSED_VAR float angle) {
 	// Stub
 }
 
-void R_Mock_DrawStretchPicGradient([[maybe_unused]] float x, [[maybe_unused]] float y, [[maybe_unused]] float w, [[maybe_unused]] float h, [[maybe_unused]] float s1, [[maybe_unused]] float t1, [[maybe_unused]] float s2, [[maybe_unused]] float t2, [[maybe_unused]] qhandle_t hShader, [[maybe_unused]] const float *gradientColor, [[maybe_unused]] int gradientType) {
+void R_Mock_DrawStretchPicGradient(UNUSED_VAR float x, UNUSED_VAR float y, UNUSED_VAR float w, UNUSED_VAR float h, UNUSED_VAR float s1, UNUSED_VAR float t1, UNUSED_VAR float s2, UNUSED_VAR float t2, UNUSED_VAR qhandle_t hShader, UNUSED_VAR const float *gradientColor, UNUSED_VAR int gradientType) {
 	// Stub
 }
 
-void R_Mock_DrawStretchRaw([[maybe_unused]] int x, [[maybe_unused]] int y, [[maybe_unused]] int w, [[maybe_unused]] int h, [[maybe_unused]] int cols, [[maybe_unused]] int rows, [[maybe_unused]] const byte *data, [[maybe_unused]] int client, [[maybe_unused]] qboolean dirty) {
+void R_Mock_DrawStretchRaw(UNUSED_VAR int x, UNUSED_VAR int y, UNUSED_VAR int w, UNUSED_VAR int h, UNUSED_VAR int cols, UNUSED_VAR int rows, UNUSED_VAR const byte *data, UNUSED_VAR int client, UNUSED_VAR qboolean dirty) {
 	// Stub
 }
 
-void R_Mock_UploadCinematic([[maybe_unused]] int w, [[maybe_unused]] int h, [[maybe_unused]] int cols, [[maybe_unused]] int rows, [[maybe_unused]] const byte *data, [[maybe_unused]] int client, [[maybe_unused]] qboolean dirty) {
+void R_Mock_UploadCinematic(UNUSED_VAR int w, UNUSED_VAR int h, UNUSED_VAR int cols, UNUSED_VAR int rows, UNUSED_VAR const byte *data, UNUSED_VAR int client, UNUSED_VAR qboolean dirty) {
 	// Stub
 }
 
-void R_Mock_DrawString([[maybe_unused]] int x, [[maybe_unused]] int y, [[maybe_unused]] const char *str, [[maybe_unused]] int style, [[maybe_unused]] vec4_t color) {
+void R_Mock_DrawString(UNUSED_VAR int x, UNUSED_VAR int y, UNUSED_VAR const char *str, UNUSED_VAR int style, UNUSED_VAR vec4_t color) {
 	// Stub
 }
 
-void R_Mock_DrawStringExt([[maybe_unused]] int x, [[maybe_unused]] int y, [[maybe_unused]] const char *str, [[maybe_unused]] int style, [[maybe_unused]] vec4_t color, [[maybe_unused]] qboolean forceColor, [[maybe_unused]] qboolean shadow) {
+void R_Mock_DrawStringExt(UNUSED_VAR int x, UNUSED_VAR int y, UNUSED_VAR const char *str, UNUSED_VAR int style, UNUSED_VAR vec4_t color, UNUSED_VAR qboolean forceColor, UNUSED_VAR qboolean shadow) {
 	// Stub
 }
 
-void R_Mock_DrawChar([[maybe_unused]] int x, [[maybe_unused]] int y, [[maybe_unused]] int ch, [[maybe_unused]] int style, [[maybe_unused]] vec4_t color) {
+void R_Mock_DrawChar(UNUSED_VAR int x, UNUSED_VAR int y, UNUSED_VAR int ch, UNUSED_VAR int style, UNUSED_VAR vec4_t color) {
 	// Stub
 }
 
-void R_Mock_RemapShader([[maybe_unused]] const char *oldShader, [[maybe_unused]] const char *newShader, [[maybe_unused]] const char *offsetTime) {
+void R_Mock_RemapShader(UNUSED_VAR const char *oldShader, UNUSED_VAR const char *newShader, UNUSED_VAR const char *offsetTime) {
 	// Stub
 }
 
-qboolean R_Mock_GetEntityToken([[maybe_unused]] char *buffer, [[maybe_unused]] int size) {
+qboolean R_Mock_GetEntityToken(UNUSED_VAR char *buffer, UNUSED_VAR int size) {
 	return qfalse;
 }
 
-qboolean R_Mock_inPVS([[maybe_unused]] const vec3_t p1, [[maybe_unused]] const vec3_t p2) {
+qboolean R_Mock_inPVS(UNUSED_VAR const vec3_t p1, UNUSED_VAR const vec3_t p2) {
 	return qtrue;
 }
 
-void R_Mock_TakeVideoFrame([[maybe_unused]] int h, [[maybe_unused]] int w, [[maybe_unused]] byte *captureBuffer, [[maybe_unused]] byte *encodeBuffer, [[maybe_unused]] qboolean motionJpeg) {
+void R_Mock_TakeVideoFrame(UNUSED_VAR int h, UNUSED_VAR int w, UNUSED_VAR byte *captureBuffer, UNUSED_VAR byte *encodeBuffer, UNUSED_VAR qboolean motionJpeg) {
 	// Stub
 }
 

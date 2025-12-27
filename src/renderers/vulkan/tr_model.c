@@ -250,7 +250,7 @@ model_t	*R_GetModelByHandle( qhandle_t index ) {
 ** R_GetModelByHandle_Context
 ** Context-aware version that can work with local state
 */
-model_t	*R_GetModelByHandle_Context( [[maybe_unused]] renderer_context_t *ctx, qhandle_t index ) {
+model_t	*R_GetModelByHandle_Context( UNUSED_VAR renderer_context_t *ctx, qhandle_t index ) {
 	trGlobals_t *tr_ctx = GET_TR_CTX(ctx);
 
 	// out of range gets the default model

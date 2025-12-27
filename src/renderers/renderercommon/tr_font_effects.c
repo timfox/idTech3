@@ -348,7 +348,7 @@ void R_GetFontEffectDefaults(font_effect_params_t *params) {
 
     // Default shadow settings
     VectorSet(params->shadow_color, 0.0f, 0.0f, 0.0f);
-    VectorSet(params->shadow_offset, 1.0f, 1.0f, 0.0f);
+    Vector2Set(params->shadow_offset, 1.0f, 1.0f);
     params->shadow_blur = 0.0f;
 
     // Default animation settings
@@ -358,8 +358,8 @@ void R_GetFontEffectDefaults(font_effect_params_t *params) {
 
     // Default transform settings
     params->rotation_angle = 0.0f;
-    VectorSet(params->scale, 1.0f, 1.0f, 1.0f);
-    VectorSet(params->skew, 0.0f, 0.0f, 0.0f);
+    Vector2Set(params->scale, 1.0f, 1.0f);
+    Vector2Set(params->skew, 0.0f, 0.0f);
 
     // Default flags
     params->flags = FONT_EFFECT_NONE;

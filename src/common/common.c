@@ -76,7 +76,7 @@ int com_frameTime = 0;
 // qboolean gw_active = qtrue;
 // qboolean gw_minimized = qfalse;
 
-char rconPassword2[ MAX_CVAR_VALUE_STRING ] = {0};
+__attribute__((visibility("hidden"))) char rconPassword2[ MAX_CVAR_VALUE_STRING ] = {0};
 
 /*
 ==================
@@ -251,7 +251,7 @@ int Com_EventLoop( void ) { return 0; }
 void Com_Quit_f( void ) { exit( 0 ); }
 char *CopyString( const char *in ) {
     if (!in) return NULL;
-    char *out = malloc(strlen(in) + 1);
+    char *out = (char *)malloc(strlen(in) + 1);
     if (out) strcpy(out, in);
     return out;
 }
@@ -271,6 +271,7 @@ qboolean Com_EarlyParseCmdLine( char *commandLine, char *con_title, int title_si
 
 void Com_WriteConfiguration( void ) { }
 void Com_StartupVariable( const char *match ) { (void)match; }
+
 void S_Spatialize( void *ch ) { (void)ch; }
 void Field_AutoComplete( field_t *edit ) { (void)edit; }
 void Field_CompleteFilename( const char *dir, const char *ext, qboolean stripExt, int flags ) { (void)dir; (void)ext; (void)stripExt; (void)flags; }

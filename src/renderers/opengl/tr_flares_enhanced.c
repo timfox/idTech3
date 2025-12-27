@@ -11,7 +11,7 @@ Multi-element flares with improved occlusion and animation
 static flareEnhanced_t flaresEnhanced[MAX_ENHANCED_FLARES];
 static int numActiveFlares = 0;
 static int nextFreeFlare = 0;
-cvar_t *r_flaresEnhanced;
+__attribute__((visibility("hidden"))) cvar_t *r_flaresEnhanced;
 static cvar_t *r_flaresOcclusion;
 static qboolean occlusionEnabled = qtrue;
 

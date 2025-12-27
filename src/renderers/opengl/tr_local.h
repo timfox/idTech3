@@ -1303,9 +1303,9 @@ extern trGlobals_t	tr;
 
 extern int					gl_clamp_mode;
 
-extern glstate_t	glState;		// outside of TR since it shouldn't be cleared during ref re-init
+extern glstate_t	glState __attribute__((visibility("hidden")));		// outside of TR since it shouldn't be cleared during ref re-init
 
-extern glstatic_t gls;
+extern glstatic_t gls __attribute__((visibility("hidden")));
 
 #ifdef USE_FBO
 extern	qboolean			windowAdjusted;

@@ -41,7 +41,7 @@ int Sys_GetPhysicalMemoryMB(void) {
 	return mockPhysicalMemoryMB;
 }
 
-void Com_Error([[maybe_unused]] errorParm_t level, const char *fmt, ...) {
+void Com_Error(UNUSED_VAR errorParm_t level, const char *fmt, ...) {
 	// Mock Com_Error - just exit the test
 	va_list argptr;
 	va_start(argptr, fmt);

@@ -111,7 +111,7 @@ int		R_GetActiveFlareCount(void);
 void	R_SetFlareOcclusionEnabled(qboolean enabled);
 
 // CVAR declarations (extern)
-extern cvar_t *r_flaresEnhanced;
+extern cvar_t *r_flaresEnhanced __attribute__((visibility("hidden")));
 
 #endif // __TR_FLARES_ENHANCED_H__
 

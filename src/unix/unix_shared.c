@@ -695,13 +695,18 @@ qboolean Sys_SetAffinityMask( const uint64_t mask )
 }
 #endif // USE_AFFINITY_MASK
 
-// Stub implementations for scalability system
+// Real implementations for scalability system
 int Sys_GetPhysicalMemoryMB(void) {
-	return 4096; // Default to 4GB
+    long pages = sysconf(_SC_PHYS_PAGES);
+    long page_size = sysconf(_SC_PAGE_SIZE);
+    if (pages == -1 || page_size == -1) return 4096;
+    return (int)((pages * page_size) / (1024 * 1024));
 }
 
 int Sys_GetNumCPUCores(void) {
-	return 4; // Default to 4 cores
+    int cores = (int)sysconf(_SC_NPROCESSORS_ONLN);
+    if (cores == -1) return 4;
+    return cores;
 }
 
 // Stub implementations for monolithic build
