@@ -1,28 +1,15 @@
-#!/bin/bash
-
-# Compile Engine Script for id Tech 3 using CMake
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 
 # Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [vulkan] [opengl]
-# For reproducible builds: SOURCE_DATE_EPOCH=1609459200 ./compile_engine.sh
 # Notes:
-# - game_name only affects how we copy/rename into release (engine CMake target is fixed to idtech3)
 # - build type defaults to Release
-# - vulkan and opengl are mutually exclusive (defaults to neither, which builds OpenGL)
-# - arguments can be in any order, but first unrecognized argument becomes game_name
-# - Examples:
-#   ./compile_engine.sh                    # Build idtech3 with OpenGL in Release mode
-#   ./compile_engine.sh quake3 Debug       # Build quake3 with OpenGL in Debug mode
-#   ./compile_engine.sh vulkan             # Build idtech3 with Vulkan in Release mode
-#   ./compile_engine.sh mymod opengl clean # Clean and build mymod with OpenGL in Release mode
+# - vulkan and opengl are mutually exclusive
+# - if neither is specified: defaults to OpenGL
+# - first unrecognized arg becomes game_name
 
 VULKAN=0
 OPENGL=0
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-BUILD_DIR="$PROJECT_ROOT/build"
-RELEASE_DIR="$PROJECT_ROOT/release"
 
 GAME_NAME="idtech3"
 BUILD_TYPE="Release"
@@ -31,62 +18,58 @@ COVERAGE=0
 QUIET=0
 
 normalize_build_type() {
-    local arg=$(echo "$1" | tr '[:upper:]' '[:lower:]')
-    case "$arg" in
-        debug|dbg|d) echo "Debug" ;;
-        release|rel|r) echo "Release" ;;
-        *) echo "" ;;
-    esac
+  local arg
+  arg="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
+  case "$arg" in
+    debug|dbg|d) echo "Debug" ;;
+    release|rel|r) echo "Release" ;;
+    *) echo "" ;;
+  esac
 }
+
+# Find project root robustly (works whether script is in repo root or /scripts/)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/CMakeLists.txt" ]; then
+  PROJECT_ROOT="$SCRIPT_DIR"
+elif [ -f "$SCRIPT_DIR/../CMakeLists.txt" ]; then
+  PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+else
+  echo "Error: Could not find CMakeLists.txt near script location."
+  exit 1
+fi
+
+RELEASE_DIR="$PROJECT_ROOT/release"
 
 # Argument parsing
 for arg in "$@"; do
-    norm_bt="$(normalize_build_type "$arg")"
-    if [ -n "$norm_bt" ]; then
-        BUILD_TYPE="$norm_bt"
-        continue
-    fi
-    if [ "$arg" = "clean" ]; then
-        CLEAN=1
-        continue
-    fi
-    if [ "$arg" = "coverage" ] || [ "$arg" = "cov" ]; then
-        COVERAGE=1
-        continue
-    fi
-    if [ "$arg" = "quiet" ] || [ "$arg" = "-q" ] || [ "$arg" = "--quiet" ] || [ "$arg" = "q" ] || [ "$arg" = "silent" ] || [ "$arg" = "-s" ] || [ "$arg" = "--silent" ]; then
-        QUIET=1
-        continue
-    fi
-    if [ "$arg" = "vulkan" ]; then
-        VULKAN=1
-        continue
-    fi
-    if [ "$arg" = "opengl" ]; then
-        OPENGL=1
-        continue
-    fi
-    # Anything else is treated as desired game name (for copied filenames)
-    GAME_NAME="$arg"
+  norm_bt="$(normalize_build_type "$arg")"
+  if [ -n "$norm_bt" ]; then BUILD_TYPE="$norm_bt"; continue; fi
+
+  case "$arg" in
+    clean) CLEAN=1 ;;
+    coverage|cov) COVERAGE=1 ;;
+    quiet|-q|--quiet|q|silent|-s|--silent) QUIET=1 ;;
+    vulkan) VULKAN=1 ;;
+    opengl) OPENGL=1 ;;
+    *) GAME_NAME="$arg" ;;
+  esac
 done
 
-# Check for mutually exclusive options
-if [ $VULKAN -eq 1 ] && [ $OPENGL -eq 1 ]; then
-    echo "Error: vulkan and opengl are mutually exclusive"
-    exit 1
+if [ "$VULKAN" -eq 1 ] && [ "$OPENGL" -eq 1 ]; then
+  echo "Error: vulkan and opengl are mutually exclusive"
+  exit 1
 fi
 
-# Set CMake flags based on parsed options
-if [ $VULKAN -eq 1 ]; then
-    USE_VULKAN=ON
-else
-    USE_VULKAN=OFF
+# Default to OpenGL if neither specified
+if [ "$VULKAN" -eq 0 ] && [ "$OPENGL" -eq 0 ]; then
+  OPENGL=1
 fi
 
-if [ $OPENGL -eq 1 ]; then
-    USE_OPENGL=ON
+# Renderer-specific build directory (prevents cache collisions)
+if [ "$VULKAN" -eq 1 ]; then
+  BUILD_DIR="$PROJECT_ROOT/build-vk-${BUILD_TYPE}"
 else
-    USE_OPENGL=OFF
+  BUILD_DIR="$PROJECT_ROOT/build-gl-${BUILD_TYPE}"
 fi
 
 echo "Building id Tech 3 engine (${BUILD_TYPE})..."
@@ -94,105 +77,93 @@ echo "Project root: $PROJECT_ROOT"
 echo "Build dir:    $BUILD_DIR"
 echo "Release dir:  $RELEASE_DIR"
 
-if [ $CLEAN -eq 1 ] && [ -d "$BUILD_DIR" ]; then
-    echo "Cleaning build directory..."
-    rm -rf "$BUILD_DIR"
+if [ "$CLEAN" -eq 1 ]; then
+  echo "Cleaning build directory..."
+  rm -rf "$BUILD_DIR"
+  rm -rf "$PROJECT_ROOT/build-coverage" || true
 fi
-if [ $CLEAN -eq 1 ] && [ -d "$PROJECT_ROOT/build-coverage" ]; then
-    echo "Cleaning coverage build directory..."
-    rm -rf "$PROJECT_ROOT/build-coverage"
-fi
+
 mkdir -p "$BUILD_DIR"
 
-cd "$BUILD_DIR"
-
-echo "Running CMake configuration..."
-cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DUSE_STB_TRUETYPE=ON -DUSE_VULKAN=${USE_VULKAN} -DUSE_OPENGL=${USE_OPENGL} -DENABLE_FORTIFY_SOURCE=OFF -DENABLE_ASAN=OFF "$PROJECT_ROOT"
-
-# Determine number of CPU cores for parallel build
+# CPU cores
 if command -v nproc &>/dev/null; then
-    CORES=$(nproc)
-elif [[ "$OSTYPE" == "darwin"* ]]; then
-    CORES=$(sysctl -n hw.ncpu)
+  CORES="$(nproc)"
+elif [[ "${OSTYPE:-}" == "darwin"* ]]; then
+  CORES="$(sysctl -n hw.ncpu)"
 else
-    CORES=4
+  CORES=4
 fi
 
-echo "Building with ${CORES} parallel jobs..."
-if [ $QUIET -eq 1 ]; then
-    cmake --build . -- -j${CORES} -s
+# CMake flags
+CMAKE_FLAGS=(
+  "-DCMAKE_BUILD_TYPE=${BUILD_TYPE}"
+  "-DUSE_STB_TRUETYPE=ON"
+  "-DENABLE_FORTIFY_SOURCE=OFF"
+  "-DENABLE_ASAN=OFF"
+)
+
+if [ "$VULKAN" -eq 1 ]; then
+  CMAKE_FLAGS+=("-DUSE_VULKAN=ON" "-DUSE_OPENGL=OFF")
 else
-    cmake --build . -- -j${CORES}
+  CMAKE_FLAGS+=("-DUSE_VULKAN=OFF" "-DUSE_OPENGL=ON")
+fi
+
+echo "Running CMake configuration..."
+cmake -S "$PROJECT_ROOT" -B "$BUILD_DIR" "${CMAKE_FLAGS[@]}"
+
+echo "Building with ${CORES} parallel jobs..."
+if [ "$QUIET" -eq 1 ]; then
+  cmake --build "$BUILD_DIR" -- -j"${CORES}" -s
+else
+  cmake --build "$BUILD_DIR" -- -j"${CORES}"
 fi
 
 echo ""
 echo "Build completed. Binaries are in $BUILD_DIR"
-echo "  - Client:   $BUILD_DIR/idtech3.x86_64"
-echo "  - Server:   $BUILD_DIR/idtech3.server.x86_64 (if built)"
-echo "  - Renderers: $BUILD_DIR/idtech3_*_*.so"
 
 echo ""
 echo "Copying engine binaries and renderer .so files to $RELEASE_DIR..."
 mkdir -p "$RELEASE_DIR"
 
-# Copy main client executable as .so only (no plain binary kept in release)
-if [ -f "idtech3.x86_64" ]; then
-    # Remove any stale non-.so copy to avoid confusion
-    rm -f "$RELEASE_DIR/${GAME_NAME}.x86_64"
-    cp -f "idtech3.x86_64" "$RELEASE_DIR/${GAME_NAME}.x86_64.so"
-    echo "Copied client -> $RELEASE_DIR/${GAME_NAME}.x86_64.so"
+# Client
+if [ -f "$BUILD_DIR/idtech3.x86_64" ]; then
+  cp -f "$BUILD_DIR/idtech3.x86_64" "$RELEASE_DIR/${GAME_NAME}.x86_64"
+  echo "Copied client -> $RELEASE_DIR/${GAME_NAME}.x86_64"
 fi
 
-# Copy dedicated server executable (if present) with both native and legacy name
-if [ -f "idtech3.server.x86_64" ]; then
-    cp -f "idtech3.server.x86_64" "$RELEASE_DIR/${GAME_NAME}.server.x86_64"
-    cp -f "idtech3.server.x86_64" "$RELEASE_DIR/${GAME_NAME}.ded.x86_64"
-    echo "Copied server -> ${RELEASE_DIR}/${GAME_NAME}.server.x86_64 (alias *.ded.x86_64)"
+# Server
+if [ -f "$BUILD_DIR/idtech3.server.x86_64" ]; then
+  cp -f "$BUILD_DIR/idtech3.server.x86_64" "$RELEASE_DIR/${GAME_NAME}.server.x86_64"
+  cp -f "$BUILD_DIR/idtech3.server.x86_64" "$RELEASE_DIR/${GAME_NAME}.ded.x86_64"
+  echo "Copied server -> $RELEASE_DIR/${GAME_NAME}.server.x86_64 (alias *.ded.x86_64)"
 fi
 
-# Copy renderers; keep only canonical CMake names (no extra aliases)
+# Renderers
 shopt -s nullglob
-for sofile in idtech3_*_*.so; do
-    base=$(basename "$sofile")
-    cp -f "$sofile" "$RELEASE_DIR/$base"
-    echo "Copied renderer -> $RELEASE_DIR/$base"
+for sofile in "$BUILD_DIR"/idtech3_*_*.so; do
+  base="$(basename "$sofile")"
+  cp -f "$sofile" "$RELEASE_DIR/$base"
+  echo "Copied renderer -> $RELEASE_DIR/$base"
 done
 shopt -u nullglob
 
-# Copy shared ImGui runtime if present (required when USE_CIMGUI=ON)
-if [ -f "libimgui_shared.so" ]; then
-    cp -f "libimgui_shared.so" "$RELEASE_DIR/"
-    echo "Copied libimgui_shared.so to $RELEASE_DIR/"
+# ImGui shared
+if [ -f "$BUILD_DIR/libimgui_shared.so" ]; then
+  cp -f "$BUILD_DIR/libimgui_shared.so" "$RELEASE_DIR/"
+  echo "Copied libimgui_shared.so to $RELEASE_DIR/"
 fi
 
-# Quick validation summary
-MISSING=0
-if [ ! -f "$RELEASE_DIR/${GAME_NAME}.x86_64.so" ]; then
-    echo "Warning: Client binary missing at $RELEASE_DIR/${GAME_NAME}.x86_64.so"
-    MISSING=1
-fi
-shopt -s nullglob
-RENDERER_FILES=("$RELEASE_DIR"/idtech3_*_*.so)
-shopt -u nullglob
-if [ ${#RENDERER_FILES[@]} -eq 0 ]; then
-    echo "Warning: Renderer .so files not found in $RELEASE_DIR"
-    MISSING=1
-fi
-if [ $MISSING -eq 0 ]; then
-    echo "✓ Engine artifacts ready in $RELEASE_DIR"
+# Coverage
+if [ "$COVERAGE" -eq 1 ]; then
+  echo ""
+  echo "Running coverage configuration/build (Debug, ENABLE_COVERAGE=ON)..."
+  if ! command -v gcovr >/dev/null 2>&1; then
+    echo "gcovr not found in PATH; skipping coverage report generation."
+  else
+    cmake -S "$PROJECT_ROOT" -B "$PROJECT_ROOT/build-coverage" -DCMAKE_BUILD_TYPE=Debug -DENABLE_COVERAGE=ON
+    cmake --build "$PROJECT_ROOT/build-coverage" --target coverage
+    echo "Coverage artifacts (HTML/XML) should be in build-coverage/"
+  fi
 fi
 
-echo "Engine binary and renderer .so files updated in $RELEASE_DIR"
-
-# Optional coverage build (Debug + ENABLE_COVERAGE=ON)
-if [ $COVERAGE -eq 1 ]; then
-    echo ""
-    echo "Running coverage configuration/build (Debug, ENABLE_COVERAGE=ON)..."
-    if ! command -v gcovr >/dev/null 2>&1; then
-        echo "gcovr not found in PATH; skipping coverage report generation."
-    else
-        cmake -S "$PROJECT_ROOT" -B "$PROJECT_ROOT/build-coverage" -DCMAKE_BUILD_TYPE=Debug -DENABLE_COVERAGE=ON
-        cmake --build "$PROJECT_ROOT/build-coverage" --target coverage
-        echo "Coverage artifacts (HTML/XML) should be in build-coverage/"
-    fi
-fi
+echo "✓ Engine artifacts ready in $RELEASE_DIR"
