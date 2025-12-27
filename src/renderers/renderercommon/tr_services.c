@@ -914,6 +914,22 @@ void *S_Malloc(int size) {
     return malloc((size_t)size);
 }
 
+int CM_NumClusters(void) {
+    return ri.CM_NumClusters ? ri.CM_NumClusters() : 0;
+}
+
+int CM_ClusterSize(void) {
+    return ri.CM_ClusterSize ? ri.CM_ClusterSize() : 0;
+}
+
+qboolean CM_ClusterVisible(int cluster1, int cluster2) {
+    return ri.CM_ClusterVisible ? ri.CM_ClusterVisible(cluster1, cluster2) : qfalse;
+}
+
+byte *CM_ClusterPVS(int cluster) {
+    return ri.CM_ClusterPVS ? ri.CM_ClusterPVS(cluster) : NULL;
+}
+
 struct channel_s;
 void S_Spatialize(struct channel_s *ch) {
     (void)ch;

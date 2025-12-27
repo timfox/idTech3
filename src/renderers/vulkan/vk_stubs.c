@@ -44,6 +44,7 @@ cvar_t *r_materialMagic;
 cvar_t *r_nocurves;
 cvar_t *r_presentBits;
 cvar_t *r_glint_intensity;
+cvar_t *r_cellLoadRadius;
 cvar_t *r_glint_scale;
 cvar_t *r_greyscale;
 cvar_t *r_bloom_intensity;
