@@ -1,0 +1,18 @@
+{
+  "setup-worktree": [
+    "git submodule update --init --recursive",
+    "bash -lc 'chmod +x ./compile_engine.sh'"
+  ],
+  "profiles": {
+    "vulkan-dev": {
+      "setup": [
+        "bash -lc './compile_engine.sh vulkan'"
+      ]
+    },
+    "opengl-compat": {
+      "setup": [
+        "bash -lc './compile_engine.sh opengl'"
+      ]
+    }
+  }
+}

@@ -3,11 +3,21 @@
 # Compile Engine Script for id Tech 3 using CMake
 set -e
 
-# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet]
+# Usage: ./compile_engine.sh [game_name] [Debug|Release] [clean] [quiet] [coverage] [vulkan] [opengl]
 # For reproducible builds: SOURCE_DATE_EPOCH=1609459200 ./compile_engine.sh
 # Notes:
 # - game_name only affects how we copy/rename into release (engine CMake target is fixed to idtech3)
 # - build type defaults to Release
+# - vulkan and opengl are mutually exclusive (defaults to neither, which builds OpenGL)
+# - arguments can be in any order, but first unrecognized argument becomes game_name
+# - Examples:
+#   ./compile_engine.sh                    # Build idtech3 with OpenGL in Release mode
+#   ./compile_engine.sh quake3 Debug       # Build quake3 with OpenGL in Debug mode
+#   ./compile_engine.sh vulkan             # Build idtech3 with Vulkan in Release mode
+#   ./compile_engine.sh mymod opengl clean # Clean and build mymod with OpenGL in Release mode
+
+VULKAN=0
+OPENGL=0
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -48,9 +58,36 @@ for arg in "$@"; do
         QUIET=1
         continue
     fi
+    if [ "$arg" = "vulkan" ]; then
+        VULKAN=1
+        continue
+    fi
+    if [ "$arg" = "opengl" ]; then
+        OPENGL=1
+        continue
+    fi
     # Anything else is treated as desired game name (for copied filenames)
     GAME_NAME="$arg"
 done
+
+# Check for mutually exclusive options
+if [ $VULKAN -eq 1 ] && [ $OPENGL -eq 1 ]; then
+    echo "Error: vulkan and opengl are mutually exclusive"
+    exit 1
+fi
+
+# Set CMake flags based on parsed options
+if [ $VULKAN -eq 1 ]; then
+    USE_VULKAN=ON
+else
+    USE_VULKAN=OFF
+fi
+
+if [ $OPENGL -eq 1 ]; then
+    USE_OPENGL=ON
+else
+    USE_OPENGL=OFF
+fi
 
 echo "Building id Tech 3 engine (${BUILD_TYPE})..."
 echo "Project root: $PROJECT_ROOT"
@@ -70,7 +107,7 @@ mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
 echo "Running CMake configuration..."
-cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DUSE_STB_TRUETYPE=ON -DUSE_VULKAN=OFF -DENABLE_FORTIFY_SOURCE=OFF -DENABLE_ASAN=OFF "$PROJECT_ROOT"
+cmake -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DUSE_STB_TRUETYPE=ON -DUSE_VULKAN=${USE_VULKAN} -DUSE_OPENGL=${USE_OPENGL} -DENABLE_FORTIFY_SOURCE=OFF -DENABLE_ASAN=OFF "$PROJECT_ROOT"
 
 # Determine number of CPU cores for parallel build
 if command -v nproc &>/dev/null; then
