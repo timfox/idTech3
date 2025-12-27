@@ -113,7 +113,13 @@ typedef struct {
 // Forward declarations for functions used in inline functions
 #include <string.h>
 #include <stdint.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 int Q_stricmp(const char *s1, const char *s2);
+#ifdef __cplusplus
+}
+#endif
 
 // Type-safe file operations
 static inline qboolean File_IsValidPath(const char *path) {
@@ -1178,9 +1184,16 @@ int QDECL Com_sprintf( char *dest, int size, const char *fmt, ... ) __attribute_
 }
 #endif
 
+// Keep linkage consistent for C++ builds (these are implemented in C).
+#ifdef __cplusplus
+extern "C" {
+#endif
 int Com_Split( char *in, char **out, int outsz, int delim );
 int Com_HexStrToInt( const char *str );
 qboolean Com_GetHashColor( const char *str, byte *color );
+#ifdef __cplusplus
+}
+#endif
 
 const char *Com_SkipTokens( const char *s, int numTokens, const char *sep );
 const char *Com_SkipCharset( const char *s, const char *sep );
@@ -1362,6 +1375,9 @@ void	Swap_Init (void);
 */
 
 // Internal swap functions (q_shared.c)
+#ifdef __cplusplus
+extern "C" {
+#endif
 void CopyShortSwap(void *dest, void *src);
 void CopyLongSwap(void *dest, void *src);
 short ShortNoSwap (short l);
@@ -1370,6 +1386,9 @@ qint64 Long64Swap (qint64 ll);
 qint64 Long64NoSwap( qint64 ll );
 float FloatNoSwap( const float *f );
 unsigned int crc32_buffer( const byte *buf, unsigned int len );
+#ifdef __cplusplus
+}
+#endif
 
 #ifdef __cplusplus
 extern "C" {

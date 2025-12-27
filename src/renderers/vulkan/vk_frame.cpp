@@ -164,7 +164,7 @@ extern "C" void vk_end_frame(void) {
 
     // Apply post-processing effects
     if (vk_has_post_processing()) {
-        vk_volumetric_fog_render(vk.tess[vk.cmd_index].command_buffer);
+        vk_volumetric_fog_render();
         vk_apply_bloom();
         vk_apply_tone_mapping();
         vk_apply_gamma_correction();

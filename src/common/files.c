@@ -3672,13 +3672,37 @@ static qboolean FS_SavePackToFile( const pack_t *pak, FILE *f )
 	pk3cacheFileItem_t it;
 	int namesLen, contentLen;
 	
-	namePtr = (char*)(pak->buildBuffer + pak->numfiles);
+	// NOTE:
+	// `pack_t::numfiles` can be decreased after loading (e.g. banned files),
+	// but the backing memory layout still reserves the original fileInPack_t
+	// array size. Derive the start of the filenames buffer from the smallest
+	// `fileInPack_t::name` pointer instead of assuming `buildBuffer + numfiles`.
+	namePtr = NULL;
+	for ( i = 0; i < pak->numfiles; i++ ) {
+		const char *n = pak->buildBuffer[i].name;
+		if ( n == NULL ) {
+			continue;
+		}
+		if ( namePtr == NULL || n < namePtr ) {
+			namePtr = n;
+		}
+	}
+	if ( namePtr == NULL ) {
+		// No filenames present; don't write an invalid cache entry.
+		return qfalse;
+	}
 
 	pakName = pak->pakFilename;
 	pakNameLen = (int) strlen( pakName ) + 1;
 	pakNameLen = PAD( pakNameLen, sizeof( int ) );
 
-	namesLen = pakName - namePtr;
+	if ( pakName <= namePtr ) {
+		// Corrupt pack layout; avoid writing a malformed cache file.
+		return qfalse;
+	}
+	namesLen = (int)( pakName - namePtr );
+	// Cache file expects 4-byte alignment for names buffer length.
+	namesLen = PAD( namesLen, sizeof( int ) );
 
 	// file content length
 	contentLen = 0;

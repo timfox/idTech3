@@ -134,11 +134,7 @@ void vk_atmosphere_init( void )
 	Com_Memcpy( &vk.atmosphere.currentParams, &atmospherePresets[ATMOSPHERE_CALM], sizeof( atmosphere_params_t ) );
 	Com_Memcpy( &vk.atmosphere.targetParams, &atmospherePresets[ATMOSPHERE_CALM], sizeof( atmosphere_params_t ) );
 	Com_Memcpy( &vk.atmosphere.baseParams, &atmospherePresets[ATMOSPHERE_CALM], sizeof( atmosphere_params_t ) );
-	
-	vk.atmosphere.noiseTexture = R_RegisterImage( "textures/common/noise", IMGFLAG_CLAMPTOEDGE | IMGFLAG_NOMIPMAP );
-	if ( !vk.atmosphere.noiseTexture ) {
-		ri.Printf( PRINT_WARNING, "Atmosphere system: Failed to load noise texture for volumetric fog.\n" );
-	}
+	// Noise texture is optional and handled by the dedicated volumetric fog system.
 
 	// Load volumetric fog shaders manually if they are not in the bundled data
 	if ( vk.modules.volumetric_fog_comp == VK_NULL_HANDLE ) {

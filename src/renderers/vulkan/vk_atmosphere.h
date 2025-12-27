@@ -65,7 +65,7 @@ void vk_atmosphere_update( void );
 // Volumetric Fog API
 void vk_volumetric_fog_init( void );
 void vk_volumetric_fog_shutdown( void );
-void vk_volumetric_fog_render( VkCommandBuffer cmdBuffer );
+void vk_volumetric_fog_render( void );
 
 // Preset control
 void vk_atmosphere_set_preset( atmosphere_preset_t preset, float transitionTime );

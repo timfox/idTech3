@@ -220,7 +220,13 @@ Sys_GetCPUCount
 Get number of CPU cores
 =================
 */
+#ifdef __cplusplus
+extern "C" {
+#endif
 int Sys_GetCPUCount(void);
+#ifdef __cplusplus
+}
+#endif
 
 /*
 =================
