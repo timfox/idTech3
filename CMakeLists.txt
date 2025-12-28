@@ -424,6 +424,10 @@ IF(USE_STB_TRUETYPE)
 	add_compile_definitions(USE_STB_TRUETYPE)
 ENDIF()
 
+IF(USE_VULKAN)
+	add_compile_definitions(USE_VULKAN)
+ENDIF()
+
 # Reproducible builds: pass SOURCE_DATE_EPOCH as compile definition if set
 IF(DEFINED ENV{SOURCE_DATE_EPOCH})
 	add_compile_definitions(SOURCE_DATE_EPOCH="$ENV{SOURCE_DATE_EPOCH}")
@@ -1182,9 +1186,6 @@ IF(USE_CIMGUI AND DEFINED CIMGUI_DIR)
 		TARGET_COMPILE_DEFINITIONS(client PRIVATE CIMGUI_USE_SDL2 USE_SDL)
 	endif()
 	# Unified Vulkan flag (no separate USE_VULKAN_API needed)
-	if(USE_VULKAN)
-		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_VULKAN)
-	endif()
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_OPENGL_API)
 ENDIF()
 
@@ -1622,9 +1623,6 @@ ELSEIF(UNIX)
 
 	IF(USE_SDL)
 		AUX_SOURCE_DIRECTORY(src/sdl Q3_UI_SRCS)
-		IF(USE_VULKAN)
-			list(REMOVE_ITEM Q3_UI_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/src/sdl/sdl_glimp.c)
-		ENDIF()
 	ELSE()
 		SET(Q3_UI_SRCS
 			src/unix/linux_glimp.c
@@ -3615,6 +3613,67 @@ ENDIF()
 OPTION(BUILD_TESTS "Build unit tests" ON)
 IF(BUILD_TESTS)
 	ENABLE_TESTING()
-	# Test files moved - no tests currently available
-	MESSAGE(STATUS "Tests moved - BUILD_TESTS enabled but no test files found")
+	# Minimal unit tests live under src/tests.
+	# Start small and expand as tests are stabilized.
+	ADD_EXECUTABLE(test_qcommon
+		src/tests/test_qcommon.c
+		src/common/q_shared.c
+	)
+	TARGET_LINK_LIBRARIES(test_qcommon PRIVATE m)
+	TARGET_INCLUDE_DIRECTORIES(test_qcommon PRIVATE
+		${CMAKE_SOURCE_DIR}/src
+		${CMAKE_SOURCE_DIR}/src/tests
+	)
+	ADD_TEST(NAME test_qcommon COMMAND test_qcommon)
+	SET_TARGET_PROPERTIES(test_qcommon PROPERTIES
+		RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+	)
+
+	ADD_EXECUTABLE(test_qmath
+		src/tests/test_qmath.c
+		src/common/q_shared.c
+		src/common/q_math.c
+	)
+	TARGET_LINK_LIBRARIES(test_qmath PRIVATE m)
+	TARGET_INCLUDE_DIRECTORIES(test_qmath PRIVATE
+		${CMAKE_SOURCE_DIR}/src
+		${CMAKE_SOURCE_DIR}/src/tests
+	)
+	ADD_TEST(NAME test_qmath COMMAND test_qmath)
+	SET_TARGET_PROPERTIES(test_qmath PROPERTIES
+		RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+	)
+
+	ADD_EXECUTABLE(test_info
+		src/tests/test_info.c
+		src/common/q_shared.c
+	)
+	TARGET_LINK_LIBRARIES(test_info PRIVATE m)
+	TARGET_INCLUDE_DIRECTORIES(test_info PRIVATE
+		${CMAKE_SOURCE_DIR}/src
+		${CMAKE_SOURCE_DIR}/src/tests
+	)
+	ADD_TEST(NAME test_info COMMAND test_info)
+	SET_TARGET_PROPERTIES(test_info PROPERTIES
+		RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+	)
+
+	ADD_EXECUTABLE(test_msg_secure
+		src/tests/test_msg_secure.c
+		src/common/q_shared.c
+		src/common/msg.c
+		src/common/msg_secure.c
+		src/common/huffman_static.c
+	)
+	TARGET_LINK_LIBRARIES(test_msg_secure PRIVATE m)
+	TARGET_INCLUDE_DIRECTORIES(test_msg_secure PRIVATE
+		${CMAKE_SOURCE_DIR}/src
+		${CMAKE_SOURCE_DIR}/src/tests
+	)
+	ADD_TEST(NAME test_msg_secure COMMAND test_msg_secure)
+	SET_TARGET_PROPERTIES(test_msg_secure PROPERTIES
+		RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+	)
+
+	MESSAGE(STATUS "Tests enabled: test_qcommon")
 ENDIF()

@@ -580,18 +580,51 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 	{
 		const char *driverName;
 
-		// If using Vulkan, explicitly set the video driver to X11 to prevent implicit OpenGL backend loading
-		#ifdef USE_VULKAN
-		if ( vulkan ) {
-			SDL_SetHint( SDL_HINT_VIDEODRIVER, "x11" );
-		}
-		#endif
+		// Wayland-first on Linux when available.
+		//
+		// Rationale:
+		// - SDL2 supports Wayland and X11 backends; historically we forced X11 for Vulkan.
+		// - We now want a Wayland-native window by default when running under Wayland.
+		// - Keep a robust fallback to X11 if Wayland initialization fails.
+		//
+		// Notes:
+		// - Respect explicit user overrides via SDL_VIDEODRIVER.
+		// - Only attempt Wayland when WAYLAND_DISPLAY is present.
+#if defined(__linux__) || defined(__unix__)
+		{
+			const char *forcedDriver = SDL_getenv( "SDL_VIDEODRIVER" );
+			const char *waylandDisplay = SDL_getenv( "WAYLAND_DISPLAY" );
+			const qboolean canTryWayland = ( ( !forcedDriver || !forcedDriver[0] ) && ( waylandDisplay && waylandDisplay[0] ) );
 
+			if ( canTryWayland ) {
+				SDL_SetHint( SDL_HINT_VIDEODRIVER, "wayland" );
+				// Explicitly disable libdecor to avoid GTK dependencies and related crashes.
+				// This relies on the compositor providing server-side decorations or the 
+				// engine handling its own window state.
+				SDL_SetHint( "SDL_VIDEO_WAYLAND_ALLOW_LIBDECOR", "0" );
+			}
+
+			if ( SDL_Init( SDL_INIT_VIDEO ) != 0 ) {
+				if ( canTryWayland ) {
+					Com_Printf( "SDL_Init video failed with Wayland driver (%s), retrying with X11...\n", SDL_GetError() );
+					SDL_SetHint( SDL_HINT_VIDEODRIVER, "x11" );
+					if ( SDL_Init( SDL_INIT_VIDEO ) != 0 ) {
+						Com_Printf( "SDL_Init( SDL_INIT_VIDEO ) FAILED (%s)\n", SDL_GetError() );
+						return RSERR_FATAL_ERROR;
+					}
+				} else {
+					Com_Printf( "SDL_Init( SDL_INIT_VIDEO ) FAILED (%s)\n", SDL_GetError() );
+					return RSERR_FATAL_ERROR;
+				}
+			}
+		}
+#else
 		if ( SDL_Init( SDL_INIT_VIDEO ) != 0 )
 		{
 			Com_Printf( "SDL_Init( SDL_INIT_VIDEO ) FAILED (%s)\n", SDL_GetError() );
 			return RSERR_FATAL_ERROR;
 		}
+#endif
 
 		driverName = SDL_GetCurrentVideoDriver();
 
@@ -791,7 +824,22 @@ VK_GetInstanceProcAddr
 */
 VK_EXPORT PFN_vkVoidFunction VK_GetInstanceProcAddr( VkInstance instance, const char *name )
 {
-	return qvkGetInstanceProcAddr( instance, name );
+	if ( qvkGetInstanceProcAddr == NULL )
+	{
+		void *addr = SDL_Vulkan_GetVkGetInstanceProcAddr();
+		fprintf(stderr, "VK_GetInstanceProcAddr: SDL_Vulkan_GetVkGetInstanceProcAddr returned %p\n", addr);
+		qvkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)(intptr_t)addr;
+	}
+
+	if ( qvkGetInstanceProcAddr == NULL )
+	{
+		fprintf(stderr, "VK_GetInstanceProcAddr: qvkGetInstanceProcAddr is STILL NULL!\n");
+		return NULL;
+	}
+
+	PFN_vkVoidFunction res = qvkGetInstanceProcAddr( instance, name );
+	fprintf(stderr, "VK_GetInstanceProcAddr(instance=%p, name=%s) returned %p\n", (void*)instance, name, (void*)res);
+	return res;
 }
 
 

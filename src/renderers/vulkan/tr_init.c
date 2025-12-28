@@ -34,6 +34,12 @@ extern refimport_t ri;
 // Forward declarations for renderer entry points
 void RE_Shutdown( refShutdownCode_t code );
 void RE_BeginRegistration( glconfig_t *glconfigOut );
+#ifdef USE_CIMGUI
+qboolean RE_ImGuiBackend_Init( void );
+void RE_ImGuiBackend_Shutdown( void );
+void RE_ImGuiBackend_NewFrame( void );
+void RE_ImGuiBackend_RenderDrawData( const struct ImDrawData *drawData );
+#endif
 qhandle_t RE_RegisterModel( const char *name );
 qhandle_t RE_RegisterSkin( const char *name );
 qhandle_t RE_RegisterShader( const char *name );
@@ -261,6 +267,7 @@ static void R_Register( void ) {
     r_vk_profiling = ri.Cvar_Get( "r_vk_profiling", "0", CVAR_ARCHIVE_ND );
     r_vk_debug_overlay = ri.Cvar_Get( "r_vk_debug_overlay", "0", CVAR_ARCHIVE_ND );
     r_vk_disableScreenMap = ri.Cvar_Get( "r_vk_disableScreenMap", "0", CVAR_ARCHIVE_ND );
+    r_vk_icd = ri.Cvar_Get( "r_vk_icd", "", CVAR_ARCHIVE_ND | CVAR_LATCH );
 
     r_procDressing = ri.Cvar_Get( "r_procDressing", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
     r_materialSystem = ri.Cvar_Get( "r_materialSystem", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
@@ -397,13 +404,17 @@ static void R_Register( void ) {
 
 void R_Init( void ) {
     static qboolean initialized = qfalse;
+    fprintf(stderr, "R_Init: called, initialized=%d\n", (int)initialized);
     if ( initialized ) {
         return;
     }
     initialized = qtrue;
 
+    fprintf(stderr, "R_Init: about to call R_Register\n");
     R_Register();
+    fprintf(stderr, "R_Init: about to call vk_initialize\n");
     vk_initialize();
+    fprintf(stderr, "R_Init: vk_initialize completed\n");
 }
 
 /*
@@ -418,16 +429,27 @@ refexport_t *GetRefAPI( int apiVersion, refimport_t *rimp ) {
 #endif
     static refexport_t re;
 
+    fprintf(stderr, "GetRefAPI: called\n");
+    if (!rimp) {
+        fprintf(stderr, "GetRefAPI: rimp is NULL!\n");
+        return NULL;
+    }
+
+    fprintf(stderr, "GetRefAPI: about to copy rimp\n");
     ri = *rimp;
+    fprintf(stderr, "GetRefAPI: rimp copied\n");
 
     Com_Memset( &re, 0, sizeof( re ) );
 
     if ( apiVersion != REF_API_VERSION ) {
+        fprintf(stderr, "GetRefAPI: version mismatch\n");
         ri.Printf( PRINT_ALL, "Mismatched REF_API_VERSION: expected %i, got %i\n", REF_API_VERSION, apiVersion );
         return NULL;
     }
 
+    fprintf(stderr, "GetRefAPI: about to call R_Register\n");
     R_Register();
+    fprintf(stderr, "GetRefAPI: R_Register completed\n");
 
     re.Shutdown = RE_Shutdown;
     re.BeginRegistration = RE_BeginRegistration;
@@ -459,6 +481,14 @@ refexport_t *GetRefAPI( int apiVersion, refimport_t *rimp ) {
     re.TakeVideoFrame = RE_TakeVideoFrame;
     re.inPVS = RE_InPVS;
 
+#ifdef USE_CIMGUI
+    re.ImGuiBackendInit = RE_ImGuiBackend_Init;
+    re.ImGuiBackendShutdown = RE_ImGuiBackend_Shutdown;
+    re.ImGuiBackendNewFrame = RE_ImGuiBackend_NewFrame;
+    re.ImGuiBackendRenderDrawData = RE_ImGuiBackend_RenderDrawData;
+#endif
+
+    fprintf(stderr, "DEBUG: Renderer sizeof(refexport_t) = %zu\n", sizeof(refexport_t));
     return &re;
 }
 

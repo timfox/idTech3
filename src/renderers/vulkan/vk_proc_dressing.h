@@ -9,7 +9,7 @@ Type definitions and constants for the procedural dressing system.
 #ifndef __VK_PROC_DRESSING_H__
 #define __VK_PROC_DRESSING_H__
 
-#include "q_shared.h"
+#include "../../common/q_shared.h"
 
 // Maximum number of procedural instances
 #define VK_MAX_PROC_INSTANCES 65536

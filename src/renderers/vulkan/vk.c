@@ -2300,6 +2300,7 @@ static void vk_destroy_instance( void ) {
 
 #ifdef USE_VK_VALIDATION
 	if ( vk_debug_callback ) {
+		fprintf(stderr, "vk_destroy_instance: destroying debug callback\n");
 		if ( qvkDestroyDebugReportCallbackEXT != NULL ) {
 			qvkDestroyDebugReportCallbackEXT( vk_instance, vk_debug_callback, NULL );
 		}
@@ -2308,32 +2309,37 @@ static void vk_destroy_instance( void ) {
 #endif
 
 	if ( vk_instance != VK_NULL_HANDLE ) {
+		fprintf(stderr, "vk_destroy_instance: destroying instance\n");
 		if ( qvkDestroyInstance ) {
 			qvkDestroyInstance( vk_instance, NULL );
 		}
 		vk_instance = VK_NULL_HANDLE;
 	}
+	fprintf(stderr, "vk_destroy_instance: completed\n");
 }
 
 
 static void init_vulkan_library( void )
 {
+	fprintf(stderr, "init_vulkan_library: called\n");
 	VkPhysicalDeviceProperties props;
 	VkPhysicalDevice *physical_devices;
 	uint32_t device_count;
 	int device_index;
 	VkResult res;
 
-	ri.Printf(PRINT_ALL, "DEBUG: init_vulkan_library calling Com_Memset\n");
+	fprintf(stderr, "init_vulkan_library: about to memset vk (size=%zu)\n", sizeof(vk));
 	Com_Memset( &vk, 0, sizeof( vk ) );
-	ri.Printf(PRINT_ALL, "DEBUG: init_vulkan_library memset completed\n");
+	fprintf(stderr, "init_vulkan_library: memset completed\n");
 
-	// Run safety checks on Vulkan initialization
 	vk_safety_checks();
+	fprintf(stderr, "init_vulkan_library: safety checks completed\n");
 
 #ifdef USE_VULKAN
+	fprintf(stderr, "init_vulkan_library: checking r_vk_icd\n");
 	// Allow forcing a specific ICD via cvar (maps to VK_ICD_FILENAMES).
 	if ( r_vk_icd && r_vk_icd->string && r_vk_icd->string[0] ) {
+		fprintf(stderr, "init_vulkan_library: setting VK_ICD_FILENAMES to %s\n", r_vk_icd->string);
 		if ( setenv( "VK_ICD_FILENAMES", r_vk_icd->string, 1 ) == 0 ) {
 			ri.Printf( PRINT_ALL, "...using VK_ICD_FILENAMES override: %s\n", r_vk_icd->string );
 		} else {
@@ -2342,6 +2348,7 @@ static void init_vulkan_library( void )
 	}
 #endif
 
+	fprintf(stderr, "init_vulkan_library: checking vk_instance\n");
 	if ( vk_instance == VK_NULL_HANDLE ) {
 
 		// force cleanup
@@ -3522,17 +3529,18 @@ static void vk_create_pipeline_layouts(void);
 
 void vk_initialize( void )
 {
+	fprintf(stderr, "vk_initialize: called, active=%d\n", (int)vk.active);
 	if ( vk.active ) {
 		return;
 	}
-	ri.Printf(PRINT_ALL, "DEBUG: init_vulkan_library completed, about to create shader modules\n");
+	fprintf(stderr, "vk_initialize: about to call init_vulkan_library\n");
 	init_vulkan_library();
+	fprintf(stderr, "vk_initialize: init_vulkan_library completed\n");
 
 	// Create shader modules early so they are available for pipeline creation
-	ri.Printf(PRINT_ALL, "Vulkan: Initializing shader modules\n");
-	ri.Printf(PRINT_ALL, "DEBUG: Calling vk_create_shader_modules\n");
+	fprintf(stderr, "vk_initialize: about to call vk_create_shader_modules\n");
 	vk_create_shader_modules();
-	ri.Printf(PRINT_ALL, "DEBUG: vk_create_shader_modules completed\n");
+	fprintf(stderr, "vk_initialize: vk_create_shader_modules completed\n");
 
 	// Initialize ray tracing if supported
 	if (vk.rayTracingSupported) {
@@ -5316,7 +5324,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
 		case TYPE_VOLUMETRIC_FOG_COMPOSITE:
 			vs_module = vk.modules.post_vert;
-			fs_module = vk.modules.volumetric_fog_composite_frag;
+			fs_module = vk.modules.volumetric_fog_composite_comp;
 			break;
 
 		default:
@@ -5498,7 +5506,7 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
 		case TYPE_VOLUMETRIC_FOG_COMPOSITE:
 			vs_module = vk.modules.post_vert;
-			fs_module = vk.modules.volumetric_fog_composite_frag;
+			fs_module = vk.modules.volumetric_fog_composite_comp;
 			break;
 
 		default:

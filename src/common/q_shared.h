@@ -84,23 +84,11 @@ typedef unsigned char byte;
 #include <stdbool.h>
 #endif
 
-// Use native bool as the primary boolean type, keep qboolean for mod compatibility
-#ifdef __cplusplus  // For C++ mode
-using qboolean = bool;
-#define qtrue true
-#define qfalse false
-#else  // For C mode
-# if __STDC_VERSION__ >= 202311L  // C23 has native bool keyword
-typedef bool qboolean;
-#define qtrue true
-#define qfalse false
-# else  // Fallback for pre-C23 compilers
-#include <stdbool.h>
-typedef bool qboolean;
-#define qtrue true
-#define qfalse false
-# endif
-#endif
+// Use 4-byte qboolean for ABI compatibility with existing renderers and mods.
+// Using an int instead of an enum allows implicit conversions in C++
+// which avoids breaking modern code while maintaining the 4-byte size.
+typedef int qboolean;
+enum { qfalse = 0, qtrue = 1 };
 
 // Type-safe file handle
 typedef struct {

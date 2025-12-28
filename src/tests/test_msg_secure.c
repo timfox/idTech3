@@ -7,15 +7,26 @@ Tests the enhanced message handling with bounds checking.
 */
 
 #include "test_framework.h"
-#include "../src/common/msg_secure.h"
+#include "../common/msg_secure.h"
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 // Mock stubs for external dependencies
 cvar_t *cl_shownet = NULL;
 
+void Com_Printf( const char *fmt, ... ) {
+	va_list argptr;
+	va_start( argptr, fmt );
+	vprintf( fmt, argptr );
+	va_end( argptr );
+}
+
 void Com_Error(errorParm_t level, const char *error, ...) {
     (void)level;
     (void)error;
-    // Tests don't exit on error
+	// This is declared noreturn in the engine; keep that contract.
+	abort();
 }
 
 // Test buffer

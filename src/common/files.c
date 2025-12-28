@@ -5516,6 +5516,22 @@ static void FS_AddGameDirectory( const char *path, const char *dir ) {
 	Sys_FreeFileList( pakfiles );
 }
 
+/*
+================
+FS_DirectoryExists
+
+Minimal helper for detecting whether an OS directory exists.
+We intentionally avoid platform-specific stat helpers here and reuse Sys_ListFiles,
+which is already the canonical cross-platform filesystem primitive in this codebase.
+================
+*/
+static qboolean FS_DirectoryExists( const char *ospath ) {
+	int numdirs = 0;
+	char **dirs = Sys_ListFiles( ospath, "/", NULL, &numdirs, 0 );
+	Sys_FreeFileList( dirs );
+	return numdirs > 0;
+}
+
 
 /*
 ================
@@ -6283,17 +6299,34 @@ static void FS_Startup( void ) {
 
 	// check for additional game folder for mods
 	if ( fs_gamedirvar->string[0] != '\0' && !FS_IsBaseGame( fs_gamedirvar->string ) ) {
+		// Repo layout supports mods in either:
+		//  - <basepath>/<fs_game>
+		//  - <basepath>/mods/<fs_game>
+		//
+		// Prefer the latter when it exists so CI scripts can use "+set fs_game mymod"
+		// while the repo keeps mods under /mods/.
+		char modDiskDir[MAX_OSPATH];
+		const char *effectiveDir = fs_gamedirvar->string;
+
+		Com_sprintf( modDiskDir, sizeof( modDiskDir ), "mods/%s", fs_gamedirvar->string );
+		if ( fs_basepath && fs_basepath->string[0] != '\0' ) {
+			const char *modOSPath = FS_BuildOSPath( fs_basepath->string, modDiskDir, NULL );
+			if ( FS_DirectoryExists( modOSPath ) ) {
+				effectiveDir = modDiskDir;
+			}
+		}
+
 		if ( fs_debug && fs_debug->integer ) {
-			Com_Printf( "Adding mod directory: %s\n", fs_gamedirvar->string );
+			Com_Printf( "Adding mod directory: %s (disk: %s)\n", fs_gamedirvar->string, effectiveDir );
 		}
 		if ( fs_steampath->string[0] != '\0' ) {
-			FS_AddGameDirectory( fs_steampath->string, fs_gamedirvar->string );
+			FS_AddGameDirectory( fs_steampath->string, effectiveDir );
 		}
 		if ( fs_basepath->string[0] != '\0' ) {
-			FS_AddGameDirectory( fs_basepath->string, fs_gamedirvar->string );
+			FS_AddGameDirectory( fs_basepath->string, effectiveDir );
 		}
 		if ( fs_homepath->string[0] != '\0' && Q_stricmp( fs_homepath->string, fs_basepath->string ) ) {
-			FS_AddGameDirectory( fs_homepath->string, fs_gamedirvar->string );
+			FS_AddGameDirectory( fs_homepath->string, effectiveDir );
 		}
 	} else if ( fs_debug && fs_debug->integer ) {
 		Com_Printf( "Mod directory not added: fs_game='%s', isBaseGame=%d\n", 

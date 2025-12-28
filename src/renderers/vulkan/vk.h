@@ -35,6 +35,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // VMA (Vulkan Memory Allocator) - conditional include
 #ifdef USE_VMA
 #include <vk_mem_alloc.h>
+#else
+typedef struct VmaAllocator_T* VmaAllocator;
 #endif
 
 #include "vk_memory.h"
@@ -645,7 +647,7 @@ typedef struct {
     VkShaderModule gibs_spawn_comp; // Added
     VkShaderModule gibs_update_comp; // Added
     VkShaderModule volumetric_fog_comp; // Volumetric fog compute shader
-    VkShaderModule volumetric_fog_composite_frag; // Volumetric fog composite fragment shader
+    VkShaderModule volumetric_fog_composite_comp; // Volumetric fog composite compute shader
     VkShaderModule post_vert; // Post-process/shared fullscreen vertex shader
 } vk_modules_t;
 
@@ -848,6 +850,7 @@ typedef struct {
         atmosphere_preset_t currentPreset;
         qboolean enabled;
         qboolean initialized;
+        image_t *noiseTexture;
         VkBuffer atmosphereBuffer;
         VkDeviceMemory atmosphereBufferMemory;
     } atmosphere;

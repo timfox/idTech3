@@ -11,7 +11,7 @@ Procedural generation, scripting, runtime modification, Vulkan/PBR support
 #include <string.h>
 
 #ifdef USE_VULKAN
-#include "../renderervk/vk.h"
+#include "../vulkan/vk.h"
 #endif
 
 static proceduralShader_t proceduralShaders[MAX_PROCEDURAL_SHADERS];
@@ -1162,37 +1162,6 @@ void R_SetShaderPortalRange(int shaderId, float range)
 }
 
 #ifdef USE_VULKAN
-/*
-===================
-R_GenerateVulkanShader
-===================
-*/
-void R_GenerateVulkanShader(int shaderId, const char *vertexSource, const char *fragmentSource)
-{
-	// TODO: Compile GLSL to SPIR-V and create Vulkan shader module
-	// This would integrate with the Vulkan renderer's shader compilation system
-}
-
-/*
-===================
-R_UpdateVulkanShaderParameters
-===================
-*/
-void R_UpdateVulkanShaderParameters(int shaderId)
-{
-	// TODO: Update Vulkan uniform buffers with shader parameters
-}
-
-/*
-===================
-R_IsVulkanShader
-===================
-*/
-qboolean R_IsVulkanShader(int shaderId)
-{
-	// TODO: Check if shader is using Vulkan renderer
-	return qfalse;
-}
 #endif
 
 /*

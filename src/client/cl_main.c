@@ -39,6 +39,9 @@ cvar_t	*cl_motd;
 static cvar_t *cl_renderer;
 #endif
 
+// Local forward declarations
+static void CL_InitRenderer( void );
+
 cvar_t	*rcon_client_password;
 cvar_t	*rconAddress;
 
@@ -3116,6 +3119,30 @@ void CL_Frame(int msec, int realMsec) {
 		return;
 	}
 
+#ifndef DEDICATED
+	// If we are running a client but haven't initialized renderer/UI yet (e.g. no
+	// local server has been spawned), do it on the first real client frame so a
+	// window appears for the main menu/console.
+	//
+	// This avoids doing dynamic renderer loading during CL_Init(), which can be
+	// too early for some subsystems and can crash in static initializers.
+	if ( !cls.rendererStarted ) {
+		// If there's no display available (headless CI, ssh without forwarding),
+		// avoid initializing the windowing/renderer path.
+		//
+		// SDL will generally fail without these, but some environments can hang or
+		// behave unexpectedly. This keeps headless smoke tests stable.
+		const char *wl = getenv( "WAYLAND_DISPLAY" );
+		const char *x11 = getenv( "DISPLAY" );
+		if ( ( !wl || !wl[0] ) && ( !x11 || !x11[0] ) ) {
+			return;
+		}
+
+		cls.rendererStarted = qtrue;
+		CL_InitRenderer();
+	}
+#endif
+
 	// Reload localization data when cl_language changes
 	CL_Localize_Frame();
 
@@ -3243,7 +3270,7 @@ void CL_Frame(int msec, int realMsec) {
 	cls.frametime = msec;
 	cls.realtime += msec;
 
-	if ( cl_timegraph->integer ) {
+	if ( cl_timegraph && cl_timegraph->integer ) {
 		SCR_DebugGraph( msec * 0.25f );
 	}
 
@@ -3357,12 +3384,33 @@ CL_InitRenderer
 static void CL_InitRenderer( void ) {
 	// Initialize cl_renderer early so renderer loading knows which renderer to use
 	if (!cl_renderer) {
-		cl_renderer = Cvar_Get( "cl_renderer", "vulkan", CVAR_ARCHIVE | CVAR_LATCH );
+		// Default to OpenGL for maximum compatibility.
+		// Vulkan can be selected explicitly via:
+		//   +set cl_renderer vulkan
+		// or the legacy alias:
+		//   +set r_renderer vulkan
+		cl_renderer = Cvar_Get( "cl_renderer", "opengl", CVAR_ARCHIVE | CVAR_LATCH );
 		Cvar_SetDescription( cl_renderer, "Sets your desired renderer, requires \\vid_restart." );
 		fprintf(stderr, "DEBUG: Initialized cl_renderer to: %s\n", cl_renderer->string );
 	} else {
 		fprintf(stderr, "DEBUG: cl_renderer already exists: %s\n", cl_renderer->string );
 	}
+
+	// Back-compat: some scripts/users use "+set r_renderer <name>".
+	// Treat it as an alias for cl_renderer.
+	{
+		const char *rr = Cvar_VariableString( "r_renderer" );
+		if ( rr && rr[0] ) {
+			Cvar_Set( "cl_renderer", rr );
+		}
+	}
+
+#ifndef USE_VULKAN
+	// If Vulkan support isn't compiled in, force OpenGL.
+	if ( cl_renderer && cl_renderer->string && !Q_stricmp( cl_renderer->string, "vulkan" ) ) {
+		Cvar_Set( "cl_renderer", "opengl" );
+	}
+#endif
 
 	// fixup renderer -EC-
 	if ( !re.BeginRegistration ) {
@@ -3370,7 +3418,9 @@ static void CL_InitRenderer( void ) {
 	}
 
 	// this sets up the renderer and calls R_Init
+	fprintf(stderr, "DEBUG: Calling re.BeginRegistration (%p)\n", (void*)re.BeginRegistration);
 	re.BeginRegistration( &cls.glconfig );
+	fprintf(stderr, "DEBUG: re.BeginRegistration completed\n");
 
 	// load character sets
 	cls.charSetShader = re.RegisterShader( "gfx/2d/bigchars" );
@@ -3563,6 +3613,11 @@ static void CL_InitRef( void ) {
 	}
 
 	fprintf( stderr, "CL_InitRef: ENTERING FUNCTION\n" );
+#ifdef USE_VULKAN
+	fprintf( stderr, "DEBUG: USE_VULKAN is DEFINED in cl_main.c\n" );
+#else
+	fprintf( stderr, "DEBUG: USE_VULKAN is NOT DEFINED in cl_main.c\n" );
+#endif
 	Com_Printf( "DEBUG: CL_InitRef called\n" );
 	fprintf( stderr, "CL_InitRef: Function called!\n" );
 	CL_InitGLimp_Cvars();
@@ -3759,6 +3814,10 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 	rimp.VK_CreateSurface = NULL;
 #endif
 	ret = GetRefAPI( REF_API_VERSION, &rimp );
+	fprintf( stderr, "DEBUG: GetRefAPI returned: %p\n", (void*)ret );
+	if (ret) {
+		fprintf( stderr, "DEBUG: Engine sizeof(refexport_t) = %zu\n", sizeof(refexport_t) );
+	}
 
 	Com_Printf( "-------------------------------\n");
 
@@ -3766,10 +3825,13 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 		Com_Error (ERR_FATAL, "Couldn't initialize refresh" );
 	}
 
+	fprintf(stderr, "DEBUG: About to copy re from ret\n");
 	re = *ret;
+	fprintf(stderr, "DEBUG: Copy successful\n");
 
 	// unpause so the cgame definitely gets a snapshot and renders a frame
 	Cvar_Set( "cl_paused", "0" );
+	fprintf(stderr, "CL_InitRef: EXITING FUNCTION\n");
 }
 
 

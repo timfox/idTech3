@@ -4,7 +4,7 @@
 #include <vulkan/vulkan.h>
 #include <stdint.h>
 #include <stdatomic.h>
-#include "q_shared.h"
+#include "../../common/q_shared.h"
 #include "tr_common.h"
 
 // Forward declarations for imGUI types if needed
@@ -1339,6 +1339,7 @@ typedef struct vk_performance_hud_bottlenecks_s {
     const char *top_recommendations[5];
     float recommendation_priorities[5];
 } vk_performance_hud_bottlenecks_t;
+#endif
 
 // Performance HUD main structure
 typedef struct vk_performance_hud_s {
@@ -1346,8 +1347,10 @@ typedef struct vk_performance_hud_s {
     atomic_uint_t enabled;
     atomic_uint_t visible;
 
+#ifdef USE_CIMGUI
     // Configuration
     vk_performance_hud_config_t config;
+#endif
 
     // Timing
     atomic_uint64_t last_update_time;
@@ -1359,8 +1362,10 @@ typedef struct vk_performance_hud_s {
     float frame_time_max;
     float frame_time_avg;
 
+#ifdef USE_CIMGUI
     // Bottleneck analysis
     vk_performance_hud_bottlenecks_t bottlenecks;
+#endif
 
     // Display state
     qboolean show_demo_window;
@@ -1373,7 +1378,6 @@ typedef struct vk_performance_hud_s {
 
     const char *debug_name;
 } vk_performance_hud_t;
-#endif
 
 // Automated Performance Regression Detection - CI-based performance gates with historical comparison
 

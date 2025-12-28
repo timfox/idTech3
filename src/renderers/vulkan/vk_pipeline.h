@@ -3,7 +3,7 @@
 
 #include <vulkan/vulkan.h>
 #include <stdint.h>
-#include "q_shared.h"
+#include "../../common/q_shared.h"
 #include "vk.h"
 
 #ifdef __cplusplus

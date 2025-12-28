@@ -8,6 +8,7 @@ Atmosphere and Mood System Implementation
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 #include "vk.h"
+#include "vk_volumetric_fog.h"
 #include "vk_atmosphere.h"
 
 #ifdef USE_VULKAN
@@ -134,7 +135,10 @@ void vk_atmosphere_init( void )
 	Com_Memcpy( &vk.atmosphere.currentParams, &atmospherePresets[ATMOSPHERE_CALM], sizeof( atmosphere_params_t ) );
 	Com_Memcpy( &vk.atmosphere.targetParams, &atmospherePresets[ATMOSPHERE_CALM], sizeof( atmosphere_params_t ) );
 	Com_Memcpy( &vk.atmosphere.baseParams, &atmospherePresets[ATMOSPHERE_CALM], sizeof( atmosphere_params_t ) );
-	// Noise texture is optional and handled by the dedicated volumetric fog system.
+	vk.atmosphere.noiseTexture = R_FindImageFile( "textures/common/noise", IMGFLAG_CLAMPTOEDGE, 0 );
+	if ( !vk.atmosphere.noiseTexture ) {
+		ri.Printf( PRINT_WARNING, "Atmosphere system: Failed to load noise texture for volumetric fog.\n" );
+	}
 
 	// Load volumetric fog shaders manually if they are not in the bundled data
 	if ( vk.modules.volumetric_fog_comp == VK_NULL_HANDLE ) {
@@ -145,11 +149,11 @@ void vk_atmosphere_init( void )
 			ri.FS_FreeFile( buffer );
 		}
 	}
-	if ( vk.modules.volumetric_fog_composite_frag == VK_NULL_HANDLE ) {
+	if ( vk.modules.volumetric_fog_composite_comp == VK_NULL_HANDLE ) {
 		void *buffer;
-		int size = ri.FS_ReadFile( "src/renderers/vulkan/shaders/spirv/volumetric_fog_composite_frag.spv", &buffer );
+		int size = ri.FS_ReadFile( "src/renderers/vulkan/shaders/spirv/volumetric_fog_composite_comp.spv", &buffer );
 		if ( size > 0 ) {
-			vk.modules.volumetric_fog_composite_frag = vk_create_shader_module( (const uint8_t *)buffer, size );
+			vk.modules.volumetric_fog_composite_comp = vk_create_shader_module( (const uint8_t *)buffer, size );
 			ri.FS_FreeFile( buffer );
 		}
 	}

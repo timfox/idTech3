@@ -17,10 +17,13 @@ extern void vk_track_free(VkDeviceSize size);
 
 // Runtime safety checks for Vulkan compatibility
 void vk_safety_checks(void) {
+    fprintf(stderr, "vk_safety_checks: called\n");
     // Ensure VK_NULL_HANDLE compatibility
     if (VK_NULL_HANDLE != NULL) {
+        fprintf(stderr, "vk_safety_checks: VK_NULL_HANDLE != NULL\n");
         ri.Printf(PRINT_WARNING, "VK_NULL_HANDLE != NULL - this may cause compatibility issues\n");
     }
+    fprintf(stderr, "vk_safety_checks: completed\n");
 }
 
 // Modern bounds checking for array operations

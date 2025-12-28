@@ -5,7 +5,7 @@ Info string helpers tests (Info_ValueForKey, Info_SetValueForKey, Info_RemoveKey
 */
 
 #include "test_framework.h"
-#include "../src/common/q_shared.h"
+#include "../common/q_shared.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -27,11 +27,6 @@ void Com_Error(errorParm_t level, const char *error, ...) {
 	va_end(argptr);
 	fprintf(stderr, "\n");
 	exit(1);
-}
-
-// Mock Q_atof for testing
-float Q_atof(const char *str) {
-	return (float)atof(str);
 }
 
 TEST(info_value_for_key_basic) {
