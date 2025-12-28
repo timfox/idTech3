@@ -16,6 +16,10 @@ public class MainActivity extends AppCompatActivity {
     private native void engineRender();
     private native void engineLoadMod(String modPath);
     private native void engineLoadModFromBytes(byte[] data, String modName);
+    private native void testIngestTextureBytes(byte[] data, String texName);
+    private native void testIngestMeshBytes(byte[] data, String meshName);
+    private native void testIngestResourceBytes(byte[] data, String resName);
+    private native String getRegistries();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,6 +43,19 @@ public class MainActivity extends AppCompatActivity {
         } catch (IOException e) {
             // Ignore if asset not present
         }
+        // Wire minimal tests for texture/mesh/resource ingestion
+        byte[] sampleBytes = new byte[] {0x01, 0x02, 0x03, 0x04};
+        testIngestTextureBytes(sampleBytes, "sampleTexture");
+        testIngestMeshBytes(sampleBytes, "sampleMesh");
+        testIngestResourceBytes(sampleBytes, "sampleResource");
+        // Fetch registries for CI visibility
+        try {
+            String registries = getRegistries();
+            android.util.Log.i("EngineSignCI", "Registries:\\n" + registries);
+        } catch (Throwable t) {
+            // Ignore if any failure
+        }
+        // Optional: queue additional ingestion via engineCore_queueTextureBytes, etc., later from the engine loop
         // Optional: load all mods from APK assets
         loadAllModsFromAssets();
         GLSurfaceView glView = new GLSurfaceView(this);
