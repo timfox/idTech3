@@ -3408,6 +3408,7 @@ static void CL_InitRenderer( void ) {
 #ifndef USE_VULKAN
 	// If Vulkan support isn't compiled in, force OpenGL.
 	if ( cl_renderer && cl_renderer->string && !Q_stricmp( cl_renderer->string, "vulkan" ) ) {
+		Com_Printf( "Vulkan support not compiled into this binary, falling back to opengl\n" );
 		Cvar_Set( "cl_renderer", "opengl" );
 	}
 #endif
@@ -3779,6 +3780,14 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 	rimp.VKimp_Shutdown = VKimp_Shutdown;
 	rimp.VK_GetInstanceProcAddr = VK_GetInstanceProcAddr;
 	rimp.VK_CreateSurface = VK_CreateSurface;
+	
+	// Copy rimp to the global ri in the main executable so platform code like sdl_glimp.c
+	// can use ri.Printf and other import functions.
+	{
+		extern refimport_t ri;
+		ri = rimp;
+		fprintf(stderr, "DEBUG: CL_InitRef set global ri.Printf to %p\n", (void*)ri.Printf);
+	}
 	
 	// Validate that all Vulkan function pointers were properly assigned
 	if ( !rimp.VKimp_Init || !rimp.VKimp_Shutdown || 

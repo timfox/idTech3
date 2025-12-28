@@ -1,4 +1,6 @@
 #include "tr_local.h"
+#include <stdio.h>
+#include <unistd.h>
 #include "vk_memory.h"
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
@@ -2327,31 +2329,41 @@ static void init_vulkan_library( void )
 	// Global vk instance is zero-initialized by default. 
 	// Do not use Com_Memset here if it contains complex C++ types like atomics.
 
+	write(2, "DEBUG: Entering init_vulkan_library\n", 36);
 	vk_safety_checks();
+	write(2, "DEBUG: Returned from vk_safety_checks\n", 38);
 
 #ifdef USE_VULKAN
+	write(2, "DEBUG: Checking r_vk_icd\n", 25);
 	// Allow forcing a specific ICD via cvar (maps to VK_ICD_FILENAMES).
 	if ( r_vk_icd && r_vk_icd->string && r_vk_icd->string[0] ) {
+		write(2, "DEBUG: setting VK_ICD_FILENAMES\n", 32);
 		if ( setenv( "VK_ICD_FILENAMES", r_vk_icd->string, 1 ) == 0 ) {
-			ri.Printf( PRINT_ALL, "...using VK_ICD_FILENAMES override: %s\n", r_vk_icd->string );
+			write(2, "...using VK_ICD_FILENAMES override\n", 35);
 		} else {
-			ri.Printf( PRINT_WARNING, "Failed to set VK_ICD_FILENAMES to '%s'\n", r_vk_icd->string );
+			write(2, "Failed to set VK_ICD_FILENAMES\n", 31);
 		}
 	}
 #endif
 
+	write(2, "DEBUG: Checking vk_instance\n", 28);
 	if ( vk_instance == VK_NULL_HANDLE ) {
 
+		write(2, "DEBUG: Calling vk_destroy_instance\n", 35);
 		// force cleanup
 		vk_destroy_instance();
 
+		write(2, "DEBUG: Loading basic instance functions\n", 40);
 		// Get functions that do not depend on VkInstance (vk_instance == nullptr at this point).
 		INIT_INSTANCE_FUNCTION( vkCreateInstance )
 		INIT_INSTANCE_FUNCTION( vkEnumerateInstanceExtensionProperties )
 
+		write(2, "DEBUG: Calling create_instance\n", 31);
 		// Get instance level functions.
 		create_instance();
+		write(2, "DEBUG: create_instance returned\n", 32);
 
+		write(2, "DEBUG: Loading instance functions\n", 34);
 		INIT_INSTANCE_FUNCTION( vkCreateDevice )
 		INIT_INSTANCE_FUNCTION( vkDestroyInstance )
 		INIT_INSTANCE_FUNCTION( vkEnumerateDeviceExtensionProperties )
@@ -2367,30 +2379,40 @@ static void init_vulkan_library( void )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceSurfaceFormatsKHR )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceSurfacePresentModesKHR )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceSurfaceSupportKHR )
+		write(2, "DEBUG: instance functions loaded\n", 33);
 
+		write(2, "DEBUG: Loading properties2 functions\n", 38);
 		// Load KHR_get_physical_device_properties2 extension functions if available
 		// Try KHR version first (for Vulkan 1.0), then core version (Vulkan 1.1+)
 		// Note: In Vulkan 1.1+, these are core functions with identical signatures
+		write(2, "DEBUG: Calling GetInstanceProcAddr for Properties2KHR\n", 55);
 		void *funcPtr = ri.VK_GetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceProperties2KHR");
+		write(2, "DEBUG: Returned from GetInstanceProcAddr\n", 42);
 		if (!funcPtr) {
+			write(2, "DEBUG: Calling GetInstanceProcAddr for Properties2\n", 52);
 			funcPtr = ri.VK_GetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceProperties2");
+			write(2, "DEBUG: Returned from GetInstanceProcAddr\n", 42);
 		}
 		qvkGetPhysicalDeviceProperties2KHR = (PFN_vkGetPhysicalDeviceProperties2KHR)funcPtr;
 		if (qvkGetPhysicalDeviceProperties2KHR) {
-			ri.Printf(PRINT_DEVELOPER, "Loaded vkGetPhysicalDeviceProperties2KHR function pointer\n");
+			write(2, "DEBUG: Loaded vkGetPhysicalDeviceProperties2KHR\n", 49);
 		} else {
-			ri.Printf(PRINT_WARNING, "Failed to load vkGetPhysicalDeviceProperties2KHR function pointer (extension may not be enabled)\n");
+			write(2, "DEBUG: Failed to load vkGetPhysicalDeviceProperties2KHR\n", 57);
 		}
 		
+		write(2, "DEBUG: Calling GetInstanceProcAddr for Features2KHR\n", 53);
 		funcPtr = ri.VK_GetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceFeatures2KHR");
+		write(2, "DEBUG: Returned from GetInstanceProcAddr\n", 42);
 		if (!funcPtr) {
+			write(2, "DEBUG: Calling GetInstanceProcAddr for Features2\n", 50);
 			funcPtr = ri.VK_GetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceFeatures2");
+			write(2, "DEBUG: Returned from GetInstanceProcAddr\n", 42);
 		}
 		qvkGetPhysicalDeviceFeatures2KHR = (PFN_vkGetPhysicalDeviceFeatures2KHR)funcPtr;
 		if (qvkGetPhysicalDeviceFeatures2KHR) {
-			ri.Printf(PRINT_DEVELOPER, "Loaded vkGetPhysicalDeviceFeatures2KHR function pointer\n");
+			write(2, "DEBUG: Loaded vkGetPhysicalDeviceFeatures2KHR\n", 47);
 		} else {
-			ri.Printf(PRINT_WARNING, "Failed to load vkGetPhysicalDeviceFeatures2KHR function pointer (extension may not be enabled)\n");
+			write(2, "DEBUG: Failed to load vkGetPhysicalDeviceFeatures2KHR\n", 55);
 		}
 
 #ifdef USE_VK_VALIDATION
@@ -2412,6 +2434,7 @@ static void init_vulkan_library( void )
 		}
 #endif
 
+		write(2, "DEBUG: Creating surface\n", 25);
 		// create surface
 		if ( !ri.VK_CreateSurface( vk_instance, &vk_surface ) ) {
 			ri.Error( ERR_FATAL, "Error creating Vulkan surface" );
@@ -2419,7 +2442,9 @@ static void init_vulkan_library( void )
 		}
 	} // vk_instance == VK_NULL_HANDLE
 
+	write(2, "DEBUG: Enumerating physical devices\n", 37);
 	res = qvkEnumeratePhysicalDevices( vk_instance, &device_count, NULL );
+	write(2, "DEBUG: Enumerated physical devices\n", 36);
 	if ( device_count == 0 ) {
 		ri.Error( ERR_FATAL, "Vulkan: no physical devices found" );
 		return;
@@ -2433,19 +2458,23 @@ static void init_vulkan_library( void )
 	VK_CHECK( qvkEnumeratePhysicalDevices( vk_instance, &device_count, physical_devices ) );
 
 	// initial physical device index
-	device_index = r_device->integer;
+	if (r_device) {
+		device_index = r_device->integer;
+	} else {
+		device_index = -1;
+	}
 
-	ri.Printf( PRINT_ALL, ".......................\nAvailable physical devices:\n" );
+	fprintf(stderr, ".......................\nAvailable physical devices:\n" );
         for ( uint32_t i = 0; i < device_count; i++ ) {
 		qvkGetPhysicalDeviceProperties( physical_devices[ i ], &props );
-		ri.Printf( PRINT_ALL, " %i: %s\n", i, renderer_name( &props ) );
+		fprintf(stderr, " %i: %s\n", i, renderer_name( &props ) );
 		if ( device_index == -1 && props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ) {
 			device_index = i;
 		} else if ( device_index == -2 && props.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU ) {
 			device_index = i;
 		}
 	}
-	ri.Printf( PRINT_ALL, ".......................\n" );
+	fprintf(stderr, ".......................\n" );
 
 	vk.physical_device = VK_NULL_HANDLE;
 	{
@@ -2570,84 +2599,8 @@ static void init_vulkan_library( void )
 			selected_index, candidates[selected_index].properties.deviceName,
 			candidates[selected_index].reason);
 
-		// Initialize VRAM statistics after physical device selection
-		vk_init_vram_stats();
-
-		// Initialize memory defragmentation system
-		vk_init_memory_defragmentation();
-
-		// Initialize hierarchical memory pool system
-		if (!vk_init_memory_pool_system()) {
-			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize memory pool system\n");
-		}
-
-		// Initialize lock-free memory manager for high-performance concurrent allocation
-		if (!vk_init_lock_free_memory_manager()) {
-			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize lock-free memory manager\n");
-		}
-
-		// Initialize arena memory manager for scoped memory management
-		if (!vk_init_arena_manager()) {
-			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize arena memory manager\n");
-		}
-
-		// Initialize memory advisor for intelligent layout optimization
-		if (!vk_init_memory_advisor()) {
-			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize memory advisor\n");
-		}
-
-		// Initialize render graph profiler for detailed performance analysis
-		if (!vk_init_render_profiler()) {
-			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize render profiler\n");
-		}
-
-		// Initialize memory bandwidth profiler for cache analysis and access pattern optimization
-		if (!vk_init_memory_bandwidth_profiler()) {
-			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize memory bandwidth profiler\n");
-		}
-
-		// Initialize parallel processing profiler for thread utilization and synchronization tracking
-		if (!vk_init_parallel_profiler()) {
-			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize parallel profiler\n");
-		}
-
-		// Initialize shader performance analyzer for instruction count, register usage, and optimization suggestions
-		if (!vk_init_shader_performance_analyzer()) {
-			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize shader performance analyzer\n");
-		}
-
-		// Initialize asset loading profiler for streaming performance and I/O bottleneck identification
-		if (!vk_init_asset_loading_profiler()) {
-			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize asset loading profiler\n");
-		}
-
-		// Initialize performance HUD for real-time overlay with bottleneck highlighting and recommendations
-		if (!vk_init_performance_hud()) {
-			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize performance HUD\n");
-		}
-
-		// Initialize automated performance regression detector for CI-based performance gates
-		if (!vk_init_performance_regression_detector()) {
-			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize performance regression detector\n");
-		}
-
-		// Initialize heatmap visualizer for performance data visualization
-		if (!vk_init_heatmap_visualizer()) {
-			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize heatmap visualizer\n");
-		}
-
-		// Initialize GPU-Async compute manager for asynchronous job scheduling
-		if (!vk_init_compute_manager()) {
-			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize GPU-Async compute manager\n");
-		}
-
 		// Set default performance preset
 		vk.current_perf_preset = VK_PERF_PRESET_MEDIUM;
-
-		// Initialize cache-conscious data structures manager
-		if (!vk_init_cache_structures_manager()) {
-			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize cache structures manager\n");
-		}
 
 		// Enhanced device information reporting
 		const VkPhysicalDeviceProperties *device_props = &candidates[selected_index].properties;
@@ -2925,6 +2878,83 @@ static void init_vulkan_library( void )
 		ri.Printf(PRINT_ALL, "Vulkan: Main command pool created\n");
 	} else {
 		ri.Printf(PRINT_ERROR, "DEBUG: Skipping command pool creation - invalid handles\n");
+	}
+
+	// Initialize systems that require a valid vk.device
+	// Initialize VRAM statistics
+	vk_init_vram_stats();
+
+	// Initialize memory defragmentation system
+	vk_init_memory_defragmentation();
+
+	// Initialize hierarchical memory pool system
+	if (!vk_init_memory_pool_system()) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize memory pool system\n");
+	}
+
+	// Initialize lock-free memory manager
+	if (!vk_init_lock_free_memory_manager()) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize lock-free memory manager\n");
+	}
+
+	// Initialize arena memory manager
+	if (!vk_init_arena_manager()) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize arena memory manager\n");
+	}
+
+	// Initialize memory advisor
+	if (!vk_init_memory_advisor()) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize memory advisor\n");
+	}
+
+	// Initialize render graph profiler
+	if (!vk_init_render_profiler()) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize render profiler\n");
+	}
+
+	// Initialize memory bandwidth profiler
+	if (!vk_init_memory_bandwidth_profiler()) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize memory bandwidth profiler\n");
+	}
+
+	// Initialize parallel processing profiler
+	if (!vk_init_parallel_profiler()) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize parallel profiler\n");
+	}
+
+	// Initialize shader performance analyzer
+	if (!vk_init_shader_performance_analyzer()) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize shader performance analyzer\n");
+	}
+
+	// Initialize asset loading profiler
+	if (!vk_init_asset_loading_profiler()) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize asset loading profiler\n");
+	}
+
+	// Initialize performance HUD
+	if (!vk_init_performance_hud()) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize performance HUD\n");
+	}
+
+	// Initialize automated performance regression detector
+	if (!vk_init_performance_regression_detector()) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize performance regression detector\n");
+	}
+
+	// Initialize heatmap visualizer
+	if (!vk_init_heatmap_visualizer()) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize heatmap visualizer\n");
+	}
+
+	// Initialize GPU-Async compute manager
+	if (!vk_init_compute_manager()) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize GPU-Async compute manager\n");
+	}
+
+	// Initialize cache-conscious data structures manager
+	if (!vk_init_cache_structures_manager()) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize cache structures manager\n");
 	}
 
 	ri.Printf(PRINT_ALL, "DEBUG: About to set vk.active = qtrue\n");

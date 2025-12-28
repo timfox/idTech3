@@ -42,6 +42,164 @@ static const float s_flipMatrix[16] = {
 
 Q_EXPORT refimport_t	ri;
 
+Q_EXPORT cvar_t	*r_subdivisions;
+Q_EXPORT cvar_t	*r_lodCurveError;
+Q_EXPORT cvar_t	*r_mapGreyScale;
+Q_EXPORT cvar_t	*r_mergeLightmaps;
+Q_EXPORT cvar_t	*r_vbo;
+Q_EXPORT cvar_t	*r_vertexLight;
+Q_EXPORT cvar_t	*r_vrs;
+Q_EXPORT cvar_t	*r_vrs_mode;
+Q_EXPORT cvar_t	*r_vrs_center_radius;
+Q_EXPORT cvar_t	*r_vrs_falloff_start;
+Q_EXPORT cvar_t	*r_vrs_min_rate;
+Q_EXPORT cvar_t	*r_vrs_max_rate;
+Q_EXPORT cvar_t	*r_vk_profiling;
+Q_EXPORT cvar_t	*r_vk_debug_overlay;
+Q_EXPORT cvar_t	*r_vk_disableScreenMap;
+Q_EXPORT cvar_t	*r_vk_icd;
+Q_EXPORT cvar_t	*r_device;
+Q_EXPORT cvar_t	*r_vulkan_validation;
+Q_EXPORT cvar_t	*r_vk_renderdoc;
+Q_EXPORT cvar_t	*r_vk_dynamicRendering;
+Q_EXPORT cvar_t	*r_vk_asyncShaderCompile;
+Q_EXPORT cvar_t	*r_vk_hotReload;
+Q_EXPORT cvar_t	*r_vk_bindlessTextures;
+
+Q_EXPORT cvar_t	*r_procDressing;
+Q_EXPORT cvar_t	*r_procDressingDensity;
+Q_EXPORT cvar_t	*r_foliageWindFrequency;
+Q_EXPORT cvar_t	*r_foliageWindStrength;
+Q_EXPORT cvar_t	*r_procDressingDebug;
+
+Q_EXPORT cvar_t	*r_materialSystem;
+Q_EXPORT cvar_t	*r_materialDamage;
+Q_EXPORT cvar_t	*r_materialWetness;
+Q_EXPORT cvar_t	*r_materialMagic;
+
+Q_EXPORT cvar_t	*r_dynamicResolution;
+Q_EXPORT cvar_t	*r_frameTelemetry;
+Q_EXPORT cvar_t	*r_bloom;
+Q_EXPORT cvar_t	*r_bloom_intensity;
+Q_EXPORT cvar_t	*r_bloom_threshold;
+
+Q_EXPORT cvar_t	*r_volumetricFog;
+Q_EXPORT cvar_t	*r_volumetricFogSamples;
+Q_EXPORT cvar_t	*r_volumetricFogScattering;
+Q_EXPORT cvar_t	*r_volumetricFogAbsorption;
+
+Q_EXPORT cvar_t	*r_dlss;
+Q_EXPORT cvar_t	*r_dlss_quality;
+Q_EXPORT cvar_t	*r_dlss_sharpening;
+
+Q_EXPORT cvar_t	*r_fsr_enable;
+Q_EXPORT cvar_t	*r_fsr_easu;
+Q_EXPORT cvar_t	*r_fsr_rcas;
+Q_EXPORT cvar_t	*r_fsr_sharpness;
+
+Q_EXPORT cvar_t	*r_styleTransfer;
+
+Q_EXPORT cvar_t	*r_virtualTextures;
+Q_EXPORT cvar_t	*r_vt_pageSize;
+Q_EXPORT cvar_t	*r_vt_cacheSize;
+
+Q_EXPORT cvar_t	*r_gpuSceneGraph;
+Q_EXPORT cvar_t	*r_gpuSceneDebug;
+
+Q_EXPORT cvar_t	*r_particles_gpu;
+Q_EXPORT cvar_t	*r_particles_max;
+
+Q_EXPORT cvar_t	*r_meshShaders;
+Q_EXPORT cvar_t	*r_meshletSize;
+
+Q_EXPORT cvar_t	*r_layeredMaterials;
+Q_EXPORT cvar_t	*r_layeredMaterialProfile;
+Q_EXPORT cvar_t	*r_layeredMaterialMaxLayers;
+Q_EXPORT cvar_t	*r_layeredMaterialSimple;
+
+Q_EXPORT cvar_t	*r_cellLoadRadius;
+Q_EXPORT cvar_t	*r_cellUnloadDistance;
+
+Q_EXPORT cvar_t	*r_saveFontData;
+Q_EXPORT cvar_t	*r_fullbright;
+Q_EXPORT cvar_t	*r_singleShader;
+Q_EXPORT cvar_t	*r_baseNormalX;
+Q_EXPORT cvar_t	*r_baseNormalY;
+Q_EXPORT cvar_t	*r_baseParallax;
+Q_EXPORT cvar_t	*r_noportals;
+Q_EXPORT cvar_t	*r_fastsky;
+Q_EXPORT cvar_t	*r_norefresh;
+Q_EXPORT cvar_t	*r_dlightMode;
+Q_EXPORT cvar_t	*r_nocull;
+Q_EXPORT cvar_t	*r_drawentities;
+Q_EXPORT cvar_t	*r_shadows;
+Q_EXPORT cvar_t	*r_portalOnly;
+Q_EXPORT cvar_t	*r_raytracing;
+Q_EXPORT cvar_t	*r_rt_samples;
+Q_EXPORT cvar_t	*r_rt_maxDepth;
+Q_EXPORT cvar_t	*r_rt_debugMagenta;
+Q_EXPORT cvar_t	*r_rt_tlasUpdateMode;
+Q_EXPORT cvar_t	*r_gamma;
+Q_EXPORT cvar_t	*r_intensity;
+Q_EXPORT cvar_t	*r_lightmap;
+Q_EXPORT cvar_t	*r_showsky;
+Q_EXPORT cvar_t	*r_detailTextures;
+Q_EXPORT cvar_t	*r_ext_multitexture;
+Q_EXPORT cvar_t	*r_railCoreWidth;
+Q_EXPORT cvar_t	*r_railSegmentLength;
+Q_EXPORT cvar_t	*r_railWidth;
+Q_EXPORT cvar_t	*r_wireframe;
+Q_EXPORT cvar_t	*r_shownormals;
+Q_EXPORT cvar_t	*r_speeds;
+Q_EXPORT cvar_t	*r_textureMode;
+Q_EXPORT cvar_t	*r_marksOnTriangleMeshes;
+Q_EXPORT cvar_t	*r_dlightBacks;
+Q_EXPORT cvar_t	*r_debugSort;
+Q_EXPORT cvar_t	*r_showtris;
+
+Q_EXPORT cvar_t	*r_znear;
+Q_EXPORT cvar_t	*r_zproj;
+Q_EXPORT cvar_t	*r_stereoSeparation;
+Q_EXPORT cvar_t	*r_skipBackEnd;
+Q_EXPORT cvar_t	*r_showImages;
+Q_EXPORT cvar_t	*r_clear;
+Q_EXPORT cvar_t	*r_finish;
+Q_EXPORT cvar_t	*r_dynamiclight;
+Q_EXPORT cvar_t	*r_drawworld;
+Q_EXPORT cvar_t	*r_lockpvs;
+Q_EXPORT cvar_t	*r_showcluster;
+Q_EXPORT cvar_t	*r_novis;
+Q_EXPORT cvar_t	*r_vk_debug2D;
+Q_EXPORT cvar_t	*r_vk_debugClearColor;
+Q_EXPORT cvar_t	*r_vk_debugUiOnly;
+Q_EXPORT cvar_t	*r_debugSurface;
+Q_EXPORT cvar_t	*r_teleporterFlash;
+Q_EXPORT cvar_t	*r_drawSun;
+Q_EXPORT cvar_t	*r_flares;
+Q_EXPORT cvar_t	*r_flareFade;
+Q_EXPORT cvar_t	*r_flareSize;
+Q_EXPORT cvar_t	*r_flareCoeff;
+
+Q_EXPORT cvar_t	*r_nobind;
+Q_EXPORT cvar_t	*r_roundImagesDown;
+Q_EXPORT cvar_t	*r_colorMipLevels;
+Q_EXPORT cvar_t	*r_picmip;
+Q_EXPORT cvar_t	*r_nomip;
+Q_EXPORT cvar_t	*r_simpleMipMaps;
+Q_EXPORT cvar_t	*r_overBrightBits;
+Q_EXPORT cvar_t	*r_mapOverBrightBits;
+Q_EXPORT cvar_t	*r_dither;
+Q_EXPORT cvar_t	*r_pbr;
+Q_EXPORT cvar_t	*r_offsetUnits;
+Q_EXPORT cvar_t	*r_offsetFactor;
+Q_EXPORT cvar_t	*r_directedScale;
+Q_EXPORT cvar_t	*r_debugLight;
+Q_EXPORT cvar_t	*r_lodbias;
+Q_EXPORT cvar_t	*r_facePlaneCull;
+Q_EXPORT cvar_t	*r_dlightSaturation;
+Q_EXPORT cvar_t	*r_dlightIntensity;
+Q_EXPORT cvar_t	*r_dlightScale;
+
 // entities that will have procedurally generated surfaces will just
 // point at this for their sorting surface
 static surfaceType_t entitySurface = SF_ENTITY;

@@ -74,115 +74,165 @@ int R_LerpTag( orientation_t *tag, qhandle_t model, int startFrame, int endFrame
 void R_ModelBounds( qhandle_t model, vec3_t mins, vec3_t maxs );
 
 // Global renderer cvars
-cvar_t	*r_subdivisions;
-cvar_t	*r_lodCurveError;
-cvar_t	*r_mapGreyScale;
-cvar_t	*r_mergeLightmaps;
-cvar_t	*r_vbo;
-cvar_t	*r_vertexLight;
-cvar_t	*r_vrs;
-cvar_t	*r_vrs_mode;
-cvar_t	*r_vrs_center_radius;
-cvar_t	*r_vrs_falloff_start;
-cvar_t	*r_vrs_min_rate;
-cvar_t	*r_vrs_max_rate;
-cvar_t	*r_vk_profiling;
-cvar_t	*r_vk_debug_overlay;
-cvar_t	*r_vk_disableScreenMap;
-cvar_t	*r_procDressing;
-cvar_t	*r_materialSystem;
-cvar_t	*r_dynamicResolution;
-cvar_t	*r_frameTelemetry;
-cvar_t	*r_bloom;
-cvar_t	*r_volumetricFog;
-cvar_t	*r_volumetricFogSamples;
-cvar_t	*r_volumetricFogScattering;
-cvar_t	*r_volumetricFogAbsorption;
-cvar_t	*r_dlss;
-cvar_t	*r_dlss_quality;
-cvar_t	*r_dlss_sharpening;
-cvar_t	*r_styleTransfer;
-cvar_t	*r_saveFontData;
-cvar_t	*r_fullbright;
-cvar_t	*r_singleShader;
-cvar_t	*r_baseNormalX;
-cvar_t	*r_baseNormalY;
-cvar_t	*r_baseParallax;
-cvar_t	*r_noportals;
-cvar_t	*r_fastsky;
-cvar_t	*r_norefresh;
-cvar_t	*r_dlightMode;
-cvar_t	*r_nocull;
-cvar_t	*r_drawentities;
-cvar_t	*r_shadows;
-cvar_t	*r_portalOnly;
-cvar_t	*r_raytracing;
-cvar_t	*r_rt_samples;
-cvar_t	*r_rt_maxDepth;
-cvar_t	*r_rt_debugMagenta;
-cvar_t	*r_rt_tlasUpdateMode;
-cvar_t	*r_gamma;
-cvar_t	*r_intensity;
-cvar_t	*r_lightmap;
-cvar_t	*r_showsky;
-cvar_t	*r_detailTextures;
-cvar_t	*r_ext_multitexture;
-cvar_t	*r_railCoreWidth;
-cvar_t	*r_railSegmentLength;
-cvar_t	*r_railWidth;
-cvar_t	*r_wireframe;
-cvar_t	*r_shownormals;
-cvar_t	*r_speeds;
-cvar_t	*r_textureMode;
-cvar_t	*r_marksOnTriangleMeshes;
-cvar_t	*r_dlightBacks;
-cvar_t	*r_debugSort;
-cvar_t	*r_showtris;
+extern cvar_t	*r_subdivisions;
+extern cvar_t	*r_lodCurveError;
+extern cvar_t	*r_mapGreyScale;
+extern cvar_t	*r_mergeLightmaps;
+extern cvar_t	*r_vbo;
+extern cvar_t	*r_vertexLight;
+extern cvar_t	*r_vrs;
+extern cvar_t	*r_vrs_mode;
+extern cvar_t	*r_vrs_center_radius;
+extern cvar_t	*r_vrs_falloff_start;
+extern cvar_t	*r_vrs_min_rate;
+extern cvar_t	*r_vrs_max_rate;
+extern cvar_t	*r_vk_profiling;
+extern cvar_t	*r_vk_debug_overlay;
+extern cvar_t	*r_vk_disableScreenMap;
+extern cvar_t	*r_vk_icd;
+extern cvar_t	*r_device;
+extern cvar_t	*r_vulkan_validation;
+extern cvar_t	*r_vk_renderdoc;
+extern cvar_t	*r_vk_dynamicRendering;
+extern cvar_t	*r_vk_asyncShaderCompile;
+extern cvar_t	*r_vk_hotReload;
+extern cvar_t	*r_vk_bindlessTextures;
+
+extern cvar_t	*r_procDressing;
+extern cvar_t	*r_procDressingDensity;
+extern cvar_t	*r_foliageWindFrequency;
+extern cvar_t	*r_foliageWindStrength;
+extern cvar_t	*r_procDressingDebug;
+
+extern cvar_t	*r_materialSystem;
+extern cvar_t	*r_materialDamage;
+extern cvar_t	*r_materialWetness;
+extern cvar_t	*r_materialMagic;
+
+extern cvar_t	*r_dynamicResolution;
+extern cvar_t	*r_frameTelemetry;
+extern cvar_t	*r_bloom;
+extern cvar_t	*r_bloom_intensity;
+extern cvar_t	*r_bloom_threshold;
+
+extern cvar_t	*r_volumetricFog;
+extern cvar_t	*r_volumetricFogSamples;
+extern cvar_t	*r_volumetricFogScattering;
+extern cvar_t	*r_volumetricFogAbsorption;
+
+extern cvar_t	*r_dlss;
+extern cvar_t	*r_dlss_quality;
+extern cvar_t	*r_dlss_sharpening;
+
+extern cvar_t	*r_fsr_enable;
+extern cvar_t	*r_fsr_easu;
+extern cvar_t	*r_fsr_rcas;
+extern cvar_t	*r_fsr_sharpness;
+
+extern cvar_t	*r_styleTransfer;
+
+extern cvar_t	*r_virtualTextures;
+extern cvar_t	*r_vt_pageSize;
+extern cvar_t	*r_vt_cacheSize;
+
+extern cvar_t	*r_gpuSceneGraph;
+extern cvar_t	*r_gpuSceneDebug;
+
+extern cvar_t	*r_particles_gpu;
+extern cvar_t	*r_particles_max;
+
+extern cvar_t	*r_meshShaders;
+extern cvar_t	*r_meshletSize;
+
+extern cvar_t	*r_layeredMaterials;
+extern cvar_t	*r_layeredMaterialProfile;
+extern cvar_t	*r_layeredMaterialMaxLayers;
+extern cvar_t	*r_layeredMaterialSimple;
+
+extern cvar_t	*r_cellLoadRadius;
+extern cvar_t	*r_cellUnloadDistance;
+
+extern cvar_t	*r_saveFontData;
+extern cvar_t	*r_fullbright;
+extern cvar_t	*r_singleShader;
+extern cvar_t	*r_baseNormalX;
+extern cvar_t	*r_baseNormalY;
+extern cvar_t	*r_baseParallax;
+extern cvar_t	*r_noportals;
+extern cvar_t	*r_fastsky;
+extern cvar_t	*r_norefresh;
+extern cvar_t	*r_dlightMode;
+extern cvar_t	*r_nocull;
+extern cvar_t	*r_drawentities;
+extern cvar_t	*r_shadows;
+extern cvar_t	*r_portalOnly;
+extern cvar_t	*r_raytracing;
+extern cvar_t	*r_rt_samples;
+extern cvar_t	*r_rt_maxDepth;
+extern cvar_t	*r_rt_debugMagenta;
+extern cvar_t	*r_rt_tlasUpdateMode;
+extern cvar_t	*r_gamma;
+extern cvar_t	*r_intensity;
+extern cvar_t	*r_lightmap;
+extern cvar_t	*r_showsky;
+extern cvar_t	*r_detailTextures;
+extern cvar_t	*r_ext_multitexture;
+extern cvar_t	*r_railCoreWidth;
+extern cvar_t	*r_railSegmentLength;
+extern cvar_t	*r_railWidth;
+extern cvar_t	*r_wireframe;
+extern cvar_t	*r_shownormals;
+extern cvar_t	*r_speeds;
+extern cvar_t	*r_textureMode;
+extern cvar_t	*r_marksOnTriangleMeshes;
+extern cvar_t	*r_dlightBacks;
+extern cvar_t	*r_debugSort;
+extern cvar_t	*r_showtris;
 
 // Additional legacy/shared cvars referenced by common renderer code paths
-cvar_t	*r_znear;
-cvar_t	*r_zproj;
-cvar_t	*r_stereoSeparation;
-cvar_t	*r_skipBackEnd;
-cvar_t	*r_showImages;
-cvar_t	*r_clear;
-cvar_t	*r_finish;
-cvar_t	*r_dynamiclight;
-cvar_t	*r_drawworld;
-cvar_t	*r_lockpvs;
-cvar_t	*r_showcluster;
-cvar_t	*r_novis;
-cvar_t	*r_vk_debug2D;
-cvar_t	*r_vk_debugClearColor;
-cvar_t	*r_vk_debugUiOnly;
-cvar_t	*r_debugSurface;
-cvar_t	*r_teleporterFlash;
-cvar_t	*r_drawSun;
-cvar_t	*r_flares;
-cvar_t	*r_flareFade;
-cvar_t	*r_flareSize;
-cvar_t	*r_flareCoeff;
+extern cvar_t	*r_znear;
+extern cvar_t	*r_zproj;
+extern cvar_t	*r_stereoSeparation;
+extern cvar_t	*r_skipBackEnd;
+extern cvar_t	*r_showImages;
+extern cvar_t	*r_clear;
+extern cvar_t	*r_finish;
+extern cvar_t	*r_dynamiclight;
+extern cvar_t	*r_drawworld;
+extern cvar_t	*r_lockpvs;
+extern cvar_t	*r_showcluster;
+extern cvar_t	*r_novis;
+extern cvar_t	*r_vk_debug2D;
+extern cvar_t	*r_vk_debugClearColor;
+extern cvar_t	*r_vk_debugUiOnly;
+extern cvar_t	*r_debugSurface;
+extern cvar_t	*r_teleporterFlash;
+extern cvar_t	*r_drawSun;
+extern cvar_t	*r_flares;
+extern cvar_t	*r_flareFade;
+extern cvar_t	*r_flareSize;
+extern cvar_t	*r_flareCoeff;
 
 // Shared/legacy renderer globals expected by the Vulkan renderer code
-cvar_t	*r_nobind;
-cvar_t	*r_roundImagesDown;
-cvar_t	*r_colorMipLevels;
-cvar_t	*r_picmip;
-cvar_t	*r_nomip;
-cvar_t	*r_simpleMipMaps;
-cvar_t	*r_overBrightBits;
-cvar_t	*r_mapOverBrightBits;
-cvar_t	*r_dither;
-cvar_t	*r_pbr;
-cvar_t	*r_offsetUnits;
-cvar_t	*r_offsetFactor;
-cvar_t	*r_directedScale;
-cvar_t	*r_debugLight;
-cvar_t	*r_lodbias;
-cvar_t	*r_facePlaneCull;
-cvar_t	*r_dlightSaturation;
-cvar_t	*r_dlightIntensity;
-cvar_t	*r_dlightScale;
+extern cvar_t	*r_nobind;
+extern cvar_t	*r_roundImagesDown;
+extern cvar_t	*r_colorMipLevels;
+extern cvar_t	*r_picmip;
+extern cvar_t	*r_nomip;
+extern cvar_t	*r_simpleMipMaps;
+extern cvar_t	*r_overBrightBits;
+extern cvar_t	*r_mapOverBrightBits;
+extern cvar_t	*r_dither;
+extern cvar_t	*r_pbr;
+extern cvar_t	*r_offsetUnits;
+extern cvar_t	*r_offsetFactor;
+extern cvar_t	*r_directedScale;
+extern cvar_t	*r_debugLight;
+extern cvar_t	*r_lodbias;
+extern cvar_t	*r_facePlaneCull;
+extern cvar_t	*r_dlightSaturation;
+extern cvar_t	*r_dlightIntensity;
+extern cvar_t	*r_dlightScale;
 
 static cvar_t *r_maxpolys;
 static cvar_t *r_maxpolyverts;
@@ -268,12 +318,30 @@ static void R_Register( void ) {
     r_vk_debug_overlay = ri.Cvar_Get( "r_vk_debug_overlay", "0", CVAR_ARCHIVE_ND );
     r_vk_disableScreenMap = ri.Cvar_Get( "r_vk_disableScreenMap", "0", CVAR_ARCHIVE_ND );
     r_vk_icd = ri.Cvar_Get( "r_vk_icd", "", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_device = ri.Cvar_Get( "r_device", "-1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_vulkan_validation = ri.Cvar_Get( "r_vulkan_validation", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_vk_renderdoc = ri.Cvar_Get( "r_vk_renderdoc", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_vk_dynamicRendering = ri.Cvar_Get( "r_vk_dynamicRendering", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_vk_asyncShaderCompile = ri.Cvar_Get( "r_vk_asyncShaderCompile", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_vk_hotReload = ri.Cvar_Get( "r_vk_hotReload", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_vk_bindlessTextures = ri.Cvar_Get( "r_vk_bindlessTextures", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 
     r_procDressing = ri.Cvar_Get( "r_procDressing", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_procDressingDensity = ri.Cvar_Get( "r_procDressingDensity", "1.0", CVAR_ARCHIVE_ND );
+    r_foliageWindFrequency = ri.Cvar_Get( "r_foliageWindFrequency", "1.0", CVAR_ARCHIVE_ND );
+    r_foliageWindStrength = ri.Cvar_Get( "r_foliageWindStrength", "1.0", CVAR_ARCHIVE_ND );
+    r_procDressingDebug = ri.Cvar_Get( "r_procDressingDebug", "0", CVAR_ARCHIVE_ND );
+    
     r_materialSystem = ri.Cvar_Get( "r_materialSystem", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_materialDamage = ri.Cvar_Get( "r_materialDamage", "1", CVAR_ARCHIVE_ND );
+    r_materialWetness = ri.Cvar_Get( "r_materialWetness", "1", CVAR_ARCHIVE_ND );
+    r_materialMagic = ri.Cvar_Get( "r_materialMagic", "1", CVAR_ARCHIVE_ND );
+    
     r_dynamicResolution = ri.Cvar_Get( "r_dynamicResolution", "0", CVAR_ARCHIVE_ND );
     r_frameTelemetry = ri.Cvar_Get( "r_frameTelemetry", "0", CVAR_ARCHIVE_ND );
     r_bloom = ri.Cvar_Get( "r_bloom", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_bloom_intensity = ri.Cvar_Get( "r_bloom_intensity", "1.0", CVAR_ARCHIVE_ND );
+    r_bloom_threshold = ri.Cvar_Get( "r_bloom_threshold", "0.8", CVAR_ARCHIVE_ND );
     
     r_volumetricFog = ri.Cvar_Get( "r_volumetricFog", "0", CVAR_ARCHIVE_ND );
     ri.Cvar_SetDescription( r_volumetricFog, "Enable advanced volumetric fog system." );
@@ -290,8 +358,35 @@ static void R_Register( void ) {
     r_dlss = ri.Cvar_Get( "r_dlss", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
     r_dlss_quality = ri.Cvar_Get( "r_dlss_quality", "3", CVAR_ARCHIVE_ND );
     r_dlss_sharpening = ri.Cvar_Get( "r_dlss_sharpening", "0.5", CVAR_ARCHIVE_ND );
+    
+    r_fsr_enable = ri.Cvar_Get( "r_fsr_enable", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_fsr_easu = ri.Cvar_Get( "r_fsr_easu", "1", CVAR_ARCHIVE_ND );
+    r_fsr_rcas = ri.Cvar_Get( "r_fsr_rcas", "1", CVAR_ARCHIVE_ND );
+    r_fsr_sharpness = ri.Cvar_Get( "r_fsr_sharpness", "0.5", CVAR_ARCHIVE_ND );
+
     r_styleTransfer = ri.Cvar_Get( "r_styleTransfer", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 
+    r_virtualTextures = ri.Cvar_Get( "r_virtualTextures", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_vt_pageSize = ri.Cvar_Get( "r_vt_pageSize", "128", CVAR_ARCHIVE_ND );
+    r_vt_cacheSize = ri.Cvar_Get( "r_vt_cacheSize", "1024", CVAR_ARCHIVE_ND );
+
+    r_gpuSceneGraph = ri.Cvar_Get( "r_gpuSceneGraph", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_gpuSceneDebug = ri.Cvar_Get( "r_gpuSceneDebug", "0", CVAR_ARCHIVE_ND );
+
+    r_particles_gpu = ri.Cvar_Get( "r_particles_gpu", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_particles_max = ri.Cvar_Get( "r_particles_max", "2048", CVAR_ARCHIVE_ND );
+
+    r_meshShaders = ri.Cvar_Get( "r_meshShaders", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_meshletSize = ri.Cvar_Get( "r_meshletSize", "64", CVAR_ARCHIVE_ND );
+
+    r_layeredMaterials = ri.Cvar_Get( "r_layeredMaterials", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_layeredMaterialProfile = ri.Cvar_Get( "r_layeredMaterialProfile", "0", CVAR_ARCHIVE_ND );
+    r_layeredMaterialMaxLayers = ri.Cvar_Get( "r_layeredMaterialMaxLayers", "4", CVAR_ARCHIVE_ND );
+    r_layeredMaterialSimple = ri.Cvar_Get( "r_layeredMaterialSimple", "0", CVAR_ARCHIVE_ND );
+
+    r_cellLoadRadius = ri.Cvar_Get( "r_cellLoadRadius", "2000", CVAR_ARCHIVE_ND );
+    r_cellUnloadDistance = ri.Cvar_Get( "r_cellUnloadDistance", "3000", CVAR_ARCHIVE_ND );
+    
     r_saveFontData = ri.Cvar_Get( "r_saveFontData", "0", CVAR_CHEAT );
     r_fullbright = ri.Cvar_Get( "r_fullbright", "0", CVAR_CHEAT );
     r_singleShader = ri.Cvar_Get( "r_singleShader", "0", CVAR_CHEAT | CVAR_LATCH );

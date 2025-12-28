@@ -2055,6 +2055,8 @@ Update Vulkan uniform buffers with shader parameters
 */
 void R_UpdateVulkanShaderParameters(int shaderId)
 {
+	Q_UNUSED(shaderId);
+
 	// TODO: Update Vulkan uniform buffers
 	// This would require access to Vulkan renderer's uniform buffer system
 }

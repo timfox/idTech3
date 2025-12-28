@@ -954,8 +954,23 @@ VK_CreateSurface
 */
 VK_EXPORT qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR *surface )
 {
-	if ( SDL_Vulkan_CreateSurface( SDL_window, instance, surface ) == SDL_TRUE )
+	write(2, "DEBUG: Entering VK_CreateSurface\n", 33);
+	if ( ri.Printf == NULL ) {
+		write(2, "DEBUG: ri.Printf is NULL!\n", 26);
+		fprintf(stderr, "CRITICAL ERROR: ri.Printf is NULL in VK_CreateSurface!\n");
+		return qfalse;
+	}
+	if ( SDL_window == NULL ) {
+		write(2, "DEBUG: SDL_window is NULL!\n", 27);
+		ri.Printf( PRINT_ERROR, "VK_CreateSurface: SDL_window is NULL\n" );
+		return qfalse;
+	}
+	write(2, "DEBUG: Calling SDL_Vulkan_CreateSurface\n", 40);
+	if ( SDL_Vulkan_CreateSurface( SDL_window, instance, surface ) == SDL_TRUE ) {
+		write(2, "DEBUG: SDL_Vulkan_CreateSurface succeeded\n", 42);
 		return qtrue;
+	}
+	write(2, "DEBUG: SDL_Vulkan_CreateSurface failed\n", 39);
 
 	// If Wayland surface creation fails, try a one-time fallback to X11 by restarting
 	// the SDL video backend and recreating the window, then retrying surface creation.
