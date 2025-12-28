@@ -11,6 +11,9 @@ endif()
 
 project(idtech3 C CXX ASM)
 
+include("${CMAKE_SOURCE_DIR}/cmake/backend_select.cmake" NO_POLICY_SCOPE)
+include("${CMAKE_SOURCE_DIR}/cmake/moltenvk_setup.cmake" NO_POLICY_SCOPE)
+
 if(ANDROID)
     set(CMAKE_TOOLCHAIN_FILE "$ENV{ANDROID_HOME}/ndk/25.1.8937393/build/cmake/android.toolchain.cmake")
     set(ANDROID_ABI "arm64-v8a") # Target 64-bit ARM
