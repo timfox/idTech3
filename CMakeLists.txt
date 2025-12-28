@@ -3,7 +3,21 @@
 # ==============================================================================
 
 cmake_minimum_required(VERSION 3.20)
+if(COMMAND cmake_parse_arguments)
+    cmake_minimum_required(VERSION 3.10.3)
+else()
+    cmake_minimum_required(VERSION 3.10.3 FATAL_ERROR)
+endif()
+
 project(idtech3 C CXX ASM)
+
+if(ANDROID)
+    set(CMAKE_TOOLCHAIN_FILE "$ENV{ANDROID_HOME}/ndk/25.1.8937393/build/cmake/android.toolchain.cmake")
+    set(ANDROID_ABI "arm64-v8a") # Target 64-bit ARM
+    set(ANDROID_PLATFORM "android-21") # Minimum API level
+    set(ANDROID_STL "c++_static") # Use static C++ standard library
+    # You might also want to set ANDROID_NATIVE_API_LEVEL and ANDROID_APP_PLATFORM if needed
+endif()
 
 # Find dependencies
 find_package(OpenGL QUIET)
@@ -1280,6 +1294,7 @@ list(APPEND RENDERER_COMMON_SRCS src/renderers/renderercommon/tr_services.c)
 # Note: FreeType-dependent files are included when USE_FREETYPE is defined
 # They have proper guards to compile to empty implementations when FreeType is not available
 AUX_SOURCE_DIRECTORY(src/renderers/opengl RENDERER_GL_SRCS)
+AUX_SOURCE_DIRECTORY(src/renderers/opengl RENDERER_GLES_SRCS)
 list(APPEND RENDERER_GL_SRCS src/renderers/opengl/tr_main.c)
 SET(RENDERER_VK_SRCS
 	src/renderers/vulkan/tr_animation.c
@@ -1361,6 +1376,7 @@ SET(RENDERER_VK_SRCS
 # Vulkan experimental modules (work-in-progress). Keep ON by default for prioritized
 # Vulkan RTX implementation development.
 option(IDTECH3_VK_EXPERIMENTAL "Build experimental Vulkan renderer modules" ON)
+option(FEATURE_RENDERER_GLES "Build and use OpenGL ES renderer" ON)
 	if(NOT IDTECH3_VK_EXPERIMENTAL)
 	list(REMOVE_ITEM RENDERER_VK_SRCS
 		src/renderers/vulkan/gltf_loader.c
@@ -1444,28 +1460,50 @@ IF(USE_RENDERER_DLOPEN)
 	ENDIF()
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_RENDERER_DLOPEN RENDERER_PREFIX="${RENDERER_PREFIX}" RENDERER_DEFAULT=${RENDERER_DEFAULT})
 
-	ADD_LIBRARY(${RENDERER_PREFIX}_opengl${RENDEXT} SHARED ${RENDERER_GL_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
-	SET_TARGET_PROPERTIES(${RENDERER_PREFIX}_opengl${RENDEXT} PROPERTIES 
-        OUTPUT_NAME "${RENDERER_PREFIX}_opengl${RENDEXT}" 
-        PREFIX ""
-        POSITION_INDEPENDENT_CODE ON
-    )
-	TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_OPENGL_API)
-    TARGET_COMPILE_OPTIONS(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE -fvisibility=hidden)
-	IF(USE_FREETYPE)
-		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE BUILD_FREETYPE)
+	IF(NOT ANDROID)
+		ADD_LIBRARY(${RENDERER_PREFIX}_opengl${RENDEXT} SHARED ${RENDERER_GL_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
+		SET_TARGET_PROPERTIES(${RENDERER_PREFIX}_opengl${RENDEXT} PROPERTIES 
+            OUTPUT_NAME "${RENDERER_PREFIX}_opengl${RENDEXT}" 
+            PREFIX ""
+            POSITION_INDEPENDENT_CODE ON
+        )
+		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_OPENGL_API)
+        TARGET_COMPILE_OPTIONS(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE -fvisibility=hidden)
+		IF(USE_FREETYPE)
+			TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE BUILD_FREETYPE)
+		ENDIF()
+		# `src/renderers/renderercommon/*` uses legacy relative includes like "../qcommon/...".
+		# Adding `src/renderers` to the include path keeps those includes resolving to `src/qcommon/...`.
+		target_include_directories(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/renderers)
+		IF(USE_FREETYPE)
+			target_include_directories(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE /usr/include/freetype2)
+		ENDIF()
+		TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_opengl${RENDEXT} m /usr/lib/x86_64-linux-gnu/libGL.so.1)
+		IF(USE_FREETYPE)
+			TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_opengl${RENDEXT} /usr/lib/x86_64-linux-gnu/libfreetype.so)
+		ENDIF()
+		TARGET_LINK_OPTIONS(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE -Wl,--export-dynamic -Wl,--unresolved-symbols=ignore-all)
 	ENDIF()
-	# `src/renderers/renderercommon/*` uses legacy relative includes like "../qcommon/...".
-	# Adding `src/renderers` to the include path keeps those includes resolving to `src/qcommon/...`.
-	target_include_directories(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/renderers)
-	IF(USE_FREETYPE)
-		target_include_directories(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE /usr/include/freetype2)
-	ENDIF()
-	TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_opengl${RENDEXT} m /usr/lib/x86_64-linux-gnu/libGL.so.1)
-	IF(USE_FREETYPE)
-		TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_opengl${RENDEXT} /usr/lib/x86_64-linux-gnu/libfreetype.so)
-	ENDIF()
-	TARGET_LINK_OPTIONS(${RENDERER_PREFIX}_opengl${RENDEXT} PRIVATE -Wl,--export-dynamic -Wl,--unresolved-symbols=ignore-all)
+
+    IF(ANDROID AND FEATURE_RENDERER_GLES)
+        ADD_LIBRARY(${RENDERER_PREFIX}_gles${RENDEXT} SHARED ${RENDERER_GLES_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
+        SET_TARGET_PROPERTIES(${RENDERER_PREFIX}_gles${RENDEXT} PROPERTIES
+            OUTPUT_NAME "${RENDERER_PREFIX}_gles${RENDEXT}"
+            PREFIX ""
+            POSITION_INDEPENDENT_CODE ON
+        )
+        TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_gles${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_OPENGL_API USE_OPENGL_ES)
+        TARGET_COMPILE_OPTIONS(${RENDERER_PREFIX}_gles${RENDEXT} PRIVATE -fvisibility=hidden)
+        IF(USE_FREETYPE)
+            TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_gles${RENDEXT} PRIVATE BUILD_FREETYPE)
+        ENDIF()
+        target_include_directories(${RENDERER_PREFIX}_gles${RENDEXT} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/renderers)
+        IF(USE_FREETYPE)
+            target_include_directories(${RENDERER_PREFIX}_gles${RENDEXT} PRIVATE ${ANDROID_NDK_SYSROOT}/usr/include/freetype2) # Use NDK freetype
+        ENDIF()
+        TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_gles${RENDEXT} m android log OpenSLES GLESv2 EGL) # Link Android-specific libs
+        TARGET_LINK_OPTIONS(${RENDERER_PREFIX}_gles${RENDEXT} PRIVATE -Wl,--export-dynamic -Wl,--unresolved-symbols=ignore-all)
+    ENDIF()
 
 	if(USE_VULKAN)
 		ADD_LIBRARY(${RENDERER_PREFIX}_vulkan${RENDEXT} SHARED ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
