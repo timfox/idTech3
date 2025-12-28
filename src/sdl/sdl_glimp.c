@@ -48,6 +48,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 
 #include "../client/client.h"
+#include "vk_metrics.h"
 #include "../renderers/renderercommon/tr_public.h"
 #include "sdl_glw.h"
 #include "sdl_icon.h"
@@ -1027,6 +1028,8 @@ VK_EXPORT qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR *surface 
         } else {
             fprintf(stderr, "DEBUG: SDL_Vulkan_CreateSurface succeeded\n");
         }
+        // Emit a surface-created metric
+        vk_metrics_increment_surface_created();
         return qtrue;
     }
     if (ri.Printf) {
@@ -1040,9 +1043,11 @@ VK_EXPORT qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR *surface 
 	{
 		const char *drv = SDL_GetCurrentVideoDriver();
 		if ( drv && strcmp( drv, "wayland" ) == 0 && GLimp_CanFallbackToX11() ) {
-			Com_Printf( "SDL_Vulkan_CreateSurface failed on Wayland (%s); retrying with X11...\n", SDL_GetError() );
+		Com_Printf( "SDL_Vulkan_CreateSurface failed on Wayland (%s); retrying with X11...\n", SDL_GetError() );
+		Com_Printf( "VK_CreateSurface: Wayland fallback to X11 path engaged (attempting restart)\n" );
 
 			if ( GLimp_RestartVideoDriver( "x11" ) ) {
+				Com_Printf( "VK_CreateSurface: X11 fallback restart succeeded\n" );
 				// Recreate the window in Vulkan mode using the last requested settings.
 				const rserr_t err = GLW_SetMode( s_last_mode, s_last_modeFS, s_last_fullscreen, qtrue );
 				if ( err == RSERR_OK ) {

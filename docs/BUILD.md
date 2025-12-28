@@ -44,6 +44,15 @@ cd release
 VK_VERBOSE_PIPELINE_LOGS=1 ./release/idtech3.x86_64 +set fs_game mymod +set cl_renderer vulkan
 ```
 - Expected output: additional DEBUG lines around pipeline allocation, e.g. "Allocated pipeline def ..." after vk_find_pipeline_ext allocations.
+
+### Wayland with X11 fallback for Vulkan
+- On Wayland sessions, if SDL_Vulkan_CreateSurface fails, the engine automatically retries by restarting the video backend to X11 and recreating the Vulkan surface.
+- Runtime log hints:
+  - "SDL_Vulkan_CreateSurface failed on Wayland (...); retrying with X11..."
+- How to test:
+  - Run in a Wayland session with Vulkan enabled; observe fallback if surface creation fails.
+- Notes:
+  - This fallback path is intended for environments with limited Wayland support; modern Wayland setups should render directly.
 ### Dedicated server
 
 ```bash

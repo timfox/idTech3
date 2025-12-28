@@ -1,5 +1,17 @@
 # id Tech 3
 
+### Wayland + X11 Vulkan fallback (summary)
+- What it does: On Wayland, if Vulkan surface creation fails, the runtime attempts a one-time fallback to X11 by restarting the video backend and retrying surface creation.
+- Log markers to verify:
+  - VK_CreateSurface: Wayland detected; retrying with X11 path engaged (attempting restart)
+  - VK_CreateSurface: X11 fallback restart succeeded
+- How to test locally:
+  - Run Vulkan with Wayland session: VK_VERBOSE_PIPELINE_LOGS=1 VK_LOG_TO_FILE=1 ./release/idtech3.x86_64 +set fs_game mymod +set cl_renderer vulkan > run.log 2>&1
+  - If surface creation fails on Wayland, check for the fallback messages and the eventual success paths.
+  - If you use the provided CI script, reference scripts/ci_wayland_fallback.sh for automated checks.
+
+- Notes:
+- This Fallback path is primarily for older Wayland setups; modern Wayland environments should render directly.
 [![build](../../workflows/build/badge.svg)](../../actions?query=workflow%3Abuild) <a href="https://discord.com/invite/X3Exs4C"><img src="https://img.shields.io/discord/314456230649135105?color=7289da&logo=discord&logoColor=white" alt="Discord server" /></a>
 
 This is a modern id Tech 3 engine with PBR and ray tracing.
@@ -132,3 +144,38 @@ Go to [Releases](../../releases) section to download the latest binaries for you
 * https://github.com/NVIDIA/Q2RTX
 * https://github.com/TTimo/GtkRadiant
 * https://github.com/JKSunny/Quake3e
+
+### Android signing (minimal) - README snippet
+- This project supports signing the Android app module for release builds.
+- Local signing (manual)
+  - Generate a release keystore (example):
+    ```
+    keytool -genkeypair -v -keystore release.keystore -alias idtech3 -keyalg RSA -keysize 2048 -validity 10000
+    ```
+  - Place the keystore in a secure location (e.g. `android/keystore/release.keystore`), and configure Gradle signing in `src/android-app/build.gradle`:
+    ```
+    signingConfigs {
+      release {
+        storeFile file("$rootDir/keystore/release.keystore")
+        storePassword "changeit"
+        keyAlias "idtech3"
+        keyPassword "changeit"
+      }
+    }
+
+    buildTypes {
+      release {
+        signingConfig signingConfigs.release
+      }
+    }
+    ```
+- CI signing (secret-based)
+  - In CI, supply keystore path and credentials via environment variables:
+    - RELEASE_STORE_FILE
+    - RELEASE_STORE_PASSWORD
+    - RELEASE_KEY_ALIAS
+    - RELEASE_KEY_PASSWORD
+- Verification steps (local)
+  - ./gradlew :src/android-app:assembleRelease
+- Verification steps (CI)
+  - Use a dedicated CI job to run signing (see .github/workflows/android-signing.yml)
