@@ -182,18 +182,42 @@ typedef enum {
 } renderPass_t;
 
 // TESS flags for vertex attribute binding
+#ifndef TESS_XYZ
 #define TESS_XYZ       (1 << 0)
+#endif
+#ifndef TESS_RGBA0
 #define TESS_RGBA0     (1 << 1)
+#endif
+#ifndef TESS_ST0
 #define TESS_ST0       (1 << 2)
+#endif
+#ifndef TESS_ST1
 #define TESS_ST1       (1 << 3)
+#endif
+#ifndef TESS_ST2
 #define TESS_ST2       (1 << 4)
+#endif
+#ifndef TESS_NNN
 #define TESS_NNN       (1 << 5)
+#endif
+#ifndef TESS_RGBA1
 #define TESS_RGBA1     (1 << 6)
+#endif
+#ifndef TESS_RGBA2
 #define TESS_RGBA2     (1 << 7)
+#endif
+#ifndef TESS_PBR
 #define TESS_PBR       (1 << 8)
+#endif
+#ifndef TESS_ENV
 #define TESS_ENV       (1 << 9)
+#endif
+#ifndef TESS_VPOS
 #define TESS_VPOS      (1 << 11)
+#endif
+#ifndef TESS_ENT0
 #define TESS_ENT0      (1 << 10)
+#endif
 
 // VK_DESC descriptor binding indices
 #define VK_DESC_TEXTURE_BASE           0

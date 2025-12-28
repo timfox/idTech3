@@ -404,17 +404,13 @@ static void R_Register( void ) {
 
 void R_Init( void ) {
     static qboolean initialized = qfalse;
-    fprintf(stderr, "R_Init: called, initialized=%d\n", (int)initialized);
     if ( initialized ) {
         return;
     }
     initialized = qtrue;
 
-    fprintf(stderr, "R_Init: about to call R_Register\n");
     R_Register();
-    fprintf(stderr, "R_Init: about to call vk_initialize\n");
     vk_initialize();
-    fprintf(stderr, "R_Init: vk_initialize completed\n");
 }
 
 /*
@@ -429,27 +425,20 @@ refexport_t *GetRefAPI( int apiVersion, refimport_t *rimp ) {
 #endif
     static refexport_t re;
 
-    fprintf(stderr, "GetRefAPI: called\n");
     if (!rimp) {
-        fprintf(stderr, "GetRefAPI: rimp is NULL!\n");
         return NULL;
     }
 
-    fprintf(stderr, "GetRefAPI: about to copy rimp\n");
     ri = *rimp;
-    fprintf(stderr, "GetRefAPI: rimp copied\n");
 
     Com_Memset( &re, 0, sizeof( re ) );
 
     if ( apiVersion != REF_API_VERSION ) {
-        fprintf(stderr, "GetRefAPI: version mismatch\n");
         ri.Printf( PRINT_ALL, "Mismatched REF_API_VERSION: expected %i, got %i\n", REF_API_VERSION, apiVersion );
         return NULL;
     }
 
-    fprintf(stderr, "GetRefAPI: about to call R_Register\n");
     R_Register();
-    fprintf(stderr, "GetRefAPI: R_Register completed\n");
 
     re.Shutdown = RE_Shutdown;
     re.BeginRegistration = RE_BeginRegistration;

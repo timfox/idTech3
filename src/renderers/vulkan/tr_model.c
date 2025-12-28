@@ -1299,14 +1299,9 @@ static qboolean R_LoadMDR( model_t *mod, void *buffer, int filesize, const char 
 ** RE_BeginRegistration
 */
 void RE_BeginRegistration( glconfig_t *glconfigOut ) {
-	fprintf(stderr, "RE_BeginRegistration: called\n");
-
-	fprintf(stderr, "RE_BeginRegistration: about to call R_Init\n");
 	R_Init();
-	fprintf(stderr, "RE_BeginRegistration: R_Init completed\n");
 
 	if (glconfigOut) {
-		fprintf(stderr, "RE_BeginRegistration: copying glConfig\n");
 		*glconfigOut = glConfig;
 	}
 

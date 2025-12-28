@@ -2300,7 +2300,6 @@ static void vk_destroy_instance( void ) {
 
 #ifdef USE_VK_VALIDATION
 	if ( vk_debug_callback ) {
-		fprintf(stderr, "vk_destroy_instance: destroying debug callback\n");
 		if ( qvkDestroyDebugReportCallbackEXT != NULL ) {
 			qvkDestroyDebugReportCallbackEXT( vk_instance, vk_debug_callback, NULL );
 		}
@@ -2309,37 +2308,30 @@ static void vk_destroy_instance( void ) {
 #endif
 
 	if ( vk_instance != VK_NULL_HANDLE ) {
-		fprintf(stderr, "vk_destroy_instance: destroying instance\n");
 		if ( qvkDestroyInstance ) {
 			qvkDestroyInstance( vk_instance, NULL );
 		}
 		vk_instance = VK_NULL_HANDLE;
 	}
-	fprintf(stderr, "vk_destroy_instance: completed\n");
 }
 
 
 static void init_vulkan_library( void )
 {
-	fprintf(stderr, "init_vulkan_library: called\n");
 	VkPhysicalDeviceProperties props;
 	VkPhysicalDevice *physical_devices;
 	uint32_t device_count;
 	int device_index;
 	VkResult res;
 
-	fprintf(stderr, "init_vulkan_library: about to memset vk (size=%zu)\n", sizeof(vk));
-	Com_Memset( &vk, 0, sizeof( vk ) );
-	fprintf(stderr, "init_vulkan_library: memset completed\n");
+	// Global vk instance is zero-initialized by default. 
+	// Do not use Com_Memset here if it contains complex C++ types like atomics.
 
 	vk_safety_checks();
-	fprintf(stderr, "init_vulkan_library: safety checks completed\n");
 
 #ifdef USE_VULKAN
-	fprintf(stderr, "init_vulkan_library: checking r_vk_icd\n");
 	// Allow forcing a specific ICD via cvar (maps to VK_ICD_FILENAMES).
 	if ( r_vk_icd && r_vk_icd->string && r_vk_icd->string[0] ) {
-		fprintf(stderr, "init_vulkan_library: setting VK_ICD_FILENAMES to %s\n", r_vk_icd->string);
 		if ( setenv( "VK_ICD_FILENAMES", r_vk_icd->string, 1 ) == 0 ) {
 			ri.Printf( PRINT_ALL, "...using VK_ICD_FILENAMES override: %s\n", r_vk_icd->string );
 		} else {
@@ -2348,7 +2340,6 @@ static void init_vulkan_library( void )
 	}
 #endif
 
-	fprintf(stderr, "init_vulkan_library: checking vk_instance\n");
 	if ( vk_instance == VK_NULL_HANDLE ) {
 
 		// force cleanup
@@ -3529,18 +3520,17 @@ static void vk_create_pipeline_layouts(void);
 
 void vk_initialize( void )
 {
-	fprintf(stderr, "vk_initialize: called, active=%d\n", (int)vk.active);
 	if ( vk.active ) {
 		return;
 	}
-	fprintf(stderr, "vk_initialize: about to call init_vulkan_library\n");
+
+	// Initialize the platform-specific Vulkan implementation (window, library loading)
+	ri.VKimp_Init( &glConfig );
+
 	init_vulkan_library();
-	fprintf(stderr, "vk_initialize: init_vulkan_library completed\n");
 
 	// Create shader modules early so they are available for pipeline creation
-	fprintf(stderr, "vk_initialize: about to call vk_create_shader_modules\n");
 	vk_create_shader_modules();
-	fprintf(stderr, "vk_initialize: vk_create_shader_modules completed\n");
 
 	// Initialize ray tracing if supported
 	if (vk.rayTracingSupported) {
@@ -3574,7 +3564,7 @@ void vk_initialize( void )
 	// Initialize world effects system
 	vk_world_effects_init();
 
-	ri.Printf(PRINT_ALL, "DEBUG: vk_initialize completed successfully\n");
+	ri.Printf(PRINT_ALL, "Vulkan: Initialized successfully\n");
 
 	// Mark Vulkan as active
 	vk.active = qtrue;

@@ -3418,9 +3418,7 @@ static void CL_InitRenderer( void ) {
 	}
 
 	// this sets up the renderer and calls R_Init
-	fprintf(stderr, "DEBUG: Calling re.BeginRegistration (%p)\n", (void*)re.BeginRegistration);
 	re.BeginRegistration( &cls.glconfig );
-	fprintf(stderr, "DEBUG: re.BeginRegistration completed\n");
 
 	// load character sets
 	cls.charSetShader = re.RegisterShader( "gfx/2d/bigchars" );
@@ -3613,13 +3611,6 @@ static void CL_InitRef( void ) {
 	}
 
 	fprintf( stderr, "CL_InitRef: ENTERING FUNCTION\n" );
-#ifdef USE_VULKAN
-	fprintf( stderr, "DEBUG: USE_VULKAN is DEFINED in cl_main.c\n" );
-#else
-	fprintf( stderr, "DEBUG: USE_VULKAN is NOT DEFINED in cl_main.c\n" );
-#endif
-	Com_Printf( "DEBUG: CL_InitRef called\n" );
-	fprintf( stderr, "CL_InitRef: Function called!\n" );
 	CL_InitGLimp_Cvars();
 
 	Com_Printf( "----- Initializing Renderer ----\n" );
@@ -3814,24 +3805,15 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 	rimp.VK_CreateSurface = NULL;
 #endif
 	ret = GetRefAPI( REF_API_VERSION, &rimp );
-	fprintf( stderr, "DEBUG: GetRefAPI returned: %p\n", (void*)ret );
-	if (ret) {
-		fprintf( stderr, "DEBUG: Engine sizeof(refexport_t) = %zu\n", sizeof(refexport_t) );
-	}
-
-	Com_Printf( "-------------------------------\n");
 
 	if ( !ret ) {
 		Com_Error (ERR_FATAL, "Couldn't initialize refresh" );
 	}
 
-	fprintf(stderr, "DEBUG: About to copy re from ret\n");
 	re = *ret;
-	fprintf(stderr, "DEBUG: Copy successful\n");
 
 	// unpause so the cgame definitely gets a snapshot and renders a frame
 	Cvar_Set( "cl_paused", "0" );
-	fprintf(stderr, "CL_InitRef: EXITING FUNCTION\n");
 }
 
 

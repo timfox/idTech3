@@ -793,9 +793,27 @@ VK_EXPORT void VKimp_Init( glconfig_t *config )
 		}
 	}
 
+#ifdef USE_VULKAN
+	if ( SDL_Vulkan_LoadLibrary( NULL ) < 0 )
+	{
+		// Try to load the default library manually as a fallback
+		if ( SDL_Vulkan_LoadLibrary( "libvulkan.so.1" ) < 0 ) {
+			Com_Error( ERR_FATAL, "VKimp_Init() - could not load Vulkan library: %s", SDL_GetError() );
+			return;
+		}
+	}
+#endif
+
 	{
 		void *addr = SDL_Vulkan_GetVkGetInstanceProcAddr();
 		qvkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)(intptr_t)addr;
+		
+		if ( qvkGetInstanceProcAddr == NULL )
+		{
+			// Already tried loading library above, but let's be thorough
+			addr = SDL_Vulkan_GetVkGetInstanceProcAddr();
+			qvkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)(intptr_t)addr;
+		}
 	}
 
 	if ( qvkGetInstanceProcAddr == NULL )
@@ -827,19 +845,28 @@ VK_EXPORT PFN_vkVoidFunction VK_GetInstanceProcAddr( VkInstance instance, const 
 	if ( qvkGetInstanceProcAddr == NULL )
 	{
 		void *addr = SDL_Vulkan_GetVkGetInstanceProcAddr();
-		fprintf(stderr, "VK_GetInstanceProcAddr: SDL_Vulkan_GetVkGetInstanceProcAddr returned %p\n", addr);
+		
+		if ( !addr ) {
+			// Fallback: try to load it from the process global namespace
+			// This can happen if SDL is linked statically or has issues with library loading
+#ifndef _WIN32
+			#include <dlfcn.h>
+			void *handle = dlopen("libvulkan.so.1", RTLD_LAZY | RTLD_GLOBAL);
+			if (handle) {
+				addr = dlsym(handle, "vkGetInstanceProcAddr");
+			}
+#endif
+		}
+		
 		qvkGetInstanceProcAddr = (PFN_vkGetInstanceProcAddr)(intptr_t)addr;
 	}
 
 	if ( qvkGetInstanceProcAddr == NULL )
 	{
-		fprintf(stderr, "VK_GetInstanceProcAddr: qvkGetInstanceProcAddr is STILL NULL!\n");
 		return NULL;
 	}
 
-	PFN_vkVoidFunction res = qvkGetInstanceProcAddr( instance, name );
-	fprintf(stderr, "VK_GetInstanceProcAddr(instance=%p, name=%s) returned %p\n", (void*)instance, name, (void*)res);
-	return res;
+	return qvkGetInstanceProcAddr( instance, name );
 }
 
 

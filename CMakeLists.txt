@@ -1168,7 +1168,7 @@ ELSE()
 ENDIF()
 
 # Add OGG/Vorbis include directories for client (used by snd_codec_ogg.c)
-TARGET_INCLUDE_DIRECTORIES(client PRIVATE libs/ogg/include libs/vorbis/include)
+TARGET_INCLUDE_DIRECTORIES(client PRIVATE src/common src libs/ogg/include libs/vorbis/include)
 
 IF(USE_CIMGUI AND DEFINED CIMGUI_DIR)
 	set(CIMGUI_USER_CONFIG "\"cimconfig.h\"")
@@ -1435,6 +1435,9 @@ IF(USE_RENDERER_DLOPEN)
 		src/common/puff.c
 		src/common/q_math.c
 	)
+	IF(USE_VULKAN)
+		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_VULKAN)
+	ENDIF()
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_RENDERER_DLOPEN RENDERER_PREFIX="${RENDERER_PREFIX}" RENDERER_DEFAULT=${RENDERER_DEFAULT})
 
 	ADD_LIBRARY(${RENDERER_PREFIX}_opengl${RENDEXT} SHARED ${RENDERER_GL_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
