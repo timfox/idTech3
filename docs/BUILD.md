@@ -37,6 +37,13 @@ cd release
 ./idtech3.x86_64
 ```
 
+### Debug Vulkan pipeline logging
+- To enable verbose Vulkan pipeline creation logs, run the engine with the environment variable `VK_VERBOSE_PIPELINE_LOGS` set.
+- Example:
+```bash
+VK_VERBOSE_PIPELINE_LOGS=1 ./release/idtech3.x86_64 +set fs_game mymod +set cl_renderer vulkan
+```
+- Expected output: additional DEBUG lines around pipeline allocation, e.g. "Allocated pipeline def ..." after vk_find_pipeline_ext allocations.
 ### Dedicated server
 
 ```bash

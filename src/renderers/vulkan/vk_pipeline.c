@@ -413,11 +413,21 @@ VkPipeline vk_find_pipeline_ext(int base_pipeline, Vk_Pipeline_Def* def, qboolea
 		}
 	}
 
-	index = vk_alloc_pipeline(def);
-	if (index == 0) {
+    index = vk_alloc_pipeline(def);
+    if (index == 0) {
 		ri.Printf(PRINT_ERROR, "vk_find_pipeline_ext: failed to allocate pipeline\n");
 		return VK_NULL_HANDLE;
 	}
+    // Optional extended logging: print more details when VK_VERBOSE_PIPELINE_LOGS is set
+    if (getenv("VK_VERBOSE_PIPELINE_LOGS")) {
+        ri.Printf(PRINT_ALL, "DEBUG: Allocated pipeline def -> shader_type=%d, cullType=%d, primitives=%d, mirror=%d, state_bits=%d, line_width=%f, abs_light=%d, vk_pbr_flags=%d\n",
+            def->shader_type, def->cullType, def->primitives, def->mirror, def->state_bits, def->line_width, def->abs_light, def->vk_pbr_flags);
+    }
+    ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext allocated def shader_type=%d cullType=%d primitives=%d mirror=%d state_bits=%d line_width=%f abs_light=%d vk_pbr_flags=%d\n",
+        def->shader_type, def->cullType, def->primitives, def->mirror, def->state_bits, def->line_width, def->abs_light, def->vk_pbr_flags);
+	// Extra logging for allocation
+	ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext allocated pipeline index=%u shader_type=%d state_bits=%d primitives=%d mirror=%d\n",
+		index, def->shader_type, def->state_bits, def->primitives, def->mirror);
 
 found:
 
@@ -427,10 +437,13 @@ found:
 			ri.Printf(PRINT_ERROR, "vk_find_pipeline_ext: failed to generate pipeline %u\n", index);
 			return VK_NULL_HANDLE;
 		}
+		ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext generated pipeline %u -> %p\n", index, (void*)pipeline);
 		return pipeline;
 	}
 
-	return vk_gen_pipeline(index);
+	VkPipeline pipeline = vk_gen_pipeline(index);
+	ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext returned existing pipeline %u -> %p\n", index, (void*)pipeline);
+	return pipeline;
 }
 
 void vk_get_pipeline_def(VkPipeline pipeline, Vk_Pipeline_Def *def) {

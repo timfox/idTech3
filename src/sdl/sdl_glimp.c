@@ -31,6 +31,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 #else
 #	include <SDL.h>
+#include <stdio.h>
 #ifdef USE_VULKAN
 #	include <SDL_vulkan.h>
 #endif
@@ -998,23 +999,41 @@ VK_CreateSurface
 */
 VK_EXPORT qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR *surface )
 {
-	write(2, "DEBUG: Entering VK_CreateSurface\n", 33);
-	if ( ri.Printf == NULL ) {
-		write(2, "DEBUG: ri.Printf is NULL!\n", 26);
-		fprintf(stderr, "CRITICAL ERROR: ri.Printf is NULL in VK_CreateSurface!\n");
-		return qfalse;
-	}
-	if ( SDL_window == NULL ) {
-		write(2, "DEBUG: SDL_window is NULL!\n", 27);
-		ri.Printf( PRINT_ERROR, "VK_CreateSurface: SDL_window is NULL\n" );
-		return qfalse;
-	}
-	write(2, "DEBUG: Calling SDL_Vulkan_CreateSurface\n", 40);
-	if ( SDL_Vulkan_CreateSurface( SDL_window, instance, surface ) == SDL_TRUE ) {
-		write(2, "DEBUG: SDL_Vulkan_CreateSurface succeeded\n", 42);
-		return qtrue;
-	}
-	write(2, "DEBUG: SDL_Vulkan_CreateSurface failed\n", 39);
+    if (ri.Printf) {
+        ri.Printf(PRINT_ALL, "DEBUG: Entering VK_CreateSurface\n");
+    } else {
+        fprintf(stderr, "DEBUG: Entering VK_CreateSurface\n");
+    }
+    if ( ri.Printf == NULL ) {
+        if (ri.Printf) ri.Printf(PRINT_ALL, "DEBUG: ri.Printf is NULL!\n");
+        else fprintf(stderr, "DEBUG: ri.Printf is NULL!\n");
+        fprintf(stderr, "CRITICAL ERROR: ri.Printf is NULL in VK_CreateSurface!\n");
+        return qfalse;
+    }
+    if ( SDL_window == NULL ) {
+        if (ri.Printf) ri.Printf(PRINT_ALL, "DEBUG: SDL_window is NULL!\n");
+        else fprintf(stderr, "DEBUG: SDL_window is NULL!\n");
+        ri.Printf( PRINT_ERROR, "VK_CreateSurface: SDL_window is NULL\n" );
+        return qfalse;
+    }
+    if (ri.Printf) {
+        ri.Printf(PRINT_ALL, "DEBUG: Calling SDL_Vulkan_CreateSurface\n");
+    } else {
+        fprintf(stderr, "DEBUG: Calling SDL_Vulkan_CreateSurface\n");
+    }
+    if ( SDL_Vulkan_CreateSurface( SDL_window, instance, surface ) == SDL_TRUE ) {
+        if (ri.Printf) {
+            ri.Printf(PRINT_ALL, "DEBUG: SDL_Vulkan_CreateSurface succeeded\n");
+        } else {
+            fprintf(stderr, "DEBUG: SDL_Vulkan_CreateSurface succeeded\n");
+        }
+        return qtrue;
+    }
+    if (ri.Printf) {
+        ri.Printf(PRINT_ALL, "DEBUG: SDL_Vulkan_CreateSurface failed\n");
+    } else {
+        fprintf(stderr, "DEBUG: SDL_Vulkan_CreateSurface failed\n");
+    }
 
 	// If Wayland surface creation fails, try a one-time fallback to X11 by restarting
 	// the SDL video backend and recreating the window, then retrying surface creation.
