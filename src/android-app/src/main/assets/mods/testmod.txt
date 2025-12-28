@@ -1,0 +1,3 @@
+name=TestMod
+version=0.1
+

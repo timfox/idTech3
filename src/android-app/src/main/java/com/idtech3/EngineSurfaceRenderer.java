@@ -10,6 +10,7 @@ public class EngineSurfaceRenderer implements GLSurfaceView.Renderer {
     }
     private native void engineInit();
     private native void engineRender();
+    private native void engineConfigureSurface(int width, int height);
 
     @Override
     public void onSurfaceCreated(GL10 gl, EGLConfig config) {
@@ -18,7 +19,7 @@ public class EngineSurfaceRenderer implements GLSurfaceView.Renderer {
 
     @Override
     public void onSurfaceChanged(GL10 gl, int width, int height) {
-        // Pass size if needed
+        engineConfigureSurface(width, height);
     }
 
     @Override

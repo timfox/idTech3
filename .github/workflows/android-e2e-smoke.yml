@@ -1,0 +1,47 @@
+name: Android - End-to-End Smoke Test (src)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  e2e-smoke:
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_STORE_FILE: ${{ secrets.RELEASE_STORE_FILE }}
+      RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+      RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+      RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 11
+        uses: actions/setup-java@v3
+        with:
+          distribution: "temurin"
+          java-version: "11"
+      - name: Install Android SDK & Build Tools
+        uses: android-actions/setup-sdk@v1
+        with:
+          api-level: 33
+          group: 'android-33'
+      - name: Create & Start Emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          target: default
+          arch: x86_64
+          script: |
+            ./gradlew :src/android-app:assembleRelease
+            adb install -r src/android-app/build/outputs/apk/release/app-release.apk
+            adb shell am start -n com.idtech3/.MainActivity
+            sleep 5
+            adb logcat -d | grep -E "EngineAndroid|engineInit|engineRender|engineLoadMod"
+            echo "End-to-end smoke test completed."
+      - name: Run additional end-to-end smoke (release)
+        run: |
+          bash scripts/android_sign_and_smoke.sh release
+      - name: Verify APK signing with apksigner
+        run: |
+          bash scripts/verify_apksigner.sh src/android-app/build/outputs/apk/release/app-release.apk
+
