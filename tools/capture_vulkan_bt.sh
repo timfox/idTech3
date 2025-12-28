@@ -65,6 +65,18 @@ fi
 echo "[4/5] Running under gdb using ${GDB_CMDS} (logs: ${BT_LOG})…"
 gdb --batch -x "${GDB_CMDS}" --args "${EXE}" \
   +set fs_game "${GAME}" \
+  +set com_error "1" \
+  +set com_developer "1" \
+  +set r_developer "1" \
+  +set r_fullscreen "1" \
+  +set r_mode "6" \
+  +set r_windowed "0" \
+  +set r_width "1920" \
+  +set r_height "1080" \
+  +set r_xpos "100" \
+  +set r_ypos "100" \
+  +set r_showFPS "1" \
+  +set cl_renderer "vulkan" \
   +set r_vkValidation "${VK_VALIDATION}" \
   +set r_vkMeshShaders "${VK_MESH_SHADERS}" \
   +set r_vkRayTracing "${VK_RAY_TRACING}" \

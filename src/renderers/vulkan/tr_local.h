@@ -1464,6 +1464,7 @@ extern cvar_t	*r_stereoSeparation;			// separation of cameras for stereo renderi
 
 extern cvar_t	*r_lodbias;				// push/pull LOD transitions
 extern cvar_t	*r_lodscale;
+extern cvar_t	*r_ambientScale;
 
 extern cvar_t	*r_teleporterFlash;		// teleport hyperspace visual
 

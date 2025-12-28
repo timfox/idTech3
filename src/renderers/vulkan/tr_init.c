@@ -177,6 +177,8 @@ extern cvar_t	*r_lightmap;
 extern cvar_t	*r_showsky;
 extern cvar_t	*r_detailTextures;
 extern cvar_t	*r_ext_multitexture;
+extern cvar_t	*r_ext_texture_filter_anisotropic;
+extern cvar_t	*r_ext_max_anisotropy;
 extern cvar_t	*r_railCoreWidth;
 extern cvar_t	*r_railSegmentLength;
 extern cvar_t	*r_railWidth;
@@ -229,6 +231,13 @@ extern cvar_t	*r_offsetFactor;
 extern cvar_t	*r_directedScale;
 extern cvar_t	*r_debugLight;
 extern cvar_t	*r_lodbias;
+extern cvar_t	*r_lodscale;
+extern cvar_t	*r_fbo;
+extern cvar_t	*r_hdr;
+extern cvar_t	*r_presentBits;
+extern cvar_t	*r_texturebits;
+extern cvar_t	*r_ambientScale;
+extern cvar_t	*r_defaultImage;
 extern cvar_t	*r_facePlaneCull;
 extern cvar_t	*r_dlightSaturation;
 extern cvar_t	*r_dlightIntensity;
@@ -318,8 +327,8 @@ static void R_Register( void ) {
     r_vk_debug_overlay = ri.Cvar_Get( "r_vk_debug_overlay", "0", CVAR_ARCHIVE_ND );
     r_vk_disableScreenMap = ri.Cvar_Get( "r_vk_disableScreenMap", "0", CVAR_ARCHIVE_ND );
     r_vk_icd = ri.Cvar_Get( "r_vk_icd", "", CVAR_ARCHIVE_ND | CVAR_LATCH );
-    r_device = ri.Cvar_Get( "r_device", "-1", CVAR_ARCHIVE_ND | CVAR_LATCH );
-    r_vulkan_validation = ri.Cvar_Get( "r_vulkan_validation", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_device = ri.Cvar_Get( "r_vkDevice", "-1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_vulkan_validation = ri.Cvar_Get( "r_vkValidation", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
     r_vk_renderdoc = ri.Cvar_Get( "r_vk_renderdoc", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
     r_vk_dynamicRendering = ri.Cvar_Get( "r_vk_dynamicRendering", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
     r_vk_asyncShaderCompile = ri.Cvar_Get( "r_vk_asyncShaderCompile", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
@@ -376,7 +385,7 @@ static void R_Register( void ) {
     r_particles_gpu = ri.Cvar_Get( "r_particles_gpu", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
     r_particles_max = ri.Cvar_Get( "r_particles_max", "2048", CVAR_ARCHIVE_ND );
 
-    r_meshShaders = ri.Cvar_Get( "r_meshShaders", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_meshShaders = ri.Cvar_Get( "r_vkMeshShaders", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
     r_meshletSize = ri.Cvar_Get( "r_meshletSize", "64", CVAR_ARCHIVE_ND );
 
     r_layeredMaterials = ri.Cvar_Get( "r_layeredMaterials", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
@@ -404,7 +413,7 @@ static void R_Register( void ) {
     r_shadows = ri.Cvar_Get( "r_shadows", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
     r_portalOnly = ri.Cvar_Get( "r_portalOnly", "0", CVAR_CHEAT );
 
-    r_raytracing = ri.Cvar_Get( "r_raytracing", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_raytracing = ri.Cvar_Get( "r_vkRayTracing", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
     r_rt_samples = ri.Cvar_Get( "r_rt_samples", "1", CVAR_ARCHIVE_ND );
     r_rt_maxDepth = ri.Cvar_Get( "r_rt_maxDepth", "2", CVAR_ARCHIVE_ND );
     r_rt_debugMagenta = ri.Cvar_Get( "r_rt_debugMagenta", "0", CVAR_CHEAT );
@@ -425,6 +434,14 @@ static void R_Register( void ) {
 
     r_textureMode = ri.Cvar_Get( "r_textureMode", "GL_LINEAR_MIPMAP_LINEAR", CVAR_ARCHIVE );
     ri.Cvar_CheckRange( r_textureMode, "GL_NEAREST;GL_LINEAR;GL_NEAREST_MIPMAP_NEAREST;GL_LINEAR_MIPMAP_NEAREST;GL_NEAREST_MIPMAP_LINEAR;GL_LINEAR_MIPMAP_LINEAR", NULL, CV_STRINGLIST );
+
+    r_ext_texture_filter_anisotropic = ri.Cvar_Get( "r_ext_texture_filter_anisotropic", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    ri.Cvar_CheckRange( r_ext_texture_filter_anisotropic, "0", "1", CV_INTEGER );
+    ri.Cvar_SetDescription( r_ext_texture_filter_anisotropic, "Allow anisotropic filtering." );
+
+    r_ext_max_anisotropy = ri.Cvar_Get( "r_ext_max_anisotropy", "8", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    ri.Cvar_CheckRange( r_ext_max_anisotropy, "1", NULL, CV_INTEGER );
+    ri.Cvar_SetDescription( r_ext_max_anisotropy, "Sets maximum anisotropic level for your graphics driver. Requires \\r_ext_texture_filter_anisotropic." );
 
     r_marksOnTriangleMeshes = ri.Cvar_Get( "r_marksOnTriangleMeshes", "0", CVAR_ARCHIVE );
     r_dlightBacks = ri.Cvar_Get( "r_dlightBacks", "1", CVAR_CHEAT );
@@ -495,6 +512,15 @@ static void R_Register( void ) {
     r_flareFade = ri.Cvar_Get( "r_flareFade", "7", CVAR_ARCHIVE );
     r_flareSize = ri.Cvar_Get( "r_flareSize", "40", CVAR_ARCHIVE );
     r_flareCoeff = ri.Cvar_Get( "r_flareCoeff", "1", CVAR_ARCHIVE );
+
+    // Register missing cvars to avoid NULL dereference in vk.c
+    r_fbo = ri.Cvar_Get( "r_fbo", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_hdr = ri.Cvar_Get( "r_hdr", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_presentBits = ri.Cvar_Get( "r_presentBits", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_texturebits = ri.Cvar_Get( "r_texturebits", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_lodscale = ri.Cvar_Get( "r_lodscale", "5", CVAR_CHEAT );
+    r_ambientScale = ri.Cvar_Get( "r_ambientScale", "0.6", CVAR_CHEAT );
+    r_defaultImage = ri.Cvar_Get( "r_defaultImage", "", CVAR_ARCHIVE_ND | CVAR_LATCH );
 }
 
 void R_Init( void ) {
@@ -505,6 +531,32 @@ void R_Init( void ) {
     initialized = qtrue;
 
     R_Register();
+
+    // Allocate backend data buffers before any shaders are sorted.
+    {
+        byte *ptr;
+        size_t backEndSize;
+
+        if ( max_polys < MAX_POLYS ) {
+            max_polys = MAX_POLYS;
+        }
+        if ( max_polyverts < MAX_POLYVERTS ) {
+            max_polyverts = MAX_POLYVERTS;
+        }
+
+        backEndSize = sizeof( *backEndData )
+            + sizeof( srfPoly_t ) * (size_t)max_polys
+            + sizeof( polyVert_t ) * (size_t)max_polyverts;
+
+        ptr = ri.Hunk_Alloc( backEndSize, h_low );
+        backEndData = (backEndData_t *)ptr;
+        backEndData->polys = (srfPoly_t *)( ptr + sizeof( *backEndData ) );
+        backEndData->polyVerts = (polyVert_t *)( ptr + sizeof( *backEndData )
+            + sizeof( srfPoly_t ) * (size_t)max_polys );
+
+        R_InitNextFrame();
+    }
+
     vk_initialize();
 }
 

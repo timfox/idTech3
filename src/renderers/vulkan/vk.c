@@ -3604,6 +3604,11 @@ void vk_initialize( void )
 
 	// Mark Vulkan as active
 	vk.active = qtrue;
+
+	// Notify the client of the active render scaling so console math uses valid values.
+	if ( ri.CL_SetScaling ) {
+		ri.CL_SetScaling( 1.0f, glConfig.vidWidth, glConfig.vidHeight );
+	}
 }
 
 static void vk_create_special_pipelines( void )
