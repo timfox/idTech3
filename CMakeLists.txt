@@ -343,12 +343,14 @@ endif()
 # Application naming configuration
 # Check for command line mod name override
 if(DEFINED MOD_NAME AND NOT "${MOD_NAME}" STREQUAL "")
-    set(ENGINE_NAME "${MOD_NAME}" CACHE STRING "Engine display name")
-    set(CNAME "${MOD_NAME_LOWER}" CACHE STRING "Main executable/library name")
-    set(DNAME "${MOD_NAME_LOWER}.server" CACHE STRING "Dedicated server executable name")
-    # Generate package name from mod name
+    # Normalize mod name early for use in target naming
     string(TOLOWER "${MOD_NAME}" MOD_NAME_LOWER)
     string(REGEX REPLACE "[^a-z0-9]" "" MOD_NAME_CLEAN "${MOD_NAME_LOWER}")
+
+    set(ENGINE_NAME "${MOD_NAME}" CACHE STRING "Engine display name")
+    set(CNAME "${MOD_NAME_CLEAN}" CACHE STRING "Main executable/library name")
+    set(DNAME "${MOD_NAME_CLEAN}.server" CACHE STRING "Dedicated server executable name")
+    # Generate package name from mod name
     set(APP_PACKAGE_NAME "com.${MOD_NAME_CLEAN}.game" CACHE STRING "Android package name")
     set(APP_DISPLAY_NAME "${MOD_NAME}" CACHE STRING "Application display name")
 else()
@@ -408,6 +410,8 @@ OPTION(USE_THEORA "Enable Theora (Ogg Theora) video codec support" ON)
 OPTION(USE_VPX "Enable VP8/VP9 (WebM) video codec support" ON)
 OPTION(USE_DAV1D "Enable AV1 video codec support (dav1d decoder)" ON)
 OPTION(USE_STB_TRUETYPE "Enable stb_truetype font baking (SDF/TTF runtime atlases)" ON)
+# Engine targets
+OPTION(BUILD_SERVER "Build dedicated server executable" ON)
 #OPTION(USE_OPENGL "" OFF)
 #OPTION(USE_OPENGL2 "" OFF)
 #OPTION(USE_USD "" ON)
@@ -885,8 +889,8 @@ IF(USE_BULLET)
 ENDIF()
 
 # dedicated server
-ADD_LIBRARY(common_ded OBJECT ${QCOMMON_SRCS} ${SERVER_SRCS})
-TARGET_COMPILE_DEFINITIONS(common_ded PUBLIC DEDICATED)
+ADD_LIBRARY(common_ded OBJECT ${QCOMMON_SRCS})
+TARGET_COMPILE_DEFINITIONS(common_ded PRIVATE DEDICATED)
 set_property(TARGET common_ded PROPERTY POSITION_INDEPENDENT_CODE ON)
 IF(USE_JOBSYSTEM)
 	TARGET_COMPILE_DEFINITIONS(common_ded PRIVATE USE_JOBSYSTEM)
@@ -1623,6 +1627,9 @@ ELSEIF(UNIX)
 		src/unix/unix_shared.c
 		src/unix/linux_signals.c
 		${SERVER_SRCS})
+		# Dedicated server executable uses the same platform + server sources,
+		# but links against the DEDICATED-flavored common object library.
+		set(Q3_DED_SRCS ${Q3_SRCS})
 
 	IF(USE_SDL)
 		AUX_SOURCE_DIRECTORY(src/sdl Q3_UI_SRCS)
@@ -1696,6 +1703,11 @@ ELSEIF(WIN32)
 	AUX_SOURCE_DIRECTORY(src/win32 Q3_SRCS)
 	AUX_SOURCE_DIRECTORY(src/win32 Q3_UI_SRCS)
 ENDIF()
+
+# If a platform didn't set dedicated sources explicitly, default to Q3_SRCS.
+if(NOT DEFINED Q3_DED_SRCS)
+	set(Q3_DED_SRCS ${Q3_SRCS})
+endif()
 
 IF(USE_SDL)
 	find_package(SDL2 REQUIRED)
@@ -3398,8 +3410,9 @@ IF(ANDROID)
 ENDIF()
 
 IF(BUILD_SERVER AND NOT ANDROID)
-	ADD_EXECUTABLE(${DNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
+	ADD_EXECUTABLE(${DNAME}${BINEXT} ${EXE_TYPE} ${Q3_DED_SRCS})
 	TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE common_ded botlib)
+	TARGET_COMPILE_DEFINITIONS(${DNAME}${BINEXT} PRIVATE DEDICATED)
 TARGET_INCLUDE_DIRECTORIES(${DNAME}${BINEXT} PRIVATE src/common)
 
 	IF(USE_SDL)

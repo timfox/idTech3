@@ -183,6 +183,50 @@ void QDECL Com_Error( errorParm_t level, const char *fmt, ... ) {
 Com_Init
 ==================
 */
+static void Com_AddStartupCommands( const char *commandLine ) {
+	const char *s;
+
+	if ( !commandLine || !commandLine[0] ) {
+		return;
+	}
+
+	s = commandLine;
+	while ( ( s = strchr( s, '+' ) ) != NULL ) {
+		char cmd[ MAX_STRING_CHARS ];
+		int i = 0;
+
+		// Skip '+'
+		s++;
+		while ( *s == ' ' ) {
+			s++;
+		}
+
+		// Grab until next '+' or end of string
+		while ( *s && *s != '+' && i < (int)sizeof( cmd ) - 1 ) {
+			cmd[i++] = *s++;
+		}
+		cmd[i] = '\0';
+
+		// Trim trailing whitespace
+		while ( i > 0 && ( cmd[i - 1] == ' ' || cmd[i - 1] == '\t' || cmd[i - 1] == '\r' || cmd[i - 1] == '\n' ) ) {
+			cmd[--i] = '\0';
+		}
+
+		if ( !cmd[0] ) {
+			continue;
+		}
+
+		// +set is handled early via Com_StartupVariable() so filesystem/tty vars
+		// can affect initialization order.
+		if ( !Q_stricmpn( cmd, "set ", 4 ) ) {
+			continue;
+		}
+
+		Cbuf_AddText( cmd );
+		Cbuf_AddText( "\n" );
+	}
+}
+
 void Com_Init( char *commandLine ) {
     Com_Printf( "----- Com_Init -----\n" );
 
@@ -196,6 +240,10 @@ void Com_Init( char *commandLine ) {
     Cvar_Init();
 	Cbuf_Init();
     Cmd_Init();
+
+	// Core console commands (needed for dedicated and "+quit" style startup)
+	Cmd_AddCommand( "quit", Com_Quit_f );
+	Cmd_AddCommand( "exit", Com_Quit_f );
 
     // Register engine-wide cvars
     com_developer = Cvar_Get( "developer", "0", CVAR_ARCHIVE );
@@ -227,7 +275,14 @@ void Com_Init( char *commandLine ) {
 	// Initialize server/client subsystems (unless in dedicated mode).
 	// These set up the renderer, input, and main loop state.
 	SV_Init();
+#ifndef DEDICATED
 	CL_Init();
+#endif
+
+	// Queue any "+cmd" style startup commands and run them once so things like
+	// "+quit" or "+exec autoexec.cfg" behave like upstream idtech3 forks.
+	Com_AddStartupCommands( commandLine );
+	Cbuf_Execute();
 
     com_frameTime = Sys_Milliseconds();
     com_fullyInitialized = qtrue;
@@ -272,9 +327,11 @@ void Com_Frame( qboolean noDelay ) {
     }
 
     // Run client frame if active
+#ifndef DEDICATED
     if ( com_cl_running && com_cl_running->integer ) {
         CL_Frame( msec, realMsec );
     }
+#endif
 
     perfCounters.frameCount++;
 }
@@ -381,9 +438,11 @@ void Com_ReadCDKey( const char *filename ) {
 void Com_AppendCDKey( const char *filename ) {
 #ifndef STANDALONE
 	// Only append mod-specific portion if UI says unique cdkeys are used.
+#ifndef DEDICATED
 	if ( !UI_usesUniqueCDKey() ) {
 		return;
 	}
+#endif
 #endif
 
 	{
@@ -555,16 +614,24 @@ int Com_EventLoop( void )
 
 		switch ( ev.evType ) {
 			case SE_KEY:
+#ifndef DEDICATED
 				CL_KeyEvent( ev.evValue, (qboolean)ev.evValue2, (unsigned)ev.evTime );
+#endif
 				break;
 			case SE_CHAR:
+#ifndef DEDICATED
 				CL_CharEvent( ev.evValue );
+#endif
 				break;
 			case SE_MOUSE:
+#ifndef DEDICATED
 				CL_MouseEvent( ev.evValue, ev.evValue2 );
+#endif
 				break;
 			case SE_JOYSTICK_AXIS:
+#ifndef DEDICATED
 				CL_JoystickEvent( ev.evValue, ev.evValue2, ev.evTime );
+#endif
 				break;
 			case SE_CONSOLE:
 				if ( ev.evPtr ) {
