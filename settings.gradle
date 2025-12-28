@@ -1,4 +1,4 @@
 rootProject.name = "idtech3"
 
 include(":android-app")
-project(":android-app").projectDir = file("android/app")
+project(":android-app").projectDir = file("src/android-app")
