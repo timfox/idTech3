@@ -20,6 +20,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 
+#if defined(__ANDROID__) && !defined(USE_VULKAN)
+#define USE_VULKAN
+#endif
+
 #ifdef USE_LOCAL_HEADERS
 #	include "SDL.h"
 #ifdef USE_VULKAN
@@ -30,6 +34,16 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef USE_VULKAN
 #	include <SDL_vulkan.h>
 #endif
+
+#ifdef __ANDROID__
+#	include <GLES3/gl3.h>
+#	include <EGL/egl.h>
+#	include <EGL/eglext.h>
+#endif
+#endif
+
+#if defined(__ANDROID__) && defined(USE_VULKAN)
+#	include <vulkan/vulkan_android.h>
 #endif
 
 #include "../client/client.h"
@@ -736,6 +750,11 @@ of OpenGL
 */
 void GLimp_Init( glconfig_t *config )
 {
+#if defined(__ANDROID__) && defined(USE_VULKAN)
+	VKimp_Init( config );
+	return;
+#endif
+
 	rserr_t err;
 
 #ifndef _WIN32
@@ -869,6 +888,31 @@ VK_EXPORT void VKimp_Init( glconfig_t *config )
 			return;
 		}
 	}
+
+#if defined(__ANDROID__)
+	{
+		unsigned int required_extension_count = 0;
+		if ( SDL_Vulkan_GetInstanceExtensions( SDL_window, &required_extension_count, NULL ) != SDL_TRUE ) {
+			Com_Error( ERR_FATAL, "VKimp_Init(): SDL_Vulkan_GetInstanceExtensions (count) failed: %s", SDL_GetError() );
+			return;
+		}
+
+		if ( required_extension_count > 0 ) {
+			const char **required_extensions = (const char **)ri.Malloc( required_extension_count * sizeof( char * ) );
+			if ( SDL_Vulkan_GetInstanceExtensions( SDL_window, &required_extension_count, required_extensions ) != SDL_TRUE ) {
+				ri.Free( (void*)required_extensions );
+				Com_Error( ERR_FATAL, "VKimp_Init(): SDL_Vulkan_GetInstanceExtensions (names) failed: %s", SDL_GetError() );
+				return;
+			}
+
+			for ( unsigned int extIndex = 0; extIndex < required_extension_count; ++extIndex ) {
+				ri.Printf( PRINT_DEVELOPER, "...SDL requires Vulkan instance extension: %s\n", required_extensions[extIndex] );
+			}
+
+			ri.Free( (void*)required_extensions );
+		}
+	}
+#endif
 
 #ifdef USE_VULKAN
 	if ( SDL_Vulkan_LoadLibrary( NULL ) < 0 )

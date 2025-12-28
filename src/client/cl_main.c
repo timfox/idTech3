@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../sdl/sdl_glw.h"
 #endif
 #include <limits.h>
+#include <stdint.h>
 #ifdef USE_CURL
 #include "cl_net_enhanced.h"
 #endif
@@ -3786,7 +3787,8 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 	{
 		extern refimport_t ri;
 		ri = rimp;
-		fprintf(stderr, "DEBUG: CL_InitRef set global ri.Printf to %p\n", (void*)ri.Printf);
+		fprintf(stderr, "DEBUG: CL_InitRef set global ri.Printf to %p\n",
+		        (void*)(uintptr_t)ri.Printf);
 	}
 	
 	// Validate that all Vulkan function pointers were properly assigned

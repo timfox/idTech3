@@ -107,6 +107,7 @@ namespace android {
         jmethodID get_display_metrics_method_ = nullptr;
 
         // Synchronization primitives
+        std::mutex window_mutex_;
         std::mutex touch_mutex_;
         std::condition_variable cv_;
 
@@ -141,6 +142,8 @@ namespace android {
         // Window management
         ANativeWindow* get_native_window() const { return window_; }
         bool has_window() const { return window_ != nullptr; }
+        void set_native_window(ANativeWindow* window);
+        void clear_native_window();
 
         // Platform detection
         bool is_running() const { return app_ != nullptr; }
@@ -159,6 +162,7 @@ namespace android {
 
         // Engine thread function
         void engine_thread_func();
+        void start_engine_thread();
 
         // Helper methods
         void on_app_cmd(int32_t cmd);
@@ -196,6 +200,41 @@ namespace android {
         return true;
     }
 
+    void AndroidPlatform::start_engine_thread() {
+        if (engine_initialized_) {
+            return;
+        }
+        engine_thread_ = std::jthread([this](std::stop_token token) {
+            engine_thread_func();
+        });
+        engine_initialized_ = true;
+    }
+
+    void AndroidPlatform::set_native_window(ANativeWindow* window) {
+        std::unique_lock<std::mutex> lock(window_mutex_);
+        if (window_ == window) {
+            return;
+        }
+        if (window_) {
+            ANativeWindow_release(window_);
+            window_ = nullptr;
+        }
+        window_ = window;
+        bool should_start = window_ && !engine_initialized_;
+        lock.unlock();
+        if (should_start) {
+            start_engine_thread();
+        }
+    }
+
+    void AndroidPlatform::clear_native_window() {
+        std::lock_guard<std::mutex> lock(window_mutex_);
+        if (window_) {
+            ANativeWindow_release(window_);
+            window_ = nullptr;
+        }
+    }
+
     void AndroidPlatform::shutdown() {
         log_info("Shutting down Android platform");
 
@@ -203,13 +242,14 @@ namespace android {
             shutdown_requested_ = true;
             engine_thread_.join();
         }
+        engine_initialized_ = false;
 
         if (jvm_) {
             jvm_->DetachCurrentThread();
             jvm_ = nullptr;
         }
 
-        window_ = nullptr;
+        clear_native_window();
         app_ = nullptr;
         activity_ref_.reset();
 
@@ -266,19 +306,15 @@ namespace android {
         switch (cmd) {
             case APP_CMD_INIT_WINDOW:
                 log_info("Android: APP_CMD_INIT_WINDOW");
-                window_ = app_->window;
-
-                if (window_ && !engine_initialized_) {
-                    // Start engine thread
-                    engine_thread_ = std::jthread([this](std::stop_token token) {
-                        engine_thread_func();
-                    });
+                if (app_->window) {
+                    ANativeWindow_acquire(app_->window);
+                    set_native_window(app_->window);
                 }
                 break;
 
             case APP_CMD_TERM_WINDOW:
                 log_info("Android: APP_CMD_TERM_WINDOW");
-                window_ = nullptr;
+                clear_native_window();
                 break;
 
             case APP_CMD_GAINED_FOCUS:
@@ -454,6 +490,54 @@ void android_main(struct android_app* app) {
     Android_RunMainLoop();
 
     android::log_info("idTech3 Android shutting down");
+}
+
+JNIEXPORT void JNICALL Java_com_idtech3_engine_IdTech3Activity_nativeSurfaceCreated
+  (JNIEnv* env, jclass clazz, jobject surface)
+{
+    (void)clazz;
+    if (!surface) {
+        return;
+    }
+
+    ANativeWindow* window = ANativeWindow_fromSurface(env, surface);
+    if (android::g_platform) {
+        android::g_platform->set_native_window(window);
+    } else if (window) {
+        ANativeWindow_release(window);
+    }
+}
+
+JNIEXPORT void JNICALL Java_com_idtech3_engine_IdTech3Activity_nativeSurfaceChanged
+  (JNIEnv* env, jclass clazz, jobject surface, jint format, jint width, jint height)
+{
+    (void)clazz; (void)format; (void)width; (void)height;
+    if (!surface) {
+        return;
+    }
+    ANativeWindow* window = ANativeWindow_fromSurface(env, surface);
+    if (android::g_platform) {
+        android::g_platform->set_native_window(window);
+    } else if (window) {
+        ANativeWindow_release(window);
+    }
+}
+
+JNIEXPORT void JNICALL Java_com_idtech3_engine_IdTech3Activity_nativeSurfaceDestroyed
+  (JNIEnv* env, jclass clazz)
+{
+    (void)env; (void)clazz;
+    if (android::g_platform) {
+        android::g_platform->clear_native_window();
+    }
+}
+
+extern void android_app_oncreate(ANativeActivity* activity, void* savedState, size_t savedStateSize);
+
+void ANativeActivity_onCreate(ANativeActivity* activity, void* savedState, size_t savedStateSize)
+{
+    android::log_info("ANativeActivity_onCreate invoked");
+    android_app_oncreate(activity, savedState, savedStateSize);
 }
 
 } // extern "C"

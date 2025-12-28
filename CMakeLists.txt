@@ -114,6 +114,7 @@ IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 	IF(ENABLE_ASAN)
 		MESSAGE(STATUS "AddressSanitizer (ASan) enabled (configured per-target)")
 	ENDIF()
+
 	
 	IF(ENABLE_UBSAN)
 		MESSAGE(STATUS "UndefinedBehaviorSanitizer (UBSan) enabled (configured per-target)")
@@ -320,6 +321,14 @@ else()
 endif()
 OPTION(USE_SDL "Enable SDL2 integration" ${USE_SDL_DEFAULT})
 
+if(ANDROID)
+    # For Android, always use SDL and rely on the Android toolchain to find it.
+    # Set USE_SDL to ON explicitly and skip the find_package logic.
+    set(USE_SDL ON CACHE BOOL "Enable SDL2 integration" FORCE)
+    # Ensure SDL2 is considered found for Android to proceed with linking
+    set(SDL2_FOUND TRUE CACHE BOOL "" FORCE)
+endif()
+
 if(USE_SDL)
 	# Use CMake's built-in FindSDL2 or pkg-config fallback
 	find_package(PkgConfig)
@@ -381,6 +390,10 @@ set(APP_PACKAGE_NAME "${APP_PACKAGE_NAME}" CACHE STRING "Android package name")
 
 SET(RENDERER_PREFIX ${CNAME})
 set(RENDERER_DEFAULT "opengl" CACHE STRING "Default renderer (opengl, vulkan, opengl2, d3d12, metal)")
+
+if(ANDROID)
+    set(RENDERER_DEFAULT "vulkan" CACHE STRING "Default renderer (opengl, vulkan, opengl2, d3d12, metal)" FORCE)
+endif()
 
 # Some configurations (notably monolithic Vulkan without dlopen) are not fully supported yet.
 # Prefer the dlopen renderer path to keep builds reproducible (and to provide `make install`).
@@ -1376,7 +1389,10 @@ SET(RENDERER_VK_SRCS
 # Vulkan experimental modules (work-in-progress). Keep ON by default for prioritized
 # Vulkan RTX implementation development.
 option(IDTECH3_VK_EXPERIMENTAL "Build experimental Vulkan renderer modules" ON)
-option(FEATURE_RENDERER_GLES "Build and use OpenGL ES renderer" ON)
+option(FEATURE_RENDERER_GLES "Build and use OpenGL ES renderer" ON) # Keep default ON for non-Android
+if(ANDROID)
+    set(FEATURE_RENDERER_GLES OFF CACHE BOOL "Build and use OpenGL ES renderer" FORCE)
+endif()
 	if(NOT IDTECH3_VK_EXPERIMENTAL)
 	list(REMOVE_ITEM RENDERER_VK_SRCS
 		src/renderers/vulkan/gltf_loader.c
@@ -1507,65 +1523,72 @@ IF(USE_RENDERER_DLOPEN)
 
 	if(USE_VULKAN)
 		ADD_LIBRARY(${RENDERER_PREFIX}_vulkan${RENDEXT} SHARED ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
-		SET_TARGET_PROPERTIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES 
-            OUTPUT_NAME "${RENDERER_PREFIX}_vulkan${RENDEXT}" 
-            PREFIX ""
-            POSITION_INDEPENDENT_CODE ON
-        )
-		TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_VULKAN USE_FREETYPE)
-        TARGET_COMPILE_OPTIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE -fvisibility=hidden)
-		IF(USE_FREETYPE)
-			TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE BUILD_FREETYPE)
-		ENDIF()
-		# `src/renderers/renderercommon/*` uses legacy relative includes like "../qcommon/...".
-		# Adding `src/renderers` to the include path keeps those includes resolving to `src/qcommon/...`.
-	target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/renderers ${CMAKE_CURRENT_SOURCE_DIR}/src/common ${CMAKE_CURRENT_SOURCE_DIR}/src/renderers/renderercommon)
-	IF(USE_FREETYPE)
-		target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE /usr/include/freetype2)
-	ENDIF()
-		IF(IDTECH3_VK_EXPERIMENTAL)
-			TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE IDTECH3_VK_EXPERIMENTAL)
-		ENDIF()
-		TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE m SDL2::SDL2)
-		IF(USE_FREETYPE)
-			TARGET_LINK_LIBRARIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE /usr/lib/x86_64-linux-gnu/libfreetype.so)
-		ENDIF()
+		SET_TARGET_PROPERTIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES
+			OUTPUT_NAME "${RENDERER_PREFIX}_vulkan${RENDEXT}"
+			PREFIX ""
+			POSITION_INDEPENDENT_CODE ON
+		)
+		target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_VULKAN)
+		if(ANDROID)
+			target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE VK_USE_PLATFORM_ANDROID_KHR)
+		endif()
+		if(USE_FREETYPE)
+			target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE BUILD_FREETYPE)
+		endif()
+		TARGET_COMPILE_OPTIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE -fvisibility=hidden)
+		target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE
+			${CMAKE_CURRENT_SOURCE_DIR}/src/renderers
+			${CMAKE_CURRENT_SOURCE_DIR}/src/common
+			${CMAKE_CURRENT_SOURCE_DIR}/src/renderers/renderercommon
+		)
+		if(USE_FREETYPE)
+			if(ANDROID)
+				target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE ${ANDROID_NDK_SYSROOT}/usr/include/freetype2)
+			else()
+				target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE /usr/include/freetype2)
+			endif()
+		endif()
+		if(IDTECH3_VK_EXPERIMENTAL)
+			target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE IDTECH3_VK_EXPERIMENTAL)
+		endif()
+		if(ANDROID)
+			target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE m android log OpenSLES SDL2::SDL2 vulkan)
+		else()
+			target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE m SDL2::SDL2)
+			if(USE_FREETYPE)
+				target_link_libraries(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE /usr/lib/x86_64-linux-gnu/libfreetype.so)
+			endif()
+		endif()
 		TARGET_LINK_OPTIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE -Wl,--export-dynamic)
-		# Suppress some warnings for Vulkan renderer to avoid warning-as-error issues
-        TARGET_COMPILE_OPTIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE
-            $<$<AND:$<COMPILE_LANGUAGE:C>,$<C_COMPILER_ID:GNU,Clang>>:-Wno-missing-prototypes>
-            $<$<C_COMPILER_ID:GNU,Clang>:-Wno-unused-variable>
-            $<$<C_COMPILER_ID:GNU,Clang>:-Wno-unused-function>
-            $<$<C_COMPILER_ID:GNU,Clang>:-Wno-unused-parameter>
-            $<$<C_COMPILER_ID:GNU,Clang>:-Wno-shadow>
-            $<$<C_COMPILER_ID:GNU,Clang>:-Wno-int-to-pointer-cast>
-            $<$<C_COMPILER_ID:GNU,Clang>:-Wno-pointer-arith>
-            $<$<C_COMPILER_ID:GNU,Clang>:-Wno-sign-compare>
-            $<$<C_COMPILER_ID:GNU,Clang>:-Wno-pedantic>
-            $<$<C_COMPILER_ID:GNU,Clang>:-Wno-format>
-            $<$<C_COMPILER_ID:GNU,Clang>:-Wno-switch>
+		TARGET_COMPILE_OPTIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE
+			$<$<AND:$<COMPILE_LANGUAGE:C>,$<C_COMPILER_ID:GNU,Clang>>:-Wno-missing-prototypes>
+			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-unused-variable>
+			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-unused-function>
+			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-unused-parameter>
+			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-shadow>
+			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-int-to-pointer-cast>
+			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-pointer-arith>
+			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-sign-compare>
+			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-pedantic>
+			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-format>
+			$<$<C_COMPILER_ID:GNU,Clang>:-Wno-switch>
 		)
 
-		# VMA (Vulkan Memory Allocator) - configure after target is created
-		IF(USE_VMA AND USE_VULKAN)
-			# Check if VMA header exists
-			IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/libs/vma/vk_mem_alloc.h)
-				TARGET_COMPILE_DEFINITIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VMA)
-				TARGET_INCLUDE_DIRECTORIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE libs/vma)
-				# Suppress warnings from third-party VMA library code
-				IF(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-					SET_SOURCE_FILES_PROPERTIES(src/renderers/vulkan/vk_vma.cpp PROPERTIES
+		if(USE_VMA AND USE_VULKAN)
+			if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/libs/vma/vk_mem_alloc.h)
+				target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_VMA)
+				target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE libs/vma)
+				if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+					set_source_files_properties(src/renderers/vulkan/vk_vma.cpp PROPERTIES
 						COMPILE_FLAGS "-Wno-unused-parameter -Wno-unused-variable"
 					)
-				ENDIF()
-				MESSAGE(STATUS "VMA: Vulkan Memory Allocator enabled")
-			ELSE()
-				MESSAGE(WARNING "VMA: Header not found at libs/vma/vk_mem_alloc.h. Download it from https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator")
-				SET(USE_VMA OFF CACHE BOOL "" FORCE)
-			ENDIF()
-		ENDIF()
-	else()
-		MESSAGE(STATUS "Vulkan renderer disabled (USE_VULKAN=OFF)")
+				endif()
+				message(STATUS "VMA: Vulkan Memory Allocator enabled")
+			else()
+				message(WARNING "VMA: Header not found at libs/vma/vk_mem_alloc.h. Download it from https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator")
+				set(USE_VMA OFF CACHE BOOL "" FORCE)
+			endif()
+		endif()
 	endif()
 	
 	IF(WIN32 AND USE_D3D12)
