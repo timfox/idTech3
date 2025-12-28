@@ -709,16 +709,7 @@ int Sys_GetNumCPUCores(void) {
     return cores;
 }
 
-// Stub implementations for monolithic build
-void Sys_QueEvent( int evTime, sysEventType_t evType, int value, int value2, int ptrLength, void *ptr ) {
-	// Stub implementation - in monolithic build, events are handled differently
-	Q_UNUSED(evTime);
-	Q_UNUSED(evType);
-	Q_UNUSED(value);
-	Q_UNUSED(value2);
-	Q_UNUSED(ptrLength);
-	Q_UNUSED(ptr);
-}
+// Sys_QueEvent is implemented in src/common/common.c (shared event queue).
 
 // SV_Shutdown is implemented in server code
 

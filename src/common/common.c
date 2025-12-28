@@ -16,6 +16,8 @@ Basic functions used throughout the engine.
 #include <stdio.h>
 #include <stdarg.h>
 #include <time.h>
+#include <ctype.h>
+#include <string.h>
 
 // Forward declarations for stubs to satisfy -Wmissing-prototypes
 struct channel_s;
@@ -75,6 +77,68 @@ int com_frameTime = 0;
 
 __attribute__((visibility("hidden"))) char rconPassword2[ MAX_CVAR_VALUE_STRING ] = {0};
 
+// Keep a copy of the raw command line (argv[1..] merged).
+static char com_cmdline[MAX_STRING_CHARS] = {0};
+
+// =====================================================================================
+// Sys event queue (minimal Q3-style event loop)
+// =====================================================================================
+
+#define MAX_QUEUED_EVENTS 256
+
+static sysEvent_t com_eventQueue[MAX_QUEUED_EVENTS];
+static int com_eventHead = 0;
+static int com_eventTail = 0;
+
+void Sys_QueEvent( int evTime, sysEventType_t evType, int value, int value2, int ptrLength, void *ptr )
+{
+	sysEvent_t *ev;
+
+	if ( evTime == 0 ) {
+		evTime = Sys_Milliseconds();
+	}
+
+	// Drop oldest if full (and free its payload).
+	if ( com_eventHead - com_eventTail >= MAX_QUEUED_EVENTS ) {
+		ev = &com_eventQueue[ com_eventTail & ( MAX_QUEUED_EVENTS - 1 ) ];
+		if ( ev->evPtr ) {
+			Z_Free( ev->evPtr );
+			ev->evPtr = NULL;
+		}
+		com_eventTail++;
+	}
+
+	ev = &com_eventQueue[ com_eventHead & ( MAX_QUEUED_EVENTS - 1 ) ];
+	com_eventHead++;
+
+	ev->evTime = evTime;
+	ev->evType = evType;
+	ev->evValue = value;
+	ev->evValue2 = value2;
+	ev->evPtrLength = ptrLength;
+	ev->evPtr = ptr;
+}
+
+static sysEvent_t Com_GetEvent( void )
+{
+	sysEvent_t ev;
+
+	if ( com_eventTail < com_eventHead ) {
+		ev = com_eventQueue[ com_eventTail & ( MAX_QUEUED_EVENTS - 1 ) ];
+		com_eventTail++;
+		return ev;
+	}
+
+	// No events queued.
+	ev.evTime = Sys_Milliseconds();
+	ev.evType = SE_NONE;
+	ev.evValue = 0;
+	ev.evValue2 = 0;
+	ev.evPtrLength = 0;
+	ev.evPtr = NULL;
+	return ev;
+}
+
 /*
 ==================
 Com_Printf
@@ -122,8 +186,15 @@ Com_Init
 void Com_Init( char *commandLine ) {
     Com_Printf( "----- Com_Init -----\n" );
 
+	if ( commandLine ) {
+		Q_strncpyz( com_cmdline, commandLine, sizeof( com_cmdline ) );
+	} else {
+		com_cmdline[0] = '\0';
+	}
+
     // Initialize core systems
     Cvar_Init();
+	Cbuf_Init();
     Cmd_Init();
 
     // Register engine-wide cvars
@@ -142,12 +213,21 @@ void Com_Init( char *commandLine ) {
     // Disable resource cache to debug buffer overflow
     Cvar_Set( "fs_resourceCache", "0" );
 
+	// Apply +set variables from the command line early.
+	// This ensures fs_* and ttycon settings take effect before filesystem/tty init.
+	Com_StartupVariable( NULL );
+
     // Initialize filesystem
     FS_InitFilesystem();
 
     if ( commandLine ) {
         Com_Printf( "Command line: %s\n", commandLine );
     }
+
+	// Initialize server/client subsystems (unless in dedicated mode).
+	// These set up the renderer, input, and main loop state.
+	SV_Init();
+	CL_Init();
 
     com_frameTime = Sys_Milliseconds();
     com_fullyInitialized = qtrue;
@@ -163,6 +243,12 @@ Com_Frame
 void Com_Frame( qboolean noDelay ) {
     int msec, realMsec;
     int frameTime;
+
+	// Pump OS/input and dispatch queued sys events.
+	Com_EventLoop();
+
+	// Run any queued console commands (including + commands and autoexec).
+	Cbuf_Execute();
 
     frameTime = Sys_Milliseconds();
     realMsec = frameTime - com_frameTime;
@@ -335,7 +421,6 @@ int Com_RealTime( qtime_t *qtime ) {
     return 0;
 }
 
-int Com_EventLoop( void ) { return 0; }
 void Com_Quit_f( void ) { exit( 0 ); }
 char *CopyString( const char *in ) {
     if (!in) return NULL;
@@ -353,12 +438,152 @@ void Field_Clear( field_t *field ) {
 }
 
 qboolean Com_EarlyParseCmdLine( char *commandLine, char *con_title, int title_size, int *vid_xpos, int *vid_ypos ) {
-    (void)commandLine; (void)con_title; (void)title_size; (void)vid_xpos; (void)vid_ypos;
-    return qfalse;
+	// Minimal early parsing: cache the cmdline string for Com_StartupVariable.
+	if ( commandLine ) {
+		Q_strncpyz( com_cmdline, commandLine, sizeof( com_cmdline ) );
+	}
+
+	if ( con_title && title_size > 0 ) {
+		Q_strncpyz( con_title, cl_title, title_size );
+	}
+	if ( vid_xpos ) *vid_xpos = 0;
+	if ( vid_ypos ) *vid_ypos = 0;
+	return qfalse;
 }
 
 void Com_WriteConfiguration( void ) { }
-void Com_StartupVariable( const char *match ) { (void)match; }
+static const char *Com_ParseCmdlineToken( const char *s, char *out, size_t outSize )
+{
+	size_t i = 0;
+	out[0] = '\0';
+
+	while ( *s && isspace( (unsigned char)*s ) ) {
+		s++;
+	}
+
+	if ( !*s ) {
+		return s;
+	}
+
+	// Quoted token
+	if ( *s == '"' ) {
+		s++;
+		while ( *s && *s != '"' ) {
+			if ( i + 1 < outSize ) {
+				out[i++] = *s;
+			}
+			s++;
+		}
+		if ( *s == '"' ) {
+			s++;
+		}
+		out[i] = '\0';
+		return s;
+	}
+
+	// Unquoted token
+	while ( *s && !isspace( (unsigned char)*s ) ) {
+		if ( i + 1 < outSize ) {
+			out[i++] = *s;
+		}
+		s++;
+	}
+	out[i] = '\0';
+	return s;
+}
+
+void Com_StartupVariable( const char *match )
+{
+	const char *s = com_cmdline;
+	char cmd[MAX_STRING_CHARS];
+	char var[MAX_STRING_CHARS];
+	char val[MAX_STRING_CHARS];
+
+	if ( !s || !*s ) {
+		return;
+	}
+
+	while ( *s ) {
+		if ( *s != '+' ) {
+			s++;
+			continue;
+		}
+
+		// Skip '+'
+		s++;
+		s = Com_ParseCmdlineToken( s, cmd, sizeof( cmd ) );
+
+		// Only handle "+set <var> <value>" here.
+		if ( Q_stricmp( cmd, "set" ) != 0 ) {
+			continue;
+		}
+
+		s = Com_ParseCmdlineToken( s, var, sizeof( var ) );
+		s = Com_ParseCmdlineToken( s, val, sizeof( val ) );
+
+		if ( !var[0] ) {
+			continue;
+		}
+
+		if ( !match || Q_stricmp( match, var ) == 0 ) {
+			// Cvar_Set will create the cvar if it doesn't exist yet.
+			Cvar_Set( var, val[0] ? val : "" );
+		}
+	}
+}
+
+int Com_EventLoop( void )
+{
+	sysEvent_t ev;
+	char *s;
+
+	// Pump platform input (SDL) into Sys_QueEvent.
+	Sys_SendKeyEvents();
+
+	// Pump tty console input (if enabled).
+	s = Sys_ConsoleInput();
+	if ( s && s[0] ) {
+		char *copy = CopyString( s );
+		Sys_QueEvent( 0, SE_CONSOLE, 0, 0, (int)strlen( copy ) + 1, copy );
+	}
+
+	while ( 1 ) {
+		ev = Com_GetEvent();
+		if ( ev.evType == SE_NONE ) {
+			break;
+		}
+
+		switch ( ev.evType ) {
+			case SE_KEY:
+				CL_KeyEvent( ev.evValue, (qboolean)ev.evValue2, (unsigned)ev.evTime );
+				break;
+			case SE_CHAR:
+				CL_CharEvent( ev.evValue );
+				break;
+			case SE_MOUSE:
+				CL_MouseEvent( ev.evValue, ev.evValue2 );
+				break;
+			case SE_JOYSTICK_AXIS:
+				CL_JoystickEvent( ev.evValue, ev.evValue2, ev.evTime );
+				break;
+			case SE_CONSOLE:
+				if ( ev.evPtr ) {
+					Cbuf_AddText( (const char *)ev.evPtr );
+					Cbuf_AddText( "\n" );
+				}
+				break;
+			default:
+				break;
+		}
+
+		if ( ev.evPtr ) {
+			Z_Free( ev.evPtr );
+			ev.evPtr = NULL;
+		}
+	}
+
+	return 0;
+}
 
 // Missing engine stubs
 void S_Spatialize( struct channel_s *ch ) { (void)ch; }

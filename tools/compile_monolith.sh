@@ -236,10 +236,15 @@ case "$MODE" in
         echo "Copying engine binaries and renderer .so files to $RELEASE_DIR..."
         mkdir -p "$RELEASE_DIR"
 
-        # Copy/rename main client executable (ship with .so suffix)
+        # Copy main client executable.
+        #
+        # NOTE:
+        # Some helper scripts historically launched "${GAME_NAME}.x86_64.so" as if it were the engine.
+        # Keep that name as a compatibility alias, but ensure both names point to the same binary.
         if [ -f "idtech3.x86_64" ]; then
+            cp -f "idtech3.x86_64" "$RELEASE_DIR/${GAME_NAME}.x86_64"
             cp -f "idtech3.x86_64" "$RELEASE_DIR/${GAME_NAME}.x86_64.so"
-            echo "Copied idtech3.x86_64 to $RELEASE_DIR/${GAME_NAME}.x86_64.so"
+            echo "Copied client -> $RELEASE_DIR/${GAME_NAME}.x86_64 (alias: ${GAME_NAME}.x86_64.so)"
         fi
 
         # Copy/rename dedicated server executable if present
