@@ -23,6 +23,12 @@ extern cvar_t *r_vk_hotReload;
 #include "vk.h"
 #include <dlfcn.h>
 
+static inline void vk_debug_write(int fd, const char *msg, size_t len)
+{
+	ssize_t written = write(fd, msg, len);
+	(void)written;
+}
+
 // Define the global Vulkan instance
 Vk_Instance vk;
 
@@ -2329,41 +2335,41 @@ static void init_vulkan_library( void )
 	// Global vk instance is zero-initialized by default. 
 	// Do not use Com_Memset here if it contains complex C++ types like atomics.
 
-        (void)write(2, "DEBUG: Entering init_vulkan_library\n", 36);
+        vk_debug_write(2, "DEBUG: Entering init_vulkan_library\n", 36);
 	vk_safety_checks();
-        (void)write(2, "DEBUG: Returned from vk_safety_checks\n", 38);
+        vk_debug_write(2, "DEBUG: Returned from vk_safety_checks\n", 38);
 
 #ifdef USE_VULKAN
-        (void)write(2, "DEBUG: Checking r_vk_icd\n", 25);
+        vk_debug_write(2, "DEBUG: Checking r_vk_icd\n", 25);
 	// Allow forcing a specific ICD via cvar (maps to VK_ICD_FILENAMES).
 	if ( r_vk_icd && r_vk_icd->string && r_vk_icd->string[0] ) {
-                (void)write(2, "DEBUG: setting VK_ICD_FILENAMES\n", 32);
+                vk_debug_write(2, "DEBUG: setting VK_ICD_FILENAMES\n", 32);
 		if ( setenv( "VK_ICD_FILENAMES", r_vk_icd->string, 1 ) == 0 ) {
-                        (void)write(2, "...using VK_ICD_FILENAMES override\n", 35);
+                        vk_debug_write(2, "...using VK_ICD_FILENAMES override\n", 35);
 		} else {
-                        (void)write(2, "Failed to set VK_ICD_FILENAMES\n", 31);
+                        vk_debug_write(2, "Failed to set VK_ICD_FILENAMES\n", 31);
 		}
 	}
 #endif
 
-        (void)write(2, "DEBUG: Checking vk_instance\n", 28);
+        vk_debug_write(2, "DEBUG: Checking vk_instance\n", 28);
 	if ( vk_instance == VK_NULL_HANDLE ) {
 
-                (void)write(2, "DEBUG: Calling vk_destroy_instance\n", 35);
+                vk_debug_write(2, "DEBUG: Calling vk_destroy_instance\n", 35);
 		// force cleanup
 		vk_destroy_instance();
 
-                (void)write(2, "DEBUG: Loading basic instance functions\n", 40);
+                vk_debug_write(2, "DEBUG: Loading basic instance functions\n", 40);
 		// Get functions that do not depend on VkInstance (vk_instance == nullptr at this point).
 		INIT_INSTANCE_FUNCTION( vkCreateInstance )
 		INIT_INSTANCE_FUNCTION( vkEnumerateInstanceExtensionProperties )
 
-                (void)write(2, "DEBUG: Calling create_instance\n", 31);
+                vk_debug_write(2, "DEBUG: Calling create_instance\n", 31);
 		// Get instance level functions.
 		create_instance();
-                (void)write(2, "DEBUG: create_instance returned\n", 32);
+                vk_debug_write(2, "DEBUG: create_instance returned\n", 32);
 
-                (void)write(2, "DEBUG: Loading instance functions\n", 34);
+                vk_debug_write(2, "DEBUG: Loading instance functions\n", 34);
 		INIT_INSTANCE_FUNCTION( vkCreateDevice )
 		INIT_INSTANCE_FUNCTION( vkDestroyInstance )
 		INIT_INSTANCE_FUNCTION( vkEnumerateDeviceExtensionProperties )
@@ -2379,40 +2385,40 @@ static void init_vulkan_library( void )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceSurfaceFormatsKHR )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceSurfacePresentModesKHR )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceSurfaceSupportKHR )
-                (void)write(2, "DEBUG: instance functions loaded\n", 33);
+                vk_debug_write(2, "DEBUG: instance functions loaded\n", 33);
 
-                (void)write(2, "DEBUG: Loading properties2 functions\n", 38);
+                vk_debug_write(2, "DEBUG: Loading properties2 functions\n", 38);
 		// Load KHR_get_physical_device_properties2 extension functions if available
 		// Try KHR version first (for Vulkan 1.0), then core version (Vulkan 1.1+)
 		// Note: In Vulkan 1.1+, these are core functions with identical signatures
-                (void)write(2, "DEBUG: Calling GetInstanceProcAddr for Properties2KHR\n", 55);
+                vk_debug_write(2, "DEBUG: Calling GetInstanceProcAddr for Properties2KHR\n", 55);
 		void *funcPtr = ri.VK_GetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceProperties2KHR");
-                (void)write(2, "DEBUG: Returned from GetInstanceProcAddr\n", 42);
+                vk_debug_write(2, "DEBUG: Returned from GetInstanceProcAddr\n", 42);
 		if (!funcPtr) {
-                        (void)write(2, "DEBUG: Calling GetInstanceProcAddr for Properties2\n", 52);
+                        vk_debug_write(2, "DEBUG: Calling GetInstanceProcAddr for Properties2\n", 52);
 			funcPtr = ri.VK_GetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceProperties2");
-                        (void)write(2, "DEBUG: Returned from GetInstanceProcAddr\n", 42);
+                        vk_debug_write(2, "DEBUG: Returned from GetInstanceProcAddr\n", 42);
 		}
 		qvkGetPhysicalDeviceProperties2KHR = (PFN_vkGetPhysicalDeviceProperties2KHR)funcPtr;
 		if (qvkGetPhysicalDeviceProperties2KHR) {
-                        (void)write(2, "DEBUG: Loaded vkGetPhysicalDeviceProperties2KHR\n", 49);
+                        vk_debug_write(2, "DEBUG: Loaded vkGetPhysicalDeviceProperties2KHR\n", 49);
 		} else {
-                        (void)write(2, "DEBUG: Failed to load vkGetPhysicalDeviceProperties2KHR\n", 57);
+                        vk_debug_write(2, "DEBUG: Failed to load vkGetPhysicalDeviceProperties2KHR\n", 57);
 		}
 		
-                (void)write(2, "DEBUG: Calling GetInstanceProcAddr for Features2KHR\n", 53);
+                vk_debug_write(2, "DEBUG: Calling GetInstanceProcAddr for Features2KHR\n", 53);
 		funcPtr = ri.VK_GetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceFeatures2KHR");
-                (void)write(2, "DEBUG: Returned from GetInstanceProcAddr\n", 42);
+                vk_debug_write(2, "DEBUG: Returned from GetInstanceProcAddr\n", 42);
 		if (!funcPtr) {
-                        (void)write(2, "DEBUG: Calling GetInstanceProcAddr for Features2\n", 50);
+                        vk_debug_write(2, "DEBUG: Calling GetInstanceProcAddr for Features2\n", 50);
 			funcPtr = ri.VK_GetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceFeatures2");
-                        (void)write(2, "DEBUG: Returned from GetInstanceProcAddr\n", 42);
+                        vk_debug_write(2, "DEBUG: Returned from GetInstanceProcAddr\n", 42);
 		}
 		qvkGetPhysicalDeviceFeatures2KHR = (PFN_vkGetPhysicalDeviceFeatures2KHR)funcPtr;
 		if (qvkGetPhysicalDeviceFeatures2KHR) {
-                        (void)write(2, "DEBUG: Loaded vkGetPhysicalDeviceFeatures2KHR\n", 47);
+                        vk_debug_write(2, "DEBUG: Loaded vkGetPhysicalDeviceFeatures2KHR\n", 47);
 		} else {
-                        (void)write(2, "DEBUG: Failed to load vkGetPhysicalDeviceFeatures2KHR\n", 55);
+                        vk_debug_write(2, "DEBUG: Failed to load vkGetPhysicalDeviceFeatures2KHR\n", 55);
 		}
 
 #ifdef USE_VK_VALIDATION
@@ -2434,7 +2440,7 @@ static void init_vulkan_library( void )
 		}
 #endif
 
-                (void)write(2, "DEBUG: Creating surface\n", 25);
+                vk_debug_write(2, "DEBUG: Creating surface\n", 25);
 		// create surface
 		if ( !ri.VK_CreateSurface( vk_instance, &vk_surface ) ) {
 			ri.Error( ERR_FATAL, "Error creating Vulkan surface" );
@@ -2442,9 +2448,9 @@ static void init_vulkan_library( void )
 		}
 	} // vk_instance == VK_NULL_HANDLE
 
-        (void)write(2, "DEBUG: Enumerating physical devices\n", 37);
+        vk_debug_write(2, "DEBUG: Enumerating physical devices\n", 37);
 	res = qvkEnumeratePhysicalDevices( vk_instance, &device_count, NULL );
-        (void)write(2, "DEBUG: Enumerated physical devices\n", 36);
+        vk_debug_write(2, "DEBUG: Enumerated physical devices\n", 36);
 	if ( device_count == 0 ) {
 		ri.Error( ERR_FATAL, "Vulkan: no physical devices found" );
 		return;
