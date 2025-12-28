@@ -40,3 +40,8 @@ void engineCore_render() {
                         gEngine.frame, gEngine.width, gEngine.height, gEngine.textures, gEngine.meshes, gEngine.resources, gEngine.mods.size());
 }
 
+void engineCore_addModBytes(const unsigned char* data, int length, const char* modName) {
+    // Basic stub: log and push to mods list
+    __android_log_print(ANDROID_LOG_INFO, "EngineAndroid", "engineCore_addModBytes(%s, length=%d)", modName ? modName : "(unknown)", length);
+    gEngine.mods.emplace_back(std::string(modName ? modName : "(unknown)") + ":" + std::to_string(length));
+}
