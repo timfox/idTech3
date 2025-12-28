@@ -926,6 +926,51 @@ static const imageExtToLoaderMap_t imageLoaders[] =
 
 static const int numImageLoaders = ARRAY_LEN( imageLoaders );
 
+static qboolean R_TryLoadImageByExt( const char *filename, const char *ext, byte **pic, int *width, int *height )
+{
+	int i;
+
+	if ( !filename || !filename[0] || !ext || !ext[0] ) {
+		return qfalse;
+	}
+
+	for ( i = 0; i < numImageLoaders; i++ ) {
+		if ( !Q_stricmp( ext, imageLoaders[ i ].ext ) ) {
+			imageLoaders[ i ].ImageLoader( filename, pic, width, height );
+			return ( *pic != NULL ) ? qtrue : qfalse;
+		}
+	}
+
+	return qfalse;
+}
+
+static qboolean R_ShouldPreferEXR( void )
+{
+	// "if HDR/PBR wants it": for OpenGL renderer we key off HDR.
+	return ( r_hdr && r_hdr->integer ) ? qtrue : qfalse;
+}
+
+static qboolean R_TryLoadPreferredTexture( const char *baseName, const char *ext, char *outName, size_t outNameSize,
+	byte **pic, int *width, int *height )
+{
+	char candidate[ MAX_QPATH ];
+
+	if ( !baseName || !baseName[0] || !ext || !ext[0] ) {
+		return qfalse;
+	}
+
+	Com_sprintf( candidate, sizeof( candidate ), "%s.%s", baseName, ext );
+
+	if ( R_TryLoadImageByExt( candidate, ext, pic, width, height ) ) {
+		if ( outName && outNameSize ) {
+			Q_strncpyz( outName, candidate, outNameSize );
+		}
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
 /*
 =================
 R_LoadImage
@@ -951,38 +996,57 @@ static const char *R_LoadImage( const char *name, byte **pic, int *width, int *h
 	ext = COM_GetExtension( localName );
 	if ( *ext )
 	{
-		// Look for the correct loader and use it
+		// Try the explicitly requested extension first
+		R_TryLoadImageByExt( localName, ext, pic, width, height );
+
+		// A loader was found
 		for ( i = 0; i < numImageLoaders; i++ )
 		{
-			if ( !Q_stricmp( ext, imageLoaders[ i ].ext ) )
-			{
-				// Load
-				imageLoaders[ i ].ImageLoader( localName, pic, width, height );
+			if ( !Q_stricmp( ext, imageLoaders[ i ].ext ) ) {
+				orgLoader = i;
 				break;
 			}
 		}
 
-		// A loader was found
-		if ( i < numImageLoaders )
-		{
-			if ( *pic == NULL )
-			{
-				// Loader failed, most likely because the file isn't there;
-				// try again without the extension
-				//orgNameFailed = qtrue;
-				orgLoader = i;
-				COM_StripExtension( name, localName, MAX_QPATH );
-			}
-			else
-			{
-				// Something loaded
+		if ( *pic != NULL ) {
+			// Something loaded
+			return localName;
+		}
+
+		// If shader explicitly asked for .exr but it's missing, try other common extensions.
+		if ( !Q_stricmp( ext, "exr" ) ) {
+			char baseName[ MAX_QPATH ];
+			COM_StripExtension( name, baseName, sizeof( baseName ) );
+
+			if ( R_TryLoadPreferredTexture( baseName, "png", localName, sizeof( localName ), pic, width, height ) ||
+				 R_TryLoadPreferredTexture( baseName, "tga", localName, sizeof( localName ), pic, width, height ) ||
+				 R_TryLoadPreferredTexture( baseName, "jpg", localName, sizeof( localName ), pic, width, height ) ||
+				 R_TryLoadPreferredTexture( baseName, "jpeg", localName, sizeof( localName ), pic, width, height ) ) {
 				return localName;
 			}
 		}
+
+		// Loader failed, most likely because the file isn't there; try again without the extension.
+		COM_StripExtension( name, localName, MAX_QPATH );
 	}
 
-	// Try and find a suitable match using all
-	// the image formats supported
+	// If shader asked for foo (no extension), try in order:
+	//   foo.exr (if HDR wants it), foo.png, foo.tga, foo.jpg
+	{
+		const qboolean preferEXR = R_ShouldPreferEXR();
+		char baseName[ MAX_QPATH ];
+		Q_strncpyz( baseName, localName, sizeof( baseName ) );
+
+		if ( ( preferEXR && R_TryLoadPreferredTexture( baseName, "exr", localName, sizeof( localName ), pic, width, height ) ) ||
+			 R_TryLoadPreferredTexture( baseName, "png", localName, sizeof( localName ), pic, width, height ) ||
+			 R_TryLoadPreferredTexture( baseName, "tga", localName, sizeof( localName ), pic, width, height ) ||
+			 R_TryLoadPreferredTexture( baseName, "jpg", localName, sizeof( localName ), pic, width, height ) ||
+			 R_TryLoadPreferredTexture( baseName, "jpeg", localName, sizeof( localName ), pic, width, height ) ) {
+			return localName;
+		}
+	}
+
+	// Fallback: Try and find a suitable match using all supported image formats
 	for ( i = 0; i < numImageLoaders; i++ )
 	{
 		if ( i == orgLoader )
@@ -1008,6 +1072,55 @@ static const char *R_LoadImage( const char *name, byte **pic, int *width, int *h
 	}
 
 	return localName;
+}
+
+static image_t *R_FindCriticalFallbackImage( const char *name, imgFlags_t flags )
+{
+	char base[ MAX_QPATH ];
+	const char *leaf;
+
+	if ( !name || !name[0] ) {
+		return NULL;
+	}
+
+	leaf = strrchr( name, '/' );
+	leaf = leaf ? ( leaf + 1 ) : name;
+
+	Q_strncpyz( base, leaf, sizeof( base ) );
+	COM_StripExtension( base, base, sizeof( base ) );
+
+	// white: 1x1 RGBA(255,255,255,255)
+	if ( !Q_stricmp( base, "*white" ) || !Q_stricmp( base, "white" ) ) {
+		return tr.whiteImage ? tr.whiteImage : NULL;
+	}
+
+	// black: 1x1 RGBA(0,0,0,255) (create on demand)
+	if ( !Q_stricmp( base, "*black" ) || !Q_stricmp( base, "black" ) ) {
+		static image_t *blackImage = NULL;
+		if ( !blackImage ) {
+			const byte rgba[4] = { 0, 0, 0, 255 };
+			blackImage = R_CreateImage( "*black", NULL, (byte *)rgba, 1, 1, flags & ~(IMGFLAG_MIPMAP | IMGFLAG_PICMIP) );
+		}
+		return blackImage;
+	}
+
+	// console: reuse checker (or white as last resort)
+	if ( !Q_stricmp( base, "console" ) ) {
+		if ( tr.checkerImage ) {
+			return tr.checkerImage;
+		}
+		return tr.whiteImage ? tr.whiteImage : NULL;
+	}
+
+	// flare/sun: reuse dlight (radial-ish) or white
+	if ( strstr( base, "flare" ) != NULL || !Q_stricmp( base, "sun" ) ) {
+		if ( tr.dlightImage ) {
+			return tr.dlightImage;
+		}
+		return tr.whiteImage ? tr.whiteImage : NULL;
+	}
+
+	return NULL;
 }
 
 #ifdef USE_JOBSYSTEM
@@ -1208,6 +1321,12 @@ image_t	*R_FindImageFile( const char *name, imgFlags_t flags )
 	//
 	localName = R_LoadImage( name, &pic, &width, &height );
 	if ( pic == NULL ) {
+		// For critical built-in shaders/images, generate or reuse procedural fallbacks
+		// so shader creation doesn't hard-fail just because art is missing.
+		image = R_FindCriticalFallbackImage( name, flags );
+		if ( image ) {
+			return image;
+		}
 		return NULL;
 	}
 
@@ -1495,8 +1614,10 @@ static void R_CreateBuiltinImages( void ) {
 	R_CreateDefaultImage();
 
 	// we use a solid white image instead of disabling texturing
-	Com_Memset( data, 255, sizeof( data ) );
-	tr.whiteImage = R_CreateImage( "*white", NULL, (byte *)data, 8, 8, IMGFLAG_NONE );
+	{
+		const byte rgba[4] = { 255, 255, 255, 255 };
+		tr.whiteImage = R_CreateImage( "*white", NULL, (byte *)rgba, 1, 1, IMGFLAG_NONE );
+	}
 
 	// with overbright bits active, we need an image which is some fraction of full color,
 	// for default lightmaps, etc

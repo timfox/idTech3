@@ -69,6 +69,64 @@ static PFN_vkGetInstanceProcAddr qvkGetInstanceProcAddr;
 cvar_t *r_stereoEnabled;
 cvar_t *in_nograb;
 
+// Cache the last requested mode so we can recreate the window if we need to
+// fall back from Wayland -> X11 (e.g. Vulkan surface creation).
+static int s_last_mode = 0;
+static char s_last_modeFS[ MAX_CVAR_VALUE_STRING ];
+static qboolean s_last_fullscreen = qfalse;
+static qboolean s_last_vulkan = qfalse;
+
+static qboolean GLimp_CanFallbackToX11( void )
+{
+#if defined(__linux__) || defined(__unix__)
+	const char *forcedDriver = SDL_getenv( "SDL_VIDEODRIVER" );
+	const char *display = SDL_getenv( "DISPLAY" );
+
+	// Respect explicit user override: if they forced a driver, don't fight it.
+	if ( forcedDriver && forcedDriver[0] ) {
+		return qfalse;
+	}
+
+	// X11 fallback only makes sense if Xwayland/X11 is available.
+	if ( !display || !display[0] ) {
+		return qfalse;
+	}
+
+	return qtrue;
+#else
+	return qfalse;
+#endif
+}
+
+static qboolean GLimp_RestartVideoDriver( const char *driver )
+{
+	if ( !driver || !driver[0] ) {
+		return qfalse;
+	}
+
+	// Tear down window first.
+	if ( SDL_window ) {
+		SDL_DestroyWindow( SDL_window );
+		SDL_window = NULL;
+	}
+
+	// Shut down video subsystem if it was initialized.
+	if ( SDL_WasInit( SDL_INIT_VIDEO ) ) {
+		SDL_QuitSubSystem( SDL_INIT_VIDEO );
+	}
+
+	// Force the requested backend for the remainder of this process.
+	SDL_setenv( "SDL_VIDEODRIVER", driver, 1 );
+
+	if ( SDL_Init( SDL_INIT_VIDEO ) != 0 ) {
+		Com_Printf( "SDL_Init video failed for driver \"%s\" (%s)\n", driver, SDL_GetError() );
+		return qfalse;
+	}
+
+	Com_Printf( "SDL using driver \"%s\"\n", SDL_GetCurrentVideoDriver() );
+	return qtrue;
+}
+
 /*
 ===============
 GLimp_Shutdown
@@ -568,6 +626,12 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 {
 	rserr_t err;
 
+	// Cache last requested parameters for possible recreation/fallback.
+	s_last_mode = mode;
+	Q_strncpyz( s_last_modeFS, modeFS ? modeFS : "", sizeof( s_last_modeFS ) );
+	s_last_fullscreen = fullscreen;
+	s_last_vulkan = vulkan;
+
 	if ( fullscreen && in_nograb->integer )
 	{
 		Com_Printf( "Fullscreen not allowed with \\in_nograb 1\n");
@@ -597,7 +661,9 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 			const qboolean canTryWayland = ( ( !forcedDriver || !forcedDriver[0] ) && ( waylandDisplay && waylandDisplay[0] ) );
 
 			if ( canTryWayland ) {
-				SDL_SetHint( SDL_HINT_VIDEODRIVER, "wayland" );
+				// Prefer wayland when running in a wayland session (unless user forced a driver).
+				// SDL2 honors SDL_VIDEODRIVER during initialization.
+				SDL_setenv( "SDL_VIDEODRIVER", "wayland", 0 /* don't override user */ );
 				// Explicitly disable libdecor to avoid GTK dependencies and related crashes.
 				// This relies on the compositor providing server-side decorations or the 
 				// engine handling its own window state.
@@ -607,7 +673,7 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 			if ( SDL_Init( SDL_INIT_VIDEO ) != 0 ) {
 				if ( canTryWayland ) {
 					Com_Printf( "SDL_Init video failed with Wayland driver (%s), retrying with X11...\n", SDL_GetError() );
-					SDL_SetHint( SDL_HINT_VIDEODRIVER, "x11" );
+					SDL_setenv( "SDL_VIDEODRIVER", "x11", 1 );
 					if ( SDL_Init( SDL_INIT_VIDEO ) != 0 ) {
 						Com_Printf( "SDL_Init( SDL_INIT_VIDEO ) FAILED (%s)\n", SDL_GetError() );
 						return RSERR_FATAL_ERROR;
@@ -632,6 +698,17 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 	}
 
 	err = GLW_SetMode( mode, modeFS, fullscreen, vulkan );
+	if ( err == RSERR_FATAL_ERROR ) {
+		// Wayland can successfully initialize, but window/context/surface creation may fail
+		// on some compositor/driver combinations. In that case, fall back to X11 if possible.
+		const char *drv = SDL_GetCurrentVideoDriver();
+		if ( drv && strcmp( drv, "wayland" ) == 0 && GLimp_CanFallbackToX11() ) {
+			Com_Printf( "Wayland backend failed to create window; falling back to X11...\n" );
+			if ( GLimp_RestartVideoDriver( "x11" ) ) {
+				err = GLW_SetMode( mode, modeFS, fullscreen, vulkan );
+			}
+		}
+	}
 
 	switch ( err )
 	{
@@ -879,8 +956,30 @@ VK_EXPORT qboolean VK_CreateSurface( VkInstance instance, VkSurfaceKHR *surface 
 {
 	if ( SDL_Vulkan_CreateSurface( SDL_window, instance, surface ) == SDL_TRUE )
 		return qtrue;
-	else
-		return qfalse;
+
+	// If Wayland surface creation fails, try a one-time fallback to X11 by restarting
+	// the SDL video backend and recreating the window, then retrying surface creation.
+	{
+		const char *drv = SDL_GetCurrentVideoDriver();
+		if ( drv && strcmp( drv, "wayland" ) == 0 && GLimp_CanFallbackToX11() ) {
+			Com_Printf( "SDL_Vulkan_CreateSurface failed on Wayland (%s); retrying with X11...\n", SDL_GetError() );
+
+			if ( GLimp_RestartVideoDriver( "x11" ) ) {
+				// Recreate the window in Vulkan mode using the last requested settings.
+				const rserr_t err = GLW_SetMode( s_last_mode, s_last_modeFS, s_last_fullscreen, qtrue );
+				if ( err == RSERR_OK ) {
+					if ( SDL_Vulkan_CreateSurface( SDL_window, instance, surface ) == SDL_TRUE ) {
+						return qtrue;
+					}
+					Com_Printf( "SDL_Vulkan_CreateSurface still failed on X11 (%s)\n", SDL_GetError() );
+				} else {
+					Com_Printf( "Failed to recreate Vulkan window on X11\n" );
+				}
+			}
+		}
+	}
+
+	return qfalse;
 }
 
 

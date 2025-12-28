@@ -2281,6 +2281,60 @@ static const imageExtToLoaderMap_t imageLoaders[ ] =
 
 static const int numImageLoaders = ARRAY_LEN( imageLoaders );
 
+static qboolean R_ShouldPreferEXR( void )
+{
+	// "if HDR/PBR wants it"
+	const qboolean hdr = ( r_hdr && r_hdr->integer ) ? qtrue : qfalse;
+	const qboolean pbr = ( r_pbr && r_pbr->integer ) ? qtrue : qfalse;
+	return ( hdr || pbr ) ? qtrue : qfalse;
+}
+
+static qboolean R_TryLoadImageByExt( const char *filename, const char *ext,
+	byte **pic, int *width, int *height, GLenum *picFormat, int *numMips )
+{
+	int i;
+
+	if ( !filename || !filename[0] || !ext || !ext[0] ) {
+		return qfalse;
+	}
+
+	// DDS is not in the common loader table (special path with mip support).
+	if ( !Q_stricmp( ext, "dds" ) ) {
+		R_LoadDDS( filename, pic, width, height, picFormat, numMips );
+		return ( *pic != NULL ) ? qtrue : qfalse;
+	}
+
+	for ( i = 0; i < numImageLoaders; i++ ) {
+		if ( !Q_stricmp( ext, imageLoaders[ i ].ext ) ) {
+			imageLoaders[ i ].ImageLoader( filename, pic, width, height );
+			return ( *pic != NULL ) ? qtrue : qfalse;
+		}
+	}
+
+	return qfalse;
+}
+
+static qboolean R_TryLoadPreferredTexture( const char *baseName, const char *ext,
+	char *outName, size_t outNameSize,
+	byte **pic, int *width, int *height, GLenum *picFormat, int *numMips )
+{
+	char candidate[ MAX_QPATH ];
+
+	if ( !baseName || !baseName[0] || !ext || !ext[0] ) {
+		return qfalse;
+	}
+
+	Com_sprintf( candidate, sizeof( candidate ), "%s.%s", baseName, ext );
+	if ( R_TryLoadImageByExt( candidate, ext, pic, width, height, picFormat, numMips ) ) {
+		if ( outName && outNameSize ) {
+			Q_strncpyz( outName, candidate, outNameSize );
+		}
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
 /*
 =================
 R_LoadImage
@@ -2297,6 +2351,7 @@ static void R_LoadImage( const char *name, byte **pic, int *width, int *height, 
 	char localName[ MAX_QPATH ];
 	const char *ext;
 	const char *altName;
+	const qboolean preferEXR = R_ShouldPreferEXR();
 
 	*pic = NULL;
 	*width = 0;
@@ -2308,76 +2363,126 @@ static void R_LoadImage( const char *name, byte **pic, int *width, int *height, 
 
 	ext = COM_GetExtension( localName );
 
-	// If compressed textures are enabled, try loading a DDS first, it'll load fastest
-	if (r_ext_compressed_textures->integer)
-	{
-		char ddsName[MAX_QPATH];
-
-		COM_StripExtension(name, ddsName, MAX_QPATH);
-		Q_strcat(ddsName, MAX_QPATH, ".dds");
-
-		R_LoadDDS(ddsName, pic, width, height, picFormat, numMips);
-
-		// If loaded, we're done.
-		if (*pic)
+	// If an explicit extension is provided, try that exact file first.
+	if ( *ext ) {
+		if ( R_TryLoadImageByExt( localName, ext, pic, width, height, picFormat, numMips ) ) {
 			return;
-	}
+		}
 
-	if( *ext )
-	{
-		// Look for the correct loader and use it
-		for( i = 0; i < numImageLoaders; i++ )
-		{
-			if( !Q_stricmp( ext, imageLoaders[ i ].ext ) )
-			{
-				// Load
-				imageLoaders[ i ].ImageLoader( localName, pic, width, height );
-				break;
+		// If shader literally asks for foo.exr and it’s missing:
+		// try same basename other extensions automatically.
+		if ( !Q_stricmp( ext, "exr" ) ) {
+			char baseName[ MAX_QPATH ];
+			COM_StripExtension( name, baseName, sizeof( baseName ) );
+
+			if ( R_TryLoadPreferredTexture( baseName, "png", localName, sizeof( localName ), pic, width, height, picFormat, numMips ) ||
+				 R_TryLoadPreferredTexture( baseName, "tga", localName, sizeof( localName ), pic, width, height, picFormat, numMips ) ||
+				 R_TryLoadPreferredTexture( baseName, "jpg", localName, sizeof( localName ), pic, width, height, picFormat, numMips ) ||
+				 R_TryLoadPreferredTexture( baseName, "jpeg", localName, sizeof( localName ), pic, width, height, picFormat, numMips ) ) {
+				return;
 			}
 		}
 
-		// A loader was found
-		if( i < numImageLoaders )
-		{
-			if( *pic == NULL )
-			{
-				// Loader failed, most likely because the file isn't there;
-				// try again without the extension
-				orgNameFailed = qtrue;
+		// Fall back to old behaviour: strip extension and probe other formats.
+		orgNameFailed = qtrue;
+		COM_StripExtension( name, localName, MAX_QPATH );
+
+		for ( i = 0; i < numImageLoaders; i++ ) {
+			if ( !Q_stricmp( ext, imageLoaders[ i ].ext ) ) {
 				orgLoader = i;
-				COM_StripExtension( name, localName, MAX_QPATH );
+				break;
 			}
-			else
-			{
-				// Something loaded
+		}
+	} else {
+		// If shader asks for foo (no extension), try in order:
+		// foo.exr (if HDR/PBR wants it), foo.png, foo.tga, foo.jpg
+		const char *baseName = localName;
+
+		if ( ( preferEXR && R_TryLoadPreferredTexture( baseName, "exr", localName, sizeof( localName ), pic, width, height, picFormat, numMips ) ) ||
+			 R_TryLoadPreferredTexture( baseName, "png", localName, sizeof( localName ), pic, width, height, picFormat, numMips ) ||
+			 R_TryLoadPreferredTexture( baseName, "tga", localName, sizeof( localName ), pic, width, height, picFormat, numMips ) ||
+			 R_TryLoadPreferredTexture( baseName, "jpg", localName, sizeof( localName ), pic, width, height, picFormat, numMips ) ||
+			 R_TryLoadPreferredTexture( baseName, "jpeg", localName, sizeof( localName ), pic, width, height, picFormat, numMips ) ) {
+			return;
+		}
+
+		// If compressed textures are enabled, try loading a DDS after preferred formats.
+		if ( r_ext_compressed_textures->integer ) {
+			char ddsName[MAX_QPATH];
+			COM_StripExtension( name, ddsName, sizeof( ddsName ) );
+			Q_strcat( ddsName, sizeof( ddsName ), ".dds" );
+			R_LoadDDS( ddsName, pic, width, height, picFormat, numMips );
+			if ( *pic ) {
 				return;
 			}
 		}
 	}
 
-	// Try and find a suitable match using all
-	// the image formats supported
-	for( i = 0; i < numImageLoaders; i++ )
-	{
-		if (i == orgLoader)
+	// Fallback: Try and find a suitable match using all supported formats.
+	for ( i = 0; i < numImageLoaders; i++ ) {
+		if ( i == orgLoader ) {
 			continue;
+		}
 
 		altName = va( "%s.%s", localName, imageLoaders[ i ].ext );
-
-		// Load
 		imageLoaders[ i ].ImageLoader( altName, pic, width, height );
 
-		if( *pic )
-		{
-			if( orgNameFailed )
-			{
-				ri.Printf( PRINT_DEVELOPER, "WARNING: %s not present, using %s instead\n",
-						name, altName );
+		if ( *pic ) {
+			if ( orgNameFailed ) {
+				ri.Printf( PRINT_DEVELOPER, "WARNING: %s not present, using %s instead\n", name, altName );
 			}
-
-			break;
+			return;
 		}
 	}
+}
+
+static image_t *R_FindCriticalFallbackImage( const char *name, imgType_t type, imgFlags_t flags )
+{
+	char base[ MAX_QPATH ];
+	const char *leaf;
+
+	(void)type;
+
+	if ( !name || !name[0] ) {
+		return NULL;
+	}
+
+	leaf = strrchr( name, '/' );
+	leaf = leaf ? ( leaf + 1 ) : name;
+
+	Q_strncpyz( base, leaf, sizeof( base ) );
+	COM_StripExtension( base, base, sizeof( base ) );
+
+	// white: 1x1 RGBA(255,255,255,255)
+	if ( !Q_stricmp( base, "*white" ) || !Q_stricmp( base, "white" ) ) {
+		return tr.whiteImage ? tr.whiteImage : NULL;
+	}
+
+	// black: 1x1 RGBA(0,0,0,255) (create on demand)
+	if ( !Q_stricmp( base, "*black" ) || !Q_stricmp( base, "black" ) ) {
+		static image_t *blackImage = NULL;
+		if ( !blackImage ) {
+			const byte rgba[4] = { 0, 0, 0, 255 };
+			blackImage = R_CreateImage( "*black", (byte *)rgba, 1, 1, IMGTYPE_COLORALPHA,
+				flags & ~(IMGFLAG_MIPMAP | IMGFLAG_PICMIP), 0 );
+		}
+		return blackImage;
+	}
+
+	// console: reuse white or a small checker (we already have checker)
+	if ( !Q_stricmp( base, "console" ) ) {
+		return tr.whiteImage ? tr.whiteImage : NULL;
+	}
+
+	// flare/sun: reuse dlight (radial-ish) or white
+	if ( strstr( base, "flare" ) != NULL || !Q_stricmp( base, "sun" ) ) {
+		if ( tr.dlightImage ) {
+			return tr.dlightImage;
+		}
+		return tr.whiteImage ? tr.whiteImage : NULL;
+	}
+
+	return NULL;
 }
 
 
@@ -2425,6 +2530,11 @@ image_t	*R_FindImageFile( const char *name, imgType_t type, imgFlags_t flags )
 	//
 	R_LoadImage( name, &pic, &width, &height, &picFormat, &picNumMips );
 	if ( pic == NULL ) {
+		// For critical built-in shaders/images, generate/reuse procedural fallbacks.
+		image = R_FindCriticalFallbackImage( name, type, flags );
+		if ( image ) {
+			return image;
+		}
 		return NULL;
 	}
 
@@ -2719,8 +2829,10 @@ static void R_CreateBuiltinImages( void ) {
 	R_CreateDefaultImage();
 
 	// we use a solid white image instead of disabling texturing
-	Com_Memset( data, 255, sizeof( data ) );
-	tr.whiteImage = R_CreateImage("*white", (byte *)data, 8, 8, IMGTYPE_COLORALPHA, IMGFLAG_NONE, 0);
+	{
+		const byte rgba[4] = { 255, 255, 255, 255 };
+		tr.whiteImage = R_CreateImage("*white", (byte *)rgba, 1, 1, IMGTYPE_COLORALPHA, IMGFLAG_NONE, 0);
+	}
 
 	if (r_dlightMode->integer >= 2)
 	{
