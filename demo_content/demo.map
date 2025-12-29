@@ -1,0 +1,30 @@
+// Minimal demo map for testing
+{
+"classname" "worldspawn"
+"message" "idTech3 Demo Map"
+"music" "music/demo"
+
+// Simple room
+{
+"classname" "func_static"
+"model" "*1"
+{
+brushDef
+{
+( 0 0 0 0 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/demo/floor" 0 0 0
+( 0 0 0 0 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/demo/floor" 0 0 0
+( 0 0 0 0 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/demo/floor" 0 0 0
+( 0 0 0 0 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/demo/floor" 0 0 0
+( 0 0 0 0 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/demo/floor" 0 0 0
+( 0 0 0 0 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/demo/floor" 0 0 0
+}
+}
+}
+
+// Player start
+{
+"classname" "info_player_start"
+"origin" "0 0 32"
+"angle" "0"
+}
+}

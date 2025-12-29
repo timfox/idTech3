@@ -6323,6 +6323,19 @@ static void FS_Startup( void ) {
 			}
 		}
 
+		// Validate mod safety before loading
+		Crash_SetModLoadingContext( fs_gamedirvar->string, "directory_scan" );
+		if ( !Mod_ValidateBeforeLoad( fs_gamedirvar->string ) ) {
+			Com_Printf( S_COLOR_RED "Mod validation failed: %s - refusing to load\n", fs_gamedirvar->string );
+			Crash_ReportModLoad( fs_gamedirvar->string, "pre-load validation failed" );
+			Crash_ClearModLoadingContext();
+			continue; // Don't load this mod
+		}
+		Crash_ClearModLoadingContext();
+
+		// Apply sandbox restrictions for the mod
+		Mod_ApplySandboxRestrictions( fs_gamedirvar->string );
+
 		if ( fs_debug && fs_debug->integer ) {
 			Com_Printf( "Adding mod directory: %s (disk: %s)\n", fs_gamedirvar->string, effectiveDir );
 		}

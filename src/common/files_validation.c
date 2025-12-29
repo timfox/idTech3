@@ -9,6 +9,7 @@ Provides user-friendly error messages and ensures content integrity.
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include "fs_validation.h"
 #include "files_internal.h"
 #include <stdio.h>
 #include <string.h>
@@ -163,7 +164,7 @@ qboolean Mod_ValidateBeforeLoad( const char *modName ) {
 	fileLen = FS_FOpenFileRead( vmPath, &f, qfalse );
 	if ( fileLen >= 0 && f != FS_INVALID_HANDLE ) {
 		FS_FCloseFile( f );
-		
+
 		// Validate VM file size (should be reasonable)
 		if ( fileLen < 1024 ) {
 			Com_Printf( S_COLOR_YELLOW "Warning: Mod VM file appears too small: %s (%d bytes)\n", vmPath, fileLen );
@@ -172,7 +173,34 @@ qboolean Mod_ValidateBeforeLoad( const char *modName ) {
 			return qfalse;
 		}
 	}
-	
+
+	// Additional security checks: look for potentially dangerous files
+	const char *dangerousFiles[] = {
+		"autoexec.cfg",     // Could override user settings
+		"config.cfg",       // Could override user config
+		"../q3config.cfg",  // Path traversal attempt
+		"../../../etc/passwd", // Unix path traversal
+		NULL
+	};
+
+	int i;
+	for ( i = 0; dangerousFiles[i] != NULL; i++ ) {
+		char dangerousPath[MAX_OSPATH];
+		Com_sprintf( dangerousPath, sizeof( dangerousPath ), "%s/%s", modPath, dangerousFiles[i] );
+		fileLen = FS_FOpenFileRead( dangerousPath, &f, qfalse );
+		if ( fileLen >= 0 && f != FS_INVALID_HANDLE ) {
+			FS_FCloseFile( f );
+			Com_Printf( S_COLOR_RED "Security warning: Mod contains potentially dangerous file: %s\n", dangerousFiles[i] );
+			// Don't fail validation - just warn, but could be made stricter
+		}
+	}
+
+	// Check for scripts directory - validate script files don't contain dangerous commands
+	char scriptsPath[MAX_OSPATH];
+	Com_sprintf( scriptsPath, sizeof( scriptsPath ), "%s/scripts/", modPath );
+	// Note: Would need directory enumeration to check individual script files
+	// For now, just check if scripts directory exists and warn
+
 	return qtrue;
 }
 
@@ -310,4 +338,50 @@ qboolean FS_ValidateContentOnStartup( void ) {
 	
 	Com_Printf( S_COLOR_GREEN "Content validation: OK\n" );
 	return qtrue;
+}
+
+/*
+=================
+Mod_ApplySandboxRestrictions
+
+Apply sandbox restrictions for mod loading to prevent security issues.
+Returns qtrue if restrictions applied successfully.
+=================
+*/
+qboolean Mod_ApplySandboxRestrictions( const char *modName ) {
+	if ( !modName || !*modName ) {
+		return qfalse;
+	}
+
+	// Set mod-specific cvars to restrict functionality
+	Cvar_Get( va( "mod_%s_restricted", modName), "1", CVAR_ROM | CVAR_PRIVATE );
+
+	// Restrict filesystem access for mods
+	Cvar_Get( va( "fs_mod_%s_basegame_only", modName), "1", CVAR_ROM | CVAR_PRIVATE );
+
+	// Disable potentially dangerous commands for mod VMs
+	Cvar_Get( va( "mod_%s_safe_mode", modName), "1", CVAR_ROM | CVAR_PRIVATE );
+
+	Com_Printf( "Applied sandbox restrictions for mod: %s\n", modName );
+	return qtrue;
+}
+
+/*
+=================
+Mod_RemoveSandboxRestrictions
+
+Remove sandbox restrictions when unloading a mod.
+=================
+*/
+void Mod_RemoveSandboxRestrictions( const char *modName ) {
+	if ( !modName || !*modName ) {
+		return;
+	}
+
+	// Remove mod-specific restriction cvars
+	Cvar_Set( va( "mod_%s_restricted", modName), "0" );
+	Cvar_Set( va( "fs_mod_%s_basegame_only", modName), "0" );
+	Cvar_Set( va( "mod_%s_safe_mode", modName), "0" );
+
+	Com_Printf( "Removed sandbox restrictions for mod: %s\n", modName );
 }

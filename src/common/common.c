@@ -145,9 +145,18 @@ Com_Printf
 */
 void QDECL Com_Printf( const char *fmt, ... ) {
     va_list argptr;
+    char msg[4096];
+
     va_start( argptr, fmt );
-    vprintf( fmt, argptr );
+    Q_vsnprintf( msg, sizeof( msg ), fmt, argptr );
     va_end( argptr );
+
+    // Forward to crash handler for ring buffer capture
+    Crash_LogMessage( msg );
+
+    // Output to console
+    fputs( msg, stdout );
+    fflush( stdout );
 }
 
 /*
@@ -246,6 +255,9 @@ static void Com_InitCrashRecovery(void) {
     // Set up signal handlers for crash recovery
     Com_Printf( "Initializing crash recovery system...\n" );
 
+    // Initialize the crash handler system
+    Crash_Init();
+
     // Save current state periodically for restoration
     // This would integrate with the existing save/load system
 }
@@ -316,6 +328,9 @@ void Com_Init( char *commandLine ) {
 
     // Initialize filesystem
     FS_InitFilesystem();
+
+    // Initialize crash handler after filesystem (for proper Com_Printf support)
+    Crash_Init();
 
     if ( commandLine ) {
         Com_Printf( "Command line: %s\n", commandLine );

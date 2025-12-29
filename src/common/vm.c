@@ -1965,6 +1965,19 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 
 	name = vmName[ index ];
 
+	// Mod safety: Validate VM loading context
+	if ( fs_gamedirvar && fs_gamedirvar->string[0] && !FS_IsBaseGame( fs_gamedirvar->string ) ) {
+		// We're loading a VM from a mod - validate the mod first
+		Crash_SetModLoadingContext( fs_gamedirvar->string, va( "VM_%s_load", name ) );
+		if ( !Mod_ValidateBeforeLoad( fs_gamedirvar->string ) ) {
+			Com_Printf( S_COLOR_RED "Mod validation failed for %s VM load: %s\n", name, fs_gamedirvar->string );
+			Crash_ReportModLoad( fs_gamedirvar->string, va( "VM_%s_validation_failed", name ) );
+			Crash_ClearModLoadingContext();
+			return NULL;
+		}
+		Crash_ClearModLoadingContext();
+	}
+
 	vm->name = name;
 	vm->index = index;
 	vm->systemCall = systemCalls;

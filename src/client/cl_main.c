@@ -28,6 +28,7 @@ void Con_EnsureHistoryFileExists(void);
 #include "../sdl/sdl_glw.h"
 #endif
 #include <limits.h>
+#include <sys/stat.h>
 #include <stdint.h>
 #ifdef USE_CURL
 #include "cl_net_enhanced.h"
@@ -3634,12 +3635,41 @@ static void CL_InitRef( void ) {
 fprintf(stderr, "USE_RENDERER_DLOPEN is defined, cl_renderer = %s\n", cl_renderer ? cl_renderer->string : "NULL");
 fprintf(stderr, "About to enter renderer loading logic\n");
 
-	// Try to load renderer with automatic fallback
-	// Priority: Vulkan -> OpenGL2 -> Legacy OpenGL
+	// Enhanced renderer selection with GPU capability detection
+	// Priority: Vulkan -> OpenGL2 -> Legacy OpenGL (with intelligent fallback)
 	const char *rendererPriority[] = { "vulkan", "opengl2", "opengl" };
-	const char *rendererName = cl_renderer ? cl_renderer->string : "vulkan"; // Default to Vulkan
+	const char *rendererName = cl_renderer ? cl_renderer->string : "auto"; // Default to auto-selection
 	int numRenderers = sizeof(rendererPriority) / sizeof(rendererPriority[0]);
 	int startIndex = 0;
+
+	// Auto-select renderer based on GPU capabilities if requested
+	if (Q_stricmp(rendererName, "auto") == 0) {
+		// Try to detect best available renderer
+		rendererName = "vulkan"; // Default to Vulkan for auto mode
+		Com_Printf("Auto-selecting renderer based on system capabilities...\n");
+
+		// Check for Vulkan support first (most modern)
+		char testDllName[MAX_OSPATH];
+		Com_sprintf(testDllName, sizeof(testDllName), RENDERER_PREFIX "_vulkan_" REND_ARCH_STRING DLL_EXT);
+		char *testPath = FS_BuildOSPath(Sys_DefaultBasePath(), testDllName, NULL);
+		if (Sys_LoadLibrary(testPath)) {
+			Sys_UnloadLibrary(Sys_LoadLibrary(testPath)); // Just test load/unload
+			rendererName = "vulkan";
+			Com_Printf("  Vulkan renderer available, selecting Vulkan\n");
+		} else {
+			// Fallback to OpenGL2
+			Com_sprintf(testDllName, sizeof(testDllName), RENDERER_PREFIX "_opengl2_" REND_ARCH_STRING DLL_EXT);
+			testPath = FS_BuildOSPath(Sys_DefaultBasePath(), testDllName, NULL);
+			if (Sys_LoadLibrary(testPath)) {
+				Sys_UnloadLibrary(Sys_LoadLibrary(testPath));
+				rendererName = "opengl2";
+				Com_Printf("  Vulkan unavailable, selecting OpenGL2\n");
+			} else {
+				rendererName = "opengl";
+				Com_Printf("  Modern renderers unavailable, selecting legacy OpenGL\n");
+			}
+		}
+	}
 
 	// Find the requested renderer in our priority list
 	for (int i = 0; i < numRenderers; i++) {
@@ -3671,6 +3701,13 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 		}
 
 		ospath = FS_BuildOSPath( Sys_DefaultBasePath(), dllName, NULL );
+
+		// Pre-check renderer capabilities before loading
+		if (Q_stricmp(tryRenderer, "vulkan") == 0) {
+			// For Vulkan, we could add more sophisticated checks here
+			// For now, just proceed with library loading
+		}
+
 		localRendererLib = Sys_LoadLibrary( ospath );
 
 		if (localRendererLib) {
@@ -3684,9 +3721,13 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 				Com_Printf( S_COLOR_YELLOW "  (This is normal if the requested renderer is unavailable)\n" );
 			}
 		} else {
+			const char *error = Sys_LibraryError();
 			Com_Printf( S_COLOR_YELLOW "  Failed to load renderer: %s\n", tryRenderer );
+			if (error && *error) {
+				Com_Printf( S_COLOR_YELLOW "  Error: %s\n", error );
+			}
 			Com_Printf( S_COLOR_YELLOW "  Path attempted: %s\n", ospath );
-			if (i == 0) {
+			if (i == 0) { // Only print this if it's the first attempt (requested renderer)
 				Com_Printf( "Requested renderer %s failed to load, trying fallbacks\n", rendererName );
 			}
 		}
@@ -3708,8 +3749,17 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 		Com_Printf( S_COLOR_CYAN "  1. Ensure renderer .so files are in the same directory as the engine\n" );
 		Com_Printf( S_COLOR_CYAN "  2. Check that required graphics drivers are installed\n" );
 		Com_Printf( S_COLOR_CYAN "  3. For Vulkan: Ensure Vulkan drivers are installed (vulkan-utils package)\n" );
+		Com_Printf( S_COLOR_CYAN "     Try: apt install vulkan-tools libvulkan1 mesa-vulkan-drivers\n" );
 		Com_Printf( S_COLOR_CYAN "  4. For OpenGL: Ensure OpenGL drivers are installed (mesa-utils package)\n" );
-		Com_Printf( S_COLOR_CYAN "  5. Try running with: +set cl_renderer opengl\n" );
+		Com_Printf( S_COLOR_CYAN "     Try: apt install mesa-utils libgl1-mesa-glx\n" );
+		Com_Printf( S_COLOR_CYAN "  5. Check GPU compatibility:\n" );
+		Com_Printf( S_COLOR_CYAN "     - Discrete GPU recommended for Vulkan\n" );
+		Com_Printf( S_COLOR_CYAN "     - Integrated graphics may work with OpenGL fallback\n" );
+		Com_Printf( S_COLOR_CYAN "  6. Try manual renderer selection:\n" );
+		Com_Printf( S_COLOR_CYAN "     +set cl_renderer opengl    (legacy OpenGL)\n" );
+		Com_Printf( S_COLOR_CYAN "     +set cl_renderer opengl2   (modern OpenGL)\n" );
+		Com_Printf( S_COLOR_CYAN "     +set cl_renderer vulkan    (Vulkan - recommended)\n" );
+		Com_Printf( S_COLOR_CYAN "     +set cl_renderer auto      (automatic selection)\n" );
 		Com_Printf( "\n" );
 		Com_Error( ERR_FATAL, "No renderer available. See console output above for details." );
 		return;

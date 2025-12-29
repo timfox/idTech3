@@ -637,5 +637,3 @@ refexport_t *GetRefAPI( int apiVersion, refimport_t *rimp ) {
     fprintf(stderr, "DEBUG: Renderer sizeof(refexport_t) = %zu\n", sizeof(refexport_t));
     return &re;
 }
-
-// (Helper stubs removed: these functions are provided by other compilation units.)

@@ -13,10 +13,26 @@ Provides:
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <direct.h>
+#define PATH_SEPARATOR '\\'
+#define PATH_SEPARATOR_STR "\\"
+#define chdir _chdir
+#define getcwd _getcwd
+#define execv _execv
+#define stat _stat
+#define S_ISDIR(mode) ((mode) & _S_IFDIR)
+#else
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <errno.h>
+#define PATH_SEPARATOR '/'
+#define PATH_SEPARATOR_STR "/"
+#endif
 
 #define MAX_PATH 1024
 #define MAX_ARGS 64
@@ -33,6 +49,23 @@ static int is_directory(const char *path) {
 		return 0;
 	}
 	return S_ISDIR(st.st_mode);
+}
+
+// Cross-platform path normalization
+static void normalize_path(char *path) {
+#ifdef _WIN32
+	char *p = path;
+	while (*p) {
+		if (*p == '/') *p = '\\';
+		p++;
+	}
+#else
+	char *p = path;
+	while (*p) {
+		if (*p == '\\') *p = '/';
+		p++;
+	}
+#endif
 }
 
 /*
@@ -57,21 +90,26 @@ static const char *Launcher_FindContentDir(const char *execPath) {
 	
 	// Get directory containing executable
 	char *execDir = strdup(execPath);
-	char *lastSlash = strrchr(execDir, '/');
-	if (lastSlash) {
-		*lastSlash = '\0';
+	char *lastSep = strrchr(execDir, PATH_SEPARATOR);
+	if (!lastSep) {
+		lastSep = strrchr(execDir, PATH_SEPARATOR == '\\' ? '/' : '\\');
+	}
+	if (lastSep) {
+		*lastSep = '\0';
 	} else {
 		execDir[0] = '.';
 		execDir[1] = '\0';
 	}
-	
+
 	// Try candidates relative to executable directory
 	for (i = 0; candidates[i] != NULL; i++) {
-		snprintf(testPath, sizeof(testPath), "%s/%s", execDir, candidates[i]);
+		snprintf(testPath, sizeof(testPath), "%s%s%s", execDir, PATH_SEPARATOR_STR, candidates[i]);
+		normalize_path(testPath);
 		if (is_directory(testPath)) {
 			// Check for pak files
 			char pakPath[MAX_PATH];
-			snprintf(pakPath, sizeof(pakPath), "%s/pak0.pk3", testPath);
+			snprintf(pakPath, sizeof(pakPath), "%s%spak0.pk3", testPath, PATH_SEPARATOR_STR);
+			normalize_path(pakPath);
 			if (path_exists(pakPath)) {
 				strncpy(contentDir, testPath, sizeof(contentDir) - 1);
 				contentDir[sizeof(contentDir) - 1] = '\0';
@@ -116,14 +154,16 @@ static int Launcher_ValidateContent(const char *contentDir) {
 	}
 	
 	// Check for at least one pak file
-	snprintf(pakPath, sizeof(pakPath), "%s/pak0.pk3", contentDir);
+	snprintf(pakPath, sizeof(pakPath), "%s%spak0.pk3", contentDir, PATH_SEPARATOR_STR);
+	normalize_path(pakPath);
 	if (path_exists(pakPath)) {
 		foundPak = 1;
 	} else {
 		// Try other common pak files
 		int i;
 		for (i = 1; i <= 9 && !foundPak; i++) {
-			snprintf(pakPath, sizeof(pakPath), "%s/pak%d.pk3", contentDir, i);
+			snprintf(pakPath, sizeof(pakPath), "%s%spak%d.pk3", contentDir, PATH_SEPARATOR_STR, i);
+			normalize_path(pakPath);
 			if (path_exists(pakPath)) {
 				foundPak = 1;
 			}
@@ -238,21 +278,40 @@ int main(int argc, char **argv) {
 	printf("====================\n\n");
 	
 	// Find engine binary (assume it's in the same directory as launcher)
-	char *lastSlash = strrchr(execPath, '/');
-	if (lastSlash) {
-		int len = lastSlash - execPath;
-		snprintf(enginePath, sizeof(enginePath), "%.*s/idtech3.x86_64", len, execPath);
-	} else {
-		strncpy(enginePath, "idtech3.x86_64", sizeof(enginePath) - 1);
+	char *lastSep = strrchr(execPath, PATH_SEPARATOR);
+	if (!lastSep) {
+		lastSep = strrchr(execPath, PATH_SEPARATOR == '\\' ? '/' : '\\');
 	}
-	
+	if (lastSep) {
+		int len = lastSep - execPath;
+#ifdef _WIN32
+		snprintf(enginePath, sizeof(enginePath), "%.*s\\idtech3.x86_64.exe", len, execPath);
+#else
+		snprintf(enginePath, sizeof(enginePath), "%.*s/idtech3.x86_64", len, execPath);
+#endif
+	} else {
+#ifdef _WIN32
+		strncpy(enginePath, "idtech3.x86_64.exe", sizeof(enginePath) - 1);
+#else
+		strncpy(enginePath, "idtech3.x86_64", sizeof(enginePath) - 1);
+#endif
+	}
+
 	// Check if engine exists
 	if (!path_exists(enginePath)) {
 		// Try release directory
+#ifdef _WIN32
+		snprintf(enginePath, sizeof(enginePath), "release\\idtech3.x86_64.exe");
+#else
 		snprintf(enginePath, sizeof(enginePath), "release/idtech3.x86_64");
+#endif
 		if (!path_exists(enginePath)) {
 			fprintf(stderr, "Error: Engine binary not found: %s\n", enginePath);
+#ifdef _WIN32
+			fprintf(stderr, "  Expected: idtech3.x86_64.exe or release\\idtech3.x86_64.exe\n");
+#else
 			fprintf(stderr, "  Expected: idtech3.x86_64 or release/idtech3.x86_64\n");
+#endif
 			return 1;
 		}
 	}
