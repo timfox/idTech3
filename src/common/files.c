@@ -1,4 +1,5 @@
 #include "crash_handler.h"
+#include "files_validation.h"
 /*
 ===========================================================================
 Copyright (C) 1999-2005 Id Software, Inc.
