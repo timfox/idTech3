@@ -986,7 +986,7 @@ ENDIF()
 IF(USE_LUA)
 	TARGET_COMPILE_DEFINITIONS(common PRIVATE USE_LUA)
 	TARGET_INCLUDE_DIRECTORIES(common PRIVATE /usr/include/lua5.4)
-	# Note: Lua linking happens at the executable level
+	TARGET_LINK_LIBRARIES(common PRIVATE lua5.4)
 ENDIF()
 IF(USE_LUASQL)
 	TARGET_COMPILE_DEFINITIONS(common PRIVATE USE_LUASQL)
@@ -1018,7 +1018,7 @@ ENDIF()
 IF(USE_LUA)
 	TARGET_COMPILE_DEFINITIONS(common_ded PRIVATE USE_LUA)
 	TARGET_INCLUDE_DIRECTORIES(common_ded PRIVATE /usr/include/lua5.4)
-	# Note: Lua linking happens at the executable level
+	TARGET_LINK_LIBRARIES(common_ded PRIVATE lua5.4)
 ENDIF()
 IF(USE_LUASQL)
 	TARGET_COMPILE_DEFINITIONS(common_ded PRIVATE USE_LUASQL)
@@ -1429,8 +1429,7 @@ SET(RENDERER_VK_SRCS
 	src/renderers/vulkan/tr_cmds.c
 	src/renderers/vulkan/tr_curve.c
 	src/renderers/vulkan/tr_image.c
-	src/renderers/vulkan/tr_init.c
-	src/renderers/vulkan/tr_entry.cpp
+	src/renderers/vulkan/tr_entry.c
 	src/renderers/vulkan/tr_light.c
 	src/renderers/vulkan/tr_lightclusters.c
 	src/renderers/vulkan/tr_main.c
@@ -2656,9 +2655,7 @@ TARGET_INCLUDE_DIRECTORIES(${CNAME}${BINEXT} PRIVATE src/common src)
 IF(USE_UI2)
 	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE ui2)
 ENDIF()
-IF(Lua_FOUND)
-	TARGET_LINK_LIBRARIES(${CNAME}${BINEXT} PRIVATE lua5.4)
-ENDIF()
+# Lua linking is handled at the common library level
 
 # Non-SDL UNIX UI code (src/unix/linux_glimp.c, etc.) depends on X11 symbols.
 if(UNIX AND NOT USE_SDL)
@@ -3669,11 +3666,7 @@ TARGET_INCLUDE_DIRECTORIES(${DNAME}${BINEXT} PRIVATE src/common)
 		ENDIF()
 	ENDIF()
 
-IF(USE_LUA)
-	IF(Lua_FOUND)
-		TARGET_LINK_LIBRARIES(${DNAME}${BINEXT} PRIVATE lua5.4)
-	ENDIF()
-ENDIF()
+# Lua linking is handled at the common_ded library level
 
 	IF(USE_ASSIMP)
 		IF(ASSIMP_FOUND AND ASSIMP_LIBRARIES)
