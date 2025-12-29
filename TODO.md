@@ -36,3 +36,7 @@
 ## Engine Window Enhancements
 - [ ] **Add qt**: Add C++ qt
 - [ ] **Upgrade Window security**: Replace X11 with Wayland support
+
+## Refactor
+- [ ] **Modernize to C23 and C++23:** Update the game engine code to meet C23 and C++23 standards
+- [ ] **Port everything to C++23:** Refactor C code into C++
