@@ -12,6 +12,7 @@
 - [ ] **Mesh Shaders**: Implementation for modern GPU geometry pipelines.
 - [ ] **Material System**: Layered materials and procedural shader support.
 - [x] **Dynamic Resolution**: Runtime resolution scaling for performance stability.
+- [ ] **Bench enhancement**: Add per-iteration timings, memory metrics, and time-series dashboards; include parsing tools and CI publishing for bench_timeseries.jsonl and bench.csv.
 
 ## Filesystem & Assets
 - [ ] **Virtual FS v2**: Improved mount table and priority system.
