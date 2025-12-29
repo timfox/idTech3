@@ -10,6 +10,7 @@ Contains definitions for advanced post-processing effects including:
 - Motion blur (velocity tiles)
 - 3D LUT color grading
 - Heat distortion/volumetrics
+- Raymarching (distance fields and volumetrics)
 =============================================================================
 */
 
@@ -34,6 +35,7 @@ typedef enum {
     PP_EFFECT_COLOR_GRADING = (1 << 5),
     PP_EFFECT_HEAT_DISTORTION = (1 << 6),
     PP_EFFECT_LENS_FLARE   = (1 << 7),
+    PP_EFFECT_RAYMARCHING  = (1 << 8),
 } postProcessEffect_t;
 
 // SSAO configuration

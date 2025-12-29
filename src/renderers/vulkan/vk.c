@@ -21,6 +21,7 @@ extern cvar_t *r_dither;
 extern cvar_t *r_vk_hotReload;
 #include "../../common/performance_counters.h"
 #include "vk.h"
+#include "vk_raymarching.h"
 #include <dlfcn.h>
 
 static inline void vk_debug_write(int fd, const char *msg, size_t len)
@@ -3729,6 +3730,11 @@ void vk_initialize( void )
 
 	// Initialize world effects system
 	vk_world_effects_init();
+
+	// Initialize raymarching system
+	if (!VK_Raymarching_Init()) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize raymarching\n");
+	}
 
 	ri.Printf(PRINT_ALL, "Vulkan: Initialized successfully\n");
 
@@ -8402,6 +8408,9 @@ void vk_shutdown( refShutdownCode_t code ) {
 
 			// Shutdown world effects system
 			vk_world_effects_shutdown();
+
+			// Shutdown raymarching system
+			VK_Raymarching_Shutdown();
 
 			// Shutdown ray tracing if enabled
 #ifdef USE_VULKAN_RAY_TRACING

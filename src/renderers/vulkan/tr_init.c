@@ -364,6 +364,25 @@ static void R_Register( void ) {
     r_volumetricFogAbsorption = ri.Cvar_Get( "r_volumetricFogAbsorption", "0.1", CVAR_ARCHIVE_ND );
     ri.Cvar_SetDescription( r_volumetricFogAbsorption, "Absorption coefficient for volumetric fog." );
 
+    // Raymarching settings
+    r_raymarching = ri.Cvar_Get( "r_vkRaymarching", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    ri.Cvar_SetDescription( r_raymarching, "Enable raymarching effects." );
+
+    r_raymarchingQuality = ri.Cvar_Get( "r_vkRaymarchingQuality", "64", CVAR_ARCHIVE_ND );
+    ri.Cvar_SetDescription( r_raymarchingQuality, "Raymarching quality (steps per ray)." );
+
+    r_raymarchingMaxDistance = ri.Cvar_Get( "r_vkRaymarchingMaxDistance", "100.0", CVAR_ARCHIVE_ND );
+    ri.Cvar_SetDescription( r_raymarchingMaxDistance, "Maximum raymarching distance." );
+
+    r_raymarchingEpsilon = ri.Cvar_Get( "r_vkRaymarchingEpsilon", "0.01", CVAR_ARCHIVE_ND );
+    ri.Cvar_SetDescription( r_raymarchingEpsilon, "Raymarching surface epsilon." );
+
+    r_raymarchingVolumetric = ri.Cvar_Get( "r_vkRaymarchingVolumetric", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    ri.Cvar_SetDescription( r_raymarchingVolumetric, "Enable volumetric raymarching (fog/clouds)." );
+
+    r_raymarchingVolumetricDensity = ri.Cvar_Get( "r_vkRaymarchingVolumetricDensity", "0.1", CVAR_ARCHIVE_ND );
+    ri.Cvar_SetDescription( r_raymarchingVolumetricDensity, "Volumetric raymarching density." );
+
     r_dlss = ri.Cvar_Get( "r_dlss", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
     r_dlss_quality = ri.Cvar_Get( "r_dlss_quality", "3", CVAR_ARCHIVE_ND );
     r_dlss_sharpening = ri.Cvar_Get( "r_dlss_sharpening", "0.5", CVAR_ARCHIVE_ND );
