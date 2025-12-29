@@ -19,6 +19,12 @@ if [[ -z "${WAYLAND_DISPLAY:-}" ]]; then
 fi
 
 LOG_FILE="$(mktemp /tmp/wayland-ci-XXXX.log)"
+ # Determine metrics artifact path (CI only)
+if [ -n "${GITHUB_WORKSPACE:-}" ]; then
+  METRICS_OUTPUT="$GITHUB_WORKSPACE/vk_metrics.txt"
+else
+  METRICS_OUTPUT="/tmp/vk_metrics.txt"
+fi
 echo "CI log: ${LOG_FILE}"
 
 # Run the Vulkan client non-interactively, capture logs
@@ -63,5 +69,8 @@ echo "Test completed; inspecting for fallback messages..."
 grep -q "retrying with X11" "${LOG_FILE}" && echo "Fallback to X11 path detected." || echo "Fallback to X11 not detected."
 
 kill "${PID}" 2>/dev/null || true
+#
+# Persist metrics for triage (if possible)
+grep -E "VK_METRICS|pipeline_alloc|pipeline_lookup|surface_created|REPORT" "$LOG_FILE" > "$METRICS_OUTPUT" 2>/dev/null || true
 exit 0
 

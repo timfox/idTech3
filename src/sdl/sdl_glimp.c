@@ -1092,6 +1092,8 @@ VK_EXPORT void VKimp_Shutdown( qboolean unloadDLL )
 
 	if ( unloadDLL )
 		SDL_QuitSubSystem( SDL_INIT_VIDEO );
+	// Emit final Vulkan metrics snapshot before shutdown
+    vk_metrics_report();
 }
 #endif // USE_VULKAN
 

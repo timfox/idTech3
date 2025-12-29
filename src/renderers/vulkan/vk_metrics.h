@@ -4,6 +4,8 @@
 // These hooks are intentionally minimal to avoid impacting hot paths.
 
 void vk_metrics_increment_pipeline_alloc(void);
+void vk_metrics_increment_renderpass_alloc(uint32_t renderPassIndex, uint32_t pipeline_index);
+void vk_metrics_increment_pipeline_lookup(void);
 void vk_metrics_increment_surface_created(void);
 void vk_metrics_report(void);
 

@@ -21,4 +21,10 @@ jobs:
         run: bash scripts/ci_wayland_fallback.sh
         env:
           WAYLAND_DISPLAY: wayland-1
+      - name: Upload VK metrics artifact
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: vk-metrics
+          path: vk_metrics.txt
 

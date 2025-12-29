@@ -407,18 +407,28 @@ VkPipeline vk_find_pipeline_ext(int base_pipeline, Vk_Pipeline_Def* def, qboolea
 		return VK_NULL_HANDLE;
 	}
 
-	for (index = base_pipeline; index < vk.pipelines_count; index++) {
+ for (index = base_pipeline; index < vk.pipelines_count; index++) {
 		cur_def = &vk.pipelines[index].def;
 		if (memcmp(cur_def, def, sizeof(*def)) == 0) {
+			// record a lookup event for metrics
+			vk_metrics_increment_pipeline_lookup();
 			goto found;
 		}
 	}
 
-	index = vk_alloc_pipeline(def);
+index = vk_alloc_pipeline(def);
 	if (index == 0) {
 		ri.Printf(PRINT_ERROR, "vk_find_pipeline_ext: failed to allocate pipeline\n");
 		return VK_NULL_HANDLE;
 	}
+if (getenv("VK_VERBOSE_PIPELINE_LOGS")) {
+	ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext def_index=%u shader_type=%d cullType=%d\n", index, def->shader_type, def->cullType);
+}
+// Emit render-pass correlation metric for this allocation
+vk_metrics_increment_renderpass_alloc((uint32_t)vk.renderPassIndex, index);
+if (getenv("VK_VERBOSE_PIPELINE_LOGS")) {
+	ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext def_index=%u shader_type=%d cullType=%d\n", index, def->shader_type, def->cullType);
+}
 	if (getenv("VK_VERBOSE_PIPELINE_LOGS")) {
 		ri.Printf(PRINT_ALL, "DEBUG: Allocated def fields: shader_type=%d, cullType=%d, polygonOffset=%d, vk_pbr_flags=%d, fog_stage=%d, acff=%d, mirror=%d, shadow_phase=%d, line_width=%f, state_bits=%d, face_culling=%d, abs_light=%d, primitives=%d, color.rgb=%d, color.alpha=%d, normalScale=(%f,%f,%f,%f), specularScale=(%f,%f,%f,%f)\n",
 			def->shader_type, def->cullType, def->polygonOffset, def->vk_pbr_flags, def->fog_stage, def->acff, def->mirror, def->shadow_phase, def->line_width, def->state_bits, def->face_culling, def->abs_light, def->primitives, def->color.rgb, def->color.alpha, def->normalScale[0], def->normalScale[1], def->normalScale[2], def->normalScale[3], def->specularScale[0], def->specularScale[1], def->specularScale[2], def->specularScale[3]);
@@ -444,12 +454,12 @@ found:
 			ri.Printf(PRINT_ERROR, "vk_find_pipeline_ext: failed to generate pipeline %u\n", index);
 			return VK_NULL_HANDLE;
 		}
-		ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext generated pipeline handle=0x%llx (index=%u shader_type=%d)\n", (unsigned long long)pipeline, index, def->shader_type);
+	ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext generated pipeline handle=0x%llx (def_index=%u shader_type=%d)\n", (unsigned long long)pipeline, index, def->shader_type);
 		return pipeline;
 	}
 
 	VkPipeline pipeline = vk_gen_pipeline(index);
-	ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext returned existing pipeline handle=0x%llx (index=%u shader_type=%d)\n", (unsigned long long)pipeline, index, def->shader_type);
+	ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext returned existing pipeline handle=0x%llx (def_index=%u shader_type=%d)\n", (unsigned long long)pipeline, index, def->shader_type);
 	return pipeline;
 }
 
