@@ -142,6 +142,7 @@ Returns selected mod name or NULL for base game.
 =================
 */
 static const char *Launcher_SelectMod(const char *basePath, int argc, char **argv) {
+    (void)basePath;
 	int i;
 	
 	// Check command line for mod selection

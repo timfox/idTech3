@@ -3091,7 +3091,11 @@ static void init_vulkan_library( void )
 
 	ri.Printf(PRINT_ALL, "DEBUG: About to set vk.active = qtrue\n");
 	vk.active = qtrue;
-	ri.Printf(PRINT_ALL, "DEBUG: vk.active set successfully, init_vulkan_library ending\n");
+    ri.Printf(PRINT_ALL, "DEBUG: vk.active set successfully, init_vulkan_library ending\n");
+    vk_silent_init();
+    if (!vk_silent) {
+        ri.Printf(PRINT_ALL, "Startup renderer: Vulkan\n");
+    }
 }
 
 static void vk_create_pipeline_layouts(void) {

@@ -39,6 +39,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "qcommon.h"
 #include "files_internal.h"  // Internal type definitions (includes unzip.h)
 #include "files_v2.h"  // VFS v2 mount table
+#include "job_system.h"
 #ifndef _WIN32
 #include <stdio.h> // popen, pclose
 // Some libc headers may hide popen/pclose behind feature macros;
@@ -3047,6 +3048,7 @@ qboolean FS_FileIsInPAK( const char *filename, int *pChecksum, char *pakName ) {
 
 
 // Async file loading structures
+typedef struct job_handle_s job_handle_t;
 typedef struct async_load_s {
 	const char *filename;
 	void **buffer;

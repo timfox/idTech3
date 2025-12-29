@@ -84,6 +84,9 @@ ELSE()
     SET(CMAKE_C_STANDARD_REQUIRED OFF)  # Allow fallback for MSVC
     MESSAGE(STATUS "Using C17 standard (MSVC or other compiler)")
 ENDIF()
+
+# Dependency graph generation (optional)
+option(ENABLE_DEPENDENCY_GRAPH "Generate a Graphviz dependency graph" ON)
 SET(CMAKE_C_EXTENSIONS OFF)
 
 # Set C++17 as default for broad compatibility, C++23 for GCC/Clang
@@ -115,6 +118,18 @@ ELSEIF(MSVC)
 	ADD_COMPILE_OPTIONS(/W4)
 ENDIF()
 
+#
+#
+# Build optimizations toggle (default ON)
+
+## Enable AddressSanitizer by default unless explicitly disabled
+if(NOT DEFINED ENABLE_ASAN)
+  set(ENABLE_ASAN ON CACHE BOOL "Enable AddressSanitizer" FORCE)
+  message(STATUS "AddressSanitizer (ASan) enabled by default")
+endif()
+option(ENABLE_BUILD_OPTIMIZATION "Enable build optimizations" ON)
+#
+#
 # Sanitizer & coverage support (GCC/Clang only, requires debug build)
 IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
 	IF(ENABLE_ASAN)
@@ -2067,6 +2082,12 @@ ENDIF()
 
 
 # Theora video codec support
+if(EXISTS "${CMAKE_SOURCE_DIR}/src/ui2/dummy.c")
+  # Attach the dummy UI2 implementation to the ui2 target if present
+  if(TARGET ui2)
+    target_sources(ui2 PRIVATE src/ui2/dummy.c)
+  endif()
+endif()
 IF(USE_THEORA)
 	# Try pkg-config first (common on Linux)
 	find_package(PkgConfig QUIET)
@@ -3782,7 +3803,7 @@ IF(BUILD_TESTS)
 		src/common/files.c
 		src/common/common.c
 	)
-	TARGET_LINK_LIBRARIES(test_integration PRIVATE ${CMAKE_DL_LIBS} m)
+    TARGET_LINK_LIBRARIES(test_integration PRIVATE ${CMAKE_DL_LIBS} m common qmath)
 	TARGET_INCLUDE_DIRECTORIES(test_integration PRIVATE
 		${CMAKE_SOURCE_DIR}/src
 		${CMAKE_SOURCE_DIR}/src/tests
@@ -3793,12 +3814,11 @@ IF(BUILD_TESTS)
 	)
 
 	# Performance tests
-	ADD_EXECUTABLE(test_performance
-		src/tests/test_performance.c
-		src/common/q_shared.c
-		src/common/q_math.c
-	)
-	TARGET_LINK_LIBRARIES(test_performance PRIVATE ${CMAKE_DL_LIBS} m)
+ADD_EXECUTABLE(test_performance
+	src/tests/test_performance.c
+	src/common/q_shared.c
+)
+TARGET_LINK_LIBRARIES(test_performance PRIVATE ${CMAKE_DL_LIBS} m common)
 	TARGET_INCLUDE_DIRECTORIES(test_performance PRIVATE
 		${CMAKE_SOURCE_DIR}/src
 		${CMAKE_SOURCE_DIR}/src/tests

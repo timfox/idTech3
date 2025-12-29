@@ -48,6 +48,10 @@ static int benchmarkCapacity = 0;
 Benchmark_Init
 ==================
 */
+// Forward declarations for benchmarks
+void Benchmark_Init(void);
+void Benchmark_Shutdown(void);
+void Benchmark_RunAll(void);
 void Benchmark_Init(void) {
     benchmarkCapacity = 32;
     benchmarkResults = (benchmarkResult_t*)malloc(sizeof(benchmarkResult_t) * benchmarkCapacity);
