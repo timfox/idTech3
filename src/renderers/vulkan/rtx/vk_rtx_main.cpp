@@ -333,6 +333,30 @@ struct RTXState {
             inFlightFences.emplace_back(std::make_unique<VulkanFence>(device, VK_FENCE_CREATE_SIGNALED_BIT));
         }
     }
+    
+    // Centralized cleanup of all RAII-managed Vulkan resources
+    void CleanupResources() noexcept {
+        vertexBuffer.reset();
+        indexBuffer.reset();
+        uniformBuffer.reset();
+        colorImage.reset();
+        depthImage.reset();
+        vertexShader.reset();
+        fragmentShader.reset();
+        graphicsPipeline.reset();
+        descriptorPool.reset();
+        commandPool.reset();
+
+        imageAvailableSemaphores.clear();
+        renderFinishedSemaphores.clear();
+        inFlightFences.clear();
+
+        // Reset lifecycle state
+        initialized = false;
+        // Do not alter mode here; allow caller to decide whether to reinitialize
+        frame_count = 0;
+        frame_time = 0.0f;
+    }
 };
 
 // Backwards compatibility typedef
@@ -591,6 +615,32 @@ qboolean RTX_Init(void)
 }
 
 /*
+========================
+RTX_SwitchMode
+Switch RTX rendering mode with proper cleanup of existing resources.
+This does not perform full reinitialization; it marks a mode change
+and leaves resource reinitialization to the next init/activation.
+========================
+*/
+void RTX_SwitchMode(int newMode)
+{
+    if (rtx.mode == newMode) {
+        return;
+    }
+    // If currently initialized, perform a clean teardown of RAII resources
+    if (rtx.initialized) {
+        rtx.CleanupResources();
+    }
+    rtx.mode = newMode;
+    // Resources will be reinitialized lazily on next Init or first render path
+    // Minimal reinitialization for non-GPU subsystems to complete the mode-change lifecycle
+    PathTracer_Shutdown();
+    PathTracer_Init();
+    Denoiser_Shutdown();
+    Denoiser_Init();
+}
+
+/*
 ===============
 RTX_Shutdown
 
@@ -605,6 +655,11 @@ void RTX_Shutdown(refShutdownCode_t code)
     if (!rtx.initialized) {
         return;
     }
+
+    // Ensure all RAII-managed resources are cleaned up in a single place.
+    // This guarantees a consistent teardown even if resources were partially
+    // initialized or if mode switching occurred previously.
+    rtx.CleanupResources();
 
     // Shutdown in reverse order
     if (rtx.fsr_enabled) {
@@ -674,6 +729,12 @@ Begin a new frame
 */
 void RTX_BeginFrame(stereoFrame_t stereoFrame)
 {
+    // Detect RTX mode changes from CVAR and apply safe transition
+    static int g_lastRtxMode = -1;
+    if (r_rtx_mode && r_rtx_mode->integer != g_lastRtxMode) {
+        RTX_SwitchMode(r_rtx_mode->integer);
+        g_lastRtxMode = r_rtx_mode->integer;
+    }
     (void)stereoFrame; // Mark as unused for now
 
     if (!rtx.initialized) {

@@ -1,0 +1,75 @@
+name: Renderer Bench CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build -- -j
+
+      - name: Run benchmarks
+        run: ./build/renderer_bench > bench.log 2>&1
+      - name: Rename bench.csv to bench_${GITHUB_SHA:0:7}.csv
+        shell: bash
+        run: |
+          if [ -f bench.csv ]; then
+            mv bench.csv bench_${GITHUB_SHA:0:7}.csv
+          fi
+      - name: Upload timestamped bench CSV
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: renderer_bench_csv_timestamped
+          path: bench_${GITHUB_SHA:0:7}.csv
+      - name: Upload bench_summary.json
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: renderer_bench_summary
+          path: bench_summary.json
+      - name: Generate bench.csv from bench.json
+        run: |
+          if [ -f bench.json ]; then
+            python3 tools/bench_json_to_csv.py bench.json > bench.csv
+          else
+            echo "bench.json not found; skipping CSV generation"
+          fi
+      - name: Upload bench.csv
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: renderer_bench_csv
+          path: bench.csv
+      - name: Upload bench_timeseries_jsonl
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: renderer_bench_timeseries_jsonl
+          path: bench_timeseries.jsonl
+      - name: Upload bench.json
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: renderer_bench_json
+          path: bench.json
+
+      - name: Show log
+        run: tail -n +1 bench.log | sed -n '1,200p'
+
+      - name: Upload bench log
+        uses: actions/upload-artifact@v3
+        with:
+          name: renderer_bench_log
+          path: bench.log

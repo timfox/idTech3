@@ -3921,6 +3921,30 @@ IF(BUILD_TESTS)
 	ADD_EXECUTABLE(test_renderer_init
 		src/tests/test_renderer_init.c
 	)
+ADD_EXECUTABLE(test_renderer_abstraction_usage_mock
+	src/tests/test_renderer_abstraction_usage_mock.c
+)
+ADD_EXECUTABLE(test_renderer_abstraction_wrappers
+	src/tests/test_renderer_abstraction_wrappers.cpp
+)
+TARGET_LINK_LIBRARIES(test_renderer_abstraction_wrappers PRIVATE ${CMAKE_DL_LIBS})
+TARGET_INCLUDE_DIRECTORIES(test_renderer_abstraction_wrappers PRIVATE
+	${CMAKE_SOURCE_DIR}/src
+	${CMAKE_SOURCE_DIR}/src/tests
+)
+ADD_TEST(NAME test_renderer_abstraction_wrappers COMMAND test_renderer_abstraction_wrappers)
+SET_TARGET_PROPERTIES(test_renderer_abstraction_wrappers PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
+TARGET_LINK_LIBRARIES(test_renderer_abstraction_usage_mock PRIVATE ${CMAKE_DL_LIBS})
+TARGET_INCLUDE_DIRECTORIES(test_renderer_abstraction_usage_mock PRIVATE
+	${CMAKE_SOURCE_DIR}/src
+	${CMAKE_SOURCE_DIR}/src/tests
+)
+ADD_TEST(NAME test_renderer_abstraction_usage_mock COMMAND test_renderer_abstraction_usage_mock)
+SET_TARGET_PROPERTIES(test_renderer_abstraction_usage_mock PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
 	TARGET_LINK_LIBRARIES(test_renderer_init PRIVATE ${CMAKE_DL_LIBS})
 	TARGET_INCLUDE_DIRECTORIES(test_renderer_init PRIVATE
 		${CMAKE_SOURCE_DIR}/src
@@ -3967,3 +3991,5 @@ ADD_EXECUTABLE(idtech3_launcher src/launcher/launcher_main.c)
 SET_TARGET_PROPERTIES(idtech3_launcher PROPERTIES
 	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
+
+add_subdirectory(src/benchmarks)
