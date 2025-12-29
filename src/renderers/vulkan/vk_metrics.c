@@ -38,3 +38,14 @@ void vk_metrics_report(void) {
     }
 }
 
+void vk_metrics_increment_renderpass_alloc(uint32_t renderPassIndex, uint32_t pipeline_index) {
+    (void)pipeline_index; // currently unused in per-pass accounting, reserved for future correlation
+    if (renderPassIndex < (uint32_t)RENDER_PASS_COUNT) {
+        g_renderpass_alloc_counts[renderPassIndex]++;
+        // Periodic micro-log for visibility
+        if ((g_renderpass_alloc_counts[renderPassIndex] % 1000) == 0) {
+            fprintf(stderr, "[VK_METRICS] renderpass_alloc[%u] (pipeline_index=%u) count=%llu\n",
+                    renderPassIndex, pipeline_index, g_renderpass_alloc_counts[renderPassIndex]);
+        }
+    }
+}

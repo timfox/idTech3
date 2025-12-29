@@ -102,6 +102,17 @@ extern int setenv( const char *name, const char *value, int overwrite );
 // Modern C23/C++23 safety features for Vulkan renderer
 static void vk_create_descriptor_set_layouts(void);
 static void vk_create_pipeline_layouts(void);
+static qboolean vk_silent_initialized = qfalse;
+static qboolean vk_silent = qfalse;
+static void vk_silent_init(void)
+{
+    if (vk_silent_initialized) return;
+    vk_silent_initialized = qtrue;
+    #ifdef IDTECH3_VULKAN_SILENT
+    const char *env = getenv("IDTECH3_VULKAN_SILENT");
+    if (env && *env) vk_silent = qtrue;
+    #endif
+}
 #include <assert.h>
 
 // Static assertions for Vulkan safety
@@ -2335,9 +2346,12 @@ static void init_vulkan_library( void )
 	// Global vk instance is zero-initialized by default. 
 	// Do not use Com_Memset here if it contains complex C++ types like atomics.
 
+        vk_silent_init();
         vk_debug_write(2, "DEBUG: Entering init_vulkan_library\n", 36);
-	vk_safety_checks();
+    vk_safety_checks();
+    if (!vk_silent) {
         vk_debug_write(2, "DEBUG: Returned from vk_safety_checks\n", 38);
+    }
 
 #ifdef USE_VULKAN
         vk_debug_write(2, "DEBUG: Checking r_vk_icd\n", 25);
@@ -2471,7 +2485,7 @@ static void init_vulkan_library( void )
 	}
 
 	fprintf(stderr, ".......................\nAvailable physical devices:\n" );
-        for ( uint32_t i = 0; i < device_count; i++ ) {
+       for ( uint32_t i = 0; i < device_count; i++ ) {
 		qvkGetPhysicalDeviceProperties( physical_devices[ i ], &props );
 		fprintf(stderr, " %i: %s\n", i, renderer_name( &props ) );
 		if ( device_index == -1 && props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ) {
@@ -2481,6 +2495,24 @@ static void init_vulkan_library( void )
 		}
 	}
 	fprintf(stderr, ".......................\n" );
+
+	// Startup GPU sanity check: ensure we actually have a GPU device (not CPU fallback)
+	{
+		int has_gpu = 0;
+		for (uint32_t i = 0; i < device_count; ++i) {
+			VkPhysicalDeviceProperties p;
+			qvkGetPhysicalDeviceProperties(physical_devices[i], &p);
+			if (p.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ||
+			    p.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU) {
+				has_gpu = 1;
+				break;
+			}
+		}
+		if (!has_gpu) {
+			ri.Printf(PRINT_WARNING, "Vulkan: No suitable GPU detected. Falling back to non-Vulkan path.\n");
+			vk.active = qfalse;
+		}
+	}
 
 	vk.physical_device = VK_NULL_HANDLE;
 	{
@@ -5050,7 +5082,14 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	create_info.basePipelineHandle = VK_NULL_HANDLE;
 	create_info.basePipelineIndex = -1;
 
-	VK_CHECK( qvkCreateGraphicsPipelines( vk.device, VK_NULL_HANDLE, 1, &create_info, NULL, pipeline ) );
+{
+    VkResult pipeline_res = qvkCreateGraphicsPipelines( vk.device, VK_NULL_HANDLE, 1, &create_info, NULL, pipeline );
+    if (pipeline_res != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "Vulkan: Failed to allocate graphics pipeline (def_index=%d, pass=%u, shader_type=%d), result=%d\n",
+                  def_index, renderPassIndex, def->shader_type, (int)pipeline_res);
+        return VK_NULL_HANDLE;
+    }
+}
 
 	SET_OBJECT_NAME( *pipeline, pipeline_name, VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 }

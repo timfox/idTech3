@@ -48,7 +48,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 
 #include "../client/client.h"
-#include "vk_metrics.h"
+#include "../renderers/vulkan/vk_metrics.h"
 #include "../renderers/renderercommon/tr_public.h"
 #include "sdl_glw.h"
 #include "sdl_icon.h"

@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_main.c  -- client main loop
 
 #include "client.h"
+#include "history.h"
 #ifdef USE_SDL
 #include "../sdl/sdl_glw.h"
 #endif
@@ -3396,6 +3397,10 @@ static void CL_InitRenderer( void ) {
 	} else {
 		fprintf(stderr, "DEBUG: cl_renderer already exists: %s\n", cl_renderer->string );
 	}
+
+	// Ensure console history file exists on startup to avoid read failures
+	// in history.c during initial user input load.
+	Con_EnsureHistoryFileExists();
 
 	// Back-compat: some scripts/users use "+set r_renderer <name>".
 	// Treat it as an alias for cl_renderer.

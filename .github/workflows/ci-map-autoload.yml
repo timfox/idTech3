@@ -1,0 +1,26 @@
+name: Map Autoload CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  map-autoload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip xvfb
+      - name: Build Vulkan target
+        run: |
+          ./tools/compile_engine.sh vulkan clean
+      - name: Run map autoload test
+        run: |
+          bash -eux ./scripts/ci_map_autoload.sh
+      - name: Upload map autoload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vk-map-autoload
+          path: ci_map_autoload.log

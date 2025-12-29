@@ -3,6 +3,24 @@
 #include "q_shared.h"
 #include "qcommon.h"
 
+// Ensure the console history file exists on startup for first-run usability.
+void Con_EnsureHistoryFileExists( void )
+{
+    // Attempt to open for writing; this will create the file if it doesn't exist.
+    fileHandle_t f = FS_FOpenFileWrite( CONSOLE_HISTORY_FILE );
+    if ( f == FS_INVALID_HANDLE ) {
+        // If creation failed, try a best-effort diagnostic message.
+        Com_Printf( "Couldn't create console history file %s on startup.\n", CONSOLE_HISTORY_FILE );
+        return;
+    }
+    // Write a single newline to initialize the file if empty
+    const char *newline = "\n";
+    if ( FS_Write( newline, 1, f ) < 1 ) {
+        Com_Printf( "Couldn't initialize console history file %s on startup.\n", CONSOLE_HISTORY_FILE );
+    }
+    FS_FCloseFile( f );
+}
+
 static      qboolean historyLoaded = qfalse;
 
 #define     COMMAND_HISTORY 32
@@ -147,12 +165,23 @@ static void Con_LoadHistory( void )
 		Field_Clear( &historyEditLines[i] );
 	}
 
-	consoleSaveBufferSize = FS_Home_FOpenFileRead( CONSOLE_HISTORY_FILE, &f );
-	if ( f == FS_INVALID_HANDLE )
-	{
-		Com_Printf( "Couldn't read %s.\n", CONSOLE_HISTORY_FILE );
-		return;
-	}
+    consoleSaveBufferSize = FS_Home_FOpenFileRead( CONSOLE_HISTORY_FILE, &f );
+    if ( f == FS_INVALID_HANDLE )
+    {
+        // If history file doesn't exist yet, initialize an empty history.
+        // This ensures startup doesn't fail due to missing history.
+        Con_ResetHistory();
+        // Try to create an empty history file on first run for future starts.
+        fileHandle_t f_create = FS_FOpenFileWrite( CONSOLE_HISTORY_FILE );
+        if ( f_create != FS_INVALID_HANDLE ) {
+            const char *emptyLine = "\n";
+            (void)FS_Write( emptyLine, 1, f_create );
+            FS_FCloseFile( f_create );
+        } else {
+            Com_Printf( "Couldn't create %s on startup.\n", CONSOLE_HISTORY_FILE );
+        }
+        return;
+    }
 
 	if ( consoleSaveBufferSize < MAX_CONSOLE_SAVE_BUFFER &&
 			FS_Read( consoleSaveBuffer, consoleSaveBufferSize, f ) == consoleSaveBufferSize )
