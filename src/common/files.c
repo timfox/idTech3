@@ -472,7 +472,7 @@ void FS_PreloadCriticalResources_Disabled(void) {
 }
 #endif
 
-// Case-insensitive file lookups (TODO: Address case sensitivity issues)
+// Case-insensitive file lookups
 static	cvar_t		*fs_caseInsensitive;	// Enable case-insensitive file lookups
 
 // Path Normalization Cache (Performance improvement)
@@ -1842,7 +1842,7 @@ qboolean FS_FilenameCompare( const char *s1, const char *s2 ) {
 
 /*
 ===========
-FS_FindFileCaseInsensitive (TODO: Address case sensitivity)
+FS_FindFileCaseInsensitive
 
 Find a file in a directory using case-insensitive matching.
 Given a full path that failed to open, try to find the file case-insensitively.
@@ -2537,7 +2537,7 @@ extern qboolean		com_fullyInitialized;
 				netpath = FS_BuildOSPath( dir->path, dir->gamedir, filename );
 				temp = Sys_FOpen( netpath, "rb" );
 				
-				// TODO: Case-insensitive file lookup
+				// Case-insensitive file lookup fallback
 				if ( temp == NULL && fs_caseInsensitive && fs_caseInsensitive->integer ) {
 					if ( FS_FindFileCaseInsensitive( netpath, filename ) ) {
 						temp = Sys_FOpen( netpath, "rb" );
@@ -2608,7 +2608,7 @@ extern qboolean		com_fullyInitialized;
 
 			temp = Sys_FOpen( netpath, "rb" );
 			
-			// TODO: Case-insensitive file lookup - if direct open fails and case-insensitive is enabled, try case-insensitive match
+			// Case-insensitive file lookup fallback - if direct open fails and case-insensitive is enabled, try case-insensitive match
 			if ( temp == NULL && fs_caseInsensitive && fs_caseInsensitive->integer ) {
 				if ( FS_FindFileCaseInsensitive( netpath, filename ) ) {
 					temp = Sys_FOpen( netpath, "rb" );
