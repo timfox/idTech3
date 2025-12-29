@@ -3758,5 +3758,18 @@ IF(BUILD_TESTS)
 		RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 	)
 
-	MESSAGE(STATUS "Tests enabled: test_qcommon")
+	ADD_EXECUTABLE(test_renderer_init
+		src/tests/test_renderer_init.c
+	)
+	TARGET_LINK_LIBRARIES(test_renderer_init PRIVATE ${CMAKE_DL_LIBS})
+	TARGET_INCLUDE_DIRECTORIES(test_renderer_init PRIVATE
+		${CMAKE_SOURCE_DIR}/src
+		${CMAKE_SOURCE_DIR}/src/tests
+	)
+	ADD_TEST(NAME test_renderer_init COMMAND test_renderer_init)
+	SET_TARGET_PROPERTIES(test_renderer_init PROPERTIES
+		RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+	)
+
+	MESSAGE(STATUS "Tests enabled: test_qcommon, test_qmath, test_info, test_msg_secure, test_renderer_init")
 ENDIF()

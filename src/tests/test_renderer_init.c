@@ -7,7 +7,7 @@
 
 int main(void) {
     printf("Renderer Init Test: Vulkan backend loading\n");
-    void *lib = dlopen("./build/idtech3_vulkan_x86_64.so", RTLD_LAZY);
+    void *lib = dlopen("./idtech3_vulkan_x86_64.so", RTLD_LAZY);
     if (!lib) {
         printf("  ❌ Failed to load Vulkan renderer library: %s\n", dlerror());
         return 1;

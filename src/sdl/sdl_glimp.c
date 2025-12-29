@@ -629,7 +629,9 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 
 	SDL_WarpMouseInWindow( SDL_window, glw_state.window_width / 2, glw_state.window_height / 2 );
 
-	return RSERR_OK;
+    // Expose the final render path after attempting startup (Vulkan vs OpenGL)
+    Com_Printf("Renderer startup final path: %s\n", (s_last_vulkan ? "vulkan" : "opengl"));
+    return RSERR_OK;
 }
 
 
@@ -714,6 +716,10 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 	}
 
 	err = GLW_SetMode( mode, modeFS, fullscreen, vulkan );
+	// If window creation succeeded, emit a diagnostic log to confirm visibility
+	if ( err == RSERR_OK ) {
+		Com_Printf( "SDL window created: mode=%d fullscreen=%d vulkan=%d\n", mode, fullscreen, vulkan );
+	}
 	if ( err == RSERR_FATAL_ERROR ) {
 		// Wayland can successfully initialize, but window/context/surface creation may fail
 		// on some compositor/driver combinations. In that case, fall back to X11 if possible.
