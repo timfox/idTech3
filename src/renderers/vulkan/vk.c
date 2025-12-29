@@ -5082,14 +5082,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	create_info.basePipelineHandle = VK_NULL_HANDLE;
 	create_info.basePipelineIndex = -1;
 
-{
-    VkResult pipeline_res = qvkCreateGraphicsPipelines( vk.device, VK_NULL_HANDLE, 1, &create_info, NULL, pipeline );
-    if (pipeline_res != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "Vulkan: Failed to allocate graphics pipeline (def_index=%d, pass=%u, shader_type=%d), result=%d\n",
-                  def_index, renderPassIndex, def->shader_type, (int)pipeline_res);
-        return VK_NULL_HANDLE;
-    }
-}
+VK_CHECK( qvkCreateGraphicsPipelines( vk.device, VK_NULL_HANDLE, 1, &create_info, NULL, pipeline ) );
 
 	SET_OBJECT_NAME( *pipeline, pipeline_name, VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 }

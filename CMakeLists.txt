@@ -1,4 +1,6 @@
-target_sources(idtech3.x86_64 PRIVATE src/client/auto_map_startup.c)
+if(TARGET idtech3.x86_64)
+  target_sources(idtech3.x86_64 PRIVATE src/client/auto_map_startup.c)
+endif()
 # ==============================================================================
 # id Tech 3 Build System - CMake Configuration
 # ==============================================================================
