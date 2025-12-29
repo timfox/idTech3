@@ -3720,13 +3720,13 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 				Com_Printf( S_COLOR_YELLOW "Note: Fell back from requested renderer '%s' to '%s'\n", rendererName, tryRenderer );
 				Com_Printf( S_COLOR_YELLOW "  (This is normal if the requested renderer is unavailable)\n" );
 			}
-		} else {
-			const char *error = Sys_LibraryError();
-			Com_Printf( S_COLOR_YELLOW "  Failed to load renderer: %s\n", tryRenderer );
-			if (error && *error) {
-				Com_Printf( S_COLOR_YELLOW "  Error: %s\n", error );
-			}
-			Com_Printf( S_COLOR_YELLOW "  Path attempted: %s\n", ospath );
+        } else {
+            const char *error = NULL;
+            Com_Printf( S_COLOR_YELLOW "  Failed to load renderer: %s\n", tryRenderer );
+            if (error && *error) {
+                Com_Printf( S_COLOR_YELLOW "  Error: %s\n", error );
+            }
+            Com_Printf( S_COLOR_YELLOW "  Path attempted: %s\n", ospath );
 			if (i == 0) { // Only print this if it's the first attempt (requested renderer)
 				Com_Printf( "Requested renderer %s failed to load, trying fallbacks\n", rendererName );
 			}
