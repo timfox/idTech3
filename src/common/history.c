@@ -10,8 +10,26 @@ void Con_EnsureHistoryFileExists( void );
 // Ensure the console history file exists on startup for first-run usability.
 void Con_EnsureHistoryFileExists( void )
 {
-    // History directory creation is OS-specific and FS_CreatePath is internal to files.c.
-    // We avoid calling it here to maintain a clean compile across translations units.
+    // Create the history directory structure if it doesn't exist
+    const char *homePath = FS_GetHomePath();
+    const char *gameDir = FS_GetCurrentGameDir();
+
+    if (homePath && gameDir && *homePath && *gameDir) {
+        char historyDir[MAX_OSPATH];
+        char fullPath[MAX_OSPATH];
+
+        // Construct the history directory path: home/game/
+        Com_sprintf(historyDir, sizeof(historyDir), "%s/%s", homePath, gameDir);
+
+        // Create the directory structure
+        Sys_Mkdir(historyDir);
+
+        // Construct full path to history file for verification
+        Com_sprintf(fullPath, sizeof(fullPath), "%s/%s", historyDir, CONSOLE_HISTORY_FILE);
+
+        Com_DPrintf("Ensuring console history file exists: %s\n", fullPath);
+    }
+
     // Attempt to open for writing; this will create the file if it doesn't exist.
     fileHandle_t f = FS_FOpenFileWrite( CONSOLE_HISTORY_FILE );
     if ( f == FS_INVALID_HANDLE ) {
@@ -19,12 +37,15 @@ void Con_EnsureHistoryFileExists( void )
         Com_Printf( "Couldn't create console history file %s on startup.\n", CONSOLE_HISTORY_FILE );
         return;
     }
+
     // Write a single newline to initialize the file if empty
     const char *newline = "\n";
     if ( FS_Write( newline, 1, f ) < 1 ) {
         Com_Printf( "Couldn't initialize console history file %s on startup.\n", CONSOLE_HISTORY_FILE );
     }
     FS_FCloseFile( f );
+
+    Com_DPrintf("Console history file ready\n");
 }
 
 static      qboolean historyLoaded = qfalse;

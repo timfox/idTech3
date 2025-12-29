@@ -508,11 +508,37 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 				SDL_GL_SetAttribute( SDL_GL_ACCELERATED_VISUAL, 1 );
 		}
 
+		// Attempt window creation with detailed diagnostics
+		Com_DPrintf( "Attempting to create window: %dx%d at (%d,%d), fullscreen=%d, vulkan=%d\n",
+		            config->vidWidth, config->vidHeight, x, y, fullscreen, vulkan );
+
 		if ( ( SDL_window = SDL_CreateWindow( cl_title, x, y, config->vidWidth, config->vidHeight, flags ) ) == NULL )
 		{
-			Com_DPrintf( "SDL_CreateWindow failed: %s\n", SDL_GetError() );
+			const char* sdlError = SDL_GetError();
+			Com_Printf( S_COLOR_RED "ERROR: SDL_CreateWindow failed: %s\n", sdlError );
+			Com_Printf( S_COLOR_YELLOW "Window creation parameters:\n" );
+			Com_Printf( S_COLOR_YELLOW "  Title: %s\n", cl_title );
+			Com_Printf( S_COLOR_YELLOW "  Position: (%d, %d)\n", x, y );
+			Com_Printf( S_COLOR_YELLOW "  Size: %dx%d\n", config->vidWidth, config->vidHeight );
+			Com_Printf( S_COLOR_YELLOW "  Fullscreen: %d\n", fullscreen );
+			Com_Printf( S_COLOR_YELLOW "  Vulkan: %d\n", vulkan );
+			Com_Printf( S_COLOR_YELLOW "  Flags: 0x%08x\n", flags );
+
+			// Provide helpful suggestions based on error
+			if (strstr(sdlError, "wayland") || strstr(sdlError, "Wayland")) {
+				Com_Printf( S_COLOR_YELLOW "Suggestion: Try setting SDL_VIDEODRIVER=x11\n" );
+				Com_Printf( S_COLOR_YELLOW "Or run: export SDL_VIDEODRIVER=x11\n" );
+			} else if (strstr(sdlError, "No available displays")) {
+				Com_Printf( S_COLOR_YELLOW "Suggestion: Check display connection and X11/Wayland setup\n" );
+			} else if (strstr(sdlError, "Could not initialize OpenGL")) {
+				Com_Printf( S_COLOR_YELLOW "Suggestion: Update graphics drivers or try software rendering\n" );
+			}
+
 			continue;
 		}
+
+		// Window created successfully - log details
+		Com_DPrintf( "SDL window created successfully\n" );
 
 		if ( fullscreen )
 		{

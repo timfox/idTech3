@@ -2849,28 +2849,28 @@ void RE_LoadWorldMap( const char *name ) {
 
 		if (0)
 		{
-			int i;
-			byte *buffer = ri.Malloc(w->lightGridBounds[0] * w->lightGridBounds[1] * 3 + 18);
+			int grid_i;
+			byte *grid_buffer = ri.Malloc(w->lightGridBounds[0] * w->lightGridBounds[1] * 3 + 18);
 			byte *out;
 			uint8_t *in;
 			char fileName[MAX_QPATH];
 			
-			Com_Memset (buffer, 0, 18);
-			buffer[2] = 2;		// uncompressed type
-			buffer[12] = w->lightGridBounds[0] & 255;
-			buffer[13] = w->lightGridBounds[0] >> 8;
-			buffer[14] = w->lightGridBounds[1] & 255;
-			buffer[15] = w->lightGridBounds[1] >> 8;
-			buffer[16] = 24;	// pixel size
+			Com_Memset (grid_buffer, 0, 18);
+			grid_buffer[2] = 2;		// uncompressed type
+			grid_buffer[12] = w->lightGridBounds[0] & 255;
+			grid_buffer[13] = w->lightGridBounds[0] >> 8;
+			grid_buffer[14] = w->lightGridBounds[1] & 255;
+			grid_buffer[15] = w->lightGridBounds[1] >> 8;
+			grid_buffer[16] = 24;	// pixel size
 
 			in = primaryLightGrid;
-			for (i = 0; i < w->lightGridBounds[2]; i++)
+			for (grid_i = 0; grid_i < w->lightGridBounds[2]; grid_i++)
 			{
 				int j;
 
-				sprintf(fileName, "primarylg%d.tga", i);
+				sprintf(fileName, "primarylg%d.tga", grid_i);
 
-				out = buffer + 18;
+				out = grid_buffer + 18;
 				for (j = 0; j < w->lightGridBounds[0] * w->lightGridBounds[1]; j++)
 				{
 					if (*in == 1)

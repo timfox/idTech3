@@ -3392,8 +3392,8 @@ static void CL_InitRenderer( void ) {
 		//   +set cl_renderer vulkan
 		// or the legacy alias:
 		//   +set r_renderer vulkan
-		cl_renderer = Cvar_Get( "cl_renderer", "opengl", CVAR_ARCHIVE | CVAR_LATCH );
-		Cvar_SetDescription( cl_renderer, "Sets your desired renderer, requires \\vid_restart." );
+		cl_renderer = Cvar_Get( "cl_renderer", "vulkan", CVAR_ARCHIVE | CVAR_LATCH );
+		Cvar_SetDescription( cl_renderer, "Sets your desired renderer (vulkan, opengl2, opengl), requires \\vid_restart. Engine will fallback automatically if requested renderer fails." );
 		fprintf(stderr, "DEBUG: Initialized cl_renderer to: %s\n", cl_renderer->string );
 	} else {
 		fprintf(stderr, "DEBUG: cl_renderer already exists: %s\n", cl_renderer->string );
@@ -3634,11 +3634,63 @@ static void CL_InitRef( void ) {
 fprintf(stderr, "USE_RENDERER_DLOPEN is defined, cl_renderer = %s\n", cl_renderer ? cl_renderer->string : "NULL");
 fprintf(stderr, "About to enter renderer loading logic\n");
 
-	// Try to load the renderer specified by cl_renderer first
-	const char *rendererName = cl_renderer ? cl_renderer->string : "opengl";
-	fprintf(stderr, "DEBUG: Trying renderer: %s\n", rendererName);
-	Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, rendererName );
-	fprintf(stderr, "Trying to load DLL: %s\n", dllName);
+	// Try to load renderer with automatic fallback
+	// Priority: Vulkan -> OpenGL2 -> Legacy OpenGL
+	const char *rendererPriority[] = { "vulkan", "opengl2", "opengl" };
+	const char *rendererName = cl_renderer ? cl_renderer->string : "vulkan"; // Default to Vulkan
+	int numRenderers = sizeof(rendererPriority) / sizeof(rendererPriority[0]);
+	int startIndex = 0;
+
+	// Find the requested renderer in our priority list
+	for (int i = 0; i < numRenderers; i++) {
+		if (Q_stricmp(rendererName, rendererPriority[i]) == 0) {
+			startIndex = i;
+			break;
+		}
+	}
+
+	// Try renderers in priority order starting from requested one
+	void *rendererLib = NULL;
+	const char *loadedRenderer = NULL;
+
+	for (int i = 0; i < numRenderers && !rendererLib; i++) {
+		int tryIndex = (startIndex + i) % numRenderers;
+		const char *tryRenderer = rendererPriority[tryIndex];
+
+		Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, tryRenderer );
+		Com_Printf( "Trying renderer: %s (%s)\n", tryRenderer, dllName );
+
+		// Pre-load OpenGL library if trying OpenGL-based renderers
+		if ( strstr( dllName, "opengl" ) ) {
+			void *glLib = Sys_LoadLibrary( OPENGL_DRIVER_NAME );
+			if ( glLib ) {
+				// Keep it loaded
+			}
+		}
+
+		ospath = FS_BuildOSPath( Sys_DefaultBasePath(), dllName, NULL );
+		rendererLib = Sys_LoadLibrary( ospath );
+
+		if (rendererLib) {
+			loadedRenderer = tryRenderer;
+			Com_Printf( "Successfully loaded renderer: %s\n", tryRenderer );
+
+			// Runtime test: Print active rendering path
+			if (com_developer && com_developer->integer) {
+				Com_Printf( "Renderer startup final path: %s\n", tryRenderer );
+				if (Q_stricmp(tryRenderer, rendererName) != 0) {
+					Com_Printf( "Note: Fell back from requested renderer '%s' to '%s'\n", rendererName, tryRenderer );
+				}
+			}
+		} else if (i == 0) {
+			Com_Printf( "Requested renderer %s failed to load, trying fallbacks\n", rendererName );
+		}
+	}
+
+	if (!rendererLib) {
+		Com_Error( ERR_FATAL, "Failed to load any renderer" );
+		return;
+	}
 
 	// Pre-load OpenGL library if trying OpenGL renderer
 	if ( strstr( dllName, "opengl" ) ) {
@@ -3648,35 +3700,15 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 		}
 	}
 
-	ospath = FS_BuildOSPath( Sys_DefaultBasePath(), dllName, NULL );
-	rendererLib = Sys_LoadLibrary( ospath );
-	if ( !rendererLib )
-	{
-		// If the specified renderer failed, try OpenGL as fallback
-		if ( Q_stricmp( cl_renderer->string, "opengl" ) != 0 ) {
-			Com_Printf( "Failed to load renderer %s, trying OpenGL fallback\n", cl_renderer->string );
-			Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_opengl_" REND_ARCH_STRING DLL_EXT );
-			ospath = FS_BuildOSPath( Sys_DefaultBasePath(), dllName, NULL );
-			rendererLib = Sys_LoadLibrary( ospath );
-		} else {
-			Com_Printf( "Failed to load OpenGL renderer, no fallback available\n" );
-		}
-		if ( !rendererLib )
-		{
-			Com_Error( ERR_FATAL, "Failed to load renderer %s", dllName );
-		}
-	}
 	// Try alternative architecture suffix if x86_64 (some builds use _x86 for 64-bit)
-	const char *currentRenderer = cl_renderer->string;
-	if ( !rendererLib && Q_stricmp( currentRenderer, "opengl" ) != 0 ) {
-		currentRenderer = "opengl"; // We tried OpenGL as fallback
-	}
-
 	if ( !rendererLib && !Q_stricmp( REND_ARCH_STRING, "x86_64" ) )
 	{
-		Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_x86" DLL_EXT, currentRenderer );
+		Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_x86" DLL_EXT, loadedRenderer );
 		ospath = FS_BuildOSPath( Sys_DefaultBasePath(), dllName, NULL );
 		rendererLib = Sys_LoadLibrary( ospath );
+		if (rendererLib) {
+			Com_Printf( "Loaded alternative architecture renderer: %s\n", dllName );
+		}
 	}
 	if ( !rendererLib )
 	{

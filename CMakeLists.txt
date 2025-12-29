@@ -3771,5 +3771,41 @@ IF(BUILD_TESTS)
 		RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 	)
 
-	MESSAGE(STATUS "Tests enabled: test_qcommon, test_qmath, test_info, test_msg_secure, test_renderer_init")
+	# Integration tests
+	ADD_EXECUTABLE(test_integration
+		src/tests/test_integration.c
+		src/common/q_shared.c
+		src/common/q_math.c
+		src/common/cvar.c
+		src/common/cmd.c
+		src/common/files.c
+		src/common/common.c
+	)
+	TARGET_LINK_LIBRARIES(test_integration PRIVATE ${CMAKE_DL_LIBS} m)
+	TARGET_INCLUDE_DIRECTORIES(test_integration PRIVATE
+		${CMAKE_SOURCE_DIR}/src
+		${CMAKE_SOURCE_DIR}/src/tests
+	)
+	ADD_TEST(NAME test_integration COMMAND test_integration)
+	SET_TARGET_PROPERTIES(test_integration PROPERTIES
+		RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+	)
+
+	# Performance tests
+	ADD_EXECUTABLE(test_performance
+		src/tests/test_performance.c
+		src/common/q_shared.c
+		src/common/q_math.c
+	)
+	TARGET_LINK_LIBRARIES(test_performance PRIVATE ${CMAKE_DL_LIBS} m)
+	TARGET_INCLUDE_DIRECTORIES(test_performance PRIVATE
+		${CMAKE_SOURCE_DIR}/src
+		${CMAKE_SOURCE_DIR}/src/tests
+	)
+	ADD_TEST(NAME test_performance COMMAND test_performance)
+	SET_TARGET_PROPERTIES(test_performance PROPERTIES
+		RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+	)
+
+	MESSAGE(STATUS "Tests enabled: test_qcommon, test_qmath, test_info, test_msg_secure, test_renderer_init, test_integration, test_performance")
 ENDIF()

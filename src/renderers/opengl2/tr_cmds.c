@@ -561,7 +561,7 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	extern void RE_UpdateAsyncFonts(void);
 	RE_UpdateAsyncFonts();
 #endif
-	}
+
 	cmd = R_GetCommandBufferReserved( sizeof( *cmd ), 0 );
 	if ( !cmd ) {
 		return;

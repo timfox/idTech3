@@ -621,14 +621,28 @@ static void RB_BeginDrawingView( void ) {
 	{
 		clearBits |= GL_STENCIL_BUFFER_BIT;
 	}
-	if ( 0 && r_fastsky->integer && !( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) )
+	if ( r_fastsky->integer && !( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) )
 	{
-		clearBits |= GL_COLOR_BUFFER_BIT;	// FIXME: only if sky shaders have been used
-#ifdef _DEBUG
-		qglClearColor( 0.8f, 0.7f, 0.4f, 1.0f );	// FIXME: get color of sky
-#else
-		qglClearColor( 0.0f, 0.0f, 0.0f, 1.0f );	// FIXME: get color of sky
-#endif
+		// Check if sky shaders are present in the current scene
+		qboolean hasSkyShaders = qfalse;
+		for ( int i = 0; i < backEnd.refdef.numDrawSurfs; i++ ) {
+			const drawSurf_t* drawSurf = &backEnd.refdef.drawSurfs[i];
+			if ( drawSurf && drawSurf->shader && drawSurf->shader->isSky ) {
+				hasSkyShaders = qtrue;
+				break;
+			}
+		}
+
+		if ( hasSkyShaders ) {
+			clearBits |= GL_COLOR_BUFFER_BIT;
+			// Use sky light color from the level's sky shader
+			if ( tr.sunLight[0] || tr.sunLight[1] || tr.sunLight[2] ) {
+				qglClearColor( tr.sunLight[0], tr.sunLight[1], tr.sunLight[2], 1.0f );
+			} else {
+				// Default sky color if no sun light is defined
+				qglClearColor( 0.5f, 0.7f, 1.0f, 1.0f ); // Light blue sky
+			}
+		}
 	}
 	qglClear( clearBits );
 #endif
