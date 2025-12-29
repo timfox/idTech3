@@ -2,10 +2,19 @@
 
 #include "q_shared.h"
 #include "qcommon.h"
+#include <stdio.h>
 
 // Ensure the console history file exists on startup for first-run usability.
 void Con_EnsureHistoryFileExists( void )
 {
+    // Ensure the history directory exists for first-run usability
+    const char *homePath = FS_GetHomePath();
+    const char *gameDir = FS_GetCurrentGameDir();
+    if (homePath && gameDir && *homePath && *gameDir) {
+        char historyDir[MAX_OSPATH];
+        snprintf(historyDir, sizeof(historyDir), "%s/%s", homePath, gameDir);
+        FS_CreatePath(historyDir);
+    }
     // Attempt to open for writing; this will create the file if it doesn't exist.
     fileHandle_t f = FS_FOpenFileWrite( CONSOLE_HISTORY_FILE );
     if ( f == FS_INVALID_HANDLE ) {

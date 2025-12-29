@@ -22,7 +22,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_main.c  -- client main loop
 
 #include "client.h"
-#include "history.h"
+// history helper is declared in history.c; use a forward declaration to avoid header path issues
+void Con_EnsureHistoryFileExists(void);
 #ifdef USE_SDL
 #include "../sdl/sdl_glw.h"
 #endif
