@@ -17,6 +17,7 @@ lua_vm_t *lVM[LUA_NUM_VM];
 // CVARs for LUA control
 static cvar_t *lua_enabled;
 static cvar_t *lua_debug;
+static cvar_t *lua_sql_enabled;
 
 /*
 ===============
@@ -98,6 +99,7 @@ qboolean G_LuaInit(void)
     // Register CVARs
     lua_enabled = Cvar_Get("lua_enabled", "1", CVAR_ARCHIVE);
     lua_debug = Cvar_Get("lua_debug", "0", CVAR_TEMP);
+    lua_sql_enabled = Cvar_Get("lua_sql_enabled", "1", CVAR_ARCHIVE);
 
     if (!lua_enabled->integer) {
         Com_Printf("LUA system disabled by cvar\n");
@@ -156,6 +158,12 @@ qboolean G_LuaStartVM(lua_vm_t *vm)
 
     // Open standard libraries
     luaL_openlibs(vm->L);
+
+    // Register LuaSQL if enabled
+    if (lua_sql_enabled && lua_sql_enabled->integer) {
+        luaopen_luasql_sqlite3(vm->L);
+        lua_setglobal(vm->L, "luasql");
+    }
 
     // TODO: Register game-specific functions
     // G_LuaRegisterGameFunctions(vm->L);

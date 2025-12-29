@@ -21,9 +21,17 @@ Features:
 
 #include "../common/q_shared.h"
 #include "g_public.h"
+
+#ifdef USE_LUA
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
+
+#ifdef USE_LUASQL
+#include "../common/luasql.h"
+#endif
+
+#endif
 
 #define LUA_NUM_VM 16
 #define LUA_MAX_FSIZE (1024 * 1024) // 1MB

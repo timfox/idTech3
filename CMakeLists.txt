@@ -36,10 +36,10 @@ if(USE_LUA)
         if(NOT TARGET Lua::lua)
             add_library(Lua::lua INTERFACE IMPORTED)
             set_target_properties(Lua::lua PROPERTIES
-                INTERFACE_INCLUDE_DIRECTORIES "${LUA_INCLUDE_DIRS}"
-                INTERFACE_LINK_LIBRARIES "${LUA_LIBRARIES}"
+                INTERFACE_INCLUDE_DIRECTORIES "${LUA_INCLUDE_DIR}"
+                INTERFACE_LINK_LIBRARIES "${LUA_LIBRARY};${LUA_MATH_LIBRARY}"
             )
-            message(STATUS "Created Lua::lua imported target with includes: ${LUA_INCLUDE_DIRS} libs: ${LUA_LIBRARIES}")
+            message(STATUS "Created Lua::lua imported target with includes: ${LUA_INCLUDE_DIR} libs: ${LUA_LIBRARY}")
         endif()
     else()
         message(WARNING "Lua not found - Lua integration will be disabled")
@@ -137,6 +137,7 @@ option(ENABLE_BUILD_OPTIMIZATION "Enable build optimizations" ON)
 
 # Feature options
 option(USE_LUA "Enable Lua scripting support" ON)
+option(USE_LUASQL "Enable LuaSQL database support" ON)
 #
 #
 # Sanitizer & coverage support (GCC/Clang only, requires debug build)
@@ -644,6 +645,11 @@ IF(USE_LUA)
 	list(APPEND QCOMMON_SRCS src/game/g_lua.c)
 ENDIF()
 
+# LuaSQL system
+IF(USE_LUASQL)
+	list(APPEND QCOMMON_SRCS src/common/luasql.c src/common/ls_sqlite3.c)
+ENDIF()
+
 # EnTT ECS system
 IF(USE_ENTT)
 	# Add EnTT include directory
@@ -939,7 +945,10 @@ ENDIF()
 IF(USE_LUA)
 	TARGET_COMPILE_DEFINITIONS(common PRIVATE USE_LUA)
 	TARGET_INCLUDE_DIRECTORIES(common PRIVATE /usr/include/lua5.4)
-	TARGET_LINK_LIBRARIES(common INTERFACE Lua::lua)
+	# Note: Lua linking happens at the executable level
+ENDIF()
+IF(USE_LUASQL)
+	TARGET_COMPILE_DEFINITIONS(common PRIVATE USE_LUASQL)
 ENDIF()
 IF(USE_BULLET)
 	IF(BULLET_FOUND AND BULLET_LIBRARIES)
@@ -968,7 +977,10 @@ ENDIF()
 IF(USE_LUA)
 	TARGET_COMPILE_DEFINITIONS(common_ded PRIVATE USE_LUA)
 	TARGET_INCLUDE_DIRECTORIES(common_ded PRIVATE /usr/include/lua5.4)
-	TARGET_LINK_LIBRARIES(common_ded INTERFACE Lua::lua)
+	# Note: Lua linking happens at the executable level
+ENDIF()
+IF(USE_LUASQL)
+	TARGET_COMPILE_DEFINITIONS(common_ded PRIVATE USE_LUASQL)
 ENDIF()
 
 # client + cURL

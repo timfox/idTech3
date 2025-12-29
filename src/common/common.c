@@ -302,6 +302,9 @@ void Com_Init( char *commandLine ) {
     Cvar_Init();
 	Cbuf_Init();
     Cmd_Init();
+#ifdef USE_SQLITE
+    SQLite_Init();
+#endif
 
 	// Core console commands (needed for dedicated and "+quit" style startup)
 	Cmd_AddCommand( "quit", Com_Quit_f );
