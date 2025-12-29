@@ -2559,7 +2559,7 @@ static void init_vulkan_library( void )
 {
 	VkPhysicalDeviceProperties props;
 	VkPhysicalDevice *physical_devices;
-	uint32_t device_count;
+	uint32_t device_count = 0;
 	int device_index;
 	VkResult res;
 
