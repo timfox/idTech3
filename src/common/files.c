@@ -6331,7 +6331,7 @@ static void FS_Startup( void ) {
 			Com_Printf( S_COLOR_RED "Mod validation failed: %s - refusing to load\n", fs_gamedirvar->string );
 			Crash_ReportModLoad( fs_gamedirvar->string, "pre-load validation failed" );
 			Crash_ClearModLoadingContext();
-			continue; // Don't load this mod
+                        goto mod_load_skip;
 		}
 		Crash_ClearModLoadingContext();
 
@@ -6350,7 +6350,7 @@ static void FS_Startup( void ) {
 		if ( fs_homepath->string[0] != '\0' && Q_stricmp( fs_homepath->string, fs_basepath->string ) ) {
 			FS_AddGameDirectory( fs_homepath->string, effectiveDir );
 		}
-	} else if ( fs_debug && fs_debug->integer ) {
+} else if ( fs_debug && fs_debug->integer ) {
 		Com_Printf( "Mod directory not added: fs_game='%s', isBaseGame=%d\n", 
 			fs_gamedirvar->string, FS_IsBaseGame( fs_gamedirvar->string ) );
 	}
@@ -6457,6 +6457,9 @@ static void FS_Startup( void ) {
 #endif
 #endif
 }
+
+// Label target to skip to next mod when validation fails
+mod_load_skip:
 
 
 #if defined(__GNUC__)
