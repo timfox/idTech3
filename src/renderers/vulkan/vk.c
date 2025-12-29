@@ -2713,11 +2713,13 @@ static void init_vulkan_library( void )
 	if (r_device) {
 		device_index = r_device->integer;
 	} else {
-		device_index = -1;
+		// Prefer integrated GPUs over discrete GPUs to avoid driver issues
+		device_index = -2; // -2 means prefer integrated GPU
 	}
 
 	fprintf(stderr, ".......................\nAvailable physical devices:\n" );
        for ( uint32_t i = 0; i < device_count; i++ ) {
+		// Get device properties
 		qvkGetPhysicalDeviceProperties( physical_devices[ i ], &props );
 		fprintf(stderr, " %i: %s\n", i, renderer_name( &props ) );
 		if ( device_index == -1 && props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU ) {
