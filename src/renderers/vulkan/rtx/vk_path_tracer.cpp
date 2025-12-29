@@ -182,7 +182,6 @@ void PathTracer_TracePath(vec3_t result, const vec3_t origin, const vec3_t direc
 
         // Trace ray against scene
         // This would integrate with the existing ray tracing system
-        trace_t trace;
         vec3_t end_pos;
 
         // Extend ray

@@ -29,6 +29,7 @@ Convert entity pointer to entity number for LUA access
 int G_LuaGetEntityId(uintptr_t addr)
 {
     // TODO: Implement when game entities are available
+    (void)addr; // Suppress unused parameter warning
     Com_Printf("G_LuaGetEntityId not implemented - no game entities available\n");
     return -1;
 }
@@ -488,6 +489,7 @@ LUA function to get entity field values
 int G_LuaGetEntityField(lua_State *L)
 {
     // TODO: Implement entity field access
+    (void)L; // Suppress unused parameter warning
     Com_Printf("G_LuaGetEntityField not yet implemented\n");
     return 0;
 }
@@ -502,6 +504,7 @@ LUA function to set entity field values
 int G_LuaSetEntityField(lua_State *L)
 {
     // TODO: Implement entity field modification
+    (void)L; // Suppress unused parameter warning
     Com_Printf("G_LuaSetEntityField not yet implemented\n");
     return 0;
 }

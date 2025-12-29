@@ -26,6 +26,11 @@ if(ANDROID)
 endif()
 
 # Find dependencies
+# Set OpenGL policy to prefer GLVND
+if(POLICY CMP0072)
+    cmake_policy(SET CMP0072 NEW)
+    set(OpenGL_GL_PREFERENCE GLVND)
+endif()
 find_package(OpenGL QUIET)
 
 # Lua support
@@ -2710,12 +2715,12 @@ OPTION(MONOLITH_USE_LTO "Enable link-time optimization for monolithic builds" OF
 OPTION(MONOLITH_USE_GC_SECTIONS "Enable function/data section GC for monolithic builds" OFF)
 
 # Build optimization options
-OPTION(ENABLE_LTO "Enable Link-Time Optimization" OFF)
-OPTION(ENABLE_BUILD_OPTIMIZATION "Enable comprehensive build optimizations" OFF)
-OPTION(ENABLE_BINARY_SIZE_OPTIMIZATION "Enable binary size reduction techniques" OFF)
-OPTION(ENABLE_DEAD_CODE_ELIMINATION "Enable aggressive dead code elimination" OFF)
-OPTION(ENABLE_PROFILE_GUIDED_OPTIMIZATION "Enable Profile-Guided Optimization support" OFF)
-OPTION(ENABLE_BINARY_COMPRESSION "Enable binary compression (UPX)" OFF)
+OPTION(ENABLE_LTO "Enable Link-Time Optimization" ON)
+OPTION(ENABLE_BUILD_OPTIMIZATION "Enable comprehensive build optimizations" ON)
+OPTION(ENABLE_BINARY_SIZE_OPTIMIZATION "Enable binary size reduction techniques" ON)
+OPTION(ENABLE_DEAD_CODE_ELIMINATION "Enable aggressive dead code elimination" ON)
+OPTION(ENABLE_PROFILE_GUIDED_OPTIMIZATION "Enable Profile-Guided Optimization support" ON)
+OPTION(ENABLE_BINARY_COMPRESSION "Enable binary compression (UPX)" ON)
 OPTION(ENABLE_BUILD_PERFORMANCE_MONITORING "Monitor build performance and size" ON)
 
 # ============================================================================

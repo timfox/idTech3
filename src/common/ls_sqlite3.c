@@ -248,7 +248,6 @@ static int conn_execute(lua_State *L)
 	conn_data *conn = getconnection(L);
 	const char *statement = luaL_checkstring(L, 2);
 	sqlite3_stmt *sql_vm;
-	const char *errmsg;
 	int res;
 
 	/* compile SQL statement */

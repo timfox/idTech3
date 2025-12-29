@@ -359,6 +359,7 @@ VulkanPipeline::VulkanPipeline(VkDevice device,
                               const VkRayTracingPipelineCreateInfoNV& createInfo)
     : VulkanResource(device), layout_(layout), bindPoint_(VK_PIPELINE_BIND_POINT_RAY_TRACING_NV)
 {
+    (void)createInfo; // Suppress unused parameter warning
     // Note: Ray tracing pipeline creation would need the appropriate extension function
     // For now, we'll use a placeholder
     Com_Error(ERR_FATAL, "Ray tracing pipeline creation not implemented yet");
@@ -840,6 +841,7 @@ void VulkanUtils::transitionImageLayout(VkDevice device,
                                        VkImageLayout oldLayout,
                                        VkImageLayout newLayout)
 {
+    (void)format; // Suppress unused parameter warning
     executeSingleTimeCommands(device, commandPool, queue,
         [&](VkCommandBuffer commandBuffer) {
             VkImageMemoryBarrier barrier{};

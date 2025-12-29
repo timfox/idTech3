@@ -97,6 +97,8 @@ qboolean VK_Raymarching_Init(void) {
     // Create shader module using C++23 string_view
     const VkShaderModuleCreateInfo shaderInfo = {
         .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
         .codeSize = raymarchingComputeShader.size(),
         .pCode = reinterpret_cast<const uint32_t*>(raymarchingComputeShader.data())
     };
@@ -110,26 +112,31 @@ qboolean VK_Raymarching_Init(void) {
             .binding = 0,
             .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .pImmutableSamplers = nullptr
         },
         // Output image
         {
             .binding = 1,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE,
             .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .pImmutableSamplers = nullptr
         },
         // Distance fields buffer
         {
             .binding = 2,
             .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .descriptorCount = 1,
-            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT
+            .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
+            .pImmutableSamplers = nullptr
         }
     }};
 
     const VkDescriptorSetLayoutCreateInfo layoutInfo = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0,
         .bindingCount = static_cast<uint32_t>(bindings.size()),
         .pBindings = bindings.data()
     };
