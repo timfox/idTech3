@@ -27,20 +27,26 @@ endif()
 
 # Find dependencies
 find_package(OpenGL QUIET)
-find_package(Lua QUIET)
-if(Lua_FOUND)
-    # Create Lua::lua imported target for consistent linking across all targets
-    if(NOT TARGET Lua::lua)
-        add_library(Lua::lua INTERFACE IMPORTED)
-        set_target_properties(Lua::lua PROPERTIES
-            INTERFACE_INCLUDE_DIRECTORIES "${LUA_INCLUDE_DIRS}"
-            INTERFACE_LINK_LIBRARIES "${LUA_LIBRARIES}"
-        )
-        message(STATUS "Created Lua::lua imported target with includes: ${LUA_INCLUDE_DIRS} libs: ${LUA_LIBRARIES}")
+
+# Lua support
+if(USE_LUA)
+    find_package(Lua QUIET)
+    if(Lua_FOUND)
+        # Create Lua::lua imported target for consistent linking across all targets
+        if(NOT TARGET Lua::lua)
+            add_library(Lua::lua INTERFACE IMPORTED)
+            set_target_properties(Lua::lua PROPERTIES
+                INTERFACE_INCLUDE_DIRECTORIES "${LUA_INCLUDE_DIRS}"
+                INTERFACE_LINK_LIBRARIES "${LUA_LIBRARIES}"
+            )
+            message(STATUS "Created Lua::lua imported target with includes: ${LUA_INCLUDE_DIRS} libs: ${LUA_LIBRARIES}")
+        endif()
+    else()
+        message(WARNING "Lua not found - Lua integration will be disabled")
+        set(USE_LUA OFF CACHE BOOL "Lua not found" FORCE)
     endif()
 else()
-    message(WARNING "Lua not found - Lua integration will be disabled")
-    set(USE_LUA OFF CACHE BOOL "Lua not found" FORCE)
+    message(STATUS "Lua integration disabled by USE_LUA=OFF")
 endif()
 
 # Prefer colored compiler diagnostics when supported
@@ -128,6 +134,9 @@ if(NOT DEFINED ENABLE_ASAN)
   message(STATUS "AddressSanitizer (ASan) enabled by default")
 endif()
 option(ENABLE_BUILD_OPTIMIZATION "Enable build optimizations" ON)
+
+# Feature options
+option(USE_LUA "Enable Lua scripting support" ON)
 #
 #
 # Sanitizer & coverage support (GCC/Clang only, requires debug build)
@@ -589,6 +598,7 @@ list(APPEND QCOMMON_SRCS src/common/event_system.c)
 # Add crash handler and assert system
 list(APPEND QCOMMON_SRCS src/common/crash_handler.c)
 list(APPEND QCOMMON_SRCS src/common/q_assert.c)
+# Add game LUA system (will be added later after USE_LUA is determined)
 # Add watchdog system
 list(APPEND QCOMMON_SRCS src/common/q_watchdog.c)
 list(APPEND QCOMMON_SRCS src/common/files_v2.c)
@@ -627,6 +637,11 @@ list(APPEND QCOMMON_SRCS src/common/i18n.c)
 
 IF(USE_FREETYPE)
 	list(APPEND QCOMMON_SRCS src/common/freetype_wrapper.c)
+ENDIF()
+
+# Game LUA system
+IF(USE_LUA)
+	list(APPEND QCOMMON_SRCS src/game/g_lua.c)
 ENDIF()
 
 # EnTT ECS system
@@ -916,10 +931,15 @@ list(REMOVE_ITEM SERVER_SRCS src/server/sv_rankings.c)
 
 # universal binary - common library should only contain truly common code
 ADD_LIBRARY(common OBJECT ${QCOMMON_SRCS})
-	TARGET_INCLUDE_DIRECTORIES(common PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/common)
+	TARGET_INCLUDE_DIRECTORIES(common PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/common ${CMAKE_CURRENT_SOURCE_DIR}/src/game)
 	set_property(TARGET common PROPERTY POSITION_INDEPENDENT_CODE ON)
 IF(USE_JOBSYSTEM)
 	TARGET_COMPILE_DEFINITIONS(common PRIVATE USE_JOBSYSTEM)
+ENDIF()
+IF(USE_LUA)
+	TARGET_COMPILE_DEFINITIONS(common PRIVATE USE_LUA)
+	TARGET_INCLUDE_DIRECTORIES(common PRIVATE /usr/include/lua5.4)
+	TARGET_LINK_LIBRARIES(common INTERFACE Lua::lua)
 ENDIF()
 IF(USE_BULLET)
 	IF(BULLET_FOUND AND BULLET_LIBRARIES)
@@ -940,9 +960,15 @@ ENDIF()
 # dedicated server
 ADD_LIBRARY(common_ded OBJECT ${QCOMMON_SRCS})
 TARGET_COMPILE_DEFINITIONS(common_ded PRIVATE DEDICATED)
+TARGET_INCLUDE_DIRECTORIES(common_ded PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/common ${CMAKE_CURRENT_SOURCE_DIR}/src/game)
 set_property(TARGET common_ded PROPERTY POSITION_INDEPENDENT_CODE ON)
 IF(USE_JOBSYSTEM)
 	TARGET_COMPILE_DEFINITIONS(common_ded PRIVATE USE_JOBSYSTEM)
+ENDIF()
+IF(USE_LUA)
+	TARGET_COMPILE_DEFINITIONS(common_ded PRIVATE USE_LUA)
+	TARGET_INCLUDE_DIRECTORIES(common_ded PRIVATE /usr/include/lua5.4)
+	TARGET_LINK_LIBRARIES(common_ded INTERFACE Lua::lua)
 ENDIF()
 
 # client + cURL
@@ -3794,7 +3820,7 @@ IF(BUILD_TESTS)
 		RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 	)
 
-	# Integration tests
+# Integration tests
 ADD_EXECUTABLE(test_integration
 	src/tests/test_integration.c
 )

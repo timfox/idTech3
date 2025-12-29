@@ -214,7 +214,7 @@ int MSG_ReadBits( msg_t *msg, int bits ) {
 			}
 		}
 		msg->bit = bitIndex;
-		msg->readcount = (bitIndex >> 3) + 1;
+		msg->readcount = (bitIndex >> 3);
 	}
 
 	if ( sgn && bits < 32 ) {

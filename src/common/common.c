@@ -13,6 +13,7 @@ Basic functions used throughout the engine.
 #include "files_v2.h"
 #include "../renderers/renderercommon/tr_public.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdarg.h>
 #include <time.h>
 #include <ctype.h>

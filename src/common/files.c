@@ -6456,11 +6456,11 @@ static void FS_Startup( void ) {
 	FS_SaveCache();
 #endif
 #endif
-}
 
 // Label target to skip to next mod when validation fails
 mod_load_skip:
 
+}
 
 #if defined(__GNUC__)
 __attribute__((unused))

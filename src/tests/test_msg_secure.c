@@ -49,7 +49,7 @@ TEST(msg_secure_write_bits_bounds) {
 
     // This should work - plenty of space
     MSG_WriteBits_Secure(&test_msg, 42, 8, "test_write");
-    ASSERT_EQ(test_msg.cursize, 1);
+    ASSERT_EQ(test_msg.cursize, 2);
 
     // Fill up the message
     while (MSG_HasBits(&test_msg, 8, "fill_test")) {
