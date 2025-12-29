@@ -17,6 +17,10 @@ Provides user-friendly error messages and ensures content integrity.
 
 // Validation result structure is defined in qcommon.h
 
+// Function prototypes
+qboolean Mod_ApplySandboxRestrictions( const char *modName );
+void Mod_RemoveSandboxRestrictions( const char *modName );
+
 /*
 =================
 FS_ValidatePakFile

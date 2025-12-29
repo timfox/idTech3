@@ -32,14 +32,42 @@ find_package(OpenGL QUIET)
 if(USE_LUA)
     find_package(Lua QUIET)
     if(Lua_FOUND)
-        # Create Lua::lua imported target for consistent linking across all targets
-        if(NOT TARGET Lua::lua)
-            add_library(Lua::lua INTERFACE IMPORTED)
-            set_target_properties(Lua::lua PROPERTIES
-                INTERFACE_INCLUDE_DIRECTORIES "${LUA_INCLUDE_DIR}"
-                INTERFACE_LINK_LIBRARIES "${LUA_LIBRARY};${LUA_MATH_LIBRARY}"
-            )
-            message(STATUS "Created Lua::lua imported target with includes: ${LUA_INCLUDE_DIR} libs: ${LUA_LIBRARY}")
+        # Try to use pkg-config for more complete Lua library detection
+        find_package(PkgConfig QUIET)
+        if(PkgConfig_FOUND)
+            pkg_check_modules(LUA_PC lua5.4 QUIET)
+            if(LUA_PC_FOUND)
+                # Create Lua::lua imported target using pkg-config results
+                if(NOT TARGET Lua::lua)
+                    add_library(Lua::lua INTERFACE IMPORTED)
+                    set_target_properties(Lua::lua PROPERTIES
+                        INTERFACE_INCLUDE_DIRECTORIES "${LUA_PC_INCLUDE_DIRS}"
+                        INTERFACE_LINK_LIBRARIES "${LUA_PC_LIBRARIES}"
+                        INTERFACE_LINK_OPTIONS "${LUA_PC_LDFLAGS_OTHER}"
+                    )
+                    message(STATUS "Created Lua::lua imported target using pkg-config: includes=${LUA_PC_INCLUDE_DIRS}, libs=${LUA_PC_LIBRARIES}")
+                endif()
+            else()
+                # Fallback to CMake's FindLua results
+                if(NOT TARGET Lua::lua)
+                    add_library(Lua::lua INTERFACE IMPORTED)
+                    set_target_properties(Lua::lua PROPERTIES
+                        INTERFACE_INCLUDE_DIRECTORIES "${LUA_INCLUDE_DIR}"
+                        INTERFACE_LINK_LIBRARIES "${LUA_LIBRARY};${LUA_MATH_LIBRARY}"
+                    )
+                    message(STATUS "Created Lua::lua imported target with CMake FindLua: includes=${LUA_INCLUDE_DIR}, libs=${LUA_LIBRARY}")
+                endif()
+            endif()
+        else()
+            # Fallback to CMake's FindLua results without pkg-config
+            if(NOT TARGET Lua::lua)
+                add_library(Lua::lua INTERFACE IMPORTED)
+                set_target_properties(Lua::lua PROPERTIES
+                    INTERFACE_INCLUDE_DIRECTORIES "${LUA_INCLUDE_DIR}"
+                    INTERFACE_LINK_LIBRARIES "${LUA_LIBRARY};${LUA_MATH_LIBRARY}"
+                )
+                message(STATUS "Created Lua::lua imported target with CMake FindLua (no pkg-config): includes=${LUA_INCLUDE_DIR}, libs=${LUA_LIBRARY}")
+            endif()
         endif()
     else()
         message(WARNING "Lua not found - Lua integration will be disabled")

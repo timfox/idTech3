@@ -1,7 +1,7 @@
 #include "q_shared.h"
 #include "qcommon.h"
 
-#ifdef USE_LUA
+#if defined(USE_LUA) && !defined(DEDICATED)
 #include <lua.h>
 #include <lauxlib.h>
 #include <lualib.h>
@@ -182,5 +182,5 @@ void Lua_RegisterSoundBindings(lua_State *L)
 	Lua_RegisterFunction(L, "sound_set_volume", Lua_SoundSetVolume);
 }
 
-#endif // USE_LUA
+#endif // defined(USE_LUA) && !defined(DEDICATED)
 

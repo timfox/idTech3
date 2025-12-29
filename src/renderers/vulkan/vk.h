@@ -1509,6 +1509,8 @@ void end_command_buffer(VkCommandBuffer command_buffer, const char* function_nam
 // Vulkan function pointers
 extern PFN_vkCreateSampler qvkCreateSampler;
 extern PFN_vkGetPhysicalDeviceFeatures2KHR qvkGetPhysicalDeviceFeatures2KHR;
+extern PFN_vkCreateDebugUtilsMessengerEXT qvkCreateDebugUtilsMessengerEXT;
+extern PFN_vkDestroyDebugUtilsMessengerEXT qvkDestroyDebugUtilsMessengerEXT;
 extern PFN_vkCreateDescriptorSetLayout qvkCreateDescriptorSetLayout;
 extern PFN_vkCreateDescriptorPool qvkCreateDescriptorPool;
 extern PFN_vkCreateCommandPool qvkCreateCommandPool;

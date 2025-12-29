@@ -447,9 +447,10 @@ PFN_vkGetPhysicalDeviceSurfaceSupportKHR			qvkGetPhysicalDeviceSurfaceSupportKHR
 #ifdef USE_VK_VALIDATION
 PFN_vkCreateDebugReportCallbackEXT				qvkCreateDebugReportCallbackEXT;
 PFN_vkDestroyDebugReportCallbackEXT				qvkDestroyDebugReportCallbackEXT;
-// PFN_vkCreateDebugUtilsMessengerEXT				qvkCreateDebugUtilsMessengerEXT;
-// PFN_vkDestroyDebugUtilsMessengerEXT				qvkDestroyDebugUtilsMessengerEXT;
 #endif
+// Debug utils functions are available independent of validation
+PFN_vkCreateDebugUtilsMessengerEXT				qvkCreateDebugUtilsMessengerEXT;
+PFN_vkDestroyDebugUtilsMessengerEXT				qvkDestroyDebugUtilsMessengerEXT;
 PFN_vkAllocateCommandBuffers						qvkAllocateCommandBuffers;
 PFN_vkAllocateDescriptorSets						qvkAllocateDescriptorSets;
 PFN_vkAllocateMemory								qvkAllocateMemory;
@@ -1414,11 +1415,17 @@ static const char* vk_get_device_type_string(VkPhysicalDeviceType type) {
 	}
 }
 
+// Forward declaration
+static void vk_setup_debug_messenger(qboolean debugUtilsAvailable);
+
 static void create_instance( void )
 {
 	// Basic validation layer support
 	const char *enabled_layers[2] = {0};
 	uint32_t enabled_layer_count = 0;
+
+	// Debug utils extension availability (instance extension)
+	qboolean debugUtils = qtrue; // We know it's available since it's in used_instance_extension
 
 	// Enable validation layers if requested
 	if (r_vulkan_validation && r_vulkan_validation->integer) {
@@ -1560,15 +1567,14 @@ static void create_instance( void )
 		ri.Error( ERR_FATAL, "Vulkan: instance creation failed with %s", vk_result_string( res ) );
 	}
 
-	// Setup debug messenger after instance creation if debug utils is available
-	vk_setup_debug_messenger();
+	// Setup debug messenger will be done in init_vulkan_library after all function pointers are loaded
 
 }
 
 
 // Debug messenger setup for VK_EXT_debug_utils
-static void vk_setup_debug_messenger(void) {
-	if (!debugUtils) {
+static void vk_setup_debug_messenger(qboolean debugUtilsAvailable) {
+	if (!debugUtilsAvailable) {
 		ri.Printf(PRINT_ALL, "...debug utils not supported\n");
 		return;
 	}
@@ -1588,12 +1594,12 @@ static void vk_setup_debug_messenger(void) {
 	createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
 							 VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
 							 VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-	createInfo.pfnUserCallback = vk_debug_callback;
+	createInfo.pfnUserCallback = (PFN_vkDebugUtilsMessengerCallbackEXT)vk_debug_callback;
 	createInfo.pUserData = NULL;
 
 	VkResult result = qvkCreateDebugUtilsMessengerEXT(vk_instance, &createInfo, NULL, &vk.debugMessenger);
 	if (result != VK_SUCCESS) {
-		ri.Printf(PRINT_WARNING, "Failed to create debug messenger: %s\n", vk_result_to_string(result));
+		ri.Printf(PRINT_WARNING, "Failed to create debug messenger: %s\n", vk_result_string(result));
 	} else {
 		ri.Printf(PRINT_ALL, "...debug messenger created successfully\n");
 	}
@@ -2655,6 +2661,15 @@ static void init_vulkan_library( void )
 #endif
 
 		// Load debug utils functions if available (independent of validation)
+		qvkCreateDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT) ri.VK_GetInstanceProcAddr(vk_instance, "vkCreateDebugUtilsMessengerEXT");
+		qvkDestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT) ri.VK_GetInstanceProcAddr(vk_instance, "vkDestroyDebugUtilsMessengerEXT");
+
+		// Setup debug messenger if functions are available
+		if (qvkCreateDebugUtilsMessengerEXT && qvkDestroyDebugUtilsMessengerEXT) {
+			vk_setup_debug_messenger(qtrue);
+		} else {
+			ri.Printf(PRINT_ALL, "...debug utils functions not available\n");
+		}
 
 		// Create debug callback.
 		// if ( qvkCreateDebugReportCallbackEXT && qvkDestroyDebugReportCallbackEXT ) {
@@ -3475,8 +3490,8 @@ static void __attribute__((unused)) deinit_instance_functions( void )
 	qvkCreateDebugReportCallbackEXT = NULL;
 	qvkDestroyDebugReportCallbackEXT = NULL;
 #endif
-	// qvkCreateDebugUtilsMessengerEXT = NULL;
-	// qvkDestroyDebugUtilsMessengerEXT = NULL;
+	qvkCreateDebugUtilsMessengerEXT = NULL;
+	qvkDestroyDebugUtilsMessengerEXT = NULL;
 }
 
 
@@ -8620,7 +8635,7 @@ void vk_shutdown( refShutdownCode_t code ) {
 
 
 		// Destroy debug messenger before clearing instance data
-		if (vk.debugMessenger != VK_NULL_HANDLE && qvkDestroyDebugUtilsMessengerEXT) {
+		if (vk.debugMessenger != VK_NULL_HANDLE && qvkDestroyDebugUtilsMessengerEXT != NULL) {
 			qvkDestroyDebugUtilsMessengerEXT(vk_instance, vk.debugMessenger, NULL);
 			vk.debugMessenger = VK_NULL_HANDLE;
 			ri.Printf(PRINT_ALL, "vk_shutdown: Debug messenger destroyed\n");

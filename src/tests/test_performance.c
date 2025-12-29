@@ -13,6 +13,17 @@ Basic performance testing for core operations.
 #include <math.h>
 #include <unistd.h>
 
+// Type definitions
+typedef float vec3_t[3];
+typedef float mat4_t[16];
+
+// Function declarations
+static double get_time_ms(void);
+static void VectorAdd(const vec3_t a, const vec3_t b, vec3_t out);
+static void VectorScale(const vec3_t in, float scale, vec3_t out);
+static float VectorLength(const vec3_t v);
+static void MatrixMultiply(const mat4_t a, const mat4_t b, mat4_t out);
+
 // Simple timing function
 double get_time_ms(void) {
     return (double)clock() / CLOCKS_PER_SEC * 1000.0;
@@ -20,9 +31,6 @@ double get_time_ms(void) {
 
 // Benchmark configuration
 #define ITERATIONS 1000
-
-// Vector operations
-typedef float vec3_t[3];
 
 void VectorAdd(const vec3_t a, const vec3_t b, vec3_t out) {
     out[0] = a[0] + b[0];
@@ -39,9 +47,6 @@ void VectorScale(const vec3_t in, float scale, vec3_t out) {
 float VectorLength(const vec3_t v) {
     return sqrtf(v[0]*v[0] + v[1]*v[1] + v[2]*v[2]);
 }
-
-// Matrix operations
-typedef float mat4_t[16];
 
 void MatrixMultiply(const mat4_t a, const mat4_t b, mat4_t out) {
     for (int i = 0; i < 4; i++) {

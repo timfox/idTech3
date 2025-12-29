@@ -37,6 +37,12 @@ Provides:
 #define MAX_PATH 1024
 #define MAX_ARGS 64
 
+// Suppress false positive format-truncation warnings
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+#endif
+
 // Simple path utilities
 static int path_exists(const char *path) {
 	struct stat st;
@@ -350,3 +356,7 @@ int main(int argc, char **argv) {
 	// Launch engine
 	return Launcher_LaunchEngine(enginePath, contentDir, modName, argc, argv);
 }
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif

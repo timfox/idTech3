@@ -19,7 +19,9 @@ It wraps Lua functions with engine-style APIs.
 // Forward declarations for module bindings
 void Lua_RegisterGameBindings(lua_State *L);
 void Lua_RegisterRendererBindings(lua_State *L);
+#if !defined(DEDICATED)
 void Lua_RegisterSoundBindings(lua_State *L);
+#endif
 void Lua_Events_RegisterBindings(lua_State *L);
 void Lua_Entity_RegisterBindings(lua_State *L);
 
@@ -280,7 +282,9 @@ lua_State *Lua_CreateState(void)
 	// Register module-specific bindings
 	Lua_RegisterGameBindings(L);
 	Lua_RegisterRendererBindings(L);
+#if !defined(DEDICATED)
 	Lua_RegisterSoundBindings(L);
+#endif
 	
 	// Load scripts from filesystem
 	Lua_LoadScriptsFromFS(L);
