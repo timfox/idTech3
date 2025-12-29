@@ -1,20 +1,6 @@
-# id Tech 3
-
-### Wayland + X11 Vulkan fallback (summary)
-- What it does: On Wayland, if Vulkan surface creation fails, the runtime attempts a one-time fallback to X11 by restarting the video backend and retrying surface creation.
-- Log markers to verify:
-  - VK_CreateSurface: Wayland detected; retrying with X11 path engaged (attempting restart)
-  - VK_CreateSurface: X11 fallback restart succeeded
-- How to test locally:
-  - Run Vulkan with Wayland session: VK_VERBOSE_PIPELINE_LOGS=1 VK_LOG_TO_FILE=1 ./release/idtech3.x86_64 +set fs_game mymod +set cl_renderer vulkan > run.log 2>&1
-  - If surface creation fails on Wayland, check for the fallback messages and the eventual success paths.
-  - If you use the provided CI script, reference scripts/ci_wayland_fallback.sh for automated checks.
-
-- Notes:
-- This Fallback path is primarily for older Wayland setups; modern Wayland environments should render directly.
 [![build](../../workflows/build/badge.svg)](../../actions?query=workflow%3Abuild) <a href="https://discord.com/invite/X3Exs4C"><img src="https://img.shields.io/discord/314456230649135105?color=7289da&logo=discord&logoColor=white" alt="Discord server" /></a>
 
-This is a modern id Tech 3 engine with PBR and ray tracing.
+This is a modernized id Tech 3 engine fork with PBR and ray tracing using C23 and C++23 standards.
 
 Go to [Releases](../../releases) section to download the latest binaries for your platform or follow [Build Instructions](#build-instructions).
 
@@ -22,29 +8,29 @@ Go to [Releases](../../releases) section to download the latest binaries for you
 
 **Key features**:
 
-* OpenGL renderer
-* DirectX 12 renderer
-* Vulkan renderer
-* Vulkan ray tracing
-* Metal renderer (macOS/iOS)
-* Physically Based Rendering (PBR)
+* C23 and C++23 standards
+* Ray tracing
+* Physically based rendering (PBR)
+* Realtime global illumination
+* Raymarching for volumetrics
 * Material clearcoat, anisotropy, and subsurface scattering options
 * Steamworks and Steam Deck compatible
 * Modernized graphics options menu
 * ImGui layer for in-engine tools and overlays
-* SysCall Registry
+* SysCall registry
 * QT Radiant world editor
-
+* Job System and multi-threading
+* Online and offline documentation
+* Font Rendering with OTF, TTF, and Glyph support
 
 ## Vulkan renderer
 
 * Ray tracing (hardware-accelerated where available, DXR-compatible)
 * High-quality per-pixel dynamic lighting
-* Surfel-based indirect lighting and global illumination (**experimental**)
-* Volumetric fog and light shafts
+* Surfel-based indirect lighting and global illumination
 * Physically correct area and spot lights
-* Very fast flares (**\r_flares 1**)
-* Anisotropic filtering (**\r_ext_texture_filter_anisotropic**)
+* Raymarching for volumetrics
+* FSR and dynamic resolution
 * Greatly reduced API overhead (call/dispatch ratio)
 * Flexible vertex buffer memory management to allow loading huge maps
 * Pipeline cache and incremental pipeline compilation for faster loading and less stutter
