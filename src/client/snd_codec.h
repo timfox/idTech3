@@ -92,6 +92,15 @@ void *S_OGG_CodecLoad(const char *filename, snd_info_t *info);
 snd_stream_t *S_OGG_CodecOpenStream(const char *filename);
 void S_OGG_CodecCloseStream(snd_stream_t *stream);
 int S_OGG_CodecReadStream(snd_stream_t *stream, int bytes, void *buffer);
-#endif // USE_OGG_VORBIS
+#endif
+
+// MP3 codec - DISABLED
+// #ifdef USE_MP3
+// extern snd_codec_t mp3_codec;
+// void *S_MP3_CodecLoad(const char *filename, snd_info_t *info);
+// snd_stream_t *S_MP3_CodecOpenStream(const char *filename);
+// void S_MP3_CodecCloseStream(snd_stream_t *stream);
+// int S_MP3_CodecReadStream(snd_stream_t *stream, int bytes, void *buffer);
+// #endif // USE_OGG_VORBIS
 
 #endif // !_SND_CODEC_H_

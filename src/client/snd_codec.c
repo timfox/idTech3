@@ -24,6 +24,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "client.h"
 #include "snd_codec.h"
 
+#ifdef USE_MP3
+extern snd_codec_t mp3_codec;
+#endif
+
 static snd_codec_t *codecs;
 
 static void S_CodecRegister( snd_codec_t *codec );
@@ -129,6 +133,10 @@ void S_CodecInit( void )
 
 #ifdef USE_OGG_VORBIS
 	S_CodecRegister( &ogg_codec );
+#endif
+
+#ifdef USE_MP3
+	S_CodecRegister( &mp3_codec );
 #endif
 
 	// Register wav codec last so that it is always tried first when a file extension was not found

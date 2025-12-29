@@ -4,7 +4,7 @@
 #include "vk_shadows.h"
 #include "vk_sem.h"
 #include "vk_physics.h"
-#include "vk_compute_raytracing.h"
+// Compute ray tracing moved to RTX renderer
 #include "tr_local.h"
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;

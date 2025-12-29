@@ -138,6 +138,14 @@ option(ENABLE_BUILD_OPTIMIZATION "Enable build optimizations" ON)
 # Feature options
 option(USE_LUA "Enable Lua scripting support" ON)
 option(USE_LUASQL "Enable LuaSQL database support" ON)
+
+# RTX renderer integrated - no separate VKPT option needed
+option(USE_ASVGF "Enable Adaptive SVGF denoising" OFF)
+option(USE_PBR "Enable Physically Based Rendering materials" OFF)
+option(USE_GOD_RAYS "Enable volumetric lighting (god rays)" OFF)
+option(USE_FSR "Enable FidelityFX Super Resolution upscaling" OFF)
+
+# RTX renderer is always available as a separate module
 #
 #
 # Sanitizer & coverage support (GCC/Clang only, requires debug build)
@@ -991,6 +999,12 @@ IF(USE_OPENAL)
 	list(APPEND CLIENT_SRCS src/client/snd_openal.c)
 ENDIF()
 
+# Add MP3 codec support (using built-in decoder)
+list(APPEND CLIENT_SRCS src/client/snd_codec_mp3.c)
+# Add built-in MP3 decoder files
+AUX_SOURCE_DIRECTORY(src/client/mp3code MP3CODE_SRCS)
+list(APPEND CLIENT_SRCS ${MP3CODE_SRCS})
+
 IF(USE_OPENEXR)
 	# Try CMake's config package first (OpenEXR 3.x and newer)
 	find_package(OpenEXR QUIET)
@@ -1237,6 +1251,7 @@ IF(USE_SYSTEM_JPEG)
 	find_package(JPEG REQUIRED)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE -DUSE_SYSTEM_JPEG)
 	TARGET_LINK_LIBRARIES(client ${JPEG_LIBRARIES})
+	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_MP3)
 	IF(USE_JOBSYSTEM)
 		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_JOBSYSTEM)
 	ENDIF()
@@ -1247,6 +1262,7 @@ ELSE()
 	ADD_LIBRARY(client OBJECT ${CLIENT_SRCS} ${JPEG_SRCS})
 	# Add JPEG include directory for internal includes
 	TARGET_INCLUDE_DIRECTORIES(client PRIVATE libs/jpeg)
+	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_MP3)
 	IF(USE_JOBSYSTEM)
 		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_JOBSYSTEM)
 	ENDIF()
@@ -1260,6 +1276,10 @@ ENDIF()
 
 # Add OGG/Vorbis include directories for client (used by snd_codec_ogg.c)
 TARGET_INCLUDE_DIRECTORIES(client PRIVATE src/common src libs/ogg/include libs/vorbis/include)
+
+# Add MP3 support using custom mp3code (like SunnyJK)
+TARGET_INCLUDE_DIRECTORIES(client PRIVATE src/client/mp3code)
+message(STATUS "MP3 support enabled with custom mp3code")
 
 IF(USE_CIMGUI AND DEFINED CIMGUI_DIR)
 	set(CIMGUI_USER_CONFIG "\"cimconfig.h\"")
@@ -1398,7 +1418,6 @@ SET(RENDERER_VK_SRCS
 	src/renderers/vulkan/tr_surface.c
 	src/renderers/vulkan/tr_world.c
 	src/renderers/vulkan/vk.c
-	src/renderers/vulkan/vk_raymarching.cpp
 	src/renderers/vulkan/vk_stubs.c
 	src/renderers/vulkan/vk_fsr.c
 	src/renderers/vulkan/tr_font_vk.c
@@ -1428,7 +1447,6 @@ SET(RENDERER_VK_SRCS
 	src/renderers/vulkan/vk_portal_lights.c
 	src/renderers/vulkan/vk_post_process.cpp
 	src/renderers/vulkan/vk_proc_dressing.c
-	src/renderers/vulkan/vk_raytracing.c
 	src/renderers/vulkan/vk_renderpass.c
 	src/renderers/vulkan/vk_scene_graph.c
 	src/renderers/vulkan/vk_sync.c
@@ -1459,7 +1477,6 @@ endif()
 		src/renderers/vulkan/gltf_loader.c
 		src/renderers/vulkan/tr_font_vk.c
 		src/renderers/vulkan/tr_image.c
-		src/renderers/vulkan/vk_compute_raytracing.c
 		src/renderers/vulkan/vk_dynamic_rendering.c
 		src/renderers/vulkan/vk_graphics_settings.c
 		src/renderers/vulkan/vk_ibl.c
@@ -1473,6 +1490,61 @@ endif()
 IF(USE_VMA AND USE_VULKAN)
 	list(APPEND RENDERER_VK_SRCS src/renderers/vulkan/vk_vma.cpp)
 ENDIF()
+
+# RTX renderer integrates all advanced Vulkan features
+
+# RTX renderer - unified advanced renderer
+set(RENDERER_RTX_SRCS
+	src/renderers/vulkan/rtx/vk_rtx_main.cpp
+	src/renderers/vulkan/rtx/vk_path_tracer.cpp
+	src/renderers/vulkan/rtx/vk_denoiser.cpp
+	src/renderers/vulkan/rtx/vk_rtx_raii.cpp
+	src/renderers/vulkan/rtx/vk_raytracing.cpp
+	src/renderers/vulkan/rtx/vk_compute_raytracing.c
+	src/renderers/vulkan/rtx/vk_raymarching.cpp
+)
+
+# RTX renderer files - modernized with C++23 RAII patterns
+set(RENDERER_RTX_SRCS
+	src/renderers/vulkan/rtx/vk_rtx_main.cpp
+	src/renderers/vulkan/rtx/vk_path_tracer.cpp
+	src/renderers/vulkan/rtx/vk_denoiser.cpp
+	src/renderers/vulkan/rtx/vk_rtx_raii.cpp
+	src/renderers/vulkan/rtx/vk_raytracing.cpp
+	src/renderers/vulkan/rtx/vk_compute_raytracing.c
+	src/renderers/vulkan/rtx/vk_raymarching.cpp
+	src/renderers/vulkan/rtx/vk_rtx.h
+	src/renderers/vulkan/rtx/vk_path_tracer.h
+	src/renderers/vulkan/rtx/vk_denoiser.h
+	src/renderers/vulkan/rtx/vk_rtx_raii.h
+	src/renderers/vulkan/rtx/vk_compute_raytracing.h
+	src/renderers/vulkan/rtx/vk_raymarching.h
+)
+
+# Add RTX renderer as separate shared library
+add_library(renderer_rtx MODULE ${RENDERER_RTX_SRCS})
+set_target_properties(renderer_rtx PROPERTIES
+	PREFIX ""
+	OUTPUT_NAME "idtech3_rtx_x86_64"
+	LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/../release"
+)
+
+# Link dependencies for RTX renderer
+target_link_libraries(renderer_rtx
+	common
+	${Vulkan_LIBRARIES}
+	${SDL2_LIBRARIES}
+	${CMAKE_DL_LIBS}
+)
+
+# Include directories for RTX renderer
+target_include_directories(renderer_rtx PRIVATE
+	${CMAKE_SOURCE_DIR}/src/common
+	${CMAKE_SOURCE_DIR}/src/renderercommon
+	${CMAKE_SOURCE_DIR}/src/renderers/vulkan
+	${CMAKE_SOURCE_DIR}/src/renderers/vulkan/rtx
+	${CMAKE_SOURCE_DIR}/libs/cimgui
+)
 
 IF(USE_CIMGUI AND DEFINED CIMGUI_DIR)
 	list(APPEND RENDERER_VK_SRCS

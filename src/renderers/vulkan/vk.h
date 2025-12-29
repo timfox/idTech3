@@ -879,8 +879,23 @@ typedef struct {
         VkDeviceMemory atmosphereBufferMemory;
     } atmosphere;
 
+    // Advanced features capability tracking (for RTX renderer gating)
+    struct {
+        qboolean materialSystem;    // Advanced material system with PBR
+        qboolean godRays;           // God rays/volumetric lighting
+        qboolean atmosphere;        // Atmospheric scattering
+        qboolean ibl;               // Image-based lighting
+        qboolean fsr;               // FidelityFX Super Resolution
+        qboolean raymarching;       // Advanced ray marching effects
+        qboolean meshShaders;       // Mesh shader support
+        qboolean shaderObject;      // Shader object support
+        qboolean performanceQuery;  // GPU performance monitoring
+        qboolean descriptorBuffer;  // Dense descriptor management
+    } advanced;
+
     // Debug markers support
     qboolean debugMarkers;
+    VkDebugUtilsMessengerEXT debugMessenger;
 
     // GPU culling support
     struct {
@@ -1601,10 +1616,7 @@ void vk_draw_indexed(uint32_t indexCount, uint32_t firstIndex);
 qboolean create_color_attachment(uint32_t width, uint32_t height, VkSampleCountFlagBits samples, VkFormat format, VkImageUsageFlags usage, VkImage *image, VkImageView *image_view, VkImageLayout image_layout, qboolean multisample, VkImageCreateFlags flags);
 qboolean vk_gpu_culling_is_enabled(void);
 
-// Ray tracing functions
-void vk_rt_init(void);
-void vk_rt_shutdown(void);
-void vk_rt_trace_rays(uint32_t width, uint32_t height);
+// Ray tracing functions moved to RTX renderer only
 
 // Memory and performance systems
 void vk_init_vram_stats(void);

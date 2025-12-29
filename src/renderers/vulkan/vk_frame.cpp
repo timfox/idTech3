@@ -10,7 +10,7 @@
 #include "vk_terrain.h"
 #include "vk_surface_sprites.h"
 #include "vk_world_effects.h"
-#include "vk_raymarching.h"
+// Ray marching moved to RTX renderer only
 #include "vk.h"
 
 #include "vk_fsr.h"
@@ -171,11 +171,7 @@ extern "C" void vk_end_frame(void) {
         vk_apply_gamma_correction();
     }
 
-    // Apply raymarching effects
-    if (r_raymarching->integer) {
-        VK_Raymarching_UpdateConfig();
-        VK_Raymarching_Render(vk.cmd->command_buffer, vk.color_image_view, vk.color_image_view);
-    }
+    // Ray marching moved to RTX renderer only
 
     // Apply FSR (FidelityFX Super Resolution) after post-processing but before UI
     if (vk_fsr_is_enabled()) {

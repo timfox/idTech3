@@ -27,7 +27,6 @@ static void vk_rt_create_temporal_buffers( uint32_t width, uint32_t height );
 static void vk_rt_create_descriptor_set_layout( void );
 static void vk_rt_create_pipeline_layout( void );
 static void vk_rt_create_shader_binding_table( void );
-static void vk_rt_destroy_temporal_buffers( void );
 
 #ifdef USE_VULKAN
 
@@ -369,7 +368,7 @@ static void vk_rt_load_blue_noise_array( void )
 	// Check if staging buffer is large enough, if not we need to allocate a temporary one
 	// For now, assume staging buffer exists and is managed elsewhere
 	// If it's too small, we'll need to handle that case
-	if ( vk.staging_buffer.size < total_size ) {
+	if ( (size_t)vk.staging_buffer.size < (size_t)total_size ) {
 		ri.Printf( PRINT_WARNING, "Staging buffer too small for blue noise array (%d < %d). Upload may fail.\n", 
 			(int)vk.staging_buffer.size, total_size );
 		// In a real implementation, we'd allocate a larger staging buffer or upload in chunks
@@ -377,7 +376,7 @@ static void vk_rt_load_blue_noise_array( void )
 	}
 
 	// Copy all layers to staging buffer sequentially
-	byte *staging_ptr = vk.staging_buffer.ptr;
+        byte *staging_ptr = static_cast<byte*>(vk.staging_buffer.ptr);
 	for ( i = 0; i < loaded_count; i++ ) {
 		Com_Memcpy( staging_ptr, pics[i], pixel_size );
 		staging_ptr += pixel_size;
@@ -1100,7 +1099,7 @@ void vk_rt_build_blas( VkBuffer vertexBuffer, VkDeviceSize vertexOffset, uint32_
 	uint32_t existingSlot = vk_rt_find_blas_slot( hash );
 	if ( existingSlot < vk.rt.blasCount && vk.rt.blas[existingSlot] != VK_NULL_HANDLE && existingSlot != blasIndex ) {
 		// Reuse existing BLAS
-		ri.Printf( PRINT_DEVELOPER, "Reusing BLAS %u for slot %u (hash: 0x%016llx)\n", existingSlot, blasIndex, hash );
+                ri.Printf( PRINT_DEVELOPER, "Reusing BLAS %u for slot %u (hash: 0x%016lx)\n", existingSlot, blasIndex, (unsigned long)hash );
 		// Copy reference (in a full implementation, we'd track reference counts)
 		return;
 	}
@@ -1788,8 +1787,6 @@ void vk_rt_update_descriptor_set( void )
 	imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
 	VkDescriptorImageInfo blueNoiseInfo = {};
-	VkDescriptorImageInfo historyImageInfo = {};
-	VkDescriptorImageInfo motionVectorImageInfo = {};
 
 	VkWriteDescriptorSet writes[7] = {};
 	uint32_t writeCount = 0;

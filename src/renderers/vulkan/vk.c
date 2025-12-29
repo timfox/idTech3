@@ -21,7 +21,6 @@ extern cvar_t *r_dither;
 extern cvar_t *r_vk_hotReload;
 #include "../../common/performance_counters.h"
 #include "vk.h"
-#include "vk_raymarching.h"
 #include <dlfcn.h>
 
 static inline void vk_debug_write(int fd, const char *msg, size_t len)
@@ -155,6 +154,9 @@ typedef struct {
     qboolean dlssSupported;           // NVIDIA DLSS (framework ready)
     qboolean fsrSupported;            // AMD FSR (framework ready)
     qboolean pipelineBinaries;        // VK_KHR_pipeline_executable_properties
+    qboolean performanceQuery;         // VK_KHR_performance_query
+    qboolean descriptorBuffer;         // VK_EXT_descriptor_buffer
+    qboolean shaderObject;             // VK_EXT_shader_object
 } vk_advanced_features_t;
 
 vk_advanced_features_t vk_advanced = {0};
@@ -323,10 +325,10 @@ typedef struct VkPhysicalDeviceMeshShaderFeaturesEXT {
 #include "gltf_loader.h"
 #include "vk_dynamic_rendering.h"
 #include "vk_multithreaded_rendering.h"
-#include "vk_compute_raytracing.h"
 #include "vk_sem.h"
 #include "vk_graphics_settings.h"
 #include "vk_physics.h"
+// Ray tracing moved to RTX renderer only
 #endif
 
 #include "vk_commands.h"
@@ -338,6 +340,8 @@ typedef struct VkPhysicalDeviceMeshShaderFeaturesEXT {
 // FSR integration lives in vk_fsr.c; avoid including AMD reference headers here
 qboolean vk_fsr_init(void);
 void vk_fsr_shutdown(void);
+
+// Ray tracing moved to RTX renderer only
 
 // Pipeline binary function pointers (VK_KHR_pipeline_executable_properties) - forward declaration
 PFN_vkGetPipelineExecutablePropertiesKHR		qvkGetPipelineExecutablePropertiesKHR;
@@ -392,9 +396,7 @@ static double __attribute__((used)) vkFrameTelemetryLast = 0.0;
 static VkInstance vk_instance = VK_NULL_HANDLE;
 static VkSurfaceKHR vk_surface = VK_NULL_HANDLE;
 
-#ifndef NDEBUG
 VkDebugReportCallbackEXT vk_debug_callback = VK_NULL_HANDLE;
-#endif
 
 static void vk_log_subgroup_capabilities( VkPhysicalDevice physical_device ) {
 	if ( qvkGetPhysicalDeviceProperties2KHR == NULL ) {
@@ -445,6 +447,8 @@ PFN_vkGetPhysicalDeviceSurfaceSupportKHR			qvkGetPhysicalDeviceSurfaceSupportKHR
 #ifdef USE_VK_VALIDATION
 PFN_vkCreateDebugReportCallbackEXT				qvkCreateDebugReportCallbackEXT;
 PFN_vkDestroyDebugReportCallbackEXT				qvkDestroyDebugReportCallbackEXT;
+// PFN_vkCreateDebugUtilsMessengerEXT				qvkCreateDebugUtilsMessengerEXT;
+// PFN_vkDestroyDebugUtilsMessengerEXT				qvkDestroyDebugUtilsMessengerEXT;
 #endif
 PFN_vkAllocateCommandBuffers						qvkAllocateCommandBuffers;
 PFN_vkAllocateDescriptorSets						qvkAllocateDescriptorSets;
@@ -1381,6 +1385,9 @@ static qboolean used_instance_extension( const char *ext )
 	if ( Q_stricmp( ext, VK_EXT_DEBUG_UTILS_EXTENSION_NAME ) == 0 )
 		return qtrue;
 
+	if ( Q_stricmp( ext, VK_EXT_VALIDATION_FEATURES_EXTENSION_NAME ) == 0 )
+		return qtrue;
+
 	if ( Q_stricmp( ext, VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME ) == 0 )
 		return qtrue;
 
@@ -1552,8 +1559,67 @@ static void create_instance( void )
 	if ( res != VK_SUCCESS ) {
 		ri.Error( ERR_FATAL, "Vulkan: instance creation failed with %s", vk_result_string( res ) );
 	}
+
+	// Setup debug messenger after instance creation if debug utils is available
+	vk_setup_debug_messenger();
+
 }
 
+
+// Debug messenger setup for VK_EXT_debug_utils
+static void vk_setup_debug_messenger(void) {
+	if (!debugUtils) {
+		ri.Printf(PRINT_ALL, "...debug utils not supported\n");
+		return;
+	}
+
+	if (!qvkCreateDebugUtilsMessengerEXT) {
+		ri.Printf(PRINT_WARNING, "...VK_EXT_debug_utils function not loaded\n");
+		return;
+	}
+
+	ri.Printf(PRINT_ALL, "...setting up debug messenger\n");
+
+	VkDebugUtilsMessengerCreateInfoEXT createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+	createInfo.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+								 VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+								 VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+	createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+							 VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+							 VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+	createInfo.pfnUserCallback = vk_debug_callback;
+	createInfo.pUserData = NULL;
+
+	VkResult result = qvkCreateDebugUtilsMessengerEXT(vk_instance, &createInfo, NULL, &vk.debugMessenger);
+	if (result != VK_SUCCESS) {
+		ri.Printf(PRINT_WARNING, "Failed to create debug messenger: %s\n", vk_result_to_string(result));
+	} else {
+		ri.Printf(PRINT_ALL, "...debug messenger created successfully\n");
+	}
+}
+
+// Debug callback function for VK_EXT_debug_utils
+// static VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
+// 	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+// 	VkDebugUtilsMessageTypeFlagsEXT messageType,
+// 	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+// 	void* pUserData) {
+//
+// 	// Map Vulkan severity to our print levels
+// 	int printLevel = PRINT_DEVELOPER;
+// 	if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) {
+// 		printLevel = PRINT_ERROR;
+// 	} else if (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+// 		printLevel = PRINT_WARNING;
+// 	}
+//
+// 	ri.Printf(printLevel, "Vulkan Debug [%s]: %s\n",
+// 			  pCallbackData->pMessageIdName ? pCallbackData->pMessageIdName : "Unknown",
+// 			  pCallbackData->pMessage);
+//
+// 	return VK_FALSE;
+// }
 
 static VkFormat get_depth_format( VkPhysicalDevice physical_device ) {
 	VkFormatProperties props;
@@ -1857,6 +1923,14 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		qboolean dedicatedAllocation = qfalse;
 		qboolean memoryRequirements2 = qfalse;
 		qboolean debugMarker = qfalse;
+		qboolean debugUtils = qfalse;
+		qboolean validationFeatures = qfalse;
+		qboolean performanceQuery = qfalse;
+		qboolean descriptorBuffer = qfalse;
+		qboolean nvMotionBlur = qfalse;
+		qboolean amdVertexParams = qfalse;
+		qboolean intelFunctions = qfalse;
+		qboolean shaderObject = qfalse;
 		qboolean meshShaderExt = qfalse;
 		qboolean meshShadersEnabled = qfalse;
 		qboolean sync2 = qfalse;
@@ -1905,6 +1979,18 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 				memoryRequirements2 = qtrue;
 			} else if ( strcmp( ext, VK_EXT_DEBUG_MARKER_EXTENSION_NAME ) == 0 ) {
 				debugMarker = qtrue;
+			} else if ( strcmp( ext, VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME ) == 0 ) {
+				performanceQuery = qtrue;
+			} else if ( strcmp( ext, "VK_EXT_descriptor_buffer" ) == 0 ) {
+				descriptorBuffer = qtrue;
+			} else if ( strcmp( ext, "VK_NV_ray_tracing_motion_blur" ) == 0 ) {
+				nvMotionBlur = qtrue;
+			} else if ( strcmp( ext, "VK_AMD_shader_explicit_vertex_parameter" ) == 0 ) {
+				amdVertexParams = qtrue;
+			} else if ( strcmp( ext, "VK_INTEL_shader_integer_functions2" ) == 0 ) {
+				intelFunctions = qtrue;
+			} else if ( strcmp( ext, "VK_EXT_shader_object" ) == 0 ) {
+				shaderObject = qtrue;
 #ifdef _DEBUG
 			} else if ( strcmp( ext, VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME ) == 0 ) {
 				timelineSemaphore = qtrue;
@@ -2083,6 +2169,77 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 
 		if ( pushDescriptor ) {
 			device_extension_list[ device_extension_count++ ] = VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME;
+		}
+
+		// Performance query support (VK_KHR_performance_query)
+		if ( performanceQuery ) {
+			device_extension_list[ device_extension_count++ ] = VK_KHR_PERFORMANCE_QUERY_EXTENSION_NAME;
+			vk_advanced.performanceQuery = qtrue;
+			ri.Printf( PRINT_ALL, "...performance query support enabled\n" );
+		}
+
+		// Descriptor buffer support (VK_EXT_descriptor_buffer)
+		if ( descriptorBuffer ) {
+			device_extension_list[ device_extension_count++ ] = "VK_EXT_descriptor_buffer";
+			vk_advanced.descriptorBuffer = qtrue;
+			ri.Printf( PRINT_ALL, "...descriptor buffer support enabled\n" );
+		}
+
+		// Vendor-specific extensions
+		if ( nvMotionBlur ) {
+			device_extension_list[ device_extension_count++ ] = "VK_NV_ray_tracing_motion_blur";
+			ri.Printf( PRINT_ALL, "...NVIDIA ray tracing motion blur enabled\n" );
+		}
+
+		if ( amdVertexParams ) {
+			device_extension_list[ device_extension_count++ ] = "VK_AMD_shader_explicit_vertex_parameter";
+			ri.Printf( PRINT_ALL, "...AMD shader explicit vertex parameter enabled\n" );
+		}
+
+		if ( intelFunctions ) {
+			device_extension_list[ device_extension_count++ ] = "VK_INTEL_shader_integer_functions2";
+			ri.Printf( PRINT_ALL, "...Intel shader integer functions 2 enabled\n" );
+		}
+
+		// Shader object support (VK_EXT_shader_object)
+		if ( shaderObject ) {
+			device_extension_list[ device_extension_count++ ] = "VK_EXT_shader_object";
+			vk.advanced.shaderObject = qtrue;
+			ri.Printf( PRINT_ALL, "...shader object support enabled\n" );
+		}
+
+		// Initialize advanced features capability flags for RTX gating
+		vk.advanced.materialSystem = qtrue; // Material system is always available in Vulkan renderer
+		vk.advanced.godRays = qtrue;        // God rays are compute-based, widely supported
+		vk.advanced.atmosphere = qtrue;     // Atmosphere is compute-based
+		vk.advanced.ibl = qtrue;           // IBL is compute-based
+		vk.advanced.fsr = qtrue;           // FSR is compute-based
+		vk.advanced.raymarching = qtrue;   // Raymarching is compute-based
+		vk.advanced.meshShaders = meshShadersEnabled;
+		vk.advanced.performanceQuery = performanceQuery;
+		vk.advanced.descriptorBuffer = descriptorBuffer;
+
+		ri.Printf( PRINT_ALL, "...RTX capability detection complete\n" );
+
+		// Suggest RTX enabling for capable hardware
+		if (vk.rayTracingSupported) {
+			cvar_t *r_rtx_enable = ri.Cvar_Get("r_rtx_enable", "0", CVAR_ARCHIVE);
+			if (r_rtx_enable && r_rtx_enable->integer == 0) {
+				ri.Printf(PRINT_ALL, "\n");
+				ri.Printf(PRINT_ALL, "===============================================================================\n");
+				ri.Printf(PRINT_ALL, "RAY TRACING DETECTED: This GPU supports hardware ray tracing!\n");
+				ri.Printf(PRINT_ALL, "To enable advanced RTX features, set: /r_rtx_enable 1\n");
+				ri.Printf(PRINT_ALL, "Recommended settings for RTX:\n");
+				ri.Printf(PRINT_ALL, "  /r_rtx_mode 0     - Hardware ray tracing (fastest)\n");
+				ri.Printf(PRINT_ALL, "  /r_rtx_mode 2     - Hybrid mode (hardware + compute)\n");
+				ri.Printf(PRINT_ALL, "  /r_rtx_samples 4  - Better quality (1-16, higher = slower)\n");
+				ri.Printf(PRINT_ALL, "  /r_rtx_bounces 3  - Multiple light bounces (1-8)\n");
+				ri.Printf(PRINT_ALL, "===============================================================================\n");
+				ri.Printf(PRINT_ALL, "\n");
+			}
+		} else {
+			ri.Printf(PRINT_ALL, "...Hardware ray tracing not supported (RTX features unavailable)\n");
+			ri.Printf(PRINT_ALL, "...Basic Vulkan renderer will be used\n");
 		}
 
 		// Pipeline binary support (VK_KHR_pipeline_executable_properties)
@@ -2330,6 +2487,8 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			as_features.descriptorBindingAccelerationStructureUpdateAfterBind = VK_FALSE;
 		}
 #endif
+
+
 		(void)pNextPtr;
 		res = qvkCreateDevice( physical_device, &device_desc, NULL, &vk.device );
 		if ( res < 0 ) {
@@ -2493,21 +2652,24 @@ static void init_vulkan_library( void )
 #ifdef USE_VK_VALIDATION
 		INIT_INSTANCE_FUNCTION_EXT( vkCreateDebugReportCallbackEXT )
 		INIT_INSTANCE_FUNCTION_EXT( vkDestroyDebugReportCallbackEXT )
+#endif
+
+		// Load debug utils functions if available (independent of validation)
 
 		// Create debug callback.
-		if ( qvkCreateDebugReportCallbackEXT && qvkDestroyDebugReportCallbackEXT ) {
-			VkDebugReportCallbackCreateInfoEXT desc;
-			desc.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
-			desc.pNext = NULL;
-			desc.flags = VK_DEBUG_REPORT_WARNING_BIT_EXT |
-				VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
-				VK_DEBUG_REPORT_ERROR_BIT_EXT;
-			desc.pfnCallback = &debug_callback;
-			desc.pUserData = NULL;
+		// if ( qvkCreateDebugReportCallbackEXT && qvkDestroyDebugReportCallbackEXT ) {
+		// 	VkDebugReportCallbackCreateInfoEXT desc;
+		// 	desc.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
+		// 	desc.pNext = NULL;
+		// 	desc.flags = VK_DEBUG_REPORT_WARNING_BIT_EXT |
+		// 		VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT |
+		// 		VK_DEBUG_REPORT_ERROR_BIT_EXT;
+		// 	desc.pfnCallback = &debug_callback;
+		// 	desc.pUserData = NULL;
 
-			VK_CHECK( qvkCreateDebugReportCallbackEXT( vk_instance, &desc, NULL, &vk_debug_callback ) );
-		}
-#endif
+		// 	VK_CHECK( qvkCreateDebugReportCallbackEXT( vk_instance, &desc, NULL, &vk_debug_callback ) );
+		// }
+
 
                 vk_debug_write(2, "DEBUG: Creating surface\n", 25);
 		// create surface
@@ -3313,6 +3475,8 @@ static void __attribute__((unused)) deinit_instance_functions( void )
 	qvkCreateDebugReportCallbackEXT = NULL;
 	qvkDestroyDebugReportCallbackEXT = NULL;
 #endif
+	// qvkCreateDebugUtilsMessengerEXT = NULL;
+	// qvkDestroyDebugUtilsMessengerEXT = NULL;
 }
 
 
@@ -3699,12 +3863,6 @@ void vk_initialize( void )
 	// Create shader modules early so they are available for pipeline creation
 	vk_create_shader_modules();
 
-	// Initialize ray tracing if supported
-	if (vk.rayTracingSupported) {
-		ri.Printf(PRINT_ALL, "Vulkan: Initializing ray tracing\n");
-		vk_rt_init();
-	}
-
 	// Initialize FSR (FidelityFX Super Resolution)
 	if (!vk_fsr_init()) {
 		ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize FSR\n");
@@ -3731,10 +3889,7 @@ void vk_initialize( void )
 	// Initialize world effects system
 	vk_world_effects_init();
 
-	// Initialize raymarching system
-	if (!VK_Raymarching_Init()) {
-		ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize raymarching\n");
-	}
+	// Ray tracing and raymarching moved to RTX renderer only
 
 	ri.Printf(PRINT_ALL, "Vulkan: Initialized successfully\n");
 
@@ -8409,15 +8564,7 @@ void vk_shutdown( refShutdownCode_t code ) {
 			// Shutdown world effects system
 			vk_world_effects_shutdown();
 
-			// Shutdown raymarching system
-			VK_Raymarching_Shutdown();
-
-			// Shutdown ray tracing if enabled
-#ifdef USE_VULKAN_RAY_TRACING
-			if ( vk.rayTracingSupported ) {
-				vk_rt_shutdown();
-			}
-#endif
+			// Ray tracing and raymarching moved to RTX renderer only
 
 			// Shutdown async compute
 			vk_shutdown_compute_manager();
@@ -8469,6 +8616,14 @@ void vk_shutdown( refShutdownCode_t code ) {
 
 	// Mark Vulkan as inactive after cleanup
 			vk.active = qfalse;
+		}
+
+
+		// Destroy debug messenger before clearing instance data
+		if (vk.debugMessenger != VK_NULL_HANDLE && qvkDestroyDebugUtilsMessengerEXT) {
+			qvkDestroyDebugUtilsMessengerEXT(vk_instance, vk.debugMessenger, NULL);
+			vk.debugMessenger = VK_NULL_HANDLE;
+			ri.Printf(PRINT_ALL, "vk_shutdown: Debug messenger destroyed\n");
 		}
 
 		// Clear Vulkan instance data based on shutdown level

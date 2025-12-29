@@ -40,7 +40,7 @@ void VK_ComputeRT_Init(void) {
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    VK_CHECK(qvkCreateFence(vk.device, &fenceInfo, NULL, &vk_compute_rt.computeFence));
+    VK_CHECK(vkCreateFence(vk.device, &fenceInfo, NULL, &vk_compute_rt.computeFence));
 
     // Create descriptor set layout for compute shader
     VkDescriptorSetLayoutBinding bindings[3] = {};
@@ -199,7 +199,7 @@ void VK_ComputeRT_Shutdown(void) {
 
     // Destroy fence
     if (vk_compute_rt.computeFence != VK_NULL_HANDLE) {
-        qvkDestroyFence(vk.device, vk_compute_rt.computeFence, NULL);
+        vkDestroyFence(vk.device, vk_compute_rt.computeFence, NULL);
     }
 
     // Destroy command pool
