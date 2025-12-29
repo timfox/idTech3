@@ -88,8 +88,8 @@ mkdir -p "$BUILD_DIR"
 # CPU cores
 if command -v nproc &>/dev/null; then
   CORES="$(nproc)"
-elif [[ "${OSTYPE:-}" == "darwin"* ]]; then
-  CORES="$(sysctl -n hw.ncpu)"
+elif [[ "${OSTYPE:-}" =~ ^darwin ]]; then
+  CORES="$(sysctl -n hw.ncpu 2>/dev/null || echo 4)"
 else
   CORES=4
 fi
@@ -102,6 +102,7 @@ CMAKE_FLAGS=(
   "-DENABLE_ASAN=OFF"
   "-DBUILD_SERVER=ON"
   "-DUSE_VULKAN=ON"
+  "-Wno-dev"
 )
 
 if [ "$VULKAN" -eq 1 ]; then
