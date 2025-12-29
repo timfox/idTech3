@@ -406,6 +406,7 @@ static void R_Register( void ) {
 
     r_noportals = ri.Cvar_Get( "r_noportals", "0", CVAR_CHEAT );
     r_fastsky = ri.Cvar_Get( "r_fastsky", "0", CVAR_ARCHIVE );
+    r_neatsky = ri.Cvar_Get( "r_neatsky", "0", CVAR_ARCHIVE | CVAR_LATCH );
     r_norefresh = ri.Cvar_Get( "r_norefresh", "0", CVAR_CHEAT );
     r_dlightMode = ri.Cvar_Get( "r_dlightMode", "0", CVAR_ARCHIVE );
     r_nocull = ri.Cvar_Get( "r_nocull", "0", CVAR_CHEAT );
@@ -446,6 +447,7 @@ static void R_Register( void ) {
     r_marksOnTriangleMeshes = ri.Cvar_Get( "r_marksOnTriangleMeshes", "0", CVAR_ARCHIVE );
     r_dlightBacks = ri.Cvar_Get( "r_dlightBacks", "1", CVAR_CHEAT );
     r_debugSort = ri.Cvar_Get( "r_debugSort", "0", CVAR_CHEAT );
+    r_printShaders = ri.Cvar_Get( "r_printShaders", "0", 0 );
     r_showtris = ri.Cvar_Get( "r_showtris", "0", CVAR_CHEAT );
 
     // Texture/debug controls used by shared renderer code
@@ -521,7 +523,14 @@ static void R_Register( void ) {
     r_lodscale = ri.Cvar_Get( "r_lodscale", "5", CVAR_CHEAT );
     r_ambientScale = ri.Cvar_Get( "r_ambientScale", "0.6", CVAR_CHEAT );
     r_defaultImage = ri.Cvar_Get( "r_defaultImage", "", CVAR_ARCHIVE_ND | CVAR_LATCH );
+
+    r_fontSDF = ri.Cvar_Get( "r_fontSDF", "0", CVAR_ARCHIVE | CVAR_LATCH );
 }
+
+// Cvar definitions
+cvar_t *r_neatsky;
+cvar_t *r_printShaders;
+cvar_t *r_fontSDF;
 
 void R_Init( void ) {
     static qboolean initialized = qfalse;

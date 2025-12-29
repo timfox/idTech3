@@ -1641,6 +1641,7 @@ extern	cvar_t	*r_defaultImage;
 extern	cvar_t	*r_debugSort;
 
 extern	cvar_t	*r_printShaders;
+extern	cvar_t	*r_fontSDF;
 
 extern cvar_t	*r_marksOnTriangleMeshes;
 

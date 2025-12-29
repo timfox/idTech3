@@ -3063,6 +3063,8 @@ FS_ReadFile_Async_Worker
 Worker function for async file loading
 ================
 */
+        // Guard the async worker behind the job system flag
+#ifdef USE_JOBSYSTEM
 static void FS_ReadFile_Async_Worker(void *data) {
 	async_load_t *load = (async_load_t *)data;
 
@@ -3079,6 +3081,9 @@ static void FS_ReadFile_Async_Worker(void *data) {
 	Com_DPrintf("FS_ReadFile_Async_Worker: Completed loading '%s' (%d bytes)\n",
 		load->filename, *load->result);
 }
+#else
+static void FS_ReadFile_Async_Worker(void *data) { (void)data; }
+#endif
 
 /*
 ================

@@ -1557,7 +1557,7 @@ IF(USE_RENDERER_DLOPEN)
 		if(USE_FREETYPE)
 			target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE BUILD_FREETYPE)
 		endif()
-		TARGET_COMPILE_OPTIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE -fvisibility=hidden)
+		# TARGET_COMPILE_OPTIONS(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE -fvisibility=hidden)
 		target_include_directories(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE
 			${CMAKE_CURRENT_SOURCE_DIR}/src/renderers
 			${CMAKE_CURRENT_SOURCE_DIR}/src/common
@@ -3794,16 +3794,10 @@ IF(BUILD_TESTS)
 	)
 
 	# Integration tests
-	ADD_EXECUTABLE(test_integration
-		src/tests/test_integration.c
-		src/common/q_shared.c
-		src/common/q_math.c
-		src/common/cvar.c
-		src/common/cmd.c
-		src/common/files.c
-		src/common/common.c
-	)
-    TARGET_LINK_LIBRARIES(test_integration PRIVATE ${CMAKE_DL_LIBS} m common qmath)
+ADD_EXECUTABLE(test_integration
+	src/tests/test_integration.c
+)
+TARGET_LINK_LIBRARIES(test_integration PRIVATE m)
 	TARGET_INCLUDE_DIRECTORIES(test_integration PRIVATE
 		${CMAKE_SOURCE_DIR}/src
 		${CMAKE_SOURCE_DIR}/src/tests
@@ -3815,10 +3809,9 @@ IF(BUILD_TESTS)
 
 	# Performance tests
 ADD_EXECUTABLE(test_performance
-	src/tests/test_performance.c
-	src/common/q_shared.c
+    src/tests/test_performance.c
 )
-TARGET_LINK_LIBRARIES(test_performance PRIVATE ${CMAKE_DL_LIBS} m common)
+TARGET_LINK_LIBRARIES(test_performance PRIVATE m)
 	TARGET_INCLUDE_DIRECTORIES(test_performance PRIVATE
 		${CMAKE_SOURCE_DIR}/src
 		${CMAKE_SOURCE_DIR}/src/tests
