@@ -1360,6 +1360,7 @@ SET(RENDERER_VK_SRCS
 	src/renderers/vulkan/tr_surface.c
 	src/renderers/vulkan/tr_world.c
 	src/renderers/vulkan/vk.c
+	src/renderers/vulkan/vk_raymarching.cpp
 	src/renderers/vulkan/vk_stubs.c
 	src/renderers/vulkan/vk_fsr.c
 	src/renderers/vulkan/tr_font_vk.c
