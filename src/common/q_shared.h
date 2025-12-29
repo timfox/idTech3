@@ -104,12 +104,24 @@ typedef struct {
 #ifdef __cplusplus
 extern "C" {
 #endif
+// Q_stricmp
+// Case-insensitive string comparison
+// Parameters:
+//   s1, s2: Null-terminated strings to compare
+// Returns: Negative if s1 < s2, 0 if equal, positive if s1 > s2
 int Q_stricmp(const char *s1, const char *s2);
 #ifdef __cplusplus
 }
 #endif
 
 // Type-safe file operations
+
+// File_IsValidPath
+// Validates a file path for security and correctness
+// Parameters:
+//   path: File path to validate
+// Returns: qtrue if path is valid and safe, qfalse otherwise
+// Security: Prevents path traversal attacks and validates length
 static inline qboolean File_IsValidPath(const char *path) {
     if (!path) return qfalse;
     if (strlen(path) >= sizeof(pathname_t)) return qfalse;
