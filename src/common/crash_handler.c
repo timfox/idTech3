@@ -49,6 +49,10 @@ static int g_start_time = 0;
 static crash_callback_t g_crash_callbacks[8];
 static int g_crash_callback_count = 0;
 
+// Mod loading context for crash debugging
+static char g_mod_loading_name[MAX_QPATH] = {0};
+static char g_mod_loading_operation[64] = {0};
+
 // Forward declarations
 static void Crash_WriteReport(const crash_info_t *info, const char *reason);
 static void Crash_SetSafeModeFlag(void);
@@ -431,3 +435,61 @@ void Crash_RegisterCallback(crash_callback_t callback)
     }
 }
 
+/*
+=================
+Crash_SetModLoadingContext
+
+Set context for mod loading operations to help debug crashes
+=================
+*/
+void Crash_SetModLoadingContext(const char *modName, const char *operation)
+{
+    if (modName) {
+        Q_strncpyz(g_mod_loading_name, modName, sizeof(g_mod_loading_name));
+    } else {
+        g_mod_loading_name[0] = '\0';
+    }
+    
+    if (operation) {
+        Q_strncpyz(g_mod_loading_operation, operation, sizeof(g_mod_loading_operation));
+    } else {
+        g_mod_loading_operation[0] = '\0';
+    }
+}
+
+/*
+=================
+Crash_ClearModLoadingContext
+
+Clear mod loading context after successful load
+=================
+*/
+void Crash_ClearModLoadingContext(void)
+{
+    g_mod_loading_name[0] = '\0';
+    g_mod_loading_operation[0] = '\0';
+}
+
+/*
+=================
+Crash_ReportModLoad
+
+Report mod loading errors with detailed context
+=================
+*/
+void Crash_ReportModLoad(const char *modName, const char *error)
+{
+    char report[1024];
+    
+    Com_Printf(S_COLOR_RED "Mod loading error:\n");
+    Com_Printf(S_COLOR_YELLOW "  Mod: %s\n", modName ? modName : "unknown");
+    Com_Printf(S_COLOR_YELLOW "  Error: %s\n", error ? error : "unknown error");
+    
+    if (g_mod_loading_operation[0]) {
+        Com_Printf(S_COLOR_YELLOW "  Operation: %s\n", g_mod_loading_operation);
+    }
+    
+    Com_sprintf(report, sizeof(report), "Mod load failure: %s - %s", 
+                modName ? modName : "unknown", error ? error : "unknown");
+    Crash_GenerateReport(report);
+}

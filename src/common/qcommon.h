@@ -1072,6 +1072,21 @@ void FS_PureServerSetLoadedPaks( const char *pakSums, const char *pakNames );
 
 qboolean FS_IsPureChecksum( int sum );
 
+// Content validation functions
+typedef struct {
+	qboolean valid;
+	const char *error;
+	int missing_files;
+	int corrupted_files;
+} fs_validation_result_t;
+
+qboolean FS_ValidatePakFile( const char *pakPath, char *errorMsg, int errorMsgSize );
+qboolean FS_ValidateGameContent( fs_validation_result_t *result );
+qboolean FS_ValidateMod( const char *modName, fs_validation_result_t *result );
+void FS_ReportMissingContent( fs_validation_result_t *result );
+qboolean FS_ValidateContentOnStartup( void );
+qboolean Mod_ValidateBeforeLoad( const char *modName );
+
 qboolean FS_InvalidGameDir( const char *gamedir );
 qboolean FS_idPak( const char *pak, const char *base, int numPaks );
 qboolean FS_ComparePaks( char *neededpaks, int len, qboolean dlstring );

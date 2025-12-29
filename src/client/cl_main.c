@@ -3650,10 +3650,10 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 	}
 
 	// Try renderers in priority order starting from requested one
-	void *rendererLib = NULL;
+	void *localRendererLib = NULL;
 	const char *loadedRenderer = NULL;
 
-	for (int i = 0; i < numRenderers && !rendererLib; i++) {
+	for (int i = 0; i < numRenderers && !localRendererLib; i++) {
 		int tryIndex = (startIndex + i) % numRenderers;
 		const char *tryRenderer = rendererPriority[tryIndex];
 
@@ -3664,31 +3664,54 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 		if ( strstr( dllName, "opengl" ) ) {
 			void *glLib = Sys_LoadLibrary( OPENGL_DRIVER_NAME );
 			if ( glLib ) {
-				// Keep it loaded
+				Com_Printf( "  OpenGL library pre-loaded successfully\n" );
+			} else {
+				Com_Printf( S_COLOR_YELLOW "  Warning: Could not pre-load OpenGL library\n" );
 			}
 		}
 
 		ospath = FS_BuildOSPath( Sys_DefaultBasePath(), dllName, NULL );
-		rendererLib = Sys_LoadLibrary( ospath );
+		localRendererLib = Sys_LoadLibrary( ospath );
 
-		if (rendererLib) {
+		if (localRendererLib) {
 			loadedRenderer = tryRenderer;
-			Com_Printf( "Successfully loaded renderer: %s\n", tryRenderer );
+			Com_Printf( S_COLOR_GREEN "Successfully loaded renderer: %s\n", tryRenderer );
 
 			// Runtime test: Print active rendering path
-			if (com_developer && com_developer->integer) {
-				Com_Printf( "Renderer startup final path: %s\n", tryRenderer );
-				if (Q_stricmp(tryRenderer, rendererName) != 0) {
-					Com_Printf( "Note: Fell back from requested renderer '%s' to '%s'\n", rendererName, tryRenderer );
-				}
+			Com_Printf( "Renderer startup final path: %s\n", tryRenderer );
+			if (Q_stricmp(tryRenderer, rendererName) != 0) {
+				Com_Printf( S_COLOR_YELLOW "Note: Fell back from requested renderer '%s' to '%s'\n", rendererName, tryRenderer );
+				Com_Printf( S_COLOR_YELLOW "  (This is normal if the requested renderer is unavailable)\n" );
 			}
-		} else if (i == 0) {
-			Com_Printf( "Requested renderer %s failed to load, trying fallbacks\n", rendererName );
+		} else {
+			Com_Printf( S_COLOR_YELLOW "  Failed to load renderer: %s\n", tryRenderer );
+			Com_Printf( S_COLOR_YELLOW "  Path attempted: %s\n", ospath );
+			if (i == 0) {
+				Com_Printf( "Requested renderer %s failed to load, trying fallbacks\n", rendererName );
+			}
 		}
 	}
 
-	if (!rendererLib) {
-		Com_Error( ERR_FATAL, "Failed to load any renderer" );
+	// If no renderer loaded, provide helpful error message
+	if (!localRendererLib) {
+		Com_Printf( S_COLOR_RED "\n" );
+		Com_Printf( S_COLOR_RED "========================================\n" );
+		Com_Printf( S_COLOR_RED "FATAL: Failed to load any renderer\n" );
+		Com_Printf( S_COLOR_RED "========================================\n" );
+		Com_Printf( S_COLOR_YELLOW "Tried renderers in order:\n" );
+		for (int i = 0; i < numRenderers; i++) {
+			int tryIndex = (startIndex + i) % numRenderers;
+			Com_Printf( S_COLOR_YELLOW "  %d. %s\n", i + 1, rendererPriority[tryIndex] );
+		}
+		Com_Printf( "\n" );
+		Com_Printf( S_COLOR_CYAN "Troubleshooting:\n" );
+		Com_Printf( S_COLOR_CYAN "  1. Ensure renderer .so files are in the same directory as the engine\n" );
+		Com_Printf( S_COLOR_CYAN "  2. Check that required graphics drivers are installed\n" );
+		Com_Printf( S_COLOR_CYAN "  3. For Vulkan: Ensure Vulkan drivers are installed (vulkan-utils package)\n" );
+		Com_Printf( S_COLOR_CYAN "  4. For OpenGL: Ensure OpenGL drivers are installed (mesa-utils package)\n" );
+		Com_Printf( S_COLOR_CYAN "  5. Try running with: +set cl_renderer opengl\n" );
+		Com_Printf( "\n" );
+		Com_Error( ERR_FATAL, "No renderer available. See console output above for details." );
 		return;
 	}
 
@@ -3699,6 +3722,9 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 			// Keep it loaded
 		}
 	}
+
+	// Assign to global rendererLib
+	rendererLib = localRendererLib;
 
 	// Try alternative architecture suffix if x86_64 (some builds use _x86 for 64-bit)
 	if ( !rendererLib && !Q_stricmp( REND_ARCH_STRING, "x86_64" ) )

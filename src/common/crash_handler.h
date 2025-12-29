@@ -80,6 +80,11 @@ const crash_info_t *Crash_GetInfo(void);
 typedef void (*crash_callback_t)(const crash_info_t *info);
 void Crash_RegisterCallback(crash_callback_t callback);
 
+// Mod loading crash debugging
+void Crash_SetModLoadingContext(const char *modName, const char *operation);
+void Crash_ClearModLoadingContext(void);
+void Crash_ReportModLoad(const char *modName, const char *error);
+
 #ifdef __cplusplus
 }
 #endif

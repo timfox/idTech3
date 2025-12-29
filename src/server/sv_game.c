@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define TRAP_EXTENSIONS_LIST g_extensionTraps
 #include "../common/vm_ext.h"
 #include "../common/syscall_registry.h"
+#include "../common/crash_handler.h"
 
 #include "../botlib/botlib.h"
 
@@ -1134,12 +1135,44 @@ void SV_InitGameProgs( void ) {
 	}
 
 	Com_Printf( "SV_InitGameProgs: Calling VM_Create for game module\n" );
+	
+	// Set mod loading context for crash debugging
+	cvar_t *fs_game = Cvar_Get( "fs_game", "", 0 );
+	const char *modName = fs_game ? fs_game->string : "";
+	if ( modName && *modName && Q_stricmp( modName, BASEGAME ) ) {
+		// Validate mod before loading
+		if ( !Mod_ValidateBeforeLoad( modName ) ) {
+			Com_Printf( S_COLOR_RED "Mod validation failed for: %s\n", modName );
+			Com_Printf( S_COLOR_YELLOW "Attempting to load anyway (may crash)\n" );
+		}
+		Crash_SetModLoadingContext( modName, "VM_Create" );
+	}
+	
+	// Safety check: ensure gvm pointer is NULL before creating
+	if ( gvm != NULL ) {
+		Com_Printf( S_COLOR_YELLOW "Warning: gvm already initialized, freeing old instance\n" );
+		VM_Free( gvm );
+		gvm = NULL;
+	}
+	
 	// load the dll or bytecode
 	gvm = VM_Create( VM_GAME, SV_GameSystemCalls, SV_DllSyscall, VM_SelectInterpret( "vm_game", VMI_NATIVE, qfalse ) );
 	if ( !gvm ) {
+		if ( modName && *modName ) {
+			Crash_ReportModLoad( modName, "VM_Create failed - unable to load game module" );
+		}
 		VM_Error( ERR_DROP, VM_GAME );
 	}
+	
+	// Safety check: validate gvm structure after creation
+	if ( !gvm->name || !gvm->dataBase ) {
+		Com_Error( ERR_DROP, "VM_Create returned invalid VM structure" );
+	}
+	
 	Com_Printf( "SV_InitGameProgs: VM_Create succeeded, gvm=%p\n", (void*)gvm );
+	
+	// Clear mod loading context on success
+	Crash_ClearModLoadingContext();
 
 	Com_Printf( "SV_InitGameProgs: Calling SV_InitGameVM\n" );
 	SV_InitGameVM( qfalse );

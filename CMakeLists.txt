@@ -481,6 +481,7 @@ SET(QCOMMON_SRCS
     src/common/cmd.c
     src/common/common.c
     src/common/crash_handler.c
+    src/common/files_validation.c
     src/common/cvar.c
     src/common/q_lockfree.c
     src/common/ecs.cpp
@@ -3809,3 +3810,9 @@ IF(BUILD_TESTS)
 
 	MESSAGE(STATUS "Tests enabled: test_qcommon, test_qmath, test_info, test_msg_secure, test_renderer_init, test_integration, test_performance")
 ENDIF()
+
+# Game Launcher
+ADD_EXECUTABLE(idtech3_launcher src/launcher/launcher_main.c)
+SET_TARGET_PROPERTIES(idtech3_launcher PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+)

@@ -1,0 +1,4 @@
+Mod Name: testmod
+Description: Custom mod for idTech3
+Version: 1.0
+Author: Your Name

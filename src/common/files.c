@@ -6413,6 +6413,11 @@ static void FS_Startup( void ) {
 		FS_CheckIdPaks();
 	}
 
+	// Validate content after filesystem is fully initialized
+	// This is called from FS_Restart, so validation happens after all paths are set up
+	// Note: We don't fail startup if validation fails - just warn the user
+	FS_ValidateContentOnStartup();
+
 	// Mark startup as complete - fs_searchpaths is now initialized
 	fs_startupInProgress = qfalse;
 
@@ -7028,6 +7033,9 @@ void FS_Restart( int checksumFeed ) {
 		Com_Printf( "  Note: Create default.cfg in your %s directory to set default settings.\n", BASEGAME );
 	}
 
+	// Validate game content
+	FS_ValidateContentOnStartup();
+	
 	// Preload critical resources to reduce loading stalls
 	FS_PreloadCriticalResources();
 
