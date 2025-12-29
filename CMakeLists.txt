@@ -1430,6 +1430,7 @@ SET(RENDERER_VK_SRCS
 	src/renderers/vulkan/tr_curve.c
 	src/renderers/vulkan/tr_image.c
 	src/renderers/vulkan/tr_init.c
+	src/renderers/vulkan/tr_entry.cpp
 	src/renderers/vulkan/tr_light.c
 	src/renderers/vulkan/tr_lightclusters.c
 	src/renderers/vulkan/tr_main.c
@@ -1688,11 +1689,11 @@ IF(USE_RENDERER_DLOPEN)
     ENDIF()
 
 	if(USE_VULKAN)
-		ADD_LIBRARY(${RENDERER_PREFIX}_vulkan${RENDEXT} SHARED ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
+		ADD_LIBRARY(${RENDERER_PREFIX}_vulkan${RENDEXT} MODULE ${RENDERER_VK_SRCS} ${RENDERER_COMMON_SRCS} ${AUX_SRCS})
 		SET_TARGET_PROPERTIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES
 			OUTPUT_NAME "${RENDERER_PREFIX}_vulkan${RENDEXT}"
 			PREFIX ""
-			POSITION_INDEPENDENT_CODE ON
+			LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/../release"
 		)
 		target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_VULKAN)
 		if(ANDROID)
