@@ -17,6 +17,10 @@ Advanced raymarching implementation for:
 
 #include "vk.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Raymarching configuration
 typedef struct {
     int maxSteps;
@@ -61,5 +65,9 @@ void VK_Raymarching_AddDemoFields(void);
 void VK_Raymarching_RenderVolumetric(VkCommandBuffer commandBuffer, VkImageView depthImage, VkImageView outputImage);
 
 #endif // USE_VULKAN
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // VK_RAYMARCHING_H

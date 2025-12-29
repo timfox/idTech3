@@ -1525,11 +1525,6 @@ extern cvar_t	*r_rt_giIntensity;
 
 // Raymarching
 extern cvar_t	*r_raymarching;
-extern cvar_t	*r_raymarchingQuality;
-extern cvar_t	*r_raymarchingMaxDistance;
-extern cvar_t	*r_raymarchingEpsilon;
-extern cvar_t	*r_raymarchingVolumetric;
-extern cvar_t	*r_raymarchingVolumetricDensity;
 extern cvar_t	*r_postprocess_compute;
 extern cvar_t	*r_postprocess_workgroup;
 extern cvar_t	*r_postQuality;
