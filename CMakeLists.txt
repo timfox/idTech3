@@ -1035,8 +1035,8 @@ ENDIF()
 # Add MP3 codec support (using built-in decoder)
 list(APPEND CLIENT_SRCS src/client/snd_codec_mp3.c)
 # Add built-in MP3 decoder files
-AUX_SOURCE_DIRECTORY(src/client/mp3code MP3CODE_SRCS)
-list(APPEND CLIENT_SRCS ${MP3CODE_SRCS})
+AUX_SOURCE_DIRECTORY(src/client/mp3 mp3_SRCS)
+list(APPEND CLIENT_SRCS ${mp3_SRCS})
 
 IF(USE_OPENEXR)
 	# Try CMake's config package first (OpenEXR 3.x and newer)
@@ -1310,9 +1310,9 @@ ENDIF()
 # Add OGG/Vorbis include directories for client (used by snd_codec_ogg.c)
 TARGET_INCLUDE_DIRECTORIES(client PRIVATE src/common src libs/ogg/include libs/vorbis/include)
 
-# Add MP3 support using custom mp3code (like SunnyJK)
-TARGET_INCLUDE_DIRECTORIES(client PRIVATE src/client/mp3code)
-message(STATUS "MP3 support enabled with custom mp3code")
+# Add MP3 support using custom mp3 (like SunnyJK)
+TARGET_INCLUDE_DIRECTORIES(client PRIVATE src/client/mp3)
+message(STATUS "MP3 support enabled with custom mp3")
 
 IF(USE_CIMGUI AND DEFINED CIMGUI_DIR)
 	set(CIMGUI_USER_CONFIG "\"cimconfig.h\"")

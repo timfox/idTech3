@@ -1,12 +1,12 @@
-// includes for the Q3 sound system
+// includes for the sound system
 #include "client.h"
 #include "snd_codec.h"
 
-// includes for the MP3 codec (SunnyJK mp3code)
-#include "mp3code/mhead.h"
-#include "mp3code/mp3struct.h"
+// includes for the MP3 codec
+#include "mp3/mhead.h"
+#include "mp3/mp3struct.h"
 
-// MP3 decoder function declarations (from mp3code)
+// MP3 decoder function declarations (from mp3)
 #ifdef __cplusplus
 extern "C" {
 #endif

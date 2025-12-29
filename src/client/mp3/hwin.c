@@ -48,6 +48,7 @@ static float win[4][36];	// effectively a constant
 /*====================================================================*/
 void imdct18(float f[]);	/* 18 point */
 void imdct6_3(float f[]);	/* 6 point */
+ARRAY36 *hwin_init_addr(void);
 
 /*====================================================================*/
 ARRAY36 *hwin_init_addr()

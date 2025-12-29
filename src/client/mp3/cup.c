@@ -482,6 +482,7 @@ static void unpack_samp()	/* unpack samples */
 /* -- end of dispatch -- */
 	    case 37:
 	       skip(pMP3Stream->bit_skip);
+	       /* fall through */
 	    case 36:
 	       s += 3 * 64;
 	 }			/* end switch */

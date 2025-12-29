@@ -22,20 +22,29 @@
 	along with this program; if not, write to the Free Software
 	Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
-	$Id: cwinb.c,v 1.4 1999/10/19 07:13:08 elrod Exp $
+	$Id: cwin.c,v 1.7 1999/10/19 07:13:08 elrod Exp $
 ____________________________________________________________________________*/
 
 /****  cwin.c  ***************************************************
 
 include to cwinm.c
 
-MPEG audio decoder, float window routines - 8 bit output
+MPEG audio decoder, float window routines
 portable C
 
 ******************************************************************/
-/*-------------------------------------------------------------------------*/
 
-void windowB(float *vbuf, int vb_ptr, unsigned char *pcm)
+#include "config.h"
+
+void window(float *vbuf, int vb_ptr, short *pcm);
+void window_dual(float *vbuf, int vb_ptr, short *pcm);
+void window16(float *vbuf, int vb_ptr, short *pcm);
+void window16_dual(float *vbuf, int vb_ptr, short *pcm);
+void window8(float *vbuf, int vb_ptr, short *pcm);
+void window8_dual(float *vbuf, int vb_ptr, short *pcm);
+
+/*-------------------------------------------------------------------------*/
+void window(float *vbuf, int vb_ptr, short *pcm)
 {
    int i, j;
    int si, bx;
@@ -65,7 +74,7 @@ void windowB(float *vbuf, int vb_ptr, unsigned char *pcm)
 	 tmp = 32767;
       else if (tmp < -32768)
 	 tmp = -32768;
-      *pcm++ = ((unsigned char) (tmp >> 8)) ^ 0x80;
+      *pcm++ = (short)tmp;
    }
 /*--  special case --*/
    sum = 0.0F;
@@ -79,7 +88,7 @@ void windowB(float *vbuf, int vb_ptr, unsigned char *pcm)
       tmp = 32767;
    else if (tmp < -32768)
       tmp = -32768;
-   *pcm++ = ((unsigned char) (tmp >> 8)) ^ 0x80;
+   *pcm++ = (short)tmp;
 /*-- last 15 --*/
    coef = wincoef + 255;	/* back pass through coefs */
    for (i = 0; i < 15; i++)
@@ -99,11 +108,14 @@ void windowB(float *vbuf, int vb_ptr, unsigned char *pcm)
 	 tmp = 32767;
       else if (tmp < -32768)
 	 tmp = -32768;
-      *pcm++ = ((unsigned char) (tmp >> 8)) ^ 0x80;
+      *pcm++ = (short)tmp;
    }
 }
+
+
+
 /*------------------------------------------------------------*/
-void windowB_dual(float *vbuf, int vb_ptr, unsigned char *pcm)
+void window_dual(float *vbuf, int vb_ptr, short *pcm)
 {
    int i, j;			/* dual window interleaves output */
    int si, bx;
@@ -133,7 +145,7 @@ void windowB_dual(float *vbuf, int vb_ptr, unsigned char *pcm)
 	 tmp = 32767;
       else if (tmp < -32768)
 	 tmp = -32768;
-      *pcm = ((unsigned char) (tmp >> 8)) ^ 0x80;
+      *pcm = (short)tmp;
       pcm += 2;
    }
 /*--  special case --*/
@@ -148,7 +160,7 @@ void windowB_dual(float *vbuf, int vb_ptr, unsigned char *pcm)
       tmp = 32767;
    else if (tmp < -32768)
       tmp = -32768;
-   *pcm = ((unsigned char) (tmp >> 8)) ^ 0x80;
+   *pcm = (short)tmp;
    pcm += 2;
 /*-- last 15 --*/
    coef = wincoef + 255;	/* back pass through coefs */
@@ -169,13 +181,13 @@ void windowB_dual(float *vbuf, int vb_ptr, unsigned char *pcm)
 	 tmp = 32767;
       else if (tmp < -32768)
 	 tmp = -32768;
-      *pcm = ((unsigned char) (tmp >> 8)) ^ 0x80;
+      *pcm = (short)tmp;
       pcm += 2;
    }
 }
 /*------------------------------------------------------------*/
 /*------------------- 16 pt window ------------------------------*/
-void windowB16(float *vbuf, int vb_ptr, unsigned char *pcm)
+void window16(float *vbuf, int vb_ptr, short *pcm)
 {
    int i, j;
    unsigned char si, bx;
@@ -206,7 +218,7 @@ void windowB16(float *vbuf, int vb_ptr, unsigned char *pcm)
 	 tmp = 32767;
       else if (tmp < -32768)
 	 tmp = -32768;
-      *pcm++ = ((unsigned char) (tmp >> 8)) ^ 0x80;
+      *pcm++ = (short)tmp;
    }
 /*--  special case --*/
    sum = 0.0F;
@@ -220,7 +232,7 @@ void windowB16(float *vbuf, int vb_ptr, unsigned char *pcm)
       tmp = 32767;
    else if (tmp < -32768)
       tmp = -32768;
-   *pcm++ = ((unsigned char) (tmp >> 8)) ^ 0x80;
+   *pcm++ = (short)tmp;
 /*-- last 7 --*/
    coef = wincoef + 255;	/* back pass through coefs */
    for (i = 0; i < 7; i++)
@@ -241,11 +253,11 @@ void windowB16(float *vbuf, int vb_ptr, unsigned char *pcm)
 	 tmp = 32767;
       else if (tmp < -32768)
 	 tmp = -32768;
-      *pcm++ = ((unsigned char) (tmp >> 8)) ^ 0x80;
+      *pcm++ = (short)tmp;
    }
 }
 /*--------------- 16 pt dual window (interleaved output) -----------------*/
-void windowB16_dual(float *vbuf, int vb_ptr, unsigned char *pcm)
+void window16_dual(float *vbuf, int vb_ptr, short *pcm)
 {
    int i, j;
    unsigned char si, bx;
@@ -276,7 +288,7 @@ void windowB16_dual(float *vbuf, int vb_ptr, unsigned char *pcm)
 	 tmp = 32767;
       else if (tmp < -32768)
 	 tmp = -32768;
-      *pcm = ((unsigned char) (tmp >> 8)) ^ 0x80;
+      *pcm = (short)tmp;
       pcm += 2;
    }
 /*--  special case --*/
@@ -291,7 +303,7 @@ void windowB16_dual(float *vbuf, int vb_ptr, unsigned char *pcm)
       tmp = 32767;
    else if (tmp < -32768)
       tmp = -32768;
-   *pcm = ((unsigned char) (tmp >> 8)) ^ 0x80;
+   *pcm = (short)tmp;
    pcm += 2;
 /*-- last 7 --*/
    coef = wincoef + 255;	/* back pass through coefs */
@@ -313,12 +325,12 @@ void windowB16_dual(float *vbuf, int vb_ptr, unsigned char *pcm)
 	 tmp = 32767;
       else if (tmp < -32768)
 	 tmp = -32768;
-      *pcm = ((unsigned char) (tmp >> 8)) ^ 0x80;
+      *pcm = (short)tmp;
       pcm += 2;
    }
 }
 /*------------------- 8 pt window ------------------------------*/
-void windowB8(float *vbuf, int vb_ptr, unsigned char *pcm)
+void window8(float *vbuf, int vb_ptr, short *pcm)
 {
    int i, j;
    int si, bx;
@@ -349,7 +361,7 @@ void windowB8(float *vbuf, int vb_ptr, unsigned char *pcm)
 	 tmp = 32767;
       else if (tmp < -32768)
 	 tmp = -32768;
-      *pcm++ = ((unsigned char) (tmp >> 8)) ^ 0x80;
+      *pcm++ = (short)tmp;
    }
 /*--  special case --*/
    sum = 0.0F;
@@ -363,7 +375,7 @@ void windowB8(float *vbuf, int vb_ptr, unsigned char *pcm)
       tmp = 32767;
    else if (tmp < -32768)
       tmp = -32768;
-   *pcm++ = ((unsigned char) (tmp >> 8)) ^ 0x80;
+   *pcm++ = (short)tmp;
 /*-- last 3 --*/
    coef = wincoef + 255;	/* back pass through coefs */
    for (i = 0; i < 3; i++)
@@ -384,11 +396,11 @@ void windowB8(float *vbuf, int vb_ptr, unsigned char *pcm)
 	 tmp = 32767;
       else if (tmp < -32768)
 	 tmp = -32768;
-      *pcm++ = ((unsigned char) (tmp >> 8)) ^ 0x80;
+      *pcm++ = (short)tmp;
    }
 }
 /*--------------- 8 pt dual window (interleaved output) -----------------*/
-void windowB8_dual(float *vbuf, int vb_ptr, unsigned char *pcm)
+void window8_dual(float *vbuf, int vb_ptr, short *pcm)
 {
    int i, j;
    int si, bx;
@@ -419,7 +431,7 @@ void windowB8_dual(float *vbuf, int vb_ptr, unsigned char *pcm)
 	 tmp = 32767;
       else if (tmp < -32768)
 	 tmp = -32768;
-      *pcm = ((unsigned char) (tmp >> 8)) ^ 0x80;
+      *pcm = (short)tmp;
       pcm += 2;
    }
 /*--  special case --*/
@@ -434,7 +446,7 @@ void windowB8_dual(float *vbuf, int vb_ptr, unsigned char *pcm)
       tmp = 32767;
    else if (tmp < -32768)
       tmp = -32768;
-   *pcm = ((unsigned char) (tmp >> 8)) ^ 0x80;
+   *pcm = (short)tmp;
    pcm += 2;
 /*-- last 3 --*/
    coef = wincoef + 255;	/* back pass through coefs */
@@ -456,7 +468,7 @@ void windowB8_dual(float *vbuf, int vb_ptr, unsigned char *pcm)
 	 tmp = 32767;
       else if (tmp < -32768)
 	 tmp = -32768;
-      *pcm = ((unsigned char) (tmp >> 8)) ^ 0x80;
+      *pcm = (short)tmp;
       pcm += 2;
    }
 }

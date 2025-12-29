@@ -42,6 +42,17 @@ portable C
 
 float coef32[31];	/* 32 pt dct coefs */		// !!!!!!!!!!!!!!!!!! (only generated once (always to same value)
 
+float *dct_coef_addr(void);
+void fdct32(float x[], float c[]);
+void fdct32_dual(float x[], float c[]);
+void fdct32_dual_mono(float x[], float c[]);
+void fdct16(float x[], float c[]);
+void fdct16_dual(float x[], float c[]);
+void fdct16_dual_mono(float x[], float c[]);
+void fdct8(float x[], float c[]);
+void fdct8_dual(float x[], float c[]);
+void fdct8_dual_mono(float x[], float c[]);
+
 /*------------------------------------------------------------*/
 float *dct_coef_addr()
 {

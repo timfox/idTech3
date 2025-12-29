@@ -295,7 +295,7 @@ void RE_Shutdown( refShutdownCode_t code ) {
 R_Register
 ================
 */
-static void R_Register( void ) {
+void R_Register( void ) {
     r_subdivisions = ri.Cvar_Get( "r_subdivisions", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
     ri.Cvar_SetDescription( r_subdivisions, "Distance to subdivide bezier curved surfaces." );
 

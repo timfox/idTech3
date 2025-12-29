@@ -35,11 +35,24 @@ layer III
 /*============================================================*/
 /*============ Layer III =====================================*/
 /*============================================================*/
+void sbt_mono_L3(float *sample, short *pcm, int ch);
+void sbt_dual_L3(float *sample, short *pcm, int ch);
+void sbt16_mono_L3(float *sample, short *pcm, int ch);
+void sbt16_dual_L3(float *sample, short *pcm, int ch);
+void sbt8_mono_L3(float *sample, short *pcm, int ch);
+void sbt8_dual_L3(float *sample, short *pcm, int ch);
+void sbtB_mono_L3(float *sample, unsigned char *pcm, int ch);
+void sbtB_dual_L3(float *sample, unsigned char *pcm, int ch);
+void sbtB16_mono_L3(float *sample, unsigned char *pcm, int ch);
+void sbtB16_dual_L3(float *sample, unsigned char *pcm, int ch);
+void sbtB8_mono_L3(float *sample, unsigned char *pcm, int ch);
+void sbtB8_dual_L3(float *sample, unsigned char *pcm, int ch);
+
 void sbt_mono_L3(float *sample, short *pcm, int ch)
 {
 	int i;
 
-	ch = 0;
+	(void)ch; /* unused */
 	for (i = 0; i < 18; i++)
 	{
 		fdct32(sample, pMP3Stream->vbuf + pMP3Stream->vb_ptr);
@@ -85,7 +98,7 @@ void sbt16_mono_L3(float *sample, short *pcm, int ch)
 {
 	int i;
 
-	ch = 0;
+	(void)ch; /* unused */
 	for (i = 0; i < 18; i++)
 	{
 		fdct16(sample, pMP3Stream->vbuf + pMP3Stream->vb_ptr);
@@ -130,7 +143,7 @@ void sbt8_mono_L3(float *sample, short *pcm, int ch)
 {
 	int i;
 
-	ch = 0;
+	(void)ch; /* unused */
 	for (i = 0; i < 18; i++)
 	{
 		fdct8(sample, pMP3Stream->vbuf + pMP3Stream->vb_ptr);
@@ -175,7 +188,7 @@ void sbtB_mono_L3(float *sample, unsigned char *pcm, int ch)
 {
 	int i;
 
-	ch = 0;
+	(void)ch; /* unused */
 	for (i = 0; i < 18; i++)
 	{
 		fdct32(sample, pMP3Stream->vbuf + pMP3Stream->vb_ptr);
@@ -221,7 +234,7 @@ void sbtB16_mono_L3(float *sample, unsigned char *pcm, int ch)
 {
 	int i;
 
-	ch = 0;
+	(void)ch; /* unused */
 	for (i = 0; i < 18; i++)
 	{
 		fdct16(sample, pMP3Stream->vbuf + pMP3Stream->vb_ptr);
@@ -266,7 +279,7 @@ void sbtB8_mono_L3(float *sample, unsigned char *pcm, int ch)
 {
 	int i;
 
-	ch = 0;
+	(void)ch; /* unused */
 	for (i = 0; i < 18; i++)
 	{
 		fdct8(sample, pMP3Stream->vbuf + pMP3Stream->vb_ptr);

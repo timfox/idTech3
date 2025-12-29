@@ -206,6 +206,15 @@ static void bitget_init_end(unsigned char *buf_end)
    bitdat.bs_ptr_end = buf_end;
 }
 /*------------- get n bits from bitstream -------------*/
+int bitget_bits_used(void);
+void bitget_check(int n);
+unsigned int bitget(int n);
+unsigned int bitget_1bit(void);
+IN_OUT L3audio_decode(unsigned char *bs, unsigned char *pcm);
+int L3audio_decode_init(MPEG_HEAD * h, int framebytes_arg,
+			int reduction_code, int transform_code, int convert_code,
+			int freq_limit);
+
 int bitget_bits_used()
 {
    int n;			/* compute bits used from last init call */
@@ -1119,6 +1128,8 @@ int L3audio_decode_init(MPEG_HEAD * h, int framebytes_arg,
 {
    int i, j, k;
    // static int first_pass = 1;
+
+   (void)transform_code; /* unused */
    int samprate;
    int limit;
    int bit_code;

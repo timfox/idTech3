@@ -176,6 +176,7 @@ static void unpack_sampL1()	/* unpack samples */
 /* -- end of dispatch -- */
 	 case 31:
 	    skip(pMP3Stream->bit_skip);
+	    /* fall through */
 	 case 30:
 	    s += 64;
       }				/* end switch */
@@ -228,6 +229,8 @@ int L1audio_decode_init(MPEG_HEAD * h, int framebytes_arg,
    int i, k;
    static int first_pass = 1;
    long samprate;
+
+   (void)transform_code; /* unused */
    int limit;
    long step;
    int bit_code;

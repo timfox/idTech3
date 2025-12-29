@@ -182,6 +182,7 @@ int audio_decode_initL1(MPEG_HEAD * h, int framebytes_arg,
 		   int reduction_code, int transform_code, int convert_code,
 			int freq_limit);
 void sbt_init();
+void decode_table_init(void);
 
 
 IN_OUT L1audio_decode(unsigned char *bs, signed short *pcm);
@@ -391,3 +392,5 @@ void decode_table_init()
 /*---------------------------------------------------------*/
 #endif	// #ifdef COMPILE_ME
 
+/* Dummy statement to avoid empty translation unit warning */
+static void *dummy_cupini = (void *)0;
