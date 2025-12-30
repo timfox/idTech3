@@ -2573,7 +2573,7 @@ static qboolean vk_init_timestamp_queries(vk_timestamp_query_t *queries, uint32_
         .pipelineStatistics = 0
     };
 
-    VkResult result = vkCreateQueryPool(vk.device, &create_info, NULL, &queries->query_pool);
+    VkResult result = qvkCreateQueryPool(vk.device, &create_info, NULL, &queries->query_pool);
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_WARNING, "Vulkan: Failed to create timestamp query pool: %s\n",
             vk_result_string(result));
@@ -2586,14 +2586,14 @@ static qboolean vk_init_timestamp_queries(vk_timestamp_query_t *queries, uint32_
     queries->available = qfalse;
 
     if (!queries->timestamps) {
-        vkDestroyQueryPool(vk.device, queries->query_pool, NULL);
+        qvkDestroyQueryPool(vk.device, queries->query_pool, NULL);
         return qfalse;
     }
 
     memset(queries->timestamps, 0, sizeof(uint64_t) * query_count);
 
     // Reset query pool
-    vkResetQueryPool(vk.device, queries->query_pool, 0, query_count);
+    qvkResetQueryPool(vk.device, queries->query_pool, 0, query_count);
 
     return qtrue;
 }
@@ -2617,7 +2617,7 @@ static qboolean vk_init_pipeline_stats(vk_pipeline_stats_t *stats, VkQueryPipeli
         .pipelineStatistics = flags
     };
 
-    VkResult result = vkCreateQueryPool(vk.device, &create_info, NULL, &stats->query_pool);
+    VkResult result = qvkCreateQueryPool(vk.device, &create_info, NULL, &stats->query_pool);
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_WARNING, "Vulkan: Failed to create pipeline statistics query pool: %s\n",
             vk_result_string(result));
@@ -2630,14 +2630,14 @@ static qboolean vk_init_pipeline_stats(vk_pipeline_stats_t *stats, VkQueryPipeli
     stats->available = qfalse;
 
     if (!stats->statistics) {
-        vkDestroyQueryPool(vk.device, stats->query_pool, NULL);
+        qvkDestroyQueryPool(vk.device, stats->query_pool, NULL);
         return qfalse;
     }
 
     memset(stats->statistics, 0, sizeof(uint64_t) * stat_count);
 
     // Reset query pool
-    vkResetQueryPool(vk.device, stats->query_pool, 0, stat_count);
+    qvkResetQueryPool(vk.device, stats->query_pool, 0, stat_count);
 
     return qtrue;
 }
@@ -2759,10 +2759,10 @@ void vk_shutdown_render_profiler(void) {
     // Destroy GPU query pools
     if (vk.render_profiler.detailed_profiling) {
         if (vk.render_profiler.timestamp_queries.query_pool != VK_NULL_HANDLE) {
-            vkDestroyQueryPool(vk.device, vk.render_profiler.timestamp_queries.query_pool, NULL);
+            qvkDestroyQueryPool(vk.device, vk.render_profiler.timestamp_queries.query_pool, NULL);
         }
         if (vk.render_profiler.pipeline_stats.query_pool != VK_NULL_HANDLE) {
-            vkDestroyQueryPool(vk.device, vk.render_profiler.pipeline_stats.query_pool, NULL);
+            qvkDestroyQueryPool(vk.device, vk.render_profiler.pipeline_stats.query_pool, NULL);
         }
     }
 
@@ -3062,7 +3062,7 @@ void vk_profile_frame_end(void) {
         vk_timestamp_query_t *timestamps = &vk.render_profiler.timestamp_queries;
 
         // Check if results are available (from previous frame)
-        VkResult result = vkGetQueryPoolResults(vk.device, timestamps->query_pool, 0,
+        VkResult result = qvkGetQueryPoolResults(vk.device, timestamps->query_pool, 0,
                                                timestamps->current_query, sizeof(uint64_t) * timestamps->current_query,
                                                timestamps->timestamps, sizeof(uint64_t),
                                                VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
@@ -3082,7 +3082,7 @@ void vk_profile_frame_end(void) {
         }
 
         // Reset timestamp queries for next frame
-        vkResetQueryPool(vk.device, timestamps->query_pool, 0, timestamps->query_count);
+        qvkResetQueryPool(vk.device, timestamps->query_pool, 0, timestamps->query_count);
         timestamps->current_query = 0;
         timestamps->available = qfalse;
     }

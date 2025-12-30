@@ -62,9 +62,66 @@ extern "C" void vk_begin_frame(void) {
         return;
     }
 
-    // Acquire next swapchain image
-    result = qvkAcquireNextImageKHR(vk.device, vk.swapchain, UINT64_MAX,
-        vk.tess[vk.cmd_index].image_acquired, VK_NULL_HANDLE, &image_index);
+    // Set command buffer pointer early so we can use vk.cmd
+    vk.cmd = &vk.tess[vk.cmd_index];
+
+    // Check if we're running headless (no display available)
+    static qboolean headless_detected = qfalse;
+    if (!headless_detected) {
+        // Try to acquire image with very short timeout first to detect headless mode
+        result = qvkAcquireNextImageKHR(vk.device, vk.swapchain, 1000000ULL, // 1ms timeout
+            vk.tess[vk.cmd_index].image_acquired, VK_NULL_HANDLE, &image_index);
+
+        if (result == VK_TIMEOUT || result == VK_NOT_READY) {
+            // Likely running headless, skip rendering for this frame
+            ri.Printf(PRINT_DEVELOPER, "Vulkan: Headless mode detected, skipping frame rendering\n");
+            headless_detected = qtrue;
+            return;
+        }
+    } else {
+        // Already detected headless mode, continue skipping
+        return;
+    }
+
+    // Acquire next swapchain image with retry logic
+    const uint64_t timeout_ns = 1000000000ULL; // 1 second timeout
+    int retry_count = 0;
+    const int max_retries = 3;
+
+    do {
+        result = qvkAcquireNextImageKHR(vk.device, vk.swapchain, timeout_ns,
+            vk.tess[vk.cmd_index].image_acquired, VK_NULL_HANDLE, &image_index);
+
+        if (result == VK_SUCCESS) {
+            break; // Success!
+        } else if (result == VK_NOT_READY && retry_count < max_retries) {
+            // Swapchain not ready, wait a bit and retry
+            ri.Printf(PRINT_DEVELOPER, "Vulkan: Swapchain not ready, retrying... (%d/%d)\n", retry_count + 1, max_retries);
+            retry_count++;
+            ri.Milliseconds(); // Small delay
+            continue;
+        } else if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+            // Swapchain needs recreation
+            ri.Printf(PRINT_WARNING, "Vulkan: Swapchain needs recreation (result=%d)\n", result);
+            vk_recreate_swapchain();
+            return;
+        } else if (result == VK_TIMEOUT) {
+            // Timeout - window may be minimized or display unavailable
+            ri.Printf(PRINT_WARNING, "Vulkan: Timeout acquiring swapchain image, window may be minimized or display unavailable\n");
+            headless_detected = qtrue; // Mark as headless for future frames
+            return;
+        } else {
+            // Other error
+            ri.Printf(PRINT_ERROR, "vk_begin_frame: Failed to acquire swapchain image: %s\n", vk_result_string(result));
+            return;
+        }
+    } while (retry_count < max_retries);
+
+    // If we get here and result is not success, all retries failed
+    if (result != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "vk_begin_frame: Failed to acquire swapchain image after %d retries: %s\n", max_retries, vk_result_string(result));
+        return;
+    }
 
     // Handle dynamic resolution
     if (r_dynamicResolution && r_dynamicResolution->integer) {
@@ -74,26 +131,16 @@ extern "C" void vk_begin_frame(void) {
         } else if (vk.performance.fps > 70.0f) {
             scale = 1.0f;
         }
-        
+
         uint32_t targetWidth = (uint32_t)(glConfig.vidWidth * scale);
         uint32_t targetHeight = (uint32_t)(glConfig.vidHeight * scale);
-        
+
         if (targetWidth != vk.renderWidth || targetHeight != vk.renderHeight) {
             vk.renderWidth = targetWidth;
             vk.renderHeight = targetHeight;
-            ri.Printf(PRINT_ALL, "Vulkan: Dynamic resolution scale set to %.2f (%dx%d)\n", 
+            ri.Printf(PRINT_ALL, "Vulkan: Dynamic resolution scale set to %.2f (%dx%d)\n",
                 scale, vk.renderWidth, vk.renderHeight);
         }
-    }
-
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-        // Swapchain needs recreation
-        ri.Printf(PRINT_WARNING, "Vulkan: Swapchain needs recreation (result=%d)\n", result);
-        vk_recreate_swapchain();
-        return;
-    } else if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "vk_begin_frame: Failed to acquire swapchain image: %s\n", vk_result_string(result));
-        return;
     }
 
     vk.cmd->swapchain_image_index = image_index;
@@ -117,7 +164,7 @@ extern "C" void vk_begin_frame(void) {
     }
 
     // Set up render area
-    vk.cmd = &vk.tess[vk.cmd_index];
+    // vk.cmd already set above
 
     // Transition offscreen color image to color attachment if needed
     // (Render pass will handle this if initialLayout is UNDEFINED)

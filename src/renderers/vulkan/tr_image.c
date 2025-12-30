@@ -290,7 +290,7 @@ If a larger shrinking is needed, use the mipmap function
 before or after.
 ================
 */
-static void ResampleTexture( unsigned *in, int inwidth, int inheight, unsigned *out,  
+static void ResampleTexture( unsigned *in, int inwidth, int inheight, unsigned *out,
 							int outwidth, int outheight ) {
 	int		i, j;
 	unsigned	*inrow, *inrow2;
@@ -298,6 +298,13 @@ static void ResampleTexture( unsigned *in, int inwidth, int inheight, unsigned *
 	unsigned	p1[MAX_TEXTURE_SIZE];
 	unsigned	p2[MAX_TEXTURE_SIZE];
 	byte		*pix1, *pix2, *pix3, *pix4;
+
+	// Debug: Check for invalid parameters
+	if (outwidth <= 0 || outheight <= 0) {
+		ri.Printf(PRINT_ERROR, "ResampleTexture: Invalid output dimensions %dx%d (input %dx%d)\n",
+			outwidth, outheight, inwidth, inheight);
+		return;
+	}
 
 	if ( outwidth > (int)ARRAY_LEN( p1 ) )
 		ri.Error( ERR_DROP, "ResampleTexture: max width" );
@@ -626,11 +633,26 @@ static void generate_image_upload_data( image_t *image, byte *data, Image_Upload
 	// scale both axis down equally so we don't have to
 	// deal with a half mip resampling
 	//
-	while ( scaled_width > glConfig.maxTextureSize
-		|| scaled_height > glConfig.maxTextureSize ) {
+	while ( (scaled_width > glConfig.maxTextureSize && glConfig.maxTextureSize > 0)
+		|| (scaled_height > glConfig.maxTextureSize && glConfig.maxTextureSize > 0) ) {
 		scaled_width >>= 1;
 		scaled_height >>= 1;
 	}
+
+	// Ensure minimum size of 1 to prevent division by zero
+	if (scaled_width < 1) {
+		ri.Printf(PRINT_WARNING, "R_CreateImage: scaled_width was %d, clamping to 1 for '%s'\n",
+			scaled_width, image->imgName);
+		scaled_width = 1;
+	}
+	if (scaled_height < 1) {
+		ri.Printf(PRINT_WARNING, "R_CreateImage: scaled_height was %d, clamping to 1 for '%s'\n",
+			scaled_height, image->imgName);
+		scaled_height = 1;
+	}
+
+	ri.Printf(PRINT_DEVELOPER, "R_CreateImage: '%s' original %dx%d -> scaled %dx%d (maxTextureSize=%d)\n",
+		image->imgName, width, height, scaled_width, scaled_height, glConfig.maxTextureSize);
 
 	// Calculate buffer size with overflow protection
 	// Buffer needs to hold base level + all mip levels (approximately 1.33x base level)
@@ -966,13 +988,17 @@ static void Upload32( byte *data, int x, int y, int width, int height, image_t *
 	// scale both axis down equally so we don't have to
 	// deal with a half mip resampling
 	//
-	while ( scaled_width > glConfig.maxTextureSize
-		|| scaled_height > glConfig.maxTextureSize ) {
+	while ( (scaled_width > glConfig.maxTextureSize && glConfig.maxTextureSize > 0)
+		|| (scaled_height > glConfig.maxTextureSize && glConfig.maxTextureSize > 0) ) {
 		scaled_width >>= 1;
 		scaled_height >>= 1;
 		x >>= 1;
 		y >>= 1;
 	}
+
+	// Ensure minimum size of 1 to prevent division by zero
+	if (scaled_width < 1) scaled_width = 1;
+	if (scaled_height < 1) scaled_height = 1;
 
 	if ( scaled_width != width || scaled_height != height ) {
 		if ( data ) {

@@ -1572,6 +1572,12 @@ extern PFN_vkEndCommandBuffer qvkEndCommandBuffer;
 extern PFN_vkQueueSubmit qvkQueueSubmit;
 extern PFN_vkGetBufferDeviceAddress qvkGetBufferDeviceAddress;
 
+// Query pool functions (for profiling)
+extern PFN_vkCreateQueryPool qvkCreateQueryPool;
+extern PFN_vkDestroyQueryPool qvkDestroyQueryPool;
+extern PFN_vkResetQueryPool qvkResetQueryPool;
+extern PFN_vkGetQueryPoolResults qvkGetQueryPoolResults;
+
 // Swapchain and surface functions
 extern PFN_vkCreateSwapchainKHR qvkCreateSwapchainKHR;
 extern PFN_vkDestroySwapchainKHR qvkDestroySwapchainKHR;
