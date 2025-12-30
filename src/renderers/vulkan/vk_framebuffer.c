@@ -173,7 +173,20 @@ void vk_create_render_passes(void) {
 
 // Framebuffer creation
 void vk_create_framebuffers(void) {
-    ri.Printf(PRINT_ALL, "Vulkan: Creating framebuffers (%dx%d)...\n", vk.renderWidth, vk.renderHeight);
+    ri.Printf(PRINT_ALL, "Vulkan: Creating framebuffers (%dx%d)\n", vk.renderWidth, vk.renderHeight);
+
+    // Debug: Check render pass validity
+    if (!vk_validate_handle(vk.render_pass.main, "main render pass")) {
+        ri.Printf(PRINT_ERROR, "Vulkan: Main render pass is invalid during framebuffer creation!\n");
+        return;
+    }
+
+    // Debug: Check image views
+    if (!vk_validate_handle(vk.color_image_view, "color image view") ||
+        !vk_validate_handle(vk.depth_image_view, "depth image view")) {
+        ri.Printf(PRINT_ERROR, "Vulkan: Color or depth image views are invalid during framebuffer creation!\n");
+        return;
+    }
 
     // 1. Main Framebuffers (Swapchain dependent)
     for (uint32_t i = 0; i < vk.swapchain_image_count; i++) {

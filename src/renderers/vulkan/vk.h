@@ -515,6 +515,9 @@ typedef struct {
 extern PFN_vkGetPhysicalDeviceProperties qvkGetPhysicalDeviceProperties;
 extern PFN_vkGetPhysicalDeviceProperties2KHR qvkGetPhysicalDeviceProperties2KHR;
 
+// Cached physical device memory properties (queried once during device selection)
+extern VkPhysicalDeviceMemoryProperties vk_physical_device_memory_properties;
+
 // Vulkan sampler definition structure
 typedef struct {
     VkFilter vk_mag_filter;
@@ -1339,6 +1342,7 @@ typedef struct {
 
     // Swapchain
     VkSwapchainKHR swapchain;
+    VkExtent2D swapchain_extent; // Store the swapchain extent for render dimensions
     VkImage *swapchain_images;
     VkImageView *swapchain_image_views;
     VkSemaphore *swapchain_rendering_finished;

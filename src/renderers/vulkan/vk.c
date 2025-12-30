@@ -107,6 +107,7 @@ extern int setenv( const char *name, const char *value, int overwrite );
 // Modern C23/C++23 safety features for Vulkan renderer
 static void vk_create_descriptor_set_layouts(void);
 static void vk_create_pipeline_layouts(void);
+void vk_create_attachments(void);
 static qboolean vk_silent_initialized = qfalse;
 static qboolean vk_silent = qfalse;
 static void vk_silent_init(void)
@@ -193,6 +194,9 @@ typedef struct {
     uint32_t fps;
     double frame_time;
 } vk_performance_stats_t;
+
+// Cached physical device memory properties (queried once during device selection)
+VkPhysicalDeviceMemoryProperties vk_physical_device_memory_properties;
 
 static vk_performance_stats_t vk_perf_stats = {0};
 
@@ -596,26 +600,25 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 // Modernized memory type finding with better safety and error handling
 VK_NONNULL
 uint32_t find_memory_type(uint32_t memory_type_bits, VkMemoryPropertyFlags properties) {
-	VkPhysicalDeviceMemoryProperties memory_properties = {0};
+	ri.Printf(PRINT_ALL, "DEBUG: find_memory_type called with bits=0x%x, properties=0x%x\n", memory_type_bits, properties);
 
-	// Modern Vulkan API call with safety check
-	if (!qvkGetPhysicalDeviceMemoryProperties) {
-		ri.Error(ERR_FATAL, "Vulkan: qvkGetPhysicalDeviceMemoryProperties function pointer is NULL");
-	}
-
-	if (qvkGetPhysicalDeviceMemoryProperties) {
-		qvkGetPhysicalDeviceMemoryProperties(vk.physical_device, &memory_properties);
-	} else {
-		ri.Error(ERR_FATAL, "Vulkan: qvkGetPhysicalDeviceMemoryProperties is NULL in find_memory_type");
-	}
+	// Use cached memory properties instead of calling Vulkan API again
+	// This avoids potential driver issues with repeated calls
+	const VkPhysicalDeviceMemoryProperties *memory_properties = &vk_physical_device_memory_properties;
+	ri.Printf(PRINT_ALL, "DEBUG: cached memory_properties=%p, memoryTypeCount=%u\n", memory_properties, memory_properties->memoryTypeCount);
 
 	// Bounds checking with modern loop
-	const uint32_t max_types = memory_properties.memoryTypeCount;
+	const uint32_t max_types = memory_properties->memoryTypeCount;
+	ri.Printf(PRINT_ALL, "DEBUG: searching %u memory types\n", max_types);
 	for (uint32_t i = 0; i < max_types && i < VK_MAX_MEMORY_TYPES; i++) {
 		const uint32_t bit = (uint32_t)(1U << i);
+		ri.Printf(PRINT_ALL, "DEBUG: checking memory type %u: bit=0x%x, flags=0x%x\n", i, bit, memory_properties->memoryTypes[i].propertyFlags);
 		if ((memory_type_bits & bit) != 0 &&
-			(memory_properties.memoryTypes[i].propertyFlags & properties) == properties) {
-			return i;
+			(memory_properties->memoryTypes[i].propertyFlags & properties) == properties) {
+			ri.Printf(PRINT_ALL, "DEBUG: found matching memory type %u\n", i);
+			uint32_t result = i;
+			ri.Printf(PRINT_ALL, "DEBUG: returning result %u\n", result);
+			return result;
 		}
 	}
 
@@ -1044,6 +1047,9 @@ static VkResult vk_create_swapchain_safe( VkPhysicalDevice physical_device, VkDe
 		image_extent.height = MIN( surface_caps.maxImageExtent.height, MAX( surface_caps.minImageExtent.height, (uint32_t) glConfig.vidHeight ) );
 	}
 
+	// Store the calculated extent for later use by render dimension setting
+	vk.swapchain_extent = image_extent;
+
 	vk.clearAttachment = qtrue;
 
 	if ( !vk.fboActive ) {
@@ -1203,6 +1209,15 @@ static VkResult vk_create_swapchain_safe( VkPhysicalDevice physical_device, VkDe
 		}
 	}
 
+	// Allocate memory for swapchain rendering finished semaphores array AFTER clamping the count
+	if (!vk.swapchain_rendering_finished) {
+		vk.swapchain_rendering_finished = (VkSemaphore *)ri.Malloc(vk.swapchain_image_count * sizeof(VkSemaphore));
+		if (!vk.swapchain_rendering_finished) {
+			ri.Printf(PRINT_ERROR, "Vulkan: Failed to allocate memory for swapchain rendering finished semaphores\n");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
+		}
+	}
+
 	result = qvkGetSwapchainImagesKHR( vk.device, vk.swapchain, &vk.swapchain_image_count, vk.swapchain_images );
 	if (result != VK_SUCCESS) {
 		ri.Printf(PRINT_ERROR, "Vulkan: Failed to get swapchain images (2): %s\n", vk_result_string(result));
@@ -1239,6 +1254,24 @@ static VkResult vk_create_swapchain_safe( VkPhysicalDevice physical_device, VkDe
 		result = qvkCreateImageView( vk.device, &view, NULL, &vk.swapchain_image_views[i] );
 		if (result != VK_SUCCESS) {
 			ri.Printf(PRINT_ERROR, "Vulkan: Failed to create image view %i: %s\n", i, vk_result_string(result));
+			return result;
+		}
+
+		// create rendering finished semaphore for this swapchain image
+		VkSemaphoreCreateInfo semaphoreInfo = {
+			.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+			.pNext = NULL,
+			.flags = 0
+		};
+
+		if (!qvkCreateSemaphore) {
+			ri.Printf(PRINT_ERROR, "Vulkan: qvkCreateSemaphore function pointer is NULL\n");
+			return VK_ERROR_INITIALIZATION_FAILED;
+		}
+
+		result = qvkCreateSemaphore(vk.device, &semaphoreInfo, NULL, &vk.swapchain_rendering_finished[i]);
+		if (result != VK_SUCCESS) {
+			ri.Printf(PRINT_ERROR, "Vulkan: Failed to create rendering finished semaphore %i: %s\n", i, vk_result_string(result));
 			return result;
 		}
 	}
@@ -3079,6 +3112,10 @@ static void init_vulkan_library( void )
 			selected_index, candidates[selected_index].properties.deviceName,
 			candidates[selected_index].reason);
 
+		// Cache the physical device memory properties for later use
+		vk_physical_device_memory_properties = candidates[selected_index].memory;
+		ri.Printf(PRINT_ALL, "DEBUG: Cached physical device memory properties\n");
+
 		// Set default performance preset
 		vk.current_perf_preset = VK_PERF_PRESET_MEDIUM;
 
@@ -3164,14 +3201,12 @@ static void init_vulkan_library( void )
 
 				ri.Printf(PRINT_ALL, "Vulkan: Real swapchain created successfully\n");
 
-				// Create render pass for the swapchain
-				if (!vk_create_main_render_pass()) {
-					ri.Printf(PRINT_ERROR, "Vulkan: Failed to create render pass\n");
-					continue;
-				}
+				// Set initial render dimensions from stored swapchain extent (set during swapchain creation)
+				vk.renderWidth = vk.swapchain_extent.width;
+				vk.renderHeight = vk.swapchain_extent.height;
+				vk.renderScaleX = vk.renderScaleY = 1.0f;
 
-				// Create framebuffers for each swapchain image
-				vk_create_framebuffers();
+				ri.Printf(PRINT_ALL, "Vulkan: Render dimensions set to %dx%d\n", vk.renderWidth, vk.renderHeight);
 
 				// Success! Break out of the loop
 				break;
@@ -3374,6 +3409,16 @@ skip_device_creation:
 		// Create pipeline layouts
 		vk_create_pipeline_layouts();
 		}
+	}
+
+	// Create Vulkan attachments now that device functions are loaded
+	if (!is_fake_device) {
+		// Create render passes first to ensure they exist for framebuffer creation
+		vk_create_render_passes();
+
+		vk_create_attachments();
+
+		vk_create_framebuffers();
 	}
 
 	// Initialize main graphics queue
@@ -4116,7 +4161,6 @@ void vk_destroy_samplers( void )
 
 
 
-static void vk_create_attachments( void );
 static void vk_create_descriptor_set_layouts(void);
 static void vk_create_pipeline_layouts(void);
 
@@ -4732,6 +4776,8 @@ qboolean create_color_attachment(
 	VkImageView *image_view, VkImageLayout image_layout,
 	qboolean multisample, VkImageCreateFlags flags )
 {
+	ri.Printf(PRINT_ALL, "DEBUG: create_color_attachment called with %dx%d\n", width, height);
+
 	VkImageCreateInfo create_desc;
 	VkMemoryRequirements memory_requirements;
 	VkResult result;
@@ -4871,9 +4917,24 @@ static qboolean create_depth_attachment( uint32_t width, uint32_t height, VkSamp
 }
 
 
-static void vk_create_attachments( void )
+void vk_create_attachments( void )
 {
 	ri.Printf(PRINT_ALL, "DEBUG: vk_create_attachments START\n");
+
+	if (!vk.device) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Cannot create attachments - device not initialized\n");
+		return;
+	}
+
+	ri.Printf(PRINT_ALL, "DEBUG: vk_create_attachments - device check passed\n");
+
+	if (vk.color_format == VK_FORMAT_UNDEFINED || vk.depth_format == VK_FORMAT_UNDEFINED) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Cannot create attachments - formats not initialized\n");
+		return;
+	}
+
+	ri.Printf(PRINT_ALL, "DEBUG: vk_create_attachments - format check passed\n");
+	ri.Printf(PRINT_ALL, "Vulkan: Creating attachments (%dx%d)\n", glConfig.vidWidth, glConfig.vidHeight);
 
 	// Comprehensive safety checks
 	if (vk.device == VK_NULL_HANDLE) {
@@ -4881,10 +4942,11 @@ static void vk_create_attachments( void )
 		return;
 	}
 
-	if (!vk.active) {
-		ri.Printf(PRINT_WARNING, "Vulkan: Cannot create attachments - Vulkan not active\n");
-		return;
-	}
+	// Allow attachment creation during initialization even if vk.active is not yet set
+	// if (!vk.active) {
+	// 	ri.Printf(PRINT_WARNING, "Vulkan: Cannot create attachments - Vulkan not active\n");
+	// 	return;
+	// }
 
 	if (vk.color_format == VK_FORMAT_UNDEFINED || vk.depth_format == VK_FORMAT_UNDEFINED) {
 		ri.Printf(PRINT_WARNING, "Vulkan: Cannot create attachments - formats not initialized\n");
@@ -4920,9 +4982,12 @@ static void vk_create_attachments( void )
 		vk.image_chunk_size = IMAGE_CHUNK_SIZE;
 	}
 
+	ri.Printf(PRINT_ALL, "DEBUG: About to call vk_allocate_image_chunk\n");
 	// Pre-allocate memory chunk with error handling
 	vk_allocate_image_chunk();
 
+	ri.Printf(PRINT_ALL, "DEBUG: vk_allocate_image_chunk completed\n");
+	ri.Printf(PRINT_ALL, "DEBUG: About to call create_color_attachment for main color\n");
 	// Create color attachment
 	create_color_attachment(glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
@@ -4947,8 +5012,8 @@ static void vk_create_attachments( void )
 		create_color_attachment(glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16G16B16A16_SFLOAT,
 			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
 			&vk.upscale.image[i], &vk.upscale.view[i], VK_IMAGE_LAYOUT_GENERAL, qfalse, 0);
-		SET_OBJECT_NAME(vk.upscale.image[i], va("upscale image %d", i), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
-		SET_OBJECT_NAME(vk.upscale.view[i], va("upscale image view %d", i), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT);
+		// SET_OBJECT_NAME(vk.upscale.image[i], va("upscale image %d", i), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
+		// SET_OBJECT_NAME(vk.upscale.view[i], va("upscale image view %d", i), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT);
 	}
 
 	// Create additional attachments if FBO is active
@@ -4977,36 +5042,43 @@ static void vk_create_attachments( void )
 	}
 
 	// Allocate attachment descriptors
+	ri.Printf(PRINT_ALL, "DEBUG: About to call vk_alloc_attachments\n");
 	vk_alloc_attachments();
+	ri.Printf(PRINT_ALL, "DEBUG: vk_alloc_attachments completed\n");
 
 	// Set up debugging names for all successfully created resources
+	// Temporarily disabled to isolate crash
+	/*
 	if (vk.color_image != VK_NULL_HANDLE) {
 		SET_OBJECT_NAME(vk.color_image, "color attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
 	}
 	if (vk.color_image_view != VK_NULL_HANDLE) {
 		SET_OBJECT_NAME(vk.color_image_view, "color attachment view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT);
 	}
+	*/
 	if (vk.depth_image != VK_NULL_HANDLE) {
-		SET_OBJECT_NAME(vk.depth_image, "depth attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
+		// SET_OBJECT_NAME(vk.depth_image, "depth attachment", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
 	}
 	if (vk.depth_image_view != VK_NULL_HANDLE) {
-		SET_OBJECT_NAME(vk.depth_image_view, "depth attachment view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT);
+		// SET_OBJECT_NAME(vk.depth_image_view, "depth attachment view", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT);
 	}
 
 	// Additional debugging names for advanced features
 	if (vk.fboActive) {
 		if (vk.screenMap.color_image != VK_NULL_HANDLE) {
-			SET_OBJECT_NAME(vk.screenMap.color_image, "screenmap color", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
+			// SET_OBJECT_NAME(vk.screenMap.color_image, "screenmap color", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
 		}
 		if (vk.screenMap.depth_image != VK_NULL_HANDLE) {
-			SET_OBJECT_NAME(vk.screenMap.depth_image, "screenmap depth", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
+			// SET_OBJECT_NAME(vk.screenMap.depth_image, "screenmap depth", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
 		}
 		if (vk.msaaActive && vk.msaa_image != VK_NULL_HANDLE) {
-			SET_OBJECT_NAME(vk.msaa_image, "msaa color", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
+			// SET_OBJECT_NAME(vk.msaa_image, "msaa color", VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
 		}
 	}
 
+	ri.Printf(PRINT_ALL, "DEBUG: About to print success message\n");
 	ri.Printf(PRINT_ALL, "Vulkan: Attachments created successfully\n");
+	ri.Printf(PRINT_ALL, "DEBUG: vk_create_attachments function ending\n");
 }
 
 
@@ -8923,6 +8995,13 @@ void vk_shutdown( refShutdownCode_t code ) {
 				vk.swapchain_image_views = NULL;
 			}
 			if (vk.swapchain_rendering_finished) {
+				// Destroy semaphores before freeing the array
+				for (uint32_t i = 0; i < vk.swapchain_image_count; i++) {
+					if (vk.swapchain_rendering_finished[i] != VK_NULL_HANDLE) {
+						qvkDestroySemaphore(vk.device, vk.swapchain_rendering_finished[i], NULL);
+						vk.swapchain_rendering_finished[i] = VK_NULL_HANDLE;
+					}
+				}
 				ri.Free(vk.swapchain_rendering_finished);
 				vk.swapchain_rendering_finished = NULL;
 			}

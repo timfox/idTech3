@@ -24,12 +24,17 @@ static inline void atomic_increment_u64(atomic_uint64_t *ptr);
 static inline void atomic_increment_u32(atomic_uint_t *ptr);
 
 qboolean vk_allocate_image_chunk(void) {
+	ri.Printf(PRINT_ALL, "DEBUG: vk_allocate_image_chunk - entered function\n");
 	// Ensure image_chunk_size is initialized
 	if (vk.image_chunk_size == 0) {
 		vk.image_chunk_size = IMAGE_CHUNK_SIZE;
+		ri.Printf(PRINT_ALL, "DEBUG: vk_allocate_image_chunk - set image_chunk_size to %u\n", vk.image_chunk_size);
 	}
 
+	ri.Printf(PRINT_ALL, "DEBUG: vk_allocate_image_chunk - checking num_image_chunks (%u)\n", vk_world.num_image_chunks);
 	if (vk_world.num_image_chunks == 0) {
+		ri.Printf(PRINT_ALL, "DEBUG: vk_allocate_image_chunk - allocating first chunk\n");
+		ri.Printf(PRINT_ALL, "DEBUG: vk_allocate_image_chunk - about to create VkMemoryAllocateInfo\n");
 		VkMemoryAllocateInfo alloc_info = {
 			.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 			.pNext = NULL,
@@ -37,8 +42,10 @@ qboolean vk_allocate_image_chunk(void) {
 			.memoryTypeIndex = find_memory_type(~0U, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
 		};
 
+		ri.Printf(PRINT_ALL, "DEBUG: calling qvkAllocateMemory with device=%p\n", vk.device);
 		VkDeviceMemory memory;
 		VkResult result = qvkAllocateMemory(vk.device, &alloc_info, NULL, &memory);
+		ri.Printf(PRINT_ALL, "DEBUG: qvkAllocateMemory returned %d\n", result);
 
 		if (result != VK_SUCCESS) {
 			ri.Printf(PRINT_WARNING, "Vulkan: Failed to allocate image memory chunk (%u MB): %s\n",
