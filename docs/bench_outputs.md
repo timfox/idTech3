@@ -1,26 +1,26 @@
 ### Bench outputs and dashboard usage
 
 - What you get after running the benchmarks
-  - `bench.json`: rich per-iteration timing data plus memory samples (linux). Contains fields such as:
+  - `tests/benchmarks/bench.json`: rich per-iteration timing data plus memory samples (linux). Contains fields such as:
     - `timestamp`, `pathTracer_ms`, `rtx_ms`, `denoiser_ms`, `fsr_ms`, `iterations_pathTracer`, `width`, `height`
     - Optionally per-iteration arrays: `pathTracer_perIterMs`, `rtx_perIterMs`, `denoiser_perIterMs`, `fsr_perIterMs`
     - Memory arrays: `memory_per_iter_mb`, `memory_end_mb`
-  - `bench_summary.json`: run summary with overall timings and end-state metrics, including:
+  - `tests/benchmarks/bench_summary.json`: run summary with overall timings and end-state metrics, including:
     - `start_time`, `end_time`, `duration_seconds`, `memory_end_mb`
-  - `bench_timeseries.jsonl`: per-iteration lines for time-series analysis, including:
+  - `tests/benchmarks/bench_timeseries.jsonl`: per-iteration lines for time-series analysis, including:
     - `timestamp`, `idx`, `pathTracer_ms`, `pathTracer_delta_ms`, `rtx_ms`, `rtx_delta_ms`, `denoiser_ms`, `denoiser_delta_ms`, `fsr_ms`, `fsr_delta_ms`, `memory_mb`
-  - `bench.csv`: compact CSV form produced by `tools/bench_json_to_csv.py`, with optional per-iteration fields when requested:
+  - `tests/benchmarks/bench.csv`: compact CSV form produced by `tools/bench_json_to_csv.py`, with optional per-iteration fields when requested:
     - header includes: `timestamp`, `pathTracer_ms`, `rtx_ms`, `denoiser_ms`, `fsr_ms`, `iterations_pathTracer`, `width`, `height`
     - optional per-iteration columns: `pathTracer_perIterMs`, `rtx_perIterMs`, `denoiser_perIterMs`, `fsr_perIterMs`, `memory_per_iter_mb`, `memory_end_mb` (as JSON strings)
-  - `bench_dashboard.html` (under `web/`): HTML dashboard visualizing bench data via the dashboard generator.
+  - `tests/benchmarks/bench_dashboard.html`: HTML dashboard visualizing bench data via the dashboard generator.
 - How to view dashboards and data
   - Dashboard (HTML)
-    - Location: `web/bench_dashboard.html`
-    - Generate with: `python3 tools/dashboard_generator.py --input bench.json --output web/bench_dashboard.html`
+    - Location: `tests/benchmarks/bench_dashboard.html`
+    - Generate with: `python3 tools/dashboard_generator.py --input tests/benchmarks/bench.json --output tests/benchmarks/bench_dashboard.html`
   - CSV
-    - Convert bench.json to CSV with per-iteration data: `python3 tools/bench_json_to_csv.py bench.json --include-per-iter > bench.csv`
+    - Convert bench.json to CSV with per-iteration data: `python3 tools/bench_json_to_csv.py tests/benchmarks/bench.json --include-per-iter > tests/benchmarks/bench.csv`
   - Time-series
-    - The per-iteration time-series is emitted as `bench_timeseries.jsonl` in the repo root.
+    - The per-iteration time-series is emitted as `tests/benchmarks/bench_timeseries.jsonl`.
 - Cross-platform memory metrics
   - Linux: memory in MB from `/proc/self/statm` (default)
   - Windows/macOS: memory from platform-specific calls (via cross-platform memory helper in bench)

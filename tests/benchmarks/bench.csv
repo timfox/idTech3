@@ -1,0 +1,2 @@
+timestamp,pathTracer_ms,rtx_ms,denoiser_ms,fsr_ms,iterations_pathTracer,width,height
+2024-12-29T16:40:00Z,0.5,1.2,0.8,0.3,200,128,128

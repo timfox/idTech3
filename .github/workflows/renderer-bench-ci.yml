@@ -20,29 +20,29 @@ jobs:
         run: cmake --build build -- -j
 
       - name: Run benchmarks
-        run: ./build/renderer_bench > bench.log 2>&1
+        run: ./build/renderer_bench > tests/tmp/bench.log 2>&1
       - name: Rename bench.csv to bench_${GITHUB_SHA:0:7}.csv
         shell: bash
         run: |
-          if [ -f bench.csv ]; then
-            mv bench.csv bench_${GITHUB_SHA:0:7}.csv
+          if [ -f tests/benchmarks/bench.csv ]; then
+            mv tests/benchmarks/bench.csv tests/benchmarks/bench_${GITHUB_SHA:0:7}.csv
           fi
       - name: Upload timestamped bench CSV
         if: always()
         uses: actions/upload-artifact@v3
         with:
           name: renderer_bench_csv_timestamped
-          path: bench_${GITHUB_SHA:0:7}.csv
+          path: tests/benchmarks/bench_${GITHUB_SHA:0:7}.csv
       - name: Upload bench_summary.json
         if: always()
         uses: actions/upload-artifact@v3
         with:
           name: renderer_bench_summary
-          path: bench_summary.json
+          path: tests/benchmarks/bench_summary.json
       - name: Generate bench.csv from bench.json
         run: |
-          if [ -f bench.json ]; then
-            python3 tools/bench_json_to_csv.py bench.json > bench.csv
+          if [ -f tests/benchmarks/bench.json ]; then
+            python3 tools/bench_json_to_csv.py tests/benchmarks/bench.json > tests/benchmarks/bench.csv
           else
             echo "bench.json not found; skipping CSV generation"
           fi
@@ -51,28 +51,28 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: renderer_bench_csv
-          path: bench.csv
+          path: tests/benchmarks/bench.csv
       - name: Upload bench_timeseries_jsonl
         if: always()
         uses: actions/upload-artifact@v3
         with:
           name: renderer_bench_timeseries_jsonl
-          path: bench_timeseries.jsonl
+          path: tests/benchmarks/bench_timeseries.jsonl
       - name: Upload bench.json
         if: always()
         uses: actions/upload-artifact@v3
         with:
           name: renderer_bench_json
-          path: bench.json
+          path: tests/benchmarks/bench.json
 
       - name: Show log
-        run: tail -n +1 bench.log | sed -n '1,200p'
+        run: tail -n +1 tests/tmp/bench.log | sed -n '1,200p'
 
       - name: Upload bench log
         uses: actions/upload-artifact@v3
         with:
           name: renderer_bench_log
-          path: bench.log
+          path: tests/tmp/bench.log
 
   wayland_test:
     name: Wayland Test
@@ -111,14 +111,14 @@ jobs:
           exit_code=$(grep -o 'WAYLAND_EXIT:[0-9]*' /tmp/wayland_exit | cut -d':' -f2)
           if [ -z "$exit_code" ]; then exit_code=1; fi
           ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          echo "{\"timestamp\":\"$ts\",\"passed\":$([ \"$exit_code\" -eq 0 ] && echo true || echo false),\"exit_code\":$exit_code}" > bench_wayland_summary.json
+          echo "{\"timestamp\":\"$ts\",\"passed\":$([ \"$exit_code\" -eq 0 ] && echo true || echo false),\"exit_code\":$exit_code}" > tests/benchmarks/bench_wayland_summary.json
 
       - name: Upload Wayland summary
         if: always()
         uses: actions/upload-artifact@v3
         with:
           name: renderer_bench_wayland_summary
-          path: bench_wayland_summary.json
+          path: tests/benchmarks/bench_wayland_summary.json
 
       - name: Upload Weston log
         if: always()
@@ -132,4 +132,4 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: renderer_bench_log
-          path: bench.log
+          path: tests/tmp/bench.log

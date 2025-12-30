@@ -1,0 +1,14 @@
+{
+  "start_time": "2025-12-30T00:46:07Z",
+  "end_time": "2025-12-30T00:46:07Z",
+  "duration_seconds": 0.001243,
+  "memory_end_mb": 4.28,
+  "pathTracer_iterations": 200,
+  "rtx_iterations": 100,
+  "denoiser_iterations": 50,
+  "fsr_iterations": 50,
+  "pathTracer_avg_ms": 0.000110,
+  "rtx_avg_ms": 0.000120,
+  "denoiser_avg_ms": 0.002760,
+  "fsr_avg_ms": 0.000000
+}

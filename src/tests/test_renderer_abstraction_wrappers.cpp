@@ -5,13 +5,8 @@
 #include <assert.h>
 #include <stdio.h>
 
-// Forward declare types used by the wrappers
-// We rely on the project's public vec3_t/refdef_t definitions. Avoid local typedefs.
-
-// Prototypes for wrapper entry points (from header) with correct C linkage.
-extern "C" void PathTracer_RenderSample_wrapper(float* result, const float* origin, const float* direction);
-extern "C" void RTX_RenderScene_wrapper(const void *fd); // use opaque pointer to avoid typedef conflicts
-// For address-level checks, include the RendererAbstraction header to get the typedefs
+// Include project headers for types
+#include "../renderers/renderercommon/tr_types.h"
 #include "renderers/renderer_abstraction.h"
 // Test hooks (available when UNIT_TEST is defined in the build)
 extern "C" int RTX_GetModeForTest();
@@ -23,13 +18,13 @@ extern "C" void RTX_SwitchMode(int);
 static int g_mock_pathTracer_calls = 0;
 static int g_mock_rtx_calls = 0;
 
-// Mock wrappers (actual test hooks): align with C linkage signatures
-extern "C" void PathTracer_RenderSample_wrapper(float* result, const float* origin, const float* direction) {
+// Mock wrappers that match the header declarations
+void PathTracer_RenderSample_wrapper(vec3_t result, const vec3_t origin, const vec3_t direction) {
     (void)origin; (void)direction;
     g_mock_pathTracer_calls++;
     result[0] = 1.0f; result[1] = 2.0f; result[2] = 3.0f;
 }
-extern "C" void RTX_RenderScene_wrapper(const void* fd) {
+void RTX_RenderScene_wrapper(const refdef_t *fd) {
     (void)fd;
     g_mock_rtx_calls++;
 }
@@ -48,11 +43,12 @@ int main(int argc, char **argv) {
     g_mock_rtx_calls = 0;
 
     // Exercise wrappers
-    float out[3] = {0.0f, 0.0f, 0.0f};
-    float origin[3] = {0.0f, 0.0f, 0.0f};
-    float dir[3] = {0.0f, 0.0f, -1.0f};
+    vec3_t out = {0.0f, 0.0f, 0.0f};
+    vec3_t origin = {0.0f, 0.0f, 0.0f};
+    vec3_t dir = {0.0f, 0.0f, -1.0f};
     PathTracer_RenderSample_wrapper(out, origin, dir);
-    RTX_RenderScene_wrapper(nullptr);
+    refdef_t dummyFd = {};
+    RTX_RenderScene_wrapper(&dummyFd);
 
     // Assertions: both wrappers should dispatch to their mocks exactly once
     assert(g_mock_pathTracer_calls == 1);
@@ -64,16 +60,10 @@ int main(int argc, char **argv) {
     printf("RendererAbstraction wrappers dispatch asserted successfully\\n");
 
     if (verboseWrappers) {
-        // Print actual function addresses for manual inspection
-        printf("PathTracer_RenderSample_wrapper address: %p\\n", (void*)PathTracer_RenderSample_wrapper);
-        printf("RTX_RenderScene_wrapper address: %p\\n", (void*)RTX_RenderScene_wrapper);
         // Print the addresses recorded in the default abstraction mapping
         RendererAbstraction ra = get_default_renderer_abstraction();
         printf("ra.renderSample pointer: %p\\n", (void*)ra.renderSample);
         printf("ra.renderScene pointer: %p\\n", (void*)ra.renderScene);
-        // Also print the expected addresses for comparison
-        printf("Expected sample wrapper: %p\\n", (void*)PathTracer_RenderSample_wrapper);
-        printf("Expected scene wrapper: %p\\n", (void*)RTX_RenderScene_wrapper);
     }
 
 // (Optional) Address-level checks removed to keep test stable across typedef changes

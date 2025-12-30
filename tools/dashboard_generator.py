@@ -54,8 +54,8 @@ def render_dashboard(data: dict) -> str:
     h1 {{ font-size: 1.6rem; }}
     .metrics {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }}
     .card {{ border: 1px solid #ddd; border-radius: 8px; padding: 12px; background: #fff; }}
-    .bar { height: 18px; background: #4CAF50; border-radius: 6px; }
-    svg { width: 100%; height: 40px; display: block; }
+    .bar {{ height: 18px; background: #4CAF50; border-radius: 6px; }}
+    svg {{ width: 100%; height: 40px; display: block; }}
   </style>
 </head>
 <body>
@@ -98,7 +98,7 @@ def main():
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument("--input", required=True, help="bench.json or bench_summary.json")
-  ap.add_argument("--output", default="web/bench_dashboard.html", help="Output HTML file")
+    ap.add_argument("--output", default="tests/benchmarks/bench_dashboard.html", help="Output HTML file")
     args = ap.parse_args()
 
     inpath = args.input

@@ -646,7 +646,6 @@ extern "C" int RTX_GetModeForTest() { return rtx.mode; }
 extern "C" int RTX_IsInitializedForTest() { return rtx.initialized ? 1 : 0; }
 extern "C" void RTX_TestForceResourceCleanupForTest() { rtx.CleanupResources(); }
 #endif
-}
 
 /*
 ===============
