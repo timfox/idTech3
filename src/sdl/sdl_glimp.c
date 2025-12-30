@@ -112,6 +112,19 @@ static qboolean GLimp_CanFallbackToX11( void )
 #else
 	return qfalse;
 #endif
+#ifdef UNIT_TEST
+// Expose tiny helper for tests to verify the Wayland toggle behavior
+extern "C" int Wayland_Toggle_IsWaylandForced();
+int Wayland_Toggle_IsWaylandForced() {
+#ifdef _WIN32
+    const char* v = SDL_getenv("WAYLAND_FORCE");
+    return (v && v[0] == '1') ? 1 : 0;
+#else
+    const char* v = SDL_getenv("WAYLAND_FORCE");
+    return (v && v[0] == '1') ? 1 : 0;
+#endif
+}
+#endif
 }
 
 static qboolean GLimp_RestartVideoDriver( const char *driver )
