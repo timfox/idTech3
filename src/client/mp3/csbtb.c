@@ -292,3 +292,8 @@ void sbtB8_dual_right(float *sample, unsigned char *pcm, int n)
 }
 /*------------------------------------------------------------*/
 #endif	// #ifdef COMPILE_ME
+
+#ifndef COMPILE_ME
+// Dummy function to suppress empty translation unit warning
+static void csbtb_dummy(void) {}
+#endif

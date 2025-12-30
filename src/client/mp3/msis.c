@@ -223,10 +223,10 @@ void is_process_MPEG2(float x[][1152],	/* intensity stereo */
    int il[21];
    int tmp;
    int r;
-   ARRAY2 *lr;
+   ARRAY2 *lr_ptr;
    int cb0, cb1;
 
-   lr = lr2[is_sf_info->intensity_scale][ms_mode];
+   lr_ptr = lr2[is_sf_info->intensity_scale][ms_mode];
 
    if (cb_info[1].cbtype)
       goto short_blocks;

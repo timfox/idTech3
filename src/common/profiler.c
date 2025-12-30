@@ -96,7 +96,7 @@ static void Profiler_DecreaseDetail_f(void) {
 Profiler_ModeChanged
 ===============
 */
-static void Profiler_ModeChanged(void) {
+static void __attribute__((unused)) Profiler_ModeChanged(void) {
 	cvar_t *mode_cvar = Cvar_Get("profiler_mode", "0", CVAR_ARCHIVE);
 	int new_mode = mode_cvar->integer;
 
@@ -128,7 +128,7 @@ static void Profiler_ModeChanged(void) {
 Profiler_OverheadLimitChanged
 ===============
 */
-static void Profiler_OverheadLimitChanged(void) {
+static void __attribute__((unused)) Profiler_OverheadLimitChanged(void) {
 	cvar_t *overhead_cvar = Cvar_Get("profiler_overhead_limit", "5.0", CVAR_ARCHIVE);
 	profiler_config.profiling_overhead_limit = overhead_cvar->value;
 }

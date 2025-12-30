@@ -69,7 +69,7 @@ static void vk_fsr_apply(int width, int height) {
 }
 
 // Simple Linux memory measurement (RSS in MB)
-static double get_current_memory_mb() {
+static double get_current_memory_mb() __attribute__((unused));
 #if defined(_WIN32)
     PROCESS_MEMORY_COUNTERS_EX pmc;
     if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {

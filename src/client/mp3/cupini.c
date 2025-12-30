@@ -393,4 +393,4 @@ void decode_table_init()
 #endif	// #ifdef COMPILE_ME
 
 /* Dummy statement to avoid empty translation unit warning */
-static void *dummy_cupini = (void *)0;
+static void *dummy_cupini __attribute__((unused)) = (void *)0;
