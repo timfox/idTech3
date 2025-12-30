@@ -64,8 +64,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../renderercommon/tr_public.h"
 #include "../renderercommon/tr_backend_iface.h"
 #include "vk.h"
+#include "vk_scene_rendering.h"
+#include "vk_texture_management.h"
 #include "iqm.h"
 #include "../opengl/tr_tiki.h"
+
+// Vulkan function pointers
+extern PFN_vkAcquireNextImageKHR qvkAcquireNextImageKHR;
+extern PFN_vkQueuePresentKHR qvkQueuePresentKHR;
 
 #ifdef __cplusplus
 extern "C" {
@@ -2018,7 +2024,7 @@ MARKERS, POLYGON PROJECTION ON WORLD POLYGONS
 */
 
 int R_MarkFragments( int numPoints, const vec3_t *points, const vec3_t projection,
-				   int maxPoints, vec_t *pointBuffer, int maxFragments, markFragment_t *fragmentBuffer );
+				   int maxPoints, vec3_t pointBuffer, int maxFragments, markFragment_t *fragmentBuffer );
 
 
 /*

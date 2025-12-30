@@ -420,7 +420,7 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 	backEnd.color2D.u32 = ~0U;
 
 	// For real Vulkan devices, acquire next swapchain image
-	if (vk.device != (VkDevice)0x20000000 && vk.active) {
+	if (vk.device != (VkDevice)0x20000000 && vk.active && vk.swapchain != VK_NULL_HANDLE && qvkAcquireNextImageKHR) {
 		// Acquire next image from swapchain
 		VkResult result = qvkAcquireNextImageKHR(vk.device, vk.swapchain, UINT64_MAX,
 			vk.image_available, VK_NULL_HANDLE, &vk.current_swapchain_image_index);
@@ -581,7 +581,7 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 #endif
 
 		// Vulkan: Present the rendered frame
-		if (vk.device != (VkDevice)0x20000000 && vk.active && vk.swapchain != VK_NULL_HANDLE) {
+		if (vk.device != (VkDevice)0x20000000 && vk.active && vk.swapchain != VK_NULL_HANDLE && qvkQueuePresentKHR) {
 			// Submit rendering commands and present
 			VkPresentInfoKHR present_info = {
 				.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,

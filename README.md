@@ -130,38 +130,3 @@ Go to [Releases](../../releases) section to download the latest binaries for you
 * https://github.com/NVIDIA/Q2RTX
 * https://github.com/TTimo/GtkRadiant
 * https://github.com/JKSunny/Quake3e
-
-### Android signing (minimal) - README snippet
-- This project supports signing the Android app module for release builds.
-- Local signing (manual)
-  - Generate a release keystore (example):
-    ```
-    keytool -genkeypair -v -keystore release.keystore -alias idtech3 -keyalg RSA -keysize 2048 -validity 10000
-    ```
-  - Place the keystore in a secure location (e.g. `android/keystore/release.keystore`), and configure Gradle signing in `src/android-app/build.gradle`:
-    ```
-    signingConfigs {
-      release {
-        storeFile file("$rootDir/keystore/release.keystore")
-        storePassword "changeit"
-        keyAlias "idtech3"
-        keyPassword "changeit"
-      }
-    }
-
-    buildTypes {
-      release {
-        signingConfig signingConfigs.release
-      }
-    }
-    ```
-- CI signing (secret-based)
-  - In CI, supply keystore path and credentials via environment variables:
-    - RELEASE_STORE_FILE
-    - RELEASE_STORE_PASSWORD
-    - RELEASE_KEY_ALIAS
-    - RELEASE_KEY_PASSWORD
-- Verification steps (local)
-  - ./gradlew :src/android-app:assembleRelease
-- Verification steps (CI)
-  - Use a dedicated CI job to run signing (see .github/workflows/android-signing.yml)

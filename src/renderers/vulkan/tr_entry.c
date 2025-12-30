@@ -59,7 +59,7 @@ extern void RE_StretchRaw(int x, int y, int w, int h, int cols, int rows, byte *
 extern void RE_UploadCinematic(int w, int h, int cols, int rows, byte *data, int client, qboolean dirty);
 extern void RE_BeginFrame(stereoFrame_t stereoFrame);
 extern void RE_EndFrame(int *frontEndMsec, int *backEndMsec);
-extern int R_MarkFragments(int numPoints, const vec3_t *points, const vec3_t projection, int maxPoints, vec_t *pointBuffer, int maxFragments, markFragment_t *fragmentBuffer);
+extern int R_MarkFragments(int numPoints, const vec3_t *points, const vec3_t projection, int maxPoints, vec3_t pointBuffer, int maxFragments, markFragment_t *fragmentBuffer);
 extern int R_LerpTag(orientation_t *tag, qhandle_t model, int startFrame, int endFrame, float frac, const char *tagName);
 extern void R_ModelBounds(qhandle_t model, vec3_t mins, vec3_t maxs);
 extern qboolean RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font);

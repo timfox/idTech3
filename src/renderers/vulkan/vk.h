@@ -831,6 +831,17 @@ typedef struct {
     VkSemaphore render_finished_semaphore;
     VkFence fence;
 
+    // Additional swapchain management
+    VkSurfaceKHR surface;
+    VkSemaphore image_available_semaphores[MAX_SWAPCHAIN_IMAGES];
+    VkSemaphore rendering_finished_semaphores[MAX_SWAPCHAIN_IMAGES];
+    VkSemaphore image_available;
+    VkSemaphore rendering_finished;
+    uint32_t current_swapchain_image_index;
+
+    // Rendering state
+    float currentColor[4]; // Current rendering color (RGBA)
+
     // Render state
     qboolean msaaActive;
     struct {

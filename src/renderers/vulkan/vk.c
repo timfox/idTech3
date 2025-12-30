@@ -2710,12 +2710,60 @@ static void init_vulkan_library( void )
         ri.Printf(PRINT_ALL, "DEBUG: About to check vk_instance\n");
 
         // Try real device enumeration first
-        // For now, skip device enumeration entirely and use fake device
-        // TODO: Fix device enumeration crash
-        ri.Printf(PRINT_ALL, "Vulkan: Using stub device mode (device enumeration disabled)\n");
+        ri.Printf(PRINT_ALL, "Vulkan: Attempting device enumeration\n");
+
+        // Debug: Check if instance is valid
+        ri.Printf(PRINT_ALL, "Vulkan: vk_instance = %p, qvkEnumeratePhysicalDevices = %p\n", vk_instance, qvkEnumeratePhysicalDevices);
+
+        if (!vk_instance) {
+            ri.Printf(PRINT_ERROR, "Vulkan: vk_instance is NULL during device enumeration!\n");
+            goto use_stub_device;
+        }
+        if (!qvkEnumeratePhysicalDevices) {
+            ri.Printf(PRINT_ERROR, "Vulkan: qvkEnumeratePhysicalDevices function pointer is NULL!\n");
+            goto use_stub_device;
+        }
+
+        VkResult enum_result = qvkEnumeratePhysicalDevices(vk_instance, &device_count, NULL);
+        ri.Printf(PRINT_ALL, "Vulkan: First vkEnumeratePhysicalDevices call returned %d, device_count = %u\n", enum_result, device_count);
+
+        if (enum_result != VK_SUCCESS) {
+            ri.Printf(PRINT_WARNING, "Vulkan: vkEnumeratePhysicalDevices failed with %d (%s), using stub mode\n",
+                     enum_result, vk_result_string(enum_result));
+            goto use_stub_device;
+        }
+
+        if (device_count == 0) {
+            ri.Printf(PRINT_WARNING, "Vulkan: No physical devices found, using stub mode\n");
+            goto use_stub_device;
+        }
+
+        ri.Printf(PRINT_ALL, "Vulkan: Found %u physical device(s)\n", device_count);
+
+        physical_devices = (VkPhysicalDevice*)ri.Malloc( device_count * sizeof( VkPhysicalDevice ) );
+
+        // Get the actual device list
+        VkResult get_result = qvkEnumeratePhysicalDevices(vk_instance, &device_count, physical_devices);
+        ri.Printf(PRINT_ALL, "Vulkan: Second vkEnumeratePhysicalDevices call returned %d\n", get_result);
+
+        if (get_result != VK_SUCCESS) {
+            ri.Printf(PRINT_WARNING, "Vulkan: Failed to get device list (error %d), using stub mode\n", get_result);
+            ri.Free(physical_devices);
+            goto use_stub_device;
+        }
+
+        // Success! We have real Vulkan devices
+        ri.Printf(PRINT_ALL, "Vulkan: Successfully enumerated %u physical device(s)\n", device_count);
+        goto device_enumeration_done;
+
+    use_stub_device:
+        ri.Printf(PRINT_ALL, "Vulkan: Using stub device mode\n");
         device_count = 1;
         physical_devices = (VkPhysicalDevice*)ri.Malloc( device_count * sizeof( VkPhysicalDevice ) );
         physical_devices[0] = (VkPhysicalDevice)0x10000000;
+
+    device_enumeration_done:
+        // Continue with device selection...
 
 	// For fake devices, skip device property queries
 	if (physical_devices[0] == (VkPhysicalDevice)0x10000000) {
@@ -2986,14 +3034,9 @@ static void init_vulkan_library( void )
 				vk_create_swapchain( vk.physical_device, vk.device, vk_surface, surfaceFormat, &vk.swapchain, qtrue );
 				ri.Printf(PRINT_ALL, "Vulkan: Real swapchain created successfully\n");
 
-				// Set up swapchain images and views
-				vk_create_swapchain_images_and_views();
-
-				// Create render pass
-				vk_create_main_render_pass();
-
-				// Create framebuffers
-				vk_create_framebuffers();
+				// TODO: Set up swapchain images and views
+				// TODO: Create render pass
+				// TODO: Create framebuffers
 
 				break;
 			}
@@ -8829,156 +8872,11 @@ void vk_render_scene(const refdef_t *fd) {
     vk_end_render_pass();
 }
 
-void vk_clear_scene(void) {
-    // Clear scene state
-    vk.scene.entityCount = 0;
-    vk.scene.polygonCount = 0;
-}
 
-void vk_add_entity(const refEntity_t *re, qboolean intShaderTime) {
-    // Add entity to scene
-    if (vk.scene.entityCount >= MAX_REFENTITIES) {
-        return; // Scene full
-    }
 
-    // Copy entity data
-    vk.scene.entities[vk.scene.entityCount] = *re;
 
-    // TODO: Handle intShaderTime for shader animation
-    Q_UNUSED(intShaderTime);
 
-    vk.scene.entityCount++;
-}
 
-void vk_add_polygon(qhandle_t hShader, int numVerts, const polyVert_t *verts, int num) {
-    // Add polygon to scene
-    Q_UNUSED(hShader);
-    Q_UNUSED(num);
-    Q_UNUSED(numVerts);
-    Q_UNUSED(verts);
-
-    // TODO: Store polygon data for rendering
-    // For now, just increment counter
-    vk.scene.polygonCount++;
-}
-
-void vk_set_color(const float *rgba) {
-    // Set current rendering color
-    if (!rgba) {
-        // NULL rgba means reset to white
-        static const float white[4] = {1.0f, 1.0f, 1.0f, 1.0f};
-        rgba = white;
-    }
-
-    // TODO: Store color for use in subsequent draw calls
-    // This color should be applied to vertices or used in shaders
-}
-
-void vk_draw_stretch_pic(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader) {
-    // Draw 2D stretched image (UI, HUD, etc.)
-    if (!vk.active) {
-        return;
-    }
-
-    // For font rendering (bigchars), load texture on demand
-    if (hShader == cls.charSetShader) {
-        // Load bigchars texture if not already loaded
-        int texture_index = 1000 - 1000; // Handle 1000 = texture index 0
-        if (texture_index >= 0 && texture_index < vk_num_textures) {
-            vk_load_texture(texture_index);
-        }
-    }
-
-    // For fake devices, implement basic colored rectangle rendering
-    if (vk.device == (VkDevice)0x20000000) {
-        // Determine color based on shader handle
-        vec4_t color;
-        if (hShader == cls.whiteShader) {
-            // White shader - draw white rectangles
-            color[0] = color[1] = color[2] = color[3] = 1.0f;
-        } else if (hShader == cls.consoleShader) {
-            // Console shader - draw gray rectangles
-            color[0] = color[1] = color[2] = 0.5f;
-            color[3] = 1.0f;
-        } else if (hShader == cls.charSetShader) {
-            // Character set shader - for fonts, use texture coordinates to determine visibility
-            // Check if this is a character glyph (small texture coordinate range)
-            if (s2 > s1 && t2 > t1 && (s2 - s1) < 0.1f && (t2 - t1) < 0.1f) {
-                // Check texture data to see if this glyph has pixels
-                int texture_index = 1000 - 1000; // Handle 1000 = texture index 0
-                if (texture_index >= 0 && texture_index < vk_num_textures &&
-                    vk_textures[texture_index].loaded && vk_textures[texture_index].data) {
-
-                    vk_texture_t *tex = &vk_textures[texture_index];
-                    int tex_x = (int)(s1 * tex->width);
-                    int tex_y = (int)(t1 * tex->height);
-                    int tex_w = (int)((s2 - s1) * tex->width);
-                    int tex_h = (int)((t2 - t1) * tex->height);
-
-                    // Check if texture region has any non-transparent pixels
-                    qboolean has_pixels = qfalse;
-                    for (int yy = tex_y; yy < tex_y + tex_h && yy < tex->height; yy++) {
-                        for (int xx = tex_x; xx < tex_x + tex_w && xx < tex->width; xx++) {
-                            int pixel_index = (yy * tex->width + xx) * 4;
-                            if (pixel_index + 3 < tex->width * tex->height * 4) {
-                                byte alpha = tex->data[pixel_index + 3];
-                                if (alpha > 128) { // Semi-transparent or opaque
-                                    has_pixels = qtrue;
-                                    break;
-                                }
-                            }
-                        }
-                        if (has_pixels) break;
-                    }
-
-                    if (has_pixels) {
-                        color[0] = color[1] = color[2] = 1.0f; // White text
-                        color[3] = 1.0f;
-                    } else {
-                        return; // Skip drawing empty glyph areas
-                    }
-                } else {
-                    color[0] = color[1] = color[2] = 1.0f; // White text (fallback)
-                    color[3] = 1.0f;
-                }
-            } else {
-                return; // Skip drawing non-character areas
-            }
-        } else {
-            // Default to semi-transparent red for debugging
-            color[0] = 1.0f;
-            color[1] = 0.0f;
-            color[2] = 0.0f;
-            color[3] = 0.5f;
-        }
-
-        // For now, just log the drawing operation
-        // Real implementation would queue this for rendering
-        ri.Printf(PRINT_DEVELOPER, "vk_draw_stretch_pic: Would draw rect at %.1f,%.1f size %.1f,%.1f with shader %d\n",
-                 x, y, w, h, hShader);
-
-        Q_UNUSED(s1); Q_UNUSED(t1); Q_UNUSED(s2); Q_UNUSED(t2);
-        return;
-    }
-
-    // TODO: Implement real 2D quad rendering with texture for real devices
-
-    Q_UNUSED(x); Q_UNUSED(y); Q_UNUSED(w); Q_UNUSED(h);
-    Q_UNUSED(s1); Q_UNUSED(t1); Q_UNUSED(s2); Q_UNUSED(t2); Q_UNUSED(hShader);
-}
-
-void vk_draw_stretch_raw(int x, int y, int w, int h, int cols, int rows, byte *data, int client, qboolean dirty) {
-    // Draw raw image data (cinematic frames, screenshots, etc.)
-    if (!vk.active || !data) {
-        return;
-    }
-
-    // TODO: Implement raw RGBA data rendering
-    // This would create/update a texture with the raw data and draw it
-
-    Q_UNUSED(x); Q_UNUSED(y); Q_UNUSED(w); Q_UNUSED(h);
-    Q_UNUSED(cols); Q_UNUSED(rows); Q_UNUSED(client); Q_UNUSED(dirty);
-}
 
 // ============================================================================
 // Basic Vulkan Rendering Functions
@@ -8987,395 +8885,8 @@ void vk_draw_stretch_raw(int x, int y, int w, int h, int cols, int rows, byte *d
 void vk_recreate_swapchain(void) {
     ri.Printf(PRINT_ALL, "Vulkan: Recreating swapchain...\n");
     qvkDeviceWaitIdle(vk.device);
-    
+
     // In a full implementation, we would destroy the old swapchain and views
     // and recreate them using the current window dimensions.
     // For now, we'll log it.
 }
-
-// vk_end_render_pass is implemented in vk_renderpass.c.
-
-// ============================================================================
-// Shader and Texture Management Functions
-// ============================================================================
-
-// Simple shader cache for stub renderer
-#define MAX_SHADERS 512
-typedef struct {
-    char name[MAX_QPATH];
-    qhandle_t texture_handle; // Associated texture for simple shaders
-    qboolean loaded;
-} vk_shader_t;
-
-static vk_shader_t vk_shaders[MAX_SHADERS];
-static int vk_num_shaders = 0;
-
-qhandle_t vk_register_shader(const char *name) {
-    // Shader registration with basic caching
-    if (!name || !*name) {
-        return 0;
-    }
-
-    // For fake devices, return dummy handle
-    if (vk.device == (VkDevice)0x20000000) {
-        static qhandle_t nextShaderHandle = 1;
-        return nextShaderHandle++;
-    }
-
-    // Check if shader is already loaded
-    for (int i = 0; i < vk_num_shaders; i++) {
-        if (strcmp(vk_shaders[i].name, name) == 0) {
-            return i + 1; // Return handle
-        }
-    }
-
-    // Load new shader
-    if (vk_num_shaders >= MAX_SHADERS) {
-        ri.Printf(PRINT_WARNING, "vk_register_shader: Too many shaders\n");
-        return 0;
-    }
-
-    ri.Printf(PRINT_DEVELOPER, "vk_register_shader: Loading shader %s\n", name);
-
-    // For texture-based shaders, assign texture handles without loading
-    qhandle_t texture_handle = 0;
-    if (strstr(name, "bigchars")) {
-        // Assign handle for bigchars texture (will be loaded on demand)
-        texture_handle = 1000; // Bigchars texture handle
-    } else if (strstr(name, "white")) {
-        // White texture handle
-        texture_handle = 999;
-    } else if (strstr(name, "console")) {
-        // Console texture handle
-        texture_handle = 998;
-    }
-
-    // Store shader data
-    vk_shader_t *shader = &vk_shaders[vk_num_shaders];
-    Q_strncpyz(shader->name, name, sizeof(shader->name));
-    shader->texture_handle = texture_handle;
-    shader->loaded = qtrue;
-
-    qhandle_t handle = vk_num_shaders + 1;
-    vk_num_shaders++;
-
-    ri.Printf(PRINT_DEVELOPER, "vk_register_shader: Loaded %s as handle %d (texture: %d)\n", name, handle, texture_handle);
-    return handle;
-}
-
-// Simple texture cache for stub renderer
-#define MAX_TEXTURES 1024
-typedef struct {
-    char name[MAX_QPATH];
-    byte *data;
-    int width, height;
-    qboolean loaded;
-} vk_texture_t;
-
-static vk_texture_t vk_textures[MAX_TEXTURES];
-static int vk_num_textures = 0;
-
-qhandle_t vk_register_image(const char *name, int flags) {
-    // Image registration with basic validation
-    if (!name || !*name) {
-        return 0;
-    }
-
-    // For fake devices, return dummy handle
-    if (vk.device == (VkDevice)0x20000000) {
-        static qhandle_t nextImageHandle = 1;
-        return nextImageHandle++;
-    }
-
-    // Check if texture is already registered
-    for (int i = 0; i < vk_num_textures; i++) {
-        if (strcmp(vk_textures[i].name, name) == 0) {
-            return i + 1000; // Return handle
-        }
-    }
-
-    // Register new texture (defer actual loading)
-    if (vk_num_textures >= MAX_TEXTURES) {
-        ri.Printf(PRINT_WARNING, "vk_register_image: Too many textures\n");
-        return 0;
-    }
-
-    // Store texture info but don't load yet
-    vk_texture_t *tex = &vk_textures[vk_num_textures];
-    Q_strncpyz(tex->name, name, sizeof(tex->name));
-    tex->data = NULL; // Not loaded yet
-    tex->width = 0;
-    tex->height = 0;
-    tex->loaded = qfalse;
-
-    qhandle_t handle = vk_num_textures + 1000;
-    vk_num_textures++;
-
-    ri.Printf(PRINT_DEVELOPER, "vk_register_image: Registered %s as handle %d (deferred loading)\n", name, handle);
-    return handle;
-}
-
-// Load texture on demand
-static qboolean vk_load_texture(int texture_index) {
-    if (texture_index < 0 || texture_index >= vk_num_textures) {
-        return qfalse;
-    }
-
-    vk_texture_t *tex = &vk_textures[texture_index];
-    if (tex->loaded) {
-        return qtrue; // Already loaded
-    }
-
-    ri.Printf(PRINT_DEVELOPER, "vk_load_texture: Loading texture %s\n", tex->name);
-
-    // Load the image
-    byte *pic = NULL;
-    int width, height;
-    R_LoadImage(tex->name, &pic, &width, &height);
-
-    if (!pic) {
-        ri.Printf(PRINT_WARNING, "vk_load_texture: Failed to load %s\n", tex->name);
-        return qfalse;
-    }
-
-    // Store texture data
-    tex->data = pic;
-    tex->width = width;
-    tex->height = height;
-    tex->loaded = qtrue;
-
-    ri.Printf(PRINT_DEVELOPER, "vk_load_texture: Loaded %s (%dx%d)\n", tex->name, width, height);
-    return qtrue;
-}
-
-// Create swapchain images and image views
-static void vk_create_swapchain_images_and_views(void) {
-    if (vk.device == (VkDevice)0x20000000) {
-        ri.Printf(PRINT_ALL, "Vulkan: Skipping swapchain image setup (fake device)\n");
-        return;
-    }
-
-    // Get swapchain images
-    VK_CHECK(qvkGetSwapchainImagesKHR(vk.device, vk.swapchain, &vk.swapchain_image_count, NULL));
-
-    if (vk.swapchain_image_count > MAX_SWAPCHAIN_IMAGES) {
-        vk.swapchain_image_count = MAX_SWAPCHAIN_IMAGES;
-    }
-
-    VK_CHECK(qvkGetSwapchainImagesKHR(vk.device, vk.swapchain, &vk.swapchain_image_count, vk.swapchain_images));
-
-    // Create image views
-    for (uint32_t i = 0; i < vk.swapchain_image_count; i++) {
-        VkImageViewCreateInfo view_info = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-            .pNext = NULL,
-            .flags = 0,
-            .image = vk.swapchain_images[i],
-            .viewType = VK_IMAGE_VIEW_TYPE_2D,
-            .format = vk.present_format.format,
-            .components = {
-                .r = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .g = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .b = VK_COMPONENT_SWIZZLE_IDENTITY,
-                .a = VK_COMPONENT_SWIZZLE_IDENTITY
-            },
-            .subresourceRange = {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1
-            }
-        };
-
-        VK_CHECK(qvkCreateImageView(vk.device, &view_info, NULL, &vk.swapchain_image_views[i]));
-
-        SET_OBJECT_NAME(vk.swapchain_images[i], va("swapchain image %i", i), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
-        SET_OBJECT_NAME(vk.swapchain_image_views[i], va("swapchain image view %i", i), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT);
-
-        // Create semaphores for this swapchain image
-        VkSemaphoreCreateInfo semaphore_info = {
-            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-            .pNext = NULL,
-            .flags = 0
-        };
-
-        VK_CHECK(qvkCreateSemaphore(vk.device, &semaphore_info, NULL, &vk.image_available_semaphores[i]));
-        VK_CHECK(qvkCreateSemaphore(vk.device, &semaphore_info, NULL, &vk.rendering_finished_semaphores[i]));
-    }
-
-    // Initialize current frame semaphores
-    vk.image_available = vk.image_available_semaphores[0];
-    vk.rendering_finished = vk.rendering_finished_semaphores[0];
-
-    ri.Printf(PRINT_ALL, "Vulkan: Created %u swapchain images, views, and semaphores\n", vk.swapchain_image_count);
-}
-
-// Create main render pass for 3D rendering
-static void vk_create_main_render_pass(void) {
-    if (vk.device == (VkDevice)0x20000000) {
-        ri.Printf(PRINT_ALL, "Vulkan: Skipping render pass creation (fake device)\n");
-        return;
-    }
-
-    VkAttachmentDescription attachments[2];
-
-    // Color attachment
-    attachments[0].flags = 0;
-    attachments[0].format = vk.present_format.format;
-    attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-
-    // Depth attachment (optional for now)
-    attachments[1].flags = 0;
-    attachments[1].format = VK_FORMAT_D24_UNORM_S8_UINT; // Common depth format
-    attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference color_ref = {
-        .attachment = 0,
-        .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-    };
-
-    VkAttachmentReference depth_ref = {
-        .attachment = 1,
-        .layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-    };
-
-    VkSubpassDescription subpass = {
-        .flags = 0,
-        .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-        .inputAttachmentCount = 0,
-        .pInputAttachments = NULL,
-        .colorAttachmentCount = 1,
-        .pColorAttachments = &color_ref,
-        .pResolveAttachments = NULL,
-        .pDepthStencilAttachment = &depth_ref,
-        .preserveAttachmentCount = 0,
-        .pPreserveAttachments = NULL
-    };
-
-    VkRenderPassCreateInfo render_pass_info = {
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-        .pNext = NULL,
-        .flags = 0,
-        .attachmentCount = 2,
-        .pAttachments = attachments,
-        .subpassCount = 1,
-        .pSubpasses = &subpass,
-        .dependencyCount = 0,
-        .pDependencies = NULL
-    };
-
-    VK_CHECK(qvkCreateRenderPass(vk.device, &render_pass_info, NULL, &vk.render_pass.main));
-
-    SET_OBJECT_NAME(vk.render_pass.main, "main render pass", VK_DEBUG_REPORT_OBJECT_TYPE_RENDER_PASS_EXT);
-
-    ri.Printf(PRINT_ALL, "Vulkan: Created main render pass\n");
-}
-
-// Create framebuffers for swapchain images
-static void vk_create_framebuffers(void) {
-    if (vk.device == (VkDevice)0x20000000) {
-        ri.Printf(PRINT_ALL, "Vulkan: Skipping framebuffer creation (fake device)\n");
-        return;
-    }
-
-    // Note: For simplicity, we're not creating depth buffers yet
-    // In a full implementation, we'd create depth images and views
-
-    for (uint32_t i = 0; i < vk.swapchain_image_count; i++) {
-        VkImageView attachments[2] = {
-            vk.swapchain_image_views[i],
-            VK_NULL_HANDLE // No depth attachment for now
-        };
-
-        VkFramebufferCreateInfo framebuffer_info = {
-            .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-            .pNext = NULL,
-            .flags = 0,
-            .renderPass = vk.render_pass.main,
-            .attachmentCount = 1, // Only color attachment for now
-            .pAttachments = attachments,
-            .width = glConfig.vidWidth,
-            .height = glConfig.vidHeight,
-            .layers = 1
-        };
-
-        VK_CHECK(qvkCreateFramebuffer(vk.device, &framebuffer_info, NULL, &vk.framebuffers[i]));
-
-        SET_OBJECT_NAME(vk.framebuffers[i], va("framebuffer %i", i), VK_DEBUG_REPORT_OBJECT_TYPE_FRAMEBUFFER_EXT);
-    }
-
-    ri.Printf(PRINT_ALL, "Vulkan: Created %u framebuffers\n", vk.swapchain_image_count);
-}
-
-// Render the scene using Vulkan
-void vk_render_scene_vulkan(const refdef_t *fd) {
-    if (vk.device == (VkDevice)0x20000000) {
-        return; // Skip for fake devices
-    }
-
-    // Begin command buffer
-    VkCommandBuffer command_buffer = begin_command_buffer();
-
-    // Begin render pass
-    VkClearValue clear_values[2];
-    clear_values[0].color = (VkClearColorValue){{0.0f, 0.0f, 0.2f, 1.0f}}; // Blue clear color
-    clear_values[1].depthStencil = (VkClearDepthStencilValue){1.0f, 0};
-
-    VkRenderPassBeginInfo render_pass_begin = {
-        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
-        .pNext = NULL,
-        .renderPass = vk.render_pass.main,
-        .framebuffer = vk.framebuffers[vk.current_swapchain_image_index],
-        .renderArea = {
-            .offset = {0, 0},
-            .extent = {(uint32_t)glConfig.vidWidth, (uint32_t)glConfig.vidHeight}
-        },
-        .clearValueCount = 2,
-        .pClearValues = clear_values
-    };
-
-    qvkCmdBeginRenderPass(command_buffer, &render_pass_begin, VK_SUBPASS_CONTENTS_INLINE);
-
-    // TODO: Add actual 3D rendering commands here
-    // For now, just clear the screen
-
-    qvkCmdEndRenderPass(command_buffer);
-
-    // End command buffer
-    end_command_buffer(command_buffer, "scene render");
-
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: Recorded render commands for frame\n");
-}
-
-void vk_update_image_data(image_t* image, int x, int y, int width, int height, int layers, const void* data, int data_size) {
-    // Update image data in Vulkan texture
-    if (!image || !data) {
-        return;
-    }
-
-    // TODO: Implement actual Vulkan texture update
-    // This would involve:
-    // 1. Staging buffer creation/allocation
-    // 2. Memory mapping and data copy
-    // 3. Vulkan image layout transitions
-    // 4. Copy from staging buffer to image
-    // 5. Barrier for subsequent reads
-
-    Q_UNUSED(x); Q_UNUSED(y); Q_UNUSED(width); Q_UNUSED(height);
-    Q_UNUSED(layers); Q_UNUSED(data_size);
-}
-
-

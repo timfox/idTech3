@@ -8,6 +8,10 @@ Quake 3 UI Module
 #include "../common/qcommon.h"
 #include "ui_public.h"
 
+// Function prototypes
+Q_EXPORT void QDECL dllEntry_ui( dllSyscall_t syscallptr );
+Q_EXPORT intptr_t QDECL vmMain_ui( int command, intptr_t arg0, intptr_t arg1, intptr_t arg2 );
+
 // UI syscall function pointer
 static intptr_t (QDECL *syscall)( intptr_t arg, ... ) = NULL;
 
@@ -28,7 +32,7 @@ Q_EXPORT void QDECL dllEntry_ui( dllSyscall_t syscallptr ) {
 vmMain_ui
 ===============
 */
-Q_EXPORT intptr_t QDECL vmMain_ui( int command, intptr_t arg0, intptr_t arg1, intptr_t arg2 ) {
+Q_EXPORT intptr_t QDECL vmMain_ui( int command, intptr_t arg0, intptr_t arg1 __attribute__((unused)), intptr_t arg2 __attribute__((unused)) ) {
     switch ( command ) {
     case UI_INIT:
         // Initialize UI
@@ -51,7 +55,9 @@ Q_EXPORT intptr_t QDECL vmMain_ui( int command, intptr_t arg0, intptr_t arg1, in
         if (uiActiveMenu == UIMENU_MAIN) {
             // Draw a simple white background
             vec4_t color = {1.0f, 1.0f, 1.0f, 1.0f};
-            syscall( UI_R_SETCOLOR, *(int*)&color );
+            int color_int;
+            memcpy(&color_int, &color, sizeof(int)); // Avoid strict aliasing violation
+            syscall( UI_R_SETCOLOR, color_int );
             syscall( UI_R_DRAWSTRETCHPIC, 100, 100, 400, 300, 0, 0, 1, 1, 0 );
         }
         return 0;

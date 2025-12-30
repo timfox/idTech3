@@ -1400,8 +1400,8 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 UI_DllSyscall
 ====================
 */
-static intptr_t QDECL UI_DllSyscall( intptr_t arg, ... ) {
 #if !id386 || defined __clang__
+static __attribute__((unused)) intptr_t QDECL UI_DllSyscall( intptr_t arg, ... ) {
 	intptr_t	args[10]; // max.count for UI
 	va_list	ap;
 	size_t i;
@@ -1413,10 +1413,12 @@ static intptr_t QDECL UI_DllSyscall( intptr_t arg, ... ) {
 	va_end( ap );
 
 	return CL_UISystemCalls( args );
-#else
-	return CL_UISystemCalls( &arg );
-#endif
 }
+#else
+static __attribute__((unused)) intptr_t QDECL UI_DllSyscall( intptr_t arg, ... ) {
+	return CL_UISystemCalls( &arg );
+}
+#endif
 
 
 /*
@@ -1450,42 +1452,6 @@ void CL_InitUI( void ) {
 	Com_Printf( "INFO: UI system initialized (VM loading disabled).\n" );
 	cls.uiStarted = qtrue;
 	uivm = NULL; // No VM, but UI is marked as started
-}
-
-	// Original UI loading code (commented out to prevent crashes)
-	/*
-	int		v;
-	vmInterpret_t		interpret;
-	static qboolean uiRetryAttempted = qfalse;
-
-	// disallow vl.collapse for UI elements
-	re.VertexLighting( qfalse );
-
-	// load the dll or bytecode
-	interpret = VM_SelectInterpret( "vm_ui", VMI_BYTECODE, cl_connectedToPureServer ? qtrue : qfalse );
-
-	uivm = VM_Create( VM_UI, CL_UISystemCalls, UI_DllSyscall, interpret );
-	if ( !uivm ) {
-		if ( cl_connectedToPureServer && !uiRetryAttempted && CL_GameSwitch() ) {
-			// server-side modification may require and reference only single custom ui.qvm
-			// so allow referencing everything until we download all files
-			// new gamestate will be requested after downloads complete
-			// which will correct filesystem permissions
-			fs_reordered = qfalse;
-			FS_PureServerSetLoadedPaks( "", "" );
-			uivm = VM_Create( VM_UI, CL_UISystemCalls, UI_DllSyscall, interpret );
-			uiRetryAttempted = qtrue;
-		}
-		if ( !uivm ) {
-			// UI module loading failed - allow engine to continue without UI
-			// Original code would error here: Com_Error( ERR_DROP, "VM_Create on UI failed" );
-			Com_Printf( "WARNING: UI module not found. Running without UI.\n" );
-			Com_Printf( "  To fix: Ensure vm/ui.qvm or ui%s.so exists in your mod directory.\n", ARCH_STRING );
-			Com_Printf( "  Or set vm_ui to 1 to use QVM bytecode, or 2 for compiled QVM.\n" );
-			cls.uiStarted = qfalse;
-			return;
-		}
-	}
 }
 
 qboolean UI_usesUniqueCDKey( void ) {
