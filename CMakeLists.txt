@@ -3924,9 +3924,23 @@ IF(BUILD_TESTS)
 ADD_EXECUTABLE(test_renderer_abstraction_usage_mock
 	src/tests/test_renderer_abstraction_usage_mock.c
 )
+target_compile_definitions(test_renderer_abstraction_usage_mock PRIVATE UNIT_TEST)
 ADD_EXECUTABLE(test_renderer_abstraction_wrappers
 	src/tests/test_renderer_abstraction_wrappers.cpp
 )
+ADD_EXECUTABLE(test_rtx_switchmode
+	src/tests/test_rtx_switchmode.cpp
+)
+TARGET_LINK_LIBRARIES(test_rtx_switchmode PRIVATE ${CMAKE_DL_LIBS})
+TARGET_INCLUDE_DIRECTORIES(test_rtx_switchmode PRIVATE
+	${CMAKE_SOURCE_DIR}/src
+	${CMAKE_SOURCE_DIR}/src/tests
+)
+ADD_TEST(NAME test_rtx_switchmode COMMAND test_rtx_switchmode)
+SET_TARGET_PROPERTIES(test_rtx_switchmode PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
+target_compile_definitions(test_renderer_abstraction_wrappers PRIVATE UNIT_TEST)
 TARGET_LINK_LIBRARIES(test_renderer_abstraction_wrappers PRIVATE ${CMAKE_DL_LIBS})
 TARGET_INCLUDE_DIRECTORIES(test_renderer_abstraction_wrappers PRIVATE
 	${CMAKE_SOURCE_DIR}/src

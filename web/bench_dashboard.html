@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Renderer Bench Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #f7f7fb;
+      --card: #fff;
+      --border: #ddd;
+      --text: #111;
+      --accent: #4CAF50;
+    }
+    body { font-family: Arial, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+    h1 { font-size: 1.8rem; margin: 0 0 12px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+    .muted { color: #666; font-size: .9em; }
+    .spark { width: 100%; height: 60px; display: block; }
+    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    th, td { border: 1px solid var(--border); padding: 6px 8px; text-align: left; }
+    th { background: #f0f0f0; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>Renderer Bench Dashboard</h1>
+  <div id="summary" class="grid">
+    <div class="card" id="card-summary">
+      <h3>Summary</h3>
+      <div id="summary-content" class="muted">Loading bench summary...</div>
+    </div>
+    <div class="card" id="card-memory">
+      <h3>Memory Snapshot</h3>
+      <div id="memory-content" class="muted">Loading memory data...</div>
+    </div>
+  </div>
+
+  <div class="card" id="per-iter" style="margin-top:16px;">
+    <h3>Per-iteration sparkline</h3>
+    <div id="periter-container" class="muted">Loading per-iteration data...</div>
+  </div>
+
+  <div class="card" id="timeseries" style="margin-top:16px;">
+    <h3>Timeseries (bench_timeseries.jsonl)</h3>
+    <div id="timeseries-container" class="muted">Loading timeseries...</div>
+  </div>
+
+  <script>
+    function fetchJson(url) {
+      return fetch(url).then(r => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      }).catch(() => null);
+    }
+
+    function fetchText(url) {
+      return fetch(url).then(r => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.text();
+      }).catch(() => null);
+    }
+
+    function toSpark(values, w=600, h=60) {
+      if (!values || values.length === 0) return "";
+      const svgNS = "http://www.w3.org/2000/svg";
+      let maxV = Math.max(...values, 1);
+      const pts = [];
+      for (let i=0; i<values.length; i++) {
+        const x = (i/(values.length-1))*w;
+        const y = h - (values[i]/maxV)*h;
+        pts.push(`${x.toFixed(2)},${y.toFixed(2)}`);
+      }
+      const poly = document.createElementNS(svgNS, "polyline");
+      poly.setAttribute("points", pts.join(" "));
+      poly.setAttribute("fill","none");
+      poly.setAttribute("stroke","steelblue");
+      poly.setAttribute("stroke-width","2");
+      const svg = document.createElementNS(svgNS, "svg");
+      svg.setAttribute("class","spark");
+      svg.setAttribute("width","100%");
+      svg.setAttribute("height",String(h));
+      svg.appendChild(poly);
+      return new XMLSerializer().serializeToString(svg);
+    }
+
+    async function loadBench() {
+      const bench = await fetchJson("bench.json");
+      if (bench) {
+        const end = bench.memory_end_mb;
+        const path = bench.pathTracer_ms;
+        const rtx = bench.rtx_ms;
+        const den = bench.denoiser_ms;
+        const fsr = bench.fsr_ms;
+        document.getElementById("summary-content").textContent =
+          `PathTracer ${path} ms, RTX ${rtx} ms, Denoiser ${den} ms, FSR ${fsr} ms, Memory end ${end} MB`;
+        const memEl = document.getElementById("memory-content");
+        if (end != null) memEl.textContent = `End memory: ${end} MB`;
+        // Per-iteration sparkline if present
+        ['pathTracer_perIterMs','rtx_perIterMs','denoiser_perIterMs','fsr_perIterMs'].forEach((key,i) => {
+          const arr = bench[key];
+          if (Array.isArray(arr) && arr.length>0) {
+            const div = document.getElementById("periter-container");
+            div.innerHTML += `<div><strong>${key}</strong>${toSpark(arr)}</div>`;
+          }
+        });
+      }
+      const ts = await fetchText("bench_timeseries.jsonl").catch(()=>null);
+      if (ts) {
+        const lines = ts.trim().split(/\n+/);
+        const rows = lines.map(l => JSON.parse(l));
+        if (rows.length>0) {
+          let html = "<table><tr><th>idx</th><th>time</th><th>pathTracer</th><th>rtx</th><th>memory MB</th></tr>";
+          for (const r of rows) {
+            html += `<tr><td>${r.idx}</td><td>${r.timestamp}</td><td>${r.pathTracer_ms}</td><td>${r.rtx_ms}</td><td>${r.memory_mb}</td></tr>`;
+          }
+          html += "</table>";
+          document.getElementById("timeseries-container").innerHTML = html;
+        }
+      }
+    }
+    loadBench();
+  </script>
+</body>
+</html>

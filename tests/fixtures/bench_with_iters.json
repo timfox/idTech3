@@ -1,0 +1,16 @@
+{
+  "timestamp": "2025-01-01T00:00:00Z",
+  "pathTracer_ms": 1.0,
+  "rtx_ms": 0.5,
+  "denoiser_ms": 0.2,
+  "fsr_ms": 0.1,
+  "iterations_pathTracer": 3,
+  "width": 128,
+  "height": 128,
+  "pathTracer_perIterMs": [0.3, 0.4, 0.3],
+  "rtx_perIterMs": [0.2, 0.25, 0.05],
+  "denoiser_perIterMs": [0.1, 0.05, 0.05],
+  "fsr_perIterMs": [0.04, 0.04, 0.02],
+  "memory_per_iter_mb": [100.1, 100.3, 100.5],
+  "memory_end_mb": 100.6
+}

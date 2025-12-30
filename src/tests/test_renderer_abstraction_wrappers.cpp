@@ -15,6 +15,11 @@ void PathTracer_RenderSample_wrapper(vec3_t result, const vec3_t origin, const v
 void RTX_RenderScene_wrapper(const refdef_t *fd);
 // For address-level checks, include the RendererAbstraction header to get the typedefs
 #include "renderers/renderer_abstraction.h"
+// Test hooks (available when UNIT_TEST is defined in the build)
+extern "C" int RTX_GetModeForTest();
+extern "C" int RTX_IsInitializedForTest();
+extern "C" void RTX_TestForceResourceCleanupForTest();
+extern "C" void RTX_SwitchMode(int);
 
 // Mock counters
 static int g_mock_pathTracer_calls = 0;
@@ -86,6 +91,17 @@ int main(int argc, char **argv) {
     RendererAbstraction ra = get_default_renderer_abstraction();
     assert(ra.renderSample == (RenderSampleFunc)expectedSample);
     assert(ra.renderScene == (RenderSceneFunc)expectedScene);
+#ifdef UNIT_TEST
+    // Cross-check: call the RTX_SwitchMode test hook and verify the mode updates
+    RTX_SwitchMode(1);
+    int mode = RTX_GetModeForTest();
+    assert(mode == 1);
+    RTX_TestForceResourceCleanupForTest();
+    // Restore to a known state
+    RTX_SwitchMode(0);
+    int mode0 = RTX_GetModeForTest();
+    assert(mode0 == 0);
+#endif
     return 0;
 }
 

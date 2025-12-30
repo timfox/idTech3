@@ -640,6 +640,14 @@ void RTX_SwitchMode(int newMode)
     Denoiser_Init();
 }
 
+// Test hooks ( UNIT_TEST builds ) - expose minimal introspection / control
+#ifdef UNIT_TEST
+extern "C" int RTX_GetModeForTest() { return rtx.mode; }
+extern "C" int RTX_IsInitializedForTest() { return rtx.initialized ? 1 : 0; }
+extern "C" void RTX_TestForceResourceCleanupForTest() { rtx.CleanupResources(); }
+#endif
+}
+
 /*
 ===============
 RTX_Shutdown

@@ -12,6 +12,15 @@
 #include <vector>
 #include <unistd.h>
 #include <string>
+#if defined(_WIN32)
+#include <windows.h>
+#include <psapi.h>
+#elif defined(__APPLE__)
+#include <mach/mach.h>
+#include <mach/mach_time.h>
+#include <mach/mach_kernel.h>
+#else
+#endif
 
 // Include renderer abstraction and wrappers
 #include "../renderers/renderer_abstraction.h"
@@ -27,7 +36,21 @@ extern void vk_fsr_apply(int width, int height);
 
 // Simple Linux memory measurement (RSS in MB)
 static double get_current_memory_mb() {
-#ifdef __linux__
+#if defined(_WIN32)
+    PROCESS_MEMORY_COUNTERS_EX pmc;
+    if (GetProcessMemoryInfo(GetCurrentProcess(), (PROCESS_MEMORY_COUNTERS*)&pmc, sizeof(pmc))) {
+        return pmc.WorkingSetSize / (1024.0 * 1024.0);
+    }
+    return -1.0;
+#elif defined(__APPLE__)
+    struct mach_task_basic_info info;
+    mach_msg_type_number_t infoCount = MACH_TASK_BASIC_INFO_COUNT;
+    if (task_info(mach_task_self(), MACH_TASK_BASIC_INFO, (task_info_t)&info, &infoCount) == KERN_SUCCESS) {
+        return info.resident_size / (1024.0 * 1024.0);
+    }
+    return -1.0;
+#else
+    // Linux fallback
     long resident_pages = 0;
     FILE *f = fopen("/proc/self/statm", "r");
     if (f) {
@@ -40,8 +63,6 @@ static double get_current_memory_mb() {
         }
         fclose(f);
     }
-    return -1.0;
-#else
     return -1.0;
 #endif
 }
