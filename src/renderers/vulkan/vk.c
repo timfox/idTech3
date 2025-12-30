@@ -2695,6 +2695,14 @@ static void init_vulkan_library( void )
 	} // vk_instance == VK_NULL_HANDLE
 
         vk_debug_write(2, "DEBUG: Enumerating physical devices\n", 37);
+        if (!vk_instance) {
+            ri.Error( ERR_FATAL, "Vulkan: vk_instance is NULL during device enumeration" );
+            return;
+        }
+        if (!qvkEnumeratePhysicalDevices) {
+            ri.Error( ERR_FATAL, "Vulkan: qvkEnumeratePhysicalDevices function pointer is NULL" );
+            return;
+        }
 	res = qvkEnumeratePhysicalDevices( vk_instance, &device_count, NULL );
         vk_debug_write(2, "DEBUG: Enumerated physical devices\n", 36);
 	if ( device_count == 0 ) {

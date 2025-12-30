@@ -1436,6 +1436,7 @@ SET(RENDERER_VK_SRCS
 	src/renderers/vulkan/tr_cmds.c
 	src/renderers/vulkan/tr_curve.c
 	src/renderers/vulkan/tr_image.c
+	src/renderers/vulkan/tr_init.c
 	src/renderers/vulkan/tr_entry.c
 	src/renderers/vulkan/tr_light.c
 	src/renderers/vulkan/tr_lightclusters.c

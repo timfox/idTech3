@@ -31,13 +31,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 extern refimport_t ri;
 
-// Stub implementations for missing functions
-void R_Init(void) {
-    // Stub - Vulkan renderer initialization not implemented
-}
-
-int max_polys = 4096;
-int max_polyverts = 8192;
 
 // Extern declarations for functions implemented in other files
 extern void R_Register(void);
@@ -112,80 +105,6 @@ void RE_SyncRender(void) {
     // Vulkan renderer should implement proper render synchronization
 }
 
-// Vulkan renderer stub implementations
-void Vulkan_Shutdown(refShutdownCode_t code) {
-    ri.Printf( PRINT_ALL, "Vulkan renderer: Shutdown (%i)\n", code );
-}
-
-void Vulkan_BeginRegistration(glconfig_t *glconfigOut) {
-    ri.Printf( PRINT_ALL, "Vulkan renderer: BeginRegistration\n" );
-    R_Init();
-    if (glconfigOut) {
-        Com_Memset(glconfigOut, 0, sizeof(*glconfigOut));
-        glconfigOut->vidWidth = 800;
-        glconfigOut->vidHeight = 600;
-        Q_strncpyz(glconfigOut->renderer_string, "Vulkan (stub)", sizeof(glconfigOut->renderer_string));
-        glconfigOut->driverType = GLDRV_OPENGL3; // Pretend to be modern OpenGL
-    }
-}
-
-void Vulkan_EndRegistration(void) {
-    ri.Printf( PRINT_ALL, "Vulkan renderer: EndRegistration\n" );
-}
-
-void Vulkan_ClearScene(void) {
-    // Stub
-}
-
-void Vulkan_RenderScene(const refdef_t *fd) {
-    // Stub - clear screen to indicate Vulkan renderer is active
-    if (fd) {
-        ri.Printf( PRINT_DEVELOPER, "Vulkan renderer: RenderScene\n" );
-    }
-}
-
-void Vulkan_SetColor(const float *rgba) {
-    // Stub
-}
-
-void Vulkan_StretchPic(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader) {
-    // Stub - draw a simple rectangle to show renderer is working
-    ri.Printf( PRINT_DEVELOPER, "Vulkan renderer: StretchPic %.0f,%.0f %.0fx%.0f\n", x, y, w, h );
-}
-
-void Vulkan_BeginFrame(stereoFrame_t stereoFrame) {
-    // Stub
-}
-
-void Vulkan_EndFrame(int *frontEndMsec, int *backEndMsec) {
-    // Stub
-    if (frontEndMsec) *frontEndMsec = 0;
-    if (backEndMsec) *backEndMsec = 0;
-}
-
-qboolean Vulkan_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
-    // Stub
-    return qfalse;
-}
-
-qboolean Vulkan_InPVS(const vec3_t p1, const vec3_t p2) {
-    // Stub - assume always visible
-    return qtrue;
-}
-
-const glconfig_t *Vulkan_GetConfig(void) {
-    static glconfig_t config;
-    static qboolean initialized = qfalse;
-    if (!initialized) {
-        Com_Memset(&config, 0, sizeof(config));
-        config.vidWidth = 800;
-        config.vidHeight = 600;
-        Q_strncpyz(config.renderer_string, "Vulkan (stub)", sizeof(config.renderer_string));
-        config.driverType = GLDRV_OPENGL3;
-        initialized = qtrue;
-    }
-    return &config;
-}
 
 // All these functions are implemented in other files in this library
 // No extern declarations needed
@@ -207,24 +126,57 @@ Q_EXPORT __attribute__((visibility("default"))) refexport_t* GetRefAPI(int apiVe
         return NULL;
     }
 
-    ri.Printf( PRINT_ALL, "Vulkan renderer: Initializing (stub implementation)\n" );
+    ri.Printf( PRINT_ALL, "Vulkan renderer: Initializing\n" );
 
-    // Initialize with stub functions implemented in this file
-    re.Shutdown = Vulkan_Shutdown;
-    re.BeginRegistration = Vulkan_BeginRegistration;
-    re.EndRegistration = Vulkan_EndRegistration;
-    re.ClearScene = Vulkan_ClearScene;
-    re.RenderScene = Vulkan_RenderScene;
-    re.SetColor = Vulkan_SetColor;
-    re.DrawStretchPic = Vulkan_StretchPic;
-    re.BeginFrame = Vulkan_BeginFrame;
-    re.EndFrame = Vulkan_EndFrame;
-    re.RegisterFont = Vulkan_RegisterFont;
+    // Call Vulkan initialization
+    vk_initialize();
+
+    // Initialize with real Vulkan renderer functions
+    re.Shutdown = RE_Shutdown;
+    re.BeginRegistration = RE_BeginRegistration;
+    re.RegisterModel = RE_RegisterModel;
+    re.RegisterSkin = RE_RegisterSkin;
+    re.RegisterShader = RE_RegisterShader;
+    re.RegisterShaderNoMip = RE_RegisterShaderNoMip;
+    re.LoadWorld = RE_LoadWorldMap;
+    re.SetWorldVisData = RE_SetWorldVisData;
+    re.EndRegistration = RE_EndRegistration;
+    re.ClearScene = RE_ClearScene;
+    re.AddRefEntityToScene = RE_AddRefEntityToScene;
+    re.AddPolyToScene = RE_AddPolyToScene;
+    re.AddParticle = RE_AddParticle;
+    re.LightForPoint = R_LightForPoint;
+    re.AddLightToScene = RE_AddLightToScene;
+    re.AddAdditiveLightToScene = RE_AddAdditiveLightToScene;
+    re.AddLinearLightToScene = RE_AddLinearLightToScene;
+    re.RenderScene = RE_RenderScene;
+    re.SetColor = RE_SetColor;
+    re.DrawStretchPic = RE_StretchPic;
+    re.DrawStretchRaw = RE_StretchRaw;
+    re.UploadCinematic = RE_UploadCinematic;
+    re.BeginFrame = RE_BeginFrame;
+    re.EndFrame = RE_EndFrame;
+    re.MarkFragments = R_MarkFragments;
+    re.LerpTag = R_LerpTag;
+    re.ModelBounds = R_ModelBounds;
+    re.RegisterFont = RE_RegisterFont;
+    re.R_GetGlyphFromFont = R_GetGlyphFromFont;
+    re.R_InitFonts = R_InitFonts;
+    re.R_ShutdownFonts = R_ShutdownFonts;
     re.Font_Height = Font_Height;
     re.Font_Width = Font_Width;
     re.Font_DrawString = Font_DrawString;
-    re.GetConfig = Vulkan_GetConfig;
-    re.inPVS = Vulkan_InPVS;
+    re.RemapShader = RE_RemapShader;
+    re.GetEntityToken = RE_GetEntityToken;
+    re.inPVS = RE_InPVS;
+    re.TakeVideoFrame = RE_TakeVideoFrame;
+    re.ThrottleBackend = RE_ThrottleBackend;
+    re.FinishBloom = RE_FinishBloom;
+    re.SetColorMappings = RE_SetColorMappings;
+    re.CanMinimize = RE_CanMinimize;
+    re.GetConfig = RE_GetConfig;
+    re.VertexLighting = RE_VertexLighting;
+    re.SyncRender = RE_SyncRender;
 
     return &re;
 }
