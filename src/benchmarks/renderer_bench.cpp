@@ -26,7 +26,7 @@
 #include "../renderers/renderer_abstraction.h"
 
 // Types used by the engine
-#include "../renderers/../renderercommon/tr_public.h"
+#include "../renderers/renderercommon/tr_public.h"
 
 // Lightweight externs for denoiser and FSR (best-effort if not initialized)
 extern void Denoiser_Init(void);
