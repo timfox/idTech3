@@ -3931,6 +3931,18 @@ ADD_EXECUTABLE(test_renderer_abstraction_wrappers
 ADD_EXECUTABLE(test_rtx_switchmode
 	src/tests/test_rtx_switchmode.cpp
 )
+ADD_EXECUTABLE(test_wayland_toggle
+	src/tests/test_wayland_toggle.cpp
+)
+TARGET_LINK_LIBRARIES(test_wayland_toggle PRIVATE ${CMAKE_DL_LIBS})
+TARGET_INCLUDE_DIRECTORIES(test_wayland_toggle PRIVATE
+	${CMAKE_SOURCE_DIR}/src
+	${CMAKE_SOURCE_DIR}/src/tests
+)
+ADD_TEST(NAME test_wayland_toggle COMMAND test_wayland_toggle)
+SET_TARGET_PROPERTIES(test_wayland_toggle PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
 TARGET_LINK_LIBRARIES(test_rtx_switchmode PRIVATE ${CMAKE_DL_LIBS})
 TARGET_INCLUDE_DIRECTORIES(test_rtx_switchmode PRIVATE
 	${CMAKE_SOURCE_DIR}/src

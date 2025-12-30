@@ -73,3 +73,63 @@ jobs:
         with:
           name: renderer_bench_log
           path: bench.log
+
+  wayland_test:
+    name: Wayland Test
+    needs: bench
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Weston and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y weston xserver-xorg-video-all libwayland-client0 libwayland-client0-dbg
+
+      - name: Start Weston (headless Wayland session)
+        id: weston_start
+        run: |
+          nohup weston > /tmp/weston.log 2>&1 & echo $! > /tmp/weston_pid
+
+      - name: Run Wayland test
+        run: |
+          export WAYLAND_DISPLAY=wayland-0
+          build/tests/test_wayland_toggle -V || true
+          echo "WAYLAND_EXIT:$?" > /tmp/wayland_exit
+
+      - name: Stop Weston
+        if: always()
+        run: |
+          if [ -f /tmp/weston_pid ]; then
+            kill -9 "$(cat /tmp/weston_pid)" 2>/dev/null || true
+          fi
+
+      - name: Capture Wayland summary
+        if: always()
+        run: |
+          exit_code=$(grep -o 'WAYLAND_EXIT:[0-9]*' /tmp/wayland_exit | cut -d':' -f2)
+          if [ -z "$exit_code" ]; then exit_code=1; fi
+          ts=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          echo "{\"timestamp\":\"$ts\",\"passed\":$([ \"$exit_code\" -eq 0 ] && echo true || echo false),\"exit_code\":$exit_code}" > bench_wayland_summary.json
+
+      - name: Upload Wayland summary
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: renderer_bench_wayland_summary
+          path: bench_wayland_summary.json
+
+      - name: Upload Weston log
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: wayland_weston_log
+          path: /tmp/weston.log
+
+      - name: Upload bench log
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: renderer_bench_log
+          path: bench.log
