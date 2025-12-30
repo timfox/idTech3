@@ -570,6 +570,11 @@ void RE_RenderScene( const refdef_t *fd ) {
 
 	// Ray tracing moved to RTX renderer only
 
+	// Vulkan: Record rendering commands
+	if (vk.device != (VkDevice)0x20000000 && vk.active) {
+		vk_render_scene_vulkan(fd);
+	}
+
 	RE_EndScene();
 
 	tr.frontEndMsec += ri.Milliseconds() - startTime;

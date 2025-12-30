@@ -3284,8 +3284,13 @@ a null buffer will just return the file length without loading
 		return len;
 	}
 
+	if (!qpath) {
+		return -1;
+	}
+
 	Com_Printf( "FS_ReadFile: Loading %s\n", qpath );
 	Com_DPrintf( "FS_ReadFile: %s, len %ld\n", qpath, len );
+
 	buf = Hunk_AllocateTempMemory( len + 1 );
 	*buffer = buf;
 

@@ -419,6 +419,22 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 
 	backEnd.color2D.u32 = ~0U;
 
+	// For real Vulkan devices, acquire next swapchain image
+	if (vk.device != (VkDevice)0x20000000 && vk.active) {
+		// Acquire next image from swapchain
+		VkResult result = qvkAcquireNextImageKHR(vk.device, vk.swapchain, UINT64_MAX,
+			vk.image_available, VK_NULL_HANDLE, &vk.current_swapchain_image_index);
+
+		if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+			// Swapchain is out of date, need to recreate
+			ri.Printf(PRINT_WARNING, "Vulkan: Swapchain out of date, skipping frame\n");
+			return;
+		} else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+			ri.Error(ERR_FATAL, "Vulkan: Failed to acquire swapchain image: %d\n", result);
+		}
+		ri.Printf(PRINT_DEVELOPER, "Vulkan: Acquired swapchain image %u\n", vk.current_swapchain_image_index);
+	}
+
 	tr.frameCount++;
 	tr.frameSceneNum = 0;
 
@@ -481,7 +497,6 @@ Returns the number of msec spent in the back end
 =============
 */
 void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
-
 	swapBuffersCommand_t *cmd;
 	rg_frame_graph_t graph;
 
@@ -564,6 +579,33 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 #ifdef USE_VULKAN
 		vk_update_post_process_pipelines();
 #endif
+
+		// Vulkan: Present the rendered frame
+		if (vk.device != (VkDevice)0x20000000 && vk.active && vk.swapchain != VK_NULL_HANDLE) {
+			// Submit rendering commands and present
+			VkPresentInfoKHR present_info = {
+				.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+				.pNext = NULL,
+				.waitSemaphoreCount = 1,
+				.pWaitSemaphores = &vk.rendering_finished,
+				.swapchainCount = 1,
+				.pSwapchains = &vk.swapchain,
+				.pImageIndices = &vk.current_swapchain_image_index,
+				.pResults = NULL
+			};
+
+			VkResult result = qvkQueuePresentKHR(vk.queue, &present_info);
+			if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+				// Swapchain needs recreation
+				ri.Printf(PRINT_WARNING, "Vulkan: Swapchain needs recreation\n");
+			} else if (result != VK_SUCCESS) {
+				ri.Printf(PRINT_WARNING, "Vulkan: Failed to present: %d\n", result);
+			}
+
+			// Reset semaphores for next frame
+			vk.image_available = VK_NULL_HANDLE;
+			vk.rendering_finished = VK_NULL_HANDLE;
+		}
 
 		ri.Cvar_ResetGroup( CVG_RENDERER, qtrue /* reset modified flags */ );
 	}

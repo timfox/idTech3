@@ -289,7 +289,7 @@ void Con_CheckResize( void )
 	int		vispage;
 	float	scale;
 
-	if ( con.viswidth == cls.glconfig.vidWidth && !con_scale->modified ) {
+	if ( con.viswidth == cls.glconfig.vidWidth && con_scale && !con_scale->modified ) {
 		return;
 	}
 

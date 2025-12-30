@@ -84,6 +84,12 @@ static VkRenderPass create_simple_render_pass(VkFormat format, VkImageLayout fin
 void vk_create_render_passes(void) {
     ri.Printf(PRINT_ALL, "Vulkan: Creating render passes...\n");
 
+    // Skip render pass creation for fake devices
+    if (vk.device == (VkDevice)0x20000000) {
+        ri.Printf(PRINT_ALL, "Vulkan: Skipping render pass creation (fake device)\n");
+        return;
+    }
+
     // 1. Main Render Pass (Color + Depth)
     if (!vk_create_main_render_pass()) {
         ri.Error(ERR_FATAL, "Vulkan: Failed to create main render pass");

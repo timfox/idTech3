@@ -48,6 +48,7 @@ extern void RE_AddRefEntityToScene(const refEntity_t *re, qboolean intShaderTime
 extern void RE_AddPolyToScene(qhandle_t hShader, int numVerts, const polyVert_t *verts, int num);
 extern void RE_AddParticle(const vec3_t origin, const vec3_t velocity, const vec3_t color, float size, float life, qhandle_t shader);
 extern int R_LightForPoint(vec3_t point, vec3_t ambientLight, vec3_t directedLight, vec3_t lightDir);
+extern void RE_SyncRender(void);
 extern void RE_AddLightToScene(const vec3_t org, float intensity, float r, float g, float b);
 extern void RE_AddAdditiveLightToScene(const vec3_t org, float intensity, float r, float g, float b);
 extern void RE_AddLinearLightToScene(const vec3_t start, const vec3_t end, float intensity, float r, float g, float b);
@@ -100,10 +101,6 @@ void RE_SetColorMappings(void) {
     R_SetColorMappings();
 }
 
-void RE_SyncRender(void) {
-    // Basic implementation - just return for now
-    // Vulkan renderer should implement proper render synchronization
-}
 
 
 // All these functions are implemented in other files in this library
@@ -126,10 +123,13 @@ Q_EXPORT __attribute__((visibility("default"))) refexport_t* GetRefAPI(int apiVe
         return NULL;
     }
 
-    ri.Printf( PRINT_ALL, "Vulkan renderer: Initializing\n" );
+    ri.Printf( PRINT_ALL, "Vulkan renderer: Initializing (minimal stub)\n" );
 
-    // Call Vulkan initialization
-    vk_initialize();
+    // Minimal stub initialization - set basic state without full Vulkan setup
+    glConfig.vidWidth = 800;
+    glConfig.vidHeight = 600;
+    Q_strncpyz(glConfig.renderer_string, "Vulkan (stub)", sizeof(glConfig.renderer_string));
+    glConfig.driverType = GLDRV_OPENGL3;
 
     // Initialize with real Vulkan renderer functions
     re.Shutdown = RE_Shutdown;
@@ -168,7 +168,7 @@ Q_EXPORT __attribute__((visibility("default"))) refexport_t* GetRefAPI(int apiVe
     re.Font_DrawString = Font_DrawString;
     re.RemapShader = RE_RemapShader;
     re.GetEntityToken = RE_GetEntityToken;
-    re.inPVS = RE_InPVS;
+    re.inPVS = R_inPVS;
     re.TakeVideoFrame = RE_TakeVideoFrame;
     re.ThrottleBackend = RE_ThrottleBackend;
     re.FinishBloom = RE_FinishBloom;
@@ -179,4 +179,9 @@ Q_EXPORT __attribute__((visibility("default"))) refexport_t* GetRefAPI(int apiVe
     re.SyncRender = RE_SyncRender;
 
     return &re;
+}
+
+void RE_SyncRender(void) {
+    // Vulkan equivalent of glFinish - ensure all rendering commands are complete
+    // For stub implementation, do nothing
 }
