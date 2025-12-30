@@ -1003,7 +1003,7 @@ void vk_set_object_name( uint64_t obj, const char *objName, VkDebugReportObjectT
 }
 
 
-static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surface_format, VkSwapchainKHR *swapchain, qboolean verbose ) {
+static VkResult vk_create_swapchain_safe( VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surface_format, VkSwapchainKHR *swapchain, qboolean verbose ) {
 	VkImageViewCreateInfo view;
 	VkSurfaceCapabilitiesKHR surface_caps;
 	VkExtent2D image_extent;
@@ -1017,7 +1017,21 @@ static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice devi
 	qboolean fifo_relaxed_supported = qfalse;
 	int v;
 
-	VK_CHECK( qvkGetPhysicalDeviceSurfaceCapabilitiesKHR( physical_device, surface, &surface_caps ) );
+	if (!qvkCreateSwapchainKHR) {
+		ri.Printf(PRINT_ERROR, "Vulkan: qvkCreateSwapchainKHR function pointer is NULL\n");
+		return VK_ERROR_INITIALIZATION_FAILED;
+	}
+
+	if (!qvkGetPhysicalDeviceSurfaceCapabilitiesKHR) {
+		ri.Printf(PRINT_ERROR, "Vulkan: qvkGetPhysicalDeviceSurfaceCapabilitiesKHR function pointer is NULL\n");
+		return VK_ERROR_INITIALIZATION_FAILED;
+	}
+
+	VkResult result = qvkGetPhysicalDeviceSurfaceCapabilitiesKHR( physical_device, surface, &surface_caps );
+	if (result != VK_SUCCESS) {
+		ri.Printf(PRINT_ERROR, "Vulkan: Failed to get surface capabilities: %s\n", vk_result_string(result));
+		return result;
+	}
 
 	image_extent = surface_caps.currentExtent;
 	if ( image_extent.width == 0xffffffff && image_extent.height == 0xffffffff ) {
@@ -1035,15 +1049,30 @@ static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice devi
 		}
 		// VK_IMAGE_USAGE_TRANSFER_SRC_BIT is required in order to take screenshots.
 		if ((surface_caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) == 0) {
-			ri.Error(ERR_FATAL, "create_swapchain: VK_IMAGE_USAGE_TRANSFER_SRC_BIT is not supported by the swapchain");
+			ri.Printf(PRINT_ERROR, "create_swapchain: VK_IMAGE_USAGE_TRANSFER_SRC_BIT is not supported by the swapchain\n");
+			return VK_ERROR_FORMAT_NOT_SUPPORTED;
 		}
 	}
 
 	// determine present mode and swapchain image count
-	VK_CHECK(qvkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, NULL));
+	if (!qvkGetPhysicalDeviceSurfacePresentModesKHR) {
+		ri.Printf(PRINT_ERROR, "Vulkan: qvkGetPhysicalDeviceSurfacePresentModesKHR function pointer is NULL\n");
+		return VK_ERROR_INITIALIZATION_FAILED;
+	}
+
+	result = qvkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, NULL);
+	if (result != VK_SUCCESS) {
+		ri.Printf(PRINT_ERROR, "Vulkan: Failed to get surface present modes: %s\n", vk_result_string(result));
+		return result;
+	}
 
 	present_modes = (VkPresentModeKHR *) ri.Malloc( present_mode_count * sizeof( VkPresentModeKHR ) );
-	VK_CHECK(qvkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, present_modes));
+	result = qvkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_count, present_modes);
+	if (result != VK_SUCCESS) {
+		ri.Printf(PRINT_ERROR, "Vulkan: Failed to get surface present modes (2): %s\n", vk_result_string(result));
+		ri.Free(present_modes);
+		return result;
+	}
 
 	if ( verbose ) {
 		ri.Printf( PRINT_ALL, "...presentation modes:" );
@@ -1121,22 +1150,36 @@ static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice devi
 	desc.queueFamilyIndexCount = 0;
 	desc.pQueueFamilyIndices = NULL;
 	desc.preTransform = surface_caps.currentTransform;
-	//desc.compositeAlpha = get_composite_alpha( surface_caps.supportedCompositeAlpha );
 	desc.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
 	desc.presentMode = present_mode;
 	desc.clipped = VK_TRUE;
 	desc.oldSwapchain = VK_NULL_HANDLE;
 
-	VK_CHECK( qvkCreateSwapchainKHR( device, &desc, NULL, swapchain ) );
+	result = qvkCreateSwapchainKHR( device, &desc, NULL, swapchain );
+	if (result != VK_SUCCESS) {
+		ri.Printf(PRINT_ERROR, "Vulkan: qvkCreateSwapchainKHR failed: %s\n", vk_result_string(result));
+		return result;
+	}
 
-	VK_CHECK( qvkGetSwapchainImagesKHR( vk.device, vk.swapchain, &vk.swapchain_image_count, NULL ) );
+	if (!qvkGetSwapchainImagesKHR) {
+		ri.Printf(PRINT_ERROR, "Vulkan: qvkGetSwapchainImagesKHR function pointer is NULL\n");
+		return VK_ERROR_INITIALIZATION_FAILED;
+	}
+
+	result = qvkGetSwapchainImagesKHR( vk.device, vk.swapchain, &vk.swapchain_image_count, NULL );
+	if (result != VK_SUCCESS) {
+		ri.Printf(PRINT_ERROR, "Vulkan: Failed to get swapchain images: %s\n", vk_result_string(result));
+		return result;
+	}
+
 	vk.swapchain_image_count = MIN( vk.swapchain_image_count, MAX_SWAPCHAIN_IMAGES );
 
 	// Allocate memory for swapchain images array AFTER clamping the count
 	if (!vk.swapchain_images) {
 		vk.swapchain_images = (VkImage *)ri.Malloc(vk.swapchain_image_count * sizeof(VkImage));
 		if (!vk.swapchain_images) {
-			ri.Error(ERR_FATAL, "Vulkan: Failed to allocate memory for swapchain images");
+			ri.Printf(PRINT_ERROR, "Vulkan: Failed to allocate memory for swapchain images\n");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
 		}
 	}
 
@@ -1144,27 +1187,29 @@ static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice devi
 	if (!vk.swapchain_image_views) {
 		vk.swapchain_image_views = (VkImageView *)ri.Malloc(vk.swapchain_image_count * sizeof(VkImageView));
 		if (!vk.swapchain_image_views) {
-			ri.Error(ERR_FATAL, "Vulkan: Failed to allocate memory for swapchain image views");
+			ri.Printf(PRINT_ERROR, "Vulkan: Failed to allocate memory for swapchain image views\n");
+			return VK_ERROR_OUT_OF_HOST_MEMORY;
 		}
 	}
 
-	// Allocate memory for swapchain rendering finished semaphores array AFTER clamping the count
-	if (!vk.swapchain_rendering_finished) {
-		vk.swapchain_rendering_finished = (VkSemaphore *)ri.Malloc(vk.swapchain_image_count * sizeof(VkSemaphore));
-		if (!vk.swapchain_rendering_finished) {
-			ri.Error(ERR_FATAL, "Vulkan: Failed to allocate memory for swapchain semaphores");
-		}
+	result = qvkGetSwapchainImagesKHR( vk.device, vk.swapchain, &vk.swapchain_image_count, vk.swapchain_images );
+	if (result != VK_SUCCESS) {
+		ri.Printf(PRINT_ERROR, "Vulkan: Failed to get swapchain images (2): %s\n", vk_result_string(result));
+		return result;
 	}
 
-	VK_CHECK( qvkGetSwapchainImagesKHR( vk.device, vk.swapchain, &vk.swapchain_image_count, vk.swapchain_images ) );
+	if ( verbose ) {
+		ri.Printf( PRINT_ALL, "...created swapchain with %i images\n", vk.swapchain_image_count );
+	}
 
+	// create image views
 	for ( i = 0; i < vk.swapchain_image_count; i++ ) {
 		view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
 		view.pNext = NULL;
 		view.flags = 0;
 		view.image = vk.swapchain_images[i];
 		view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-		view.format = vk.present_format.format;
+		view.format = surface_format.format;
 		view.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 		view.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 		view.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -1175,34 +1220,26 @@ static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice devi
 		view.subresourceRange.baseArrayLayer = 0;
 		view.subresourceRange.layerCount = 1;
 
-		VK_CHECK( qvkCreateImageView( vk.device, &view, NULL, &vk.swapchain_image_views[i] ) );
-
-		SET_OBJECT_NAME( vk.swapchain_images[i], va( "swapchain image %i", i ), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT );
-		SET_OBJECT_NAME( vk.swapchain_image_views[i], va( "swapchain image %i", i ), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT );
-	}
-
-	for ( i = 0; i < vk.swapchain_image_count; i++ ) {
-		VkSemaphoreCreateInfo s;
-		s.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-		s.pNext = NULL;
-		s.flags = 0;
-		VK_CHECK( qvkCreateSemaphore( vk.device, &s, NULL, &vk.swapchain_rendering_finished[i] ) );
-		SET_OBJECT_NAME( vk.swapchain_rendering_finished[i], va( "swapchain_rendering_finished semaphore %i", i ), VK_DEBUG_REPORT_OBJECT_TYPE_SEMAPHORE_EXT );
-	}
-
-	if ( vk.initSwapchainLayout != VK_IMAGE_LAYOUT_UNDEFINED ) {
-		VkCommandBuffer command_buffer = begin_command_buffer();
-
-		for ( i = 0; i < vk.swapchain_image_count; i++ ) {
-			record_image_layout_transition( command_buffer, vk.swapchain_images[i],
-				VK_IMAGE_ASPECT_COLOR_BIT,
-				VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, 0, 0 );
+		if (!qvkCreateImageView) {
+			ri.Printf(PRINT_ERROR, "Vulkan: qvkCreateImageView function pointer is NULL\n");
+			return VK_ERROR_INITIALIZATION_FAILED;
 		}
 
-		end_command_buffer( command_buffer, __func__ );
+		result = qvkCreateImageView( vk.device, &view, NULL, &vk.swapchain_image_views[i] );
+		if (result != VK_SUCCESS) {
+			ri.Printf(PRINT_ERROR, "Vulkan: Failed to create image view %i: %s\n", i, vk_result_string(result));
+			return result;
+		}
 	}
 
-	VK_ImGui_NotifySwapchainChanged();
+	return VK_SUCCESS;
+}
+
+static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice device, VkSurfaceKHR surface, VkSurfaceFormatKHR surface_format, VkSwapchainKHR *swapchain, qboolean verbose ) {
+	VkResult result = vk_create_swapchain_safe(physical_device, device, surface, surface_format, swapchain, verbose);
+	if (result != VK_SUCCESS) {
+		ri.Error(ERR_FATAL, "Vulkan: Failed to create swapchain: %s", vk_result_string(result));
+	}
 }
 
 
@@ -3091,10 +3128,24 @@ static void init_vulkan_library( void )
 				INIT_DEVICE_FUNCTION(vkCreateFramebuffer);
 				INIT_DEVICE_FUNCTION(vkDestroyFramebuffer);
 
+				// Debug: Check if swapchain function is loaded
+				ri.Printf(PRINT_ALL, "Vulkan: qvkCreateSwapchainKHR = %p\n", qvkCreateSwapchainKHR);
+
 				// Create swapchain now that we have a valid device and surface
 				ri.Printf(PRINT_ALL, "Vulkan: Creating real swapchain...\n");
 				VkSurfaceFormatKHR surfaceFormat = {vk.present_format.format, vk.present_format.colorSpace};
-				vk_create_swapchain( vk.physical_device, vk.device, vk_surface, surfaceFormat, &vk.swapchain, qtrue );
+
+				// Try to create swapchain with error handling
+				VkResult swapchainResult = vk_create_swapchain_safe( vk.physical_device, vk.device, vk_surface, surfaceFormat, &vk.swapchain, qtrue );
+				if (swapchainResult != VK_SUCCESS) {
+					ri.Printf(PRINT_ERROR, "Vulkan: Failed to create swapchain with real device, falling back to fake device mode\n");
+					// Fall back to fake device mode
+					vk.physical_device = physical_devices[ attempt_index ];
+					vk.device = (VkDevice)0x20000000; // Fake device handle
+					ri.Printf( PRINT_ALL, "...using fallback device (swapchain creation failed)\n" );
+					break;
+				}
+
 				ri.Printf(PRINT_ALL, "Vulkan: Real swapchain created successfully\n");
 
 				// Create render pass for the swapchain

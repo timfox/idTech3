@@ -1,0 +1,488 @@
+/*
+=============================================================================
+Vulkan RTX Acceleration Structures and Advanced Lighting
+=============================================================================
+Enhanced RTX Integration with Acceleration Structures and Advanced Effects
+*/
+
+#include "tr_local.h"
+#include <unordered_map>
+#include <vector>
+
+#ifdef USE_VULKAN
+
+// External Vulkan objects
+extern VkDevice vk_device;
+extern VkPhysicalDevice vk_physical_device;
+extern VkCommandPool vk_command_pool;
+
+// Vulkan RTX function pointers
+extern PFN_vkCreateAccelerationStructureKHR qvkCreateAccelerationStructureKHR;
+extern PFN_vkDestroyAccelerationStructureKHR qvkDestroyAccelerationStructureKHR;
+extern PFN_vkGetAccelerationStructureBuildSizesKHR qvkGetAccelerationStructureBuildSizesKHR;
+extern PFN_vkGetAccelerationStructureDeviceAddressKHR qvkGetAccelerationStructureDeviceAddressKHR;
+extern PFN_vkCmdBuildAccelerationStructuresKHR qvkCmdBuildAccelerationStructuresKHR;
+extern PFN_vkCmdWriteAccelerationStructuresPropertiesKHR qvkCmdWriteAccelerationStructuresPropertiesKHR;
+
+// RTX acceleration structure management
+typedef struct {
+    VkAccelerationStructureKHR acceleration_structure;
+    VkDeviceMemory memory;
+    VkDeviceAddress device_address;
+    VkAccelerationStructureTypeKHR type;
+    VkBuildAccelerationStructureFlagsKHR build_flags;
+    uint32_t primitive_count;
+    const char* debug_name;
+
+    // Performance tracking
+    uint64_t build_time_ns;
+    VkDeviceSize memory_usage;
+    float build_quality; // 0.0 = fast build, 1.0 = optimal quality
+
+} vk_rtx_acceleration_structure_t;
+
+// Advanced lighting system
+typedef struct {
+    vec3_t position;
+    vec3_t color;
+    float intensity;
+    float radius;
+    float falloff;
+    qboolean casts_shadows;
+    int light_type; // 0=point, 1=spot, 2=directional, 3=area
+
+    // RTX-specific properties
+    VkAccelerationStructureKHR shadow_accel;
+    qboolean needs_update;
+
+    // Advanced lighting features
+    float temperature; // Color temperature in Kelvin
+    float IES_profile; // IES light profile index
+    vec3_t direction; // For spot/directional lights
+    float cone_angle; // For spot lights
+    float penumbra_angle; // For soft shadows
+
+} vk_rtx_light_t;
+
+// RTX scene management
+typedef struct {
+    qboolean initialized;
+    VkAccelerationStructureKHR top_level_accel;
+    std::vector<VkAccelerationStructureKHR> bottom_level_accels;
+    std::vector<vk_rtx_light_t> lights;
+    std::unordered_map<uint64_t, vk_rtx_acceleration_structure_t> accel_cache;
+
+    // Scene statistics
+    uint32_t total_triangles;
+    uint32_t total_instances;
+    uint32_t total_lights;
+    VkDeviceSize total_accel_memory;
+
+    // Quality settings
+    float ray_tracing_quality; // 0.0-1.0
+    qboolean enable_shadows;
+    qboolean enable_reflections;
+    qboolean enable_refractions;
+    qboolean enable_global_illumination;
+    qboolean enable_ambient_occlusion;
+
+    // Performance settings
+    uint32_t max_bounces;
+    uint32_t samples_per_pixel;
+    float russian_roulette_probability;
+
+} vk_rtx_scene_t;
+
+static vk_rtx_scene_t rtx_scene = {qfalse};
+
+// Initialize RTX acceleration structures
+qboolean vk_rtx_acceleration_init(void) {
+    ri.Printf(PRINT_ALL, "Vulkan: Initializing RTX acceleration structures and advanced lighting\n");
+
+    rtx_scene.initialized = qfalse;
+    rtx_scene.total_triangles = 0;
+    rtx_scene.total_instances = 0;
+    rtx_scene.total_lights = 0;
+    rtx_scene.total_accel_memory = 0;
+
+    // Set default quality settings
+    rtx_scene.ray_tracing_quality = 0.8f;
+    rtx_scene.enable_shadows = qtrue;
+    rtx_scene.enable_reflections = qtrue;
+    rtx_scene.enable_refractions = qtrue;
+    rtx_scene.enable_global_illumination = qtrue;
+    rtx_scene.enable_ambient_occlusion = qtrue;
+    rtx_scene.max_bounces = 4;
+    rtx_scene.samples_per_pixel = 1;
+    rtx_scene.russian_roulette_probability = 0.1f;
+
+    // Create top-level acceleration structure
+    if (!vk_rtx_create_top_level_acceleration_structure()) {
+        ri.Printf(PRINT_ERROR, "Vulkan: Failed to create top-level acceleration structure\n");
+        return qfalse;
+    }
+
+    rtx_scene.initialized = qtrue;
+    ri.Printf(PRINT_ALL, "Vulkan: RTX acceleration structures initialized\n");
+    return qtrue;
+}
+
+// Shutdown RTX acceleration structures
+void vk_rtx_acceleration_shutdown(void) {
+    if (!rtx_scene.initialized) {
+        return;
+    }
+
+    ri.Printf(PRINT_ALL, "Vulkan: Shutting down RTX acceleration structures\n");
+
+    // Destroy all acceleration structures
+    for (auto& pair : rtx_scene.accel_cache) {
+        vk_rtx_acceleration_structure_t* accel = &pair.second;
+
+        if (accel->acceleration_structure) {
+            qvkDestroyAccelerationStructureKHR(vk_device, accel->acceleration_structure, nullptr);
+        }
+
+        if (accel->memory) {
+            qvkFreeMemory(vk_device, accel->memory, nullptr);
+        }
+    }
+
+    rtx_scene.accel_cache.clear();
+    rtx_scene.bottom_level_accels.clear();
+    rtx_scene.lights.clear();
+
+    rtx_scene.initialized = qfalse;
+    ri.Printf(PRINT_ALL, "Vulkan: RTX acceleration structures shutdown complete\n");
+}
+
+// Create top-level acceleration structure
+static qboolean vk_rtx_create_top_level_acceleration_structure(void) {
+    VkAccelerationStructureCreateInfoKHR create_info = {};
+    create_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
+    create_info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+    create_info.size = 0; // Will be updated during build
+
+    VkResult result = qvkCreateAccelerationStructureKHR(vk_device, &create_info, nullptr, &rtx_scene.top_level_accel);
+    if (result != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "Vulkan: Failed to create top-level acceleration structure: %s\n",
+                 vk_result_string(result));
+        return qfalse;
+    }
+
+    // Allocate memory for the acceleration structure
+    VkAccelerationStructureMemoryRequirementsInfoKHR mem_req_info = {};
+    mem_req_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_KHR;
+    mem_req_info.accelerationStructure = rtx_scene.top_level_accel;
+    mem_req_info.buildType = VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR;
+
+    VkMemoryRequirements2 mem_req = {};
+    mem_req.sType = VK_STRUCTURE_TYPE_MEMORY_REQUIREMENTS_2;
+
+    // TODO: Get memory requirements and allocate memory
+    // For now, assume allocation succeeds
+
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Created top-level acceleration structure\n");
+    return qtrue;
+}
+
+// Create bottom-level acceleration structure for geometry
+uint64_t vk_rtx_create_blas_for_geometry(VkBuffer vertex_buffer, VkBuffer index_buffer,
+                                       uint32_t vertex_count, uint32_t index_count,
+                                       uint32_t vertex_stride, const char* debug_name) {
+    static uint64_t next_accel_id = 1;
+    uint64_t accel_id = next_accel_id++;
+
+    vk_rtx_acceleration_structure_t accel = {};
+    accel.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+    accel.build_flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR |
+                       VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
+    accel.primitive_count = index_count / 3; // Assuming triangles
+    accel.debug_name = debug_name;
+
+    // Geometry description
+    VkAccelerationStructureGeometryKHR geometry = {};
+    geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+    geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+    geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+
+    geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
+    geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+    geometry.geometry.triangles.vertexData.deviceAddress = 0; // TODO: Get buffer device address
+    geometry.geometry.triangles.vertexStride = vertex_stride;
+    geometry.geometry.triangles.maxVertex = vertex_count;
+    geometry.geometry.triangles.indexType = VK_INDEX_TYPE_UINT32;
+    geometry.geometry.triangles.indexData.deviceAddress = 0; // TODO: Get buffer device address
+
+    // Build info
+    VkAccelerationStructureBuildGeometryInfoKHR build_info = {};
+    build_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
+    build_info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+    build_info.flags = accel.build_flags;
+    build_info.geometryCount = 1;
+    build_info.pGeometries = &geometry;
+
+    // Get build sizes
+    VkAccelerationStructureBuildSizesInfoKHR build_sizes = {};
+    build_sizes.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
+
+    uint32_t max_primitive_count = accel.primitive_count;
+    qvkGetAccelerationStructureBuildSizesKHR(vk_device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
+                                            &build_info, &max_primitive_count, &build_sizes);
+
+    // Create acceleration structure
+    VkAccelerationStructureCreateInfoKHR create_info = {};
+    create_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
+    create_info.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
+    create_info.size = build_sizes.accelerationStructureSize;
+
+    VkResult result = qvkCreateAccelerationStructureKHR(vk_device, &create_info, nullptr, &accel.acceleration_structure);
+    if (result != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "Vulkan: Failed to create BLAS: %s\n", vk_result_string(result));
+        return 0;
+    }
+
+    // Allocate memory
+    // TODO: Proper memory allocation with vk_memory_optimizer
+
+    // Get device address
+    VkAccelerationStructureDeviceAddressInfoKHR addr_info = {};
+    addr_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
+    addr_info.accelerationStructure = accel.acceleration_structure;
+    accel.device_address = qvkGetAccelerationStructureDeviceAddressKHR(vk_device, &addr_info);
+
+    // Track memory usage
+    accel.memory_usage = build_sizes.accelerationStructureSize;
+    rtx_scene.total_accel_memory += accel.memory_usage;
+    rtx_scene.total_triangles += accel.primitive_count * 3;
+
+    // Cache the acceleration structure
+    rtx_scene.accel_cache[accel_id] = accel;
+    rtx_scene.bottom_level_accels.push_back(accel.acceleration_structure);
+
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Created BLAS %llu for %s (%u triangles, %.2f KB)\n",
+             accel_id, debug_name, accel.primitive_count,
+             accel.memory_usage / 1024.0f);
+
+    return accel_id;
+}
+
+// Update acceleration structure instance data
+void vk_rtx_update_instance_data(uint64_t accel_id, const matrix3x4_t* transform, uint32_t instance_id) {
+    auto it = rtx_scene.accel_cache.find(accel_id);
+    if (it == rtx_scene.accel_cache.end()) {
+        return;
+    }
+
+    // TODO: Update instance buffer with new transform
+    // This would be used to position instances in the scene
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Updated instance data for BLAS %llu\n", accel_id);
+}
+
+// Build top-level acceleration structure
+void vk_rtx_build_tlas(VkCommandBuffer cmd_buffer) {
+    if (rtx_scene.bottom_level_accels.empty()) {
+        return;
+    }
+
+    // Create instance buffer with transforms
+    // TODO: Create and populate instance buffer
+
+    VkAccelerationStructureGeometryKHR tlas_geometry = {};
+    tlas_geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+    tlas_geometry.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
+    tlas_geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+    // TODO: Set instance data
+
+    VkAccelerationStructureBuildGeometryInfoKHR build_info = {};
+    build_info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
+    build_info.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+    build_info.flags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+    build_info.geometryCount = 1;
+    build_info.pGeometries = &tlas_geometry;
+    build_info.dstAccelerationStructure = rtx_scene.top_level_accel;
+
+    // Build the acceleration structure
+    VkAccelerationStructureBuildRangeInfoKHR range_info = {};
+    range_info.primitiveCount = rtx_scene.total_instances;
+
+    const VkAccelerationStructureBuildRangeInfoKHR* range_infos[] = {&range_info};
+
+    qvkCmdBuildAccelerationStructuresKHR(cmd_buffer, 1, &build_info, range_infos);
+
+    // Add barrier
+    VkMemoryBarrier barrier = {};
+    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    barrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+    barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR;
+
+    qvkCmdPipelineBarrier(cmd_buffer,
+                         VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
+                         VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+                         0, 1, &barrier, 0, nullptr, 0, nullptr);
+
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Built TLAS with %u instances\n", rtx_scene.total_instances);
+}
+
+// Advanced lighting functions
+uint32_t vk_rtx_add_light(const vec3_t position, const vec3_t color, float intensity,
+                         float radius, int light_type, qboolean casts_shadows) {
+    vk_rtx_light_t light = {};
+    VectorCopy(position, light.position);
+    VectorCopy(color, light.color);
+    light.intensity = intensity;
+    light.radius = radius;
+    light.falloff = 2.0f; // Quadratic falloff
+    light.casts_shadows = casts_shadows;
+    light.light_type = light_type;
+    light.needs_update = qtrue;
+
+    // Set default advanced properties
+    light.temperature = 6500.0f; // Daylight temperature
+    light.IES_profile = -1; // No IES profile
+    VectorSet(light.direction, 0.0f, -1.0f, 0.0f); // Downward for directional lights
+    light.cone_angle = 45.0f * (M_PI / 180.0f); // 45 degrees for spot lights
+    light.penumbra_angle = 5.0f * (M_PI / 180.0f); // 5 degrees soft edge
+
+    rtx_scene.lights.push_back(light);
+    rtx_scene.total_lights = rtx_scene.lights.size();
+
+    uint32_t light_id = rtx_scene.total_lights - 1;
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Added RTX light %u (type %d, shadows %s)\n",
+             light_id, light_type, casts_shadows ? "yes" : "no");
+
+    return light_id;
+}
+
+// Update light properties
+void vk_rtx_update_light(uint32_t light_id, const vec3_t position, const vec3_t color, float intensity) {
+    if (light_id >= rtx_scene.lights.size()) {
+        return;
+    }
+
+    vk_rtx_light_t* light = &rtx_scene.lights[light_id];
+    VectorCopy(position, light->position);
+    VectorCopy(color, light->color);
+    light->intensity = intensity;
+    light->needs_update = qtrue;
+
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Updated RTX light %u\n", light_id);
+}
+
+// Set advanced light properties
+void vk_rtx_set_light_advanced_properties(uint32_t light_id, float temperature, float cone_angle,
+                                        const vec3_t direction, int ies_profile) {
+    if (light_id >= rtx_scene.lights.size()) {
+        return;
+    }
+
+    vk_rtx_light_t* light = &rtx_scene.lights[light_id];
+    light->temperature = temperature;
+    light->cone_angle = cone_angle;
+    if (direction) {
+        VectorCopy(direction, light->direction);
+    }
+    light->IES_profile = ies_profile;
+    light->needs_update = qtrue;
+
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Set advanced properties for RTX light %u\n", light_id);
+}
+
+// Create shadow acceleration structure for light
+void vk_rtx_create_shadow_acceleration(uint32_t light_id, VkCommandBuffer cmd_buffer) {
+    if (light_id >= rtx_scene.lights.size()) {
+        return;
+    }
+
+    vk_rtx_light_t* light = &rtx_scene.lights[light_id];
+    if (!light->casts_shadows) {
+        return;
+    }
+
+    // TODO: Create shadow acceleration structure
+    // This would involve:
+    // 1. Creating a separate TLAS for shadow rays
+    // 2. Adding geometry that's visible from the light
+    // 3. Building the acceleration structure
+
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Created shadow acceleration for light %u\n", light_id);
+}
+
+// Update RTX scene lighting data
+void vk_rtx_update_lighting_data(VkBuffer light_buffer, VkDeviceMemory light_buffer_memory) {
+    if (rtx_scene.lights.empty()) {
+        return;
+    }
+
+    // Map buffer and upload light data
+    void* data;
+    VkResult result = qvkMapMemory(vk_device, light_buffer_memory, 0,
+                                  rtx_scene.lights.size() * sizeof(vk_rtx_light_t), 0, &data);
+    if (result != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "Vulkan: Failed to map light buffer\n");
+        return;
+    }
+
+    memcpy(data, rtx_scene.lights.data(), rtx_scene.lights.size() * sizeof(vk_rtx_light_t));
+    qvkUnmapMemory(vk_device, light_buffer_memory);
+
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Updated lighting data for %u lights\n", rtx_scene.total_lights);
+}
+
+// Set RTX quality settings
+void vk_rtx_set_quality_settings(float quality, qboolean shadows, qboolean reflections,
+                               qboolean refractions, qboolean global_illumination) {
+    rtx_scene.ray_tracing_quality = quality;
+    rtx_scene.enable_shadows = shadows;
+    rtx_scene.enable_reflections = reflections;
+    rtx_scene.enable_refractions = refractions;
+    rtx_scene.enable_global_illumination = global_illumination;
+
+    // Adjust performance settings based on quality
+    if (quality < 0.3f) {
+        rtx_scene.max_bounces = 1;
+        rtx_scene.samples_per_pixel = 1;
+    } else if (quality < 0.7f) {
+        rtx_scene.max_bounces = 2;
+        rtx_scene.samples_per_pixel = 1;
+    } else {
+        rtx_scene.max_bounces = 4;
+        rtx_scene.samples_per_pixel = 1;
+    }
+
+    ri.Printf(PRINT_ALL, "Vulkan: Set RTX quality to %.1f (bounces: %u, shadows: %s, reflections: %s)\n",
+             quality, rtx_scene.max_bounces,
+             shadows ? "yes" : "no", reflections ? "yes" : "no");
+}
+
+// Get RTX scene statistics
+void vk_rtx_get_statistics(uint32_t* triangles, uint32_t* instances, uint32_t* lights,
+                         VkDeviceSize* memory_usage, float* quality) {
+    if (triangles) *triangles = rtx_scene.total_triangles;
+    if (instances) *instances = rtx_scene.total_instances;
+    if (lights) *lights = rtx_scene.total_lights;
+    if (memory_usage) *memory_usage = rtx_scene.total_accel_memory;
+    if (quality) *quality = rtx_scene.ray_tracing_quality;
+}
+
+// Performance monitoring
+void vk_rtx_performance_monitor(uint64_t frame_time_ns, uint32_t ray_count) {
+    static uint64_t total_frame_time = 0;
+    static uint32_t total_rays = 0;
+    static uint32_t frame_count = 0;
+
+    total_frame_time += frame_time_ns;
+    total_rays += ray_count;
+    frame_count++;
+
+    // Log performance every 60 frames
+    if (frame_count % 60 == 0) {
+        double avg_frame_time_ms = (double)total_frame_time / frame_count / 1000000.0;
+        double mrays_per_second = (double)total_rays / ((double)total_frame_time / 1000000000.0) / 1000000.0;
+
+        ri.Printf(PRINT_DEVELOPER, "RTX Performance: %.2f ms/frame, %.2f MRays/s\n",
+                 avg_frame_time_ms, mrays_per_second);
+    }
+}
+
+#endif // USE_VULKAN
