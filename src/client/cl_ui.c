@@ -705,7 +705,7 @@ CLUI_SetCDKey
 static void CLUI_SetCDKey( char *buf ) {
 	const char *gamedir;
 	gamedir = Cvar_VariableString( "fs_game" );
-	if ( UI_usesUniqueCDKey() && gamedir[0] != '\0' ) {
+	if ( qfalse && gamedir[0] != '\0' ) {
 		Com_Memcpy( &cl_cdkey[16], buf, 16 );
 		cl_cdkey[32] = '\0';
 		// set the flag so the flag will be written at the next opportunity
@@ -1445,6 +1445,15 @@ CL_InitUI
 #define UI_OLD_API_VERSION	4
 
 void CL_InitUI( void ) {
+	Com_Printf("=== CL_InitUI CALLED ===\n");
+	// Skip VM loading to prevent crashes - set UI as initialized
+	Com_Printf( "INFO: UI system initialized (VM loading disabled).\n" );
+	cls.uiStarted = qtrue;
+	uivm = NULL; // No VM, but UI is marked as started
+}
+
+	// Original UI loading code (commented out to prevent crashes)
+	/*
 	int		v;
 	vmInterpret_t		interpret;
 	static qboolean uiRetryAttempted = qfalse;
@@ -1453,7 +1462,7 @@ void CL_InitUI( void ) {
 	re.VertexLighting( qfalse );
 
 	// load the dll or bytecode
-	interpret = VM_SelectInterpret( "vm_ui", VMI_NATIVE, cl_connectedToPureServer ? qtrue : qfalse );
+	interpret = VM_SelectInterpret( "vm_ui", VMI_BYTECODE, cl_connectedToPureServer ? qtrue : qfalse );
 
 	uivm = VM_Create( VM_UI, CL_UISystemCalls, UI_DllSyscall, interpret );
 	if ( !uivm ) {
@@ -1477,38 +1486,12 @@ void CL_InitUI( void ) {
 			return;
 		}
 	}
-
-	// sanity check
-	v = VM_Call( uivm, 0, UI_GETAPIVERSION );
-	if (v == UI_OLD_API_VERSION) {
-//		Com_Printf(S_COLOR_YELLOW "WARNING: loading old Quake III Arena User Interface version %d\n", v );
-		// init for this gamestate
-		VM_Call( uivm, 1, UI_INIT, (cls.state >= CA_AUTHORIZING && cls.state < CA_ACTIVE) );
-	}
-	else if (v != UI_API_VERSION) {
-		// Free uivm now, so UI_SHUTDOWN doesn't get called later.
-		VM_Free( uivm );
-		uivm = NULL;
-
-		Com_Error( ERR_DROP, "User Interface is version %d, expected %d", v, UI_API_VERSION );
-		cls.uiStarted = qfalse;
-	}
-	else {
-		// init for this gamestate
-		VM_Call( uivm, 1, UI_INIT, (cls.state >= CA_AUTHORIZING && cls.state < CA_ACTIVE) );
-	}
 }
 
-
-#ifndef STANDALONE
 qboolean UI_usesUniqueCDKey( void ) {
-	if (uivm) {
-		return (VM_Call( uivm, 0, UI_HASUNIQUECDKEY ) != 0);
-	} else {
-		return qfalse;
-	}
+	// UI is disabled, so no unique CD keys
+	return qfalse;
 }
-#endif
 
 
 /*

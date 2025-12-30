@@ -461,9 +461,9 @@ Q_EXPORT intptr_t vmMain( int command, int arg0, int arg1, int arg2, [[maybe_unu
 {
 	switch ( command ) {
 	case GAME_INIT:
-		// Debug: verify syscall is initialized before using G_Printf
-		extern intptr_t (QDECL *syscall)( intptr_t arg, ... );
-		if ( syscall == (intptr_t (QDECL *)( intptr_t, ...))-1 ) {
+		// Debug: verify mod_syscall is initialized before using G_Printf
+		extern intptr_t (QDECL *mod_syscall)( intptr_t arg, ... );
+		if ( mod_syscall == (intptr_t (QDECL *)( intptr_t, ...))-1 ) {
 			// Syscall not initialized; bail out before using any trap-dependent logging
 			return -1;
 		}
@@ -828,10 +828,10 @@ void G_InitGame( int levelTime, int randomSeed, int restart )
         G_Printf ("gamedate: %s\n", __DATE__);
 	G_Printf ("G_InitGame: levelTime=%d, randomSeed=%d, restart=%d\n", levelTime, randomSeed, restart );
 
-	// Debug: verify syscall is initialized
-	extern intptr_t (QDECL *syscall)( intptr_t arg, ... );
-	if ( syscall == (intptr_t (QDECL *)( intptr_t, ...))-1 ) {
-		G_Error( "G_InitGame: syscall pointer not initialized!" );
+	// Debug: verify mod_syscall is initialized
+	extern intptr_t (QDECL *mod_syscall)( intptr_t arg, ... );
+	if ( mod_syscall == (intptr_t (QDECL *)( intptr_t, ...))-1 ) {
+		G_Error( "G_InitGame: mod_syscall pointer not initialized!" );
 		return;
 	}
 

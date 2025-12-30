@@ -514,9 +514,8 @@ void Com_AppendCDKey( const char *filename ) {
 #ifndef STANDALONE
 	// Only append mod-specific portion if UI says unique cdkeys are used.
 #ifndef DEDICATED
-	if ( !UI_usesUniqueCDKey() ) {
-		return;
-	}
+	// For now, skip CD key functionality to avoid UI dependency issues
+	return;
 #endif
 #endif
 

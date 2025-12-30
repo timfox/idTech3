@@ -1852,13 +1852,13 @@ __attribute__((visibility("default"))) void MapInfoGet(const char* mapname, int 
 	char *pointer;
 	int mayRead;
 	int i;
-	extern intptr_t (QDECL *syscall)( intptr_t arg, ... );
+        // extern intptr_t (QDECL *mod_syscall)( intptr_t arg, ... ); // Removed conflicting declaration
 
 	memset(result, 0, sizeof (*result));
 	
-	// Safety check: if syscall pointer is not initialized (still -1), return early
+	// Safety check: if mod_syscall pointer is not initialized (still -1), return early
 	// This can happen when MapInfoGet is called from UI module before game module is initialized
-	if ( syscall == (intptr_t (QDECL *)( intptr_t, ...))-1 ) {
+	if ( mod_syscall == (intptr_t (QDECL *)( intptr_t, ...))-1 ) {
 		// Game module not initialized yet - return empty result
 		return;
 	}

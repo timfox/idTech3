@@ -4699,6 +4699,9 @@ void CL_Init( void ) {
 	}
 #endif
 
+	// Initialize UI for main menu
+	CL_InitUI();
+
 	Com_Printf( "----- Client Initialization Complete -----\n" );
 }
 

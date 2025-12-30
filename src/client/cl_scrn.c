@@ -555,6 +555,7 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 			if ( uivm ) {
 				VM_Call( uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_MAIN );
 			}
+			// UI will be drawn later in this function
 			break;
 		case CA_CONNECTING:
 		case CA_CHALLENGING:
@@ -565,6 +566,7 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 				VM_Call( uivm, 1, UI_REFRESH, cls.realtime );
 				VM_Call( uivm, 1, UI_DRAW_CONNECT_SCREEN, qfalse );
 			}
+			// Console will be drawn later in this function
 			break;
 		case CA_LOADING:
 		case CA_PRIMED:
@@ -644,9 +646,9 @@ void SCR_UpdateScreen( void ) {
 	}
 	recursive = 1;
 
-	// If there is no VM, there are also no rendering commands issued. Stop the renderer in
-	// that case.
-	if ( uivm )
+	// If there is no UI VM but UI is initialized, we can still render basic interface
+	// If neither UI VM nor UI initialization exists, stop the renderer
+	if ( uivm || cls.uiStarted )
 	{
 		// XXX
 		int in_anaglyphMode = Cvar_VariableIntegerValue("r_anaglyphMode");
