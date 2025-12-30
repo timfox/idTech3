@@ -124,9 +124,10 @@ qboolean vk_2d_initialize(void) {
 
     VK_CHECK(qvkCreatePipelineLayout(vk_device, &pipelineLayoutInfo, nullptr, &vk_2d_internal.pipelineLayout));
 
-    // TODO: Create actual graphics pipeline with vertex/fragment shaders
-    // For now, we'll create a basic pipeline structure
-    vk_2d_internal.pipeline = VK_NULL_HANDLE; // Placeholder
+    // Create graphics pipeline with 2D shaders
+    // Note: This requires access to compiled SPIR-V shaders
+    // For now, create a basic pipeline structure that will be completed later
+    vk_2d_internal.pipeline = VK_NULL_HANDLE; // Will be implemented when shader loading is complete
 
     // Create vertex buffer
     VkBufferCreateInfo vertexBufferInfo = {
@@ -146,13 +147,15 @@ qboolean vk_2d_initialize(void) {
     VkMemoryRequirements memRequirements;
     qvkGetBufferMemoryRequirements(vk_device, vk_2d_internal.vertexBuffer, &memRequirements);
 
-    // TODO: Proper memory allocation using VMA
-    // For now, use a simple allocation
+    // Find proper memory type for vertex buffer
+    uint32_t memoryTypeIndex = find_memory_type(memRequirements.memoryTypeBits,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
     VkMemoryAllocateInfo allocInfo = {
         .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
         .pNext = nullptr,
         .allocationSize = memRequirements.size,
-        .memoryTypeIndex = 0 // TODO: Find proper memory type
+        .memoryTypeIndex = memoryTypeIndex
     };
 
     VK_CHECK(qvkAllocateMemory(vk_device, &allocInfo, nullptr, &vk_2d_internal.vertexBufferMemory));
@@ -281,13 +284,47 @@ void vk_2d_flush(void) {
         return;
     }
 
-    // TODO: Implement actual Vulkan rendering commands
-    // 1. Update vertex/index buffers with current data
-    // 2. Bind pipeline and descriptor sets
-    // 3. Record draw commands
-    // 4. Submit to command buffer
+    // Update vertex buffer with current data
+    void* data;
+    VK_CHECK(qvkMapMemory(vk_device, vk_2d_internal.vertexBufferMemory, 0,
+                         vk_2d_internal.currentVertexCount * sizeof(vk_2d_vertex_t), 0, &data));
+    memcpy(data, vk_2d_internal.vertexData.data(),
+           vk_2d_internal.currentVertexCount * sizeof(vk_2d_vertex_t));
+    qvkUnmapMemory(vk_device, vk_2d_internal.vertexBufferMemory);
 
-    ri.Printf(PRINT_DEVELOPER, "2D Vulkan: Flushing %u vertices, %u indices\n",
+    // Update index buffer with current data
+    VK_CHECK(qvkMapMemory(vk_device, vk_2d_internal.indexBufferMemory, 0,
+                         vk_2d_internal.currentIndexCount * sizeof(uint16_t), 0, &data));
+    memcpy(data, vk_2d_internal.indexData.data(),
+           vk_2d_internal.currentIndexCount * sizeof(uint16_t));
+    qvkUnmapMemory(vk_device, vk_2d_internal.indexBufferMemory);
+
+    // Get current command buffer
+    VkCommandBuffer cmdBuffer = vk.cmd->command_buffer;
+
+    // Bind pipeline (when implemented)
+    if (vk_2d_internal.pipeline != VK_NULL_HANDLE) {
+        qvkCmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk_2d_internal.pipeline);
+    }
+
+    // Bind vertex buffer
+    VkDeviceSize offset = 0;
+    qvkCmdBindVertexBuffers(cmdBuffer, 0, 1, &vk_2d_internal.vertexBuffer, &offset);
+
+    // Bind index buffer
+    qvkCmdBindIndexBuffer(cmdBuffer, vk_2d_internal.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+
+    // Bind descriptor sets (when implemented)
+    if (vk_2d_internal.descriptorSet != VK_NULL_HANDLE) {
+        qvkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                vk_2d_internal.pipelineLayout, 0, 1,
+                                &vk_2d_internal.descriptorSet, 0, nullptr);
+    }
+
+    // Draw indexed
+    qvkCmdDrawIndexed(cmdBuffer, vk_2d_internal.currentIndexCount, 1, 0, 0, 0);
+
+    ri.Printf(PRINT_DEVELOPER, "2D Vulkan: Flushed %u vertices, %u indices\n",
               vk_2d_internal.currentVertexCount, vk_2d_internal.currentIndexCount);
 
     // Reset counters for next batch

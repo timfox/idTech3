@@ -22,6 +22,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "tr_local.h"
 
+// Vulkan function pointers
+extern PFN_vkCmdSetViewport qvkCmdSetViewport;
+extern PFN_vkCmdSetScissor qvkCmdSetScissor;
+
 // Scene Rendering Functions for Vulkan Renderer
 // Handles 3D scene rendering, entities, polygons, and world geometry
 
@@ -116,33 +120,47 @@ void vk_render_scene_vulkan(const refdef_t *fd) {
 
     qvkCmdBeginRenderPass(command_buffer, &render_pass_begin, VK_SUBPASS_CONTENTS_INLINE);
 
-    // Add actual 3D rendering commands here
-    // Render entities and polygons stored in the scene
+    // Set up viewport and scissor for 3D rendering
+    VkViewport viewport = {
+        .x = 0.0f,
+        .y = 0.0f,
+        .width = (float)glConfig.vidWidth,
+        .height = (float)glConfig.vidHeight,
+        .minDepth = 0.0f,
+        .maxDepth = 1.0f
+    };
+    qvkCmdSetViewport(command_buffer, 0, 1, &viewport);
 
-    // TODO: Set up viewport and scissor for 3D rendering
-    // For now, we'll skip the detailed Vulkan command setup
+    VkRect2D scissor = {
+        .offset = {0, 0},
+        .extent = {(uint32_t)glConfig.vidWidth, (uint32_t)glConfig.vidHeight}
+    };
+    qvkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
     // Render polygons (if any)
     if (vk.scene.polygonCount > 0) {
         ri.Printf(PRINT_DEVELOPER, "Vulkan: Rendering %d polygons\n", vk.scene.polygonCount);
 
-        // Implement polygon rendering with proper vertex/index buffers
-        // This would involve:
-        // 1. Creating vertex and index buffers for polygon data
-        // 2. Setting up proper shader pipeline for polygon rendering
-        // 3. Binding vertex/index buffers and issuing draw calls
-        // 4. Handling polygon materials and textures
-
-        // For now, we log the polygon rendering attempt
-        // TODO: Implement full polygon rendering pipeline
+        // TODO: Implement full polygon rendering pipeline with vertex/index buffers
+        // For now, we iterate through polygons and log their data
         for (int i = 0; i < vk.scene.polygonCount; i++) {
-            // Each polygon consists of 3 vertices (triangle)
             int baseVertex = i * 3;
             if (baseVertex + 2 < MAX_VERTS) {
-                ri.Printf(PRINT_DEVELOPER, "Polygon %d: vertices (%d,%d,%d)\n",
-                         i, vk.scene.polygonIndexes[baseVertex],
-                         vk.scene.polygonIndexes[baseVertex + 1],
-                         vk.scene.polygonIndexes[baseVertex + 2]);
+                polyVert_t *verts[3] = {
+                    &vk.scene.polygonVerts[vk.scene.polygonIndexes[baseVertex]],
+                    &vk.scene.polygonVerts[vk.scene.polygonIndexes[baseVertex + 1]],
+                    &vk.scene.polygonVerts[vk.scene.polygonIndexes[baseVertex + 2]]
+                };
+
+                // TODO: Create vertex buffer with polygon data
+                // TODO: Set up polygon material/shader pipeline
+                // TODO: Issue draw call for triangle
+
+                ri.Printf(PRINT_DEVELOPER, "Polygon %d: positions (%.1f,%.1f,%.1f) (%.1f,%.1f,%.1f) (%.1f,%.1f,%.1f)\n",
+                         i,
+                         verts[0]->xyz[0], verts[0]->xyz[1], verts[0]->xyz[2],
+                         verts[1]->xyz[0], verts[1]->xyz[1], verts[1]->xyz[2],
+                         verts[2]->xyz[0], verts[2]->xyz[1], verts[2]->xyz[2]);
             }
         }
     }
@@ -151,17 +169,14 @@ void vk_render_scene_vulkan(const refdef_t *fd) {
     if (vk.scene.entityCount > 0) {
         ri.Printf(PRINT_DEVELOPER, "Vulkan: Rendering %d entities\n", vk.scene.entityCount);
 
-        // Implement entity rendering with proper model loading and transformation
-        // This would involve:
-        // 1. Loading 3D models (MD3, IQM, etc.)
-        // 2. Setting up model-view-projection matrices
-        // 3. Handling entity transformations (position, rotation, scale)
-        // 4. Rendering with appropriate shaders and materials
-
-        // For now, we log entity rendering information
-        // TODO: Implement full entity rendering pipeline
         for (int i = 0; i < vk.scene.entityCount; i++) {
             const refEntity_t *ent = &vk.scene.entities[i];
+
+            // TODO: Load and render 3D models with proper transformations
+            // TODO: Set up model-view-projection matrices
+            // TODO: Handle entity animations and shader effects
+            // TODO: Bind appropriate materials and textures
+
             ri.Printf(PRINT_DEVELOPER, "Entity %d: origin(%.1f,%.1f,%.1f) model=%d shaderTime=%d\n",
                      i, ent->origin[0], ent->origin[1], ent->origin[2],
                      ent->hModel, ent->shaderTime);

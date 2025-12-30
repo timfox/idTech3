@@ -35,6 +35,9 @@ Vk_Instance vk;
 // Define the global Vulkan world
 vk_world_t vk_world;
 
+// Vulkan library handle
+static void *vulkan_lib = NULL;
+
 // Global cvars are defined/registered in tr_init.c
 
 // Define glConfig for compatibility (Vulkan renderer uses its own config but some shared code expects this)
@@ -393,7 +396,7 @@ extern cvar_t *r_vram_budget;
 static int vkSamples = VK_SAMPLE_COUNT_1_BIT;
 static double __attribute__((used)) vkFrameTelemetryLast = 0.0;
 
-static VkInstance vk_instance = VK_NULL_HANDLE;
+VkInstance vk_instance = VK_NULL_HANDLE;
 static VkSurfaceKHR vk_surface = VK_NULL_HANDLE;
 
 VkDebugReportCallbackEXT vk_debug_callback = VK_NULL_HANDLE;
@@ -1128,6 +1131,31 @@ static void vk_create_swapchain( VkPhysicalDevice physical_device, VkDevice devi
 
 	VK_CHECK( qvkGetSwapchainImagesKHR( vk.device, vk.swapchain, &vk.swapchain_image_count, NULL ) );
 	vk.swapchain_image_count = MIN( vk.swapchain_image_count, MAX_SWAPCHAIN_IMAGES );
+
+	// Allocate memory for swapchain images array AFTER clamping the count
+	if (!vk.swapchain_images) {
+		vk.swapchain_images = (VkImage *)ri.Malloc(vk.swapchain_image_count * sizeof(VkImage));
+		if (!vk.swapchain_images) {
+			ri.Error(ERR_FATAL, "Vulkan: Failed to allocate memory for swapchain images");
+		}
+	}
+
+	// Allocate memory for swapchain image views array AFTER clamping the count
+	if (!vk.swapchain_image_views) {
+		vk.swapchain_image_views = (VkImageView *)ri.Malloc(vk.swapchain_image_count * sizeof(VkImageView));
+		if (!vk.swapchain_image_views) {
+			ri.Error(ERR_FATAL, "Vulkan: Failed to allocate memory for swapchain image views");
+		}
+	}
+
+	// Allocate memory for swapchain rendering finished semaphores array AFTER clamping the count
+	if (!vk.swapchain_rendering_finished) {
+		vk.swapchain_rendering_finished = (VkSemaphore *)ri.Malloc(vk.swapchain_image_count * sizeof(VkSemaphore));
+		if (!vk.swapchain_rendering_finished) {
+			ri.Error(ERR_FATAL, "Vulkan: Failed to allocate memory for swapchain semaphores");
+		}
+	}
+
 	VK_CHECK( qvkGetSwapchainImagesKHR( vk.device, vk.swapchain, &vk.swapchain_image_count, vk.swapchain_images ) );
 
 	for ( i = 0; i < vk.swapchain_image_count; i++ ) {
@@ -2522,13 +2550,13 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
 #define INIT_INSTANCE_FUNCTION(func) \
-	q##func = (PFN_##func) ri.VK_GetInstanceProcAddr(vk_instance, #func); \
+	q##func = (PFN_##func) Sys_LoadFunction(vulkan_lib, #func); \
 	if (q##func == NULL) {											\
 		ri.Error(ERR_FATAL, "Failed to find entrypoint %s", #func);	\
 	}
 
 #define INIT_INSTANCE_FUNCTION_EXT(func) \
-	q##func = (PFN_##func) ri.VK_GetInstanceProcAddr(vk_instance, #func);
+	q##func = (PFN_##func) Sys_LoadFunction(vulkan_lib, #func);
 
 
 #define INIT_DEVICE_FUNCTION(func) \
@@ -2575,7 +2603,7 @@ static void init_vulkan_library( void )
 	int device_index;
 	VkResult res;
 
-	// Global vk instance is zero-initialized by default. 
+	// Global vk instance is zero-initialized by default.
 	// Do not use Com_Memset here if it contains complex C++ types like atomics.
 
         vk_silent_init();
@@ -2584,6 +2612,28 @@ static void init_vulkan_library( void )
     if (!vk_silent) {
         vk_debug_write(2, "DEBUG: Returned from vk_safety_checks\n", 38);
     }
+
+	// Load Vulkan library and basic functions
+	if (!vulkan_lib) {
+		vulkan_lib = Sys_LoadLibrary("libvulkan.so.1");
+		if (!vulkan_lib) {
+			ri.Printf(PRINT_ERROR, "Vulkan: Failed to load libvulkan.so.1\n");
+			return;
+		}
+
+		// Load core functions that don't require an instance
+		qvkCreateInstance = (PFN_vkCreateInstance)Sys_LoadFunction(vulkan_lib, "vkCreateInstance");
+		qvkEnumerateInstanceExtensionProperties = (PFN_vkEnumerateInstanceExtensionProperties)Sys_LoadFunction(vulkan_lib, "vkEnumerateInstanceExtensionProperties");
+
+		if (!qvkCreateInstance || !qvkEnumerateInstanceExtensionProperties) {
+			ri.Printf(PRINT_ERROR, "Vulkan: Failed to load core Vulkan functions\n");
+			Sys_UnloadLibrary(vulkan_lib);
+			vulkan_lib = NULL;
+			return;
+		}
+
+		ri.Printf(PRINT_ALL, "Vulkan: Library loaded successfully\n");
+	}
 
 #ifdef USE_VULKAN
         vk_debug_write(2, "DEBUG: Checking r_vk_icd\n", 25);
@@ -2606,9 +2656,7 @@ static void init_vulkan_library( void )
 		vk_destroy_instance();
 
                 vk_debug_write(2, "DEBUG: Loading basic instance functions\n", 40);
-		// Get functions that do not depend on VkInstance (vk_instance == nullptr at this point).
-		INIT_INSTANCE_FUNCTION( vkCreateInstance )
-		INIT_INSTANCE_FUNCTION( vkEnumerateInstanceExtensionProperties )
+		// Basic functions are already loaded above from the library
 
                 vk_debug_write(2, "DEBUG: Calling create_instance\n", 31);
 		// Get instance level functions.
@@ -2638,11 +2686,11 @@ static void init_vulkan_library( void )
 		// Try KHR version first (for Vulkan 1.0), then core version (Vulkan 1.1+)
 		// Note: In Vulkan 1.1+, these are core functions with identical signatures
                 vk_debug_write(2, "DEBUG: Calling GetInstanceProcAddr for Properties2KHR\n", 55);
-		void *funcPtr = ri.VK_GetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceProperties2KHR");
+		void *funcPtr = Sys_LoadFunction(vulkan_lib, "vkGetPhysicalDeviceProperties2KHR");
                 vk_debug_write(2, "DEBUG: Returned from GetInstanceProcAddr\n", 42);
 		if (!funcPtr) {
                         vk_debug_write(2, "DEBUG: Calling GetInstanceProcAddr for Properties2\n", 52);
-			funcPtr = ri.VK_GetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceProperties2");
+			funcPtr = Sys_LoadFunction(vulkan_lib, "vkGetPhysicalDeviceProperties2");
                         vk_debug_write(2, "DEBUG: Returned from GetInstanceProcAddr\n", 42);
 		}
 		qvkGetPhysicalDeviceProperties2KHR = (PFN_vkGetPhysicalDeviceProperties2KHR)funcPtr;
@@ -2653,11 +2701,11 @@ static void init_vulkan_library( void )
 		}
 		
                 vk_debug_write(2, "DEBUG: Calling GetInstanceProcAddr for Features2KHR\n", 53);
-		funcPtr = ri.VK_GetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceFeatures2KHR");
+		funcPtr = Sys_LoadFunction(vulkan_lib, "vkGetPhysicalDeviceFeatures2KHR");
                 vk_debug_write(2, "DEBUG: Returned from GetInstanceProcAddr\n", 42);
 		if (!funcPtr) {
                         vk_debug_write(2, "DEBUG: Calling GetInstanceProcAddr for Features2\n", 50);
-			funcPtr = ri.VK_GetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceFeatures2");
+			funcPtr = Sys_LoadFunction(vulkan_lib, "vkGetPhysicalDeviceFeatures2");
                         vk_debug_write(2, "DEBUG: Returned from GetInstanceProcAddr\n", 42);
 		}
 		qvkGetPhysicalDeviceFeatures2KHR = (PFN_vkGetPhysicalDeviceFeatures2KHR)funcPtr;
@@ -2673,8 +2721,8 @@ static void init_vulkan_library( void )
 #endif
 
 		// Load debug utils functions if available (independent of validation)
-		qvkCreateDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT) ri.VK_GetInstanceProcAddr(vk_instance, "vkCreateDebugUtilsMessengerEXT");
-		qvkDestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT) ri.VK_GetInstanceProcAddr(vk_instance, "vkDestroyDebugUtilsMessengerEXT");
+		qvkCreateDebugUtilsMessengerEXT = (PFN_vkCreateDebugUtilsMessengerEXT) Sys_LoadFunction(vulkan_lib, "vkCreateDebugUtilsMessengerEXT");
+		qvkDestroyDebugUtilsMessengerEXT = (PFN_vkDestroyDebugUtilsMessengerEXT) Sys_LoadFunction(vulkan_lib, "vkDestroyDebugUtilsMessengerEXT");
 
 		// Setup debug messenger if functions are available
 		if (qvkCreateDebugUtilsMessengerEXT && qvkDestroyDebugUtilsMessengerEXT) {
@@ -3028,15 +3076,35 @@ static void init_vulkan_library( void )
 				vk.physical_device = physical_devices[ attempt_index ];
 				ri.Printf( PRINT_ALL, "...selected physical device: %d (requested %d)\n", attempt_index, requested_index );
 
+				// Load essential device functions needed for swapchain and render pass creation
+				INIT_DEVICE_FUNCTION(vkCreateSwapchainKHR);
+				INIT_DEVICE_FUNCTION(vkDestroySwapchainKHR);
+				INIT_DEVICE_FUNCTION(vkGetSwapchainImagesKHR);
+				INIT_DEVICE_FUNCTION(vkAcquireNextImageKHR);
+				INIT_DEVICE_FUNCTION(vkQueuePresentKHR);
+				INIT_DEVICE_FUNCTION(vkCreateImageView);
+				INIT_DEVICE_FUNCTION(vkDestroyImageView);
+				INIT_DEVICE_FUNCTION(vkCreateSemaphore);
+				INIT_DEVICE_FUNCTION(vkDestroySemaphore);
+				INIT_DEVICE_FUNCTION(vkCreateRenderPass);
+				INIT_DEVICE_FUNCTION(vkDestroyRenderPass);
+				INIT_DEVICE_FUNCTION(vkCreateFramebuffer);
+				INIT_DEVICE_FUNCTION(vkDestroyFramebuffer);
+
 				// Create swapchain now that we have a valid device and surface
 				ri.Printf(PRINT_ALL, "Vulkan: Creating real swapchain...\n");
 				VkSurfaceFormatKHR surfaceFormat = {vk.present_format.format, vk.present_format.colorSpace};
 				vk_create_swapchain( vk.physical_device, vk.device, vk_surface, surfaceFormat, &vk.swapchain, qtrue );
 				ri.Printf(PRINT_ALL, "Vulkan: Real swapchain created successfully\n");
 
-				// TODO: Set up swapchain images and views
-				// TODO: Create render pass
-				// TODO: Create framebuffers
+				// Create render pass for the swapchain
+				if (!vk_create_main_render_pass()) {
+					ri.Printf(PRINT_ERROR, "Vulkan: Failed to create render pass\n");
+					break;
+				}
+
+				// Create framebuffers for each swapchain image
+				vk_create_framebuffers();
 
 				break;
 			}
@@ -8763,6 +8831,21 @@ void vk_shutdown( refShutdownCode_t code ) {
 		// Clear Vulkan instance data based on shutdown level
 		if ( code != REF_KEEP_WINDOW ) {
 			ri.Printf(PRINT_ALL, "vk_shutdown: Full cleanup - clearing Vulkan instance data\n");
+
+			// Free dynamically allocated swapchain arrays
+			if (vk.swapchain_images) {
+				ri.Free(vk.swapchain_images);
+				vk.swapchain_images = NULL;
+			}
+			if (vk.swapchain_image_views) {
+				ri.Free(vk.swapchain_image_views);
+				vk.swapchain_image_views = NULL;
+			}
+			if (vk.swapchain_rendering_finished) {
+				ri.Free(vk.swapchain_rendering_finished);
+				vk.swapchain_rendering_finished = NULL;
+			}
+
 			// Full shutdown - clear everything
 			Com_Memset( &vk, 0, sizeof( vk ) );
 		} else {
@@ -8770,6 +8853,13 @@ void vk_shutdown( refShutdownCode_t code ) {
 		}
 	} else {
 		ri.Printf(PRINT_ALL, "vk_shutdown: Keeping Vulkan context (REF_KEEP_CONTEXT)\n");
+	}
+
+	// Unload Vulkan library if it was loaded
+	if (vulkan_lib) {
+		Sys_UnloadLibrary(vulkan_lib);
+		vulkan_lib = NULL;
+		ri.Printf(PRINT_ALL, "vk_shutdown: Vulkan library unloaded\n");
 	}
 }
 
