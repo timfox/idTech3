@@ -1151,7 +1151,7 @@ Entry point for the RTX renderer
 ===============
 */
 #ifdef USE_RENDERER_DLOPEN
-extern "C" Q_EXPORT refexport_t* QDECL GetRefAPI( int apiVersion, refimport_t *rimp ) {
+extern "C" Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI( int apiVersion, refimport_t *rimp ) {
     return RTX_GetRefAPI(apiVersion, rimp);
 }
 #endif

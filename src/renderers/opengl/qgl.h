@@ -231,6 +231,32 @@ typedef char GLchar;
 	GLE( void, glProgramLocalParameter4fARB, GLenum target, GLuint index, GLfloat x, GLfloat y, GLfloat z, GLfloat w ) \
 	GLE( void, glProgramLocalParameter4fvARB, GLenum target, GLuint index, const GLfloat *params )
 
+#define QGL_GLSL_PROCS \
+	GLE( GLuint, glCreateShader, GLenum type ) \
+	GLE( void, glDeleteShader, GLuint shader ) \
+	GLE( void, glShaderSource, GLuint shader, GLsizei count, const GLchar *const*string, const GLint *length ) \
+	GLE( void, glCompileShader, GLuint shader ) \
+	GLE( void, glGetShaderiv, GLuint shader, GLenum pname, GLint *params ) \
+	GLE( void, glGetShaderInfoLog, GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *infoLog ) \
+	GLE( GLuint, glCreateProgram, void ) \
+	GLE( void, glDeleteProgram, GLuint program ) \
+	GLE( void, glAttachShader, GLuint program, GLuint shader ) \
+	GLE( void, glDetachShader, GLuint program, GLuint shader ) \
+	GLE( void, glLinkProgram, GLuint program ) \
+	GLE( void, glGetProgramiv, GLuint program, GLenum pname, GLint *params ) \
+	GLE( void, glGetProgramInfoLog, GLuint program, GLsizei bufSize, GLsizei *length, GLchar *infoLog ) \
+	GLE( void, glUseProgram, GLuint program ) \
+	GLE( GLint, glGetUniformLocation, GLuint program, const GLchar *name ) \
+	GLE( void, glUniform1f, GLint location, GLfloat v0 ) \
+	GLE( void, glUniform2f, GLint location, GLfloat v0, GLfloat v1 ) \
+	GLE( void, glUniform3f, GLint location, GLfloat v0, GLfloat v1, GLfloat v2 ) \
+	GLE( void, glUniform4f, GLint location, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3 ) \
+	GLE( void, glUniform1i, GLint location, GLint v0 ) \
+	GLE( void, glUniformMatrix4fv, GLint location, GLsizei count, GLboolean transpose, const GLfloat *value ) \
+	GLE( void, glVertexAttribPointer, GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid *pointer ) \
+	GLE( void, glEnableVertexAttribArray, GLuint index ) \
+	GLE( void, glDisableVertexAttribArray, GLuint index )
+
 #define QGL_VBO_PROCS \
 	GLE( void, glGenBuffersARB, GLsizei n, GLuint *buffers ) \
 	GLE( void, glDeleteBuffersARB, GLsizei n, const GLuint *buffers ) \

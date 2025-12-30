@@ -168,7 +168,8 @@ typedef enum {
 								// should always be the lowest value in this
 								// enum set
 	GLDRV_STANDALONE,			// driver is a non-3Dfx standalone driver
-	GLDRV_VOODOO				// driver is a 3Dfx standalone driver
+	GLDRV_VOODOO,				// driver is a 3Dfx standalone driver
+	GLDRV_OPENGL3				// modern OpenGL 3.3+ with GLSL shaders
 } glDriverType_t;
 
 typedef enum {

@@ -175,7 +175,7 @@ id3v1_1 *gpTAG;
 																									\
 	/* account for trailing ID3 tag in _iBytesRemaining */											\
 	gpTAG = (id3v1_1*) (((byte *)_pvData + _iBytesRemaining)-sizeof(id3v1_1));	/* sizeof = 128	*/	\
-	if (!strncmp(gpTAG->id, "TAG", 3))																\
+	if (!strncmp(gpTAG->id, "TAG", (size_t)3))																\
 	{																								\
 		_iBytesRemaining -= sizeof(id3v1_1);														\
 	}

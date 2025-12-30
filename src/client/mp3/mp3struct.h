@@ -127,6 +127,15 @@ typedef struct
 } MP3STREAM, *LP_MP3STREAM;
 
 
+// Function declarations
+char *C_MP3_IsValid(void *pvData, int iDataLen, int bStereoDesired);
+char* C_MP3_GetHeaderData(void *pvData, int iDataLen, int *piRate, int *piWidth, int *piChannels, int bStereoDesired);
+char *C_MP3_GetUnpackedSize(void *pvData, int iSourceBytesRemaining, int *piUnpackedSize, int bStereoDesired);
+char *C_MP3_UnpackRawPCM(void *pvData, int iSourceBytesRemaining, int *piUnpackedSize, void *pbUnpackBuffer, int bStereoDesired);
+char *C_MP3Stream_DecodeInit(LP_MP3STREAM pSFX_MP3Stream, void *pvSourceData, int iSourceBytesRemaining, int iGameAudioSampleRate, int iGameAudioSampleBits, int bStereoDesired);
+unsigned int C_MP3Stream_Decode(LP_MP3STREAM pSFX_MP3Stream);
+char *C_MP3Stream_Rewind(LP_MP3STREAM pSFX_MP3Stream);
+
 extern LP_MP3STREAM pMP3Stream;
 extern int bFastEstimateOnly;
 

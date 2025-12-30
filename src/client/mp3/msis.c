@@ -246,8 +246,8 @@ void is_process_MPEG2(float x[][1152],	/* intensity stereo */
    for (cb = cb0 + 1; cb < 21; cb++)
    {
       isf = il[cb] + sf->l[cb];
-      fl = lr[isf][0];
-      fr = lr[isf][1];
+      fl = lr_ptr[isf][0];
+      fr = lr_ptr[isf][1];
       n = pMP3Stream->nBand[0][cb];
       for (j = 0; j < n; j++, i++)
       {
@@ -277,8 +277,8 @@ void is_process_MPEG2(float x[][1152],	/* intensity stereo */
       for (cb = cb0 + 1; cb <= cb1; cb++)
       {
 	 isf = il[cb] + sf->s[w][cb];
-	 fl = lr[isf][0];
-	 fr = lr[isf][1];
+	 fl = lr_ptr[isf][0];
+	 fr = lr_ptr[isf][1];
 	 n = pMP3Stream->nBand[1][cb];
 	 for (j = 0; j < n; j++)
 	 {

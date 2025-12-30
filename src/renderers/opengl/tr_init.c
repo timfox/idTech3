@@ -242,6 +242,7 @@ static char gl_extensions[ 32768 ];
 	QGL_Core_PROCS
 	QGL_Ext_PROCS
 	QGL_ARB_PROGRAM_PROCS
+	QGL_GLSL_PROCS
 	QGL_VBO_PROCS
 	QGL_FBO_PROCS
 	QGL_FBO_OPT_PROCS
@@ -256,6 +257,7 @@ typedef struct {
 static sym_t core_procs[] = { QGL_Core_PROCS };
 static sym_t ext_procs[] = { QGL_Ext_PROCS };
 static sym_t arb_procs[] = { QGL_ARB_PROGRAM_PROCS };
+static sym_t glsl_procs[] = { QGL_GLSL_PROCS };
 static sym_t vbo_procs[] = { QGL_VBO_PROCS };
 static sym_t fbo_procs[] = { QGL_FBO_PROCS };
 static sym_t fbo_opt_procs[] = { QGL_FBO_OPT_PROCS };
@@ -538,7 +540,33 @@ static void R_InitExtensions( void )
 		ri.Printf( PRINT_ALL, "...GL_EXT_texture_filter_anisotropic not found\n" );
 	}
 
-	if ( R_HaveExtension( "GL_ARB_vertex_program" ) && R_HaveExtension( "GL_ARB_fragment_program" ) )
+	// Check for modern GLSL shaders first (preferred over ARB programs)
+	// In OpenGL 2.0+, GLSL is available as core functionality
+	ri.Printf( PRINT_ALL, "...OpenGL version: %d\n", gl_version );
+	if ( gl_version >= 200 ||
+		 (R_HaveExtension( "GL_ARB_shading_language_100" ) &&
+		  R_HaveExtension( "GL_ARB_vertex_shader" ) &&
+		  R_HaveExtension( "GL_ARB_fragment_shader" )) )
+	{
+		ri.Printf( PRINT_ALL, "...attempting to load GLSL shader functions\n" );
+		err = R_ResolveSymbols( glsl_procs, ARRAY_LEN( glsl_procs ) );
+		if ( err )
+		{
+			ri.Printf( PRINT_WARNING, "Error resolving GLSL shader function '%s'\n", err );
+			qglCreateShader = NULL; // indicates presence of GLSL functionality
+		}
+		else
+		{
+			ri.Printf( PRINT_ALL, "...using GLSL vertex/fragment shaders\n" );
+			glConfig.driverType = GLDRV_OPENGL3; // Use modern GLSL path
+		}
+	}
+	else
+	{
+		ri.Printf( PRINT_ALL, "...GLSL not available, OpenGL version too old\n" );
+	}
+	// Fallback to legacy ARB programs
+	if ( !qglCreateShader && R_HaveExtension( "GL_ARB_vertex_program" ) && R_HaveExtension( "GL_ARB_fragment_program" ) )
 	{
 		err = R_ResolveSymbols( arb_procs, ARRAY_LEN( arb_procs ) );
 		if ( err )

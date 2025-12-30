@@ -2056,6 +2056,16 @@ struct fontInfo_s {
   int subsetSize;           // number of glyphs in the subset
 };
 
+/**
+ * @struct fontHelper_t
+ * @brief Font helper structure for Unicode font handling
+ */
+typedef struct
+{
+	void *fontData;
+	glyphInfo_t *(*GetGlyph)(void *fontdata, unsigned long codepoint);
+} fontHelper_t;
+
 #define Square(x) ((x)*(x))
 
 // real time

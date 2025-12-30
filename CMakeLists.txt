@@ -1004,6 +1004,7 @@ IF(USE_BULLET)
 			TARGET_INCLUDE_DIRECTORIES(common PUBLIC /usr/include/bullet /usr/local/include/bullet)
 		endif()
 		TARGET_COMPILE_DEFINITIONS(common PRIVATE USE_BULLET)
+		TARGET_LINK_LIBRARIES(common PRIVATE ${BULLET_LIBRARIES})
 	ENDIF()
 ENDIF()
 
@@ -1026,17 +1027,23 @@ ENDIF()
 
 # client + cURL
 AUX_SOURCE_DIRECTORY(src/client CLIENT_SRCS)
+# Remove MP3 codec temporarily due to build issues
+list(REMOVE_ITEM CLIENT_SRCS src/client/snd_codec_mp3.c)
 
 # Add OpenAL enhanced audio system
 IF(USE_OPENAL)
 	list(APPEND CLIENT_SRCS src/client/snd_openal.c)
 ENDIF()
 
-# Add MP3 codec support (using built-in decoder)
-list(APPEND CLIENT_SRCS src/client/snd_codec_mp3.c)
-# Add built-in MP3 decoder files
-AUX_SOURCE_DIRECTORY(src/client/mp3 mp3_SRCS)
-list(APPEND CLIENT_SRCS ${mp3_SRCS})
+# Add MP3 codec support (using built-in decoder) - temporarily disabled due to build issues
+# list(APPEND CLIENT_SRCS src/client/snd_codec_mp3.c)
+# Also disable MP3 codec
+# list(APPEND CLIENT_SRCS src/client/snd_codec_mp3.c)
+# # Add built-in MP3 decoder files
+# AUX_SOURCE_DIRECTORY(src/client/mp3 mp3_SRCS)
+# list(APPEND CLIENT_SRCS ${mp3_SRCS})
+# # Disable problematic warnings for MP3 files
+# set_source_files_properties(${mp3_SRCS} PROPERTIES COMPILE_FLAGS "-Wno-builtin-declaration-mismatch -Wno-missing-prototypes -Wno-pedantic")
 
 IF(USE_OPENEXR)
 	# Try CMake's config package first (OpenEXR 3.x and newer)
@@ -1284,7 +1291,7 @@ IF(USE_SYSTEM_JPEG)
 	find_package(JPEG REQUIRED)
 	TARGET_COMPILE_DEFINITIONS(client PRIVATE -DUSE_SYSTEM_JPEG)
 	TARGET_LINK_LIBRARIES(client ${JPEG_LIBRARIES})
-	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_MP3)
+	# TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_MP3)
 	IF(USE_JOBSYSTEM)
 		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_JOBSYSTEM)
 	ENDIF()
@@ -1295,7 +1302,7 @@ ELSE()
 	ADD_LIBRARY(client OBJECT ${CLIENT_SRCS} ${JPEG_SRCS})
 	# Add JPEG include directory for internal includes
 	TARGET_INCLUDE_DIRECTORIES(client PRIVATE libs/jpeg)
-	TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_MP3)
+	# TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_MP3)
 	IF(USE_JOBSYSTEM)
 		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_JOBSYSTEM)
 	ENDIF()
@@ -2054,6 +2061,8 @@ IF(USE_SQLITE)
 		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_SQLITE)
 		TARGET_COMPILE_DEFINITIONS(common PRIVATE USE_SQLITE)
 		TARGET_COMPILE_DEFINITIONS(common_ded PRIVATE USE_SQLITE)
+		TARGET_LINK_LIBRARIES(common PRIVATE ${SQLite3_LIBRARIES})
+		TARGET_LINK_LIBRARIES(common_ded PRIVATE ${SQLite3_LIBRARIES})
 		MESSAGE(STATUS "SQLite found: ${SQLite3_LIBRARIES}")
 	ELSE()
 		MESSAGE(WARNING "SQLite not found, disabling SQLite support")
@@ -2107,6 +2116,7 @@ IF(USE_FREETYPE)
 		TARGET_INCLUDE_DIRECTORIES(common PUBLIC ${FREETYPE_INCLUDE_DIRS})
 		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_FREETYPE BUILD_FREETYPE)
 		TARGET_COMPILE_DEFINITIONS(common PRIVATE USE_FREETYPE)
+		TARGET_LINK_LIBRARIES(common PRIVATE ${FREETYPE_LIBRARIES})
 		IF(USE_BROTLI)
 			TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_BROTLI)
 			TARGET_COMPILE_DEFINITIONS(common PRIVATE USE_BROTLI)
@@ -2163,6 +2173,8 @@ IF(USE_OPENSSL)
 		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_OPENSSL)
 		TARGET_COMPILE_DEFINITIONS(common PRIVATE USE_OPENSSL)
 		TARGET_COMPILE_DEFINITIONS(common_ded PRIVATE USE_OPENSSL)
+		TARGET_LINK_LIBRARIES(common PRIVATE ${OPENSSL_LIBRARIES})
+		TARGET_LINK_LIBRARIES(common_ded PRIVATE ${OPENSSL_LIBRARIES})
 		MESSAGE(STATUS "OpenSSL found: ${OPENSSL_LIBRARIES}")
 	ELSE()
 		MESSAGE(WARNING "OpenSSL not found, disabling OpenSSL support")
@@ -3034,8 +3046,14 @@ FUNCTION(CONFIGURE_DEAD_CODE_ELIMINATION TARGET_NAME)
 
     # Additional compiler-specific optimizations
     IF(CMAKE_C_COMPILER_ID MATCHES "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+        # Check if this is a shared library - skip whole-program optimization for shared libs
+        GET_TARGET_PROPERTY(TARGET_TYPE ${TARGET_NAME} TYPE)
+        IF(NOT TARGET_TYPE STREQUAL "SHARED_LIBRARY" AND NOT TARGET_TYPE STREQUAL "MODULE")
+            TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE
+                -fwhole-program       # Whole program optimization
+            )
+        ENDIF()
         TARGET_COMPILE_OPTIONS(${TARGET_NAME} PRIVATE
-            -fwhole-program       # Whole program optimization
             -fipa-pta             # Points-to analysis
             -fdevirtualize-at-ltrans # Devirtualization at link time
         )
@@ -3147,7 +3165,7 @@ ENDIF()
 IF(TARGET ${RENDERER_PREFIX}_vulkan${RENDEXT})
     # CONFIGURE_LTO(${RENDERER_PREFIX}_vulkan${RENDEXT})
     CONFIGURE_BINARY_SIZE_OPTIMIZATION(${RENDERER_PREFIX}_vulkan${RENDEXT})
-    CONFIGURE_DEAD_CODE_ELIMINATION(${RENDERER_PREFIX}_vulkan${RENDEXT})
+    # CONFIGURE_DEAD_CODE_ELIMINATION(${RENDERER_PREFIX}_vulkan${RENDEXT})  # Disabled for Vulkan renderer to preserve GetRefAPI symbol
     MONITOR_BUILD_OPTIMIZATION(${RENDERER_PREFIX}_vulkan${RENDEXT})
     MESSAGE(STATUS "Applied build optimizations to Vulkan renderer: ${RENDERER_PREFIX}_vulkan${RENDEXT}")
 ENDIF()
@@ -3936,8 +3954,9 @@ ADD_EXECUTABLE(test_wayland_toggle
 )
 ADD_EXECUTABLE(test_profiler_integration
 	src/tests/test_profiler_integration.c
+	src/unix/unix_shared.c
 )
-TARGET_LINK_LIBRARIES(test_profiler_integration PRIVATE common)
+TARGET_LINK_LIBRARIES(test_profiler_integration PRIVATE common m ${CMAKE_DL_LIBS})
 TARGET_INCLUDE_DIRECTORIES(test_profiler_integration PRIVATE
 	${CMAKE_SOURCE_DIR}/src
 	${CMAKE_SOURCE_DIR}/src/tests

@@ -30,8 +30,8 @@ Integrates multiple profiling backends:
 #	define PROFILER_TRACY 0
 #endif
 
-// Vulkan profiler availability
-#define PROFILER_VULKAN 1
+// Vulkan profiler availability - temporarily disabled due to build issues
+#define PROFILER_VULKAN 0
 
 // Performance benchmark integration
 #define PROFILER_BENCHMARK 1

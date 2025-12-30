@@ -80,7 +80,7 @@ extern void RE_VertexLighting(qboolean allowed);
 extern void RE_SyncRender(void);
 
 // Entry point for dlopen
-Q_EXPORT refexport_t* GetRefAPI(int apiVersion, refimport_t *rimp) {
+Q_EXPORT __attribute__((visibility("default"))) refexport_t* GetRefAPI(int apiVersion, refimport_t *rimp) {
     static refexport_t re;
 
     if (!rimp) {

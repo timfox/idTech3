@@ -3386,6 +3386,7 @@ CL_InitRenderer
 ============
 */
 static void CL_InitRenderer( void ) {
+#ifdef USE_RENDERER_DLOPEN
 	// Initialize cl_renderer early so renderer loading knows which renderer to use
 	if (!cl_renderer) {
 		// Default to OpenGL for maximum compatibility.
@@ -3393,12 +3394,13 @@ static void CL_InitRenderer( void ) {
 		//   +set cl_renderer vulkan
 		// or the legacy alias:
 		//   +set r_renderer vulkan
-		cl_renderer = Cvar_Get( "cl_renderer", "vulkan", CVAR_ARCHIVE | CVAR_LATCH );
+		cl_renderer = Cvar_Get( "cl_renderer", "opengl", CVAR_ARCHIVE | CVAR_LATCH );
 		Cvar_SetDescription( cl_renderer, "Sets your desired renderer (vulkan, opengl2, opengl), requires \\vid_restart. Engine will fallback automatically if requested renderer fails." );
 		fprintf(stderr, "DEBUG: Initialized cl_renderer to: %s\n", cl_renderer->string );
 	} else {
 		fprintf(stderr, "DEBUG: cl_renderer already exists: %s\n", cl_renderer->string );
 	}
+#endif
 
 	// Ensure console history file exists on startup to avoid read failures
 	// in history.c during initial user input load.
