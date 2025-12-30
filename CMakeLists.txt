@@ -629,10 +629,10 @@ list(APPEND QCOMMON_SRCS src/common/q_input_validation.c)
 # list(APPEND QCOMMON_SRCS src/renderers/renderercommon/tr_font_effects.c)
 # Add secure message functions
 list(APPEND QCOMMON_SRCS src/common/msg_secure.c)
-# Add secure message functions
-list(APPEND QCOMMON_SRCS src/common/msg_secure.c)
 # Add memory statistics tracking
 list(APPEND QCOMMON_SRCS src/common/memory_stats.c)
+# Add comprehensive profiling system
+list(APPEND QCOMMON_SRCS src/common/profiler.c)
 # Add VM hot reload system
 list(APPEND QCOMMON_SRCS src/common/vm_hot_reload.c)
 # Add event system
@@ -3933,6 +3933,17 @@ ADD_EXECUTABLE(test_rtx_switchmode
 )
 ADD_EXECUTABLE(test_wayland_toggle
 	src/tests/test_wayland_toggle.cpp
+)
+ADD_EXECUTABLE(test_profiler_integration
+	src/tests/test_profiler_integration.c
+)
+TARGET_LINK_LIBRARIES(test_profiler_integration PRIVATE common)
+TARGET_INCLUDE_DIRECTORIES(test_profiler_integration PRIVATE
+	${CMAKE_SOURCE_DIR}/src
+	${CMAKE_SOURCE_DIR}/src/tests
+)
+SET_TARGET_PROPERTIES(test_profiler_integration PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
 TARGET_LINK_LIBRARIES(test_wayland_toggle PRIVATE ${CMAKE_DL_LIBS})
 TARGET_INCLUDE_DIRECTORIES(test_wayland_toggle PRIVATE

@@ -20,7 +20,7 @@ typedef enum {
     BENCHMARK_RESULT_REGRESSION,       // Performance regression detected
     BENCHMARK_RESULT_IMPROVEMENT,      // Performance improvement detected
     BENCHMARK_RESULT_COUNT
-} benchmark_result_t;
+} benchmark_result_type_t;
 
 // Benchmark categories
 typedef enum {
@@ -117,7 +117,7 @@ typedef struct {
 typedef struct {
     char benchmark_id[64];
     char run_id[64];                   // Unique run identifier
-    benchmark_result_t result;
+    benchmark_result_type_t result;
     uint64_t start_time;
     uint64_t end_time;
     uint64_t duration_ms;
@@ -262,7 +262,7 @@ qboolean Benchmark_GenerateCIBadge(const benchmark_result_t* result,
                                  const char* badge_file);
 
 // Utility Functions
-const char* Benchmark_GetResultString(benchmark_result_t result);
+const char* Benchmark_GetResultString(benchmark_result_type_t result);
 const char* Benchmark_GetCategoryString(benchmark_category_t category);
 const char* Benchmark_GetMetricString(performance_metric_t metric);
 qboolean Benchmark_ValidateConfig(const benchmark_config_t* config);

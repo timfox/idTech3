@@ -47,6 +47,26 @@
       "memory_end_mb": 100.6
     }
 
+- Engine Profiling System
+  - The engine includes a comprehensive profiling system that integrates multiple backends:
+    - **Tracy**: CPU/GPU profiling when USE_TRACY=1
+    - **Vulkan Render Profiler**: GPU render graph analysis
+    - **Performance Benchmarking**: Automated regression detection
+    - **Memory Bandwidth Profiler**: Memory access pattern analysis
+  - Control profiling via CVARs:
+    - `profiler_mode`: 0=disabled, 1=basic, 2=vulkan, 3=full, 4=benchmark
+    - `profiler_overhead_limit`: Maximum profiling overhead percentage
+  - Runtime commands:
+    - `profiler_status`: Show current profiling status
+    - `profiler_toggle`: Cycle through profiling modes
+    - `profiler_dump`: Dump current frame profiling data
+    - `profiler_reset`: Reset profiling statistics
+    - `profiler_export`: Export profiling data to text file
+    - `profiler_export_json`: Export to JSON format
+    - `profiler_export_csv`: Export to CSV format
+    - `profiler_increase_detail`/`profiler_decrease_detail`: Adjust profiling detail level
+
 - Notes
   - All file names and paths are subject to the CI and local build layout.
   - The dashboard is designed to be lightweight and pluggable into your existing data pipeline.
+  - Profiling can be enabled at build time with USE_TRACY=1 for Tracy integration.
