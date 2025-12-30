@@ -6,7 +6,11 @@ Unicode glyph mapping support for modern font rendering
 
 #include "../common/q_shared.h"
 #include "../renderercommon/tr_public.h"
+#ifdef USE_VULKAN
+#include "../vulkan/tr_common.h"
+#else
 #include "../renderer/tr_common.h"
+#endif
 
 // Font CVars are accessed via ri.Cvar_Get
 

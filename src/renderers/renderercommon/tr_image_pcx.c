@@ -24,7 +24,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../common/q_shared.h"
 #include "../renderercommon/tr_public.h"
+#ifdef USE_VULKAN
+#include "../vulkan/tr_common.h"
+#else
 #include "../renderer/tr_common.h"
+#endif
 
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
