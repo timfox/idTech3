@@ -77,10 +77,8 @@ static inline void agent_log(const char* hypothesisId, const char* location, con
 }
 // Simple fallback trace log for environments where NDJSON log isn't captured
 static inline void agent_trace_log(const char* json) {
-  FILE* f = fopen("/home/tim/Desktop/idtech3/.cursor/trace.log", "a");
-  if (!f) return;
-  fprintf(f, "%s\n", json);
-  fclose(f);
+// Route instrumentation to centralized trace helper instead of direct file IO
+vt_trace(json);
 }
 static inline void vt_trace(const char* json) {
   FILE* f = fopen("/home/tim/Desktop/idtech3/.cursor/trace.log", "a");
