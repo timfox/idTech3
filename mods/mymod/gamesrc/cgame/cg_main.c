@@ -50,7 +50,7 @@ This must be the very first function compiled into the .q3vm file
 // Note: In monolithic builds, we need to avoid symbol conflicts with game/ui modules
 // So we make vmMain static (internal linkage) and use vmMain_cgame as the exported entry point
 #ifndef Q3_VM
-extern intptr_t (QDECL *syscall)( intptr_t arg, ... );
+extern intptr_t (QDECL *cgame_syscall)( intptr_t arg, ... );
 #endif
 #ifdef COMBINED_MONOLITH
 static intptr_t QDECL vmMain(int command, intptr_t arg0, intptr_t arg1, intptr_t arg2, [[maybe_unused]] intptr_t arg3, [[maybe_unused]] intptr_t arg4, [[maybe_unused]] intptr_t arg5, [[maybe_unused]] intptr_t arg6, [[maybe_unused]] intptr_t arg7, [[maybe_unused]] intptr_t arg8, [[maybe_unused]] intptr_t arg9, [[maybe_unused]] intptr_t arg10, [[maybe_unused]] intptr_t arg11) {
@@ -59,7 +59,7 @@ Q_EXPORT intptr_t vmMain(int command, int arg0, int arg1, int arg2, [[maybe_unus
 #endif
 
 	// Ensure syscall is initialized before any trap-dependent work
-	if ( syscall == (intptr_t (QDECL *)( intptr_t, ...))-1 ) {
+	if ( cgame_syscall == (intptr_t (QDECL *)( intptr_t, ...))-1 ) {
 		return -1;
 	}
 

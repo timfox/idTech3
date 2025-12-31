@@ -1852,7 +1852,7 @@ __attribute__((visibility("default"))) void MapInfoGet(const char* mapname, int 
 	char *pointer;
 	int mayRead;
 	int i;
-        // extern intptr_t (QDECL *mod_syscall)( intptr_t arg, ... ); // Removed conflicting declaration
+        extern intptr_t (QDECL *mod_syscall)( intptr_t arg, ... );
 
 	memset(result, 0, sizeof (*result));
 	
