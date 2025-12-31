@@ -1,0 +1,16 @@
+{"timestamp":1178,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":1178,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":1178,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":1179,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_result","hypothesisId":"H1","data":{"result":0,"image_index":1}}
+{"timestamp":1179,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":0}}
+{"timestamp":1179,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":0}}
+{"timestamp":2179,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":0,"result":2,"image_index":1}}
+{"timestamp":2179,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":0,"image_index":1}}
+{"timestamp":2179,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":1}}
+{"timestamp":2179,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":1}}
+{"timestamp":3179,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":1,"result":2,"image_index":1}}
+{"timestamp":3179,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":1,"image_index":1}}
+{"timestamp":3179,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":2}}
+{"timestamp":3179,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":2}}
+{"timestamp":4179,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":2,"result":2,"image_index":1}}
+{"timestamp":4179,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":2,"image_index":1}}

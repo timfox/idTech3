@@ -75,6 +75,13 @@ static inline void agent_log(const char* hypothesisId, const char* location, con
   fprintf(f, "{\"timestamp\":%lld,\"location\":\"%s\",\"message\":\"%s\",\"hypothesisId\":\"%s\",\"data\":%s}\n", ts, location, message, hypothesisId, data);
   fclose(f);
 }
+// Simple fallback trace log for environments where NDJSON log isn't captured
+static inline void agent_trace_log(const char* json) {
+  FILE* f = fopen("/home/tim/Desktop/idtech3/.cursor/trace.log", "a");
+  if (!f) return;
+  fprintf(f, "%s\n", json);
+  fclose(f);
+}
 // end region
 // (Note: headless-present guard variable now provided by existing static at vk_frame.cpp: present guard)
 extern "C" void vk_begin_frame(void) {
@@ -167,6 +174,7 @@ extern "C" void vk_begin_frame(void) {
             char _attempt[64];
             snprintf(_attempt, sizeof(_attempt), "{\"attempt\":%d}", retry_count);
             agent_log("H1","vk_frame.cpp:vk_begin_frame","acquire_attempt", _attempt);
+            agent_trace_log(_attempt);
         }
         result = qvkAcquireNextImageKHR(vk.device, vk.swapchain, timeout_ns,
             vk.tess[vk.cmd_index].image_acquired, VK_NULL_HANDLE, &image_index);
@@ -175,6 +183,7 @@ extern "C" void vk_begin_frame(void) {
             snprintf(data, sizeof(data), "{\"retry\":%d,\"result\":%d,\"image_index\":%u}",
                      retry_count, (int)result, image_index);
             agent_log("H1","vk_frame.cpp:vk_begin_frame","acquire_retry", data);
+            agent_trace_log(data);
         }
         ri.Printf(PRINT_ALL, "DEBUG: Acquisition result: %d (%s), image_index=%u\n", result, vk_result_string(result), image_index);
 
