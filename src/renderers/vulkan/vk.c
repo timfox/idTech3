@@ -1119,14 +1119,32 @@ static VkResult vk_create_swapchain_safe( VkPhysicalDevice physical_device, VkDe
 		else if ( present_modes[i] == VK_PRESENT_MODE_FIFO_RELAXED_KHR )
 			fifo_relaxed_supported = qtrue;
 	}
+	ri.Printf(PRINT_ALL, "DEBUG: Present mode support - mailbox:%d, immediate:%d, fifo_relaxed:%d\n",
+		mailbox_supported, immediate_supported, fifo_relaxed_supported);
 	if ( verbose ) {
 		ri.Printf( PRINT_ALL, "\n" );
 	}
 
 	ri.Free( present_modes );
 
+	// Check for NVIDIA GPU and force more conservative present mode
+	qboolean is_nvidia = qfalse;
+	if (physical_device != VK_NULL_HANDLE) {
+		VkPhysicalDeviceProperties props;
+		qvkGetPhysicalDeviceProperties(physical_device, &props);
+		if (props.vendorID == 0x10DE) { // NVIDIA
+			is_nvidia = qtrue;
+		}
+	}
+
 	if ( ( v = ri.Cvar_VariableIntegerValue( "r_swapInterval" ) ) != 0 ) {
-		if ( v == 2 && mailbox_supported )
+		// For NVIDIA, prefer FIFO modes which are more stable
+		if (is_nvidia) {
+			if ( fifo_relaxed_supported )
+				present_mode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+			else
+				present_mode = VK_PRESENT_MODE_FIFO_KHR;
+		} else if ( v == 2 && mailbox_supported )
 			present_mode = VK_PRESENT_MODE_MAILBOX_KHR;
 		else if ( fifo_relaxed_supported )
 			present_mode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
@@ -1134,7 +1152,16 @@ static VkResult vk_create_swapchain_safe( VkPhysicalDevice physical_device, VkDe
 			present_mode = VK_PRESENT_MODE_FIFO_KHR;
 		image_count = MAX( MIN_SWAPCHAIN_IMAGES_FIFO, surface_caps.minImageCount );
 	} else {
-		if ( immediate_supported ) {
+		if (is_nvidia) {
+			// For NVIDIA, avoid IMMEDIATE mode which can cause issues
+			if ( fifo_relaxed_supported ) {
+				present_mode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+				image_count = MAX( MIN_SWAPCHAIN_IMAGES_FIFO, surface_caps.minImageCount );
+			} else {
+				present_mode = VK_PRESENT_MODE_FIFO_KHR;
+				image_count = MAX( MIN_SWAPCHAIN_IMAGES_FIFO, surface_caps.minImageCount );
+			}
+		} else if ( immediate_supported ) {
 			present_mode = VK_PRESENT_MODE_IMMEDIATE_KHR;
 			image_count = MAX( MIN_SWAPCHAIN_IMAGES_IMM, surface_caps.minImageCount );
 		} else if ( mailbox_supported ) {
@@ -1148,6 +1175,9 @@ static VkResult vk_create_swapchain_safe( VkPhysicalDevice physical_device, VkDe
 			image_count = MAX( MIN_SWAPCHAIN_IMAGES_FIFO, surface_caps.minImageCount );
 		}
 	}
+
+	ri.Printf(PRINT_ALL, "DEBUG: Selected swapchain config - present_mode:%s (%d), image_count:%u, swap_interval:%d\n",
+		pmode_to_str(present_mode), present_mode, image_count, v);
 
 	if ( image_count < 2 ) {
 		image_count = 2;
@@ -3010,11 +3040,8 @@ static void init_vulkan_library( void )
     device_enumeration_done:
         // Continue with device selection...
 
-	// Check for NVIDIA GPUs and disable validation if needed
-	ri.Printf(PRINT_ALL, "DEBUG: Checking for NVIDIA GPUs - validation=%d, device_count=%u\n",
-		r_vulkan_validation ? r_vulkan_validation->integer : -1, device_count);
-
-	if (r_vulkan_validation && r_vulkan_validation->integer && physical_devices[0] != (VkPhysicalDevice)0x10000000) {
+	// Check for NVIDIA GPUs and apply compatibility fixes
+	if (physical_devices[0] != (VkPhysicalDevice)0x10000000) {
 		// Check if any enumerated device is NVIDIA
 		qboolean has_nvidia = qfalse;
 		for (uint32_t i = 0; i < device_count; i++) {
@@ -3029,14 +3056,13 @@ static void init_vulkan_library( void )
 		}
 
 		if (has_nvidia) {
-			ri.Printf(PRINT_ALL, "Vulkan: NVIDIA GPU(s) detected - disabling Vulkan validation (driver compatibility)\n");
-			// Force disable validation by setting the cvar to 0
-			r_vulkan_validation->integer = 0;
-		} else {
-			ri.Printf(PRINT_ALL, "DEBUG: No NVIDIA GPUs detected, keeping validation enabled\n");
+			ri.Printf(PRINT_ALL, "Vulkan: NVIDIA GPU(s) detected - applying driver compatibility fixes\n");
+			if (r_vulkan_validation && r_vulkan_validation->integer) {
+				ri.Printf(PRINT_ALL, "Vulkan: NVIDIA GPU detected - disabling Vulkan validation (driver compatibility)\n");
+				// Force disable validation by setting the cvar to 0
+				r_vulkan_validation->integer = 0;
+			}
 		}
-	} else {
-		ri.Printf(PRINT_ALL, "DEBUG: Skipping NVIDIA check - validation disabled or using stub device\n");
 	}
 
 	// For fake devices, skip device property queries
@@ -5205,15 +5231,15 @@ void vk_create_attachments( void )
 
 
 	// Create depth attachment
-	// Skip depth attachment on NVIDIA GPUs due to driver compatibility issues
+	// For NVIDIA GPUs, create a minimal depth buffer to avoid framebuffer issues
 	if (!skipUpscaling) {
 		create_depth_attachment(glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT,
 			&vk.depth_image, &vk.depth_image_view, qfalse);
 	} else {
-		ri.Printf(PRINT_ALL, "Vulkan: Skipping depth attachment on NVIDIA GPU (driver compatibility)\n");
-		// Set defaults to avoid crashes
-		vk.depth_image = VK_NULL_HANDLE;
-		vk.depth_image_view = VK_NULL_HANDLE;
+		ri.Printf(PRINT_ALL, "Vulkan: Creating minimal depth attachment for NVIDIA GPU compatibility\n");
+		// Create a small dummy depth buffer to satisfy framebuffer requirements
+		create_depth_attachment(64, 64, VK_SAMPLE_COUNT_1_BIT,
+			&vk.depth_image, &vk.depth_image_view, qfalse);
 	}
 
 	// Create upscaling target images (for FSR/DLSS output)
@@ -9091,6 +9117,19 @@ void vk_vrs_apply_shading_rate( VkCommandBuffer cmdBuffer ) {
 }
 
 void vk_shutdown( refShutdownCode_t code ) {
+  // region instrumentation guard: avoid cleanup if no active context
+  if (!vk.active || vk.device == VK_NULL_HANDLE || vk.swapchain == VK_NULL_HANDLE) {
+    ri.Printf(PRINT_ALL, "vk_shutdown: skipping cleanup (state invalid) - active=%d, device=%p, swapchain=%p\n", (int)vk.active, (void*)vk.device, (void*)vk.swapchain);
+    // Invalidate remaining state to prevent accidental teardown in later calls
+    vk.active = qfalse;
+    vk.device = VK_NULL_HANDLE;
+    vk.swapchain = VK_NULL_HANDLE;
+    if (vulkan_lib) {
+      Sys_UnloadLibrary(vulkan_lib);
+      vulkan_lib = NULL;
+    }
+    return;
+  }
 	ri.Printf( PRINT_ALL, "vk_shutdown( %i )\n", code );
 
 	// Shutdown in reverse order of initialization with error handling
