@@ -1784,8 +1784,17 @@ static void create_instance( void )
 	if ( res != VK_SUCCESS ) {
 		ri.Error( ERR_FATAL, "Vulkan: instance creation failed with %s", vk_result_string( res ) );
 	}
-	// Select preferred GPU after instance creation
-	vk_select_preferred_gpu();
+    // Select preferred GPU after instance creation
+    vk_select_preferred_gpu();
+    // Log the selected device details if available
+    if (g_vk_selected_phys != VK_NULL_HANDLE) {
+        VkPhysicalDeviceProperties _props;
+        qvkGetPhysicalDeviceProperties(g_vk_selected_phys, &_props);
+        ri.Printf(PRINT_ALL, "VK: using device index=%d, name=%s, vendor=0x%04x\n",
+            g_vk_selected_device_index, _props.deviceName, _props.vendorID);
+    } else {
+        ri.Printf(PRINT_ALL, "VK: no preferred device selected (no NVIDIA found)\n");
+    }
 
 	// Setup debug messenger will be done in init_vulkan_library after all function pointers are loaded
 
