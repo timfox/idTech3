@@ -82,6 +82,12 @@ static inline void agent_trace_log(const char* json) {
   fprintf(f, "%s\n", json);
   fclose(f);
 }
+static inline void vt_trace(const char* json) {
+  FILE* f = fopen("/home/tim/Desktop/idtech3/.cursor/trace.log", "a");
+  if (!f) return;
+  fprintf(f, "%s\n", json);
+  fclose(f);
+}
 // end region
 // (Note: headless-present guard variable now provided by existing static at vk_frame.cpp: present guard)
 extern "C" void vk_begin_frame(void) {
@@ -236,6 +242,12 @@ extern "C" void vk_begin_frame(void) {
                 char _log[32];
                 snprintf(_log, sizeof(_log), "{\"headless_state\":1}");
                 agent_log("H1","vk_frame.cpp:vk_begin_frame","headless_state", _log);
+            }
+            // Additional instrumentation: indicate headless entered boundary
+            {
+                char _flog[40];
+                snprintf(_flog, sizeof(_flog), "{\"headless_entered\":1}");
+                agent_log("H1","vk_frame.cpp:vk_begin_frame","headless_entered", _flog);
             }
             return;
         } else {
@@ -559,7 +571,13 @@ extern "C" void vk_end_frame(void) {
         vk.cmd->waitForFence = qfalse;
     }
 
-    // Present the frame
+        // Present the frame
+        {
+            // present_start instrumentation (before actual present)
+            char _log[64];
+            snprintf(_log, sizeof(_log), "{\"present_start_image_index\":%u}", vk.cmd->swapchain_image_index);
+            agent_log("H1","vk_frame.cpp:vk_present_frame","present_start", _log);
+        }
     VkPresentInfoKHR present_info = {
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
         .pNext = nullptr,

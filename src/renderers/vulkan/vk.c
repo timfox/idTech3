@@ -1786,6 +1786,15 @@ static void create_instance( void )
 	}
     // Select preferred GPU after instance creation
     vk_select_preferred_gpu();
+    // Log final device if selection happened
+    if (g_vk_selected_phys != VK_NULL_HANDLE) {
+        VkPhysicalDeviceProperties _props;
+        qvkGetPhysicalDeviceProperties(g_vk_selected_phys, &_props);
+        ri.Printf(PRINT_ALL, "VK: final selected device index=%d, name=%s, vendor=0x%04x\n",
+                  g_vk_selected_device_index, _props.deviceName, _props.vendorID);
+    } else {
+        ri.Printf(PRINT_ALL, "VK: no NVIDIA device selected as preferred\n");
+    }
     // Log the selected device details if available
     if (g_vk_selected_phys != VK_NULL_HANDLE) {
         VkPhysicalDeviceProperties _props;
@@ -9177,6 +9186,7 @@ void vk_vrs_apply_shading_rate( VkCommandBuffer cmdBuffer ) {
 }
 
 void vk_shutdown( refShutdownCode_t code ) {
+  ri.Printf(PRINT_ALL, "vk_shutdown entering: code=%d, active=%d, device=%p\n", (int)code, (int)vk.active, (void*)vk.device);
   ri.Printf(PRINT_ALL, "vk_shutdown entering: code=%d, active=%d, device=%p\n", (int)code, (int)vk.active, (void*)vk.device);
   ri.Printf(PRINT_ALL, "vk_shutdown called: code=%d, active=%d, device=%p, swapchain=%p\n", (int)code, (int)vk.active, (void*)vk.device, (void*)vk.swapchain);
   // region instrumentation guard: avoid cleanup if no active context
