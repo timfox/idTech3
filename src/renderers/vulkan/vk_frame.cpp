@@ -162,6 +162,12 @@ extern "C" void vk_begin_frame(void) {
     agent_log("H1","vk_frame.cpp:vk_begin_frame","acquire_retry_start", _log);
   }
         ri.Printf(PRINT_ALL, "DEBUG: Acquisition attempt %d/%d\n", retry_count + 1, max_retries + 1);
+        // instrumentation: log an acquire attempt before calling acquire
+        {
+            char _attempt[64];
+            snprintf(_attempt, sizeof(_attempt), "{\"attempt\":%d}", retry_count);
+            agent_log("H1","vk_frame.cpp:vk_begin_frame","acquire_attempt", _attempt);
+        }
         result = qvkAcquireNextImageKHR(vk.device, vk.swapchain, timeout_ns,
             vk.tess[vk.cmd_index].image_acquired, VK_NULL_HANDLE, &image_index);
         {
