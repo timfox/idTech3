@@ -487,10 +487,10 @@ extern "C" void vk_end_frame(void) {
     // region agent log: present frame entry
     agent_log("H1","vk_frame.cpp:vk_present_frame","present_frame","{}");
     // If headless, skip presenting
-    if (g_vk_headless_present_state) {
-        ri.Printf(PRINT_ALL, "DEBUG: Skipping present frame due to headless state\n");
+  if (g_vk_headless_present_state) {
+        ri.Printf(PRINT_ALL, "DEBUG: headless present state active, skipping vk_present_frame\n");
         return;
-    }
+  }
     ri.Printf(PRINT_ALL, "DEBUG: vk_present_frame called\n");
 
     if (!vk_validate_handle(vk.swapchain, "swapchain")) {
