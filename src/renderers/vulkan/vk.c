@@ -4689,10 +4689,6 @@ static void vk_alloc_attachments( void )
 	VkMemoryDedicatedAllocateInfoKHR alloc_info2;
 	VkMemoryAllocateInfo alloc_info;
 	VkCommandBuffer command_buffer;
-	VkDeviceMemory memory;
-	VkDeviceSize offset;
-	uint32_t memoryTypeBits;
-	uint32_t memoryTypeIndex;
 	uint32_t i;
 	int layer;
 
@@ -4700,82 +4696,63 @@ static void vk_alloc_attachments( void )
 		return;
 	}
 
-	ri.Printf(PRINT_ALL, "DEBUG: vk_alloc_attachments memory_count=%d\n", vk.image_memory_count);
-	if ( vk.image_memory_count >= ARRAY_LEN( vk.image_memory ) ) {
-		ri.Error( ERR_DROP, "vk.image_memory_count == %i", (int)ARRAY_LEN( vk.image_memory ) );
-	}
-
-	memoryTypeBits = ~0U;
-	offset = 0;
-
+	// Allocate separate memory for each attachment to avoid offset calculation issues
 	for ( i = 0; i < num_attachments; i++ ) {
+		VkDeviceMemory memory;
+		uint32_t memoryTypeIndex;
+		int layer;
+
 		ri.Printf(PRINT_ALL, "DEBUG: vk_alloc_attachments processing attachment %d\n", i);
-#ifdef MIN_IMAGE_ALIGN
-		VkDeviceSize alignment = MAX( attachments[ i ].reqs.alignment, MIN_IMAGE_ALIGN );
-#else
-		VkDeviceSize alignment = attachments[ i ].reqs.alignment;
-#endif
-		memoryTypeBits &= attachments[ i ].reqs.memoryTypeBits;
-		offset = PAD( offset, alignment );
-		attachments[ i ].memory_offset = offset;
-		offset += attachments[ i ].reqs.size;
-	}
 
-	ri.Printf(PRINT_ALL, "DEBUG: vk_alloc_attachments finding memory type bits=0x%x\n", memoryTypeBits);
-	if ( num_attachments == 1 && attachments[ 0 ].usage & VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT ) {
-		// try lazy memory
-		memoryTypeIndex = find_memory_type2( memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT, NULL );
-		if ( memoryTypeIndex == ~0U ) {
-			memoryTypeIndex = find_memory_type( memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+		// Find appropriate memory type for this specific attachment
+		if ( attachments[ i ].usage & VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT ) {
+			// try lazy memory for transient attachments
+			memoryTypeIndex = find_memory_type2( attachments[ i ].reqs.memoryTypeBits,
+				VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT, NULL );
+			if ( memoryTypeIndex == ~0U ) {
+				memoryTypeIndex = find_memory_type( attachments[ i ].reqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
+			}
+		} else {
+			memoryTypeIndex = find_memory_type( attachments[ i ].reqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 		}
-	} else {
-		memoryTypeIndex = find_memory_type( memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
-	}
 
-	ri.Printf(PRINT_ALL, "DEBUG: vk_alloc_attachments memoryTypeIndex=%d offset=%ld\n", memoryTypeIndex, (long)offset);
+		ri.Printf(PRINT_ALL, "DEBUG: attachment %d: size=%lu, memoryTypeIndex=%d\n",
+			i, (unsigned long)attachments[i].reqs.size, memoryTypeIndex);
 
-	alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-	alloc_info.pNext = NULL;
-	alloc_info.allocationSize = offset;
-	alloc_info.memoryTypeIndex = memoryTypeIndex;
+		// Allocate dedicated memory for this attachment
+		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+		alloc_info.pNext = NULL;
+		alloc_info.allocationSize = attachments[i].reqs.size;
+		alloc_info.memoryTypeIndex = memoryTypeIndex;
 
-	if ( num_attachments == 1 ) {
+		// Use dedicated allocation for better performance
 		if ( vk.dedicatedAllocation ) {
 			Com_Memset( &alloc_info2, 0, sizeof( alloc_info2 ) );
-			alloc_info2.sType =  VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO_KHR;
-			alloc_info2.image = attachments[ 0 ].descriptor;
+			alloc_info2.sType = VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO_KHR;
+			alloc_info2.image = attachments[ i ].descriptor;
 			alloc_info.pNext = &alloc_info2;
 		}
-	}
 
-	// allocate and bind memory
-	ri.Printf(PRINT_ALL, "DEBUG: vk_alloc_attachments calling qvkAllocateMemory, target addr=%p\n", (void*)&vk.image_memory[vk.image_memory_count]);
-	VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &memory ) );
-	ri.Printf(PRINT_ALL, "DEBUG: vk_alloc_attachments qvkAllocateMemory returned memory=%p, count=%d\n", (void*)memory, vk.image_memory_count);
-	
-	if (vk.image_memory_count < MAX_ATTACHMENTS_IN_POOL) {
-		vk.image_memory[ vk.image_memory_count ] = memory;
-		vk.image_memory_count++;
-		ri.Printf(PRINT_ALL, "DEBUG: vk_alloc_attachments assigned memory, new count=%d\n", vk.image_memory_count);
-	} else {
-		ri.Printf(PRINT_ERROR, "DEBUG: vk_alloc_attachments image_memory overflow!\n");
-	}
+		// Allocate memory
+		VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &memory ) );
+		ri.Printf(PRINT_ALL, "DEBUG: allocated memory for attachment %d: %p\n", i, (void*)memory);
 
-	for ( i = 0; i < num_attachments; i++ ) {
+		// Bind image memory (offset = 0 since we allocated dedicated memory)
+		ri.Printf(PRINT_ALL, "DEBUG: binding image %d, descriptor=%p, memory=%p\n",
+			i, (void*)attachments[i].descriptor, (void*)memory);
+		VK_CHECK( qvkBindImageMemory( vk.device, attachments[i].descriptor, memory, 0 ) );
+		ri.Printf(PRINT_ALL, "DEBUG: bound image %d successfully\n", i);
+
+		// Create image views
 		VkImageViewType viewType = attachments[i].viewType; // preserve original type
-		
-		ri.Printf(PRINT_ALL, "DEBUG: vk_alloc_attachments binding image %d, descriptor=%p, offset=%ld\n", i, (void*)attachments[i].descriptor, (long)attachments[i].memory_offset);
-		VK_CHECK( qvkBindImageMemory( vk.device, attachments[i].descriptor, memory, attachments[i].memory_offset ) );
-		ri.Printf(PRINT_ALL, "DEBUG: vk_alloc_attachments bound image %d\n", i);
-        
 		layer = 0;
-        while ( qtrue ) {
-            // create color image view
-            view_desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-            view_desc.pNext = NULL;
-            view_desc.flags = 0;
-            view_desc.image = attachments[i].descriptor;
-            view_desc.viewType = viewType;
+		while ( qtrue ) {
+			// create color image view
+			view_desc.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+			view_desc.pNext = NULL;
+			view_desc.flags = 0;
+			view_desc.image = attachments[i].descriptor;
+			view_desc.viewType = viewType;
             view_desc.format = attachments[i].image_format;
             view_desc.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
             view_desc.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
