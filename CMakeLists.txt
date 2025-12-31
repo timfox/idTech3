@@ -4047,6 +4047,21 @@ TARGET_LINK_LIBRARIES(test_performance PRIVATE m)
 		RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 	)
 
+# Enhanced benchmark performance test with detailed metrics
+ADD_EXECUTABLE(benchmark_performance
+    src/tests/benchmark_performance.c
+    src/common/q_shared.c
+    src/common/q_math.c
+)
+TARGET_LINK_LIBRARIES(benchmark_performance PRIVATE m)
+TARGET_INCLUDE_DIRECTORIES(benchmark_performance PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/tests
+)
+SET_TARGET_PROPERTIES(benchmark_performance PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+)
+
 	MESSAGE(STATUS "Tests enabled: test_qcommon, test_qmath, test_info, test_msg_secure, test_renderer_init, test_integration, test_performance")
 ENDIF()
 

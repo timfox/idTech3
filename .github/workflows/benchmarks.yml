@@ -62,34 +62,44 @@ jobs:
           mkdir -p benchmarks/results
           TIMESTAMP=$(date +%Y%m%d_%H%M%S)
           RESULTS_FILE="benchmarks/results/results_${TIMESTAMP}.json"
-          
+
           # Measure build time
           BUILD_START=$(date +%s)
           # Already built, so just record
           BUILD_END=$(date +%s)
           BUILD_TIME=$((BUILD_END - BUILD_START))
-          
+
           # Measure binary sizes
           if [ -f "build/idtech3.x86_64" ]; then
             BINARY_SIZE=$(stat -f%z build/idtech3.x86_64 2>/dev/null || stat -c%s build/idtech3.x86_64)
           else
             BINARY_SIZE=0
           fi
-          
+
           # Measure startup time (if binary exists and can run)
           if [ -f "build/idtech3.x86_64" ] && [ -x "build/idtech3.x86_64" ]; then
             STARTUP_TIME=$(timeout 5s time -p ./build/idtech3.x86_64 +quit 2>&1 | grep real | awk '{print $2}' || echo "0")
           else
             STARTUP_TIME="0"
           fi
-          
+
           # Measure memory usage (if binary exists)
           if [ -f "build/idtech3.x86_64" ] && [ -x "build/idtech3.x86_64" ]; then
             MEMORY_KB=$(timeout 5s /usr/bin/time -v ./build/idtech3.x86_64 +quit 2>&1 | grep "Maximum resident set size" | awk '{print $6}' || echo "0")
           else
             MEMORY_KB="0"
           fi
-          
+
+          # Run enhanced performance benchmarks
+          echo "Running enhanced performance benchmarks..."
+          if [ -f "build/benchmark_performance" ]; then
+            ./build/benchmark_performance > benchmarks/enhanced_benchmarks.log 2>&1
+            BENCHMARK_STATUS=$?
+          else
+            echo "Warning: benchmark_performance not found, skipping enhanced benchmarks"
+            BENCHMARK_STATUS=1
+          fi
+
           # Create JSON results
           cat > "$RESULTS_FILE" << EOF
           {
@@ -100,7 +110,8 @@ jobs:
               "build_time": ${BUILD_TIME},
               "binary_size": ${BINARY_SIZE},
               "startup_time": "${STARTUP_TIME}",
-              "memory_kb": "${MEMORY_KB}"
+              "memory_kb": "${MEMORY_KB}",
+              "benchmark_status": ${BENCHMARK_STATUS}
             },
             "binaries": {
               "engine": "$(ls -lh build/idtech3.x86_64 2>/dev/null | awk '{print $5}' || echo 'N/A')",
@@ -108,7 +119,7 @@ jobs:
             }
           }
           EOF
-          
+
           cat "$RESULTS_FILE"
           echo "results_file=$RESULTS_FILE" >> $GITHUB_OUTPUT
       
@@ -216,7 +227,39 @@ jobs:
           fi
 
           echo "regression_found=$REGRESSION_FOUND" >> $GITHUB_OUTPUT
-      
+
+      - name: Analyze enhanced benchmark results
+        id: benchmark_analysis
+        run: |
+          if [ -f "benchmark_timeseries.jsonl" ]; then
+            echo "Analyzing enhanced benchmark results..."
+
+            # Generate analysis reports
+            python3 tools/bench_analyzer.py benchmark_timeseries.jsonl --output-dir benchmark_reports
+
+            # Convert to CSV for external analysis
+            python3 tools/bench_timeseries_to_csv.py benchmark_timeseries.jsonl --output-dir benchmark_csv
+
+            # Check for performance regressions in detailed metrics
+            if [ -f "benchmark_reports/performance_report.txt" ]; then
+              # Look for any "degrading" trends in the report
+              if grep -q "degrading" benchmark_reports/performance_report.txt; then
+                echo "Performance degradation detected in detailed metrics"
+                echo "detailed_regression=true" >> $GITHUB_OUTPUT
+              else
+                echo "No detailed performance regressions detected"
+                echo "detailed_regression=false" >> $GITHUB_OUTPUT
+              fi
+            fi
+
+            # Store analysis artifacts
+            echo "analysis_complete=true" >> $GITHUB_OUTPUT
+          else
+            echo "No enhanced benchmark data found"
+            echo "analysis_complete=false" >> $GITHUB_OUTPUT
+            echo "detailed_regression=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
@@ -224,6 +267,11 @@ jobs:
           path: |
             benchmarks/results/*.json
             benchmarks/baseline.json
+            benchmark_reports/
+            benchmark_csv/
+            benchmark_*.json
+            benchmark_timeseries.jsonl
+            benchmark_summary.csv
           retention-days: 90
       
       - name: Comment on PR
@@ -233,18 +281,47 @@ jobs:
           script: |
             const fs = require('fs');
             const resultsFile = '${{ steps.benchmarks.outputs.results_file }}';
-            let comment = '## Benchmark Results\n\n';
-            
+            let comment = '## 🚀 Enhanced Benchmark Results\n\n';
+
             if (fs.existsSync(resultsFile)) {
               const results = JSON.parse(fs.readFileSync(resultsFile, 'utf8'));
+              comment += '### System Metrics\n';
               comment += `- **Build Time**: ${results.metrics.build_time}s\n`;
               comment += `- **Binary Size**: ${results.metrics.binary_size} bytes\n`;
               comment += `- **Startup Time**: ${results.metrics.startup_time}s\n`;
-              comment += `- **Memory Usage**: ${results.metrics.memory_kb} KB\n`;
+              comment += `- **Memory Usage**: ${results.metrics.memory_kb} KB\n\n`;
+
+              // Check for enhanced benchmark results
+              const analysisComplete = '${{ steps.benchmark_analysis.outputs.analysis_complete }}' === 'true';
+              const detailedRegression = '${{ steps.benchmark_analysis.outputs.detailed_regression }}' === 'true';
+
+              if (analysisComplete) {
+                comment += '### Performance Analysis ✅\n';
+                comment += 'Enhanced benchmarks completed with detailed per-iteration metrics.\n\n';
+
+                if (fs.existsSync('benchmark_reports/performance_report.txt')) {
+                  comment += '**Performance Report**: Available in artifacts\n';
+                }
+
+                if (detailedRegression) {
+                  comment += '⚠️ **Performance regression detected** in detailed metrics\n';
+                } else {
+                  comment += '✅ No performance regressions detected\n';
+                }
+
+                comment += '\n**Analysis Artifacts**:\n';
+                comment += '- 📊 Performance reports (`benchmark_reports/`)\n';
+                comment += '- 📈 Time-series data (`benchmark_timeseries.jsonl`)\n';
+                comment += '- 📋 CSV exports (`benchmark_csv/`)\n';
+                comment += '- 📝 Detailed logs (`benchmarks/enhanced_benchmarks.log`)\n';
+              } else {
+                comment += '### Performance Analysis ⚠️\n';
+                comment += 'Enhanced benchmark analysis not available.\n';
+              }
             } else {
               comment += 'Benchmark results not available.';
             }
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,

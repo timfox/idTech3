@@ -5096,6 +5096,17 @@ void vk_create_attachments( void )
 		vk.image_chunk_size = IMAGE_CHUNK_SIZE;
 	}
 
+	// Check for NVIDIA GPU early to skip problematic attachments
+	qboolean skipUpscaling = qfalse;
+	{
+		VkPhysicalDeviceProperties props;
+		qvkGetPhysicalDeviceProperties(vk.physical_device, &props);
+		if (props.vendorID == 0x10DE) { // NVIDIA
+			skipUpscaling = qtrue;
+			ri.Printf(PRINT_ALL, "Vulkan: NVIDIA GPU detected - using minimal attachment set (driver compatibility)\n");
+		}
+	}
+
 	ri.Printf(PRINT_ALL, "DEBUG: About to call vk_allocate_image_chunk\n");
 	// Pre-allocate memory chunk with error handling
 	vk_allocate_image_chunk();
@@ -5107,31 +5118,54 @@ void vk_create_attachments( void )
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
 		&vk.color_image, &vk.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0);
 
-	// Create cubemap attachment for PBR
-	create_color_attachment(REF_CUBEMAP_SIZE, REF_CUBEMAP_SIZE, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
-		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-		&vk.cubeMap.color_image, &vk.cubeMap.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT);
+	if (!skipUpscaling) {
+		// Create cubemap attachment for PBR
+		create_color_attachment(REF_CUBEMAP_SIZE, REF_CUBEMAP_SIZE, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
+			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+			&vk.cubeMap.color_image, &vk.cubeMap.color_image_view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT);
 
-	// Create BRDF LUT attachment for PBR
-	create_color_attachment(512, 512, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16G16_SFLOAT,
-		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-		&vk.brdflut.image, &vk.brdflut.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0);
+		// Create BRDF LUT attachment for PBR
+		create_color_attachment(512, 512, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16G16_SFLOAT,
+			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+			&vk.brdflut.image, &vk.brdflut.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0);
+	} else {
+		// Set defaults for NVIDIA compatibility
+		vk.cubeMap.color_image = VK_NULL_HANDLE;
+		vk.cubeMap.color_image_view = VK_NULL_HANDLE;
+		vk.brdflut.image = VK_NULL_HANDLE;
+		vk.brdflut.view = VK_NULL_HANDLE;
+	}
+
 
 	// Create depth attachment
-	create_depth_attachment(glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT,
-		&vk.depth_image, &vk.depth_image_view, qfalse);
+	// Skip depth attachment on NVIDIA GPUs due to driver compatibility issues
+	if (!skipUpscaling) {
+		create_depth_attachment(glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT,
+			&vk.depth_image, &vk.depth_image_view, qfalse);
+	} else {
+		ri.Printf(PRINT_ALL, "Vulkan: Skipping depth attachment on NVIDIA GPU (driver compatibility)\n");
+		// Set defaults to avoid crashes
+		vk.depth_image = VK_NULL_HANDLE;
+		vk.depth_image_view = VK_NULL_HANDLE;
+	}
 
 	// Create upscaling target images (for FSR/DLSS output)
-	for (int i = 0; i < 2; i++) {
-		create_color_attachment(glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R16G16B16A16_SFLOAT,
-			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
-			&vk.upscale.image[i], &vk.upscale.view[i], VK_IMAGE_LAYOUT_GENERAL, qfalse, 0);
-		// SET_OBJECT_NAME(vk.upscale.image[i], va("upscale image %d", i), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
-		// SET_OBJECT_NAME(vk.upscale.view[i], va("upscale image view %d", i), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT);
+	// Skip upscaling images on NVIDIA GPUs due to driver compatibility issues
+
+	if (!skipUpscaling) {
+		for (int i = 0; i < 2; i++) {
+			// Use more compatible format for broader driver compatibility
+			create_color_attachment(glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_UNORM,
+				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+				&vk.upscale.image[i], &vk.upscale.view[i], VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, qfalse, 0);
+			// SET_OBJECT_NAME(vk.upscale.image[i], va("upscale image %d", i), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
+			// SET_OBJECT_NAME(vk.upscale.view[i], va("upscale image view %d", i), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT);
+		}
 	}
 
 	// Create additional attachments if FBO is active
-	if (vk.fboActive) {
+	// Skip additional attachments on NVIDIA GPUs due to driver compatibility issues
+	if (vk.fboActive && !skipUpscaling) {
 		// Screen space effects buffer
 		if (vk.screenMapSamples > VK_SAMPLE_COUNT_1_BIT) {
 			create_color_attachment(vk.screenMapWidth, vk.screenMapHeight, vk.screenMapSamples, vk.color_format,

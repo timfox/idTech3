@@ -9,6 +9,9 @@ Performance benchmarking harness for automated regression testing
 #include <time.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/resource.h>
+#include <unistd.h>
+#include <float.h>
 
 // Mock implementations
 void Com_Error(errorParm_t level, const char *error, ...) {
@@ -33,6 +36,38 @@ typedef struct {
 	const char *name;
 } benchmark_timer_t;
 
+// Per-iteration metrics structure
+typedef struct {
+	int iteration;
+	double time_ms;
+	size_t memory_kb;
+} benchmark_iteration_t;
+
+// Memory measurement utilities
+static size_t get_current_memory_usage(void) {
+	struct rusage usage;
+	if (getrusage(RUSAGE_SELF, &usage) == 0) {
+		return usage.ru_maxrss; // KB on Linux
+	}
+	return 0;
+}
+
+// Benchmark results structure for detailed output
+typedef struct {
+	const char *test_name;
+	int total_iterations;
+	int warmup_iterations;
+	double total_time_ms;
+	double avg_time_per_iter_ms;
+	double min_time_per_iter_ms;
+	double max_time_per_iter_ms;
+	size_t peak_memory_kb;
+	size_t avg_memory_per_iter_kb;
+	benchmark_iteration_t *iterations; // Array of per-iteration data
+	int iterations_collected;
+	int max_iterations; // Maximum iterations to store
+} benchmark_results_t;
+
 static benchmark_timer_t benchmark_start(const char *name) {
 	benchmark_timer_t timer;
 	timer.start_time = clock();
@@ -45,12 +80,124 @@ static double benchmark_end(benchmark_timer_t timer) {
 	return ((double)(end_time - timer.start_time) / CLOCKS_PER_SEC) * 1000.0; // ms
 }
 
+// Initialize benchmark results structure
+static void benchmark_results_init(benchmark_results_t *results, const char *test_name, int max_iterations) {
+	memset(results, 0, sizeof(*results));
+	results->test_name = test_name;
+	results->max_iterations = max_iterations;
+	if (max_iterations > 0) {
+		results->iterations = (benchmark_iteration_t*)malloc(sizeof(benchmark_iteration_t) * max_iterations);
+	}
+	results->min_time_per_iter_ms = DBL_MAX;
+	results->max_time_per_iter_ms = 0.0;
+}
+
+// Add per-iteration data
+static void benchmark_results_add_iteration(benchmark_results_t *results, int iteration, double time_ms, size_t memory_kb) {
+	if (results->iterations_collected < results->max_iterations && results->iterations) {
+		results->iterations[results->iterations_collected].iteration = iteration;
+		results->iterations[results->iterations_collected].time_ms = time_ms;
+		results->iterations[results->iterations_collected].memory_kb = memory_kb;
+		results->iterations_collected++;
+	}
+
+	results->total_time_ms += time_ms;
+	results->total_iterations++;
+
+	if (time_ms < results->min_time_per_iter_ms) results->min_time_per_iter_ms = time_ms;
+	if (time_ms > results->max_time_per_iter_ms) results->max_time_per_iter_ms = time_ms;
+	if (memory_kb > results->peak_memory_kb) results->peak_memory_kb = memory_kb;
+
+	results->avg_time_per_iter_ms = results->total_time_ms / results->total_iterations;
+	results->avg_memory_per_iter_kb = (results->avg_memory_per_iter_kb * (results->total_iterations - 1) + memory_kb) / results->total_iterations;
+}
+
+// Finalize benchmark results
+static void benchmark_results_finalize(benchmark_results_t *results) {
+	if (results->total_iterations > 0) {
+		results->avg_time_per_iter_ms = results->total_time_ms / results->total_iterations;
+	}
+}
+
+// Output benchmark results in detailed JSON format
+static void benchmark_results_output_json(const benchmark_results_t *results, FILE *output) {
+	fprintf(output, "{\n");
+	fprintf(output, "  \"test_name\": \"%s\",\n", results->test_name);
+	fprintf(output, "  \"total_iterations\": %d,\n", results->total_iterations);
+	fprintf(output, "  \"warmup_iterations\": %d,\n", results->warmup_iterations);
+	fprintf(output, "  \"total_time_ms\": %.6f,\n", results->total_time_ms);
+	fprintf(output, "  \"avg_time_per_iter_ms\": %.6f,\n", results->avg_time_per_iter_ms);
+	fprintf(output, "  \"min_time_per_iter_ms\": %.6f,\n", results->min_time_per_iter_ms);
+	fprintf(output, "  \"max_time_per_iter_ms\": %.6f,\n", results->max_time_per_iter_ms);
+	fprintf(output, "  \"peak_memory_kb\": %zu,\n", results->peak_memory_kb);
+        fprintf(output, "  \"avg_memory_per_iter_kb\": %zu,\n", (size_t)results->avg_memory_per_iter_kb);
+
+	// Output per-iteration data if available
+	if (results->iterations && results->iterations_collected > 0) {
+		fprintf(output, "  \"per_iteration_data\": [\n");
+		for (int i = 0; i < results->iterations_collected; i++) {
+			const benchmark_iteration_t *iter = &results->iterations[i];
+			fprintf(output, "    {\"iteration\": %d, \"time_ms\": %.6f, \"memory_kb\": %zu}%s\n",
+				iter->iteration, iter->time_ms, iter->memory_kb,
+				i < results->iterations_collected - 1 ? "," : "");
+		}
+		fprintf(output, "  ],\n");
+	}
+
+	// Output time series data for dashboards
+	time_t now = time(NULL);
+	char timestamp[64];
+	strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", gmtime(&now));
+
+	fprintf(output, "  \"timestamp\": \"%s\",\n", timestamp);
+	fprintf(output, "  \"hostname\": \"localhost\",\n");
+	fprintf(output, "  \"platform\": \"linux-x86_64\"\n");
+	fprintf(output, "}\n");
+}
+
+// Output benchmark results in time-series format (JSONL)
+static void benchmark_results_output_timeseries(const benchmark_results_t *results, FILE *output) {
+	time_t now = time(NULL);
+	char timestamp[64];
+	strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", gmtime(&now));
+
+	// Output time-series entry for total metrics
+	fprintf(output, "{\"timestamp\":\"%s\",\"test\":\"%s\",\"metric\":\"total_time\",\"value\":%.6f}\n",
+		timestamp, results->test_name, results->total_time_ms);
+	fprintf(output, "{\"timestamp\":\"%s\",\"test\":\"%s\",\"metric\":\"avg_time_per_iter\",\"value\":%.6f}\n",
+		timestamp, results->test_name, results->avg_time_per_iter_ms);
+	fprintf(output, "{\"timestamp\":\"%s\",\"test\":\"%s\",\"metric\":\"peak_memory\",\"value\":%zu}\n",
+		timestamp, results->test_name, results->peak_memory_kb);
+
+	// Output per-iteration time series data
+	if (results->iterations && results->iterations_collected > 0) {
+		for (int i = 0; i < results->iterations_collected; i++) {
+			const benchmark_iteration_t *iter = &results->iterations[i];
+			fprintf(output, "{\"timestamp\":\"%s\",\"test\":\"%s\",\"metric\":\"iteration_time\",\"iteration\":%d,\"value\":%.6f}\n",
+				timestamp, results->test_name, iter->iteration, iter->time_ms);
+			fprintf(output, "{\"timestamp\":\"%s\",\"test\":\"%s\",\"metric\":\"iteration_memory\",\"iteration\":%d,\"value\":%zu}\n",
+				timestamp, results->test_name, iter->iteration, iter->memory_kb);
+		}
+	}
+}
+
+// Cleanup benchmark results
+static void benchmark_results_cleanup(benchmark_results_t *results) {
+	if (results->iterations) {
+		free(results->iterations);
+		results->iterations = NULL;
+	}
+}
+
 // Benchmark configuration
 #define BENCHMARK_ITERATIONS 10000
 #define BENCHMARK_WARMUP_ITERATIONS 1000
 #define PERFORMANCE_THRESHOLD_MS 50.0 // Max acceptable time per benchmark
 
 TEST(benchmark_vector_operations) {
+	benchmark_results_t results;
+	benchmark_results_init(&results, "vector_operations", 100); // Collect first 100 iterations
+
 	// Warmup
 	for (int i = 0; i < BENCHMARK_WARMUP_ITERATIONS; i++) {
 		vec3_t a = {1.0f, 2.0f, 3.0f};
@@ -60,9 +207,16 @@ TEST(benchmark_vector_operations) {
 		(void)result; // Suppress unused variable warning
 	}
 
-	// Benchmark
-	benchmark_timer_t timer = benchmark_start("vector_operations");
+	results.warmup_iterations = BENCHMARK_WARMUP_ITERATIONS;
+
+	// Benchmark with per-iteration measurement
+	benchmark_timer_t overall_timer = benchmark_start("vector_operations_overall");
+	size_t initial_memory = get_current_memory_usage();
+
 	for (int i = 0; i < BENCHMARK_ITERATIONS; i++) {
+		benchmark_timer_t iter_timer = benchmark_start("iteration");
+		size_t iter_memory = get_current_memory_usage();
+
 		vec3_t a = {(float)i, (float)i + 1, (float)i + 2};
 		vec3_t b = {(float)i + 3, (float)i + 4, (float)i + 5};
 		vec3_t result;
@@ -70,12 +224,44 @@ TEST(benchmark_vector_operations) {
 		VectorNormalize(result); // Modifies result in place
 		float dot = DotProduct(a, b);
 		(void)dot; // Suppress unused warning
+
+		double iter_time = benchmark_end(iter_timer);
+		size_t current_memory = get_current_memory_usage();
+
+		// Record per-iteration data (only first N iterations to avoid memory bloat)
+		benchmark_results_add_iteration(&results, i, iter_time, current_memory - iter_memory);
 	}
-	double elapsed = benchmark_end(timer);
+
+	double total_elapsed = benchmark_end(overall_timer);
+	results.total_time_ms = total_elapsed;
+
+	benchmark_results_finalize(&results);
 
 	Com_Printf("Vector operations: %.3f ms total, %.6f ms per operation\n",
-			   elapsed, elapsed / BENCHMARK_ITERATIONS);
-	ASSERT_TRUE(elapsed < PERFORMANCE_THRESHOLD_MS);
+			   results.total_time_ms, results.avg_time_per_iter_ms);
+	Com_Printf("Memory usage: peak %zu KB, avg per iteration %zu KB\n",
+			   results.peak_memory_kb, (size_t)results.avg_memory_per_iter_kb);
+	Com_Printf("Time range: %.6f - %.6f ms per operation\n",
+			   results.min_time_per_iter_ms, results.max_time_per_iter_ms);
+
+	// Output detailed results to files
+	FILE *json_file = fopen("benchmark_vector_ops.json", "w");
+	if (json_file) {
+		benchmark_results_output_json(&results, json_file);
+		fclose(json_file);
+		Com_Printf("Detailed results saved to benchmark_vector_ops.json\n");
+	}
+
+	FILE *timeseries_file = fopen("benchmark_timeseries.jsonl", "a");
+	if (timeseries_file) {
+		benchmark_results_output_timeseries(&results, timeseries_file);
+		fclose(timeseries_file);
+		Com_Printf("Time-series data appended to benchmark_timeseries.jsonl\n");
+	}
+
+	ASSERT_TRUE(results.total_time_ms < PERFORMANCE_THRESHOLD_MS);
+
+	benchmark_results_cleanup(&results);
 }
 
 TEST(benchmark_matrix_operations) {
@@ -235,7 +421,13 @@ TEST(performance_regression_check) {
 }
 
 int main(void) {
-	Com_Printf("Running performance benchmarks...\n\n");
+	Com_Printf("Running enhanced performance benchmarks...\n\n");
+
+	// Clear any existing time-series file
+	FILE *ts_file = fopen("benchmark_timeseries.jsonl", "w");
+	if (ts_file) {
+		fclose(ts_file);
+	}
 
 	RUN_TEST(benchmark_vector_operations);
 	RUN_TEST(benchmark_matrix_operations);
@@ -247,8 +439,25 @@ int main(void) {
 
 	PRINT_TEST_SUMMARY();
 
-	Com_Printf("\nPerformance benchmarks completed.\n");
-	Com_Printf("Use these results to establish performance baselines.\n");
+	// Generate CSV summary
+	FILE *csv_file = fopen("benchmark_summary.csv", "w");
+	if (csv_file) {
+		time_t now = time(NULL);
+		char timestamp[64];
+		strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", gmtime(&now));
+
+		fprintf(csv_file, "timestamp,hostname,platform,total_tests,passed_tests,failed_tests\n");
+		fprintf(csv_file, "%s,localhost,linux-x86_64,%d,%d,%d\n",
+			timestamp, test_count, test_passed, test_failed);
+		fclose(csv_file);
+		Com_Printf("CSV summary saved to benchmark_summary.csv\n");
+	}
+
+	Com_Printf("\nEnhanced performance benchmarks completed.\n");
+	Com_Printf("Results saved to:\n");
+	Com_Printf("  - benchmark_*.json (detailed per-test results)\n");
+	Com_Printf("  - benchmark_timeseries.jsonl (time-series data)\n");
+	Com_Printf("  - benchmark_summary.csv (summary statistics)\n");
 
 	return (test_failed > 0) ? 1 : 0;
 }

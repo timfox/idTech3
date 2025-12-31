@@ -31,7 +31,7 @@ USER INTERFACE MAIN
 
 #include "ui_local.h"
 #ifndef Q3_VM
-extern intptr_t (QDECL *syscall)( intptr_t arg, ... );
+extern intptr_t (QDECL *ui_syscall)( intptr_t arg, ... );
 #endif
 
 #ifdef COMBINED_MONOLITH
@@ -56,7 +56,7 @@ static intptr_t QDECL vmMain( int command, intptr_t arg0, intptr_t arg1, [[maybe
 Q_EXPORT intptr_t vmMain( int command, int arg0, int arg1, [[maybe_unused]] int arg2, [[maybe_unused]] int arg3, [[maybe_unused]] int arg4, [[maybe_unused]] int arg5, [[maybe_unused]] int arg6, [[maybe_unused]] int arg7, [[maybe_unused]] int arg8, [[maybe_unused]] int arg9, [[maybe_unused]] int arg10, [[maybe_unused]] int arg11  ) {
 #endif
 	// Ensure syscall is initialized before any trap-dependent work
-	if ( syscall == (intptr_t (QDECL *)( intptr_t, ...))-1 ) {
+	if ( ui_syscall == (intptr_t (QDECL *)( intptr_t, ...))-1 ) {
 		return -1;
 	}
 
