@@ -150,8 +150,12 @@ extern "C" void vk_begin_frame(void) {
     ri.Printf(PRINT_ALL, "DEBUG: Starting swapchain image acquisition with timeout=%llu ns, max_retries=%d\n", timeout_ns, max_retries);
 
  do {
-   // region instrumentation: retry start
-   agent_log("H1","vk_frame.cpp:vk_begin_frame","acquire_retry_start","{\"retry\":%d}", retry_count);
+  // region instrumentation: retry start
+  {
+    char _log[128];
+    snprintf(_log, sizeof(_log), "{\"retry\":%d}", retry_count);
+    agent_log("H1","vk_frame.cpp:vk_begin_frame","acquire_retry_start", _log);
+  }
         ri.Printf(PRINT_ALL, "DEBUG: Acquisition attempt %d/%d\n", retry_count + 1, max_retries + 1);
         result = qvkAcquireNextImageKHR(vk.device, vk.swapchain, timeout_ns,
             vk.tess[vk.cmd_index].image_acquired, VK_NULL_HANDLE, &image_index);
@@ -181,15 +185,23 @@ extern "C" void vk_begin_frame(void) {
         } else if (result == VK_TIMEOUT) {
             // Timeout - window may be minimized or display unavailable
             ri.Printf(PRINT_WARNING, "Vulkan: Timeout acquiring swapchain image, window may be minimized or display unavailable\n");
-            // Instrument runtime evidence
-            agent_log("H1","vk_frame.cpp:vk_begin_frame","timeout_detected","{\"retry\":%d,\"image_index\":%u}", retry_count, image_index);
+            // Buffered log
+            {
+                char _buf[64];
+                snprintf(_buf, sizeof(_buf), "{\"retry\":%d,\"image_index\":%u}", retry_count, image_index);
+                agent_log("H1","vk_frame.cpp:vk_begin_frame","timeout_detected", _buf);
+            }
             if (retry_count < max_retries) {
                 retry_count++;
                 ri.Milliseconds();
                 continue;
             }
             headless_detected = qtrue;
-            agent_log("H1","vk_frame.cpp:vk_begin_frame","headless_detected","{\"result\":%d}", (int)result);
+            {
+                char _buf[32];
+                snprintf(_buf, sizeof(_buf), "{\"result\":%d}", (int)result);
+                agent_log("H1","vk_frame.cpp:vk_begin_frame","headless_detected", _buf);
+            }
             return;
         } else {
             // Other error
