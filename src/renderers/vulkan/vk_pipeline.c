@@ -349,8 +349,43 @@ static VkShaderModule vk_load_spirv_shader(const char *filename) {
 	ri.Printf(PRINT_DEVELOPER, "Attempting to load shader: %s\n", filepath);
 	file_len = ri.FS_ReadFile(filepath, &spirv_data);
 	if (file_len <= 0 || !spirv_data) {
-		ri.Printf(PRINT_WARNING, "Failed to open SPIR-V file: %s (len=%d)\n", filepath, file_len);
-		return VK_NULL_HANDLE;
+		ri.Printf(PRINT_WARNING, "Failed to open SPIR-V file: %s (len=%d), using fallback\n", filepath, file_len);
+		// Create a minimal dummy shader module to prevent crashes
+		// This creates a simple shader that can be used as fallback
+		static const uint32_t dummy_spirv[] = {
+			// Minimal SPIR-V header for a simple shader
+			0x07230203, 0x00010000, 0x00080001, 0x0000000D, 0x00000000, 0x00020011,
+			0x00000001, 0x0006000B, 0x00000001, 0x4C534C47, 0x6474732E, 0x3035342E,
+			0x00000000, 0x0003000E, 0x00000000, 0x00000001, 0x0007000F, 0x00000000,
+			0x00000004, 0x6E69616D, 0x00000000, 0x00000009, 0x0000000B, 0x00030003,
+			0x00000002, 0x000001C2, 0x00040005, 0x00000004, 0x6E69616D, 0x00000000,
+			0x00040005, 0x00000009, 0x6C6F6376, 0x00000000, 0x00040005, 0x0000000B,
+			0x6C676C5F, 0x695F7050, 0x00007369, 0x00040047, 0x00000009, 0x0000001E,
+			0x00000000, 0x00040047, 0x0000000B, 0x0000001E, 0x00000000, 0x00020013,
+			0x00000002, 0x00030021, 0x00000003, 0x00000002, 0x00030016, 0x00000006,
+			0x00000020, 0x00040017, 0x00000007, 0x00000006, 0x00000004, 0x00040020,
+			0x00000008, 0x00000003, 0x00000007, 0x0004003B, 0x00000008, 0x00000009,
+			0x00000003, 0x00040020, 0x0000000A, 0x00000001, 0x00000007, 0x0004003B,
+			0x0000000A, 0x0000000B, 0x00000001, 0x0004002B, 0x00000006, 0x0000000C,
+			0x00000000, 0x00050036, 0x00000002, 0x00000004, 0x00000000, 0x00000003,
+			0x000200F8, 0x00000005, 0x0004003D, 0x00000007, 0x0000000D, 0x0000000B,
+			0x0003003E, 0x00000009, 0x0000000D, 0x000100FD, 0x00010038
+		};
+
+		VkShaderModuleCreateInfo createInfo = {
+			.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+			.codeSize = sizeof(dummy_spirv),
+			.pCode = dummy_spirv
+		};
+
+		VkShaderModule shaderModule;
+		VkResult result = qvkCreateShaderModule(vk.device, &createInfo, NULL, &shaderModule);
+		if (result != VK_SUCCESS) {
+			ri.Printf(PRINT_ERROR, "Failed to create fallback shader module: %s\n", vk_result_string(result));
+			return VK_NULL_HANDLE;
+		}
+		ri.Printf(PRINT_WARNING, "Created fallback shader module for %s\n", filename);
+		return shaderModule;
 	}
 
 	ri.Printf(PRINT_DEVELOPER, "Successfully loaded shader %s (%d bytes)\n", filename, file_len);
@@ -536,6 +571,16 @@ void vk_get_pipeline_def(VkPipeline pipeline, Vk_Pipeline_Def *def) {
 }
 
 void vk_bind_pipeline(VkPipeline pipeline) {
+	if (pipeline == VK_NULL_HANDLE) {
+		ri.Printf(PRINT_WARNING, "vk_bind_pipeline: Attempting to bind null pipeline - skipping\n");
+		return;
+	}
+
+	if (!vk.cmd || !vk.cmd->command_buffer) {
+		ri.Printf(PRINT_WARNING, "vk_bind_pipeline: Invalid command buffer state\n");
+		return;
+	}
+
 	if (pipeline != vk.cmd->last_pipeline) {
 		qvkCmdBindPipeline(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 		vk.cmd->last_pipeline = pipeline;

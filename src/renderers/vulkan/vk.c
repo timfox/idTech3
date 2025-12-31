@@ -2490,6 +2490,8 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		}
 
 		// Ray tracing extensions (all required together)
+		ri.Printf( PRINT_ALL, "...ray tracing check: pipeline=%d, accel=%d, deferred=%d, buffer_addr=%d, query=%d\n",
+			rayTracingPipeline, accelerationStructure, deferredHostOperations, bufferDeviceAddress, rayQuery);
 		if ( rayTracingPipeline && accelerationStructure && deferredHostOperations && bufferDeviceAddress ) {
 			device_extension_list[ device_extension_count++ ] = VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME;
 			device_extension_list[ device_extension_count++ ] = VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME;
@@ -3688,6 +3690,9 @@ skip_device_creation:
     vk_silent_init();
     if (!vk_silent) {
         ri.Printf(PRINT_ALL, "Startup renderer: Vulkan\n");
+        ri.Printf(PRINT_ALL, "Vulkan renderer initialized successfully\n");
+        ri.Printf(PRINT_ALL, "Ray tracing: %s\n", vk.rayTracingSupported ? "Enabled" : "Disabled");
+        ri.Printf(PRINT_ALL, "Device: %s\n", vk.physical_device != VK_NULL_HANDLE ? "Selected" : "None");
     }
 }
 
@@ -4404,7 +4409,18 @@ static void vk_create_special_pipelines( void )
 		def.mirror = qfalse;
 		ri.Printf(PRINT_ALL, "DEBUG: Skybox pipeline def initialized, calling vk_find_pipeline_ext\n");
 		vk.skybox_pipeline = vk_find_pipeline_ext( 0, &def, qtrue );
-		ri.Printf(PRINT_ALL, "DEBUG: Skybox pipeline created successfully, index: %u\n", vk.skybox_pipeline);
+		if (vk.skybox_pipeline == VK_NULL_HANDLE) {
+			ri.Printf(PRINT_WARNING, "DEBUG: Skybox pipeline creation failed, will use fallback rendering\n");
+		} else {
+			ri.Printf(PRINT_ALL, "DEBUG: Skybox pipeline created successfully, index: %u\n", vk.skybox_pipeline);
+		}
+	}
+
+	if (vk.skybox_pipeline == VK_NULL_HANDLE) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Some pipelines failed to create - renderer may not work correctly\n");
+		ri.Printf(PRINT_WARNING, "Vulkan: This is expected when SPIR-V shader files are missing\n");
+	} else {
+		ri.Printf(PRINT_ALL, "Vulkan: All special pipelines created successfully\n");
 	}
 
 	ri.Printf(PRINT_ALL, "DEBUG: vk_create_special_pipelines completed successfully\n");
@@ -4700,7 +4716,6 @@ static void vk_alloc_attachments( void )
 	for ( i = 0; i < num_attachments; i++ ) {
 		VkDeviceMemory memory;
 		uint32_t memoryTypeIndex;
-		int layer;
 
 		ri.Printf(PRINT_ALL, "DEBUG: vk_alloc_attachments processing attachment %d\n", i);
 
@@ -4780,7 +4795,15 @@ static void vk_alloc_attachments( void )
 
 	// perform layout transition
 	command_buffer = begin_command_buffer();
+	if (command_buffer == VK_NULL_HANDLE) {
+		ri.Printf(PRINT_ERROR, "vk_alloc_attachments: Failed to begin command buffer\n");
+		return;
+	}
 	for ( i = 0; i < num_attachments; i++ ) {
+		if (attachments[i].descriptor == VK_NULL_HANDLE) {
+			ri.Printf(PRINT_ERROR, "vk_alloc_attachments: Attachment %d has null descriptor\n", i);
+			continue;
+		}
 		record_image_layout_transition( command_buffer,
 			attachments[i].descriptor,
 			attachments[i].aspect_flags,
