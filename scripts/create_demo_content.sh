@@ -1,90 +1,144 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
 
-# Create demo content for testing the engine
-# This creates a minimal demo pak with basic shaders and a test map
+# Demo Content Creation Tool
+# Creates minimal demo content for testing the idTech3 engine
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-DEMO_DIR="$PROJECT_ROOT/release/demo"
-BASE_DIR="$PROJECT_ROOT/release/base"
+set -e
 
-echo "Creating demo content..."
+echo "Creating minimal demo content for idTech3..."
 
-# Create directories
+# Create demo directory structure
+DEMO_DIR="demo_content"
 mkdir -p "$DEMO_DIR"
-mkdir -p "$BASE_DIR"
 
-# Create minimal default.cfg
-if [ ! -f "$BASE_DIR/default.cfg" ]; then
-    cat > "$BASE_DIR/default.cfg" << 'EOF'
-// Default configuration for idTech3 engine
+# Create a simple map file
+cat > "$DEMO_DIR/demo.map" << 'EOMAP'
+// Minimal demo map for testing
+{
+"classname" "worldspawn"
+"message" "idTech3 Demo Map"
+"music" "music/demo"
+
+// Simple room
+{
+"classname" "func_static"
+"model" "*1"
+{
+brushDef
+{
+( 0 0 0 0 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/demo/floor" 0 0 0
+( 0 0 0 0 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/demo/floor" 0 0 0
+( 0 0 0 0 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/demo/floor" 0 0 0
+( 0 0 0 0 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/demo/floor" 0 0 0
+( 0 0 0 0 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/demo/floor" 0 0 0
+( 0 0 0 0 ) ( ( 0.015625 0 0 ) ( 0 0.015625 0 ) ) "textures/demo/floor" 0 0 0
+}
+}
+}
+
+// Player start
+{
+"classname" "info_player_start"
+"origin" "0 0 32"
+"angle" "0"
+}
+}
+EOMAP
+
+# Create basic shader files
+mkdir -p "$DEMO_DIR/scripts"
+
+cat > "$DEMO_DIR/scripts/demo.shader" << 'EOSHD'
+textures/demo/floor
+{
+    qer_editorimage textures/demo/floor.tga
+    {
+        map $lightmap
+        rgbGen identity
+    }
+    {
+        map textures/demo/floor.tga
+        blendFunc filter
+        rgbGen identity
+    }
+}
+
+textures/demo/wall
+{
+    qer_editorimage textures/demo/wall.tga
+    {
+        map $lightmap
+        rgbGen identity
+    }
+    {
+        map textures/demo/wall.tga
+        blendFunc filter
+        rgbGen identity
+    }
+}
+EOSHD
+
+# Create simple textures (basic colored squares)
+mkdir -p "$DEMO_DIR/textures/demo"
+
+# Create floor texture (checkerboard pattern)
+convert -size 64x64 xc: -fill '#404040' -draw 'rectangle 0,0 31,31' -fill '#606060' -draw 'rectangle 32,0 63,31' -fill '#606060' -draw 'rectangle 0,32 31,63' -fill '#404040' -draw 'rectangle 32,32 63,63' "$DEMO_DIR/textures/demo/floor.tga" 2>/dev/null || {
+    echo "Warning: ImageMagick not available, creating placeholder texture files"
+    echo "Please install ImageMagick and re-run this script to generate proper textures"
+    # Create placeholder files
+    echo "placeholder" > "$DEMO_DIR/textures/demo/floor.tga"
+    echo "placeholder" > "$DEMO_DIR/textures/demo/wall.tga"
+}
+
+# Create wall texture (solid color)
+convert -size 64x64 xc:'#808080' "$DEMO_DIR/textures/demo/wall.tga" 2>/dev/null || {
+    echo "placeholder" > "$DEMO_DIR/textures/demo/wall.tga"
+}
+
+# Create basic game scripts
+cat > "$DEMO_DIR/demo.cfg" << 'EOCFG'
+// Demo configuration
 seta r_mode "-1"
-seta r_customwidth "1920"
-seta r_customheight "1080"
+seta r_customwidth "1024"
+seta r_customheight "768"
 seta r_fullscreen "0"
-seta com_maxfps "125"
-seta cl_maxpackets "30"
-seta cl_packetdup "1"
-seta s_khz "44"
-seta s_musicvolume "0.5"
-seta s_volume "0.5"
-EOF
-    echo "Created default.cfg"
-fi
+seta com_maxfps "60"
 
-# Create minimal shader file
-mkdir -p "$BASE_DIR/scripts"
-if [ ! -f "$BASE_DIR/scripts/common.shader" ]; then
-    cat > "$BASE_DIR/scripts/common.shader" << 'EOF'
-// Common shaders for demo content
+// Demo settings
+seta cg_drawFPS "1"
+seta developer "1"
+EOCFG
 
-textures/common/caulk
-{
-    {
-        map $whiteimage
-        rgbGen const ( 0.5 0.5 0.5 )
-    }
-}
+mkdir -p "$DEMO_DIR/maps"
+# Create a basic BSP file (placeholder - would need q3map2 to compile)
+echo "This is a placeholder BSP file. Use q3map2 to compile demo.map into demo.bsp" > "$DEMO_DIR/maps/demo.bsp"
 
-textures/common/nodraw
-{
-    {
-        map $whiteimage
-        rgbGen const ( 0 0 0 )
-    }
-}
+# Create README
+cat > "$DEMO_DIR/README.txt" << 'EOREADME'
+idTech3 Demo Content
+====================
 
-textures/common/trigger
-{
-    {
-        map $whiteimage
-        rgbGen const ( 1 1 0 )
-        alphaGen const 0.5
-    }
-}
-EOF
-    echo "Created common.shader"
-fi
+This is minimal demo content for testing the idTech3 engine.
 
-# Create a simple test map info file
-mkdir -p "$BASE_DIR/maps"
-if [ ! -f "$BASE_DIR/maps/test.bsp" ]; then
-    echo "Note: test.bsp map file not created (requires BSP compiler)"
-    echo "  Place your compiled .bsp map files in: $BASE_DIR/maps/"
-    echo "  Or package them in a .pk3 file"
-fi
+Files:
+- demo.map: Source map file
+- maps/demo.bsp: Compiled map (placeholder - needs q3map2)
+- scripts/demo.shader: Material definitions
+- textures/demo/: Basic textures
+- demo.cfg: Demo configuration
 
-# Create a simple pak file structure (empty for now, user can add content)
-echo ""
-echo "Demo content structure created in: $DEMO_DIR"
-echo "Base content structure created in: $BASE_DIR"
-echo ""
-echo "To create a working demo:"
-echo "  1. Place .bsp map files in $BASE_DIR/maps/"
-echo "  2. Place textures in $BASE_DIR/textures/"
-echo "  3. Place shaders in $BASE_DIR/scripts/"
-echo "  4. Package everything into a .pk3 file using:"
-echo "     zip -r $BASE_DIR/demo.pk3 $BASE_DIR/*"
-echo ""
-echo "Or use the package_content.sh script to create pak files."
+To compile the map:
+1. Install GtkRadiant or q3map2
+2. Run: q3map2 -fs_basepath . -game demo_content demo.map
+
+To run the demo:
+1. Place demo_content directory in your idtech3 base path
+2. Launch engine with: +set fs_game demo_content +map demo
+
+Note: This is very basic content for testing engine functionality.
+For full game content, obtain official Quake 3 assets.
+EOREADME
+
+echo "Demo content created in: $DEMO_DIR"
+echo "To package as .pk3: zip -r demo.pk3 $DEMO_DIR/*"
+echo "Then place demo.pk3 in your base/ directory"

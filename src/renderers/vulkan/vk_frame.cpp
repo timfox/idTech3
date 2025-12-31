@@ -12,15 +12,27 @@
 #include "vk_world_effects.h"
 // Ray marching moved to RTX renderer only
 #include "vk.h"
-// Note: vk_command_buffers.h is not available; declare needed prototypes manually
-extern VkCommandBuffer vk_begin_command_buffer(void);
-extern void vk_end_command_buffer(VkCommandBuffer, const char* location);
+#include "vk_link_bridge.h"
+// Note: vk_command_buffers.h is not available; declare needed prototypes manually with C linkage
+#ifdef __cplusplus
+extern "C" {
+#endif
+// Bridge wrappers (actual implementations live in vk_link_bridge.cpp)
+VkCommandBuffer vk_begin_command_buffer_bridge(void);
+void vk_end_command_buffer_bridge(VkCommandBuffer, const char* location);
+#ifdef __cplusplus
+}
+#endif
 
 #include "vk_fsr.h"
 #include "vk_atmosphere.h"
 
+// Forward declare trace helper used by low-level logging
+static void vt_trace(const char* json);
+
 // Global guard for headless-present state (initialized early for cross-function visibility)
 static bool g_vk_headless_present_state = false;
+static int retry_count = 0;
 
 // Renderer interface
 extern refimport_t ri;
@@ -97,9 +109,7 @@ extern "C" void vk_update_performance_stats(void) {
 }
 
 // Begin frame
-    // region agent log
-    // declare retry_count for logs in this scope
-    int retry_count = 0;
+   // region agent log
 static void log_instrumentation(const char* hypothesisId, const char* location, const char* message, const char* data) {
   FILE* f = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
   if (!f) return;
@@ -120,10 +130,8 @@ static inline void agent_log(const char* hypothesisId, const char* location, con
 // Simple fallback trace log for environments where NDJSON log isn't captured
 static inline void agent_trace_log(const char* json) {
 // Route instrumentation to centralized trace helper instead of direct file IO
-static void vt_trace(const char* json);
 vt_trace(json);
 }
-static void vt_trace(const char* json);
 static inline void vt_trace(const char* json) {
   FILE* f = fopen("/home/tim/Desktop/idtech3/.cursor/trace.log", "a");
   if (!f) return;
@@ -137,7 +145,6 @@ extern "C" void vk_begin_frame(void) {
   // Initialize per-frame timeline value increment if available
   static uint64_t last_timeline_value = 0;
   // Lightweight local retry counter for present/submission retries
-  int retry_count = 0;
   agent_log("H1","vk_frame.cpp:vk_begin_frame","begin_frame","{}");
     VkResult result;
     uint32_t image_index;
@@ -221,7 +228,7 @@ extern "C" void vk_begin_frame(void) {
 
     // Acquire next swapchain image with retry logic
     const uint64_t timeout_ns = 1000000000ULL; // 1 second timeout
-    int retry_count = 0;
+    // use existing retry_count state
     const int max_retries = 3;
 
     ri.Printf(PRINT_ALL, "DEBUG: Starting swapchain image acquisition with timeout=%llu ns, max_retries=%d\n", timeout_ns, max_retries);
@@ -850,7 +857,7 @@ void vk_read_pixels(byte *buffer, uint32_t width, uint32_t height) {
     // Ensure staging buffer has enough space
     vk_alloc_staging_buffer((VkDeviceSize)bytes);
     // Begin a short-lived command buffer
-    VkCommandBuffer cmd = vk_begin_command_buffer();
+    VkCommandBuffer cmd = vk_begin_command_buffer_bridge();
     if (cmd != VK_NULL_HANDLE) {
       // Transition COLOR_ATTACHMENT_OPTIMAL -> TRANSFER_SRC_OPTIMAL
       VkImageMemoryBarrier barrier1 = {
@@ -894,10 +901,10 @@ void vk_read_pixels(byte *buffer, uint32_t width, uint32_t height) {
       qvkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, &barrier2);
 
       // End and submit
-      vk_end_command_buffer(cmd, "vk_read_pixels_readback");
+      vk_end_command_buffer_bridge(cmd, "vk_read_pixels_readback");
       VkSubmitInfo submitInfo = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .pNext = nullptr, .commandBufferCount = 1, .pCommandBuffers = &cmd };
       qvkQueueSubmit(vk.queue, 1, &submitInfo, VK_NULL_HANDLE);
-      qvkQueueWaitIdle(vk.queue);
+    vkQueueWaitIdle(vk.queue);
 
       // Copy staging to CPU memory
       if (vk.staging_buffer.ptr) {

@@ -44,8 +44,8 @@ extern refimport_t ri;
 #endif
 #define NANOSVG_IMPLEMENTATION
 #define NANOSVGRAST_IMPLEMENTATION
-#include "../../libs/nanosvg/nanosvg.h"
-#include "../../libs/nanosvg/nanosvgrast.h"
+#include "../../../external/include/nanosvg/nanosvg.h"
+#include "../../../external/include/nanosvg/nanosvgrast.h"
 #if defined(__GNUC__)
 #pragma GCC diagnostic pop
 #endif

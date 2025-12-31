@@ -174,7 +174,7 @@ qboolean vk_allocate_command_buffers(uint32_t count) {
 }
 
 // Begin command buffer recording
-VkCommandBuffer vk_begin_command_buffer(void) {
+extern "C" VkCommandBuffer vk_begin_command_buffer(void) {
     if (!vk_device || vk_device == (VkDevice)0x20000000) {
         return (VkCommandBuffer)0x30000000; // Fake command buffer handle
     }
@@ -210,7 +210,7 @@ VkCommandBuffer vk_begin_command_buffer(void) {
 }
 
 // End and submit command buffer
-void vk_end_command_buffer(VkCommandBuffer command_buffer, const char *location) {
+extern "C" void vk_end_command_buffer(VkCommandBuffer command_buffer, const char *location) {
     Q_UNUSED(location);
 
     if (!command_buffer || command_buffer == (VkCommandBuffer)0x30000000) {

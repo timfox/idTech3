@@ -1,33 +1,42 @@
 {
-  "name": "idTech3",
-  "version": "1.0.0",
+  "name": "idtech3",
+  "version": "0.1.0",
+  "description": "Modernized idTech3 engine with Vulkan renderer and optional modules",
   "dependencies": [
     "zlib",
+    "zstd",
+
     "libpng",
     "libjpeg-turbo",
-    "libvorbis",
+    "openexr",
+    "stb",
+
     "libogg",
+    "libvorbis",
+    "openal-soft",
+
     "libtheora",
     "libvpx",
     "libdav1d",
-    "openexr",
-    "assimp",
-    "bullet3",
+
     "enet",
     "curl",
-    "freetype",
+    "openssl",
+    "miniupnpc",
+
     "lua",
     "sqlite3",
-    "websockets",
-    "zstd",
-    "openal-soft",
+    "nlohmann-json",
+
+    "assimp",
+    "bullet3",
+
     "vulkan",
     "vulkan-memory-allocator",
     "glm",
-    "stb",
-    "nlohmann-json",
-    "openssl",
-    "miniupnpc",
+
+    "freetype",
+
     "gtest",
     "benchmark"
   ]

@@ -1,4 +1,4 @@
-option(VK_METRICS_ENABLED "Enable Vulkan metrics instrumentation" OFF)
+option(VK_METRICS_ENABLED "Enable Vulkan metrics instrumentation" ON)
 
 if(VK_METRICS_ENABLED)
   if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vk_metrics.c")
@@ -9,6 +9,10 @@ if(VK_METRICS_ENABLED)
       message(WARNING "VK_METRICS_ENABLED ON but no idtech3_vulkan_x86_64 target found in this directory")
     endif()
   endif()
+endif()
+# Always include lightweight Vulkan command-buffer stubs to ease testing
+if(TARGET idtech3_vulkan_x86_64)
+  target_sources(idtech3_vulkan_x86_64 PRIVATE vk_stub_buffers.cpp)
 endif()
 option(VK_METRICS_ENABLED "Enable Vulkan metrics instrumentation" OFF)
 

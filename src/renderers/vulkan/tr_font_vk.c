@@ -36,8 +36,15 @@ qboolean RE_RegisterFont_Vulkan(const char *fontName, int pointSize, fontInfo_t 
 	}
 
 	// TODO: Implement proper Vulkan font texture creation
-	// For now, use a placeholder texture handle
-	font->shader = 0; // Placeholder - should be a Vulkan texture handle
+	// Fallback to STB font if available to prevent hard failures in Vulkan path
+	font->shader = 0; // default placeholder
+	extern qboolean RE_RegisterFont_Stb(const char *fontName, int pointSize, fontInfo_t *font);
+	fontInfo_t stbFont;
+	if (RE_RegisterFont_Stb(fontName, pointSize, &stbFont)) {
+		Com_Memcpy(font, &stbFont, sizeof(fontInfo_t));
+		ri.Printf(PRINT_ALL, "Vulkan: fallback to STB font for '%s' (%dpt)\n", fontName, pointSize);
+		return qtrue;
+	}
 
 	ri.Printf(PRINT_ALL, "RE_RegisterFont_Vulkan: Registered placeholder font '%s' (%dpt)\n",
 		fontName, pointSize);

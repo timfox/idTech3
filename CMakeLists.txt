@@ -694,7 +694,7 @@ ENDIF()
 # EnTT ECS system
 IF(USE_ENTT)
 	# Add EnTT include directory
-	INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/libs/entt/src)
+            INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/external/include/entt/src)
 	# Add compile definition
 	ADD_COMPILE_DEFINITIONS(USE_ENTT)
 	# Add C++ source files for ECS (will be created)
@@ -1106,11 +1106,11 @@ ENDIF()
 
 IF(USE_NANOSVG)
 	# nanosvg is a single-header library, check if headers exist
-	IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libs/nanosvg/nanosvg.h" AND 
-	   EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libs/nanosvg/nanosvgrast.h")
-		ADD_COMPILE_DEFINITIONS(USE_NANOSVG)
-		TARGET_INCLUDE_DIRECTORIES(common PRIVATE libs/nanosvg)
-		TARGET_INCLUDE_DIRECTORIES(common_ded PRIVATE libs/nanosvg)
+IF(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/include/nanosvg/nanosvg.h" AND 
+   EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/include/nanosvg/nanosvgrast.h")
+            ADD_COMPILE_DEFINITIONS(USE_NANOSVG)
+            TARGET_INCLUDE_DIRECTORIES(common PRIVATE external/include/nanosvg)
+            TARGET_INCLUDE_DIRECTORIES(common_ded PRIVATE external/include/nanosvg)
 		message(STATUS "nanosvg found: using bundled headers")
 	else()
 		message(WARNING "nanosvg headers not found, disabling SVG support")
@@ -1296,12 +1296,12 @@ IF(USE_SYSTEM_JPEG)
 		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_JOBSYSTEM)
 	ENDIF()
 ELSE()
-	AUX_SOURCE_DIRECTORY(libs/jpeg JPEG_SRCS)
+AUX_SOURCE_DIRECTORY(external/src/jpeg JPEG_SRCS)
 	#ADD_LIBRARY(jpeg ${JPEG_SRCS})
 	#TARGET_LINK_LIBRARIES(client jpeg)
 	ADD_LIBRARY(client OBJECT ${CLIENT_SRCS} ${JPEG_SRCS})
 	# Add JPEG include directory for internal includes
-	TARGET_INCLUDE_DIRECTORIES(client PRIVATE libs/jpeg)
+TARGET_INCLUDE_DIRECTORIES(client PRIVATE external/include/jpeg)
 	# TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_MP3)
 	IF(USE_JOBSYSTEM)
 		TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_JOBSYSTEM)
@@ -1315,7 +1315,7 @@ ELSE()
 ENDIF()
 
 # Add OGG/Vorbis include directories for client (used by snd_codec_ogg.c)
-TARGET_INCLUDE_DIRECTORIES(client PRIVATE src/common src libs/ogg/include libs/vorbis/include)
+TARGET_INCLUDE_DIRECTORIES(client PRIVATE src/common src external/include/ogg/include external/include/vorbis/include)
 
 # Add MP3 support using custom mp3 (like SunnyJK)
 TARGET_INCLUDE_DIRECTORIES(client PRIVATE src/client/mp3)
