@@ -39,6 +39,8 @@ extern PFN_vkDestroyCommandPool qvkDestroyCommandPool;
 extern PFN_vkAllocateCommandBuffers qvkAllocateCommandBuffers;
 extern PFN_vkFreeCommandBuffers qvkFreeCommandBuffers;
 extern PFN_vkBeginCommandBuffer qvkBeginCommandBuffer;
+// Forward declare temporary readback path helpers (optional)
+extern PFN_vkCopyImageToBuffer qvkCmdCopyImageToBuffer; // ensure symbol presence
 extern PFN_vkEndCommandBuffer qvkEndCommandBuffer;
 extern PFN_vkResetCommandBuffer qvkResetCommandBuffer;
 extern PFN_vkCmdPipelineBarrier qvkCmdPipelineBarrier;
@@ -90,6 +92,7 @@ void vk_init_command_functions(void) {
     qvkEndCommandBuffer = (PFN_vkEndCommandBuffer)qvkGetDeviceProcAddr(vk_device, "vkEndCommandBuffer");
     qvkResetCommandBuffer = (PFN_vkResetCommandBuffer)qvkGetDeviceProcAddr(vk_device, "vkResetCommandBuffer");
     qvkCmdPipelineBarrier = (PFN_vkCmdPipelineBarrier)qvkGetDeviceProcAddr(vk_device, "vkCmdPipelineBarrier");
+    qvkCmdCopyImageToBuffer = (PFN_vkCmdCopyImageToBuffer)qvkGetDeviceProcAddr(vk_device, "vkCmdCopyImageToBuffer");
     qvkCreateFence = (PFN_vkCreateFence)qvkGetDeviceProcAddr(vk_device, "vkCreateFence");
     qvkDestroyFence = (PFN_vkDestroyFence)qvkGetDeviceProcAddr(vk_device, "vkDestroyFence");
     qvkResetFences = (PFN_vkResetFences)qvkGetDeviceProcAddr(vk_device, "vkResetFences");

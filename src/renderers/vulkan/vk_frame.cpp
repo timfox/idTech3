@@ -42,18 +42,39 @@ extern shaderCommands_t tess;
 
 // Performance tracking
 extern "C" void vk_update_performance_stats(void) {
-    static int last_frame_time = 0;
-    int current_time = ri.Milliseconds();
-    int frame_time = current_time - last_frame_time;
-    last_frame_time = current_time;
+   static int last_frame_time = 0;
+   int current_time = ri.Milliseconds();
+   int frame_time = current_time - last_frame_time;
+   last_frame_time = current_time;
 
-    if (frame_time > 0) {
-        vk.performance.fps = 1000.0f / (float)frame_time;
-        vk.performance.frame_time_ms = (float)frame_time;
-    }
+   if (frame_time > 0) {
+       vk.performance.fps = 1000.0f / (float)frame_time;
+       vk.performance.frame_time_ms = (float)frame_time;
+   }
 
-    // Update GPU timing if available
-    // TODO: Implement GPU timestamp query processing
+   // Update GPU timing if available (capture from the last completed frame)
+   if (vk.render_profiler.detailed_profiling) {
+       // Index of the last completed frame in the circular frame history
+       uint32_t last_index = (vk.render_profiler.current_frame_index + vk.render_profiler.max_frames - 1) % vk.render_profiler.max_frames;
+
+       // Avoid re-logging the same frame timing if it's already been recorded
+       static int last_logged_gpu_time_frame = -1;
+       if ((int)last_index != last_logged_gpu_time_frame) {
+           const vk_frame_profile_t *last_frame = &vk.render_profiler.frame_history[last_index];
+           // Only push if we have a valid GPU time for the frame
+           if (last_frame && last_frame->gpu_time_ms > 0.0) {
+               int head = vk_gpu_timing.frame_timing_head;
+               int count = vk_gpu_timing.frame_timing_count;
+               // Append latest GPU time in milliseconds
+               vk_gpu_timing.frame_timings[head] = last_frame->gpu_time_ms;
+               vk_gpu_timing.frame_timing_head = (head + 1) % 128;
+               if (count < 128) {
+                   vk_gpu_timing.frame_timing_count = count + 1;
+               }
+               last_logged_gpu_time_frame = (int)last_index;
+           }
+       }
+   }
 }
 
 // Begin frame
@@ -627,11 +648,14 @@ extern "C" void vk_end_frame(void) {
         agent_log("H1","vk_frame.cpp:vk_present_frame","present_queue", present_data);
     }
 
-    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
-        // Swapchain needs recreation
+    if (result == VK_SUCCESS) {
+        // Present succeeded
+    } else if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        // Swapchain needs recreation after present
         ri.Printf(PRINT_WARNING, "Vulkan: Swapchain needs recreation after present (result=%d)\n", result);
-        // TODO: Handle swapchain recreation
-    } else if (result != VK_SUCCESS) {
+        vk_recreate_swapchain();
+        return;
+    } else {
         ri.Printf(PRINT_ERROR, "vk_present_frame: Failed to present frame: %s\n", vk_result_string(result));
     }
 
@@ -730,11 +754,74 @@ void vk_read_pixels(byte *buffer, uint32_t width, uint32_t height) {
         return;
     }
 
-    // This would implement reading pixels from the current framebuffer
-    // Implementation depends on specific requirements and may involve
-    // copying from GPU to CPU memory
+// Attempt real GPU readback via vkCmdCopyImageToBuffer if available
+size_t bytes = (size_t)width * (size_t)height * 4;
+if (qvkCmdCopyImageToBuffer && vk.color_image != VK_NULL_HANDLE && vk.staging_buffer.handle != VK_NULL_HANDLE) {
+    // Ensure staging buffer has enough space
+    vk_alloc_staging_buffer((VkDeviceSize)bytes);
+    // Begin a short-lived command buffer
+    VkCommandBuffer cmd = vk_begin_command_buffer();
+    if (cmd != VK_NULL_HANDLE) {
+        // Transition COLOR_ATTACHMENT_OPTIMAL -> TRANSFER_SRC_OPTIMAL
+        VkImageMemoryBarrier barrier1 = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .pNext = nullptr,
+            .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+            .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = vk.color_image,
+            .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+        };
+        qvkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier1);
 
-    ri.Printf(PRINT_ALL, "Vulkan: Read pixels %ux%u (stub implementation)\n", width, height);
-    // TODO: Implement actual pixel reading
-    Com_Memset(buffer, 0, width * height * 4); // Placeholder
+        // Copy image -> buffer
+        VkBufferImageCopy region = {};
+        region.bufferOffset = 0;
+        region.bufferRowLength = 0;
+        region.bufferImageHeight = 0;
+        region.imageSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+        region.imageOffset = {0, 0, 0};
+        region.imageExtent = { (uint32_t)width, (uint32_t)height, 1 };
+        qvkCmdCopyImageToBuffer(cmd, vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                               vk.staging_buffer.handle, 1, &region);
+
+        // Transition back to COLOR_ATTACHMENT_OPTIMAL
+        VkImageMemoryBarrier barrier2 = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .pNext = nullptr,
+            .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+            .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = vk.color_image,
+            .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+        };
+        qvkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, &barrier2);
+
+        // End and submit
+        vk_end_command_buffer(cmd, "vk_read_pixels_readback");
+        VkSubmitInfo submitInfo = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .pNext = nullptr, .commandBufferCount = 1, .pCommandBuffers = &cmd };
+        qvkQueueSubmit(vk.queue, 1, &submitInfo, VK_NULL_HANDLE);
+        qvkQueueWaitIdle(vk.queue);
+
+        // Copy staging to CPU memory
+        if (vk.staging_buffer.ptr) {
+            memcpy(buffer, vk.staging_buffer.ptr, bytes);
+        } else {
+            memset(buffer, 0, bytes);
+        }
+        return;
+    } else {
+        ri.Printf(PRINT_WARNING, "Vulkan: failed to begin readback command buffer\n");
+    }
+}
+
+// Fallback: zero-fill
+ri.Printf(PRINT_ALL, "Vulkan: Read pixels %ux%u -> zero-filled (readback unavailable)\n", width, height);
+Com_Memset(buffer, 0, (size_t)width * (size_t)height * 4);
 }

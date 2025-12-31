@@ -535,6 +535,7 @@ PFN_vkCmdClearDepthStencilImage				qvkCmdClearDepthStencilImage;
 PFN_vkCmdSetBlendConstants					qvkCmdSetBlendConstants;
 PFN_vkCmdCopyBuffer								qvkCmdCopyBuffer;
 PFN_vkCmdCopyBufferToImage						qvkCmdCopyBufferToImage;
+PFN_vkCmdCopyImageToBuffer						qvkCmdCopyImageToBuffer;
 PFN_vkCmdCopyImage								qvkCmdCopyImage;
 PFN_vkCmdDispatch								qvkCmdDispatch;
 PFN_vkCmdDraw									qvkCmdDraw;
@@ -4075,6 +4076,7 @@ static void __attribute__((unused)) deinit_device_functions( void )
 	qvkCmdClearDepthStencilImage				= NULL;
 	qvkCmdCopyBuffer							= NULL;
 	qvkCmdCopyBufferToImage						= NULL;
+	qvkCmdCopyImageToBuffer						= NULL;
 	qvkCmdCopyImage								= NULL;
 	qvkCmdDispatch								= NULL;
 	qvkCmdDraw									= NULL;

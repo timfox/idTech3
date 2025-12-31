@@ -232,6 +232,9 @@ typedef enum {
 #define VK_DESC_PBR_PHYSICAL           8
 #define VK_DESC_PBR_CUBEMAP            9
 #define VK_DESC_MATERIAL_PARAMS        10
+
+// GPU readback: optional function to copy color image to a host-visible buffer
+extern PFN_vkCmdCopyImageToBuffer qvkCmdCopyImageToBuffer;
 #define VK_DESC_FOG_DLIGHT             11
 #define VK_DESC_STORAGE                12
 
