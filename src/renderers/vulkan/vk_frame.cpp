@@ -137,7 +137,6 @@ extern "C" void vk_begin_frame(void) {
             ri.Printf(PRINT_ALL, "DEBUG: Headless mode set due to result=%d\n", result);
             headless_detected = qtrue;
             g_vk_headless_present_state = true;
-            g_vk_headless_present_state = true;
             return;
         } else if (result != VK_SUCCESS) {
             ri.Printf(PRINT_ALL, "DEBUG: Unexpected result in headless detection: %d\n", result);
@@ -496,6 +495,10 @@ extern "C" void vk_end_frame(void) {
 
     if (!vk_validate_handle(vk.swapchain, "swapchain")) {
         ri.Printf(PRINT_ALL, "DEBUG: Swapchain handle invalid, skipping present\n");
+        return;
+    }
+    if (vk.device == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_ALL, "DEBUG: Vulkan device invalid during present, skipping\n");
         return;
     }
 

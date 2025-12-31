@@ -102,6 +102,45 @@ void *Sys_LoadFunction(void *handle, const char *name) {
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
+// NVIDIA GPU selection helpers
+static VkPhysicalDevice g_vk_selected_phys = VK_NULL_HANDLE;
+static int g_vk_selected_device_index = -1;
+extern PFN_vkEnumeratePhysicalDevices qvkEnumeratePhysicalDevices;
+
+static void vk_select_preferred_gpu(void) {
+    if (!vk.instance) return;
+    uint32_t count = 0;
+    VkResult res = qvkEnumeratePhysicalDevices(vk.instance, &count, NULL);
+    if (res != VK_SUCCESS || count == 0) {
+        ri.Printf(PRINT_WARNING, "VK: no physical devices found during selection (count=%u)\n", count);
+        return;
+    }
+    VkPhysicalDevice* devices = (VkPhysicalDevice*)malloc(sizeof(VkPhysicalDevice) * count);
+    if (!devices) return;
+    res = qvkEnumeratePhysicalDevices(vk.instance, &count, devices);
+    if (res == VK_SUCCESS) {
+        for (uint32_t i = 0; i < count; ++i) {
+            VkPhysicalDeviceProperties props;
+            qvkGetPhysicalDeviceProperties(devices[i], &props);
+            if (props.vendorID == 0x10DE) {
+                g_vk_selected_phys = devices[i];
+                g_vk_selected_device_index = (int)i;
+                ri.Printf(PRINT_ALL, "VK: selected NVIDIA device %u: %s (vendor 0x%04x)\n", i, props.deviceName, props.vendorID);
+                free(devices);
+                return;
+            }
+        }
+        // fallback
+        g_vk_selected_phys = devices[0];
+        g_vk_selected_device_index = 0;
+        VkPhysicalDeviceProperties props;
+        qvkGetPhysicalDeviceProperties(g_vk_selected_phys, &props);
+        ri.Printf(PRINT_ALL, "VK: NVIDIA not found, using device 0: %s (vendor 0x%04x)\n", props.deviceName, props.vendorID);
+    } else {
+        ri.Printf(PRINT_WARNING, "VK: failed to enumerate physical devices\n");
+    }
+    free(devices);
+}
 extern int setenv( const char *name, const char *value, int overwrite );
 
 // Modern C23/C++23 safety features for Vulkan renderer
@@ -458,7 +497,7 @@ PFN_vkEnumerateInstanceExtensionProperties		qvkEnumerateInstanceExtensionPropert
 PFN_vkCreateDevice								qvkCreateDevice;
 PFN_vkDestroyInstance							qvkDestroyInstance;
 PFN_vkEnumerateDeviceExtensionProperties			qvkEnumerateDeviceExtensionProperties;
-PFN_vkEnumeratePhysicalDevices					qvkEnumeratePhysicalDevices;
+PFN_vkEnumeratePhysicalDevices qvkEnumeratePhysicalDevices;
 PFN_vkGetDeviceProcAddr							qvkGetDeviceProcAddr;
 PFN_vkGetPhysicalDeviceFeatures					qvkGetPhysicalDeviceFeatures;
 PFN_vkGetPhysicalDeviceFormatProperties			qvkGetPhysicalDeviceFormatProperties;
@@ -558,6 +597,7 @@ PFN_vkGetImageSubresourceLayout					qvkGetImageSubresourceLayout;
 PFN_vkInvalidateMappedMemoryRanges				qvkInvalidateMappedMemoryRanges;
 PFN_vkMapMemory									qvkMapMemory;
 PFN_vkQueueSubmit								qvkQueueSubmit;
+// PFN_vkEnumeratePhysicalDevices qvkEnumeratePhysicalDevices; removed duplicate declaration
 PFN_vkQueueWaitIdle								qvkQueueWaitIdle;
 PFN_vkResetCommandBuffer							qvkResetCommandBuffer;
 PFN_vkResetDescriptorPool						qvkResetDescriptorPool;
@@ -1744,6 +1784,8 @@ static void create_instance( void )
 	if ( res != VK_SUCCESS ) {
 		ri.Error( ERR_FATAL, "Vulkan: instance creation failed with %s", vk_result_string( res ) );
 	}
+	// Select preferred GPU after instance creation
+	vk_select_preferred_gpu();
 
 	// Setup debug messenger will be done in init_vulkan_library after all function pointers are loaded
 
@@ -2763,7 +2805,15 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 
 
 		(void)pNextPtr;
-		res = qvkCreateDevice( physical_device, &device_desc, NULL, &vk.device );
+		{
+			VkPhysicalDevice phys = (g_vk_selected_phys != VK_NULL_HANDLE) ? g_vk_selected_phys : physical_device;
+			VkPhysicalDeviceProperties used_props;
+			qvkGetPhysicalDeviceProperties(phys, &used_props);
+			ri.Printf(PRINT_ALL, "VK: creating device on %s (vendor 0x%04x) at index=%d\n",
+			          used_props.deviceName, used_props.vendorID,
+			          (g_vk_selected_device_index >= 0 ? g_vk_selected_device_index : -1));
+			res = qvkCreateDevice( phys, &device_desc, NULL, &vk.device );
+		}
 		if ( res < 0 ) {
 			ri.Printf( PRINT_ERROR, "vkCreateDevice returned %s\n", vk_result_string( res ) );
 			return qfalse;
@@ -2824,6 +2874,7 @@ static void vk_destroy_instance( void ) {
 
 static void init_vulkan_library( void )
 {
+    vk_select_preferred_gpu();
 	VkPhysicalDeviceProperties props;
 	VkPhysicalDevice *physical_devices;
 	uint32_t device_count = 0;
