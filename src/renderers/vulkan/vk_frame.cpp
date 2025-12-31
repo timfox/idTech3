@@ -16,6 +16,9 @@
 #include "vk_fsr.h"
 #include "vk_atmosphere.h"
 
+// Global guard for headless-present state (initialized early for cross-function visibility)
+static bool g_vk_headless_present_state = false;
+
 // Renderer interface
 extern refimport_t ri;
 
@@ -73,6 +76,7 @@ static inline void agent_log(const char* hypothesisId, const char* location, con
   fclose(f);
 }
 // end region
+// (Note: headless-present guard variable now provided by existing static at vk_frame.cpp: present guard)
 extern "C" void vk_begin_frame(void) {
   // region agent log
   agent_log("H1","vk_frame.cpp:vk_begin_frame","begin_frame","{}");
@@ -132,6 +136,8 @@ extern "C" void vk_begin_frame(void) {
         }
             ri.Printf(PRINT_ALL, "DEBUG: Headless mode set due to result=%d\n", result);
             headless_detected = qtrue;
+            g_vk_headless_present_state = true;
+            g_vk_headless_present_state = true;
             return;
         } else if (result != VK_SUCCESS) {
             ri.Printf(PRINT_ALL, "DEBUG: Unexpected result in headless detection: %d\n", result);
@@ -478,16 +484,10 @@ extern "C" void vk_end_frame(void) {
 }
 
 // Present frame
-// Global flag to indicate headless state affecting present
-static bool g_vk_headless_present_state = false;
-extern "C" void vk_present_frame(void) {
+ extern "C" void vk_present_frame(void) {
     // region agent log: present frame entry
     agent_log("H1","vk_frame.cpp:vk_present_frame","present_frame","{}");
-    if (g_vk_headless_present_state) {
-        ri.Printf(PRINT_ALL, "DEBUG: Skipping present frame due to headless state (gate)\n");
-        return;
-    }
-    // Gate based on global headless state
+    // If headless, skip presenting
     if (g_vk_headless_present_state) {
         ri.Printf(PRINT_ALL, "DEBUG: Skipping present frame due to headless state\n");
         return;
