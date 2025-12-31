@@ -51,6 +51,11 @@ extern "C" {
 void vk_set_object_name( uint64_t obj, const char *objName, VkDebugReportObjectTypeEXT objType );
 #define SET_OBJECT_NAME(obj,objName,objType) vk_set_object_name( (uint64_t)(obj), (objName), (objType) )
 void Perf_CountDrawCall( void );
+// Timeline semaphore extension (optional)
+#ifdef VK_KHR_TIMELINE_SEMAPHORE
+extern PFN_vkWaitSemaphoresKHR qvkWaitSemaphoresKHR;
+extern PFN_vkSignalSemaphoreKHR qvkSignalSemaphoreKHR;
+#endif
 
 // Forward declarations for renderer types
 typedef struct image_s image_t;
@@ -879,7 +884,8 @@ typedef struct {
 
     // Compute shader support
     vk_compute_manager_t compute_manager;
-    VkSemaphore timeline_semaphore;
+    uint64_t gpu_timeline_counter; // Per-frame GPU timeline counter (optional)
+    VkSemaphore timeline_semaphore; // Optional timeline semaphore for advanced sync
 
     // Atmosphere rendering
     struct {
@@ -1428,6 +1434,7 @@ typedef struct {
     VkDeviceMemory portalLightsBufferMemory;
     VkDescriptorSetLayout portalLightsDescriptorSetLayout;
     VkDescriptorSet portalLightsDescriptorSet;
+    // Timeline semaphore fields consolidated at the top to avoid duplication
 
     // Vulkan 1.4 enhanced push constants
     uint32_t pushConstantSize;
@@ -1445,6 +1452,7 @@ void vk_end_render_pass(void);
 void vk_begin_frame(void);
 void vk_end_frame(void);
 void vk_recreate_swapchain(void);
+void vk_destroy_swapchain(void);
 void vk_bind_index(void);
 void vk_bind_index_ext(uint32_t numIndexes, uint32_t* hitIndexes);
 void vk_bind_pipeline(VkPipeline pipeline);

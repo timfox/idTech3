@@ -39,8 +39,11 @@ extern PFN_vkDestroyCommandPool qvkDestroyCommandPool;
 extern PFN_vkAllocateCommandBuffers qvkAllocateCommandBuffers;
 extern PFN_vkFreeCommandBuffers qvkFreeCommandBuffers;
 extern PFN_vkBeginCommandBuffer qvkBeginCommandBuffer;
+// Timeline semaphore function pointers (optional)
+extern PFN_vkWaitSemaphoresKHR qvkWaitSemaphoresKHR;
+extern PFN_vkSignalSemaphoreKHR qvkSignalSemaphoreKHR;
 // Forward declare temporary readback path helpers (optional)
-extern PFN_vkCopyImageToBuffer qvkCmdCopyImageToBuffer; // ensure symbol presence
+extern PFN_vkCmdCopyImageToBuffer qvkCmdCopyImageToBuffer; // ensure symbol presence
 extern PFN_vkEndCommandBuffer qvkEndCommandBuffer;
 extern PFN_vkResetCommandBuffer qvkResetCommandBuffer;
 extern PFN_vkCmdPipelineBarrier qvkCmdPipelineBarrier;
@@ -100,6 +103,9 @@ void vk_init_command_functions(void) {
     qvkQueueSubmit = (PFN_vkQueueSubmit)qvkGetDeviceProcAddr(vk_device, "vkQueueSubmit");
     qvkQueueWaitIdle = (PFN_vkQueueWaitIdle)qvkGetDeviceProcAddr(vk_device, "vkQueueWaitIdle");
     qvkDeviceWaitIdle = (PFN_vkDeviceWaitIdle)qvkGetDeviceProcAddr(vk_device, "vkDeviceWaitIdle");
+    // Optional: load timeline semaphore functions
+    qvkWaitSemaphoresKHR = (PFN_vkWaitSemaphoresKHR)qvkGetDeviceProcAddr(vk_device, "vkWaitSemaphoresKHR");
+    qvkSignalSemaphoreKHR = (PFN_vkSignalSemaphoreKHR)qvkGetDeviceProcAddr(vk_device, "vkSignalSemaphoreKHR");
 }
 
 // Create command pool

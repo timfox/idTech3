@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <unistd.h>
 #include "vk_memory.h"
+#include "vk_swapchain_manager.h"
+extern VkSurfaceFormatKHR vk_present_format;
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 
@@ -102,6 +104,7 @@ void *Sys_LoadFunction(void *handle, const char *name) {
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
+#include "vk_framebuffer.h"
 // NVIDIA GPU selection helpers
 static VkPhysicalDevice g_vk_selected_phys = VK_NULL_HANDLE;
 static int g_vk_selected_device_index = -1;
@@ -535,6 +538,9 @@ PFN_vkCmdClearDepthStencilImage				qvkCmdClearDepthStencilImage;
 PFN_vkCmdSetBlendConstants					qvkCmdSetBlendConstants;
 PFN_vkCmdCopyBuffer								qvkCmdCopyBuffer;
 PFN_vkCmdCopyBufferToImage						qvkCmdCopyBufferToImage;
+PFN_vkCmdCopyImageToBuffer						qvkCmdCopyImageToBuffer;
+PFN_vkWaitSemaphoresKHR							qvkWaitSemaphoresKHR;
+PFN_vkSignalSemaphoreKHR							qvkSignalSemaphoreKHR;
 PFN_vkCmdCopyImageToBuffer						qvkCmdCopyImageToBuffer;
 PFN_vkCmdCopyImage								qvkCmdCopyImage;
 PFN_vkCmdDispatch								qvkCmdDispatch;
@@ -4436,11 +4442,36 @@ void vk_initialize( void )
 		init_vulkan_library();
 	}
 
-	// Create synchronization primitives (semaphores, fences)
-	if (vk.device != (VkDevice)0x20000000) {
-		vk_create_sync_primitives();
-		ri.Printf(PRINT_ALL, "Vulkan: Sync primitives created\n");
-	}
+    // Create synchronization primitives (semaphores, fences)
+    if (vk.device != (VkDevice)0x20000000) {
+        vk_create_sync_primitives();
+        ri.Printf(PRINT_ALL, "Vulkan: Sync primitives created\n");
+    // Optional: initialize timeline semaphore if available
+        #ifdef VK_KHR_TIMELINE_SEMAPHORE
+        if (qvkCreateSemaphore) {
+            VkSemaphoreTypeCreateInfo timelineType = {
+                .sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO,
+                .pNext = NULL,
+                .semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE,
+                .initialValue = 0
+            };
+            VkSemaphoreCreateInfo semaInfo = {
+                .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+                .pNext = &timelineType,
+                .flags = 0
+            };
+            VkResult res = qvkCreateSemaphore(vk.device, &semaInfo, NULL, &vk.timeline_semaphore);
+        if (res != VK_SUCCESS) {
+                ri.Printf(PRINT_WARNING, "Vulkan: Failed to create timeline semaphore: %s\n", vk_result_string(res));
+            } else {
+                ri.Printf(PRINT_ALL, "Vulkan: Timeline semaphore created\n");
+            }
+        }
+        #endif
+    // Initialize GPU timeline counter
+    vk.timeline_semaphore = (vk.timeline_semaphore == VK_NULL_HANDLE) ? vk.timeline_semaphore : vk.timeline_semaphore;
+    vk.gpu_timeline_counter = 0;
+    }
 
 	// Create shader modules early so they are available for pipeline creation
 	// Skip for fake devices
@@ -9881,12 +9912,14 @@ void vk_render_scene(const refdef_t *fd) {
 // ============================================================================
 
 void vk_recreate_swapchain(void) {
-    ri.Printf(PRINT_ALL, "Vulkan: Recreating swapchain...\n");
-    qvkDeviceWaitIdle(vk.device);
-
-    // In a full implementation, we would destroy the old swapchain and views
-    // and recreate them using the current window dimensions.
-    // For now, we'll log it.
+  ri.Printf(PRINT_ALL, "Vulkan: Recreating swapchain\n");
+  vk_wait_idle();
+  vk_destroy_swapchain();
+  // Recreate swapchain (use internal wrapper)
+  vk_create_swapchain(vk.physical_device, vk.device, vk_surface, vk_present_format, &vk.swapchain, true);
+  // Recreate framebuffers for the new swapchain images
+  vk_create_framebuffers();
+  ri.Printf(PRINT_ALL, "Vulkan: Swapchain recreated with %u images\n", vk.swapchain_image_count);
 }
 
 /*

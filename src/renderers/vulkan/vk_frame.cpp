@@ -12,6 +12,9 @@
 #include "vk_world_effects.h"
 // Ray marching moved to RTX renderer only
 #include "vk.h"
+// Note: vk_command_buffers.h is not available; declare needed prototypes manually
+extern VkCommandBuffer vk_begin_command_buffer(void);
+extern void vk_end_command_buffer(VkCommandBuffer, const char* location);
 
 #include "vk_fsr.h"
 #include "vk_atmosphere.h"
@@ -75,10 +78,28 @@ extern "C" void vk_update_performance_stats(void) {
            }
        }
    }
+  // Timeline signal for per-frame synchronization if available
+#ifdef VK_KHR_TIMELINE_SEMAPHORE
+  if (vk.timeline_semaphore != VK_NULL_HANDLE && qvkSignalSemaphoreKHR) {
+    vk.gpu_timeline_counter++;
+    VkSemaphoreSignalInfoKHR signalInfo = {
+      .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO_KHR,
+      .pNext = NULL,
+      .semaphore = vk.timeline_semaphore,
+      .value = vk.gpu_timeline_counter
+    };
+    VkResult res = qvkSignalSemaphoreKHR(vk.device, &signalInfo);
+    if (res != VK_SUCCESS) {
+      ri.Printf(PRINT_WARNING, "Vulkan: timeline signal failed: %s\n", vk_result_string(res));
+    }
+  }
+#endif
 }
 
 // Begin frame
-// region agent log
+    // region agent log
+    // declare retry_count for logs in this scope
+    int retry_count = 0;
 static void log_instrumentation(const char* hypothesisId, const char* location, const char* message, const char* data) {
   FILE* f = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
   if (!f) return;
@@ -99,8 +120,10 @@ static inline void agent_log(const char* hypothesisId, const char* location, con
 // Simple fallback trace log for environments where NDJSON log isn't captured
 static inline void agent_trace_log(const char* json) {
 // Route instrumentation to centralized trace helper instead of direct file IO
+static void vt_trace(const char* json);
 vt_trace(json);
 }
+static void vt_trace(const char* json);
 static inline void vt_trace(const char* json) {
   FILE* f = fopen("/home/tim/Desktop/idtech3/.cursor/trace.log", "a");
   if (!f) return;
@@ -111,6 +134,10 @@ static inline void vt_trace(const char* json) {
 // (Note: headless-present guard variable now provided by existing static at vk_frame.cpp: present guard)
 extern "C" void vk_begin_frame(void) {
   // region agent log
+  // Initialize per-frame timeline value increment if available
+  static uint64_t last_timeline_value = 0;
+  // Lightweight local retry counter for present/submission retries
+  int retry_count = 0;
   agent_log("H1","vk_frame.cpp:vk_begin_frame","begin_frame","{}");
     VkResult result;
     uint32_t image_index;
@@ -394,6 +421,22 @@ extern "C" void vk_end_frame(void) {
     }
 
     // Ray marching moved to RTX renderer only
+    // Timeline signaling at end of frame
+    #ifdef VK_KHR_TIMELINE_SEMAPHORE
+    if (vk.timeline_semaphore != VK_NULL_HANDLE && qvkSignalSemaphoreKHR) {
+        vk.gpu_timeline_counter++;
+        VkSemaphoreSignalInfoKHR signalInfo = {
+            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO_KHR,
+            .pNext = NULL,
+            .semaphore = vk.timeline_semaphore,
+            .value = vk.gpu_timeline_counter
+        };
+        VkResult res = qvkSignalSemaphoreKHR(vk.device, &signalInfo);
+        if (res != VK_SUCCESS) {
+            ri.Printf(PRINT_WARNING, "Vulkan: timeline signal failed: %s\n", vk_result_string(res));
+        }
+    }
+    #endif
 
     // Apply FSR (FidelityFX Super Resolution) after post-processing but before UI
     if (vk_fsr_is_enabled()) {
@@ -554,6 +597,53 @@ extern "C" void vk_end_frame(void) {
     vk_sample_thread_utilization();
 
     ri.Printf(PRINT_ALL, "Vulkan: Frame %d ended\n", vk.frame_count);
+#ifdef VK_KHR_TIMELINE_SEMAPHORE
+    if (vk.timeline_semaphore != VK_NULL_HANDLE && qvkSignalSemaphoreKHR) {
+        vk.gpu_timeline_counter++;
+        VkSemaphoreSignalInfoKHR signalInfo = {
+            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO_KHR,
+            .pNext = NULL,
+            .semaphore = vk.timeline_semaphore,
+            .value = vk.gpu_timeline_counter
+        };
+        VkResult res = qvkSignalSemaphoreKHR(vk.device, &signalInfo);
+        if (res != VK_SUCCESS) {
+            ri.Printf(PRINT_WARNING, "Vulkan: timeline signal failed: %s\n", vk_result_string(res));
+        }
+    }
+#endif
+    #ifdef VK_KHR_TIMELINE_SEMAPHORE
+    if (vk.timeline_semaphore != VK_NULL_HANDLE && qvkSignalSemaphoreKHR) {
+        static uint64_t per_frame_sig = 0;
+        per_frame_sig++;
+        VkSemaphoreSignalInfoKHR signalInfo = {
+            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO_KHR,
+            .pNext = NULL,
+            .semaphore = vk.timeline_semaphore,
+            .value = per_frame_sig
+        };
+        VkResult res = qvkSignalSemaphoreKHR(vk.device, &signalInfo);
+        if (res != VK_SUCCESS) {
+            ri.Printf(PRINT_WARNING, "Vulkan: timeline signal failed: %s\n", vk_result_string(res));
+        }
+    }
+    #endif
+// Timeline signaling already emitted above
+#ifdef VK_KHR_TIMELINE_SEMAPHORE
+    if (vk.timeline_semaphore != VK_NULL_HANDLE && qvkSignalSemaphoreKHR) {
+        vk.gpu_timeline_counter++;
+        VkSemaphoreSignalInfoKHR signalInfo = {
+            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO_KHR,
+            .pNext = NULL,
+            .semaphore = vk.timeline_semaphore,
+            .value = vk.gpu_timeline_counter
+        };
+        VkResult res = qvkSignalSemaphoreKHR(vk.device, &signalInfo);
+        if (res != VK_SUCCESS) {
+            ri.Printf(PRINT_WARNING, "Vulkan: timeline signal failed: %s\n", vk_result_string(res));
+        }
+    }
+#endif
 }
 
 // Present frame
@@ -749,79 +839,79 @@ extern "C" void vk_clear_depth(qboolean clear_stencil) {
 
 // Read pixels from framebuffer
 void vk_read_pixels(byte *buffer, uint32_t width, uint32_t height) {
-    if (!buffer || width == 0 || height == 0) {
-        ri.Printf(PRINT_ERROR, "vk_read_pixels: Invalid parameters\n");
-        return;
-    }
+  if (!buffer || width == 0 || height == 0) {
+    ri.Printf(PRINT_ERROR, "vk_read_pixels: Invalid parameters\n");
+    return;
+  }
 
-// Attempt real GPU readback via vkCmdCopyImageToBuffer if available
-size_t bytes = (size_t)width * (size_t)height * 4;
-if (qvkCmdCopyImageToBuffer && vk.color_image != VK_NULL_HANDLE && vk.staging_buffer.handle != VK_NULL_HANDLE) {
+  // Try real GPU readback via vkCmdCopyImageToBuffer if available
+  size_t bytes = (size_t)width * (size_t)height * 4;
+  if (qvkCmdCopyImageToBuffer && vk.color_image != VK_NULL_HANDLE && vk.staging_buffer.handle != VK_NULL_HANDLE) {
     // Ensure staging buffer has enough space
     vk_alloc_staging_buffer((VkDeviceSize)bytes);
     // Begin a short-lived command buffer
     VkCommandBuffer cmd = vk_begin_command_buffer();
     if (cmd != VK_NULL_HANDLE) {
-        // Transition COLOR_ATTACHMENT_OPTIMAL -> TRANSFER_SRC_OPTIMAL
-        VkImageMemoryBarrier barrier1 = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .pNext = nullptr,
-            .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = vk.color_image,
-            .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
-        };
-        qvkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier1);
+      // Transition COLOR_ATTACHMENT_OPTIMAL -> TRANSFER_SRC_OPTIMAL
+      VkImageMemoryBarrier barrier1 = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .pNext = nullptr,
+        .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+        .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = vk.color_image,
+        .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+      };
+      qvkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier1);
 
-        // Copy image -> buffer
-        VkBufferImageCopy region = {};
-        region.bufferOffset = 0;
-        region.bufferRowLength = 0;
-        region.bufferImageHeight = 0;
-        region.imageSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-        region.imageOffset = {0, 0, 0};
-        region.imageExtent = { (uint32_t)width, (uint32_t)height, 1 };
-        qvkCmdCopyImageToBuffer(cmd, vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                               vk.staging_buffer.handle, 1, &region);
+      // Copy image -> buffer
+      VkBufferImageCopy region = {};
+      region.bufferOffset = 0;
+      region.bufferRowLength = 0;
+      region.bufferImageHeight = 0;
+      region.imageSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+      region.imageOffset = {0, 0, 0};
+      region.imageExtent = { (uint32_t)width, (uint32_t)height, 1 };
+      qvkCmdCopyImageToBuffer(cmd, vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                             vk.staging_buffer.handle, 1, &region);
 
-        // Transition back to COLOR_ATTACHMENT_OPTIMAL
-        VkImageMemoryBarrier barrier2 = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .pNext = nullptr,
-            .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-            .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = vk.color_image,
-            .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
-        };
-        qvkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, &barrier2);
+      // Transition back to COLOR_ATTACHMENT_OPTIMAL
+      VkImageMemoryBarrier barrier2 = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .pNext = nullptr,
+        .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+        .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        .newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = vk.color_image,
+        .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+      };
+      qvkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, &barrier2);
 
-        // End and submit
-        vk_end_command_buffer(cmd, "vk_read_pixels_readback");
-        VkSubmitInfo submitInfo = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .pNext = nullptr, .commandBufferCount = 1, .pCommandBuffers = &cmd };
-        qvkQueueSubmit(vk.queue, 1, &submitInfo, VK_NULL_HANDLE);
-        qvkQueueWaitIdle(vk.queue);
+      // End and submit
+      vk_end_command_buffer(cmd, "vk_read_pixels_readback");
+      VkSubmitInfo submitInfo = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .pNext = nullptr, .commandBufferCount = 1, .pCommandBuffers = &cmd };
+      qvkQueueSubmit(vk.queue, 1, &submitInfo, VK_NULL_HANDLE);
+      qvkQueueWaitIdle(vk.queue);
 
-        // Copy staging to CPU memory
-        if (vk.staging_buffer.ptr) {
-            memcpy(buffer, vk.staging_buffer.ptr, bytes);
-        } else {
-            memset(buffer, 0, bytes);
-        }
-        return;
+      // Copy staging to CPU memory
+      if (vk.staging_buffer.ptr) {
+        memcpy(buffer, vk.staging_buffer.ptr, bytes);
+      } else {
+        memset(buffer, 0, bytes);
+      }
+      return;
     } else {
-        ri.Printf(PRINT_WARNING, "Vulkan: failed to begin readback command buffer\n");
+      ri.Printf(PRINT_WARNING, "Vulkan: failed to begin readback command buffer\n");
     }
-}
+  }
 
-// Fallback: zero-fill
-ri.Printf(PRINT_ALL, "Vulkan: Read pixels %ux%u -> zero-filled (readback unavailable)\n", width, height);
-Com_Memset(buffer, 0, (size_t)width * (size_t)height * 4);
+  // Fallback: zero-fill
+  ri.Printf(PRINT_ALL, "Vulkan: Read pixels %ux%u -> zero-filled (readback unavailable)\n", width, height);
+  Com_Memset(buffer, 0, bytes);
 }

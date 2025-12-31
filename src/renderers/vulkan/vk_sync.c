@@ -84,6 +84,13 @@ void vk_destroy_sync_primitives(void) {
     vk.rendering_finished = VK_NULL_HANDLE;
     vk.image_uploaded = VK_NULL_HANDLE;
 #endif
+// Destroy timeline semaphore if present
+#ifdef VK_KHR_TIMELINE_SEMAPHORE
+    if (vk.timeline_semaphore != VK_NULL_HANDLE) {
+        qvkDestroySemaphore(vk.device, vk.timeline_semaphore, NULL);
+        vk.timeline_semaphore = VK_NULL_HANDLE;
+    }
+#endif
 
     ri.Printf(PRINT_ALL, "Vulkan: Destroyed synchronization primitives\n");
 }
@@ -107,13 +114,47 @@ qboolean vk_is_frame_complete(uint32_t frame_index) {
 
 // Timeline semaphore operations (VK_KHR_timeline_semaphore) - framework
 __attribute__((unused)) void vk_timeline_wait(uint64_t value) {
-    // TODO: Implement timeline semaphore wait
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: Timeline semaphore wait requested (value: %llu)\n", (unsigned long long)value);
+#ifdef VK_KHR_TIMELINE_SEMAPHORE
+    if (qvkWaitSemaphoresKHR && vk.timeline_semaphore != VK_NULL_HANDLE) {
+        VkSemaphoreWaitInfoKHR waitInfo = {
+            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO_KHR,
+            .pNext = nullptr,
+            .flags = 0,
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = &vk.timeline_semaphore,
+            .pValues = &value
+        };
+        VkResult res = qvkWaitSemaphoresKHR(vk.device, &waitInfo, UINT64_MAX);
+        if (res != VK_SUCCESS) {
+            ri.Printf(PRINT_WARNING, "Vulkan: timeline wait failed: %s\n", vk_result_string(res));
+        }
+    } else {
+        ri.Printf(PRINT_DEVELOPER, "Vulkan: timeline wait not available (no function pointer or semaphore)\n");
+    }
+#else
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: timeline wait requested but VK_KHR_TIMELINE_SEMAPHORE not defined\n");
+#endif
 }
 
 __attribute__((unused)) void vk_timeline_signal(uint64_t value) {
-    // TODO: Implement timeline semaphore signal
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: Timeline semaphore signal requested (value: %llu)\n", (unsigned long long)value);
+#ifdef VK_KHR_TIMELINE_SEMAPHORE
+    if (qvkSignalSemaphoreKHR && vk.timeline_semaphore != VK_NULL_HANDLE) {
+        VkSemaphoreSignalInfoKHR signalInfo = {
+            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO_KHR,
+            .pNext = nullptr,
+            .semaphore = vk.timeline_semaphore,
+            .value = value
+        };
+        VkResult res = qvkSignalSemaphoreKHR(vk.device, &signalInfo);
+        if (res != VK_SUCCESS) {
+            ri.Printf(PRINT_WARNING, "Vulkan: timeline signal failed: %s\n", vk_result_string(res));
+        }
+    } else {
+        ri.Printf(PRINT_DEVELOPER, "Vulkan: timeline signal not available (no function pointer or semaphore)\n");
+    }
+#else
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: timeline signal requested but VK_KHR_TIMELINE_SEMAPHORE not defined\n");
+#endif
 }
 
 // Synchronization2 operations (VK_KHR_synchronization2) - Vulkan 1.4 core
