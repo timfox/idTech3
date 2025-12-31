@@ -9188,6 +9188,7 @@ void vk_vrs_apply_shading_rate( VkCommandBuffer cmdBuffer ) {
 void vk_shutdown( refShutdownCode_t code ) {
   ri.Printf(PRINT_ALL, "vk_shutdown entering: code=%d, active=%d, device=%p\n", (int)code, (int)vk.active, (void*)vk.device);
   ri.Printf(PRINT_ALL, "vk_shutdown entering: code=%d, active=%d, device=%p\n", (int)code, (int)vk.active, (void*)vk.device);
+  ri.Printf(PRINT_ALL, "vk_shutdown entering: code=%d, active=%d, device=%p\n", (int)code, (int)vk.active, (void*)vk.device);
   ri.Printf(PRINT_ALL, "vk_shutdown called: code=%d, active=%d, device=%p, swapchain=%p\n", (int)code, (int)vk.active, (void*)vk.device, (void*)vk.swapchain);
   // region instrumentation guard: avoid cleanup if no active context
   if (!vk.active || vk.device == VK_NULL_HANDLE || vk.swapchain == VK_NULL_HANDLE) {

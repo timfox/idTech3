@@ -117,6 +117,19 @@ extern "C" void vk_begin_frame(void) {
         // Validate parameters before acquisition
         if (vk.swapchain == VK_NULL_HANDLE) {
             ri.Printf(PRINT_ERROR, "DEBUG: Swapchain handle is NULL!\n");
+            // Final boundary instrumentation
+            {
+                char _log[64];
+                snprintf(_log, sizeof(_log), "{\"final_timeout\":1,\"retry\":%d}", retry_count);
+                agent_log("H1","vk_frame.cpp:vk_begin_frame","final_timeout", _log);
+                vt_trace(_log);
+            }
+            {
+                char _log2[32];
+                snprintf(_log2, sizeof(_log2), "{\"headless\":1}");
+                agent_log("H1","vk_frame.cpp:vk_begin_frame","headless_state", _log2);
+                vt_trace(_log2);
+            }
             return;
         }
         if (vk.tess[vk.cmd_index].image_acquired == VK_NULL_HANDLE) {
@@ -553,7 +566,13 @@ extern "C" void vk_end_frame(void) {
         return;
     }
 
-    ri.Printf(PRINT_ALL, "DEBUG: Presenting frame, image_index=%u, semaphore=%p\n",
+  {
+    char _present[64];
+    snprintf(_present, sizeof(_present), "{\"present_start_image_index\":%u}", vk.cmd->swapchain_image_index);
+    agent_log("H1","vk_frame.cpp:vk_present_frame","present_start", _present);
+    vt_trace(_present);
+  }
+  ri.Printf(PRINT_ALL, "DEBUG: Presenting frame, image_index=%u, semaphore=%p\n",
         vk.cmd->swapchain_image_index, vk.cmd->rendering_finished2);
 
     // Wait for rendering to complete
