@@ -507,6 +507,11 @@ extern "C" void vk_end_frame(void) {
         return;
   }
     ri.Printf(PRINT_ALL, "DEBUG: vk_present_frame called\n");
+    {
+        char _log[64];
+        snprintf(_log, sizeof(_log), "{\"image_index\":%u,\"swapchain\":%p}", vk.cmd->swapchain_image_index, (void*)vk.swapchain);
+        agent_log("H1","vk_frame.cpp:vk_present_frame","present_start", _log);
+    }
 
     if (!vk_validate_handle(vk.swapchain, "swapchain")) {
         ri.Printf(PRINT_ALL, "DEBUG: Swapchain handle invalid, skipping present\n");
