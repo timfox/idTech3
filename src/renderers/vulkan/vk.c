@@ -597,7 +597,7 @@ PFN_vkGetImageSubresourceLayout					qvkGetImageSubresourceLayout;
 PFN_vkInvalidateMappedMemoryRanges				qvkInvalidateMappedMemoryRanges;
 PFN_vkMapMemory									qvkMapMemory;
 PFN_vkQueueSubmit								qvkQueueSubmit;
-// PFN_vkEnumeratePhysicalDevices qvkEnumeratePhysicalDevices; removed duplicate declaration
+PFN_vkEnumeratePhysicalDevices qvkEnumeratePhysicalDevices;
 PFN_vkQueueWaitIdle								qvkQueueWaitIdle;
 PFN_vkResetCommandBuffer							qvkResetCommandBuffer;
 PFN_vkResetDescriptorPool						qvkResetDescriptorPool;
