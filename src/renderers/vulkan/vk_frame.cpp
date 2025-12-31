@@ -208,6 +208,11 @@ extern "C" void vk_begin_frame(void) {
                 agent_log("H1","vk_frame.cpp:vk_begin_frame","headless_detected", _buf);
             }
             {
+                char _log[24];
+                snprintf(_log, sizeof(_log), "{\"headless\":1}");
+                agent_log("H1","vk_frame.cpp:vk_begin_frame","headless_state", _log);
+            }
+            {
                 char _log[32];
                 snprintf(_log, sizeof(_log), "{\"headless_state\":1}");
                 agent_log("H1","vk_frame.cpp:vk_begin_frame","headless_state", _log);
