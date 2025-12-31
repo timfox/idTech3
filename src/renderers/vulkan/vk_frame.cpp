@@ -203,6 +203,11 @@ extern "C" void vk_begin_frame(void) {
             }
             headless_detected = qtrue;
             {
+                char _log[40];
+                snprintf(_log, sizeof(_log), "{\"final_timeout\":%d}", (int)result);
+                agent_log("H1","vk_frame.cpp:vk_begin_frame","final_timeout", _log);
+            }
+            {
                 char _buf[32];
                 snprintf(_buf, sizeof(_buf), "{\"result\":%d}", (int)result);
                 agent_log("H1","vk_frame.cpp:vk_begin_frame","headless_detected", _buf);
