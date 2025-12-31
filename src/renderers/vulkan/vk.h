@@ -1476,6 +1476,13 @@ void vk_push_constants_enhanced(VkPipelineLayout layout, VkShaderStageFlags stag
 void vk_push_constants_batch(VkPipelineLayout layout, uint32_t count,
                             const VkPushConstantRange *ranges, const void *values);
 
+// Vulkan 1.4 Dynamic Rendering function pointers (extern declarations)
+extern PFN_vkCmdBeginRenderingKHR qvkCmdBeginRenderingKHR;
+extern PFN_vkCmdEndRenderingKHR qvkCmdEndRenderingKHR;
+
+// Vulkan 1.4 Synchronization2 function pointers (extern declarations)
+extern PFN_vkCmdPipelineBarrier2KHR qvkCmdPipelineBarrier2KHR;
+
 // Vulkan 1.4 Host Image Copy Operations (requires VK_EXT_host_image_copy)
 // Note: Types not available in current Vulkan headers - framework ready
 // qboolean vk_host_image_copy_supported(void);

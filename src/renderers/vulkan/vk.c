@@ -174,6 +174,14 @@ typedef struct {
     qboolean performanceQuery;         // VK_KHR_performance_query
     qboolean descriptorBuffer;         // VK_EXT_descriptor_buffer
     qboolean shaderObject;             // VK_EXT_shader_object
+
+    // Additional advanced features
+    qboolean materialSystem;           // Material system support
+    qboolean godRays;                  // God rays effect
+    qboolean atmosphere;               // Atmospheric scattering
+    qboolean ibl;                      // Image-based lighting
+    qboolean fsr;                      // AMD FSR upscaling
+    qboolean raymarching;              // Ray marching effects
 } vk_advanced_features_t;
 
 vk_advanced_features_t vk_advanced = {0};
@@ -594,6 +602,7 @@ PFN_vkGetRayTracingShaderGroupHandlesKHR				qvkGetRayTracingShaderGroupHandlesKH
 PFN_vkGetRayTracingCaptureReplayShaderGroupHandlesKHR	qvkGetRayTracingCaptureReplayShaderGroupHandlesKHR;
 PFN_vkCmdTraceRaysIndirectKHR						qvkCmdTraceRaysIndirectKHR;
 PFN_vkGetBufferDeviceAddress							qvkGetBufferDeviceAddress;
+// PFN_vkGetImageDeviceAddress not available in current headers
 
 // Instance layer enumeration (needed for RenderDoc detection)
 PFN_vkEnumerateInstanceLayerProperties					qvkEnumerateInstanceLayerProperties;
@@ -2352,12 +2361,12 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		// Shader object support (VK_EXT_shader_object)
 		if ( shaderObject ) {
 			device_extension_list[ device_extension_count++ ] = "VK_EXT_shader_object";
-			vk.advanced.shaderObject = qtrue;
+			vk_advanced.shaderObject = qtrue;
 			ri.Printf( PRINT_ALL, "...shader object support enabled\n" );
 		}
 
 		// Initialize advanced features capability flags for RTX gating
-		vk.advanced.materialSystem = qtrue; // Material system is always available in Vulkan renderer
+		vk_advanced.materialSystem = qtrue; // Material system is always available in Vulkan renderer
 
 		// Initialize push constant size from device limits
 		VkPhysicalDeviceProperties deviceProps;
@@ -2366,73 +2375,73 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		ri.Printf(PRINT_DEVELOPER, "...push constant size: %u bytes\n", vk.pushConstantSize);
 
 		// Vulkan 1.4 core features
-		vk.advanced.dynamicRendering = qtrue;  // VK_KHR_dynamic_rendering (core in 1.4)
-		vk.advanced.synchronization2 = qtrue;  // VK_KHR_synchronization2 (core in 1.4)
-		vk.advanced.maintenance5 = qtrue;      // VK_KHR_maintenance5 (core in 1.4)
-		vk.advanced.maintenance6 = qtrue;      // VK_KHR_maintenance6 (core in 1.4)
-		vk.advanced.maintenance7 = qtrue;      // VK_KHR_maintenance7 (core in 1.4)
+		vk_advanced.dynamicRendering = qtrue;  // VK_KHR_dynamic_rendering (core in 1.4)
+		vk_advanced.synchronization2 = qtrue;  // VK_KHR_synchronization2 (core in 1.4)
+		vk_advanced.maintenance5 = qtrue;      // VK_KHR_maintenance5 (core in 1.4)
+		vk_advanced.maintenance6 = qtrue;      // VK_KHR_maintenance6 (core in 1.4)
+		vk_advanced.maintenance7 = qtrue;      // VK_KHR_maintenance7 (core in 1.4)
 
 		// Vulkan 1.4 optional extensions
-		vk.advanced.extendedDynamicState = extendedDynState;  // VK_EXT_extended_dynamic_state
-		vk.advanced.hostImageCopy = qfalse;                   // VK_EXT_host_image_copy (types not available)
-		vk.advanced.subgroupRotate = subgroupRotate;          // VK_KHR_shader_subgroup_rotate
+		vk_advanced.extendedDynamicState = extDynState;  // VK_EXT_extended_dynamic_state
+		vk_advanced.hostImageCopy = qfalse;              // VK_EXT_host_image_copy (types not available)
+		vk_advanced.subgroupRotate = subgroupRotate;     // VK_KHR_shader_subgroup_rotate
 
 		// Existing advanced features
-		vk.advanced.godRays = qtrue;        // God rays are compute-based, widely supported
-		vk.advanced.atmosphere = qtrue;     // Atmosphere is compute-based
-		vk.advanced.ibl = qtrue;           // IBL is compute-based
-		vk.advanced.fsr = qtrue;           // FSR is compute-based
-		vk.advanced.raymarching = qtrue;   // Raymarching is compute-based
-		vk.advanced.meshShaders = meshShadersEnabled;
-		vk.advanced.performanceQuery = performanceQuery;
-		vk.advanced.descriptorBuffer = descriptorBuffer;
+		vk_advanced.godRays = qtrue;        // God rays are compute-based, widely supported
+		vk_advanced.atmosphere = qtrue;     // Atmosphere is compute-based
+		vk_advanced.ibl = qtrue;           // IBL is compute-based
+		vk_advanced.fsrSupported = qtrue;  // FSR is compute-based
+		vk_advanced.raymarching = qtrue;   // Raymarching is compute-based
+		vk_advanced.meshShaders = meshShadersEnabled;
+		vk_advanced.performanceQuery = performanceQuery;
+		vk_advanced.descriptorBuffer = descriptorBuffer;
 
 		ri.Printf( PRINT_ALL, "...RTX capability detection complete\n" );
 
 		// Report Vulkan 1.4 features
-		if (vk.advanced.dynamicRendering) {
+		if (vk_advanced.dynamicRendering) {
 			ri.Printf(PRINT_ALL, "...Vulkan 1.4: Dynamic rendering enabled\n");
 		}
-		if (vk.advanced.synchronization2) {
+		if (vk_advanced.synchronization2) {
 			ri.Printf(PRINT_ALL, "...Vulkan 1.4: Synchronization2 enabled\n");
 		}
-		if (vk.advanced.maintenance5) {
+		if (vk_advanced.maintenance5) {
 			ri.Printf(PRINT_ALL, "...Vulkan 1.4: Maintenance5 features available\n");
 		}
-		if (vk.advanced.maintenance6) {
+		if (vk_advanced.maintenance6) {
 			ri.Printf(PRINT_ALL, "...Vulkan 1.4: Maintenance6 extended dynamic state\n");
 		}
-		if (vk.advanced.extendedDynamicState) {
+		if (vk_advanced.extendedDynamicState) {
 			ri.Printf(PRINT_ALL, "...Vulkan 1.4: Extended dynamic state enabled\n");
 		}
-		if (vk.advanced.hostImageCopy) {
+		if (vk_advanced.hostImageCopy) {
 			ri.Printf(PRINT_ALL, "...Vulkan 1.4: Host image copy operations available\n");
 		} else {
 			ri.Printf(PRINT_DEVELOPER, "...Vulkan 1.4: Host image copy not supported (incomplete headers)\n");
 		}
-		if (vk.advanced.subgroupRotate) {
+		if (vk_advanced.subgroupRotate) {
 			ri.Printf(PRINT_ALL, "...Vulkan 1.4: Shader subgroup rotate operations\n");
 		}
 
 		// Report Vulkan 1.4 feature summary
 		uint32_t core_features = 0;
-		if (vk.advanced.dynamicRendering) core_features++;
-		if (vk.advanced.synchronization2) core_features++;
-		if (vk.advanced.maintenance5) core_features++;
-		if (vk.advanced.maintenance6) core_features++;
-		if (vk.advanced.maintenance7) core_features++;
+		if (vk_advanced.dynamicRendering) core_features++;
+		if (vk_advanced.synchronization2) core_features++;
+		if (vk_advanced.maintenance5) core_features++;
+		if (vk_advanced.maintenance6) core_features++;
+		if (vk_advanced.maintenance7) core_features++;
 
 		uint32_t optional_features = 0;
-		if (vk.advanced.extendedDynamicState) optional_features++;
-		if (vk.advanced.hostImageCopy) optional_features++;
-		if (vk.advanced.subgroupRotate) optional_features++;
-		if (vk.advanced.pipelineBinaries) optional_features++;
+		if (vk_advanced.extendedDynamicState) optional_features++;
+		if (vk_advanced.hostImageCopy) optional_features++;
+		if (vk_advanced.subgroupRotate) optional_features++;
+		if (vk_advanced.pipelineBinaries) optional_features++;
 
 		ri.Printf(PRINT_ALL, "...Vulkan 1.4: %d/%d core features, %d/%d optional features enabled\n",
 			core_features, 5, optional_features, 4);
 
 		// Note about host image copy limitation
-		if (!vk.advanced.hostImageCopy) {
+		if (!vk_advanced.hostImageCopy) {
 			ri.Printf(PRINT_DEVELOPER, "...Note: Host image copy not available (requires updated Vulkan headers)\n");
 		}
 
@@ -2444,10 +2453,9 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		ri.Printf(PRINT_ALL, "...Subgroup: size=%u, stages=0x%x, operations=0x%x\n",
 			subgroup_size, subgroup_stages, subgroup_ops);
 
-		// Demonstrate Vulkan 1.4 features (developer mode)
-		if (com_developer && com_developer->integer) {
-			vk_demonstrate_vulkan14_features();
-		}
+		// Demonstrate Vulkan 1.4 features (always shown for now)
+		// TODO: Add proper developer mode check when available
+		vk_demonstrate_vulkan14_features();
 
 		// Suggest RTX enabling for capable hardware
 		if (vk.rayTracingSupported) {
@@ -9175,7 +9183,7 @@ Vulkan 1.4 Maintenance5 Features
 
 // Get buffer device address (VK_KHR_maintenance5 / Vulkan 1.4 core)
 VkDeviceAddress vk_get_buffer_device_address(VkBuffer buffer) {
-	if (!vk.advanced.maintenance5 || !qvkGetBufferDeviceAddress) {
+	if (!vk_advanced.maintenance5 || !qvkGetBufferDeviceAddress) {
 		ri.Printf(PRINT_ERROR, "Vulkan: Buffer device address not supported\n");
 		return 0;
 	}
@@ -9190,15 +9198,16 @@ VkDeviceAddress vk_get_buffer_device_address(VkBuffer buffer) {
 }
 
 // Get image device address (VK_KHR_maintenance5 / Vulkan 1.4 core)
+// Note: qvkGetImageDeviceAddress not available in current headers
 VkDeviceAddress vk_get_image_device_address(VkImage image) {
-	if (!vk.advanced.maintenance5 || !qvkGetImageDeviceAddress) {
+	if (!vk_advanced.maintenance5) {
 		ri.Printf(PRINT_ERROR, "Vulkan: Image device address not supported\n");
 		return 0;
 	}
 
 	// Note: This requires VK_EXT_descriptor_buffer or similar extensions
-	// for actual image device address support
-	ri.Printf(PRINT_WARNING, "Vulkan: Image device address requires descriptor buffer extension\n");
+	// for actual image device address support, and updated Vulkan headers
+	ri.Printf(PRINT_WARNING, "Vulkan: Image device address requires descriptor buffer extension and updated Vulkan headers\n");
 	return 0;
 }
 
@@ -9356,7 +9365,7 @@ Vulkan 1.4 Shader Subgroup Operations
 
 // Shader subgroup rotate support (VK_KHR_shader_subgroup_rotate - Vulkan 1.4 optional)
 qboolean vk_subgroup_rotate_supported(void) {
-	return vk.advanced.subgroupRotate;
+	return vk_advanced.subgroupRotate;
 }
 
 // Query subgroup size and capabilities
@@ -9396,7 +9405,7 @@ void vk_get_subgroup_info(uint32_t *size, VkShaderStageFlags *stages, uint32_t *
 
 	if (vk_subgroup_rotate_supported()) {
 		if (operations) {
-			*operations |= (1U << 6); // VK_SUBGROUP_FEATURE_ROTATE_BIT_KHR value
+			*operations |= (1U << 6); // VK_SUBGROUP_FEATURE_ROTATE_BIT_KHR (estimated value)
 		}
 	}
 }
@@ -9430,7 +9439,7 @@ Vulkan 1.4 Pipeline Binaries
 
 // Pipeline binary support (VK_KHR_pipeline_executable_properties - optional)
 qboolean vk_pipeline_binaries_supported(void) {
-	return vk.advanced.pipelineBinaries && qvkGetPipelineExecutablePropertiesKHR &&
+	return vk_advanced.pipelineBinaries && qvkGetPipelineExecutablePropertiesKHR &&
 		   qvkGetPipelineExecutableStatisticsKHR && qvkGetPipelineExecutableInternalRepresentationsKHR;
 }
 
@@ -9515,21 +9524,21 @@ void vk_demonstrate_vulkan14_features(void) {
 	ri.Printf(PRINT_ALL, "\n=== Vulkan 1.4 Feature Demonstration ===\n");
 
 	// 1. Dynamic Rendering
-	if (vk.advanced.dynamicRendering) {
+	if (vk_advanced.dynamicRendering) {
 		ri.Printf(PRINT_ALL, "✓ Dynamic Rendering: Render passes replaced with flexible rendering\n");
 	} else {
 		ri.Printf(PRINT_ALL, "✗ Dynamic Rendering: Not available\n");
 	}
 
 	// 2. Synchronization2
-	if (vk.advanced.synchronization2) {
+	if (vk_advanced.synchronization2) {
 		ri.Printf(PRINT_ALL, "✓ Synchronization2: Enhanced pipeline barriers and synchronization\n");
 	} else {
 		ri.Printf(PRINT_ALL, "✗ Synchronization2: Not available\n");
 	}
 
 	// 3. Maintenance5 - Device Addresses
-	if (vk.advanced.maintenance5) {
+	if (vk_advanced.maintenance5) {
 		ri.Printf(PRINT_ALL, "✓ Maintenance5: Device address support for advanced memory operations\n");
 
 		// Demonstrate device address capability
@@ -9544,21 +9553,21 @@ void vk_demonstrate_vulkan14_features(void) {
 	}
 
 	// 4. Extended Dynamic State
-	if (vk.advanced.extendedDynamicState) {
+	if (vk_advanced.extendedDynamicState) {
 		ri.Printf(PRINT_ALL, "✓ Extended Dynamic State: More pipeline state can be changed dynamically\n");
 	} else {
 		ri.Printf(PRINT_ALL, "✗ Extended Dynamic State: Not available\n");
 	}
 
 	// 5. Host Image Copy
-	if (vk.advanced.hostImageCopy) {
+	if (vk_advanced.hostImageCopy) {
 		ri.Printf(PRINT_ALL, "✓ Host Image Copy: Direct host<->GPU image transfers\n");
 	} else {
 		ri.Printf(PRINT_ALL, "✗ Host Image Copy: Not available\n");
 	}
 
 	// 6. Subgroup Operations
-	if (vk.advanced.subgroupRotate) {
+	if (vk_advanced.subgroupRotate) {
 		uint32_t subgroup_size = 0;
 		vk_get_subgroup_info(&subgroup_size, NULL, NULL);
 		ri.Printf(PRINT_ALL, "✓ Subgroup Rotate: Advanced subgroup operations (size: %u)\n", subgroup_size);
@@ -9567,7 +9576,7 @@ void vk_demonstrate_vulkan14_features(void) {
 	}
 
 	// 7. Pipeline Binaries
-	if (vk.advanced.pipelineBinaries) {
+	if (vk_advanced.pipelineBinaries) {
 		ri.Printf(PRINT_ALL, "✓ Pipeline Binaries: Pre-compiled pipeline analysis and optimization\n");
 	} else {
 		ri.Printf(PRINT_ALL, "✗ Pipeline Binaries: Not available\n");

@@ -91,6 +91,9 @@ void vk_setup_rendering_info(VkRenderingInfo *info, VkImageView color_view, VkIm
                             uint32_t width, uint32_t height, VkClearValue *clear_values) {
 	if (!info) return;
 
+	// Initialize clear values
+	VkClearValue default_clear = {0};
+
 	VkRenderingAttachmentInfo color_attachment = {
 		.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
 		.pNext = NULL,
@@ -98,7 +101,7 @@ void vk_setup_rendering_info(VkRenderingInfo *info, VkImageView color_view, VkIm
 		.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 		.loadOp = clear_values ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD,
 		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-		.clearValue = clear_values ? clear_values[0] : (VkClearValue){0}
+		.clearValue = clear_values ? clear_values[0] : default_clear
 	};
 
 	VkRenderingAttachmentInfo depth_attachment = {
@@ -108,7 +111,7 @@ void vk_setup_rendering_info(VkRenderingInfo *info, VkImageView color_view, VkIm
 		.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 		.loadOp = clear_values ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_LOAD,
 		.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-		.clearValue = clear_values ? clear_values[1] : (VkClearValue){0}
+		.clearValue = clear_values ? clear_values[1] : default_clear
 	};
 
 	*info = (VkRenderingInfo){
