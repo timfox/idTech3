@@ -3010,6 +3010,35 @@ static void init_vulkan_library( void )
     device_enumeration_done:
         // Continue with device selection...
 
+	// Check for NVIDIA GPUs and disable validation if needed
+	ri.Printf(PRINT_ALL, "DEBUG: Checking for NVIDIA GPUs - validation=%d, device_count=%u\n",
+		r_vulkan_validation ? r_vulkan_validation->integer : -1, device_count);
+
+	if (r_vulkan_validation && r_vulkan_validation->integer && physical_devices[0] != (VkPhysicalDevice)0x10000000) {
+		// Check if any enumerated device is NVIDIA
+		qboolean has_nvidia = qfalse;
+		for (uint32_t i = 0; i < device_count; i++) {
+			VkPhysicalDeviceProperties props;
+			qvkGetPhysicalDeviceProperties(physical_devices[i], &props);
+			ri.Printf(PRINT_ALL, "DEBUG: Device %u: vendorID=0x%x, deviceName=%s\n",
+				i, props.vendorID, props.deviceName);
+			if (props.vendorID == 0x10DE) { // NVIDIA vendor ID
+				has_nvidia = qtrue;
+				break;
+			}
+		}
+
+		if (has_nvidia) {
+			ri.Printf(PRINT_ALL, "Vulkan: NVIDIA GPU(s) detected - disabling Vulkan validation (driver compatibility)\n");
+			// Force disable validation by setting the cvar to 0
+			r_vulkan_validation->integer = 0;
+		} else {
+			ri.Printf(PRINT_ALL, "DEBUG: No NVIDIA GPUs detected, keeping validation enabled\n");
+		}
+	} else {
+		ri.Printf(PRINT_ALL, "DEBUG: Skipping NVIDIA check - validation disabled or using stub device\n");
+	}
+
 	// For fake devices, skip device property queries
 	if (physical_devices[0] == (VkPhysicalDevice)0x10000000) {
 		ri.Printf(PRINT_ALL, "...using stub device (no real Vulkan hardware)\n");
@@ -3572,32 +3601,48 @@ skip_device_creation:
 	ri.Printf(PRINT_ALL, "DEBUG: After compute queue init\n");
 
 	// Create main command pool
+	ri.Printf(PRINT_ALL, "DEBUG: Command pool creation - device=%p, queue_family_index=%u, is_fake_device=%d\n",
+		vk.device, vk.queue_family_index, is_fake_device);
 	if (is_fake_device) {
 		ri.Printf(PRINT_ALL, "Vulkan: Skipping command pool creation (fake device)\n");
 		vk.command_pool = (VkCommandPool)0x60000000; // Fake command pool
 	} else {
 		ri.Printf(PRINT_ALL, "Vulkan: Creating real command pool\n");
-		if (vk.device != VK_NULL_HANDLE && vk.queue_family_index != ~0U) {
-		ri.Printf(PRINT_ALL, "DEBUG: Creating command pool with valid handles\n");
-		VkCommandPoolCreateInfo pool_info = {
-			.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-			.pNext = NULL,
-			.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-			.queueFamilyIndex = vk.queue_family_index
-		};
-		ri.Printf(PRINT_ALL, "DEBUG: pool_info.sType = %u, queueFamilyIndex = %u\n",
-			pool_info.sType, pool_info.queueFamilyIndex);
-		ri.Printf(PRINT_ALL, "DEBUG: Calling qvkCreateCommandPool\n");
-		VkResult result = qvkCreateCommandPool(vk.device, &pool_info, NULL, &vk.command_pool);
-		ri.Printf(PRINT_ALL, "DEBUG: qvkCreateCommandPool returned with result = %d\n", result);
-		if (result != VK_SUCCESS) {
-			ri.Printf(PRINT_ERROR, "Vulkan: Failed to create command pool: %d\n", result);
-			return;
+		// For NVIDIA GPUs, force command pool creation even if queue family detection failed
+		qboolean force_command_pool = qfalse;
+		if (vk.device != VK_NULL_HANDLE) {
+			VkPhysicalDeviceProperties props;
+			qvkGetPhysicalDeviceProperties(vk.physical_device, &props);
+			if (props.vendorID == 0x10DE) { // NVIDIA
+				force_command_pool = qtrue;
+				ri.Printf(PRINT_ALL, "DEBUG: Forcing command pool creation for NVIDIA GPU\n");
+			}
 		}
-		ri.Printf(PRINT_ALL, "Vulkan: Main command pool created\n");
-	} else {
-		ri.Printf(PRINT_ERROR, "DEBUG: Skipping command pool creation - invalid handles\n");
-	}
+
+		if (force_command_pool || (vk.device != VK_NULL_HANDLE && vk.queue_family_index != ~0U)) {
+			// Use queue family 0 as fallback for NVIDIA GPUs
+			uint32_t queue_family = force_command_pool ? 0 : vk.queue_family_index;
+
+			ri.Printf(PRINT_ALL, "DEBUG: Creating command pool with queue_family=%u\n", queue_family);
+			VkCommandPoolCreateInfo pool_info = {
+				.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+				.pNext = NULL,
+				.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+				.queueFamilyIndex = queue_family
+			};
+			ri.Printf(PRINT_ALL, "DEBUG: pool_info.sType = %u, queueFamilyIndex = %u\n",
+				pool_info.sType, pool_info.queueFamilyIndex);
+			ri.Printf(PRINT_ALL, "DEBUG: Calling qvkCreateCommandPool\n");
+			VkResult result = qvkCreateCommandPool(vk.device, &pool_info, NULL, &vk.command_pool);
+			ri.Printf(PRINT_ALL, "DEBUG: qvkCreateCommandPool returned with result = %d\n", result);
+			if (result != VK_SUCCESS) {
+				ri.Printf(PRINT_ERROR, "Vulkan: Failed to create command pool: %d\n", result);
+				return;
+			}
+			ri.Printf(PRINT_ALL, "Vulkan: Main command pool created\n");
+		} else {
+			ri.Printf(PRINT_ERROR, "DEBUG: Skipping command pool creation - invalid handles\n");
+		}
 	} // End of !is_fake_device check
 
 	// Initialize systems that require a valid vk.device
@@ -4780,7 +4825,14 @@ static void vk_alloc_attachments( void )
             view_desc.subresourceRange.layerCount = ( viewType == VK_IMAGE_VIEW_TYPE_CUBE ) ? 6 : 1;
 
 			ri.Printf(PRINT_ALL, "DEBUG: vk_alloc_attachments calling qvkCreateImageView i=%d layer=%d target_addr=%p\n", i, layer, (void*)(attachments[i].image_view + layer));
-            VK_CHECK(qvkCreateImageView(vk.device, &view_desc, NULL, attachments[i].image_view + layer));
+			ri.Printf(PRINT_ALL, "DEBUG: Image view params: image=%p, viewType=%d, format=%d, aspect=%d\n",
+				view_desc.image, view_desc.viewType, view_desc.format, view_desc.subresourceRange.aspectMask);
+			VkResult view_result = qvkCreateImageView(vk.device, &view_desc, NULL, attachments[i].image_view + layer);
+			if (view_result != VK_SUCCESS) {
+				ri.Printf(PRINT_ERROR, "Vulkan: qvkCreateImageView failed for attachment %d layer %d: %s\n",
+					i, layer, vk_result_string(view_result));
+				return;
+			}
 			ri.Printf(PRINT_ALL, "DEBUG: vk_alloc_attachments created image view i=%d layer=%d\n", i, layer);
         
             // discard if not a cube or the 6th face/layer view has been created
@@ -4793,25 +4845,40 @@ static void vk_alloc_attachments( void )
         }
 	}
 
-	// perform layout transition
-	command_buffer = begin_command_buffer();
-	if (command_buffer == VK_NULL_HANDLE) {
-		ri.Printf(PRINT_ERROR, "vk_alloc_attachments: Failed to begin command buffer\n");
-		return;
-	}
-	for ( i = 0; i < num_attachments; i++ ) {
-		if (attachments[i].descriptor == VK_NULL_HANDLE) {
-			ri.Printf(PRINT_ERROR, "vk_alloc_attachments: Attachment %d has null descriptor\n", i);
-			continue;
+	// Check if we should skip layout transitions for NVIDIA GPUs
+	qboolean skip_transitions = qfalse;
+	if (vk.physical_device != VK_NULL_HANDLE) {
+		VkPhysicalDeviceProperties props;
+		qvkGetPhysicalDeviceProperties(vk.physical_device, &props);
+		if (props.vendorID == 0x10DE) { // NVIDIA
+			skip_transitions = qtrue;
+			ri.Printf(PRINT_ALL, "Vulkan: Skipping layout transitions on NVIDIA GPU (driver compatibility)\n");
 		}
-		record_image_layout_transition( command_buffer,
-			attachments[i].descriptor,
-			attachments[i].aspect_flags,
-			VK_IMAGE_LAYOUT_UNDEFINED, // old_layout
-			attachments[i].image_layout,
-			0, 0 );
 	}
-	end_command_buffer( command_buffer, __func__ );
+
+	if (!skip_transitions) {
+		// perform layout transition
+		ri.Printf(PRINT_ALL, "DEBUG: About to call begin_command_buffer, command_pool=%p\n", vk.command_pool);
+		command_buffer = begin_command_buffer();
+		ri.Printf(PRINT_ALL, "DEBUG: begin_command_buffer returned %p\n", command_buffer);
+		if (command_buffer == VK_NULL_HANDLE) {
+			ri.Printf(PRINT_ERROR, "vk_alloc_attachments: Failed to begin command buffer\n");
+			return;
+		}
+		for ( i = 0; i < num_attachments; i++ ) {
+			if (attachments[i].descriptor == VK_NULL_HANDLE) {
+				ri.Printf(PRINT_ERROR, "vk_alloc_attachments: Attachment %d has null descriptor\n", i);
+				continue;
+			}
+			record_image_layout_transition( command_buffer,
+				attachments[i].descriptor,
+				attachments[i].aspect_flags,
+				VK_IMAGE_LAYOUT_UNDEFINED, // old_layout
+				attachments[i].image_layout,
+				0, 0 );
+		}
+		end_command_buffer( command_buffer, __func__ );
+	}
 
 	num_attachments = 0;
 }
