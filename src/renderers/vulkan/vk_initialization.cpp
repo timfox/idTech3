@@ -115,10 +115,10 @@ qboolean vk_create_instance(void) {
     VkApplicationInfo appInfo = {
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
         .pApplicationName = "idTech3",
-        .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
+        .applicationVersion = VK_MAKE_VERSION(1, 4, 0),
         .pEngineName = "idTech3 Vulkan Renderer",
-        .engineVersion = VK_MAKE_VERSION(1, 0, 0),
-        .apiVersion = VK_API_VERSION_1_1
+        .engineVersion = VK_MAKE_VERSION(1, 4, 0),
+        .apiVersion = VK_MAKE_API_VERSION(0, 1, 4, 0)
     };
 
     // Instance create info

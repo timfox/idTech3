@@ -1425,6 +1425,9 @@ typedef struct {
     VkDeviceMemory portalLightsBufferMemory;
     VkDescriptorSetLayout portalLightsDescriptorSetLayout;
     VkDescriptorSet portalLightsDescriptorSet;
+
+    // Vulkan 1.4 enhanced push constants
+    uint32_t pushConstantSize;
 } Vk_Instance;
 
 // Global Vulkan instance
@@ -1462,6 +1465,41 @@ void vk_get_pipeline_def(VkPipeline pipeline, Vk_Pipeline_Def *def);
 VkPipeline vk_find_pipeline_ext(int base_pipeline, Vk_Pipeline_Def* def, qboolean create_if_missing);
 void vk_wait_idle(void);
 void vk_queue_wait_idle(void);
+
+// Vulkan 1.4 Maintenance5 features
+VkDeviceAddress vk_get_buffer_device_address(VkBuffer buffer);
+VkDeviceAddress vk_get_image_device_address(VkImage image);
+
+// Vulkan 1.4 Enhanced Push Constants
+void vk_push_constants_enhanced(VkPipelineLayout layout, VkShaderStageFlags stageFlags,
+                               uint32_t offset, uint32_t size, const void *values);
+void vk_push_constants_batch(VkPipelineLayout layout, uint32_t count,
+                            const VkPushConstantRange *ranges, const void *values);
+
+// Vulkan 1.4 Host Image Copy Operations (requires VK_EXT_host_image_copy)
+// Note: Types not available in current Vulkan headers - framework ready
+// qboolean vk_host_image_copy_supported(void);
+// void vk_host_image_copy_to_image(const VkHostImageCopyInfo *copy_info);
+// void vk_host_image_copy_from_image(const VkHostImageCopyInfo *copy_info);
+// void vk_host_image_copy_image_to_image(const VkHostImageToImageCopyInfo *copy_info);
+// void vk_host_image_layout_transition(VkImage image, VkImageLayout old_layout,
+//                                     VkImageLayout new_layout, VkImageSubresourceRange *subresource_range);
+
+// Vulkan 1.4 Extended Dynamic State (framework ready)
+// void vk_set_dynamic_state_extended(VkDynamicState state, const void *data);
+// void vk_set_dynamic_states_batch(uint32_t count, const VkDynamicState *states, const void **data);
+
+// Vulkan 1.4 Shader Subgroup Operations
+qboolean vk_subgroup_rotate_supported(void);
+void vk_get_subgroup_info(uint32_t *size, VkShaderStageFlags *stages, uint32_t *operations);
+void vk_dispatch_compute_optimized(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
+
+// Vulkan 1.4 Pipeline Binaries
+qboolean vk_pipeline_binaries_supported(void);
+void vk_analyze_pipeline_executable(VkPipeline pipeline, const char *pipeline_name);
+
+// Vulkan 1.4 Feature Demonstration
+void vk_demonstrate_vulkan14_features(void);
 void vk_update_post_process_pipelines(void);
 qboolean VK_ImGui_InitBackend(void);
 void VK_ImGui_ShutdownBackend(void);

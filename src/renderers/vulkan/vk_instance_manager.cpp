@@ -102,10 +102,10 @@ static VkResult create_vulkan_instance() {
     VkApplicationInfo app_info = {};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.pApplicationName = "idtech3";
-    app_info.applicationVersion = VK_MAKE_VERSION(1, 3, 0);
+    app_info.applicationVersion = VK_MAKE_VERSION(1, 4, 0);
     app_info.pEngineName = "idtech3";
-    app_info.engineVersion = VK_MAKE_VERSION(1, 3, 0);
-    app_info.apiVersion = VK_API_VERSION_1_3;
+    app_info.engineVersion = VK_MAKE_VERSION(1, 4, 0);
+    app_info.apiVersion = VK_MAKE_API_VERSION(0, 1, 4, 0);
 
     VkInstanceCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;

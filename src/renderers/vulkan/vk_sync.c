@@ -116,12 +116,15 @@ __attribute__((unused)) void vk_timeline_signal(uint64_t value) {
     ri.Printf(PRINT_DEVELOPER, "Vulkan: Timeline semaphore signal requested (value: %llu)\n", (unsigned long long)value);
 }
 
-// Synchronization2 operations (VK_KHR_synchronization2) - framework
+// Synchronization2 operations (VK_KHR_synchronization2) - Vulkan 1.4 core
 void vk_sync2_pipeline_barrier(const VkDependencyInfo *dependency_info) {
-    // TODO: Implement Synchronization2 pipeline barrier
-    // Suppress unused parameter warning for framework function
-    (void)dependency_info;
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: Synchronization2 pipeline barrier requested\n");
+    if (!qvkCmdPipelineBarrier2KHR) {
+        ri.Printf(PRINT_ERROR, "Vulkan: Synchronization2 not available\n");
+        return;
+    }
+
+    qvkCmdPipelineBarrier2KHR(vk.cmd->command_buffer, dependency_info);
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Synchronization2 pipeline barrier executed\n");
 }
 
 // Frame timing and performance counters
