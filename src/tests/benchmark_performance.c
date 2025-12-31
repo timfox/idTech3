@@ -211,7 +211,7 @@ TEST(benchmark_vector_operations) {
 
 	// Benchmark with per-iteration measurement
 	benchmark_timer_t overall_timer = benchmark_start("vector_operations_overall");
-	size_t initial_memory = get_current_memory_usage();
+	// initial_memory removed (unused)
 
 	for (int i = 0; i < BENCHMARK_ITERATIONS; i++) {
 		benchmark_timer_t iter_timer = benchmark_start("iteration");
