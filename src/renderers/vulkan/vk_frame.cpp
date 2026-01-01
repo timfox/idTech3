@@ -12,20 +12,18 @@
 #include "vk_world_effects.h"
 // Ray marching moved to RTX renderer only
 #include "vk.h"
+// include bridge header for CPU-wait API
 #include "vk_link_bridge.h"
+// Forward declarations for real command buffer helpers (C linkage)
+extern "C" VkCommandBuffer vk_begin_command_buffer(void);
+extern "C" void vk_end_command_buffer(VkCommandBuffer, const char*);
 // Note: vk_command_buffers.h is not available; declare needed prototypes manually with C linkage
-#ifdef __cplusplus
-extern "C" {
-#endif
 // Bridge wrappers (actual implementations live in vk_link_bridge.cpp)
-VkCommandBuffer vk_begin_command_buffer_bridge(void);
-void vk_end_command_buffer_bridge(VkCommandBuffer, const char* location);
-#ifdef __cplusplus
-}
-#endif
+#include "vk_link_bridge.h"
 
 #include "vk_fsr.h"
 #include "vk_atmosphere.h"
+#include "vk_calibrated.h"
 
 // Forward declare trace helper used by low-level logging
 static void vt_trace(const char* json);
@@ -108,7 +106,7 @@ extern "C" void vk_update_performance_stats(void) {
 #endif
 }
 
-// Begin frame
+  // Begin frame
    // region agent log
 static void log_instrumentation(const char* hypothesisId, const char* location, const char* message, const char* data) {
   FILE* f = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
@@ -154,7 +152,7 @@ extern "C" void vk_begin_frame(void) {
     // region instrumentation: begin frame entry
     agent_log("H1","vk_frame.cpp:vk_begin_frame","begin_frame","{}");
     // end region
-    if (!vk_validate_handle(vk.swapchain, "swapchain")) {
+  if (!vk_validate_handle(vk.swapchain, "swapchain")) {
         return;
     }
 
@@ -852,11 +850,28 @@ void vk_read_pixels(byte *buffer, uint32_t width, uint32_t height) {
   }
 
   // Try real GPU readback via vkCmdCopyImageToBuffer if available
+  #ifdef VK_EXT_CALIBRATED_TIMESTAMPS
+  uint64_t _vk_readback_start_ns = (uint64_t)ri.Milliseconds() * 1000000ULL;
+  vk_calibrated_begin_pass("readback_path");
+  #endif
+#ifdef VK_EXT_CALIBRATED_TIMESTAMPS
+  uint64_t _vk_readback_start_ms = (uint64_t)ri.Milliseconds();
+  vk_calibrated_begin_pass("readback_path");
+#endif
+#ifdef VK_KHR_TIMELINE_SEMAPHORE
+  // Synchronize with CPU timeline to ensure readback happens after prior GPU work
+  if (vk.timeline_semaphore != VK_NULL_HANDLE && vk.gpu_timeline_counter) {
+    if (!vk_cpu_wait_for_timeline((uint64_t)vk.gpu_timeline_counter, 1000000000ULL)) {
+      ri.Printf(PRINT_WARNING, "Vulkan: timeline wait timeout before readback; continuing with best effort\n");
+    }
+  }
+#endif
   size_t bytes = (size_t)width * (size_t)height * 4;
-  if (qvkCmdCopyImageToBuffer && vk.color_image != VK_NULL_HANDLE && vk.staging_buffer.handle != VK_NULL_HANDLE) {
+    if (qvkCmdCopyImageToBuffer && vk.color_image != VK_NULL_HANDLE && vk.staging_buffer.handle != VK_NULL_HANDLE) {
     // Ensure staging buffer has enough space
     vk_alloc_staging_buffer((VkDeviceSize)bytes);
     // Begin a short-lived command buffer
+    // Use the real command buffer begin function
     VkCommandBuffer cmd = vk_begin_command_buffer_bridge();
     if (cmd != VK_NULL_HANDLE) {
       // Transition COLOR_ATTACHMENT_OPTIMAL -> TRANSFER_SRC_OPTIMAL
@@ -902,6 +917,14 @@ void vk_read_pixels(byte *buffer, uint32_t width, uint32_t height) {
 
       // End and submit
       vk_end_command_buffer_bridge(cmd, "vk_read_pixels_readback");
+  #ifdef VK_EXT_CALIBRATED_TIMESTAMPS
+  uint64_t _vk_readback_end_ns = (uint64_t)ri.Milliseconds() * 1000000ULL;
+  vk_calibrated_end_pass("readback_path", _vk_readback_end_ns - _vk_readback_start_ns);
+  #endif
+#ifdef VK_EXT_CALIBRATED_TIMESTAMPS
+      uint64_t _vk_readback_end_ms = (uint64_t)ri.Milliseconds();
+      vk_calibrated_end_pass("readback_path", (_vk_readback_end_ms - _vk_readback_start_ms) * 1000000ULL);
+#endif
       VkSubmitInfo submitInfo = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .pNext = nullptr, .commandBufferCount = 1, .pCommandBuffers = &cmd };
       qvkQueueSubmit(vk.queue, 1, &submitInfo, VK_NULL_HANDLE);
     vkQueueWaitIdle(vk.queue);

@@ -58,6 +58,8 @@ PFN_vkGetPhysicalDeviceSurfacePresentModesKHR qvkGetPhysicalDeviceSurfacePresent
 extern VkSwapchainKHR vk_swapchain;
 extern VkSurfaceKHR vk_surface;
 extern VkSurfaceFormatKHR vk_present_format;
+// Strong definition for the present format used across modules
+VkSurfaceFormatKHR vk_present_format = {};
 extern uint32_t vk_swapchain_image_count;
 extern uint32_t vk_current_swapchain_image_index;
 

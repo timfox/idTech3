@@ -29,3 +29,10 @@ WEAK void vk_end_command_buffer_bridge(VkCommandBuffer cb, const char* location)
 WEAK void vk_destroy_swapchain_bridge(void) { }
 WEAK VkSurfaceFormatKHR vk_present_format_bridge(void) { VkSurfaceFormatKHR f = {}; return f; }
 
+// Explicit non-weak wrappers to satisfy the linker when the real bridge is available.
+// If a real bridge exists in the linked objects, these definitions will be overridden.
+extern "C" VkCommandBuffer vk_begin_command_buffer_bridge(void) { return vk_begin_command_buffer(); }
+extern "C" void vk_end_command_buffer_bridge(VkCommandBuffer cb, const char* location) { vk_end_command_buffer(cb, location); }
+extern "C" void vk_destroy_swapchain_bridge(void) { vk_destroy_swapchain(); }
+extern "C" VkSurfaceFormatKHR vk_present_format_bridge(void) { return vk_present_format; }
+

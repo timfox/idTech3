@@ -7,6 +7,30 @@
 // Renderer interface
 extern refimport_t ri;
 
+// BRDF LUT Sampler bootstrap (private to descriptor module)
+static VkSampler brdflut_sampler = VK_NULL_HANDLE;
+static void ensure_brdf_sampler(void) {
+    if (brdflut_sampler != VK_NULL_HANDLE) return;
+    VkSamplerCreateInfo samplerInfo = {};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.pNext = NULL;
+    samplerInfo.flags = 0;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.maxAnisotropy = 1.0f;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
+    VK_CHECK(qvkCreateSampler(vk.device, &samplerInfo, NULL, &brdflut_sampler));
+}
+
 // Vulkan function pointer extern declarations
 extern PFN_vkCreateDescriptorSetLayout qvkCreateDescriptorSetLayout;
 extern PFN_vkCreateDescriptorPool qvkCreateDescriptorPool;
@@ -430,12 +454,26 @@ extern "C" void vk_update_attachment_descriptors(void) {
     }
 
 #ifdef VK_PBR_BRDFLUT
-    // brdf - TODO: implement BRDF LUT descriptor updates
-    // if (vk.brdflut_image_view != VK_NULL_HANDLE) {
-    //     info.imageView = vk.brdflut_image_view;
-    //     desc.dstSet = vk.brdflut_image_descriptor;
-    //     qvkUpdateDescriptorSets(vk.device, 1, &desc, 0, NULL);
-    // }
+  // BRDF LUT: update descriptor with BRDF LUT image+sampler
+  if (vk.brdflut.view != VK_NULL_HANDLE && vk.brdflut_image_descriptor != VK_NULL_HANDLE) {
+    VkDescriptorImageInfo brdfInfo = {};
+    brdfInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    brdfInfo.imageView = vk.brdflut.view;
+    ensure_brdf_sampler();
+    brdfInfo.sampler = brdflut_sampler;
+
+    VkWriteDescriptorSet brdfDesc = {};
+    brdfDesc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    brdfDesc.dstSet = vk.brdflut_image_descriptor;
+    brdfDesc.dstBinding = 0;
+    brdfDesc.dstArrayElement = 0;
+    brdfDesc.descriptorCount = 1;
+    brdfDesc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    brdfDesc.pImageInfo = &brdfInfo;
+    brdfDesc.pBufferInfo = NULL;
+    brdfDesc.pTexelBufferView = NULL;
+    qvkUpdateDescriptorSets(vk.device, 1, &brdfDesc, 0, NULL);
+  }
 #endif
 
     // cubemap - temporarily disabled due to C++ Vulkan handle type issues
@@ -507,6 +545,14 @@ extern "C" void vk_init_descriptors(void) {
     desc.pTexelBufferView = NULL;
 
     qvkUpdateDescriptorSets(vk.device, 1, &desc, 0, NULL);
+
+#ifdef VK_PBR_BRDFLUT
+    // Allocate BRDF LUT descriptor set (uses the same sampler layout as color sampler)
+    alloc.descriptorSetCount = 1;
+    alloc.pSetLayouts = &vk.set_layout_sampler;
+    VK_CHECK(qvkAllocateDescriptorSets(vk.device, &alloc, &vk.brdflut_image_descriptor));
+    SET_OBJECT_NAME(vk.brdflut_image_descriptor, "BRDF LUT image descriptor", VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT);
+#endif
 
     // Allocate and update descriptor set for each command buffer
     for (i = 0; i < NUM_COMMAND_BUFFERS; i++) {

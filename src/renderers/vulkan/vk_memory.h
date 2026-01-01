@@ -111,6 +111,9 @@ typedef struct {
 
     // Defragmentation state
     qboolean defrag_in_progress;
+    // Progress counter for staged defragmentation (frames remaining before
+    // performing the actual defragmentation work).
+    uint32_t defrag_progress_remaining;
     atomic_uint_t chunks_to_defrag;     // Number of chunks that need defragmentation
     atomic_uint_t defrag_operations;    // Total defrag operations performed
 

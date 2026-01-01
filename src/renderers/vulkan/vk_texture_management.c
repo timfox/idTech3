@@ -21,6 +21,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "tr_local.h"
+#include "vk_images.h"
+#include "vk.h"
+// Prototypes for host-accessible command buffer helpers (C linkage)
+extern VkCommandBuffer vk_begin_command_buffer_bridge(void);
+extern void vk_end_command_buffer_bridge(VkCommandBuffer, const char* location);
 
 // Texture Management Functions for Vulkan Renderer
 // Simplified implementation for modularization
@@ -95,11 +100,98 @@ void vk_update_image_data(image_t* image, int x, int y, int width, int height, i
                   expected_size, data_size);
     }
 
-    // TODO: Implement full staging buffer and image update pipeline
-    // This requires access to Vulkan device, command buffers, and memory management
-    // For now, this is a framework for future implementation
+    // Upload using existing staging-based path in the image management subsystem
+    // This uses the same staging buffer and copy mechanism as the rest of the engine.
+    // We forward to the centralized upload path to ensure consistency.
+    if (image && data && data_size > 0) {
+        vk_upload_image_data(image, x, y, width, height, layers, data, data_size, qtrue);
+        return;
+    }
 
     ri.Printf(PRINT_DEVELOPER, "vk_update_image_data: Texture update framework ready - implementation pending Vulkan device access\n");
 
     Q_UNUSED(x); Q_UNUSED(y); Q_UNUSED(layers);
+}
+
+// Read back an image to CPU memory using a staging buffer
+// Currently supports a single layer (layers == 1). Falls back gracefully otherwise.
+void vk_readback_image_to_cpu(image_t *image, void *dstBuffer, int width, int height, int layers) {
+    if (!image || !dstBuffer || width <= 0 || height <= 0 || layers != 1) {
+        ri.Printf(PRINT_WARNING, "vk_readback_image_to_cpu: unsupported parameters\n");
+        return;
+    }
+    // Calculate bytes (RGBA8 assumed)
+    size_t bytes = (size_t)width * (size_t)height * 4;
+    // Ensure staging buffer is large enough
+    if (vk.staging_buffer.handle == VK_NULL_HANDLE || vk.staging_buffer.size < bytes) {
+        vk_alloc_staging_buffer((VkDeviceSize)bytes);
+    }
+    // Allocate a short-lived command buffer for copy
+    VkCommandBuffer cmd = vk_begin_command_buffer_bridge();
+    if (cmd == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_WARNING, "vk_readback_image_to_cpu: failed to acquire command buffer\n");
+        // Fallback: zero memory
+        memset(dstBuffer, 0, bytes);
+        return;
+    }
+
+    // Transition to transfer source
+    VkImageMemoryBarrier barrier1 = (VkImageMemoryBarrier){
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .pNext = NULL,
+        .srcAccessMask = VK_ACCESS_SHADER_READ_BIT,
+        .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+        .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = image->handle,
+        .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+    };
+    qvkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier1);
+
+    // Copy to staging buffer
+    VkBufferImageCopy region = {};
+    region.bufferOffset = vk.staging_buffer.offset;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset.x = 0;
+    region.imageOffset.y = 0;
+    region.imageOffset.z = 0;
+    region.imageExtent.width = (uint32_t)width;
+    region.imageExtent.height = (uint32_t)height;
+    region.imageExtent.depth = 1;
+    qvkCmdCopyImageToBuffer(cmd, image->handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, vk.staging_buffer.handle, 1, &region);
+
+    // Transition back to shader read
+    VkImageMemoryBarrier barrier2 = (VkImageMemoryBarrier){
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .pNext = NULL,
+        .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+        .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+        .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = image->handle,
+        .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+    };
+    qvkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier2);
+
+    // End and submit
+    vk_end_command_buffer_bridge(cmd, "vk_readback_image_to_cpu");
+    VkSubmitInfo submitInfo = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .pNext = NULL, .commandBufferCount = 1, .pCommandBuffers = &cmd };
+    qvkQueueSubmit(vk.queue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(vk.queue);
+
+    // Copy staging buffer to CPU memory
+    if (vk.staging_buffer.ptr) {
+        memcpy(dstBuffer, vk.staging_buffer.ptr, bytes);
+    } else {
+        memset(dstBuffer, 0, bytes);
+    }
 }
