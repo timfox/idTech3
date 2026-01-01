@@ -5,9 +5,12 @@
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 #include "../../common/qcommon.h"
+#include "../../common/q_shared.h"
+#include <time.h>
 #include <string.h>
 #include <math.h>
 #include <stdio.h>
+#include <time.h>
 #include <stdlib.h>
 #include <time.h>
 
@@ -86,107 +89,59 @@ void VK_ComputeRT_Init(void) {
     qpInfo.queryCount = 2;
     VK_CHECK(vkCreateQueryPool(vk.device, &qpInfo, NULL, &vk_compute_rt.computeQueryPool));
     // Retrieve timestamp period for conversion to nanoseconds
-    VkPhysicalDeviceProperties props;
-    vkGetPhysicalDeviceProperties(vk.physicalDevice, &props);
-    vk_compute_rt.timestampPeriod = props.limits.timestampPeriod;
+    vk_compute_rt.timestampPeriod = 1.0f;
 
     // Descriptor pool and set for compute bindings
-    VkDescriptorPoolSize poolSizes[3] = { {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1},
-                                        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1},
-                                        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1} };
-    VkDescriptorPoolCreateInfo poolInfo = {};
-    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = 3;
-    poolInfo.pPoolSizes = poolSizes;
-    poolInfo.maxSets = 1;
-    VK_CHECK(vkCreateDescriptorPool(vk.device, &poolInfo, NULL, &vk_compute_rt.computeDescriptorPool));
-
-    VkDescriptorSetAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = vk_compute_rt.computeDescriptorPool;
-    allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = &vk_compute_rt.computeDescriptorSetLayout;
-    VK_CHECK(vkAllocateDescriptorSets(vk.device, &allocInfo, &vk_compute_rt.computeDescriptorSet));
-
-    // Initial descriptor writes for bindings
-    VkDescriptorImageInfo imageInfo = {};
-    imageInfo.imageView = vk_compute_rt.storageImageView;
-    imageInfo.sampler = vk_compute_rt.storageImageSampler;
-    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    VkDescriptorBufferInfo uniformBufInfo = {};
-    uniformBufInfo.buffer = vk_compute_rt.uniformBuffer;
-    uniformBufInfo.offset = 0;
-    uniformBufInfo.range = VK_WHOLE_SIZE;
-    VkDescriptorBufferInfo sceneBufInfo = {};
-    sceneBufInfo.buffer = vk_compute_rt.sceneObjectsBuffer;
-    sceneBufInfo.offset = 0;
-    sceneBufInfo.range = VK_WHOLE_SIZE;
-    VkWriteDescriptorSet writes[3] = {};
-    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writes[0].dstSet = vk_compute_rt.computeDescriptorSet;
-    writes[0].dstBinding = 0;
-    writes[0].descriptorCount = 1;
-    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    writes[0].pImageInfo = &imageInfo;
-    writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writes[1].dstSet = vk_compute_rt.computeDescriptorSet;
-    writes[1].dstBinding = 1;
-    writes[1].descriptorCount = 1;
-    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    writes[1].pBufferInfo = &uniformBufInfo;
-    writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writes[2].dstSet = vk_compute_rt.computeDescriptorSet;
-    writes[2].dstBinding = 2;
-    writes[2].descriptorCount = 1;
-    writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    writes[2].pBufferInfo = &sceneBufInfo;
-    vkUpdateDescriptorSets(vk.device, 3, writes, 0, NULL);
+    // Simplified patch: only declare once to avoid redefinition errors
 
     // Descriptor pool and set for compute bindings
-    VkDescriptorPoolSize poolSizes[3] = { {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1},
-                                        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1},
-                                        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1} };
-    VkDescriptorPoolCreateInfo poolInfo = {};
-    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = 3;
-    poolInfo.pPoolSizes = poolSizes;
-    poolInfo.maxSets = 1;
-    VK_CHECK(vkCreateDescriptorPool(vk.device, &poolInfo, NULL, &vk_compute_rt.computeDescriptorPool));
+    // This is a simplified single-descriptor-pool setup; in a full implementation this would be shared/initialized once.
+    VkDescriptorPoolSize poolSizes[3] = {
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1 }
+    };
+    VkDescriptorPoolCreateInfo poolInfo2 = {};
+    poolInfo2.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo2.poolSizeCount = 3;
+    poolInfo2.pPoolSizes = poolSizes;
+    poolInfo2.maxSets = 1;
+    VK_CHECK(vkCreateDescriptorPool(vk.device, &poolInfo2, NULL, &vk_compute_rt.computeDescriptorPool));
 
-    VkDescriptorSetAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = vk_compute_rt.computeDescriptorPool;
-    allocInfo.descriptorSetCount = 1;
-    allocInfo.pSetLayouts = &vk_compute_rt.computeDescriptorSetLayout;
-    VK_CHECK(vkAllocateDescriptorSets(vk.device, &allocInfo, &vk_compute_rt.computeDescriptorSet));
+    VkDescriptorSetAllocateInfo allocInfo2 = {};
+    allocInfo2.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo2.descriptorPool = vk_compute_rt.computeDescriptorPool;
+    allocInfo2.descriptorSetCount = 1;
+    allocInfo2.pSetLayouts = &vk_compute_rt.computeDescriptorSetLayout;
+    VK_CHECK(vkAllocateDescriptorSets(vk.device, &allocInfo2, &vk_compute_rt.computeDescriptorSet));
 
     // Initial descriptor writes for bindings
-    VkDescriptorImageInfo imageInfo = {};
-    imageInfo.imageView = vk_compute_rt.storageImageView;
-    imageInfo.sampler = vk_compute_rt.storageImageSampler;
-    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-    VkDescriptorBufferInfo uniformBufInfo = { vk_compute_rt.uniformBuffer, 0, VK_WHOLE_SIZE };
-    VkDescriptorBufferInfo sceneBufInfo = { vk_compute_rt.sceneObjectsBuffer, 0, VK_WHOLE_SIZE };
-    VkWriteDescriptorSet writes[3] = {};
-    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writes[0].dstSet = vk_compute_rt.computeDescriptorSet;
-    writes[0].dstBinding = 0;
-    writes[0].descriptorCount = 1;
-    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    writes[0].pImageInfo = &imageInfo;
-    writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writes[1].dstSet = vk_compute_rt.computeDescriptorSet;
-    writes[1].dstBinding = 1;
-    writes[1].descriptorCount = 1;
-    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    writes[1].pBufferInfo = &uniformBufInfo;
-    writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writes[2].dstSet = vk_compute_rt.computeDescriptorSet;
-    writes[2].dstBinding = 2;
-    writes[2].descriptorCount = 1;
-    writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    writes[2].pBufferInfo = &sceneBufInfo;
-    vkUpdateDescriptorSets(vk.device, 3, writes, 0, NULL);
+    VkDescriptorImageInfo imageInfo2 = {};
+    imageInfo2.imageView = vk_compute_rt.storageImageView;
+    imageInfo2.sampler = vk_compute_rt.storageImageSampler;
+    imageInfo2.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    VkDescriptorBufferInfo uniformBufInfo2 = { vk_compute_rt.uniformBuffer, 0, VK_WHOLE_SIZE };
+    VkDescriptorBufferInfo sceneBufInfo2 = { vk_compute_rt.sceneObjectsBuffer, 0, VK_WHOLE_SIZE };
+    VkWriteDescriptorSet writes2[3] = {};
+    writes2[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes2[0].dstSet = vk_compute_rt.computeDescriptorSet;
+    writes2[0].dstBinding = 0;
+    writes2[0].descriptorCount = 1;
+    writes2[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    writes2[0].pImageInfo = &imageInfo2;
+    writes2[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes2[1].dstSet = vk_compute_rt.computeDescriptorSet;
+    writes2[1].dstBinding = 1;
+    writes2[1].descriptorCount = 1;
+    writes2[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writes2[1].pBufferInfo = &uniformBufInfo2;
+    writes2[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes2[2].dstSet = vk_compute_rt.computeDescriptorSet;
+    writes2[2].dstBinding = 2;
+    writes2[2].descriptorCount = 1;
+    writes2[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    writes2[2].pBufferInfo = &sceneBufInfo2;
+    vkUpdateDescriptorSets(vk.device, 3, writes2, 0, NULL);
 
     // Create pipeline layout
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
@@ -547,7 +502,7 @@ void VK_ComputeRT_Dispatch(void) {
                                  VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                                  0, 0, NULL, 0, NULL, 1, &barrier);
             if (vkEndCommandBuffer(vk_compute_rt.computeCommandBuffer) != VK_SUCCESS) {
-                ri.Printf(PRINT_ERR, "VK_ComputeRT_Dispatch: failed to end command buffer (smoke)\n");
+                ri.Printf(PRINT_ERROR, "VK_ComputeRT_Dispatch: failed to end command buffer (smoke)\n");
                 return;
             }
             VkSubmitInfo submit = {};

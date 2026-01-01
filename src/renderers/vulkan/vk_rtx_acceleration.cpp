@@ -54,8 +54,12 @@ void vk_rtx_update_instance_data(uint64_t accel_id, const matrix3x4_t* transform
 }
 
 void vk_rtx_build_tlas(VkCommandBuffer cmd_buffer) {
+    ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: TLAS scaffold build called (stub)\n");
     (void)cmd_buffer;
+    // Mark TLAS scaffold as built (placeholder)
+    g_rtx_blas_tlas_built = qtrue;
 }
+
 
 uint32_t vk_rtx_add_light(const vec3_t position, const vec3_t color, float intensity,
                           float radius, int light_type, qboolean casts_shadows) {
@@ -96,6 +100,8 @@ void vk_rtx_bind_and_trace_raysKHR_from_main(VkCommandBuffer cmd_buffer, uint32_
         vk_rtx_build_tlas(cmd_buffer);
         // SBT setup scaffold
         vk_rtx_setup_sbt(cmd_buffer);
+        // Build frame-local SBT (stub)
+        vk_rtx_build_sbt_for_frame(cmd_buffer);
         // Invoke trace (stub)
         vk_rtx_trace_raysKHR(cmd_buffer);
     #else

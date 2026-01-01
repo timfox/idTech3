@@ -36,6 +36,8 @@ void vk_rtx_trace_raysKHR(VkCommandBuffer cmd_buffer);
 // Hardware trace path (width/height provided by caller)
 void vk_rtx_bind_and_trace_raysKHR_from_main(VkCommandBuffer cmd_buffer, uint32_t width, uint32_t height);
 void vk_rtx_setup_sbt(VkCommandBuffer cmd_buffer);
+void vk_rtx_create_sbt_buffer(void);
+void vk_rtx_build_sbt_for_frame(VkCommandBuffer cmd_buffer);
 
 // Advanced lighting system
 uint32_t vk_rtx_add_light(const vec3_t position, const vec3_t color, float intensity,

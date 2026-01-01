@@ -49,6 +49,7 @@ typedef struct {
     VkPipelineLayout computePipelineLayout;
     VkDescriptorSetLayout computeDescriptorSetLayout;
     VkDescriptorSet computeDescriptorSet;
+    VkDescriptorPool computeDescriptorPool;
 
     // Scene objects storage buffer
     VkBuffer sceneObjectsBuffer;

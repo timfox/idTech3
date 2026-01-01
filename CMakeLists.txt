@@ -1467,6 +1467,7 @@ SET(RENDERER_VK_SRCS
 	src/renderers/vulkan/vk_render_pass_manager.cpp
 	src/renderers/vulkan/vk_framebuffer_manager.cpp
 	src/renderers/vulkan/vk_stubs.c
+	# src/renderers/vulkan/vk_rtx_acceleration.cpp  # Temporarily disabled - has undefined references
 	src/renderers/vulkan/vk_fsr.c
 	src/renderers/vulkan/tr_font_vk.c
 	src/renderers/vulkan/vk_memory.c

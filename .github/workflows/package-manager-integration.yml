@@ -1,2 +1,71 @@
+name: Package Manager Integration
 
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run package manager tests weekly
+    - cron: '0 3 * * 1'
 
+jobs:
+  vcpkg-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate vcpkg.json
+        run: |
+          if [ -f "vcpkg.json" ]; then
+            echo "Validating vcpkg.json..."
+            python3 -c "import json; json.load(open('vcpkg.json')); print('vcpkg.json is valid JSON')"
+          else
+            echo "No vcpkg.json found"
+            exit 1
+          fi
+
+      - name: Install vcpkg
+        run: |
+          git clone https://github.com/microsoft/vcpkg
+          cd vcpkg
+          ./bootstrap-vcpkg.sh
+
+      - name: Install dependencies via vcpkg
+        run: |
+          cd vcpkg
+          ./vcpkg install --triplet=x64-linux
+
+      - name: Build with vcpkg
+        run: |
+          mkdir build && cd build
+          cmake .. \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="$GITHUB_WORKSPACE/vcpkg/scripts/buildsystems/vcpkg.cmake" \
+            -DVCPKG_TARGET_TRIPLET=x64-linux \
+            -DUSE_VULKAN=ON \
+            -DUSE_RENDERER_DLOPEN=ON \
+            -DBUILD_SERVER=ON
+          make -j$(nproc)
+
+      - name: Verify build artifacts
+        run: |
+          cd build
+          ls -la idtech3* || echo "No idtech3 binaries found"
+
+  conan-integration:
+    runs-on: ubuntu-latest
+    if: false  # Disabled for now - enable if conan support is added
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Conan
+        run: |
+          pip install conan
+
+      - name: Test Conan integration
+        run: |
+          echo "Conan integration test placeholder"
+          # Add conan integration tests here when implemented

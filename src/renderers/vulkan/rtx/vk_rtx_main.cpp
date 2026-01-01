@@ -16,6 +16,7 @@ RAY TRACING GATING:
 
 // RTX renderer includes - modernized with C++23 following EternalJK approach
 #include "vk_rtx.h"
+#include "vk_rtx_acceleration.h"
 #include "vk_rtx_raii.h" // RAII Vulkan resource management
 #include "vk_compute_raytracing.h" // Compute ray tracing implementation
 #include "vk_raymarching.h" // Raymarching implementation
