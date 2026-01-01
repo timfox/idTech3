@@ -37,6 +37,7 @@ qboolean vk_rtx_build_tlas_real_full(VkCommandBuffer cmd_buffer);
 qboolean vk_rtx_build_blas_for_geometry_real(VkCommandBuffer cmd_buffer);
 void vk_rtx_create_sbt_buffer_full(void);
 void vk_rtx_build_sbt_for_frame_full(VkCommandBuffer cmd_buffer);
+void vk_rtx_build_sbt_for_frame_full(VkCommandBuffer cmd_buffer);
 extern "C" {
 qboolean vk_rtx_build_tlas_real(VkCommandBuffer cmd_buffer);
 }

@@ -13,25 +13,20 @@ qboolean vk_rtx_build_tlas_real_full(VkCommandBuffer cmd_buffer) {
     ri.Printf(PRINT_WARNING, "TLAS real full build requested with zero BLAS\n");
     return qfalse;
   }
-  // Real implementation would:
-  // - Build TLAS from existing BLAS instances (vkCmdBuildAccelerationStructuresKHR)
-  // - Create and fill TLAS buffer, instance buffers, and range info
-  // - Ensure proper memory barriers around TLAS build
-  // For now, emit a barrier to illustrate the pathway and mark built.
+  // Delegate to the existing TLAS build path for actual work (until real build is implemented)
+  vk_rtx_build_tlas(cmd_buffer);
+  // Barrier for synchronization between build and subsequent shader stages
   VkMemoryBarrier barrier = {
     .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
-    .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
-    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT
+    .srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR,
+    .dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR
   };
   vkCmdPipelineBarrier(cmd_buffer,
+                       VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR,
                        VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
-                       VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
-                       0,
-                       1, &barrier,
-                       0, NULL,
-                       0, NULL);
+                       0, 1, &barrier, 0, NULL, 0, NULL);
   g_rtx_blas_tlas_built = qtrue;
-  ri.Printf(PRINT_ALL, "TLAS real full build pathway invoked (note: actual build to be implemented).\n");
+  ri.Printf(PRINT_ALL, "TLAS real full build pathway invoked (delegated to vk_rtx_build_tlas).\n");
   return qtrue;
 }
 
@@ -69,14 +64,40 @@ void vk_rtx_create_sbt_buffer_full(void) {
 }
 
 void vk_rtx_build_sbt_for_frame_full(VkCommandBuffer cmd_buffer) {
-  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: per-frame SBT build (full) request\n");
+  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: per-frame SBT build (full) start\n");
   if (g_sbt.sbt_buffer.buffer == VK_NULL_HANDLE) {
     vk_rtx_create_sbt_buffer_full();
+    if (g_sbt.sbt_buffer.buffer == VK_NULL_HANDLE) {
+      ri.Printf(PRINT_WARNING, "RTX: SBT buffer not created, skip fill\n");
+      return;
+    }
   }
-  if (g_sbt.sbt_buffer.mapped) {
-    memset(g_sbt.sbt_buffer.mapped, 0, (size_t)g_sbt.sbt_buffer.size);
+  // Get the shader group handles for 3 groups
+  VkResult result = vkGetRayTracingShaderGroupHandlesKHR(vk.device, g_rt_pipeline, 0, 3,
+                                                      3 * MAX_SHADER_HANDLE_SIZE, g_shader_handles);
+  if (result != VK_SUCCESS) {
+    ri.Printf(PRINT_ERROR, "RTX: Failed to get shader group handles for SBT\n");
+    return;
   }
-  // real population to happen here
+  // Copy handles into SBT (raygen, miss, closest-hit)
+  void* mapped = NULL;
+  if (g_sbt.sbt_buffer.memory != VK_NULL_HANDLE) {
+    VkResult map_res = vkMapMemory(vk.device, g_sbt.sbt_buffer.memory, 0, g_sbt.sbt_buffer.size, 0, &mapped);
+    if (map_res == VK_SUCCESS && mapped) {
+      memcpy(mapped, g_shader_handles, g_shader_handle_size);
+      memcpy((uint8_t*)mapped + g_sbt.sbt_record_size, g_shader_handles + g_shader_handle_size, g_shader_handle_size);
+      memcpy((uint8_t*)mapped + 2 * g_sbt.sbt_record_size, g_shader_handles + 2 * g_shader_handle_size, g_shader_handle_size);
+      vkUnmapMemory(vk.device, g_sbt.sbt_buffer.memory);
+    } else {
+      ri.Printf(PRINT_ERROR, "RTX: Failed to map SBT memory for writing\n");
+      return;
+    }
+  }
+  // Offsets
+  g_sbt.sbt_raygen_offset = 0;
+  g_sbt.sbt_miss_offset = g_sbt.sbt_record_size;
+  g_sbt.sbt_hit_offset = 2 * g_sbt.sbt_record_size;
+  ri.Printf(PRINT_ALL, "Vulkan RTX: SBT built for frame (full)\n");
 }
 void vk_rtx_build_sbt_for_frame(VkCommandBuffer cmd_buffer) {
     ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: per-frame SBT build request (wrapper)\n");
@@ -89,6 +110,7 @@ void vk_rtx_build_sbt_for_frame(VkCommandBuffer cmd_buffer) {
 #include <stdlib.h>
 #include <string.h>
 #include <vulkan/vulkan.h>
+#include <time.h>
 
 // Include Vulkan headers for ray tracing
 #ifdef USE_VULKAN
@@ -698,8 +720,14 @@ void vk_rtx_bind_and_trace_raysKHR_from_main(VkCommandBuffer cmd_buffer, uint32_
                             VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
                             0, 1, &barrier, 0, NULL, 0, NULL);
 
-        // Execute ray tracing
+        // Execute ray tracing and measure CPU time for the frame
+        struct timespec t0, t1;
+        clock_gettime(CLOCK_MONOTONIC, &t0);
         vk_rtx_trace_raysKHR(cmd_buffer);
+        clock_gettime(CLOCK_MONOTONIC, &t1);
+        uint64_t elapsed_ns = (uint64_t)(t1.tv_sec - t0.tv_sec) * 1000000000ULL + (t1.tv_nsec - t0.tv_nsec);
+        ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: trace took %llu ns for frame (%ux%u)\n",
+                  (unsigned long long)elapsed_ns, width, height);
 
         // Transition ray tracing output to presentation layout
         // This assumes the output image is the current swapchain image
