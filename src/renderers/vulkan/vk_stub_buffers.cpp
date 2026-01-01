@@ -18,11 +18,14 @@ WEAK void vk_end_command_buffer(VkCommandBuffer cb, const char* location);
 WEAK void vk_destroy_swapchain(void);
 WEAK VkSurfaceFormatKHR vk_present_format; // weakly-linked variable; real symbol provided elsewhere
 
-// No direct definitions here; rely on real implementations or bridge wrappers
-// for actual symbol resolution. Prototypes are provided above as WEAK.
-WEAK void vk_destroy_swapchain(void);
 
 #ifdef __cplusplus
 }
 #endif
+
+// Lightweight weak bridges to ensure symbols exist for linking if real bridge is missing
+WEAK VkCommandBuffer vk_begin_command_buffer_bridge(void) { return VK_NULL_HANDLE; }
+WEAK void vk_end_command_buffer_bridge(VkCommandBuffer cb, const char* location) { (void)cb; (void)location; }
+WEAK void vk_destroy_swapchain_bridge(void) { }
+WEAK VkSurfaceFormatKHR vk_present_format_bridge(void) { VkSurfaceFormatKHR f = {}; return f; }
 

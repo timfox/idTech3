@@ -4,6 +4,11 @@
 #include "vk_memory.h"
 #include "vk_swapchain_manager.h"
 extern VkSurfaceFormatKHR vk_present_format;
+// Bridge-provided wrappers for ensuring C-linkage across modules
+extern void vk_destroy_swapchain_bridge(void);
+extern VkSurfaceFormatKHR vk_present_format_bridge(void);
+extern VkCommandBuffer vk_begin_command_buffer_bridge(void);
+extern void vk_end_command_buffer_bridge(VkCommandBuffer, const char* location);
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 
@@ -23,6 +28,7 @@ extern cvar_t *r_dither;
 extern cvar_t *r_vk_hotReload;
 #include "../../common/performance_counters.h"
 #include "vk.h"
+#include "vk_link_bridge.h"
 #include <dlfcn.h>
 
 static inline void vk_debug_write(int fd, const char *msg, size_t len)
@@ -9914,9 +9920,9 @@ void vk_render_scene(const refdef_t *fd) {
 void vk_recreate_swapchain(void) {
   ri.Printf(PRINT_ALL, "Vulkan: Recreating swapchain\n");
   vk_wait_idle();
-  vk_destroy_swapchain();
+  vk_destroy_swapchain_bridge();
   // Recreate swapchain (use internal wrapper)
-  vk_create_swapchain(vk.physical_device, vk.device, vk_surface, vk_present_format, &vk.swapchain, true);
+    vk_create_swapchain(vk.physical_device, vk.device, vk_surface, vk_present_format_bridge(), &vk.swapchain, true);
   // Recreate framebuffers for the new swapchain images
   vk_create_framebuffers();
   ri.Printf(PRINT_ALL, "Vulkan: Swapchain recreated with %u images\n", vk.swapchain_image_count);

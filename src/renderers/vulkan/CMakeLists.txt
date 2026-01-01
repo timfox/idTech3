@@ -12,7 +12,10 @@ if(VK_METRICS_ENABLED)
 endif()
 # Always include lightweight Vulkan command-buffer stubs to ease testing
 if(TARGET idtech3_vulkan_x86_64)
-  target_sources(idtech3_vulkan_x86_64 PRIVATE vk_stub_buffers.cpp)
+  target_sources(idtech3_vulkan_x86_64 PRIVATE vk_stub_buffers.cpp vk_link_bridge.cpp)
+  # Ensure bridge symbols are linked (guarantee linkage for Plan A)
+  # (No-op at runtime; just helps the linker resolve bridge wrappers)
+  set_target_properties(idtech3_vulkan_x86_64 PROPERTIES LINKER_LANGUAGE CXX)
 endif()
 option(VK_METRICS_ENABLED "Enable Vulkan metrics instrumentation" OFF)
 
