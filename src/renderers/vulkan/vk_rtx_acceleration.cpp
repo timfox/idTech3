@@ -1,3 +1,87 @@
+// Real TLAS skeleton stub for immediate wiring (will be replaced by full TLAS code)
+qboolean vk_rtx_build_tlas_real_inline(VkCommandBuffer cmd_buffer) {
+  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: TLAS real build inline stub\n");
+  (void)cmd_buffer;
+  g_rtx_blas_tlas_built = qtrue;
+  return qtrue;
+}
+
+qboolean vk_rtx_build_tlas_real_full(VkCommandBuffer cmd_buffer) {
+  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: TLAS real full build (stub) started\n");
+  (void)cmd_buffer;
+  if (g_blas_count == 0) {
+    ri.Printf(PRINT_WARNING, "TLAS real full build requested with zero BLAS\n");
+    return qfalse;
+  }
+  // Real implementation would:
+  // - Build TLAS from existing BLAS instances (vkCmdBuildAccelerationStructuresKHR)
+  // - Create and fill TLAS buffer, instance buffers, and range info
+  // - Ensure proper memory barriers around TLAS build
+  // For now, emit a barrier to illustrate the pathway and mark built.
+  VkMemoryBarrier barrier = {
+    .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+    .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
+    .dstAccessMask = VK_ACCESS_SHADER_READ_BIT
+  };
+  vkCmdPipelineBarrier(cmd_buffer,
+                       VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+                       VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,
+                       0,
+                       1, &barrier,
+                       0, NULL,
+                       0, NULL);
+  g_rtx_blas_tlas_built = qtrue;
+  ri.Printf(PRINT_ALL, "TLAS real full build pathway invoked (note: actual build to be implemented).\n");
+  return qtrue;
+}
+
+void vk_rtx_create_sbt_buffer_full(void) {
+  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: create SBT buffer (full stub)\n");
+  // Placeholder for SBT buffer creation
+}
+
+qboolean vk_rtx_build_sbt_for_frame_full(VkCommandBuffer cmd_buffer) {
+  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: build SBT for frame (full stub)\n");
+  (void)cmd_buffer;
+  return qtrue;
+}
+
+// Real TLAS full build (stub)
+qboolean vk_rtx_build_tlas_real_full(VkCommandBuffer cmd_buffer) {
+  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: TLAS real full build (stub) started\n");
+  (void)cmd_buffer;
+  g_rtx_blas_tlas_built = qtrue;
+  return qtrue;
+}
+
+qboolean vk_rtx_build_blas_for_geometry_real(VkCommandBuffer cmd_buffer) {
+  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: BLAS for geometry real build (stub)\n");
+  (void)cmd_buffer;
+  g_rtx_blas_tlas_built = qtrue;
+  return qtrue;
+}
+
+void vk_rtx_create_sbt_buffer_full(void) {
+  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: creating full SBT buffer (stub)\n");
+  if (g_sbt.sbt_buffer.buffer == VK_NULL_HANDLE) {
+    // placeholder
+  }
+}
+
+void vk_rtx_build_sbt_for_frame_full(VkCommandBuffer cmd_buffer) {
+  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: per-frame SBT build (full) request\n");
+  if (g_sbt.sbt_buffer.buffer == VK_NULL_HANDLE) {
+    vk_rtx_create_sbt_buffer_full();
+  }
+  if (g_sbt.sbt_buffer.mapped) {
+    memset(g_sbt.sbt_buffer.mapped, 0, (size_t)g_sbt.sbt_buffer.size);
+  }
+  // real population to happen here
+}
+void vk_rtx_build_sbt_for_frame(VkCommandBuffer cmd_buffer) {
+    ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: per-frame SBT build request (wrapper)\n");
+    // Placeholder; actual SBT population would occur here
+}
 #include "tr_local.h"
 #include "vk_rtx_acceleration.h"
 #include <stdint.h>
@@ -58,6 +142,10 @@ static VkPipeline g_rt_pipeline = VK_NULL_HANDLE;
 static VkPipelineLayout g_rt_pipeline_layout = VK_NULL_HANDLE;
 static VkDescriptorSetLayout g_rt_descriptor_set_layout = VK_NULL_HANDLE;
 static VkDescriptorSet g_rt_descriptor_set = VK_NULL_HANDLE;
+// Scratch buffer for TLAS/BLAS building per frame
+VkBuffer g_rt_scratch_buffer = VK_NULL_HANDLE;
+VkDeviceMemory g_rt_scratch_memory = VK_NULL_HANDLE;
+VkDeviceSize g_rt_scratch_size = 0;
 
 // Ray tracing shader groups
 static VkRayTracingShaderGroupCreateInfoKHR g_shader_groups[3] = {0};
@@ -114,6 +202,44 @@ static void* rtx_alloc(VkDeviceSize size, VkBuffer* buffer, VkDeviceMemory* memo
     *memory = VK_NULL_HANDLE;
 
     return (void*)0x1; // Dummy pointer
+}
+
+void vk_rtx_build_tlas_for_frame(VkCommandBuffer cmd_buffer) {
+    ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: per-frame TLAS build request (wrapper)\n");
+#ifdef VK_RTX_REAL_TLAS_AVAIL
+    if (vk_rtx_build_tlas_real_full) {
+        vk_rtx_build_tlas_real_full(cmd_buffer);
+        g_rtx_blas_tlas_built = qtrue;
+        return;
+    }
+#endif
+    vk_rtx_build_tlas(cmd_buffer);
+}
+
+// Real TLAS builder (hook; to be expanded into full TLAS construction)
+qboolean vk_rtx_build_tlas_real(VkCommandBuffer cmd_buffer) {
+  static qboolean already_built = qfalse;
+  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: TLAS real build (scaffold) started - cmd_buf=%p\n", (void*)cmd_buffer);
+  (void)cmd_buffer;
+  if (!already_built) {
+    already_built = qtrue;
+    ri.Printf(PRINT_ALL, "TLAS scaffold: preparing BLAS/TLAS placeholders (no actual vulkan calls yet).\n");
+  } else {
+    ri.Printf(PRINT_DEVELOPER, "TLAS scaffold already initialized.\n");
+  }
+  // Indicate readiness for real wiring in subsequent patches
+  g_rtx_blas_tlas_built = qtrue;
+  return qtrue;
+}
+
+void vk_rtx_build_tlas_for_frame(VkCommandBuffer cmd_buffer) {
+    ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: per-frame TLAS build request (wrapper)\n");
+    vk_rtx_build_tlas(cmd_buffer);
+}
+
+void vk_rtx_build_sbt_for_frame(VkCommandBuffer cmd_buffer) {
+    ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: per-frame SBT build request (wrapper)\n");
+    // placeholder; actual SBT population would occur here in a full impl
 }
 
 static void rtx_free_buffer(rtx_buffer_t* buffer) {
@@ -545,15 +671,20 @@ void vk_rtx_bind_and_trace_raysKHR_from_main(VkCommandBuffer cmd_buffer, uint32_
     if (!g_rtx_accel_initialized) { ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: acceleration not initialized; skip\n"); return; }
     if (g_rt_pipeline == VK_NULL_HANDLE) { ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: pipeline not created; skip\n"); return; }
     ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: Starting ray tracing pipeline %ux%u\n", width, height);
+    // Initialize per-frame TLAS/BLAS and SBT wiring
+    vk_rtx_build_tlas_for_frame(cmd_buffer);
+    vk_rtx_build_sbt_for_frame(cmd_buffer);
 
     #ifdef VK_KHR_ray_tracing_pipeline
         // Ensure acceleration structures are built
-        if (!g_rtx_blas_tlas_built) {
-            vk_rtx_build_tlas(cmd_buffer);
-        }
+      if (!g_rtx_blas_tlas_built) {
+          vk_rtx_build_tlas_for_frame(cmd_buffer);
+      }
 
-        // Set up SBT
-        vk_rtx_setup_sbt(cmd_buffer);
+      // Set up SBT
+      vk_rtx_setup_sbt(cmd_buffer);
+      // Build per-frame SBT (wrapper)
+      vk_rtx_build_sbt_for_frame(cmd_buffer);
 
         // Memory barrier to ensure acceleration structure build is complete
         VkMemoryBarrier barrier = {

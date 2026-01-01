@@ -31,6 +31,15 @@ uint64_t vk_rtx_create_blas_for_geometry(VkBuffer vertex_buffer, VkBuffer index_
                                        uint32_t vertex_stride, const char* debug_name);
 void vk_rtx_update_instance_data(uint64_t accel_id, const matrix3x4_t* transform, uint32_t instance_id);
 void vk_rtx_build_tlas(VkCommandBuffer cmd_buffer);
+// Real TLAS builder
+qboolean vk_rtx_build_tlas_real(VkCommandBuffer cmd_buffer);
+qboolean vk_rtx_build_tlas_real_full(VkCommandBuffer cmd_buffer);
+qboolean vk_rtx_build_blas_for_geometry_real(VkCommandBuffer cmd_buffer);
+void vk_rtx_create_sbt_buffer_full(void);
+void vk_rtx_build_sbt_for_frame_full(VkCommandBuffer cmd_buffer);
+extern "C" {
+qboolean vk_rtx_build_tlas_real(VkCommandBuffer cmd_buffer);
+}
 // Stub for hardware ray tracing kernel launch (will be fleshed out in future)
 void vk_rtx_trace_raysKHR(VkCommandBuffer cmd_buffer);
 // Hardware trace path (width/height provided by caller)
@@ -38,6 +47,10 @@ void vk_rtx_bind_and_trace_raysKHR_from_main(VkCommandBuffer cmd_buffer, uint32_
 void vk_rtx_setup_sbt(VkCommandBuffer cmd_buffer);
 void vk_rtx_create_sbt_buffer(void);
 void vk_rtx_build_sbt_for_frame(VkCommandBuffer cmd_buffer);
+// Temporary per-frame RT scratch and TLAS/BLAS scaffolding
+extern VkBuffer g_rt_scratch_buffer;
+extern VkDeviceMemory g_rt_scratch_memory;
+extern VkDeviceSize g_rt_scratch_size;
 
 // Advanced lighting system
 uint32_t vk_rtx_add_light(const vec3_t position, const vec3_t color, float intensity,
