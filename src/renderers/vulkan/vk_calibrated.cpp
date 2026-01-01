@@ -2,7 +2,7 @@
 #include "vk_calibrated.h"
 
 #ifdef VK_EXT_CALIBRATED_TIMESTAMPS
-#include "vk_link_bridge.h"
+// Bridging layer removed; direct Vulkan API usage
 #include "vk.h"
 #include <time.h>
 #endif

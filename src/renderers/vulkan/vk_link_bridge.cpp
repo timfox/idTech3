@@ -1,5 +1,4 @@
-// Bridge wrappers to expose C-linkage for critical Vulkan helper functions.
-// These wrappers forward to the real implementations if present.
+// Plan D: Bridge wrappers removed. This file is deprecated; direct Vulkan usage is used.
 
 #include "vk_link_bridge.h"
 #include "vk.h"
@@ -20,44 +19,15 @@ extern "C" void vk_destroy_swapchain(void);
 extern "C" VkSurfaceFormatKHR vk_present_format;
 
 // Bridge implementations
-VkCommandBuffer vk_begin_command_buffer_bridge(void) {
-    // Forward to real implementation if available
-    return vk_begin_command_buffer();
-}
+// bridge removed
 
-void vk_end_command_buffer_bridge(VkCommandBuffer cb, const char* location) {
-    vk_end_command_buffer(cb, location);
-}
+// bridge removed
 
-void vk_destroy_swapchain_bridge(void) {
-    vk_destroy_swapchain();
-}
+// bridge removed
 
-VkSurfaceFormatKHR vk_present_format_bridge(void) {
-    return vk_present_format;
-}
+// bridge removed
 
-// Calibrated timestamps bridge stubs
-#include "vk_calibrated.h"
-bool vk_calibrated_supported(void) {
-#ifdef VK_EXT_CALIBRATED_TIMESTAMPS
-  return true;
-#else
-  return false;
-#endif
-}
-void vk_calibrated_begin_frame(uint32_t frameIndex, const char* label) {
-  (void)frameIndex; (void)label;
-}
-void vk_calibrated_end_frame(uint32_t frameIndex, const char* label, uint64_t duration_ns) {
-  (void)frameIndex; (void)label; (void)duration_ns;
-}
-void vk_calibrated_begin_pass(const char* name) {
-  (void)name;
-}
-void vk_calibrated_end_pass(const char* name, uint64_t duration_ns) {
-  (void)name; (void)duration_ns;
-}
+// bridge removed
 // Implement CPU wait as a bridge-level helper
 #include <stdint.h>
 #include <stdbool.h>

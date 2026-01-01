@@ -15,6 +15,12 @@ Enhanced RTX Integration with Acceleration Structures and Advanced Lighting
 extern "C" {
 #endif
 
+// Ensure matrix3x4_t is defined for this header if not pulled in by consumers.
+#ifndef MATRIX3X4_T_DEFINED
+typedef struct { float m[12]; } matrix3x4_t;
+#define MATRIX3X4_T_DEFINED
+#endif
+
 // RTX acceleration structure management
 qboolean vk_rtx_acceleration_init(void);
 void vk_rtx_acceleration_shutdown(void);

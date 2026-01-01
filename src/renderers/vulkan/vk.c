@@ -23,7 +23,6 @@ extern cvar_t *r_dither;
 extern cvar_t *r_vk_hotReload;
 #include "../../common/performance_counters.h"
 #include "vk.h"
-#include "vk_link_bridge.h"
 #include <dlfcn.h>
 
 static inline void vk_debug_write(int fd, const char *msg, size_t len)
@@ -3443,8 +3442,12 @@ static void init_vulkan_library( void )
 				if (swapchainResult != VK_SUCCESS) {
 					ri.Printf(PRINT_ERROR, "Vulkan: Failed to create swapchain with device %d, trying next device\n", attempt_index);
 					// Clean up device and try next one
-					// TODO: Add device cleanup here
-					continue;
+                // Cleanup partially created device before trying next
+                if (vk.device != VK_NULL_HANDLE && qvkDestroyDevice) {
+                    qvkDestroyDevice(vk.device, NULL);
+                    vk.device = VK_NULL_HANDLE;
+                }
+                continue;
 				}
 
 				ri.Printf(PRINT_ALL, "Vulkan: Real swapchain created successfully\n");
@@ -9918,7 +9921,7 @@ void vk_recreate_swapchain(void) {
   vk_wait_idle();
   // Destroy existing framebuffers and render passes tied to the old swapchain
   vk_destroy_framebuffers();
-  // Destroy old swapchain resources via bridge (replace with real function)
+  // Destroy old swapchain resources via direct function (no bridge)
   vk_destroy_swapchain();
   // Recreate swapchain with up-to-date surface format
   vk_create_swapchain(vk.physical_device, vk.device, vk_surface, vk_present_format, &vk.swapchain, true);

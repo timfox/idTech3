@@ -627,17 +627,26 @@ void RTX_SwitchMode(int newMode)
     if (rtx.mode == newMode) {
         return;
     }
-    // If currently initialized, perform a clean teardown of RAII resources
-    if (rtx.initialized) {
-        rtx.CleanupResources();
+    // Thorough teardown of active RTX subsystems
+    if (rtx.ray_tracing_active) {
+        // Shutdown hardware RT resources if active
+        vk_rtx_acceleration_shutdown();
+        rtx.ray_tracing_active = qfalse;
+        ri.Printf(PRINT_ALL, "RTX: hardware RT resources torn down during mode switch\n");
     }
+    if (rtx.compute_rt_active) {
+        // Shutdown compute RT path if active
+        VK_ComputeRT_Shutdown();
+        rtx.compute_rt_active = qfalse;
+        ri.Printf(PRINT_ALL, "RTX: compute RT resources torn down during mode switch\n");
+    }
+    // Generic resource cleanup
+    rtx.CleanupResources();
+    // Mark as not initialized so next Init will reconstruct resources
+    rtx.initialized = qfalse;
+    // Switch mode and schedule reinitialization on next init/activation
     rtx.mode = newMode;
-    // Resources will be reinitialized lazily on next Init or first render path
-    // Minimal reinitialization for non-GPU subsystems to complete the mode-change lifecycle
-    PathTracer_Shutdown();
-    PathTracer_Init();
-    Denoiser_Shutdown();
-    Denoiser_Init();
+    ri.Printf(PRINT_ALL, "RTX: switched mode to %d; resources will be reinitialized on next init/activation\n", newMode);
 }
 
 // Test hooks ( UNIT_TEST builds ) - expose minimal introspection / control

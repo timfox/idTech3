@@ -1,0 +1,85 @@
+// Lightweight active stub for RTX hardware acceleration (BLAS/TLAS)
+// Provides a minimal, compilable implementation so the RTX code can link
+// and be extended later with a full hardware-accelerated path.
+#include "tr_local.h"
+#include "vk_rtx_acceleration.h"
+#include <stdint.h>
+#include <stdio.h>
+#include <vulkan/vulkan.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+qboolean vk_rtx_acceleration_init(void) {
+    ri.Printf(PRINT_ALL, "Vulkan RTX: acceleration init (stub active)\n");
+    return qtrue;
+}
+
+void vk_rtx_acceleration_shutdown(void) {
+    ri.Printf(PRINT_ALL, "Vulkan RTX: acceleration shutdown (stub)\n");
+}
+
+uint64_t vk_rtx_create_blas_for_geometry(VkBuffer vertex_buffer, VkBuffer index_buffer,
+                                      uint32_t vertex_count, uint32_t index_count,
+                                      uint32_t vertex_stride, const char* debug_name) {
+    // Accept parameters but do not perform real GPU work yet.
+    ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: createBLAS_for_geometry stub for %s (verts=%u, idx=%u)\n",
+              debug_name ? debug_name : "unnamed", vertex_count, index_count);
+    // Return a dummy non-zero handle to simulate a created BLAS
+    return 1;
+}
+
+void vk_rtx_update_instance_data(uint64_t accel_id, const matrix3x4_t* transform, uint32_t instance_id) {
+    (void)accel_id; (void)transform; (void)instance_id;
+}
+
+void vk_rtx_build_tlas(VkCommandBuffer cmd_buffer) {
+    (void)cmd_buffer;
+}
+
+uint32_t vk_rtx_add_light(const vec3_t position, const vec3_t color, float intensity,
+                          float radius, int light_type, qboolean casts_shadows) {
+    (void)position; (void)color; (void)intensity; (void)radius; (void)light_type; (void)casts_shadows;
+    return 0;
+}
+
+void vk_rtx_update_light(uint32_t light_id, const vec3_t position, const vec3_t color, float intensity) {
+    (void)light_id; (void)position; (void)color; (void)intensity;
+}
+
+void vk_rtx_set_light_advanced_properties(uint32_t light_id, float temperature,
+                                         float cone_angle, const vec3_t direction, int ies_profile) {
+    (void)light_id; (void)temperature; (void)cone_angle; (void)direction; (void)ies_profile;
+}
+
+void vk_rtx_create_shadow_acceleration(uint32_t light_id, VkCommandBuffer cmd_buffer) {
+    (void)light_id; (void)cmd_buffer;
+}
+
+void vk_rtx_update_lighting_data(VkBuffer light_buffer, VkDeviceMemory light_buffer_memory) {
+    (void)light_buffer; (void)light_buffer_memory;
+}
+
+void vk_rtx_set_quality_settings(float quality, qboolean shadows, qboolean reflections,
+                                 qboolean refractions, qboolean global_illumination) {
+    (void)quality; (void)shadows; (void)reflections; (void)refractions; (void)global_illumination;
+}
+
+void vk_rtx_get_statistics(uint32_t* triangles, uint32_t* instances, uint32_t* lights,
+                         VkDeviceSize* memory_usage, float* quality) {
+    if (triangles) *triangles = 0;
+    if (instances) *instances = 0;
+    if (lights) *lights = 0;
+    if (memory_usage) *memory_usage = 0;
+    if (quality) *quality = 0.0f;
+}
+
+void vk_rtx_performance_monitor(uint64_t frame_time_ns, uint32_t ray_count) {
+    (void)frame_time_ns; (void)ray_count;
+}
+
+#ifdef __cplusplus
+}
+#endif
+

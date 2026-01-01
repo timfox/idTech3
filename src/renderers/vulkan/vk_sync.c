@@ -172,22 +172,66 @@ void vk_sync2_pipeline_barrier(const VkDependencyInfo *dependency_info) {
 void vk_update_frame_timing(void) {
     // Basic frame timing update
     static uint32_t frame_count = 0;
+    static uint64_t last_time_ns = 0;
 
     frame_count++;
 
-    // TODO: Implement proper frame timing with high-precision timers
-    // For now, this is a framework that can be extended
-    // Note: last_time variable removed until proper timing implementation
+    // Compute frame duration using wall-clock time (milliseconds) as a fallback
+    uint64_t now_ms = (uint64_t)ri.Milliseconds();
+    uint64_t now_ns = now_ms * 1000000ULL;
+    double frame_time_ms = 0.0;
+    if (last_time_ns != 0) {
+        uint64_t delta_ns = now_ns - last_time_ns;
+        frame_time_ms = (double)delta_ns / 1000000.0;
+    } else {
+        frame_time_ms = 16.67; // assume ~60fps for first frame
+    }
+    last_time_ns = now_ns;
+
+    // Update per-frame timing table in the profiler (circular buffer)
+    if (vk.render_profiler.frame_history && vk.render_profiler.max_frames > 0) {
+        uint32_t idx = (uint32_t)vk.render_profiler.current_frame_index;
+        if (idx >= vk.render_profiler.max_frames) idx = 0;
+        vk_frame_profile_t *frame = &vk.render_profiler.frame_history[idx];
+        frame->frame_number = vk.render_profiler.total_frames_recorded;
+        frame->frame_time_ms = frame_time_ms;
+        // CPU time left as 0 for now; GPU time may be filled when/if queries are active
+        frame->cpu_time_ms = 0.0;
+        frame->gpu_time_ms = 0.0;
+        frame->passes = frame->passes; // keep existing pointer
+    }
+
+    // Advance circular frame index and total frame counter
+    atomic_fetch_add_explicit(&vk.render_profiler.current_frame_index, 1, memory_order_relaxed);
+    atomic_fetch_add_explicit(&vk.render_profiler.total_frames_recorded, 1, memory_order_relaxed);
 }
 
 float vk_get_frame_time(void) {
-    // TODO: Return actual frame time
-    return 16.67f; // ~60 FPS
+    // Return the most recently recorded frame time, if available
+    if (vk.render_profiler.frame_history && vk.render_profiler.max_frames > 0) {
+        uint32_t idx = (uint32_t)((vk.render_profiler.current_frame_index + vk.render_profiler.max_frames - 1) % vk.render_profiler.max_frames);
+        double t = vk.render_profiler.frame_history[idx].frame_time_ms;
+        if (t > 0.0) return (float)t;
+    }
+    return 16.67f;
 }
 
 float vk_get_average_fps(void) {
-    // TODO: Calculate actual FPS
-    return 60.0f;
+    // Calculate FPS over the available frame history
+    if (!vk.render_profiler.frame_history || vk.render_profiler.max_frames == 0) {
+        return 60.0f;
+    }
+    uint32_t max_frames = vk.render_profiler.max_frames;
+    uint32_t total = (uint32_t)vk.render_profiler.total_frames_recorded;
+    if (total == 0) return 60.0f;
+    uint32_t frames_to_consider = total < max_frames ? total : max_frames;
+    double sum = 0.0;
+    for (uint32_t i = 0; i < frames_to_consider; i++) {
+        uint32_t idx = (uint32_t)((vk.render_profiler.current_frame_index + max_frames - 1 - i) % max_frames);
+        sum += vk.render_profiler.frame_history[idx].frame_time_ms;
+    }
+    double avg = (frames_to_consider > 0) ? (sum / (double)frames_to_consider) : 16.67;
+    return (float)(1000.0 / avg);
 }
 
 // GPU timing queries - framework

@@ -12,14 +12,12 @@
 #include "vk_world_effects.h"
 // Ray marching moved to RTX renderer only
 #include "vk.h"
-// include bridge header for CPU-wait API
-#include "vk_link_bridge.h"
+// Plan D: bridge layer removed; CPU-wait API accessed directly via vk_link_bridge removals
 // Forward declarations for real command buffer helpers (C linkage)
 extern "C" VkCommandBuffer vk_begin_command_buffer(void);
 extern "C" void vk_end_command_buffer(VkCommandBuffer, const char*);
 // Note: vk_command_buffers.h is not available; declare needed prototypes manually with C linkage
-// Bridge wrappers (actual implementations live in vk_link_bridge.cpp)
-#include "vk_link_bridge.h"
+// Bridging layer removed; using direct Vulkan APIs
 
 #include "vk_fsr.h"
 #include "vk_atmosphere.h"

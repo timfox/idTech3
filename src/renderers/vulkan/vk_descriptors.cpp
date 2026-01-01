@@ -476,15 +476,14 @@ extern "C" void vk_update_attachment_descriptors(void) {
   }
 #endif
 
-    // cubemap - temporarily disabled due to C++ Vulkan handle type issues
-    // TODO: Fix VkImageView_T incomplete type handling in C++
-    /*
-    if ((void*)vk.cubeMap.color_image_view[0] != nullptr) {
-        info.imageView = (VkImageView)vk.cubeMap.color_image_view[0];
-        desc.dstSet = vk.cubeMap.color_descriptor;
-        qvkUpdateDescriptorSets(vk.device, 1, &desc, 0, NULL);
-    }
-    */
+// cubemap binding disabled due to C++ Vulkan handle type issues
+#if 0
+if (vk.cubeMap.color_image_view[0] != (void*)0) {
+    info.imageView = (VkImageView)vk.cubeMap.color_image_view[0];
+    desc.dstSet = vk.cubeMap.color_descriptor;
+    qvkUpdateDescriptorSets(vk.device, 1, &desc, 0, NULL);
+}
+#endif
 }
 
 // Initialize descriptors
