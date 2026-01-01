@@ -1,5 +1,7 @@
 #include "tr_local.h"
 #include "vk_frame.h"
+#include "vk_sync.h"
+#include <time.h>
 #include "vk_renderpass.h"
 #include "vk_utils.h"
 #include "vk_postprocess.h"
@@ -28,6 +30,7 @@ static void vt_trace(const char* json);
 
 // Global guard for headless-present state (initialized early for cross-function visibility)
 static bool g_vk_headless_present_state = false;
+static struct timespec g_vk_frame_start_ts;
 static int retry_count = 0;
 
 // Renderer interface
@@ -156,6 +159,8 @@ extern "C" void vk_begin_frame(void) {
 
     // Set command buffer pointer early so we can use vk.cmd
     vk.cmd = &vk.tess[vk.cmd_index];
+    // Record frame start time for GPU timing (non-RTX path)
+    clock_gettime(CLOCK_MONOTONIC, &g_vk_frame_start_ts);
 
     // Check if we're running headless (no display available)
     static qboolean headless_detected = qfalse;
@@ -600,6 +605,14 @@ extern "C" void vk_end_frame(void) {
     vk_sample_thread_utilization();
 
     ri.Printf(PRINT_ALL, "Vulkan: Frame %d ended\n", vk.frame_count);
+    // End-of-frame GPU timing for non-RTX path
+    if (vk.render_profiler.initialized && vk.render_profiler.frame_history && vk.render_profiler.max_frames > 0) {
+        struct timespec t1;
+        clock_gettime(CLOCK_MONOTONIC, &t1);
+        uint64_t delta_ns = (uint64_t)(t1.tv_sec - g_vk_frame_start_ts.tv_sec) * 1000000000ULL
+                            + (uint64_t)(t1.tv_nsec - g_vk_frame_start_ts.tv_nsec);
+        vk_update_gpu_timing_ns(delta_ns);
+    }
 #ifdef VK_KHR_TIMELINE_SEMAPHORE
     if (vk.timeline_semaphore != VK_NULL_HANDLE && qvkSignalSemaphoreKHR) {
         vk.gpu_timeline_counter++;

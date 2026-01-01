@@ -5,6 +5,10 @@
 #include <stdint.h>
 #include "../common/q_shared.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Synchronization primitives management
 void vk_create_sync_primitives(void);
 void vk_destroy_sync_primitives(void);
@@ -32,5 +36,9 @@ __attribute__((unused)) float vk_get_gpu_timing_result(const char *name);
 
 // Feed a GPU timing measurement (ns) into the per-frame profiler
 void vk_update_gpu_timing_ns(uint64_t gpu_ns);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __VK_SYNC_H__

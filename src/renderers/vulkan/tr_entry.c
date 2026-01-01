@@ -25,11 +25,31 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../renderercommon/tr_backend_iface.h"
 #include "../../common/q_shared.h"
 #include "vk.h"
+#include <unistd.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
 
 extern refimport_t ri;
+static qboolean g_vk_safe_mode = qfalse;
+static qboolean g_vulkan_patch1_enabled = qfalse;
+static qboolean g_vulkan_patch1_tiny_enabled = qfalse;
+
+static void check_safe_mode_flag(void) {
+  if (g_vk_safe_mode) return;
+  if (access("/home/tim/Desktop/idtech3/logs/safe_mode.flag", F_OK) == 0) {
+    g_vk_safe_mode = qtrue;
+    ri.Printf(PRINT_ALL, "SAFE MODE: Vulkan path disabled via flag\n");
+  }
+  // Tiny patch gate
+  if (!g_vulkan_patch1_tiny_enabled) {
+    if (access("/home/tim/Desktop/idtech3/logs/enable_vulkan_patch1_tiny.flag", F_OK) == 0) {
+      g_vulkan_patch1_tiny_enabled = qtrue;
+      ri.Printf(PRINT_ALL, "PLAN: Vulkan patch1 tiny surface enabled (guarded)\n");
+    }
+  }
+}
 
 
 // Extern declarations for functions implemented in other files
@@ -107,12 +127,53 @@ void RE_SetColorMappings(void) {
 // No extern declarations needed
 
 // Entry point for dlopen
-Q_EXPORT __attribute__((visibility("default"))) refexport_t* GetRefAPI(int apiVersion, refimport_t *rimp) {
-    // STABLE BASELINE: Return NULL to force fallback to OpenGL renderer
-    // This prevents crashes while maintaining Vulkan renderer loading capability
-    // TODO: Fix underlying renderer interface issues before enabling full Vulkan support
-    (void)apiVersion; (void)rimp;
+// Plan-guarded: return a minimal Vulkan surface if patch1 is enabled, otherwise NULL
+Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI(int apiVersion, refimport_t *rimp) {
+  check_safe_mode_flag();
+  if (g_vk_safe_mode) {
+    ri.Printf(PRINT_ALL, "SAFE MODE active: GetRefAPI returns NULL to force GL fallback\n");
     return NULL;
+  }
+  if (g_vulkan_patch1_enabled || g_vulkan_patch1_tiny_enabled) {
+    static refexport_t re;
+    if (apiVersion != REF_API_VERSION) {
+      ri.Printf(PRINT_ALL, "Mismatched REF_API_VERSION: expected %i, got %i\n", REF_API_VERSION, apiVersion);
+      return NULL;
+    }
+    ri = *rimp;
+    Com_Memset(&re, 0, sizeof(re));
+    if (g_vulkan_patch1_tiny_enabled) {
+      // Tiny surface: only core lifecycle and essential render pointer
+      re.Shutdown = RE_Shutdown;
+      re.BeginRegistration = RE_BeginRegistration;
+      re.EndRegistration = RE_EndRegistration;
+      re.BeginFrame = RE_BeginFrame;
+      re.EndFrame = RE_EndFrame;
+      re.RenderScene = RE_RenderScene;
+      re.SetColor = RE_SetColor;
+      g_vulkan_patch1_enabled = qtrue;
+      g_vulkan_patch1_tiny_enabled = qtrue;
+      ri.Printf(PRINT_ALL, "PLAN: Vulkan patch1 surface implicitly enabled by tiny flag\n");
+      ri.Printf(PRINT_ALL, "PLAN: Vulkan patch1 tiny surface wired (API version: %d)\n", apiVersion);
+    } else {
+      // Expanded plan surface (guarded)
+      re.Shutdown = RE_Shutdown;
+      re.BeginRegistration = RE_BeginRegistration;
+      re.EndRegistration = RE_EndRegistration;
+      re.BeginFrame = RE_BeginFrame;
+      re.EndFrame = RE_EndFrame;
+      re.RenderScene = RE_RenderScene;
+      re.SetColor = RE_SetColor;
+      // Expanded basic render surface
+      re.ClearScene = RE_ClearScene;
+      re.AddRefEntityToScene = RE_AddRefEntityToScene;
+      re.AddPolyToScene = RE_AddPolyToScene;
+      re.UploadCinematic = RE_UploadCinematic;
+      ri.Printf(PRINT_ALL, "PLAN: Vulkan patch1 surface wired (API version: %d)\n", apiVersion);
+    }
+    return &re;
+  }
+  return NULL;
 }
 
 void RE_SyncRender(void) {

@@ -9935,6 +9935,12 @@ void vk_recreate_swapchain(void) {
   // Recreate framebuffers for the new swapchain images
   vk_create_framebuffers();
   ri.Printf(PRINT_ALL, "Vulkan: Swapchain recreated with %u images\n", vk.swapchain_image_count);
+  // Optional: Reset GPU timing profiler to align with new swapchain
+  if (vk.render_profiler.initialized) {
+    vk_shutdown_render_profiler();
+    vk_init_render_profiler();
+    ri.Printf(PRINT_ALL, "Vulkan: Render profiler reinitialized after swapchain recreation\n");
+  }
 }
 
 /*
