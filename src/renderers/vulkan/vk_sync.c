@@ -250,3 +250,16 @@ __attribute__((unused)) float vk_get_gpu_timing_result(const char *name) {
     ri.Printf(PRINT_DEVELOPER, "Vulkan: GPU timing result requested for: %s\n", name ? name : "unnamed");
     return 0.0f;
 }
+// Store GPU timing in current frame's profile
+void vk_update_gpu_timing_ns(uint64_t gpu_ns) {
+#ifdef VK_RENDERER_DEBUG_TIMING
+    ri.Printf(PRINT_DEVELOPER, "VK timing: updating gpu_ns=%llu\n", (unsigned long long)gpu_ns);
+#endif
+    if (!vk.render_profiler.frame_history || vk.render_profiler.max_frames == 0) {
+        return;
+    }
+    uint32_t idx = (uint32_t)((vk.render_profiler.current_frame_index + vk.render_profiler.max_frames - 1) % vk.render_profiler.max_frames);
+    if (idx >= vk.render_profiler.max_frames) return;
+    vk_frame_profile_t* frame = &vk.render_profiler.frame_history[idx];
+    frame->gpu_time_ms = (float)((double)gpu_ns / 1e6);
+}

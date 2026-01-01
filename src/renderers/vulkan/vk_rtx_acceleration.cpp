@@ -111,6 +111,7 @@ void vk_rtx_build_sbt_for_frame(VkCommandBuffer cmd_buffer) {
 #include <string.h>
 #include <vulkan/vulkan.h>
 #include <time.h>
+void vk_update_gpu_timing_ns(uint64_t gpu_ns);
 
 // Include Vulkan headers for ray tracing
 #ifdef USE_VULKAN
@@ -149,6 +150,9 @@ typedef struct {
 // Global RTX state
 static qboolean g_rtx_accel_initialized = qfalse;
 static qboolean g_rtx_blas_tlas_built = qfalse;
+// Timing: GPU/RT timestamps
+static VkQueryPool g_rtx_timing_query_pool = VK_NULL_HANDLE;
+static float     g_rtx_timestamp_period = 1.0f;
 
 #define MAX_BLAS 1024
 #define MAX_TLAS_INSTANCES 4096
@@ -300,6 +304,14 @@ qboolean vk_rtx_acceleration_init(void) {
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Vulkan RTX: Failed to create ray tracing pipeline\n");
         return qfalse;
+    }
+    // Initialize timing query pool for GPU timing
+    VkQueryPoolCreateInfo qp = { .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO, .queryType = VK_QUERY_TYPE_TIMESTAMP, .queryCount = 2 };
+    if (vkCreateQueryPool(vk.device, &qp, NULL, &g_rtx_timing_query_pool) != VK_SUCCESS) {
+        ri.Printf(PRINT_WARNING, "Vulkan RTX: failed to create timing query pool\n");
+        g_rtx_timing_query_pool = VK_NULL_HANDLE;
+    } else {
+        g_rtx_timestamp_period = 1.0f;
     }
 
     g_rtx_accel_initialized = qtrue;
@@ -679,9 +691,17 @@ void vk_rtx_trace_raysKHR(VkCommandBuffer cmd_buffer) {
 
     VkStridedDeviceAddressRegionKHR callable_region = {0}; // Not used in this simple implementation
 
+    // Optional start timestamp
+    if (g_rtx_timing_query_pool != VK_NULL_HANDLE) {
+        vkCmdWriteTimestamp(cmd_buffer, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, g_rtx_timing_query_pool, 0);
+    }
     // Issue the trace rays command
     vkCmdTraceRaysKHR(cmd_buffer, &raygen_region, &miss_region, &hit_region, &callable_region,
                      glConfig.vidWidth, glConfig.vidHeight, 1);
+    // Optional end timestamp
+    if (g_rtx_timing_query_pool != VK_NULL_HANDLE) {
+        vkCmdWriteTimestamp(cmd_buffer, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, g_rtx_timing_query_pool, 1);
+    }
 
     ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: vkCmdTraceRaysKHR executed for %ux%u\n",
               glConfig.vidWidth, glConfig.vidHeight);
@@ -755,6 +775,21 @@ void vk_rtx_bind_and_trace_raysKHR_from_main(VkCommandBuffer cmd_buffer, uint32_
                             0, 0, NULL, 0, NULL, 1, &present_barrier);
 
         ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: Ray tracing pipeline completed, output ready for presentation\n");
+        // Optional: read back timing results
+        if (g_rtx_timing_query_pool != VK_NULL_HANDLE) {
+            uint64_t timestamps[2] = {0, 0};
+            VkResult qr = vkGetQueryPoolResults(vk.device, g_rtx_timing_query_pool, 0, 2,
+                                                sizeof(uint64_t) * 2, timestamps, 0,
+                                                VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+            if (qr == VK_SUCCESS) {
+                uint64_t delta = timestamps[1] - timestamps[0];
+                uint64_t gpu_ns = delta * (uint64_t)g_rtx_timestamp_period;
+                ri.Printf(PRINT_DEVELOPER, "RTX: GPU frame time ~ %llu ns\n", (unsigned long long)gpu_ns);
+                vk_update_gpu_timing_ns(gpu_ns);
+            } else {
+                ri.Printf(PRINT_DEVELOPER, "RTX: timing query results not ready (0x%x)\n", qr);
+            }
+        }
     #else
         ri.Printf(PRINT_WARNING, "Vulkan RTX: VK_KHR_ray_tracing_pipeline not available\n");
     #endif

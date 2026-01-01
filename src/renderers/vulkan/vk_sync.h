@@ -30,4 +30,7 @@ __attribute__((unused)) void vk_begin_gpu_timing(const char *name);
 __attribute__((unused)) void vk_end_gpu_timing(void);
 __attribute__((unused)) float vk_get_gpu_timing_result(const char *name);
 
+// Feed a GPU timing measurement (ns) into the per-frame profiler
+void vk_update_gpu_timing_ns(uint64_t gpu_ns);
+
 #endif // __VK_SYNC_H__
