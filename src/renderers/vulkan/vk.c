@@ -4,11 +4,6 @@
 #include "vk_memory.h"
 #include "vk_swapchain_manager.h"
 extern VkSurfaceFormatKHR vk_present_format;
-// Bridge-provided wrappers for ensuring C-linkage across modules
-extern void vk_destroy_swapchain_bridge(void);
-extern VkSurfaceFormatKHR vk_present_format_bridge(void);
-extern VkCommandBuffer vk_begin_command_buffer_bridge(void);
-extern void vk_end_command_buffer_bridge(VkCommandBuffer, const char* location);
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 
