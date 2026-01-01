@@ -21,18 +21,16 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "tr_local.h"
+#include "vk.h"
 #include <vector>
 
 // External Vulkan objects (declared in initialization module)
 extern VkInstance vk_instance;
-extern VkPhysicalDevice vk_physical_device;
-extern VkDevice vk_device;
-extern VkQueue vk_queue;
-extern uint32_t vk_queue_family_index;
+// These are now part of the global vk structure
 
 // Vulkan function pointers
 extern PFN_vkGetDeviceProcAddr qvkGetDeviceProcAddr;
-extern PFN_vkGetInstanceProcAddr qvkGetInstanceProcAddr;
+// Use vkGetInstanceProcAddr directly from Vulkan loader
 extern PFN_vkCreateSemaphore qvkCreateSemaphore;
 extern PFN_vkDestroySemaphore qvkDestroySemaphore;
 extern PFN_vkCreateSwapchainKHR qvkCreateSwapchainKHR;
@@ -44,27 +42,12 @@ extern PFN_vkQueuePresentKHR qvkQueuePresentKHR;
 // Vulkan Swapchain Management Module
 // Handles swapchain creation, recreation, and presentation
 
-// Swapchain function pointers
-PFN_vkCreateSwapchainKHR qvkCreateSwapchainKHR = nullptr;
-PFN_vkDestroySwapchainKHR qvkDestroySwapchainKHR = nullptr;
-PFN_vkGetSwapchainImagesKHR qvkGetSwapchainImagesKHR = nullptr;
-PFN_vkAcquireNextImageKHR qvkAcquireNextImageKHR = nullptr;
-PFN_vkQueuePresentKHR qvkQueuePresentKHR = nullptr;
-PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR qvkGetPhysicalDeviceSurfaceCapabilitiesKHR = nullptr;
-PFN_vkGetPhysicalDeviceSurfaceFormatsKHR qvkGetPhysicalDeviceSurfaceFormatsKHR = nullptr;
-PFN_vkGetPhysicalDeviceSurfacePresentModesKHR qvkGetPhysicalDeviceSurfacePresentModesKHR = nullptr;
+// Swapchain function pointers (defined in vk.c)
 
 // Current swapchain state
-extern VkSwapchainKHR vk_swapchain;
-extern VkSurfaceKHR vk_surface;
+// These are now part of the global vk structure
 // Present format is defined in this TU to ensure a single definition
 VkSurfaceFormatKHR vk_present_format = {};
-extern uint32_t vk_swapchain_image_count;
-extern uint32_t vk_current_swapchain_image_index;
-
-// Semaphore management
-extern VkSemaphore vk_image_available;
-extern VkSemaphore vk_rendering_finished;
 
 // Internal swapchain state for this module
 static std::vector<VkImage> swapchain_images;
@@ -74,19 +57,19 @@ static std::vector<VkSemaphore> rendering_finished_semaphores;
 
 // Initialize swapchain function pointers
 void vk_init_swapchain_functions(void) {
-    if (!vk_device || vk_device == (VkDevice)0x20000000) {
+    if (!vk.device || vk.device == (VkDevice)0x20000000) {
         return;
     }
 
     // Load swapchain functions
-    qvkCreateSwapchainKHR = (PFN_vkCreateSwapchainKHR)qvkGetDeviceProcAddr(vk_device, "vkCreateSwapchainKHR");
-    qvkDestroySwapchainKHR = (PFN_vkDestroySwapchainKHR)qvkGetDeviceProcAddr(vk_device, "vkDestroySwapchainKHR");
-    qvkGetSwapchainImagesKHR = (PFN_vkGetSwapchainImagesKHR)qvkGetDeviceProcAddr(vk_device, "vkGetSwapchainImagesKHR");
-    qvkAcquireNextImageKHR = (PFN_vkAcquireNextImageKHR)qvkGetDeviceProcAddr(vk_device, "vkAcquireNextImageKHR");
-    qvkQueuePresentKHR = (PFN_vkQueuePresentKHR)qvkGetDeviceProcAddr(vk_device, "vkQueuePresentKHR");
-    qvkGetPhysicalDeviceSurfaceCapabilitiesKHR = (PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR)qvkGetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
-    qvkGetPhysicalDeviceSurfaceFormatsKHR = (PFN_vkGetPhysicalDeviceSurfaceFormatsKHR)qvkGetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceSurfaceFormatsKHR");
-    qvkGetPhysicalDeviceSurfacePresentModesKHR = (PFN_vkGetPhysicalDeviceSurfacePresentModesKHR)qvkGetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceSurfacePresentModesKHR");
+    qvkCreateSwapchainKHR = (PFN_vkCreateSwapchainKHR)qvkGetDeviceProcAddr(vk.device, "vkCreateSwapchainKHR");
+    qvkDestroySwapchainKHR = (PFN_vkDestroySwapchainKHR)qvkGetDeviceProcAddr(vk.device, "vkDestroySwapchainKHR");
+    qvkGetSwapchainImagesKHR = (PFN_vkGetSwapchainImagesKHR)qvkGetDeviceProcAddr(vk.device, "vkGetSwapchainImagesKHR");
+    qvkAcquireNextImageKHR = (PFN_vkAcquireNextImageKHR)qvkGetDeviceProcAddr(vk.device, "vkAcquireNextImageKHR");
+    qvkQueuePresentKHR = (PFN_vkQueuePresentKHR)qvkGetDeviceProcAddr(vk.device, "vkQueuePresentKHR");
+    qvkGetPhysicalDeviceSurfaceCapabilitiesKHR = (PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR)vkGetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
+    qvkGetPhysicalDeviceSurfaceFormatsKHR = (PFN_vkGetPhysicalDeviceSurfaceFormatsKHR)vkGetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceSurfaceFormatsKHR");
+    qvkGetPhysicalDeviceSurfacePresentModesKHR = (PFN_vkGetPhysicalDeviceSurfacePresentModesKHR)vkGetInstanceProcAddr(vk_instance, "vkGetPhysicalDeviceSurfacePresentModesKHR");
 }
 
 // Choose surface format
@@ -111,7 +94,7 @@ VkPresentModeKHR vk_choose_present_mode(const std::vector<VkPresentModeKHR>& mod
 
 // Create swapchain
 qboolean vk_create_swapchain(void) {
-    if (!vk_device || vk_device == (VkDevice)0x20000000) {
+    if (!vk.device || vk.device == (VkDevice)0x20000000) {
         ri.Printf(PRINT_ALL, "Swapchain: Skipping creation (stub device)\n");
         return qtrue;
     }
@@ -120,7 +103,7 @@ qboolean vk_create_swapchain(void) {
 
     // Get surface capabilities
     VkSurfaceCapabilitiesKHR capabilities;
-    VkResult result = qvkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk_physical_device, vk_surface, &capabilities);
+    VkResult result = qvkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk.physical_device, vk.surface, &capabilities);
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Swapchain: Failed to get surface capabilities\n");
         return qfalse;
@@ -128,14 +111,14 @@ qboolean vk_create_swapchain(void) {
 
     // Get surface formats
     uint32_t formatCount;
-    result = qvkGetPhysicalDeviceSurfaceFormatsKHR(vk_physical_device, vk_surface, &formatCount, nullptr);
+    result = qvkGetPhysicalDeviceSurfaceFormatsKHR(vk.physical_device, vk.surface, &formatCount, nullptr);
     if (result != VK_SUCCESS || formatCount == 0) {
         ri.Printf(PRINT_ERROR, "Swapchain: No surface formats available\n");
         return qfalse;
     }
 
     std::vector<VkSurfaceFormatKHR> formats(formatCount);
-    result = qvkGetPhysicalDeviceSurfaceFormatsKHR(vk_physical_device, vk_surface, &formatCount, formats.data());
+    result = qvkGetPhysicalDeviceSurfaceFormatsKHR(vk.physical_device, vk.surface, &formatCount, formats.data());
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Swapchain: Failed to get surface formats\n");
         return qfalse;
@@ -146,14 +129,14 @@ qboolean vk_create_swapchain(void) {
 
     // Get present modes
     uint32_t presentModeCount;
-    result = qvkGetPhysicalDeviceSurfacePresentModesKHR(vk_physical_device, vk_surface, &presentModeCount, nullptr);
+    result = qvkGetPhysicalDeviceSurfacePresentModesKHR(vk.physical_device, vk.surface, &presentModeCount, nullptr);
     if (result != VK_SUCCESS || presentModeCount == 0) {
         ri.Printf(PRINT_ERROR, "Swapchain: No present modes available\n");
         return qfalse;
     }
 
     std::vector<VkPresentModeKHR> presentModes(presentModeCount);
-    result = qvkGetPhysicalDeviceSurfacePresentModesKHR(vk_physical_device, vk_surface, &presentModeCount, presentModes.data());
+    result = qvkGetPhysicalDeviceSurfacePresentModesKHR(vk.physical_device, vk.surface, &presentModeCount, presentModes.data());
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Swapchain: Failed to get present modes\n");
         return qfalse;
@@ -183,7 +166,7 @@ qboolean vk_create_swapchain(void) {
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .pNext = nullptr,
         .flags = 0,
-        .surface = vk_surface,
+        .surface = vk.surface,
         .minImageCount = imageCount,
         .imageFormat = vk_present_format.format,
         .imageColorSpace = vk_present_format.colorSpace,
@@ -200,29 +183,29 @@ qboolean vk_create_swapchain(void) {
         .oldSwapchain = VK_NULL_HANDLE
     };
 
-    result = qvkCreateSwapchainKHR(vk_device, &createInfo, nullptr, &vk_swapchain);
+    result = qvkCreateSwapchainKHR(vk.device, &createInfo, nullptr, &vk.swapchain);
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Swapchain: Failed to create swapchain: %d\n", result);
         return qfalse;
     }
 
     // Get swapchain images
-    result = qvkGetSwapchainImagesKHR(vk_device, vk_swapchain, &vk_swapchain_image_count, nullptr);
+    result = qvkGetSwapchainImagesKHR(vk.device, vk.swapchain, &vk.swapchain_image_count, nullptr);
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Swapchain: Failed to get image count\n");
         return qfalse;
     }
 
-    swapchain_images.resize(vk_swapchain_image_count);
-    result = qvkGetSwapchainImagesKHR(vk_device, vk_swapchain, &vk_swapchain_image_count, swapchain_images.data());
+    swapchain_images.resize(vk.swapchain_image_count);
+    result = qvkGetSwapchainImagesKHR(vk.device, vk.swapchain, &vk.swapchain_image_count, swapchain_images.data());
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Swapchain: Failed to get images\n");
         return qfalse;
     }
 
     // Create image views
-    swapchain_image_views.resize(vk_swapchain_image_count);
-    for (size_t i = 0; i < vk_swapchain_image_count; i++) {
+    swapchain_image_views.resize(vk.swapchain_image_count);
+    for (size_t i = 0; i < vk.swapchain_image_count; i++) {
         VkImageViewCreateInfo viewInfo = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
             .image = swapchain_images[i],
@@ -243,7 +226,7 @@ qboolean vk_create_swapchain(void) {
             }
         };
 
-        result = qvkCreateImageView(vk_device, &viewInfo, nullptr, &swapchain_image_views[i]);
+        result = qvkCreateImageView(vk.device, &viewInfo, nullptr, &swapchain_image_views[i]);
         if (result != VK_SUCCESS) {
             ri.Printf(PRINT_ERROR, "Swapchain: Failed to create image view %zu\n", i);
             return qfalse;
@@ -251,21 +234,21 @@ qboolean vk_create_swapchain(void) {
     }
 
     // Create semaphores
-    image_available_semaphores.resize(vk_swapchain_image_count);
-    rendering_finished_semaphores.resize(vk_swapchain_image_count);
+    image_available_semaphores.resize(vk.swapchain_image_count);
+    rendering_finished_semaphores.resize(vk.swapchain_image_count);
 
     VkSemaphoreCreateInfo semaphoreInfo = {
         .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
     };
 
-    for (size_t i = 0; i < vk_swapchain_image_count; i++) {
-        result = qvkCreateSemaphore(vk_device, &semaphoreInfo, nullptr, &image_available_semaphores[i]);
+    for (size_t i = 0; i < vk.swapchain_image_count; i++) {
+        result = qvkCreateSemaphore(vk.device, &semaphoreInfo, nullptr, &image_available_semaphores[i]);
         if (result != VK_SUCCESS) {
             ri.Printf(PRINT_ERROR, "Swapchain: Failed to create image available semaphore\n");
             return qfalse;
         }
 
-        result = qvkCreateSemaphore(vk_device, &semaphoreInfo, nullptr, &rendering_finished_semaphores[i]);
+        result = qvkCreateSemaphore(vk.device, &semaphoreInfo, nullptr, &rendering_finished_semaphores[i]);
         if (result != VK_SUCCESS) {
             ri.Printf(PRINT_ERROR, "Swapchain: Failed to create rendering finished semaphore\n");
             return qfalse;
@@ -273,25 +256,25 @@ qboolean vk_create_swapchain(void) {
     }
 
     // Set initial semaphores
-    vk_image_available = image_available_semaphores[0];
-    vk_rendering_finished = rendering_finished_semaphores[0];
+    vk.image_available = image_available_semaphores[0];
+    vk.rendering_finished = rendering_finished_semaphores[0];
 
-    ri.Printf(PRINT_ALL, "Swapchain: Created successfully with %u images\n", vk_swapchain_image_count);
+    ri.Printf(PRINT_ALL, "Swapchain: Created successfully with %u images\n", vk.swapchain_image_count);
     return qtrue;
 }
 
 // Destroy swapchain
 void vk_destroy_swapchain(void) {
-    if (!vk_device || vk_device == (VkDevice)0x20000000) {
+    if (!vk.device || vk.device == (VkDevice)0x20000000) {
         return;
     }
 
     // Destroy semaphores
     for (auto semaphore : image_available_semaphores) {
-        if (semaphore) qvkDestroySemaphore(vk_device, semaphore, nullptr);
+        if (semaphore) qvkDestroySemaphore(vk.device, semaphore, nullptr);
     }
     for (auto semaphore : rendering_finished_semaphores) {
-        if (semaphore) qvkDestroySemaphore(vk_device, semaphore, nullptr);
+        if (semaphore) qvkDestroySemaphore(vk.device, semaphore, nullptr);
     }
 
     image_available_semaphores.clear();
@@ -299,14 +282,14 @@ void vk_destroy_swapchain(void) {
 
     // Destroy image views
     for (auto view : swapchain_image_views) {
-        if (view) qvkDestroyImageView(vk_device, view, nullptr);
+        if (view) qvkDestroyImageView(vk.device, view, nullptr);
     }
     swapchain_image_views.clear();
 
     // Destroy swapchain
-    if (vk_swapchain) {
-        qvkDestroySwapchainKHR(vk_device, vk_swapchain, nullptr);
-        vk_swapchain = VK_NULL_HANDLE;
+    if (vk.swapchain) {
+        qvkDestroySwapchainKHR(vk.device, vk.swapchain, nullptr);
+        vk.swapchain = VK_NULL_HANDLE;
     }
 
     ri.Printf(PRINT_ALL, "Swapchain: Destroyed\n");
@@ -314,13 +297,13 @@ void vk_destroy_swapchain(void) {
 
 // Acquire next swapchain image
 qboolean vk_acquire_next_image(void) {
-    if (!vk_swapchain) {
+    if (!vk.swapchain) {
         return qfalse;
     }
 
-    VkResult result = qvkAcquireNextImageKHR(vk_device, vk_swapchain, UINT64_MAX,
-                                             vk_image_available, VK_NULL_HANDLE,
-                                             &vk_current_swapchain_image_index);
+    VkResult result = qvkAcquireNextImageKHR(vk.device, vk.swapchain, UINT64_MAX,
+                                             vk.image_available, VK_NULL_HANDLE,
+                                             &vk.current_swapchain_image_index);
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
         // Swapchain needs recreation
@@ -337,20 +320,20 @@ qboolean vk_acquire_next_image(void) {
 
 // Present swapchain image
 qboolean vk_present_image(void) {
-    if (!vk_swapchain) {
+    if (!vk.swapchain) {
         return qfalse;
     }
 
     VkPresentInfoKHR presentInfo = {
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores = &vk_rendering_finished,
+        .pWaitSemaphores = &vk.rendering_finished,
         .swapchainCount = 1,
-        .pSwapchains = &vk_swapchain,
-        .pImageIndices = &vk_current_swapchain_image_index
+        .pSwapchains = &vk.swapchain,
+        .pImageIndices = &vk.current_swapchain_image_index
     };
 
-    VkResult result = qvkQueuePresentKHR(vk_queue, &presentInfo);
+    VkResult result = qvkQueuePresentKHR(vk.queue, &presentInfo);
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
         // Swapchain needs recreation

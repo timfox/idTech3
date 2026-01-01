@@ -1464,6 +1464,8 @@ SET(RENDERER_VK_SRCS
 	src/renderers/vulkan/vk_texture_management.c
 	src/renderers/vulkan/vk_instance_manager.cpp
 	src/renderers/vulkan/vk_swapchain_manager.cpp
+	src/renderers/vulkan/vk_swapchain.cpp
+	src/renderers/vulkan/vk_command_buffers.cpp
 	src/renderers/vulkan/vk_render_pass_manager.cpp
 	src/renderers/vulkan/vk_framebuffer_manager.cpp
 	src/renderers/vulkan/vk_stubs.c

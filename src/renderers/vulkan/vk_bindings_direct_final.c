@@ -5,10 +5,13 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-VkCommandBuffer vk_begin_command_buffer(void) { return VK_NULL_HANDLE; }
-void vk_end_command_buffer(VkCommandBuffer cb, const char* location) { (void)cb; (void)location; }
-void vk_destroy_swapchain(void) { }
-VkSurfaceFormatKHR vk_present_format = {};
+
+// These functions are implemented in vk_command_buffers.cpp and vk_swapchain.cpp
+extern VkCommandBuffer vk_begin_command_buffer(void);
+extern void vk_end_command_buffer(VkCommandBuffer cb, const char* location);
+extern void vk_destroy_swapchain(void);
+extern VkSurfaceFormatKHR vk_present_format;
+
 #ifdef __cplusplus
 }
 #endif

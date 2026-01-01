@@ -21,14 +21,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "tr_local.h"
+#include "vk.h"
 #include <vector>
 
 // External Vulkan objects (declared in initialization module)
 extern VkInstance vk_instance;
 extern VkPhysicalDevice vk_physical_device;
-extern VkDevice vk_device;
-extern VkQueue vk_queue;
-extern uint32_t vk_queue_family_index;
+// External Vulkan objects are now part of the global vk structure
 
 // Command buffer state is local to this module
 
@@ -59,58 +58,44 @@ extern PFN_vkDeviceWaitIdle qvkDeviceWaitIdle;
 // Handles command pool and command buffer creation, recording, and submission
 
 // Command buffer state (local to this module)
-static VkCommandPool command_pool = VK_NULL_HANDLE;
+// Use vk.vk.command_pool from the global vk structure
 static VkCommandBuffer current_command_buffer = VK_NULL_HANDLE;
 static std::vector<VkCommandBuffer> command_buffers;
 static VkFence command_fence = VK_NULL_HANDLE;
 
 // Command buffer functions
-PFN_vkCreateCommandPool qvkCreateCommandPool = nullptr;
-PFN_vkDestroyCommandPool qvkDestroyCommandPool = nullptr;
-PFN_vkAllocateCommandBuffers qvkAllocateCommandBuffers = nullptr;
-PFN_vkFreeCommandBuffers qvkFreeCommandBuffers = nullptr;
-PFN_vkBeginCommandBuffer qvkBeginCommandBuffer = nullptr;
-PFN_vkEndCommandBuffer qvkEndCommandBuffer = nullptr;
-PFN_vkResetCommandBuffer qvkResetCommandBuffer = nullptr;
-PFN_vkCmdPipelineBarrier qvkCmdPipelineBarrier = nullptr;
-PFN_vkCreateFence qvkCreateFence = nullptr;
-PFN_vkDestroyFence qvkDestroyFence = nullptr;
-PFN_vkResetFences qvkResetFences = nullptr;
-PFN_vkWaitForFences qvkWaitForFences = nullptr;
-PFN_vkQueueSubmit qvkQueueSubmit = nullptr;
-PFN_vkQueueWaitIdle qvkQueueWaitIdle = nullptr;
-PFN_vkDeviceWaitIdle qvkDeviceWaitIdle = nullptr;
+// Vulkan function pointers (defined in vk.c)
 
 // Initialize command buffer function pointers
 void vk_init_command_functions(void) {
-    if (!vk_device || vk_device == (VkDevice)0x20000000) {
+    if (!vk.device || vk.device == (VkDevice)0x20000000) {
         return;
     }
 
-    qvkCreateCommandPool = (PFN_vkCreateCommandPool)qvkGetDeviceProcAddr(vk_device, "vkCreateCommandPool");
-    qvkDestroyCommandPool = (PFN_vkDestroyCommandPool)qvkGetDeviceProcAddr(vk_device, "vkDestroyCommandPool");
-    qvkAllocateCommandBuffers = (PFN_vkAllocateCommandBuffers)qvkGetDeviceProcAddr(vk_device, "vkAllocateCommandBuffers");
-    qvkFreeCommandBuffers = (PFN_vkFreeCommandBuffers)qvkGetDeviceProcAddr(vk_device, "vkFreeCommandBuffers");
-    qvkBeginCommandBuffer = (PFN_vkBeginCommandBuffer)qvkGetDeviceProcAddr(vk_device, "vkBeginCommandBuffer");
-    qvkEndCommandBuffer = (PFN_vkEndCommandBuffer)qvkGetDeviceProcAddr(vk_device, "vkEndCommandBuffer");
-    qvkResetCommandBuffer = (PFN_vkResetCommandBuffer)qvkGetDeviceProcAddr(vk_device, "vkResetCommandBuffer");
-    qvkCmdPipelineBarrier = (PFN_vkCmdPipelineBarrier)qvkGetDeviceProcAddr(vk_device, "vkCmdPipelineBarrier");
-    qvkCmdCopyImageToBuffer = (PFN_vkCmdCopyImageToBuffer)qvkGetDeviceProcAddr(vk_device, "vkCmdCopyImageToBuffer");
-    qvkCreateFence = (PFN_vkCreateFence)qvkGetDeviceProcAddr(vk_device, "vkCreateFence");
-    qvkDestroyFence = (PFN_vkDestroyFence)qvkGetDeviceProcAddr(vk_device, "vkDestroyFence");
-    qvkResetFences = (PFN_vkResetFences)qvkGetDeviceProcAddr(vk_device, "vkResetFences");
-    qvkWaitForFences = (PFN_vkWaitForFences)qvkGetDeviceProcAddr(vk_device, "vkWaitForFences");
-    qvkQueueSubmit = (PFN_vkQueueSubmit)qvkGetDeviceProcAddr(vk_device, "vkQueueSubmit");
-    qvkQueueWaitIdle = (PFN_vkQueueWaitIdle)qvkGetDeviceProcAddr(vk_device, "vkQueueWaitIdle");
-    qvkDeviceWaitIdle = (PFN_vkDeviceWaitIdle)qvkGetDeviceProcAddr(vk_device, "vkDeviceWaitIdle");
+    qvkCreateCommandPool = (PFN_vkCreateCommandPool)qvkGetDeviceProcAddr(vk.device, "vkCreateCommandPool");
+    qvkDestroyCommandPool = (PFN_vkDestroyCommandPool)qvkGetDeviceProcAddr(vk.device, "vkDestroyCommandPool");
+    qvkAllocateCommandBuffers = (PFN_vkAllocateCommandBuffers)qvkGetDeviceProcAddr(vk.device, "vkAllocateCommandBuffers");
+    qvkFreeCommandBuffers = (PFN_vkFreeCommandBuffers)qvkGetDeviceProcAddr(vk.device, "vkFreeCommandBuffers");
+    qvkBeginCommandBuffer = (PFN_vkBeginCommandBuffer)qvkGetDeviceProcAddr(vk.device, "vkBeginCommandBuffer");
+    qvkEndCommandBuffer = (PFN_vkEndCommandBuffer)qvkGetDeviceProcAddr(vk.device, "vkEndCommandBuffer");
+    qvkResetCommandBuffer = (PFN_vkResetCommandBuffer)qvkGetDeviceProcAddr(vk.device, "vkResetCommandBuffer");
+    qvkCmdPipelineBarrier = (PFN_vkCmdPipelineBarrier)qvkGetDeviceProcAddr(vk.device, "vkCmdPipelineBarrier");
+    qvkCmdCopyImageToBuffer = (PFN_vkCmdCopyImageToBuffer)qvkGetDeviceProcAddr(vk.device, "vkCmdCopyImageToBuffer");
+    qvkCreateFence = (PFN_vkCreateFence)qvkGetDeviceProcAddr(vk.device, "vkCreateFence");
+    qvkDestroyFence = (PFN_vkDestroyFence)qvkGetDeviceProcAddr(vk.device, "vkDestroyFence");
+    qvkResetFences = (PFN_vkResetFences)qvkGetDeviceProcAddr(vk.device, "vkResetFences");
+    qvkWaitForFences = (PFN_vkWaitForFences)qvkGetDeviceProcAddr(vk.device, "vkWaitForFences");
+    qvkQueueSubmit = (PFN_vkQueueSubmit)qvkGetDeviceProcAddr(vk.device, "vkQueueSubmit");
+    qvkQueueWaitIdle = (PFN_vkQueueWaitIdle)qvkGetDeviceProcAddr(vk.device, "vkQueueWaitIdle");
+    qvkDeviceWaitIdle = (PFN_vkDeviceWaitIdle)qvkGetDeviceProcAddr(vk.device, "vkDeviceWaitIdle");
     // Optional: load timeline semaphore functions
-    qvkWaitSemaphoresKHR = (PFN_vkWaitSemaphoresKHR)qvkGetDeviceProcAddr(vk_device, "vkWaitSemaphoresKHR");
-    qvkSignalSemaphoreKHR = (PFN_vkSignalSemaphoreKHR)qvkGetDeviceProcAddr(vk_device, "vkSignalSemaphoreKHR");
+    qvkWaitSemaphoresKHR = (PFN_vkWaitSemaphoresKHR)qvkGetDeviceProcAddr(vk.device, "vkWaitSemaphoresKHR");
+    qvkSignalSemaphoreKHR = (PFN_vkSignalSemaphoreKHR)qvkGetDeviceProcAddr(vk.device, "vkSignalSemaphoreKHR");
 }
 
 // Create command pool
 qboolean vk_create_command_pool(void) {
-    if (!vk_device || vk_device == (VkDevice)0x20000000) {
+    if (!vk.device || vk.device == (VkDevice)0x20000000) {
         ri.Printf(PRINT_ALL, "Command: Skipping command pool creation (stub device)\n");
         return qtrue;
     }
@@ -121,10 +106,10 @@ qboolean vk_create_command_pool(void) {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
         .pNext = nullptr,
         .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
-        .queueFamilyIndex = vk_queue_family_index
+        .queueFamilyIndex = vk.queue_family_index
     };
 
-    VkResult result = qvkCreateCommandPool(vk_device, &poolInfo, nullptr, &command_pool);
+    VkResult result = qvkCreateCommandPool(vk.device, &poolInfo, nullptr, &vk.command_pool);
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Command: Failed to create command pool: %d\n", result);
         return qfalse;
@@ -137,7 +122,7 @@ qboolean vk_create_command_pool(void) {
         .flags = VK_FENCE_CREATE_SIGNALED_BIT
     };
 
-    result = qvkCreateFence(vk_device, &fenceInfo, nullptr, &command_fence);
+    result = qvkCreateFence(vk.device, &fenceInfo, nullptr, &command_fence);
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Command: Failed to create fence: %d\n", result);
         return qfalse;
@@ -149,7 +134,7 @@ qboolean vk_create_command_pool(void) {
 
 // Allocate command buffers
 qboolean vk_allocate_command_buffers(uint32_t count) {
-    if (!command_pool) {
+    if (!vk.command_pool) {
         return qfalse;
     }
 
@@ -158,12 +143,12 @@ qboolean vk_allocate_command_buffers(uint32_t count) {
     VkCommandBufferAllocateInfo allocInfo = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .pNext = nullptr,
-        .commandPool = command_pool,
+        .commandPool = vk.command_pool,
         .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
         .commandBufferCount = count
     };
 
-    VkResult result = qvkAllocateCommandBuffers(vk_device, &allocInfo, command_buffers.data());
+    VkResult result = qvkAllocateCommandBuffers(vk.device, &allocInfo, command_buffers.data());
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Command: Failed to allocate command buffers: %d\n", result);
         return qfalse;
@@ -175,7 +160,7 @@ qboolean vk_allocate_command_buffers(uint32_t count) {
 
 // Begin command buffer recording
 extern "C" VkCommandBuffer vk_begin_command_buffer(void) {
-    if (!vk_device || vk_device == (VkDevice)0x20000000) {
+    if (!vk.device || vk.device == (VkDevice)0x20000000) {
         return (VkCommandBuffer)0x30000000; // Fake command buffer handle
     }
 
@@ -186,8 +171,8 @@ extern "C" VkCommandBuffer vk_begin_command_buffer(void) {
     current_command_buffer = command_buffers[0];
 
     // Wait for previous frame to complete
-    qvkWaitForFences(vk_device, 1, &command_fence, VK_TRUE, UINT64_MAX);
-    qvkResetFences(vk_device, 1, &command_fence);
+    qvkWaitForFences(vk.device, 1, &command_fence, VK_TRUE, UINT64_MAX);
+    qvkResetFences(vk.device, 1, &command_fence);
 
     // Reset command buffer
     qvkResetCommandBuffer(current_command_buffer, 0);
@@ -237,45 +222,40 @@ extern "C" void vk_end_command_buffer(VkCommandBuffer command_buffer, const char
         .pSignalSemaphores = nullptr
     };
 
-    result = qvkQueueSubmit(vk_queue, 1, &submitInfo, command_fence);
+    result = qvkQueueSubmit(vk.queue, 1, &submitInfo, command_fence);
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Command: Failed to submit command buffer: %d\n", result);
         return;
     }
 
     // Wait for completion (for simplicity, in a real engine you'd use multiple buffers)
-    qvkWaitForFences(vk_device, 1, &command_fence, VK_TRUE, UINT64_MAX);
+    qvkWaitForFences(vk.device, 1, &command_fence, VK_TRUE, UINT64_MAX);
 }
 
-// Wait for device to become idle
-void vk_wait_idle(void) {
-    if (vk_device && vk_device != (VkDevice)0x20000000) {
-        qvkDeviceWaitIdle(vk_device);
-    }
-}
+// vk_wait_idle is defined in vk.c
 
 // Destroy command pool and resources
 void vk_destroy_command_pool(void) {
-    if (!vk_device || vk_device == (VkDevice)0x20000000) {
+    if (!vk.device || vk.device == (VkDevice)0x20000000) {
         return;
     }
 
     // Free command buffers
-    if (!command_buffers.empty() && command_pool) {
-        qvkFreeCommandBuffers(vk_device, command_pool, static_cast<uint32_t>(command_buffers.size()), command_buffers.data());
+    if (!command_buffers.empty() && vk.command_pool) {
+        qvkFreeCommandBuffers(vk.device, vk.command_pool, static_cast<uint32_t>(command_buffers.size()), command_buffers.data());
         command_buffers.clear();
     }
 
     // Destroy fence
     if (command_fence) {
-        qvkDestroyFence(vk_device, command_fence, nullptr);
+        qvkDestroyFence(vk.device, command_fence, nullptr);
         command_fence = VK_NULL_HANDLE;
     }
 
     // Destroy command pool
-    if (command_pool) {
-        qvkDestroyCommandPool(vk_device, command_pool, nullptr);
-        command_pool = VK_NULL_HANDLE;
+    if (vk.command_pool) {
+        qvkDestroyCommandPool(vk.device, vk.command_pool, nullptr);
+        vk.command_pool = VK_NULL_HANDLE;
     }
 
     ri.Printf(PRINT_ALL, "Command: Command pool destroyed\n");
