@@ -872,7 +872,7 @@ void vk_read_pixels(byte *buffer, uint32_t width, uint32_t height) {
     vk_alloc_staging_buffer((VkDeviceSize)bytes);
     // Begin a short-lived command buffer
     // Use the real command buffer begin function
-    VkCommandBuffer cmd = vk_begin_command_buffer_bridge();
+    VkCommandBuffer cmd = vk_begin_command_buffer();
     if (cmd != VK_NULL_HANDLE) {
       // Transition COLOR_ATTACHMENT_OPTIMAL -> TRANSFER_SRC_OPTIMAL
       VkImageMemoryBarrier barrier1 = {
@@ -916,7 +916,7 @@ void vk_read_pixels(byte *buffer, uint32_t width, uint32_t height) {
       qvkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, &barrier2);
 
       // End and submit
-      vk_end_command_buffer_bridge(cmd, "vk_read_pixels_readback");
+      vk_end_command_buffer(cmd, "vk_read_pixels_readback");
   #ifdef VK_EXT_CALIBRATED_TIMESTAMPS
   uint64_t _vk_readback_end_ns = (uint64_t)ri.Milliseconds() * 1000000ULL;
   vk_calibrated_end_pass("readback_path", _vk_readback_end_ns - _vk_readback_start_ns);

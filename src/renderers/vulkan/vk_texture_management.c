@@ -23,9 +23,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #include "vk_images.h"
 #include "vk.h"
-// Prototypes for host-accessible command buffer helpers (C linkage)
-extern VkCommandBuffer vk_begin_command_buffer_bridge(void);
-extern void vk_end_command_buffer_bridge(VkCommandBuffer, const char* location);
+// Prototypes for host-accessible command buffer helpers (use real functions)
+extern VkCommandBuffer vk_begin_command_buffer(void);
+extern void vk_end_command_buffer(VkCommandBuffer, const char* location);
 
 // Texture Management Functions for Vulkan Renderer
 // Simplified implementation for modularization
@@ -127,7 +127,7 @@ void vk_readback_image_to_cpu(image_t *image, void *dstBuffer, int width, int he
         vk_alloc_staging_buffer((VkDeviceSize)bytes);
     }
     // Allocate a short-lived command buffer for copy
-    VkCommandBuffer cmd = vk_begin_command_buffer_bridge();
+    VkCommandBuffer cmd = vk_begin_command_buffer();
     if (cmd == VK_NULL_HANDLE) {
         ri.Printf(PRINT_WARNING, "vk_readback_image_to_cpu: failed to acquire command buffer\n");
         // Fallback: zero memory
@@ -183,7 +183,7 @@ void vk_readback_image_to_cpu(image_t *image, void *dstBuffer, int width, int he
     qvkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &barrier2);
 
     // End and submit
-    vk_end_command_buffer_bridge(cmd, "vk_readback_image_to_cpu");
+    vk_end_command_buffer(cmd, "vk_readback_image_to_cpu");
     VkSubmitInfo submitInfo = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .pNext = NULL, .commandBufferCount = 1, .pCommandBuffers = &cmd };
     qvkQueueSubmit(vk.queue, 1, &submitInfo, VK_NULL_HANDLE);
     vkQueueWaitIdle(vk.queue);

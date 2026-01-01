@@ -9923,10 +9923,10 @@ void vk_recreate_swapchain(void) {
   vk_wait_idle();
   // Destroy existing framebuffers and render passes tied to the old swapchain
   vk_destroy_framebuffers();
-  // Destroy old swapchain resources via bridge (stable path)
-  vk_destroy_swapchain_bridge();
-  // Recreate swapchain with up-to-date surface format via bridge accessor
-  vk_create_swapchain(vk.physical_device, vk.device, vk_surface, vk_present_format_bridge(), &vk.swapchain, true);
+  // Destroy old swapchain resources via bridge (replace with real function)
+  vk_destroy_swapchain();
+  // Recreate swapchain with up-to-date surface format
+  vk_create_swapchain(vk.physical_device, vk.device, vk_surface, vk_present_format, &vk.swapchain, true);
   // Recreate framebuffers for the new swapchain images
   vk_create_framebuffers();
   ri.Printf(PRINT_ALL, "Vulkan: Swapchain recreated with %u images\n", vk.swapchain_image_count);
