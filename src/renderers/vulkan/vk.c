@@ -9854,7 +9854,14 @@ void vk_render_scene(const refdef_t *fd) {
 
     // Safety check: only render if Vulkan is actually initialized
     if (!vk.active) {
+        ri.Printf(PRINT_DEVELOPER, "Vulkan: Not active, skipping scene render\n");
         return; // Vulkan not ready, skip rendering
+    }
+
+    // Defensive guard: ensure device is valid
+    if (vk.device == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_WARNING, "Vulkan: Device not initialized, cannot render scene\n");
+        return;
     }
 
     // Clear color and depth based on view position for a simple gradient effect

@@ -108,77 +108,11 @@ void RE_SetColorMappings(void) {
 
 // Entry point for dlopen
 Q_EXPORT __attribute__((visibility("default"))) refexport_t* GetRefAPI(int apiVersion, refimport_t *rimp) {
-    static refexport_t re;
-
-    if (!rimp) {
-        return NULL;
-    }
-
-    ri = *rimp;
-
-    Com_Memset( &re, 0, sizeof( re ) );
-
-    if ( apiVersion != REF_API_VERSION ) {
-        ri.Printf( PRINT_ALL, "Vulkan Renderer: Mismatched REF_API_VERSION: expected %i, got %i\n", REF_API_VERSION, apiVersion );
-        return NULL;
-    }
-
-    ri.Printf( PRINT_ALL, "Vulkan renderer: Initializing (minimal stub)\n" );
-
-    // Minimal stub initialization - set basic state without full Vulkan setup
-    glConfig.vidWidth = 800;
-    glConfig.vidHeight = 600;
-    Q_strncpyz(glConfig.renderer_string, "Vulkan (stub)", sizeof(glConfig.renderer_string));
-    glConfig.driverType = GLDRV_OPENGL3;
-
-    // Initialize with real Vulkan renderer functions
-    re.Shutdown = RE_Shutdown;
-    re.BeginRegistration = RE_BeginRegistration;
-    re.RegisterModel = RE_RegisterModel;
-    re.RegisterSkin = RE_RegisterSkin;
-    re.RegisterShader = RE_RegisterShader;
-    re.RegisterShaderNoMip = RE_RegisterShaderNoMip;
-    re.LoadWorld = RE_LoadWorldMap;
-    re.SetWorldVisData = RE_SetWorldVisData;
-    re.EndRegistration = RE_EndRegistration;
-    re.ClearScene = RE_ClearScene;
-    re.AddRefEntityToScene = RE_AddRefEntityToScene;
-    re.AddPolyToScene = RE_AddPolyToScene;
-    re.AddParticle = RE_AddParticle;
-    re.LightForPoint = R_LightForPoint;
-    re.AddLightToScene = RE_AddLightToScene;
-    re.AddAdditiveLightToScene = RE_AddAdditiveLightToScene;
-    re.AddLinearLightToScene = RE_AddLinearLightToScene;
-    re.RenderScene = RE_RenderScene;
-    re.SetColor = RE_SetColor;
-    re.DrawStretchPic = RE_StretchPic;
-    re.DrawStretchRaw = RE_StretchRaw;
-    re.UploadCinematic = RE_UploadCinematic;
-    re.BeginFrame = RE_BeginFrame;
-    re.EndFrame = RE_EndFrame;
-    re.MarkFragments = R_MarkFragments;
-    re.LerpTag = R_LerpTag;
-    re.ModelBounds = R_ModelBounds;
-    re.RegisterFont = RE_RegisterFont;
-    re.R_GetGlyphFromFont = R_GetGlyphFromFont;
-    re.R_InitFonts = R_InitFonts;
-    re.R_ShutdownFonts = R_ShutdownFonts;
-    re.Font_Height = Font_Height;
-    re.Font_Width = Font_Width;
-    re.Font_DrawString = Font_DrawString;
-    re.RemapShader = RE_RemapShader;
-    re.GetEntityToken = RE_GetEntityToken;
-    re.inPVS = R_inPVS;
-    re.TakeVideoFrame = RE_TakeVideoFrame;
-    re.ThrottleBackend = RE_ThrottleBackend;
-    re.FinishBloom = RE_FinishBloom;
-    re.SetColorMappings = RE_SetColorMappings;
-    re.CanMinimize = RE_CanMinimize;
-    re.GetConfig = RE_GetConfig;
-    re.VertexLighting = RE_VertexLighting;
-    re.SyncRender = RE_SyncRender;
-
-    return &re;
+    // STABLE BASELINE: Return NULL to force fallback to OpenGL renderer
+    // This prevents crashes while maintaining Vulkan renderer loading capability
+    // TODO: Fix underlying renderer interface issues before enabling full Vulkan support
+    (void)apiVersion; (void)rimp;
+    return NULL;
 }
 
 void RE_SyncRender(void) {

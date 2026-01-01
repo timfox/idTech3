@@ -288,14 +288,21 @@ static void rtx_free_buffer(rtx_buffer_t* buffer) {
     }
 }
 qboolean vk_rtx_acceleration_init(void) {
+    // Defensive guard: prevent double initialization
     if (g_rtx_accel_initialized) {
         ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: acceleration already initialized\n");
         return qtrue;
     }
 
+    // Guard: ensure Vulkan is active before proceeding
+    if (!vk.active) {
+        ri.Printf(PRINT_WARNING, "Vulkan RTX: Vulkan not active, cannot initialize RTX acceleration\n");
+        return qfalse;
+    }
+
     ri.Printf(PRINT_ALL, "Vulkan RTX: Initializing acceleration structures\n");
 
-    // Initialize acceleration structure state
+    // Initialize acceleration structure state with defensive memset
     memset(g_blas, 0, sizeof(g_blas));
     memset(&g_tlas, 0, sizeof(g_tlas));
     memset(&g_instance_buffer, 0, sizeof(g_instance_buffer));
@@ -304,21 +311,34 @@ qboolean vk_rtx_acceleration_init(void) {
     g_blas_count = 0;
     g_rtx_blas_tlas_built = qfalse;
 
+    // Guard: only create pipeline if Vulkan device is valid
+    if (vk.device == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_ERROR, "Vulkan RTX: Invalid Vulkan device, cannot create pipeline\n");
+        return qfalse;
+    }
+
     // Create basic ray tracing pipeline (simplified - would normally load shaders)
     VkResult result = vk_rtx_create_pipeline();
     if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "Vulkan RTX: Failed to create ray tracing pipeline\n");
+        ri.Printf(PRINT_ERROR, "Vulkan RTX: Failed to create ray tracing pipeline (error: %d)\n", result);
         return qfalse;
     }
+
     // Initialize calibrated timestamps support (best-effort)
     VK_CAL_TS_INIT_ONCE
-    // Initialize timing query pool for GPU timing
-    VkQueryPoolCreateInfo qp = { .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO, .queryType = VK_QUERY_TYPE_TIMESTAMP, .queryCount = 2 };
-    if (vkCreateQueryPool(vk.device, &qp, NULL, &g_rtx_timing_query_pool) != VK_SUCCESS) {
-        ri.Printf(PRINT_WARNING, "Vulkan RTX: failed to create timing query pool\n");
-        g_rtx_timing_query_pool = VK_NULL_HANDLE;
+
+    // Initialize timing query pool for GPU timing - add defensive check
+    if (vk.device != VK_NULL_HANDLE) {
+        VkQueryPoolCreateInfo qp = { .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO, .queryType = VK_QUERY_TYPE_TIMESTAMP, .queryCount = 2 };
+        if (vkCreateQueryPool(vk.device, &qp, NULL, &g_rtx_timing_query_pool) != VK_SUCCESS) {
+            ri.Printf(PRINT_WARNING, "Vulkan RTX: failed to create timing query pool\n");
+            g_rtx_timing_query_pool = VK_NULL_HANDLE;
+        } else {
+            g_rtx_timestamp_period = 1.0f;
+        }
     } else {
-        g_rtx_timestamp_period = 1.0f;
+        ri.Printf(PRINT_WARNING, "Vulkan RTX: cannot create timing query pool - device not available\n");
+        g_rtx_timing_query_pool = VK_NULL_HANDLE;
     }
 
     g_rtx_accel_initialized = qtrue;
