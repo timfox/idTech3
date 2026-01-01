@@ -7,6 +7,7 @@ extern refimport_t ri;
 #include "../../common/qcommon.h"
 #include "../../common/q_shared.h"
 #include <time.h>
+#include <unistd.h>
 #include <string.h>
 #include <math.h>
 #include <stdio.h>
@@ -468,8 +469,10 @@ void VK_ComputeRT_UpdateLight(const vec3_t position) {
 }
 
 void VK_ComputeRT_Dispatch(void) {
-    struct timespec ts_start, ts_end;
-    clock_gettime(CLOCK_MONOTONIC, &ts_start);
+    // Performance timing disabled for build compatibility
+    // struct timespec ts_start, ts_end;
+    // clock_gettime(CLOCK_MONOTONIC, &ts_start);
+    // clock_gettime(CLOCK_MONOTONIC, &ts_end);
     if (!vk_compute_rt.initialized) return;
     if (!vk_compute_rt.computeShaderLoaded || vk_compute_rt.computePipeline == VK_NULL_HANDLE) {
         if (vk_compute_rt.smokeTestEnabled) {
@@ -510,14 +513,14 @@ void VK_ComputeRT_Dispatch(void) {
             submit.commandBufferCount = 1;
             submit.pCommandBuffers = &vk_compute_rt.computeCommandBuffer;
             if (vkQueueSubmit(vk.queue, 1, &submit, vk_compute_rt.computeFence) != VK_SUCCESS) {
-                ri.Printf(PRINT_ERR, "VK_ComputeRT_Dispatch: failed to submit smoke test\n");
+                ri.Printf(PRINT_ERROR, "VK_ComputeRT_Dispatch: failed to submit smoke test\n");
                 return;
             }
             VK_CHECK(vkWaitForFences(vk.device, 1, &vk_compute_rt.computeFence, VK_TRUE, UINT64_MAX));
             vkResetFences(vk.device, 1, &vk_compute_rt.computeFence);
-            clock_gettime(CLOCK_MONOTONIC, &ts_end);
-            uint64_t duration_ns = (uint64_t)(ts_end.tv_sec - ts_start.tv_sec) * 1000000000ULL + (uint64_t)(ts_end.tv_nsec - ts_start.tv_nsec);
-            ri.Printf(PRINT_DEVELOPER, "VK_ComputeRT_Dispatch: smoke test duration %llu ns\n", (unsigned long long)duration_ns);
+            // clock_gettime(CLOCK_MONOTONIC, &ts_end);
+            // uint64_t duration_ns = (uint64_t)(ts_end.tv_sec - ts_start.tv_sec) * 1000000000ULL + (uint64_t)(ts_end.tv_nsec - ts_start.tv_nsec);
+            // ri.Printf(PRINT_DEVELOPER, "VK_ComputeRT_Dispatch: smoke test duration %llu ns\n", (unsigned long long)duration_ns);
             #if defined(VK_TIMELINE_SEMAPHORE_ENABLED) || defined(VK_CALIBRATED_TIMESTAMPS_ENABLED)
             vk_update_frame_timing(duration_ns);
             #endif
@@ -537,7 +540,7 @@ void VK_ComputeRT_Dispatch(void) {
         vkCmdWriteTimestamp(vk_compute_rt.computeCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, vk_compute_rt.computeQueryPool, 0);
     }
     if (vkBeginCommandBuffer(vk_compute_rt.computeCommandBuffer, &beginInfo) != VK_SUCCESS) {
-        ri.Printf(PRINT_ERR, "VK_ComputeRT_Dispatch: failed to begin command buffer\n");
+        ri.Printf(PRINT_ERROR, "VK_ComputeRT_Dispatch: failed to begin command buffer\n");
         return;
     }
     // Optional: stage scene data before dispatch
@@ -587,7 +590,7 @@ void VK_ComputeRT_Dispatch(void) {
         vkCmdWriteTimestamp(vk_compute_rt.computeCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, vk_compute_rt.computeQueryPool, 1);
     }
     if (vkEndCommandBuffer(vk_compute_rt.computeCommandBuffer) != VK_SUCCESS) {
-        ri.Printf(PRINT_ERR, "VK_ComputeRT_Dispatch: failed to end command buffer\n");
+        ri.Printf(PRINT_ERROR, "VK_ComputeRT_Dispatch: failed to end command buffer\n");
         return;
     }
     VkSubmitInfo submit = {};
@@ -595,14 +598,14 @@ void VK_ComputeRT_Dispatch(void) {
     submit.commandBufferCount = 1;
     submit.pCommandBuffers = &vk_compute_rt.computeCommandBuffer;
     if (vkQueueSubmit(vk.queue, 1, &submit, vk_compute_rt.computeFence) != VK_SUCCESS) {
-        ri.Printf(PRINT_ERR, "VK_ComputeRT_Dispatch: failed to submit compute work\n");
+        ri.Printf(PRINT_ERROR, "VK_ComputeRT_Dispatch: failed to submit compute work\n");
         return;
     }
     VK_CHECK(vkWaitForFences(vk.device, 1, &vk_compute_rt.computeFence, VK_TRUE, UINT64_MAX));
     vkResetFences(vk.device, 1, &vk_compute_rt.computeFence);
-    clock_gettime(CLOCK_MONOTONIC, &ts_end);
-    uint64_t duration_ns = (uint64_t)(ts_end.tv_sec - ts_start.tv_sec) * 1000000000ULL + (uint64_t)(ts_end.tv_nsec - ts_start.tv_nsec);
-    ri.Printf(PRINT_DEVELOPER, "VK_ComputeRT_Dispatch: duration %llu ns\n", (unsigned long long)duration_ns);
+    // clock_gettime(CLOCK_MONOTONIC, &ts_end);
+    // uint64_t duration_ns = (uint64_t)(ts_end.tv_sec - ts_start.tv_sec) * 1000000000ULL + (uint64_t)(ts_end.tv_nsec - ts_start.tv_nsec);
+    // ri.Printf(PRINT_DEVELOPER, "VK_ComputeRT_Dispatch: duration %llu ns\n", (unsigned long long)duration_ns);
     // Retrieve GPU timestamps if available and convert to nanoseconds
     if (vk_compute_rt.computeQueryPool != VK_NULL_HANDLE) {
         uint64_t timestamps[2] = {0, 0};
