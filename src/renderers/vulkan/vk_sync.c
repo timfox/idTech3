@@ -253,6 +253,12 @@ __attribute__((unused)) float vk_get_gpu_timing_result(const char *name) {
 // Store GPU timing in current frame's profile
 void vk_update_gpu_timing_ns(uint64_t gpu_ns) {
 #ifdef VK_RENDERER_DEBUG_TIMING
+    if (gpu_ns == 0) {
+        ri.Printf(PRINT_DEVELOPER, "VK timing: ignoring zero gpu_ns\n");
+        return;
+    }
+#endif
+#ifdef VK_RENDERER_DEBUG_TIMING
     ri.Printf(PRINT_DEVELOPER, "VK timing: updating gpu_ns=%llu\n", (unsigned long long)gpu_ns);
 #endif
     if (!vk.render_profiler.frame_history || vk.render_profiler.max_frames == 0) {

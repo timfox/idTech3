@@ -111,6 +111,11 @@ void vk_rtx_build_sbt_for_frame(VkCommandBuffer cmd_buffer) {
 #include <string.h>
 #include <vulkan/vulkan.h>
 #include <time.h>
+#ifdef VK_CALIBRATED_TIMESTAMPS_ENABLED
+static void VK_debug_calibrated_ts(void) {
+  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: calibrated timestamps are enabled\n");
+}
+#endif
 void vk_update_gpu_timing_ns(uint64_t gpu_ns);
 
 // Include Vulkan headers for ray tracing
@@ -365,6 +370,11 @@ void vk_rtx_acceleration_shutdown(void) {
     g_rtx_blas_tlas_built = qfalse;
     g_blas_count = 0;
 
+    // Clean up timing query pool if created
+    if (g_rtx_timing_query_pool != VK_NULL_HANDLE) {
+        vkDestroyQueryPool(vk.device, g_rtx_timing_query_pool, NULL);
+        g_rtx_timing_query_pool = VK_NULL_HANDLE;
+    }
     ri.Printf(PRINT_ALL, "Vulkan RTX: Acceleration structures shut down\n");
 }
 
@@ -714,8 +724,29 @@ void vk_rtx_bind_and_trace_raysKHR_from_main(VkCommandBuffer cmd_buffer, uint32_
     if (g_rt_pipeline == VK_NULL_HANDLE) { ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: pipeline not created; skip\n"); return; }
     ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: Starting ray tracing pipeline %ux%u\n", width, height);
     // Initialize per-frame TLAS/BLAS and SBT wiring
+    #ifdef VK_CALIBRATED_TIMESTAMPS_ENABLED
+    VK_debug_calibrated_ts();
+    #endif
     vk_rtx_build_tlas_for_frame(cmd_buffer);
     vk_rtx_build_sbt_for_frame(cmd_buffer);
+    // Extra defensive guard: ensure we have a built SBT
+    if (g_sbt.sbt_buffer.buffer == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_WARNING, "Vulkan RTX: SBT not ready after build steps; abort trace\n");
+        return;
+    }
+    // Ensure TLAS/BLAS have been built; try to build if not yet built
+    if (!g_rtx_blas_tlas_built) {
+        vk_rtx_build_tlas_for_frame(cmd_buffer);
+        if (!g_rtx_blas_tlas_built) {
+            ri.Printf(PRINT_WARNING, "Vulkan RTX: TLAS/BLAS not ready; abort trace\n");
+            return;
+        }
+    }
+    // Guard: ensure SBT is ready before tracing
+    if (g_sbt.sbt_buffer.buffer == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_WARNING, "Vulkan RTX: SBT not ready; skipping trace\n");
+        return;
+    }
 
     #ifdef VK_KHR_ray_tracing_pipeline
         // Ensure acceleration structures are built
