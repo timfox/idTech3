@@ -91,8 +91,12 @@ void vk_rtx_bind_and_trace_raysKHR_from_main(VkCommandBuffer cmd_buffer, uint32_
     // Bind RT pipeline, SBT, and trace rays
     ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: bind_and_trace_raysKHR_from_main called %ux%u\n", width, height);
     #ifdef VK_KHR_ray_tracing_pipeline
-        ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: hardware RT extension present; preparing TLAS/BLAS/SBT (stub)\n");
-        // Real binding would occur here in a full implementation
+        ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: hardware RT extension present; scaffolding TLAS/BLAS and SBT\n");
+        // Minimal scaffold: build TLAS/BLAS to prepare for real tracing
+        vk_rtx_build_tlas(cmd_buffer);
+        // SBT setup scaffold
+        vk_rtx_setup_sbt(cmd_buffer);
+        // Invoke trace (stub)
         vk_rtx_trace_raysKHR(cmd_buffer);
     #else
         ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: VK_KHR_ray_tracing_pipeline not available; cannot trace\n");
@@ -100,6 +104,12 @@ void vk_rtx_bind_and_trace_raysKHR_from_main(VkCommandBuffer cmd_buffer, uint32_
     (void)cmd_buffer;
     (void)width;
     (void)height;
+}
+
+void vk_rtx_setup_sbt(VkCommandBuffer cmd_buffer) {
+    // Minimal SBT scaffold: log and no-op
+    ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: setup_sbt scaffold called (stub)\n");
+    (void)cmd_buffer;
 }
 
 void vk_rtx_set_quality_settings(float quality, qboolean shadows, qboolean reflections,
