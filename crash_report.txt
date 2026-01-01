@@ -1,0 +1,41 @@
+========================================
+CRASH REPORT
+========================================
+
+Time: 2025-12-31 22:21:04
+Build ID: dev-unknown
+Build Date: Dec 31 2025 21:34:19
+Uptime: 0 seconds
+
+Crash Reason: Unknown
+Signal: SIGSEGV (Segmentation fault) (11)
+
+--- Stack Trace ---
+  [0] ./release/idtech3.x86_64(+0x89923) [0x59d2ea7e5923]
+  [1] /lib/x86_64-linux-gnu/libc.so.6(+0x45f60) [0x78146e845f60]
+
+--- Last 4096 bytes of log ---
+Crash handler initialized (Build: dev-unknown)
+Command line: +set fs_game mymod +set cl_renderer vulkan +set developer 1
+----- Client Initialization -----
+=== CL_InitUI CALLED ===
+INFO: UI system initialized (VM loading disabled).
+----- Client Initialization Complete -----
+Initializing runtime security monitoring...
+Initializing crash recovery system...
+--------------------
+Started tty console (use +set ttycon 0 to disable)
+Couldn't create console history file history on startup.
+Window title already set to: 'idtech3'
+----- Initializing Renderer ----
+Trying renderer: vulkan (idtech3_vulkan_x86_64.so)
+^2Successfully loaded renderer: vulkan
+Renderer startup final path: vulkan
+CL_InitRef: rimp memset to zero, about to set function pointers
+DEBUG: About to check USE_OPENGL_API
+DEBUG: USE_OPENGL_API is NOT defined
+Vulkan renderer: Initializing (minimal stub)
+
+========================================
+END CRASH REPORT
+========================================

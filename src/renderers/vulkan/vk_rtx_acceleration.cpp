@@ -540,6 +540,10 @@ void vk_rtx_trace_raysKHR(VkCommandBuffer cmd_buffer) {
 }
 
 void vk_rtx_bind_and_trace_raysKHR_from_main(VkCommandBuffer cmd_buffer, uint32_t width, uint32_t height) {
+    // Guard early
+    if (width == 0 || height == 0) { ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: zero-dim; skip\n"); return; }
+    if (!g_rtx_accel_initialized) { ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: acceleration not initialized; skip\n"); return; }
+    if (g_rt_pipeline == VK_NULL_HANDLE) { ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: pipeline not created; skip\n"); return; }
     ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: Starting ray tracing pipeline %ux%u\n", width, height);
 
     #ifdef VK_KHR_ray_tracing_pipeline

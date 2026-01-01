@@ -3881,11 +3881,16 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 	rimp.GLimp_SetGamma = GLimp_SetGamma;
 
 	// OpenGL API
+	Com_Printf( "DEBUG: About to check USE_OPENGL_API\n" );
 #ifdef USE_OPENGL_API
+	Com_Printf( "DEBUG: USE_OPENGL_API is defined\n" );
 	rimp.GLimp_Init = GLimp_Init;
 	rimp.GLimp_Shutdown = GLimp_Shutdown;
 	rimp.GL_GetProcAddress = GL_GetProcAddress;
 	rimp.GLimp_EndFrame = GLimp_EndFrame;
+	Com_Printf( "DEBUG: GLimp_Init assigned: %p\n", GLimp_Init );
+#else
+	Com_Printf( "DEBUG: USE_OPENGL_API is NOT defined\n" );
 #endif
 
 	// Vulkan API
