@@ -133,7 +133,7 @@ typedef struct {
     VkDeviceMemory memory;
     VkDeviceAddress address;
     uint64_t handle;
-} rtx_acceleration_t;
+} rtx_acceleration_t; // end of rtx_acceleration_t
 
 typedef struct {
     VkBuffer buffer;
@@ -141,7 +141,7 @@ typedef struct {
     VkDeviceAddress address;
     void* mapped;
     VkDeviceSize size;
-} rtx_buffer_t;
+} rtx_buffer_t; // end of rtx_buffer_t
 
 typedef struct {
     rtx_buffer_t sbt_buffer;
@@ -310,6 +310,8 @@ qboolean vk_rtx_acceleration_init(void) {
         ri.Printf(PRINT_ERROR, "Vulkan RTX: Failed to create ray tracing pipeline\n");
         return qfalse;
     }
+    // Initialize calibrated timestamps support (best-effort)
+    VK_CAL_TS_INIT_ONCE
     // Initialize timing query pool for GPU timing
     VkQueryPoolCreateInfo qp = { .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO, .queryType = VK_QUERY_TYPE_TIMESTAMP, .queryCount = 2 };
     if (vkCreateQueryPool(vk.device, &qp, NULL, &g_rtx_timing_query_pool) != VK_SUCCESS) {
@@ -701,15 +703,15 @@ void vk_rtx_trace_raysKHR(VkCommandBuffer cmd_buffer) {
 
     VkStridedDeviceAddressRegionKHR callable_region = {0}; // Not used in this simple implementation
 
-    // Optional start timestamp
-    if (g_rtx_timing_query_pool != VK_NULL_HANDLE) {
+    // Optional start timestamp (only if calibrated timestamps available)
+    if (g_rtx_timing_query_pool != VK_NULL_HANDLE && g_cal_ts_available) {
         vkCmdWriteTimestamp(cmd_buffer, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, g_rtx_timing_query_pool, 0);
     }
     // Issue the trace rays command
     vkCmdTraceRaysKHR(cmd_buffer, &raygen_region, &miss_region, &hit_region, &callable_region,
                      glConfig.vidWidth, glConfig.vidHeight, 1);
-    // Optional end timestamp
-    if (g_rtx_timing_query_pool != VK_NULL_HANDLE) {
+    // Optional end timestamp (only if calibrated timestamps available)
+    if (g_rtx_timing_query_pool != VK_NULL_HANDLE && g_cal_ts_available) {
         vkCmdWriteTimestamp(cmd_buffer, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, g_rtx_timing_query_pool, 1);
     }
 
@@ -780,7 +782,7 @@ void vk_rtx_bind_and_trace_raysKHR_from_main(VkCommandBuffer cmd_buffer, uint32_
         ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: trace took %llu ns for frame (%ux%u)\n",
                   (unsigned long long)elapsed_ns, width, height);
 
-        // Transition ray tracing output to presentation layout
+    // Transition ray tracing output to presentation layout
         // This assumes the output image is the current swapchain image
         VkImageMemoryBarrier present_barrier = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -828,6 +830,30 @@ void vk_rtx_bind_and_trace_raysKHR_from_main(VkCommandBuffer cmd_buffer, uint32_
     (void)cmd_buffer;
     (void)width;
     (void)height;
+}
+
+// Calibrated timestamps preliminary wiring (best-effort)
+static qboolean g_cal_ts_attempted = qfalse;
+static qboolean g_cal_ts_available = qfalse;
+#if defined(VK_EXT_CALIBRATED_TIMESTAMPS_ENABLED)
+static bool g_cal_ts_ext_present = false;
+static void vk_rtx_init_calibrated_ts_stub(void) {
+  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: calibrated timestamps extension stub inited\n");
+  g_cal_ts_ext_present = true;
+  g_cal_ts_available = qtrue;
+  g_rtx_timestamp_period = 1.0f;
+}
+#endif
+void VK_try_init_calibrated_timestamps(void) {
+#if defined(VK_EXT_CALIBRATED_TIMESTAMPS_ENABLED)
+  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: calibrated timestamps probing (stub)\n");
+  // In a full patch, load entry points then query device properties.
+  // Current minimal behavior: assume not available yet.
+  g_cal_ts_available = qfalse;
+#else
+  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: calibrated timestamps extension not available\n");
+  g_cal_ts_available = qfalse;
+#endif
 }
 
 void vk_rtx_create_sbt_buffer(void) {

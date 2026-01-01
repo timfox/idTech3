@@ -2,7 +2,7 @@
 CRASH REPORT
 ========================================
 
-Time: 2026-01-01 03:09:58
+Time: 2026-01-01 10:44:02
 Build ID: dev-unknown
 Build Date: Dec 31 2025 21:34:19
 Uptime: 0 seconds
@@ -11,8 +11,8 @@ Crash Reason: Unknown
 Signal: SIGSEGV (Segmentation fault) (11)
 
 --- Stack Trace ---
-  [0] ./release/idtech3.x86_64(+0x89923) [0x6436281a5923]
-  [1] /lib/x86_64-linux-gnu/libc.so.6(+0x45f60) [0x769211045f60]
+  [0] ./release/idtech3.x86_64(+0x89923) [0x5952d5fbf923]
+  [1] /lib/x86_64-linux-gnu/libc.so.6(+0x45f60) [0x7b894a845f60]
 
 --- Last 4096 bytes of log ---
 Crash handler initialized (Build: dev-unknown)
