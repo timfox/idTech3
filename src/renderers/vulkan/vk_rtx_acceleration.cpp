@@ -11,23 +11,45 @@
 extern "C" {
 #endif
 
+static qboolean g_rtx_accel_initialized = qfalse;
+static qboolean g_rtx_blas_tlas_built = qfalse;
+static uint64_t g_dummy_blas_id = 1;
+static uint64_t g_dummy_tlas_id = 1;
 qboolean vk_rtx_acceleration_init(void) {
-    ri.Printf(PRINT_ALL, "Vulkan RTX: acceleration init (stub active)\n");
+    if (g_rtx_accel_initialized) {
+        ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: acceleration already initialized (hardware stub)\n");
+        return qtrue;
+    }
+    ri.Printf(PRINT_ALL, "Vulkan RTX: acceleration init (hardware stub)\n");
+    g_rtx_accel_initialized = qtrue;
+    // Initialize internal dummy resources
+    g_rtx_blas_tlas_built = qtrue;
+    ri.Printf(PRINT_ALL, "Vulkan RTX: dummy BLAS/TLAS allocated (stub)\n");
     return qtrue;
 }
 
 void vk_rtx_acceleration_shutdown(void) {
-    ri.Printf(PRINT_ALL, "Vulkan RTX: acceleration shutdown (stub)\n");
+    if (!g_rtx_accel_initialized) {
+        ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: acceleration shutdown called; not initialized\n");
+        return;
+    }
+    ri.Printf(PRINT_ALL, "Vulkan RTX: acceleration shutdown (hardware stub)\n");
+    g_rtx_accel_initialized = qfalse;
+    g_rtx_blas_tlas_built = qfalse;
 }
 
 uint64_t vk_rtx_create_blas_for_geometry(VkBuffer vertex_buffer, VkBuffer index_buffer,
                                       uint32_t vertex_count, uint32_t index_count,
                                       uint32_t vertex_stride, const char* debug_name) {
     // Accept parameters but do not perform real GPU work yet.
-    ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: createBLAS_for_geometry stub for %s (verts=%u, idx=%u)\n",
+    ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: createBLAS_for_geometry (stub) %s verts=%u idx=%u\n",
               debug_name ? debug_name : "unnamed", vertex_count, index_count);
     // Return a dummy non-zero handle to simulate a created BLAS
-    return 1;
+    if (!g_rtx_accel_initialized) {
+        ri.Printf(PRINT_WARNING, "Vulkan RTX: blas requested before init; returning 0\n");
+        return 0;
+    }
+    return g_dummy_blas_id++;
 }
 
 void vk_rtx_update_instance_data(uint64_t accel_id, const matrix3x4_t* transform, uint32_t instance_id) {
@@ -59,6 +81,13 @@ void vk_rtx_create_shadow_acceleration(uint32_t light_id, VkCommandBuffer cmd_bu
 
 void vk_rtx_update_lighting_data(VkBuffer light_buffer, VkDeviceMemory light_buffer_memory) {
     (void)light_buffer; (void)light_buffer_memory;
+}
+
+void vk_rtx_trace_raysKHR(VkCommandBuffer cmd_buffer) {
+    // Stub: in a full implementation this would bind the RT pipeline,
+    // configure SBT, sets, and issue vkCmdTraceRaysKHR.
+    ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: trace_raysKHR called (stub)\n");
+    (void)cmd_buffer;
 }
 
 void vk_rtx_set_quality_settings(float quality, qboolean shadows, qboolean reflections,

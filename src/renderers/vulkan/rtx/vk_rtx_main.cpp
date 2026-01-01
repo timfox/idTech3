@@ -199,8 +199,8 @@ static void RTX_ComputeRT_RenderScene(const refdef_t* fd) {
     vec3_t planeColor = {0.5f, 0.5f, 0.5f}; // Gray plane
     VK_ComputeRT_AddPlane(planeNormal, -2.0f, planeColor, 0.0f);
 
-    // Dispatch the compute shader
-    VK_ComputeRT_Dispatch();
+    // Dispatch the compute shader (batch render frame)
+    VK_ComputeRT_BatchRenderFrame();
 }
 extern void vk_material_system_init(void);
 extern void vk_god_rays_init(void);

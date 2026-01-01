@@ -31,6 +31,8 @@ uint64_t vk_rtx_create_blas_for_geometry(VkBuffer vertex_buffer, VkBuffer index_
                                        uint32_t vertex_stride, const char* debug_name);
 void vk_rtx_update_instance_data(uint64_t accel_id, const matrix3x4_t* transform, uint32_t instance_id);
 void vk_rtx_build_tlas(VkCommandBuffer cmd_buffer);
+// Stub for hardware ray tracing kernel launch (will be fleshed out in future)
+void vk_rtx_trace_raysKHR(VkCommandBuffer cmd_buffer);
 
 // Advanced lighting system
 uint32_t vk_rtx_add_light(const vec3_t position, const vec3_t color, float intensity,

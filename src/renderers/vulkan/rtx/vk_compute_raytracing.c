@@ -7,6 +7,9 @@ extern refimport_t ri;
 #include "../../common/qcommon.h"
 #include <string.h>
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 
 vk_compute_rt_t vk_compute_rt;
 
@@ -17,6 +20,12 @@ static int sceneObjectCount = 0;
 static uint32_t currentObjectId = 0;
 
 void VK_ComputeRT_Init(void) {
+    // If already initialized, nothing to do
+    if (vk_compute_rt.initialized) {
+        ri.Printf(PRINT_DEVELOPER, "VK_ComputeRT_Init: already initialized\n");
+        return;
+    }
+    // Reset state for safety
     memset(&vk_compute_rt, 0, sizeof(vk_compute_rt_t));
 
     // Create compute command pool
@@ -70,6 +79,114 @@ void VK_ComputeRT_Init(void) {
     layoutInfo.pBindings = bindings;
 
     VK_CHECK(qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &vk_compute_rt.computeDescriptorSetLayout));
+    // Create a timestamp query pool for per-dispatch timing (2 timestamps)
+    VkQueryPoolCreateInfo qpInfo = {};
+    qpInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+    qpInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+    qpInfo.queryCount = 2;
+    VK_CHECK(vkCreateQueryPool(vk.device, &qpInfo, NULL, &vk_compute_rt.computeQueryPool));
+    // Retrieve timestamp period for conversion to nanoseconds
+    VkPhysicalDeviceProperties props;
+    vkGetPhysicalDeviceProperties(vk.physicalDevice, &props);
+    vk_compute_rt.timestampPeriod = props.limits.timestampPeriod;
+
+    // Descriptor pool and set for compute bindings
+    VkDescriptorPoolSize poolSizes[3] = { {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1},
+                                        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1},
+                                        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1} };
+    VkDescriptorPoolCreateInfo poolInfo = {};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 3;
+    poolInfo.pPoolSizes = poolSizes;
+    poolInfo.maxSets = 1;
+    VK_CHECK(vkCreateDescriptorPool(vk.device, &poolInfo, NULL, &vk_compute_rt.computeDescriptorPool));
+
+    VkDescriptorSetAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = vk_compute_rt.computeDescriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &vk_compute_rt.computeDescriptorSetLayout;
+    VK_CHECK(vkAllocateDescriptorSets(vk.device, &allocInfo, &vk_compute_rt.computeDescriptorSet));
+
+    // Initial descriptor writes for bindings
+    VkDescriptorImageInfo imageInfo = {};
+    imageInfo.imageView = vk_compute_rt.storageImageView;
+    imageInfo.sampler = vk_compute_rt.storageImageSampler;
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    VkDescriptorBufferInfo uniformBufInfo = {};
+    uniformBufInfo.buffer = vk_compute_rt.uniformBuffer;
+    uniformBufInfo.offset = 0;
+    uniformBufInfo.range = VK_WHOLE_SIZE;
+    VkDescriptorBufferInfo sceneBufInfo = {};
+    sceneBufInfo.buffer = vk_compute_rt.sceneObjectsBuffer;
+    sceneBufInfo.offset = 0;
+    sceneBufInfo.range = VK_WHOLE_SIZE;
+    VkWriteDescriptorSet writes[3] = {};
+    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[0].dstSet = vk_compute_rt.computeDescriptorSet;
+    writes[0].dstBinding = 0;
+    writes[0].descriptorCount = 1;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    writes[0].pImageInfo = &imageInfo;
+    writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[1].dstSet = vk_compute_rt.computeDescriptorSet;
+    writes[1].dstBinding = 1;
+    writes[1].descriptorCount = 1;
+    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writes[1].pBufferInfo = &uniformBufInfo;
+    writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[2].dstSet = vk_compute_rt.computeDescriptorSet;
+    writes[2].dstBinding = 2;
+    writes[2].descriptorCount = 1;
+    writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    writes[2].pBufferInfo = &sceneBufInfo;
+    vkUpdateDescriptorSets(vk.device, 3, writes, 0, NULL);
+
+    // Descriptor pool and set for compute bindings
+    VkDescriptorPoolSize poolSizes[3] = { {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1},
+                                        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1},
+                                        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1} };
+    VkDescriptorPoolCreateInfo poolInfo = {};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 3;
+    poolInfo.pPoolSizes = poolSizes;
+    poolInfo.maxSets = 1;
+    VK_CHECK(vkCreateDescriptorPool(vk.device, &poolInfo, NULL, &vk_compute_rt.computeDescriptorPool));
+
+    VkDescriptorSetAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = vk_compute_rt.computeDescriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &vk_compute_rt.computeDescriptorSetLayout;
+    VK_CHECK(vkAllocateDescriptorSets(vk.device, &allocInfo, &vk_compute_rt.computeDescriptorSet));
+
+    // Initial descriptor writes for bindings
+    VkDescriptorImageInfo imageInfo = {};
+    imageInfo.imageView = vk_compute_rt.storageImageView;
+    imageInfo.sampler = vk_compute_rt.storageImageSampler;
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    VkDescriptorBufferInfo uniformBufInfo = { vk_compute_rt.uniformBuffer, 0, VK_WHOLE_SIZE };
+    VkDescriptorBufferInfo sceneBufInfo = { vk_compute_rt.sceneObjectsBuffer, 0, VK_WHOLE_SIZE };
+    VkWriteDescriptorSet writes[3] = {};
+    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[0].dstSet = vk_compute_rt.computeDescriptorSet;
+    writes[0].dstBinding = 0;
+    writes[0].descriptorCount = 1;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    writes[0].pImageInfo = &imageInfo;
+    writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[1].dstSet = vk_compute_rt.computeDescriptorSet;
+    writes[1].dstBinding = 1;
+    writes[1].descriptorCount = 1;
+    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writes[1].pBufferInfo = &uniformBufInfo;
+    writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[2].dstSet = vk_compute_rt.computeDescriptorSet;
+    writes[2].dstBinding = 2;
+    writes[2].descriptorCount = 1;
+    writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    writes[2].pBufferInfo = &sceneBufInfo;
+    vkUpdateDescriptorSets(vk.device, 3, writes, 0, NULL);
 
     // Create pipeline layout
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
@@ -135,6 +252,53 @@ void VK_ComputeRT_Init(void) {
     vk_compute_rt.enabled = qtrue;
     vk_compute_rt.initialized = qtrue;
 
+    // Attempt to load a SPIR-V compute shader (optional)
+    const char* shaderPath = "./shaders/compute_raytracing.comp.spv";
+    FILE* shaderFile = fopen(shaderPath, "rb");
+    if (shaderFile) {
+        fseek(shaderFile, 0, SEEK_END);
+        long shaderSize = ftell(shaderFile);
+        rewind(shaderFile);
+        if (shaderSize > 0) {
+            uint32_t* shaderCode = (uint32_t*)malloc(shaderSize);
+            if (shaderCode && fread(shaderCode, 1, shaderSize, shaderFile) == (size_t)shaderSize) {
+                VkShaderModuleCreateInfo smci = {};
+                smci.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+                smci.codeSize = (size_t)shaderSize;
+                smci.pCode = shaderCode;
+                if (vkCreateShaderModule(vk.device, &smci, NULL, &vk_compute_rt.computeShaderModule) == VK_SUCCESS) {
+                    vk_compute_rt.computeShaderLoaded = qtrue;
+                    ri.Printf(PRINT_ALL, "VK_ComputeRT_Init: loaded shader module (%s)\n", shaderPath);
+                    // Create compute pipeline
+                    VkPipelineShaderStageCreateInfo stage = {};
+                    stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+                    stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+                    stage.module = vk_compute_rt.computeShaderModule;
+                    stage.pName = "main";
+                    VkComputePipelineCreateInfo cpi = {};
+                    cpi.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+                    cpi.stage = stage;
+                    cpi.layout = vk_compute_rt.computePipelineLayout;
+                    if (vkCreateComputePipelines(vk.device, VK_NULL_HANDLE, 1, &cpi, NULL, &vk_compute_rt.computePipeline) == VK_SUCCESS) {
+                        ri.Printf(PRINT_ALL, "VK_ComputeRT_Init: compute pipeline created\n");
+                    } else {
+                        ri.Printf(PRINT_WARNING, "VK_ComputeRT_Init: failed to create compute pipeline\n");
+                    }
+                } else {
+                    ri.Printf(PRINT_WARNING, "VK_ComputeRT_Init: failed to create shader module\n");
+                }
+            } else {
+                ri.Printf(PRINT_WARNING, "VK_ComputeRT_Init: failed to read shader file\n");
+            }
+            free(shaderCode);
+        } else {
+            ri.Printf(PRINT_WARNING, "VK_ComputeRT_Init: shader file empty\n");
+        }
+        fclose(shaderFile);
+    } else {
+        ri.Printf(PRINT_WARNING, "VK_ComputeRT_Init: shader not found: %s\n", shaderPath);
+    }
+
     // Initialize optional hardware acceleration path (stubbed if not available)
     if (!vk_rtx_acceleration_init()) {
         ri.Printf(PRINT_WARNING, "Vulkan RTX: acceleration init failed or not available (stub).\n");
@@ -142,9 +306,19 @@ void VK_ComputeRT_Init(void) {
         ri.Printf(PRINT_ALL, "Vulkan RTX: acceleration subsystem initialized (stub).\n");
     }
     ri.Printf(PRINT_ALL, "Compute ray tracing system initialized\n");
+    // Route compute work through the main queue for now
+    vk_compute_rt.computeQueue = vk.queue;
 }
 
 void VK_ComputeRT_Shutdown(void) {
+    if (!vk_compute_rt.initialized) return;
+    ri.Printf(PRINT_ALL, "VK_ComputeRT_Shutdown: tearing down compute RT path\n");
+    // Destroy shader module if loaded
+    if (vk_compute_rt.computeShaderModule != VK_NULL_HANDLE) {
+        vkDestroyShaderModule(vk.device, vk_compute_rt.computeShaderModule, NULL);
+        vk_compute_rt.computeShaderModule = VK_NULL_HANDLE;
+        vk_compute_rt.computeShaderLoaded = qfalse;
+    }
     if (!vk_compute_rt.initialized) return;
 
     // Unmap uniform buffer
@@ -212,6 +386,11 @@ void VK_ComputeRT_Shutdown(void) {
     // Destroy command pool
     if (vk_compute_rt.computeCommandPool != VK_NULL_HANDLE) {
         qvkDestroyCommandPool(vk.device, vk_compute_rt.computeCommandPool, NULL);
+    }
+    // Destroy timestamp query pool
+    if (vk_compute_rt.computeQueryPool != VK_NULL_HANDLE) {
+        vkDestroyQueryPool(vk.device, vk_compute_rt.computeQueryPool, NULL);
+        vk_compute_rt.computeQueryPool = VK_NULL_HANDLE;
     }
 
     memset(&vk_compute_rt, 0, sizeof(vk_compute_rt_t));
@@ -334,17 +513,157 @@ void VK_ComputeRT_UpdateLight(const vec3_t position) {
 }
 
 void VK_ComputeRT_Dispatch(void) {
-    // Minimal, safe dispatch path for now.
+    struct timespec ts_start, ts_end;
+    clock_gettime(CLOCK_MONOTONIC, &ts_start);
     if (!vk_compute_rt.initialized) return;
-    // Update any small, harmless state to indicate we dispatched
-    if (vk_compute_rt.uniformBufferMapped) {
-        float *f = (float*)vk_compute_rt.uniformBufferMapped;
-        // Simple no-op mutation to demonstrate activity without requiring a shader
-        f[0] += 0.0f; // no real effect, placeholder
+    if (!vk_compute_rt.computeShaderLoaded || vk_compute_rt.computePipeline == VK_NULL_HANDLE) {
+        if (vk_compute_rt.smokeTestEnabled) {
+            // Perform a quick smoke-test render by clearing the storage image to a solid color
+            // Ensure we have a command buffer started
+            // Insert simple barriers and clear
+            VkImageMemoryBarrier barrier = {};
+            barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+            barrier.image = vk_compute_rt.storageImage;
+            barrier.srcAccessMask = 0;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            barrier.subresourceRange.baseMipLevel = 0;
+            barrier.subresourceRange.levelCount = 1;
+            barrier.subresourceRange.baseArrayLayer = 0;
+            barrier.subresourceRange.layerCount = 1;
+            vkCmdPipelineBarrier(vk_compute_rt.computeCommandBuffer,
+                                 VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                 0, 0, NULL, 0, NULL, 1, &barrier);
+            VkClearColorValue clearColor = { {0.0f, 0.0f, 0.0f, 1.0f} };
+            VkImageSubresourceRange range = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+            vkCmdClearColorImage(vk_compute_rt.computeCommandBuffer, vk_compute_rt.storageImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearColor, 1, &range);
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            vkCmdPipelineBarrier(vk_compute_rt.computeCommandBuffer,
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                                 0, 0, NULL, 0, NULL, 1, &barrier);
+            if (vkEndCommandBuffer(vk_compute_rt.computeCommandBuffer) != VK_SUCCESS) {
+                ri.Printf(PRINT_ERR, "VK_ComputeRT_Dispatch: failed to end command buffer (smoke)\n");
+                return;
+            }
+            VkSubmitInfo submit = {};
+            submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            submit.commandBufferCount = 1;
+            submit.pCommandBuffers = &vk_compute_rt.computeCommandBuffer;
+            if (vkQueueSubmit(vk.queue, 1, &submit, vk_compute_rt.computeFence) != VK_SUCCESS) {
+                ri.Printf(PRINT_ERR, "VK_ComputeRT_Dispatch: failed to submit smoke test\n");
+                return;
+            }
+            VK_CHECK(vkWaitForFences(vk.device, 1, &vk_compute_rt.computeFence, VK_TRUE, UINT64_MAX));
+            vkResetFences(vk.device, 1, &vk_compute_rt.computeFence);
+            clock_gettime(CLOCK_MONOTONIC, &ts_end);
+            uint64_t duration_ns = (uint64_t)(ts_end.tv_sec - ts_start.tv_sec) * 1000000000ULL + (uint64_t)(ts_end.tv_nsec - ts_start.tv_nsec);
+            ri.Printf(PRINT_DEVELOPER, "VK_ComputeRT_Dispatch: smoke test duration %llu ns\n", (unsigned long long)duration_ns);
+            #if defined(VK_TIMELINE_SEMAPHORE_ENABLED) || defined(VK_CALIBRATED_TIMESTAMPS_ENABLED)
+            vk_update_frame_timing(duration_ns);
+            #endif
+            ri.Printf(PRINT_DEVELOPER, "VK_ComputeRT_Dispatch: smoke test render complete\n");
+            return;
+        }
+        ri.Printf(PRINT_DEVELOPER, "VK_ComputeRT_Dispatch: compute path not available (no shader)\n");
+        return;
     }
-    // Log a debug message to indicate compute path was invoked
-    ri.Printf(PRINT_DEVELOPER, "VK_ComputeRT_Dispatch: compute path invoked (no-op)\n");
-    // In a full implementation, this would bind and dispatch a compute shader.
+    // Begin command buffer for one-time submission
+    VkCommandBufferBeginInfo beginInfo = {};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    // Optional: mark timing start via a timestamp for compute
+    if (vk_compute_rt.computeQueryPool != VK_NULL_HANDLE) {
+        vkCmdResetQueryPool(vk_compute_rt.computeCommandBuffer, vk_compute_rt.computeQueryPool, 0, 2);
+        vkCmdWriteTimestamp(vk_compute_rt.computeCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, vk_compute_rt.computeQueryPool, 0);
+    }
+    if (vkBeginCommandBuffer(vk_compute_rt.computeCommandBuffer, &beginInfo) != VK_SUCCESS) {
+        ri.Printf(PRINT_ERR, "VK_ComputeRT_Dispatch: failed to begin command buffer\n");
+        return;
+    }
+    // Optional: stage scene data before dispatch
+    size_t dataSize = (size_t)sceneObjectCount * sizeof(rt_scene_object_t);
+    if (dataSize > 0 && vk_compute_rt.stagingBufferInitialized) {
+        // Map staging memory and copy scene data
+        void* mapped = NULL;
+        if (vkMapMemory(vk.device, vk_compute_rt.stagingBufferMemory, 0, dataSize, 0, &mapped) == VK_SUCCESS) {
+            memcpy(mapped, sceneObjects, dataSize);
+            vkUnmapMemory(vk.device, vk_compute_rt.stagingBufferMemory);
+        }
+        VkBufferCopy copyRegion = {};
+        copyRegion.srcOffset = 0;
+        copyRegion.dstOffset = 0;
+        copyRegion.size = dataSize;
+        vkCmdCopyBuffer(vk_compute_rt.computeCommandBuffer, vk_compute_rt.stagingBuffer, vk_compute_rt.sceneObjectsBuffer, 1, &copyRegion);
+        vk_compute_rt.stagingDataDirty = qfalse;
+    } else if (dataSize > 0 && !vk_compute_rt.stagingBufferInitialized) {
+        // Initialize a simple staging buffer on first use
+        VkBufferCreateInfo sbInfo = {};
+        sbInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        sbInfo.size = dataSize;
+        sbInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        sbInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        if (vkCreateBuffer(vk.device, &sbInfo, NULL, &vk_compute_rt.stagingBuffer) == VK_SUCCESS) {
+            VkMemoryRequirements memReq;
+            vkGetBufferMemoryRequirements(vk.device, vk_compute_rt.stagingBuffer, &memReq);
+            VkMemoryAllocateInfo allocInfo = {};
+            allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+            allocInfo.allocationSize = memReq.size;
+            allocInfo.memoryTypeIndex = find_memory_type(memReq.memoryTypeBits,
+                                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+            if (vkAllocateMemory(vk.device, &allocInfo, NULL, &vk_compute_rt.stagingBufferMemory) == VK_SUCCESS) {
+                vkBindBufferMemory(vk.device, vk_compute_rt.stagingBuffer, vk_compute_rt.stagingBufferMemory, 0);
+                vk_compute_rt.stagingBufferSize = dataSize;
+                vk_compute_rt.stagingBufferInitialized = qtrue;
+            }
+        }
+        // If staging creation failed, we'll skip staging for this frame
+    }
+    vkCmdBindPipeline(vk_compute_rt.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk_compute_rt.computePipeline);
+    vkCmdBindDescriptorSets(vk_compute_rt.computeCommandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk_compute_rt.computePipelineLayout, 0, 1, &vk_compute_rt.computeDescriptorSet, 0, NULL);
+    uint32_t gx = (uint32_t)((vk_compute_rt.resolution + 15) / 16);
+    uint32_t gy = (uint32_t)((vk_compute_rt.resolution + 15) / 16);
+    vkCmdDispatch(vk_compute_rt.computeCommandBuffer, gx, gy, 1);
+    if (vk_compute_rt.computeQueryPool != VK_NULL_HANDLE) {
+        vkCmdWriteTimestamp(vk_compute_rt.computeCommandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, vk_compute_rt.computeQueryPool, 1);
+    }
+    if (vkEndCommandBuffer(vk_compute_rt.computeCommandBuffer) != VK_SUCCESS) {
+        ri.Printf(PRINT_ERR, "VK_ComputeRT_Dispatch: failed to end command buffer\n");
+        return;
+    }
+    VkSubmitInfo submit = {};
+    submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit.commandBufferCount = 1;
+    submit.pCommandBuffers = &vk_compute_rt.computeCommandBuffer;
+    if (vkQueueSubmit(vk.queue, 1, &submit, vk_compute_rt.computeFence) != VK_SUCCESS) {
+        ri.Printf(PRINT_ERR, "VK_ComputeRT_Dispatch: failed to submit compute work\n");
+        return;
+    }
+    VK_CHECK(vkWaitForFences(vk.device, 1, &vk_compute_rt.computeFence, VK_TRUE, UINT64_MAX));
+    vkResetFences(vk.device, 1, &vk_compute_rt.computeFence);
+    clock_gettime(CLOCK_MONOTONIC, &ts_end);
+    uint64_t duration_ns = (uint64_t)(ts_end.tv_sec - ts_start.tv_sec) * 1000000000ULL + (uint64_t)(ts_end.tv_nsec - ts_start.tv_nsec);
+    ri.Printf(PRINT_DEVELOPER, "VK_ComputeRT_Dispatch: duration %llu ns\n", (unsigned long long)duration_ns);
+    // Retrieve GPU timestamps if available and convert to nanoseconds
+    if (vk_compute_rt.computeQueryPool != VK_NULL_HANDLE) {
+        uint64_t timestamps[2] = {0, 0};
+        VkResult res = vkGetQueryPoolResults(vk.device, vk_compute_rt.computeQueryPool, 0, 2, sizeof(timestamps), timestamps, sizeof(uint64_t), VK_QUERY_RESULT_64_BIT);
+        if (res == VK_SUCCESS) {
+            uint64_t gpu_duration_ns = (timestamps[1] - timestamps[0]) * (uint64_t)vk_compute_rt.timestampPeriod;
+            ri.Printf(PRINT_DEVELOPER, "VK_ComputeRT_Dispatch: gpu duration %llu ns\n", (unsigned long long)gpu_duration_ns);
+            #if defined(VK_TIMELINE_SEMAPHORE_ENABLED) || defined(VK_CALIBRATED_TIMESTAMPS_ENABLED)
+            vk_update_frame_timing(gpu_duration_ns);
+            #endif
+        }
+    }
+#if defined(VK_TIMELINE_SEMAPHORE_ENABLED) || defined(VK_CALIBRATED_TIMESTAMPS_ENABLED)
+    vk_update_frame_timing(duration_ns);
+#endif
+    ri.Printf(PRINT_DEVELOPER, "VK_ComputeRT_Dispatch: compute path dispatched\n");
 }
 
 void VK_ComputeRT_RenderFullscreen(void) {
@@ -372,4 +691,78 @@ void VK_ComputeRT_SetMaxBounces(int bounces) {
 
 void VK_ComputeRT_SetUseReflections(qboolean use) {
     vk_compute_rt.useReflections = use;
+}
+
+void VK_ComputeRT_ReloadShader(void) {
+    // Unload existing shader if any
+    if (vk_compute_rt.computeShaderModule != VK_NULL_HANDLE) {
+        vkDestroyShaderModule(vk.device, vk_compute_rt.computeShaderModule, NULL);
+        vk_compute_rt.computeShaderModule = VK_NULL_HANDLE;
+        vk_compute_rt.computeShaderLoaded = qfalse;
+    }
+    // Attempt to load shader again (same path as Init)
+    const char* shaderPath = "./shaders/compute_raytracing.comp.spv";
+    FILE* shaderFile = fopen(shaderPath, "rb");
+    if (shaderFile) {
+        fseek(shaderFile, 0, SEEK_END);
+        long shaderSize = ftell(shaderFile);
+        rewind(shaderFile);
+        if (shaderSize > 0) {
+            uint32_t* shaderCode = (uint32_t*)malloc(shaderSize);
+            if (shaderCode && fread(shaderCode, 1, shaderSize, shaderFile) == (size_t)shaderSize) {
+                VkShaderModuleCreateInfo smci = {};
+                smci.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+                smci.codeSize = (size_t)shaderSize;
+                smci.pCode = shaderCode;
+                if (vkCreateShaderModule(vk.device, &smci, NULL, &vk_compute_rt.computeShaderModule) == VK_SUCCESS) {
+                    vk_compute_rt.computeShaderLoaded = qtrue;
+                    ri.Printf(PRINT_ALL, "VK_ComputeRT_ReloadShader: loaded shader module (%s)\n", shaderPath);
+                    // Try to create pipeline if layout exists and not yet created
+                    if (vk_compute_rt.computePipeline == VK_NULL_HANDLE) {
+                        VkPipelineShaderStageCreateInfo stage = {};
+                        stage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+                        stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+                        stage.module = vk_compute_rt.computeShaderModule;
+                        stage.pName = "main";
+                        VkComputePipelineCreateInfo cpi = {};
+                        cpi.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+                        cpi.stage = stage;
+                        cpi.layout = vk_compute_rt.computePipelineLayout;
+                        if (vkCreateComputePipelines(vk.device, VK_NULL_HANDLE, 1, &cpi, NULL, &vk_compute_rt.computePipeline) == VK_SUCCESS) {
+                            ri.Printf(PRINT_ALL, "VK_ComputeRT_ReloadShader: compute pipeline created\n");
+                        } else {
+                            ri.Printf(PRINT_WARNING, "VK_ComputeRT_ReloadShader: failed to create compute pipeline\n");
+                        }
+                    }
+                } else {
+                    ri.Printf(PRINT_WARNING, "VK_ComputeRT_ReloadShader: failed to create shader module\n");
+                }
+            } else {
+                ri.Printf(PRINT_WARNING, "VK_ComputeRT_ReloadShader: failed to read shader file\n");
+            }
+            free(shaderCode);
+        } else {
+            ri.Printf(PRINT_WARNING, "VK_ComputeRT_ReloadShader: shader file empty\n");
+        }
+        fclose(shaderFile);
+    } else {
+        ri.Printf(PRINT_WARNING, "VK_ComputeRT_ReloadShader: shader not found: %s\n", shaderPath);
+    }
+}
+
+// Enable/disable a CPU-side smoke-test render path when no shader is available.
+void VK_ComputeRT_EnableSmokeTest(qboolean enabled) {
+    vk_compute_rt.smokeTestEnabled = enabled;
+    if (enabled) {
+        ri.Printf(PRINT_ALL, "VK_ComputeRT: smoke-test mode enabled (CPU-based frame render)\n");
+    } else {
+        ri.Printf(PRINT_ALL, "VK_ComputeRT: smoke-test mode disabled\n");
+    }
+}
+
+// Small wrapper to render a single frame batch (update data, then dispatch)
+void VK_ComputeRT_BatchRenderFrame(void) {
+    // This wrapper allows external code to trigger a full compute-frame sequence
+    // For now, simply invoke the main dispatch path (which handles staging)
+    VK_ComputeRT_Dispatch();
 }

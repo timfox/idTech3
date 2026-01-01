@@ -1,6 +1,7 @@
 #pragma once
 
 #include "tr_local.h"
+#include <vulkan/vulkan.h>
 
 // Compute Shader-Based Ray Tracing System
 // Software ray tracing using compute shaders (not hardware-accelerated)
@@ -26,6 +27,8 @@ typedef struct {
 typedef struct {
     qboolean enabled;
     qboolean initialized;
+    VkShaderModule computeShaderModule;
+    qboolean computeShaderLoaded;
 
     // Compute resources
     VkQueue computeQueue;
@@ -77,6 +80,18 @@ typedef struct {
     int resolution;  // Storage image resolution (e.g., 2048)
     qboolean useReflections;
     int maxBounces;
+    // Staging area for scene data (uploads via host-visible staging buffer)
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    size_t stagingBufferSize;
+    qboolean stagingBufferInitialized;
+    // Flag indicating staging data has been prepared for transfer this frame
+    qboolean stagingDataDirty;
+    // Smoke-test render path flag
+    qboolean smokeTestEnabled;
+    // GPU timestamp timing
+    VkQueryPool computeQueryPool;
+    float timestampPeriod; // nanoseconds per timestamp unit
 } vk_compute_rt_t;
 
 extern vk_compute_rt_t vk_compute_rt;
@@ -95,6 +110,9 @@ void VK_ComputeRT_RenderFullscreen(void);
 
 // Settings
 qboolean VK_ComputeRT_IsEnabled(void);
+void VK_ComputeRT_ReloadShader(void);
+void VK_ComputeRT_EnableSmokeTest(qboolean enabled);
+void VK_ComputeRT_BatchRenderFrame(void);
 void VK_ComputeRT_SetEnabled(qboolean enabled);
 void VK_ComputeRT_SetResolution(int resolution);
 void VK_ComputeRT_SetMaxBounces(int bounces);
