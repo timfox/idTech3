@@ -48,6 +48,7 @@ static qboolean g_crash_initialized = qfalse;
 static int g_start_time = 0;
 static crash_callback_t g_crash_callbacks[8];
 static int g_crash_callback_count = 0;
+static char g_last_crash_filename[256] = {0};
 
 // Mod loading context for crash debugging
 static char g_mod_loading_name[MAX_QPATH] = {0};
@@ -225,6 +226,7 @@ static void Crash_WriteReport(const crash_info_t *info, const char *reason)
     FILE *f;
     time_t now;
     char time_str[64];
+    char filename[256];
     int i;
 
     // Ensure logs directory exists
@@ -233,14 +235,23 @@ static void Crash_WriteReport(const crash_info_t *info, const char *reason)
         mkdir(CRASH_LOG_DIR, 0755);
     }
 
-    f = fopen(CRASH_REPORT_FILENAME, "w");
+    now = time(NULL);
+    strftime(time_str, sizeof(time_str), "%Y%m%d_%H%M%S", localtime(&now));
+
+    // Create timestamped filename
+    snprintf(filename, sizeof(filename), "%s%s.txt", CRASH_REPORT_BASENAME, time_str);
+
+    // Store filename for use in other functions
+    Q_strncpyz(g_last_crash_filename, filename, sizeof(g_last_crash_filename));
+
+    f = fopen(filename, "w");
     if (!f) {
         // Try writing to stderr as fallback
         f = stderr;
+        Com_Printf("Failed to write crash report to %s, falling back to stderr\n", filename);
+    } else {
+        Com_Printf("Writing crash report to %s\n", filename);
     }
-
-    now = time(NULL);
-    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", localtime(&now));
 
     fprintf(f, "========================================\n");
     fprintf(f, "CRASH REPORT\n");
@@ -276,6 +287,31 @@ static void Crash_WriteReport(const crash_info_t *info, const char *reason)
         fprintf(f, "\n--- Mod Loading Context ---\n");
         fprintf(f, "Mod Name: %s\n", g_mod_loading_name);
         fprintf(f, "Operation: %s\n", g_mod_loading_operation);
+    }
+
+    // Add renderer state information
+    fprintf(f, "\n--- Renderer State ---\n");
+    fprintf(f, "Renderer Initialized: %s\n", g_crash_info.uptime_seconds > 0 ? "Yes" : "No");
+
+    // Try to get some basic system load info
+    FILE *loadavg = fopen("/proc/loadavg", "r");
+    if (loadavg) {
+        char load_buf[256];
+        if (fgets(load_buf, sizeof(load_buf), loadavg)) {
+            fprintf(f, "System Load: %s", load_buf);
+        }
+        fclose(loadavg);
+    }
+
+    // Add OpenGL/Vulkan information if available
+    const char *renderer = getenv("r_renderer");
+    if (renderer) {
+        fprintf(f, "Renderer: %s\n", renderer);
+    }
+
+    const char *rtx_enabled = getenv("r_rtx_enable");
+    if (rtx_enabled) {
+        fprintf(f, "RTX Enabled: %s\n", rtx_enabled);
     }
 
     // Add environment info
@@ -349,16 +385,54 @@ static void Crash_WriteReport(const crash_info_t *info, const char *reason)
 
     // Recent filesystem operations (if tracked)
     fprintf(f, "\n--- Recent Operations ---\n");
-    fprintf(f, "Command Line: ");
-    // Try to reconstruct command line from environment
-    extern char **environ;
-    for (i = 0; environ[i]; i++) {
-        if (strstr(environ[i], "PWD=")) continue;  // Skip PWD
-        if (strlen(environ[i]) < 256) {  // Safety check
-            fprintf(f, "%s ", environ[i]);
+
+    // Try to get command line from /proc/self/cmdline
+    FILE *cmdline_file = fopen("/proc/self/cmdline", "rb");
+    if (cmdline_file) {
+        char cmdline_buf[1024] = {0};
+        size_t bytes_read = fread(cmdline_buf, 1, sizeof(cmdline_buf) - 1, cmdline_file);
+        fclose(cmdline_file);
+
+        if (bytes_read > 0) {
+            fprintf(f, "Command Line: ");
+            // Command line arguments are null-separated
+            for (size_t j = 0; j < bytes_read; j++) {
+                if (cmdline_buf[j] == '\0') {
+                    if (j + 1 < bytes_read && cmdline_buf[j + 1] != '\0') {
+                        fprintf(f, " ");
+                    }
+                } else {
+                    fputc(cmdline_buf[j], f);
+                }
+            }
+            fprintf(f, "\n");
         }
+    } else {
+        fprintf(f, "Command Line: (unable to read /proc/self/cmdline)\n");
     }
-    fprintf(f, "\n");
+
+    // Add some basic system resource info
+    fprintf(f, "\n--- Process Information ---\n");
+
+    // Try to get process ID
+    pid_t pid = getpid();
+    fprintf(f, "Process ID: %d\n", pid);
+
+    // Try to get parent process ID
+    pid_t ppid = getppid();
+    fprintf(f, "Parent Process ID: %d\n", ppid);
+
+    // Try to get current working directory
+    char cwd_buf[PATH_MAX];
+    if (getcwd(cwd_buf, sizeof(cwd_buf))) {
+        fprintf(f, "Current Working Directory: %s\n", cwd_buf);
+    }
+
+    // Try to get username
+    const char *username = getenv("USER");
+    if (username) {
+        fprintf(f, "User: %s\n", username);
+    }
 
     // Log ring buffer
     fprintf(f, "\n--- Last %d bytes of log ---\n", CRASH_LOG_RING_SIZE);
@@ -422,7 +496,7 @@ static void Crash_HandleCrash(int sig, void *fault_addr, const char *reason)
 
     // Print to stderr
     fprintf(stderr, "\n*** CRASH: %s ***\n", g_crash_info.signal_name);
-    fprintf(stderr, "Crash report written to: %s\n", CRASH_REPORT_FILENAME);
+    fprintf(stderr, "Crash report written to: %s\n", g_last_crash_filename[0] ? g_last_crash_filename : "stderr");
     fprintf(stderr, "Build: %s (%s)\n", BUILD_ID, BUILD_DATE);
 }
 
@@ -497,7 +571,7 @@ void Crash_GenerateReport(const char *reason)
     g_crash_info.uptime_seconds = (Sys_Milliseconds() - g_start_time) / 1000;
     Crash_CaptureStackTrace(&g_crash_info);
     Crash_WriteReport(&g_crash_info, reason);
-    Com_Printf("Crash report generated: %s\n", CRASH_REPORT_FILENAME);
+    Com_Printf("Crash report generated: %s\n", g_last_crash_filename[0] ? g_last_crash_filename : "unknown");
 }
 
 /*

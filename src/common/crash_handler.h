@@ -26,8 +26,8 @@ extern "C" {
 // Maximum stack frames to capture
 #define CRASH_MAX_STACK_FRAMES  32
 
-// Crash report file
-#define CRASH_REPORT_FILENAME   "logs/crash_report.txt"
+// Crash report file (base name, will be timestamped)
+#define CRASH_REPORT_BASENAME   "logs/crash_report_"
 
 // Ensure logs directory exists
 #define CRASH_LOG_DIR           "logs"

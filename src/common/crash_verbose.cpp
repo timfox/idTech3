@@ -4,8 +4,8 @@
 #include <stdlib.h>
 #include <time.h>
 
-// Path to crash report; uses relative path from working directory
-#define CRASH_REPORT_PATH "logs/crash_report.txt"
+// Base path for crash reports; uses relative path from working directory
+#define CRASH_REPORT_BASE "logs/crash_report_"
 // Additional verbose crash log location
 #define CRASH_VERBOSE_LOG "logs/crash_verbose.log"
 // Crash logs directory
@@ -25,15 +25,20 @@ void append_verbose_crash_context(void) {
         mkdir(CRASH_LOG_DIR, 0755);
     }
 
+    // Generate timestamped crash report filename
+    time_t now = time(NULL);
+    struct tm* tm_info = localtime(&now);
+    char timebuf[64];
+    char crash_filename[256];
+    strftime(timebuf, sizeof(timebuf), "%Y%m%d_%H%M%S", tm_info);
+    snprintf(crash_filename, sizeof(crash_filename), "%s%s.txt", CRASH_REPORT_BASE, timebuf);
+
     // Persist to primary crash report
-    FILE* f = fopen(CRASH_REPORT_PATH, "a");
+    FILE* f = fopen(crash_filename, "a");
     if (!f) {
         free(strings);
         return;
     }
-    time_t now = time(NULL);
-    struct tm* tm_info = localtime(&now);
-    char timebuf[64];
     strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M:%S", tm_info);
     fprintf(f, "\n=== Backtrace at %s ===\n", timebuf);
     for (int i = 0; i < nptrs; ++i) {
@@ -57,10 +62,15 @@ void append_verbose_crash_context(void) {
         fclose(f2);
     }
     // Also create a lightweight relocation note file for automation
-    FILE* f3 = fopen("logs/collected_crash_report.txt", "a");
+    char collection_filename[256];
+    strftime(timebuf, sizeof(timebuf), "%Y%m%d_%H%M%S", tm_info);
+    snprintf(collection_filename, sizeof(collection_filename), "logs/crash_collection_%s.txt", timebuf);
+
+    FILE* f3 = fopen(collection_filename, "w");
     if (f3) {
-        time_t now3 = time(NULL);
-        fprintf(f3, "Crash at %ld (verbose log updated)\n", now3);
+        fprintf(f3, "Crash Report Generated: %s\n", crash_filename);
+        fprintf(f3, "Timestamp: %ld\n", (long)now);
+        fprintf(f3, "Build: %s\n", "dev-unknown"); // Could be passed as parameter
         fclose(f3);
     }
 }
