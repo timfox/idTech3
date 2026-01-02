@@ -548,6 +548,7 @@ SET(QCOMMON_SRCS
     src/common/crash_handler.c
     src/common/files_validation.c
     src/common/cvar.c
+    src/common/dvar.c
     src/common/q_lockfree.c
     src/common/ecs.cpp
     src/common/ecs_systems.cpp

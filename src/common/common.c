@@ -7,6 +7,7 @@ Basic functions used throughout the engine.
 */
 
 #include "qcommon.h"
+#include "dvar.h"
 #include "net_threads.h"
 #include "performance_counters.h"
 #include "crash_handler.h"
@@ -300,6 +301,7 @@ void Com_Init( char *commandLine ) {
 
     // Initialize core systems
     Cvar_Init();
+    Dvar_Init();
 	Cbuf_Init();
     Cmd_Init();
 #ifdef USE_SQLITE
