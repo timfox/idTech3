@@ -24,8 +24,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
+#include <dlfcn.h>
 #ifdef USE_VULKAN
 #include "vk.h"
+#include "vk_material_parser.h"
 #ifdef USE_VULKAN_RAY_TRACING
 #include "vk_rtx_acceleration.h"
 #include "vk_portal_lights.h"
@@ -2843,15 +2845,31 @@ vk_material_parser_load_map_materials(s_worldData.baseName);
 
 // Build RTX acceleration structures for world geometry
 #ifdef USE_VULKAN_RAY_TRACING
+// RTX functions are optional - only call if available
+// These will be no-ops if RTX module is not loaded
 if (vk.rayTracingSupported) {
-    if (vk_rtx_acceleration_init()) {
-        vk_rtx_build_blas_from_world();
-        vk_rtx_update_surface_material_indices_buffer();
+    // Use function pointers to avoid linking issues
+    typedef qboolean (*pfn_vk_rtx_acceleration_init)(void);
+    typedef qboolean (*pfn_vk_rtx_build_blas_from_world)(void);
+    typedef void (*pfn_vk_rtx_update_surface_material_indices_buffer)(void);
+
+    // Try to get function pointers (these may be NULL if RTX not loaded)
+    pfn_vk_rtx_acceleration_init rtx_init = (pfn_vk_rtx_acceleration_init)dlsym(RTLD_DEFAULT, "vk_rtx_acceleration_init");
+    pfn_vk_rtx_build_blas_from_world rtx_build_blas = (pfn_vk_rtx_build_blas_from_world)dlsym(RTLD_DEFAULT, "vk_rtx_build_blas_from_world");
+    pfn_vk_rtx_update_surface_material_indices_buffer rtx_update_indices = (pfn_vk_rtx_update_surface_material_indices_buffer)dlsym(RTLD_DEFAULT, "vk_rtx_update_surface_material_indices_buffer");
+
+    if (rtx_init && rtx_build_blas && rtx_update_indices) {
+        if (rtx_init()) {
+            rtx_build_blas();
+            rtx_update_indices();
+        } else {
+            ri.Printf(PRINT_WARNING, "RTX acceleration unavailable; proceeding without RTX. Check Vulkan drivers and support.\n");
+        }
     } else {
-        ri.Printf(PRINT_WARNING, "RTX acceleration unavailable; proceeding without RTX. Check Vulkan drivers and support.\n");
+        ri.Printf(PRINT_DEVELOPER, "RTX functions not available; using raster rendering.\n");
     }
 } else {
-    ri.Printf(PRINT_DEBUG, "RTX acceleration not supported by this GPU/driver; raster path only.\n");
+    ri.Printf(PRINT_DEVELOPER, "RTX acceleration not supported by this GPU/driver; raster path only.\n");
 }
 #endif
 

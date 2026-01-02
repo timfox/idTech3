@@ -19,7 +19,7 @@ struct RayPayload {
 };
 
 struct ShadowPayload {
-    bool shadowed;
+    float shadowFactor;
 };
 
 // Acceleration structure
@@ -92,11 +92,16 @@ layout(binding = 5, set = 0) uniform LightCount { uint light_count; };
 // Texture samplers
 layout(binding = 6, set = 0) uniform sampler2D textures[];
 
+// Per-surface material indices
+layout(binding = 7, set = 0) buffer SurfaceMaterialIndices { uint surfaceMaterialIndices[]; };
+
 layout(push_constant) uniform PushConstants {
     uint max_recursion_depth;
     uint samples_per_pixel;
     uint enable_shadows;
     uint enable_reflections;
+    uint enable_gi;
+    uint gi_samples;
 } push_constants;
 
 layout(location = 0) rayPayloadEXT RayPayload payload;
@@ -116,11 +121,11 @@ vec3 sample_environment(vec3 dir) {
     return mix(vec3(1.0, 1.0, 1.0), vec3(0.5, 0.7, 1.0), t) * 0.5;
 }
 
-vec3 compute_lighting(vec3 position, vec3 normal, vec3 view_dir, MaterialData material) {
-    vec3 color = material.base_color.rgb * material.emissive;
+vec3 compute_lighting(vec3 position, vec3 normal, vec3 view_dir, MaterialData material, uint recursion_depth) {
+    vec3 color = material.emissive;
 
     // Ambient
-    color += material.base_color.rgb * 0.1;
+    color += material.baseColor.rgb * 0.1;
 
     // Direct lighting (simplified)
     for (uint i = 0; i < min(light_count, 8u); ++i) {
@@ -144,13 +149,14 @@ vec3 compute_lighting(vec3 position, vec3 normal, vec3 view_dir, MaterialData ma
         if (n_dot_l > 0.0) {
             // Shadow test
             if (push_constants.enable_shadows != 0) {
-                vec3 shadow_origin = position + normal * EPSILON;
+                shadow_payload.shadowFactor = 1.0; // Default to fully lit
+                vec3 shadow_origin = position + normal * 0.001; // Small offset to avoid self-shadowing
                 traceRayEXT(tlas, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT,
                            0xFF, RT_SHADOW_RAY_INDEX, 0, RT_SHADOW_RAY_INDEX,
-                           shadow_origin, EPSILON, light_dir, MAX_DISTANCE, 1);
+                           shadow_origin, 0.001, light_dir, 1000.0, 1);
 
-                if (shadow_payload.shadowed) {
-                    continue; // Skip this light
+                if (shadow_payload.shadowFactor < 0.5) {
+                    continue; // Skip this light if in shadow
                 }
             }
 
@@ -188,7 +194,62 @@ vec3 compute_lighting(vec3 position, vec3 normal, vec3 view_dir, MaterialData ma
         }
     }
 
+    // Reflections
+    if (push_constants.enable_reflections != 0 && recursion_depth < push_constants.max_recursion_depth) {
+        float reflectivity = material.metallic + material.clearcoat * 0.1;
+        if (reflectivity > 0.01) {
+            vec3 reflect_dir = reflect(-view_dir, normal);
+            RayPayload reflect_payload;
+            reflect_payload.recursion_depth = recursion_depth + 1;
+
+            traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xFF, RT_PRIMARY_RAY_INDEX, 0, RT_PRIMARY_RAY_INDEX,
+                       position + normal * 0.001, 0.001, reflect_dir, 1000.0, 0);
+
+            vec3 reflect_color = reflect_payload.color;
+            if (reflect_color == vec3(0.0)) {
+                reflect_color = sample_environment(reflect_dir);
+            }
+            color += reflect_color * reflectivity * 0.5; // Blend with reflection
+        }
+    }
+
+    // Global Illumination
+    if (push_constants.enable_gi != 0 && recursion_depth == 0) {
+        vec3 gi_color = sample_global_illumination(position, normal, recursion_depth);
+        color += gi_color * material.baseColor.rgb * 0.3; // Subtle GI contribution
+    }
+
     return color;
+}
+
+vec3 sample_global_illumination(vec3 position, vec3 normal, uint recursion_depth) {
+    if (recursion_depth >= push_constants.max_recursion_depth) {
+        return sample_environment(normal);
+    }
+
+    vec3 gi_color = vec3(0.0);
+    uint samples = min(push_constants.gi_samples, 4u);
+
+    for (uint i = 0; i < samples; ++i) {
+        // Generate random direction in hemisphere
+        vec2 rand_uv = vec2(random_float(), random_float());
+        vec3 sample_dir = random_hemisphere_direction(normal, rand_uv);
+
+        RayPayload gi_payload;
+        gi_payload.recursion_depth = recursion_depth + 1;
+
+        traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xFF, RT_PRIMARY_RAY_INDEX, 0, RT_PRIMARY_RAY_INDEX,
+                   position + normal * 0.001, 0.001, sample_dir, 50.0, 0);
+
+        vec3 sample_color = gi_payload.color;
+        if (sample_color == vec3(0.0)) {
+            sample_color = sample_environment(sample_dir);
+        }
+
+        gi_color += sample_color;
+    }
+
+    return gi_color / float(samples);
 }
 
 void main() {
@@ -210,7 +271,7 @@ void main() {
     payload.material_id = 0;
 
     // Trace primary ray
-    traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xFF, RT_SHADOW_RAY_INDEX, 0, RT_SHADOW_RAY_INDEX,
+    traceRayEXT(tlas, gl_RayFlagsOpaqueEXT, 0xFF, RT_PRIMARY_RAY_INDEX, 0, RT_PRIMARY_RAY_INDEX,
                ray_origin, camera.near_plane, ray_direction, camera.far_plane, 0);
 
     // If we hit nothing, sample environment
@@ -219,9 +280,9 @@ void main() {
     } else {
         // Compute lighting for the hit point
         MaterialData material = materials[payload.material_id];
-        vec3 view_dir = normalize(camera.camera_position - ray_origin);
-        payload.color = compute_lighting(ray_origin + ray_direction * (camera.near_plane + payload.normal.z * 0.1),
-                                        payload.normal, view_dir, material);
+        vec3 hit_position = ray_origin + ray_direction * (camera.near_plane + length(payload.normal) * 0.1);
+        vec3 view_dir = normalize(camera.camera_position - hit_position);
+        payload.color = compute_lighting(hit_position, payload.normal, view_dir, material, payload.recursion_depth);
     }
 
     // Tone mapping and output

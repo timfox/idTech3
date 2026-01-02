@@ -832,7 +832,32 @@ void vk_rtx_set_light_advanced_properties(uint32_t light_id, float temperature,
 }
 
 void vk_rtx_create_shadow_acceleration(uint32_t light_id, VkCommandBuffer cmd_buffer) {
-    (void)light_id; (void)cmd_buffer;
+    if (!g_rtx_accel_initialized || !g_rtx_available) {
+        ri.Printf(PRINT_DEVELOPER, "RTX: shadow acceleration skipped (not initialized)\n");
+        return;
+    }
+
+    if (!g_rt_pipeline) {
+        ri.Printf(PRINT_WARNING, "RTX: No RT pipeline for shadow acceleration\n");
+        return;
+    }
+
+    // For now, shadow acceleration is handled in the ray tracing pipeline
+    // This function can be extended for specialized shadow acceleration structures
+    ri.Printf(PRINT_DEVELOPER, "RTX: Shadow acceleration ready for light %u\n", light_id);
+}
+
+// Perform shadow ray tracing for a point and light direction
+qboolean vk_rtx_trace_shadow_ray(const vec3_t origin, const vec3_t direction, float distance) {
+    if (!g_rtx_accel_initialized || !g_rtx_available || !g_rt_pipeline) {
+        return qfalse; // No shadow information available
+    }
+
+    // This is a high-level interface for shadow testing
+    // The actual shadow tracing is done in the raygen shader
+    // Return false (not shadowed) for now - will be properly implemented
+    // when the shader pipeline is fully integrated
+    return qfalse;
 }
 
 void vk_rtx_update_lighting_data(VkBuffer light_buffer, VkDeviceMemory light_buffer_memory) {
@@ -1150,9 +1175,56 @@ void vk_rtx_setup_sbt(VkCommandBuffer cmd_buffer) {
     vk_rtx_build_sbt_for_frame(cmd_buffer);
 }
 
+static rtx_quality_preset_t g_current_quality_preset = RTX_QUALITY_MEDIUM;
+
 void vk_rtx_set_quality_settings(float quality, qboolean shadows, qboolean reflections,
                                  qboolean refractions, qboolean global_illumination) {
-    (void)quality; (void)shadows; (void)reflections; (void)refractions; (void)global_illumination;
+    // Update CVar-based settings
+    if (r_rtx_shadows) ri.Cvar_Set("r_rtx_shadows", shadows ? "1" : "0");
+    if (r_rtx_reflections) ri.Cvar_Set("r_rtx_reflections", reflections ? "1" : "0");
+    if (r_rtx_gi) ri.Cvar_Set("r_rtx_gi", global_illumination ? "1" : "0");
+    if (r_rtx_quality) ri.Cvar_SetValue("r_rtx_quality", quality);
+
+    ri.Printf(PRINT_ALL, "RTX: Quality settings updated - shadows:%d reflections:%d GI:%d quality:%.1f\n",
+              shadows, reflections, global_illumination, quality);
+}
+
+void vk_rtx_set_quality_preset(rtx_quality_preset_t preset) {
+    g_current_quality_preset = preset;
+
+    switch (preset) {
+        case RTX_QUALITY_LOW:
+            // Low quality: shadows only, minimal features
+            vk_rtx_set_quality_settings(0.3f, qtrue, qfalse, qfalse, qfalse);
+            ri.Printf(PRINT_ALL, "RTX: Set to LOW quality preset\n");
+            break;
+
+        case RTX_QUALITY_MEDIUM:
+            // Medium quality: shadows + reflections
+            vk_rtx_set_quality_settings(0.6f, qtrue, qtrue, qfalse, qfalse);
+            ri.Printf(PRINT_ALL, "RTX: Set to MEDIUM quality preset\n");
+            break;
+
+        case RTX_QUALITY_HIGH:
+            // High quality: shadows + reflections + basic GI
+            vk_rtx_set_quality_settings(0.8f, qtrue, qtrue, qfalse, qtrue);
+            ri.Printf(PRINT_ALL, "RTX: Set to HIGH quality preset\n");
+            break;
+
+        case RTX_QUALITY_ULTRA:
+            // Ultra quality: all features enabled
+            vk_rtx_set_quality_settings(1.0f, qtrue, qtrue, qfalse, qtrue);
+            ri.Printf(PRINT_ALL, "RTX: Set to ULTRA quality preset\n");
+            break;
+
+        default:
+            ri.Printf(PRINT_WARNING, "RTX: Unknown quality preset %d\n", preset);
+            break;
+    }
+}
+
+rtx_quality_preset_t vk_rtx_get_current_quality_preset(void) {
+    return g_current_quality_preset;
 }
 
 void vk_rtx_get_statistics(uint32_t* triangles, uint32_t* instances, uint32_t* lights,

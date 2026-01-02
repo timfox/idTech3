@@ -201,7 +201,7 @@ void vk_material_parser_load_map_materials(const char* mapname) {
 	// Try to load <mapname>.mat file
 	Com_sprintf(filename, sizeof(filename), "%s.mat", mapname);
 
-	len = ri.FS_ReadFile(filename, NULL, qfalse);
+	len = ri.FS_ReadFile(filename, NULL);
 	if (len > 0) {
 		// Map-specific material file exists, load it
 		if (materialParser.numFiles < MAX_MATERIAL_FILES) {

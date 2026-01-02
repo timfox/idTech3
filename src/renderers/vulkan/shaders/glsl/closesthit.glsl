@@ -14,7 +14,11 @@ struct RayPayload {
 };
 
 layout(location = 0) rayPayloadInEXT RayPayload payload;
-layout(location = 1) rayPayloadEXT bool shadow_payload;
+struct ShadowPayload {
+    float shadowFactor;
+};
+
+layout(location = 1) rayPayloadInEXT ShadowPayload shadow_payload;
 
 hitAttributeEXT vec2 hit_attribs;
 
@@ -57,9 +61,13 @@ struct MaterialData {
 
 layout(binding = 3, set = 0) buffer Materials { MaterialData materials[]; };
 
+// Per-surface material indices
+layout(binding = 7, set = 0) buffer SurfaceMaterialIndices { uint surfaceMaterialIndices[]; };
+
 void main() {
-    // Get material for this hit
-    uint material_id = gl_InstanceCustomIndexEXT;
+    // Get material for this hit using per-surface material indices
+    uint surface_index = gl_PrimitiveID;
+    uint material_id = surfaceMaterialIndices[surface_index];
     MaterialData material = materials[material_id];
 
     // Interpolate normal and UV (simplified - would use actual vertex attributes)
@@ -74,5 +82,5 @@ void main() {
 }
 
 void shadow_hit() {
-    shadow_payload = true;
+    shadow_payload.shadowFactor = 0.0; // Fully shadowed
 }

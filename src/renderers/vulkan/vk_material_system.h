@@ -9,6 +9,7 @@ Supports dynamic material properties (wetness, damage, magical states)
 
 #include "tr_local.h"
 #include "vk.h"
+#include "vk_material_parser.h"
 
 #ifdef USE_VULKAN
 

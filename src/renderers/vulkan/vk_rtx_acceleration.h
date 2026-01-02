@@ -72,11 +72,21 @@ void vk_rtx_update_light(uint32_t light_id, const vec3_t position, const vec3_t 
 void vk_rtx_set_light_advanced_properties(uint32_t light_id, float temperature, float cone_angle,
                                         const vec3_t direction, int ies_profile);
 void vk_rtx_create_shadow_acceleration(uint32_t light_id, VkCommandBuffer cmd_buffer);
+qboolean vk_rtx_trace_shadow_ray(const vec3_t origin, const vec3_t direction, float distance);
 void vk_rtx_update_lighting_data(VkBuffer light_buffer, VkDeviceMemory light_buffer_memory);
 
 // Quality and performance settings
+typedef enum {
+    RTX_QUALITY_LOW = 0,
+    RTX_QUALITY_MEDIUM,
+    RTX_QUALITY_HIGH,
+    RTX_QUALITY_ULTRA
+} rtx_quality_preset_t;
+
 void vk_rtx_set_quality_settings(float quality, qboolean shadows, qboolean reflections,
                                qboolean refractions, qboolean global_illumination);
+void vk_rtx_set_quality_preset(rtx_quality_preset_t preset);
+rtx_quality_preset_t vk_rtx_get_current_quality_preset(void);
 
 // Statistics and monitoring
 void vk_rtx_get_statistics(uint32_t* triangles, uint32_t* instances, uint32_t* lights,

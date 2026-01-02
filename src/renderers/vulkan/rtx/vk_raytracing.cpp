@@ -16,6 +16,13 @@ extern refimport_t ri;
 #include "tr_math_optimized.h"
 #include "vk_framebuffer.h"
 
+// RTX CVAR extern declarations
+extern cvar_t *r_rtx_enable;
+extern cvar_t *r_rtx_shadows;
+extern cvar_t *r_rtx_reflections;
+extern cvar_t *r_rtx_gi;
+extern cvar_t *r_rtx_quality;
+
 // Forward declarations for ray tracing functions
 void vk_rt_create_denoise_resources( uint32_t width, uint32_t height );
 void vk_rt_destroy_denoise_resources( void );
@@ -768,7 +775,7 @@ void vk_rt_shutdown(void)
 
 void vk_rt_create_descriptor_set_layout( void )
 {
-	VkDescriptorSetLayoutBinding bindings[7];
+	VkDescriptorSetLayoutBinding bindings[8];
 	uint32_t bindingCount = 0;
 	VkDescriptorSetLayoutCreateInfo layoutInfo = {};
 
@@ -2159,6 +2166,48 @@ void vk_rt_trace_rays( uint32_t width, uint32_t height )
 
 	// Bind ray tracing pipeline
 	qvkCmdBindPipeline( vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vk.rt.raytracingPipeline );
+
+	// Set push constants for RTX features based on quality settings
+	uint32_t max_recursion = 1;
+	uint32_t gi_samples = 1;
+
+	rtx_quality_preset_t quality = vk_rtx_get_current_quality_preset();
+	switch (quality) {
+		case RTX_QUALITY_LOW:
+			max_recursion = 1;
+			gi_samples = 1;
+			break;
+		case RTX_QUALITY_MEDIUM:
+			max_recursion = 2;
+			gi_samples = 2;
+			break;
+		case RTX_QUALITY_HIGH:
+			max_recursion = 3;
+			gi_samples = 4;
+			break;
+		case RTX_QUALITY_ULTRA:
+			max_recursion = 4;
+			gi_samples = 8;
+			break;
+	}
+
+	uint32_t push_constants[6] = {
+		max_recursion, // max_recursion_depth
+		1, // samples_per_pixel
+		(r_rtx_shadows && r_rtx_shadows->integer) ? 1u : 0u, // enable_shadows
+		(r_rtx_reflections && r_rtx_reflections->integer) ? 1u : 0u, // enable_reflections
+		(r_rtx_gi && r_rtx_gi->integer) ? 1u : 0u, // enable_gi
+		gi_samples // gi_samples
+	};
+
+	qvkCmdPushConstants(
+		vk.cmd->command_buffer,
+		vk.rt.raytracingPipelineLayout,
+		VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR,
+		0,
+		sizeof(push_constants),
+		push_constants
+	);
 
 	// Trace rays - dispatch size must match image dimensions exactly
 	// Log dispatch size for debugging
