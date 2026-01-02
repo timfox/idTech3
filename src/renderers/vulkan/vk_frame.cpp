@@ -936,7 +936,17 @@ void vk_read_pixels(byte *buffer, uint32_t width, uint32_t height) {
       uint64_t _vk_readback_end_ms = (uint64_t)ri.Milliseconds();
       vk_calibrated_end_pass("readback_path", (_vk_readback_end_ms - _vk_readback_start_ms) * 1000000ULL);
 #endif
-      VkSubmitInfo submitInfo = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .pNext = nullptr, .commandBufferCount = 1, .pCommandBuffers = &cmd };
+      VkSubmitInfo submitInfo = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .pNext = nullptr,
+        .waitSemaphoreCount = 0,
+        .pWaitSemaphores = NULL,
+        .pWaitDstStageMask = NULL,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &cmd,
+        .signalSemaphoreCount = 0,
+        .pSignalSemaphores = NULL
+      };
       qvkQueueSubmit(vk.queue, 1, &submitInfo, VK_NULL_HANDLE);
     vkQueueWaitIdle(vk.queue);
 

@@ -6,7 +6,7 @@
 
 // Path to crash report; adjust if you relocate the repo
 // Crash report path; relocate if needed
-#define CRASH_REPORT_PATH "/home/tim/Desktop/idtech3/crash_report.txt"
+#define CRASH_REPORT_PATH "/home/tim/Desktop/idtech3/logs/crash_report.txt"
 // Additional verbose crash log location
 #define CRASH_VERBOSE_LOG "/home/tim/Desktop/idtech3/logs/crash_verbose.log"
 // Relocated crash logs directory
