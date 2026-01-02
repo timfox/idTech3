@@ -1791,18 +1791,6 @@ void CIN_DrawCinematic( int handle ) {
 	float	x, y, w, h;
 	byte	*buf;
 
-	// #region agent log - hypothesis B: cinematic drawing called
-	FILE *debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
-	if (debug_log) {
-		fprintf(debug_log, "{\"id\":\"log_%lld_B\",\"timestamp\":%lld,\"location\":\"cl_cin.c:CIN_DrawCinematic\",\"message\":\"Cinematic draw attempt\",\"data\":{\"handle\":%d,\"status\":%d,\"buf\":\"%p\",\"cls_state\":%d},\"sessionId\":\"debug-session\",\"runId\":\"pre-fix\",\"hypothesisId\":\"B\"}\n",
-			(long long)time(NULL), (long long)time(NULL)*1000, handle,
-			handle >= 0 && handle < MAX_VIDEO_HANDLES ? cinTable[handle].status : -1,
-			handle >= 0 && handle < MAX_VIDEO_HANDLES ? cinTable[handle].buf : NULL,
-			cls.state);
-		fclose(debug_log);
-	}
-	// #endregion
-
 	if (handle < 0 || handle>= MAX_VIDEO_HANDLES || cinTable[handle].status == FMV_EOF) {
 		return;
 	}
@@ -1828,6 +1816,19 @@ void CIN_DrawCinematic( int handle ) {
 	}
 
 	SCR_AdjustFrom640( &x, &y, &w, &h );
+
+	// #region agent log - hypothesis E: which rendering path taken
+	{
+		FILE *debug_log_e = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
+		if (debug_log_e) {
+			fprintf(debug_log_e, "{\"id\":\"log_%lld_E\",\"timestamp\":%lld,\"location\":\"cl_cin.c:CIN_DrawCinematic\",\"message\":\"Render path check\",\"data\":{\"dirty\":%d,\"CIN_WIDTH\":%ld,\"drawX\":%ld,\"CIN_HEIGHT\":%ld,\"drawY\":%ld},\"sessionId\":\"debug-session\",\"runId\":\"pre-fix\",\"hypothesisId\":\"E\"}\n",
+				(long long)time(NULL), (long long)time(NULL)*1000,
+				cinTable[handle].dirty, (long)cinTable[handle].CIN_WIDTH, (long)cinTable[handle].drawX,
+				(long)cinTable[handle].CIN_HEIGHT, (long)cinTable[handle].drawY);
+			fclose(debug_log_e);
+		}
+	}
+	// #endregion
 
 	if (cinTable[handle].dirty && (cinTable[handle].CIN_WIDTH != cinTable[handle].drawX || cinTable[handle].CIN_HEIGHT != cinTable[handle].drawY)) {
 		int *buf2;
@@ -1882,11 +1883,8 @@ void CL_PlayCinematic_f( void ) {
 
 
 void SCR_DrawCinematic( void ) {
-	Com_Printf("SCR_DrawCinematic called, CL_handle = %d\n", CL_handle);
 	if (CL_handle >= 0 && CL_handle < MAX_VIDEO_HANDLES) {
 		CIN_DrawCinematic(CL_handle);
-	} else {
-		Com_Printf("SCR_DrawCinematic: invalid CL_handle\n");
 	}
 }
 

@@ -548,6 +548,7 @@ SET(QCOMMON_SRCS
     src/common/crash_handler.c
     src/common/files_validation.c
     src/common/cvar.c
+    src/common/dvar.c
     src/common/q_lockfree.c
     src/common/ecs.cpp
     src/common/ecs_systems.cpp
@@ -625,7 +626,7 @@ list(APPEND QCOMMON_SRCS src/common/q_error_recovery.c)
 list(APPEND QCOMMON_SRCS src/common/q_input_validation.c)
 # Add font effects system
 # Font effects are renderer-specific, not common
-# list(APPEND QCOMMON_SRCS src/renderers/renderercommon/tr_font_effects.c)
+list(APPEND QCOMMON_SRCS src/renderers/renderercommon/tr_font_effects.c)
 # Add secure message functions
 list(APPEND QCOMMON_SRCS src/common/msg_secure.c)
 # Add memory statistics tracking
@@ -671,6 +672,14 @@ IF(USE_AIML)
 		src/common/aiml/aiml_c_api.cpp
 	)
 	ADD_COMPILE_DEFINITIONS(USE_AIML)
+ENDIF()
+
+#
+# NPOT textures for CIN (texture size equals CIN_WIDTH/CIN_HEIGHT)
+#
+OPTION(USE_NPOT_TEXTURES "Use NPOT textures for CIN when possible" OFF)
+IF(USE_NPOT_TEXTURES)
+   ADD_COMPILE_DEFINITIONS(USE_NPOT_TEXTURES)
 ENDIF()
 
 # Internationalization (i18n) support

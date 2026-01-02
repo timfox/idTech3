@@ -520,14 +520,6 @@ This will be called twice if rendering in stereo mode
 ==================
 */
 static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
-	// #region agent log - hypothesis C: screen drawing called
-	FILE *debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
-	if (debug_log) {
-		fprintf(debug_log, "{\"id\":\"log_%lld_C\",\"timestamp\":%lld,\"location\":\"cl_scrn.c:SCR_DrawScreenField\",\"message\":\"Screen draw\",\"data\":{\"stereoFrame\":%d,\"cls_state\":%d,\"uivm\":\"%p\"},\"sessionId\":\"debug-session\",\"runId\":\"pre-fix\",\"hypothesisId\":\"C\"}\n",
-			(long long)time(NULL), (long long)time(NULL)*1000, stereoFrame, cls.state, uivm);
-		fclose(debug_log);
-	}
-	// #endregion
 	qboolean uiFullscreen;
 
 	re.BeginFrame( stereoFrame );
@@ -555,14 +547,6 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 			Com_Error( ERR_FATAL, "SCR_DrawScreenField: bad cls.state" );
 			break;
 		case CA_CINEMATIC:
-			// #region agent log - hypothesis D: cinematic case executed
-			FILE *debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
-			if (debug_log) {
-				fprintf(debug_log, "{\"id\":\"log_%lld_D\",\"timestamp\":%lld,\"location\":\"cl_scrn.c:SCR_DrawScreenField\",\"message\":\"Cinematic case hit\",\"data\":{\"cls_state\":%d},\"sessionId\":\"debug-session\",\"runId\":\"pre-fix\",\"hypothesisId\":\"D\"}\n",
-					(long long)time(NULL), (long long)time(NULL)*1000, cls.state);
-				fclose(debug_log);
-			}
-			// #endregion
 			SCR_DrawCinematic();
 			break;
 		case CA_DISCONNECTED:
@@ -638,7 +622,6 @@ text to the screen.
 ==================
 */
 void SCR_UpdateScreen( void ) {
-	Com_Printf("SCR_UpdateScreen called, cls.state = %d\n", cls.state);
 	static int recursive;
 	static int framecount;
 	static int next_frametime;

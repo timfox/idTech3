@@ -1090,14 +1090,6 @@ void RE_StretchRaw( int x, int y, int w, int h, int cols, int rows, byte *data, 
 	}
 
 	tr.cinematicShader->stages[0]->bundle[0].image[0] = tr.scratchImage[client];
-	// #region agent log - hypothesis A: texture binding and rendering
-	FILE *debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
-	if (debug_log) {
-		fprintf(debug_log, "{\"id\":\"log_%lld_A\",\"timestamp\":%lld,\"location\":\"tr_backend.c:RE_StretchRaw\",\"message\":\"Video render attempt\",\"data\":{\"client\":%d,\"image\":\"%p\",\"shader\":\"%p\",\"rect\":\"%dx%d@%d,%d\",\"cinematicShader_index\":%d},\"sessionId\":\"debug-session\",\"runId\":\"pre-fix\",\"hypothesisId\":\"A\"}\n",
-			(long long)time(NULL), (long long)time(NULL)*1000, client, tr.scratchImage[client], tr.cinematicShader, (int)w, (int)h, (int)x, (int)y, tr.cinematicShader->index);
-		fclose(debug_log);
-	}
-	// #endregion
 	// Use full texture coordinates for video (0,0 to 1,1)
 	RE_StretchPic( x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, tr.cinematicShader->index );
 }
@@ -1109,6 +1101,22 @@ void RE_UploadCinematic( int w, int h, int cols, int rows, byte *data, int clien
 	image_t *image;
 
 	if ( !tr.scratchImage[ client ] ) {
+		// #region agent log - hypothesis F: video texture creation
+		FILE *debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
+		if (debug_log) {
+			// Sample first few bytes of video data
+			char data_sample[64];
+			int sample_len = cols * rows * 4 < 64 ? cols * rows * 4 : 64;
+			for (int i = 0; i < sample_len; i++) {
+				sprintf(data_sample + i*2, "%02x", (unsigned char)data[i]);
+			}
+			data_sample[sample_len*2] = '\0';
+
+			fprintf(debug_log, "{\"id\":\"log_%lld_F\",\"timestamp\":%lld,\"location\":\"tr_backend.c:RE_UploadCinematic\",\"message\":\"Video texture creation\",\"data\":{\"client\":%d,\"cols\":%d,\"rows\":%d,\"data_sample\":\"%s\",\"data_ptr\":\"%p\"},\"sessionId\":\"debug-session\",\"runId\":\"pre-fix\",\"hypothesisId\":\"F\"}\n",
+				(long long)time(NULL), (long long)time(NULL)*1000, client, cols, rows, data_sample, data);
+			fclose(debug_log);
+		}
+		// #endregion
 		tr.scratchImage[ client ] = R_CreateImage( va( "*scratch%i", client ), NULL, data, cols, rows, IMGFLAG_CLAMPTOEDGE | IMGFLAG_NOSCALE );
 		return;
 	}
