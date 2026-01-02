@@ -1,0 +1,3 @@
+{"id":"log_1767385624_C","timestamp":1767385624000,"location":"cl_scrn.c:SCR_DrawScreenField","message":"Screen draw","data":{"stereoFrame":0,"cls_state":9,"uivm":"(nil)"},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"C"}
+{"id":"log_1767385624_D","timestamp":1767385624000,"location":"cl_scrn.c:SCR_DrawScreenField","message":"Cinematic case hit","data":{"cls_state":9},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"D"}
+{"id":"log_1767385624_B","timestamp":1767385624000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Cinematic draw attempt","data":{"handle":0,"status":1,"buf":"0x7540a756d010","cls_state":9},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"B"}

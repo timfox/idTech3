@@ -1090,7 +1090,16 @@ void RE_StretchRaw( int x, int y, int w, int h, int cols, int rows, byte *data, 
 	}
 
 	tr.cinematicShader->stages[0]->bundle[0].image[0] = tr.scratchImage[client];
-	RE_StretchPic( x, y, w, h, 0.5f / cols, 0.5f / rows, 1.0f - 0.5f / cols, 1.0f - 0.5 / rows, tr.cinematicShader->index );
+	// #region agent log - hypothesis A: texture binding and rendering
+	FILE *debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
+	if (debug_log) {
+		fprintf(debug_log, "{\"id\":\"log_%lld_A\",\"timestamp\":%lld,\"location\":\"tr_backend.c:RE_StretchRaw\",\"message\":\"Video render attempt\",\"data\":{\"client\":%d,\"image\":\"%p\",\"shader\":\"%p\",\"rect\":\"%dx%d@%d,%d\",\"cinematicShader_index\":%d},\"sessionId\":\"debug-session\",\"runId\":\"pre-fix\",\"hypothesisId\":\"A\"}\n",
+			(long long)time(NULL), (long long)time(NULL)*1000, client, tr.scratchImage[client], tr.cinematicShader, (int)w, (int)h, (int)x, (int)y, tr.cinematicShader->index);
+		fclose(debug_log);
+	}
+	// #endregion
+	// Use full texture coordinates for video (0,0 to 1,1)
+	RE_StretchPic( x, y, w, h, 0.0f, 0.0f, 1.0f, 1.0f, tr.cinematicShader->index );
 }
 
 
@@ -1100,7 +1109,7 @@ void RE_UploadCinematic( int w, int h, int cols, int rows, byte *data, int clien
 	image_t *image;
 
 	if ( !tr.scratchImage[ client ] ) {
-		tr.scratchImage[ client ] = R_CreateImage( va( "*scratch%i", client ), NULL, data, cols, rows, IMGFLAG_CLAMPTOEDGE | IMGFLAG_RGB | IMGFLAG_NOSCALE );
+		tr.scratchImage[ client ] = R_CreateImage( va( "*scratch%i", client ), NULL, data, cols, rows, IMGFLAG_CLAMPTOEDGE | IMGFLAG_NOSCALE );
 		return;
 	}
 

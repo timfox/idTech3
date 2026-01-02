@@ -3807,7 +3807,7 @@ static void CreateInternalShaders( void ) {
 	stages[0].bundle[0].tcGen = TCGEN_TEXTURE;
 	stages[0].active = qtrue;
 	stages[0].rgbGen = CGEN_IDENTITY_LIGHTING;
-	stages[0].stateBits = GLS_DEPTHTEST_DISABLE;
+	stages[0].stateBits = GLS_DEPTHTEST_DISABLE | GLS_SRCBLEND_ONE | GLS_DSTBLEND_ZERO;
 	tr.cinematicShader = FinishShader();
 }
 

@@ -347,9 +347,9 @@ void Com_Init( char *commandLine ) {
 
 	// Initialize networking before server/client subsystems
 	extern void Netchan_Init( int port );
-	Com_Printf("About to call Netchan_Init\n");
+	// Initialize networking before server/client subsystems
+	extern void Netchan_Init( int port );
 	Netchan_Init( 0 );
-	Com_Printf("Netchan_Init completed\n");
 
 	// Initialize server/client subsystems (unless in dedicated mode).
 	// These set up the renderer, input, and main loop state.

@@ -979,9 +979,24 @@ static void readQuadInfo( byte *qData )
 		if ( cinTable[currentHandle].drawY > 256 ) {
 			cinTable[currentHandle].drawY = 256;
 		}
-		if ( cinTable[currentHandle].CIN_WIDTH != 256 || cinTable[currentHandle].CIN_HEIGHT != 256 ) {
-			Com_Printf( "HACK: approxmimating cinematic for Rage Pro or Voodoo\n" );
-		}
+	}
+
+	// Ensure drawX and drawY are powers of 2 for texture compatibility
+	{
+		int i;
+		for ( i = 0 ; ( 1 << i ) <= cinTable[currentHandle].drawX ; i++ ) {}
+		cinTable[currentHandle].drawX = 1 << (i - 1); // Round down to nearest power of 2
+
+		for ( i = 0 ; ( 1 << i ) <= cinTable[currentHandle].drawY ; i++ ) {}
+		cinTable[currentHandle].drawY = 1 << (i - 1); // Round down to nearest power of 2
+
+		// Ensure minimum size of 16x16
+		if ( cinTable[currentHandle].drawX < 16 ) cinTable[currentHandle].drawX = 16;
+		if ( cinTable[currentHandle].drawY < 16 ) cinTable[currentHandle].drawY = 16;
+	}
+
+	if ( cinTable[currentHandle].CIN_WIDTH != 256 || cinTable[currentHandle].CIN_HEIGHT != 256 ) {
+		Com_Printf( "HACK: approxmimating cinematic for Rage Pro or Voodoo\n" );
 	}
 }
 
@@ -1672,7 +1687,12 @@ int CIN_PlayCinematic( const char *arg, int x, int y, int w, int h, int systemBi
 	Com_DPrintf("trFMV::play(), playing %s with codec %s\n", arg, codecInfo->name);
 
 	if (cinTable[currentHandle].alterGameState) {
+		Com_Printf("Setting cls.state to CA_CINEMATIC\n");
 		cls.state = CA_CINEMATIC;
+		// Force a screen update to ensure cinematic is visible
+		SCR_UpdateScreen();
+	} else {
+		Com_Printf("Not setting cls.state to CA_CINEMATIC (alterGameState = %d)\n", cinTable[currentHandle].alterGameState);
 	}
 	
 	Con_Close();
@@ -1771,7 +1791,21 @@ void CIN_DrawCinematic( int handle ) {
 	float	x, y, w, h;
 	byte	*buf;
 
-	if (handle < 0 || handle>= MAX_VIDEO_HANDLES || cinTable[handle].status == FMV_EOF) return;
+	// #region agent log - hypothesis B: cinematic drawing called
+	FILE *debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
+	if (debug_log) {
+		fprintf(debug_log, "{\"id\":\"log_%lld_B\",\"timestamp\":%lld,\"location\":\"cl_cin.c:CIN_DrawCinematic\",\"message\":\"Cinematic draw attempt\",\"data\":{\"handle\":%d,\"status\":%d,\"buf\":\"%p\",\"cls_state\":%d},\"sessionId\":\"debug-session\",\"runId\":\"pre-fix\",\"hypothesisId\":\"B\"}\n",
+			(long long)time(NULL), (long long)time(NULL)*1000, handle,
+			handle >= 0 && handle < MAX_VIDEO_HANDLES ? cinTable[handle].status : -1,
+			handle >= 0 && handle < MAX_VIDEO_HANDLES ? cinTable[handle].buf : NULL,
+			cls.state);
+		fclose(debug_log);
+	}
+	// #endregion
+
+	if (handle < 0 || handle>= MAX_VIDEO_HANDLES || cinTable[handle].status == FMV_EOF) {
+		return;
+	}
 
 	if (!cinTable[handle].buf) {
 		return;
@@ -1839,13 +1873,20 @@ void CL_PlayCinematic_f( void ) {
 		do {
 			SCR_RunCinematic();
 		} while (cinTable[currentHandle].buf == NULL && cinTable[currentHandle].status == FMV_PLAY); // wait for first frame (load codebook and sound)
+
+		// Don't reset client state immediately - let it stay in cinematic mode
+		// The cinematic will be stopped by user input or other means
+		Com_Printf("Cinematic finished, but keeping cls.state as CA_CINEMATIC\n");
 	}
 }
 
 
 void SCR_DrawCinematic( void ) {
+	Com_Printf("SCR_DrawCinematic called, CL_handle = %d\n", CL_handle);
 	if (CL_handle >= 0 && CL_handle < MAX_VIDEO_HANDLES) {
 		CIN_DrawCinematic(CL_handle);
+	} else {
+		Com_Printf("SCR_DrawCinematic: invalid CL_handle\n");
 	}
 }
 

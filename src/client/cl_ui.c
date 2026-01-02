@@ -1448,10 +1448,76 @@ CL_InitUI
 
 void CL_InitUI( void ) {
 	Com_Printf("=== CL_InitUI CALLED ===\n");
-	// Skip VM loading to prevent crashes - set UI as initialized
-	Com_Printf( "INFO: UI system initialized (VM loading disabled).\n" );
+
+	// UI VM loading causes crashes, skip for now
+	// TODO: Fix UI VM compatibility issues
+	Com_Printf( "INFO: UI system initialized (VM loading disabled to prevent crashes)\n" );
 	cls.uiStarted = qtrue;
-	uivm = NULL; // No VM, but UI is marked as started
+	uivm = NULL; // No VM for now
+
+	// Check if intro should be skipped
+	cvar_t *skipIntro = Cvar_Get( "cl_skipIntro", "0", CVAR_ARCHIVE );
+	if ( skipIntro->integer ) {
+		Com_Printf( "Intro video skipped (cl_skipIntro = 1)\n" );
+		return;
+	}
+
+	// Automatically play intro video based on mod and available formats
+	const char *fs_game = Cvar_VariableString( "fs_game" );
+	const char *baseName = NULL;
+
+	// Determine base video name for this mod
+	if ( !fs_game || !fs_game[0] || Q_stricmp( fs_game, "base" ) == 0 ) {
+		// Base game - standard Quake 3 intro
+		baseName = "video/idlogo";
+	} else if ( Q_stricmp( fs_game, "openarena" ) == 0 ) {
+		// OpenArena - OpenArena specific intro
+		baseName = "video/openarena_intro";
+	} else if ( Q_stricmp( fs_game, "mymod" ) == 0 ) {
+		// MyMod - custom intro
+		baseName = "video/mymod_intro";
+	} else {
+		// Other mods - try generic intro
+		baseName = "video/intro";
+	}
+
+	// Try different formats in order of preference
+	const char *formats[] = { ".roq", ".webm", ".ogv", ".ogg" };
+	static char selectedVideoFile[256] = {0};
+	const char *videoFile = NULL;
+	int i;
+
+	for ( i = 0; i < 4; i++ ) {
+		char testFile[256];
+		Com_sprintf( testFile, sizeof(testFile), "%s%s", baseName, formats[i] );
+		if ( FS_FileExists( testFile ) ) {
+			Q_strncpyz( selectedVideoFile, testFile, sizeof(selectedVideoFile) );
+			videoFile = selectedVideoFile;
+			break;
+		}
+	}
+
+	// Fallback to any available intro file
+	if ( !videoFile ) {
+		const char *fallbackFiles[] = {
+			"video/intro.roq", "video/intro.webm", "video/intro.ogv",
+			"video/idlogo.roq", "video/idlogo.webm", "video/idlogo.ogv"
+		};
+
+		for ( i = 0; i < 6; i++ ) {
+			if ( FS_FileExists( fallbackFiles[i] ) ) {
+				videoFile = fallbackFiles[i];
+				break;
+			}
+		}
+	}
+
+	if ( videoFile ) {
+		Com_Printf( "Playing intro video: %s\n", videoFile );
+		Cbuf_ExecuteText( EXEC_NOW, va( "cinematic %s 2\n", videoFile ) ); // 2 = loop mode
+	} else {
+		Com_Printf( "No intro video found for mod '%s'\n", fs_game && fs_game[0] ? fs_game : "base" );
+	}
 }
 
 qboolean UI_usesUniqueCDKey( void ) {
