@@ -6,6 +6,18 @@ qboolean vk_rtx_build_tlas_real_inline(VkCommandBuffer cmd_buffer) {
   return qtrue;
 }
 
+void vk_rtx_bind_and_trace_raysKHR_from_main(VkCommandBuffer cmd_buffer, uint32_t width, uint32_t height) {
+  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: bind and trace from main (stub) width=%u height=%u cmd=%p\n", width, height, (void*)cmd_buffer);
+}
+
+void vk_rtx_trace_raysKHR(VkCommandBuffer cmd_buffer) {
+  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: trace raysKHR (stub) cmd=%p\n", (void*)cmd_buffer);
+}
+
+void vk_rtx_setup_sbt(VkCommandBuffer cmd_buffer) {
+  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: setup SBT (stub) cmd=%p\n", (void*)cmd_buffer);
+}
+
 qboolean vk_rtx_build_tlas_real_full(VkCommandBuffer cmd_buffer) {
   ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: TLAS real full build (stub) started\n");
   (void)cmd_buffer;
@@ -111,12 +123,24 @@ void vk_rtx_build_sbt_for_frame(VkCommandBuffer cmd_buffer) {
 #include <string.h>
 #include <vulkan/vulkan.h>
 #include <time.h>
+// Stub: create RT pipeline (Plan A groundwork)
+VkResult vk_rtx_create_pipeline(void) {
+  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: creating (stub) RT pipeline\n");
+  // In a real implementation, you'd create g_rt_pipeline and g_rt_pipeline_layout here.
+  g_rt_pipeline = VK_NULL_HANDLE;
+  g_rt_pipeline_layout = VK_NULL_HANDLE;
+  return VK_SUCCESS;
+}
 #ifdef VK_CALIBRATED_TIMESTAMPS_ENABLED
 static void VK_debug_calibrated_ts(void) {
   ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: calibrated timestamps are enabled\n");
 }
 #endif
 void vk_update_gpu_timing_ns(uint64_t gpu_ns);
+// Lightweight stub for calibrated timestamp initialization
+void VK_try_init_calibrated_timestamps(void) {
+  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: VK_try_init_calibrated_timestamps (stub)\n");
+}
 
 // Include Vulkan headers for ray tracing
 #ifdef USE_VULKAN

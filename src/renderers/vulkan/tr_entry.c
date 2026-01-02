@@ -49,6 +49,13 @@ static void check_safe_mode_flag(void) {
       ri.Printf(PRINT_ALL, "PLAN: Vulkan patch1 tiny surface enabled (guarded)\n");
     }
   }
+  // Full Plan A gate: enable full Vulkan patch1 surface when the flag is present
+  if (!g_vulkan_patch1_enabled && !g_vulkan_patch1_tiny_enabled) {
+    if (access("/home/tim/Desktop/idtech3/logs/enable_vulkan_patch1.flag", F_OK) == 0) {
+      g_vulkan_patch1_enabled = qtrue;
+      ri.Printf(PRINT_ALL, "PLAN: Vulkan patch1 surface wired (full) enabled\n");
+    }
+  }
 }
 
 

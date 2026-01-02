@@ -36,7 +36,14 @@ qboolean vk_rtx_build_tlas_real(VkCommandBuffer cmd_buffer);
 qboolean vk_rtx_build_tlas_real_full(VkCommandBuffer cmd_buffer);
 qboolean vk_rtx_build_blas_for_geometry_real(VkCommandBuffer cmd_buffer);
 void vk_rtx_create_sbt_buffer_full(void);
+VkResult vk_rtx_create_pipeline(void);
 void VK_try_init_calibrated_timestamps(void);
+
+// Plan A RTX groundwork (pipeline creation and per-frame hooks)
+VkResult vk_rtx_create_pipeline(void);
+void vk_rtx_bind_and_trace_raysKHR_from_main(VkCommandBuffer cmd_buffer, uint32_t width, uint32_t height);
+void vk_rtx_trace_raysKHR(VkCommandBuffer cmd_buffer);
+void vk_rtx_setup_sbt(VkCommandBuffer cmd_buffer);
 void vk_rtx_build_sbt_for_frame_full(VkCommandBuffer cmd_buffer);
 // Stub for hardware ray tracing kernel launch (will be fleshed out in future)
 void vk_rtx_trace_raysKHR(VkCommandBuffer cmd_buffer);

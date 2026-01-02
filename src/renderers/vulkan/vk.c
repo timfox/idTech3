@@ -97,6 +97,7 @@ void *Sys_LoadFunction(void *handle, const char *name) {
 #include "vk_surface_sprites.h"
 #include "vk_world_effects.h"
 #include "vk_frame.h"
+
 #include "vk_post_process.h"
 #ifdef USE_VULKAN_RAY_TRACING
 #include "vk_portal_lights.h"
@@ -8194,15 +8195,17 @@ qboolean vk_capture_screenmap( void )
 	// Vulkan allows UNDEFINED->any layout transition, but we'll get a validation warning.
 	// To be completely safe, we could check the actual layout, but that's expensive.
 	// Instead, we ensure the image is cleared before blitting, which handles uninitialized data.
-	// CRITICAL: Use UNDEFINED as oldLayout to handle first-use case safely.
-	// Vulkan spec allows UNDEFINED->any layout transition, which always works regardless
-	// of the actual current layout. If screenMap is actually in SHADER_READ_ONLY_OPTIMAL,
-	// this transition still works (Vulkan allows transitioning from UNDEFINED even if
-	// the image is in a different layout). This prevents VK_ERROR_DEVICE_LOST from
-	// layout mismatch errors.
-	dstBarrier.srcAccessMask = 0; // No previous access - UNDEFINED layout has no access requirements
-	dstBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-	dstBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED; // Safe for first use - always valid transition
+    // First-use protection: use PREINITIALIZED for the very first barrier, then fall back
+    // to UNDEFINED for subsequent uses (maintaining safer transitions).
+    static bool _g_cap_screenMap_first_use = true;
+    dstBarrier.srcAccessMask = 0; // No previous access - UNDEFINED layout has no access requirements
+    dstBarrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    if (_g_cap_screenMap_first_use) {
+      dstBarrier.oldLayout = VK_IMAGE_LAYOUT_PREINITIALIZED;
+      _g_cap_screenMap_first_use = false;
+    } else {
+      dstBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    }
 	dstBarrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 	dstBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	dstBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -8216,7 +8219,9 @@ qboolean vk_capture_screenmap( void )
 	// CRITICAL: The render pass has ended, so vk.color_image is transitioning to SHADER_READ_ONLY_OPTIMAL
 	// (the finalLayout). Our barrier transitions from SHADER_READ_ONLY_OPTIMAL to TRANSFER_SRC_OPTIMAL.
 	// The pipeline stages must wait for the render pass end transition to complete before our transition.
-	VkImageMemoryBarrier barriers[2] = { srcBarrier, dstBarrier };
+    VkImageMemoryBarrier barriers[2];
+    barriers[0] = srcBarrier;
+    barriers[1] = dstBarrier;
 	// Wait for COLOR_ATTACHMENT_OUTPUT_BIT to complete (render pass end transition) and
 	// FRAGMENT_SHADER_BIT (in case image is already sampled), then transition to TRANSFER_BIT.
 	qvkCmdPipelineBarrier(
