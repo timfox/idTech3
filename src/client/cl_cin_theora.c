@@ -110,17 +110,21 @@ qboolean Theora_Init(int handle) {
 	ogg_page ogg_page;
 	ogg_packet ogg_packet;
 
-	if (handle < 0 || handle >= MAX_VIDEO_HANDLES) return qfalse;
+	if (handle < 0 || handle >= MAX_VIDEO_HANDLES) {
+		Com_Printf("Theora_Init: invalid handle %d\n", handle);
+		return qfalse;
+	}
 	
 	// Allocate codec data
-		data = (theora_data_t *)Z_Malloc(sizeof(theora_data_t));
+	data = (theora_data_t *)Z_Malloc(sizeof(theora_data_t));
 	if (!data) {
 		Com_Printf("Theora_Init: failed to allocate memory\n");
 		return qfalse;
 	}
-	
+
 	Com_Memset(data, 0, sizeof(theora_data_t));
 	cinTable[handle].codecData = data;
+	Com_Printf("Theora_Init: allocated data at %p\n", (void*)data);
 	
 	// Initialize Ogg sync
 	ogg_sync_init(&data->ogg_sync);
@@ -163,12 +167,15 @@ qboolean Theora_Init(int handle) {
 	}
 	
 	// Create decoder
+	Com_Printf("Theora_Init: creating decoder with info pic_width=%d pic_height=%d\n",
+		data->theora_info.frame_width, data->theora_info.frame_height);
 	data->theora_decoder = th_decode_alloc(&data->theora_info, data->theora_setup);
 	if (!data->theora_decoder) {
 		Com_Printf("Theora_Init: failed to create decoder\n");
 		Theora_Shutdown(handle);
 		return qfalse;
 	}
+	Com_Printf("Theora_Init: decoder allocated at %p\n", (void*)data->theora_decoder);
 
 	// Set up video dimensions
 	cinTable[handle].CIN_WIDTH = data->theora_info.frame_width;
@@ -262,13 +269,19 @@ e_status Theora_Run(int handle) {
 	int ret;
 	int current_time;
 	int frame_delay;
-	
+
+	Com_Memset(&ycbcr, 0, sizeof(th_ycbcr_buffer));
+
 	if (handle < 0 || handle >= MAX_VIDEO_HANDLES) {
+		Com_Printf("Theora_Run: invalid handle %d\n", handle);
 		return FMV_EOF;
 	}
-	
+
 	data = (theora_data_t *)cinTable[handle].codecData;
+    Com_Printf("Theora_Run: data=%p initialized=%d decoder=%p\n",
+        (void*)data, data ? data->initialized : -1, (void*)(data ? data->theora_decoder : NULL));
 	if (!data || !data->initialized) {
+		Com_Printf("Theora_Run: data not initialized\n");
 		return FMV_EOF;
 	}
 	
@@ -303,8 +316,20 @@ e_status Theora_Run(int handle) {
 			ret = th_decode_packetin(data->theora_decoder, &ogg_packet, NULL);
 			if (ret == 0) {
 				// Got a frame!
+				if (!data->theora_decoder) {
+					Com_Printf("Theora_Run: decoder is NULL\n");
+					cinTable[handle].status = FMV_EOF;
+					return FMV_EOF;
+				}
 				th_decode_ycbcr_out(data->theora_decoder, ycbcr);
-				
+
+				// Validate YUV buffer
+				if (!ycbcr[0].data || !ycbcr[1].data || !ycbcr[2].data) {
+					Com_Printf("Theora_Run: invalid YUV buffer from decoder\n");
+					cinTable[handle].status = FMV_EOF;
+					return FMV_EOF;
+				}
+
 				// Convert YUV to RGB
 				if (cinTable[handle].buf) {
 					Theora_YUVtoRGB(ycbcr, cinTable[handle].buf, 
