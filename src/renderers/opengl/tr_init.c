@@ -640,7 +640,7 @@ static void InitOpenGL( void )
 	{
 		const char *err;
 
-		Com_Printf( "DEBUG: ri.GLimp_Init = %p\n", ri.GLimp_Init );
+		Com_Printf( "DEBUG: ri.GLimp_Init = %p\n", (void*)(uintptr_t)ri.GLimp_Init );
 		if ( !ri.GLimp_Init )
 		{
 			ri.Error( ERR_FATAL, "OpenGL interface is not initialized" );

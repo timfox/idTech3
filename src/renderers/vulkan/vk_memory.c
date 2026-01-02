@@ -6926,12 +6926,12 @@ static void vk_update_heatmap_texture(vk_heatmap_layer_t *layer) {
     if (!rgba_data) return;
 
     for (uint32_t i = 0; i < layer->width * layer->height; i++) {
+#ifdef USE_CIMGUI
         float intensity = 0.0f;
         if (layer->max_intensity > 0.0f) {
             intensity = (float)layer->data[i] / layer->max_intensity;
         }
 
-#ifdef USE_CIMGUI
         ImVec4 color = vk_get_heatmap_color(intensity, vk.heatmap_visualizer.gradient_colors);
         
         rgba_data[i*4 + 0] = (uint8_t)(color.x * 255.0f);
