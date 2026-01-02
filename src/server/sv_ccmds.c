@@ -21,6 +21,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "server.h"
+#include <stdlib.h>
+
+// External declarations
+extern qboolean com_fullyInitialized;
 
 /*
 ===============================================================================
@@ -256,7 +260,16 @@ static void SV_Map_f( void ) {
 	len = FS_FOpenFileRead( expanded, NULL, qfalse );
 	FS_RestorePure();
 	if ( len == -1 ) {
-		Com_Printf( "Can't find map %s\n", expanded );
+		Com_Printf( S_COLOR_RED "ERROR: Map '%s' not found. Available maps:\n", map );
+		Com_Printf( S_COLOR_YELLOW "  OpenArena: oa_dm1, oa_dm2, oa_dm3, oa_dm4, oa_dm5, oa_dm6, oa_dm7\n" );
+		Com_Printf( S_COLOR_YELLOW "  Quake 3: q3dm9, pro-q3dm13, pro-q3dm6 (and others in pk3 files)\n" );
+		Com_Printf( S_COLOR_CYAN "  Custom: Check your mod's maps directory\n" );
+
+		// In startup mode, exit cleanly instead of continuing with client initialization
+		if (!com_fullyInitialized) {
+			Com_Printf( S_COLOR_RED "Exiting due to missing map during startup.\n" );
+			exit(1);
+		}
 		return;
 	}
 

@@ -109,6 +109,9 @@ void vk_material_set_flags( uint32_t materialIndex, uint32_t flags );
 
 material_params_t *vk_material_get_params( uint32_t materialIndex );
 
+// RTX material binding
+uint32_t vk_material_system_find_or_create_index(const materialEntry_t* entry);
+
 // Scripting interface
 void vk_material_register_lua_functions( void *luaState );
 

@@ -589,6 +589,25 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	}
 #endif
 
+	// Validate that the map exists before trying to load it
+	{
+		char expanded[MAX_QPATH];
+		int len;
+
+		Com_sprintf( expanded, sizeof( expanded ), "maps/%s.bsp", mapname );
+		// bypass pure check so we can open downloaded map
+		FS_BypassPure();
+		len = FS_FOpenFileRead( expanded, NULL, qfalse );
+		FS_RestorePure();
+		if ( len == -1 ) {
+			Com_Printf( S_COLOR_RED "ERROR: Map '%s' not found. Available maps:\n", mapname );
+			Com_Printf( S_COLOR_YELLOW "  OpenArena: oa_dm1, oa_dm2, oa_dm3, oa_dm4, oa_dm5, oa_dm6, oa_dm7\n" );
+			Com_Printf( S_COLOR_YELLOW "  Quake 3: q3dm9, pro-q3dm13, pro-q3dm6 (and others in pk3 files)\n" );
+			Com_Printf( S_COLOR_CYAN "  Custom: Check your mod's maps directory\n" );
+			return;
+		}
+	}
+
 	Sys_SetStatus( "Loading map %s", mapname );
 	if ( !FS_StartupInProgress() ) {
 		Com_Printf( "DEBUG: SV_SpawnServer calling CM_LoadMap\n" );

@@ -127,6 +127,14 @@ extern cvar_t	*r_dlss_sharpening;
 extern cvar_t	*r_fsr_enable;
 extern cvar_t	*r_fsr_easu;
 extern cvar_t	*r_fsr_rcas;
+
+// RTX ray tracing CVARs
+extern cvar_t	*r_rtx_enable;
+extern cvar_t	*r_rtx_shadows;
+extern cvar_t	*r_rtx_reflections;
+extern cvar_t	*r_rtx_gi;
+extern cvar_t	*r_rtx_quality;
+extern cvar_t	*r_rtx_blasCompaction;
 extern cvar_t	*r_fsr_sharpness;
 
 extern cvar_t	*r_styleTransfer;

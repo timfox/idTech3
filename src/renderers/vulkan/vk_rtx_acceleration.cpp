@@ -1,4 +1,31 @@
 // Real TLAS skeleton stub for immediate wiring (will be replaced by full TLAS code)
+
+#include "tr_local.h"
+#include "vk_rtx_acceleration.h"
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <vulkan/vulkan.h>
+#include <time.h>
+
+// Get material index for this surface's shader
+uint32_t materialIndex = 0; // Default material
+if (surf->shader && vk.materialSystem.enabled) {
+    // Try to find material entry for this shader
+    const materialEntry_t* entry = vk_material_parser_find_entry(surf->shader->name);
+    if (entry) {
+        // Find or create material index for this entry
+        materialIndex = vk_material_system_find_or_create_index(entry);
+        ri.Printf(PRINT_DEVELOPER, "RTX: Surface %d uses material %d for shader '%s'\n",
+                 i, materialIndex, surf->shader->name);
+    }
+}
+
+// Store material index in instance data for RTX shaders
+// This will be used by gl_InstanceCustomIndexEXT in closest-hit shader
+surf->materialIndex = materialIndex;
+
 qboolean vk_rtx_build_tlas_real_inline(VkCommandBuffer cmd_buffer) {
   ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: TLAS real build inline stub\n");
   (void)cmd_buffer;
@@ -1280,6 +1307,76 @@ static VkResult vk_rtx_create_pipeline(void) {
 
     ri.Printf(PRINT_ALL, "Vulkan RTX: Ray tracing pipeline created successfully\n");
     return VK_SUCCESS;
+}
+
+/ Build BLAS for world geometry from BSP surfaces
+qboolean vk_rtx_build_blas_from_world(void) {
+    if (!g_rtx_accel_initialized) {
+        ri.Printf(PRINT_WARNING, "RTX: Acceleration structures not initialized, cannot build world BLAS\n");
+        return qfalse;
+    }
+
+    if (!tr.world || !tr.world->surfaces || tr.world->numsurfaces == 0) {
+        ri.Printf(PRINT_WARNING, "RTX: No world geometry available for BLAS building\n");
+        return qfalse;
+    }
+
+    ri.Printf(PRINT_ALL, "RTX: Building BLAS for %d world surfaces\n", tr.world->numsurfaces);
+
+    // Group surfaces by material/shader for efficient BLAS creation
+    // For now, create one BLAS per surface (can be optimized later)
+    int successful_blas = 0;
+
+    for (int i = 0; i < tr.world->numsurfaces; i++) {
+        msurface_t* surf = &tr.world->surfaces[i];
+
+        // Skip surfaces without geometry
+        if (!surf || surf->numIndexes == 0 || surf->numVerts == 0) {
+            continue;
+        }
+
+        // Get vertex and index buffers from VBO system
+        VkBuffer vertexBuffer = VK_NULL_HANDLE;
+        VkBuffer indexBuffer = VK_NULL_HANDLE;
+        VkDeviceSize vertexOffset = 0;
+        VkDeviceSize indexOffset = 0;
+        uint32_t vertexCount = surf->numVerts;
+        uint32_t indexCount = surf->numIndexes;
+
+        // For now, we'll need to get the buffers from the VBO system
+        // This is a simplified implementation - in practice we'd need to
+        // extract the relevant vertex/index data for this surface
+        if (vk_world.vbo && vk_world.ibo) {
+            vertexBuffer = vk_world.vbo->buffer;
+            indexBuffer = vk_world.ibo->buffer;
+
+            // Calculate offsets for this surface in the VBO
+            // This is a placeholder - would need proper VBO offset calculation
+            vertexOffset = surf->firstVert * sizeof(drawVert_t);
+            indexOffset = surf->firstIndex * sizeof(glIndex_t);
+        } else {
+            ri.Printf(PRINT_DEVELOPER, "RTX: Skipping surface %d - no VBO data available\n", i);
+            continue;
+        }
+
+        // Create BLAS for this surface
+        uint64_t blas_handle = vk_rtx_create_blas_for_geometry(
+            vertexBuffer, indexBuffer, vertexCount, indexCount,
+            sizeof(drawVert_t), va("world_surface_%d", i)
+        );
+
+        if (blas_handle != 0) {
+            successful_blas++;
+            ri.Printf(PRINT_DEVELOPER, "RTX: Created BLAS for surface %d (handle: %llu)\n", i, blas_handle);
+        } else {
+            ri.Printf(PRINT_WARNING, "RTX: Failed to create BLAS for surface %d\n", i);
+        }
+    }
+
+    ri.Printf(PRINT_ALL, "RTX: Successfully created %d BLAS from %d world surfaces\n",
+              successful_blas, tr.world->numsurfaces);
+
+    return (successful_blas > 0);
 }
 
 #ifdef __cplusplus

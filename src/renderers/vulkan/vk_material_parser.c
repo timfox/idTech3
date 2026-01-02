@@ -189,6 +189,38 @@ void vk_material_parser_load_files(void) {
 			  materialParser.numFiles > 0 ? materialParser.files[0].numEntries : 0);
 }
 
+// Load map-specific materials (Q2RTX-style override system)
+void vk_material_parser_load_map_materials(const char* mapname) {
+	char filename[MAX_QPATH];
+	int len;
+
+	if (!mapname || !*mapname) {
+		return;
+	}
+
+	// Try to load <mapname>.mat file
+	Com_sprintf(filename, sizeof(filename), "%s.mat", mapname);
+
+	len = ri.FS_ReadFile(filename, NULL, qfalse);
+	if (len > 0) {
+		// Map-specific material file exists, load it
+		if (materialParser.numFiles < MAX_MATERIAL_FILES) {
+			Q_strncpyz(materialParser.files[materialParser.numFiles].filename, filename,
+					   sizeof(materialParser.files[materialParser.numFiles].filename));
+			parse_material_file(&materialParser.files[materialParser.numFiles]);
+			materialParser.numFiles++;
+
+			ri.Printf(PRINT_DEVELOPER, "Loaded map-specific material file: %s (%d entries)\n",
+					  filename, materialParser.files[materialParser.numFiles-1].numEntries);
+		} else {
+			ri.Printf(PRINT_WARNING, "Cannot load map-specific material file %s: too many material files\n", filename);
+		}
+	} else {
+		// Map-specific material file doesn't exist, which is fine
+		ri.Printf(PRINT_DEVELOPER, "No map-specific material file found: %s\n", filename);
+	}
+}
+
 // Find material entry by texture name
 const materialEntry_t* vk_material_parser_find_entry(const char* textureName) {
     for (int fileIdx = 0; fileIdx < materialParser.numFiles; fileIdx++) {

@@ -1008,6 +1008,9 @@ typedef struct msurface_s {
 	int					lightCount;		// if == tr.lightCount, already added to the litsurf list for the current light
 #endif // USE_PMLIGHT
 	surfaceType_t		*data;			// any of srf*_t
+
+	// RTX material binding
+	uint32_t			materialIndex;	// Material index for RTX shader access
 } msurface_t;
 
 

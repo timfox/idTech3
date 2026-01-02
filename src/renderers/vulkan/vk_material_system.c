@@ -623,5 +623,28 @@ void vk_material_register_lua_functions( void *luaState )
 #endif // USE_LUA
 }
 
+uint32_t vk_material_system_find_or_create_index(const materialEntry_t* entry) {
+    if (!entry || !vk.materialSystem.enabled || !vk.materialSystem.initialized) {
+        return 0; // Default material
+    }
+
+    // For now, create a simple hash-based index
+    // In a full implementation, this would check for existing materials
+    uint32_t hash = 0;
+    const char* str = entry->textureNames;
+    while (*str) {
+        hash = hash * 31 + *str++;
+    }
+
+    // Use hash to get an index within our material capacity
+    uint32_t index = hash % vk.materialSystem.materialCapacity;
+
+    // Apply material properties to this index
+    vk_material_parser_apply_to_material(entry, va("rtx_material_%u", index),
+                                       &materialParams[index]);
+
+    return index;
+}
+
 #endif // USE_VULKAN
 

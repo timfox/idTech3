@@ -2808,6 +2808,12 @@ void RE_LoadWorldMap( const char *name ) {
 	R_LoadEntities( &header->lumps[LUMP_ENTITIES] );
 	R_LoadLightGrid( &header->lumps[LUMP_LIGHTGRID] );
 
+		// Load map-specific materials (Q2RTX-style override system)
+#ifdef USE_VULKAN
+vk_material_parser_load_map_materials(s_worldData.baseName);
+#endif
+
+
 #ifdef USE_VK_PBR
 	vk_generate_light_directions();
 
@@ -2832,6 +2838,13 @@ void RE_LoadWorldMap( const char *name ) {
 
 #ifdef USE_VBO
 	R_BuildWorldVBO( s_worldData.surfaces, s_worldData.numsurfaces );
+#endif
+
+// Build RTX acceleration structures for world geometry
+#ifdef USE_VULKAN_RAY_TRACING
+if (vk.rayTracingSupported && vk_rtx_acceleration_init()) {
+	vk_rtx_build_blas_from_world();
+}
 #endif
 
 	// Load portal lights for this map

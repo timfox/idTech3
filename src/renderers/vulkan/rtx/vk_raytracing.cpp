@@ -10,6 +10,9 @@ Based on Quake-III-Arena-R reference implementation
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 #include "vk.h"
+#include "vk_material_system.h"
+#include "vk_material_parser.h"
+#include "vk_rtx_acceleration.h"
 #include "tr_math_optimized.h"
 #include "vk_framebuffer.h"
 

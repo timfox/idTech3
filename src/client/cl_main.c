@@ -3945,6 +3945,21 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 
 	re = *ret;
 
+	// Validate that the renderer was properly initialized
+	if ( !re.GetConfig || !re.BeginFrame || !re.EndFrame ) {
+		Com_Printf( S_COLOR_RED "ERROR: Renderer initialization failed - graphics subsystem unavailable\n" );
+		Com_Printf( S_COLOR_YELLOW "This can happen in headless environments or when graphics drivers are missing\n" );
+		Com_Printf( S_COLOR_YELLOW "Current environment: DISPLAY=%s, WAYLAND_DISPLAY=%s\n",
+		           getenv("DISPLAY") ? getenv("DISPLAY") : "not set",
+		           getenv("WAYLAND_DISPLAY") ? getenv("WAYLAND_DISPLAY") : "not set" );
+		Com_Printf( S_COLOR_CYAN "Solutions:\n" );
+		Com_Printf( S_COLOR_CYAN "  1. Run on a system with graphics support\n" );
+		Com_Printf( S_COLOR_CYAN "  2. Use X11 forwarding: ssh -X hostname\n" );
+		Com_Printf( S_COLOR_CYAN "  3. Use VNC or similar remote desktop\n" );
+		Com_Printf( S_COLOR_CYAN "  4. For server-only: use idtech3.server.x86_64\n" );
+		Com_Error( ERR_FATAL, "Graphics initialization failed - no suitable display found" );
+	}
+
 	// unpause so the cgame definitely gets a snapshot and renders a frame
 	Cvar_Set( "cl_paused", "0" );
 }

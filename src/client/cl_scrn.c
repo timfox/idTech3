@@ -629,6 +629,13 @@ void SCR_UpdateScreen( void ) {
 	if ( !scr_initialized )
 		return; // not initialized yet
 
+	// Check if renderer is properly initialized before using it
+	// A properly initialized renderer should have essential function pointers
+	if ( !re.GetConfig || !re.BeginFrame || !re.EndFrame || !re.ThrottleBackend ) {
+		// Renderer not fully initialized yet or failed to initialize, skip rendering
+		return;
+	}
+
 	if ( framecount == cls.framecount ) {
 		int ms = Sys_Milliseconds();
 		if ( next_frametime && ms - next_frametime < 0 ) {

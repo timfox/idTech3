@@ -68,6 +68,7 @@ typedef struct {
 void vk_material_parser_init(void);
 void vk_material_parser_shutdown(void);
 void vk_material_parser_load_files(void);
+void vk_material_parser_load_map_materials(const char* mapname);
 const materialEntry_t* vk_material_parser_find_entry(const char* textureName);
 void vk_material_parser_apply_to_material(const materialEntry_t* entry, const char* materialName, material_params_t* params);
 
