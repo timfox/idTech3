@@ -631,7 +631,11 @@ void SCR_UpdateScreen( void ) {
 
 	// Check if renderer interface is available and properly initialized
 	// This prevents crashes during early startup before CL_InitRef completes
-	if ( !re.GetConfig || !re.BeginFrame || !re.EndFrame ) {
+	extern qboolean re_initialized;
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: SCR_UpdateScreen called, re_initialized=%d\n", re_initialized );
+	}
+	if ( !re_initialized || !re.GetConfig || !re.BeginFrame || !re.EndFrame ) {
 		// Renderer not fully initialized yet or failed to initialize, skip rendering
 		if ( !FS_StartupInProgress() ) {
 			Com_Printf( "DEBUG: SCR_UpdateScreen - renderer not ready, skipping\n" );

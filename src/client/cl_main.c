@@ -136,6 +136,14 @@ refexport_t	re;
 static void	*rendererLib;
 #endif
 
+// Flag to track if renderer has been initialized
+qboolean re_initialized = qfalse;
+
+// Function to check if renderer is initialized
+qboolean CL_IsRendererInitialized(void) {
+    return re_initialized;
+}
+
 static ping_t cl_pinglist[MAX_PINGREQUESTS];
 
 typedef struct serverStatus_s
@@ -1115,7 +1123,13 @@ void CL_MapLoading( void ) {
 	if ( !FS_StartupInProgress() ) {
 		Com_Printf( "DEBUG: CL_MapLoading called\n" );
 	}
-	if ( com_dedicated->integer ) {
+
+	// Debug: Check if basic systems are initialized
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: CL_MapLoading - checking cvars\n" );
+	}
+
+	if ( com_dedicated && com_dedicated->integer ) {
 		if ( !FS_StartupInProgress() ) {
 			Com_Printf( "DEBUG: CL_MapLoading returning early - dedicated server\n" );
 		}
@@ -1124,17 +1138,26 @@ void CL_MapLoading( void ) {
 		return;
 	}
 
-	if ( !com_cl_running->integer ) {
+	if ( com_cl_running && !com_cl_running->integer ) {
 		if ( !FS_StartupInProgress() ) {
 			Com_Printf( "DEBUG: CL_MapLoading returning early - client not running\n" );
 		}
 		return;
 	}
 
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: CL_MapLoading - about to call Con_Close\n" );
+	}
 	Con_Close();
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: CL_MapLoading - Con_Close done, calling Key_SetCatcher\n" );
+	}
 	Key_SetCatcher( 0 );
 
 	// if we are already connected to the local host, stay connected
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: CL_MapLoading - about to check cls.state (value: %d)\n", cls.state );
+	}
 	if ( cls.state >= CA_CONNECTED && !Q_stricmp( cls.servername, "localhost" ) ) {
 		cls.state = CA_CONNECTED;		// so the connect screen is drawn
 		Com_Memset( cls.updateInfoString, 0, sizeof( cls.updateInfoString ) );
@@ -1145,17 +1168,61 @@ void CL_MapLoading( void ) {
 		SCR_UpdateScreen();
 	} else {
 		// clear nextmap so the cinematic shutdown doesn't execute it
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: CL_MapLoading - entering else branch\n" );
+		}
 		Cvar_Set( "nextmap", "" );
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: CL_MapLoading - Cvar_Set done\n" );
+		}
 		CL_Disconnect( qtrue );
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: CL_MapLoading - CL_Disconnect done\n" );
+		}
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: CL_MapLoading - about to set cls.servername\n" );
+		}
 		Q_strncpyz( cls.servername, "localhost", sizeof(cls.servername) );
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: CL_MapLoading - cls.servername set\n" );
+		}
 		cls.state = CA_CHALLENGING;		// so the connect screen is drawn
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: CL_MapLoading - cls.state set\n" );
+		}
 		Key_SetCatcher( 0 );
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: CL_MapLoading - Key_SetCatcher done\n" );
+		}
 		cls.framecount++;
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: CL_MapLoading - cls.framecount incremented\n" );
+		}
 		SCR_UpdateScreen();
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: CL_MapLoading - SCR_UpdateScreen done\n" );
+		}
 		clc.connectTime = -RETRANSMIT_TIMEOUT;
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: CL_MapLoading - clc.connectTime set\n" );
+		}
 		NET_StringToAdr( cls.servername, &clc.serverAddress, NA_UNSPEC );
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: CL_MapLoading - NET_StringToAdr done\n" );
+		}
 		// we don't need a challenge on the localhost
-		CL_CheckForResend();
+		// For local servers, don't try to connect via network
+		extern cvar_t *com_sv_running;
+		if ( !com_sv_running || !com_sv_running->integer ) {
+			CL_CheckForResend();
+		} else {
+			if ( !FS_StartupInProgress() ) {
+				Com_Printf( "DEBUG: Skipping CL_CheckForResend for local server\n" );
+			}
+		}
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: CL_MapLoading - CL_CheckForResend done\n" );
+		}
 	}
 	if ( !FS_StartupInProgress() ) {
 		Com_Printf( "DEBUG: CL_MapLoading completed\n" );
@@ -3944,6 +4011,7 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 	}
 
 	re = *ret;
+	re_initialized = qtrue;
 
 	// Validate that the renderer was properly initialized
 	if ( !re.GetConfig || !re.BeginFrame || !re.EndFrame ) {

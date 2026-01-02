@@ -453,11 +453,23 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 
 	// Only print if filesystem is initialized (not during FS_Restart)
 	if ( !FS_StartupInProgress() ) {
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: About to print server initialization\n" );
+		}
 		Com_Printf( "------ Server Initialization ------\n" );
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: About to print server name: %s\n", mapname ? mapname : "NULL" );
+		}
 		Com_Printf( "Server: %s\n", mapname );
 	}
 
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: About to call Sys_SetStatus\n" );
+	}
 	Sys_SetStatus( "Initializing server..." );
+	if ( !FS_StartupInProgress() ) {
+		Com_Printf( "DEBUG: Sys_SetStatus completed\n" );
+	}
 
 #ifndef DEDICATED
 	// if not running a dedicated server CL_MapLoading will connect the client to the server

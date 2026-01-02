@@ -553,6 +553,9 @@ void	SCR_Init( void );
 void	SCR_Done( void );
 void	SCR_UpdateScreen( void );
 
+// Renderer initialization check
+qboolean CL_IsRendererInitialized( void );
+
 void	SCR_DebugGraph( float value );
 
 int		SCR_GetBigStringWidth( const char *str );	// returns in virtual 640x480 coordinates
