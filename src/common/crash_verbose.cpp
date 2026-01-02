@@ -4,13 +4,12 @@
 #include <stdlib.h>
 #include <time.h>
 
-// Path to crash report; adjust if you relocate the repo
-// Crash report path; relocate if needed
-#define CRASH_REPORT_PATH "/home/tim/Desktop/idtech3/logs/crash_report.txt"
+// Path to crash report; uses relative path from working directory
+#define CRASH_REPORT_PATH "logs/crash_report.txt"
 // Additional verbose crash log location
-#define CRASH_VERBOSE_LOG "/home/tim/Desktop/idtech3/logs/crash_verbose.log"
-// Relocated crash logs directory
-#define CRASH_LOG_DIR "/home/tim/Desktop/idtech3/logs"
+#define CRASH_VERBOSE_LOG "logs/crash_verbose.log"
+// Crash logs directory
+#define CRASH_LOG_DIR "logs"
 
 void append_verbose_crash_context(void) {
     void* buffer[256];
@@ -19,6 +18,12 @@ void append_verbose_crash_context(void) {
 
     char** strings = backtrace_symbols(buffer, nptrs);
     if (!strings) return;
+
+    // Ensure logs directory exists
+    struct stat st = {0};
+    if (stat(CRASH_LOG_DIR, &st) == -1) {
+        mkdir(CRASH_LOG_DIR, 0755);
+    }
 
     // Persist to primary crash report
     FILE* f = fopen(CRASH_REPORT_PATH, "a");
@@ -52,7 +57,7 @@ void append_verbose_crash_context(void) {
         fclose(f2);
     }
     // Also create a lightweight relocation note file for automation
-    FILE* f3 = fopen("/home/tim/Desktop/idtech3/logs/collected_crash_report.txt", "a");
+    FILE* f3 = fopen("logs/collected_crash_report.txt", "a");
     if (f3) {
         time_t now3 = time(NULL);
         fprintf(f3, "Crash at %ld (verbose log updated)\n", now3);

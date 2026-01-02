@@ -208,6 +208,8 @@ qboolean vk_create_swapchain(void) {
     for (size_t i = 0; i < vk.swapchain_image_count; i++) {
         VkImageViewCreateInfo viewInfo = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+            .pNext = nullptr,
+            .flags = 0,
             .image = swapchain_images[i],
             .viewType = VK_IMAGE_VIEW_TYPE_2D,
             .format = vk_present_format.format,
@@ -238,7 +240,9 @@ qboolean vk_create_swapchain(void) {
     rendering_finished_semaphores.resize(vk.swapchain_image_count);
 
     VkSemaphoreCreateInfo semaphoreInfo = {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+        .pNext = nullptr,
+        .flags = 0
     };
 
     for (size_t i = 0; i < vk.swapchain_image_count; i++) {
@@ -326,11 +330,13 @@ qboolean vk_present_image(void) {
 
     VkPresentInfoKHR presentInfo = {
         .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+        .pNext = nullptr,
         .waitSemaphoreCount = 1,
         .pWaitSemaphores = &vk.rendering_finished,
         .swapchainCount = 1,
         .pSwapchains = &vk.swapchain,
-        .pImageIndices = &vk.current_swapchain_image_index
+        .pImageIndices = &vk.current_swapchain_image_index,
+        .pResults = nullptr
     };
 
     VkResult result = qvkQueuePresentKHR(vk.queue, &presentInfo);

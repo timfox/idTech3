@@ -227,6 +227,12 @@ static void Crash_WriteReport(const crash_info_t *info, const char *reason)
     char time_str[64];
     int i;
 
+    // Ensure logs directory exists
+    struct stat st = {0};
+    if (stat(CRASH_LOG_DIR, &st) == -1) {
+        mkdir(CRASH_LOG_DIR, 0755);
+    }
+
     f = fopen(CRASH_REPORT_FILENAME, "w");
     if (!f) {
         // Try writing to stderr as fallback
@@ -253,6 +259,37 @@ static void Crash_WriteReport(const crash_info_t *info, const char *reason)
         fprintf(f, "Fault Address: %p\n", info->fault_address);
     }
 
+    // Add more verbose system information
+    fprintf(f, "\n--- System Information ---\n");
+#ifdef __linux__
+    fprintf(f, "Platform: Linux\n");
+#elif defined(__APPLE__)
+    fprintf(f, "Platform: macOS\n");
+#elif defined(_WIN32)
+    fprintf(f, "Platform: Windows\n");
+#else
+    fprintf(f, "Platform: Unknown\n");
+#endif
+
+    // Add mod loading context if available
+    if (g_mod_loading_name[0]) {
+        fprintf(f, "\n--- Mod Loading Context ---\n");
+        fprintf(f, "Mod Name: %s\n", g_mod_loading_name);
+        fprintf(f, "Operation: %s\n", g_mod_loading_operation);
+    }
+
+    // Add environment info
+    fprintf(f, "\n--- Environment ---\n");
+    char *cmdline = getenv("_");
+    if (cmdline) {
+        fprintf(f, "Executable: %s\n", cmdline);
+    }
+    char *cwd = getcwd(NULL, 0);
+    if (cwd) {
+        fprintf(f, "Working Directory: %s\n", cwd);
+        free(cwd);
+    }
+
     // Stack trace
     fprintf(f, "\n--- Stack Trace ---\n");
     if (info->stack_frame_count > 0) {
@@ -260,9 +297,14 @@ static void Crash_WriteReport(const crash_info_t *info, const char *reason)
         char **symbols = backtrace_symbols(info->stack_frames, info->stack_frame_count);
         if (symbols) {
             for (i = 0; i < info->stack_frame_count; i++) {
-                fprintf(f, "  [%d] %s\n", i, symbols[i]);
+                fprintf(f, "  [%d] %p %s\n", i, info->stack_frames[i], symbols[i]);
             }
             free(symbols);
+        } else {
+            fprintf(f, "  (Failed to get symbol names)\n");
+            for (i = 0; i < info->stack_frame_count; i++) {
+                fprintf(f, "  [%d] %p\n", i, info->stack_frames[i]);
+            }
         }
 #elif defined(_WIN32)
         for (i = 0; i < info->stack_frame_count; i++) {
@@ -272,6 +314,51 @@ static void Crash_WriteReport(const crash_info_t *info, const char *reason)
     } else {
         fprintf(f, "  (Stack trace unavailable)\n");
     }
+
+    // Log ring buffer
+    fprintf(f, "\n--- Last %d bytes of log ---\n", CRASH_LOG_RING_SIZE);
+    if (info->log_ring_buffer[0]) {
+        // Find the start of the ring buffer (wrap around point)
+        int start_pos = info->log_ring_pos;
+        for (i = 0; i < CRASH_LOG_RING_SIZE; i++) {
+            char c = info->log_ring_buffer[(start_pos + i) % CRASH_LOG_RING_SIZE];
+            if (c == '\0') break;
+            fputc(c, f);
+        }
+        fprintf(f, "\n");
+    } else {
+        fprintf(f, "(No log data available)\n");
+    }
+
+    // Memory information
+    fprintf(f, "\n--- Memory Information ---\n");
+    // Try to get memory usage if available
+    FILE *meminfo = fopen("/proc/meminfo", "r");
+    if (meminfo) {
+        char line[256];
+        while (fgets(line, sizeof(line), meminfo)) {
+            if (strstr(line, "MemTotal") || strstr(line, "MemFree") ||
+                strstr(line, "MemAvailable")) {
+                fprintf(f, "%s", line);
+            }
+        }
+        fclose(meminfo);
+    } else {
+        fprintf(f, "(Memory information unavailable)\n");
+    }
+
+    // Recent filesystem operations (if tracked)
+    fprintf(f, "\n--- Recent Operations ---\n");
+    fprintf(f, "Command Line: ");
+    // Try to reconstruct command line from environment
+    extern char **environ;
+    for (i = 0; environ[i]; i++) {
+        if (strstr(environ[i], "PWD=")) continue;  // Skip PWD
+        if (strlen(environ[i]) < 256) {  // Safety check
+            fprintf(f, "%s ", environ[i]);
+        }
+    }
+    fprintf(f, "\n");
 
     // Log ring buffer
     fprintf(f, "\n--- Last %d bytes of log ---\n", CRASH_LOG_RING_SIZE);

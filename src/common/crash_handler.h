@@ -27,7 +27,10 @@ extern "C" {
 #define CRASH_MAX_STACK_FRAMES  32
 
 // Crash report file
-#define CRASH_REPORT_FILENAME   "crash_report.txt"
+#define CRASH_REPORT_FILENAME   "logs/crash_report.txt"
+
+// Ensure logs directory exists
+#define CRASH_LOG_DIR           "logs"
 
 // Safe mode flag file
 #define SAFE_MODE_FLAG_FILE     "safe_mode.flag"

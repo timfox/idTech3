@@ -629,10 +629,13 @@ void SCR_UpdateScreen( void ) {
 	if ( !scr_initialized )
 		return; // not initialized yet
 
-	// Check if renderer is properly initialized before using it
-	// A properly initialized renderer should have essential function pointers
-	if ( !re.GetConfig || !re.BeginFrame || !re.EndFrame || !re.ThrottleBackend ) {
+	// Check if renderer interface is available and properly initialized
+	// This prevents crashes during early startup before CL_InitRef completes
+	if ( !re.GetConfig || !re.BeginFrame || !re.EndFrame ) {
 		// Renderer not fully initialized yet or failed to initialize, skip rendering
+		if ( !FS_StartupInProgress() ) {
+			Com_Printf( "DEBUG: SCR_UpdateScreen - renderer not ready, skipping\n" );
+		}
 		return;
 	}
 
