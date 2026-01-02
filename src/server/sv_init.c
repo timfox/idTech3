@@ -443,52 +443,42 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	const char	*p;
 
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: SV_SpawnServer called with mapname=%s killBots=%d\n", mapname, killBots );
 	}
 	// shut down the existing game if it is running
 	SV_ShutdownGameProgs();
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: SV_SpawnServer SV_ShutdownGameProgs completed\n" );
 	}
 
 	// Only print if filesystem is initialized (not during FS_Restart)
 	if ( !FS_StartupInProgress() ) {
 		if ( !FS_StartupInProgress() ) {
-			Com_Printf( "DEBUG: About to print server initialization\n" );
 		}
 		Com_Printf( "------ Server Initialization ------\n" );
 		if ( !FS_StartupInProgress() ) {
-			Com_Printf( "DEBUG: About to print server name: %s\n", mapname ? mapname : "NULL" );
 		}
 		Com_Printf( "Server: %s\n", mapname );
 	}
 
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: About to call Sys_SetStatus\n" );
 	}
 	Sys_SetStatus( "Initializing server..." );
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: Sys_SetStatus completed\n" );
 	}
 
 #ifndef DEDICATED
 	// if not running a dedicated server CL_MapLoading will connect the client to the server
 	// also print some status stuff
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: SV_SpawnServer calling CL_MapLoading\n" );
 	}
 	CL_MapLoading();
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: SV_SpawnServer CL_MapLoading completed\n" );
 	}
 
 	// make sure all the client stuff is unloaded
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: SV_SpawnServer calling CL_ShutdownAll\n" );
 	}
 	CL_ShutdownAll();
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: SV_SpawnServer CL_ShutdownAll completed\n" );
 	}
 #endif
 
@@ -583,7 +573,6 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	FS_Restart( sv.checksumFeed );
 	// Debug output after FS_Restart completes
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: SV_SpawnServer FS_Restart completed\n" );
 	}
 
 #ifndef DEDICATED
@@ -592,11 +581,9 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	// CL_MapLoading already shut down client systems, now restart them
 	if ( com_cl_running && com_cl_running->integer ) {
 		if ( !FS_StartupInProgress() ) {
-			Com_Printf( "DEBUG: SV_SpawnServer calling CL_StartHunkUsers\n" );
 		}
 		CL_StartHunkUsers();
 		if ( !FS_StartupInProgress() ) {
-			Com_Printf( "DEBUG: SV_SpawnServer CL_StartHunkUsers completed\n" );
 		}
 	}
 #endif
@@ -622,11 +609,9 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 
 	Sys_SetStatus( "Loading map %s", mapname );
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: SV_SpawnServer calling CM_LoadMap\n" );
 	}
 	CM_LoadMap( va( "maps/%s.bsp", mapname ), qfalse, &checksum );
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: SV_SpawnServer CM_LoadMap completed\n" );
 	}
 
 	// set serverinfo visible name
@@ -652,11 +637,9 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 
 	// load and spawn all other entities
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: SV_SpawnServer calling SV_InitGameProgs\n" );
 	}
 	SV_InitGameProgs();
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: SV_SpawnServer SV_InitGameProgs completed\n" );
 	}
 
 	// don't allow a map_restart if game is modified

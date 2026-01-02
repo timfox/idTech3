@@ -30,7 +30,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ** QGL_Shutdown() - unloads libraries, NULLs function pointers
 */
 
-#ifdef USE_OPENGL_API
+#ifdef USE_OPENGL
 
 #include "../common/q_shared.h"
 #include "../common/qcommon.h"

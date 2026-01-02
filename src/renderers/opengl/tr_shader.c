@@ -3604,12 +3604,30 @@ way to ask for different implicit lighting modes (vertex, lightmap, etc)
 ====================
 */
 qhandle_t RE_RegisterShader( const char *name ) {
-	// TEMPORARY: Return default shader to avoid GeneratePermanentShader crashes
-	if (!tr.defaultShader) {
-		ri.Printf(PRINT_ERROR, "ERROR: tr.defaultShader is NULL in OpenGL renderer\n");
+	shader_t	*sh;
+
+	if ( !name ) {
+		ri.Printf( PRINT_ALL, "NULL shader\n" );
 		return 0;
 	}
-	return tr.defaultShader->index;
+
+	if ( strlen( name ) >= MAX_QPATH ) {
+		ri.Printf( PRINT_ALL, "Shader name exceeds MAX_QPATH\n" );
+		return 0;
+	}
+
+	sh = R_FindShader( name, LIGHTMAP_2D, qtrue );
+
+	// we want to return 0 if the shader failed to
+	// load for some reason, but R_FindShader should
+	// still keep a name allocated for it, so if
+	// something calls RE_RegisterShader again with
+	// the same name, we don't try looking for it again
+	if ( sh->defaultShader ) {
+		return 0;
+	}
+
+	return sh->index;
 }
 
 

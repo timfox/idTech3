@@ -43,6 +43,11 @@ cvar_t	*cl_motd;
 static cvar_t *cl_renderer;
 #endif
 
+// Constants
+#define MAX_SERVERSPERPACKET	256
+#define VID_RESTART_THRESHOLD	500
+#define SERVER_HASH_SIZE	1024
+
 // Local forward declarations
 static void CL_InitRenderer( void );
 
@@ -1121,17 +1126,14 @@ memory on the hunk from cgame, ui, and renderer
 */
 void CL_MapLoading( void ) {
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: CL_MapLoading called\n" );
 	}
 
 	// Debug: Check if basic systems are initialized
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: CL_MapLoading - checking cvars\n" );
 	}
 
 	if ( com_dedicated && com_dedicated->integer ) {
 		if ( !FS_StartupInProgress() ) {
-			Com_Printf( "DEBUG: CL_MapLoading returning early - dedicated server\n" );
 		}
 		cls.state = CA_DISCONNECTED;
 		Key_SetCatcher( KEYCATCH_CONSOLE );
@@ -1140,75 +1142,60 @@ void CL_MapLoading( void ) {
 
 	if ( com_cl_running && !com_cl_running->integer ) {
 		if ( !FS_StartupInProgress() ) {
-			Com_Printf( "DEBUG: CL_MapLoading returning early - client not running\n" );
 		}
 		return;
 	}
 
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: CL_MapLoading - about to call Con_Close\n" );
 	}
 	Con_Close();
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: CL_MapLoading - Con_Close done, calling Key_SetCatcher\n" );
 	}
 	Key_SetCatcher( 0 );
 
 	// if we are already connected to the local host, stay connected
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: CL_MapLoading - about to check cls.state (value: %d)\n", cls.state );
 	}
 	if ( cls.state >= CA_CONNECTED && !Q_stricmp( cls.servername, "localhost" ) ) {
 		cls.state = CA_CONNECTED;		// so the connect screen is drawn
 		Com_Memset( cls.updateInfoString, 0, sizeof( cls.updateInfoString ) );
 		Com_Memset( clc.serverMessage, 0, sizeof( clc.serverMessage ) );
 		Com_Memset( &cl.gameState, 0, sizeof( cl.gameState ) );
-		clc.lastPacketSentTime = cls.realtime - 9999;  // send packet immediately
+		clc.lastPacketSentTime = cls.realtime - RETRANSMIT_TIMEOUT;  // send packet immediately
 		cls.framecount++;
 		SCR_UpdateScreen();
 	} else {
 		// clear nextmap so the cinematic shutdown doesn't execute it
 		if ( !FS_StartupInProgress() ) {
-			Com_Printf( "DEBUG: CL_MapLoading - entering else branch\n" );
 		}
 		Cvar_Set( "nextmap", "" );
 		if ( !FS_StartupInProgress() ) {
-			Com_Printf( "DEBUG: CL_MapLoading - Cvar_Set done\n" );
 		}
 		CL_Disconnect( qtrue );
 		if ( !FS_StartupInProgress() ) {
-			Com_Printf( "DEBUG: CL_MapLoading - CL_Disconnect done\n" );
 		}
 		if ( !FS_StartupInProgress() ) {
-			Com_Printf( "DEBUG: CL_MapLoading - about to set cls.servername\n" );
 		}
 		Q_strncpyz( cls.servername, "localhost", sizeof(cls.servername) );
 		if ( !FS_StartupInProgress() ) {
-			Com_Printf( "DEBUG: CL_MapLoading - cls.servername set\n" );
 		}
 		cls.state = CA_CHALLENGING;		// so the connect screen is drawn
 		if ( !FS_StartupInProgress() ) {
-			Com_Printf( "DEBUG: CL_MapLoading - cls.state set\n" );
 		}
 		Key_SetCatcher( 0 );
 		if ( !FS_StartupInProgress() ) {
-			Com_Printf( "DEBUG: CL_MapLoading - Key_SetCatcher done\n" );
 		}
 		cls.framecount++;
 		if ( !FS_StartupInProgress() ) {
-			Com_Printf( "DEBUG: CL_MapLoading - cls.framecount incremented\n" );
 		}
 		SCR_UpdateScreen();
 		if ( !FS_StartupInProgress() ) {
-			Com_Printf( "DEBUG: CL_MapLoading - SCR_UpdateScreen done\n" );
 		}
 		clc.connectTime = -RETRANSMIT_TIMEOUT;
 		if ( !FS_StartupInProgress() ) {
-			Com_Printf( "DEBUG: CL_MapLoading - clc.connectTime set\n" );
 		}
 		NET_StringToAdr( cls.servername, &clc.serverAddress, NA_UNSPEC );
 		if ( !FS_StartupInProgress() ) {
-			Com_Printf( "DEBUG: CL_MapLoading - NET_StringToAdr done\n" );
 		}
 		// we don't need a challenge on the localhost
 		// For local servers, don't try to connect via network
@@ -1217,15 +1204,12 @@ void CL_MapLoading( void ) {
 			CL_CheckForResend();
 		} else {
 			if ( !FS_StartupInProgress() ) {
-				Com_Printf( "DEBUG: Skipping CL_CheckForResend for local server\n" );
 			}
 		}
 		if ( !FS_StartupInProgress() ) {
-			Com_Printf( "DEBUG: CL_MapLoading - CL_CheckForResend done\n" );
 		}
 	}
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: CL_MapLoading completed\n" );
 	}
 }
 
@@ -1770,7 +1754,7 @@ static void CL_Connect_f( void ) {
 	}
 
 	Key_SetCatcher( 0 );
-	clc.connectTime = -99999;	// CL_CheckForResend() will fire immediately
+	clc.connectTime = -RETRANSMIT_TIMEOUT;	// CL_CheckForResend() will fire immediately
 	clc.connectPacketCount = 0;
 
 	Cvar_Set( "cl_reconnectArgs", args );
@@ -1966,7 +1950,7 @@ static void CL_Vid_Restart_f( void ) {
 		CL_Vid_Restart( REF_KEEP_WINDOW );
 	} else {
 		if ( cls.lastVidRestart ) {
-			if ( abs( cls.lastVidRestart - Sys_Milliseconds() ) < 500 ) {
+			if ( abs( cls.lastVidRestart - Sys_Milliseconds() ) < VID_RESTART_THRESHOLD ) {
 				// hack for OSP mod: do not allow vid restart right after cgame init
 				return;
 			}
@@ -2582,14 +2566,12 @@ static void CL_InitServerInfo( serverInfo_t *server, const netadr_t *address ) {
 	server->g_needpass = 0;
 }
 
-#define MAX_SERVERSPERPACKET	256
-
 typedef struct hash_chain_s {
 	netadr_t             addr;
 	struct hash_chain_s *next;
 } hash_chain_t;
 
-static hash_chain_t *hash_table[1024];
+static hash_chain_t *hash_table[SERVER_HASH_SIZE];
 static hash_chain_t hash_list[MAX_GLOBAL_SERVERS];
 static unsigned int hash_count = 0;
 
@@ -2613,7 +2595,7 @@ static unsigned int hash_func( const netadr_t *addr ) {
 
 	hash = hash ^ ( hash >> 16 );
 
-	return (hash & 1023);
+	return (hash & (SERVER_HASH_SIZE - 1));
 }
 
 static void hash_insert( const netadr_t *addr )
@@ -2865,7 +2847,7 @@ static qboolean CL_ConnectionlessPacket( const netadr_t *from, msg_t *msg ) {
 		clc.challenge = atoi(Cmd_Argv(1));
 		cls.state = CA_CHALLENGING;
 		clc.connectPacketCount = 0;
-		clc.connectTime = -99999;
+		clc.connectTime = -RETRANSMIT_TIMEOUT;
 
 		// take this address as the new server address.  This allows
 		// a server proxy to hand off connections to multiple servers
@@ -2926,7 +2908,7 @@ static qboolean CL_ConnectionlessPacket( const netadr_t *from, msg_t *msg ) {
 		Netchan_Setup( NS_CLIENT, &clc.netchan, from, Cvar_VariableIntegerValue( "net_qport" ), clc.challenge, clc.compat );
 
 		cls.state = CA_CONNECTED;
-		clc.lastPacketSentTime = cls.realtime - 9999; // send first packet immediately
+		clc.lastPacketSentTime = cls.realtime - RETRANSMIT_TIMEOUT; // send first packet immediately
 		return qtrue;
 	}
 
@@ -3463,9 +3445,7 @@ static void CL_InitRenderer( void ) {
 		//   +set r_renderer vulkan
 		cl_renderer = Cvar_Get( "cl_renderer", "opengl", CVAR_ARCHIVE | CVAR_LATCH );
 		Cvar_SetDescription( cl_renderer, "Sets your desired renderer (vulkan, opengl2, opengl), requires \\vid_restart. Engine will fallback automatically if requested renderer fails." );
-		fprintf(stderr, "DEBUG: Initialized cl_renderer to: %s\n", cl_renderer->string );
 	} else {
-		fprintf(stderr, "DEBUG: cl_renderer already exists: %s\n", cl_renderer->string );
 	}
 #endif
 
@@ -3499,10 +3479,9 @@ static void CL_InitRenderer( void ) {
 	re.BeginRegistration( &cls.glconfig );
 
 	// load character sets
-
-	cls.charSetShader = re.RegisterShader( "gfx/2d/bigchars" );
 	cls.whiteShader = re.RegisterShader( "white" );
 	cls.consoleShader = re.RegisterShader( "console" );
+	cls.charSetShader = re.RegisterShader( "gfx/2d/bigchars" );
 
 	Con_CheckResize();
 
@@ -3536,12 +3515,10 @@ This is the only place that any of these functions are called from
 */
 void CL_StartHunkUsers( void ) {
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: CL_StartHunkUsers called\n" );
 	}
 
 	if ( !com_cl_running || !com_cl_running->integer ) {
 		if ( !FS_StartupInProgress() ) {
-			Com_Printf( "DEBUG: CL_StartHunkUsers returning early - client not running\n" );
 		}
 		return;
 	}
@@ -3589,7 +3566,6 @@ void CL_StartHunkUsers( void ) {
 		CL_InitUI();
 	}
 	if ( !FS_StartupInProgress() ) {
-		Com_Printf( "DEBUG: CL_StartHunkUsers completed\n" );
 	}
 }
 
@@ -3741,21 +3717,21 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 		}
 	}
 
-	// Find the requested renderer in our priority list
-	for (int i = 0; i < numRenderers; i++) {
-		if (Q_stricmp(rendererName, rendererPriority[i]) == 0) {
-			startIndex = i;
-			break;
-		}
-	}
-
-	// Try renderers in priority order starting from requested one
+	// Try the requested renderer first, then try fallbacks
 	void *localRendererLib = NULL;
 	const char *loadedRenderer = NULL;
 
-	for (int i = 0; i < numRenderers && !localRendererLib; i++) {
-		int tryIndex = (startIndex + i) % numRenderers;
-		const char *tryRenderer = rendererPriority[tryIndex];
+	// First try the exact renderer requested by the user
+	const char *tryRenderers[] = { rendererName, "vulkan", "opengl2", "opengl" };
+	int numTryRenderers = sizeof(tryRenderers) / sizeof(tryRenderers[0]);
+
+	for (int i = 0; i < numTryRenderers && !localRendererLib; i++) {
+		const char *tryRenderer = tryRenderers[i];
+
+		// Skip duplicates (don't try the same renderer twice)
+		if (i > 0 && Q_stricmp(tryRenderer, rendererName) == 0) {
+			continue;
+		}
 
 		Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, tryRenderer );
 		Com_Printf( "Trying renderer: %s (%s)\n", tryRenderer, dllName );
@@ -3765,6 +3741,7 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 			void *glLib = Sys_LoadLibrary( OPENGL_DRIVER_NAME );
 			if ( glLib ) {
 				Com_Printf( "  OpenGL library pre-loaded successfully\n" );
+				Sys_UnloadLibrary( glLib ); // Clean up test load
 			} else {
 				Com_Printf( S_COLOR_YELLOW "  Warning: Could not pre-load OpenGL library\n" );
 			}
@@ -3876,7 +3853,6 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 
 	Com_Memset( &rimp, 0, sizeof( rimp ) );
 	
-	// DEBUG: Always print to verify this code path executes
 	Com_Printf( "CL_InitRef: rimp memset to zero, about to set function pointers\n" );
 
 	rimp.Cmd_AddCommand = Cmd_AddCommand;
@@ -3948,16 +3924,11 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 	rimp.GLimp_SetGamma = GLimp_SetGamma;
 
 	// OpenGL API
-	Com_Printf( "DEBUG: About to check USE_OPENGL_API\n" );
-#ifdef USE_OPENGL_API
-	Com_Printf( "DEBUG: USE_OPENGL_API is defined\n" );
+#ifdef USE_OPENGL
 	rimp.GLimp_Init = GLimp_Init;
 	rimp.GLimp_Shutdown = GLimp_Shutdown;
 	rimp.GL_GetProcAddress = GL_GetProcAddress;
 	rimp.GLimp_EndFrame = GLimp_EndFrame;
-	Com_Printf( "DEBUG: GLimp_Init assigned: %p\n", GLimp_Init );
-#else
-	Com_Printf( "DEBUG: USE_OPENGL_API is NOT defined\n" );
 #endif
 
 	// Vulkan API
@@ -3976,8 +3947,6 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 	{
 		extern refimport_t ri;
 		ri = rimp;
-		fprintf(stderr, "DEBUG: CL_InitRef set global ri.Printf to %p\n",
-		        (void*)(uintptr_t)ri.Printf);
 	}
 	
 	// Validate that all Vulkan function pointers were properly assigned

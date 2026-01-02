@@ -81,18 +81,18 @@ void Crash_Init(void)
     // Windows: Set up structured exception handler
     SetUnhandledExceptionFilter(Crash_WindowsExceptionHandler);
 #else
-    // Unix: Set up signal handlers
+    // Unix: Set up signal handlers - conservative approach
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_sigaction = Crash_UnixSignalHandler;
-    sa.sa_flags = SA_SIGINFO | SA_RESETHAND;  // Get extra info, reset after catching
+    sa.sa_flags = SA_SIGINFO | SA_NODEFER;  // Get extra info, don't block signal during handler
     sigemptyset(&sa.sa_mask);
 
-    sigaction(SIGSEGV, &sa, NULL);
-    sigaction(SIGBUS, &sa, NULL);
-    sigaction(SIGFPE, &sa, NULL);
-    sigaction(SIGILL, &sa, NULL);
-    sigaction(SIGABRT, &sa, NULL);
+    // Only handle critical crash signals, avoid signals that might occur during normal operation
+    sigaction(SIGSEGV, &sa, NULL);  // Segmentation fault - critical
+    sigaction(SIGBUS, &sa, NULL);   // Bus error - critical
+    sigaction(SIGILL, &sa, NULL);   // Illegal instruction - critical
+    // Skip SIGFPE (floating point exceptions) and SIGABRT as they can occur in normal code
 #endif
 
     g_crash_initialized = qtrue;

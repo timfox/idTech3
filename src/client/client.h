@@ -641,7 +641,7 @@ void	GLimp_InitGamma(glconfig_t *config);
 void	GLimp_SetGamma(unsigned char red[256], unsigned char green[256], unsigned char blue[256]);
 
 // OpenGL
-#ifdef USE_OPENGL_API
+#ifdef USE_OPENGL
 void	GLimp_Init( glconfig_t *config );
 void	GLimp_Shutdown( qboolean unloadDLL );
 void	GLimp_EndFrame( void );

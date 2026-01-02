@@ -61,7 +61,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "linux_local.h"
 #include "unix_glw.h"
 
-#ifdef USE_OPENGL_API
+#ifdef USE_OPENGL
 #include "../renderer/qgl.h"
 #endif
 
@@ -117,7 +117,7 @@ Display *dpy = NULL;
 int scrnum;
 
 Window win = 0;
-#ifdef USE_OPENGL_API
+#ifdef USE_OPENGL
 static GLXContext ctx = NULL;
 #endif
 static Atom wmDeleteEvent = None;
@@ -1106,7 +1106,7 @@ void GLimp_SetGamma( unsigned char red[256], unsigned char green[256], unsigned 
 }
 
 
-#ifdef USE_OPENGL_API
+#ifdef USE_OPENGL
 /*
 ** GLimp_Shutdown
 **
@@ -1306,7 +1306,7 @@ static rserr_t GLW_StartDriverAndSetMode( int mode, const char *modeFS, qboolean
 }
 
 
-#ifdef USE_OPENGL_API
+#ifdef USE_OPENGL
 static XVisualInfo *GL_SelectVisual( int colorbits, int depthbits, int stencilbits, glconfig_t *config )
 {
 	// these match in the array
@@ -1594,7 +1594,7 @@ int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qboolean vul
 	if ( vulkan )
 		visinfo = VK_SelectVisual( colorbits, depthbits, stencilbits, config );
 #endif
-#ifdef USE_OPENGL_API
+#ifdef USE_OPENGL
 	if ( !vulkan )
 		visinfo = GL_SelectVisual( colorbits, depthbits, stencilbits, config );
 #endif
@@ -1686,7 +1686,7 @@ int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qboolean vul
 //	XSync( dpy, False );
 
 	// create rendering context
-#ifdef USE_OPENGL_API
+#ifdef USE_OPENGL
 	if ( !vulkan )
 	{
 		ctx = qglXCreateContext( dpy, visinfo, NULL, True );
@@ -1791,7 +1791,7 @@ static void InitCvars( void )
 }
 
 
-#ifdef USE_OPENGL_API
+#ifdef USE_OPENGL
 /*
 ** GLW_LoadOpenGL
 **
