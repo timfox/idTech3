@@ -35,6 +35,14 @@ void vk_rtx_build_tlas(VkCommandBuffer cmd_buffer);
 qboolean vk_rtx_build_tlas_real(VkCommandBuffer cmd_buffer);
 qboolean vk_rtx_build_tlas_real_full(VkCommandBuffer cmd_buffer);
 qboolean vk_rtx_build_blas_for_geometry_real(VkCommandBuffer cmd_buffer);
+// Query per-surface material index
+uint32_t vk_rtx_get_surface_material_index(uint32_t surfaceIndex, uint32_t* outIndex);
+// Build BLAS for world geometry during map load
+qboolean vk_rtx_build_blas_from_world(void);
+void vk_rtx_update_surface_material_indices_buffer(void);
+VkBuffer vk_rtx_get_surface_indices_buffer(void);
+VkDeviceSize vk_rtx_get_surface_indices_size(void);
+void vk_rtx_bind_surface_indices_buffer(VkDescriptorSet descriptorSet);
 void vk_rtx_create_sbt_buffer_full(void);
 VkResult vk_rtx_create_pipeline(void);
 void VK_try_init_calibrated_timestamps(void);

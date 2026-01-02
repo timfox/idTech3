@@ -27,6 +27,7 @@ extern refimport_t ri;
 #ifdef USE_VULKAN
 #include "vk.h"
 #ifdef USE_VULKAN_RAY_TRACING
+#include "vk_rtx_acceleration.h"
 #include "vk_portal_lights.h"
 #endif
 
@@ -2842,8 +2843,15 @@ vk_material_parser_load_map_materials(s_worldData.baseName);
 
 // Build RTX acceleration structures for world geometry
 #ifdef USE_VULKAN_RAY_TRACING
-if (vk.rayTracingSupported && vk_rtx_acceleration_init()) {
-	vk_rtx_build_blas_from_world();
+if (vk.rayTracingSupported) {
+    if (vk_rtx_acceleration_init()) {
+        vk_rtx_build_blas_from_world();
+        vk_rtx_update_surface_material_indices_buffer();
+    } else {
+        ri.Printf(PRINT_WARNING, "RTX acceleration unavailable; proceeding without RTX. Check Vulkan drivers and support.\n");
+    }
+} else {
+    ri.Printf(PRINT_DEBUG, "RTX acceleration not supported by this GPU/driver; raster path only.\n");
 }
 #endif
 

@@ -8,6 +8,92 @@
 #include <string.h>
 #include <vulkan/vulkan.h>
 #include <time.h>
+// Per-surface material indices
+#define MAX_SURFACES_FOR_INDICES 4096
+static uint32_t g_surface_indices_cpu[MAX_SURFACES_FOR_INDICES];
+static VkBuffer g_surface_indices_buffer = VK_NULL_HANDLE;
+static VkDeviceMemory g_surface_indices_memory = VK_NULL_HANDLE;
+static VkDeviceAddress g_surface_indices_address = 0;
+static VkDeviceSize g_surface_indices_size = 0;
+static void vk_rtx_allocate_surface_indices_buffer(void);
+static void vk_rtx_allocate_surface_indices_buffer(void) {
+    if (g_surface_indices_buffer != VK_NULL_HANDLE) return;
+    VkBufferCreateInfo bufInfo = {};
+    bufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufInfo.size = MAX_SURFACES_FOR_INDICES * sizeof(uint32_t);
+    bufInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    if (qvkCreateBuffer) {
+        if (qvkCreateBuffer(vk.device, &bufInfo, NULL, &g_surface_indices_buffer) != VK_SUCCESS) {
+            ri.Printf(PRINT_ERROR, "RTX: failed to create surface indices buffer\n");
+            g_surface_indices_buffer = VK_NULL_HANDLE;
+            return;
+        }
+    } else {
+        ri.Printf(PRINT_WARNING, "RTX: qvkCreateBuffer not available\n");
+        return;
+    }
+    VkMemoryRequirements memReqs;
+    qvkGetBufferMemoryRequirements(vk.device, g_surface_indices_buffer, &memReqs);
+    uint32_t memType = find_memory_type(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    VkMemoryAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memReqs.size;
+    allocInfo.memoryTypeIndex = memType;
+    if (qvkAllocateMemory(vk.device, &allocInfo, NULL, &g_surface_indices_memory) != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "RTX: failed to allocate memory for surface indices buffer\n");
+        vkDestroyBuffer(vk.device, g_surface_indices_buffer, NULL);
+        g_surface_indices_buffer = VK_NULL_HANDLE;
+        g_surface_indices_memory = VK_NULL_HANDLE;
+        return;
+    }
+    qvkBindBufferMemory(vk.device, g_surface_indices_buffer, g_surface_indices_memory, 0);
+    g_surface_indices_size = bufInfo.size;
+    ri.Printf(PRINT_DEVELOPER, "RTX: surface indices buffer allocated: %llu bytes\n", (unsigned long long)g_surface_indices_size);
+}
+static VkBuffer s_dummy_bind_buffer = VK_NULL_HANDLE;
+static VkDescriptorSet s_dummy_bind_desc = VK_NULL_HANDLE;
+
+// Ensure buffers for surface indices exist
+static void vk_rtx_allocate_surface_indices_buffer(void) {
+    if (g_surface_indices_buffer != VK_NULL_HANDLE) {
+        return;
+    }
+    VkBufferCreateInfo bufferInfo = {};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = MAX_SURFACES_FOR_INDICES * sizeof(uint32_t);
+    bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    if (qvkCreateBuffer) {
+        if (qvkCreateBuffer(vk.device, &bufferInfo, NULL, &g_surface_indices_buffer) != VK_SUCCESS) {
+            ri.Printf(PRINT_ERROR, "RTX: Failed to create surface indices buffer\n");
+            g_surface_indices_buffer = VK_NULL_HANDLE;
+            return;
+        }
+    } else {
+        // Fallback: log
+        ri.Printf(PRINT_WARNING, "RTX: qvkCreateBuffer not available; cannot allocate surface indices buffer\n");
+        return;
+    }
+    VkMemoryRequirements memReqs;
+    qvkGetBufferMemoryRequirements(vk.device, g_surface_indices_buffer, &memReqs);
+    uint32_t memoryType = find_memory_type(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    VkMemoryAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memReqs.size;
+    allocInfo.memoryTypeIndex = memoryType;
+    if (qvkAllocateMemory(vk.device, &allocInfo, NULL, &g_surface_indices_memory) != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "RTX: Failed to allocate memory for surface indices buffer\n");
+        vkDestroyBuffer(vk.device, g_surface_indices_buffer, NULL);
+        g_surface_indices_buffer = VK_NULL_HANDLE;
+        g_surface_indices_memory = VK_NULL_HANDLE;
+        return;
+    }
+    qvkBindBufferMemory(vk.device, g_surface_indices_buffer, g_surface_indices_memory, 0);
+    g_surface_indices_size = bufferInfo.size;
+    ri.Printf(PRINT_DEVELOPER, "RTX: allocated surface indices buffer (%llu bytes)\n", (unsigned long long)g_surface_indices_size);
+}
+
 
 // Get material index for this surface's shader
 uint32_t materialIndex = 0; // Default material
@@ -31,6 +117,23 @@ qboolean vk_rtx_build_tlas_real_inline(VkCommandBuffer cmd_buffer) {
   (void)cmd_buffer;
   g_rtx_blas_tlas_built = qtrue;
   return qtrue;
+}
+
+uint32_t vk_rtx_get_surface_material_index(uint32_t surfaceIndex, uint32_t* outIndex) {
+    if (!outIndex) {
+        ri.Printf(PRINT_DEVELOPER, "RTX: vk_rtx_get_surface_material_index called with NULL outIndex\n");
+        return 0;
+    }
+    if (!tr.world || !tr.world->surfaces) {
+        *outIndex = 0;
+        return 0;
+    }
+    if (surfaceIndex >= (uint32_t)tr.world->numsurfaces) {
+        *outIndex = 0;
+        return 0;
+    }
+    *outIndex = tr.world->surfaces[surfaceIndex].materialIndex;
+    return *outIndex;
 }
 
 void vk_rtx_bind_and_trace_raysKHR_from_main(VkCommandBuffer cmd_buffer, uint32_t width, uint32_t height) {
@@ -1379,7 +1482,68 @@ qboolean vk_rtx_build_blas_from_world(void) {
     return (successful_blas > 0);
 }
 
+// Accessors for surface indices buffer
+extern "C" {
+VkBuffer vk_rtx_get_surface_indices_buffer(void) {
+    return g_surface_indices_buffer;
+}
+VkDeviceSize vk_rtx_get_surface_indices_size(void) {
+    return g_surface_indices_size;
+}
+void vk_rtx_bind_surface_indices_buffer(VkDescriptorSet descriptorSet) {
+    if (g_surface_indices_buffer == VK_NULL_HANDLE || g_surface_indices_size == 0) return;
+    VkDescriptorBufferInfo bufferInfo = { .buffer = g_surface_indices_buffer, .offset = 0, .range = g_surface_indices_size };
+    VkWriteDescriptorSet write = {};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = descriptorSet;
+    write.dstBinding = 7;
+    write.dstArrayElement = 0;
+    write.descriptorCount = 1;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    write.pBufferInfo = &bufferInfo;
+    write.pImageInfo = NULL;
+    write.pTexelBufferView = NULL;
+    qvkUpdateDescriptorSets(vk.device, 1, &write, 0, NULL);
+}
+}
 #ifdef __cplusplus
 }
 #endif
+
+void vk_rtx_update_surface_material_indices_buffer(void) {
+    if (!g_rtx_accel_initialized) {
+        ri.Printf(PRINT_DEVELOPER, "RTX: surface indices buffer update skipped (not initialized)\n");
+        return;
+    }
+    if (g_surface_indices_buffer == VK_NULL_HANDLE) {
+        vk_rtx_allocate_surface_indices_buffer();
+        if (g_surface_indices_buffer == VK_NULL_HANDLE) {
+            ri.Printf(PRINT_DEVELOPER, "RTX: failed to allocate surface indices buffer\n");
+            return;
+        }
+    }
+    if (!tr.world || !tr.world->surfaces) {
+        ri.Printf(PRINT_DEVELOPER, "RTX: surface indices buffer update skipped (no world data)\n");
+        return;
+    }
+    uint32_t count = tr.world->numsurfaces;
+    if (count > MAX_SURFACES_FOR_INDICES) count = MAX_SURFACES_FOR_INDICES;
+    for (uint32_t i = 0; i < count; i++) {
+        g_surface_indices_cpu[i] = tr.world->surfaces[i].materialIndex;
+    }
+    g_surface_indices_size = count * sizeof(uint32_t);
+    if (g_surface_indices_buffer == VK_NULL_HANDLE || g_surface_indices_memory == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_DEVELOPER, "RTX: surface indices GPU buffer not allocated; skipping upload\n");
+        return;
+    }
+    void* mapped = NULL;
+    VkResult r = vkMapMemory(vk.device, g_surface_indices_memory, 0, (VkDeviceSize)g_surface_indices_size, 0, &mapped);
+    if (r == VK_SUCCESS && mapped && g_surface_indices_size > 0) {
+        memcpy(mapped, g_surface_indices_cpu, (size_t)g_surface_indices_size);
+        vkUnmapMemory(vk.device, g_surface_indices_memory);
+        ri.Printf(PRINT_DEVELOPER, "RTX: uploaded %u bytes of surface indices to GPU\n", (unsigned)g_surface_indices_size);
+    } else {
+        ri.Printf(PRINT_DEVELOPER, "RTX: failed to map surface indices buffer for upload\n");
+    }
+}
 

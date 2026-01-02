@@ -820,13 +820,21 @@ void vk_rt_create_descriptor_set_layout( void )
 	bindings[bindingCount].pImmutableSamplers = NULL;
 	bindingCount++;
 
-	// Binding 6: Motion vectors (for temporal reprojection)
+    // Binding 6: Motion vectors (for temporal reprojection)
 	bindings[bindingCount].binding = 6;
 	bindings[bindingCount].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 	bindings[bindingCount].descriptorCount = 1;
 	bindings[bindingCount].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
 	bindings[bindingCount].pImmutableSamplers = NULL;
 	bindingCount++;
+
+    // Binding 7: Per-surface material indices (RTX)
+    bindings[bindingCount].binding = 7;
+    bindings[bindingCount].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    bindings[bindingCount].descriptorCount = 1;
+    bindings[bindingCount].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+    bindings[bindingCount].pImmutableSamplers = NULL;
+    bindingCount++;
 
 	layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	layoutInfo.pNext = NULL;
@@ -1904,7 +1912,10 @@ void vk_rt_update_descriptor_set( void )
 		writeCount++;
 	}
 
-	qvkUpdateDescriptorSets( vk.device, writeCount, writes, 0, NULL );
+    qvkUpdateDescriptorSets( vk.device, writeCount, writes, 0, NULL );
+
+    // Bind per-surface material indices buffer to the descriptor set
+    vk_rtx_bind_surface_indices_buffer( vk.rt.raytracingDescriptorSet );
 }
 
 // Update uniform buffer with camera data and debug flags
