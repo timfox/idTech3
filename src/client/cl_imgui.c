@@ -334,7 +334,11 @@ void CL_ImGui_Shutdown( void ) {}
 void CL_ImGui_FrameBegin( void ) {}
 void CL_ImGui_FrameEnd( void ) {}
 void CL_ImGui_Draw( void ) {}
+#ifdef USE_SDL
+qboolean CL_ImGui_ProcessEvent( const SDL_Event *event )
+#else
 qboolean CL_ImGui_ProcessEvent( const void *event )
+#endif
 {
 	(void)event;
 	return qfalse;

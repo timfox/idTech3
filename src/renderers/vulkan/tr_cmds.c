@@ -411,6 +411,14 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 		return;
 	}
 
+	// Safety check: if Vulkan is not properly initialized, skip rendering to avoid crashes
+#ifdef USE_VULKAN
+	if (!vk.active || vk.device == VK_NULL_HANDLE || vk.swapchain == VK_NULL_HANDLE) {
+		ri.Printf(PRINT_DEVELOPER, "Vulkan: Skipping frame - not fully initialized\n");
+		return;
+	}
+#endif
+
 	glState.finishCalled = qfalse;
 
 #ifdef USE_VULKAN

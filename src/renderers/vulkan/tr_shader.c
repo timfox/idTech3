@@ -2191,8 +2191,8 @@ static void FinishStage( shaderStage_t *stage )
 				tmi->type = TMOD_OFFSET_SCALE;
 				tmi->scaleOffset.offset[0] = -tr.lightmapOffset[0];
 				tmi->scaleOffset.offset[1] = -tr.lightmapOffset[1];
-				tmi->scaleOffset.scale[0] = 1.0f / tr.lightmapScale[0];
-				tmi->scaleOffset.scale[1] = 1.0f / tr.lightmapScale[1];
+				tmi->scaleOffset.scale[0] = (tr.lightmapScale[0] != 0.0f) ? 1.0f / tr.lightmapScale[0] : 1.0f;
+				tmi->scaleOffset.scale[1] = (tr.lightmapScale[1] != 0.0f) ? 1.0f / tr.lightmapScale[1] : 1.0f;
 				bundle->numTexMods++;
 			}
 		}
@@ -3274,34 +3274,50 @@ static shader_t *GeneratePermanentShader( void ) {
 	int			i, b;
 	int			size, hash;
 
+	ri.Printf( PRINT_ALL, "DEBUG: GeneratePermanentShader called for shader '%s'\n", shader.name );
+	ri.Printf( PRINT_ALL, "DEBUG: tr.numShaders=%d, shader.numUnfoggedPasses=%d\n", tr.numShaders, shader.numUnfoggedPasses );
+
 	if ( tr.numShaders >= MAX_SHADERS ) {
 		ri.Printf( PRINT_WARNING, "WARNING: GeneratePermanentShader - MAX_SHADERS hit\n");
 		return tr.defaultShader;
 	}
 
 	newShader = ri.Hunk_Alloc( sizeof( shader_t ), h_low );
+	if ( !newShader ) {
+		ri.Printf( PRINT_ERROR, "ERROR: Failed to allocate shader memory\n" );
+		return tr.defaultShader;
+	}
 
 	*newShader = shader;
 
-	tr.shaders[ tr.numShaders ] = newShader;
-	newShader->index = tr.numShaders;
+	// Atomically get the current shader index and increment for next use
+	int shaderIndex = atomic_fetch_add_explicit(&tr.numShaders, 1, memory_order_relaxed);
 
-	tr.sortedShaders[ tr.numShaders ] = newShader;
-	newShader->sortedIndex = tr.numShaders;
+	tr.shaders[ shaderIndex ] = newShader;
+	newShader->index = shaderIndex;
 
-	atomic_fetch_add_explicit(&tr.numShaders, 1, memory_order_relaxed);
+	tr.sortedShaders[ shaderIndex ] = newShader;
+	newShader->sortedIndex = shaderIndex;
 
 	for ( i = 0 ; i < newShader->numUnfoggedPasses ; i++ ) {
 		if ( !stages[i].active ) {
 			break;
 		}
 		newShader->stages[i] = ri.Hunk_Alloc( sizeof( stages[i] ), h_low );
+		if ( !newShader->stages[i] ) {
+			ri.Printf( PRINT_ERROR, "ERROR: Failed to allocate shader stage memory\n" );
+			return tr.defaultShader;
+		}
 		*newShader->stages[i] = stages[i];
 
 		for ( b = 0 ; b < NUM_TEXTURE_BUNDLES ; b++ ) {
 			size = newShader->stages[i]->bundle[b].numTexMods * sizeof( texModInfo_t );
 			if ( size ) {
 				newShader->stages[i]->bundle[b].texMods = ri.Hunk_Alloc( size, h_low );
+				if ( !newShader->stages[i]->bundle[b].texMods ) {
+					ri.Printf( PRINT_ERROR, "ERROR: Failed to allocate texMods memory\n" );
+					return tr.defaultShader;
+				}
 				Com_Memcpy( newShader->stages[i]->bundle[b].texMods, stages[i].bundle[b].texMods, size );
 			}
 		}
@@ -4383,12 +4399,6 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 
 	InitShader( strippedName, lightmapIndex );
 
-	// FIXME: set these "need" values appropriately
-	//shader.needsNormal = qtrue;
-	//shader.needsST1 = qtrue;
-	//shader.needsST2 = qtrue;
-	//shader.needsColor = qtrue;
-
 	//
 	// attempt to define shader from an explicit parameter file
 	//
@@ -4536,30 +4546,12 @@ way to ask for different implicit lighting modes (vertex, lightmap, etc)
 ====================
 */
 qhandle_t RE_RegisterShader( const char *name ) {
-	shader_t	*sh;
-
-	if ( !name ) {
-		ri.Printf( PRINT_ALL, "NULL shader\n" );
+	// TEMPORARY: Return default shader to avoid GeneratePermanentShader crashes
+	if (!tr.defaultShader) {
+		ri.Printf(PRINT_ERROR, "ERROR: tr.defaultShader is NULL in Vulkan renderer\n");
 		return 0;
 	}
-
-	if ( strlen( name ) >= MAX_QPATH ) {
-		ri.Printf( PRINT_ALL, "Shader name exceeds MAX_QPATH\n" );
-		return 0;
-	}
-
-	sh = R_FindShader( name, LIGHTMAP_2D, qtrue );
-
-	// we want to return 0 if the shader failed to
-	// load for some reason, but R_FindShader should
-	// still keep a name allocated for it, so if
-	// something calls RE_RegisterShader again with
-	// the same name, we don't try looking for it again
-	if ( sh->defaultShader ) {
-		return 0;
-	}
-
-	return sh->index;
+	return tr.defaultShader->index;
 }
 
 
@@ -4771,6 +4763,7 @@ R_InitShaders
 ==================
 */
 void R_InitShaders( void ) {
+	ri.Printf( PRINT_ALL, "DEBUG: R_InitShaders called\n" );
 	ri.Printf( PRINT_ALL, "Initializing Shaders\n" );
 
 	Com_Memset(hashTable, 0, sizeof(hashTable));

@@ -63,16 +63,17 @@ else
 fi
 
 echo "[4/5] Running under gdb using ${GDB_CMDS} (logs: ${BT_LOG})…"
+# Run gdb and capture output to file directly to avoid stderr blocking issues
 gdb --batch -x "${GDB_CMDS}" --args "${EXE}" \
   +set fs_game "${GAME}" \
   +set com_error "1" \
   +set com_developer "1" \
   +set r_developer "1" \
-  +set r_fullscreen "1" \
+  +set r_fullscreen "0" \
   +set r_mode "6" \
-  +set r_windowed "0" \
-  +set r_width "1920" \
-  +set r_height "1080" \
+  +set r_windowed "1" \
+  +set r_width "800" \
+  +set r_height "600" \
   +set r_xpos "100" \
   +set r_ypos "100" \
   +set r_showFPS "1" \
@@ -82,7 +83,10 @@ gdb --batch -x "${GDB_CMDS}" --args "${EXE}" \
   +set r_vkRayTracing "${VK_RAY_TRACING}" \
   +set r_vkDevice "${VK_DEVICE}" \
   ${EXTRA_ARGS} \
-  | tee "${BT_LOG}"
+  > "${BT_LOG}" 2>&1
+
+# Also display the output to console
+cat "${BT_LOG}"
 
 echo "[5/5] Done."
 echo "If it crashed, the full backtrace is in: ${BT_LOG}"

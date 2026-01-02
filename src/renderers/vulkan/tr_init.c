@@ -576,6 +576,8 @@ void R_Init( void ) {
     }
 
     vk_initialize();
+
+    R_InitShaders();
 }
 
 /*

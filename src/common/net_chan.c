@@ -68,6 +68,7 @@ Netchan_Init
 */
 void Netchan_Init( int port ) {
 	port &= 0xffff;
+	Com_Printf("Netchan_Init called with port %d\n", port);
 	showpackets = Cvar_Get ("showpackets", "0", CVAR_TEMP );
 	Cvar_SetDescription( showpackets, "Toggles information of all packets sent and received." );
 	showdrop = Cvar_Get ("showdrop", "0", CVAR_TEMP );
@@ -705,10 +706,17 @@ void NET_FlushPacketQueue( int time_diff )
 
 void NET_SendPacket( netsrc_t sock, int length, const void *data, const netadr_t *to ) {
 
-	// sequenced packets are shown in netchan, so just show oob
-	if ( showpackets->integer && *(int32_t *)data == -1 ) {
-		Com_Printf ("send packet %4i\n", length);
+	// Safety check for NULL to parameter
+	if ( !to ) {
+		Com_Printf( "NET_SendPacket: NULL to parameter\n" );
+		return;
 	}
+
+	// sequenced packets are shown in netchan, so just show oob
+	// Temporarily disabled showpackets check to avoid crashes
+	// if ( showpackets && showpackets->integer && *(int32_t *)data == -1 ) {
+	//	Com_Printf ("send packet %4i\n", length);
+	// }
 
 	if ( to->type == NA_BOT ) {
 		return;
@@ -717,11 +725,11 @@ void NET_SendPacket( netsrc_t sock, int length, const void *data, const netadr_t
 		return;
 	}
 #ifndef DEDICATED
-	if ( sock == NS_CLIENT && cl_packetdelay->integer > 0 ) {
+	if ( sock == NS_CLIENT && cl_packetdelay && cl_packetdelay->integer > 0 ) {
 		NET_QueuePacket( sock, length, data, to, cl_packetdelay->integer );
 	} else
 #endif
-	if ( sock == NS_SERVER && sv_packetdelay->integer > 0 ) {
+	if ( sock == NS_SERVER && sv_packetdelay && sv_packetdelay->integer > 0 ) {
 		NET_QueuePacket( sock, length, data, to, sv_packetdelay->integer );
 	}
 #ifndef DEDICATED

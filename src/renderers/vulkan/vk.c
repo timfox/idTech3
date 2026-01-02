@@ -3458,6 +3458,24 @@ static void init_vulkan_library( void )
 				vk.renderHeight = vk.swapchain_extent.height;
 				vk.renderScaleX = vk.renderScaleY = 1.0f;
 
+				// Initialize glConfig with window dimensions and Vulkan-compatible values (required for engine compatibility)
+				glConfig.vidWidth = vk.renderWidth;
+				glConfig.vidHeight = vk.renderHeight;
+				glConfig.windowAspect = (float)vk.renderWidth / (float)vk.renderHeight;
+				glConfig.colorBits = 32;  // RGBA8
+				glConfig.depthBits = 24;  // D24S8
+				glConfig.stencilBits = 8; // D24S8
+				glConfig.driverType = GLDRV_OPENGL3;  // Use modern driver type for Vulkan
+				glConfig.hardwareType = GLHW_GENERIC; // Generic hardware
+				glConfig.deviceSupportsGamma = qtrue;
+				glConfig.isFullscreen = qfalse; // Windowed mode
+				glConfig.stereoEnabled = qfalse;
+				glConfig.smpActive = qfalse;
+				glConfig.maxTextureSize = 16384; // Large texture support
+				glConfig.numTextureUnits = 32; // Many texture units
+				glConfig.textureCompression = TC_NONE; // No texture compression for Vulkan
+				glConfig.textureEnvAddAvailable = qtrue;
+
 				ri.Printf(PRINT_ALL, "Vulkan: Render dimensions set to %dx%d\n", vk.renderWidth, vk.renderHeight);
 
 				// Success! Break out of the loop
@@ -4519,10 +4537,13 @@ void vk_initialize( void )
 
 	// Mark Vulkan as active
 	vk.active = qtrue;
+	ri.Printf(PRINT_ALL, "DEBUG: Vulkan marked as active\n");
 
 	// Notify the client of the active render scaling so console math uses valid values.
 	if ( ri.CL_SetScaling ) {
+		ri.Printf(PRINT_ALL, "DEBUG: About to call CL_SetScaling\n");
 		ri.CL_SetScaling( 1.0f, glConfig.vidWidth, glConfig.vidHeight );
+		ri.Printf(PRINT_ALL, "DEBUG: CL_SetScaling completed\n");
 	}
 }
 

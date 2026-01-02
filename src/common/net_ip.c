@@ -1785,6 +1785,7 @@ NET_Init
 ====================
 */
 void NET_Init( void ) {
+	Com_Printf("NET_Init called\n");
 #ifdef _WIN32
 	int		r;
 
@@ -1798,8 +1799,9 @@ void NET_Init( void ) {
 	LOG_NETWORK_INFO("Winsock initialized");
 #endif
 
+	Netchan_Init( 0 );
 	NET_Config( qtrue );
-	LOG_NETWORK_INFO("Networking initialized (udp=%d, ipv6=%d)", net_enabled->integer, net_enabled->integer && net_enabled->integer != 1);
+	Com_Printf("Networking initialized\n");
 	
 	Cmd_AddCommand( "net_restart", NET_Restart_f );
 }

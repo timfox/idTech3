@@ -1299,19 +1299,25 @@ static qboolean R_LoadMDR( model_t *mod, void *buffer, int filesize, const char 
 ** RE_BeginRegistration
 */
 void RE_BeginRegistration( glconfig_t *glconfigOut ) {
+	ri.Printf(PRINT_ALL, "DEBUG: RE_BeginRegistration called\n");
 	R_Init();
+	ri.Printf(PRINT_ALL, "DEBUG: R_Init completed\n");
 
 	if (glconfigOut) {
 		*glconfigOut = glConfig;
+		ri.Printf(PRINT_ALL, "DEBUG: glconfig copied\n");
 	}
 
 	tr.viewCluster = -1;		// force markleafs to regenerate
 
 	R_ClearFlares();
+	ri.Printf(PRINT_ALL, "DEBUG: R_ClearFlares completed\n");
 
 	RE_ClearScene();
+	ri.Printf(PRINT_ALL, "DEBUG: RE_ClearScene completed\n");
 
 	tr.registered = qtrue;
+	ri.Printf(PRINT_ALL, "DEBUG: RE_BeginRegistration completed\n");
 }
 
 //=============================================================================

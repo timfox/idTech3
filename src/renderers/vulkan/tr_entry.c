@@ -136,6 +136,7 @@ void RE_SetColorMappings(void) {
 // Entry point for dlopen
 // Plan-guarded: return a minimal Vulkan surface if patch1 is enabled, otherwise NULL
 Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI(int apiVersion, refimport_t *rimp) {
+  ri = *rimp;
   check_safe_mode_flag();
   if (g_vk_safe_mode) {
     ri.Printf(PRINT_ALL, "SAFE MODE active: GetRefAPI returns NULL to force GL fallback\n");
@@ -147,10 +148,10 @@ Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI(int
       ri.Printf(PRINT_ALL, "Mismatched REF_API_VERSION: expected %i, got %i\n", REF_API_VERSION, apiVersion);
       return NULL;
     }
-    ri = *rimp;
     Com_Memset(&re, 0, sizeof(re));
     if (g_vulkan_patch1_tiny_enabled) {
       // Tiny surface: only core lifecycle and essential render pointer
+      re.GetConfig = RE_GetConfig;
       re.Shutdown = RE_Shutdown;
       re.BeginRegistration = RE_BeginRegistration;
       re.EndRegistration = RE_EndRegistration;
@@ -164,6 +165,7 @@ Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI(int
       ri.Printf(PRINT_ALL, "PLAN: Vulkan patch1 tiny surface wired (API version: %d)\n", apiVersion);
     } else {
       // Expanded plan surface (guarded)
+      re.GetConfig = RE_GetConfig;
       re.Shutdown = RE_Shutdown;
       re.BeginRegistration = RE_BeginRegistration;
       re.EndRegistration = RE_EndRegistration;

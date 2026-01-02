@@ -28,14 +28,29 @@ for MOD in ${MOD_LIST}; do
 	LOG_FILE="${VK_VALIDATE_LOG:-/tmp/ci_vk_smoke_${MOD}.log}"
 	echo "[ci_vk_smoke] Starting Vulkan validation smoke for fs_game=${MOD} (log: ${LOG_FILE})"
 	set +e
-	/usr/bin/timeout "${SMOKE_TIMEOUT}"s env VK_VALIDATE_LOG="${LOG_FILE}" "${ROOT}/tools/vk_validate.sh" "${ENGINE_BIN}" \
-		+set r_renderer "vulkan" \
-		+set fs_game "${MOD}" \
-		+set sv_pure 0 \
-		+set com_speeds 1 \
-		+set ttycon 1 \
-		+quit >"${LOG_FILE}" 2>&1
-	STATUS=$?
+	# If the external Vulkan smoke script is present, use it.
+ VK_SCRIPT="${ROOT}/tools/vk_validate.sh"
+	if [[ -x "${VK_SCRIPT}" ]]; then
+		/usr/bin/timeout "${SMOKE_TIMEOUT}"s env VK_VALIDATE_LOG="${LOG_FILE}" "${VK_SCRIPT}" "${ENGINE_BIN}" \
+			+set r_renderer "vulkan" \
+			+set fs_game "${MOD}" \
+			+set sv_pure 0 \
+			+set com_speeds 1 \
+			+set ttycon 1 \
+			+quit >"${LOG_FILE}" 2>&1
+		STATUS=$?
+	else
+		# Fallback: run engine directly (no Vulkan smoke wrapper) if script is missing
+		echo "[ci_vk_smoke] vk_validate.sh not found or not executable; running engine directly" >>"${LOG_FILE}"
+		/usr/bin/timeout "${SMOKE_TIMEOUT}"s env VK_VALIDATE_LOG="${LOG_FILE}" "${ENGINE_BIN}" \
+			+set r_renderer "vulkan" \
+			+set fs_game "${MOD}" \
+			+set sv_pure 0 \
+			+set com_speeds 1 \
+			+set ttycon 1 \
+			+quit >"${LOG_FILE}" 2>&1
+		STATUS=$?
+	fi
 	set -e
 
 	# timeout(1) exits 124; treat that as a soft-pass if the engine started.

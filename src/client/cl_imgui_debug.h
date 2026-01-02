@@ -45,5 +45,10 @@ void CL_ImGui_Debug_RenderAll(void);
 
 #endif // USE_CIMGUI
 
+// Stub declarations for when USE_CIMGUI is not defined
+void CL_ImGui_Debug_Init(void);
+void CL_ImGui_Debug_Shutdown(void);
+void CL_ImGui_Debug_RenderAll(void);
+
 #endif // __CL_IMGUI_DEBUG_H__
 

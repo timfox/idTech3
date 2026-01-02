@@ -435,6 +435,7 @@ extern	cvar_t	*r_glDriver;
 
 extern	cvar_t	*r_displayRefresh;
 extern	cvar_t	*r_fullscreen;
+extern	cvar_t	*r_wayland;
 extern	cvar_t	*r_mode;
 extern	cvar_t	*r_modeFullscreen;
 extern	cvar_t	*r_customwidth;

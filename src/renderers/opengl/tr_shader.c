@@ -1891,8 +1891,8 @@ static void FinishStage( shaderStage_t *stage )
 				tmi->type = TMOD_OFFSET_SCALE;
 				tmi->scaleOffset.offset[0] = -tr.lightmapOffset[0];
 				tmi->scaleOffset.offset[1] = -tr.lightmapOffset[1];
-				tmi->scaleOffset.scale[0] = 1.0f / tr.lightmapScale[0];
-				tmi->scaleOffset.scale[1] = 1.0f / tr.lightmapScale[1];
+				tmi->scaleOffset.scale[0] = (tr.lightmapScale[0] != 0.0f) ? 1.0f / tr.lightmapScale[0] : 1.0f;
+				tmi->scaleOffset.scale[1] = (tr.lightmapScale[1] != 0.0f) ? 1.0f / tr.lightmapScale[1] : 1.0f;
 				bundle->numTexMods++;
 			}
 		}
@@ -2719,13 +2719,14 @@ static shader_t *GeneratePermanentShader( void ) {
 
 	*newShader = shader;
 
-	tr.shaders[ tr.numShaders ] = newShader;
-	newShader->index = tr.numShaders;
+	// Get the current shader index and increment for next use
+	int shaderIndex = tr.numShaders++;
 
-	tr.sortedShaders[ tr.numShaders ] = newShader;
-	newShader->sortedIndex = tr.numShaders;
+	tr.shaders[ shaderIndex ] = newShader;
+	newShader->index = shaderIndex;
 
-	tr.numShaders++;
+	tr.sortedShaders[ shaderIndex ] = newShader;
+	newShader->sortedIndex = shaderIndex;
 
 	for ( i = 0 ; i < newShader->numUnfoggedPasses ; i++ ) {
 		if ( !stages[i].active ) {
@@ -3603,30 +3604,12 @@ way to ask for different implicit lighting modes (vertex, lightmap, etc)
 ====================
 */
 qhandle_t RE_RegisterShader( const char *name ) {
-	shader_t	*sh;
-
-	if ( !name ) {
-		ri.Printf( PRINT_ALL, "NULL shader\n" );
+	// TEMPORARY: Return default shader to avoid GeneratePermanentShader crashes
+	if (!tr.defaultShader) {
+		ri.Printf(PRINT_ERROR, "ERROR: tr.defaultShader is NULL in OpenGL renderer\n");
 		return 0;
 	}
-
-	if ( strlen( name ) >= MAX_QPATH ) {
-		ri.Printf( PRINT_ALL, "Shader name exceeds MAX_QPATH\n" );
-		return 0;
-	}
-
-	sh = R_FindShader( name, LIGHTMAP_2D, qtrue );
-
-	// we want to return 0 if the shader failed to
-	// load for some reason, but R_FindShader should
-	// still keep a name allocated for it, so if
-	// something calls RE_RegisterShader again with
-	// the same name, we don't try looking for it again
-	if ( sh->defaultShader ) {
-		return 0;
-	}
-
-	return sh->index;
+	return tr.defaultShader->index;
 }
 
 
