@@ -4,6 +4,7 @@
 #include "vk.h"
 #include "vk_commands.h"
 #include "vk_memory.h"
+#include "vk_shader_manager.h"
 #include <string.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -490,9 +491,10 @@ void vk_create_shader_modules(void)
 	// Load basic shaders manually for now
 	// TODO: Replace with proper shader binding system
 
-	// Single texture shader (type 1) - load into the gen arrays
-	vk.modules.vert.gen[0][0][0][0][0] = vk_load_spirv_shader("dot_vert");
-	vk.modules.frag.gen[0][0][0][0] = vk_load_spirv_shader("dot_frag");
+	// Single texture shader (type 1) - load into the gen arrays using shader manager
+	// The shader manager handles embedded fallback automatically
+	vk.modules.vert.gen[0][0][0][0][0] = vk_load_shader("generic", VK_SHADER_STAGE_VERTEX_BIT);
+	vk.modules.frag.gen[0][0][0][0] = vk_load_shader("generic", VK_SHADER_STAGE_FRAGMENT_BIT);
 
 	// Color shader
 	vk.modules.color_vs = vk_load_spirv_shader("color_vert");

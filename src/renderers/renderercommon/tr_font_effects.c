@@ -11,8 +11,7 @@ tr_font_effects.c - Advanced Font Effects and Rendering Implementation
 // Forward declarations
 static void R_RenderTextBasic(const font_render_context_t *context);
 
-// Font-related cvars
-extern cvar_t *r_fontSDF;
+// Font-related cvars - now handled by renderer-specific code
 
 // Font effects state
 static qboolean font_effects_initialized = qfalse;
@@ -318,9 +317,10 @@ static void R_RenderTextBasic(const font_render_context_t *context) {
     // the existing RE_RenderString or similar function
     // For now, we'll use the existing font rendering system
 
-    if (context->use_sdf && r_fontSDF && r_fontSDF->integer) {
+    if (context->use_sdf) {
         // Use SDF rendering path
         // Implementation would go here
+        // Note: SDF enable/disable is now handled at renderer level
     }
 
     // Fall back to standard rendering

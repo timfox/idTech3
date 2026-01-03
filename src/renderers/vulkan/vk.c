@@ -7408,7 +7408,20 @@ multisample_state.rasterizationSamples = (renderPassIndex == RENDER_PASS_SCREENM
 		.basePipelineIndex = -1
 	};
 
-	VK_CHECK( qvkCreateGraphicsPipelines( vk.device, vk.pipelineCache, 1, &create_info, NULL, &pipeline ) );
+	// Debug pipeline creation parameters
+	ri.Printf(PRINT_DEVELOPER, "Pipeline creation debug: def_index=%d, pass=%d\n", def_index, renderPassIndex);
+	ri.Printf(PRINT_DEVELOPER, "  vertex shader: %p\n", create_info.pStages[0].module);
+	ri.Printf(PRINT_DEVELOPER, "  fragment shader: %p\n", create_info.pStages[1].module);
+	ri.Printf(PRINT_DEVELOPER, "  pipeline layout: %p\n", create_info.layout);
+	ri.Printf(PRINT_DEVELOPER, "  render pass: %p\n", create_info.renderPass);
+
+	VkResult pipelineResult = qvkCreateGraphicsPipelines(vk.device, vk.pipelineCache, 1, &create_info, NULL, &pipeline);
+	if (pipelineResult != VK_SUCCESS) {
+		ri.Printf(PRINT_ERROR, "Pipeline creation failed with VkResult: %d\n", (int)pipelineResult);
+		ri.Printf(PRINT_ERROR, "Pipeline debug info: shader_type=%d, cullType=%d, state_bits=0x%x\n",
+			def->shader_type, def->cullType, def->state_bits);
+		return VK_NULL_HANDLE; // Return null handle on failure
+	}
 
 	SET_OBJECT_NAME( pipeline, va( "pipeline def#%i, pass#%i", def_index, renderPassIndex ), VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
 

@@ -20,14 +20,14 @@ layout(set = 0, binding = 0) uniform UBO {
 //#endif
 };
 
-layout(location = 0) in vec3 in_position;
-//layout(location = 1) in vec4 in_color;
-//layout(location = 2) in vec2 in_tex_coord0;
+layout(location = 0) in vec2 in_position;
+layout(location = 1) in vec2 in_tex_coord0;
+layout(location = 2) in vec4 in_color;
 //layout(location = 3) in vec2 in_tex_coord1;
 //layout(location = 4) in vec2 in_tex_coord2;
 
-//layout(location = 0) out vec4 frag_color;
-//layout(location = 1) out vec2 frag_tex_coord0;
+layout(location = 0) out vec4 frag_color;
+layout(location = 1) out vec2 frag_tex_coord0;
 //layout(location = 2) out vec2 frag_tex_coord1;
 //layout(location = 3) out vec2 frag_tex_coord1;
 layout(location = 4) out vec2 fog_tex_coord;
@@ -37,15 +37,15 @@ out gl_PerVertex {
 };
 
 void main() {
-	gl_Position = mvp * vec4(in_position, 1.0);
+	gl_Position = mvp * vec4(in_position, 0.0, 1.0);
 
-	//frag_color = in_color;
-	//frag_tex_coord0 = in_tex_coord0;
+	frag_color = in_color;
+	frag_tex_coord0 = in_tex_coord0;
 
 	// fog calculations...
-
-	float s = dot(in_position, fogDistanceVector.xyz) + fogDistanceVector.w;
-	float t = dot(in_position, fogDepthVector.xyz) + fogDepthVector.w;
+	vec3 world_pos = vec3(in_position, 0.0); // Convert vec2 position to vec3 for fog calculations
+	float s = dot(world_pos, fogDistanceVector.xyz) + fogDistanceVector.w;
+	float t = dot(world_pos, fogDepthVector.xyz) + fogDepthVector.w;
 
 	if ( fogEyeT.y == 1.0 ) {
 		if ( t < 0.0 ) {

@@ -1,3 +1,12 @@
 {"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5c376b9570f0 init=1","timestamp":1767405948000}
 {"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x633a29fb00f0 init=1","timestamp":1767405980000}
 {"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x6159fb3600f0 init=1","timestamp":1767406592000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x59220e9fcdb0 init=1","timestamp":1767406748000}
+{"id":"log_1767406748_E","timestamp":1767406748000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x62f75b28ce10 init=1","timestamp":1767406787000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x63d73672d0f0 init=1","timestamp":1767406801000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x555556752740 init=1","timestamp":1767406843000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x55d037c0d0f0 init=1","timestamp":1767406844000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x62359b2f90f0 init=1","timestamp":1767406936000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5814cb7bfe10 init=1","timestamp":1767407555000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x555556752740 init=1","timestamp":1767407604000}

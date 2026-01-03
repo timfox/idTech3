@@ -24,6 +24,14 @@ extern PFN_vkCreateShaderModule qvkCreateShaderModule;
 extern PFN_vkDestroyShaderModule qvkDestroyShaderModule;
 extern PFN_vkCreateGraphicsPipelines qvkCreateGraphicsPipelines;
 
+// Embedded SPIR-V shader extern declarations (from shader_data.c)
+extern const unsigned char dot_vert_spv[1192];
+extern const unsigned char dot_frag_spv[544];
+extern const unsigned char color_vert_spv[872];
+extern const unsigned char color_frag_spv[1296];
+extern const unsigned char fog_vert_spv[2700];
+extern const unsigned char fog_frag_spv[1240];
+
 // Shader cache structure
 struct VkShaderCache {
     std::unordered_map<std::string, VkShaderModule> vertexShaders;
@@ -68,29 +76,23 @@ VkShaderModule load_embedded_shader(const char* shader_name, ShaderType type) {
     // Dot shaders
     // Support both exact names and common aliases to maximize embed-hit rate
     if ((strcmp(shader_name, "dot_vert") == 0 || strcmp(shader_name, "dot_vert_spv") == 0) && type == ShaderType::VERTEX) {
-        extern const unsigned char dot_vert_spv[1192];
         return make_module(dot_vert_spv, sizeof(dot_vert_spv));
     }
     if ((strcmp(shader_name, "dot_frag") == 0 || strcmp(shader_name, "dot_frag_spv") == 0) && type == ShaderType::FRAGMENT) {
-        extern const unsigned char dot_frag_spv[544];
         return make_module(dot_frag_spv, sizeof(dot_frag_spv));
     }
     // Color shaders
     if ((strcmp(shader_name, "color_vert") == 0 || strcmp(shader_name, "color_vert_spv") == 0) && type == ShaderType::VERTEX) {
-        extern const unsigned char color_vert_spv[872];
         return make_module(color_vert_spv, sizeof(color_vert_spv));
     }
     if ((strcmp(shader_name, "color_frag") == 0 || strcmp(shader_name, "color_frag_spv") == 0) && type == ShaderType::FRAGMENT) {
-        extern const unsigned char color_frag_spv[1296];
         return make_module(color_frag_spv, sizeof(color_frag_spv));
     }
     // Fog shaders
     if ((strcmp(shader_name, "fog_vert") == 0 || strcmp(shader_name, "fog_vert_spv") == 0) && type == ShaderType::VERTEX) {
-        extern const unsigned char fog_vert_spv[2700];
         return make_module(fog_vert_spv, sizeof(fog_vert_spv));
     }
     if ((strcmp(shader_name, "fog_frag") == 0 || strcmp(shader_name, "fog_frag_spv") == 0) && type == ShaderType::FRAGMENT) {
-        extern const unsigned char fog_frag_spv[1240];
         return make_module(fog_frag_spv, sizeof(fog_frag_spv));
     }
 
@@ -163,6 +165,8 @@ VkShaderStageFlagBits get_shader_stage(ShaderType type) {
 } // namespace shader_mgr
 
 // Public interface functions
+
+extern "C" {
 
 // Initialize shader management system
 qboolean vk_shader_manager_init(void) {
@@ -391,5 +395,7 @@ qboolean vk_create_basic_pipeline(const char* vertex_shader, const char* fragmen
              vertex_shader, fragment_shader);
     return qtrue;
 }
+
+} // extern "C"
 
 #endif // USE_VULKAN

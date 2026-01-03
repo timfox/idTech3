@@ -423,7 +423,7 @@ void R_Register( void ) {
     r_shadows = ri.Cvar_Get( "r_shadows", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
     r_portalOnly = ri.Cvar_Get( "r_portalOnly", "0", CVAR_CHEAT );
 
-    r_raytracing = ri.Cvar_Get( "r_vkRayTracing", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_raytracing = ri.Cvar_Get( "r_vkRayTracing", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
     r_rt_samples = ri.Cvar_Get( "r_rt_samples", "1", CVAR_ARCHIVE_ND );
     r_rt_maxDepth = ri.Cvar_Get( "r_rt_maxDepth", "2", CVAR_ARCHIVE_ND );
     r_rt_debugMagenta = ri.Cvar_Get( "r_rt_debugMagenta", "0", CVAR_CHEAT );
@@ -524,22 +524,18 @@ void R_Register( void ) {
     r_flareSize = ri.Cvar_Get( "r_flareSize", "40", CVAR_ARCHIVE );
     r_flareCoeff = ri.Cvar_Get( "r_flareCoeff", "1", CVAR_ARCHIVE );
 
-    // Register missing cvars to avoid NULL dereference in vk.c
-    r_fbo = ri.Cvar_Get( "r_fbo", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
-    r_hdr = ri.Cvar_Get( "r_hdr", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_fbo = ri.Cvar_Get( "r_fbo", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_hdr = ri.Cvar_Get( "r_hdr", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
     r_presentBits = ri.Cvar_Get( "r_presentBits", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
     r_texturebits = ri.Cvar_Get( "r_texturebits", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
     r_lodscale = ri.Cvar_Get( "r_lodscale", "5", CVAR_CHEAT );
     r_ambientScale = ri.Cvar_Get( "r_ambientScale", "0.6", CVAR_CHEAT );
     r_defaultImage = ri.Cvar_Get( "r_defaultImage", "", CVAR_ARCHIVE_ND | CVAR_LATCH );
-
-    r_fontSDF = ri.Cvar_Get( "r_fontSDF", "0", CVAR_ARCHIVE | CVAR_LATCH );
 }
 
 // Cvar definitions
 cvar_t *r_neatsky;
 cvar_t *r_printShaders;
-cvar_t *r_fontSDF;
 
 void R_Init( void ) {
     static qboolean initialized = qfalse;
