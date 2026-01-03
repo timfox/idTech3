@@ -2131,6 +2131,13 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 		return NULL;
 	}
 
+	// Check QVM format and adjust interpretation mode
+	// Old VM_MAGIC format QVMs should use interpretation, not compilation
+	if ( LittleLong( header->vmMagic ) == VM_MAGIC && interpret >= VMI_COMPILED ) {
+		Com_Printf( "VM_Create: Old QVM format detected, falling back to interpretation for %s\n", name );
+		interpret = VMI_BYTECODE;
+	}
+
 	// allocate space for the jump targets, which will be filled in by the compile/prep functions
 	vm->instructionCount = header->instructionCount;
 	//vm->instructionPointers = Hunk_Alloc(vm->instructionCount * sizeof(*vm->instructionPointers), h_high);

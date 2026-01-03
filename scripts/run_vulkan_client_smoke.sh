@@ -33,22 +33,39 @@ BASE_MOD_DIR="/home/tim/Desktop/idtech3/mods/demo"
 #   MAP_TO_USE="oa_dm1"
 # fi
 
-echo "Launching server (base content)..."
+echo "Starting virtual display and processes..."
+
 if [ -f /tmp/server_smoke.pid ]; then
   kill "$(cat /tmp/server_smoke.pid)" 2>/dev/null || true
 fi
+if [ -f /tmp/client_smoke.pid ]; then
+  kill "$(cat /tmp/client_smoke.pid)" 2>/dev/null || true
+fi
+
+# Start server
 ${SERVER_BIN} +map q3dm6 > "$LOG" 2>&1 &
 SERVER_PID=$!
 echo "Server PID: $SERVER_PID"
+echo "$SERVER_PID" > /tmp/server_smoke.pid
 
-echo "Launching client..."
-${CLIENT_BIN} +connect localhost +set cl_playIntro 0 > "$LOG.client" 2>&1 &
+# Start client
+${CLIENT_BIN} +connect localhost +set fs_game mymod +set cl_playIntro 0 > "$LOG.client" 2>&1 &
 CLIENT_PID=$!
 echo "Client PID: $CLIENT_PID"
+echo "$CLIENT_PID" > /tmp/client_smoke.pid
 
-echo "Logs:"
-tail -n +1 -f "$LOG" &
-TAIL_PID=$!
+echo "Waiting for processes to initialize..."
+sleep 5
 
-echo "Done. Logs at $LOG and $LOG.client"
+echo "Server log ($LOG):"
+echo "=================="
+tail -20 "$LOG"
+echo ""
+echo "Client log ($LOG.client):"
+echo "========================="
+tail -20 "$LOG.client"
+
+echo ""
+echo "Monitoring server log (press Ctrl+C to stop)..."
+tail -f "$LOG"
 
