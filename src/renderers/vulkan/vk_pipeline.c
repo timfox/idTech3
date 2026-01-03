@@ -350,8 +350,76 @@ static VkShaderModule vk_load_spirv_shader(const char *filename) {
 	file_len = ri.FS_ReadFile(filepath, &spirv_data);
 	if (file_len <= 0 || !spirv_data) {
 		ri.Printf(PRINT_WARNING, "Failed to open SPIR-V file: %s (len=%d), using fallback\n", filepath, file_len);
-		// Create a minimal dummy shader module to prevent crashes
-		// This creates a simple shader that can be used as fallback
+		// Try embedded SPIR-V data as a fallback before resorting to a dummy shader
+        // Embedded shader blob support (dot_vert/dot_frag/color_vert/color_frag/fog_vert/fog_frag)
+        if (strcmp(filepath, "dot_vert.spv") == 0) {
+            extern const unsigned char dot_vert_spv[1192];
+            VkShaderModuleCreateInfo createInfo = {
+                .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                .codeSize = 1192,
+                .pCode = (const uint32_t*)dot_vert_spv
+            };
+            VkShaderModule module;
+            if (vkCreateShaderModule(vk.device, &createInfo, NULL, &module) == VK_SUCCESS) {
+                return module;
+            }
+        } else if (strcmp(filepath, "dot_frag.spv") == 0) {
+            extern const unsigned char dot_frag_spv[544];
+            VkShaderModuleCreateInfo createInfo = {
+                .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                .codeSize = 544,
+                .pCode = (const uint32_t*)dot_frag_spv
+            };
+            VkShaderModule module;
+            if (vkCreateShaderModule(vk.device, &createInfo, NULL, &module) == VK_SUCCESS) {
+                return module;
+            }
+        } else if (strcmp(filepath, "color_vert.spv") == 0) {
+            extern const unsigned char color_vert_spv[872];
+            VkShaderModuleCreateInfo createInfo = {
+                .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                .codeSize = 872,
+                .pCode = (const uint32_t*)color_vert_spv
+            };
+            VkShaderModule module;
+            if (vkCreateShaderModule(vk.device, &createInfo, NULL, &module) == VK_SUCCESS) {
+                return module;
+            }
+        } else if (strcmp(filepath, "color_frag.spv") == 0) {
+            extern const unsigned char color_frag_spv[1296];
+            VkShaderModuleCreateInfo createInfo = {
+                .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                .codeSize = 1296,
+                .pCode = (const uint32_t*)color_frag_spv
+            };
+            VkShaderModule module;
+            if (vkCreateShaderModule(vk.device, &createInfo, NULL, &module) == VK_SUCCESS) {
+                return module;
+            }
+        } else if (strcmp(filepath, "fog_vert.spv") == 0) {
+            extern const unsigned char fog_vert_spv[2700];
+            VkShaderModuleCreateInfo createInfo = {
+                .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                .codeSize = 2700,
+                .pCode = (const uint32_t*)fog_vert_spv
+            };
+            VkShaderModule module;
+            if (vkCreateShaderModule(vk.device, &createInfo, NULL, &module) == VK_SUCCESS) {
+                return module;
+            }
+        } else if (strcmp(filepath, "fog_frag.spv") == 0) {
+            extern const unsigned char fog_frag_spv[1240];
+            VkShaderModuleCreateInfo createInfo = {
+                .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+                .codeSize = 1240,
+                .pCode = (const uint32_t*)fog_frag_spv
+            };
+            VkShaderModule module;
+            if (vkCreateShaderModule(vk.device, &createInfo, NULL, &module) == VK_SUCCESS) {
+                return module;
+            }
+        }
+		// Create a minimal dummy shader to prevent crashes if embedded is not available
 		static const uint32_t dummy_spirv[] = {
 			// Minimal SPIR-V header for a simple shader
 			0x07230203, 0x00010000, 0x00080001, 0x0000000D, 0x00000000, 0x00020011,

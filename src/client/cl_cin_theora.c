@@ -3,6 +3,15 @@
 #include "client.h"
 #include "cl_cin_codec.h"
 #include <theora/theora.h>
+// region agent log
+static void agent_log(const char* hypothesisId, const char* location, const char* message) {
+  FILE* f = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
+  if (!f) return;
+  long long ts = (long long)time(NULL) * 1000;
+  fprintf(f, "{\"sessionId\":\"debug-session\",\"runId\":\"runtime-test\",\"hypothesisId\":\"%s\",\"location\":\"%s\",\"message\":\"%s\",\"timestamp\":%lld}\n", hypothesisId, location, message, ts);
+  fclose(f);
+}
+// endregion
 #include <theora/theoradec.h>
 #include <ogg/ogg.h>
 
@@ -278,6 +287,10 @@ e_status Theora_Run(int handle) {
 	}
 
 	data = (theora_data_t *)cinTable[handle].codecData;
+	// A1: function entry log
+	char _logbuf[256];
+	snprintf(_logbuf, sizeof(_logbuf), "handle=%d data=%p init=%d", handle, (void*)data, data ? data->initialized : -1);
+	agent_log("A1","src/client/cl_cin_theora.c:Theora_Run entry", _logbuf);
     Com_Printf("Theora_Run: data=%p initialized=%d decoder=%p\n",
         (void*)data, data ? data->initialized : -1, (void*)(data ? data->theora_decoder : NULL));
 	if (!data || !data->initialized) {
@@ -321,21 +334,66 @@ e_status Theora_Run(int handle) {
 					cinTable[handle].status = FMV_EOF;
 					return FMV_EOF;
 				}
-				th_decode_ycbcr_out(data->theora_decoder, ycbcr);
-
-				// Validate YUV buffer
-				if (!ycbcr[0].data || !ycbcr[1].data || !ycbcr[2].data) {
+	th_decode_ycbcr_out(data->theora_decoder, ycbcr);
+	// A2: after decode
+	{
+		char _logbuf2[256];
+		snprintf(_logbuf2, sizeof(_logbuf2), "decoded_ycbcr=%p %p %p", ycbcr[0].data, ycbcr[1].data, ycbcr[2].data);
+		agent_log("A2","src/client/cl_cin_theora.c:Theora_Run after_decode", _logbuf2);
+	}
+    // Additional safety: ensure buffers exist after decode
+    if (!data->theora_decoder || !ycbcr[0].data || !ycbcr[1].data || !ycbcr[2].data || !cinTable[handle].buf) {
+        Com_Printf("Theora_Run: invalid post-decode buffers\n");
+        cinTable[handle].status = FMV_EOF;
+        return FMV_EOF;
+    }
+    // Validate YUV buffer
+    if (!ycbcr[0].data || !ycbcr[1].data || !ycbcr[2].data) {
 					Com_Printf("Theora_Run: invalid YUV buffer from decoder\n");
 					cinTable[handle].status = FMV_EOF;
 					return FMV_EOF;
 				}
 
-				// Convert YUV to RGB
-				if (cinTable[handle].buf) {
-					Theora_YUVtoRGB(ycbcr, cinTable[handle].buf, 
-						cinTable[handle].CIN_WIDTH, cinTable[handle].CIN_HEIGHT);
-					cinTable[handle].dirty = qtrue;
+		// A3: before RGB conversion guard log
+		{
+			char _logbuf3[256];
+			snprintf(_logbuf3, sizeof(_logbuf3), "buf=%p y0=%p y1=%p y2=%p", cinTable[handle].buf, ycbcr[0].data, ycbcr[1].data, ycbcr[2].data);
+			agent_log("A3","src/client/cl_cin_theora.c:Theora_Run RGB_guard", _logbuf3);
+		}
+		// A3: before RGB conversion guard log
+		{
+			char _logbuf3[256];
+			snprintf(_logbuf3, sizeof(_logbuf3), "buf=%p y0=%p y1=%p y2=%p", cinTable[handle].buf, ycbcr[0].data, ycbcr[1].data, ycbcr[2].data);
+			agent_log("A3","src/client/cl_cin_theora.c:Theora_Run RGB_guard", _logbuf3);
+		}
+                // A3: before RGB conversion guard log
+                {
+                    char _logbuf3[256];
+                    snprintf(_logbuf3, sizeof(_logbuf3), "buf=%p y0=%p y1=%p y2=%p", cinTable[handle].buf, ycbcr[0].data, ycbcr[1].data, ycbcr[2].data);
+                    agent_log("A3","src/client/cl_cin_theora.c:Theora_Run RGB_guard", _logbuf3);
+                }
+                // Convert YUV to RGB (guard against invalid/NULL YCbCr buffers)
+                if (cinTable[handle].buf && ycbcr[0].data && ycbcr[1].data && ycbcr[2].data) {
+                Theora_YUVtoRGB(ycbcr, cinTable[handle].buf, 
+                    cinTable[handle].CIN_WIDTH, cinTable[handle].CIN_HEIGHT);
+                cinTable[handle].dirty = qtrue;
+                {
+                    char _logbuf4[256];
+                    snprintf(_logbuf4, sizeof(_logbuf4), "frame_count=%d", data ? data->frame_count : -1);
+                    agent_log("A4","src/client/cl_cin_theora.c:Theora_Run RGB_done", _logbuf4);
+                }
+				{
+					char _logbuf4[256];
+					snprintf(_logbuf4, sizeof(_logbuf4), "frame_count=%d", data ? data->frame_count : -1);
+					agent_log("A4","src/client/cl_cin_theora.c:Theora_Run RGB_done", _logbuf4);
 				}
+				// A4: after RGB conversion
+                {
+                    char _logbuf4[256];
+                    snprintf(_logbuf4, sizeof(_logbuf4), "frame_count=%d", data ? data->frame_count : -1);
+                    agent_log("A4","src/client/cl_cin_theora.c:Theora_Run RGB_done", _logbuf4);
+                }
+                }
 				
 				data->frame_count++;
 				data->last_frame_time = current_time;
