@@ -499,7 +499,7 @@ VkPipeline vk_find_pipeline_ext(int base_pipeline, Vk_Pipeline_Def* def, qboolea
 
 index = vk_alloc_pipeline(def);
 	if (index == 0) {
-		ri.Printf(PRINT_ERROR, "vk_find_pipeline_ext: failed to allocate pipeline\n");
+		ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext: pipeline limit reached, will try existing pipelines\n");
 		return VK_NULL_HANDLE;
 	}
 if (getenv("VK_VERBOSE_PIPELINE_LOGS")) {

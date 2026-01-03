@@ -150,35 +150,53 @@ Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI(int
     }
     Com_Memset(&re, 0, sizeof(re));
     if (g_vulkan_patch1_tiny_enabled) {
-      // Tiny surface: only core lifecycle and essential render pointer
+      // Tiny surface: core lifecycle + essential functions for basic operation
       re.GetConfig = RE_GetConfig;
       re.Shutdown = RE_Shutdown;
       re.BeginRegistration = RE_BeginRegistration;
+      re.RegisterShader = RE_RegisterShader;
+      re.RegisterShaderNoMip = RE_RegisterShaderNoMip;
       re.EndRegistration = RE_EndRegistration;
       re.BeginFrame = RE_BeginFrame;
       re.EndFrame = RE_EndFrame;
       re.RenderScene = RE_RenderScene;
       re.SetColor = RE_SetColor;
+      re.ClearScene = RE_ClearScene;
+      re.AddRefEntityToScene = RE_AddRefEntityToScene;
+      re.AddPolyToScene = RE_AddPolyToScene;
       g_vulkan_patch1_enabled = qtrue;
       g_vulkan_patch1_tiny_enabled = qtrue;
       ri.Printf(PRINT_ALL, "PLAN: Vulkan patch1 surface implicitly enabled by tiny flag\n");
       ri.Printf(PRINT_ALL, "PLAN: Vulkan patch1 tiny surface wired (API version: %d)\n", apiVersion);
     } else {
-      // Expanded plan surface (guarded)
+      // Expanded plan surface (guarded) - include essential functions for CL_InitRenderer
       re.GetConfig = RE_GetConfig;
       re.Shutdown = RE_Shutdown;
       re.BeginRegistration = RE_BeginRegistration;
+      re.RegisterModel = RE_RegisterModel;
+      re.RegisterSkin = RE_RegisterSkin;
+      re.RegisterShader = RE_RegisterShader;
+      re.RegisterShaderNoMip = RE_RegisterShaderNoMip;
+      re.LoadWorld = RE_LoadWorldMap;
+      re.SetWorldVisData = RE_SetWorldVisData;
       re.EndRegistration = RE_EndRegistration;
       re.BeginFrame = RE_BeginFrame;
       re.EndFrame = RE_EndFrame;
-      re.RenderScene = RE_RenderScene;
-      re.SetColor = RE_SetColor;
-      // Expanded basic render surface
+      re.MarkFragments = R_MarkFragments;
+      re.LerpTag = R_LerpTag;
+      re.ModelBounds = R_ModelBounds;
       re.ClearScene = RE_ClearScene;
       re.AddRefEntityToScene = RE_AddRefEntityToScene;
       re.AddPolyToScene = RE_AddPolyToScene;
+      re.RenderScene = RE_RenderScene;
+      re.SetColor = RE_SetColor;
+      re.DrawStretchPic = RE_StretchPic;
+      re.DrawStretchRaw = RE_StretchRaw;
       re.UploadCinematic = RE_UploadCinematic;
-      ri.Printf(PRINT_ALL, "PLAN: Vulkan patch1 surface wired (API version: %d)\n", apiVersion);
+      re.RegisterFont = RE_RegisterFont;
+      re.RemapShader = RE_RemapShader;
+      re.GetEntityToken = RE_GetEntityToken;
+      ri.Printf(PRINT_ALL, "PLAN: Vulkan patch1 surface wired (full API) (API version: %d)\n", apiVersion);
     }
     return &re;
   }

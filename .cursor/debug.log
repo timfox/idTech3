@@ -31,3 +31,163 @@
 {"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5d73aa669680 init=1","timestamp":1767409319000}
 {"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x60eef24a6680 init=1","timestamp":1767409346000}
 {"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x56e58e93a680 init=1","timestamp":1767409353000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x62c72a720680 init=1","timestamp":1767409485000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5fc9bcd2a680 init=1","timestamp":1767409509000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5c71bf67c680 init=1","timestamp":1767409531000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5cb5835d4680 init=1","timestamp":1767409561000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5aa7f7d1e680 init=1","timestamp":1767409588000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x568b3ef35680 init=1","timestamp":1767409592000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x57cdf2f34e10 init=1","timestamp":1767413277000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x555556752740 init=1","timestamp":1767413292000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x613f40b78680 init=1","timestamp":1767413362000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x64db226eb680 init=1","timestamp":1767413366000}
+{"id":"log_1767413367_E","timestamp":1767413367000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x575676682680 init=1","timestamp":1767413372000}
+{"id":"log_1767413372_E","timestamp":1767413372000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x62d1b1f4ae10 init=1","timestamp":1767413580000}
+{"id":"log_1767413580_E","timestamp":1767413580000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x555556752740 init=1","timestamp":1767413633000}
+{"id":"log_1767413634_E","timestamp":1767413634000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x59dec1e08680 init=1","timestamp":1767413680000}
+{"id":"log_1767413681_E","timestamp":1767413681000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x59c784900700 init=1","timestamp":1767413683000}
+{"id":"log_1767413684_E","timestamp":1767413684000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x62c1ece30520 init=1","timestamp":1767413686000}
+{"id":"log_1767413687_E","timestamp":1767413687000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x56b59b369700 init=1","timestamp":1767413690000}
+{"id":"log_1767413691_E","timestamp":1767413691000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x632f024a0700 init=1","timestamp":1767413693000}
+{"id":"log_1767413694_E","timestamp":1767413694000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x58b9c6957700 init=1","timestamp":1767413697000}
+{"id":"log_1767413698_E","timestamp":1767413698000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5607851b9d10 init=1","timestamp":1767413852000}
+{"id":"log_1767413852_E","timestamp":1767413852000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5cc782fbb700 init=1","timestamp":1767413880000}
+{"id":"log_1767413881_E","timestamp":1767413881000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x555c51e2a700 init=1","timestamp":1767413883000}
+{"id":"log_1767413884_E","timestamp":1767413884000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5d9463d44700 init=1","timestamp":1767413886000}
+{"id":"log_1767413886_E","timestamp":1767413886000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5bf186a75700 init=1","timestamp":1767413891000}
+{"id":"log_1767413891_E","timestamp":1767413891000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x60e1d8d604c0 init=1","timestamp":1767413895000}
+{"id":"log_1767413895_E","timestamp":1767413895000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x635dbc65c700 init=1","timestamp":1767413912000}
+{"id":"log_1767413913_E","timestamp":1767413913000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5a5cabc9b700 init=1","timestamp":1767413916000}
+{"id":"log_1767413916_E","timestamp":1767413916000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5c9837cd2700 init=1","timestamp":1767413935000}
+{"id":"log_1767413936_E","timestamp":1767413936000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5ada628c4700 init=1","timestamp":1767413946000}
+{"id":"log_1767413947_E","timestamp":1767413947000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x64b078a74760 init=1","timestamp":1767413949000}
+{"id":"log_1767413950_E","timestamp":1767413950000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5e6941d4d760 init=1","timestamp":1767413966000}
+{"id":"log_1767413967_E","timestamp":1767413967000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5e2c263b0700 init=1","timestamp":1767413970000}
+{"id":"log_1767413971_E","timestamp":1767413971000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5ef03d2db700 init=1","timestamp":1767413974000}
+{"id":"log_1767413975_E","timestamp":1767413975000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x590c298e2700 init=1","timestamp":1767414032000}
+{"id":"log_1767414032_E","timestamp":1767414032000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x60bcd174a780 init=1","timestamp":1767414057000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x60bcd174a780 init=1","timestamp":1767414057000}
+{"id":"log_1767414058_E","timestamp":1767414058000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5d921cdb2700 init=1","timestamp":1767414113000}
+{"id":"log_1767414114_E","timestamp":1767414114000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x570131746700 init=1","timestamp":1767414136000}
+{"id":"log_1767414137_E","timestamp":1767414137000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x57c77cda9700 init=1","timestamp":1767414140000}
+{"id":"log_1767414140_E","timestamp":1767414140000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x620e52cc2680 init=1","timestamp":1767414155000}
+{"id":"log_1767414156_E","timestamp":1767414156000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5fc3a89a3700 init=1","timestamp":1767414175000}
+{"id":"log_1767414175_E","timestamp":1767414175000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"timestamp":1313,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":1313,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":1313,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":1313,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_result","hypothesisId":"H1","data":{"result":0,"image_index":1}}
+{"timestamp":1313,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":0}}
+{"timestamp":1313,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":0}}
+{"timestamp":2313,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":0,"result":2,"image_index":1}}
+{"timestamp":2313,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":0,"image_index":1}}
+{"timestamp":2313,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":1}}
+{"timestamp":2313,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":1}}
+{"timestamp":3313,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":1,"result":2,"image_index":1}}
+{"timestamp":3313,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":1,"image_index":1}}
+{"timestamp":3313,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":2}}
+{"timestamp":3313,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":2}}
+{"timestamp":4314,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":2,"result":2,"image_index":1}}
+{"timestamp":4314,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":2,"image_index":1}}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5a6194174680 init=1","timestamp":1767414313000}
+{"id":"log_1767414313_E","timestamp":1767414313000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5b9425f84620 init=1","timestamp":1767414331000}
+{"id":"log_1767414331_E","timestamp":1767414331000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5b155f4d7680 init=1","timestamp":1767414349000}
+{"timestamp":1774,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":1774,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":1774,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":1774,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_result","hypothesisId":"H1","data":{"result":0,"image_index":1}}
+{"timestamp":1775,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":0}}
+{"timestamp":1775,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":0}}
+{"timestamp":2775,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":0,"result":2,"image_index":1}}
+{"timestamp":2775,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":0,"image_index":1}}
+{"timestamp":2775,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":1}}
+{"timestamp":2775,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":1}}
+{"timestamp":3775,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":1,"result":2,"image_index":1}}
+{"timestamp":3775,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":1,"image_index":1}}
+{"timestamp":3775,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":2}}
+{"timestamp":3775,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":2}}
+{"timestamp":4775,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":2,"result":2,"image_index":1}}
+{"timestamp":4775,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":2,"image_index":1}}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5e67a87bd680 init=1","timestamp":1767414372000}
+{"timestamp":897,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":897,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":897,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":897,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_result","hypothesisId":"H1","data":{"result":0,"image_index":1}}
+{"timestamp":897,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":0}}
+{"timestamp":897,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":0}}
+{"timestamp":1897,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":0,"result":2,"image_index":1}}
+{"timestamp":1897,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":0,"image_index":1}}
+{"timestamp":1897,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":1}}
+{"timestamp":1897,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":1}}
+{"timestamp":2897,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":1,"result":2,"image_index":1}}
+{"timestamp":2897,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":1,"image_index":1}}
+{"timestamp":2897,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":2}}
+{"timestamp":2897,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":2}}
+{"timestamp":3897,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":2,"result":2,"image_index":1}}
+{"timestamp":3897,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":2,"image_index":1}}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5ad8d799f680 init=1","timestamp":1767414391000}
+{"timestamp":761,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":761,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":761,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":761,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_result","hypothesisId":"H1","data":{"result":0,"image_index":1}}
+{"timestamp":761,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":0}}
+{"timestamp":761,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":0}}
+{"timestamp":1761,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":0,"result":2,"image_index":1}}
+{"timestamp":1761,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":0,"image_index":1}}
+{"timestamp":1761,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":1}}
+{"timestamp":1761,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":1}}
+{"timestamp":2761,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":1,"result":2,"image_index":1}}
+{"timestamp":2761,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":1,"image_index":1}}
+{"timestamp":2761,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":2}}
+{"timestamp":2761,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":2}}
+{"timestamp":3761,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":2,"result":2,"image_index":1}}
+{"timestamp":3762,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":2,"image_index":1}}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x57bbaceac680 init=1","timestamp":1767414411000}
+{"timestamp":552,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":552,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":552,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":552,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_result","hypothesisId":"H1","data":{"result":0,"image_index":1}}
+{"timestamp":552,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":0}}
+{"timestamp":552,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":0}}
+{"timestamp":1552,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":0,"result":2,"image_index":1}}
+{"timestamp":1553,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":0,"image_index":1}}
+{"timestamp":1553,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":1}}
+{"timestamp":1553,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":1}}
+{"timestamp":2553,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":1,"result":2,"image_index":1}}
+{"timestamp":2553,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":1,"image_index":1}}
+{"timestamp":2553,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":2}}
+{"timestamp":2553,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":2}}
+{"timestamp":3553,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":2,"result":2,"image_index":1}}
+{"timestamp":3553,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":2,"image_index":1}}

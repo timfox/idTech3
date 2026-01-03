@@ -1878,6 +1878,11 @@ void CL_PlayCinematic_f( void ) {
 		// Don't reset client state immediately - let it stay in cinematic mode
 		// The cinematic will be stopped by user input or other means
 		Com_Printf("Cinematic finished, but keeping cls.state as CA_CINEMATIC\n");
+
+		// For headless operation, just stop the cinematic handle
+		// The application will continue with normal initialization
+		Com_Printf("DEBUG: Stopping cinematic handle for headless operation\n");
+		CL_handle = -1; // Stop cinematic
 	}
 }
 
@@ -1891,7 +1896,12 @@ void SCR_DrawCinematic( void ) {
 
 void SCR_RunCinematic( void ) {
 	if (CL_handle >= 0 && CL_handle < MAX_VIDEO_HANDLES) {
-		CIN_RunCinematic(CL_handle);
+		e_status status = CIN_RunCinematic(CL_handle);
+		// If cinematic reached EOF, stop it automatically (like user pressing a key)
+		if (status == FMV_EOF) {
+			SCR_StopCinematic();
+			cls.state = CA_DISCONNECTED; // Transition out of cinematic mode
+		}
 	}
 }
 

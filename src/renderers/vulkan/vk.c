@@ -3459,6 +3459,15 @@ static void init_vulkan_library( void )
 				vk.renderScaleX = vk.renderScaleY = 1.0f;
 
 				// Initialize glConfig with window dimensions and Vulkan-compatible values (required for engine compatibility)
+				Com_Memset(&glConfig, 0, sizeof(glConfig)); // Clear entire structure first
+
+				// Initialize string fields with safe defaults
+				Q_strncpyz(glConfig.renderer_string, "Vulkan Renderer", sizeof(glConfig.renderer_string));
+				Q_strncpyz(glConfig.vendor_string, "Vulkan", sizeof(glConfig.vendor_string));
+				Q_strncpyz(glConfig.version_string, "Vulkan 1.4", sizeof(glConfig.version_string));
+				Q_strncpyz(glConfig.extensions_string, "Vulkan extensions", sizeof(glConfig.extensions_string));
+
+				// Initialize numeric fields
 				glConfig.vidWidth = vk.renderWidth;
 				glConfig.vidHeight = vk.renderHeight;
 				glConfig.windowAspect = (float)vk.renderWidth / (float)vk.renderHeight;
@@ -3475,6 +3484,7 @@ static void init_vulkan_library( void )
 				glConfig.numTextureUnits = 32; // Many texture units
 				glConfig.textureCompression = TC_NONE; // No texture compression for Vulkan
 				glConfig.textureEnvAddAvailable = qtrue;
+				glConfig.displayFrequency = 60; // Default refresh rate
 
 				ri.Printf(PRINT_ALL, "Vulkan: Render dimensions set to %dx%d\n", vk.renderWidth, vk.renderHeight);
 
