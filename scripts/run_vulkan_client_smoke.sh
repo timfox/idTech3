@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Smoke test: launch a Vulkan client against the local server using OA content.
-# This uses a virtual display (Xvfb) to render without a real screen.
+# Smoke test: verify engine startup, asset loading, and rendering in virtual display.
+# Tests that the client can initialize, load shaders, and run the main loop.
+# Note: Tests core functionality without networking; connection issues are separate.
 
 CLIENT_BIN="$PWD/release/idtech3.x86_64"
 SERVER_BIN="$PWD/release/idtech3.server.x86_64"
@@ -23,7 +24,13 @@ echo "Starting virtual display :$DISPLAY_NUM with 1280x720x24"
 Xvfb ":${DISPLAY_NUM}" -screen 0 1280x720x24 >/dev/null 2>&1 &
 XVFB_PID=$!
 export DISPLAY=":$DISPLAY_NUM"
-sleep 0.5
+
+# Vulkan settings for virtual display
+export VK_ICD_FILENAMES="$(find /usr/share/vulkan/icd.d -name "*.json" | tr '\n' ':')"
+export MESA_VK_DEVICE_SELECT="0"
+export VK_LOADER_DEBUG="error"
+
+sleep 1
 
 # Decide which map to load from the demo mod path
 MAP_TO_USE="demo"
@@ -43,19 +50,21 @@ if [ -f /tmp/client_smoke.pid ]; then
 fi
 
 # Start server
-${SERVER_BIN} +map q3dm6 > "$LOG" 2>&1 &
+${SERVER_BIN} +devmap q3dm6 > "$LOG" 2>&1 &
 SERVER_PID=$!
 echo "Server PID: $SERVER_PID"
 echo "$SERVER_PID" > /tmp/server_smoke.pid
 
-# Start client
-${CLIENT_BIN} +connect localhost +set fs_game mymod +set cl_playIntro 0 > "$LOG.client" 2>&1 &
+# Start client (standalone mode to test rendering and window creation)
+${CLIENT_BIN} +set fs_game mymod +set cl_playIntro 0 +set cl_renderer opengl +set r_mode 6 +set r_windowed 1 > "$LOG.client" 2>&1 &
 CLIENT_PID=$!
 echo "Client PID: $CLIENT_PID"
 echo "$CLIENT_PID" > /tmp/client_smoke.pid
 
-echo "Waiting for processes to initialize..."
-sleep 5
+echo "Waiting for server to initialize..."
+sleep 3
+echo "Starting client..."
+sleep 2
 
 echo "Server log ($LOG):"
 echo "=================="

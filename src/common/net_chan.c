@@ -822,7 +822,7 @@ int NET_StringToAdr( const char *s, netadr_t *a, netadrtype_t family )
 	}
 
 	Q_strncpyz( base, s, sizeof( base ) );
-	
+
 	if(*base == '[' || Q_CountChar(base, ':') > 1)
 	{
 		// This is an ipv6 address, handle it specially.
@@ -835,7 +835,7 @@ int NET_StringToAdr( const char *s, netadr_t *a, netadrtype_t family )
 			if(*search == ':')
 				port = search + 1;
 		}
-		
+
 		if(*base == '[')
 			search = base + 1;
 		else
@@ -845,12 +845,12 @@ int NET_StringToAdr( const char *s, netadr_t *a, netadrtype_t family )
 	{
 		// look for a port number
 		port = strchr( base, ':' );
-		
+
 		if ( port ) {
 			*port = '\0';
 			port++;
 		}
-		
+
 		search = base;
 	}
 
