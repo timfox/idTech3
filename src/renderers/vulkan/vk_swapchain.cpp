@@ -305,6 +305,13 @@ qboolean vk_acquire_next_image(void) {
         return qfalse;
     }
 
+#ifdef USE_VULKAN
+    if (VK_IsHeadless()) {
+        // In headless mode, do not acquire swapchain images
+        ri.Printf(PRINT_DEVELOPER, "Vulkan: Headless skip acquireNextImageKHR in vk_swapchain.cpp\n");
+        return VK_NOT_READY;
+    }
+#endif
     VkResult result = qvkAcquireNextImageKHR(vk.device, vk.swapchain, UINT64_MAX,
                                              vk.image_available, VK_NULL_HANDLE,
                                              &vk.current_swapchain_image_index);

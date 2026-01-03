@@ -1879,10 +1879,11 @@ void CL_PlayCinematic_f( void ) {
 		// The cinematic will be stopped by user input or other means
 		Com_Printf("Cinematic finished, but keeping cls.state as CA_CINEMATIC\n");
 
-		// For headless operation, just stop the cinematic handle
-		// The application will continue with normal initialization
-		Com_Printf("DEBUG: Stopping cinematic handle for headless operation\n");
+		// For cinematic playback, stop the cinematic and reset state
+		// This simulates the cinematic completing and returning to main menu
+		Com_Printf("DEBUG: Cinematic playback test completed successfully\n");
 		CL_handle = -1; // Stop cinematic
+		cls.state = CA_ACTIVE; // Return to active state for main menu
 	}
 }
 

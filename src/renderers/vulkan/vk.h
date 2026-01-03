@@ -689,6 +689,7 @@ typedef struct {
 // Main Vulkan instance structure
 typedef struct {
     qboolean active;
+    qboolean headless;
     VkInstance instance;
 
     // Bindless support
@@ -1442,6 +1443,12 @@ typedef struct {
 
 // Global Vulkan instance
 extern Vk_Instance vk;
+
+// Lightweight helper to query headless mode (inlined for zero-cost checks)
+static inline qboolean VK_IsHeadless(void)
+{
+    return vk.headless;
+}
 
 // Function prototypes
 void vk_begin_main_render_pass(void);

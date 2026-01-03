@@ -1,193 +1,201 @@
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5c376b9570f0 init=1","timestamp":1767405948000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x633a29fb00f0 init=1","timestamp":1767405980000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x6159fb3600f0 init=1","timestamp":1767406592000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x59220e9fcdb0 init=1","timestamp":1767406748000}
-{"id":"log_1767406748_E","timestamp":1767406748000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x62f75b28ce10 init=1","timestamp":1767406787000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x63d73672d0f0 init=1","timestamp":1767406801000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x555556752740 init=1","timestamp":1767406843000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x55d037c0d0f0 init=1","timestamp":1767406844000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x62359b2f90f0 init=1","timestamp":1767406936000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5814cb7bfe10 init=1","timestamp":1767407555000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x555556752740 init=1","timestamp":1767407604000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x555556752740 init=1","timestamp":1767408743000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5555567fec60 init=1","timestamp":1767409041000}
-{"id":"log_1767409041_E","timestamp":1767409041000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x609423f07680 init=1","timestamp":1767409045000}
-{"id":"log_1767409046_E","timestamp":1767409046000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x63f15a9e7680 init=1","timestamp":1767409060000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5d6a6fdb1680 init=1","timestamp":1767409100000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5fcdf6f88680 init=1","timestamp":1767409105000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5bd2663bd680 init=1","timestamp":1767409131000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5779357d7680 init=1","timestamp":1767409137000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x64d16e49e680 init=1","timestamp":1767409140000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x595008493680 init=1","timestamp":1767409152000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x64c9e597d680 init=1","timestamp":1767409187000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5f62eba09680 init=1","timestamp":1767409193000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x628b88d95680 init=1","timestamp":1767409199000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x63cb5e991680 init=1","timestamp":1767409211000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x587b9aa17680 init=1","timestamp":1767409218000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5df8b854a680 init=1","timestamp":1767409263000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5d73aa669680 init=1","timestamp":1767409319000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x60eef24a6680 init=1","timestamp":1767409346000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x56e58e93a680 init=1","timestamp":1767409353000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x62c72a720680 init=1","timestamp":1767409485000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5fc9bcd2a680 init=1","timestamp":1767409509000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5c71bf67c680 init=1","timestamp":1767409531000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5cb5835d4680 init=1","timestamp":1767409561000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5aa7f7d1e680 init=1","timestamp":1767409588000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x568b3ef35680 init=1","timestamp":1767409592000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x57cdf2f34e10 init=1","timestamp":1767413277000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x555556752740 init=1","timestamp":1767413292000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x613f40b78680 init=1","timestamp":1767413362000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x64db226eb680 init=1","timestamp":1767413366000}
-{"id":"log_1767413367_E","timestamp":1767413367000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x575676682680 init=1","timestamp":1767413372000}
-{"id":"log_1767413372_E","timestamp":1767413372000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x62d1b1f4ae10 init=1","timestamp":1767413580000}
-{"id":"log_1767413580_E","timestamp":1767413580000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x555556752740 init=1","timestamp":1767413633000}
-{"id":"log_1767413634_E","timestamp":1767413634000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x59dec1e08680 init=1","timestamp":1767413680000}
-{"id":"log_1767413681_E","timestamp":1767413681000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x59c784900700 init=1","timestamp":1767413683000}
-{"id":"log_1767413684_E","timestamp":1767413684000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x62c1ece30520 init=1","timestamp":1767413686000}
-{"id":"log_1767413687_E","timestamp":1767413687000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x56b59b369700 init=1","timestamp":1767413690000}
-{"id":"log_1767413691_E","timestamp":1767413691000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x632f024a0700 init=1","timestamp":1767413693000}
-{"id":"log_1767413694_E","timestamp":1767413694000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x58b9c6957700 init=1","timestamp":1767413697000}
-{"id":"log_1767413698_E","timestamp":1767413698000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5607851b9d10 init=1","timestamp":1767413852000}
-{"id":"log_1767413852_E","timestamp":1767413852000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5cc782fbb700 init=1","timestamp":1767413880000}
-{"id":"log_1767413881_E","timestamp":1767413881000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x555c51e2a700 init=1","timestamp":1767413883000}
-{"id":"log_1767413884_E","timestamp":1767413884000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5d9463d44700 init=1","timestamp":1767413886000}
-{"id":"log_1767413886_E","timestamp":1767413886000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5bf186a75700 init=1","timestamp":1767413891000}
-{"id":"log_1767413891_E","timestamp":1767413891000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x60e1d8d604c0 init=1","timestamp":1767413895000}
-{"id":"log_1767413895_E","timestamp":1767413895000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x635dbc65c700 init=1","timestamp":1767413912000}
-{"id":"log_1767413913_E","timestamp":1767413913000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5a5cabc9b700 init=1","timestamp":1767413916000}
-{"id":"log_1767413916_E","timestamp":1767413916000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5c9837cd2700 init=1","timestamp":1767413935000}
-{"id":"log_1767413936_E","timestamp":1767413936000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5ada628c4700 init=1","timestamp":1767413946000}
-{"id":"log_1767413947_E","timestamp":1767413947000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x64b078a74760 init=1","timestamp":1767413949000}
-{"id":"log_1767413950_E","timestamp":1767413950000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5e6941d4d760 init=1","timestamp":1767413966000}
-{"id":"log_1767413967_E","timestamp":1767413967000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5e2c263b0700 init=1","timestamp":1767413970000}
-{"id":"log_1767413971_E","timestamp":1767413971000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5ef03d2db700 init=1","timestamp":1767413974000}
-{"id":"log_1767413975_E","timestamp":1767413975000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x590c298e2700 init=1","timestamp":1767414032000}
-{"id":"log_1767414032_E","timestamp":1767414032000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x60bcd174a780 init=1","timestamp":1767414057000}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x60bcd174a780 init=1","timestamp":1767414057000}
-{"id":"log_1767414058_E","timestamp":1767414058000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5d921cdb2700 init=1","timestamp":1767414113000}
-{"id":"log_1767414114_E","timestamp":1767414114000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x570131746700 init=1","timestamp":1767414136000}
-{"id":"log_1767414137_E","timestamp":1767414137000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x57c77cda9700 init=1","timestamp":1767414140000}
-{"id":"log_1767414140_E","timestamp":1767414140000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x620e52cc2680 init=1","timestamp":1767414155000}
-{"id":"log_1767414156_E","timestamp":1767414156000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5fc3a89a3700 init=1","timestamp":1767414175000}
-{"id":"log_1767414175_E","timestamp":1767414175000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"timestamp":1313,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
-{"timestamp":1313,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
-{"timestamp":1313,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
-{"timestamp":1313,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_result","hypothesisId":"H1","data":{"result":0,"image_index":1}}
-{"timestamp":1313,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":0}}
-{"timestamp":1313,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":0}}
-{"timestamp":2313,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":0,"result":2,"image_index":1}}
-{"timestamp":2313,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":0,"image_index":1}}
-{"timestamp":2313,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":1}}
-{"timestamp":2313,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":1}}
-{"timestamp":3313,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":1,"result":2,"image_index":1}}
-{"timestamp":3313,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":1,"image_index":1}}
-{"timestamp":3313,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":2}}
-{"timestamp":3313,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":2}}
-{"timestamp":4314,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":2,"result":2,"image_index":1}}
-{"timestamp":4314,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":2,"image_index":1}}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5a6194174680 init=1","timestamp":1767414313000}
-{"id":"log_1767414313_E","timestamp":1767414313000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5b9425f84620 init=1","timestamp":1767414331000}
-{"id":"log_1767414331_E","timestamp":1767414331000,"location":"cl_cin.c:CIN_DrawCinematic","message":"Render path check","data":{"dirty":1,"CIN_WIDTH":320,"drawX":320,"CIN_HEIGHT":240,"drawY":240},"sessionId":"debug-session","runId":"pre-fix","hypothesisId":"E"}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5b155f4d7680 init=1","timestamp":1767414349000}
-{"timestamp":1774,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
-{"timestamp":1774,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
-{"timestamp":1774,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
-{"timestamp":1774,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_result","hypothesisId":"H1","data":{"result":0,"image_index":1}}
-{"timestamp":1775,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":0}}
-{"timestamp":1775,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":0}}
-{"timestamp":2775,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":0,"result":2,"image_index":1}}
-{"timestamp":2775,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":0,"image_index":1}}
-{"timestamp":2775,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":1}}
-{"timestamp":2775,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":1}}
-{"timestamp":3775,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":1,"result":2,"image_index":1}}
-{"timestamp":3775,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":1,"image_index":1}}
-{"timestamp":3775,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":2}}
-{"timestamp":3775,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":2}}
-{"timestamp":4775,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":2,"result":2,"image_index":1}}
-{"timestamp":4775,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":2,"image_index":1}}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5e67a87bd680 init=1","timestamp":1767414372000}
-{"timestamp":897,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
-{"timestamp":897,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
-{"timestamp":897,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
-{"timestamp":897,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_result","hypothesisId":"H1","data":{"result":0,"image_index":1}}
-{"timestamp":897,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":0}}
-{"timestamp":897,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":0}}
-{"timestamp":1897,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":0,"result":2,"image_index":1}}
-{"timestamp":1897,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":0,"image_index":1}}
-{"timestamp":1897,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":1}}
-{"timestamp":1897,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":1}}
-{"timestamp":2897,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":1,"result":2,"image_index":1}}
-{"timestamp":2897,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":1,"image_index":1}}
-{"timestamp":2897,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":2}}
-{"timestamp":2897,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":2}}
-{"timestamp":3897,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":2,"result":2,"image_index":1}}
-{"timestamp":3897,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":2,"image_index":1}}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5ad8d799f680 init=1","timestamp":1767414391000}
-{"timestamp":761,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
-{"timestamp":761,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
-{"timestamp":761,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
-{"timestamp":761,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_result","hypothesisId":"H1","data":{"result":0,"image_index":1}}
-{"timestamp":761,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":0}}
-{"timestamp":761,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":0}}
-{"timestamp":1761,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":0,"result":2,"image_index":1}}
-{"timestamp":1761,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":0,"image_index":1}}
-{"timestamp":1761,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":1}}
-{"timestamp":1761,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":1}}
-{"timestamp":2761,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":1,"result":2,"image_index":1}}
-{"timestamp":2761,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":1,"image_index":1}}
-{"timestamp":2761,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":2}}
-{"timestamp":2761,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":2}}
-{"timestamp":3761,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":2,"result":2,"image_index":1}}
-{"timestamp":3762,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":2,"image_index":1}}
-{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x57bbaceac680 init=1","timestamp":1767414411000}
-{"timestamp":552,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
-{"timestamp":552,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
-{"timestamp":552,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
-{"timestamp":552,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_result","hypothesisId":"H1","data":{"result":0,"image_index":1}}
-{"timestamp":552,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":0}}
-{"timestamp":552,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":0}}
-{"timestamp":1552,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":0,"result":2,"image_index":1}}
-{"timestamp":1553,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":0,"image_index":1}}
-{"timestamp":1553,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":1}}
-{"timestamp":1553,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":1}}
-{"timestamp":2553,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":1,"result":2,"image_index":1}}
-{"timestamp":2553,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":1,"image_index":1}}
-{"timestamp":2553,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":2}}
-{"timestamp":2553,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":2}}
-{"timestamp":3553,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":2,"result":2,"image_index":1}}
-{"timestamp":3553,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":2,"image_index":1}}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x56ece420a680 init=1","timestamp":1767414624000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A2","location":"src/client/cl_cin_theora.c:Theora_Run after_decode","message":"decoded_ycbcr=0x764c23d4e620 0x764c23d65c20 0x764c23d7d220","timestamp":1767414624000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x764c23c8f010 y0=0x764c23d4e620 y1=0x764c23d65c20 y2=0x764c23d7d220","timestamp":1767414624000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x764c23c8f010 y0=0x764c23d4e620 y1=0x764c23d65c20 y2=0x764c23d7d220","timestamp":1767414624000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x764c23c8f010 y0=0x764c23d4e620 y1=0x764c23d65c20 y2=0x764c23d7d220","timestamp":1767414624000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414624000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414624000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414624000}
+{"timestamp":1677,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":1677,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":1677,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":1677,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_result","hypothesisId":"H1","data":{"result":0,"image_index":1}}
+{"timestamp":1677,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":0}}
+{"timestamp":1677,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":0}}
+{"timestamp":2678,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":0,"result":2,"image_index":1}}
+{"timestamp":2678,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":0,"image_index":1}}
+{"timestamp":2678,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":1}}
+{"timestamp":2678,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":1}}
+{"timestamp":3678,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":1,"result":2,"image_index":1}}
+{"timestamp":3678,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":1,"image_index":1}}
+{"timestamp":3678,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":2}}
+{"timestamp":3678,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":2}}
+{"timestamp":4678,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":2,"result":2,"image_index":1}}
+{"timestamp":4678,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":2,"image_index":1}}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5a609fb5b680 init=1","timestamp":1767414654000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A2","location":"src/client/cl_cin_theora.c:Theora_Run after_decode","message":"decoded_ycbcr=0x70784e22c620 0x70784e243c20 0x70784e25b220","timestamp":1767414654000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x70784e1df010 y0=0x70784e22c620 y1=0x70784e243c20 y2=0x70784e25b220","timestamp":1767414654000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x70784e1df010 y0=0x70784e22c620 y1=0x70784e243c20 y2=0x70784e25b220","timestamp":1767414654000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x70784e1df010 y0=0x70784e22c620 y1=0x70784e243c20 y2=0x70784e25b220","timestamp":1767414654000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414654000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414654000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414654000}
+{"timestamp":977,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":977,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":977,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":977,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_result","hypothesisId":"H1","data":{"result":0,"image_index":1}}
+{"timestamp":977,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":0}}
+{"timestamp":977,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":0}}
+{"timestamp":1977,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":0,"result":2,"image_index":1}}
+{"timestamp":1977,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":0,"image_index":1}}
+{"timestamp":1977,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":1}}
+{"timestamp":1977,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":1}}
+{"timestamp":2977,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":1,"result":2,"image_index":1}}
+{"timestamp":2977,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":1,"image_index":1}}
+{"timestamp":2977,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":2}}
+{"timestamp":2977,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":2}}
+{"timestamp":3977,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":2,"result":2,"image_index":1}}
+{"timestamp":3977,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":2,"image_index":1}}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T1","location":"src/client/cl_cin_theora.c:Theora_Init","message":"page_added: stream_serial=-1848457418","timestamp":1767414701000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T2","location":"src/client/cl_cin_theora.c:Theora_Init","message":"packet_out: size=42, granulepos=0","timestamp":1767414701000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T1","location":"src/client/cl_cin_theora.c:Theora_Init","message":"page_added: stream_serial=-1848457418","timestamp":1767414701000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T2","location":"src/client/cl_cin_theora.c:Theora_Init","message":"packet_out: size=62, granulepos=-1","timestamp":1767414701000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T2","location":"src/client/cl_cin_theora.c:Theora_Init","message":"packet_out: size=3196, granulepos=0","timestamp":1767414701000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5f9812f23680 init=1","timestamp":1767414701000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A2","location":"src/client/cl_cin_theora.c:Theora_Run after_decode","message":"decoded_ycbcr=0x7595da5b6620 0x7595da5cdc20 0x7595da5e5220","timestamp":1767414701000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7595da4f7010 y0=0x7595da5b6620 y1=0x7595da5cdc20 y2=0x7595da5e5220","timestamp":1767414701000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7595da4f7010 y0=0x7595da5b6620 y1=0x7595da5cdc20 y2=0x7595da5e5220","timestamp":1767414701000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7595da4f7010 y0=0x7595da5b6620 y1=0x7595da5cdc20 y2=0x7595da5e5220","timestamp":1767414701000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414701000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414701000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414701000}
+{"timestamp":1366,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":1366,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":1366,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":1367,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_result","hypothesisId":"H1","data":{"result":0,"image_index":1}}
+{"timestamp":1367,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":0}}
+{"timestamp":1367,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":0}}
+{"timestamp":2367,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":0,"result":2,"image_index":1}}
+{"timestamp":2367,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":0,"image_index":1}}
+{"timestamp":2367,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":1}}
+{"timestamp":2367,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":1}}
+{"timestamp":3367,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":1,"result":2,"image_index":1}}
+{"timestamp":3367,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":1,"image_index":1}}
+{"timestamp":3367,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":2}}
+{"timestamp":3367,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":2}}
+{"timestamp":4367,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":2,"result":2,"image_index":1}}
+{"timestamp":4367,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":2,"image_index":1}}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T1","location":"src/client/cl_cin_theora.c:Theora_Init","message":"page_added: stream_serial=-1848457418","timestamp":1767414728000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T2","location":"src/client/cl_cin_theora.c:Theora_Init","message":"packet_out: size=42, granulepos=0","timestamp":1767414728000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T1","location":"src/client/cl_cin_theora.c:Theora_Init","message":"page_added: stream_serial=-1848457418","timestamp":1767414728000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T2","location":"src/client/cl_cin_theora.c:Theora_Init","message":"packet_out: size=62, granulepos=-1","timestamp":1767414728000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T2","location":"src/client/cl_cin_theora.c:Theora_Init","message":"packet_out: size=3196, granulepos=0","timestamp":1767414728000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x61606e916680 init=1","timestamp":1767414728000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A2","location":"src/client/cl_cin_theora.c:Theora_Run after_decode","message":"decoded_ycbcr=0x7da1a6c2c620 0x7da1a6c43c20 0x7da1a6c5b220","timestamp":1767414728000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7da1a6b6d010 y0=0x7da1a6c2c620 y1=0x7da1a6c43c20 y2=0x7da1a6c5b220","timestamp":1767414728000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7da1a6b6d010 y0=0x7da1a6c2c620 y1=0x7da1a6c43c20 y2=0x7da1a6c5b220","timestamp":1767414728000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7da1a6b6d010 y0=0x7da1a6c2c620 y1=0x7da1a6c43c20 y2=0x7da1a6c5b220","timestamp":1767414728000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414728000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414728000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414728000}
+{"timestamp":1310,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":1310,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":1310,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":1310,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_result","hypothesisId":"H1","data":{"result":0,"image_index":1}}
+{"timestamp":1310,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":0}}
+{"timestamp":1310,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":0}}
+{"timestamp":2310,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":0,"result":2,"image_index":1}}
+{"timestamp":2310,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":0,"image_index":1}}
+{"timestamp":2310,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":1}}
+{"timestamp":2310,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":1}}
+{"timestamp":3311,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":1,"result":2,"image_index":1}}
+{"timestamp":3311,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":1,"image_index":1}}
+{"timestamp":3311,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":2}}
+{"timestamp":3311,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":2}}
+{"timestamp":4311,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":2,"result":2,"image_index":1}}
+{"timestamp":4311,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":2,"image_index":1}}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T1","location":"src/client/cl_cin_theora.c:Theora_Init","message":"page_added: stream_serial=-1848457418","timestamp":1767414751000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T2","location":"src/client/cl_cin_theora.c:Theora_Init","message":"packet_out: size=42, granulepos=0","timestamp":1767414751000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T1","location":"src/client/cl_cin_theora.c:Theora_Init","message":"page_added: stream_serial=-1848457418","timestamp":1767414751000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T2","location":"src/client/cl_cin_theora.c:Theora_Init","message":"packet_out: size=62, granulepos=-1","timestamp":1767414751000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T2","location":"src/client/cl_cin_theora.c:Theora_Init","message":"packet_out: size=3196, granulepos=0","timestamp":1767414751000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x65428bc11680 init=1","timestamp":1767414751000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A2","location":"src/client/cl_cin_theora.c:Theora_Run after_decode","message":"decoded_ycbcr=0x7f590182c620 0x7f5901843c20 0x7f590185b220","timestamp":1767414751000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7f59017df010 y0=0x7f590182c620 y1=0x7f5901843c20 y2=0x7f590185b220","timestamp":1767414751000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7f59017df010 y0=0x7f590182c620 y1=0x7f5901843c20 y2=0x7f590185b220","timestamp":1767414751000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7f59017df010 y0=0x7f590182c620 y1=0x7f5901843c20 y2=0x7f590185b220","timestamp":1767414751000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414751000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414751000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414751000}
+{"timestamp":640,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":640,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":640,"location":"vk_frame.cpp:vk_begin_frame","message":"begin_frame","hypothesisId":"H1","data":{}}
+{"timestamp":640,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_result","hypothesisId":"H1","data":{"result":0,"image_index":1}}
+{"timestamp":640,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":0}}
+{"timestamp":640,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":0}}
+{"timestamp":1640,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":0,"result":2,"image_index":1}}
+{"timestamp":1640,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":0,"image_index":1}}
+{"timestamp":1640,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":1}}
+{"timestamp":1640,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":1}}
+{"timestamp":2640,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":1,"result":2,"image_index":1}}
+{"timestamp":2640,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":1,"image_index":1}}
+{"timestamp":2640,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry_start","hypothesisId":"H1","data":{"retry":2}}
+{"timestamp":2640,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_attempt","hypothesisId":"H1","data":{"attempt":2}}
+{"timestamp":3640,"location":"vk_frame.cpp:vk_begin_frame","message":"acquire_retry","hypothesisId":"H1","data":{"retry":2,"result":2,"image_index":1}}
+{"timestamp":3640,"location":"vk_frame.cpp:vk_begin_frame","message":"timeout_detected","hypothesisId":"H1","data":{"retry":2,"image_index":1}}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T1","location":"src/client/cl_cin_theora.c:Theora_Init","message":"page_added: stream_serial=-1848457418","timestamp":1767414772000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T2","location":"src/client/cl_cin_theora.c:Theora_Init","message":"packet_out: size=42, granulepos=0","timestamp":1767414772000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T1","location":"src/client/cl_cin_theora.c:Theora_Init","message":"page_added: stream_serial=-1848457418","timestamp":1767414772000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T2","location":"src/client/cl_cin_theora.c:Theora_Init","message":"packet_out: size=62, granulepos=-1","timestamp":1767414772000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T2","location":"src/client/cl_cin_theora.c:Theora_Init","message":"packet_out: size=3196, granulepos=0","timestamp":1767414772000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5a7835ba5680 init=1","timestamp":1767414772000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A2","location":"src/client/cl_cin_theora.c:Theora_Run after_decode","message":"decoded_ycbcr=0x701dce92e620 0x701dce945c20 0x701dce95d220","timestamp":1767414772000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x701dce86f010 y0=0x701dce92e620 y1=0x701dce945c20 y2=0x701dce95d220","timestamp":1767414772000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x701dce86f010 y0=0x701dce92e620 y1=0x701dce945c20 y2=0x701dce95d220","timestamp":1767414772000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x701dce86f010 y0=0x701dce92e620 y1=0x701dce945c20 y2=0x701dce95d220","timestamp":1767414772000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414772000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414772000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414772000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T1","location":"src/client/cl_cin_theora.c:Theora_Init","message":"page_added: stream_serial=-1848457418","timestamp":1767414776000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T2","location":"src/client/cl_cin_theora.c:Theora_Init","message":"packet_out: size=42, granulepos=0","timestamp":1767414776000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T1","location":"src/client/cl_cin_theora.c:Theora_Init","message":"page_added: stream_serial=-1848457418","timestamp":1767414776000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T2","location":"src/client/cl_cin_theora.c:Theora_Init","message":"packet_out: size=62, granulepos=-1","timestamp":1767414776000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"T2","location":"src/client/cl_cin_theora.c:Theora_Init","message":"packet_out: size=3196, granulepos=0","timestamp":1767414776000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5ee34f389680 init=1","timestamp":1767414776000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A2","location":"src/client/cl_cin_theora.c:Theora_Run after_decode","message":"decoded_ycbcr=0x7b8f9ec2c620 0x7b8f9ec43c20 0x7b8f9ec5b220","timestamp":1767414776000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7b8f9ebdf010 y0=0x7b8f9ec2c620 y1=0x7b8f9ec43c20 y2=0x7b8f9ec5b220","timestamp":1767414776000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7b8f9ebdf010 y0=0x7b8f9ec2c620 y1=0x7b8f9ec43c20 y2=0x7b8f9ec5b220","timestamp":1767414776000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7b8f9ebdf010 y0=0x7b8f9ec2c620 y1=0x7b8f9ec43c20 y2=0x7b8f9ec5b220","timestamp":1767414776000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414776000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414776000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414776000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x57b5edd68090 init=1","timestamp":1767414987000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A2","location":"src/client/cl_cin_theora.c:Theora_Run after_decode","message":"decoded_ycbcr=0x70a93c5e9620 0x70a93c600c20 0x70a93c618220","timestamp":1767414987000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x70a93c52a010 y0=0x70a93c5e9620 y1=0x70a93c600c20 y2=0x70a93c618220","timestamp":1767414987000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x70a93c52a010 y0=0x70a93c5e9620 y1=0x70a93c600c20 y2=0x70a93c618220","timestamp":1767414987000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x70a93c52a010 y0=0x70a93c5e9620 y1=0x70a93c600c20 y2=0x70a93c618220","timestamp":1767414987000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414987000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414987000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767414987000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x647d9050ccd0 init=1","timestamp":1767415290000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A2","location":"src/client/cl_cin_theora.c:Theora_Run after_decode","message":"decoded_ycbcr=0x731606ceb620 0x731606d02c20 0x731606d1a220","timestamp":1767415290000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x731606c2c010 y0=0x731606ceb620 y1=0x731606d02c20 y2=0x731606d1a220","timestamp":1767415290000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x731606c2c010 y0=0x731606ceb620 y1=0x731606d02c20 y2=0x731606d1a220","timestamp":1767415290000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x731606c2c010 y0=0x731606ceb620 y1=0x731606d02c20 y2=0x731606d1a220","timestamp":1767415290000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767415290000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767415290000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767415290000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x56a7576b9cd0 init=1","timestamp":1767415293000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A2","location":"src/client/cl_cin_theora.c:Theora_Run after_decode","message":"decoded_ycbcr=0x70cd8562c620 0x70cd85643c20 0x70cd8565b220","timestamp":1767415293000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x70cd8556d010 y0=0x70cd8562c620 y1=0x70cd85643c20 y2=0x70cd8565b220","timestamp":1767415293000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x70cd8556d010 y0=0x70cd8562c620 y1=0x70cd85643c20 y2=0x70cd8565b220","timestamp":1767415293000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x70cd8556d010 y0=0x70cd8562c620 y1=0x70cd85643c20 y2=0x70cd8565b220","timestamp":1767415293000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767415293000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767415293000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767415293000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x614848f6cd50 init=1","timestamp":1767415361000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A2","location":"src/client/cl_cin_theora.c:Theora_Run after_decode","message":"decoded_ycbcr=0x7931bf8e5620 0x7931bf8fcc20 0x7931bf914220","timestamp":1767415361000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7931bf826010 y0=0x7931bf8e5620 y1=0x7931bf8fcc20 y2=0x7931bf914220","timestamp":1767415361000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7931bf826010 y0=0x7931bf8e5620 y1=0x7931bf8fcc20 y2=0x7931bf914220","timestamp":1767415361000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7931bf826010 y0=0x7931bf8e5620 y1=0x7931bf8fcc20 y2=0x7931bf914220","timestamp":1767415361000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767415361000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767415361000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767415361000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x575c7f378cd0 init=1","timestamp":1767415919000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A2","location":"src/client/cl_cin_theora.c:Theora_Run after_decode","message":"decoded_ycbcr=0x7a71d0c2c620 0x7a71d0c43c20 0x7a71d0c5b220","timestamp":1767415919000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7a71d0b6d010 y0=0x7a71d0c2c620 y1=0x7a71d0c43c20 y2=0x7a71d0c5b220","timestamp":1767415919000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7a71d0b6d010 y0=0x7a71d0c2c620 y1=0x7a71d0c43c20 y2=0x7a71d0c5b220","timestamp":1767415919000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7a71d0b6d010 y0=0x7a71d0c2c620 y1=0x7a71d0c43c20 y2=0x7a71d0c5b220","timestamp":1767415919000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767415919000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767415919000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767415919000}

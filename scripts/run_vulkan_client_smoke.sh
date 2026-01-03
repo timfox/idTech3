@@ -25,16 +25,23 @@ XVFB_PID=$!
 export DISPLAY=":$DISPLAY_NUM"
 sleep 0.5
 
+# Decide which map to load from the demo mod path
+MAP_TO_USE="oa_dm1"
+BASE_MOD_DIR="/home/tim/Desktop/idtech3/mods/demo"
+if [ -f "${BASE_MOD_DIR}/pak0.pk3" ]; then
+  MAP_TO_USE="oa_dm1"
+fi
+
 echo "Launching server (oa content path)..."
 if [ -f /tmp/server_smoke.pid ]; then
   kill "$(cat /tmp/server_smoke.pid)" 2>/dev/null || true
 fi
-${SERVER_BIN} +set fs_game demo_content +map oa_dm1 > "$LOG" 2>&1 &
+${SERVER_BIN} +set fs_game demo +map ${MAP_TO_USE} > "$LOG" 2>&1 &
 SERVER_PID=$!
 echo "Server PID: $SERVER_PID"
 
 echo "Launching client..."
-"${CLIENT_BIN}" +set fs_game demo_content +map oa_dm1 > "$LOG.client" 2>&1 &
+${CLIENT_BIN} +set fs_game demo +map ${MAP_TO_USE} > "$LOG.client" 2>&1 &
 CLIENT_PID=$!
 echo "Client PID: $CLIENT_PID"
 

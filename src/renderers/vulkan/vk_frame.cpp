@@ -140,6 +140,12 @@ static inline void vt_trace(const char* json) {
 // end region
 // (Note: headless-present guard variable now provided by existing static at vk_frame.cpp: present guard)
 extern "C" void vk_begin_frame(void) {
+#ifdef USE_VULKAN
+  if (VK_IsHeadless()) {
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Headless mode active, skipping vk_begin_frame\n");
+    return;
+  }
+#endif
   // region agent log
   // Initialize per-frame timeline value increment if available
   static uint64_t last_timeline_value = 0;
@@ -164,11 +170,27 @@ extern "C" void vk_begin_frame(void) {
 
     // Check if we're running headless (no display available)
     static qboolean headless_detected = qfalse;
+    // #region agent log
+    {
+        char _log[128];
+        snprintf(_log, sizeof(_log), "{\"headless_detected\":%d,\"swapchain\":%p,\"cmd_index\":%d}",
+            (int)headless_detected, vk.swapchain, vk.cmd_index);
+        agent_log("H1","vk_frame.cpp:vk_begin_frame","headless_check", _log);
+    }
+    // #endregion
     if (!headless_detected) {
         // Try to acquire image with very short timeout first to detect headless mode
         ri.Printf(PRINT_ALL, "DEBUG: Attempting initial swapchain image acquisition (headless detection)\n");
         ri.Printf(PRINT_ALL, "DEBUG: swapchain=%p, semaphore=%p, cmd_index=%d\n",
             vk.swapchain, vk.tess[vk.cmd_index].image_acquired, vk.cmd_index);
+        // #region agent log
+        {
+            char _log[256];
+            snprintf(_log, sizeof(_log), "{\"swapchain\":%p,\"semaphore\":%p,\"cmd_index\":%d,\"device\":%p}",
+                vk.swapchain, vk.tess[vk.cmd_index].image_acquired, vk.cmd_index, vk.device);
+            agent_log("H2","vk_frame.cpp:vk_begin_frame","pre_acquire_params", _log);
+        }
+        // #endregion
 
         // Validate parameters before acquisition
         if (vk.swapchain == VK_NULL_HANDLE) {
@@ -201,22 +223,39 @@ extern "C" void vk_begin_frame(void) {
             vk.tess[vk.cmd_index].image_acquired, VK_NULL_HANDLE, &image_index);
         {
             char data[128];
-            snprintf(data, sizeof(data), "{\"result\":%d,\"image_index\":%u}", (int)result, image_index);
-            agent_log("H1","vk_frame.cpp:vk_begin_frame","acquire_result", data);
+            snprintf(data, sizeof(data), "{\"result\":%d,\"image_index\":%u,\"timeout_ms\":1}", (int)result, image_index);
+            agent_log("H2","vk_frame.cpp:vk_begin_frame","initial_acquire_result", data);
         }
         ri.Printf(PRINT_ALL, "DEBUG: Initial acquisition result: %d (%s), image_index=%u\n", result, vk_result_string(result), image_index);
 
         if (result == VK_TIMEOUT || result == VK_NOT_READY) {
+            // #region agent log
+            {
+                char _log[128];
+                snprintf(_log, sizeof(_log), "{\"result\":%d,\"is_timeout\":%d,\"is_not_ready\":%d}",
+                    (int)result, result == VK_TIMEOUT, result == VK_NOT_READY);
+                agent_log("H3","vk_frame.cpp:vk_begin_frame","headless_condition_met", _log);
+            }
+            // #endregion
             // Likely running headless, skip rendering for this frame
             ri.Printf(PRINT_DEVELOPER, "Vulkan: Headless mode detected, skipping frame rendering\n");
         {
             char data[128];
-            snprintf(data, sizeof(data), "{\"result\":%d}", (int)result);
-            agent_log("H1","vk_frame.cpp:vk_begin_frame","headless_detected", data);
+            snprintf(data, sizeof(data), "{\"result\":%d,\"setting_headless\":1}", (int)result);
+            agent_log("H3","vk_frame.cpp:vk_begin_frame","headless_detected", data);
         }
             ri.Printf(PRINT_ALL, "DEBUG: Headless mode set due to result=%d\n", result);
             headless_detected = qtrue;
+            vk.headless = qtrue;
+            vk.headless = qtrue;
             g_vk_headless_present_state = true;
+            // #region agent log
+            {
+                char _log[64];
+                snprintf(_log, sizeof(_log), "{\"headless_set\":1,\"returning_early\":1}");
+                agent_log("H3","vk_frame.cpp:vk_begin_frame","headless_return", _log);
+            }
+            // #endregion
             return;
         } else if (result != VK_SUCCESS) {
             ri.Printf(PRINT_ALL, "DEBUG: Unexpected result in headless detection: %d\n", result);
@@ -233,6 +272,14 @@ extern "C" void vk_begin_frame(void) {
     const int max_retries = 3;
 
     ri.Printf(PRINT_ALL, "DEBUG: Starting swapchain image acquisition with timeout=%llu ns, max_retries=%d\n", timeout_ns, max_retries);
+    // #region agent log
+    {
+        char _log[128];
+        snprintf(_log, sizeof(_log), "{\"timeout_ns\":%llu,\"max_retries\":%d,\"headless_detected\":%d}",
+            timeout_ns, max_retries, (int)headless_detected);
+        agent_log("H4","vk_frame.cpp:vk_begin_frame","retry_setup", _log);
+    }
+    // #endregion
 
  do {
   // region instrumentation: retry start
@@ -328,6 +375,14 @@ extern "C" void vk_begin_frame(void) {
     // If we get here and result is not success, all retries failed
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "vk_begin_frame: Failed to acquire swapchain image after %d retries: %s\n", max_retries, vk_result_string(result));
+        // #region agent log
+        {
+            char _log[128];
+            snprintf(_log, sizeof(_log), "{\"final_failure\":1,\"result\":%d,\"retries\":%d,\"headless_detected\":%d}",
+                (int)result, max_retries, (int)headless_detected);
+            agent_log("H5","vk_frame.cpp:vk_begin_frame","final_failure", _log);
+        }
+        // #endregion
         return;
     }
 

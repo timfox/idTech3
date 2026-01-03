@@ -407,6 +407,15 @@ for each RE_EndFrame
 void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 	drawBufferCommand_t *cmd;
 
+	// If we're in headless mode or cinematic state, skip swapchain acquisitions to avoid crashes
+#ifdef USE_VULKAN
+    // Skip swapchain acquisition in headless mode; cinematic handling is managed elsewhere
+    if ( VK_IsHeadless() ) {
+        ri.Printf( PRINT_DEVELOPER, "Vulkan: Skipping swapchain acquisition (headless)\n" );
+        return;
+    }
+#endif
+
 	if ( !tr.registered ) {
 		return;
 	}

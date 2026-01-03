@@ -575,6 +575,8 @@ void R_Init( void ) {
     TR_Init_FontSDF_CVARS();
 
     vk_initialize();
+    // Initialize headless flag explicitly to a safe default
+    vk.headless = qfalse;
 
     R_InitShaders();
 }

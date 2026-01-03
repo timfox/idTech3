@@ -58,15 +58,15 @@ static size_t Theora_ReadOggPage(int handle, ogg_page *page) {
 	// Read from file
 	bytes = FS_Read((byte *)buffer, 4096, cinTable[handle].iFile);
 	if (bytes <= 0) return 0;
-	
+
 	// Tell Ogg how many bytes we read
 	ogg_sync_wrote(&data->ogg_sync, bytes);
-	
+
 	// Get a page
 	if (ogg_sync_pageout(&data->ogg_sync, page) == 1) {
 		ret = page->header_len + page->body_len;
 	}
-	
+
 	return ret;
 }
 
@@ -162,7 +162,7 @@ qboolean Theora_Init(int handle) {
 		
 		// Add page to stream
 		ogg_stream_pagein(&data->ogg_stream, &ogg_page);
-		
+
 		// Try to get Theora header packets
 		while (ogg_stream_packetout(&data->ogg_stream, &ogg_packet) > 0) {
 			if (th_decode_headerin(&data->theora_info, &data->theora_comment, &data->theora_setup, &ogg_packet) >= 0) {
@@ -301,8 +301,9 @@ e_status Theora_Run(int handle) {
 	// Check timing
 	current_time = CL_ScaledMilliseconds();
 	frame_delay = (int)(1000.0 / data->fps);
-	
-	if (current_time - data->last_frame_time < frame_delay) {
+
+	// Allow first frame to be processed immediately
+	if (data->frame_count > 0 && current_time - data->last_frame_time < frame_delay) {
 		return cinTable[handle].status; // Not time for next frame yet
 	}
 	
@@ -322,7 +323,8 @@ e_status Theora_Run(int handle) {
 		
 		// Add page to stream
 		ogg_stream_pagein(&data->ogg_stream, &ogg_page);
-		
+		Com_Printf("DEBUG: Theora_Run: added page to stream\n");
+
 		// Try to get a video packet
 		while (ogg_stream_packetout(&data->ogg_stream, &ogg_packet) > 0) {
 			// Try to decode as video
