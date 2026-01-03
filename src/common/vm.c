@@ -2102,6 +2102,7 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 	}
 
 	// load the image
+	vm->name = name; // Set name before loading QVM
 	header = VM_LoadQVM( vm, qtrue );
 	if ( header == NULL ) {
 		// QVM bytecode not found or failed to load.

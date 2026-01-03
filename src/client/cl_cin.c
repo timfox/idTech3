@@ -1034,7 +1034,7 @@ static void RoQPrepMcomp( long xoff, long yoff )
 *
 ******************************************************************************/
 
-static void initRoQ( void ) 
+static void initRoQ( void )
 {
 	if (currentHandle < 0) return;
 
@@ -1239,11 +1239,14 @@ static void RoQ_init( void )
 
 	cinTable[currentHandle].numQuads = -1;
 
+	// Initialize quad status for VQ processing
+	setupQuad( 0, 0 );
+
 	cinTable[currentHandle].roq_id		= cin.file[ 8] + cin.file[ 9]*256;
 	cinTable[currentHandle].RoQFrameSize	= cin.file[10] + cin.file[11]*256 + cin.file[12]*65536;
 	cinTable[currentHandle].roq_flags	= cin.file[14] + cin.file[15]*256;
 
-	if (cinTable[currentHandle].RoQFrameSize > 65536 || !cinTable[currentHandle].RoQFrameSize) { 
+	if (cinTable[currentHandle].RoQFrameSize > 65528 || !cinTable[currentHandle].RoQFrameSize) {
 		return;
 	}
 

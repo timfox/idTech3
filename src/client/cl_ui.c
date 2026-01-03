@@ -1449,9 +1449,9 @@ CL_InitUI
 void CL_InitUI( void ) {
 	Com_Printf("=== CL_InitUI CALLED ===\n");
 
-	// UI VM loading causes crashes, skip for now
-	// TODO: Fix UI VM compatibility issues
-	Com_Printf( "INFO: UI system initialized (VM loading disabled to prevent crashes)\n" );
+	// UI VM loading causes crashes due to incompatible/missing UI modules
+	// Keep UI system disabled for stability, but enable intro video playback
+	Com_Printf( "INFO: UI system initialized (VM loading disabled - incompatible UI modules)\n" );
 	cls.uiStarted = qtrue;
 	uivm = NULL; // No VM for now
 

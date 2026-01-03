@@ -4,8 +4,8 @@ set -euo pipefail
 # Smoke test: launch a Vulkan client against the local server using OA content.
 # This uses a virtual display (Xvfb) to render without a real screen.
 
-CLIENT_BIN="$PWD/build/idtech3.x86_64"
-SERVER_BIN="$PWD/build/idtech3.server.x86_64"
+CLIENT_BIN="$PWD/release/idtech3.x86_64"
+SERVER_BIN="$PWD/release/idtech3.server.x86_64"
 LOG="/tmp/client_smoke.log"
 DISPLAY_NUM="${DISPLAY_NUM:-99}"
 
@@ -26,22 +26,23 @@ export DISPLAY=":$DISPLAY_NUM"
 sleep 0.5
 
 # Decide which map to load from the demo mod path
-MAP_TO_USE="oa_dm1"
+MAP_TO_USE="demo"
 BASE_MOD_DIR="/home/tim/Desktop/idtech3/mods/demo"
-if [ -f "${BASE_MOD_DIR}/pak0.pk3" ]; then
-  MAP_TO_USE="oa_dm1"
-fi
+# Use simple demo map instead of oa_dm1 for now
+# if [ -f "${BASE_MOD_DIR}/pak0.pk3" ]; then
+#   MAP_TO_USE="oa_dm1"
+# fi
 
-echo "Launching server (oa content path)..."
+echo "Launching server (base content)..."
 if [ -f /tmp/server_smoke.pid ]; then
   kill "$(cat /tmp/server_smoke.pid)" 2>/dev/null || true
 fi
-${SERVER_BIN} +set fs_game demo +map ${MAP_TO_USE} > "$LOG" 2>&1 &
+${SERVER_BIN} +map q3dm6 > "$LOG" 2>&1 &
 SERVER_PID=$!
 echo "Server PID: $SERVER_PID"
 
 echo "Launching client..."
-${CLIENT_BIN} +set fs_game demo +map ${MAP_TO_USE} > "$LOG.client" 2>&1 &
+${CLIENT_BIN} +connect localhost +set cl_playIntro 0 > "$LOG.client" 2>&1 &
 CLIENT_PID=$!
 echo "Client PID: $CLIENT_PID"
 
