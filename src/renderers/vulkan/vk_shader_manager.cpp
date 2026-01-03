@@ -24,6 +24,53 @@ extern PFN_vkCreateShaderModule qvkCreateShaderModule;
 extern PFN_vkDestroyShaderModule qvkDestroyShaderModule;
 extern PFN_vkCreateGraphicsPipelines qvkCreateGraphicsPipelines;
 
+// Helper function to convert VkResult to string for logging
+static const char* vk_result_to_string(VkResult result) {
+    switch (result) {
+        case VK_SUCCESS: return "VK_SUCCESS";
+        case VK_NOT_READY: return "VK_NOT_READY";
+        case VK_TIMEOUT: return "VK_TIMEOUT";
+        case VK_EVENT_SET: return "VK_EVENT_SET";
+        case VK_EVENT_RESET: return "VK_EVENT_RESET";
+        case VK_INCOMPLETE: return "VK_INCOMPLETE";
+        case VK_ERROR_OUT_OF_HOST_MEMORY: return "VK_ERROR_OUT_OF_HOST_MEMORY";
+        case VK_ERROR_OUT_OF_DEVICE_MEMORY: return "VK_ERROR_OUT_OF_DEVICE_MEMORY";
+        case VK_ERROR_INITIALIZATION_FAILED: return "VK_ERROR_INITIALIZATION_FAILED";
+        case VK_ERROR_DEVICE_LOST: return "VK_ERROR_DEVICE_LOST";
+        case VK_ERROR_MEMORY_MAP_FAILED: return "VK_ERROR_MEMORY_MAP_FAILED";
+        case VK_ERROR_LAYER_NOT_PRESENT: return "VK_ERROR_LAYER_NOT_PRESENT";
+        case VK_ERROR_EXTENSION_NOT_PRESENT: return "VK_ERROR_EXTENSION_NOT_PRESENT";
+        case VK_ERROR_FEATURE_NOT_PRESENT: return "VK_ERROR_FEATURE_NOT_PRESENT";
+        case VK_ERROR_INCOMPATIBLE_DRIVER: return "VK_ERROR_INCOMPATIBLE_DRIVER";
+        case VK_ERROR_TOO_MANY_OBJECTS: return "VK_ERROR_TOO_MANY_OBJECTS";
+        case VK_ERROR_FORMAT_NOT_SUPPORTED: return "VK_ERROR_FORMAT_NOT_SUPPORTED";
+        case VK_ERROR_FRAGMENTED_POOL: return "VK_ERROR_FRAGMENTED_POOL";
+        case VK_ERROR_UNKNOWN: return "VK_ERROR_UNKNOWN";
+        case VK_ERROR_OUT_OF_POOL_MEMORY: return "VK_ERROR_OUT_OF_POOL_MEMORY";
+        case VK_ERROR_INVALID_EXTERNAL_HANDLE: return "VK_ERROR_INVALID_EXTERNAL_HANDLE";
+        case VK_ERROR_FRAGMENTATION: return "VK_ERROR_FRAGMENTATION";
+        case VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS: return "VK_ERROR_INVALID_OPAQUE_CAPTURE_ADDRESS";
+        case VK_ERROR_SURFACE_LOST_KHR: return "VK_ERROR_SURFACE_LOST_KHR";
+        case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR: return "VK_ERROR_NATIVE_WINDOW_IN_USE_KHR";
+        case VK_ERROR_OUT_OF_DATE_KHR: return "VK_ERROR_OUT_OF_DATE_KHR";
+        case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR: return "VK_ERROR_INCOMPATIBLE_DISPLAY_KHR";
+        case VK_ERROR_VALIDATION_FAILED_EXT: return "VK_ERROR_VALIDATION_FAILED_EXT";
+        case VK_ERROR_INVALID_SHADER_NV: return "VK_ERROR_INVALID_SHADER_NV";
+        default: return "VK_UNKNOWN_RESULT";
+    }
+}
+
+// Helper function to log Vulkan calls with results
+static void log_vk_call(const char* function_name, VkResult result, const char* context = nullptr) {
+    if (result == VK_SUCCESS) {
+        ri.Printf(PRINT_DEVELOPER, "VK_CALL: %s succeeded%s%s\n", function_name,
+                 context ? " (" : "", context ? context : "");
+    } else {
+        ri.Printf(PRINT_ERROR, "VK_CALL: %s failed with %s%s%s\n", function_name,
+                 vk_result_to_string(result), context ? " (" : "", context ? context : "");
+    }
+}
+
 // Embedded SPIR-V shader extern declarations (from shader_data.c)
 extern const unsigned char dot_vert_spv[1192];
 extern const unsigned char dot_frag_spv[544];
@@ -60,16 +107,22 @@ VkShaderModule load_embedded_shader(const char* shader_name, ShaderType type) {
     // Lightweight string compare for a few known shaders
     if (shader_name == nullptr) return VK_NULL_HANDLE;
     // Helper macro to create a module from embedded data
-    auto make_module = [](const void* data, size_t size) -> VkShaderModule {
-        if (!data || size == 0) return VK_NULL_HANDLE;
+    auto make_module = [&, type](const void* data, size_t size) -> VkShaderModule {
+        if (!data || size == 0) {
+            ri.Printf(PRINT_DEVELOPER, "Shader Manager: Embedded shader '%s' (type %d) has invalid data/size\n", shader_name, static_cast<int>(type));
+            return VK_NULL_HANDLE;
+        }
         VkShaderModuleCreateInfo createInfo = {};
         createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
         createInfo.codeSize = size;
         createInfo.pCode = reinterpret_cast<const uint32_t*>(data);
         VkShaderModule module;
-        if (vkCreateShaderModule(vk.device, &createInfo, nullptr, &module) != VK_SUCCESS) {
+        VkResult result = qvkCreateShaderModule(vk.device, &createInfo, nullptr, &module);
+        log_vk_call("qvkCreateShaderModule", result, shader_name);
+        if (result != VK_SUCCESS) {
             return VK_NULL_HANDLE;
         }
+        ri.Printf(PRINT_DEVELOPER, "Shader Manager: Embedded shader '%s' (type %d) created; size=%zu; module=%p\n", shader_name, static_cast<int>(type), size, (void*)module);
         return module;
     };
 
@@ -138,10 +191,9 @@ VkShaderModule load_shader_from_file(const char* filename) {
 
     VkShaderModule shader_module;
     VkResult result = qvkCreateShaderModule(vk.device, &create_info, nullptr, &shader_module);
+    log_vk_call("qvkCreateShaderModule", result, filename);
 
     if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "Shader Manager: Failed to create shader module from %s: %s\n",
-                 filename, vk_result_string(result));
         return VK_NULL_HANDLE;
     }
 
@@ -206,6 +258,8 @@ void vk_shader_manager_shutdown(void) {
 
 // Load a shader by name and type
 VkShaderModule vk_load_shader(const char* shader_name, VkShaderStageFlagBits stage) {
+    ri.Printf(PRINT_DEVELOPER, "Shader Manager: Requesting shader '%s' for stage %d\n", shader_name, static_cast<int>(stage));
+
     std::string key = std::string(shader_name) + "_" + std::to_string(static_cast<int>(stage));
 
     // Check cache first
@@ -226,6 +280,7 @@ VkShaderModule vk_load_shader(const char* shader_name, VkShaderStageFlagBits sta
     }
 
     if (*cached_module != VK_NULL_HANDLE) {
+        ri.Printf(PRINT_DEVELOPER, "Shader Manager: Returning cached shader '%s'\n", shader_name);
         return *cached_module;
     }
 
@@ -238,14 +293,16 @@ VkShaderModule vk_load_shader(const char* shader_name, VkShaderStageFlagBits sta
         default: return VK_NULL_HANDLE;
     }
 
+    ri.Printf(PRINT_DEVELOPER, "Shader Manager: Attempting embedded load for '%s' (type=%d)\n", shader_name, static_cast<int>(type));
     VkShaderModule module = shader_mgr::load_embedded_shader(shader_name, type);
 
     // Do not fall back to disk loading; rely solely on embedded SPIR-V.
     if (module != VK_NULL_HANDLE) {
         *cached_module = module;
-        ri.Printf(PRINT_DEVELOPER, "Shader Manager: Loaded and cached shader %s\n", shader_name);
+        ri.Printf(PRINT_DEVELOPER, "Shader Manager: SUCCESS - Loaded and cached embedded shader %s\n", shader_name);
+        ri.Printf(PRINT_DEVELOPER, "Shader Manager: Module for %s is %p (stage=%d)\n", shader_name, (void*)module, static_cast<int>(type));
     } else {
-        ri.Printf(PRINT_WARNING, "Shader Manager: Embedded shader not found for %s; not loading from disk\n", shader_name);
+        ri.Printf(PRINT_WARNING, "Shader Manager: FAILED - Embedded shader not found for %s (type=%d); not loading from disk\n", shader_name, static_cast<int>(type));
         return VK_NULL_HANDLE;
     }
 
@@ -384,10 +441,9 @@ qboolean vk_create_basic_pipeline(const char* vertex_shader, const char* fragmen
 
     VkResult result = qvkCreateGraphicsPipelines(vk.device, VK_NULL_HANDLE, 1, &pipeline_info,
                                                 nullptr, pipeline);
+    log_vk_call("qvkCreateGraphicsPipelines", result, "basic pipeline");
 
     if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "Shader Manager: Failed to create graphics pipeline: %s\n",
-                 vk_result_string(result));
         return qfalse;
     }
 

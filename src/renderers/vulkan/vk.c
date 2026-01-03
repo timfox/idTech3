@@ -6260,8 +6260,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
 		case TYPE_SINGLE_TEXTURE:
 			ri.Printf(PRINT_ALL, "DEBUG: TYPE_SINGLE_TEXTURE use_pbr=%d\n", use_pbr);
-			ri.Printf(PRINT_ALL, "DEBUG: vert.gen[%d][0][0][0][0] addr=%p\n", use_pbr, (void*)&vk.modules.vert.gen[use_pbr][0][0][0][0]);
-			ri.Printf(PRINT_ALL, "DEBUG: frag.gen[%d][0][0][0] addr=%p\n", use_pbr, (void*)&vk.modules.frag.gen[use_pbr][0][0][0]);
+			ri.Printf(PRINT_ALL, "DEBUG: vert.gen[%d][0][0][0][0] addr=%p value=%p\n", use_pbr, (void*)&vk.modules.vert.gen[use_pbr][0][0][0][0], (void*)vk.modules.vert.gen[use_pbr][0][0][0][0]);
+			ri.Printf(PRINT_ALL, "DEBUG: frag.gen[%d][0][0][0] addr=%p value=%p\n", use_pbr, (void*)&vk.modules.frag.gen[use_pbr][0][0][0], (void*)vk.modules.frag.gen[use_pbr][0][0][0]);
 			vs_module = vk.modules.vert.gen[use_pbr][0][0][0][0];
 			fs_module = vk.modules.frag.gen[use_pbr][0][0][0];
 			ri.Printf(PRINT_ALL, "DEBUG: got vs=%p fs=%p\n", (void*)vs_module, (void*)fs_module);
@@ -6912,12 +6912,12 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			break;
 
 		case TYPE_SINGLE_TEXTURE:
-			push_bind( 0, sizeof( vec4_t ) );					// xyz array
-			push_bind( 1, sizeof( color4ub_t ) );				// color array
-			push_bind( 2, sizeof( vec2_t ) );					// st0 array
-			push_attr( 0, 0, VK_FORMAT_R32G32B32A32_SFLOAT );
-			push_attr( 1, 1, VK_FORMAT_R8G8B8A8_UNORM );
-			push_attr( 2, 2, VK_FORMAT_R32G32_SFLOAT );
+			push_bind( 0, sizeof( vec4_t ) );					// xyz array (position in xy)
+			push_bind( 1, sizeof( vec2_t ) );					// st0 array (texcoord)
+			push_bind( 2, sizeof( color4ub_t ) );				// color array
+			push_attr( 0, 0, VK_FORMAT_R32G32_SFLOAT );		// location 0: position (vec2 from xy of vec4)
+			push_attr( 1, 1, VK_FORMAT_R32G32_SFLOAT );		// location 1: texcoord (vec2)
+			push_attr( 2, 2, VK_FORMAT_R8G8B8A8_UNORM );		// location 2: color (color4ub_t normalized to vec4)
 			break;
 
 		case TYPE_SINGLE_TEXTURE_ENV:

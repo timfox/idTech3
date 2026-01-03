@@ -1,3 +1,5 @@
+/* Removed duplicate block above; keep a single definition elsewhere. */
+
 /*
  * Centralized SDF font CVAR definitions to avoid symbol duplication
  */

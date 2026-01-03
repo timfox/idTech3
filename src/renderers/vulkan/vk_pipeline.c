@@ -344,117 +344,27 @@ static VkShaderModule vk_load_spirv_shader(const char *filename) {
 	char filepath[1024];
 	void *spirv_data;
 	int file_len;
+	VkShaderStageFlagBits stage = VK_SHADER_STAGE_VERTEX_BIT;
+
+	// Determine shader stage from filename
+	if (strstr(filename, "_frag")) {
+		stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	} else if (strstr(filename, "_vert")) {
+		stage = VK_SHADER_STAGE_VERTEX_BIT;
+	} else if (strstr(filename, "_comp")) {
+		stage = VK_SHADER_STAGE_COMPUTE_BIT;
+	}
 
 	Com_sprintf(filepath, sizeof(filepath), "%s.spv", filename);
 
 	ri.Printf(PRINT_DEVELOPER, "Attempting to load shader: %s\n", filepath);
 	file_len = ri.FS_ReadFile(filepath, &spirv_data);
 	if (file_len <= 0 || !spirv_data) {
-		ri.Printf(PRINT_WARNING, "Failed to open SPIR-V file: %s (len=%d), using fallback\n", filepath, file_len);
-		// Try embedded SPIR-V data as a fallback before resorting to a dummy shader
-        // Embedded shader blob support (dot_vert/dot_frag/color_vert/color_frag/fog_vert/fog_frag)
-        if (strcmp(filepath, "dot_vert.spv") == 0) {
-            extern const unsigned char dot_vert_spv[1192];
-            VkShaderModuleCreateInfo createInfo = {
-                .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-                .codeSize = 1192,
-                .pCode = (const uint32_t*)dot_vert_spv
-            };
-            VkShaderModule module;
-            if (vkCreateShaderModule(vk.device, &createInfo, NULL, &module) == VK_SUCCESS) {
-                return module;
-            }
-        } else if (strcmp(filepath, "dot_frag.spv") == 0) {
-            extern const unsigned char dot_frag_spv[544];
-            VkShaderModuleCreateInfo createInfo = {
-                .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-                .codeSize = 544,
-                .pCode = (const uint32_t*)dot_frag_spv
-            };
-            VkShaderModule module;
-            if (vkCreateShaderModule(vk.device, &createInfo, NULL, &module) == VK_SUCCESS) {
-                return module;
-            }
-        } else if (strcmp(filepath, "color_vert.spv") == 0) {
-            extern const unsigned char color_vert_spv[872];
-            VkShaderModuleCreateInfo createInfo = {
-                .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-                .codeSize = 872,
-                .pCode = (const uint32_t*)color_vert_spv
-            };
-            VkShaderModule module;
-            if (vkCreateShaderModule(vk.device, &createInfo, NULL, &module) == VK_SUCCESS) {
-                return module;
-            }
-        } else if (strcmp(filepath, "color_frag.spv") == 0) {
-            extern const unsigned char color_frag_spv[1296];
-            VkShaderModuleCreateInfo createInfo = {
-                .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-                .codeSize = 1296,
-                .pCode = (const uint32_t*)color_frag_spv
-            };
-            VkShaderModule module;
-            if (vkCreateShaderModule(vk.device, &createInfo, NULL, &module) == VK_SUCCESS) {
-                return module;
-            }
-        } else if (strcmp(filepath, "fog_vert.spv") == 0) {
-            extern const unsigned char fog_vert_spv[2700];
-            VkShaderModuleCreateInfo createInfo = {
-                .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-                .codeSize = 2700,
-                .pCode = (const uint32_t*)fog_vert_spv
-            };
-            VkShaderModule module;
-            if (vkCreateShaderModule(vk.device, &createInfo, NULL, &module) == VK_SUCCESS) {
-                return module;
-            }
-        } else if (strcmp(filepath, "fog_frag.spv") == 0) {
-            extern const unsigned char fog_frag_spv[1240];
-            VkShaderModuleCreateInfo createInfo = {
-                .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-                .codeSize = 1240,
-                .pCode = (const uint32_t*)fog_frag_spv
-            };
-            VkShaderModule module;
-            if (vkCreateShaderModule(vk.device, &createInfo, NULL, &module) == VK_SUCCESS) {
-                return module;
-            }
-        }
-		// Create a minimal dummy shader to prevent crashes if embedded is not available
-		static const uint32_t dummy_spirv[] = {
-			// Minimal SPIR-V header for a simple shader
-			0x07230203, 0x00010000, 0x00080001, 0x0000000D, 0x00000000, 0x00020011,
-			0x00000001, 0x0006000B, 0x00000001, 0x4C534C47, 0x6474732E, 0x3035342E,
-			0x00000000, 0x0003000E, 0x00000000, 0x00000001, 0x0007000F, 0x00000000,
-			0x00000004, 0x6E69616D, 0x00000000, 0x00000009, 0x0000000B, 0x00030003,
-			0x00000002, 0x000001C2, 0x00040005, 0x00000004, 0x6E69616D, 0x00000000,
-			0x00040005, 0x00000009, 0x6C6F6376, 0x00000000, 0x00040005, 0x0000000B,
-			0x6C676C5F, 0x695F7050, 0x00007369, 0x00040047, 0x00000009, 0x0000001E,
-			0x00000000, 0x00040047, 0x0000000B, 0x0000001E, 0x00000000, 0x00020013,
-			0x00000002, 0x00030021, 0x00000003, 0x00000002, 0x00030016, 0x00000006,
-			0x00000020, 0x00040017, 0x00000007, 0x00000006, 0x00000004, 0x00040020,
-			0x00000008, 0x00000003, 0x00000007, 0x0004003B, 0x00000008, 0x00000009,
-			0x00000003, 0x00040020, 0x0000000A, 0x00000001, 0x00000007, 0x0004003B,
-			0x0000000A, 0x0000000B, 0x00000001, 0x0004002B, 0x00000006, 0x0000000C,
-			0x00000000, 0x00050036, 0x00000002, 0x00000004, 0x00000000, 0x00000003,
-			0x000200F8, 0x00000005, 0x0004003D, 0x00000007, 0x0000000D, 0x0000000B,
-			0x0003003E, 0x00000009, 0x0000000D, 0x000100FD, 0x00010038
-		};
-
-		VkShaderModuleCreateInfo createInfo = {
-			.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-			.codeSize = sizeof(dummy_spirv),
-			.pCode = dummy_spirv
-		};
-
-		VkShaderModule shaderModule;
-		VkResult result = qvkCreateShaderModule(vk.device, &createInfo, NULL, &shaderModule);
-		if (result != VK_SUCCESS) {
-			ri.Printf(PRINT_ERROR, "Failed to create fallback shader module: %s\n", vk_result_string(result));
-			return VK_NULL_HANDLE;
-		}
-		ri.Printf(PRINT_WARNING, "Created fallback shader module for %s\n", filename);
-		return shaderModule;
+		ri.Printf(PRINT_WARNING, "Failed to open SPIR-V file: %s (len=%d), trying embedded fallback for %s (stage=%d)\n", filepath, file_len, filename, stage);
+		// Try embedded shader loading via the shader manager
+		VkShaderModule result = vk_load_shader(filename, stage);
+		ri.Printf(PRINT_WARNING, "vk_load_spirv_shader: embedded fallback returned %p for %s\n", (void*)result, filename);
+		return result;
 	}
 
 	ri.Printf(PRINT_DEVELOPER, "Successfully loaded shader %s (%d bytes)\n", filename, file_len);
@@ -493,8 +403,16 @@ void vk_create_shader_modules(void)
 
 	// Single texture shader (type 1) - load into the gen arrays using shader manager
 	// The shader manager handles embedded fallback automatically
-	vk.modules.vert.gen[0][0][0][0][0] = vk_load_shader("generic", VK_SHADER_STAGE_VERTEX_BIT);
-	vk.modules.frag.gen[0][0][0][0] = vk_load_shader("generic", VK_SHADER_STAGE_FRAGMENT_BIT);
+	// Use color shaders as the generic single-texture shader
+	VkShaderModule vs_module = vk_load_shader("color_vert", VK_SHADER_STAGE_VERTEX_BIT);
+	VkShaderModule fs_module = vk_load_shader("color_frag", VK_SHADER_STAGE_FRAGMENT_BIT);
+	ri.Printf(PRINT_ALL, "DEBUG: vk_create_shader_modules setting gen modules: vs=%p fs=%p\n", (void*)vs_module, (void*)fs_module);
+	vk.modules.vert.gen[0][0][0][0][0] = vs_module;
+	vk.modules.frag.gen[0][0][0][0] = fs_module;
+
+	// Fixed color shaders - use same modules as generic for now (since fixed variants don't exist in embedded data)
+	vk.modules.vert.fixed[0][0][0][0] = vs_module;
+	vk.modules.frag.fixed[0][0][0] = fs_module;
 
 	// Color shader
 	vk.modules.color_vs = vk_load_spirv_shader("color_vert");

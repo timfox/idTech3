@@ -571,6 +571,9 @@ void R_Init( void ) {
         R_InitNextFrame();
     }
 
+    // Initialize centralized SDF CVARs (ensures single symbol definitions)
+    TR_Init_FontSDF_CVARS();
+
     vk_initialize();
 
     R_InitShaders();

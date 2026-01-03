@@ -544,12 +544,22 @@ void R_ShutdownSafeShaderLoadContext(void);
 #endif
 
 // Shared SDF CVAR declarations to avoid cross-renderer symbol conflicts
+// externs for SDF CVARs moved to centralized block; see extern "C" block below
+
+// Initialize SDF CVARs (see TR_Init_FontSDF_CVARS in tr_font_sdf.c)
+// TR_Init_FontSDF_CVARS declared above; avoid duplicate prototype here
+
+// Centralized SDF CVARs
+#ifdef __cplusplus
+extern "C" {
+#endif
 extern cvar_t *r_fontSDF;
 extern cvar_t *r_fontSDFSpread;
 extern cvar_t *r_fontSDFSmooth;
 extern cvar_t *r_fontSDFOutline;
-
-// Initialize SDF CVARs (see TR_Init_FontSDF_CVARS in tr_font_sdf.c)
 void TR_Init_FontSDF_CVARS(void);
+#ifdef __cplusplus
+}
+#endif
 
 #endif	// __TR_PUBLIC_H

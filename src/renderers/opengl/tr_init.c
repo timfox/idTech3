@@ -218,10 +218,7 @@ cvar_t	*r_fontStreaming;
 cvar_t	*r_fontAntialiasing;
 cvar_t	*r_fontLCDFilter;
 cvar_t	*r_fontKerning;
-cvar_t	*r_fontSDF;
-cvar_t	*r_fontSDFSpread;
-cvar_t	*r_fontSDFSmooth;
-cvar_t	*r_fontSDFOutline;
+// r_fontSDF is centralized; extern declared in tr_public.h
 // cvar_t	*r_fontGPUSDF; // Removed to fix DLL symbol issues
 cvar_t	*r_fontGPUEffects;
 cvar_t	*r_fontGPULayout;
