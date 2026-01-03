@@ -409,9 +409,9 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 
 	// If we're in headless mode or cinematic state, skip swapchain acquisitions to avoid crashes
 #ifdef USE_VULKAN
-    // Skip swapchain acquisition in headless mode; cinematic handling is managed elsewhere
+    // Skip swapchain acquisition in headless mode
     if ( VK_IsHeadless() ) {
-        ri.Printf( PRINT_DEVELOPER, "Vulkan: Skipping swapchain acquisition (headless)\n" );
+        ri.Printf( PRINT_DEVELOPER, "Vulkan: Skipping swapchain acquisition (headless or cinematic)\n" );
         return;
     }
 #endif
