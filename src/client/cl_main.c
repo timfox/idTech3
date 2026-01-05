@@ -22,6 +22,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cl_main.c  -- client main loop
 
 #include "client.h"
+#include "../common/physics_bullet.h"
+#include "../common/ecs.h"
+
+// Debug command functions are registered with Cmd_AddCommand but may appear unused to the compiler
+
 // history helper is declared in history.c; use a forward declaration to avoid header path issues
 void Con_EnsureHistoryFileExists(void);
 #ifdef USE_SDL
@@ -4712,6 +4717,15 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("ui_openmenu", CL_UI_OpenMain_f);
 	Cmd_AddCommand ("openmenu", CL_UI_OpenMain_f);
 	Cmd_AddCommand ("mainmenu", CL_UI_OpenMain_f);
+
+	// TODO: Add debug commands
+	// Cmd_AddCommand ("physics_info", CL_PhysicsInfo_f);
+	// Cmd_AddCommand ("physics_debug", CL_PhysicsDebug_f);
+	// Cmd_AddCommand ("physics_stats", CL_PhysicsStats_f);
+	// Cmd_AddCommand ("ecs_info", CL_ECSInfo_f);
+	// Cmd_AddCommand ("ecs_entities", CL_ECSEntities_f);
+	// Cmd_AddCommand ("perf_info", CL_PerfInfo_f);
+	// Cmd_AddCommand ("mem_info", CL_MemInfo_f);
 	Cmd_AddCommand ("disconnect", CL_Disconnect_f);
 	Cmd_AddCommand ("record", CL_Record_f);
 	Cmd_SetCommandCompletionFunc( "record", CL_CompleteRecordName );
@@ -4767,6 +4781,15 @@ void CL_Init( void ) {
 
 	Com_Printf( "----- Client Initialization Complete -----\n" );
 }
+
+// TODO: Implement debug command functions
+// void CL_PhysicsInfo_f(void) { Com_Printf("Physics debug commands not yet implemented\n"); }
+// void CL_PhysicsDebug_f(void) { Com_Printf("Physics debug commands not yet implemented\n"); }
+// void CL_PhysicsStats_f(void) { Com_Printf("Physics debug commands not yet implemented\n"); }
+// void CL_ECSInfo_f(void) { Com_Printf("ECS debug commands not yet implemented\n"); }
+// void CL_ECSEntities_f(void) { Com_Printf("ECS debug commands not yet implemented\n"); }
+// void CL_PerfInfo_f(void) { Com_Printf("Performance debug commands not yet implemented\n"); }
+// void CL_MemInfo_f(void) { Com_Printf("Memory debug commands not yet implemented\n"); }
 
 
 /*

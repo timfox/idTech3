@@ -408,15 +408,53 @@ static void S_StopMusic_f( void )
 S_Init
 =================
 */
+// OpenAL sound interface wrapper functions
+static qboolean S_OpenAL_Init(void) { return SndOpenAL_Init(); }
+static void S_OpenAL_Shutdown(void) { SndOpenAL_Shutdown(); }
+static void S_OpenAL_Update(void) { /* OpenAL handles updates internally */ }
+static void S_OpenAL_StartSound(vec3_t origin, int entnum, int entchannel, sfxHandle_t sfx) {
+	// Convert to OpenAL API
+	sfx_t *sfxData = S_GetSfxByHandle(sfx);
+	if (!sfxData) return;
+
+	sndOpenAL3DProps_t props = {0};
+	if (origin) {
+		VectorCopy(origin, props.position);
+	}
+	// Set default values for 3D sound
+	props.minDistance = 128.0f;
+	props.maxDistance = 1024.0f;
+	props.volume = 1.0f;
+	props.pitch = 1.0f;
+	props.looping = qfalse;
+	props.flags = SND_OPENAL_3D | SND_OPENAL_DOPPLER;
+
+	SndOpenAL_PlaySound(sfxData->soundName, &props);
+}
+static void S_OpenAL_StartLocalSound(sfxHandle_t sfx, int channelNum) {
+	// Local sounds are played at listener position with no 3D effects
+	sfx_t *sfxData = S_GetSfxByHandle(sfx);
+	if (!sfxData) return;
+
+	sndOpenAL3DProps_t props = {0};
+	// Local sounds have no position/3D effects
+	props.minDistance = 1.0f;
+	props.maxDistance = 1.0f;
+	props.volume = 1.0f;
+	props.pitch = 1.0f;
+	props.looping = qfalse;
+	props.flags = 0; // No 3D effects for local sounds
+
+	SndOpenAL_PlaySound(sfxData->soundName, &props);
+}
+static void S_OpenAL_StopAllSounds(void) { SndOpenAL_StopAllSounds(); }
+
 void S_Init( void )
 {
 	cvar_t		*cv;
 	qboolean	started = qfalse;
 
 	Com_Printf( "------ Initializing Sound ------\n" );
-	
-	// Initialize OpenAL enhanced audio system
-	SndOpenAL_Init();
 
 	s_volume = Cvar_Get( "s_volume", "0.8", CVAR_ARCHIVE );
 	Cvar_CheckRange( s_volume, "0", "1", CV_FLOAT );
@@ -454,6 +492,8 @@ void S_Init( void )
 		Cmd_AddCommand( "s_info", S_SoundInfo );
 		Cmd_AddCommand( "audiothreads", S_AudioThreads_f );
 
+		// For now, use DMA sound system
+		// TODO: Integrate OpenAL properly once basic functionality is working
 		if ( !started ) {
 			started = S_Base_Init( &si );
 		}

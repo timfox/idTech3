@@ -355,7 +355,16 @@ typedef struct {
 	unsigned int 	dlight : 1;
 } textureBundle_t;
 
-#define NUM_TEXTURE_BUNDLES 2
+#define NUM_TEXTURE_BUNDLES 6
+
+// Texture bundle indices
+#define TB_DIFFUSEMAP    0
+#define TB_LIGHTMAP      1
+#define TB_NORMALMAP     2
+#define TB_SPECULARMAP   3
+#define TB_METALLICMAP   4
+#define TB_ROUGHNESSMAP  5
+#define TB_PHYSICALMAP   4  // Shared with metallic for ORM maps
 
 #define TESS_ST0	1<<0
 #define TESS_ST1	1<<1

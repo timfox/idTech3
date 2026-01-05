@@ -775,6 +775,96 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			}
 		}
 		//
+		// PBR material maps
+		//
+		else if ( !Q_stricmp( token, "normalMap" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for 'normalMap' keyword in shader '%s'\n", shader.name );
+				return qfalse;
+			}
+
+			imgFlags_t flags = IMGFLAG_NONE;
+			if (!shader.noMipMaps)
+				flags |= IMGFLAG_MIPMAP;
+			if (!shader.noPicMip)
+				flags |= IMGFLAG_PICMIP;
+			if (shader.noLightScale)
+				flags |= IMGFLAG_NOLIGHTSCALE;
+
+			stage->bundle[TB_NORMALMAP].image[0] = R_FindImageFile( token, flags );
+			if ( !stage->bundle[TB_NORMALMAP].image[0] )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: R_FindImageFile could not find '%s' in shader '%s'\n", token, shader.name );
+				return qfalse;
+			}
+			stage->bundle[TB_NORMALMAP].numImageAnimations = 1;
+		}
+		else if ( !Q_stricmp( token, "specularMap" ) || !Q_stricmp( token, "specMap" ) )
+		{
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for 'specularMap' keyword in shader '%s'\n", shader.name );
+				return qfalse;
+			}
+
+			imgFlags_t flags = IMGFLAG_NONE;
+			if (!shader.noMipMaps)
+				flags |= IMGFLAG_MIPMAP;
+			if (!shader.noPicMip)
+				flags |= IMGFLAG_PICMIP;
+			if (shader.noLightScale)
+				flags |= IMGFLAG_NOLIGHTSCALE;
+
+			stage->bundle[TB_SPECULARMAP].image[0] = R_FindImageFile( token, flags );
+			if ( !stage->bundle[TB_SPECULARMAP].image[0] )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: R_FindImageFile could not find '%s' in shader '%s'\n", token, shader.name );
+				return qfalse;
+			}
+			stage->bundle[TB_SPECULARMAP].numImageAnimations = 1;
+		}
+		else if ( !Q_stricmp( token, "metallicMap" ) || !Q_stricmp( token, "roughnessMap" ) || !Q_stricmp( token, "physicalMap" ) )
+		{
+			qboolean isMetallic = !Q_stricmp( token, "metallicMap" );
+			qboolean isRoughness = !Q_stricmp( token, "roughnessMap" );
+
+			token = COM_ParseExt( text, qfalse );
+			if ( !token[0] )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: missing parameter for '%s' keyword in shader '%s'\n", token, shader.name );
+				return qfalse;
+			}
+
+			imgFlags_t flags = IMGFLAG_NONE;
+			if (!shader.noMipMaps)
+				flags |= IMGFLAG_MIPMAP;
+			if (!shader.noPicMip)
+				flags |= IMGFLAG_PICMIP;
+			if (shader.noLightScale)
+				flags |= IMGFLAG_NOLIGHTSCALE;
+
+			int bundleIndex;
+			if (isMetallic) {
+				bundleIndex = TB_METALLICMAP;
+			} else if (isRoughness) {
+				bundleIndex = TB_ROUGHNESSMAP;
+			} else {
+				bundleIndex = TB_PHYSICALMAP;
+			}
+
+			stage->bundle[bundleIndex].image[0] = R_FindImageFile( token, flags );
+			if ( !stage->bundle[bundleIndex].image[0] )
+			{
+				ri.Printf( PRINT_WARNING, "WARNING: R_FindImageFile could not find '%s' in shader '%s'\n", token, shader.name );
+				return qfalse;
+			}
+			stage->bundle[bundleIndex].numImageAnimations = 1;
+		}
+		//
 		// alphafunc <func>
 		//
 		else if ( !Q_stricmp( token, "alphaFunc" ) )

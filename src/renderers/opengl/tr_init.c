@@ -134,6 +134,13 @@ cvar_t	*r_ext_texture_env_add;
 cvar_t	*r_ext_texture_filter_anisotropic;
 cvar_t	*r_ext_max_anisotropy;
 
+// PBR material CVars
+cvar_t	*r_pbr;
+cvar_t	*r_pbrMetallic;
+cvar_t	*r_pbrRoughness;
+cvar_t	*r_normalMapping;
+cvar_t	*r_specularMapping;
+
 cvar_t	*r_ignoreGLErrors;
 
 //cvar_t	*r_stencilbits;
@@ -1987,6 +1994,26 @@ static void R_Register( void )
 	ri.Cvar_SetDescription( r_ext_texture_filter_anisotropic, "Allow anisotropic filtering." );
 
 	r_ext_max_anisotropy = ri.Cvar_Get( "r_ext_max_anisotropy", "8", CVAR_ARCHIVE_ND | CVAR_LATCH );
+
+	// PBR material support
+	r_pbr = ri.Cvar_Get( "r_pbr", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_SetDescription( r_pbr, "Enable physically-based rendering materials." );
+
+	r_pbrMetallic = ri.Cvar_Get( "r_pbrMetallic", "0.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbrMetallic, "0.0", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_pbrMetallic, "Default metallic value for PBR materials (0.0 = dielectric, 1.0 = metal)." );
+
+	r_pbrRoughness = ri.Cvar_Get( "r_pbrRoughness", "0.5", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_pbrRoughness, "0.0", "1.0", CV_FLOAT );
+	ri.Cvar_SetDescription( r_pbrRoughness, "Default roughness value for PBR materials (0.0 = smooth, 1.0 = rough)." );
+
+	r_normalMapping = ri.Cvar_Get( "r_normalMapping", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_normalMapping, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_normalMapping, "Enable normal mapping for detailed surface normals." );
+
+	r_specularMapping = ri.Cvar_Get( "r_specularMapping", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	ri.Cvar_CheckRange( r_specularMapping, "0", "1", CV_INTEGER );
+	ri.Cvar_SetDescription( r_specularMapping, "Enable specular mapping for material reflectivity." );
 	ri.Cvar_CheckRange( r_ext_max_anisotropy, "1", NULL, CV_INTEGER );
 	ri.Cvar_SetDescription( r_ext_max_anisotropy, "Sets maximum anisotropic level for your graphics driver. Requires \\r_ext_texture_filter_anisotropic." );
 
