@@ -17,9 +17,14 @@ These components are used throughout the engine for common entity properties.
 
 #ifdef __cplusplus
 #ifdef USE_BULLET
-// Forward declaration to avoid pulling Bullet headers into every translation unit
-class btRigidBody;
-class btCollisionShape;
+#include <LinearMath/btVector3.h>
+#include <LinearMath/btQuaternion.h>
+#include <LinearMath/btTransform.h>
+#include <BulletDynamics/Dynamics/btRigidBody.h>
+#include <BulletCollision/CollisionShapes/btCollisionShape.h>
+#include <BulletDynamics/Dynamics/btDiscreteDynamicsWorld.h>
+#include <BulletDynamics/Dynamics/btDynamicsWorld.h>
+#include <LinearMath/btMotionState.h>
 
 // Collision shape types for Bullet physics
 enum class CollisionShapeType {
@@ -73,7 +78,7 @@ struct PhysicsComponent {
 	btCollisionShape *collisionShape;  // Owned by the component
 
 	// Motion state for synchronization with TransformComponent
-	class TransformMotionState *motionState;
+        btMotionState *motionState;
 #endif
 
 	PhysicsComponent() : mass(1.0f), friction(0.0f)
@@ -103,7 +108,13 @@ struct HealthComponent {
 // Network Component - Links ECS entity to engine entity structures
 struct NetworkComponent {
 	int entityIndex;      // Index into gentity_t or svEntity_t array
-	int entityType;
+	int entityType;       // Entity type (ET_PLAYER, ET_ITEM, etc.)
+	qboolean needsSync;   // Whether this entity needs network sync
+	qboolean isServer;    // true for svEntity_t, false for gentity_t
+
+	NetworkComponent() : entityIndex(-1), entityType(0), needsSync(qfalse), isServer(qfalse) {}
+	NetworkComponent(int idx, int type, qboolean server)
+		: entityIndex(idx), entityType(type), needsSync(qtrue), isServer(server) {}
 };
 
 // Collision callback types
@@ -121,14 +132,7 @@ struct CollisionEvent {
 	float impulse;
 	int timestamp;
 };
-#endif       // Entity type (ET_PLAYER, ET_ITEM, etc.)
-	qboolean needsSync;   // Whether this entity needs network sync
-	qboolean isServer;    // true for svEntity_t, false for gentity_t
-	
-	NetworkComponent() : entityIndex(-1), entityType(0), needsSync(qfalse), isServer(qfalse) {}
-	NetworkComponent(int idx, int type, qboolean server) 
-		: entityIndex(idx), entityType(type), needsSync(qtrue), isServer(server) {}
-};
+#endif
 
 // Script Component - Attaches Lua scripts to entities
 struct ScriptComponent {

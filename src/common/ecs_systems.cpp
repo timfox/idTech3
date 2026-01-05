@@ -11,6 +11,7 @@ Core system implementations for physics, health, and network sync.
 #include "ecs.h"
 #include "ecs_components.h"
 #include "ecs_internal.h"
+#include "q_shared.h"
 #include <entt/entt.hpp>
 #include <vector>
 
@@ -114,7 +115,7 @@ struct CollisionContactResultCallback : public btCollisionWorld::ContactResultCa
 			event.normal[1] = cp.m_normalWorldOnB.y();
 			event.normal[2] = cp.m_normalWorldOnB.z();
 			event.impulse = cp.getAppliedImpulse();
-			event.timestamp = Sys_Milliseconds();
+                        event.timestamp = 0; // TODO: Add proper timestamp
 
 			events.push_back(event);
 		}
@@ -129,10 +130,10 @@ private:
 		for (auto entity : view) {
 			auto &physics = view.get<PhysicsComponent>(entity);
 			if (physics.body == body) {
-				return entity;
+				return static_cast<ecs_entity_t>(entity);
 			}
 		}
-		return entt::null;
+		return static_cast<ecs_entity_t>(entt::null);
 	}
 };
 
@@ -254,12 +255,12 @@ static void ECS_Bullet_Step(entt::registry &registry, float deltaTime) {
 
 			// Create custom motion state for TransformComponent sync
 			if (!physics.motionState) {
-				physics.motionState = new TransformMotionState(&transform);
+				physics.motionState = static_cast<btMotionState*>(new TransformMotionState(&transform));
 			}
 
 			btRigidBody::btRigidBodyConstructionInfo rbInfo(
 				physics.mass > 0.0f ? physics.mass : 0.0f,
-				physics.motionState,
+				static_cast<btMotionState*>(physics.motionState),
 				physics.collisionShape,
 				localInertia
 			);

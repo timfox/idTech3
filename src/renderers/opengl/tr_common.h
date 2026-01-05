@@ -27,20 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define MAX_TEXTURE_UNITS 8
 
-typedef enum
-{
-	IMGFLAG_NONE           = 0x0000,
-	IMGFLAG_MIPMAP         = 0x0001,
-	IMGFLAG_PICMIP         = 0x0002,
-	IMGFLAG_CLAMPTOEDGE    = 0x0004,
-	IMGFLAG_CLAMPTOBORDER  = 0x0008,
-	IMGFLAG_NO_COMPRESSION = 0x0010,
-	IMGFLAG_NOLIGHTSCALE   = 0x0020,
-	IMGFLAG_LIGHTMAP       = 0x0040,
-	IMGFLAG_NOSCALE        = 0x0080,
-	IMGFLAG_RGB            = 0x0100,
-	IMGFLAG_COLORSHIFT     = 0x0200,
-} imgFlags_t;
+// imgFlags_t is now defined in tr_public.h
 
 typedef enum {
 	CT_FRONT_SIDED = 0,

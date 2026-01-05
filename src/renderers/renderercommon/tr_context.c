@@ -32,8 +32,7 @@ extern refimport_t ri;
 extern refexport_t re;
 extern trGlobals_t tr;
 
-// imgFlags_t type for context functions
-typedef int imgFlags_t;
+// imgFlags_t is now defined in tr_public.h
 
 // Stub function removed - was unused
 

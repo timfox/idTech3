@@ -105,6 +105,7 @@ cvar_t *r_displayRefresh;
 cvar_t *r_fullscreen;
 cvar_t *r_mode;
 cvar_t *r_modeFullscreen;
+cvar_t *r_wayland;
 cvar_t *r_customwidth;
 cvar_t *r_customheight;
 cvar_t *r_customPixelAspect;

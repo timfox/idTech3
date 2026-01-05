@@ -538,6 +538,7 @@ ENDIF()
 SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake_modules)
 
 SET(QCOMMON_SRCS
+    src/common/cm_bullet.cpp
     src/common/cm_load.c
     src/common/cm_patch.c
     src/common/cm_polylib.c

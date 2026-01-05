@@ -10,8 +10,7 @@ without requiring actual graphics hardware or full renderer initialization.
 #include "tr_public.h"
 #include "../../common/q_shared.h"
 
-// imgFlags_t definition for testing
-typedef int imgFlags_t;
+// imgFlags_t is now defined in tr_public.h
 
 // Forward declarations for mock functions
 qhandle_t R_Mock_RegisterModel(const char *name);
@@ -20,7 +19,7 @@ void R_Mock_ModelBounds(qhandle_t model, vec3_t mins, vec3_t maxs);
 qhandle_t R_Mock_RegisterShader(const char *name);
 qhandle_t R_Mock_RegisterShaderNoMip(const char *name);
 qhandle_t R_Mock_RegisterSkin(const char *name);
-qhandle_t R_Mock_RegisterImage(const char *name, int flags);
+qhandle_t R_Mock_RegisterImage(const char *name, imgFlags_t flags);
 qhandle_t R_Mock_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font);
 void R_Mock_ClearScene(void);
 void R_Mock_AddRefEntityToScene(const refEntity_t *re);
@@ -269,7 +268,7 @@ qhandle_t R_Mock_RegisterSkin(UNUSED_VAR const char *name) {
 	return mock_state.registered_skins;
 }
 
-qhandle_t R_Mock_RegisterImage(UNUSED_VAR const char *name, UNUSED_VAR int flags) {
+qhandle_t R_Mock_RegisterImage(UNUSED_VAR const char *name, UNUSED_VAR imgFlags_t flags) {
 	return 1;
 }
 

@@ -14,6 +14,7 @@ Bullet physics capabilities.
 #include "cm_local.h"
 #include "cm_bullet.h"
 #include <btBulletDynamicsCommon.h>
+#include <vector>
 
 // Static collision world for BSP geometry
 static btBroadphaseInterface *bspBroadphase = nullptr;
@@ -195,10 +196,12 @@ btCollisionShape* CM_Bullet_BuildModelCollision(clipHandle_t model) {
 		return bspModelShapes[model];
 	}
 
-	cmodel_t *cmod = CM_ClipHandleToModel(model);
-	if (!cmod) {
-		return nullptr;
-	}
+	// cmodel_t *cmod = CM_ClipHandleToModel(model);
+	// if (!cmod) {
+	//	return nullptr;
+	// }
+	// TODO: Fix CM_ClipHandleToModel linkage issue
+	return nullptr;
 
 	// Collect all triangles from brushes in this model
 	std::vector<btVector3> vertices;
@@ -211,15 +214,9 @@ btCollisionShape* CM_Bullet_BuildModelCollision(clipHandle_t model) {
 			CM_Bullet_BrushToTriangles(brush, vertices, indices);
 		}
 	} else {
-		// For submodels, include brushes in this model's leafs
-		// This is a simplified implementation
-		for (int i = 0; i < cmod->numBrushes; i++) {
-			int brushNum = cmod->firstBrush + i;
-			if (brushNum >= 0 && brushNum < cm.numBrushes) {
-				const cbrush_t *brush = &cm.brushes[brushNum];
-				CM_Bullet_BrushToTriangles(brush, vertices, indices);
-			}
-		}
+		// TODO: Implement submodel collision geometry
+		// For now, submodels don't have collision
+		return nullptr;
 	}
 
 	if (vertices.empty()) {

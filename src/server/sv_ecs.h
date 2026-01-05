@@ -13,10 +13,8 @@ Server-side ECS integration with svEntity_t bridge for network sync.
 #include "../common/ecs.h"
 #include "server.h"
 
-// Forward declarations for game entity types
-#ifdef USE_BULLET
+// Forward declaration for game entity type
 typedef struct gentity_s gentity_t;
-#endif
 
 #ifdef USE_ENTT
 
