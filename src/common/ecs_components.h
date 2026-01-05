@@ -19,6 +19,18 @@ These components are used throughout the engine for common entity properties.
 #ifdef USE_BULLET
 // Forward declaration to avoid pulling Bullet headers into every translation unit
 class btRigidBody;
+class btCollisionShape;
+
+// Collision shape types for Bullet physics
+enum class CollisionShapeType {
+	NONE = 0,
+	BOX,           // Rectangular box
+	SPHERE,        // Spherical shape
+	CAPSULE,       // Capsule (cylinder with hemispherical ends)
+	CONVEX_HULL,   // Convex hull from vertices
+	MESH,          // Triangle mesh (static only)
+	COMPOUND       // Compound shape (multiple shapes)
+};
 #endif
 #endif
 
@@ -47,22 +59,33 @@ struct PhysicsComponent {
 	vec3_t acceleration;
 	float mass;
 	float friction;
-	
+
 #ifdef USE_BULLET
 	// When true, this entity will be simulated by Bullet instead of the
 	// simple integrator. The Bullet world and rigid bodies are managed
 	// by the ECS physics system implementation.
 	qboolean	useBullet;
 	btRigidBody *body;
+
+	// Collision shape configuration
+	CollisionShapeType shapeType;
+	vec3_t shapeDimensions;  // For box: half-extents, for sphere: radius, for capsule: radius/height
+	btCollisionShape *collisionShape;  // Owned by the component
+
+	// Motion state for synchronization with TransformComponent
+	class TransformMotionState *motionState;
 #endif
-	
+
 	PhysicsComponent() : mass(1.0f), friction(0.0f)
 #ifdef USE_BULLET
-		, useBullet(qfalse), body(nullptr)
+		, useBullet(qfalse), body(nullptr), shapeType(CollisionShapeType::BOX), collisionShape(nullptr), motionState(nullptr)
 #endif
 	{
 		VectorClear(velocity);
 		VectorClear(acceleration);
+#ifdef USE_BULLET
+		VectorSet(shapeDimensions, 0.5f, 0.5f, 0.5f);  // Default box half-extents
+#endif
 	}
 };
 
@@ -80,7 +103,25 @@ struct HealthComponent {
 // Network Component - Links ECS entity to engine entity structures
 struct NetworkComponent {
 	int entityIndex;      // Index into gentity_t or svEntity_t array
-	int entityType;       // Entity type (ET_PLAYER, ET_ITEM, etc.)
+	int entityType;
+};
+
+// Collision callback types
+#ifdef USE_BULLET
+using CollisionCallback = void(*)(ecs_entity_t entityA, ecs_entity_t entityB,
+                                 const btVector3 &contactPoint,
+                                 const btVector3 &normal, float impulse);
+
+// Collision event structure for game code
+struct CollisionEvent {
+	ecs_entity_t entityA;
+	ecs_entity_t entityB;
+	vec3_t contactPoint;
+	vec3_t normal;
+	float impulse;
+	int timestamp;
+};
+#endif       // Entity type (ET_PLAYER, ET_ITEM, etc.)
 	qboolean needsSync;   // Whether this entity needs network sync
 	qboolean isServer;    // true for svEntity_t, false for gentity_t
 	

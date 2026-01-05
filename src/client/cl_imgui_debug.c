@@ -28,6 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../common/qcommon.h"
 #include "../common/event_system.h"
 #include "../common/performance_counters.h"
+#include "../common/physics_bullet.h"
 
 #ifdef USE_CIMGUI
 
@@ -709,6 +710,7 @@ void CL_ImGui_Debug_RenderAll(void) {
 	CL_ImGui_Debug_ShowMemoryOverlay();
 	CL_ImGui_Debug_ShowNetworkOverlay();
 	CL_ImGui_Debug_ShowRendererOverlay();
+	CL_ImGui_Debug_ShowPhysicsOverlay();
 	CL_ImGui_Debug_ShowCVarBrowser();
 	CL_ImGui_Debug_ShowConsoleOverlay();
 	CL_ImGui_Debug_ShowEventSystemOverlay();
@@ -724,6 +726,78 @@ void CL_ImGui_Debug_Init(void) {
 	CL_ImGui_Debug_RegisterCvars();
 	Com_Memset(frame_times, 0, sizeof(frame_times));
 	Com_Memset(fps_history, 0, sizeof(fps_history));
+}
+
+/*
+================
+CL_ImGui_Debug_ShowPhysicsOverlay
+================
+*/
+void CL_ImGui_Debug_ShowPhysicsOverlay(void) {
+#ifdef USE_BULLET
+	static qboolean showPhysicsWindow = qfalse;
+	static cvar_t *showPhysics = NULL;
+
+	if (!showPhysics) {
+		showPhysics = Cvar_Get("cl_imguiPhysics", "0", CVAR_TEMP);
+		Cvar_SetDescription(showPhysics, "Show the physics debugging overlay.");
+	}
+
+	if (!showPhysics->integer) {
+		return;
+	}
+
+	if (igBegin("Physics Debug", &showPhysicsWindow, 0)) {
+		if (!Physics_IsInitialized()) {
+			igText("Physics system not initialized");
+		} else {
+			// Physics stats
+			int numBodies = 0, numConstraints = 0;
+			float stepTime = 0.0f;
+			Physics_GetStats(&numBodies, &numConstraints, &stepTime);
+
+			igText("Bodies: %d", numBodies);
+			igText("Constraints: %d", numConstraints);
+			igText("Step Time: %.3f ms", stepTime * 1000.0f);
+
+			// Gravity
+			vec3_t gravity;
+			if (Physics_GetGravity(gravity) == PHYSICS_OK) {
+				igText("Gravity: %.1f, %.1f, %.1f", gravity[0], gravity[1], gravity[2]);
+			}
+
+			igSeparator();
+
+			// Debug drawing toggle
+			static qboolean debugDraw = qfalse;
+			if (igCheckbox("Debug Draw", &debugDraw)) {
+				Physics_DebugDraw(debugDraw);
+			}
+
+			igSeparator();
+
+			// Bullet cvars
+			float bulletEnable = Cvar_VariableValue("sv_bulletEnable");
+			float bulletDebug = Cvar_VariableValue("sv_bulletDebug");
+			float bulletSubSteps = Cvar_VariableValue("sv_bulletMaxSubSteps");
+			float bulletFixedStep = Cvar_VariableValue("sv_bulletFixedTimestep");
+
+			igText("Bullet Physics Settings:");
+			igText("  Enabled: %s", bulletEnable > 0.0f ? "Yes" : "No");
+			igText("  Debug: %s", bulletDebug > 0.0f ? "Yes" : "No");
+			igText("  Max Substeps: %.0f", bulletSubSteps);
+			igText("  Fixed Timestep: %.4f", bulletFixedStep);
+
+			igSeparator();
+
+			// ECS Physics status
+			igText("ECS Physics:");
+			// TODO: Show ECS physics entity count and status
+			igText("  (ECS integration status pending)");
+		}
+	}
+	igEnd();
+#endif // USE_BULLET
 }
 
 /*

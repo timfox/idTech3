@@ -30,6 +30,7 @@ void CL_ImGui_Debug_ShowPerformanceOverlay(void);
 void CL_ImGui_Debug_ShowMemoryOverlay(void);
 void CL_ImGui_Debug_ShowNetworkOverlay(void);
 void CL_ImGui_Debug_ShowRendererOverlay(void);
+void CL_ImGui_Debug_ShowPhysicsOverlay(void);
 void CL_ImGui_Debug_ShowCVarBrowser(void);
 void CL_ImGui_Debug_ShowConsoleOverlay(void);
 void CL_ImGui_Debug_ShowEventSystemOverlay(void);

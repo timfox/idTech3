@@ -22,6 +22,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // cmodel.c -- model loading
 
 #include "cm_local.h"
+#include "cm_bullet.h"
 
 #ifdef BSPC
 
@@ -705,6 +706,11 @@ void CM_LoadMap( const char *name, qboolean clientload, int *checksum ) {
 	if ( !clientload ) {
 		Q_strncpyz( cm.name, name, sizeof( cm.name ) );
 	}
+
+#ifdef USE_BULLET
+	// Build Bullet physics collision geometry for the loaded map
+	CM_Bullet_LoadMap();
+#endif
 }
 
 

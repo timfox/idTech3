@@ -84,8 +84,127 @@ namespace {
 			initialized = false;
 		}
 	};
-	
+
+// Custom contact result callback for collision events
+struct CollisionContactResultCallback : public btCollisionWorld::ContactResultCallback {
+	std::vector<CollisionEvent> &events;
+	entt::registry &registry;
+
+	CollisionContactResultCallback(std::vector<CollisionEvent> &e, entt::registry &r)
+		: events(e), registry(r) {}
+
+	virtual btScalar addSingleResult(btManifoldPoint &cp,
+									const btCollisionObjectWrapper *colObj0Wrap,
+									int partId0, int index0,
+									const btCollisionObjectWrapper *colObj1Wrap,
+									int partId1, int index1) override {
+
+		// Find ECS entities from Bullet collision objects
+		ecs_entity_t entityA = FindEntityFromBulletBody(colObj0Wrap->getCollisionObject());
+		ecs_entity_t entityB = FindEntityFromBulletBody(colObj1Wrap->getCollisionObject());
+
+		if (entityA != entt::null && entityB != entt::null) {
+			CollisionEvent event;
+			event.entityA = entityA;
+			event.entityB = entityB;
+			event.contactPoint[0] = cp.getPositionWorldOnA().x();
+			event.contactPoint[1] = cp.getPositionWorldOnA().y();
+			event.contactPoint[2] = cp.getPositionWorldOnA().z();
+			event.normal[0] = cp.m_normalWorldOnB.x();
+			event.normal[1] = cp.m_normalWorldOnB.y();
+			event.normal[2] = cp.m_normalWorldOnB.z();
+			event.impulse = cp.getAppliedImpulse();
+			event.timestamp = Sys_Milliseconds();
+
+			events.push_back(event);
+		}
+
+		return 0.0f;
+	}
+
+private:
+	ecs_entity_t FindEntityFromBulletBody(const btCollisionObject *body) {
+		// Search through physics components to find matching body
+		auto view = registry.view<PhysicsComponent>();
+		for (auto entity : view) {
+			auto &physics = view.get<PhysicsComponent>(entity);
+			if (physics.body == body) {
+				return entity;
+			}
+		}
+		return entt::null;
+	}
+};
+
+// Custom motion state to synchronize Bullet transforms with ECS TransformComponent
+class TransformMotionState : public btMotionState {
+private:
+	TransformComponent *transform;
+
+public:
+	TransformMotionState(TransformComponent *t) : transform(t) {}
+
+	virtual void getWorldTransform(btTransform &worldTrans) const override {
+		// Convert ECS transform to Bullet transform
+		btVector3 pos(transform->position[0], transform->position[1], transform->position[2]);
+
+		// Convert Euler angles to quaternion (simplified - assumes ZYX order)
+		btQuaternion rot;
+		rot.setEulerZYX(transform->rotation[2] * M_PI / 180.0f,
+					   transform->rotation[1] * M_PI / 180.0f,
+					   transform->rotation[0] * M_PI / 180.0f);
+
+		worldTrans.setOrigin(pos);
+		worldTrans.setRotation(rot);
+	}
+
+	virtual void setWorldTransform(const btTransform &worldTrans) override {
+		// Convert Bullet transform back to ECS transform
+		const btVector3 &pos = worldTrans.getOrigin();
+		transform->position[0] = pos.x();
+		transform->position[1] = pos.y();
+		transform->position[2] = pos.z();
+
+		// Convert quaternion back to Euler angles (simplified)
+		btQuaternion rot = worldTrans.getRotation();
+		btScalar yaw, pitch, roll;
+		rot.getEulerZYX(yaw, pitch, roll);
+		transform->rotation[0] = yaw * 180.0f / M_PI;
+		transform->rotation[1] = pitch * 180.0f / M_PI;
+		transform->rotation[2] = roll * 180.0f / M_PI;
+	}
+};
+
 	static BulletWorld s_bulletWorld;
+
+// Collision shape factory functions
+static btCollisionShape* CreateCollisionShape(CollisionShapeType type, const vec3_t dimensions) {
+	switch (type) {
+		case CollisionShapeType::BOX:
+			return new btBoxShape(btVector3(dimensions[0], dimensions[1], dimensions[2]));
+
+		case CollisionShapeType::SPHERE:
+			return new btSphereShape(dimensions[0]);  // radius
+
+		case CollisionShapeType::CAPSULE:
+			return new btCapsuleShape(dimensions[0], dimensions[1]);  // radius, height
+
+		case CollisionShapeType::CONVEX_HULL:
+			// Placeholder - would need vertex data
+			return new btBoxShape(btVector3(dimensions[0], dimensions[1], dimensions[2]));
+
+		case CollisionShapeType::MESH:
+			// Static triangle mesh - placeholder
+			return new btBoxShape(btVector3(dimensions[0], dimensions[1], dimensions[2]));
+
+		case CollisionShapeType::COMPOUND:
+			// Compound shape - placeholder
+			return new btCompoundShape();
+
+		default:
+			return new btBoxShape(btVector3(0.5f, 0.5f, 0.5f));  // fallback
+	}
+}
 }
 
 /*
@@ -105,8 +224,11 @@ static void ECS_Bullet_Step(entt::registry &registry, float deltaTime) {
 	}
 	
 	s_bulletWorld.Init();
-	
+
 	auto view = registry.view<TransformComponent, PhysicsComponent>();
+
+	// Collect collision events
+	std::vector<CollisionEvent> collisionEvents;
 	
 	// Ensure Bullet bodies exist and push per-frame forces
 	for (auto entity : view) {
@@ -119,33 +241,34 @@ static void ECS_Bullet_Step(entt::registry &registry, float deltaTime) {
 		
 		// Lazily create a Bullet rigid body for this entity
 		if (!physics.body) {
-			// For now, use a simple box shape; future work can parameterize this
-			btCollisionShape *shape = new btBoxShape(btVector3(0.5f, 0.5f, 0.5f));
-			
+			// Create collision shape based on configured type
+			if (!physics.collisionShape) {
+				physics.collisionShape = CreateCollisionShape(physics.shapeType, physics.shapeDimensions);
+			}
+
 			const bool isDynamic = (physics.mass > 0.0f);
 			btVector3 localInertia(0, 0, 0);
 			if (isDynamic) {
-				shape->calculateLocalInertia(physics.mass, localInertia);
+				physics.collisionShape->calculateLocalInertia(physics.mass, localInertia);
 			}
-			
-			btTransform startTransform;
-			startTransform.setIdentity();
-			startTransform.setOrigin(btVector3(transform.position[0], transform.position[1], transform.position[2]));
-			
-			btDefaultMotionState *motionState = new btDefaultMotionState(startTransform);
-			
+
+			// Create custom motion state for TransformComponent sync
+			if (!physics.motionState) {
+				physics.motionState = new TransformMotionState(&transform);
+			}
+
 			btRigidBody::btRigidBodyConstructionInfo rbInfo(
 				physics.mass > 0.0f ? physics.mass : 0.0f,
-				motionState,
-				shape,
+				physics.motionState,
+				physics.collisionShape,
 				localInertia
 			);
-			
+
 			btRigidBody *body = new btRigidBody(rbInfo);
-			
+
 			// Approximate friction using the existing friction parameter
 			body->setFriction(physics.friction);
-			
+
 			s_bulletWorld.world->addRigidBody(body);
 			physics.body = body;
 		}
@@ -175,7 +298,45 @@ static void ECS_Bullet_Step(entt::registry &registry, float deltaTime) {
 	} else {
 		s_bulletWorld.world->stepSimulation(deltaTime, maxSubSteps, fixedTimestep);
 	}
-	
+
+	// Perform collision detection and generate events
+	CollisionContactResultCallback collisionCallback(collisionEvents, registry);
+	s_bulletWorld.world->performDiscreteCollisionDetection();
+
+	// Check for collisions using contact manifolds
+	int numManifolds = s_bulletWorld.world->getDispatcher()->getNumManifolds();
+	for (int i = 0; i < numManifolds; i++) {
+		btPersistentManifold *contactManifold =
+			s_bulletWorld.world->getDispatcher()->getManifoldByIndexInternal(i);
+
+		int numContacts = contactManifold->getNumContacts();
+		if (numContacts > 0) {
+			const btCollisionObject *objA = contactManifold->getBody0();
+			const btCollisionObject *objB = contactManifold->getBody1();
+
+			// Create collision wrappers for the callback
+			btCollisionObjectWrapper objAWrap(0, objA->getCollisionShape(), objA, btTransform::getIdentity(), -1, -1);
+			btCollisionObjectWrapper objBWrap(0, objB->getCollisionShape(), objB, btTransform::getIdentity(), -1, -1);
+
+			for (int j = 0; j < numContacts; j++) {
+				btManifoldPoint &pt = contactManifold->getContactPoint(j);
+				if (pt.getDistance() < 0.f) {
+					collisionCallback.addSingleResult(pt, &objAWrap, 0, 0, &objBWrap, 0, 0);
+				}
+			}
+		}
+	}
+
+	// Process collision events (call user callbacks if registered)
+	for (const auto &event : collisionEvents) {
+		// TODO: Call user-registered collision callbacks
+		// For now, just log the collision
+		if (Cvar_VariableValue("sv_bulletDebug") > 0.0f) {
+			Com_Printf("Bullet collision: entity %d <-> entity %d, impulse %.2f\n",
+					  (int)event.entityA, (int)event.entityB, event.impulse);
+		}
+	}
+
 	// Sync Bullet transforms back into ECS components
 	for (auto entity : view) {
 		auto &transform = view.get<TransformComponent>(entity);

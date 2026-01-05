@@ -13,6 +13,11 @@ Server-side ECS integration with svEntity_t bridge for network sync.
 #include "../common/ecs.h"
 #include "server.h"
 
+// Forward declarations for game entity types
+#ifdef USE_BULLET
+typedef struct gentity_s gentity_t;
+#endif
+
 #ifdef USE_ENTT
 
 #ifdef __cplusplus
@@ -44,6 +49,11 @@ void SV_ECS_RunFrame(float deltaTime);
 // These require USE_BULLET and will be no-ops otherwise.
 void SV_ECS_EnableBulletForEntity(svEntity_t *ent, float mass, float friction);
 void SV_ECS_DisableBulletForEntity(svEntity_t *ent);
+
+// Legacy entity synchronization
+// Sync between gentity_t and ECS systems
+void SV_ECS_SyncGEntityToECS(gentity_t *gent);
+void SV_ECS_SyncECSToGEntity(gentity_t *gent);
 
 #ifdef __cplusplus
 }

@@ -310,6 +310,81 @@ void SV_ECS_DisableBulletForEntity(svEntity_t *ent) {
 #endif
 }
 
+/*
+================
+SV_ECS_SyncGEntityToECS
+Sync legacy gentity_t position/rotation to ECS TransformComponent
+================
+*/
+void SV_ECS_SyncGEntityToECS(gentity_t *gent) {
+	if (!gent) {
+		return;
+	}
+
+#if defined(USE_ENTT) && defined(USE_BULLET)
+	// Find the corresponding svEntity_t for this gentity_t
+	// This is a simplified mapping - in practice, you'd need proper entity linking
+	svEntity_t *svEnt = nullptr;
+
+	// For now, assume a 1:1 mapping or search by entity number
+	// TODO: Implement proper entity mapping
+
+	if (svEnt) {
+		entt::registry &registry = ECS::GetRegistry();
+		ecs_entity_t ecsEntity = SV_ECS_GetEntityFromSvEntity(svEnt);
+
+		if (ECS_IsValid(ecsEntity)) {
+			entt::entity e = static_cast<entt::entity>(ecsEntity);
+
+			if (registry.all_of<TransformComponent>(e)) {
+				auto &transform = registry.get<TransformComponent>(e);
+				VectorCopy(gent->r.currentOrigin, transform.position);
+				// Note: Rotation sync would need proper quaternion conversion
+			}
+		}
+	}
+#else
+	(void)gent;
+#endif
+}
+
+/*
+================
+SV_ECS_SyncECSToGEntity
+Sync ECS TransformComponent back to legacy gentity_t
+================
+*/
+void SV_ECS_SyncECSToGEntity(gentity_t *gent) {
+	if (!gent) {
+		return;
+	}
+
+#if defined(USE_ENTT) && defined(USE_BULLET)
+	// Find the corresponding svEntity_t for this gentity_t
+	svEntity_t *svEnt = nullptr;
+
+	// For now, assume a 1:1 mapping
+	// TODO: Implement proper entity mapping
+
+	if (svEnt) {
+		entt::registry &registry = ECS::GetRegistry();
+		ecs_entity_t ecsEntity = SV_ECS_GetEntityFromSvEntity(svEnt);
+
+		if (ECS_IsValid(ecsEntity)) {
+			entt::entity e = static_cast<entt::entity>(ecsEntity);
+
+			if (registry.all_of<TransformComponent>(e)) {
+				auto &transform = registry.get<TransformComponent>(e);
+				VectorCopy(transform.position, gent->r.currentOrigin);
+				// Note: Rotation sync would need proper quaternion conversion
+			}
+		}
+	}
+#else
+	(void)gent;
+#endif
+}
+
 #ifdef __cplusplus
 }
 #endif
