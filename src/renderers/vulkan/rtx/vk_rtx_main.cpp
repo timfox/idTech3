@@ -39,6 +39,23 @@ extern void vk_rt_denoise(uint32_t width, uint32_t height);
 #include <type_traits>
 #include <concepts>
 #include <numbers>
+#include <print>
+
+// C++23 print wrapper for C compatibility
+extern "C" {
+    // This allows C code to call std::print through a C interface
+    // while we migrate to C++23 features
+    void RTX_Print(const char* format, ...) {
+        // For now, just use Com_Printf as a bridge
+        // In a full implementation, this would parse format and use std::print
+        va_list args;
+        va_start(args, format);
+        char buffer[1024];
+        vsnprintf(buffer, sizeof(buffer), format, args);
+        va_end(args);
+        Com_Printf("%s", buffer);
+    }
+}
 
 // C++23 Concepts and type safety
 template<typename T>
@@ -801,25 +818,25 @@ void RTX_RenderScene(const refdef_t *fd)
     // 1. God rays (volumetric lighting)
     if (rtx.god_rays_enabled) {
         vk_god_rays_render();
-        Com_Printf("RTX: God rays rendered\n");
+        std::print("RTX: God rays rendered\n");
     }
 
     // 2. Atmosphere effects
     if (rtx.atmosphere_enabled) {
         vk_atmosphere_render();
-        Com_Printf("RTX: Atmosphere rendered\n");
+        std::print("RTX: Atmosphere rendered\n");
     }
 
     // 3. Image-based lighting
     if (rtx.ibl_enabled) {
         // IBL rendering integrated into main pipeline
-        Com_Printf("RTX: IBL active\n");
+        std::print("RTX: IBL active\n");
     }
 
     // 4. Raymarching effects
     if (rtx.raymarching_enabled) {
         // Raymarching rendering (distance fields, volumetric effects)
-        Com_Printf("RTX: Raymarching active\n");
+        std::print("RTX: Raymarching active\n");
     }
 
     // Post-processing effects
@@ -842,7 +859,7 @@ void RTX_RenderScene(const refdef_t *fd)
     // Apply FSR upscaling if enabled (final post-processing stage)
     if (rtx.fsr_enabled) {
         vk_fsr_apply(glConfig.vidWidth, glConfig.vidHeight);
-        Com_Printf("RTX: FSR upscaling applied\n");
+        std::print("RTX: FSR upscaling applied\n");
     }
 
     // Update path tracer statistics

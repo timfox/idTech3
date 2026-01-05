@@ -14,6 +14,7 @@ Core EnTT registry wrapper providing C interface for engine use.
 #include <entt/entt.hpp>
 #include <unordered_map>
 #include <cassert>
+#include <optional>
 
 // Global registry instance
 static entt::registry *g_registry = nullptr;
@@ -91,7 +92,23 @@ ecs_entity_t ECS_CreateEntity(void) {
 	if (g_registry == nullptr) {
 		return ECS_NULL_ENTITY;
 	}
-	
+
+	entt::entity entity = g_registry->create();
+	return static_cast<ecs_entity_t>(entity);
+}
+
+/*
+================
+ECS_CreateEntity_Optional
+
+C++23 version using std::optional for better error handling
+================
+*/
+std::optional<ecs_entity_t> ECS_CreateEntity_Optional(void) {
+	if (g_registry == nullptr) {
+		return std::nullopt;
+	}
+
 	entt::entity entity = g_registry->create();
 	return static_cast<ecs_entity_t>(entity);
 }

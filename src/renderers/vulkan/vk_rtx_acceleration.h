@@ -88,6 +88,89 @@ void vk_rtx_set_quality_settings(float quality, qboolean shadows, qboolean refle
 void vk_rtx_set_quality_preset(rtx_quality_preset_t preset);
 rtx_quality_preset_t vk_rtx_get_current_quality_preset(void);
 
+// BVH optimization functions
+qboolean vk_rtx_build_blas_incremental(VkCommandBuffer cmd, uint32_t changed_surface_start, uint32_t changed_surface_count);
+void vk_rtx_optimize_bvh_quality(rtx_quality_preset_t preset);
+void vk_rtx_compact_geometry(void);
+qboolean vk_rtx_update_instance_transforms(VkCommandBuffer cmd_buffer);
+
+// Parallel BLAS building
+typedef struct {
+    VkAccelerationStructureKHR accel;
+    VkDeviceMemory memory;
+    VkBuffer scratch_buffer;
+    VkDeviceMemory scratch_memory;
+    VkDeviceSize scratch_size;
+    uint32_t surface_index;
+    qboolean valid;
+} blas_build_job_t;
+
+qboolean vk_rtx_build_blas_parallel(VkCommandBuffer cmd_buffer, uint32_t max_parallel_jobs);
+void vk_rtx_submit_blas_jobs(VkCommandBuffer cmd_buffer, blas_build_job_t *jobs, uint32_t job_count);
+
+// Memory management and pooling
+typedef struct RTXMemoryPool_s {
+    VkBuffer scratch_buffer;
+    VkDeviceMemory scratch_memory;
+    VkDeviceSize allocated_size;
+    VkDeviceSize max_size;
+    qboolean initialized;
+} RTXMemoryPool_t;
+
+qboolean vk_rtx_memory_pool_init(RTXMemoryPool_t *pool, VkDeviceSize initial_size, VkDeviceSize max_size);
+void vk_rtx_memory_pool_shutdown(RTXMemoryPool_t *pool);
+VkBuffer vk_rtx_memory_pool_allocate_scratch(RTXMemoryPool_t *pool, VkDeviceSize size, VkDeviceMemory *memory);
+void vk_rtx_memory_pool_free_scratch(RTXMemoryPool_t *pool, VkBuffer buffer, VkDeviceMemory memory);
+qboolean vk_rtx_memory_pool_defragment(RTXMemoryPool_t *pool);
+
+// Memory budgeting and lazy allocation
+typedef struct RTXMemoryBudget_s {
+    VkDeviceSize current_usage;
+    VkDeviceSize peak_usage;
+    VkDeviceSize budget_limit;
+    VkDeviceSize warning_threshold;
+    uint32_t allocation_count;
+} RTXMemoryBudget_t;
+
+void vk_rtx_memory_budget_init(RTXMemoryBudget_t *budget, VkDeviceSize limit);
+qboolean vk_rtx_memory_budget_check(RTXMemoryBudget_t *budget, VkDeviceSize requested_size);
+void vk_rtx_memory_budget_allocate(RTXMemoryBudget_t *budget, VkDeviceSize size);
+void vk_rtx_memory_budget_free(RTXMemoryBudget_t *budget, VkDeviceSize size);
+void vk_rtx_memory_budget_report(RTXMemoryBudget_t *budget);
+
+// Lazy allocation system
+typedef struct RTXLazyAllocator_s {
+    VkBuffer buffer;
+    VkDeviceMemory memory;
+    VkDeviceSize size;
+    VkDeviceSize used;
+    qboolean allocated;
+    qboolean dirty;
+} RTXLazyAllocator_t;
+
+qboolean vk_rtx_lazy_allocate(RTLazyAllocator_t *allocator, VkDeviceSize minimum_size);
+void vk_rtx_lazy_free(RTLazyAllocator_t *allocator);
+VkDeviceSize vk_rtx_lazy_get_free_space(RTLazyAllocator_t *allocator);
+
+// SBT optimization functions
+typedef struct RTXSBTCache_s {
+    VkBuffer sbt_buffer;
+    VkDeviceMemory sbt_memory;
+    VkDeviceSize sbt_size;
+    uint32_t shader_group_count;
+    qboolean valid;
+} RTXSBTCache_t;
+
+qboolean vk_rtx_sbt_cache_init(RTXSBTCache_t *cache, uint32_t max_shader_groups);
+void vk_rtx_sbt_cache_shutdown(RTXSBTCache_t *cache);
+qboolean vk_rtx_sbt_build_optimized(VkCommandBuffer cmd_buffer, RTXSBTCache_t *cache);
+qboolean vk_rtx_sbt_update_incremental(VkCommandBuffer cmd_buffer, RTXSBTCache_t *cache,
+                                     uint32_t changed_groups_start, uint32_t changed_groups_count);
+qboolean vk_rtx_sbt_compress(RTXSBTCache_t *cache);
+void vk_rtx_sbt_reorder_groups(RTXSBTCache_t *cache);
+qboolean vk_rtx_sbt_prefetch_groups(VkCommandBuffer cmd_buffer, RTXSBTCache_t *cache,
+                                  const uint32_t *group_indices, uint32_t group_count);
+
 // Statistics and monitoring
 void vk_rtx_get_statistics(uint32_t* triangles, uint32_t* instances, uint32_t* lights,
                          VkDeviceSize* memory_usage, float* quality);

@@ -1133,6 +1133,55 @@ float Q_atof( const char *str );
 #define MIN(x,y) ((x)<(y)?(x):(y))
 #endif
 
+// C23 _Generic type-safe min/max functions
+#ifdef __STDC_VERSION__
+#if __STDC_VERSION__ >= 201112L  // C11 or later
+#define MIN_SAFE(a, b) _Generic((a), \
+    int: ((a) < (b)) ? (a) : (b), \
+    unsigned int: ((a) < (b)) ? (a) : (b), \
+    long: ((a) < (b)) ? (a) : (b), \
+    unsigned long: ((a) < (b)) ? (a) : (b), \
+    long long: ((a) < (b)) ? (a) : (b), \
+    unsigned long long: ((a) < (b)) ? (a) : (b), \
+    float: ((a) < (b)) ? (a) : (b), \
+    double: ((a) < (b)) ? (a) : (b), \
+    default: MIN(a, b))
+
+#define MAX_SAFE(a, b) _Generic((a), \
+    int: ((a) > (b)) ? (a) : (b), \
+    unsigned int: ((a) > (b)) ? (a) : (b), \
+    long: ((a) > (b)) ? (a) : (b), \
+    unsigned long: ((a) > (b)) ? (a) : (b), \
+    long long: ((a) > (b)) ? (a) : (b), \
+    unsigned long long: ((a) > (b)) ? (a) : (b), \
+    float: ((a) > (b)) ? (a) : (b), \
+    double: ((a) > (b)) ? (a) : (b), \
+    default: MAX(a, b))
+#endif
+#endif
+
+// C23 [[maybe_unused]] attribute equivalent
+#ifndef MAYBE_UNUSED
+#ifdef __GNUC__
+#define MAYBE_UNUSED __attribute__((unused))
+#elif defined(_MSC_VER)
+#define MAYBE_UNUSED
+#else
+#define MAYBE_UNUSED
+#endif
+#endif
+
+// C23 [[nodiscard]] attribute equivalent
+#ifndef NODISCARD
+#ifdef __GNUC__
+#define NODISCARD __attribute__((warn_unused_result))
+#elif defined(_MSC_VER)
+#define NODISCARD _Check_return_
+#else
+#define NODISCARD
+#endif
+#endif
+
 //=============================================
 
 #ifdef __cplusplus

@@ -24,6 +24,47 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "qcommon.h"
 #include "net_threads.h"
 
+// Enhanced fragmentation system
+#define MAX_FRAGMENT_REORDER_BUFFER 64  // Maximum out-of-order fragments to buffer
+#define FRAGMENT_ADAPTIVE_MIN_SIZE 256  // Minimum fragment size for adaptive mode
+#define FRAGMENT_ADAPTIVE_MAX_SIZE 2048 // Maximum fragment size for adaptive mode
+#define FRAGMENT_LOSS_TIMEOUT 5000      // Timeout for fragment loss detection (ms)
+
+// Fragment reordering buffer entry
+typedef struct {
+	int sequence;
+	int fragmentStart;
+	int fragmentLength;
+	int receivedTime;
+	byte data[FRAGMENT_SIZE];
+	qboolean received;
+} fragment_buffer_entry_t;
+
+// Enhanced fragmentation state per channel
+typedef struct {
+	// Adaptive fragmentation
+	int currentFragmentSize;
+	float packetLossRate;
+	int lastAdaptTime;
+	int successfulTransmissions;
+	int failedTransmissions;
+
+	// Fragment reordering
+	fragment_buffer_entry_t reorderBuffer[MAX_FRAGMENT_REORDER_BUFFER];
+	int reorderBufferCount;
+	int expectedFragmentStart;
+
+	// Priority queuing (for future use)
+	int priorityLevel;
+
+	// Loss detection
+	int lastFragmentTime;
+	qboolean awaitingRetransmission;
+} enhanced_fragmentation_t;
+
+// Global fragmentation state (could be per-channel in the future)
+static enhanced_fragmentation_t enhanced_frag;
+
 /*
 
 packet header
@@ -75,6 +116,9 @@ void Netchan_Init( int port ) {
 	Cvar_SetDescription( showdrop, "Toggles information of dropped packet traffic." );
 	qport = Cvar_Get ("net_qport", va("%i", port), CVAR_INIT );
 	Cvar_SetDescription( qport, "Set internal network port. This allows more than one person to play from behind a NAT router by using only one IP address." );
+
+	// Initialize enhanced fragmentation system
+	Netchan_InitEnhancedFragmentation();
 }
 
 
@@ -870,4 +914,439 @@ int NET_StringToAdr( const char *s, netadr_t *a, netadrtype_t family )
 		a->port = BigShort(PORT_SERVER);
 		return 2;
 	}
+}
+
+// ============================================================================
+// Enhanced Fragmentation System
+// ============================================================================
+
+/*
+=================
+Netchan_InitEnhancedFragmentation
+
+Initialize the enhanced fragmentation system
+=================
+*/
+NODISCARD qboolean Netchan_InitEnhancedFragmentation(void) {
+	// Enhanced initializer for the fragmentation state
+	enhanced_fragmentation_t init_state = {
+		.currentFragmentSize = FRAGMENT_SIZE,
+		.packetLossRate = 0.0f,
+		.lastAdaptTime = Sys_Milliseconds(),
+		.successfulTransmissions = 0,
+		.failedTransmissions = 0,
+		.expectedFragmentStart = 0,
+		.priorityLevel = 0,
+		.lastFragmentTime = 0,
+		.awaitingRetransmission = qfalse,
+		.reorderBufferCount = 0
+	};
+
+	Com_Memcpy(&enhanced_frag, &init_state, sizeof(enhanced_fragmentation_t));
+
+	Com_Printf("Enhanced fragmentation system initialized\n");
+	return qtrue;
+}
+
+/*
+=================
+Netchan_AdaptFragmentSize
+
+Adapt fragment size based on network conditions
+=================
+*/
+static void Netchan_AdaptFragmentSize(void) {
+	int currentTime = Sys_Milliseconds();
+	int timeSinceLastAdapt = currentTime - enhanced_frag.lastAdaptTime;
+
+	// Only adapt every 10 seconds to avoid thrashing
+	if (timeSinceLastAdapt < 10000) {
+		return;
+	}
+
+	int totalTransmissions = enhanced_frag.successfulTransmissions + enhanced_frag.failedTransmissions;
+	if (totalTransmissions < 10) {
+		return; // Need more data
+	}
+
+	// Calculate packet loss rate
+	enhanced_frag.packetLossRate = (float)enhanced_frag.failedTransmissions / (float)totalTransmissions;
+
+	// Adapt fragment size based on loss rate
+	if (enhanced_frag.packetLossRate > 0.1f) {
+		// High loss - use smaller fragments
+		enhanced_frag.currentFragmentSize = MAX(FRAGMENT_ADAPTIVE_MIN_SIZE,
+			enhanced_frag.currentFragmentSize / 2);
+		Com_DPrintf("Fragmentation: High loss rate (%.1f%%), reducing fragment size to %d\n",
+			enhanced_frag.packetLossRate * 100.0f, enhanced_frag.currentFragmentSize);
+	} else if (enhanced_frag.packetLossRate < 0.01f && enhanced_frag.successfulTransmissions > 100) {
+		// Low loss - can use larger fragments
+		enhanced_frag.currentFragmentSize = MIN(FRAGMENT_ADAPTIVE_MAX_SIZE,
+			enhanced_frag.currentFragmentSize * 2);
+		Com_DPrintf("Fragmentation: Low loss rate (%.1f%%), increasing fragment size to %d\n",
+			enhanced_frag.packetLossRate * 100.0f, enhanced_frag.currentFragmentSize);
+	}
+
+	// Reset counters for next adaptation period
+	enhanced_frag.successfulTransmissions = 0;
+	enhanced_frag.failedTransmissions = 0;
+	enhanced_frag.lastAdaptTime = currentTime;
+}
+
+/*
+=================
+Netchan_BufferFragment
+
+Buffer an out-of-order fragment for later reassembly
+=================
+*/
+static qboolean Netchan_BufferFragment(netchan_t *chan, int sequence, int fragmentStart,
+                                     int fragmentLength, const byte *data) {
+	// Find a free slot in the reorder buffer
+	for (int i = 0; i < MAX_FRAGMENT_REORDER_BUFFER; i++) {
+		if (!enhanced_frag.reorderBuffer[i].received) {
+			fragment_buffer_entry_t *entry = &enhanced_frag.reorderBuffer[i];
+
+			entry->sequence = sequence;
+			entry->fragmentStart = fragmentStart;
+			entry->fragmentLength = fragmentLength;
+			entry->receivedTime = Sys_Milliseconds();
+			entry->received = qtrue;
+
+			if (fragmentLength <= FRAGMENT_SIZE) {
+				Com_Memcpy(entry->data, data, fragmentLength);
+			} else {
+				Com_Printf(S_COLOR_YELLOW "Fragment too large for reorder buffer: %d bytes\n", fragmentLength);
+				return qfalse;
+			}
+
+			enhanced_frag.reorderBufferCount++;
+			Com_DPrintf("Buffered out-of-order fragment: seq=%d, start=%d, len=%d\n",
+				sequence, fragmentStart, fragmentLength);
+			return qtrue;
+		}
+	}
+
+	Com_DPrintf("Fragment reorder buffer full, dropping fragment\n");
+	return qfalse;
+}
+
+/*
+=================
+Netchan_ProcessReorderedFragments
+
+Process any buffered fragments that can now be assembled in order
+=================
+*/
+static qboolean Netchan_ProcessReorderedFragments(netchan_t *chan, msg_t *msg) {
+	if (enhanced_frag.reorderBufferCount == 0) {
+		return qfalse;
+	}
+
+	// Look for the next expected fragment
+	for (int i = 0; i < MAX_FRAGMENT_REORDER_BUFFER; i++) {
+		fragment_buffer_entry_t *entry = &enhanced_frag.reorderBuffer[i];
+
+		if (entry->received && entry->fragmentStart == chan->fragmentLength &&
+		    entry->sequence == chan->fragmentSequence) {
+
+			// This fragment can be processed now
+			if (entry->fragmentLength < 0 ||
+			    (size_t)(chan->fragmentLength + entry->fragmentLength) > sizeof(chan->fragmentBuffer)) {
+				Com_Printf(S_COLOR_YELLOW "Invalid reordered fragment length\n");
+				return qfalse;
+			}
+
+			// Copy fragment data
+			Com_Memcpy(chan->fragmentBuffer + chan->fragmentLength,
+				entry->data, entry->fragmentLength);
+
+			chan->fragmentLength += entry->fragmentLength;
+
+			// Mark as processed
+			entry->received = qfalse;
+			enhanced_frag.reorderBufferCount--;
+
+			Com_DPrintf("Processed reordered fragment: start=%d, len=%d, total=%d\n",
+				entry->fragmentStart, entry->fragmentLength, chan->fragmentLength);
+
+			// If this completes the message, return it
+			if (entry->fragmentLength != FRAGMENT_SIZE) {
+				if (chan->fragmentLength > msg->maxsize) {
+					Com_Printf("%s:fragmentLength %i > msg->maxsize\n",
+						NET_AdrToString(&chan->remoteAddress), chan->fragmentLength);
+					return qfalse;
+				}
+
+				// Copy the full message
+				*(int32_t *)msg->data = LittleLong(chan->fragmentSequence);
+				Com_Memcpy(msg->data + 4, chan->fragmentBuffer, chan->fragmentLength);
+				msg->cursize = chan->fragmentLength + 4;
+
+				// Reset for next message
+				chan->fragmentLength = 0;
+
+				return qtrue;
+			}
+
+			// Continue looking for more fragments in sequence
+			i = -1; // Restart loop to find next fragment
+		}
+	}
+
+	return qfalse;
+}
+
+/*
+=================
+Netchan_DetectFragmentLoss
+
+Detect lost fragments and request retransmission
+=================
+*/
+static void Netchan_DetectFragmentLoss(netchan_t *chan) {
+	int currentTime = Sys_Milliseconds();
+
+	if (chan->fragmentLength > 0) {
+		int timeSinceLastFragment = currentTime - enhanced_frag.lastFragmentTime;
+
+		if (timeSinceLastFragment > FRAGMENT_LOSS_TIMEOUT && !enhanced_frag.awaitingRetransmission) {
+			Com_DPrintf("Fragment loss detected, sequence=%d, expected_start=%d, current_length=%d\n",
+				chan->fragmentSequence, enhanced_frag.expectedFragmentStart, chan->fragmentLength);
+
+			// In a real implementation, this would send a retransmission request
+			// For now, just mark as awaiting retransmission
+			enhanced_frag.awaitingRetransmission = qtrue;
+			enhanced_frag.failedTransmissions++;
+		}
+	}
+}
+
+/*
+=================
+Netchan_TransmitNextFragment_Enhanced
+
+Enhanced version of Netchan_TransmitNextFragment with adaptive sizing
+=================
+*/
+void Netchan_TransmitNextFragment_Enhanced(netchan_t *chan) {
+	msg_t send;
+	byte send_buf[MAX_PACKETLEN + 8];
+	int fragmentLength;
+
+	// Adapt fragment size based on network conditions
+	Netchan_AdaptFragmentSize();
+
+	// Use adaptive fragment size
+	int effectiveFragmentSize = enhanced_frag.currentFragmentSize;
+	if (effectiveFragmentSize <= 0) {
+		effectiveFragmentSize = FRAGMENT_SIZE; // Fallback
+	}
+
+	// Write the packet header
+	MSG_InitOOB(&send, send_buf, sizeof(send_buf) - 8);
+
+	MSG_WriteLong(&send, chan->outgoingSequence | FRAGMENT_BIT);
+
+	// Write the qport if we are a client
+	if (chan->sock == NS_CLIENT) {
+		MSG_WriteShort(&send, qport->integer);
+	}
+
+	fragmentLength = effectiveFragmentSize;
+	if (chan->unsentFragmentStart + fragmentLength > chan->unsentLength) {
+		fragmentLength = chan->unsentLength - chan->unsentFragmentStart;
+	}
+
+	MSG_WriteShort(&send, chan->unsentFragmentStart);
+	MSG_WriteShort(&send, fragmentLength);
+	MSG_WriteData(&send, chan->unsentBuffer + chan->unsentFragmentStart, fragmentLength);
+
+	// Send the datagram
+	NET_SendPacket(chan->sock, send.cursize, send.data, &chan->remoteAddress);
+
+	// Update transmission stats
+	chan->lastSentTime = Sys_Milliseconds();
+	chan->lastSentSize = send.cursize;
+
+	if (showpackets->integer) {
+		Com_Printf("%s send %4i : s=%i fragment=%i,%i\n",
+			netsrcString[chan->sock],
+			send.cursize,
+			chan->outgoingSequence,
+			chan->unsentFragmentStart, fragmentLength);
+	}
+
+	chan->unsentFragmentStart += fragmentLength;
+
+	// Exit condition: if this was the last fragment
+	if (chan->unsentFragmentStart == chan->unsentLength && fragmentLength != effectiveFragmentSize) {
+		chan->outgoingSequence++;
+		chan->unsentFragments = qfalse;
+		enhanced_frag.successfulTransmissions++;
+	}
+}
+
+/*
+=================
+Netchan_Process_Enhanced
+
+Enhanced version of Netchan_Process with fragment reordering and loss detection
+=================
+*/
+qboolean Netchan_Process_Enhanced(netchan_t *chan, msg_t *msg) {
+	int sequence;
+	int fragmentStart, fragmentLength;
+	qboolean fragmented;
+
+	// XOR unscramble all data in the packet after the header
+	// Netchan_UnScramblePacket( msg );
+
+	// Get sequence numbers
+	MSG_BeginReadingOOB(msg);
+	sequence = MSG_ReadLong(msg);
+
+	// Check for fragment information
+	if (sequence & FRAGMENT_BIT) {
+		sequence &= ~FRAGMENT_BIT;
+		fragmented = qtrue;
+	} else {
+		fragmented = qfalse;
+	}
+
+	// Read the qport if we are a server
+	if (chan->sock == NS_SERVER) {
+		MSG_ReadShort(msg);
+	}
+
+	// Read the fragment information
+	if (fragmented) {
+		fragmentStart = MSG_ReadShort(msg);
+		fragmentLength = MSG_ReadShort(msg);
+	} else {
+		fragmentStart = 0;
+		fragmentLength = 0;
+	}
+
+	if (showpackets->integer) {
+		if (fragmented) {
+			Com_Printf("%s recv %4i : s=%i fragment=%i,%i\n",
+				netsrcString[chan->sock],
+				msg->cursize,
+				sequence,
+				fragmentStart, fragmentLength);
+		} else {
+			Com_Printf("%s recv %4i : s=%i\n",
+				netsrcString[chan->sock],
+				msg->cursize,
+				sequence);
+		}
+	}
+
+	// Discard out of order or duplicated packets
+	if (sequence <= chan->incomingSequence) {
+		if (showdrop->integer || showpackets->integer) {
+			Com_Printf("%s:Out of order packet %i at %i\n",
+				NET_AdrToString(&chan->remoteAddress),
+				sequence, chan->incomingSequence);
+		}
+		return qfalse;
+	}
+
+	// Dropped packets don't keep the message from being used
+	chan->dropped = sequence - (chan->incomingSequence + 1);
+	if (chan->dropped > 0) {
+		if (showdrop->integer || showpackets->integer) {
+			Com_Printf("%s:Dropped %i packets at %i\n",
+				NET_AdrToString(&chan->remoteAddress),
+				chan->dropped, sequence);
+		}
+	}
+
+	// If the current outgoing reliable message has been acknowledged
+	// clear the buffer to make way for the next
+	if (sequence >= chan->incomingAcknowledged) {
+		chan->incomingAcknowledged = sequence;
+		chan->incomingReliableAcknowledged = chan->incomingReliableSequence;
+	}
+
+	// Enhanced fragmentation processing
+	if (fragmented) {
+		enhanced_frag.lastFragmentTime = Sys_Milliseconds();
+
+		// Check for sequence mismatch (start of new fragmented message)
+		if (sequence != chan->fragmentSequence) {
+			chan->fragmentSequence = sequence;
+			chan->fragmentLength = 0;
+			enhanced_frag.expectedFragmentStart = 0;
+			enhanced_frag.awaitingRetransmission = qfalse;
+		}
+
+		// Check if this fragment is in order
+		if (fragmentStart == chan->fragmentLength) {
+			// In-order fragment - process immediately
+			if (fragmentLength < 0 || msg->readcount + fragmentLength > msg->cursize ||
+				(size_t)(chan->fragmentLength + fragmentLength) > sizeof(chan->fragmentBuffer)) {
+				if (showdrop->integer || showpackets->integer) {
+					Com_Printf("%s:illegal fragment length\n",
+						NET_AdrToString(&chan->remoteAddress));
+				}
+				return qfalse;
+			}
+
+			Com_Memcpy(chan->fragmentBuffer + chan->fragmentLength,
+				msg->data + msg->readcount, fragmentLength);
+
+			chan->fragmentLength += fragmentLength;
+			enhanced_frag.expectedFragmentStart = chan->fragmentLength;
+
+			// If this wasn't the last fragment, wait for more
+			if (fragmentLength == FRAGMENT_SIZE) {
+				return qfalse;
+			}
+
+			// Last fragment - check if we can process any buffered fragments
+			if (!Netchan_ProcessReorderedFragments(chan, msg)) {
+				// No buffered fragments to process, handle this message
+				if (chan->fragmentLength > msg->maxsize) {
+					Com_Printf("%s:fragmentLength %i > msg->maxsize\n",
+						NET_AdrToString(&chan->remoteAddress),
+						chan->fragmentLength);
+					return qfalse;
+				}
+
+				// Copy the full message over the partial fragment
+				*(int32_t *)msg->data = LittleLong(sequence);
+				Com_Memcpy(msg->data + 4, chan->fragmentBuffer, chan->fragmentLength);
+				msg->cursize = chan->fragmentLength + 4;
+
+				chan->incomingSequence = sequence;
+				chan->fragmentLength = 0;
+				enhanced_frag.expectedFragmentStart = 0;
+
+				return qtrue;
+			}
+		} else if (fragmentStart > chan->fragmentLength) {
+			// Out-of-order fragment - buffer it
+			if (!Netchan_BufferFragment(chan, sequence, fragmentStart, fragmentLength,
+				msg->data + msg->readcount)) {
+				if (showdrop->integer || showpackets->integer) {
+					Com_Printf("%s:Dropped out-of-order fragment\n",
+						NET_AdrToString(&chan->remoteAddress));
+				}
+			}
+			return qfalse;
+		} else {
+			// Duplicate fragment - ignore
+			Com_DPrintf("Received duplicate fragment: start=%d\n", fragmentStart);
+			return qfalse;
+		}
+	}
+
+	// Check for fragment loss
+	Netchan_DetectFragmentLoss(chan);
+
+	// Non-fragmented packet or successfully reassembled fragmented packet
+	chan->incomingSequence = sequence;
+	return qtrue;
 }

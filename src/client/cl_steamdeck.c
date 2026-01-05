@@ -7,6 +7,7 @@ Steamworks SDK integration for Steam Deck features
 
 #include "client.h"
 #include "cl_steamdeck.h"
+#include "../renderercommon/tr_public.h"  // For re (renderer interface)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -30,6 +31,47 @@ static qboolean steamdeck_is_steamdeck = qfalse;
 static qboolean steamdeck_is_docked = qfalse;
 static qboolean steamdeck_textinput_active = qfalse;
 static char steamdeck_textinput_buffer[4096];
+
+// Glyph system state
+static qboolean steamdeck_glyphs_initialized = qfalse;
+static qhandle_t steamdeck_glyph_textures[STEAMDECK_GLYPH_MAX];
+static qboolean steamdeck_glyph_available[STEAMDECK_GLYPH_MAX];
+
+// Glyph texture file mapping
+static const char *steamdeck_glyph_files[STEAMDECK_GLYPH_MAX] = {
+    "steamdeck/glyph_a.tga",        // STEAMDECK_GLYPH_A
+    "steamdeck/glyph_b.tga",        // STEAMDECK_GLYPH_B
+    "steamdeck/glyph_x.tga",        // STEAMDECK_GLYPH_X
+    "steamdeck/glyph_y.tga",        // STEAMDECK_GLYPH_Y
+    "steamdeck/glyph_l1.tga",       // STEAMDECK_GLYPH_L1
+    "steamdeck/glyph_l2.tga",       // STEAMDECK_GLYPH_L2
+    "steamdeck/glyph_r1.tga",       // STEAMDECK_GLYPH_R1
+    "steamdeck/glyph_r2.tga",       // STEAMDECK_GLYPH_R2
+    "steamdeck/glyph_lstick.tga",   // STEAMDECK_GLYPH_LSTICK
+    "steamdeck/glyph_rstick.tga",   // STEAMDECK_GLYPH_RSTICK
+    "steamdeck/glyph_dpad_up.tga",  // STEAMDECK_GLYPH_DPAD_UP
+    "steamdeck/glyph_dpad_down.tga", // STEAMDECK_GLYPH_DPAD_DOWN
+    "steamdeck/glyph_dpad_left.tga", // STEAMDECK_GLYPH_DPAD_LEFT
+    "steamdeck/glyph_dpad_right.tga", // STEAMDECK_GLYPH_DPAD_RIGHT
+    "steamdeck/glyph_start.tga",    // STEAMDECK_GLYPH_START
+    "steamdeck/glyph_select.tga",   // STEAMDECK_GLYPH_SELECT
+    "steamdeck/glyph_lgrip.tga",    // STEAMDECK_GLYPH_LGRIP
+    "steamdeck/glyph_rgrip.tga",    // STEAMDECK_GLYPH_RGRIP
+    "steamdeck/glyph_lpad_click.tga", // STEAMDECK_GLYPH_LPAD_CLICK
+    "steamdeck/glyph_rpad_click.tga", // STEAMDECK_GLYPH_RPAD_CLICK
+    "steamdeck/glyph_lpad_touch.tga", // STEAMDECK_GLYPH_LPAD_TOUCH
+    "steamdeck/glyph_rpad_touch.tga", // STEAMDECK_GLYPH_RPAD_TOUCH
+    "steamdeck/glyph_qam.tga"       // STEAMDECK_GLYPH_QAM
+};
+
+// Glyph display names
+static const char *steamdeck_glyph_names[STEAMDECK_GLYPH_MAX] = {
+    "A", "B", "X", "Y", "L1", "L2", "R1", "R2",
+    "Left Stick", "Right Stick", "DPad Up", "DPad Down",
+    "DPad Left", "DPad Right", "Start", "Select",
+    "Left Grip", "Right Grip", "Left Pad Click", "Right Pad Click",
+    "Left Pad Touch", "Right Pad Touch", "Quick Access Menu"
+};
 
 #ifdef USE_STEAMWORKS
 static ISteamUtils *steam_utils = NULL;
@@ -493,13 +535,161 @@ void CL_SteamDeck_RunFrame( void )
 	if ( !steamdeck_initialized ) {
 		return;
 	}
-	
+
 #ifdef USE_STEAMWORKS
 	// Run Steam API callbacks
 	SteamAPI_RunCallbacks();
-	
+
 	// Run Steam Input frame
 	CL_SteamDeck_SteamInput_RunFrame();
 #endif
 }
 
+// ============================================================================
+// Controller Glyph System
+// ============================================================================
+
+/*
+================
+CL_SteamDeck_Glyphs_Init
+
+Initialize the Steam Deck controller glyph system
+================
+*/
+qboolean CL_SteamDeck_Glyphs_Init( void )
+{
+	int i;
+
+	if ( steamdeck_glyphs_initialized ) {
+		return qtrue;
+	}
+
+	if ( !steamdeck_is_steamdeck ) {
+		Com_Printf( "Steam Deck glyphs: Not initializing (not on Steam Deck)\n" );
+		return qfalse;
+	}
+
+	Com_Printf( "Initializing Steam Deck controller glyphs...\n" );
+
+	// Initialize glyph state
+	for ( i = 0; i < STEAMDECK_GLYPH_MAX; i++ ) {
+		steamdeck_glyph_textures[i] = 0;
+		steamdeck_glyph_available[i] = qfalse;
+	}
+
+	// Load glyph textures
+	for ( i = 0; i < STEAMDECK_GLYPH_MAX; i++ ) {
+		if ( re.RegisterShader( steamdeck_glyph_files[i] ) ) {
+			steamdeck_glyph_textures[i] = re.RegisterShader( steamdeck_glyph_files[i] );
+			steamdeck_glyph_available[i] = qtrue;
+			Com_DPrintf( "Loaded Steam Deck glyph: %s\n", steamdeck_glyph_files[i] );
+		} else {
+			Com_DPrintf( "Steam Deck glyph not found: %s\n", steamdeck_glyph_files[i] );
+		}
+	}
+
+	steamdeck_glyphs_initialized = qtrue;
+	Com_Printf( "Steam Deck controller glyphs initialized\n" );
+
+	return qtrue;
+}
+
+/*
+================
+CL_SteamDeck_Glyphs_Shutdown
+
+Shutdown the Steam Deck controller glyph system
+================
+*/
+void CL_SteamDeck_Glyphs_Shutdown( void )
+{
+	if ( !steamdeck_glyphs_initialized ) {
+		return;
+	}
+
+	Com_Printf( "Shutting down Steam Deck controller glyphs...\n" );
+
+	// Glyph textures are managed by the renderer, no explicit cleanup needed
+
+	steamdeck_glyphs_initialized = qfalse;
+}
+
+/*
+================
+CL_SteamDeck_GetGlyphTexture
+
+Get the texture handle for a Steam Deck controller glyph
+================
+*/
+qhandle_t CL_SteamDeck_GetGlyphTexture( steamdeck_glyph_t glyph )
+{
+	if ( !steamdeck_glyphs_initialized || glyph < 0 || glyph >= STEAMDECK_GLYPH_MAX ) {
+		return 0;
+	}
+
+	return steamdeck_glyph_textures[glyph];
+}
+
+/*
+================
+CL_SteamDeck_RenderGlyph
+
+Render a Steam Deck controller glyph at the specified position
+================
+*/
+void CL_SteamDeck_RenderGlyph( float x, float y, float scale, steamdeck_glyph_t glyph )
+{
+	if ( !steamdeck_glyphs_initialized || !steamdeck_glyph_available[glyph] ) {
+		return;
+	}
+
+	qhandle_t shader = steamdeck_glyph_textures[glyph];
+	if ( !shader ) {
+		return;
+	}
+
+	// Calculate glyph dimensions (assuming square glyphs)
+	float size = 32.0f * scale;
+
+	// Set up render state for 2D rendering
+	re.SetColor( (float*)&colorWhite );
+
+	// Draw the glyph texture
+	// This would typically use the UI rendering system
+	// For now, we'll use a simple quad rendering approach
+	// (In a real implementation, this would integrate with the UI system)
+
+	re.DrawStretchPic( x, y, size, size, 0, 0, 1, 1, shader );
+}
+
+/*
+================
+CL_SteamDeck_GetGlyphName
+
+Get the display name for a Steam Deck controller glyph
+================
+*/
+const char *CL_SteamDeck_GetGlyphName( steamdeck_glyph_t glyph )
+{
+	if ( glyph < 0 || glyph >= STEAMDECK_GLYPH_MAX ) {
+		return "Unknown";
+	}
+
+	return steamdeck_glyph_names[glyph];
+}
+
+/*
+================
+CL_SteamDeck_IsGlyphAvailable
+
+Check if a Steam Deck controller glyph is available
+================
+*/
+qboolean CL_SteamDeck_IsGlyphAvailable( steamdeck_glyph_t glyph )
+{
+	if ( !steamdeck_glyphs_initialized || glyph < 0 || glyph >= STEAMDECK_GLYPH_MAX ) {
+		return qfalse;
+	}
+
+	return steamdeck_glyph_available[glyph];
+}

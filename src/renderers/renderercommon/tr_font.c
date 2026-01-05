@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../common/q_shared.h"
 #include "../common/qcommon.h"
 #include "../common/q_scalability.h"
+#include "../common/q_fallback_assets.h"
 
 void R_InitFonts(void); // Forward declaration
 // As of this writing ( Nov, 2000 ) Team Arena uses these fonts for all of the ui and 
@@ -839,11 +840,89 @@ static qboolean R_FontFallbackChain(const char *fontName, int pointSize, fontInf
 		ri.FS_FreeFile(datData);
 	}
 
-	// Fallback 4: Generate a simple built-in font
+	// Fallback 4: Try our fallback bitmap font
+	if (FallbackFont_IsAvailable()) {
+		ri.Printf(PRINT_WARNING, "R_FontFallbackChain: Using fallback bitmap font instead of '%s'\n", fontName);
+		return R_LoadFallbackFont(pointSize, font);
+	}
+
+	// Fallback 5: Generate a simple built-in font (last resort)
 	ri.Printf(PRINT_WARNING, "R_FontFallbackChain: All font loading methods failed for '%s', built-in font generation disabled\n", fontName);
         // return R_GenerateBuiltInFont(pointSize, font);
 	inFontFallback = qfalse; // Reset recursion flag
 	return qfalse;
+}
+
+/*
+=================
+R_LoadFallbackFont
+
+Load the fallback bitmap font into a fontInfo_t structure
+=================
+*/
+static qboolean R_LoadFallbackFont(int pointSize, fontInfo_t *font) {
+	if (!font || !FallbackFont_IsAvailable()) {
+		return qfalse;
+	}
+
+	// Get fallback font asset
+	const fallback_asset_t *asset = FS_GetFallbackAsset("menu/art/font1_prop.tga");
+	if (!asset || asset->type != FALLBACK_ASSET_FONT) {
+		return qfalse;
+	}
+
+	const fallback_font_t *fallbackFont = (const fallback_font_t *)asset->data;
+
+	// Initialize font info
+	Com_Memset(font, 0, sizeof(fontInfo_t));
+	Q_strncpyz(font->name, "fallback_font", sizeof(font->name));
+
+	// Scale font size based on requested point size
+	float scale = (float)pointSize / 12.0f; // Base size is 12pt
+	int scaledWidth = (int)(fallbackFont->width * scale);
+	int scaledHeight = (int)(fallbackFont->height * scale);
+
+	// Set up glyph info for each character (32-126)
+	for (int i = 0; i < fallbackFont->char_count && i < GLYPHS_PER_FONT; i++) {
+		int charCode = 32 + i; // ASCII 32-126
+		glyphInfo_t *glyph = &font->glyphs[charCode];
+
+		// Basic glyph setup
+		glyph->width = scaledWidth;
+		glyph->height = scaledHeight;
+		glyph->pitch = scaledWidth;
+		glyph->xSkip = scaledWidth + 1; // Add small spacing
+		glyph->top = -scaledHeight; // Baseline adjustment
+		glyph->left = 0;
+		glyph->bottom = 0;
+
+		// Calculate UV coordinates for the character in the bitmap
+		float charWidth = 1.0f / fallbackFont->char_count;
+		glyph->s = i * charWidth;
+		glyph->t = 0.0f;
+		glyph->s2 = (i + 1) * charWidth;
+		glyph->t2 = 1.0f;
+
+		// For now, set image handle to 0 (will be set by renderer)
+		glyph->glyph = 0;
+	}
+
+	// Set font properties
+	font->pointSize = pointSize;
+	font->isSDF = qfalse; // Not SDF
+	font->height = scaledHeight;
+
+	// Load the font texture
+	font->shader = R_FindShader("menu/art/font1_prop.tga", LIGHTMAP_NONE, qtrue);
+	if (!font->shader) {
+		ri.Printf(PRINT_WARNING, "R_LoadFallbackFont: Failed to load fallback font shader\n");
+		return qfalse;
+	}
+
+	ri.Printf(PRINT_ALL, "R_LoadFallbackFont: Loaded fallback font (%dx%d, %dpt)\n",
+	          scaledWidth, scaledHeight, pointSize);
+
+	return qtrue;
 }
 
 /*

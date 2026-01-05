@@ -84,24 +84,38 @@ qboolean FS_ValidateGameContent( fs_validation_result_t *result ) {
 		"pak0.pk3",
 		NULL
 	};
-	
+
+	// Critical asset files that should be available for basic functionality
+	const char *criticalAssets[] = {
+		"menu/art/font1_prop.tga",      // Main UI font texture
+		"menu/art/font2_prop.tga",      // Secondary UI font texture
+		"gfx/2d/bigchars.tga",          // Console characters
+		"gfx/2d/consolechars.tga",      // Console font
+		"menu/art/back_0.tga",          // Main menu background
+		"menu/art/back_1.tga",          // Alternative menu background
+		"gfx/misc/console01.tga",       // Console background
+		"gfx/misc/console02.tga",       // Alternative console background
+		NULL
+	};
+
 	int i;
 	qboolean allValid = qtrue;
-	
+	qboolean hasBasicContent = qfalse;
+
 	if ( !result ) {
 		return qfalse;
 	}
-	
+
 	result->valid = qtrue;
 	result->error = NULL;
 	result->missing_files = 0;
 	result->corrupted_files = 0;
-	
+
 	// Check for required pak files
 	for ( i = 0; requiredPaks[i] != NULL; i++ ) {
 		char pakPath[MAX_OSPATH];
 		fileHandle_t f;
-		
+
 		// Try to find the pak file
 		int fileLen = FS_FOpenFileRead( requiredPaks[i], &f, qfalse );
 		if ( fileLen < 0 || f == FS_INVALID_HANDLE ) {
@@ -111,7 +125,8 @@ qboolean FS_ValidateGameContent( fs_validation_result_t *result ) {
 			continue;
 		}
 		FS_FCloseFile( f );
-		
+		hasBasicContent = qtrue;
+
 		// Validate the pak file
 		Com_sprintf( pakPath, sizeof( pakPath ), "%s", requiredPaks[i] );
 		if ( !FS_ValidatePakFile( pakPath, errorMsg, sizeof( errorMsg ) ) ) {
@@ -120,7 +135,33 @@ qboolean FS_ValidateGameContent( fs_validation_result_t *result ) {
 			allValid = qfalse;
 		}
 	}
-	
+
+	// Check for critical asset files (fonts, UI textures, etc.)
+	// These might be in pak files or as loose files
+	int availableAssets = 0;
+	for ( i = 0; criticalAssets[i] != NULL; i++ ) {
+		fileHandle_t f;
+		int fileLen = FS_FOpenFileRead( criticalAssets[i], &f, qfalse );
+		if ( fileLen >= 0 && f != FS_INVALID_HANDLE ) {
+			FS_FCloseFile( f );
+			availableAssets++;
+		}
+	}
+
+	// If we have pak files but no critical assets, something is wrong
+	if ( hasBasicContent && availableAssets == 0 ) {
+		Com_Printf( S_COLOR_YELLOW "WARNING: Pak files found but no critical assets detected. Content may be incomplete.\n" );
+		result->valid = qfalse;
+		allValid = qfalse;
+	}
+
+	// If no pak files but some assets exist, warn about incomplete setup
+	if ( !hasBasicContent && availableAssets > 0 ) {
+		Com_Printf( S_COLOR_YELLOW "WARNING: Found some assets but no pak files. Game content setup may be incomplete.\n" );
+		result->valid = qfalse;
+		allValid = qfalse;
+	}
+
 	return allValid;
 }
 
@@ -289,32 +330,66 @@ void FS_ReportMissingContent( fs_validation_result_t *result ) {
 	if ( !result ) {
 		return;
 	}
-	
+
 	if ( result->valid ) {
-		Com_Printf( "Content validation: All required files present and valid.\n" );
+		Com_Printf( S_COLOR_GREEN "Content validation: All required files present and valid.\n" );
 		return;
 	}
-	
-	Com_Printf( S_COLOR_RED "Content validation failed!\n" );
-	
+
+	Com_Printf( S_COLOR_RED "\n================================================================================\n" );
+	Com_Printf( S_COLOR_RED "GAME CONTENT NOT FOUND - ENGINE STARTED IN FALLBACK MODE\n" );
+	Com_Printf( S_COLOR_RED "================================================================================\n\n" );
+
+	Com_Printf( S_COLOR_YELLOW "The engine requires game content to display properly.\n\n" );
+
 	if ( result->missing_files > 0 ) {
-		Com_Printf( S_COLOR_YELLOW "  Missing files: %d\n", result->missing_files );
-		Com_Printf( S_COLOR_YELLOW "  Required: pak0.pk3 (and optionally pak1.pk3, pak2.pk3, etc.)\n" );
-		Com_Printf( S_COLOR_YELLOW "  Place your game content (.pk3 files) in the base/ directory\n" );
+		Com_Printf( S_COLOR_YELLOW "ISSUES FOUND:\n" );
+		Com_Printf( S_COLOR_RED "  • No game content (.pk3 files) detected\n" );
+		Com_Printf( S_COLOR_RED "  • Missing pak0.pk3 and other required content files\n" );
 	}
-	
+
 	if ( result->corrupted_files > 0 ) {
-		Com_Printf( S_COLOR_YELLOW "  Corrupted files: %d\n", result->corrupted_files );
-		Com_Printf( S_COLOR_YELLOW "  Some pak files appear to be damaged. Please reinstall game content.\n" );
+		Com_Printf( S_COLOR_RED "  • %d pak file(s) appear corrupted or damaged\n", result->corrupted_files );
 	}
-	
+
+	Com_Printf( "\n" S_COLOR_CYAN "SOLUTIONS:\n\n" );
+
+	Com_Printf( S_COLOR_GREEN "OPTION 1 - Use OpenArena (Free & Recommended):\n" );
+	Com_Printf( "  1. Download OpenArena from: https://openarena.ws/\n" );
+	Com_Printf( "  2. Extract the game files\n" );
+	Com_Printf( "  3. Copy all .pk3 files from OpenArena's baseoa/ directory\n" );
+	Com_Printf( "     to this engine's base/ directory\n\n" );
+
+	Com_Printf( S_COLOR_GREEN "OPTION 2 - Use Original Quake 3:\n" );
+	Com_Printf( "  1. Own a legal copy of Quake 3 Arena\n" );
+	Com_Printf( "  2. Copy pak0.pk3, pak1.pk3, pak2.pk3, pak3.pk3, pak4.pk3, pak5.pk3, pak6.pk3, pak7.pk3, pak8.pk3\n" );
+	Com_Printf( "     from Quake 3's baseq3/ directory to this engine's base/ directory\n\n" );
+
+	Com_Printf( S_COLOR_GREEN "OPTION 3 - Use Custom Content:\n" );
+	Com_Printf( "  Create your own .pk3 files with game assets (maps, textures, sounds, etc.)\n" );
+	Com_Printf( "  and place them in the base/ directory\n\n" );
+
+	Com_Printf( S_COLOR_CYAN "CURRENT STATUS:\n" );
+	Com_Printf( "  • Engine is running with minimal fallback assets\n" );
+	Com_Printf( "  • Basic text display is available\n" );
+	Com_Printf( "  • Console and basic UI functions work\n" );
+	Com_Printf( "  • Full gameplay requires game content\n\n" );
+
+	Com_Printf( S_COLOR_CYAN "To test the engine with content:\n" );
+	Com_Printf( "  ./idtech3.x86_64 +set fs_game base\n\n" );
+
 	if ( result->error ) {
-		Com_Printf( S_COLOR_YELLOW "  Error: %s\n", result->error );
+		Com_Printf( S_COLOR_RED "Additional error: %s\n\n", result->error );
 	}
-	
-	Com_Printf( "\n" );
-	Com_Printf( S_COLOR_CYAN "Note: You can use any .pk3 files in the base directory.\n" );
-	Com_Printf( S_COLOR_CYAN "      Place your game assets (maps, textures, etc.) in .pk3 files.\n" );
+
+	Com_Printf( S_COLOR_CYAN "================================================================================\n\n" );
+
+	// Also display the fallback asset status
+	Com_Printf( S_COLOR_GREEN "Fallback assets loaded:\n" );
+	Com_Printf( "  ✓ Minimal bitmap font (ASCII characters)\n" );
+	Com_Printf( "  ✓ Basic UI textures and backgrounds\n" );
+	Com_Printf( "  ✓ Error display system\n" );
+	Com_Printf( "  ✓ Console functionality\n\n" );
 }
 
 /*

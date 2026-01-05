@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "client.h"
 #include "../common/physics_bullet.h"
 #include "../common/ecs.h"
+#include "../common/q_fallback_assets.h"
 
 // Debug command functions are registered with Cmd_AddCommand but may appear unused to the compiler
 
@@ -4778,6 +4779,12 @@ void CL_Init( void ) {
 
 	// Initialize UI for main menu
 	CL_InitUI();
+
+	// Check if we need to display asset instructions
+	if (!com_fullyInitialized) {
+		// Display fallback asset status on first init
+		FallbackAssets_DisplayAssetInstructions();
+	}
 
 	Com_Printf( "----- Client Initialization Complete -----\n" );
 }

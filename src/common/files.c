@@ -41,6 +41,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "qcommon.h"
 #include "files_internal.h"  // Internal type definitions (includes unzip.h)
 #include "files_v2.h"  // VFS v2 mount table
+#include "q_fallback_assets.h"  // Fallback asset system
 #include "job_system.h"
 #ifndef _WIN32
 #include <stdio.h> // popen, pclose
@@ -434,11 +435,6 @@ Preload commonly used resources to reduce loading stalls during gameplay
 ================
 */
 void FS_PreloadCriticalResources(void) {
-	return; // Disabled to debug buffer overflow
-}
-
-#if 0
-void FS_PreloadCriticalResources_Disabled(void) {
 	static const char *criticalResources[] = {
 		"menu/art/font1_prop.tga",
 		"menu/art/font2_prop.tga",
@@ -452,28 +448,90 @@ void FS_PreloadCriticalResources_Disabled(void) {
 		"menu/art/back_1.tga",
 		"gfx/misc/console01.tga",
 		"gfx/misc/console02.tga",
+		"gfx/colors/black.tga",
+		"gfx/colors/white.tga",
 		NULL
 	};
 
+	int preloadedCount = 0;
+	int failedCount = 0;
+
+	// Only preload if resource caching is enabled
 	if (!FS_ResourceCacheEnabled()) {
+		Com_DPrintf("FS_PreloadCriticalResources: Resource cache disabled, skipping preload\n");
+		return;
+	}
+
+	// Check if we're in a safe state to preload
+	if (FS_StartupInProgress()) {
+		Com_DPrintf("FS_PreloadCriticalResources: Startup in progress, deferring preload\n");
 		return;
 	}
 
 	Com_Printf("Preloading critical resources...\n");
 
 	for (int i = 0; criticalResources[i]; i++) {
-		void *buffer;
-		int len = FS_ReadFile(criticalResources[i], &buffer);
+		const char *resourcePath = criticalResources[i];
+
+		// Safety check: validate path length
+		if (strlen(resourcePath) >= MAX_QPATH) {
+			Com_Printf(S_COLOR_YELLOW "WARNING: Resource path too long, skipping: %s\n", resourcePath);
+			failedCount++;
+			continue;
+		}
+
+		// Safety check: validate path doesn't contain dangerous characters
+		if (strstr(resourcePath, "..") || strstr(resourcePath, "\\") ||
+		    resourcePath[0] == '/' || !Q_ValidateFilePath(resourcePath)) {
+			Com_Printf(S_COLOR_YELLOW "WARNING: Invalid resource path, skipping: %s\n", resourcePath);
+			failedCount++;
+			continue;
+		}
+
+		// Check if fallback asset is available (don't preload if we have fallback)
+		if (FS_IsFallbackAssetLoaded(resourcePath)) {
+			Com_DPrintf("Skipping preload for fallback asset: %s\n", resourcePath);
+			continue;
+		}
+
+		void *buffer = NULL;
+		int len = FS_ReadFile(resourcePath, &buffer);
+
 		if (len > 0) {
-			Com_DPrintf("Preloaded: %s (%d bytes)\n", criticalResources[i], len);
+			// Validate reasonable file size (prevent loading huge files accidentally)
+			if (len > 10 * 1024 * 1024) { // 10MB limit
+				Com_Printf(S_COLOR_YELLOW "WARNING: Resource too large, skipping: %s (%d bytes)\n", resourcePath, len);
+				failedCount++;
+				continue;
+			}
+
+			Com_DPrintf("Preloaded: %s (%d bytes)\n", resourcePath, len);
+			preloadedCount++;
+
 			// FS_ReadFile already added it to cache if appropriate
-			// Buffers remain loaded in memory for performance
+			// The buffer is managed by the cache system
+
+		} else if (len == 0) {
+			// File exists but is empty - not necessarily an error
+			Com_DPrintf("Empty resource: %s\n", resourcePath);
+		} else {
+			// File not found or error
+			Com_DPrintf("Resource not found: %s\n", resourcePath);
 		}
 	}
 
-	Com_Printf("Critical resource preloading complete\n");
+	if (preloadedCount > 0) {
+		Com_Printf("Critical resource preloading complete: %d loaded", preloadedCount);
+		if (failedCount > 0) {
+			Com_Printf(", %d skipped/warnings", failedCount);
+		}
+		Com_Printf("\n");
+	} else if (failedCount == 0) {
+		Com_Printf("No critical resources found to preload (expected with fallback assets)\n");
+	} else {
+		Com_Printf(S_COLOR_YELLOW "Critical resource preloading completed with %d warnings\n", failedCount);
+	}
 }
-#endif
 
 // Case-insensitive file lookups
 static	cvar_t		*fs_caseInsensitive;	// Enable case-insensitive file lookups
@@ -3243,6 +3301,31 @@ a null buffer will just return the file length without loading
 	// look for it in the filesystem or pack files
 	len = FS_FOpenFileRead( qpath, &h, qfalse );
 	if ( h == FS_INVALID_HANDLE ) {
+		// Check for fallback assets before failing
+		const fallback_asset_t *fallback = FS_GetFallbackAsset(qpath);
+		if (fallback && buffer) {
+			Com_DPrintf("Using fallback asset for: %s\n", qpath);
+
+			// Allocate buffer for fallback asset data
+			if (fallback->is_generated) {
+				// For generated assets, copy the data
+				*buffer = Hunk_AllocateTempMemory(fallback->data_size);
+				if (*buffer) {
+					memcpy(*buffer, fallback->data, fallback->data_size);
+					fs_loadCount++;
+					fs_loadStack++;
+					return fallback->data_size;
+				}
+			} else {
+				// For non-generated assets, we would need to load from somewhere
+				// For now, just return the data pointer directly (if it's static)
+				*buffer = (void*)fallback->data;
+				fs_loadCount++;
+				fs_loadStack++;
+				return fallback->data_size;
+			}
+		}
+
 		if ( buffer ) {
 			*buffer = NULL;
 		}
@@ -7065,7 +7148,10 @@ void FS_Restart( int checksumFeed ) {
 
 	// Validate game content
 	FS_ValidateContentOnStartup();
-	
+
+	// Load fallback assets for when game content is missing
+	FS_LoadFallbackAssets();
+
 	// Preload critical resources to reduce loading stalls
 	FS_PreloadCriticalResources();
 

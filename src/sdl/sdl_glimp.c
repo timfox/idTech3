@@ -52,6 +52,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../renderers/renderercommon/tr_public.h"
 #include "sdl_glw.h"
 #include "sdl_icon.h"
+#include "sdl_wayland.h"
 
 // Export Vulkan functions for dynamic renderer loading
 #ifdef USE_VULKAN
@@ -868,6 +869,18 @@ void GLimp_Init( glconfig_t *config )
 	}
 
 	// These values force the UI to disable driver selection
+	// Initialize Wayland support if available
+#ifdef SDL_VIDEO_DRIVER_WAYLAND
+	if (SDL_VideoInit(NULL) == 0) {
+		const char *driver = SDL_GetCurrentVideoDriver();
+		if (driver && strcmp(driver, "wayland") == 0) {
+			if (GLimp_InitWayland()) {
+				Com_Printf("Using native Wayland support\n");
+			}
+		}
+	}
+#endif
+
 	config->driverType = GLDRV_ICD;
 	config->hardwareType = GLHW_GENERIC;
 
@@ -894,6 +907,11 @@ void GLimp_EndFrame( void )
 	{
 		SDL_GL_SwapWindow( SDL_window );
 	}
+
+	// Process Wayland events if available
+#ifdef SDL_VIDEO_DRIVER_WAYLAND
+	GLimp_HandleWaylandEvents();
+#endif
 }
 
 

@@ -31,6 +31,12 @@ ecs_entity_t ECS_CreateEntity(void);
 void ECS_DestroyEntity(ecs_entity_t entity);
 qboolean ECS_IsValid(ecs_entity_t entity);
 
+// C++23 std::optional version (for modern C++ code)
+#ifdef __cplusplus
+#include <optional>
+std::optional<ecs_entity_t> ECS_CreateEntity_Optional(void);
+#endif
+
 // Registry access (for C++ code)
 ecs_registry_t *ECS_GetRegistry(void);
 

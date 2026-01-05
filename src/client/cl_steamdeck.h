@@ -40,6 +40,41 @@ qboolean CL_SteamDeck_SteamInput_Init( void );
 void CL_SteamDeck_SteamInput_Shutdown( void );
 void CL_SteamDeck_SteamInput_RunFrame( void );
 
+// Controller glyphs
+typedef enum {
+    STEAMDECK_GLYPH_A,
+    STEAMDECK_GLYPH_B,
+    STEAMDECK_GLYPH_X,
+    STEAMDECK_GLYPH_Y,
+    STEAMDECK_GLYPH_L1,
+    STEAMDECK_GLYPH_L2,
+    STEAMDECK_GLYPH_R1,
+    STEAMDECK_GLYPH_R2,
+    STEAMDECK_GLYPH_LSTICK,
+    STEAMDECK_GLYPH_RSTICK,
+    STEAMDECK_GLYPH_DPAD_UP,
+    STEAMDECK_GLYPH_DPAD_DOWN,
+    STEAMDECK_GLYPH_DPAD_LEFT,
+    STEAMDECK_GLYPH_DPAD_RIGHT,
+    STEAMDECK_GLYPH_START,
+    STEAMDECK_GLYPH_SELECT,
+    STEAMDECK_GLYPH_LGRIP,
+    STEAMDECK_GLYPH_RGRIP,
+    STEAMDECK_GLYPH_LPAD_CLICK,
+    STEAMDECK_GLYPH_RPAD_CLICK,
+    STEAMDECK_GLYPH_LPAD_TOUCH,
+    STEAMDECK_GLYPH_RPAD_TOUCH,
+    STEAMDECK_GLYPH_QAM,
+    STEAMDECK_GLYPH_MAX
+} steamdeck_glyph_t;
+
+qboolean CL_SteamDeck_Glyphs_Init( void );
+void CL_SteamDeck_Glyphs_Shutdown( void );
+qhandle_t CL_SteamDeck_GetGlyphTexture( steamdeck_glyph_t glyph );
+void CL_SteamDeck_RenderGlyph( float x, float y, float scale, steamdeck_glyph_t glyph );
+const char *CL_SteamDeck_GetGlyphName( steamdeck_glyph_t glyph );
+qboolean CL_SteamDeck_IsGlyphAvailable( steamdeck_glyph_t glyph );
+
 // Initialization and shutdown
 void CL_SteamDeck_Init( void );
 void CL_SteamDeck_Shutdown( void );
