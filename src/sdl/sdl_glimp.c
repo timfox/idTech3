@@ -715,36 +715,52 @@ static rserr_t GLimp_StartDriverAndSetMode( int mode, const char *modeFS, qboole
 		{
 			const char *forcedDriver = SDL_getenv( "SDL_VIDEODRIVER" );
 			const char *waylandDisplay = SDL_getenv( "WAYLAND_DISPLAY" );
-			const qboolean useWayland = ( forcedDriver && !Q_stricmp(forcedDriver, "wayland") ) ||
-			                            ( !forcedDriver && Cvar_VariableIntegerValue("r_wayland") );
+			const char *x11Display = SDL_getenv( "DISPLAY" );
+			qboolean useWayland = ( forcedDriver && !Q_stricmp(forcedDriver, "wayland") ) ||
+			                      ( !forcedDriver && Cvar_VariableIntegerValue("r_wayland") );
 
-			if ( useWayland && waylandDisplay && waylandDisplay[0] ) {
-				// Use Wayland when explicitly requested and WAYLAND_DISPLAY is present
-				SDL_setenv( "SDL_VIDEODRIVER", "wayland", 0 /* don't override user */ );
-				// Explicitly disable libdecor to avoid GTK dependencies and related crashes.
-				// This relies on the compositor providing server-side decorations or the
-				// engine handling its own window state.
-				SDL_SetHint( "SDL_VIDEO_WAYLAND_ALLOW_LIBDECOR", "0" );
-				Com_Printf("Using Wayland display driver\n");
+			if ( useWayland ) {
+				if ( waylandDisplay && waylandDisplay[0] ) {
+					// Use Wayland when explicitly requested and WAYLAND_DISPLAY is present
+					SDL_setenv( "SDL_VIDEODRIVER", "wayland", 0 /* don't override user */ );
+					// Explicitly disable libdecor to avoid GTK dependencies and related crashes.
+					// This relies on the compositor providing server-side decorations or the
+					// engine handling its own window state.
+					SDL_SetHint( "SDL_VIDEO_WAYLAND_ALLOW_LIBDECOR", "0" );
+					// Enable window state management for proper fullscreen/minimize support
+					SDL_SetHint( "SDL_VIDEO_WAYLAND_WMCLASS", "idtech3" );
+					Com_Printf("Using Wayland display driver (WAYLAND_DISPLAY=%s)\n", waylandDisplay);
+				} else {
+					Com_Printf( "Wayland requested but WAYLAND_DISPLAY not set, falling back to X11\n" );
+					if ( !forcedDriver ) {
+						SDL_setenv( "SDL_VIDEODRIVER", "x11", 0 /* don't override user */ );
+					}
+					useWayland = qfalse;
+				}
 			} else {
 				// Default to X11 for better compatibility
 				if ( !forcedDriver ) {
 					SDL_setenv( "SDL_VIDEODRIVER", "x11", 0 /* don't override user */ );
 				}
-				Com_Printf("Using X11 display driver (default)\n");
+				if ( x11Display && x11Display[0] ) {
+					Com_Printf("Using X11 display driver (DISPLAY=%s)\n", x11Display);
+				} else {
+					Com_Printf("Using X11 display driver (default)\n");
+				}
 			}
 
 			if ( SDL_Init( SDL_INIT_VIDEO ) != 0 ) {
+				const char *errorMsg = SDL_GetError();
 				if ( useWayland ) {
-					Com_Printf( "SDL_Init video failed with Wayland driver (%s), retrying with X11...\n", SDL_GetError() );
+					Com_Printf( "SDL_Init video failed with Wayland driver (%s), retrying with X11...\n", errorMsg );
 					SDL_setenv( "SDL_VIDEODRIVER", "x11", 1 );
 					if ( SDL_Init( SDL_INIT_VIDEO ) != 0 ) {
-						Com_Printf( "SDL_Init( SDL_INIT_VIDEO ) FAILED (%s)\n", SDL_GetError() );
+						Com_Printf( "SDL_Init( SDL_INIT_VIDEO ) FAILED with both Wayland and X11 (%s)\n", SDL_GetError() );
 						return RSERR_FATAL_ERROR;
 					}
-					Com_Printf("Falling back to X11 after Wayland failure\n");
+					Com_Printf("Successfully fell back to X11 after Wayland failure\n");
 				} else {
-					Com_Printf( "SDL_Init( SDL_INIT_VIDEO ) FAILED (%s)\n", SDL_GetError() );
+					Com_Printf( "SDL_Init( SDL_INIT_VIDEO ) FAILED (%s)\n", errorMsg );
 					return RSERR_FATAL_ERROR;
 				}
 			}

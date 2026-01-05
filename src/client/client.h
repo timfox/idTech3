@@ -589,6 +589,10 @@ void CIN_SetExtents (int handle, int x, int y, int w, int h);
 void CIN_UploadCinematic(int handle);
 void CIN_CloseAllVideos(void);
 
+// Debug logging functions
+void cin_debug_log_init(void);
+void cin_debug_log_entry(const char *hypothesis, const char *location, const char *message, const char *data_json);
+
 //
 // cl_cgame.c
 //

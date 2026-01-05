@@ -12,15 +12,16 @@
 #include "client.h"
 #include "snd_local.h"
 
-// #region agent log
+#ifdef CIN_DEBUG
 #include <time.h>
 FILE *cin_debug_log = NULL;
 void cin_debug_log_init(void) {
     if (!cin_debug_log) {
-        cin_debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
+        cvar_t *logPath = Cvar_Get("cin_debug_log", "cin_debug.log", CVAR_ARCHIVE);
+        cin_debug_log = fopen(logPath->string, "a");
         if (!cin_debug_log) {
             // Fallback to stderr if file can't be opened
-            fprintf(stderr, "DEBUG: Failed to open log file\n");
+            fprintf(stderr, "CIN_DEBUG: Failed to open log file: %s\n", logPath->string);
         }
     }
 }
@@ -33,10 +34,10 @@ void cin_debug_log_entry(const char *hypothesis, const char *location, const cha
         fflush(cin_debug_log);
     } else {
         // Fallback logging
-        fprintf(stderr, "DEBUG [%s]: %s - %s\n", location, message, data_json ? data_json : "{}");
+        fprintf(stderr, "CIN_DEBUG [%s]: %s - %s\n", location, message, data_json ? data_json : "{}");
     }
 }
-// #endregion
+#endif // CIN_DEBUG
 #include "cl_cin_codec.h"
 
 #define MAXSIZE				8
@@ -1394,25 +1395,40 @@ Fetch and decompress the pending frame
 
 e_status CIN_RunCinematic( int handle )
 {
+	extern qboolean re_initialized;
+
+	// Don't run cinematic decoding if renderer is not initialized
+	if (!re_initialized) {
+		return FMV_IDLE;
+	}
+
 	// Simple debug output
+#ifdef CIN_DEBUG
 	printf("DEBUG: CIN_RunCinematic called with handle %d\n", handle);
 	cin_debug_log_entry("D", "CIN_RunCinematic", "ENTER FUNCTION", "{}");
+#endif
 
 	char data_buf[256];
 	int start = 0;
 	int thisTime = 0;
 
 	if (handle < 0 || handle >= MAX_VIDEO_HANDLES) {
+#ifdef CIN_DEBUG
 		printf("DEBUG: Invalid handle %d\n", handle);
 		cin_debug_log_entry("D", "CIN_RunCinematic", "INVALID HANDLE", "{}");
+#endif
 		return FMV_EOF;
 	}
 
 	snprintf(data_buf, sizeof(data_buf), "{\"handle\":%d,\"status\":%d}", handle, cinTable[handle].status);
+#ifdef CIN_DEBUG
 	cin_debug_log_entry("D", "CIN_RunCinematic", "Starting cinematic run", data_buf);
+#endif
 
 	if (handle < 0 || handle>= MAX_VIDEO_HANDLES || cinTable[handle].status == FMV_EOF) {
+#ifdef CIN_DEBUG
 		cin_debug_log_entry("D", "CIN_RunCinematic", "Early return - invalid handle or EOF", "{}");
+#endif
 		return FMV_EOF;
 	}
 
@@ -1943,9 +1959,13 @@ void SCR_DrawCinematic( void ) {
 
 
 void SCR_RunCinematic( void ) {
+#ifdef CIN_DEBUG
 	printf("DEBUG: SCR_RunCinematic called, CL_handle=%d\n", CL_handle);
+#endif
 	if (CL_handle >= 0 && CL_handle < MAX_VIDEO_HANDLES) {
+#ifdef CIN_DEBUG
 		printf("DEBUG: Calling CIN_RunCinematic\n");
+#endif
 		e_status status = CIN_RunCinematic(CL_handle);
 		// If cinematic reached EOF, stop it automatically (like user pressing a key)
 		if (status == FMV_EOF) {

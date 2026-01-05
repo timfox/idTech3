@@ -90,6 +90,7 @@ typedef struct trGlobals_s trGlobals_t;
 #endif
 
 // imgFlags_t is defined in renderer-specific headers
+typedef enum imgFlags_e imgFlags_t;
 
 // Renderer context for dependency injection
 typedef struct renderer_context_s {
@@ -114,7 +115,7 @@ typedef struct context_aware_renderer_api_s {
 	qhandle_t (*RegisterSkin)(renderer_context_t *ctx, const char *name);
 
 	// Image management
-	qhandle_t (*RegisterImage)(renderer_context_t *ctx, const char *name, int flags);
+	qhandle_t (*RegisterImage)(renderer_context_t *ctx, const char *name, imgFlags_t flags);
 
 	// Font management
 	qhandle_t (*RegisterFont)(renderer_context_t *ctx, const char *fontName, int pointSize, fontInfo_t *font);
@@ -198,7 +199,7 @@ typedef struct testable_renderer_api_s {
 	qhandle_t (*RegisterSkin)(const char *name);
 
 	// Image registration
-	qhandle_t (*RegisterImage)(const char *name, int flags);
+	qhandle_t (*RegisterImage)(const char *name, imgFlags_t flags);
 
 	// Font registration
 	qhandle_t (*RegisterFont)(const char *fontName, int pointSize, fontInfo_t *font);

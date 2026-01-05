@@ -664,6 +664,9 @@ void S_Shutdown( void )
 
 	S_CodecShutdown();
 
+	// Shutdown OpenAL enhanced audio system
+	SndOpenAL_Shutdown();
+
 	// Shutdown audio thread system
 	AudioThread_Shutdown();
 

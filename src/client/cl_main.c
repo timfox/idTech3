@@ -4306,6 +4306,10 @@ static void CL_InitGLimp_Cvars( void )
 	Cvar_CheckRange( r_noborder, "0", "1", CV_INTEGER );
 	Cvar_SetDescription( r_noborder, "Setting to 1 will remove window borders and title bar in windowed mode, hold ALT to drag & drop it with opened console." );
 
+	r_wayland = Cvar_Get( "r_wayland", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+	Cvar_CheckRange( r_wayland, "0", "1", CV_INTEGER );
+	Cvar_SetDescription( r_wayland, "Force Wayland backend for SDL video driver. Linux only.\n 0 - use X11 (default)\n 1 - use Wayland" );
+
 	r_mode = Cvar_Get( "r_mode", "-2", CVAR_ARCHIVE | CVAR_LATCH );
 	Cvar_CheckRange( r_mode, "-2", va( "%i", s_numVidModes-1 ), CV_INTEGER );
 	Cvar_SetDescription( r_mode, "Set video mode:\n -2 - use current desktop resolution\n -1 - use \\r_customWidth and \\r_customHeight\n  0..N - enter \\modelist for details" );

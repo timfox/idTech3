@@ -45,7 +45,14 @@ VK_VERBOSE_PIPELINE_LOGS=1 ./release/idtech3.x86_64 +set fs_game mymod +set cl_r
 ```
 - Expected output: additional DEBUG lines around pipeline allocation, e.g. "Allocated pipeline def ..." after vk_find_pipeline_ext allocations.
 
-### Wayland with X11 fallback for Vulkan
+### Wayland Support
+- **Linux only**: Wayland backend is supported via SDL with automatic X11 fallback
+- **Configuration**: Use `+set r_wayland 1` to force Wayland, `+set r_wayland 0` for X11 (default)
+- **Requirements**: `WAYLAND_DISPLAY` environment variable must be set for Wayland to work
+- **Fallback**: If Wayland initialization fails, engine automatically falls back to X11
+- **Window management**: Wayland uses server-side decorations by default (libdecor disabled)
+
+#### Wayland with X11 fallback for Vulkan
 - On Wayland sessions, if SDL_Vulkan_CreateSurface fails, the engine automatically retries by restarting the video backend to X11 and recreating the Vulkan surface.
 - Runtime log hints:
   - "SDL_Vulkan_CreateSurface failed on Wayland (...); retrying with X11..."
