@@ -773,7 +773,7 @@ modules of the program.
 #ifdef __cplusplus
 extern "C" {
 #endif
-cvar_t *Cvar_Get( const char *var_name, const char *value, int flags );
+NODISCARD cvar_t *Cvar_Get( const char *var_name, const char *value, int flags );
 #ifdef __cplusplus
 }
 #endif

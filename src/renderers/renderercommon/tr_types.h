@@ -30,27 +30,63 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define	MAX_DLIGHTS			32			// can't be increased, because bit flags are used on surfaces
 
-// renderfx flags
-#define	RF_MINLIGHT			0x0001		// always have some light (viewmodel, some items)
-#define	RF_THIRD_PERSON		0x0002		// don't draw through eyes, only mirrors (player bodies, chat sprites)
-#define	RF_FIRST_PERSON		0x0004		// only draw through eyes (view weapon, damage blood blob)
-#define	RF_DEPTHHACK		0x0008		// for view weapon Z crunching
-
-#define RF_CROSSHAIR		0x0010		// This item is a cross hair and will draw over everything similar to
+// renderfx flags - strongly typed enum for better type safety
+typedef enum {
+	RF_NONE				= 0x0000,
+	RF_MINLIGHT			= 0x0001,		// always have some light (viewmodel, some items)
+	RF_THIRD_PERSON		= 0x0002,		// don't draw through eyes, only mirrors (player bodies, chat sprites)
+	RF_FIRST_PERSON		= 0x0004,		// only draw through eyes (view weapon, damage blood blob)
+	RF_DEPTHHACK		= 0x0008,		// for view weapon Z crunching
+	RF_CROSSHAIR		= 0x0010,		// This item is a cross hair and will draw over everything similar to
 										// DEPTHHACK in stereo rendering mode, with the difference that the
 										// projection matrix won't be hacked to reduce the stereo separation as
 										// is done for the gun.
-
-#define	RF_NOSHADOW			0x0040		// don't add stencil shadows
-
-#define RF_LIGHTING_ORIGIN	0x0080		// use refEntity->lightingOrigin instead of refEntity->origin
+	RF_NOSHADOW			= 0x0040,		// don't add stencil shadows
+	RF_LIGHTING_ORIGIN	= 0x0080,		// use refEntity->lightingOrigin instead of refEntity->origin
 										// for lighting.  This allows entities to sink into the floor
 										// with their origin going solid, and allows all parts of a
 										// player to get the same lighting
-
-#define	RF_SHADOW_PLANE		0x0100		// use refEntity->shadowPlane
-#define	RF_WRAP_FRAMES		0x0200		// mod the model frames by the maxframes to allow continuous
+	RF_SHADOW_PLANE		= 0x0100,		// use refEntity->shadowPlane
+	RF_WRAP_FRAMES		= 0x0200,		// mod the model frames by the maxframes to allow continuous
 										// animation without needing to know the frame count
+	RF_HILIGHT			= 0x0400,		// entity is hilighted (for example, when hovering over the entity in the editor)
+	RF_BLINK			= 0x0800,		// entity is blinking (for example, a powerup)
+	RF_FORCENOLOD		= 0x1000,		// entity forces LOD to 0 (full detail)
+	RF_ADDITIVE			= 0x2000,		// entity is rendered with additive blending
+	RF_TRANSLUCENT		= 0x4000		// entity is translucent (but not additive)
+} renderFxFlags_t;
+
+// Compile-time validation of enum values
+STATIC_ASSERT((int)RF_MINLIGHT == 0x0001, "RF_MINLIGHT value mismatch");
+STATIC_ASSERT((int)RF_THIRD_PERSON == 0x0002, "RF_THIRD_PERSON value mismatch");
+STATIC_ASSERT((int)RF_FIRST_PERSON == 0x0004, "RF_FIRST_PERSON value mismatch");
+STATIC_ASSERT((int)RF_DEPTHHACK == 0x0008, "RF_DEPTHHACK value mismatch");
+STATIC_ASSERT((int)RF_CROSSHAIR == 0x0010, "RF_CROSSHAIR value mismatch");
+STATIC_ASSERT((int)RF_NOSHADOW == 0x0040, "RF_NOSHADOW value mismatch");
+STATIC_ASSERT((int)RF_LIGHTING_ORIGIN == 0x0080, "RF_LIGHTING_ORIGIN value mismatch");
+STATIC_ASSERT((int)RF_SHADOW_PLANE == 0x0100, "RF_SHADOW_PLANE value mismatch");
+STATIC_ASSERT((int)RF_WRAP_FRAMES == 0x0200, "RF_WRAP_FRAMES value mismatch");
+STATIC_ASSERT((int)RF_HILIGHT == 0x0400, "RF_HILIGHT value mismatch");
+STATIC_ASSERT((int)RF_BLINK == 0x0800, "RF_BLINK value mismatch");
+STATIC_ASSERT((int)RF_FORCENOLOD == 0x1000, "RF_FORCENOLOD value mismatch");
+STATIC_ASSERT((int)RF_ADDITIVE == 0x2000, "RF_ADDITIVE value mismatch");
+STATIC_ASSERT((int)RF_TRANSLUCENT == 0x4000, "RF_TRANSLUCENT value mismatch");
+
+// Legacy defines for backward compatibility (deprecated - use enum values)
+#define	RF_MINLIGHT			((renderFxFlags_t)0x0001)
+#define	RF_THIRD_PERSON		((renderFxFlags_t)0x0002)
+#define	RF_FIRST_PERSON		((renderFxFlags_t)0x0004)
+#define	RF_DEPTHHACK		((renderFxFlags_t)0x0008)
+#define RF_CROSSHAIR		((renderFxFlags_t)0x0010)
+#define	RF_NOSHADOW			((renderFxFlags_t)0x0040)
+#define RF_LIGHTING_ORIGIN	((renderFxFlags_t)0x0080)
+#define	RF_SHADOW_PLANE		((renderFxFlags_t)0x0100)
+#define	RF_WRAP_FRAMES		((renderFxFlags_t)0x0200)
+#define RF_HILIGHT			((renderFxFlags_t)0x0400)
+#define RF_BLINK			((renderFxFlags_t)0x0800)
+#define RF_FORCENOLOD		((renderFxFlags_t)0x1000)
+#define RF_ADDITIVE			((renderFxFlags_t)0x2000)
+#define RF_TRANSLUCENT		((renderFxFlags_t)0x4000)
 
 // refdef flags
 #define RDF_NOWORLDMODEL	0x0001		// used for player configuration screen

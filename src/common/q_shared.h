@@ -288,6 +288,50 @@ static inline qboolean Net_PacketRead(net_packet_t *packet, void *data, size_t s
 #define FORMAT_PRINTF(x, y) /* nothing */
 #endif
 
+// C23/C++23 Type Safety Attributes
+#if defined(__cplusplus) && __cplusplus >= 202302L
+// C++23 attributes
+#define NODISCARD [[nodiscard]]
+#define DEPRECATED(msg) [[deprecated(msg)]]
+#define MAYBE_UNUSED [[maybe_unused]]
+#define LIKELY [[likely]]
+#define UNLIKELY [[unlikely]]
+#define NO_UNIQUE_ADDRESS [[no_unique_address]]
+#elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L
+// C23 attributes (limited support)
+#define NODISCARD /* C23 doesn't have nodiscard */
+#define DEPRECATED(msg) /* C23 doesn't have deprecated */
+#define MAYBE_UNUSED /* C23 doesn't have maybe_unused */
+#define LIKELY /* C23 doesn't have likely/unlikely */
+#define UNLIKELY
+#define NO_UNIQUE_ADDRESS
+#elif defined(__GNUC__) || defined(__clang__)
+// GCC/Clang fallbacks
+#define NODISCARD __attribute__((warn_unused_result))
+#define DEPRECATED(msg) __attribute__((deprecated(msg)))
+#define MAYBE_UNUSED __attribute__((unused))
+#define LIKELY /* not supported */
+#define UNLIKELY /* not supported */
+#define NO_UNIQUE_ADDRESS /* not supported */
+#else
+// Fallback for other compilers
+#define NODISCARD
+#define DEPRECATED(msg)
+#define MAYBE_UNUSED
+#define LIKELY
+#define UNLIKELY
+#define NO_UNIQUE_ADDRESS
+#endif
+
+// C23 static_assert with fallback for better error messages
+#if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 202311L
+#define STATIC_ASSERT(expr, msg) static_assert(expr, msg)
+#elif defined(__cplusplus) && __cplusplus >= 201703L
+#define STATIC_ASSERT(expr, msg) static_assert(expr, msg)
+#else
+#define STATIC_ASSERT(expr, msg) /* static_assert not available */
+#endif
+
 /**********************************************************************
   VM Considerations
 
@@ -297,7 +341,7 @@ static inline qboolean Net_PacketRead(net_packet_t *packet, void *data, size_t s
 
   When writing mods, please add needed headers HERE, do not start including
   stuff like <stdio.h> in the various .c files that make up each of the VMs
-  since you will be including system headers files can will have issues.
+  since you will be including system headers files will have issues.
 
   Remember, if you use a C library function that is not defined in bg_lib.c,
   you will have to add your own version for support in the VM.
@@ -518,10 +562,12 @@ typedef union {
 } color4ub_t;
 
 
-typedef int		qhandle_t;
-typedef int		sfxHandle_t;
-typedef int		fileHandle_t;
-typedef int		clipHandle_t;
+// Handle types - keeping as int for array indexing compatibility
+// TODO: Consider making these opaque types in a future major version
+typedef int qhandle_t;
+typedef int sfxHandle_t;
+typedef int fileHandle_t;
+typedef int clipHandle_t;
 
 #define PAD(base, alignment)	(((base)+(alignment)-1) & ~((alignment)-1))
 #define PADLEN(base, alignment)	(PAD((base), (alignment)) - (base))
@@ -1552,41 +1598,59 @@ default values.
 ==========================================================
 */
 
-#define	CVAR_ARCHIVE		0x0001	// set to cause it to be saved to vars.rc
-					// used for system variables, not for player
-					// specific configurations
-#define	CVAR_USERINFO		0x0002	// sent to server on connect or change
-#define	CVAR_SERVERINFO		0x0004	// sent in response to front end requests
-#define	CVAR_SYSTEMINFO		0x0008	// these cvars will be duplicated on all clients
-#define	CVAR_INIT			0x0010	// don't allow change from console at all,
-					// but can be set from the command line
-#define	CVAR_LATCH			0x0020	// will only change when C code next does
-					// a Cvar_Get(), so it can't be changed
-					// without proper initialization.  modified
-					// will be set, even though the value hasn't
-					// changed yet
-#define	CVAR_ROM			0x0040	// display only, cannot be set by user at all
-#define	CVAR_USER_CREATED	0x0080	// created by a set command
-#define	CVAR_TEMP			0x0100	// can be set even when cheats are disabled, but is not archived
-#define CVAR_CHEAT			0x0200	// can not be changed if cheats are disabled
-#define CVAR_NORESTART		0x0400	// do not clear when a cvar_restart is issued
+// CVAR flags - strongly typed enum for better type safety
+typedef enum {
+	CVAR_NONE			= 0x0000,
+	CVAR_ARCHIVE		= 0x0001,	// set to cause it to be saved to vars.rc
+									// used for system variables, not for player
+									// specific configurations
+	CVAR_USERINFO		= 0x0002,	// sent to server on connect or change
+	CVAR_SERVERINFO		= 0x0004,	// sent in response to front end requests
+	CVAR_SYSTEMINFO		= 0x0008,	// these cvars will be duplicated on all clients
+	CVAR_INIT			= 0x0010,	// don't allow change from console at all,
+									// but can be set from the command line
+	CVAR_LATCH			= 0x0020,	// will only change when C code next does
+									// a Cvar_Get(), so it can't be changed
+									// without proper initialization.  modified
+									// will be set, even though the value hasn't
+									// changed yet
+	CVAR_ROM			= 0x0040,	// display only, cannot be set by user at all
+	CVAR_USER_CREATED	= 0x0080,	// created by a set command
+	CVAR_TEMP			= 0x0100,	// can be set even when cheats are disabled, but is not archived
+	CVAR_CHEAT			= 0x0200,	// can not be changed if cheats are disabled
+	CVAR_NORESTART		= 0x0400,	// do not clear when a cvar_restart is issued
+	CVAR_SERVER_CREATED	= 0x0800,	// cvar was created by a server the client connected to.
+	CVAR_VM_CREATED		= 0x1000,	// cvar was created exclusively in one of the VMs.
+	CVAR_PROTECTED		= 0x2000,	// prevent modifying this var from VMs or the server
+	CVAR_NODEFAULT		= 0x4000,	// do not write to config if matching with default value
+	CVAR_PRIVATE		= 0x8000,	// can't be read from VM
+	CVAR_DEVELOPER		= 0x10000,	// can be set only in developer mode
+	CVAR_NOTABCOMPLETE	= 0x20000,	// no tab completion in console
+	CVAR_MODIFIED		= 0x40000000,	// Cvar was modified (returned by Cvar_Flags only)
+	CVAR_NONEXISTENT	= 0x80000000	// Cvar doesn't exist (returned by Cvar_Flags only)
+} cvarFlags_t;
 
-#define CVAR_SERVER_CREATED	0x0800	// cvar was created by a server the client connected to.
-#define CVAR_VM_CREATED		0x1000	// cvar was created exclusively in one of the VMs.
-#define CVAR_PROTECTED		0x2000	// prevent modifying this var from VMs or the server
-
-#define CVAR_NODEFAULT		0x4000	// do not write to config if matching with default value
-
-#define CVAR_PRIVATE		0x8000	// can't be read from VM
-
-#define CVAR_DEVELOPER		0x10000 // can be set only in developer mode
-#define CVAR_NOTABCOMPLETE	0x20000 // no tab completion in console
-
-#define CVAR_ARCHIVE_ND		(CVAR_ARCHIVE | CVAR_NODEFAULT)
-
-// These flags are only returned by the Cvar_Flags() function
-#define CVAR_MODIFIED		0x40000000	// Cvar was modified
-#define CVAR_NONEXISTENT	0x80000000	// Cvar doesn't exist.
+// Legacy defines for backward compatibility (deprecated - use enum values)
+#define	CVAR_ARCHIVE		((cvarFlags_t)0x0001)
+#define	CVAR_USERINFO		((cvarFlags_t)0x0002)
+#define	CVAR_SERVERINFO		((cvarFlags_t)0x0004)
+#define	CVAR_SYSTEMINFO		((cvarFlags_t)0x0008)
+#define	CVAR_INIT			((cvarFlags_t)0x0010)
+#define	CVAR_LATCH			((cvarFlags_t)0x0020)
+#define	CVAR_ROM			((cvarFlags_t)0x0040)
+#define	CVAR_USER_CREATED	((cvarFlags_t)0x0080)
+#define	CVAR_TEMP			((cvarFlags_t)0x0100)
+#define CVAR_CHEAT			((cvarFlags_t)0x0200)
+#define CVAR_NORESTART		((cvarFlags_t)0x0400)
+#define CVAR_SERVER_CREATED	((cvarFlags_t)0x0800)
+#define CVAR_VM_CREATED		((cvarFlags_t)0x1000)
+#define CVAR_PROTECTED		((cvarFlags_t)0x2000)
+#define CVAR_PRIVATE		((cvarFlags_t)0x8000)
+#define CVAR_DEVELOPER		((cvarFlags_t)0x10000)
+#define CVAR_NOTABCOMPLETE	((cvarFlags_t)0x20000)
+#define CVAR_MODIFIED		((cvarFlags_t)0x40000000)
+#define CVAR_NONEXISTENT	((cvarFlags_t)0x80000000)
+#define	CVAR_ARCHIVE_ND		(CVAR_ARCHIVE | CVAR_NODEFAULT)
 
 typedef enum {
 	CV_NONE = 0,

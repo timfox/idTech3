@@ -15,6 +15,35 @@ These components are used throughout the engine for common entity properties.
 #include <entt/entt.hpp>
 #include "q_shared.h"
 
+// C++23 type safety enhancements
+#include <optional>
+#include <expected>
+#include <string_view>
+#include <span>
+
+// Strong typedef for entity IDs to prevent accidental mixing
+using EntityID = entt::entity;
+
+// Result type for operations that might fail
+template<typename T, typename E>
+using Result = std::expected<T, E>;
+
+// Optional values
+template<typename T>
+using Optional = std::optional<T>;
+
+// String view for read-only string operations
+using StringView = std::string_view;
+
+// Span for contiguous memory access
+template<typename T>
+using Span = std::span<T>;
+
+// Constexpr string validation
+consteval bool is_valid_component_name(const char* name) {
+    return name != nullptr && name[0] != '\0';
+}
+
 #ifdef __cplusplus
 #ifdef USE_BULLET
 #include <LinearMath/btVector3.h>
@@ -27,7 +56,7 @@ These components are used throughout the engine for common entity properties.
 #include <LinearMath/btMotionState.h>
 
 // Collision shape types for Bullet physics
-enum class CollisionShapeType {
+enum class CollisionShapeType : uint8_t {
 	NONE = 0,
 	BOX,           // Rectangular box
 	SPHERE,        // Spherical shape
@@ -35,6 +64,39 @@ enum class CollisionShapeType {
 	CONVEX_HULL,   // Convex hull from vertices
 	MESH,          // Triangle mesh (static only)
 	COMPOUND       // Compound shape (multiple shapes)
+};
+
+// Type-safe collision shape operations
+class CollisionShapeTypeOps {
+public:
+	// Check if shape type is valid
+	static constexpr bool is_valid(CollisionShapeType type) noexcept {
+		return type >= CollisionShapeType::NONE && type <= CollisionShapeType::COMPOUND;
+	}
+
+	// Check if shape requires dimensions
+	static constexpr bool requires_dimensions(CollisionShapeType type) noexcept {
+		return type != CollisionShapeType::NONE;
+	}
+
+	// Check if shape is static-only
+	static constexpr bool is_static_only(CollisionShapeType type) noexcept {
+		return type == CollisionShapeType::MESH;
+	}
+
+	// Get string representation
+	static constexpr StringView to_string(CollisionShapeType type) noexcept {
+		switch (type) {
+			case CollisionShapeType::NONE: return "NONE";
+			case CollisionShapeType::BOX: return "BOX";
+			case CollisionShapeType::SPHERE: return "SPHERE";
+			case CollisionShapeType::CAPSULE: return "CAPSULE";
+			case CollisionShapeType::CONVEX_HULL: return "CONVEX_HULL";
+			case CollisionShapeType::MESH: return "MESH";
+			case CollisionShapeType::COMPOUND: return "COMPOUND";
+			default: return "UNKNOWN";
+		}
+	}
 };
 #endif
 #endif
@@ -79,6 +141,33 @@ struct PhysicsComponent {
 
 	// Motion state for synchronization with TransformComponent
         btMotionState *motionState;
+#endif
+
+	// Type-safe validation methods
+	[[nodiscard]] constexpr bool is_valid() const noexcept {
+		return mass > 0.0f && friction >= 0.0f && friction <= 1.0f;
+	}
+
+	[[nodiscard]] constexpr bool is_static() const noexcept {
+		return mass >= std::numeric_limits<float>::max() / 2.0f; // Very large mass = static
+	}
+
+	[[nodiscard]] constexpr bool is_kinematic() const noexcept {
+		return !is_static() && (velocity[0] != 0.0f || velocity[1] != 0.0f || velocity[2] != 0.0f);
+	}
+
+#ifdef USE_BULLET
+	// Bullet-specific validation
+	[[nodiscard]] constexpr bool has_valid_bullet_shape() const noexcept {
+		return CollisionShapeTypeOps::is_valid(shapeType) &&
+			   (!CollisionShapeTypeOps::requires_dimensions(shapeType) ||
+				(shapeDimensions[0] > 0.0f && shapeDimensions[1] > 0.0f && shapeDimensions[2] > 0.0f));
+	}
+
+	[[nodiscard]] constexpr bool can_use_bullet() const noexcept {
+		return is_valid() && has_valid_bullet_shape() &&
+			   !CollisionShapeTypeOps::is_static_only(shapeType);
+	}
 #endif
 
 	PhysicsComponent() : mass(1.0f), friction(0.0f)

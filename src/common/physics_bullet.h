@@ -5,6 +5,33 @@
 
 #include "q_shared.h"
 
+#ifdef __cplusplus
+#include <expected>
+#include <optional>
+#include <string_view>
+
+// C++23 physics result type for better error handling
+enum class PhysicsError {
+	OK = 0,
+	GENERIC_ERROR,
+	INVALID_ENTITY,
+	NO_BULLET_SUPPORT,
+	NOT_INITIALIZED,
+	SHAPE_CREATION_FAILED,
+	BODY_CREATION_FAILED
+};
+
+template<typename T>
+using PhysicsResult = std::expected<T, PhysicsError>;
+
+// Optional physics values
+template<typename T>
+using PhysicsOptional = std::optional<T>;
+
+// Physics string views for read-only operations
+using PhysicsString = std::string_view;
+#endif
+
 // Forward declarations
 typedef struct gentity_s gentity_t;
 typedef struct svEntity_s svEntity_t;
@@ -286,6 +313,64 @@ Get physics performance statistics
 ================
 */
 physicsResult_t Physics_GetStats(int *numBodies, int *numConstraints, float *stepTime);
+
+// ============================================================================
+// C++23 Enhanced API - Type-safe wrappers with better error handling
+// ============================================================================
+
+#ifdef __cplusplus
+
+namespace Physics {
+
+// Type-safe physics operations using std::expected
+class API {
+public:
+    // Initialize physics system
+    static PhysicsResult<bool> Initialize() noexcept {
+        auto result = Physics_Init();
+        if (result == PHYSICS_OK) {
+            return true;
+        }
+        return std::unexpected(static_cast<PhysicsError>(result));
+    }
+
+    // Check if initialized
+    static PhysicsOptional<bool> IsInitialized() noexcept {
+        if (Physics_IsInitialized()) {
+            return true;
+        }
+        return std::nullopt;
+    }
+
+    // Get physics statistics
+    struct Stats {
+        int bodies;
+        int constraints;
+        float stepTime;
+    };
+
+    static PhysicsResult<Stats> GetStatistics() noexcept {
+        Stats stats{};
+        auto result = Physics_GetStats(&stats.bodies, &stats.constraints, &stats.stepTime);
+        if (result == PHYSICS_OK) {
+            return stats;
+        }
+        return std::unexpected(static_cast<PhysicsError>(result));
+    }
+
+    // Enable/disable debug drawing
+    static PhysicsResult<bool> SetDebugDrawing(bool enable) noexcept {
+        auto result = Physics_DebugDraw(enable ? qtrue : qfalse);
+        if (result == PHYSICS_OK) {
+            return enable;
+        }
+        return std::unexpected(static_cast<PhysicsError>(result));
+    }
+};
+
+} // namespace Physics
+
+#endif // __cplusplus
 
 #ifdef __cplusplus
 }
