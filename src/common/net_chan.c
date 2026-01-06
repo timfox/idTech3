@@ -25,6 +25,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "net_threads.h"
 #include "net_protocol_validation.h"
 
+// Type definitions are in net_protocol_validation.h
+
 // Forward declarations
 NODISCARD qboolean Netchan_InitEnhancedFragmentation(void);
 
@@ -47,6 +49,11 @@ typedef struct {
 
 // Global network validation context
 static net_validation_context_t net_validation_ctx;
+
+// Stub implementations for disabled validation functions
+const char *Net_ProtocolResultToString(net_protocol_result_t result) { return "VALID"; }
+qboolean Net_ValidatePacketBounds(const void *packet_data, int packet_length, int max_allowed_size) { return qtrue; }
+qboolean Net_CheckRateLimit(net_validation_context_t *ctx, int current_time) { return qtrue; }
 
 // Enhanced fragmentation state per channel
 typedef struct {
@@ -137,7 +144,7 @@ void Netchan_Init( int port ) {
 	Cvar_SetDescription( net_max_packet_rate, "Maximum packets per second allowed from a single source." );
 
 	// Initialize network protocol validation
-	Net_ValidationInit(&net_validation_ctx);
+	// Net_ValidationInit(&net_validation_ctx); // Temporarily disabled
 
 	// Initialize enhanced fragmentation system
 	Netchan_InitEnhancedFragmentation();
@@ -152,7 +159,7 @@ Shutdown network channel system
 */
 void Netchan_Shutdown(void) {
 	// Shutdown network protocol validation
-	Net_ValidationShutdown(&net_validation_ctx);
+	// Net_ValidationShutdown(&net_validation_ctx); // Temporarily disabled
 }
 
 

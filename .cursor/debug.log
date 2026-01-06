@@ -202,3 +202,7 @@
 {"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767679061000}
 {"timestamp":1767679410000,"hypothesisId":"D","location":"CIN_RunCinematic","message":"ENTER FUNCTION","data":{},"runId":"debug"}
 {"timestamp":1767679410000,"hypothesisId":"D","location":"CIN_RunCinematic","message":"Starting cinematic run","data":{"handle":0,"status":1},"runId":"debug"}
+{"timestamp":1767679603000,"hypothesisId":"D","location":"CIN_RunCinematic","message":"ENTER FUNCTION","data":{},"runId":"debug"}
+{"timestamp":1767679603000,"hypothesisId":"D","location":"CIN_RunCinematic","message":"Starting cinematic run","data":{"handle":0,"status":1},"runId":"debug"}
+{"timestamp":1767680104000,"hypothesisId":"D","location":"CIN_RunCinematic","message":"ENTER FUNCTION","data":{},"runId":"debug"}
+{"timestamp":1767680104000,"hypothesisId":"D","location":"CIN_RunCinematic","message":"Starting cinematic run","data":{"handle":0,"status":1},"runId":"debug"}

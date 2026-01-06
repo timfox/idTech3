@@ -10,6 +10,9 @@ Comprehensive network protocol validation with bounds checking and security
 #include "qcommon.h"
 #include <string.h>
 
+// Forward declarations
+net_protocol_result_t Net_ValidateServerCommand(const byte *data, int length);
+
 // Protocol constants
 #define PROTOCOL_HEADER_SIZE 8
 #define MAX_COMMAND_DATA_SIZE 32768

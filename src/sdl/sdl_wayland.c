@@ -7,8 +7,17 @@ Provides Wayland surface creation, input handling, and advanced features.
 ===========================================================================
 */
 
+// Check if Wayland headers are available at compile time
+#ifdef __has_include
+#  if __has_include(<wayland-client.h>) && __has_include(<xdg-shell-client-protocol.h>)
+#    define WAYLAND_HEADERS_AVAILABLE
+#  endif
+#endif
+// Only include Wayland functionality if both SDL Wayland driver and headers are available
+#if defined(SDL_VIDEO_DRIVER_WAYLAND) && defined(WAYLAND_HEADERS_AVAILABLE)
+
 #include "../client/client.h"
-#include "../renderercommon/tr_public.h"
+#include "../renderers/renderercommon/tr_public.h"
 #include "sdl_glw.h"
 #include <SDL.h>
 #include <SDL_syswm.h>
@@ -18,9 +27,6 @@ Provides Wayland surface creation, input handling, and advanced features.
 #include <wayland-egl.h>
 #include <xdg-shell-client-protocol.h>
 #include <xdg-decoration-unstable-v1-client-protocol.h>
-
-// Check if Wayland is available
-#ifdef SDL_VIDEO_DRIVER_WAYLAND
 
 // Wayland global objects
 static struct wl_display *wayland_display = NULL;
@@ -477,51 +483,27 @@ void GLimp_Wayland_SetVRREnabled(qboolean enabled) {
     }
 }
 
-#else // SDL_VIDEO_DRIVER_WAYLAND not defined
+#else // SDL_VIDEO_DRIVER_WAYLAND && WAYLAND_HEADERS_AVAILABLE
 
-qboolean GLimp_InitWayland(void) {
-    Com_Printf(S_COLOR_YELLOW "Wayland support not compiled in\n");
-    return qfalse;
-}
+// Stub implementations when Wayland is not available
+#include "../client/client.h"
+#include "../renderers/renderercommon/tr_public.h"
+#include "sdl_glw.h"
 
-void GLimp_CreateWaylandWindow(int width, int height, qboolean fullscreen) {
-    // Stub
-}
+qboolean GLimp_Wayland_Init(void) { return qfalse; }
+void GLimp_Wayland_Shutdown(void) {}
+qboolean GLimp_Wayland_CreateWindow(int width, int height) { return qfalse; }
+void GLimp_Wayland_DestroyWindow(void) {}
+void GLimp_Wayland_SetWindowSize(int width, int height) {}
+void GLimp_Wayland_SetWindowTitle(const char *title) {}
+void GLimp_Wayland_PumpEvents(void) {}
+qboolean GLimp_Wayland_IsVariableRefreshRateSupported(void) { return qfalse; }
+void GLimp_Wayland_SetVariableRefreshRate(qboolean enabled) {}
+qboolean GLimp_Wayland_IsMaximized(void) { return qfalse; }
+qboolean GLimp_Wayland_IsFullscreen(void) { return qfalse; }
+qboolean GLimp_Wayland_IsMinimized(void) { return qfalse; }
+qboolean GLimp_Wayland_VRRSupported(void) { return qfalse; }
+qboolean GLimp_Wayland_VRREnabled(void) { return qfalse; }
+void GLimp_Wayland_SetVRREnabled(qboolean enabled) {}
 
-void GLimp_HandleWaylandEvents(void) {
-    // Stub
-}
-
-qboolean GLimp_Wayland_IsInitialized(void) {
-    return qfalse;
-}
-
-qboolean GLimp_Wayland_HasFocus(void) {
-    return qfalse;
-}
-
-qboolean GLimp_Wayland_IsMaximized(void) {
-    return qfalse;
-}
-
-qboolean GLimp_Wayland_IsFullscreen(void) {
-    return qfalse;
-}
-
-qboolean GLimp_Wayland_IsMinimized(void) {
-    return qfalse;
-}
-
-qboolean GLimp_Wayland_VRRSupported(void) {
-    return qfalse;
-}
-
-qboolean GLimp_Wayland_VRREnabled(void) {
-    return qfalse;
-}
-
-void GLimp_Wayland_SetVRREnabled(qboolean enabled) {
-    // Stub
-}
-
-#endif // SDL_VIDEO_DRIVER_WAYLAND
+#endif // SDL_VIDEO_DRIVER_WAYLAND && WAYLAND_HEADERS_AVAILABLE

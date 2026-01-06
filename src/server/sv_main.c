@@ -1405,11 +1405,11 @@ void SV_Frame( int msec ) {
 	// update infostrings if anything has been changed
 	if ( atomic_load_explicit(&cvar_modifiedFlags, memory_order_relaxed) & CVAR_SERVERINFO )  {
 		SV_SetConfigstring( CS_SERVERINFO, Cvar_InfoString( CVAR_SERVERINFO, NULL ) );
-		do { int old_val = atomic_load_explicit(&cvar_modifiedFlags, memory_order_relaxed); } while (!atomic_compare_exchange_weak_explicit(&cvar_modifiedFlags, &old_val, old_val & (~CVAR_SERVERINFO), memory_order_relaxed, memory_order_relaxed));
+		{ int old_val, new_val; do { old_val = atomic_load_explicit(&cvar_modifiedFlags, memory_order_relaxed); new_val = old_val & (~CVAR_SERVERINFO); } while (!atomic_compare_exchange_weak_explicit(&cvar_modifiedFlags, &old_val, new_val, memory_order_relaxed, memory_order_relaxed)); }
 	}
 	if ( atomic_load_explicit(&cvar_modifiedFlags, memory_order_relaxed) & CVAR_SYSTEMINFO )  {
 		SV_SetConfigstring( CS_SYSTEMINFO, Cvar_InfoString_Big( CVAR_SYSTEMINFO, NULL ) );
-		do { int old_val = atomic_load_explicit(&cvar_modifiedFlags, memory_order_relaxed); } while (!atomic_compare_exchange_weak_explicit(&cvar_modifiedFlags, &old_val, old_val & (~CVAR_SYSTEMINFO), memory_order_relaxed, memory_order_relaxed));
+		{ int old_val, new_val; do { old_val = atomic_load_explicit(&cvar_modifiedFlags, memory_order_relaxed); new_val = old_val & (~CVAR_SYSTEMINFO); } while (!atomic_compare_exchange_weak_explicit(&cvar_modifiedFlags, &old_val, new_val, memory_order_relaxed, memory_order_relaxed)); }
 	}
 
 	if ( com_speeds->integer ) {
