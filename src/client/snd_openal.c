@@ -7,13 +7,8 @@
 
 // Global variables for OpenAL state (available even when OpenAL is not compiled)
 int numOpenALSounds = 0;
-#ifdef USE_OPENAL
-ALCdevice *openalDevice = NULL;
-ALCcontext *openalContext = NULL;
-#else
 void *openalDevice = NULL;
 void *openalContext = NULL;
-#endif
 qboolean openalEfxAvailable = qfalse;
 
 #ifdef USE_OPENAL

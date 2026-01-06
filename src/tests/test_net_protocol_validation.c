@@ -13,7 +13,16 @@ Tests network protocol validation and bounds checking functionality
 #include <string.h>
 
 // Stub for MSG_Init (not available in test environment)
-void MSG_Init(void) {}
+void MSG_Init(msg_t *buf, byte *data, int length) {
+    // Stub implementation for testing
+    if (buf) {
+        buf->data = data;
+        buf->maxsize = length;
+        buf->cursize = 0;
+        buf->readcount = 0;
+        buf->bit = 0;
+    }
+}
 
 // Test data
 static const byte valid_packet_data[] = {
