@@ -4110,7 +4110,24 @@ SET_TARGET_PROPERTIES(test_backwards_compatibility PROPERTIES
 	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
 
-	MESSAGE(STATUS "Tests enabled: test_qcommon, test_qmath, test_info, test_msg_secure, test_renderer_init, test_integration, test_performance, test_net_protocol_validation, test_backwards_compatibility")
+ADD_EXECUTABLE(test_compatibility_regression
+	src/tests/test_compatibility_regression.c
+	src/common/backwards_compatibility.c
+	src/common/compatibility_shims.c
+)
+target_compile_definitions(test_compatibility_regression PRIVATE UNIT_TEST)
+TARGET_LINK_LIBRARIES(test_compatibility_regression PRIVATE ${CMAKE_DL_LIBS})
+TARGET_INCLUDE_DIRECTORIES(test_compatibility_regression PRIVATE
+	src/common
+	src/client
+	src/server
+)
+ADD_TEST(NAME test_compatibility_regression COMMAND test_compatibility_regression)
+SET_TARGET_PROPERTIES(test_compatibility_regression PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
+
+	MESSAGE(STATUS "Tests enabled: test_qcommon, test_qmath, test_info, test_msg_secure, test_renderer_init, test_integration, test_performance, test_net_protocol_validation, test_backwards_compatibility, test_compatibility_regression")
 ENDIF()
 
 # Game Launcher

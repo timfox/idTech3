@@ -14,6 +14,7 @@ Basic functions used throughout the engine.
 #include "files_v2.h"
 #include "q_memory_safety.h"
 #include "backwards_compatibility.h"
+#include "compatibility_shims.h"
 #include "../renderers/renderercommon/tr_public.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,6 +52,7 @@ char cl_cdkey[34] = "000000000000000000000000000000000";
 
 // Backwards compatibility context
 static legacy_context_t bc_context;
+static shim_context_t shim_context;
 
 // Core Engine Cvars
 cvar_t *com_developer = NULL;
@@ -307,6 +309,7 @@ void Com_Init( char *commandLine ) {
     // Initialize core systems
     MemorySafety_Init();
     BC_Init(&bc_context);
+    Shim_Init(&shim_context, LEGACY_MODE_NONE); // Start with modern mode
     Cvar_Init();
     Dvar_Init();
     Cbuf_Init();
@@ -323,6 +326,10 @@ void Com_Init( char *commandLine ) {
 	Cmd_AddCommand( "bc_status", Com_BC_Status_f );
 	Cmd_AddCommand( "bc_detect", Com_BC_Detect_f );
 	Cmd_AddCommand( "bc_setmode", Com_BC_SetMode_f );
+
+	// Compatibility shim commands
+	Cmd_AddCommand( "shim_status", Com_Shim_Status_f );
+	Cmd_AddCommand( "shim_reset", Com_Shim_Reset_f );
 
     // Register engine-wide cvars
     com_developer = Cvar_Get( "developer", "0", CVAR_ARCHIVE );
@@ -800,6 +807,7 @@ void Com_BC_Detect_f(void) {
         if (mod_result.requires_legacy_mode) {
             Com_Printf("Mod detected: %s (%s)\n", mod_result.detected_mod_name, mod_result.compatibility_notes);
             BC_SetLegacyMode(&bc_context, mod_result.detected_mode);
+            Shim_SetMode(&shim_context, mod_result.detected_mode);
         }
     }
 
@@ -808,6 +816,7 @@ void Com_BC_Detect_f(void) {
     if (pak_result.requires_legacy_mode) {
         Com_Printf("Content detected: %s\n", pak_result.compatibility_notes);
         BC_SetLegacyMode(&bc_context, pak_result.detected_mode);
+        Shim_SetMode(&shim_context, pak_result.detected_mode);
     }
 
     Com_Printf("Detection complete. Current mode: %s\n", BC_LegacyModeToString(BC_GetCurrentMode(&bc_context)));
@@ -831,10 +840,36 @@ void Com_BC_SetMode_f(void) {
     legacy_mode_t mode = BC_StringToLegacyMode(mode_str);
 
     if (BC_SetLegacyMode(&bc_context, mode)) {
+        Shim_SetMode(&shim_context, mode);
         Com_Printf("Backwards compatibility mode set to: %s\n", BC_LegacyModeToString(mode));
     } else {
         Com_Printf("Failed to set backwards compatibility mode: %s\n", mode_str);
     }
+}
+
+/*
+===============
+Com_Shim_Status_f
+
+Display compatibility shim status
+===============
+*/
+void Com_Shim_Status_f(void) {
+    char stats[1024];
+    Shim_GetStats(&shim_context, stats, sizeof(stats));
+    Com_Printf("%s", stats);
+}
+
+/*
+===============
+Com_Shim_Reset_f
+
+Reset compatibility shim statistics
+===============
+*/
+void Com_Shim_Reset_f(void) {
+    Shim_ResetStats(&shim_context);
+    Com_Printf("Compatibility shim statistics reset\n");
 }
 
 void Com_BeginRedirect (char *buffer, int buffersize, void (*flush)(const char *)) { (void)buffer; (void)buffersize; (void)flush; }
