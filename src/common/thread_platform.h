@@ -14,6 +14,16 @@ Provides unified threading API across Windows, Linux, macOS.
 #ifdef _WIN32
 	#include <windows.h>
 	#include <process.h>
+#else
+	#include <pthread.h>
+	#ifndef __APPLE__
+		#include <semaphore.h>
+	#endif
+#endif
+
+#ifdef _WIN32
+	#include <windows.h>
+	#include <process.h>
     
     typedef int qboolean;
     #define qfalse 0
@@ -307,9 +317,14 @@ Barriers
 #ifdef _WIN32
 typedef SYNCHRONIZATION_BARRIER barrier_t;
 #else
-// Assume POSIX barriers are available on modern systems
-// If not available, fallback implementation will be used
-typedef pthread_barrier_t barrier_t;
+// Use fallback barrier implementation (POSIX barriers have compatibility issues)
+typedef struct {
+    pthread_mutex_t mutex;
+    pthread_cond_t cond;
+    int count;
+    int waiting;
+    int phase;
+} barrier_t;
 #endif
 
 qboolean Barrier_Init(barrier_t *barrier, int thread_count);

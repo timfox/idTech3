@@ -13,6 +13,7 @@ Basic functions used throughout the engine.
 #include "crash_handler.h"
 #include "files_v2.h"
 #include "q_memory_safety.h"
+#include "backwards_compatibility.h"
 #include "../renderers/renderercommon/tr_public.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,6 +48,9 @@ Q_EXPORT refimport_t ri = {0};
 int CPU_Flags = 0;
 void *botlib_export = NULL;
 char cl_cdkey[34] = "000000000000000000000000000000000";
+
+// Backwards compatibility context
+static legacy_context_t bc_context;
 
 // Core Engine Cvars
 cvar_t *com_developer = NULL;
@@ -302,9 +306,10 @@ void Com_Init( char *commandLine ) {
 
     // Initialize core systems
     MemorySafety_Init();
+    BC_Init(&bc_context);
     Cvar_Init();
     Dvar_Init();
-	Cbuf_Init();
+    Cbuf_Init();
     Cmd_Init();
 #ifdef USE_SQLITE
     SQLite_Init();
@@ -313,6 +318,11 @@ void Com_Init( char *commandLine ) {
 	// Core console commands (needed for dedicated and "+quit" style startup)
 	Cmd_AddCommand( "quit", Com_Quit_f );
 	Cmd_AddCommand( "exit", Com_Quit_f );
+
+	// Backwards compatibility commands
+	Cmd_AddCommand( "bc_status", Com_BC_Status_f );
+	Cmd_AddCommand( "bc_detect", Com_BC_Detect_f );
+	Cmd_AddCommand( "bc_setmode", Com_BC_SetMode_f );
 
     // Register engine-wide cvars
     com_developer = Cvar_Get( "developer", "0", CVAR_ARCHIVE );
@@ -388,6 +398,9 @@ void Com_Frame( qboolean noDelay ) {
 
 	// Perform periodic security checks
 	Com_SecurityCheck();
+
+	// Update backwards compatibility detection
+	BC_UpdateDetection(&bc_context);
 
 	// Pump OS/input and dispatch queued sys events.
 	Com_EventLoop();
@@ -747,6 +760,83 @@ int Com_EventLoop( void )
 // Missing engine stubs
 void S_Spatialize( struct channel_s *ch ) { (void)ch; }
 void Field_CompleteCommand( const char *cmd, qboolean doCommands, qboolean doCvars ) { (void)cmd; (void)doCommands; (void)doCvars; }
+/*
+===============
+Backwards Compatibility Commands
+===============
+*/
+
+/*
+===============
+Com_BC_Status_f
+
+Display backwards compatibility status
+===============
+*/
+void Com_BC_Status_f(void) {
+    char stats[1024];
+    BC_GetStats(&bc_context, stats, sizeof(stats));
+    Com_Printf("%s", stats);
+
+    legacy_mode_t current_mode = BC_GetCurrentMode(&bc_context);
+    Com_Printf("Current Mode: %s\n", BC_LegacyModeToString(current_mode));
+    Com_Printf("Legacy Mode Active: %s\n", BC_IsLegacyModeActive(&bc_context) ? "Yes" : "No");
+}
+
+/*
+===============
+Com_BC_Detect_f
+
+Force detection of backwards compatibility requirements
+===============
+*/
+void Com_BC_Detect_f(void) {
+    Com_Printf("Forcing backwards compatibility detection...\n");
+
+    // Check current mod
+    cvar_t *fs_game = Cvar_FindVar("fs_game");
+    if (fs_game && fs_game->string[0]) {
+        compatibility_result_t mod_result = BC_DetectModCompatibility(fs_game->string);
+        if (mod_result.requires_legacy_mode) {
+            Com_Printf("Mod detected: %s (%s)\n", mod_result.detected_mod_name, mod_result.compatibility_notes);
+            BC_SetLegacyMode(&bc_context, mod_result.detected_mode);
+        }
+    }
+
+    // Check for pak0.pk3
+    compatibility_result_t pak_result = BC_DetectContentCompatibility("pak0.pk3");
+    if (pak_result.requires_legacy_mode) {
+        Com_Printf("Content detected: %s\n", pak_result.compatibility_notes);
+        BC_SetLegacyMode(&bc_context, pak_result.detected_mode);
+    }
+
+    Com_Printf("Detection complete. Current mode: %s\n", BC_LegacyModeToString(BC_GetCurrentMode(&bc_context)));
+}
+
+/*
+===============
+Com_BC_SetMode_f
+
+Manually set backwards compatibility mode
+===============
+*/
+void Com_BC_SetMode_f(void) {
+    if (Cmd_Argc() < 2) {
+        Com_Printf("Usage: bc_setmode <mode>\n");
+        Com_Printf("Available modes: none, vanilla, point, mod, oa, custom\n");
+        return;
+    }
+
+    const char *mode_str = Cmd_Argv(1);
+    legacy_mode_t mode = BC_StringToLegacyMode(mode_str);
+
+    if (BC_SetLegacyMode(&bc_context, mode)) {
+        Com_Printf("Backwards compatibility mode set to: %s\n", BC_LegacyModeToString(mode));
+    } else {
+        Com_Printf("Failed to set backwards compatibility mode: %s\n", mode_str);
+    }
+}
+
 void Com_BeginRedirect (char *buffer, int buffersize, void (*flush)(const char *)) { (void)buffer; (void)buffersize; (void)flush; }
 void Com_EndRedirect( void ) { }
 void *S_Malloc( int size ) { return malloc( (size_t)size ); }

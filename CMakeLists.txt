@@ -4024,6 +4024,7 @@ ADD_TEST(NAME test_renderer_abstraction_usage_mock COMMAND test_renderer_abstrac
 SET_TARGET_PROPERTIES(test_renderer_abstraction_usage_mock PROPERTIES
 	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
 )
+
 	TARGET_LINK_LIBRARIES(test_renderer_init PRIVATE ${CMAKE_DL_LIBS})
 	TARGET_INCLUDE_DIRECTORIES(test_renderer_init PRIVATE
 		${CMAKE_SOURCE_DIR}/src
@@ -4077,7 +4078,39 @@ SET_TARGET_PROPERTIES(benchmark_performance PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
 
-	MESSAGE(STATUS "Tests enabled: test_qcommon, test_qmath, test_info, test_msg_secure, test_renderer_init, test_integration, test_performance")
+ADD_EXECUTABLE(test_net_protocol_validation
+	src/tests/test_net_protocol_validation.c
+	src/common/net_protocol_validation.c
+)
+target_compile_definitions(test_net_protocol_validation PRIVATE UNIT_TEST)
+TARGET_LINK_LIBRARIES(test_net_protocol_validation PRIVATE ${CMAKE_DL_LIBS})
+TARGET_INCLUDE_DIRECTORIES(test_net_protocol_validation PRIVATE
+	src/common
+	src/client
+	src/server
+)
+ADD_TEST(NAME test_net_protocol_validation COMMAND test_net_protocol_validation)
+SET_TARGET_PROPERTIES(test_net_protocol_validation PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
+
+ADD_EXECUTABLE(test_backwards_compatibility
+	src/tests/test_backwards_compatibility.c
+	src/common/backwards_compatibility.c
+)
+target_compile_definitions(test_backwards_compatibility PRIVATE UNIT_TEST)
+TARGET_LINK_LIBRARIES(test_backwards_compatibility PRIVATE ${CMAKE_DL_LIBS})
+TARGET_INCLUDE_DIRECTORIES(test_backwards_compatibility PRIVATE
+	src/common
+	src/client
+	src/server
+)
+ADD_TEST(NAME test_backwards_compatibility COMMAND test_backwards_compatibility)
+SET_TARGET_PROPERTIES(test_backwards_compatibility PROPERTIES
+	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests"
+)
+
+	MESSAGE(STATUS "Tests enabled: test_qcommon, test_qmath, test_info, test_msg_secure, test_renderer_init, test_integration, test_performance, test_net_protocol_validation, test_backwards_compatibility")
 ENDIF()
 
 # Game Launcher

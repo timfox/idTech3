@@ -14,31 +14,11 @@ Performance Counters Implementation
 // Global performance counters instance
 performanceCounters_t perfCounters;
 
-// Enhanced stability monitoring
-typedef struct {
-    // Stability metrics
-    float stability_score;        // 0-100 based on frame time variance
-    float reliability_score;      // 0-100 based on crash frequency
-    int consecutive_stable_frames;
-    int total_frame_drops;
-    float average_frame_time_variance;
-
-    // Anomaly detection
-    qboolean anomaly_detected;
-    char last_anomaly_description[256];
-    int anomaly_count;
-
-    // System health
-    float memory_usage_percent;
-    float cpu_usage_percent;
-    int thread_count;
-    qboolean system_overloaded;
-
-    // Recovery suggestions
-    char recovery_suggestions[512];
-} stability_metrics_t;
-
+// Static stability metrics instance (type defined in header)
 static stability_metrics_t stability_metrics = {0};
+
+// Forward declarations
+static void Perf_UpdateStabilityMetrics(void);
 
 // Advanced performance monitoring cvars
 static cvar_t *perf_detailed_gpu;

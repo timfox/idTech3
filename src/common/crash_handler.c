@@ -14,6 +14,7 @@ Platform-specific crash handling with diagnostics.
 
 #include "crash_handler.h"
 #include "qcommon.h"
+#include "q_memory_safety.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -762,8 +763,9 @@ recovery_result_t Crash_AttemptRecovery(void) {
         case RECOVERY_ROLLBACK:
             // Attempt to rollback to last good state
             if (g_state_save_path[0]) {
-                fileHandle_t f = FS_FOpenFileRead(g_state_save_path);
-                if (f) {
+                fileHandle_t f;
+                int len = FS_FOpenFileRead(g_state_save_path, &f, qfalse);
+                if (len >= 0) {
                     auto_save_state_t state;
                     FS_Read(&state, sizeof(state), f);
                     FS_FCloseFile(f);
@@ -847,7 +849,7 @@ qboolean Crash_ValidateSystemHealth(void) {
 
     // Memory health
     const memory_safety_stats_t *mem_stats = MemorySafety_GetStats();
-    if (mem_stats && (mem_stats->leak_count > 10 || mem_stats->corruption_detected > 0)) {
+    if (mem_stats && (atomic_load(&mem_stats->leak_count) > 10 || atomic_load(&mem_stats->corruption_detected) > 0)) {
         Com_Printf(S_COLOR_RED "System health check failed: Memory issues detected\n");
         return qfalse;
     }

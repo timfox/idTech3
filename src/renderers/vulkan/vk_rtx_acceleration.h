@@ -148,9 +148,9 @@ typedef struct RTXLazyAllocator_s {
     qboolean dirty;
 } RTXLazyAllocator_t;
 
-qboolean vk_rtx_lazy_allocate(RTLazyAllocator_t *allocator, VkDeviceSize minimum_size);
-void vk_rtx_lazy_free(RTLazyAllocator_t *allocator);
-VkDeviceSize vk_rtx_lazy_get_free_space(RTLazyAllocator_t *allocator);
+qboolean vk_rtx_lazy_allocate(RTXLazyAllocator_t *allocator, VkDeviceSize minimum_size);
+void vk_rtx_lazy_free(RTXLazyAllocator_t *allocator);
+VkDeviceSize vk_rtx_lazy_get_free_space(RTXLazyAllocator_t *allocator);
 
 // SBT optimization functions
 typedef struct RTXSBTCache_s {

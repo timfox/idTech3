@@ -20,6 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
 #include "client.h"
+#include "../common/input_validation.h"
 
 /*
 
@@ -523,6 +524,18 @@ static void Message_Key( int key ) {
 				Com_sprintf( buffer, sizeof( buffer ), "say_team \"%s\"\n", chatField.buffer );
 			else
 				Com_sprintf( buffer, sizeof( buffer ), "say \"%s\"\n", chatField.buffer );
+
+			// Validate chat message before sending
+			if (Cvar_VariableIntegerValue("cl_validate_input")) {
+				char sanitized[MAX_SAY_TEXT];
+				Input_SanitizeChatMessage(sanitized, sizeof(sanitized), chatField.buffer);
+
+				// Reconstruct command with sanitized message
+				if (chat_team)
+					Com_sprintf( buffer, sizeof( buffer ), "say_team \"%s\"\n", sanitized );
+				else
+					Com_sprintf( buffer, sizeof( buffer ), "say \"%s\"\n", sanitized );
+			}
 
 			CL_AddReliableCommand( buffer, qfalse );
 		}

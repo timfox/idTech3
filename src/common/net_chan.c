@@ -23,8 +23,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_shared.h"
 #include "qcommon.h"
 #include "net_threads.h"
+#include "net_protocol_validation.h"
+
+// Forward declarations
+NODISCARD qboolean Netchan_InitEnhancedFragmentation(void);
 
 // Enhanced fragmentation system
+#define FRAGMENT_SIZE			(MAX_PACKETLEN - 100)
 #define MAX_FRAGMENT_REORDER_BUFFER 64  // Maximum out-of-order fragments to buffer
 #define FRAGMENT_ADAPTIVE_MIN_SIZE 256  // Minimum fragment size for adaptive mode
 #define FRAGMENT_ADAPTIVE_MAX_SIZE 2048 // Maximum fragment size for adaptive mode
@@ -39,6 +44,9 @@ typedef struct {
 	byte data[FRAGMENT_SIZE];
 	qboolean received;
 } fragment_buffer_entry_t;
+
+// Global network validation context
+static net_validation_context_t net_validation_ctx;
 
 // Enhanced fragmentation state per channel
 typedef struct {
@@ -88,13 +96,16 @@ to the new value before sending out any replies.
 
 */
 
-#define	FRAGMENT_SIZE			(MAX_PACKETLEN - 100)
+// FRAGMENT_SIZE defined earlier
 
 #define	FRAGMENT_BIT			(1U<<31)
 
 cvar_t		*showpackets;
 cvar_t		*showdrop;
 cvar_t		*qport;
+cvar_t		*net_validate_packets;
+cvar_t		*net_strict_validation;
+cvar_t		*net_max_packet_rate;
 
 static const char *netsrcString[2] = {
 	"client",
@@ -117,8 +128,31 @@ void Netchan_Init( int port ) {
 	qport = Cvar_Get ("net_qport", va("%i", port), CVAR_INIT );
 	Cvar_SetDescription( qport, "Set internal network port. This allows more than one person to play from behind a NAT router by using only one IP address." );
 
+	// Network validation CVars
+	Cvar_Get ("net_validate_packets", "1", CVAR_ARCHIVE);
+	Cvar_SetDescription( net_validate_packets, "Enable network protocol validation and bounds checking." );
+	Cvar_Get ("net_strict_validation", "0", CVAR_ARCHIVE);
+	Cvar_SetDescription( net_strict_validation, "Enable strict network validation (rejects more packets)." );
+	Cvar_Get ("net_max_packet_rate", "100", CVAR_ARCHIVE);
+	Cvar_SetDescription( net_max_packet_rate, "Maximum packets per second allowed from a single source." );
+
+	// Initialize network protocol validation
+	Net_ValidationInit(&net_validation_ctx);
+
 	// Initialize enhanced fragmentation system
 	Netchan_InitEnhancedFragmentation();
+}
+
+/*
+===============
+Netchan_Shutdown
+
+Shutdown network channel system
+===============
+*/
+void Netchan_Shutdown(void) {
+	// Shutdown network protocol validation
+	Net_ValidationShutdown(&net_validation_ctx);
 }
 
 
@@ -285,6 +319,16 @@ void Netchan_Transmit( netchan_t *chan, int length, const byte *data ) {
 		Com_Error( ERR_DROP, "%s: length = %i", __func__, length );
 	}
 
+	// Validate outgoing packet data
+	if (net_validate_packets && net_validate_packets->integer && data && length > 0) {
+		if (!Net_ValidatePacketBounds(data, length, net_validation_ctx.config.max_packet_size)) {
+			if (showpackets->integer) {
+				Com_Printf("%s: Outgoing packet bounds validation failed\n", netsrcString[chan->sock]);
+			}
+			return; // Silently drop invalid packets
+		}
+	}
+
 	chan->unsentFragmentStart = 0;
 
 	// fragment large reliable messages
@@ -408,6 +452,39 @@ qboolean Netchan_Process( netchan_t *chan, msg_t *msg ) {
 	int			fragmentStart, fragmentLength;
 	qboolean	fragmented;
 
+	// Validate packet bounds and integrity
+	if (net_validate_packets && net_validate_packets->integer) {
+		atomic_fetch_add(&net_validation_ctx.stats.total_packets_validated, 1);
+
+		// Basic bounds checking
+		if (!Net_ValidatePacketBounds(msg->data, msg->cursize, net_validation_ctx.config.max_packet_size)) {
+			atomic_fetch_add(&net_validation_ctx.stats.packets_rejected, 1);
+			if (showpackets->integer) {
+				Com_Printf("%s: Packet bounds validation failed\n", netsrcString[chan->sock]);
+			}
+			return qfalse;
+		}
+
+		// Message integrity validation
+		net_protocol_result_t integrity_result = Net_ValidateMessageIntegrity(msg);
+		if (integrity_result != NET_PROTOCOL_VALID) {
+			atomic_fetch_add(&net_validation_ctx.stats.packets_rejected, 1);
+			if (showpackets->integer) {
+				Com_Printf("%s: Message integrity validation failed: %s\n",
+					netsrcString[chan->sock], Net_ProtocolResultToString(integrity_result));
+			}
+			return qfalse;
+		}
+
+		// Rate limiting check
+		if (!Net_CheckRateLimit(&net_validation_ctx, Sys_Milliseconds())) {
+			if (showpackets->integer) {
+				Com_Printf("%s: Packet rate limit exceeded\n", netsrcString[chan->sock]);
+			}
+			return qfalse;
+		}
+	}
+
 	// XOR unscramble all data in the packet after the header
 //	Netchan_UnScramblePacket( msg );
 
@@ -440,6 +517,21 @@ qboolean Netchan_Process( netchan_t *chan, msg_t *msg ) {
 	if ( fragmented ) {
 		fragmentStart = MSG_ReadShort( msg );
 		fragmentLength = MSG_ReadShort( msg );
+
+		// Validate fragmented packet data
+		if (net_validate_packets && net_validate_packets->integer) {
+			net_protocol_result_t frag_result = Net_ValidateFragmentationData(
+				msg->data + msg->readcount - 4, fragmentLength + 4, fragmentLength);
+
+			if (frag_result != NET_PROTOCOL_VALID) {
+				atomic_fetch_add(&net_validation_ctx.stats.packets_rejected, 1);
+				if (showpackets->integer) {
+					Com_Printf("%s: Fragment validation failed: %s\n",
+						netsrcString[chan->sock], Net_ProtocolResultToString(frag_result));
+				}
+				return qfalse;
+			}
+		}
 	} else {
 		fragmentStart = 0;		// stop warning message
 		fragmentLength = 0;
@@ -1263,12 +1355,7 @@ qboolean Netchan_Process_Enhanced(netchan_t *chan, msg_t *msg) {
 		}
 	}
 
-	// If the current outgoing reliable message has been acknowledged
-	// clear the buffer to make way for the next
-	if (sequence >= chan->incomingAcknowledged) {
-		chan->incomingAcknowledged = sequence;
-		chan->incomingReliableAcknowledged = chan->incomingReliableSequence;
-	}
+	// Reliable message acknowledgment is handled elsewhere in the network stack
 
 	// Enhanced fragmentation processing
 	if (fragmented) {

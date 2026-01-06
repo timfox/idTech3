@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../common/physics_bullet.h"
 #include "../common/ecs.h"
 #include "../common/q_fallback_assets.h"
+#include "../common/input_validation.h"
 
 // Debug command functions are registered with Cmd_AddCommand but may appear unused to the compiler
 
@@ -44,6 +45,9 @@ void Con_EnsureHistoryFileExists(void);
 cvar_t	*cl_noprint;
 cvar_t	*cl_debugMove;
 cvar_t	*cl_motd;
+
+// Input validation context
+static input_validation_context_t input_validation_ctx;
 
 #ifdef USE_RENDERER_DLOPEN
 static cvar_t *cl_renderer;
@@ -230,6 +234,27 @@ void CL_AddReliableCommand( const char *cmd, qboolean isDisconnectCmd ) {
 
 	if ( clc.serverAddress.type == NA_BAD )
 		return;
+
+	// Validate command input
+	if (cmd && Cvar_VariableIntegerValue("cl_validate_input")) {
+		atomic_fetch_add(&input_validation_ctx.stats.total_inputs_validated, 1);
+
+		input_validation_result_t result = Input_ValidateConsoleCommand(cmd, strlen(cmd));
+		if (result != INPUT_VALID) {
+			atomic_fetch_add(&input_validation_ctx.stats.inputs_rejected, 1);
+			if (result == INPUT_INJECTION_ATTEMPT) {
+				atomic_fetch_add(&input_validation_ctx.stats.injection_attempts, 1);
+			}
+			Com_Printf("Rejected unreliable command: %s\n", Input_ValidationResultToString(result));
+			return; // Silently drop invalid commands
+		}
+
+		// Check rate limiting
+		if (!Input_CheckRateLimit(&input_validation_ctx, Sys_Milliseconds())) {
+			Com_DPrintf("Command rate limit exceeded\n");
+			return;
+		}
+	}
 
 	// if we would be losing an old command that hasn't been acknowledged,
 	// we must drop the connection
@@ -1937,7 +1962,7 @@ static void CL_Vid_Restart( refShutdownCode_t shutdownCode ) {
 	extern qboolean com_fullyInitialized;
 	if ( com_fullyInitialized ) {
 		// Mark archive cvars as modified so they get saved
-		extern int cvar_modifiedFlags;
+		// cvar_modifiedFlags declared in qcommon.h
 		Cvar_AtomicOrModifiedFlags(CVAR_ARCHIVE);
 	}
 }
@@ -4551,6 +4576,9 @@ void CL_Init( void ) {
 	// Initialize Steam Deck features
 	CL_SteamDeck_Init();
 
+	// Initialize input validation
+	Input_ValidationInit(&input_validation_ctx);
+
 	//
 	// register client variables
 	//
@@ -4565,6 +4593,12 @@ void CL_Init( void ) {
 
 	cl_autoNudge = Cvar_Get( "cl_autoNudge", "0", CVAR_TEMP );
 	Cvar_CheckRange( cl_autoNudge, "0", "1", CV_FLOAT );
+
+	// Input validation CVars
+	Cvar_Get( "cl_validate_input", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( Cvar_FindVar("cl_validate_input"), "Enable client input validation and sanitization." );
+	Cvar_Get( "cl_input_rate_limit", "10", CVAR_ARCHIVE );
+	Cvar_SetDescription( Cvar_FindVar("cl_input_rate_limit"), "Maximum input events per second allowed." );
 	Cvar_SetDescription( cl_autoNudge, "Automatic time nudge that uses your average ping as the time nudge, values:\n  0 - use fixed \\cl_timeNudge\n (0..1] - factor of median average ping to use as timenudge\n" );
 	cl_timeNudge = Cvar_Get( "cl_timeNudge", "0", CVAR_TEMP );
 	Cvar_CheckRange( cl_timeNudge, "-30", "30", CV_INTEGER );

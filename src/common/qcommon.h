@@ -865,7 +865,7 @@ void	Cvar_Restart( qboolean unsetVM );
 
 void	Cvar_CompleteCvarName( const char *args, int argNum );
 
-extern	int			cvar_modifiedFlags;
+extern	atomic_int_t	cvar_modifiedFlags;
 // whenever a cvar is modifed, its flags will be OR'd into this, so
 // a single check can determine if any CVAR_USERINFO, CVAR_SERVERINFO,
 // etc, variables have been modified since the last check.  The bit

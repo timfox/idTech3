@@ -473,7 +473,19 @@ qboolean Barrier_Init(barrier_t *barrier, int thread_count) {
 #ifdef _WIN32
     return InitializeSynchronizationBarrier(barrier, thread_count, -1);
 #else
-    return pthread_barrier_init(barrier, NULL, thread_count) == 0;
+    // Use fallback implementation for consistency
+    barrier->count = thread_count;
+    barrier->waiting = 0;
+    barrier->phase = 0;
+
+    if (pthread_mutex_init(&barrier->mutex, NULL) != 0) {
+        return qfalse;
+    }
+    if (pthread_cond_init(&barrier->cond, NULL) != 0) {
+        pthread_mutex_destroy(&barrier->mutex);
+        return qfalse;
+    }
+    return qtrue;
 #endif
 }
 
@@ -483,7 +495,9 @@ void Barrier_Destroy(barrier_t *barrier) {
 #ifdef _WIN32
     DeleteSynchronizationBarrier(barrier);
 #else
-    pthread_barrier_destroy(barrier);
+    // Fallback implementation cleanup
+    pthread_cond_destroy(&barrier->cond);
+    pthread_mutex_destroy(&barrier->mutex);
 #endif
 }
 
@@ -493,6 +507,29 @@ qboolean Barrier_Wait(barrier_t *barrier) {
 #ifdef _WIN32
     return EnterSynchronizationBarrier(barrier, 0) == TRUE;
 #else
-    return pthread_barrier_wait(barrier) != PTHREAD_BARRIER_SERIAL_THREAD;
+    // Fallback implementation
+    pthread_mutex_lock(&barrier->mutex);
+
+    int phase = barrier->phase;
+    barrier->waiting++;
+
+    if (barrier->waiting == barrier->count) {
+        // Last thread to arrive, wake everyone up
+        barrier->waiting = 0;
+        barrier->phase = 1 - phase; // Toggle phase
+        pthread_cond_broadcast(&barrier->cond);
+        pthread_mutex_unlock(&barrier->mutex);
+        return qtrue; // This thread doesn't wait
+    } else {
+        // Wait until all threads arrive
+        while (barrier->phase == phase) {
+            if (pthread_cond_wait(&barrier->cond, &barrier->mutex) != 0) {
+                pthread_mutex_unlock(&barrier->mutex);
+                return qfalse;
+            }
+        }
+        pthread_mutex_unlock(&barrier->mutex);
+        return qtrue;
+    }
 #endif
 }
