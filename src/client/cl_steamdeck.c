@@ -7,7 +7,7 @@ Steamworks SDK integration for Steam Deck features
 
 #include "client.h"
 #include "cl_steamdeck.h"
-#include "../renderercommon/tr_public.h"  // For re (renderer interface)
+#include "../renderers/renderercommon/tr_public.h"  // For re (renderer interface)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

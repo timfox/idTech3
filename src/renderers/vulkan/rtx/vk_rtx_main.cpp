@@ -279,6 +279,7 @@ cvar_t *r_rtx_ibl;
 cvar_t *r_rtx_fsr;
 cvar_t *r_rtx_raymarching;
 cvar_t *r_rtx_imgui;        // Show ImGui settings window
+cvar_t *r_rt_pathtracing;   // Enable full path tracing (0=hybrid, 1=full)
 
 // C++23 RTX constants
 constexpr int RTX_MODE_HARDWARE = 0;
@@ -451,6 +452,7 @@ qboolean RTX_Init(void)
     r_rtx_fsr = ri.Cvar_Get("r_rtx_fsr", "0", CVAR_ARCHIVE);
     r_rtx_raymarching = ri.Cvar_Get("r_rtx_raymarching", "0", CVAR_ARCHIVE);
     r_rtx_imgui = ri.Cvar_Get("r_rtx_imgui", "0", CVAR_ARCHIVE); // ImGui settings window
+    r_rt_pathtracing = ri.Cvar_Get("r_rt_pathtracing", "0", CVAR_ARCHIVE); // 0=hybrid, 1=full path tracing
 
     if (!r_rtx_enable->integer) {
         // Provide helpful information about RTX availability even when disabled
@@ -1096,6 +1098,15 @@ void RTX_ImGuiSettingsWindow(void)
         igSameLine(0, -1);
         igText("(Not Supported)");
     }
+
+    // Path Tracing Mode
+    static bool pathTracing = false; // Initialize with default
+    pathTracing = r_rt_pathtracing->integer; // Update from CVAR
+    if (igCheckbox("Full Path Tracing", &pathTracing)) {
+        ri.Cvar_Set("r_rt_pathtracing", pathTracing ? "1" : "0");
+    }
+    igSameLine(0, -1);
+    igText("(0=Hybrid, 1=Full PT)");
 
     // Denoising
     static bool denoise = false; // Initialize with default

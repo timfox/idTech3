@@ -8,7 +8,7 @@
 - [ ] **OOP Entity Architecture**: Move beyond legacy `gentity_t` to a modern C++ class hierarchy.
 
 ## Rendering Improvements
-- [ ] **Ray Tracing (Hardware)**: Optimize BVH builds and pipeline for Vulkan/DXR.
+- [x] **Ray Tracing (Hardware)**: Optimize BVH builds and pipeline for Vulkan/DXR - Path tracing implemented with r_rt_pathtracing CVAR.
 - [ ] **Mesh Shaders**: Implementation for modern GPU geometry pipelines.
 - [ ] **Material System**: Layered materials and procedural shader support.
 - [x] **Dynamic Resolution**: Runtime resolution scaling for performance stability.

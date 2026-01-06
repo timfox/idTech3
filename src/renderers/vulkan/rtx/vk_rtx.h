@@ -24,6 +24,7 @@ extern cvar_t *r_rtx_ibl;
 extern cvar_t *r_rtx_fsr;
 extern cvar_t *r_rtx_raymarching;
 extern cvar_t *r_rtx_imgui;        // Show ImGui settings window
+extern cvar_t *r_rt_pathtracing;   // Enable full path tracing (0=hybrid, 1=full)
 
 // RTX renderer statistics (internal use only)
 

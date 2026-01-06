@@ -108,3 +108,35 @@
 {"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767678218000}
 {"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767678218000}
 {"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767678218000}
+{"timestamp":1767678545000,"hypothesisId":"D","location":"CIN_RunCinematic","message":"ENTER FUNCTION","data":{},"runId":"debug"}
+{"timestamp":1767678545000,"hypothesisId":"D","location":"CIN_RunCinematic","message":"Starting cinematic run","data":{"handle":0,"status":1},"runId":"debug"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5c64d2a329e0 init=1","timestamp":1767678545000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A2","location":"src/client/cl_cin_theora.c:Theora_Run after_decode","message":"decoded_ycbcr=0x78c88d82c620 0x78c88d843c20 0x78c88d85b220","timestamp":1767678545000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x78c88d76d010 y0=0x78c88d82c620 y1=0x78c88d843c20 y2=0x78c88d85b220","timestamp":1767678545000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x78c88d76d010 y0=0x78c88d82c620 y1=0x78c88d843c20 y2=0x78c88d85b220","timestamp":1767678545000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x78c88d76d010 y0=0x78c88d82c620 y1=0x78c88d843c20 y2=0x78c88d85b220","timestamp":1767678545000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767678545000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767678545000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767678545000}
+{"timestamp":1767678548000,"hypothesisId":"D","location":"CIN_RunCinematic","message":"ENTER FUNCTION","data":{},"runId":"debug"}
+{"timestamp":1767678548000,"hypothesisId":"D","location":"CIN_RunCinematic","message":"Starting cinematic run","data":{"handle":0,"status":1},"runId":"debug"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x56cd1cc6ba60 init=1","timestamp":1767678548000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A2","location":"src/client/cl_cin_theora.c:Theora_Run after_decode","message":"decoded_ycbcr=0x78f66a373620 0x78f66a38ac20 0x78f66a3a2220","timestamp":1767678548000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x78f66a2b4010 y0=0x78f66a373620 y1=0x78f66a38ac20 y2=0x78f66a3a2220","timestamp":1767678548000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x78f66a2b4010 y0=0x78f66a373620 y1=0x78f66a38ac20 y2=0x78f66a3a2220","timestamp":1767678548000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x78f66a2b4010 y0=0x78f66a373620 y1=0x78f66a38ac20 y2=0x78f66a3a2220","timestamp":1767678548000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767678548000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767678548000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767678548000}
+{"timestamp":1767678551000,"hypothesisId":"D","location":"CIN_RunCinematic","message":"ENTER FUNCTION","data":{},"runId":"debug"}
+{"timestamp":1767678551000,"hypothesisId":"D","location":"CIN_RunCinematic","message":"Starting cinematic run","data":{"handle":0,"status":1},"runId":"debug"}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A1","location":"src/client/cl_cin_theora.c:Theora_Run entry","message":"handle=0 data=0x5765d06e7a40 init=1","timestamp":1767678551000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A2","location":"src/client/cl_cin_theora.c:Theora_Run after_decode","message":"decoded_ycbcr=0x7d282a42c620 0x7d282a443c20 0x7d282a45b220","timestamp":1767678551000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7d282a36d010 y0=0x7d282a42c620 y1=0x7d282a443c20 y2=0x7d282a45b220","timestamp":1767678551000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7d282a36d010 y0=0x7d282a42c620 y1=0x7d282a443c20 y2=0x7d282a45b220","timestamp":1767678551000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A3","location":"src/client/cl_cin_theora.c:Theora_Run RGB_guard","message":"buf=0x7d282a36d010 y0=0x7d282a42c620 y1=0x7d282a443c20 y2=0x7d282a45b220","timestamp":1767678551000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767678551000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767678551000}
+{"sessionId":"debug-session","runId":"runtime-test","hypothesisId":"A4","location":"src/client/cl_cin_theora.c:Theora_Run RGB_done","message":"frame_count=0","timestamp":1767678551000}
+{"timestamp":1767678557000,"hypothesisId":"D","location":"CIN_RunCinematic","message":"ENTER FUNCTION","data":{},"runId":"debug"}
+{"timestamp":1767678557000,"hypothesisId":"D","location":"CIN_RunCinematic","message":"Starting cinematic run","data":{"handle":0,"status":1},"runId":"debug"}

@@ -2533,7 +2533,7 @@ static void CL_CheckForResend( void ) {
 		NET_OutOfBandCompress( NS_CLIENT, &clc.serverAddress, (byte *) &data[0], len );
 		// the most current userinfo has been sent, so watch for any
 		// newer changes to userinfo variables
-		do { int old_val = atomic_load_explicit(&cvar_modifiedFlags, memory_order_relaxed); } while (!atomic_compare_exchange_weak_explicit(&cvar_modifiedFlags, &old_val, old_val & (~CVAR_USERINFO), memory_order_relaxed, memory_order_relaxed));
+		{ int old_val, new_val; do { old_val = atomic_load_explicit(&cvar_modifiedFlags, memory_order_relaxed); new_val = old_val & (~CVAR_USERINFO); } while (!atomic_compare_exchange_weak_explicit(&cvar_modifiedFlags, &old_val, new_val, memory_order_relaxed, memory_order_relaxed)); }
 
 		// ... but force re-send if userinfo was truncated in any way
 		if ( infoTruncated || !notOverflowed ) {
@@ -3147,12 +3147,17 @@ static void CL_CheckUserinfo( void ) {
 		return;
 
 	// send a reliable userinfo update if needed
-	if ( atomic_load_explicit(&cvar_modifiedFlags, memory_order_relaxed) & CVAR_USERINFO ) 
+	if ( atomic_load_explicit(&cvar_modifiedFlags, memory_order_relaxed) & CVAR_USERINFO )
 	{
 		qboolean infoTruncated = qfalse;
 		const char *info;
 
-		do { int old_val = atomic_load_explicit(&cvar_modifiedFlags, memory_order_relaxed); } while (!atomic_compare_exchange_weak_explicit(&cvar_modifiedFlags, &old_val, old_val & (~CVAR_USERINFO), memory_order_relaxed, memory_order_relaxed));
+		// Clear the USERINFO flag atomically
+		int old_val, new_val;
+		do {
+			old_val = atomic_load_explicit(&cvar_modifiedFlags, memory_order_relaxed);
+			new_val = old_val & (~CVAR_USERINFO);
+		} while (!atomic_compare_exchange_weak_explicit(&cvar_modifiedFlags, &old_val, new_val, memory_order_relaxed, memory_order_relaxed));
 
 		info = Cvar_InfoString( CVAR_USERINFO, &infoTruncated );
 		if ( strlen( info ) > MAX_USERINFO_LENGTH || infoTruncated ) {
@@ -4595,10 +4600,10 @@ void CL_Init( void ) {
 	Cvar_CheckRange( cl_autoNudge, "0", "1", CV_FLOAT );
 
 	// Input validation CVars
-	Cvar_Get( "cl_validate_input", "1", CVAR_ARCHIVE );
-	Cvar_SetDescription( Cvar_FindVar("cl_validate_input"), "Enable client input validation and sanitization." );
-	Cvar_Get( "cl_input_rate_limit", "10", CVAR_ARCHIVE );
-	Cvar_SetDescription( Cvar_FindVar("cl_input_rate_limit"), "Maximum input events per second allowed." );
+	cvar_t *cl_validate_input = Cvar_Get( "cl_validate_input", "1", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_validate_input, "Enable client input validation and sanitization." );
+	cvar_t *cl_input_rate_limit = Cvar_Get( "cl_input_rate_limit", "10", CVAR_ARCHIVE );
+	Cvar_SetDescription( cl_input_rate_limit, "Maximum input events per second allowed." );
 	Cvar_SetDescription( cl_autoNudge, "Automatic time nudge that uses your average ping as the time nudge, values:\n  0 - use fixed \\cl_timeNudge\n (0..1] - factor of median average ping to use as timenudge\n" );
 	cl_timeNudge = Cvar_Get( "cl_timeNudge", "0", CVAR_TEMP );
 	Cvar_CheckRange( cl_timeNudge, "-30", "30", CV_INTEGER );
@@ -4815,6 +4820,7 @@ void CL_Init( void ) {
 	CL_InitUI();
 
 	// Check if we need to display asset instructions
+	extern qboolean com_fullyInitialized;
 	if (!com_fullyInitialized) {
 		// Display fallback asset status on first init
 		FallbackAssets_DisplayAssetInstructions();
