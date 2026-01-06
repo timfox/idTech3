@@ -54,6 +54,8 @@ static net_validation_context_t net_validation_ctx;
 const char *Net_ProtocolResultToString(net_protocol_result_t result) { return "VALID"; }
 qboolean Net_ValidatePacketBounds(const void *packet_data, int packet_length, int max_allowed_size) { return qtrue; }
 qboolean Net_CheckRateLimit(net_validation_context_t *ctx, int current_time) { return qtrue; }
+net_protocol_result_t Net_ValidateMessageIntegrity(msg_t *msg) { return NET_PROTOCOL_VALID; }
+net_protocol_result_t Net_ValidateFragmentationData(const byte *data, int length, int fragment_size) { return NET_PROTOCOL_VALID; }
 
 // Enhanced fragmentation state per channel
 typedef struct {

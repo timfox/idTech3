@@ -11,6 +11,36 @@ compatibility with legacy Quake 3 mods and content.
 #include "qcommon.h"
 #include <string.h>
 
+// Stub renderer interface for testing
+#ifdef UNIT_TEST
+
+#define qboolean int
+#define qtrue 1
+#define qfalse 0
+
+typedef struct {
+    float x, y, w, h, s1, t1, s2, t2;
+    int hShader;
+} refdef_t;
+
+typedef struct {
+    void (*RegisterShader)(const char *name);
+    void (*RegisterShaderNoMip)(const char *name);
+    void (*DrawStretchPic)(float x, float y, float w, float h, float s1, float t1, float s2, float t2, int hShader);
+} refexport_t;
+
+static void Stub_RegisterShader(const char *name) {}
+static void Stub_RegisterShaderNoMip(const char *name) {}
+static void Stub_DrawStretchPic(float x, float y, float w, float h, float s1, float t1, float s2, float t2, int hShader) {}
+
+static refexport_t re = {
+    .RegisterShader = Stub_RegisterShader,
+    .RegisterShaderNoMip = Stub_RegisterShaderNoMip,
+    .DrawStretchPic = Stub_DrawStretchPic
+};
+
+#endif // UNIT_TEST
+
 // Global CVars
 cvar_t *shim_enable_vm_shims;
 cvar_t *shim_enable_asset_shims;

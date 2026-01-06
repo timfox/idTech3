@@ -277,6 +277,10 @@ static void SndOpenAL_InitEfx(void) {
 
 	alGetError(); // clear
 
+	// Set global Doppler effect parameters
+	alDopplerFactor(1.0f);     // Scale factor for Doppler effect
+	alDopplerVelocity(343.3f); // Speed of sound in air (m/s)
+
 	alGenEffects(1, &openalReverbEffect);
 	if (alGetError() != AL_NO_ERROR) {
 		openalReverbEffect = 0;
@@ -399,12 +403,33 @@ sndOpenALHandle_t SndOpenAL_PlaySound(const char *soundName, const sndOpenAL3DPr
 			VectorCopy(props->position, sound->position);
 			VectorCopy(props->velocity, sound->velocity);
 			sound->flags |= SND_OPENAL_3D;
-			
-			// Set 3D position
+
+			// Enhanced 3D spatialization
 			alSource3f(source, AL_POSITION, props->position[0], props->position[1], props->position[2]);
 			alSource3f(source, AL_VELOCITY, props->velocity[0], props->velocity[1], props->velocity[2]);
-			alSourcef(source, AL_REFERENCE_DISTANCE, props->minDistance);
-			alSourcef(source, AL_MAX_DISTANCE, props->maxDistance);
+
+			// Distance attenuation with better defaults
+			float minDist = props->minDistance > 0 ? props->minDistance : 128.0f;
+			float maxDist = props->maxDistance > 0 ? props->maxDistance : 1024.0f;
+			alSourcef(source, AL_REFERENCE_DISTANCE, minDist);
+			alSourcef(source, AL_MAX_DISTANCE, maxDist);
+			alSourcef(source, AL_ROLLOFF_FACTOR, 1.0f); // Linear distance attenuation
+
+			// Directional sound cone for more realistic spatialization
+			alSourcef(source, AL_CONE_INNER_ANGLE, 360.0f); // Omnidirectional
+			alSourcef(source, AL_CONE_OUTER_ANGLE, 360.0f);
+			alSourcef(source, AL_CONE_OUTER_GAIN, 0.0f);
+
+			// Enable Doppler effect for moving sounds
+			if (props->flags & SND_OPENAL_DOPPLER && s_doppler && s_doppler->integer) {
+				// Doppler settings are global, but we can adjust per-source velocity
+				alSource3f(source, AL_VELOCITY, props->velocity[0], props->velocity[1], props->velocity[2]);
+			}
+		} else {
+			// 2D sounds are positioned relative to listener
+			alSource3f(source, AL_POSITION, 0.0f, 0.0f, 0.0f);
+			alSource3f(source, AL_VELOCITY, 0.0f, 0.0f, 0.0f);
+			alSourcei(source, AL_SOURCE_RELATIVE, AL_TRUE);
 		}
 		sound->volume = props->volume;
 		sound->pitch = props->pitch;
@@ -769,6 +794,111 @@ void SndOpenAL_StopStream(sndOpenALHandle_t handle)
 	S_StopBackgroundTrack();
 }
 
+/*
+=================
+SndOpenAL_SetEnvironmentReverb
+=================
+Set global environmental reverb parameters
+=================
+*/
+void SndOpenAL_SetEnvironmentReverb(float roomSize, float dampening, float wetness, float dryMix)
+{
+	if (!s_openal_reverb || !s_openal_reverb->integer || !openalEfxAvailable)
+		return;
+
+#ifdef AL_EFFECT_REVERB
+	if (openalReverbEffect && openalReverbSlot) {
+		// Clamp values to reasonable ranges
+		float clampedRoomSize = Com_Clamp(0.0f, 1.0f, roomSize);
+		float clampedDampening = Com_Clamp(0.0f, 1.0f, dampening);
+		float clampedWetness = Com_Clamp(0.0f, 1.0f, wetness);
+		float clampedDryMix = Com_Clamp(0.0f, 1.0f, dryMix);
+
+		alEffectf(openalReverbEffect, AL_REVERB_GAIN, clampedWetness);
+		alEffectf(openalReverbEffect, AL_REVERB_DECAY_TIME, 0.5f + clampedRoomSize * 2.0f);
+		alEffectf(openalReverbEffect, AL_REVERB_DECAY_HFRATIO, 0.5f + clampedDampening * 0.5f);
+		alEffectf(openalReverbEffect, AL_REVERB_DENSITY, clampedDryMix);
+
+		alAuxiliaryEffectSloti(openalReverbSlot, AL_EFFECTSLOT_EFFECT, openalReverbEffect);
+	}
+#endif
+}
+
+/*
+=================
+SndOpenAL_UpdateEnvironmentalAudio
+=================
+Update environmental audio effects based on listener position
+=================
+*/
+void SndOpenAL_UpdateEnvironmentalAudio(void)
+{
+	// This would be called regularly to update environmental effects
+	// based on the player's current environment (indoor/outdoor, room size, etc.)
+	// For now, this is a placeholder for future environmental audio features
+}
+
+/*
+=================
+SndOpenAL_SetSoundCone
+=================
+Set directional sound cone parameters for more realistic spatialization
+=================
+*/
+void SndOpenAL_SetSoundCone(sndOpenALHandle_t handle, float innerAngle, float outerAngle, float outerGain)
+{
+	openalSound_t *sound;
+
+	if (!s_openal_3d || !s_openal_3d->integer)
+		return;
+
+	if (handle < 0 || handle >= MAX_OPENAL_SOURCES)
+		return;
+
+	sound = &openalSounds[handle];
+	if (!sound->playing || !sound->source)
+		return;
+
+	// Set directional sound cone
+	alSourcef(sound->source, AL_CONE_INNER_ANGLE, Com_Clamp(0.0f, 360.0f, innerAngle));
+	alSourcef(sound->source, AL_CONE_OUTER_ANGLE, Com_Clamp(0.0f, 360.0f, outerAngle));
+	alSourcef(sound->source, AL_CONE_OUTER_GAIN, Com_Clamp(0.0f, 1.0f, outerGain));
+}
+
+/*
+=================
+SndOpenAL_SetSoundDirectivity
+=================
+Set sound directivity for HRTF-like effects
+=================
+*/
+void SndOpenAL_SetSoundDirectivity(sndOpenALHandle_t handle, float directivity, float directivitySharpness)
+{
+	openalSound_t *sound;
+
+	if (!s_openal_3d || !s_openal_3d->integer)
+		return;
+
+	if (handle < 0 || handle >= MAX_OPENAL_SOURCES)
+		return;
+
+	sound = &openalSounds[handle];
+	if (!sound->playing || !sound->source)
+		return;
+
+	// Directivity affects how directional the sound is
+	// Higher directivity = more focused sound field
+	float clampedDirectivity = Com_Clamp(0.0f, 1.0f, directivity);
+	float clampedSharpness = Com_Clamp(0.1f, 10.0f, directivitySharpness);
+
+	// Map directivity to cone angles
+	float innerAngle = 360.0f * (1.0f - clampedDirectivity * 0.8f);
+	float outerAngle = innerAngle + (360.0f - innerAngle) * clampedSharpness * 0.1f;
+	float outerGain = 1.0f - clampedDirectivity * 0.5f;
+
+	SndOpenAL_SetSoundCone(handle, innerAngle, outerAngle, outerGain);
+}
+
 #else // !USE_OPENAL
 
 // Stub implementations when OpenAL is not available
@@ -787,6 +917,10 @@ void SndOpenAL_SetOcclusion(sndOpenALHandle_t handle, float occlusionFactor) {}
 void SndOpenAL_SetReverb(sndOpenALHandle_t handle, float reverbLevel, float reverbDelay) {}
 sndOpenALHandle_t SndOpenAL_StartStream(const char *streamName, qboolean looping) { return SND_OPENAL_INVALID_HANDLE; }
 void SndOpenAL_StopStream(sndOpenALHandle_t handle) { (void)handle; }
+void SndOpenAL_SetEnvironmentReverb(float roomSize, float dampening, float wetness, float dryMix) { (void)roomSize; (void)dampening; (void)wetness; (void)dryMix; }
+void SndOpenAL_UpdateEnvironmentalAudio(void) {}
+void SndOpenAL_SetSoundCone(sndOpenALHandle_t handle, float innerAngle, float outerAngle, float outerGain) { (void)handle; (void)innerAngle; (void)outerAngle; (void)outerGain; }
+void SndOpenAL_SetSoundDirectivity(sndOpenALHandle_t handle, float directivity, float directivitySharpness) { (void)handle; (void)directivity; (void)directivitySharpness; }
 
 #endif // USE_OPENAL
 

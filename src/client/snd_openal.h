@@ -53,5 +53,13 @@ void		SndOpenAL_SetReverb(sndOpenALHandle_t handle, float reverbLevel, float rev
 sndOpenALHandle_t SndOpenAL_StartStream(const char *streamName, qboolean looping);
 void		SndOpenAL_StopStream(sndOpenALHandle_t handle);
 
+// Environmental audio
+void		SndOpenAL_SetEnvironmentReverb(float roomSize, float dampening, float wetness, float dryMix);
+void		SndOpenAL_UpdateEnvironmentalAudio(void);
+
+// Advanced spatialization
+void		SndOpenAL_SetSoundCone(sndOpenALHandle_t handle, float innerAngle, float outerAngle, float outerGain);
+void		SndOpenAL_SetSoundDirectivity(sndOpenALHandle_t handle, float directivity, float directivitySharpness);
+
 #endif // __SND_OPENAL_H__
 

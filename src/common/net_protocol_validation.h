@@ -11,6 +11,19 @@ Comprehensive network protocol validation with bounds checking and security
 
 #include "q_shared.h"
 
+// Forward declarations
+#ifdef UNIT_TEST
+typedef struct msg_s {
+    byte *data;
+    int maxsize;
+    int cursize;
+    int readcount;
+} msg_t;
+#else
+struct msg_s;
+typedef struct msg_s msg_t;
+#endif
+
 // Protocol validation result codes
 typedef enum {
     NET_PROTOCOL_VALID = 0,

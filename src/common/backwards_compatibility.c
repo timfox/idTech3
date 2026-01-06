@@ -7,8 +7,102 @@ compatibility with existing Quake 3 mods and content.
 =============================================================================
 */
 
+// Stub implementations for standalone testing
+#ifdef UNIT_TEST
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdarg.h>
+
+#ifndef qboolean
+#define qboolean int
+#endif
+#ifndef qtrue
+#define qtrue 1
+#endif
+#ifndef qfalse
+#define qfalse 0
+#endif
+
+#ifndef cvar_t
+typedef struct {
+    char string[256];
+} cvar_t;
+#endif
+
+static void Com_Printf(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    vprintf(fmt, args);
+    va_end(args);
+}
+
+static void Com_DPrintf(const char *fmt, ...) {
+    // Debug printf - do nothing in tests
+}
+
+static cvar_t* Cvar_Get(const char *name, const char *default_value, int flags) {
+    static cvar_t cvar;
+    strcpy(cvar.string, default_value);
+    return &cvar;
+}
+
+static int Sys_Milliseconds(void) {
+    return 0;
+}
+
+static void Q_strncpyz(char *dest, const char *src, int destsize) {
+    int len = strlen(src);
+    if (len >= destsize) {
+        len = destsize - 1;
+    }
+    memcpy(dest, src, len);
+    dest[len] = '\0';
+}
+
+static int Q_stricmp(const char *s1, const char *s2) {
+    return strcasecmp(s1, s2);
+}
+
+static int FS_FOpenFileRead(const char *path, int *handle, qboolean unique) {
+    return -1; // File not found
+}
+
+static int FS_Read(void *buffer, int size, int handle) {
+    return 0;
+}
+
+static void FS_FCloseFile(int handle) {
+}
+
+static const char* COM_GetExtension(const char *path) {
+    const char *ext = strrchr(path, '.');
+    return ext ? ext + 1 : "";
+}
+
+static char* COM_SkipPath(char *pathname) {
+    char *last = strrchr(pathname, '/');
+    if (last) {
+        return last + 1;
+    }
+    return pathname;
+}
+
+static int Com_sprintf(char *dest, int size, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    int result = vsnprintf(dest, size, fmt, args);
+    va_end(args);
+    return result;
+}
+
+#endif // UNIT_TEST
+
 #include "backwards_compatibility.h"
+#ifndef UNIT_TEST
 #include "qcommon.h"
+#endif
 #include <string.h>
 #include <ctype.h>
 
