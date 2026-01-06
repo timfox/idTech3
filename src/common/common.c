@@ -303,6 +303,12 @@ static void Com_SecurityCheck(void) {
 void Com_Init( char *commandLine ) {
   Com_Printf( "----- Com_Init -----\n" );
 
+    // Initialize memory safety FIRST before any allocations
+    MemorySafety_Init();
+
+    // Register memory safety CVars after basic initialization
+    MemorySafety_RegisterCVars();
+
 	// Perform comprehensive startup health checks
 	Com_Printf( "Performing startup health checks...\n" );
 	Com_ValidateSystemRequirements();
@@ -312,9 +318,6 @@ void Com_Init( char *commandLine ) {
 	} else {
 		com_cmdline[0] = '\0';
 	}
-
-    // Initialize core systems
-    MemorySafety_Init();
     Com_Printf("About to initialize backwards compatibility...\n");
     qboolean bc_ok = BC_Init(&bc_context);
     qboolean shim_ok = Shim_Init(&shim_context, LEGACY_MODE_NONE);

@@ -23,34 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_shared.h"
 #include "qcommon.h"
 #include "net_threads.h"
-#ifdef UNIT_TEST
 #include "net_protocol_validation.h"
-#else
-// Forward declarations for main build
-typedef struct {
-    int total_packets_validated;
-    int packets_rejected;
-    int buffer_overflow_attempts;
-    int corruption_detected;
-    int rate_limit_hits;
-    int invalid_sequences;
-    int size_mismatches;
-} net_validation_stats_t;
-
-typedef struct {
-    net_validation_stats_t stats;
-    struct {
-        int max_packet_size;
-    } config;
-} net_validation_context_t;
-
-typedef enum {
-    NET_PROTOCOL_VALID = 0,
-    NET_PROTOCOL_INVALID_LENGTH,
-    NET_PROTOCOL_INVALID_PAYLOAD,
-    NET_PROTOCOL_SIZE_MISMATCH
-} net_protocol_result_t;
-#endif
 
 // Type definitions are in net_protocol_validation.h
 
@@ -77,12 +50,7 @@ typedef struct {
 // Global network validation context
 static net_validation_context_t net_validation_ctx;
 
-// Stub implementations for disabled validation functions
-const char *Net_ProtocolResultToString(net_protocol_result_t result) { return "VALID"; }
-qboolean Net_ValidatePacketBounds(const void *packet_data, int packet_length, int max_allowed_size) { return qtrue; }
-qboolean Net_CheckRateLimit(net_validation_context_t *ctx, int current_time) { return qtrue; }
-net_protocol_result_t Net_ValidateMessageIntegrity(msg_t *msg) { return NET_PROTOCOL_VALID; }
-net_protocol_result_t Net_ValidateFragmentationData(const byte *data, int length, int fragment_size) { return NET_PROTOCOL_VALID; }
+// Validation functions are now implemented in net_protocol_validation.c
 
 // Enhanced fragmentation state per channel
 typedef struct {
@@ -186,7 +154,7 @@ Netchan_Shutdown
 Shutdown network channel system
 ===============
 */
-void Netchan_Shutdown(void) {
+static void __attribute__((unused)) Netchan_Shutdown(void) {
 	// Shutdown network protocol validation
 	// Net_ValidationShutdown(&net_validation_ctx); // Temporarily disabled
 }
@@ -506,8 +474,8 @@ qboolean Netchan_Process( netchan_t *chan, msg_t *msg ) {
 		if (integrity_result != NET_PROTOCOL_VALID) {
 			atomic_fetch_add(&net_validation_ctx.stats.packets_rejected, 1);
 			if (showpackets->integer) {
-				Com_Printf("%s: Message integrity validation failed: %s\n",
-					netsrcString[chan->sock], Net_ProtocolResultToString(integrity_result));
+                                Com_Printf("%s: Message integrity validation failed: %d\n",
+                                        netsrcString[chan->sock], (int)integrity_result);
 			}
 			return qfalse;
 		}
@@ -562,8 +530,8 @@ qboolean Netchan_Process( netchan_t *chan, msg_t *msg ) {
 			if (frag_result != NET_PROTOCOL_VALID) {
 				atomic_fetch_add(&net_validation_ctx.stats.packets_rejected, 1);
 				if (showpackets->integer) {
-					Com_Printf("%s: Fragment validation failed: %s\n",
-						netsrcString[chan->sock], Net_ProtocolResultToString(frag_result));
+                                        Com_Printf("%s: Fragment validation failed: %d\n",
+                                                netsrcString[chan->sock], (int)frag_result);
 				}
 				return qfalse;
 			}
@@ -1128,7 +1096,7 @@ Netchan_BufferFragment
 Buffer an out-of-order fragment for later reassembly
 =================
 */
-static qboolean Netchan_BufferFragment(netchan_t *chan, int sequence, int fragmentStart,
+static qboolean Netchan_BufferFragment(netchan_t *chan __attribute__((unused)), int sequence, int fragmentStart,
                                      int fragmentLength, const byte *data) {
 	// Find a free slot in the reorder buffer
 	for (int i = 0; i < MAX_FRAGMENT_REORDER_BUFFER; i++) {
@@ -1257,7 +1225,7 @@ Netchan_TransmitNextFragment_Enhanced
 Enhanced version of Netchan_TransmitNextFragment with adaptive sizing
 =================
 */
-void Netchan_TransmitNextFragment_Enhanced(netchan_t *chan) {
+static void __attribute__((unused)) Netchan_TransmitNextFragment_Enhanced(netchan_t *chan) {
 	msg_t send;
 	byte send_buf[MAX_PACKETLEN + 8];
 	int fragmentLength;
@@ -1322,7 +1290,7 @@ Netchan_Process_Enhanced
 Enhanced version of Netchan_Process with fragment reordering and loss detection
 =================
 */
-qboolean Netchan_Process_Enhanced(netchan_t *chan, msg_t *msg) {
+static qboolean __attribute__((unused)) Netchan_Process_Enhanced(netchan_t *chan, msg_t *msg) {
 	int sequence;
 	int fragmentStart, fragmentLength;
 	qboolean fragmented;

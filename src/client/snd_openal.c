@@ -5,19 +5,27 @@
 #include "snd_local.h"
 #include "snd_openal.h"
 
+// Global variables for OpenAL state (available even when OpenAL is not compiled)
+int numOpenALSounds = 0;
+#ifdef USE_OPENAL
+ALCdevice *openalDevice = NULL;
+ALCcontext *openalContext = NULL;
+#else
+void *openalDevice = NULL;
+void *openalContext = NULL;
+#endif
+qboolean openalEfxAvailable = qfalse;
+
 #ifdef USE_OPENAL
 #define AL_ALEXT_PROTOTYPES
 #include <AL/al.h>
 #include <AL/alc.h>
 #include <AL/efx.h>
 
-static ALCdevice *openalDevice = NULL;
-static ALCcontext *openalContext = NULL;
 static cvar_t *s_openal_enabled;
 static cvar_t *s_openal_3d;
 static cvar_t *s_openal_occlusion;
 static cvar_t *s_openal_reverb;
-static qboolean openalEfxAvailable = qfalse;
 static ALuint openalReverbEffect = 0;
 static ALuint openalReverbSlot = 0;
 

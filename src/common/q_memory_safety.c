@@ -35,6 +35,7 @@ static void MemorySafety_UntrackAllocation(void *ptr);
 
 // Memory safety configuration
 cvar_t *memory_safety_enable;
+static qboolean memory_cvars_registered = qfalse;
 cvar_t *memory_bounds_checking;
 cvar_t *memory_corruption_detection;
 cvar_t *memory_leak_detection;
@@ -61,7 +62,16 @@ void MemorySafety_Init(void) {
     Com_Memset(&memory_stats, 0, sizeof(memory_stats));
     Com_Memset(&memory_state, 0, sizeof(memory_state));
 
-    // Register CVars
+    // Mark as initialized but defer CVAR registration to avoid circular dependency
+    memory_state.initialized = qtrue;
+
+    Com_Printf("Memory safety framework initialized\n");
+}
+
+void MemorySafety_RegisterCVars(void) {
+    // Mark that we're registering CVars to avoid circular dependency
+    memory_cvars_registered = qtrue;
+
     memory_safety_enable = Cvar_Get("memory_safety_enable", "1", CVAR_ARCHIVE | CVAR_LATCH);
     memory_bounds_checking = Cvar_Get("memory_bounds_checking", "1", CVAR_ARCHIVE);
     memory_corruption_detection = Cvar_Get("memory_corruption_detection", "1", CVAR_ARCHIVE);
@@ -71,8 +81,7 @@ void MemorySafety_Init(void) {
     memory_use_after_free_detection = Cvar_Get("memory_use_after_free_detection", "1", CVAR_ARCHIVE);
     memory_buffer_overflow_protection = Cvar_Get("memory_buffer_overflow_protection", "1", CVAR_ARCHIVE);
 
-    memory_state.initialized = qtrue;
-    Com_Printf("Memory safety framework initialized\n");
+    memory_cvars_registered = qfalse;
 }
 
 /*
@@ -112,7 +121,8 @@ MemorySafety_Malloc
 ===============
 */
 void *MemorySafety_Malloc(size_t size, const char *file, int line) {
-    if (!memory_safety_enable->integer || !memory_state.initialized) {
+    if (!memory_state.initialized || memory_cvars_registered ||
+        (memory_safety_enable && !memory_safety_enable->integer)) {
         return Z_Malloc(size);
     }
 

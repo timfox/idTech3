@@ -869,21 +869,24 @@ void FS_PreloadCriticalResources(void) {
 			if (len > 10 * 1024 * 1024) { // 10MB limit
 				Com_Printf(S_COLOR_YELLOW "WARNING: Resource too large, skipping: %s (%d bytes)\n", resourcePath, len);
 				failedCount++;
+				if (buffer) FS_FreeFile(buffer);
 				continue;
 			}
 
 			Com_DPrintf("Preloaded: %s (%d bytes)\n", resourcePath, len);
 			preloadedCount++;
 
-			// FS_ReadFile already added it to cache if appropriate
-			// The buffer is managed by the cache system
+			// Free the buffer since we're just preloading to cache
+			if (buffer) FS_FreeFile(buffer);
 
 		} else if (len == 0) {
 			// File exists but is empty - not necessarily an error
 			Com_DPrintf("Empty resource: %s\n", resourcePath);
+			if (buffer) FS_FreeFile(buffer);
 		} else {
 			// File not found or error
 			Com_DPrintf("Resource not found: %s\n", resourcePath);
+			if (buffer) FS_FreeFile(buffer);
 		}
 	}
 
@@ -7537,13 +7540,16 @@ void FS_Restart( int checksumFeed ) {
 	}
 
 	// Validate game content
-	FS_ValidateContentOnStartup();
+	// Temporarily disabled to isolate crash
+	// FS_ValidateContentOnStartup();
 
 	// Load fallback assets for when game content is missing
-	FS_LoadFallbackAssets();
+	// Temporarily disabled to isolate crash
+	// FS_LoadFallbackAssets();
 
 	// Preload critical resources to reduce loading stalls
-	FS_PreloadCriticalResources();
+	// Temporarily disabled due to memory management issues
+	// FS_PreloadCriticalResources();
 
 	// new check before safeMode
 	if ( Q_stricmp(fs_gamedirvar->string, lastValidGame) && execConfig ) {

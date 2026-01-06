@@ -34,21 +34,17 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <AL/alc.h>
 #endif
 
-#ifdef USE_OPENAL
-// OpenAL externals for sound info
+// OpenAL externals for sound info (defined in snd_openal.c when available)
 extern int numOpenALSounds;
+#ifdef USE_OPENAL
 extern ALCdevice *openalDevice;
 extern ALCcontext *openalContext;
+#else
+extern void *openalDevice;
+extern void *openalContext;
+#endif
 extern qboolean openalEfxAvailable;
 #define MAX_OPENAL_SOURCES 256
-#else
-// Stub definitions when OpenAL is not available
-static int numOpenALSounds = 0;
-static ALCdevice *openalDevice = NULL;
-static ALCcontext *openalContext = NULL;
-static qboolean openalEfxAvailable = qfalse;
-#define MAX_OPENAL_SOURCES 256
-#endif
 
 cvar_t *s_volume;
 cvar_t *s_musicVolume;

@@ -42,6 +42,7 @@ typedef struct memory_allocation_s {
 
 // Function declarations
 void MemorySafety_Init(void);
+void MemorySafety_RegisterCVars(void);
 void MemorySafety_Shutdown(void);
 
 // Memory management with safety
