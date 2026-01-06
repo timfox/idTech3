@@ -592,6 +592,32 @@ typedef int clipHandle_t;
 #define ARRAY_LEN(x)		(sizeof(x) / sizeof(*(x)))
 #define STRARRAY_LEN(x)		(ARRAY_LEN(x) - 1)
 
+// Runtime bounds checking macros (enabled when memory safety is active)
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// Bounds checking function declarations
+qboolean Q_BoundsCheckArray(const void *array, size_t element_size, size_t array_len, size_t index, const char *context);
+qboolean Q_BoundsCheckString(const char *str, size_t max_len, const char *context);
+
+// Bounds checking macros
+#define BOUNDS_CHECK_ARRAY(array, index, context) \
+    (Q_BoundsCheckArray((array), sizeof(*(array)), ARRAY_LEN(array), (index), (context)) ? (array)[index] : (array)[0])
+
+#define BOUNDS_CHECK_STRING_ACCESS(str, index, context) \
+    (Q_BoundsCheckString((str), strlen(str) + 1, (context)) ? (str)[index] : '\0')
+
+#define SAFE_ARRAY_ACCESS(array, index) \
+    BOUNDS_CHECK_ARRAY(array, index, #array "[" #index "]")
+
+#define SAFE_STRING_ACCESS(str, index) \
+    BOUNDS_CHECK_STRING_ACCESS(str, index, #str "[" #index "]")
+
+#ifdef __cplusplus
+}
+#endif
+
 // angle indexes
 #define	PITCH				0		// up / down
 #define	YAW					1		// left / right

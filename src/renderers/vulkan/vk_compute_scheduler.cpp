@@ -308,7 +308,7 @@ vk_compute_job_t* vk_compute_job_create(const char* debug_name, vk_compute_prior
     memset(job, 0, sizeof(vk_compute_job_t));
     job->debug_name = debug_name ? ri.Hunk_Alloc(strlen(debug_name) + 1, h_low) : "unnamed_job";
     if (debug_name) {
-        strcpy(const_cast<char*>(job->debug_name), debug_name);
+        Q_strncpyz(const_cast<char*>(job->debug_name), debug_name, strlen(debug_name) + 1);
     }
 
     return job;

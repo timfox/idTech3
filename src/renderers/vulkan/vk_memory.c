@@ -5929,7 +5929,7 @@ static void vk_update_performance_hud_bottlenecks(vk_performance_hud_t *hud) { (
 static void vk_render_performance_hud_main_window(vk_performance_hud_t *hud) {
 #ifdef USE_CIMGUI
     char window_title[256];
-    sprintf(window_title, "Performance HUD (FPS: %.1f)###PerformanceHUD", hud->fps_current);
+    Q_snprintf(window_title, sizeof(window_title), "Performance HUD (FPS: %.1f)###PerformanceHUD", hud->fps_current);
 
     igSetNextWindowPos((ImVec2_c){hud->config.position_x, hud->config.position_y}, ImGuiCond_FirstUseEver, (ImVec2_c){0, 0});
     igSetNextWindowSize((ImVec2_c){hud->config.size_x, hud->config.size_y}, ImGuiCond_FirstUseEver);
@@ -6166,13 +6166,12 @@ static ImVec4 vk_get_bottleneck_color(float severity, const vk_performance_hud_c
 
 // Format performance value with unit
 static void vk_format_performance_value(char *buffer, size_t size, float value, const char *unit) {
-    (void)size;
     if (value >= 1000000.0f) {
-        sprintf(buffer, "%.1f M%s", (double)value / 1000000.0f, unit);
+        Q_snprintf(buffer, size, "%.1f M%s", (double)value / 1000000.0f, unit);
     } else if (value >= 1000.0f) {
-        sprintf(buffer, "%.1f K%s", (double)value / 1000.0f, unit);
+        Q_snprintf(buffer, size, "%.1f K%s", (double)value / 1000.0f, unit);
     } else {
-        sprintf(buffer, "%.1f %s", (double)value, unit);
+        Q_snprintf(buffer, size, "%.1f %s", (double)value, unit);
     }
 }
 

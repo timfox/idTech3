@@ -12,6 +12,7 @@ Basic functions used throughout the engine.
 #include "performance_counters.h"
 #include "crash_handler.h"
 #include "files_v2.h"
+#include "q_memory_safety.h"
 #include "../renderers/renderercommon/tr_public.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -300,6 +301,7 @@ void Com_Init( char *commandLine ) {
 	}
 
     // Initialize core systems
+    MemorySafety_Init();
     Cvar_Init();
     Dvar_Init();
 	Cbuf_Init();
@@ -570,8 +572,11 @@ int Com_RealTime( qtime_t *qtime ) {
 void Com_Quit_f( void ) { exit( 0 ); }
 char *CopyString( const char *in ) {
     if (!in) return NULL;
-    char *out = (char *)malloc(strlen(in) + 1);
-    if (out) strcpy(out, in);
+    size_t len = strlen(in) + 1;
+    char *out = (char *)MEMORY_SAFETY_MALLOC(len);
+    if (out) {
+        Q_strncpyz(out, in, len);
+    }
     return out;
 }
 

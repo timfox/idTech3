@@ -8,6 +8,7 @@ Background asset streaming with priority management for seamless loading.
 
 #include "streaming_thread.h"
 #include "qcommon.h"
+#include "q_memory_safety.h"
 #include <string.h>
 
 // Global streaming thread system instance
@@ -97,7 +98,7 @@ static THREAD_RETURN THREAD_CALL StreamThreadWorker(void* arg) {
             thread->last_activity_time = end_time;
 
             // Free work item
-            free(work);
+            MEMORY_SAFETY_FREE(work);
         } else {
             // Yield to prevent busy-waiting
             Thread_Yield();
@@ -443,7 +444,7 @@ qboolean StreamThread_RequestAssetLoad(const char* assetName, assetType_t assetT
     }
 
     // Create load request
-    asset_load_request_t* request = (asset_load_request_t*)malloc(sizeof(asset_load_request_t));
+    asset_load_request_t* request = (asset_load_request_t*)MEMORY_SAFETY_MALLOC(sizeof(asset_load_request_t));
     if (!request) return qfalse;
 
     memset(request, 0, sizeof(asset_load_request_t));
@@ -636,7 +637,7 @@ static void SubmitStreamWork(stream_thread_type_t threadType, void* workData,
     stream_thread_data_t* thread = &stream_thread_system.threads[threadType];
 
     // Create work item
-    stream_work_item_t* workItem = (stream_work_item_t*)malloc(sizeof(stream_work_item_t));
+    stream_work_item_t* workItem = (stream_work_item_t*)MEMORY_SAFETY_MALLOC(sizeof(stream_work_item_t));
     if (!workItem) {
         workFunction(workData); // Fallback
         return;
@@ -652,7 +653,7 @@ static void SubmitStreamWork(stream_thread_type_t threadType, void* workData,
     // Add to appropriate priority queue
     if (!LF_Queue_Enqueue(&thread->work_queues[priority], workItem)) {
         // Queue full - execute immediately as fallback
-        free(workItem);
+        MEMORY_SAFETY_FREE(workItem);
         workFunction(workData);
         return;
     }
@@ -752,7 +753,7 @@ void StreamThread_FlushQueues(asset_priority_t minPriority) {
                     StreamThread_ProcessGeneralLoad(request);
                     break;
             }
-            free(request);
+            MEMORY_SAFETY_FREE(request);
         }
     }
 }

@@ -1252,12 +1252,12 @@ const char *VM_LoadInstructions( const byte *code_pos, int codeLength, int instr
 	for ( i = 0; i < instructionCount; i++, ci++, op1 = op0 ) {
 		op0 = *code_pos;
 		if ( op0 < 0 || op0 >= OP_MAX ) {
-			sprintf( errBuf, "bad opcode %02X at offset %d", op0, (int)(code_pos - code_start) );
+			Q_snprintf( errBuf, sizeof(errBuf), "bad opcode %02X at offset %d", op0, (int)(code_pos - code_start) );
 			return errBuf;
 		}
 		n = ops[ op0 ].size;
 		if ( code_pos + 1 + n  > code_end ) {
-			sprintf( errBuf, "code_pos > code_end" );
+			Q_snprintf( errBuf, sizeof(errBuf), "code_pos > code_end" );
 			return errBuf;
 		}
 		code_pos++;
@@ -1337,11 +1337,11 @@ const char *VM_CheckInstructions( instruction_t *buf,
 	for ( i = 0; i < instructionCount; i++, ci++ ) {
 		opStack += ops[ ci->op ].stack;
 		if ( opStack < 0 ) {
-			sprintf( errBuf, "opStack underflow at %i", i );
+			Q_snprintf( errBuf, sizeof(errBuf), "opStack underflow at %i", i );
 			return errBuf;
 		}
 		if ( opStack >= PROC_OPSTACK_SIZE * 4 ) {
-			sprintf( errBuf, "opStack overflow at %i", i );
+			Q_snprintf( errBuf, sizeof(errBuf), "opStack overflow at %i", i );
 			return errBuf;
 		}
 	}
@@ -1393,17 +1393,17 @@ const char *VM_CheckInstructions( instruction_t *buf,
 		if ( op0 == OP_ENTER ) {
 			// missing block end
 			if ( proc || ( pstack && op1 != OP_LEAVE ) ) {
-				sprintf( errBuf, "missing proc end before %i", i );
+				Q_snprintf( errBuf, sizeof(errBuf), "missing proc end before %i", i );
 				return errBuf;
 			}
 			if ( ci->opStack != 0 ) {
 				v = ci->opStack;
-				sprintf( errBuf, "bad entry opstack %i at %i", v, i );
+				Q_snprintf( errBuf, sizeof(errBuf), "bad entry opstack %i at %i", v, i );
 				return errBuf;
 			}
 			v = ci->value;
 			if ( v < 0 || v >= PROGRAM_STACK_SIZE || (v & 3) ) {
-				sprintf( errBuf, "bad entry programStack %i at %i", v, i );
+				Q_snprintf( errBuf, sizeof(errBuf), "bad entry programStack %i at %i", v, i );
 				return errBuf;
 			}
 
@@ -1424,7 +1424,7 @@ const char *VM_CheckInstructions( instruction_t *buf,
 			}
 
 			if ( endp == 0 ) {
-				sprintf( errBuf, "missing end proc for %i", i );
+				Q_snprintf( errBuf, sizeof(errBuf), "missing end proc for %i", i );
 				return errBuf;
 			}
 
@@ -1440,23 +1440,23 @@ const char *VM_CheckInstructions( instruction_t *buf,
 			// bad return programStack
 			if ( pstack != ci->value ) {
 				v = ci->value;
-				sprintf( errBuf, "bad programStack %i at %i", v, i );
+				Q_snprintf( errBuf, sizeof(errBuf), "bad programStack %i at %i", v, i );
 				return errBuf;
 			}
 			// bad opStack before return
 			if ( ci->opStack != 4 ) {
 				v = ci->opStack;
-				sprintf( errBuf, "bad opStack %i at %i", v, i );
+				Q_snprintf( errBuf, sizeof(errBuf), "bad opStack %i at %i", v, i );
 				return errBuf;
 			}
 			v = ci->value;
 			if ( v < 0 || v >= PROGRAM_STACK_SIZE || (v & 3) ) {
-				sprintf( errBuf, "bad return programStack %i at %i", v, i );
+				Q_snprintf( errBuf, sizeof(errBuf), "bad return programStack %i at %i", v, i );
 				return errBuf;
 			}
 			if ( op1 == OP_PUSH ) {
 				if ( proc == NULL ) {
-					sprintf( errBuf, "unexpected proc end at %i", i );
+					Q_snprintf( errBuf, sizeof(errBuf), "unexpected proc end at %i", i );
 					return errBuf;
 				}
 				proc = NULL;
@@ -1471,18 +1471,18 @@ const char *VM_CheckInstructions( instruction_t *buf,
 			v = ci->value;
 			// conditional jumps should have opStack >= 8
 			if ( ci->opStack < 8 ) {
-				sprintf( errBuf, "bad jump opStack %i at %i", ci->opStack, i );
+				Q_snprintf( errBuf, sizeof(errBuf), "bad jump opStack %i at %i", ci->opStack, i );
 				return errBuf;
 			}
 			//if ( v >= header->instructionCount ) {
 			// allow only local proc jumps
 			if ( v < startp || v > endp ) {
-				sprintf( errBuf, "jump target %i at %i is out of range (%i,%i)", v, i-1, startp, endp );
+				Q_snprintf( errBuf, sizeof(errBuf), "jump target %i at %i is out of range (%i,%i)", v, i-1, startp, endp );
 				return errBuf;
 			}
 			if ( buf[v].opStack != ci->opStack - 8 ) {
 				n = buf[v].opStack;
-				sprintf( errBuf, "jump target %i has bad opStack %i", v, n );
+				Q_snprintf( errBuf, sizeof(errBuf), "jump target %i has bad opStack %i", v, n );
 				return errBuf;
 			}
 			// mark jump target
@@ -1494,28 +1494,28 @@ const char *VM_CheckInstructions( instruction_t *buf,
 		if ( op0 == OP_JUMP ) {
 			// jumps should have opStack >= 4
 			if ( ci->opStack < 4 ) {
-				sprintf( errBuf, "bad jump opStack %i at %i", ci->opStack, i );
+				Q_snprintf( errBuf, sizeof(errBuf), "bad jump opStack %i at %i", ci->opStack, i );
 				return errBuf;
 			}
 			if ( op1 == OP_CONST ) {
 				v = buf[i-1].value;
 				// allow only local jumps
 				if ( v < startp || v > endp ) {
-					sprintf( errBuf, "jump target %i at %i is out of range (%i,%i)", v, i-1, startp, endp );
+					Q_snprintf( errBuf, sizeof(errBuf), "jump target %i at %i is out of range (%i,%i)", v, i-1, startp, endp );
 					return errBuf;
 				}
 				if ( buf[v].opStack != ci->opStack - 4 ) {
 					n = buf[v].opStack;
-					sprintf( errBuf, "jump target %i has bad opStack %i", v, n );
+					Q_snprintf( errBuf, sizeof(errBuf), "jump target %i has bad opStack %i", v, n );
 					return errBuf;
 				}
 				if ( buf[v].op == OP_ENTER ) {
 					n = buf[v].op;
-					sprintf( errBuf, "jump target %i has bad opcode %s", v, opname[ n ] );
+					Q_snprintf( errBuf, sizeof(errBuf), "jump target %i has bad opcode %s", v, opname[ n ] );
 					return errBuf;
 				}
 				if ( v == (i-1) ) {
-					sprintf( errBuf, "self loop at %i", v );
+					Q_snprintf( errBuf, sizeof(errBuf), "self loop at %i", v );
 					return errBuf;
 				}
 				// mark jump target
@@ -1531,7 +1531,7 @@ const char *VM_CheckInstructions( instruction_t *buf,
 
 		if ( op0 == OP_CALL ) {
 			if ( ci->opStack < 4 ) {
-				sprintf( errBuf, "bad call opStack at %i", i );
+				Q_snprintf( errBuf, sizeof(errBuf), "bad call opStack at %i", i );
 				return errBuf;
 			}
 			if ( op1 == OP_CONST ) {
@@ -1539,16 +1539,16 @@ const char *VM_CheckInstructions( instruction_t *buf,
 				// analyse only local function calls
 				if ( v >= 0 ) {
 					if ( v >= instructionCount ) {
-						sprintf( errBuf, "call target %i is out of range", v );
+						Q_snprintf( errBuf, sizeof(errBuf), "call target %i is out of range", v );
 						return errBuf;
 					}
 					if ( buf[v].op != OP_ENTER ) {
 						n = buf[v].op;
-						sprintf( errBuf, "call target %i has bad opcode %s", v, opname[ n ] );
+						Q_snprintf( errBuf, sizeof(errBuf), "call target %i has bad opcode %s", v, opname[ n ] );
 						return errBuf;
 					}
 					if ( v == 0 ) {
-						sprintf( errBuf, "explicit vmMain call inside VM at %i", i );
+						Q_snprintf( errBuf, sizeof(errBuf), "explicit vmMain call inside VM at %i", i );
 						return errBuf;
 					}
 					// mark jump target
@@ -1561,12 +1561,12 @@ const char *VM_CheckInstructions( instruction_t *buf,
 		if ( ci->op == OP_ARG ) {
 			v = ci->value & 255;
 			if ( proc == NULL ) {
-				sprintf( errBuf, "missing proc frame for %s %i at %i", opname[ ci->op ], v, i );
+				Q_snprintf( errBuf, sizeof(errBuf), "missing proc frame for %s %i at %i", opname[ ci->op ], v, i );
 				return errBuf;
 			}
 			// argument can't exceed programStack frame
 			if ( v < 8 || v > pstack - 4 || (v & 3) ) {
-				sprintf( errBuf, "bad argument address %i at %i", v, i );
+				Q_snprintf( errBuf, sizeof(errBuf), "bad argument address %i at %i", v, i );
 				return errBuf;
 			}
 			continue;
@@ -1575,12 +1575,12 @@ const char *VM_CheckInstructions( instruction_t *buf,
 		if ( ci->op == OP_LOCAL ) {
 			v = ci->value;
 			if ( proc == NULL ) {
-				sprintf( errBuf, "missing proc frame for %s %i at %i", opname[ ci->op ], v, i );
+				Q_snprintf( errBuf, sizeof(errBuf), "missing proc frame for %s %i at %i", opname[ ci->op ], v, i );
 				return errBuf;
 			}
 			if ( (ci+1)->op == OP_LOAD4 || (ci+1)->op == OP_LOAD2 || (ci+1)->op == OP_LOAD1 ) {
 				if ( !safe_address( ci, proc, dataLength ) ) {
-					sprintf( errBuf, "bad %s address %i at %i", opname[ ci->op ], v, i );
+					Q_snprintf( errBuf, sizeof(errBuf), "bad %s address %i at %i", opname[ ci->op ], v, i );
 					return errBuf;
 				}
 			}
@@ -1590,7 +1590,7 @@ const char *VM_CheckInstructions( instruction_t *buf,
 		if ( ci->op == OP_LOAD4 && op1 == OP_CONST ) {
 			v = (ci-1)->value;
 			if ( v < 0 || v > dataLength - 4 ) {
-				sprintf( errBuf, "bad %s address %i at %i", opname[ ci->op ], v, i - 1 );
+				Q_snprintf( errBuf, sizeof(errBuf), "bad %s address %i at %i", opname[ ci->op ], v, i - 1 );
 				return errBuf;
 			}
 			continue;
@@ -1599,7 +1599,7 @@ const char *VM_CheckInstructions( instruction_t *buf,
 		if ( ci->op == OP_LOAD2 && op1 == OP_CONST ) {
 			v = (ci-1)->value;
 			if ( v < 0 || v > dataLength - 2 ) {
-				sprintf( errBuf, "bad %s address %i at %i", opname[ ci->op ], v, i - 1 );
+				Q_snprintf( errBuf, sizeof(errBuf), "bad %s address %i at %i", opname[ ci->op ], v, i - 1 );
 				return errBuf;
 			}
 			continue;
@@ -1608,7 +1608,7 @@ const char *VM_CheckInstructions( instruction_t *buf,
 		if ( ci->op == OP_LOAD1 && op1 == OP_CONST ) {
 			v =  (ci-1)->value;
 			if ( v < 0 || v > dataLength - 1 ) {
-				sprintf( errBuf, "bad %s address %i at %i", opname[ ci->op ], v, i - 1 );
+				Q_snprintf( errBuf, sizeof(errBuf), "bad %s address %i at %i", opname[ ci->op ], v, i - 1 );
 				return errBuf;
 			}
 			continue;
@@ -1622,7 +1622,7 @@ const char *VM_CheckInstructions( instruction_t *buf,
 					safe_stores++;
 					continue;
 				} else {
-					sprintf( errBuf, "bad %s address %i at %i", opname[ ci->op ], x->value, (int)(x - buf) );
+					Q_snprintf( errBuf, sizeof(errBuf), "bad %s address %i at %i", opname[ ci->op ], x->value, (int)(x - buf) );
 					return errBuf;
 				}
 			}
@@ -1636,12 +1636,12 @@ const char *VM_CheckInstructions( instruction_t *buf,
 			int safe = 0;
 			v = ci->value;
 			if ( v >= dataLength ) {
-				sprintf( errBuf, "bad count %i for block copy at %i", v, i - 1 );
+				Q_snprintf( errBuf, sizeof(errBuf), "bad count %i for block copy at %i", v, i - 1 );
 				return errBuf;
 			}
 			if ( src->op == OP_LOCAL || src->op == OP_CONST ) {
 				if ( !safe_address( src, proc, dataLength ) ) {
-					sprintf( errBuf, "bad src for block copy at %i", (int)(dst - buf) );
+					Q_snprintf( errBuf, sizeof(errBuf), "bad src for block copy at %i", (int)(dst - buf) );
 					return errBuf;
 				}
 				src->safe = 1;
@@ -1649,7 +1649,7 @@ const char *VM_CheckInstructions( instruction_t *buf,
 			}
 			if ( dst->op == OP_LOCAL || dst->op == OP_CONST ) {
 				if ( !safe_address( dst, proc, dataLength ) ) {
-					sprintf( errBuf, "bad dst for block copy at %i", (int)(dst - buf) );
+					Q_snprintf( errBuf, sizeof(errBuf), "bad dst for block copy at %i", (int)(dst - buf) );
 					return errBuf;
 				}
 				dst->safe = 1;
@@ -1668,7 +1668,7 @@ const char *VM_CheckInstructions( instruction_t *buf,
 	}
 
 	if ( op1 != OP_UNDEF && op1 != OP_LEAVE ) {
-		sprintf( errBuf, "missing return instruction at the end of the image" );
+		Q_snprintf( errBuf, sizeof(errBuf), "missing return instruction at the end of the image" );
 		return errBuf;
 	}
 

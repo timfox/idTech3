@@ -482,3 +482,82 @@ void *MemorySafety_Memset(void *s, int c, size_t n) {
 
     return memset(s, c, n);
 }
+
+// ============================================================================
+// Bounds Checking Functions
+// ============================================================================
+
+/*
+================
+MemorySafety_UpdateState
+Update internal state from CVars
+================
+*/
+static void MemorySafety_UpdateState(void) {
+    if (!memory_state.initialized) {
+        return;
+    }
+
+    memory_state.bounds_checking_active = (memory_bounds_checking && memory_bounds_checking->integer) ? qtrue : qfalse;
+    memory_state.corruption_detection_active = (memory_corruption_detection && memory_corruption_detection->integer) ? qtrue : qfalse;
+    memory_state.leak_detection_active = (memory_leak_detection && memory_leak_detection->integer) ? qtrue : qfalse;
+}
+
+/*
+================
+Q_BoundsCheckArray
+Runtime bounds checking for array access
+================
+*/
+qboolean Q_BoundsCheckArray(const void *array, size_t element_size, size_t array_len, size_t index, const char *context) {
+    MemorySafety_UpdateState();
+
+    if (!memory_state.bounds_checking_active) {
+        return qtrue; // Skip checking if disabled
+    }
+
+    if (!array) {
+        Com_Printf(S_COLOR_RED "BOUNDS CHECK: NULL array access in %s\n", context);
+        memory_stats.bounds_violations++;
+        return qfalse;
+    }
+
+    if (index >= array_len) {
+        Com_Printf(S_COLOR_RED "BOUNDS CHECK: Array index %zu out of bounds (max %zu) in %s\n",
+                  index, array_len - 1, context);
+        memory_stats.bounds_violations++;
+        return qfalse;
+    }
+
+    return qtrue;
+}
+
+/*
+================
+Q_BoundsCheckString
+Runtime bounds checking for string access
+================
+*/
+qboolean Q_BoundsCheckString(const char *str, size_t max_len, const char *context) {
+    MemorySafety_UpdateState();
+
+    if (!memory_state.bounds_checking_active) {
+        return qtrue; // Skip checking if disabled
+    }
+
+    if (!str) {
+        Com_Printf(S_COLOR_RED "BOUNDS CHECK: NULL string access in %s\n", context);
+        memory_stats.bounds_violations++;
+        return qfalse;
+    }
+
+    size_t len = strlen(str);
+    if (len >= max_len) {
+        Com_Printf(S_COLOR_RED "BOUNDS CHECK: String access out of bounds (len %zu, max %zu) in %s\n",
+                  len, max_len - 1, context);
+        memory_stats.bounds_violations++;
+        return qfalse;
+    }
+
+    return qtrue;
+}
