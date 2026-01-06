@@ -349,3 +349,114 @@ void SpinLock_Unlock(spinlock_t *lock) {
     atomic_store_explicit(&lock->lock, 0, memory_order_release);
 }
 
+/*
+=============================================================================
+Semaphore Implementation
+=============================================================================
+*/
+
+qboolean Semaphore_Init(semaphore_t *semaphore, int initial_count) {
+    if (!semaphore) return qfalse;
+
+#ifdef _WIN32
+    *semaphore = CreateSemaphore(NULL, initial_count, LONG_MAX, NULL);
+    return *semaphore != NULL;
+#elif defined(__APPLE__)
+    *semaphore = dispatch_semaphore_create(initial_count);
+    return *semaphore != NULL;
+#else
+    return sem_init(semaphore, 0, initial_count) == 0;
+#endif
+}
+
+void Semaphore_Destroy(semaphore_t *semaphore) {
+    if (!semaphore) return;
+
+#ifdef _WIN32
+    if (*semaphore) {
+        CloseHandle(*semaphore);
+        *semaphore = NULL;
+    }
+#elif defined(__APPLE__)
+    // dispatch_semaphore is automatically managed
+    *semaphore = NULL;
+#else
+    sem_destroy(semaphore);
+#endif
+}
+
+qboolean Semaphore_Wait(semaphore_t *semaphore) {
+    if (!semaphore) return qfalse;
+
+#ifdef _WIN32
+    return WaitForSingleObject(*semaphore, INFINITE) == WAIT_OBJECT_0;
+#elif defined(__APPLE__)
+    return dispatch_semaphore_wait(*semaphore, DISPATCH_TIME_FOREVER) == 0;
+#else
+    return sem_wait(semaphore) == 0;
+#endif
+}
+
+qboolean Semaphore_TryWait(semaphore_t *semaphore) {
+    if (!semaphore) return qfalse;
+
+#ifdef _WIN32
+    return WaitForSingleObject(*semaphore, 0) == WAIT_OBJECT_0;
+#elif defined(__APPLE__)
+    return dispatch_semaphore_wait(*semaphore, DISPATCH_TIME_NOW) == 0;
+#else
+    return sem_trywait(semaphore) == 0;
+#endif
+}
+
+qboolean Semaphore_TimedWait(semaphore_t *semaphore, int timeout_ms) {
+    if (!semaphore) return qfalse;
+
+#ifdef _WIN32
+    return WaitForSingleObject(*semaphore, timeout_ms) == WAIT_OBJECT_0;
+#elif defined(__APPLE__)
+    dispatch_time_t timeout = dispatch_time(DISPATCH_TIME_NOW, timeout_ms * NSEC_PER_MSEC);
+    return dispatch_semaphore_wait(*semaphore, timeout) == 0;
+#else
+    struct timespec ts;
+    if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+        return qfalse;
+    }
+    ts.tv_sec += timeout_ms / 1000;
+    ts.tv_nsec += (timeout_ms % 1000) * 1000000;
+    if (ts.tv_nsec >= 1000000000) {
+        ts.tv_sec++;
+        ts.tv_nsec -= 1000000000;
+    }
+    return sem_timedwait(semaphore, &ts) == 0;
+#endif
+}
+
+void Semaphore_Post(semaphore_t *semaphore) {
+    if (!semaphore) return;
+
+#ifdef _WIN32
+    ReleaseSemaphore(*semaphore, 1, NULL);
+#elif defined(__APPLE__)
+    dispatch_semaphore_signal(*semaphore);
+#else
+    sem_post(semaphore);
+#endif
+}
+
+int Semaphore_GetValue(semaphore_t *semaphore) {
+    if (!semaphore) return -1;
+
+#ifdef _WIN32
+    LONG value = 0;
+    ReleaseSemaphore(*semaphore, 0, &value);  // This doesn't actually release, just gets value
+    return value;
+#elif defined(__APPLE__)
+    // dispatch_semaphore doesn't provide a way to get current value
+    return 0;
+#else
+    int value = 0;
+    sem_getvalue(semaphore, &value);
+    return value;
+#endif
+}

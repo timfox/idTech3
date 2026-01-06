@@ -24,15 +24,27 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 extern refimport_t ri;
 #include "../../common/performance_counters.h"
 #include "vk.h"
+#include "../../common/thread_platform.h"
 
 backEndData_t	*backEndData;
 backEndState_t	backEnd;
+
+// Thread synchronization for backEnd structure
+static mutex_t backEnd_mutex;
+static qboolean backEnd_mutex_initialized = qfalse;
 
 // Backend interface (Vulkan implementation)
 // -----------------------------------------------------------------------------
 #include "../renderercommon/tr_backend_iface.h"
 
-static qboolean RBVK_InitInterface( void ) { return qtrue; }
+static qboolean RBVK_InitInterface( void ) {
+	// Initialize backEnd mutex for thread safety
+	if (!backEnd_mutex_initialized) {
+		MUTEX_INIT(backEnd_mutex);
+		backEnd_mutex_initialized = qtrue;
+	}
+	return qtrue;
+}
 static void RBVK_ShutdownInterface( void ) {}
 static void RBVK_BeginFrame( void ) {
 	Perf_ResetFrameCounters();

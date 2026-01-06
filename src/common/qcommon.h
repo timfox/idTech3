@@ -819,6 +819,9 @@ void	Cvar_VariableStringBufferSafe( const char *var_name, char *buffer, int bufs
 unsigned Cvar_Flags( const char *var_name );
 // returns CVAR_NONEXISTENT if cvar doesn't exist or the flags of that particular CVAR.
 
+void Cvar_AtomicOrModifiedFlags( int flags );
+// Atomically OR flags into cvar_modifiedFlags for thread safety
+
 void	Cvar_CommandCompletion( void(*callback)(const char *s) );
 // callback with each valid string
 

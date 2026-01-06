@@ -144,11 +144,13 @@ void *MemorySafety_Malloc(size_t size, const char *file, int line) {
     // Track allocation
     MemorySafety_TrackAllocation(user_ptr, size, file, line);
 
-    memory_stats.total_allocations++;
-    memory_stats.current_memory += size;
+    ATOMIC_INCREMENT(&memory_stats.total_allocations);
+    ATOMIC_ADD(&memory_stats.current_memory, size);
 
-    if (memory_stats.current_memory > memory_stats.peak_memory) {
-        memory_stats.peak_memory = memory_stats.current_memory;
+    int current = atomic_load_explicit(&memory_stats.current_memory, memory_order_relaxed);
+    int peak = atomic_load_explicit(&memory_stats.peak_memory, memory_order_relaxed);
+    if (current > peak) {
+        atomic_store_explicit(&memory_stats.peak_memory, current, memory_order_relaxed);
     }
 
     return user_ptr;
@@ -194,8 +196,8 @@ void MemorySafety_Free(void *ptr) {
     // Remove from tracking
     MemorySafety_UntrackAllocation(ptr);
 
-    memory_stats.total_frees++;
-    memory_stats.current_memory -= block->size;
+    ATOMIC_INCREMENT(&memory_stats.total_frees);
+    ATOMIC_ADD(&memory_stats.current_memory, -(block->size));
 
     // Get raw pointer and free
     void *raw_ptr = block;
@@ -348,8 +350,8 @@ void MemorySafety_CheckLeaks(void) {
     if (leak_count > 0) {
         Com_Printf(S_COLOR_RED "MEMORY LEAKS DETECTED: %d leaks, %zu bytes total\n",
             leak_count, leak_size);
-        memory_stats.leak_count = leak_count;
-        memory_stats.leak_size = leak_size;
+        atomic_store_explicit(&memory_stats.leak_count, leak_count, memory_order_relaxed);
+        atomic_store_explicit(&memory_stats.leak_size, (int)leak_size, memory_order_relaxed);
     } else {
         Com_Printf(S_COLOR_GREEN "No memory leaks detected\n");
     }
@@ -518,14 +520,14 @@ qboolean Q_BoundsCheckArray(const void *array, size_t element_size, size_t array
 
     if (!array) {
         Com_Printf(S_COLOR_RED "BOUNDS CHECK: NULL array access in %s\n", context);
-        memory_stats.bounds_violations++;
+        ATOMIC_INCREMENT(&memory_stats.bounds_violations);
         return qfalse;
     }
 
     if (index >= array_len) {
         Com_Printf(S_COLOR_RED "BOUNDS CHECK: Array index %zu out of bounds (max %zu) in %s\n",
                   index, array_len - 1, context);
-        memory_stats.bounds_violations++;
+        ATOMIC_INCREMENT(&memory_stats.bounds_violations);
         return qfalse;
     }
 
@@ -547,7 +549,7 @@ qboolean Q_BoundsCheckString(const char *str, size_t max_len, const char *contex
 
     if (!str) {
         Com_Printf(S_COLOR_RED "BOUNDS CHECK: NULL string access in %s\n", context);
-        memory_stats.bounds_violations++;
+        ATOMIC_INCREMENT(&memory_stats.bounds_violations);
         return qfalse;
     }
 
@@ -555,7 +557,7 @@ qboolean Q_BoundsCheckString(const char *str, size_t max_len, const char *contex
     if (len >= max_len) {
         Com_Printf(S_COLOR_RED "BOUNDS CHECK: String access out of bounds (len %zu, max %zu) in %s\n",
                   len, max_len - 1, context);
-        memory_stats.bounds_violations++;
+        ATOMIC_INCREMENT(&memory_stats.bounds_violations);
         return qfalse;
     }
 

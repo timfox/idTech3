@@ -27,7 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 cvar_t	*cvar_vars = NULL;
 static cvar_t	*cvar_cheats;
 static cvar_t	*cvar_developer;
-int			cvar_modifiedFlags;
+atomic_int_t	cvar_modifiedFlags;
 
 static mutex_t cvar_mutex;
 static qboolean cvar_initialized = qfalse;
@@ -37,6 +37,15 @@ static cvar_t	cvar_indexes[MAX_CVARS];
 static int		cvar_numIndexes;
 
 static int	cvar_group[ CVG_MAX ];
+
+// Atomic OR helper function for cvar_modifiedFlags
+void Cvar_AtomicOrModifiedFlags(int flags) {
+    int old_value, new_value;
+    do {
+        old_value = atomic_load_explicit(&cvar_modifiedFlags, memory_order_relaxed);
+        new_value = old_value | flags;
+    } while (!atomic_compare_exchange_weak_explicit(&cvar_modifiedFlags, &old_value, new_value, memory_order_relaxed, memory_order_relaxed));
+}
 
 #define FILE_HASH_SIZE		256
 static	cvar_t	*hashTable[FILE_HASH_SIZE];
@@ -519,7 +528,7 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 
 		// ZOID--needs to be set so that cvars the game sets as 
 		// SERVERINFO get sent to clients
-		cvar_modifiedFlags |= flags;
+		Cvar_AtomicOrModifiedFlags(flags);
 
         MUTEX_UNLOCK(cvar_mutex);
 		return var;
@@ -574,7 +583,7 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 
 	var->flags = flags;
 	// note what types of cvars have been modified (userinfo, archive, serverinfo, systeminfo)
-	cvar_modifiedFlags |= var->flags;
+	Cvar_AtomicOrModifiedFlags(var->flags);
 
 	hash = generateHashValue(var_name);
 	var->hashIndex = hash;
@@ -796,7 +805,7 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
     }
 
 	// note what types of cvars have been modified (userinfo, archive, serverinfo, systeminfo)
-	cvar_modifiedFlags |= var->flags;
+	Cvar_AtomicOrModifiedFlags(var->flags);
 
 	if ( !force )
 	{
@@ -834,7 +843,7 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 			// When applying a latched value (force=true), ensure it's marked for archiving
 			// This ensures graphics settings are saved after vid_restart
 			if ( var->flags & CVAR_ARCHIVE ) {
-				cvar_modifiedFlags |= CVAR_ARCHIVE;
+				Cvar_AtomicOrModifiedFlags(CVAR_ARCHIVE);
 			}
 			Z_Free( var->latchedString );
 			var->latchedString = NULL;
@@ -1180,19 +1189,19 @@ static void Cvar_Set_f( void ) {
 		case 'a':
 			if( !( v->flags & CVAR_ARCHIVE ) ) {
 				v->flags |= CVAR_ARCHIVE;
-				cvar_modifiedFlags |= CVAR_ARCHIVE;
+				Cvar_AtomicOrModifiedFlags(CVAR_ARCHIVE);
 			}
 			break;
 		case 'u':
 			if( !( v->flags & CVAR_USERINFO ) ) {
 				v->flags |= CVAR_USERINFO;
-				cvar_modifiedFlags |= CVAR_USERINFO;
+				Cvar_AtomicOrModifiedFlags(CVAR_USERINFO);
 			}
 			break;
 		case 's':
 			if( !( v->flags & CVAR_SERVERINFO ) ) {
 				v->flags |= CVAR_SERVERINFO;
-				cvar_modifiedFlags |= CVAR_SERVERINFO;
+				Cvar_AtomicOrModifiedFlags(CVAR_SERVERINFO);
 			}
 			break;
 	}
@@ -1676,7 +1685,7 @@ static cvar_t *Cvar_Unset( cvar_t *cv )
 	cvar_t *next = cv->next;
 
 	// note what types of cvars have been modified (userinfo, archive, serverinfo, systeminfo)
-	cvar_modifiedFlags |= cv->flags;
+	Cvar_AtomicOrModifiedFlags(cv->flags);
 	
 	if ( cv->name )
 		Z_Free( cv->name );

@@ -104,3 +104,30 @@ void Perf_UpdateGPUTiming(float gpuFrameTimeMs);
 void Perf_DisplayInfo_f(void);
 
 #endif // __PERFORMANCE_COUNTERS_H__
+// Stability monitoring structures
+typedef struct {
+    // Stability metrics
+    float stability_score;        // 0-100 based on frame time variance
+    float reliability_score;      // 0-100 based on crash frequency
+    int consecutive_stable_frames;
+    int total_frame_drops;
+    float average_frame_time_variance;
+
+    // Anomaly detection
+    qboolean anomaly_detected;
+    char last_anomaly_description[256];
+    int anomaly_count;
+
+    // System health
+    float memory_usage_percent;
+    float cpu_usage_percent;
+    int thread_count;
+    qboolean system_overloaded;
+
+    // Recovery suggestions
+    char recovery_suggestions[512];
+} stability_metrics_t;
+
+// Enhanced performance monitoring functions
+const stability_metrics_t* Perf_GetStabilityMetrics(void);
+void Perf_GetStabilityReport(char *buffer, int bufferSize);

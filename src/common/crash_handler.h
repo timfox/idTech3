@@ -94,3 +94,40 @@ void Crash_ReportModLoad(const char *modName, const char *error);
 
 #endif // __CRASH_HANDLER_H__
 
+
+// Enhanced reliability structures
+typedef enum {
+    RECOVERY_NONE,        // No recovery attempt
+    RECOVERY_RESTART,     // Restart the engine
+    RECOVERY_ROLLBACK,    // Rollback to saved state
+    RECOVERY_DEGRADED     // Enter degraded mode
+} recovery_strategy_t;
+
+typedef enum {
+    RECOVERY_FAILED,
+    RECOVERY_SUCCESSFUL,
+    RECOVERY_PARTIAL
+} recovery_result_t;
+
+typedef struct {
+    qboolean auto_save_enabled;
+    recovery_strategy_t recovery_strategy;
+    int last_save_time;
+    int uptime_seconds;
+    int reliability_score;  // 0-100
+} crash_reliability_metrics_t;
+
+// Enhanced reliability functions
+void Crash_EnableAutoSave(qboolean enable, const char *save_path);
+void Crash_SetSaveInterval(int interval_ms);
+void Crash_SetRecoveryStrategy(recovery_strategy_t strategy);
+recovery_result_t Crash_AttemptRecovery(void);
+void Crash_Update(void);
+void Crash_GetReliabilityMetrics(crash_reliability_metrics_t *metrics);
+qboolean Crash_ValidateSystemHealth(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // __CRASH_HANDLER_H__

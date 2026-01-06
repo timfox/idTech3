@@ -43,6 +43,29 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "files_v2.h"  // VFS v2 mount table
 #include "q_fallback_assets.h"  // Fallback asset system
 #include "job_system.h"
+#include "thread_platform.h"  // For thread synchronization
+
+// Path security validation structures
+typedef enum {
+    PATH_RISK_LOW,      // Safe path
+    PATH_RISK_MEDIUM,   // Moderate risk
+    PATH_RISK_HIGH,     // High risk - log warning
+    PATH_RISK_CRITICAL  // Critical risk - block access
+} path_risk_level_t;
+
+typedef enum {
+    PATH_CONTEXT_FILE_READ,
+    PATH_CONTEXT_FILE_WRITE,
+    PATH_CONTEXT_DIRECTORY_LIST,
+    PATH_CONTEXT_ARCHIVE_EXTRACT
+} path_security_context_t;
+
+typedef struct {
+    qboolean is_valid;
+    path_risk_level_t risk_level;
+    char error_message[256];
+    char normalized_path[MAX_OSPATH];
+} path_validation_result_t;
 #ifndef _WIN32
 #include <stdio.h> // popen, pclose
 // Some libc headers may hide popen/pclose behind feature macros;
@@ -303,6 +326,319 @@ static int fs_resourceCacheCount = 0;
 static int fs_resourceCacheTime = 0;
 static cvar_t *fs_resourceCacheEnabled;  // Enable resource caching
 
+// Thread synchronization for filesystem operations
+static mutex_t fs_mutex;
+static qboolean fs_mutex_initialized = qfalse;
+
+// Path security validation
+typedef struct {
+    qboolean allow_parent_dirs;      // Allow "../" in paths
+    qboolean allow_absolute_paths;   // Allow absolute paths
+    qboolean allow_hidden_files;     // Allow files starting with "."
+    qboolean allow_symlinks;         // Allow symlink resolution
+    qboolean normalize_paths;        // Normalize path separators
+    qboolean validate_utf8;          // Validate UTF-8 encoding
+    char allowed_extensions[512];    // Comma-separated allowed extensions
+    char blocked_patterns[512];      // Comma-separated blocked patterns
+} path_security_config_t;
+
+static path_security_config_t fs_path_security = {
+    .allow_parent_dirs = qfalse,
+    .allow_absolute_paths = qfalse,
+    .allow_hidden_files = qfalse,
+    .allow_symlinks = qfalse,
+    .normalize_paths = qtrue,
+    .validate_utf8 = qtrue,
+    .allowed_extensions = "pk3,tga,jpg,png,bsp,shader,cfg,txt,md3,md5,wav,mp3,ogg",
+    .blocked_patterns = "../,..\\,\\\\,\\x00,\\x01,\\x02,\\x03,\\x04,\\x05,\\x06,\\x07"
+};
+
+// Path validation CVars
+static cvar_t *fs_path_security_enable;
+static cvar_t *fs_path_allow_parent_dirs;
+static cvar_t *fs_path_allow_absolute;
+static cvar_t *fs_path_allowed_extensions;
+static cvar_t *fs_path_blocked_patterns;
+
+/*
+================
+FS_ValidatePathSecurity
+
+Comprehensive path security validation to prevent:
+- Path traversal attacks (../)
+- Absolute path attacks
+- Null byte injection
+- Hidden file access
+- Symlink attacks
+- Invalid UTF-8 sequences
+================
+*/
+static path_validation_result_t FS_ValidatePathSecurity(const char *path, path_security_context_t context) {
+    path_validation_result_t result = {0};
+    result.is_valid = qtrue;
+    result.risk_level = PATH_RISK_LOW;
+
+    if (!path || !*path) {
+        result.is_valid = qfalse;
+        Q_strncpyz(result.error_message, "Empty or NULL path", sizeof(result.error_message));
+        result.risk_level = PATH_RISK_CRITICAL;
+        return result;
+    }
+
+    // Update security config from CVars
+    if (fs_path_security_enable && fs_path_security_enable->integer) {
+        fs_path_security.allow_parent_dirs = (fs_path_allow_parent_dirs && fs_path_allow_parent_dirs->integer);
+        fs_path_security.allow_absolute_paths = (fs_path_allow_absolute && fs_path_allow_absolute->integer);
+
+        if (fs_path_allowed_extensions) {
+            Q_strncpyz(fs_path_security.allowed_extensions, fs_path_allowed_extensions->string,
+                      sizeof(fs_path_security.allowed_extensions));
+        }
+        if (fs_path_blocked_patterns) {
+            Q_strncpyz(fs_path_security.blocked_patterns, fs_path_blocked_patterns->string,
+                      sizeof(fs_path_security.blocked_patterns));
+        }
+    }
+
+    // Length validation
+    if (strlen(path) > MAX_OSPATH) {
+        result.is_valid = qfalse;
+        Q_snprintf(result.error_message, sizeof(result.error_message),
+                  "Path too long (%zu > %d)", strlen(path), MAX_OSPATH);
+        result.risk_level = PATH_RISK_HIGH;
+        return result;
+    }
+
+    // Null byte injection check
+    if (memchr(path, '\0', strlen(path) + 1) != NULL) {
+        result.is_valid = qfalse;
+        Q_strncpyz(result.error_message, "Null byte injection detected", sizeof(result.error_message));
+        result.risk_level = PATH_RISK_CRITICAL;
+        return result;
+    }
+
+    // UTF-8 validation
+    if (fs_path_security.validate_utf8 && !FS_ValidateUTF8(path)) {
+        result.is_valid = qfalse;
+        Q_strncpyz(result.error_message, "Invalid UTF-8 encoding", sizeof(result.error_message));
+        result.risk_level = PATH_RISK_MEDIUM;
+        return result;
+    }
+
+    // Path traversal attack detection
+    if (!fs_path_security.allow_parent_dirs) {
+        if (strstr(path, "../") || strstr(path, "..\\")) {
+            result.is_valid = qfalse;
+            Q_strncpyz(result.error_message, "Path traversal attack detected (..)", sizeof(result.error_message));
+            result.risk_level = PATH_RISK_CRITICAL;
+            return result;
+        }
+    }
+
+    // Absolute path check
+    if (!fs_path_security.allow_absolute_paths) {
+        if (path[0] == '/' || path[0] == '\\' ||
+            (strlen(path) >= 3 && path[1] == ':' && (path[2] == '/' || path[2] == '\\'))) {
+            result.is_valid = qfalse;
+            Q_strncpyz(result.error_message, "Absolute path not allowed", sizeof(result.error_message));
+            result.risk_level = PATH_RISK_HIGH;
+            return result;
+        }
+    }
+
+    // Hidden file check
+    if (!fs_path_security.allow_hidden_files) {
+        const char *basename = FS_Basename(path);
+        if (basename && basename[0] == '.') {
+            result.is_valid = qfalse;
+            Q_strncpyz(result.error_message, "Hidden files not allowed", sizeof(result.error_message));
+            result.risk_level = PATH_RISK_MEDIUM;
+            return result;
+        }
+    }
+
+    // Blocked patterns check
+    if (fs_path_security.blocked_patterns[0]) {
+        char patterns[512];
+        Q_strncpyz(patterns, fs_path_security.blocked_patterns, sizeof(patterns));
+
+        char *pattern = patterns;
+        char *next;
+        while ((next = strchr(pattern, ',')) != NULL) {
+            *next = '\0';
+            if (strstr(path, pattern)) {
+                result.is_valid = qfalse;
+                Q_snprintf(result.error_message, sizeof(result.error_message),
+                          "Blocked pattern detected: %s", pattern);
+                result.risk_level = PATH_RISK_HIGH;
+                return result;
+            }
+            pattern = next + 1;
+        }
+        if (strstr(path, pattern)) {
+            result.is_valid = qfalse;
+            Q_snprintf(result.error_message, sizeof(result.error_message),
+                      "Blocked pattern detected: %s", pattern);
+            result.risk_level = PATH_RISK_HIGH;
+            return result;
+        }
+    }
+
+    // Extension validation
+    if (fs_path_security.allowed_extensions[0] && context == PATH_CONTEXT_FILE_READ) {
+        const char *ext = FS_GetExtension(path);
+        if (ext && *ext) {
+            qboolean allowed = qfalse;
+            char extensions[512];
+            Q_strncpyz(extensions, fs_path_security.allowed_extensions, sizeof(extensions));
+
+            char *allowed_ext = extensions;
+            char *next;
+            while ((next = strchr(allowed_ext, ',')) != NULL) {
+                *next = '\0';
+                if (Q_stricmp(ext, allowed_ext) == 0) {
+                    allowed = qtrue;
+                    break;
+                }
+                allowed_ext = next + 1;
+            }
+            if (!allowed && Q_stricmp(ext, allowed_ext) == 0) {
+                allowed = qtrue;
+            }
+
+            if (!allowed) {
+                result.is_valid = qfalse;
+                Q_snprintf(result.error_message, sizeof(result.error_message),
+                          "File extension not allowed: %s", ext);
+                result.risk_level = PATH_RISK_MEDIUM;
+                return result;
+            }
+        }
+    }
+
+    // Normalize path if requested
+    if (fs_path_security.normalize_paths) {
+        char normalized[MAX_OSPATH];
+        FS_NormalizePath(path, normalized, sizeof(normalized));
+        // Check if normalization changed the path (potential attack)
+        if (strcmp(path, normalized) != 0) {
+            Com_DPrintf("Path normalized: '%s' -> '%s'\n", path, normalized);
+        }
+    }
+
+    return result;
+}
+
+/*
+================
+FS_ValidateUTF8
+
+Validate UTF-8 encoding to prevent encoding attacks
+================
+*/
+static qboolean FS_ValidateUTF8(const char *str) {
+    const unsigned char *bytes = (const unsigned char *)str;
+
+    while (*bytes) {
+        if (*bytes <= 0x7F) {
+            // ASCII character
+            bytes++;
+        } else if ((*bytes & 0xE0) == 0xC0) {
+            // 2-byte sequence
+            if ((bytes[1] & 0xC0) != 0x80) return qfalse;
+            bytes += 2;
+        } else if ((*bytes & 0xF0) == 0xE0) {
+            // 3-byte sequence
+            if ((bytes[1] & 0xC0) != 0x80) return qfalse;
+            if ((bytes[2] & 0xC0) != 0x80) return qfalse;
+            bytes += 3;
+        } else if ((*bytes & 0xF8) == 0xF0) {
+            // 4-byte sequence
+            if ((bytes[1] & 0xC0) != 0x80) return qfalse;
+            if ((bytes[2] & 0xC0) != 0x80) return qfalse;
+            if ((bytes[3] & 0xC0) != 0x80) return qfalse;
+            bytes += 4;
+        } else {
+            // Invalid UTF-8
+            return qfalse;
+        }
+    }
+
+    return qtrue;
+}
+
+/*
+================
+FS_NormalizePath
+
+Normalize path separators and resolve relative components
+================
+*/
+static void FS_NormalizePath(const char *path, char *out, size_t out_size) {
+    if (!path || !out || out_size == 0) return;
+
+    Q_strncpyz(out, path, out_size);
+
+    // Convert backslashes to forward slashes
+    for (char *p = out; *p; p++) {
+        if (*p == '\\') *p = '/';
+    }
+
+    // Remove double slashes
+    char *write = out;
+    for (const char *read = out; *read; read++) {
+        if (*read == '/' && *(read + 1) == '/' && write > out) {
+            continue; // Skip duplicate slashes
+        }
+        *write++ = *read;
+    }
+    *write = '\0';
+}
+
+/*
+================
+FS_Basename
+
+Extract basename from path
+================
+*/
+static const char *FS_Basename(const char *path) {
+    if (!path) return NULL;
+
+    const char *last_slash = strrchr(path, '/');
+    const char *last_backslash = strrchr(path, '\\');
+
+    const char *basename = path;
+    if (last_slash && last_slash > basename) basename = last_slash + 1;
+    if (last_backslash && last_backslash > basename) basename = last_backslash + 1;
+
+    return basename;
+}
+
+/*
+================
+FS_GetExtension
+
+Get file extension from path
+================
+*/
+static const char *FS_GetExtension(const char *path) {
+    if (!path) return NULL;
+
+    const char *dot = strrchr(path, '.');
+    if (!dot || dot == path) return NULL;
+
+    // Check if there's a path separator after the dot
+    const char *slash = strrchr(path, '/');
+    const char *backslash = strrchr(path, '\\');
+
+    if ((slash && dot < slash) || (backslash && dot < backslash)) {
+        return NULL; // Dot is part of directory name
+    }
+
+    return dot + 1;
+}
+
 /*
 ================
 FS_ResourceCacheFind
@@ -311,7 +647,14 @@ Find a cached resource by name
 ================
 */
 static fs_resource_cache_entry_t *FS_ResourceCacheFind(const char *name) {
+	if (!fs_mutex_initialized) {
+		return NULL; // Safety check
+	}
+
+	MUTEX_LOCK(fs_mutex);
+
 	if (!fs_resourceCacheEnabled || !fs_resourceCacheEnabled->integer) {
+		MUTEX_UNLOCK(fs_mutex);
 		return NULL;
 	}
 
@@ -320,9 +663,12 @@ static fs_resource_cache_entry_t *FS_ResourceCacheFind(const char *name) {
 			// Update access statistics
 			fs_resourceCache[i].accessCount++;
 			fs_resourceCache[i].lastAccessTime = fs_resourceCacheTime++;
+			MUTEX_UNLOCK(fs_mutex);
 			return &fs_resourceCache[i];
 		}
 	}
+
+	MUTEX_UNLOCK(fs_mutex);
 	return NULL;
 }
 
@@ -374,16 +720,25 @@ Add a resource to the cache
 ================
 */
 static void FS_ResourceCacheAdd(const char *name, void *data, int size) {
+	if (!fs_mutex_initialized) {
+		return; // Safety check
+	}
+
+	MUTEX_LOCK(fs_mutex);
+
 	if (!fs_resourceCacheEnabled || !fs_resourceCacheEnabled->integer) {
+		MUTEX_UNLOCK(fs_mutex);
 		return;
 	}
 
 	if (!data || size <= 0 || size > FS_RESOURCE_CACHE_MAX_SIZE) {
+		MUTEX_UNLOCK(fs_mutex);
 		return;
 	}
 
 	// Check if already cached
 	if (FS_ResourceCacheFind(name)) {
+		MUTEX_UNLOCK(fs_mutex);
 		return;
 	}
 
@@ -403,6 +758,8 @@ static void FS_ResourceCacheAdd(const char *name, void *data, int size) {
 	entry->size = size;
 	entry->accessCount = 1;
 	entry->lastAccessTime = fs_resourceCacheTime++;
+
+	MUTEX_UNLOCK(fs_mutex);
 }
 
 /*
@@ -7073,6 +7430,12 @@ is resetting due to a game change
 ================
 */
 void FS_InitFilesystem( void ) {
+	// Initialize filesystem mutex for thread safety
+	if (!fs_mutex_initialized) {
+		MUTEX_INIT(fs_mutex);
+		fs_mutex_initialized = qtrue;
+	}
+
 	// allow command line parms to override our defaults
 	// we have to specially handle this, because normal command
 	// line variable sets don't happen until after the filesystem

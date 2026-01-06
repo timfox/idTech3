@@ -9,16 +9,16 @@ q_memory_safety.h - Enhanced Memory Safety and Bounds Checking
 
 #include "q_shared.h"
 
-// Memory safety statistics
+// Memory safety statistics (thread-safe)
 typedef struct {
-    int total_allocations;
-    int total_frees;
-    int current_memory;
-    int peak_memory;
-    int leak_count;
-    int leak_size;
-    int corruption_detected;
-    int bounds_violations;
+    atomic_int_t total_allocations;
+    atomic_int_t total_frees;
+    atomic_int_t current_memory;
+    atomic_int_t peak_memory;
+    atomic_int_t leak_count;
+    atomic_int_t leak_size;
+    atomic_int_t corruption_detected;
+    atomic_int_t bounds_violations;
 } memory_safety_stats_t;
 
 // Memory safety state

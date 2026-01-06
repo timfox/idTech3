@@ -33,7 +33,10 @@ Provides unified threading API across Windows, Linux, macOS.
     typedef struct {
         atomic_int_t lock;
     } spinlock_t;
-    
+
+    // Semaphore
+    typedef HANDLE semaphore_t;
+
 	#define THREAD_CALL WINAPI
 	#define THREAD_RETURN DWORD
 	
@@ -91,8 +94,15 @@ Provides unified threading API across Windows, Linux, macOS.
 	typedef pthread_t thread_handle_t;
 	typedef pthread_mutex_t mutex_t;
 	typedef pthread_cond_t condition_t;
-	// Some libpthread builds hide pthread_rwlock_t behind feature macros; fall back to mutex when unavailable.
-	typedef pthread_mutex_t rwlock_t;
+
+	// Proper RW lock implementation for POSIX
+	// Check if pthread_rwlock is available, otherwise fall back to mutex
+	#if defined(_POSIX_RWLOCKS) && (_POSIX_RWLOCKS > 0)
+		typedef pthread_rwlock_t rwlock_t;
+	#else
+		// Fallback to mutex when RW locks are not available
+		typedef pthread_mutex_t rwlock_t;
+	#endif
 	typedef atomic_int atomic_int_t;
 	typedef atomic_uint atomic_uint_t;
     typedef atomic_long atomic_int64_t;
@@ -104,7 +114,16 @@ Provides unified threading API across Windows, Linux, macOS.
     typedef struct {
         atomic_int_t lock;
     } spinlock_t;
-    
+
+    // Semaphore
+    #ifdef __APPLE__
+        #include <dispatch/dispatch.h>
+        typedef dispatch_semaphore_t semaphore_t;
+    #else
+        #include <semaphore.h>
+        typedef sem_t semaphore_t;
+    #endif
+
 	#define THREAD_CALL
 	#define THREAD_RETURN void*
 	
@@ -131,7 +150,23 @@ Provides unified threading API across Windows, Linux, macOS.
 	} while(0)
 	#define CONDITION_SIGNAL(cond) pthread_cond_signal(&(cond))
 	#define CONDITION_BROADCAST(cond) pthread_cond_broadcast(&(cond))
-	
+
+	// RW Lock macros
+	#if defined(_POSIX_RWLOCKS) && (_POSIX_RWLOCKS > 0)
+		#define RWLOCK_INIT(lock) pthread_rwlock_init(&(lock), NULL)
+		#define RWLOCK_DESTROY(lock) pthread_rwlock_destroy(&(lock))
+		#define RWLOCK_RDLOCK(lock) pthread_rwlock_rdlock(&(lock))
+		#define RWLOCK_WRLOCK(lock) pthread_rwlock_wrlock(&(lock))
+		#define RWLOCK_UNLOCK(lock) pthread_rwlock_unlock(&(lock))
+	#else
+		// Fallback to mutex when RW locks are not available
+		#define RWLOCK_INIT(lock) pthread_mutex_init(&(lock), NULL)
+		#define RWLOCK_DESTROY(lock) pthread_mutex_destroy(&(lock))
+		#define RWLOCK_RDLOCK(lock) pthread_mutex_lock(&(lock))
+		#define RWLOCK_WRLOCK(lock) pthread_mutex_lock(&(lock))
+		#define RWLOCK_UNLOCK(lock) pthread_mutex_unlock(&(lock))
+	#endif
+
 	#define ATOMIC_INCREMENT(ptr) atomic_fetch_add((ptr), 1)
 	#define ATOMIC_DECREMENT(ptr) atomic_fetch_sub((ptr), 1)
 	#define ATOMIC_ADD(ptr, val) atomic_fetch_add((ptr), (val))
@@ -248,5 +283,35 @@ void SpinLock_Lock(spinlock_t *lock);
 qboolean SpinLock_TryLock(spinlock_t *lock);
 void SpinLock_Unlock(spinlock_t *lock);
 
+/*
+=================
+Semaphores
+=================
+*/
+qboolean Semaphore_Init(semaphore_t *semaphore, int initial_count);
+void Semaphore_Destroy(semaphore_t *semaphore);
+qboolean Semaphore_Wait(semaphore_t *semaphore);
+qboolean Semaphore_TryWait(semaphore_t *semaphore);
+qboolean Semaphore_TimedWait(semaphore_t *semaphore, int timeout_ms);
+void Semaphore_Post(semaphore_t *semaphore);
+int Semaphore_GetValue(semaphore_t *semaphore);
+
 #endif // __THREAD_PLATFORM_H__
 
+
+/*
+=================
+Barriers
+=================
+*/
+#ifdef _WIN32
+typedef SYNCHRONIZATION_BARRIER barrier_t;
+#else
+typedef pthread_barrier_t barrier_t;
+#endif
+
+qboolean Barrier_Init(barrier_t *barrier, int thread_count);
+void Barrier_Destroy(barrier_t *barrier);
+qboolean Barrier_Wait(barrier_t *barrier);
+
+#endif // __THREAD_PLATFORM_H__

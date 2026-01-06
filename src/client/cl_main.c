@@ -1938,7 +1938,7 @@ static void CL_Vid_Restart( refShutdownCode_t shutdownCode ) {
 	if ( com_fullyInitialized ) {
 		// Mark archive cvars as modified so they get saved
 		extern int cvar_modifiedFlags;
-		cvar_modifiedFlags |= CVAR_ARCHIVE;
+		Cvar_AtomicOrModifiedFlags(CVAR_ARCHIVE);
 	}
 }
 
@@ -2508,11 +2508,11 @@ static void CL_CheckForResend( void ) {
 		NET_OutOfBandCompress( NS_CLIENT, &clc.serverAddress, (byte *) &data[0], len );
 		// the most current userinfo has been sent, so watch for any
 		// newer changes to userinfo variables
-		cvar_modifiedFlags &= ~CVAR_USERINFO;
+		do { int old_val = atomic_load_explicit(&cvar_modifiedFlags, memory_order_relaxed); } while (!atomic_compare_exchange_weak_explicit(&cvar_modifiedFlags, &old_val, old_val & (~CVAR_USERINFO), memory_order_relaxed, memory_order_relaxed));
 
 		// ... but force re-send if userinfo was truncated in any way
 		if ( infoTruncated || !notOverflowed ) {
-			cvar_modifiedFlags |= CVAR_USERINFO;
+			Cvar_AtomicOrModifiedFlags(CVAR_USERINFO);
 		}
 		break;
 
@@ -3122,12 +3122,12 @@ static void CL_CheckUserinfo( void ) {
 		return;
 
 	// send a reliable userinfo update if needed
-	if ( cvar_modifiedFlags & CVAR_USERINFO )
+	if ( atomic_load_explicit(&cvar_modifiedFlags, memory_order_relaxed) & CVAR_USERINFO ) 
 	{
 		qboolean infoTruncated = qfalse;
 		const char *info;
 
-		cvar_modifiedFlags &= ~CVAR_USERINFO;
+		do { int old_val = atomic_load_explicit(&cvar_modifiedFlags, memory_order_relaxed); } while (!atomic_compare_exchange_weak_explicit(&cvar_modifiedFlags, &old_val, old_val & (~CVAR_USERINFO), memory_order_relaxed, memory_order_relaxed));
 
 		info = Cvar_InfoString( CVAR_USERINFO, &infoTruncated );
 		if ( strlen( info ) > MAX_USERINFO_LENGTH || infoTruncated ) {
