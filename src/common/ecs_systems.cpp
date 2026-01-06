@@ -99,6 +99,8 @@ struct CollisionContactResultCallback : public btCollisionWorld::ContactResultCa
 									int partId0, int index0,
 									const btCollisionObjectWrapper *colObj1Wrap,
 									int partId1, int index1) override {
+		// Suppress unused parameter warnings - these are required by Bullet interface
+		(void)partId0; (void)index0; (void)partId1; (void)index1;
 
 		// Find ECS entities from Bullet collision objects
 		ecs_entity_t entityA = FindEntityFromBulletBody(colObj0Wrap->getCollisionObject());

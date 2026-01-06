@@ -135,7 +135,12 @@ static void CM_Bullet_BrushToTriangles(const cbrush_t *brush,
 		// Approximate brush bounds from planes
 		// This is a simplified approach - real implementation would
 		// need proper brush geometry extraction
+		(void)plane; // Suppress unused variable warning - placeholder for future implementation
 	}
+
+	// Suppress unused variable warnings - placeholder for future bounds calculation
+	(void)mins;
+	(void)maxs;
 
 	// Create a simple box mesh as placeholder
 	float halfWidth = 32.0f;  // Default brush size

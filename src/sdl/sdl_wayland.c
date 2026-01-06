@@ -490,20 +490,37 @@ void GLimp_Wayland_SetVRREnabled(qboolean enabled) {
 #include "../renderers/renderercommon/tr_public.h"
 #include "sdl_glw.h"
 
+// Function prototypes for stub implementations
+static qboolean GLimp_Wayland_Init(void);
+static void GLimp_Wayland_Shutdown(void);
+static qboolean GLimp_Wayland_CreateWindow(int width, int height);
+static void GLimp_Wayland_DestroyWindow(void);
+static void GLimp_Wayland_SetWindowSize(int width, int height);
+static void GLimp_Wayland_SetWindowTitle(const char *title);
+static void GLimp_Wayland_PumpEvents(void);
+static qboolean GLimp_Wayland_IsVariableRefreshRateSupported(void);
+static void GLimp_Wayland_SetVariableRefreshRate(qboolean enabled);
+static qboolean GLimp_Wayland_IsMaximized(void);
+static qboolean GLimp_Wayland_IsFullscreen(void);
+static qboolean GLimp_Wayland_IsMinimized(void);
+static qboolean GLimp_Wayland_VRRSupported(void);
+static qboolean GLimp_Wayland_VRREnabled(void);
+static void GLimp_Wayland_SetVRREnabled(qboolean enabled);
+
 qboolean GLimp_Wayland_Init(void) { return qfalse; }
 void GLimp_Wayland_Shutdown(void) {}
-qboolean GLimp_Wayland_CreateWindow(int width, int height) { return qfalse; }
+qboolean GLimp_Wayland_CreateWindow(int width, int height) { (void)width; (void)height; return qfalse; }
 void GLimp_Wayland_DestroyWindow(void) {}
-void GLimp_Wayland_SetWindowSize(int width, int height) {}
-void GLimp_Wayland_SetWindowTitle(const char *title) {}
+void GLimp_Wayland_SetWindowSize(int width, int height) { (void)width; (void)height; }
+void GLimp_Wayland_SetWindowTitle(const char *title) { (void)title; }
 void GLimp_Wayland_PumpEvents(void) {}
 qboolean GLimp_Wayland_IsVariableRefreshRateSupported(void) { return qfalse; }
-void GLimp_Wayland_SetVariableRefreshRate(qboolean enabled) {}
+void GLimp_Wayland_SetVariableRefreshRate(qboolean enabled) { (void)enabled; }
 qboolean GLimp_Wayland_IsMaximized(void) { return qfalse; }
 qboolean GLimp_Wayland_IsFullscreen(void) { return qfalse; }
 qboolean GLimp_Wayland_IsMinimized(void) { return qfalse; }
 qboolean GLimp_Wayland_VRRSupported(void) { return qfalse; }
 qboolean GLimp_Wayland_VRREnabled(void) { return qfalse; }
-void GLimp_Wayland_SetVRREnabled(qboolean enabled) {}
+void GLimp_Wayland_SetVRREnabled(qboolean enabled) { (void)enabled; }
 
 #endif // SDL_VIDEO_DRIVER_WAYLAND && WAYLAND_HEADERS_AVAILABLE

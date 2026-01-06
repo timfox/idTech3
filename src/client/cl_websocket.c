@@ -401,7 +401,7 @@ qboolean CL_WebSocket_ReceiveText(char *buffer, size_t max_len) {
     }
 
     int received = CL_WebSocket_Receive(buffer, max_len);
-    if (received > 0 && received < max_len) {
+    if (received > 0 && (size_t)received < max_len) {
         buffer[received] = '\0'; // Null terminate
         return qtrue;
     }
@@ -571,6 +571,9 @@ Send data via HTTP POST (fallback when WebSocket fails)
 =================
 */
 qboolean CL_HTTP_Fallback_Send(const char *url, const void *data, size_t len) {
+    // Suppress unused parameter warning - placeholder for future HTTP implementation
+    (void)data;
+
     // This would use the existing HTTP client in cl_curl.c
     // For now, just log that we'd send via HTTP
     Com_Printf("HTTP Fallback: Would send %zu bytes to %s\n", len, url);
@@ -585,6 +588,9 @@ Receive data via HTTP GET (fallback when WebSocket fails)
 =================
 */
 qboolean CL_HTTP_Fallback_Receive(const char *url, void *buffer, size_t max_len, size_t *received_len) {
+    // Suppress unused parameter warnings - placeholder for future HTTP implementation
+    (void)buffer; (void)max_len;
+
     // This would use the existing HTTP client in cl_curl.c
     // For now, just log that we'd receive via HTTP
     Com_Printf("HTTP Fallback: Would receive from %s\n", url);

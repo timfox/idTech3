@@ -6784,11 +6784,12 @@ static void FS_Startup( void ) {
 
 		Com_sprintf( modDiskDir, sizeof( modDiskDir ), "mods/%s", fs_gamedirvar->string );
 		if ( fs_basepath && fs_basepath->string[0] != '\0' ) {
-			const char *modOSPath = FS_BuildOSPath( fs_basepath->string, modDiskDir, NULL );
-			// Temporarily disable directory check
-			// if ( FS_DirectoryExists( modOSPath ) ) {
-				effectiveDir = modDiskDir;
-			// }
+		const char *modOSPath = FS_BuildOSPath( fs_basepath->string, modDiskDir, NULL );
+		(void)modOSPath; // Suppress unused variable warning - directory check temporarily disabled
+		// Temporarily disable directory check
+		// if ( FS_DirectoryExists( modOSPath ) ) {
+			effectiveDir = modDiskDir;
+		// }
 		}
 
 		if ( fs_debug && fs_debug->integer ) {
