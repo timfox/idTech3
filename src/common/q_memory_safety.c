@@ -522,6 +522,7 @@ Runtime bounds checking for array access
 ================
 */
 qboolean Q_BoundsCheckArray(const void *array, size_t element_size, size_t array_len, size_t index, const char *context) {
+    (void)element_size; // Reserved for future use
     MemorySafety_UpdateState();
 
     if (!memory_state.bounds_checking_active) {

@@ -6628,7 +6628,6 @@ static void FS_Startup( void ) {
 
 	fs_decompression_threads = Cvar_Get( "fs_decompression_threads", "2", CVAR_ARCHIVE );
 	Cvar_SetDescription( fs_decompression_threads, "Number of threads for asset decompression" );
-	Cvar_SetDescription( fs_debug, "Debugging tool for the filesystem. Run the game in debug mode. Prints additional information regarding read files into the console." );
 	fs_copyfiles = Cvar_Get( "fs_copyfiles", "0", CVAR_INIT );
 	Cvar_SetDescription( fs_copyfiles, "Whether or not to copy files when loading them into the game. Every file found in the cdpath will be copied over." );
 	#ifdef COMBINED_MONOLITH

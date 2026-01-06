@@ -912,18 +912,18 @@ void SndOpenAL_SetSoundDirectivity(sndOpenALHandle_t handle, float directivity, 
 // Stub implementations when OpenAL is not available
 qboolean SndOpenAL_Init(void) { return qfalse; }
 void SndOpenAL_Shutdown(void) {}
-sndOpenALHandle_t SndOpenAL_PlaySound(const char *soundName, const sndOpenAL3DProps_t *props) { return SND_OPENAL_INVALID_HANDLE; }
-void SndOpenAL_StopSound(sndOpenALHandle_t handle) {}
+sndOpenALHandle_t SndOpenAL_PlaySound(const char *soundName, const sndOpenAL3DProps_t *props) { (void)soundName; (void)props; return SND_OPENAL_INVALID_HANDLE; }
+void SndOpenAL_StopSound(sndOpenALHandle_t handle) { (void)handle; }
 void SndOpenAL_StopAllSounds(void) {}
-void SndOpenAL_SetListenerPosition(const vec3_t position, const vec3_t forward, const vec3_t up, const vec3_t velocity) {}
-void SndOpenAL_SetSoundPosition(sndOpenALHandle_t handle, const vec3_t position) {}
-void SndOpenAL_SetSoundVelocity(sndOpenALHandle_t handle, const vec3_t velocity) {}
-void SndOpenAL_SetSoundVolume(sndOpenALHandle_t handle, float volume) {}
-void SndOpenAL_SetSoundPitch(sndOpenALHandle_t handle, float pitch) {}
-qboolean SndOpenAL_IsSoundPlaying(sndOpenALHandle_t handle) { return qfalse; }
-void SndOpenAL_SetOcclusion(sndOpenALHandle_t handle, float occlusionFactor) {}
-void SndOpenAL_SetReverb(sndOpenALHandle_t handle, float reverbLevel, float reverbDelay) {}
-sndOpenALHandle_t SndOpenAL_StartStream(const char *streamName, qboolean looping) { return SND_OPENAL_INVALID_HANDLE; }
+void SndOpenAL_SetListenerPosition(const vec3_t position, const vec3_t forward, const vec3_t up, const vec3_t velocity) { (void)position; (void)forward; (void)up; (void)velocity; }
+void SndOpenAL_SetSoundPosition(sndOpenALHandle_t handle, const vec3_t position) { (void)handle; (void)position; }
+void SndOpenAL_SetSoundVelocity(sndOpenALHandle_t handle, const vec3_t velocity) { (void)handle; (void)velocity; }
+void SndOpenAL_SetSoundVolume(sndOpenALHandle_t handle, float volume) { (void)handle; (void)volume; }
+void SndOpenAL_SetSoundPitch(sndOpenALHandle_t handle, float pitch) { (void)handle; (void)pitch; }
+qboolean SndOpenAL_IsSoundPlaying(sndOpenALHandle_t handle) { (void)handle; return qfalse; }
+void SndOpenAL_SetOcclusion(sndOpenALHandle_t handle, float occlusionFactor) { (void)handle; (void)occlusionFactor; }
+void SndOpenAL_SetReverb(sndOpenALHandle_t handle, float reverbLevel, float reverbDelay) { (void)handle; (void)reverbLevel; (void)reverbDelay; }
+sndOpenALHandle_t SndOpenAL_StartStream(const char *streamName, qboolean looping) { (void)streamName; (void)looping; return SND_OPENAL_INVALID_HANDLE; }
 void SndOpenAL_StopStream(sndOpenALHandle_t handle) { (void)handle; }
 void SndOpenAL_SetEnvironmentReverb(float roomSize, float dampening, float wetness, float dryMix) { (void)roomSize; (void)dampening; (void)wetness; (void)dryMix; }
 void SndOpenAL_UpdateEnvironmentalAudio(void) {}

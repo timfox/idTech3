@@ -133,11 +133,11 @@ void Netchan_Init( int port ) {
 	Cvar_SetDescription( qport, "Set internal network port. This allows more than one person to play from behind a NAT router by using only one IP address." );
 
 	// Network validation CVars
-	Cvar_Get ("net_validate_packets", "1", CVAR_ARCHIVE);
+	net_validate_packets = Cvar_Get ("net_validate_packets", "1", CVAR_ARCHIVE);
 	Cvar_SetDescription( net_validate_packets, "Enable network protocol validation and bounds checking." );
-	Cvar_Get ("net_strict_validation", "0", CVAR_ARCHIVE);
+	net_strict_validation = Cvar_Get ("net_strict_validation", "0", CVAR_ARCHIVE);
 	Cvar_SetDescription( net_strict_validation, "Enable strict network validation (rejects more packets)." );
-	Cvar_Get ("net_max_packet_rate", "100", CVAR_ARCHIVE);
+	net_max_packet_rate = Cvar_Get ("net_max_packet_rate", "100", CVAR_ARCHIVE);
 	Cvar_SetDescription( net_max_packet_rate, "Maximum packets per second allowed from a single source." );
 
 	// Initialize network protocol validation
