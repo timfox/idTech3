@@ -457,7 +457,7 @@ Validate entity state data
 ===============
 */
 net_protocol_result_t Net_ValidateEntityState(const byte *data, int length) {
-    if (!data || length < sizeof(entityState_t)) {
+    if (!data || length < (int)sizeof(entityState_t)) {
         return NET_PROTOCOL_INVALID_LENGTH;
     }
 
@@ -486,7 +486,7 @@ Validate player state data
 ===============
 */
 net_protocol_result_t Net_ValidatePlayerState(const byte *data, int length) {
-    if (!data || length < sizeof(playerState_t)) {
+    if (!data || length < (int)sizeof(playerState_t)) {
         return NET_PROTOCOL_INVALID_LENGTH;
     }
 

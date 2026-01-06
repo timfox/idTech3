@@ -52,7 +52,6 @@ typedef struct {
 } openalSound_t;
 
 static openalSound_t openalSounds[MAX_OPENAL_SOURCES];
-static int numOpenALSounds = 0;
 
 static qboolean SndOpenAL_CreateBufferFromSfx( sfxHandle_t sfxHandle, ALuint *outBuffer );
 static qboolean SndOpenAL_AttachBufferToSource( ALuint source, ALuint buffer );

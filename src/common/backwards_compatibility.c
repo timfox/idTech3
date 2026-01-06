@@ -406,7 +406,7 @@ compatibility_result_t BC_DetectContentCompatibility(const char *content_path) {
     }
 
     // Check filename patterns
-    const char *filename = COM_SkipPath(content_path);
+    const char *filename = COM_SkipPath((char *)content_path);
     for (int i = 0; legacy_signatures[i].signature; i++) {
         if (strstr(filename, legacy_signatures[i].signature)) {
             result.detected_mode = legacy_signatures[i].mode;
@@ -671,7 +671,7 @@ qboolean BC_AnalyzePK3Compatibility(const char *pk3_path, compatibility_result_t
 
     // Read PK3 header to check format
     byte header[30];
-    if (len >= sizeof(header)) {
+    if (len >= (int)sizeof(header)) {
         FS_Read(header, sizeof(header), f);
 
         // Check for ZIP/PK3 signature (PK\x03\x04)

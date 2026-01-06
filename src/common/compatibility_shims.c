@@ -52,9 +52,9 @@ cvar_t *shim_enable_network_shims;
 cvar_t *shim_strict_compatibility;
 
 // Static shim contexts for different modes
-static shim_context_t q3_vanilla_shims;
-static shim_context_t openarena_shims;
-static shim_context_t mod_generic_shims;
+static shim_context_t q3_vanilla_shims __attribute__((unused));
+static shim_context_t openarena_shims __attribute__((unused));
+static shim_context_t mod_generic_shims __attribute__((unused));
 
 // Current active shim context
 static shim_context_t *active_shims = NULL;
@@ -532,7 +532,7 @@ qboolean Shim_LoadShader_OpenArena(const char *shader_name, char *output_path, i
     return qtrue;
 }
 
-qboolean Shim_NetworkMessage_OpenArena(byte *data, int *length, int max_length) {
+qboolean Shim_NetworkMessage_OpenArena(byte *data __attribute__((unused)), int *length __attribute__((unused)), int max_length __attribute__((unused))) {
     // OpenArena network message transformations
     // Handle OA-specific protocol differences
     return qtrue;

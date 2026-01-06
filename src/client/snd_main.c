@@ -36,13 +36,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 // OpenAL externals for sound info (defined in snd_openal.c when available)
 extern int numOpenALSounds;
-#ifdef USE_OPENAL
-extern ALCdevice *openalDevice;
-extern ALCcontext *openalContext;
-#else
 extern void *openalDevice;
 extern void *openalContext;
-#endif
 extern qboolean openalEfxAvailable;
 #define MAX_OPENAL_SOURCES 256
 
@@ -576,7 +571,7 @@ static void S_OpenAL_AddLoopingSound(int entityNum, const vec3_t origin, const v
 	SndOpenAL_PlaySound(sfxData->soundName, &props);
 }
 
-static void S_OpenAL_StopLoopingSound(int entityNum) {
+static void S_OpenAL_StopLoopingSound(int entityNum __attribute__((unused))) {
 	// Need to implement entity-based sound stopping in OpenAL
 	// For now, just stop all looping sounds
 	SndOpenAL_StopAllSounds();

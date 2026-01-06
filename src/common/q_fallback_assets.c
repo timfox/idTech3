@@ -274,7 +274,7 @@ Generate simple placeholder textures
 =================
 */
 static void FallbackAssets_GenerateTextures(void) {
-    int i, x, y;
+    int x, y;
 
     // Generate console background texture (64x64 RGB)
     // Simple gradient from dark blue to black
@@ -436,7 +436,7 @@ FallbackFont_RenderChar
 Render a single character using the fallback font
 =================
 */
-void FallbackFont_RenderChar(int x, int y, char c, const vec4_t color) {
+void FallbackFont_RenderChar(int x, int y, char c, const vec4_t color __attribute__((unused))) {
     if (!FallbackFont_IsAvailable()) {
         return;
     }

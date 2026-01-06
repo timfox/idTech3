@@ -12,6 +12,9 @@ Tests network protocol validation and bounds checking functionality
 #include <stdio.h>
 #include <string.h>
 
+// Stub for MSG_Init (not available in test environment)
+void MSG_Init(void) {}
+
 // Test data
 static const byte valid_packet_data[] = {
     66, 0, 0, 0, 0, 1, 0, 10,  // Header (protocol 66, seq 0, cmd 1, length 10)
@@ -258,7 +261,7 @@ static void test_bounds_checking_functions(void) {
         return;
     }
 
-    result = Net_BoundsCheckPointer(buffer + 200, buffer, sizeof(buffer));
+    result = Net_BoundsCheckPointer((char *)buffer + 200, buffer, sizeof(buffer));
     if (result) {
         printf("  FAILED: Invalid pointer bounds accepted\n");
         return;
