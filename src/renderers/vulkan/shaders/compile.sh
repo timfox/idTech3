@@ -48,7 +48,13 @@ compile_shader() {
 
     echo "Compiling $input_file -> $output_file"
 
-    if ! glslangValidator -S "$stage" -V $defines -o "$output_file" "$input_file" 2>/dev/null; then
+    # Use Vulkan 1.2 target environment for ray tracing shaders
+    local target_env=""
+    if [[ "$stage" == "rgen" || "$stage" == "rmiss" || "$stage" == "rchit" || "$stage" == "rahit" || "$stage" == "rint" ]]; then
+        target_env="--target-env vulkan1.2"
+    fi
+
+    if ! glslangValidator -S "$stage" -V $target_env $defines -o "$output_file" "$input_file" 2>/dev/null; then
         echo -e "${RED}Failed to compile $input_file${NC}"
         glslangValidator -S "$stage" -V $defines -o "$output_file" "$input_file"
         return 1

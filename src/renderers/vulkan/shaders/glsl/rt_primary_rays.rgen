@@ -34,6 +34,8 @@ layout(binding = 6, set = 0, rg16f) uniform image2D motionVectorImage; // Motion
 
 layout(location = 0) rayPayloadEXT vec3 hitValue;
 layout(location = 1) rayPayloadEXT float hitDistance;
+layout(location = 2) rayPayloadEXT int bounceCount;
+layout(location = 3) rayPayloadEXT vec3 accumulatedColor;
 
 void main()
 {

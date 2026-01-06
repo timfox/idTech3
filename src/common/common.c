@@ -811,7 +811,7 @@ void Com_BC_Detect_f(void) {
     Com_Printf("Forcing backwards compatibility detection...\n");
 
     // Check current mod
-    cvar_t *fs_game = Cvar_FindVar("fs_game");
+    cvar_t *fs_game = Cvar_Get("fs_game", "", CVAR_SYSTEMINFO);
     if (fs_game && fs_game->string[0]) {
         compatibility_result_t mod_result = BC_DetectModCompatibility(fs_game->string);
         if (mod_result.requires_legacy_mode) {
