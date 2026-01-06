@@ -31,6 +31,16 @@ typedef struct {
 } cvar_t;
 #endif
 
+#ifndef msg_t
+typedef struct msg_s {
+    byte *data;
+    int maxsize;
+    int cursize;
+    int readcount;
+    int bit;
+} msg_t;
+#endif
+
 static void Com_Printf(const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
@@ -96,6 +106,77 @@ static int Com_sprintf(char *dest, int size, const char *fmt, ...) {
     va_end(args);
     return result;
 }
+
+// Message buffer stubs for testing
+static void MSG_BeginReadingOOB(msg_t *msg) {
+    msg->readcount = 0;
+    msg->bit = 0;
+}
+
+static int MSG_ReadLong(msg_t *msg) {
+    if (msg->readcount + 4 > msg->cursize) return 0;
+    int value = *(int*)(msg->data + msg->readcount);
+    msg->readcount += 4;
+    return value;
+}
+
+static int MSG_ReadShort(msg_t *msg) {
+    if (msg->readcount + 2 > msg->cursize) return 0;
+    short value = *(short*)(msg->data + msg->readcount);
+    msg->readcount += 2;
+    return value;
+}
+
+static void MSG_InitOOB(msg_t *msg, byte *data, int length) {
+    msg->data = data;
+    msg->maxsize = length;
+    msg->cursize = 0;
+    msg->readcount = 0;
+    msg->bit = 0;
+}
+
+static void MSG_WriteLong(msg_t *msg, int value) {
+    if (msg->cursize + 4 > msg->maxsize) return;
+    *(int*)(msg->data + msg->cursize) = value;
+    msg->cursize += 4;
+}
+
+static void MSG_WriteShort(msg_t *msg, int value) {
+    if (msg->cursize + 2 > msg->maxsize) return;
+    *(short*)(msg->data + msg->cursize) = (short)value;
+    msg->cursize += 2;
+}
+
+static void MSG_WriteData(msg_t *msg, const void *data, int length) {
+    if (msg->cursize + length > msg->maxsize) return;
+    memcpy(msg->data + msg->cursize, data, length);
+    msg->cursize += length;
+}
+
+// Additional stubs needed for net_chan.c
+static int LittleLong(int value) {
+    // Assuming little-endian, just return value
+    return value;
+}
+
+static void Com_Memcpy(void *dest, const void *src, size_t size) {
+    memcpy(dest, src, size);
+}
+
+static int NET_OutOfBandCompress(int port, byte *data, int length) {
+    // Stub - just return original length
+    (void)port; (void)data;
+    return length;
+}
+
+static int NETCHAN_GENCHECKSUM(int challenge, int sequence) {
+    // Simple checksum stub
+    return challenge ^ sequence;
+}
+
+// CVAR stubs
+static cvar_t *qport = NULL;
+static cvar_t *showpackets = NULL;
 
 #endif // UNIT_TEST
 

@@ -9,7 +9,11 @@ compatibility with legacy Quake 3 mods and content.
 
 #include "compatibility_shims.h"
 #include "qcommon.h"
+#include "../renderers/renderercommon/tr_public.h"
 #include <string.h>
+
+// Forward declaration for renderer interface
+extern refexport_t *re;
 
 // Stub renderer interface for testing
 #ifdef UNIT_TEST
@@ -209,7 +213,7 @@ Shim for shader registration
 */
 qhandle_t Shim_RegisterShader(const char *name) {
     if (!active_shims || !shim_enable_asset_shims || !shim_enable_asset_shims->integer) {
-        return re.RegisterShader(name);
+        return re->RegisterShader(name);
     }
 
     // Apply shader name transformations for legacy compatibility
@@ -217,10 +221,10 @@ qhandle_t Shim_RegisterShader(const char *name) {
     if (Shim_LoadShader(name, transformed_name, sizeof(transformed_name))) {
         atomic_fetch_add(&active_shims->asset_shims_applied, 1);
         Shim_LogShimApplication("Shader", name, active_shims->active_mode);
-        return re.RegisterShader(transformed_name);
+        return re->RegisterShader(transformed_name);
     }
 
-    return re.RegisterShader(name);
+    return re->RegisterShader(name);
 }
 
 /*
@@ -232,7 +236,7 @@ Shim for shader registration without mipmaps
 */
 qhandle_t Shim_RegisterShaderNoMip(const char *name) {
     if (!active_shims || !shim_enable_asset_shims || !shim_enable_asset_shims->integer) {
-        return re.RegisterShaderNoMip(name);
+        return re->RegisterShaderNoMip(name);
     }
 
     // Apply shader name transformations for legacy compatibility
@@ -240,10 +244,10 @@ qhandle_t Shim_RegisterShaderNoMip(const char *name) {
     if (Shim_LoadShader(name, transformed_name, sizeof(transformed_name))) {
         atomic_fetch_add(&active_shims->asset_shims_applied, 1);
         Shim_LogShimApplication("ShaderNoMip", name, active_shims->active_mode);
-        return re.RegisterShaderNoMip(transformed_name);
+        return re->RegisterShaderNoMip(transformed_name);
     }
 
-    return re.RegisterShaderNoMip(name);
+    return re->RegisterShaderNoMip(name);
 }
 
 /*
@@ -255,7 +259,7 @@ Shim for drawing stretched pictures
 */
 void Shim_DrawStretchPic(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader) {
     if (!active_shims) {
-        re.DrawStretchPic(x, y, w, h, s1, t1, s2, t2, hShader);
+        re->DrawStretchPic(x, y, w, h, s1, t1, s2, t2, hShader);
         return;
     }
 
@@ -266,7 +270,7 @@ void Shim_DrawStretchPic(float x, float y, float w, float h, float s1, float t1,
             break;
 
         default:
-            re.DrawStretchPic(x, y, w, h, s1, t1, s2, t2, hShader);
+            re->DrawStretchPic(x, y, w, h, s1, t1, s2, t2, hShader);
             break;
     }
 
@@ -506,13 +510,13 @@ Mode-specific shim implementations
 qhandle_t Shim_RegisterShader_Q3Vanilla(const char *name) {
     // Q3 vanilla shader registration
     // Handle legacy shader naming conventions
-    return re.RegisterShader(name);
+    return re->RegisterShader(name);
 }
 
 void Shim_DrawStretchPic_Q3Vanilla(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader) {
     // Q3 vanilla coordinate system adjustments
     // Legacy Q3 might use different coordinate origins
-    re.DrawStretchPic(x, y, w, h, s1, t1, s2, t2, hShader);
+    re->DrawStretchPic(x, y, w, h, s1, t1, s2, t2, hShader);
 }
 
 qboolean Shim_LoadShader_OpenArena(const char *shader_name, char *output_path, int output_size) {

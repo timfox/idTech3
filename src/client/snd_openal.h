@@ -24,6 +24,8 @@ typedef struct {
 	float		pitch;
 	qboolean	looping;
 	int			flags;
+	int			entityNum;
+	int			channel;
 } sndOpenAL3DProps_t;
 
 // Initialization

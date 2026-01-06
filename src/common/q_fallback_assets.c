@@ -9,7 +9,6 @@ black screen and provide user feedback.
 
 #include "q_fallback_assets.h"
 #include "qcommon.h"
-#include "files.h"
 #include <string.h>
 #include <stdlib.h>
 

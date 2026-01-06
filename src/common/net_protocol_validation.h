@@ -10,19 +10,7 @@ Comprehensive network protocol validation with bounds checking and security
 #define __NET_PROTOCOL_VALIDATION_H__
 
 #include "q_shared.h"
-
-// Forward declarations
-#ifdef UNIT_TEST
-typedef struct msg_s {
-    byte *data;
-    int maxsize;
-    int cursize;
-    int readcount;
-} msg_t;
-#else
-struct msg_s;
-typedef struct msg_s msg_t;
-#endif
+#include "qcommon.h"  // For msg_t definition
 
 // Protocol validation result codes
 typedef enum {
@@ -96,6 +84,8 @@ qboolean Net_BoundsCheckPointer(const void *ptr, const void *buffer_start, int b
 // Protocol-specific validation
 net_protocol_result_t Net_ValidateServerInfo(const byte *data, int length);
 net_protocol_result_t Net_ValidateClientCommand(const byte *data, int length);
+net_protocol_result_t Net_ValidateClientMove(const byte *data, int length);
+net_protocol_result_t Net_ValidateSnapshotData(const byte *data, int length);
 net_protocol_result_t Net_ValidateEntityState(const byte *data, int length);
 net_protocol_result_t Net_ValidatePlayerState(const byte *data, int length);
 

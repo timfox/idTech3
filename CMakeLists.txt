@@ -556,6 +556,7 @@ SET(QCOMMON_SRCS
     src/common/entity_facade.cpp
     src/common/event_system.c
     src/common/files.c
+    src/common/q_fallback_assets.c
     src/common/files_v2.c
     src/common/files_v2_impl.c
     src/common/freetype_wrapper.c
@@ -585,7 +586,7 @@ SET(QCOMMON_SRCS
     src/common/net_chan.c
     src/common/net_enet.c
     src/common/net_ip.c
-    # src/common/net_protocol_validation.c  # Temporarily disabled due to compilation issues
+    src/common/net_protocol_validation.c
     src/common/oop_services.cpp
     src/common/openssl_wrapper.c
     src/common/performance_counters.c
@@ -625,7 +626,11 @@ list(APPEND QCOMMON_SRCS src/common/q_stability.c)
 # Add error recovery system
 list(APPEND QCOMMON_SRCS src/common/q_error_recovery.c)
 # Add input validation system
-# list(APPEND QCOMMON_SRCS src/common/input_validation.c)  # Temporarily disabled
+list(APPEND QCOMMON_SRCS src/common/input_validation.c)
+# Add backwards compatibility system
+list(APPEND QCOMMON_SRCS src/common/backwards_compatibility.c)
+# Add compatibility shims system
+list(APPEND QCOMMON_SRCS src/common/compatibility_shims.c)
 # Add font effects system
 # Font effects are renderer-specific, not common
 list(APPEND QCOMMON_SRCS src/renderers/renderercommon/tr_font_effects.c)

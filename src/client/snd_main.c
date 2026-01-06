@@ -28,6 +28,28 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "snd_openal.h"
 #include "snd_audio_thread.h"
 
+#ifdef USE_OPENAL
+#define AL_ALEXT_PROTOTYPES
+#include <AL/al.h>
+#include <AL/alc.h>
+#endif
+
+#ifdef USE_OPENAL
+// OpenAL externals for sound info
+extern int numOpenALSounds;
+extern ALCdevice *openalDevice;
+extern ALCcontext *openalContext;
+extern qboolean openalEfxAvailable;
+#define MAX_OPENAL_SOURCES 256
+#else
+// Stub definitions when OpenAL is not available
+static int numOpenALSounds = 0;
+static ALCdevice *openalDevice = NULL;
+static ALCcontext *openalContext = NULL;
+static qboolean openalEfxAvailable = qfalse;
+#define MAX_OPENAL_SOURCES 256
+#endif
+
 cvar_t *s_volume;
 cvar_t *s_musicVolume;
 cvar_t *s_doppler;
@@ -461,7 +483,7 @@ static void S_OpenAL_Shutdown(void) {
 	SndOpenAL_Shutdown();
 }
 
-static void S_OpenAL_StartSound(vec3_t origin, int entnum, int entchannel, sfxHandle_t sfx) {
+static void S_OpenAL_StartSound(const vec3_t origin, int entnum, int entchannel, sfxHandle_t sfx) {
 	sfx_t *sfxData = S_GetSfxByHandle(sfx);
 	if (!sfxData) return;
 
@@ -525,16 +547,14 @@ static void S_OpenAL_RawSamples(int samples, int rate, int width, int channels, 
 	// OpenAL handles raw samples through its mixing system
 	// This would need additional implementation for streaming raw audio
 	(void)samples; (void)rate; (void)width; (void)channels; (void)data; (void)volume;
-}
-
-static void S_OpenAL_StopAllSounds(void) {
-	SndOpenAL_StopAllSounds();
+	// TODO: Implement raw sample streaming with OpenAL
 }
 
 static void S_OpenAL_ClearLoopingSounds(qboolean killall) {
 	// OpenAL handles looping sounds through its source management
 	// This would need to track looping sounds separately
 	(void)killall;
+	// TODO: Implement looping sound management
 }
 
 static void S_OpenAL_AddLoopingSound(int entityNum, const vec3_t origin, const vec3_t velocity, sfxHandle_t sfxHandle) {
@@ -579,17 +599,20 @@ static void S_OpenAL_Respatialize(int entityNum, const vec3_t origin, vec3_t axi
 	}
 
 	SndOpenAL_SetListenerPosition(origin ? origin : vec3_origin, forward, up, velocity);
+	(void)entityNum; (void)inwater; // Not used in current implementation
 }
 
 static void S_OpenAL_UpdateEntityPosition(int entityNum, const vec3_t origin) {
 	// Update entity position for 3D sounds
 	// This would require tracking entity-to-sound mappings
 	(void)entityNum; (void)origin;
+	// TODO: Implement entity position tracking for 3D sounds
 }
 
 static void S_OpenAL_Update(int msec) {
 	// OpenAL handles internal updates, but we could add custom processing here
 	(void)msec;
+	// TODO: Add any OpenAL-specific update processing if needed
 }
 
 static void S_OpenAL_DisableSounds(void) {
@@ -602,13 +625,14 @@ static void S_OpenAL_BeginRegistration(void) {
 
 static sfxHandle_t S_OpenAL_RegisterSound(const char *sample, qboolean compressed) {
 	// Use existing sound registration system
-	return S_Base_RegisterSound(sample, compressed);
+	return S_RegisterSound(sample, compressed);
 }
 
 static void S_OpenAL_ClearSoundBuffer(void) {
 	SndOpenAL_StopAllSounds();
 }
 
+#ifdef USE_OPENAL
 static void S_OpenAL_SoundInfo(void) {
 	Com_Printf("OpenAL Sound System:\n");
 	Com_Printf("  Device: %s\n", openalDevice ? alcGetString(openalDevice, ALC_DEVICE_SPECIFIER) : "None");
@@ -616,6 +640,11 @@ static void S_OpenAL_SoundInfo(void) {
 	Com_Printf("  EFX Available: %s\n", openalEfxAvailable ? "Yes" : "No");
 	Com_Printf("  Sources: %d/%d\n", numOpenALSounds, MAX_OPENAL_SOURCES);
 }
+#else
+static void S_OpenAL_SoundInfo(void) {
+	Com_Printf("OpenAL Sound System: Not available (compiled without OpenAL support)\n");
+}
+#endif
 static void S_OpenAL_StopAllSounds(void) { SndOpenAL_StopAllSounds(); }
 
 // Initialize OpenAL sound interface structure

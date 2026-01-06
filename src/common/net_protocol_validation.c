@@ -159,28 +159,47 @@ net_protocol_result_t Net_ValidateCommandData(int command, const byte *data, int
         return NET_PROTOCOL_INVALID_LENGTH;
     }
 
-    switch (command) {
-        case svc_serverCommand:
-            return Net_ValidateServerCommand(data, length);
+    // Check if this is a server command (svc_*) or client command (clc_*)
+    // Since enum values overlap, we need to distinguish based on range
+    if (command >= svc_bad && command <= svc_EOF) {
+        // Server command
+        switch (command) {
+            case svc_serverCommand:
+                return Net_ValidateServerCommand(data, length);
 
-        case svc_gamestate:
-            return Net_ValidateGameStateData(data, length);
+            case svc_gamestate:
+                return Net_ValidateGameStateData(data, length);
 
-        case svc_snapshot:
-            return Net_ValidateSnapshotData(data, length);
+            case svc_snapshot:
+                return Net_ValidateSnapshotData(data, length);
 
-        case clc_move:
-            return Net_ValidateClientMove(data, length);
+            default:
+                // Unknown server command - allow but check size
+                if (length > MAX_COMMAND_DATA_SIZE) {
+                    return NET_PROTOCOL_SIZE_MISMATCH;
+                }
+                break;
+        }
+    } else if (command >= clc_bad && command <= clc_EOF) {
+        // Client command
+        switch (command) {
+            case clc_move:
+            case clc_moveNoDelta:
+                return Net_ValidateClientMove(data, length);
 
-        case clc_clientCommand:
-            return Net_ValidateClientCommand(data, length);
+            case clc_clientCommand:
+                return Net_ValidateClientCommand(data, length);
 
-        default:
-            // Unknown command - allow but log
-            if (length > MAX_COMMAND_DATA_SIZE) {
-                return NET_PROTOCOL_SIZE_MISMATCH;
-            }
-            break;
+            default:
+                // Unknown client command - allow but check size
+                if (length > MAX_COMMAND_DATA_SIZE) {
+                    return NET_PROTOCOL_SIZE_MISMATCH;
+                }
+                break;
+        }
+    } else {
+        // Unknown command type
+        return NET_PROTOCOL_INVALID_COMMAND;
     }
 
     return NET_PROTOCOL_VALID;

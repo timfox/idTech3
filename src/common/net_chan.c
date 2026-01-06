@@ -23,7 +23,34 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_shared.h"
 #include "qcommon.h"
 #include "net_threads.h"
+#ifdef UNIT_TEST
 #include "net_protocol_validation.h"
+#else
+// Forward declarations for main build
+typedef struct {
+    int total_packets_validated;
+    int packets_rejected;
+    int buffer_overflow_attempts;
+    int corruption_detected;
+    int rate_limit_hits;
+    int invalid_sequences;
+    int size_mismatches;
+} net_validation_stats_t;
+
+typedef struct {
+    net_validation_stats_t stats;
+    struct {
+        int max_packet_size;
+    } config;
+} net_validation_context_t;
+
+typedef enum {
+    NET_PROTOCOL_VALID = 0,
+    NET_PROTOCOL_INVALID_LENGTH,
+    NET_PROTOCOL_INVALID_PAYLOAD,
+    NET_PROTOCOL_SIZE_MISMATCH
+} net_protocol_result_t;
+#endif
 
 // Type definitions are in net_protocol_validation.h
 
