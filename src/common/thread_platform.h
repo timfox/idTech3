@@ -83,6 +83,9 @@ Provides unified threading API across Windows, Linux, macOS.
     #define atomic_exchange_explicit(ptr, val, order) InterlockedExchange((LONG volatile*)(ptr), (val))
 
 #else
+	#ifndef _GNU_SOURCE
+	#define _GNU_SOURCE
+	#endif
 	#include <pthread.h>
 	#include <unistd.h>
 	#include <stdatomic.h>
@@ -126,12 +129,12 @@ Provides unified threading API across Windows, Linux, macOS.
 
 	#define THREAD_CALL
 	#define THREAD_RETURN void*
-	
+
 	#define MUTEX_INIT(mutex) pthread_mutex_init(&(mutex), NULL)
 	#define MUTEX_DESTROY(mutex) pthread_mutex_destroy(&(mutex))
 	#define MUTEX_LOCK(mutex) pthread_mutex_lock(&(mutex))
 	#define MUTEX_UNLOCK(mutex) pthread_mutex_unlock(&(mutex))
-	
+
 	#define CONDITION_INIT(cond) pthread_cond_init(&(cond), NULL)
 	#define CONDITION_DESTROY(cond) pthread_cond_destroy(&(cond))
 	#define CONDITION_WAIT(cond, mutex) pthread_cond_wait(&(cond), &(mutex))
@@ -177,7 +180,7 @@ Provides unified threading API across Windows, Linux, macOS.
     #define ATOMIC_INCREMENT64(ptr) atomic_fetch_add((ptr), 1)
     #define ATOMIC_DECREMENT64(ptr) atomic_fetch_sub((ptr), 1)
 
-    // Standard C11 atomics are available - no need to redefine them
+	// Standard C11 atomics are available - no need to redefine them
 #endif
 
 // Thread priority levels
@@ -296,9 +299,6 @@ qboolean Semaphore_TimedWait(semaphore_t *semaphore, int timeout_ms);
 void Semaphore_Post(semaphore_t *semaphore);
 int Semaphore_GetValue(semaphore_t *semaphore);
 
-#endif // __THREAD_PLATFORM_H__
-
-
 /*
 =================
 Barriers
@@ -307,6 +307,8 @@ Barriers
 #ifdef _WIN32
 typedef SYNCHRONIZATION_BARRIER barrier_t;
 #else
+// Assume POSIX barriers are available on modern systems
+// If not available, fallback implementation will be used
 typedef pthread_barrier_t barrier_t;
 #endif
 

@@ -460,3 +460,39 @@ int Semaphore_GetValue(semaphore_t *semaphore) {
     return value;
 #endif
 }
+
+/*
+=============================================================================
+Barrier Implementation
+=============================================================================
+*/
+
+qboolean Barrier_Init(barrier_t *barrier, int thread_count) {
+    if (!barrier || thread_count <= 0) return qfalse;
+
+#ifdef _WIN32
+    return InitializeSynchronizationBarrier(barrier, thread_count, -1);
+#else
+    return pthread_barrier_init(barrier, NULL, thread_count) == 0;
+#endif
+}
+
+void Barrier_Destroy(barrier_t *barrier) {
+    if (!barrier) return;
+
+#ifdef _WIN32
+    DeleteSynchronizationBarrier(barrier);
+#else
+    pthread_barrier_destroy(barrier);
+#endif
+}
+
+qboolean Barrier_Wait(barrier_t *barrier) {
+    if (!barrier) return qfalse;
+
+#ifdef _WIN32
+    return EnterSynchronizationBarrier(barrier, 0) == TRUE;
+#else
+    return pthread_barrier_wait(barrier) != PTHREAD_BARRIER_SERIAL_THREAD;
+#endif
+}

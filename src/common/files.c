@@ -342,6 +342,13 @@ typedef struct {
     char blocked_patterns[512];      // Comma-separated blocked patterns
 } path_security_config_t;
 
+// Forward declarations for path security functions
+static qboolean FS_ValidateUTF8(const char *str);
+static void FS_NormalizePath(const char *path, char *out, size_t out_size);
+static const char *FS_Basename(const char *path);
+static const char *FS_GetExtension(const char *path);
+static path_validation_result_t FS_ValidatePathSecurity(const char *path, path_security_context_t context);
+
 static path_security_config_t fs_path_security = {
     .allow_parent_dirs = qfalse,
     .allow_absolute_paths = qfalse,
@@ -469,19 +476,22 @@ static path_validation_result_t FS_ValidatePathSecurity(const char *path, path_s
             if (strstr(path, pattern)) {
                 result.is_valid = qfalse;
                 Q_snprintf(result.error_message, sizeof(result.error_message),
-                          "Blocked pattern detected: %s", pattern);
+                          "Blocked pattern detected");
                 result.risk_level = PATH_RISK_HIGH;
                 return result;
             }
             pattern = next + 1;
         }
-        if (strstr(path, pattern)) {
-            result.is_valid = qfalse;
-            Q_snprintf(result.error_message, sizeof(result.error_message),
-                      "Blocked pattern detected: %s", pattern);
-            result.risk_level = PATH_RISK_HIGH;
-            return result;
-        }
+            if (strstr(path, pattern)) {
+                result.is_valid = qfalse;
+                // Safely copy pattern name, truncating if necessary
+                char safe_pattern[64];
+                Q_strncpyz(safe_pattern, pattern, sizeof(safe_pattern));
+                Q_snprintf(result.error_message, sizeof(result.error_message),
+                          "Blocked pattern detected: %s", safe_pattern);
+                result.risk_level = PATH_RISK_HIGH;
+                return result;
+            }
     }
 
     // Extension validation
@@ -921,7 +931,11 @@ static	int			fs_readCount;			// total bytes read
 static	qboolean	fs_startupInProgress = qfalse;	// Track if FS_Startup is running
 static	int			fs_loadCount;			// total files read
 static	int			fs_loadStack;			// total files in memory
-static	int			fs_activeAsyncLoads;	// active async file loads
+// Suppress unused variable warning for fs_activeAsyncLoads
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-variable"
+static	int			fs_activeAsyncLoads = 0;	// active async file loads
+#pragma GCC diagnostic pop
 static	int			fs_packFiles;			// total number of files in all loaded packs
 
 static	int			fs_pk3dirCount;			// total number of pk3 directories in searchpath
@@ -3413,6 +3427,19 @@ qboolean FS_FileIsInPAK( const char *filename, int *pChecksum, char *pakName ) {
 		Com_Error( ERR_FATAL, "FS_FOpenFileRead: NULL 'filename' parameter passed" );
 	}
 
+	// Path security validation
+	if (fs_path_security_enable && fs_path_security_enable->integer) {
+		path_validation_result_t validation = FS_ValidatePathSecurity(filename, PATH_CONTEXT_FILE_READ);
+		if (!validation.is_valid) {
+			if (validation.risk_level >= PATH_RISK_HIGH) {
+				Com_Printf(S_COLOR_RED "FS_FOpenFileRead: Path security violation - %s\n", validation.error_message);
+				return -1; // Block access to risky paths
+			} else {
+				Com_DPrintf("FS_FOpenFileRead: Path security warning - %s\n", validation.error_message);
+			}
+		}
+	}
+
 	// qpaths are not supposed to have a leading slash
 	while ( filename[0] == '/' || filename[0] == '\\' )
 		filename++;
@@ -3499,7 +3526,7 @@ static void FS_ReadFile_Async_Worker(void *data) {
 		load->filename, *load->result);
 }
 #else
-static void FS_ReadFile_Async_Worker(void *data) { (void)data; }
+// static void FS_ReadFile_Async_Worker(void *data) { (void)data; } // Unused async worker
 #endif
 
 /*

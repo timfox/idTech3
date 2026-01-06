@@ -88,13 +88,6 @@ void Crash_SetModLoadingContext(const char *modName, const char *operation);
 void Crash_ClearModLoadingContext(void);
 void Crash_ReportModLoad(const char *modName, const char *error);
 
-#ifdef __cplusplus
-}
-#endif
-
-#endif // __CRASH_HANDLER_H__
-
-
 // Enhanced reliability structures
 typedef enum {
     RECOVERY_NONE,        // No recovery attempt
