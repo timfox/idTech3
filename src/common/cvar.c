@@ -27,7 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 cvar_t	*cvar_vars = NULL;
 static cvar_t	*cvar_cheats;
 static cvar_t	*cvar_developer;
-atomic_int_t	cvar_modifiedFlags;
+int	cvar_modifiedFlags;
 
 static mutex_t cvar_mutex;
 static qboolean cvar_initialized = qfalse;
@@ -38,14 +38,6 @@ static int		cvar_numIndexes;
 
 static int	cvar_group[ CVG_MAX ];
 
-// Atomic OR helper function for cvar_modifiedFlags
-void Cvar_AtomicOrModifiedFlags(int flags) {
-    int old_value, new_value;
-    do {
-        old_value = atomic_load_explicit(&cvar_modifiedFlags, memory_order_relaxed);
-        new_value = old_value | flags;
-    } while (!atomic_compare_exchange_weak_explicit(&cvar_modifiedFlags, &old_value, new_value, memory_order_relaxed, memory_order_relaxed));
-}
 
 #define FILE_HASH_SIZE		256
 static	cvar_t	*hashTable[FILE_HASH_SIZE];
@@ -314,7 +306,7 @@ static const char *Cvar_Validate( cvar_t *var, const char *value, qboolean warn 
 				if ( !Cvar_IsIntegral( value ) ) {
 					if ( warn )
 						Com_Printf( "WARNING: cvar '%s' must be integral", var->name );
-					sprintf( intbuf, "%i", atoi( value ) );
+					Q_secure_snprintf( intbuf, sizeof(intbuf), "%i", atoi( value ) );
 					value = intbuf; // new value
 				}
 				valuei = atoi( value );
@@ -528,7 +520,7 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 
 		// ZOID--needs to be set so that cvars the game sets as 
 		// SERVERINFO get sent to clients
-		Cvar_AtomicOrModifiedFlags(flags);
+		cvar_modifiedFlags |=(flags);
 
         MUTEX_UNLOCK(cvar_mutex);
 		return var;
@@ -583,7 +575,7 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 
 	var->flags = flags;
 	// note what types of cvars have been modified (userinfo, archive, serverinfo, systeminfo)
-	Cvar_AtomicOrModifiedFlags(var->flags);
+	cvar_modifiedFlags |=(var->flags);
 
 	hash = generateHashValue(var_name);
 	var->hashIndex = hash;
@@ -805,7 +797,7 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
     }
 
 	// note what types of cvars have been modified (userinfo, archive, serverinfo, systeminfo)
-	Cvar_AtomicOrModifiedFlags(var->flags);
+	cvar_modifiedFlags |=(var->flags);
 
 	if ( !force )
 	{
@@ -843,7 +835,7 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 			// When applying a latched value (force=true), ensure it's marked for archiving
 			// This ensures graphics settings are saved after vid_restart
 			if ( var->flags & CVAR_ARCHIVE ) {
-				Cvar_AtomicOrModifiedFlags(CVAR_ARCHIVE);
+				cvar_modifiedFlags |=(CVAR_ARCHIVE);
 			}
 			Z_Free( var->latchedString );
 			var->latchedString = NULL;
@@ -957,7 +949,7 @@ Cvar_SetIntegerValue
 void Cvar_SetIntegerValue( const char *var_name, int value ) {
 	char	val[32];
 
-	sprintf( val, "%i", value );
+	Q_secure_snprintf( val, sizeof(val), "%i", value );
 	Cvar_Set( var_name, val );
 }
 
@@ -1189,19 +1181,19 @@ static void Cvar_Set_f( void ) {
 		case 'a':
 			if( !( v->flags & CVAR_ARCHIVE ) ) {
 				v->flags |= CVAR_ARCHIVE;
-				Cvar_AtomicOrModifiedFlags(CVAR_ARCHIVE);
+				cvar_modifiedFlags |=(CVAR_ARCHIVE);
 			}
 			break;
 		case 'u':
 			if( !( v->flags & CVAR_USERINFO ) ) {
 				v->flags |= CVAR_USERINFO;
-				Cvar_AtomicOrModifiedFlags(CVAR_USERINFO);
+				cvar_modifiedFlags |=(CVAR_USERINFO);
 			}
 			break;
 		case 's':
 			if( !( v->flags & CVAR_SERVERINFO ) ) {
 				v->flags |= CVAR_SERVERINFO;
-				Cvar_AtomicOrModifiedFlags(CVAR_SERVERINFO);
+				cvar_modifiedFlags |=(CVAR_SERVERINFO);
 			}
 			break;
 	}
@@ -1450,12 +1442,12 @@ static void Cvar_Func_f( void ) {
 		Cvar_Op( ftype, &ival, &fval ); // apply modification
 	
 	if ( cvar && cvar->validator == CV_INTEGER ) {
-		sprintf( value, "%i", ival );
+		Q_secure_snprintf( value, sizeof(value), "%i", ival );
 	} else {
 		if ( (int)fval == fval )
-			sprintf( value, "%i", (int)fval );
+			Q_secure_snprintf( value, sizeof(value), "%i", (int)fval );
 		else
-			sprintf( value, "%f", fval );
+			Q_secure_snprintf( value, sizeof(value), "%f", fval );
 	}
 
 	Cvar_Set2( cvar_name, value, qfalse );
@@ -1685,7 +1677,7 @@ static cvar_t *Cvar_Unset( cvar_t *cv )
 	cvar_t *next = cv->next;
 
 	// note what types of cvars have been modified (userinfo, archive, serverinfo, systeminfo)
-	Cvar_AtomicOrModifiedFlags(cv->flags);
+	cvar_modifiedFlags |=(cv->flags);
 	
 	if ( cv->name )
 		Z_Free( cv->name );

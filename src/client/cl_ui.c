@@ -709,11 +709,11 @@ static void CLUI_SetCDKey( char *buf ) {
 		Com_Memcpy( &cl_cdkey[16], buf, 16 );
 		cl_cdkey[32] = '\0';
 		// set the flag so the flag will be written at the next opportunity
-		Cvar_AtomicOrModifiedFlags(CVAR_ARCHIVE);
+		cvar_modifiedFlags |=(CVAR_ARCHIVE);
 	} else {
 		Com_Memcpy( cl_cdkey, buf, 16 );
 		// set the flag so the flag will be written at the next opportunity
-		Cvar_AtomicOrModifiedFlags(CVAR_ARCHIVE);
+		cvar_modifiedFlags |=(CVAR_ARCHIVE);
 	}
 }
 #endif

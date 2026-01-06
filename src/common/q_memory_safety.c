@@ -121,7 +121,7 @@ MemorySafety_Malloc
 ===============
 */
 void *MemorySafety_Malloc(size_t size, const char *file, int line) {
-    if (!memory_state.initialized || memory_cvars_registered ||
+    if (!memory_state.initialized || !memory_safety_enable ||
         (memory_safety_enable && !memory_safety_enable->integer)) {
         return Z_Malloc(size);
     }
@@ -176,7 +176,8 @@ void MemorySafety_Free(void *ptr) {
         return;
     }
 
-    if (!memory_safety_enable->integer || !memory_state.initialized) {
+    if (!memory_state.initialized || !memory_safety_enable ||
+        (memory_safety_enable && !memory_safety_enable->integer)) {
         Z_Free(ptr);
         return;
     }

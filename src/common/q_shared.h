@@ -576,9 +576,52 @@ typedef int clipHandle_t;
 
 #ifdef __GNUC__
 #define QALIGN(x) __attribute__((aligned(x)))
+// Security hardening macros
+#define SECURITY_NO_EXEC_STACK __attribute__((noexecstack))
+#define SECURITY_STACK_PROTECT __attribute__((stack_protect))
+#define SECURITY_NO_SANITIZE __attribute__((no_sanitize("address", "thread", "undefined", "leak")))
+#define SECURITY_HOT __attribute__((hot))
+#define SECURITY_COLD __attribute__((cold))
+#define SECURITY_NONNULL(...) __attribute__((nonnull(__VA_ARGS__)))
+#define SECURITY_RETURNS_NONNULL __attribute__((returns_nonnull))
+#define SECURITY_WARN_UNUSED_RESULT __attribute__((warn_unused_result))
+#define SECURITY_FORMAT(type, fmt, args) __attribute__((format(type, fmt, args)))
 #else
 #define QALIGN(x)
+// Security hardening macros
+#define SECURITY_NO_EXEC_STACK
+#define SECURITY_STACK_PROTECT
+#define SECURITY_NO_SANITIZE
+#define SECURITY_HOT
+#define SECURITY_COLD
+#define SECURITY_NONNULL(...)
+#define SECURITY_RETURNS_NONNULL
+#define SECURITY_WARN_UNUSED_RESULT
+#define SECURITY_FORMAT(type, fmt, args)
 #endif
+
+// Function attribute for security-critical functions
+#define SECURITY_CRITICAL __attribute__((visibility("hidden"))) SECURITY_STACK_PROTECT SECURITY_NO_SANITIZE
+
+// Secure sprintf with buffer overflow protection
+#define Q_secure_snprintf(buf, size, fmt, ...) do { \
+    int result = snprintf(buf, size, fmt, ##__VA_ARGS__); \
+    if (result < 0 || result >= (int)size) { \
+        Com_Printf(S_COLOR_RED "SECURITY: Q_secure_snprintf buffer overflow prevented in %s:%d\n", __FILE__, __LINE__); \
+        buf[size-1] = '\0'; /* Ensure null termination */ \
+        /* Trigger security alert */ \
+        Com_Error(ERR_DROP, "Security violation: sprintf overflow attempt"); \
+    } \
+} while(0)
+
+// Atomic CVar operations for thread safety
+#define Cvar_AtomicOrModifiedFlags(flags) do { \
+    atomic_int_t old_val, new_val; \
+    do { \
+        old_val = atomic_load(&cvar_modifiedFlags); \
+        new_val = old_val | (flags); \
+    } while (!atomic_compare_exchange_weak_explicit(&cvar_modifiedFlags, &old_val, new_val, memory_order_seq_cst, memory_order_relaxed)); \
+} while(0)
 
 #ifndef NULL
 #define NULL ((void *)0)

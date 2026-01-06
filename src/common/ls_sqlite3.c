@@ -12,6 +12,7 @@ Based on LuaSQL implementation.
 #include "luasql.h"
 #include "sqlite_wrapper.h"
 #include <sqlite3.h>
+#include "q_shared.h"
 
 #ifdef USE_LUA
 #ifdef USE_SQLITE
@@ -389,7 +390,7 @@ static int cur_getcolnames(lua_State *L)
 			// Note: SQLite wrapper doesn't provide column names
 			// We could implement this if needed
 			char colName[32];
-			sprintf(colName, "col%d", i + 1);
+			Q_secure_snprintf(colName, sizeof(colName), "col%d", i + 1);
 			lua_pushstring(L, colName);
 			lua_rawseti(L, -2, i + 1);
 		}

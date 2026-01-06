@@ -819,8 +819,6 @@ void	Cvar_VariableStringBufferSafe( const char *var_name, char *buffer, int bufs
 unsigned Cvar_Flags( const char *var_name );
 // returns CVAR_NONEXISTENT if cvar doesn't exist or the flags of that particular CVAR.
 
-void Cvar_AtomicOrModifiedFlags( int flags );
-// Atomically OR flags into cvar_modifiedFlags for thread safety
 
 void	Cvar_CommandCompletion( void(*callback)(const char *s) );
 // callback with each valid string
@@ -865,7 +863,7 @@ void	Cvar_Restart( qboolean unsetVM );
 
 void	Cvar_CompleteCvarName( const char *args, int argNum );
 
-extern	atomic_int_t	cvar_modifiedFlags;
+extern	int	cvar_modifiedFlags;
 // whenever a cvar is modifed, its flags will be OR'd into this, so
 // a single check can determine if any CVAR_USERINFO, CVAR_SERVERINFO,
 // etc, variables have been modified since the last check.  The bit

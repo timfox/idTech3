@@ -399,7 +399,7 @@ void Key_SetBinding( int keynum, const char *binding ) {
 
 	// consider this like modifying an archived cvar, so the
 	// file write will be triggered at the next opportunity
-	Cvar_AtomicOrModifiedFlags(CVAR_ARCHIVE);
+	cvar_modifiedFlags |=(CVAR_ARCHIVE);
 }
 
 
