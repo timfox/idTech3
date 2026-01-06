@@ -4383,7 +4383,7 @@ static void CL_InitGLimp_Cvars( void )
 	Cvar_SetDescription( cl_drawBuffer, "Specifies buffer to draw from: GL_FRONT or GL_BACK." );
 #ifdef USE_RENDERER_DLOPEN
 cl_renderer = Cvar_Get( "cl_renderer", "vulkan", CVAR_ARCHIVE | CVAR_LATCH );
-	Cvar_SetDescription( cl_renderer, "Sets your desired renderer, requires \\vid_restart." );
+// Description already set above
 
 	if ( !isValidRenderer( cl_renderer->string ) ) {
 		Cvar_ForceReset( "cl_renderer" );
@@ -4572,7 +4572,8 @@ void CL_Init( void ) {
 	CL_ClearState();
 	cls.state = CA_DISCONNECTED;	// no longer CA_UNINITIALIZED
 
-	CL_ResetOldGame();
+	// Temporarily disable to isolate crash
+	// CL_ResetOldGame();
 
 	cls.realtime = 0;
 
