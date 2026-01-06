@@ -96,6 +96,7 @@ Initialize backwards compatibility system
 qboolean BC_Init(legacy_context_t *ctx) {
     if (!ctx) return qfalse;
 
+    Com_Printf("BC_Init called\n");
     memset(ctx, 0, sizeof(*ctx));
 
     // Set default configuration

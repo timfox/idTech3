@@ -43,6 +43,13 @@ qboolean FS_Sandbox_ValidateOperation( const char *qpath, fsMount_t *mount, qboo
 qboolean Q_ValidateFilePath( const char *path );
 int FS_Mount_FindFile( const char *qpath, fileHandle_t *file, fsMount_t **outMount, pack_t **outPak, fileInPack_t **outPakFile );
 
+// Backwards compatibility command functions
+void Com_BC_Status_f(void);
+void Com_BC_Detect_f(void);
+void Com_BC_SetMode_f(void);
+void Com_Shim_Status_f(void);
+void Com_Shim_Reset_f(void);
+
 // Global variables expected by the engine
 char cl_title[ MAX_CVAR_VALUE_STRING ] = "idtech3";
 Q_EXPORT refimport_t ri = {0};
@@ -308,8 +315,18 @@ void Com_Init( char *commandLine ) {
 
     // Initialize core systems
     MemorySafety_Init();
-    BC_Init(&bc_context);
-    Shim_Init(&shim_context, LEGACY_MODE_NONE); // Start with modern mode
+    Com_Printf("About to initialize backwards compatibility...\n");
+    qboolean bc_ok = BC_Init(&bc_context);
+    qboolean shim_ok = Shim_Init(&shim_context, LEGACY_MODE_NONE);
+    Com_Printf("BC_Init: %s, Shim_Init: %s\n", bc_ok ? "OK" : "FAILED", shim_ok ? "OK" : "FAILED");
+
+    // Register backwards compatibility commands
+    Cmd_AddCommand("bc_status", Com_BC_Status_f);
+    Cmd_AddCommand("bc_detect", Com_BC_Detect_f);
+    Cmd_AddCommand("bc_setmode", Com_BC_SetMode_f);
+    Cmd_AddCommand("shim_status", Com_Shim_Status_f);
+    Cmd_AddCommand("shim_reset", Com_Shim_Reset_f);
+    Com_Printf("Backwards compatibility commands registered\n");
     Cvar_Init();
     Dvar_Init();
     Cbuf_Init();
@@ -322,14 +339,7 @@ void Com_Init( char *commandLine ) {
 	Cmd_AddCommand( "quit", Com_Quit_f );
 	Cmd_AddCommand( "exit", Com_Quit_f );
 
-	// Backwards compatibility commands
-	Cmd_AddCommand( "bc_status", Com_BC_Status_f );
-	Cmd_AddCommand( "bc_detect", Com_BC_Detect_f );
-	Cmd_AddCommand( "bc_setmode", Com_BC_SetMode_f );
-
-	// Compatibility shim commands
-	Cmd_AddCommand( "shim_status", Com_Shim_Status_f );
-	Cmd_AddCommand( "shim_reset", Com_Shim_Reset_f );
+	// Backwards compatibility commands are registered in Com_Init
 
     // Register engine-wide cvars
     com_developer = Cvar_Get( "developer", "0", CVAR_ARCHIVE );
