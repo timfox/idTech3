@@ -1979,6 +1979,7 @@ void Cvar_Init (void)
 // 	return Cvar_Get( var_name, json_value, flags );
 // }
 
+#ifdef USE_CJSON
 cvar_t *Cvar_GetJSON( const char *var_name, const char *json_value, int flags ) {
 	cvar_t *var;
 	cJSON *json_obj = NULL;
@@ -2097,7 +2098,14 @@ cvar_t *Cvar_GetJSON( const char *var_name, const char *json_value, int flags ) 
     MUTEX_UNLOCK(cvar_mutex);
 	return var;
 }
+#else
+cvar_t *Cvar_GetJSON( const char *var_name, const char *json_value, int flags ) {
+	// USE_CJSON disabled - fallback to regular cvar
+	return Cvar_Get( var_name, json_value, flags );
+}
+#endif
 
+#ifdef USE_CJSON
 void Cvar_SetJSON( const char *var_name, const char *json_value ) {
 	cvar_t *var;
 
@@ -2171,6 +2179,14 @@ void Cvar_SetJSON( const char *var_name, const char *json_value ) {
 
     MUTEX_UNLOCK(cvar_mutex);
 }
+#else
+void Cvar_SetJSON( const char *var_name, const char *json_value ) {
+	// USE_CJSON disabled - fallback to regular cvar
+	Cvar_Set( var_name, json_value );
+}
+#endif
+
+#ifdef USE_CJSON
 const char *Cvar_GetJSONValue( const char *var_name, const char *key_path ) {
 	cvar_t *var;
 	const char *result = NULL;
@@ -2223,6 +2239,13 @@ const char *Cvar_GetJSONValue( const char *var_name, const char *key_path ) {
     MUTEX_UNLOCK(cvar_mutex);
 	return result;
 }
+#else
+const char *Cvar_GetJSONValue( const char *var_name, const char *key_path ) {
+	// USE_CJSON disabled - return NULL
+	return NULL;
+}
+#endif
+
 double Cvar_GetJSONNumber( const char *var_name, const char *key_path, double default_value ) {
 	const char *str_value = Cvar_GetJSONValue( var_name, key_path );
 	if ( str_value ) {
@@ -2256,6 +2279,7 @@ void Cvar_SetJSONValidator( cvar_t *var, cvarJSONValidator_t validator_type, con
 	(void)schema; // Unused for now
 }
 
+#ifdef USE_CJSON
 qboolean Cvar_ValidateJSON( cvar_t *var, const char *json_string ) {
 	if ( !var || !json_string ) {
 		return qfalse;
@@ -2271,3 +2295,17 @@ qboolean Cvar_ValidateJSON( cvar_t *var, const char *json_string ) {
 	cJSON_Delete( test_obj );
 	return qtrue;
 }
+#else
+qboolean Cvar_ValidateJSON( cvar_t *var, const char *json_string ) {
+	// USE_CJSON disabled - basic string validation only
+	if ( !var || !json_string ) {
+		return qfalse;
+	}
+	// Very basic validation - check if it starts and ends with braces/brackets
+	if ( (json_string[0] == '{' && json_string[strlen(json_string)-1] == '}') ||
+		 (json_string[0] == '[' && json_string[strlen(json_string)-1] == ']') ) {
+		return qtrue;
+	}
+	return qfalse;
+}
+#endif
