@@ -166,6 +166,10 @@ typedef char GLchar;
 
 //===========================================================================
 
+#ifdef USE_OPENGL_CORE_PROFILE
+#include "qgl_modern.h"
+#define QGL_Core_PROCS QGL_Core_PROCS_MODERN
+#else
 #define QGL_Core_PROCS \
 	GLE( void, glAlphaFunc, GLenum func, GLclampf ref ) \
 	GLE( void, glBindTexture, GLenum target, GLuint texture ) \
@@ -215,6 +219,7 @@ typedef char GLchar;
 	GLE( void, glTexSubImage2D, GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *pixels ) \
 	GLE( void, glVertexPointer, GLint size, GLenum type, GLsizei stride, const GLvoid *pointer ) \
 	GLE( void, glViewport, GLint x, GLint y, GLsizei width, GLsizei height )
+#endif // USE_OPENGL_CORE_PROFILE
 
 #define QGL_Ext_PROCS \
 	GLE( void, glMultiTexCoord2fARB, GLenum texture, GLfloat s, GLfloat t ) \
@@ -297,8 +302,7 @@ typedef char GLchar;
 #define QGL_Swp_PROCS \
 	GLE( void,	glXSwapIntervalEXT, Display *dpy, GLXDrawable drawable, int interval ) \
 	GLE( int,	glXSwapIntervalMESA, unsigned interval ) \
-	GLE( int,	glXSwapIntervalSGI, int interval ) \
-	GLEWEAK( void,	glPixelStorei, GLenum pname, GLint param )
+	GLE( int,	glXSwapIntervalSGI, int interval )
 #endif
 
 #define QGL_LinX11_PROCS \

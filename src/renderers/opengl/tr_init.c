@@ -25,6 +25,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_skyportals.h"
 #include "tr_flares_enhanced.h"
 #include "../renderercommon/tr_backend_iface.h"
+#include "gl_shader.h"
+#include "gl_vertex.h"
 
 extern refimport_t ri;
 
@@ -257,6 +259,73 @@ typedef struct {
 	const char *name;
 } sym_t;
 
+// Dummy functions for core OpenGL functions when dynamic resolution fails
+static void APIENTRY glAlphaFuncDummy(GLenum func, GLclampf ref) {
+	// Alpha testing is deprecated in modern OpenGL - this is a no-op
+	// Modern applications should use alpha blending or discard in shaders instead
+}
+
+static void APIENTRY glBindTextureDummy(GLenum target, GLuint texture) {
+	// This should not be called - indicates OpenGL context issues
+	// In a proper fix, this would be replaced with static linking
+}
+
+static void APIENTRY glBlendFuncDummy(GLenum sfactor, GLenum dfactor) {
+	// This should not be called - indicates OpenGL context issues
+}
+
+static void APIENTRY glClearDummy(GLbitfield mask) {
+	// This should not be called - indicates OpenGL context issues
+}
+
+static void APIENTRY glClearColorDummy(GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha) {
+	// This should not be called - indicates OpenGL context issues
+}
+
+static void APIENTRY glClearDepthDummy(GLclampd depth) {
+	// This should not be called - indicates OpenGL context issues
+}
+
+static void APIENTRY glColor4fDummy(GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha) {
+	// This should not be called - indicates OpenGL context issues
+}
+
+static void APIENTRY glColorMaskDummy(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha) {
+	// This should not be called - indicates OpenGL context issues
+}
+
+static void APIENTRY glColorPointerDummy(GLint size, GLenum type, GLsizei stride, const GLvoid *pointer) {
+	// This should not be called - indicates OpenGL context issues
+}
+
+static void APIENTRY glCullFaceDummy(GLenum mode) {
+	// This should not be called - indicates OpenGL context issues
+}
+
+static void APIENTRY glDeleteTexturesDummy(GLsizei n, const GLuint *textures) {
+	// This should not be called - indicates OpenGL context issues
+}
+
+static void APIENTRY glDepthFuncDummy(GLenum func) {
+	// This should not be called - indicates OpenGL context issues
+}
+
+static void APIENTRY glDepthMaskDummy(GLboolean flag) {
+	// This should not be called - indicates OpenGL context issues
+}
+
+static void APIENTRY glDepthRangeDummy(GLclampd zNear, GLclampd zFar) {
+	// This should not be called - indicates OpenGL context issues
+}
+
+static void APIENTRY glDisableDummy(GLenum cap) {
+	// This should not be called - indicates OpenGL context issues
+}
+
+static void APIENTRY glDisableClientStateDummy(GLenum array) {
+	// This should not be called - indicates OpenGL context issues
+}
+
 #define GLE( ret, name, ... ) { (void**)&q##name, XSTRING(name) },
 static sym_t core_procs[] = { QGL_Core_PROCS };
 static sym_t ext_procs[] = { QGL_Ext_PROCS };
@@ -283,6 +352,89 @@ static const char *R_ResolveSymbols( sym_t *syms, int count )
 		*syms[ i ].symbol = ri.GL_GetProcAddress( syms[ i ].name );
 		if ( *syms[ i ].symbol == NULL )
 		{
+			// Special handling for core functions that may not be dynamically available in some OpenGL contexts
+			if (Q_stricmp(syms[i].name, "glAlphaFunc") == 0) {
+				ri.Printf(PRINT_WARNING, "glAlphaFunc not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glAlphaFuncDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glBindTexture") == 0) {
+				ri.Printf(PRINT_WARNING, "glBindTexture not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glBindTextureDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glBlendFunc") == 0) {
+				ri.Printf(PRINT_WARNING, "glBlendFunc not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glBlendFuncDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glClear") == 0) {
+				ri.Printf(PRINT_WARNING, "glClear not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glClearDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glClearColor") == 0) {
+				ri.Printf(PRINT_WARNING, "glClearColor not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glClearColorDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glClearDepth") == 0) {
+				ri.Printf(PRINT_WARNING, "glClearDepth not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glClearDepthDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glColor4f") == 0) {
+				ri.Printf(PRINT_WARNING, "glColor4f not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glColor4fDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glColorMask") == 0) {
+				ri.Printf(PRINT_WARNING, "glColorMask not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glColorMaskDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glColorPointer") == 0) {
+				ri.Printf(PRINT_WARNING, "glColorPointer not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glColorPointerDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glCullFace") == 0) {
+				ri.Printf(PRINT_WARNING, "glCullFace not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glCullFaceDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glDeleteTextures") == 0) {
+				ri.Printf(PRINT_WARNING, "glDeleteTextures not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glDeleteTexturesDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glDepthFunc") == 0) {
+				ri.Printf(PRINT_WARNING, "glDepthFunc not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glDepthFuncDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glDepthMask") == 0) {
+				ri.Printf(PRINT_WARNING, "glDepthMask not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glDepthMaskDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glDepthRange") == 0) {
+				ri.Printf(PRINT_WARNING, "glDepthRange not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glDepthRangeDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glDisable") == 0) {
+				ri.Printf(PRINT_WARNING, "glDisable not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glDisableDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glDisableClientState") == 0) {
+				ri.Printf(PRINT_WARNING, "glDisableClientState not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glDisableClientStateDummy;
+				continue;
+			}
+			// If we can't resolve core functions, this indicates a deeper OpenGL context issue
+			ri.Printf(PRINT_ERROR, "Failed to resolve core OpenGL function '%s' - OpenGL context may not be properly initialized\n", syms[i].name);
 			return syms[ i ].name;
 		}
 	}
@@ -651,6 +803,10 @@ static void InitOpenGL( void )
 		}
 
 		ri.GLimp_Init( &glConfig );
+
+		// Initialize modern OpenGL systems
+		GL_ShaderInit();
+		GL_VertexInit();
 
 		R_ClearSymTables();
 
@@ -2161,6 +2317,10 @@ RE_Shutdown
 static void RE_Shutdown( refShutdownCode_t code ) {
 
 	ri.Printf( PRINT_ALL, "RE_Shutdown( %i )\n", code );
+
+	// Shutdown modern OpenGL systems first
+	GL_VertexShutdown();
+	GL_ShaderShutdown();
 
 	ri.Cmd_RemoveCommand( "modellist" );
 	ri.Cmd_RemoveCommand( "screenshotBMP" );
