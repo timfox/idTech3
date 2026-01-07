@@ -8,11 +8,9 @@ Provides traditional cvars backed by JSON configuration.
 #ifndef TR_CONFIG_JSON_H
 #define TR_CONFIG_JSON_H
 
-// JSON-based renderer configuration functions
+// Function prototypes
 void R_InitConfigurationJSON(void);
 void R_ShutdownConfigurationJSON(void);
-
-// Sync functions between JSON and traditional cvars
 void R_SyncConfigurationFromJSON(void);
 void R_UpdateConfigurationJSON(void);
 

@@ -6832,7 +6832,11 @@ static void FS_Startup( void ) {
 	if (fs_searchpaths) {
 		FS_MigrateLegacySearchPaths();
 	}
-	
+
+	// Validate content after VFS migration is complete
+	// Note: We don't fail startup if validation fails - just warn the user
+	FS_ValidateContentOnStartup();
+
 	// Register VFS v2 console commands
 	FS_Mount_RegisterCommands();
 
@@ -6878,10 +6882,6 @@ static void FS_Startup( void ) {
 		FS_CheckIdPaks();
 	}
 
-	// Validate content after filesystem is fully initialized
-	// This is called from FS_Restart, so validation happens after all paths are set up
-	// Note: We don't fail startup if validation fails - just warn the user
-	FS_ValidateContentOnStartup();
 
 	// Mark startup as complete - fs_searchpaths is now initialized
 	fs_startupInProgress = qfalse;

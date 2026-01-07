@@ -114,10 +114,6 @@ qboolean FS_ValidateGameContent( fs_validation_result_t *result ) {
 	result->corrupted_files = 0;
 
 	// Check for required pak files
-	// Special case for OpenArena: allow it to run without pak files since it has compiled VM code
-	const char *currentGame = FS_GetCurrentGameDir();
-	qboolean isOpenArena = (currentGame && !Q_stricmp(currentGame, "openarena"));
-
 	for ( i = 0; requiredPaks[i] != NULL; i++ ) {
 		char pakPath[MAX_OSPATH];
 		fileHandle_t f;
@@ -125,12 +121,9 @@ qboolean FS_ValidateGameContent( fs_validation_result_t *result ) {
 		// Try to find the pak file
 		int fileLen = FS_FOpenFileRead( requiredPaks[i], &f, qfalse );
 		if ( fileLen < 0 || f == FS_INVALID_HANDLE ) {
-			// Allow OpenArena to skip pak file requirement
-			if ( !isOpenArena ) {
-				result->missing_files++;
-				result->valid = qfalse;
-				allValid = qfalse;
-			}
+			result->missing_files++;
+			result->valid = qfalse;
+			allValid = qfalse;
 			continue;
 		}
 		FS_FCloseFile( f );

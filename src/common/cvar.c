@@ -2273,9 +2273,9 @@ void Cvar_Init (void)
 	Cmd_AddCommand ("cvar_restart", Cvar_Restart_f);
 	Cmd_AddCommand ("cvar_trim", Cvar_Trim_f);
 
-	// JSON-enhanced cvar demo commands
-	Cmd_AddCommand ("cvar_kvp_demo", CVAR_KVP_Demo);
-	Cmd_AddCommand ("cvar_kvp_test_validation", CVAR_KVP_TestValidation);
+	// JSON-enhanced cvar demo commands (disabled to avoid build issues)
+	// Cmd_AddCommand ("cvar_kvp_demo", CVAR_KVP_Demo);
+	// Cmd_AddCommand ("cvar_kvp_test_validation", CVAR_KVP_TestValidation);
 }
 
 // ============================================================================
@@ -2289,12 +2289,11 @@ Cvar_GetJSON
 Creates or gets a cvar that stores JSON data
 ================
 */
-cvar_t *Cvar_GetJSON( const char *var_name, const char *json_value, int flags ) {
-	// Temporarily disabled for testing - fallback to regular cvar
-	return Cvar_Get( var_name, json_value, flags );
-}
+// cvar_t *Cvar_GetJSON( const char *var_name, const char *json_value, int flags ) {
+// 	// Temporarily disabled for testing - fallback to regular cvar
+// 	return Cvar_Get( var_name, json_value, flags );
+// }
 
-/*
 cvar_t *Cvar_GetJSON( const char *var_name, const char *json_value, int flags ) {
 	cvar_t *var;
 #ifdef USE_CJSON
@@ -2325,6 +2324,106 @@ cvar_t *Cvar_GetJSON( const char *var_name, const char *json_value, int flags ) 
 	}
 
 	var = Cvar_FindVar (var_name);
+
+	if(var)
+	{
+		// Existing cvar - update JSON data
+		if ( var->isJSON ) {
+			// Free existing JSON data
+#ifdef USE_CJSON
+			if ( var->jsonObject ) {
+				JSON_cJSON_Delete( var->jsonObject );
+			}
+#endif
+			Z_Free( var->jsonString );
+		} else {
+			// Convert from string cvar to JSON cvar
+			var->isJSON = qtrue;
+		}
+
+#ifdef USE_CJSON
+		var->jsonObject = json_obj;
+#endif
+		var->jsonString = CopyString( json_value );
+		var->flags |= flags;
+
+		// Update string representation for compatibility
+#ifdef USE_CJSON
+		char *json_str = JSON_cJSON_PrintUnformatted( json_obj );
+		if ( var->string ) {
+			Z_Free( var->string );
+		}
+		var->string = json_str;
+#endif
+
+		var->value = 0.0f;
+		var->integer = 0;
+
+        MUTEX_UNLOCK(cvar_mutex);
+		return var;
+	}
+
+	//
+	// allocate a new cvar
+	//
+
+	// find a free cvar
+	int index;
+	for(index = 0; index < MAX_CVARS; index++)
+	{
+		if(!cvar_indexes[index].name)
+			break;
+	}
+
+	if(index >= MAX_CVARS)
+	{
+		if(!com_errorEntered) {
+            MUTEX_UNLOCK(cvar_mutex);
+			Com_Error(ERR_FATAL, "Error: Too many cvars, cannot create a new one!");
+        }
+        MUTEX_UNLOCK(cvar_mutex);
+		return NULL;
+	}
+
+	var = &cvar_indexes[index];
+	Com_Memset( var, 0, sizeof( *var ) );
+
+	var->name = CopyString( var_name );
+#ifdef USE_CJSON
+	var->jsonString = CopyString( json_value );
+	var->jsonObject = json_obj;
+	var->isJSON = qtrue;
+
+	// Create string representation for compatibility
+	char *json_str = JSON_cJSON_PrintUnformatted( json_obj );
+	if ( json_str ) {
+		var->string = CopyString( json_str );
+		free( json_str ); // cJSON uses malloc, so use free
+	} else {
+		var->string = CopyString( "{}" ); // fallback
+	}
+#endif
+	var->flags = flags;
+	var->description = NULL;
+
+	var->value = 0.0f;
+	var->integer = 0;
+
+	var->next = cvar_vars;
+	cvar_vars = var;
+
+	// Link into hash table
+	var->hashIndex = Cvar_HashString( var_name );
+	var->hashNext = hashTable[var->hashIndex];
+	hashTable[var->hashIndex] = var;
+	if ( var->hashNext ) {
+		var->hashNext->hashPrev = var;
+	}
+
+	cvar_numIndexes++;
+
+    MUTEX_UNLOCK(cvar_mutex);
+	return var;
 
 	if(var) {
 		// Existing cvar - update JSON data
@@ -2505,6 +2604,8 @@ Returns NULL if not found or not a JSON cvar
 ================
 */
 const char *Cvar_GetJSONValue( const char *var_name, const char *key_path ) {
+	(void)var_name;
+	(void)key_path;
 #ifdef USE_CJSON
 	cvar_t *var;
 	const char *result = NULL;
@@ -2572,6 +2673,8 @@ Retrieves a numeric value from a JSON cvar
 ================
 */
 double Cvar_GetJSONNumber( const char *var_name, const char *key_path, double default_value ) {
+	(void)var_name;
+	(void)key_path;
 #ifdef USE_CJSON
 	const char *str_value = Cvar_GetJSONValue( var_name, key_path );
 	if ( str_value ) {
@@ -2591,6 +2694,8 @@ Retrieves a string value from a JSON cvar
 ================
 */
 const char *Cvar_GetJSONString( const char *var_name, const char *key_path, const char *default_value ) {
+	(void)var_name;
+	(void)key_path;
 #ifdef USE_CJSON
 	const char *result = Cvar_GetJSONValue( var_name, key_path );
 	return result ? result : default_value;
@@ -2607,6 +2712,8 @@ Retrieves a boolean value from a JSON cvar
 ================
 */
 qboolean Cvar_GetJSONBoolean( const char *var_name, const char *key_path, qboolean default_value ) {
+	(void)var_name;
+	(void)key_path;
 #ifdef USE_CJSON
 	const char *str_value = Cvar_GetJSONValue( var_name, key_path );
 	if ( str_value ) {
@@ -2626,6 +2733,9 @@ Sets a JSON validator for a cvar
 ================
 */
 void Cvar_SetJSONValidator( cvar_t *var, cvarJSONValidator_t validator_type, const char *schema ) {
+	(void)var;
+	(void)validator_type;
+	(void)schema;
 #ifdef USE_CJSON
 	if ( !var ) {
 		return;
@@ -2646,6 +2756,8 @@ Validates JSON data for a cvar
 ================
 */
 qboolean Cvar_ValidateJSON( cvar_t *var, const char *json_string ) {
+	(void)var;
+	(void)json_string;
 #ifdef USE_CJSON
 	cJSON *test_obj;
 

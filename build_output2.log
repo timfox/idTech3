@@ -1,7 +1,0 @@
-make: Entering directory '/home/tim/Desktop/idtech3/build-vk-Release'
-[  2%] Built target q3ui
-[ 15%] Built target botlib
-[ 52%] Built target client
-[ 92%] Built target common
-[100%] Built target idtech3.x86_64
-make: Leaving directory '/home/tim/Desktop/idtech3/build-vk-Release'
