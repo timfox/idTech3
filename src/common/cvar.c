@@ -2243,6 +2243,8 @@ const char *Cvar_GetJSONValue( const char *var_name, const char *key_path ) {
 #else
 const char *Cvar_GetJSONValue( const char *var_name, const char *key_path ) {
 	// USE_CJSON disabled - return NULL
+	Q_UNUSED(var_name);
+	Q_UNUSED(key_path);
 	return NULL;
 }
 #endif

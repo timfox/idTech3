@@ -11,18 +11,42 @@ with the existing json.h API when possible.
 #include "q_shared.h"
 #include "qcommon.h"
 
+// Suppress unused function warnings for wrapper functions that may be used in future
+#pragma GCC diagnostic ignored "-Wunused-function"
+
 #ifdef USE_CJSON
 #include "cJSON.h"
 
 // CVar to control JSON library usage
 static cvar_t *com_json_library;
 
+// Static function declarations to suppress missing prototype warnings
+static cJSON *JSON_cJSON_Parse(const char *jsonString);
+static cJSON *JSON_cJSON_GetObjectItem(const cJSON *object, const char *string);
+static cJSON *JSON_cJSON_GetArrayItem(const cJSON *array, int item);
+static int JSON_cJSON_GetArraySize(const cJSON *array);
+static const char *JSON_cJSON_GetStringValue(const cJSON *item);
+static double JSON_cJSON_GetNumberValue(const cJSON *item);
+static qboolean JSON_cJSON_IsString(const cJSON *item);
+static qboolean JSON_cJSON_IsNumber(const cJSON *item);
+static qboolean JSON_cJSON_IsObject(const cJSON *item);
+static qboolean JSON_cJSON_IsArray(const cJSON *item);
+static void JSON_cJSON_Delete(cJSON *item);
+static char *JSON_cJSON_Print(const cJSON *item);
+static char *JSON_cJSON_PrintUnformatted(const cJSON *item);
+static cJSON *JSON_cJSON_CreateObject(void);
+static cJSON *JSON_cJSON_CreateArray(void);
+static cJSON *JSON_cJSON_CreateString(const char *string);
+static cJSON *JSON_cJSON_CreateNumber(double num);
+static void JSON_cJSON_AddItemToObject(cJSON *object, const char *string, cJSON *item);
+static void JSON_cJSON_AddItemToArray(cJSON *array, cJSON *item);
+
 /*
 =================
 JSON_cJSON_Parse
 =================
 */
-cJSON *JSON_cJSON_Parse(const char *jsonString)
+static cJSON *JSON_cJSON_Parse(const char *jsonString)
 {
 	if (!jsonString || !*jsonString)
 		return NULL;
@@ -35,7 +59,7 @@ cJSON *JSON_cJSON_Parse(const char *jsonString)
 JSON_cJSON_GetObjectItem
 =================
 */
-cJSON *JSON_cJSON_GetObjectItem(const cJSON *object, const char *string)
+static cJSON *JSON_cJSON_GetObjectItem(const cJSON *object, const char *string)
 {
 	if (!object || !string)
 		return NULL;
@@ -48,7 +72,7 @@ cJSON *JSON_cJSON_GetObjectItem(const cJSON *object, const char *string)
 JSON_cJSON_GetArrayItem
 =================
 */
-cJSON *JSON_cJSON_GetArrayItem(const cJSON *array, int item)
+static cJSON *JSON_cJSON_GetArrayItem(const cJSON *array, int item)
 {
 	if (!array)
 		return NULL;
@@ -61,7 +85,7 @@ cJSON *JSON_cJSON_GetArrayItem(const cJSON *array, int item)
 JSON_cJSON_GetArraySize
 =================
 */
-int JSON_cJSON_GetArraySize(const cJSON *array)
+static int JSON_cJSON_GetArraySize(const cJSON *array)
 {
 	if (!array)
 		return 0;
@@ -74,7 +98,7 @@ int JSON_cJSON_GetArraySize(const cJSON *array)
 JSON_cJSON_GetStringValue
 =================
 */
-const char *JSON_cJSON_GetStringValue(const cJSON *item)
+static const char *JSON_cJSON_GetStringValue(const cJSON *item)
 {
 	if (!item)
 		return NULL;
@@ -87,7 +111,7 @@ const char *JSON_cJSON_GetStringValue(const cJSON *item)
 JSON_cJSON_GetNumberValue
 =================
 */
-double JSON_cJSON_GetNumberValue(const cJSON *item)
+static double JSON_cJSON_GetNumberValue(const cJSON *item)
 {
 	if (!item)
 		return 0.0;
@@ -100,7 +124,7 @@ double JSON_cJSON_GetNumberValue(const cJSON *item)
 JSON_cJSON_IsString
 =================
 */
-qboolean JSON_cJSON_IsString(const cJSON *item)
+static qboolean JSON_cJSON_IsString(const cJSON *item)
 {
 	if (!item)
 		return qfalse;
@@ -113,7 +137,7 @@ qboolean JSON_cJSON_IsString(const cJSON *item)
 JSON_cJSON_IsNumber
 =================
 */
-qboolean JSON_cJSON_IsNumber(const cJSON *item)
+static qboolean JSON_cJSON_IsNumber(const cJSON *item)
 {
 	if (!item)
 		return qfalse;
@@ -126,7 +150,7 @@ qboolean JSON_cJSON_IsNumber(const cJSON *item)
 JSON_cJSON_IsObject
 =================
 */
-qboolean JSON_cJSON_IsObject(const cJSON *item)
+static qboolean JSON_cJSON_IsObject(const cJSON *item)
 {
 	if (!item)
 		return qfalse;
@@ -139,7 +163,7 @@ qboolean JSON_cJSON_IsObject(const cJSON *item)
 JSON_cJSON_IsArray
 =================
 */
-qboolean JSON_cJSON_IsArray(const cJSON *item)
+static qboolean JSON_cJSON_IsArray(const cJSON *item)
 {
 	if (!item)
 		return qfalse;
@@ -152,7 +176,7 @@ qboolean JSON_cJSON_IsArray(const cJSON *item)
 JSON_cJSON_Delete
 =================
 */
-void JSON_cJSON_Delete(cJSON *item)
+static void JSON_cJSON_Delete(cJSON *item)
 {
 	if (item)
 		cJSON_Delete(item);
@@ -163,7 +187,7 @@ void JSON_cJSON_Delete(cJSON *item)
 JSON_cJSON_Print
 =================
 */
-char *JSON_cJSON_Print(const cJSON *item)
+static char *JSON_cJSON_Print(const cJSON *item)
 {
 	if (!item)
 		return NULL;
@@ -176,7 +200,7 @@ char *JSON_cJSON_Print(const cJSON *item)
 JSON_cJSON_PrintUnformatted
 =================
 */
-char *JSON_cJSON_PrintUnformatted(const cJSON *item)
+static char *JSON_cJSON_PrintUnformatted(const cJSON *item)
 {
 	if (!item)
 		return NULL;
@@ -189,7 +213,7 @@ char *JSON_cJSON_PrintUnformatted(const cJSON *item)
 JSON_cJSON_CreateObject
 =================
 */
-cJSON *JSON_cJSON_CreateObject(void)
+static cJSON *JSON_cJSON_CreateObject(void)
 {
 	return cJSON_CreateObject();
 }
@@ -199,7 +223,7 @@ cJSON *JSON_cJSON_CreateObject(void)
 JSON_cJSON_CreateArray
 =================
 */
-cJSON *JSON_cJSON_CreateArray(void)
+static cJSON *JSON_cJSON_CreateArray(void)
 {
 	return cJSON_CreateArray();
 }
@@ -209,7 +233,7 @@ cJSON *JSON_cJSON_CreateArray(void)
 JSON_cJSON_CreateString
 =================
 */
-cJSON *JSON_cJSON_CreateString(const char *string)
+static cJSON *JSON_cJSON_CreateString(const char *string)
 {
 	if (!string)
 		return NULL;
@@ -222,7 +246,7 @@ cJSON *JSON_cJSON_CreateString(const char *string)
 JSON_cJSON_CreateNumber
 =================
 */
-cJSON *JSON_cJSON_CreateNumber(double num)
+static cJSON *JSON_cJSON_CreateNumber(double num)
 {
 	return cJSON_CreateNumber(num);
 }
@@ -232,7 +256,7 @@ cJSON *JSON_cJSON_CreateNumber(double num)
 JSON_cJSON_AddItemToObject
 =================
 */
-void JSON_cJSON_AddItemToObject(cJSON *object, const char *string, cJSON *item)
+static void JSON_cJSON_AddItemToObject(cJSON *object, const char *string, cJSON *item)
 {
 	if (object && string && item)
 		cJSON_AddItemToObject(object, string, item);
@@ -243,7 +267,7 @@ void JSON_cJSON_AddItemToObject(cJSON *object, const char *string, cJSON *item)
 JSON_cJSON_AddItemToArray
 =================
 */
-void JSON_cJSON_AddItemToArray(cJSON *array, cJSON *item)
+static void JSON_cJSON_AddItemToArray(cJSON *array, cJSON *item)
 {
 	if (array && item)
 		cJSON_AddItemToArray(array, item);
