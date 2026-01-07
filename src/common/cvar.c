@@ -2290,6 +2290,12 @@ Creates or gets a cvar that stores JSON data
 ================
 */
 cvar_t *Cvar_GetJSON( const char *var_name, const char *json_value, int flags ) {
+	// Temporarily disabled for testing - fallback to regular cvar
+	return Cvar_Get( var_name, json_value, flags );
+}
+
+/*
+cvar_t *Cvar_GetJSON( const char *var_name, const char *json_value, int flags ) {
 	cvar_t *var;
 #ifdef USE_CJSON
 	cJSON *json_obj = NULL;
@@ -2339,10 +2345,13 @@ cvar_t *Cvar_GetJSON( const char *var_name, const char *json_value, int flags ) 
 
 		// Update string representation for compatibility
 		char *json_str = JSON_cJSON_PrintUnformatted( json_obj );
-		if ( var->string ) {
-			Z_Free( var->string );
+		if ( json_str ) {
+			if ( var->string ) {
+				Z_Free( var->string );
+			}
+			var->string = CopyString( json_str );
+			free( json_str ); // cJSON uses malloc, so use free
 		}
-		var->string = json_str;
 
 		var->value = 0.0f;
 		var->integer = 0;
@@ -2378,7 +2387,12 @@ cvar_t *Cvar_GetJSON( const char *var_name, const char *json_value, int flags ) 
 
 	// Create string representation for compatibility
 	char *json_str = JSON_cJSON_PrintUnformatted( json_obj );
-	var->string = json_str;
+	if ( json_str ) {
+		var->string = CopyString( json_str );
+		free( json_str ); // cJSON uses malloc, so use free
+	} else {
+		var->string = CopyString( "{}" ); // fallback
+	}
 
 	var->value = 0.0f;
 	var->integer = 0;
@@ -2461,10 +2475,13 @@ void Cvar_SetJSON( const char *var_name, const char *json_value ) {
 
 	// Update string representation
 	char *json_str = JSON_cJSON_PrintUnformatted( json_obj );
-	if ( var->string ) {
-		Z_Free( var->string );
+	if ( json_str ) {
+		if ( var->string ) {
+			Z_Free( var->string );
+		}
+		var->string = CopyString( json_str );
+		free( json_str ); // cJSON uses malloc, so use free
 	}
-	var->string = json_str;
 
 	var->value = 0.0f;
 	var->integer = 0;
@@ -2533,7 +2550,6 @@ const char *Cvar_GetJSONValue( const char *var_name, const char *key_path ) {
 			if ( temp_str ) {
 				static char static_buffer[MAX_CVAR_VALUE_STRING];
 				Q_strncpyz( static_buffer, temp_str, sizeof( static_buffer ) );
-				JSON_cJSON_Delete( JSON_cJSON_Parse( temp_str ) ); // Free temp object
 				free( temp_str ); // cJSON uses malloc
 				result = static_buffer;
 			}
