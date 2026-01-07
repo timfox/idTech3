@@ -507,20 +507,20 @@ static qboolean GLimp_Wayland_VRRSupported(void);
 static qboolean GLimp_Wayland_VRREnabled(void);
 static void GLimp_Wayland_SetVRREnabled(qboolean enabled);
 
-qboolean GLimp_Wayland_Init(void) { return qfalse; }
-void GLimp_Wayland_Shutdown(void) {}
-qboolean GLimp_Wayland_CreateWindow(int width, int height) { (void)width; (void)height; return qfalse; }
-void GLimp_Wayland_DestroyWindow(void) {}
-void GLimp_Wayland_SetWindowSize(int width, int height) { (void)width; (void)height; }
-void GLimp_Wayland_SetWindowTitle(const char *title) { (void)title; }
-void GLimp_Wayland_PumpEvents(void) {}
-qboolean GLimp_Wayland_IsVariableRefreshRateSupported(void) { return qfalse; }
-void GLimp_Wayland_SetVariableRefreshRate(qboolean enabled) { (void)enabled; }
-qboolean GLimp_Wayland_IsMaximized(void) { return qfalse; }
-qboolean GLimp_Wayland_IsFullscreen(void) { return qfalse; }
-qboolean GLimp_Wayland_IsMinimized(void) { return qfalse; }
-qboolean GLimp_Wayland_VRRSupported(void) { return qfalse; }
-qboolean GLimp_Wayland_VRREnabled(void) { return qfalse; }
-void GLimp_Wayland_SetVRREnabled(qboolean enabled) { (void)enabled; }
+__attribute__((unused)) qboolean GLimp_Wayland_Init(void) { return qfalse; }
+__attribute__((unused)) void GLimp_Wayland_Shutdown(void) {}
+__attribute__((unused)) qboolean GLimp_Wayland_CreateWindow(int width, int height) { (void)width; (void)height; return qfalse; }
+__attribute__((unused)) void GLimp_Wayland_DestroyWindow(void) {}
+__attribute__((unused)) void GLimp_Wayland_SetWindowSize(int width, int height) { (void)width; (void)height; }
+__attribute__((unused)) void GLimp_Wayland_SetWindowTitle(const char *title) { (void)title; }
+__attribute__((unused)) void GLimp_Wayland_PumpEvents(void) {}
+__attribute__((unused)) qboolean GLimp_Wayland_IsVariableRefreshRateSupported(void) { return qfalse; }
+__attribute__((unused)) void GLimp_Wayland_SetVariableRefreshRate(qboolean enabled) { (void)enabled; }
+__attribute__((unused)) qboolean GLimp_Wayland_IsMaximized(void) { return qfalse; }
+__attribute__((unused)) qboolean GLimp_Wayland_IsFullscreen(void) { return qfalse; }
+__attribute__((unused)) qboolean GLimp_Wayland_IsMinimized(void) { return qfalse; }
+__attribute__((unused)) qboolean GLimp_Wayland_VRRSupported(void) { return qfalse; }
+__attribute__((unused)) qboolean GLimp_Wayland_VRREnabled(void) { return qfalse; }
+__attribute__((unused)) void GLimp_Wayland_SetVRREnabled(qboolean enabled) { (void)enabled; }
 
 #endif // SDL_VIDEO_DRIVER_WAYLAND && WAYLAND_HEADERS_AVAILABLE

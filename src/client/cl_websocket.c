@@ -18,7 +18,7 @@ HTTP fallback when WebSocket is not available.
 #include <libwebsockets.h>
 #else
 // Stub implementation when libwebsockets is not available
-#warning "libwebsockets not available - WebSocket support disabled"
+// WebSocket support disabled (libwebsockets not available)
 #endif
 
 // Internal state
