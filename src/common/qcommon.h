@@ -838,6 +838,16 @@ void 	Cvar_WriteVariables( fileHandle_t f );
 // writes lines containing "set variable value" for all variables
 // with the archive flag set to true.
 
+// JSON-enhanced cvar functions for complex configurations
+NODISCARD cvar_t *Cvar_GetJSON( const char *var_name, const char *json_value, int flags );
+void Cvar_SetJSON( const char *var_name, const char *json_value );
+const char *Cvar_GetJSONValue( const char *var_name, const char *key_path );
+double Cvar_GetJSONNumber( const char *var_name, const char *key_path, double default_value );
+const char *Cvar_GetJSONString( const char *var_name, const char *key_path, const char *default_value );
+qboolean Cvar_GetJSONBoolean( const char *var_name, const char *key_path, qboolean default_value );
+void Cvar_SetJSONValidator( cvar_t *var, cvarJSONValidator_t validator_type, const char *schema );
+qboolean Cvar_ValidateJSON( cvar_t *var, const char *json_string );
+
 void	Cvar_Init( void );
 
 const char *Cvar_InfoString( int bit, qboolean *truncated );

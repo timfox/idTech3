@@ -1780,6 +1780,13 @@ typedef enum {
 } cvarValidator_t;
 
 typedef enum {
+	CVJ_NONE = 0,
+	CVJ_SCHEMA,      // JSON schema validation
+	CVJ_TYPE_CHECK,  // Basic type validation
+	CVJ_MAX,
+} cvarJSONValidator_t;
+
+typedef enum {
 	CVG_NONE = 0,
 	CVG_RENDERER,
 	CVG_SERVER,
@@ -1810,6 +1817,12 @@ struct cvar_s {
 	cvar_t		*hashPrev;
 	int			hashIndex;
 	cvarGroup_t	group;				// to track changes
+
+	// JSON support for complex configurations
+	qboolean	isJSON;				// true if this cvar stores JSON data
+	char		*jsonString;		// JSON string representation
+	void		*jsonObject;		// parsed JSON object (cJSON)
+	cvarJSONValidator_t jsonValidator; // JSON schema validator
 };
 
 #define	MAX_CVAR_VALUE_STRING	256

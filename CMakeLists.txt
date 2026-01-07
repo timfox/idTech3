@@ -549,6 +549,7 @@ SET(QCOMMON_SRCS
     src/common/crash_handler.c
     src/common/files_validation.c
     src/common/cvar.c
+    src/common/cvar_kvp_demo.c
     src/common/dvar.c
     src/common/q_lockfree.c
     src/common/ecs.cpp
@@ -1440,6 +1441,8 @@ IF(USE_STB_TRUETYPE)
 ENDIF()
 # Always include tr_services.c for safe shader loading
 list(APPEND RENDERER_COMMON_SRCS src/renderers/renderercommon/tr_services.c)
+# JSON-based renderer configuration
+list(APPEND RENDERER_COMMON_SRCS src/renderers/common/tr_config_json.c)
 # Note: FreeType-dependent files are included when USE_FREETYPE is defined
 # They have proper guards to compile to empty implementations when FreeType is not available
 AUX_SOURCE_DIRECTORY(src/renderers/opengl RENDERER_GL_SRCS)
