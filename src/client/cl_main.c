@@ -4578,7 +4578,7 @@ void CL_Init( void ) {
 	cls.realtime = 0;
 
 	CL_InitInput();
-	
+
 	// Initialize Steam Deck features
 	CL_SteamDeck_Init();
 
