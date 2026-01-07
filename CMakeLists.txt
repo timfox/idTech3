@@ -4144,4 +4144,60 @@ SET_TARGET_PROPERTIES(idtech3_launcher PROPERTIES
 	RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
 )
 
+# Post-build: Copy executables to release directory
+if(NOT ANDROID)
+	add_custom_command(TARGET ${CNAME}${BINEXT} POST_BUILD
+		COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/release"
+		COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:${CNAME}${BINEXT}>" "${CMAKE_SOURCE_DIR}/release/"
+		COMMENT "Copying ${CNAME}${BINEXT} to release directory"
+	)
+
+	if(BUILD_SERVER AND TARGET ${DNAME}${BINEXT})
+		add_custom_command(TARGET ${DNAME}${BINEXT} POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/release"
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:${DNAME}${BINEXT}>" "${CMAKE_SOURCE_DIR}/release/"
+			COMMENT "Copying ${DNAME}${BINEXT} to release directory"
+		)
+	endif()
+
+	# Copy renderer libraries
+	if(USE_RENDERER_DLOPEN)
+		if(TARGET ${RENDERER_PREFIX}_vulkan${RENDEXT})
+			add_custom_command(TARGET ${RENDERER_PREFIX}_vulkan${RENDEXT} POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/release"
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:${RENDERER_PREFIX}_vulkan${RENDEXT}>" "${CMAKE_SOURCE_DIR}/release/"
+				COMMENT "Copying Vulkan renderer to release directory"
+			)
+		endif()
+		if(TARGET ${RENDERER_PREFIX}_opengl${RENDEXT})
+			add_custom_command(TARGET ${RENDERER_PREFIX}_opengl${RENDEXT} POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/release"
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:${RENDERER_PREFIX}_opengl${RENDEXT}>" "${CMAKE_SOURCE_DIR}/release/"
+				COMMENT "Copying OpenGL renderer to release directory"
+			)
+		endif()
+		if(TARGET ${RENDERER_PREFIX}_rtx${RENDEXT})
+			add_custom_command(TARGET ${RENDERER_PREFIX}_rtx${RENDEXT} POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/release"
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:${RENDERER_PREFIX}_rtx${RENDEXT}>" "${CMAKE_SOURCE_DIR}/release/"
+				COMMENT "Copying RTX renderer to release directory"
+			)
+		endif()
+		if(TARGET idtech3_launcher)
+			add_custom_command(TARGET idtech3_launcher POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/release"
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:idtech3_launcher>" "${CMAKE_SOURCE_DIR}/release/"
+				COMMENT "Copying launcher to release directory"
+			)
+		endif()
+		if(BUILD_DEDICATED AND TARGET idtech3.ded${BINEXT})
+			add_custom_command(TARGET idtech3.ded${BINEXT} POST_BUILD
+				COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/release"
+				COMMAND ${CMAKE_COMMAND} -E copy_if_different "$<TARGET_FILE:idtech3.ded${BINEXT}>" "${CMAKE_SOURCE_DIR}/release/"
+				COMMENT "Copying dedicated server to release directory"
+			)
+		endif()
+	endif()
+endif()
+
 add_subdirectory(src/benchmarks)
