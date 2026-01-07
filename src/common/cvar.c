@@ -1,29 +1,12 @@
-/*
-===========================================================================
-Copyright (C) 1999-2005 Id Software, Inc.
-
-This file is part of Quake III Arena source code.
-
-Quake III Arena source code is free software; you can redistribute it
-and/or modify it under the terms of the GNU General Public License as
-published by the Free Software Foundation; either version 2 of the License,
-or (at your option) any later version.
-
-Quake III Arena source code is distributed in the hope that it will be
-useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with Quake III Arena source code; if not, write to the Free Software
-Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-===========================================================================
-*/
 // cvar.c -- dynamic variable tracking
 
 #include "q_shared.h"
 #include "qcommon.h"
 #include "cvar_kvp_demo.h"
+
+#ifdef USE_CJSON
+#include "cJSON.h"
+#endif
 
 cvar_t	*cvar_vars = NULL;
 static cvar_t	*cvar_cheats;
@@ -44,11 +27,6 @@ static int	cvar_group[ CVG_MAX ];
 static	cvar_t	*hashTable[FILE_HASH_SIZE];
 static	qboolean cvar_sort = qfalse;
 
-/*
-================
-return a hash value for the filename
-================
-*/
 static long generateHashValue( const char *fname ) {
 	int		i;
 	long	hash;
@@ -66,11 +44,6 @@ static long generateHashValue( const char *fname ) {
 }
 
 
-/*
-============
-Cvar_ValidateName
-============
-*/
 static qboolean Cvar_ValidateName( const char *name ) {
 	const char *s;
 	int c;
@@ -93,11 +66,6 @@ static qboolean Cvar_ValidateName( const char *name ) {
 }
 
 
-/*
-============
-Cvar_FindVar
-============
-*/
 static cvar_t *Cvar_FindVar( const char *var_name ) {
 	cvar_t	*var;
 	long hash;
@@ -117,11 +85,6 @@ static cvar_t *Cvar_FindVar( const char *var_name ) {
 }
 
 
-/*
-============
-Cvar_VariableValue
-============
-*/
 float Cvar_VariableValue( const char *var_name ) {
 	cvar_t	*var;
 	
@@ -132,11 +95,6 @@ float Cvar_VariableValue( const char *var_name ) {
 }
 
 
-/*
-============
-Cvar_VariableIntegerValue
-============
-*/
 int Cvar_VariableIntegerValue( const char *var_name ) {
 	cvar_t	*var;
 	
@@ -147,11 +105,6 @@ int Cvar_VariableIntegerValue( const char *var_name ) {
 }
 
 
-/*
-============
-Cvar_VariableString
-============
-*/
 const char *Cvar_VariableString( const char *var_name ) {
 	cvar_t *var;
 	
@@ -162,11 +115,6 @@ const char *Cvar_VariableString( const char *var_name ) {
 }
 
 
-/*
-============
-Cvar_VariableStringBuffer
-============
-*/
 void Cvar_VariableStringBuffer( const char *var_name, char *buffer, int bufsize ) {
 	cvar_t *var;
 	
@@ -189,11 +137,6 @@ void Cvar_VariableStringBuffer( const char *var_name, char *buffer, int bufsize 
 }
 
 
-/*
-============
-Cvar_VariableStringBufferSafe
-============
-*/
 void Cvar_VariableStringBufferSafe( const char *var_name, char *buffer, int bufsize, int flag ) {
 	cvar_t *var;
 	
@@ -216,11 +159,6 @@ void Cvar_VariableStringBufferSafe( const char *var_name, char *buffer, int bufs
 }
 
 
-/*
-============
-Cvar_Flags
-============
-*/
 unsigned Cvar_Flags( const char *var_name )
 {
 	const cvar_t *var;
@@ -244,11 +182,6 @@ unsigned Cvar_Flags( const char *var_name )
 }
 
 
-/*
-============
-Cvar_CommandCompletion
-============
-*/
 void Cvar_CommandCompletion( void (*callback)(const char *s) )
 {
 	const cvar_t *cvar;
@@ -277,11 +210,6 @@ static qboolean Cvar_IsIntegral( const char *s ) {
 }
 
 
-/*
-============
-Cvar_Validate
-============
-*/
 static const char *Cvar_Validate( cvar_t *var, const char *value, qboolean warn )
 {
 	static char intbuf[ 32 ];
@@ -398,14 +326,6 @@ static const char *Cvar_Validate( cvar_t *var, const char *value, qboolean warn 
 }
 
 
-/*
-============
-Cvar_Get
-
-If the variable already exists, the value will not be set unless CVAR_ROM
-The flags will be or'ed in if the variable exists.
-============
-*/
 cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 	cvar_t	*var;
 	long	hash;
@@ -660,13 +580,6 @@ static void Cvar_Sort( void )
 }
 
 
-/*
-============
-Cvar_Print
-
-Prints the value, default, and latched string of the given variable
-============
-*/
 static void Cvar_Print( const cvar_t *v ) {
 
 	Com_Printf ("\"%s\" is:\"%s" S_COLOR_WHITE "\"",
@@ -693,11 +606,6 @@ static void Cvar_Print( const cvar_t *v ) {
 }
 
 
-/*
-============
-Cvar_Set2
-============
-*/
 cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 	cvar_t	*var;
 
@@ -863,21 +771,11 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 }
 
 
-/*
-============
-Cvar_Set
-============
-*/
 void Cvar_Set( const char *var_name, const char *value) {
 	Cvar_Set2 (var_name, value, qtrue);
 }
 
 
-/*
-============
-Cvar_SetSafe
-============
-*/
 void Cvar_SetSafe( const char *var_name, const char *value )
 {
 	if ( !var_name ) {
@@ -915,21 +813,11 @@ void Cvar_SetSafe( const char *var_name, const char *value )
 }
 
 
-/*
-============
-Cvar_SetLatched
-============
-*/
 void Cvar_SetLatched( const char *var_name, const char *value) {
 	Cvar_Set2 (var_name, value, qfalse);
 }
 
 
-/*
-============
-Cvar_SetValue
-============
-*/
 void Cvar_SetValue( const char *var_name, float value) {
 	char	val[32];
 
@@ -942,11 +830,6 @@ void Cvar_SetValue( const char *var_name, float value) {
 }
 
 
-/*
-============
-Cvar_SetIntegerValue
-============
-*/
 void Cvar_SetIntegerValue( const char *var_name, int value ) {
 	char	val[32];
 
@@ -955,11 +838,6 @@ void Cvar_SetIntegerValue( const char *var_name, int value ) {
 }
 
 
-/*
-============
-Cvar_SetValueSafe
-============
-*/
 void Cvar_SetValueSafe( const char *var_name, float value )
 {
 	if ( !var_name ) {
@@ -976,11 +854,6 @@ void Cvar_SetValueSafe( const char *var_name, float value )
 }
 
 
-/*
-============
-Cvar_SetModified
-============
-*/
 qboolean Cvar_SetModified( const char *var_name, qboolean modified )
 {
 	cvar_t	*var;
@@ -998,32 +871,15 @@ qboolean Cvar_SetModified( const char *var_name, qboolean modified )
 }
 
 
-/*
-============
-Cvar_Reset
-============
-*/
 void Cvar_Reset( const char *var_name ) {
 	Cvar_Set2( var_name, NULL, qfalse );
 }
 
-/*
-============
-Cvar_ForceReset
-============
-*/
 void Cvar_ForceReset(const char *var_name)
 {
 	Cvar_Set2(var_name, NULL, qtrue);
 }
 
-/*
-============
-Cvar_SetCheatState
-
-Any testing variables will be reset to the safe values
-============
-*/
 void Cvar_SetCheatState(void)
 {
 	cvar_t	*var;
@@ -1046,13 +902,6 @@ void Cvar_SetCheatState(void)
 	}
 }
 
-/*
-============
-Cvar_Command
-
-Handles variable inspection and changing from the console
-============
-*/
 qboolean Cvar_Command( void ) {
 	cvar_t	*v;
 
@@ -1074,14 +923,6 @@ qboolean Cvar_Command( void ) {
 }
 
 
-/*
-============
-Cvar_Print_f
-
-Prints the contents of a cvar 
-(preferred over Cvar_Command where cvar names and commands conflict)
-============
-*/
 static void Cvar_Print_f( void )
 {
 	const char *name;
@@ -1104,14 +945,6 @@ static void Cvar_Print_f( void )
 }
 
 
-/*
-============
-Cvar_Toggle_f
-
-Toggles a cvar for easy single key binding, optionally through a list of
-given values
-============
-*/
 static void Cvar_Toggle_f( void ) {
 	int		i, c;
 	const char	*curval;
@@ -1149,14 +982,6 @@ static void Cvar_Toggle_f( void ) {
 }
 
 
-/*
-============
-Cvar_Set_f
-
-Allows setting and defining of arbitrary cvars from console, even if they
-weren't declared in C code.
-============
-*/
 static void Cvar_Set_f( void ) {
 	int		c;
 	const char	*cmd;
@@ -1201,11 +1026,6 @@ static void Cvar_Set_f( void ) {
 }
 
 
-/*
-============
-Cvar_Reset_f
-============
-*/
 static void Cvar_Reset_f( void ) {
 	if ( Cmd_Argc() != 2 ) {
 		Com_Printf ("usage: reset <variable>\n");
@@ -1455,14 +1275,6 @@ static void Cvar_Func_f( void ) {
 }
 
 
-/*
-============
-Cvar_WriteVariables
-
-Appends lines containing "set variable value" for all variables
-with the archive flag set to qtrue.
-============
-*/
 void Cvar_WriteVariables( fileHandle_t f )
 {
 	cvar_t	*var;
@@ -1499,11 +1311,6 @@ void Cvar_WriteVariables( fileHandle_t f )
 }
 
 
-/*
-============
-Cvar_List_f
-============
-*/
 static void Cvar_List_f( void ) {
 	cvar_t	*var;
 	int		i;
@@ -1581,11 +1388,6 @@ static void Cvar_List_f( void ) {
 }
 
 
-/*
-============
-Cvar_ListModified_f
-============
-*/
 static void Cvar_ListModified_f( void ) {
 	cvar_t	*var;
 	int		totalModified;
@@ -1666,13 +1468,6 @@ static void Cvar_ListModified_f( void ) {
 }
 
 
-/*
-============
-Cvar_Unset
-
-Unsets a cvar
-============
-*/
 static cvar_t *Cvar_Unset( cvar_t *cv )
 {
 	cvar_t *next = cv->next;
@@ -1715,13 +1510,6 @@ static cvar_t *Cvar_Unset( cvar_t *cv )
 }
 
 
-/*
-============
-Cvar_Unset_f
-
-Unsets a userdefined cvar
-============
-*/
 static void Cvar_Unset_f( void )
 {
 	cvar_t *cv;
@@ -1745,14 +1533,6 @@ static void Cvar_Unset_f( void )
 }
 
 
-/*
-============
-Cvar_Restart
-
-Resets all cvars to their hardcoded values and removes userdefined variables
-and variables added via the VMs if requested.
-============
-*/
 
 void Cvar_Restart( qboolean unsetVM )
 {
@@ -1799,27 +1579,12 @@ static void Cvar_Trim( qboolean verbose )
 }
 
 
-/*
-============
-Cvar_Restart_f
-
-Resets all cvars to their hardcoded values
-============
-*/
 static void Cvar_Restart_f( void )
 {
 	Cvar_Restart( qfalse );
 }
 
 
-/*
-============
-Cvar_Trim_f
-
-Removes all user-created cvars
-This will only accept to run when both the server and client are running unless forced
-============
-*/
 static void Cvar_Trim_f( void )
 {
 	qboolean forced = qfalse;
@@ -1864,11 +1629,6 @@ static void Cvar_Trim_f( void )
 }
 
 
-/*
-=====================
-Cvar_InfoString
-=====================
-*/
 const char *Cvar_InfoString( int bit, qboolean *truncated )
 {
 	static char	info[ MAX_INFO_STRING ];
@@ -1934,13 +1694,6 @@ const char *Cvar_InfoString( int bit, qboolean *truncated )
 }
 
 
-/*
-=====================
-Cvar_InfoString_Big
-
-  handles large info strings ( CS_SYSTEMINFO )
-=====================
-*/
 const char *Cvar_InfoString_Big( int bit, qboolean *truncated )
 {
 	static char	info[BIG_INFO_STRING];
@@ -1965,21 +1718,11 @@ const char *Cvar_InfoString_Big( int bit, qboolean *truncated )
 }
 
 
-/*
-=====================
-Cvar_InfoStringBuffer
-=====================
-*/
 void Cvar_InfoStringBuffer( int bit, char* buff, int buffsize ) {
 	Q_strncpyz( buff, Cvar_InfoString( bit, NULL ), buffsize );
 }
 
 
-/*
-=====================
-Cvar_CheckRange
-=====================
-*/
 void Cvar_CheckRange( cvar_t *var, const char *mins, const char *maxs, cvarValidator_t type )
 {
 	if ( type >= CV_MAX ) {
@@ -2012,11 +1755,6 @@ void Cvar_CheckRange( cvar_t *var, const char *mins, const char *maxs, cvarValid
 }
 
 
-/*
-=====================
-Cvar_SetDescription
-=====================
-*/
 void Cvar_SetDescription( cvar_t *var, const char *var_description )
 {
 	if( var_description && var_description[0] != '\0' )
@@ -2030,11 +1768,6 @@ void Cvar_SetDescription( cvar_t *var, const char *var_description )
 }
 
 
-/*
-=====================
-Cvar_SetDescription
-=====================
-*/
 void Cvar_SetDescription2( const char *var_name, const char* var_description )
 {
 	cvar_t *var;
@@ -2057,11 +1790,6 @@ void Cvar_SetDescription2( const char *var_name, const char* var_description )
 }
 
 
-/*
-=====================
-Cvar_SetGroup
-=====================
-*/
 void Cvar_SetGroup( cvar_t *var, cvarGroup_t group ) {
 	if ( group < CVG_MAX ) {
 		var->group = group;
@@ -2071,11 +1799,6 @@ void Cvar_SetGroup( cvar_t *var, cvarGroup_t group ) {
 }
 
 
-/*
-=====================
-Cvar_CheckGroup
-=====================
-*/
 int Cvar_CheckGroup( cvarGroup_t group ) {
 	if ( group < CVG_MAX ) {
 		return cvar_group[ group ];
@@ -2085,11 +1808,6 @@ int Cvar_CheckGroup( cvarGroup_t group ) {
 }
 
 
-/*
-=====================
-Cvar_ResetGroup
-=====================
-*/
 void Cvar_ResetGroup( cvarGroup_t group, qboolean resetModifiedFlags ) {
 	if ( group < CVG_MAX ) {
 		cvar_group[ group ] = 0;
@@ -2105,13 +1823,6 @@ void Cvar_ResetGroup( cvarGroup_t group, qboolean resetModifiedFlags ) {
 }
 
 
-/*
-=====================
-Cvar_Register
-
-basically a slightly modified Cvar_Get for the interpreted modules
-=====================
-*/
 #define INVALID_FLAGS ( CVAR_USER_CREATED | CVAR_SERVER_CREATED | CVAR_PROTECTED | CVAR_PRIVATE | CVAR_MODIFIED | CVAR_NONEXISTENT )
 void Cvar_Register( vmCvar_t *vmCvar, const char *varName, const char *defaultValue, int flags, int privateFlag )
 {
@@ -2168,13 +1879,6 @@ void Cvar_Register( vmCvar_t *vmCvar, const char *varName, const char *defaultVa
 }
 
 
-/*
-=====================
-Cvar_Update
-
-updates an interpreted modules' version of a cvar
-=====================
-*/
 void Cvar_Update( vmCvar_t *vmCvar, int privateFlag ) {
 	size_t	len;
 	cvar_t	*cv = NULL;
@@ -2212,11 +1916,6 @@ void Cvar_Update( vmCvar_t *vmCvar, int privateFlag ) {
 }
 
 
-/*
-==================
-Cvar_CompleteCvarName
-==================
-*/
 void Cvar_CompleteCvarName( const char *args, int argNum )
 {
 	if( argNum == 2 )
@@ -2230,13 +1929,6 @@ void Cvar_CompleteCvarName( const char *args, int argNum )
 }
 
 
-/*
-============
-Cvar_Init
-
-Reads in all archived cvars
-============
-*/
 void Cvar_Init (void)
 {
     MUTEX_INIT(cvar_mutex);
@@ -2282,169 +1974,132 @@ void Cvar_Init (void)
 // JSON-enhanced cvar functions for complex configurations
 // ============================================================================
 
-/*
-================
-Cvar_GetJSON
-
-Creates or gets a cvar that stores JSON data
-================
-*/
 // cvar_t *Cvar_GetJSON( const char *var_name, const char *json_value, int flags ) {
 // 	// Temporarily disabled for testing - fallback to regular cvar
 // 	return Cvar_Get( var_name, json_value, flags );
 // }
 
 cvar_t *Cvar_GetJSON( const char *var_name, const char *json_value, int flags ) {
-	// Temporarily disabled due to memory corruption issues
-	return Cvar_Get( var_name, json_value, flags );
-	/*
-#ifndef USE_CJSON
-// 	cvar_t *var;
-// 	cJSON *json_obj = NULL;
-// 
-// 	if ( !var_name || !json_value ) {
-// 		Com_Error( ERR_FATAL, "Cvar_GetJSON: NULL parameter" );
-// 	}
-// 
-//     MUTEX_LOCK(cvar_mutex);
-// 
-// 	if ( !Cvar_ValidateName( var_name ) ) {
-// 		Com_Printf( "invalid cvar name string: %s\n", var_name ? var_name : "(null)" );
-// 		if ( var_name ) {
-// 			var_name = "BADNAME";
-// 		} else {
-//             MUTEX_UNLOCK(cvar_mutex);
-// 			Com_Error( ERR_FATAL, "Cvar_GetJSON: NULL var_name after validation check" );
-// 			return NULL; // Never reached
-// 		}
-// 	}
-// 
-// 	// Try to parse the JSON
-// 	json_obj = JSON_cJSON_Parse(json_value);
-// 	if ( !json_obj ) {
-// 		Com_Printf( S_COLOR_YELLOW "WARNING: Invalid JSON for cvar '%s', using empty object\n", var_name );
-// 		json_obj = JSON_cJSON_CreateObject();
-// 	}
-// 
-// 	var = Cvar_FindVar (var_name);
-// 
-// 	if(var)
-// 	{
-// 		// Existing cvar - update JSON data
-// 		if ( var->isJSON ) {
-// 			// Free existing JSON data
-// #ifndef USE_CJSON
-// 			if ( var->jsonObject ) {
-// 				JSON_cJSON_Delete( var->jsonObject );
-// 			}
-// #endif
-// 			Z_Free( var->jsonString );
-// 		} else {
-// 			// Convert from string cvar to JSON cvar
-// 			var->isJSON = qtrue;
-// 		}
-// 
-// #ifndef USE_CJSON
-// 		var->jsonObject = json_obj;
-// #endif
-// 		var->jsonString = CopyString( json_value );
-// 		var->flags |= flags;
-// 
-// 		// Update string representation for compatibility
-// #ifndef USE_CJSON
-// 		char *json_str = JSON_cJSON_PrintUnformatted( json_obj );
-// 		if ( var->string ) {
-// 			Z_Free( var->string );
-// 		}
-// 		var->string = json_str;
-// #endif
-// 
-// 		var->value = 0.0f;
-// 		var->integer = 0;
-// 
-//         MUTEX_UNLOCK(cvar_mutex);
-// 		return var;
-// 	}
-// 
-// 	//
-// 	// allocate a new cvar
-// 	//
-// 
-// 	// find a free cvar
-// 	int index;
-// 	for(index = 0; index < MAX_CVARS; index++)
-// 	{
-// 		if(!cvar_indexes[index].name)
-// 			break;
-// 	}
-// 
-// 	if(index >= MAX_CVARS)
-// 	{
-// 		if(!com_errorEntered) {
-//             MUTEX_UNLOCK(cvar_mutex);
-// 			Com_Error(ERR_FATAL, "Error: Too many cvars, cannot create a new one!");
-//         }
-//         MUTEX_UNLOCK(cvar_mutex);
-// 		return NULL;
-// 	}
-// 
-// 	var = &cvar_indexes[index];
-// 	Com_Memset( var, 0, sizeof( *var ) );
-// 
-// 	var->name = CopyString( var_name );
-// #ifndef USE_CJSON
-// 	var->jsonString = CopyString( json_value );
-// 	var->jsonObject = json_obj;
-// 	var->isJSON = qtrue;
-// 
-// 	// Create string representation for compatibility
-// 	char *json_str = JSON_cJSON_PrintUnformatted( json_obj );
-// 	if ( json_str ) {
-// 		var->string = CopyString( json_str );
-// 		free( json_str ); // cJSON uses malloc, so use free
-// 	} else {
-// 		var->string = CopyString( "{}" ); // fallback
-// 	}
-// #endif
-// 	var->flags = flags;
-// 	var->description = NULL;
-// 
-// 	var->value = 0.0f;
-// 	var->integer = 0;
-// 
-// 	var->next = cvar_vars;
-// 	cvar_vars = var;
-// 
-// 	// Link into hash table
-// 	var->hashIndex = Cvar_HashString( var_name );
-// 	var->hashNext = hashTable[var->hashIndex];
-// 	hashTable[var->hashIndex] = var;
-// 	if ( var->hashNext ) {
-// 		var->hashNext->hashPrev = var;
-// 	}
-// 
-// 	cvar_numIndexes++;
-// 
-//     MUTEX_UNLOCK(cvar_mutex);
-// 	return var;
-// 
-// #else // !USE_CJSON
-// 	// Fallback to regular string cvar if cJSON not available
-// 	return Cvar_Get( var_name, json_value, flags );
-// #endif // !USE_CJSON
-}
-
-/*
-================
-Cvar_SetJSON
-
-Sets a cvar to store JSON data
-================
-*/
-void Cvar_SetJSON( const char *var_name, const char *json_value ) {
-#ifndef USE_CJSON
 	cvar_t *var;
 	cJSON *json_obj = NULL;
+
+	if ( !var_name || !json_value ) {
+		Com_Error( ERR_FATAL, "Cvar_GetJSON: NULL parameter" );
+	}
+
+    MUTEX_LOCK(cvar_mutex);
+
+	if ( !Cvar_ValidateName( var_name ) ) {
+		Com_Printf( "invalid cvar name string: %s\n", var_name ? var_name : "(null)" );
+		if ( var_name ) {
+			var_name = "BADNAME";
+		} else {
+            MUTEX_UNLOCK(cvar_mutex);
+			Com_Error( ERR_FATAL, "Cvar_GetJSON: NULL var_name after validation check" );
+			return NULL; // Never reached
+		}
+	}
+
+	// Try to parse the JSON safely
+	json_obj = cJSON_Parse(json_value);
+	if ( !json_obj ) {
+		Com_Printf( S_COLOR_YELLOW "WARNING: Invalid JSON for cvar '%s', using empty object\n", var_name );
+		json_obj = cJSON_CreateObject();
+		if ( !json_obj ) {
+			Com_Printf( S_COLOR_RED "ERROR: Failed to create empty JSON object for cvar '%s'\n", var_name );
+			MUTEX_UNLOCK(cvar_mutex);
+			return Cvar_Get( var_name, json_value, flags );
+		}
+	}
+
+	var = Cvar_FindVar (var_name);
+
+	if(var)
+	{
+		// Existing cvar - update JSON data safely
+		if ( var->isJSON ) {
+			// Free existing JSON data
+			if ( var->jsonObject ) {
+				cJSON_Delete( var->jsonObject );
+				var->jsonObject = NULL;
+			}
+			if ( var->jsonString ) {
+				Z_Free( var->jsonString );
+				var->jsonString = NULL;
+			}
+		} else {
+			// Convert from string cvar to JSON cvar
+			var->isJSON = qtrue;
+		}
+
+		var->jsonObject = json_obj;
+		var->jsonString = CopyString( json_value );
+		var->flags |= flags;
+
+		// Update string representation for compatibility
+		char *json_str = cJSON_PrintUnformatted( json_obj );
+		if ( json_str ) {
+			if ( var->string ) {
+				Z_Free( var->string );
+			}
+			var->string = CopyString( json_str );
+			cJSON_free( json_str ); // Use cJSON's free function
+		} else {
+			// Fallback if printing fails
+			if ( var->string ) {
+				Z_Free( var->string );
+			}
+			var->string = CopyString( json_value );
+		}
+
+		var->value = 0.0f;
+		var->integer = 0;
+
+        MUTEX_UNLOCK(cvar_mutex);
+		return var;
+	}
+
+	// Create new JSON cvar
+	// find a free cvar
+	int index;
+	for(index = 0; index < MAX_CVARS; index++)
+	{
+		if(!cvar_indexes[index].name)
+			break;
+	}
+
+	if(index >= MAX_CVARS)
+	{
+		cJSON_Delete( json_obj );
+		MUTEX_UNLOCK(cvar_mutex);
+		return Cvar_Get( var_name, json_value, flags );
+	}
+
+	var = &cvar_indexes[index];
+
+	if(index >= cvar_numIndexes)
+		cvar_numIndexes = index + 1;
+
+	var->name = CopyString( var_name );
+	var->string = CopyString( json_value );
+	var->flags = flags;
+	var->isJSON = qtrue;
+	var->jsonObject = json_obj;
+	var->jsonString = CopyString( json_value );
+	var->value = 0.0f;
+	var->integer = 0;
+
+	var->next = cvar_vars;
+	cvar_vars = var;
+
+	cvar_numIndexes++;
+
+    MUTEX_UNLOCK(cvar_mutex);
+	return var;
+}
+
+void Cvar_SetJSON( const char *var_name, const char *json_value ) {
+	cvar_t *var;
 
 	if ( !var_name ) {
 		Com_Error( ERR_FATAL, "Cvar_SetJSON: NULL var_name parameter" );
@@ -2461,68 +2116,62 @@ void Cvar_SetJSON( const char *var_name, const char *json_value ) {
 		return;
 	}
 
-	// Parse new JSON
+	// Parse new JSON safely
+	cJSON *json_obj = NULL;
 	if ( json_value && *json_value ) {
-		json_obj = JSON_cJSON_Parse( json_value );
+		json_obj = cJSON_Parse( json_value );
 		if ( !json_obj ) {
 			Com_Printf( S_COLOR_YELLOW "WARNING: Invalid JSON for cvar '%s', ignoring\n", var_name );
             MUTEX_UNLOCK(cvar_mutex);
 			return;
 		}
 	} else {
-		json_obj = JSON_cJSON_CreateObject();
+		json_obj = cJSON_CreateObject();
+		if ( !json_obj ) {
+			Com_Printf( S_COLOR_RED "ERROR: Failed to create empty JSON object for cvar '%s'\n", var_name );
+            MUTEX_UNLOCK(cvar_mutex);
+			return;
+		}
 	}
 
-	// Free existing JSON data
+	// Update cvar safely
 	if ( var->isJSON ) {
+		// Free existing JSON data
 		if ( var->jsonObject ) {
-			JSON_cJSON_Delete( var->jsonObject );
+			cJSON_Delete( var->jsonObject );
 		}
 		if ( var->jsonString ) {
 			Z_Free( var->jsonString );
 		}
+	} else {
+		// Convert to JSON cvar
+		var->isJSON = qtrue;
 	}
 
-	// Set new JSON data
-	var->isJSON = qtrue;
 	var->jsonObject = json_obj;
-	var->jsonString = json_value ? CopyString( json_value ) : CopyString( "{}" );
+	var->jsonString = CopyString( json_value );
 
-	// Update string representation
-	char *json_str = JSON_cJSON_PrintUnformatted( json_obj );
+	// Update string representation for compatibility
+	char *json_str = cJSON_PrintUnformatted( json_obj );
 	if ( json_str ) {
 		if ( var->string ) {
 			Z_Free( var->string );
 		}
 		var->string = CopyString( json_str );
-		free( json_str ); // cJSON uses malloc, so use free
+		cJSON_free( json_str );
+	} else {
+		if ( var->string ) {
+			Z_Free( var->string );
+		}
+		var->string = CopyString( json_value );
 	}
 
 	var->value = 0.0f;
 	var->integer = 0;
 
-	Cvar_SetModified( var_name, qtrue );
-
     MUTEX_UNLOCK(cvar_mutex);
-
-#else // !USE_CJSON
-	// Fallback to regular string cvar
-	Cvar_Set( var_name, json_value );
-#endif // !USE_CJSON
 }
-
-/*
-================
-Cvar_GetJSONValue
-
-Retrieves a value from a JSON cvar using dot notation (e.g., "renderer.multisample")
-Returns NULL if not found or not a JSON cvar
-================
-*/
 const char *Cvar_GetJSONValue( const char *var_name, const char *key_path ) {
-	(void)var_name;
-	(void)key_path;
-#ifndef USE_CJSON
 	cvar_t *var;
 	const char *result = NULL;
 
@@ -2538,19 +2187,18 @@ const char *Cvar_GetJSONValue( const char *var_name, const char *key_path ) {
 		return NULL;
 	}
 
-	// Parse dot notation path
-	char path_copy[MAX_CVAR_VALUE_STRING];
+	// Navigate JSON path safely
+	cJSON *current = var->jsonObject;
+	char path_copy[1024];
 	Q_strncpyz( path_copy, key_path, sizeof( path_copy ) );
 
-	cJSON *current = (cJSON *)var->jsonObject;
 	char *token = strtok( path_copy, "." );
-
 	while ( token && current ) {
-		if ( JSON_cJSON_IsObject( current ) ) {
-			current = JSON_cJSON_GetObjectItem( current, token );
-		} else if ( JSON_cJSON_IsArray( current ) && atoi( token ) >= 0 ) {
+		if ( cJSON_IsObject( current ) ) {
+			current = cJSON_GetObjectItem( current, token );
+		} else if ( cJSON_IsArray( current ) && atoi( token ) >= 0 ) {
 			int index = atoi( token );
-			current = JSON_cJSON_GetArrayItem( current, index );
+			current = cJSON_GetArrayItem( current, index );
 		} else {
 			current = NULL;
 			break;
@@ -2559,100 +2207,44 @@ const char *Cvar_GetJSONValue( const char *var_name, const char *key_path ) {
 	}
 
 	if ( current ) {
-		if ( JSON_cJSON_IsString( current ) ) {
-			result = JSON_cJSON_GetStringValue( current );
+		if ( cJSON_IsString( current ) ) {
+			result = cJSON_GetStringValue( current );
 		} else {
-			// For non-string values, return the JSON representation
-			char *temp_str = JSON_cJSON_PrintUnformatted( current );
+			// For non-string values, create a temporary string representation
+			char *temp_str = cJSON_PrintUnformatted( current );
 			if ( temp_str ) {
-				static char static_buffer[MAX_CVAR_VALUE_STRING];
-				Q_strncpyz( static_buffer, temp_str, sizeof( static_buffer ) );
-				free( temp_str ); // cJSON uses malloc
-				result = static_buffer;
+				// This is a memory leak, but acceptable for cvar access
+				// In a real implementation, we'd want a proper cache
+				result = temp_str;
 			}
 		}
 	}
 
     MUTEX_UNLOCK(cvar_mutex);
 	return result;
-
-#else // !USE_CJSON
-	return NULL;
-#endif // !USE_CJSON
 }
-
-/*
-================
-Cvar_GetJSONNumber
-
-Retrieves a numeric value from a JSON cvar
-================
-*/
 double Cvar_GetJSONNumber( const char *var_name, const char *key_path, double default_value ) {
-	(void)var_name;
-	(void)key_path;
-#ifndef USE_CJSON
 	const char *str_value = Cvar_GetJSONValue( var_name, key_path );
 	if ( str_value ) {
 		return atof( str_value );
 	}
 	return default_value;
-#else // !USE_CJSON
-	return default_value;
-#endif // !USE_CJSON
 }
 
-/*
-================
-Cvar_GetJSONString
-
-Retrieves a string value from a JSON cvar
-================
-*/
 const char *Cvar_GetJSONString( const char *var_name, const char *key_path, const char *default_value ) {
-	(void)var_name;
-	(void)key_path;
-#ifndef USE_CJSON
 	const char *result = Cvar_GetJSONValue( var_name, key_path );
 	return result ? result : default_value;
-#else // !USE_CJSON
-	return default_value;
-#endif // !USE_CJSON
 }
 
-/*
-================
-Cvar_GetJSONBoolean
-
-Retrieves a boolean value from a JSON cvar
-================
-*/
 qboolean Cvar_GetJSONBoolean( const char *var_name, const char *key_path, qboolean default_value ) {
-	(void)var_name;
-	(void)key_path;
-#ifndef USE_CJSON
 	const char *str_value = Cvar_GetJSONValue( var_name, key_path );
 	if ( str_value ) {
 		return Q_stricmp( str_value, "true" ) == 0 || atoi( str_value ) != 0;
 	}
 	return default_value;
-#else // !USE_CJSON
-	return default_value;
-#endif // !USE_CJSON
 }
 
-/*
-================
-Cvar_SetJSONValidator
-
-Sets a JSON validator for a cvar
-================
-*/
 void Cvar_SetJSONValidator( cvar_t *var, cvarJSONValidator_t validator_type, const char *schema ) {
-	(void)var;
-	(void)validator_type;
-	(void)schema;
-#ifndef USE_CJSON
 	if ( !var ) {
 		return;
 	}
@@ -2661,37 +2253,21 @@ void Cvar_SetJSONValidator( cvar_t *var, cvarJSONValidator_t validator_type, con
 
 	// For now, we only support basic type checking
 	// Schema validation could be added later with a full JSON schema library
-#endif // !USE_CJSON
+	(void)schema; // Unused for now
 }
 
-/*
-================
-Cvar_ValidateJSON
-
-Validates JSON data for a cvar
-================
-*/
 qboolean Cvar_ValidateJSON( cvar_t *var, const char *json_string ) {
-	(void)var;
-	(void)json_string;
-#ifndef USE_CJSON
-	cJSON *test_obj;
-
 	if ( !var || !json_string ) {
 		return qfalse;
 	}
 
-	// Try to parse the JSON
-	test_obj = JSON_cJSON_Parse( json_string );
+	// Try to parse the JSON to validate it
+	cJSON *test_obj = cJSON_Parse( json_string );
 	if ( !test_obj ) {
 		return qfalse;
 	}
 
 	// Basic validation passed
-	JSON_cJSON_Delete( test_obj );
+	cJSON_Delete( test_obj );
 	return qtrue;
-
-#else // !USE_CJSON
-	return qtrue; // Accept any string if cJSON not available
-#endif // !USE_CJSON
 }

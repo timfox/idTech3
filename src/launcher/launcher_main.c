@@ -34,7 +34,7 @@ Provides:
 #define PATH_SEPARATOR_STR "/"
 #endif
 
-#define MAX_PATH 1024
+#define MAX_PATH 4096
 #define MAX_ARGS 64
 
 // Suppress false positive format-truncation warnings
@@ -251,16 +251,36 @@ static int Launcher_LaunchEngine(const char *enginePath, const char *contentDir,
 	}
 	
 	new_argv[new_argc] = NULL;
-	
+
+	// Get absolute path for engine before changing directories
+	char absEnginePath[MAX_PATH];
+#ifdef _WIN32
+	strncpy(absEnginePath, enginePath, sizeof(absEnginePath) - 1);
+#else
+	char cwd[MAX_PATH];
+	if (getcwd(cwd, sizeof(cwd)) != NULL) {
+		if (enginePath[0] == '/') {
+			// Already absolute
+			strncpy(absEnginePath, enginePath, sizeof(absEnginePath) - 1);
+		} else {
+			// Make absolute path
+			snprintf(absEnginePath, sizeof(absEnginePath), "%s/%s", cwd, enginePath);
+		}
+	} else {
+		strncpy(absEnginePath, enginePath, sizeof(absEnginePath) - 1);
+	}
+#endif
+	absEnginePath[sizeof(absEnginePath) - 1] = '\0';
+
 	// Change to content directory if specified
 	if (contentDir) {
 		if (chdir(contentDir) != 0) {
 			fprintf(stderr, "Warning: Could not change to content directory: %s\n", contentDir);
 		}
 	}
-	
+
 	// Execute engine
-	execv(enginePath, new_argv);
+	execv(absEnginePath, new_argv);
 	
 	// If execv returns, it failed
 	perror("execv failed");
@@ -323,7 +343,13 @@ int main(int argc, char **argv) {
 	}
 	
 	printf("Engine: %s\n", enginePath);
-	
+
+	// Ensure engine path is valid
+	if (!path_exists(enginePath)) {
+		fprintf(stderr, "Error: Engine binary not found at: %s\n", enginePath);
+		return 1;
+	}
+
 	// Find content directory
 	contentDir = Launcher_FindContentDir(execPath);
 	if (!contentDir) {
