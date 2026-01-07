@@ -1,0 +1,143 @@
+// Test map for demonstrating advanced graphics features
+// Created for idTech3 engine testing
+
+{
+"classname" "worldspawn"
+"message" "Test Map - Advanced Graphics Demo"
+"_color" "0.5 0.5 0.5"
+"gravity" "800"
+
+// Floor
+{
+( -512 -512 0 ) ( -512 512 0 ) ( 512 512 0 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( 512 512 0 ) ( 512 -512 0 ) ( -512 -512 0 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( -512 -512 -16 ) ( 512 -512 -16 ) ( 512 512 -16 ) textures/test/floor 0 0 0 1 1 0 0 0
+( 512 512 -16 ) ( -512 512 -16 ) ( -512 -512 -16 ) textures/test/floor 0 0 0 1 1 0 0 0
+( -512 -512 -16 ) ( -512 512 -16 ) ( -512 512 0 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( -512 512 0 ) ( -512 -512 0 ) ( -512 -512 -16 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( 512 -512 -16 ) ( -512 -512 -16 ) ( -512 -512 0 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( -512 -512 0 ) ( 512 -512 0 ) ( 512 -512 -16 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( -512 512 -16 ) ( 512 512 -16 ) ( 512 512 0 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( 512 512 0 ) ( -512 512 0 ) ( -512 512 -16 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+}
+
+// Ceiling
+{
+( -512 -512 128 ) ( 512 -512 128 ) ( 512 512 128 ) textures/test/ceiling 0 0 0 1 1 0 0 0
+( 512 512 128 ) ( -512 512 128 ) ( -512 -512 128 ) textures/test/ceiling 0 0 0 1 1 0 0 0
+( -512 -512 112 ) ( -512 512 112 ) ( 512 512 112 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( 512 512 112 ) ( 512 -512 112 ) ( -512 -512 112 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( -512 -512 112 ) ( 512 -512 112 ) ( 512 -512 128 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( 512 -512 128 ) ( -512 -512 128 ) ( -512 -512 112 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( -512 512 112 ) ( -512 -512 112 ) ( -512 -512 128 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( -512 -512 128 ) ( -512 512 128 ) ( -512 512 112 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( 512 -512 112 ) ( 512 512 112 ) ( 512 512 128 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( 512 512 128 ) ( 512 -512 128 ) ( 512 -512 112 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( -512 512 112 ) ( 512 512 112 ) ( 512 512 128 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( 512 512 128 ) ( -512 512 128 ) ( -512 512 112 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+}
+
+// Wall 1 (North)
+{
+( -512 -512 0 ) ( 512 -512 0 ) ( 512 -512 128 ) textures/test/wall 0 0 0 1 1 0 0 0
+( 512 -512 128 ) ( -512 -512 128 ) ( -512 -512 0 ) textures/test/wall 0 0 0 1 1 0 0 0
+( -512 -512 0 ) ( -512 -512 128 ) ( 512 -512 128 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( 512 -512 128 ) ( 512 -512 0 ) ( -512 -512 0 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( -512 -512 0 ) ( 512 -512 128 ) ( 512 -512 0 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( 512 -512 0 ) ( 512 -512 128 ) ( -512 -512 0 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+}
+
+// Wall 2 (South)
+{
+( -512 512 0 ) ( -512 512 128 ) ( 512 512 128 ) textures/test/wall 0 0 0 1 1 0 0 0
+( 512 512 128 ) ( 512 512 0 ) ( -512 512 0 ) textures/test/wall 0 0 0 1 1 0 0 0
+( -512 512 0 ) ( 512 512 128 ) ( 512 512 0 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( 512 512 0 ) ( 512 512 128 ) ( -512 512 0 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( -512 512 0 ) ( -512 512 128 ) ( 512 512 128 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( 512 512 128 ) ( -512 512 128 ) ( -512 512 0 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+}
+
+// Wall 3 (East)
+{
+( 512 -512 0 ) ( 512 512 0 ) ( 512 512 128 ) textures/test/wall 0 0 0 1 1 0 0 0
+( 512 512 128 ) ( 512 -512 128 ) ( 512 -512 0 ) textures/test/wall 0 0 0 1 1 0 0 0
+( 512 -512 0 ) ( 512 -512 128 ) ( 512 512 128 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( 512 512 128 ) ( 512 512 0 ) ( 512 -512 0 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( 512 -512 0 ) ( 512 512 128 ) ( 512 512 0 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( 512 512 0 ) ( 512 512 128 ) ( 512 -512 0 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+}
+
+// Wall 4 (West)
+{
+( -512 -512 0 ) ( -512 -512 128 ) ( -512 512 128 ) textures/test/wall 0 0 0 1 1 0 0 0
+( -512 512 128 ) ( -512 512 0 ) ( -512 -512 0 ) textures/test/wall 0 0 0 1 1 0 0 0 0
+( -512 -512 0 ) ( -512 512 128 ) ( -512 512 0 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( -512 512 0 ) ( -512 512 128 ) ( -512 -512 0 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( -512 -512 0 ) ( -512 -512 128 ) ( -512 512 128 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+( -512 512 128 ) ( -512 -512 128 ) ( -512 -512 0 ) common/caulk 0 0 0 0.5 0.5 0 0 0
+}
+
+// Central pillar with PBR materials
+{
+"classname" "misc_model"
+"model" "models/mapobjects/pillar/pillar.md3"
+"origin" "0 0 32"
+"angles" "0 0 0"
+}
+
+// Player spawn point
+{
+"classname" "info_player_deathmatch"
+"origin" "0 0 24"
+"angle" "0"
+}
+
+// Weapon spawn
+{
+"classname" "weapon_rocketlauncher"
+"origin" "64 64 8"
+}
+
+// Armor
+{
+"classname" "item_armor_combat"
+"origin" "-64 -64 8"
+}
+
+// Light for illumination
+{
+"classname" "light"
+"origin" "0 0 96"
+"light" "300"
+"_color" "1.0 0.8 0.6"
+"radius" "300"
+}
+
+// Point light for testing ray tracing
+{
+"classname" "light"
+"origin" "128 0 64"
+"light" "200"
+"_color" "0.3 0.5 1.0"
+"radius" "200"
+"rt_reflection" "1"
+"rt_shadow" "1"
+}
+
+// Ambient light
+{
+"classname" "light"
+"origin" "0 0 200"
+"light" "50"
+"_color" "0.2 0.2 0.3"
+"radius" "1000"
+}
+
+// Test model with PBR materials
+{
+"classname" "misc_model"
+"model" "models/weapons2/rocketl/rocketl.md3"
+"origin" "0 128 24"
+"angles" "0 45 0"
+}
+}
