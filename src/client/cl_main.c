@@ -4823,8 +4823,11 @@ void CL_Init( void ) {
 	// Check if we need to display asset instructions
 	extern qboolean com_fullyInitialized;
 	if (!com_fullyInitialized) {
-		// Display fallback asset status on first init
-		FallbackAssets_DisplayAssetInstructions();
+		// Only show asset instructions if content validation failed
+		extern qboolean FS_ContentValidationPassed(void);
+		if (!FS_ContentValidationPassed()) {
+			FallbackAssets_DisplayAssetInstructions();
+		}
 	}
 
 	Com_Printf( "----- Client Initialization Complete -----\n" );

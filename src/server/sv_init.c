@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "server.h"
+#include "../common/q_memory_safety.h"
 #ifdef USE_ENTT
 #include "sv_ecs.h"
 #endif
@@ -131,7 +132,7 @@ void SV_SetConfigstring (int index, const char *val) {
 	}
 
 	// change the string in sv
-	Z_Free( sv.configstrings[index] );
+	MEMORY_SAFETY_FREE( sv.configstrings[index] );
 	sv.configstrings[index] = CopyString( val );
 
 	// send it to all the clients if we aren't
@@ -413,7 +414,7 @@ static void SV_ClearServer( void ) {
 
 	for ( i = 0; i < MAX_CONFIGSTRINGS; i++ ) {
 		if ( sv.configstrings[i] ) {
-			Z_Free( sv.configstrings[i] );
+			MEMORY_SAFETY_FREE( sv.configstrings[i] );
 		}
 	}
 

@@ -19,6 +19,20 @@ Provides user-friendly error messages and ensures content integrity.
 
 // Validation result structure is defined in qcommon.h
 
+// Global validation status
+static qboolean contentValidationPassed = qfalse;
+
+/*
+=================
+FS_ContentValidationPassed
+
+Returns whether content validation passed during startup.
+=================
+*/
+qboolean FS_ContentValidationPassed(void) {
+	return contentValidationPassed;
+}
+
 // Function prototypes
 qboolean Mod_ApplySandboxRestrictions( const char *modName );
 void Mod_RemoveSandboxRestrictions( const char *modName );
@@ -82,6 +96,11 @@ Returns qtrue if all required content is present.
 */
 qboolean FS_ValidateGameContent( fs_validation_result_t *result ) {
 	char errorMsg[MAX_OSPATH];
+	const char *fs_game = Cvar_VariableString("fs_game");
+
+	// If we're playing a mod, be more lenient - don't require base game assets
+	qboolean isMod = (fs_game && fs_game[0] && Q_stricmp(fs_game, "base") != 0 && Q_stricmp(fs_game, "baseq3") != 0);
+
 	const char *requiredPaks[] = {
 		"pak0.pk3",
 		NULL
@@ -114,6 +133,7 @@ qboolean FS_ValidateGameContent( fs_validation_result_t *result ) {
 	result->corrupted_files = 0;
 
 	// Check for required pak files
+	// For mods, be more lenient - don't require pak0.pk3 if mod has its own assets
 	for ( i = 0; requiredPaks[i] != NULL; i++ ) {
 		char pakPath[MAX_OSPATH];
 		fileHandle_t f;
@@ -121,9 +141,12 @@ qboolean FS_ValidateGameContent( fs_validation_result_t *result ) {
 		// Try to find the pak file
 		int fileLen = FS_FOpenFileRead( requiredPaks[i], &f, qfalse );
 		if ( fileLen < 0 || f == FS_INVALID_HANDLE ) {
-			result->missing_files++;
-			result->valid = qfalse;
-			allValid = qfalse;
+			// For mods, missing pak0.pk3 is not necessarily fatal
+			if (!isMod) {
+				result->missing_files++;
+				result->valid = qfalse;
+				allValid = qfalse;
+			}
 			continue;
 		}
 		FS_FCloseFile( f );
@@ -150,7 +173,33 @@ qboolean FS_ValidateGameContent( fs_validation_result_t *result ) {
 		}
 	}
 
-	// If we have pak files but no critical assets, something is wrong
+	// For mods, be more lenient - if we have any content at all, consider it valid
+	if (isMod) {
+		// Check if mod has any content at all
+		char modPak[MAX_OSPATH];
+		fileHandle_t modF;
+
+		Com_sprintf(modPak, sizeof(modPak), "%s/pak0.pk3", fs_game);
+		int modFileLen = FS_FOpenFileRead(modPak, &modF, qfalse);
+		if (modFileLen >= 0 && modF != FS_INVALID_HANDLE) {
+			FS_FCloseFile(modF);
+			// Mod has its own pak file, consider it valid
+			result->valid = qtrue;
+			return qtrue;
+		}
+
+		// Check for any .bsp files in maps directory (indicates mod has maps)
+		fileHandle_t mapF;
+		int mapLen = FS_FOpenFileRead("maps/q3dm9.bsp", &mapF, qfalse);
+		if (mapLen >= 0 && mapF != FS_INVALID_HANDLE) {
+			FS_FCloseFile(mapF);
+			// Mod has maps, consider it valid
+			result->valid = qtrue;
+			return qtrue;
+		}
+	}
+
+	// For base game, require critical assets
 	if ( hasBasicContent && availableAssets == 0 ) {
 		Com_Printf( S_COLOR_YELLOW "WARNING: Pak files found but no critical assets detected. Content may be incomplete.\n" );
 		result->valid = qfalse;
@@ -405,18 +454,20 @@ Called from FS_Startup or launcher.
 qboolean FS_ValidateContentOnStartup( void ) {
 	fs_validation_result_t result;
 	qboolean valid;
-	
+
 	Com_Printf( "Validating game content...\n" );
-	
+
 	valid = FS_ValidateGameContent( &result );
-	
+
+	contentValidationPassed = valid;
+
 	if ( !valid ) {
 		FS_ReportMissingContent( &result );
 		// Don't fail startup - allow engine to run with missing content
 		// (user might be setting up or testing)
 		return qfalse;
 	}
-	
+
 	Com_Printf( S_COLOR_GREEN "Content validation: OK\n" );
 	return qtrue;
 }

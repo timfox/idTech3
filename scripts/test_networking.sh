@@ -30,12 +30,12 @@ fi
 echo "Testing Networking Features..."
 echo
 
-# Test 1: Start dedicated server
+# Test 1: Start dedicated server (using client in dedicated mode)
 echo "Test 1: Starting Dedicated Server"
-echo "Command: ./idtech3.server.x86_64 +set sv_pure 0 +set sv_maxclients 8 +map q3dm9"
-"$SERVER" +set sv_pure 0 +set sv_maxclients 8 +map q3dm9 &
+echo "Command: ./idtech3.x86_64 +set dedicated 1 +set sv_pure 0 +set sv_maxclients 8 +map q3dm9"
+"$ENGINE" +set dedicated 1 +set sv_pure 0 +set sv_maxclients 8 +map q3dm9 &
 SERVER_PID=$!
-sleep 3
+sleep 5
 
 # Check if server is running
 if kill -0 $SERVER_PID 2>/dev/null; then

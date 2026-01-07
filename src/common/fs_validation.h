@@ -27,6 +27,9 @@ void FS_ReportMissingContent( fs_validation_result_t *result );
 // Run startup-time content validation (paks, base content, mods)
 qboolean FS_ValidateContentOnStartup( void );
 
+// Check if content validation passed during startup
+qboolean FS_ContentValidationPassed( void );
+
 // Validate a specific mod before loading (returns true if loadable)
 qboolean Mod_ValidateBeforeLoad( const char *modName );
 
