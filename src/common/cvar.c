@@ -2295,8 +2295,8 @@ Creates or gets a cvar that stores JSON data
 // }
 
 cvar_t *Cvar_GetJSON( const char *var_name, const char *json_value, int flags ) {
-	cvar_t *var;
 #ifdef USE_CJSON
+	cvar_t *var;
 	cJSON *json_obj = NULL;
 
 	if ( !var_name || !json_value ) {
@@ -2405,93 +2405,6 @@ cvar_t *Cvar_GetJSON( const char *var_name, const char *json_value, int flags ) 
 #endif
 	var->flags = flags;
 	var->description = NULL;
-
-	var->value = 0.0f;
-	var->integer = 0;
-
-	var->next = cvar_vars;
-	cvar_vars = var;
-
-	// Link into hash table
-	var->hashIndex = Cvar_HashString( var_name );
-	var->hashNext = hashTable[var->hashIndex];
-	hashTable[var->hashIndex] = var;
-	if ( var->hashNext ) {
-		var->hashNext->hashPrev = var;
-	}
-
-	cvar_numIndexes++;
-
-    MUTEX_UNLOCK(cvar_mutex);
-	return var;
-
-	if(var) {
-		// Existing cvar - update JSON data
-		if ( var->isJSON ) {
-			// Free existing JSON data
-			if ( var->jsonObject ) {
-				JSON_cJSON_Delete( var->jsonObject );
-			}
-			Z_Free( var->jsonString );
-		} else {
-			// Convert from string cvar to JSON cvar
-			var->isJSON = qtrue;
-		}
-
-		var->jsonObject = json_obj;
-		var->jsonString = CopyString( json_value );
-		var->flags |= flags;
-
-		// Update string representation for compatibility
-		char *json_str = JSON_cJSON_PrintUnformatted( json_obj );
-		if ( json_str ) {
-			if ( var->string ) {
-				Z_Free( var->string );
-			}
-			var->string = CopyString( json_str );
-			free( json_str ); // cJSON uses malloc, so use free
-		}
-
-		var->value = 0.0f;
-		var->integer = 0;
-
-        MUTEX_UNLOCK(cvar_mutex);
-		return var;
-	}
-
-	// Allocate a new JSON cvar
-	for(int index = 0; index < MAX_CVARS; index++) {
-		if(!cvar_indexes[index].name)
-			break;
-	}
-
-	if(index >= MAX_CVARS) {
-		if(!com_errorEntered) {
-            MUTEX_UNLOCK(cvar_mutex);
-			Com_Error(ERR_FATAL, "Error: Too many cvars, cannot create a new one!");
-        }
-        MUTEX_UNLOCK(cvar_mutex);
-		return NULL;
-	}
-
-	var = &cvar_indexes[index];
-	Com_Memset( var, 0, sizeof( *var ) );
-
-	var->name = CopyString( var_name );
-	var->jsonString = CopyString( json_value );
-	var->jsonObject = json_obj;
-	var->isJSON = qtrue;
-	var->flags = flags;
-	var->description = NULL;
-
-	// Create string representation for compatibility
-	char *json_str = JSON_cJSON_PrintUnformatted( json_obj );
-	if ( json_str ) {
-		var->string = CopyString( json_str );
-		free( json_str ); // cJSON uses malloc, so use free
-	} else {
-		var->string = CopyString( "{}" ); // fallback
-	}
 
 	var->value = 0.0f;
 	var->integer = 0;

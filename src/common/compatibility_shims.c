@@ -12,8 +12,21 @@ compatibility with legacy Quake 3 mods and content.
 #include "../renderers/renderercommon/tr_public.h"
 #include <string.h>
 
-// Forward declaration for renderer interface
-extern refexport_t *re;
+// Renderer interface - may be NULL when renderer is not loaded
+// This is accessed via extern in client code, but we need to be careful
+// about linking when building the common library
+static refexport_t *re = NULL;
+
+/*
+===============
+Shim_SetRenderer
+
+Set the renderer interface for compatibility shims
+===============
+*/
+void Shim_SetRenderer(struct refexport_s *renderer) {
+    re = (refexport_t *)renderer;
+}
 
 // Stub renderer interface for testing
 #ifdef UNIT_TEST
@@ -212,6 +225,11 @@ Shim for shader registration
 ===============
 */
 qhandle_t Shim_RegisterShader(const char *name) {
+    if (!re) {
+        Com_Printf(S_COLOR_YELLOW "WARNING: Shim_RegisterShader called without renderer loaded\n");
+        return 0; // Return invalid handle
+    }
+
     if (!active_shims || !shim_enable_asset_shims || !shim_enable_asset_shims->integer) {
         return re->RegisterShader(name);
     }
@@ -235,6 +253,11 @@ Shim for shader registration without mipmaps
 ===============
 */
 qhandle_t Shim_RegisterShaderNoMip(const char *name) {
+    if (!re) {
+        Com_Printf(S_COLOR_YELLOW "WARNING: Shim_RegisterShaderNoMip called without renderer loaded\n");
+        return 0; // Return invalid handle
+    }
+
     if (!active_shims || !shim_enable_asset_shims || !shim_enable_asset_shims->integer) {
         return re->RegisterShaderNoMip(name);
     }
@@ -258,6 +281,11 @@ Shim for drawing stretched pictures
 ===============
 */
 void Shim_DrawStretchPic(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader) {
+    if (!re) {
+        Com_Printf(S_COLOR_YELLOW "WARNING: Shim_DrawStretchPic called without renderer loaded\n");
+        return;
+    }
+
     if (!active_shims) {
         re->DrawStretchPic(x, y, w, h, s1, t1, s2, t2, hShader);
         return;
@@ -508,12 +536,22 @@ Mode-specific shim implementations
 */
 
 qhandle_t Shim_RegisterShader_Q3Vanilla(const char *name) {
+    if (!re) {
+        Com_Printf(S_COLOR_YELLOW "WARNING: Shim_RegisterShader_Q3Vanilla called without renderer loaded\n");
+        return 0; // Return invalid handle
+    }
+
     // Q3 vanilla shader registration
     // Handle legacy shader naming conventions
     return re->RegisterShader(name);
 }
 
 void Shim_DrawStretchPic_Q3Vanilla(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader) {
+    if (!re) {
+        Com_Printf(S_COLOR_YELLOW "WARNING: Shim_DrawStretchPic_Q3Vanilla called without renderer loaded\n");
+        return;
+    }
+
     // Q3 vanilla coordinate system adjustments
     // Legacy Q3 might use different coordinate origins
     re->DrawStretchPic(x, y, w, h, s1, t1, s2, t2, hShader);

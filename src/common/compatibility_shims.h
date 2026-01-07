@@ -13,6 +13,9 @@ compatibility with legacy Quake 3 mods and content.
 #include "q_shared.h"
 #include "backwards_compatibility.h"
 
+// Forward declaration for renderer interface (avoid including tr_public.h here to prevent circular dependencies)
+struct refexport_s;
+
 // Shim function types
 typedef void *(*shim_func_t)(const char *name, void *original_func);
 typedef qboolean (*asset_shim_func_t)(const char *path, char *output_path, int output_size);
@@ -128,6 +131,9 @@ void Shim_Cmd_AddCommand_ModGeneric(const char *cmd_name, void(*function)(void))
 const char *Shim_GetShimDescription(legacy_mode_t mode);
 qboolean Shim_IsShimAvailable(legacy_mode_t mode, const char *shim_type);
 void Shim_LogShimApplication(const char *shim_type, const char *function_name, legacy_mode_t mode);
+
+// Renderer interface management
+void Shim_SetRenderer(struct refexport_s *renderer);
 
 // CVars for shim control
 extern cvar_t *shim_enable_vm_shims;
