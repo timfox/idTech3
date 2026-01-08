@@ -302,6 +302,9 @@ static void Com_SecurityCheck(void) {
 
 void Com_Init( char *commandLine ) {
   Com_Printf( "----- Com_Init -----\n" );
+  Com_Printf( "Build: %s\n", BUILD_ID );
+  Com_Printf( "Build Date: %s\n", BUILD_DATE );
+  Com_Printf( "Compiled: %s %s\n", __DATE__, __TIME__ );
 
     // Initialize memory safety FIRST before any allocations
     MemorySafety_Init();

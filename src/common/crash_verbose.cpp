@@ -107,7 +107,8 @@ void append_verbose_crash_context(void) {
     if (f3) {
         fprintf(f3, "Crash Report Generated: %s\n", crash_filename);
         fprintf(f3, "Timestamp: %ld\n", (long)now);
-        fprintf(f3, "Build: %s\n", "dev-unknown"); // Could be passed as parameter
+        fprintf(f3, "Build: %s\n", BUILD_ID);
+        fprintf(f3, "Build Date: %s\n", BUILD_DATE);
         fclose(f3);
     }
 }

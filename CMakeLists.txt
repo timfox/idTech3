@@ -14,6 +14,48 @@ endif()
 
 project(idtech3 C CXX ASM)
 
+# Generate build information
+if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
+    execute_process(
+        COMMAND git describe --tags --always --dirty
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        OUTPUT_VARIABLE GIT_DESCRIBE
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    if(GIT_DESCRIBE)
+        set(BUILD_ID "${GIT_DESCRIBE}")
+    else()
+        set(BUILD_ID "git-unknown")
+    endif()
+else()
+    set(BUILD_ID "dev-unknown")
+endif()
+
+# Set build date/time
+if(DEFINED ENV{SOURCE_DATE_EPOCH})
+    # Use SOURCE_DATE_EPOCH if set (for reproducible builds)
+    execute_process(
+        COMMAND date -u -d "@$ENV{SOURCE_DATE_EPOCH}" "+%Y-%m-%d %H:%M:%S UTC"
+        OUTPUT_VARIABLE BUILD_DATE
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+else()
+    # Use current date/time
+    execute_process(
+        COMMAND date "+%Y-%m-%d %H:%M:%S %Z"
+        OUTPUT_VARIABLE BUILD_DATE
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+endif()
+
+# Make build info available to source code
+add_compile_definitions(BUILD_ID="${BUILD_ID}")
+add_compile_definitions(BUILD_DATE="${BUILD_DATE}")
+
+message(STATUS "Build ID: ${BUILD_ID}")
+message(STATUS "Build Date: ${BUILD_DATE}")
+
 include("${CMAKE_SOURCE_DIR}/cmake/backend_select.cmake" NO_POLICY_SCOPE)
 include("${CMAKE_SOURCE_DIR}/cmake/moltenvk_setup.cmake" NO_POLICY_SCOPE)
 

@@ -35,14 +35,8 @@ extern "C" {
 // Safe mode flag file
 #define SAFE_MODE_FLAG_FILE     "safe_mode.flag"
 
-// Build identification (set at compile time)
-#ifndef BUILD_ID
-#define BUILD_ID "dev-unknown"
-#endif
-
-#ifndef BUILD_DATE
-#define BUILD_DATE __DATE__ " " __TIME__
-#endif
+// Build identification (set at compile time by CMake)
+// BUILD_ID and BUILD_DATE are defined in CMakeLists.txt
 
 // Crash info structure
 typedef struct {
