@@ -608,6 +608,17 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 					SDL_window = NULL;
 					continue;
 				}
+
+				// Make the OpenGL context current
+				if ( SDL_GL_MakeCurrent( SDL_window, SDL_glContext ) < 0 )
+				{
+					Com_DPrintf( "SDL_GL_MakeCurrent failed: %s\n", SDL_GetError( ) );
+					SDL_GL_DeleteContext( SDL_glContext );
+					SDL_glContext = NULL;
+					SDL_DestroyWindow( SDL_window );
+					SDL_window = NULL;
+					continue;
+				}
 			}
 
 			if ( SDL_GL_SetSwapInterval( r_swapInterval->integer ) == -1 )

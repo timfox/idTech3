@@ -805,8 +805,9 @@ static void InitOpenGL( void )
 		ri.GLimp_Init( &glConfig );
 
 		// Initialize modern OpenGL systems
-		GL_ShaderInit();
-		GL_VertexInit();
+		// FIXME: Temporarily disabled to isolate crash
+		// GL_ShaderInit();
+		// GL_VertexInit();
 
 		R_ClearSymTables();
 
@@ -2319,8 +2320,9 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.Printf( PRINT_ALL, "RE_Shutdown( %i )\n", code );
 
 	// Shutdown modern OpenGL systems first
-	GL_VertexShutdown();
-	GL_ShaderShutdown();
+	// FIXME: Temporarily disabled to isolate crash
+	// GL_VertexShutdown();
+	// GL_ShaderShutdown();
 
 	ri.Cmd_RemoveCommand( "modellist" );
 	ri.Cmd_RemoveCommand( "screenshotBMP" );

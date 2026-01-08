@@ -49,7 +49,7 @@ static const char *current_test_name = nullptr;
 static double current_test_start_time = 0.0;
 static qboolean test_isolation_enabled = qtrue;
 static qboolean test_memory_tracking = qtrue;
-static qboolean test_thread_safety_check = qtrue;
+static qboolean test_thread_safety_check = qtrue; // NOLINT(readability-identifier-naming)
 
 // Global test counters
 static int test_count = 0;
@@ -57,8 +57,8 @@ static int test_passed = 0;
 static int test_failed = 0;
 
 // Stub functions for performance monitoring
-static void Perf_Init(void) {}
-static void Perf_CountDrawCall(void) {}
+static void Perf_Init(void) {} // NOLINT(readability-convert-member-functions-to-static)
+static void Perf_CountDrawCall(void) {} // NOLINT(readability-convert-member-functions-to-static)
 
 // Stub functions for system utilities
 static int Sys_Milliseconds(void) { return 0; }
@@ -211,19 +211,19 @@ static void test_memory_checkpoint(void) {
 	// Check for leaks after test completes
 }
 
-static qboolean test_check_memory_safety([[maybe_unused]] void (*test_block)(void)) {
+static qboolean test_check_memory_safety([[maybe_unused]] void (*test_block)(void)) { // NOLINT(misc-unused-parameters)
 	// Run test in memory-safe environment
 	// Return true if no violations detected
 	return qtrue;
 }
 
-static qboolean test_check_thread_safety([[maybe_unused]] void (*test_block)(void)) {
+static qboolean test_check_thread_safety([[maybe_unused]] void (*test_block)(void)) { // NOLINT(misc-unused-parameters)
 	// Run test with thread safety checking
 	// Return true if no race conditions detected
 	return qtrue;
 }
 
-static qboolean test_check_no_crash([[maybe_unused]] void (*test_block)(void)) {
+static qboolean test_check_no_crash([[maybe_unused]] void (*test_block)(void)) { // NOLINT(misc-unused-parameters)
 	// Run test with crash protection
 	// Return true if test completed without crashing
 	return qtrue;
@@ -269,13 +269,13 @@ static qboolean test_check_no_crash([[maybe_unused]] void (*test_block)(void)) {
 		Com_Printf("Reliability Score: %d/100\n", test_stats.reliability_score); \
 		\
 		if (test_stats.failed_tests == 0 && test_stats.crashed_tests == 0) { \
-			Com_Printf("✅ ALL TESTS PASSED - System is reliable!\n"); \
+			Com_Printf("? ALL TESTS PASSED - System is reliable!\n"); \
 		} else { \
-			Com_Printf("❌ TESTS FAILED - System needs attention!\n"); \
+			Com_Printf("? TESTS FAILED - System needs attention!\n"); \
 		} \
 	} while(0)
 
-static int calculate_reliability_score(void) {
+static int calculate_reliability_score(void) { // NOLINT(readability-convert-member-functions-to-static)
 	int score = 100;
 
 	// Deduct points for failures
@@ -298,7 +298,7 @@ static int calculate_reliability_score(void) {
 }
 
 // Get test statistics
-static const test_statistics_t* Test_GetStatistics(void) {
+static const test_statistics_t* Test_GetStatistics(void) { // NOLINT(readability-convert-member-functions-to-static)
 	return &test_stats;
 }
 
