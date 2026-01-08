@@ -612,12 +612,27 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 				// Make the OpenGL context current
 				if ( SDL_GL_MakeCurrent( SDL_window, SDL_glContext ) < 0 )
 				{
+// #region agent log
+					FILE *debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
+					if (debug_log) {
+						fprintf(debug_log, "{\"id\":\"log_%ld_glmakecurrent_fail\",\"timestamp\":%ld,\"location\":\"sdl_glimp.c:GLimp_Init\",\"message\":\"SDL_GL_MakeCurrent failed\",\"data\":{\"error\":\"%s\",\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"A\"},\"sessionId\":\"debug-session\"}\n", time(NULL), time(NULL)*1000, SDL_GetError());
+						fclose(debug_log);
+					}
+// #endregion
 					Com_DPrintf( "SDL_GL_MakeCurrent failed: %s\n", SDL_GetError( ) );
 					SDL_GL_DeleteContext( SDL_glContext );
 					SDL_glContext = NULL;
 					SDL_DestroyWindow( SDL_window );
 					SDL_window = NULL;
 					continue;
+				} else {
+// #region agent log
+					FILE *debug_log_fail = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
+					if (debug_log_fail) {
+						fprintf(debug_log_fail, "{\"id\":\"log_%ld_glmakecurrent_success\",\"timestamp\":%ld,\"location\":\"sdl_glimp.c:GLimp_Init\",\"message\":\"SDL_GL_MakeCurrent succeeded\",\"data\":{\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"A\"},\"sessionId\":\"debug-session\"}\n", time(NULL), time(NULL)*1000);
+						fclose(debug_log_fail);
+					}
+// #endregion
 				}
 			}
 
