@@ -4025,6 +4025,23 @@ fprintf(stderr, "About to enter renderer loading logic\n");
         if (waylandEnv) {
             Com_Printf(S_COLOR_YELLOW "WAYLAND_DISPLAY=%s\n", waylandEnv);
         }
+        // Extended environment diagnostics
+        const char* xdgRuntimeDir = getenv("XDG_RUNTIME_DIR");
+        if (xdgRuntimeDir) {
+            Com_Printf(S_COLOR_YELLOW "XDG_RUNTIME_DIR=%s\n", xdgRuntimeDir);
+        }
+        const char* xdgCurrentDesktop = getenv("XDG_CURRENT_DESKTOP");
+        if (xdgCurrentDesktop) {
+            Com_Printf(S_COLOR_YELLOW "XDG_CURRENT_DESKTOP=%s\n", xdgCurrentDesktop);
+        }
+        const char* xdgSessionDesktop = getenv("XDG_SESSION_DESKTOP");
+        if (xdgSessionDesktop) {
+            Com_Printf(S_COLOR_YELLOW "XDG_SESSION_DESKTOP=%s\n", xdgSessionDesktop);
+        }
+        const char* xauth = getenv("XAUTHORITY");
+        if (xauth) {
+            Com_Printf(S_COLOR_YELLOW "XAUTHORITY=%s\n", xauth);
+        }
         if (rendererLib) {
             Com_Printf("Renderer library loaded: %p\n", (void*)rendererLib);
         }
