@@ -127,6 +127,12 @@ GL_CreateShaderProgram
 ===============
 */
 shaderProgram_t *GL_CreateShaderProgram(const char *vertexSource, const char *fragmentSource) {
+    // Validate input parameters
+    if (!vertexSource || !fragmentSource) {
+        ri.Printf(PRINT_ERROR, "GL_CreateShaderProgram: NULL shader source provided\n");
+        return nullptr;
+    }
+
     shaderProgram_t *program = ri.Malloc(sizeof(shaderProgram_t));
     if (!program) {
         ri.Printf(PRINT_ERROR, "GL_CreateShaderProgram: Failed to allocate shader program structure\n");

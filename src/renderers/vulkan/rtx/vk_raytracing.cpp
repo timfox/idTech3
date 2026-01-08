@@ -293,7 +293,7 @@ static void vk_rt_load_blue_noise_array( void )
 
 	if ( loaded_count == 0 ) {
 		ri.Printf( PRINT_DEVELOPER, "Warning: No blue noise textures found. Ray tracing will use hash-based RNG.\n" );
-		vk.rt.blueNoiseTexture = NULL;
+		vk.rt.blueNoiseTexture = nullptr;
 		return;
 	}
 
@@ -529,7 +529,7 @@ void vk_rt_init(void)
 	}
 	
 	// Initialize TLAS update tracking
-	vk.rt.previousInstances = NULL;
+	vk.rt.previousInstances = nullptr;
 	vk.rt.previousInstanceCount = 0;
 	vk.rt.tlasNeedsRebuild = qtrue;
 	vk.rt.tlasAllowsUpdate = qfalse;
@@ -614,9 +614,9 @@ void vk_rt_shutdown(void)
 		ri.Free( vk.rt.blas );
 		ri.Free( vk.rt.blasBuffers );
 		ri.Free( vk.rt.blasMemory );
-		vk.rt.blas = NULL;
-		vk.rt.blasBuffers = NULL;
-		vk.rt.blasMemory = NULL;
+		vk.rt.blas = nullptr;
+		vk.rt.blasBuffers = nullptr;
+		vk.rt.blasMemory = nullptr;
 	}
 
 	// Destroy TLAS
@@ -693,34 +693,34 @@ void vk_rt_shutdown(void)
 	// Free previous instances buffer
 	if ( vk.rt.previousInstances != NULL ) {
 		ri.Free( vk.rt.previousInstances );
-		vk.rt.previousInstances = NULL;
+		vk.rt.previousInstances = nullptr;
 		vk.rt.previousInstanceCount = 0;
 	}
 	
 	// Free BLAS reuse and compaction arrays
-	if ( vk.rt.blasHashes != NULL ) {
+	if ( vk.rt.blasHashes != nullptr ) {
 		ri.Free( vk.rt.blasHashes );
-		vk.rt.blasHashes = NULL;
+		vk.rt.blasHashes = nullptr;
 	}
-	if ( vk.rt.blasCompacted != NULL ) {
+	if ( vk.rt.blasCompacted != nullptr ) {
 		ri.Free( vk.rt.blasCompacted );
-		vk.rt.blasCompacted = NULL;
+		vk.rt.blasCompacted = nullptr;
 	}
-	if ( vk.rt.blasCompactedBuffers != NULL ) {
+	if ( vk.rt.blasCompactedBuffers != nullptr ) {
 		ri.Free( vk.rt.blasCompactedBuffers );
-		vk.rt.blasCompactedBuffers = NULL;
+		vk.rt.blasCompactedBuffers = nullptr;
 	}
-	if ( vk.rt.blasCompactedMemory != NULL ) {
+	if ( vk.rt.blasCompactedMemory != nullptr ) {
 		ri.Free( vk.rt.blasCompactedMemory );
-		vk.rt.blasCompactedMemory = NULL;
+		vk.rt.blasCompactedMemory = nullptr;
 	}
-	if ( vk.rt.blasNeedsCompaction != NULL ) {
+	if ( vk.rt.blasNeedsCompaction != nullptr ) {
 		ri.Free( vk.rt.blasNeedsCompaction );
-		vk.rt.blasNeedsCompaction = NULL;
+		vk.rt.blasNeedsCompaction = nullptr;
 	}
-	if ( vk.rt.blasUnusedSlots != NULL ) {
+	if ( vk.rt.blasUnusedSlots != nullptr ) {
 		ri.Free( vk.rt.blasUnusedSlots );
-		vk.rt.blasUnusedSlots = NULL;
+		vk.rt.blasUnusedSlots = nullptr;
 	}
 
 	// Destroy SBT

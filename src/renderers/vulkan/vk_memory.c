@@ -427,7 +427,7 @@ void vk_clean_staging_buffer(void) {
 		vk.staging_buffer.memory = VK_NULL_HANDLE;
 	}
 
-	vk.staging_buffer.ptr = NULL;
+	vk.staging_buffer.ptr = nullptr;
 	vk.staging_buffer.size = 0;
 #ifdef USE_UPLOAD_QUEUE
 	vk.staging_buffer.offset = 0;

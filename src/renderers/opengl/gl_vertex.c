@@ -33,7 +33,26 @@ void GL_VertexInit(void) {
 
     // Allocate vertex and index arrays
     vertexManager.immediateBuffer.vertices = ri.Malloc(sizeof(vertex_t) * vertexManager.immediateBuffer.maxVertices);
+    if (!vertexManager.immediateBuffer.vertices) {
+        ri.Printf(PRINT_ERROR, "GL_VertexInit: Failed to allocate immediate mode vertex buffer (%d vertices)\n", vertexManager.immediateBuffer.maxVertices);
+        // Clean up OpenGL objects
+        qglDeleteVertexArrays(1, &vertexManager.immediateBuffer.vao);
+        qglDeleteBuffers(1, &vertexManager.immediateBuffer.vbo);
+        qglDeleteBuffers(1, &vertexManager.immediateBuffer.ibo);
+        return;
+    }
+
     vertexManager.immediateBuffer.indices = ri.Malloc(sizeof(GLuint) * vertexManager.immediateBuffer.maxIndices);
+    if (!vertexManager.immediateBuffer.indices) {
+        ri.Printf(PRINT_ERROR, "GL_VertexInit: Failed to allocate immediate mode index buffer (%d indices)\n", vertexManager.immediateBuffer.maxIndices);
+        // Clean up everything
+        ri.Free(vertexManager.immediateBuffer.vertices);
+        vertexManager.immediateBuffer.vertices = nullptr;
+        qglDeleteVertexArrays(1, &vertexManager.immediateBuffer.vao);
+        qglDeleteBuffers(1, &vertexManager.immediateBuffer.vbo);
+        qglDeleteBuffers(1, &vertexManager.immediateBuffer.ibo);
+        return;
+    }
 
     // Set default matrices
     Com_Memset(vertexManager.modelViewMatrix, 0, sizeof(vertexManager.modelViewMatrix));
@@ -96,6 +115,16 @@ GL_CreateVertexBuffer
 ===============
 */
 vertexBuffer_t *GL_CreateVertexBuffer(int maxVertices, int maxIndices, qboolean dynamic) {
+    // Validate input parameters
+    if (maxVertices <= 0) {
+        ri.Printf(PRINT_ERROR, "GL_CreateVertexBuffer: Invalid maxVertices (%d), must be > 0\n", maxVertices);
+        return nullptr;
+    }
+    if (maxIndices < 0) {
+        ri.Printf(PRINT_ERROR, "GL_CreateVertexBuffer: Invalid maxIndices (%d), must be >= 0\n", maxIndices);
+        return nullptr;
+    }
+
     vertexBuffer_t *buffer = ri.Malloc(sizeof(vertexBuffer_t));
     if (!buffer) {
         ri.Printf(PRINT_ERROR, "GL_CreateVertexBuffer: Failed to allocate vertex buffer structure\n");
@@ -231,7 +260,7 @@ GL_UnbindVertexBuffer
 */
 void GL_UnbindVertexBuffer(void) {
     qglBindVertexArray(0);
-    vertexManager.currentBuffer = NULL;
+    vertexManager.currentBuffer = nullptr;
 }
 
 /*
@@ -302,6 +331,12 @@ void GL_Begin(GLenum mode) {
         return;
     }
 
+    // Check if immediate buffer was properly allocated
+    if (!vertexManager.immediateBuffer.vertices) {
+        ri.Printf(PRINT_ERROR, "GL_Begin: Immediate mode buffer not available (allocation failed)\n");
+        return;
+    }
+
     vertexManager.inImmediateMode = qtrue;
     currentPrimitiveMode = mode;
     currentVertex = vertexManager.immediateBuffer.vertices;
@@ -329,7 +364,7 @@ void GL_End(void) {
 }
 
 void GL_Vertex3f(float x, float y, float z) {
-    if (!vertexManager.inImmediateMode || vertexCount >= vertexManager.immediateBuffer.maxVertices) {
+    if (!vertexManager.inImmediateMode || vertexCount >= vertexManager.immediateBuffer.maxVertices || !currentVertex) {
         return;
     }
 
@@ -342,7 +377,7 @@ void GL_Vertex3f(float x, float y, float z) {
 }
 
 void GL_TexCoord2f(float s, float t) {
-    if (!vertexManager.inImmediateMode || vertexCount == 0) {
+    if (!vertexManager.inImmediateMode || vertexCount == 0 || !currentVertex) {
         return;
     }
 
@@ -351,7 +386,7 @@ void GL_TexCoord2f(float s, float t) {
 }
 
 void GL_Color4f(float r, float g, float b, float a) {
-    if (!vertexManager.inImmediateMode || vertexCount == 0) {
+    if (!vertexManager.inImmediateMode || vertexCount == 0 || !currentVertex) {
         return;
     }
 
@@ -362,7 +397,7 @@ void GL_Color4f(float r, float g, float b, float a) {
 }
 
 void GL_Normal3f(float nx, float ny, float nz) {
-    if (!vertexManager.inImmediateMode || vertexCount == 0) {
+    if (!vertexManager.inImmediateMode || vertexCount == 0 || !currentVertex) {
         return;
     }
 

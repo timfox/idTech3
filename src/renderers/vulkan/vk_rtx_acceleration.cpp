@@ -2520,7 +2520,7 @@ void vk_rtx_update_surface_material_indices_buffer(void) {
         ri.Printf(PRINT_DEVELOPER, "RTX: surface indices GPU buffer not allocated; skipping upload\n");
         return;
     }
-    void* mapped = NULL;
+    void* mapped = nullptr;
     VkResult r = vkMapMemory(vk.device, g_surface_indices_memory, 0, (VkDeviceSize)g_surface_indices_size, 0, &mapped);
     if (r == VK_SUCCESS && mapped && g_surface_indices_size > 0) {
         memcpy(mapped, g_surface_indices_cpu, (size_t)g_surface_indices_size);
