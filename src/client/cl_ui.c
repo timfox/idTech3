@@ -29,6 +29,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../botlib/botlib.h"
 
 extern	botlib_export_t	*botlib_export;
+extern qboolean re_initialized;
 
 static ext_trap_keys_t ui_extensionTraps[] = {
 	{ "trap_R_AddRefEntityToScene2",       UI_R_ADDREFENTITYTOSCENE2, qfalse },
@@ -1449,11 +1450,22 @@ CL_InitUI
 void CL_InitUI( void ) {
 	Com_Printf("=== CL_InitUI CALLED ===\n");
 
-	// UI VM loading causes crashes due to incompatible/missing UI modules
-	// Keep UI system disabled for stability, but enable intro video playback
-	Com_Printf( "INFO: UI system initialized (VM loading disabled - incompatible UI modules)\n" );
-	cls.uiStarted = qtrue;
-	uivm = NULL; // No VM for now
+	// Initialize UI virtual machine based on vm_ui CVAR
+	cvar_t *vm_ui = Cvar_Get( "vm_ui", "2", CVAR_ARCHIVE | CVAR_PROTECTED );
+	vmInterpret_t interpret = VM_SelectInterpret( "vm_ui", VMI_NATIVE, qfalse );
+
+	// Try to load UI VM module
+		uivm = VM_Create( VM_UI, CL_UISystemCalls, UI_DllSyscall, interpret );
+	if ( !uivm ) {
+		Com_Printf( S_COLOR_RED "WARNING: Failed to load UI VM (vm_ui = %d), falling back to no UI\n", vm_ui->integer );
+		cls.uiStarted = qtrue;
+		uivm = NULL;
+		Com_Printf( "INFO: UI system initialized (VM loading failed - no UI modules available)\n" );
+	} else {
+		// VM loaded successfully
+		cls.uiStarted = qtrue;
+		Com_Printf( "UI VM loaded successfully (vm_ui = %d)\n", vm_ui->integer );
+	}
 
 	// Check if intro should be skipped
 	cvar_t *skipIntro = Cvar_Get( "cl_skipIntro", "0", CVAR_ARCHIVE );
@@ -1513,8 +1525,13 @@ void CL_InitUI( void ) {
 	}
 
 	if ( videoFile ) {
-		Com_Printf( "Playing intro video: %s\n", videoFile );
-		Cbuf_ExecuteText( EXEC_NOW, va( "cinematic %s 2\n", videoFile ) ); // 2 = loop mode
+		extern qboolean re_initialized;
+		if ( re_initialized ) {
+			Com_Printf( "Playing intro video: %s\n", videoFile );
+			Cbuf_ExecuteText( EXEC_NOW, va( "cinematic %s 2\n", videoFile ) ); // 2 = loop mode
+		} else {
+			Com_Printf( "Intro video '%s' queued (renderer not initialized yet)\n", videoFile );
+		}
 	} else {
 		Com_Printf( "No intro video found for mod '%s'\n", fs_game && fs_game[0] ? fs_game : "base" );
 	}
