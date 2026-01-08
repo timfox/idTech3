@@ -27,9 +27,9 @@ void GL_VertexInit(void) {
     vertexManager.immediateBuffer.maxIndices = 65536;
     vertexManager.immediateBuffer.dynamic = qtrue;
 
-    glGenVertexArrays(1, &vertexManager.immediateBuffer.vao);
-    glGenBuffers(1, &vertexManager.immediateBuffer.vbo);
-    glGenBuffers(1, &vertexManager.immediateBuffer.ibo);
+    qglGenVertexArrays(1, &vertexManager.immediateBuffer.vao);
+    qglGenBuffers(1, &vertexManager.immediateBuffer.vbo);
+    qglGenBuffers(1, &vertexManager.immediateBuffer.ibo);
 
     // Allocate vertex and index arrays
     vertexManager.immediateBuffer.vertices = ri.Malloc(sizeof(vertex_t) * vertexManager.immediateBuffer.maxVertices);
@@ -70,17 +70,17 @@ void GL_VertexShutdown(void) {
     }
 
     if (vertexManager.immediateBuffer.vao) {
-        glDeleteVertexArrays(1, &vertexManager.immediateBuffer.vao);
+        qglDeleteVertexArrays(1, &vertexManager.immediateBuffer.vao);
         vertexManager.immediateBuffer.vao = 0;
     }
 
     if (vertexManager.immediateBuffer.vbo) {
-        glDeleteBuffers(1, &vertexManager.immediateBuffer.vbo);
+        qglDeleteBuffers(1, &vertexManager.immediateBuffer.vbo);
         vertexManager.immediateBuffer.vbo = 0;
     }
 
     if (vertexManager.immediateBuffer.ibo) {
-        glDeleteBuffers(1, &vertexManager.immediateBuffer.ibo);
+        qglDeleteBuffers(1, &vertexManager.immediateBuffer.ibo);
         vertexManager.immediateBuffer.ibo = 0;
     }
 
@@ -104,11 +104,11 @@ vertexBuffer_t *GL_CreateVertexBuffer(int maxVertices, int maxIndices, qboolean 
     buffer->dynamic = dynamic;
 
     // Generate OpenGL objects
-    glGenVertexArrays(1, &buffer->vao);
-    glGenBuffers(1, &buffer->vbo);
+    qglGenVertexArrays(1, &buffer->vao);
+    qglGenBuffers(1, &buffer->vbo);
 
     if (maxIndices > 0) {
-        glGenBuffers(1, &buffer->ibo);
+        qglGenBuffers(1, &buffer->ibo);
     }
 
     // Allocate memory
@@ -137,15 +137,15 @@ void GL_DestroyVertexBuffer(vertexBuffer_t *buffer) {
     }
 
     if (buffer->vao) {
-        glDeleteVertexArrays(1, &buffer->vao);
+        qglDeleteVertexArrays(1, &buffer->vao);
     }
 
     if (buffer->vbo) {
-        glDeleteBuffers(1, &buffer->vbo);
+        qglDeleteBuffers(1, &buffer->vbo);
     }
 
     if (buffer->ibo) {
-        glDeleteBuffers(1, &buffer->ibo);
+        qglDeleteBuffers(1, &buffer->ibo);
     }
 
     ri.Free(buffer);
@@ -158,43 +158,43 @@ GL_BindVertexBuffer
 */
 void GL_BindVertexBuffer(vertexBuffer_t *buffer) {
     if (!buffer) {
-        glBindVertexArray(0);
+        qglBindVertexArray(0);
         vertexManager.currentBuffer = NULL;
         return;
     }
 
-    glBindVertexArray(buffer->vao);
+    qglBindVertexArray(buffer->vao);
     vertexManager.currentBuffer = buffer;
 
     // Set up vertex attributes for the default shader
-    glBindBuffer(GL_ARRAY_BUFFER, buffer->vbo);
+    qglBindBuffer(GL_ARRAY_BUFFER, buffer->vbo);
 
     if (shaderManager.defaultProgram.a_position >= 0) {
-        glEnableVertexAttribArray(shaderManager.defaultProgram.a_position);
-        glVertexAttribPointer(shaderManager.defaultProgram.a_position, 3, GL_FLOAT, GL_FALSE,
+        qglEnableVertexAttribArray(shaderManager.defaultProgram.a_position);
+        qglVertexAttribPointer(shaderManager.defaultProgram.a_position, 3, GL_FLOAT, GL_FALSE,
                             sizeof(vertex_t), (void*)offsetof(vertex_t, position));
     }
 
     if (shaderManager.defaultProgram.a_texCoord >= 0) {
-        glEnableVertexAttribArray(shaderManager.defaultProgram.a_texCoord);
-        glVertexAttribPointer(shaderManager.defaultProgram.a_texCoord, 2, GL_FLOAT, GL_FALSE,
+        qglEnableVertexAttribArray(shaderManager.defaultProgram.a_texCoord);
+        qglVertexAttribPointer(shaderManager.defaultProgram.a_texCoord, 2, GL_FLOAT, GL_FALSE,
                             sizeof(vertex_t), (void*)offsetof(vertex_t, texCoord));
     }
 
     if (shaderManager.defaultProgram.a_color >= 0) {
-        glEnableVertexAttribArray(shaderManager.defaultProgram.a_color);
-        glVertexAttribPointer(shaderManager.defaultProgram.a_color, 4, GL_FLOAT, GL_FALSE,
+        qglEnableVertexAttribArray(shaderManager.defaultProgram.a_color);
+        qglVertexAttribPointer(shaderManager.defaultProgram.a_color, 4, GL_FLOAT, GL_FALSE,
                             sizeof(vertex_t), (void*)offsetof(vertex_t, color));
     }
 
     if (shaderManager.defaultProgram.a_normal >= 0) {
-        glEnableVertexAttribArray(shaderManager.defaultProgram.a_normal);
-        glVertexAttribPointer(shaderManager.defaultProgram.a_normal, 3, GL_FLOAT, GL_FALSE,
+        qglEnableVertexAttribArray(shaderManager.defaultProgram.a_normal);
+        qglVertexAttribPointer(shaderManager.defaultProgram.a_normal, 3, GL_FLOAT, GL_FALSE,
                             sizeof(vertex_t), (void*)offsetof(vertex_t, normal));
     }
 
     if (buffer->ibo) {
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer->ibo);
+        qglBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer->ibo);
     }
 }
 
@@ -204,7 +204,7 @@ GL_UnbindVertexBuffer
 ===============
 */
 void GL_UnbindVertexBuffer(void) {
-    glBindVertexArray(0);
+    qglBindVertexArray(0);
     vertexManager.currentBuffer = NULL;
 }
 
@@ -221,8 +221,8 @@ void GL_BufferVertexData(vertexBuffer_t *buffer, const vertex_t *vertices, int n
         numVertices = buffer->maxVertices;
     }
 
-    glBindBuffer(GL_ARRAY_BUFFER, buffer->vbo);
-    glBufferData(GL_ARRAY_BUFFER, numVertices * sizeof(vertex_t), vertices,
+    qglBindBuffer(GL_ARRAY_BUFFER, buffer->vbo);
+    qglBufferData(GL_ARRAY_BUFFER, numVertices * sizeof(vertex_t), vertices,
                 buffer->dynamic ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW);
 
     buffer->numVertices = numVertices;
@@ -241,8 +241,8 @@ void GL_BufferIndexData(vertexBuffer_t *buffer, const GLuint *indices, int numIn
         numIndices = buffer->maxIndices;
     }
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer->ibo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, numIndices * sizeof(GLuint), indices, GL_STATIC_DRAW);
+    qglBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer->ibo);
+    qglBufferData(GL_ELEMENT_ARRAY_BUFFER, numIndices * sizeof(GLuint), indices, GL_STATIC_DRAW);
 
     buffer->numIndices = numIndices;
 }
@@ -258,9 +258,9 @@ void GL_DrawVertexBuffer(vertexBuffer_t *buffer, GLenum mode, int first, int cou
     GL_BindVertexBuffer(buffer);
 
     if (buffer->ibo && buffer->numIndices > 0) {
-        glDrawElements(mode, count, GL_UNSIGNED_INT, (void*)(first * sizeof(GLuint)));
+        qglDrawElements(mode, count, GL_UNSIGNED_INT, (void*)(first * sizeof(GLuint)));
     } else {
-        glDrawArrays(mode, first, count);
+        qglDrawArrays(mode, first, count);
     }
 }
 

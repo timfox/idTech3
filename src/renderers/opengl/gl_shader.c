@@ -63,25 +63,28 @@ void GL_ShaderInit(void) {
     Com_Memset(&shaderManager, 0, sizeof(shaderManager));
 
     // Create default shader program
-    shaderManager.defaultProgram.program = glCreateProgram();
-    shaderManager.defaultProgram.vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    shaderManager.defaultProgram.fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    shaderManager.defaultProgram.program = qglCreateProgram();
+    shaderManager.defaultProgram.vertexShader = qglCreateShader(GL_VERTEX_SHADER);
+    shaderManager.defaultProgram.fragmentShader = qglCreateShader(GL_FRAGMENT_SHADER);
 
     if (GL_CompileShader(shaderManager.defaultProgram.vertexShader, defaultVertexShader) &&
         GL_CompileShader(shaderManager.defaultProgram.fragmentShader, defaultFragmentShader) &&
         GL_LinkShaderProgram(&shaderManager.defaultProgram)) {
 
         // Get uniform locations
-        shaderManager.defaultProgram.u_modelViewProjectionMatrix = glGetUniformLocation(shaderManager.defaultProgram.program, "u_modelViewProjectionMatrix");
-        shaderManager.defaultProgram.u_diffuseMap = glGetUniformLocation(shaderManager.defaultProgram.program, "u_diffuseMap");
-        shaderManager.defaultProgram.u_color = glGetUniformLocation(shaderManager.defaultProgram.program, "u_color");
-        shaderManager.defaultProgram.u_alphaTest = glGetUniformLocation(shaderManager.defaultProgram.program, "u_alphaTest");
+        shaderManager.defaultProgram.u_modelViewProjectionMatrix = qglGetUniformLocation(shaderManager.defaultProgram.program, "u_modelViewProjectionMatrix");
+        shaderManager.defaultProgram.u_diffuseMap = qglGetUniformLocation(shaderManager.defaultProgram.program, "u_diffuseMap");
+        shaderManager.defaultProgram.u_color = qglGetUniformLocation(shaderManager.defaultProgram.program, "u_color");
+        shaderManager.defaultProgram.u_alphaTest = qglGetUniformLocation(shaderManager.defaultProgram.program, "u_alphaTest");
 
         // Get attribute locations
-        shaderManager.defaultProgram.a_position = glGetAttribLocation(shaderManager.defaultProgram.program, "a_position");
-        shaderManager.defaultProgram.a_texCoord = glGetAttribLocation(shaderManager.defaultProgram.program, "a_texCoord");
-        shaderManager.defaultProgram.a_color = glGetAttribLocation(shaderManager.defaultProgram.program, "a_color");
-        shaderManager.defaultProgram.a_normal = glGetAttribLocation(shaderManager.defaultProgram.program, "a_normal");
+        shaderManager.defaultProgram.a_position = qglGetAttribLocation(shaderManager.defaultProgram.program, "a_position");
+        shaderManager.defaultProgram.a_texCoord = qglGetAttribLocation(shaderManager.defaultProgram.program, "a_texCoord");
+        shaderManager.defaultProgram.a_color = qglGetAttribLocation(shaderManager.defaultProgram.program, "a_color");
+        shaderManager.defaultProgram.a_normal = qglGetAttribLocation(shaderManager.defaultProgram.program, "a_normal");
+        shaderManager.defaultProgram.a_texCoord = qglGetAttribLocation(shaderManager.defaultProgram.program, "a_texCoord");
+        shaderManager.defaultProgram.a_color = qglGetAttribLocation(shaderManager.defaultProgram.program, "a_color");
+        shaderManager.defaultProgram.a_normal = qglGetAttribLocation(shaderManager.defaultProgram.program, "a_normal");
 
         shaderManager.defaultProgram.compiled = qtrue;
         shaderManager.defaultProgram.linked = qtrue;
@@ -101,17 +104,17 @@ GL_ShaderShutdown
 */
 void GL_ShaderShutdown(void) {
     if (shaderManager.defaultProgram.program) {
-        glDeleteProgram(shaderManager.defaultProgram.program);
+        qglDeleteProgram(shaderManager.defaultProgram.program);
         shaderManager.defaultProgram.program = 0;
     }
 
     if (shaderManager.defaultProgram.vertexShader) {
-        glDeleteShader(shaderManager.defaultProgram.vertexShader);
+        qglDeleteShader(shaderManager.defaultProgram.vertexShader);
         shaderManager.defaultProgram.vertexShader = 0;
     }
 
     if (shaderManager.defaultProgram.fragmentShader) {
-        glDeleteShader(shaderManager.defaultProgram.fragmentShader);
+        qglDeleteShader(shaderManager.defaultProgram.fragmentShader);
         shaderManager.defaultProgram.fragmentShader = 0;
     }
 
@@ -127,9 +130,9 @@ shaderProgram_t *GL_CreateShaderProgram(const char *vertexSource, const char *fr
     shaderProgram_t *program = ri.Malloc(sizeof(shaderProgram_t));
     Com_Memset(program, 0, sizeof(shaderProgram_t));
 
-    program->vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    program->fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    program->program = glCreateProgram();
+    program->vertexShader = qglCreateShader(GL_VERTEX_SHADER);
+    program->fragmentShader = qglCreateShader(GL_FRAGMENT_SHADER);
+    program->program = qglCreateProgram();
 
     if (GL_CompileShader(program->vertexShader, vertexSource) &&
         GL_CompileShader(program->fragmentShader, fragmentSource) &&
@@ -151,15 +154,15 @@ void GL_DestroyShaderProgram(shaderProgram_t *program) {
     if (!program) return;
 
     if (program->program) {
-        glDeleteProgram(program->program);
+        qglDeleteProgram(program->program);
     }
 
     if (program->vertexShader) {
-        glDeleteShader(program->vertexShader);
+        qglDeleteShader(program->vertexShader);
     }
 
     if (program->fragmentShader) {
-        glDeleteShader(program->fragmentShader);
+        qglDeleteShader(program->fragmentShader);
     }
 
     ri.Free(program);
@@ -173,14 +176,14 @@ GL_CompileShader
 qboolean GL_CompileShader(GLuint shader, const char *source) {
     GLint compiled;
 
-    glShaderSource(shader, 1, &source, NULL);
-    glCompileShader(shader);
+    qglShaderSource(shader, 1, &source, NULL);
+    qglCompileShader(shader);
 
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
+    qglGetShaderiv(shader, GL_COMPILE_STATUS, &compiled);
 
     if (!compiled) {
         GLchar infoLog[1024];
-        glGetShaderInfoLog(shader, sizeof(infoLog), NULL, infoLog);
+        qglGetShaderInfoLog(shader, sizeof(infoLog), NULL, infoLog);
         ri.Printf(PRINT_ERROR, "Shader compilation failed: %s\n", infoLog);
         return qfalse;
     }
@@ -196,15 +199,15 @@ GL_LinkShaderProgram
 qboolean GL_LinkShaderProgram(shaderProgram_t *program) {
     GLint linked;
 
-    glAttachShader(program->program, program->vertexShader);
-    glAttachShader(program->program, program->fragmentShader);
-    glLinkProgram(program->program);
+    qglAttachShader(program->program, program->vertexShader);
+    qglAttachShader(program->program, program->fragmentShader);
+    qglLinkProgram(program->program);
 
-    glGetProgramiv(program->program, GL_LINK_STATUS, &linked);
+    qglGetProgramiv(program->program, GL_LINK_STATUS, &linked);
 
     if (!linked) {
         GLchar infoLog[1024];
-        glGetProgramInfoLog(program->program, sizeof(infoLog), NULL, infoLog);
+        qglGetProgramInfoLog(program->program, sizeof(infoLog), NULL, infoLog);
         ri.Printf(PRINT_ERROR, "Shader program linking failed: %s\n", infoLog);
         return qfalse;
     }
@@ -219,9 +222,9 @@ GL_UseShaderProgram
 */
 void GL_UseShaderProgram(shaderProgram_t *program) {
     if (program && program->linked) {
-        glUseProgram(program->program);
+        qglUseProgram(program->program);
     } else {
-        glUseProgram(0);
+        qglUseProgram(0);
     }
 }
 
@@ -232,7 +235,7 @@ GL_SetShaderUniformMatrix4
 */
 void GL_SetShaderUniformMatrix4(shaderProgram_t *program, GLint location, const float *matrix) {
     if (program && program->linked && location >= 0) {
-        glUniformMatrix4fv(location, 1, GL_FALSE, matrix);
+        qglUniformMatrix4fv(location, 1, GL_FALSE, matrix);
     }
 }
 
@@ -243,7 +246,7 @@ GL_SetShaderUniform1i
 */
 void GL_SetShaderUniform1i(shaderProgram_t *program, GLint location, GLint value) {
     if (program && program->linked && location >= 0) {
-        glUniform1i(location, value);
+        qglUniform1i(location, value);
     }
 }
 
@@ -254,6 +257,6 @@ GL_SetShaderUniform4f
 */
 void GL_SetShaderUniform4f(shaderProgram_t *program, GLint location, float x, float y, float z, float w) {
     if (program && program->linked && location >= 0) {
-        glUniform4f(location, x, y, z, w);
+        qglUniform4f(location, x, y, z, w);
     }
 }

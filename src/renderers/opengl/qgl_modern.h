@@ -51,6 +51,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 	GLE( void, glGetShaderInfoLog, GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *infoLog ) \
 	GLE( void, glGetShaderiv, GLuint shader, GLenum pname, GLint *params ) \
 	GLE( GLint, glGetUniformLocation, GLuint program, const GLchar *name ) \
+	GLE( GLint, glGetAttribLocation, GLuint program, const GLchar *name ) \
 	GLE( void, glLinkProgram, GLuint program ) \
 	GLE( void, glShaderSource, GLuint shader, GLsizei count, const GLchar *const *string, const GLint *length ) \
 	GLE( void, glStencilFunc, GLenum func, GLint ref, GLuint mask ) \
@@ -90,6 +91,33 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 	GLE( void, glTexEnvi, GLenum target, GLenum pname, GLint param ) \
 	GLE( void, glVertex3f, GLfloat x, GLfloat y, GLfloat z ) \
 	GLE( void, glVertex3fv, const GLfloat *v ) \
-	GLE( void, glVertexPointer, GLint size, GLenum type, GLsizei stride, const GLvoid *pointer )
+	GLE( void, glVertexPointer, GLint size, GLenum type, GLsizei stride, const GLvoid *pointer ) \
+	/* Additional legacy functions needed by the codebase */ \
+	GLE( void, glBindTexture, GLenum target, GLuint texture ) \
+	GLE( void, glBlendFunc, GLenum sfactor, GLenum dfactor ) \
+	GLE( void, glClear, GLbitfield mask ) \
+	GLE( void, glClearColor, GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha ) \
+	GLE( void, glCullFace, GLenum mode ) \
+	GLE( void, glDeleteTextures, GLsizei n, const GLuint *textures ) \
+	GLE( void, glDepthFunc, GLenum func ) \
+	GLE( void, glDepthMask, GLboolean flag ) \
+	GLE( void, glDepthRange, GLclampd zNear, GLclampd zFar ) \
+	GLE( void, glDisable, GLenum cap ) \
+	GLE( void, glDrawArrays, GLenum mode, GLint first, GLsizei count ) \
+	GLE( void, glDrawElements, GLenum mode, GLsizei count, GLenum type, const GLvoid *indices ) \
+	GLE( void, glEnable, GLenum cap ) \
+	GLE( void, glFinish, void ) \
+	GLE( void, glGenTextures, GLsizei n, GLuint *textures ) \
+	GLE( void, glGetBooleanv, GLenum pname, GLboolean *params ) \
+	GLE( GLenum, glGetError, void ) \
+	GLE( void, glGetIntegerv, GLenum pname, GLint *params ) \
+	GLE( const GLubyte *, glGetString, GLenum name ) \
+	GLE( void, glReadPixels, GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, GLvoid *pixels ) \
+	GLE( void, glScissor, GLint x, GLint y, GLsizei width, GLsizei height ) \
+	GLE( void, glViewport, GLint x, GLint y, GLsizei width, GLsizei height ) \
+	GLE( void, glTexParameteri, GLenum target, GLenum pname, GLint param ) \
+	GLE( void, glTexImage2D, GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const GLvoid *pixels ) \
+	GLE( void, glTexSubImage2D, GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *pixels ) \
+	GLE( void, glPolygonMode, GLenum face, GLenum mode )
 
 #endif // __QGL_MODERN_H__
