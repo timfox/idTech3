@@ -22,6 +22,22 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "server.h"
 #include "../common/q_memory_safety.h"
+static qboolean CM_CheckAssetDependencies( const char *mapname )
+{
+    // Preflight: verify map asset availability before loading
+    if ( !mapname || !*mapname ) {
+        Com_Printf( S_COLOR_YELLOW "Preflight: invalid map name in CM_CheckAssetDependencies\n" );
+        return qfalse;
+    }
+    char mappath[MAX_QPATH];
+    Com_sprintf( mappath, sizeof( mappath ), "maps/%s.bsp", mapname );
+    int len = FS_FOpenFileRead( mappath, NULL, qfalse );
+    if ( len == -1 ) {
+        Com_Printf( S_COLOR_YELLOW "Preflight: map file not found: %s\n", mappath );
+        return qfalse;
+    }
+    return qtrue;
+}
 #ifdef USE_ENTT
 #include "sv_ecs.h"
 #endif
@@ -608,11 +624,17 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 		}
 	}
 
-	Sys_SetStatus( "Loading map %s", mapname );
-	if ( !FS_StartupInProgress() ) {
+    Sys_SetStatus( "Loading map %s", mapname );
+    Com_Printf( "CM_CheckAssetDependencies: preflight for map %s\n", mapname );
+    if ( !CM_CheckAssetDependencies( mapname ) ) {
+        Com_Printf( S_COLOR_YELLOW "Preflight: asset checks failed for map %s; continuing anyway\n", mapname );
+    }
+Com_Printf( "CM_LoadMap: loading maps/%s.bsp\n", mapname );
+if ( !FS_StartupInProgress() ) {
 	}
-	CM_LoadMap( va( "maps/%s.bsp", mapname ), qfalse, &checksum );
-	if ( !FS_StartupInProgress() ) {
+CM_LoadMap( va( "maps/%s.bsp", mapname ), qfalse, &checksum );
+Com_Printf( "CM_LoadMap: loaded maps/%s.bsp, checksum=%d\n", mapname, checksum );
+if ( !FS_StartupInProgress() ) {
 	}
 
 	// set serverinfo visible name

@@ -265,10 +265,10 @@ static void SV_Map_f( void ) {
 		Com_Printf( S_COLOR_YELLOW "  Quake 3: q3dm9, pro-q3dm13, pro-q3dm6 (and others in pk3 files)\n" );
 		Com_Printf( S_COLOR_CYAN "  Custom: Check your mod's maps directory\n" );
 
-		// In startup mode, exit cleanly instead of continuing with client initialization
+		// In startup mode, avoid hard exit on missing map to prevent crash during startup.
+		// Log a warning and return to allow startup to continue in a degraded state.
 		if (!com_fullyInitialized) {
-			Com_Printf( S_COLOR_RED "Exiting due to missing map during startup.\n" );
-			exit(1);
+			Com_Printf( S_COLOR_RED "Startup: missing map during initialization; continuing in degraded mode.\n" );
 		}
 		return;
 	}

@@ -603,6 +603,7 @@ Loads in the map and all submodels
 ==================
 */
 void CM_LoadMap( const char *name, qboolean clientload, int *checksum ) {
+	Com_DPrintf( "%s( '%s', %i ) -- entering CM_LoadMap\n", __func__, name, clientload );
 	void			*buf;
 	int				i;
 	dheader_t		header;
@@ -659,8 +660,10 @@ void CM_LoadMap( const char *name, qboolean clientload, int *checksum ) {
 	}
 
 	*checksum = cm.checksum = LittleLong( Com_BlockChecksum( buf, length ) );
+	Com_DPrintf( "%s: checksum=%d for map '%s'\n", __func__, *checksum, name );
 
-	header = *(dheader_t *)buf;
+header = *(dheader_t *)buf;
+Com_DPrintf("%s: loaded header version=%d, lumps=%d\n", __func__, header.version, HEADER_LUMPS);
 	for ( i = 0; i < (int)( sizeof( dheader_t ) / sizeof( int32_t ) ); i++ ) {
 		( (int32_t *)&header )[i] = LittleLong( ( (int32_t *)&header )[i] );
 	}
