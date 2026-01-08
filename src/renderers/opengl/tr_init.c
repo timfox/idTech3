@@ -335,10 +335,12 @@ static void APIENTRY glStencilFuncDummy(GLenum func, GLint ref, GLuint mask) {
 }
 
 static void APIENTRY glStencilOpDummy(GLenum fail, GLenum zfail, GLenum zpass) {
+	(void)fail; (void)zfail; (void)zpass;
 	// Stencil operations not available - this is a no-op
 }
 
 static void APIENTRY glLineWidthDummy(GLfloat width) {
+	(void)width;
 	// Line width control not available - this is a no-op
 }
 
@@ -347,46 +349,57 @@ static void APIENTRY glLoadIdentityDummy(void) {
 }
 
 static void APIENTRY glLoadMatrixfDummy(const GLfloat *m) {
+	(void)m;
 	// Matrix operations not available - this is a no-op
 }
 
 static void APIENTRY glMatrixModeDummy(GLenum mode) {
+	(void)mode;
 	// Matrix mode operations not available - this is a no-op
 }
 
 static void APIENTRY glMultMatrixfDummy(const GLfloat *m) {
+	(void)m;
 	// Matrix operations not available - this is a no-op
 }
 
 static void APIENTRY glNormal3fDummy(GLfloat nx, GLfloat ny, GLfloat nz) {
+	(void)nx; (void)ny; (void)nz;
 	// Normal specification not available - this is a no-op
 }
 
 static void APIENTRY glNormalPointerDummy(GLenum type, GLsizei stride, const GLvoid *pointer) {
+	(void)type; (void)stride; (void)pointer;
 	// Normal pointer specification not available - this is a no-op
 }
 
 static void APIENTRY glTexCoord2fDummy(GLfloat s, GLfloat t) {
+	(void)s; (void)t;
 	// Texture coordinate specification not available - this is a no-op
 }
 
 static void APIENTRY glTexCoordPointerDummy(GLint size, GLenum type, GLsizei stride, const GLvoid *pointer) {
+	(void)size; (void)type; (void)stride; (void)pointer;
 	// Texture coordinate pointer specification not available - this is a no-op
 }
 
 static void APIENTRY glVertex2fDummy(GLfloat x, GLfloat y) {
+	(void)x; (void)y;
 	// Vertex specification not available - this is a no-op
 }
 
 static void APIENTRY glVertex3fDummy(GLfloat x, GLfloat y, GLfloat z) {
+	(void)x; (void)y; (void)z;
 	// Vertex specification not available - this is a no-op
 }
 
 static void APIENTRY glVertexPointerDummy(GLint size, GLenum type, GLsizei stride, const GLvoid *pointer) {
+	(void)size; (void)type; (void)stride; (void)pointer;
 	// Vertex pointer specification not available - this is a no-op
 }
 
 static void APIENTRY glBeginDummy(GLenum mode) {
+	(void)mode;
 	// Begin immediate mode not available - this is a no-op
 }
 

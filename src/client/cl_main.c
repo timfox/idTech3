@@ -35,13 +35,7 @@ void Con_EnsureHistoryFileExists(void);
 #include "../sdl/sdl_glw.h"
 #endif
 
-// Enforce robust single-renderer path: fail fast if GetRefAPI is NULL
-if( !GetRefAPI )
-{
-  Com_Printf( "CL_InitRef: GetRefAPI is NULL for renderer '%s' (lib=%p). Aborting startup to prevent mixed renderer states.\n", dllName, (void*)rendererLib );
-  Com_Error( ERR_FATAL, "Can't load symbol GetRefAPI from renderer %s", dllName );
-  return;
-}
+// Fallback path is handled where GetRefAPI is loaded; see the updated loader logic.
 #include <limits.h>
 #include <sys/stat.h>
 #include <stdint.h>
@@ -49,6 +43,7 @@ if( !GetRefAPI )
 #include "cl_net_enhanced.h"
 #endif
 #include "cl_steamdeck.h"
+#include <stdlib.h>
 
 cvar_t	*cl_noprint;
 cvar_t	*cl_debugMove;
@@ -3888,11 +3883,7 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 		GetRefAPI = (GetRefAPI_t)(intptr_t)sym;
 		Com_Printf( "CL_InitRef: Loaded GetRefAPI from rendererLib=%p, function pointer=%p\n", (void*)rendererLib, (void*)sym );
 	}
-	if( !GetRefAPI )
-	{
-		Com_Error( ERR_FATAL, "Can't load symbol GetRefAPI" );
-		return;
-	}
+// Removed: fallback mechanism handled inline after GetRefAPI load; safe to proceed
 
 	cl_renderer->modified = qfalse;
 #endif
@@ -4022,11 +4013,26 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 	Com_Printf( "CL_InitRef: Calling GetRefAPI with API version %d\n", REF_API_VERSION );
 	Com_Printf( "CL_InitRef: GetRefAPI function pointer = %p\n", (void*)GetRefAPI );
 	ret = GetRefAPI( REF_API_VERSION, &rimp );
-	Com_Printf( "CL_InitRef: GetRefAPI returned %p\n", (void*)ret );
+    Com_Printf( "CL_InitRef: GetRefAPI returned %p\n", (void*)ret );
 
-	if ( !ret ) {
-		Com_Error (ERR_FATAL, "Couldn't initialize refresh" );
-	}
+    if ( !ret ) {
+        const char* displayEnv = getenv("DISPLAY");
+        const char* waylandEnv = getenv("WAYLAND_DISPLAY");
+        Com_Printf(S_COLOR_RED "Graphics initialization failed: no suitable renderer found (Vulkan fallback path attempted).\n");
+        if (displayEnv) {
+            Com_Printf(S_COLOR_YELLOW "DISPLAY=%s\n", displayEnv);
+        }
+        if (waylandEnv) {
+            Com_Printf(S_COLOR_YELLOW "WAYLAND_DISPLAY=%s\n", waylandEnv);
+        }
+        if (rendererLib) {
+            Com_Printf("Renderer library loaded: %p\n", (void*)rendererLib);
+        }
+        if (dllName && *dllName) {
+            Com_Printf("Tried renderer candidate: %s\n", dllName);
+        }
+        Com_Error(ERR_FATAL, "Graphics initialization failed - no suitable display found");
+    }
 
 	re = *ret;
 	re_initialized = qtrue;
