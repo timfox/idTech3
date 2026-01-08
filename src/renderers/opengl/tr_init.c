@@ -330,6 +330,30 @@ static void APIENTRY glDrawBufferDummy(GLenum mode) {
 	// Draw buffer control not available - this is a no-op
 }
 
+static void APIENTRY glStencilFuncDummy(GLenum func, GLint ref, GLuint mask) {
+	// Stencil operations not available - this is a no-op
+}
+
+static void APIENTRY glStencilOpDummy(GLenum fail, GLenum zfail, GLenum zpass) {
+	// Stencil operations not available - this is a no-op
+}
+
+static void APIENTRY glLineWidthDummy(GLfloat width) {
+	// Line width control not available - this is a no-op
+}
+
+static void APIENTRY glLoadIdentityDummy(void) {
+	// Matrix operations not available - this is a no-op
+}
+
+static void APIENTRY glLoadMatrixfDummy(const GLfloat *m) {
+	// Matrix operations not available - this is a no-op
+}
+
+static void APIENTRY glMatrixModeDummy(GLenum mode) {
+	// Matrix mode operations not available - this is a no-op
+}
+
 static void APIENTRY glEnableClientStateDummy(GLenum array) {
 	// Client state not available - this is a no-op
 }
@@ -480,6 +504,46 @@ static void APIENTRY glEnableVertexAttribArrayDummy(GLuint index) {
 
 static void APIENTRY glVertexAttribPointerDummy(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid *pointer) {
 	// Vertex attributes not available - this is a no-op
+}
+
+// Dummy functions for uniform functions when dynamic resolution fails
+static GLint APIENTRY glGetUniformLocationDummy(GLuint program, const GLchar *name) {
+	// Uniforms not available - return invalid location
+	return -1;
+}
+
+static void APIENTRY glUniform1fDummy(GLint location, GLfloat v0) {
+	// Uniforms not available - this is a no-op
+}
+
+static void APIENTRY glUniform1iDummy(GLint location, GLint v0) {
+	// Uniforms not available - this is a no-op
+}
+
+static void APIENTRY glUniform2fDummy(GLint location, GLfloat v0, GLfloat v1) {
+	// Uniforms not available - this is a no-op
+}
+
+static void APIENTRY glUniform3fDummy(GLint location, GLfloat v0, GLfloat v1, GLfloat v2) {
+	// Uniforms not available - this is a no-op
+}
+
+static void APIENTRY glUniform4fDummy(GLint location, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3) {
+	// Uniforms not available - this is a no-op
+}
+
+static void APIENTRY glUniformMatrix3fvDummy(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value) {
+	// Uniforms not available - this is a no-op
+}
+
+static void APIENTRY glUniformMatrix4fvDummy(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value) {
+	// Uniforms not available - this is a no-op
+}
+
+// Dummy functions for attribute location functions when dynamic resolution fails
+static GLint APIENTRY glGetAttribLocationDummy(GLuint program, const GLchar *name) {
+	// Attributes not available - return invalid location
+	return -1;
 }
 
 #define GLE( ret, name, ... ) { (void**)&q##name, XSTRING(name) },
@@ -653,6 +717,53 @@ static const char *R_ResolveSymbols( sym_t *syms, int count )
                 *syms[i].symbol = (void *)&glVertexAttribPointerDummy;
                 continue;
             }
+            // Fallbacks for uniform functions - use dummy implementations
+            if (Q_stricmp(syms[i].name, "glGetUniformLocation") == 0) {
+                ri.Printf(PRINT_WARNING, "glGetUniformLocation not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glGetUniformLocationDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glUniform1f") == 0) {
+                ri.Printf(PRINT_WARNING, "glUniform1f not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glUniform1fDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glUniform1i") == 0) {
+                ri.Printf(PRINT_WARNING, "glUniform1i not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glUniform1iDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glUniform2f") == 0) {
+                ri.Printf(PRINT_WARNING, "glUniform2f not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glUniform2fDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glUniform3f") == 0) {
+                ri.Printf(PRINT_WARNING, "glUniform3f not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glUniform3fDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glUniform4f") == 0) {
+                ri.Printf(PRINT_WARNING, "glUniform4f not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glUniform4fDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glUniformMatrix3fv") == 0) {
+                ri.Printf(PRINT_WARNING, "glUniformMatrix3fv not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glUniformMatrix3fvDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glUniformMatrix4fv") == 0) {
+                ri.Printf(PRINT_WARNING, "glUniformMatrix4fv not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glUniformMatrix4fvDummy;
+                continue;
+            }
+            // Fallbacks for attribute location functions - use dummy implementations
+            if (Q_stricmp(syms[i].name, "glGetAttribLocation") == 0) {
+                ri.Printf(PRINT_WARNING, "glGetAttribLocation not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glGetAttribLocationDummy;
+                continue;
+            }
 			if (Q_stricmp(syms[i].name, "glAlphaFunc") == 0) {
 				ri.Printf(PRINT_WARNING, "glAlphaFunc not available in this OpenGL context, using compatibility fallback\n");
 				*syms[i].symbol = (void *)&glAlphaFuncDummy;
@@ -666,6 +777,36 @@ static const char *R_ResolveSymbols( sym_t *syms, int count )
 			if (Q_stricmp(syms[i].name, "glEnableClientState") == 0) {
 				ri.Printf(PRINT_WARNING, "glEnableClientState not available in this OpenGL context, using compatibility fallback\n");
 				*syms[i].symbol = (void *)&glEnableClientStateDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glStencilFunc") == 0) {
+				ri.Printf(PRINT_WARNING, "glStencilFunc not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glStencilFuncDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glStencilOp") == 0) {
+				ri.Printf(PRINT_WARNING, "glStencilOp not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glStencilOpDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glLineWidth") == 0) {
+				ri.Printf(PRINT_WARNING, "glLineWidth not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glLineWidthDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glLoadIdentity") == 0) {
+				ri.Printf(PRINT_WARNING, "glLoadIdentity not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glLoadIdentityDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glLoadMatrixf") == 0) {
+				ri.Printf(PRINT_WARNING, "glLoadMatrixf not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glLoadMatrixfDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glMatrixMode") == 0) {
+				ri.Printf(PRINT_WARNING, "glMatrixMode not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glMatrixModeDummy;
 				continue;
 			}
 			if (Q_stricmp(syms[i].name, "glBindTexture") == 0) {

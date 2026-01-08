@@ -518,9 +518,9 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 		
 			SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1 );
 
-			// Request OpenGL 4.6 compatibility profile for full legacy support
-			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, 4 );
-			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 6 );
+			// Request OpenGL 3.0 for modern GLSL support
+			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, 3 );
+			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 0 );
 			SDL_GL_SetAttribute( SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY );
 
 			if ( !r_allowSoftwareGL->integer )
