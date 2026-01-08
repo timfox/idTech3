@@ -1,1 +1,0 @@
-{"id":"log_1767859989_glmakecurrent_success","timestamp":1767859989000,"location":"sdl_glimp.c:GLimp_Init","message":"SDL_GL_MakeCurrent succeeded","data":{"sessionId":"debug-session","runId":"post-fix","hypothesisId":"A"},"sessionId":"debug-session"}

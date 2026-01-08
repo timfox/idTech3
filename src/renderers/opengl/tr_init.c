@@ -347,35 +347,10 @@ returns NULL on success or last failed symbol name otherwise
 static const char *R_ResolveSymbols( sym_t *syms, int count )
 {
     int i;
-    // Lightweight instrumentation: track symbol resolution without breaking ABI
-    static FILE *debug_log_ptr = NULL;
-    if (debug_log_ptr == NULL) {
-        debug_log_ptr = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
-    }
-    if (debug_log_ptr) {
-        fprintf(debug_log_ptr, "{\"id\":\"log_RResolve_enter\",\"timestamp\":0,\"location\":\"tr_init.c:R_ResolveSymbols\",\"message\":\"ENTER SYMBOL RESOLUTION\",\"data\":{\"count\":%d}}\n", count);
-        fflush(debug_log_ptr);
-    }
 
     for ( i = 0; i < count; i++ )
 	{
-// #region agent log
-		debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
-		if (debug_log) {
-			fprintf(debug_log, "{\"id\":\"log_%ld_%d\",\"timestamp\":%ld,\"location\":\"tr_init.c:R_ResolveSymbols\",\"message\":\"Resolving symbol\",\"data\":{\"symbol\":\"%s\",\"index\":%d,\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"A\"},\"sessionId\":\"debug-session\"}\n", time(NULL), i, time(NULL)*1000, syms[i].name, i);
-			fclose(debug_log);
-		}
-// #endregion
-
 		*syms[ i ].symbol = ri.GL_GetProcAddress( syms[ i ].name );
-// #region agent log
-		debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
-		if (debug_log) {
-			void *proc_addr = ri.GL_GetProcAddress( syms[ i ].name );
-			fprintf(debug_log, "{\"id\":\"log_%ld_%d_result\",\"timestamp\":%ld,\"location\":\"tr_init.c:R_ResolveSymbols\",\"message\":\"Symbol resolution result\",\"data\":{\"symbol\":\"%s\",\"proc_addr\":\"%p\",\"assigned\":\"%p\",\"null_check\":%s,\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"A\"},\"sessionId\":\"debug-session\"}\n", time(NULL), i, time(NULL)*1000, syms[i].name, proc_addr, *syms[i].symbol, (*syms[i].symbol == NULL) ? "true" : "false");
-			fclose(debug_log);
-		}
-// #endregion
 
         if ( *syms[ i ].symbol == NULL )
         {
@@ -383,27 +358,15 @@ static const char *R_ResolveSymbols( sym_t *syms, int count )
             if (Q_stricmp(syms[i].name, "glActiveTexture") == 0) {
                 void *addrARB = ri.GL_GetProcAddress("glActiveTextureARB");
                 if (addrARB) {
-                    if (debug_log) {
-                        fprintf(debug_log, "{\"id\":\"log_RResolve_glActiveTexture_arb_fallback\",\"timestamp\":%ld,\"location\":\"tr_init.c:R_ResolveSymbols\",\"message\":\"ARB fallback used for glActiveTexture\",\"data\":{\"addr\":\"%p\"}}\n", time(NULL), addrARB);
-                        fflush(debug_log);
-                    }
                     *syms[ i ].symbol = addrARB;
+                    continue;
+                } else {
+                    // ARB fallback failed, use system header version
+                    ri.Printf(PRINT_WARNING, "glActiveTexture not available through extension mechanism, using system header version\n");
+                    *syms[i].symbol = (void *)&glActiveTexture;
                     continue;
                 }
             }
-			// Special handling for core functions that may not be dynamically available in some OpenGL contexts
-			if (Q_stricmp(syms[i].name, "glActiveTexture") == 0) {
-// #region agent log
-				FILE *debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
-				if (debug_log) {
-					fprintf(debug_log, "{\"id\":\"log_%ld_glactivetexture_fix\",\"timestamp\":%ld,\"location\":\"tr_init.c:R_ResolveSymbols\",\"message\":\"Applying glActiveTexture fix\",\"data\":{\"glActiveTexture_addr\":\"%p\",\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"C\"},\"sessionId\":\"debug-session\"}\n", time(NULL), time(NULL)*1000, &glActiveTexture);
-					fclose(debug_log);
-				}
-// #endregion
-				ri.Printf(PRINT_WARNING, "glActiveTexture not available through extension mechanism, using system header version\n");
-				*syms[i].symbol = (void *)&glActiveTexture;
-				continue;
-			}
 			if (Q_stricmp(syms[i].name, "glAlphaFunc") == 0) {
 				ri.Printf(PRINT_WARNING, "glAlphaFunc not available in this OpenGL context, using compatibility fallback\n");
 				*syms[i].symbol = (void *)&glAlphaFuncDummy;
@@ -485,13 +448,6 @@ static const char *R_ResolveSymbols( sym_t *syms, int count )
 				continue;
 			}
 			// If we can't resolve core functions, this indicates a deeper OpenGL context issue
-// #region agent log
-			FILE *debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
-			if (debug_log) {
-				fprintf(debug_log, "{\"id\":\"log_%ld_final_error\",\"timestamp\":%ld,\"location\":\"tr_init.c:R_ResolveSymbols\",\"message\":\"Final error - symbol not resolved\",\"data\":{\"symbol\":\"%s\",\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"C\"},\"sessionId\":\"debug-session\"}\n", time(NULL), time(NULL)*1000, syms[i].name);
-				fclose(debug_log);
-			}
-// #endregion
 			ri.Printf(PRINT_ERROR, "Failed to resolve core OpenGL function '%s' - OpenGL context may not be properly initialized\n", syms[i].name);
 			return syms[ i ].name;
 		}
@@ -839,10 +795,6 @@ static void R_InitExtensions( void )
 */
 static void InitOpenGL( void )
 {
-    FILE *debug_log = NULL;
-{
-    FILE *debug_log = NULL;
-{
 	//
 	// initialize OS specific portions of the renderer
 	//
@@ -873,35 +825,9 @@ static void InitOpenGL( void )
 
 		R_ClearSymTables();
 
-// #region agent log
-if (debug_log == NULL) {
-    debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
-}
-if (debug_log) {
-    fprintf(debug_log, "{\"id\":\"log_%lu_before_resolve\",\"timestamp\":%lu,\"location\":\"tr_init.c:R_Init\",\"message\":\"About to resolve core symbols\",\"data\":{\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"A\"}} \n", (unsigned long)time(NULL), (unsigned long)time(NULL)*1000);
-    fflush(debug_log);
-}
-// #endregion
-
 		err = R_ResolveSymbols( core_procs, ARRAY_LEN( core_procs ) );
-		if ( err ) {
-// #region agent log
-			debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
-			if (debug_log) {
-				fprintf(debug_log, "{\"id\":\"log_%ld_resolve_failed\",\"timestamp\":%ld,\"location\":\"tr_init.c:R_Init\",\"message\":\"Symbol resolution failed\",\"data\":{\"failed_symbol\":\"%s\",\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"A\"},\"sessionId\":\"debug-session\"}\n", time(NULL), time(NULL)*1000, err);
-				fclose(debug_log);
-			}
-// #endregion
+		if ( err )
 			ri.Error( ERR_FATAL, "Error resolving core OpenGL function '%s'", err );
-		} else {
-// #region agent log
-			debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
-			if (debug_log) {
-				fprintf(debug_log, "{\"id\":\"log_%ld_resolve_success\",\"timestamp\":%ld,\"location\":\"tr_init.c:R_Init\",\"message\":\"Core symbol resolution succeeded\",\"data\":{\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"A\"},\"sessionId\":\"debug-session\"}\n", time(NULL), time(NULL)*1000);
-				fclose(debug_log);
-			}
-// #endregion
-		}
 
 		R_InitExtensions();
 
@@ -951,13 +877,6 @@ if (debug_log) {
 		GfxInfo();
 
 		gls.initTime = ri.Milliseconds();
-	}
-	else
-	{
-#ifdef USE_FBO
-		QGL_SetRenderScale( qfalse );
-#endif
-	}
 
 	if ( !qglViewport ) // might happen after REF_KEEP_WINDOW
 	{
@@ -979,6 +898,7 @@ if (debug_log) {
 	GL_SetDefaultState();
 
 	tr.inited = qtrue;
+}
 }
 
 
