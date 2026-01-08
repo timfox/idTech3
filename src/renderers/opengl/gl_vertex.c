@@ -61,12 +61,12 @@ void GL_VertexShutdown(void) {
     // Clean up immediate buffer
     if (vertexManager.immediateBuffer.vertices) {
         ri.Free(vertexManager.immediateBuffer.vertices);
-        vertexManager.immediateBuffer.vertices = NULL;
+        vertexManager.immediateBuffer.vertices = nullptr;
     }
 
     if (vertexManager.immediateBuffer.indices) {
         ri.Free(vertexManager.immediateBuffer.indices);
-        vertexManager.immediateBuffer.indices = NULL;
+        vertexManager.immediateBuffer.indices = nullptr;
     }
 
     if (vertexManager.immediateBuffer.vao) {
@@ -159,7 +159,7 @@ GL_BindVertexBuffer
 void GL_BindVertexBuffer(vertexBuffer_t *buffer) {
     if (!buffer) {
         qglBindVertexArray(0);
-        vertexManager.currentBuffer = NULL;
+        vertexManager.currentBuffer = nullptr;
         return;
     }
 

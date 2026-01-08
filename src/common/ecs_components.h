@@ -219,7 +219,7 @@ struct CollisionEvent {
 	vec3_t contactPoint;
 	vec3_t normal;
 	float impulse;
-	int timestamp;
+	uint64_t timestamp;
 };
 #endif
 

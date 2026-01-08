@@ -118,7 +118,7 @@ struct CollisionContactResultCallback : public btCollisionWorld::ContactResultCa
 			event.normal[1] = cp.m_normalWorldOnB.y();
 			event.normal[2] = cp.m_normalWorldOnB.z();
 			event.impulse = cp.getAppliedImpulse();
-                        event.timestamp = (int)time(NULL); // Use current time as timestamp
+                        event.timestamp = (uint64_t)time(NULL); // Use current time as timestamp
 
 			events.push_back(event);
 		}

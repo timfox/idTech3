@@ -419,8 +419,7 @@ static qboolean vk_compute_scheduler_submit_job(vk_compute_job_t* job) {
 static void vk_compute_scheduler_check_completed_jobs(void) {
     std::vector<uint64_t> completed_job_ids;
 
-    for (auto& pair : compute_scheduler.active_jobs) {
-        vk_compute_job_t* job = pair.second;
+    for (auto& [job_id, job] : compute_scheduler.active_jobs) {
 
         VkResult status = qvkGetFenceStatus(vk_device, job->fence);
         if (status == VK_SUCCESS) {
@@ -509,8 +508,7 @@ void vk_compute_scheduler_wait_all_jobs(void) {
     }
 
     // Wait for active jobs to complete
-    for (auto& pair : compute_scheduler.active_jobs) {
-        vk_compute_job_internal_t* job = pair.second;
+    for (auto& [job_id, job] : compute_scheduler.active_jobs) {
         qvkWaitForFences(vk_device, 1, &job->fence, VK_TRUE, UINT64_MAX);
         job->completed = qtrue;
         compute_scheduler.total_jobs_completed++;
@@ -518,8 +516,7 @@ void vk_compute_scheduler_wait_all_jobs(void) {
     }
 
     // Clean up completed jobs
-    for (auto& pair : compute_scheduler.active_jobs) {
-        vk_compute_job_internal_t* job = pair.second;
+    for (auto& [job_id, job] : compute_scheduler.active_jobs) {
         qvkDestroyFence(vk_device, job->fence, nullptr);
         ri.Free(job);
     }

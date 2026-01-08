@@ -27,11 +27,22 @@ void append_verbose_crash_context(void) {
 
     // Generate timestamped crash report filename
     time_t now = time(NULL);
-    struct tm* tm_info = localtime(&now);
+    struct tm tm_info_buf;
+    struct tm* tm_info = localtime_r(&now, &tm_info_buf);
+    if (!tm_info) {
+        free(strings);
+        return; // Failed to get local time
+    }
     char timebuf[64];
     char crash_filename[256];
-    strftime(timebuf, sizeof(timebuf), "%Y%m%d_%H%M%S", tm_info);
-    snprintf(crash_filename, sizeof(crash_filename), "%s%s.txt", CRASH_REPORT_BASE, timebuf);
+    if (strftime(timebuf, sizeof(timebuf), "%Y%m%d_%H%M%S", tm_info) == 0) {
+        free(strings);
+        return; // Failed to format time
+    }
+    if (snprintf(crash_filename, sizeof(crash_filename), "%s%s.txt", CRASH_REPORT_BASE, timebuf) >= (int)sizeof(crash_filename)) {
+        free(strings);
+        return; // Buffer overflow prevented
+    }
 
     // Persist to primary crash report
     FILE* f = fopen(crash_filename, "a");
@@ -39,26 +50,49 @@ void append_verbose_crash_context(void) {
         free(strings);
         return;
     }
-    strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M:%S", tm_info);
-    fprintf(f, "\n=== Backtrace at %s ===\n", timebuf);
-    for (int i = 0; i < nptrs; ++i) {
-        fprintf(f, "%p %s\n", buffer[i], strings[i]);
+    if (strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M:%S", tm_info) == 0) {
+        fclose(f);
+        free(strings);
+        return; // Failed to format time
     }
-    fprintf(f, "=== End Backtrace ===\n");
+    if (fprintf(f, "\n=== Backtrace at %s ===\n", timebuf) < 0) {
+        fclose(f);
+        free(strings);
+        return; // Failed to write to file
+    }
+    for (int i = 0; i < nptrs; ++i) {
+        if (fprintf(f, "%p %s\n", buffer[i], strings[i]) < 0) {
+            fclose(f);
+            free(strings);
+            return; // Failed to write to file
+        }
+    }
+    if (fprintf(f, "=== End Backtrace ===\n") < 0) {
+        fclose(f);
+        free(strings);
+        return; // Failed to write to file
+    }
     fclose(f);
     free(strings);
     // Additionally, write to a verbose crash log if available
     FILE* f2 = fopen(CRASH_VERBOSE_LOG, "a");
     if (f2) {
         time_t now2 = time(NULL);
-        struct tm* tm2 = localtime(&now2);
-        char tbuf[64];
-        strftime(tbuf, sizeof(tbuf), "%Y-%m-%d %H:%M:%S", tm2);
-        fprintf(f2, "\n=== Verbose Crash at %s ===\n", tbuf);
-        for (int i = 0; i < nptrs; ++i) {
-            fprintf(f2, "%p %s\n", buffer[i], strings[i]);
+        struct tm tm2_buf;
+        struct tm* tm2 = localtime_r(&now2, &tm2_buf);
+        if (tm2) {
+            char tbuf[64];
+            if (strftime(tbuf, sizeof(tbuf), "%Y-%m-%d %H:%M:%S", tm2) > 0) {
+                if (fprintf(f2, "\n=== Verbose Crash at %s ===\n", tbuf) >= 0) {
+                    for (int i = 0; i < nptrs; ++i) {
+                        if (fprintf(f2, "%p %s\n", buffer[i], strings[i]) < 0) {
+                            break; // Stop writing on error
+                        }
+                    }
+                    fprintf(f2, "=== End Verbose Crash ===\n");
+                }
+            }
         }
-        fprintf(f2, "=== End Verbose Crash ===\n");
         fclose(f2);
     }
     // Also create a lightweight relocation note file for automation

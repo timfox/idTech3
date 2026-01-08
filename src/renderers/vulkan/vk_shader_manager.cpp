@@ -234,23 +234,23 @@ void vk_shader_manager_shutdown(void) {
     ri.Printf(PRINT_ALL, "Vulkan: Shutting down shader management system\n");
 
     // Destroy cached shader modules
-    for (auto& pair : shader_cache.vertexShaders) {
-        if (pair.second != VK_NULL_HANDLE) {
-            qvkDestroyShaderModule(vk.device, pair.second, nullptr);
+    for (auto& [shader_name, shader_module] : shader_cache.vertexShaders) {
+        if (shader_module != VK_NULL_HANDLE) {
+            qvkDestroyShaderModule(vk.device, shader_module, nullptr);
         }
     }
     shader_cache.vertexShaders.clear();
 
-    for (auto& pair : shader_cache.fragmentShaders) {
-        if (pair.second != VK_NULL_HANDLE) {
-            qvkDestroyShaderModule(vk.device, pair.second, nullptr);
+    for (auto& [shader_name, shader_module] : shader_cache.fragmentShaders) {
+        if (shader_module != VK_NULL_HANDLE) {
+            qvkDestroyShaderModule(vk.device, shader_module, nullptr);
         }
     }
     shader_cache.fragmentShaders.clear();
 
-    for (auto& pair : shader_cache.computeShaders) {
-        if (pair.second != VK_NULL_HANDLE) {
-            qvkDestroyShaderModule(vk.device, pair.second, nullptr);
+    for (auto& [shader_name, shader_module] : shader_cache.computeShaders) {
+        if (shader_module != VK_NULL_HANDLE) {
+            qvkDestroyShaderModule(vk.device, shader_module, nullptr);
         }
     }
     shader_cache.computeShaders.clear();

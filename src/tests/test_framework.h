@@ -308,6 +308,7 @@ void Test_ExportResultsCSV(const char *filename);
 void Test_ExportResultsXML(const char *filename);
 
 // Example reliability test for memory safety
+#ifdef ENABLE_TEST_FRAMEWORK
 TEST(memory_safety_bounds_checking) {
 	// Test array bounds checking
 	char buffer[10];
@@ -325,7 +326,9 @@ TEST(memory_safety_bounds_checking) {
 	ASSERT_EQ(array[0], 42);
 	ASSERT_EQ(array[4], 99);
 }
+#endif
 
+#ifdef ENABLE_TEST_FRAMEWORK
 TEST(memory_safety_string_operations) {
 	char dest[20];
 	const char *src = "Hello World!";
@@ -338,7 +341,9 @@ TEST(memory_safety_string_operations) {
 	dest[0] = 'h';
 	ASSERT_EQ(dest[0], 'h');
 }
+#endif
 
+#ifdef ENABLE_TEST_FRAMEWORK
 TEST(thread_safety_atomic_operations) {
 	atomic_int_t counter = 0;
 
@@ -349,7 +354,9 @@ TEST(thread_safety_atomic_operations) {
 
 	ASSERT_EQ(atomic_load_explicit(&counter, memory_order_relaxed), 7);
 }
+#endif
 
+#ifdef ENABLE_TEST_FRAMEWORK
 TEST(performance_monitoring) {
 	// Test performance monitoring doesn't impact functionality
 	Perf_Init();
@@ -361,7 +368,9 @@ TEST(performance_monitoring) {
 	// Verify counters work
 	// Note: This would need access to perfCounters which might not be available in test context
 }
+#endif
 
+#ifdef ENABLE_TEST_FRAMEWORK
 TEST(synchronization_primitives) {
 	mutex_t mutex;
 	semaphore_t sem;
@@ -384,6 +393,7 @@ TEST(synchronization_primitives) {
 	Barrier_Wait(&barrier);
 	Barrier_Destroy(&barrier);
 }
+#endif
 
 #define ASSERT_FLOAT_EQ(a, b, tolerance) \
 	do { \

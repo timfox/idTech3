@@ -105,17 +105,17 @@ GL_ShaderShutdown
 void GL_ShaderShutdown(void) {
     if (shaderManager.defaultProgram.program) {
         qglDeleteProgram(shaderManager.defaultProgram.program);
-        shaderManager.defaultProgram.program = 0;
+        shaderManager.defaultProgram.program = nullptr;
     }
 
     if (shaderManager.defaultProgram.vertexShader) {
         qglDeleteShader(shaderManager.defaultProgram.vertexShader);
-        shaderManager.defaultProgram.vertexShader = 0;
+        shaderManager.defaultProgram.vertexShader = nullptr;
     }
 
     if (shaderManager.defaultProgram.fragmentShader) {
         qglDeleteShader(shaderManager.defaultProgram.fragmentShader);
-        shaderManager.defaultProgram.fragmentShader = 0;
+        shaderManager.defaultProgram.fragmentShader = nullptr;
     }
 
     Com_Memset(&shaderManager, 0, sizeof(shaderManager));
