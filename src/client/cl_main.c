@@ -3878,6 +3878,7 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 	{
 		void *sym = Sys_LoadFunction( rendererLib, "GetRefAPI" );
 		GetRefAPI = (GetRefAPI_t)(intptr_t)sym;
+		Com_Printf( "CL_InitRef: Loaded GetRefAPI from rendererLib=%p, function pointer=%p\n", (void*)rendererLib, (void*)sym );
 	}
 	if( !GetRefAPI )
 	{
@@ -4010,7 +4011,10 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 	rimp.VK_GetInstanceProcAddr = NULL;
 	rimp.VK_CreateSurface = NULL;
 #endif
+	Com_Printf( "CL_InitRef: Calling GetRefAPI with API version %d\n", REF_API_VERSION );
+	Com_Printf( "CL_InitRef: GetRefAPI function pointer = %p\n", (void*)GetRefAPI );
 	ret = GetRefAPI( REF_API_VERSION, &rimp );
+	Com_Printf( "CL_InitRef: GetRefAPI returned %p\n", (void*)ret );
 
 	if ( !ret ) {
 		Com_Error (ERR_FATAL, "Couldn't initialize refresh" );

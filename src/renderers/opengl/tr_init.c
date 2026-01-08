@@ -354,6 +354,70 @@ static void APIENTRY glMatrixModeDummy(GLenum mode) {
 	// Matrix mode operations not available - this is a no-op
 }
 
+static void APIENTRY glMultMatrixfDummy(const GLfloat *m) {
+	// Matrix operations not available - this is a no-op
+}
+
+static void APIENTRY glNormal3fDummy(GLfloat nx, GLfloat ny, GLfloat nz) {
+	// Normal specification not available - this is a no-op
+}
+
+static void APIENTRY glNormalPointerDummy(GLenum type, GLsizei stride, const GLvoid *pointer) {
+	// Normal pointer specification not available - this is a no-op
+}
+
+static void APIENTRY glTexCoord2fDummy(GLfloat s, GLfloat t) {
+	// Texture coordinate specification not available - this is a no-op
+}
+
+static void APIENTRY glTexCoordPointerDummy(GLint size, GLenum type, GLsizei stride, const GLvoid *pointer) {
+	// Texture coordinate pointer specification not available - this is a no-op
+}
+
+static void APIENTRY glVertex2fDummy(GLfloat x, GLfloat y) {
+	// Vertex specification not available - this is a no-op
+}
+
+static void APIENTRY glVertex3fDummy(GLfloat x, GLfloat y, GLfloat z) {
+	// Vertex specification not available - this is a no-op
+}
+
+static void APIENTRY glVertexPointerDummy(GLint size, GLenum type, GLsizei stride, const GLvoid *pointer) {
+	// Vertex pointer specification not available - this is a no-op
+}
+
+static void APIENTRY glBeginDummy(GLenum mode) {
+	// Begin immediate mode not available - this is a no-op
+}
+
+static void APIENTRY glEndDummy(void) {
+	// End immediate mode not available - this is a no-op
+}
+
+static void APIENTRY glPopMatrixDummy(void) {
+	// Matrix stack operations not available - this is a no-op
+}
+
+static void APIENTRY glPushMatrixDummy(void) {
+	// Matrix stack operations not available - this is a no-op
+}
+
+static void APIENTRY glPointSizeDummy(GLfloat size) {
+	// Point size specification not available - this is a no-op
+}
+
+static void APIENTRY glRotatefDummy(GLfloat angle, GLfloat x, GLfloat y, GLfloat z) {
+	// Matrix rotation not available - this is a no-op
+}
+
+static void APIENTRY glScalefDummy(GLfloat x, GLfloat y, GLfloat z) {
+	// Matrix scaling not available - this is a no-op
+}
+
+static void APIENTRY glTranslatefDummy(GLfloat x, GLfloat y, GLfloat z) {
+	// Matrix translation not available - this is a no-op
+}
+
 static void APIENTRY glEnableClientStateDummy(GLenum array) {
 	// Client state not available - this is a no-op
 }
@@ -807,6 +871,86 @@ static const char *R_ResolveSymbols( sym_t *syms, int count )
 			if (Q_stricmp(syms[i].name, "glMatrixMode") == 0) {
 				ri.Printf(PRINT_WARNING, "glMatrixMode not available in this OpenGL context, using compatibility fallback\n");
 				*syms[i].symbol = (void *)&glMatrixModeDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glMultMatrixf") == 0) {
+				ri.Printf(PRINT_WARNING, "glMultMatrixf not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glMultMatrixfDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glNormal3f") == 0) {
+				ri.Printf(PRINT_WARNING, "glNormal3f not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glNormal3fDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glNormalPointer") == 0) {
+				ri.Printf(PRINT_WARNING, "glNormalPointer not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glNormalPointerDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glTexCoord2f") == 0) {
+				ri.Printf(PRINT_WARNING, "glTexCoord2f not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glTexCoord2fDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glTexCoordPointer") == 0) {
+				ri.Printf(PRINT_WARNING, "glTexCoordPointer not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glTexCoordPointerDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glVertex2f") == 0) {
+				ri.Printf(PRINT_WARNING, "glVertex2f not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glVertex2fDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glVertex3f") == 0) {
+				ri.Printf(PRINT_WARNING, "glVertex3f not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glVertex3fDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glVertexPointer") == 0) {
+				ri.Printf(PRINT_WARNING, "glVertexPointer not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glVertexPointerDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glBegin") == 0) {
+				ri.Printf(PRINT_WARNING, "glBegin not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glBeginDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glEnd") == 0) {
+				ri.Printf(PRINT_WARNING, "glEnd not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glEndDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glPopMatrix") == 0) {
+				ri.Printf(PRINT_WARNING, "glPopMatrix not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glPopMatrixDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glPushMatrix") == 0) {
+				ri.Printf(PRINT_WARNING, "glPushMatrix not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glPushMatrixDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glPointSize") == 0) {
+				ri.Printf(PRINT_WARNING, "glPointSize not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glPointSizeDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glRotatef") == 0) {
+				ri.Printf(PRINT_WARNING, "glRotatef not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glRotatefDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glScalef") == 0) {
+				ri.Printf(PRINT_WARNING, "glScalef not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glScalefDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glTranslatef") == 0) {
+				ri.Printf(PRINT_WARNING, "glTranslatef not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glTranslatefDummy;
 				continue;
 			}
 			if (Q_stricmp(syms[i].name, "glBindTexture") == 0) {

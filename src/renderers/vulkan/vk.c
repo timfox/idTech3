@@ -113,6 +113,10 @@ extern PFN_vkEnumeratePhysicalDevices qvkEnumeratePhysicalDevices;
 
 static void vk_select_preferred_gpu(void) {
     if (!vk.instance) return;
+    if (!qvkEnumeratePhysicalDevices || !qvkGetPhysicalDeviceProperties) {
+        ri.Printf(PRINT_WARNING, "VK: Required Vulkan functions not loaded, skipping GPU selection\n");
+        return;
+    }
     uint32_t count = 0;
     VkResult res = qvkEnumeratePhysicalDevices(vk.instance, &count, NULL);
     if (res != VK_SUCCESS || count == 0) {
@@ -2105,11 +2109,16 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 #endif
 
 	ri.Printf( PRINT_ALL, "...selected physical device: %i\n", device_index );
+	ri.Printf( PRINT_ALL, "Vulkan: vk_create_device called for device %d\n", device_index );
+	ri.Printf( PRINT_ALL, "Vulkan: About to select surface format\n" );
 
 	// select surface format
+	ri.Printf( PRINT_ALL, "Vulkan: Selecting surface format...\n" );
 	if ( !vk_select_surface_format( physical_device, vk_surface ) ) {
+		ri.Printf( PRINT_ERROR, "Vulkan: Failed to select surface format\n" );
 		return qfalse;
 	}
+	ri.Printf( PRINT_ALL, "Vulkan: Surface format selected successfully\n" );
 
 	setup_surface_formats( physical_device );
 
@@ -2153,9 +2162,10 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 
 		if ( vk.queue_family_index == ~0U ) {
 			ri.Printf( PRINT_ERROR, "...failed to find graphics queue family\n" );
-
+			ri.Printf( PRINT_ERROR, "Vulkan: No suitable graphics queue family found\n" );
 			return qfalse;
 		}
+		ri.Printf( PRINT_ALL, "Vulkan: Selected graphics queue family %u\n", vk.queue_family_index );
 	}
 
 	// create VkDevice
@@ -2838,12 +2848,20 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			ri.Printf(PRINT_ALL, "VK: creating device on %s (vendor 0x%04x) at index=%d\n",
 			          used_props.deviceName, used_props.vendorID,
 			          (g_vk_selected_device_index >= 0 ? g_vk_selected_device_index : -1));
+			ri.Printf(PRINT_ALL, "VK: Physical device handle: %p\n", (void*)phys);
+                ri.Printf( PRINT_ALL, "Vulkan: Calling vkCreateDevice...\n" );
+			ri.Printf( PRINT_ALL, "Vulkan: Device create info: flags=%u, queueCount=%u, layerCount=%u, extensionCount=%u\n",
+			          device_desc.flags, device_desc.queueCreateInfoCount,
+			          device_desc.enabledLayerCount, device_desc.enabledExtensionCount);
 			res = qvkCreateDevice( phys, &device_desc, NULL, &vk.device );
+			ri.Printf( PRINT_ALL, "Vulkan: vkCreateDevice returned with result: %d\n", res);
 		}
 		if ( res < 0 ) {
 			ri.Printf( PRINT_ERROR, "vkCreateDevice returned %s\n", vk_result_string( res ) );
+			ri.Printf( PRINT_ERROR, "Vulkan: Device creation failed with error: %s\n", vk_result_string( res ) );
 			return qfalse;
 		}
+		ri.Printf( PRINT_ALL, "Vulkan: Device created successfully\n" );
 	}
 
 	return qtrue;
@@ -2855,7 +2873,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 #define INIT_INSTANCE_FUNCTION(func) \
 	q##func = (PFN_##func) Sys_LoadFunction(vulkan_lib, #func); \
 	if (q##func == NULL) {											\
-		ri.Error(ERR_FATAL, "Failed to find entrypoint %s", #func);	\
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to load %s, skipping\n", #func); \
 	}
 
 #define INIT_INSTANCE_FUNCTION_EXT(func) \
@@ -2967,7 +2985,6 @@ static void init_vulkan_library( void )
 		create_instance();
                 vk_debug_write(2, "DEBUG: create_instance returned\n", 32);
 
-                vk_debug_write(2, "DEBUG: Loading instance functions\n", 34);
 		INIT_INSTANCE_FUNCTION( vkCreateDevice )
 		INIT_INSTANCE_FUNCTION( vkDestroyInstance )
 		INIT_INSTANCE_FUNCTION( vkEnumerateDeviceExtensionProperties )
@@ -2983,21 +3000,16 @@ static void init_vulkan_library( void )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceSurfaceFormatsKHR )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceSurfacePresentModesKHR )
 		INIT_INSTANCE_FUNCTION( vkGetPhysicalDeviceSurfaceSupportKHR )
-                vk_debug_write(2, "DEBUG: instance functions loaded\n", 33);
-
-                vk_debug_write(2, "DEBUG: Loading properties2 functions\n", 38);
 		// Load KHR_get_physical_device_properties2 extension functions if available
 		// Try KHR version first (for Vulkan 1.0), then core version (Vulkan 1.1+)
 		// Note: In Vulkan 1.1+, these are core functions with identical signatures
-                vk_debug_write(2, "DEBUG: Calling GetInstanceProcAddr for Properties2KHR\n", 55);
 		void *funcPtr = Sys_LoadFunction(vulkan_lib, "vkGetPhysicalDeviceProperties2KHR");
-                vk_debug_write(2, "DEBUG: Returned from GetInstanceProcAddr\n", 42);
 		if (!funcPtr) {
-                        vk_debug_write(2, "DEBUG: Calling GetInstanceProcAddr for Properties2\n", 52);
 			funcPtr = Sys_LoadFunction(vulkan_lib, "vkGetPhysicalDeviceProperties2");
-                        vk_debug_write(2, "DEBUG: Returned from GetInstanceProcAddr\n", 42);
 		}
-		qvkGetPhysicalDeviceProperties2KHR = (PFN_vkGetPhysicalDeviceProperties2KHR)funcPtr;
+		if (funcPtr) {
+			qvkGetPhysicalDeviceProperties2KHR = (PFN_vkGetPhysicalDeviceProperties2KHR)funcPtr;
+		}
 		if (qvkGetPhysicalDeviceProperties2KHR) {
                         vk_debug_write(2, "DEBUG: Loaded vkGetPhysicalDeviceProperties2KHR\n", 49);
 		} else {
@@ -3051,10 +3063,10 @@ static void init_vulkan_library( void )
 
 
                 vk_debug_write(2, "DEBUG: Creating surface\n", 25);
-		// create surface
+		// create surface - defer if window not ready yet
 		if ( !ri.VK_CreateSurface( vk_instance, &vk_surface ) ) {
-			ri.Error( ERR_FATAL, "Error creating Vulkan surface" );
-			return;
+			ri.Printf(PRINT_WARNING, "Vulkan: Surface creation deferred (window not ready yet)\n");
+			// Don't fail here - surface will be created later during VKimp_Init
 		}
 	} // vk_instance == VK_NULL_HANDLE
 
@@ -4473,6 +4485,23 @@ void vk_initialize( void )
 		ri.VKimp_Init( &glConfig );
 
 		init_vulkan_library();
+
+		// If surface wasn't created during init_vulkan_library (window wasn't ready),
+		// try to create it now that the window exists
+		ri.Printf(PRINT_ALL, "Vulkan: Checking for deferred surface creation (surface=%p, instance=%p)\n", (void*)vk_surface, (void*)vk_instance);
+		if (vk_surface == VK_NULL_HANDLE && vk_instance != VK_NULL_HANDLE) {
+			ri.Printf(PRINT_ALL, "Vulkan: Creating deferred surface after window initialization\n");
+			if ( !ri.VK_CreateSurface( vk_instance, &vk_surface ) ) {
+				ri.Printf(PRINT_ERROR, "Vulkan: Deferred surface creation failed\n");
+				ri.Error( ERR_FATAL, "Error creating deferred Vulkan surface" );
+				return;
+			}
+			ri.Printf(PRINT_ALL, "Vulkan: Deferred surface created successfully\n");
+		} else if (vk_surface != VK_NULL_HANDLE) {
+			ri.Printf(PRINT_ALL, "Vulkan: Surface already exists, skipping deferred creation\n");
+		} else {
+			ri.Printf(PRINT_ALL, "Vulkan: No instance available for surface creation\n");
+		}
 	}
 
     // Create synchronization primitives (semaphores, fences)
