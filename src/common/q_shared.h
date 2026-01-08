@@ -1463,10 +1463,10 @@ typedef struct {
 
 // Type-safe memory allocation with alignment and bounds checking
 static inline void* Q_MallocSafe(size_t size, size_t alignment) {
-    if (size == 0) return NULL;
+    if (size == 0) return nullptr;
     if (alignment == 0) alignment = sizeof(void*); // Default alignment
-    // This would use a type-safe allocator - for now return NULL to indicate not implemented
-    return NULL;
+    // This would use a type-safe allocator - for now return nullptr to indicate not implemented
+    return nullptr;
 }
 
 static inline void Q_FreeSafe(void *ptr) {
@@ -1641,7 +1641,7 @@ static inline scoped_resource_t make_scoped_resource(void *resource, void (*clea
 static inline void scoped_resource_free(scoped_resource_t *sr) {
     if (sr->resource && sr->cleanup) {
         sr->cleanup(sr->resource);
-        sr->resource = NULL;
+        sr->resource = nullptr;
     }
 }
 

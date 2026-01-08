@@ -68,6 +68,21 @@ Example configuration:
 
 static cvar_t *in_config_json = NULL;
 
+// Function prototypes
+void IN_InitConfigurationJSON(void);
+qboolean IN_GetKeyboardBinding(const char *action, const char **key, const char **modifiers, int max_modifiers, qboolean *repeat);
+void IN_SetKeyboardBinding(const char *action, const char *action_key, const char *modifiers, qboolean repeat);
+void IN_GetMouseConfig(float *sensitivity, float *acceleration, qboolean *invert_y, qboolean *raw_input);
+void IN_UpdateMouseConfig(float sensitivity, float acceleration, qboolean invert_y, qboolean raw_input);
+void IN_GetControllerConfig(qboolean *enabled, const char **device,
+    float *left_deadzone, float *right_deadzone, float *trigger_deadzone,
+    const char **mapping_move_forward, const char **mapping_jump);
+void IN_UpdateControllerConfig(qboolean enabled, const char *device,
+    float left_deadzone, float right_deadzone, float trigger_deadzone);
+const char *IN_GetControllerMapping(const char *action);
+void IN_SetControllerMapping(const char *action, const char *mapping);
+void IN_ShutdownConfigurationJSON(void);
+
 /*
 ================
 IN_InitConfigurationJSON

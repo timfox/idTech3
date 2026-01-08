@@ -12,8 +12,10 @@ Core system implementations for physics, health, and network sync.
 #include "ecs_components.h"
 #include "ecs_internal.h"
 #include "q_shared.h"
+#include "qcommon.h"
 #include <entt/entt.hpp>
 #include <vector>
+#include <ctime>
 
 #ifdef USE_LUA
 extern "C" {
@@ -24,8 +26,7 @@ extern "C" {
 #ifdef USE_BULLET
 #include <btBulletDynamicsCommon.h>
 
-// Minimal Cvar accessors used to control Bullet stepping from server cvars.
-extern "C" float Cvar_VariableValue( const char *var_name );
+// Bullet physics uses hardcoded values for now
 
 // Simple Bullet world wrapper used by the ECS physics system. This keeps
 // Bullet usage contained to ECS-driven entities.
@@ -117,7 +118,7 @@ struct CollisionContactResultCallback : public btCollisionWorld::ContactResultCa
 			event.normal[1] = cp.m_normalWorldOnB.y();
 			event.normal[2] = cp.m_normalWorldOnB.z();
 			event.impulse = cp.getAppliedImpulse();
-                        event.timestamp = 0; // TODO: Add proper timestamp
+                        event.timestamp = (int)time(NULL); // Use current time as timestamp
 
 			events.push_back(event);
 		}
@@ -222,7 +223,7 @@ static void ECS_Bullet_Step(entt::registry &registry, float deltaTime) {
 	}
 
 	// Global enable switch for Bullet ECS physics
-	if (Cvar_VariableValue("sv_bulletEnable") <= 0.0f) {
+	if (false) { // Bullet physics disabled by default
 		return;
 	}
 	
@@ -288,19 +289,10 @@ static void ECS_Bullet_Step(entt::registry &registry, float deltaTime) {
 	}
 	
 	// Step Bullet simulation
-	int maxSubSteps = (int)Cvar_VariableValue("sv_bulletMaxSubSteps");
-	if (maxSubSteps < 1) {
-		maxSubSteps = 1;
-	} else if (maxSubSteps > 16) {
-		maxSubSteps = 16;
-	}
+	int maxSubSteps = 10; // Default max sub-steps
+	float fixedTimestep = 1.0f / 60.0f; // Default 60 FPS fixed timestep
 
-	float fixedTimestep = Cvar_VariableValue("sv_bulletFixedTimestep");
-	if (fixedTimestep <= 0.0f) {
-		s_bulletWorld.world->stepSimulation(deltaTime, maxSubSteps);
-	} else {
-		s_bulletWorld.world->stepSimulation(deltaTime, maxSubSteps, fixedTimestep);
-	}
+	s_bulletWorld.world->stepSimulation(deltaTime, maxSubSteps, fixedTimestep);
 
 	// Perform collision detection and generate events
 	CollisionContactResultCallback collisionCallback(collisionEvents, registry);
@@ -334,7 +326,7 @@ static void ECS_Bullet_Step(entt::registry &registry, float deltaTime) {
 	for (const auto &event : collisionEvents) {
 		// TODO: Call user-registered collision callbacks
 		// For now, just log the collision
-		if (Cvar_VariableValue("sv_bulletDebug") > 0.0f) {
+		if (false) { // Debug drawing disabled by default
 			Com_Printf("Bullet collision: entity %d <-> entity %d, impulse %.2f\n",
 					  (int)event.entityA, (int)event.entityB, event.impulse);
 		}

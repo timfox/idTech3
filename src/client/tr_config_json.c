@@ -30,6 +30,12 @@ cvar_t *r_color_grading_lut = NULL;
 // JSON backing cvar
 static cvar_t *r_config_json = NULL;
 
+// Function prototypes
+void R_InitConfigurationJSON(void);
+void R_SyncConfigurationFromJSON(void);
+void R_UpdateConfigurationJSON(void);
+void R_ShutdownConfigurationJSON(void);
+
 /*
 ================
 R_InitConfigurationJSON

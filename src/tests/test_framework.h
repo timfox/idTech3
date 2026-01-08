@@ -45,7 +45,7 @@ typedef struct {
 } test_statistics_t;
 
 static test_statistics_t test_stats = {0};
-static const char *current_test_name = NULL;
+static const char *current_test_name = nullptr;
 static double current_test_start_time = 0.0;
 static qboolean test_isolation_enabled = qtrue;
 static qboolean test_memory_tracking = qtrue;
@@ -211,19 +211,19 @@ static void test_memory_checkpoint(void) {
 	// Check for leaks after test completes
 }
 
-static qboolean test_check_memory_safety(void (*test_block)(void)) {
+static qboolean test_check_memory_safety([[maybe_unused]] void (*test_block)(void)) {
 	// Run test in memory-safe environment
 	// Return true if no violations detected
 	return qtrue;
 }
 
-static qboolean test_check_thread_safety(void (*test_block)(void)) {
+static qboolean test_check_thread_safety([[maybe_unused]] void (*test_block)(void)) {
 	// Run test with thread safety checking
 	// Return true if no race conditions detected
 	return qtrue;
 }
 
-static qboolean test_check_no_crash(void (*test_block)(void)) {
+static qboolean test_check_no_crash([[maybe_unused]] void (*test_block)(void)) {
 	// Run test with crash protection
 	// Return true if test completed without crashing
 	return qtrue;

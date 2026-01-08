@@ -1131,7 +1131,7 @@ void vk_rtx_build_sbt_for_frame_full(VkCommandBuffer cmd_buffer) {
     return;
   }
   // Copy handles into SBT (raygen, miss, closest-hit)
-  void* mapped = NULL;
+  void* mapped = nullptr;
   if (g_sbt.sbt_buffer.memory != VK_NULL_HANDLE) {
     VkResult map_res = vkMapMemory(vk.device, g_sbt.sbt_buffer.memory, 0, g_sbt.sbt_buffer.size, 0, &mapped);
     if (map_res == VK_SUCCESS && mapped) {
@@ -1251,7 +1251,7 @@ static uint32_t g_shader_handle_size = 0;
 
 // Utility functions
 static void* rtx_alloc(VkDeviceSize size, VkBuffer* buffer, VkDeviceMemory* memory, VkDeviceAddress* address) {
-    if (!vk.allocator) return NULL;
+    if (!vk.allocator) return nullptr;
 
     VkBufferCreateInfo buffer_info = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -1270,7 +1270,7 @@ static void* rtx_alloc(VkDeviceSize size, VkBuffer* buffer, VkDeviceMemory* memo
     VkResult result = vmaCreateBuffer(vk.allocator, &buffer_info, &alloc_info, buffer, &allocation, NULL);
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "RTX: Failed to allocate buffer\n");
-        return NULL;
+        return nullptr;
     }
 
     // Get device address
@@ -1339,7 +1339,7 @@ void vk_rtx_build_sbt_for_frame(VkCommandBuffer cmd_buffer) {
 static void rtx_free_buffer(rtx_buffer_t* buffer) {
     if (buffer->mapped) {
         vkUnmapMemory(vk.device, buffer->memory);
-        buffer->mapped = NULL;
+        buffer->mapped = nullptr;
     }
     if (buffer->buffer != VK_NULL_HANDLE) {
         vkDestroyBuffer(vk.device, buffer->buffer, NULL);
