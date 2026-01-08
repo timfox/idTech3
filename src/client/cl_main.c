@@ -34,6 +34,14 @@ void Con_EnsureHistoryFileExists(void);
 #ifdef USE_SDL
 #include "../sdl/sdl_glw.h"
 #endif
+
+// Enforce robust single-renderer path: fail fast if GetRefAPI is NULL
+if( !GetRefAPI )
+{
+  Com_Printf( "CL_InitRef: GetRefAPI is NULL for renderer '%s' (lib=%p). Aborting startup to prevent mixed renderer states.\n", dllName, (void*)rendererLib );
+  Com_Error( ERR_FATAL, "Can't load symbol GetRefAPI from renderer %s", dllName );
+  return;
+}
 #include <limits.h>
 #include <sys/stat.h>
 #include <stdint.h>
