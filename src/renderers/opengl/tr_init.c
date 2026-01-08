@@ -346,16 +346,18 @@ returns NULL on success or last failed symbol name otherwise
 */
 static const char *R_ResolveSymbols( sym_t *syms, int count )
 {
-	int i;
-// #region agent log
-	FILE *debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
-	if (debug_log) {
-		fprintf(debug_log, "{\"id\":\"log_%ld\",\"timestamp\":%ld,\"location\":\"tr_init.c:R_ResolveSymbols\",\"message\":\"Starting symbol resolution\",\"data\":{\"count\":%d,\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"A\"},\"sessionId\":\"debug-session\"}\n", time(NULL), time(NULL)*1000, count);
-		fclose(debug_log);
-	}
-// #endregion
+    int i;
+    // Lightweight instrumentation: track symbol resolution without breaking ABI
+    static FILE *debug_log_ptr = NULL;
+    if (debug_log_ptr == NULL) {
+        debug_log_ptr = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
+    }
+    if (debug_log_ptr) {
+        fprintf(debug_log_ptr, "{\"id\":\"log_RResolve_enter\",\"timestamp\":0,\"location\":\"tr_init.c:R_ResolveSymbols\",\"message\":\"ENTER SYMBOL RESOLUTION\",\"data\":{\"count\":%d}}\n", count);
+        fflush(debug_log_ptr);
+    }
 
-	for ( i = 0; i < count; i++ )
+    for ( i = 0; i < count; i++ )
 	{
 // #region agent log
 		debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
@@ -824,6 +826,8 @@ static void R_InitExtensions( void )
 ** to the user.
 */
 static void InitOpenGL( void )
+{
+    FILE *debug_log = NULL;
 {
 	//
 	// initialize OS specific portions of the renderer
