@@ -105,17 +105,17 @@ GL_ShaderShutdown
 void GL_ShaderShutdown(void) {
     if (shaderManager.defaultProgram.program) {
         qglDeleteProgram(shaderManager.defaultProgram.program);
-        shaderManager.defaultProgram.program = nullptr;
+        shaderManager.defaultProgram.program = 0;
     }
 
     if (shaderManager.defaultProgram.vertexShader) {
         qglDeleteShader(shaderManager.defaultProgram.vertexShader);
-        shaderManager.defaultProgram.vertexShader = nullptr;
+        shaderManager.defaultProgram.vertexShader = 0;
     }
 
     if (shaderManager.defaultProgram.fragmentShader) {
         qglDeleteShader(shaderManager.defaultProgram.fragmentShader);
-        shaderManager.defaultProgram.fragmentShader = nullptr;
+        shaderManager.defaultProgram.fragmentShader = 0;
     }
 
     Com_Memset(&shaderManager, 0, sizeof(shaderManager));
@@ -128,6 +128,10 @@ GL_CreateShaderProgram
 */
 shaderProgram_t *GL_CreateShaderProgram(const char *vertexSource, const char *fragmentSource) {
     shaderProgram_t *program = ri.Malloc(sizeof(shaderProgram_t));
+    if (!program) {
+        ri.Printf(PRINT_ERROR, "GL_CreateShaderProgram: Failed to allocate shader program structure\n");
+        return nullptr;
+    }
     Com_Memset(program, 0, sizeof(shaderProgram_t));
 
     program->vertexShader = qglCreateShader(GL_VERTEX_SHADER);
@@ -140,6 +144,19 @@ shaderProgram_t *GL_CreateShaderProgram(const char *vertexSource, const char *fr
 
         program->compiled = qtrue;
         program->linked = qtrue;
+    } else {
+        // Compilation/linking failed - clean up OpenGL objects
+        if (program->program) {
+            qglDeleteProgram(program->program);
+        }
+        if (program->vertexShader) {
+            qglDeleteShader(program->vertexShader);
+        }
+        if (program->fragmentShader) {
+            qglDeleteShader(program->fragmentShader);
+        }
+        ri.Free(program);
+        return nullptr;
     }
 
     return program;

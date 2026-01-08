@@ -11,8 +11,11 @@
 // Crash logs directory
 #define CRASH_LOG_DIR "logs"
 
+// Maximum backtrace depth - can be increased if needed for very deep call stacks
+#define MAX_BACKTRACE_DEPTH 256
+
 void append_verbose_crash_context(void) {
-    void* buffer[256];
+    void* buffer[MAX_BACKTRACE_DEPTH];
     int nptrs = backtrace(buffer, sizeof(buffer) / sizeof(void*));
     if (nptrs <= 0) return;
 

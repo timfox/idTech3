@@ -97,6 +97,10 @@ GL_CreateVertexBuffer
 */
 vertexBuffer_t *GL_CreateVertexBuffer(int maxVertices, int maxIndices, qboolean dynamic) {
     vertexBuffer_t *buffer = ri.Malloc(sizeof(vertexBuffer_t));
+    if (!buffer) {
+        ri.Printf(PRINT_ERROR, "GL_CreateVertexBuffer: Failed to allocate vertex buffer structure\n");
+        return nullptr;
+    }
     Com_Memset(buffer, 0, sizeof(vertexBuffer_t));
 
     buffer->maxVertices = maxVertices;
@@ -113,8 +117,30 @@ vertexBuffer_t *GL_CreateVertexBuffer(int maxVertices, int maxIndices, qboolean 
 
     // Allocate memory
     buffer->vertices = ri.Malloc(sizeof(vertex_t) * maxVertices);
+    if (!buffer->vertices) {
+        ri.Printf(PRINT_ERROR, "GL_CreateVertexBuffer: Failed to allocate vertex data (%d vertices)\n", maxVertices);
+        // Clean up OpenGL objects
+        qglDeleteVertexArrays(1, &buffer->vao);
+        qglDeleteBuffers(1, &buffer->vbo);
+        if (maxIndices > 0) {
+            qglDeleteBuffers(1, &buffer->ibo);
+        }
+        ri.Free(buffer);
+        return nullptr;
+    }
+
     if (maxIndices > 0) {
         buffer->indices = ri.Malloc(sizeof(GLuint) * maxIndices);
+        if (!buffer->indices) {
+            ri.Printf(PRINT_ERROR, "GL_CreateVertexBuffer: Failed to allocate index data (%d indices)\n", maxIndices);
+            // Clean up everything
+            ri.Free(buffer->vertices);
+            qglDeleteVertexArrays(1, &buffer->vao);
+            qglDeleteBuffers(1, &buffer->vbo);
+            qglDeleteBuffers(1, &buffer->ibo);
+            ri.Free(buffer);
+            return nullptr;
+        }
     }
 
     return buffer;
