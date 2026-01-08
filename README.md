@@ -27,6 +27,7 @@ Go to [Releases](../../releases) section to download the latest binaries for you
 
 ## Vulkan renderer
 
+* Vulkan 1.4
 * Ray tracing (hardware-accelerated where available, DXR-compatible)
 * High-quality per-pixel dynamic lighting
 * Surfel-based indirect lighting and global illumination
@@ -60,12 +61,12 @@ Go to [Releases](../../releases) section to download the latest binaries for you
 
 ## OpenGL renderer
 
-* OpenGL 1.1 compatible (uses features from newer versions when available)
-* High-quality per-pixel dynamic lighting (**\r_dlightMode**)
-* Merged lightmaps (atlases)
-* Static world surfaces cached in VBO (**\r_vbo 1**)
-* All offscreen rendering features available as in Vulkan renderer
-* Bloom reflection post-processing effect
+* Supports OpenGL 4.6 core profile
+* High-quality per-pixel dynamic lighting (via **\r_dlightMode**)
+* Lightmap atlases for improved lighting performance and quality
+* Static geometry cached in vertex buffer objects (**\r_vbo 1**) for faster rendering
+* Full suite of offscreen rendering capabilities (matching Vulkan renderer): includes HDR, bloom, multisample, supersample, environment reflections, greyscale mode, gamma-correct rendering, and more
+* Post-processed bloom reflections
 
 
 ## DirectX 12 renderer
