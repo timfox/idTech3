@@ -1,5 +1,7 @@
 [![build](../../workflows/build/badge.svg)](../../actions?query=workflow%3Abuild) <a href="https://discord.com/invite/X3Exs4C"><img src="https://img.shields.io/discord/314456230649135105?color=7289da&logo=discord&logoColor=white" alt="Discord server" /></a>
 
+# id Tech 3
+
 This is a modernized id Tech 3 engine fork with PBR and ray tracing using C23 and C++23 standards.
 
 Go to [Releases](../../releases) section to download the latest binaries for your platform or follow [Build Instructions](#build-instructions).
