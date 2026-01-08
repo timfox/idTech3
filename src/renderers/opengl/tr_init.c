@@ -326,6 +326,162 @@ static void APIENTRY glDisableClientStateDummy(GLenum array) {
 	// This should not be called - indicates OpenGL context issues
 }
 
+static void APIENTRY glDrawBufferDummy(GLenum mode) {
+	// Draw buffer control not available - this is a no-op
+}
+
+static void APIENTRY glEnableClientStateDummy(GLenum array) {
+	// Client state not available - this is a no-op
+}
+
+// Dummy functions for GLSL shader functions when dynamic resolution fails
+static void APIENTRY glAttachShaderDummy(GLuint program, GLuint shader) {
+	// GLSL shaders not available - this is a no-op
+	// Engine will fall back to fixed-function rendering
+}
+
+static void APIENTRY glCompileShaderDummy(GLuint shader) {
+	// GLSL shaders not available - this is a no-op
+}
+
+static GLuint APIENTRY glCreateShaderDummy(GLenum type) {
+	// GLSL shaders not available - return invalid shader
+	return 0;
+}
+
+static void APIENTRY glDeleteShaderDummy(GLuint shader) {
+	// GLSL shaders not available - this is a no-op
+}
+
+static void APIENTRY glDetachShaderDummy(GLuint program, GLuint shader) {
+	// GLSL shaders not available - this is a no-op
+}
+
+static void APIENTRY glGetShaderInfoLogDummy(GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *infoLog) {
+	// GLSL shaders not available - return empty log
+	if (length) *length = 0;
+	if (infoLog && bufSize > 0) infoLog[0] = '\0';
+}
+
+static void APIENTRY glGetShaderivDummy(GLuint shader, GLenum pname, GLint *params) {
+	// GLSL shaders not available - return default values
+	if (params) {
+		switch (pname) {
+			case GL_COMPILE_STATUS:
+				*params = GL_FALSE;
+				break;
+			case GL_SHADER_TYPE:
+				*params = GL_FRAGMENT_SHADER;
+				break;
+			default:
+				*params = 0;
+				break;
+		}
+	}
+}
+
+static void APIENTRY glShaderSourceDummy(GLuint shader, GLsizei count, const GLchar *const *string, const GLint *length) {
+	// GLSL shaders not available - this is a no-op
+}
+
+// Dummy functions for VBO functions when dynamic resolution fails
+static void APIENTRY glBindBufferDummy(GLenum target, GLuint buffer) {
+	// VBOs not available - this is a no-op
+	// Engine will fall back to immediate mode rendering
+}
+
+static void APIENTRY glBufferDataDummy(GLenum target, GLsizeiptr size, const GLvoid *data, GLenum usage) {
+	// VBOs not available - this is a no-op
+}
+
+static void APIENTRY glBufferSubDataDummy(GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid *data) {
+	// VBOs not available - this is a no-op
+}
+
+static void APIENTRY glDeleteBuffersDummy(GLsizei n, const GLuint *buffers) {
+	// VBOs not available - this is a no-op
+}
+
+static void APIENTRY glGenBuffersDummy(GLsizei n, GLuint *buffers) {
+	// VBOs not available - return invalid buffer names
+	if (buffers) {
+		for (GLsizei i = 0; i < n; i++) {
+			buffers[i] = 0;
+		}
+	}
+}
+
+// Dummy functions for VAO functions when dynamic resolution fails
+static void APIENTRY glBindVertexArrayDummy(GLuint array) {
+	// VAOs not available - this is a no-op
+	// Engine will fall back to client-side vertex arrays
+}
+
+static void APIENTRY glDeleteVertexArraysDummy(GLsizei n, const GLuint *arrays) {
+	// VAOs not available - this is a no-op
+}
+
+static void APIENTRY glGenVertexArraysDummy(GLsizei n, GLuint *arrays) {
+	// VAOs not available - return invalid array names
+	if (arrays) {
+		for (GLsizei i = 0; i < n; i++) {
+			arrays[i] = 0;
+		}
+	}
+}
+
+// Dummy functions for GLSL program functions when dynamic resolution fails
+static GLuint APIENTRY glCreateProgramDummy(void) {
+	// GLSL programs not available - return invalid program
+	return 0;
+}
+
+static void APIENTRY glDeleteProgramDummy(GLuint program) {
+	// GLSL programs not available - this is a no-op
+}
+
+static void APIENTRY glGetProgramInfoLogDummy(GLuint program, GLsizei bufSize, GLsizei *length, GLchar *infoLog) {
+	// GLSL programs not available - return empty log
+	if (length) *length = 0;
+	if (infoLog && bufSize > 0) infoLog[0] = '\0';
+}
+
+static void APIENTRY glGetProgramivDummy(GLuint program, GLenum pname, GLint *params) {
+	// GLSL programs not available - return default values
+	if (params) {
+		switch (pname) {
+			case GL_LINK_STATUS:
+				*params = GL_FALSE;
+				break;
+			default:
+				*params = 0;
+				break;
+		}
+	}
+}
+
+static void APIENTRY glLinkProgramDummy(GLuint program) {
+	// GLSL programs not available - this is a no-op
+}
+
+static void APIENTRY glUseProgramDummy(GLuint program) {
+	// GLSL programs not available - this is a no-op
+}
+
+// Dummy functions for vertex attribute functions when dynamic resolution fails
+static void APIENTRY glDisableVertexAttribArrayDummy(GLuint index) {
+	// Vertex attributes not available - this is a no-op
+	// Engine will fall back to fixed-function vertex processing
+}
+
+static void APIENTRY glEnableVertexAttribArrayDummy(GLuint index) {
+	// Vertex attributes not available - this is a no-op
+}
+
+static void APIENTRY glVertexAttribPointerDummy(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid *pointer) {
+	// Vertex attributes not available - this is a no-op
+}
+
 #define GLE( ret, name, ... ) { (void**)&q##name, XSTRING(name) },
 static sym_t core_procs[] = { QGL_Core_PROCS };
 static sym_t ext_procs[] = { QGL_Ext_PROCS };
@@ -367,9 +523,149 @@ static const char *R_ResolveSymbols( sym_t *syms, int count )
                     continue;
                 }
             }
+            // Fallbacks for GLSL shader functions - use dummy implementations
+            if (Q_stricmp(syms[i].name, "glAttachShader") == 0) {
+                ri.Printf(PRINT_WARNING, "glAttachShader not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glAttachShaderDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glCompileShader") == 0) {
+                ri.Printf(PRINT_WARNING, "glCompileShader not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glCompileShaderDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glCreateShader") == 0) {
+                ri.Printf(PRINT_WARNING, "glCreateShader not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glCreateShaderDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glDeleteShader") == 0) {
+                ri.Printf(PRINT_WARNING, "glDeleteShader not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glDeleteShaderDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glDetachShader") == 0) {
+                ri.Printf(PRINT_WARNING, "glDetachShader not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glDetachShaderDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glGetShaderInfoLog") == 0) {
+                ri.Printf(PRINT_WARNING, "glGetShaderInfoLog not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glGetShaderInfoLogDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glGetShaderiv") == 0) {
+                ri.Printf(PRINT_WARNING, "glGetShaderiv not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glGetShaderivDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glShaderSource") == 0) {
+                ri.Printf(PRINT_WARNING, "glShaderSource not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glShaderSourceDummy;
+                continue;
+            }
+            // Fallbacks for VBO functions - use dummy implementations
+            if (Q_stricmp(syms[i].name, "glBindBuffer") == 0) {
+                ri.Printf(PRINT_WARNING, "glBindBuffer not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glBindBufferDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glBufferData") == 0) {
+                ri.Printf(PRINT_WARNING, "glBufferData not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glBufferDataDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glBufferSubData") == 0) {
+                ri.Printf(PRINT_WARNING, "glBufferSubData not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glBufferSubDataDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glDeleteBuffers") == 0) {
+                ri.Printf(PRINT_WARNING, "glDeleteBuffers not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glDeleteBuffersDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glGenBuffers") == 0) {
+                ri.Printf(PRINT_WARNING, "glGenBuffers not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glGenBuffersDummy;
+                continue;
+            }
+            // Fallbacks for VAO functions - use dummy implementations
+            if (Q_stricmp(syms[i].name, "glBindVertexArray") == 0) {
+                ri.Printf(PRINT_WARNING, "glBindVertexArray not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glBindVertexArrayDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glDeleteVertexArrays") == 0) {
+                ri.Printf(PRINT_WARNING, "glDeleteVertexArrays not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glDeleteVertexArraysDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glGenVertexArrays") == 0) {
+                ri.Printf(PRINT_WARNING, "glGenVertexArrays not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glGenVertexArraysDummy;
+                continue;
+            }
+            // Fallbacks for GLSL program functions - use dummy implementations
+            if (Q_stricmp(syms[i].name, "glCreateProgram") == 0) {
+                ri.Printf(PRINT_WARNING, "glCreateProgram not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glCreateProgramDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glDeleteProgram") == 0) {
+                ri.Printf(PRINT_WARNING, "glDeleteProgram not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glDeleteProgramDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glGetProgramInfoLog") == 0) {
+                ri.Printf(PRINT_WARNING, "glGetProgramInfoLog not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glGetProgramInfoLogDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glGetProgramiv") == 0) {
+                ri.Printf(PRINT_WARNING, "glGetProgramiv not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glGetProgramivDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glLinkProgram") == 0) {
+                ri.Printf(PRINT_WARNING, "glLinkProgram not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glLinkProgramDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glUseProgram") == 0) {
+                ri.Printf(PRINT_WARNING, "glUseProgram not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glUseProgramDummy;
+                continue;
+            }
+            // Fallbacks for vertex attribute functions - use dummy implementations
+            if (Q_stricmp(syms[i].name, "glDisableVertexAttribArray") == 0) {
+                ri.Printf(PRINT_WARNING, "glDisableVertexAttribArray not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glDisableVertexAttribArrayDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glEnableVertexAttribArray") == 0) {
+                ri.Printf(PRINT_WARNING, "glEnableVertexAttribArray not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glEnableVertexAttribArrayDummy;
+                continue;
+            }
+            if (Q_stricmp(syms[i].name, "glVertexAttribPointer") == 0) {
+                ri.Printf(PRINT_WARNING, "glVertexAttribPointer not available, using dummy implementation\n");
+                *syms[i].symbol = (void *)&glVertexAttribPointerDummy;
+                continue;
+            }
 			if (Q_stricmp(syms[i].name, "glAlphaFunc") == 0) {
 				ri.Printf(PRINT_WARNING, "glAlphaFunc not available in this OpenGL context, using compatibility fallback\n");
 				*syms[i].symbol = (void *)&glAlphaFuncDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glDrawBuffer") == 0) {
+				ri.Printf(PRINT_WARNING, "glDrawBuffer not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glDrawBufferDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glEnableClientState") == 0) {
+				ri.Printf(PRINT_WARNING, "glEnableClientState not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glEnableClientStateDummy;
 				continue;
 			}
 			if (Q_stricmp(syms[i].name, "glBindTexture") == 0) {
