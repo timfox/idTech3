@@ -377,8 +377,20 @@ static const char *R_ResolveSymbols( sym_t *syms, int count )
 		}
 // #endregion
 
-		if ( *syms[ i ].symbol == NULL )
-		{
+        if ( *syms[ i ].symbol == NULL )
+        {
+            // If core symbol is missing, attempt ARB fallback for glActiveTexture
+            if (Q_stricmp(syms[i].name, "glActiveTexture") == 0) {
+                void *addrARB = ri.GL_GetProcAddress("glActiveTextureARB");
+                if (addrARB) {
+                    if (debug_log) {
+                        fprintf(debug_log, "{\"id\":\"log_RResolve_glActiveTexture_arb_fallback\",\"timestamp\":%ld,\"location\":\"tr_init.c:R_ResolveSymbols\",\"message\":\"ARB fallback used for glActiveTexture\",\"data\":{\"addr\":\"%p\"}}\n", time(NULL), addrARB);
+                        fflush(debug_log);
+                    }
+                    *syms[ i ].symbol = addrARB;
+                    continue;
+                }
+            }
 			// Special handling for core functions that may not be dynamically available in some OpenGL contexts
 			if (Q_stricmp(syms[i].name, "glActiveTexture") == 0) {
 // #region agent log
@@ -829,6 +841,8 @@ static void InitOpenGL( void )
 {
     FILE *debug_log = NULL;
 {
+    FILE *debug_log = NULL;
+{
 	//
 	// initialize OS specific portions of the renderer
 	//
@@ -860,11 +874,13 @@ static void InitOpenGL( void )
 		R_ClearSymTables();
 
 // #region agent log
-	debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
-	if (debug_log) {
-		fprintf(debug_log, "{\"id\":\"log_%ld_before_resolve\",\"timestamp\":%ld,\"location\":\"tr_init.c:R_Init\",\"message\":\"About to resolve core symbols\",\"data\":{\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"A\"},\"sessionId\":\"debug-session\"}\n", time(NULL), time(NULL)*1000);
-		fclose(debug_log);
-	}
+if (debug_log == NULL) {
+    debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
+}
+if (debug_log) {
+    fprintf(debug_log, "{\"id\":\"log_%lu_before_resolve\",\"timestamp\":%lu,\"location\":\"tr_init.c:R_Init\",\"message\":\"About to resolve core symbols\",\"data\":{\"sessionId\":\"debug-session\",\"runId\":\"post-fix\",\"hypothesisId\":\"A\"}} \n", (unsigned long)time(NULL), (unsigned long)time(NULL)*1000);
+    fflush(debug_log);
+}
 // #endregion
 
 		err = R_ResolveSymbols( core_procs, ARRAY_LEN( core_procs ) );
