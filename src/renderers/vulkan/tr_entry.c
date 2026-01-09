@@ -240,3 +240,33 @@ void RE_SyncRender(void) {
     // Vulkan equivalent of glFinish - ensure all rendering commands are complete
     // For stub implementation, do nothing
 }
+
+// Safe accessor for glConfig that prevents crashes before renderer initialization
+const glconfig_t *GL_GetConfig(void) {
+    // Check if renderer is initialized by checking if glConfig has been populated
+    // We do this by checking if version_string is not empty (it gets set during init)
+    if (glConfig.version_string[0] == '\0') {
+        static glconfig_t dummy_config;
+        static qboolean initialized = qfalse;
+
+        if (!initialized) {
+            // Initialize dummy config with safe defaults
+            memset(&dummy_config, 0, sizeof(dummy_config));
+            Q_strncpyz(dummy_config.version_string, "Renderer not initialized", sizeof(dummy_config.version_string));
+            Q_strncpyz(dummy_config.renderer_string, "Unknown", sizeof(dummy_config.renderer_string));
+            Q_strncpyz(dummy_config.vendor_string, "Unknown", sizeof(dummy_config.vendor_string));
+            Q_strncpyz(dummy_config.extensions_string, "", sizeof(dummy_config.extensions_string));
+            dummy_config.maxTextureSize = 0;
+            dummy_config.numTextureUnits = 0;
+            dummy_config.colorBits = 0;
+            dummy_config.depthBits = 0;
+            dummy_config.stencilBits = 0;
+            initialized = qtrue;
+        }
+
+        ri.Printf(PRINT_WARNING, "GL_GetConfig called before renderer initialization - returning dummy config\n");
+        return &dummy_config;
+    }
+
+    return &glConfig;
+}

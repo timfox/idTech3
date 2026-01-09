@@ -50,6 +50,9 @@ typedef struct image_s image_t;
 
 extern glconfig_t	glConfig;		// outside of TR since it shouldn't be cleared during ref re-init
 
+// Safe accessor for glConfig that prevents crashes before renderer initialization
+const glconfig_t *GL_GetConfig(void);
+
 // These variables should live inside glConfig but can't because of
 // compatibility issues to the original ID vms.  If you release a stand-alone
 // game and your mod uses tr_types.h from this build you can safely move them

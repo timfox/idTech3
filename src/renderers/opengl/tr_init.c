@@ -408,6 +408,11 @@ static void APIENTRY glVertex3fDummy(GLfloat x, GLfloat y, GLfloat z __attribute
 	// Vertex specification not available - this is a no-op
 }
 
+static void APIENTRY glVertex3fvDummy(const GLfloat *v __attribute__((unused))) {
+	(void)v;
+	// Vertex specification not available - this is a no-op
+}
+
 static void APIENTRY glVertexPointerDummy(GLint size, GLenum type, GLsizei stride, const GLvoid *pointer __attribute__((unused))) {
 	(void)size; (void)type; (void)stride; (void)pointer;
 	// Vertex pointer specification not available - this is a no-op
@@ -1088,6 +1093,11 @@ static const char *R_ResolveSymbols( sym_t *syms, int count )
 			if (Q_stricmp(syms[i].name, "glTexCoord2fv") == 0) {
 				ri.Printf(PRINT_WARNING, "glTexCoord2fv not available in this OpenGL context, using compatibility fallback\n");
 				*syms[i].symbol = (void *)&glTexCoord2fvDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glVertex3fv") == 0) {
+				ri.Printf(PRINT_WARNING, "glVertex3fv not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glVertex3fvDummy;
 				continue;
 			}
 			// If we can't resolve core functions, this indicates a deeper OpenGL context issue

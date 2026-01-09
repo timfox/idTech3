@@ -72,6 +72,7 @@ cvar_t *com_speeds = NULL;
 cvar_t *com_assertLevel = NULL;
 cvar_t *com_journal = NULL;
 cvar_t *com_protocol = NULL;
+cvar_t *com_version = NULL;
 
 cvar_t *cl_paused = NULL;
 cvar_t *cl_packetdelay = NULL;
@@ -360,6 +361,7 @@ void Com_Init( char *commandLine ) {
     com_assertLevel = Cvar_Get( "com_assertLevel", "1", CVAR_ARCHIVE );
     com_journal = Cvar_Get( "journal", "0", CVAR_INIT );
     com_protocol = Cvar_Get( "protocol", va("%i", DEFAULT_PROTOCOL_VERSION), CVAR_ROM );
+    com_version = Cvar_Get( "version", Q3_VERSION, CVAR_ROM | CVAR_SERVERINFO );
 
     // Initialize these early since networking code uses them
     cl_paused = Cvar_Get( "cl_paused", "0", CVAR_ROM );

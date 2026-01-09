@@ -163,6 +163,17 @@ qboolean CL_IsRendererInitialized(void) {
     return re_initialized;
 }
 
+// Safe renderer access function - provides error message instead of crash
+qboolean CL_CheckRendererInitialized(const char *function_name) {
+    if (!re_initialized) {
+        Com_Printf(S_COLOR_RED "ERROR: Renderer not initialized - cannot call %s\n", function_name);
+        Com_Printf(S_COLOR_RED "This may happen during startup or when using +commands before renderer initialization\n");
+        Com_Printf(S_COLOR_RED "Try running the command after the game has fully started\n");
+        return qfalse;
+    }
+    return qtrue;
+}
+
 static ping_t cl_pinglist[MAX_PINGREQUESTS];
 
 typedef struct serverStatus_s
@@ -2104,6 +2115,41 @@ static void CL_Clientinfo_f( void ) {
 	Com_Printf ("User info settings:\n");
 	Info_Print( Cvar_InfoString( CVAR_USERINFO, NULL ) );
 	Com_Printf( "--------------------------------------\n" );
+}
+
+// Safe version command that doesn't crash before renderer initialization
+static void CL_Version_f( void ) {
+	Com_Printf( "----- Engine Version Information -----\n" );
+
+	// Safe engine version info
+	extern cvar_t *com_version;
+	if (com_version) {
+		Com_Printf( "Engine Version: %s\n", com_version->string );
+	} else {
+		Com_Printf( "Engine Version: Unknown\n" );
+	}
+
+	// Safe build information
+	Com_Printf( "Build Date: %s\n", __DATE__ );
+	Com_Printf( "Build Time: %s\n", __TIME__ );
+	Com_Printf( "Architecture: %s\n", ARCH_STRING );
+
+	// Safe renderer information (only if initialized)
+	if (CL_IsRendererInitialized() && re.GetConfig) {
+		const glconfig_t *config = re.GetConfig();
+		if (config) {
+			Com_Printf( "Renderer: %s\n", config->renderer_string );
+			Com_Printf( "Vendor: %s\n", config->vendor_string );
+			Com_Printf( "Version: %s\n", config->version_string );
+			Com_Printf( "Max Texture Size: %d\n", config->maxTextureSize );
+			Com_Printf( "Texture Units: %d\n", config->numTextureUnits );
+		}
+	} else {
+		Com_Printf( "Renderer: Not initialized (use after game starts)\n" );
+		Com_Printf( "Available Renderers: Vulkan (RTX), OpenGL\n" );
+	}
+
+	Com_Printf( "Features: RTX Hardware Acceleration, imGUI Performance Monitoring\n" );
 }
 
 
@@ -4800,6 +4846,7 @@ void CL_Init( void ) {
 	Cmd_AddCommand ("snd_restart", CL_Snd_Restart_f);
 	Cmd_AddCommand ("vid_restart", CL_Vid_Restart_f);
 	Cmd_AddCommand ("ui_restart", CL_UI_Restart_f);
+	Cmd_AddCommand ("version", CL_Version_f);
 	Cmd_AddCommand ("ui_openmenu", CL_UI_OpenMain_f);
 	Cmd_AddCommand ("openmenu", CL_UI_OpenMain_f);
 	Cmd_AddCommand ("mainmenu", CL_UI_OpenMain_f);
