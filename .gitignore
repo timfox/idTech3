@@ -29,3 +29,4 @@ build
 safe_mode.flag
 enable_vulkan_patch1.flag
 enable_vulkan_patch1_tiny.flag
+.cursor/
