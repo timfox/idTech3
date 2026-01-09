@@ -417,12 +417,66 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 	if (vk.device_lost) {
 		// Only log once per second to avoid spam
 		static int last_log_time = 0;
+		static int last_recovery_attempt = 0;
 		int current_time = ri.Milliseconds();
 		if (current_time - last_log_time > 1000) {
 			ri.Printf(PRINT_WARNING, "Vulkan: Device is lost - rendering disabled. Video playback will not work.\n");
 			ri.Printf(PRINT_WARNING, "Vulkan: Try restarting the application or updating GPU drivers.\n");
 			last_log_time = current_time;
 		}
+		
+		// Attempt device recovery every 5 seconds
+		if (current_time - last_recovery_attempt > 5000) {
+			last_recovery_attempt = current_time;
+			ri.Printf(PRINT_ALL, "Vulkan: Attempting device recovery...\n");
+			
+			// Test if device is responsive by checking device properties
+			if (vk.device != VK_NULL_HANDLE && vk.physical_device != VK_NULL_HANDLE && qvkGetPhysicalDeviceProperties) {
+				VkPhysicalDeviceProperties props;
+				qvkGetPhysicalDeviceProperties(vk.physical_device, &props);
+				
+				// Try to recreate swapchain as a test
+				if (vk.swapchain != VK_NULL_HANDLE && vk_surface != VK_NULL_HANDLE) {
+					ri.Printf(PRINT_ALL, "Vulkan: Testing device recovery by checking device state...\n");
+					
+					// Test device responsiveness with a simple operation
+					if (qvkDeviceWaitIdle) {
+						VkResult wait_result = qvkDeviceWaitIdle(vk.device);
+						if (wait_result == VK_ERROR_DEVICE_LOST) {
+							ri.Printf(PRINT_WARNING, "Vulkan: Device still lost. Will retry in 5 seconds.\n");
+							return;
+						}
+						// If we get here, device might be recovered
+					}
+					
+					// Try recreating swapchain
+					ri.Printf(PRINT_ALL, "Vulkan: Attempting swapchain recreation...\n");
+					vk_recreate_swapchain();
+					
+					// Test if swapchain recreation succeeded by trying to acquire an image
+					if (qvkAcquireNextImageKHR && vk.swapchain != VK_NULL_HANDLE) {
+						uint32_t test_index;
+						VkResult test_result = qvkAcquireNextImageKHR(vk.device, vk.swapchain, 0, 
+							vk.image_available, VK_NULL_HANDLE, &test_index);
+						
+						if (test_result == VK_SUCCESS || test_result == VK_SUBOPTIMAL_KHR) {
+							ri.Printf(PRINT_ALL, "Vulkan: Device recovery successful! Resuming rendering.\n");
+							vk.device_lost = qfalse; // Reset device lost flag
+							// Release the test image - we'll acquire it properly in the normal flow
+							if (test_result == VK_SUCCESS) {
+								// Image was acquired, we'll use it in the normal flow
+								vk.current_swapchain_image_index = test_index;
+							}
+						} else if (test_result == VK_ERROR_DEVICE_LOST) {
+							ri.Printf(PRINT_WARNING, "Vulkan: Device still lost during recovery test. Will retry in 5 seconds.\n");
+						} else {
+							ri.Printf(PRINT_WARNING, "Vulkan: Device recovery test failed (result: %d). Will retry in 5 seconds.\n", test_result);
+						}
+					}
+				}
+			}
+		}
+		
 		return;
 	}
 #endif
