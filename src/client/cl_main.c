@@ -3743,23 +3743,14 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 			rendererName = "vulkan";
 			Com_Printf("  Vulkan renderer available, selecting Vulkan\n");
 		} else {
-			// Fallback to OpenGL2
-			Com_sprintf(testDllName, sizeof(testDllName), RENDERER_PREFIX "_opengl2_" REND_ARCH_STRING DLL_EXT);
-			testPath = FS_BuildOSPath(Sys_DefaultBasePath(), testDllName, NULL);
-			if (Sys_LoadLibrary(testPath)) {
-				Sys_UnloadLibrary(Sys_LoadLibrary(testPath));
-				rendererName = "opengl2";
-				Com_Printf("  Vulkan unavailable, selecting OpenGL2\n");
-			} else {
-				rendererName = "opengl";
-				Com_Printf("  Modern renderers unavailable, selecting legacy OpenGL\n");
-			}
+			// Fallback to OpenGL
+			rendererName = "opengl";
+			Com_Printf("  Vulkan unavailable, selecting OpenGL\n");
 		}
 	}
 
 	// Try the requested renderer first, then try fallbacks
 	void *localRendererLib = NULL;
-	const char *loadedRenderer = NULL;
 
 	// First try the exact renderer requested by the user
 	const char *tryRenderers[] = { rendererName, "vulkan", "opengl2", "opengl" };
@@ -3818,7 +3809,6 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 				if (testRet) {
 					// Renderer works! Commit to using it
 					localRendererLib = testRendererLib;
-					loadedRenderer = tryRenderer;
 					GetRefAPI = testGetRefAPI;
 					Com_Printf( S_COLOR_GREEN "Successfully loaded renderer: %s\n", tryRenderer );
 					Com_Printf( "Renderer startup final path: %s\n", tryRenderer );
@@ -4021,7 +4011,6 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 	rimp.VK_CreateSurface = NULL;
 #endif
 	Com_Printf( "CL_InitRef: Calling GetRefAPI with API version %d\n", REF_API_VERSION );
-	Com_Printf( "CL_InitRef: GetRefAPI function pointer = %p\n", (void*)GetRefAPI );
 	ret = GetRefAPI( REF_API_VERSION, &rimp );
     Com_Printf( "CL_InitRef: GetRefAPI returned %p\n", (void*)ret );
 
@@ -4055,7 +4044,7 @@ fprintf(stderr, "About to enter renderer loading logic\n");
         if (rendererLib) {
             Com_Printf("Renderer library loaded: %p\n", (void*)rendererLib);
         }
-        if (dllName && *dllName) {
+        if (*dllName) {
             Com_Printf("Tried renderer candidate: %s\n", dllName);
         }
         Com_Error(ERR_FATAL, "Graphics initialization failed - no suitable display found");

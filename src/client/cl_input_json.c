@@ -166,7 +166,7 @@ IN_GetKeyboardBinding
 Retrieve keyboard binding configuration from JSON
 ================
 */
-qboolean IN_GetKeyboardBinding(const char *action, const char **key, const char **modifiers, int max_modifiers, qboolean *repeat) {
+qboolean IN_GetKeyboardBinding(const char *action, const char **key, const char **modifiers, int max_modifiers __attribute__((unused)), qboolean *repeat) {
 	if (!in_config_json || !action) {
 		return qfalse;
 	}

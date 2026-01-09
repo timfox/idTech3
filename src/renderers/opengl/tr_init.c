@@ -260,211 +260,216 @@ typedef struct {
 } sym_t;
 
 // Dummy functions for core OpenGL functions when dynamic resolution fails
-static void APIENTRY glAlphaFuncDummy(GLenum func, GLclampf ref) {
+static void APIENTRY glAlphaFuncDummy(GLenum func __attribute__((unused)), GLclampf ref __attribute__((unused))) {
 	// Alpha testing is deprecated in modern OpenGL - this is a no-op
 	// Modern applications should use alpha blending or discard in shaders instead
 }
 
-static void APIENTRY glBindTextureDummy(GLenum target, GLuint texture) {
+static void APIENTRY glShadeModelDummy(GLenum mode __attribute__((unused))) {
+	// Shading model is deprecated in modern OpenGL - this is a no-op
+	// Modern applications should use shaders for all rendering
+}
+
+static void APIENTRY glBindTextureDummy(GLenum target __attribute__((unused)), GLuint texture __attribute__((unused))) {
 	// This should not be called - indicates OpenGL context issues
 	// In a proper fix, this would be replaced with static linking
 }
 
-static void APIENTRY glBlendFuncDummy(GLenum sfactor, GLenum dfactor) {
+static void APIENTRY glBlendFuncDummy(GLenum sfactor __attribute__((unused)), GLenum dfactor __attribute__((unused))) {
 	// This should not be called - indicates OpenGL context issues
 }
 
-static void APIENTRY glClearDummy(GLbitfield mask) {
+static void APIENTRY glClearDummy(GLbitfield mask __attribute__((unused))) {
 	// This should not be called - indicates OpenGL context issues
 }
 
-static void APIENTRY glClearColorDummy(GLclampf red, GLclampf green, GLclampf blue, GLclampf alpha) {
+static void APIENTRY glClearColorDummy(GLclampf red __attribute__((unused)), GLclampf green __attribute__((unused)), GLclampf blue __attribute__((unused)), GLclampf alpha __attribute__((unused))) {
 	// This should not be called - indicates OpenGL context issues
 }
 
-static void APIENTRY glClearDepthDummy(GLclampd depth) {
+static void APIENTRY glClearDepthDummy(GLclampd depth __attribute__((unused))) {
 	// This should not be called - indicates OpenGL context issues
 }
 
-static void APIENTRY glColor4fDummy(GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha) {
+static void APIENTRY glColor4fDummy(GLfloat red __attribute__((unused)), GLfloat green __attribute__((unused)), GLfloat blue __attribute__((unused)), GLfloat alpha __attribute__((unused))) {
 	// This should not be called - indicates OpenGL context issues
 }
 
-static void APIENTRY glColorMaskDummy(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha) {
+static void APIENTRY glColorMaskDummy(GLboolean red __attribute__((unused)), GLboolean green __attribute__((unused)), GLboolean blue __attribute__((unused)), GLboolean alpha __attribute__((unused))) {
 	// This should not be called - indicates OpenGL context issues
 }
 
-static void APIENTRY glColorPointerDummy(GLint size, GLenum type, GLsizei stride, const GLvoid *pointer) {
+static void APIENTRY glColorPointerDummy(GLint size __attribute__((unused)), GLenum type __attribute__((unused)), GLsizei stride __attribute__((unused)), const GLvoid *pointer __attribute__((unused))) {
 	// This should not be called - indicates OpenGL context issues
 }
 
-static void APIENTRY glCullFaceDummy(GLenum mode) {
+static void APIENTRY glCullFaceDummy(GLenum mode __attribute__((unused))) {
 	// This should not be called - indicates OpenGL context issues
 }
 
-static void APIENTRY glDeleteTexturesDummy(GLsizei n, const GLuint *textures) {
+static void APIENTRY glDeleteTexturesDummy(GLsizei n __attribute__((unused)), const GLuint *textures __attribute__((unused))) {
 	// This should not be called - indicates OpenGL context issues
 }
 
-static void APIENTRY glDepthFuncDummy(GLenum func) {
+static void APIENTRY glDepthFuncDummy(GLenum func __attribute__((unused))) {
 	// This should not be called - indicates OpenGL context issues
 }
 
-static void APIENTRY glDepthMaskDummy(GLboolean flag) {
+static void APIENTRY glDepthMaskDummy(GLboolean flag __attribute__((unused))) {
 	// This should not be called - indicates OpenGL context issues
 }
 
-static void APIENTRY glDepthRangeDummy(GLclampd zNear, GLclampd zFar) {
+static void APIENTRY glDepthRangeDummy(GLclampd zNear __attribute__((unused)), GLclampd zFar __attribute__((unused))) {
 	// This should not be called - indicates OpenGL context issues
 }
 
-static void APIENTRY glDisableDummy(GLenum cap) {
+static void APIENTRY glDisableDummy(GLenum cap __attribute__((unused))) {
 	// This should not be called - indicates OpenGL context issues
 }
 
-static void APIENTRY glDisableClientStateDummy(GLenum array) {
+static void APIENTRY glDisableClientStateDummy(GLenum array __attribute__((unused))) {
 	// This should not be called - indicates OpenGL context issues
 }
 
-static void APIENTRY glDrawBufferDummy(GLenum mode) {
+static void APIENTRY glDrawBufferDummy(GLenum mode __attribute__((unused))) {
 	// Draw buffer control not available - this is a no-op
 }
 
-static void APIENTRY glStencilFuncDummy(GLenum func, GLint ref, GLuint mask) {
+static void APIENTRY glStencilFuncDummy(GLenum func __attribute__((unused)), GLint ref __attribute__((unused)), GLuint mask __attribute__((unused))) {
 	// Stencil operations not available - this is a no-op
 }
 
-static void APIENTRY glStencilOpDummy(GLenum fail, GLenum zfail, GLenum zpass) {
+static void APIENTRY glStencilOpDummy(GLenum fail, GLenum zfail, GLenum zpass __attribute__((unused))) {
 	(void)fail; (void)zfail; (void)zpass;
 	// Stencil operations not available - this is a no-op
 }
 
-static void APIENTRY glLineWidthDummy(GLfloat width) {
+static void APIENTRY glLineWidthDummy(GLfloat width __attribute__((unused))) {
 	(void)width;
 	// Line width control not available - this is a no-op
 }
 
-static void APIENTRY glLoadIdentityDummy(void) {
+static void APIENTRY glLoadIdentityDummy(void __attribute__((unused))) {
 	// Matrix operations not available - this is a no-op
 }
 
-static void APIENTRY glLoadMatrixfDummy(const GLfloat *m) {
+static void APIENTRY glLoadMatrixfDummy(const GLfloat *m __attribute__((unused))) {
 	(void)m;
 	// Matrix operations not available - this is a no-op
 }
 
-static void APIENTRY glMatrixModeDummy(GLenum mode) {
+static void APIENTRY glMatrixModeDummy(GLenum mode __attribute__((unused))) {
 	(void)mode;
 	// Matrix mode operations not available - this is a no-op
 }
 
-static void APIENTRY glMultMatrixfDummy(const GLfloat *m) {
+static void APIENTRY glMultMatrixfDummy(const GLfloat *m __attribute__((unused))) {
 	(void)m;
 	// Matrix operations not available - this is a no-op
 }
 
-static void APIENTRY glNormal3fDummy(GLfloat nx, GLfloat ny, GLfloat nz) {
+static void APIENTRY glNormal3fDummy(GLfloat nx, GLfloat ny, GLfloat nz __attribute__((unused))) {
 	(void)nx; (void)ny; (void)nz;
 	// Normal specification not available - this is a no-op
 }
 
-static void APIENTRY glNormalPointerDummy(GLenum type, GLsizei stride, const GLvoid *pointer) {
+static void APIENTRY glNormalPointerDummy(GLenum type, GLsizei stride, const GLvoid *pointer __attribute__((unused))) {
 	(void)type; (void)stride; (void)pointer;
 	// Normal pointer specification not available - this is a no-op
 }
 
-static void APIENTRY glTexCoord2fDummy(GLfloat s, GLfloat t) {
+static void APIENTRY glTexCoord2fDummy(GLfloat s, GLfloat t __attribute__((unused))) {
 	(void)s; (void)t;
 	// Texture coordinate specification not available - this is a no-op
 }
 
-static void APIENTRY glTexCoordPointerDummy(GLint size, GLenum type, GLsizei stride, const GLvoid *pointer) {
+static void APIENTRY glTexCoordPointerDummy(GLint size, GLenum type, GLsizei stride, const GLvoid *pointer __attribute__((unused))) {
 	(void)size; (void)type; (void)stride; (void)pointer;
 	// Texture coordinate pointer specification not available - this is a no-op
 }
 
-static void APIENTRY glVertex2fDummy(GLfloat x, GLfloat y) {
+static void APIENTRY glVertex2fDummy(GLfloat x, GLfloat y __attribute__((unused))) {
 	(void)x; (void)y;
 	// Vertex specification not available - this is a no-op
 }
 
-static void APIENTRY glVertex3fDummy(GLfloat x, GLfloat y, GLfloat z) {
+static void APIENTRY glVertex3fDummy(GLfloat x, GLfloat y, GLfloat z __attribute__((unused))) {
 	(void)x; (void)y; (void)z;
 	// Vertex specification not available - this is a no-op
 }
 
-static void APIENTRY glVertexPointerDummy(GLint size, GLenum type, GLsizei stride, const GLvoid *pointer) {
+static void APIENTRY glVertexPointerDummy(GLint size, GLenum type, GLsizei stride, const GLvoid *pointer __attribute__((unused))) {
 	(void)size; (void)type; (void)stride; (void)pointer;
 	// Vertex pointer specification not available - this is a no-op
 }
 
-static void APIENTRY glBeginDummy(GLenum mode) {
+static void APIENTRY glBeginDummy(GLenum mode __attribute__((unused))) {
 	(void)mode;
 	// Begin immediate mode not available - this is a no-op
 }
 
-static void APIENTRY glEndDummy(void) {
+static void APIENTRY glEndDummy(void __attribute__((unused))) {
 	// End immediate mode not available - this is a no-op
 }
 
-static void APIENTRY glPopMatrixDummy(void) {
+static void APIENTRY glPopMatrixDummy(void __attribute__((unused))) {
 	// Matrix stack operations not available - this is a no-op
 }
 
-static void APIENTRY glPushMatrixDummy(void) {
+static void APIENTRY glPushMatrixDummy(void __attribute__((unused))) {
 	// Matrix stack operations not available - this is a no-op
 }
 
-static void APIENTRY glPointSizeDummy(GLfloat size) {
+static void APIENTRY glPointSizeDummy(GLfloat size __attribute__((unused))) {
 	// Point size specification not available - this is a no-op
 }
 
-static void APIENTRY glRotatefDummy(GLfloat angle, GLfloat x, GLfloat y, GLfloat z) {
+static void APIENTRY glRotatefDummy(GLfloat angle __attribute__((unused)), GLfloat x __attribute__((unused)), GLfloat y __attribute__((unused)), GLfloat z __attribute__((unused))) {
 	// Matrix rotation not available - this is a no-op
 }
 
-static void APIENTRY glScalefDummy(GLfloat x, GLfloat y, GLfloat z) {
+static void APIENTRY glScalefDummy(GLfloat x __attribute__((unused)), GLfloat y __attribute__((unused)), GLfloat z __attribute__((unused))) {
 	// Matrix scaling not available - this is a no-op
 }
 
-static void APIENTRY glTranslatefDummy(GLfloat x, GLfloat y, GLfloat z) {
+static void APIENTRY glTranslatefDummy(GLfloat x __attribute__((unused)), GLfloat y __attribute__((unused)), GLfloat z __attribute__((unused))) {
 	// Matrix translation not available - this is a no-op
 }
 
-static void APIENTRY glEnableClientStateDummy(GLenum array) {
+static void APIENTRY glEnableClientStateDummy(GLenum array __attribute__((unused))) {
 	// Client state not available - this is a no-op
 }
 
 // Dummy functions for GLSL shader functions when dynamic resolution fails
-static void APIENTRY glAttachShaderDummy(GLuint program, GLuint shader) {
+static void APIENTRY glAttachShaderDummy(GLuint program __attribute__((unused)), GLuint shader __attribute__((unused))) {
 	// GLSL shaders not available - this is a no-op
 	// Engine will fall back to fixed-function rendering
 }
 
-static void APIENTRY glCompileShaderDummy(GLuint shader) {
+static void APIENTRY glCompileShaderDummy(GLuint shader __attribute__((unused))) {
 	// GLSL shaders not available - this is a no-op
 }
 
-static GLuint APIENTRY glCreateShaderDummy(GLenum type) {
+static GLuint APIENTRY glCreateShaderDummy(GLenum type __attribute__((unused))) {
 	// GLSL shaders not available - return invalid shader
 	return 0;
 }
 
-static void APIENTRY glDeleteShaderDummy(GLuint shader) {
+static void APIENTRY glDeleteShaderDummy(GLuint shader __attribute__((unused))) {
 	// GLSL shaders not available - this is a no-op
 }
 
-static void APIENTRY glDetachShaderDummy(GLuint program, GLuint shader) {
+static void APIENTRY glDetachShaderDummy(GLuint program __attribute__((unused)), GLuint shader __attribute__((unused))) {
 	// GLSL shaders not available - this is a no-op
 }
 
-static void APIENTRY glGetShaderInfoLogDummy(GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *infoLog) {
+static void APIENTRY glGetShaderInfoLogDummy(GLuint shader __attribute__((unused)), GLsizei bufSize __attribute__((unused)), GLsizei *length __attribute__((unused)), GLchar *infoLog __attribute__((unused))) {
 	// GLSL shaders not available - return empty log
 	if (length) *length = 0;
 	if (infoLog && bufSize > 0) infoLog[0] = '\0';
 }
 
-static void APIENTRY glGetShaderivDummy(GLuint shader, GLenum pname, GLint *params) {
+static void APIENTRY glGetShaderivDummy(GLuint shader __attribute__((unused)), GLenum pname __attribute__((unused)), GLint *params __attribute__((unused))) {
 	// GLSL shaders not available - return default values
 	if (params) {
 		switch (pname) {
@@ -481,29 +486,29 @@ static void APIENTRY glGetShaderivDummy(GLuint shader, GLenum pname, GLint *para
 	}
 }
 
-static void APIENTRY glShaderSourceDummy(GLuint shader, GLsizei count, const GLchar *const *string, const GLint *length) {
+static void APIENTRY glShaderSourceDummy(GLuint shader __attribute__((unused)), GLsizei count __attribute__((unused)), const GLchar *const *string __attribute__((unused)), const GLint *length __attribute__((unused))) {
 	// GLSL shaders not available - this is a no-op
 }
 
 // Dummy functions for VBO functions when dynamic resolution fails
-static void APIENTRY glBindBufferDummy(GLenum target, GLuint buffer) {
+static void APIENTRY glBindBufferDummy(GLenum target __attribute__((unused)), GLuint buffer __attribute__((unused))) {
 	// VBOs not available - this is a no-op
 	// Engine will fall back to immediate mode rendering
 }
 
-static void APIENTRY glBufferDataDummy(GLenum target, GLsizeiptr size, const GLvoid *data, GLenum usage) {
+static void APIENTRY glBufferDataDummy(GLenum target __attribute__((unused)), GLsizeiptr size __attribute__((unused)), const GLvoid *data __attribute__((unused)), GLenum usage __attribute__((unused))) {
 	// VBOs not available - this is a no-op
 }
 
-static void APIENTRY glBufferSubDataDummy(GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid *data) {
+static void APIENTRY glBufferSubDataDummy(GLenum target __attribute__((unused)), GLintptr offset __attribute__((unused)), GLsizeiptr size __attribute__((unused)), const GLvoid *data __attribute__((unused))) {
 	// VBOs not available - this is a no-op
 }
 
-static void APIENTRY glDeleteBuffersDummy(GLsizei n, const GLuint *buffers) {
+static void APIENTRY glDeleteBuffersDummy(GLsizei n __attribute__((unused)), const GLuint *buffers __attribute__((unused))) {
 	// VBOs not available - this is a no-op
 }
 
-static void APIENTRY glGenBuffersDummy(GLsizei n, GLuint *buffers) {
+static void APIENTRY glGenBuffersDummy(GLsizei n, GLuint *buffers __attribute__((unused))) {
 	// VBOs not available - return invalid buffer names
 	if (buffers) {
 		for (GLsizei i = 0; i < n; i++) {
@@ -513,16 +518,16 @@ static void APIENTRY glGenBuffersDummy(GLsizei n, GLuint *buffers) {
 }
 
 // Dummy functions for VAO functions when dynamic resolution fails
-static void APIENTRY glBindVertexArrayDummy(GLuint array) {
+static void APIENTRY glBindVertexArrayDummy(GLuint array __attribute__((unused))) {
 	// VAOs not available - this is a no-op
 	// Engine will fall back to client-side vertex arrays
 }
 
-static void APIENTRY glDeleteVertexArraysDummy(GLsizei n, const GLuint *arrays) {
+static void APIENTRY glDeleteVertexArraysDummy(GLsizei n __attribute__((unused)), const GLuint *arrays __attribute__((unused))) {
 	// VAOs not available - this is a no-op
 }
 
-static void APIENTRY glGenVertexArraysDummy(GLsizei n, GLuint *arrays) {
+static void APIENTRY glGenVertexArraysDummy(GLsizei n, GLuint *arrays __attribute__((unused))) {
 	// VAOs not available - return invalid array names
 	if (arrays) {
 		for (GLsizei i = 0; i < n; i++) {
@@ -537,17 +542,17 @@ static GLuint APIENTRY glCreateProgramDummy(void) {
 	return 0;
 }
 
-static void APIENTRY glDeleteProgramDummy(GLuint program) {
+static void APIENTRY glDeleteProgramDummy(GLuint program __attribute__((unused))) {
 	// GLSL programs not available - this is a no-op
 }
 
-static void APIENTRY glGetProgramInfoLogDummy(GLuint program, GLsizei bufSize, GLsizei *length, GLchar *infoLog) {
+static void APIENTRY glGetProgramInfoLogDummy(GLuint program __attribute__((unused)), GLsizei bufSize __attribute__((unused)), GLsizei *length __attribute__((unused)), GLchar *infoLog __attribute__((unused))) {
 	// GLSL programs not available - return empty log
 	if (length) *length = 0;
 	if (infoLog && bufSize > 0) infoLog[0] = '\0';
 }
 
-static void APIENTRY glGetProgramivDummy(GLuint program, GLenum pname, GLint *params) {
+static void APIENTRY glGetProgramivDummy(GLuint program __attribute__((unused)), GLenum pname __attribute__((unused)), GLint *params __attribute__((unused))) {
 	// GLSL programs not available - return default values
 	if (params) {
 		switch (pname) {
@@ -561,69 +566,69 @@ static void APIENTRY glGetProgramivDummy(GLuint program, GLenum pname, GLint *pa
 	}
 }
 
-static void APIENTRY glLinkProgramDummy(GLuint program) {
+static void APIENTRY glLinkProgramDummy(GLuint program __attribute__((unused))) {
 	// GLSL programs not available - this is a no-op
 }
 
-static void APIENTRY glUseProgramDummy(GLuint program) {
+static void APIENTRY glUseProgramDummy(GLuint program __attribute__((unused))) {
 	// GLSL programs not available - this is a no-op
 }
 
 // Dummy functions for vertex attribute functions when dynamic resolution fails
-static void APIENTRY glDisableVertexAttribArrayDummy(GLuint index) {
+static void APIENTRY glDisableVertexAttribArrayDummy(GLuint index __attribute__((unused))) {
 	// Vertex attributes not available - this is a no-op
 	// Engine will fall back to fixed-function vertex processing
 }
 
-static void APIENTRY glEnableVertexAttribArrayDummy(GLuint index) {
+static void APIENTRY glEnableVertexAttribArrayDummy(GLuint index __attribute__((unused))) {
 	// Vertex attributes not available - this is a no-op
 }
 
-static void APIENTRY glVertexAttribPointerDummy(GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid *pointer) {
+static void APIENTRY glVertexAttribPointerDummy(GLuint index __attribute__((unused)), GLint size __attribute__((unused)), GLenum type __attribute__((unused)), GLboolean normalized __attribute__((unused)), GLsizei stride __attribute__((unused)), const GLvoid *pointer __attribute__((unused))) {
 	// Vertex attributes not available - this is a no-op
 }
 
 // Dummy functions for uniform functions when dynamic resolution fails
-static GLint APIENTRY glGetUniformLocationDummy(GLuint program, const GLchar *name) {
+static GLint APIENTRY glGetUniformLocationDummy(GLuint program __attribute__((unused)), const GLchar *name __attribute__((unused))) {
 	// Uniforms not available - return invalid location
 	return -1;
 }
 
-static void APIENTRY glUniform1fDummy(GLint location, GLfloat v0) {
+static void APIENTRY glUniform1fDummy(GLint location __attribute__((unused)), GLfloat v0 __attribute__((unused))) {
 	// Uniforms not available - this is a no-op
 }
 
-static void APIENTRY glUniform1iDummy(GLint location, GLint v0) {
+static void APIENTRY glUniform1iDummy(GLint location __attribute__((unused)), GLint v0 __attribute__((unused))) {
 	// Uniforms not available - this is a no-op
 }
 
-static void APIENTRY glUniform2fDummy(GLint location, GLfloat v0, GLfloat v1) {
+static void APIENTRY glUniform2fDummy(GLint location __attribute__((unused)), GLfloat v0 __attribute__((unused)), GLfloat v1 __attribute__((unused))) {
 	// Uniforms not available - this is a no-op
 }
 
-static void APIENTRY glUniform3fDummy(GLint location, GLfloat v0, GLfloat v1, GLfloat v2) {
+static void APIENTRY glUniform3fDummy(GLint location __attribute__((unused)), GLfloat v0 __attribute__((unused)), GLfloat v1 __attribute__((unused)), GLfloat v2 __attribute__((unused))) {
 	// Uniforms not available - this is a no-op
 }
 
-static void APIENTRY glUniform4fDummy(GLint location, GLfloat v0, GLfloat v1, GLfloat v2, GLfloat v3) {
+static void APIENTRY glUniform4fDummy(GLint location __attribute__((unused)), GLfloat v0 __attribute__((unused)), GLfloat v1 __attribute__((unused)), GLfloat v2 __attribute__((unused)), GLfloat v3 __attribute__((unused))) {
 	// Uniforms not available - this is a no-op
 }
 
-static void APIENTRY glUniformMatrix3fvDummy(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value) {
+static void APIENTRY glUniformMatrix3fvDummy(GLint location __attribute__((unused)), GLsizei count __attribute__((unused)), GLboolean transpose __attribute__((unused)), const GLfloat *value __attribute__((unused))) {
 	// Uniforms not available - this is a no-op
 }
 
-static void APIENTRY glUniformMatrix4fvDummy(GLint location, GLsizei count, GLboolean transpose, const GLfloat *value) {
+static void APIENTRY glUniformMatrix4fvDummy(GLint location __attribute__((unused)), GLsizei count __attribute__((unused)), GLboolean transpose __attribute__((unused)), const GLfloat *value __attribute__((unused))) {
 	// Uniforms not available - this is a no-op
 }
 
 // Dummy functions for attribute location functions when dynamic resolution fails
-static GLint APIENTRY glGetAttribLocationDummy(GLuint program, const GLchar *name) {
+static GLint APIENTRY glGetAttribLocationDummy(GLuint program __attribute__((unused)), const GLchar *name __attribute__((unused))) {
 	// Attributes not available - return invalid location
 	return -1;
 }
 
-static void APIENTRY glPolygonOffsetDummy(GLfloat factor, GLfloat units) {
+static void APIENTRY glPolygonOffsetDummy(GLfloat factor __attribute__((unused)), GLfloat units __attribute__((unused))) {
 	// Polygon offset not available - this is a no-op in compatibility mode
 	// Modern applications should handle depth offset in shaders
 }
@@ -648,6 +653,8 @@ returns NULL on success or last failed symbol name otherwise
 */
 static const char *R_ResolveSymbols( sym_t *syms, int count )
 {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic"
     int i;
 
     for ( i = 0; i < count; i++ )
@@ -656,6 +663,12 @@ static const char *R_ResolveSymbols( sym_t *syms, int count )
 
         if ( *syms[ i ].symbol == NULL )
         {
+            // Fallback for glShadeModel - use dummy since it's deprecated in modern OpenGL
+            if (Q_stricmp(syms[i].name, "glShadeModel") == 0) {
+                ri.Printf(PRINT_WARNING, "glShadeModel not available in this OpenGL context, using compatibility fallback\n");
+                *syms[i].symbol = (void *)&glShadeModelDummy;
+                continue;
+            }
             // If core symbol is missing, attempt ARB fallback for glActiveTexture
             if (Q_stricmp(syms[i].name, "glActiveTexture") == 0) {
                 void *addrARB = ri.GL_GetProcAddress("glActiveTextureARB");
@@ -1052,11 +1065,17 @@ static const char *R_ResolveSymbols( sym_t *syms, int count )
 				*syms[i].symbol = (void *)&glPolygonOffsetDummy;
 				continue;
 			}
+			if (Q_stricmp(syms[i].name, "glShadeModel") == 0) {
+				ri.Printf(PRINT_WARNING, "glShadeModel not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glShadeModelDummy;
+				continue;
+			}
 			// If we can't resolve core functions, this indicates a deeper OpenGL context issue
 			ri.Printf(PRINT_ERROR, "Failed to resolve core OpenGL function '%s' - OpenGL context may not be properly initialized\n", syms[i].name);
 			return syms[ i ].name;
 		}
 	}
+#pragma GCC diagnostic pop
 	return NULL;
 }
 
@@ -1413,7 +1432,7 @@ static void InitOpenGL( void )
 
 	if ( glConfig.vidWidth == 0 )
 	{
-		const char *err;
+		const char *init_err;
 
 		Com_Printf( "DEBUG: ri.GLimp_Init = %p\n", (void*)(uintptr_t)ri.GLimp_Init );
 		if ( !ri.GLimp_Init )
@@ -1430,9 +1449,9 @@ static void InitOpenGL( void )
 
 		R_ClearSymTables();
 
-		err = R_ResolveSymbols( core_procs, ARRAY_LEN( core_procs ) );
-		if ( err )
-			ri.Error( ERR_FATAL, "Error resolving core OpenGL function '%s'", err );
+		init_err = R_ResolveSymbols( core_procs, ARRAY_LEN( core_procs ) );
+		if ( init_err )
+			ri.Error( ERR_FATAL, "Error resolving core OpenGL function '%s'", init_err );
 
 		R_InitExtensions();
 
@@ -2797,7 +2816,7 @@ static void R_Register( void )
 
 #ifdef USE_FBO
 	r_fbo = ri.Cvar_Get( "r_fbo", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_SetDescription( r_fbo, "Use framebuffer objects, enables gamma correction in windowed mode and allows arbitrary video size and screenshot/video capture.\n Required for bloom, HDR rendering, anti-aliasing and greyscale effects.\n OpenGL 3.0+ required." );
+	ri.Cvar_SetDescription( r_fbo, "Use framebuffer objects, enables gamma correction in windowed mode and allows arbitrary video size and screenshot/video capture.\n Required for bloom, HDR rendering, anti-aliasing and greyscale effects.\n OpenGL 4.6+ required." );
 
 	r_ext_supersample = ri.Cvar_Get( "r_ext_supersample", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_ext_supersample, "0", "1", CV_INTEGER );

@@ -1016,21 +1016,21 @@ to totally exit after returning from this function.
 */
 static void SV_FinalMessage( const char *message ) {
 	int			i, j;
-	client_t	*cl;
+	client_t	*client;
 
 	// send it twice, ignoring rate
 	for ( j = 0 ; j < 2 ; j++ ) {
-		for ( i = 0, cl = svs.clients; i < sv.maxclients; i++, cl++) {
-			if (cl->state >= CS_CONNECTED ) {
+		for ( i = 0, client = svs.clients; i < sv.maxclients; i++, client++) {
+			if (client->state >= CS_CONNECTED ) {
 				// don't send a disconnect to a local client
-				if ( cl->netchan.remoteAddress.type != NA_LOOPBACK ) {
-					SV_SendServerCommand( cl, "print \"%s\n\"\n", message );
-					SV_SendServerCommand( cl, "disconnect \"%s\"", message );
+				if ( client->netchan.remoteAddress.type != NA_LOOPBACK ) {
+					SV_SendServerCommand( client, "print \"%s\n\"\n", message );
+					SV_SendServerCommand( client, "disconnect \"%s\"", message );
 				}
 				// force a snapshot to be sent
-				cl->lastSnapshotTime = svs.time - 9999; // generate a snapshot immediately
-				cl->state = CS_ZOMBIE; // skip delta generation
-				SV_SendClientSnapshot( cl );
+				client->lastSnapshotTime = svs.time - 9999; // generate a snapshot immediately
+				client->state = CS_ZOMBIE; // skip delta generation
+				SV_SendClientSnapshot( client );
 			}
 		}
 	}
