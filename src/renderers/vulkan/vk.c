@@ -2115,7 +2115,8 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 	// select surface format
 	ri.Printf( PRINT_ALL, "Vulkan: Selecting surface format...\n" );
 	if ( !vk_select_surface_format( physical_device, vk_surface ) ) {
-		ri.Printf( PRINT_ERROR, "Vulkan: Failed to select surface format\n" );
+		ri.Printf( PRINT_ERROR, "Vulkan: Failed to select surface format - cannot continue with Vulkan\n" );
+		ri.Printf( PRINT_ERROR, "Vulkan: Try using OpenGL renderer instead: +set cl_renderer opengl\n" );
 		return qfalse;
 	}
 	ri.Printf( PRINT_ALL, "Vulkan: Surface format selected successfully\n" );
@@ -2867,6 +2868,70 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 	return qtrue;
 }
 
+// Check if Vulkan is in a safe state for operations
+qboolean vk_is_safe_state(void) {
+	if (!vk.active) {
+		return qfalse;
+	}
+
+	if (vk.device == VK_NULL_HANDLE || vk.device == (VkDevice)0x20000000) {
+		return qfalse;
+	}
+
+	if (vk.instance == VK_NULL_HANDLE) {
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+// Safe wrapper for Vulkan operations that may fail
+qboolean vk_safe_operation(const char *operation_name, qboolean (*operation_func)(void)) {
+	if (!vk_is_safe_state()) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Skipping %s - renderer not in safe state\n", operation_name);
+		return qfalse;
+	}
+
+	if (operation_func) {
+		qboolean result = operation_func();
+		if (!result) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Operation %s failed\n", operation_name);
+		}
+		return result;
+	}
+
+	return qtrue;
+}
+
+// Safe floating point operations to prevent SIGFPE
+float vk_safe_divide(float numerator, float denominator, float default_value) {
+	if (denominator == 0.0f || isnan(denominator) || isinf(denominator)) {
+		ri.Printf(PRINT_DEVELOPER, "Vulkan: Division by zero/inf/NaN prevented (%.3f / %.3f), using %.3f\n",
+				 numerator, denominator, default_value);
+		return default_value;
+	}
+	float result = numerator / denominator;
+	if (isnan(result) || isinf(result)) {
+		ri.Printf(PRINT_DEVELOPER, "Vulkan: Invalid result from division (%.3f / %.3f = %.3f), using %.3f\n",
+				 numerator, denominator, result, default_value);
+		return default_value;
+	}
+	return result;
+}
+
+float vk_safe_sqrt(float value, float default_value) {
+	if (value < 0.0f || isnan(value) || isinf(value)) {
+		ri.Printf(PRINT_DEVELOPER, "Vulkan: Invalid sqrt input %.3f, using %.3f\n", value, default_value);
+		return default_value;
+	}
+	float result = sqrtf(value);
+	if (isnan(result) || isinf(result)) {
+		ri.Printf(PRINT_DEVELOPER, "Vulkan: Invalid sqrt result %.3f, using %.3f\n", result, default_value);
+		return default_value;
+	}
+	return result;
+}
+
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpedantic"
@@ -2918,6 +2983,12 @@ static void vk_destroy_instance( void ) {
 
 static void init_vulkan_library( void )
 {
+	// Set up floating point exception handling to prevent SIGFPE crashes
+#ifdef __linux__
+	// Clear any pending floating point exceptions and set safe mode
+	feclearexcept(FE_ALL_EXCEPT);
+#endif
+
     vk_select_preferred_gpu();
 	VkPhysicalDeviceProperties props;
 	VkPhysicalDevice *physical_devices;
@@ -4574,9 +4645,20 @@ void vk_initialize( void )
 
 	ri.Printf(PRINT_ALL, "Vulkan: Initialized successfully\n");
 
-	// Mark Vulkan as active
+	// Validate initialization before marking as active
+	if (!vk.device || vk.device == VK_NULL_HANDLE) {
+		ri.Printf(PRINT_ERROR, "Vulkan: Failed to initialize device, aborting\n");
+		return;
+	}
+
+	if (!vk.instance || vk.instance == VK_NULL_HANDLE) {
+		ri.Printf(PRINT_ERROR, "Vulkan: Failed to initialize instance, aborting\n");
+		return;
+	}
+
+	// Mark Vulkan as active only after successful validation
 	vk.active = qtrue;
-	ri.Printf(PRINT_ALL, "DEBUG: Vulkan marked as active\n");
+	ri.Printf(PRINT_ALL, "DEBUG: Vulkan marked as active after validation\n");
 
 	// Notify the client of the active render scaling so console math uses valid values.
 	if ( ri.CL_SetScaling ) {

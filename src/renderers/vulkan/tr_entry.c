@@ -147,18 +147,30 @@ void RE_SetColorMappings(void) {
 // Entry point for dlopen
 // Plan-guarded: return a minimal Vulkan surface if patch1 is enabled, otherwise NULL
 Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI(int apiVersion, refimport_t *rimp) {
+  // Validate parameters
+  if (!rimp) {
+    // Can't use ri.Printf here since ri is not set yet
+    return NULL;
+  }
+
   ri = *rimp;
+
+  // Check for safe mode before any Vulkan operations
   check_safe_mode_flag();
   if (g_vk_safe_mode) {
     ri.Printf(PRINT_ALL, "SAFE MODE active: GetRefAPI returns NULL to force GL fallback\n");
     return NULL;
   }
+
+  // Validate API version early
+  if (apiVersion != REF_API_VERSION) {
+    ri.Printf(PRINT_ERROR, "Vulkan GetRefAPI: Unsupported API version %d, expected %d\n",
+              apiVersion, REF_API_VERSION);
+    return NULL;
+  }
   if (g_vulkan_patch1_enabled || g_vulkan_patch1_tiny_enabled) {
     static refexport_t re;
-    if (apiVersion != REF_API_VERSION) {
-      ri.Printf(PRINT_ALL, "Mismatched REF_API_VERSION: expected %i, got %i\n", REF_API_VERSION, apiVersion);
-      return NULL;
-    }
+    // API version already validated above
     Com_Memset(&re, 0, sizeof(re));
     if (g_vulkan_patch1_tiny_enabled) {
       // Tiny surface: core lifecycle + essential functions for basic operation

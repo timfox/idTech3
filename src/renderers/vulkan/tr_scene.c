@@ -472,6 +472,13 @@ to handle mirrors,
 void RE_RenderScene( const refdef_t *fd ) {
 #ifdef USE_VULKAN
 	renderCommand_t	lastRenderCommand __attribute__((unused));
+
+	// Check Vulkan safety before rendering
+	extern qboolean vk_is_safe_state(void);
+	if (!vk_is_safe_state()) {
+		ri.Printf(PRINT_DEVELOPER, "Vulkan: Skipping scene render - renderer not in safe state\n");
+		return;
+	}
 #endif
 	viewParms_t		parms;
 	int				startTime;

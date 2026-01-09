@@ -1575,6 +1575,14 @@ void vk_shutdown_performance_regression_detector(void);
 void vk_shutdown_heatmap_visualizer(void);
 void vk_shutdown_cache_structures_manager(void);
 
+// Safety and validation functions
+qboolean vk_is_safe_state(void);
+qboolean vk_safe_operation(const char *operation_name, qboolean (*operation_func)(void));
+
+// Safe mathematical operations
+float vk_safe_divide(float numerator, float denominator, float default_value);
+float vk_safe_sqrt(float value, float default_value);
+
 // Memory tracking functions
 void vk_track_allocation(VkDeviceSize size);
 void vk_track_free(VkDeviceSize size);
