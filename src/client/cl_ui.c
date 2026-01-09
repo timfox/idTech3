@@ -1428,15 +1428,27 @@ CL_ShutdownUI
 ====================
 */
 void CL_ShutdownUI( void ) {
+	Com_Printf( PRINT_ALL, "CL_ShutdownUI: Starting UI shutdown process\n" );
+
 	Key_SetCatcher( Key_GetCatcher() & ~KEYCATCH_UI );
 	cls.uiStarted = qfalse;
 	if ( !uivm ) {
+		Com_Printf( PRINT_ALL, "CL_ShutdownUI: No UI VM to shutdown\n" );
 		return;
 	}
+
+	Com_Printf( PRINT_ALL, "CL_ShutdownUI: Calling UI_SHUTDOWN syscall on VM\n" );
 	VM_Call( uivm, 0, UI_SHUTDOWN );
+
+	Com_Printf( PRINT_ALL, "CL_ShutdownUI: Freeing UI VM\n" );
 	VM_Free( uivm );
+
 	uivm = NULL;
+
+	Com_Printf( PRINT_ALL, "CL_ShutdownUI: Closing UI VM files\n" );
 	FS_VM_CloseFiles( H_Q3UI );
+
+	Com_Printf( PRINT_ALL, "CL_ShutdownUI: UI shutdown complete\n" );
 }
 
 

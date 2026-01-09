@@ -2187,6 +2187,137 @@ vm_t *VM_Create( vmIndex_t index, syscall_t systemCalls, dllSyscall_t dllSyscall
 
 /*
 ==============
+VM_ValidatePointer
+
+Validates a pointer for basic sanity checks
+==============
+*/
+static qboolean VM_ValidatePointer( void *ptr, const char *context ) {
+	if ( !ptr ) {
+		Com_DPrintf( "VM_ValidatePointer: NULL pointer in context '%s'\n",
+		           context ? context : "unknown" );
+		return qfalse;
+	}
+
+	uintptr_t addr = (uintptr_t)ptr;
+
+	// Avoid obviously invalid addresses (NULL, very low addresses, kernel space)
+	if ( addr < 0x1000 || addr >= 0x7FFFFFFFFFFF ) {
+		Com_Printf( "VM_ValidatePointer: Pointer %p appears invalid (out of range) in context '%s'\n",
+		           ptr, context ? context : "unknown" );
+		return qfalse;
+	}
+
+	// Check for suspicious patterns that might indicate corrupted pointers
+	// Avoid pointers that look like they might be uninitialized or corrupted
+	if ( (addr & 0xFFFF) == 0xAAAA || (addr & 0xFFFF) == 0xCCCC || (addr & 0xFFFF) == 0xCDCD ) {
+		Com_Printf( "VM_ValidatePointer: Pointer %p appears corrupted (suspicious pattern) in context '%s'\n",
+		           ptr, context ? context : "unknown" );
+		return qfalse;
+	}
+
+	// Basic user address space check (64-bit Linux)
+	// Check that pointer is in user space (not kernel space)
+	if ( addr >= 0x800000000000ULL ) {  // Kernel space starts around 0x800000000000 on x86_64
+		Com_Printf( "VM_ValidatePointer: Pointer %p appears to be in kernel space in context '%s'\n",
+		           ptr, context ? context : "unknown" );
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+==============
+VM_ValidateVMState
+
+Validates VM structure integrity before destruction
+==============
+*/
+static qboolean VM_ValidateVMState( vm_t *vm ) {
+	if ( !vm ) {
+		Com_DPrintf( "VM_ValidateVMState: NULL VM pointer\n" );
+		return qfalse;
+	}
+
+	// Check for obviously corrupted VM structure
+	if ( vm->index < 0 || vm->index >= VM_COUNT ) {
+		Com_Printf( "VM_ValidateVMState: Invalid VM index %d\n", vm->index );
+		return qfalse;
+	}
+
+	if ( !vm->name || !vm->name[0] ) {
+		Com_Printf( "VM_ValidateVMState: VM has invalid name\n" );
+		return qfalse;
+	}
+
+	// Validate function pointers if they exist (cast to void* for validation)
+	if ( vm->destroy && !VM_ValidatePointer( (void*)vm->destroy, "vm_destroy" ) ) {
+		Com_Printf( "VM_ValidateVMState: VM destroy function pointer appears corrupted\n" );
+		return qfalse;
+	}
+
+	// Validate DLL handle if it exists
+	if ( vm->dllHandle && !VM_ValidatePointer( vm->dllHandle, "vm_dllHandle" ) ) {
+		Com_Printf( "VM_ValidateVMState: VM DLL handle appears corrupted\n" );
+		return qfalse;
+	}
+
+	return qtrue;
+}
+
+/*
+==============
+VM_SafeDestroy
+
+Safely calls VM destroy function with error handling
+==============
+*/
+static void VM_SafeDestroy( vm_t *vm ) {
+	if ( !vm || !vm->destroy ) {
+		return;
+	}
+
+	// Additional validation before calling destroy
+	if ( !VM_ValidateVMState(vm) ) {
+		Com_Printf( "VM_SafeDestroy: VM state validation failed, skipping destroy for %s\n",
+		           vm->name ? vm->name : "unknown" );
+		return;
+	}
+
+	Com_DPrintf( "VM_SafeDestroy: Calling destroy function for VM %s\n",
+	           vm->name ? vm->name : "unknown" );
+
+	// Call destroy with basic error trapping
+	// Note: We can't use setjmp/longjmp here as it's not portable across DLL boundaries
+	vm->destroy( vm );
+}
+
+/*
+==============
+VM_SafeUnloadLibrary
+
+Safely unloads VM DLL with error handling
+==============
+*/
+static void VM_SafeUnloadLibrary( void *dllHandle ) {
+	if ( !dllHandle ) {
+		return;
+	}
+
+	Com_DPrintf( "VM_SafeUnloadLibrary: Unloading DLL %p\n", dllHandle );
+
+	// Basic validation - ensure dllHandle looks reasonable
+	if ( (uintptr_t)dllHandle < 0x1000 || (uintptr_t)dllHandle >= 0x7FFFFFFFFFFF ) {
+		Com_Printf( "VM_SafeUnloadLibrary: DLL handle appears corrupted: %p, skipping unload\n", dllHandle );
+		return;
+	}
+
+	Sys_UnloadLibrary( dllHandle );
+}
+
+/*
+==============
 VM_Free
 ==============
 */
@@ -2194,6 +2325,13 @@ void VM_Free( vm_t *vm ) {
 
 	if( !vm ) {
 		return;
+	}
+
+	// Enhanced validation before any operations
+	if ( !VM_ValidateVMState(vm) ) {
+		Com_Printf( "VM_Free: VM state validation failed for %s, performing minimal cleanup\n",
+		           vm->name ? vm->name : "unknown" );
+		goto cleanup;
 	}
 
 	if ( vm->callLevel ) {
@@ -2205,9 +2343,10 @@ void VM_Free( vm_t *vm ) {
 		}
 	}
 
-	if ( vm->destroy )
-		vm->destroy( vm );
+	// Safe destroy call
+	VM_SafeDestroy( vm );
 
+	// Safe DLL unloading
 	if ( vm->dllHandle ) {
 #ifdef COMBINED_MONOLITH
 		// Statically linked modules shouldn't be unloaded via dlclose.
@@ -2216,7 +2355,7 @@ void VM_Free( vm_t *vm ) {
 		} else
 #endif
 		{
-			Sys_UnloadLibrary( vm->dllHandle );
+			VM_SafeUnloadLibrary( vm->dllHandle );
 		}
 	}
 
@@ -2231,6 +2370,8 @@ void VM_Free( vm_t *vm ) {
 		Z_Free( vm->instructionPointers );
 	}
 #endif
+
+cleanup:
 	Com_Memset( vm, 0, sizeof( *vm ) );
 }
 

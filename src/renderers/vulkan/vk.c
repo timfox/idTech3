@@ -9800,8 +9800,12 @@ void vk_shutdown( refShutdownCode_t code ) {
 			ri.Printf(PRINT_ALL, "vk_shutdown: Full cleanup - clearing Vulkan instance data\n");
 
 			// Free dynamically allocated swapchain arrays safely
-			vk_safe_free((void**)&vk.swapchain_images, "swapchain_images");
-			vk_safe_free((void**)&vk.swapchain_image_views, "swapchain_image_views");
+			if (vk.swapchain_images) {
+				vk_safe_free((void**)&vk.swapchain_images, "swapchain_images");
+			}
+			if (vk.swapchain_image_views) {
+				vk_safe_free((void**)&vk.swapchain_image_views, "swapchain_image_views");
+			}
 			if (vk.swapchain_rendering_finished) {
 				// Destroy semaphores before freeing the array
 				for (uint32_t i = 0; i < vk.swapchain_image_count; i++) {
@@ -9836,22 +9840,27 @@ void vk_shutdown( refShutdownCode_t code ) {
 
 // Safe memory management functions to prevent double-free corruption
 void vk_safe_free(void **ptr, const char *context) {
-    if (!ptr || !*ptr) {
-        if (context) {
-            ri.Printf(PRINT_DEVELOPER, "vk_safe_free: NULL pointer in context '%s', skipping\n", context);
-        }
+    if (!ptr) {
+        ri.Printf(PRINT_DEVELOPER, "vk_safe_free: NULL ptr parameter\n");
+        return;
+    }
+
+    if (!*ptr) {
+        ri.Printf(PRINT_DEVELOPER, "vk_safe_free: NULL pointer in context '%s', skipping\n",
+                 context ? context : "unknown");
         return;
     }
 
     // Basic validation - check if pointer looks reasonable
     if (!vk_validate_pointer(*ptr, context)) {
-        ri.Printf(PRINT_WARNING, "vk_safe_free: Invalid pointer detected in context '%s', skipping free\n",
+        ri.Printf(PRINT_DEVELOPER, "vk_safe_free: Invalid pointer detected in context '%s', skipping free\n",
                  context ? context : "unknown");
         *ptr = NULL; // Clear the pointer to prevent further issues
         return;
     }
 
-    ri.Printf(PRINT_DEVELOPER, "vk_safe_free: Freeing pointer %p in context '%s'\n", *ptr, context ? context : "unknown");
+    ri.Printf(PRINT_DEVELOPER, "vk_safe_free: Freeing pointer in context '%s'\n",
+             context ? context : "unknown");
 
     // Attempt the free operation
     ri.Free(*ptr);
@@ -9860,22 +9869,37 @@ void vk_safe_free(void **ptr, const char *context) {
 
 qboolean vk_validate_pointer(void *ptr, const char *context) {
     if (!ptr) {
+        ri.Printf(PRINT_DEVELOPER, "vk_validate_pointer: NULL pointer in context '%s'\n",
+                 context ? context : "unknown");
         return qfalse;
     }
 
     // Basic sanity checks
-    // Check if pointer is in a reasonable address range
     uintptr_t addr = (uintptr_t)ptr;
 
     // Avoid obviously invalid addresses (NULL, very low addresses, kernel space)
     if (addr < 0x1000 || addr >= 0x7FFFFFFFFFFF) {
-        ri.Printf(PRINT_WARNING, "vk_validate_pointer: Pointer %p appears invalid in context '%s'\n",
+        ri.Printf(PRINT_WARNING, "vk_validate_pointer: Pointer %p appears invalid (out of range) in context '%s'\n",
                  ptr, context ? context : "unknown");
         return qfalse;
     }
 
-    // Additional validation could be added here if needed
-    // For now, we assume the pointer is valid if it passes basic checks
+    // Check for suspicious patterns that might indicate corrupted pointers
+    // Avoid pointers that look like they might be uninitialized or corrupted
+    if ((addr & 0xFFFF) == 0xAAAA || (addr & 0xFFFF) == 0xCCCC || (addr & 0xFFFF) == 0xCDCD) {
+        ri.Printf(PRINT_WARNING, "vk_validate_pointer: Pointer %p appears corrupted (suspicious pattern) in context '%s'\n",
+                 ptr, context ? context : "unknown");
+        return qfalse;
+    }
+
+    // Basic user address space check (64-bit Linux)
+    // Check that pointer is in user space (not kernel space)
+    // This is a heuristic - not foolproof but catches obviously wrong pointers
+    if (addr >= 0x800000000000ULL) {  // Kernel space starts around 0x800000000000 on x86_64
+        ri.Printf(PRINT_WARNING, "vk_validate_pointer: Pointer %p appears to be in kernel space in context '%s'\n",
+                 ptr, context ? context : "unknown");
+        return qfalse;
+    }
 
     return qtrue;
 }

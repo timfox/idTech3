@@ -4107,37 +4107,35 @@ static shader_t *FinishShader( void ) {
 
 			if (has_depth_fragment) {
 				ri.Printf(PRINT_ALL, "DEBUG: Executing depth fragment processing for shader %s\n", shader.name);
-				} else {
-					ri.Printf(PRINT_ALL, "DEBUG: Skipping depth fragment processing\n");
-				}
 
-					// Reset FPU state before Vulkan operations to prevent state corruption
-					#ifdef __linux__
-					#ifdef __i386__
-					__asm__ __volatile__ ("fninit");
-					#endif
-					#endif
+				// Reset FPU state before Vulkan operations to prevent state corruption
+				#ifdef __linux__
+				#ifdef __i386__
+				__asm__ __volatile__ ("fninit");
+				#endif
+				#endif
 
-					def.mirror = qfalse;
-					#ifdef USE_VK_PBR
-					def.vk_pbr_flags = 0;
-					#endif
-					def.shader_type = TYPE_SINGLE_TEXTURE_DF;
-					pStage->vk_pipeline_df = vk_find_pipeline_ext( 0, &def, qtrue );
-					if (pStage->vk_pipeline_df == VK_NULL_HANDLE) {
-						ri.Printf(PRINT_WARNING, "Failed to create Vulkan depth fragment pipeline for shader stage\n");
-						// Don't fail, depth fragment pipeline is optional
-					}
-					def.mirror = qtrue;
-					def.shader_type = TYPE_SINGLE_TEXTURE_DF;
-					pStage->vk_mirror_pipeline_df = vk_find_pipeline_ext( 0, &def, qfalse );
-					ri.Printf(PRINT_ALL, "DEBUG: Depth fragment mirror pipeline call completed\n");
-					if (pStage->vk_mirror_pipeline_df == VK_NULL_HANDLE) {
-						ri.Printf(PRINT_WARNING, "Failed to create Vulkan mirror depth fragment pipeline for shader stage\n");
-						// Don't fail, mirror depth fragment pipeline is optional
-					}
-					ri.Printf(PRINT_ALL, "DEBUG: Depth fragment processing completed successfully\n");
+				def.mirror = qfalse;
+				#ifdef USE_VK_PBR
+				def.vk_pbr_flags = 0;
+				#endif
+				def.shader_type = TYPE_SINGLE_TEXTURE_DF;
+				pStage->vk_pipeline_df = vk_find_pipeline_ext( 0, &def, qtrue );
+				if (pStage->vk_pipeline_df == VK_NULL_HANDLE) {
+					ri.Printf(PRINT_WARNING, "Failed to create Vulkan depth fragment pipeline for shader stage\n");
+					// Don't fail, depth fragment pipeline is optional
 				}
+				def.mirror = qtrue;
+				def.shader_type = TYPE_SINGLE_TEXTURE_DF;
+				pStage->vk_mirror_pipeline_df = vk_find_pipeline_ext( 0, &def, qfalse );
+				ri.Printf(PRINT_ALL, "DEBUG: Depth fragment mirror pipeline call completed\n");
+				if (pStage->vk_mirror_pipeline_df == VK_NULL_HANDLE) {
+					ri.Printf(PRINT_WARNING, "Failed to create Vulkan mirror depth fragment pipeline for shader stage\n");
+					// Don't fail, mirror depth fragment pipeline is optional
+				}
+				ri.Printf(PRINT_ALL, "DEBUG: Depth fragment processing completed successfully\n");
+			} else {
+				ri.Printf(PRINT_ALL, "DEBUG: Skipping depth fragment processing\n");
 			}
 			}
 
