@@ -413,9 +413,16 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 		ri.Printf(PRINT_DEVELOPER, "Vulkan: Skipping frame - not fully initialized\n");
 		return;
 	}
-	// Skip rendering if device is lost
+	// Skip rendering if device is lost (prevents video playback and all rendering)
 	if (vk.device_lost) {
-		ri.Printf(PRINT_DEVELOPER, "Vulkan: Skipping frame - device is lost\n");
+		// Only log once per second to avoid spam
+		static int last_log_time = 0;
+		int current_time = ri.Milliseconds();
+		if (current_time - last_log_time > 1000) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Device is lost - rendering disabled. Video playback will not work.\n");
+			ri.Printf(PRINT_WARNING, "Vulkan: Try restarting the application or updating GPU drivers.\n");
+			last_log_time = current_time;
+		}
 		return;
 	}
 #endif

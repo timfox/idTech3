@@ -948,7 +948,8 @@ void end_command_buffer(VkCommandBuffer command_buffer, const char *location)
 			vk.device_lost = qtrue;  // Mark device as lost
 			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during queue submit - GPU driver issue\n");
 			ri.Printf(PRINT_ERROR, "Vulkan: This may cause rendering artifacts or instability\n");
-			ri.Printf(PRINT_ERROR, "Vulkan: Rendering disabled until device recovery\n");
+			ri.Printf(PRINT_ERROR, "Vulkan: Rendering disabled. Try restarting the application or updating GPU drivers.\n");
+			ri.Printf(PRINT_ERROR, "Vulkan: Video playback may not work until device is recovered.\n");
 			// Don't terminate - let vk_queue_wait_idle handle cleanup
 		} else {
 			// For other errors, use the standard error handling
