@@ -592,7 +592,8 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	// Note: Don't use Com_Printf here as FS_Restart clears fs_searchpaths temporarily
 	srand( Com_Milliseconds() );
 	Com_RandomBytes( (byte*)&sv.checksumFeed, sizeof( sv.checksumFeed ) );
-	FS_Restart( sv.checksumFeed );
+	// FS_Restart will be called after map loading to avoid memory corruption
+	// FS_Restart( sv.checksumFeed );
 	// Debug output after FS_Restart completes
 	if ( !FS_StartupInProgress() ) {
 	}
@@ -640,7 +641,14 @@ if ( !FS_StartupInProgress() ) {
 CM_LoadMap( va( "maps/%s.bsp", mapname ), qfalse, &checksum );
 Com_Printf( "CM_LoadMap: loaded maps/%s.bsp, checksum=%d\n", mapname, checksum );
 if ( !FS_StartupInProgress() ) {
-	}
+}
+
+// Now restart the filesystem with the new checksum after map loading
+// This avoids memory corruption during early initialization
+FS_Restart( sv.checksumFeed );
+// Debug output after FS_Restart completes
+if ( !FS_StartupInProgress() ) {
+}
 
 	// set serverinfo visible name
 	Cvar_Set( "mapname", mapname );
