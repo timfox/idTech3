@@ -3795,17 +3795,46 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 			// For now, just proceed with library loading
 		}
 
-		localRendererLib = Sys_LoadLibrary( ospath );
+		void *testRendererLib = Sys_LoadLibrary( ospath );
 
-		if (localRendererLib) {
-			loadedRenderer = tryRenderer;
-			Com_Printf( S_COLOR_GREEN "Successfully loaded renderer: %s\n", tryRenderer );
+		if (testRendererLib) {
+			// Test that GetRefAPI works before committing to this renderer
+			GetRefAPI_t testGetRefAPI = (GetRefAPI_t)(intptr_t)Sys_LoadFunction( testRendererLib, "GetRefAPI" );
 
-			// Runtime test: Print active rendering path
-			Com_Printf( "Renderer startup final path: %s\n", tryRenderer );
-			if (Q_stricmp(tryRenderer, rendererName) != 0) {
-				Com_Printf( S_COLOR_YELLOW "Note: Fell back from requested renderer '%s' to '%s'\n", rendererName, tryRenderer );
-				Com_Printf( S_COLOR_YELLOW "  (This is normal if the requested renderer is unavailable)\n" );
+			if (testGetRefAPI) {
+				// Try to initialize the renderer to make sure it works
+				refimport_t testRimp;
+				Com_Memset( &testRimp, 0, sizeof( testRimp ) );
+
+				// Set up minimal rimp for testing
+				testRimp.Printf = CL_RefPrintf;
+				testRimp.Error = Com_Error;
+				testRimp.Milliseconds = CL_ScaledMilliseconds;
+				testRimp.Malloc = CL_RefMalloc;
+				testRimp.Free = Z_Free;
+
+				refexport_t *testRet = testGetRefAPI( REF_API_VERSION, &testRimp );
+
+				if (testRet) {
+					// Renderer works! Commit to using it
+					localRendererLib = testRendererLib;
+					loadedRenderer = tryRenderer;
+					GetRefAPI = testGetRefAPI;
+					Com_Printf( S_COLOR_GREEN "Successfully loaded renderer: %s\n", tryRenderer );
+					Com_Printf( "Renderer startup final path: %s\n", tryRenderer );
+					if (Q_stricmp(tryRenderer, rendererName) != 0) {
+						Com_Printf( S_COLOR_YELLOW "Note: Fell back from requested renderer '%s' to '%s'\n", rendererName, tryRenderer );
+						Com_Printf( S_COLOR_YELLOW "  (This is normal if the requested renderer is unavailable)\n" );
+					}
+				} else {
+					// GetRefAPI returned NULL, unload and try next renderer
+					Sys_UnloadLibrary( testRendererLib );
+					Com_Printf( S_COLOR_YELLOW "  Renderer %s loaded but GetRefAPI failed, trying next renderer\n", tryRenderer );
+				}
+			} else {
+				// No GetRefAPI function, unload and try next renderer
+				Sys_UnloadLibrary( testRendererLib );
+				Com_Printf( S_COLOR_YELLOW "  Renderer %s missing GetRefAPI function, trying next renderer\n", tryRenderer );
 			}
         } else {
             const char *error = NULL;
@@ -3863,27 +3892,8 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 	// Assign to global rendererLib
 	rendererLib = localRendererLib;
 
-	// Try alternative architecture suffix if x86_64 (some builds use _x86 for 64-bit)
-	if ( !rendererLib && !Q_stricmp( REND_ARCH_STRING, "x86_64" ) )
-	{
-		Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_x86" DLL_EXT, loadedRenderer );
-		ospath = FS_BuildOSPath( Sys_DefaultBasePath(), dllName, NULL );
-		rendererLib = Sys_LoadLibrary( ospath );
-		if (rendererLib) {
-			Com_Printf( "Loaded alternative architecture renderer: %s\n", dllName );
-		}
-	}
-	if ( !rendererLib )
-	{
-		Com_Error( ERR_FATAL, "Failed to load renderer %s", dllName );
-	}
-
-	{
-		void *sym = Sys_LoadFunction( rendererLib, "GetRefAPI" );
-		GetRefAPI = (GetRefAPI_t)(intptr_t)sym;
-		Com_Printf( "CL_InitRef: Loaded GetRefAPI from rendererLib=%p, function pointer=%p\n", (void*)rendererLib, (void*)sym );
-	}
-// Removed: fallback mechanism handled inline after GetRefAPI load; safe to proceed
+	// GetRefAPI is already loaded and tested in the renderer selection loop above
+	// If we get here, rendererLib and GetRefAPI are both valid
 
 	cl_renderer->modified = qfalse;
 #endif

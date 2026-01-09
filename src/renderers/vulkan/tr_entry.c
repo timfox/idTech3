@@ -38,9 +38,20 @@ static qboolean g_vulkan_patch1_tiny_enabled = qfalse;
 
 static void check_safe_mode_flag(void) {
   if (g_vk_safe_mode) return;
-  if (access("/home/tim/Desktop/idtech3/logs/safe_mode.flag", F_OK) == 0) {
-    g_vk_safe_mode = qtrue;
-    ri.Printf(PRINT_ALL, "SAFE MODE: Vulkan path disabled via flag\n");
+
+  // Check for safe mode flag in multiple locations
+  const char *checkPaths[] = {
+    "safe_mode.flag",                    // Current directory
+    "logs/safe_mode.flag",               // logs subdirectory
+    "/home/tim/Desktop/idtech3/logs/safe_mode.flag"  // Hardcoded fallback
+  };
+
+  for (int i = 0; i < sizeof(checkPaths)/sizeof(checkPaths[0]); i++) {
+    if (access(checkPaths[i], F_OK) == 0) {
+      g_vk_safe_mode = qtrue;
+      ri.Printf(PRINT_ALL, "SAFE MODE: Vulkan path disabled via flag at %s\n", checkPaths[i]);
+      return;
+    }
   }
   // Tiny patch gate
   if (!g_vulkan_patch1_tiny_enabled) {

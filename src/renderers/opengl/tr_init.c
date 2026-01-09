@@ -623,6 +623,11 @@ static GLint APIENTRY glGetAttribLocationDummy(GLuint program, const GLchar *nam
 	return -1;
 }
 
+static void APIENTRY glPolygonOffsetDummy(GLfloat factor, GLfloat units) {
+	// Polygon offset not available - this is a no-op in compatibility mode
+	// Modern applications should handle depth offset in shaders
+}
+
 #define GLE( ret, name, ... ) { (void**)&q##name, XSTRING(name) },
 static sym_t core_procs[] = { QGL_Core_PROCS };
 static sym_t ext_procs[] = { QGL_Ext_PROCS };
@@ -1039,6 +1044,12 @@ static const char *R_ResolveSymbols( sym_t *syms, int count )
 			if (Q_stricmp(syms[i].name, "glDisableClientState") == 0) {
 				ri.Printf(PRINT_WARNING, "glDisableClientState not available in this OpenGL context, using compatibility fallback\n");
 				*syms[i].symbol = (void *)&glDisableClientStateDummy;
+				continue;
+			}
+			// Fallback for core OpenGL 1.1 functions that should be in system headers
+			if (Q_stricmp(syms[i].name, "glPolygonOffset") == 0) {
+				ri.Printf(PRINT_WARNING, "glPolygonOffset not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glPolygonOffsetDummy;
 				continue;
 			}
 			// If we can't resolve core functions, this indicates a deeper OpenGL context issue

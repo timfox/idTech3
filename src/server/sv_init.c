@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "server.h"
+#include "../client/client.h"
 #include "../common/q_memory_safety.h"
 static qboolean CM_CheckAssetDependencies( const char *mapname )
 {
@@ -485,17 +486,21 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 #ifndef DEDICATED
 	// if not running a dedicated server CL_MapLoading will connect the client to the server
 	// also print some status stuff
-	if ( !FS_StartupInProgress() ) {
-	}
-	CL_MapLoading();
-	if ( !FS_StartupInProgress() ) {
-	}
+	// Only call client functions if the renderer is initialized to avoid crashes
+	extern qboolean re_initialized;
+	if ( re_initialized ) {
+		if ( !FS_StartupInProgress() ) {
+		}
+		CL_MapLoading();
+		if ( !FS_StartupInProgress() ) {
+		}
 
-	// make sure all the client stuff is unloaded
-	if ( !FS_StartupInProgress() ) {
-	}
-	CL_ShutdownAll();
-	if ( !FS_StartupInProgress() ) {
+		// make sure all the client stuff is unloaded
+		if ( !FS_StartupInProgress() ) {
+		}
+		CL_ShutdownAll();
+		if ( !FS_StartupInProgress() ) {
+		}
 	}
 #endif
 
