@@ -968,6 +968,84 @@ static intptr_t QDECL CL_DllSyscall( intptr_t arg, ... ) {
 
 /*
 ====================
+CL_BotLibPrint
+====================
+*/
+static void CL_BotLibPrint(int type, const char *fmt, ...) {
+	va_list argptr;
+	char msg[MAXPRINTMSG];
+
+	va_start(argptr, fmt);
+	Q_vsnprintf(msg, sizeof(msg), fmt, argptr);
+	va_end(argptr);
+
+	Com_Printf("%s", msg);
+}
+
+/*
+====================
+CL_BotLibHunkAlloc
+====================
+*/
+static void *CL_BotLibHunkAlloc(int size) {
+	return Hunk_Alloc(size, h_low);
+}
+
+/*
+====================
+CL_InitBotLib
+====================
+*/
+static void CL_InitBotLib( void ) {
+	botlib_import_t	botlib_import;
+
+	if (botlib_export) {
+		// Already initialized
+		return;
+	}
+
+	Com_Printf("Initializing botlib for client...\n");
+
+	// Set up botlib import functions for client use
+	botlib_import.Print = CL_BotLibPrint;
+	botlib_import.Trace = NULL;  // Not needed for PC_* functions
+	botlib_import.EntityTrace = NULL;
+	botlib_import.PointContents = NULL;
+	botlib_import.inPVS = NULL;
+	botlib_import.BSPEntityData = NULL;
+	botlib_import.BSPModelMinsMaxsOrigin = NULL;
+	botlib_import.BotClientCommand = NULL;
+
+	// Memory management - use client memory functions
+	botlib_import.GetMemory = Z_Malloc;
+	botlib_import.FreeMemory = Z_Free;
+	botlib_import.AvailableMemory = Z_AvailableMemory;
+	botlib_import.HunkAlloc = CL_BotLibHunkAlloc;
+
+	// File system access
+	botlib_import.FS_FOpenFile = FS_FOpenFileByMode;
+	botlib_import.FS_Read = FS_Read;
+	botlib_import.FS_Write = FS_Write;
+	botlib_import.FS_FCloseFile = FS_FCloseFile;
+	botlib_import.FS_Seek = FS_Seek;
+
+	// Debug functions - not needed for basic PC functionality
+	botlib_import.DebugLineCreate = NULL;
+	botlib_import.DebugLineDelete = NULL;
+	botlib_import.DebugLineShow = NULL;
+	botlib_import.DebugPolygonCreate = NULL;
+	botlib_import.DebugPolygonDelete = NULL;
+
+	botlib_import.Sys_Milliseconds = Sys_Milliseconds;
+
+	botlib_export = (botlib_export_t *)GetBotLibAPI( BOTLIB_API_VERSION, &botlib_import );
+	if (!botlib_export) {
+		Com_Printf( S_COLOR_RED "ERROR: Failed to initialize botlib for client\n" );
+	}
+}
+
+/*
+====================
 CL_InitCGame
 
 Should only be called by CL_StartHunkUsers
@@ -982,6 +1060,9 @@ void CL_InitCGame( void ) {
 	Cbuf_NestedReset();
 
 	t1 = Sys_Milliseconds();
+
+	// Initialize botlib for cgame VM script parsing
+	CL_InitBotLib();
 
 	// put away the console
 	Con_Close();

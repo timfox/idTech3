@@ -4172,6 +4172,8 @@ static shader_t *FinishShader( void ) {
 			}
 			*/
 #endif
+	}
+}
 #endif // USE_VULKAN
 
 #ifdef USE_PMLIGHT
