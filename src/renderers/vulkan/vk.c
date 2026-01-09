@@ -4655,6 +4655,16 @@ static void vk_create_pipeline_layouts(void);
 void vk_initialize( void )
 {
 	ri.Printf(PRINT_WARNING, "VULKAN INIT: Starting Vulkan initialization\n");
+	ri.Printf(PRINT_ALL, "DEBUG: vk_initialize called (vk.active=%d)\n", vk.active);
+
+	// Initialize images (needed for default shader) - do this regardless of vk.active
+	static qboolean images_initialized = qfalse;
+	if (!images_initialized) {
+		ri.Printf(PRINT_ALL, "DEBUG: Calling R_InitImages from vk_initialize\n");
+		R_InitImages();
+		images_initialized = qtrue;
+	}
+
 	qboolean was_already_active = vk.active;
 
 	if ( !vk.active ) {
@@ -4666,6 +4676,9 @@ void vk_initialize( void )
 #endif
 		ri.Printf(PRINT_DEVELOPER, "vk_initialize: Cleared FPE state before Vulkan initialization\n");
 #endif
+
+		// Initialize images before Vulkan setup (needed for default shader)
+		R_InitImages();
 
 		// Initialize the platform-specific Vulkan implementation (window, library loading)
 		ri.VKimp_Init( &glConfig );

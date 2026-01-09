@@ -117,6 +117,9 @@ void RE_Shutdown(refShutdownCode_t code) {
 void RE_BeginRegistration(glconfig_t *glconfigOut) {
     ri.Printf(PRINT_ALL, "Vulkan Renderer: BeginRegistration\n");
 
+    // Initialize images (needed for default shader)
+    R_InitImages();
+
     // Initialize scene management if Vulkan is active
     if (vk.active) {
         vk.scene.initialized = qtrue;

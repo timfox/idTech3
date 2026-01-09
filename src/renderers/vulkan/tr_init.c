@@ -540,10 +540,13 @@ cvar_t *r_printShaders;
 
 void R_Init( void ) {
     static qboolean initialized = qfalse;
+    ri.Printf(PRINT_ALL, "DEBUG: Vulkan R_Init called\n");
     if ( initialized ) {
+        ri.Printf(PRINT_ALL, "DEBUG: Vulkan R_Init already initialized, returning\n");
         return;
     }
     initialized = qtrue;
+    ri.Printf(PRINT_ALL, "DEBUG: Vulkan R_Init proceeding with initialization\n");
 
     R_Register();
 

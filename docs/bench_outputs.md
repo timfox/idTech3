@@ -24,10 +24,10 @@
 - Cross-platform memory metrics
   - Linux: memory in MB from `/proc/self/statm` (default)
   - Windows/macOS: memory from platform-specific calls (via cross-platform memory helper in bench)
-- Wayland toggle for testing
-  - You can force using Wayland even if SDL would fallback to X11 by setting the environment variable `WAYLAND_FORCE=1`.
-  - In that mode, the system will log that Wayland is forced and will avoid an X11 fallback.
-  - This is useful for deterministic testing of the Wayland path in CI or dedicated tests.
+- Wayland testing
+  - To test Wayland fallback behavior, use `SDL_VIDEODRIVER=wayland` or `+set r_wayland 1`
+  - The engine will attempt Wayland first, then automatically fallback to X11 if it fails
+  - CI testing: Run `scripts/ci_wayland_fallback.sh` to validate the complete fallback logic
 - Quick usage examples
   - Minimal bench.json example (snippet)
     {

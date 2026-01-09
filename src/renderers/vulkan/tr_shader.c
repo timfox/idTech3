@@ -4052,9 +4052,8 @@ static shader_t *FinishShader( void ) {
 			ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext returned 0x%llx for main pipeline\n", (unsigned long long)pStage->vk_pipeline[0]);
 			if (pStage->vk_pipeline[0] == VK_NULL_HANDLE) {
 				ri.Printf(PRINT_WARNING, "Failed to create Vulkan pipeline (type %d), using default shader\n", def.shader_type);
-				// Use default shader when Vulkan pipeline creation fails
-				shader.defaultShader = qtrue;
-				return FinishShader();
+				// Return the pre-created default shader to avoid infinite loop
+				return tr.defaultShader;
 			}
 			def.mirror = qtrue;
 			// Try to find existing mirror pipeline, don't create if missing to avoid SIGFPE
@@ -4387,6 +4386,13 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 	const char	*shaderText;
 	image_t		*image;
 	shader_t	*sh;
+	static qboolean images_initialized = qfalse;
+
+	// Initialize images on first shader lookup (Vulkan renderer doesn't call R_InitImages)
+	if (!images_initialized) {
+		R_InitImages();
+		images_initialized = qtrue;
+	}
 
 	if ( name[0] == '\0' ) {
 		return tr.defaultShader;

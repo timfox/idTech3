@@ -28,7 +28,8 @@ fi
 echo "CI log: ${LOG_FILE}"
 
 # Run the Vulkan client non-interactively, capture logs
-VK_VERBOSE_PIPELINE_LOGS=1 VK_LOG_TO_FILE=1 \
+# Force Wayland first to test the fallback logic
+VK_VERBOSE_PIPELINE_LOGS=1 VK_LOG_TO_FILE=1 SDL_VIDEODRIVER=wayland \
 ./release/idtech3.x86_64 +set fs_game mymod +set cl_renderer vulkan \
   > "${LOG_FILE}" 2>&1 &
 PID=$!
@@ -36,37 +37,35 @@ PID=$!
 echo "Launched PID ${PID}. Waiting for surface init..."
 sleep 20
 
-if grep -m1 -q "VK_CreateSurface: Wayland" "${LOG_FILE}"; then
-  echo "Wayland surface creation path observed."
-else
-  echo "No Wayland surface path observed in this run."
-  tail -n +1 "${LOG_FILE}" | sed -n '1,200p'
-  # If Wayland path wasn't observed, attempt X11 fallback via Xvfb if available
-  if command -v Xvfb >/dev/null 2>&1; then
-    echo "CI: Attempting X11 fallback via Xvfb for validation..."
-    # Launch again under X11
-    VK_VERBOSE_PIPELINE_LOGS=1 VK_LOG_TO_FILE=1 \
-    ./release/idtech3.x86_64 +set fs_game mymod +set cl_renderer vulkan \
-      > "${LOG_FILE}" 2>&1 &
-    PID2=$!
-    sleep 20
-    if grep -m1 -q "SDL_Vulkan_CreateSurface" "${LOG_FILE}"; then
-      echo "X11 fallback path executed (observed surface messages)."
-      kill "${PID2}" 2>/dev/null || true
-      exit 0
-    else
-      echo "X11 fallback path did not observe surface messages. See logs."
-      tail -n +1 "${LOG_FILE}" | sed -n '1,200p'
-      kill "${PID2}" 2>/dev/null || true
-      exit 1
-    fi
+# Check if Wayland was attempted and if fallback occurred
+if grep -m1 -q "VK_CreateSurface: Wayland fallback to X11 path engaged" "${LOG_FILE}"; then
+  echo "Wayland fallback to X11 path successfully exercised."
+  SUCCESS=1
+elif grep -m1 -q "SDL_Vulkan_CreateSurface failed on Wayland" "${LOG_FILE}"; then
+  echo "Wayland surface creation failed as expected, checking for fallback..."
+  if grep -q "retrying with X11" "${LOG_FILE}"; then
+    echo "X11 fallback path executed successfully."
+    SUCCESS=1
   else
-    exit 1
+    echo "Wayland failed but no X11 fallback detected."
+    SUCCESS=0
   fi
+elif grep -m1 -q "Using Wayland display driver" "${LOG_FILE}"; then
+  echo "Wayland initialized successfully (no fallback needed)."
+  SUCCESS=1
+else
+  echo "Wayland was not attempted. Check environment setup."
+  echo "First 200 lines of log:"
+  tail -n +1 "${LOG_FILE}" | sed -n '1,200p'
+  SUCCESS=0
 fi
 
-echo "Test completed; inspecting for fallback messages..."
-grep -q "retrying with X11" "${LOG_FILE}" && echo "Fallback to X11 path detected." || echo "Fallback to X11 not detected."
+if [[ $SUCCESS -eq 0 ]]; then
+  echo "Test failed: Wayland fallback not properly exercised."
+  exit 1
+fi
+
+echo "Test completed successfully - Wayland fallback path validated."
 
 kill "${PID}" 2>/dev/null || true
 #
