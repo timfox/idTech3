@@ -935,7 +935,18 @@ void end_command_buffer(VkCommandBuffer command_buffer, const char *location)
 	submit_info.signalSemaphoreCount = 0;
 	submit_info.pSignalSemaphores = NULL;
 
-	VK_CHECK( qvkQueueSubmit( vk.queue, 1, &submit_info, VK_NULL_HANDLE ) );
+	// Handle device lost gracefully instead of terminating
+	VkResult submit_result = qvkQueueSubmit( vk.queue, 1, &submit_info, VK_NULL_HANDLE );
+	if (submit_result != VK_SUCCESS) {
+		if (submit_result == VK_ERROR_DEVICE_LOST) {
+			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during queue submit - GPU driver issue\n");
+			ri.Printf(PRINT_ERROR, "Vulkan: This may cause rendering artifacts or instability\n");
+			// Don't terminate - let vk_queue_wait_idle handle cleanup
+		} else {
+			// For other errors, use the standard error handling
+			VK_CHECK(submit_result);
+		}
+	}
 
 	vk_queue_wait_idle();
 
