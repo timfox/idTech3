@@ -130,6 +130,10 @@ void GL_Bind( image_t *image ) {
 	if ( !image ) {
 		ri.Printf( PRINT_WARNING, "GL_Bind: NULL image\n" );
 		image = tr.defaultImage;
+		if ( !image ) {
+			ri.Printf( PRINT_ERROR, "GL_Bind: NULL image and no default image available\n" );
+			return; // Cannot bind without an image
+		}
 	}
 
 	if ( r_nobind->integer && tr.dlightImage ) {		// performance evaluation option
@@ -146,7 +150,12 @@ void GL_Bind( image_t *image ) {
 
 	if ( !image ) {
 		ri.Printf( PRINT_WARNING, "GL_Bind: NULL image\n" );
-		texnum = tr.defaultImage->texnum;
+		if ( tr.defaultImage ) {
+			texnum = tr.defaultImage->texnum;
+		} else {
+			ri.Printf( PRINT_ERROR, "GL_Bind: NULL image and no default image available\n" );
+			texnum = 0; // Fallback to texture 0
+		}
 	} else {
 		texnum = image->texnum;
 	}

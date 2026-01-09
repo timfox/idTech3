@@ -3,7 +3,7 @@
 id Tech 3 - Unified RTX Renderer
 
 RTX renderer that integrates all advanced Vulkan features into a cohesive
-ray tracing pipeline. Orchestrates existing systems for Q2RTX-like quality.
+ray tracing pipeline.
 
 RAY TRACING GATING:
 - Hardware ray tracing: Only enabled if vk.rayTracingSupported is true

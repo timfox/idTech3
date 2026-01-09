@@ -489,11 +489,17 @@ VkPipeline vk_find_pipeline_ext(int base_pipeline, Vk_Pipeline_Def* def, qboolea
 	static qboolean images_initialized = qfalse;
 	if (!images_initialized && tr.defaultImage == NULL) {
 		ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext initializing images\n");
-		// Only initialize images if Vulkan is active to avoid crashes
-		if (vk.active) {
+		// Only initialize images if Vulkan device is ready to avoid crashes
+		if (vk.device != VK_NULL_HANDLE) {
 			R_InitImages();
-			images_initialized = qtrue;
-			ri.Printf(PRINT_ALL, "DEBUG: Images initialized successfully\n");
+			if (tr.defaultImage != NULL) {
+				images_initialized = qtrue;
+				ri.Printf(PRINT_ALL, "DEBUG: Images initialized successfully\n");
+			} else {
+				ri.Printf(PRINT_ALL, "DEBUG: Images initialization failed\n");
+			}
+		} else {
+			ri.Printf(PRINT_ALL, "DEBUG: Vulkan device not ready, cannot initialize images\n");
 		}
 	}
 

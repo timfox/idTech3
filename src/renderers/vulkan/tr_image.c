@@ -2201,8 +2201,11 @@ void R_InitImages( void ) {
 	// Check if Vulkan is ready for image creation
 	if (!vk.active || vk.device == VK_NULL_HANDLE) {
 		if (ri.Printf) {
-			ri.Printf(PRINT_WARNING, "R_InitImages: Vulkan not ready for image creation, skipping\n");
+			ri.Printf(PRINT_WARNING, "R_InitImages: Vulkan not ready for image creation, using fallback images\n");
 		}
+		// Even if Vulkan is not ready, we need to create basic images for the renderer to work
+		// Create fallback images that don't use Vulkan
+		R_CreateBuiltinImages();
 		return;
 	}
 

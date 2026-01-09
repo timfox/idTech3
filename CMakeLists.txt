@@ -503,7 +503,7 @@ set(APP_DISPLAY_NAME "${APP_DISPLAY_NAME}" CACHE STRING "Application display nam
 set(APP_PACKAGE_NAME "${APP_PACKAGE_NAME}" CACHE STRING "Android package name")
 
 SET(RENDERER_PREFIX ${CNAME})
-set(RENDERER_DEFAULT "opengl" CACHE STRING "Default renderer (opengl, vulkan, opengl2, d3d12, metal)")
+set(RENDERER_DEFAULT "vulkan" CACHE STRING "Default renderer (opengl, vulkan, opengl2, d3d12, metal)")
 
 if(ANDROID)
     set(RENDERER_DEFAULT "vulkan" CACHE STRING "Default renderer (opengl, vulkan, opengl2, d3d12, metal)" FORCE)
