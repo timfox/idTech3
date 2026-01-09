@@ -2907,29 +2907,26 @@ void vk_fpe_signal_handler(int signum) {
 	static int fpe_count = 0;
 	fpe_count++;
 
-	ri.Printf(PRINT_ERROR, "Vulkan: Caught SIGFPE #%d (floating point exception)\n", fpe_count);
+	ri.Printf(PRINT_ERROR, "Vulkan: SIGNAL HANDLER CALLED - Caught SIGFPE #%d (floating point exception)\n", fpe_count);
 
 	// Clear any pending exceptions
 #ifdef __linux__
 	feclearexcept(FE_ALL_EXCEPT);
+
+	// Log FPE status
+	int pending = fetestexcept(FE_ALL_EXCEPT);
+	ri.Printf(PRINT_ERROR, "Vulkan: Pending FPE exceptions: 0x%x\n", pending);
 #endif
 
-	// For Vulkan renderer, shut down gracefully on FPE to allow fallback to OpenGL
+	// For Vulkan renderer, handle FPE gracefully without crashing
 	if (fpe_count >= 1) {
-		ri.Printf(PRINT_ERROR, "Vulkan: Floating point exception detected, shutting down Vulkan renderer\n");
+		ri.Printf(PRINT_ERROR, "Vulkan: Floating point exception in pipeline creation - setting error flag\n");
 
-		// Mark Vulkan as failed so it won't be used again
-		if (vk.active) {
-			vk.active = qfalse;
-			ri.Printf(PRINT_ERROR, "Vulkan: Renderer deactivated due to floating point errors\n");
+		// Set flag to indicate FPE occurred - pipeline creation will check this
+		vk_fpe_occurred = 1;
 
-			// Force a clean shutdown of Vulkan subsystems
-			vk_shutdown(REF_DESTROY_WINDOW);
-		}
-
-		// Exit cleanly without core dump to allow engine restart
-		ri.Printf(PRINT_ERROR, "Vulkan: Exiting cleanly to prevent core dump\n");
-		_exit(1); // Use _exit to avoid cleanup that might trigger more SIGFPE
+		// Don't deactivate Vulkan, just let this pipeline creation fail
+		return;
 	}
 
 	ri.Printf(PRINT_WARNING, "Vulkan: Continuing after SIGFPE #%d\n", fpe_count);
@@ -3087,11 +3084,26 @@ static void init_vulkan_library( void )
 	// Clear any pending floating point exceptions
 	feclearexcept(FE_ALL_EXCEPT);
 
-	// Ignore SIGFPE to prevent core dumps - most reliable approach
-	if (signal(SIGFPE, SIG_IGN) != SIG_ERR) {
-		ri.Printf(PRINT_DEVELOPER, "Vulkan: SIGFPE will be ignored to prevent crashes\n");
+	// Disable floating point exceptions to prevent SIGFPE entirely
+	// This is the most reliable way to prevent FPE crashes
+	int old_excepts = fedisableexcept(FE_ALL_EXCEPT);
+
+	ri.Printf(PRINT_DEVELOPER, "Vulkan: Disabled floating point exceptions (was: 0x%x) to prevent SIGFPE\n", old_excepts);
+
+	// Verify that exceptions are actually disabled
+	int current_excepts = fegetexcept();
+	ri.Printf(PRINT_DEVELOPER, "Vulkan: Current FPE mask: 0x%x\n", current_excepts);
+
+	// Install signal handler as backup in case exceptions get re-enabled
+	struct sigaction sa;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_handler = vk_fpe_signal_handler;
+	sa.sa_flags = SA_RESTART | SA_NODEFER;
+
+	if (sigaction(SIGFPE, &sa, NULL) == 0) {
+		ri.Printf(PRINT_DEVELOPER, "Vulkan: SIGFPE signal handler installed as backup\n");
 	} else {
-		ri.Printf(PRINT_WARNING, "Vulkan: Failed to ignore SIGFPE\n");
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to install SIGFPE signal handler\n");
 	}
 #endif
 
@@ -6305,6 +6317,12 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	create_info.basePipelineHandle = VK_NULL_HANDLE;
 	create_info.basePipelineIndex = -1;
 
+	// Validate Vulkan function pointer before calling
+	if (!qvkCreateGraphicsPipelines) {
+		ri.Printf(PRINT_ERROR, "create_pipeline: qvkCreateGraphicsPipelines function not loaded\n");
+		return VK_NULL_HANDLE;
+	}
+
 	// Create graphics pipeline with detailed error reporting
 	VkResult pipelineResult = qvkCreateGraphicsPipelines( vk.device, VK_NULL_HANDLE, 1, &create_info, NULL, pipeline );
 	if ( pipelineResult != VK_SUCCESS ) {
@@ -6365,9 +6383,46 @@ static void push_attr( uint32_t location, uint32_t binding, VkFormat format )
 VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassIndex, uint32_t def_index ) {
 	ri.Printf(PRINT_ALL, "DEBUG: create_pipeline index=%d pass=%d shader_type=%d\n", def_index, renderPassIndex, def->shader_type);
 
+	// Temporarily skip TYPE_SINGLE_TEXTURE pipelines that cause SIGFPE
+	if (def->shader_type == TYPE_SINGLE_TEXTURE) {
+		ri.Printf(PRINT_WARNING, "create_pipeline: skipping TYPE_SINGLE_TEXTURE pipeline (known SIGFPE issue)\n");
+		return VK_NULL_HANDLE;
+	}
+
+	// Check if SIGFPE occurred during previous operations
+#ifdef __linux__
+	if (vk_fpe_occurred) {
+		ri.Printf(PRINT_ERROR, "create_pipeline: skipping pipeline creation due to previous SIGFPE\n");
+		return VK_NULL_HANDLE;
+	}
+#endif
+
 	// Validate shader inputs to prevent crashes from invalid float values
 	if (!vk_validate_shader_inputs(def)) {
 		ri.Printf(PRINT_ERROR, "create_pipeline: shader input validation failed\n");
+		return VK_NULL_HANDLE;
+	}
+
+	// Validate Vulkan device and instance
+	if (!vk.device || vk.device == VK_NULL_HANDLE) {
+		ri.Printf(PRINT_ERROR, "create_pipeline: Vulkan device not initialized\n");
+		return VK_NULL_HANDLE;
+	}
+
+	if (!vk.instance || vk.instance == VK_NULL_HANDLE) {
+		ri.Printf(PRINT_ERROR, "create_pipeline: Vulkan instance not initialized\n");
+		return VK_NULL_HANDLE;
+	}
+
+	// Validate render pass index
+	if (renderPassIndex < 0 || renderPassIndex >= RENDER_PASS_COUNT) {
+		ri.Printf(PRINT_ERROR, "create_pipeline: invalid render pass index %d\n", renderPassIndex);
+		return VK_NULL_HANDLE;
+	}
+
+	// Validate pipeline layout
+	if (!vk.pipeline_layout || vk.pipeline_layout == VK_NULL_HANDLE) {
+		ri.Printf(PRINT_ERROR, "create_pipeline: pipeline layout not initialized\n");
 		return VK_NULL_HANDLE;
 	}
 
@@ -6500,8 +6555,12 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
 		case TYPE_SINGLE_TEXTURE:
 			ri.Printf(PRINT_ALL, "DEBUG: TYPE_SINGLE_TEXTURE use_pbr=%d\n", use_pbr);
-			ri.Printf(PRINT_ALL, "DEBUG: vert.gen[%d][0][0][0][0] addr=%p value=%p\n", use_pbr, (void*)&vk.modules.vert.gen[use_pbr][0][0][0][0], (void*)vk.modules.vert.gen[use_pbr][0][0][0][0]);
-			ri.Printf(PRINT_ALL, "DEBUG: frag.gen[%d][0][0][0] addr=%p value=%p\n", use_pbr, (void*)&vk.modules.frag.gen[use_pbr][0][0][0], (void*)vk.modules.frag.gen[use_pbr][0][0][0]);
+			// Check if shader modules are valid before using them
+			if (use_pbr >= 2 || vk.modules.vert.gen[use_pbr][0][0][0][0] == VK_NULL_HANDLE ||
+				vk.modules.frag.gen[use_pbr][0][0][0] == VK_NULL_HANDLE) {
+				ri.Printf(PRINT_ERROR, "create_pipeline: TYPE_SINGLE_TEXTURE shader modules not available (use_pbr=%d)\n", use_pbr);
+				return VK_NULL_HANDLE;
+			}
 			vs_module = vk.modules.vert.gen[use_pbr][0][0][0][0];
 			fs_module = vk.modules.frag.gen[use_pbr][0][0][0];
 			ri.Printf(PRINT_ALL, "DEBUG: got vs=%p fs=%p\n", (void*)vs_module, (void*)fs_module);

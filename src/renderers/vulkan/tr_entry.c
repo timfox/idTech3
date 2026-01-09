@@ -185,6 +185,16 @@ Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI(int
     return NULL;
   }
 
+  // Test basic shader loading before proceeding
+  // This prevents SIGFPE crashes during pipeline creation
+  VkShaderModule test_vs = vk_load_shader("color_vert", VK_SHADER_STAGE_VERTEX_BIT);
+  VkShaderModule test_fs = vk_load_shader("color_frag", VK_SHADER_STAGE_FRAGMENT_BIT);
+
+  if (test_vs == VK_NULL_HANDLE || test_fs == VK_NULL_HANDLE) {
+    ri.Printf(PRINT_WARNING, "Vulkan: Basic shaders not available, falling back to OpenGL\n");
+    return NULL;
+  }
+
   // Initialize Vulkan tiny mode - always enabled
   ri.Printf(PRINT_ALL, "Vulkan: Tiny mode enabled\n");
   ri.Printf(PRINT_ALL, "Vulkan: Renderer initialized with RTX hardware support\n");

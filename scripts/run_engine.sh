@@ -234,37 +234,38 @@ main() {
     # Launch engine with crash recovery for Vulkan
     cd "$ENGINE_DIR"
 
+    # Launch engine with automatic crash recovery
+    cd "$ENGINE_DIR"
+
     # Check if we're trying Vulkan renderer
     if echo "$args" | grep -q "cl_renderer vulkan"; then
-        echo -e "${YELLOW}Vulkan renderer selected - enabling crash recovery${NC}"
+        echo -e "${YELLOW}Vulkan renderer selected - attempting to run...${NC}"
 
-        # Try Vulkan first with timeout to catch crashes
-        if timeout 30 "$RELEASE_DIR/idtech3.x86_64" $args 2>&1 | tee /tmp/engine_output.log; then
-            # Success - exit normally
-            exit 0
+        # Try Vulkan first
+        "$RELEASE_DIR/idtech3.x86_64" $args 2>&1 &
+        engine_pid=$!
+
+        # Wait a bit to see if it crashes
+        sleep 3
+
+        # Check if process is still running
+        if kill -0 $engine_pid 2>/dev/null; then
+            # Vulkan is running successfully
+            echo -e "${GREEN}Vulkan renderer started successfully${NC}"
+            wait $engine_pid
+            exit $?
         else
-            exit_code=$?
-            echo -e "${RED}Vulkan renderer failed (exit code: $exit_code)${NC}"
+            # Vulkan crashed, try OpenGL
+            echo -e "${RED}Vulkan renderer crashed, automatically switching to OpenGL${NC}"
+            wait $engine_pid 2>/dev/null || true
 
-            # Check if it's a SIGFPE crash
-            if grep -q "Floating point exception" /tmp/engine_output.log 2>/dev/null; then
-                echo -e "${YELLOW}SIGFPE detected - automatically falling back to OpenGL${NC}"
-
-                # Replace vulkan with opengl in args
-                args=$(echo "$args" | sed 's/cl_renderer vulkan/cl_renderer opengl/g')
-
-                echo -e "${GREEN}Retrying with OpenGL renderer...${NC}"
-                echo -e "${BLUE}Command: $RELEASE_DIR/idtech3.x86_64 $args${NC}"
-
-                # Try OpenGL
-                exec "$RELEASE_DIR/idtech3.x86_64" $args
-            else
-                echo -e "${RED}Non-recoverable crash detected - exiting${NC}"
-                exit $exit_code
-            fi
+            # Replace vulkan with opengl in args
+            args=$(echo "$args" | sed 's/cl_renderer vulkan/cl_renderer opengl/g')
+            echo -e "${GREEN}Starting OpenGL renderer...${NC}"
+            exec "$RELEASE_DIR/idtech3.x86_64" $args
         fi
     else
-        # Not Vulkan, just run normally
+        # Not Vulkan, run normally
         exec "$RELEASE_DIR/idtech3.x86_64" $args
     fi
 }

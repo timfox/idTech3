@@ -406,7 +406,15 @@ void vk_create_shader_modules(void)
 	// Use color shaders as the generic single-texture shader
 	VkShaderModule vs_module = vk_load_shader("color_vert", VK_SHADER_STAGE_VERTEX_BIT);
 	VkShaderModule fs_module = vk_load_shader("color_frag", VK_SHADER_STAGE_FRAGMENT_BIT);
-	ri.Printf(PRINT_ALL, "DEBUG: vk_create_shader_modules setting gen modules: vs=%p fs=%p\n", (void*)vs_module, (void*)fs_module);
+	ri.Printf(PRINT_ALL, "DEBUG: vk_create_shader_modules loaded shaders: vs=%p fs=%p\n", (void*)vs_module, (void*)fs_module);
+
+	if (vs_module == VK_NULL_HANDLE || fs_module == VK_NULL_HANDLE) {
+		ri.Printf(PRINT_ERROR, "vk_create_shader_modules: Failed to load basic shaders, disabling Vulkan renderer\n");
+		// Disable Vulkan so the engine will fall back to OpenGL
+		vk.active = qfalse;
+		return;
+	}
+
 	vk.modules.vert.gen[0][0][0][0][0] = vs_module;
 	vk.modules.frag.gen[0][0][0][0] = fs_module;
 
