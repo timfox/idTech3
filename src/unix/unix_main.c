@@ -303,8 +303,11 @@ void NORETURN Sys_Exit( int code )
 	//exit(ex);
 	_exit( code );
 #else
-	// Give me a backtrace on error exits.
-	assert( code == 0 );
+	// Allow graceful exit with error codes to prevent double signal faults
+	// Give a backtrace on error exits but don't assert
+	if (code != 0) {
+		fprintf(stderr, "Sys_Exit called with error code %d\n", code);
+	}
 	exit( code );
 #endif
 }

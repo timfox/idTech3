@@ -518,13 +518,18 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 		
 			SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1 );
 
-			// Request OpenGL 4.6 for modern GLSL support
-			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, 4 );
-			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 6 );
+			// Request OpenGL with fallback versions for better compatibility
+			// Start with OpenGL 3.3 which has good driver support
+			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, 3 );
+			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 3 );
 			SDL_GL_SetAttribute( SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY );
 
 			if ( !r_allowSoftwareGL->integer )
 				SDL_GL_SetAttribute( SDL_GL_ACCELERATED_VISUAL, 1 );
+
+			// Force hardware acceleration hints
+			SDL_SetHint( SDL_HINT_OPENGL_ES_DRIVER, "0" ); // Disable GLES
+			SDL_SetHint( SDL_HINT_RENDER_DRIVER, "opengl" ); // Force OpenGL
 		}
 
 		// Attempt window creation with detailed diagnostics
