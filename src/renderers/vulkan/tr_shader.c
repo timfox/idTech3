@@ -4051,7 +4051,8 @@ static shader_t *FinishShader( void ) {
 			pStage->vk_pipeline[0] = vk_find_pipeline_ext( 0, &def, qtrue );
 			ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext returned 0x%llx for main pipeline\n", (unsigned long long)pStage->vk_pipeline[0]);
 			if (pStage->vk_pipeline[0] == VK_NULL_HANDLE) {
-				ri.Printf(PRINT_WARNING, "Failed to create Vulkan pipeline for shader stage (type %d), falling back to default shader\n", def.shader_type);
+				ri.Printf(PRINT_WARNING, "Failed to create Vulkan pipeline (type %d), using default shader\n", def.shader_type);
+				// Use default shader when Vulkan pipeline creation fails
 				shader.defaultShader = qtrue;
 				return FinishShader();
 			}

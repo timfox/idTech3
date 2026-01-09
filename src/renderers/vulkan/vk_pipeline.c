@@ -494,9 +494,12 @@ VkPipeline vk_find_pipeline_ext(int base_pipeline, Vk_Pipeline_Def* def, qboolea
 		return VK_NULL_HANDLE;
 	}
 
-	// Immediately return NULL for TYPE_SINGLE_TEXTURE to prevent SIGFPE
-	if (def->shader_type == TYPE_SINGLE_TEXTURE) {
-		ri.Printf(PRINT_ALL, "DEBUG: Early return for TYPE_SINGLE_TEXTURE (shader_type=%d)\n", def->shader_type);
+	// For problematic shader types that cause SIGFPE, return NULL to use default shader
+	if (def->shader_type == TYPE_SINGLE_TEXTURE ||
+		def->shader_type == TYPE_SINGLE_TEXTURE_IDENTITY ||
+		def->shader_type == TYPE_SINGLE_TEXTURE_FIXED_COLOR ||
+		def->shader_type == TYPE_MULTI_TEXTURE_MUL2_IDENTITY) {
+		ri.Printf(PRINT_ALL, "DEBUG: Skipping problematic shader type %d to avoid SIGFPE\n", def->shader_type);
 		return VK_NULL_HANDLE;
 	}
 

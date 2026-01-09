@@ -3784,14 +3784,17 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 		char testDllName[MAX_OSPATH];
 		Com_sprintf(testDllName, sizeof(testDllName), RENDERER_PREFIX "_vulkan_" REND_ARCH_STRING DLL_EXT);
 		char *testPath = FS_BuildOSPath(Sys_DefaultBasePath(), testDllName, NULL);
-		if (Sys_LoadLibrary(testPath)) {
-			Sys_UnloadLibrary(Sys_LoadLibrary(testPath)); // Just test load/unload
+		Com_Printf("  Testing Vulkan library: %s\n", testPath);
+		void *testLib = Sys_LoadLibrary(testPath);
+		if (testLib) {
+			Com_Printf("  Vulkan library loaded successfully, testing unload\n");
+			Sys_UnloadLibrary(testLib);
+			Com_Printf("  Vulkan library test passed, selecting Vulkan\n");
 			rendererName = "vulkan";
-			Com_Printf("  Vulkan renderer available, selecting Vulkan\n");
 		} else {
 			// Fallback to OpenGL
+			Com_Printf("  Vulkan library load failed, selecting OpenGL\n");
 			rendererName = "opengl";
-			Com_Printf("  Vulkan unavailable, selecting OpenGL\n");
 		}
 	}
 

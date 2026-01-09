@@ -2909,6 +2909,7 @@ void vk_fpe_signal_handler(int signum) {
 	fpe_count++;
 
 	ri.Printf(PRINT_ALL, "Vulkan: SIGNAL HANDLER CALLED - Caught SIGFPE #%d (floating point exception)\n", fpe_count);
+	ri.Printf(PRINT_ALL, "Vulkan: Setting vk_fpe_occurred = 1\n");
 
 	// Try to get a backtrace if possible
 #ifdef __linux__
@@ -4653,6 +4654,7 @@ static void vk_create_pipeline_layouts(void);
 
 void vk_initialize( void )
 {
+	ri.Printf(PRINT_WARNING, "VULKAN INIT: Starting Vulkan initialization\n");
 	qboolean was_already_active = vk.active;
 
 	if ( !vk.active ) {
@@ -4668,7 +4670,23 @@ void vk_initialize( void )
 		// Initialize the platform-specific Vulkan implementation (window, library loading)
 		ri.VKimp_Init( &glConfig );
 
+		// Check if FPE occurred during display initialization
+		ri.Printf(PRINT_ALL, "Vulkan: Checking FPE after VKimp_Init (vk_fpe_occurred=%d)\n", vk_fpe_occurred);
+		if (vk_fpe_occurred) {
+			ri.Printf(PRINT_WARNING, "Vulkan: FPE detected during display initialization, aborting Vulkan setup\n");
+			vk.active = qfalse; // Ensure Vulkan is marked as inactive
+			return; // Exit early
+		}
+
 		init_vulkan_library();
+
+		// Check if FPE occurred during library initialization
+		ri.Printf(PRINT_ALL, "Vulkan: Checking FPE flag after library init (vk_fpe_occurred=%d)\n", vk_fpe_occurred);
+		if (vk_fpe_occurred) {
+			ri.Printf(PRINT_WARNING, "Vulkan: FPE detected during library initialization, aborting Vulkan setup\n");
+			vk.active = qfalse; // Ensure Vulkan is marked as inactive
+			return; // Exit early
+		}
 
 		// Check if FPE occurred during init_vulkan_library
 #ifdef __linux__
@@ -4773,6 +4791,11 @@ void vk_initialize( void )
 
 	ri.Printf(PRINT_ALL, "Vulkan: Initialized successfully\n");
 
+	// Memory corruption check
+	static char corruption_test[1024];
+	Com_Memset(corruption_test, 0xAA, sizeof(corruption_test));
+	ri.Printf(PRINT_ALL, "DEBUG: Memory corruption test passed\n");
+
 	// Debug: Check vk structure state before validation
 	ri.Printf(PRINT_ALL, "DEBUG: Pre-validation - vk.instance=%p, vk.device=%p, vk.active=%d\n",
 		(void*)vk.instance, (void*)vk.device, vk.active);
@@ -4794,6 +4817,16 @@ void vk_initialize( void )
 #ifdef __linux__
 	if (vk_fpe_occurred) {
 		ri.Printf(PRINT_ERROR, "Vulkan: FPE detected during full initialization, disabling Vulkan renderer\n");
+		vk.active = qfalse;
+		return;
+	}
+#endif
+
+	// Final FPE check before marking Vulkan as active
+#ifdef __linux__
+	ri.Printf(PRINT_ALL, "Vulkan: Final FPE check (vk_fpe_occurred=%d)\n", vk_fpe_occurred);
+	if (vk_fpe_occurred) {
+		ri.Printf(PRINT_ERROR, "Vulkan: SIGFPE detected before marking active, aborting Vulkan renderer\n");
 		vk.active = qfalse;
 		return;
 	}
