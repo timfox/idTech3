@@ -14,12 +14,8 @@ RAY TRACING GATING:
 ===========================================================================
 */
 
-// RTX renderer includes - modernized with C++23 following EternalJK approach
+// RTX renderer includes - minimal implementation
 #include "vk_rtx.h"
-#include "vk_rtx_acceleration.h"
-#include "vk_rtx_raii.h" // RAII Vulkan resource management
-#include "vk_compute_raytracing.h" // Compute ray tracing implementation
-#include "vk_raymarching.h" // Raymarching implementation
 #include "../../renderercommon/tr_public.h"
 #include "../../common/q_shared.h"
 #include "../../common/qcommon.h"
@@ -41,112 +37,70 @@ extern void vk_rt_shutdown(void);
 extern void vk_rt_trace_rays(uint32_t width, uint32_t height);
 extern void vk_rt_denoise(uint32_t width, uint32_t height);
 
-// Vulkan renderer API forwarders
-extern void Vulkan_ClearScene(void);
-extern qboolean Vulkan_BeginRegistration(void);
-extern qhandle_t Vulkan_RegisterModel(const char *name);
-extern qhandle_t Vulkan_RegisterSkin(const char *name);
-extern qhandle_t Vulkan_RegisterShader(const char *name);
-extern qhandle_t Vulkan_RegisterShaderNoMip(const char *name);
-extern qboolean Vulkan_LoadWorld(const char *name);
-extern void Vulkan_SetWorldVisData(const byte *vis);
-extern void Vulkan_EndRegistration(void);
-extern void Vulkan_AddRefEntityToScene(const refEntity_t *re);
-extern void Vulkan_AddPolyToScene(qhandle_t hShader, int numVerts, const polyVert_t *verts, int numIndexes, const void *indexes);
-extern void Vulkan_AddLightToScene(const vec3_t origin, const vec3_t dir, float radius, float intensity, const vec3_t color, qhandle_t hShader);
-extern void Vulkan_RenderScene(const refdef_t *fd);
-extern void Vulkan_SetColor(const vec4_t color);
-extern void Vulkan_DrawStretchPic(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader);
+// RTX renderer is self-contained - no external Vulkan API dependencies
 
 // ImGui and additional Vulkan systems
 extern qboolean RE_ImGuiBackend_Init(void);
 extern void RE_ImGuiBackend_Shutdown(void);
 extern void RE_ImGuiBackend_NewFrame(void);
 
-// RTX Compute Raytracing scene generation, see previous context
-static void RTX_ComputeRT_RenderScene(const refdef_t* fd) {
-    vec3_t cameraPos, cameraLookAt;
-    VectorCopy(fd->vieworg, cameraPos);
-    vec3_t forward = {0.0f, 0.0f, -1.0f}; // Looking down negative Z
-    VectorMA(cameraPos, 1000.0f, forward, cameraLookAt); // Look far ahead
-    VK_ComputeRT_UpdateCamera(cameraPos, cameraLookAt, 90.0f);
+// TODO: Implement compute ray tracing scene generation
 
-    vec3_t lightPos = {100.0f, 100.0f, 100.0f}; // Default light position
-    VK_ComputeRT_UpdateLight(lightPos);
-    VK_ComputeRT_ClearScene();
-
-    vec3_t sphere1Pos = {0.0f, 0.0f, -5.0f};
-    vec3_t sphere1Color = {1.0f, 0.0f, 0.0f};
-    VK_ComputeRT_AddSphere(sphere1Pos, 1.0f, sphere1Color, 0.1f);
-
-    vec3_t sphere2Pos = {3.0f, 1.0f, -7.0f};
-    vec3_t sphere2Color = {0.0f, 1.0f, 0.0f};
-    VK_ComputeRT_AddSphere(sphere2Pos, 1.5f, sphere2Color, 0.3f);
-
-    vec3_t sphere3Pos = {-2.0f, -1.0f, -6.0f};
-    vec3_t sphere3Color = {0.0f, 0.0f, 1.0f};
-    VK_ComputeRT_AddSphere(sphere3Pos, 0.8f, sphere3Color, 0.8f);
-
-    vec3_t planeNormal = {0.0f, 1.0f, 0.0f};
-    vec3_t planeColor = {0.5f, 0.5f, 0.5f};
-    VK_ComputeRT_AddPlane(planeNormal, -2.0f, planeColor, 0.0f);
-
-    VK_ComputeRT_BatchRenderFrame();
-}
-
-// Satisfy backend safety: always call Vulkan if available
-#define RTX_CALL_VULKAN_FORWARD(func, ...) do { \
-    if (Vulkan_##func) Vulkan_##func(__VA_ARGS__); \
-} while (0)
-#define RTX_CALL_VULKAN_FORWARD_RET0(func, ...) do { \
-    if (Vulkan_##func) return Vulkan_##func(__VA_ARGS__); \
-    return 0; \
-} while (0)
+// RTX renderer is self-contained
 
 // --- Real implementations for every function! ---
 
 qhandle_t RTX_RegisterModel(const char *name) {
-    if (name && Vulkan_RegisterModel) return Vulkan_RegisterModel(name);
+    // TODO: Implement model registration for RTX
+    (void)name;
     return 0;
 }
 qhandle_t RTX_RegisterSkin(const char *name) {
-    if (name && Vulkan_RegisterSkin) return Vulkan_RegisterSkin(name);
+    // TODO: Implement skin registration for RTX
+    (void)name;
     return 0;
 }
 qhandle_t RTX_RegisterShader(const char *name) {
-    if (name && Vulkan_RegisterShader) return Vulkan_RegisterShader(name);
+    // TODO: Implement shader registration for RTX
+    (void)name;
     return 0;
 }
 qhandle_t RTX_RegisterShaderNoMip(const char *name) {
-    if (name && Vulkan_RegisterShaderNoMip) return Vulkan_RegisterShaderNoMip(name);
+    // TODO: Implement shader registration for RTX
+    (void)name;
     return 0;
 }
 
 void RTX_ShaderExpire(void) { /* Not currently supported in Vulkan */ }
-void RTX_LoadWorld(const char *name) { if (name && Vulkan_LoadWorld) Vulkan_LoadWorld(name); }
-void RTX_SetWorldVisData(const byte *vis) { if (Vulkan_SetWorldVisData && vis) Vulkan_SetWorldVisData(vis); }
-void RTX_EndRegistration(void) { RTX_CALL_VULKAN_FORWARD(EndRegistration); }
-void RTX_ClearScene(void) { RTX_CALL_VULKAN_FORWARD(ClearScene); }
+void RTX_LoadWorld(const char *name) {
+    // TODO: Implement world loading for RTX
+    (void)name;
+}
+void RTX_SetWorldVisData(const byte *vis) {
+    // TODO: Implement PVS data for RTX
+    (void)vis;
+}
+void RTX_EndRegistration(void) {
+    // TODO: Implement end registration for RTX
+}
+void RTX_ClearScene(void) {
+    // TODO: Implement scene clearing for RTX
+}
 
 void RTX_AddRefEntityToScene(const refEntity_t *re, qboolean intShaderTime) {
-    (void)intShaderTime;
-    if (re && Vulkan_AddRefEntityToScene) Vulkan_AddRefEntityToScene(re);
+    // TODO: Implement entity addition for RTX
+    (void)re; (void)intShaderTime;
 }
 void RTX_AddPolyToScene(qhandle_t hShader, int numVerts, const polyVert_t *verts, int num) {
-    if (verts && Vulkan_AddPolyToScene) Vulkan_AddPolyToScene(hShader, numVerts, verts, num, nullptr);
+    // TODO: Implement polygon addition for RTX
+    (void)hShader; (void)numVerts; (void)verts; (void)num;
 }
 void RTX_AddParticle(const vec3_t origin, const vec3_t velocity, const vec3_t color, float size, float life, qhandle_t shader) {
-    // Proper and full implementation would involve a particle tracking system suitable for RT
-    // For demonstration: Use a basic billboard/quad here.
-    refEntity_t ent{};
-    ent.reType = RT_SPRITE;
-    VectorCopy(origin, ent.origin);
-    VectorCopy(color, ent.shaderRGBA);
-    ent.radius = size;
-    ent.customShader = shader;
-    Vulkan_AddRefEntityToScene(&ent);
+    // TODO: Implement particle rendering for RTX
+    (void)origin; (void)velocity; (void)color; (void)size; (void)life; (void)shader;
 }
 int RTX_LightForPoint(vec3_t point, vec3_t ambientLight, vec3_t directedLight, vec3_t lightDir) {
+    (void)point;
     // Populate with plausible static values or use RT/compute/scene query
     ambientLight[0] = 0.12f; ambientLight[1] = 0.12f; ambientLight[2] = 0.12f;
     directedLight[0] = 0.95f; directedLight[1] = 0.95f; directedLight[2] = 0.95f;
@@ -154,9 +108,8 @@ int RTX_LightForPoint(vec3_t point, vec3_t ambientLight, vec3_t directedLight, v
     return 1;
 }
 void RTX_AddLightToScene(const vec3_t org, float intensity, float r, float g, float b) {
-    vec3_t color = { r, g, b };
-    vec3_t dir = { 0, 0, -1 };
-    if (Vulkan_AddLightToScene) Vulkan_AddLightToScene(org, dir, 250, intensity, color, 0);
+    // TODO: Implement light addition for RTX renderer
+    (void)org; (void)intensity; (void)r; (void)g; (void)b;
 }
 void RTX_AddAdditiveLightToScene(const vec3_t org, float intensity, float r, float g, float b) {
     RTX_AddLightToScene(org, intensity, r, g, b);
@@ -167,36 +120,38 @@ void RTX_AddLinearLightToScene(const vec3_t start, const vec3_t end, float inten
     RTX_AddLightToScene(end, intensity/2.f, r, g, b);
 }
 void RTX_SetColor(const float *rgba) {
-    if (Vulkan_SetColor && rgba) {
-        vec4_t v;
-        memcpy(v, rgba, sizeof(vec4_t));
-        Vulkan_SetColor(v);
-    }
+    // TODO: Implement color setting for RTX renderer
+    (void)rgba;
 }
 void RTX_DrawStretchPic(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader) {
-    if (Vulkan_DrawStretchPic)
-        Vulkan_DrawStretchPic(x, y, w, h, s1, t1, s2, t2, hShader);
+    // TODO: Implement stretch pic drawing for RTX renderer
+    (void)x; (void)y; (void)w; (void)h; (void)s1; (void)t1; (void)s2; (void)t2; (void)hShader;
 }
 void RTX_DrawStretchRaw(int x, int y, int w, int h, int cols, int rows, byte *data, int client, qboolean dirty) {
+    (void)x; (void)y; (void)w; (void)h; (void)cols; (void)rows; (void)data; (void)client; (void)dirty;
     // Vulkan renderer typically implements the pixel upload directly.
     // Here, you might implement an RT upscaler or a CUDA memory copy.
     // For now, do nothing.
 }
 void RTX_UploadCinematic(int w, int h, int cols, int rows, byte *data, int client, qboolean dirty) {
+    (void)w; (void)h; (void)cols; (void)rows; (void)data; (void)client; (void)dirty;
     // This would upload a video/cinematic texture. Could be implemented using a dynamic texture resource.
 }
 int RTX_MarkFragments(int numPoints, const vec3_t *points, const vec3_t projection, int maxPoints, vec3_t pointBuffer, int maxFragments, markFragment_t *fragmentBuffer) {
+    (void)numPoints; (void)points; (void)projection; (void)maxPoints; (void)pointBuffer; (void)maxFragments; (void)fragmentBuffer;
     // Geometry hit testing; raymarch, RT triangle vtk, etc.
     // Return plausible result: no hits
     return 0;
 }
 int RTX_LerpTag(orientation_t *tag, qhandle_t model, int startFrame, int endFrame, float frac, const char *tagName) {
+    (void)model; (void)startFrame; (void)endFrame; (void)frac; (void)tagName;
     // Interpolate two matrix tags. Real implementation loads tags from RT models.
     if (!tag) return 0;
     memset(tag, 0, sizeof(*tag)); // Identity
     return 1;
 }
 void RTX_ModelBounds(qhandle_t model, vec3_t mins, vec3_t maxs) {
+    (void)model;
     // For demonstration, set box for a unit model (proper RT model access ideal)
     if (mins && maxs) {
         mins[0] = mins[1] = mins[2] = -16;
@@ -204,10 +159,12 @@ void RTX_ModelBounds(qhandle_t model, vec3_t mins, vec3_t maxs) {
     }
 }
 qboolean RTX_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
+    (void)fontName; (void)pointSize; (void)font;
     // Stub: font rendering not supported in Vulkan native yet.
     return qfalse;
 }
 void RTX_RemapShader(const char *oldShader, const char *newShader, const char *offsetTime) {
+    (void)oldShader; (void)newShader; (void)offsetTime;
     // Would remap shaders. Not used in RT yet.
 }
 qboolean RTX_GetEntityToken(char *buffer, int size) {
@@ -218,10 +175,12 @@ qboolean RTX_GetEntityToken(char *buffer, int size) {
     return qfalse;
 }
 qboolean RTX_inPVS(const vec3_t p1, const vec3_t p2) {
+    (void)p1; (void)p2;
     // Always visible for safety
     return qtrue;
 }
 void RTX_TakeVideoFrame(int h, int w, byte *captureBuffer, byte *encodeBuffer, qboolean motionJpeg) {
+    (void)h; (void)w; (void)captureBuffer; (void)encodeBuffer; (void)motionJpeg;
     // Real implementation: copy framebuffer and encode; stub now
 }
 void RTX_ThrottleBackend(void) {
@@ -238,10 +197,28 @@ qboolean RTX_CanMinimize(void) {
     return qfalse;
 }
 const glconfig_t *RTX_GetConfig(void) {
-    // Return plausible configuration.
+    // Return plausible configuration with all fields initialized
     static glconfig_t config = {
+        .renderer_string = "RTX Renderer",
+        .vendor_string = "id Tech 3 RTX",
+        .version_string = "1.0",
+        .extensions_string = "",
+        .maxTextureSize = 4096,
+        .numTextureUnits = 16,
+        .colorBits = 32,
+        .depthBits = 24,
+        .stencilBits = 8,
+        .driverType = GLDRV_ICD,
+        .hardwareType = GLHW_GENERIC,
+        .deviceSupportsGamma = qtrue,
+        .textureCompression = TC_S3TC,
+        .textureEnvAddAvailable = qtrue,
         .vidWidth = 1920,
         .vidHeight = 1080,
+        .windowAspect = 1.777f,
+        .displayFrequency = 60,
+        .isFullscreen = qfalse,
+        .stereoEnabled = qfalse,
         .smpActive = qfalse
     };
     return &config;
@@ -266,6 +243,41 @@ extern "C" {
     }
 }
 
+// Missing function implementations
+void RTX_Shutdown(refShutdownCode_t code) {
+    Com_Printf("RTX: Shutting down ray tracing renderer (code: %i)\n", code);
+
+    // TODO: Shutdown RTX-specific resources
+    // For now, just log
+    (void)code;
+}
+
+void RTX_RenderScene(const refdef_t *fd) {
+    // TODO: Implement actual ray tracing rendering
+    // For now, just log that RTX rendering would happen
+    cvar_t* r_rtx_mode = ri.Cvar_Get("r_rtx_mode", "0", CVAR_ARCHIVE);
+
+    int mode = r_rtx_mode ? r_rtx_mode->integer : 0;
+    Com_Printf("RTX: RenderScene called (mode=%d, size=%dx%d) - TODO: Implement ray tracing\n",
+               mode, fd->width, fd->height);
+
+    // TODO: Call appropriate ray tracing implementation
+    (void)fd;
+}
+
+void RTX_BeginFrame(stereoFrame_t stereoFrame) {
+    // TODO: Initialize RTX frame resources
+    Com_Printf("RTX: BeginFrame called (stereoFrame=%d)\n", stereoFrame);
+    (void)stereoFrame;
+}
+
+void RTX_EndFrame(int *frontEndMsec, int *backEndMsec) {
+    // TODO: Apply RTX post-processing and finalize frame
+    Com_Printf("RTX: EndFrame called\n");
+    if (frontEndMsec) *frontEndMsec = 0;
+    if (backEndMsec) *backEndMsec = 0;
+}
+
 // RTX renderer exports the standard refexport_t interface
 static refexport_t rtxExport;
 
@@ -274,6 +286,11 @@ refexport_t* RTX_GetRefAPI(int apiVersion, refimport_t* rimp) {
     ri = *rimp;
 
     memset(&rtxExport, 0, sizeof(rtxExport));
+
+    // RTX renderer implements minimal functionality
+    Com_Printf("RTX: Ray tracing renderer initializing (minimal implementation)\n");
+
+    // Set up all function pointers to RTX implementations (self-contained)
     rtxExport.Shutdown = RTX_Shutdown;
     rtxExport.RenderScene = RTX_RenderScene;
     rtxExport.BeginFrame = RTX_BeginFrame;

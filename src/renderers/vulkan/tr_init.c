@@ -303,9 +303,14 @@ void RE_Shutdown( refShutdownCode_t code ) {
     ri.Cmd_RemoveCommand( "gfxinfo" );
     ri.Cmd_RemoveCommand( "shaderstate" );
 
-    // Shutdown Vulkan backend - disabled to prevent crashes when pipelines are disabled
-    ri.Printf( PRINT_ALL, "RE_Shutdown: Vulkan backend shutdown disabled to prevent crashes\n" );
-    // vk_shutdown( code );
+    // Shutdown Vulkan backend with safety checks
+    ri.Printf( PRINT_ALL, "RE_Shutdown: Attempting safe Vulkan backend shutdown\n" );
+    if (vk.active && vk.device != VK_NULL_HANDLE) {
+        vk_shutdown( code );
+        ri.Printf( PRINT_ALL, "RE_Shutdown: Vulkan backend shutdown completed\n" );
+    } else {
+        ri.Printf( PRINT_ALL, "RE_Shutdown: Vulkan backend not active, skipping shutdown\n" );
+    }
 }
 
 /*

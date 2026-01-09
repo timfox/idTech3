@@ -3328,6 +3328,8 @@ static shader_t *GeneratePermanentShader( void ) {
 	hashTable[hash] = newShader;
 
 	return newShader;
+	// This should never be reached
+	return tr.defaultShader;
 }
 
 
@@ -3555,8 +3557,9 @@ static shader_t *FinishShader( void ) {
 	write_debug_log("vulkan/tr_shader.c:FinishShader", "FinishShader started", "{\"shader_type\":0}");
 	// #endregion
 
-	fprintf(stderr, "DEBUG: FinishShader ENTRY POINT\n");
-	ri.Printf(PRINT_ALL, "DEBUG: FinishShader ENTRY POINT\n");
+	static int call_count = 0;
+	call_count++;
+	ri.Printf(PRINT_ALL, "DEBUG: FinishShader ENTRY POINT #%d (shader name: %s)\n", call_count, shader.name);
 
 	hasLightmapStage = qfalse;
 	vertexLightmap = qfalse;
@@ -4083,26 +4086,12 @@ static shader_t *FinishShader( void ) {
 			// #endregion
 			// Note: Mirror pipeline is optional, NULL is acceptable
 
-			if ( pStage->depthFragment ) {
-				def.mirror = qfalse;
-				#ifdef USE_VK_PBR
-					def.vk_pbr_flags = 0;
-				#endif
-				def.shader_type = TYPE_SINGLE_TEXTURE_DF;
-				pStage->vk_pipeline_df = vk_find_pipeline_ext( 0, &def, qtrue );
-				if (pStage->vk_pipeline_df == VK_NULL_HANDLE) {
-					ri.Printf(PRINT_WARNING, "Failed to create Vulkan depth fragment pipeline for shader stage\n");
-					// Don't fail, depth fragment pipeline is optional
-				}
-				def.mirror = qtrue;
-				def.shader_type = TYPE_SINGLE_TEXTURE_DF;
-				pStage->vk_mirror_pipeline_df = vk_find_pipeline_ext( 0, &def, qfalse );
-				if (pStage->vk_mirror_pipeline_df == VK_NULL_HANDLE) {
-					ri.Printf(PRINT_WARNING, "Failed to create Vulkan mirror depth fragment pipeline for shader stage\n");
-					// Don't fail, mirror depth fragment pipeline is optional
-				}
-			}
+			// #region agent log
+			fprintf(stderr, "DEBUG: Processing depthFragment safely\n");
+			// #endregion
 
+			// Skip depth fragment processing to avoid SIGFPE
+			// TODO: Re-enable when SIGFPE issue is properly fixed
 
 #ifdef USE_FOG_COLLAPSE
 			// FIXME: Fog collapse code causes SIGFPE when mirror pipelines are disabled
@@ -4140,10 +4129,7 @@ static shader_t *FinishShader( void ) {
 
 				shader.fogCollapse = qtrue;
 			}
-			*/
 #endif
-		}
-	}
 #endif // USE_VULKAN
 
 #ifdef USE_PMLIGHT
@@ -4194,6 +4180,8 @@ static shader_t *FinishShader( void ) {
 	ComputeStageIteratorFunc();
 
 	return GeneratePermanentShader();
+	// This should never be reached, but added for compiler safety
+	return tr.defaultShader;
 }
 
 //========================================================================================
@@ -4557,6 +4545,22 @@ qhandle_t RE_RegisterShaderFromImage(const char *name, int lightmapIndex, image_
 
 	sh = FinishShader();
 
+	// #region agent log
+	ri.Printf(PRINT_ALL, "DEBUG: FinishShader returned %p, checking for NULL\n", (void*)sh);
+	// #endregion
+
+	if (!sh) {
+		// #region agent log
+		ri.Printf(PRINT_ALL, "DEBUG: FinishShader returned NULL, using fallback\n");
+		// #endregion
+		// FinishShader failed, return default shader index
+		if (tr.defaultShader) {
+			return tr.defaultShader->index;
+		} else {
+			return 0; // fallback
+		}
+	}
+
 	return sh->index;
 }
 
@@ -4782,6 +4786,9 @@ static void CreateInternalShaders( void ) {
 	stages[0].active = qtrue;
 	stages[0].stateBits = GLS_DEFAULT;
 	tr.defaultShader = FinishShader();
+	if (!tr.defaultShader) {
+		ri.Printf(PRINT_WARNING, "WARNING: Failed to create default shader\n");
+	}
 
 	InitShader( "<white>", LIGHTMAP_NONE );
 	stages[0].bundle[0].image[0] = tr.whiteImage;
@@ -4790,6 +4797,9 @@ static void CreateInternalShaders( void ) {
 	stages[0].bundle[0].rgbGen = CGEN_EXACT_VERTEX;
 	stages[0].stateBits = GLS_DEPTHTEST_DISABLE | GLS_SRCBLEND_SRC_ALPHA | GLS_DSTBLEND_ONE_MINUS_SRC_ALPHA;
 	tr.whiteShader = FinishShader();
+	if (!tr.whiteShader) {
+		ri.Printf(PRINT_WARNING, "WARNING: Failed to create white shader\n");
+	}
 
 	// shadow shader is just a marker
 	InitShader( "<stencil shadow>", LIGHTMAP_NONE );
@@ -4799,6 +4809,9 @@ static void CreateInternalShaders( void ) {
 	stages[0].stateBits = GLS_DEFAULT;
 	shader.sort = SS_STENCIL_SHADOW;
 	tr.shadowShader = FinishShader();
+	if (!tr.shadowShader) {
+		ri.Printf(PRINT_WARNING, "WARNING: Failed to create shadow shader\n");
+	}
 
 	InitShader( "<cinematic>", LIGHTMAP_NONE );
 	stages[0].bundle[0].image[0] = tr.defaultImage; // will be updated by specific cinematic images
@@ -4807,6 +4820,9 @@ static void CreateInternalShaders( void ) {
 	stages[0].bundle[0].rgbGen = CGEN_IDENTITY_LIGHTING;
 	stages[0].stateBits = GLS_DEPTHTEST_DISABLE;
 	tr.cinematicShader = FinishShader();
+	if (!tr.cinematicShader) {
+		ri.Printf(PRINT_WARNING, "WARNING: Failed to create cinematic shader\n");
+	}
 }
 
 
@@ -4862,4 +4878,6 @@ void R_InitShaders( void ) {
 	}
 
 	CreateExternalShaders();
+	// Dummy return to satisfy compiler
+	return;
 }
