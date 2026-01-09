@@ -1100,6 +1100,142 @@ static const char *R_ResolveSymbols( sym_t *syms, int count )
 				*syms[i].symbol = (void *)&glVertex3fvDummy;
 				continue;
 			}
+			// Core OpenGL 1.1 functions that should be in system headers
+			if (Q_stricmp(syms[i].name, "glDrawArrays") == 0) {
+				ri.Printf(PRINT_WARNING, "glDrawArrays not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glDrawArrays;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glDrawElements") == 0) {
+				ri.Printf(PRINT_WARNING, "glDrawElements not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glDrawElements;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glTexImage2D") == 0) {
+				ri.Printf(PRINT_WARNING, "glTexImage2D not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glTexImage2D;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glReadPixels") == 0) {
+				ri.Printf(PRINT_WARNING, "glReadPixels not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glReadPixels;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glScissor") == 0) {
+				ri.Printf(PRINT_WARNING, "glScissor not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glScissor;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glPolygonMode") == 0) {
+				ri.Printf(PRINT_WARNING, "glPolygonMode not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glPolygonMode;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glTexParameteri") == 0) {
+				ri.Printf(PRINT_WARNING, "glTexParameteri not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glTexParameteri;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glTexSubImage2D") == 0) {
+				ri.Printf(PRINT_WARNING, "glTexSubImage2D not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glTexSubImage2D;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glGenTextures") == 0) {
+				ri.Printf(PRINT_WARNING, "glGenTextures not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glGenTextures;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glGetBooleanv") == 0) {
+				ri.Printf(PRINT_WARNING, "glGetBooleanv not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glGetBooleanv;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glGetError") == 0) {
+				ri.Printf(PRINT_WARNING, "glGetError not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glGetError;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glGetIntegerv") == 0) {
+				ri.Printf(PRINT_WARNING, "glGetIntegerv not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glGetIntegerv;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glGetString") == 0) {
+				ri.Printf(PRINT_WARNING, "glGetString not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glGetString;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glEnable") == 0) {
+				ri.Printf(PRINT_WARNING, "glEnable not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glEnable;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glDisable") == 0) {
+				ri.Printf(PRINT_WARNING, "glDisable not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glDisable;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glClear") == 0) {
+				ri.Printf(PRINT_WARNING, "glClear not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glClear;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glClearColor") == 0) {
+				ri.Printf(PRINT_WARNING, "glClearColor not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glClearColor;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glBlendFunc") == 0) {
+				ri.Printf(PRINT_WARNING, "glBlendFunc not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glBlendFunc;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glCullFace") == 0) {
+				ri.Printf(PRINT_WARNING, "glCullFace not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glCullFace;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glDepthFunc") == 0) {
+				ri.Printf(PRINT_WARNING, "glDepthFunc not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glDepthFunc;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glDepthMask") == 0) {
+				ri.Printf(PRINT_WARNING, "glDepthMask not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glDepthMask;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glDepthRange") == 0) {
+				ri.Printf(PRINT_WARNING, "glDepthRange not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glDepthRange;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glBindTexture") == 0) {
+				ri.Printf(PRINT_WARNING, "glBindTexture not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glBindTexture;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glDeleteTextures") == 0) {
+				ri.Printf(PRINT_WARNING, "glDeleteTextures not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glDeleteTextures;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glVertexPointer") == 0) {
+				ri.Printf(PRINT_WARNING, "glVertexPointer not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glVertexPointerDummy;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glFinish") == 0) {
+				ri.Printf(PRINT_WARNING, "glFinish not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glFinish;
+				continue;
+			}
+			if (Q_stricmp(syms[i].name, "glViewport") == 0) {
+				ri.Printf(PRINT_WARNING, "glViewport not available in this OpenGL context, using system header fallback\n");
+				*syms[i].symbol = (void *)&glViewport;
+				continue;
+			}
 			// If we can't resolve core functions, this indicates a deeper OpenGL context issue
 			// Special case: glTexCoord2fv is not essential in modern OpenGL (handled by shaders)
 			if (Q_stricmp(syms[i].name, "glTexCoord2fv") == 0) {

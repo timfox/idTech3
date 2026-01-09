@@ -2896,6 +2896,10 @@ qboolean vk_is_safe_state(void) {
 	return qtrue;
 }
 
+#ifdef __linux__
+static volatile sig_atomic_t vk_fpe_occurred = 0;
+#endif
+
 // Signal handler for floating point exceptions
 void vk_fpe_signal_handler(int signum) {
 	(void)signum; // Suppress unused parameter warning
@@ -2923,12 +2927,9 @@ void vk_fpe_signal_handler(int signum) {
 			vk_shutdown(REF_DESTROY_WINDOW);
 		}
 
-		// Reset the signal handler to default behavior to prevent re-triggering
-		signal(SIGFPE, SIG_DFL);
-
-		// Try to continue execution - the engine should fall back to OpenGL
-		ri.Printf(PRINT_ERROR, "Vulkan: Attempting to continue with OpenGL fallback\n");
-		return;
+		// Exit cleanly without core dump to allow engine restart
+		ri.Printf(PRINT_ERROR, "Vulkan: Exiting cleanly to prevent core dump\n");
+		_exit(1); // Use _exit to avoid cleanup that might trigger more SIGFPE
 	}
 
 	ri.Printf(PRINT_WARNING, "Vulkan: Continuing after SIGFPE #%d\n", fpe_count);
@@ -3086,10 +3087,12 @@ static void init_vulkan_library( void )
 	// Clear any pending floating point exceptions
 	feclearexcept(FE_ALL_EXCEPT);
 
-	// Install signal handler for floating point exceptions
-	signal(SIGFPE, vk_fpe_signal_handler);
-
-	ri.Printf(PRINT_DEVELOPER, "Vulkan: Installed SIGFPE handler\n");
+	// Ignore SIGFPE to prevent core dumps - most reliable approach
+	if (signal(SIGFPE, SIG_IGN) != SIG_ERR) {
+		ri.Printf(PRINT_DEVELOPER, "Vulkan: SIGFPE will be ignored to prevent crashes\n");
+	} else {
+		ri.Printf(PRINT_WARNING, "Vulkan: Failed to ignore SIGFPE\n");
+	}
 #endif
 
     vk_select_preferred_gpu();
@@ -4655,10 +4658,23 @@ void vk_initialize( void )
 	qboolean was_already_active = vk.active;
 
 	if ( !vk.active ) {
+#ifdef __linux__
+		// Clear FPE flag before starting
+		vk_fpe_occurred = 0;
+#endif
+
 		// Initialize the platform-specific Vulkan implementation (window, library loading)
 		ri.VKimp_Init( &glConfig );
 
 		init_vulkan_library();
+
+		// Check if FPE occurred during init_vulkan_library
+#ifdef __linux__
+		if (vk_fpe_occurred) {
+			ri.Printf(PRINT_ERROR, "Vulkan: SIGFPE detected during initialization, aborting Vulkan renderer\n");
+			return;
+		}
+#endif
 
 		// If surface wasn't created during init_vulkan_library (window wasn't ready),
 		// try to create it now that the window exists

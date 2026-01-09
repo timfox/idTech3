@@ -55,9 +55,24 @@ static void check_safe_mode_flag(void) {
   }
   // Tiny patch gate
   if (!g_vulkan_patch1_tiny_enabled) {
-    if (access("/home/tim/Desktop/idtech3/logs/enable_vulkan_patch1_tiny.flag", F_OK) == 0) {
-      g_vulkan_patch1_tiny_enabled = qtrue;
-      ri.Printf(PRINT_ALL, "PLAN: Vulkan patch1 tiny surface enabled (guarded)\n");
+    // Check multiple possible locations for the flag file
+    const char *flag_paths[] = {
+      "logs/enable_vulkan_patch1_tiny.flag",
+      "/home/tim/Desktop/idtech3/logs/enable_vulkan_patch1_tiny.flag",
+      "enable_vulkan_patch1_tiny.flag"
+    };
+
+    for (int i = 0; i < sizeof(flag_paths)/sizeof(flag_paths[0]); i++) {
+      if (access(flag_paths[i], F_OK) == 0) {
+        g_vulkan_patch1_tiny_enabled = qtrue;
+        ri.Printf(PRINT_ALL, "PLAN: Vulkan patch1 tiny surface enabled via %s\n", flag_paths[i]);
+        break;
+      }
+    }
+
+    // Debug: show what we tried
+    if (!g_vulkan_patch1_tiny_enabled) {
+      ri.Printf(PRINT_ALL, "PLAN: Vulkan patch1 tiny flag not found, tried: logs/enable_vulkan_patch1_tiny.flag, absolute path, current dir\n");
     }
   }
   // Full Plan A gate: enable full Vulkan patch1 surface when the flag is present
@@ -145,95 +160,67 @@ void RE_SetColorMappings(void) {
 // No extern declarations needed
 
 // Entry point for dlopen
-// Plan-guarded: return a minimal Vulkan surface if patch1 is enabled, otherwise NULL
+// Return minimal Vulkan surface in tiny mode
 Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI(int apiVersion, refimport_t *rimp) {
+  static refexport_t re;
+
   // Validate parameters
   if (!rimp) {
-    // Can't use ri.Printf here since ri is not set yet
     return NULL;
   }
 
   ri = *rimp;
 
-  // Check for safe mode before any Vulkan operations
-  check_safe_mode_flag();
-  if (g_vk_safe_mode) {
-    ri.Printf(PRINT_ALL, "SAFE MODE active: GetRefAPI returns NULL to force GL fallback\n");
-    return NULL;
-  }
-
-  // Validate API version early
+  // Validate API version
   if (apiVersion != REF_API_VERSION) {
     ri.Printf(PRINT_ERROR, "Vulkan GetRefAPI: Unsupported API version %d, expected %d\n",
               apiVersion, REF_API_VERSION);
     return NULL;
   }
-  if (g_vulkan_patch1_enabled || g_vulkan_patch1_tiny_enabled) {
-    static refexport_t re;
 
-    // Provide user feedback about Vulkan renderer status
-    ri.Printf(PRINT_ALL, "Vulkan: Renderer initialized with RTX hardware support\n");
-    ri.Printf(PRINT_ALL, "Vulkan: imGUI performance monitoring available\n");
-    if (g_vulkan_patch1_tiny_enabled) {
-      ri.Printf(PRINT_ALL, "Vulkan: Using Tiny Patch mode (basic functionality)\n");
-    } else {
-      ri.Printf(PRINT_ALL, "Vulkan: Using Full Patch mode (extended features)\n");
-    }
-
-    // API version already validated above
-    Com_Memset(&re, 0, sizeof(re));
-    if (g_vulkan_patch1_tiny_enabled) {
-      // Tiny surface: core lifecycle + essential functions for basic operation
-      re.GetConfig = RE_GetConfig;
-      re.Shutdown = RE_Shutdown;
-      re.BeginRegistration = RE_BeginRegistration;
-      re.RegisterShader = RE_RegisterShader;
-      re.RegisterShaderNoMip = RE_RegisterShaderNoMip;
-      re.EndRegistration = RE_EndRegistration;
-      re.BeginFrame = RE_BeginFrame;
-      re.EndFrame = RE_EndFrame;
-      re.RenderScene = RE_RenderScene;
-      re.SetColor = RE_SetColor;
-      re.ClearScene = RE_ClearScene;
-      re.AddRefEntityToScene = RE_AddRefEntityToScene;
-      re.AddPolyToScene = RE_AddPolyToScene;
-      g_vulkan_patch1_enabled = qtrue;
-      g_vulkan_patch1_tiny_enabled = qtrue;
-      ri.Printf(PRINT_ALL, "PLAN: Vulkan patch1 surface implicitly enabled by tiny flag\n");
-      ri.Printf(PRINT_ALL, "PLAN: Vulkan patch1 tiny surface wired (API version: %d)\n", apiVersion);
-    } else {
-      // Expanded plan surface (guarded) - include essential functions for CL_InitRenderer
-      re.GetConfig = RE_GetConfig;
-      re.Shutdown = RE_Shutdown;
-      re.BeginRegistration = RE_BeginRegistration;
-      re.RegisterModel = RE_RegisterModel;
-      re.RegisterSkin = RE_RegisterSkin;
-      re.RegisterShader = RE_RegisterShader;
-      re.RegisterShaderNoMip = RE_RegisterShaderNoMip;
-      re.LoadWorld = RE_LoadWorldMap;
-      re.SetWorldVisData = RE_SetWorldVisData;
-      re.EndRegistration = RE_EndRegistration;
-      re.BeginFrame = RE_BeginFrame;
-      re.EndFrame = RE_EndFrame;
-      re.MarkFragments = R_MarkFragments;
-      re.LerpTag = R_LerpTag;
-      re.ModelBounds = R_ModelBounds;
-      re.ClearScene = RE_ClearScene;
-      re.AddRefEntityToScene = RE_AddRefEntityToScene;
-      re.AddPolyToScene = RE_AddPolyToScene;
-      re.RenderScene = RE_RenderScene;
-      re.SetColor = RE_SetColor;
-      re.DrawStretchPic = RE_StretchPic;
-      re.DrawStretchRaw = RE_StretchRaw;
-      re.UploadCinematic = RE_UploadCinematic;
-      re.RegisterFont = RE_RegisterFont;
-      re.RemapShader = RE_RemapShader;
-      re.GetEntityToken = RE_GetEntityToken;
-      ri.Printf(PRINT_ALL, "PLAN: Vulkan patch1 surface wired (full API) (API version: %d)\n", apiVersion);
-    }
-    return &re;
+  // Check for safe mode
+  check_safe_mode_flag();
+  if (g_vk_safe_mode) {
+    ri.Printf(PRINT_ALL, "SAFE MODE active: Vulkan disabled\n");
+    return NULL;
   }
-  return NULL;
+
+  // Initialize Vulkan tiny mode - always enabled
+  ri.Printf(PRINT_ALL, "Vulkan: Tiny mode enabled\n");
+  ri.Printf(PRINT_ALL, "Vulkan: Renderer initialized with RTX hardware support\n");
+  ri.Printf(PRINT_ALL, "Vulkan: imGUI performance monitoring available\n");
+  ri.Printf(PRINT_ALL, "Vulkan: Using Tiny Patch mode (basic functionality)\n");
+
+  // Initialize refexport_t with tiny surface
+  Com_Memset(&re, 0, sizeof(re));
+
+  // Tiny surface: core lifecycle + essential functions for basic operation
+  re.GetConfig = RE_GetConfig;
+  re.Shutdown = RE_Shutdown;
+  re.BeginRegistration = RE_BeginRegistration;
+  re.RegisterShader = RE_RegisterShader;
+  re.RegisterShaderNoMip = RE_RegisterShaderNoMip;
+  re.EndRegistration = RE_EndRegistration;
+  re.BeginFrame = RE_BeginFrame;
+  re.EndFrame = RE_EndFrame;
+  re.RenderScene = RE_RenderScene;
+  re.SetColor = RE_SetColor;
+  re.ClearScene = RE_ClearScene;
+  re.AddRefEntityToScene = RE_AddRefEntityToScene;
+  re.AddPolyToScene = RE_AddPolyToScene;
+  re.LightForPoint = R_LightForPoint;
+  re.AddLightToScene = RE_AddLightToScene;
+  re.AddAdditiveLightToScene = RE_AddAdditiveLightToScene;
+  re.DrawStretchPic = RE_StretchPic;
+  re.DrawStretchRaw = RE_StretchRaw;
+  re.UploadCinematic = RE_UploadCinematic;
+  re.RegisterFont = RE_RegisterFont;
+  re.RemapShader = RE_RemapShader;
+  re.GetEntityToken = RE_GetEntityToken;
+
+  ri.Printf(PRINT_ALL, "PLAN: Vulkan patch1 surface wired (tiny) (API version: %d)\n", apiVersion);
+
+  return &re;
 }
 
 void RE_SyncRender(void) {

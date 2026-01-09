@@ -231,9 +231,42 @@ main() {
     echo -e "${GREEN}Launching id Tech 3 Engine...${NC}"
     echo -e "${BLUE}Command: $RELEASE_DIR/idtech3.x86_64 $args${NC}"
 
-    # Launch engine
+    # Launch engine with crash recovery for Vulkan
     cd "$ENGINE_DIR"
-    exec "$RELEASE_DIR/idtech3.x86_64" $args
+
+    # Check if we're trying Vulkan renderer
+    if echo "$args" | grep -q "cl_renderer vulkan"; then
+        echo -e "${YELLOW}Vulkan renderer selected - enabling crash recovery${NC}"
+
+        # Try Vulkan first with timeout to catch crashes
+        if timeout 30 "$RELEASE_DIR/idtech3.x86_64" $args 2>&1 | tee /tmp/engine_output.log; then
+            # Success - exit normally
+            exit 0
+        else
+            exit_code=$?
+            echo -e "${RED}Vulkan renderer failed (exit code: $exit_code)${NC}"
+
+            # Check if it's a SIGFPE crash
+            if grep -q "Floating point exception" /tmp/engine_output.log 2>/dev/null; then
+                echo -e "${YELLOW}SIGFPE detected - automatically falling back to OpenGL${NC}"
+
+                # Replace vulkan with opengl in args
+                args=$(echo "$args" | sed 's/cl_renderer vulkan/cl_renderer opengl/g')
+
+                echo -e "${GREEN}Retrying with OpenGL renderer...${NC}"
+                echo -e "${BLUE}Command: $RELEASE_DIR/idtech3.x86_64 $args${NC}"
+
+                # Try OpenGL
+                exec "$RELEASE_DIR/idtech3.x86_64" $args
+            else
+                echo -e "${RED}Non-recoverable crash detected - exiting${NC}"
+                exit $exit_code
+            fi
+        fi
+    else
+        # Not Vulkan, just run normally
+        exec "$RELEASE_DIR/idtech3.x86_64" $args
+    fi
 }
 
 # Run main function
