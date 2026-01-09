@@ -23,6 +23,8 @@ if [ $# -ge 1 ] && [ -n "${1:-}" ]; then
   shift
 fi
 
+clear
+
 mkdir -p "${LOG_DIR}"
 
 echo "[1/5] Enabling core dumps (current shell only)…"
@@ -46,15 +48,36 @@ set pagination off
 set confirm off
 set breakpoint pending on
 set solib-search-path __SOLIB__
+# Catch signals to stop before process exits
+handle SIGSEGV stop print
+handle SIGABRT stop print
+handle SIGFPE stop print
+handle SIGILL stop print
+handle SIGBUS stop print
+# Set breakpoint on fatal error function to catch before exit
+break ri.Error
 run
-printf "\n== Crash context ==\n"
-printf "PC=%p\n", $pc
-info symbol $pc
+# If we hit the breakpoint or a signal, capture context
+if $_isvoid($pc) == 0
+  printf "\n== Crash context (process stopped) ==\n"
+  printf "PC=%p\n", $pc
+  info symbol $pc
+  printf "\n== Full backtrace ==\n"
+  thread apply all bt full
+  printf "\n== Register state ==\n"
+  info registers
+  printf "\n== Local variables ==\n"
+  info locals
+  continue
+else
+  printf "\n== Process exited ==\n"
+  printf "Check output above for error message\n"
+end
+# Always show these (they work even after exit)
+printf "\n== Shared library info ==\n"
 info sharedlibrary idtech3_vulkan_x86_64.so
 info files
-maintenance info sections ?idtech3_vulkan_x86_64.so
-printf "\n== Full backtrace ==\n"
-thread apply all bt full
+maintenance info sections
 quit
 EOF
   sed -i "s|__SOLIB__|${SOLIB_PATH}|g" "${GDB_CMDS}"
