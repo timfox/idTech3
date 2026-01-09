@@ -199,6 +199,19 @@ static qboolean SV_ValidateMapName(const char *mapName) {
 	return qtrue;
 }
 
+// #region agent log
+#include <stdio.h>
+#include <time.h>
+static void write_debug_log(const char* location, const char* message, const char* data_json) {
+    FILE* f = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
+    if (f) {
+        fprintf(f, "{\"id\":\"log_%ld_%s\",\"timestamp\":%ld,\"location\":\"%s\",\"message\":\"%s\",\"data\":%s,\"sessionId\":\"debug-session\",\"runId\":\"hypothesis1\",\"hypothesisId\":\"A\"}\n",
+                (long)time(NULL), location, (long)time(NULL)*1000, location, message, data_json ? data_json : "{}");
+        fclose(f);
+    }
+}
+// #endregion
+
 static void SV_Map_f( void ) {
 	const char		*cmd;
 	const char		*map;
@@ -206,6 +219,10 @@ static void SV_Map_f( void ) {
 	char		expanded[MAX_QPATH];
 	char		mapname[MAX_QPATH];
 	int			len;
+
+	// #region agent log
+	write_debug_log("sv_ccmds.c:SV_Map_f", "Map loading started", "{\"cmd\":\"SV_Map_f\",\"timestamp\":0}");
+	// #endregion
 
 	cmd = Cmd_Argv(0);
 	map = Cmd_Argv(1);

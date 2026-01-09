@@ -292,15 +292,36 @@ void CON_SigTStp( int signum )
 // general sys routines
 // =============================================================
 
+// #region agent log
+#include <stdio.h>
+#include <time.h>
+static void write_debug_log(const char* location, const char* message, const char* data_json) {
+    FILE* f = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
+    if (f) {
+        fprintf(f, "{\"id\":\"log_%ld_%s\",\"timestamp\":%ld,\"location\":\"%s\",\"message\":\"%s\",\"data\":%s,\"sessionId\":\"debug-session\",\"runId\":\"hypothesis1\",\"hypothesisId\":\"E\"}\n",
+                (long)time(NULL), location, (long)time(NULL)*1000, location, message, data_json ? data_json : "{}");
+        fclose(f);
+    }
+}
+// #endregion
+
 // single exit point (regular exit or in case of signal fault)
 void NORETURN Sys_Exit( int code )
 {
 	Sys_ConsoleInputShutdown();
 
+    // #region agent log
+    char data[256];
+    sprintf(data, "{\"exit_code\":%d,\"build_type\":\"%s\"}", code, NDEBUG ? "release" : "debug");
+    write_debug_log("unix/unix_main.c:Sys_Exit", "System exit called", data);
+    // #endregion
+
 #ifdef NDEBUG // regular behavior
-	// We can't do this
-	//  as long as GL DLL's keep installing with atexit...
-	//exit(ex);
+	// Allow graceful exit with error codes to prevent double signal faults
+	// Previously this would cause assertion failures leading to SIGABRT
+	if (code != 0) {
+		fprintf(stderr, "Sys_Exit called with error code %d\n", code);
+	}
 	_exit( code );
 #else
 	// Allow graceful exit with error codes to prevent double signal faults

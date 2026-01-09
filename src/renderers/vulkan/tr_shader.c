@@ -3529,6 +3529,19 @@ Returns a freshly allocated shader with all the needed info
 from the current global working shader
 =========================
 */
+// #region agent log
+#include <stdio.h>
+#include <time.h>
+static void write_debug_log(const char* location, const char* message, const char* data_json) {
+    FILE* f = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
+    if (f) {
+        fprintf(f, "{\"id\":\"log_%ld_%s\",\"timestamp\":%ld,\"location\":\"%s\",\"message\":\"%s\",\"data\":%s,\"sessionId\":\"debug-session\",\"runId\":\"hypothesis2\",\"hypothesisId\":\"A\"}\n",
+                (long)time(NULL), location, (long)time(NULL)*1000, location, message, data_json ? data_json : "{}");
+        fclose(f);
+    }
+}
+// #endregion
+
 static shader_t *FinishShader( void ) {
 	int			stage, i, n, m;
 	qboolean	hasLightmapStage;
@@ -3537,6 +3550,13 @@ static shader_t *FinishShader( void ) {
 	qboolean	depthMask;
 	qboolean	fogCollapse;
 	shaderStage_t *lastStage[NUM_TEXTURE_BUNDLES];
+
+	// #region agent log
+	write_debug_log("vulkan/tr_shader.c:FinishShader", "FinishShader started", "{\"shader_type\":0}");
+	// #endregion
+
+	fprintf(stderr, "DEBUG: FinishShader ENTRY POINT\n");
+	ri.Printf(PRINT_ALL, "DEBUG: FinishShader ENTRY POINT\n");
 
 	hasLightmapStage = qfalse;
 	vertexLightmap = qfalse;
@@ -4046,16 +4066,21 @@ static shader_t *FinishShader( void ) {
 			#endif
 			}
 
-			def.mirror = qfalse;
-
 			// Vulkan pipeline creation is disabled due to memory corruption issues
-			// Always use default shader to prevent crashes
-			ri.Printf(PRINT_ALL, "DEBUG: EARLY RETURN - Using default shader for Vulkan (shader_type=%d)\n", def.shader_type);
-			return tr.defaultShader;
+			// TEMPORARILY DISABLE EARLY RETURN TO TEST IF THIS CAUSES THE CRASH
+			// def.mirror = qfalse;
+			// ri.Printf(PRINT_ALL, "DEBUG: EARLY RETURN - Using default shader for Vulkan (shader_type=%d)\n", def.shader_type);
+			// return tr.defaultShader;
 			def.mirror = qtrue;
 			// Disable mirror pipeline creation to prevent crashes
 			ri.Printf(PRINT_ALL, "DEBUG: Mirror pipeline creation disabled (shader_type=%d)\n", def.shader_type);
+			// #region agent log
+			fprintf(stderr, "DEBUG: About to set vk_mirror_pipeline to NULL, pStage=%p\n", (void*)pStage);
+			// #endregion
 			pStage->vk_mirror_pipeline[0] = VK_NULL_HANDLE;
+			// #region agent log
+			fprintf(stderr, "DEBUG: Successfully set vk_mirror_pipeline to NULL\n");
+			// #endregion
 			// Note: Mirror pipeline is optional, NULL is acceptable
 
 			if ( pStage->depthFragment ) {
@@ -4080,7 +4105,14 @@ static shader_t *FinishShader( void ) {
 
 
 #ifdef USE_FOG_COLLAPSE
+			// FIXME: Fog collapse code causes SIGFPE when mirror pipelines are disabled
+			// This code assumes mirror pipelines exist, but we disable them to prevent crashes
+			// Temporarily disabled until fog collapse can handle NULL mirror pipelines
+			/*
 			if ( fogCollapse && tr.numFogs > 0 ) {
+				// #region agent log
+				fprintf(stderr, "DEBUG: Inside fog collapse if block\n");
+				// #endregion
 				Vk_Pipeline_Def def_fog;
 				Vk_Pipeline_Def def_mirror;
 
@@ -4108,6 +4140,7 @@ static shader_t *FinishShader( void ) {
 
 				shader.fogCollapse = qtrue;
 			}
+			*/
 #endif
 		}
 	}

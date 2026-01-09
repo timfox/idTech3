@@ -284,7 +284,15 @@ qboolean RE_InPVS( const vec3_t p1, const vec3_t p2 ) {
 RE_Shutdown
 ================
 */
+// #region agent log
+#define DEBUG_LOG(msg) fprintf(stderr, "DEBUG_LOG: %s\n", msg)
+// #endregion
+
 void RE_Shutdown( refShutdownCode_t code ) {
+    // #region agent log
+    DEBUG_LOG("Vulkan RE_Shutdown called");
+    // #endregion
+
     ri.Printf( PRINT_ALL, "RE_Shutdown( %i )\n", code );
 
     // Remove console commands

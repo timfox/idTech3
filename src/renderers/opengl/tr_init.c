@@ -3183,7 +3183,25 @@ void R_Init( void ) {
 RE_Shutdown
 ===============
 */
+// #region agent log
+#include <stdio.h>
+#include <time.h>
+static void write_debug_log(const char* location, const char* message, const char* data_json) {
+    FILE* f = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
+    if (f) {
+        fprintf(f, "{\"id\":\"log_%ld_%s\",\"timestamp\":%ld,\"location\":\"%s\",\"message\":\"%s\",\"data\":%s,\"sessionId\":\"debug-session\",\"runId\":\"hypothesis1\",\"hypothesisId\":\"C\"}\n",
+                (long)time(NULL), location, (long)time(NULL)*1000, location, message, data_json ? data_json : "{}");
+        fclose(f);
+    }
+}
+// #endregion
+
 static void RE_Shutdown( refShutdownCode_t code ) {
+    // #region agent log
+    char data[256];
+    sprintf(data, "{\"shutdown_code\":%d,\"gl_active\":%d}", code, glConfig.isFullscreen ? 1 : 0);
+    write_debug_log("opengl/tr_init.c:RE_Shutdown", "OpenGL renderer shutdown started", data);
+    // #endregion
 
 	ri.Printf( PRINT_ALL, "RE_Shutdown( %i )\n", code );
 

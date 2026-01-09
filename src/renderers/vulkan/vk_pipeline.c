@@ -484,7 +484,26 @@ VkPipeline vk_gen_pipeline(uint32_t index) {
 	}
 }
 
+// #region agent log
+#include <stdio.h>
+#include <time.h>
+static void write_debug_log(const char* location, const char* message, const char* data_json) {
+    FILE* f = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
+    if (f) {
+        fprintf(f, "{\"id\":\"log_%ld_%s\",\"timestamp\":%ld,\"location\":\"%s\",\"message\":\"%s\",\"data\":%s,\"sessionId\":\"debug-session\",\"runId\":\"hypothesis3\",\"hypothesisId\":\"A\"}\n",
+                (long)time(NULL), location, (long)time(NULL)*1000, location, message, data_json ? data_json : "{}");
+        fclose(f);
+    }
+}
+// #endregion
+
 VkPipeline vk_find_pipeline_ext(int base_pipeline, Vk_Pipeline_Def* def, qboolean create_if_missing) {
+    // #region agent log
+    char data[256];
+    sprintf(data, "{\"shader_type\":%d,\"create_if_missing\":%d,\"base_pipeline\":%d}", def ? def->shader_type : -1, create_if_missing, base_pipeline);
+    write_debug_log("vulkan/vk_pipeline.c:vk_find_pipeline_ext", "Pipeline creation requested", data);
+    // #endregion
+
 	// ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext shader_type=%d create_if_missing=%d\n", def->shader_type, create_if_missing);
 	const Vk_Pipeline_Def *cur_def;
 	uint32_t index;
