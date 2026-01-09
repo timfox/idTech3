@@ -701,6 +701,7 @@ typedef struct {
 typedef struct {
     qboolean active;
     qboolean headless;
+    qboolean device_lost;  // Track if device is lost to prevent further submissions
     VkInstance instance;
 
     // Bindless support

@@ -935,12 +935,20 @@ void end_command_buffer(VkCommandBuffer command_buffer, const char *location)
 	submit_info.signalSemaphoreCount = 0;
 	submit_info.pSignalSemaphores = NULL;
 
+	// Check if device is already lost - skip submission if so
+	if (vk.device_lost) {
+		ri.Printf(PRINT_DEVELOPER, "Vulkan: Skipping queue submit - device is lost\n");
+		return;
+	}
+
 	// Handle device lost gracefully instead of terminating
 	VkResult submit_result = qvkQueueSubmit( vk.queue, 1, &submit_info, VK_NULL_HANDLE );
 	if (submit_result != VK_SUCCESS) {
 		if (submit_result == VK_ERROR_DEVICE_LOST) {
+			vk.device_lost = qtrue;  // Mark device as lost
 			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during queue submit - GPU driver issue\n");
 			ri.Printf(PRINT_ERROR, "Vulkan: This may cause rendering artifacts or instability\n");
+			ri.Printf(PRINT_ERROR, "Vulkan: Rendering disabled until device recovery\n");
 			// Don't terminate - let vk_queue_wait_idle handle cleanup
 		} else {
 			// For other errors, use the standard error handling
@@ -4072,6 +4080,7 @@ skip_device_creation:
 
 	ri.Printf(PRINT_ALL, "DEBUG: About to set vk.active = qtrue\n");
 	vk.active = qtrue;
+	vk.device_lost = qfalse;  // Initialize device lost flag
     ri.Printf(PRINT_ALL, "DEBUG: vk.active set successfully, init_vulkan_library ending\n");
     vk_silent_init();
     if (!vk_silent) {
@@ -10025,9 +10034,15 @@ void vk_get_gpu_timing_stats( double *avg_frame_time_ms, double *min_frame_time_
 }
 
 void vk_wait_idle( void ) {
+	// Skip if device is already lost
+	if (vk.device_lost) {
+		return;
+	}
+
 	VkResult result = qvkDeviceWaitIdle( vk.device );
 	if (result != VK_SUCCESS) {
 		if (result == VK_ERROR_DEVICE_LOST) {
+			vk.device_lost = qtrue;  // Mark device as lost
 			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during device wait - GPU driver issue\n");
 			ri.Printf(PRINT_ERROR, "Vulkan: This may cause rendering artifacts or instability\n");
 			// Don't terminate the engine for device lost
@@ -10040,9 +10055,15 @@ void vk_wait_idle( void ) {
 }
 
 void vk_queue_wait_idle( void ) {
+	// Skip if device is already lost
+	if (vk.device_lost) {
+		return;
+	}
+
 	VkResult result = qvkQueueWaitIdle( vk.queue );
 	if (result != VK_SUCCESS) {
 		if (result == VK_ERROR_DEVICE_LOST) {
+			vk.device_lost = qtrue;  // Mark device as lost
 			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during queue wait - GPU driver issue\n");
 			ri.Printf(PRINT_ERROR, "Vulkan: This may cause rendering artifacts or instability\n");
 			// Don't terminate the engine for device lost

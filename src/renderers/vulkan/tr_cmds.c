@@ -413,6 +413,11 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 		ri.Printf(PRINT_DEVELOPER, "Vulkan: Skipping frame - not fully initialized\n");
 		return;
 	}
+	// Skip rendering if device is lost
+	if (vk.device_lost) {
+		ri.Printf(PRINT_DEVELOPER, "Vulkan: Skipping frame - device is lost\n");
+		return;
+	}
 #endif
 
 	// Initialize frame ready flag

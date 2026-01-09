@@ -630,9 +630,21 @@ extern "C" void vk_end_frame(void) {
         .pSignalSemaphores = &vk.cmd->rendering_finished2
     };
 
+    // Check if device is lost before submitting
+    if (vk.device_lost) {
+        ri.Printf(PRINT_DEVELOPER, "Vulkan: Skipping queue submit - device is lost\n");
+        return;
+    }
+
     result = qvkQueueSubmit(vk.queue, 1, &submit_info, vk.cmd->rendering_finished_fence);
     if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "vk_end_frame: Failed to submit command buffer: %s\n", vk_result_string(result));
+        if (result == VK_ERROR_DEVICE_LOST) {
+            vk.device_lost = qtrue;  // Mark device as lost
+            ri.Printf(PRINT_ERROR, "Vulkan: Device lost during frame submit - GPU driver issue\n");
+            ri.Printf(PRINT_ERROR, "Vulkan: Rendering disabled until device recovery\n");
+        } else {
+            ri.Printf(PRINT_ERROR, "vk_end_frame: Failed to submit command buffer: %s\n", vk_result_string(result));
+        }
         return;
     }
 
