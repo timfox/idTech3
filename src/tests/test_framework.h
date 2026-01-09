@@ -49,7 +49,7 @@ static const char *current_test_name = nullptr;
 static double current_test_start_time = 0.0;
 static qboolean test_isolation_enabled = qtrue;
 static qboolean test_memory_tracking = qtrue;
-static qboolean test_thread_safety_check = qtrue; // NOLINT(readability-identifier-naming)
+[[maybe_unused]] static qboolean test_thread_safety_check = qtrue; // NOLINT(readability-identifier-naming)
 
 // Global test counters
 static int test_count = 0;
@@ -57,8 +57,8 @@ static int test_passed = 0;
 static int test_failed = 0;
 
 // Stub functions for performance monitoring
-static void Perf_Init(void) {} // NOLINT(readability-convert-member-functions-to-static)
-static void Perf_CountDrawCall(void) {} // NOLINT(readability-convert-member-functions-to-static)
+[[maybe_unused]] static void Perf_Init(void) {}
+[[maybe_unused]] static void Perf_CountDrawCall(void) {}
 
 // Stub functions for system utilities
 static int Sys_Milliseconds(void) { return 0; }
@@ -66,7 +66,7 @@ static int Sys_Milliseconds(void) { return 0; }
 // Enhanced test macro with reliability features
 #define TEST(name) \
 	static void test_##name(void); \
-	static void test_wrapper_##name(void) { \
+	[[maybe_unused]] static void test_wrapper_##name(void) { \
 		current_test_name = #name; \
 		current_test_start_time = Sys_Milliseconds() / 1000.0; \
 		test_stats.total_tests++; \
@@ -211,19 +211,19 @@ static void test_memory_checkpoint(void) {
 	// Check for leaks after test completes
 }
 
-static qboolean test_check_memory_safety([[maybe_unused]] void (*test_block)(void)) { // NOLINT(misc-unused-parameters)
+[[maybe_unused]] static qboolean test_check_memory_safety([[maybe_unused]] void (*test_block)(void)) {
 	// Run test in memory-safe environment
 	// Return true if no violations detected
 	return qtrue;
 }
 
-static qboolean test_check_thread_safety([[maybe_unused]] void (*test_block)(void)) { // NOLINT(misc-unused-parameters)
+[[maybe_unused]] static qboolean test_check_thread_safety([[maybe_unused]] void (*test_block)(void)) {
 	// Run test with thread safety checking
 	// Return true if no race conditions detected
 	return qtrue;
 }
 
-static qboolean test_check_no_crash([[maybe_unused]] void (*test_block)(void)) { // NOLINT(misc-unused-parameters)
+[[maybe_unused]] static qboolean test_check_no_crash([[maybe_unused]] void (*test_block)(void)) {
 	// Run test with crash protection
 	// Return true if test completed without crashing
 	return qtrue;
@@ -275,7 +275,7 @@ static qboolean test_check_no_crash([[maybe_unused]] void (*test_block)(void)) {
 		} \
 	} while(0)
 
-static int calculate_reliability_score(void) { // NOLINT(readability-convert-member-functions-to-static)
+[[maybe_unused]] static int calculate_reliability_score(void) {
 	int score = 100;
 
 	// Deduct points for failures
@@ -298,7 +298,7 @@ static int calculate_reliability_score(void) { // NOLINT(readability-convert-mem
 }
 
 // Get test statistics
-static const test_statistics_t* Test_GetStatistics(void) { // NOLINT(readability-convert-member-functions-to-static)
+[[maybe_unused]] static const test_statistics_t* Test_GetStatistics(void) {
 	return &test_stats;
 }
 

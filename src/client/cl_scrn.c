@@ -28,6 +28,7 @@ static qboolean	scr_initialized;		// ready to draw
 cvar_t		*cl_timegraph;
 static cvar_t		*cl_debuggraph;
 static cvar_t		*cl_graphheight;
+extern cvar_t		*com_developer;
 static cvar_t		*cl_graphscale;
 static cvar_t		*cl_graphshift;
 
@@ -632,12 +633,13 @@ void SCR_UpdateScreen( void ) {
 	// Check if renderer interface is available and properly initialized
 	// This prevents crashes during early startup before CL_InitRef completes
 	extern qboolean re_initialized;
-	if ( !FS_StartupInProgress() ) {
+	extern cvar_t *com_developer;
+	if ( !FS_StartupInProgress() && com_developer && com_developer->integer ) {
 		Com_Printf( "DEBUG: SCR_UpdateScreen called, re_initialized=%d\n", re_initialized );
 	}
 	if ( !re_initialized || !re.GetConfig || !re.BeginFrame || !re.EndFrame ) {
 		// Renderer not fully initialized yet or failed to initialize, skip rendering
-		if ( !FS_StartupInProgress() ) {
+		if ( !FS_StartupInProgress() && com_developer && com_developer->integer ) {
 			Com_Printf( "DEBUG: SCR_UpdateScreen - renderer not ready, skipping\n" );
 		}
 		return;

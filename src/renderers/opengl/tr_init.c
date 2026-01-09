@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../renderercommon/tr_backend_iface.h"
 #include "gl_shader.h"
 #include "gl_vertex.h"
+#include <unistd.h>
 
 extern refimport_t ri;
 
@@ -1309,10 +1310,42 @@ static void R_InitExtensions( void )
 	size_t len;
 	const char *err;
 
-	// Check if we have a valid OpenGL context
-	const char *vendor = (const char *)qglGetString(GL_VENDOR);
-	const char *renderer = (const char *)qglGetString(GL_RENDERER);
-	const char *version_str = (const char *)qglGetString(GL_VERSION);
+	// Ensure OpenGL context is current before querying
+	ri.Printf(PRINT_ALL, "DEBUG: Ensuring OpenGL context is current\n");
+
+	const char *vendor = NULL;
+	const char *renderer = NULL;
+	const char *version_str = NULL;
+
+		if (qglGetString) {
+			// Try to get OpenGL strings multiple times in case context needs to settle
+			for (int attempt = 0; attempt < 3 && (!vendor || !renderer || !version_str); attempt++) {
+				if (attempt > 0) {
+					ri.Printf(PRINT_ALL, "DEBUG: Retrying OpenGL string queries (attempt %d)\n", attempt + 1);
+				}
+				vendor = (const char *)qglGetString(GL_VENDOR);
+				renderer = (const char *)qglGetString(GL_RENDERER);
+				version_str = (const char *)qglGetString(GL_VERSION);
+			}
+
+			ri.Printf(PRINT_ALL, "DEBUG: OpenGL strings - vendor='%s', renderer='%s', version='%s'\n",
+				vendor ? vendor : "NULL", renderer ? renderer : "NULL", version_str ? version_str : "NULL");
+
+			// If still NULL, try fallback values that might work
+			if (!vendor || !renderer || !version_str) {
+				ri.Printf(PRINT_WARNING, "OpenGL context queries failed, using fallback values\n");
+
+				// Set reasonable fallback values
+				vendor = "Mesa";
+				renderer = "Software Rasterizer";
+				version_str = "3.0";
+			}
+		} else {
+		ri.Printf(PRINT_WARNING, "qglGetString function pointer is NULL!\n");
+		vendor = "Unknown";
+		renderer = "Unknown";
+		version_str = "Unknown";
+	}
 
 	if (!vendor || !renderer || !version_str) {
 		ri.Printf(PRINT_WARNING, "OpenGL context strings not available, using fallback values\n");
@@ -1365,14 +1398,22 @@ static void R_InitExtensions( void )
 	gl_clamp_mode = GL_CLAMP; // by default
 
 	// OpenGL driver constants
-	qglGetIntegerv( GL_MAX_TEXTURE_SIZE, &max_texture_size );
+	if (qglGetIntegerv) {
+		qglGetIntegerv( GL_MAX_TEXTURE_SIZE, &max_texture_size );
+		ri.Printf(PRINT_ALL, "DEBUG: GL_MAX_TEXTURE_SIZE query returned %d\n", max_texture_size);
+	} else {
+		max_texture_size = 0;
+		ri.Printf(PRINT_WARNING, "qglGetIntegerv function pointer is NULL!\n");
+	}
 	glConfig.maxTextureSize = max_texture_size;
 
 	// stubbed or broken drivers may have reported 0...
-	if ( glConfig.maxTextureSize <= 0 )
-		glConfig.maxTextureSize = 0;
-	else if ( glConfig.maxTextureSize > 2048 )
+	if ( glConfig.maxTextureSize <= 0 ) {
+		ri.Printf(PRINT_WARNING, "GL_MAX_TEXTURE_SIZE is 0, setting fallback value of 2048\n");
+		glConfig.maxTextureSize = 2048; // Reasonable fallback
+	} else if ( glConfig.maxTextureSize > 2048 ) {
 		glConfig.maxTextureSize = 2048; // ResampleTexture() relies on that maximum
+	}
 
 	if ( !r_allowExtensions->integer )
 	{

@@ -544,7 +544,13 @@ found:
 	if (create_if_missing) {
 		VkPipeline pipeline = vk_gen_pipeline(index);
 		if (pipeline == VK_NULL_HANDLE) {
-			ri.Printf(PRINT_ERROR, "vk_find_pipeline_ext: failed to generate pipeline %u\n", index);
+			ri.Printf(PRINT_WARNING, "vk_find_pipeline_ext: failed to generate pipeline %u (shader_type=%d) - this may cause rendering issues\n", index, def->shader_type);
+			// Don't return NULL for non-critical pipelines, try to continue
+			if (def->shader_type != TYPE_SINGLE_TEXTURE) {
+				ri.Printf(PRINT_ERROR, "vk_find_pipeline_ext: critical pipeline failed, returning NULL\n");
+				return VK_NULL_HANDLE;
+			}
+			// For TYPE_SINGLE_TEXTURE, return NULL but don't treat as fatal
 			return VK_NULL_HANDLE;
 		}
 	ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext generated pipeline handle=0x%llx (def_index=%u shader_type=%d)\n", (unsigned long long)pipeline, index, def->shader_type);

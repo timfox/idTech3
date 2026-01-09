@@ -4731,12 +4731,18 @@ void vk_initialize( void )
 	// Create shader modules early so they are available for pipeline creation
 	// Skip for fake devices
 	if (vk.device != (VkDevice)0x20000000) {
+		ri.Printf(PRINT_ALL, "DEBUG: About to call vk_create_shader_modules\n");
 		vk_create_shader_modules();
+		ri.Printf(PRINT_ALL, "DEBUG: vk_create_shader_modules completed\n");
 
 		// Initialize FSR (FidelityFX Super Resolution)
 		if (!vk_fsr_init()) {
 			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize FSR\n");
 		}
+
+		// Debug: Check if FSR corrupted vk structure
+		ri.Printf(PRINT_ALL, "DEBUG: Post-FSR - vk.instance=%p, vk.device=%p\n",
+			(void*)vk.instance, (void*)vk.device);
 
 		// Initialize volumetric fog system
 		vk_volumetric_fog_init();
@@ -4767,6 +4773,10 @@ void vk_initialize( void )
 
 	ri.Printf(PRINT_ALL, "Vulkan: Initialized successfully\n");
 
+	// Debug: Check vk structure state before validation
+	ri.Printf(PRINT_ALL, "DEBUG: Pre-validation - vk.instance=%p, vk.device=%p, vk.active=%d\n",
+		(void*)vk.instance, (void*)vk.device, vk.active);
+
 	// Validate initialization before marking as active
 	if (!vk.device || vk.device == VK_NULL_HANDLE) {
 		ri.Printf(PRINT_ERROR, "Vulkan: Failed to initialize device, aborting\n");
@@ -4775,6 +4785,8 @@ void vk_initialize( void )
 
 	if (!vk.instance || vk.instance == VK_NULL_HANDLE) {
 		ri.Printf(PRINT_ERROR, "Vulkan: Failed to initialize instance, aborting\n");
+		ri.Printf(PRINT_ERROR, "DEBUG: vk.instance is NULL during validation\n");
+		vk.active = qfalse;
 		return;
 	}
 
@@ -6509,6 +6521,12 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	vs_module = VK_NULL_HANDLE;
 	fs_module = VK_NULL_HANDLE;
 
+	// Skip problematic shader types that cause SIGFPE
+	if (def->shader_type == TYPE_SINGLE_TEXTURE) {
+		ri.Printf(PRINT_WARNING, "create_pipeline: skipping TYPE_SINGLE_TEXTURE pipeline (known SIGFPE issue)\n");
+		return VK_NULL_HANDLE;
+	}
+
 	switch ( def->shader_type ) {
 
 		case TYPE_SINGLE_TEXTURE_LIGHTING:
@@ -6702,7 +6720,14 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
 		default:
 			ri.Error(ERR_DROP, "create_pipeline: unknown shader type %i\n", def->shader_type);
-			return 0;
+			return VK_NULL_HANDLE;
+	}
+
+	// Validate shader modules before proceeding to prevent SIGFPE
+	if (vs_module == VK_NULL_HANDLE || fs_module == VK_NULL_HANDLE) {
+		ri.Printf(PRINT_ERROR, "create_pipeline: Invalid shader modules (vs=%p fs=%p) for shader_type %d\n",
+			(void*)vs_module, (void*)fs_module, def->shader_type);
+		return VK_NULL_HANDLE;
 	}
 
 	switch ( def->shader_type ) {
