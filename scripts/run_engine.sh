@@ -242,28 +242,29 @@ main() {
         echo -e "${YELLOW}Vulkan renderer selected - attempting to run...${NC}"
 
         # Try Vulkan first
+        echo -e "${BLUE}Starting Vulkan renderer...${NC}"
         "$RELEASE_DIR/idtech3.x86_64" $args 2>&1 &
         engine_pid=$!
 
-        # Wait a bit to see if it crashes
-        sleep 3
+        # Monitor the process more aggressively for crashes
+        for i in {1..10}; do
+            sleep 0.5
+            if ! kill -0 $engine_pid 2>/dev/null; then
+                # Vulkan crashed quickly, try OpenGL
+                echo -e "${RED}Vulkan renderer crashed during startup (attempt $i), switching to OpenGL${NC}"
+                wait $engine_pid 2>/dev/null || true
 
-        # Check if process is still running
-        if kill -0 $engine_pid 2>/dev/null; then
-            # Vulkan is running successfully
-            echo -e "${GREEN}Vulkan renderer started successfully${NC}"
-            wait $engine_pid
-            exit $?
-        else
-            # Vulkan crashed, try OpenGL
-            echo -e "${RED}Vulkan renderer crashed, automatically switching to OpenGL${NC}"
-            wait $engine_pid 2>/dev/null || true
+                # Replace vulkan with opengl in args
+                args=$(echo "$args" | sed 's/cl_renderer vulkan/cl_renderer opengl/g')
+                echo -e "${GREEN}Starting OpenGL renderer...${NC}"
+                exec "$RELEASE_DIR/idtech3.x86_64" $args
+            fi
+        done
 
-            # Replace vulkan with opengl in args
-            args=$(echo "$args" | sed 's/cl_renderer vulkan/cl_renderer opengl/g')
-            echo -e "${GREEN}Starting OpenGL renderer...${NC}"
-            exec "$RELEASE_DIR/idtech3.x86_64" $args
-        fi
+        # If we get here, Vulkan seems to be running
+        echo -e "${GREEN}Vulkan renderer appears stable, continuing...${NC}"
+        wait $engine_pid
+        exit $?
     else
         # Not Vulkan, run normally
         exec "$RELEASE_DIR/idtech3.x86_64" $args

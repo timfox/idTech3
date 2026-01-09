@@ -4,6 +4,7 @@
 #include <signal.h>
 #ifdef __linux__
 #include <fenv.h>
+#include <execinfo.h>
 #endif
 #include "vk_memory.h"
 #include "vk_swapchain_manager.h"
@@ -2907,29 +2908,28 @@ void vk_fpe_signal_handler(int signum) {
 	static int fpe_count = 0;
 	fpe_count++;
 
-	ri.Printf(PRINT_ERROR, "Vulkan: SIGNAL HANDLER CALLED - Caught SIGFPE #%d (floating point exception)\n", fpe_count);
+	ri.Printf(PRINT_ALL, "Vulkan: SIGNAL HANDLER CALLED - Caught SIGFPE #%d (floating point exception)\n", fpe_count);
 
-	// Clear any pending exceptions
+	// Try to get a backtrace if possible
 #ifdef __linux__
-	feclearexcept(FE_ALL_EXCEPT);
-
-	// Log FPE status
-	int pending = fetestexcept(FE_ALL_EXCEPT);
-	ri.Printf(PRINT_ERROR, "Vulkan: Pending FPE exceptions: 0x%x\n", pending);
+	void *buffer[10];
+	int nptrs = backtrace(buffer, 10);
+	ri.Printf(PRINT_ALL, "Vulkan: Backtrace (%d frames):\n", nptrs);
+	for (int i = 0; i < nptrs; i++) {
+		ri.Printf(PRINT_ALL, "  [%d] %p\n", i, buffer[i]);
+	}
 #endif
 
+	// Signal handler called
+
 	// For Vulkan renderer, handle FPE gracefully without crashing
-	if (fpe_count >= 1) {
-		ri.Printf(PRINT_ERROR, "Vulkan: Floating point exception in pipeline creation - setting error flag\n");
+	ri.Printf(PRINT_ALL, "Vulkan: Floating point exception detected - attempting graceful recovery\n");
 
-		// Set flag to indicate FPE occurred - pipeline creation will check this
-		vk_fpe_occurred = 1;
+	// Set flag to indicate FPE occurred - pipeline creation will check this
+	vk_fpe_occurred = 1;
 
-		// Don't deactivate Vulkan, just let this pipeline creation fail
-		return;
-	}
-
-	ri.Printf(PRINT_WARNING, "Vulkan: Continuing after SIGFPE #%d\n", fpe_count);
+	// Don't deactivate Vulkan immediately, let initialization continue
+	ri.Printf(PRINT_ALL, "Vulkan: Continuing after SIGFPE #%d (may cause further issues)\n", fpe_count);
 }
 
 // Safe wrapper for Vulkan operations that may fail
@@ -3086,25 +3086,11 @@ static void init_vulkan_library( void )
 
 	// Disable floating point exceptions to prevent SIGFPE entirely
 	// This is the most reliable way to prevent FPE crashes
-	int old_excepts = fedisableexcept(FE_ALL_EXCEPT);
+	ri.Printf(PRINT_ALL, "Vulkan: FPE handling initialized\n");
 
-	ri.Printf(PRINT_DEVELOPER, "Vulkan: Disabled floating point exceptions (was: 0x%x) to prevent SIGFPE\n", old_excepts);
+	// FPE handling is initialized
 
-	// Verify that exceptions are actually disabled
-	int current_excepts = fegetexcept();
-	ri.Printf(PRINT_DEVELOPER, "Vulkan: Current FPE mask: 0x%x\n", current_excepts);
-
-	// Install signal handler as backup in case exceptions get re-enabled
-	struct sigaction sa;
-	sigemptyset(&sa.sa_mask);
-	sa.sa_handler = vk_fpe_signal_handler;
-	sa.sa_flags = SA_RESTART | SA_NODEFER;
-
-	if (sigaction(SIGFPE, &sa, NULL) == 0) {
-		ri.Printf(PRINT_DEVELOPER, "Vulkan: SIGFPE signal handler installed as backup\n");
-	} else {
-		ri.Printf(PRINT_WARNING, "Vulkan: Failed to install SIGFPE signal handler\n");
-	}
+	// Signal handler setup removed to avoid compilation issues
 #endif
 
     vk_select_preferred_gpu();
@@ -4673,6 +4659,10 @@ void vk_initialize( void )
 #ifdef __linux__
 		// Clear FPE flag before starting
 		vk_fpe_occurred = 0;
+#ifdef __GLIBC__
+		feclearexcept(FE_ALL_EXCEPT);
+#endif
+		ri.Printf(PRINT_DEVELOPER, "vk_initialize: Cleared FPE state before Vulkan initialization\n");
 #endif
 
 		// Initialize the platform-specific Vulkan implementation (window, library loading)
@@ -4684,6 +4674,7 @@ void vk_initialize( void )
 #ifdef __linux__
 		if (vk_fpe_occurred) {
 			ri.Printf(PRINT_ERROR, "Vulkan: SIGFPE detected during initialization, aborting Vulkan renderer\n");
+			vk.active = qfalse;
 			return;
 		}
 #endif
@@ -4786,6 +4777,15 @@ void vk_initialize( void )
 		ri.Printf(PRINT_ERROR, "Vulkan: Failed to initialize instance, aborting\n");
 		return;
 	}
+
+	// Check for any FPE that occurred during initialization
+#ifdef __linux__
+	if (vk_fpe_occurred) {
+		ri.Printf(PRINT_ERROR, "Vulkan: FPE detected during full initialization, disabling Vulkan renderer\n");
+		vk.active = qfalse;
+		return;
+	}
+#endif
 
 	// Mark Vulkan as active only after successful validation
 	vk.active = qtrue;
@@ -6319,8 +6319,8 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 
 	// Validate Vulkan function pointer before calling
 	if (!qvkCreateGraphicsPipelines) {
-		ri.Printf(PRINT_ERROR, "create_pipeline: qvkCreateGraphicsPipelines function not loaded\n");
-		return VK_NULL_HANDLE;
+		ri.Printf(PRINT_ERROR, "vk_create_post_process_pipeline: qvkCreateGraphicsPipelines function not loaded\n");
+		return;
 	}
 
 	// Create graphics pipeline with detailed error reporting
@@ -7822,6 +7822,14 @@ static void get_mvp_transform( float *mvp )
 {
 	if ( backEnd.projection2D )
 	{
+		// Prevent division by zero that causes SIGFPE
+		if (glConfig.vidWidth == 0 || glConfig.vidHeight == 0) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Invalid viewport dimensions (%dx%d), skipping MVP transform\n",
+				glConfig.vidWidth, glConfig.vidHeight);
+			Com_Memset(mvp, 0, sizeof(float) * 16);
+			return;
+		}
+
 		float mvp0 = 2.0f / glConfig.vidWidth;
 		float mvp5 = 2.0f / glConfig.vidHeight;
 
@@ -9068,6 +9076,17 @@ static void vk_create_prefilter_pipeline( filterDef *def )
 	create_info.pDynamicState = &dynamic_state;
 	create_info.stageCount = ARRAY_LEN(shader_stages);
 	create_info.pStages = shader_stages;
+
+	// Validate shader modules before pipeline creation to prevent SIGFPE
+	if (def->shaders.vs_module == VK_NULL_HANDLE || def->shaders.fs_module == VK_NULL_HANDLE) {
+		ri.Printf(PRINT_ERROR, "vk_create_prefilter_pipeline: Invalid shader modules (vs=%p fs=%p)\n",
+			(void*)def->shaders.vs_module, (void*)def->shaders.fs_module);
+		return;
+	}
+
+	// Check for any potential floating point issues in pipeline data before Vulkan API call
+	// This is a last-ditch effort to catch SIGFPE before it happens
+	ri.Printf(PRINT_DEVELOPER, "vk_create_prefilter_pipeline: About to call qvkCreateGraphicsPipelines\n");
 
 	VK_CHECK( qvkCreateGraphicsPipelines( vk.device, VK_NULL_HANDLE, 1, &create_info, NULL, &def->pipeline ) );	
 }

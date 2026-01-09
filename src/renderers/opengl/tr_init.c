@@ -1309,23 +1309,40 @@ static void R_InitExtensions( void )
 	size_t len;
 	const char *err;
 
-	if ( !qglGetString( GL_EXTENSIONS ) )
-	{
-		ri.Error( ERR_FATAL, "OpenGL installation is broken. Please fix video drivers and/or restart your system" );
+	// Check if we have a valid OpenGL context
+	const char *vendor = (const char *)qglGetString(GL_VENDOR);
+	const char *renderer = (const char *)qglGetString(GL_RENDERER);
+	const char *version_str = (const char *)qglGetString(GL_VERSION);
+
+	if (!vendor || !renderer || !version_str) {
+		ri.Printf(PRINT_WARNING, "OpenGL context strings not available, using fallback values\n");
+		vendor = vendor ? vendor : "Unknown";
+		renderer = renderer ? renderer : "Unknown";
+		version_str = version_str ? version_str : "Unknown";
 	}
 
 	// get our config strings
-	Q_strncpyz( glConfig.vendor_string, (char *)qglGetString (GL_VENDOR), sizeof( glConfig.vendor_string ) );
-	Q_strncpyz( glConfig.renderer_string, (char *)qglGetString (GL_RENDERER), sizeof( glConfig.renderer_string ) );
+	Q_strncpyz( glConfig.vendor_string, vendor, sizeof( glConfig.vendor_string ) );
+	Q_strncpyz( glConfig.renderer_string, renderer, sizeof( glConfig.renderer_string ) );
 	len = strlen( glConfig.renderer_string );
 	if ( len && glConfig.renderer_string[ len - 1 ] == '\n' )
 		glConfig.renderer_string[ len - 1 ] = '\0';
-	Q_strncpyz( glConfig.version_string, (char *)qglGetString( GL_VERSION ), sizeof( glConfig.version_string ) );
+	Q_strncpyz( glConfig.version_string, version_str, sizeof( glConfig.version_string ) );
 
-	Q_strncpyz( gl_extensions, (char *)qglGetString( GL_EXTENSIONS ), sizeof( gl_extensions ) );
-	Q_strncpyz( glConfig.extensions_string, gl_extensions, sizeof( glConfig.extensions_string ) );
+	// Handle extensions - GL_EXTENSIONS may be NULL in modern OpenGL
+	const char *extensions = (const char *)qglGetString(GL_EXTENSIONS);
+	if (extensions) {
+		Q_strncpyz( gl_extensions, extensions, sizeof( gl_extensions ) );
+		Q_strncpyz( glConfig.extensions_string, gl_extensions, sizeof( glConfig.extensions_string ) );
+	} else {
+		// Modern OpenGL doesn't provide GL_EXTENSIONS, use empty string
+		ri.Printf(PRINT_WARNING, "GL_EXTENSIONS not available (modern OpenGL), using empty extension string\n");
+		gl_extensions[0] = '\0';
+		glConfig.extensions_string[0] = '\0';
+		// Don't treat this as a fatal error - continue with empty extensions
+	}
 
-	version = Q_atof( (const char *)qglGetString( GL_VERSION ) );
+	version = Q_atof( version_str );
 	gl_version = (int)(version * 10.001);
 
 	glConfig.textureCompression = TC_NONE;

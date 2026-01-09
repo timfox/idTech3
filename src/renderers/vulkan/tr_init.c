@@ -28,6 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
+#include <signal.h>
 
 extern refimport_t ri;
 
@@ -575,6 +576,7 @@ void R_Init( void ) {
     TR_Init_FontSDF_CVARS();
 
     vk_initialize();
+
     // Initialize headless flag explicitly to a safe default
     vk.headless = qfalse;
 

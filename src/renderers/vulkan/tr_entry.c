@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../renderercommon/tr_backend_iface.h"
 #include "../../common/q_shared.h"
 #include "vk.h"
+#include "vk_shader_manager.h"
 #include <unistd.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -185,14 +186,20 @@ Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI(int
     return NULL;
   }
 
-  // Test basic shader loading before proceeding
-  // This prevents SIGFPE crashes during pipeline creation
-  VkShaderModule test_vs = vk_load_shader("color_vert", VK_SHADER_STAGE_VERTEX_BIT);
-  VkShaderModule test_fs = vk_load_shader("color_frag", VK_SHADER_STAGE_FRAGMENT_BIT);
+  // Test basic Vulkan device availability before proceeding
+  // This prevents SIGFPE crashes when Vulkan is not initialized
+  if (vk.device == VK_NULL_HANDLE) {
+    ri.Printf(PRINT_WARNING, "Vulkan: Device not initialized, cannot test shaders yet. Tiny mode enabled.\n");
+    // Don't return NULL - allow tiny mode to proceed without shader test
+  } else {
+    // Test basic shader loading only if Vulkan is initialized
+    VkShaderModule test_vs = vk_load_shader("color_vert", VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderModule test_fs = vk_load_shader("color_frag", VK_SHADER_STAGE_FRAGMENT_BIT);
 
-  if (test_vs == VK_NULL_HANDLE || test_fs == VK_NULL_HANDLE) {
-    ri.Printf(PRINT_WARNING, "Vulkan: Basic shaders not available, falling back to OpenGL\n");
-    return NULL;
+    if (test_vs == VK_NULL_HANDLE || test_fs == VK_NULL_HANDLE) {
+      ri.Printf(PRINT_WARNING, "Vulkan: Basic shaders not available, falling back to OpenGL\n");
+      return NULL;
+    }
   }
 
   // Initialize Vulkan tiny mode - always enabled
