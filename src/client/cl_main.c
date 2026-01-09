@@ -4116,6 +4116,11 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 	re = *ret;
 	re_initialized = qtrue;
 
+	// Debug: Check if renderer function pointers are set
+	if (!re.RegisterModel) {
+		Com_Printf("WARNING: re.RegisterModel is NULL after renderer initialization\n");
+	}
+
 	// Validate that the renderer was properly initialized
 	if ( !re.GetConfig || !re.BeginFrame || !re.EndFrame ) {
 		Com_Printf( S_COLOR_RED "ERROR: Renderer initialization failed - graphics subsystem unavailable\n" );

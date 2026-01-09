@@ -270,7 +270,10 @@ static void test_bounds_checking_functions(void) {
         return;
     }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Warray-bounds"
     result = Net_BoundsCheckPointer((char *)buffer + 200, buffer, sizeof(buffer));
+#pragma GCC diagnostic pop
     if (result) {
         printf("  FAILED: Invalid pointer bounds accepted\n");
         return;

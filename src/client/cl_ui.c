@@ -815,6 +815,9 @@ The ui module is making a system call
 ====================
 */
 static intptr_t CL_UISystemCalls( intptr_t *args ) {
+	if (args[0] >= 100) {  // Debug for high trap numbers that might indicate corruption
+		Com_Printf("WARNING: UI system call with suspicious trap number: %ld\n", (long)args[0]);
+	}
 	switch( args[0] ) {
 	case UI_ERROR:
 	{
@@ -1053,6 +1056,12 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 	}
 
 	case UI_R_REGISTERMODEL:
+		if (!re.RegisterModel) {
+			Com_Printf("ERROR: re.RegisterModel is NULL - renderer function table corrupted\n");
+			Com_Printf("re.Shutdown = %p, re.BeginFrame = %p, re.EndFrame = %p\n",
+				re.Shutdown, re.BeginFrame, re.EndFrame);
+			return 0;
+		}
 		return re.RegisterModel( VMA(1) );
 
 	case UI_R_REGISTERSKIN:
@@ -1302,7 +1311,10 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 		if (!botlib_export) return 0;
 		return botlib_export->PC_AddGlobalDefine( VMA(1) );
 	case UI_PC_LOAD_SOURCE:
-		if (!botlib_export) return 0;
+		if (!botlib_export) {
+			Com_Printf("WARNING: botlib_export is NULL in UI_PC_LOAD_SOURCE\n");
+			return 0;
+		}
 		return botlib_export->PC_LoadSourceHandle( VMA(1) );
 	case UI_PC_FREE_SOURCE:
 		if (!botlib_export) return 0;
@@ -1428,27 +1440,27 @@ CL_ShutdownUI
 ====================
 */
 void CL_ShutdownUI( void ) {
-	Com_Printf( PRINT_ALL, "CL_ShutdownUI: Starting UI shutdown process\n" );
+	Com_Printf( "CL_ShutdownUI: Starting UI shutdown process\n" );
 
 	Key_SetCatcher( Key_GetCatcher() & ~KEYCATCH_UI );
 	cls.uiStarted = qfalse;
 	if ( !uivm ) {
-		Com_Printf( PRINT_ALL, "CL_ShutdownUI: No UI VM to shutdown\n" );
+		Com_Printf( "CL_ShutdownUI: No UI VM to shutdown\n" );
 		return;
 	}
 
-	Com_Printf( PRINT_ALL, "CL_ShutdownUI: Calling UI_SHUTDOWN syscall on VM\n" );
+	Com_Printf( "CL_ShutdownUI: Calling UI_SHUTDOWN syscall on VM\n" );
 	VM_Call( uivm, 0, UI_SHUTDOWN );
 
-	Com_Printf( PRINT_ALL, "CL_ShutdownUI: Freeing UI VM\n" );
+	Com_Printf( "CL_ShutdownUI: Freeing UI VM\n" );
 	VM_Free( uivm );
 
 	uivm = NULL;
 
-	Com_Printf( PRINT_ALL, "CL_ShutdownUI: Closing UI VM files\n" );
+	Com_Printf( "CL_ShutdownUI: Closing UI VM files\n" );
 	FS_VM_CloseFiles( H_Q3UI );
 
-	Com_Printf( PRINT_ALL, "CL_ShutdownUI: UI shutdown complete\n" );
+	Com_Printf( "CL_ShutdownUI: UI shutdown complete\n" );
 }
 
 
@@ -1457,7 +1469,7 @@ void CL_ShutdownUI( void ) {
 CL_BotLibPrint
 ====================
 */
-static void CL_BotLibPrint(int type, const char *fmt, ...) {
+static void CL_BotLibPrint(int type __attribute__((unused)), const char *fmt, ...) {
 	va_list argptr;
 	char msg[MAXPRINTMSG];
 

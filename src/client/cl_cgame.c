@@ -971,7 +971,7 @@ static intptr_t QDECL CL_DllSyscall( intptr_t arg, ... ) {
 CL_BotLibPrint
 ====================
 */
-static void CL_BotLibPrint(int type, const char *fmt, ...) {
+static void CL_BotLibPrint(int type __attribute__((unused)), const char *fmt, ...) {
 	va_list argptr;
 	char msg[MAXPRINTMSG];
 
