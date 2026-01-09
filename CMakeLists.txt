@@ -1637,29 +1637,30 @@ set(RENDERER_RTX_SRCS
 # )
 
 # Add RTX renderer as separate shared library
-add_library(renderer_rtx MODULE ${RENDERER_RTX_SRCS})
-set_target_properties(renderer_rtx PROPERTIES
-	PREFIX ""
-	OUTPUT_NAME "idtech3_rtx_x86_64"
-	LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/../release"
-)
+# Temporarily disabled due to undefined symbol errors
+# add_library(renderer_rtx MODULE ${RENDERER_RTX_SRCS})
+# set_target_properties(renderer_rtx PROPERTIES
+# 	PREFIX ""
+# 	OUTPUT_NAME "idtech3_rtx_x86_64"
+# 	LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/../release"
+# )
 
 # Link dependencies for RTX renderer
-target_link_libraries(renderer_rtx
-	common
-	${Vulkan_LIBRARIES}
-	${SDL2_LIBRARIES}
-	${CMAKE_DL_LIBS}
-)
+# target_link_libraries(renderer_rtx
+# 	common
+# 	${Vulkan_LIBRARIES}
+# 	${SDL2_LIBRARIES}
+# 	${CMAKE_DL_LIBS}
+# )
 
 # Include directories for RTX renderer
-target_include_directories(renderer_rtx PRIVATE
-	${CMAKE_SOURCE_DIR}/src/common
-	${CMAKE_SOURCE_DIR}/src/renderercommon
-	${CMAKE_SOURCE_DIR}/src/renderers/vulkan
-	${CMAKE_SOURCE_DIR}/src/renderers/vulkan/rtx
-	${CMAKE_SOURCE_DIR}/libs/cimgui
-)
+# target_include_directories(renderer_rtx PRIVATE
+# 	${CMAKE_SOURCE_DIR}/src/common
+# 	${CMAKE_SOURCE_DIR}/src/renderercommon
+# 	${CMAKE_SOURCE_DIR}/src/renderers/vulkan
+# 	${CMAKE_SOURCE_DIR}/src/renderers/vulkan/rtx
+# 	${CMAKE_SOURCE_DIR}/libs/cimgui
+# )
 
 IF(USE_CIMGUI AND DEFINED CIMGUI_DIR)
 	list(APPEND RENDERER_VK_SRCS

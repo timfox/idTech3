@@ -639,6 +639,7 @@ refexport_t *GetRefAPI( int apiVersion, refimport_t *rimp ) {
     }
 
     R_Register();
+    R_ModelInit();
 
     re.Shutdown = RE_Shutdown;
     re.BeginRegistration = RE_BeginRegistration;

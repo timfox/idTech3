@@ -274,8 +274,17 @@ model_t *R_AllocModel( void ) {
 ** Context-aware version that can work with local state
 */
 model_t *R_AllocModel_Context( renderer_context_t *ctx ) {
-	trGlobals_t *tr_ctx = GET_TR_CTX(ctx);
-	refimport_t *ri_ctx = GET_RI_CTX(ctx);
+	trGlobals_t *tr_ctx;
+	refimport_t *ri_ctx;
+
+	if (ctx) {
+		tr_ctx = GET_TR_CTX(ctx);
+		ri_ctx = GET_RI_CTX(ctx);
+	} else {
+		// Fallback to global context for compatibility
+		tr_ctx = &tr;
+		ri_ctx = &ri;
+	}
 
 	int maxModels = MAX_MOD_KNOWN;
 	if ( maxModels <= 0 ) {
@@ -283,13 +292,21 @@ model_t *R_AllocModel_Context( renderer_context_t *ctx ) {
 	}
 
 	if ( tr_ctx->numModels >= maxModels ) {
-		R_CTX_Printf(ctx, PRINT_WARNING, "R_AllocModel: Maximum models (%d) reached\n", maxModels);
+		if (ctx) {
+			R_CTX_Printf(ctx, PRINT_WARNING, "R_AllocModel: Maximum models (%d) reached\n", maxModels);
+		} else {
+			ri.Printf(PRINT_WARNING, "R_AllocModel: Maximum models (%d) reached\n", maxModels);
+		}
 		return NULL;
 	}
 
 	model_t *mod = (model_t *)ri_ctx->Hunk_Alloc( sizeof( *tr_ctx->models[tr_ctx->numModels] ), h_low );
 	if (!mod) {
-		R_CTX_Printf(ctx, PRINT_WARNING, "R_AllocModel: Hunk_Alloc failed\n");
+		if (ctx) {
+			R_CTX_Printf(ctx, PRINT_WARNING, "R_AllocModel: Hunk_Alloc failed\n");
+		} else {
+			ri.Printf(PRINT_WARNING, "R_AllocModel: Hunk_Alloc failed\n");
+		}
 		return NULL;
 	}
 
