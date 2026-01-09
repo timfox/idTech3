@@ -2316,7 +2316,7 @@ void R_DeleteTextures( void ) {
 
 	for ( i = 0; i < tr.numImages; i++ ) {
 		image_t *img = tr.images[ i ];
-		vk_destroy_image_resources( &img->handle, &img->view );
+		vk_destroy_image( img );
 
 		// img->descriptor will be released with pool reset
 	}

@@ -315,6 +315,10 @@ void RE_Shutdown( refShutdownCode_t code ) {
             return;
         }
 
+        // Clean up all textures and images to prevent GPU memory leaks
+        ri.Printf( PRINT_ALL, "RE_Shutdown: Cleaning up textures and images\n" );
+        R_DeleteTextures();
+
         // Attempt shutdown with error handling
         ri.Printf( PRINT_ALL, "RE_Shutdown: Calling vk_shutdown\n" );
         vk_shutdown( code );
@@ -611,6 +615,8 @@ void R_Init( void ) {
     vk.headless = qfalse;
 
     R_InitShaders();
+
+    R_ModelInit();
 }
 
 /*

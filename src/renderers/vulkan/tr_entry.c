@@ -221,8 +221,8 @@ Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI(int
   // Initialize refexport_t with tiny surface
   Com_Memset(&re, 0, sizeof(re));
 
-  // Initialize renderer subsystems
-  R_ModelInit();
+  // Tiny patch mode: defer full initialization until proper R_Init() call
+  // R_ModelInit() will be called later during full renderer initialization
 
   // Tiny surface: core lifecycle + essential functions for basic operation
   re.GetConfig = RE_GetConfig;

@@ -6398,7 +6398,9 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		Com_Printf( S_COLOR_YELLOW "         - Fragment shader: %p\n", (void*)shader_stages[1].module );
 
 		// Try to provide helpful suggestions
-		if (pipelineResult == VK_ERROR_OUT_OF_DEVICE_MEMORY) {
+		if (pipelineResult == VK_ERROR_DEVICE_LOST) {
+			Com_Printf( S_COLOR_YELLOW "       Device lost - this is a driver/GPU issue. Try updating drivers.\n" );
+		} else if (pipelineResult == VK_ERROR_OUT_OF_DEVICE_MEMORY) {
 			Com_Printf( S_COLOR_YELLOW "       Suggestion: Reduce graphics settings or close other applications\n" );
 		} else if (pipelineResult == VK_ERROR_OUT_OF_HOST_MEMORY) {
 			Com_Printf( S_COLOR_YELLOW "       Suggestion: Close other applications to free system memory\n" );
@@ -7788,10 +7790,20 @@ multisample_state.rasterizationSamples = (renderPassIndex == RENDER_PASS_SCREENM
 
 	VkResult pipelineResult = qvkCreateGraphicsPipelines(vk.device, vk.pipelineCache, 1, &create_info, NULL, &pipeline);
 	if (pipelineResult != VK_SUCCESS) {
-		ri.Printf(PRINT_ERROR, "Pipeline creation failed with VkResult: %d\n", (int)pipelineResult);
-		ri.Printf(PRINT_ERROR, "Pipeline debug info: shader_type=%d, cullType=%d, state_bits=0x%x\n",
-			def->shader_type, def->cullType, def->state_bits);
-		return VK_NULL_HANDLE; // Return null handle on failure
+		if (pipelineResult == VK_ERROR_DEVICE_LOST) {
+			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during pipeline creation - this is a driver/GPU issue\n");
+			ri.Printf(PRINT_ERROR, "Vulkan: Try updating graphics drivers or reducing graphics settings\n");
+			ri.Printf(PRINT_ERROR, "Vulkan: Pipeline debug info: shader_type=%d, cullType=%d, state_bits=0x%x\n",
+				def->shader_type, def->cullType, def->state_bits);
+			// Don't terminate the engine, just log and return null
+			return VK_NULL_HANDLE;
+		} else {
+			ri.Printf(PRINT_ERROR, "Pipeline creation failed with VkResult: %d (%s)\n", (int)pipelineResult,
+				vk_result_string(pipelineResult));
+			ri.Printf(PRINT_ERROR, "Pipeline debug info: shader_type=%d, cullType=%d, state_bits=0x%x\n",
+				def->shader_type, def->cullType, def->state_bits);
+			return VK_NULL_HANDLE; // Return null handle on failure
+		}
 	}
 
 	SET_OBJECT_NAME( pipeline, va( "pipeline def#%i, pass#%i", def_index, renderPassIndex ), VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT );
@@ -9160,7 +9172,20 @@ static void vk_create_prefilter_pipeline( filterDef *def )
 	// This is a last-ditch effort to catch SIGFPE before it happens
 	ri.Printf(PRINT_DEVELOPER, "vk_create_prefilter_pipeline: About to call qvkCreateGraphicsPipelines\n");
 
-	VK_CHECK( qvkCreateGraphicsPipelines( vk.device, VK_NULL_HANDLE, 1, &create_info, NULL, &def->pipeline ) );	
+	// Use more robust error handling to prevent device loss from propagating
+	VkResult pipelineResult = qvkCreateGraphicsPipelines( vk.device, VK_NULL_HANDLE, 1, &create_info, NULL, &def->pipeline );
+	if (pipelineResult != VK_SUCCESS) {
+		if (pipelineResult == VK_ERROR_DEVICE_LOST) {
+			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during pipeline creation - this is a driver issue\n");
+			ri.Printf(PRINT_ERROR, "Vulkan: Try updating graphics drivers or reducing graphics settings\n");
+			// Don't call ri.Error here as it would terminate - just log and return
+			return;
+		} else {
+			ri.Printf(PRINT_ERROR, "Vulkan pipeline creation failed: %s (%d)\n",
+				vk_result_string(pipelineResult), pipelineResult);
+			return;
+		}
+	}	
 }
 
 void vk_create_cubemap_prefilter( void )
@@ -9817,8 +9842,10 @@ void vk_shutdown( refShutdownCode_t code ) {
 				vk_safe_free((void**)&vk.swapchain_rendering_finished, "swapchain_rendering_finished");
 			}
 
-			// Full shutdown - clear everything
-			Com_Memset( &vk, 0, sizeof( vk ) );
+			// Full shutdown - mark as inactive but don't memset to avoid corrupting any remaining state
+			vk.active = qfalse;
+			vk.device = VK_NULL_HANDLE;
+			vk.swapchain = VK_NULL_HANDLE;
 		} else {
 			ri.Printf(PRINT_ALL, "vk_shutdown: Partial cleanup - keeping window context\n");
 		}
@@ -9935,11 +9962,33 @@ void vk_get_gpu_timing_stats( double *avg_frame_time_ms, double *min_frame_time_
 }
 
 void vk_wait_idle( void ) {
-	VK_CHECK( qvkDeviceWaitIdle( vk.device ) );
+	VkResult result = qvkDeviceWaitIdle( vk.device );
+	if (result != VK_SUCCESS) {
+		if (result == VK_ERROR_DEVICE_LOST) {
+			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during device wait - GPU driver issue\n");
+			ri.Printf(PRINT_ERROR, "Vulkan: This may cause rendering artifacts or instability\n");
+			// Don't terminate the engine for device lost
+			return;
+		} else {
+			// For other errors, use the standard error handling
+			VK_CHECK(result);
+		}
+	}
 }
 
 void vk_queue_wait_idle( void ) {
-	VK_CHECK( qvkQueueWaitIdle( vk.queue ) );
+	VkResult result = qvkQueueWaitIdle( vk.queue );
+	if (result != VK_SUCCESS) {
+		if (result == VK_ERROR_DEVICE_LOST) {
+			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during queue wait - GPU driver issue\n");
+			ri.Printf(PRINT_ERROR, "Vulkan: This may cause rendering artifacts or instability\n");
+			// Don't terminate the engine for device lost
+			return;
+		} else {
+			// For other errors, use the standard error handling
+			VK_CHECK(result);
+		}
+	}
 }
 
 /*

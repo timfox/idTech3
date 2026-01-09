@@ -1549,6 +1549,7 @@ void vk_destroy_samplers(void);
 void vk_update_attachment_descriptors(void);
 void vk_update_descriptor_set(image_t* img, qboolean isTexture);
 void vk_destroy_image_resources(VkImage* image, VkImageView* view);
+void vk_destroy_image(image_t *image);
 float ByteToFloat(byte b);
 float sRGBtoRGB(float srgb);
 byte FloatToByte(float f);
