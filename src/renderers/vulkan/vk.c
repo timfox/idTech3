@@ -7938,7 +7938,21 @@ static void get_mvp_transform( float *mvp )
 		proj[5] = -p[5];
 		//proj[10] = ( p[10] - 1.0f ) / 2.0f;
 		//proj[14] = p[14] / 2.0f;
-		myGlMultMatrix( vk_world.modelview_transform, proj, mvp );
+
+		// Check if vk_world.modelview_transform is properly initialized
+		if (vk_world.modelview_transform[15] == 0.0f) {
+			// Fallback to identity matrix if not initialized
+			float identity[16] = {
+				1.0f, 0.0f, 0.0f, 0.0f,
+				0.0f, 1.0f, 0.0f, 0.0f,
+				0.0f, 0.0f, 1.0f, 0.0f,
+				0.0f, 0.0f, 0.0f, 1.0f
+			};
+			myGlMultMatrix( identity, proj, mvp );
+			ri.Printf(PRINT_DEVELOPER, "get_mvp_transform: Using identity matrix (modelview_transform not initialized)\n");
+		} else {
+			myGlMultMatrix( vk_world.modelview_transform, proj, mvp );
+		}
 	}
 }
 
@@ -7948,6 +7962,11 @@ static void get_mvp_transform( float *mvp )
 
 
 void vk_update_mvp( void *m ) {
+	// Skip if frame is not ready (e.g., swapchain acquisition failed)
+	if (!vk.cmd->frame_ready) {
+		return;
+	}
+
 	float push_constants[16]; // mvp transform
 
 	//

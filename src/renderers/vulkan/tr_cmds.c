@@ -407,6 +407,17 @@ for each RE_EndFrame
 void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 	drawBufferCommand_t *cmd;
 
+	// Safety check: if Vulkan is not properly initialized, skip rendering to avoid crashes
+#ifdef USE_VULKAN
+	if (!vk.active || vk.device == VK_NULL_HANDLE || vk.swapchain == VK_NULL_HANDLE || vk.cmd == NULL) {
+		ri.Printf(PRINT_DEVELOPER, "Vulkan: Skipping frame - not fully initialized\n");
+		return;
+	}
+#endif
+
+	// Initialize frame ready flag
+	vk.cmd->frame_ready = qfalse;
+
 #ifdef USE_VULKAN
 	// Memory validation disabled to avoid compilation issues
 	// TODO: Re-enable when function linking is resolved
@@ -425,14 +436,6 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 		return;
 	}
 
-	// Safety check: if Vulkan is not properly initialized, skip rendering to avoid crashes
-#ifdef USE_VULKAN
-	if (!vk.active || vk.device == VK_NULL_HANDLE || vk.swapchain == VK_NULL_HANDLE) {
-		ri.Printf(PRINT_DEVELOPER, "Vulkan: Skipping frame - not fully initialized\n");
-		return;
-	}
-#endif
-
 	glState.finishCalled = qfalse;
 
 #ifdef USE_VULKAN
@@ -450,6 +453,10 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 		if (result == VK_ERROR_OUT_OF_DATE_KHR) {
 			// Swapchain is out of date, need to recreate
 			ri.Printf(PRINT_WARNING, "Vulkan: Swapchain out of date, skipping frame\n");
+			return;
+		} else if (result == VK_TIMEOUT) {
+			// Timeout acquiring swapchain image (common in headless environments)
+			ri.Printf(PRINT_WARNING, "Vulkan: Timeout acquiring swapchain image, skipping frame (headless mode?)\n");
 			return;
 		} else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
 			ri.Error(ERR_FATAL, "Vulkan: Failed to acquire swapchain image: %d\n", result);

@@ -246,8 +246,18 @@ extern PFN_vkCmdCopyImageToBuffer qvkCmdCopyImageToBuffer;
 // Bloom system constants
 #define VK_NUM_BLOOM_PASSES            3
 
-// Vulkan error checking macro
-#define VK_CHECK(x) do { VkResult err = x; if (err) { ri.Error(ERR_FATAL, "Vulkan error %d at %s:%d", err, __FILE__, __LINE__); } } while (0)
+// Vulkan error checking macro with descriptive error messages
+#define VK_CHECK(x) do { \
+    VkResult err = x; \
+    if (err) { \
+        const char* err_str = vk_result_string(err); \
+        if (err == VK_ERROR_DEVICE_LOST) { \
+            ri.Error(ERR_FATAL, "Vulkan device lost (%s) at %s:%d - This usually indicates a GPU driver or hardware issue. Try updating your graphics drivers.", err_str, __FILE__, __LINE__); \
+        } else { \
+            ri.Error(ERR_FATAL, "Vulkan error %s (%d) at %s:%d", err_str, err, __FILE__, __LINE__); \
+        } \
+    } \
+} while (0)
 
 // Shader file watch structure for hot reloading
 typedef struct shader_file_watch_s {
@@ -360,6 +370,7 @@ typedef struct {
     VkDeviceSize curr_index_offset;
     Vk_Depth_Range depth_range;
     uint32_t camera_ubo_offset;
+    qboolean frame_ready; // True when vk_begin_frame completed successfully
 
     struct {
         VkDescriptorSet current[32];
@@ -1448,6 +1459,12 @@ extern Vk_Instance vk;
 static inline qboolean VK_IsHeadless(void)
 {
     return vk.headless;
+}
+
+// Lightweight helper to check if Vulkan command buffer is ready (inlined for zero-cost checks)
+static inline qboolean VK_IsCmdReady(void)
+{
+    return vk.active && vk.cmd != NULL && vk.cmd->command_buffer != VK_NULL_HANDLE;
 }
 
 // Function prototypes

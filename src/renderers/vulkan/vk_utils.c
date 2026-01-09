@@ -301,9 +301,7 @@ qboolean vk_validate_memory_state(void) {
 
     // Check VRAM stats for obviously corrupted values
     if (vk.vram_stats.used_vram > vk.vram_stats.total_vram * 2 ||
-        vk.vram_stats.used_vram < 0 ||
-        vk.vram_stats.available_vram > vk.vram_stats.total_vram ||
-        vk.vram_stats.available_vram < 0) {
+        vk.vram_stats.available_vram > vk.vram_stats.total_vram) {
         ri.Printf(PRINT_ERROR, "vk_validate_memory_state: VRAM statistics corrupted\n");
         ri.Printf(PRINT_ERROR, "  used_vram: %llu, total_vram: %llu, available_vram: %llu\n",
                  (unsigned long long)vk.vram_stats.used_vram,
@@ -315,7 +313,7 @@ qboolean vk_validate_memory_state(void) {
     // Check memory type usage for corrupted values
     for (uint32_t i = 0; i < VK_MAX_MEMORY_TYPES; i++) {
         VkDeviceSize usage = vk.vram_stats.memory_type_usage[i];
-        if (usage != 0 && (usage > vk.vram_stats.total_vram * 2 || usage < 0)) {
+        if (usage != 0 && usage > vk.vram_stats.total_vram * 2) {
             ri.Printf(PRINT_ERROR, "vk_validate_memory_state: Memory type %u usage corrupted: %llu\n",
                      i, (unsigned long long)usage);
             return qfalse;

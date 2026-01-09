@@ -203,8 +203,115 @@ Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI(int
 			return NULL;
 		}
 
-		// Simple watchdog test - try basic Vulkan operations with timeout
-		ri.Printf(PRINT_ALL, "DEBUG: Testing basic Vulkan operations\n");
+		// Test basic Vulkan device operations to catch device lost errors early
+		ri.Printf(PRINT_ALL, "DEBUG: Testing basic Vulkan device operations\n");
+
+		// Try a simple Vulkan operation that would fail if device is lost
+		VkCommandPool testPool = VK_NULL_HANDLE;
+		VkCommandPoolCreateInfo poolInfo = {
+			.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+			.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
+			.queueFamilyIndex = vk.queue_family_index
+		};
+
+		VkResult testResult = qvkCreateCommandPool(vk.device, &poolInfo, NULL, &testPool);
+		if (testResult != VK_SUCCESS) {
+			ri.Printf(PRINT_ERROR, "Vulkan: Device test failed (%s), falling back to OpenGL\n", vk_result_string(testResult));
+			return NULL;
+		}
+
+		// Clean up test resources
+		if (testPool != VK_NULL_HANDLE) {
+			qvkDestroyCommandPool(vk.device, testPool, NULL);
+		}
+
+		// Test more comprehensive Vulkan initialization (similar to what vk_create_attachments does)
+		ri.Printf(PRINT_ALL, "DEBUG: Testing Vulkan attachment creation\n");
+
+		// Try to create a basic attachment to test if device is really functional
+		VkImage testImage = VK_NULL_HANDLE;
+		VkDeviceMemory testMemory = VK_NULL_HANDLE;
+		VkImageView testView = VK_NULL_HANDLE;
+
+		// Create a tiny 1x1 test image
+		VkImageCreateInfo imageInfo = {
+			.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+			.imageType = VK_IMAGE_TYPE_2D,
+			.format = VK_FORMAT_R8G8B8A8_UNORM,
+			.extent = {1, 1, 1},
+			.mipLevels = 1,
+			.arrayLayers = 1,
+			.samples = VK_SAMPLE_COUNT_1_BIT,
+			.tiling = VK_IMAGE_TILING_OPTIMAL,
+			.usage = VK_IMAGE_USAGE_SAMPLED_BIT,
+			.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
+		};
+
+		VkResult imageResult = qvkCreateImage(vk.device, &imageInfo, NULL, &testImage);
+		if (imageResult != VK_SUCCESS) {
+			ri.Printf(PRINT_ERROR, "Vulkan: Image creation test failed (%s), falling back to OpenGL\n", vk_result_string(imageResult));
+			return NULL;
+		}
+
+		// Get memory requirements
+		VkMemoryRequirements memReqs;
+		qvkGetImageMemoryRequirements(vk.device, testImage, &memReqs);
+
+		// Allocate memory
+		VkMemoryAllocateInfo allocInfo = {
+			.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+			.allocationSize = memReqs.size,
+			.memoryTypeIndex = find_memory_type(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+		};
+
+		VkResult allocResult = qvkAllocateMemory(vk.device, &allocInfo, NULL, &testMemory);
+		if (allocResult != VK_SUCCESS) {
+			qvkDestroyImage(vk.device, testImage, NULL);
+			ri.Printf(PRINT_ERROR, "Vulkan: Memory allocation test failed (%s), falling back to OpenGL\n", vk_result_string(allocResult));
+			return NULL;
+		}
+
+		// Bind memory
+		VkResult bindResult = qvkBindImageMemory(vk.device, testImage, testMemory, 0);
+		if (bindResult != VK_SUCCESS) {
+			qvkDestroyImage(vk.device, testImage, NULL);
+			qvkFreeMemory(vk.device, testMemory, NULL);
+			ri.Printf(PRINT_ERROR, "Vulkan: Memory binding test failed (%s), falling back to OpenGL\n", vk_result_string(bindResult));
+			return NULL;
+		}
+
+		// Create image view
+		VkImageViewCreateInfo viewInfo = {
+			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+			.image = testImage,
+			.viewType = VK_IMAGE_VIEW_TYPE_2D,
+			.format = VK_FORMAT_R8G8B8A8_UNORM,
+			.subresourceRange = {
+				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+				.baseMipLevel = 0,
+				.levelCount = 1,
+				.baseArrayLayer = 0,
+				.layerCount = 1
+			}
+		};
+
+		VkResult viewResult = qvkCreateImageView(vk.device, &viewInfo, NULL, &testView);
+		if (viewResult != VK_SUCCESS) {
+			qvkDestroyImage(vk.device, testImage, NULL);
+			qvkFreeMemory(vk.device, testMemory, NULL);
+			ri.Printf(PRINT_ERROR, "Vulkan: Image view creation test failed (%s), falling back to OpenGL\n", vk_result_string(viewResult));
+			return NULL;
+		}
+
+		// Clean up test resources
+		if (testView != VK_NULL_HANDLE) qvkDestroyImageView(vk.device, testView, NULL);
+		if (testImage != VK_NULL_HANDLE) qvkDestroyImage(vk.device, testImage, NULL);
+		if (testMemory != VK_NULL_HANDLE) qvkFreeMemory(vk.device, testMemory, NULL);
+
+		ri.Printf(PRINT_ALL, "DEBUG: Vulkan attachment creation test passed\n");
+
+		ri.Printf(PRINT_ALL, "DEBUG: Vulkan device operations test passed\n");
 
 		// Q2RTX-style approach: Don't test Vulkan upfront, just ensure we have fallback ready
 		ri.Printf(PRINT_ALL, "DEBUG: Vulkan renderer ready with OpenGL fallback\n");

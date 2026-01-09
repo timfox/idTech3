@@ -572,6 +572,11 @@ static void RB_Hyperspace( void ) {
 
 static void SetViewportAndScissor( void ) {
 #ifdef USE_VULKAN
+	// Skip if Vulkan command buffer is not ready
+	if (!VK_IsCmdReady()) {
+		return;
+	}
+
 	//Com_Memcpy( vk_world.modelview_transform, backEnd.or.modelViewMatrix, 64 );
 	//vk_update_mvp();
 	// force depth range and viewport/scissor updates
@@ -1148,6 +1153,11 @@ static void RB_SetGL2D( void ) {
 	backEnd.projection2D = qtrue;
 
 #ifdef USE_VULKAN
+	// Skip Vulkan operations if Vulkan is not ready or frame is not ready (e.g., swapchain acquisition failed)
+	if (!VK_IsCmdReady() || !vk.cmd->frame_ready) {
+		return;
+	}
+
 	// CRITICAL: Ensure main render pass is started before UI rendering.
 	// On menu-only frames (no 3D world), RB_DrawSurfs() may never be called,
 	// so the render pass never starts, causing UI to render to nothing -> black screen.
@@ -2053,6 +2063,14 @@ RB_ExecuteRenderCommands
 ====================
 */
 void RB_ExecuteRenderCommands( const void *data ) {
+
+#ifdef USE_VULKAN
+	// Skip rendering if Vulkan is not fully initialized to prevent crashes
+	if (!VK_IsCmdReady()) {
+		ri.Printf(PRINT_DEVELOPER, "Vulkan: Skipping render commands - not fully initialized\n");
+		return;
+	}
+#endif
 
 	backEnd.pc.msec = ri.Milliseconds();
 

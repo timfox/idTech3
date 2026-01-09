@@ -2260,7 +2260,7 @@ static qboolean VM_ValidateVMState( vm_t *vm ) {
 
 	// Validate function pointers if they exist (cast to void* for validation)
 	if ( vm->destroy ) {
-		if ( !VM_ValidatePointer( (void *)vm->destroy, "vm_destroy" ) ) {
+		if ( !VM_ValidatePointer( (void *)(uintptr_t)vm->destroy, "vm_destroy" ) ) {
 			Com_Printf( "VM_ValidateVMState: VM destroy function pointer appears corrupted\n" );
 			return qfalse;
 		}

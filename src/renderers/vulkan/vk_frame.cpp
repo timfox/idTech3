@@ -375,6 +375,8 @@ extern "C" void vk_begin_frame(void) {
     // If we get here and result is not success, all retries failed
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "vk_begin_frame: Failed to acquire swapchain image after %d retries: %s\n", max_retries, vk_result_string(result));
+        // Mark frame as not ready to prevent rendering
+        vk.cmd->frame_ready = qfalse;
         // #region agent log
         {
             char _log[128];
@@ -385,6 +387,9 @@ extern "C" void vk_begin_frame(void) {
         // #endregion
         return;
     }
+
+    // Mark frame as ready for rendering
+    vk.cmd->frame_ready = qtrue;
 
     // Handle dynamic resolution
     if (r_dynamicResolution && r_dynamicResolution->integer) {
