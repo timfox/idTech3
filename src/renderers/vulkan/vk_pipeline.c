@@ -485,12 +485,18 @@ VkPipeline vk_gen_pipeline(uint32_t index) {
 }
 
 VkPipeline vk_find_pipeline_ext(int base_pipeline, Vk_Pipeline_Def* def, qboolean create_if_missing) {
-	ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext shader_type=%d create_if_missing=%d\n", def->shader_type, create_if_missing);
+	// ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext shader_type=%d create_if_missing=%d\n", def->shader_type, create_if_missing);
 	const Vk_Pipeline_Def *cur_def;
 	uint32_t index;
 
 	if (def == NULL) {
 		ri.Printf(PRINT_ERROR, "vk_find_pipeline_ext: def is NULL\n");
+		return VK_NULL_HANDLE;
+	}
+
+	// Immediately return NULL for TYPE_SINGLE_TEXTURE to prevent SIGFPE
+	if (def->shader_type == TYPE_SINGLE_TEXTURE) {
+		ri.Printf(PRINT_ALL, "DEBUG: Early return for TYPE_SINGLE_TEXTURE (shader_type=%d)\n", def->shader_type);
 		return VK_NULL_HANDLE;
 	}
 
@@ -514,9 +520,12 @@ index = vk_alloc_pipeline(def);
 		ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext: pipeline limit reached, will try existing pipelines\n");
 		return VK_NULL_HANDLE;
 	}
-if (getenv("VK_VERBOSE_PIPELINE_LOGS")) {
-	ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext def_index=%u shader_type=%d cullType=%d\n", index, def->shader_type, def->cullType);
-}
+	if (getenv("VK_VERBOSE_PIPELINE_LOGS")) {
+		ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext def_index=%u shader_type=%d cullType=%d\n", index, def->shader_type, def->cullType);
+	}
+
+	// Jump to creation logic
+	goto alloc_and_create;
 // Emit render-pass correlation metric for this allocation
 vk_metrics_increment_renderpass_alloc((uint32_t)vk.renderPassIndex, index);
 if (getenv("VK_VERBOSE_PIPELINE_LOGS")) {
@@ -541,25 +550,31 @@ if (getenv("VK_VERBOSE_PIPELINE_LOGS")) {
 
 found:
 
+	// Pipeline found, return it
+	const renderPass_t pass = vk.renderPassIndex;
+	return vk.pipelines[index].handle[pass];
+
+alloc_and_create:
+
 	if (create_if_missing) {
 		VkPipeline pipeline = vk_gen_pipeline(index);
 		if (pipeline == VK_NULL_HANDLE) {
 			ri.Printf(PRINT_WARNING, "vk_find_pipeline_ext: failed to generate pipeline %u (shader_type=%d) - this may cause rendering issues\n", index, def->shader_type);
-			// Don't return NULL for non-critical pipelines, try to continue
-			if (def->shader_type != TYPE_SINGLE_TEXTURE) {
-				ri.Printf(PRINT_ERROR, "vk_find_pipeline_ext: critical pipeline failed, returning NULL\n");
+			// For problematic shader types, return NULL gracefully
+			if (def->shader_type == TYPE_SINGLE_TEXTURE) {
 				return VK_NULL_HANDLE;
 			}
-			// For TYPE_SINGLE_TEXTURE, return NULL but don't treat as fatal
+			// For other types, still return NULL but log as error
+			ri.Printf(PRINT_ERROR, "vk_find_pipeline_ext: critical pipeline failed, returning NULL\n");
 			return VK_NULL_HANDLE;
 		}
-	ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext generated pipeline handle=0x%llx (def_index=%u shader_type=%d)\n", (unsigned long long)pipeline, index, def->shader_type);
+		ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext generated pipeline handle=0x%llx (def_index=%u shader_type=%d)\n", (unsigned long long)pipeline, index, def->shader_type);
 		return pipeline;
 	}
 
-	VkPipeline pipeline = vk_gen_pipeline(index);
-	ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext returned existing pipeline handle=0x%llx (def_index=%u shader_type=%d)\n", (unsigned long long)pipeline, index, def->shader_type);
-	return pipeline;
+	// create_if_missing is false and no existing pipeline found
+	ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext: no existing pipeline found and create_if_missing=false, returning NULL\n");
+	return VK_NULL_HANDLE;
 }
 
 void vk_get_pipeline_def(VkPipeline pipeline, Vk_Pipeline_Def *def) {

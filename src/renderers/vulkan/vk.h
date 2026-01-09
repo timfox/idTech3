@@ -646,7 +646,7 @@ typedef struct {
 
     // Fragment shader modules (complex structure for various shader combinations)
     struct {
-        VkShaderModule gen[2][2][2][2]; // Multi-dimensional array for shader variants
+        VkShaderModule gen[2][3][2][2]; // Multi-dimensional array for shader variants (increased 2nd dim)
         VkShaderModule fixed[2][2][2]; // Fixed shader variants
         VkShaderModule ident1[2][2][2]; // Identity shader variants
         VkShaderModule ent[2][2][2]; // Entity shader variants
@@ -656,7 +656,7 @@ typedef struct {
 
     // Vertex shader modules (complex structure for various shader combinations)
     struct {
-        VkShaderModule gen[2][2][2][2][2]; // Multi-dimensional array for shader variants
+        VkShaderModule gen[2][3][2][2][2]; // Multi-dimensional array for shader variants (increased 2nd dim)
         VkShaderModule fixed[2][2][2][2]; // Fixed shader variants
         VkShaderModule ident1[2][2][2][2]; // Identity shader variants
         VkShaderModule light[2]; // Light vertex shader variants

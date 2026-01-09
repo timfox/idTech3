@@ -556,6 +556,7 @@ void	SCR_UpdateScreen( void );
 
 // Renderer initialization check
 qboolean CL_IsRendererInitialized( void );
+qboolean CL_CheckRendererInitialized( const char *function_name );
 
 void	SCR_DebugGraph( float value );
 

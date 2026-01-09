@@ -4047,9 +4047,20 @@ static shader_t *FinishShader( void ) {
 			}
 
 			def.mirror = qfalse;
+			ri.Printf(PRINT_ALL, "DEBUG: About to call vk_find_pipeline_ext for main pipeline (shader_type=%d)\n", def.shader_type);
 			pStage->vk_pipeline[0] = vk_find_pipeline_ext( 0, &def, qtrue );
+			ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext returned 0x%llx for main pipeline\n", (unsigned long long)pStage->vk_pipeline[0]);
+			if (pStage->vk_pipeline[0] == VK_NULL_HANDLE) {
+				ri.Printf(PRINT_WARNING, "Failed to create Vulkan pipeline for shader stage (type %d), falling back to default shader\n", def.shader_type);
+				shader.defaultShader = qtrue;
+				return FinishShader();
+			}
 			def.mirror = qtrue;
+			// Try to find existing mirror pipeline, don't create if missing to avoid SIGFPE
+			ri.Printf(PRINT_ALL, "DEBUG: About to call vk_find_pipeline_ext for mirror pipeline (shader_type=%d)\n", def.shader_type);
 			pStage->vk_mirror_pipeline[0] = vk_find_pipeline_ext( 0, &def, qfalse );
+			ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext returned 0x%llx for mirror pipeline\n", (unsigned long long)pStage->vk_mirror_pipeline[0]);
+			// Note: Mirror pipeline is optional, NULL is acceptable
 
 			if ( pStage->depthFragment ) {
 				def.mirror = qfalse;
@@ -4058,9 +4069,17 @@ static shader_t *FinishShader( void ) {
 				#endif
 				def.shader_type = TYPE_SINGLE_TEXTURE_DF;
 				pStage->vk_pipeline_df = vk_find_pipeline_ext( 0, &def, qtrue );
+				if (pStage->vk_pipeline_df == VK_NULL_HANDLE) {
+					ri.Printf(PRINT_WARNING, "Failed to create Vulkan depth fragment pipeline for shader stage\n");
+					// Don't fail, depth fragment pipeline is optional
+				}
 				def.mirror = qtrue;
 				def.shader_type = TYPE_SINGLE_TEXTURE_DF;
 				pStage->vk_mirror_pipeline_df = vk_find_pipeline_ext( 0, &def, qfalse );
+				if (pStage->vk_mirror_pipeline_df == VK_NULL_HANDLE) {
+					ri.Printf(PRINT_WARNING, "Failed to create Vulkan mirror depth fragment pipeline for shader stage\n");
+					// Don't fail, mirror depth fragment pipeline is optional
+				}
 			}
 
 
@@ -4078,7 +4097,15 @@ static shader_t *FinishShader( void ) {
 				def_mirror.acff = pStage->bundle[0].adjustColorsForFog;
 
 				pStage->vk_pipeline[1] = vk_find_pipeline_ext( 0, &def_fog, qfalse );
+				if (pStage->vk_pipeline[1] == VK_NULL_HANDLE) {
+					ri.Printf(PRINT_WARNING, "Failed to create Vulkan fog pipeline for shader stage\n");
+					// Don't fail, fog pipeline is optional
+				}
 				pStage->vk_mirror_pipeline[1] = vk_find_pipeline_ext( 0, &def_mirror, qfalse );
+				if (pStage->vk_mirror_pipeline[1] == VK_NULL_HANDLE) {
+					ri.Printf(PRINT_WARNING, "Failed to create Vulkan mirror fog pipeline for shader stage\n");
+					// Don't fail, mirror fog pipeline is optional
+				}
 
 
 				pStage->bundle[0].adjustColorsForFog = ACFF_NONE; // will be handled in shader from now
