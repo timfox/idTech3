@@ -19,7 +19,7 @@
    ```bash
    # For Vulkan
    sudo apt-get install vulkan-utils vulkan-tools
-   
+
    # For OpenGL
    sudo apt-get install mesa-utils
    ```
@@ -33,6 +33,17 @@
    ```bash
    ldd release/idtech3_vulkan_x86_64.so
    ldd release/idtech3_opengl_x86_64.so
+   ```
+
+5. For build issues, use the recommended build method:
+   ```bash
+   # Use the wrapper script (recommended)
+   bash tools/compile_engine.sh vulkan Release
+   ```
+
+6. If CMake times out, try the Makefile directly:
+   ```bash
+   make vulkan BUILD_TYPE=Release
    ```
 
 #### "pak0.pk3 not found"

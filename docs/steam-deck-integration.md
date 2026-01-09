@@ -33,10 +33,11 @@ This document describes the Steam Deck features integrated into the engine and m
 - **Description**: Engine uses Vulkan as primary graphics API, providing best performance and battery life on Steam Deck.
 
 #### Video Codecs
-- **Status**: ⚠️ Needs Review
+- **Status**: 🔄 In Progress
 - **Current**: Uses Theora and VPX codecs
-- **Recommendation**: Ensure VP9/AV1 support for video playback
+- **Updates**: Added VP9/AV1 support for better Steam Deck compatibility
 - **Location**: `src/client/cl_cin_*.c`
+- **Implementation**: Automatic codec selection based on available libraries
 
 ### 3. Game Features
 

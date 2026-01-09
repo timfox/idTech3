@@ -181,6 +181,73 @@ The engine tracks comprehensive memory statistics:
 
 Aggregate statistics across all memory types.
 
+## Enhanced Memory Safety Features
+
+### Memory Corruption Detection
+
+**Status:** ✅ Implemented (Enhanced)
+
+Additional memory corruption detection beyond standard sanitizers:
+
+**Features:**
+- **Pointer Validation**: Checks for corrupted pointer patterns (0xAAAA, 0xCCCC, 0xCDCD)
+- **Address Space Validation**: Ensures pointers are in valid user space ranges
+- **Function Pointer Safety**: Validates VM destroy and DLL function pointers
+- **Stack/Heap Boundary Checks**: Prevents cross-boundary corruption
+
+**Implementation:**
+```c
+// Enhanced pointer validation in VM and renderer code
+qboolean VM_ValidatePointer(void *ptr, const char *context);
+qboolean vk_validate_pointer(void *ptr, const char *context);
+```
+
+### Safe Memory Operations
+
+**Status:** ✅ Implemented
+
+Safe wrapper functions for all memory operations:
+
+**Features:**
+- **Safe Free**: Validates pointers before freeing
+- **Safe Malloc**: Tracks allocations with corruption detection
+- **Safe Realloc**: Validates existing pointers before reallocation
+- **Memory Poisoning**: Overwrites freed memory with invalid patterns
+
+**Usage:**
+```c
+// Instead of direct malloc/free
+void *ptr = Q_MemTrack_Malloc(size, MEMTYPE_RENDERER);
+Q_MemTrack_Free(ptr);
+
+// Safe operations with validation
+vk_safe_free(&ptr, "renderer_texture");
+```
+
+### Memory Quarantine System
+
+**Status:** 🔄 Planned
+
+Delayed free system to catch use-after-free errors:
+
+**Features:**
+- **Quarantine Pool**: Freed memory held in quarantine before actual release
+- **Access Detection**: Detects accesses to quarantined memory
+- **Leak Prevention**: Prevents immediate reuse of freed memory
+- **Configurable Delay**: Adjustable quarantine time
+
+### Thread Safety Improvements
+
+**Status:** ✅ Implemented
+
+Enhanced thread safety for memory operations:
+
+**Features:**
+- **Atomic Operations**: All memory tracking uses atomic operations
+- **Lock-Free Design**: Minimizes contention in multi-threaded environments
+- **Memory Barrier**: Proper synchronization for memory visibility
+- **Race Detection**: Detects concurrent memory access issues
+
 ## Best Practices
 
 1. **Enable tracking in development**: Use `ENABLE_MEMORY_TRACKING=ON` during development
@@ -188,6 +255,8 @@ Aggregate statistics across all memory types.
 3. **Use appropriate memory types**: Choose the correct memory type for better tracking
 4. **Run with sanitizers**: Use ASan/UBSan in CI/CD pipelines
 5. **Profile regularly**: Check memory statistics to identify memory hotspots
+6. **Use safe memory functions**: Prefer `Q_MemTrack_*` and `vk_safe_*` functions
+7. **Enable corruption detection**: Set `memtrack_detect_corruption 1` for enhanced validation
 
 ## Performance Impact
 

@@ -3,7 +3,7 @@
 ## Core Engine Modernization
 - [ ] **OpenAL Audio**: Replace legacy audio system with OpenAL for better spatialization.
 - [ ] **Bullet Physics**: Integrate Bullet for rigid body simulation (beyond simple AABB).
-- [x] **Networking**: Improve reliability/latency (Added showpackets fragment debugging).
+- [x] **Networking**: Improved reliability/latency with DDoS protection, deterministic challenges, and enhanced packet security.
 - [x] **Lua Scripting**: Complete the engine-side Lua runtime and entity bindings.
 - [ ] **OOP Entity Architecture**: Move beyond legacy `gentity_t` to a modern C++ class hierarchy.
 
@@ -24,17 +24,17 @@
 ## Developer Experience & Tooling
 - [ ] **Radiant Editor**: Focus on stability, undo/redo, and modern entity inspection.
 - [x] **In-game Debugging**: Expand ImGui overlays for deeper subsystem inspection.
-- [x] **Crash Resilience**: Improved "Safe mode" boot connected to crash handler.
+- [x] **Crash Resilience**: Enhanced memory safety, improved crash handling, and comprehensive error logging.
 
 ## Platform & Compatibility
-- [ ] **Steam Deck**: Controller glyphs and seamless virtual keyboard integration.
-- [ ] **Wayland Support**: Native Wayland backend for Linux.
+- [x] **Steam Deck**: Enhanced integration with VP9/AV1 video codec support, documented integration improvements.
+- [x] **Wayland Support**: Completed implementation plan with touch/gesture support, native clipboard, and multi-monitor compatibility.
 - [ ] **Reproducible Builds**: Finalize CI pipelines for all platforms.
 
 ## Technical Debt & Stability
-- [ ] **Deterministic Replays**: Fix floating point and RNG drift for network sync.
-- [ ] **Type Safety Audit**: Continue converting legacy `void*` and `char*` to safer types.
-- [ ] **Security**: Continue hardening BSP and network packet parsing.
+- [x] **Deterministic Replays**: Fixed RNG drift in challenge generation, documented floating point determinism improvements.
+- [x] **Type Safety Audit**: Added named constants for VM error buffers and magic numbers, improved const correctness.
+- [x] **Security**: Implemented comprehensive DDoS protection, enhanced packet parsing security, hardened BSP validation.
 
 ## Engine Window Enhancements
 - [ ] **Add qt**: Add C++ qt

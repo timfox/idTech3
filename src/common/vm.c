@@ -284,6 +284,13 @@ static void *VM_GetCombinedEntryPoint( vmIndex_t index, vmMainFunc_t *entryPoint
 // used by Com_Error to get rid of running vm's before longjmp
 static int forced_unload;
 
+// Type safety constants
+#define VM_ERROR_BUFFER_SIZE 128
+#define VM_LOCAL_ADDRESS_LIMIT 256
+#define VM_CRC32_QAGAME 0x3E93FC1A
+#define VM_INSTRUCTION_COUNT_QAGAME 123596
+#define VM_DATA_LENGTH_QAGAME 2007536
+
 struct vm_s vmTable[ VM_COUNT ];
 
 const char *vmName[ VM_COUNT ] = {
@@ -805,7 +812,7 @@ VM_ValidateHeader
 */
 static char *VM_ValidateHeader( vmHeader_t *header, int fileSize )
 {
-	static char errMsg[128];
+	static char errMsg[VM_ERROR_BUFFER_SIZE];
 	int n;
 	size_t fileSizeSz = (size_t)fileSize;
 	
@@ -1292,8 +1299,8 @@ const char *VM_LoadInstructions( const byte *code_pos, int codeLength, int instr
 static qboolean safe_address( instruction_t *ci, instruction_t *proc, int dataLength )
 {
 	if ( ci->op == OP_LOCAL ) {
-		// local address can't exceed programStack frame plus 256 bytes of passed arguments
-		if ( ci->value < 8 || ( proc && ci->value >= proc->value + 256 ) )
+		// local address can't exceed programStack frame plus VM_LOCAL_ADDRESS_LIMIT bytes of passed arguments
+		if ( ci->value < 8 || ( proc && ci->value >= proc->value + VM_LOCAL_ADDRESS_LIMIT ) )
 			return qfalse;
 		return qtrue;
 	}
@@ -1322,7 +1329,7 @@ const char *VM_CheckInstructions( instruction_t *buf,
 								int numJumpTableTargets,
 								int dataLength )
 {
-	static char errBuf[ 128 ];
+	static char errBuf[ VM_ERROR_BUFFER_SIZE ];
 	instruction_t *opStackPtr[ PROC_OPSTACK_SIZE ];
 	int i, m, n, v, op0, op1, opStack, pstack;
 	instruction_t *ci, *proc;
@@ -1738,7 +1745,7 @@ void VM_ReplaceInstructions( vm_t *vm, instruction_t *buf ) {
 	//Com_Printf( S_COLOR_GREEN "VMINFO [%s] crc: %08X, ic: %i, dl: %i\n", vm->name, vm->crc32sum, vm->instructionCount, vm->exactDataLength );
 
 	if ( vm->index == VM_CGAME ) {
-		if ( vm->crc32sum == 0x3E93FC1A && vm->instructionCount == 123596 && vm->exactDataLength == 2007536 ) {
+		if ( vm->crc32sum == VM_CRC32_QAGAME && vm->instructionCount == VM_INSTRUCTION_COUNT_QAGAME && vm->exactDataLength == VM_DATA_LENGTH_QAGAME ) {
 			ip = buf + 110190;
 			if ( ip->op == OP_ENTER && (ip+183)->op == OP_LEAVE && ip->value == (ip+183)->value ) {
 				ip++;

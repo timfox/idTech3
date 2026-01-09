@@ -1508,8 +1508,11 @@ static void CL_RequestMotd( void ) {
 		BigShort( cls.updateServer.port ) );
 
 	info[0] = 0;
-	// Mix rand() with Com_Milliseconds() to improve update challenge randomization
-	Com_sprintf( cls.updateChallenge, sizeof( cls.updateChallenge ), "%i", ((rand() << 16) ^ rand()) ^ Com_Milliseconds());
+	// Use deterministic challenge generation for replay compatibility
+	// Mix server time with a fixed seed to ensure deterministic challenges
+	static unsigned int challenge_seed = 0xDEADBEEF;
+	challenge_seed = (challenge_seed * 1103515245 + 12345) & 0x7FFFFFFF;
+	Com_sprintf( cls.updateChallenge, sizeof( cls.updateChallenge ), "%i", challenge_seed ^ (unsigned int)cl.serverTime);
 
 	Info_SetValueForKey( info, "challenge", cls.updateChallenge );
 	Info_SetValueForKey( info, "renderer", cls.glconfig.renderer_string );

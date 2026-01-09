@@ -24,7 +24,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define TR_LOCAL_H
 
 #define USE_VK_PBR
+#ifndef USE_VULKAN_RAY_TRACING
 #define USE_VULKAN_RAY_TRACING
+#endif
 
 #ifdef USE_VK_PBR
 #define VK_PBR_BRDFLUT		// for inspecting codebase, does not toggle brdflut. 

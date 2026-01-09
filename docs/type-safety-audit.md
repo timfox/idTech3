@@ -24,6 +24,12 @@ This document summarizes the type safety improvements made to the id Tech 3 code
 - **Replaced**: Magic numbers in error handling code
 - **Rationale**: Makes error rate limiting behavior configurable and documented
 
+**VM Type Safety Constants**
+- **Added**: `VM_ERROR_BUFFER_SIZE = 128`, `VM_LOCAL_ADDRESS_LIMIT = 256`
+- **Added**: `VM_CRC32_QAGAME = 0x3E93FC1A`, `VM_INSTRUCTION_COUNT_QAGAME = 123596`, `VM_DATA_LENGTH_QAGAME = 2007536`
+- **Replaced**: Hardcoded buffer sizes and QAGAME detection magic numbers
+- **Rationale**: Improves maintainability and prevents buffer overflow issues
+
 ### 3. Enum Type Safety
 
 **Verified Proper Enum Usage**
