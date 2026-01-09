@@ -54,25 +54,28 @@ handle SIGABRT stop print
 handle SIGFPE stop print
 handle SIGILL stop print
 handle SIGBUS stop print
-# Set breakpoint on fatal error function to catch before exit
+# Set breakpoint on fatal error function and auto-capture when hit
 break ri.Error
-run
-# If we hit the breakpoint or a signal, capture context
-if $_isvoid($pc) == 0
-  printf "\n== Crash context (process stopped) ==\n"
+commands
+  printf "\n== Fatal error breakpoint hit ==\n"
   printf "PC=%p\n", $pc
   info symbol $pc
   printf "\n== Full backtrace ==\n"
   thread apply all bt full
   printf "\n== Register state ==\n"
   info registers
+  printf "\n== Arguments ==\n"
+  info args
   printf "\n== Local variables ==\n"
   info locals
+  # Continue to let process exit normally after capturing context
   continue
-else
-  printf "\n== Process exited ==\n"
-  printf "Check output above for error message\n"
 end
+run
+# After run completes, the breakpoint commands above will have captured
+# context if ri.Error was called. If process exited normally, we can't
+# access registers anymore, so just show what we can.
+printf "\n== Post-run information ==\n"
 # Always show these (they work even after exit)
 printf "\n== Shared library info ==\n"
 info sharedlibrary idtech3_vulkan_x86_64.so
