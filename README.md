@@ -1,32 +1,32 @@
 [![build](../../workflows/build/badge.svg)](../../actions?query=workflow%3Abuild) <a href="https://discord.com/invite/X3Exs4C"><img src="https://img.shields.io/discord/314456230649135105?color=7289da&logo=discord&logoColor=white" alt="Discord server" /></a>
 
-# id Tech 3 - Enhanced Edition
+# id Tech 3
 
-## 🚀 **Modern Vulkan Renderer with RTX Support**
+## **Modern Vulkan Renderer with RTX Support**
 
 This enhanced version of the id Tech 3 engine features a complete Vulkan renderer implementation with RTX hardware acceleration, professional debugging tools, and robust error handling.
 
-## ✨ **Key Features**
+## **Key Features**
 
-### **🎮 Advanced Rendering**
+### **Advanced Rendering**
 - **Vulkan API**: Modern graphics API with RTX ray tracing support
 - **RTX Hardware**: Automatic detection and utilization of NVIDIA RTX GPUs
 - **OpenGL Fallback**: Reliable fallback renderer for compatibility
 - **imGUI Integration**: Professional performance monitoring and debugging
 
-### **🛡️ Robust Stability**
+### **Robust Stability**
 - **Memory Safety**: Comprehensive corruption detection and prevention
 - **Error Recovery**: Automatic renderer fallback on failures
 - **SIGFPE Protection**: Floating point exception handling
 - **Filesystem Protection**: Safe file operations with corruption prevention
 
-### **🔧 Developer Tools**
+### **Developer Tools**
 - **Performance HUD**: Real-time GPU and CPU monitoring
 - **Shader Analysis**: Advanced shader performance tracking
 - **Memory Profiling**: Detailed allocation and leak detection
 - **Debug Logging**: Comprehensive diagnostic information
 
-## 🛠️ **Enhanced Tools & Scripts**
+## **Enhanced Tools & Scripts**
 
 ### **Smart Launcher (Recommended)**
 ```bash
@@ -57,7 +57,7 @@ This enhanced version of the id Tech 3 engine features a complete Vulkan rendere
 ./scripts/benchmark_engine.sh --system-info    # System information
 ```
 
-## 🎯 **Quick Start**
+## **Quick Start**
 
 ### **Basic Usage**
 ```bash
@@ -102,18 +102,7 @@ touch logs/enable_vulkan_patch1_tiny.flag
 # - Performance monitoring tools
 ```
 
-## 📊 **Renderer Capabilities**
-
-| Feature | Vulkan | OpenGL | Notes |
-|---------|--------|--------|-------|
-| **RTX Ray Tracing** | ✅ | ❌ | Hardware accelerated |
-| **imGUI Debug UI** | ✅ | ❌ | Performance monitoring |
-| **Modern API** | ✅ | ❌ | Vulkan 1.4 compliance |
-| **GPU Selection** | ✅ | ⚠️ | Automatic discrete GPU |
-| **Error Recovery** | ✅ | ✅ | Automatic fallback |
-| **Memory Safety** | ✅ | ✅ | Corruption prevention |
-
-## 🏗️ **Building from Source**
+## **Building from Source**
 
 ### **Prerequisites**
 - GCC 15+ with C23/C++23 support
@@ -149,7 +138,7 @@ make install
 -DCMAKE_BUILD_TYPE=Debug      # Debug build with symbols
 ```
 
-## 🎮 **Game Compatibility**
+## **Game Compatibility**
 
 ### **Supported Games**
 - **Quake III Arena**: Full compatibility
@@ -161,7 +150,7 @@ make install
 - Mods in individual directories
 - No additional asset conversion required
 
-## 🔧 **Troubleshooting**
+## **Troubleshooting**
 
 ### **Vulkan Issues**
 ```bash
@@ -181,7 +170,7 @@ vulkaninfo --summary
 3. **Performance**: Enable Vulkan for best RTX performance
 4. **Debugging**: Use `+set developer 1` for detailed logs
 
-## 📈 **Performance Features**
+## **Performance Features**
 
 ### **Vulkan Optimizations**
 - **Async Compute**: Parallel GPU operations
@@ -195,7 +184,7 @@ vulkaninfo --summary
 - **Memory Stats**: GPU memory allocation tracking
 - **Shader Performance**: Individual shader timing
 
-## 🛠️ **Development**
+## **Development**
 
 ### **Architecture**
 ```
@@ -221,11 +210,7 @@ src/
 3. Include performance monitoring
 4. Test with both Vulkan and OpenGL renderers
 
-## 📄 **License**
-
-This enhanced version maintains compatibility with the original id Tech 3 GPL license while adding modern improvements and optimizations.
-
-## 🎯 **System Requirements**
+## **System Requirements**
 
 ### **Minimum**
 - Linux distribution with Vulkan support
@@ -359,7 +344,7 @@ Go to [Releases](../../releases) section to download the latest binaries for you
 * Variable refresh rate (ProMotion) support
 * High-DPI menu and input support on all platforms
 
-## 📜 **Scripts & Tools**
+## **Scripts & Tools**
 
 ### **Enhanced Launcher (`scripts/run_engine.sh`)**
 Intelligent engine launcher with automatic GPU detection and renderer selection:
