@@ -815,9 +815,6 @@ The ui module is making a system call
 ====================
 */
 static intptr_t CL_UISystemCalls( intptr_t *args ) {
-	if (args[0] >= 100) {  // Debug for high trap numbers that might indicate corruption
-		Com_Printf("WARNING: UI system call with suspicious trap number: %ld\n", (long)args[0]);
-	}
 	switch( args[0] ) {
 	case UI_ERROR:
 	{
@@ -1056,12 +1053,6 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 	}
 
 	case UI_R_REGISTERMODEL:
-		if (!re.RegisterModel) {
-			Com_Printf("ERROR: re.RegisterModel is NULL - renderer function table corrupted\n");
-			Com_Printf("re.Shutdown = %p, re.BeginFrame = %p, re.EndFrame = %p\n",
-				re.Shutdown, re.BeginFrame, re.EndFrame);
-			return 0;
-		}
 		return re.RegisterModel( VMA(1) );
 
 	case UI_R_REGISTERSKIN:

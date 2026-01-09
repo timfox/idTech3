@@ -225,6 +225,7 @@ Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI(int
   re.GetConfig = RE_GetConfig;
   re.Shutdown = RE_Shutdown;
   re.BeginRegistration = RE_BeginRegistration;
+  re.RegisterModel = RE_RegisterModel;
   re.RegisterShader = RE_RegisterShader;
   re.RegisterShaderNoMip = RE_RegisterShaderNoMip;
   re.EndRegistration = RE_EndRegistration;
