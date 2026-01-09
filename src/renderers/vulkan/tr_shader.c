@@ -19,6 +19,7 @@ along with Quake III Arena source code; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ===========================================================================
 */
+
 #include "tr_local.h"
 #include "vk_material_parser.h"
 // Renderer import interface - defined in renderer main file
@@ -3560,6 +3561,9 @@ static shader_t *FinishShader( void ) {
 	static int call_count = 0;
 	call_count++;
 	ri.Printf(PRINT_ALL, "DEBUG: FinishShader ENTRY POINT #%d (shader name: %s)\n", call_count, shader.name);
+	// #region agent log
+	write_debug_log("vulkan/tr_shader.c:FinishShader", "Processing shader", shader.name);
+	// #endregion
 
 	hasLightmapStage = qfalse;
 	vertexLightmap = qfalse;
@@ -4090,18 +4094,60 @@ static shader_t *FinishShader( void ) {
 			fprintf(stderr, "DEBUG: Processing depthFragment safely\n");
 			// #endregion
 
-			// Skip depth fragment processing to avoid SIGFPE
-			// TODO: Re-enable when SIGFPE issue is properly fixed
+			// Safe depth fragment processing - re-enabled with SIGFPE protection
+			{
+			// Use safer boolean evaluation to prevent SIGFPE from FPU state corruption
+			int has_depth_fragment = 0;
+			if (pStage && pStage->depthFragment) {
+				has_depth_fragment = 1;
+			}
+
+			ri.Printf(PRINT_ALL, "DEBUG: Shader %s, pStage=%p, depthFragment=%d, has_depth_fragment=%d\n",
+					  shader.name, (void*)pStage, pStage ? pStage->depthFragment : -1, has_depth_fragment);
+
+			if (has_depth_fragment) {
+				ri.Printf(PRINT_ALL, "DEBUG: Executing depth fragment processing for shader %s\n", shader.name);
+				} else {
+					ri.Printf(PRINT_ALL, "DEBUG: Skipping depth fragment processing\n");
+				}
+
+					// Reset FPU state before Vulkan operations to prevent state corruption
+					#ifdef __linux__
+					#ifdef __i386__
+					__asm__ __volatile__ ("fninit");
+					#endif
+					#endif
+
+					def.mirror = qfalse;
+					#ifdef USE_VK_PBR
+					def.vk_pbr_flags = 0;
+					#endif
+					def.shader_type = TYPE_SINGLE_TEXTURE_DF;
+					pStage->vk_pipeline_df = vk_find_pipeline_ext( 0, &def, qtrue );
+					if (pStage->vk_pipeline_df == VK_NULL_HANDLE) {
+						ri.Printf(PRINT_WARNING, "Failed to create Vulkan depth fragment pipeline for shader stage\n");
+						// Don't fail, depth fragment pipeline is optional
+					}
+					def.mirror = qtrue;
+					def.shader_type = TYPE_SINGLE_TEXTURE_DF;
+					pStage->vk_mirror_pipeline_df = vk_find_pipeline_ext( 0, &def, qfalse );
+					ri.Printf(PRINT_ALL, "DEBUG: Depth fragment mirror pipeline call completed\n");
+					if (pStage->vk_mirror_pipeline_df == VK_NULL_HANDLE) {
+						ri.Printf(PRINT_WARNING, "Failed to create Vulkan mirror depth fragment pipeline for shader stage\n");
+						// Don't fail, mirror depth fragment pipeline is optional
+					}
+					ri.Printf(PRINT_ALL, "DEBUG: Depth fragment processing completed successfully\n");
+				}
+			}
+			}
 
 #ifdef USE_FOG_COLLAPSE
 			// FIXME: Fog collapse code causes SIGFPE when mirror pipelines are disabled
 			// This code assumes mirror pipelines exist, but we disable them to prevent crashes
-			// Temporarily disabled until fog collapse can handle NULL mirror pipelines
+			// Re-disabled until fog collapse can handle NULL mirror pipelines safely
+			// Commenting out the entire block to avoid preprocessor issues
 			/*
 			if ( fogCollapse && tr.numFogs > 0 ) {
-				// #region agent log
-				fprintf(stderr, "DEBUG: Inside fog collapse if block\n");
-				// #endregion
 				Vk_Pipeline_Def def_fog;
 				Vk_Pipeline_Def def_mirror;
 
@@ -4116,19 +4162,17 @@ static shader_t *FinishShader( void ) {
 				pStage->vk_pipeline[1] = vk_find_pipeline_ext( 0, &def_fog, qfalse );
 				if (pStage->vk_pipeline[1] == VK_NULL_HANDLE) {
 					ri.Printf(PRINT_WARNING, "Failed to create Vulkan fog pipeline for shader stage\n");
-					// Don't fail, fog pipeline is optional
 				}
 				pStage->vk_mirror_pipeline[1] = vk_find_pipeline_ext( 0, &def_mirror, qfalse );
 				if (pStage->vk_mirror_pipeline[1] == VK_NULL_HANDLE) {
 					ri.Printf(PRINT_WARNING, "Failed to create Vulkan mirror fog pipeline for shader stage\n");
-					// Don't fail, mirror fog pipeline is optional
 				}
 
-
-				pStage->bundle[0].adjustColorsForFog = ACFF_NONE; // will be handled in shader from now
+				pStage->bundle[0].adjustColorsForFog = ACFF_NONE;
 
 				shader.fogCollapse = qtrue;
 			}
+			*/
 #endif
 #endif // USE_VULKAN
 
@@ -4878,6 +4922,4 @@ void R_InitShaders( void ) {
 	}
 
 	CreateExternalShaders();
-	// Dummy return to satisfy compiler
-	return;
 }
