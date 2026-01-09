@@ -1582,6 +1582,8 @@ qboolean vk_safe_operation(const char *operation_name, qboolean (*operation_func
 // Safe mathematical operations
 float vk_safe_divide(float numerator, float denominator, float default_value);
 float vk_safe_sqrt(float value, float default_value);
+void vk_safe_normalize(float *v, int len);
+void vk_safe_matrix_multiply(const float *a, const float *b, float *result, int size);
 
 // Memory tracking functions
 void vk_track_allocation(VkDeviceSize size);

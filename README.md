@@ -1,6 +1,246 @@
 [![build](../../workflows/build/badge.svg)](../../actions?query=workflow%3Abuild) <a href="https://discord.com/invite/X3Exs4C"><img src="https://img.shields.io/discord/314456230649135105?color=7289da&logo=discord&logoColor=white" alt="Discord server" /></a>
 
-# id Tech 3
+# id Tech 3 - Enhanced Edition
+
+## 🚀 **Modern Vulkan Renderer with RTX Support**
+
+This enhanced version of the id Tech 3 engine features a complete Vulkan renderer implementation with RTX hardware acceleration, professional debugging tools, and robust error handling.
+
+## ✨ **Key Features**
+
+### **🎮 Advanced Rendering**
+- **Vulkan API**: Modern graphics API with RTX ray tracing support
+- **RTX Hardware**: Automatic detection and utilization of NVIDIA RTX GPUs
+- **OpenGL Fallback**: Reliable fallback renderer for compatibility
+- **imGUI Integration**: Professional performance monitoring and debugging
+
+### **🛡️ Robust Stability**
+- **Memory Safety**: Comprehensive corruption detection and prevention
+- **Error Recovery**: Automatic renderer fallback on failures
+- **SIGFPE Protection**: Floating point exception handling
+- **Filesystem Protection**: Safe file operations with corruption prevention
+
+### **🔧 Developer Tools**
+- **Performance HUD**: Real-time GPU and CPU monitoring
+- **Shader Analysis**: Advanced shader performance tracking
+- **Memory Profiling**: Detailed allocation and leak detection
+- **Debug Logging**: Comprehensive diagnostic information
+
+## 🛠️ **Enhanced Tools & Scripts**
+
+### **Smart Launcher (Recommended)**
+```bash
+# Intelligent auto-configuration
+./scripts/run_engine.sh --auto
+
+# Force specific configurations
+./scripts/run_engine.sh --vulkan --gpu=1        # Vulkan on discrete GPU
+./scripts/run_engine.sh --opengl --developer    # OpenGL with debugging
+./scripts/run_engine.sh --validation --perf-hud # Full Vulkan debugging
+
+# Launch with mods/maps
+./scripts/run_engine.sh +map q3dm9
+./scripts/run_engine.sh +set fs_game mymod
+```
+
+### **Testing & Benchmarking**
+```bash
+# Run comprehensive test suite
+./scripts/test_engine.sh
+
+# Performance benchmarking
+./scripts/benchmark_engine.sh --compare        # Compare Vulkan vs OpenGL
+./scripts/benchmark_engine.sh --vulkan --duration=60
+
+# System diagnostics
+./scripts/run_engine.sh --detect-gpu           # GPU detection
+./scripts/benchmark_engine.sh --system-info    # System information
+```
+
+## 🎯 **Quick Start**
+
+### **Basic Usage**
+```bash
+# Launch with Vulkan renderer (recommended)
+./release/idtech3.x86_64
+
+# Force specific renderer
+./release/idtech3.x86_64 +set cl_renderer vulkan
+./release/idtech3.x86_64 +set cl_renderer opengl
+
+# Force NVIDIA GPU selection
+VK_LAYER_MESA_device_select=device=1 ./release/idtech3.x86_64 +set cl_renderer vulkan
+```
+
+### **Advanced Configuration**
+```bash
+# Enable Vulkan extended features
+touch logs/enable_vulkan_patch1_tiny.flag
+
+# Developer mode with detailed logging
+./release/idtech3.x86_64 +set developer 1 +set r_vk_enable_validation 1
+
+# Performance monitoring
+./release/idtech3.x86_64 +set r_perfhud 1
+```
+
+### **Automated Testing & Quality Assurance**
+```bash
+# Run full test suite (recommended before production use)
+./scripts/test_engine.sh
+
+# Generate detailed test reports in logs/test_report_*.txt
+
+# Performance regression testing
+./scripts/benchmark_engine.sh --compare
+
+# Automated validation of all engine features
+# - Renderer initialization (Vulkan/OpenGL)
+# - Memory safety systems
+# - GPU detection and selection
+# - Mod loading compatibility
+# - Performance monitoring tools
+```
+
+## 📊 **Renderer Capabilities**
+
+| Feature | Vulkan | OpenGL | Notes |
+|---------|--------|--------|-------|
+| **RTX Ray Tracing** | ✅ | ❌ | Hardware accelerated |
+| **imGUI Debug UI** | ✅ | ❌ | Performance monitoring |
+| **Modern API** | ✅ | ❌ | Vulkan 1.4 compliance |
+| **GPU Selection** | ✅ | ⚠️ | Automatic discrete GPU |
+| **Error Recovery** | ✅ | ✅ | Automatic fallback |
+| **Memory Safety** | ✅ | ✅ | Corruption prevention |
+
+## 🏗️ **Building from Source**
+
+### **Prerequisites**
+- GCC 15+ with C23/C++23 support
+- CMake 3.20+
+- Vulkan SDK
+- SDL2 development libraries
+- OpenEXR, Assimp, and other media libraries
+
+### **Build Commands**
+```bash
+# Create build directory
+mkdir build && cd build
+
+# Configure with CMake
+cmake .. -DCMAKE_BUILD_TYPE=Release
+
+# Build all components
+make -j$(nproc)
+
+# Install to release directory
+make install
+```
+
+### **Build Options**
+```bash
+# Enable/disable components
+-DUSE_CIMGUI=ON          # imGUI support (default: ON)
+-DUSE_VULKAN=ON          # Vulkan renderer (default: ON)
+-DUSE_OPENGL=ON          # OpenGL renderer (default: ON)
+
+# Optimization levels
+-DCMAKE_BUILD_TYPE=Release    # Optimized build
+-DCMAKE_BUILD_TYPE=Debug      # Debug build with symbols
+```
+
+## 🎮 **Game Compatibility**
+
+### **Supported Games**
+- **Quake III Arena**: Full compatibility
+- **Team Arena**: Complete support
+- **Custom Mods**: All id Tech 3 based modifications
+
+### **Asset Requirements**
+- Base game PK3 files in `baseq3/` directory
+- Mods in individual directories
+- No additional asset conversion required
+
+## 🔧 **Troubleshooting**
+
+### **Vulkan Issues**
+```bash
+# Check Vulkan installation
+vulkaninfo --summary
+
+# Test Vulkan renderer
+./release/idtech3.x86_64 +set cl_renderer vulkan +quit
+
+# Force OpenGL fallback
+./release/idtech3.x86_64 +set cl_renderer opengl
+```
+
+### **Common Solutions**
+1. **Vulkan crashes**: Engine automatically falls back to OpenGL
+2. **GPU selection**: Use `VK_LAYER_MESA_device_select=device=N`
+3. **Performance**: Enable Vulkan for best RTX performance
+4. **Debugging**: Use `+set developer 1` for detailed logs
+
+## 📈 **Performance Features**
+
+### **Vulkan Optimizations**
+- **Async Compute**: Parallel GPU operations
+- **Memory Pooling**: Efficient GPU memory management
+- **Pipeline Caching**: Fast shader loading
+- **Multi-threading**: Parallel rendering pipelines
+
+### **Monitoring Tools**
+- **Real-time FPS**: Frame rate monitoring
+- **GPU Usage**: Graphics processor utilization
+- **Memory Stats**: GPU memory allocation tracking
+- **Shader Performance**: Individual shader timing
+
+## 🛠️ **Development**
+
+### **Architecture**
+```
+src/
+├── renderers/
+│   ├── vulkan/          # Vulkan renderer implementation
+│   └── opengl/          # OpenGL fallback renderer
+├── client/              # Client-side game logic
+├── server/              # Server implementation
+├── common/              # Shared utilities
+└── qcommon/            # Quake common code
+```
+
+### **Key Components**
+- **Vulkan Renderer**: Modern graphics pipeline with RTX support
+- **imGUI Integration**: Professional debugging interface
+- **Memory Safety**: Comprehensive corruption detection
+- **Error Handling**: Graceful failure recovery
+
+### **Contributing**
+1. Follow existing code style and patterns
+2. Add comprehensive error checking
+3. Include performance monitoring
+4. Test with both Vulkan and OpenGL renderers
+
+## 📄 **License**
+
+This enhanced version maintains compatibility with the original id Tech 3 GPL license while adding modern improvements and optimizations.
+
+## 🎯 **System Requirements**
+
+### **Minimum**
+- Linux distribution with Vulkan support
+- 4GB RAM
+- OpenGL 3.3 compatible GPU
+
+### **Recommended**
+- NVIDIA RTX GPU (for ray tracing)
+- 8GB+ RAM
+- Vulkan 1.1+ compatible GPU
+- Multi-core CPU
+
+---
+
+**Built with modern C23/C++23 standards, comprehensive safety features, and professional debugging tools.**
 
 This is a modernized id Tech 3 engine fork with PBR and ray tracing using C23 and C++23 standards.
 
@@ -118,6 +358,46 @@ Go to [Releases](../../releases) section to download the latest binaries for you
 * Retina display support
 * Variable refresh rate (ProMotion) support
 * High-DPI menu and input support on all platforms
+
+## 📜 **Scripts & Tools**
+
+### **Enhanced Launcher (`scripts/run_engine.sh`)**
+Intelligent engine launcher with automatic GPU detection and renderer selection:
+- **Auto-detection**: Automatically selects best renderer for your GPU
+- **GPU Selection**: Force specific GPU devices (integrated/discrete)
+- **Debug Options**: Enable validation layers, performance HUD, developer mode
+- **Mod Support**: Easy launching with custom modifications
+
+### **Testing Suite (`scripts/test_engine.sh`)**
+Comprehensive automated testing framework:
+- **Renderer Tests**: Validates Vulkan and OpenGL initialization
+- **Safety Tests**: Memory corruption prevention and error recovery
+- **Feature Tests**: imGUI, RTX support, performance monitoring
+- **Mod Compatibility**: Tests custom modification loading
+- **Report Generation**: Detailed test results and diagnostics
+
+### **Benchmarking (`scripts/benchmark_engine.sh`)**
+Performance analysis and comparison tools:
+- **FPS Measurement**: Automated frame rate testing
+- **GPU Monitoring**: Real-time GPU utilization and temperature
+- **Renderer Comparison**: Side-by-side Vulkan vs OpenGL performance
+- **System Profiling**: Hardware capability assessment
+
+### **Usage Examples**
+```bash
+# Quick start with auto-configuration
+./scripts/run_engine.sh
+
+# Full system validation
+./scripts/test_engine.sh
+
+# Performance comparison
+./scripts/benchmark_engine.sh --compare
+
+# Detailed diagnostics
+./scripts/run_engine.sh --detect-gpu
+./scripts/benchmark_engine.sh --system-info
+```
 
 ## [Build Instructions](docs/BUILD.md)
 

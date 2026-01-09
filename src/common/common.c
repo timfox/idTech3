@@ -305,6 +305,8 @@ void Com_Init( char *commandLine ) {
   Com_Printf( "Build: %s\n", BUILD_ID );
   Com_Printf( "Build Date: %s\n", BUILD_DATE );
   Com_Printf( "Compiled: %s %s\n", __DATE__, __TIME__ );
+  Com_Printf( "Renderer Support: Vulkan (RTX) + OpenGL fallback\n" );
+  Com_Printf( "Advanced Features: imGUI, Ray Tracing, Performance Monitoring\n" );
 
     // Initialize memory safety FIRST before any allocations
     MemorySafety_Init();

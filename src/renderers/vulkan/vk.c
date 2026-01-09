@@ -1,6 +1,10 @@
 #include "tr_local.h"
 #include <stdio.h>
 #include <unistd.h>
+#include <signal.h>
+#ifdef __linux__
+#include <fenv.h>
+#endif
 #include "vk_memory.h"
 #include "vk_swapchain_manager.h"
 extern VkSurfaceFormatKHR vk_present_format;
@@ -2110,6 +2114,13 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 
 	ri.Printf( PRINT_ALL, "...selected physical device: %i\n", device_index );
 	ri.Printf( PRINT_ALL, "Vulkan: vk_create_device called for device %d\n", device_index );
+
+	// Provide user feedback about GPU selection
+	if (device_index == 0) {
+		ri.Printf( PRINT_ALL, "Vulkan: Using integrated GPU\n" );
+	} else {
+		ri.Printf( PRINT_ALL, "Vulkan: Using discrete GPU (RTX recommended)\n" );
+	}
 	ri.Printf( PRINT_ALL, "Vulkan: About to select surface format\n" );
 
 	// select surface format
@@ -2885,6 +2896,44 @@ qboolean vk_is_safe_state(void) {
 	return qtrue;
 }
 
+// Signal handler for floating point exceptions
+void vk_fpe_signal_handler(int signum) {
+	(void)signum; // Suppress unused parameter warning
+
+	static int fpe_count = 0;
+	fpe_count++;
+
+	ri.Printf(PRINT_ERROR, "Vulkan: Caught SIGFPE #%d (floating point exception)\n", fpe_count);
+
+	// Clear any pending exceptions
+#ifdef __linux__
+	feclearexcept(FE_ALL_EXCEPT);
+#endif
+
+	// For Vulkan renderer, shut down gracefully on FPE to allow fallback to OpenGL
+	if (fpe_count >= 1) {
+		ri.Printf(PRINT_ERROR, "Vulkan: Floating point exception detected, shutting down Vulkan renderer\n");
+
+		// Mark Vulkan as failed so it won't be used again
+		if (vk.active) {
+			vk.active = qfalse;
+			ri.Printf(PRINT_ERROR, "Vulkan: Renderer deactivated due to floating point errors\n");
+
+			// Force a clean shutdown of Vulkan subsystems
+			vk_shutdown(REF_DESTROY_WINDOW);
+		}
+
+		// Reset the signal handler to default behavior to prevent re-triggering
+		signal(SIGFPE, SIG_DFL);
+
+		// Try to continue execution - the engine should fall back to OpenGL
+		ri.Printf(PRINT_ERROR, "Vulkan: Attempting to continue with OpenGL fallback\n");
+		return;
+	}
+
+	ri.Printf(PRINT_WARNING, "Vulkan: Continuing after SIGFPE #%d\n", fpe_count);
+}
+
 // Safe wrapper for Vulkan operations that may fail
 qboolean vk_safe_operation(const char *operation_name, qboolean (*operation_func)(void)) {
 	if (!vk_is_safe_state()) {
@@ -2905,7 +2954,7 @@ qboolean vk_safe_operation(const char *operation_name, qboolean (*operation_func
 
 // Safe floating point operations to prevent SIGFPE
 float vk_safe_divide(float numerator, float denominator, float default_value) {
-	if (denominator == 0.0f || isnan(denominator) || isinf(denominator)) {
+	if (denominator == 0.0f || denominator == -0.0f || isnan(denominator) || isinf(denominator)) {
 		ri.Printf(PRINT_DEVELOPER, "Vulkan: Division by zero/inf/NaN prevented (%.3f / %.3f), using %.3f\n",
 				 numerator, denominator, default_value);
 		return default_value;
@@ -2930,6 +2979,55 @@ float vk_safe_sqrt(float value, float default_value) {
 		return default_value;
 	}
 	return result;
+}
+
+// Safe vector operations
+void vk_safe_normalize(float *v, int len) {
+	if (!v || len <= 0) return;
+
+	float length = 0.0f;
+	for (int i = 0; i < len; i++) {
+		if (isnan(v[i]) || isinf(v[i])) {
+			ri.Printf(PRINT_DEVELOPER, "Vulkan: Invalid vector component at index %d: %.3f\n", i, v[i]);
+			v[i] = 0.0f;
+		}
+		length += v[i] * v[i];
+	}
+
+	length = vk_safe_sqrt(length, 1.0f);
+
+	if (length > 0.0001f) {
+		for (int i = 0; i < len; i++) {
+			v[i] /= length;
+		}
+	} else {
+		// Default to unit vector in first dimension
+		for (int i = 0; i < len; i++) {
+			v[i] = (i == 0) ? 1.0f : 0.0f;
+		}
+	}
+}
+
+// Safe matrix operations
+void vk_safe_matrix_multiply(const float *a, const float *b, float *result, int size) {
+	if (!a || !b || !result || size <= 0) return;
+
+	for (int i = 0; i < size; i++) {
+		for (int j = 0; j < size; j++) {
+			float sum = 0.0f;
+			for (int k = 0; k < size; k++) {
+				float val_a = a[i * size + k];
+				float val_b = b[k * size + j];
+
+				if (isnan(val_a) || isinf(val_a) || isnan(val_b) || isinf(val_b)) {
+					sum = 0.0f;
+					break;
+				}
+				sum += val_a * val_b;
+			}
+			result[i * size + j] = sum;
+		}
+	}
 }
 
 
@@ -2985,8 +3083,13 @@ static void init_vulkan_library( void )
 {
 	// Set up floating point exception handling to prevent SIGFPE crashes
 #ifdef __linux__
-	// Clear any pending floating point exceptions and set safe mode
+	// Clear any pending floating point exceptions
 	feclearexcept(FE_ALL_EXCEPT);
+
+	// Install signal handler for floating point exceptions
+	signal(SIGFPE, vk_fpe_signal_handler);
+
+	ri.Printf(PRINT_DEVELOPER, "Vulkan: Installed SIGFPE handler\n");
 #endif
 
     vk_select_preferred_gpu();

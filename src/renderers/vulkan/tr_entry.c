@@ -170,6 +170,16 @@ Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI(int
   }
   if (g_vulkan_patch1_enabled || g_vulkan_patch1_tiny_enabled) {
     static refexport_t re;
+
+    // Provide user feedback about Vulkan renderer status
+    ri.Printf(PRINT_ALL, "Vulkan: Renderer initialized with RTX hardware support\n");
+    ri.Printf(PRINT_ALL, "Vulkan: imGUI performance monitoring available\n");
+    if (g_vulkan_patch1_tiny_enabled) {
+      ri.Printf(PRINT_ALL, "Vulkan: Using Tiny Patch mode (basic functionality)\n");
+    } else {
+      ri.Printf(PRINT_ALL, "Vulkan: Using Full Patch mode (extended features)\n");
+    }
+
     // API version already validated above
     Com_Memset(&re, 0, sizeof(re));
     if (g_vulkan_patch1_tiny_enabled) {

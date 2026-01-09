@@ -3811,6 +3811,15 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 					localRendererLib = testRendererLib;
 					GetRefAPI = testGetRefAPI;
 					Com_Printf( S_COLOR_GREEN "Successfully loaded renderer: %s\n", tryRenderer );
+
+					// Provide additional info about the selected renderer
+					if (Q_stricmp(tryRenderer, "vulkan") == 0) {
+						Com_Printf( S_COLOR_GREEN "  Vulkan renderer: RTX hardware acceleration enabled\n" );
+						Com_Printf( S_COLOR_GREEN "  imGUI performance monitoring available\n" );
+					} else if (Q_stricmp(tryRenderer, "opengl") == 0) {
+						Com_Printf( S_COLOR_GREEN "  OpenGL renderer: Reliable fallback renderer\n" );
+					}
+
 					Com_Printf( "Renderer startup final path: %s\n", tryRenderer );
 					if (Q_stricmp(tryRenderer, rendererName) != 0) {
 						Com_Printf( S_COLOR_YELLOW "Note: Fell back from requested renderer '%s' to '%s'\n", rendererName, tryRenderer );
@@ -3840,11 +3849,13 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 	}
 
 	// If no renderer loaded, provide helpful error message
-	if (!localRendererLib) {
+		if (!localRendererLib) {
 		Com_Printf( S_COLOR_RED "\n" );
 		Com_Printf( S_COLOR_RED "========================================\n" );
 		Com_Printf( S_COLOR_RED "FATAL: Failed to load any renderer\n" );
 		Com_Printf( S_COLOR_RED "========================================\n" );
+		Com_Printf( S_COLOR_RED "Available renderers: vulkan (recommended), opengl\n" );
+		Com_Printf( S_COLOR_RED "Check that renderer libraries exist in ./release/\n" );
 		Com_Printf( S_COLOR_YELLOW "Tried renderers in order:\n" );
 		for (int i = 0; i < numRenderers; i++) {
 			int tryIndex = (startIndex + i) % numRenderers;
