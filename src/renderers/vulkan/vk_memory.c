@@ -5033,9 +5033,7 @@ static void vk_update_heatmap_layer(vk_heatmap_layer_t *layer, vk_heatmap_sample
 static void vk_create_heatmap_texture(vk_heatmap_layer_t *layer);
 static void vk_update_heatmap_texture(vk_heatmap_layer_t *layer);
 #ifdef USE_CIMGUI
-#ifdef USE_CIMGUI
 static ImVec4 vk_get_heatmap_color(float intensity, float gradient[5][4]);
-#endif
 #endif
 
 // Initialize asset loading profiler
@@ -6128,9 +6126,9 @@ static void vk_render_performance_hud_recommendations(vk_performance_hud_t *hud)
 #endif
 }
 
+#ifdef USE_CIMGUI
 // Get color for bottleneck severity
 static ImVec4 vk_get_bottleneck_color(float severity, const vk_performance_hud_config_t *config) {
-#ifdef USE_CIMGUI
     ImVec4 color;
     if (severity >= config->bottleneck_threshold_high) {
         color.x = config->color_critical[0];
@@ -6154,8 +6152,8 @@ static ImVec4 vk_get_bottleneck_color(float severity, const vk_performance_hud_c
         color.w = config->color_good[3];
     }
     return color;
-#endif
 }
+#endif
 
 // Format performance value with unit
 static void vk_format_performance_value(char *buffer, size_t size, float value, const char *unit) {
@@ -6941,9 +6939,9 @@ static void vk_update_heatmap_texture(vk_heatmap_layer_t *layer) {
     ri.Free(rgba_data);
 }
 
+#ifdef USE_CIMGUI
 // Internal: Map intensity to color gradient
 static ImVec4 vk_get_heatmap_color(float intensity, float gradient[5][4]) {
-#ifdef USE_CIMGUI
     if (intensity <= 0.0f) return (ImVec4){0, 0, 0, 0};
     if (intensity >= 1.0f) return (ImVec4){gradient[4][0], gradient[4][1], gradient[4][2], gradient[4][3]};
 
@@ -6961,8 +6959,8 @@ static ImVec4 vk_get_heatmap_color(float intensity, float gradient[5][4]) {
     result.w = c1[3] + (c2[3] - c1[3]) * frac;
 
     return result;
-#endif
 }
+#endif
 
 // Performance Presets Implementation
 
