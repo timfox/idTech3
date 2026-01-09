@@ -2582,7 +2582,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 				ri.Printf(PRINT_ALL, "\n");
 			}
 		} else {
-			ri.Printf(PRINT_ALL, "...Hardware ray tracing not supported (RTX features unavailable)\n");
+			ri.Printf(PRINT_DEVELOPER, "...Hardware ray tracing not supported (RTX features unavailable)\n");
 			ri.Printf(PRINT_ALL, "...Basic Vulkan renderer will be used\n");
 		}
 
@@ -3852,7 +3852,7 @@ skip_device_creation:
 
 	// Initialize performance HUD
 	if (!vk_init_performance_hud()) {
-		ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize performance HUD\n");
+		ri.Printf(PRINT_DEVELOPER, "Vulkan: Failed to initialize performance HUD (imGUI not available)\n");
 	}
 
 	// Initialize automated performance regression detector
@@ -5045,7 +5045,7 @@ static void vk_alloc_attachments( void )
 		qvkGetPhysicalDeviceProperties(vk.physical_device, &props);
 		if (props.vendorID == 0x10DE) { // NVIDIA
 			skip_transitions = qtrue;
-			ri.Printf(PRINT_ALL, "Vulkan: Skipping layout transitions on NVIDIA GPU (driver compatibility)\n");
+			ri.Printf(PRINT_DEVELOPER, "Vulkan: Skipping layout transitions on NVIDIA GPU (driver compatibility)\n");
 		}
 	}
 
@@ -9301,6 +9301,15 @@ void vk_vrs_apply_shading_rate( VkCommandBuffer cmdBuffer ) {
 }
 
 void vk_shutdown( refShutdownCode_t code ) {
+  static qboolean shutdown_in_progress = qfalse;
+
+  // Prevent recursive shutdown calls
+  if (shutdown_in_progress) {
+    ri.Printf(PRINT_WARNING, "vk_shutdown: Recursive shutdown call detected, ignoring\n");
+    return;
+  }
+  shutdown_in_progress = qtrue;
+
   ri.Printf(PRINT_ALL, "vk_shutdown entering: code=%d, active=%d, device=%p\n", (int)code, (int)vk.active, (void*)vk.device);
   ri.Printf(PRINT_ALL, "vk_shutdown entering: code=%d, active=%d, device=%p\n", (int)code, (int)vk.active, (void*)vk.device);
   ri.Printf(PRINT_ALL, "vk_shutdown entering: code=%d, active=%d, device=%p\n", (int)code, (int)vk.active, (void*)vk.device);
@@ -9327,11 +9336,13 @@ void vk_shutdown( refShutdownCode_t code ) {
 			ri.Printf(PRINT_ALL, "vk_shutdown: Shutting down Vulkan subsystems...\n");
 
 			// Wait for device idle first before destroying resources
-			if (qvkDeviceWaitIdle) {
+			if (qvkDeviceWaitIdle && vk.device != VK_NULL_HANDLE) {
 				VkResult result = qvkDeviceWaitIdle(vk.device);
 				if (result != VK_SUCCESS) {
 					ri.Printf(PRINT_WARNING, "vk_shutdown: qvkDeviceWaitIdle failed: %s\n", vk_result_string(result));
 				}
+			} else {
+				ri.Printf(PRINT_WARNING, "vk_shutdown: Skipping device wait - device invalid or function not available\n");
 			}
 
 			// Shutdown enhanced post processing
@@ -9349,7 +9360,7 @@ void vk_shutdown( refShutdownCode_t code ) {
 			// Shutdown god rays
 			vk_god_rays_shutdown();
 
-			// Shutdown PBO system
+			// Shutdown PBO system safely
 			vk_pbo_shutdown();
 
 			// Shutdown terrain system
@@ -9456,6 +9467,8 @@ void vk_shutdown( refShutdownCode_t code ) {
 	} else {
 		ri.Printf(PRINT_ALL, "vk_shutdown: Keeping Vulkan context (REF_KEEP_CONTEXT)\n");
 	}
+
+	shutdown_in_progress = qfalse;
 
 	// Unload Vulkan library if it was loaded
 	if (vulkan_lib) {

@@ -393,9 +393,15 @@ void ScanAndLoadShaderFiles_Safe(void) {
 	// Free the file list
 	ri.FS_FreeFileList(shaderFiles);
 
-	// Combine all loaded files
-	if (!R_CombineShaderFilesSafe()) {
-		ri.Printf(PRINT_WARNING, "Failed to combine shader files\n");
+	// Combine all loaded files (only if we actually loaded some)
+	if (loadedCount > 0) {
+		if (!R_CombineShaderFilesSafe()) {
+			ri.Printf(PRINT_WARNING, "Failed to combine shader files\n");
+			R_ShutdownSafeShaderLoadContext();
+			return;
+		}
+	} else {
+		ri.Printf(PRINT_WARNING, "No shader files were successfully loaded, skipping combination\n");
 		R_ShutdownSafeShaderLoadContext();
 		return;
 	}

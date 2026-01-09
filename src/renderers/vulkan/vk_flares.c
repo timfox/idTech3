@@ -95,7 +95,7 @@ R_ClearFlares
 void R_ClearFlares( void ) {
 	// Vulkan flares are not implemented yet, so this is a no-op for now
 	// This prevents crashes during early initialization
-	ri.Printf(PRINT_ALL, "DEBUG: R_ClearFlares - Vulkan flares not implemented, skipping\n");
+	ri.Printf(PRINT_DEVELOPER, "Vulkan: Flares not implemented, skipping\n");
 }
 
 

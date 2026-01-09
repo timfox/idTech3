@@ -7,19 +7,11 @@
 
 #ifdef USE_CIMGUI
 #define CIMGUI_DEFINE_ENUMS_AND_STRUCTS
-#include "../../libs/cimgui/cimgui.h"
+#include "../../../external/src/cimgui/cimgui.h"
 #endif
 
-// Lightweight fallback typedefs to satisfy references when ImGui types are unavailable
-#ifndef IM_VEC4_DEFINED
-typedef struct { float r, g, b, a; } ImVec4;
-#define IM_VEC4_DEFINED
-#endif
+// ImGui types are now available through cimgui
 
-#ifndef VK_PERF_HUD_CONFIG_T_DEFINED
-typedef struct { int dummy; } vk_performance_hud_config_t;
-#define VK_PERF_HUD_CONFIG_T_DEFINED
-#endif
 
 // Forward declarations for functions used from vk.c
 extern void vk_set_object_name(uint64_t obj, const char *name, VkDebugReportObjectTypeEXT type);
@@ -5747,8 +5739,8 @@ qboolean vk_init_performance_hud(void) {
 
     return qtrue;
 #else
-    // imGUI not available, return failure
-    ri.Printf(PRINT_WARNING, "Vulkan: Performance HUD - imGUI not available\n");
+    // imGUI not available, return failure (expected on systems without imGUI)
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Performance HUD - imGUI not available (expected)\n");
     return qfalse;
 #endif
 }
