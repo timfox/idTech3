@@ -523,6 +523,7 @@ OPTION(USE_CURL "" ON)
 OPTION(USE_LOCAL_HEADERS "" ON)
 OPTION(USE_OPENGL "" ON)
 OPTION(USE_VULKAN "" ON)
+OPTION(USE_VULKAN_RAY_TRACING "" ON)
 OPTION(USE_VMA "Enable Vulkan Memory Allocator (VMA) for better memory management" ON)
 OPTION(USE_D3D12 "Enable DirectX 12 renderer (Windows only)" ON)
 OPTION(USE_METAL "Enable Metal renderer (macOS/iOS only)" ON)
@@ -570,6 +571,9 @@ ENDIF()
 
 IF(USE_VULKAN)
 	add_compile_definitions(USE_VULKAN)
+	if(USE_VULKAN_RAY_TRACING)
+		add_compile_definitions(USE_VULKAN_RAY_TRACING)
+	endif()
 ENDIF()
 
 # Reproducible builds: pass SOURCE_DATE_EPOCH as compile definition if set
@@ -1777,7 +1781,7 @@ IF(USE_RENDERER_DLOPEN)
 			PREFIX ""
 			LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/../release"
 		)
-		target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_VULKAN USE_OPENGL)
+		target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_VULKAN USE_OPENGL $<$<BOOL:${USE_VULKAN_RAY_TRACING}>:USE_VULKAN_RAY_TRACING>)
 		if(ANDROID)
 			target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE VK_USE_PLATFORM_ANDROID_KHR)
 		endif()

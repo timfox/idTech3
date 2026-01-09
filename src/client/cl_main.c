@@ -3768,8 +3768,8 @@ fprintf(stderr, "USE_RENDERER_DLOPEN is defined, cl_renderer = %s\n", cl_rendere
 fprintf(stderr, "About to enter renderer loading logic\n");
 
 	// Enhanced renderer selection with GPU capability detection
-	// Priority: Vulkan -> OpenGL2 -> Legacy OpenGL (with intelligent fallback)
-	const char *rendererPriority[] = { "vulkan", "opengl2", "opengl" };
+	// Priority: RTX (Vulkan) -> Vulkan -> OpenGL2 -> Legacy OpenGL (with intelligent fallback)
+	const char *rendererPriority[] = { "rtx", "vulkan", "opengl2", "opengl" };
 	const char *rendererName = cl_renderer ? cl_renderer->string : "auto"; // Default to auto-selection
 	int numRenderers = sizeof(rendererPriority) / sizeof(rendererPriority[0]);
 	int startIndex = 0;
@@ -3802,7 +3802,7 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 	void *localRendererLib = NULL;
 
 	// First try the exact renderer requested by the user
-	const char *tryRenderers[] = { rendererName, "vulkan", "opengl" };
+	const char *tryRenderers[] = { rendererName, "rtx", "vulkan", "opengl" };
 	int numTryRenderers = sizeof(tryRenderers) / sizeof(tryRenderers[0]);
 
 	for (int i = 0; i < numTryRenderers && !localRendererLib; i++) {

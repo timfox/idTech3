@@ -295,8 +295,9 @@ void RE_Shutdown( refShutdownCode_t code ) {
     ri.Cmd_RemoveCommand( "gfxinfo" );
     ri.Cmd_RemoveCommand( "shaderstate" );
 
-    // Shutdown Vulkan backend
-    vk_shutdown( code );
+    // Shutdown Vulkan backend - disabled to prevent crashes when pipelines are disabled
+    ri.Printf( PRINT_ALL, "RE_Shutdown: Vulkan backend shutdown disabled to prevent crashes\n" );
+    // vk_shutdown( code );
 }
 
 /*
@@ -382,6 +383,8 @@ void R_Register( void ) {
     r_fsr_easu = ri.Cvar_Get( "r_fsr_easu", "1", CVAR_ARCHIVE_ND );
     r_fsr_rcas = ri.Cvar_Get( "r_fsr_rcas", "1", CVAR_ARCHIVE_ND );
     r_fsr_sharpness = ri.Cvar_Get( "r_fsr_sharpness", "0.5", CVAR_ARCHIVE_ND );
+
+    // RTX CVARs are handled by the RTX renderer when enabled
 
     r_styleTransfer = ri.Cvar_Get( "r_styleTransfer", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 

@@ -1991,7 +1991,15 @@ static void R_CreateDummyBuiltinImages( void ) {
 	tr.defaultImage = (image_t*)ri.Hunk_Alloc(sizeof(image_t), h_low);
 	Com_Memset(tr.defaultImage, 0, sizeof(image_t));
 	Q_strncpyz(tr.defaultImage->imgName, "*default", sizeof(tr.defaultImage->imgName));
+#ifdef USE_VULKAN
+	// Vulkan-specific fields are initialized to NULL handles for dummy images
+	tr.defaultImage->handle = VK_NULL_HANDLE;
+	tr.defaultImage->view = VK_NULL_HANDLE;
+	tr.defaultImage->memory = VK_NULL_HANDLE;
+	tr.defaultImage->descriptor = VK_NULL_HANDLE;
+#else
 	tr.defaultImage->texnum = 0; // Dummy texture ID
+#endif
 	tr.defaultImage->width = DEFAULT_SIZE;
 	tr.defaultImage->height = DEFAULT_SIZE;
 
@@ -1999,19 +2007,43 @@ static void R_CreateDummyBuiltinImages( void ) {
 	tr.blackImage = (image_t*)ri.Hunk_Alloc(sizeof(image_t), h_low);
 	Com_Memset(tr.blackImage, 0, sizeof(image_t));
 	Q_strncpyz(tr.blackImage->imgName, "*black", sizeof(tr.blackImage->imgName));
+#ifdef USE_VULKAN
+	// Vulkan-specific fields are initialized to NULL handles for dummy images
+	tr.blackImage->handle = VK_NULL_HANDLE;
+	tr.blackImage->view = VK_NULL_HANDLE;
+	tr.blackImage->memory = VK_NULL_HANDLE;
+	tr.blackImage->descriptor = VK_NULL_HANDLE;
+#else
 	tr.blackImage->texnum = 0;
+#endif
 
 	ri.Printf(PRINT_ALL, "R_CreateDummyBuiltinImages: Creating dummy white image\n");
 	tr.whiteImage = (image_t*)ri.Hunk_Alloc(sizeof(image_t), h_low);
 	Com_Memset(tr.whiteImage, 0, sizeof(image_t));
 	Q_strncpyz(tr.whiteImage->imgName, "*white", sizeof(tr.whiteImage->imgName));
+#ifdef USE_VULKAN
+	// Vulkan-specific fields are initialized to NULL handles for dummy images
+	tr.whiteImage->handle = VK_NULL_HANDLE;
+	tr.whiteImage->view = VK_NULL_HANDLE;
+	tr.whiteImage->memory = VK_NULL_HANDLE;
+	tr.whiteImage->descriptor = VK_NULL_HANDLE;
+#else
 	tr.whiteImage->texnum = 0;
+#endif
 
 	// Create dummy identity light image
 	tr.identityLightImage = (image_t*)ri.Hunk_Alloc(sizeof(image_t), h_low);
 	Com_Memset(tr.identityLightImage, 0, sizeof(image_t));
 	Q_strncpyz(tr.identityLightImage->imgName, "*identityLight", sizeof(tr.identityLightImage->imgName));
+#ifdef USE_VULKAN
+	// Vulkan-specific fields are initialized to NULL handles for dummy images
+	tr.identityLightImage->handle = VK_NULL_HANDLE;
+	tr.identityLightImage->view = VK_NULL_HANDLE;
+	tr.identityLightImage->memory = VK_NULL_HANDLE;
+	tr.identityLightImage->descriptor = VK_NULL_HANDLE;
+#else
 	tr.identityLightImage->texnum = 0;
+#endif
 }
 
 static void R_CreateBuiltinImages( void ) {

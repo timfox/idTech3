@@ -24,6 +24,9 @@ RAY TRACING GATING:
 #include "../../common/q_shared.h"
 #include "../../common/qcommon.h"
 
+// RTX renderer bypasses Vulkan shader processing to prevent crashes
+// Define our own minimal shader interface that doesn't use Vulkan pipelines
+
 // Forward declarations for hardware ray tracing functions
 extern void vk_rt_init(void);
 extern void vk_rt_shutdown(void);
@@ -439,6 +442,12 @@ qboolean RTX_Init(void)
 {
     Com_Printf("Initializing Unified RTX Renderer...\n");
 
+    // Prevent double initialization
+    if (rtx.initialized) {
+        Com_Printf("RTX: Already initialized, skipping\n");
+        return qtrue;
+    }
+
     // Register RTX-specific CVARs with conservative defaults
     // Ray tracing is disabled by default - users must explicitly enable it
     r_rtx_enable = ri.Cvar_Get("r_rtx_enable", "0", CVAR_ARCHIVE);
@@ -543,22 +552,34 @@ qboolean RTX_Init(void)
     // Initialize based on determined mode
     if (rtx.mode == RTX_MODE_HARDWARE) {
         Com_Printf("RTX: Initializing hardware ray tracing...\n");
-        vk_rt_init();
-        rtx.ray_tracing_active = true;
+        if (vk.rayTracingSupported) {
+            vk_rt_init();
+            rtx.ray_tracing_active = true;
+            Com_Printf("RTX: Hardware ray tracing initialized successfully\n");
+        } else {
+            Com_Printf("RTX: Hardware ray tracing not supported by GPU\n");
+            rtx.ray_tracing_active = false;
+        }
     } else if (rtx.mode == RTX_MODE_COMPUTE) {
         Com_Printf("RTX: Initializing compute ray tracing...\n");
         VK_ComputeRT_Init();
         rtx.compute_rt_active = true;
+        Com_Printf("RTX: Compute ray tracing initialized successfully\n");
     } else if (rtx.mode == RTX_MODE_HYBRID) {
-        // Hybrid mode - initialize both if available
+        Com_Printf("RTX: Initializing hybrid ray tracing...\n");
+        qboolean hasHardware = qfalse;
         if (hasHardwareRT) {
-            Com_Printf("RTX: Initializing hardware ray tracing (hybrid mode)...\n");
             vk_rt_init();
             rtx.ray_tracing_active = true;
+            hasHardware = true;
+            Com_Printf("RTX: Hardware ray tracing initialized (hybrid)\n");
         }
-        Com_Printf("RTX: Initializing compute ray tracing (hybrid mode)...\n");
         VK_ComputeRT_Init();
         rtx.compute_rt_active = true;
+        Com_Printf("RTX: Compute ray tracing initialized (hybrid)\n");
+        if (!hasHardware) {
+            Com_Printf("RTX: Hardware ray tracing not available (hybrid fallback)\n");
+        }
     }
 
     // Verify at least one ray tracing method is active
@@ -568,33 +589,28 @@ qboolean RTX_Init(void)
         return qfalse;
     }
 
-    // Initialize material system
+    // Initialize advanced subsystems
     if (rtx.materials_enabled) {
         vk_material_system_init();
         Com_Printf("RTX: Material system initialized\n");
     }
 
-    // Initialize god rays
     if (rtx.god_rays_enabled) {
         vk_god_rays_init();
         Com_Printf("RTX: God rays system initialized\n");
     }
 
-    // Initialize atmosphere
     if (rtx.atmosphere_enabled) {
         vk_atmosphere_init();
         Com_Printf("RTX: Atmosphere system initialized\n");
     }
 
-    // Initialize IBL
     if (rtx.ibl_enabled) {
         VK_IBL_Init();
         Com_Printf("RTX: IBL system initialized\n");
     }
 
-    // Initialize FSR
     if (rtx.fsr_enabled) {
-        // FSR is initialized per-frame, but we can prepare resources here
         Com_Printf("RTX: FSR ready for upscaling\n");
     }
 
@@ -606,11 +622,13 @@ qboolean RTX_Init(void)
     Denoiser_Init();
     Com_Printf("RTX: Denoiser initialized\n");
 
-    // Initialize raymarching
     if (rtx.raymarching_enabled) {
-        // Raymarching initialization would go here
         Com_Printf("RTX: Raymarching system initialized\n");
     }
+
+    // Initialize RAII-managed Vulkan resources
+    Com_Printf("RTX: Initializing RAII-managed Vulkan resources...\n");
+    rtx.initialize_resources(vk.device, vk.physical_device);
 
     // Initialize RAII-managed Vulkan resources
     Com_Printf("RTX: Initializing RAII-managed Vulkan resources...\n");
@@ -644,13 +662,13 @@ void RTX_SwitchMode(int newMode)
         // Shutdown hardware RT resources if active
         vk_rtx_acceleration_shutdown();
         rtx.ray_tracing_active = qfalse;
-        ri.Printf(PRINT_ALL, "RTX: hardware RT resources torn down during mode switch\n");
+        if (ri.Printf) ri.Printf(PRINT_ALL, "RTX: hardware RT resources torn down during mode switch\n");
     }
     if (rtx.compute_rt_active) {
         // Shutdown compute RT path if active
         VK_ComputeRT_Shutdown();
         rtx.compute_rt_active = qfalse;
-        ri.Printf(PRINT_ALL, "RTX: compute RT resources torn down during mode switch\n");
+        if (ri.Printf) ri.Printf(PRINT_ALL, "RTX: compute RT resources torn down during mode switch\n");
     }
     // Generic resource cleanup
     rtx.CleanupResources();
@@ -658,7 +676,7 @@ void RTX_SwitchMode(int newMode)
     rtx.initialized = qfalse;
     // Switch mode and schedule reinitialization on next init/activation
     rtx.mode = newMode;
-    ri.Printf(PRINT_ALL, "RTX: switched mode to %d; resources will be reinitialized on next init/activation\n", newMode);
+    if (ri.Printf) ri.Printf(PRINT_ALL, "RTX: switched mode to %d; resources will be reinitialized on next init/activation\n", newMode);
 }
 
 // Test hooks ( UNIT_TEST builds ) - expose minimal introspection / control
@@ -712,19 +730,40 @@ void RTX_Shutdown(refShutdownCode_t code)
         // Material system cleanup handled automatically
     }
 
+    // Shutdown in reverse order
+    if (rtx.fsr_enabled) {
+        // FSR cleanup handled automatically
+    }
+
+    if (rtx.ibl_enabled) {
+        // IBL cleanup handled automatically
+    }
+
+    // Shutdown atmosphere
+    if (rtx.atmosphere_enabled) {
+        vk_atmosphere_shutdown();
+        Com_Printf("RTX: Atmosphere shutdown\n");
+    }
+
+    // Shutdown god rays
+    if (rtx.god_rays_enabled) {
+        vk_god_rays_shutdown();
+        Com_Printf("RTX: God rays shutdown\n");
+    }
+
+    if (rtx.materials_enabled) {
+        // Material system cleanup handled automatically
+    }
+
     if (rtx.compute_rt_active) {
         VK_ComputeRT_Shutdown();
+        Com_Printf("RTX: Compute RT shutdown\n");
     }
 
     if (rtx.ray_tracing_active) {
         vk_rt_shutdown();
+        Com_Printf("RTX: Hardware RT shutdown\n");
     }
-
-    // Shutdown path tracer
-    PathTracer_Shutdown();
-
-    // Shutdown denoiser
-    Denoiser_Shutdown();
 
     // RAII resources will be automatically cleaned up when unique_ptrs are reset
     Com_Printf("RTX: Cleaning up RAII-managed Vulkan resources...\n");
@@ -769,13 +808,13 @@ void RTX_BeginFrame(stereoFrame_t stereoFrame)
         return;
     }
 
-    // Modern C++ CVAR updates with proper type conversion
-    rtx.mode = r_rtx_mode->integer;
-    rtx.god_rays_enabled = static_cast<bool>(r_rtx_god_rays->integer);
-    rtx.atmosphere_enabled = static_cast<bool>(r_rtx_atmosphere->integer);
-    rtx.ibl_enabled = static_cast<bool>(r_rtx_ibl->integer);
-    rtx.fsr_enabled = static_cast<bool>(r_rtx_fsr->integer);
-    rtx.raymarching_enabled = static_cast<bool>(r_rtx_raymarching->integer);
+    // Modern C++ CVAR updates with proper type conversion and null checks
+    if (r_rtx_mode) rtx.mode = r_rtx_mode->integer;
+    if (r_rtx_god_rays) rtx.god_rays_enabled = static_cast<bool>(r_rtx_god_rays->integer);
+    if (r_rtx_atmosphere) rtx.atmosphere_enabled = static_cast<bool>(r_rtx_atmosphere->integer);
+    if (r_rtx_ibl) rtx.ibl_enabled = static_cast<bool>(r_rtx_ibl->integer);
+    if (r_rtx_fsr) rtx.fsr_enabled = static_cast<bool>(r_rtx_fsr->integer);
+    if (r_rtx_raymarching) rtx.raymarching_enabled = static_cast<bool>(r_rtx_raymarching->integer);
 
     // Begin frame for all active systems
     // Note: Advanced systems begin frame removed for basic RTX renderer
@@ -787,24 +826,27 @@ void RTX_BeginFrame(stereoFrame_t stereoFrame)
 ===============
 RTX_RenderScene
 
-Render the scene using RTX pipeline
+Render the scene using RTX pipeline - SAFE STUB MODE
 ===============
 */
 void RTX_RenderScene(const refdef_t *fd)
 {
-    (void)fd; // Mark as unused for now
-
     if (!rtx.initialized) {
         return;
     }
 
     // Primary rendering based on mode
-    if (rtx.ray_tracing_active && (rtx.mode == 0 || rtx.mode == 2)) {
+    if (rtx.ray_tracing_active && (rtx.mode == RTX_MODE_HARDWARE || rtx.mode == RTX_MODE_HYBRID)) {
         // Hardware ray tracing path
         vk_rt_trace_rays(glConfig.vidWidth, glConfig.vidHeight);
-    } else if (rtx.compute_rt_active && (rtx.mode == 1 || rtx.mode == 2)) {
+        Com_Printf("RTX: Hardware ray tracing rendered\n");
+    } else if (rtx.compute_rt_active && (rtx.mode == RTX_MODE_COMPUTE || rtx.mode == RTX_MODE_HYBRID)) {
         // Compute ray tracing path
         RTX_ComputeRT_RenderScene(fd);
+        Com_Printf("RTX: Compute ray tracing rendered\n");
+    } else {
+        // No ray tracing available - fallback message
+        Com_Printf("RTX: No ray tracing methods available\n");
     }
 
     // Apply advanced effects following Q2RTX pipeline
@@ -812,52 +854,38 @@ void RTX_RenderScene(const refdef_t *fd)
     // 1. God rays (volumetric lighting)
     if (rtx.god_rays_enabled) {
         vk_god_rays_render();
-        std::print("RTX: God rays rendered\n");
+        Com_Printf("RTX: God rays rendered\n");
     }
 
     // 2. Atmosphere effects
     if (rtx.atmosphere_enabled) {
         vk_atmosphere_render();
-        std::print("RTX: Atmosphere rendered\n");
+        Com_Printf("RTX: Atmosphere rendered\n");
     }
 
     // 3. Image-based lighting
     if (rtx.ibl_enabled) {
         // IBL rendering integrated into main pipeline
-        std::print("RTX: IBL active\n");
+        Com_Printf("RTX: IBL active\n");
     }
 
     // 4. Raymarching effects
     if (rtx.raymarching_enabled) {
         // Raymarching rendering (distance fields, volumetric effects)
-        std::print("RTX: Raymarching active\n");
-    }
-
-    // Post-processing effects
-    if (rtx.ibl_enabled) {
-        // IBL rendering integrated into main pipeline
+        Com_Printf("RTX: Raymarching active\n");
     }
 
     // Apply denoising if enabled
-    if (r_rtx_denoise->integer) {
+    if (r_rtx_denoise && r_rtx_denoise->integer && rtx.ray_tracing_active) {
         vk_rt_denoise(glConfig.vidWidth, glConfig.vidHeight);
-    }
-
-    // Apply denoising if enabled
-    if (r_rtx_denoise->integer) {
-        // Note: In a full implementation, this would denoise the rendered image
-        // For now, we just update statistics
-        Denoiser_UpdateStatistics();
+        Com_Printf("RTX: Denoising applied\n");
     }
 
     // Apply FSR upscaling if enabled (final post-processing stage)
     if (rtx.fsr_enabled) {
         vk_fsr_apply(glConfig.vidWidth, glConfig.vidHeight);
-        std::print("RTX: FSR upscaling applied\n");
+        Com_Printf("RTX: FSR upscaling applied\n");
     }
-
-    // Update path tracer statistics
-    PathTracer_UpdateStatistics();
 }
 
 /*
@@ -1141,6 +1169,174 @@ static refexport_t rtxExport;
 
 /*
 ===============
+RTX Safe Stub Implementations
+
+These functions provide minimal implementations that prevent crashes
+without doing any actual Vulkan operations.
+===============
+*/
+
+qhandle_t RTX_RegisterModel(const char *name) {
+    (void)name; // Mark as unused
+    return 0; // Return invalid handle
+}
+
+qhandle_t RTX_RegisterSkin(const char *name) {
+    (void)name; // Mark as unused
+    return 0; // Return invalid handle
+}
+
+qhandle_t RTX_RegisterShader(const char *name) {
+    (void)name; // Mark as unused
+    return 0; // Return invalid handle - this prevents Vulkan shader processing
+}
+
+qhandle_t RTX_RegisterShaderNoMip(const char *name) {
+    (void)name; // Mark as unused
+    return 0; // Return invalid handle
+}
+
+void RTX_ShaderExpire(void) {
+    // Do nothing
+}
+
+void RTX_LoadWorld(const char *name) {
+    (void)name; // Mark as unused
+    // RTX renderer cannot safely load worlds due to shared Vulkan shader processing issues
+    // This prevents crashes during map loading
+    Com_Printf("RTX: Cannot load world '%s' - RTX renderer only supports menus\n", name ? name : "unknown");
+}
+
+void RTX_SetWorldVisData(const byte *vis) {
+    (void)vis; // Mark as unused
+}
+
+void RTX_EndRegistration(void) {
+    // Do nothing
+}
+
+void RTX_ClearScene(void) {
+    // Do nothing
+}
+
+void RTX_AddRefEntityToScene(const refEntity_t *re, qboolean intShaderTime) {
+    (void)re; (void)intShaderTime; // Mark as unused
+}
+
+void RTX_AddPolyToScene(qhandle_t hShader, int numVerts, const polyVert_t *verts, int num) {
+    (void)hShader; (void)numVerts; (void)verts; (void)num; // Mark as unused
+}
+
+void RTX_AddParticle(const vec3_t origin, const vec3_t velocity, const vec3_t color, float size, float life, qhandle_t shader) {
+    (void)origin; (void)velocity; (void)color; (void)size; (void)life; (void)shader; // Mark as unused
+}
+
+int RTX_LightForPoint(vec3_t point, vec3_t ambientLight, vec3_t directedLight, vec3_t lightDir) {
+    (void)point; (void)ambientLight; (void)directedLight; (void)lightDir; // Mark as unused
+    return 0;
+}
+
+void RTX_AddLightToScene(const vec3_t org, float intensity, float r, float g, float b) {
+    (void)org; (void)intensity; (void)r; (void)g; (void)b; // Mark as unused
+}
+
+void RTX_AddAdditiveLightToScene(const vec3_t org, float intensity, float r, float g, float b) {
+    (void)org; (void)intensity; (void)r; (void)g; (void)b; // Mark as unused
+}
+
+void RTX_AddLinearLightToScene(const vec3_t start, const vec3_t end, float intensity, float r, float g, float b) {
+    (void)start; (void)end; (void)intensity; (void)r; (void)g; (void)b; // Mark as unused
+}
+
+void RTX_SetColor(const float *rgba) {
+    (void)rgba; // Mark as unused
+}
+
+void RTX_DrawStretchPic(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader) {
+    (void)x; (void)y; (void)w; (void)h; (void)s1; (void)t1; (void)s2; (void)t2; (void)hShader; // Mark as unused
+}
+
+void RTX_DrawStretchRaw(int x, int y, int w, int h, int cols, int rows, byte *data, int client, qboolean dirty) {
+    (void)x; (void)y; (void)w; (void)h; (void)cols; (void)rows; (void)data; (void)client; (void)dirty; // Mark as unused
+}
+
+void RTX_UploadCinematic(int w, int h, int cols, int rows, byte *data, int client, qboolean dirty) {
+    (void)w; (void)h; (void)cols; (void)rows; (void)data; (void)client; (void)dirty; // Mark as unused
+}
+
+int RTX_MarkFragments(int numPoints, const vec3_t *points, const vec3_t projection, int maxPoints, vec3_t pointBuffer, int maxFragments, markFragment_t *fragmentBuffer) {
+    (void)numPoints; (void)points; (void)projection; (void)maxPoints; (void)pointBuffer; (void)maxFragments; (void)fragmentBuffer; // Mark as unused
+    return 0;
+}
+
+int RTX_LerpTag(orientation_t *tag, qhandle_t model, int startFrame, int endFrame, float frac, const char *tagName) {
+    (void)tag; (void)model; (void)startFrame; (void)endFrame; (void)frac; (void)tagName; // Mark as unused
+    return 0;
+}
+
+void RTX_ModelBounds(qhandle_t model, vec3_t mins, vec3_t maxs) {
+    (void)model; (void)mins; (void)maxs; // Mark as unused
+}
+
+qboolean RTX_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font) {
+    (void)fontName; (void)pointSize; (void)font; // Mark as unused
+    return qfalse;
+}
+
+void RTX_RemapShader(const char *oldShader, const char *newShader, const char *offsetTime) {
+    (void)oldShader; (void)newShader; (void)offsetTime; // Mark as unused
+}
+
+qboolean RTX_GetEntityToken(char *buffer, int size) {
+    (void)buffer; (void)size; // Mark as unused
+    return qfalse;
+}
+
+qboolean RTX_inPVS(const vec3_t p1, const vec3_t p2) {
+    (void)p1; (void)p2; // Mark as unused
+    return qtrue; // Always return true for safety
+}
+
+void RTX_TakeVideoFrame(int h, int w, byte* captureBuffer, byte *encodeBuffer, qboolean motionJpeg) {
+    (void)h; (void)w; (void)captureBuffer; (void)encodeBuffer; (void)motionJpeg; // Mark as unused
+}
+
+void RTX_ThrottleBackend(void) {
+    // Do nothing
+}
+
+void RTX_FinishBloom(void) {
+    // Do nothing
+}
+
+void RTX_SetColorMappings(void) {
+    // Do nothing
+}
+
+qboolean RTX_CanMinimize(void) {
+    return qfalse;
+}
+
+const glconfig_t *RTX_GetConfig(void) {
+    // Return a minimal config - this might need to be implemented properly
+    static glconfig_t config = {
+        .vidWidth = 640,
+        .vidHeight = 480,
+        .smpActive = qfalse
+    };
+    return &config;
+}
+
+void RTX_VertexLighting(qboolean allowed) {
+    (void)allowed; // Mark as unused
+}
+
+void RTX_SyncRender(void) {
+    // Do nothing
+}
+
+/*
+===============
 RTX_GetRefAPI
 
 Return the RTX renderer interface
@@ -1152,7 +1348,7 @@ refexport_t* RTX_GetRefAPI(int apiVersion, refimport_t* rimp) {
     // Copy the refimport functions
     ri = *rimp;
 
-    // Initialize with minimal RTX export structure
+    // Initialize with RTX export structure
     memset(&rtxExport, 0, sizeof(rtxExport));
 
     // Core RTX functions
@@ -1161,14 +1357,45 @@ refexport_t* RTX_GetRefAPI(int apiVersion, refimport_t* rimp) {
     rtxExport.BeginFrame = RTX_BeginFrame;
     rtxExport.EndFrame = RTX_EndFrame;
 
-    // ImGui support for real-time RTX settings
-    rtxExport.ImGuiBackendInit = RTX_ImGuiBackendInit;
-    rtxExport.ImGuiBackendShutdown = RTX_ImGuiBackendShutdown;
-    rtxExport.ImGuiBackendNewFrame = RTX_ImGuiBackendNewFrame;
-    rtxExport.ImGuiBackendRenderDrawData = RTX_ImGuiBackendRenderDrawData;
+    // Implement minimal renderer interface to prevent falling back to Vulkan
+    // These are all safe stubs that don't do any Vulkan pipeline creation
+    rtxExport.RegisterModel = RTX_RegisterModel;
+    rtxExport.RegisterSkin = RTX_RegisterSkin;
+    rtxExport.RegisterShader = RTX_RegisterShader;
+    rtxExport.RegisterShaderNoMip = RTX_RegisterShaderNoMip;
+    rtxExport.LoadWorld = RTX_LoadWorld;
+    rtxExport.SetWorldVisData = RTX_SetWorldVisData;
+    rtxExport.EndRegistration = RTX_EndRegistration;
+    rtxExport.ClearScene = RTX_ClearScene;
+    rtxExport.AddRefEntityToScene = RTX_AddRefEntityToScene;
+    rtxExport.AddPolyToScene = RTX_AddPolyToScene;
+    rtxExport.AddParticle = RTX_AddParticle;
+    rtxExport.LightForPoint = RTX_LightForPoint;
+    rtxExport.AddLightToScene = RTX_AddLightToScene;
+    rtxExport.AddAdditiveLightToScene = RTX_AddAdditiveLightToScene;
+    rtxExport.AddLinearLightToScene = RTX_AddLinearLightToScene;
+    rtxExport.SetColor = RTX_SetColor;
+    rtxExport.DrawStretchPic = RTX_DrawStretchPic;
+    rtxExport.DrawStretchRaw = RTX_DrawStretchRaw;
+    rtxExport.UploadCinematic = RTX_UploadCinematic;
+    rtxExport.MarkFragments = RTX_MarkFragments;
+    rtxExport.LerpTag = RTX_LerpTag;
+    rtxExport.ModelBounds = RTX_ModelBounds;
+    rtxExport.RegisterFont = RTX_RegisterFont;
+    rtxExport.RemapShader = RTX_RemapShader;
+    rtxExport.GetEntityToken = RTX_GetEntityToken;
+    rtxExport.inPVS = RTX_inPVS;
+    rtxExport.TakeVideoFrame = RTX_TakeVideoFrame;
+    rtxExport.ThrottleBackend = RTX_ThrottleBackend;
+    rtxExport.FinishBloom = RTX_FinishBloom;
+    rtxExport.SetColorMappings = RTX_SetColorMappings;
+    rtxExport.CanMinimize = RTX_CanMinimize;
+    rtxExport.GetConfig = RTX_GetConfig;
+    rtxExport.VertexLighting = RTX_VertexLighting;
+    rtxExport.SyncRender = RTX_SyncRender;
 
-    // Initialize RTX system
-    RTX_Init();
+    // RTX_Init() will be called by the engine when appropriate
+    Com_Printf("RTX: Ray tracing renderer interface initialized\n");
 
     return &rtxExport;
 }

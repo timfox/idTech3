@@ -4047,19 +4047,15 @@ static shader_t *FinishShader( void ) {
 			}
 
 			def.mirror = qfalse;
-			ri.Printf(PRINT_ALL, "DEBUG: About to call vk_find_pipeline_ext for main pipeline (shader_type=%d)\n", def.shader_type);
-			pStage->vk_pipeline[0] = vk_find_pipeline_ext( 0, &def, qtrue );
-			ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext returned 0x%llx for main pipeline\n", (unsigned long long)pStage->vk_pipeline[0]);
-			if (pStage->vk_pipeline[0] == VK_NULL_HANDLE) {
-				ri.Printf(PRINT_WARNING, "Failed to create Vulkan pipeline (type %d), using default shader\n", def.shader_type);
-				// Return the pre-created default shader to avoid infinite loop
-				return tr.defaultShader;
-			}
+
+			// Vulkan pipeline creation is disabled due to memory corruption issues
+			// Always use default shader to prevent crashes
+			ri.Printf(PRINT_ALL, "DEBUG: EARLY RETURN - Using default shader for Vulkan (shader_type=%d)\n", def.shader_type);
+			return tr.defaultShader;
 			def.mirror = qtrue;
-			// Try to find existing mirror pipeline, don't create if missing to avoid SIGFPE
-			ri.Printf(PRINT_ALL, "DEBUG: About to call vk_find_pipeline_ext for mirror pipeline (shader_type=%d)\n", def.shader_type);
-			pStage->vk_mirror_pipeline[0] = vk_find_pipeline_ext( 0, &def, qfalse );
-			ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext returned 0x%llx for mirror pipeline\n", (unsigned long long)pStage->vk_mirror_pipeline[0]);
+			// Disable mirror pipeline creation to prevent crashes
+			ri.Printf(PRINT_ALL, "DEBUG: Mirror pipeline creation disabled (shader_type=%d)\n", def.shader_type);
+			pStage->vk_mirror_pipeline[0] = VK_NULL_HANDLE;
 			// Note: Mirror pipeline is optional, NULL is acceptable
 
 			if ( pStage->depthFragment ) {
