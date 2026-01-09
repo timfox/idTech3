@@ -4839,6 +4839,11 @@ void vk_initialize( void )
 	vk.active = qtrue;
 	ri.Printf(PRINT_ALL, "DEBUG: Vulkan marked as active after validation\n");
 
+	// Initialize Vulkan images now that the device is ready
+	ri.Printf(PRINT_ALL, "DEBUG: Initializing Vulkan images after device validation\n");
+	R_InitImages();
+	ri.Printf(PRINT_ALL, "DEBUG: Vulkan images initialized successfully\n");
+
 	// Notify the client of the active render scaling so console math uses valid values.
 	if ( ri.CL_SetScaling ) {
 		ri.Printf(PRINT_ALL, "DEBUG: About to call CL_SetScaling\n");

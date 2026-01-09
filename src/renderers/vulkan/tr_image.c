@@ -1983,6 +1983,37 @@ static void R_CreateDefaultImage( void ) {
 R_CreateBuiltinImages
 ==================
 */
+static void R_CreateDummyBuiltinImages( void ) {
+	// Create dummy image structures without Vulkan backing
+	// These will be replaced with real images when Vulkan is ready
+
+	ri.Printf(PRINT_ALL, "R_CreateDummyBuiltinImages: Creating dummy default image\n");
+	tr.defaultImage = (image_t*)ri.Hunk_Alloc(sizeof(image_t), h_low);
+	Com_Memset(tr.defaultImage, 0, sizeof(image_t));
+	Q_strncpyz(tr.defaultImage->imgName, "*default", sizeof(tr.defaultImage->imgName));
+	tr.defaultImage->texnum = 0; // Dummy texture ID
+	tr.defaultImage->width = DEFAULT_SIZE;
+	tr.defaultImage->height = DEFAULT_SIZE;
+
+	ri.Printf(PRINT_ALL, "R_CreateDummyBuiltinImages: Creating dummy black image\n");
+	tr.blackImage = (image_t*)ri.Hunk_Alloc(sizeof(image_t), h_low);
+	Com_Memset(tr.blackImage, 0, sizeof(image_t));
+	Q_strncpyz(tr.blackImage->imgName, "*black", sizeof(tr.blackImage->imgName));
+	tr.blackImage->texnum = 0;
+
+	ri.Printf(PRINT_ALL, "R_CreateDummyBuiltinImages: Creating dummy white image\n");
+	tr.whiteImage = (image_t*)ri.Hunk_Alloc(sizeof(image_t), h_low);
+	Com_Memset(tr.whiteImage, 0, sizeof(image_t));
+	Q_strncpyz(tr.whiteImage->imgName, "*white", sizeof(tr.whiteImage->imgName));
+	tr.whiteImage->texnum = 0;
+
+	// Create dummy identity light image
+	tr.identityLightImage = (image_t*)ri.Hunk_Alloc(sizeof(image_t), h_low);
+	Com_Memset(tr.identityLightImage, 0, sizeof(image_t));
+	Q_strncpyz(tr.identityLightImage->imgName, "*identityLight", sizeof(tr.identityLightImage->imgName));
+	tr.identityLightImage->texnum = 0;
+}
+
 static void R_CreateBuiltinImages( void ) {
 	int		x,y;
 	byte	data[DEFAULT_SIZE][DEFAULT_SIZE][4];
@@ -2199,13 +2230,14 @@ void R_InitImages( void ) {
 
 #ifdef USE_VULKAN
 	// Check if Vulkan is ready for image creation
-	if (!vk.active || vk.device == VK_NULL_HANDLE) {
+	if (!vk.active || vk.device == VK_NULL_HANDLE || vk.instance == VK_NULL_HANDLE) {
 		if (ri.Printf) {
-			ri.Printf(PRINT_WARNING, "R_InitImages: Vulkan not ready for image creation, using fallback images\n");
+			ri.Printf(PRINT_WARNING, "R_InitImages: Vulkan not ready (active=%d, device=%p, instance=%p), creating dummy images\n",
+				vk.active, vk.device, vk.instance);
 		}
-		// Even if Vulkan is not ready, we need to create basic images for the renderer to work
-		// Create fallback images that don't use Vulkan
-		R_CreateBuiltinImages();
+		// Create dummy images that don't require Vulkan
+		// These will be replaced with real Vulkan images later when Vulkan is ready
+		R_CreateDummyBuiltinImages();
 		return;
 	}
 

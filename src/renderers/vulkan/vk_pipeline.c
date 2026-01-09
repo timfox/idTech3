@@ -485,24 +485,6 @@ VkPipeline vk_gen_pipeline(uint32_t index) {
 }
 
 VkPipeline vk_find_pipeline_ext(int base_pipeline, Vk_Pipeline_Def* def, qboolean create_if_missing) {
-	// Ensure images are initialized before pipeline creation
-	static qboolean images_initialized = qfalse;
-	if (!images_initialized && tr.defaultImage == NULL) {
-		ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext initializing images\n");
-		// Only initialize images if Vulkan device is ready to avoid crashes
-		if (vk.device != VK_NULL_HANDLE) {
-			R_InitImages();
-			if (tr.defaultImage != NULL) {
-				images_initialized = qtrue;
-				ri.Printf(PRINT_ALL, "DEBUG: Images initialized successfully\n");
-			} else {
-				ri.Printf(PRINT_ALL, "DEBUG: Images initialization failed\n");
-			}
-		} else {
-			ri.Printf(PRINT_ALL, "DEBUG: Vulkan device not ready, cannot initialize images\n");
-		}
-	}
-
 	// ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext shader_type=%d create_if_missing=%d\n", def->shader_type, create_if_missing);
 	const Vk_Pipeline_Def *cur_def;
 	uint32_t index;
