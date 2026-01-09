@@ -1589,6 +1589,10 @@ void vk_safe_matrix_multiply(const float *a, const float *b, float *result, int 
 void vk_track_allocation(VkDeviceSize size);
 void vk_track_free(VkDeviceSize size);
 
+// Safe memory management functions
+void vk_safe_free(void **ptr, const char *context);
+qboolean vk_validate_pointer(void *ptr, const char *context);
+
 // Missing utility functions
 const char* vk_result_string(VkResult result);
 VkCommandBuffer begin_command_buffer(void);

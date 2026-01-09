@@ -479,6 +479,10 @@ void RE_RenderScene( const refdef_t *fd ) {
 		ri.Printf(PRINT_DEVELOPER, "Vulkan: Skipping scene render - renderer not in safe state\n");
 		return;
 	}
+
+	// Periodic memory corruption check for cache structures
+	extern void vk_memory_corruption_check(void);
+	vk_memory_corruption_check();
 #endif
 	viewParms_t		parms;
 	int				startTime;

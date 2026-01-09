@@ -93,6 +93,19 @@ void vk_pbo_init(void) {
 void vk_pbo_shutdown(void) {
     ri.Printf(PRINT_ALL, "Vulkan: Shutting down PBO system\n");
 
+    // Guard: Check if PBO system was actually initialized
+    if (!pbo_system.initialized) {
+        ri.Printf(PRINT_ALL, "Vulkan: PBO system was not initialized, skipping shutdown\n");
+        return;
+    }
+
+    // Guard: Check if Vulkan device is still valid
+    if (!vk.device || vk.device == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_WARNING, "Vulkan: Device invalid during PBO shutdown, skipping Vulkan API calls\n");
+        pbo_system.initialized = qfalse;
+        return;
+    }
+
     // Wait for all pending uploads to complete
     vk_pbo_wait_all_uploads();
 
@@ -204,9 +217,15 @@ void vk_pbo_wait_all_uploads(void) {
         return;
     }
 
+    // Check if Vulkan device is still valid
+    if (!vk.device || vk.device == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_WARNING, "vk_pbo_wait_all_uploads: Vulkan device invalid, skipping fence operations\n");
+        return;
+    }
+
     // Wait for all transfer fences
     for (int i = 0; i < MAX_PBO_BUFFERS; i++) {
-        if (pbo_system.upload_jobs[i].active && pbo_system.transfer_fences[i] != VK_NULL_HANDLE) {
+        if (pbo_system.upload_jobs[i].active && pbo_system.transfer_fences[i] != VK_NULL_HANDLE && qvkWaitForFences && qvkResetFences) {
             qvkWaitForFences(vk.device, 1, &pbo_system.transfer_fences[i], VK_TRUE, UINT64_MAX);
             qvkResetFences(vk.device, 1, &pbo_system.transfer_fences[i]);
 
@@ -360,39 +379,45 @@ static qboolean vk_create_pbo_resources(void) {
 static void vk_destroy_pbo_resources(void) {
     int num_buffers = MIN(r_pboBuffers->integer, MAX_PBO_BUFFERS);
 
+    // Double-check Vulkan device validity
+    if (!vk.device || vk.device == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_WARNING, "vk_destroy_pbo_resources: Vulkan device invalid, skipping resource destruction\n");
+        return;
+    }
+
     // Destroy semaphores and fences
     for (int i = 0; i < num_buffers; i++) {
-        if (pbo_system.transfer_semaphores[i]) {
+        if (pbo_system.transfer_semaphores[i] && qvkDestroySemaphore) {
             qvkDestroySemaphore(vk.device, pbo_system.transfer_semaphores[i], NULL);
             pbo_system.transfer_semaphores[i] = VK_NULL_HANDLE;
         }
 
-        if (pbo_system.transfer_fences[i]) {
+        if (pbo_system.transfer_fences[i] && qvkDestroyFence) {
             qvkDestroyFence(vk.device, pbo_system.transfer_fences[i], NULL);
             pbo_system.transfer_fences[i] = VK_NULL_HANDLE;
         }
     }
 
     // Free command buffers
-    if (pbo_system.transfer_command_pool && pbo_system.transfer_command_buffers[0]) {
+    if (pbo_system.transfer_command_pool && pbo_system.transfer_command_buffers[0] && qvkFreeCommandBuffers) {
         qvkFreeCommandBuffers(vk.device, pbo_system.transfer_command_pool, num_buffers, pbo_system.transfer_command_buffers);
         memset(pbo_system.transfer_command_buffers, 0, sizeof(pbo_system.transfer_command_buffers));
     }
 
     // Destroy command pool
-    if (pbo_system.transfer_command_pool) {
+    if (pbo_system.transfer_command_pool && qvkDestroyCommandPool) {
         qvkDestroyCommandPool(vk.device, pbo_system.transfer_command_pool, NULL);
         pbo_system.transfer_command_pool = VK_NULL_HANDLE;
     }
 
     // Destroy staging buffers
     for (int i = 0; i < num_buffers; i++) {
-        if (pbo_system.staging_buffers[i]) {
+        if (pbo_system.staging_buffers[i] && qvkDestroyBuffer) {
             qvkDestroyBuffer(vk.device, pbo_system.staging_buffers[i], NULL);
             pbo_system.staging_buffers[i] = VK_NULL_HANDLE;
         }
 
-        if (pbo_system.staging_memory[i]) {
+        if (pbo_system.staging_memory[i] && qvkFreeMemory) {
             qvkFreeMemory(vk.device, pbo_system.staging_memory[i], NULL);
             pbo_system.staging_memory[i] = VK_NULL_HANDLE;
         }

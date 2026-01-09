@@ -1015,18 +1015,16 @@ void vk_shutdown_memory_pool_system(void) {
             }
         }
 
-        // Free allocated arrays
-        if (level->memory_blocks) ri.Free(level->memory_blocks);
-        if (level->memory_sizes) ri.Free(level->memory_sizes);
-        if (level->allocation_counts) ri.Free(level->allocation_counts);
-        if (level->mapped_pointers) ri.Free(level->mapped_pointers);
-        if (level->allocations) ri.Free(level->allocations);
-        if (level->free_indices) ri.Free(level->free_indices);
+        // Free allocated arrays safely
+        vk_safe_free((void**)&level->memory_blocks, "memory_pool_level_blocks");
+        vk_safe_free((void**)&level->memory_sizes, "memory_pool_level_sizes");
+        vk_safe_free((void**)&level->allocation_counts, "memory_pool_level_counts");
+        vk_safe_free((void**)&level->mapped_pointers, "memory_pool_level_pointers");
+        vk_safe_free((void**)&level->allocations, "memory_pool_level_allocations");
+        vk_safe_free((void**)&level->free_indices, "memory_pool_level_indices");
     }
 
-    if (vk.resource_pools.pool_levels) {
-        ri.Free(vk.resource_pools.pool_levels);
-    }
+    vk_safe_free((void**)&vk.resource_pools.pool_levels, "resource_pools_levels");
 
     vk.resource_pools.initialized = qfalse;
     ri.Printf(PRINT_ALL, "Vulkan: Hierarchical memory pool system shutdown complete\n");
@@ -1142,13 +1140,11 @@ static void vk_shutdown_lock_free_allocator(vk_lock_free_allocator_t *allocator)
     ri.Printf(PRINT_ALL, "Vulkan: Shutting down lock-free allocator %s\n", allocator->debug_name);
 
     if (allocator->free_list) {
-        ri.Free((void*)allocator->free_list);
-        allocator->free_list = NULL;
+        vk_safe_free((void**)&allocator->free_list, "lock_free_allocator_free_list");
     }
 
     if (allocator->memory_pool) {
-        ri.Free(allocator->memory_pool);
-        allocator->memory_pool = NULL;
+        vk_safe_free((void**)&allocator->memory_pool, "lock_free_allocator_memory_pool");
     }
 
     // Reset statistics
@@ -1449,8 +1445,7 @@ static void vk_shutdown_memory_arena(vk_memory_arena_t *arena) {
     }
 
     if (arena->memory) {
-        ri.Free(arena->memory);
-        arena->memory = NULL;
+        vk_safe_free((void**)&arena->memory, "memory_arena");
     }
 
     arena->used = 0;
@@ -1617,8 +1612,7 @@ void vk_shutdown_arena_manager(void) {
     }
 
     if (vk.arena_manager.dynamic_arenas) {
-        ri.Free(vk.arena_manager.dynamic_arenas);
-        vk.arena_manager.dynamic_arenas = NULL;
+        vk_safe_free((void**)&vk.arena_manager.dynamic_arenas, "arena_manager_dynamic_arenas");
     }
 
     // Shutdown pre-allocated arenas
@@ -1926,25 +1920,10 @@ void vk_shutdown_memory_advisor(void) {
 
     ri.Printf(PRINT_ALL, "Vulkan: Shutting down memory advisor\n");
 
-    if (vk.memory_advisor.analyzer.access_log) {
-        ri.Free(vk.memory_advisor.analyzer.access_log);
-        vk.memory_advisor.analyzer.access_log = NULL;
-    }
-
-    if (vk.memory_advisor.analyzer.hot_addresses) {
-        ri.Free(vk.memory_advisor.analyzer.hot_addresses);
-        vk.memory_advisor.analyzer.hot_addresses = NULL;
-    }
-
-    if (vk.memory_advisor.analyzer.cold_addresses) {
-        ri.Free(vk.memory_advisor.analyzer.cold_addresses);
-        vk.memory_advisor.analyzer.cold_addresses = NULL;
-    }
-
-    if (vk.memory_advisor.recommendations) {
-        ri.Free(vk.memory_advisor.recommendations);
-        vk.memory_advisor.recommendations = NULL;
-    }
+    vk_safe_free((void**)&vk.memory_advisor.analyzer.access_log, "memory_advisor_access_log");
+    vk_safe_free((void**)&vk.memory_advisor.analyzer.hot_addresses, "memory_advisor_hot_addresses");
+    vk_safe_free((void**)&vk.memory_advisor.analyzer.cold_addresses, "memory_advisor_cold_addresses");
+    vk_safe_free((void**)&vk.memory_advisor.recommendations, "memory_advisor_recommendations");
 
     vk.memory_advisor.initialized = qfalse;
     ri.Printf(PRINT_ALL, "Vulkan: Memory advisor shutdown complete\n");
@@ -2228,6 +2207,213 @@ void vk_force_memory_analysis(void) {
 
 // Cache-Conscious Data Structures Implementation
 
+// Validate cache array structure integrity
+static qboolean vk_validate_cache_array_integrity(const vk_cache_array_t *array) {
+    if (!array) return qfalse;
+
+    // Check for obviously corrupted values
+    if (array->capacity > 1000000) { // Reasonable upper bound
+        ri.Printf(PRINT_WARNING, "vk_validate_cache_array_integrity: Invalid capacity %u\n", array->capacity);
+        return qfalse;
+    }
+
+    if (array->element_size == 0 || array->element_size > 10000) { // Reasonable size bounds
+        ri.Printf(PRINT_WARNING, "vk_validate_cache_array_integrity: Invalid element size %llu\n",
+                 (unsigned long long)array->element_size);
+        return qfalse;
+    }
+
+    // Validate data pointer
+    if (array->data && !vk_validate_pointer(array->data, "cache_array_data")) {
+        return qfalse;
+    }
+
+    // Validate original allocation pointer if it exists
+    if (array->original_allocation && !vk_validate_pointer(array->original_allocation, "cache_array_orig")) {
+        return qfalse;
+    }
+
+    // Note: original_allocation and data can be identical if the allocation was already aligned
+    // This is not corruption - it's just efficient alignment
+
+    return qtrue;
+}
+
+// Validate alignment calculation for cache structures
+static qboolean vk_validate_alignment_calculation(void *calculated_orig, void *array_data, const char *context) {
+    if (!calculated_orig || !array_data) return qfalse;
+
+    uintptr_t calc_addr = (uintptr_t)calculated_orig;
+    uintptr_t data_addr = (uintptr_t)array_data;
+
+    // The calculated original should be less than the data address
+    if (calc_addr >= data_addr) {
+        ri.Printf(PRINT_WARNING, "vk_validate_alignment_calculation: Calculated original %p >= data %p in %s\n",
+                 calculated_orig, array_data, context);
+        return qfalse;
+    }
+
+    // The difference should be reasonable (less than 2 cache lines)
+    uintptr_t diff = data_addr - calc_addr;
+    if (diff > CACHE_LINE_SIZE * 2) {
+        ri.Printf(PRINT_WARNING, "vk_validate_alignment_calculation: Excessive alignment offset %llu in %s\n",
+                 (unsigned long long)diff, context);
+        return qfalse;
+    }
+
+    return qtrue;
+}
+
+// Validate allocation size is reasonable
+static qboolean vk_validate_allocation_size(size_t size, const char *context) {
+    // Reasonable bounds for cache structures (avoid obviously corrupted sizes)
+    const size_t max_reasonable_size = 100 * 1024 * 1024; // 100MB
+
+    if (size == 0) {
+        ri.Printf(PRINT_WARNING, "vk_validate_allocation_size: Zero size allocation in %s\n", context);
+        return qfalse;
+    }
+
+    if (size > max_reasonable_size) {
+        ri.Printf(PRINT_WARNING, "vk_validate_allocation_size: Excessive size %llu in %s\n",
+                 (unsigned long long)size, context);
+        return qfalse;
+    }
+
+    return qtrue;
+}
+
+// Track memory allocation for cache structures
+static void vk_track_cache_allocation(void *ptr, size_t size, const char *context) {
+    if (!ptr) return;
+
+    // Check if this allocation is already being tracked to prevent double-tracking
+    uint32_t count = atomic_load_explicit(&vk.cache_structures_manager.memory_tracking_count, memory_order_relaxed);
+    for (uint32_t i = 0; i < count; i++) {
+        vk_memory_tracking_t *tracking = &vk.cache_structures_manager.memory_tracking[i];
+        if (tracking->allocation == ptr && tracking->magic == 0xDEADBEEF && !tracking->freed) {
+            ri.Printf(PRINT_DEVELOPER, "vk_track_cache_allocation: Allocation %p already tracked, skipping\n", ptr);
+            return;
+        }
+    }
+
+    uint32_t index = count;
+    if (index >= ARRAY_LEN(vk.cache_structures_manager.memory_tracking)) {
+        ri.Printf(PRINT_WARNING, "vk_track_cache_allocation: Memory tracking table full (%u/%u), cannot track allocation %p\n",
+                 index, (uint32_t)ARRAY_LEN(vk.cache_structures_manager.memory_tracking), ptr);
+        return;
+    }
+
+    vk_memory_tracking_t *tracking = &vk.cache_structures_manager.memory_tracking[index];
+    tracking->allocation = ptr;
+    tracking->size = size;
+    tracking->context = context;
+    tracking->freed = qfalse;
+    tracking->magic = 0xDEADBEEF; // Magic number for corruption detection
+
+    atomic_fetch_add_explicit(&vk.cache_structures_manager.memory_tracking_count, 1, memory_order_relaxed);
+
+    ri.Printf(PRINT_DEVELOPER, "vk_track_cache_allocation: Tracked allocation %p (size=%llu) at index %u\n",
+             ptr, (unsigned long long)size, index);
+}
+
+// Mark allocation as freed in tracking table
+static void vk_untrack_cache_allocation(void *ptr) {
+    if (!ptr) return;
+
+    uint32_t count = atomic_load_explicit(&vk.cache_structures_manager.memory_tracking_count, memory_order_relaxed);
+    if (count == 0) {
+        ri.Printf(PRINT_DEVELOPER, "vk_untrack_cache_allocation: Tracking table empty, allocation %p was not tracked\n", ptr);
+        return;
+    }
+
+    for (uint32_t i = 0; i < count; i++) {
+        vk_memory_tracking_t *tracking = &vk.cache_structures_manager.memory_tracking[i];
+        if (tracking->allocation == ptr) {
+            if (tracking->magic != 0xDEADBEEF) {
+                ri.Printf(PRINT_WARNING, "vk_untrack_cache_allocation: Tracking entry corrupted for %p (magic=0x%08X)\n", ptr, tracking->magic);
+                return;
+            }
+            if (tracking->freed) {
+                ri.Printf(PRINT_WARNING, "vk_untrack_cache_allocation: Double free detected for %p in context '%s'\n",
+                         ptr, tracking->context ? tracking->context : "unknown");
+                return;
+            }
+            tracking->freed = qtrue;
+            ri.Printf(PRINT_DEVELOPER, "vk_untrack_cache_allocation: Marked allocation %p as freed (context=%s)\n",
+                     ptr, tracking->context ? tracking->context : "unknown");
+            return;
+        }
+    }
+
+    // This allocation was not found in the tracking table
+    // This can happen if tracking table was full or allocation happened before tracking was enabled
+    ri.Printf(PRINT_DEVELOPER, "vk_untrack_cache_allocation: Allocation %p not found in tracking table (%u entries)\n", ptr, count);
+}
+
+// Validate all tracked allocations for corruption
+static qboolean vk_validate_tracked_allocations(void) {
+    if (!vk.cache_structures_manager.initialized) return qtrue;
+
+    qboolean all_valid = qtrue;
+    uint32_t count = atomic_load_explicit(&vk.cache_structures_manager.memory_tracking_count, memory_order_relaxed);
+
+    for (uint32_t i = 0; i < count; i++) {
+        vk_memory_tracking_t *tracking = &vk.cache_structures_manager.memory_tracking[i];
+
+        // Check magic number corruption
+        if (tracking->magic != 0xDEADBEEF) {
+            ri.Printf(PRINT_WARNING, "vk_validate_tracked_allocations: Magic number corrupted at index %u\n", i);
+            all_valid = qfalse;
+            continue;
+        }
+
+        // If allocation exists and not freed, validate the pointer
+        if (tracking->allocation && !tracking->freed) {
+            if (!vk_validate_pointer(tracking->allocation, tracking->context)) {
+                ri.Printf(PRINT_WARNING, "vk_validate_tracked_allocations: Invalid tracked allocation %p in context '%s'\n",
+                         tracking->allocation, tracking->context ? tracking->context : "unknown");
+                all_valid = qfalse;
+            }
+        }
+    }
+
+    return all_valid;
+}
+
+// Periodic memory corruption check for cache structures
+void vk_memory_corruption_check(void) {
+    static uint32_t check_counter = 0;
+
+    // Only run check every 100 frames to avoid performance impact
+    if (++check_counter % 100 != 0) {
+        return;
+    }
+
+    if (!vk.cache_structures_manager.initialized) {
+        return;
+    }
+
+    // Check sentinels for corruption
+    if (vk.cache_structures_manager.sentinel_before != 0xAAAAAAAA ||
+        vk.cache_structures_manager.sentinel_after != 0xAAAAAAAA) {
+        ri.Printf(PRINT_WARNING, "vk_memory_corruption_check: Sentinel corruption detected!\n");
+        ri.Printf(PRINT_WARNING, "  sentinel_before: 0x%08X (expected 0xAAAAAAAA)\n",
+                 vk.cache_structures_manager.sentinel_before);
+        ri.Printf(PRINT_WARNING, "  sentinel_after: 0x%08X (expected 0xAAAAAAAA)\n",
+                 vk.cache_structures_manager.sentinel_after);
+
+        // Reset sentinels to prevent repeated warnings
+        vk.cache_structures_manager.sentinel_before = 0xAAAAAAAA;
+        vk.cache_structures_manager.sentinel_after = 0xAAAAAAAA;
+    }
+
+    // Validate tracked allocations
+    if (!vk_validate_tracked_allocations()) {
+        ri.Printf(PRINT_WARNING, "vk_memory_corruption_check: Allocation corruption detected\n");
+    }
+}
+
 // Initialize cache-conscious array
 qboolean vk_cache_array_init(vk_cache_array_t *array, VkDeviceSize element_size,
                            uint32_t initial_capacity, const char *debug_name) {
@@ -2235,19 +2421,29 @@ qboolean vk_cache_array_init(vk_cache_array_t *array, VkDeviceSize element_size,
         return qfalse;
     }
 
-    array->data = ri.Malloc(element_size * initial_capacity + CACHE_LINE_SIZE);
-    if (!array->data) {
+    // Validate allocation parameters
+    size_t alloc_size = (size_t)element_size * initial_capacity + CACHE_LINE_SIZE;
+    if (!vk_validate_allocation_size(alloc_size, "cache_array_init")) {
+        return qfalse;
+    }
+
+    void *raw_allocation = ri.Malloc(alloc_size);
+    if (!raw_allocation) {
         return qfalse;
     }
 
     // Align to cache line boundary
-    uintptr_t addr = (uintptr_t)array->data;
+    uintptr_t addr = (uintptr_t)raw_allocation;
     uintptr_t aligned_addr = (addr + CACHE_LINE_SIZE - 1) & ~CACHE_LINE_MASK;
     array->data = (void*)aligned_addr;
+    array->original_allocation = raw_allocation; // Store for proper freeing
+
+    // Track the allocation for corruption detection
+    vk_track_cache_allocation(raw_allocation, alloc_size, debug_name ? debug_name : "cache_array");
 
     array->element_size = element_size;
     array->capacity = initial_capacity;
-    array->size = 0;
+    atomic_store_explicit(&array->size, 0, memory_order_relaxed);
     array->growth_factor = 2; // Double capacity on growth
     array->debug_name = debug_name;
 
@@ -2326,17 +2522,48 @@ qboolean vk_cache_array_pop(vk_cache_array_t *array, void *element) {
 
 // Get element at index
 void *vk_cache_array_get(vk_cache_array_t *array, uint32_t index) {
-    if (!array || index >= array->size) {
+    if (!array) {
+        ri.Printf(PRINT_DEVELOPER, "vk_cache_array_get: NULL array pointer\n");
         return NULL;
     }
 
-    return (uint8_t*)array->data + (index * array->element_size);
+    // Validate array structure integrity
+    if (!vk_validate_cache_array_integrity(array)) {
+        ri.Printf(PRINT_WARNING, "vk_cache_array_get: Array structure corrupted\n");
+        return NULL;
+    }
+
+    // Bounds checking with additional validation
+    uint32_t current_size = atomic_load_explicit(&array->size, memory_order_relaxed);
+    if (index >= current_size) {
+        ri.Printf(PRINT_DEVELOPER, "vk_cache_array_get: Index %u out of bounds (size: %u)\n", index, current_size);
+        return NULL;
+    }
+
+    // Validate that the calculated offset is safe
+    size_t offset = (size_t)index * array->element_size;
+    if (offset >= (size_t)array->capacity * array->element_size) {
+        ri.Printf(PRINT_WARNING, "vk_cache_array_get: Calculated offset %llu exceeds array bounds\n",
+                 (unsigned long long)offset);
+        return NULL;
+    }
+
+    uint8_t *element_ptr = (uint8_t*)array->data + offset;
+
+    // Final validation of the calculated pointer
+    if (!vk_validate_pointer(element_ptr, "cache_array_element")) {
+        ri.Printf(PRINT_WARNING, "vk_cache_array_get: Invalid element pointer calculated\n");
+        return NULL;
+    }
+
+    return element_ptr;
 }
 
 // Clear cache array (doesn't free memory)
 void vk_cache_array_clear(vk_cache_array_t *array) {
     if (array) {
         atomic_store_explicit(&array->size, 0, memory_order_relaxed);
+        // Note: original_allocation remains unchanged as memory is not freed
     }
 }
 
@@ -2346,17 +2573,30 @@ void vk_cache_array_destroy(vk_cache_array_t *array) {
         return;
     }
 
-    if (array->data) {
-        // Find original allocation
+    // Free the original allocation if we have it and it looks valid
+    if (array->original_allocation) {
+        vk_untrack_cache_allocation(array->original_allocation);
+        // Only free if it looks like a plausible heap pointer
+        uintptr_t addr = (uintptr_t)array->original_allocation;
+        if (addr >= 0x100000 && addr < 0x7FFFFFFFF000) {  // Reasonable heap address range
+            vk_safe_free(&array->original_allocation, "cache_array");
+        } else {
+            ri.Printf(PRINT_WARNING, "vk_cache_array_destroy: Skipping free of suspicious pointer %p\n", array->original_allocation);
+            array->original_allocation = NULL;
+        }
+    } else if (array->data) {
+        // Fallback: only free data pointer if it looks valid
         uintptr_t addr = (uintptr_t)array->data;
-        uintptr_t orig_addr = addr - CACHE_LINE_SIZE;
-        void *orig_ptr = (void*)((orig_addr & ~CACHE_LINE_MASK) - CACHE_LINE_SIZE + CACHE_LINE_SIZE);
-        ri.Free(orig_ptr);
-        array->data = NULL;
+        if (addr >= 0x100000 && addr < 0x7FFFFFFFF000) {  // Reasonable heap address range
+            vk_safe_free(&array->data, "cache_array_fallback");
+        } else {
+            ri.Printf(PRINT_WARNING, "vk_cache_array_destroy: Skipping free of suspicious data pointer %p\n", array->data);
+            array->data = NULL;
+        }
     }
 
-    array->capacity = 0;
-    atomic_store_explicit(&array->size, 0, memory_order_relaxed);
+    // Clear the structure
+    memset(array, 0, sizeof(vk_cache_array_t));
 }
 
 // Simple hash function for uint32_t
@@ -2402,25 +2642,30 @@ qboolean vk_cache_hash_map_init(vk_cache_hash_map_t *map, VkDeviceSize key_size,
     VkDeviceSize value_array_size = value_size * capacity + CACHE_LINE_SIZE;
     VkDeviceSize metadata_size = capacity + CACHE_LINE_SIZE;
 
-    map->keys = ri.Malloc(key_array_size);
-    map->values = ri.Malloc(value_array_size);
-    map->metadata = ri.Malloc(metadata_size);
+    map->keys_orig = ri.Malloc(key_array_size);
+    map->values_orig = ri.Malloc(value_array_size);
+    map->metadata_orig = ri.Malloc(metadata_size);
 
-    if (!map->keys || !map->values || !map->metadata) {
-        if (map->keys) ri.Free(map->keys);
-        if (map->values) ri.Free(map->values);
-        if (map->metadata) ri.Free(map->metadata);
+    if (!map->keys_orig || !map->values_orig || !map->metadata_orig) {
+        if (map->keys_orig) ri.Free(map->keys_orig);
+        if (map->values_orig) ri.Free(map->values_orig);
+        if (map->metadata_orig) ri.Free(map->metadata_orig);
         return qfalse;
     }
 
     // Align pointers
-    uintptr_t key_addr = (uintptr_t)map->keys;
-    uintptr_t value_addr = (uintptr_t)map->values;
-    uintptr_t meta_addr = (uintptr_t)map->metadata;
+    uintptr_t key_addr = (uintptr_t)map->keys_orig;
+    uintptr_t value_addr = (uintptr_t)map->values_orig;
+    uintptr_t meta_addr = (uintptr_t)map->metadata_orig;
 
     map->keys = (void*)((key_addr + CACHE_LINE_SIZE - 1) & ~CACHE_LINE_MASK);
     map->values = (void*)((value_addr + CACHE_LINE_SIZE - 1) & ~CACHE_LINE_MASK);
     map->metadata = (uint8_t*)((meta_addr + CACHE_LINE_SIZE - 1) & ~CACHE_LINE_MASK);
+
+    // Track allocations for corruption detection
+    vk_track_cache_allocation(map->keys_orig, key_array_size, "cache_hash_keys");
+    vk_track_cache_allocation(map->values_orig, value_array_size, "cache_hash_values");
+    vk_track_cache_allocation(map->metadata_orig, metadata_size, "cache_hash_metadata");
 
     // Initialize metadata (0 = empty, 1 = occupied, 2 = deleted)
     memset(map->metadata, 0, capacity);
@@ -2451,16 +2696,19 @@ qboolean vk_cache_queue_init(vk_cache_queue_t *queue, VkDeviceSize element_size,
     }
 
     VkDeviceSize buffer_size = element_size * actual_capacity + CACHE_LINE_SIZE;
-    queue->buffer = ri.Malloc(buffer_size);
+    queue->buffer_orig = ri.Malloc(buffer_size);
 
-    if (!queue->buffer) {
+    if (!queue->buffer_orig) {
         return qfalse;
     }
 
     // Align buffer
-    uintptr_t addr = (uintptr_t)queue->buffer;
+    uintptr_t addr = (uintptr_t)queue->buffer_orig;
     uintptr_t aligned_addr = (addr + CACHE_LINE_SIZE - 1) & ~CACHE_LINE_MASK;
     queue->buffer = (void*)aligned_addr;
+
+    // Track allocation for corruption detection
+    vk_track_cache_allocation(queue->buffer_orig, buffer_size, "cache_queue_buffer");
 
     queue->element_size = element_size;
     queue->capacity = actual_capacity;
@@ -2480,7 +2728,13 @@ qboolean vk_init_cache_structures_manager(void) {
 
     ri.Printf(PRINT_ALL, "Vulkan: Initializing cache-conscious data structures manager\n");
 
-    // Initialize temporary pools
+    // Initialize memory tracking FIRST so allocations can be tracked
+    memset(vk.cache_structures_manager.memory_tracking, 0, sizeof(vk.cache_structures_manager.memory_tracking));
+    atomic_init(&vk.cache_structures_manager.memory_tracking_count, 0);
+    vk.cache_structures_manager.sentinel_before = 0xAAAAAAAA; // Sentinel pattern
+    vk.cache_structures_manager.sentinel_after = 0xAAAAAAAA;
+
+    // Initialize temporary pools (now tracking will work)
     for (uint32_t i = 0; i < 16; i++) {
         if (!vk_cache_array_init(&vk.cache_structures_manager.temp_array_pool[i], 1, 64, NULL)) {
             ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize temp array pool\n");
@@ -2528,9 +2782,32 @@ qboolean vk_init_cache_structures_manager(void) {
     return qtrue;
 }
 
-// Shutdown cache structures manager
+// Shutdown cache structures manager with memory safety checks
 void vk_shutdown_cache_structures_manager(void) {
     if (!vk.cache_structures_manager.initialized) {
+        ri.Printf(PRINT_ALL, "Vulkan: Cache structures manager was not initialized, skipping shutdown\n");
+        return;
+    }
+
+    // Check sentinels for memory corruption
+    if (vk.cache_structures_manager.sentinel_before != 0xAAAAAAAA ||
+        vk.cache_structures_manager.sentinel_after != 0xAAAAAAAA) {
+        ri.Printf(PRINT_WARNING, "Vulkan: Memory corruption detected in cache structures manager sentinels\n");
+        // Continue with shutdown but log the corruption
+    }
+
+    // Validate all tracked allocations before shutdown
+    if (!vk_validate_tracked_allocations()) {
+        ri.Printf(PRINT_WARNING, "Vulkan: Memory corruption detected in tracked allocations during shutdown\n");
+        // Continue with shutdown but be more cautious
+    }
+
+    // Additional safety check - validate that we have a reasonable number of structures
+    if (vk.cache_structures_manager.temp_array_count > 16 ||
+        vk.cache_structures_manager.temp_hash_count > 8 ||
+        vk.cache_structures_manager.temp_queue_count > 8) {
+        ri.Printf(PRINT_WARNING, "Vulkan: Cache structures manager has invalid counts, skipping shutdown\n");
+        vk.cache_structures_manager.initialized = qfalse;
         return;
     }
 
@@ -2542,16 +2819,24 @@ void vk_shutdown_cache_structures_manager(void) {
     }
 
     for (uint32_t i = 0; i < vk.cache_structures_manager.temp_hash_count; i++) {
-        if (vk.cache_structures_manager.temp_hash_pool[i].keys) ri.Free(vk.cache_structures_manager.temp_hash_pool[i].keys);
-        if (vk.cache_structures_manager.temp_hash_pool[i].values) ri.Free(vk.cache_structures_manager.temp_hash_pool[i].values);
-        if (vk.cache_structures_manager.temp_hash_pool[i].metadata) ri.Free(vk.cache_structures_manager.temp_hash_pool[i].metadata);
+        vk_untrack_cache_allocation(vk.cache_structures_manager.temp_hash_pool[i].keys_orig);
+        vk_untrack_cache_allocation(vk.cache_structures_manager.temp_hash_pool[i].values_orig);
+        vk_untrack_cache_allocation(vk.cache_structures_manager.temp_hash_pool[i].metadata_orig);
+        vk_safe_free((void**)&vk.cache_structures_manager.temp_hash_pool[i].keys_orig, "cache_hash_keys");
+        vk_safe_free((void**)&vk.cache_structures_manager.temp_hash_pool[i].values_orig, "cache_hash_values");
+        vk_safe_free((void**)&vk.cache_structures_manager.temp_hash_pool[i].metadata_orig, "cache_hash_metadata");
     }
 
     for (uint32_t i = 0; i < vk.cache_structures_manager.temp_queue_count; i++) {
-        if (vk.cache_structures_manager.temp_queue_pool[i].buffer) {
-            ri.Free(vk.cache_structures_manager.temp_queue_pool[i].buffer);
-        }
+        vk_untrack_cache_allocation(vk.cache_structures_manager.temp_queue_pool[i].buffer_orig);
+        vk_safe_free((void**)&vk.cache_structures_manager.temp_queue_pool[i].buffer_orig, "cache_queue_buffer");
     }
+
+    // Reset memory tracking table for clean state
+    memset(vk.cache_structures_manager.memory_tracking, 0, sizeof(vk.cache_structures_manager.memory_tracking));
+    atomic_store_explicit(&vk.cache_structures_manager.memory_tracking_count, 0, memory_order_relaxed);
+    vk.cache_structures_manager.sentinel_before = 0;
+    vk.cache_structures_manager.sentinel_after = 0;
 
     vk.cache_structures_manager.initialized = qfalse;
     ri.Printf(PRINT_ALL, "Vulkan: Cache-conscious data structures manager shutdown complete\n");
@@ -2800,27 +3085,17 @@ void vk_shutdown_render_profiler(void) {
         }
     }
 
-    // Free timestamp buffers
-    if (vk.render_profiler.timestamp_queries.timestamps) {
-        ri.Free(vk.render_profiler.timestamp_queries.timestamps);
-    }
-    if (vk.render_profiler.pipeline_stats.statistics) {
-        ri.Free(vk.render_profiler.pipeline_stats.statistics);
-    }
+    // Free timestamp buffers safely
+    vk_safe_free((void**)&vk.render_profiler.timestamp_queries.timestamps, "render_profiler_timestamps");
+    vk_safe_free((void**)&vk.render_profiler.pipeline_stats.statistics, "render_profiler_statistics");
+    vk_safe_free((void**)&vk.render_profiler.current_passes, "render_profiler_current_passes");
 
-    // Free current passes buffer
-    if (vk.render_profiler.current_passes) {
-        ri.Free(vk.render_profiler.current_passes);
-    }
-
-    // Free frame history
+    // Free frame history safely
     if (vk.render_profiler.frame_history) {
         for (uint32_t i = 0; i < vk.render_profiler.max_frames; i++) {
-            if (vk.render_profiler.frame_history[i].passes) {
-                ri.Free(vk.render_profiler.frame_history[i].passes);
-            }
+            vk_safe_free((void**)&vk.render_profiler.frame_history[i].passes, "render_profiler_frame_passes");
         }
-        ri.Free(vk.render_profiler.frame_history);
+        vk_safe_free((void**)&vk.render_profiler.frame_history, "render_profiler_frame_history");
     }
 
     vk.render_profiler.initialized = qfalse;

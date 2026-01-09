@@ -419,12 +419,20 @@ void vk_create_shader_modules(void)
 		return;
 	}
 
+	// Assign shader modules to the correct array locations used by pipeline creation
 	vk.modules.vert.gen[0][0][0][0][0] = vs_module;
 	vk.modules.frag.gen[0][0][0][0] = fs_module;
 
 	// Fixed color shaders - use same modules as generic for now (since fixed variants don't exist in embedded data)
 	vk.modules.vert.fixed[0][0][0][0] = vs_module;
 	vk.modules.frag.fixed[0][0][0] = fs_module;
+
+	// Identity shaders - used by TYPE_SINGLE_TEXTURE_DF and other identity types
+	vk.modules.vert.ident1[0][0][0][0] = vs_module;
+	vk.modules.frag.ident1[0][0][0] = fs_module;
+
+	// Depth fragment shader - used by TYPE_SINGLE_TEXTURE_DF
+	vk.modules.frag.gen0_df = fs_module;
 
 	// Color shader
 	vk.modules.color_vs = vk_load_spirv_shader("color_vert");

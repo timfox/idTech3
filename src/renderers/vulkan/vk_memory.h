@@ -341,6 +341,7 @@ typedef struct vk_memory_advisor_s {
 // Cache-conscious dynamic array (cache-friendly vector)
 typedef struct vk_cache_array_s {
     void *data;                    // Array data (cache-aligned)
+    void *original_allocation;     // Original malloc pointer for tracking/freeing
     VkDeviceSize element_size;     // Size of each element
     uint32_t capacity;            // Allocated capacity
     atomic_uint_t size;           // Current size
@@ -353,6 +354,9 @@ typedef struct vk_cache_hash_map_s {
     void *keys;                   // Key array (cache-aligned)
     void *values;                 // Value array (cache-aligned)
     uint8_t *metadata;            // Metadata for each slot (cache-aligned)
+    void *keys_orig;              // Original keys allocation pointer
+    void *values_orig;            // Original values allocation pointer
+    void *metadata_orig;          // Original metadata allocation pointer
     VkDeviceSize key_size;        // Size of keys
     VkDeviceSize value_size;      // Size of values
     uint32_t capacity;            // Total capacity (power of 2)
@@ -366,6 +370,7 @@ typedef struct vk_cache_hash_map_s {
 // Cache-conscious queue (ring buffer optimized for cache)
 typedef struct vk_cache_queue_s {
     void *buffer;                 // Ring buffer (cache-aligned)
+    void *buffer_orig;            // Original buffer allocation pointer
     VkDeviceSize element_size;    // Size of each element
     uint32_t capacity;            // Buffer capacity (power of 2 for efficiency)
     atomic_uint_t head;           // Read position
@@ -454,6 +459,15 @@ typedef struct vk_particle_storage_s {
 } vk_particle_storage_t;
 
 // Cache-conscious data structures manager
+// Memory tracking for cache structures to detect corruption
+typedef struct vk_memory_tracking_s {
+    void *allocation;          // Pointer to allocated memory
+    size_t size;               // Size of allocation
+    const char *context;       // Context where allocation was made
+    qboolean freed;            // Whether this allocation has been freed
+    uint32_t magic;            // Magic number for corruption detection
+} vk_memory_tracking_t;
+
 typedef struct vk_cache_structures_manager_s {
     qboolean enabled;
     qboolean initialized;
@@ -466,6 +480,14 @@ typedef struct vk_cache_structures_manager_s {
     atomic_uint_t temp_array_count;
     atomic_uint_t temp_hash_count;
     atomic_uint_t temp_queue_count;
+
+    // Memory corruption detection and tracking
+    vk_memory_tracking_t memory_tracking[128]; // Track allocations (increased from 32)
+    atomic_uint_t memory_tracking_count;       // Number of tracked allocations
+
+    // Memory corruption sentinels
+    uint32_t sentinel_before;  // Sentinel before cache structures
+    uint32_t sentinel_after;   // Sentinel after cache structures
 
     // Performance statistics
     atomic_uint64_t cache_misses_avoided;
@@ -1715,6 +1737,9 @@ qboolean vk_cache_hash_map_init(vk_cache_hash_map_t *map, VkDeviceSize key_size,
 qboolean vk_cache_queue_init(vk_cache_queue_t *queue, VkDeviceSize element_size, uint32_t capacity, const char *debug_name);
 void vk_print_cache_structures_stats(void);
 void vk_init_resource_pool(void);
+
+// Memory corruption detection
+void vk_memory_corruption_check(void);
 VkBuffer vk_get_buffer_from_pool(VkDeviceSize size);
 void vk_return_buffer_to_pool(VkBuffer buffer);
 void vk_alloc_staging_buffer(VkDeviceSize size);

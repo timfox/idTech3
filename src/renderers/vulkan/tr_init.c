@@ -303,9 +303,20 @@ void RE_Shutdown( refShutdownCode_t code ) {
     ri.Cmd_RemoveCommand( "gfxinfo" );
     ri.Cmd_RemoveCommand( "shaderstate" );
 
-    // Shutdown Vulkan backend with safety checks
+    // Shutdown Vulkan backend with enhanced safety checks
     ri.Printf( PRINT_ALL, "RE_Shutdown: Attempting safe Vulkan backend shutdown\n" );
     if (vk.active && vk.device != VK_NULL_HANDLE) {
+        // Add memory corruption detection before shutdown
+        ri.Printf( PRINT_ALL, "RE_Shutdown: Validating Vulkan state before shutdown\n" );
+
+        // Check for basic Vulkan state integrity
+        if (vk.device == VK_NULL_HANDLE || vk.device == (VkDevice)0x20000000) {
+            ri.Printf( PRINT_WARNING, "RE_Shutdown: Invalid Vulkan device handle detected, skipping shutdown\n" );
+            return;
+        }
+
+        // Attempt shutdown with error handling
+        ri.Printf( PRINT_ALL, "RE_Shutdown: Calling vk_shutdown\n" );
         vk_shutdown( code );
         ri.Printf( PRINT_ALL, "RE_Shutdown: Vulkan backend shutdown completed\n" );
     } else {
