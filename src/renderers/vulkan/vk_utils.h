@@ -28,6 +28,7 @@ void vk_sanitize_vec4(vec4_t v, float default_value);
 qboolean vk_validate_shader_inputs(const Vk_Pipeline_Def *def);
 
 // Memory statistics
+qboolean vk_validate_memory_state(void);
 void vk_print_memory_stats(void);
 
 #ifdef __cplusplus

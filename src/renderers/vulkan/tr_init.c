@@ -321,6 +321,7 @@ void RE_Shutdown( refShutdownCode_t code ) {
 
         // Attempt shutdown with error handling
         ri.Printf( PRINT_ALL, "RE_Shutdown: Calling vk_shutdown\n" );
+
         vk_shutdown( code );
         ri.Printf( PRINT_ALL, "RE_Shutdown: Vulkan backend shutdown completed\n" );
     } else {

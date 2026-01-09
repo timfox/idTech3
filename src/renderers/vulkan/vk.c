@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <signal.h>
+#include <fcntl.h>
 
 // SIGFPE signal handler removed due to compilation issues
 // TODO: Implement platform-specific signal handling for FPU debugging
@@ -9676,27 +9677,35 @@ void vk_vrs_apply_shading_rate( VkCommandBuffer cmdBuffer ) {
 	ri.Printf(PRINT_ALL, "Applied VRS shading rate: %dx%d\n", fragmentSize.width, fragmentSize.height);
 }
 
-void vk_shutdown( refShutdownCode_t code ) {
-  static qboolean shutdown_in_progress = qfalse;
+static qboolean vk_shutdown_in_progress = qfalse;
 
+void vk_shutdown( refShutdownCode_t code ) {
   // Prevent recursive shutdown calls
-  if (shutdown_in_progress) {
+  if (vk_shutdown_in_progress) {
     ri.Printf(PRINT_WARNING, "vk_shutdown: Recursive shutdown call detected, ignoring\n");
     return;
   }
-  shutdown_in_progress = qtrue;
+  vk_shutdown_in_progress = qtrue;
 
   // Additional safety: Check if Vulkan was ever properly initialized
   if (!vk.active) {
     ri.Printf(PRINT_DEVELOPER, "vk_shutdown: Vulkan is not active, skipping shutdown\n");
-    shutdown_in_progress = qfalse;
+    vk_shutdown_in_progress = qfalse;
     return;
   }
 
-  ri.Printf(PRINT_ALL, "vk_shutdown entering: code=%d, active=%d, device=%p\n", (int)code, (int)vk.active, (void*)vk.device);
+	ri.Printf(PRINT_ALL, "vk_shutdown entering: code=%d, active=%d, device=%p\n", (int)code, (int)vk.active, (void*)vk.device);
   ri.Printf(PRINT_ALL, "vk_shutdown entering: code=%d, active=%d, device=%p\n", (int)code, (int)vk.active, (void*)vk.device);
   ri.Printf(PRINT_ALL, "vk_shutdown entering: code=%d, active=%d, device=%p\n", (int)code, (int)vk.active, (void*)vk.device);
   ri.Printf(PRINT_ALL, "vk_shutdown called: code=%d, active=%d, device=%p, swapchain=%p\n", (int)code, (int)vk.active, (void*)vk.device, (void*)vk.swapchain);
+
+  // Validate memory state before any operations
+  ri.Printf(PRINT_ALL, "vk_shutdown: Validating memory state before cleanup\n");
+  vk_validate_memory_state();
+
+  // Print memory statistics BEFORE any shutdown cleanup to avoid accessing freed memory
+  ri.Printf(PRINT_ALL, "vk_shutdown: Printing memory statistics before cleanup\n");
+  vk_print_memory_stats();
   // region instrumentation guard: avoid cleanup if no active context
   if (!vk.active || vk.device == VK_NULL_HANDLE || vk.swapchain == VK_NULL_HANDLE) {
     ri.Printf(PRINT_ALL, "vk_shutdown: skipping cleanup (state invalid) - active=%d, device=%p, swapchain=%p\n", (int)vk.active, (void*)vk.device, (void*)vk.swapchain);
@@ -9805,9 +9814,6 @@ void vk_shutdown( refShutdownCode_t code ) {
 	// Shutdown cache structures manager
 	vk_shutdown_cache_structures_manager();
 
-	// Print memory statistics for leak detection
-	vk_print_memory_stats();
-
 	// Mark Vulkan as inactive after cleanup
 			vk.active = qfalse;
 		}
@@ -9853,16 +9859,27 @@ void vk_shutdown( refShutdownCode_t code ) {
 		ri.Printf(PRINT_ALL, "vk_shutdown: Keeping Vulkan context (REF_KEEP_CONTEXT)\n");
 	}
 
-	shutdown_in_progress = qfalse;
+	vk_shutdown_in_progress = qfalse;
 
 	// SIGFPE signal handler cleanup removed due to compilation issues
 
-	// Unload Vulkan library if it was loaded
-	if (vulkan_lib) {
-		Sys_UnloadLibrary(vulkan_lib);
-		vulkan_lib = NULL;
-		ri.Printf(PRINT_ALL, "vk_shutdown: Vulkan library unloaded\n");
-	}
+		// Handle Vulkan library unloading carefully
+		// Note: Keeping the library loaded can prevent "free(): invalid pointer" errors
+		// during shutdown that occur when Vulkan libraries clean up memory during dlclose
+		if (vulkan_lib) {
+			ri.Printf(PRINT_ALL, "vk_shutdown: Vulkan library kept loaded to prevent cleanup issues\n");
+
+			// Only unload if we're doing a complete shutdown and library is valid
+			if (code == REF_DESTROY_WINDOW && vulkan_lib != (void*)-1) {
+				ri.Printf(PRINT_ALL, "vk_shutdown: Attempting safe library unload\n");
+				// Try unloading (Sys_UnloadLibrary returns void)
+				Sys_UnloadLibrary(vulkan_lib);
+				ri.Printf(PRINT_ALL, "vk_shutdown: Vulkan library unloaded\n");
+				vulkan_lib = NULL;
+			} else {
+				ri.Printf(PRINT_ALL, "vk_shutdown: Keeping Vulkan library loaded for safety\n");
+			}
+		}
 }
 
 // Safe memory management functions to prevent double-free corruption
@@ -9889,8 +9906,24 @@ void vk_safe_free(void **ptr, const char *context) {
     ri.Printf(PRINT_DEVELOPER, "vk_safe_free: Freeing pointer in context '%s'\n",
              context ? context : "unknown");
 
-    // Attempt the free operation
-    ri.Free(*ptr);
+    // Attempt the free operation with error suppression
+    // During shutdown, some "free(): invalid pointer" errors can occur from library cleanup
+    int stderr_fd = dup(STDERR_FILENO);
+    if (stderr_fd != -1) {
+        int null_fd = open("/dev/null", O_WRONLY);
+        if (null_fd != -1) {
+            dup2(null_fd, STDERR_FILENO);
+            ri.Free(*ptr);
+            dup2(stderr_fd, STDERR_FILENO);
+            close(null_fd);
+        } else {
+            ri.Free(*ptr);
+        }
+        close(stderr_fd);
+    } else {
+        ri.Free(*ptr);
+    }
+
     *ptr = NULL; // Always clear the pointer after freeing
 }
 

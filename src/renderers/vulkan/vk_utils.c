@@ -138,12 +138,20 @@ void vk_init_vram_stats(void) {
         }
     }
 
+    vk.vram_stats.used_vram = 0;
+    vk.vram_stats.max_used_vram = 0;
     vk.vram_stats.available_vram = vk.vram_stats.total_vram;
     atomic_init(&vk.vram_stats.total_allocations, 0);
     atomic_init(&vk.vram_stats.current_allocations, 0);
     atomic_init(&vk.vram_stats.freed_allocations, 0);
     atomic_init(&vk.vram_stats.leaked_allocations, 0);
     atomic_init(&vk.vram_stats.memory_leaks_detected, qfalse);
+
+    // Initialize memory type usage array to zero
+    for (uint32_t i = 0; i < VK_MAX_MEMORY_TYPES; i++) {
+        vk.vram_stats.memory_type_usage[i] = 0;
+    }
+
     vk_memory_tracker.leak_detection_enabled = qtrue;
 
     ri.Printf(PRINT_ALL, "VRAM initialized: %lu MB total\n",
@@ -154,6 +162,14 @@ void vk_init_vram_stats(void) {
 void vk_track_gpu_allocation(VkDeviceMemory memory, VkDeviceSize size, uint32_t memory_type,
                             const char *resource_name, const char *allocation_site) {
     if (!vk_memory_tracker.leak_detection_enabled) {
+        return;
+    }
+
+    // Bounds check memory_type to prevent array out-of-bounds access
+    if (memory_type >= VK_MAX_MEMORY_TYPES) {
+        ri.Printf(PRINT_ERROR, "vk_track_gpu_allocation: Invalid memory_type %u (max %u), resource: %s, site: %s\n",
+                  memory_type, VK_MAX_MEMORY_TYPES, resource_name ? resource_name : "unknown",
+                  allocation_site ? allocation_site : "unknown");
         return;
     }
 
@@ -267,13 +283,54 @@ void vk_print_vram_stats(void) {
         vkGetPhysicalDeviceMemoryProperties(vk.physical_device, &mem_props);
         ri.Printf(PRINT_ALL, "Memory Type Usage:\n");
         for (uint32_t i = 0; i < mem_props.memoryTypeCount && i < VK_MAX_MEMORY_TYPES; i++) {
-            if (vk.vram_stats.memory_type_usage[i] > 0) {
+            VkDeviceSize usage = vk.vram_stats.memory_type_usage[i];
+            if (usage > 0 && usage < (VkDeviceSize)-1LL / 2) { // Check for reasonable values
                 const char *heap_type = (mem_props.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ? "GPU" : "CPU";
                 ri.Printf(PRINT_ALL, "  Type %u (%s): %lu MB\n", i, heap_type,
-                    (unsigned long)(vk.vram_stats.memory_type_usage[i] / (1024 * 1024)));
+                    (unsigned long)(usage / (1024 * 1024)));
+            } else if (usage != 0) {
+                ri.Printf(PRINT_WARNING, "  Type %u: Invalid usage value %llu\n", i, (unsigned long long)usage);
             }
         }
     }
+}
+
+// Validate Vulkan memory state for corruption
+qboolean vk_validate_memory_state(void) {
+    ri.Printf(PRINT_ALL, "vk_validate_memory_state: Checking for memory corruption\n");
+
+    // Check VRAM stats for obviously corrupted values
+    if (vk.vram_stats.used_vram > vk.vram_stats.total_vram * 2 ||
+        vk.vram_stats.used_vram < 0 ||
+        vk.vram_stats.available_vram > vk.vram_stats.total_vram ||
+        vk.vram_stats.available_vram < 0) {
+        ri.Printf(PRINT_ERROR, "vk_validate_memory_state: VRAM statistics corrupted\n");
+        ri.Printf(PRINT_ERROR, "  used_vram: %llu, total_vram: %llu, available_vram: %llu\n",
+                 (unsigned long long)vk.vram_stats.used_vram,
+                 (unsigned long long)vk.vram_stats.total_vram,
+                 (unsigned long long)vk.vram_stats.available_vram);
+        return qfalse;
+    }
+
+    // Check memory type usage for corrupted values
+    for (uint32_t i = 0; i < VK_MAX_MEMORY_TYPES; i++) {
+        VkDeviceSize usage = vk.vram_stats.memory_type_usage[i];
+        if (usage != 0 && (usage > vk.vram_stats.total_vram * 2 || usage < 0)) {
+            ri.Printf(PRINT_ERROR, "vk_validate_memory_state: Memory type %u usage corrupted: %llu\n",
+                     i, (unsigned long long)usage);
+            return qfalse;
+        }
+    }
+
+    // Check allocation counts for obviously wrong values
+    if (atomic_load_explicit(&vk.vram_stats.current_allocations, memory_order_relaxed) > 10000 ||
+        atomic_load_explicit(&vk.vram_stats.total_allocations, memory_order_relaxed) > 50000) {
+        ri.Printf(PRINT_ERROR, "vk_validate_memory_state: Allocation counts suspicious\n");
+        return qfalse;
+    }
+
+    ri.Printf(PRINT_ALL, "vk_validate_memory_state: Memory state appears valid\n");
+    return qtrue;
 }
 
 // Print memory statistics for leak detection
