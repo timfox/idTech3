@@ -12,6 +12,93 @@
 
 // ImGui types are now available through cimgui
 
+// Memory integrity validation for Vulkan operations
+static void vk_validate_memory_integrity(void) {
+    static uint32_t validation_count = 0;
+    validation_count++;
+
+    // Check Vulkan structure integrity
+    if (vk.device == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_WARNING, "vk_validate_memory_integrity[%u]: Vulkan device is NULL\n", validation_count);
+        return;
+    }
+
+    // Validate resource pool integrity
+    if (vk.resource_pools.initialized) {
+        for (uint32_t i = 0; i < vk.resource_pools.num_pool_levels; i++) {
+            vk_memory_pool_level_t *level = &vk.resource_pools.pool_levels[i];
+            if (level->current_blocks > level->max_blocks) {
+                ri.Printf(PRINT_WARNING, "vk_validate_memory_integrity[%u]: Pool level %u has corrupted block count (%u > %u)\n",
+                         validation_count, i, level->current_blocks, level->max_blocks);
+            }
+
+            // Check for common corruption patterns
+            for (uint32_t j = 0; j < level->current_blocks; j++) {
+                if (level->memory_blocks) {
+                    VkDeviceMemory handle = level->memory_blocks[j];
+                    // Check for common corruption patterns
+                    if (handle == (VkDeviceMemory)0xCCCCCCCCCCCCCCCC ||
+                        handle == (VkDeviceMemory)0xCDCDCDCDCDCDCDCD ||
+                        handle == (VkDeviceMemory)0xDDDDDDDDDDDDDDDD ||
+                        handle == (VkDeviceMemory)0xFEEEEEEEFEEEEEEF) {
+                        ri.Printf(PRINT_WARNING, "vk_validate_memory_integrity[%u]: Pool level %u block %u has corrupted memory handle: %p\n",
+                                 validation_count, i, j, (void*)handle);
+                    }
+                }
+            }
+        }
+    }
+
+    // Validate PBO system integrity
+    extern pbo_system_t pbo_system;
+    if (pbo_system.initialized) {
+        for (int i = 0; i < MAX_PBO_BUFFERS; i++) {
+            VkBuffer buf = pbo_system.staging_buffers[i];
+            VkDeviceMemory mem = pbo_system.staging_memory[i];
+
+            // Check for corruption patterns
+            if (buf == (VkBuffer)0xCCCCCCCCCCCCCCCC || buf == (VkBuffer)0xCDCDCDCDCDCDCDCD) {
+                ri.Printf(PRINT_WARNING, "vk_validate_memory_integrity[%u]: PBO buffer %d has corrupted handle: %p\n",
+                         validation_count, i, (void*)buf);
+            }
+            if (mem == (VkDeviceMemory)0xCCCCCCCCCCCCCCCC || mem == (VkDeviceMemory)0xCDCDCDCDCDCDCDCD) {
+                ri.Printf(PRINT_WARNING, "vk_validate_memory_integrity[%u]: PBO memory %d has corrupted handle: %p\n",
+                         validation_count, i, (void*)mem);
+            }
+        }
+    }
+
+    // Check Vulkan instance integrity
+    if (vk.instance == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_WARNING, "vk_validate_memory_integrity[%u]: Vulkan instance is NULL\n", validation_count);
+    }
+
+    ri.Printf(PRINT_DEVELOPER, "vk_validate_memory_integrity[%u]: Memory validation completed\n", validation_count);
+}
+
+// Validate command system integrity (called before filesystem operations)
+void vk_validate_command_integrity(void) {
+    // This function checks if Vulkan operations have corrupted the command system
+    // It's called before filesystem operations that might trigger command cleanup
+
+    // The command system corruption typically manifests as invalid pointers in cmd_functions
+    // We can't directly access cmd_functions from here, but we can check for other signs
+
+    // Check if our own Vulkan structures are still intact
+    if (vk.active && vk.device != VK_NULL_HANDLE) {
+        // Vulkan is still active, check for basic integrity
+        if (vk.instance == VK_NULL_HANDLE) {
+            ri.Printf(PRINT_WARNING, "vk_validate_command_integrity: Vulkan instance corrupted while device is valid\n");
+        }
+
+        // Check swapchain integrity
+        if (vk.swapchain == VK_NULL_HANDLE && vk.active) {
+            ri.Printf(PRINT_WARNING, "vk_validate_command_integrity: Vulkan swapchain corrupted while active\n");
+        }
+    }
+
+    ri.Printf(PRINT_DEVELOPER, "vk_validate_command_integrity: Command system validation completed\n");
+}
 
 // Forward declarations for functions used from vk.c
 extern void vk_set_object_name(uint64_t obj, const char *name, VkDebugReportObjectTypeEXT type);

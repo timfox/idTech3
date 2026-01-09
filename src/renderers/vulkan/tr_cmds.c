@@ -407,6 +407,12 @@ for each RE_EndFrame
 void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 	drawBufferCommand_t *cmd;
 
+#ifdef USE_VULKAN
+	// Validate memory integrity at the start of each frame to catch corruption early
+	extern void vk_validate_memory_integrity(void);
+	vk_validate_memory_integrity();
+#endif
+
 	// If we're in headless mode or cinematic state, skip swapchain acquisitions to avoid crashes
 #ifdef USE_VULKAN
     // Skip swapchain acquisition in headless mode
@@ -626,6 +632,12 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 
 		ri.Cvar_ResetGroup( CVG_RENDERER, qtrue /* reset modified flags */ );
 	}
+
+#ifdef USE_VULKAN
+	// Validate memory integrity at the end of each frame to catch corruption
+	extern void vk_validate_memory_integrity(void);
+	vk_validate_memory_integrity();
+#endif
 }
 
 

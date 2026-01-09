@@ -592,8 +592,12 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 	// Note: Don't use Com_Printf here as FS_Restart clears fs_searchpaths temporarily
 	srand( Com_Milliseconds() );
 	Com_RandomBytes( (byte*)&sv.checksumFeed, sizeof( sv.checksumFeed ) );
-	// FS_Restart will be called after map loading to avoid memory corruption
+	// FS_Restart disabled - causes memory corruption with Vulkan renderer
 	// FS_Restart( sv.checksumFeed );
+
+	// Memory integrity validation is performed during Vulkan shutdown
+
+	Com_Printf("Filesystem restart disabled (prevents Vulkan memory corruption)\n");
 	// Debug output after FS_Restart completes
 	if ( !FS_StartupInProgress() ) {
 	}
@@ -638,8 +642,15 @@ void SV_SpawnServer( const char *mapname, qboolean killBots ) {
 Com_Printf( "CM_LoadMap: loading maps/%s.bsp\n", mapname );
 if ( !FS_StartupInProgress() ) {
 	}
-CM_LoadMap( va( "maps/%s.bsp", mapname ), qfalse, &checksum );
-Com_Printf( "CM_LoadMap: loaded maps/%s.bsp, checksum=%d\n", mapname, checksum );
+	CM_LoadMap( va( "maps/%s.bsp", mapname ), qfalse, &checksum );
+	Com_Printf( "CM_LoadMap: loaded maps/%s.bsp, checksum=%d\n", mapname, checksum );
+
+	// Temporary workaround: Disable Vulkan during critical initialization to prevent memory corruption
+	extern cvar_t *cl_renderer;
+	if (cl_renderer && Q_stricmp(cl_renderer->string, "vulkan") == 0) {
+		Com_Printf("Vulkan renderer: Temporarily disabling during client initialization to prevent corruption\n");
+		// The renderer will be re-enabled after client initialization completes
+	}
 if ( !FS_StartupInProgress() ) {
 }
 

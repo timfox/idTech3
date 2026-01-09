@@ -9310,6 +9310,13 @@ void vk_shutdown( refShutdownCode_t code ) {
   }
   shutdown_in_progress = qtrue;
 
+  // Additional safety: Check if Vulkan was ever properly initialized
+  if (!vk.initialized) {
+    ri.Printf(PRINT_DEVELOPER, "vk_shutdown: Vulkan was never initialized, skipping shutdown\n");
+    shutdown_in_progress = qfalse;
+    return;
+  }
+
   ri.Printf(PRINT_ALL, "vk_shutdown entering: code=%d, active=%d, device=%p\n", (int)code, (int)vk.active, (void*)vk.device);
   ri.Printf(PRINT_ALL, "vk_shutdown entering: code=%d, active=%d, device=%p\n", (int)code, (int)vk.active, (void*)vk.device);
   ri.Printf(PRINT_ALL, "vk_shutdown entering: code=%d, active=%d, device=%p\n", (int)code, (int)vk.active, (void*)vk.device);
@@ -9334,6 +9341,9 @@ void vk_shutdown( refShutdownCode_t code ) {
 		// Shutdown all Vulkan subsystems safely
 		if (vk.active && vk.device != VK_NULL_HANDLE && vk.device != (VkDevice)0x20000000) {
 			ri.Printf(PRINT_ALL, "vk_shutdown: Shutting down Vulkan subsystems...\n");
+
+			// Validate memory integrity before shutdown
+			vk_validate_memory_integrity();
 
 			// Wait for device idle first before destroying resources
 			if (qvkDeviceWaitIdle && vk.device != VK_NULL_HANDLE) {

@@ -1719,6 +1719,8 @@ VkBuffer vk_get_buffer_from_pool(VkDeviceSize size);
 void vk_return_buffer_to_pool(VkBuffer buffer);
 void vk_alloc_staging_buffer(VkDeviceSize size);
 void vk_flush_staging_buffer(qboolean final);
+void vk_validate_memory_integrity(void);
+void vk_validate_command_integrity(void);
 
 #ifdef __cplusplus
 }
