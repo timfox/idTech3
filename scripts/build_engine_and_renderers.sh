@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-./scripts/compile_engine.sh OpenGL Release
-./scripts/compile_engine.sh Vulkan Release
+./scripts/compile_engine.sh opengl Release
+./scripts/compile_engine.sh vulkan Release

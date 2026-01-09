@@ -3734,26 +3734,16 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 		rendererName = "vulkan"; // Default to Vulkan for auto mode
 		Com_Printf("Auto-selecting renderer based on system capabilities...\n");
 
-		// Check for Vulkan support first (most modern)
-		char testDllName[MAX_OSPATH];
-		Com_sprintf(testDllName, sizeof(testDllName), RENDERER_PREFIX "_vulkan_" REND_ARCH_STRING DLL_EXT);
-		char *testPath = FS_BuildOSPath(Sys_DefaultBasePath(), testDllName, NULL);
-		if (Sys_LoadLibrary(testPath)) {
-			Sys_UnloadLibrary(Sys_LoadLibrary(testPath)); // Just test load/unload
-			rendererName = "vulkan";
-			Com_Printf("  Vulkan renderer available, selecting Vulkan\n");
-		} else {
-			// Fallback to OpenGL
-			rendererName = "opengl";
-			Com_Printf("  Vulkan unavailable, selecting OpenGL\n");
-		}
+		// Use OpenGL 4.6 renderer (single renderer approach)
+		rendererName = "opengl";
+		Com_Printf("  Using OpenGL 4.6 renderer\n");
 	}
 
 	// Try the requested renderer first, then try fallbacks
 	void *localRendererLib = NULL;
 
-	// First try the exact renderer requested by the user
-	const char *tryRenderers[] = { rendererName, "vulkan", "opengl2", "opengl" };
+	// Force all requests to use OpenGL 4.6 (single renderer approach)
+	const char *tryRenderers[] = { "opengl" };
 	int numTryRenderers = sizeof(tryRenderers) / sizeof(tryRenderers[0]);
 
 	for (int i = 0; i < numTryRenderers && !localRendererLib; i++) {

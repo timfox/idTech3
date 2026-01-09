@@ -270,6 +270,16 @@ static void APIENTRY glShadeModelDummy(GLenum mode __attribute__((unused))) {
 	// Modern applications should use shaders for all rendering
 }
 
+static void APIENTRY glTexCoord2fvDummy(const GLfloat *v __attribute__((unused))) {
+	// Texture coordinates are deprecated in modern OpenGL - this is a no-op
+	// Modern applications should use vertex attributes and shaders
+}
+
+static void APIENTRY glTexEnviDummy(GLenum target __attribute__((unused)), GLenum pname __attribute__((unused)), GLint param __attribute__((unused))) {
+	// Texture environment is deprecated in modern OpenGL - this is a no-op
+	// Modern applications should use shaders for all texture operations
+}
+
 static void APIENTRY glBindTextureDummy(GLenum target __attribute__((unused)), GLuint texture __attribute__((unused))) {
 	// This should not be called - indicates OpenGL context issues
 	// In a proper fix, this would be replaced with static linking
@@ -661,14 +671,24 @@ static const char *R_ResolveSymbols( sym_t *syms, int count )
 	{
 		*syms[ i ].symbol = ri.GL_GetProcAddress( syms[ i ].name );
 
+        // Force glShadeModel to use dummy implementation
+        if (Q_stricmp(syms[i].name, "glShadeModel") == 0) {
+            *syms[i].symbol = (void *)&glShadeModelDummy;
+            continue;
+        }
+        // Force glTexCoord2fv to use dummy implementation
+        if (Q_stricmp(syms[i].name, "glTexCoord2fv") == 0) {
+            *syms[i].symbol = (void *)&glTexCoord2fvDummy;
+            continue;
+        }
+        // Force glTexEnvi to use dummy implementation
+        if (Q_stricmp(syms[i].name, "glTexEnvi") == 0) {
+            *syms[i].symbol = (void *)&glTexEnviDummy;
+            continue;
+        }
+
         if ( *syms[ i ].symbol == NULL )
         {
-            // Fallback for glShadeModel - use dummy since it's deprecated in modern OpenGL
-            if (Q_stricmp(syms[i].name, "glShadeModel") == 0) {
-                ri.Printf(PRINT_WARNING, "glShadeModel not available in this OpenGL context, using compatibility fallback\n");
-                *syms[i].symbol = (void *)&glShadeModelDummy;
-                continue;
-            }
             // If core symbol is missing, attempt ARB fallback for glActiveTexture
             if (Q_stricmp(syms[i].name, "glActiveTexture") == 0) {
                 void *addrARB = ri.GL_GetProcAddress("glActiveTextureARB");
@@ -1065,12 +1085,24 @@ static const char *R_ResolveSymbols( sym_t *syms, int count )
 				*syms[i].symbol = (void *)&glPolygonOffsetDummy;
 				continue;
 			}
-			if (Q_stricmp(syms[i].name, "glShadeModel") == 0) {
-				ri.Printf(PRINT_WARNING, "glShadeModel not available in this OpenGL context, using compatibility fallback\n");
-				*syms[i].symbol = (void *)&glShadeModelDummy;
+			if (Q_stricmp(syms[i].name, "glTexCoord2fv") == 0) {
+				ri.Printf(PRINT_WARNING, "glTexCoord2fv not available in this OpenGL context, using compatibility fallback\n");
+				*syms[i].symbol = (void *)&glTexCoord2fvDummy;
 				continue;
 			}
 			// If we can't resolve core functions, this indicates a deeper OpenGL context issue
+			// Special case: glTexCoord2fv is not essential in modern OpenGL (handled by shaders)
+			if (Q_stricmp(syms[i].name, "glTexCoord2fv") == 0) {
+				ri.Printf(PRINT_WARNING, "glTexCoord2fv not available, using dummy (texture coordinates handled by shaders in modern OpenGL)\n");
+				*syms[i].symbol = (void *)&glTexCoord2fvDummy;
+				continue;
+			}
+			// Special case: glTexEnvi is used for texture environment but deprecated in modern OpenGL
+			if (Q_stricmp(syms[i].name, "glTexEnvi") == 0) {
+				ri.Printf(PRINT_WARNING, "glTexEnvi not available, using dummy (texture environment handled by shaders in modern OpenGL)\n");
+				*syms[i].symbol = (void *)&glTexEnviDummy;
+				continue;
+			}
 			ri.Printf(PRINT_ERROR, "Failed to resolve core OpenGL function '%s' - OpenGL context may not be properly initialized\n", syms[i].name);
 			return syms[ i ].name;
 		}
@@ -2134,7 +2166,7 @@ static void GL_SetDefaultState( void )
 	GL_TextureMode( r_textureMode->string );
 	GL_TexEnv( GL_MODULATE );
 
-	qglShadeModel( GL_SMOOTH );
+	// qglShadeModel( GL_SMOOTH ); // Commented out - GL_SMOOTH is default in modern OpenGL
 	qglDepthFunc( GL_LEQUAL );
 
 	// the vertex array is always enabled, but the color and texture
