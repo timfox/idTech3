@@ -24,3 +24,5 @@ mods/baseq3/
 base/
 baseq3/
 build
+.cursor/debug.log
+.cursor/trace.log
