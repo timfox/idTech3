@@ -4390,7 +4390,7 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 
 	// Initialize images on first shader lookup (Vulkan renderer doesn't call R_InitImages)
 	if (!images_initialized) {
-		R_InitImages();
+		ri.Printf(PRINT_ALL, "DEBUG: R_FindShader initializing images\n");
 		images_initialized = qtrue;
 	}
 

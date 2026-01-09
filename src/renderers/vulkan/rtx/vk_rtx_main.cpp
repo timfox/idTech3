@@ -592,12 +592,6 @@ qboolean RTX_Init(void)
         Com_Printf("RTX: IBL system initialized\n");
     }
 
-    // Initialize IBL
-    if (rtx.ibl_enabled) {
-        VK_IBL_Init();
-        Com_Printf("RTX: IBL system initialized\n");
-    }
-
     // Initialize FSR
     if (rtx.fsr_enabled) {
         // FSR is initialized per-frame, but we can prepare resources here
@@ -619,10 +613,8 @@ qboolean RTX_Init(void)
     }
 
     // Initialize RAII-managed Vulkan resources
-    // Note: We need to get the physical device from the main Vulkan renderer
-    // For now, we'll initialize with nullptr and update this when we have proper access
     Com_Printf("RTX: Initializing RAII-managed Vulkan resources...\n");
-    // rtx.initialize_resources(vk.device, vk.physical_device); // TODO: Enable when device access is available
+    rtx.initialize_resources(vk.device, vk.physical_device);
 
     rtx.initialized = qtrue;
     Com_Printf("RTX: Unified renderer initialized successfully\n");

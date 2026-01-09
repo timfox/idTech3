@@ -2192,8 +2192,20 @@ R_InitImages
 ===============
 */
 void R_InitImages( void ) {
+	// Check if ri is initialized to avoid crashes
+	if (ri.Printf) {
+		ri.Printf(PRINT_ALL, "R_InitImages: Called\n");
+	}
 
 #ifdef USE_VULKAN
+	// Check if Vulkan is ready for image creation
+	if (!vk.active || vk.device == VK_NULL_HANDLE) {
+		if (ri.Printf) {
+			ri.Printf(PRINT_WARNING, "R_InitImages: Vulkan not ready for image creation, skipping\n");
+		}
+		return;
+	}
+
 	// initialize linear gamma table before setting color mappings for the first time
 	int i;
 
@@ -2208,7 +2220,11 @@ void R_InitImages( void ) {
 
 	// create default texture and white texture
 	R_CreateBuiltinImages();
-	ri.Printf(PRINT_ALL, "R_InitImages: Builtin images created successfully\n");
+
+	// Check if ri is initialized to avoid crashes
+	if (ri.Printf) {
+		ri.Printf(PRINT_ALL, "R_InitImages: Builtin images created successfully\n");
+	}
 
 #ifdef USE_VULKAN
 	// vk_update_post_process_pipelines(); // Temporarily disabled for testing

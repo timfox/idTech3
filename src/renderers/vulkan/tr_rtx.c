@@ -115,10 +115,6 @@ void RE_Shutdown(refShutdownCode_t code) {
 }
 
 void RE_BeginRegistration(glconfig_t *glconfigOut) {
-    ri.Printf(PRINT_ALL, "Vulkan Renderer: BeginRegistration\n");
-
-    // Initialize images (needed for default shader)
-    R_InitImages();
 
     // Initialize scene management if Vulkan is active
     if (vk.active) {
@@ -295,15 +291,8 @@ Q_EXPORT refexport_t* QDECL GetRefAPI(int apiVersion, refimport_t *rimp) {
     // Debug output at the very beginning
     fprintf(stderr, "VULKAN_RENDERER: GetRefAPI ENTRY POINT CALLED (apiVersion=%d, rimp=%p)\n", apiVersion, (void*)rimp);
 
-    static refexport_t re;
-
-    // Use direct printf for debugging since ri might not be initialized yet
-    fprintf(stderr, "VULKAN_DEBUG: GetRefAPI called (API version: %d)\n", apiVersion);
-
-    if (!rimp) {
-        fprintf(stderr, "VULKAN_DEBUG: NULL refimport_t\n");
-        return NULL;
-    }
+    fprintf(stderr, "VULKAN_DEBUG: Forcing GetRefAPI to return NULL to test fallback\n");
+    return NULL;
 
     fprintf(stderr, "VULKAN_DEBUG: Initializing refimport_t\n");
 
