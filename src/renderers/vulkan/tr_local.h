@@ -473,6 +473,7 @@ typedef struct {
 	int			innerboxFrames[6];
 	double		animationSpeed;
 	qboolean	isAnimated;
+	qboolean	fullClouds;		// Whether sky shader covers entire sky dome
 } skyParms_t;
 
 typedef struct {

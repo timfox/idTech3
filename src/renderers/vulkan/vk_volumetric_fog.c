@@ -331,8 +331,9 @@ void vk_volumetric_fog_render(VkCommandBuffer cmdBuffer)
     if (!r_volumetricFog->integer || !vk.atmosphere.initialized || vk.atmosphere.volumetricFogPipeline == VK_NULL_HANDLE) return;
 
     // Transition output image to GENERAL for writing
-    VkImageMemoryBarrier barrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    VkImageMemoryBarrier barrier = {0};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.pNext = NULL;
     barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -358,10 +359,10 @@ void vk_volumetric_fog_render(VkCommandBuffer cmdBuffer)
     volumetric_fog_pc_t pc = {0};
     // Get MVP matrices from viewParms
     // Note: vk.cmd doesn't have mvp member, so we construct from viewParms
-    if (backEnd.viewParms.projectionMatrix && backEnd.viewParms.world.modelMatrix) {
-        Com_Memcpy(pc.projectionMatrix, backEnd.viewParms.projectionMatrix, sizeof(pc.projectionMatrix));
-        Com_Memcpy(pc.viewMatrix, backEnd.viewParms.world.modelMatrix, sizeof(pc.viewMatrix));
-    } else {
+    // projectionMatrix and modelMatrix are arrays, not pointers, so they're always valid
+    Com_Memcpy(pc.projectionMatrix, backEnd.viewParms.projectionMatrix, sizeof(pc.projectionMatrix));
+    Com_Memcpy(pc.viewMatrix, backEnd.viewParms.world.modelMatrix, sizeof(pc.viewMatrix));
+    {
         // Fallback to identity if matrices not available
         Matrix16Identity(pc.projectionMatrix);
         Matrix16Identity(pc.viewMatrix);
@@ -436,8 +437,7 @@ void vk_volumetric_fog_render(VkCommandBuffer cmdBuffer)
 
     VkDescriptorImageInfo fogInfo = {0};
     fogInfo.sampler = sampler;
-    // fogInfo.imageView = vk.atmosphere.volumetricFogImageView; // TODO: Add to structure
-    fogInfo.imageView = VK_NULL_HANDLE; // Stub for compilation
+    fogInfo.imageView = vk.atmosphere.volumetricFogImageView;
     fogInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     VkWriteDescriptorSet compositeWrites[2] = {0};

@@ -913,9 +913,8 @@ static qboolean vk_load_heightmap_from_file(const char *path) {
     ri.Free(image_data);
 
     // Update terrain system
-    if (terrain_system.heightmap.heights) {
-        ri.Hunk_Free(terrain_system.heightmap.heights);
-    }
+    // Note: Hunk_Alloc allocations are permanent and freed when hunk is cleared
+    // No need to free old allocations - they'll be overwritten
     terrain_system.heightmap.heights = heights;
     terrain_system.heightmap.width = width;
     terrain_system.heightmap.height = height;
@@ -923,9 +922,6 @@ static qboolean vk_load_heightmap_from_file(const char *path) {
     terrain_system.heightmap.max_height = max_height;
 
     // Allocate normals
-    if (terrain_system.heightmap.normals) {
-        ri.Hunk_Free(terrain_system.heightmap.normals);
-    }
     terrain_system.heightmap.normals = (vec3_t*)ri.Hunk_Alloc(sizeof(vec3_t) * width * height, h_low);
 
     // Generate normals
@@ -1129,7 +1125,7 @@ void vk_terrain_smooth_area(int x, int y, int radius) {
     int max_y = MIN(terrain_system.heightmap.height - 1, y + radius);
 
     // Allocate temporary buffer for smoothed heights
-    float *smoothed = (float*)ri.Hunk_AllocateTempMemory((max_x - min_x + 1) * (max_y - min_y + 1) * sizeof(float), h_low);
+    float *smoothed = (float*)ri.Hunk_AllocateTempMemory((max_x - min_x + 1) * (max_y - min_y + 1) * sizeof(float));
     if (!smoothed) {
         ri.Printf(PRINT_WARNING, "vk_terrain_smooth_area: Failed to allocate temporary buffer\n");
         return;

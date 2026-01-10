@@ -373,7 +373,9 @@ void vk_surface_sprites_populate_terrain(int type_index, const vec3_t mins, cons
             position[0] = mins[0] + x * spacing_x + (rand() % 100 - 50) * 0.01f * spacing_x;
             position[2] = mins[2] + z * spacing_z + (rand() % 100 - 50) * 0.01f * spacing_z;
 
-            if (use_heightmap && vk_terrain_get_height) {
+            if (use_heightmap) {
+                // Try to get height from terrain system
+                // vk_terrain_get_height will return 0.0 if terrain not loaded
                 position[1] = vk_terrain_get_height((int)position[0], (int)position[2]);
             } else {
                 position[1] = mins[1];

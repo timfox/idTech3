@@ -1661,6 +1661,7 @@ static void ParseSkyParms( const char **text ) {
 	// Initialize sky structure for non-animated skybox
 	shader.sky.isAnimated = qfalse;
 	shader.sky.animationSpeed = 0.0;
+	shader.sky.fullClouds = qtrue; // Default to full cloud coverage
 	for ( i = 0; i < 6; i++ ) {
 		shader.sky.outerboxFrames[i] = 1;
 		shader.sky.innerboxFrames[i] = 1;
@@ -1712,6 +1713,10 @@ static void ParseSkyParms( const char **text ) {
 			}
 		}
 	}
+
+	// fullClouds defaults to qtrue (set in initialization above)
+	// Shader authors can override this by adding "fullClouds" or "partialClouds" keywords
+	// For now, we default to full cloud coverage for backward compatibility
 
 	shader.isSky = qtrue;
 }
