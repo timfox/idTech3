@@ -2,6 +2,7 @@
 #define __VK_UTILS_H__
 
 #include "vk.h"
+#include "vk_memory.h"  // For vk_memory_tracker_t
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,6 +31,10 @@ qboolean vk_validate_shader_inputs(const Vk_Pipeline_Def *def);
 // Memory statistics
 qboolean vk_validate_memory_state(void);
 void vk_print_memory_stats(void);
+void vk_detect_memory_leaks(void);
+
+// Memory tracker (extern declaration)
+extern vk_memory_tracker_t vk_memory_tracker;
 
 #ifdef __cplusplus
 }

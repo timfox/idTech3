@@ -237,14 +237,20 @@ float vk_get_average_fps(void) {
 // GPU timing queries - framework
 // Note: GPU timing queries are stubbed for future implementation.
 // To implement properly:
-// 1. Check for VK_EXT_calibrated_timestamps extension support
+// GPU timing implementation steps:
+// 1. Check for VK_EXT_calibrated_timestamps extension support (or use standard timestamp queries)
 // 2. Create VkQueryPool with VK_QUERY_TYPE_TIMESTAMP
-// 3. Record timestamps at begin/end points in command buffer
-// 4. Retrieve results after command buffer execution
-// 5. Convert timestamp deltas to milliseconds/seconds
+// 3. Record timestamps at begin/end points in command buffer using vkCmdWriteTimestamp()
+// 4. Retrieve results after command buffer execution using vkGetQueryPoolResults()
+// 5. Convert timestamp deltas to milliseconds/seconds using device timestamp period
 // Alternative: Use VK_EXT_host_query_reset for simpler implementation
 __attribute__((unused)) void vk_begin_gpu_timing(const char *name) {
-    // TODO: Implement GPU timing queries if VK_EXT_calibrated_timestamps is available
+    // TODO: Implement GPU timing queries.
+    //       Steps:
+    //       1. Allocate query pool if not already created (one per frame in flight)
+    //       2. Reset query pool: vkCmdResetQueryPool() or VK_EXT_host_query_reset
+    //       3. Record begin timestamp: vkCmdWriteTimestamp(vk.cmd->command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, query_pool, query_index)
+    //       4. Store query_index and name in per-frame timing structure
     ri.Printf(PRINT_DEVELOPER, "Vulkan: GPU timing begin requested for: %s (not yet implemented)\n", name ? name : "unnamed");
 }
 
@@ -254,7 +260,14 @@ __attribute__((unused)) void vk_end_gpu_timing(void) {
 }
 
 __attribute__((unused)) float vk_get_gpu_timing_result(const char *name) {
-    // TODO: Return GPU timing result - retrieve timestamp delta and convert to ms
+    // TODO: Return GPU timing result - retrieve timestamp delta and convert to ms.
+    //       Steps:
+    //       1. Find query_index by name in per-frame timing structure
+    //       2. Wait for command buffer completion (or use fence)
+    //       3. Retrieve timestamps: vkGetQueryPoolResults(device, query_pool, query_index, 2, sizeof(uint64_t)*2, timestamps, sizeof(uint64_t), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT)
+    //       4. Calculate delta: (end_timestamp - begin_timestamp) * timestamp_period (from VkPhysicalDeviceProperties.limits.timestampPeriod)
+    //       5. Convert to milliseconds: delta_ns / 1e6
+    //       6. Return result in milliseconds
     ri.Printf(PRINT_DEVELOPER, "Vulkan: GPU timing result requested for: %s (not yet implemented)\n", name ? name : "unnamed");
     return 0.0f;
 }

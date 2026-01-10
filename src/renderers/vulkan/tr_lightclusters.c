@@ -19,10 +19,16 @@ extern refimport_t ri;
 static const int lc_tileSize = 16; // pixels per tile
 static const int lc_slicesZ = 16;  // depth slices
 
-// TODO: Add Vulkan buffer storage for cluster headers and indices
-// These would be VkBuffer objects uploaded to GPU for shader access
-// static VkBuffer lcHeaderBuffer = VK_NULL_HANDLE;
-// static VkBuffer lcIndexBuffer = VK_NULL_HANDLE;
+// TODO: Add Vulkan buffer storage for cluster headers and indices.
+//       These would be VkBuffer objects uploaded to GPU for shader access.
+//       Implementation requires:
+//       1. Declare static VkBuffer lcHeaderBuffer, lcIndexBuffer
+//       2. Allocate buffers with VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+//       3. Use device-local memory with staging buffer for uploads
+//       4. Bind buffers to descriptor sets (bindings 6 and 7 per tr_lightclusters.glsl)
+//       5. Update buffers each frame in R_BuildLightClusters()
+//       static VkBuffer lcHeaderBuffer = VK_NULL_HANDLE;
+//       static VkBuffer lcIndexBuffer = VK_NULL_HANDLE;
 
 // Compute grid dimensions for current viewport
 static lc_grid_params_t LC_ComputeGrid(void) {
@@ -77,9 +83,18 @@ void R_BuildLightClusters( void ) {
 		return;
 	}
 	
-	// TODO: Implement full binning logic (see steps above)
-	// For now, this is a no-op that allows the renderer to function
-	// without clustered lighting support
+	// TODO: Implement full binning logic (see steps above).
+	//       Current implementation is a no-op that allows the renderer to function
+	//       without clustered lighting support. To complete:
+	//       1. Allocate/resize Vulkan buffers (see TODO above)
+	//       2. Reset cluster headers (lightOffset=0, lightCount=0 for all clusters)
+	//       3. For each dynamic light in tr.refdef.dlights:
+	//          a. Compute screen-space AABB of light influence
+	//          b. Map depth range to Z slices using logarithmic distribution
+	//          c. For each affected cluster (tileX, tileY, sliceZ):
+	//             - Append light index to cluster's light list
+	//       4. Upload cluster data to GPU buffers via staging buffer
+	//       5. Bind buffers to shader descriptor sets for use in lighting shaders
 }
 
 

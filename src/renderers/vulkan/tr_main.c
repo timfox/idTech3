@@ -87,6 +87,9 @@ Q_EXPORT cvar_t	*r_volumetricFog;
 Q_EXPORT cvar_t	*r_volumetricFogSamples;
 Q_EXPORT cvar_t	*r_volumetricFogScattering;
 Q_EXPORT cvar_t	*r_volumetricFogAbsorption;
+Q_EXPORT cvar_t	*r_volumetricFogDensity;
+Q_EXPORT cvar_t	*r_volumetricFogHeight;
+Q_EXPORT cvar_t	*r_volumetricFogFalloff;
 
 Q_EXPORT cvar_t	*r_dlss;
 Q_EXPORT cvar_t	*r_dlss_quality;

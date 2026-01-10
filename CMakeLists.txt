@@ -1584,6 +1584,11 @@ SET(RENDERER_VK_SRCS
 	src/renderers/vulkan/vk_postprocess.cpp
 	src/renderers/vulkan/vk_config.cpp
 	src/renderers/vulkan/tr_model_assimp.cpp
+	src/renderers/vulkan/vk_volumetric_fog.c
+	src/renderers/vulkan/vk_decals.c
+	src/renderers/vulkan/vk_god_rays.c
+	src/renderers/vulkan/vk_terrain.c
+	src/renderers/vulkan/vk_surface_sprites.c
 )
 
 # Vulkan experimental modules (work-in-progress). Keep ON by default for prioritized

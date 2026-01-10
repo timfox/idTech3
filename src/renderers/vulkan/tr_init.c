@@ -120,6 +120,9 @@ extern cvar_t	*r_volumetricFog;
 extern cvar_t	*r_volumetricFogSamples;
 extern cvar_t	*r_volumetricFogScattering;
 extern cvar_t	*r_volumetricFogAbsorption;
+extern cvar_t	*r_volumetricFogDensity;
+extern cvar_t	*r_volumetricFogHeight;
+extern cvar_t	*r_volumetricFogFalloff;
 
 extern cvar_t	*r_dlss;
 extern cvar_t	*r_dlss_quality;
@@ -403,6 +406,15 @@ void R_Register( void ) {
     
     r_volumetricFogAbsorption = ri.Cvar_Get( "r_volumetricFogAbsorption", "0.1", CVAR_ARCHIVE_ND );
     ri.Cvar_SetDescription( r_volumetricFogAbsorption, "Absorption coefficient for volumetric fog." );
+    
+    r_volumetricFogDensity = ri.Cvar_Get( "r_volumetricFogDensity", "0.5", CVAR_ARCHIVE_ND );
+    ri.Cvar_SetDescription( r_volumetricFogDensity, "Base density for volumetric fog." );
+    
+    r_volumetricFogHeight = ri.Cvar_Get( "r_volumetricFogHeight", "100.0", CVAR_ARCHIVE_ND );
+    ri.Cvar_SetDescription( r_volumetricFogHeight, "Height of volumetric fog layer." );
+    
+    r_volumetricFogFalloff = ri.Cvar_Get( "r_volumetricFogFalloff", "0.1", CVAR_ARCHIVE_ND );
+    ri.Cvar_SetDescription( r_volumetricFogFalloff, "Height-based falloff factor for volumetric fog." );
 
 
     r_dlss = ri.Cvar_Get( "r_dlss", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );

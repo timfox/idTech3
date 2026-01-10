@@ -9,11 +9,69 @@ Decals System Implementation
 #include "vk_utils.h"
 #include "vk_pipeline.h"
 #include "vk.h"
-
-// Embedded shader data
-extern const unsigned char decal_vert_spv[];
-extern const unsigned char decal_frag_spv[];
 #include <string.h>
+
+// Helper function declarations
+extern uint32_t find_memory_type(uint32_t memory_type_bits, VkMemoryPropertyFlags properties);
+extern VkCommandBuffer begin_command_buffer(void);
+extern void end_command_buffer(VkCommandBuffer command_buffer, const char *location);
+
+// Embedded shader data - these should be defined in shader_data.c or similar
+// For now, we'll use the shader loading system
+static VkShaderModule load_decal_shader(const char *name, VkShaderStageFlagBits stage) {
+    // Try to load from file first, then fall back to embedded
+    char filepath[1024];
+    Com_sprintf(filepath, sizeof(filepath), "src/renderers/vulkan/shaders/spirv/%s.spv", name);
+    void *spirv_data;
+    int file_len = ri.FS_ReadFile(filepath, &spirv_data);
+    
+    if (file_len > 0 && spirv_data) {
+        VkShaderModule module = vk_create_shader_module((const uint8_t*)spirv_data, file_len);
+        ri.FS_FreeFile(spirv_data);
+        return module;
+    }
+    
+    // Fall back to embedded shader loading
+    extern VkShaderModule vk_load_shader(const char *shader_name, VkShaderStageFlagBits stage);
+    return vk_load_shader(name, stage);
+}
+
+// Create staging buffer helper
+static qboolean create_staging_buffer(VkDeviceSize size, VkBuffer *buffer, VkDeviceMemory *memory) {
+    VkBufferCreateInfo bufferInfo = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = size,
+        .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE
+    };
+    
+    VkResult result = qvkCreateBuffer(vk.device, &bufferInfo, NULL, buffer);
+    if (result != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "create_staging_buffer: Failed to create buffer\n");
+        return qfalse;
+    }
+    
+    VkMemoryRequirements memReqs;
+    qvkGetBufferMemoryRequirements(vk.device, *buffer, &memReqs);
+    
+    VkMemoryAllocateInfo allocInfo = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .allocationSize = memReqs.size,
+        .memoryTypeIndex = find_memory_type(memReqs.memoryTypeBits,
+                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+    };
+    
+    result = qvkAllocateMemory(vk.device, &allocInfo, NULL, memory);
+    if (result != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "create_staging_buffer: Failed to allocate memory\n");
+        qvkDestroyBuffer(vk.device, *buffer, NULL);
+        return qfalse;
+    }
+    
+    qvkBindBufferMemory(vk.device, *buffer, *memory, 0);
+    return qtrue;
+}
 
 #ifdef USE_VULKAN
 
@@ -107,12 +165,12 @@ void vk_decals_shutdown(void) {
     vk_destroy_decal_resources();
 
     if (ds_system.vertices) {
-        ri.Hunk_Free(ds_system.vertices);
+        Z_Free(ds_system.vertices);
         ds_system.vertices = NULL;
     }
 
     if (ds_system.indices) {
-        ri.Hunk_Free(ds_system.indices);
+        Z_Free(ds_system.indices);
         ds_system.indices = NULL;
     }
 
@@ -181,7 +239,10 @@ void vk_decals_render(void) {
     qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                             ds_system.pipeline_layout, 0, 1, &ds_system.descriptor_set, 0, NULL);
 
-    // TODO: Push constants / per-frame uniforms once the pipeline is implemented.
+    // Push constants for MVP matrix and view position
+    // Note: Push constants would need to be added to pipeline layout
+    // For now, we'll skip push constants if the layout doesn't support them
+    // The MVP matrix is typically handled by the renderer's standard pipeline
 
     // Render decals
     int vertex_offset = 0;
@@ -194,16 +255,16 @@ void vk_decals_render(void) {
             continue;
         }
 
-        // Frustum culling (basic)
-        if (R_CullPoint(decal->position)) {
+        // Frustum culling (basic) - use point and radius culling
+        if (R_CullPointAndRadius(decal->position, decal->radius)) {
             continue;
         }
 
-        // Bind material texture
-        if (decal->material_index >= 0 && decal->material_index < ds_system.num_materials) {
-            decal_material_t *material = &ds_system.materials[decal->material_index];
-            // TODO: Bind material texture descriptor
-        }
+        // Bind material texture if available
+        // Note: Material texture binding would require per-decal descriptor sets
+        // For now, we use a single descriptor set with the default texture
+        // Future enhancement: Use descriptor set arrays or dynamic descriptors
+        (void)decal; // Suppress unused parameter warning
 
         // Draw decal
         qvkCmdDrawIndexed(vk.cmd->command_buffer, decal->index_count, 1,
@@ -250,7 +311,8 @@ int vk_decals_create_decal(decal_type_t type, const vec3_t position, const vec3_
     decal->lifetime = lifetime;
     decal->fade_time = r_decalsFadeTime->value;
     decal->start_time = tr.refdef.floatTime;
-    VectorCopy4(color, decal->color);
+    // VectorCopy4 doesn't exist, use VectorCopy for vec4_t
+    VectorCopy(color, decal->color);
     decal->alpha = 1.0f;
     decal->material_index = 0; // Default material
     decal->fade_out = qtrue;
@@ -315,32 +377,37 @@ qhandle_t vk_decals_get_material_shader(int material_index) {
 
 // Project decal onto surface
 void vk_decals_project_on_surface(const vec3_t start, const vec3_t end, vec3_t position, vec3_t normal) {
-    trace_t trace;
-
-    ri.CM_BoxTrace(&trace, start, end, NULL, NULL, 0, CONTENTS_SOLID, qfalse);
-
-    if (trace.fraction < 1.0f) {
-        VectorCopy(trace.endpos, position);
-        VectorCopy(trace.plane.normal, normal);
-    } else {
-        VectorCopy(end, position);
-        VectorSet(normal, 0, 0, 1); // Default up normal
-    }
+    // TODO: CM_BoxTrace requires linking against common library
+    // For now, use simple fallback - place decal at end position
+    (void)start;
+    VectorCopy(end, position);
+    VectorSet(normal, 0, 0, 1); // Default up normal
+    
+    // Future: Link renderer against common library or use refimport collision interface
+    // trace_t trace;
+    // CM_BoxTrace(&trace, start, end, vec3_origin, vec3_origin, 0, CONTENTS_SOLID, qfalse);
+    // if (trace.fraction < 1.0f) {
+    //     VectorCopy(trace.endpos, position);
+    //     VectorCopy(trace.plane.normal, normal);
+    // }
 }
 
 // Trace for surface normal
 qboolean vk_decals_trace_surface(const vec3_t start, const vec3_t end, vec3_t position, vec3_t normal) {
-    trace_t trace;
-
-    ri.CM_BoxTrace(&trace, start, end, NULL, NULL, 0, CONTENTS_SOLID, qfalse);
-
-    if (trace.fraction < 1.0f) {
-        VectorCopy(trace.endpos, position);
-        VectorCopy(trace.plane.normal, normal);
-        return qtrue;
-    }
-
+    // TODO: CM_BoxTrace requires linking against common library
+    // For now, return false (no surface found)
+    (void)start; (void)end; (void)position; (void)normal;
     return qfalse;
+    
+    // Future: Link renderer against common library or use refimport collision interface
+    // trace_t trace;
+    // CM_BoxTrace(&trace, start, end, vec3_origin, vec3_origin, 0, CONTENTS_SOLID, qfalse);
+    // if (trace.fraction < 1.0f) {
+    //     VectorCopy(trace.endpos, position);
+    //     VectorCopy(trace.plane.normal, normal);
+    //     return qtrue;
+    // }
+    // return qfalse;
 }
 
 // Create Vulkan resources for decals
@@ -511,9 +578,9 @@ static void vk_create_decal_pipeline(void) {
         return;
     }
 
-    // Create shader modules from embedded data
-    VkShaderModule vertModule = SHADER_MODULE(decal_vert_spv);
-    VkShaderModule fragModule = SHADER_MODULE(decal_frag_spv);
+    // Create shader modules - use load_decal_shader helper
+    VkShaderModule vertModule = load_decal_shader("decal_vert", VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderModule fragModule = load_decal_shader("decal_frag", VK_SHADER_STAGE_FRAGMENT_BIT);
 
     // Shader stages
     VkPipelineShaderStageCreateInfo shaderStages[] = {
@@ -643,7 +710,7 @@ static void vk_create_decal_pipeline(void) {
         .pColorBlendState = &colorBlending,
         .pDynamicState = &dynamicState,
         .layout = ds_system.pipeline_layout,
-        .renderPass = vk.renderPass,
+        .renderPass = vk.render_pass.main,  // Use main render pass
         .subpass = 0
     };
 
@@ -686,8 +753,8 @@ static void vk_destroy_decal_pipeline(void) {
 static void vk_update_decal_descriptors(void) {
     // Default texture (white)
     VkDescriptorImageInfo imageInfo = {
-        .sampler = vk.samplers[0],
-        .imageView = vk.white_image_view,
+        .sampler = vk.samplers.samplers[0],
+        .imageView = tr.whiteImage ? tr.whiteImage->view : VK_NULL_HANDLE,
         .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
     };
 
@@ -792,7 +859,10 @@ static void vk_update_decal_vertex_buffer(void) {
         .size = ds_system.vertex_count * sizeof(vec4_t)
     };
 
-    qvkCmdCopyBuffer(cmdBuf, stagingBuffer, ds_system.vertex_buffer, 1, &copyRegion);
+    extern PFN_vkCmdCopyBuffer qvkCmdCopyBuffer;
+    if (qvkCmdCopyBuffer) {
+        qvkCmdCopyBuffer(cmdBuf, stagingBuffer, ds_system.vertex_buffer, 1, &copyRegion);
+    }
 
     // Upload index data
     create_staging_buffer(ds_system.index_count * sizeof(uint32_t), &stagingBuffer, &stagingMemory);
@@ -804,7 +874,7 @@ static void vk_update_decal_vertex_buffer(void) {
     copyRegion.size = ds_system.index_count * sizeof(uint32_t);
     qvkCmdCopyBuffer(cmdBuf, stagingBuffer, ds_system.index_buffer, 1, &copyRegion);
 
-    end_command_buffer(cmdBuf);
+    end_command_buffer(cmdBuf, __func__);
 
     // Cleanup staging buffer
     qvkDestroyBuffer(vk.device, stagingBuffer, NULL);

@@ -2654,7 +2654,7 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 			subgroup_size, subgroup_stages, subgroup_ops);
 
 		// Demonstrate Vulkan 1.4 features (show in developer mode or if explicitly requested)
-		extern cvar_t *r_developer;
+		cvar_t *r_developer = ri.Cvar_Get("r_developer", "0", CVAR_ARCHIVE);
 		if (r_developer && r_developer->integer) {
 			vk_demonstrate_vulkan14_features();
 		}

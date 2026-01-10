@@ -89,99 +89,47 @@ cvar_t *r_rt_giIntensity;
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Work-in-progress subsystems (keep stubbed until integrated)
+// Optional subsystems - implementations in their respective files
 // ---------------------------------------------------------------------------
-// Note: These subsystems are optional features that are not yet fully
-// implemented. The stub functions allow the renderer to compile and run
-// without these features. When implemented, these functions should be
-// moved to their respective implementation files (vk_volumetric_fog.c, etc.)
+// Note: These subsystems are implemented in:
+// - vk_volumetric_fog.c - Volumetric fog system
+// - vk_decals.c - Decal system
+// - vk_god_rays.c - God rays/light shafts system
+// - vk_terrain.c - Terrain rendering system
+// - vk_surface_sprites.c - Surface sprites system
+//
+// The functions are declared here for forward compatibility, but the
+// actual implementations are in the respective .c files.
 
-void vk_volumetric_fog_init(void) {
-    // Stub: Volumetric fog system initialization
-    // Future: Initialize fog volume textures, compute shaders, and rendering pipelines
-}
-void vk_volumetric_fog_shutdown(void) {
-    // Stub: Volumetric fog system shutdown
-    // Future: Clean up fog resources (textures, buffers, pipelines)
-}
-void vk_volumetric_fog_update(void) {
-    // Stub: Update volumetric fog parameters per frame
-    // Future: Update fog density, wind, lighting, etc.
-}
-void vk_volumetric_fog_render(VkCommandBuffer cmdBuffer) {
-    // Stub: Render volumetric fog
-    // Future: Execute fog rendering compute shader or raymarching
-    (void)cmdBuffer;
-}
+// Forward declarations - implementations in vk_volumetric_fog.c
+extern void vk_volumetric_fog_init(void);
+extern void vk_volumetric_fog_shutdown(void);
+extern void vk_volumetric_fog_update(void);
+extern void vk_volumetric_fog_render(VkCommandBuffer cmdBuffer);
 
-void vk_decals_init(void) {
-    // Stub: Decal system initialization
-    // Future: Initialize decal texture atlas, projection matrices, rendering pipeline
-}
-void vk_decals_shutdown(void) {
-    // Stub: Decal system shutdown
-    // Future: Clean up decal resources
-}
-void vk_decals_update(void) {
-    // Stub: Update decal system per frame
-    // Future: Update decal lifetimes, culling, sorting
-}
-void vk_decals_render(void) {
-    // Stub: Render decals
-    // Future: Render decal quads with proper depth testing and blending
-}
+// Forward declarations - implementations in vk_decals.c
+extern void vk_decals_init(void);
+extern void vk_decals_shutdown(void);
+extern void vk_decals_update(void);
+extern void vk_decals_render(void);
 
-void vk_god_rays_init(void) {
-    // Stub: God rays (volumetric lighting) initialization
-    // Future: Initialize light occlusion buffers, raymarching pipeline
-}
-void vk_god_rays_shutdown(void) {
-    // Stub: God rays system shutdown
-    // Future: Clean up god rays resources
-}
-void vk_god_rays_update(void) {
-    // Stub: Update god rays per frame
-    // Future: Update light positions, occlusion, scattering parameters
-}
-void vk_god_rays_render(VkCommandBuffer cmd_buffer) {
-    // Stub: Render god rays
-    // Future: Render volumetric light scattering from light sources
-    (void)cmd_buffer;
-}
+// Forward declarations - implementations in vk_god_rays.c
+extern void vk_god_rays_init(void);
+extern void vk_god_rays_shutdown(void);
+extern void vk_god_rays_update(void);
+extern void vk_god_rays_render(VkCommandBuffer cmd_buffer);
 
-void vk_terrain_init(void) {
-    // Stub: Terrain system initialization
-    // Future: Initialize height maps, terrain textures, LOD system
-}
-void vk_terrain_shutdown(void) {
-    // Stub: Terrain system shutdown
-    // Future: Clean up terrain resources
-}
-void vk_terrain_update(void) {
-    // Stub: Update terrain per frame
-    // Future: Update LOD, culling, streaming
-}
-void vk_terrain_render(void) {
-    // Stub: Render terrain
-    // Future: Render terrain patches with proper LOD and texturing
-}
+// Forward declarations - implementations in vk_terrain.c
+extern void vk_terrain_init(void);
+extern void vk_terrain_shutdown(void);
+extern void vk_terrain_update(void);
+extern void vk_terrain_render(void);
 
-void vk_surface_sprites_init(void) {
-    // Stub: Surface sprite system initialization
-    // Future: Initialize sprite texture atlas, billboard rendering pipeline
-}
-void vk_surface_sprites_shutdown(void) {
-    // Stub: Surface sprite system shutdown
-    // Future: Clean up sprite resources
-}
-void vk_surface_sprites_update(void) {
-    // Stub: Update surface sprites per frame
-    // Future: Update sprite positions, animations, culling
-}
-void vk_surface_sprites_render(void) {
-    // Stub: Render surface sprites
-    // Future: Render billboard sprites on surfaces (grass, debris, etc.)
-}
+// Forward declarations - implementations in vk_surface_sprites.c
+extern void vk_surface_sprites_init(void);
+extern void vk_surface_sprites_shutdown(void);
+extern void vk_surface_sprites_update(void);
+extern void vk_surface_sprites_render(void);
 
 // Global timing
 vk_gpu_timing_t vk_gpu_timing;

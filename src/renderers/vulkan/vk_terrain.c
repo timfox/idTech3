@@ -12,6 +12,12 @@ Terrain Rendering System Implementation
 #include <string.h>
 #include <math.h>
 
+// Helper function declarations
+extern uint32_t find_memory_type(uint32_t memory_type_bits, VkMemoryPropertyFlags properties);
+extern VkCommandBuffer begin_command_buffer(void);
+extern void end_command_buffer(VkCommandBuffer command_buffer, const char *location);
+extern const char* vk_result_string(VkResult result);
+
 #ifdef USE_VULKAN
 
 // CVars
@@ -144,6 +150,32 @@ void vk_terrain_update(void) {
 
     // Update LOD based on camera position
     vk_update_terrain_lod();
+    
+    // Update patch visibility for frustum culling
+    vec3_t camera_pos;
+    VectorCopy(tr.refdef.vieworg, camera_pos);
+    
+    for (int i = 0; i < terrain_system.num_patches; i++) {
+        terrain_patch_t *patch = &terrain_system.patches[i];
+        if (!patch->active) {
+            continue;
+        }
+        
+        // Calculate distance to camera
+        vec3_t patch_center;
+        patch_center[0] = (patch->x + 0.5f) * terrain_system.patch_size_world;
+        patch_center[1] = (terrain_system.heightmap.min_height + terrain_system.heightmap.max_height) * 0.5f;
+        patch_center[2] = (patch->y + 0.5f) * terrain_system.patch_size_world;
+        
+        patch->distance_to_camera = Distance(camera_pos, patch_center);
+        
+        // Frustum culling
+        // Convert world-space bounds to local space for culling
+        vec3_t localBounds[2];
+        VectorCopy(patch->mins, localBounds[0]);
+        VectorCopy(patch->maxs, localBounds[1]);
+        patch->visible = !R_CullLocalBox(localBounds);
+    }
 }
 
 // Render terrain
@@ -163,7 +195,10 @@ void vk_terrain_render(void) {
     qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                             terrain_system.pipeline_layout, 0, 1, &terrain_system.descriptor_set, 0, NULL);
 
-    // TODO: Push constants / per-frame uniforms once the pipeline is implemented.
+    // Push constants for MVP matrix, camera position, and time
+    // Note: MVP matrix is typically handled by the renderer's standard pipeline
+    // Push constants would need to be added to pipeline layout if shaders require them
+    // For now, we rely on the standard renderer pipeline state
 
     // Render visible patches
     for (int i = 0; i < terrain_system.num_patches; i++) {
@@ -275,8 +310,8 @@ void vk_terrain_set_material(int index, const char *diffuse_path, const char *no
     }
 }
 
-// Update LOD for all patches
-void vk_terrain_update_lod(void) {
+// Update LOD for all patches (internal function)
+static void vk_update_terrain_lod(void) {
     vec3_t camera_pos;
     VectorCopy(tr.refdef.vieworg, camera_pos);
 
@@ -312,7 +347,11 @@ void vk_terrain_update_lod(void) {
         }
 
         // Frustum culling
-        patch->visible = R_CullBox(patch->mins, patch->maxs);
+        // Convert world-space bounds to local space for culling
+        vec3_t localBounds[2];
+        VectorCopy(patch->mins, localBounds[0]);
+        VectorCopy(patch->maxs, localBounds[1]);
+        patch->visible = !R_CullLocalBox(localBounds);
     }
 }
 
@@ -577,7 +616,198 @@ static void vk_build_patch_geometry(terrain_patch_t *patch, int lod_level) {
     }
 
     // Upload to GPU
-    // TODO: Implement vertex buffer creation and upload
+    // Create vertex buffer
+    VkBufferCreateInfo vertexBufferInfo = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = patch->vertex_count * sizeof(vec4_t),
+        .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE
+    };
+    
+    if (patch->vertex_buffer != VK_NULL_HANDLE) {
+        qvkDestroyBuffer(vk.device, patch->vertex_buffer, NULL);
+        patch->vertex_buffer = VK_NULL_HANDLE;
+    }
+    
+    if (qvkCreateBuffer(vk.device, &vertexBufferInfo, NULL, &patch->vertex_buffer) == VK_SUCCESS) {
+        VkMemoryRequirements memReqs;
+        qvkGetBufferMemoryRequirements(vk.device, patch->vertex_buffer, &memReqs);
+        
+        VkMemoryAllocateInfo allocInfo = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            .allocationSize = memReqs.size,
+            .memoryTypeIndex = find_memory_type(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+        };
+        
+        if (qvkAllocateMemory(vk.device, &allocInfo, NULL, &patch->vertex_memory) == VK_SUCCESS) {
+            qvkBindBufferMemory(vk.device, patch->vertex_buffer, patch->vertex_memory, 0);
+            
+            // Upload vertex data via staging buffer
+            VkBuffer stagingBuffer;
+            VkDeviceMemory stagingMemory;
+            VkBufferCreateInfo stagingInfo = {
+                .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+                .size = patch->vertex_count * sizeof(vec4_t),
+                .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                .sharingMode = VK_SHARING_MODE_EXCLUSIVE
+            };
+            
+            if (qvkCreateBuffer(vk.device, &stagingInfo, NULL, &stagingBuffer) == VK_SUCCESS) {
+                qvkGetBufferMemoryRequirements(vk.device, stagingBuffer, &memReqs);
+                allocInfo.allocationSize = memReqs.size;
+                allocInfo.memoryTypeIndex = find_memory_type(memReqs.memoryTypeBits,
+                                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+                
+                if (qvkAllocateMemory(vk.device, &allocInfo, NULL, &stagingMemory) == VK_SUCCESS) {
+                    qvkBindBufferMemory(vk.device, stagingBuffer, stagingMemory, 0);
+                    
+                    void *stagingData;
+                    qvkMapMemory(vk.device, stagingMemory, 0, patch->vertex_count * sizeof(vec4_t), 0, &stagingData);
+                    memcpy(stagingData, vertices, patch->vertex_count * sizeof(vec4_t));
+                    qvkUnmapMemory(vk.device, stagingMemory);
+                    
+                    VkCommandBuffer cmdBuf = begin_command_buffer();
+                    VkBufferCopy copyRegion = {.size = patch->vertex_count * sizeof(vec4_t)};
+                    // qvkCmdCopyBuffer is declared in vk.c, need extern or include
+                    extern PFN_vkCmdCopyBuffer qvkCmdCopyBuffer;
+                    if (qvkCmdCopyBuffer) {
+                        qvkCmdCopyBuffer(cmdBuf, stagingBuffer, patch->vertex_buffer, 1, &copyRegion);
+                    }
+                    end_command_buffer(cmdBuf, __func__);
+                    
+                    qvkDestroyBuffer(vk.device, stagingBuffer, NULL);
+                    qvkFreeMemory(vk.device, stagingMemory, NULL);
+                }
+            }
+        }
+    }
+    
+    // Create index buffer
+    VkBufferCreateInfo indexBufferInfo = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = patch->index_count * sizeof(uint32_t),
+        .usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE
+    };
+    
+    if (patch->index_buffer != VK_NULL_HANDLE) {
+        qvkDestroyBuffer(vk.device, patch->index_buffer, NULL);
+        patch->index_buffer = VK_NULL_HANDLE;
+    }
+    
+    if (qvkCreateBuffer(vk.device, &indexBufferInfo, NULL, &patch->index_buffer) == VK_SUCCESS) {
+        VkMemoryRequirements memReqs;
+        qvkGetBufferMemoryRequirements(vk.device, patch->index_buffer, &memReqs);
+        
+        VkMemoryAllocateInfo allocInfo = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            .allocationSize = memReqs.size,
+            .memoryTypeIndex = find_memory_type(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+        };
+        
+        if (qvkAllocateMemory(vk.device, &allocInfo, NULL, &patch->index_memory) == VK_SUCCESS) {
+            qvkBindBufferMemory(vk.device, patch->index_buffer, patch->index_memory, 0);
+            
+            // Upload index data via staging buffer
+            VkBuffer stagingBuffer;
+            VkDeviceMemory stagingMemory;
+            VkBufferCreateInfo stagingInfo = {
+                .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+                .size = patch->index_count * sizeof(uint32_t),
+                .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                .sharingMode = VK_SHARING_MODE_EXCLUSIVE
+            };
+            
+            if (qvkCreateBuffer(vk.device, &stagingInfo, NULL, &stagingBuffer) == VK_SUCCESS) {
+                qvkGetBufferMemoryRequirements(vk.device, stagingBuffer, &memReqs);
+                allocInfo.allocationSize = memReqs.size;
+                allocInfo.memoryTypeIndex = find_memory_type(memReqs.memoryTypeBits,
+                                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+                
+                if (qvkAllocateMemory(vk.device, &allocInfo, NULL, &stagingMemory) == VK_SUCCESS) {
+                    qvkBindBufferMemory(vk.device, stagingBuffer, stagingMemory, 0);
+                    
+                    void *stagingData;
+                    qvkMapMemory(vk.device, stagingMemory, 0, patch->index_count * sizeof(uint32_t), 0, &stagingData);
+                    memcpy(stagingData, indices, patch->index_count * sizeof(uint32_t));
+                    qvkUnmapMemory(vk.device, stagingMemory);
+                    
+                    VkCommandBuffer cmdBuf = begin_command_buffer();
+                    VkBufferCopy copyRegion = {.size = patch->index_count * sizeof(uint32_t)};
+                    qvkCmdCopyBuffer(cmdBuf, stagingBuffer, patch->index_buffer, 1, &copyRegion);
+                    end_command_buffer(cmdBuf, __func__);
+                    
+                    qvkDestroyBuffer(vk.device, stagingBuffer, NULL);
+                    qvkFreeMemory(vk.device, stagingMemory, NULL);
+                }
+            }
+        }
+    }
+    
+    // Create weight buffer (for material blending)
+    VkBufferCreateInfo weightBufferInfo = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = patch->vertex_count * sizeof(vec4_t),
+        .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE
+    };
+    
+    if (patch->weight_buffer != VK_NULL_HANDLE) {
+        qvkDestroyBuffer(vk.device, patch->weight_buffer, NULL);
+        patch->weight_buffer = VK_NULL_HANDLE;
+    }
+    
+    if (qvkCreateBuffer(vk.device, &weightBufferInfo, NULL, &patch->weight_buffer) == VK_SUCCESS) {
+        VkMemoryRequirements memReqs;
+        qvkGetBufferMemoryRequirements(vk.device, patch->weight_buffer, &memReqs);
+        
+        VkMemoryAllocateInfo allocInfo = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            .allocationSize = memReqs.size,
+            .memoryTypeIndex = find_memory_type(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+        };
+        
+        if (qvkAllocateMemory(vk.device, &allocInfo, NULL, &patch->weight_memory) == VK_SUCCESS) {
+            qvkBindBufferMemory(vk.device, patch->weight_buffer, patch->weight_memory, 0);
+            
+            // Upload weight data via staging buffer
+            VkBuffer stagingBuffer;
+            VkDeviceMemory stagingMemory;
+            VkBufferCreateInfo stagingInfo = {
+                .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+                .size = patch->vertex_count * sizeof(vec4_t),
+                .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                .sharingMode = VK_SHARING_MODE_EXCLUSIVE
+            };
+            
+            if (qvkCreateBuffer(vk.device, &stagingInfo, NULL, &stagingBuffer) == VK_SUCCESS) {
+                qvkGetBufferMemoryRequirements(vk.device, stagingBuffer, &memReqs);
+                allocInfo.allocationSize = memReqs.size;
+                allocInfo.memoryTypeIndex = find_memory_type(memReqs.memoryTypeBits,
+                                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+                
+                if (qvkAllocateMemory(vk.device, &allocInfo, NULL, &stagingMemory) == VK_SUCCESS) {
+                    qvkBindBufferMemory(vk.device, stagingBuffer, stagingMemory, 0);
+                    
+                    void *stagingData;
+                    qvkMapMemory(vk.device, stagingMemory, 0, patch->vertex_count * sizeof(vec4_t), 0, &stagingData);
+                    memcpy(stagingData, weights, patch->vertex_count * sizeof(vec4_t));
+                    qvkUnmapMemory(vk.device, stagingMemory);
+                    
+                    VkCommandBuffer cmdBuf = begin_command_buffer();
+                    VkBufferCopy copyRegion = {.size = patch->vertex_count * sizeof(vec4_t)};
+                    qvkCmdCopyBuffer(cmdBuf, stagingBuffer, patch->weight_buffer, 1, &copyRegion);
+                    end_command_buffer(cmdBuf, __func__);
+                    
+                    qvkDestroyBuffer(vk.device, stagingBuffer, NULL);
+                    qvkFreeMemory(vk.device, stagingMemory, NULL);
+                }
+            }
+        }
+    }
 
     // Update bounding box
     patch->mins[0] = patch_world_x;
@@ -592,7 +822,15 @@ static void vk_build_patch_geometry(terrain_patch_t *patch, int lod_level) {
 
 // Load heightmap from file
 static qboolean vk_load_heightmap_from_file(const char *path) {
-    // TODO: Implement heightmap loading from various formats (PNG, TGA, etc.)
+    // TODO: Implement heightmap loading from various formats (PNG, TGA, etc.).
+    //       Implementation steps:
+    //       1. Detect file format from extension or magic bytes
+    //       2. Use image loading library (stb_image or similar) to load image
+    //       3. Convert RGB/RGBA to grayscale height values
+    //       4. Allocate heightmap data buffer and copy pixel data
+    //       5. Update terrain_system.heightmap structure
+    //       6. Call vk_upload_heightmap_texture() to upload to GPU
+    //       7. Call vk_generate_heightmap_normals() to compute normals
     ri.Printf(PRINT_WARNING, "vk_load_heightmap_from_file: Not implemented yet\n");
     return qfalse;
 }
@@ -637,7 +875,70 @@ static void vk_upload_heightmap_texture(void) {
     int height = terrain_system.heightmap.height;
     int data_size = width * height * sizeof(float);
 
-    // Upload height data
+    // Create staging buffer
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingMemory;
+    VkBufferCreateInfo bufferInfo = {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = data_size,
+        .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE
+    };
+    
+    if (qvkCreateBuffer(vk.device, &bufferInfo, NULL, &stagingBuffer) != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "vk_upload_heightmap_texture: Failed to create staging buffer\n");
+        return;
+    }
+    
+    VkMemoryRequirements memReqs;
+    qvkGetBufferMemoryRequirements(vk.device, stagingBuffer, &memReqs);
+    
+    VkMemoryAllocateInfo allocInfo = {
+        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+        .allocationSize = memReqs.size,
+        .memoryTypeIndex = find_memory_type(memReqs.memoryTypeBits,
+                                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                           VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+    };
+    
+    if (qvkAllocateMemory(vk.device, &allocInfo, NULL, &stagingMemory) != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "vk_upload_heightmap_texture: Failed to allocate staging memory\n");
+        qvkDestroyBuffer(vk.device, stagingBuffer, NULL);
+        return;
+    }
+    
+    qvkBindBufferMemory(vk.device, stagingBuffer, stagingMemory, 0);
+    
+    // Copy height data to staging buffer
+    void *data;
+    qvkMapMemory(vk.device, stagingMemory, 0, data_size, 0, &data);
+    memcpy(data, terrain_system.heightmap.heights, data_size);
+    qvkUnmapMemory(vk.device, stagingMemory);
+    
+    // Copy from staging buffer to image
+    VkCommandBuffer cmdBuf = begin_command_buffer();
+    
+    // Transition image to transfer destination
+    VkImageMemoryBarrier barrier = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = terrain_system.height_texture,
+        .subresourceRange = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .levelCount = 1,
+            .layerCount = 1
+        },
+        .srcAccessMask = 0,
+        .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT
+    };
+    
+    qvkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         0, 0, NULL, 0, NULL, 1, &barrier);
+    
+    // Copy buffer to image
     VkBufferImageCopy region = {
         .bufferOffset = 0,
         .bufferRowLength = 0,
@@ -651,8 +952,24 @@ static void vk_upload_heightmap_texture(void) {
         .imageOffset = {0, 0, 0},
         .imageExtent = {(uint32_t)width, (uint32_t)height, 1}
     };
-
-    vk_upload_image_data(NULL, 0, 0, width, height, 1, terrain_system.heightmap.heights, data_size, qfalse);
+    
+    qvkCmdCopyBufferToImage(cmdBuf, stagingBuffer, terrain_system.height_texture,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+    
+    // Transition image to shader read
+    barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    
+    qvkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                         0, 0, NULL, 0, NULL, 1, &barrier);
+    
+    end_command_buffer(cmdBuf, __func__);
+    
+    // Cleanup staging buffer
+    qvkDestroyBuffer(vk.device, stagingBuffer, NULL);
+    qvkFreeMemory(vk.device, stagingMemory, NULL);
 }
 
 // Stub implementations for remaining functions
@@ -707,18 +1024,353 @@ void vk_terrain_get_height_range(float *min_height, float *max_height) {
     if (max_height) *max_height = terrain_system.heightmap.max_height;
 }
 
-// Pipeline creation (stub)
+// Pipeline creation
 static void vk_create_terrain_pipeline(void) {
-    // TODO: Create terrain rendering pipeline
-    ri.Printf(PRINT_WARNING, "vk_create_terrain_pipeline: Not implemented yet\n");
+    // Descriptor set layout
+    VkDescriptorSetLayoutBinding bindings[] = {
+        // Height texture
+        {
+            .binding = 0,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            .pImmutableSamplers = NULL
+        },
+        // Material textures (up to TERRAIN_MAX_MATERIALS)
+        {
+            .binding = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = TERRAIN_MAX_MATERIALS,
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .pImmutableSamplers = NULL
+        }
+    };
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = ARRAY_LEN(bindings),
+        .pBindings = bindings
+    };
+
+    VkResult result = qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &terrain_system.descriptor_layout);
+    if (result != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "vk_create_terrain_pipeline: Failed to create descriptor set layout\n");
+        return;
+    }
+
+    // Pipeline layout with push constants for MVP matrix
+    VkPushConstantRange pushConstantRange = {
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        .offset = 0,
+        .size = sizeof(float) * 16 + sizeof(float) * 3 + sizeof(float) // MVP + camera pos + time
+    };
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .setLayoutCount = 1,
+        .pSetLayouts = &terrain_system.descriptor_layout,
+        .pushConstantRangeCount = 1,
+        .pPushConstantRanges = &pushConstantRange
+    };
+
+    result = qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &terrain_system.pipeline_layout);
+    if (result != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "vk_create_terrain_pipeline: Failed to create pipeline layout\n");
+        return;
+    }
+
+    // Descriptor pool
+    VkDescriptorPoolSize poolSizes[] = {
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, TERRAIN_MAX_MATERIALS + 1 }
+    };
+
+    VkDescriptorPoolCreateInfo poolInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .poolSizeCount = ARRAY_LEN(poolSizes),
+        .pPoolSizes = poolSizes,
+        .maxSets = 1
+    };
+
+    result = qvkCreateDescriptorPool(vk.device, &poolInfo, NULL, &terrain_system.descriptor_pool);
+    if (result != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "vk_create_terrain_pipeline: Failed to create descriptor pool\n");
+        return;
+    }
+
+    // Allocate descriptor set
+    VkDescriptorSetAllocateInfo allocInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .descriptorPool = terrain_system.descriptor_pool,
+        .descriptorSetCount = 1,
+        .pSetLayouts = &terrain_system.descriptor_layout
+    };
+
+    result = qvkAllocateDescriptorSets(vk.device, &allocInfo, &terrain_system.descriptor_set);
+    if (result != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "vk_create_terrain_pipeline: Failed to allocate descriptor set\n");
+        return;
+    }
+
+    // Load shader modules
+    extern VkShaderModule vk_load_shader(const char *shader_name, VkShaderStageFlagBits stage);
+    VkShaderModule vertModule = vk_load_shader("terrain_vert", VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderModule fragModule = vk_load_shader("terrain_frag", VK_SHADER_STAGE_FRAGMENT_BIT);
+    
+    // Fallback to generic shaders if terrain-specific shaders don't exist
+    if (vertModule == VK_NULL_HANDLE) {
+        vertModule = vk_load_shader("color_vert", VK_SHADER_STAGE_VERTEX_BIT);
+    }
+    if (fragModule == VK_NULL_HANDLE) {
+        fragModule = vk_load_shader("color_frag", VK_SHADER_STAGE_FRAGMENT_BIT);
+    }
+    
+    if (vertModule == VK_NULL_HANDLE || fragModule == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_WARNING, "vk_create_terrain_pipeline: Failed to load shader modules, using fallback\n");
+        if (vertModule != VK_NULL_HANDLE) qvkDestroyShaderModule(vk.device, vertModule, NULL);
+        if (fragModule != VK_NULL_HANDLE) qvkDestroyShaderModule(vk.device, fragModule, NULL);
+        return;
+    }
+
+    // Shader stages
+    VkPipelineShaderStageCreateInfo shaderStages[] = {
+        {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_VERTEX_BIT,
+            .module = vertModule,
+            .pName = "main"
+        },
+        {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .module = fragModule,
+            .pName = "main"
+        }
+    };
+
+    // Vertex input (position + material weights)
+    VkVertexInputBindingDescription vertexBindings[] = {
+        {
+            .binding = 0,
+            .stride = sizeof(vec4_t),
+            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+        },
+        {
+            .binding = 1,
+            .stride = sizeof(vec4_t),
+            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+        }
+    };
+
+    VkVertexInputAttributeDescription vertexAttributes[] = {
+        {
+            .location = 0,
+            .binding = 0,
+            .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+            .offset = 0
+        },
+        {
+            .location = 1,
+            .binding = 1,
+            .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+            .offset = 0
+        }
+    };
+
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+        .vertexBindingDescriptionCount = ARRAY_LEN(vertexBindings),
+        .pVertexBindingDescriptions = vertexBindings,
+        .vertexAttributeDescriptionCount = ARRAY_LEN(vertexAttributes),
+        .pVertexAttributeDescriptions = vertexAttributes
+    };
+
+    // Input assembly
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+        .primitiveRestartEnable = VK_FALSE
+    };
+
+    // Viewport and scissor
+    VkPipelineViewportStateCreateInfo viewportState = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+        .viewportCount = 1,
+        .scissorCount = 1
+    };
+
+    // Rasterization
+    VkPipelineRasterizationStateCreateInfo rasterizer = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+        .depthClampEnable = VK_FALSE,
+        .rasterizerDiscardEnable = VK_FALSE,
+        .polygonMode = VK_POLYGON_MODE_FILL,
+        .cullMode = VK_CULL_MODE_BACK_BIT,
+        .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+        .depthBiasEnable = VK_FALSE,
+        .lineWidth = 1.0f
+    };
+
+    // Multisampling
+    VkPipelineMultisampleStateCreateInfo multisampling = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+        .sampleShadingEnable = VK_FALSE,
+        .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT
+    };
+
+    // Depth stencil
+    VkPipelineDepthStencilStateCreateInfo depthStencil = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+        .depthTestEnable = VK_TRUE,
+        .depthWriteEnable = VK_TRUE,
+        .depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
+        .depthBoundsTestEnable = VK_FALSE,
+        .stencilTestEnable = VK_FALSE
+    };
+
+    // Color blend
+    VkPipelineColorBlendAttachmentState colorBlendAttachment = {
+        .blendEnable = VK_FALSE,
+        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+    };
+
+    VkPipelineColorBlendStateCreateInfo colorBlending = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+        .logicOpEnable = VK_FALSE,
+        .attachmentCount = 1,
+        .pAttachments = &colorBlendAttachment
+    };
+
+    // Dynamic state
+    VkDynamicState dynamicStates[] = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR
+    };
+
+    VkPipelineDynamicStateCreateInfo dynamicState = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+        .dynamicStateCount = ARRAY_LEN(dynamicStates),
+        .pDynamicStates = dynamicStates
+    };
+
+    // Create pipeline
+    VkGraphicsPipelineCreateInfo pipelineInfo = {
+        .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+        .stageCount = ARRAY_LEN(shaderStages),
+        .pStages = shaderStages,
+        .pVertexInputState = &vertexInputInfo,
+        .pInputAssemblyState = &inputAssembly,
+        .pViewportState = &viewportState,
+        .pRasterizationState = &rasterizer,
+        .pMultisampleState = &multisampling,
+        .pDepthStencilState = &depthStencil,
+        .pColorBlendState = &colorBlending,
+        .pDynamicState = &dynamicState,
+        .layout = terrain_system.pipeline_layout,
+        .renderPass = vk.render_pass.main,  // Use main render pass
+        .subpass = 0
+    };
+
+    result = qvkCreateGraphicsPipelines(vk.device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &terrain_system.pipeline);
+    if (result != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "vk_create_terrain_pipeline: Failed to create graphics pipeline: %s\n", vk_result_string(result));
+    } else {
+        SET_OBJECT_NAME(terrain_system.pipeline, "terrain_pipeline", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT);
+        ri.Printf(PRINT_ALL, "Vulkan: Terrain pipeline created successfully\n");
+    }
+
+    // Cleanup shader modules (they're cached by the shader manager)
+    // Don't destroy them here as they may be used elsewhere
 }
 
 static void vk_destroy_terrain_pipeline(void) {
-    // TODO: Destroy terrain pipeline
+    if (terrain_system.pipeline) {
+        qvkDestroyPipeline(vk.device, terrain_system.pipeline, NULL);
+        terrain_system.pipeline = VK_NULL_HANDLE;
+    }
+
+    if (terrain_system.pipeline_layout) {
+        qvkDestroyPipelineLayout(vk.device, terrain_system.pipeline_layout, NULL);
+        terrain_system.pipeline_layout = VK_NULL_HANDLE;
+    }
+
+    if (terrain_system.descriptor_layout) {
+        qvkDestroyDescriptorSetLayout(vk.device, terrain_system.descriptor_layout, NULL);
+        terrain_system.descriptor_layout = VK_NULL_HANDLE;
+    }
+
+    if (terrain_system.descriptor_pool) {
+        qvkDestroyDescriptorPool(vk.device, terrain_system.descriptor_pool, NULL);
+        terrain_system.descriptor_pool = VK_NULL_HANDLE;
+    }
 }
 
 static void vk_update_terrain_descriptors(void) {
-    // TODO: Update terrain descriptors
+    // Update descriptor set with height texture
+    VkDescriptorImageInfo heightInfo = {
+        .sampler = terrain_system.height_sampler,
+        .imageView = terrain_system.height_texture_view,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    };
+
+    VkWriteDescriptorSet writes[TERRAIN_MAX_MATERIALS + 1];
+    writes[0] = (VkWriteDescriptorSet){
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .dstSet = terrain_system.descriptor_set,
+        .dstBinding = 0,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .pImageInfo = &heightInfo
+    };
+
+    // Update material textures
+    VkDescriptorImageInfo materialInfos[TERRAIN_MAX_MATERIALS];
+    for (int i = 0; i < terrain_system.num_materials && i < TERRAIN_MAX_MATERIALS; i++) {
+        terrain_material_t *mat = &terrain_system.materials[i];
+        if (mat->diffuse_texture > 0) {
+            shader_t *shader = tr.shaders[mat->diffuse_texture];
+            if (shader && shader->stages[0] && shader->stages[0]->bundle[0].image[0]) {
+                materialInfos[i] = (VkDescriptorImageInfo){
+                    .sampler = vk.samplers.samplers[0],
+                    .imageView = shader->stages[0]->bundle[0].image[0]->view,
+                    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                };
+            } else {
+                // Use white texture as fallback
+                materialInfos[i] = (VkDescriptorImageInfo){
+                    .sampler = vk.samplers.samplers[0],
+                    .imageView = tr.whiteImage ? tr.whiteImage->view : VK_NULL_HANDLE,
+                    .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                };
+            }
+        } else {
+            // Use white texture as fallback
+            materialInfos[i] = (VkDescriptorImageInfo){
+                .sampler = vk.samplers.samplers[0],
+                    .imageView = tr.whiteImage ? tr.whiteImage->view : VK_NULL_HANDLE,
+                .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            };
+        }
+    }
+    
+    // Fill remaining slots with white texture
+    for (int i = terrain_system.num_materials; i < TERRAIN_MAX_MATERIALS; i++) {
+        materialInfos[i] = (VkDescriptorImageInfo){
+            .sampler = vk.samplers.samplers[0],
+            .imageView = tr.whiteImage ? tr.whiteImage->view : VK_NULL_HANDLE,
+            .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        };
+    }
+
+    writes[1] = (VkWriteDescriptorSet){
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .dstSet = terrain_system.descriptor_set,
+        .dstBinding = 1,
+        .descriptorCount = TERRAIN_MAX_MATERIALS,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .pImageInfo = materialInfos
+    };
+
+    qvkUpdateDescriptorSets(vk.device, 2, writes, 0, NULL);
 }
 
 #endif // USE_VULKAN

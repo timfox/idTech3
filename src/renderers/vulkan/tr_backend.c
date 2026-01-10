@@ -1862,8 +1862,13 @@ static const void *RB_ColorMask( const void *data )
 		ri.Printf(PRINT_DEVELOPER, "Vulkan: Color mask set to R:%d G:%d B:%d A:%d (pipeline recreation may be needed)\n",
 			cmd->rgba[0], cmd->rgba[1], cmd->rgba[2], cmd->rgba[3]);
 		
-		// TODO: Implement full support using VK_EXT_extended_dynamic_state3 when available
-		// or track state for pipeline creation
+		// TODO: Implement full support using VK_EXT_extended_dynamic_state3 when available.
+		//       This extension allows dynamic color write mask via vkCmdSetColorWriteMaskEXT()
+		//       without pipeline recreation. Implementation steps:
+		//       1. Check for VK_EXT_extended_dynamic_state3 extension support
+		//       2. Enable VK_DYNAMIC_STATE_COLOR_WRITE_MASK_EXT in pipeline creation
+		//       3. Call vkCmdSetColorWriteMaskEXT() here instead of storing state
+		//       Alternatively, track color mask state and include it in pipeline hash/key
 	}
 #else
 	qglColorMask( cmd->rgba[0], cmd->rgba[1], cmd->rgba[2], cmd->rgba[3] );

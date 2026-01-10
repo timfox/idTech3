@@ -597,11 +597,15 @@ static void FillCloudBox( void )
 		float MIN_T;
 
 		// Check if shader has full cloud coverage
-		// Note: shader->sky.fullClouds flag indicates whether sky shader
-		// covers the entire sky dome. Currently always enabled (1) as
-		// a conservative default. Future: check shader->sky.fullClouds
-		// when sky shader system is fully implemented.
-		if ( 1 ) // TODO: Use shader->sky.fullClouds when sky shader flags are properly set
+		// TODO: Add fullClouds field to skyParms_t structure in tr_local.h
+		//       and use shader->sky.fullClouds here instead of hardcoded (1).
+		//       The fullClouds flag should indicate whether the sky shader
+		//       covers the entire sky dome. Currently always enabled (1) as
+		//       a conservative default. This requires:
+		//       1. Add qboolean fullClouds; to skyParms_t typedef
+		//       2. Parse fullClouds from shader files in tr_shader.c
+		//       3. Replace hardcoded (1) with shader->sky.fullClouds check
+		if ( 1 ) // TODO: Use shader->sky.fullClouds when field is added to skyParms_t
 		{
 			MIN_T = -HALF_SKY_SUBDIVISIONS;
 

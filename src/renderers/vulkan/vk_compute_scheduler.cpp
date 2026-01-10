@@ -66,6 +66,11 @@ typedef struct vk_compute_job_internal_t {
     VkFence fence;
     qboolean completed;
     VkResult result;
+    
+    // Dependencies (stored in internal structure since public structure doesn't have them)
+    uint64_t dependencies[MAX_DEPENDENCIES];
+    uint32_t dependency_count;
+    void (*completion_callback)(vk_compute_job_t*, qboolean); // Completion callback
 
 } vk_compute_job_internal_t;
 
@@ -231,28 +236,58 @@ static void vk_compute_scheduler_thread(void) {
         while (compute_scheduler.active_job_count < compute_scheduler.max_concurrent_jobs &&
                !compute_scheduler.job_queue.empty()) {
 
-            vk_compute_job_t* job = compute_scheduler.job_queue.top();
+            vk_compute_job_internal_t* internal_job = compute_scheduler.job_queue.front();
             compute_scheduler.job_queue.pop();
 
-            // Check if all dependencies are resolved
-            if (job->unresolved_dependencies.load(std::memory_order_acquire) > 0) {
-                // Dependencies not ready, put back in queue
-                compute_scheduler.job_queue.push(job);
-                break;
+            if (!internal_job || !internal_job->public_job) {
+                ri.Printf(PRINT_WARNING, "Vulkan: Invalid job in queue, skipping\n");
+                continue;
             }
 
-            // Submit job for execution
-            if (vk_compute_scheduler_submit_job(job)) {
-                compute_scheduler.active_jobs[job->job_id] = job;
+            // Check if all dependencies are resolved
+            // TODO: Implement proper dependency checking by verifying dependency jobs are completed.
+            //       Current implementation assumes dependencies are resolved (simple implementation).
+            //       Proper implementation should:
+            //       1. For each dependency in internal_job->dependencies[]:
+            //          a. Look up dependency job in compute_scheduler.active_jobs map
+            //          b. Check if dependency job state is JOB_STATE_COMPLETED
+            //          c. If any dependency is not completed, mark dependencies_resolved = qfalse
+            //       2. Only mark job as ready when all dependencies are completed
+            //       This requires tracking job completion state in vk_compute_job_internal_t
+            qboolean dependencies_resolved = qtrue;
+            for (uint32_t i = 0; i < internal_job->dependency_count; i++) {
+                // Check if dependency job is completed
+                auto dep_it = compute_scheduler.active_jobs.find(internal_job->dependencies[i]);
+                if (dep_it != compute_scheduler.active_jobs.end() && !dep_it->second->completed) {
+                    dependencies_resolved = qfalse;
+                    break;
+                }
+            }
+            
+            if (!dependencies_resolved) {
+                // Dependencies not ready, put back in queue
+                compute_scheduler.job_queue.push(internal_job);
+                continue; // Try next job instead of breaking
+            }
+
+            // Submit job for execution using internal helper function
+            if (vk_compute_scheduler_submit_job_internal(internal_job)) {
+                compute_scheduler.active_jobs[internal_job->job_id] = internal_job;
                 compute_scheduler.active_job_count++;
                 compute_scheduler.queued_job_count--;
             } else {
-                // Submission failed
+                // Submission failed - clean up
+                vk_compute_job_t* job = internal_job->public_job;
                 job->state = JOB_STATE_FAILED;
-                job->completion_time = ri.Milliseconds();
-                compute_scheduler.completed_jobs[job->job_id] = job;
+                internal_job->completion_time = ri.Milliseconds();
+                internal_job->completed = qtrue;
                 compute_scheduler.total_jobs_failed++;
                 compute_scheduler.queued_job_count--;
+                // Clean up internal job structure
+                if (internal_job->fence != VK_NULL_HANDLE) {
+                    qvkDestroyFence(vk_device, internal_job->fence, nullptr);
+                }
+                ri.Free(internal_job);
             }
         }
 
@@ -289,6 +324,9 @@ uint64_t vk_compute_scheduler_submit_job(vk_compute_job_t* job) {
     internal_job->job_id = job_id;
     internal_job->submit_time = ri.Milliseconds();
     internal_job->completed = qfalse;
+    internal_job->dependency_count = 0; // Initialize dependency tracking
+    internal_job->completion_callback = nullptr; // Initialize callback
+    memset(internal_job->dependencies, 0, sizeof(internal_job->dependencies)); // Initialize dependencies array
 
     // Allocate fence for the job
     VkFenceCreateInfo fence_info = {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
@@ -310,7 +348,7 @@ uint64_t vk_compute_scheduler_submit_job(vk_compute_job_t* job) {
     compute_scheduler.queued_job_count++;
     compute_scheduler.total_jobs_submitted++;
 
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: Submitted compute job %llu (%s)\n", job_id, job->debug_name);
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Submitted compute job %llu (%s)\n", job_id, job->name ? job->name : "unnamed");
 
     return job_id;
 }
@@ -323,10 +361,22 @@ vk_compute_job_t* vk_compute_job_create(const char* debug_name, vk_compute_prior
     }
 
     memset(job, 0, sizeof(vk_compute_job_t));
-    job->debug_name = debug_name ? ri.Hunk_Alloc(strlen(debug_name) + 1, h_low) : "unnamed_job";
+    // Set job debug name (vk_compute_job_t uses 'debug_name' field per vk_compute_scheduler.h)
     if (debug_name) {
-        Q_strncpyz(const_cast<char*>(job->debug_name), debug_name, strlen(debug_name) + 1);
+        // Allocate and copy name
+        size_t name_len = strlen(debug_name) + 1;
+        char* name_copy = static_cast<char*>(ri.Malloc(name_len));
+        if (name_copy) {
+            Q_strncpyz(name_copy, debug_name, name_len);
+            job->debug_name = name_copy;
+        } else {
+            job->debug_name = "unnamed_job";
+        }
+    } else {
+        job->debug_name = "unnamed_job";
     }
+    job->priority = priority;
+    job->state = JOB_STATE_QUEUED; // Initial state is queued
 
     return job;
 }
@@ -347,16 +397,69 @@ void vk_compute_job_add_dependency(vk_compute_job_t* job, uint64_t dependency_jo
         return;
     }
     
-    // Check if we have room for another dependency
-    if (job->dependency_count >= MAX_DEPENDENCIES) {
-        ri.Printf(PRINT_WARNING, "vk_compute_job_add_dependency: Maximum dependencies (%d) reached\n", MAX_DEPENDENCIES);
+    // Note: The vk_compute_job_t structure in vk_compute_scheduler.h doesn't have
+    // dependencies or dependency_count fields. Dependencies would need to be stored
+    // in the internal job tracking structure (vk_compute_job_internal_t) or added
+    // to the public structure. For now, we need to look up the internal job structure.
+    
+    // Find internal job structure by job_id and store dependency
+    std::lock_guard<std::mutex> lock(compute_scheduler.scheduler_mutex);
+    
+    // Search in active jobs
+    auto it = compute_scheduler.active_jobs.find(job->job_id);
+    vk_compute_job_internal_t* internal_job = nullptr;
+    
+    if (it != compute_scheduler.active_jobs.end()) {
+        internal_job = it->second;
+    } else {
+        // Job might be in queue - search the job queue
+        // Note: This requires iterating through the queue which is less efficient
+        // but necessary for jobs that haven't been submitted yet
+        std::queue<vk_compute_job_internal_t*> temp_queue;
+        bool found = false;
+        
+        while (!compute_scheduler.job_queue.empty()) {
+            vk_compute_job_internal_t* queued_job = compute_scheduler.job_queue.front();
+            compute_scheduler.job_queue.pop();
+            
+            if (queued_job->job_id == job->job_id) {
+                internal_job = queued_job;
+                found = true;
+            }
+            
+            temp_queue.push(queued_job);
+        }
+        
+        // Restore queue
+        while (!temp_queue.empty()) {
+            compute_scheduler.job_queue.push(temp_queue.front());
+            temp_queue.pop();
+        }
+        
+        if (!found) {
+            ri.Printf(PRINT_WARNING, "Vulkan: Job %llu not found (may not be submitted yet), dependency %llu cannot be added\n", 
+                      (unsigned long long)job->job_id, (unsigned long long)dependency_job_id);
+            return;
+        }
+    }
+    
+    if (!internal_job) {
+        ri.Printf(PRINT_WARNING, "vk_compute_job_add_dependency: Internal job structure not found\n");
         return;
     }
     
-    // Add dependency
-    job->dependencies[job->dependency_count++] = dependency_job_id;
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: Added dependency %llu to job %u\n", 
-              (unsigned long long)dependency_job_id, job->id);
+    // Check if we have room for another dependency
+    if (internal_job->dependency_count >= MAX_DEPENDENCIES) {
+        ri.Printf(PRINT_WARNING, "vk_compute_job_add_dependency: Maximum dependencies (%d) reached for job %llu\n", 
+                  MAX_DEPENDENCIES, (unsigned long long)job->job_id);
+        return;
+    }
+    
+    // Add dependency to internal job structure
+    internal_job->dependencies[internal_job->dependency_count++] = dependency_job_id;
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Added dependency %llu to job %llu (%u/%u dependencies)\n", 
+              (unsigned long long)dependency_job_id, (unsigned long long)job->job_id,
+              internal_job->dependency_count, MAX_DEPENDENCIES);
 }
 
 // Set job completion callback
@@ -366,13 +469,53 @@ void vk_compute_job_set_callback(vk_compute_job_t* job, void (*callback)(vk_comp
         return;
     }
     
-    // Store callback - would need to add callback field to internal job structure
-    // For now, we can store it in a separate map keyed by job ID
-    // Note: This requires extending vk_compute_job_internal_t to include callback
-    // or maintaining a separate callback map. For now, log the registration.
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: Setting completion callback for job %u (callback storage not yet implemented)\n", job->id);
-    // TODO: Add callback storage mechanism (either in vk_compute_job_internal_t or separate map)
-    (void)callback; // Suppress unused parameter warning until callback storage is implemented
+    // Store callback in internal job structure
+    std::lock_guard<std::mutex> lock(compute_scheduler.scheduler_mutex);
+    
+    // Find internal job structure by job_id
+    auto it = compute_scheduler.active_jobs.find(job->job_id);
+    vk_compute_job_internal_t* internal_job = nullptr;
+    
+    if (it != compute_scheduler.active_jobs.end()) {
+        internal_job = it->second;
+    } else {
+        // Job might be in queue - search the job queue
+        std::queue<vk_compute_job_internal_t*> temp_queue;
+        bool found = false;
+        
+        while (!compute_scheduler.job_queue.empty()) {
+            vk_compute_job_internal_t* queued_job = compute_scheduler.job_queue.front();
+            compute_scheduler.job_queue.pop();
+            
+            if (queued_job->job_id == job->job_id) {
+                internal_job = queued_job;
+                found = true;
+            }
+            
+            temp_queue.push(queued_job);
+        }
+        
+        // Restore queue
+        while (!temp_queue.empty()) {
+            compute_scheduler.job_queue.push(temp_queue.front());
+            temp_queue.pop();
+        }
+        
+        if (!found) {
+            ri.Printf(PRINT_WARNING, "Vulkan: Job %llu not found (may not be submitted yet), callback cannot be set\n", 
+                      (unsigned long long)job->job_id);
+            return;
+        }
+    }
+    
+    if (!internal_job) {
+        ri.Printf(PRINT_WARNING, "vk_compute_job_set_callback: Internal job structure not found\n");
+        return;
+    }
+    
+    // Store callback in internal job structure
+    internal_job->completion_callback = callback;
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Set completion callback for job %llu\n", (unsigned long long)job->job_id);
 }
 
 // Allocate resources for a job
@@ -421,35 +564,47 @@ static qboolean vk_compute_scheduler_allocate_job_resources(vk_compute_job_t* jo
     return qtrue;
 }
 
-// Submit job to Vulkan queue
-static qboolean vk_compute_scheduler_submit_job(vk_compute_job_t* job) {
+// Submit job to Vulkan queue (internal helper)
+// Note: This function is called from the scheduler thread after dependency resolution
+static qboolean vk_compute_scheduler_submit_job_internal(vk_compute_job_internal_t* internal_job) {
+    if (!internal_job || !internal_job->public_job) {
+        return qfalse;
+    }
+    
+    vk_compute_job_t* job = internal_job->public_job;
+    
+    // Allocate resources if needed
     if (!vk_compute_scheduler_allocate_job_resources(job)) {
         return qfalse;
     }
 
-    job->start_time = ri.Milliseconds();
+    // Update job state
     job->state = JOB_STATE_RUNNING;
+    internal_job->start_time = ri.Milliseconds();
 
+    // Submit command buffer to queue
+    // Note: Semaphore support would require extending the job structure
     VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .waitSemaphoreCount = static_cast<uint32_t>(job->wait_semaphores.size()),
-        .pWaitSemaphores = job->wait_semaphores.data(),
-        .pWaitDstStageMask = job->wait_stages.data(),
         .commandBufferCount = 1,
         .pCommandBuffers = &job->command_buffer,
-        .signalSemaphoreCount = static_cast<uint32_t>(job->signal_semaphores.size()),
-        .pSignalSemaphores = job->signal_semaphores.data()
+        .waitSemaphoreCount = 0,
+        .pWaitSemaphores = nullptr,
+        .pWaitDstStageMask = nullptr,
+        .signalSemaphoreCount = 0,
+        .pSignalSemaphores = nullptr
     };
 
-    VkResult result = qvkQueueSubmit(vk_queue, 1, &submit_info, job->fence);
+    VkResult result = qvkQueueSubmit(vk_queue, 1, &submit_info, internal_job->fence);
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Vulkan: Failed to submit compute job %llu: %s\n",
-                 job->job_id, vk_result_string(result));
-        job->last_error = result;
+                 (unsigned long long)internal_job->job_id, vk_result_string(result));
+        internal_job->result = result;
         return qfalse;
     }
 
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: Submitted compute job %llu to queue\n", job->job_id);
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Submitted compute job %llu to queue\n", 
+              (unsigned long long)internal_job->job_id);
     return qtrue;
 }
 
@@ -603,20 +758,9 @@ vk_compute_job_state_t vk_compute_job_get_state(vk_compute_job_t* job) {
         ri.Printf(PRINT_WARNING, "vk_compute_job_get_state: job is NULL\n");
         return JOB_STATE_FAILED;
     }
-    // Map internal status to public state
-    switch (job->status) {
-        case VK_COMPUTE_STATUS_IDLE:
-        case VK_COMPUTE_STATUS_PENDING:
-            return JOB_STATE_QUEUED;
-        case VK_COMPUTE_STATUS_SUBMITTED:
-            return JOB_STATE_RUNNING;
-        case VK_COMPUTE_STATUS_COMPLETED:
-            return JOB_STATE_COMPLETED;
-        case VK_COMPUTE_STATUS_FAILED:
-            return JOB_STATE_FAILED;
-        default:
-            return JOB_STATE_FAILED;
-    }
+    // Return state directly from job structure
+    // Note: vk_compute_job_t uses 'state' field (see vk_compute_scheduler.h)
+    return job->state;
 }
 
 // Get job ID
@@ -625,16 +769,17 @@ uint64_t vk_compute_job_get_id(vk_compute_job_t* job) {
         ri.Printf(PRINT_WARNING, "vk_compute_job_get_id: job is NULL\n");
         return 0;
     }
-    return job->id;
+    // Return job_id from job structure
+    return job->job_id;
 }
 // Get job debug name
 const char* vk_compute_job_get_debug_name(vk_compute_job_t* job) {
     if (!job) {
         return "NULL_JOB";
     }
-    // Return name field from job structure
-    // Note: vk_compute_job_t has a 'name' field (see vk_compute.h)
-    return job->name ? job->name : "unnamed_job";
+    // Return debug_name field from job structure
+    // Note: vk_compute_job_t uses 'debug_name' field (see vk_compute_scheduler.h)
+    return job->debug_name ? job->debug_name : "unnamed_job";
 }
 
 // Set job command buffer
@@ -644,7 +789,7 @@ void vk_compute_job_set_command_buffer(vk_compute_job_t* job, VkCommandBuffer cm
         return;
     }
     job->command_buffer = cmd_buffer;
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: Set command buffer for job %u\n", job->id);
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Set command buffer for job %llu\n", (unsigned long long)job->job_id);
 }
 
 // Add wait semaphore to job
@@ -654,8 +799,14 @@ void vk_compute_job_add_wait_semaphore(vk_compute_job_t* job, VkSemaphore semaph
         ri.Printf(PRINT_WARNING, "vk_compute_job_add_wait_semaphore: job is NULL\n");
         return;
     }
-    // TODO: Add semaphore array to vk_compute_job_t structure
-    // For now, log the request
+    // TODO: Add semaphore array to vk_compute_job_t structure.
+    //       Implementation requires:
+    //       1. Add VkSemaphore wait_semaphores[MAX_WAIT_SEMAPHORES] to vk_compute_job_t
+    //       2. Add VkPipelineStageFlags wait_stages[MAX_WAIT_SEMAPHORES] to vk_compute_job_t
+    //       3. Add uint32_t wait_semaphore_count to vk_compute_job_t
+    //       4. Store semaphore and stage in arrays when this function is called
+    //       5. Use arrays in vkQueueSubmit() when submitting the job
+    //       For now, log the request
     ri.Printf(PRINT_DEVELOPER, "Vulkan: Wait semaphore requested for job %u (not yet implemented)\n", job->id);
     (void)semaphore; (void)stage;
 }
@@ -667,9 +818,14 @@ void vk_compute_job_add_signal_semaphore(vk_compute_job_t* job, VkSemaphore sema
         ri.Printf(PRINT_WARNING, "vk_compute_job_add_signal_semaphore: job is NULL\n");
         return;
     }
-    // TODO: Add semaphore array to vk_compute_job_t structure
-    // For now, log the request
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: Signal semaphore requested for job %u (not yet implemented)\n", job->id);
+    // TODO: Add semaphore array to vk_compute_job_t structure.
+    //       Implementation requires:
+    //       1. Add VkSemaphore signal_semaphores[MAX_SIGNAL_SEMAPHORES] to vk_compute_job_t
+    //       2. Add uint32_t signal_semaphore_count to vk_compute_job_t
+    //       3. Store semaphore in array when this function is called
+    //       4. Use array in vkQueueSubmit() when submitting the job
+    //       For now, log the request
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Signal semaphore requested for job %llu (not yet implemented)\n", (unsigned long long)job->job_id);
     (void)semaphore;
 }
 
@@ -694,8 +850,8 @@ void vk_compute_job_set_memory_usage(vk_compute_job_t* job, uint64_t memory_kb) 
     }
     // Note: Memory usage could be used for resource pool management
     // For now, we log it but don't use it for resource allocation
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: Memory usage set for job %u: %llu KB\n", 
-              job->id, (unsigned long long)memory_kb);
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Memory usage set for job %llu: %llu KB\n", 
+              (unsigned long long)job->job_id, (unsigned long long)memory_kb);
     (void)memory_kb; // Suppress warning until memory_usage field is added to structure
 }
 
@@ -707,7 +863,9 @@ void vk_compute_job_set_user_data(vk_compute_job_t* job, void* user_data) {
     }
     // Note: user_data field would need to be added to vk_compute_job_t structure
     // For now, log the request
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: User data set for job %u (storage not yet implemented)\n", job->id);
+    // Store user data directly in job structure (field exists in vk_compute_scheduler.h definition)
+    job->user_data = user_data;
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: User data set for job %llu\n", (unsigned long long)job->job_id);
     (void)user_data; // Suppress warning until user_data field is added to structure
 }
 

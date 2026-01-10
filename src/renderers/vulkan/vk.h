@@ -916,6 +916,19 @@ typedef struct {
         image_t *noiseTexture;
         VkBuffer atmosphereBuffer;
         VkDeviceMemory atmosphereBufferMemory;
+        // Volumetric Fog resources
+        VkPipeline volumetricFogPipeline;
+        VkPipelineLayout volumetricFogLayout;
+        VkDescriptorSetLayout volumetricFogDescriptorLayout;
+        VkDescriptorSet volumetricFogDescriptorSet;
+        VkImage volumetricFogImage;
+        VkImageView volumetricFogImageView;
+        VkDeviceMemory volumetricFogImageMemory;
+        // Composite resources
+        VkPipeline compositePipeline;
+        VkPipelineLayout compositeLayout;
+        VkDescriptorSetLayout compositeDescriptorLayout;
+        VkDescriptorSet compositeDescriptorSet;
     } atmosphere;
 
     // Advanced features capability tracking (for RTX renderer gating)
@@ -1505,6 +1518,7 @@ void vk_get_pipeline_def(VkPipeline pipeline, Vk_Pipeline_Def *def);
 VkPipeline vk_find_pipeline_ext(int base_pipeline, Vk_Pipeline_Def* def, qboolean create_if_missing);
 void vk_wait_idle(void);
 void vk_queue_wait_idle(void);
+void vk_destroy_command_pool(void);
 
 // Vulkan 1.4 Maintenance5 features
 VkDeviceAddress vk_get_buffer_device_address(VkBuffer buffer);

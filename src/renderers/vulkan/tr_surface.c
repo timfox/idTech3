@@ -1444,7 +1444,10 @@ static void RB_SurfaceAxis( void ) {
 	tess.numVertexes = 6;
 
 	vk_bind_pipeline( vk.surface_axis_pipeline );
-	// TODO: use common layout and avoid ST0 binding?
+	// TODO: Use common vertex layout and avoid TESS_ST0 binding if axis pipeline doesn't require texture coordinates.
+	//       The axis rendering only needs position (TESS_XYZ) and color (TESS_RGBA0), but TESS_ST0 is included
+	//       to match a common vertex format. If the pipeline layout is updated to not require ST0, this can be
+	//       changed to: vk_bind_geometry( TESS_XYZ | TESS_RGBA0 );
 	vk_bind_geometry( TESS_XYZ | TESS_RGBA0 | TESS_ST0 );
 	vk_draw_geometry( DEPTH_RANGE_NORMAL, qfalse );
 

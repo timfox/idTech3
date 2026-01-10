@@ -4212,37 +4212,51 @@ static shader_t *FinishShader( void ) {
 			}
 
 #ifdef USE_FOG_COLLAPSE
-			// FIXME: Fog collapse code causes SIGFPE when mirror pipelines are disabled
-			// This code assumes mirror pipelines exist, but we disable them to prevent crashes
-			// Re-disabled until fog collapse can handle NULL mirror pipelines safely
-			// Commenting out the entire block to avoid preprocessor issues
-			/*
-			if ( fogCollapse && tr.numFogs > 0 ) {
+			// Fog collapse: Create fog versions of pipelines
+			// Fixed: Added NULL checks to handle disabled mirror pipelines safely
+			if ( fogCollapse && tr.numFogs > 0 && pStage->vk_pipeline[0] != VK_NULL_HANDLE ) {
 				Vk_Pipeline_Def def_fog;
 				Vk_Pipeline_Def def_mirror;
 
+				// Get definition from regular pipeline
 				vk_get_pipeline_def( pStage->vk_pipeline[0], &def_fog );
-				vk_get_pipeline_def( pStage->vk_mirror_pipeline[0], &def_mirror );
+				
+				// Get definition from mirror pipeline if it exists, otherwise use regular pipeline definition
+				if ( pStage->vk_mirror_pipeline[0] != VK_NULL_HANDLE ) {
+					vk_get_pipeline_def( pStage->vk_mirror_pipeline[0], &def_mirror );
+				} else {
+					// Mirror pipeline doesn't exist, create fog mirror definition from regular pipeline
+					Com_Memcpy( &def_mirror, &def_fog, sizeof(def_mirror) );
+					def_mirror.mirror = qtrue; // Ensure mirror flag is set
+				}
 
+				// Set fog stage and color adjustment flags
 				def_fog.fog_stage = 1;
 				def_mirror.fog_stage = 1;
 				def_fog.acff = pStage->bundle[0].adjustColorsForFog;
 				def_mirror.acff = pStage->bundle[0].adjustColorsForFog;
 
+				// Create fog versions of pipelines
 				pStage->vk_pipeline[1] = vk_find_pipeline_ext( 0, &def_fog, qfalse );
 				if (pStage->vk_pipeline[1] == VK_NULL_HANDLE) {
 					ri.Printf(PRINT_WARNING, "Failed to create Vulkan fog pipeline for shader stage\n");
 				}
-				pStage->vk_mirror_pipeline[1] = vk_find_pipeline_ext( 0, &def_mirror, qfalse );
-				if (pStage->vk_mirror_pipeline[1] == VK_NULL_HANDLE) {
-					ri.Printf(PRINT_WARNING, "Failed to create Vulkan mirror fog pipeline for shader stage\n");
+				
+				// Only create mirror fog pipeline if mirror pipeline was originally created
+				if ( pStage->vk_mirror_pipeline[0] != VK_NULL_HANDLE ) {
+					pStage->vk_mirror_pipeline[1] = vk_find_pipeline_ext( 0, &def_mirror, qfalse );
+					if (pStage->vk_mirror_pipeline[1] == VK_NULL_HANDLE) {
+						ri.Printf(PRINT_WARNING, "Failed to create Vulkan mirror fog pipeline for shader stage\n");
+					}
+				} else {
+					// Mirror pipeline was disabled, so mirror fog pipeline is also NULL
+					pStage->vk_mirror_pipeline[1] = VK_NULL_HANDLE;
 				}
 
 				pStage->bundle[0].adjustColorsForFog = ACFF_NONE;
 
 				shader.fogCollapse = qtrue;
 			}
-			*/
 #endif
 	}
 }

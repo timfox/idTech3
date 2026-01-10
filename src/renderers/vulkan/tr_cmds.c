@@ -665,14 +665,14 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 
 	if ( glConfig.stereoEnabled ) {
 		if ( stereoFrame == STEREO_LEFT ) {
-			cmd->buffer = (int)GL_BACK_LEFT;
+			cmd->buffer = 0; // Left eye buffer (Vulkan doesn't use GL_BACK_LEFT)
 		} else if ( stereoFrame == STEREO_RIGHT ) {
-			cmd->buffer = (int)GL_BACK_RIGHT;
+			cmd->buffer = 1; // Right eye buffer (Vulkan doesn't use GL_BACK_RIGHT)
 		} else {
 			// Programming error: invalid stereo frame when stereo is enabled
 			ri.Printf(PRINT_WARNING, "RE_BeginFrame: Stereo is enabled, but stereoFrame was %i (expected STEREO_LEFT or STEREO_RIGHT)\n", stereoFrame);
 			// Continue with center frame as fallback
-			cmd->buffer = (int)GL_BACK;
+			cmd->buffer = 0; // Default to left/center (Vulkan doesn't use GL_BACK)
 		}
 	} else {
 		if ( stereoFrame != STEREO_CENTER ) {
@@ -685,9 +685,9 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 		cmd->buffer = 0;
 #else
 		if ( !Q_stricmp( r_drawBuffer->string, "GL_FRONT" ) )
-			cmd->buffer = (int)GL_FRONT;
+			cmd->buffer = 0; // Front buffer (Vulkan doesn't use GL_FRONT)
 		else
-			cmd->buffer = (int)GL_BACK;
+			cmd->buffer = 0; // Back buffer (Vulkan doesn't use GL_BACK)
 #endif
 	}
 

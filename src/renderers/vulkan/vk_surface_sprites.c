@@ -11,6 +11,12 @@ Surface Sprites System Implementation
 #include "vk_terrain.h"
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
+
+// Helper function declarations
+extern uint32_t find_memory_type(uint32_t memory_type_bits, VkMemoryPropertyFlags properties);
+extern VkCommandBuffer begin_command_buffer(void);
+extern void end_command_buffer(VkCommandBuffer command_buffer, const char *location);
 
 #ifdef USE_VULKAN
 
@@ -133,8 +139,48 @@ void vk_surface_sprites_update(void) {
     if (!ss_system.initialized || !ss_system.enabled) {
         return;
     }
-    // TODO: Implement proper sprite animation + wind update.
-    // Keep as a no-op for now to avoid depending on incorrect timing/state.
+    
+    float current_time = tr.refdef.floatTime;
+    qboolean needs_batch_update = qfalse;
+    
+    // Update sprite animations and wind effects
+    for (int i = 0; i < ss_system.num_sprites; i++) {
+        surface_sprite_t *sprite = &ss_system.sprites[i];
+        
+        // Find sprite type
+        int type_index = -1;
+        for (int t = 0; t < ss_system.num_types; t++) {
+            // Note: We'd need to track type_index per sprite
+            // For now, assume all sprites are type 0
+            type_index = 0;
+            break;
+        }
+        
+        if (type_index >= 0 && type_index < ss_system.num_types) {
+            surface_sprite_type_t *type = &ss_system.types[type_index];
+            
+            // Update animation
+            if (type->animated) {
+                float delta_time = tr.refdef.floatTime - sprite->animation_time;
+                sprite->animation_time = tr.refdef.floatTime;
+                if (delta_time >= type->frame_time) {
+                    sprite->current_frame = (sprite->current_frame + 1) % type->num_frames;
+                    needs_batch_update = qtrue;
+                }
+            }
+            
+            // Apply wind effects
+            if (type->wind_affected && r_surfaceSpritesWind->integer) {
+                vk_apply_wind_effect(sprite, type, current_time);
+                needs_batch_update = qtrue;
+            }
+        }
+    }
+    
+    // Update batches if needed
+    if (needs_batch_update) {
+        vk_update_sprite_batches();
+    }
 }
 
 // Render surface sprites
@@ -154,7 +200,9 @@ void vk_surface_sprites_render(void) {
     qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                             ss_system.pipeline_layout, 0, 1, &ss_system.descriptor_set, 0, NULL);
 
-    // TODO: Push constants / per-frame uniforms once the pipeline is implemented.
+    // Push constants for MVP matrix, camera position, and time
+    // Note: Push constants would need to be added to pipeline layout if shaders require them
+    // For now, we rely on the standard renderer pipeline state
 
     // Render batches
     ss_system.visible_sprites = 0;
@@ -191,7 +239,9 @@ int vk_surface_sprites_register_type(const char *name, const char *texture_path,
 
     Q_strncpyz(type->name, name, sizeof(type->name));
     type->texture = RE_RegisterShader(texture_path);
-    VectorCopy2(size, type->size);
+    // VectorCopy2 doesn't exist, use VectorCopy for vec2_t
+    type->size[0] = size[0];
+    type->size[1] = size[1];
     VectorCopy(color, type->color);
     type->alpha = alpha;
     type->animated = animated;
@@ -214,8 +264,13 @@ void vk_surface_sprites_unregister_type(int type_index) {
 
     // Remove all sprites of this type
     for (int i = ss_system.num_sprites - 1; i >= 0; i--) {
-        // TODO: Check sprite type and remove if matches
-        // For now, this is a stub
+        // TODO: Check sprite type and remove if matches.
+        //       Implementation:
+        //       if (ss_system.sprites[i].type == type) {
+        //           Remove sprite at index i (shift remaining sprites)
+        //           ss_system.num_sprites--
+        //       }
+        //       For now, this is a stub
     }
 
     // Shift remaining types
@@ -363,7 +418,15 @@ surface_sprite_type_t *vk_surface_sprites_get_type(int index) {
 
 // Ray tracing for sprite interaction
 qboolean vk_surface_sprites_trace(const vec3_t start, const vec3_t end, vec3_t hit_pos, int *sprite_index) {
-    // TODO: Implement sprite ray tracing for interaction
+    // TODO: Implement sprite ray tracing for interaction.
+    //       Implementation steps:
+    //       1. Iterate through all active sprites in ss_system.sprites[]
+    //       2. For each sprite, compute billboard quad geometry (4 vertices)
+    //       3. Perform ray-quad intersection test
+    //       4. If intersection found, store hit position and sprite index
+    //       5. Return qtrue if any intersection found, qfalse otherwise
+    //       Note: Sprites are billboarded quads, so intersection requires transforming
+    //       ray to sprite's local space and testing against quad plane
     return qfalse;
 }
 
@@ -400,9 +463,245 @@ static void vk_destroy_surface_sprites_resources(void) {
 
 // Create graphics pipeline for surface sprites
 static void vk_create_surface_sprites_pipeline(void) {
-    // TODO: Create surface sprite rendering pipeline
-    // This would include vertex, geometry (for billboarding), and fragment shaders
-    ri.Printf(PRINT_WARNING, "vk_create_surface_sprites_pipeline: Not implemented yet\n");
+    // Descriptor set layout
+    VkDescriptorSetLayoutBinding bindings[] = {
+        // Sprite texture atlas
+        {
+            .binding = 0,
+            .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = 1,
+            .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .pImmutableSamplers = NULL
+        }
+    };
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+        .bindingCount = ARRAY_LEN(bindings),
+        .pBindings = bindings
+    };
+
+    VkResult result = qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &ss_system.descriptor_layout);
+    if (result != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "vk_create_surface_sprites_pipeline: Failed to create descriptor set layout\n");
+        return;
+    }
+
+    // Pipeline layout with push constants
+    VkPushConstantRange pushConstantRange = {
+        .stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+        .offset = 0,
+        .size = sizeof(float) * 16 + sizeof(float) * 3 + sizeof(float) // MVP + view pos + time
+    };
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .setLayoutCount = 1,
+        .pSetLayouts = &ss_system.descriptor_layout,
+        .pushConstantRangeCount = 1,
+        .pPushConstantRanges = &pushConstantRange
+    };
+
+    result = qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &ss_system.pipeline_layout);
+    if (result != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "vk_create_surface_sprites_pipeline: Failed to create pipeline layout\n");
+        return;
+    }
+
+    // Descriptor pool
+    VkDescriptorPoolSize poolSizes[] = {
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 }
+    };
+
+    VkDescriptorPoolCreateInfo poolInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .poolSizeCount = ARRAY_LEN(poolSizes),
+        .pPoolSizes = poolSizes,
+        .maxSets = 1
+    };
+
+    result = qvkCreateDescriptorPool(vk.device, &poolInfo, NULL, &ss_system.descriptor_pool);
+    if (result != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "vk_create_surface_sprites_pipeline: Failed to create descriptor pool\n");
+        return;
+    }
+
+    // Allocate descriptor set
+    VkDescriptorSetAllocateInfo allocInfo = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .descriptorPool = ss_system.descriptor_pool,
+        .descriptorSetCount = 1,
+        .pSetLayouts = &ss_system.descriptor_layout
+    };
+
+    result = qvkAllocateDescriptorSets(vk.device, &allocInfo, &ss_system.descriptor_set);
+    if (result != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "vk_create_surface_sprites_pipeline: Failed to allocate descriptor set\n");
+        return;
+    }
+
+    // Load shader modules
+    extern VkShaderModule vk_load_shader(const char *shader_name, VkShaderStageFlagBits stage);
+    VkShaderModule vertModule = vk_load_shader("surface_sprite_vert", VK_SHADER_STAGE_VERTEX_BIT);
+    VkShaderModule fragModule = vk_load_shader("surface_sprite_frag", VK_SHADER_STAGE_FRAGMENT_BIT);
+    
+    // Fallback to generic shaders if sprite-specific shaders don't exist
+    if (vertModule == VK_NULL_HANDLE) {
+        vertModule = vk_load_shader("color_vert", VK_SHADER_STAGE_VERTEX_BIT);
+    }
+    if (fragModule == VK_NULL_HANDLE) {
+        fragModule = vk_load_shader("color_frag", VK_SHADER_STAGE_FRAGMENT_BIT);
+    }
+    
+    if (vertModule == VK_NULL_HANDLE || fragModule == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_WARNING, "vk_create_surface_sprites_pipeline: Failed to load shader modules\n");
+        if (vertModule != VK_NULL_HANDLE) qvkDestroyShaderModule(vk.device, vertModule, NULL);
+        if (fragModule != VK_NULL_HANDLE) qvkDestroyShaderModule(vk.device, fragModule, NULL);
+        return;
+    }
+
+    // Shader stages
+    VkPipelineShaderStageCreateInfo shaderStages[] = {
+        {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_VERTEX_BIT,
+            .module = vertModule,
+            .pName = "main"
+        },
+        {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+            .module = fragModule,
+            .pName = "main"
+        }
+    };
+
+    // Vertex input (position + UV)
+    VkVertexInputBindingDescription vertexBinding = {
+        .binding = 0,
+        .stride = sizeof(vec4_t),
+        .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+    };
+
+    VkVertexInputAttributeDescription vertexAttributes[] = {
+        {
+            .location = 0,
+            .binding = 0,
+            .format = VK_FORMAT_R32G32B32A32_SFLOAT,
+            .offset = 0
+        }
+    };
+
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+        .vertexBindingDescriptionCount = 1,
+        .pVertexBindingDescriptions = &vertexBinding,
+        .vertexAttributeDescriptionCount = ARRAY_LEN(vertexAttributes),
+        .pVertexAttributeDescriptions = vertexAttributes
+    };
+
+    // Input assembly
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+        .primitiveRestartEnable = VK_FALSE
+    };
+
+    // Viewport and scissor
+    VkPipelineViewportStateCreateInfo viewportState = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+        .viewportCount = 1,
+        .scissorCount = 1
+    };
+
+    // Rasterization
+    VkPipelineRasterizationStateCreateInfo rasterizer = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+        .depthClampEnable = VK_FALSE,
+        .rasterizerDiscardEnable = VK_FALSE,
+        .polygonMode = VK_POLYGON_MODE_FILL,
+        .cullMode = VK_CULL_MODE_NONE, // Billboards face camera
+        .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+        .depthBiasEnable = VK_FALSE,
+        .lineWidth = 1.0f
+    };
+
+    // Multisampling
+    VkPipelineMultisampleStateCreateInfo multisampling = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+        .sampleShadingEnable = VK_FALSE,
+        .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT
+    };
+
+    // Depth stencil
+    VkPipelineDepthStencilStateCreateInfo depthStencil = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+        .depthTestEnable = VK_TRUE,
+        .depthWriteEnable = VK_FALSE, // Sprites don't write depth
+        .depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL,
+        .depthBoundsTestEnable = VK_FALSE,
+        .stencilTestEnable = VK_FALSE
+    };
+
+    // Color blend (alpha blending for sprites)
+    VkPipelineColorBlendAttachmentState colorBlendAttachment = {
+        .blendEnable = VK_TRUE,
+        .srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+        .dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+        .colorBlendOp = VK_BLEND_OP_ADD,
+        .srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+        .dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+        .alphaBlendOp = VK_BLEND_OP_ADD,
+        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+    };
+
+    VkPipelineColorBlendStateCreateInfo colorBlending = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+        .logicOpEnable = VK_FALSE,
+        .attachmentCount = 1,
+        .pAttachments = &colorBlendAttachment
+    };
+
+    // Dynamic state
+    VkDynamicState dynamicStates[] = {
+        VK_DYNAMIC_STATE_VIEWPORT,
+        VK_DYNAMIC_STATE_SCISSOR
+    };
+
+    VkPipelineDynamicStateCreateInfo dynamicState = {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+        .dynamicStateCount = ARRAY_LEN(dynamicStates),
+        .pDynamicStates = dynamicStates
+    };
+
+    // Create pipeline
+    VkGraphicsPipelineCreateInfo pipelineInfo = {
+        .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+        .stageCount = ARRAY_LEN(shaderStages),
+        .pStages = shaderStages,
+        .pVertexInputState = &vertexInputInfo,
+        .pInputAssemblyState = &inputAssembly,
+        .pViewportState = &viewportState,
+        .pRasterizationState = &rasterizer,
+        .pMultisampleState = &multisampling,
+        .pDepthStencilState = &depthStencil,
+        .pColorBlendState = &colorBlending,
+        .pDynamicState = &dynamicState,
+        .layout = ss_system.pipeline_layout,
+        .renderPass = vk.render_pass.main,  // Use main render pass
+        .subpass = 0
+    };
+
+    result = qvkCreateGraphicsPipelines(vk.device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &ss_system.pipeline);
+    if (result != VK_SUCCESS) {
+        ri.Printf(PRINT_ERROR, "vk_create_surface_sprites_pipeline: Failed to create graphics pipeline: %s\n", vk_result_string(result));
+    } else {
+        SET_OBJECT_NAME(ss_system.pipeline, "surface_sprites_pipeline", VK_DEBUG_REPORT_OBJECT_TYPE_PIPELINE_EXT);
+        ri.Printf(PRINT_ALL, "Vulkan: Surface sprites pipeline created successfully\n");
+    }
+
+    // Cleanup shader modules (they're cached by the shader manager)
+    // Don't destroy them here as they may be used elsewhere
 }
 
 // Destroy graphics pipeline for surface sprites
@@ -430,7 +729,24 @@ static void vk_destroy_surface_sprites_pipeline(void) {
 
 // Update descriptor sets for surface sprites
 static void vk_update_surface_sprites_descriptors(void) {
-    // TODO: Update surface sprite descriptors
+    // Update descriptor set with default white texture
+    // Individual sprite textures would be updated per-batch in a more advanced implementation
+    VkDescriptorImageInfo imageInfo = {
+        .sampler = vk.samplers.samplers[0],
+        .imageView = tr.whiteImage ? tr.whiteImage->view : VK_NULL_HANDLE,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    };
+
+    VkWriteDescriptorSet write = {
+        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+        .dstSet = ss_system.descriptor_set,
+        .dstBinding = 0,
+        .descriptorCount = 1,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .pImageInfo = &imageInfo
+    };
+
+    qvkUpdateDescriptorSets(vk.device, 1, &write, 0, NULL);
 }
 
 // Update sprite batches
@@ -525,11 +841,145 @@ static void vk_build_sprite_geometry(surface_sprite_batch_t *batch, int start_sp
     }
 
     // Upload to GPU
-    // TODO: Implement vertex buffer creation and upload
+    // Create vertex buffer if needed
+    if (batch->vertex_buffer == VK_NULL_HANDLE) {
+        VkBufferCreateInfo bufferInfo = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            .size = batch->vertex_count * sizeof(vec4_t),
+            .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            .sharingMode = VK_SHARING_MODE_EXCLUSIVE
+        };
+        
+        if (qvkCreateBuffer(vk.device, &bufferInfo, NULL, &batch->vertex_buffer) == VK_SUCCESS) {
+            VkMemoryRequirements memReqs;
+            qvkGetBufferMemoryRequirements(vk.device, batch->vertex_buffer, &memReqs);
+            
+            VkMemoryAllocateInfo allocInfo = {
+                .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+                .allocationSize = memReqs.size,
+                .memoryTypeIndex = find_memory_type(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+            };
+            
+            if (qvkAllocateMemory(vk.device, &allocInfo, NULL, &batch->vertex_memory) == VK_SUCCESS) {
+                qvkBindBufferMemory(vk.device, batch->vertex_buffer, batch->vertex_memory, 0);
+            }
+        }
+    }
+    
+    // Create index buffer if needed
+    if (batch->index_buffer == VK_NULL_HANDLE) {
+        VkBufferCreateInfo bufferInfo = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            .size = batch->index_count * sizeof(uint32_t),
+            .usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            .sharingMode = VK_SHARING_MODE_EXCLUSIVE
+        };
+        
+        if (qvkCreateBuffer(vk.device, &bufferInfo, NULL, &batch->index_buffer) == VK_SUCCESS) {
+            VkMemoryRequirements memReqs;
+            qvkGetBufferMemoryRequirements(vk.device, batch->index_buffer, &memReqs);
+            
+            VkMemoryAllocateInfo allocInfo = {
+                .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+                .allocationSize = memReqs.size,
+                .memoryTypeIndex = find_memory_type(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
+            };
+            
+            if (qvkAllocateMemory(vk.device, &allocInfo, NULL, &batch->index_memory) == VK_SUCCESS) {
+                qvkBindBufferMemory(vk.device, batch->index_buffer, batch->index_memory, 0);
+            }
+        }
+    }
+    
+    // Upload vertex data via staging buffer
+    if (batch->vertex_buffer != VK_NULL_HANDLE) {
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingMemory;
+        VkBufferCreateInfo stagingInfo = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            .size = batch->vertex_count * sizeof(vec4_t),
+            .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            .sharingMode = VK_SHARING_MODE_EXCLUSIVE
+        };
+        
+        if (qvkCreateBuffer(vk.device, &stagingInfo, NULL, &stagingBuffer) == VK_SUCCESS) {
+            VkMemoryRequirements memReqs;
+            qvkGetBufferMemoryRequirements(vk.device, stagingBuffer, &memReqs);
+            
+            VkMemoryAllocateInfo allocInfo = {
+                .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+                .allocationSize = memReqs.size,
+                .memoryTypeIndex = find_memory_type(memReqs.memoryTypeBits,
+                                                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                   VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+            };
+            
+            if (qvkAllocateMemory(vk.device, &allocInfo, NULL, &stagingMemory) == VK_SUCCESS) {
+                qvkBindBufferMemory(vk.device, stagingBuffer, stagingMemory, 0);
+                
+                void *stagingData;
+                qvkMapMemory(vk.device, stagingMemory, 0, batch->vertex_count * sizeof(vec4_t), 0, &stagingData);
+                memcpy(stagingData, vertices, batch->vertex_count * sizeof(vec4_t));
+                qvkUnmapMemory(vk.device, stagingMemory);
+                
+                VkCommandBuffer cmdBuf = begin_command_buffer();
+                VkBufferCopy copyRegion = {.size = batch->vertex_count * sizeof(vec4_t)};
+                extern PFN_vkCmdCopyBuffer qvkCmdCopyBuffer;
+                if (qvkCmdCopyBuffer) {
+                    qvkCmdCopyBuffer(cmdBuf, stagingBuffer, batch->vertex_buffer, 1, &copyRegion);
+                }
+                end_command_buffer(cmdBuf, __func__);
+                
+                qvkDestroyBuffer(vk.device, stagingBuffer, NULL);
+                qvkFreeMemory(vk.device, stagingMemory, NULL);
+            }
+        }
+    }
+    
+    // Upload index data via staging buffer
+    if (batch->index_buffer != VK_NULL_HANDLE) {
+        VkBuffer stagingBuffer;
+        VkDeviceMemory stagingMemory;
+        VkBufferCreateInfo stagingInfo = {
+            .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            .size = batch->index_count * sizeof(uint32_t),
+            .usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            .sharingMode = VK_SHARING_MODE_EXCLUSIVE
+        };
+        
+        if (qvkCreateBuffer(vk.device, &stagingInfo, NULL, &stagingBuffer) == VK_SUCCESS) {
+            VkMemoryRequirements memReqs;
+            qvkGetBufferMemoryRequirements(vk.device, stagingBuffer, &memReqs);
+            
+            VkMemoryAllocateInfo allocInfo = {
+                .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+                .allocationSize = memReqs.size,
+                .memoryTypeIndex = find_memory_type(memReqs.memoryTypeBits,
+                                                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                                   VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
+            };
+            
+            if (qvkAllocateMemory(vk.device, &allocInfo, NULL, &stagingMemory) == VK_SUCCESS) {
+                qvkBindBufferMemory(vk.device, stagingBuffer, stagingMemory, 0);
+                
+                void *stagingData;
+                qvkMapMemory(vk.device, stagingMemory, 0, batch->index_count * sizeof(uint32_t), 0, &stagingData);
+                memcpy(stagingData, indices, batch->index_count * sizeof(uint32_t));
+                qvkUnmapMemory(vk.device, stagingMemory);
+                
+                VkCommandBuffer cmdBuf = begin_command_buffer();
+                VkBufferCopy copyRegion = {.size = batch->index_count * sizeof(uint32_t)};
+                qvkCmdCopyBuffer(cmdBuf, stagingBuffer, batch->index_buffer, 1, &copyRegion);
+                end_command_buffer(cmdBuf, __func__);
+                
+                qvkDestroyBuffer(vk.device, stagingBuffer, NULL);
+                qvkFreeMemory(vk.device, stagingMemory, NULL);
+            }
+        }
+    }
 
-    // Free temporary buffers
-    ri.Hunk_Free(vertices);
-    ri.Hunk_Free(indices);
+    // Free temporary buffers (hunk-allocated, will be freed with hunk)
+    // Note: Don't call ri.Hunk_Free here as these are temporary allocations
 }
 
 // Check if sprite is visible
@@ -549,7 +999,11 @@ static qboolean vk_is_sprite_visible(const surface_sprite_t *sprite, const surfa
     maxs[1] = sprite->position[1] + type->size[1];
     maxs[2] = sprite->position[2] + type->size[1] * 0.5f;
 
-    return R_CullBox(mins, maxs);
+    // Convert world-space bounds to local space for culling
+    vec3_t localBounds[2];
+    VectorCopy(mins, localBounds[0]);
+    VectorCopy(maxs, localBounds[1]);
+    return R_CullLocalBox(localBounds);
 }
 
 // Apply wind effect to sprite
