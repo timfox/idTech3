@@ -57,6 +57,10 @@ static cpu_particle_t	cpu_particles[MAX_CPU_PARTICLES];
 static int				cpu_particle_count = 0;
 static float			last_particle_update_time = 0.0f;
 
+// Forward declarations for static particle functions
+static void R_ProcessCPUParticles( float deltaTime );
+static void R_RenderCPUParticles( void );
+
 
 /*
 ====================
