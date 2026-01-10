@@ -256,6 +256,23 @@ void vk_create_framebuffers(void) {
 void vk_destroy_framebuffers(void) {
     ri.Printf(PRINT_ALL, "Vulkan: Destroying framebuffers and render passes...\n");
 
+    // If device is lost, just clear handles - driver may have already destroyed resources
+    if (vk.device_lost) {
+        ri.Printf(PRINT_WARNING, "Vulkan: Device is lost, clearing framebuffer handles only\n");
+        for (uint32_t i = 0; i < vk.swapchain_image_count; i++) {
+            vk.framebuffers.main[i] = VK_NULL_HANDLE;
+        }
+        vk.framebuffers.screenmap = VK_NULL_HANDLE;
+        vk.framebuffers.bloom_extract = VK_NULL_HANDLE;
+        for (int i = 0; i < 4; i++) {
+            vk.framebuffers.blur[i] = VK_NULL_HANDLE;
+        }
+        for (int i = 0; i < 6; i++) {
+            vk.framebuffers.cubemap[i] = VK_NULL_HANDLE;
+        }
+        return;
+    }
+
     for (uint32_t i = 0; i < vk.swapchain_image_count; i++) {
         vk_destroy_framebuffer(vk.framebuffers.main[i]);
         vk.framebuffers.main[i] = VK_NULL_HANDLE;

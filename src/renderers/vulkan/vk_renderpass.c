@@ -186,6 +186,11 @@ VkFramebuffer vk_create_framebuffer(VkRenderPass render_pass, uint32_t attachmen
 
 // Destroy framebuffer
 void vk_destroy_framebuffer(VkFramebuffer framebuffer) {
+    // Skip if device is lost - driver may have already destroyed resources
+    if (vk.device_lost || vk.device == VK_NULL_HANDLE) {
+        return;
+    }
+    
     if (framebuffer != VK_NULL_HANDLE) {
         qvkDestroyFramebuffer(vk.device, framebuffer, NULL);
     }
@@ -193,6 +198,11 @@ void vk_destroy_framebuffer(VkFramebuffer framebuffer) {
 
 // Destroy render pass
 void vk_destroy_render_pass(VkRenderPass render_pass) {
+    // Skip if device is lost - driver may have already destroyed resources
+    if (vk.device_lost || vk.device == VK_NULL_HANDLE) {
+        return;
+    }
+    
     if (render_pass != VK_NULL_HANDLE) {
         qvkDestroyRenderPass(vk.device, render_pass, NULL);
     }

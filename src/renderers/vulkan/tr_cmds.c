@@ -449,14 +449,33 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 				// Test device responsiveness using the existing wrapper function
 				// This will safely check if device is responsive
 				qboolean was_device_lost = vk.device_lost;
-				vk_wait_idle();
-				// If device was lost during wait, it will be set in vk_wait_idle
-				if (vk.device_lost && !was_device_lost) {
-					ri.Printf(PRINT_WARNING, "Vulkan: Device still not responsive. Will retry in %d seconds.\n", recovery_delay / 1000);
-					return; // Skip swapchain operations if device is still lost
-				}
 				
-				// Temporarily clear device_lost flag to allow swapchain operations
+				// Only test device if it wasn't already lost (to avoid redundant checks)
+				if (!was_device_lost) {
+					vk_wait_idle();
+					// If device was lost during wait, it will be set in vk_wait_idle
+					if (vk.device_lost) {
+						ri.Printf(PRINT_WARNING, "Vulkan: Device lost during wait test. Will retry in %d seconds.\n", recovery_delay / 1000);
+						return; // Skip swapchain operations if device is still lost
+					}
+				} else {
+					// Device was already lost - check if it's still lost
+					// Use the safe wrapper function that handles device lost properly
+					qboolean device_was_lost = vk.device_lost;
+					vk_wait_idle(); // This will detect if device is still lost
+					
+					if (vk.device_lost) {
+						// Device is still lost - wait longer before attempting recovery
+						ri.Printf(PRINT_WARNING, "Vulkan: Device still lost. Driver needs more time to recover. Will retry in %d seconds.\n", recovery_delay / 1000);
+						return; // Device still lost, wait longer
+					} else if (device_was_lost) {
+						// Device was lost but now appears recovered
+						ri.Printf(PRINT_ALL, "Vulkan: Device appears to have recovered! Memory tracking reset.\n");
+						// Device recovered - memory tracking was already reset when device was lost
+						// Now we can attempt swapchain recreation
+					}
+				
+				// Device is responsive - proceed with swapchain recreation
 				was_device_lost = vk.device_lost;
 				vk.device_lost = qfalse;
 				

@@ -273,6 +273,17 @@ void vk_destroy_swapchain(void) {
         return;
     }
 
+    // Skip Vulkan API calls if device is lost - driver may have already destroyed resources
+    // But still clear our internal state
+    if (vk.device_lost) {
+        ri.Printf(PRINT_WARNING, "Swapchain: Device is lost, clearing internal state only\n");
+        image_available_semaphores.clear();
+        rendering_finished_semaphores.clear();
+        swapchain_image_views.clear();
+        vk.swapchain = VK_NULL_HANDLE;
+        return;
+    }
+
     // Destroy semaphores
     for (auto semaphore : image_available_semaphores) {
         if (semaphore) qvkDestroySemaphore(vk.device, semaphore, nullptr);

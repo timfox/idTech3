@@ -10639,21 +10639,44 @@ void vk_render_scene(const refdef_t *fd) {
 // Safe version that returns error code instead of calling ri.Error
 VkResult vk_recreate_swapchain_safe(void) {
   ri.Printf(PRINT_ALL, "Vulkan: Recreating swapchain\n");
-  // Ensure all device work is finished before destroying/recreating swapchain resources
-  vk_wait_idle();
+  
+  // Skip wait if device is lost - it will fail anyway and we've already reset memory tracking
+  if (!vk.device_lost) {
+    // Ensure all device work is finished before destroying/recreating swapchain resources
+    vk_wait_idle();
+  } else {
+    ri.Printf(PRINT_WARNING, "Vulkan: Skipping device wait - device is lost, memory tracking already reset\n");
+  }
+  
   // Destroy existing framebuffers and render passes tied to the old swapchain
+  // This will handle device lost internally
   vk_destroy_framebuffers();
+  
   // Destroy old swapchain resources via direct function (no bridge)
+  // This will handle device lost internally
   vk_destroy_swapchain();
+  
+  // If device is lost, we can't create a new swapchain yet
+  if (vk.device_lost) {
+    ri.Printf(PRINT_WARNING, "Vulkan: Cannot recreate swapchain - device is lost\n");
+    return VK_ERROR_DEVICE_LOST;
+  }
+  
   // Recreate swapchain with up-to-date surface format (safe version that returns error)
   VkResult result = vk_create_swapchain_safe(vk.physical_device, vk.device, vk_surface, vk_present_format, &vk.swapchain, true);
   if (result != VK_SUCCESS) {
     ri.Printf(PRINT_WARNING, "Vulkan: Failed to recreate swapchain: %s\n", vk_result_string(result));
+    if (result == VK_ERROR_DEVICE_LOST) {
+      vk.device_lost = qtrue;
+      vk_reset_memory_tracking_on_device_lost();
+    }
     return result;
   }
+  
   // Recreate framebuffers for the new swapchain images
   vk_create_framebuffers();
   ri.Printf(PRINT_ALL, "Vulkan: Swapchain recreated with %u images\n", vk.swapchain_image_count);
+  
   // Optional: Reset GPU timing profiler to align with new swapchain
   if (vk.render_profiler.initialized) {
     vk_shutdown_render_profiler();
