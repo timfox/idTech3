@@ -889,6 +889,7 @@ VkCommandBuffer begin_command_buffer(void)
 
 
 // Modernized command buffer submission with better structure
+// Uses fence-based synchronization like sunnyjk instead of queue wait idle
 VK_NONNULL_PARAMS(1)
 void end_command_buffer(VkCommandBuffer command_buffer, const char *location)
 {
@@ -897,6 +898,21 @@ void end_command_buffer(VkCommandBuffer command_buffer, const char *location)
 	// For fake device, skip all Vulkan API calls
 	if (vk.device == (VkDevice)0x20000000) {
 		return;
+	}
+
+	// Static fence for immediate command synchronization (sunnyjk pattern)
+	static VkFence immediate_fence = VK_NULL_HANDLE;
+	if (immediate_fence == VK_NULL_HANDLE && vk.device != VK_NULL_HANDLE) {
+		VkFenceCreateInfo fence_info = {
+			.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+			.pNext = NULL,
+			.flags = 0
+		};
+		VkResult result = qvkCreateFence(vk.device, &fence_info, NULL, &immediate_fence);
+		if (result != VK_SUCCESS) {
+			ri.Printf(PRINT_ERROR, "end_command_buffer: Failed to create fence: %s\n", vk_result_string(result));
+			// Continue without fence - command will still be submitted
+		}
 	}
 
 	VK_CHECK(qvkEndCommandBuffer(command_buffer));
@@ -938,7 +954,9 @@ void end_command_buffer(VkCommandBuffer command_buffer, const char *location)
 	}
 
 	// Handle device lost gracefully instead of terminating
-	VkResult submit_result = qvkQueueSubmit( vk.queue, 1, &submit_info, VK_NULL_HANDLE );
+	// Use fence for synchronization (sunnyjk pattern) - only waits for this specific command
+	VkFence fence_to_use = (immediate_fence != VK_NULL_HANDLE) ? immediate_fence : VK_NULL_HANDLE;
+	VkResult submit_result = qvkQueueSubmit( vk.queue, 1, &submit_info, fence_to_use );
 	if (submit_result != VK_SUCCESS) {
 		if (submit_result == VK_ERROR_DEVICE_LOST) {
 			vk.device_lost = qtrue;  // Mark device as lost
@@ -954,10 +972,28 @@ void end_command_buffer(VkCommandBuffer command_buffer, const char *location)
 		}
 	}
 
-	// Don't wait for queue idle after every command submission - this is unnecessary and can discover device loss prematurely.
-	// Use fences/semaphores for synchronization instead. Queue waits should only be used when
-	// actually necessary (resource cleanup, reading back results, etc.)
-	// The command buffer will be freed when it's actually finished, not immediately.
+	// Wait for this specific command to complete using fence (sunnyjk pattern)
+	// This is better than queue wait idle because it only waits for this command,
+	// not all commands on the queue, preventing premature device loss discovery
+	if (fence_to_use != VK_NULL_HANDLE && !vk.device_lost) {
+		VkResult fence_result = qvkWaitForFences(vk.device, 1, &fence_to_use, VK_TRUE, UINT64_MAX);
+		if (fence_result == VK_ERROR_DEVICE_LOST) {
+			vk.device_lost = qtrue;
+			vk_reset_memory_tracking_on_device_lost();
+			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during fence wait - GPU driver issue\n");
+			return;
+		} else if (fence_result != VK_SUCCESS) {
+			ri.Printf(PRINT_WARNING, "end_command_buffer: Fence wait failed: %s\n", vk_result_string(fence_result));
+		} else {
+			// Reset fence for next use
+			qvkResetFences(vk.device, 1, &fence_to_use);
+		}
+	}
+
+	// Free command buffer after it's completed
+	if (!vk.device_lost && vk.device != VK_NULL_HANDLE && vk.command_pool != VK_NULL_HANDLE) {
+		qvkFreeCommandBuffers( vk.device, vk.command_pool, 1, &command_buffer );
+	}
 }
 
 VkInstance VK_GetInstanceHandle( void )
@@ -10056,26 +10092,8 @@ void vk_queue_wait_idle( void ) {
 		return;
 	}
 
-	// Check if we've detected problematic shaders during initialization
-	// If so, use a more cautious approach - the device might be in an unstable state
-	#ifdef USE_VULKAN
-	#include "vk_shader_validation.h"
-	extern int vk_get_problematic_shader_count(void);
-	static qboolean initialization_phase = qtrue; // Track if we're still in initialization
-	if (initialization_phase && vk_get_problematic_shader_count() > 0) {
-		// During initialization with problematic shaders detected, skip wait to avoid discovering device loss
-		// The problematic shader may have already submitted a command that causes device loss
-		// We'll discover the loss later during normal operations if it persists
-		ri.Printf(PRINT_DEVELOPER, "Vulkan: Skipping queue wait during initialization - problematic shaders detected\n");
-		// Mark initialization as complete after a few frames
-		static int frame_count = 0;
-		if (++frame_count > 10) {
-			initialization_phase = qfalse;
-		}
-		return;
-	}
-	initialization_phase = qfalse; // Mark initialization as complete
-	#endif
+	// Queue wait idle should only be used when absolutely necessary (resource cleanup, etc.)
+	// For command synchronization, use fences instead (sunnyjk pattern)
 
 	// Check device status before waiting - use GetDeviceQueue2 or similar to verify device is still valid
 	// If device was lost, QueueWaitIdle will return VK_ERROR_DEVICE_LOST immediately

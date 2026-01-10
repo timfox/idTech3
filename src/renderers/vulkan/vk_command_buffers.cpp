@@ -229,7 +229,18 @@ extern "C" void vk_end_command_buffer(VkCommandBuffer command_buffer, const char
     }
 
     // Wait for completion (for simplicity, in a real engine you'd use multiple buffers)
-    qvkWaitForFences(vk.device, 1, &command_fence, VK_TRUE, UINT64_MAX);
+    VkResult fence_result = qvkWaitForFences(vk.device, 1, &command_fence, VK_TRUE, UINT64_MAX);
+    if (fence_result == VK_ERROR_DEVICE_LOST) {
+        vk.device_lost = qtrue;
+        vk_reset_memory_tracking_on_device_lost();
+        ri.Printf(PRINT_ERROR, "Vulkan: Device lost during fence wait - GPU driver issue\n");
+        return;
+    } else if (fence_result != VK_SUCCESS) {
+        ri.Printf(PRINT_WARNING, "vk_end_command_buffer: Fence wait failed: %d\n", fence_result);
+    } else {
+        // Reset fence for next use (Q2RTX pattern - proper fence reset)
+        qvkResetFences(vk.device, 1, &command_fence);
+    }
 }
 
 // vk_wait_idle is defined in vk.c

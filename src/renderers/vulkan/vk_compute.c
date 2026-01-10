@@ -244,6 +244,9 @@ qboolean vk_is_compute_job_complete(uint32_t job_id) {
                     manager->peak_execution_time_ms = manager->jobs[i].execution_duration_ms;
                 }
                 
+                // Reset fence after waiting (Q2RTX pattern - proper fence reset)
+                qvkResetFences(vk.device, 1, &manager->jobs[i].fence);
+                
                 return qtrue;
             }
             return qfalse;
@@ -265,11 +268,25 @@ void vk_wait_for_compute_job(uint32_t job_id) {
             }
 
             if (manager->jobs[i].status == VK_COMPUTE_STATUS_SUBMITTED) {
-                qvkWaitForFences(vk.device, 1, &manager->jobs[i].fence, VK_TRUE, UINT64_MAX);
+                VkResult fence_result = qvkWaitForFences(vk.device, 1, &manager->jobs[i].fence, VK_TRUE, UINT64_MAX);
+                if (fence_result == VK_ERROR_DEVICE_LOST) {
+                    vk.device_lost = qtrue;
+                    vk_reset_memory_tracking_on_device_lost();
+                    ri.Printf(PRINT_ERROR, "Vulkan: Device lost during compute job fence wait\n");
+                    manager->jobs[i].status = VK_COMPUTE_STATUS_FAILED;
+                    return;
+                } else if (fence_result != VK_SUCCESS) {
+                    ri.Printf(PRINT_ERROR, "Vulkan: Fence wait failed for compute job: %s\n", vk_result_string(fence_result));
+                    manager->jobs[i].status = VK_COMPUTE_STATUS_FAILED;
+                    return;
+                }
                 manager->jobs[i].status = VK_COMPUTE_STATUS_COMPLETED;
                 manager->jobs[i].completion_time_ns = ri.Microseconds() * 1000;
                 manager->jobs[i].execution_duration_ms = (float)(manager->jobs[i].completion_time_ns - manager->jobs[i].submission_time_ns) / 1000000.0f;
                 atomic_fetch_add_explicit(&manager->total_jobs_completed, 1, memory_order_relaxed);
+                
+                // Reset fence after waiting (Q2RTX pattern - proper fence reset)
+                qvkResetFences(vk.device, 1, &manager->jobs[i].fence);
             }
             return;
         }

@@ -572,13 +572,51 @@ void VulkanCommandPool::endSingleTimeCommands(VkCommandBuffer commandBuffer, VkQ
 {
     vkEndCommandBuffer(commandBuffer);
 
+    // Use fence for synchronization (Q2RTX/sunnyjk pattern) instead of queue wait idle
+    // This prevents premature device loss discovery and is more efficient
+    static VkFence immediate_fence = VK_NULL_HANDLE;
+    if (immediate_fence == VK_NULL_HANDLE && device_ != VK_NULL_HANDLE) {
+        VkFenceCreateInfo fenceInfo{};
+        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fenceInfo.flags = 0;
+        if (vkCreateFence(device_, &fenceInfo, nullptr, &immediate_fence) != VK_SUCCESS) {
+            // Fallback to queue wait idle if fence creation fails
+            immediate_fence = VK_NULL_HANDLE;
+        }
+    }
+
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer;
 
-    vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(queue);
+    VkResult submitResult = vkQueueSubmit(queue, 1, &submitInfo, immediate_fence);
+    if (submitResult != VK_SUCCESS) {
+        // Handle device lost gracefully
+        if (submitResult == VK_ERROR_DEVICE_LOST) {
+            Com_Error(ERR_DROP, "Vulkan: Device lost during one-time command submit");
+            return;
+        }
+        Com_Error(ERR_DROP, "Failed to submit one-time command buffer");
+        return;
+    }
+
+    // Wait for this specific command using fence (better than queue wait idle)
+    if (immediate_fence != VK_NULL_HANDLE) {
+        VkResult fenceResult = vkWaitForFences(device_, 1, &immediate_fence, VK_TRUE, UINT64_MAX);
+        if (fenceResult == VK_ERROR_DEVICE_LOST) {
+            Com_Error(ERR_DROP, "Vulkan: Device lost during fence wait");
+            return;
+        } else if (fenceResult != VK_SUCCESS) {
+            Com_Error(ERR_DROP, "Failed to wait for fence");
+            return;
+        }
+        // Reset fence for next use (Q2RTX pattern - proper fence reset)
+        vkResetFences(device_, 1, &immediate_fence);
+    } else {
+        // Fallback to queue wait idle if fence not available
+        vkQueueWaitIdle(queue);
+    }
 
     freeBuffer(commandBuffer);
 }
@@ -765,6 +803,18 @@ void VulkanUtils::executeSingleTimeCommands(VkDevice device,
                                            VkQueue queue,
                                            const std::function<void(VkCommandBuffer)>& commands)
 {
+    // Use fence for synchronization (Q2RTX/sunnyjk pattern) instead of queue wait idle
+    static VkFence immediate_fence = VK_NULL_HANDLE;
+    if (immediate_fence == VK_NULL_HANDLE && device != VK_NULL_HANDLE) {
+        VkFenceCreateInfo fenceInfo{};
+        fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+        fenceInfo.flags = 0;
+        if (vkCreateFence(device, &fenceInfo, nullptr, &immediate_fence) != VK_SUCCESS) {
+            // Fallback to queue wait idle if fence creation fails
+            immediate_fence = VK_NULL_HANDLE;
+        }
+    }
+
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -787,8 +837,35 @@ void VulkanUtils::executeSingleTimeCommands(VkDevice device,
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer;
 
-    vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(queue);
+    VkResult submitResult = vkQueueSubmit(queue, 1, &submitInfo, immediate_fence);
+    if (submitResult != VK_SUCCESS) {
+        vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+        if (submitResult == VK_ERROR_DEVICE_LOST) {
+            Com_Error(ERR_DROP, "Vulkan: Device lost during one-time command submit");
+            return;
+        }
+        Com_Error(ERR_DROP, "Failed to submit one-time command buffer");
+        return;
+    }
+
+    // Wait for this specific command using fence (better than queue wait idle)
+    if (immediate_fence != VK_NULL_HANDLE) {
+        VkResult fenceResult = vkWaitForFences(device, 1, &immediate_fence, VK_TRUE, UINT64_MAX);
+        if (fenceResult == VK_ERROR_DEVICE_LOST) {
+            vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+            Com_Error(ERR_DROP, "Vulkan: Device lost during fence wait");
+            return;
+        } else if (fenceResult != VK_SUCCESS) {
+            vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+            Com_Error(ERR_DROP, "Failed to wait for fence");
+            return;
+        }
+        // Reset fence for next use (Q2RTX pattern - proper fence reset)
+        vkResetFences(device, 1, &immediate_fence);
+    } else {
+        // Fallback to queue wait idle if fence not available
+        vkQueueWaitIdle(queue);
+    }
 
     vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
 }

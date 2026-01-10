@@ -97,8 +97,19 @@ void vk_render_scene_vulkan(const refdef_t *fd) {
         return; // Skip for fake devices
     }
 
+    // Save current command buffer context
+    VkCommandBuffer saved_command_buffer = VK_NULL_HANDLE;
+    if (vk.cmd && vk.cmd->command_buffer != VK_NULL_HANDLE) {
+        saved_command_buffer = vk.cmd->command_buffer;
+    }
+
     // Begin command buffer
     VkCommandBuffer command_buffer = begin_command_buffer();
+    
+    // Temporarily set command buffer context for helper functions
+    if (vk.cmd) {
+        vk.cmd->command_buffer = command_buffer;
+    }
 
     // Begin render pass
     VkClearValue clear_values[2];
@@ -137,56 +148,116 @@ void vk_render_scene_vulkan(const refdef_t *fd) {
     };
     qvkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
-    // Render polygons (if any)
+    // Render polygons (if any) using tessellation system
     if (vk.scene.polygonCount > 0) {
         ri.Printf(PRINT_DEVELOPER, "Vulkan: Rendering %d polygons\n", vk.scene.polygonCount);
 
-        // TODO: Implement full polygon rendering pipeline with vertex/index buffers
-        // For now, we iterate through polygons and log their data
+        // Use tessellation system to render polygons
+        // Convert stored polygons to tessellation buffer format for rendering
+        extern shaderCommands_t tess;
+        
+        tess.numVertexes = 0;
+        tess.numIndexes = 0;
+        
         for (int i = 0; i < vk.scene.polygonCount; i++) {
             int baseVertex = i * 3;
-            if (baseVertex + 2 < MAX_VERTS) {
-                polyVert_t *verts[3] = {
-                    &vk.scene.polygonVerts[vk.scene.polygonIndexes[baseVertex]],
-                    &vk.scene.polygonVerts[vk.scene.polygonIndexes[baseVertex + 1]],
-                    &vk.scene.polygonVerts[vk.scene.polygonIndexes[baseVertex + 2]]
-                };
-
-                // TODO: Create vertex buffer with polygon data
-                // TODO: Set up polygon material/shader pipeline
-                // TODO: Issue draw call for triangle
-
-                ri.Printf(PRINT_DEVELOPER, "Polygon %d: positions (%.1f,%.1f,%.1f) (%.1f,%.1f,%.1f) (%.1f,%.1f,%.1f)\n",
-                         i,
-                         verts[0]->xyz[0], verts[0]->xyz[1], verts[0]->xyz[2],
-                         verts[1]->xyz[0], verts[1]->xyz[1], verts[1]->xyz[2],
-                         verts[2]->xyz[0], verts[2]->xyz[1], verts[2]->xyz[2]);
+            if (baseVertex + 2 < MAX_VERTS && tess.numVertexes + 3 < MAX_SHADER_VERTEXES) {
+                // Add triangle vertices to tessellation buffer
+                for (int j = 0; j < 3; j++) {
+                    int vertIdx = vk.scene.polygonIndexes[baseVertex + j];
+                    if (vertIdx < MAX_VERTS && tess.numVertexes < MAX_SHADER_VERTEXES) {
+                        const polyVert_t *vert = &vk.scene.polygonVerts[vertIdx];
+                        
+                        // Copy vertex position
+                        VectorCopy(vert->xyz, tess.xyz[tess.numVertexes]);
+                        
+                        // Copy normal (default to up if not set)
+                        VectorCopy(vert->normal, tess.normal[tess.numVertexes]);
+                        if (VectorLength(tess.normal[tess.numVertexes]) < 0.1f) {
+                            VectorSet(tess.normal[tess.numVertexes], 0, 0, 1);
+                        }
+                        
+                        // Copy texture coordinates
+                        Vector2Copy(vert->st, tess.texCoords[0][tess.numVertexes]);
+                        
+                        // Copy vertex color (modulate)
+                        tess.vertexColors[tess.numVertexes][0] = vert->modulate[0];
+                        tess.vertexColors[tess.numVertexes][1] = vert->modulate[1];
+                        tess.vertexColors[tess.numVertexes][2] = vert->modulate[2];
+                        tess.vertexColors[tess.numVertexes][3] = vert->modulate[3];
+                        
+                        tess.indexes[tess.numIndexes] = tess.numVertexes;
+                        tess.numIndexes++;
+                        tess.numVertexes++;
+                    }
+                }
+            }
+        }
+        
+        // Render accumulated polygons if we have any
+        if (tess.numVertexes > 0 && tess.numIndexes > 0) {
+            // Get default shader for polygons
+            shader_t *shader = tr.defaultShader;
+            if (shader) {
+                extern VkPipeline vk_find_pipeline(shader_t *shader);
+                extern void vk_bind_pipeline(VkPipeline pipeline);
+                extern void vk_bind_geometry(uint32_t flags);
+                extern void vk_draw_geometry(Vk_Depth_Range depth_range, qboolean indexed);
+                
+                VkPipeline pipeline = vk_find_pipeline(shader);
+                if (pipeline != VK_NULL_HANDLE) {
+                    // Set shader for tessellation system
+                    tess.shader = shader;
+                    
+                    // Bind pipeline (uses vk.cmd->command_buffer which we set above)
+                    vk_bind_pipeline(pipeline);
+                    
+                    // Bind geometry using existing system (sets up vertex/index buffers)
+                    // Use TESS_XYZ | TESS_RGBA0 | TESS_ST0 flags for standard polygon rendering
+                    vk_bind_geometry(TESS_XYZ | TESS_RGBA0 | TESS_ST0);
+                    
+                    // Draw indexed geometry (uses vk.cmd->command_buffer)
+                    vk_draw_geometry(DEPTH_RANGE_NORMAL, qtrue);
+                }
             }
         }
     }
 
-    // Render entities (if any)
+    // Render entities (if any) by adding them to refdef
     if (vk.scene.entityCount > 0) {
         ri.Printf(PRINT_DEVELOPER, "Vulkan: Rendering %d entities\n", vk.scene.entityCount);
 
-        for (int i = 0; i < vk.scene.entityCount; i++) {
-            const refEntity_t *ent = &vk.scene.entities[i];
-
-            // TODO: Load and render 3D models with proper transformations
-            // TODO: Set up model-view-projection matrices
-            // TODO: Handle entity animations and shader effects
-            // TODO: Bind appropriate materials and textures
-
-            ri.Printf(PRINT_DEVELOPER, "Entity %d: origin(%.1f,%.1f,%.1f) model=%d shaderTime=%d\n",
-                     i, ent->origin[0], ent->origin[1], ent->origin[2],
-                     ent->hModel, ent->shaderTime);
+        // Entities should be added to refdef before rendering
+        // For now, we'll render them directly if refdef is available
+        if (fd && fd->entities) {
+            // Copy entities to refdef (if space available)
+            int maxEntities = MIN(vk.scene.entityCount, fd->numEntities + MAX_REFENTITIES - fd->numEntities);
+            for (int i = 0; i < maxEntities; i++) {
+                fd->entities[fd->numEntities + i] = vk.scene.entities[i];
+            }
+            fd->numEntities += maxEntities;
+        } else {
+            // Fallback: render entities directly using model rendering
+            for (int i = 0; i < vk.scene.entityCount; i++) {
+                const refEntity_t *ent = &vk.scene.entities[i];
+                
+                // Render model if entity has one
+                if (ent->hModel > 0) {
+                    extern void R_AddRefEntityToScene(const refEntity_t *re, qboolean intShaderTime);
+                    // Add entity to main scene for rendering by normal pipeline
+                    R_AddRefEntityToScene(ent, qfalse);
+                }
+            }
         }
     }
 
-    // For now, just clear the screen with a gradient or simple pattern
-    // This demonstrates that the render pass and command buffer setup is working
+    // End render pass
+    qvkCmdEndRenderPass(command_buffer);
 
-    // TODO: End render pass with qvkCmdEndRenderPass(command_buffer);
+    // Restore original command buffer context
+    if (vk.cmd) {
+        vk.cmd->command_buffer = saved_command_buffer;
+    }
 
     // End command buffer
     end_command_buffer(command_buffer, "scene render");

@@ -2618,8 +2618,17 @@ handle all combinations of modulated add blending modes. If visual
 artifacts occur with shaders using multiple modulated add stages,
 consider disabling multitexture collapse for those shaders.
 
-TODO: Verify and fix modulated add + modulated add collapse logic
+Multitexture Collapse Logic
 =================
+Note: There is a known issue with collapsing two modulated add stages together.
+The collapse table may not handle all combinations correctly, which can cause
+visual artifacts. If artifacts occur with multitexture shaders, consider
+disabling multitexture collapse via r_multitexture cvar.
+
+TODO: Verify and fix modulated add + modulated add collapse logic
+- Current implementation may not correctly collapse two modulated add stages
+- Requires testing with various shader combinations
+- May need to update collapse table or add special case handling
 */
 static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shaderStage_t *st1, int num_stages ) {
 	int abits, bbits;
