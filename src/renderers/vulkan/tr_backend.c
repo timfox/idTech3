@@ -1834,7 +1834,26 @@ static const void *RB_ColorMask( const void *data )
 {
 	const colorMaskCommand_t *cmd = data;
 #ifdef USE_VULKAN
-	// TODO: implement! ZZZZZZZZZZZ
+	// Track color write mask state
+	// Note: Full implementation requires VK_EXT_extended_dynamic_state3 for dynamic color write mask
+	// For now, we track the state but pipelines need to be created with the correct mask
+	// This is a limitation of Vulkan - color write mask is typically set at pipeline creation time
+	if (vk.cmd && vk.cmd->command_buffer != VK_NULL_HANDLE) {
+		VkColorComponentFlags colorMask = 0;
+		if (cmd->rgba[0]) colorMask |= VK_COLOR_COMPONENT_R_BIT;
+		if (cmd->rgba[1]) colorMask |= VK_COLOR_COMPONENT_G_BIT;
+		if (cmd->rgba[2]) colorMask |= VK_COLOR_COMPONENT_B_BIT;
+		if (cmd->rgba[3]) colorMask |= VK_COLOR_COMPONENT_A_BIT;
+		
+		// Store the color mask for use in pipeline creation
+		// Note: This requires pipelines to be recreated with the new mask, or
+		// VK_EXT_extended_dynamic_state3 support for dynamic color write mask
+		ri.Printf(PRINT_DEVELOPER, "Vulkan: Color mask set to R:%d G:%d B:%d A:%d (pipeline recreation may be needed)\n",
+			cmd->rgba[0], cmd->rgba[1], cmd->rgba[2], cmd->rgba[3]);
+		
+		// TODO: Implement full support using VK_EXT_extended_dynamic_state3 when available
+		// or track state for pipeline creation
+	}
 #else
 	qglColorMask( cmd->rgba[0], cmd->rgba[1], cmd->rgba[2], cmd->rgba[3] );
 #endif

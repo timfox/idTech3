@@ -2621,9 +2621,11 @@ static qboolean vk_create_device( VkPhysicalDevice physical_device, int device_i
 		ri.Printf(PRINT_ALL, "...Subgroup: size=%u, stages=0x%x, operations=0x%x\n",
 			subgroup_size, subgroup_stages, subgroup_ops);
 
-		// Demonstrate Vulkan 1.4 features (always shown for now)
-		// TODO: Add proper developer mode check when available
-		vk_demonstrate_vulkan14_features();
+		// Demonstrate Vulkan 1.4 features (show in developer mode or if explicitly requested)
+		extern cvar_t *r_developer;
+		if (r_developer && r_developer->integer) {
+			vk_demonstrate_vulkan14_features();
+		}
 
 		// Suggest RTX enabling for capable hardware
 		if (vk.rayTracingSupported) {
@@ -9809,8 +9811,10 @@ void vk_shutdown( refShutdownCode_t code ) {
 		if (vk.active && vk.device != VK_NULL_HANDLE && vk.device != (VkDevice)0x20000000 && !vk.device_lost) {
 			ri.Printf(PRINT_ALL, "vk_shutdown: Shutting down Vulkan subsystems...\n");
 
-			// Memory validation disabled to avoid compilation issues
-			// TODO: Re-enable when function linking is resolved
+			// Memory validation on shutdown - detect leaks if enabled
+			if (vk_memory_tracker.leak_detection_enabled) {
+				vk_detect_memory_leaks();
+			}
 
 			// Wait for device idle first before destroying resources
 			// Skip if device is lost - driver may have already destroyed resources

@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 #include "../renderercommon/tr_frame_graph.h"
+#include "vk_utils.h"  // For memory validation functions
 
 /*
 =====================
@@ -568,8 +569,14 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 	vk.cmd->frame_ready = qfalse;
 
 #ifdef USE_VULKAN
-	// Memory validation disabled to avoid compilation issues
-	// TODO: Re-enable when function linking is resolved
+	// Memory validation - check for corruption periodically (every 1000 frames to avoid performance impact)
+	static int frame_count_for_validation = 0;
+	if (++frame_count_for_validation >= 1000) {
+		frame_count_for_validation = 0;
+		if (vk_memory_tracker.leak_detection_enabled && !vk.device_lost) {
+			vk_validate_memory_state();
+		}
+	}
 #endif
 
 	// If we're in headless mode or cinematic state, skip swapchain acquisitions to avoid crashes
@@ -805,8 +812,10 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	}
 
 #ifdef USE_VULKAN
-	// Memory validation disabled to avoid compilation issues
-	// TODO: Re-enable when function linking is resolved
+	// Memory validation on shutdown - detect leaks if enabled
+	if (vk_memory_tracker.leak_detection_enabled && !vk.device_lost) {
+		vk_detect_memory_leaks();
+	}
 #endif
 }
 

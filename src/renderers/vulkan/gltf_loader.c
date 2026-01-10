@@ -174,8 +174,12 @@ void R_FreeGLTF(qhandle_t handle) {
     gltfModel_t* model = &gltfModels[slot];
 
     // Free Vulkan resources
-    if (model->descriptorSet != VK_NULL_HANDLE) {
-        // TODO: Free descriptor set
+    if (model->descriptorSet != VK_NULL_HANDLE && vk.device != VK_NULL_HANDLE && !vk.device_lost) {
+        // Free descriptor set back to the pool
+        if (qvkFreeDescriptorSets && vk.descriptor_pool != VK_NULL_HANDLE) {
+            qvkFreeDescriptorSets(vk.device, vk.descriptor_pool, 1, &model->descriptorSet);
+        }
+        model->descriptorSet = VK_NULL_HANDLE;
     }
 
     // Free buffers

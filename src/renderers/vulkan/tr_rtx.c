@@ -102,7 +102,14 @@ skin_t *R_GetSkinByHandle(qhandle_t handle) {
 static void vk_shutdown_local(void) {
     ri.Printf(PRINT_ALL, "Vulkan Renderer: Shutting down...\n");
 
-    // TODO: Clean up Vulkan resources if needed
+    // Clean up Vulkan resources if device is valid and not lost
+    if (vk.device != VK_NULL_HANDLE && vk.device != (VkDevice)0x20000000 && !vk.device_lost) {
+        // RTX-specific resources are cleaned up by the main Vulkan shutdown
+        // This function is called as part of the renderer shutdown sequence
+        ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: Resources will be cleaned up by main Vulkan shutdown\n");
+    } else {
+        ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: Skipping cleanup (device lost or invalid)\n");
+    }
 }
 
 // ============================================================================
