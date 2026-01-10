@@ -244,7 +244,7 @@ qboolean vk_is_compute_job_complete(uint32_t job_id) {
                     manager->peak_execution_time_ms = manager->jobs[i].execution_duration_ms;
                 }
                 
-                // Reset fence after waiting (Q2RTX pattern - proper fence reset)
+                // Reset fence after waiting
                 qvkResetFences(vk.device, 1, &manager->jobs[i].fence);
                 
                 return qtrue;
@@ -285,7 +285,7 @@ void vk_wait_for_compute_job(uint32_t job_id) {
                 manager->jobs[i].execution_duration_ms = (float)(manager->jobs[i].completion_time_ns - manager->jobs[i].submission_time_ns) / 1000000.0f;
                 atomic_fetch_add_explicit(&manager->total_jobs_completed, 1, memory_order_relaxed);
                 
-                // Reset fence after waiting (Q2RTX pattern - proper fence reset)
+                // Reset fence after waiting
                 qvkResetFences(vk.device, 1, &manager->jobs[i].fence);
             }
             return;

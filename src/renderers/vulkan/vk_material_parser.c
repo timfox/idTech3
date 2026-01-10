@@ -189,7 +189,7 @@ void vk_material_parser_load_files(void) {
 			  materialParser.numFiles > 0 ? materialParser.files[0].numEntries : 0);
 }
 
-// Load map-specific materials (Q2RTX-style override system)
+// Load map-specific materials
 void vk_material_parser_load_map_materials(const char* mapname) {
 	char filename[MAX_QPATH];
 	int len;

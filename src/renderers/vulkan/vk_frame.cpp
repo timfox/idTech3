@@ -751,13 +751,31 @@ extern "C" void vk_end_frame(void) {
     agent_log("H1","vk_frame.cpp:vk_present_frame","present_start", _present);
     vt_trace(_present);
   }
-    // Wait for rendering to complete
+    // Wait for rendering to complete before presenting
     if (vk.cmd->waitForFence) {
-        VkResult result = qvkWaitForFences(vk.device, 1, &vk.cmd->rendering_finished_fence, VK_TRUE, UINT64_MAX);
-        if (result != VK_SUCCESS) {
-            ri.Printf(PRINT_ERROR, "vk_present_frame: Failed to wait for fence: %s\n", vk_result_string(result));
+        // Check device loss before waiting
+        if (vk.device_lost) {
+            vk.cmd->waitForFence = qfalse;
+            return;
         }
-        qvkResetFences(vk.device, 1, &vk.cmd->rendering_finished_fence);
+
+        VkResult result = qvkWaitForFences(vk.device, 1, &vk.cmd->rendering_finished_fence, VK_TRUE, UINT64_MAX);
+        if (result == VK_ERROR_DEVICE_LOST) {
+            vk.device_lost = qtrue;
+            vk_reset_memory_tracking_on_device_lost();
+            ri.Printf(PRINT_ERROR, "Vulkan: Device lost during present fence wait\n");
+            vk.cmd->waitForFence = qfalse;
+            return;
+        } else if (result != VK_SUCCESS) {
+            ri.Printf(PRINT_ERROR, "vk_present_frame: Failed to wait for fence: %s\n", vk_result_string(result));
+            vk.cmd->waitForFence = qfalse;
+            return;
+        }
+        
+        // Reset fence after waiting (before reuse)
+        if (!vk.device_lost) {
+            qvkResetFences(vk.device, 1, &vk.cmd->rendering_finished_fence);
+        }
         vk.cmd->waitForFence = qfalse;
     }
 

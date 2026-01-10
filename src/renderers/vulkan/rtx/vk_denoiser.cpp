@@ -2,7 +2,7 @@
 ===========================================================================
 id Tech 3 - ASVGF Denoising Implementation
 
-Based on Q2RTX's ASVGF (Adaptive Spatio-Temporal Variance-Guided Filtering)
+ASVGF (Adaptive Spatio-Temporal Variance-Guided Filtering)
 Implementation with gradient reconstruction, temporal accumulation, and atrous filtering.
 ===========================================================================
 */
@@ -121,7 +121,7 @@ static void Denoiser_SimpleBoxFilter(vec3_t *input, vec3_t *output, int width, i
 ===============
 Denoiser_GradientReconstruction
 
-Reconstruct gradients for ASVGF (based on Q2RTX implementation)
+Reconstruct gradients for ASVGF
 ===============
 */
 static void Denoiser_GradientReconstruction(vec3_t *color, vec3_t *gradients, int width, int height)
@@ -169,7 +169,7 @@ static void Denoiser_GradientReconstruction(vec3_t *color, vec3_t *gradients, in
 ===============
 Denoiser_AtrousFilter
 
-Apply atrous wavelet filter (based on Q2RTX implementation)
+Apply atrous wavelet filter
 ===============
 */
 static void Denoiser_AtrousFilter(vec3_t *input, vec3_t *gradients, vec3_t *output,

@@ -2827,7 +2827,7 @@ void RE_LoadWorldMap( const char *name ) {
 	R_LoadEntities( &header->lumps[LUMP_ENTITIES] );
 	R_LoadLightGrid( &header->lumps[LUMP_LIGHTGRID] );
 
-		// Load map-specific materials (Q2RTX-style override system)
+		// Load map-specific materials
 #ifdef USE_VULKAN
 vk_material_parser_load_map_materials(s_worldData.baseName);
 #endif

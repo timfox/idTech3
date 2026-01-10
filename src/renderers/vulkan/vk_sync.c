@@ -145,8 +145,27 @@ void vk_destroy_sync_primitives(void) {
 
 // Fence and semaphore utilities
 void vk_wait_for_frame_fences(uint32_t frame_index) {
-    if (frame_index < NUM_COMMAND_BUFFERS && vk.tess[frame_index].waitForFence) {
-        qvkWaitForFences(vk.device, 1, &vk.tess[frame_index].rendering_finished_fence, VK_TRUE, UINT64_MAX);
+    // Check device loss before proceeding
+    if (vk.device_lost || frame_index >= NUM_COMMAND_BUFFERS) {
+        return;
+    }
+
+    if (vk.tess[frame_index].waitForFence) {
+        VkResult result = qvkWaitForFences(vk.device, 1, &vk.tess[frame_index].rendering_finished_fence, VK_TRUE, UINT64_MAX);
+        if (result == VK_ERROR_DEVICE_LOST) {
+            vk.device_lost = qtrue;
+            vk_reset_memory_tracking_on_device_lost();
+            ri.Printf(PRINT_ERROR, "Vulkan: Device lost during frame fence wait\n");
+            vk.tess[frame_index].waitForFence = qfalse;
+            return;
+        } else if (result != VK_SUCCESS) {
+            ri.Printf(PRINT_WARNING, "vk_wait_for_frame_fences: Fence wait failed: %s\n", vk_result_string(result));
+        } else {
+            // Reset fence after waiting (before reuse)
+            if (!vk.device_lost) {
+                qvkResetFences(vk.device, 1, &vk.tess[frame_index].rendering_finished_fence);
+            }
+        }
         vk.tess[frame_index].waitForFence = qfalse;
     }
 }
@@ -156,7 +175,18 @@ qboolean vk_is_frame_complete(uint32_t frame_index) {
         return qtrue;
     }
 
+    // Check device loss
+    if (vk.device_lost) {
+        return qfalse;
+    }
+
     VkResult result = qvkWaitForFences(vk.device, 1, &vk.tess[frame_index].rendering_finished_fence, VK_TRUE, 0);
+    if (result == VK_ERROR_DEVICE_LOST) {
+        vk.device_lost = qtrue;
+        vk_reset_memory_tracking_on_device_lost();
+        ri.Printf(PRINT_ERROR, "Vulkan: Device lost during frame completion check\n");
+        return qfalse;
+    }
     return result == VK_SUCCESS;
 }
 

@@ -1,6 +1,6 @@
 /*
 ===========================================================================
-Vulkan Renderer - q2rtx-style Implementation
+Vulkan Renderer Implementation
 ===========================================================================
 */
 
@@ -204,14 +204,23 @@ void RE_ClearScene(void) {
 }
 
 void RE_AddRefEntityToScene(const refEntity_t *re, qboolean intShaderTime) {
-    // Add entity to scene
+    // Add entity to scene using standard pipeline 
+    // This function in tr_rtx.c overrides the one in tr_scene.c, but we want to
+    // use the standard implementation. We'll call it via a helper that bypasses
+    // the override by using the function pointer or by calling tr_scene.c's version.
+    // For now, we'll just call vk_add_entity which will handle the standard pipeline.
+    // Note: vk_add_entity() now calls the standard RE_AddRefEntityToScene from tr_scene.c
+    // using an extern declaration to avoid circular dependency.
     if (vk.active && re) {
-        vk_add_entity(re, intShaderTime);
+        vk_add_entity(re, intShaderTime ? 1 : 0);
     }
 }
 
 void RE_AddPolyToScene(qhandle_t hShader, int numVerts, const polyVert_t *verts, int num) {
-    // Add polygon to scene
+    // Add polygon to scene using standard pipeline 
+    // This function in tr_rtx.c overrides the one in tr_scene.c, but we want to
+    // use the standard implementation. vk_add_polygon() now calls the standard
+    // RE_AddPolyToScene from tr_scene.c using an extern declaration to avoid circular dependency.
     if (vk.active && verts && numVerts > 0) {
         vk_add_polygon(hShader, numVerts, verts, num);
     }

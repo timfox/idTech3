@@ -852,6 +852,8 @@ static VkFlags get_composite_alpha( VkCompositeAlphaFlagsKHR flags )
 
 
 // Modernized command buffer creation with designated initializers
+// This function allocates a new command buffer for one-time immediate commands
+// For reusable command buffers, use vk_begin_command_buffer() from vk_command_buffers.cpp
 VK_NONNULL
 VkCommandBuffer begin_command_buffer(void)
 {
@@ -864,6 +866,17 @@ VkCommandBuffer begin_command_buffer(void)
 		return command_buffer;
 	}
 
+	// Check device loss before allocating
+	if (vk.device_lost) {
+		return VK_NULL_HANDLE;
+	}
+
+	// Check command pool validity
+	if (vk.command_pool == VK_NULL_HANDLE || vk.device == VK_NULL_HANDLE) {
+		ri.Printf(PRINT_ERROR, "begin_command_buffer: Invalid command pool or device\n");
+		return VK_NULL_HANDLE;
+	}
+
 	// Modern designated initializers for better readability and safety
 	const VkCommandBufferAllocateInfo alloc_info = {
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -873,7 +886,17 @@ VkCommandBuffer begin_command_buffer(void)
 		.commandBufferCount = 1
 	};
 
-	VK_CHECK(qvkAllocateCommandBuffers(vk.device, &alloc_info, &command_buffer));
+	VkResult alloc_result = qvkAllocateCommandBuffers(vk.device, &alloc_info, &command_buffer);
+	if (alloc_result != VK_SUCCESS) {
+		if (alloc_result == VK_ERROR_DEVICE_LOST) {
+			vk.device_lost = qtrue;
+			vk_reset_memory_tracking_on_device_lost();
+			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during command buffer allocation\n");
+		} else {
+			ri.Printf(PRINT_ERROR, "begin_command_buffer: Failed to allocate command buffer: %s\n", vk_result_string(alloc_result));
+		}
+		return VK_NULL_HANDLE;
+	}
 
 	const VkCommandBufferBeginInfo begin_info = {
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -882,14 +905,28 @@ VkCommandBuffer begin_command_buffer(void)
 		.pInheritanceInfo = NULL
 	};
 
-	VK_CHECK(qvkBeginCommandBuffer(command_buffer, &begin_info));
+	VkResult begin_result = qvkBeginCommandBuffer(command_buffer, &begin_info);
+	if (begin_result != VK_SUCCESS) {
+		if (begin_result == VK_ERROR_DEVICE_LOST) {
+			vk.device_lost = qtrue;
+			vk_reset_memory_tracking_on_device_lost();
+			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during command buffer begin\n");
+		} else {
+			ri.Printf(PRINT_ERROR, "begin_command_buffer: Failed to begin command buffer: %s\n", vk_result_string(begin_result));
+		}
+		// Free the allocated buffer on failure
+		if (vk.command_pool != VK_NULL_HANDLE) {
+			qvkFreeCommandBuffers(vk.device, vk.command_pool, 1, &command_buffer);
+		}
+		return VK_NULL_HANDLE;
+	}
 
 	return command_buffer;
 }
 
 
 // Modernized command buffer submission with better structure
-// Uses fence-based synchronization like sunnyjk instead of queue wait idle
+// Uses fence-based synchronization instead of queue wait idle
 VK_NONNULL_PARAMS(1)
 void end_command_buffer(VkCommandBuffer command_buffer, const char *location)
 {
@@ -900,7 +937,7 @@ void end_command_buffer(VkCommandBuffer command_buffer, const char *location)
 		return;
 	}
 
-	// Static fence for immediate command synchronization (sunnyjk pattern)
+	// Static fence for immediate command synchronization
 	static VkFence immediate_fence = VK_NULL_HANDLE;
 	if (immediate_fence == VK_NULL_HANDLE && vk.device != VK_NULL_HANDLE) {
 		VkFenceCreateInfo fence_info = {
@@ -954,9 +991,9 @@ void end_command_buffer(VkCommandBuffer command_buffer, const char *location)
 	}
 
 	// Handle device lost gracefully instead of terminating
-	// Use fence for synchronization (sunnyjk pattern) - only waits for this specific command
+	// Use fence for synchronization - only waits for this specific command
 	VkFence fence_to_use = (immediate_fence != VK_NULL_HANDLE) ? immediate_fence : VK_NULL_HANDLE;
-	VkResult submit_result = qvkQueueSubmit( vk.queue, 1, &submit_info, fence_to_use );
+	VkResult submit_result = qvkQueueSubmit(vk.queue, 1, &submit_info, fence_to_use);
 	if (submit_result != VK_SUCCESS) {
 		if (submit_result == VK_ERROR_DEVICE_LOST) {
 			vk.device_lost = qtrue;  // Mark device as lost
@@ -972,7 +1009,7 @@ void end_command_buffer(VkCommandBuffer command_buffer, const char *location)
 		}
 	}
 
-	// Wait for this specific command to complete using fence (sunnyjk pattern)
+	// Wait for this specific command to complete using fence
 	// This is better than queue wait idle because it only waits for this command,
 	// not all commands on the queue, preventing premature device loss discovery
 	if (fence_to_use != VK_NULL_HANDLE && !vk.device_lost) {
@@ -10093,7 +10130,7 @@ void vk_queue_wait_idle( void ) {
 	}
 
 	// Queue wait idle should only be used when absolutely necessary (resource cleanup, etc.)
-	// For command synchronization, use fences instead (sunnyjk pattern)
+	// For command synchronization, use fences instead
 
 	// Check device status before waiting - use GetDeviceQueue2 or similar to verify device is still valid
 	// If device was lost, QueueWaitIdle will return VK_ERROR_DEVICE_LOST immediately

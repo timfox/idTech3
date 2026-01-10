@@ -572,7 +572,7 @@ void VulkanCommandPool::endSingleTimeCommands(VkCommandBuffer commandBuffer, VkQ
 {
     vkEndCommandBuffer(commandBuffer);
 
-    // Use fence for synchronization (Q2RTX/sunnyjk pattern) instead of queue wait idle
+    // Use fence for synchronization  instead of queue wait idle
     // This prevents premature device loss discovery and is more efficient
     static VkFence immediate_fence = VK_NULL_HANDLE;
     if (immediate_fence == VK_NULL_HANDLE && device_ != VK_NULL_HANDLE) {
@@ -611,7 +611,7 @@ void VulkanCommandPool::endSingleTimeCommands(VkCommandBuffer commandBuffer, VkQ
             Com_Error(ERR_DROP, "Failed to wait for fence");
             return;
         }
-        // Reset fence for next use (Q2RTX pattern - proper fence reset)
+        // Reset fence for next use
         vkResetFences(device_, 1, &immediate_fence);
     } else {
         // Fallback to queue wait idle if fence not available
@@ -803,7 +803,7 @@ void VulkanUtils::executeSingleTimeCommands(VkDevice device,
                                            VkQueue queue,
                                            const std::function<void(VkCommandBuffer)>& commands)
 {
-    // Use fence for synchronization (Q2RTX/sunnyjk pattern) instead of queue wait idle
+    // Use fence for synchronization  instead of queue wait idle
     static VkFence immediate_fence = VK_NULL_HANDLE;
     if (immediate_fence == VK_NULL_HANDLE && device != VK_NULL_HANDLE) {
         VkFenceCreateInfo fenceInfo{};
@@ -860,7 +860,7 @@ void VulkanUtils::executeSingleTimeCommands(VkDevice device,
             Com_Error(ERR_DROP, "Failed to wait for fence");
             return;
         }
-        // Reset fence for next use (Q2RTX pattern - proper fence reset)
+        // Reset fence for next use
         vkResetFences(device, 1, &immediate_fence);
     } else {
         // Fallback to queue wait idle if fence not available
