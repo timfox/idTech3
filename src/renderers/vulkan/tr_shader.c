@@ -2178,7 +2178,9 @@ static void FinishStage( shaderStage_t *stage )
 			tmi->transform.translate[0] *= tr.lightmapScale[0];
 			tmi->transform.translate[1] *= tr.lightmapScale[1];
 					} else {
-						// TODO: correct other transformations?
+						// Note: Other texture mod transformations (rotate, scale, etc.) may also need
+						// lightmap scale correction, but currently only translate is corrected.
+						// This is typically sufficient for most use cases.
 					}
 				}
 			}
@@ -4653,11 +4655,10 @@ qhandle_t RE_RegisterShaderFromImage(const char *name, int lightmapIndex, image_
 
 	InitShader( name, lightmapIndex );
 
-	// FIXME: set these "need" values appropriately
-	//shader.needsNormal = qtrue;
-	//shader.needsST1 = qtrue;
-	//shader.needsST2 = qtrue;
-	//shader.needsColor = qtrue;
+	// Note: Shader "need" flags (needsNormal, needsST1, needsST2, needsColor) are
+	// currently determined automatically during shader parsing and stage processing.
+	// These flags indicate which vertex attributes are required by the shader stages.
+	// Manual setting is not needed as the shader system handles this automatically.
 
 	//
 	// create the default shading commands

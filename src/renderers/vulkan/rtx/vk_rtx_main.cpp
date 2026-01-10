@@ -247,9 +247,20 @@ extern "C" {
 void RTX_Shutdown(refShutdownCode_t code) {
     Com_Printf("RTX: Shutting down ray tracing renderer (code: %i)\n", code);
 
-    // TODO: Shutdown RTX-specific resources
-    // For now, just log
-    (void)code;
+    // Shutdown RTX-specific resources
+    // Hardware ray tracing shutdown (if initialized)
+    extern void vk_rt_shutdown(void);
+    vk_rt_shutdown();
+    
+    // Compute ray tracing shutdown (if initialized)
+    extern void VK_ComputeRT_Shutdown(void);
+    VK_ComputeRT_Shutdown();
+    
+    // Shutdown ImGui backend if it was initialized
+    RE_ImGuiBackend_Shutdown();
+    
+    Com_Printf("RTX: Shutdown complete\n");
+    (void)code; // Code parameter reserved for future use
 }
 
 void RTX_RenderScene(const refdef_t *fd) {

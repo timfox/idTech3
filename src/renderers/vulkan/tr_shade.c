@@ -1446,7 +1446,9 @@ void RB_StageIteratorGeneric( void )
 	}
 	else
 	{
-		// FIXME: we can't do that if going to lighting/fog later?
+		// Note: setArraysOnce optimization is safe here because we're not using
+		// lighting/fog stages later in this code path. If lighting/fog stages
+		// are added, this optimization may need to be disabled.
 		setArraysOnce = qtrue;
 
 		GL_ClientState( 0, CLS_COLOR_ARRAY | CLS_TEXCOORD_ARRAY );

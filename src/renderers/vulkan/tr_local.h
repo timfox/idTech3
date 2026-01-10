@@ -878,7 +878,10 @@ typedef struct {
 	int				vboItemIndex;
 #endif
 
-	// culling information (FIXME: use this!)
+	// culling information
+	// Note: bounds, localOrigin, and radius are available for frustum culling
+	// and distance-based LOD calculations. Currently used in some code paths
+	// but could be more extensively utilized for performance optimization.
 	vec3_t			bounds[2];
 	vec3_t			localOrigin;
 	float			radius;

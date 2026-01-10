@@ -79,8 +79,10 @@ static qhandle_t Vulkan_RegisterShader(const char* name) {
 }
 
 static void Vulkan_RemapShader(const char* oldShader, const char* newShader, const char* timeOffset) {
-    // Vulkan-specific shader remapping
-    // TODO: Implement if needed
+    // Vulkan-specific shader remapping - delegates to main implementation
+    // Shader remapping allows runtime replacement of shaders (e.g., for mods or effects)
+    extern void RE_RemapShader(const char *oldShader, const char *newShader, const char *timeOffset);
+    RE_RemapShader(oldShader, newShader, timeOffset);
 }
 
 static qhandle_t Vulkan_RegisterImage(const char* name) {

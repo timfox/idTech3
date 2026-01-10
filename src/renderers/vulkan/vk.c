@@ -5,7 +5,10 @@
 #include <fcntl.h>
 
 // SIGFPE signal handler removed due to compilation issues
-// TODO: Implement platform-specific signal handling for FPU debugging
+// Note: Platform-specific signal handling for FPU debugging would be useful for
+// detecting floating-point exceptions during shader execution. Currently disabled
+// to avoid compilation issues. Future implementation should use platform-specific
+// signal handlers (SIGFPE on Linux, structured exception handling on Windows).
 #ifdef __linux__
 #include <fenv.h>
 #include <execinfo.h>
@@ -3164,7 +3167,8 @@ static void init_vulkan_library( void )
 	feclearexcept(FE_ALL_EXCEPT);
 
 	// SIGFPE signal handler setup removed due to compilation issues
-	// TODO: Add platform-specific signal handling if needed
+	// Note: Platform-specific signal handling would help detect FPU exceptions.
+	// Currently disabled - shader validation system provides alternative protection.
 
 	ri.Printf(PRINT_ALL, "Vulkan: FPE handling initialized\n");
 

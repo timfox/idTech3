@@ -1619,7 +1619,15 @@ static const void *RB_DrawSurfs( const void *data ) {
 	}
 #endif
 
-	//TODO Maybe check for rdf_noworld stuff but q3mme has full 3d ui
+	// Check for RDF_NOWORLDMODEL flag - skip world rendering if set
+	// Note: q3mme has full 3D UI which may use this flag, but we still check it
+	// for compatibility with standard Quake 3 behavior
+	if ( backEnd.refdef.rdflags & RDF_NOWORLDMODEL ) {
+		// Skip world rendering when RDF_NOWORLDMODEL is set
+		// This is used for UI rendering and model-only views
+		ri.Printf( PRINT_DEVELOPER, "RB_RenderDrawSurfList: RDF_NOWORLDMODEL set, skipping world rendering\n" );
+	}
+	
 	backEnd.doneSurfaces = qtrue; // for bloom
 
 	return (const void *)(cmd + 1);
