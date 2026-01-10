@@ -329,11 +329,19 @@ qboolean vk_acquire_next_image(void) {
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
         // Swapchain needs recreation
+        ri.Printf(PRINT_WARNING, "Swapchain: OUT_OF_DATE detected during acquire, recreating...\n");
         vk_destroy_swapchain();
-        vk_create_swapchain();
+        if (!vk_create_swapchain()) {
+            ri.Printf(PRINT_ERROR, "Swapchain: Failed to recreate swapchain after OUT_OF_DATE\n");
+            return qfalse;
+        }
         return vk_acquire_next_image(); // Try again
     } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         ri.Printf(PRINT_ERROR, "Swapchain: Failed to acquire image: %d\n", result);
+        if (result == VK_ERROR_DEVICE_LOST) {
+            vk.device_lost = qtrue;
+            vk_reset_memory_tracking_on_device_lost();
+        }
         return qfalse;
     }
 
@@ -361,11 +369,19 @@ qboolean vk_present_image(void) {
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
         // Swapchain needs recreation
+        ri.Printf(PRINT_WARNING, "Swapchain: OUT_OF_DATE/SUBOPTIMAL detected during present, recreating...\n");
         vk_destroy_swapchain();
-        vk_create_swapchain();
-        return qfalse;
+        if (!vk_create_swapchain()) {
+            ri.Printf(PRINT_ERROR, "Swapchain: Failed to recreate swapchain after OUT_OF_DATE/SUBOPTIMAL\n");
+            return qfalse;
+        }
+        return qfalse; // Return false to indicate swapchain was recreated
     } else if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "Swapchain: Failed to present: %d\n", result);
+        if (result == VK_ERROR_DEVICE_LOST) {
+            vk.device_lost = qtrue;
+            vk_reset_memory_tracking_on_device_lost();
+        }
         return qfalse;
     }
 

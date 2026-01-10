@@ -1404,6 +1404,17 @@ static VkResult vk_create_swapchain_safe( VkPhysicalDevice physical_device, VkDe
 		result = qvkCreateImageView( vk.device, &view, NULL, &vk.swapchain_image_views[i] );
 		if (result != VK_SUCCESS) {
 			ri.Printf(PRINT_ERROR, "Vulkan: Failed to create image view %i: %s\n", i, vk_result_string(result));
+			// Clean up already created image views before returning
+			for (uint32_t j = 0; j < i; j++) {
+				if (vk.swapchain_image_views[j] != VK_NULL_HANDLE) {
+					qvkDestroyImageView(vk.device, vk.swapchain_image_views[j], NULL);
+					vk.swapchain_image_views[j] = VK_NULL_HANDLE;
+				}
+				if (vk.swapchain_rendering_finished && vk.swapchain_rendering_finished[j] != VK_NULL_HANDLE) {
+					qvkDestroySemaphore(vk.device, vk.swapchain_rendering_finished[j], NULL);
+					vk.swapchain_rendering_finished[j] = VK_NULL_HANDLE;
+				}
+			}
 			return result;
 		}
 
@@ -1416,12 +1427,30 @@ static VkResult vk_create_swapchain_safe( VkPhysicalDevice physical_device, VkDe
 
 		if (!qvkCreateSemaphore) {
 			ri.Printf(PRINT_ERROR, "Vulkan: qvkCreateSemaphore function pointer is NULL\n");
+			// Clean up already created resources
+			for (uint32_t j = 0; j <= i; j++) {
+				if (vk.swapchain_image_views[j] != VK_NULL_HANDLE) {
+					qvkDestroyImageView(vk.device, vk.swapchain_image_views[j], NULL);
+					vk.swapchain_image_views[j] = VK_NULL_HANDLE;
+				}
+			}
 			return VK_ERROR_INITIALIZATION_FAILED;
 		}
 
 		result = qvkCreateSemaphore(vk.device, &semaphoreInfo, NULL, &vk.swapchain_rendering_finished[i]);
 		if (result != VK_SUCCESS) {
 			ri.Printf(PRINT_ERROR, "Vulkan: Failed to create rendering finished semaphore %i: %s\n", i, vk_result_string(result));
+			// Clean up already created resources
+			for (uint32_t j = 0; j <= i; j++) {
+				if (vk.swapchain_image_views[j] != VK_NULL_HANDLE) {
+					qvkDestroyImageView(vk.device, vk.swapchain_image_views[j], NULL);
+					vk.swapchain_image_views[j] = VK_NULL_HANDLE;
+				}
+				if (j < i && vk.swapchain_rendering_finished && vk.swapchain_rendering_finished[j] != VK_NULL_HANDLE) {
+					qvkDestroySemaphore(vk.device, vk.swapchain_rendering_finished[j], NULL);
+					vk.swapchain_rendering_finished[j] = VK_NULL_HANDLE;
+				}
+			}
 			return result;
 		}
 	}
@@ -9839,6 +9868,58 @@ void vk_shutdown( refShutdownCode_t code ) {
 			// Only shutdown subsystems if device is not lost
 			// When device is lost, driver may have already destroyed resources
 			if (!vk.device_lost) {
+				// Destroy framebuffers and render passes first (before destroying swapchain)
+				vk_destroy_framebuffers();
+				
+				// Destroy swapchain resources
+				vk_destroy_swapchain();
+				
+				// Destroy command pool (must be done before device destruction)
+				// Note: vk_destroy_command_pool() is in vk_command_buffers.cpp
+				extern void vk_destroy_command_pool(void);
+				vk_destroy_command_pool();
+				
+				// Destroy descriptor pool
+				if (vk.descriptor_pool != VK_NULL_HANDLE && qvkDestroyDescriptorPool) {
+					qvkDestroyDescriptorPool(vk.device, vk.descriptor_pool, NULL);
+					vk.descriptor_pool = VK_NULL_HANDLE;
+					ri.Printf(PRINT_ALL, "vk_shutdown: Descriptor pool destroyed\n");
+				}
+				
+				// Destroy shader modules (explicit cleanup for better resource tracking)
+				// Note: Shader modules are automatically destroyed when device is destroyed,
+				// but explicit cleanup helps with resource tracking and validation
+				if (qvkDestroyShaderModule) {
+					// Destroy common shader modules
+					if (vk.modules.dot_vs != VK_NULL_HANDLE) {
+						qvkDestroyShaderModule(vk.device, vk.modules.dot_vs, NULL);
+						vk.modules.dot_vs = VK_NULL_HANDLE;
+					}
+					if (vk.modules.dot_fs != VK_NULL_HANDLE) {
+						qvkDestroyShaderModule(vk.device, vk.modules.dot_fs, NULL);
+						vk.modules.dot_fs = VK_NULL_HANDLE;
+					}
+					if (vk.modules.fog_vs != VK_NULL_HANDLE) {
+						qvkDestroyShaderModule(vk.device, vk.modules.fog_vs, NULL);
+						vk.modules.fog_vs = VK_NULL_HANDLE;
+					}
+					if (vk.modules.fog_fs != VK_NULL_HANDLE) {
+						qvkDestroyShaderModule(vk.device, vk.modules.fog_fs, NULL);
+						vk.modules.fog_fs = VK_NULL_HANDLE;
+					}
+					if (vk.modules.color_vs != VK_NULL_HANDLE) {
+						qvkDestroyShaderModule(vk.device, vk.modules.color_vs, NULL);
+						vk.modules.color_vs = VK_NULL_HANDLE;
+					}
+					if (vk.modules.color_fs != VK_NULL_HANDLE) {
+						qvkDestroyShaderModule(vk.device, vk.modules.color_fs, NULL);
+						vk.modules.color_fs = VK_NULL_HANDLE;
+					}
+					// Note: Other shader modules (gen, ident, fixed, etc.) are destroyed
+					// when pipelines are destroyed, or will be cleaned up with device destruction
+					ri.Printf(PRINT_ALL, "vk_shutdown: Common shader modules destroyed\n");
+				}
+				
 				// Shutdown enhanced post processing
 				vk_shutdown_enhanced_post_processing();
 
@@ -10665,10 +10746,12 @@ VkResult vk_recreate_swapchain_safe(void) {
   
   // Destroy existing framebuffers and render passes tied to the old swapchain
   // This will handle device lost internally
+  // Note: Framebuffers must be destroyed before swapchain to avoid validation errors
   vk_destroy_framebuffers();
   
   // Destroy old swapchain resources via direct function (no bridge)
   // This will handle device lost internally
+  // Note: Swapchain destruction must happen after framebuffers are destroyed
   vk_destroy_swapchain();
   
   // Attempt swapchain recreation even if device_lost is set - this is how we test recovery
@@ -10688,8 +10771,25 @@ VkResult vk_recreate_swapchain_safe(void) {
   }
   
   // Recreate framebuffers for the new swapchain images
+  // If framebuffer creation fails, we still have a valid swapchain, but framebuffers will be NULL
+  // This is acceptable - the system can continue, but rendering will be limited
   vk_create_framebuffers();
-  ri.Printf(PRINT_ALL, "Vulkan: Swapchain recreated with %u images\n", vk.swapchain_image_count);
+  
+  // Verify framebuffer creation succeeded (at least for main framebuffers)
+  qboolean framebuffers_valid = qtrue;
+  for (uint32_t i = 0; i < vk.swapchain_image_count && i < MAX_SWAPCHAIN_IMAGES; i++) {
+    if (vk.framebuffers.main[i] == VK_NULL_HANDLE) {
+      framebuffers_valid = qfalse;
+      ri.Printf(PRINT_WARNING, "Vulkan: Main framebuffer %u creation failed during swapchain recreation\n", i);
+      break;
+    }
+  }
+  
+  if (!framebuffers_valid) {
+    ri.Printf(PRINT_WARNING, "Vulkan: Some framebuffers failed to create - swapchain recreated but rendering may be limited\n");
+  } else {
+    ri.Printf(PRINT_ALL, "Vulkan: Swapchain recreated with %u images and all framebuffers\n", vk.swapchain_image_count);
+  }
   
   // Optional: Reset GPU timing profiler to align with new swapchain
   if (vk.render_profiler.initialized) {

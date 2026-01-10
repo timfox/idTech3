@@ -413,10 +413,18 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 	// Check for device lost FIRST, even if swapchain isn't ready - this allows recovery attempts
 	// Attempt immediate recovery instead of disabling rendering completely
 	if (vk.device_lost) {
+		// Don't attempt recovery during shutdown
+		if (!vk.active) {
+			ri.Printf(PRINT_DEVELOPER, "Vulkan: Device is lost but renderer is shutting down, skipping recovery\n");
+			return;
+		}
+
 		// Only log once per second to avoid spam
 		static int last_log_time = 0;
 		static int last_recovery_attempt = -1; // Initialize to -1 to trigger immediate first attempt
 		static int frame_count = 0;
+		static int recovery_attempt_count = 0; // Track total recovery attempts
+		static const int MAX_RECOVERY_ATTEMPTS = 50; // Limit recovery attempts to prevent infinite loops
 		frame_count++;
 		int current_time = ri.Milliseconds();
 		
@@ -436,13 +444,24 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 		static int initial_delay_passed = 0;
 		int recovery_delay = (initial_delay_passed == 0) ? 1000 : 2000; // 1s first attempt (driver needs time), then 2s
 		
+		// Check recovery attempt limit
+		if (recovery_attempt_count >= MAX_RECOVERY_ATTEMPTS) {
+			if (current_time - last_log_time > 5000) { // Log every 5 seconds when max attempts reached
+				ri.Printf(PRINT_WARNING, "Vulkan: Maximum recovery attempts (%d) reached. Device recovery may not be possible.\n", 
+					MAX_RECOVERY_ATTEMPTS);
+				last_log_time = current_time;
+			}
+			return; // Stop attempting recovery after max attempts
+		}
+
 		if (last_recovery_attempt == -1 || current_time - last_recovery_attempt > recovery_delay) {
 			if (initial_delay_passed == 0) {
 				initial_delay_passed = 1;
 			}
 			last_recovery_attempt = current_time;
-			ri.Printf(PRINT_ALL, "Vulkan: Attempting device recovery (frame %d, time=%d, delay=%dms)...\n", 
-				frame_count, current_time, recovery_delay);
+			recovery_attempt_count++;
+			ri.Printf(PRINT_ALL, "Vulkan: Attempting device recovery (attempt %d/%d, frame %d, time=%d, delay=%dms)...\n", 
+				recovery_attempt_count, MAX_RECOVERY_ATTEMPTS, frame_count, current_time, recovery_delay);
 			
 			// First, test if device is responsive with a simple operation
 			if (vk.device != VK_NULL_HANDLE && vk.physical_device != VK_NULL_HANDLE) {
@@ -521,8 +540,10 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 						vk.image_available, VK_NULL_HANDLE, &test_index);
 					
 					if (test_result == VK_SUCCESS || test_result == VK_SUBOPTIMAL_KHR) {
-						ri.Printf(PRINT_ALL, "Vulkan: Device recovery successful! Resuming rendering.\n");
+						ri.Printf(PRINT_ALL, "Vulkan: Device recovery successful! Resuming rendering (recovered after %d attempts).\n", 
+							recovery_attempt_count);
 						vk.device_lost = qfalse; // Device recovered - clear flag to allow rendering
+						recovery_attempt_count = 0; // Reset counter on successful recovery
 						// Image was acquired, we'll use it in the normal flow
 						if (test_result == VK_SUCCESS) {
 							vk.current_swapchain_image_index = test_index;

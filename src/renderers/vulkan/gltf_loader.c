@@ -182,6 +182,14 @@ void R_FreeGLTF(qhandle_t handle) {
         model->descriptorSet = VK_NULL_HANDLE;
     }
 
+    // Destroy descriptor set layout
+    if (model->descriptorSetLayout != VK_NULL_HANDLE && vk.device != VK_NULL_HANDLE && !vk.device_lost) {
+        if (qvkDestroyDescriptorSetLayout) {
+            qvkDestroyDescriptorSetLayout(vk.device, model->descriptorSetLayout, NULL);
+        }
+        model->descriptorSetLayout = VK_NULL_HANDLE;
+    }
+
     // Free buffers
     for (int i = 0; i < model->bufferCount; i++) {
         gltfBuffer_t* buffer = &model->buffers[i];
@@ -442,6 +450,12 @@ qboolean R_GLTF_GetBounds(qhandle_t handle, vec3_t mins, vec3_t maxs) {
 void R_GLTF_Render(qhandle_t handle, const float* modelMatrix, const float* viewMatrix, const float* projectionMatrix) {
     gltfModel_t* model = R_GLTF_GetModel(handle);
     if (!model || !model->loaded) return;
+
+    // Validate Vulkan state before rendering
+    if (!vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || vk.device_lost) {
+        ri.Printf(PRINT_WARNING, "R_GLTF_Render: Cannot render - command buffer not ready\n");
+        return;
+    }
 
     // Bind descriptor set
     qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
