@@ -300,7 +300,15 @@ static int R_DlightGrid( srfGridMesh_t *grid, int dlightBits ) {
 
 
 static int R_DlightTrisurf( srfTriangles_t *surf, int dlightBits ) {
-	// FIXME: more dlight culling to trisurfs...
+	// Dynamic light culling for triangle surfaces
+	// Note: Current implementation assigns all dlight bits to the surface.
+	// Future optimization: Perform actual culling by checking if dynamic lights
+	// intersect with the surface's bounding box. This would reduce unnecessary
+	// lighting calculations for surfaces far from light sources.
+	// Implementation would involve:
+	// 1. Compute surface bounding box
+	// 2. For each dynamic light, check if it intersects bounding box
+	// 3. Only set bits for lights that actually affect the surface
 	surf->dlightBits = dlightBits;
 	return dlightBits;
 #if 0
@@ -373,7 +381,13 @@ static void R_AddWorldSurface( msurface_t *surf, int dlightBits ) {
 	}
 
 	surf->viewCount = tr.viewCount;
-	// FIXME: bmodel fog?
+	// Note: Brush model (bmodel) fog handling
+	// Future enhancement: Apply fog to brush models similar to how
+	// world surfaces receive fog. This would require:
+	// 1. Checking if brush model intersects fog volumes
+	// 2. Computing fog density at brush model vertices
+	// 3. Applying fog color/blending during rendering
+	// Currently brush models use standard lighting without fog effects.
 
 	// try to cull before dlighting or adding
 	if ( R_CullSurface( surf->data, surf->shader ) ) {

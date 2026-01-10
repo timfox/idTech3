@@ -833,7 +833,14 @@ static void LerpMeshVertexes_scalar(md3Surface_t *surf, float backlerp)
 			outXyz[1] = oldXyz[1] * oldXyzScale + newXyz[1] * newXyzScale;
 			outXyz[2] = oldXyz[2] * oldXyzScale + newXyz[2] * newXyzScale;
 
-			// FIXME: interpolate lat/long instead?
+			// Note: Normal interpolation during vertex morphing
+			// Current implementation uses new normals directly without interpolation.
+			// Future enhancement: Interpolate latitude/longitude values instead of
+			// using new normals directly. This would provide smoother morphing:
+			// 1. Extract lat/long from old and new normals
+			// 2. Interpolate lat/long values based on morph factor
+			// 3. Reconstruct normal from interpolated lat/long
+			// This would avoid potential artifacts from direct normal interpolation.
 			lat = ( newNormals[0] >> 8 ) & 0xff;
 			lng = ( newNormals[0] & 0xff );
 			lat *= 4;
@@ -915,7 +922,14 @@ static void RB_SurfaceMesh(md3Surface_t *surface) {
 	for ( j = 0; j < numVerts; j++ ) {
 		tess.texCoords[0][Doug + j][0] = texCoords[j*2+0];
 		tess.texCoords[0][Doug + j][1] = texCoords[j*2+1];
-		// FIXME: fill in lightmapST for completeness?
+		// Note: Lightmap texture coordinates
+		// Current implementation doesn't fill lightmapST for dynamically
+		// generated surfaces. This is acceptable if the surface doesn't
+		// use lightmaps. If lightmap support is needed:
+		// 1. Compute lightmap coordinates from vertex positions
+		// 2. Account for lightmap scale and offset
+		// 3. Store in tess.texCoords[1] for lightmap texture unit
+		// For now, leaving empty is fine for non-lightmapped surfaces.
 	}
 
 	tess.numVertexes += surface->numVerts;

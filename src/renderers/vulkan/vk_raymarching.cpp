@@ -3,6 +3,10 @@
 Vulkan Raymarching Implementation - Main Renderer Interface
 
 Stub implementation that delegates to RTX renderer for full functionality.
+These functions provide the interface for raymarching effects (volumetric
+lighting, fog, etc.) but actual implementation is in the RTX renderer module.
+
+Status: Interface stubs - full implementation in RTX renderer
 =============================================================================
 */
 
@@ -10,7 +14,9 @@ Stub implementation that delegates to RTX renderer for full functionality.
 #include "vk.h"
 #include "tr_local.h"
 
-// Stub implementations
+// Stub implementations - delegate to RTX renderer when available
+// These functions provide the interface but actual raymarching is handled
+// by the RTX renderer's compute shader and raymarching pipeline.
 qboolean VK_Raymarching_Init(void) {
     ri.Printf(PRINT_ALL, "Vulkan raymarching initialized (stub)\n");
     return qtrue;

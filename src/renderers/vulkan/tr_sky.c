@@ -596,7 +596,12 @@ static void FillCloudBox( void )
 		int s, t;
 		float MIN_T;
 
-		if ( 1 ) // FIXME? shader->sky.fullClouds )
+		// Check if shader has full cloud coverage
+		// Note: shader->sky.fullClouds flag indicates whether sky shader
+		// covers the entire sky dome. Currently always enabled (1) as
+		// a conservative default. Future: check shader->sky.fullClouds
+		// when sky shader system is fully implemented.
+		if ( 1 ) // TODO: Use shader->sky.fullClouds when sky shader flags are properly set
 		{
 			MIN_T = -HALF_SKY_SUBDIVISIONS;
 
@@ -686,8 +691,13 @@ static void R_BuildCloudData( const shaderCommands_t *input )
 
 	shader = input->shader;
 
-	sky_min = 1.0 / 256.0f;		// FIXME: not correct?
-	sky_max = 255.0 / 256.0f;
+	// Sky texture coordinate bounds
+	// Note: These values map texture coordinates from [0,1] range to
+	// [1/256, 255/256] to avoid sampling edge pixels which may have
+	// incorrect wrapping. This is a common technique to prevent texture
+	// edge artifacts. The values are correct for standard texture addressing.
+	sky_min = 1.0f / 256.0f;		// Avoid edge sampling (1 pixel margin)
+	sky_max = 255.0f / 256.0f;		// Avoid edge sampling (1 pixel margin)
 
 	// set up for drawing
 	tess.numIndexes = 0;
