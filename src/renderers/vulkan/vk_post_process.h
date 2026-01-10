@@ -146,7 +146,7 @@ void vk_init_enhanced_post_processing(void);
 void vk_shutdown_enhanced_post_processing(void);
 qboolean vk_create_enhanced_post_process_pipelines(void);
 void vk_execute_post_processing(const postProcessConfig_t *config);
-void vk_update_post_process_config(const postProcessConfig_t *config);
+void vk_update_post_process_config(postProcessConfig_t *config);
 
 // Individual effect functions
 qboolean vk_ssao_pass(const ssaoConfig_t *config);

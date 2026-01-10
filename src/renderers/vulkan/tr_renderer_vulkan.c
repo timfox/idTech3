@@ -11,6 +11,10 @@ Vulkan implementation of the unified renderer interface.
 #include "tr_local.h"
 #include "vk.h"
 
+// Forward declarations for scene functions
+extern void RE_AddLightToScene(const vec3_t org, float intensity, float r, float g, float b);
+extern void RE_AddAdditiveLightToScene(const vec3_t org, float intensity, float r, float g, float b);
+
 // Forward declarations for Vulkan-specific functions
 extern qboolean vk_initialize(void);
 extern void vk_shutdown(void);
@@ -66,12 +70,26 @@ static void Vulkan_AddPolygon(qhandle_t shader, int numVerts, const polyVert_t* 
 }
 
 static void Vulkan_AddLight(const dlight_t* light) {
-    // Vulkan lighting integration
-    // This would need to be implemented based on Vulkan lighting system
+    // Vulkan lighting integration - delegate to RE_AddLightToScene
+    if (!light) {
+        return;
+    }
+    
+    // Use additive mode if light->additive is set, otherwise use normal mode
+    if (light->additive) {
+        RE_AddAdditiveLightToScene(light->origin, light->radius, 
+                                   light->color[0], light->color[1], light->color[2]);
+    } else {
+        RE_AddLightToScene(light->origin, light->radius, 
+                           light->color[0], light->color[1], light->color[2]);
+    }
 }
 
 static void Vulkan_SetupLighting(void) {
     // Setup Vulkan lighting state
+    // Lighting setup is handled automatically during scene rendering
+    // This function provides a hook for any pre-render lighting configuration
+    // Currently no-op as lighting is set up per-frame in vk_render_scene
 }
 
 static qhandle_t Vulkan_RegisterShader(const char* name) {
@@ -127,10 +145,14 @@ static void Vulkan_RenderSurfaces(void) {
 
 static void Vulkan_BeginPostProcess(void) {
     // Vulkan post-processing begin
+    // Post-processing setup is handled automatically in vk_end_frame
+    // This function provides a hook for any pre-post-process configuration
 }
 
 static void Vulkan_EndPostProcess(void) {
     // Vulkan post-processing end
+    // Post-processing finalization is handled automatically in vk_end_frame
+    // This function provides a hook for any post-post-process cleanup
 }
 
 static void Vulkan_DebugDrawAxis(void) {

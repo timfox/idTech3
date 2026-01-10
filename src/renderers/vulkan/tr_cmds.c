@@ -24,6 +24,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 extern refimport_t ri;
 #include "../renderercommon/tr_frame_graph.h"
 #include "vk_utils.h"  // For memory validation functions
+#ifdef USE_VULKAN
+#include "vk_post_process.h"  // For post-processing types and functions
+#endif
 
 /*
 =====================
@@ -198,9 +201,34 @@ static void RG_ExecuteLightClusters( void *user ) {
 	R_BuildLightClusters();
 }
 
-// Placeholder post pass (currently no-op). Extend later for post effects.
+// Post-processing pass - executes post-processing effects if enabled
 static void RG_ExecutePostPass( void *user ) {
 	(void)user;
+	
+#ifdef USE_VULKAN
+	// Check if post-processing is available and enabled
+	extern qboolean vk_has_post_processing(void);
+	extern void vk_execute_post_processing(const postProcessConfig_t *config);
+	extern cvar_t *r_pp_ssao;
+	extern cvar_t *r_pp_ssr;
+	extern cvar_t *r_pp_bloom;
+	extern cvar_t *r_pp_dof;
+	extern cvar_t *r_pp_motion_blur;
+	extern cvar_t *r_pp_color_grading;
+	extern cvar_t *r_pp_heat_distortion;
+	
+	if (vk_has_post_processing()) {
+		// Build post-processing configuration from CVARs
+		postProcessConfig_t config;
+		extern void vk_update_post_process_config(postProcessConfig_t *config);
+		vk_update_post_process_config(&config);
+		
+		// Execute post-processing if any effects are enabled
+		if (config.enabledEffects != 0) {
+			vk_execute_post_processing(&config);
+		}
+	}
+#endif
 }
 
 

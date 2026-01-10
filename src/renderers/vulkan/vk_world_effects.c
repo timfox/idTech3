@@ -103,9 +103,84 @@ void vk_world_effects_render(void) {
 		return;
 	}
 
-	// Placeholder: rendering paths (rain/snow/dust) not implemented yet.
-	// This is intentionally a no-op to keep the renderer stable while the
-	// system is being brought up incrementally.
+	// Weather effect rendering using particle system
+	// Weather mode: 0 = none, 1 = rain, 2 = snow, 3 = dust
+	if (we.weather_mode == 0) {
+		return; // No weather effects
+	}
+
+	// Use the CPU particle system to add weather particles
+	// This integrates with the existing particle rendering pipeline
+	extern void RE_AddParticle( const vec3_t origin, const vec3_t velocity, const vec3_t color, float size, float life, qhandle_t shader );
+	extern qhandle_t RE_RegisterShaderNoMip( const char *name );
+	
+	// Get camera position for particle spawning
+	vec3_t cameraPos;
+	if (tr.refdef.vieworg) {
+		VectorCopy(tr.refdef.vieworg, cameraPos);
+	} else {
+		VectorSet(cameraPos, 0, 0, 0);
+	}
+	
+	// Spawn weather particles based on mode
+	const int particlesPerFrame = 10; // Adjust based on performance
+	const float spawnRadius = 512.0f; // Spawn particles around camera
+	
+	for (int i = 0; i < particlesPerFrame; i++) {
+		vec3_t origin, velocity;
+		vec3_t color;
+		float size, life;
+		qhandle_t shader;
+		
+		// Random position around camera
+		origin[0] = cameraPos[0] + (rand() % (int)(spawnRadius * 2)) - spawnRadius;
+		origin[1] = cameraPos[1] + (rand() % (int)(spawnRadius * 2)) - spawnRadius;
+		origin[2] = cameraPos[2] + (rand() % (int)(spawnRadius * 2)) - spawnRadius;
+		
+		switch (we.weather_mode) {
+			case 1: // Rain
+				// Rain falls downward with wind influence
+				velocity[0] = we.wind_dir[0] * we.wind_strength * 50.0f;
+				velocity[1] = we.wind_dir[1] * we.wind_strength * 50.0f;
+				velocity[2] = -200.0f + (we.wind_dir[2] * we.wind_strength * 20.0f);
+				VectorSet(color, 0.7f, 0.7f, 0.8f); // Light gray/blue
+				size = 2.0f;
+				life = 2.0f;
+				shader = RE_RegisterShaderNoMip("gfx/weather/rain");
+				break;
+				
+			case 2: // Snow
+				// Snow falls slower with more wind influence
+				velocity[0] = we.wind_dir[0] * we.wind_strength * 30.0f;
+				velocity[1] = we.wind_dir[1] * we.wind_strength * 30.0f;
+				velocity[2] = -50.0f + (we.wind_dir[2] * we.wind_strength * 10.0f);
+				VectorSet(color, 1.0f, 1.0f, 1.0f); // White
+				size = 3.0f;
+				life = 5.0f;
+				shader = RE_RegisterShaderNoMip("gfx/weather/snow");
+				break;
+				
+			case 3: // Dust
+				// Dust particles are smaller and more wind-driven
+				velocity[0] = we.wind_dir[0] * we.wind_strength * 40.0f;
+				velocity[1] = we.wind_dir[1] * we.wind_strength * 40.0f;
+				velocity[2] = -10.0f + (we.wind_dir[2] * we.wind_strength * 5.0f);
+				VectorSet(color, 0.6f, 0.5f, 0.4f); // Brown/tan
+				size = 1.0f;
+				life = 3.0f;
+				shader = RE_RegisterShaderNoMip("gfx/weather/dust");
+				break;
+				
+			default:
+				return; // Unknown weather mode
+		}
+		
+		// Add particle to system
+		RE_AddParticle(origin, velocity, color, size, life, shader);
+	}
+	
+	// Note: Actual particle rendering is handled by R_RenderCPUParticles() in tr_scene.c
+	// which is called from RE_RenderScene(). This function just spawns the particles.
 }
 
 #endif // USE_VULKAN

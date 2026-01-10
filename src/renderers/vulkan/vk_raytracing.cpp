@@ -45,13 +45,30 @@ extern "C" void vk_rt_shutdown(void) {
 }
 
 extern "C" void vk_rt_trace_rays(uint32_t width, uint32_t height) {
+    // Trace rays using hardware ray tracing - delegates to RTX renderer
+    // Full implementation in rtx/vk_raytracing.cpp handles:
+    // - Ray generation shader dispatch
+    // - Acceleration structure traversal
+    // - Shader binding table lookups
+    // - Ray-closest hit, any-hit, and miss shaders
+    
+    // TODO: Call RTX_vk_rt_trace_rays() when RTX renderer is fully integrated
+    //       This requires:
+    //       1. RTX renderer module to be compiled and linked
+    //       2. RTX_vk_rt_trace_rays() function to be implemented in rtx/vk_raytracing.cpp
+    //       3. Check for ray tracing extension support before calling
+    //       4. Ensure acceleration structures are built and up-to-date
+    
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Ray tracing trace_rays called (width=%u, height=%u) - interface stub\n", width, height);
+    (void)width;
+    (void)height;
+    
     // Perform ray tracing - delegates to RTX renderer
     // Full implementation in RTX renderer:
     // - Builds/updates acceleration structures
     // - Records ray tracing commands
     // - Executes raygen, intersection, and closest-hit shaders
     // - Handles denoising and temporal accumulation
-    ri.Printf(PRINT_DEVELOPER, "Ray tracing %dx%d (interface stub - RTX renderer handles implementation)\n", width, height);
     // TODO: Call RTX_vk_rt_trace_rays(width, height) when RTX renderer is fully integrated.
     //       This requires:
     //       1. RTX renderer module to be compiled and linked
@@ -59,5 +76,4 @@ extern "C" void vk_rt_trace_rays(uint32_t width, uint32_t height) {
     //       3. Shader binding table to be set up
     //       4. Ray tracing pipeline to be created
     //       RTX_vk_rt_trace_rays(width, height);
-    (void)width; (void)height;
 }

@@ -666,54 +666,240 @@ void vk_execute_post_processing(const postProcessConfig_t *config)
 ===============
 vk_update_post_process_config
 ===============
+Populate post-processing configuration structure from CVARs and current render state
 */
-void vk_update_post_process_config(const postProcessConfig_t *config __attribute__((unused)))
+void vk_update_post_process_config(postProcessConfig_t *config)
 {
-    // Update configuration based on CVARs
-    // This would be called from the main rendering loop
+    if (!config) {
+        return;
+    }
+    
+    // Get current render resolution
+    vec2_t resolution = { (float)vk.renderWidth, (float)vk.renderHeight };
+    vec2_t invResolution = { 1.0f / vk.renderWidth, 1.0f / vk.renderHeight };
+    
+    // Initialize config structure
+    memset(config, 0, sizeof(postProcessConfig_t));
+    
+    // Set enabled effects based on CVARs
+    if (r_pp_ssao && r_pp_ssao->integer) {
+        config->enabledEffects |= PP_EFFECT_SSAO;
+        
+        // Configure SSAO
+        config->ssao.resolution[0] = resolution[0];
+        config->ssao.resolution[1] = resolution[1];
+        config->ssao.invResolution[0] = invResolution[0];
+        config->ssao.invResolution[1] = invResolution[1];
+        config->ssao.radius = 0.5f; // Default radius
+        config->ssao.bias = 0.025f; // Default bias
+        config->ssao.intensity = 1.0f; // Default intensity
+        config->ssao.numSamples = 16; // Default sample count
+        config->ssao.enableLISSAO = (r_pp_ssao_lissao && r_pp_ssao_lissao->integer) ? qtrue : qfalse;
+        config->ssao.indirectIntensity = 0.5f; // Default indirect intensity
+        config->ssao.indirectRadius = 1.0f; // Default indirect radius
+    }
+    
+    if (r_pp_ssr && r_pp_ssr->integer) {
+        config->enabledEffects |= PP_EFFECT_SSR;
+        
+        // Configure SSR
+        config->ssr.resolution[0] = resolution[0];
+        config->ssr.resolution[1] = resolution[1];
+        config->ssr.invResolution[0] = invResolution[0];
+        config->ssr.invResolution[1] = invResolution[1];
+        // Copy camera position from refdef (vieworg is an array, not a pointer)
+        VectorCopy(tr.refdef.vieworg, config->ssr.cameraPos);
+        config->ssr.maxDistance = 100.0f; // Default max distance
+        config->ssr.thickness = 0.1f; // Default thickness
+        config->ssr.numSteps = 32; // Default step count
+        config->ssr.numBinarySteps = 8; // Default binary search steps
+        config->ssr.roughnessThreshold = 0.5f; // Default roughness threshold
+    }
+    
+    if (r_pp_bloom && r_pp_bloom->integer) {
+        config->enabledEffects |= PP_EFFECT_BLOOM;
+        
+        // Configure Bloom
+        config->bloom.resolution[0] = resolution[0];
+        config->bloom.resolution[1] = resolution[1];
+        config->bloom.invResolution[0] = invResolution[0];
+        config->bloom.invResolution[1] = invResolution[1];
+        config->bloom.threshold = 1.0f; // Default threshold
+        config->bloom.extractMode = 2; // Default: luma
+        config->bloom.modulateMode = 1; // Default: square
+        config->bloom.useKawase = (r_pp_bloom_kawase && r_pp_bloom_kawase->integer) ? qtrue : qfalse;
+        config->bloom.numPasses = 4; // Default number of passes
+    }
+    
+    if (r_pp_dof && r_pp_dof->integer) {
+        config->enabledEffects |= PP_EFFECT_DOF;
+        
+        // Configure DoF
+        config->dof.resolution[0] = resolution[0];
+        config->dof.resolution[1] = resolution[1];
+        config->dof.invResolution[0] = invResolution[0];
+        config->dof.invResolution[1] = invResolution[1];
+        config->dof.focalDistance = 10.0f; // Default focal distance
+        config->dof.focalRange = 2.0f; // Default focal range
+        config->dof.aperture = 5.6f; // Default aperture
+        config->dof.numSamples = 16; // Default sample count
+        config->dof.bokehShape = (r_pp_dof_bokeh_shape) ? r_pp_dof_bokeh_shape->integer : 0;
+        config->dof.bokehRotation = 0.0f; // Default rotation
+    }
+    
+    if (r_pp_motion_blur && r_pp_motion_blur->integer) {
+        config->enabledEffects |= PP_EFFECT_MOTION_BLUR;
+        
+        // Configure Motion Blur
+        config->motionBlur.resolution[0] = resolution[0];
+        config->motionBlur.resolution[1] = resolution[1];
+        config->motionBlur.invResolution[0] = invResolution[0];
+        config->motionBlur.invResolution[1] = invResolution[1];
+        config->motionBlur.numSamples = 8; // Default sample count
+        config->motionBlur.exposureTime = 0.5f; // Default exposure time
+        config->motionBlur.useVelocityTiles = (r_pp_motion_blur_tiles && r_pp_motion_blur_tiles->integer) ? qtrue : qfalse;
+        config->motionBlur.tileSize[0] = 16.0f; // Default tile size
+        config->motionBlur.tileSize[1] = 16.0f;
+    }
+    
+    if (r_pp_color_grading && r_pp_color_grading->integer) {
+        config->enabledEffects |= PP_EFFECT_COLOR_GRADING;
+        
+        // Configure Color Grading
+        config->colorGrading.resolution[0] = resolution[0];
+        config->colorGrading.resolution[1] = resolution[1];
+        config->colorGrading.invResolution[0] = invResolution[0];
+        config->colorGrading.invResolution[1] = invResolution[1];
+        config->colorGrading.exposure = 1.0f; // Default exposure
+        config->colorGrading.contrast = 1.0f; // Default contrast
+        config->colorGrading.saturation = 1.0f; // Default saturation
+        config->colorGrading.brightness = 0.0f; // Default brightness
+        VectorSet(config->colorGrading.colorFilter, 1.0f, 1.0f, 1.0f); // Default: no filter
+        config->colorGrading.gamma = 2.2f; // Default gamma
+        VectorSet(config->colorGrading.shadows, 0.0f, 0.0f, 0.0f); // Default shadows
+        VectorSet(config->colorGrading.midtones, 0.0f, 0.0f, 0.0f); // Default midtones
+        VectorSet(config->colorGrading.highlights, 0.0f, 0.0f, 0.0f); // Default highlights
+        config->colorGrading.shadowsStart = 0.0f;
+        config->colorGrading.shadowsEnd = 0.3f;
+        config->colorGrading.highlightsStart = 0.7f;
+        config->colorGrading.highlightsEnd = 1.0f;
+        config->colorGrading.useLUT = qfalse; // Default: no LUT
+    }
+    
+    if (r_pp_heat_distortion && r_pp_heat_distortion->integer) {
+        config->enabledEffects |= PP_EFFECT_HEAT_DISTORTION;
+        
+        // Configure Heat Distortion
+        config->heatDistortion.resolution[0] = resolution[0];
+        config->heatDistortion.resolution[1] = resolution[1];
+        config->heatDistortion.invResolution[0] = invResolution[0];
+        config->heatDistortion.invResolution[1] = invResolution[1];
+        config->heatDistortion.time = (tr.refdef.time) ? tr.refdef.time * 0.001f : 0.0f; // Convert to seconds
+        config->heatDistortion.distortionStrength = 0.1f; // Default strength
+        config->heatDistortion.heatWaveFrequency = 1.0f; // Default frequency
+        config->heatDistortion.heatWaveSpeed = 1.0f; // Default speed
+        config->heatDistortion.numSamples = 8; // Default sample count
+        config->heatDistortion.atmosphericDistortion = 0.05f; // Default atmospheric distortion
+        VectorSet(config->heatDistortion.atmosphericTint, 1.0f, 0.9f, 0.8f); // Default warm tint
+    }
 }
 
 /*
 ===============
 vk_ssao_pass
 ===============
+Execute SSAO (Screen Space Ambient Occlusion) compute pass
 */
-qboolean vk_ssao_pass(const ssaoConfig_t *config __attribute__((unused)))
+qboolean vk_ssao_pass(const ssaoConfig_t *config)
 {
-    // TODO: Implement full SSAO pass when Vulkan resources are available
-    // For now, this is a placeholder that will be implemented in the next phase
-    if (vk.ssao_pipeline == VK_NULL_HANDLE) {
-        return qfalse; // Pipeline not created yet
+    if (!config) {
+        return qfalse;
     }
-    return qtrue; // Success placeholder
+    
+    // Check if pipeline is available
+    if (vk.ssao_pipeline == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_DEVELOPER, "Vulkan: SSAO pipeline not created, skipping pass\n");
+        return qfalse;
+    }
+    
+    // TODO: Implement full SSAO compute pass
+    // This would:
+    // 1. Bind SSAO compute pipeline
+    // 2. Update descriptor sets with depth/normal buffers
+    // 3. Push constants with config parameters
+    // 4. Dispatch compute shader (workgroup size based on resolution)
+    // 5. Insert memory barriers for output texture
+    
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: SSAO pass executed (placeholder - full implementation pending)\n");
+    return qtrue;
 }
 
 /*
 ===============
 vk_ssr_pass
 ===============
+Execute SSR (Screen Space Reflections) compute pass
 */
-qboolean vk_ssr_pass(const ssrConfig_t *config __attribute__((unused)))
+qboolean vk_ssr_pass(const ssrConfig_t *config)
 {
-    // TODO: Implement full SSR pass when Vulkan resources are available
-    if (vk.ssr_pipeline == VK_NULL_HANDLE) {
-        return qfalse; // Pipeline not created yet
+    if (!config) {
+        return qfalse;
     }
-    return qtrue; // Success placeholder
+    
+    // Check if pipeline is available
+    if (vk.ssr_pipeline == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_DEVELOPER, "Vulkan: SSR pipeline not created, skipping pass\n");
+        return qfalse;
+    }
+    
+    // TODO: Implement full SSR compute pass
+    // This would:
+    // 1. Bind SSR compute pipeline
+    // 2. Update descriptor sets with color/depth/normal/roughness buffers
+    // 3. Push constants with camera position, max distance, step counts
+    // 4. Dispatch compute shader for ray-marched reflections
+    // 5. Insert memory barriers for output texture
+    
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: SSR pass executed (placeholder - full implementation pending)\n");
+    return qtrue;
 }
 
 /*
 ===============
 vk_bloom_pass
 ===============
+Execute enhanced bloom compute pass (Kawase blur or traditional)
+Note: Basic bloom is already implemented in vk_postprocess.cpp via vk_apply_bloom()
+This is the enhanced version with Kawase blur support
 */
-qboolean vk_bloom_pass(const bloomConfig_t *config __attribute__((unused)))
+qboolean vk_bloom_pass(const bloomConfig_t *config)
 {
-    // TODO: Implement enhanced bloom pass when Vulkan resources are available
-    if (vk.bloom_pipeline == VK_NULL_HANDLE) {
-        return qfalse; // Pipeline not created yet
+    if (!config) {
+        return qfalse;
     }
-    return qtrue; // Success placeholder
+    
+    // Check if pipeline is available
+    if (vk.bloom_pipeline == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_DEVELOPER, "Vulkan: Enhanced bloom pipeline not created, skipping pass\n");
+        // Fall back to basic bloom if available
+        if (r_pp_bloom && r_pp_bloom->integer) {
+            extern void vk_apply_bloom(void);
+            vk_apply_bloom();
+            return qtrue;
+        }
+        return qfalse;
+    }
+    
+    // TODO: Implement enhanced bloom compute pass
+    // This would:
+    // 1. Extract bright areas based on threshold and extract mode
+    // 2. Apply Kawase blur if enabled (faster, higher quality) or traditional Gaussian
+    // 3. Modulate bloom based on modulate mode
+    // 4. Composite bloom back into main image
+    // 5. Handle multiple blur passes for quality
+    
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Enhanced bloom pass executed (placeholder - full implementation pending)\n");
+    return qtrue;
 }
 
 /*
@@ -794,8 +980,9 @@ qboolean vk_dof_pass(const dofConfig_t *config __attribute__((unused)))
 ===============
 vk_motion_blur_pass
 ===============
+Execute motion blur compute pass using velocity tiles
 */
-qboolean vk_motion_blur_pass(const motionBlurConfig_t *config __attribute__((unused)))
+qboolean vk_motion_blur_pass(const motionBlurConfig_t *config)
 {
     if (vk.motion_blur_pipeline == VK_NULL_HANDLE || vk.motion_blur_layout == VK_NULL_HANDLE) {
         ri.Printf(PRINT_WARNING, "Motion blur pipeline not initialized\n");
@@ -937,8 +1124,9 @@ qboolean vk_motion_blur_pass(const motionBlurConfig_t *config __attribute__((unu
 ===============
 vk_color_grading_pass
 ===============
+Execute color grading compute pass with 3D LUT support
 */
-qboolean vk_color_grading_pass(const colorGradingConfig_t *config __attribute__((unused)))
+qboolean vk_color_grading_pass(const colorGradingConfig_t *config)
 {
     if (vk.color_grading_pipeline == VK_NULL_HANDLE || vk.color_grading_layout == VK_NULL_HANDLE) {
         ri.Printf(PRINT_WARNING, "Color grading pipeline not initialized\n");
@@ -997,8 +1185,9 @@ qboolean vk_color_grading_pass(const colorGradingConfig_t *config __attribute__(
 ===============
 vk_heat_distortion_pass
 ===============
+Execute heat distortion compute pass for atmospheric effects
 */
-qboolean vk_heat_distortion_pass(const heatDistortionConfig_t *config __attribute__((unused)))
+qboolean vk_heat_distortion_pass(const heatDistortionConfig_t *config)
 {
     if (vk.heat_distortion_pipeline == VK_NULL_HANDLE || vk.heat_distortion_layout == VK_NULL_HANDLE) {
         ri.Printf(PRINT_WARNING, "Heat distortion pipeline not initialized\n");
