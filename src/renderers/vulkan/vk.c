@@ -109,6 +109,7 @@ void *Sys_LoadFunction(void *handle, const char *name) {
 #include "vk_surface_sprites.h"
 #include "vk_world_effects.h"
 #include "vk_frame.h"
+#include "vk_resource_state.h"
 
 #include "vk_post_process.h"
 #ifdef USE_VULKAN_RAY_TRACING
@@ -629,6 +630,7 @@ PFN_vkResetFences								qvkResetFences;
 PFN_vkUnmapMemory								qvkUnmapMemory;
 PFN_vkUpdateDescriptorSets						qvkUpdateDescriptorSets;
 PFN_vkWaitForFences								qvkWaitForFences;
+PFN_vkGetFenceStatus							qvkGetFenceStatus;
 PFN_vkAcquireNextImageKHR						qvkAcquireNextImageKHR;
 PFN_vkCreateSwapchainKHR							qvkCreateSwapchainKHR;
 PFN_vkDestroySwapchainKHR						qvkDestroySwapchainKHR;
@@ -1055,6 +1057,7 @@ void VK_EndImmediateCommands( VkCommandBuffer command_buffer, const char *locati
 
 
 // Optimized layout transition helper using C23 designated initializers
+// Now uses resource state tracker to avoid redundant barriers
 static void record_image_layout_transition( 
 	VkCommandBuffer command_buffer, 
 	VkImage image, 
@@ -1064,101 +1067,26 @@ static void record_image_layout_transition(
 	uint32_t src_stage_override, 
 	uint32_t dst_stage_override )
 {
-	(void)dst_stage_override; // Suppress unused parameter warning
-	
-	// Determine source stage and access mask
-	uint32_t src_stage;
-	VkAccessFlags src_access;
-	
-	switch ( old_layout ) {
-		case VK_IMAGE_LAYOUT_UNDEFINED:
-			src_stage = (src_stage_override != 0) ? src_stage_override : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-			src_access = VK_ACCESS_NONE;
-			break;
-		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-			src_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-			src_access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-			src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			src_access = VK_ACCESS_TRANSFER_WRITE_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
-			src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			src_access = VK_ACCESS_TRANSFER_READ_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-			src_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-			src_access = VK_ACCESS_SHADER_READ_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
-			src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			src_access = VK_ACCESS_NONE;
-			break;
-		default:
-			ri.Error( ERR_DROP, "unsupported old layout %i", old_layout );
-			src_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-			src_access = VK_ACCESS_NONE;
-			break;
-	}
-
-	// Determine destination stage and access mask
-	uint32_t dst_stage;
-	VkAccessFlags dst_access;
-	
-	switch ( new_layout ) {
-		case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
-			dst_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-			dst_access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
-			dst_stage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-			dst_access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
-			dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			dst_access = VK_ACCESS_NONE;
-			break;
-		case VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL:
-			dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			dst_access = VK_ACCESS_TRANSFER_READ_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
-			dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-			dst_access = VK_ACCESS_TRANSFER_WRITE_BIT;
-			break;
-		case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
-			dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-			dst_access = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-			break;
-		default:
-			ri.Error( ERR_DROP, "unsupported new layout %i", new_layout);
-			dst_stage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-			dst_access = VK_ACCESS_NONE;
-			break;
-	}
-
-	// Use C23 designated initializer for better performance and type safety
-	const VkImageMemoryBarrier barrier = {
-		.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-		.pNext = NULL,
-		.srcAccessMask = src_access,
-		.dstAccessMask = dst_access,
-		.oldLayout = old_layout,
-		.newLayout = new_layout,
-		.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-		.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-		.image = image,
-		.subresourceRange = {
-			.aspectMask = image_aspect_flags,
-			.baseMipLevel = 0,
-			.levelCount = VK_REMAINING_MIP_LEVELS,
-			.baseArrayLayer = 0,
-			.layerCount = VK_REMAINING_ARRAY_LAYERS
+	// Use resource state tracker to avoid redundant barriers
+	// If old_layout is UNDEFINED, try to get actual layout from state tracker
+	VkImageLayout actual_old_layout = old_layout;
+	if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED) {
+		VkImageLayout tracked_layout = vk_resource_state_get_image_layout(image);
+		if (tracked_layout != VK_IMAGE_LAYOUT_UNDEFINED) {
+			actual_old_layout = tracked_layout;
 		}
-	};
-
-	qvkCmdPipelineBarrier( command_buffer, src_stage, dst_stage, 0, 0, NULL, 0, NULL, 1, &barrier );
+	}
+	
+	// Use state tracker transition (will skip if layout hasn't changed)
+	if (actual_old_layout == VK_IMAGE_LAYOUT_UNDEFINED) {
+		// First use - use automatic transition
+		vk_resource_state_transition_image(command_buffer, image, image_aspect_flags,
+		                                   new_layout, src_stage_override, dst_stage_override);
+	} else {
+		// Known old layout - use explicit transition
+		vk_resource_state_transition_image_explicit(command_buffer, image, image_aspect_flags,
+		                                            actual_old_layout, new_layout, src_stage_override, dst_stage_override);
+	}
 }
 
 
@@ -3891,6 +3819,7 @@ skip_device_creation:
 	INIT_DEVICE_FUNCTION(vkResetCommandBuffer)
 	INIT_DEVICE_FUNCTION(vkResetDescriptorPool)
 	INIT_DEVICE_FUNCTION(vkResetFences)
+	INIT_DEVICE_FUNCTION(vkGetFenceStatus)
 	INIT_DEVICE_FUNCTION(vkUnmapMemory)
 	INIT_DEVICE_FUNCTION(vkUpdateDescriptorSets)
 	INIT_DEVICE_FUNCTION(vkWaitForFences)
@@ -4462,6 +4391,7 @@ qvkGetPipelineCacheData					= NULL;
 	qvkResetFences								= NULL;
 	qvkResetQueryPool							= NULL;
 	qvkCmdResetQueryPool						= NULL;
+	qvkGetFenceStatus							= NULL;
 	qvkUnmapMemory								= NULL;
 	qvkUpdateDescriptorSets						= NULL;
 	qvkWaitForFences							= NULL;
@@ -4809,6 +4739,9 @@ void vk_initialize( void )
     if (vk.device != (VkDevice)0x20000000) {
         vk_create_sync_primitives();
         ri.Printf(PRINT_ALL, "Vulkan: Sync primitives created\n");
+        
+        // Initialize resource state tracker
+        vk_resource_state_init();
     // Optional: initialize timeline semaphore if available
         #ifdef VK_KHR_TIMELINE_SEMAPHORE
         if (qvkCreateSemaphore) {
@@ -9857,6 +9790,9 @@ void vk_shutdown( refShutdownCode_t code ) {
 
 				// Shutdown world effects system
 				vk_world_effects_shutdown();
+
+				// Shutdown resource state tracker
+				vk_resource_state_shutdown();
 
 				// Ray tracing and raymarching moved to RTX renderer only
 

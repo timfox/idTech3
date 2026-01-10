@@ -32,13 +32,13 @@ static int			r_firstSceneLitSurf;
 int			r_numdlights;
 static int			r_firstSceneDlight;
 
-static int			r_numentities;
+int			r_numentities;
 static int			r_firstSceneEntity;
 
-static int			r_numpolys;
+int			r_numpolys;
 static int			r_firstScenePoly;
 
-static int			r_numpolyverts;
+int			r_numpolyverts;
 
 // CPU-side particle buffer for RE_AddParticle
 #define MAX_CPU_PARTICLES 1024

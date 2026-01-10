@@ -406,10 +406,12 @@ extern "C" void vk_begin_frame(void) {
     vk_update_performance_stats();
 
     // Begin command buffer
+    // Frame command buffers are reusable - they're reset and reused each frame
+    // Omit ONE_TIME_SUBMIT_BIT for better performance with reusable buffers
     VkCommandBufferBeginInfo begin_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .pNext = nullptr,
-        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+        .flags = 0, // Reusable frame buffer - no ONE_TIME_SUBMIT_BIT
         .pInheritanceInfo = nullptr
     };
 

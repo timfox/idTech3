@@ -177,22 +177,48 @@ extern "C" VkCommandBuffer vk_begin_command_buffer(void) {
 
     current_command_buffer = command_buffers[0];
 
-    // Wait for previous frame to complete before reusing command buffer
-    // Check device loss during fence wait
-    if (!vk.device_lost) {
-        VkResult fence_result = qvkWaitForFences(vk.device, 1, &command_fence, VK_TRUE, UINT64_MAX);
-        if (fence_result == VK_ERROR_DEVICE_LOST) {
-            vk.device_lost = qtrue;
-            vk_reset_memory_tracking_on_device_lost();
-            ri.Printf(PRINT_ERROR, "Vulkan: Device lost during command buffer fence wait\n");
-            return VK_NULL_HANDLE;
-        } else if (fence_result != VK_SUCCESS) {
-            ri.Printf(PRINT_WARNING, "vk_begin_command_buffer: Fence wait failed: %d\n", fence_result);
+    // Wait for all frame command buffers to complete before reusing immediate command buffer
+    // This prevents conflicts between immediate commands and frame rendering
+    // Use frame-based synchronization to align with the main rendering pipeline
+    if (!vk.device_lost && vk.device != VK_NULL_HANDLE) {
+        // Collect all active frame fences to ensure no frame is still in flight
+        VkFence frame_fences[NUM_COMMAND_BUFFERS];
+        uint32_t fence_count = 0;
+        
+        // Add all valid frame fences
+        for (uint32_t i = 0; i < NUM_COMMAND_BUFFERS; i++) {
+            if (vk.tess[i].rendering_finished_fence != VK_NULL_HANDLE) {
+                frame_fences[fence_count++] = vk.tess[i].rendering_finished_fence;
+            }
         }
         
-        // Reset fence after waiting (must be done before reuse)
-        if (!vk.device_lost) {
-            qvkResetFences(vk.device, 1, &command_fence);
+        // Wait for all frame fences if any exist
+        if (fence_count > 0) {
+            VkResult fence_result = qvkWaitForFences(vk.device, fence_count, frame_fences, VK_TRUE, UINT64_MAX);
+            if (fence_result == VK_ERROR_DEVICE_LOST) {
+                vk.device_lost = qtrue;
+                vk_reset_memory_tracking_on_device_lost();
+                ri.Printf(PRINT_ERROR, "Vulkan: Device lost during command buffer fence wait\n");
+                return VK_NULL_HANDLE;
+            } else if (fence_result != VK_SUCCESS) {
+                ri.Printf(PRINT_WARNING, "vk_begin_command_buffer: Fence wait failed: %d\n", fence_result);
+            }
+        } else {
+            // Fallback to static fence if no frame fences are available (e.g., during initialization)
+            if (command_fence != VK_NULL_HANDLE) {
+                VkResult fence_result = qvkWaitForFences(vk.device, 1, &command_fence, VK_TRUE, UINT64_MAX);
+                if (fence_result == VK_ERROR_DEVICE_LOST) {
+                    vk.device_lost = qtrue;
+                    vk_reset_memory_tracking_on_device_lost();
+                    ri.Printf(PRINT_ERROR, "Vulkan: Device lost during command buffer fence wait\n");
+                    return VK_NULL_HANDLE;
+                } else if (fence_result != VK_SUCCESS) {
+                    ri.Printf(PRINT_WARNING, "vk_begin_command_buffer: Fence wait failed: %d\n", fence_result);
+                } else {
+                    // Reset static fence after waiting (frame fences are managed by frame system)
+                    qvkResetFences(vk.device, 1, &command_fence);
+                }
+            }
         }
     }
 
@@ -208,12 +234,12 @@ extern "C" VkCommandBuffer vk_begin_command_buffer(void) {
     }
 
     // Begin recording
-    // For reusable command buffers, we can omit ONE_TIME_SUBMIT_BIT since we reset before reuse
-    // However, keeping it is safe and indicates the buffer is used once per submission
+    // This is a reusable command buffer - it's reset before reuse
+    // Omit ONE_TIME_SUBMIT_BIT for better performance with reusable buffers
     VkCommandBufferBeginInfo beginInfo = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
         .pNext = nullptr,
-        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+        .flags = 0, // Reusable buffer - no ONE_TIME_SUBMIT_BIT
         .pInheritanceInfo = nullptr
     };
 

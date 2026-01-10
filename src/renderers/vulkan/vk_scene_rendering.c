@@ -21,6 +21,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "tr_local.h"
+#include <math.h>
 
 // Vulkan function pointers
 extern PFN_vkCmdSetViewport qvkCmdSetViewport;
@@ -51,7 +52,7 @@ void vk_add_entity(const refEntity_t *re, int intShaderTime) {
         ri.Printf(PRINT_DEVELOPER, "vk_add_entity: Dropping refEntity, reached MAX_REFENTITIES\n");
         return;
     }
-    if (isnan_fp(&re->origin[0]) || isnan_fp(&re->origin[1]) || isnan_fp(&re->origin[2])) {
+    if (isnan(re->origin[0]) || isnan(re->origin[1]) || isnan(re->origin[2])) {
         static qboolean first_time = qtrue;
         if (first_time) {
             first_time = qfalse;

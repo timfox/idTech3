@@ -10,7 +10,7 @@ if(VK_METRICS_ENABLED)
     endif()
   endif()
 endif()
-target_sources(idtech3_vulkan_x86_64 PRIVATE vk_rtx_acceleration.cpp vk_bindings_direct_final.c vk_sync.c)
+target_sources(idtech3_vulkan_x86_64 PRIVATE vk_rtx_acceleration.cpp vk_bindings_direct_final.c vk_sync.c vk_resource_state.c)
 # Always include lightweight Vulkan command-buffer stubs to ease testing
 option(VK_METRICS_ENABLED "Enable Vulkan metrics instrumentation" OFF)
 
