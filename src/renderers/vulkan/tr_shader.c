@@ -3578,9 +3578,6 @@ static shader_t *FinishShader( void ) {
 	write_debug_log("vulkan/tr_shader.c:FinishShader", "FinishShader started", "{\"shader_type\":0}");
 	// #endregion
 
-	static int call_count = 0;
-	call_count++;
-	ri.Printf(PRINT_ALL, "DEBUG: FinishShader ENTRY POINT #%d (shader name: %s)\n", call_count, shader.name);
 	// #region agent log
 	write_debug_log("vulkan/tr_shader.c:FinishShader", "Processing shader", shader.name);
 	// #endregion
@@ -4143,19 +4140,8 @@ static shader_t *FinishShader( void ) {
 			// return tr.defaultShader;
 			def.mirror = qtrue;
 			// Disable mirror pipeline creation to prevent crashes
-			ri.Printf(PRINT_ALL, "DEBUG: Mirror pipeline creation disabled (shader_type=%d)\n", def.shader_type);
-			// #region agent log
-			fprintf(stderr, "DEBUG: About to set vk_mirror_pipeline to NULL, pStage=%p\n", (void*)pStage);
-			// #endregion
-			pStage->vk_mirror_pipeline[0] = VK_NULL_HANDLE;
-			// #region agent log
-			fprintf(stderr, "DEBUG: Successfully set vk_mirror_pipeline to NULL\n");
-			// #endregion
 			// Note: Mirror pipeline is optional, NULL is acceptable
-
-			// #region agent log
-			fprintf(stderr, "DEBUG: Processing depthFragment safely\n");
-			// #endregion
+			pStage->vk_mirror_pipeline[0] = VK_NULL_HANDLE;
 
 			// Safe depth fragment processing - re-enabled with SIGFPE protection
 			{
@@ -4165,11 +4151,7 @@ static shader_t *FinishShader( void ) {
 				has_depth_fragment = 1;
 			}
 
-			ri.Printf(PRINT_ALL, "DEBUG: Shader %s, pStage=%p, depthFragment=%d, has_depth_fragment=%d\n",
-					  shader.name, (void*)pStage, pStage ? pStage->depthFragment : -1, has_depth_fragment);
-
 			if (has_depth_fragment) {
-				ri.Printf(PRINT_ALL, "DEBUG: Executing depth fragment processing for shader %s\n", shader.name);
 
 				// Reset FPU state before Vulkan operations to prevent state corruption
 				#ifdef __linux__
@@ -4205,14 +4187,10 @@ static shader_t *FinishShader( void ) {
 					ri.Printf(PRINT_WARNING, "Vulkan: Device lost during mirror depth fragment pipeline creation for shader %s, skipping remaining pipeline creation\n", shader.name);
 					break; // Exit the stage loop
 				}
-				ri.Printf(PRINT_ALL, "DEBUG: Depth fragment mirror pipeline call completed\n");
 				if (pStage->vk_mirror_pipeline_df == VK_NULL_HANDLE) {
 					ri.Printf(PRINT_WARNING, "Failed to create Vulkan mirror depth fragment pipeline for shader stage\n");
 					// Don't fail, mirror depth fragment pipeline is optional
 				}
-				ri.Printf(PRINT_ALL, "DEBUG: Depth fragment processing completed successfully\n");
-			} else {
-				ri.Printf(PRINT_ALL, "DEBUG: Skipping depth fragment processing\n");
 			}
 			}
 
@@ -4542,7 +4520,6 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 
 	// Initialize images on first shader lookup (Vulkan renderer doesn't call R_InitImages)
 	if (!images_initialized) {
-		ri.Printf(PRINT_ALL, "DEBUG: R_FindShader initializing images\n");
 		images_initialized = qtrue;
 	}
 
@@ -5021,7 +4998,6 @@ R_InitShaders
 ==================
 */
 void R_InitShaders( void ) {
-	ri.Printf( PRINT_ALL, "DEBUG: R_InitShaders called\n" );
 	ri.Printf( PRINT_ALL, "Initializing Shaders\n" );
 
 	Com_Memset(hashTable, 0, sizeof(hashTable));

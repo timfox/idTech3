@@ -685,25 +685,17 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 // Modernized memory type finding with better safety and error handling
 VK_NONNULL
 uint32_t find_memory_type(uint32_t memory_type_bits, VkMemoryPropertyFlags properties) {
-	ri.Printf(PRINT_ALL, "DEBUG: find_memory_type called with bits=0x%x, properties=0x%x\n", memory_type_bits, properties);
-
 	// Use cached memory properties instead of calling Vulkan API again
 	// This avoids potential driver issues with repeated calls
 	const VkPhysicalDeviceMemoryProperties *memory_properties = &vk_physical_device_memory_properties;
-	ri.Printf(PRINT_ALL, "DEBUG: cached memory_properties=%p, memoryTypeCount=%u\n", memory_properties, memory_properties->memoryTypeCount);
 
 	// Bounds checking with modern loop
 	const uint32_t max_types = memory_properties->memoryTypeCount;
-	ri.Printf(PRINT_ALL, "DEBUG: searching %u memory types\n", max_types);
 	for (uint32_t i = 0; i < max_types && i < VK_MAX_MEMORY_TYPES; i++) {
 		const uint32_t bit = (uint32_t)(1U << i);
-		ri.Printf(PRINT_ALL, "DEBUG: checking memory type %u: bit=0x%x, flags=0x%x\n", i, bit, memory_properties->memoryTypes[i].propertyFlags);
 		if ((memory_type_bits & bit) != 0 &&
 			(memory_properties->memoryTypes[i].propertyFlags & properties) == properties) {
-			ri.Printf(PRINT_ALL, "DEBUG: found matching memory type %u\n", i);
-			uint32_t result = i;
-			ri.Printf(PRINT_ALL, "DEBUG: returning result %u\n", result);
-			return result;
+			return i;
 		}
 	}
 
@@ -4926,15 +4918,11 @@ void vk_initialize( void )
 	ri.Printf(PRINT_ALL, "DEBUG: Vulkan marked as active after validation\n");
 
 	// Initialize Vulkan images now that the device is ready
-	ri.Printf(PRINT_ALL, "DEBUG: Initializing Vulkan images after device validation\n");
 	R_InitImages();
-	ri.Printf(PRINT_ALL, "DEBUG: Vulkan images initialized successfully\n");
 
 	// Notify the client of the active render scaling so console math uses valid values.
 	if ( ri.CL_SetScaling ) {
-		ri.Printf(PRINT_ALL, "DEBUG: About to call CL_SetScaling\n");
 		ri.CL_SetScaling( 1.0f, glConfig.vidWidth, glConfig.vidHeight );
-		ri.Printf(PRINT_ALL, "DEBUG: CL_SetScaling completed\n");
 	}
 }
 
