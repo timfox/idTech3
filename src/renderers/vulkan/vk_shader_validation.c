@@ -22,8 +22,9 @@ static const char *problematic_shader_names[] = {
 };
 
 // List of problematic shader types that cause SIGFPE or crashes
+// NOTE: TYPE_SINGLE_TEXTURE is used by default shader, so we can't block it globally
+// Instead, we rely on shader name detection for specific problematic shaders
 static const int problematic_shader_types[] = {
-	TYPE_SINGLE_TEXTURE,                    // Causes SIGFPE
 	TYPE_SINGLE_TEXTURE_FIXED_COLOR,        // Causes crashes
 	TYPE_MULTI_TEXTURE_MUL2_IDENTITY,      // Causes crashes
 	-1  // Sentinel
@@ -45,6 +46,12 @@ Returns qtrue if the shader name is known to cause problems
 */
 qboolean vk_is_problematic_shader_name(const char *shader_name) {
 	if (!shader_name || shader_name[0] == '\0') {
+		return qfalse;
+	}
+
+	// Never block internal/system shaders (those starting with '<')
+	// These are essential for the renderer to function
+	if (shader_name[0] == '<') {
 		return qfalse;
 	}
 
@@ -109,29 +116,40 @@ qboolean vk_validate_shader_before_pipeline(const char *shader_name, int shader_
 		return qfalse;
 	}
 
-	// Check shader name
+	// Always allow internal/system shaders (those starting with '<' like "<default>", "<white>", etc.)
+	// These are essential for the renderer to function
+	if (shader_name && shader_name[0] == '<') {
+		return qtrue;  // Always allow internal shaders
+	}
+
+	// Check shader name for problematic shaders
 	if (shader_name && vk_is_problematic_shader_name(shader_name)) {
 		return qfalse;
 	}
 
-	// Check shader type
+	// Check shader type (but allow essential types like TYPE_SINGLE_TEXTURE for default shader)
+	// Only block types that are known to be problematic AND not commonly used
 	if (vk_is_problematic_shader_type(shader_type)) {
 		return qfalse;
 	}
 
 	// Validate pipeline definition
+	// Note: Vk_Pipeline_Def only contains metadata (shader_type, cullType, etc.)
+	// Shader modules are looked up from vk.modules based on shader_type
+	// Pipeline layout comes from vk.pipeline_layout (global state)
 	if (def) {
-		// Check for invalid shader modules
-		if (def->shaders.vs_module == VK_NULL_HANDLE || 
-			def->shaders.fs_module == VK_NULL_HANDLE) {
-			ri.Printf(PRINT_WARNING, "Vulkan: Shader has NULL shader modules (name=%s, type=%d)\n",
-				shader_name ? shader_name : "unknown", shader_type);
+		// Validate shader_type is in valid range
+		if (shader_type < 0 || shader_type > TYPE_GENERIC_END) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Invalid shader type %d (name=%s)\n",
+				shader_type, shader_name ? shader_name : "unknown");
 			return qfalse;
 		}
 
-		// Check for invalid pipeline layout
-		if (def->pipeline_layout == VK_NULL_HANDLE) {
-			ri.Printf(PRINT_WARNING, "Vulkan: Shader has NULL pipeline layout (name=%s, type=%d)\n",
+		// Check that global pipeline layout exists (it's a global, not in def)
+		// Access via the global vk structure which is already available
+		if (vk.pipeline_layout == VK_NULL_HANDLE && 
+			vk.pipeline_layout_storage == VK_NULL_HANDLE) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Pipeline layouts not initialized (name=%s, type=%d)\n",
 				shader_name ? shader_name : "unknown", shader_type);
 			return qfalse;
 		}

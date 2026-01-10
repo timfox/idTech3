@@ -1547,6 +1547,7 @@ SET(RENDERER_VK_SRCS
 	src/renderers/vulkan/vk_commands.c
 	src/renderers/vulkan/vk_pipeline.c
 	src/renderers/vulkan/vk_shader_manager.cpp
+	src/renderers/vulkan/vk_shader_validation.c
 	src/renderers/vulkan/vk_material_parser.c
 	src/renderers/vulkan/vk_material_system.c
 	src/renderers/vulkan/vk_advanced_materials.c

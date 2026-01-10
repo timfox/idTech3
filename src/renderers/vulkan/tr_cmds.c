@@ -446,15 +446,18 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 			
 			// First, test if device is responsive with a simple operation
 			if (vk.device != VK_NULL_HANDLE && vk.physical_device != VK_NULL_HANDLE) {
-				// Test device responsiveness with a simple query before attempting swapchain operations
-				VkResult test_result = qvkDeviceWaitIdle(vk.device);
-				if (test_result == VK_ERROR_DEVICE_LOST) {
+				// Test device responsiveness using the existing wrapper function
+				// This will safely check if device is responsive
+				qboolean was_device_lost = vk.device_lost;
+				vk_wait_idle();
+				// If device was lost during wait, it will be set in vk_wait_idle
+				if (vk.device_lost && !was_device_lost) {
 					ri.Printf(PRINT_WARNING, "Vulkan: Device still not responsive. Will retry in %d seconds.\n", recovery_delay / 1000);
 					return; // Skip swapchain operations if device is still lost
 				}
 				
 				// Temporarily clear device_lost flag to allow swapchain operations
-				qboolean was_device_lost = vk.device_lost;
+				was_device_lost = vk.device_lost;
 				vk.device_lost = qfalse;
 				
 				// If swapchain doesn't exist, try to create it; otherwise recreate it

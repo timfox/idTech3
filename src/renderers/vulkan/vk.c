@@ -6485,11 +6485,10 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	}
 	#endif
 
-	// Temporarily skip TYPE_SINGLE_TEXTURE pipelines that cause SIGFPE
-	if (def->shader_type == TYPE_SINGLE_TEXTURE) {
-		ri.Printf(PRINT_WARNING, "create_pipeline: skipping TYPE_SINGLE_TEXTURE pipeline (known SIGFPE issue)\n");
-		return VK_NULL_HANDLE;
-	}
+	// NOTE: TYPE_SINGLE_TEXTURE was previously skipped due to SIGFPE issues,
+	// but it's needed for default shader and many other shaders.
+	// We now rely on shader name validation to catch specific problematic shaders.
+	// If SIGFPE issues persist, they should be fixed at the shader level, not by blocking the entire type.
 
 	// Check if SIGFPE occurred during previous operations
 #ifdef __linux__
@@ -6611,11 +6610,9 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 	vs_module = VK_NULL_HANDLE;
 	fs_module = VK_NULL_HANDLE;
 
-	// Skip problematic shader types that cause SIGFPE
-	if (def->shader_type == TYPE_SINGLE_TEXTURE) {
-		ri.Printf(PRINT_WARNING, "create_pipeline: skipping TYPE_SINGLE_TEXTURE pipeline (known SIGFPE issue)\n");
-		return VK_NULL_HANDLE;
-	}
+	// NOTE: TYPE_SINGLE_TEXTURE is used by default shader and many essential shaders.
+	// We rely on shader name validation to catch specific problematic shaders instead
+	// of blocking the entire type, which would break the renderer.
 
 	switch ( def->shader_type ) {
 
