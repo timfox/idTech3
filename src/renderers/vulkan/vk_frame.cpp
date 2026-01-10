@@ -992,7 +992,12 @@ void vk_read_pixels(byte *buffer, uint32_t width, uint32_t height) {
         .pSignalSemaphores = NULL
       };
       qvkQueueSubmit(vk.queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(vk.queue);
+      // For readback operations, we need to wait, but use the wrapper function
+      // and only wait if device is not lost
+      if (!vk.device_lost) {
+          extern void vk_queue_wait_idle(void);
+          vk_queue_wait_idle();
+      }
 
       // Copy staging to CPU memory
       if (vk.staging_buffer.ptr) {

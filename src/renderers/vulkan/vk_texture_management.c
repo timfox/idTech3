@@ -184,9 +184,13 @@ void vk_readback_image_to_cpu(image_t *image, void *dstBuffer, int width, int he
 
     // End and submit
     vk_end_command_buffer(cmd, "vk_readback_image_to_cpu");
-    VkSubmitInfo submitInfo = { .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO, .pNext = NULL, .commandBufferCount = 1, .pCommandBuffers = &cmd };
-    qvkQueueSubmit(vk.queue, 1, &submitInfo, VK_NULL_HANDLE);
-    vkQueueWaitIdle(vk.queue);
+    // Note: vk_end_command_buffer already submits the command buffer
+    // For readback operations, we need to wait, but use the wrapper function
+    // and only wait if device is not lost
+    if (!vk.device_lost) {
+        extern void vk_queue_wait_idle(void);
+        vk_queue_wait_idle();
+    }
 
     // Copy staging buffer to CPU memory
     if (vk.staging_buffer.ptr) {

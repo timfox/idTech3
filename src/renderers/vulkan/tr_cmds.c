@@ -467,10 +467,23 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 		}
 		
 		// Attempt device recovery with delays to allow GPU driver to recover
-		// First attempt after 1 second (gives driver time to stabilize), then every 2 seconds
+		// First attempt is immediate (0ms) to allow UI to show as quickly as possible
+		// Next few attempts are aggressive (100ms) to allow UI to show quickly
+		// After initial attempts, use longer delays (1s first, then 2s) to give driver time to stabilize
 		// Use -1 as sentinel to ensure first attempt happens even if Milliseconds() returns 0
 		static int initial_delay_passed = 0;
-		int recovery_delay = (initial_delay_passed == 0) ? 1000 : 2000; // 1s first attempt (driver needs time), then 2s
+		static int quick_recovery_attempts = 0;
+		const int MAX_QUICK_RECOVERY_ATTEMPTS = 5; // Try 5 quick attempts before using longer delays
+		int recovery_delay;
+		if (last_recovery_attempt == -1) {
+			recovery_delay = 0; // Immediate first attempt - allows UI to show on first frame if device recovers
+		} else if (quick_recovery_attempts < MAX_QUICK_RECOVERY_ATTEMPTS) {
+			recovery_delay = 100; // 100ms for next 5 attempts - allows UI to show quickly
+		} else if (initial_delay_passed == 0) {
+			recovery_delay = 1000; // 1s first attempt after quick attempts
+		} else {
+			recovery_delay = 2000; // 2s for subsequent attempts
+		}
 		
 		// Check recovery attempt limit
 		if (recovery_attempt_count >= MAX_RECOVERY_ATTEMPTS) {
@@ -483,7 +496,9 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 		}
 
 		if (last_recovery_attempt == -1 || current_time - last_recovery_attempt > recovery_delay) {
-			if (initial_delay_passed == 0) {
+			if (quick_recovery_attempts < MAX_QUICK_RECOVERY_ATTEMPTS) {
+				quick_recovery_attempts++;
+			} else if (initial_delay_passed == 0) {
 				initial_delay_passed = 1;
 			}
 			last_recovery_attempt = current_time;
@@ -572,6 +587,8 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 							recovery_attempt_count);
 						vk.device_lost = qfalse; // Device recovered - clear flag to allow rendering
 						recovery_attempt_count = 0; // Reset counter on successful recovery
+						quick_recovery_attempts = 0; // Reset quick recovery counter
+						initial_delay_passed = 0; // Reset initial delay flag
 						// Image was acquired, we'll use it in the normal flow
 						if (test_result == VK_SUCCESS) {
 							vk.current_swapchain_image_index = test_index;

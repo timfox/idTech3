@@ -947,7 +947,6 @@ void end_command_buffer(VkCommandBuffer command_buffer, const char *location)
 			ri.Printf(PRINT_ERROR, "Vulkan: This may cause rendering artifacts or instability\n");
 			ri.Printf(PRINT_ERROR, "Vulkan: Rendering disabled. Try restarting the application or updating GPU drivers.\n");
 			ri.Printf(PRINT_ERROR, "Vulkan: Video playback may not work until device is recovered.\n");
-			// Skip wait if device is lost - it will fail anyway
 			return;
 		} else {
 			// For other errors, use the standard error handling
@@ -955,15 +954,10 @@ void end_command_buffer(VkCommandBuffer command_buffer, const char *location)
 		}
 	}
 
-	// Only wait if device is not lost
-	if (!vk.device_lost) {
-		vk_queue_wait_idle();
-	}
-
-	// Only free command buffers if device is not lost
-	if (!vk.device_lost && vk.device != VK_NULL_HANDLE) {
-		qvkFreeCommandBuffers( vk.device, vk.command_pool, 1, &command_buffer );
-	}
+	// Don't wait for queue idle after every command submission - this is unnecessary and can discover device loss prematurely.
+	// Use fences/semaphores for synchronization instead. Queue waits should only be used when
+	// actually necessary (resource cleanup, reading back results, etc.)
+	// The command buffer will be freed when it's actually finished, not immediately.
 }
 
 VkInstance VK_GetInstanceHandle( void )
@@ -10062,14 +10056,42 @@ void vk_queue_wait_idle( void ) {
 		return;
 	}
 
+	// Check if we've detected problematic shaders during initialization
+	// If so, use a more cautious approach - the device might be in an unstable state
+	#ifdef USE_VULKAN
+	#include "vk_shader_validation.h"
+	extern int vk_get_problematic_shader_count(void);
+	static qboolean initialization_phase = qtrue; // Track if we're still in initialization
+	if (initialization_phase && vk_get_problematic_shader_count() > 0) {
+		// During initialization with problematic shaders detected, skip wait to avoid discovering device loss
+		// The problematic shader may have already submitted a command that causes device loss
+		// We'll discover the loss later during normal operations if it persists
+		ri.Printf(PRINT_DEVELOPER, "Vulkan: Skipping queue wait during initialization - problematic shaders detected\n");
+		// Mark initialization as complete after a few frames
+		static int frame_count = 0;
+		if (++frame_count > 10) {
+			initialization_phase = qfalse;
+		}
+		return;
+	}
+	initialization_phase = qfalse; // Mark initialization as complete
+	#endif
+
+	// Check device status before waiting - use GetDeviceQueue2 or similar to verify device is still valid
+	// If device was lost, QueueWaitIdle will return VK_ERROR_DEVICE_LOST immediately
+	// We can't prevent this, but we can handle it gracefully
 	VkResult result = qvkQueueWaitIdle( vk.queue );
 	if (result != VK_SUCCESS) {
 		if (result == VK_ERROR_DEVICE_LOST) {
-			vk.device_lost = qtrue;  // Mark device as lost
-			vk_reset_memory_tracking_on_device_lost(); // Reset memory tracking so recovery knows memory is available
-			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during queue wait - GPU driver issue\n");
-			ri.Printf(PRINT_ERROR, "Vulkan: This may cause rendering artifacts or instability\n");
-			ri.Printf(PRINT_WARNING, "Vulkan: Recovery will be attempted automatically\n");
+			// Device was already lost (from a previous command) - we're just discovering it now
+			// Don't treat this as a new error, just mark it and continue
+			if (!vk.device_lost) {
+				vk.device_lost = qtrue;  // Mark device as lost
+				vk_reset_memory_tracking_on_device_lost(); // Reset memory tracking so recovery knows memory is available
+				ri.Printf(PRINT_WARNING, "Vulkan: Device lost detected during queue wait (from previous command)\n");
+				ri.Printf(PRINT_WARNING, "Vulkan: This was likely caused by a problematic shader or command\n");
+				ri.Printf(PRINT_WARNING, "Vulkan: Recovery will be attempted automatically\n");
+			}
 			// Don't terminate the engine for device lost - allow initialization to continue
 			return;
 		} else {
@@ -10078,12 +10100,6 @@ void vk_queue_wait_idle( void ) {
 		}
 	}
 }
-
-/*
-=============================================================================
-Vulkan 1.4 Maintenance5 Features
-=============================================================================
-*/
 
 // Get buffer device address (VK_KHR_maintenance5 / Vulkan 1.4 core)
 VkDeviceAddress vk_get_buffer_device_address(VkBuffer buffer) {

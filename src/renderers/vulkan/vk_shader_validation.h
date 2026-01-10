@@ -35,6 +35,9 @@ void vk_reset_shader_validation_stats(void);
 // Print validation report
 void vk_print_shader_validation_report(void);
 
+// Get count of problematic shaders detected
+int vk_get_problematic_shader_count(void);
+
 #endif // USE_VULKAN
 
 #endif // __VK_SHADER_VALIDATION_H__

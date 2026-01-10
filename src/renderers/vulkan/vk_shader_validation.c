@@ -234,4 +234,14 @@ void vk_print_shader_validation_report(void) {
 	ri.Printf(PRINT_ALL, "========================================\n");
 }
 
+/*
+==================
+vk_get_problematic_shader_count
+==================
+Returns the number of problematic shaders that have been detected
+*/
+int vk_get_problematic_shader_count(void) {
+	return validation_stats.problematic_shaders_skipped;
+}
+
 #endif // USE_VULKAN
