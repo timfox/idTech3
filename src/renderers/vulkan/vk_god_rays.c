@@ -622,23 +622,13 @@ static void vk_detect_bright_lights(void) {
 // Project lights to screen space
 static void vk_project_lights_to_screen(void) {
     // Get MVP from viewParms (vk.cmd doesn't have mvp member)
-    if (!backEnd.viewParms.projectionMatrix) {
-        return;
-    }
-    
     float mvp[16];
     // Use projection matrix from viewParms
-    if (backEnd.viewParms.projectionMatrix) {
-        Com_Memcpy(mvp, backEnd.viewParms.projectionMatrix, sizeof(mvp));
-        // Multiply by view matrix if available
-        if (backEnd.viewParms.world.modelViewMatrix) {
-            float temp[16];
-            // Use optimized matrix multiplication
-            extern void Matrix16MultiplyOptimized(const mat4_t a, const mat4_t b, mat4_t out);
-            Matrix16MultiplyOptimized(backEnd.viewParms.projectionMatrix, backEnd.viewParms.world.modelViewMatrix, mvp);
-        }
-    } else {
-        Matrix16Identity(mvp);
+    Com_Memcpy(mvp, backEnd.viewParms.projectionMatrix, sizeof(mvp));
+    // Multiply by view matrix if available
+    {
+        extern void Matrix16MultiplyOptimized(const mat4_t a, const mat4_t b, mat4_t out);
+        Matrix16MultiplyOptimized(backEnd.viewParms.projectionMatrix, backEnd.viewParms.world.modelViewMatrix, mvp);
     }
     
     for (int i = 0; i < gr_system.num_lights; i++) {
@@ -675,21 +665,13 @@ static void vk_project_lights_to_screen(void) {
 // Helper function to project sun to screen (simplified)
 static qboolean project_sun_to_screen(const vec3_t world_pos, vec3_t screen_pos) {
     // Get MVP from viewParms (vk.cmd doesn't have mvp member)
-    if (!backEnd.viewParms.projectionMatrix) {
-        return qfalse;
-    }
-    
     float mvp[16];
     // Use projection matrix from viewParms
-    if (backEnd.viewParms.projectionMatrix) {
-        Com_Memcpy(mvp, backEnd.viewParms.projectionMatrix, sizeof(mvp));
-        // Multiply by view matrix if available
-        if (backEnd.viewParms.world.modelViewMatrix) {
-            extern void Matrix16MultiplyOptimized(const mat4_t a, const mat4_t b, mat4_t out);
-            Matrix16MultiplyOptimized(backEnd.viewParms.projectionMatrix, backEnd.viewParms.world.modelViewMatrix, mvp);
-        }
-    } else {
-        Matrix16Identity(mvp);
+    Com_Memcpy(mvp, backEnd.viewParms.projectionMatrix, sizeof(mvp));
+    // Multiply by view matrix if available
+    {
+        extern void Matrix16MultiplyOptimized(const mat4_t a, const mat4_t b, mat4_t out);
+        Matrix16MultiplyOptimized(backEnd.viewParms.projectionMatrix, backEnd.viewParms.world.modelViewMatrix, mvp);
     }
     
     // Project world position to clip space
