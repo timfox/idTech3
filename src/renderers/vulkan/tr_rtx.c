@@ -104,9 +104,12 @@ static void vk_shutdown_local(void) {
 
     // Clean up Vulkan resources if device is valid and not lost
     if (vk.device != VK_NULL_HANDLE && vk.device != (VkDevice)0x20000000 && !vk.device_lost) {
-        // RTX-specific resources are cleaned up by the main Vulkan shutdown
-        // This function is called as part of the renderer shutdown sequence
-        ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: Resources will be cleaned up by main Vulkan shutdown\n");
+        // RTX-specific resources are cleaned up by RTX_Shutdown() which is called
+        // before this function. This ensures proper cleanup order:
+        // 1. RTX_Shutdown() -> vk_rt_shutdown(), VK_ComputeRT_Shutdown()
+        // 2. This function -> general Vulkan cleanup
+        // 3. Main Vulkan shutdown -> device destruction
+        ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: Resources cleaned up by RTX_Shutdown()\n");
     } else {
         ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: Skipping cleanup (device lost or invalid)\n");
     }

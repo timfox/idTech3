@@ -62,7 +62,25 @@ void vk_create_sync_primitives(void) {
     ri.Printf(PRINT_ALL, "Vulkan: Created synchronization primitives\n");
 }
 
+// Reset GPU timing for new frame
+void vk_reset_gpu_timing(uint32_t frame_index) {
+    if (!gpu_timing.initialized || frame_index >= NUM_COMMAND_BUFFERS) {
+        return;
+    }
+
+    if (gpu_timing.query_pools[frame_index] != VK_NULL_HANDLE && vk.cmd && vk.cmd->command_buffer) {
+        // Reset query pool at start of frame
+        qvkCmdResetQueryPool(vk.cmd->command_buffer, gpu_timing.query_pools[frame_index], 0, MAX_GPU_TIMING_REGIONS * 2);
+    }
+
+    // Reset region tracking
+    gpu_timing.region_count[frame_index] = 0;
+    gpu_timing.next_query_index[frame_index] = 0;
+    Com_Memset(gpu_timing.regions[frame_index], 0, sizeof(gpu_timing.regions[frame_index]));
+}
+
 void vk_destroy_sync_primitives(void) {
+    vk_shutdown_gpu_timing();
     uint32_t i;
 
 #ifdef USE_UPLOAD_QUEUE
@@ -234,42 +252,196 @@ float vk_get_average_fps(void) {
     return (float)(1000.0 / avg);
 }
 
-// GPU timing queries - framework
-// Note: GPU timing queries are stubbed for future implementation.
-// To implement properly:
-// GPU timing implementation steps:
-// 1. Check for VK_EXT_calibrated_timestamps extension support (or use standard timestamp queries)
-// 2. Create VkQueryPool with VK_QUERY_TYPE_TIMESTAMP
-// 3. Record timestamps at begin/end points in command buffer using vkCmdWriteTimestamp()
-// 4. Retrieve results after command buffer execution using vkGetQueryPoolResults()
-// 5. Convert timestamp deltas to milliseconds/seconds using device timestamp period
-// Alternative: Use VK_EXT_host_query_reset for simpler implementation
-__attribute__((unused)) void vk_begin_gpu_timing(const char *name) {
-    // TODO: Implement GPU timing queries.
-    //       Steps:
-    //       1. Allocate query pool if not already created (one per frame in flight)
-    //       2. Reset query pool: vkCmdResetQueryPool() or VK_EXT_host_query_reset
-    //       3. Record begin timestamp: vkCmdWriteTimestamp(vk.cmd->command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, query_pool, query_index)
-    //       4. Store query_index and name in per-frame timing structure
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: GPU timing begin requested for: %s (not yet implemented)\n", name ? name : "unnamed");
+// GPU timing queries - implementation
+#define MAX_GPU_TIMING_REGIONS 32
+
+typedef struct {
+    const char *name;
+    uint32_t query_index;
+    qboolean active;
+} gpu_timing_region_t;
+
+static struct {
+    VkQueryPool query_pools[NUM_COMMAND_BUFFERS];
+    gpu_timing_region_t regions[NUM_COMMAND_BUFFERS][MAX_GPU_TIMING_REGIONS];
+    uint32_t region_count[NUM_COMMAND_BUFFERS];
+    uint32_t next_query_index[NUM_COMMAND_BUFFERS];
+    qboolean initialized;
+    float timestamp_period; // nanoseconds per timestamp unit
+} gpu_timing = {0};
+
+// Forward declarations
+extern PFN_vkCreateQueryPool qvkCreateQueryPool;
+extern PFN_vkDestroyQueryPool qvkDestroyQueryPool;
+extern PFN_vkResetQueryPool qvkResetQueryPool;
+extern PFN_vkCmdResetQueryPool qvkCmdResetQueryPool;
+extern PFN_vkCmdWriteTimestamp qvkCmdWriteTimestamp;
+extern PFN_vkGetQueryPoolResults qvkGetQueryPoolResults;
+extern PFN_vkCmdResetQueryPool qvkCmdResetQueryPool;
+
+// Initialize GPU timing query pools
+static void vk_init_gpu_timing(void) {
+    if (gpu_timing.initialized) {
+        return;
+    }
+
+    VkQueryPoolCreateInfo createInfo = {
+        .sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO,
+        .pNext = NULL,
+        .flags = 0,
+        .queryType = VK_QUERY_TYPE_TIMESTAMP,
+        .queryCount = MAX_GPU_TIMING_REGIONS * 2, // begin + end for each region
+        .pipelineStatistics = 0
+    };
+
+    for (uint32_t i = 0; i < NUM_COMMAND_BUFFERS; i++) {
+        VkResult result = qvkCreateQueryPool(vk.device, &createInfo, NULL, &gpu_timing.query_pools[i]);
+        if (result != VK_SUCCESS) {
+            ri.Printf(PRINT_WARNING, "vk_init_gpu_timing: Failed to create query pool %u: %s\n", i, vk_result_string(result));
+            gpu_timing.query_pools[i] = VK_NULL_HANDLE;
+            continue;
+        }
+        gpu_timing.region_count[i] = 0;
+        gpu_timing.next_query_index[i] = 0;
+    }
+
+    // Get timestamp period from physical device properties
+    VkPhysicalDeviceProperties props;
+    extern PFN_vkGetPhysicalDeviceProperties qvkGetPhysicalDeviceProperties;
+    qvkGetPhysicalDeviceProperties(vk.physical_device, &props);
+    gpu_timing.timestamp_period = props.limits.timestampPeriod;
+    gpu_timing.initialized = qtrue;
+
+    ri.Printf(PRINT_DEVELOPER, "vk_init_gpu_timing: Initialized GPU timing (period: %f ns)\n", gpu_timing.timestamp_period);
 }
 
-__attribute__((unused)) void vk_end_gpu_timing(void) {
-    // TODO: End GPU timing query - record timestamp in command buffer
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: GPU timing end requested (not yet implemented)\n");
+// Cleanup GPU timing query pools
+static void vk_shutdown_gpu_timing(void) {
+    if (!gpu_timing.initialized) {
+        return;
+    }
+
+    for (uint32_t i = 0; i < NUM_COMMAND_BUFFERS; i++) {
+        if (gpu_timing.query_pools[i] != VK_NULL_HANDLE) {
+            qvkDestroyQueryPool(vk.device, gpu_timing.query_pools[i], NULL);
+            gpu_timing.query_pools[i] = VK_NULL_HANDLE;
+        }
+    }
+
+    Com_Memset(&gpu_timing, 0, sizeof(gpu_timing));
 }
 
-__attribute__((unused)) float vk_get_gpu_timing_result(const char *name) {
-    // TODO: Return GPU timing result - retrieve timestamp delta and convert to ms.
-    //       Steps:
-    //       1. Find query_index by name in per-frame timing structure
-    //       2. Wait for command buffer completion (or use fence)
-    //       3. Retrieve timestamps: vkGetQueryPoolResults(device, query_pool, query_index, 2, sizeof(uint64_t)*2, timestamps, sizeof(uint64_t), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT)
-    //       4. Calculate delta: (end_timestamp - begin_timestamp) * timestamp_period (from VkPhysicalDeviceProperties.limits.timestampPeriod)
-    //       5. Convert to milliseconds: delta_ns / 1e6
-    //       6. Return result in milliseconds
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: GPU timing result requested for: %s (not yet implemented)\n", name ? name : "unnamed");
-    return 0.0f;
+void vk_begin_gpu_timing(const char *name) {
+    if (!gpu_timing.initialized) {
+        vk_init_gpu_timing();
+    }
+
+    if (!name || !vk.cmd || !vk.cmd->command_buffer) {
+        return;
+    }
+
+    uint32_t frame_index = vk.cmd->swapchain_image_index % NUM_COMMAND_BUFFERS;
+    if (frame_index >= NUM_COMMAND_BUFFERS || gpu_timing.query_pools[frame_index] == VK_NULL_HANDLE) {
+        return;
+    }
+
+    if (gpu_timing.region_count[frame_index] >= MAX_GPU_TIMING_REGIONS) {
+        ri.Printf(PRINT_WARNING, "vk_begin_gpu_timing: Too many timing regions (max %d)\n", MAX_GPU_TIMING_REGIONS);
+        return;
+    }
+
+    // Find or create region
+    gpu_timing_region_t *region = NULL;
+    for (uint32_t i = 0; i < gpu_timing.region_count[frame_index]; i++) {
+        if (gpu_timing.regions[frame_index][i].name == name && !gpu_timing.regions[frame_index][i].active) {
+            region = &gpu_timing.regions[frame_index][i];
+            break;
+        }
+    }
+
+    if (!region) {
+        region = &gpu_timing.regions[frame_index][gpu_timing.region_count[frame_index]++];
+        region->name = name;
+        region->query_index = gpu_timing.next_query_index[frame_index];
+        gpu_timing.next_query_index[frame_index] += 2; // begin + end
+    }
+
+    region->active = qtrue;
+
+    // Record begin timestamp
+    qvkCmdWriteTimestamp(vk.cmd->command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                         gpu_timing.query_pools[frame_index], region->query_index);
+}
+
+void vk_end_gpu_timing(void) {
+    if (!gpu_timing.initialized || !vk.cmd || !vk.cmd->command_buffer) {
+        return;
+    }
+
+    uint32_t frame_index = vk.cmd->swapchain_image_index % NUM_COMMAND_BUFFERS;
+    if (frame_index >= NUM_COMMAND_BUFFERS || gpu_timing.query_pools[frame_index] == VK_NULL_HANDLE) {
+        return;
+    }
+
+    // Find active region (most recently started)
+    gpu_timing_region_t *region = NULL;
+    for (uint32_t i = gpu_timing.region_count[frame_index]; i > 0; i--) {
+        if (gpu_timing.regions[frame_index][i - 1].active) {
+            region = &gpu_timing.regions[frame_index][i - 1];
+            break;
+        }
+    }
+
+    if (!region) {
+        return;
+    }
+
+    // Record end timestamp
+    qvkCmdWriteTimestamp(vk.cmd->command_buffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                         gpu_timing.query_pools[frame_index], region->query_index + 1);
+    region->active = qfalse;
+}
+
+float vk_get_gpu_timing_result(const char *name) {
+    if (!gpu_timing.initialized || !name) {
+        return 0.0f;
+    }
+
+    // Use the frame that just completed (previous frame)
+    uint32_t frame_index = (vk.cmd->swapchain_image_index + NUM_COMMAND_BUFFERS - 1) % NUM_COMMAND_BUFFERS;
+    if (frame_index >= NUM_COMMAND_BUFFERS || gpu_timing.query_pools[frame_index] == VK_NULL_HANDLE) {
+        return 0.0f;
+    }
+
+    // Find region by name
+    gpu_timing_region_t *region = NULL;
+    for (uint32_t i = 0; i < gpu_timing.region_count[frame_index]; i++) {
+        if (gpu_timing.regions[frame_index][i].name == name) {
+            region = &gpu_timing.regions[frame_index][i];
+            break;
+        }
+    }
+
+    if (!region) {
+        return 0.0f;
+    }
+
+    // Retrieve timestamps
+    uint64_t timestamps[2];
+    VkResult result = qvkGetQueryPoolResults(vk.device, gpu_timing.query_pools[frame_index],
+                                              region->query_index, 2,
+                                              sizeof(uint64_t) * 2, timestamps,
+                                              sizeof(uint64_t),
+                                              VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+
+    if (result != VK_SUCCESS) {
+        return 0.0f;
+    }
+
+    // Calculate delta and convert to milliseconds
+    uint64_t delta = timestamps[1] - timestamps[0];
+    float delta_ms = (float)((double)delta * gpu_timing.timestamp_period / 1e6);
+    return delta_ms;
 }
 // Store GPU timing in current frame's profile
 void vk_update_gpu_timing_ns(uint64_t gpu_ns) {

@@ -19,28 +19,255 @@ full implementations of all optional features.
 glstatic_t gls = {0};
 glstate_t glState = {0};
 
-// Screenshot/video capture helpers - stubbed for now
-// Note: Screenshot functionality should be implemented via Vulkan image
-// capture and encoding. These stubs prevent link errors but don't provide
-// actual functionality. Future implementation should use vk.cmd->command_buffer
-// to copy framebuffer to host-visible image and encode to file format.
+// Screenshot/video capture helpers - full implementation
+// Uses vk_read_pixels to read framebuffer and encode to various formats
+
+// Forward declarations
+extern void vk_read_pixels(byte *buffer, uint32_t width, uint32_t height);
+extern void R_GammaCorrect(byte *buffer, int bufSize);
+extern cvar_t *r_screenshotJpegQuality;
+
+// Helper: Fill BMP header
+static void FillBMPHeader(byte *buffer, int width, int height, int memcount, int header_size) {
+    int filesize;
+    Com_Memset(buffer, 0, header_size);
+
+    // Bitmap file header
+    buffer[0] = 'B';
+    buffer[1] = 'M';
+    filesize = memcount + header_size;
+    buffer[2] = (filesize >> 0) & 255;
+    buffer[3] = (filesize >> 8) & 255;
+    buffer[4] = (filesize >> 16) & 255;
+    buffer[5] = (filesize >> 24) & 255;
+    buffer[10] = header_size; // data offset
+
+    // Bitmap info header
+    buffer[14] = 40; // size of this header
+    buffer[18] = (width >> 0) & 255;
+    buffer[19] = (width >> 8) & 255;
+    buffer[20] = (width >> 16) & 255;
+    buffer[21] = (width >> 24) & 255;
+
+    buffer[22] = (height >> 0) & 255;
+    buffer[23] = (height >> 8) & 255;
+    buffer[24] = (height >> 16) & 255;
+    buffer[25] = (height >> 24) & 255;
+    buffer[26] = 1; // number of color planes
+    buffer[28] = 24; // bpp
+
+    buffer[34] = (memcount >> 0) & 255;
+    buffer[35] = (memcount >> 8) & 255;
+    buffer[36] = (memcount >> 16) & 255;
+    buffer[37] = (memcount >> 24) & 255;
+    buffer[38] = 0xC4; // horizontal dpi
+    buffer[39] = 0x0E;
+    buffer[42] = 0xC4; // vertical dpi
+    buffer[43] = 0x0E;
+}
+
+// TGA screenshot (uncompressed)
 void RB_TakeScreenshot(int x, int y, int width, int height, const char *fileName) {
-    ri.Printf(PRINT_WARNING, "RB_TakeScreenshot: Screenshot capture not yet implemented in Vulkan renderer\n");
-    (void)x; (void)y; (void)width; (void)height; (void)fileName;
+    const int header_size = 18;
+    byte *buffer;
+    byte *srcptr, *destptr;
+    byte temp;
+    int linelen;
+    size_t memcount;
+
+    if (width <= 0 || height <= 0 || !fileName) {
+        ri.Printf(PRINT_WARNING, "RB_TakeScreenshot: Invalid parameters\n");
+        return;
+    }
+
+    // Allocate buffer for RGBA data + header
+    memcount = (size_t)width * (size_t)height * 4;
+    buffer = (byte*)ri.Hunk_AllocateTempMemory(memcount + header_size);
+    if (!buffer) {
+        ri.Printf(PRINT_ERROR, "RB_TakeScreenshot: Failed to allocate memory\n");
+        return;
+    }
+
+    // Read pixels (RGBA format)
+    vk_read_pixels(buffer + header_size, (uint32_t)width, (uint32_t)height);
+
+    // Fill TGA header
+    Com_Memset(buffer, 0, header_size);
+    buffer[2] = 2; // uncompressed type
+    buffer[12] = width & 255;
+    buffer[13] = width >> 8;
+    buffer[14] = height & 255;
+    buffer[15] = height >> 8;
+    buffer[16] = 24; // pixel size
+
+    // Convert RGBA to RGB and swap RGB to BGR
+    linelen = width * 3;
+    srcptr = buffer + header_size;
+    destptr = buffer + header_size;
+
+    for (int i = 0; i < height; i++) {
+        for (int j = 0; j < width; j++) {
+            temp = srcptr[0];
+            destptr[0] = srcptr[2]; // B
+            destptr[1] = srcptr[1]; // G
+            destptr[2] = temp;      // R
+            srcptr += 4; // Skip alpha
+            destptr += 3;
+        }
+    }
+
+    // Gamma correction
+    R_GammaCorrect(buffer + header_size, linelen * height);
+
+    // Write file
+    ri.FS_WriteFile(fileName, buffer, header_size + linelen * height);
+    ri.Hunk_FreeTempMemory(buffer);
+
+    ri.Printf(PRINT_ALL, "Screenshot saved: %s (%dx%d)\n", fileName, width, height);
 }
 
+// JPEG screenshot
 void RB_TakeScreenshotJPEG(int x, int y, int width, int height, const char *fileName) {
-    ri.Printf(PRINT_WARNING, "RB_TakeScreenshotJPEG: JPEG screenshot capture not yet implemented in Vulkan renderer\n");
-    (void)x; (void)y; (void)width; (void)height; (void)fileName;
+    byte *buffer;
+    size_t memcount;
+    int quality;
+
+    if (width <= 0 || height <= 0 || !fileName) {
+        ri.Printf(PRINT_WARNING, "RB_TakeScreenshotJPEG: Invalid parameters\n");
+        return;
+    }
+
+    // Allocate buffer for RGB data
+    memcount = (size_t)width * (size_t)height * 3;
+    buffer = (byte*)ri.Hunk_AllocateTempMemory(memcount);
+    if (!buffer) {
+        ri.Printf(PRINT_ERROR, "RB_TakeScreenshotJPEG: Failed to allocate memory\n");
+        return;
+    }
+
+    // Read pixels (RGBA format)
+    byte *rgba_buffer = (byte*)ri.Hunk_AllocateTempMemory((size_t)width * (size_t)height * 4);
+    if (!rgba_buffer) {
+        ri.Hunk_FreeTempMemory(buffer);
+        return;
+    }
+
+    vk_read_pixels(rgba_buffer, (uint32_t)width, (uint32_t)height);
+
+    // Convert RGBA to RGB
+    byte *src = rgba_buffer;
+    byte *dst = buffer;
+    for (int i = 0; i < width * height; i++) {
+        dst[0] = src[0]; // R
+        dst[1] = src[1]; // G
+        dst[2] = src[2]; // B
+        src += 4;
+        dst += 3;
+    }
+
+    // Gamma correction
+    R_GammaCorrect(buffer, (int)memcount);
+
+    // Get JPEG quality
+    quality = r_screenshotJpegQuality ? r_screenshotJpegQuality->integer : 90;
+    if (quality < 1) quality = 1;
+    if (quality > 100) quality = 100;
+
+    // Save JPEG
+    ri.CL_SaveJPG(fileName, quality, width, height, buffer, 0);
+
+    ri.Hunk_FreeTempMemory(buffer);
+    ri.Hunk_FreeTempMemory(rgba_buffer);
+
+    ri.Printf(PRINT_ALL, "JPEG screenshot saved: %s (%dx%d, quality: %d)\n", fileName, width, height, quality);
 }
 
+// BMP screenshot
 void RB_TakeScreenshotBMP(int x, int y, int width, int height, const char *fileName, int clipboard) {
-    ri.Printf(PRINT_WARNING, "RB_TakeScreenshotBMP: BMP screenshot capture not yet implemented in Vulkan renderer\n");
-    (void)x; (void)y; (void)width; (void)height; (void)fileName; (void)clipboard;
+    byte *allbuf;
+    byte *buffer;
+    byte *srcptr, *srcline;
+    byte *destptr, *dstline;
+    size_t memcount, offset;
+    const int header_size = 54; // bitmapfileheader(14) + bitmapinfoheader(40)
+    int scanlen;
+    int scanpad, len;
+
+    if (width <= 0 || height <= 0 || !fileName) {
+        ri.Printf(PRINT_WARNING, "RB_TakeScreenshotBMP: Invalid parameters\n");
+        return;
+    }
+
+    // Calculate scanline length (must be multiple of 4)
+    scanlen = PAD(width * 3, 4);
+    scanpad = scanlen - width * 3;
+    memcount = scanlen * height;
+    offset = header_size;
+
+    // Allocate buffer
+    allbuf = (byte*)ri.Hunk_AllocateTempMemory(memcount + header_size);
+    if (!allbuf) {
+        ri.Printf(PRINT_ERROR, "RB_TakeScreenshotBMP: Failed to allocate memory\n");
+        return;
+    }
+    buffer = allbuf + offset;
+
+    // Read pixels (RGBA format)
+    byte *rgba_buffer = (byte*)ri.Hunk_AllocateTempMemory((size_t)width * (size_t)height * 4);
+    if (!rgba_buffer) {
+        ri.Hunk_FreeTempMemory(allbuf);
+        return;
+    }
+
+    vk_read_pixels(rgba_buffer, (uint32_t)width, (uint32_t)height);
+
+    // Convert RGBA to BGR and flip vertically (BMP is bottom-up)
+    srcptr = rgba_buffer + (height - 1) * width * 4;
+    destptr = buffer + (height - 1) * scanlen;
+    len = (width * 3 - 3);
+
+    while (destptr >= buffer) {
+        srcline = srcptr + len;
+        dstline = destptr + len;
+        while (srcline >= srcptr) {
+            dstline[0] = srcline[2]; // B
+            dstline[1] = srcline[1]; // G
+            dstline[2] = srcline[0]; // R
+            dstline -= 3;
+            srcline -= 4; // Skip alpha
+        }
+        // Add padding if needed
+        if (scanpad > 0) {
+            Com_Memset(destptr + width * 3, 0, scanpad);
+        }
+        srcptr -= width * 4;
+        destptr -= scanlen;
+    }
+
+    // Fill BMP header
+    FillBMPHeader(allbuf, width, height, (int)memcount, header_size);
+
+    // Gamma correction
+    R_GammaCorrect(buffer, (int)memcount);
+
+    if (clipboard) {
+        // Copy to clipboard (starting from bitmapinfoheader)
+        ri.Sys_SetClipboardBitmap(allbuf + 14, memcount + 40);
+    } else {
+        // Write file
+        ri.FS_WriteFile(fileName, allbuf, memcount + header_size);
+        ri.Printf(PRINT_ALL, "BMP screenshot saved: %s (%dx%d)\n", fileName, width, height);
+    }
+
+    ri.Hunk_FreeTempMemory(allbuf);
+    ri.Hunk_FreeTempMemory(rgba_buffer);
 }
 
+// Video frame capture (stub - video encoding would require additional libraries)
 const void *RB_TakeVideoFrameCmd(const void *data) {
-    ri.Printf(PRINT_WARNING, "RB_TakeVideoFrameCmd: Video frame capture not yet implemented in Vulkan renderer\n");
+    // Video frame capture would require video encoding (e.g., FFmpeg, libx264)
+    // For now, this is a stub that could be extended to save individual frames
+    ri.Printf(PRINT_DEVELOPER, "RB_TakeVideoFrameCmd: Video frame capture not yet fully implemented\n");
     (void)data;
     return NULL;
 }
