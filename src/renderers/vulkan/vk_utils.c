@@ -274,6 +274,43 @@ void vk_track_gpu_free(VkDeviceMemory memory) {
     ri.Printf(PRINT_WARNING, "GPU memory free: allocation not found in tracker\n");
 }
 
+// Reset memory tracking when device is lost
+// This marks all tracked allocations as freed and resets VRAM statistics
+// so recovery knows all memory is available
+void vk_reset_memory_tracking_on_device_lost(void) {
+    if (!vk_memory_tracker.leak_detection_enabled) {
+        return;
+    }
+
+    ri.Printf(PRINT_WARNING, "Vulkan: Resetting memory tracking due to device loss\n");
+    
+    // Mark all allocations as freed
+    uint32_t freed_count = 0;
+    VkDeviceSize total_freed = 0;
+    
+    for (uint32_t i = 0; i < vk_memory_tracker.allocation_count; i++) {
+        vk_memory_allocation_t *alloc = &vk_memory_tracker.allocations[i];
+        if (!alloc->is_freed) {
+            alloc->is_freed = qtrue;
+            total_freed += alloc->size;
+            freed_count++;
+        }
+    }
+    
+    // Reset VRAM statistics - all memory is now available
+    __atomic_store_n(&vk.vram_stats.used_vram, 0, __ATOMIC_RELAXED);
+    __atomic_store_n(&vk.vram_stats.available_vram, vk.vram_stats.total_vram, __ATOMIC_RELAXED);
+    __atomic_store_n(&vk.vram_stats.current_allocations, 0, __ATOMIC_RELAXED);
+    
+    // Reset memory type usage
+    for (uint32_t i = 0; i < VK_MAX_MEMORY_TYPES; i++) {
+        __atomic_store_n(&vk.vram_stats.memory_type_usage[i], 0, __ATOMIC_RELAXED);
+    }
+    
+    ri.Printf(PRINT_WARNING, "Vulkan: Reset %u allocations (%llu bytes) - memory available for recovery\n",
+        freed_count, (unsigned long long)total_freed);
+}
+
 // Detect memory leaks and report them
 void vk_detect_memory_leaks(void) {
     if (!vk_memory_tracker.leak_detection_enabled) {
@@ -286,11 +323,23 @@ void vk_detect_memory_leaks(void) {
     for (uint32_t i = 0; i < vk_memory_tracker.allocation_count; i++) {
         vk_memory_allocation_t *alloc = &vk_memory_tracker.allocations[i];
         if (!alloc->is_freed) {
+            // Safely access string pointers - they may be invalid if device is lost
+            const char *resource_name = "unnamed";
+            const char *allocation_site = "unknown";
+            
+            // Only access pointers if they look valid (non-NULL and not obviously corrupted)
+            if (alloc->resource_name && (uintptr_t)alloc->resource_name > 0x1000) {
+                resource_name = alloc->resource_name;
+            }
+            if (alloc->allocation_site && (uintptr_t)alloc->allocation_site > 0x1000) {
+                allocation_site = alloc->allocation_site;
+            }
+            
             ri.Printf(PRINT_WARNING, "LEAK: Allocation ID %u, %s (%lu bytes) at %s\n",
                 alloc->allocation_id,
-                alloc->resource_name ? alloc->resource_name : "unnamed",
+                resource_name,
                 (unsigned long)alloc->size,
-                alloc->allocation_site ? alloc->allocation_site : "unknown");
+                allocation_site);
             leak_count++;
         }
     }

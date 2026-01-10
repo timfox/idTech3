@@ -573,6 +573,7 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 
 		if (result == VK_ERROR_DEVICE_LOST) {
 			vk.device_lost = qtrue;
+			vk_reset_memory_tracking_on_device_lost(); // Reset memory tracking so recovery knows memory is available
 			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during image acquisition - GPU driver issue\n");
 			return;
 		} else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -752,6 +753,7 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 			VkResult result = qvkQueuePresentKHR(vk.queue, &present_info);
 			if (result == VK_ERROR_DEVICE_LOST) {
 				vk.device_lost = qtrue;
+				vk_reset_memory_tracking_on_device_lost(); // Reset memory tracking so recovery knows memory is available
 				ri.Printf(PRINT_ERROR, "Vulkan: Device lost during present - GPU driver issue\n");
 			} else if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
 				// Swapchain needs recreation

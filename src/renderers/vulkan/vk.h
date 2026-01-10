@@ -1739,6 +1739,7 @@ void VK_ImGui_RenderDrawData(const ImDrawData* drawData);
 void vk_track_gpu_allocation(VkDeviceMemory memory, VkDeviceSize size, uint32_t memory_type, const char *resource_name, const char *allocation_site);
 void vk_record_memory_access(void *address, VkDeviceSize size, const char *resource_name, qboolean is_write);
 void vk_track_gpu_free(VkDeviceMemory memory);
+void vk_reset_memory_tracking_on_device_lost(void);
 
 // Utility functions
 uint32_t find_memory_type(uint32_t typeFilter, VkMemoryPropertyFlags properties);

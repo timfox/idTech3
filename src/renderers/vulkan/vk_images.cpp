@@ -123,9 +123,18 @@ extern "C" void vk_create_image_view(image_t *image, VkImageViewType view_type, 
 
 // Destroy image and associated resources
 extern "C" void vk_destroy_image(image_t *image) {
+    // Track memory deallocation FIRST, even if device is lost
+    // This is critical - we need to update our internal tracking so recovery knows memory is available
+    if (image->memory != VK_NULL_HANDLE) {
+        // Always update tracking, even if device is lost
+        // The driver may have already freed the memory, but we need to update our bookkeeping
+        vk_track_gpu_free(image->memory);
+    }
+
     // Skip all Vulkan API calls if device is lost - driver may have already destroyed resources
     if (vk.device_lost || vk.device == VK_NULL_HANDLE) {
         // Just clear the handles to prevent use-after-free, but don't call Vulkan API
+        // Memory tracking has already been updated above
         image->memory = VK_NULL_HANDLE;
         image->view = VK_NULL_HANDLE;
         image->handle = VK_NULL_HANDLE;
@@ -133,14 +142,7 @@ extern "C" void vk_destroy_image(image_t *image) {
     }
 
     if (image->memory != VK_NULL_HANDLE) {
-        // Get memory requirements before destroying the image
-        VkMemoryRequirements memory_requirements;
-        qvkGetImageMemoryRequirements(vk.device, image->handle, &memory_requirements);
-
-        // Track GPU memory deallocation (this already updates VRAM statistics)
-        vk_track_gpu_free(image->memory);
-
-        // Free the memory
+        // Free the memory (tracking already done above)
         qvkFreeMemory(vk.device, image->memory, NULL);
         image->memory = VK_NULL_HANDLE;
     }

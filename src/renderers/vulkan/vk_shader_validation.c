@@ -7,6 +7,7 @@ Centralized detection and handling of problematic shaders
 
 #include "tr_local.h"
 #include "vk.h"
+#include "vk_utils.h"
 
 #ifdef USE_VULKAN
 
@@ -169,6 +170,7 @@ void vk_handle_pipeline_creation_error(VkResult result, const char *shader_name,
 
 	if (result == VK_ERROR_DEVICE_LOST) {
 		vk.device_lost = qtrue;
+		vk_reset_memory_tracking_on_device_lost(); // Reset memory tracking so recovery knows memory is available
 		validation_stats.device_lost_events++;
 		ri.Printf(PRINT_ERROR, "Vulkan: Device lost during pipeline creation for shader %s (type=%d)\n",
 			shader_name ? shader_name : "unknown", shader_type);

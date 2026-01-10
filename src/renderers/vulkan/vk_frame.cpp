@@ -640,6 +640,7 @@ extern "C" void vk_end_frame(void) {
     if (result != VK_SUCCESS) {
         if (result == VK_ERROR_DEVICE_LOST) {
             vk.device_lost = qtrue;  // Mark device as lost
+            vk_reset_memory_tracking_on_device_lost(); // Reset memory tracking so recovery knows memory is available
             ri.Printf(PRINT_ERROR, "Vulkan: Device lost during frame submit - GPU driver issue\n");
             ri.Printf(PRINT_ERROR, "Vulkan: Rendering disabled until device recovery\n");
         } else {

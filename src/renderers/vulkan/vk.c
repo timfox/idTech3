@@ -946,6 +946,7 @@ void end_command_buffer(VkCommandBuffer command_buffer, const char *location)
 	if (submit_result != VK_SUCCESS) {
 		if (submit_result == VK_ERROR_DEVICE_LOST) {
 			vk.device_lost = qtrue;  // Mark device as lost
+			vk_reset_memory_tracking_on_device_lost(); // Reset memory tracking so recovery knows memory is available
 			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during queue submit - GPU driver issue\n");
 			ri.Printf(PRINT_ERROR, "Vulkan: This may cause rendering artifacts or instability\n");
 			ri.Printf(PRINT_ERROR, "Vulkan: Rendering disabled. Try restarting the application or updating GPU drivers.\n");
@@ -9767,11 +9768,15 @@ void vk_shutdown( refShutdownCode_t code ) {
   ri.Printf(PRINT_ALL, "vk_shutdown: Validating memory state before cleanup\n");
   vk_validate_memory_state();
 
-  // Print memory statistics BEFORE any shutdown cleanup to avoid accessing freed memory
-  ri.Printf(PRINT_ALL, "vk_shutdown: Printing memory statistics before cleanup\n");
-  vk_print_memory_stats();
   // region instrumentation guard: avoid cleanup if no active context or device is lost
   if (!vk.active || vk.device == VK_NULL_HANDLE || vk.swapchain == VK_NULL_HANDLE || vk.device_lost) {
+    // Print memory statistics only if device is not lost (to avoid accessing invalid pointers)
+    if (!vk.device_lost) {
+      ri.Printf(PRINT_ALL, "vk_shutdown: Printing memory statistics before cleanup\n");
+      vk_print_memory_stats();
+    } else {
+      ri.Printf(PRINT_WARNING, "vk_shutdown: Skipping memory statistics - device is lost\n");
+    }
     ri.Printf(PRINT_ALL, "vk_shutdown: skipping cleanup (state invalid) - active=%d, device=%p, swapchain=%p, device_lost=%d\n", 
         (int)vk.active, (void*)vk.device, (void*)vk.swapchain, (int)vk.device_lost);
     // Invalidate remaining state to prevent accidental teardown in later calls
@@ -10093,6 +10098,7 @@ void vk_wait_idle( void ) {
 	if (result != VK_SUCCESS) {
 		if (result == VK_ERROR_DEVICE_LOST) {
 			vk.device_lost = qtrue;  // Mark device as lost
+			vk_reset_memory_tracking_on_device_lost(); // Reset memory tracking so recovery knows memory is available
 			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during device wait - GPU driver issue\n");
 			ri.Printf(PRINT_ERROR, "Vulkan: This may cause rendering artifacts or instability\n");
 			ri.Printf(PRINT_WARNING, "Vulkan: Recovery will be attempted automatically\n");
@@ -10120,6 +10126,7 @@ void vk_queue_wait_idle( void ) {
 	if (result != VK_SUCCESS) {
 		if (result == VK_ERROR_DEVICE_LOST) {
 			vk.device_lost = qtrue;  // Mark device as lost
+			vk_reset_memory_tracking_on_device_lost(); // Reset memory tracking so recovery knows memory is available
 			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during queue wait - GPU driver issue\n");
 			ri.Printf(PRINT_ERROR, "Vulkan: This may cause rendering artifacts or instability\n");
 			ri.Printf(PRINT_WARNING, "Vulkan: Recovery will be attempted automatically\n");
