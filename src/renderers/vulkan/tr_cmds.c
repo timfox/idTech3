@@ -410,7 +410,7 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 	// Safety check: if Vulkan is not properly initialized, skip rendering to avoid crashes
 #ifdef USE_VULKAN
 	// Check for device lost FIRST, even if swapchain isn't ready - this allows recovery attempts
-	// Skip rendering if device is lost (prevents video playback and all rendering)
+	// Attempt immediate recovery instead of disabling rendering completely
 	if (vk.device_lost) {
 		// Only log once per second to avoid spam
 		static int last_log_time = 0;
@@ -425,16 +425,15 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 		}
 		
 		if (current_time - last_log_time > 1000) {
-			ri.Printf(PRINT_WARNING, "Vulkan: Device is lost - rendering disabled. Video playback will not work.\n");
-			ri.Printf(PRINT_WARNING, "Vulkan: Try restarting the application or updating GPU drivers.\n");
+			ri.Printf(PRINT_WARNING, "Vulkan: Device is lost - attempting recovery. Rendering may be limited.\n");
 			last_log_time = current_time;
 		}
 		
-		// Attempt device recovery with longer delays to allow GPU driver to recover
-		// First attempt after 10 seconds, then every 15 seconds
+		// Attempt device recovery with delays to allow GPU driver to recover
+		// First attempt after 1 second (gives driver time to stabilize), then every 2 seconds
 		// Use -1 as sentinel to ensure first attempt happens even if Milliseconds() returns 0
 		static int initial_delay_passed = 0;
-		int recovery_delay = (initial_delay_passed == 0) ? 10000 : 15000; // 10s first, then 15s
+		int recovery_delay = (initial_delay_passed == 0) ? 1000 : 2000; // 1s first attempt (driver needs time), then 2s
 		
 		if (last_recovery_attempt == -1 || current_time - last_recovery_attempt > recovery_delay) {
 			if (initial_delay_passed == 0) {
@@ -459,25 +458,17 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 						return; // Skip swapchain operations if device is still lost
 					}
 				} else {
-					// Device was already lost - check if it's still lost
-					// Use the safe wrapper function that handles device lost properly
-					qboolean device_was_lost = vk.device_lost;
-					vk_wait_idle(); // This will detect if device is still lost
-					
-					if (vk.device_lost) {
-						// Device is still lost - wait longer before attempting recovery
-						ri.Printf(PRINT_WARNING, "Vulkan: Device still lost. Driver needs more time to recover. Will retry in %d seconds.\n", recovery_delay / 1000);
-						return; // Device still lost, wait longer
-					} else if (device_was_lost) {
-						// Device was lost but now appears recovered
-						ri.Printf(PRINT_ALL, "Vulkan: Device appears to have recovered! Memory tracking reset.\n");
-						// Device recovered - memory tracking was already reset when device was lost
-						// Now we can attempt swapchain recreation
-					}
+					// Device was already lost - wait longer before attempting recovery
+					// Don't try to recreate swapchain immediately - driver needs time to stabilize
+					// The NVIDIA driver crashes if we try to access it too soon after device loss
+					ri.Printf(PRINT_WARNING, "Vulkan: Device is lost - waiting for driver to stabilize before recovery attempt.\n");
+					ri.Printf(PRINT_WARNING, "Vulkan: Will retry recovery in %d seconds.\n", recovery_delay / 1000);
+					return; // Wait longer - don't attempt swapchain recreation yet
+				}
 				
-				// Device is responsive - proceed with swapchain recreation
+				// Only proceed with swapchain recreation if device wasn't lost before
+				// If device was lost, we've already returned above
 				was_device_lost = vk.device_lost;
-				vk.device_lost = qfalse;
 				
 				// If swapchain doesn't exist, try to create it; otherwise recreate it
 				VkResult swapchain_result = VK_SUCCESS;
@@ -501,50 +492,69 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 				// Handle swapchain recreation errors gracefully
 				if (swapchain_result != VK_SUCCESS) {
 					if (swapchain_result == VK_ERROR_OUT_OF_DEVICE_MEMORY) {
-						ri.Printf(PRINT_WARNING, "Vulkan: Swapchain recreation failed - OUT_OF_DEVICE_MEMORY. GPU driver needs more time to recover. Will retry in 20 seconds.\n");
-						// Increase retry interval significantly for out-of-memory errors
-						last_recovery_attempt = current_time - (recovery_delay - 20000); // Allow retry in 20 seconds
+						ri.Printf(PRINT_WARNING, "Vulkan: Swapchain recreation failed - OUT_OF_DEVICE_MEMORY. GPU driver needs more time to recover.\n");
+						ri.Printf(PRINT_WARNING, "Vulkan: This may indicate the driver hasn't fully freed memory yet. Will retry in 30 seconds.\n");
+						// Increase retry interval significantly for out-of-memory errors - driver needs more time
+						last_recovery_attempt = current_time - (recovery_delay - 30000); // Allow retry in 30 seconds
+						vk.device_lost = qtrue; // Mark as lost to prevent further attempts
+						return; // Skip further recovery attempts - don't try to acquire image
 					} else if (swapchain_result == VK_ERROR_DEVICE_LOST) {
 						ri.Printf(PRINT_WARNING, "Vulkan: Device lost during swapchain recreation. Will retry in %d seconds.\n", recovery_delay / 1000);
+						vk.device_lost = qtrue; // Ensure flag is set
+						// Don't call vk_reset_memory_tracking_on_device_lost() here - it was already called in vk_recreate_swapchain_safe()
+						return; // Device still lost, skip further recovery attempts - don't try to acquire image
 					} else {
 						ri.Printf(PRINT_WARNING, "Vulkan: Swapchain recreation failed: %s. Will retry in %d seconds.\n", 
 							vk_result_string(swapchain_result), recovery_delay / 1000);
+						// For other errors, restore previous state
+						vk.device_lost = was_device_lost;
+						return; // Recovery failed, skip further attempts - don't try to acquire image
 					}
-					vk.device_lost = was_device_lost; // Restore flag
 				}
 				
 				// Test if swapchain creation/recreation succeeded by trying to acquire an image
-				if (qvkAcquireNextImageKHR && vk.swapchain != VK_NULL_HANDLE) {
+				// Only test if swapchain recreation succeeded (swapchain_result == VK_SUCCESS)
+				if (swapchain_result == VK_SUCCESS && qvkAcquireNextImageKHR && vk.swapchain != VK_NULL_HANDLE) {
 					uint32_t test_index;
 					VkResult test_result = qvkAcquireNextImageKHR(vk.device, vk.swapchain, 0, 
 						vk.image_available, VK_NULL_HANDLE, &test_index);
 					
 					if (test_result == VK_SUCCESS || test_result == VK_SUBOPTIMAL_KHR) {
 						ri.Printf(PRINT_ALL, "Vulkan: Device recovery successful! Resuming rendering.\n");
-						vk.device_lost = qfalse; // Device recovered
+						vk.device_lost = qfalse; // Device recovered - clear flag to allow rendering
 						// Image was acquired, we'll use it in the normal flow
 						if (test_result == VK_SUCCESS) {
 							vk.current_swapchain_image_index = test_index;
 						}
+						// Device recovered - fall through to normal rendering path
 					} else if (test_result == VK_ERROR_DEVICE_LOST) {
-						ri.Printf(PRINT_WARNING, "Vulkan: Device still lost during recovery test. Will retry in 5 seconds.\n");
+						ri.Printf(PRINT_WARNING, "Vulkan: Device still lost during recovery test. Will retry in %d seconds.\n", recovery_delay / 1000);
 						vk.device_lost = qtrue; // Restore flag
+						return; // Still lost, skip rendering
 					} else {
-						ri.Printf(PRINT_WARNING, "Vulkan: Device recovery test failed (result: %d). Will retry in 5 seconds.\n", test_result);
+						ri.Printf(PRINT_WARNING, "Vulkan: Device recovery test failed (result: %d). Will retry in %d seconds.\n", test_result, recovery_delay / 1000);
 						vk.device_lost = was_device_lost; // Restore previous state
+						return; // Recovery failed, skip rendering
 					}
 				} else if (vk.swapchain == VK_NULL_HANDLE) {
-					ri.Printf(PRINT_WARNING, "Vulkan: Swapchain creation failed during recovery. Will retry in 5 seconds.\n");
+					ri.Printf(PRINT_WARNING, "Vulkan: Swapchain creation failed during recovery. Will retry in %d seconds.\n", recovery_delay / 1000);
 					vk.device_lost = was_device_lost; // Restore flag
+					return; // Swapchain not ready, skip rendering
 				} else {
 					vk.device_lost = was_device_lost; // Restore previous state
+					return; // Cannot test recovery, skip rendering
 				}
 			} else {
 				ri.Printf(PRINT_WARNING, "Vulkan: Cannot attempt recovery - device or physical device not available.\n");
+				return; // Cannot recover, skip rendering
 			}
+		} else {
+			// Recovery attempt not ready yet - skip rendering for now
+			return;
 		}
 		
-		return;
+		// If we reach here, device was recovered - continue with normal rendering
+		// (device_lost flag was cleared above)
 	}
 	
 	// Now check if Vulkan is properly initialized (after handling device lost)
@@ -774,16 +784,21 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 				vk.device_lost = qtrue;
 				vk_reset_memory_tracking_on_device_lost(); // Reset memory tracking so recovery knows memory is available
 				ri.Printf(PRINT_ERROR, "Vulkan: Device lost during present - GPU driver issue\n");
+				// Don't reset semaphores if device is lost - they may be invalid
 			} else if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
 				// Swapchain needs recreation
 				ri.Printf(PRINT_WARNING, "Vulkan: Swapchain needs recreation\n");
+				// Still reset semaphores - swapchain recreation will handle them
+				vk.image_available = VK_NULL_HANDLE;
+				vk.rendering_finished = VK_NULL_HANDLE;
 			} else if (result != VK_SUCCESS) {
 				ri.Printf(PRINT_WARNING, "Vulkan: Failed to present: %d\n", result);
+				// Don't reset semaphores on error - they may still be in use
+			} else {
+				// Success - safe to reset semaphores for next frame
+				vk.image_available = VK_NULL_HANDLE;
+				vk.rendering_finished = VK_NULL_HANDLE;
 			}
-
-			// Reset semaphores for next frame
-			vk.image_available = VK_NULL_HANDLE;
-			vk.rendering_finished = VK_NULL_HANDLE;
 		}
 
 		ri.Cvar_ResetGroup( CVG_RENDERER, qtrue /* reset modified flags */ );

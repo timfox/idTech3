@@ -1139,6 +1139,13 @@ static VkResult vk_create_swapchain_safe( VkPhysicalDevice physical_device, VkDe
 	ri.Printf(PRINT_ALL, "Vulkan: Safe swapchain creation starting...\n");
 	ri.Printf(PRINT_ALL, "Vulkan: physical_device = %p, device = %p, surface = %p\n", physical_device, device, surface);
 
+	// Check if device is lost - if so, return early to avoid driver crashes
+	// This is called during recovery attempts, so we need to be defensive
+	if (vk.device_lost && device != VK_NULL_HANDLE) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Device is lost, cannot safely query surface capabilities\n");
+		return VK_ERROR_DEVICE_LOST;
+	}
+
 	if (!qvkGetPhysicalDeviceSurfaceCapabilitiesKHR) {
 		ri.Printf(PRINT_ERROR, "Vulkan: qvkGetPhysicalDeviceSurfaceCapabilitiesKHR function pointer is NULL\n");
 		return VK_ERROR_INITIALIZATION_FAILED;
@@ -1147,6 +1154,10 @@ static VkResult vk_create_swapchain_safe( VkPhysicalDevice physical_device, VkDe
 	VkResult result = qvkGetPhysicalDeviceSurfaceCapabilitiesKHR( physical_device, surface, &surface_caps );
 	if (result != VK_SUCCESS) {
 		ri.Printf(PRINT_ERROR, "Vulkan: Failed to get surface capabilities: %s\n", vk_result_string(result));
+		if (result == VK_ERROR_DEVICE_LOST) {
+			vk.device_lost = qtrue;
+			vk_reset_memory_tracking_on_device_lost();
+		}
 		return result;
 	}
 
@@ -10656,13 +10667,12 @@ VkResult vk_recreate_swapchain_safe(void) {
   // This will handle device lost internally
   vk_destroy_swapchain();
   
-  // If device is lost, we can't create a new swapchain yet
-  if (vk.device_lost) {
-    ri.Printf(PRINT_WARNING, "Vulkan: Cannot recreate swapchain - device is lost\n");
-    return VK_ERROR_DEVICE_LOST;
-  }
+  // Attempt swapchain recreation even if device_lost is set - this is how we test recovery
+  // The actual Vulkan API call will tell us if the device has recovered
+  qboolean was_device_lost = vk.device_lost;
   
   // Recreate swapchain with up-to-date surface format (safe version that returns error)
+  // This will succeed if device has recovered, or fail with VK_ERROR_DEVICE_LOST if still lost
   VkResult result = vk_create_swapchain_safe(vk.physical_device, vk.device, vk_surface, vk_present_format, &vk.swapchain, true);
   if (result != VK_SUCCESS) {
     ri.Printf(PRINT_WARNING, "Vulkan: Failed to recreate swapchain: %s\n", vk_result_string(result));

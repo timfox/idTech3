@@ -21,6 +21,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 // tr_image.c
 #include "tr_local.h"
+#ifdef USE_VULKAN
+#include "vk_utils.h"  // For vk_track_gpu_free
+#endif
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 
@@ -2312,10 +2315,23 @@ void R_DeleteTextures( void ) {
 	}
 
 #ifdef USE_VULKAN
-	// Skip Vulkan API calls if device is lost - driver may have already destroyed resources
+	// If device is lost, still update memory tracking for all images
+	// This ensures recovery knows memory is available
 	if (vk.device_lost) {
-		ri.Printf(PRINT_WARNING, "R_DeleteTextures: Device is lost, skipping Vulkan resource cleanup\n");
-		// Still clear the image array to prevent use-after-free
+		ri.Printf(PRINT_WARNING, "R_DeleteTextures: Device is lost, updating memory tracking only\n");
+		// Update memory tracking for all images even though we can't free them
+		for ( i = 0; i < tr.numImages; i++ ) {
+			image_t *img = tr.images[ i ];
+			if (img && img->memory != VK_NULL_HANDLE) {
+				// Update tracking so recovery knows memory is available
+				vk_track_gpu_free(img->memory);
+				// Clear handles to prevent use-after-free
+				img->memory = VK_NULL_HANDLE;
+				img->view = VK_NULL_HANDLE;
+				img->handle = VK_NULL_HANDLE;
+			}
+		}
+		// Clear the image array
 		Com_Memset( tr.images, 0, sizeof( tr.images ) );
 		Com_Memset( tr.scratchImage, 0, sizeof( tr.scratchImage ) );
 		tr.numImages = 0;
