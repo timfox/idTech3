@@ -3,7 +3,7 @@
 # Networking and Multiplayer Test Script for idTech3
 # Tests local multiplayer, dedicated server, and networking features
 
-set -e
+set -euo pipefail
 
 echo "idTech3 Networking & Multiplayer Test"
 echo "======================================"

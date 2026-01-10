@@ -3,7 +3,7 @@
 # Complete Feature Demonstration Script for idTech3
 # Shows off all the advanced features we've implemented and tested
 
-set -e
+set -euo pipefail
 
 echo "🎮 idTech3 Complete Feature Demonstration 🎮"
 echo "==========================================="

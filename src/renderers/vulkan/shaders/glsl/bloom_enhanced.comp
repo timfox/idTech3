@@ -1,0 +1,99 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+// Enhanced Multi-Octave Bloom (inspired by NaturalVisionEvolvedGTA5 NVE_Bloom)
+// Multi-octave bloom with configurable falloff and color weighting
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D inputImage;
+layout(set = 0, binding = 1) uniform sampler2D bloomOctave1;  // 1024x512
+layout(set = 0, binding = 2) uniform sampler2D bloomOctave2;  // 512x256
+layout(set = 0, binding = 3) uniform sampler2D bloomOctave3;  // 256x128
+layout(set = 0, binding = 4) uniform sampler2D bloomOctave4;  // 128x64
+layout(set = 0, binding = 5) uniform sampler2D bloomOctave5;  // 64x32
+layout(set = 0, binding = 6) uniform sampler2D bloomOctave6;  // 32x16
+layout(set = 0, binding = 7, rgba16f) uniform writeonly image2D outputImage;
+
+layout(push_constant) uniform EnhancedBloomParams {
+    vec2 resolution;
+    vec2 invResolution;
+    float threshold;
+    float thresholdCurve;
+    float intensity;
+    vec3 color0;  // Color tint for octave 1
+    vec3 color1;  // Color tint for octave 2
+    vec3 color2;  // Color tint for octave 3
+    vec3 color3;  // Color tint for octave 4
+    vec3 color4;  // Color tint for octave 5
+    vec3 color5;  // Color tint for octave 6
+    vec4 octaveWeights1;  // Weights for octaves 1-4
+    vec2 octaveWeights2;  // Weights for octaves 5-6
+    int falloffType;      // 0=linear, 1=exponential, 2=quadratic, etc.
+    float falloff;        // Falloff amount
+    float minAmount;      // Minimum bloom amount
+    float daylightTime;   // Time of day factor (0=night, 1=day)
+} pc;
+
+// Biquadratic texture sampling for better quality
+vec3 texBiquadratic(sampler2D tex, vec2 texSize, vec2 invTexSize, vec2 uv) {
+    vec2 coord = fract(uv * texSize);
+    vec2 offset = (coord * (coord - 1.0) + 0.5) * invTexSize;
+    vec2 tl = uv - offset;
+    vec2 tr = vec2(tl.x + invTexSize.x, tl.y);
+    vec2 bl = vec2(tl.x, tl.y + invTexSize.y);
+    vec2 br = tl + invTexSize;
+    
+    vec3 c00 = texture(tex, tl).rgb;
+    vec3 c01 = texture(tex, tr).rgb;
+    vec3 c10 = texture(tex, bl).rgb;
+    vec3 c11 = texture(tex, br).rgb;
+    
+    return (c00 + c01 + c10 + c11) * 0.25;
+}
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+    
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+    
+    // Sample base color
+    vec3 baseColor = texture(inputImage, uv).rgb;
+    
+    // Sample all bloom octaves with biquadratic filtering
+    vec3 octave1 = texBiquadratic(bloomOctave1, vec2(1024.0, 512.0), vec2(1.0/1024.0, 1.0/512.0), uv) * pc.octaveWeights1.x * pc.color0;
+    vec3 octave2 = texBiquadratic(bloomOctave2, vec2(512.0, 256.0), vec2(1.0/512.0, 1.0/256.0), uv) * pc.octaveWeights1.y * pc.color1;
+    vec3 octave3 = texBiquadratic(bloomOctave3, vec2(256.0, 128.0), vec2(1.0/256.0, 1.0/128.0), uv) * pc.octaveWeights1.z * pc.color2;
+    vec3 octave4 = texBiquadratic(bloomOctave4, vec2(128.0, 64.0), vec2(1.0/128.0, 1.0/64.0), uv) * pc.octaveWeights1.w * pc.color3;
+    vec3 octave5 = texBiquadratic(bloomOctave5, vec2(64.0, 32.0), vec2(1.0/64.0, 1.0/32.0), uv) * pc.octaveWeights2.x * pc.color4;
+    vec3 octave6 = texBiquadratic(bloomOctave6, vec2(32.0, 16.0), vec2(1.0/32.0, 1.0/16.0), uv) * pc.octaveWeights2.y * pc.color5;
+    
+    // Combine all octaves
+    vec3 bloom = octave1 + octave2 + octave3 + octave4 + octave5 + octave6;
+    
+    // Normalize by total weight
+    float totalWeight = dot(pc.octaveWeights1, vec4(1.0)) + dot(pc.octaveWeights2, vec2(1.0));
+    if (totalWeight > 0.001) {
+        bloom /= totalWeight;
+    }
+    
+    // Apply intensity
+    bloom *= pc.intensity;
+    
+    // Apply daylight time factor (reduce bloom during day)
+    bloom *= max(1.0 - pc.daylightTime, pc.minAmount);
+    
+    // Combine with base color
+    vec3 finalColor = baseColor + bloom;
+    
+    // Clamp to valid range
+    finalColor = clamp(finalColor, 0.0, 1.0);
+    
+    imageStore(outputImage, pixel, vec4(finalColor, 1.0));
+}

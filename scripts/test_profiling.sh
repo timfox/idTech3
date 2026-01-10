@@ -3,7 +3,7 @@
 # Performance Profiling Test Script for idTech3
 # Tests advanced profiling tools, benchmarks, and performance monitoring
 
-set -e
+set -euo pipefail
 
 echo "idTech3 Performance Profiling Test"
 echo "==================================="

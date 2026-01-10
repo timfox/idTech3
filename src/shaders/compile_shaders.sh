@@ -17,14 +17,66 @@ fi
 
 echo "Compiling GLSL shaders to SPIR-V..."
 
-# Compile all .glsl files to .spv files
-for glsl_file in *.glsl; do
+# Compile all .glsl and .comp files to .spv files
+for glsl_file in *.glsl *.comp; do
     if [ -f "$glsl_file" ]; then
-        base_name="${glsl_file%.glsl}"
+        # Handle both .glsl and .comp extensions
+        if [[ "$glsl_file" == *.comp ]]; then
+            base_name="${glsl_file%.comp}"
+            stage="comp"
+        else
+            base_name="${glsl_file%.glsl}"
+            stage=""
+        fi
         spv_file="${base_name}.spv"
 
-        echo "Compiling $glsl_file -> $spv_file"
-        if glslangValidator -V "$glsl_file" -o "$spv_file"; then
+        # Determine shader stage from filename (if not already set for .comp files)
+        if [ -z "$stage" ]; then
+            if [[ "$glsl_file" == *"_vert"* ]] || [[ "$glsl_file" == *".vert"* ]]; then
+                stage="vert"
+            elif [[ "$glsl_file" == *"_frag"* ]] || [[ "$glsl_file" == *".frag"* ]]; then
+                stage="frag"
+            elif [[ "$glsl_file" == *"_comp"* ]] || [[ "$glsl_file" == *"comp.glsl" ]]; then
+                stage="comp"
+            elif [[ "$glsl_file" == *"raytrace"* ]] || [[ "$glsl_file" == *"trace"* ]]; then
+                # Ray tracing shaders - check if it's a library or specific stage
+                # For now, skip library shaders that don't have a specific stage
+                if [[ "$glsl_file" == *"sdf_grid_raytrace"* ]]; then
+                    echo "  ⚠ Skipping $glsl_file (library shader, not a specific stage)"
+                    continue
+                fi
+            elif [[ "$glsl_file" == *"_geom"* ]] || [[ "$glsl_file" == *".geom"* ]]; then
+                stage="geom"
+            elif [[ "$glsl_file" == *"_tesc"* ]] || [[ "$glsl_file" == *".tesc"* ]]; then
+                stage="tesc"
+            elif [[ "$glsl_file" == *"_tese"* ]] || [[ "$glsl_file" == *".tese"* ]]; then
+                stage="tese"
+            elif [[ "$glsl_file" == *"_rgen"* ]] || [[ "$glsl_file" == *".rgen"* ]]; then
+                stage="rgen"
+            elif [[ "$glsl_file" == *"_rchit"* ]] || [[ "$glsl_file" == *".rchit"* ]]; then
+                stage="rchit"
+            elif [[ "$glsl_file" == *"_rmiss"* ]] || [[ "$glsl_file" == *".rmiss"* ]]; then
+                stage="rmiss"
+            elif [[ "$glsl_file" == *"_rahit"* ]] || [[ "$glsl_file" == *".rahit"* ]]; then
+                stage="rahit"
+            elif [[ "$glsl_file" == *"_rint"* ]] || [[ "$glsl_file" == *".rint"* ]]; then
+                stage="rint"
+            elif [[ "$glsl_file" == *"_rcall"* ]] || [[ "$glsl_file" == *".rcall"* ]]; then
+                stage="rcall"
+            elif [[ "$glsl_file" == *"_mesh"* ]] || [[ "$glsl_file" == *".mesh"* ]]; then
+                stage="mesh"
+            elif [[ "$glsl_file" == *"_task"* ]] || [[ "$glsl_file" == *".task"* ]]; then
+                stage="task"
+            fi
+        fi
+
+        if [ -z "$stage" ]; then
+            echo "  ⚠ Skipping $glsl_file (could not determine shader stage)"
+            continue
+        fi
+
+        echo "Compiling $glsl_file -> $spv_file (stage: $stage)"
+        if glslangValidator -V -S "$stage" "$glsl_file" -o "$spv_file"; then
             echo "  ✓ Success"
         else
             echo "  ✗ Failed to compile $glsl_file"

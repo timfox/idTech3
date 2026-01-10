@@ -518,10 +518,11 @@ static int GLW_SetMode( int mode, const char *modeFS, qboolean fullscreen, qbool
 		
 			SDL_GL_SetAttribute( SDL_GL_DOUBLEBUFFER, 1 );
 
-			// Request OpenGL with fallback versions for better compatibility
-			// Start with OpenGL 3.3 which has good driver support
-			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, 3 );
-			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 3 );
+			// Request OpenGL 4.6 for modern features (compute shaders, SSBOs, etc.)
+			// Fallback to lower versions if 4.6 is not available
+			// Try OpenGL 4.6 first, then fall back to 4.5, 4.0, 3.3 if needed
+			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, 4 );
+			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 6 );
 			SDL_GL_SetAttribute( SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY );
 
 			if ( !r_allowSoftwareGL->integer )

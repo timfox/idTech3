@@ -299,8 +299,12 @@ void VK_Raymarching_Render(VkCommandBuffer commandBuffer, VkImageView inputImage
     // Bind pipeline
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, raymarchPipeline.pipeline);
 
-    // TODO: Bind descriptor set when implemented
-    // vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, raymarchPipeline.layout, 0, 1, &raymarchPipeline.descriptorSet, 0, NULL);
+    // Bind descriptor set if it exists
+    // Note: Descriptor set creation would happen during initialization
+    // For now, check if descriptor set is valid before binding
+    if (raymarchPipeline.descriptorSet != VK_NULL_HANDLE && raymarchPipeline.layout != VK_NULL_HANDLE) {
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, raymarchPipeline.layout, 0, 1, &raymarchPipeline.descriptorSet, 0, NULL);
+    }
 
     // Push constants
     vkCmdPushConstants(commandBuffer, raymarchPipeline.layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(RaymarchingPushConstants), &pushConstants);

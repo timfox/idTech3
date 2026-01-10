@@ -36,6 +36,14 @@ typedef enum {
     PP_EFFECT_HEAT_DISTORTION = (1 << 6),
     PP_EFFECT_LENS_FLARE   = (1 << 7),
     PP_EFFECT_RAYMARCHING  = (1 << 8),
+    // Cinematic effects (inspired by NaturalVisionEvolvedGTA5)
+    PP_EFFECT_ACES_TONEMAP = (1 << 9),      // Enhanced ACES filmic tone mapping
+    PP_EFFECT_DEBAND       = (1 << 10),     // Debanding to remove color artifacts
+    PP_EFFECT_BLOOM_ENHANCED = (1 << 11),   // Multi-octave enhanced bloom
+    PP_EFFECT_COLOR_CINEMATIC = (1 << 12),  // Cinematic color grading with presets
+    PP_EFFECT_LUMA_SHARPEN = (1 << 13),     // Luma-based sharpening
+    PP_EFFECT_VOLUMETRIC_CLOUDS = (1 << 14), // Volumetric cloud rendering
+    PP_EFFECT_VOLUMETRIC_AURORA = (1 << 15), // Aurora/lightning effects
 } postProcessEffect_t;
 
 // SSAO configuration

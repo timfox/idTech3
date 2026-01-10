@@ -1,0 +1,192 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+// Volumetric Clouds (inspired by NaturalVisionEvolvedGTA5 NVE_VolumetricClouds)
+// Ray-marched volumetric cloud rendering with lighting and shadows
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D depthBuffer;
+layout(set = 0, binding = 1) uniform sampler3D cloudNoise;      // 3D noise texture
+layout(set = 0, binding = 2) uniform sampler2D weatherTexture;  // Weather map
+layout(set = 0, binding = 3, rgba16f) uniform writeonly image2D outputImage;
+
+layout(push_constant) uniform VolumetricCloudsParams {
+    mat4 projectionMatrix;
+    mat4 viewMatrix;
+    mat4 invProjectionMatrix;
+    mat4 invViewMatrix;
+    vec2 resolution;
+    vec2 invResolution;
+    vec3 cameraPos;
+    vec3 sunDir;
+    vec3 sunColor;
+    float sunIntensity;
+    float cloudHeightMin;
+    float cloudHeightMax;
+    float cloudDensity;
+    float cloudCoverage;
+    float cloudSpeed;
+    float time;
+    int numSteps;
+    int numLightSteps;
+    float lightAbsorption;
+    float scatteringG;
+    float cloudScale;
+    vec3 cloudColor;
+    vec3 cloudColorSecondary;
+} pc;
+
+// Hash function for noise
+float hash(vec3 p) {
+    p = fract(p * vec3(443.8975, 397.2973, 491.1871));
+    p += dot(p.xyz, p.yzx + 19.19);
+    return fract(p.x * p.y);
+}
+
+// Sample 3D noise
+float sampleCloudDensity(vec3 pos) {
+    // Scale position
+    vec3 scaledPos = pos * pc.cloudScale;
+    
+    // Add time-based movement
+    scaledPos += vec3(pc.time * pc.cloudSpeed, 0.0, pc.time * pc.cloudSpeed * 0.5);
+    
+    // Sample 3D noise texture
+    float density = texture(cloudNoise, scaledPos * 0.01).r;
+    
+    // Sample weather texture for coverage
+    vec2 weatherUV = pos.xz * 0.0001;
+    float weather = texture(weatherTexture, weatherUV).r;
+    
+    // Combine density with weather coverage
+    density = smoothstep(1.0 - pc.cloudCoverage, 1.0, density * weather);
+    
+    // Apply density multiplier
+    density *= pc.cloudDensity;
+    
+    return density;
+}
+
+// Calculate lighting through cloud
+float calculateLighting(vec3 pos, vec3 lightDir) {
+    float lightEnergy = 1.0;
+    vec3 lightPos = pos;
+    
+    for (int i = 0; i < pc.numLightSteps; i++) {
+        lightPos += lightDir * 50.0; // Step size for light rays
+        
+        // Check if we've gone too far
+        if (lightPos.y > pc.cloudHeightMax + 1000.0) {
+            break;
+        }
+        
+        // Sample density along light ray
+        float density = sampleCloudDensity(lightPos);
+        lightEnergy *= exp(-density * pc.lightAbsorption);
+        
+        if (lightEnergy < 0.01) {
+            break;
+        }
+    }
+    
+    return lightEnergy;
+}
+
+// Henyey-Greenstein phase function
+float henyeyGreenstein(float cosTheta, float g) {
+    float g2 = g * g;
+    return (1.0 - g2) / pow(1.0 + g2 - 2.0 * g * cosTheta, 1.5);
+}
+
+// Reconstruct world position from depth
+vec3 reconstructPosition(vec2 uv, float depth) {
+    vec4 clipPos = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+    vec4 viewPos = pc.invProjectionMatrix * clipPos;
+    viewPos /= viewPos.w;
+    vec4 worldPos = pc.invViewMatrix * viewPos;
+    return worldPos.xyz;
+}
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+    
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+    
+    // Get depth
+    float depth = texture(depthBuffer, uv).r;
+    
+    // Reconstruct ray direction
+    vec3 rayDir = normalize(reconstructPosition(uv, 0.5) - pc.cameraPos);
+    
+    // Calculate ray start and end points for cloud layer
+    float tMin = (pc.cloudHeightMin - pc.cameraPos.y) / rayDir.y;
+    float tMax = (pc.cloudHeightMax - pc.cameraPos.y) / rayDir.y;
+    
+    if (tMin > tMax) {
+        // Ray doesn't intersect cloud layer
+        imageStore(outputImage, pixel, vec4(0.0, 0.0, 0.0, 0.0));
+        return;
+    }
+    
+    // Clamp to camera near/far
+    if (depth < 1.0) {
+        vec3 hitPos = reconstructPosition(uv, depth);
+        float tHit = length(hitPos - pc.cameraPos);
+        tMax = min(tMax, tHit);
+    }
+    
+    if (tMin >= tMax || tMin < 0.0) {
+        imageStore(outputImage, pixel, vec4(0.0, 0.0, 0.0, 0.0));
+        return;
+    }
+    
+    // Ray march through clouds
+    vec3 rayStart = pc.cameraPos + rayDir * tMin;
+    vec3 rayEnd = pc.cameraPos + rayDir * tMax;
+    float rayLength = length(rayEnd - rayStart);
+    float stepSize = rayLength / float(pc.numSteps);
+    
+    float transmittance = 1.0;
+    vec3 lightEnergy = vec3(0.0);
+    
+    for (int i = 0; i < pc.numSteps; i++) {
+        vec3 pos = rayStart + rayDir * (float(i) + 0.5) * stepSize;
+        
+        // Sample cloud density
+        float density = sampleCloudDensity(pos);
+        
+        if (density > 0.001) {
+            // Calculate lighting
+            float light = calculateLighting(pos, pc.sunDir);
+            
+            // Calculate phase function (scattering)
+            float cosTheta = dot(rayDir, -pc.sunDir);
+            float phase = henyeyGreenstein(cosTheta, pc.scatteringG);
+            
+            // Accumulate light energy
+            vec3 scattering = mix(pc.cloudColor, pc.cloudColorSecondary, phase) * light * density;
+            lightEnergy += scattering * transmittance * stepSize;
+            
+            // Update transmittance
+            transmittance *= exp(-density * stepSize * 0.1);
+            
+            if (transmittance < 0.01) {
+                break;
+            }
+        }
+    }
+    
+    // Apply sun color and intensity
+    lightEnergy *= pc.sunColor * pc.sunIntensity;
+    
+    // Output cloud color with alpha
+    float alpha = 1.0 - transmittance;
+    imageStore(outputImage, pixel, vec4(lightEnergy, alpha));
+}

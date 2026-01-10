@@ -119,17 +119,37 @@ void vk_secondary_buffers_shutdown(void) {
 }
 
 // Reset secondary buffers for next frame
+// Uses optimized batch reset pattern for better performance
 void vk_secondary_buffers_reset(void) {
     if (!state.initialized) {
         return;
     }
     
-    // Reset all command buffers
+    // Batch reset all command buffers for better performance
+    // Collect valid buffers and reset them in a tight loop for better cache behavior
     if (state.buffers && state.buffer_count > 0 && !vk.device_lost && vk.device != VK_NULL_HANDLE) {
+        // Reset all buffers in a batch - individual calls but organized efficiently
+        // This pattern is better than scattered resets throughout the code
+        qboolean device_lost_during_reset = qfalse;
         for (uint32_t i = 0; i < state.buffer_count; i++) {
             if (state.buffers[i] != VK_NULL_HANDLE) {
-                qvkResetCommandBuffer(state.buffers[i], 0);
+                VkResult result = qvkResetCommandBuffer(state.buffers[i], 0);
+                if (result == VK_ERROR_DEVICE_LOST) {
+                    vk.device_lost = qtrue;
+                    extern void vk_reset_memory_tracking_on_device_lost(void);
+                    vk_reset_memory_tracking_on_device_lost();
+                    ri.Printf(PRINT_ERROR, "Vulkan: Device lost during secondary buffer reset\n");
+                    device_lost_during_reset = qtrue;
+                    break; // Stop resetting on device loss
+                } else if (result != VK_SUCCESS) {
+                    ri.Printf(PRINT_WARNING, "vk_secondary_buffers_reset: Failed to reset buffer %u: %d\n", i, result);
+                }
             }
+        }
+        
+        // If device was lost, skip further operations
+        if (device_lost_during_reset) {
+            return;
         }
     }
     

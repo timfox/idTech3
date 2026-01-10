@@ -1,0 +1,216 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+// Advanced Cinematic Color Grading (inspired by NaturalVisionEvolvedGTA5 NVE_Color)
+// Multiple presets and advanced color controls
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D inputImage;
+layout(set = 0, binding = 1) uniform sampler1D lutTexture; // 3D LUT (optional)
+layout(set = 0, binding = 2, rgba16f) uniform writeonly image2D outputImage;
+
+layout(push_constant) uniform CinematicColorGradingParams {
+    vec2 resolution;
+    vec2 invResolution;
+    int preset;              // 0=Default, 1=Color Boost, 2=Warm, 3=Vintage, 4=Retro, 5=VHS, 6=Old Cam, 7=Matrix, 8=Noir
+    float gamma;
+    float brightness;
+    float contrast;
+    float saturation;
+    float chromaticAberration;
+    float bleachBypass;
+    float colorTempStrength;
+    float colorTemp;          // -1.0 (cool) to 1.0 (warm)
+    vec3 shadows;
+    vec3 midtones;
+    vec3 highlights;
+    float shadowsStart;
+    float shadowsEnd;
+    float highlightsStart;
+    float highlightsEnd;
+    int useLUT;
+} pc;
+
+// Color temperature adjustment
+vec3 adjustColorTemperature(vec3 color, float temp) {
+    if (temp > 0.0) {
+        // Warm (increase red/yellow)
+        color.r += temp * 0.1;
+        color.g += temp * 0.05;
+    } else {
+        // Cool (increase blue)
+        color.b += abs(temp) * 0.1;
+        color.g += abs(temp) * 0.02;
+    }
+    return color;
+}
+
+// Bleach bypass effect
+vec3 applyBleachBypass(vec3 color, float amount) {
+    float luma = dot(color, vec3(0.299, 0.587, 0.114));
+    vec3 bleached = mix(color, vec3(luma), amount);
+    return mix(color, bleached, amount);
+}
+
+// Chromatic aberration
+vec3 applyChromaticAberration(vec3 color, vec2 uv, float amount) {
+    vec2 offset = (uv - 0.5) * amount * 0.01;
+    float r = texture(inputImage, uv + offset).r;
+    float g = color.g;
+    float b = texture(inputImage, uv - offset).b;
+    return vec3(r, g, b);
+}
+
+// Apply color grading preset
+vec3 applyPreset(vec3 color, int preset) {
+    if (preset == 0) {
+        // Default - no change
+        return color;
+    } else if (preset == 1) {
+        // Color Boost Filter
+        color.rgb = pow(color.rgb, vec3(0.9));
+        color.rgb *= vec3(1.1, 1.05, 1.0);
+    } else if (preset == 2) {
+        // Warm Filter
+        color = adjustColorTemperature(color, 0.5);
+        color.rgb *= vec3(1.05, 1.0, 0.95);
+    } else if (preset == 3) {
+        // Vintage Filter
+        color.r = pow(color.r, 0.95);
+        color.g = pow(color.g, 0.98);
+        color.b = pow(color.b, 1.02);
+        color.rgb *= vec3(1.1, 1.05, 0.9);
+    } else if (preset == 4) {
+        // Retro Filter
+        color.rgb = pow(color.rgb, vec3(1.1));
+        color.rgb *= vec3(0.95, 0.98, 1.05);
+        color = applyBleachBypass(color, 0.2);
+    } else if (preset == 5) {
+        // VHS Filter
+        color.rgb = pow(color.rgb, vec3(0.85));
+        color.rgb *= vec3(1.15, 1.1, 0.9);
+        color = adjustColorTemperature(color, 0.3);
+    } else if (preset == 6) {
+        // Old Cam Filter
+        color.rgb = pow(color.rgb, vec3(1.15));
+        color.rgb *= vec3(0.9, 0.95, 1.1);
+        color = applyBleachBypass(color, 0.15);
+    } else if (preset == 7) {
+        // Matrix Filter (green tint)
+        color.g *= 1.2;
+        color.r *= 0.9;
+        color.b *= 0.9;
+        color.rgb = pow(color.rgb, vec3(1.05));
+    } else if (preset == 8) {
+        // Noir Filter (black and white with contrast)
+        float luma = dot(color, vec3(0.299, 0.587, 0.114));
+        color = vec3(luma);
+        color = pow(color, vec3(0.9));
+        color *= 1.2;
+    }
+    
+    return color;
+}
+
+// Sample 3D LUT
+vec3 sampleLUT(vec3 color) {
+    if (pc.useLUT == 0) {
+        return color;
+    }
+    
+    // Convert RGB to LUT coordinates (assuming 32x32x32 LUT)
+    const float lutSize = 32.0;
+    float scale = (lutSize - 1.0) / lutSize;
+    float offset = 1.0 / (2.0 * lutSize);
+    
+    vec3 coord = color * scale + offset;
+    
+    // Sample LUT (stored as 1D texture)
+    float lutCoord = coord.b * lutSize * lutSize + coord.g * lutSize + coord.r;
+    return texture(lutTexture, lutCoord).rgb;
+}
+
+// Adjust shadows/midtones/highlights
+vec3 adjustToneZones(vec3 color) {
+    float luma = dot(color, vec3(0.299, 0.587, 0.114));
+    
+    vec3 result = color;
+    
+    // Shadows
+    if (luma < pc.shadowsEnd) {
+        float shadowFactor = smoothstep(pc.shadowsStart, pc.shadowsEnd, luma);
+        result = mix(color * pc.shadows, color, shadowFactor);
+    }
+    
+    // Highlights
+    if (luma > pc.highlightsStart) {
+        float highlightFactor = smoothstep(pc.highlightsStart, pc.highlightsEnd, luma);
+        result = mix(result, color * pc.highlights, highlightFactor);
+    }
+    
+    // Midtones (between shadows and highlights)
+    if (luma >= pc.shadowsEnd && luma <= pc.highlightsStart) {
+        float midFactor = smoothstep(pc.shadowsEnd, pc.highlightsStart, luma);
+        result = mix(color * pc.midtones, result, midFactor);
+    }
+    
+    return result;
+}
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+    
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+    
+    // Sample input color
+    vec3 color = texture(inputImage, uv).rgb;
+    
+    // Apply preset
+    color = applyPreset(color, pc.preset);
+    
+    // Apply brightness
+    color *= pc.brightness;
+    
+    // Apply contrast (center around 0.5)
+    color = (color - 0.5) * pc.contrast + 0.5;
+    
+    // Apply saturation
+    float luma = dot(color, vec3(0.299, 0.587, 0.114));
+    color = mix(vec3(luma), color, pc.saturation);
+    
+    // Apply color temperature
+    if (pc.colorTempStrength > 0.001) {
+        color = adjustColorTemperature(color, pc.colorTemp * pc.colorTempStrength);
+    }
+    
+    // Apply tone zones (shadows/midtones/highlights)
+    color = adjustToneZones(color);
+    
+    // Apply gamma
+    color = pow(color, vec3(1.0 / pc.gamma));
+    
+    // Apply bleach bypass
+    if (pc.bleachBypass > 0.001) {
+        color = applyBleachBypass(color, pc.bleachBypass);
+    }
+    
+    // Apply LUT if enabled
+    color = sampleLUT(color);
+    
+    // Apply chromatic aberration (subtle)
+    if (pc.chromaticAberration > 0.001) {
+        color = applyChromaticAberration(color, uv, pc.chromaticAberration);
+    }
+    
+    // Clamp final result
+    color = clamp(color, 0.0, 1.0);
+    
+    imageStore(outputImage, pixel, vec4(color, 1.0));
+}

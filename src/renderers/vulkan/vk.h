@@ -1032,9 +1032,15 @@ typedef struct {
     VkDescriptorSetLayout ssao_descriptor_layout;  // Added
     VkDescriptorSet ssao_descriptor;  // Added
     VkPipeline ssao_pipeline;  // Added
+    VkImage ssao_output_image;  // SSAO output storage image
+    VkImageView ssao_output_image_view;  // SSAO output image view
+    VkDeviceMemory ssao_output_image_memory;  // SSAO output image memory
     VkDescriptorSetLayout ssr_descriptor_layout;  // Added
     VkDescriptorSet ssr_descriptor;  // Added
     VkPipeline ssr_pipeline;  // Added
+    VkImage ssr_output_image;  // SSR output storage image
+    VkImageView ssr_output_image_view;  // SSR output image view
+    VkDeviceMemory ssr_output_image_memory;  // SSR output image memory
     VkDescriptorSetLayout bloom_descriptor_layout;  // Added
     VkDescriptorSet bloom_descriptor;  // Added
     VkPipeline bloom_pipeline;  // Added

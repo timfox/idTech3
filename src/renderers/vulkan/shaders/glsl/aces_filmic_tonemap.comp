@@ -1,0 +1,119 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+// Enhanced ACES Filmic Tone Mapping (inspired by NaturalVisionEvolvedGTA5)
+// Based on ACES filmic curve with additional cinematic controls
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D inputImage;
+layout(set = 0, binding = 1, rgba16f) uniform writeonly image2D outputImage;
+
+layout(push_constant) uniform ACESParams {
+    vec2 resolution;
+    vec2 invResolution;
+    float exposure;
+    float contrast;
+    float saturation;
+    float brightness;
+    float whitePoint;      // White point adjustment
+    float blackPoint;      // Black point adjustment
+    int tonemapMode;       // 0=ACES, 1=ACES Filmic, 2=ACES with shoulder
+} pc;
+
+// Standard ACES filmic curve
+vec3 ACESFilm(vec3 x) {
+    const float a = 2.51;
+    const float b = 0.03;
+    const float c = 2.43;
+    const float d = 0.59;
+    const float e = 0.14;
+    return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+}
+
+// ACES Filmic with shoulder (more cinematic)
+vec3 ACESFilmicShoulder(vec3 x) {
+    const float a = 2.51;
+    const float b = 0.03;
+    const float c = 2.43;
+    const float d = 0.59;
+    const float e = 0.14;
+    vec3 color = (x * (a * x + b)) / (x * (c * x + d) + e);
+    
+    // Add shoulder rolloff for highlights
+    vec3 shoulder = 1.0 - exp2(-8.0 * max(vec3(0.0), color - vec3(0.8)));
+    color = mix(color, color + shoulder * 0.1, 0.3);
+    
+    return clamp(color, 0.0, 1.0);
+}
+
+// Enhanced ACES with white/black point adjustment
+vec3 ACESEnhanced(vec3 x) {
+    vec3 color = ACESFilm(x);
+    
+    // Adjust white point
+    color = color / (pc.whitePoint + 0.001);
+    
+    // Adjust black point
+    color = (color - vec3(pc.blackPoint)) / (1.0 - pc.blackPoint);
+    
+    return clamp(color, 0.0, 1.0);
+}
+
+// Linear to sRGB conversion
+vec3 linearToSrgb(vec3 linear) {
+    vec3 s1 = linear * 12.92;
+    vec3 s2 = 1.055 * pow(linear, vec3(1.0 / 2.4)) - 0.055;
+    return mix(s1, s2, step(vec3(0.0031308), linear));
+}
+
+// Adjust saturation
+vec3 adjustSaturation(vec3 color, float saturation) {
+    float luma = dot(color, vec3(0.299, 0.587, 0.114));
+    return mix(vec3(luma), color, saturation);
+}
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+    
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+    
+    // Sample HDR input
+    vec3 hdrColor = texture(inputImage, uv).rgb;
+    
+    // Apply exposure
+    hdrColor *= pc.exposure;
+    
+    // Apply tone mapping
+    vec3 ldrColor;
+    if (pc.tonemapMode == 0) {
+        ldrColor = ACESFilm(hdrColor);
+    } else if (pc.tonemapMode == 1) {
+        ldrColor = ACESFilmicShoulder(hdrColor);
+    } else {
+        ldrColor = ACESEnhanced(hdrColor);
+    }
+    
+    // Apply brightness
+    ldrColor *= pc.brightness;
+    
+    // Apply contrast (center around 0.5)
+    ldrColor = (ldrColor - 0.5) * pc.contrast + 0.5;
+    
+    // Apply saturation
+    ldrColor = adjustSaturation(ldrColor, pc.saturation);
+    
+    // Convert to sRGB
+    ldrColor = linearToSrgb(ldrColor);
+    
+    // Clamp final result
+    ldrColor = clamp(ldrColor, 0.0, 1.0);
+    
+    imageStore(outputImage, pixel, vec4(ldrColor, 1.0));
+}

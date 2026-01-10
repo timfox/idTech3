@@ -1,0 +1,174 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+// Based on q3rtx ASVGF temporal accumulation
+// Performs temporal filtering with reprojection and anti-lag
+
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
+#include "shader_constants.glsl"
+
+// Input images
+layout(binding = 0, set = 0, rgba16f) uniform image2D directIllumination; // Current frame
+layout(binding = 1, set = 0, rgba16f) uniform image2D motionBuffer; // Motion vectors (xy=motion, z=depth, w=fwidth)
+layout(binding = 2, set = 0, rgba16f) uniform image2D normalBuffer; // Normal buffer (xyz=normal, w=depth)
+layout(binding = 3, set = 0, rgba16f) uniform image2D normalBufferPrev; // Previous frame normal buffer
+layout(binding = 4, set = 0, rgba16f) uniform sampler2D gradBuffer; // Gradient buffer (sampler)
+layout(binding = 5, set = 0, rgba16f) uniform image2D histColorPrev; // Previous frame history color
+layout(binding = 6, set = 0, rgba16f) uniform image2D histMomentsPrev; // Previous frame history moments
+layout(binding = 7, set = 0) uniform sampler2DArray blueNoise; // Blue noise texture array
+
+// Output images
+layout(binding = 8, set = 0, rgba16f) uniform image2D histColor; // History color output
+layout(binding = 9, set = 0, rgba16f) uniform image2D histMoments; // History moments output
+layout(binding = 10, set = 0, rgba16f) uniform image2D atrousOutput; // Atrous filter input
+
+// Uniform buffer
+layout(binding = 11, set = 0) uniform UniformBuffer {
+    vec2 resolution;
+    vec2 invResolution;
+    int frameIndex;
+    float temporalAlpha;
+    float varianceAlpha;
+    int gradDownscale; // GRAD_DWN
+} ubo;
+
+#define GRAD_DWN 3
+#define NUM_BLUE_NOISE_TEX 128u
+#define BLUE_NOISE_RES 256u
+
+float luminance(vec3 c) {
+    return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
+float get_antilag_alpha(sampler2D tex_gradient, ivec2 ipos) {
+    const int r = 1;
+    float antilag_alpha = 0.0;
+
+    for (int yy = -r; yy <= r; yy++) {
+        for (int xx = -r; xx <= r; xx++) {
+            ivec2 p = ipos / GRAD_DWN + ivec2(xx, yy);
+
+            if (any(lessThan(p, ivec2(0))) || 
+                any(greaterThanEqual(p, ivec2(ubo.resolution) / GRAD_DWN))) {
+                continue;
+            }
+
+            float a = textureLod(tex_gradient, vec2(p) * ubo.invResolution * float(GRAD_DWN), 0.0).r;
+            antilag_alpha = max(antilag_alpha, a);
+        }
+    }
+
+    return clamp(antilag_alpha, 0.0, 1.0);
+}
+
+void temporal_filter() {
+    ivec2 ipos = ivec2(gl_GlobalInvocationID);
+    
+    if (any(greaterThanEqual(ipos, ivec2(ubo.resolution)))) {
+        return;
+    }
+    
+    vec4 motion = imageLoad(motionBuffer, ipos);
+    vec4 color_curr = imageLoad(directIllumination, ipos);
+    float lum_curr = luminance(color_curr.rgb);
+
+    // Environment map or invalid pixel
+    if (motion.a < 0.0 || color_curr.a < 1.0) {
+        imageStore(histMoments, ipos, vec4(0.0));
+        imageStore(atrousOutput, ipos, color_curr);
+        return;
+    }
+
+    motion.xy *= ubo.resolution * 0.5;
+
+    // Jitter for subpixel error compensation
+    vec2 jitter;
+    ivec3 noiseCoord = ivec3(ipos, ubo.frameIndex) % ivec3(BLUE_NOISE_RES, BLUE_NOISE_RES, NUM_BLUE_NOISE_TEX);
+    jitter.x = fract(texelFetch(blueNoise, noiseCoord, 0).r);
+    noiseCoord.z = (ubo.frameIndex + 1) % NUM_BLUE_NOISE_TEX;
+    jitter.y = fract(texelFetch(blueNoise, noiseCoord, 0).r);
+    jitter -= vec2(0.5);
+
+    vec2 pos_prev = vec2(ipos) + vec2(0.5) + motion.xy + jitter * 0.1;
+
+    float depth_curr = imageLoad(normalBuffer, ipos).w;
+    vec3 normal_curr = imageLoad(normalBuffer, ipos).xyz;
+
+    vec4 color_prev = vec4(0.0);
+    vec3 moments_histlen_prev = vec3(0.0);
+    float sum_w = 0.0;
+    
+    // Bilinear sampling from previous frame
+    {
+        vec2 pos_ld = floor(pos_prev - vec2(0.5));
+        vec2 subpix = fract(pos_prev - vec2(0.5) - pos_ld);
+
+        const ivec2 off[4] = { { 0, 0 }, { 1, 0 }, { 0, 1 }, { 1, 1 } };
+        float w[4] = {
+            (1.0 - subpix.x) * (1.0 - subpix.y),
+            (subpix.x) * (1.0 - subpix.y),
+            (1.0 - subpix.x) * (subpix.y),
+            (subpix.x) * (subpix.y)
+        };
+        
+        for (int i = 0; i < 4; i++) {
+            ivec2 p = ivec2(pos_ld) + off[i];
+
+            if (any(lessThan(p, ivec2(0))) || 
+                any(greaterThanEqual(p, ivec2(ubo.resolution)))) {
+                continue;
+            }
+
+            float depth_prev = imageLoad(normalBufferPrev, p).w;
+            vec3 normal_prev = imageLoad(normalBufferPrev, p).xyz;
+
+            float dist_depth = abs(depth_curr - depth_prev + motion.z) * motion.a;
+            if (dist_depth < 2.0 && depth_prev > 0.0 && depth_curr > 0.0) {
+                color_prev += imageLoad(histColorPrev, p) * w[i];
+                moments_histlen_prev += imageLoad(histMomentsPrev, p).rgb * w[i];
+                sum_w += w[i];
+            }
+        }
+    }
+
+    if (sum_w > 0.001 && color_curr.a > 0.0 &&
+        !any(isnan(color_prev)) && !any(isnan(moments_histlen_prev))) {
+        
+        float antilag_alpha = get_antilag_alpha(gradBuffer, ipos);
+
+        color_prev /= sum_w;
+        moments_histlen_prev /= sum_w;
+
+        float hist_len = min(moments_histlen_prev.z + 1.0, 256.0);
+        float alpha_color = max(0.075, 1.0 / hist_len);
+        alpha_color *= (1.0 - antilag_alpha * 0.5);
+
+        // Temporal accumulation
+        vec3 color_out = mix(color_prev.rgb, color_curr.rgb, alpha_color);
+        
+        // Update moments
+        float lum_out = luminance(color_out);
+        float mean_prev = moments_histlen_prev.x;
+        float var_prev = moments_histlen_prev.y;
+        
+        float mean_out = mix(mean_prev, lum_out, alpha_color);
+        float var_out = mix(var_prev, max(0.0, lum_out - mean_out), alpha_color);
+
+        imageStore(histColor, ipos, vec4(color_out, 1.0));
+        imageStore(histMoments, ipos, vec4(mean_out, var_out, hist_len, 0.0));
+        imageStore(atrousOutput, ipos, vec4(color_out, 1.0));
+    } else {
+        // No valid history
+        imageStore(histColor, ipos, color_curr);
+        imageStore(histMoments, ipos, vec4(lum_curr, 0.0, 1.0, 0.0));
+        imageStore(atrousOutput, ipos, color_curr);
+    }
+}
+
+void main() {
+    temporal_filter();
+}

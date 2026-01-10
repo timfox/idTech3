@@ -14,6 +14,8 @@ extern refimport_t ri;
 #include "vk.h"
 #include "vk_post_process.h"
 #include "vk_postprocess.h"
+#include "vk_descriptor_batch.h"
+#include "tr_math_optimized.h"
 
 // Vulkan function pointers (extern declarations)
 extern PFN_vkCreateComputePipelines qvkCreateComputePipelines;
@@ -109,6 +111,33 @@ void vk_shutdown_enhanced_post_processing(void)
         return;
     }
 
+    // Destroy output images
+    if (vk.ssao_output_image_view != VK_NULL_HANDLE) {
+        qvkDestroyImageView(vk.device, vk.ssao_output_image_view, NULL);
+        vk.ssao_output_image_view = VK_NULL_HANDLE;
+    }
+    if (vk.ssao_output_image != VK_NULL_HANDLE) {
+        qvkDestroyImage(vk.device, vk.ssao_output_image, NULL);
+        vk.ssao_output_image = VK_NULL_HANDLE;
+    }
+    if (vk.ssao_output_image_memory != VK_NULL_HANDLE) {
+        qvkFreeMemory(vk.device, vk.ssao_output_image_memory, NULL);
+        vk.ssao_output_image_memory = VK_NULL_HANDLE;
+    }
+    
+    if (vk.ssr_output_image_view != VK_NULL_HANDLE) {
+        qvkDestroyImageView(vk.device, vk.ssr_output_image_view, NULL);
+        vk.ssr_output_image_view = VK_NULL_HANDLE;
+    }
+    if (vk.ssr_output_image != VK_NULL_HANDLE) {
+        qvkDestroyImage(vk.device, vk.ssr_output_image, NULL);
+        vk.ssr_output_image = VK_NULL_HANDLE;
+    }
+    if (vk.ssr_output_image_memory != VK_NULL_HANDLE) {
+        qvkFreeMemory(vk.device, vk.ssr_output_image_memory, NULL);
+        vk.ssr_output_image_memory = VK_NULL_HANDLE;
+    }
+    
     // Destroy pipelines
     if (vk.ssao_pipeline != VK_NULL_HANDLE) {
         qvkDestroyPipeline(vk.device, vk.ssao_pipeline, NULL);
@@ -812,7 +841,7 @@ Execute SSAO (Screen Space Ambient Occlusion) compute pass
 */
 qboolean vk_ssao_pass(const ssaoConfig_t *config)
 {
-    if (!config) {
+    if (!config || vk.device_lost || vk.device == VK_NULL_HANDLE) {
         return qfalse;
     }
     
@@ -822,15 +851,284 @@ qboolean vk_ssao_pass(const ssaoConfig_t *config)
         return qfalse;
     }
     
-    // TODO: Implement full SSAO compute pass
-    // This would:
-    // 1. Bind SSAO compute pipeline
-    // 2. Update descriptor sets with depth/normal buffers
-    // 3. Push constants with config parameters
-    // 4. Dispatch compute shader (workgroup size based on resolution)
-    // 5. Insert memory barriers for output texture
+    // Check if command buffer is available
+    if (!vk.cmd || !vk.cmd->command_buffer || vk.cmd->command_buffer == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_DEVELOPER, "Vulkan: SSAO pass - no command buffer available\n");
+        return qfalse;
+    }
     
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: SSAO pass executed (placeholder - full implementation pending)\n");
+    // Ensure output image exists
+    if (vk.ssao_output_image == VK_NULL_HANDLE) {
+        // Create SSAO output image if it doesn't exist
+        uint32_t width = (uint32_t)config->resolution[0];
+        uint32_t height = (uint32_t)config->resolution[1];
+        
+        if (width == 0 || height == 0) {
+            width = vk.renderWidth;
+            height = vk.renderHeight;
+        }
+        
+        if (width > 0 && height > 0) {
+            VkImageCreateInfo imageInfo = {};
+            imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+            imageInfo.imageType = VK_IMAGE_TYPE_2D;
+            imageInfo.format = VK_FORMAT_R8_UNORM; // Single channel for occlusion
+            imageInfo.extent.width = width;
+            imageInfo.extent.height = height;
+            imageInfo.extent.depth = 1;
+            imageInfo.mipLevels = 1;
+            imageInfo.arrayLayers = 1;
+            imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+            imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+            imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+            imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+            imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            
+            if (qvkCreateImage(vk.device, &imageInfo, NULL, &vk.ssao_output_image) == VK_SUCCESS) {
+                VkMemoryRequirements memReqs;
+                qvkGetImageMemoryRequirements(vk.device, vk.ssao_output_image, &memReqs);
+                
+                VkMemoryAllocateInfo allocInfo = {};
+                allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+                allocInfo.allocationSize = memReqs.size;
+                allocInfo.memoryTypeIndex = find_memory_type(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+                
+                if (qvkAllocateMemory(vk.device, &allocInfo, NULL, &vk.ssao_output_image_memory) == VK_SUCCESS) {
+                    qvkBindImageMemory(vk.device, vk.ssao_output_image, vk.ssao_output_image_memory, 0);
+                    
+                    VkImageViewCreateInfo viewInfo = {};
+                    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+                    viewInfo.image = vk.ssao_output_image;
+                    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+                    viewInfo.format = VK_FORMAT_R8_UNORM;
+                    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                    viewInfo.subresourceRange.baseMipLevel = 0;
+                    viewInfo.subresourceRange.levelCount = 1;
+                    viewInfo.subresourceRange.baseArrayLayer = 0;
+                    viewInfo.subresourceRange.layerCount = 1;
+                    
+                    if (qvkCreateImageView(vk.device, &viewInfo, NULL, &vk.ssao_output_image_view) != VK_SUCCESS) {
+                        qvkFreeMemory(vk.device, vk.ssao_output_image_memory, NULL);
+                        qvkDestroyImage(vk.device, vk.ssao_output_image, NULL);
+                        vk.ssao_output_image = VK_NULL_HANDLE;
+                        vk.ssao_output_image_memory = VK_NULL_HANDLE;
+                        ri.Printf(PRINT_WARNING, "Vulkan: Failed to create SSAO output image view\n");
+                        return qfalse;
+                    }
+                } else {
+                    qvkDestroyImage(vk.device, vk.ssao_output_image, NULL);
+                    vk.ssao_output_image = VK_NULL_HANDLE;
+                    ri.Printf(PRINT_WARNING, "Vulkan: Failed to allocate SSAO output image memory\n");
+                    return qfalse;
+                }
+            } else {
+                ri.Printf(PRINT_WARNING, "Vulkan: Failed to create SSAO output image\n");
+                return qfalse;
+            }
+        }
+    }
+    
+    // Check required input resources
+    if (vk.depth_image_view == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_DEVELOPER, "Vulkan: SSAO pass - depth buffer not available\n");
+        return qfalse;
+    }
+    
+    // Get normal buffer (use RT denoise normal buffer if available, otherwise fallback)
+    VkImageView normalBufferView = VK_NULL_HANDLE;
+    if (vk.rt.denoiseNormalBufferView != VK_NULL_HANDLE) {
+        normalBufferView = vk.rt.denoiseNormalBufferView;
+    } else {
+        // Fallback: use white image as placeholder (will produce no occlusion, but won't crash)
+        if (tr.whiteImage && tr.whiteImage->view != VK_NULL_HANDLE) {
+            normalBufferView = tr.whiteImage->view;
+            ri.Printf(PRINT_DEVELOPER, "Vulkan: SSAO using fallback normal buffer\n");
+        } else {
+            ri.Printf(PRINT_DEVELOPER, "Vulkan: SSAO pass - normal buffer not available\n");
+            return qfalse;
+        }
+    }
+    
+    // Get blue noise texture
+    VkImageView blueNoiseView = VK_NULL_HANDLE;
+    if (vk.rt.blueNoiseTexture && vk.rt.blueNoiseTexture->view != VK_NULL_HANDLE) {
+        blueNoiseView = vk.rt.blueNoiseTexture->view;
+    } else if (tr.whiteImage && tr.whiteImage->view != VK_NULL_HANDLE) {
+        blueNoiseView = tr.whiteImage->view; // Fallback
+        ri.Printf(PRINT_DEVELOPER, "Vulkan: SSAO using fallback blue noise texture\n");
+    }
+    
+    // Get color buffer for LISSAO (optional)
+    VkImageView colorBufferView = vk.color_image_view;
+    if (colorBufferView == VK_NULL_HANDLE && tr.whiteImage && tr.whiteImage->view != VK_NULL_HANDLE) {
+        colorBufferView = tr.whiteImage->view; // Fallback
+    }
+    
+    // Update descriptor set
+    VkDescriptorImageInfo depthImageInfo = {};
+    depthImageInfo.sampler = vk.samplers.handle[0]; // Use first sampler
+    depthImageInfo.imageView = vk.depth_image_view;
+    depthImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    
+    VkDescriptorImageInfo normalImageInfo = {};
+    normalImageInfo.sampler = vk.samplers.handle[0];
+    normalImageInfo.imageView = normalBufferView;
+    normalImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    
+    VkDescriptorImageInfo blueNoiseImageInfo = {};
+    blueNoiseImageInfo.sampler = vk.samplers.handle[0];
+    blueNoiseImageInfo.imageView = blueNoiseView;
+    blueNoiseImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    
+    VkDescriptorImageInfo colorImageInfo = {};
+    colorImageInfo.sampler = vk.samplers.handle[0];
+    colorImageInfo.imageView = colorBufferView;
+    colorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    
+    VkDescriptorImageInfo outputImageInfo = {};
+    outputImageInfo.imageView = vk.ssao_output_image_view;
+    outputImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL; // Storage images use GENERAL layout
+    
+    VkWriteDescriptorSet writes[5] = {};
+    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[0].dstSet = vk.ssao_descriptor;
+    writes[0].dstBinding = 0;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[0].descriptorCount = 1;
+    writes[0].pImageInfo = &depthImageInfo;
+    
+    writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[1].dstSet = vk.ssao_descriptor;
+    writes[1].dstBinding = 1;
+    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[1].descriptorCount = 1;
+    writes[1].pImageInfo = &normalImageInfo;
+    
+    writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[2].dstSet = vk.ssao_descriptor;
+    writes[2].dstBinding = 2;
+    writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[2].descriptorCount = 1;
+    writes[2].pImageInfo = &blueNoiseImageInfo;
+    
+    writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[3].dstSet = vk.ssao_descriptor;
+    writes[3].dstBinding = 3;
+    writes[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[3].descriptorCount = 1;
+    writes[3].pImageInfo = &colorImageInfo;
+    
+    writes[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[4].dstSet = vk.ssao_descriptor;
+    writes[4].dstBinding = 4;
+    writes[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    writes[4].descriptorCount = 1;
+    writes[4].pImageInfo = &outputImageInfo;
+    
+    // Use batched descriptor updates
+    extern qboolean vk_descriptor_batch_defer_update(const VkWriteDescriptorSet *write);
+    for (int i = 0; i < 5; i++) {
+        if (!vk_descriptor_batch_defer_update(&writes[i])) {
+            // Fallback to immediate update if batching fails
+            qvkUpdateDescriptorSets(vk.device, 1, &writes[i], 0, NULL);
+        }
+    }
+    
+    // Transition output image to GENERAL layout for compute shader write
+    VkImageMemoryBarrier outputBarrier = {};
+    outputBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    outputBarrier.srcAccessMask = 0;
+    outputBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    outputBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    outputBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    outputBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    outputBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    outputBarrier.image = vk.ssao_output_image;
+    outputBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    outputBarrier.subresourceRange.baseMipLevel = 0;
+    outputBarrier.subresourceRange.levelCount = 1;
+    outputBarrier.subresourceRange.baseArrayLayer = 0;
+    outputBarrier.subresourceRange.layerCount = 1;
+    
+    qvkCmdPipelineBarrier(vk.cmd->command_buffer,
+                          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                          0, 0, NULL, 0, NULL, 1, &outputBarrier);
+    
+    // Get matrices from backEnd
+    extern backEndState_t backEnd;
+    mat4_t projectionMatrix, invProjectionMatrix;
+    Com_Memcpy(projectionMatrix, backEnd.viewParms.projectionMatrix, sizeof(mat4_t));
+    // Use Matrix16Inverse (standard function) instead of optimized version for compatibility
+    Matrix16Inverse(projectionMatrix, invProjectionMatrix);
+    
+    // Prepare push constants
+    struct {
+        float projectionMatrix[16];
+        float invProjectionMatrix[16];
+        float resolution[2];
+        float invResolution[2];
+        float radius;
+        float bias;
+        float intensity;
+        int numSamples;
+        int enableLISSAO;
+        float indirectIntensity;
+        float indirectRadius;
+    } pushConstants;
+    
+    Com_Memcpy(pushConstants.projectionMatrix, projectionMatrix, sizeof(float) * 16);
+    Com_Memcpy(pushConstants.invProjectionMatrix, invProjectionMatrix, sizeof(float) * 16);
+    pushConstants.resolution[0] = config->resolution[0];
+    pushConstants.resolution[1] = config->resolution[1];
+    pushConstants.invResolution[0] = config->invResolution[0];
+    pushConstants.invResolution[1] = config->invResolution[1];
+    pushConstants.radius = config->radius;
+    pushConstants.bias = config->bias;
+    pushConstants.intensity = config->intensity;
+    pushConstants.numSamples = config->numSamples;
+    pushConstants.enableLISSAO = config->enableLISSAO ? 1 : 0;
+    pushConstants.indirectIntensity = config->indirectIntensity;
+    pushConstants.indirectRadius = config->indirectRadius;
+    
+    // Bind pipeline
+    qvkCmdBindPipeline(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.ssao_pipeline);
+    
+    // Bind descriptor set
+    qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                             vk.ssao_layout, 0, 1, &vk.ssao_descriptor, 0, NULL);
+    
+    // Push constants
+    qvkCmdPushConstants(vk.cmd->command_buffer, vk.ssao_layout, VK_SHADER_STAGE_COMPUTE_BIT,
+                        0, sizeof(pushConstants), &pushConstants);
+    
+    // Dispatch compute shader (workgroup size is 8x8)
+    uint32_t groupCountX = ((uint32_t)config->resolution[0] + 7) / 8;
+    uint32_t groupCountY = ((uint32_t)config->resolution[1] + 7) / 8;
+    qvkCmdDispatch(vk.cmd->command_buffer, groupCountX, groupCountY, 1);
+    
+    // Memory barrier to ensure compute shader completes before using output
+    VkMemoryBarrier barrier = {};
+    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    
+    qvkCmdPipelineBarrier(vk.cmd->command_buffer,
+                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                          0, 1, &barrier, 0, NULL, 0, NULL);
+    
+    // Transition output image to SHADER_READ_ONLY_OPTIMAL for sampling
+    outputBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    outputBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    outputBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    outputBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    
+    qvkCmdPipelineBarrier(vk.cmd->command_buffer,
+                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                          0, 0, NULL, 0, NULL, 1, &outputBarrier);
+    
     return qtrue;
 }
 
@@ -842,7 +1140,7 @@ Execute SSR (Screen Space Reflections) compute pass
 */
 qboolean vk_ssr_pass(const ssrConfig_t *config)
 {
-    if (!config) {
+    if (!config || vk.device_lost || vk.device == VK_NULL_HANDLE) {
         return qfalse;
     }
     
@@ -852,15 +1150,294 @@ qboolean vk_ssr_pass(const ssrConfig_t *config)
         return qfalse;
     }
     
-    // TODO: Implement full SSR compute pass
-    // This would:
-    // 1. Bind SSR compute pipeline
-    // 2. Update descriptor sets with color/depth/normal/roughness buffers
-    // 3. Push constants with camera position, max distance, step counts
-    // 4. Dispatch compute shader for ray-marched reflections
-    // 5. Insert memory barriers for output texture
+    // Check if command buffer is available
+    if (!vk.cmd || !vk.cmd->command_buffer || vk.cmd->command_buffer == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_DEVELOPER, "Vulkan: SSR pass - no command buffer available\n");
+        return qfalse;
+    }
     
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: SSR pass executed (placeholder - full implementation pending)\n");
+    // Ensure output image exists
+    if (vk.ssr_output_image == VK_NULL_HANDLE) {
+        // Create SSR output image if it doesn't exist
+        uint32_t width = (uint32_t)config->resolution[0];
+        uint32_t height = (uint32_t)config->resolution[1];
+        
+        if (width == 0 || height == 0) {
+            width = vk.renderWidth;
+            height = vk.renderHeight;
+        }
+        
+        if (width > 0 && height > 0) {
+            VkImageCreateInfo imageInfo = {};
+            imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+            imageInfo.imageType = VK_IMAGE_TYPE_2D;
+            imageInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT; // HDR format for reflections
+            imageInfo.extent.width = width;
+            imageInfo.extent.height = height;
+            imageInfo.extent.depth = 1;
+            imageInfo.mipLevels = 1;
+            imageInfo.arrayLayers = 1;
+            imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+            imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+            imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+            imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+            imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+            
+            if (qvkCreateImage(vk.device, &imageInfo, NULL, &vk.ssr_output_image) == VK_SUCCESS) {
+                VkMemoryRequirements memReqs;
+                qvkGetImageMemoryRequirements(vk.device, vk.ssr_output_image, &memReqs);
+                
+                VkMemoryAllocateInfo allocInfo = {};
+                allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+                allocInfo.allocationSize = memReqs.size;
+                allocInfo.memoryTypeIndex = find_memory_type(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+                
+                if (qvkAllocateMemory(vk.device, &allocInfo, NULL, &vk.ssr_output_image_memory) == VK_SUCCESS) {
+                    qvkBindImageMemory(vk.device, vk.ssr_output_image, vk.ssr_output_image_memory, 0);
+                    
+                    VkImageViewCreateInfo viewInfo = {};
+                    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+                    viewInfo.image = vk.ssr_output_image;
+                    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+                    viewInfo.format = VK_FORMAT_R16G16B16A16_SFLOAT;
+                    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                    viewInfo.subresourceRange.baseMipLevel = 0;
+                    viewInfo.subresourceRange.levelCount = 1;
+                    viewInfo.subresourceRange.baseArrayLayer = 0;
+                    viewInfo.subresourceRange.layerCount = 1;
+                    
+                    if (qvkCreateImageView(vk.device, &viewInfo, NULL, &vk.ssr_output_image_view) != VK_SUCCESS) {
+                        qvkFreeMemory(vk.device, vk.ssr_output_image_memory, NULL);
+                        qvkDestroyImage(vk.device, vk.ssr_output_image, NULL);
+                        vk.ssr_output_image = VK_NULL_HANDLE;
+                        vk.ssr_output_image_memory = VK_NULL_HANDLE;
+                        ri.Printf(PRINT_WARNING, "Vulkan: Failed to create SSR output image view\n");
+                        return qfalse;
+                    }
+                } else {
+                    qvkDestroyImage(vk.device, vk.ssr_output_image, NULL);
+                    vk.ssr_output_image = VK_NULL_HANDLE;
+                    ri.Printf(PRINT_WARNING, "Vulkan: Failed to allocate SSR output image memory\n");
+                    return qfalse;
+                }
+            } else {
+                ri.Printf(PRINT_WARNING, "Vulkan: Failed to create SSR output image\n");
+                return qfalse;
+            }
+        }
+    }
+    
+    // Check required input resources
+    if (vk.depth_image_view == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_DEVELOPER, "Vulkan: SSR pass - depth buffer not available\n");
+        return qfalse;
+    }
+    
+    if (vk.color_image_view == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_DEVELOPER, "Vulkan: SSR pass - color buffer not available\n");
+        return qfalse;
+    }
+    
+    // Get normal buffer (use RT denoise normal buffer if available, otherwise fallback)
+    VkImageView normalBufferView = VK_NULL_HANDLE;
+    if (vk.rt.denoiseNormalBufferView != VK_NULL_HANDLE) {
+        normalBufferView = vk.rt.denoiseNormalBufferView;
+    } else {
+        // Fallback: use white image as placeholder
+        if (tr.whiteImage && tr.whiteImage->view != VK_NULL_HANDLE) {
+            normalBufferView = tr.whiteImage->view;
+            ri.Printf(PRINT_DEVELOPER, "Vulkan: SSR using fallback normal buffer\n");
+        } else {
+            ri.Printf(PRINT_DEVELOPER, "Vulkan: SSR pass - normal buffer not available\n");
+            return qfalse;
+        }
+    }
+    
+    // Get blue noise texture
+    VkImageView blueNoiseView = VK_NULL_HANDLE;
+    if (vk.rt.blueNoiseTexture && vk.rt.blueNoiseTexture->view != VK_NULL_HANDLE) {
+        blueNoiseView = vk.rt.blueNoiseTexture->view;
+    } else if (tr.whiteImage && tr.whiteImage->view != VK_NULL_HANDLE) {
+        blueNoiseView = tr.whiteImage->view; // Fallback
+        ri.Printf(PRINT_DEVELOPER, "Vulkan: SSR using fallback blue noise texture\n");
+    }
+    
+    // Update descriptor set
+    VkDescriptorImageInfo colorImageInfo = {};
+    colorImageInfo.sampler = vk.samplers.handle[0];
+    colorImageInfo.imageView = vk.color_image_view;
+    colorImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    
+    VkDescriptorImageInfo normalImageInfo = {};
+    normalImageInfo.sampler = vk.samplers.handle[0];
+    normalImageInfo.imageView = normalBufferView;
+    normalImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    
+    VkDescriptorImageInfo depthImageInfo = {};
+    depthImageInfo.sampler = vk.samplers.handle[0];
+    depthImageInfo.imageView = vk.depth_image_view;
+    depthImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    
+    VkDescriptorImageInfo blueNoiseImageInfo = {};
+    blueNoiseImageInfo.sampler = vk.samplers.handle[0];
+    blueNoiseImageInfo.imageView = blueNoiseView;
+    blueNoiseImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    
+    VkDescriptorImageInfo outputImageInfo = {};
+    outputImageInfo.imageView = vk.ssr_output_image_view;
+    outputImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL; // Storage images use GENERAL layout
+    
+    VkWriteDescriptorSet writes[5] = {};
+    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[0].dstSet = vk.ssr_descriptor;
+    writes[0].dstBinding = 0;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[0].descriptorCount = 1;
+    writes[0].pImageInfo = &colorImageInfo;
+    
+    writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[1].dstSet = vk.ssr_descriptor;
+    writes[1].dstBinding = 1;
+    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[1].descriptorCount = 1;
+    writes[1].pImageInfo = &normalImageInfo;
+    
+    writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[2].dstSet = vk.ssr_descriptor;
+    writes[2].dstBinding = 2;
+    writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[2].descriptorCount = 1;
+    writes[2].pImageInfo = &depthImageInfo;
+    
+    writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[3].dstSet = vk.ssr_descriptor;
+    writes[3].dstBinding = 3;
+    writes[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[3].descriptorCount = 1;
+    writes[3].pImageInfo = &blueNoiseImageInfo;
+    
+    writes[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[4].dstSet = vk.ssr_descriptor;
+    writes[4].dstBinding = 4;
+    writes[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    writes[4].descriptorCount = 1;
+    writes[4].pImageInfo = &outputImageInfo;
+    
+    // Use batched descriptor updates
+    extern qboolean vk_descriptor_batch_defer_update(const VkWriteDescriptorSet *write);
+    for (int i = 0; i < 5; i++) {
+        if (!vk_descriptor_batch_defer_update(&writes[i])) {
+            // Fallback to immediate update if batching fails
+            qvkUpdateDescriptorSets(vk.device, 1, &writes[i], 0, NULL);
+        }
+    }
+    
+    // Flush descriptor updates before binding
+    extern void vk_descriptor_batch_flush(void);
+    vk_descriptor_batch_flush();
+    
+    // Transition output image to GENERAL layout for compute shader write
+    VkImageMemoryBarrier outputBarrier = {};
+    outputBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    outputBarrier.srcAccessMask = 0;
+    outputBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    outputBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    outputBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    outputBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    outputBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    outputBarrier.image = vk.ssr_output_image;
+    outputBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    outputBarrier.subresourceRange.baseMipLevel = 0;
+    outputBarrier.subresourceRange.levelCount = 1;
+    outputBarrier.subresourceRange.baseArrayLayer = 0;
+    outputBarrier.subresourceRange.layerCount = 1;
+    
+    qvkCmdPipelineBarrier(vk.cmd->command_buffer,
+                          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                          0, 0, NULL, 0, NULL, 1, &outputBarrier);
+    
+    // Get matrices from backEnd
+    extern backEndState_t backEnd;
+    mat4_t projectionMatrix, invProjectionMatrix;
+    mat4_t viewMatrix, invViewMatrix;
+    Com_Memcpy(projectionMatrix, backEnd.viewParms.projectionMatrix, sizeof(mat4_t));
+    // Use Matrix16Inverse (standard function) instead of optimized version for compatibility
+    Matrix16Inverse(projectionMatrix, invProjectionMatrix);
+    Com_Memcpy(viewMatrix, backEnd.viewParms.world.modelViewMatrix, sizeof(mat4_t));
+    Matrix16Inverse(viewMatrix, invViewMatrix);
+    
+    // Prepare push constants
+    struct {
+        float projectionMatrix[16];
+        float viewMatrix[16];
+        float invProjectionMatrix[16];
+        float invViewMatrix[16];
+        float resolution[2];
+        float invResolution[2];
+        float cameraPos[3];
+        float maxDistance;
+        float thickness;
+        int numSteps;
+        int numBinarySteps;
+        float roughnessThreshold;
+    } pushConstants;
+    
+    Com_Memcpy(pushConstants.projectionMatrix, projectionMatrix, sizeof(float) * 16);
+    Com_Memcpy(pushConstants.viewMatrix, viewMatrix, sizeof(float) * 16);
+    Com_Memcpy(pushConstants.invProjectionMatrix, invProjectionMatrix, sizeof(float) * 16);
+    Com_Memcpy(pushConstants.invViewMatrix, invViewMatrix, sizeof(float) * 16);
+    pushConstants.resolution[0] = config->resolution[0];
+    pushConstants.resolution[1] = config->resolution[1];
+    pushConstants.invResolution[0] = config->invResolution[0];
+    pushConstants.invResolution[1] = config->invResolution[1];
+    pushConstants.cameraPos[0] = config->cameraPos[0];
+    pushConstants.cameraPos[1] = config->cameraPos[1];
+    pushConstants.cameraPos[2] = config->cameraPos[2];
+    pushConstants.maxDistance = config->maxDistance;
+    pushConstants.thickness = config->thickness;
+    pushConstants.numSteps = config->numSteps;
+    pushConstants.numBinarySteps = config->numBinarySteps;
+    pushConstants.roughnessThreshold = config->roughnessThreshold;
+    
+    // Bind pipeline
+    qvkCmdBindPipeline(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.ssr_pipeline);
+    
+    // Bind descriptor set
+    qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                             vk.ssr_layout, 0, 1, &vk.ssr_descriptor, 0, NULL);
+    
+    // Push constants
+    qvkCmdPushConstants(vk.cmd->command_buffer, vk.ssr_layout, VK_SHADER_STAGE_COMPUTE_BIT,
+                        0, sizeof(pushConstants), &pushConstants);
+    
+    // Dispatch compute shader (workgroup size is 8x8)
+    uint32_t groupCountX = ((uint32_t)config->resolution[0] + 7) / 8;
+    uint32_t groupCountY = ((uint32_t)config->resolution[1] + 7) / 8;
+    qvkCmdDispatch(vk.cmd->command_buffer, groupCountX, groupCountY, 1);
+    
+    // Memory barrier to ensure compute shader completes before using output
+    VkMemoryBarrier barrier = {};
+    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    
+    qvkCmdPipelineBarrier(vk.cmd->command_buffer,
+                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                          0, 1, &barrier, 0, NULL, 0, NULL);
+    
+    // Transition output image to SHADER_READ_ONLY_OPTIMAL for sampling
+    outputBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    outputBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    outputBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    outputBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    
+    qvkCmdPipelineBarrier(vk.cmd->command_buffer,
+                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                          0, 0, NULL, 0, NULL, 1, &outputBarrier);
+    
     return qtrue;
 }
 
@@ -890,15 +1467,161 @@ qboolean vk_bloom_pass(const bloomConfig_t *config)
         return qfalse;
     }
     
-    // TODO: Implement enhanced bloom compute pass
-    // This would:
-    // 1. Extract bright areas based on threshold and extract mode
-    // 2. Apply Kawase blur if enabled (faster, higher quality) or traditional Gaussian
-    // 3. Modulate bloom based on modulate mode
-    // 4. Composite bloom back into main image
-    // 5. Handle multiple blur passes for quality
+    // Implement enhanced bloom compute pass
+    if (vk.device_lost || vk.device == VK_NULL_HANDLE) {
+        return qfalse;
+    }
     
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: Enhanced bloom pass executed (placeholder - full implementation pending)\n");
+    // Check if command buffer is available
+    if (!vk.cmd || !vk.cmd->command_buffer || vk.cmd->command_buffer == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_DEVELOPER, "Vulkan: Bloom pass - no command buffer available\n");
+        return qfalse;
+    }
+    
+    // Ensure bloom output image exists (use first bloom image if available)
+    VkImageView bloomOutputView = VK_NULL_HANDLE;
+    if (vk.bloom_image_view[0] != VK_NULL_HANDLE) {
+        bloomOutputView = vk.bloom_image_view[0];
+    } else {
+        // Create bloom output image if it doesn't exist
+        uint32_t width = (uint32_t)config->resolution[0];
+        uint32_t height = (uint32_t)config->resolution[1];
+        
+        if (width == 0 || height == 0) {
+            width = vk.renderWidth;
+            height = vk.renderHeight;
+        }
+        
+        if (width > 0 && height > 0 && vk.bloom_image[0] == VK_NULL_HANDLE) {
+            // Bloom images are created during initialization, not here
+            // If they don't exist, we can't proceed with compute bloom
+            ri.Printf(PRINT_DEVELOPER, "Vulkan: Bloom pass - bloom images not initialized\n");
+            return qfalse;
+        }
+        bloomOutputView = vk.bloom_image_view[0];
+    }
+    
+    if (bloomOutputView == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_DEVELOPER, "Vulkan: Bloom pass - bloom output image not available\n");
+        return qfalse;
+    }
+    
+    // Get input color buffer
+    if (vk.color_image_view == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_DEVELOPER, "Vulkan: Bloom pass - color buffer not available\n");
+        return qfalse;
+    }
+    
+    // Update descriptor set
+    VkDescriptorImageInfo inputImageInfo = {};
+    inputImageInfo.sampler = vk.samplers.handle[0];
+    inputImageInfo.imageView = vk.color_image_view;
+    inputImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    
+    VkDescriptorImageInfo outputImageInfo = {};
+    outputImageInfo.imageView = bloomOutputView;
+    outputImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL; // Storage images use GENERAL layout
+    
+    VkWriteDescriptorSet writes[2] = {};
+    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[0].dstSet = vk.bloom_descriptor;
+    writes[0].dstBinding = 0;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[0].descriptorCount = 1;
+    writes[0].pImageInfo = &inputImageInfo;
+    
+    writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[1].dstSet = vk.bloom_descriptor;
+    writes[1].dstBinding = 1;
+    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    writes[1].descriptorCount = 1;
+    writes[1].pImageInfo = &outputImageInfo;
+    
+    // Use batched descriptor updates
+    extern qboolean vk_descriptor_batch_defer_update(const VkWriteDescriptorSet *write);
+    for (int i = 0; i < 2; i++) {
+        if (!vk_descriptor_batch_defer_update(&writes[i])) {
+            qvkUpdateDescriptorSets(vk.device, 1, &writes[i], 0, NULL);
+        }
+    }
+    
+    // Flush descriptor updates
+    extern void vk_descriptor_batch_flush(void);
+    vk_descriptor_batch_flush();
+    
+    // Transition output image to GENERAL layout for compute shader write
+    VkImageMemoryBarrier outputBarrier = {};
+    outputBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    outputBarrier.srcAccessMask = 0;
+    outputBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    outputBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    outputBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    outputBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    outputBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    outputBarrier.image = vk.bloom_image[0];
+    outputBarrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    outputBarrier.subresourceRange.baseMipLevel = 0;
+    outputBarrier.subresourceRange.levelCount = 1;
+    outputBarrier.subresourceRange.baseArrayLayer = 0;
+    outputBarrier.subresourceRange.layerCount = 1;
+    
+    qvkCmdPipelineBarrier(vk.cmd->command_buffer,
+                          VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                          0, 0, NULL, 0, NULL, 1, &outputBarrier);
+    
+    // Prepare push constants
+    struct {
+        float threshold;
+        int extract_mode;
+        int base_modulate;
+    } pushConstants;
+    
+    pushConstants.threshold = config->threshold;
+    pushConstants.extract_mode = config->extractMode;
+    pushConstants.base_modulate = config->modulateMode;
+    
+    // Bind pipeline
+    qvkCmdBindPipeline(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE, vk.bloom_pipeline);
+    
+    // Bind descriptor set
+    qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                             vk.bloom_layout, 0, 1, &vk.bloom_descriptor, 0, NULL);
+    
+    // Push constants
+    qvkCmdPushConstants(vk.cmd->command_buffer, vk.bloom_layout, VK_SHADER_STAGE_COMPUTE_BIT,
+                        0, sizeof(pushConstants), &pushConstants);
+    
+    // Dispatch compute shader (workgroup size is 8x8)
+    uint32_t groupCountX = ((uint32_t)config->resolution[0] + 7) / 8;
+    uint32_t groupCountY = ((uint32_t)config->resolution[1] + 7) / 8;
+    qvkCmdDispatch(vk.cmd->command_buffer, groupCountX, groupCountY, 1);
+    
+    // Memory barrier to ensure compute shader completes
+    VkMemoryBarrier barrier = {};
+    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    
+    qvkCmdPipelineBarrier(vk.cmd->command_buffer,
+                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                          0, 1, &barrier, 0, NULL, 0, NULL);
+    
+    // Transition output image to SHADER_READ_ONLY_OPTIMAL for sampling
+    outputBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    outputBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    outputBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    outputBarrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    
+    qvkCmdPipelineBarrier(vk.cmd->command_buffer,
+                          VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                          VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                          0, 0, NULL, 0, NULL, 1, &outputBarrier);
+    
+    // Note: Kawase blur and multiple passes would be handled by additional compute dispatches
+    // For now, this implements the extraction phase. Blur passes can be added separately.
+    
     return qtrue;
 }
 

@@ -19,6 +19,15 @@ extern refimport_t ri;
 typedef void (*PFN_vkCmdDrawMeshTasksEXT)(VkCommandBuffer commandBuffer, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
 typedef void (*PFN_vkCmdDrawMeshTasksIndirectEXT)(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, uint32_t drawCount, uint32_t stride);
 typedef void (*PFN_vkCmdDrawMeshTasksIndirectCountEXT)(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, VkBuffer countBuffer, VkDeviceSize countBufferOffset, uint32_t maxDrawCount, uint32_t stride);
+typedef VkResult (*PFN_vkCreateGraphicsPipelines)(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount, const VkGraphicsPipelineCreateInfo* pCreateInfos, const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines);
+
+// Mesh shader stage flags (VK_EXT_mesh_shader)
+#ifndef VK_SHADER_STAGE_TASK_BIT_EXT
+#define VK_SHADER_STAGE_TASK_BIT_EXT 0x00000040
+#endif
+#ifndef VK_SHADER_STAGE_MESH_BIT_EXT
+#define VK_SHADER_STAGE_MESH_BIT_EXT 0x00000080
+#endif
 
 // Mesh shader function pointers
 static PFN_vkCmdDrawMeshTasksEXT qvkCmdDrawMeshTasksEXT = NULL;
@@ -251,26 +260,222 @@ void vk_mesh_shaders_create_pipeline( void )
 		ri.Printf( PRINT_DEVELOPER, "Mesh shaders: loaded external mesh/task modules from shaders/spirv\n" );
 	}
 	
-	// TODO: Create mesh shader pipeline
-	// This requires:
-	// 1. Task shader module (optional, for culling/LOD)
-	// 2. Mesh shader module (generates vertices/primitives)
-	// 3. Fragment shader module (standard fragment shader)
-	// 4. Pipeline creation with VK_EXT_mesh_shader stages
-	// 5. Descriptor set layout for meshlet buffers and textures
+	// Create mesh shader pipeline
+	// This requires task shader (optional), mesh shader, and fragment shader modules
 	
-	// Pipeline creation would look like:
-	// VkPipelineShaderStageCreateInfo stages[3];
-	// stages[0].stage = VK_SHADER_STAGE_TASK_BIT_EXT; // Task shader
-	// stages[1].stage = VK_SHADER_STAGE_MESH_BIT_EXT; // Mesh shader
-	// stages[2].stage = VK_SHADER_STAGE_FRAGMENT_BIT;  // Fragment shader
-	// 
-	// VkGraphicsPipelineCreateInfo pipelineInfo = {};
-	// pipelineInfo.stageCount = vk.mesh.taskShaderSupported ? 3 : 2;
-	// pipelineInfo.pStages = stages;
-	// pipelineInfo.pNext = &meshShaderPipelineCreateInfo; // VK_EXT_mesh_shader extension struct
+	// Get fragment shader module (use standard fragment shader for now)
+	// In a full implementation, this would be a mesh-specific fragment shader
+	VkShaderModule frag_module = VK_NULL_HANDLE;
+	if (vk.modules.frag.gen[0][0][0][0] != VK_NULL_HANDLE) {
+		frag_module = vk.modules.frag.gen[0][0][0][0]; // Use generic fragment shader
+	} else {
+		// Try to load a fragment shader
+		frag_module = vk_load_shader_file("shaders/spirv/meshlet.frag.spv");
+		if (frag_module == VK_NULL_HANDLE) {
+			ri.Printf(PRINT_WARNING, "Mesh shaders: Fragment shader not available, using fallback\n");
+			vk.mesh.useFallback = qtrue;
+			return;
+		}
+	}
 	
-	ri.Printf( PRINT_DEVELOPER, "Mesh shader pipeline creation (shaders not yet compiled)\n" );
+	// Create descriptor set layout for meshlet buffers and textures
+	VkDescriptorSetLayoutBinding bindings[] = {
+		{0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT, NULL}, // Meshlet buffer
+		{1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_MESH_BIT_EXT, NULL}, // Vertex buffer
+		{2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_MESH_BIT_EXT, NULL}, // Index buffer
+		{3, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, NULL}, // Texture
+	};
+	
+	VkDescriptorSetLayoutCreateInfo layoutInfo = {
+		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
+		.bindingCount = ARRAY_LEN(bindings),
+		.pBindings = bindings
+	};
+	
+	if (qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, NULL, &vk.mesh.meshShaderDescriptorSetLayout) != VK_SUCCESS) {
+		ri.Printf(PRINT_ERROR, "Mesh shaders: Failed to create descriptor set layout\n");
+		vk.mesh.useFallback = qtrue;
+		return;
+	}
+	
+	// Create pipeline layout
+	VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+		.setLayoutCount = 1,
+		.pSetLayouts = &vk.mesh.meshShaderDescriptorSetLayout,
+		.pushConstantRangeCount = 0,
+		.pPushConstantRanges = NULL
+	};
+	
+	if (qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, NULL, &vk.mesh.meshShaderPipelineLayout) != VK_SUCCESS) {
+		ri.Printf(PRINT_ERROR, "Mesh shaders: Failed to create pipeline layout\n");
+		qvkDestroyDescriptorSetLayout(vk.device, vk.mesh.meshShaderDescriptorSetLayout, NULL);
+		vk.mesh.meshShaderDescriptorSetLayout = VK_NULL_HANDLE;
+		vk.mesh.useFallback = qtrue;
+		return;
+	}
+	
+	// Prepare shader stages
+	VkPipelineShaderStageCreateInfo stages[3];
+	uint32_t stageCount = 0;
+	
+	// Task shader (optional)
+	if (vk.mesh.taskShaderSupported && vk.mesh.mesh_task != VK_NULL_HANDLE) {
+		stages[stageCount] = (VkPipelineShaderStageCreateInfo){
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			.stage = VK_SHADER_STAGE_TASK_BIT_EXT,
+			.module = vk.mesh.mesh_task,
+			.pName = "main"
+		};
+		stageCount++;
+	}
+	
+	// Mesh shader (required)
+	if (vk.mesh.mesh_mesh != VK_NULL_HANDLE) {
+		stages[stageCount] = (VkPipelineShaderStageCreateInfo){
+			.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+			.stage = VK_SHADER_STAGE_MESH_BIT_EXT,
+			.module = vk.mesh.mesh_mesh,
+			.pName = "main"
+		};
+		stageCount++;
+	} else {
+		ri.Printf(PRINT_ERROR, "Mesh shaders: Mesh shader module not available\n");
+		qvkDestroyPipelineLayout(vk.device, vk.mesh.meshShaderPipelineLayout, NULL);
+		qvkDestroyDescriptorSetLayout(vk.device, vk.mesh.meshShaderDescriptorSetLayout, NULL);
+		vk.mesh.meshShaderPipelineLayout = VK_NULL_HANDLE;
+		vk.mesh.meshShaderDescriptorSetLayout = VK_NULL_HANDLE;
+		vk.mesh.useFallback = qtrue;
+		return;
+	}
+	
+	// Fragment shader (required)
+	stages[stageCount] = (VkPipelineShaderStageCreateInfo){
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+		.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+		.module = frag_module,
+		.pName = "main"
+	};
+	stageCount++;
+	
+	// Note: Subgroup size optimization could be added here if extension is available
+	// For now, use default subgroup size
+	
+	// Vertex input state (not used for mesh shaders, but required)
+	VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+		.vertexBindingDescriptionCount = 0,
+		.pVertexBindingDescriptions = NULL,
+		.vertexAttributeDescriptionCount = 0,
+		.pVertexAttributeDescriptions = NULL
+	};
+	
+	// Input assembly (not used for mesh shaders)
+	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+		.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+		.primitiveRestartEnable = VK_FALSE
+	};
+	
+	// Viewport and scissor (dynamic)
+	VkViewport viewport = {0.0f, 0.0f, (float)vk.renderWidth, (float)vk.renderHeight, 0.0f, 1.0f};
+	VkRect2D scissor = {{0, 0}, {vk.renderWidth, vk.renderHeight}};
+	
+	VkPipelineViewportStateCreateInfo viewportState = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+		.viewportCount = 1,
+		.pViewports = &viewport,
+		.scissorCount = 1,
+		.pScissors = &scissor
+	};
+	
+	// Rasterization
+	VkPipelineRasterizationStateCreateInfo rasterizer = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+		.depthClampEnable = VK_FALSE,
+		.rasterizerDiscardEnable = VK_FALSE,
+		.polygonMode = VK_POLYGON_MODE_FILL,
+		.cullMode = VK_CULL_MODE_BACK_BIT,
+		.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+		.depthBiasEnable = VK_FALSE,
+		.lineWidth = 1.0f
+	};
+	
+	// Multisampling
+	VkPipelineMultisampleStateCreateInfo multisampling = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+		.sampleShadingEnable = VK_FALSE,
+		.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT
+	};
+	
+	// Color blending
+	VkPipelineColorBlendAttachmentState colorBlendAttachment = {
+		.blendEnable = VK_FALSE,
+		.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT
+	};
+	
+	VkPipelineColorBlendStateCreateInfo colorBlending = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+		.logicOpEnable = VK_FALSE,
+		.attachmentCount = 1,
+		.pAttachments = &colorBlendAttachment
+	};
+	
+	// Dynamic state
+	VkDynamicState dynamicStates[] = {VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR};
+	VkPipelineDynamicStateCreateInfo dynamicState = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
+		.dynamicStateCount = ARRAY_LEN(dynamicStates),
+		.pDynamicStates = dynamicStates
+	};
+	
+	// Depth stencil
+	VkPipelineDepthStencilStateCreateInfo depthStencil = {
+		.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+		.depthTestEnable = VK_TRUE,
+		.depthWriteEnable = VK_TRUE,
+		.depthCompareOp = VK_COMPARE_OP_LESS,
+		.depthBoundsTestEnable = VK_FALSE,
+		.stencilTestEnable = VK_FALSE
+	};
+	
+	// Graphics pipeline create info
+	VkGraphicsPipelineCreateInfo pipelineInfo = {
+		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+		.stageCount = stageCount,
+		.pStages = stages,
+		.pVertexInputState = &vertexInputInfo,
+		.pInputAssemblyState = &inputAssembly,
+		.pViewportState = &viewportState,
+		.pRasterizationState = &rasterizer,
+		.pMultisampleState = &multisampling,
+		.pDepthStencilState = &depthStencil,
+		.pColorBlendState = &colorBlending,
+		.pDynamicState = &dynamicState,
+		.layout = vk.mesh.meshShaderPipelineLayout,
+		.renderPass = VK_NULL_HANDLE, // Using dynamic rendering
+		.subpass = 0
+	};
+	
+	// Create pipeline
+	// Get function pointer
+	PFN_vkCreateGraphicsPipelines qvkCreateGraphicsPipelines = (PFN_vkCreateGraphicsPipelines)vkGetDeviceProcAddr(vk.device, "vkCreateGraphicsPipelines");
+	if (qvkCreateGraphicsPipelines) {
+		VkResult result = qvkCreateGraphicsPipelines(vk.device, VK_NULL_HANDLE, 1, &pipelineInfo, NULL, &vk.mesh.meshShaderPipeline);
+		if (result != VK_SUCCESS) {
+			ri.Printf(PRINT_ERROR, "Mesh shaders: Failed to create graphics pipeline: %d\n", result);
+			qvkDestroyPipelineLayout(vk.device, vk.mesh.meshShaderPipelineLayout, NULL);
+			qvkDestroyDescriptorSetLayout(vk.device, vk.mesh.meshShaderDescriptorSetLayout, NULL);
+			vk.mesh.meshShaderPipelineLayout = VK_NULL_HANDLE;
+			vk.mesh.meshShaderDescriptorSetLayout = VK_NULL_HANDLE;
+			vk.mesh.useFallback = qtrue;
+			return;
+		}
+		ri.Printf(PRINT_DEVELOPER, "Mesh shaders: Pipeline created successfully (%d stages)\n", stageCount);
+	} else {
+		ri.Printf(PRINT_ERROR, "Mesh shaders: vkCreateGraphicsPipelines function not available\n");
+		vk.mesh.useFallback = qtrue;
+	}
 }
 
 // Render using mesh shaders

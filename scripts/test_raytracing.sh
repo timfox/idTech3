@@ -3,7 +3,7 @@
 # Ray Tracing Feature Test Script for idTech3
 # Tests various ray tracing capabilities and performance
 
-set -e
+set -euo pipefail
 
 echo "idTech3 Ray Tracing Feature Test"
 echo "================================="

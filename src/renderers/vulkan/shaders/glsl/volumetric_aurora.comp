@@ -1,0 +1,180 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+// Volumetric Aurora/Lightning Effects (inspired by NaturalVisionEvolvedGTA5)
+// Atmospheric aurora and lightning effects
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D depthBuffer;
+layout(set = 0, binding = 1) uniform sampler2D noiseTexture;
+layout(set = 0, binding = 2, rgba16f) uniform writeonly image2D outputImage;
+
+layout(push_constant) uniform VolumetricAuroraParams {
+    mat4 projectionMatrix;
+    mat4 viewMatrix;
+    mat4 invProjectionMatrix;
+    mat4 invViewMatrix;
+    vec2 resolution;
+    vec2 invResolution;
+    vec3 cameraPos;
+    vec3 auroraColor1;        // Primary aurora color
+    vec3 auroraColor2;        // Secondary aurora color
+    float auroraIntensity;
+    float auroraHeight;       // Height of aurora layer
+    float auroraThickness;
+    float auroraSpeed;
+    float time;
+    int lightningEnabled;
+    vec3 lightningPosition;   // World position of lightning
+    float lightningIntensity;
+    float lightningRadius;
+    float lightningLifetime; // 0.0-1.0
+    float lightningMaxLifetime;
+} pc;
+
+// Reconstruct world position from depth
+vec3 reconstructPosition(vec2 uv, float depth) {
+    vec4 clipPos = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+    vec4 viewPos = pc.invProjectionMatrix * clipPos;
+    viewPos /= viewPos.w;
+    vec4 worldPos = pc.invViewMatrix * viewPos;
+    return worldPos.xyz;
+}
+
+// Sample aurora density
+float sampleAuroraDensity(vec3 pos) {
+    // Check if position is in aurora layer
+    if (pos.y < pc.auroraHeight || pos.y > pc.auroraHeight + pc.auroraThickness) {
+        return 0.0;
+    }
+    
+    // Sample noise for aurora waves
+    vec2 noiseUV = pos.xz * 0.001 + vec2(pc.time * pc.auroraSpeed, 0.0);
+    float noise = texture(noiseTexture, noiseUV).r;
+    
+    // Create wave pattern
+    float wave = sin(pos.x * 0.01 + pc.time * 0.5) * cos(pos.z * 0.01 + pc.time * 0.3);
+    float density = (noise + wave * 0.5) * 0.5;
+    
+    // Fade based on height within layer
+    float heightFade = 1.0 - abs((pos.y - pc.auroraHeight) / pc.auroraThickness - 0.5) * 2.0;
+    density *= smoothstep(0.0, 1.0, heightFade);
+    
+    return density;
+}
+
+// Calculate lightning effect
+vec3 calculateLightning(vec3 pos) {
+    if (pc.lightningEnabled == 0 || pc.lightningLifetime <= 0.0) {
+        return vec3(0.0);
+    }
+    
+    // Distance to lightning
+    float dist = length(pos - pc.lightningPosition);
+    
+    if (dist > pc.lightningRadius) {
+        return vec3(0.0);
+    }
+    
+    // Calculate lightning intensity based on distance and lifetime
+    float distFactor = 1.0 - (dist / pc.lightningRadius);
+    float lifetimeFactor = pc.lightningLifetime / pc.lightningMaxLifetime;
+    
+    // Fade out as lifetime decreases
+    float intensity = pc.lightningIntensity * distFactor * lifetimeFactor;
+    
+    // Add flicker
+    float flicker = sin(pc.time * 100.0) * 0.1 + 0.9;
+    intensity *= flicker;
+    
+    return vec3(intensity);
+}
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+    
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+    
+    // Get depth
+    float depth = texture(depthBuffer, uv).r;
+    
+    // Reconstruct ray direction
+    vec3 rayDir = normalize(reconstructPosition(uv, 0.5) - pc.cameraPos);
+    
+    // Calculate intersection with aurora layer
+    float tMin = (pc.auroraHeight - pc.cameraPos.y) / rayDir.y;
+    float tMax = (pc.auroraHeight + pc.auroraThickness - pc.cameraPos.y) / rayDir.y;
+    
+    if (tMin > tMax || tMin < 0.0) {
+        // Check for lightning only
+        if (pc.lightningEnabled != 0) {
+            vec3 lightning = calculateLightning(pc.cameraPos + rayDir * 1000.0);
+            imageStore(outputImage, pixel, vec4(lightning, length(lightning) > 0.001 ? 1.0 : 0.0));
+        } else {
+            imageStore(outputImage, pixel, vec4(0.0, 0.0, 0.0, 0.0));
+        }
+        return;
+    }
+    
+    // Clamp to scene depth
+    if (depth < 1.0) {
+        vec3 hitPos = reconstructPosition(uv, depth);
+        float tHit = length(hitPos - pc.cameraPos);
+        tMax = min(tMax, tHit);
+    }
+    
+    if (tMin >= tMax) {
+        imageStore(outputImage, pixel, vec4(0.0, 0.0, 0.0, 0.0));
+        return;
+    }
+    
+    // Ray march through aurora
+    vec3 rayStart = pc.cameraPos + rayDir * tMin;
+    vec3 rayEnd = pc.cameraPos + rayDir * tMax;
+    float rayLength = length(rayEnd - rayStart);
+    int numSteps = 32;
+    float stepSize = rayLength / float(numSteps);
+    
+    float transmittance = 1.0;
+    vec3 auroraEnergy = vec3(0.0);
+    
+    for (int i = 0; i < numSteps; i++) {
+        vec3 pos = rayStart + rayDir * (float(i) + 0.5) * stepSize;
+        
+        // Sample aurora density
+        float density = sampleAuroraDensity(pos);
+        
+        if (density > 0.001) {
+            // Mix aurora colors based on position
+            float colorMix = sin(pos.x * 0.01 + pc.time) * 0.5 + 0.5;
+            vec3 auroraColor = mix(pc.auroraColor1, pc.auroraColor2, colorMix);
+            
+            // Accumulate aurora energy
+            auroraEnergy += auroraColor * density * transmittance * stepSize * pc.auroraIntensity;
+            
+            // Update transmittance
+            transmittance *= exp(-density * stepSize * 0.05);
+            
+            if (transmittance < 0.01) {
+                break;
+            }
+        }
+        
+        // Add lightning contribution
+        if (pc.lightningEnabled != 0) {
+            vec3 lightning = calculateLightning(pos);
+            auroraEnergy += lightning * transmittance;
+        }
+    }
+    
+    // Output aurora with alpha
+    float alpha = 1.0 - transmittance;
+    imageStore(outputImage, pixel, vec4(auroraEnergy, alpha));
+}

@@ -957,7 +957,3 @@ main() {
 
 # Run main packaging
 main "$@"
-EOF
-
-<xai:function_call name="run_terminal_cmd">
-<parameter name="command">chmod +x /home/tim/Desktop/idtech3/create_distribution_package.sh

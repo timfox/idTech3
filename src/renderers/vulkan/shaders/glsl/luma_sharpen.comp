@@ -1,0 +1,123 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+// Luma Sharpen (inspired by NaturalVisionEvolvedGTA5 LumaSharpen.fx)
+// Sharpens image in luma space to avoid color artifacts
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D inputImage;
+layout(set = 0, binding = 1, rgba16f) uniform writeonly image2D outputImage;
+
+layout(push_constant) uniform LumaSharpenParams {
+    vec2 resolution;
+    vec2 invResolution;
+    float sharpStrength;     // Sharpening strength (0.1-3.0)
+    float sharpClamp;        // Sharpening limit to avoid haloing (0.0-1.0)
+    int pattern;             // 0=Fast, 1=Normal, 2=Wider, 3=Pyramid
+    float offsetBias;        // Offset bias for sampling pattern
+} pc;
+
+// BT.709 luma coefficient
+const vec3 CoefLuma = vec3(0.2126, 0.7152, 0.0722);
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+    
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+    vec2 texelSize = pc.invResolution;
+    
+    // Get original pixel
+    vec3 ori = texture(inputImage, uv).rgb;
+    
+    // Combine strength and luma multipliers
+    vec3 sharpStrengthLuma = CoefLuma * pc.sharpStrength;
+    
+    vec3 blur;
+    
+    // Pattern 0: Fast (7 tap gaussian, 2+1 texture fetches)
+    if (pc.pattern == 0) {
+        vec3 nw = textureOffset(inputImage, uv, ivec2(-1, -1)).rgb;
+        vec3 se = textureOffset(inputImage, uv, ivec2(1, 1)).rgb;
+        vec3 ne = textureOffset(inputImage, uv, ivec2(1, -1)).rgb;
+        vec3 sw = textureOffset(inputImage, uv, ivec2(-1, 1)).rgb;
+        vec3 n = textureOffset(inputImage, uv, ivec2(0, -1)).rgb;
+        vec3 s = textureOffset(inputImage, uv, ivec2(0, 1)).rgb;
+        vec3 w = textureOffset(inputImage, uv, ivec2(-1, 0)).rgb;
+        vec3 e = textureOffset(inputImage, uv, ivec2(1, 0)).rgb;
+        
+        blur = (nw + ne + sw + se) * 0.0625 + (n + s + w + e) * 0.125 + ori * 0.25;
+    }
+    // Pattern 1: Normal (9 tap, optimized)
+    else if (pc.pattern == 1) {
+        vec2 offset = texelSize * pc.offsetBias;
+        vec3 nw = texture(inputImage, uv + vec2(-offset.x, -offset.y)).rgb;
+        vec3 n = texture(inputImage, uv + vec2(0.0, -offset.y)).rgb;
+        vec3 ne = texture(inputImage, uv + vec2(offset.x, -offset.y)).rgb;
+        vec3 w = texture(inputImage, uv + vec2(-offset.x, 0.0)).rgb;
+        vec3 e = texture(inputImage, uv + vec2(offset.x, 0.0)).rgb;
+        vec3 sw = texture(inputImage, uv + vec2(-offset.x, offset.y)).rgb;
+        vec3 s = texture(inputImage, uv + vec2(0.0, offset.y)).rgb;
+        vec3 se = texture(inputImage, uv + vec2(offset.x, offset.y)).rgb;
+        
+        blur = (nw + ne + sw + se) * 0.0625 + (n + s + w + e) * 0.125 + ori * 0.25;
+    }
+    // Pattern 2: Wider (13 tap)
+    else if (pc.pattern == 2) {
+        vec2 offset = texelSize * pc.offsetBias * 1.5;
+        vec3 nw = texture(inputImage, uv + vec2(-offset.x, -offset.y)).rgb;
+        vec3 n = texture(inputImage, uv + vec2(0.0, -offset.y)).rgb;
+        vec3 ne = texture(inputImage, uv + vec2(offset.x, -offset.y)).rgb;
+        vec3 w = texture(inputImage, uv + vec2(-offset.x, 0.0)).rgb;
+        vec3 e = texture(inputImage, uv + vec2(offset.x, 0.0)).rgb;
+        vec3 sw = texture(inputImage, uv + vec2(-offset.x, offset.y)).rgb;
+        vec3 s = texture(inputImage, uv + vec2(0.0, offset.y)).rgb;
+        vec3 se = texture(inputImage, uv + vec2(offset.x, offset.y)).rgb;
+        
+        // Additional samples for wider pattern
+        vec3 nn = texture(inputImage, uv + vec2(0.0, -offset.y * 2.0)).rgb;
+        vec3 ss = texture(inputImage, uv + vec2(0.0, offset.y * 2.0)).rgb;
+        vec3 ww = texture(inputImage, uv + vec2(-offset.x * 2.0, 0.0)).rgb;
+        vec3 ee = texture(inputImage, uv + vec2(offset.x * 2.0, 0.0)).rgb;
+        
+        blur = (nw + ne + sw + se) * 0.04 + (n + s + w + e) * 0.08 + 
+               (nn + ss + ww + ee) * 0.04 + ori * 0.2;
+    }
+    // Pattern 3: Pyramid shaped
+    else {
+        vec2 offset = texelSize * pc.offsetBias;
+        vec3 nw = texture(inputImage, uv + vec2(-offset.x, -offset.y)).rgb;
+        vec3 n = texture(inputImage, uv + vec2(0.0, -offset.y)).rgb;
+        vec3 ne = texture(inputImage, uv + vec2(offset.x, -offset.y)).rgb;
+        vec3 w = texture(inputImage, uv + vec2(-offset.x, 0.0)).rgb;
+        vec3 e = texture(inputImage, uv + vec2(offset.x, 0.0)).rgb;
+        vec3 sw = texture(inputImage, uv + vec2(-offset.x, offset.y)).rgb;
+        vec3 s = texture(inputImage, uv + vec2(0.0, offset.y)).rgb;
+        vec3 se = texture(inputImage, uv + vec2(offset.x, offset.y)).rgb;
+        
+        // Pyramid weights (center heavier)
+        blur = (nw + ne + sw + se) * 0.05 + (n + s + w + e) * 0.1 + ori * 0.4;
+    }
+    
+    // Calculate sharpening amount in luma space
+    float oriLuma = dot(ori, CoefLuma);
+    float blurLuma = dot(blur, CoefLuma);
+    float sharpLuma = oriLuma - blurLuma;
+    
+    // Apply sharpening with clamp to avoid haloing
+    float sharpAmount = clamp(sharpLuma * 3.0, -pc.sharpClamp, pc.sharpClamp);
+    
+    // Apply sharpening
+    vec3 sharpened = ori + (ori - blur) * sharpAmount;
+    
+    // Clamp to valid range
+    sharpened = clamp(sharpened, 0.0, 1.0);
+    
+    imageStore(outputImage, pixel, vec4(sharpened, 1.0));
+}

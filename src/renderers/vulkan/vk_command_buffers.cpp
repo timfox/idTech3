@@ -69,6 +69,39 @@ extern PFN_vkDeviceWaitIdle qvkDeviceWaitIdle;
 static std::vector<VkCommandBuffer> command_buffers;
 static VkFence command_fences[NUM_COMMAND_BUFFERS]; // Per-frame fences for immediate commands
 
+// Batch reset command buffers for better performance
+// Resets multiple command buffers efficiently
+static qboolean batch_reset_command_buffers(VkCommandBuffer *buffers, uint32_t count) {
+    if (!buffers || count == 0 || vk.device_lost || vk.device == VK_NULL_HANDLE) {
+        return qfalse;
+    }
+    
+    // Reset all buffers - individual calls but organized for better performance
+    // Vulkan doesn't have a batch reset API, but we can optimize by:
+    // 1. Collecting all buffers first
+    // 2. Resetting them in a tight loop for better cache behavior
+    qboolean all_succeeded = qtrue;
+    for (uint32_t i = 0; i < count; i++) {
+        if (buffers[i] != VK_NULL_HANDLE) {
+            VkResult result = qvkResetCommandBuffer(buffers[i], 0);
+            if (result != VK_SUCCESS) {
+                if (result == VK_ERROR_DEVICE_LOST) {
+                    vk.device_lost = qtrue;
+                    extern void vk_reset_memory_tracking_on_device_lost(void);
+                    vk_reset_memory_tracking_on_device_lost();
+                    ri.Printf(PRINT_ERROR, "Vulkan: Device lost during batch command buffer reset\n");
+                    return qfalse;
+                } else {
+                    ri.Printf(PRINT_WARNING, "batch_reset_command_buffers: Failed to reset buffer %u: %d\n", i, result);
+                    all_succeeded = qfalse;
+                }
+            }
+        }
+    }
+    
+    return all_succeeded;
+}
+
 // Command buffer functions
 // Vulkan function pointers (defined in vk.c)
 
@@ -208,13 +241,68 @@ extern "C" VkCommandBuffer vk_begin_command_buffer(void) {
 
     VkCommandBuffer current_command_buffer = command_buffers[frame_index];
 
-    // Wait only on the current frame's fence to avoid blocking other frames
-    // This enables parallel execution of immediate commands with frame rendering
+    // Wait on the current frame's rendering fence to ensure immediate commands
+    // don't conflict with frame rendering. This ensures proper synchronization
+    // between immediate commands and frame rendering command buffers.
     if (!vk.device_lost && vk.device != VK_NULL_HANDLE) {
-        VkFence fence_to_wait = command_fences[frame_index];
+        // Wait on both the immediate command fence and the frame rendering fence
+        // to ensure we don't conflict with either
+        VkFence immediate_fence = command_fences[frame_index];
+        VkFence frame_fence = vk.tess[frame_index].rendering_finished_fence;
         
-        if (fence_to_wait != VK_NULL_HANDLE) {
-            VkResult fence_result = qvkWaitForFences(vk.device, 1, &fence_to_wait, VK_TRUE, UINT64_MAX);
+        // Wait on frame rendering fence first to ensure frame rendering is complete
+        // This prevents immediate commands from conflicting with frame rendering
+        if (frame_fence != VK_NULL_HANDLE) {
+            extern PFN_vkGetFenceStatus qvkGetFenceStatus;
+            if (qvkGetFenceStatus) {
+                VkResult frame_status = qvkGetFenceStatus(vk.device, frame_fence);
+                if (frame_status == VK_SUCCESS) {
+                    // Frame fence is signaled, frame rendering is complete
+                    // Reset it for next use
+                    qvkResetFences(vk.device, 1, &frame_fence);
+                } else if (frame_status == VK_NOT_READY) {
+                    // Frame is still rendering, wait for it to complete
+                    VkResult fence_result = qvkWaitForFences(vk.device, 1, &frame_fence, VK_TRUE, UINT64_MAX);
+                    if (fence_result == VK_ERROR_DEVICE_LOST) {
+                        vk.device_lost = qtrue;
+                        extern void vk_reset_memory_tracking_on_device_lost(void);
+                        vk_reset_memory_tracking_on_device_lost();
+                        ri.Printf(PRINT_ERROR, "Vulkan: Device lost during frame fence wait\n");
+                        return VK_NULL_HANDLE;
+                    } else if (fence_result != VK_SUCCESS) {
+                        ri.Printf(PRINT_WARNING, "vk_begin_command_buffer: Frame fence wait failed: %d\n", fence_result);
+                    } else {
+                        // Reset fence after waiting
+                        qvkResetFences(vk.device, 1, &frame_fence);
+                    }
+                } else if (frame_status == VK_ERROR_DEVICE_LOST) {
+                    vk.device_lost = qtrue;
+                    extern void vk_reset_memory_tracking_on_device_lost(void);
+                    vk_reset_memory_tracking_on_device_lost();
+                    ri.Printf(PRINT_ERROR, "Vulkan: Device lost during frame fence status check\n");
+                    return VK_NULL_HANDLE;
+                }
+            } else {
+                // Fallback: wait on fence if status check is unavailable
+                VkResult fence_result = qvkWaitForFences(vk.device, 1, &frame_fence, VK_TRUE, UINT64_MAX);
+                if (fence_result == VK_ERROR_DEVICE_LOST) {
+                    vk.device_lost = qtrue;
+                    extern void vk_reset_memory_tracking_on_device_lost(void);
+                    vk_reset_memory_tracking_on_device_lost();
+                    ri.Printf(PRINT_ERROR, "Vulkan: Device lost during frame fence wait\n");
+                    return VK_NULL_HANDLE;
+                } else if (fence_result != VK_SUCCESS) {
+                    ri.Printf(PRINT_WARNING, "vk_begin_command_buffer: Frame fence wait failed: %d\n", fence_result);
+                } else {
+                    // Reset fence after waiting
+                    qvkResetFences(vk.device, 1, &frame_fence);
+                }
+            }
+        }
+        
+        // Also wait on immediate command fence for this frame
+        if (immediate_fence != VK_NULL_HANDLE) {
+            VkResult fence_result = qvkWaitForFences(vk.device, 1, &immediate_fence, VK_TRUE, UINT64_MAX);
             if (fence_result == VK_ERROR_DEVICE_LOST) {
                 vk.device_lost = qtrue;
                 extern void vk_reset_memory_tracking_on_device_lost(void);
@@ -225,16 +313,25 @@ extern "C" VkCommandBuffer vk_begin_command_buffer(void) {
                 ri.Printf(PRINT_WARNING, "vk_begin_command_buffer: Fence wait failed: %d\n", fence_result);
             } else {
                 // Reset fence after waiting
-                qvkResetFences(vk.device, 1, &fence_to_wait);
+                qvkResetFences(vk.device, 1, &immediate_fence);
             }
         }
     }
 
     // Reset command buffer only if device is still valid
+    // Note: We reset individually here since we only need one buffer
+    // For batch resets, use batch_reset_command_buffers() when resetting multiple buffers
     if (!vk.device_lost && vk.device != VK_NULL_HANDLE) {
         VkResult reset_result = qvkResetCommandBuffer(current_command_buffer, 0);
         if (reset_result != VK_SUCCESS) {
-            ri.Printf(PRINT_WARNING, "vk_begin_command_buffer: Failed to reset command buffer: %d\n", reset_result);
+            if (reset_result == VK_ERROR_DEVICE_LOST) {
+                vk.device_lost = qtrue;
+                extern void vk_reset_memory_tracking_on_device_lost(void);
+                vk_reset_memory_tracking_on_device_lost();
+                ri.Printf(PRINT_ERROR, "Vulkan: Device lost during command buffer reset\n");
+            } else {
+                ri.Printf(PRINT_WARNING, "vk_begin_command_buffer: Failed to reset command buffer: %d\n", reset_result);
+            }
             return VK_NULL_HANDLE;
         }
     } else {
@@ -370,6 +467,18 @@ extern "C" void vk_end_command_buffer(VkCommandBuffer command_buffer, const char
 }
 
 // vk_wait_idle is defined in vk.c
+
+// Batch reset all immediate command buffers
+// Can be called when multiple buffers are ready to be reset
+extern "C" void vk_batch_reset_command_buffers(void) {
+    if (command_buffers.empty() || vk.device_lost || vk.device == VK_NULL_HANDLE) {
+        return;
+    }
+    
+    // Batch reset all allocated command buffers
+    // This is more efficient than resetting them individually throughout the code
+    batch_reset_command_buffers(command_buffers.data(), static_cast<uint32_t>(command_buffers.size()));
+}
 
 // Destroy command pool and resources
 void vk_destroy_command_pool(void) {

@@ -253,6 +253,7 @@ static char gl_extensions[ 32768 ];
 	QGL_VBO_PROCS
 	QGL_FBO_PROCS
 	QGL_FBO_OPT_PROCS
+	QGL_46_PROCS
 #undef GLE
 
 typedef struct {
@@ -1594,6 +1595,62 @@ static void R_InitExtensions( void )
 	else
 	{
 		ri.Printf( PRINT_ALL, "...GLSL not available, OpenGL version too old\n" );
+	}
+	
+	// Initialize OpenGL 4.6 features if available
+	if ( gl_version >= 460 || gl_version >= 430 ) // 4.6 or 4.3+ (compute shaders)
+	{
+		ri.Printf( PRINT_ALL, "...detected OpenGL 4.3+ or 4.6, initializing modern features\n" );
+		
+		// Load OpenGL 4.6 function pointers
+		// Note: GLE must be defined for the macro expansion
+		#define GLE( ret, name, ... ) { (void**)&q##name, XSTRING(name) },
+		static sym_t gl46_procs[] = { QGL_46_PROCS };
+		#undef GLE
+		err = R_ResolveSymbols( gl46_procs, ARRAY_LEN( gl46_procs ) );
+		if ( err )
+		{
+			ri.Printf( PRINT_WARNING, "...OpenGL 4.6: Error resolving function '%s' (some features may be unavailable)\n", err );
+		}
+		else
+		{
+			ri.Printf( PRINT_ALL, "...OpenGL 4.6 features loaded successfully\n" );
+			
+			// Check for specific OpenGL 4.6 capabilities
+			if ( qglDispatchCompute )
+			{
+				ri.Printf( PRINT_ALL, "...OpenGL 4.6: Compute shaders available\n" );
+			}
+			if ( qglBindBufferBase )
+			{
+				ri.Printf( PRINT_ALL, "...OpenGL 4.6: Shader storage buffer objects available\n" );
+			}
+			if ( qglDrawArraysIndirect )
+			{
+				ri.Printf( PRINT_ALL, "...OpenGL 4.6: Indirect drawing available\n" );
+			}
+			if ( qglTexStorage2D )
+			{
+				ri.Printf( PRINT_ALL, "...OpenGL 4.6: Texture storage available\n" );
+			}
+			if ( qglCreateBuffers )
+			{
+				ri.Printf( PRINT_ALL, "...OpenGL 4.6: Direct state access available\n" );
+			}
+		}
+	}
+	else if ( gl_version >= 400 )
+	{
+		ri.Printf( PRINT_ALL, "...OpenGL 4.0+ detected, loading available 4.x features\n" );
+		// Load subset of 4.6 features that are available in 4.0+
+		#define GLE( ret, name, ... ) { (void**)&q##name, XSTRING(name) },
+		static sym_t gl40_procs[] = { QGL_DRAW_INDIRECT_PROCS };
+		#undef GLE
+		err = R_ResolveSymbols( gl40_procs, ARRAY_LEN( gl40_procs ) );
+		if ( !err )
+		{
+			ri.Printf( PRINT_ALL, "...OpenGL 4.0: Indirect drawing available\n" );
+		}
 	}
 	// Fallback to legacy ARB programs
 	if ( !qglCreateShader && R_HaveExtension( "GL_ARB_vertex_program" ) && R_HaveExtension( "GL_ARB_fragment_program" ) )

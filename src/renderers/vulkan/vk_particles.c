@@ -22,6 +22,10 @@ extern PFN_vkFreeMemory qvkFreeMemory;
 extern PFN_vkBindBufferMemory qvkBindBufferMemory;
 extern PFN_vkMapMemory qvkMapMemory;
 extern PFN_vkUnmapMemory qvkUnmapMemory;
+extern PFN_vkCmdBindPipeline qvkCmdBindPipeline;
+extern PFN_vkCmdBindDescriptorSets qvkCmdBindDescriptorSets;
+extern PFN_vkCmdBindVertexBuffers qvkCmdBindVertexBuffers;
+extern PFN_vkCmdDraw qvkCmdDraw;
 extern uint32_t find_memory_type(uint32_t memory_type_bits, VkMemoryPropertyFlags properties);
 
 // GPU particle data structure (matches CPU particle structure)
@@ -170,9 +174,10 @@ void vk_particles_init( void )
 	
 	qvkBindBufferMemory( vk.device, vk_particles.indirectDrawBuffer, vk_particles.indirectDrawMemory, 0 );
 	
-	// TODO: Create descriptor set layouts, pipelines, and descriptor sets
-	// These require shader compilation and pipeline creation which is more complex
-	// For now, buffers are created and ready for data upload
+	// Note: Descriptor set layouts, pipelines, and descriptor sets would be created here
+	// when shader compilation and pipeline creation infrastructure is available.
+	// For now, buffers are created and ready for data upload.
+	// The rendering function will check for pipeline availability before rendering.
 	
 	ri.Printf( PRINT_DEVELOPER, "GPU particle system initialized (max particles: %u, buffer size: %lu bytes)\n", 
 		vk_particles.maxParticles, (unsigned long)particleBufferSize );
@@ -213,10 +218,35 @@ void vk_particles_shutdown( void )
 		vk_particles.particleMemory = VK_NULL_HANDLE;
 	}
 	
-	// TODO: Cleanup pipelines and descriptor sets when implemented
-	// if ( vk_particles.simulationPipeline != VK_NULL_HANDLE ) { ... }
-	// if ( vk_particles.renderingPipeline != VK_NULL_HANDLE ) { ... }
-	// if ( vk_particles.simulationDescriptorLayout != VK_NULL_HANDLE ) { ... }
+	// Cleanup pipelines and descriptor sets if they were created
+	if (vk_particles.simulationPipeline != VK_NULL_HANDLE) {
+		extern PFN_vkDestroyPipeline qvkDestroyPipeline;
+		if (qvkDestroyPipeline) {
+			qvkDestroyPipeline(vk.device, vk_particles.simulationPipeline, NULL);
+		}
+		vk_particles.simulationPipeline = VK_NULL_HANDLE;
+	}
+	if (vk_particles.renderingPipeline != VK_NULL_HANDLE) {
+		extern PFN_vkDestroyPipeline qvkDestroyPipeline;
+		if (qvkDestroyPipeline) {
+			qvkDestroyPipeline(vk.device, vk_particles.renderingPipeline, NULL);
+		}
+		vk_particles.renderingPipeline = VK_NULL_HANDLE;
+	}
+	if (vk_particles.simulationDescriptorLayout != VK_NULL_HANDLE) {
+		extern PFN_vkDestroyDescriptorSetLayout qvkDestroyDescriptorSetLayout;
+		if (qvkDestroyDescriptorSetLayout) {
+			qvkDestroyDescriptorSetLayout(vk.device, vk_particles.simulationDescriptorLayout, NULL);
+		}
+		vk_particles.simulationDescriptorLayout = VK_NULL_HANDLE;
+	}
+	if (vk_particles.renderingDescriptorLayout != VK_NULL_HANDLE) {
+		extern PFN_vkDestroyDescriptorSetLayout qvkDestroyDescriptorSetLayout;
+		if (qvkDestroyDescriptorSetLayout) {
+			qvkDestroyDescriptorSetLayout(vk.device, vk_particles.renderingDescriptorLayout, NULL);
+		}
+		vk_particles.renderingDescriptorLayout = VK_NULL_HANDLE;
+	}
 	// if ( vk_particles.renderingDescriptorLayout != VK_NULL_HANDLE ) { ... }
 	
 	vk_particles.initialized = qfalse;
@@ -332,15 +362,52 @@ void vk_particles_render( void )
 	}
 	
 	// Render particles using indirect draw
-	// TODO: Full implementation would:
-	// 1. Bind graphics pipeline
-	// 2. Bind descriptor set with particle buffer
-	// 3. Bind vertex/index buffers if needed
-	// 4. Draw indirect using particle count from buffer
-	// 5. Handle shader changes per particle (if needed)
+	// Check if command buffer is available
+	if (!vk.cmd || !vk.cmd->command_buffer || vk.cmd->command_buffer == VK_NULL_HANDLE) {
+		return;
+	}
 	
-	// For now, this is a placeholder
-	// The actual rendering would use vkCmdDrawIndirect or similar
+	// Check if pipeline is available
+	if (vk_particles.renderingPipeline == VK_NULL_HANDLE) {
+		// Pipeline not created yet - particles will be rendered when pipeline is available
+		ri.Printf(PRINT_DEVELOPER, "Vulkan: Particle rendering pipeline not created yet\n");
+		return;
+	}
+	
+	// Bind graphics pipeline
+	extern PFN_vkCmdBindPipeline qvkCmdBindPipeline;
+	if (qvkCmdBindPipeline) {
+		qvkCmdBindPipeline(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vk_particles.renderingPipeline);
+	}
+	
+	// Bind descriptor set with particle buffer if available
+	if (vk_particles.renderingDescriptorSet != VK_NULL_HANDLE) {
+		extern PFN_vkCmdBindDescriptorSets qvkCmdBindDescriptorSets;
+		extern VkPipelineLayout vk_pipeline_layout; // Use standard pipeline layout if available
+		if (qvkCmdBindDescriptorSets && vk.pipeline_layout != VK_NULL_HANDLE) {
+			qvkCmdBindDescriptorSets(vk.cmd->command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			                         vk.pipeline_layout, 0, 1, &vk_particles.renderingDescriptorSet, 0, NULL);
+		}
+	}
+	
+	// Bind particle buffer as vertex buffer
+	extern PFN_vkCmdBindVertexBuffers qvkCmdBindVertexBuffers;
+	if (qvkCmdBindVertexBuffers && vk_particles.particleBuffer != VK_NULL_HANDLE) {
+		VkDeviceSize offsets[] = {0};
+		qvkCmdBindVertexBuffers(vk.cmd->command_buffer, 0, 1, &vk_particles.particleBuffer, offsets);
+	}
+	
+	// Draw particles using direct draw
+	// Note: Indirect draw (vkCmdDrawIndirect) would be more efficient but requires
+	// proper indirect command buffer setup. For now, use direct draw.
+	if (vk_particles.activeParticleCount > 0) {
+		extern PFN_vkCmdDraw qvkCmdDraw;
+		if (qvkCmdDraw) {
+			// Draw 6 vertices per particle (quad = 2 triangles)
+			// Each particle is rendered as a billboard quad
+			qvkCmdDraw(vk.cmd->command_buffer, 6, vk_particles.activeParticleCount, 0, 0);
+		}
+	}
 }
 
 #endif // USE_VULKAN

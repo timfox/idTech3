@@ -1,0 +1,132 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+// Based on q3rtx ASVGF atrous wavelet filtering
+// Multi-pass spatial filtering with exponential step sizes
+
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
+#include "shader_constants.glsl"
+
+// Input images
+layout(binding = 0, set = 0, rgba16f) uniform image2D inputImage; // Input to filter
+layout(binding = 1, set = 0, rgba16f) uniform image2D normalBuffer; // Normal buffer (xyz=normal, w=depth)
+layout(binding = 2, set = 0, rgba16f) uniform image2D motionBuffer; // Motion buffer (w=fwidth_depth)
+
+// Output images
+layout(binding = 3, set = 0, rgba16f) uniform image2D outputImage; // Filtered output
+
+// Uniform buffer
+layout(binding = 4, set = 0) uniform UniformBuffer {
+    vec2 resolution;
+    vec2 invResolution;
+    int iteration; // Current atrous iteration (0-based)
+    int maxIterations; // Maximum iterations
+    float depthWeight; // Depth weight for filtering
+    float normalWeight; // Normal weight for filtering
+} ubo;
+
+// Push constant for iteration
+layout(push_constant) uniform PushConstant {
+    int iteration;
+} pc;
+
+#define GRAD_DWN 3
+
+const float wavelet_factor = 0.5;
+const float wavelet_kernel[2][2] = {
+    { 1.0, wavelet_factor },
+    { wavelet_factor, wavelet_factor * wavelet_factor }
+};
+
+float square(float x) { return x * x; }
+
+void filter_image() {
+    ivec2 ipos_lowres = ivec2(gl_GlobalInvocationID);
+    ivec2 ipos_hires = ipos_lowres * GRAD_DWN + ivec2(1);
+
+    if (any(greaterThanEqual(ipos_hires, ivec2(ubo.resolution)))) {
+        return;
+    }
+
+    // Load center color
+    vec4 color_center = imageLoad(inputImage, ipos_lowres);
+
+    // Early exit for later iterations
+    if (pc.iteration >= 4) {
+        imageStore(outputImage, ipos_lowres, color_center);
+        return;
+    }
+
+    // Load anchor pixel parameters
+    vec3 geo_normal_center = imageLoad(normalBuffer, ipos_hires).xyz;
+    float depth_center = imageLoad(normalBuffer, ipos_hires).w;
+    float fwidth_depth = imageLoad(motionBuffer, ipos_hires).w;
+
+    const int step_size = int(1u << (pc.iteration - 1));
+
+    vec4 sum_color = color_center;
+    float sum_w = 1.0;
+
+    // Boundaries for checkerboard field
+    int field_left = 0;
+    int field_right = int(ubo.resolution.x) / 2;
+    if (ipos_hires.x >= field_right) {
+        field_left = field_right;
+        field_right = int(ubo.resolution.x);
+    }
+
+    // 3x3 sparse pattern
+    const int r = 1;
+    for (int yy = -r; yy <= r; yy++) {
+        for (int xx = -r; xx <= r; xx++) {
+            if (xx == 0 && yy == 0) {
+                continue;
+            }
+
+            ivec2 p_lowres = ipos_lowres + ivec2(xx, yy) * step_size;
+            ivec2 p_hires = p_lowres * GRAD_DWN + ivec2(1);
+
+            float w = float(all(greaterThanEqual(p_hires, ivec2(field_left, 0))) &&
+                           all(lessThan(p_hires, ivec2(field_right, int(ubo.resolution.y)))));
+
+            if (w == 0.0) {
+                continue;
+            }
+
+            // Load sample parameters
+            vec3 geo_normal = imageLoad(normalBuffer, p_hires).xyz;
+            float depth = imageLoad(normalBuffer, p_hires).w;
+
+            // Depth weight
+            float dist_z = abs(depth_center - depth) * fwidth_depth * 0.5;
+            w *= exp(-dist_z / float(step_size * GRAD_DWN));
+            w *= wavelet_kernel[abs(xx)][abs(yy)];
+
+            // Normal weight
+            if (ubo.normalWeight > 0.0) {
+                float GNdotGN = max(0.0, dot(geo_normal_center, geo_normal));
+                w *= pow(GNdotGN, ubo.normalWeight);
+            }
+
+            // Load and accumulate color
+            vec4 color_sample = imageLoad(inputImage, p_lowres);
+            sum_color += color_sample * w;
+            sum_w += w;
+        }
+    }
+
+    // Normalize
+    if (sum_w > 0.0) {
+        sum_color /= sum_w;
+    }
+
+    imageStore(outputImage, ipos_lowres, sum_color);
+}
+
+void main() {
+    filter_image();
+}

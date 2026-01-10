@@ -210,6 +210,10 @@ This document describes the complete implementation of synchronization patterns 
 - [x] All compute commands use fences with reset
 - [x] All one-time commands use fences (improved)
 - [x] All cleanup paths are safe
+- [x] Frame begin waits on previous frame's fence (Q2RTX pattern)
+- [x] Frame begin resets fence after waiting (Q2RTX pattern)
+- [x] Frame begin explicitly resets command buffers (Q2RTX pattern)
+- [x] Immediate command buffers wait on frame rendering fence before reuse
 
 **Status**: ✅ **ALL PATTERNS IMPLEMENTED AND VERIFIED**
 

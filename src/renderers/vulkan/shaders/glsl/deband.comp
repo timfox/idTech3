@@ -1,0 +1,168 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+// Debanding shader (inspired by NaturalVisionEvolvedGTA5 Deband.fx)
+// Removes color banding artifacts using dithering and smoothing
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(set = 0, binding = 0) uniform sampler2D inputImage;
+layout(set = 0, binding = 1) uniform sampler2D depthBuffer; // Optional depth for sky detection
+layout(set = 0, binding = 2, rgba16f) uniform writeonly image2D outputImage;
+
+layout(push_constant) uniform DebandParams {
+    vec2 resolution;
+    vec2 invResolution;
+    float threshold;          // Banding detection threshold
+    float range;              // Sample range
+    int iterations;           // Number of iterations
+    float ditherAmount;       // Dithering strength
+    int useDepth;             // Use depth buffer for sky detection
+    float depthMin;           // Minimum depth for debanding
+    float depthMax;           // Maximum depth for debanding
+} pc;
+
+// Hash function for dithering
+float hash(vec2 p) {
+    p = fract(p * vec2(123.34, 456.21));
+    p += dot(p, p + 45.32);
+    return fract(p.x * p.y);
+}
+
+// Bayer dithering matrix (4x4)
+float bayerDither(vec2 coord) {
+    ivec2 bayerCoord = ivec2(mod(coord, 4.0));
+    const float bayerMatrix[16] = float[](
+        0.0/16.0,  8.0/16.0,  2.0/16.0, 10.0/16.0,
+        12.0/16.0, 4.0/16.0, 14.0/16.0,  6.0/16.0,
+        3.0/16.0, 11.0/16.0,  1.0/16.0,  9.0/16.0,
+        15.0/16.0, 7.0/16.0, 13.0/16.0,  5.0/16.0
+    );
+    int index = bayerCoord.y * 4 + bayerCoord.x;
+    return bayerMatrix[index];
+}
+
+// Calculate standard deviation of nearby pixels
+float calculateDeviation(vec3 center, vec2 uv, float range) {
+    float deviation = 0.0;
+    float weightSum = 0.0;
+    
+    // Sample 8 surrounding pixels
+    vec2 offsets[8] = vec2[](
+        vec2(-1.0, -1.0), vec2(0.0, -1.0), vec2(1.0, -1.0),
+        vec2(-1.0,  0.0),                   vec2(1.0,  0.0),
+        vec2(-1.0,  1.0), vec2(0.0,  1.0), vec2(1.0,  1.0)
+    );
+    
+    for (int i = 0; i < 8; i++) {
+        vec2 sampleUV = uv + offsets[i] * pc.invResolution * range;
+        vec3 sample = texture(inputImage, sampleUV).rgb;
+        float diff = length(sample - center);
+        deviation += diff;
+        weightSum += 1.0;
+    }
+    
+    return deviation / weightSum;
+}
+
+// Weber ratio analysis (for banding detection)
+float weberRatio(vec3 center, vec2 uv, float range) {
+    vec2 offsets[4] = vec2[](
+        vec2(-1.0, 0.0), vec2(1.0, 0.0),
+        vec2(0.0, -1.0), vec2(0.0, 1.0)
+    );
+    
+    float avgIntensity = 0.0;
+    for (int i = 0; i < 4; i++) {
+        vec2 sampleUV = uv + offsets[i] * pc.invResolution * range;
+        vec3 sample = texture(inputImage, sampleUV).rgb;
+        avgIntensity += dot(sample, vec3(0.299, 0.587, 0.114));
+    }
+    avgIntensity /= 4.0;
+    
+    float centerIntensity = dot(center, vec3(0.299, 0.587, 0.114));
+    if (avgIntensity < 0.001) return 0.0;
+    
+    return abs(centerIntensity - avgIntensity) / (avgIntensity + 0.001);
+}
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (pixel.x >= int(pc.resolution.x) || pixel.y >= int(pc.resolution.y)) {
+        return;
+    }
+    
+    vec2 uv = (vec2(pixel) + 0.5) * pc.invResolution;
+    
+    // Sample center pixel
+    vec3 color = texture(inputImage, uv).rgb;
+    
+    // Depth-based filtering (for sky detection)
+    if (pc.useDepth != 0) {
+        float depth = texture(depthBuffer, uv).r;
+        if (depth < pc.depthMin || depth > pc.depthMax) {
+            imageStore(outputImage, pixel, vec4(color, 1.0));
+            return;
+        }
+    }
+    
+    // Detect banding using standard deviation and Weber ratio
+    float deviation = calculateDeviation(color, uv, pc.range);
+    float weber = weberRatio(color, uv, pc.range);
+    
+    // Check if banding is detected
+    bool isBanding = (deviation < pc.threshold) && (weber < pc.threshold * 2.0);
+    
+    if (!isBanding) {
+        // No banding detected, pass through
+        imageStore(outputImage, pixel, vec4(color, 1.0));
+        return;
+    }
+    
+    // Apply debanding: average with nearby pixels and add dither
+    vec3 debanded = color;
+    
+    for (int iter = 0; iter < pc.iterations; iter++) {
+        vec3 sum = vec3(0.0);
+        float weightSum = 0.0;
+        
+        // Sample nearby pixels with random offset
+        vec2 randomOffset = vec2(
+            hash(uv + vec2(iter * 0.1, 0.0)) - 0.5,
+            hash(uv + vec2(0.0, iter * 0.1)) - 0.5
+        ) * pc.range * pc.invResolution;
+        
+        vec2 offsets[4] = vec2[](
+            vec2(-1.0, 0.0) + randomOffset,
+            vec2(1.0, 0.0) + randomOffset,
+            vec2(0.0, -1.0) + randomOffset,
+            vec2(0.0, 1.0) + randomOffset
+        );
+        
+        for (int i = 0; i < 4; i++) {
+            vec2 sampleUV = uv + offsets[i];
+            vec3 sample = texture(inputImage, sampleUV).rgb;
+            float weight = 1.0 / (1.0 + length(sample - color) * 10.0);
+            sum += sample * weight;
+            weightSum += weight;
+        }
+        
+        if (weightSum > 0.001) {
+            debanded = mix(color, sum / weightSum, 0.5);
+        }
+    }
+    
+    // Apply dithering to break up remaining banding
+    float dither = bayerDither(vec2(pixel)) - 0.5;
+    dither *= pc.ditherAmount / 255.0; // Scale to reasonable range
+    
+    debanded += vec3(dither);
+    
+    // Clamp result
+    debanded = clamp(debanded, 0.0, 1.0);
+    
+    imageStore(outputImage, pixel, vec4(debanded, 1.0));
+}

@@ -288,6 +288,51 @@ typedef char GLchar;
 	GLE( void, glRenderbufferStorageMultisample, GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height ) \
 	GLE( void, glGetInternalformativ, GLenum target, GLenum internalformat, GLenum pname, GLsizei bufSize, GLint *params )
 
+// OpenGL 4.6 Core Features
+#define QGL_COMPUTE_PROCS \
+	GLE( void, glDispatchCompute, GLuint num_groups_x, GLuint num_groups_y, GLuint num_groups_z ) \
+	GLE( void, glDispatchComputeIndirect, GLintptr indirect ) \
+	GLE( void, glGetProgramInterfaceiv, GLuint program, GLenum programInterface, GLenum pname, GLint *params ) \
+	GLE( GLuint, glGetProgramResourceIndex, GLuint program, GLenum programInterface, const GLchar *name ) \
+	GLE( void, glGetProgramResourceName, GLuint program, GLenum programInterface, GLuint index, GLsizei bufSize, GLsizei *length, GLchar *name ) \
+	GLE( void, glGetProgramResourceiv, GLuint program, GLenum programInterface, GLuint index, GLsizei propCount, const GLenum *props, GLsizei bufSize, GLsizei *length, GLint *params )
+
+#define QGL_SSBO_PROCS \
+	GLE( void, glBindBufferBase, GLenum target, GLuint index, GLuint buffer ) \
+	GLE( void, glBindBufferRange, GLenum target, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size ) \
+	GLE( void, glGetActiveAtomicCounterBufferiv, GLuint program, GLuint bufferIndex, GLenum pname, GLint *params )
+
+#define QGL_DRAW_INDIRECT_PROCS \
+	GLE( void, glDrawArraysIndirect, GLenum mode, const void *indirect ) \
+	GLE( void, glDrawElementsIndirect, GLenum mode, GLenum type, const void *indirect ) \
+	GLE( void, glMultiDrawArraysIndirect, GLenum mode, const void *indirect, GLsizei drawcount, GLsizei stride ) \
+	GLE( void, glMultiDrawElementsIndirect, GLenum mode, GLenum type, const void *indirect, GLsizei drawcount, GLsizei stride )
+
+#define QGL_TEXTURE_STORAGE_PROCS \
+	GLE( void, glTexStorage1D, GLenum target, GLsizei levels, GLenum internalformat, GLsizei width ) \
+	GLE( void, glTexStorage2D, GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height ) \
+	GLE( void, glTexStorage3D, GLenum target, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth ) \
+	GLE( void, glTexStorage2DMultisample, GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLboolean fixedsamplelocations ) \
+	GLE( void, glTexStorage3DMultisample, GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height, GLsizei depth, GLboolean fixedsamplelocations )
+
+#define QGL_DSA_PROCS \
+	GLE( void, glCreateBuffers, GLsizei n, GLuint *buffers ) \
+	GLE( void, glNamedBufferData, GLuint buffer, GLsizeiptr size, const void *data, GLenum usage ) \
+	GLE( void, glNamedBufferSubData, GLuint buffer, GLintptr offset, GLsizeiptr size, const void *data ) \
+	GLE( void, glCreateTextures, GLenum target, GLsizei n, GLuint *textures ) \
+	GLE( void, glTextureParameteri, GLuint texture, GLenum pname, GLint param ) \
+	GLE( void, glTextureStorage2D, GLuint texture, GLsizei levels, GLenum internalformat, GLsizei width, GLsizei height ) \
+	GLE( void, glTextureSubImage2D, GLuint texture, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const void *pixels ) \
+	GLE( void, glGenerateTextureMipmap, GLuint texture ) \
+	GLE( void, glBindTextureUnit, GLuint unit, GLuint texture )
+
+#define QGL_46_PROCS \
+	QGL_COMPUTE_PROCS \
+	QGL_SSBO_PROCS \
+	QGL_DRAW_INDIRECT_PROCS \
+	QGL_TEXTURE_STORAGE_PROCS \
+	QGL_DSA_PROCS
+
 #define QGL_Win32_PROCS \
 	GLE( HGLRC, wglCreateContext, HDC ) \
 	GLE( BOOL,  wglDeleteContext ,HGLRC ) \

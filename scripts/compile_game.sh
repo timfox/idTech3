@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Compile Game Script for id Tech 3 mods, with robust CMake cache handling
-set -e
+set -euo pipefail
 
 # Usage: ./compile_game.sh [mod_name] [Debug|Release] [clean]
 
@@ -24,6 +24,22 @@ normalize_build_type() {
 
 # Argument parsing: first non-flag is mod name
 for arg in "$@"; do
+    # Handle help flag
+    if [ "$arg" = "--help" ] || [ "$arg" = "-h" ]; then
+        echo "Usage: $0 [mod_name] [Debug|Release] [clean]"
+        echo ""
+        echo "Options:"
+        echo "  mod_name    Name of the mod to compile (default: mymod)"
+        echo "  Debug       Build in Debug mode"
+        echo "  Release     Build in Release mode (default)"
+        echo "  clean       Clean build directory before building"
+        echo ""
+        echo "Examples:"
+        echo "  $0 openarena              # Build openarena mod in Release mode"
+        echo "  $0 mymod Debug            # Build mymod in Debug mode"
+        echo "  $0 openarena Release clean # Clean build of openarena"
+        exit 0
+    fi
     norm_bt="$(normalize_build_type "$arg")"
     if [ -n "$norm_bt" ]; then
         BUILD_TYPE="$norm_bt"
@@ -50,6 +66,14 @@ RUNTIME_VM_DIR="$HOME/.$MOD_NAME/vm"
 
 if [ ! -d "$MOD_SOURCE_DIR" ]; then
     echo "Error: ${MOD_SOURCE_DIR} not found."
+    echo ""
+    echo "Available mods with gamesrc:"
+    for moddir in "$PROJECT_ROOT/mods"/*/; do
+        if [ -d "${moddir}gamesrc" ]; then
+            echo "  - $(basename "$moddir")"
+        fi
+    done
+    echo ""
     echo "Usage: $0 [mod_name] [Debug|Release] [clean]"
     exit 1
 fi
@@ -95,7 +119,10 @@ fi
 # Create build directory and configure CMake
 mkdir -p "$MOD_BUILD_DIR"
 cd "$MOD_BUILD_DIR"
-cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE ..
+if ! cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE ..; then
+    echo "Error: CMake configuration failed for $MOD_NAME"
+    exit 1
+fi
 
 # Build with parallel jobs
 if command -v nproc &>/dev/null; then
@@ -105,7 +132,10 @@ elif [[ "$OSTYPE" == "darwin"* ]]; then
 else
     CORES=4
 fi
-cmake --build . -- -j${CORES}
+if ! cmake --build . -- -j${CORES}; then
+    echo "Error: Build failed for $MOD_NAME"
+    exit 1
+fi
 
 # VM files should be in mod/vm/ directory
 echo "Checking for compiled VM files in $MOD_VM_DIR"
@@ -137,11 +167,29 @@ else
           "$RELEASE_VM_DIR"/gamex86_64.so "$RELEASE_VM_DIR"/cgamex86_64.so "$RELEASE_VM_DIR"/uix86_64.so \
           "$RUNTIME_VM_DIR"/gamex86_64.so "$RUNTIME_VM_DIR"/cgamex86_64.so "$RUNTIME_VM_DIR"/uix86_64.so 2>/dev/null || true
     echo "Copying files to mod's release directory: $RELEASE_VM_DIR (and runtime: $RUNTIME_VM_DIR)"
+    
+    # Track which files we've already copied to avoid duplicates
+    declare -A copied_files
+    
     for lib in "${ARTIFACTS[@]}"; do
+        if [ ! -f "$lib" ]; then
+            continue
+        fi
         libname=$(basename "$lib")
         mapped=$(map_vm_name "$libname")
-        cp -v "$lib" "$RELEASE_VM_DIR/$mapped"
-        cp -v "$lib" "$RUNTIME_VM_DIR/$mapped"
+        
+        # Skip if we've already copied this mapped name
+        # Use [[ -v ]] to check if key exists (works with set -u)
+        if [[ -v copied_files[$mapped] ]]; then
+            continue
+        fi
+        
+        # Only copy if the target doesn't exist or source is newer
+        if [ ! -f "$RELEASE_VM_DIR/$mapped" ] || [ "$lib" -nt "$RELEASE_VM_DIR/$mapped" ]; then
+            cp -v "$lib" "$RELEASE_VM_DIR/$mapped"
+            cp -v "$lib" "$RUNTIME_VM_DIR/$mapped"
+            copied_files[$mapped]=1
+        fi
     done
     echo "Libraries copied to $RELEASE_VM_DIR/"
 fi
@@ -202,14 +250,20 @@ package_pk3() {
         fi
     done
 
+    # zip may return non-zero exit codes for warnings, so check if file was created
     zip -r "$RELEASE_PK3" "${INCLUDES[@]}" \
         -x "gamesrc/*" "gamesrc/**" \
            "build/*" "build/**" \
            "out/*" "out/**" \
            "vm/*.a" "vm/*.pdb" "vm/*.dll" \
            "**/.DS_Store" "**/.git*" "**/CMakeFiles/**" \
-        >/dev/null
-    echo "✓ Wrote $RELEASE_PK3"
+        >/dev/null 2>&1 || true  # Ignore zip exit code, check file existence instead
+    
+    if [ -f "$RELEASE_PK3" ]; then
+        echo "✓ Wrote $RELEASE_PK3"
+    else
+        echo "Warning: PK3 package creation may have failed, but build succeeded"
+    fi
 }
 
 if [ $PK3_ENABLED -eq 1 ]; then
@@ -218,7 +272,8 @@ fi
 
 echo ""
 if [ -d "$RELEASE_VM_DIR" ]; then
-    SO_COUNT=$(ls -1 "$RELEASE_VM_DIR"/*.so "$RELEASE_VM_DIR"/*.dll 2>/dev/null | wc -l)
+    # Use find instead of ls to avoid exit code issues with globs
+    SO_COUNT=$(find "$RELEASE_VM_DIR" -maxdepth 1 \( -name "*.so" -o -name "*.dll" \) 2>/dev/null | wc -l)
     if [ "$SO_COUNT" -gt 0 ]; then
         echo "Libraries available in $RELEASE_VM_DIR/:"
         ls -lh "$RELEASE_VM_DIR"/*.so "$RELEASE_VM_DIR"/*.dll 2>/dev/null || true
@@ -231,6 +286,10 @@ fi
 echo ""
 echo "Game mod build completed!"
 echo "  Libraries: $RELEASE_VM_DIR/*.so"
-echo "  Primary:  $RELEASE_SO"
-echo "  Package:  $RELEASE_PK3"
+if [ -f "$RELEASE_VM_DIR/game.x86_64.so" ]; then
+    echo "  Game module: $RELEASE_VM_DIR/game.x86_64.so"
+fi
+if [ -f "$RELEASE_PK3" ]; then
+    echo "  Package: $RELEASE_PK3"
+fi
 echo "  Source: $MOD_SOURCE_DIR/"

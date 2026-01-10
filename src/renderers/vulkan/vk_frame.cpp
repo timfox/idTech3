@@ -45,6 +45,7 @@ extern PFN_vkQueuePresentKHR qvkQueuePresentKHR;
 extern PFN_vkQueueSubmit qvkQueueSubmit;
 extern PFN_vkWaitForFences qvkWaitForFences;
 extern PFN_vkResetFences qvkResetFences;
+extern PFN_vkResetCommandBuffer qvkResetCommandBuffer;
 extern PFN_vkBeginCommandBuffer qvkBeginCommandBuffer;
 extern PFN_vkEndCommandBuffer qvkEndCommandBuffer;
 extern PFN_vkCmdPipelineBarrier qvkCmdPipelineBarrier;
@@ -378,6 +379,32 @@ extern "C" void vk_begin_frame(void) {
     // Mark frame as ready for rendering
     vk.cmd->frame_ready = qtrue;
 
+    // Wait for previous frame's rendering to complete before reusing command buffer
+    // This matches Q2RTX pattern: wait on frame fence at BEGIN of frame, then reset
+    // This ensures the command buffer is safe to reset and reuse
+    if (!vk.device_lost && vk.device != VK_NULL_HANDLE) {
+        VkFence frame_fence = vk.tess[vk.cmd_index].rendering_finished_fence;
+        if (frame_fence != VK_NULL_HANDLE) {
+            // Wait on frame fence to ensure previous frame is complete (Q2RTX pattern)
+            extern PFN_vkWaitForFences qvkWaitForFences;
+            extern PFN_vkResetFences qvkResetFences;
+            if (qvkWaitForFences && qvkResetFences) {
+                VkResult wait_result = qvkWaitForFences(vk.device, 1, &frame_fence, VK_TRUE, UINT64_MAX);
+                if (wait_result == VK_ERROR_DEVICE_LOST) {
+                    vk.device_lost = qtrue;
+                    vk_reset_memory_tracking_on_device_lost();
+                    ri.Printf(PRINT_ERROR, "Vulkan: Device lost during frame fence wait in vk_begin_frame\n");
+                    return;
+                } else if (wait_result != VK_SUCCESS) {
+                    ri.Printf(PRINT_WARNING, "vk_begin_frame: Frame fence wait failed: %s\n", vk_result_string(wait_result));
+                } else {
+                    // Reset fence after waiting (before reuse) - Q2RTX pattern
+                    qvkResetFences(vk.device, 1, &frame_fence);
+                }
+            }
+        }
+    }
+
     // Handle dynamic resolution
     if (r_dynamicResolution && r_dynamicResolution->integer) {
         float scale = 1.0f;
@@ -405,6 +432,26 @@ extern "C" void vk_begin_frame(void) {
     // Update performance statistics
     vk_update_performance_stats();
 
+    // Reset descriptor batching for new frame
+    extern void vk_descriptor_batch_reset_frame(void);
+    vk_descriptor_batch_reset_frame();
+
+    // Explicitly reset command buffer after waiting on fence (Q2RTX pattern)
+    // This matches Q2RTX: wait fence -> reset fence -> reset command buffers -> begin
+    if (!vk.device_lost && vk.device != VK_NULL_HANDLE) {
+        if (qvkResetCommandBuffer && vk.tess[vk.cmd_index].command_buffer != VK_NULL_HANDLE) {
+            VkResult reset_result = qvkResetCommandBuffer(vk.tess[vk.cmd_index].command_buffer, 0);
+            if (reset_result == VK_ERROR_DEVICE_LOST) {
+                vk.device_lost = qtrue;
+                vk_reset_memory_tracking_on_device_lost();
+                ri.Printf(PRINT_ERROR, "Vulkan: Device lost during command buffer reset in vk_begin_frame\n");
+                return;
+            } else if (reset_result != VK_SUCCESS) {
+                ri.Printf(PRINT_WARNING, "vk_begin_frame: Command buffer reset failed: %s\n", vk_result_string(reset_result));
+            }
+        }
+    }
+    
     // Begin command buffer
     // Frame command buffers are reusable - they're reset and reused each frame
     // Omit ONE_TIME_SUBMIT_BIT for better performance with reusable buffers

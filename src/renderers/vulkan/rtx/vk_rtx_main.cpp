@@ -51,53 +51,119 @@ extern void RE_ImGuiBackend_NewFrame(void);
 // --- Real implementations for every function! ---
 
 qhandle_t RTX_RegisterModel(const char *name) {
-    // TODO: Implement model registration for RTX
-    (void)name;
-    return 0;
+    // Delegate to standard renderer model registration
+    if (!name || !vk.active) {
+        return 0;
+    }
+    extern qhandle_t RE_RegisterModel(const char *name);
+    return RE_RegisterModel(name);
 }
 qhandle_t RTX_RegisterSkin(const char *name) {
-    // TODO: Implement skin registration for RTX
-    (void)name;
-    return 0;
+    // Delegate to standard renderer skin registration
+    if (!name || !vk.active) {
+        return 0;
+    }
+    extern qhandle_t RE_RegisterSkin(const char *name);
+    return RE_RegisterSkin(name);
 }
 qhandle_t RTX_RegisterShader(const char *name) {
-    // TODO: Implement shader registration for RTX
-    (void)name;
-    return 0;
+    // Delegate to standard renderer shader registration
+    if (!name || !vk.active) {
+        return 0;
+    }
+    extern qhandle_t RE_RegisterShader(const char *name);
+    return RE_RegisterShader(name);
 }
 qhandle_t RTX_RegisterShaderNoMip(const char *name) {
-    // TODO: Implement shader registration for RTX
-    (void)name;
-    return 0;
+    // Delegate to standard renderer shader registration (no mip)
+    if (!name || !vk.active) {
+        return 0;
+    }
+    extern qhandle_t RE_RegisterShaderNoMip(const char *name);
+    return RE_RegisterShaderNoMip(name);
 }
 
 void RTX_ShaderExpire(void) { /* Not currently supported in Vulkan */ }
 void RTX_LoadWorld(const char *name) {
-    // TODO: Implement world loading for RTX
-    (void)name;
+    // Load world using standard pipeline, then build RTX acceleration structures
+    if (!name || !vk.active) {
+        return;
+    }
+    
+    // Use standard world loading (handled by main renderer)
+    extern void R_LoadWorld(const char *name);
+    R_LoadWorld(name);
+    
+    // Build BLAS for world geometry if RTX is supported
+    if (vk.rayTracingSupported && vk.rt.initialized) {
+        extern void vk_rt_build_acceleration_structures(void);
+        vk_rt_build_acceleration_structures();
+        ri.Printf(PRINT_DEVELOPER, "RTX: World loaded, acceleration structures built\n");
+    }
 }
 void RTX_SetWorldVisData(const byte *vis) {
-    // TODO: Implement PVS data for RTX
-    (void)vis;
+    // Store PVS data for RTX visibility culling
+    // Delegate to standard renderer which handles PVS data
+    if (!vis || !vk.active) {
+        return;
+    }
+    extern void RE_SetWorldVisData(const byte *vis);
+    RE_SetWorldVisData(vis);
+    
+    // RTX can use PVS data for acceleration structure culling
+    // This is handled by the standard pipeline
 }
 void RTX_EndRegistration(void) {
-    // TODO: Implement end registration for RTX
+    // End registration using standard pipeline
+    extern void RE_EndRegistration(void);
+    RE_EndRegistration();
+    
+    // Update TLAS if RTX is supported and entities were added
+    if (vk.rayTracingSupported && vk.rt.initialized) {
+        extern void vk_rt_update_tlas(void);
+        vk_rt_update_tlas();
+        ri.Printf(PRINT_DEVELOPER, "RTX: Registration ended, TLAS updated\n");
+    }
 }
 void RTX_ClearScene(void) {
-    // TODO: Implement scene clearing for RTX
+    // Clear scene using standard pipeline
+    extern void RE_ClearScene(void);
+    RE_ClearScene();
+    
+    // Note: Acceleration structures persist across frames for performance
+    // They're only rebuilt when geometry actually changes
 }
 
 void RTX_AddRefEntityToScene(const refEntity_t *re, qboolean intShaderTime) {
-    // TODO: Implement entity addition for RTX
-    (void)re; (void)intShaderTime;
+    // Add entity using standard pipeline (entities stored in backEndData)
+    if (!re || !vk.active) {
+        return;
+    }
+    
+    // Use standard entity addition (handled by main renderer)
+    extern void RE_AddRefEntityToScene(const refEntity_t *re, qboolean intShaderTime);
+    RE_AddRefEntityToScene(re, intShaderTime);
+    
+    // Note: BLAS building for entity models would happen here if needed
+    // For now, we rely on the standard pipeline and build BLAS on-demand
+    // when entities are actually rendered
 }
 void RTX_AddPolyToScene(qhandle_t hShader, int numVerts, const polyVert_t *verts, int num) {
-    // TODO: Implement polygon addition for RTX
-    (void)hShader; (void)numVerts; (void)verts; (void)num;
+    // Delegate to standard renderer polygon addition
+    if (!verts || numVerts <= 0 || num <= 0 || !vk.active) {
+        return;
+    }
+    extern void RE_AddPolyToScene(qhandle_t hShader, int numVerts, const polyVert_t *verts, int num);
+    RE_AddPolyToScene(hShader, numVerts, verts, num);
 }
 void RTX_AddParticle(const vec3_t origin, const vec3_t velocity, const vec3_t color, float size, float life, qhandle_t shader) {
-    // TODO: Implement particle rendering for RTX
-    (void)origin; (void)velocity; (void)color; (void)size; (void)life; (void)shader;
+    // Delegate to standard renderer particle addition
+    // RTX can use particles for volumetric effects or ray-traced particle rendering
+    if (!origin || !vk.active) {
+        return;
+    }
+    extern void RE_AddParticle(const vec3_t origin, const vec3_t velocity, const vec3_t color, float size, float life, qhandle_t shader);
+    RE_AddParticle(origin, velocity, color, size, life, shader);
 }
 int RTX_LightForPoint(vec3_t point, vec3_t ambientLight, vec3_t directedLight, vec3_t lightDir) {
     (void)point;
@@ -108,8 +174,13 @@ int RTX_LightForPoint(vec3_t point, vec3_t ambientLight, vec3_t directedLight, v
     return 1;
 }
 void RTX_AddLightToScene(const vec3_t org, float intensity, float r, float g, float b) {
-    // TODO: Implement light addition for RTX renderer
-    (void)org; (void)intensity; (void)r; (void)g; (void)b;
+    // Delegate to standard renderer light addition
+    // RTX can use these lights for ray-traced lighting calculations
+    if (!org || !vk.active) {
+        return;
+    }
+    extern void RE_AddLightToScene(const vec3_t org, float intensity, float r, float g, float b);
+    RE_AddLightToScene(org, intensity, r, g, b);
 }
 void RTX_AddAdditiveLightToScene(const vec3_t org, float intensity, float r, float g, float b) {
     RTX_AddLightToScene(org, intensity, r, g, b);
@@ -120,12 +191,30 @@ void RTX_AddLinearLightToScene(const vec3_t start, const vec3_t end, float inten
     RTX_AddLightToScene(end, intensity/2.f, r, g, b);
 }
 void RTX_SetColor(const float *rgba) {
-    // TODO: Implement color setting for RTX renderer
-    (void)rgba;
+    // Delegate to standard renderer color setting
+    // This affects the current rendering color state
+    if (!rgba || !vk.active) {
+        return;
+    }
+    // Store color in Vulkan renderer state
+    if (rgba[0] >= 0.0f && rgba[0] <= 1.0f &&
+        rgba[1] >= 0.0f && rgba[1] <= 1.0f &&
+        rgba[2] >= 0.0f && rgba[2] <= 1.0f &&
+        rgba[3] >= 0.0f && rgba[3] <= 1.0f) {
+        vk.currentColor[0] = rgba[0];
+        vk.currentColor[1] = rgba[1];
+        vk.currentColor[2] = rgba[2];
+        vk.currentColor[3] = rgba[3];
+    }
 }
 void RTX_DrawStretchPic(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader) {
-    // TODO: Implement stretch pic drawing for RTX renderer
-    (void)x; (void)y; (void)w; (void)h; (void)s1; (void)t1; (void)s2; (void)t2; (void)hShader;
+    // Delegate to standard renderer stretch pic drawing
+    // This is used for UI elements, HUD, and 2D overlays
+    if (!vk.active) {
+        return;
+    }
+    extern void RE_StretchPic(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader);
+    RE_StretchPic(x, y, w, h, s1, t1, s2, t2, hShader);
 }
 void RTX_DrawStretchRaw(int x, int y, int w, int h, int cols, int rows, byte *data, int client, qboolean dirty) {
     (void)x; (void)y; (void)w; (void)h; (void)cols; (void)rows; (void)data; (void)client; (void)dirty;
@@ -268,29 +357,90 @@ void RTX_Shutdown(refShutdownCode_t code) {
 }
 
 void RTX_RenderScene(const refdef_t *fd) {
-    // TODO: Implement actual ray tracing rendering
-    // For now, just log that RTX rendering would happen
-    cvar_t* r_rtx_mode = ri.Cvar_Get("r_rtx_mode", "0", CVAR_ARCHIVE);
-
-    int mode = r_rtx_mode ? r_rtx_mode->integer : 0;
-    Com_Printf("RTX: RenderScene called (mode=%d, size=%dx%d) - TODO: Implement ray tracing\n",
-               mode, fd->width, fd->height);
-
-    // TODO: Call appropriate ray tracing implementation
-    (void)fd;
+    // Implement ray tracing rendering using existing RTX infrastructure
+    if (!fd || !vk.active) {
+        return;
+    }
+    
+    // Check if RTX is enabled and supported
+    cvar_t* r_rtx_enable = ri.Cvar_Get("r_rtx_enable", "0", CVAR_ARCHIVE);
+    if (!r_rtx_enable || r_rtx_enable->integer == 0) {
+        // RTX disabled, use standard rendering
+        extern void RE_RenderScene(const refdef_t *fd);
+        RE_RenderScene(fd);
+        return;
+    }
+    
+    if (!vk.rayTracingSupported || !vk.rt.initialized) {
+        // RTX not supported, fall back to standard rendering
+        extern void RE_RenderScene(const refdef_t *fd);
+        RE_RenderScene(fd);
+        return;
+    }
+    
+    // Use hardware ray tracing if available
+    if (vk.rayTracingSupported) {
+        extern void vk_rt_trace_rays(uint32_t width, uint32_t height);
+        vk_rt_trace_rays(fd->width, fd->height);
+        
+        // Denoise ray-traced output
+        extern void vk_rt_denoise(uint32_t width, uint32_t height);
+        vk_rt_denoise(fd->width, fd->height);
+    } else {
+        // Fall back to compute ray tracing
+        extern void VK_ComputeRT_Dispatch(void);
+        VK_ComputeRT_Dispatch();
+    }
+    
+    // Composite RTX output with scene
+    extern void vk_rt_composite(void);
+    vk_rt_composite();
 }
 
 void RTX_BeginFrame(stereoFrame_t stereoFrame) {
-    // TODO: Initialize RTX frame resources
-    Com_Printf("RTX: BeginFrame called (stereoFrame=%d)\n", stereoFrame);
-    (void)stereoFrame;
+    // Initialize RTX frame resources
+    if (!vk.active) {
+        return;
+    }
+    
+    // Use standard frame begin which handles all frame setup
+    extern void vk_begin_frame(void);
+    vk_begin_frame();
+    
+    // Initialize RTX-specific frame resources if RTX is enabled
+    cvar_t* r_rtx_enable = ri.Cvar_Get("r_rtx_enable", "0", CVAR_ARCHIVE);
+    if (r_rtx_enable && r_rtx_enable->integer && vk.rayTracingSupported && vk.rt.initialized) {
+        // Update RTX uniform buffers with current frame data
+        extern void vk_rt_update_uniform_buffer(void);
+        vk_rt_update_uniform_buffer();
+    }
+    
+    (void)stereoFrame; // Stereo support can be added later if needed
 }
 
 void RTX_EndFrame(int *frontEndMsec, int *backEndMsec) {
-    // TODO: Apply RTX post-processing and finalize frame
-    Com_Printf("RTX: EndFrame called\n");
-    if (frontEndMsec) *frontEndMsec = 0;
-    if (backEndMsec) *backEndMsec = 0;
+    // Apply RTX post-processing and finalize frame
+    if (!vk.active) {
+        if (frontEndMsec) *frontEndMsec = 0;
+        if (backEndMsec) *backEndMsec = 0;
+        return;
+    }
+    
+    // Use standard frame end which handles presentation and timing
+    extern void vk_end_frame(void);
+    vk_end_frame();
+    
+    // Get timing from standard frame end
+    // Note: vk_end_frame() updates timing internally, but we can provide
+    // placeholder values here since the standard pipeline handles timing
+    if (frontEndMsec) {
+        // Front-end time would be measured in RE_RenderScene
+        *frontEndMsec = 0; // Placeholder - actual timing handled by standard pipeline
+    }
+    if (backEndMsec) {
+        // Back-end time is measured in vk_end_frame
+        *backEndMsec = 0; // Placeholder - actual timing handled by standard pipeline
+    }
 }
 
 // RTX renderer exports the standard refexport_t interface

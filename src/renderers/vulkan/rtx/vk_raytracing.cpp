@@ -267,17 +267,34 @@ static void vk_rt_load_blue_noise_array( void )
 	// and read back, or declare R_LoadImage as extern
 	
 	// Try to load all PNG files using R_LoadPNG (public function)
+	// Support multiple path patterns from q3rtx reference
 	for ( i = 0; i < NUM_BLUE_NOISE_LAYERS; i++ ) {
-		// Try q3rtx path first
-		Com_sprintf( path, sizeof( path ), "q3rtx/blue_noise_textures/256_256/HDR_RGBA_%04d.png", i );
-		R_LoadPNG( path, &pics[loaded_count], &widths[loaded_count], &heights[loaded_count] );
-		if ( pics[loaded_count] == NULL ) {
-			// Try alternative path
-			Com_sprintf( path, sizeof( path ), "blue_noise_textures/256_256/HDR_RGBA_%04d.png", i );
+		// Try multiple path patterns (q3rtx compatibility)
+		const char* path_patterns[] = {
+			"q3rtx/blue_noise_textures/256_256/HDR_RGBA_%04d.png",
+			"blue_noise_textures/256_256/HDR_RGBA_%04d.png",
+			"textures/blue_noise/HDR_RGBA_%04d.png",
+			"blue_noise/HDR_RGBA_%04d.png"
+		};
+		
+		bool loaded = false;
+		for ( int pattern_idx = 0; pattern_idx < 4; pattern_idx++ ) {
+			Com_sprintf( path, sizeof( path ), path_patterns[pattern_idx], i );
 			R_LoadPNG( path, &pics[loaded_count], &widths[loaded_count], &heights[loaded_count] );
-			if ( pics[loaded_count] == NULL ) {
-				break; // Stop if we can't load this file
+			if ( pics[loaded_count] != NULL ) {
+				loaded = true;
+				break;
 			}
+		}
+		
+		if ( !loaded ) {
+			// If we've loaded some textures, continue with what we have
+			// Otherwise, stop on first failure
+			if ( loaded_count == 0 ) {
+				break; // Stop if we can't load the first file
+			}
+			// Continue loading remaining files even if some are missing
+			continue;
 		}
 
 		// Verify dimensions match expected size

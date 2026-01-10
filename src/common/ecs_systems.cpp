@@ -16,6 +16,7 @@ Core system implementations for physics, health, and network sync.
 #include <entt/entt.hpp>
 #include <vector>
 #include <ctime>
+#include <cstring>
 
 #ifdef USE_LUA
 extern "C" {
@@ -543,6 +544,253 @@ void ECS_ScriptSystem_Update(float deltaTime) {
 
 /*
 ================
+ECS_PickupSystem_Update
+Handle item pickup logic - check for player proximity and pickup
+================
+*/
+static void ECS_PickupSystem_Update(float deltaTime) {
+	entt::registry &registry = ECS::GetRegistry();
+	
+	// Get all entities with PickupComponent and TransformComponent
+	auto view = registry.view<PickupComponent, TransformComponent>();
+	
+	for (auto entity : view) {
+		auto &pickup = view.get<PickupComponent>(entity);
+		auto &transform = view.get<TransformComponent>(entity);
+		
+		// Skip if already picked up
+		if (pickup.isPickedUp) {
+			// Handle respawn timer
+			if (pickup.respawn) {
+				pickup.timeUntilRespawn -= deltaTime;
+				if (pickup.timeUntilRespawn <= 0.0f) {
+					pickup.isPickedUp = qfalse;
+					pickup.timeUntilRespawn = pickup.respawnTime;
+					// TODO: Restore entity visibility/rendering
+				}
+			}
+			continue;
+		}
+		
+		// TODO: Check proximity to players and handle pickup
+		// This would integrate with the game's player system
+		// For now, this is a placeholder for the system structure
+	}
+}
+
+/*
+================
+ECS_KeySystem_Update
+Handle key/keycard logic - door unlocking, key management
+================
+*/
+static void ECS_KeySystem_Update(float deltaTime) {
+	entt::registry &registry = ECS::GetRegistry();
+	
+	// Get all entities with KeyComponent
+	auto view = registry.view<KeyComponent>();
+	
+	for (auto entity : view) {
+		auto &key = view.get<KeyComponent>(entity);
+		
+		// TODO: Check if key has been picked up and unlock target door
+		// This would integrate with door/trigger systems
+		(void)key; // Suppress unused warning
+	}
+	
+	(void)deltaTime; // Suppress unused warning
+}
+
+/*
+================
+ECS_BackpackSystem_Update
+Handle backpack effects - inventory expansion, duration tracking
+================
+*/
+static void ECS_BackpackSystem_Update(float deltaTime) {
+	entt::registry &registry = ECS::GetRegistry();
+	
+	// Get all entities with BackpackComponent
+	auto view = registry.view<BackpackComponent>();
+	
+	for (auto entity : view) {
+		auto &backpack = view.get<BackpackComponent>(entity);
+		
+		// Handle temporary backpack duration
+		if (!backpack.permanent && backpack.timeRemaining > 0.0f) {
+			backpack.timeRemaining -= deltaTime;
+			if (backpack.timeRemaining <= 0.0f) {
+				// TODO: Remove backpack effects from player
+				// Remove component or mark for removal
+			}
+		}
+	}
+}
+
+/*
+================
+ECS_ObjectiveSystem_Update
+Handle objective tracking - progress updates, completion checks
+================
+*/
+static void ECS_ObjectiveSystem_Update(float deltaTime) {
+	entt::registry &registry = ECS::GetRegistry();
+	
+	// Get all entities with ObjectiveComponent
+	auto view = registry.view<ObjectiveComponent>();
+	
+	for (auto entity : view) {
+		auto &objective = view.get<ObjectiveComponent>(entity);
+		
+		// Skip if already completed
+		if (objective.completed) {
+			continue;
+		}
+		
+		// Check if objective is complete
+		if (objective.progress >= objective.targetProgress) {
+			objective.completed = qtrue;
+			// TODO: Play completion sound, trigger completion events
+		}
+		
+		// TODO: Update progress based on game state
+		// This would integrate with game logic to track objective progress
+	}
+	
+	(void)deltaTime; // Suppress unused warning
+}
+
+/*
+================
+ECS_DebrisSystem_Update
+Handle debris physics and cleanup - lifetime, fade out, cleanup
+================
+*/
+static void ECS_DebrisSystem_Update(float deltaTime) {
+	entt::registry &registry = ECS::GetRegistry();
+	
+	// Get all entities with DebrisComponent
+	auto view = registry.view<DebrisComponent>();
+	
+	std::vector<entt::entity> toRemove;
+	
+	for (auto entity : view) {
+		auto &debris = view.get<DebrisComponent>(entity);
+		
+		// Update lifetime
+		debris.timeRemaining -= deltaTime;
+		
+		// Check if debris should be removed
+		if (debris.timeRemaining <= 0.0f) {
+			toRemove.push_back(entity);
+			continue;
+		}
+		
+		// Handle fade out
+		if (debris.fadeOut && debris.timeRemaining <= debris.fadeStartTime) {
+			// TODO: Apply fade alpha to rendering
+			// This would integrate with the renderer
+		}
+	}
+	
+	// Remove expired debris entities
+	for (auto entity : toRemove) {
+		ECS_DestroyEntity(static_cast<ecs_entity_t>(entity));
+	}
+}
+
+/*
+================
+ECS_PlayerClassSystem_Update
+Handle player class abilities and restrictions
+================
+*/
+static void ECS_PlayerClassSystem_Update(float deltaTime) {
+	entt::registry &registry = ECS::GetRegistry();
+	
+	// Get all entities with PlayerClassComponent
+	auto view = registry.view<PlayerClassComponent>();
+	
+	for (auto entity : view) {
+		auto &playerClass = view.get<PlayerClassComponent>(entity);
+		
+		// TODO: Apply class-specific bonuses to health/armor
+		// This would integrate with HealthComponent
+		// TODO: Apply movement speed modifiers
+		// This would integrate with PhysicsComponent
+	}
+	
+	(void)deltaTime; // Suppress unused warning
+}
+
+/*
+================
+ECS_SkillSystem_Update
+Handle skill progression and XP gain
+================
+*/
+static void ECS_SkillSystem_Update(float deltaTime) {
+	entt::registry &registry = ECS::GetRegistry();
+	
+	// Get all entities with SkillComponent
+	auto view = registry.view<SkillComponent>();
+	
+	for (auto entity : view) {
+		auto &skill = view.get<SkillComponent>(entity);
+		
+		// Check each skill for level progression
+		for (int i = 0; i < 8; i++) {
+			if (skill.skillLevels[i] < 4 && skill.skillXP[i] >= skill.skillXPRequired[i]) {
+				// Level up
+				skill.skillLevels[i]++;
+				skill.skillXP[i] = 0;
+				skill.skillsUnlocked[i] = qtrue;
+				
+				// Update XP requirement for next level
+				if (skill.skillLevels[i] < 4) {
+					switch (skill.skillLevels[i]) {
+						case 1: skill.skillXPRequired[i] = 50; break;
+						case 2: skill.skillXPRequired[i] = 90; break;
+						case 3: skill.skillXPRequired[i] = 140; break;
+						default: skill.skillXPRequired[i] = 999; break;
+					}
+				}
+			}
+		}
+	}
+	
+	(void)deltaTime; // Suppress unused warning
+}
+
+/*
+================
+ECS_FireteamSystem_Update
+Handle fireteam coordination and management
+================
+*/
+static void ECS_FireteamSystem_Update(float deltaTime) {
+	entt::registry &registry = ECS::GetRegistry();
+	
+	// Get all entities with FireteamComponent
+	auto view = registry.view<FireteamComponent>();
+	
+	for (auto entity : view) {
+		auto &fireteam = view.get<FireteamComponent>(entity);
+		
+		// Validate fireteam membership
+		if (fireteam.isLeader && fireteam.leaderId != static_cast<int>(entity)) {
+			// Leader changed, update
+			fireteam.leaderId = static_cast<int>(entity);
+		}
+		
+		// TODO: Handle fireteam communication, shared objectives, etc.
+	}
+	
+	(void)deltaTime; // Suppress unused warning
+}
+
+/*
+================
 ECS_RunFrame
 Run all ECS systems for a frame
 ================
@@ -568,6 +816,19 @@ void ECS_RunFrame(float deltaTime) {
 #endif
 	ECS_HealthSystem_Update();
 	ECS_ScriptSystem_Update(deltaTime);
+	
+	// EntityPlus-inspired systems
+	ECS_PickupSystem_Update(deltaTime);
+	ECS_KeySystem_Update(deltaTime);
+	ECS_BackpackSystem_Update(deltaTime);
+	ECS_ObjectiveSystem_Update(deltaTime);
+	ECS_DebrisSystem_Update(deltaTime);
+	
+	// Class-based gameplay systems
+	ECS_PlayerClassSystem_Update(deltaTime);
+	ECS_SkillSystem_Update(deltaTime);
+	ECS_FireteamSystem_Update(deltaTime);
+	
 	ECS_NetworkSyncSystem_Update();
 }
 

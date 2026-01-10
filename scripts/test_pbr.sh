@@ -3,7 +3,7 @@
 # PBR (Physically Based Rendering) Feature Test Script for idTech3
 # Tests material system, advanced materials, and PBR rendering features
 
-set -e
+set -euo pipefail
 
 echo "idTech3 PBR Feature Test"
 echo "========================"

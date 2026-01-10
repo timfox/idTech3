@@ -1,69 +1,170 @@
 #!/bin/bash
 
 # Build and reload QVM script for rapid development
-# Usage: ./tools/build_and_reload_qvm.sh [vm_name]
+# Supports both native shared libraries (.so/.dll) and legacy QVM bytecode
+# Usage: ./scripts/build_and_reload_qvm.sh [vm_name] [mod_name] [--qvm]
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Default to building all VMs if no specific VM requested
-TARGET_VM="$1"
+# Parse arguments
+TARGET_VM=""
+MOD_NAME="mymod"
+BUILD_QVM=0
 
-echo "Building QVMs..."
+for arg in "$@"; do
+    case "$arg" in
+        --qvm)
+            BUILD_QVM=1
+            ;;
+        --help|-h)
+            echo "Usage: $0 [vm_name] [mod_name] [--qvm]"
+            echo ""
+            echo "Arguments:"
+            echo "  vm_name    Specific VM to build (game, cgame, ui) - optional"
+            echo "  mod_name   Mod directory name (default: mymod)"
+            echo "  --qvm      Build QVM bytecode instead of native libraries"
+            echo ""
+            echo "Examples:"
+            echo "  $0                    # Build all native VMs for mymod"
+            echo "  $0 game mymod         # Build game VM for mymod"
+            echo "  $0 cgame mymod --qvm  # Build cgame QVM for mymod"
+            exit 0
+            ;;
+        game|cgame|ui)
+            TARGET_VM="$arg"
+            ;;
+        *)
+            if [ -z "$TARGET_VM" ] && [ "$MOD_NAME" = "mymod" ]; then
+                # First non-flag argument could be mod name
+                if [ -d "$PROJECT_ROOT/mods/$arg" ]; then
+                    MOD_NAME="$arg"
+                fi
+            fi
+            ;;
+    esac
+done
 
-# Change to project root
-cd "$PROJECT_ROOT"
+MOD_ROOT="$PROJECT_ROOT/mods/$MOD_NAME"
+MOD_SOURCE_DIR="$MOD_ROOT/gamesrc"
+MOD_VM_DIR="$MOD_ROOT/vm"
+BUILD_DIR="$MOD_SOURCE_DIR/build"
 
-# Build QVMs (adjust this command based on your build system)
-if [ -n "$TARGET_VM" ]; then
-    echo "Building specific VM: $TARGET_VM"
-    # Add specific VM build command here
-    # Example: make qvm_$TARGET_VM
-    echo "TODO: Implement specific VM building for $TARGET_VM"
-else
-    echo "Building all VMs..."
-    # Add your QVM build command here
-    # Example: make qvms
-    echo "TODO: Implement full QVM build process"
+echo "Building VMs for mod: $MOD_NAME"
+echo "Target VM: ${TARGET_VM:-all}"
+echo "Build type: $([ $BUILD_QVM -eq 1 ] && echo 'QVM bytecode' || echo 'Native libraries')"
+echo
+
+# Check if gamesrc exists
+if [ ! -d "$MOD_SOURCE_DIR" ]; then
+    echo "Error: Game source directory not found: $MOD_SOURCE_DIR"
+    echo "Available mods:"
+    ls -1 "$PROJECT_ROOT/mods" 2>/dev/null | grep -v "^\.$" || echo "  (none)"
+    exit 1
 fi
 
-# Copy QVMs to game directory (adjust paths as needed)
-GAME_DIR="${GAME_DIR:-$HOME/.ioquake3/baseq3}"
-VM_DIR="$GAME_DIR/vm"
+# Build QVM bytecode (legacy)
+if [ $BUILD_QVM -eq 1 ]; then
+    echo "Building QVM bytecode (legacy method)..."
+    echo "Note: QVM compilation requires q3lcc and q3asm tools"
+    
+    if ! command -v q3lcc >/dev/null 2>&1 && ! command -v q3asm >/dev/null 2>&1; then
+        echo "Error: q3lcc and q3asm not found. Install QVM compiler tools."
+        echo "For native compilation (recommended), omit --qvm flag."
+        exit 1
+    fi
+    
+    # QVM build would go here - this is a placeholder
+    echo "QVM compilation not fully implemented. Use native compilation instead."
+    echo "Run: $0 $TARGET_VM $MOD_NAME  # (without --qvm flag)"
+    exit 1
+fi
 
-echo "Deploying QVMs to: $VM_DIR"
+# Build native shared libraries (recommended)
+echo "Building native shared libraries..."
 
-# Create VM directory if it doesn't exist
-mkdir -p "$VM_DIR"
-
-# Copy built QVMs (adjust source paths)
-if [ -n "$TARGET_VM" ]; then
-    # Copy specific VM
-    if [ -f "build/vm/$TARGET_VM.qvm" ]; then
-        cp "build/vm/$TARGET_VM.qvm" "$VM_DIR/"
-        echo "Deployed: $TARGET_VM.qvm"
+# Use compile_game.sh if available
+if [ -f "$PROJECT_ROOT/scripts/compile_game.sh" ]; then
+    echo "Using compile_game.sh..."
+    "$PROJECT_ROOT/scripts/compile_game.sh" "$MOD_NAME" Release
+    
+    # Check for built libraries
+    if [ -n "$TARGET_VM" ]; then
+        VM_FILES=("$MOD_VM_DIR/${TARGET_VM}.x86_64.so" "$MOD_VM_DIR/${TARGET_VM}x86_64.so")
+        for vm_file in "${VM_FILES[@]}"; do
+            if [ -f "$vm_file" ]; then
+                echo "✓ Built: $vm_file"
+                break
+            fi
+        done
     else
-        echo "Warning: $TARGET_VM.qvm not found in build directory"
+        VM_COUNT=$(find "$MOD_VM_DIR" -name "*.so" -o -name "*.dll" 2>/dev/null | wc -l)
+        echo "✓ Built $VM_COUNT VM file(s) in $MOD_VM_DIR"
     fi
 else
-    # Copy all QVMs
-    if [ -d "build/vm" ]; then
-        cp build/vm/*.qvm "$VM_DIR/" 2>/dev/null || echo "No QVMs found in build/vm/"
+    # Fallback: try CMake build directly
+    if [ -f "$MOD_SOURCE_DIR/CMakeLists.txt" ]; then
+        echo "Building with CMake..."
+        mkdir -p "$BUILD_DIR"
+        cd "$BUILD_DIR"
+        cmake -DCMAKE_BUILD_TYPE=Release ..
+        
+        if [ -n "$TARGET_VM" ]; then
+            cmake --build . --target "$TARGET_VM" -- -j$(nproc 2>/dev/null || echo 4)
+        else
+            cmake --build . -- -j$(nproc 2>/dev/null || echo 4)
+        fi
     else
-        echo "Warning: build/vm directory not found"
+        echo "Error: No build system found. Expected CMakeLists.txt in $MOD_SOURCE_DIR"
+        exit 1
     fi
 fi
 
-echo "QVM deployment complete."
+# Copy to runtime directory if specified
+GAME_DIR="${GAME_DIR:-$HOME/.$MOD_NAME}"
+RUNTIME_VM_DIR="$GAME_DIR/vm"
+
+if [ -n "${GAME_DIR:-}" ] && [ "$GAME_DIR" != "$HOME/.ioquake3/baseq3" ]; then
+    echo "Deploying to: $RUNTIME_VM_DIR"
+    mkdir -p "$RUNTIME_VM_DIR"
+    
+    if [ -n "$TARGET_VM" ]; then
+        for vm_file in "$MOD_VM_DIR/${TARGET_VM}"*.so "$MOD_VM_DIR/${TARGET_VM}"*.dll; do
+            if [ -f "$vm_file" ]; then
+                cp "$vm_file" "$RUNTIME_VM_DIR/"
+                echo "Deployed: $(basename "$vm_file")"
+            fi
+        done
+    else
+        cp "$MOD_VM_DIR"/*.so "$MOD_VM_DIR"/*.dll "$RUNTIME_VM_DIR/" 2>/dev/null || true
+        echo "Deployed all VM files"
+    fi
+fi
+
+echo ""
+echo "Build complete!"
 echo ""
 echo "Hot reload instructions:"
-echo "1. Ensure vm_hotReload is enabled (set vm_hotReload 1)"
-echo "2. Start or restart your game"
-echo "3. QVM changes will be automatically detected and reloaded"
+echo "1. Enable native VM loading (if using native libraries):"
+echo "   set vm_game 0"
+echo "   set vm_cgame 0"
+echo "   set vm_ui 0"
 echo ""
-echo "Manual reload commands:"
-echo "  vm_reload $TARGET_VM    # Reload specific VM"
+echo "2. Enable hot reload:"
+echo "   set vm_hotReload 1"
+echo ""
+echo "3. Start or restart your game"
+echo "   VM changes will be automatically detected and reloaded"
+echo ""
+echo "Manual reload commands (in-game):"
+if [ -n "$TARGET_VM" ]; then
+    echo "  vm_reload $TARGET_VM    # Reload specific VM"
+else
+    echo "  vm_reload game         # Reload game VM"
+    echo "  vm_reload cgame        # Reload cgame VM"
+    echo "  vm_reload ui           # Reload ui VM"
+fi
 echo "  vm_reload_all          # Reload all VMs"
 echo "  vm_hotreload_status    # Show reload status"

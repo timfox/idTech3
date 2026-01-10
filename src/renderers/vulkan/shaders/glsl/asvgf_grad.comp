@@ -1,0 +1,106 @@
+#version 460
+#extension GL_GOOGLE_include_directive : enable
+
+precision highp float;
+precision highp int;
+
+// Based on q3rtx ASVGF gradient reconstruction
+// Computes luminance gradients and variance for temporal filtering
+
+layout(local_size_x = 32, local_size_y = 32, local_size_z = 1) in;
+
+#include "shader_constants.glsl"
+
+// Input images
+layout(binding = 0, set = 0, rgba16f) uniform image2D directIllumination; // Current frame direct illumination
+layout(binding = 1, set = 0, rgba16f) uniform image2D directIlluminationPrev; // Previous frame direct illumination
+layout(binding = 2, set = 0, r32ui) uniform uimage2D gradSamplePos; // Gradient sample positions
+layout(binding = 3, set = 0, r32ui) uniform uimage2D gradSamplePosPrev; // Previous frame gradient sample positions
+
+// Output images
+layout(binding = 4, set = 0, rgba16f) uniform image2D gradOutput; // Gradient output (xy=gradient, zw=moments)
+
+// Uniform buffer
+layout(binding = 5, set = 0) uniform UniformBuffer {
+    vec2 resolution;
+    vec2 invResolution;
+    int frameIndex;
+    int gradDownscale; // GRAD_DWN (typically 3)
+} ubo;
+
+#define GRAD_DWN 3
+#define STRATUM_OFFSET_SHIFT 3
+#define STRATUM_OFFSET_MASK ((1 << STRATUM_OFFSET_SHIFT) - 1)
+
+float luminance(vec3 c) {
+    return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
+vec4 compute_gradient_image() {
+    ivec2 ipos = ivec2(gl_GlobalInvocationID);
+    vec2 mom = vec2(0.0);
+    vec4 ret = vec4(0.0);
+
+    // Compute moments over downscaled region
+    for (int yy = 0; yy < GRAD_DWN; yy++) {
+        for (int xx = 0; xx < GRAD_DWN; xx++) {
+            ivec2 p = ipos * GRAD_DWN + ivec2(xx, yy);
+            
+            if (any(greaterThanEqual(p, ivec2(ubo.resolution)))) {
+                continue;
+            }
+            
+            vec3 c = imageLoad(directIllumination, p).rgb;
+            float l = luminance(c);
+            mom += vec2(l, l * l);
+        }
+    }
+    
+    mom /= float(GRAD_DWN * GRAD_DWN);
+    ret.zw = vec2(mom.x, sqrt(max(0.0, mom.y - mom.x * mom.x))); // Mean and std dev
+
+    // Get gradient sample position
+    uint u = imageLoad(gradSamplePos, ipos).r;
+    if (u == 0u) {
+        return ret;
+    }
+
+    // Position of sample inside stratum in current frame
+    ivec2 grad_strata_pos = ivec2(
+        u >> (STRATUM_OFFSET_SHIFT * 0),
+        u >> (STRATUM_OFFSET_SHIFT * 1)
+    ) & STRATUM_OFFSET_MASK;
+
+    // Full position in current frame for gradient sample
+    ivec2 grad_sample_pos_curr = ipos * GRAD_DWN + grad_strata_pos;
+    
+    // Get previous frame index
+    uint idx_prev = (u & (~(1u << 31u))) >> (2 * STRATUM_OFFSET_SHIFT);
+    
+    // Full position in previous frame
+    int w = int(ubo.resolution.x);
+    ivec2 grad_sample_pos_prev = ivec2(idx_prev % w, idx_prev / w);
+
+    // Sample current and previous frames
+    vec3 c_curr = imageLoad(directIllumination, grad_sample_pos_curr).rgb;
+    vec3 c_prev = imageLoad(directIlluminationPrev, grad_sample_pos_prev).rgb;
+
+    float l_curr = luminance(c_curr);
+    float l_prev = luminance(c_prev);
+
+    ret.x = l_curr - l_prev; // Gradient
+    ret.y = max(l_curr, l_prev); // Maximum luminance
+
+    return ret;
+}
+
+void main() {
+    ivec2 ipos = ivec2(gl_GlobalInvocationID);
+    
+    if (any(greaterThanEqual(ipos, ivec2(ubo.resolution) / GRAD_DWN))) {
+        return;
+    }
+
+    vec4 v = compute_gradient_image();
+    imageStore(gradOutput, ipos, v);
+}

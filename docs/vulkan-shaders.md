@@ -35,15 +35,19 @@ This document lists all Vulkan shaders available in the id Tech 3 renderer.
 ### Post-Processing
 - **gamma.comp** - Gamma correction
 - **tonemap.comp** - Tone mapping
+- **aces_filmic_tonemap.comp** - Enhanced ACES filmic tone mapping with shoulder rolloff (cinematic)
 - **taa.comp** - Temporal Anti-Aliasing
 - **fxaa.comp** - Fast Approximate Anti-Aliasing
 - **smaa.comp** - Subpixel Morphological Anti-Aliasing
 - **smaa_edges.comp** - SMAA edge detection pass
 - **cas_sharpen.comp** - Contrast Adaptive Sharpening (AMD FidelityFX)
+- **luma_sharpen.comp** - Luma-based sharpening (avoids color artifacts, cinematic)
 - **chromatic_aberration.comp** - Chromatic aberration effect
 - **vignette.comp** - Vignette effect
 - **lens_flare.comp** - Lens flare rendering
 - **color_grading.comp** - Color grading with LUT support
+- **color_grading_cinematic.comp** - Advanced cinematic color grading with 9 presets
+- **deband.comp** - Debanding to remove color banding artifacts (cinematic)
 - **upscale.comp** - Image upscaling (bilinear, Lanczos, FSR-style)
 
 ### Global Illumination
@@ -56,7 +60,10 @@ This document lists all Vulkan shaders available in the id Tech 3 renderer.
 - **motion_blur.comp** - Motion blur based on velocity buffer
 - **depth_of_field.comp** - Depth of field with bokeh
 - **volumetric_fog.comp** - Volumetric fog/lighting
+- **volumetric_clouds.comp** - Ray-marched volumetric clouds with lighting (cinematic)
+- **volumetric_aurora.comp** - Volumetric aurora and lightning effects (cinematic)
 - **bloom.comp** - Bloom extraction
+- **bloom_enhanced.comp** - Multi-octave enhanced bloom with color weighting (cinematic)
 - **blur.comp** - Gaussian blur
 - **blur_subgroup.comp** - Optimized blur using subgroups
 - **blur_gather.frag** - Blur gather pass
