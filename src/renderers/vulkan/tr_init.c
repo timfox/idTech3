@@ -316,6 +316,7 @@ void RE_Shutdown( refShutdownCode_t code ) {
         }
 
         // Clean up all textures and images to prevent GPU memory leaks
+        // R_DeleteTextures() now handles device lost internally
         ri.Printf( PRINT_ALL, "RE_Shutdown: Cleaning up textures and images\n" );
         R_DeleteTextures();
 

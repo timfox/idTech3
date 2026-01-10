@@ -123,6 +123,15 @@ extern "C" void vk_create_image_view(image_t *image, VkImageViewType view_type, 
 
 // Destroy image and associated resources
 extern "C" void vk_destroy_image(image_t *image) {
+    // Skip all Vulkan API calls if device is lost - driver may have already destroyed resources
+    if (vk.device_lost || vk.device == VK_NULL_HANDLE) {
+        // Just clear the handles to prevent use-after-free, but don't call Vulkan API
+        image->memory = VK_NULL_HANDLE;
+        image->view = VK_NULL_HANDLE;
+        image->handle = VK_NULL_HANDLE;
+        return;
+    }
+
     if (image->memory != VK_NULL_HANDLE) {
         // Get memory requirements before destroying the image
         VkMemoryRequirements memory_requirements;

@@ -565,12 +565,17 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 	backEnd.color2D.u32 = ~0U;
 
 	// For real Vulkan devices, acquire next swapchain image
-	if (vk.device != (VkDevice)0x20000000 && vk.active && vk.swapchain != VK_NULL_HANDLE && qvkAcquireNextImageKHR) {
+	// Skip if device is lost - prevents operations on invalid device
+	if (!vk.device_lost && vk.device != (VkDevice)0x20000000 && vk.active && vk.swapchain != VK_NULL_HANDLE && qvkAcquireNextImageKHR) {
 		// Acquire next image from swapchain
 		VkResult result = qvkAcquireNextImageKHR(vk.device, vk.swapchain, UINT64_MAX,
 			vk.image_available, VK_NULL_HANDLE, &vk.current_swapchain_image_index);
 
-		if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+		if (result == VK_ERROR_DEVICE_LOST) {
+			vk.device_lost = qtrue;
+			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during image acquisition - GPU driver issue\n");
+			return;
+		} else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
 			// Swapchain is out of date, need to recreate
 			ri.Printf(PRINT_WARNING, "Vulkan: Swapchain out of date, skipping frame\n");
 			return;
@@ -730,7 +735,8 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 #endif
 
 		// Vulkan: Present the rendered frame
-		if (vk.device != (VkDevice)0x20000000 && vk.active && vk.swapchain != VK_NULL_HANDLE && qvkQueuePresentKHR) {
+		// Skip if device is lost - prevents operations on invalid device
+		if (!vk.device_lost && vk.device != (VkDevice)0x20000000 && vk.active && vk.swapchain != VK_NULL_HANDLE && qvkQueuePresentKHR) {
 			// Submit rendering commands and present
 			VkPresentInfoKHR present_info = {
 				.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
@@ -744,7 +750,10 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 			};
 
 			VkResult result = qvkQueuePresentKHR(vk.queue, &present_info);
-			if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+			if (result == VK_ERROR_DEVICE_LOST) {
+				vk.device_lost = qtrue;
+				ri.Printf(PRINT_ERROR, "Vulkan: Device lost during present - GPU driver issue\n");
+			} else if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
 				// Swapchain needs recreation
 				ri.Printf(PRINT_WARNING, "Vulkan: Swapchain needs recreation\n");
 			} else if (result != VK_SUCCESS) {

@@ -963,7 +963,10 @@ void end_command_buffer(VkCommandBuffer command_buffer, const char *location)
 		vk_queue_wait_idle();
 	}
 
-	qvkFreeCommandBuffers( vk.device, vk.command_pool, 1, &command_buffer );
+	// Only free command buffers if device is not lost
+	if (!vk.device_lost && vk.device != VK_NULL_HANDLE) {
+		qvkFreeCommandBuffers( vk.device, vk.command_pool, 1, &command_buffer );
+	}
 }
 
 VkInstance VK_GetInstanceHandle( void )
@@ -9767,13 +9770,15 @@ void vk_shutdown( refShutdownCode_t code ) {
   // Print memory statistics BEFORE any shutdown cleanup to avoid accessing freed memory
   ri.Printf(PRINT_ALL, "vk_shutdown: Printing memory statistics before cleanup\n");
   vk_print_memory_stats();
-  // region instrumentation guard: avoid cleanup if no active context
-  if (!vk.active || vk.device == VK_NULL_HANDLE || vk.swapchain == VK_NULL_HANDLE) {
-    ri.Printf(PRINT_ALL, "vk_shutdown: skipping cleanup (state invalid) - active=%d, device=%p, swapchain=%p\n", (int)vk.active, (void*)vk.device, (void*)vk.swapchain);
+  // region instrumentation guard: avoid cleanup if no active context or device is lost
+  if (!vk.active || vk.device == VK_NULL_HANDLE || vk.swapchain == VK_NULL_HANDLE || vk.device_lost) {
+    ri.Printf(PRINT_ALL, "vk_shutdown: skipping cleanup (state invalid) - active=%d, device=%p, swapchain=%p, device_lost=%d\n", 
+        (int)vk.active, (void*)vk.device, (void*)vk.swapchain, (int)vk.device_lost);
     // Invalidate remaining state to prevent accidental teardown in later calls
     vk.active = qfalse;
     vk.device = VK_NULL_HANDLE;
     vk.swapchain = VK_NULL_HANDLE;
+    vk.device_lost = qfalse; // Clear flag for clean shutdown
     // Don't unload library - it can cause "free(): invalid pointer" errors when library
     // destructors try to clean up memory. The OS will handle cleanup on process exit.
     ri.Printf(PRINT_ALL, "vk_shutdown: Keeping Vulkan library loaded (OS will clean up on exit)\n");
@@ -9785,94 +9790,110 @@ void vk_shutdown( refShutdownCode_t code ) {
 	// Shutdown in reverse order of initialization with error handling
 	if ( code != REF_KEEP_CONTEXT ) {
 		// Shutdown all Vulkan subsystems safely
-		if (vk.active && vk.device != VK_NULL_HANDLE && vk.device != (VkDevice)0x20000000) {
+		if (vk.active && vk.device != VK_NULL_HANDLE && vk.device != (VkDevice)0x20000000 && !vk.device_lost) {
 			ri.Printf(PRINT_ALL, "vk_shutdown: Shutting down Vulkan subsystems...\n");
 
 			// Memory validation disabled to avoid compilation issues
 			// TODO: Re-enable when function linking is resolved
 
 			// Wait for device idle first before destroying resources
-			if (qvkDeviceWaitIdle && vk.device != VK_NULL_HANDLE) {
+			// Skip if device is lost - driver may have already destroyed resources
+			if (qvkDeviceWaitIdle && vk.device != VK_NULL_HANDLE && !vk.device_lost) {
 				VkResult result = qvkDeviceWaitIdle(vk.device);
 				if (result != VK_SUCCESS) {
-					ri.Printf(PRINT_WARNING, "vk_shutdown: qvkDeviceWaitIdle failed: %s\n", vk_result_string(result));
+					if (result == VK_ERROR_DEVICE_LOST) {
+						ri.Printf(PRINT_WARNING, "vk_shutdown: Device lost during wait - skipping resource cleanup\n");
+						vk.device_lost = qtrue;
+					} else {
+						ri.Printf(PRINT_WARNING, "vk_shutdown: qvkDeviceWaitIdle failed: %s\n", vk_result_string(result));
+					}
 				}
 			} else {
-				ri.Printf(PRINT_WARNING, "vk_shutdown: Skipping device wait - device invalid or function not available\n");
+				if (vk.device_lost) {
+					ri.Printf(PRINT_WARNING, "vk_shutdown: Skipping device wait - device is lost\n");
+				} else {
+					ri.Printf(PRINT_WARNING, "vk_shutdown: Skipping device wait - device invalid or function not available\n");
+				}
 			}
 
-			// Shutdown enhanced post processing
-			vk_shutdown_enhanced_post_processing();
+			// Only shutdown subsystems if device is not lost
+			// When device is lost, driver may have already destroyed resources
+			if (!vk.device_lost) {
+				// Shutdown enhanced post processing
+				vk_shutdown_enhanced_post_processing();
 
-			// Shutdown FSR
-			vk_fsr_shutdown();
+				// Shutdown FSR
+				vk_fsr_shutdown();
 
-			// Shutdown volumetric fog
-			vk_volumetric_fog_shutdown();
+				// Shutdown volumetric fog
+				vk_volumetric_fog_shutdown();
 
-			// Shutdown decals
-			vk_decals_shutdown();
+				// Shutdown decals
+				vk_decals_shutdown();
 
-			// Shutdown god rays
-			vk_god_rays_shutdown();
+				// Shutdown god rays
+				vk_god_rays_shutdown();
 
-			// Shutdown PBO system safely
-			vk_pbo_shutdown();
+				// Shutdown PBO system safely
+				vk_pbo_shutdown();
 
-			// Shutdown terrain system
-			vk_terrain_shutdown();
+				// Shutdown terrain system
+				vk_terrain_shutdown();
 
-			// Shutdown surface sprites system
-			vk_surface_sprites_shutdown();
+				// Shutdown surface sprites system
+				vk_surface_sprites_shutdown();
 
-			// Shutdown world effects system
-			vk_world_effects_shutdown();
+				// Shutdown world effects system
+				vk_world_effects_shutdown();
 
-			// Ray tracing and raymarching moved to RTX renderer only
+				// Ray tracing and raymarching moved to RTX renderer only
 
-			// Shutdown async compute
-			vk_shutdown_compute_manager();
+				// Shutdown async compute
+				vk_shutdown_compute_manager();
+			} else {
+				ri.Printf(PRINT_WARNING, "vk_shutdown: Skipping subsystem shutdown - device is lost\n");
+			}
 
-	// Shutdown resource pools
+	// Shutdown resource pools (safe even if device is lost - these are host-side)
 	vk_shutdown_resource_pool();
 
-	// Shutdown hierarchical memory pool system
+	// Shutdown hierarchical memory pool system (host-side)
 	vk_shutdown_memory_pool_system();
 
-	// Shutdown lock-free memory manager
+	// Shutdown lock-free memory manager (host-side)
 	vk_shutdown_lock_free_memory_manager();
 
-	// Shutdown arena memory manager
+	// Shutdown arena memory manager (host-side)
 	vk_shutdown_arena_manager();
 
-	// Shutdown memory advisor
+	// Shutdown memory advisor (host-side)
 	vk_shutdown_memory_advisor();
 
-	// Shutdown render graph profiler
+	// Shutdown render graph profiler (host-side)
 	vk_shutdown_render_profiler();
 
-	// Shutdown memory bandwidth profiler
+	// Shutdown memory bandwidth profiler (host-side)
 	vk_shutdown_memory_bandwidth_profiler();
 
-	// Shutdown parallel processing profiler
+	// Shutdown parallel processing profiler (host-side)
 	vk_shutdown_parallel_profiler();
 
-	// Shutdown shader performance analyzer
+	// Shutdown shader performance analyzer (host-side)
 	vk_shutdown_shader_performance_analyzer();
 
-	// Shutdown asset loading profiler
+	// Shutdown asset loading profiler (host-side)
 	vk_shutdown_asset_loading_profiler();
 
-	// Shutdown performance HUD
+	// Shutdown performance HUD (host-side)
 	vk_shutdown_performance_hud();
 
-	// Shutdown performance regression detector
+	// Shutdown performance regression detector (host-side)
 	vk_shutdown_performance_regression_detector();
 
-	// Shutdown heatmap visualizer
+	// Shutdown heatmap visualizer (host-side)
 	vk_shutdown_heatmap_visualizer();
 
-	// Shutdown cache structures manager
+	// Shutdown cache structures manager (host-side)
 	vk_shutdown_cache_structures_manager();
 
 	// Mark Vulkan as inactive after cleanup
@@ -9881,10 +9902,13 @@ void vk_shutdown( refShutdownCode_t code ) {
 
 
 		// Destroy debug messenger before clearing instance data
-		if (vk.debugMessenger != VK_NULL_HANDLE && qvkDestroyDebugUtilsMessengerEXT != NULL) {
+		// Skip if device is lost - instance may be in invalid state
+		if (!vk.device_lost && vk.debugMessenger != VK_NULL_HANDLE && qvkDestroyDebugUtilsMessengerEXT != NULL) {
 			qvkDestroyDebugUtilsMessengerEXT(vk_instance, vk.debugMessenger, NULL);
 			vk.debugMessenger = VK_NULL_HANDLE;
 			ri.Printf(PRINT_ALL, "vk_shutdown: Debug messenger destroyed\n");
+		} else if (vk.device_lost) {
+			ri.Printf(PRINT_WARNING, "vk_shutdown: Skipping debug messenger destruction - device is lost\n");
 		}
 
 		// Clear Vulkan instance data based on shutdown level
@@ -9892,6 +9916,7 @@ void vk_shutdown( refShutdownCode_t code ) {
 			ri.Printf(PRINT_ALL, "vk_shutdown: Full cleanup - clearing Vulkan instance data\n");
 
 			// Free dynamically allocated swapchain arrays safely
+			// Skip Vulkan API calls if device is lost
 			if (vk.swapchain_images) {
 				vk_safe_free((void**)&vk.swapchain_images, "swapchain_images");
 			}
@@ -9900,11 +9925,16 @@ void vk_shutdown( refShutdownCode_t code ) {
 			}
 			if (vk.swapchain_rendering_finished) {
 				// Destroy semaphores before freeing the array
-				for (uint32_t i = 0; i < vk.swapchain_image_count; i++) {
-					if (vk.swapchain_rendering_finished[i] != VK_NULL_HANDLE) {
-						qvkDestroySemaphore(vk.device, vk.swapchain_rendering_finished[i], NULL);
-						vk.swapchain_rendering_finished[i] = VK_NULL_HANDLE;
+				// Skip if device is lost - driver may have already destroyed them
+				if (!vk.device_lost && vk.device != VK_NULL_HANDLE) {
+					for (uint32_t i = 0; i < vk.swapchain_image_count; i++) {
+						if (vk.swapchain_rendering_finished[i] != VK_NULL_HANDLE) {
+							qvkDestroySemaphore(vk.device, vk.swapchain_rendering_finished[i], NULL);
+							vk.swapchain_rendering_finished[i] = VK_NULL_HANDLE;
+						}
 					}
+				} else if (vk.device_lost) {
+					ri.Printf(PRINT_WARNING, "vk_shutdown: Skipping semaphore destruction - device is lost\n");
 				}
 				vk_safe_free((void**)&vk.swapchain_rendering_finished, "swapchain_rendering_finished");
 			}
