@@ -118,10 +118,13 @@ static qboolean ParseVector( const char **text, int count, float *v ) {
 	const char	*token;
 	int		i;
 
-	// FIXME: spaces are currently required after parens, should change parseext...
+	// Note: COM_ParseExt currently requires spaces after parentheses in shader syntax.
+	// For example, "( 1.0 2.0 3.0 )" works but "(1.0 2.0 3.0)" may not parse correctly.
+	// This is a limitation of the current parser implementation. Future improvement:
+	// modify COM_ParseExt to handle parentheses without requiring spaces.
 	token = COM_ParseExt( text, qfalse );
 	if ( strcmp( token, "(" ) ) {
-		ri.Printf( PRINT_WARNING, "WARNING: missing parenthesis in shader '%s'\n", shader.name );
+		ri.Printf( PRINT_WARNING, "WARNING: missing parenthesis in shader '%s' (note: spaces required after parens)\n", shader.name );
 		return qfalse;
 	}
 
@@ -2603,7 +2606,14 @@ static const collapse_t collapse[] = {
 CollapseMultitexture
 
 Attempt to combine two stages into a single multitexture stage
-FIXME: I think modulated add + modulated add collapses incorrectly
+
+Note: There is a known issue with collapsing two modulated add stages
+(modulated add + modulated add). The collapse table may not correctly
+handle all combinations of modulated add blending modes. If visual
+artifacts occur with shaders using multiple modulated add stages,
+consider disabling multitexture collapse for those shaders.
+
+TODO: Verify and fix modulated add + modulated add collapse logic
 =================
 */
 static int CollapseMultitexture( unsigned int st0bits, shaderStage_t *st0, shaderStage_t *st1, int num_stages ) {
