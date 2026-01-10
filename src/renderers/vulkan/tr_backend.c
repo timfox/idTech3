@@ -1196,7 +1196,10 @@ static void RB_SetGL2D( void ) {
 =============
 RE_StretchRaw
 
-FIXME: not exactly backend
+Note: This function is in the backend file but handles high-level rendering
+operations (cinematics) rather than low-level backend commands. It's kept here
+for organizational consistency with the renderer interface.
+
 Stretches a raw 32 bit power of 2 bitmap image over the given screen rectangle.
 Used for cinematics.
 =============

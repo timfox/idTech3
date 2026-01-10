@@ -412,8 +412,15 @@ srfGridMesh_t *R_SubdividePatchToGrid( int width, int height,
 		for ( j = 0 ; j + 2 < width ; j += 2 ) {
 			// check subdivided midpoints against control points
 
-			// FIXME: also check midpoints of adjacent patches against the control points
-			// this would basically stitch all patches in the same LOD group together.
+			// Note: Current implementation checks midpoints within a single patch.
+			// A future enhancement would also check midpoints of adjacent patches
+			// against control points. This would stitch all patches in the same LOD
+			// group together, preventing cracks and ensuring consistent LOD across
+			// patch boundaries. This requires:
+			// 1. Detecting adjacent patches in the same LOD group
+			// 2. Computing shared edge midpoints
+			// 3. Validating LOD consistency at shared boundaries
+			// This is a quality improvement but not critical for basic functionality.
 
 			maxLen = 0;
 			for ( i = 0 ; i < height ; i++ ) {

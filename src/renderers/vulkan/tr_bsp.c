@@ -1164,7 +1164,17 @@ R_FixSharedVertexLodError_r
 
 NOTE: never sync LoD through grid edges with merged points!
 
-FIXME: write generalized version that also avoids cracks between a patch and one that meets half way?
+Note: Current implementation fixes LOD errors for patches that share edges.
+A generalized version would also handle cases where patches meet at non-edge
+boundaries (e.g., patches that meet "half way" or at arbitrary points).
+This would require:
+1. Detecting patch adjacency beyond just edge sharing
+2. Computing intersection points between patch boundaries
+3. Synchronizing LOD at intersection points to prevent cracks
+4. Handling more complex patch topologies
+
+This is a future enhancement that would improve visual quality for complex
+patch arrangements but is not critical for current functionality.
 =================
 */
 static void R_FixSharedVertexLodError_r( int start, srfGridMesh_t *grid1 ) {

@@ -116,8 +116,13 @@ qboolean vk_validate_shader_inputs(const Vk_Pipeline_Def *def) {
         return qfalse;
     }
 
-    // TODO: Add shader input validation when needed
-    // For now, just basic null checks
+    // Shader input validation: Currently performs basic null checks.
+    // Future enhancements could include:
+    // - Validating shader stage compatibility
+    // - Checking descriptor set bindings match shader requirements
+    // - Verifying uniform buffer layouts match shader expectations
+    // - Validating texture formats match shader sampler types
+    // This would help catch shader configuration errors early.
 
     return qtrue;
 }

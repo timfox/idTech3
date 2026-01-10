@@ -235,19 +235,27 @@ float vk_get_average_fps(void) {
 }
 
 // GPU timing queries - framework
+// Note: GPU timing queries are stubbed for future implementation.
+// To implement properly:
+// 1. Check for VK_EXT_calibrated_timestamps extension support
+// 2. Create VkQueryPool with VK_QUERY_TYPE_TIMESTAMP
+// 3. Record timestamps at begin/end points in command buffer
+// 4. Retrieve results after command buffer execution
+// 5. Convert timestamp deltas to milliseconds/seconds
+// Alternative: Use VK_EXT_host_query_reset for simpler implementation
 __attribute__((unused)) void vk_begin_gpu_timing(const char *name) {
     // TODO: Implement GPU timing queries if VK_EXT_calibrated_timestamps is available
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: GPU timing begin requested for: %s\n", name ? name : "unnamed");
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: GPU timing begin requested for: %s (not yet implemented)\n", name ? name : "unnamed");
 }
 
 __attribute__((unused)) void vk_end_gpu_timing(void) {
-    // TODO: End GPU timing query
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: GPU timing end requested\n");
+    // TODO: End GPU timing query - record timestamp in command buffer
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: GPU timing end requested (not yet implemented)\n");
 }
 
 __attribute__((unused)) float vk_get_gpu_timing_result(const char *name) {
-    // TODO: Return GPU timing result
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: GPU timing result requested for: %s\n", name ? name : "unnamed");
+    // TODO: Return GPU timing result - retrieve timestamp delta and convert to ms
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: GPU timing result requested for: %s (not yet implemented)\n", name ? name : "unnamed");
     return 0.0f;
 }
 // Store GPU timing in current frame's profile

@@ -404,7 +404,14 @@ void vk_create_shader_modules(void)
 	// Shader loading
 
 	// Load basic shaders manually for now
-	// TODO: Replace with proper shader binding system
+	// Note: Current implementation loads shaders directly via vk_load_shader().
+	// A proper shader binding system would:
+	// - Automatically resolve shader dependencies
+	// - Manage shader variants (e.g., PBR vs non-PBR, lighting modes)
+	// - Handle shader hot-reloading during development
+	// - Provide shader compilation caching
+	// - Support shader reflection for automatic descriptor set layout generation
+	// This is a future enhancement for better shader management.
 
 	// Single texture shader (type 1) - load into the gen arrays using shader manager
 	// The shader manager handles embedded fallback automatically

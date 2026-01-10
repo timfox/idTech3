@@ -133,9 +133,26 @@ qboolean vk_compute_scheduler_init(void) {
     compute_scheduler.queued_job_count = 0;
 
     // Initialize resource pool
+    // Use compute queue family index if available, otherwise fall back to graphics queue
+    // The compute manager already detects dedicated compute queues during initialization
+    extern vk_t vk;
+    uint32_t queue_family_index = 0; // Default to graphics queue
+    
+    // Check if dedicated compute queue was detected
+    if (vk.compute_manager.queue_family_index != ~0U) {
+        queue_family_index = vk.compute_manager.queue_family_index;
+        ri.Printf(PRINT_ALL, "Vulkan: Using dedicated compute queue family %u\n", queue_family_index);
+    } else if (vk.queue_family_index != ~0U) {
+        // Fall back to graphics queue (which also supports compute on most devices)
+        queue_family_index = vk.queue_family_index;
+        ri.Printf(PRINT_ALL, "Vulkan: Using graphics queue family %u for compute (no dedicated compute queue)\n", queue_family_index);
+    } else {
+        ri.Printf(PRINT_WARNING, "Vulkan: No valid queue family found, using index 0 as fallback\n");
+    }
+    
     VkCommandPoolCreateInfo pool_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-        .queueFamilyIndex = 0, // TODO: Use proper compute queue family index
+        .queueFamilyIndex = queue_family_index,
         .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT
     };
 
