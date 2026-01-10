@@ -12,7 +12,7 @@ layout(binding = 0) uniform sampler2D baseTextureSampler;
 // Optional base color texture
 layout(binding = 1) uniform sampler2D baseColorTexture;
 
-// Uniforms matching the paper's implementation
+// Uniforms
 layout(binding = 2) uniform SDFUniforms {
     // Soft edges
     bool SOFT_EDGES;
@@ -47,7 +47,7 @@ void main() {
     
     float distAlphaMask = texture(baseTextureSampler, v_texCoord).a;
     
-    // Apply outlining (matches paper's HLSL code)
+    // Apply outlining
     if (sdf.OUTLINE && 
         distAlphaMask >= sdf.OUTLINE_MIN_VALUE0 && 
         distAlphaMask <= sdf.OUTLINE_MAX_VALUE1) {
@@ -71,7 +71,7 @@ void main() {
         baseColor = mix(baseColor, sdf.OUTLINE_COLOR, oFactor);
     }
     
-    // Apply soft edges or alpha test (matches paper's HLSL code)
+    // Apply soft edges or alpha test
     if (sdf.SOFT_EDGES) {
         baseColor.a *= smoothstep(
             sdf.SOFT_EDGE_MIN,
@@ -83,7 +83,7 @@ void main() {
         baseColor.a = (distAlphaMask >= 0.5) ? 1.0 : 0.0;
     }
     
-    // Apply outer glow / drop shadow (matches paper's HLSL code)
+    // Apply outer glow / drop shadow
     if (sdf.OUTER_GLOW) {
         vec4 glowTexel = texture(
             baseTextureSampler,

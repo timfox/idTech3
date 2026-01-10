@@ -16,7 +16,7 @@ Full-featured implementation with:
 - Optional base color texture
 
 ### `sdf_vector_simple_frag.glsl`
-Simplified version closely matching the paper's HLSL code:
+Simplified version with minimal features:
 - Basic alpha testing
 - Soft edges
 - Outlining
@@ -135,8 +135,3 @@ fragColor = mix(shadow, main, step(0.5, dist));
 - **Memory**: A 64x64 SDF texture can represent vector art that would require 4096x4096 in traditional formats (64x memory savings)
 - **Performance**: Minimal overhead - typically 2-5 additional shader instructions
 - **Compatibility**: Works on all modern GPUs, including those without programmable shaders (using alpha testing)
-
-## References
-
-- Green, C. (2007). "Improved Alpha-Tested Magnification for Vector Textures and Special Effects". GPU Gems 3, Chapter 25.
-- Valve Corporation. Source Engine.
