@@ -110,6 +110,7 @@ void *Sys_LoadFunction(void *handle, const char *name) {
 #include "vk_world_effects.h"
 #include "vk_frame.h"
 #include "vk_resource_state.h"
+#include "vk_secondary_buffers.h"
 
 #include "vk_post_process.h"
 #ifdef USE_VULKAN_RAY_TRACING
@@ -569,6 +570,7 @@ PFN_vkCmdEndRenderPass							qvkCmdEndRenderPass;
 PFN_vkCmdNextSubpass								qvkCmdNextSubpass;
 PFN_vkCmdPipelineBarrier							qvkCmdPipelineBarrier;
 PFN_vkCmdPushConstants							qvkCmdPushConstants;
+PFN_vkCmdExecuteCommands						qvkCmdExecuteCommands;
 PFN_vkCmdSetDepthBias							qvkCmdSetDepthBias;
 PFN_vkCmdSetScissor								qvkCmdSetScissor;
 PFN_vkCmdSetViewport								qvkCmdSetViewport;
@@ -3749,6 +3751,7 @@ skip_device_creation:
 	INIT_DEVICE_FUNCTION(vkCmdDraw)
 	INIT_DEVICE_FUNCTION(vkCmdDrawIndexed)
 	INIT_DEVICE_FUNCTION(vkCmdDrawIndexedIndirect)
+	INIT_DEVICE_FUNCTION(vkCmdExecuteCommands)
 	INIT_DEVICE_FUNCTION(vkCmdEndRenderPass)
 	INIT_DEVICE_FUNCTION(vkCmdNextSubpass)
 	INIT_DEVICE_FUNCTION(vkCmdPipelineBarrier)
@@ -4326,6 +4329,7 @@ static void __attribute__((unused)) deinit_device_functions( void )
 	qvkCmdDraw									= NULL;
 	qvkCmdDrawIndexed							= NULL;
 	qvkCmdDrawIndexedIndirect					= NULL;
+	qvkCmdExecuteCommands						= NULL;
 	qvkCmdEndRenderPass							= NULL;
 	qvkCmdNextSubpass							= NULL;
 	qvkCmdPipelineBarrier						= NULL;
@@ -4742,6 +4746,9 @@ void vk_initialize( void )
         
         // Initialize resource state tracker
         vk_resource_state_init();
+        
+        // Initialize secondary command buffer system
+        vk_secondary_buffers_init();
     // Optional: initialize timeline semaphore if available
         #ifdef VK_KHR_TIMELINE_SEMAPHORE
         if (qvkCreateSemaphore) {
@@ -9793,6 +9800,9 @@ void vk_shutdown( refShutdownCode_t code ) {
 
 				// Shutdown resource state tracker
 				vk_resource_state_shutdown();
+				
+				// Shutdown secondary command buffer system
+				vk_secondary_buffers_shutdown();
 
 				// Ray tracing and raymarching moved to RTX renderer only
 

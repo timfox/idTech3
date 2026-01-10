@@ -24,6 +24,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "vk.h"
 #include <vector>
 
+// NUM_COMMAND_BUFFERS is defined in vk.h
+#ifndef NUM_COMMAND_BUFFERS
+#define NUM_COMMAND_BUFFERS 2
+#endif
+
 // External Vulkan objects (declared in initialization module)
 extern VkInstance vk_instance;
 extern VkPhysicalDevice vk_physical_device;
@@ -60,9 +65,9 @@ extern PFN_vkDeviceWaitIdle qvkDeviceWaitIdle;
 
 // Command buffer state (local to this module)
 // Use vk.vk.command_pool from the global vk structure
-static VkCommandBuffer current_command_buffer = VK_NULL_HANDLE;
+// Allocate NUM_COMMAND_BUFFERS to match frame pipelining
 static std::vector<VkCommandBuffer> command_buffers;
-static VkFence command_fence = VK_NULL_HANDLE;
+static VkFence command_fences[NUM_COMMAND_BUFFERS]; // Per-frame fences for immediate commands
 
 // Command buffer functions
 // Vulkan function pointers (defined in vk.c)
@@ -117,17 +122,24 @@ qboolean vk_create_command_pool(void) {
         return qfalse;
     }
 
-    // Create fence for command buffer synchronization
+    // Create per-frame fences for immediate command buffer synchronization
     VkFenceCreateInfo fenceInfo = {
         .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
         .pNext = nullptr,
         .flags = VK_FENCE_CREATE_SIGNALED_BIT
     };
 
-    result = qvkCreateFence(vk.device, &fenceInfo, nullptr, &command_fence);
-    if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "Command: Failed to create fence: %d\n", result);
-        return qfalse;
+    for (uint32_t i = 0; i < NUM_COMMAND_BUFFERS; i++) {
+        result = qvkCreateFence(vk.device, &fenceInfo, nullptr, &command_fences[i]);
+        if (result != VK_SUCCESS) {
+            ri.Printf(PRINT_ERROR, "Command: Failed to create fence %u: %d\n", i, result);
+            // Clean up previously created fences
+            for (uint32_t j = 0; j < i; j++) {
+                qvkDestroyFence(vk.device, command_fences[j], nullptr);
+                command_fences[j] = VK_NULL_HANDLE;
+            }
+            return qfalse;
+        }
     }
 
     ri.Printf(PRINT_ALL, "Command: Command pool created successfully\n");
@@ -135,32 +147,43 @@ qboolean vk_create_command_pool(void) {
 }
 
 // Allocate command buffers
+// Allocates NUM_COMMAND_BUFFERS to match frame pipelining
 qboolean vk_allocate_command_buffers(uint32_t count) {
     if (!vk.command_pool) {
         return qfalse;
     }
 
-    command_buffers.resize(count);
+    // Ensure we allocate at least NUM_COMMAND_BUFFERS for frame pipelining
+    uint32_t alloc_count = (count < NUM_COMMAND_BUFFERS) ? NUM_COMMAND_BUFFERS : count;
+    command_buffers.resize(alloc_count);
 
     VkCommandBufferAllocateInfo allocInfo = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .pNext = nullptr,
         .commandPool = vk.command_pool,
         .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = count
+        .commandBufferCount = alloc_count
     };
 
     VkResult result = qvkAllocateCommandBuffers(vk.device, &allocInfo, command_buffers.data());
     if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "Command: Failed to allocate command buffers: %d\n", result);
+        if (result == VK_ERROR_DEVICE_LOST) {
+            vk.device_lost = qtrue;
+            extern void vk_reset_memory_tracking_on_device_lost(void);
+            vk_reset_memory_tracking_on_device_lost();
+            ri.Printf(PRINT_ERROR, "Vulkan: Device lost during command buffer allocation\n");
+        } else {
+            ri.Printf(PRINT_ERROR, "Command: Failed to allocate command buffers: %d\n", result);
+        }
         return qfalse;
     }
 
-    ri.Printf(PRINT_ALL, "Command: Allocated %u command buffers\n", count);
+    ri.Printf(PRINT_ALL, "Command: Allocated %u command buffers (for %u frames)\n", alloc_count, NUM_COMMAND_BUFFERS);
     return qtrue;
 }
 
 // Begin command buffer recording
+// Uses frame-based indexing to leverage frame pipelining
 extern "C" VkCommandBuffer vk_begin_command_buffer(void) {
     if (!vk.device || vk.device == (VkDevice)0x20000000) {
         return (VkCommandBuffer)0x30000000; // Fake command buffer handle
@@ -171,53 +194,38 @@ extern "C" VkCommandBuffer vk_begin_command_buffer(void) {
         return VK_NULL_HANDLE;
     }
 
+    // Allocate NUM_COMMAND_BUFFERS if not already allocated
     if (command_buffers.empty()) {
-        vk_allocate_command_buffers(1);
+        vk_allocate_command_buffers(NUM_COMMAND_BUFFERS);
     }
 
-    current_command_buffer = command_buffers[0];
+    // Use frame index to select the appropriate command buffer
+    // This allows immediate commands to be pipelined with frame rendering
+    uint32_t frame_index = vk.cmd_index;
+    if (frame_index >= command_buffers.size()) {
+        frame_index = 0; // Fallback to first buffer if index is out of bounds
+    }
 
-    // Wait for all frame command buffers to complete before reusing immediate command buffer
-    // This prevents conflicts between immediate commands and frame rendering
-    // Use frame-based synchronization to align with the main rendering pipeline
+    VkCommandBuffer current_command_buffer = command_buffers[frame_index];
+
+    // Wait only on the current frame's fence to avoid blocking other frames
+    // This enables parallel execution of immediate commands with frame rendering
     if (!vk.device_lost && vk.device != VK_NULL_HANDLE) {
-        // Collect all active frame fences to ensure no frame is still in flight
-        VkFence frame_fences[NUM_COMMAND_BUFFERS];
-        uint32_t fence_count = 0;
+        VkFence fence_to_wait = command_fences[frame_index];
         
-        // Add all valid frame fences
-        for (uint32_t i = 0; i < NUM_COMMAND_BUFFERS; i++) {
-            if (vk.tess[i].rendering_finished_fence != VK_NULL_HANDLE) {
-                frame_fences[fence_count++] = vk.tess[i].rendering_finished_fence;
-            }
-        }
-        
-        // Wait for all frame fences if any exist
-        if (fence_count > 0) {
-            VkResult fence_result = qvkWaitForFences(vk.device, fence_count, frame_fences, VK_TRUE, UINT64_MAX);
+        if (fence_to_wait != VK_NULL_HANDLE) {
+            VkResult fence_result = qvkWaitForFences(vk.device, 1, &fence_to_wait, VK_TRUE, UINT64_MAX);
             if (fence_result == VK_ERROR_DEVICE_LOST) {
                 vk.device_lost = qtrue;
+                extern void vk_reset_memory_tracking_on_device_lost(void);
                 vk_reset_memory_tracking_on_device_lost();
                 ri.Printf(PRINT_ERROR, "Vulkan: Device lost during command buffer fence wait\n");
                 return VK_NULL_HANDLE;
             } else if (fence_result != VK_SUCCESS) {
                 ri.Printf(PRINT_WARNING, "vk_begin_command_buffer: Fence wait failed: %d\n", fence_result);
-            }
-        } else {
-            // Fallback to static fence if no frame fences are available (e.g., during initialization)
-            if (command_fence != VK_NULL_HANDLE) {
-                VkResult fence_result = qvkWaitForFences(vk.device, 1, &command_fence, VK_TRUE, UINT64_MAX);
-                if (fence_result == VK_ERROR_DEVICE_LOST) {
-                    vk.device_lost = qtrue;
-                    vk_reset_memory_tracking_on_device_lost();
-                    ri.Printf(PRINT_ERROR, "Vulkan: Device lost during command buffer fence wait\n");
-                    return VK_NULL_HANDLE;
-                } else if (fence_result != VK_SUCCESS) {
-                    ri.Printf(PRINT_WARNING, "vk_begin_command_buffer: Fence wait failed: %d\n", fence_result);
-                } else {
-                    // Reset static fence after waiting (frame fences are managed by frame system)
-                    qvkResetFences(vk.device, 1, &command_fence);
-                }
+            } else {
+                // Reset fence after waiting
+                qvkResetFences(vk.device, 1, &fence_to_wait);
             }
         }
     }
@@ -245,7 +253,14 @@ extern "C" VkCommandBuffer vk_begin_command_buffer(void) {
 
     VkResult result = qvkBeginCommandBuffer(current_command_buffer, &beginInfo);
     if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "Command: Failed to begin command buffer: %d\n", result);
+        if (result == VK_ERROR_DEVICE_LOST) {
+            vk.device_lost = qtrue;
+            extern void vk_reset_memory_tracking_on_device_lost(void);
+            vk_reset_memory_tracking_on_device_lost();
+            ri.Printf(PRINT_ERROR, "Vulkan: Device lost during command buffer begin\n");
+        } else {
+            ri.Printf(PRINT_ERROR, "Command: Failed to begin command buffer: %d\n", result);
+        }
         return VK_NULL_HANDLE;
     }
 
@@ -266,14 +281,49 @@ extern "C" void vk_end_command_buffer(VkCommandBuffer command_buffer, const char
         return;
     }
 
+    // Find which frame index this command buffer belongs to
+    uint32_t frame_index = vk.cmd_index;
+    if (frame_index >= command_buffers.size()) {
+        frame_index = 0; // Fallback
+    }
+    
+    // Verify this is the correct buffer for this frame
+    if (command_buffer != command_buffers[frame_index]) {
+        // Search for the buffer index
+        frame_index = NUM_COMMAND_BUFFERS; // Invalid
+        for (uint32_t i = 0; i < command_buffers.size(); i++) {
+            if (command_buffers[i] == command_buffer) {
+                frame_index = i;
+                break;
+            }
+        }
+        if (frame_index >= NUM_COMMAND_BUFFERS) {
+            ri.Printf(PRINT_WARNING, "vk_end_command_buffer: Command buffer not found in allocated buffers\n");
+            frame_index = 0; // Fallback
+        }
+    }
+
     // End recording
     VkResult result = qvkEndCommandBuffer(command_buffer);
     if (result != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "Command: Failed to end command buffer: %d\n", result);
+        if (result == VK_ERROR_DEVICE_LOST) {
+            vk.device_lost = qtrue;
+            extern void vk_reset_memory_tracking_on_device_lost(void);
+            vk_reset_memory_tracking_on_device_lost();
+            ri.Printf(PRINT_ERROR, "Vulkan: Device lost during command buffer end\n");
+        } else {
+            ri.Printf(PRINT_ERROR, "Command: Failed to end command buffer: %d\n", result);
+        }
         return;
     }
 
-    // Submit to queue
+    // Submit to queue using frame-specific fence
+    VkFence fence_to_use = command_fences[frame_index];
+    if (fence_to_use == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_ERROR, "vk_end_command_buffer: No fence available for frame %u\n", frame_index);
+        return;
+    }
+
     VkSubmitInfo submitInfo = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .pNext = nullptr,
@@ -286,10 +336,11 @@ extern "C" void vk_end_command_buffer(VkCommandBuffer command_buffer, const char
         .pSignalSemaphores = nullptr
     };
 
-    result = qvkQueueSubmit(vk.queue, 1, &submitInfo, command_fence);
+    result = qvkQueueSubmit(vk.queue, 1, &submitInfo, fence_to_use);
     if (result != VK_SUCCESS) {
         if (result == VK_ERROR_DEVICE_LOST) {
             vk.device_lost = qtrue;
+            extern void vk_reset_memory_tracking_on_device_lost(void);
             vk_reset_memory_tracking_on_device_lost();
             ri.Printf(PRINT_ERROR, "Vulkan: Device lost during command buffer submit\n");
             return;
@@ -299,10 +350,11 @@ extern "C" void vk_end_command_buffer(VkCommandBuffer command_buffer, const char
         }
     }
 
-    // Wait for completion (for simplicity, in a real engine you'd use multiple buffers)
-    VkResult fence_result = qvkWaitForFences(vk.device, 1, &command_fence, VK_TRUE, UINT64_MAX);
+    // Wait for completion using frame-specific fence
+    VkResult fence_result = qvkWaitForFences(vk.device, 1, &fence_to_use, VK_TRUE, UINT64_MAX);
     if (fence_result == VK_ERROR_DEVICE_LOST) {
         vk.device_lost = qtrue;
+        extern void vk_reset_memory_tracking_on_device_lost(void);
         vk_reset_memory_tracking_on_device_lost();
         ri.Printf(PRINT_ERROR, "Vulkan: Device lost during fence wait - GPU driver issue\n");
         return;
@@ -310,8 +362,11 @@ extern "C" void vk_end_command_buffer(VkCommandBuffer command_buffer, const char
         ri.Printf(PRINT_WARNING, "vk_end_command_buffer: Fence wait failed: %d\n", fence_result);
     } else {
         // Reset fence for next use
-        qvkResetFences(vk.device, 1, &command_fence);
+        qvkResetFences(vk.device, 1, &fence_to_use);
     }
+
+    // Note: Command buffers are reused, not freed after each use
+    // They're allocated once and reset before reuse
 }
 
 // vk_wait_idle is defined in vk.c
@@ -323,20 +378,23 @@ void vk_destroy_command_pool(void) {
     }
 
     // Wait for any pending command buffers to complete before cleanup
-    // This ensures resources are safe to destroy
-    if (command_fence != VK_NULL_HANDLE && !vk.device_lost && vk.device != VK_NULL_HANDLE && qvkGetFenceStatus) {
-        // Non-blocking check - if fence is signaled, we can proceed
-        VkResult status = qvkGetFenceStatus(vk.device, command_fence);
-        if (status == VK_NOT_READY) {
-            // Wait briefly for completion, but don't block indefinitely during shutdown
-            VkResult wait_result = qvkWaitForFences(vk.device, 1, &command_fence, VK_TRUE, 100000000); // 100ms timeout
-            if (wait_result != VK_SUCCESS && wait_result != VK_TIMEOUT) {
-                if (wait_result == VK_ERROR_DEVICE_LOST) {
+    // Check all per-frame fences
+    if (!vk.device_lost && vk.device != VK_NULL_HANDLE && qvkGetFenceStatus) {
+        for (uint32_t i = 0; i < NUM_COMMAND_BUFFERS; i++) {
+            if (command_fences[i] != VK_NULL_HANDLE) {
+                VkResult status = qvkGetFenceStatus(vk.device, command_fences[i]);
+                if (status == VK_NOT_READY) {
+                    // Wait briefly for completion, but don't block indefinitely during shutdown
+                    VkResult wait_result = qvkWaitForFences(vk.device, 1, &command_fences[i], VK_TRUE, 100000000); // 100ms timeout
+                    if (wait_result != VK_SUCCESS && wait_result != VK_TIMEOUT) {
+                        if (wait_result == VK_ERROR_DEVICE_LOST) {
+                            vk.device_lost = qtrue;
+                        }
+                    }
+                } else if (status == VK_ERROR_DEVICE_LOST) {
                     vk.device_lost = qtrue;
                 }
             }
-        } else if (status == VK_ERROR_DEVICE_LOST) {
-            vk.device_lost = qtrue;
         }
     }
 
@@ -348,12 +406,14 @@ void vk_destroy_command_pool(void) {
         command_buffers.clear();
     }
 
-    // Destroy fence
-    if (command_fence != VK_NULL_HANDLE) {
-        if (!vk.device_lost && vk.device != VK_NULL_HANDLE) {
-            qvkDestroyFence(vk.device, command_fence, nullptr);
+    // Destroy per-frame fences
+    for (uint32_t i = 0; i < NUM_COMMAND_BUFFERS; i++) {
+        if (command_fences[i] != VK_NULL_HANDLE) {
+            if (!vk.device_lost && vk.device != VK_NULL_HANDLE) {
+                qvkDestroyFence(vk.device, command_fences[i], nullptr);
+            }
+            command_fences[i] = VK_NULL_HANDLE;
         }
-        command_fence = VK_NULL_HANDLE;
     }
 
     // Destroy command pool (must be done after freeing all command buffers)
@@ -364,6 +424,5 @@ void vk_destroy_command_pool(void) {
         vk.command_pool = VK_NULL_HANDLE;
     }
 
-    current_command_buffer = VK_NULL_HANDLE;
     ri.Printf(PRINT_ALL, "Command: Command pool destroyed\n");
 }
