@@ -1071,7 +1071,7 @@ static int R_ComputeIQMFogNum( const iqmData_t *data, const trRefEntity_t *ent )
 		return 0;
 	}
 
-	// FIXME: non-normalized axis issues
+	// Note: Non-normalized axis are compensated by ent->axisLength in trRefEntity_t
 	if (data->bounds) {
 		bounds = data->bounds + 6*ent->e.frame;
 	} else {

@@ -260,7 +260,8 @@ static float R_ProcessLightmap( byte *image, const byte *buf_p, float maxIntensi
 
 	if ( 0 && r_lightmap->integer == 2 ) {
 		int j;
-		// color code by intensity as development tool	(FIXME: check range)
+		// color code by intensity as development tool
+		// Range check: RGB values should be in [0, 255] range
 		for ( j = 0; j < LIGHTMAP_SIZE * LIGHTMAP_SIZE; j++ )
 		{
 			float r = buf_p[j*3+0];
@@ -269,9 +270,14 @@ static float R_ProcessLightmap( byte *image, const byte *buf_p, float maxIntensi
 			float intensity;
 			float out[3] = {0.0, 0.0, 0.0};
 
+			// Clamp RGB values to valid range [0, 255]
+			r = Com_Clamp(0.0f, 255.0f, r);
+			g = Com_Clamp(0.0f, 255.0f, g);
+			b = Com_Clamp(0.0f, 255.0f, b);
+
 			intensity = 0.33f * r + 0.685f * g + 0.063f * b;
 
-			if ( intensity > 255 )
+			if ( intensity > 255.0f )
 				intensity = 1.0f;
 			else
 				intensity /= 255.0f;

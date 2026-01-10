@@ -1018,9 +1018,9 @@ static qboolean ParseStage( shaderStage_t *stage, const char **text )
 			exponent = atof( token );
 
 			// Change shininess to gloss
-			// FIXME: assumes max exponent of 8192 and min of 1, must change here if altered in gen_frag.glsl
-			exponent = Com_Clamp( 1.0f, 8192.0f, exponent );
-			stage->specularScale[3] = log(exponent) / log(8192.0);
+			// Use constants defined in tr_local.h to maintain consistency with gen_frag.glsl
+			exponent = Com_Clamp( SPECULAR_EXPONENT_MIN, SPECULAR_EXPONENT_MAX, exponent );
+			stage->specularScale[3] = log(exponent) / log(SPECULAR_EXPONENT_MAX);
 		}
 		else if ( !Q_stricmp(token, "parallaxdepth") )
 		{

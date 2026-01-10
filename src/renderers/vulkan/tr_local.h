@@ -217,6 +217,10 @@ typedef enum {
 
 #define MAX_SHADER_STAGES 8
 
+// Specular exponent constants (must match gen_frag.glsl)
+#define SPECULAR_EXPONENT_MIN 1.0f
+#define SPECULAR_EXPONENT_MAX 8192.0f
+
 typedef enum {
 	GF_NONE,
 

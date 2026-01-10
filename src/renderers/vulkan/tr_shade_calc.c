@@ -1172,7 +1172,8 @@ void RB_CalcRotateTexCoords( float degsPerSecond, float *src, float *dst )
 **
 ** Calculates specular coefficient and places it in the alpha channel
 */
-vec3_t lightOrigin = { -960, 1980, 96 };		// FIXME: track dynamically
+// Default light origin (fallback if no dynamic lights available)
+static vec3_t defaultLightOrigin = { -960, 1980, 96 };
 
 void RB_CalcSpecularAlpha( unsigned char *alphas ) {
 	int			i;
@@ -1181,7 +1182,17 @@ void RB_CalcSpecularAlpha( unsigned char *alphas ) {
 	float		l, d;
 	int			b;
 	vec3_t		lightDir;
+	vec3_t		lightOrigin;
 	int			numVertexes;
+
+	// Use first dynamic light origin if available, otherwise use default
+	// Note: backEndData and r_numdlights are declared in tr_local.h and tr_scene.c
+	extern int r_numdlights;
+	if (r_numdlights > 0 && backEndData && backEndData->dlights) {
+		VectorCopy(backEndData->dlights[0].origin, lightOrigin);
+	} else {
+		VectorCopy(defaultLightOrigin, lightOrigin);
+	}
 
 	v = tess.xyz[0];
 	normal = tess.normal[0];

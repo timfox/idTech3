@@ -254,7 +254,8 @@ static int R_ComputeFogNum( md3Header_t *header, const trRefEntity_t *ent ) {
 		return 0;
 	}
 
-	// FIXME: non-normalized axis issues
+	// Note: MD3 frames may have non-normalized axis, but this is handled by
+	// the entity's axisLength compensation in trRefEntity_t structure
 	md3Frame = ( md3Frame_t * ) ( ( byte * ) header + header->ofsFrames ) + ent->e.frame;
 	VectorAdd( ent->e.origin, md3Frame->localOrigin, localOrigin );
 	for ( i = 1 ; i < tr.world->numfogs ; i++ ) {

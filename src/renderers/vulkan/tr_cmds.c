@@ -621,7 +621,11 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 			ri.Printf(PRINT_WARNING, "Vulkan: Timeout acquiring swapchain image, skipping frame (headless mode?)\n");
 			return;
 		} else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-			ri.Error(ERR_FATAL, "Vulkan: Failed to acquire swapchain image: %d\n", result);
+			// Non-recoverable swapchain acquisition error (after all recovery attempts)
+			// This should be rare - most errors are handled above
+			ri.Printf(PRINT_ERROR, "Vulkan: Failed to acquire swapchain image: %s (result: %d)\n", 
+				vk_result_string(result), result);
+			ri.Error(ERR_DROP, "Vulkan: Cannot continue without swapchain image");
 		}
 		ri.Printf(PRINT_DEVELOPER, "Vulkan: Acquired swapchain image %u\n", vk.current_swapchain_image_index);
 	}
@@ -644,11 +648,16 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 		} else if ( stereoFrame == STEREO_RIGHT ) {
 			cmd->buffer = (int)GL_BACK_RIGHT;
 		} else {
-			ri.Error( ERR_FATAL, "RE_BeginFrame: Stereo is enabled, but stereoFrame was %i", stereoFrame );
+			// Programming error: invalid stereo frame when stereo is enabled
+			ri.Printf(PRINT_WARNING, "RE_BeginFrame: Stereo is enabled, but stereoFrame was %i (expected STEREO_LEFT or STEREO_RIGHT)\n", stereoFrame);
+			// Continue with center frame as fallback
+			cmd->buffer = (int)GL_BACK;
 		}
 	} else {
 		if ( stereoFrame != STEREO_CENTER ) {
-			ri.Error( ERR_FATAL, "RE_BeginFrame: Stereo is disabled, but stereoFrame was %i", stereoFrame );
+			// Programming error: stereo frame set when stereo is disabled
+			ri.Printf(PRINT_WARNING, "RE_BeginFrame: Stereo is disabled, but stereoFrame was %i (expected STEREO_CENTER)\n", stereoFrame);
+			// Continue with center frame
 		}
 
 #ifdef USE_VULKAN
