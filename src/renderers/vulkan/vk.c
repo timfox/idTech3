@@ -1215,8 +1215,6 @@ static VkResult vk_create_swapchain_safe( VkPhysicalDevice physical_device, VkDe
 		else if ( present_modes[i] == VK_PRESENT_MODE_FIFO_RELAXED_KHR )
 			fifo_relaxed_supported = qtrue;
 	}
-	ri.Printf(PRINT_ALL, "DEBUG: Present mode support - mailbox:%d, immediate:%d, fifo_relaxed:%d\n",
-		mailbox_supported, immediate_supported, fifo_relaxed_supported);
 	if ( verbose ) {
 		ri.Printf( PRINT_ALL, "\n" );
 	}
@@ -1272,8 +1270,6 @@ static VkResult vk_create_swapchain_safe( VkPhysicalDevice physical_device, VkDe
 		}
 	}
 
-	ri.Printf(PRINT_ALL, "DEBUG: Selected swapchain config - present_mode:%s (%d), image_count:%u, swap_interval:%d\n",
-		pmode_to_str(present_mode), present_mode, image_count, v);
 
 	if ( image_count < 2 ) {
 		image_count = 2;
@@ -3321,7 +3317,6 @@ static void init_vulkan_library( void )
 	} // vk_instance == VK_NULL_HANDLE
 
         // Check instance before enumeration
-        ri.Printf(PRINT_ALL, "DEBUG: About to check vk_instance\n");
 
         // Try real device enumeration first
         ri.Printf(PRINT_ALL, "Vulkan: Attempting device enumeration\n");
@@ -3386,8 +3381,6 @@ static void init_vulkan_library( void )
 		for (uint32_t i = 0; i < device_count; i++) {
 			VkPhysicalDeviceProperties props;
 			qvkGetPhysicalDeviceProperties(physical_devices[i], &props);
-			ri.Printf(PRINT_ALL, "DEBUG: Device %u: vendorID=0x%x, deviceName=%s\n",
-				i, props.vendorID, props.deviceName);
 			if (props.vendorID == 0x10DE) { // NVIDIA vendor ID
 				has_nvidia = qtrue;
 				break;
@@ -3617,14 +3610,12 @@ static void init_vulkan_library( void )
 		}
 
 		vk.physical_device = candidates[selected_index].device;
-		ri.Printf(PRINT_ALL, "DEBUG: vk_initialize assigned physical_device=%p\n", (void*)vk.physical_device);
 		ri.Printf(PRINT_ALL, "...selected physical device: %d (%s) - %s\n",
 			selected_index, candidates[selected_index].properties.deviceName,
 			candidates[selected_index].reason);
 
 		// Cache the physical device memory properties for later use
 		vk_physical_device_memory_properties = candidates[selected_index].memory;
-		ri.Printf(PRINT_ALL, "DEBUG: Cached physical device memory properties\n");
 
 		// Set default performance preset
 		vk.current_perf_preset = VK_PERF_PRESET_MEDIUM;
@@ -3970,20 +3961,15 @@ skip_device_creation:
 		ri.Printf(PRINT_ALL, "Vulkan: Skipping queue initialization (fake device)\n");
 		vk.queue = (VkQueue)0x40000000; // Fake queue handle
 	} else {
-		ri.Printf(PRINT_ALL, "DEBUG: About to initialize graphics queue\n");
 		if (vk.queue_family_index != ~0U) {
-			ri.Printf(PRINT_ALL, "DEBUG: Calling qvkGetDeviceQueue for graphics queue\n");
 			qvkGetDeviceQueue(vk.device, vk.queue_family_index, 0, &vk.queue);
-			ri.Printf(PRINT_ALL, "DEBUG: qvkGetDeviceQueue returned\n");
 			if (vk.queue == VK_NULL_HANDLE) {
 				ri.Printf(PRINT_WARNING, "Vulkan: Failed to get graphics queue\n");
 			} else {
 				ri.Printf(PRINT_ALL, "Vulkan: Graphics queue initialized\n");
 			}
 		} else {
-		ri.Printf(PRINT_WARNING, "DEBUG: Invalid queue family index\n");
 	}
-	ri.Printf(PRINT_ALL, "DEBUG: After graphics queue init\n");
 	} // End of !is_fake_device check
 
 	// Initialize compute queue
@@ -3997,11 +3983,8 @@ skip_device_creation:
 	} else if (is_fake_device) {
 		vk.compute_manager.queue = (VkQueue)0x50000000; // Fake compute queue
 	}
-	ri.Printf(PRINT_ALL, "DEBUG: After compute queue init\n");
 
 	// Create main command pool
-	ri.Printf(PRINT_ALL, "DEBUG: Command pool creation - device=%p, queue_family_index=%u, is_fake_device=%d\n",
-		vk.device, vk.queue_family_index, is_fake_device);
 	if (is_fake_device) {
 		ri.Printf(PRINT_ALL, "Vulkan: Skipping command pool creation (fake device)\n");
 		vk.command_pool = (VkCommandPool)0x60000000; // Fake command pool
@@ -4014,7 +3997,6 @@ skip_device_creation:
 			qvkGetPhysicalDeviceProperties(vk.physical_device, &props);
 			if (props.vendorID == 0x10DE) { // NVIDIA
 				force_command_pool = qtrue;
-				ri.Printf(PRINT_ALL, "DEBUG: Forcing command pool creation for NVIDIA GPU\n");
 			}
 		}
 
@@ -4022,25 +4004,19 @@ skip_device_creation:
 			// Use queue family 0 as fallback for NVIDIA GPUs
 			uint32_t queue_family = force_command_pool ? 0 : vk.queue_family_index;
 
-			ri.Printf(PRINT_ALL, "DEBUG: Creating command pool with queue_family=%u\n", queue_family);
 			VkCommandPoolCreateInfo pool_info = {
 				.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
 				.pNext = NULL,
 				.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT,
 				.queueFamilyIndex = queue_family
 			};
-			ri.Printf(PRINT_ALL, "DEBUG: pool_info.sType = %u, queueFamilyIndex = %u\n",
-				pool_info.sType, pool_info.queueFamilyIndex);
-			ri.Printf(PRINT_ALL, "DEBUG: Calling qvkCreateCommandPool\n");
 			VkResult result = qvkCreateCommandPool(vk.device, &pool_info, NULL, &vk.command_pool);
-			ri.Printf(PRINT_ALL, "DEBUG: qvkCreateCommandPool returned with result = %d\n", result);
 			if (result != VK_SUCCESS) {
 				ri.Printf(PRINT_ERROR, "Vulkan: Failed to create command pool: %d\n", result);
 				return;
 			}
 			ri.Printf(PRINT_ALL, "Vulkan: Main command pool created\n");
 		} else {
-			ri.Printf(PRINT_ERROR, "DEBUG: Skipping command pool creation - invalid handles\n");
 		}
 	} // End of !is_fake_device check
 
@@ -4128,10 +4104,8 @@ skip_device_creation:
 	}
 	} // End of !is_fake_device check
 
-	ri.Printf(PRINT_ALL, "DEBUG: About to set vk.active = qtrue\n");
 	vk.active = qtrue;
 	vk.device_lost = qfalse;  // Initialize device lost flag
-    ri.Printf(PRINT_ALL, "DEBUG: vk.active set successfully, init_vulkan_library ending\n");
     vk_silent_init();
     if (!vk_silent) {
         ri.Printf(PRINT_ALL, "Startup renderer: Vulkan\n");
@@ -4230,7 +4204,6 @@ static void vk_create_pipeline_layouts(void) {
 	}
 #endif
 
-	ri.Printf(PRINT_ALL, "DEBUG: vk_create_pipeline_layouts completed successfully\n");
 }
 
 static void vk_create_descriptor_set_layouts(void) {
@@ -4734,7 +4707,6 @@ void vk_initialize( void )
 {
 	fprintf(stderr, "VULKAN_INIT: vk_initialize function ENTRY\n");
 	ri.Printf(PRINT_WARNING, "VULKAN INIT: Starting Vulkan initialization\n");
-	ri.Printf(PRINT_WARNING, "DEBUG: vk_initialize called (vk.active=%d)\n", vk.active);
 
 	qboolean was_already_active = vk.active;
 
@@ -4830,18 +4802,13 @@ void vk_initialize( void )
 	// Create shader modules early so they are available for pipeline creation
 	// Skip for fake devices
 	if (vk.device != (VkDevice)0x20000000) {
-		ri.Printf(PRINT_ALL, "DEBUG: About to call vk_create_shader_modules\n");
 		vk_create_shader_modules();
-		ri.Printf(PRINT_ALL, "DEBUG: vk_create_shader_modules completed\n");
 
 		// Initialize FSR (FidelityFX Super Resolution)
 		if (!vk_fsr_init()) {
 			ri.Printf(PRINT_WARNING, "Vulkan: Failed to initialize FSR\n");
 		}
 
-		// Debug: Check if FSR corrupted vk structure
-		ri.Printf(PRINT_ALL, "DEBUG: Post-FSR - vk.instance=%p, vk.device=%p\n",
-			(void*)vk.instance, (void*)vk.device);
 
 		// Initialize volumetric fog system
 		vk_volumetric_fog_init();
@@ -4875,7 +4842,6 @@ void vk_initialize( void )
 	// Memory corruption check
 	static char corruption_test[1024];
 	Com_Memset(corruption_test, 0xAA, sizeof(corruption_test));
-	ri.Printf(PRINT_ALL, "DEBUG: Memory corruption test passed\n");
 
 	// Debug: Check vk structure state before validation
 	ri.Printf(PRINT_ALL, "DEBUG: Pre-validation - vk.instance=%p, vk.device=%p, vk.active=%d\n",
@@ -5237,9 +5203,7 @@ void vk_create_pipelines( void )
 	ri.Printf(PRINT_ALL, "DEBUG: vk_create_pipelines START - entering function\n");
 
 	// Create Vulkan attachments with improved error handling
-	ri.Printf(PRINT_ALL, "DEBUG: About to call vk_create_attachments\n");
 	vk_create_attachments();
-	ri.Printf(PRINT_ALL, "DEBUG: vk_create_attachments completed successfully\n");
 
 	ri.Printf(PRINT_ALL, "DEBUG: About to call vk_create_special_pipelines\n");
 	vk_create_special_pipelines();
@@ -5278,7 +5242,6 @@ static void vk_clear_attachment_pool( void )
 
 static void vk_alloc_attachments( void )
 {
-	ri.Printf(PRINT_ALL, "DEBUG: vk_alloc_attachments start num_attachments=%d\n", num_attachments);
 	VkImageViewCreateInfo view_desc;
 	VkMemoryDedicatedAllocateInfoKHR alloc_info2;
 	VkMemoryAllocateInfo alloc_info;
@@ -5294,8 +5257,6 @@ static void vk_alloc_attachments( void )
 	for ( i = 0; i < num_attachments; i++ ) {
 		VkDeviceMemory memory;
 		uint32_t memoryTypeIndex;
-
-		ri.Printf(PRINT_ALL, "DEBUG: vk_alloc_attachments processing attachment %d\n", i);
 
 		// Find appropriate memory type for this specific attachment
 		if ( attachments[ i ].usage & VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT ) {
@@ -5357,16 +5318,12 @@ static void vk_alloc_attachments( void )
             view_desc.subresourceRange.baseArrayLayer = MAX( ( layer - 1 ), 0 );
             view_desc.subresourceRange.layerCount = ( viewType == VK_IMAGE_VIEW_TYPE_CUBE ) ? 6 : 1;
 
-			ri.Printf(PRINT_ALL, "DEBUG: vk_alloc_attachments calling qvkCreateImageView i=%d layer=%d target_addr=%p\n", i, layer, (void*)(attachments[i].image_view + layer));
-			ri.Printf(PRINT_ALL, "DEBUG: Image view params: image=%p, viewType=%d, format=%d, aspect=%d\n",
-				view_desc.image, view_desc.viewType, view_desc.format, view_desc.subresourceRange.aspectMask);
 			VkResult view_result = qvkCreateImageView(vk.device, &view_desc, NULL, attachments[i].image_view + layer);
 			if (view_result != VK_SUCCESS) {
 				ri.Printf(PRINT_ERROR, "Vulkan: qvkCreateImageView failed for attachment %d layer %d: %s\n",
 					i, layer, vk_result_string(view_result));
 				return;
 			}
-			ri.Printf(PRINT_ALL, "DEBUG: vk_alloc_attachments created image view i=%d layer=%d\n", i, layer);
         
             // discard if not a cube or the 6th face/layer view has been created
             if ( attachments[i].viewType != VK_IMAGE_VIEW_TYPE_CUBE || layer == 6 )
@@ -5422,35 +5379,23 @@ static qboolean vk_add_attachment_desc( VkImage desc, VkImageView *image_view, V
 	, VkImageViewType view_type )
 #endif
 {
-	ri.Printf(PRINT_ALL, "DEBUG: vk_add_attachment_desc start num=%d\n", num_attachments);
 	if ( num_attachments >= ARRAY_LEN( attachments ) ) {
 		ri.Printf(PRINT_WARNING, "Vulkan: Attachments array overflow (%d >= %ld)\n", num_attachments, ARRAY_LEN(attachments));
 		return qfalse;
 	}
 
-	ri.Printf(PRINT_ALL, "DEBUG: vk_add_attachment_desc setting descriptor\n");
 	attachments[ num_attachments ].descriptor = desc;
-	ri.Printf(PRINT_ALL, "DEBUG: vk_add_attachment_desc setting image_view\n");
 	attachments[ num_attachments ].image_view = image_view;
 #ifdef USE_VK_PBR
-	ri.Printf(PRINT_ALL, "DEBUG: vk_add_attachment_desc setting viewType\n");
 	attachments[ num_attachments ].viewType = view_type;
 #endif
-	ri.Printf(PRINT_ALL, "DEBUG: vk_add_attachment_desc setting usage\n");
 	attachments[ num_attachments ].usage = usage;
-	ri.Printf(PRINT_ALL, "DEBUG: vk_add_attachment_desc setting reqs\n");
 	attachments[ num_attachments ].reqs = *reqs;
-	ri.Printf(PRINT_ALL, "DEBUG: vk_add_attachment_desc setting aspect_flags\n");
 	attachments[ num_attachments ].aspect_flags = aspect_flags;
-	ri.Printf(PRINT_ALL, "DEBUG: vk_add_attachment_desc setting image_layout\n");
 	attachments[ num_attachments ].image_layout = image_layout;
-	ri.Printf(PRINT_ALL, "DEBUG: vk_add_attachment_desc setting image_format\n");
 	attachments[ num_attachments ].image_format = image_format;
-	ri.Printf(PRINT_ALL, "DEBUG: vk_add_attachment_desc setting memory_offset\n");
 	attachments[ num_attachments ].memory_offset = 0;
-	ri.Printf(PRINT_ALL, "DEBUG: vk_add_attachment_desc incrementing num\n");
 	num_attachments++;
-	ri.Printf(PRINT_ALL, "DEBUG: vk_add_attachment_desc end\n");
 
 	return qtrue;
 }
@@ -5490,8 +5435,6 @@ qboolean create_color_attachment(
 	VkImageView *image_view, VkImageLayout image_layout,
 	qboolean multisample, VkImageCreateFlags flags )
 {
-	ri.Printf(PRINT_ALL, "DEBUG: create_color_attachment called with %dx%d\n", width, height);
-
 	VkImageCreateInfo create_desc;
 	VkMemoryRequirements memory_requirements;
 	VkResult result;
@@ -5525,7 +5468,6 @@ qboolean create_color_attachment(
 	create_desc.pQueueFamilyIndices = NULL;
 	create_desc.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-	ri.Printf(PRINT_ALL, "DEBUG: create_color_attachment calling qvkCreateImage\n");
 	result = qvkCreateImage( vk.device, &create_desc, NULL, image );
 	if (result != VK_SUCCESS) {
 		ri.Printf(PRINT_WARNING, "Vulkan: Failed to create color image (%dx%d): %s\n",
@@ -5533,10 +5475,7 @@ qboolean create_color_attachment(
 		return qfalse;
 	}
 
-	ri.Printf(PRINT_ALL, "DEBUG: create_color_attachment calling vk_get_image_memory_erquirements\n");
 	vk_get_image_memory_erquirements( *image, &memory_requirements );
-
-	ri.Printf(PRINT_ALL, "DEBUG: create_color_attachment calling vk_add_attachment_desc\n");
 
 #ifdef USE_VK_PBR
     VkImageViewType view_type = VK_IMAGE_VIEW_TYPE_2D;
@@ -5633,21 +5572,15 @@ static qboolean create_depth_attachment( uint32_t width, uint32_t height, VkSamp
 
 void vk_create_attachments( void )
 {
-	ri.Printf(PRINT_ALL, "DEBUG: vk_create_attachments START\n");
-
 	if (!vk.device) {
 		ri.Printf(PRINT_WARNING, "Vulkan: Cannot create attachments - device not initialized\n");
 		return;
 	}
 
-	ri.Printf(PRINT_ALL, "DEBUG: vk_create_attachments - device check passed\n");
-
 	if (vk.color_format == VK_FORMAT_UNDEFINED || vk.depth_format == VK_FORMAT_UNDEFINED) {
 		ri.Printf(PRINT_WARNING, "Vulkan: Cannot create attachments - formats not initialized\n");
 		return;
 	}
-
-	ri.Printf(PRINT_ALL, "DEBUG: vk_create_attachments - format check passed\n");
 	ri.Printf(PRINT_ALL, "Vulkan: Creating attachments (%dx%d)\n", glConfig.vidWidth, glConfig.vidHeight);
 
 	// Comprehensive safety checks
@@ -5707,12 +5640,9 @@ void vk_create_attachments( void )
 		}
 	}
 
-	ri.Printf(PRINT_ALL, "DEBUG: About to call vk_allocate_image_chunk\n");
 	// Pre-allocate memory chunk with error handling
 	vk_allocate_image_chunk();
 
-	ri.Printf(PRINT_ALL, "DEBUG: vk_allocate_image_chunk completed\n");
-	ri.Printf(PRINT_ALL, "DEBUG: About to call create_color_attachment for main color\n");
 	// Create color attachment
 	create_color_attachment(glConfig.vidWidth, glConfig.vidHeight, VK_SAMPLE_COUNT_1_BIT, vk.color_format,
 		VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
@@ -5792,7 +5722,6 @@ void vk_create_attachments( void )
 	// Allocate attachment descriptors
 	ri.Printf(PRINT_ALL, "DEBUG: About to call vk_alloc_attachments\n");
 	vk_alloc_attachments();
-	ri.Printf(PRINT_ALL, "DEBUG: vk_alloc_attachments completed\n");
 
 	// Set up debugging names for all successfully created resources
 	// Temporarily disabled to isolate crash
@@ -5824,9 +5753,7 @@ void vk_create_attachments( void )
 		}
 	}
 
-	ri.Printf(PRINT_ALL, "DEBUG: About to print success message\n");
 	ri.Printf(PRINT_ALL, "Vulkan: Attachments created successfully\n");
-	ri.Printf(PRINT_ALL, "DEBUG: vk_create_attachments function ending\n");
 }
 
 

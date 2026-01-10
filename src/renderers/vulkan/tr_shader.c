@@ -4673,14 +4673,7 @@ qhandle_t RE_RegisterShaderFromImage(const char *name, int lightmapIndex, image_
 
 	sh = FinishShader();
 
-	// #region agent log
-	ri.Printf(PRINT_ALL, "DEBUG: FinishShader returned %p, checking for NULL\n", (void*)sh);
-	// #endregion
-
 	if (!sh) {
-		// #region agent log
-		ri.Printf(PRINT_ALL, "DEBUG: FinishShader returned NULL, using fallback\n");
-		// #endregion
 		// FinishShader failed, return default shader index
 		if (tr.defaultShader) {
 			return tr.defaultShader->index;
