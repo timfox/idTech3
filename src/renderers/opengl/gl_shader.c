@@ -130,13 +130,13 @@ shaderProgram_t *GL_CreateShaderProgram(const char *vertexSource, const char *fr
     // Validate input parameters
     if (!vertexSource || !fragmentSource) {
         ri.Printf(PRINT_ERROR, "GL_CreateShaderProgram: NULL shader source provided\n");
-        return nullptr;
+        return NULL;
     }
 
     shaderProgram_t *program = ri.Malloc(sizeof(shaderProgram_t));
     if (!program) {
         ri.Printf(PRINT_ERROR, "GL_CreateShaderProgram: Failed to allocate shader program structure\n");
-        return nullptr;
+        return NULL;
     }
     Com_Memset(program, 0, sizeof(shaderProgram_t));
 
@@ -162,7 +162,7 @@ shaderProgram_t *GL_CreateShaderProgram(const char *vertexSource, const char *fr
             qglDeleteShader(program->fragmentShader);
         }
         ri.Free(program);
-        return nullptr;
+        return NULL;
     }
 
     return program;

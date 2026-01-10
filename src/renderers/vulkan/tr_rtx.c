@@ -257,22 +257,13 @@ void RE_TakeVideoFrame(int width, int height, byte *captureBuffer, byte *encodeB
 // ============================================================================
 
 Q_EXPORT refexport_t* QDECL GetRefAPI(int apiVersion, refimport_t *rimp) {
-    // Debug output at the very beginning
-    fprintf(stderr, "VULKAN_RENDERER: GetRefAPI ENTRY POINT CALLED (apiVersion=%d, rimp=%p)\n", apiVersion, (void*)rimp);
-
-    fprintf(stderr, "VULKAN_DEBUG: Initializing refimport_t\n");
-
     ri = *rimp;
-    fprintf(stderr, "VULKAN_DEBUG: refimport_t assigned, setting up renderer\n");
 
     Com_Memset(&re, 0, sizeof(re));
 
-    fprintf(stderr, "VULKAN_DEBUG: Checking API version - got %d, expected %d\n", apiVersion, REF_API_VERSION);
     if (apiVersion != REF_API_VERSION) {
-        fprintf(stderr, "VULKAN_DEBUG: Mismatched REF_API_VERSION: expected %i, got %i\n", REF_API_VERSION, apiVersion);
         return NULL;
     }
-    fprintf(stderr, "VULKAN_DEBUG: API version check passed\n");
 
     // Core renderer functions
     re.Shutdown = RE_Shutdown;
@@ -300,9 +291,6 @@ Q_EXPORT refexport_t* QDECL GetRefAPI(int apiVersion, refimport_t *rimp) {
     re.TakeVideoFrame = RE_TakeVideoFrame;
     re.BeginFrame = RE_BeginFrame;
     re.EndFrame = RE_EndFrame;
-
-    fprintf(stderr, "VULKAN_DEBUG: API interface initialized successfully\n");
-    fprintf(stderr, "VULKAN_DEBUG: GetRefAPI returning valid refexport_t\n");
 
     return &re;
 }

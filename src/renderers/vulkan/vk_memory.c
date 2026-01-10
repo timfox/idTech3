@@ -42,10 +42,8 @@ qboolean vk_allocate_image_chunk(void) {
 			.memoryTypeIndex = find_memory_type(~0U, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
 		};
 
-		ri.Printf(PRINT_ALL, "DEBUG: calling qvkAllocateMemory with device=%p\n", vk.device);
 		VkDeviceMemory memory;
 		VkResult result = qvkAllocateMemory(vk.device, &alloc_info, NULL, &memory);
-		ri.Printf(PRINT_ALL, "DEBUG: qvkAllocateMemory returned %d\n", result);
 
 		if (result != VK_SUCCESS) {
 			ri.Printf(PRINT_WARNING, "Vulkan: Failed to allocate image memory chunk (%u MB): %s\n",

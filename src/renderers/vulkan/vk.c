@@ -3175,11 +3175,7 @@ static void init_vulkan_library( void )
 	// Do not use Com_Memset here if it contains complex C++ types like atomics.
 
         vk_silent_init();
-        vk_debug_write(2, "DEBUG: Entering init_vulkan_library\n", 36);
     vk_safety_checks();
-    if (!vk_silent) {
-        vk_debug_write(2, "DEBUG: Returned from vk_safety_checks\n", 38);
-    }
 
 	// Load Vulkan library and basic functions
 	if (!vulkan_lib) {
@@ -3204,32 +3200,22 @@ static void init_vulkan_library( void )
 	}
 
 #ifdef USE_VULKAN
-        vk_debug_write(2, "DEBUG: Checking r_vk_icd\n", 25);
 	// Allow forcing a specific ICD via cvar (maps to VK_ICD_FILENAMES).
 	if ( r_vk_icd && r_vk_icd->string && r_vk_icd->string[0] ) {
-                vk_debug_write(2, "DEBUG: setting VK_ICD_FILENAMES\n", 32);
 		if ( setenv( "VK_ICD_FILENAMES", r_vk_icd->string, 1 ) == 0 ) {
-                        vk_debug_write(2, "...using VK_ICD_FILENAMES override\n", 35);
-		} else {
-                        vk_debug_write(2, "Failed to set VK_ICD_FILENAMES\n", 31);
+			// ICD override set successfully
 		}
 	}
 #endif
 
-        vk_debug_write(2, "DEBUG: Checking vk_instance\n", 28);
 	if ( vk_instance == VK_NULL_HANDLE ) {
-
-                vk_debug_write(2, "DEBUG: Calling vk_destroy_instance\n", 35);
 		// force cleanup
 		vk_destroy_instance();
 
-                vk_debug_write(2, "DEBUG: Loading basic instance functions\n", 40);
 		// Basic functions are already loaded above from the library
 
-                vk_debug_write(2, "DEBUG: Calling create_instance\n", 31);
 		// Get instance level functions.
 		create_instance();
-                vk_debug_write(2, "DEBUG: create_instance returned\n", 32);
 
 		INIT_INSTANCE_FUNCTION( vkCreateDevice )
 		INIT_INSTANCE_FUNCTION( vkDestroyInstance )
@@ -3256,26 +3242,12 @@ static void init_vulkan_library( void )
 		if (funcPtr) {
 			qvkGetPhysicalDeviceProperties2KHR = (PFN_vkGetPhysicalDeviceProperties2KHR)funcPtr;
 		}
-		if (qvkGetPhysicalDeviceProperties2KHR) {
-                        vk_debug_write(2, "DEBUG: Loaded vkGetPhysicalDeviceProperties2KHR\n", 49);
-		} else {
-                        vk_debug_write(2, "DEBUG: Failed to load vkGetPhysicalDeviceProperties2KHR\n", 57);
-		}
 		
-                vk_debug_write(2, "DEBUG: Calling GetInstanceProcAddr for Features2KHR\n", 53);
 		funcPtr = Sys_LoadFunction(vulkan_lib, "vkGetPhysicalDeviceFeatures2KHR");
-                vk_debug_write(2, "DEBUG: Returned from GetInstanceProcAddr\n", 42);
 		if (!funcPtr) {
-                        vk_debug_write(2, "DEBUG: Calling GetInstanceProcAddr for Features2\n", 50);
 			funcPtr = Sys_LoadFunction(vulkan_lib, "vkGetPhysicalDeviceFeatures2");
-                        vk_debug_write(2, "DEBUG: Returned from GetInstanceProcAddr\n", 42);
 		}
 		qvkGetPhysicalDeviceFeatures2KHR = (PFN_vkGetPhysicalDeviceFeatures2KHR)funcPtr;
-		if (qvkGetPhysicalDeviceFeatures2KHR) {
-                        vk_debug_write(2, "DEBUG: Loaded vkGetPhysicalDeviceFeatures2KHR\n", 47);
-		} else {
-                        vk_debug_write(2, "DEBUG: Failed to load vkGetPhysicalDeviceFeatures2KHR\n", 55);
-		}
 
 #ifdef USE_VK_VALIDATION
 		INIT_INSTANCE_FUNCTION_EXT( vkCreateDebugReportCallbackEXT )
@@ -3308,7 +3280,6 @@ static void init_vulkan_library( void )
 		// }
 
 
-                vk_debug_write(2, "DEBUG: Creating surface\n", 25);
 		// create surface - defer if window not ready yet
 		if ( !ri.VK_CreateSurface( vk_instance, &vk_surface ) ) {
 			ri.Printf(PRINT_WARNING, "Vulkan: Surface creation deferred (window not ready yet)\n");
@@ -4705,8 +4676,7 @@ static void vk_create_pipeline_layouts(void);
 
 void vk_initialize( void )
 {
-	fprintf(stderr, "VULKAN_INIT: vk_initialize function ENTRY\n");
-	ri.Printf(PRINT_WARNING, "VULKAN INIT: Starting Vulkan initialization\n");
+	ri.Printf(PRINT_DEVELOPER, "Vulkan: Starting initialization\n");
 
 	qboolean was_already_active = vk.active;
 
@@ -4843,9 +4813,6 @@ void vk_initialize( void )
 	static char corruption_test[1024];
 	Com_Memset(corruption_test, 0xAA, sizeof(corruption_test));
 
-	// Debug: Check vk structure state before validation
-	ri.Printf(PRINT_ALL, "DEBUG: Pre-validation - vk.instance=%p, vk.device=%p, vk.active=%d\n",
-		(void*)vk.instance, (void*)vk.device, vk.active);
 
 	// Validate initialization before marking as active
 	if (!vk.device || vk.device == VK_NULL_HANDLE) {
@@ -4855,7 +4822,6 @@ void vk_initialize( void )
 
 	if (!vk.instance || vk.instance == VK_NULL_HANDLE) {
 		ri.Printf(PRINT_ERROR, "Vulkan: Failed to initialize instance, aborting\n");
-		ri.Printf(PRINT_ERROR, "DEBUG: vk.instance is NULL during validation\n");
 		vk.active = qfalse;
 		return;
 	}
@@ -4881,7 +4847,6 @@ void vk_initialize( void )
 
 	// Mark Vulkan as active only after successful validation
 	vk.active = qtrue;
-	ri.Printf(PRINT_ALL, "DEBUG: Vulkan marked as active after validation\n");
 
 	// Initialize Vulkan images now that the device is ready
 	R_InitImages();
@@ -4896,8 +4861,6 @@ static void vk_create_special_pipelines( void )
 {
 	Vk_Pipeline_Def def;
 	unsigned int state_bits;
-
-	ri.Printf(PRINT_ALL, "DEBUG: vk_create_special_pipelines start\n");
 
 	// Comprehensive Vulkan object validation before pipeline creation
 	if (!vk_validate_handle(vk.device, "device")) {
@@ -4914,13 +4877,6 @@ static void vk_create_special_pipelines( void )
 		ri.Printf(PRINT_ERROR, "vk_create_special_pipelines: Invalid render pass index %d\n", vk.renderPassIndex);
 		return;
 	}
-
-	ri.Printf(PRINT_ALL, "DEBUG: Vulkan objects validated - device: %p, pipeline_layout: %p, render_pass_index: %d\n",
-		(void*)vk.device, (void*)vk.pipeline_layout, vk.renderPassIndex);
-
-	ri.Printf(PRINT_ALL, "DEBUG: checking shader modules: dot_vs=%p dot_fs=%p fog_vs=%p fog_fs=%p color_vs=%p color_fs=%p\n",
-		(void*)vk.modules.dot_vs, (void*)vk.modules.dot_fs, (void*)vk.modules.fog_vs, (void*)vk.modules.fog_fs,
-		(void*)vk.modules.color_vs, (void*)vk.modules.color_fs);
 
 	// Validate shader modules before creating pipelines
 	if (!vk_validate_handle(vk.modules.dot_vs, "dot_vs")) {
@@ -4940,10 +4896,8 @@ static void vk_create_special_pipelines( void )
 		return;
 	}
 
-	ri.Printf(PRINT_ALL, "DEBUG: Shader modules validated successfully\n");
 	// skybox
 	{
-		ri.Printf(PRINT_ALL, "DEBUG: Creating skybox pipeline - START\n");
 		Com_Memset(&def, 0, sizeof(def));
 		def.shader_type = TYPE_SINGLE_TEXTURE_FIXED_COLOR;
 		def.color.rgb = tr.identityLightByte;
@@ -4951,12 +4905,9 @@ static void vk_create_special_pipelines( void )
 		def.face_culling = CT_FRONT_SIDED;
 		def.polygonOffset = qfalse;
 		def.mirror = qfalse;
-		ri.Printf(PRINT_ALL, "DEBUG: Skybox pipeline def initialized, calling vk_find_pipeline_ext\n");
 		vk.skybox_pipeline = vk_find_pipeline_ext( 0, &def, qtrue );
 		if (vk.skybox_pipeline == VK_NULL_HANDLE) {
-			ri.Printf(PRINT_WARNING, "DEBUG: Skybox pipeline creation failed, will use fallback rendering\n");
-		} else {
-			ri.Printf(PRINT_ALL, "DEBUG: Skybox pipeline created successfully, index: %u\n", vk.skybox_pipeline);
+			ri.Printf(PRINT_WARNING, "Skybox pipeline creation failed, will use fallback rendering\n");
 		}
 	}
 
@@ -4967,12 +4918,10 @@ static void vk_create_special_pipelines( void )
 		ri.Printf(PRINT_ALL, "Vulkan: All special pipelines created successfully\n");
 	}
 
-	ri.Printf(PRINT_ALL, "DEBUG: vk_create_special_pipelines completed successfully\n");
 	return;
 
 	// stencil shadows - temporarily disabled for debugging
 	{
-		ri.Printf(PRINT_ALL, "DEBUG: Skipping stencil shadow pipelines for debugging\n");
 		// Temporarily disable to isolate crash
 		/*
 		cullType_t cull_types[2] = { CT_FRONT_SIDED, CT_BACK_SIDED };
@@ -4996,7 +4945,6 @@ static void vk_create_special_pipelines( void )
 	}
 	// Shadow finish pipeline - temporarily disabled for debugging
 	{
-		ri.Printf(PRINT_ALL, "DEBUG: Skipping shadow finish pipeline for debugging\n");
 		/*
 		Com_Memset( &def, 0, sizeof( def ) );
 		def.face_culling = CT_FRONT_SIDED;
@@ -5200,16 +5148,10 @@ static void vk_create_special_pipelines( void )
 
 void vk_create_pipelines( void )
 {
-	ri.Printf(PRINT_ALL, "DEBUG: vk_create_pipelines START - entering function\n");
-
 	// Create Vulkan attachments with improved error handling
 	vk_create_attachments();
 
-	ri.Printf(PRINT_ALL, "DEBUG: About to call vk_create_special_pipelines\n");
 	vk_create_special_pipelines();
-	ri.Printf(PRINT_ALL, "DEBUG: vk_create_special_pipelines completed successfully\n");
-
-	ri.Printf(PRINT_ALL, "DEBUG: vk_create_pipelines END\n");
 }
 
 void vk_create_blur_pipeline( uint32_t index, uint32_t width, uint32_t height, qboolean horizontal_pass );
@@ -5270,8 +5212,6 @@ static void vk_alloc_attachments( void )
 			memoryTypeIndex = find_memory_type( attachments[ i ].reqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT );
 		}
 
-		ri.Printf(PRINT_ALL, "DEBUG: attachment %d: size=%lu, memoryTypeIndex=%d\n",
-			i, (unsigned long)attachments[i].reqs.size, memoryTypeIndex);
 
 		// Allocate dedicated memory for this attachment
 		alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -5289,13 +5229,9 @@ static void vk_alloc_attachments( void )
 
 		// Allocate memory
 		VK_CHECK( qvkAllocateMemory( vk.device, &alloc_info, NULL, &memory ) );
-		ri.Printf(PRINT_ALL, "DEBUG: allocated memory for attachment %d: %p\n", i, (void*)memory);
 
 		// Bind image memory (offset = 0 since we allocated dedicated memory)
-		ri.Printf(PRINT_ALL, "DEBUG: binding image %d, descriptor=%p, memory=%p\n",
-			i, (void*)attachments[i].descriptor, (void*)memory);
 		VK_CHECK( qvkBindImageMemory( vk.device, attachments[i].descriptor, memory, 0 ) );
-		ri.Printf(PRINT_ALL, "DEBUG: bound image %d successfully\n", i);
 
 		// Create image views
 		VkImageViewType viewType = attachments[i].viewType; // preserve original type
@@ -5348,9 +5284,7 @@ static void vk_alloc_attachments( void )
 
 	if (!skip_transitions) {
 		// perform layout transition
-		ri.Printf(PRINT_ALL, "DEBUG: About to call begin_command_buffer, command_pool=%p\n", vk.command_pool);
 		command_buffer = begin_command_buffer();
-		ri.Printf(PRINT_ALL, "DEBUG: begin_command_buffer returned %p\n", command_buffer);
 		if (command_buffer == VK_NULL_HANDLE) {
 			ri.Printf(PRINT_ERROR, "vk_alloc_attachments: Failed to begin command buffer\n");
 			return;
@@ -5720,7 +5654,6 @@ void vk_create_attachments( void )
 	}
 
 	// Allocate attachment descriptors
-	ri.Printf(PRINT_ALL, "DEBUG: About to call vk_alloc_attachments\n");
 	vk_alloc_attachments();
 
 	// Set up debugging names for all successfully created resources
@@ -6437,8 +6370,6 @@ static void push_attr( uint32_t location, uint32_t binding, VkFormat format )
 
 
 VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassIndex, uint32_t def_index ) {
-	ri.Printf(PRINT_ALL, "DEBUG: create_pipeline index=%d pass=%d shader_type=%d\n", def_index, renderPassIndex, def->shader_type);
-
 	// Check if device is lost - skip pipeline creation
 	if (vk.device_lost) {
 		ri.Printf(PRINT_WARNING, "create_pipeline: Device is lost, skipping pipeline creation\n");
@@ -6597,17 +6528,11 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 
 		case TYPE_SINGLE_TEXTURE_DF:
 			state_bits |= GLS_DEPTHMASK_TRUE;
-			ri.Printf(PRINT_ALL, "DEBUG: TYPE_SINGLE_TEXTURE_DF vs=%p fs=%p use_pbr=%d\n",
-				(void*)vk.modules.vert.ident1[use_pbr][0][0][0],
-				(void*)vk.modules.frag.gen0_df, use_pbr);
 			vs_module = vk.modules.vert.ident1[use_pbr][0][0][0];
 			fs_module = vk.modules.frag.gen0_df;
 			break;
 
 		case TYPE_SINGLE_TEXTURE_FIXED_COLOR:
-			ri.Printf(PRINT_ALL, "DEBUG: TYPE_SINGLE_TEXTURE_FIXED_COLOR vs=%p fs=%p use_pbr=%d\n",
-				(void*)vk.modules.vert.fixed[use_pbr][0][0][0],
-				(void*)vk.modules.frag.fixed[use_pbr][0][0], use_pbr);
 			vs_module = vk.modules.vert.fixed[use_pbr][0][0][0];
 			fs_module = vk.modules.frag.fixed[use_pbr][0][0];
 			break;
@@ -6628,7 +6553,6 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			break;
 
 		case TYPE_SINGLE_TEXTURE:
-			ri.Printf(PRINT_ALL, "DEBUG: TYPE_SINGLE_TEXTURE use_pbr=%d\n", use_pbr);
 			// Check if shader modules are valid before using them
 			if (use_pbr >= 2 || vk.modules.vert.gen[use_pbr][0][0][0][0] == VK_NULL_HANDLE ||
 				vk.modules.frag.gen[use_pbr][0][0][0] == VK_NULL_HANDLE) {
@@ -6637,7 +6561,6 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			}
 			vs_module = vk.modules.vert.gen[use_pbr][0][0][0][0];
 			fs_module = vk.modules.frag.gen[use_pbr][0][0][0];
-			ri.Printf(PRINT_ALL, "DEBUG: got vs=%p fs=%p\n", (void*)vs_module, (void*)fs_module);
 			break;
 
 		case TYPE_SINGLE_TEXTURE_ENV:
@@ -6968,10 +6891,8 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 			return 0;
 	}
 
-	ri.Printf(PRINT_ALL, "DEBUG: create_pipeline index=%d shader_type=%d vs=%p fs=%p\n", def_index, def->shader_type, (void*)vs_module, (void*)fs_module);
-
 	if (vs_module == VK_NULL_HANDLE || fs_module == VK_NULL_HANDLE) {
-		ri.Printf(PRINT_ERROR, "DEBUG: create_pipeline NULL shader module! vs=%p fs=%p for shader_type=%d\n",
+		ri.Printf(PRINT_ERROR, "create_pipeline: NULL shader module (vs=%p fs=%p) for shader_type=%d\n",
 			(void*)vs_module, (void*)fs_module, def->shader_type);
 		return VK_NULL_HANDLE;
 	}

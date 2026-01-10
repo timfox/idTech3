@@ -204,8 +204,6 @@ Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI(int
 		}
 
 		// Test basic Vulkan device operations to catch device lost errors early
-		ri.Printf(PRINT_ALL, "DEBUG: Testing basic Vulkan device operations\n");
-
 		// Try a simple Vulkan operation that would fail if device is lost
 		VkCommandPool testPool = VK_NULL_HANDLE;
 		VkCommandPoolCreateInfo poolInfo = {
@@ -226,8 +224,6 @@ Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI(int
 		}
 
 		// Test more comprehensive Vulkan initialization (similar to what vk_create_attachments does)
-		ri.Printf(PRINT_ALL, "DEBUG: Testing Vulkan attachment creation\n");
-
 		// Try to create a basic attachment to test if device is really functional
 		VkImage testImage = VK_NULL_HANDLE;
 		VkDeviceMemory testMemory = VK_NULL_HANDLE;
@@ -309,14 +305,6 @@ Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI(int
 		if (testImage != VK_NULL_HANDLE) qvkDestroyImage(vk.device, testImage, NULL);
 		if (testMemory != VK_NULL_HANDLE) qvkFreeMemory(vk.device, testMemory, NULL);
 
-		ri.Printf(PRINT_ALL, "DEBUG: Vulkan attachment creation test passed\n");
-
-		ri.Printf(PRINT_ALL, "DEBUG: Vulkan device operations test passed\n");
-
-		// Q2RTX-style approach: Don't test Vulkan upfront, just ensure we have fallback ready
-		ri.Printf(PRINT_ALL, "DEBUG: Vulkan renderer ready with OpenGL fallback\n");
-
-		ri.Printf(PRINT_ALL, "DEBUG: Vulkan basic operations test passed\n");
 	}
 
   // Initialize Vulkan tiny mode - always enabled

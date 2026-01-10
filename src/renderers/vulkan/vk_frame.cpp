@@ -180,9 +180,6 @@ extern "C" void vk_begin_frame(void) {
     // #endregion
     if (!headless_detected) {
         // Try to acquire image with very short timeout first to detect headless mode
-        ri.Printf(PRINT_ALL, "DEBUG: Attempting initial swapchain image acquisition (headless detection)\n");
-        ri.Printf(PRINT_ALL, "DEBUG: swapchain=%p, semaphore=%p, cmd_index=%d\n",
-            vk.swapchain, vk.tess[vk.cmd_index].image_acquired, vk.cmd_index);
         // #region agent log
         {
             char _log[256];
@@ -194,7 +191,7 @@ extern "C" void vk_begin_frame(void) {
 
         // Validate parameters before acquisition
         if (vk.swapchain == VK_NULL_HANDLE) {
-            ri.Printf(PRINT_ERROR, "DEBUG: Swapchain handle is NULL!\n");
+            ri.Printf(PRINT_ERROR, "Swapchain handle is NULL!\n");
             // Final boundary instrumentation
             {
                 char _log[64];
@@ -211,11 +208,11 @@ extern "C" void vk_begin_frame(void) {
             return;
         }
         if (vk.tess[vk.cmd_index].image_acquired == VK_NULL_HANDLE) {
-            ri.Printf(PRINT_ERROR, "DEBUG: Image acquired semaphore is NULL!\n");
+            ri.Printf(PRINT_ERROR, "Image acquired semaphore is NULL!\n");
             return;
         }
         if (vk.cmd_index >= NUM_COMMAND_BUFFERS) {
-            ri.Printf(PRINT_ERROR, "DEBUG: Command index %d is out of bounds (>= %d)!\n", vk.cmd_index, NUM_COMMAND_BUFFERS);
+            ri.Printf(PRINT_ERROR, "Command index %d is out of bounds (>= %d)!\n", vk.cmd_index, NUM_COMMAND_BUFFERS);
             return;
         }
 
@@ -226,7 +223,6 @@ extern "C" void vk_begin_frame(void) {
             snprintf(data, sizeof(data), "{\"result\":%d,\"image_index\":%u,\"timeout_ms\":1}", (int)result, image_index);
             agent_log("H2","vk_frame.cpp:vk_begin_frame","initial_acquire_result", data);
         }
-        ri.Printf(PRINT_ALL, "DEBUG: Initial acquisition result: %d (%s), image_index=%u\n", result, vk_result_string(result), image_index);
 
         if (result == VK_TIMEOUT || result == VK_NOT_READY) {
             // #region agent log
@@ -244,7 +240,6 @@ extern "C" void vk_begin_frame(void) {
             snprintf(data, sizeof(data), "{\"result\":%d,\"setting_headless\":1}", (int)result);
             agent_log("H3","vk_frame.cpp:vk_begin_frame","headless_detected", data);
         }
-            ri.Printf(PRINT_ALL, "DEBUG: Headless mode set due to result=%d\n", result);
             headless_detected = qtrue;
             vk.headless = qtrue;
             vk.headless = qtrue;
@@ -258,11 +253,9 @@ extern "C" void vk_begin_frame(void) {
             // #endregion
             return;
         } else if (result != VK_SUCCESS) {
-            ri.Printf(PRINT_ALL, "DEBUG: Unexpected result in headless detection: %d\n", result);
         }
     } else {
         // Already detected headless mode, continue skipping
-        ri.Printf(PRINT_ALL, "DEBUG: Skipping frame due to previous headless detection\n");
         return;
     }
 
@@ -271,7 +264,6 @@ extern "C" void vk_begin_frame(void) {
     // use existing retry_count state
     const int max_retries = 3;
 
-    ri.Printf(PRINT_ALL, "DEBUG: Starting swapchain image acquisition with timeout=%llu ns, max_retries=%d\n", timeout_ns, max_retries);
     // #region agent log
     {
         char _log[128];
@@ -288,7 +280,6 @@ extern "C" void vk_begin_frame(void) {
     snprintf(_log, sizeof(_log), "{\"retry\":%d}", retry_count);
     agent_log("H1","vk_frame.cpp:vk_begin_frame","acquire_retry_start", _log);
   }
-        ri.Printf(PRINT_ALL, "DEBUG: Acquisition attempt %d/%d\n", retry_count + 1, max_retries + 1);
         // instrumentation: log an acquire attempt before calling acquire
         {
             char _attempt[64];
@@ -305,10 +296,8 @@ extern "C" void vk_begin_frame(void) {
             agent_log("H1","vk_frame.cpp:vk_begin_frame","acquire_retry", data);
             agent_trace_log(data);
         }
-        ri.Printf(PRINT_ALL, "DEBUG: Acquisition result: %d (%s), image_index=%u\n", result, vk_result_string(result), image_index);
 
         if (result == VK_SUCCESS) {
-            ri.Printf(PRINT_ALL, "DEBUG: Successfully acquired swapchain image %u\n", image_index);
             break; // Success!
         } else if (result == VK_NOT_READY && retry_count < max_retries) {
             // Swapchain not ready, wait a bit and retry
@@ -319,7 +308,6 @@ extern "C" void vk_begin_frame(void) {
         } else if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
             // Swapchain needs recreation
             ri.Printf(PRINT_WARNING, "Vulkan: Swapchain needs recreation (result=%d)\n", result);
-            ri.Printf(PRINT_ALL, "DEBUG: Recreating swapchain due to result=%d\n", result);
             vk_recreate_swapchain();
             return;
         } else if (result == VK_TIMEOUT) {
@@ -367,7 +355,6 @@ extern "C" void vk_begin_frame(void) {
         } else {
             // Other error
             ri.Printf(PRINT_ERROR, "vk_begin_frame: Failed to acquire swapchain image: %s\n", vk_result_string(result));
-            ri.Printf(PRINT_ALL, "DEBUG: Fatal error in swapchain acquisition: %d\n", result);
             return;
         }
     } while (retry_count < max_retries);
@@ -414,7 +401,6 @@ extern "C" void vk_begin_frame(void) {
     vk.cmd->swapchain_image_index = image_index;
     vk.tess[vk.cmd_index].swapchain_image_acquired = qtrue;
 
-    ri.Printf(PRINT_ALL, "DEBUG: Successfully acquired swapchain image %u, proceeding with frame setup\n", image_index);
 
     // Update performance statistics
     vk_update_performance_stats();
@@ -440,9 +426,7 @@ extern "C" void vk_begin_frame(void) {
     // (Render pass will handle this if initialLayout is UNDEFINED)
 
     // Begin main render pass
-    ri.Printf(PRINT_ALL, "DEBUG: Calling vk_begin_main_render_pass\n");
     vk_begin_main_render_pass();
-    ri.Printf(PRINT_ALL, "DEBUG: vk_begin_main_render_pass completed, frame %d begun\n", vk.frame_count);
 }
 
 // End frame
@@ -741,10 +725,8 @@ extern "C" void vk_end_frame(void) {
     agent_log("H1","vk_frame.cpp:vk_present_frame","present_frame","{}");
     // If headless, skip presenting
   if (g_vk_headless_present_state) {
-        ri.Printf(PRINT_ALL, "DEBUG: headless present state active, skipping vk_present_frame\n");
         return;
   }
-    ri.Printf(PRINT_ALL, "DEBUG: vk_present_frame called\n");
     {
         char _log[64];
         snprintf(_log, sizeof(_log), "{\"image_index\":%u,\"swapchain\":%p}", vk.cmd->swapchain_image_index, (void*)vk.swapchain);
@@ -752,17 +734,14 @@ extern "C" void vk_end_frame(void) {
     }
 
     if (!vk_validate_handle(vk.swapchain, "swapchain")) {
-        ri.Printf(PRINT_ALL, "DEBUG: Swapchain handle invalid, skipping present\n");
         return;
     }
     if (vk.device == VK_NULL_HANDLE) {
-        ri.Printf(PRINT_ALL, "DEBUG: Vulkan device invalid during present, skipping\n");
         return;
     }
 
     // Check if we have an acquired image to present
     if (!vk.cmd->swapchain_image_acquired) {
-        ri.Printf(PRINT_ALL, "DEBUG: No swapchain image acquired, skipping present\n");
         return;
     }
 
@@ -772,17 +751,11 @@ extern "C" void vk_end_frame(void) {
     agent_log("H1","vk_frame.cpp:vk_present_frame","present_start", _present);
     vt_trace(_present);
   }
-  ri.Printf(PRINT_ALL, "DEBUG: Presenting frame, image_index=%u, semaphore=%p\n",
-        vk.cmd->swapchain_image_index, vk.cmd->rendering_finished2);
-
     // Wait for rendering to complete
     if (vk.cmd->waitForFence) {
-        ri.Printf(PRINT_ALL, "DEBUG: Waiting for fence\n");
         VkResult result = qvkWaitForFences(vk.device, 1, &vk.cmd->rendering_finished_fence, VK_TRUE, UINT64_MAX);
         if (result != VK_SUCCESS) {
             ri.Printf(PRINT_ERROR, "vk_present_frame: Failed to wait for fence: %s\n", vk_result_string(result));
-        } else {
-            ri.Printf(PRINT_ALL, "DEBUG: Fence wait completed\n");
         }
         qvkResetFences(vk.device, 1, &vk.cmd->rendering_finished_fence);
         vk.cmd->waitForFence = qfalse;
@@ -806,9 +779,7 @@ extern "C" void vk_end_frame(void) {
         .pResults = nullptr
     };
 
-    ri.Printf(PRINT_ALL, "DEBUG: Calling qvkQueuePresentKHR\n");
     VkResult result = qvkQueuePresentKHR(vk.queue, &present_info);
-    ri.Printf(PRINT_ALL, "DEBUG: qvkQueuePresentKHR returned: %d (%s)\n", result, vk_result_string(result));
     {
         char pres[64];
         snprintf(pres, sizeof(pres), "{\"present_result\":%d}", (int)result);

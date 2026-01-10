@@ -116,11 +116,7 @@ void vk_world_effects_render(void) {
 	
 	// Get camera position for particle spawning
 	vec3_t cameraPos;
-	if (tr.refdef.vieworg) {
-		VectorCopy(tr.refdef.vieworg, cameraPos);
-	} else {
-		VectorSet(cameraPos, 0, 0, 0);
-	}
+	VectorCopy(tr.refdef.vieworg, cameraPos);
 	
 	// Spawn weather particles based on mode
 	const int particlesPerFrame = 10; // Adjust based on performance

@@ -488,8 +488,6 @@ if (vk.cubeMap.color_image_view[0] != (void*)0) {
 
 // Initialize descriptors
 extern "C" void vk_init_descriptors(void) {
-    ri.Printf(PRINT_ALL, "DEBUG: vk_init_descriptors called\n");
-
     VkDescriptorSetAllocateInfo alloc;
     VkDescriptorBufferInfo info;
     VkWriteDescriptorSet desc;

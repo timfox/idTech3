@@ -47,7 +47,7 @@ void GL_VertexInit(void) {
         ri.Printf(PRINT_ERROR, "GL_VertexInit: Failed to allocate immediate mode index buffer (%d indices)\n", vertexManager.immediateBuffer.maxIndices);
         // Clean up everything
         ri.Free(vertexManager.immediateBuffer.vertices);
-        vertexManager.immediateBuffer.vertices = nullptr;
+        vertexManager.immediateBuffer.vertices = NULL;
         qglDeleteVertexArrays(1, &vertexManager.immediateBuffer.vao);
         qglDeleteBuffers(1, &vertexManager.immediateBuffer.vbo);
         qglDeleteBuffers(1, &vertexManager.immediateBuffer.ibo);
@@ -80,12 +80,12 @@ void GL_VertexShutdown(void) {
     // Clean up immediate buffer
     if (vertexManager.immediateBuffer.vertices) {
         ri.Free(vertexManager.immediateBuffer.vertices);
-        vertexManager.immediateBuffer.vertices = nullptr;
+        vertexManager.immediateBuffer.vertices = NULL;
     }
 
     if (vertexManager.immediateBuffer.indices) {
         ri.Free(vertexManager.immediateBuffer.indices);
-        vertexManager.immediateBuffer.indices = nullptr;
+        vertexManager.immediateBuffer.indices = NULL;
     }
 
     if (vertexManager.immediateBuffer.vao) {
@@ -118,17 +118,17 @@ vertexBuffer_t *GL_CreateVertexBuffer(int maxVertices, int maxIndices, qboolean 
     // Validate input parameters
     if (maxVertices <= 0) {
         ri.Printf(PRINT_ERROR, "GL_CreateVertexBuffer: Invalid maxVertices (%d), must be > 0\n", maxVertices);
-        return nullptr;
+        return NULL;
     }
     if (maxIndices < 0) {
         ri.Printf(PRINT_ERROR, "GL_CreateVertexBuffer: Invalid maxIndices (%d), must be >= 0\n", maxIndices);
-        return nullptr;
+        return NULL;
     }
 
     vertexBuffer_t *buffer = ri.Malloc(sizeof(vertexBuffer_t));
     if (!buffer) {
         ri.Printf(PRINT_ERROR, "GL_CreateVertexBuffer: Failed to allocate vertex buffer structure\n");
-        return nullptr;
+        return NULL;
     }
     Com_Memset(buffer, 0, sizeof(vertexBuffer_t));
 
@@ -155,7 +155,7 @@ vertexBuffer_t *GL_CreateVertexBuffer(int maxVertices, int maxIndices, qboolean 
             qglDeleteBuffers(1, &buffer->ibo);
         }
         ri.Free(buffer);
-        return nullptr;
+        return NULL;
     }
 
     if (maxIndices > 0) {
@@ -168,7 +168,7 @@ vertexBuffer_t *GL_CreateVertexBuffer(int maxVertices, int maxIndices, qboolean 
             qglDeleteBuffers(1, &buffer->vbo);
             qglDeleteBuffers(1, &buffer->ibo);
             ri.Free(buffer);
-            return nullptr;
+            return NULL;
         }
     }
 
@@ -214,7 +214,7 @@ GL_BindVertexBuffer
 void GL_BindVertexBuffer(vertexBuffer_t *buffer) {
     if (!buffer) {
         qglBindVertexArray(0);
-        vertexManager.currentBuffer = nullptr;
+        vertexManager.currentBuffer = NULL;
         return;
     }
 
@@ -260,7 +260,7 @@ GL_UnbindVertexBuffer
 */
 void GL_UnbindVertexBuffer(void) {
     qglBindVertexArray(0);
-    vertexManager.currentBuffer = nullptr;
+    vertexManager.currentBuffer = NULL;
 }
 
 /*

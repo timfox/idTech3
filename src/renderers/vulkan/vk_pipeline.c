@@ -399,7 +399,6 @@ static VkShaderModule vk_load_spirv_shader(const char *filename) {
 
 void vk_create_shader_modules(void)
 {
-	ri.Printf(PRINT_ALL, "DEBUG: vk_create_shader_modules called\n");
 
 	// Shader loading
 
@@ -418,7 +417,6 @@ void vk_create_shader_modules(void)
 	// Use color shaders as the generic single-texture shader
 	VkShaderModule vs_module = vk_load_shader("color_vert", VK_SHADER_STAGE_VERTEX_BIT);
 	VkShaderModule fs_module = vk_load_shader("color_frag", VK_SHADER_STAGE_FRAGMENT_BIT);
-	ri.Printf(PRINT_ALL, "DEBUG: vk_create_shader_modules loaded shaders: vs=%p fs=%p\n", (void*)vs_module, (void*)fs_module);
 
 	// Shader modules created
 
@@ -458,8 +456,6 @@ void vk_create_shader_modules(void)
 
 	// Try to bind generated shaders as fallback
 	vk_bind_generated_shaders();
-
-	ri.Printf(PRINT_ALL, "DEBUG: vk_create_shader_modules completed\n");
 }
 
 static uint32_t vk_alloc_pipeline(const Vk_Pipeline_Def *def) {
@@ -535,7 +531,6 @@ VkPipeline vk_find_pipeline_ext(int base_pipeline, Vk_Pipeline_Def* def, qboolea
 	#ifdef USE_VULKAN
 	extern qboolean vk_is_problematic_shader_type(int shader_type);
 	if (vk_is_problematic_shader_type(def->shader_type)) {
-		ri.Printf(PRINT_ALL, "DEBUG: Skipping problematic shader type %d to avoid SIGFPE/crash\n", def->shader_type);
 		return VK_NULL_HANDLE;
 	}
 	#endif
@@ -557,7 +552,6 @@ VkPipeline vk_find_pipeline_ext(int base_pipeline, Vk_Pipeline_Def* def, qboolea
 
 index = vk_alloc_pipeline(def);
 	if (index == 0) {
-		ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext: pipeline limit reached, will try existing pipelines\n");
 		return VK_NULL_HANDLE;
 	}
 	if (getenv("VK_VERBOSE_PIPELINE_LOGS")) {
@@ -582,11 +576,6 @@ if (getenv("VK_VERBOSE_PIPELINE_LOGS")) {
         ri.Printf(PRINT_ALL, "DEBUG: Allocated pipeline def -> shader_type=%d, cullType=%d, primitives=%d, mirror=%d, state_bits=%d, line_width=%f, abs_light=%d, vk_pbr_flags=%d\n",
             def->shader_type, def->cullType, def->primitives, def->mirror, def->state_bits, def->line_width, def->abs_light, def->vk_pbr_flags);
     }
-    ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext allocated def shader_type=%d cullType=%d primitives=%d mirror=%d state_bits=%d line_width=%f abs_light=%d vk_pbr_flags=%d\n",
-        def->shader_type, def->cullType, def->primitives, def->mirror, def->state_bits, def->line_width, def->abs_light, def->vk_pbr_flags);
-	// Extra logging for allocation
-	ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext allocated pipeline index=%u shader_type=%d state_bits=%d primitives=%d mirror=%d\n",
-		index, def->shader_type, def->state_bits, def->primitives, def->mirror);
 
 found:
 
@@ -608,12 +597,10 @@ alloc_and_create:
 			ri.Printf(PRINT_ERROR, "vk_find_pipeline_ext: critical pipeline failed, returning NULL\n");
 			return VK_NULL_HANDLE;
 		}
-		ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext generated pipeline handle=0x%llx (def_index=%u shader_type=%d)\n", (unsigned long long)pipeline, index, def->shader_type);
 		return pipeline;
 	}
 
 	// create_if_missing is false and no existing pipeline found
-	ri.Printf(PRINT_ALL, "DEBUG: vk_find_pipeline_ext: no existing pipeline found and create_if_missing=false, returning NULL\n");
 	return VK_NULL_HANDLE;
 }
 
