@@ -282,7 +282,7 @@ const void *RB_TakeVideoFrameCmd(const void *data) {
 
     // Allocate temporary RGBA buffer
     memcount = (size_t)cmd->width * (size_t)cmd->height * 4;
-    rgba_buffer = ri.Hunk_AllocTempMemory(memcount);
+    rgba_buffer = ri.Hunk_AllocateTempMemory(memcount);
     if (!rgba_buffer) {
         ri.Printf(PRINT_ERROR, "RB_TakeVideoFrameCmd: Failed to allocate buffer\n");
         return (const void *)(cmd + 1);
@@ -484,13 +484,20 @@ int Sys_Milliseconds( void ) {
 }
 
 // Performance counter reset - should be provided by engine or profiling system
+// Note: This function is typically provided by the engine's performance counter system
+// (src/common/performance_counters.c), but we provide a stub here for compatibility
 void Perf_ResetFrameCounters( void ) {
-    // Note: This should reset frame performance counters if profiling is enabled
-    // Stub implementation - real version would reset draw call counts, etc.
+    // The actual implementation is in src/common/performance_counters.c
+    // This stub is kept for compatibility with code that may call it directly
+    // Real implementation resets all performance counters at frame start
 }
 
 // Performance draw call counter - should be provided by engine or profiling system
+// Note: The actual implementation is in src/common/performance_counters.c
+// This stub is kept for compatibility, but the real Perf_CountDrawCall() should be
+// linked from the common library
 void Perf_CountDrawCall( void ) {
-    // Note: This should increment draw call counter for performance profiling
-    // Stub implementation - real version would increment profiling counters
+    // The actual implementation is in src/common/performance_counters.c
+    // It increments the draw call counter in the performance tracking system
+    // This stub prevents link errors but the real function should be used
 }

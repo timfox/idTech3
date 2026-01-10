@@ -1187,8 +1187,9 @@ void RB_CalcSpecularAlpha( unsigned char *alphas ) {
 
 	// Use first dynamic light origin if available, otherwise use default
 	// Note: backEndData and r_numdlights are declared in tr_local.h and tr_scene.c
+	// Note: dlights is an array member, not a pointer, so we only check r_numdlights and backEndData
 	extern int r_numdlights;
-	if (r_numdlights > 0 && backEndData && backEndData->dlights) {
+	if (r_numdlights > 0 && backEndData) {
 		VectorCopy(backEndData->dlights[0].origin, lightOrigin);
 	} else {
 		VectorCopy(defaultLightOrigin, lightOrigin);

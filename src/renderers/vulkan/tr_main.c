@@ -112,6 +112,9 @@ Q_EXPORT cvar_t	*r_gpuSceneDebug;
 Q_EXPORT cvar_t	*r_particles_gpu;
 Q_EXPORT cvar_t	*r_particles_max;
 
+Q_EXPORT cvar_t	*r_clusteredLight;
+Q_EXPORT cvar_t	*r_screenshotJpegQuality;
+
 Q_EXPORT cvar_t	*r_meshShaders;
 Q_EXPORT cvar_t	*r_meshletSize;
 

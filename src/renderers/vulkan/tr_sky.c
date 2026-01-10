@@ -597,7 +597,7 @@ static void FillCloudBox( void )
 		float MIN_T;
 
 		// Check if shader has full cloud coverage
-		if ( shader->sky.fullClouds )
+		if ( tess.shader && tess.shader->sky.fullClouds )
 		{
 			MIN_T = -HALF_SKY_SUBDIVISIONS;
 

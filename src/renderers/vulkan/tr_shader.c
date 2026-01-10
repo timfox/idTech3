@@ -4869,7 +4869,19 @@ void	R_ShaderList_f (void) {
 			ri.Printf (PRINT_ALL, "  ");
 		}
 		if ( sh->multitextureEnv ) {
-			ri.Printf( PRINT_ALL, "MT(x) " ); // TODO: per-stage statistics?
+			// Show per-stage statistics for multitexture shaders
+			int mt_stages = 0;
+			int i;
+			for ( i = 0; i < sh->numUnfoggedPasses && i < MAX_SHADER_STAGES; i++ ) {
+				if ( sh->stages[i] && sh->stages[i]->mtEnv ) {
+					mt_stages++;
+				}
+			}
+			if ( mt_stages > 0 ) {
+				ri.Printf( PRINT_ALL, "MT(%d) ", mt_stages );
+			} else {
+				ri.Printf( PRINT_ALL, "MT(x) " );
+			}
 		} else {
 			ri.Printf( PRINT_ALL, "      " );
 		}

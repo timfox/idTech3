@@ -374,9 +374,13 @@ Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI(int
   return &re;
 }
 
+// Forward declaration
+extern void vk_wait_idle(void);
+
 void RE_SyncRender(void) {
     // Vulkan equivalent of glFinish - ensure all rendering commands are complete
-    // For stub implementation, do nothing
+    // This waits for the graphics queue to finish all submitted work
+    vk_wait_idle();
 }
 
 // Safe accessor for glConfig that prevents crashes before renderer initialization

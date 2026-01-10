@@ -40,6 +40,23 @@ static int			r_firstScenePoly;
 
 static int			r_numpolyverts;
 
+// CPU-side particle buffer for RE_AddParticle
+#define MAX_CPU_PARTICLES 1024
+typedef struct {
+	vec3_t		origin;
+	vec3_t		velocity;
+	vec3_t		color;
+	float		size;
+	float		life;
+	float		maxLife; // Store original life for fade calculations
+	qhandle_t	shader;
+	qboolean	active;
+} cpu_particle_t;
+
+static cpu_particle_t	cpu_particles[MAX_CPU_PARTICLES];
+static int				cpu_particle_count = 0;
+static float			last_particle_update_time = 0.0f;
+
 
 /*
 ====================
@@ -48,6 +65,18 @@ R_InitNextFrame
 ====================
 */
 void R_InitNextFrame( void ) {
+	// Process CPU particles before resetting (update positions, life, etc.)
+	if (tr.refdef.floatTime > 0.0f) {
+		float deltaTime = tr.refdef.floatTime - last_particle_update_time;
+		if (deltaTime > 0.0f && deltaTime < 1.0f) { // Sanity check: delta should be reasonable
+			R_ProcessCPUParticles(deltaTime);
+		}
+		last_particle_update_time = tr.refdef.floatTime;
+	}
+	
+	// Note: We don't reset cpu_particle_count here - particles persist across frames
+	// until they die. Only reset if explicitly clearing scene.
+	// cpu_particle_count = 0; // Moved to RE_ClearScene if needed
 
 	backEndData->commands.used = 0;
 
@@ -79,6 +108,10 @@ void RE_ClearScene( void ) {
 	r_firstSceneDlight = r_numdlights;
 	r_firstSceneEntity = r_numentities;
 	r_firstScenePoly = r_numpolys;
+	
+	// Optionally clear CPU particles when scene is cleared
+	// For now, particles persist until they die naturally
+	// cpu_particle_count = 0;
 }
 
 /*
@@ -584,6 +617,9 @@ void RE_RenderScene( const refdef_t *fd ) {
 	// Vulkan: Record rendering commands
 	if (vk.device != (VkDevice)0x20000000 && vk.active) {
 		vk_render_scene_vulkan(fd);
+		
+		// Render CPU particles after main scene
+		R_RenderCPUParticles();
 	}
 
 	RE_EndScene();
@@ -597,8 +633,162 @@ RE_AddParticle
 =====================
 */
 void RE_AddParticle( const vec3_t origin, const vec3_t velocity, const vec3_t color, float size, float life, qhandle_t shader ) {
-	// CPU particle implementation - stub
-	// In a full implementation, this would add a particle to a CPU-side buffer
-	// which is then uploaded to the GPU or rendered as sprites.
-	(void)origin; (void)velocity; (void)color; (void)size; (void)life; (void)shader;
+	// CPU particle implementation - add particle to CPU-side buffer
+	// Particles are stored and can be rendered later or uploaded to GPU particle system
+	
+	if (cpu_particle_count >= MAX_CPU_PARTICLES) {
+		// Buffer full, skip this particle
+		return;
+	}
+	
+	cpu_particle_t *particle = &cpu_particles[cpu_particle_count];
+	VectorCopy(origin, particle->origin);
+	VectorCopy(velocity, particle->velocity);
+	VectorCopy(color, particle->color);
+	particle->size = size;
+	particle->life = life;
+	particle->maxLife = life; // Store original life for fade calculations
+	particle->shader = shader;
+	particle->active = qtrue;
+	
+	cpu_particle_count++;
+}
+
+/*
+=====================
+R_ProcessCPUParticles
+
+Update CPU-side particles: apply velocity, decrease life, remove dead particles
+=====================
+*/
+static void R_ProcessCPUParticles( float deltaTime ) {
+	if (cpu_particle_count == 0) {
+		return;
+	}
+	
+	// Process each particle
+	int writeIndex = 0;
+	for (int i = 0; i < cpu_particle_count; i++) {
+		cpu_particle_t *particle = &cpu_particles[i];
+		
+		if (!particle->active) {
+			continue; // Skip inactive particles
+		}
+		
+		// Update position based on velocity
+		vec3_t delta;
+		VectorScale(particle->velocity, deltaTime, delta);
+		VectorAdd(particle->origin, delta, particle->origin);
+		
+		// Decrease life
+		particle->life -= deltaTime;
+		
+		// Remove dead particles
+		if (particle->life <= 0.0f) {
+			particle->active = qfalse;
+			continue; // Don't copy to writeIndex
+		}
+		
+		// Keep alive particles, compact array
+		if (writeIndex != i) {
+			cpu_particles[writeIndex] = cpu_particles[i];
+		}
+		writeIndex++;
+	}
+	
+	// Update count to reflect removed particles
+	cpu_particle_count = writeIndex;
+}
+
+/*
+=====================
+R_RenderCPUParticles
+
+Render CPU-side particles as billboarded sprites
+=====================
+*/
+static void R_RenderCPUParticles( void ) {
+	if (cpu_particle_count == 0 || !vk.active) {
+		return;
+	}
+	
+	// Check if GPU particle system is enabled and should be used
+	extern cvar_t *r_particles_gpu;
+	extern void vk_particles_upload_cpu_particles(const cpu_particle_t *particles, int count);
+	extern void vk_particles_render(void);
+	
+	if (r_particles_gpu && r_particles_gpu->integer) {
+		// Upload particles to GPU particle buffer for GPU-based rendering
+		vk_particles_upload_cpu_particles(cpu_particles, cpu_particle_count);
+		vk_particles_render();
+		return;
+	}
+	
+	// CPU-based rendering: render particles as billboarded quads
+	// Group particles by shader to minimize state changes
+	qhandle_t currentShader = 0;
+	qboolean shaderChanged = qfalse;
+	shader_t *shader = NULL;
+	
+	// Sort particles by shader for batching (simple approach: render in order)
+	// For better performance, could sort particles by shader handle
+	
+	for (int i = 0; i < cpu_particle_count; i++) {
+		cpu_particle_t *p = &cpu_particles[i];
+		
+		if (!p->active || p->life <= 0.0f) {
+			continue;
+		}
+		
+		// Check if we need to change shader
+		if (currentShader != p->shader) {
+			if (shaderChanged) {
+				RB_EndSurface();
+			}
+			
+			shader = R_GetShaderByHandle(p->shader);
+			if (shader) {
+				RB_BeginSurface(shader, -1);
+				currentShader = p->shader;
+				shaderChanged = qtrue;
+			} else {
+				// Invalid shader, skip this particle
+				continue;
+			}
+		}
+		
+		// Calculate billboard vectors
+		// Use view axis vectors to create billboarded quad
+		vec3_t left, up;
+		float radius = p->size;
+		
+		// Scale view axis vectors by particle size
+		VectorScale(backEnd.viewParms.or.axis[1], radius, left);
+		VectorScale(backEnd.viewParms.or.axis[2], radius, up);
+		
+		// Handle mirror views
+		if (backEnd.viewParms.portalView == PV_MIRROR) {
+			VectorSubtract(vec3_origin, left, left);
+		}
+		
+		// Create color with alpha fade based on remaining life
+		color4ub_t color;
+		float lifeRatio = p->maxLife > 0.0f ? (p->life / p->maxLife) : 1.0f;
+		if (lifeRatio < 0.0f) lifeRatio = 0.0f;
+		if (lifeRatio > 1.0f) lifeRatio = 1.0f;
+		
+		byte alpha = (byte)(255.0f * lifeRatio);
+		color.rgba[0] = (byte)(p->color[0] * 255.0f);
+		color.rgba[1] = (byte)(p->color[1] * 255.0f);
+		color.rgba[2] = (byte)(p->color[2] * 255.0f);
+		color.rgba[3] = alpha;
+		
+		// Add quad to tessellator
+		RB_AddQuadStamp(p->origin, left, up, color);
+	}
+	
+	// End the last surface
+	if (shaderChanged) {
+		RB_EndSurface();
+	}
 }

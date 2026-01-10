@@ -153,6 +153,9 @@ extern cvar_t	*r_gpuSceneDebug;
 extern cvar_t	*r_particles_gpu;
 extern cvar_t	*r_particles_max;
 
+extern cvar_t	*r_clusteredLight;
+extern cvar_t	*r_screenshotJpegQuality;
+
 extern cvar_t	*r_meshShaders;
 extern cvar_t	*r_meshletSize;
 
@@ -439,6 +442,12 @@ void R_Register( void ) {
 
     r_particles_gpu = ri.Cvar_Get( "r_particles_gpu", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
     r_particles_max = ri.Cvar_Get( "r_particles_max", "2048", CVAR_ARCHIVE_ND );
+
+    r_clusteredLight = ri.Cvar_Get( "r_clusteredLight", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    ri.Cvar_SetDescription( r_clusteredLight, "Enable clustered/forward+ light binning (experimental)" );
+    
+    r_screenshotJpegQuality = ri.Cvar_Get( "r_screenshotJpegQuality", "90", CVAR_ARCHIVE );
+    ri.Cvar_CheckRange( r_screenshotJpegQuality, "1", "100", CV_INTEGER );
 
     r_meshShaders = ri.Cvar_Get( "r_vkMeshShaders", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
     r_meshletSize = ri.Cvar_Get( "r_meshletSize", "64", CVAR_ARCHIVE_ND );

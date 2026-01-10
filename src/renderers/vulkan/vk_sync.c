@@ -62,6 +62,36 @@ void vk_create_sync_primitives(void) {
     ri.Printf(PRINT_ALL, "Vulkan: Created synchronization primitives\n");
 }
 
+// GPU timing queries - forward declarations and definitions
+#define MAX_GPU_TIMING_REGIONS 32
+
+typedef struct {
+    const char *name;
+    uint32_t query_index;
+    qboolean active;
+} gpu_timing_region_t;
+
+static struct {
+    VkQueryPool query_pools[NUM_COMMAND_BUFFERS];
+    gpu_timing_region_t regions[NUM_COMMAND_BUFFERS][MAX_GPU_TIMING_REGIONS];
+    uint32_t region_count[NUM_COMMAND_BUFFERS];
+    uint32_t next_query_index[NUM_COMMAND_BUFFERS];
+    qboolean initialized;
+    float timestamp_period; // nanoseconds per timestamp unit
+} gpu_timing = {0};
+
+// Forward declarations for GPU timing functions
+static void vk_init_gpu_timing(void);
+static void vk_shutdown_gpu_timing(void);
+
+// Forward declarations for Vulkan function pointers
+extern PFN_vkCreateQueryPool qvkCreateQueryPool;
+extern PFN_vkDestroyQueryPool qvkDestroyQueryPool;
+extern PFN_vkResetQueryPool qvkResetQueryPool;
+extern PFN_vkCmdResetQueryPool qvkCmdResetQueryPool;
+extern PFN_vkCmdWriteTimestamp qvkCmdWriteTimestamp;
+extern PFN_vkGetQueryPoolResults qvkGetQueryPoolResults;
+
 // Reset GPU timing for new frame
 void vk_reset_gpu_timing(uint32_t frame_index) {
     if (!gpu_timing.initialized || frame_index >= NUM_COMMAND_BUFFERS) {
@@ -252,32 +282,7 @@ float vk_get_average_fps(void) {
     return (float)(1000.0 / avg);
 }
 
-// GPU timing queries - implementation
-#define MAX_GPU_TIMING_REGIONS 32
-
-typedef struct {
-    const char *name;
-    uint32_t query_index;
-    qboolean active;
-} gpu_timing_region_t;
-
-static struct {
-    VkQueryPool query_pools[NUM_COMMAND_BUFFERS];
-    gpu_timing_region_t regions[NUM_COMMAND_BUFFERS][MAX_GPU_TIMING_REGIONS];
-    uint32_t region_count[NUM_COMMAND_BUFFERS];
-    uint32_t next_query_index[NUM_COMMAND_BUFFERS];
-    qboolean initialized;
-    float timestamp_period; // nanoseconds per timestamp unit
-} gpu_timing = {0};
-
-// Forward declarations
-extern PFN_vkCreateQueryPool qvkCreateQueryPool;
-extern PFN_vkDestroyQueryPool qvkDestroyQueryPool;
-extern PFN_vkResetQueryPool qvkResetQueryPool;
-extern PFN_vkCmdResetQueryPool qvkCmdResetQueryPool;
-extern PFN_vkCmdWriteTimestamp qvkCmdWriteTimestamp;
-extern PFN_vkGetQueryPoolResults qvkGetQueryPoolResults;
-extern PFN_vkCmdResetQueryPool qvkCmdResetQueryPool;
+// GPU timing implementation continues below (definitions moved up)
 
 // Initialize GPU timing query pools
 static void vk_init_gpu_timing(void) {

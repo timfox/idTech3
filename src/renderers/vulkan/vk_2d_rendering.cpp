@@ -21,14 +21,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "tr_local.h"
+#include "vk.h"
 #include <array>
+#include <cstring>
 
-// External Vulkan objects (declared in initialization module)
-extern VkInstance vk_instance;
-extern VkPhysicalDevice vk_physical_device;
-extern VkDevice vk_device;
-extern VkQueue vk_queue;
-extern uint32_t vk_queue_family_index;
+// vk is declared in vk.h as Vk_Instance vk (includes device, queue, etc.)
 
 // Vulkan function pointers
 extern PFN_vkCreateBuffer qvkCreateBuffer;
@@ -45,6 +42,19 @@ extern PFN_vkCreatePipelineLayout qvkCreatePipelineLayout;
 extern PFN_vkDestroyPipelineLayout qvkDestroyPipelineLayout;
 extern PFN_vkCreateGraphicsPipelines qvkCreateGraphicsPipelines;
 extern PFN_vkDestroyPipeline qvkDestroyPipeline;
+extern PFN_vkCmdBindVertexBuffers qvkCmdBindVertexBuffers;
+extern PFN_vkCmdBindIndexBuffer qvkCmdBindIndexBuffer;
+extern PFN_vkCmdDrawIndexed qvkCmdDrawIndexed;
+extern PFN_vkCmdBindPipeline qvkCmdBindPipeline;
+extern PFN_vkCmdBindDescriptorSets qvkCmdBindDescriptorSets;
+extern PFN_vkMapMemory qvkMapMemory;
+extern PFN_vkUnmapMemory qvkUnmapMemory;
+extern PFN_vkUpdateDescriptorSets qvkUpdateDescriptorSets;
+
+// Forward declarations
+extern "C" void vk_2d_flush(void);
+extern shader_t *R_GetShaderByHandle(qhandle_t hShader);
+extern PFN_vkUpdateDescriptorSets qvkUpdateDescriptorSets;
 
 // 2D Rendering Pipeline for Vulkan Renderer
 // Handles 2D graphics rendering with proper Vulkan pipelines
@@ -56,8 +66,7 @@ struct vk_2d_vertex_t {
     float r, g, b, a;  // Color
 };
 
-// 2D rendering pipeline state
-vk_2d_state_t vk_2d = {qfalse};
+// 2D rendering pipeline state (removed - using vk_2d_internal only)
 
 static struct vk_2d_pipeline_state {
     VkPipeline pipeline;
@@ -77,17 +86,17 @@ static struct vk_2d_pipeline_state {
 
     std::array<vk_2d_vertex_t, 1024> vertexData;
     std::array<uint16_t, 1536> indexData; // 1024 * 1.5 for quads
+    std::array<qhandle_t, 256> shaderHandles; // Track shader per quad (max 256 quads)
 
     qboolean initialized;
 } vk_2d_internal = {VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE,
                    VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE,
-                   1024, 0, 0, {}, {}, qfalse};
+                   1024, 0, 0, {}, {}, {}, qfalse};
 
 // Initialize 2D rendering pipeline
 qboolean vk_2d_initialize(void) {
-    if (vk_device == (VkDevice)0x20000000) {
+    if (vk.device == (VkDevice)0x20000000) {
         ri.Printf(PRINT_ALL, "2D Vulkan: Skipping initialization (fake device)\n");
-        vk_2d.initialized = qtrue; // Mark as initialized to avoid repeated attempts
         vk_2d_internal.initialized = qtrue;
         return qtrue;
     }
@@ -109,7 +118,7 @@ qboolean vk_2d_initialize(void) {
         .pBindings = bindings
     };
 
-    VK_CHECK(qvkCreateDescriptorSetLayout(vk_device, &layoutInfo, nullptr, &vk_2d_internal.descriptorSetLayout));
+    VK_CHECK(qvkCreateDescriptorSetLayout(vk.device, &layoutInfo, nullptr, &vk_2d_internal.descriptorSetLayout));
 
     // Create pipeline layout
     VkPipelineLayoutCreateInfo pipelineLayoutInfo = {
@@ -122,7 +131,7 @@ qboolean vk_2d_initialize(void) {
         .pPushConstantRanges = nullptr
     };
 
-    VK_CHECK(qvkCreatePipelineLayout(vk_device, &pipelineLayoutInfo, nullptr, &vk_2d_internal.pipelineLayout));
+    VK_CHECK(qvkCreatePipelineLayout(vk.device, &pipelineLayoutInfo, nullptr, &vk_2d_internal.pipelineLayout));
 
     // Create graphics pipeline with 2D shaders
     // Note: This requires access to compiled SPIR-V shaders
@@ -141,11 +150,11 @@ qboolean vk_2d_initialize(void) {
         .pQueueFamilyIndices = nullptr
     };
 
-    VK_CHECK(qvkCreateBuffer(vk_device, &vertexBufferInfo, nullptr, &vk_2d_internal.vertexBuffer));
+    VK_CHECK(qvkCreateBuffer(vk.device, &vertexBufferInfo, nullptr, &vk_2d_internal.vertexBuffer));
 
     // Allocate memory for vertex buffer
     VkMemoryRequirements memRequirements;
-    qvkGetBufferMemoryRequirements(vk_device, vk_2d_internal.vertexBuffer, &memRequirements);
+    qvkGetBufferMemoryRequirements(vk.device, vk_2d_internal.vertexBuffer, &memRequirements);
 
     // Find proper memory type for vertex buffer
     uint32_t memoryTypeIndex = find_memory_type(memRequirements.memoryTypeBits,
@@ -158,8 +167,8 @@ qboolean vk_2d_initialize(void) {
         .memoryTypeIndex = memoryTypeIndex
     };
 
-    VK_CHECK(qvkAllocateMemory(vk_device, &allocInfo, nullptr, &vk_2d_internal.vertexBufferMemory));
-    VK_CHECK(qvkBindBufferMemory(vk_device, vk_2d_internal.vertexBuffer, vk_2d_internal.vertexBufferMemory, 0));
+    VK_CHECK(qvkAllocateMemory(vk.device, &allocInfo, nullptr, &vk_2d_internal.vertexBufferMemory));
+    VK_CHECK(qvkBindBufferMemory(vk.device, vk_2d_internal.vertexBuffer, vk_2d_internal.vertexBufferMemory, 0));
 
     // Create index buffer
     VkBufferCreateInfo indexBufferInfo = {
@@ -173,13 +182,13 @@ qboolean vk_2d_initialize(void) {
         .pQueueFamilyIndices = nullptr
     };
 
-    VK_CHECK(qvkCreateBuffer(vk_device, &indexBufferInfo, nullptr, &vk_2d_internal.indexBuffer));
+    VK_CHECK(qvkCreateBuffer(vk.device, &indexBufferInfo, nullptr, &vk_2d_internal.indexBuffer));
 
-    qvkGetBufferMemoryRequirements(vk_device, vk_2d_internal.indexBuffer, &memRequirements);
+    qvkGetBufferMemoryRequirements(vk.device, vk_2d_internal.indexBuffer, &memRequirements);
 
     allocInfo.allocationSize = memRequirements.size;
-    VK_CHECK(qvkAllocateMemory(vk_device, &allocInfo, nullptr, &vk_2d_internal.indexBufferMemory));
-    VK_CHECK(qvkBindBufferMemory(vk_device, vk_2d_internal.indexBuffer, vk_2d_internal.indexBufferMemory, 0));
+    VK_CHECK(qvkAllocateMemory(vk.device, &allocInfo, nullptr, &vk_2d_internal.indexBufferMemory));
+    VK_CHECK(qvkBindBufferMemory(vk.device, vk_2d_internal.indexBuffer, vk_2d_internal.indexBufferMemory, 0));
 
     vk_2d_internal.maxVertices = vk_2d_internal.vertexData.size();
     vk_2d_internal.currentVertexCount = 0;
@@ -192,42 +201,42 @@ qboolean vk_2d_initialize(void) {
 
 // Shutdown 2D rendering pipeline
 void vk_2d_shutdown(void) {
-    if (!vk_2d_internal.initialized || vk_device == (VkDevice)0x20000000) {
+    if (!vk_2d_internal.initialized || vk.device == (VkDevice)0x20000000) {
         return;
     }
 
     if (vk_2d_internal.indexBuffer) {
-        qvkDestroyBuffer(vk_device, vk_2d_internal.indexBuffer, nullptr);
+        qvkDestroyBuffer(vk.device, vk_2d_internal.indexBuffer, nullptr);
         vk_2d_internal.indexBuffer = VK_NULL_HANDLE;
     }
 
     if (vk_2d_internal.indexBufferMemory) {
-        qvkFreeMemory(vk_device, vk_2d_internal.indexBufferMemory, nullptr);
+        qvkFreeMemory(vk.device, vk_2d_internal.indexBufferMemory, nullptr);
         vk_2d_internal.indexBufferMemory = VK_NULL_HANDLE;
     }
 
     if (vk_2d_internal.vertexBuffer) {
-        qvkDestroyBuffer(vk_device, vk_2d_internal.vertexBuffer, nullptr);
+        qvkDestroyBuffer(vk.device, vk_2d_internal.vertexBuffer, nullptr);
         vk_2d_internal.vertexBuffer = VK_NULL_HANDLE;
     }
 
     if (vk_2d_internal.vertexBufferMemory) {
-        qvkFreeMemory(vk_device, vk_2d_internal.vertexBufferMemory, nullptr);
+        qvkFreeMemory(vk.device, vk_2d_internal.vertexBufferMemory, nullptr);
         vk_2d_internal.vertexBufferMemory = VK_NULL_HANDLE;
     }
 
     if (vk_2d_internal.pipeline) {
-        qvkDestroyPipeline(vk_device, vk_2d_internal.pipeline, nullptr);
+        qvkDestroyPipeline(vk.device, vk_2d_internal.pipeline, nullptr);
         vk_2d_internal.pipeline = VK_NULL_HANDLE;
     }
 
     if (vk_2d_internal.pipelineLayout) {
-        qvkDestroyPipelineLayout(vk_device, vk_2d_internal.pipelineLayout, nullptr);
+        qvkDestroyPipelineLayout(vk.device, vk_2d_internal.pipelineLayout, nullptr);
         vk_2d_internal.pipelineLayout = VK_NULL_HANDLE;
     }
 
     if (vk_2d_internal.descriptorSetLayout) {
-        qvkDestroyDescriptorSetLayout(vk_device, vk_2d_internal.descriptorSetLayout, nullptr);
+        qvkDestroyDescriptorSetLayout(vk.device, vk_2d_internal.descriptorSetLayout, nullptr);
         vk_2d_internal.descriptorSetLayout = VK_NULL_HANDLE;
     }
 
@@ -236,8 +245,8 @@ void vk_2d_shutdown(void) {
 }
 
 // Add a textured quad to the 2D rendering batch
-void vk_2d_add_quad(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader) {
-    if (!vk_2d_internal.initialized || vk_device == (VkDevice)0x20000000) {
+extern "C" void vk_2d_add_quad(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader) {
+    if (!vk_2d_internal.initialized || vk.device == (VkDevice)0x20000000) {
         return;
     }
 
@@ -274,30 +283,34 @@ void vk_2d_add_quad(float x, float y, float w, float h, float s1, float t1, floa
     vk_2d_internal.indexData[vk_2d_internal.currentIndexCount++] = baseIndex + 2;
     vk_2d_internal.indexData[vk_2d_internal.currentIndexCount++] = baseIndex + 3;
 
-    Q_UNUSED(hShader); // TODO: Use shader for texture binding
+    // Track shader handle for this quad (store at quad index = currentVertexCount / 4)
+    uint32_t quadIndex = (vk_2d_internal.currentVertexCount - 4) / 4;
+    if (quadIndex < vk_2d_internal.shaderHandles.size()) {
+        vk_2d_internal.shaderHandles[quadIndex] = hShader;
+    }
 }
 
 // Flush the current 2D rendering batch
-void vk_2d_flush(void) {
-    if (!vk_2d.initialized || vk_device == (VkDevice)0x20000000 ||
+extern "C" void vk_2d_flush(void) {
+    if (!vk_2d_internal.initialized || vk.device == (VkDevice)0x20000000 ||
         vk_2d_internal.currentVertexCount == 0) {
         return;
     }
 
     // Update vertex buffer with current data
     void* data;
-    VK_CHECK(qvkMapMemory(vk_device, vk_2d_internal.vertexBufferMemory, 0,
+    VK_CHECK(qvkMapMemory(vk.device, vk_2d_internal.vertexBufferMemory, 0,
                          vk_2d_internal.currentVertexCount * sizeof(vk_2d_vertex_t), 0, &data));
     memcpy(data, vk_2d_internal.vertexData.data(),
            vk_2d_internal.currentVertexCount * sizeof(vk_2d_vertex_t));
-    qvkUnmapMemory(vk_device, vk_2d_internal.vertexBufferMemory);
+    qvkUnmapMemory(vk.device, vk_2d_internal.vertexBufferMemory);
 
     // Update index buffer with current data
-    VK_CHECK(qvkMapMemory(vk_device, vk_2d_internal.indexBufferMemory, 0,
+    VK_CHECK(qvkMapMemory(vk.device, vk_2d_internal.indexBufferMemory, 0,
                          vk_2d_internal.currentIndexCount * sizeof(uint16_t), 0, &data));
     memcpy(data, vk_2d_internal.indexData.data(),
            vk_2d_internal.currentIndexCount * sizeof(uint16_t));
-    qvkUnmapMemory(vk_device, vk_2d_internal.indexBufferMemory);
+    qvkUnmapMemory(vk.device, vk_2d_internal.indexBufferMemory);
 
     // Get current command buffer
     VkCommandBuffer cmdBuffer = vk.cmd->command_buffer;
@@ -314,7 +327,41 @@ void vk_2d_flush(void) {
     // Bind index buffer
     qvkCmdBindIndexBuffer(cmdBuffer, vk_2d_internal.indexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
-    // Bind descriptor sets (when implemented)
+    // Update descriptor set with texture from first quad's shader
+    if (vk_2d_internal.descriptorSet != VK_NULL_HANDLE && vk_2d_internal.currentVertexCount >= 4) {
+        // Get shader from first quad
+        qhandle_t firstShaderHandle = vk_2d_internal.shaderHandles[0];
+        if (firstShaderHandle > 0) {
+            shader_t *shader = R_GetShaderByHandle(firstShaderHandle);
+            if (shader && shader->numUnfoggedPasses > 0 && shader->stages[0] && 
+                shader->stages[0]->bundle[0].image[0]) {
+                image_t *image = shader->stages[0]->bundle[0].image[0];
+                if (image && image->handle != VK_NULL_HANDLE) {
+                    // Update descriptor set with the image
+                    VkDescriptorImageInfo imageInfo = {
+                        .sampler = VK_NULL_HANDLE, // Use default sampler
+                        .imageView = (VkImageView)image->handle, // Assuming handle is imageView
+                        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                    };
+                    VkWriteDescriptorSet descriptorWrite = {
+                        .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                        .pNext = nullptr,
+                        .dstSet = vk_2d_internal.descriptorSet,
+                        .dstBinding = 0,
+                        .dstArrayElement = 0,
+                        .descriptorCount = 1,
+                        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                        .pImageInfo = &imageInfo,
+                        .pBufferInfo = nullptr,
+                        .pTexelBufferView = nullptr
+                    };
+                    qvkUpdateDescriptorSets(vk.device, 1, &descriptorWrite, 0, nullptr);
+                }
+            }
+        }
+    }
+
+    // Bind descriptor sets
     if (vk_2d_internal.descriptorSet != VK_NULL_HANDLE) {
         qvkCmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                                 vk_2d_internal.pipelineLayout, 0, 1,

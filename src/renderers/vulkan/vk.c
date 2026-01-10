@@ -653,6 +653,7 @@ PFN_vkCmdBeginQuery								qvkCmdBeginQuery;
 PFN_vkCmdEndQuery									qvkCmdEndQuery;
 PFN_vkGetQueryPoolResults						qvkGetQueryPoolResults;
 PFN_vkResetQueryPool								qvkResetQueryPool;
+PFN_vkCmdResetQueryPool							qvkCmdResetQueryPool;
 
 // Ray tracing function pointers (non-static for use in vk_raytracing.c)
 PFN_vkCreateAccelerationStructureKHR					qvkCreateAccelerationStructureKHR;
@@ -3815,6 +3816,8 @@ skip_device_creation:
 	// older loaders or drivers may not expose it even if the header does.
 	// We already null-check qvkResetQueryPool before use, so don't hard-fail here.
 	INIT_DEVICE_FUNCTION_EXT(vkResetQueryPool)
+	// vkCmdResetQueryPool was added in Vulkan 1.2. Treat it as optional:
+	INIT_DEVICE_FUNCTION_EXT(vkCmdResetQueryPool)
 	INIT_DEVICE_FUNCTION(vkCreateBuffer)
 	INIT_DEVICE_FUNCTION(vkCreateCommandPool)
 	INIT_DEVICE_FUNCTION(vkCreateDescriptorPool)
@@ -4455,6 +4458,7 @@ qvkGetPipelineCacheData					= NULL;
 	qvkResetDescriptorPool						= NULL;
 	qvkResetFences								= NULL;
 	qvkResetQueryPool							= NULL;
+	qvkCmdResetQueryPool						= NULL;
 	qvkUnmapMemory								= NULL;
 	qvkUpdateDescriptorSets						= NULL;
 	qvkWaitForFences							= NULL;
