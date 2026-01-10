@@ -53,45 +53,13 @@ void vk_draw_dot(uint32_t storage_offset) {
     Q_UNUSED(storage_offset);
 }
 
-// Stub functions for missing Vulkan functionality
-void RB_TakeScreenshot(int x, int y, int width, int height, const char *fileName) {
-    Q_UNUSED(x); Q_UNUSED(y); Q_UNUSED(width); Q_UNUSED(height); Q_UNUSED(fileName);
-}
-
-void RB_TakeScreenshotJPEG(int x, int y, int width, int height, const char *fileName) {
-    Q_UNUSED(x); Q_UNUSED(y); Q_UNUSED(width); Q_UNUSED(height); Q_UNUSED(fileName);
-}
-
-void RB_TakeScreenshotBMP(int x, int y, int width, int height, const char *fileName, int clipboard) {
-    Q_UNUSED(x); Q_UNUSED(y); Q_UNUSED(width); Q_UNUSED(height);
-    Q_UNUSED(fileName); Q_UNUSED(clipboard);
-}
-
-// Note: Cvars are handled by the engine, not declared here
-
-// Stub functions for missing Vulkan functionality
-image_t *R_CreateImage(const char *name, const char *name2, byte *pic, int width, int height, imgFlags_t flags, int format, uint32_t type) {
-    Q_UNUSED(name);
-    Q_UNUSED(name2);
-    Q_UNUSED(pic);
-    Q_UNUSED(width);
-    Q_UNUSED(height);
-    Q_UNUSED(flags);
-    Q_UNUSED(format);
-    Q_UNUSED(type);
-    return NULL;
-}
-
-const void *RB_TakeVideoFrameCmd(const void *data) {
-    Q_UNUSED(data);
-    return NULL;
-}
-
-// Stub functions for missing Vulkan functionality
-skin_t *R_GetSkinByHandle(qhandle_t handle) {
-    Q_UNUSED(handle);
-    return NULL;
-}
+// Forward declarations - these functions are implemented in other files
+extern void RB_TakeScreenshot(int x, int y, int width, int height, const char *fileName);
+extern void RB_TakeScreenshotJPEG(int x, int y, int width, int height, const char *fileName);
+extern void RB_TakeScreenshotBMP(int x, int y, int width, int height, const char *fileName, int clipboard);
+extern image_t *R_CreateImage(const char *name, const char *name2, byte *pic, int width, int height, imgFlags_t flags, int format, uint32_t type);
+extern const void *RB_TakeVideoFrameCmd(const void *data);
+extern skin_t *R_GetSkinByHandle(qhandle_t handle);
 
 // ============================================================================
 // Vulkan-specific functions
@@ -270,22 +238,13 @@ void RE_StretchRaw(int x, int y, int w, int h, int cols, int rows, byte *data, i
     }
 }
 
-void RE_UploadCinematic(int w, int h, int cols, int rows, byte *data, int client, qboolean dirty) {
-    // Stub
-    Q_UNUSED(w); Q_UNUSED(h); Q_UNUSED(cols); Q_UNUSED(rows);
-    Q_UNUSED(data); Q_UNUSED(client); Q_UNUSED(dirty);
-}
+// Forward declarations
+extern void RE_UploadCinematic(int w, int h, int cols, int rows, byte *data, int client, qboolean dirty);
+extern void RE_RemapShader(const char *oldShader, const char *newShader, const char *timeOffset);
+extern qboolean RE_GetEntityToken(char *buffer, int size);
 
-void RE_RemapShader(const char *oldShader, const char *newShader, const char *timeOffset) {
-    // Stub
-    Q_UNUSED(oldShader); Q_UNUSED(newShader); Q_UNUSED(timeOffset);
-}
-
-qboolean RE_GetEntityToken(char *buffer, int size) {
-    // Stub
-    Q_UNUSED(buffer); Q_UNUSED(size);
-    return qfalse;
-}
+// These functions are implemented in tr_backend.c, tr_shader.c, and tr_bsp.c respectively
+// They are declared here to satisfy the renderer interface but delegate to actual implementations
 
 void RE_TakeVideoFrame(int width, int height, byte *captureBuffer, byte *encodeBuffer, qboolean motionJpeg) {
     // Stub
@@ -300,9 +259,6 @@ void RE_TakeVideoFrame(int width, int height, byte *captureBuffer, byte *encodeB
 Q_EXPORT refexport_t* QDECL GetRefAPI(int apiVersion, refimport_t *rimp) {
     // Debug output at the very beginning
     fprintf(stderr, "VULKAN_RENDERER: GetRefAPI ENTRY POINT CALLED (apiVersion=%d, rimp=%p)\n", apiVersion, (void*)rimp);
-
-    fprintf(stderr, "VULKAN_DEBUG: Forcing GetRefAPI to return NULL to test fallback\n");
-    return NULL;
 
     fprintf(stderr, "VULKAN_DEBUG: Initializing refimport_t\n");
 

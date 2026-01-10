@@ -9,6 +9,7 @@ God Rays/Light Shafts System Implementation
 #include "vk_utils.h"
 #include "vk_pipeline.h"
 #include "vk.h"
+#include "tr_math_optimized.h"
 #include <string.h>
 #include <math.h>
 
@@ -630,11 +631,11 @@ static void vk_project_lights_to_screen(void) {
     if (backEnd.viewParms.projectionMatrix) {
         Com_Memcpy(mvp, backEnd.viewParms.projectionMatrix, sizeof(mvp));
         // Multiply by view matrix if available
-        if (backEnd.viewParms.world.modelMatrix) {
+        if (backEnd.viewParms.world.modelViewMatrix) {
             float temp[16];
-            // Matrix16Multiply doesn't exist, use manual multiplication or Matrix16MultiplyOptimized
-            // For now, just use projection matrix
-            // TODO: Implement proper MVP multiplication
+            // Use optimized matrix multiplication
+            extern void Matrix16MultiplyOptimized(const mat4_t a, const mat4_t b, mat4_t out);
+            Matrix16MultiplyOptimized(backEnd.viewParms.projectionMatrix, backEnd.viewParms.world.modelViewMatrix, mvp);
         }
     } else {
         Matrix16Identity(mvp);
@@ -682,7 +683,11 @@ static qboolean project_sun_to_screen(const vec3_t world_pos, vec3_t screen_pos)
     // Use projection matrix from viewParms
     if (backEnd.viewParms.projectionMatrix) {
         Com_Memcpy(mvp, backEnd.viewParms.projectionMatrix, sizeof(mvp));
-        // TODO: Multiply by view matrix if available
+        // Multiply by view matrix if available
+        if (backEnd.viewParms.world.modelViewMatrix) {
+            extern void Matrix16MultiplyOptimized(const mat4_t a, const mat4_t b, mat4_t out);
+            Matrix16MultiplyOptimized(backEnd.viewParms.projectionMatrix, backEnd.viewParms.world.modelViewMatrix, mvp);
+        }
     } else {
         Matrix16Identity(mvp);
     }

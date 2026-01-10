@@ -21,9 +21,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include "tr_local.h"
+#include "../renderercommon/tr_types.h"
 
 // 2D Rendering Functions for Vulkan Renderer
 // Handles UI elements, HUD, console, and 2D graphics
+
+// Forward declaration
+extern void vk_2d_add_quad(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader);
+extern void vk_2d_flush(void);
 
 void vk_draw_stretch_pic(float x, float y, float w, float h, float s1, float t1, float s2, float t2, qhandle_t hShader) {
     // Draw 2D stretched image (UI, HUD, etc.)
@@ -36,23 +41,18 @@ void vk_draw_stretch_pic(float x, float y, float w, float h, float s1, float t1,
         // For now, just log the drawing operation
         ri.Printf(PRINT_DEVELOPER, "vk_draw_stretch_pic: Would draw rect at %.1f,%.1f size %.1f,%.1f with shader %d\n",
                  x, y, w, h, hShader);
-
         Q_UNUSED(s1); Q_UNUSED(t1); Q_UNUSED(s2); Q_UNUSED(t2);
         return;
     }
 
-    // Implement real 2D quad rendering with texture for real devices
-    ri.Printf(PRINT_DEVELOPER, "vk_draw_stretch_pic: Drawing stretched pic with shader %d at (%.1f,%.1f) %.1fx%.1f\n", hShader, x, y, w, h);
-
-    // For real Vulkan devices, implement proper 2D quad rendering
-    // TODO: Implement actual Vulkan draw commands here with proper pipeline
-    ri.Printf(PRINT_DEVELOPER, "2D Quad: pos(%.1f,%.1f) size(%.1f,%.1f) uv(%.3f,%.3f,%.3f,%.3f) color(%.2f,%.2f,%.2f,%.2f)\n",
-              x, y, w, h, s1, t1, s2, t2,
-              vk.currentColor[0], vk.currentColor[1], vk.currentColor[2], vk.currentColor[3]);
-
-    // For now, we'll defer this to the immediate rendering system
-    // This would queue the quad for rendering in the next frame
+    // Use the 2D rendering system to add quad
+    vk_2d_add_quad(x, y, w, h, s1, t1, s2, t2, hShader);
 }
+
+// Forward declarations
+extern void RE_UploadCinematic(int w, int h, int cols, int rows, byte *data, int client, qboolean dirty);
+extern qhandle_t RE_RegisterShader(const char *name);
+extern trGlobals_t tr;
 
 void vk_draw_stretch_raw(int x, int y, int w, int h, int cols, int rows, byte *data, int client, qboolean dirty) {
     // Draw raw image data (cinematic frames, screenshots, etc.)
@@ -60,45 +60,37 @@ void vk_draw_stretch_raw(int x, int y, int w, int h, int cols, int rows, byte *d
         return;
     }
 
-    // Implement raw RGBA data rendering
-    // This function is typically used for:
-    // - Cinematic playback frames
-    // - Screenshot display
-    // - Video playback
-
-    ri.Printf(PRINT_DEVELOPER, "vk_draw_stretch_raw: Rendering raw data at (%d,%d) size (%dx%d), cols=%d rows=%d, client=%d, dirty=%d\n",
-              x, y, w, h, cols, rows, client, dirty ? 1 : 0);
-
     // Validate data dimensions
     if (cols <= 0 || rows <= 0 || w <= 0 || h <= 0) {
         ri.Printf(PRINT_WARNING, "vk_draw_stretch_raw: Invalid dimensions\n");
         return;
     }
 
-    // Calculate expected data size (RGBA = 4 bytes per pixel)
-    size_t expected_size = (size_t)cols * (size_t)rows * 4;
-    // Note: We can't easily validate data size without knowing the actual buffer size
+    // Upload raw data to texture using existing cinematic upload system
+    RE_UploadCinematic(w, h, cols, rows, data, client, dirty);
 
-    // For Vulkan implementation, this would:
-    // 1. Create or update a texture with the raw RGBA data
-    // 2. Set up appropriate sampler (likely linear filtering)
-    // 3. Render a quad with the texture applied
-    // 4. Handle proper aspect ratio and positioning
+    // Get the uploaded texture
+    if (client < 0 || client >= MAX_VIDEO_HANDLES || !tr.scratchImage[client]) {
+        ri.Printf(PRINT_WARNING, "vk_draw_stretch_raw: Invalid client index or texture not created\n");
+        return;
+    }
 
-    // Convert screen coordinates to normalized device coordinates
-    float ndc_x = ((float)x / glConfig.vidWidth) * 2.0f - 1.0f;
-    float ndc_y = ((float)y / glConfig.vidHeight) * 2.0f - 1.0f;
-    float ndc_w = ((float)w / glConfig.vidWidth) * 2.0f;
-    float ndc_h = ((float)h / glConfig.vidHeight) * 2.0f;
+    // Get shader handle for the texture
+    qhandle_t shader = RE_RegisterShader(va("*cinematic%i", client));
+    
+    if (!shader) {
+        // Fallback: use default shader
+        shader = RE_RegisterShader("default");
+    }
 
-    // Log rendering operation
-    ri.Printf(PRINT_DEVELOPER, "Raw data quad: NDC pos(%.3f,%.3f) size(%.3f,%.3f), texture(%dx%d)\n",
-              ndc_x, ndc_y, ndc_w, ndc_h, cols, rows);
+    // Render the quad with the texture
+    // Calculate UV coordinates based on display size vs texture size
+    float s1 = 0.0f, t1 = 0.0f;
+    float s2 = (float)w / (float)cols;
+    float t2 = (float)h / (float)rows;
 
-    // TODO: Implement actual Vulkan texture upload and rendering
-    // This would involve staging buffer operations and texture updates
-
-    Q_UNUSED(client); Q_UNUSED(dirty); // These parameters might be used for caching logic
+    // Use the 2D rendering system
+    vk_2d_add_quad((float)x, (float)y, (float)w, (float)h, s1, t1, s2, t2, shader);
 }
 
 void vk_set_color(const float *rgba) {

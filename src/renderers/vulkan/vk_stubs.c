@@ -263,13 +263,108 @@ void RB_TakeScreenshotBMP(int x, int y, int width, int height, const char *fileN
     ri.Hunk_FreeTempMemory(rgba_buffer);
 }
 
-// Video frame capture (stub - video encoding would require additional libraries)
+// Video frame capture - reads framebuffer and encodes for video
 const void *RB_TakeVideoFrameCmd(const void *data) {
-    // Video frame capture would require video encoding (e.g., FFmpeg, libx264)
-    // For now, this is a stub that could be extended to save individual frames
-    ri.Printf(PRINT_DEVELOPER, "RB_TakeVideoFrameCmd: Video frame capture not yet fully implemented\n");
-    (void)data;
-    return NULL;
+    const videoFrameCommand_t *cmd = (const videoFrameCommand_t *)data;
+    byte *rgba_buffer;
+    size_t memcount;
+    int linelen;
+    int padlen = 0; // AVI line padding (4-byte aligned)
+    int avipadlen;
+    int avipadwidth;
+    byte *srcptr, *destptr;
+    byte *lineend, *memend;
+
+    if (!cmd || !cmd->captureBuffer || !cmd->encodeBuffer) {
+        ri.Printf(PRINT_WARNING, "RB_TakeVideoFrameCmd: Invalid command or buffers\n");
+        return (const void *)(cmd + 1);
+    }
+
+    // Allocate temporary RGBA buffer
+    memcount = (size_t)cmd->width * (size_t)cmd->height * 4;
+    rgba_buffer = ri.Hunk_AllocTempMemory(memcount);
+    if (!rgba_buffer) {
+        ri.Printf(PRINT_ERROR, "RB_TakeVideoFrameCmd: Failed to allocate buffer\n");
+        return (const void *)(cmd + 1);
+    }
+
+    // Read pixels from framebuffer (RGBA format)
+    vk_read_pixels(rgba_buffer, (uint32_t)cmd->width, (uint32_t)cmd->height);
+
+    // Convert RGBA to RGB and apply gamma correction
+    // Also handle alignment padding for glReadPixels-style capture
+    linelen = cmd->width * 3;
+    avipadwidth = PAD(linelen, 4); // AVI requires 4-byte alignment
+    avipadlen = avipadwidth - linelen;
+
+    // Copy RGBA to RGB in capture buffer
+    srcptr = rgba_buffer;
+    destptr = cmd->captureBuffer;
+    memend = srcptr + memcount;
+
+    while (srcptr < memend) {
+        lineend = srcptr + (cmd->width * 4);
+        while (srcptr < lineend) {
+            // Convert RGBA to RGB
+            destptr[0] = srcptr[0]; // R
+            destptr[1] = srcptr[1]; // G
+            destptr[2] = srcptr[2]; // B
+            destptr += 3;
+            srcptr += 4;
+        }
+        // Add padding for AVI alignment
+        if (avipadlen > 0) {
+            Com_Memset(destptr, 0, avipadlen);
+            destptr += avipadlen;
+        }
+    }
+    
+    // Apply gamma correction to entire RGB buffer
+    R_GammaCorrect(cmd->captureBuffer, (int)(avipadwidth * cmd->height));
+
+    if (cmd->motionJpeg) {
+        // Motion JPEG encoding
+        cvar_t *r_aviMotionJpegQuality = ri.Cvar_Get("r_aviMotionJpegQuality", "90", CVAR_ARCHIVE);
+        int quality = r_aviMotionJpegQuality ? r_aviMotionJpegQuality->integer : 90;
+        
+        memcount = ri.CL_SaveJPGToBuffer(cmd->encodeBuffer, linelen * cmd->height,
+                                         quality, cmd->width, cmd->height,
+                                         cmd->captureBuffer, padlen);
+        if (memcount > 0 && ri.CL_WriteAVIVideoFrame) {
+            ri.CL_WriteAVIVideoFrame(cmd->encodeBuffer, memcount);
+        }
+    } else {
+        // Raw RGB format for AVI (BGR conversion)
+        srcptr = cmd->captureBuffer;
+        destptr = cmd->encodeBuffer;
+        memend = srcptr + (avipadwidth * cmd->height);
+
+        // Convert RGB to BGR and remove line padding
+        while (srcptr < memend) {
+            lineend = srcptr + linelen;
+            while (srcptr < lineend) {
+                // Swap R and B for BGR format
+                destptr[0] = srcptr[2]; // B
+                destptr[1] = srcptr[1]; // G
+                destptr[2] = srcptr[0]; // R
+                destptr += 3;
+                srcptr += 3;
+            }
+            // Skip padding in source, add AVI padding in dest
+            if (avipadlen > 0) {
+                Com_Memset(destptr, 0, avipadlen);
+                destptr += avipadlen;
+                srcptr += padlen; // Skip any source padding
+            }
+        }
+
+        if (ri.CL_WriteAVIVideoFrame) {
+            ri.CL_WriteAVIVideoFrame(cmd->encodeBuffer, avipadwidth * cmd->height);
+        }
+    }
+
+    ri.Hunk_FreeTempMemory(rgba_buffer);
+    return (const void *)(cmd + 1);
 }
 
 // Stubs for CVARs that are expected by the renderer but defined in the engine

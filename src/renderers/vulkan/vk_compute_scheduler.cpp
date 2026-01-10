@@ -56,6 +56,10 @@ typedef enum {
     JOB_STATE_CANCELLED = 4
 } vk_compute_job_state_t;
 
+// Semaphore limits
+#define MAX_WAIT_SEMAPHORES 8
+#define MAX_SIGNAL_SEMAPHORES 8
+
 // Internal job tracking structure
 typedef struct vk_compute_job_internal_t {
     vk_compute_job_t* public_job;
@@ -71,6 +75,13 @@ typedef struct vk_compute_job_internal_t {
     uint64_t dependencies[MAX_DEPENDENCIES];
     uint32_t dependency_count;
     void (*completion_callback)(vk_compute_job_t*, qboolean); // Completion callback
+
+    // Semaphore synchronization
+    VkSemaphore wait_semaphores[MAX_WAIT_SEMAPHORES];
+    VkPipelineStageFlags wait_stages[MAX_WAIT_SEMAPHORES];
+    uint32_t wait_semaphore_count;
+    VkSemaphore signal_semaphores[MAX_SIGNAL_SEMAPHORES];
+    uint32_t signal_semaphore_count;
 
 } vk_compute_job_internal_t;
 
@@ -332,6 +343,11 @@ uint64_t vk_compute_scheduler_submit_job(vk_compute_job_t* job) {
     internal_job->dependency_count = 0; // Initialize dependency tracking
     internal_job->completion_callback = nullptr; // Initialize callback
     memset(internal_job->dependencies, 0, sizeof(internal_job->dependencies)); // Initialize dependencies array
+    internal_job->wait_semaphore_count = 0; // Initialize semaphore arrays
+    internal_job->signal_semaphore_count = 0;
+    memset(internal_job->wait_semaphores, 0, sizeof(internal_job->wait_semaphores));
+    memset(internal_job->wait_stages, 0, sizeof(internal_job->wait_stages));
+    memset(internal_job->signal_semaphores, 0, sizeof(internal_job->signal_semaphores));
 
     // Allocate fence for the job
     VkFenceCreateInfo fence_info = {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
@@ -587,17 +603,16 @@ static qboolean vk_compute_scheduler_submit_job_internal(vk_compute_job_internal
     job->state = JOB_STATE_RUNNING;
     internal_job->start_time = ri.Milliseconds();
 
-    // Submit command buffer to queue
-    // Note: Semaphore support would require extending the job structure
+    // Submit command buffer to queue with semaphore synchronization
     VkSubmitInfo submit_info = {
         .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
         .commandBufferCount = 1,
         .pCommandBuffers = &job->command_buffer,
-        .waitSemaphoreCount = 0,
-        .pWaitSemaphores = nullptr,
-        .pWaitDstStageMask = nullptr,
-        .signalSemaphoreCount = 0,
-        .pSignalSemaphores = nullptr
+        .waitSemaphoreCount = internal_job->wait_semaphore_count,
+        .pWaitSemaphores = (internal_job->wait_semaphore_count > 0) ? internal_job->wait_semaphores : nullptr,
+        .pWaitDstStageMask = (internal_job->wait_semaphore_count > 0) ? internal_job->wait_stages : nullptr,
+        .signalSemaphoreCount = internal_job->signal_semaphore_count,
+        .pSignalSemaphores = (internal_job->signal_semaphore_count > 0) ? internal_job->signal_semaphores : nullptr
     };
 
     VkResult result = qvkQueueSubmit(vk_queue, 1, &submit_info, internal_job->fence);
@@ -798,40 +813,117 @@ void vk_compute_job_set_command_buffer(vk_compute_job_t* job, VkCommandBuffer cm
 }
 
 // Add wait semaphore to job
-// Note: Semaphore synchronization requires extending job structure to store semaphores
 void vk_compute_job_add_wait_semaphore(vk_compute_job_t* job, VkSemaphore semaphore, VkPipelineStageFlags stage) {
-    if (!job) {
-        ri.Printf(PRINT_WARNING, "vk_compute_job_add_wait_semaphore: job is NULL\n");
+    if (!job || !semaphore) {
+        ri.Printf(PRINT_WARNING, "vk_compute_job_add_wait_semaphore: Invalid parameters\n");
         return;
     }
-    // TODO: Add semaphore array to vk_compute_job_t structure.
-    //       Implementation requires:
-    //       1. Add VkSemaphore wait_semaphores[MAX_WAIT_SEMAPHORES] to vk_compute_job_t
-    //       2. Add VkPipelineStageFlags wait_stages[MAX_WAIT_SEMAPHORES] to vk_compute_job_t
-    //       3. Add uint32_t wait_semaphore_count to vk_compute_job_t
-    //       4. Store semaphore and stage in arrays when this function is called
-    //       5. Use arrays in vkQueueSubmit() when submitting the job
-    //       For now, log the request
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: Wait semaphore requested for job %u (not yet implemented)\n", job->id);
-    (void)semaphore; (void)stage;
+
+    // Find internal job structure
+    std::lock_guard<std::mutex> lock(compute_scheduler.scheduler_mutex);
+    
+    vk_compute_job_internal_t* internal_job = nullptr;
+    
+    // Search in active jobs
+    auto it = compute_scheduler.active_jobs.find(job->job_id);
+    if (it != compute_scheduler.active_jobs.end()) {
+        internal_job = it->second;
+    } else {
+        // Search in job queue
+        std::queue<vk_compute_job_internal_t*> temp_queue;
+        while (!compute_scheduler.job_queue.empty()) {
+            vk_compute_job_internal_t* queued_job = compute_scheduler.job_queue.front();
+            compute_scheduler.job_queue.pop();
+            
+            if (queued_job->job_id == job->job_id) {
+                internal_job = queued_job;
+            }
+            
+            temp_queue.push(queued_job);
+        }
+        
+        // Restore queue
+        while (!temp_queue.empty()) {
+            compute_scheduler.job_queue.push(temp_queue.front());
+            temp_queue.pop();
+        }
+    }
+    
+    if (!internal_job) {
+        ri.Printf(PRINT_WARNING, "vk_compute_job_add_wait_semaphore: Job %llu not found\n", (unsigned long long)job->job_id);
+        return;
+    }
+    
+    // Check if we have room for another wait semaphore
+    if (internal_job->wait_semaphore_count >= MAX_WAIT_SEMAPHORES) {
+        ri.Printf(PRINT_WARNING, "vk_compute_job_add_wait_semaphore: Maximum wait semaphores (%d) reached for job %llu\n",
+                  MAX_WAIT_SEMAPHORES, (unsigned long long)job->job_id);
+        return;
+    }
+    
+    // Add semaphore and stage to arrays
+    internal_job->wait_semaphores[internal_job->wait_semaphore_count] = semaphore;
+    internal_job->wait_stages[internal_job->wait_semaphore_count] = stage;
+    internal_job->wait_semaphore_count++;
+    
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Added wait semaphore to job %llu (%u/%u wait semaphores)\n",
+              (unsigned long long)job->job_id, internal_job->wait_semaphore_count, MAX_WAIT_SEMAPHORES);
 }
 
 // Add signal semaphore to job
-// Note: Semaphore synchronization requires extending job structure to store semaphores
 void vk_compute_job_add_signal_semaphore(vk_compute_job_t* job, VkSemaphore semaphore) {
-    if (!job) {
-        ri.Printf(PRINT_WARNING, "vk_compute_job_add_signal_semaphore: job is NULL\n");
+    if (!job || !semaphore) {
+        ri.Printf(PRINT_WARNING, "vk_compute_job_add_signal_semaphore: Invalid parameters\n");
         return;
     }
-    // TODO: Add semaphore array to vk_compute_job_t structure.
-    //       Implementation requires:
-    //       1. Add VkSemaphore signal_semaphores[MAX_SIGNAL_SEMAPHORES] to vk_compute_job_t
-    //       2. Add uint32_t signal_semaphore_count to vk_compute_job_t
-    //       3. Store semaphore in array when this function is called
-    //       4. Use array in vkQueueSubmit() when submitting the job
-    //       For now, log the request
-    ri.Printf(PRINT_DEVELOPER, "Vulkan: Signal semaphore requested for job %llu (not yet implemented)\n", (unsigned long long)job->job_id);
-    (void)semaphore;
+
+    // Find internal job structure
+    std::lock_guard<std::mutex> lock(compute_scheduler.scheduler_mutex);
+    
+    vk_compute_job_internal_t* internal_job = nullptr;
+    
+    // Search in active jobs
+    auto it = compute_scheduler.active_jobs.find(job->job_id);
+    if (it != compute_scheduler.active_jobs.end()) {
+        internal_job = it->second;
+    } else {
+        // Search in job queue
+        std::queue<vk_compute_job_internal_t*> temp_queue;
+        while (!compute_scheduler.job_queue.empty()) {
+            vk_compute_job_internal_t* queued_job = compute_scheduler.job_queue.front();
+            compute_scheduler.job_queue.pop();
+            
+            if (queued_job->job_id == job->job_id) {
+                internal_job = queued_job;
+            }
+            
+            temp_queue.push(queued_job);
+        }
+        
+        // Restore queue
+        while (!temp_queue.empty()) {
+            compute_scheduler.job_queue.push(temp_queue.front());
+            temp_queue.pop();
+        }
+    }
+    
+    if (!internal_job) {
+        ri.Printf(PRINT_WARNING, "vk_compute_job_add_signal_semaphore: Job %llu not found\n", (unsigned long long)job->job_id);
+        return;
+    }
+    
+    // Check if we have room for another signal semaphore
+    if (internal_job->signal_semaphore_count >= MAX_SIGNAL_SEMAPHORES) {
+        ri.Printf(PRINT_WARNING, "vk_compute_job_add_signal_semaphore: Maximum signal semaphores (%d) reached for job %llu\n",
+                  MAX_SIGNAL_SEMAPHORES, (unsigned long long)job->job_id);
+        return;
+    }
+    
+    // Add semaphore to array
+    internal_job->signal_semaphores[internal_job->signal_semaphore_count++] = semaphore;
+    
+    ri.Printf(PRINT_DEVELOPER, "Vulkan: Added signal semaphore to job %llu (%u/%u signal semaphores)\n",
+              (unsigned long long)job->job_id, internal_job->signal_semaphore_count, MAX_SIGNAL_SEMAPHORES);
 }
 
 // Set estimated job duration (for scheduling optimization)

@@ -9,9 +9,11 @@ Surface Sprites System Implementation
 #include "vk_utils.h"
 #include "vk_pipeline.h"
 #include "vk_terrain.h"
+#include "tr_math_optimized.h"
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
+#include <float.h>
 
 // Helper function declarations
 extern uint32_t find_memory_type(uint32_t memory_type_bits, VkMemoryPropertyFlags properties);
@@ -264,13 +266,13 @@ void vk_surface_sprites_unregister_type(int type_index) {
 
     // Remove all sprites of this type
     for (int i = ss_system.num_sprites - 1; i >= 0; i--) {
-        // TODO: Check sprite type and remove if matches.
-        //       Implementation:
-        //       if (ss_system.sprites[i].type == type) {
-        //           Remove sprite at index i (shift remaining sprites)
-        //           ss_system.num_sprites--
-        //       }
-        //       For now, this is a stub
+        if (ss_system.sprites[i].type_index == type_index) {
+            // Remove sprite at index i by shifting remaining sprites
+            for (int j = i; j < ss_system.num_sprites - 1; j++) {
+                ss_system.sprites[j] = ss_system.sprites[j + 1];
+            }
+            ss_system.num_sprites--;
+        }
     }
 
     // Shift remaining types
@@ -306,6 +308,7 @@ int vk_surface_sprites_add_sprite(int type_index, const vec3_t position, const v
     sprite->rotation = rotation;
     sprite->animation_time = 0.0f;
     sprite->current_frame = 0;
+    sprite->type_index = type_index; // Store type index for removal
 
     // Add some random variation
     sprite->color_offset[0] = (rand() % 100 - 50) * 0.01f;
@@ -416,17 +419,150 @@ surface_sprite_type_t *vk_surface_sprites_get_type(int index) {
     return &ss_system.types[index];
 }
 
+// Ray-triangle intersection helper (Möller-Trumbore algorithm)
+static qboolean ray_triangle_intersect(const vec3_t ray_origin, const vec3_t ray_dir,
+                                       const vec3_t v0, const vec3_t v1, const vec3_t v2,
+                                       float *t, float *u, float *v) {
+    vec3_t edge1, edge2, tvec, pvec, qvec;
+    float det, inv_det;
+    const float EPSILON = 0.000001f;
+
+    VectorSubtract(v1, v0, edge1);
+    VectorSubtract(v2, v0, edge2);
+    CrossProduct(ray_dir, edge2, pvec);
+
+    det = DotProduct(edge1, pvec);
+    if (det > -EPSILON && det < EPSILON) {
+        return qfalse; // Ray is parallel to triangle
+    }
+
+    inv_det = 1.0f / det;
+    VectorSubtract(ray_origin, v0, tvec);
+
+    *u = DotProduct(tvec, pvec) * inv_det;
+    if (*u < 0.0f || *u > 1.0f) {
+        return qfalse;
+    }
+
+    CrossProduct(tvec, edge1, qvec);
+    *v = DotProduct(ray_dir, qvec) * inv_det;
+    if (*v < 0.0f || (*u + *v) > 1.0f) {
+        return qfalse;
+    }
+
+    *t = DotProduct(edge2, qvec) * inv_det;
+    return (*t > EPSILON); // Intersection is in front of ray origin
+}
+
+// Ray-quad intersection helper for billboarded sprites
+static qboolean ray_quad_intersect(const vec3_t ray_origin, const vec3_t ray_dir,
+                                   const vec3_t center, const vec3_t normal, const vec3_t tangent,
+                                   float width, float height, float *t, vec3_t hit_pos) {
+    vec3_t bitangent, v0, v1, v2, v3;
+    float closest_t = FLT_MAX;
+    qboolean found_hit = qfalse;
+
+    // Calculate bitangent (normal x tangent)
+    CrossProduct(normal, tangent, bitangent);
+    VectorNormalize(bitangent);
+
+    // Build quad vertices (billboarded)
+    VectorMA(center, -width * 0.5f, tangent, v0);
+    VectorMA(v0, -height * 0.5f, bitangent, v0);
+
+    VectorMA(center, width * 0.5f, tangent, v1);
+    VectorMA(v1, -height * 0.5f, bitangent, v1);
+
+    VectorMA(center, width * 0.5f, tangent, v2);
+    VectorMA(v2, height * 0.5f, bitangent, v2);
+
+    VectorMA(center, -width * 0.5f, tangent, v3);
+    VectorMA(v3, height * 0.5f, bitangent, v3);
+
+    // Test both triangles of the quad
+    float t_val, u, v;
+    
+    // Triangle 1: v0, v1, v2
+    if (ray_triangle_intersect(ray_origin, ray_dir, v0, v1, v2, &t_val, &u, &v)) {
+        if (t_val < closest_t && t_val > 0.0f) {
+            closest_t = t_val;
+            found_hit = qtrue;
+        }
+    }
+
+    // Triangle 2: v0, v2, v3
+    if (ray_triangle_intersect(ray_origin, ray_dir, v0, v2, v3, &t_val, &u, &v)) {
+        if (t_val < closest_t && t_val > 0.0f) {
+            closest_t = t_val;
+            found_hit = qtrue;
+        }
+    }
+
+    if (found_hit) {
+        *t = closest_t;
+        hit_pos[0] = ray_origin[0] + ray_dir[0] * closest_t;
+        hit_pos[1] = ray_origin[1] + ray_dir[1] * closest_t;
+        hit_pos[2] = ray_origin[2] + ray_dir[2] * closest_t;
+        return qtrue;
+    }
+
+    return qfalse;
+}
+
 // Ray tracing for sprite interaction
 qboolean vk_surface_sprites_trace(const vec3_t start, const vec3_t end, vec3_t hit_pos, int *sprite_index) {
-    // TODO: Implement sprite ray tracing for interaction.
-    //       Implementation steps:
-    //       1. Iterate through all active sprites in ss_system.sprites[]
-    //       2. For each sprite, compute billboard quad geometry (4 vertices)
-    //       3. Perform ray-quad intersection test
-    //       4. If intersection found, store hit position and sprite index
-    //       5. Return qtrue if any intersection found, qfalse otherwise
-    //       Note: Sprites are billboarded quads, so intersection requires transforming
-    //       ray to sprite's local space and testing against quad plane
+    if (!ss_system.initialized || !ss_system.sprites || !hit_pos) {
+        return qfalse;
+    }
+
+    vec3_t ray_dir;
+    float ray_length;
+    float closest_t = FLT_MAX;
+    qboolean found_hit = qfalse;
+    int best_sprite_index = -1;
+    vec3_t best_hit;
+
+    VectorSubtract(end, start, ray_dir);
+    ray_length = VectorLength(ray_dir);
+    if (ray_length < 0.0001f) {
+        return qfalse;
+    }
+    VectorNormalize(ray_dir);
+
+    // Iterate through all active sprites
+    for (int i = 0; i < ss_system.num_sprites; i++) {
+        surface_sprite_t *sprite = &ss_system.sprites[i];
+        surface_sprite_type_t *type = vk_surface_sprites_get_type(sprite->type_index);
+        
+        if (!type) {
+            continue;
+        }
+
+        // Compute billboard quad geometry
+        float width = type->size[0] * sprite->scale;
+        float height = type->size[1] * sprite->scale;
+
+        float t;
+        vec3_t hit;
+        if (ray_quad_intersect(start, ray_dir, sprite->position, sprite->normal, sprite->tangent,
+                               width, height, &t, hit)) {
+            if (t < closest_t && t <= ray_length) {
+                closest_t = t;
+                VectorCopy(hit, best_hit);
+                best_sprite_index = i;
+                found_hit = qtrue;
+            }
+        }
+    }
+
+    if (found_hit) {
+        VectorCopy(best_hit, hit_pos);
+        if (sprite_index) {
+            *sprite_index = best_sprite_index;
+        }
+        return qtrue;
+    }
+
     return qfalse;
 }
 

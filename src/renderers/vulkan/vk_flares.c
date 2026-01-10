@@ -93,9 +93,16 @@ R_ClearFlares
 ==================
 */
 void R_ClearFlares( void ) {
-	// Vulkan flares are not implemented yet, so this is a no-op for now
-	// This prevents crashes during early initialization
-	ri.Printf(PRINT_DEVELOPER, "Vulkan: Flares not implemented, skipping\n");
+	int		i;
+
+	Com_Memset( r_flareStructs, 0, sizeof( r_flareStructs ) );
+	r_activeFlares = NULL;
+	r_inactiveFlares = NULL;
+
+	for ( i = 0 ; i < MAX_FLARES ; i++ ) {
+		r_flareStructs[i].next = r_inactiveFlares;
+		r_inactiveFlares = &r_flareStructs[i];
+	}
 }
 
 

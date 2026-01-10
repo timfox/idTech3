@@ -48,6 +48,7 @@ typedef struct {
     int current_frame;        // Current animation frame
     vec3_t color_offset;      // Color variation
     float alpha_offset;       // Alpha variation
+    int type_index;           // Index of sprite type this sprite belongs to
 } surface_sprite_t;
 
 // Surface sprite batch for rendering
