@@ -22,6 +22,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "tr_local.h"
 #include "vk_material_parser.h"
+#ifdef USE_VULKAN
+#include "vk_shader_validation.h"
+#endif
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 
@@ -3565,18 +3568,21 @@ static shader_t *FinishShader( void ) {
 	write_debug_log("vulkan/tr_shader.c:FinishShader", "Processing shader", shader.name);
 	// #endregion
 
-	// Workaround: Skip problematic shaders that cause device lost
-	// These shaders trigger GPU driver crash during pipeline creation
-	if (!Q_stricmp(shader.name, "models/mapobjects/banner/q3banner04") ||
-	    !Q_stricmp(shader.name, "models/mapobjects/banner/q3banner02")) {
-		ri.Printf(PRINT_WARNING, "Vulkan: Skipping problematic shader %s (known to cause device lost)\n", shader.name);
+	// Secondary check: Skip problematic shaders that cause device lost
+	// (Primary check is now in R_FindShader for earlier detection)
+	#ifdef USE_VULKAN
+	#include "vk_shader_validation.h"
+	if (vk_is_problematic_shader_name(shader.name)) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Late skip of problematic shader %s (should have been caught earlier)\n", shader.name);
 		// Return a default shader instead
 		if (tr.defaultShader) {
 			return tr.defaultShader;
 		}
 		// If default shader not available, create a minimal shader
 		shader.numUnfoggedPasses = 0;
+		shader.defaultShader = qtrue;
 	}
+	#endif
 
 	hasLightmapStage = qfalse;
 	vertexLightmap = qfalse;
@@ -4098,6 +4104,21 @@ static shader_t *FinishShader( void ) {
 				continue;
 			}
 
+			// Validate shader before pipeline creation
+			#ifdef USE_VULKAN
+			if (!vk_validate_shader_before_pipeline(shader.name, def.shader_type, &def)) {
+				ri.Printf(PRINT_WARNING, "Vulkan: Shader validation failed for %s (type=%d), skipping pipeline creation\n", 
+					shader.name, def.shader_type);
+				// Set pipelines to NULL and continue - shader will use fallback
+				pStage->vk_pipeline[0] = VK_NULL_HANDLE;
+				pStage->vk_mirror_pipeline[0] = VK_NULL_HANDLE;
+				pStage->vk_pipeline_df = VK_NULL_HANDLE;
+				pStage->vk_mirror_pipeline_df = VK_NULL_HANDLE;
+				stage++; // Skip to next stage
+				continue;
+			}
+			#endif
+
 			// Vulkan pipeline creation is disabled due to memory corruption issues
 			// TEMPORARILY DISABLE EARLY RETURN TO TEST IF THIS CAUSES THE CRASH
 			// def.mirror = qfalse;
@@ -4147,11 +4168,15 @@ static shader_t *FinishShader( void ) {
 				def.shader_type = TYPE_SINGLE_TEXTURE_DF;
 				pStage->vk_pipeline_df = vk_find_pipeline_ext( 0, &def, qtrue );
 				if (pStage->vk_pipeline_df == VK_NULL_HANDLE) {
-					ri.Printf(PRINT_WARNING, "Failed to create Vulkan depth fragment pipeline for shader stage\n");
+					ri.Printf(PRINT_WARNING, "Failed to create Vulkan depth fragment pipeline for shader stage %s\n", shader.name);
 					// Don't fail, depth fragment pipeline is optional
 				}
 				// Check if device was lost during pipeline creation
 				if (vk.device_lost) {
+					#ifdef USE_VULKAN
+					#include "vk_shader_validation.h"
+					vk_handle_pipeline_creation_error(VK_ERROR_DEVICE_LOST, shader.name, def.shader_type);
+					#endif
 					ri.Printf(PRINT_WARNING, "Vulkan: Device lost during depth fragment pipeline creation for shader %s, skipping remaining pipeline creation\n", shader.name);
 					break; // Exit the stage loop
 				}
@@ -4508,6 +4533,23 @@ shader_t *R_FindShader( const char *name, int lightmapIndex, qboolean mipRawImag
 	}
 
 	COM_StripExtension(name, strippedName, sizeof(strippedName));
+
+	// Early detection: Skip problematic shaders before any processing
+	// This prevents device loss by catching them before pipeline creation
+	#ifdef USE_VULKAN
+	#include "vk_shader_validation.h"
+	if (vk_is_problematic_shader_name(name) || vk_is_problematic_shader_name(strippedName)) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Early skip of problematic shader %s (known to cause device lost)\n", name);
+		// Return default shader immediately without processing
+		if (tr.defaultShader) {
+			return tr.defaultShader;
+		}
+		// If default shader not available yet, create minimal shader
+		InitShader(strippedName, lightmapIndex);
+		shader.defaultShader = qtrue;
+		return FinishShader();
+	}
+	#endif
 
 	hash = generateHashValue(strippedName, FILE_HASH_SIZE);
 

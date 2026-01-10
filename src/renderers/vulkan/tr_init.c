@@ -564,6 +564,12 @@ void R_Register( void ) {
     r_lodscale = ri.Cvar_Get( "r_lodscale", "5", CVAR_CHEAT );
     r_ambientScale = ri.Cvar_Get( "r_ambientScale", "0.6", CVAR_CHEAT );
     r_defaultImage = ri.Cvar_Get( "r_defaultImage", "", CVAR_ARCHIVE_ND | CVAR_LATCH );
+
+#ifdef USE_VULKAN
+    // Register shader validation command
+    extern void vk_print_shader_validation_report(void);
+    ri.Cmd_AddCommand("r_vk_shaderValidation", (xcommand_t)vk_print_shader_validation_report);
+#endif
 }
 
 // Cvar definitions

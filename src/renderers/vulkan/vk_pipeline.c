@@ -5,6 +5,9 @@
 #include "vk_commands.h"
 #include "vk_memory.h"
 #include "vk_shader_manager.h"
+#ifdef USE_VULKAN
+#include "vk_shader_validation.h"
+#endif
 #include <string.h>
 #include <stdlib.h>
 #include <sys/stat.h>
@@ -522,11 +525,13 @@ VkPipeline vk_find_pipeline_ext(int base_pipeline, Vk_Pipeline_Def* def, qboolea
 	}
 
 	// For problematic shader types that cause SIGFPE or crashes, return NULL to use default shader
-	if (def->shader_type == TYPE_SINGLE_TEXTURE_FIXED_COLOR ||
-		def->shader_type == TYPE_MULTI_TEXTURE_MUL2_IDENTITY) {
+	#ifdef USE_VULKAN
+	extern qboolean vk_is_problematic_shader_type(int shader_type);
+	if (vk_is_problematic_shader_type(def->shader_type)) {
 		ri.Printf(PRINT_ALL, "DEBUG: Skipping problematic shader type %d to avoid SIGFPE/crash\n", def->shader_type);
 		return VK_NULL_HANDLE;
 	}
+	#endif
 
 	// Validate shader_type
 	if (def->shader_type >= TYPE_GENERIC_BEGIN + 100) { // Arbitrary large number

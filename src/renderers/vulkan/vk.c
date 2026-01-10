@@ -6476,6 +6476,15 @@ VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassI
 		return VK_NULL_HANDLE;
 	}
 
+	// Comprehensive shader validation before pipeline creation
+	#ifdef USE_VULKAN
+	#include "vk_shader_validation.h"
+	if (!vk_validate_shader_before_pipeline(NULL, def->shader_type, def)) {
+		ri.Printf(PRINT_WARNING, "create_pipeline: shader validation failed (type=%d)\n", def->shader_type);
+		return VK_NULL_HANDLE;
+	}
+	#endif
+
 	// Temporarily skip TYPE_SINGLE_TEXTURE pipelines that cause SIGFPE
 	if (def->shader_type == TYPE_SINGLE_TEXTURE) {
 		ri.Printf(PRINT_WARNING, "create_pipeline: skipping TYPE_SINGLE_TEXTURE pipeline (known SIGFPE issue)\n");
@@ -7822,6 +7831,11 @@ multisample_state.rasterizationSamples = (renderPassIndex == RENDER_PASS_SCREENM
 
 	VkResult pipelineResult = qvkCreateGraphicsPipelines(vk.device, vk.pipelineCache, 1, &create_info, NULL, &pipeline);
 	if (pipelineResult != VK_SUCCESS) {
+		#ifdef USE_VULKAN
+		#include "vk_shader_validation.h"
+		vk_handle_pipeline_creation_error(pipelineResult, NULL, def->shader_type);
+		#endif
+		
 		if (pipelineResult == VK_ERROR_DEVICE_LOST) {
 			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during pipeline creation - this is a driver/GPU issue\n");
 			ri.Printf(PRINT_ERROR, "Vulkan: Try updating graphics drivers or reducing graphics settings\n");
@@ -10043,12 +10057,18 @@ void vk_wait_idle( void ) {
 		return;
 	}
 
+	// Check device handle validity before waiting
+	if (vk.device == VK_NULL_HANDLE) {
+		return;
+	}
+
 	VkResult result = qvkDeviceWaitIdle( vk.device );
 	if (result != VK_SUCCESS) {
 		if (result == VK_ERROR_DEVICE_LOST) {
 			vk.device_lost = qtrue;  // Mark device as lost
 			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during device wait - GPU driver issue\n");
 			ri.Printf(PRINT_ERROR, "Vulkan: This may cause rendering artifacts or instability\n");
+			ri.Printf(PRINT_WARNING, "Vulkan: Recovery will be attempted automatically\n");
 			// Don't terminate the engine for device lost
 			return;
 		} else {
@@ -10064,13 +10084,18 @@ void vk_queue_wait_idle( void ) {
 		return;
 	}
 
+	// Check queue handle validity before waiting
+	if (vk.queue == VK_NULL_HANDLE || vk.device == VK_NULL_HANDLE) {
+		return;
+	}
+
 	VkResult result = qvkQueueWaitIdle( vk.queue );
 	if (result != VK_SUCCESS) {
 		if (result == VK_ERROR_DEVICE_LOST) {
 			vk.device_lost = qtrue;  // Mark device as lost
 			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during queue wait - GPU driver issue\n");
 			ri.Printf(PRINT_ERROR, "Vulkan: This may cause rendering artifacts or instability\n");
-			ri.Printf(PRINT_WARNING, "Vulkan: Will attempt recovery once game loop starts\n");
+			ri.Printf(PRINT_WARNING, "Vulkan: Recovery will be attempted automatically\n");
 			// Don't terminate the engine for device lost - allow initialization to continue
 			return;
 		} else {
