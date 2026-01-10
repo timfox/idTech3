@@ -1,0 +1,107 @@
+// Terrain Synthesis Compute Shader
+// Generates fine-level terrain detail using fractal noise displacement
+
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// Input: Coarse level height data
+layout(binding = 0, r32f) uniform readonly image2D coarseHeightTexture;
+
+// Output: Fine level height data
+layout(binding = 1, r32f) uniform writeonly image2D fineHeightTexture;
+
+// Noise texture for deterministic synthesis
+layout(binding = 2) uniform sampler2D noiseTexture;
+
+layout(binding = 3) uniform SynthesisParams {
+    ivec2 outputSize;             // Size of output texture
+    ivec2 inputOffset;            // Offset in coarse texture
+    float noiseScale;              // Scale factor for noise
+    float noiseAmplitude;          // Amplitude of noise displacement
+    int noiseOctaves;             // Number of octaves for fractal noise
+    float variance;                // Target variance for this level
+} params;
+
+// Four-point interpolatory subdivision weights
+// Mask: (-1/16, 9/16, 9/16, -1/16)
+const float SUBDIV_WEIGHTS[4] = float[4](-0.0625, 0.5625, 0.5625, -0.0625);
+
+// Sample noise texture with wrapping
+float sampleNoise(ivec2 coord) {
+    ivec2 noiseSize = textureSize(noiseTexture, 0);
+    ivec2 wrapped = ivec2(coord.x % noiseSize.x, coord.y % noiseSize.y);
+    return texture(noiseTexture, (vec2(wrapped) + 0.5) / vec2(noiseSize)).r;
+}
+
+// Fractal noise using multiple octaves
+float fractalNoise(ivec2 coord, float scale, int octaves) {
+    float value = 0.0;
+    float amplitude = 1.0;
+    float frequency = 1.0;
+    float maxValue = 0.0;
+    
+    for (int i = 0; i < octaves; i++) {
+        ivec2 sampleCoord = ivec2(coord * frequency * scale);
+        value += sampleNoise(sampleCoord) * amplitude;
+        maxValue += amplitude;
+        amplitude *= 0.5;
+        frequency *= 2.0;
+    }
+    
+    return value / maxValue;  // Normalize to [0, 1]
+}
+
+// Four-point interpolatory subdivision
+// Predicts fine level from coarse level using tensor-product subdivision
+float subdivideHeight(ivec2 fineCoord, ivec2 coarseBase) {
+    float sum = 0.0;
+    
+    // Sample 4x4 neighborhood in coarse texture
+    for (int dy = -1; dy <= 2; dy++) {
+        for (int dx = -1; dx <= 2; dx++) {
+            ivec2 coarseCoord = coarseBase + ivec2(dx, dy);
+            
+            // Sample coarse height (with bounds checking)
+            float coarseHeight = 0.0;
+            if (coarseCoord.x >= 0 && coarseCoord.y >= 0 && 
+                coarseCoord.x < params.outputSize.x / 2 && 
+                coarseCoord.y < params.outputSize.y / 2) {
+                coarseHeight = imageLoad(coarseHeightTexture, coarseCoord).r;
+            }
+            
+            // Apply subdivision weights
+            float weightX = SUBDIV_WEIGHTS[dx + 1];
+            float weightY = SUBDIV_WEIGHTS[dy + 1];
+            sum += coarseHeight * weightX * weightY;
+        }
+    }
+    
+    return sum;
+}
+
+void main() {
+    ivec2 fineCoord = ivec2(gl_GlobalInvocationID.xy);
+    
+    if (fineCoord.x >= params.outputSize.x || fineCoord.y >= params.outputSize.y) {
+        return;
+    }
+    
+    // Base coordinate in coarse texture (fine is 2x resolution)
+    ivec2 coarseBase = fineCoord / 2;
+    
+    // Predict height from coarse level using subdivision
+    float predictedHeight = subdivideHeight(fineCoord, coarseBase);
+    
+    // Generate fractal noise displacement
+    float noise = fractalNoise(fineCoord, params.noiseScale, params.noiseOctaves);
+    
+    // Convert noise from [0,1] to [-1,1] and scale by variance
+    float displacement = (noise * 2.0 - 1.0) * sqrt(params.variance);
+    
+    // Add displacement to predicted height
+    float finalHeight = predictedHeight + displacement;
+    
+    // Write to output texture
+    imageStore(fineHeightTexture, fineCoord, vec4(finalHeight, 0.0, 0.0, 0.0));
+}
