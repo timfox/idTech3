@@ -252,7 +252,10 @@ extern PFN_vkCmdCopyImageToBuffer qvkCmdCopyImageToBuffer;
     if (err) { \
         const char* err_str = vk_result_string(err); \
         if (err == VK_ERROR_DEVICE_LOST) { \
-            ri.Error(ERR_FATAL, "Vulkan device lost (%s) at %s:%d - This usually indicates a GPU driver or hardware issue. Try updating your graphics drivers.", err_str, __FILE__, __LINE__); \
+            /* Handle device lost gracefully instead of fatal error */ \
+            vk.device_lost = qtrue; \
+            ri.Printf(PRINT_ERROR, "Vulkan: Device lost (%s) at %s:%d - GPU driver issue. Rendering may be disabled.\n", err_str, __FILE__, __LINE__); \
+            ri.Printf(PRINT_ERROR, "Vulkan: Try restarting the application or updating GPU drivers.\n"); \
         } else { \
             ri.Error(ERR_FATAL, "Vulkan error %s (%d) at %s:%d", err_str, err, __FILE__, __LINE__); \
         } \
@@ -1477,6 +1480,7 @@ void vk_end_render_pass(void);
 void vk_begin_frame(void);
 void vk_end_frame(void);
 void vk_recreate_swapchain(void);
+VkResult vk_recreate_swapchain_safe(void); // Safe version that returns error code instead of calling ri.Error
 void vk_destroy_swapchain(void);
 void vk_bind_index(void);
 void vk_bind_index_ext(uint32_t numIndexes, uint32_t* hitIndexes);

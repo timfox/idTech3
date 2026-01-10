@@ -523,6 +523,13 @@ This will be called twice if rendering in stereo mode
 static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 	qboolean uiFullscreen;
 
+	// Debug: Log when BeginFrame is called (first few times only)
+	static int begin_frame_count = 0;
+	if (begin_frame_count < 3 && com_developer && com_developer->integer) {
+		Com_Printf("DEBUG: SCR_UpdateScreen calling re.BeginFrame (call #%d)\n", ++begin_frame_count);
+	} else {
+		begin_frame_count++;
+	}
 	re.BeginFrame( stereoFrame );
 
 	uiFullscreen = (uivm && VM_Call( uivm, 0, UI_IS_FULLSCREEN ));
@@ -640,7 +647,18 @@ void SCR_UpdateScreen( void ) {
 	if ( !re_initialized || !re.GetConfig || !re.BeginFrame || !re.EndFrame ) {
 		// Renderer not fully initialized yet or failed to initialize, skip rendering
 		if ( !FS_StartupInProgress() && com_developer && com_developer->integer ) {
-			Com_Printf( "DEBUG: SCR_UpdateScreen - renderer not ready, skipping\n" );
+			Com_Printf( "DEBUG: SCR_UpdateScreen - renderer not ready (re_initialized=%d, GetConfig=%p, BeginFrame=%p, EndFrame=%p), skipping\n", 
+				re_initialized, (void*)re.GetConfig, (void*)re.BeginFrame, (void*)re.EndFrame );
+		}
+		// Even if renderer isn't ready, try calling BeginFrame once to trigger recovery if device is lost
+		// This ensures recovery attempts happen even during initialization
+		if ( re_initialized && re.BeginFrame ) {
+			static int recovery_attempt_count = 0;
+			if ( recovery_attempt_count < 3 ) {
+				recovery_attempt_count++;
+				Com_Printf( "DEBUG: SCR_UpdateScreen - attempting BeginFrame call for recovery (attempt %d)\n", recovery_attempt_count );
+				re.BeginFrame( STEREO_CENTER );
+			}
 		}
 		return;
 	}

@@ -128,18 +128,12 @@ extern "C" void vk_destroy_image(image_t *image) {
         VkMemoryRequirements memory_requirements;
         qvkGetImageMemoryRequirements(vk.device, image->handle, &memory_requirements);
 
-        // Track GPU memory deallocation
+        // Track GPU memory deallocation (this already updates VRAM statistics)
         vk_track_gpu_free(image->memory);
 
         // Free the memory
         qvkFreeMemory(vk.device, image->memory, NULL);
         image->memory = VK_NULL_HANDLE;
-
-        // Update VRAM statistics
-        vk.vram_stats.used_vram -= memory_requirements.size;
-        vk.vram_stats.available_vram += memory_requirements.size;
-        atomic_fetch_add_explicit(&vk.vram_stats.freed_allocations, 1, memory_order_relaxed);
-        vk.vram_stats.memory_type_usage[memory_requirements.memoryTypeBits] -= memory_requirements.size;
     }
 
     if (image->view != VK_NULL_HANDLE) {

@@ -3565,6 +3565,19 @@ static shader_t *FinishShader( void ) {
 	write_debug_log("vulkan/tr_shader.c:FinishShader", "Processing shader", shader.name);
 	// #endregion
 
+	// Workaround: Skip problematic shaders that cause device lost
+	// These shaders trigger GPU driver crash during pipeline creation
+	if (!Q_stricmp(shader.name, "models/mapobjects/banner/q3banner04") ||
+	    !Q_stricmp(shader.name, "models/mapobjects/banner/q3banner02")) {
+		ri.Printf(PRINT_WARNING, "Vulkan: Skipping problematic shader %s (known to cause device lost)\n", shader.name);
+		// Return a default shader instead
+		if (tr.defaultShader) {
+			return tr.defaultShader;
+		}
+		// If default shader not available, create a minimal shader
+		shader.numUnfoggedPasses = 0;
+	}
+
 	hasLightmapStage = qfalse;
 	vertexLightmap = qfalse;
 	colorBlend = qfalse;
@@ -4073,6 +4086,18 @@ static shader_t *FinishShader( void ) {
 			#endif
 			}
 
+			// Check if device is lost - skip pipeline creation if so
+			if (vk.device_lost) {
+				ri.Printf(PRINT_WARNING, "Vulkan: Device is lost, skipping pipeline creation for shader %s\n", shader.name);
+				// Set pipelines to NULL and continue - shader will use fallback
+				pStage->vk_pipeline[0] = VK_NULL_HANDLE;
+				pStage->vk_mirror_pipeline[0] = VK_NULL_HANDLE;
+				pStage->vk_pipeline_df = VK_NULL_HANDLE;
+				pStage->vk_mirror_pipeline_df = VK_NULL_HANDLE;
+				stage++; // Skip to next stage
+				continue;
+			}
+
 			// Vulkan pipeline creation is disabled due to memory corruption issues
 			// TEMPORARILY DISABLE EARLY RETURN TO TEST IF THIS CAUSES THE CRASH
 			// def.mirror = qfalse;
@@ -4125,9 +4150,19 @@ static shader_t *FinishShader( void ) {
 					ri.Printf(PRINT_WARNING, "Failed to create Vulkan depth fragment pipeline for shader stage\n");
 					// Don't fail, depth fragment pipeline is optional
 				}
+				// Check if device was lost during pipeline creation
+				if (vk.device_lost) {
+					ri.Printf(PRINT_WARNING, "Vulkan: Device lost during depth fragment pipeline creation for shader %s, skipping remaining pipeline creation\n", shader.name);
+					break; // Exit the stage loop
+				}
 				def.mirror = qtrue;
 				def.shader_type = TYPE_SINGLE_TEXTURE_DF;
 				pStage->vk_mirror_pipeline_df = vk_find_pipeline_ext( 0, &def, qfalse );
+				// Check if device was lost during mirror pipeline creation
+				if (vk.device_lost) {
+					ri.Printf(PRINT_WARNING, "Vulkan: Device lost during mirror depth fragment pipeline creation for shader %s, skipping remaining pipeline creation\n", shader.name);
+					break; // Exit the stage loop
+				}
 				ri.Printf(PRINT_ALL, "DEBUG: Depth fragment mirror pipeline call completed\n");
 				if (pStage->vk_mirror_pipeline_df == VK_NULL_HANDLE) {
 					ri.Printf(PRINT_WARNING, "Failed to create Vulkan mirror depth fragment pipeline for shader stage\n");

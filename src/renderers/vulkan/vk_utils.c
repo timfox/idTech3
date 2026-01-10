@@ -189,15 +189,31 @@ void vk_track_gpu_allocation(VkDeviceMemory memory, VkDeviceSize size, uint32_t 
     alloc->allocation_id = atomic_fetch_add_explicit(&vk_memory_tracker.next_allocation_id, 1, memory_order_relaxed);
     alloc->is_freed = qfalse;
 
-    // Update VRAM statistics
-    vk.vram_stats.used_vram += size;
-    vk.vram_stats.available_vram -= size;
+    // Update VRAM statistics (thread-safe with bounds checking)
+    VkDeviceSize new_used = __atomic_add_fetch(&vk.vram_stats.used_vram, size, __ATOMIC_RELAXED);
+    VkDeviceSize new_available = __atomic_sub_fetch(&vk.vram_stats.available_vram, size, __ATOMIC_RELAXED);
+    
+    // Bounds check to prevent overflow
+    if (new_used > vk.vram_stats.total_vram * 2) {
+        ri.Printf(PRINT_ERROR, "vk_track_gpu_allocation: VRAM overflow detected! used_vram=%llu, total_vram=%llu\n",
+                 (unsigned long long)new_used, (unsigned long long)vk.vram_stats.total_vram);
+        // Rollback
+        __atomic_sub_fetch(&vk.vram_stats.used_vram, size, __ATOMIC_RELAXED);
+        __atomic_add_fetch(&vk.vram_stats.available_vram, size, __ATOMIC_RELAXED);
+        return;
+    }
+    
     atomic_fetch_add_explicit(&vk.vram_stats.total_allocations, 1, memory_order_relaxed);
     atomic_fetch_add_explicit(&vk.vram_stats.current_allocations, 1, memory_order_relaxed);
-    vk.vram_stats.memory_type_usage[memory_type] += size;
+    __atomic_add_fetch(&vk.vram_stats.memory_type_usage[memory_type], size, __ATOMIC_RELAXED);
 
-    if (vk.vram_stats.used_vram > vk.vram_stats.max_used_vram) {
-        vk.vram_stats.max_used_vram = vk.vram_stats.used_vram;
+    // Update max_used_vram atomically (compare-and-swap loop)
+    VkDeviceSize current_max = __atomic_load_n(&vk.vram_stats.max_used_vram, __ATOMIC_RELAXED);
+    while (new_used > current_max) {
+        if (__atomic_compare_exchange_n(&vk.vram_stats.max_used_vram, &current_max, new_used,
+                                        qfalse, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+            break;
+        }
     }
 
     // Basic leak detection warning
@@ -217,12 +233,39 @@ void vk_track_gpu_free(VkDeviceMemory memory) {
         if (alloc->memory == memory && !alloc->is_freed) {
             alloc->is_freed = qtrue;
 
-            // Update VRAM statistics
-            vk.vram_stats.used_vram -= alloc->size;
-            vk.vram_stats.available_vram += alloc->size;
+            // Update VRAM statistics (thread-safe with bounds checking)
+            VkDeviceSize current_used = __atomic_load_n(&vk.vram_stats.used_vram, __ATOMIC_RELAXED);
+            
+            // Bounds check to prevent underflow
+            if (alloc->size > current_used) {
+                ri.Printf(PRINT_ERROR, "vk_track_gpu_free: VRAM underflow detected! size=%llu > used_vram=%llu\n",
+                         (unsigned long long)alloc->size, (unsigned long long)current_used);
+                // Clamp to prevent underflow
+                alloc->size = current_used;
+            }
+            
+            VkDeviceSize new_used = __atomic_sub_fetch(&vk.vram_stats.used_vram, alloc->size, __ATOMIC_RELAXED);
+            VkDeviceSize new_available = __atomic_add_fetch(&vk.vram_stats.available_vram, alloc->size, __ATOMIC_RELAXED);
+            
+            // Bounds check available_vram
+            if (new_available > vk.vram_stats.total_vram) {
+                ri.Printf(PRINT_WARNING, "vk_track_gpu_free: available_vram exceeds total_vram, clamping\n");
+                __atomic_store_n(&vk.vram_stats.available_vram, vk.vram_stats.total_vram, __ATOMIC_RELAXED);
+            }
+            
             atomic_fetch_add_explicit(&vk.vram_stats.freed_allocations, 1, memory_order_relaxed);
             atomic_fetch_sub_explicit(&vk.vram_stats.current_allocations, 1, memory_order_relaxed);
-            vk.vram_stats.memory_type_usage[alloc->memory_type] -= alloc->size;
+            
+            // Bounds check for memory_type_usage
+            if (alloc->memory_type < VK_MAX_MEMORY_TYPES) {
+                VkDeviceSize current_type_usage = __atomic_load_n(&vk.vram_stats.memory_type_usage[alloc->memory_type], __ATOMIC_RELAXED);
+                if (alloc->size <= current_type_usage) {
+                    __atomic_sub_fetch(&vk.vram_stats.memory_type_usage[alloc->memory_type], alloc->size, __ATOMIC_RELAXED);
+                } else {
+                    ri.Printf(PRINT_WARNING, "vk_track_gpu_free: memory_type_usage underflow for type %u, clamping\n", alloc->memory_type);
+                    __atomic_store_n(&vk.vram_stats.memory_type_usage[alloc->memory_type], 0, __ATOMIC_RELAXED);
+                }
+            }
 
             return;
         }
@@ -264,12 +307,17 @@ void vk_detect_memory_leaks(void) {
 // Print comprehensive VRAM usage statistics
 void vk_print_vram_stats(void) {
     ri.Printf(PRINT_ALL, "=== Vulkan VRAM Statistics ===\n");
-    ri.Printf(PRINT_ALL, "Total VRAM: %lu MB\n", (unsigned long)(vk.vram_stats.total_vram / (1024 * 1024)));
+    VkDeviceSize total_vram = vk.vram_stats.total_vram;
+    VkDeviceSize used_vram = __atomic_load_n(&vk.vram_stats.used_vram, __ATOMIC_RELAXED);
+    VkDeviceSize available_vram = __atomic_load_n(&vk.vram_stats.available_vram, __ATOMIC_RELAXED);
+    VkDeviceSize max_used_vram = __atomic_load_n(&vk.vram_stats.max_used_vram, __ATOMIC_RELAXED);
+    
+    ri.Printf(PRINT_ALL, "Total VRAM: %lu MB\n", (unsigned long)(total_vram / (1024 * 1024)));
     ri.Printf(PRINT_ALL, "Used VRAM: %lu MB (%.1f%%)\n",
-        (unsigned long)(vk.vram_stats.used_vram / (1024 * 1024)),
-        vk.vram_stats.total_vram > 0 ? (float)vk.vram_stats.used_vram / vk.vram_stats.total_vram * 100.0f : 0.0f);
-    ri.Printf(PRINT_ALL, "Available VRAM: %lu MB\n", (unsigned long)(vk.vram_stats.available_vram / (1024 * 1024)));
-    ri.Printf(PRINT_ALL, "Peak Usage: %lu MB\n", (unsigned long)(vk.vram_stats.max_used_vram / (1024 * 1024)));
+        (unsigned long)(used_vram / (1024 * 1024)),
+        total_vram > 0 ? (float)used_vram / total_vram * 100.0f : 0.0f);
+    ri.Printf(PRINT_ALL, "Available VRAM: %lu MB\n", (unsigned long)(available_vram / (1024 * 1024)));
+    ri.Printf(PRINT_ALL, "Peak Usage: %lu MB\n", (unsigned long)(max_used_vram / (1024 * 1024)));
 
     ri.Printf(PRINT_ALL, "Allocation Stats:\n");
     ri.Printf(PRINT_ALL, "  Total allocations: %u\n", atomic_load_explicit(&vk.vram_stats.total_allocations, memory_order_relaxed));
@@ -283,7 +331,7 @@ void vk_print_vram_stats(void) {
         vkGetPhysicalDeviceMemoryProperties(vk.physical_device, &mem_props);
         ri.Printf(PRINT_ALL, "Memory Type Usage:\n");
         for (uint32_t i = 0; i < mem_props.memoryTypeCount && i < VK_MAX_MEMORY_TYPES; i++) {
-            VkDeviceSize usage = vk.vram_stats.memory_type_usage[i];
+            VkDeviceSize usage = __atomic_load_n(&vk.vram_stats.memory_type_usage[i], __ATOMIC_RELAXED);
             if (usage > 0 && usage < (VkDeviceSize)-1LL / 2) { // Check for reasonable values
                 const char *heap_type = (mem_props.memoryTypes[i].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ? "GPU" : "CPU";
                 ri.Printf(PRINT_ALL, "  Type %u (%s): %lu MB\n", i, heap_type,
@@ -299,23 +347,39 @@ void vk_print_vram_stats(void) {
 qboolean vk_validate_memory_state(void) {
     ri.Printf(PRINT_ALL, "vk_validate_memory_state: Checking for memory corruption\n");
 
+    // Load VRAM stats atomically to get consistent snapshot
+    VkDeviceSize used_vram = __atomic_load_n(&vk.vram_stats.used_vram, __ATOMIC_RELAXED);
+    VkDeviceSize available_vram = __atomic_load_n(&vk.vram_stats.available_vram, __ATOMIC_RELAXED);
+    VkDeviceSize total_vram = vk.vram_stats.total_vram;
+
     // Check VRAM stats for obviously corrupted values
-    if (vk.vram_stats.used_vram > vk.vram_stats.total_vram * 2 ||
-        vk.vram_stats.available_vram > vk.vram_stats.total_vram) {
+    if (used_vram > total_vram * 2 || available_vram > total_vram) {
         ri.Printf(PRINT_ERROR, "vk_validate_memory_state: VRAM statistics corrupted\n");
         ri.Printf(PRINT_ERROR, "  used_vram: %llu, total_vram: %llu, available_vram: %llu\n",
-                 (unsigned long long)vk.vram_stats.used_vram,
-                 (unsigned long long)vk.vram_stats.total_vram,
-                 (unsigned long long)vk.vram_stats.available_vram);
+                 (unsigned long long)used_vram,
+                 (unsigned long long)total_vram,
+                 (unsigned long long)available_vram);
+        
+        // Attempt to repair corrupted stats by resetting to safe values
+        if (used_vram > total_vram * 2) {
+            ri.Printf(PRINT_WARNING, "vk_validate_memory_state: Resetting corrupted used_vram\n");
+            __atomic_store_n(&vk.vram_stats.used_vram, 0, __ATOMIC_RELAXED);
+        }
+        if (available_vram > total_vram) {
+            ri.Printf(PRINT_WARNING, "vk_validate_memory_state: Resetting corrupted available_vram\n");
+            __atomic_store_n(&vk.vram_stats.available_vram, total_vram, __ATOMIC_RELAXED);
+        }
         return qfalse;
     }
 
     // Check memory type usage for corrupted values
     for (uint32_t i = 0; i < VK_MAX_MEMORY_TYPES; i++) {
-        VkDeviceSize usage = vk.vram_stats.memory_type_usage[i];
-        if (usage != 0 && usage > vk.vram_stats.total_vram * 2) {
+        VkDeviceSize usage = __atomic_load_n(&vk.vram_stats.memory_type_usage[i], __ATOMIC_RELAXED);
+        if (usage != 0 && usage > total_vram * 2) {
             ri.Printf(PRINT_ERROR, "vk_validate_memory_state: Memory type %u usage corrupted: %llu\n",
                      i, (unsigned long long)usage);
+            // Reset corrupted memory type usage
+            __atomic_store_n(&vk.vram_stats.memory_type_usage[i], 0, __ATOMIC_RELAXED);
             return qfalse;
         }
     }

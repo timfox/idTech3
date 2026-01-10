@@ -950,14 +950,18 @@ void end_command_buffer(VkCommandBuffer command_buffer, const char *location)
 			ri.Printf(PRINT_ERROR, "Vulkan: This may cause rendering artifacts or instability\n");
 			ri.Printf(PRINT_ERROR, "Vulkan: Rendering disabled. Try restarting the application or updating GPU drivers.\n");
 			ri.Printf(PRINT_ERROR, "Vulkan: Video playback may not work until device is recovered.\n");
-			// Don't terminate - let vk_queue_wait_idle handle cleanup
+			// Skip wait if device is lost - it will fail anyway
+			return;
 		} else {
 			// For other errors, use the standard error handling
 			VK_CHECK(submit_result);
 		}
 	}
 
-	vk_queue_wait_idle();
+	// Only wait if device is not lost
+	if (!vk.device_lost) {
+		vk_queue_wait_idle();
+	}
 
 	qvkFreeCommandBuffers( vk.device, vk.command_pool, 1, &command_buffer );
 }
@@ -6466,6 +6470,12 @@ static void push_attr( uint32_t location, uint32_t binding, VkFormat format )
 VkPipeline create_pipeline( const Vk_Pipeline_Def *def, renderPass_t renderPassIndex, uint32_t def_index ) {
 	ri.Printf(PRINT_ALL, "DEBUG: create_pipeline index=%d pass=%d shader_type=%d\n", def_index, renderPassIndex, def->shader_type);
 
+	// Check if device is lost - skip pipeline creation
+	if (vk.device_lost) {
+		ri.Printf(PRINT_WARNING, "create_pipeline: Device is lost, skipping pipeline creation\n");
+		return VK_NULL_HANDLE;
+	}
+
 	// Temporarily skip TYPE_SINGLE_TEXTURE pipelines that cause SIGFPE
 	if (def->shader_type == TYPE_SINGLE_TEXTURE) {
 		ri.Printf(PRINT_WARNING, "create_pipeline: skipping TYPE_SINGLE_TEXTURE pipeline (known SIGFPE issue)\n");
@@ -9753,10 +9763,10 @@ void vk_shutdown( refShutdownCode_t code ) {
     vk.active = qfalse;
     vk.device = VK_NULL_HANDLE;
     vk.swapchain = VK_NULL_HANDLE;
-    if (vulkan_lib) {
-      Sys_UnloadLibrary(vulkan_lib);
-      vulkan_lib = NULL;
-    }
+    // Don't unload library - it can cause "free(): invalid pointer" errors when library
+    // destructors try to clean up memory. The OS will handle cleanup on process exit.
+    ri.Printf(PRINT_ALL, "vk_shutdown: Keeping Vulkan library loaded (OS will clean up on exit)\n");
+    vulkan_lib = NULL; // Clear the pointer but don't actually unload
     return;
   }
 	ri.Printf( PRINT_ALL, "vk_shutdown( %i )\n", code );
@@ -9906,19 +9916,12 @@ void vk_shutdown( refShutdownCode_t code ) {
 		// Handle Vulkan library unloading carefully
 		// Note: Keeping the library loaded can prevent "free(): invalid pointer" errors
 		// during shutdown that occur when Vulkan libraries clean up memory during dlclose
+		// We never unload the library during shutdown to avoid these issues - the OS will clean it up on exit
 		if (vulkan_lib) {
-			ri.Printf(PRINT_ALL, "vk_shutdown: Vulkan library kept loaded to prevent cleanup issues\n");
-
-			// Only unload if we're doing a complete shutdown and library is valid
-			if (code == REF_DESTROY_WINDOW && vulkan_lib != (void*)-1) {
-				ri.Printf(PRINT_ALL, "vk_shutdown: Attempting safe library unload\n");
-				// Try unloading (Sys_UnloadLibrary returns void)
-				Sys_UnloadLibrary(vulkan_lib);
-				ri.Printf(PRINT_ALL, "vk_shutdown: Vulkan library unloaded\n");
-				vulkan_lib = NULL;
-			} else {
-				ri.Printf(PRINT_ALL, "vk_shutdown: Keeping Vulkan library loaded for safety\n");
-			}
+			ri.Printf(PRINT_ALL, "vk_shutdown: Keeping Vulkan library loaded (OS will clean up on exit)\n");
+			// Don't unload the library - it can cause "free(): invalid pointer" errors
+			// when library destructors try to clean up memory. The OS will handle cleanup on process exit.
+			vulkan_lib = NULL; // Clear the pointer but don't actually unload
 		}
 }
 
@@ -10067,7 +10070,8 @@ void vk_queue_wait_idle( void ) {
 			vk.device_lost = qtrue;  // Mark device as lost
 			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during queue wait - GPU driver issue\n");
 			ri.Printf(PRINT_ERROR, "Vulkan: This may cause rendering artifacts or instability\n");
-			// Don't terminate the engine for device lost
+			ri.Printf(PRINT_WARNING, "Vulkan: Will attempt recovery once game loop starts\n");
+			// Don't terminate the engine for device lost - allow initialization to continue
 			return;
 		} else {
 			// For other errors, use the standard error handling
@@ -10573,7 +10577,8 @@ void vk_render_scene(const refdef_t *fd) {
 // Basic Vulkan Rendering Functions
 // ============================================================================
 
-void vk_recreate_swapchain(void) {
+// Safe version that returns error code instead of calling ri.Error
+VkResult vk_recreate_swapchain_safe(void) {
   ri.Printf(PRINT_ALL, "Vulkan: Recreating swapchain\n");
   // Ensure all device work is finished before destroying/recreating swapchain resources
   vk_wait_idle();
@@ -10581,8 +10586,12 @@ void vk_recreate_swapchain(void) {
   vk_destroy_framebuffers();
   // Destroy old swapchain resources via direct function (no bridge)
   vk_destroy_swapchain();
-  // Recreate swapchain with up-to-date surface format
-  vk_create_swapchain(vk.physical_device, vk.device, vk_surface, vk_present_format, &vk.swapchain, true);
+  // Recreate swapchain with up-to-date surface format (safe version that returns error)
+  VkResult result = vk_create_swapchain_safe(vk.physical_device, vk.device, vk_surface, vk_present_format, &vk.swapchain, true);
+  if (result != VK_SUCCESS) {
+    ri.Printf(PRINT_WARNING, "Vulkan: Failed to recreate swapchain: %s\n", vk_result_string(result));
+    return result;
+  }
   // Recreate framebuffers for the new swapchain images
   vk_create_framebuffers();
   ri.Printf(PRINT_ALL, "Vulkan: Swapchain recreated with %u images\n", vk.swapchain_image_count);
@@ -10591,6 +10600,14 @@ void vk_recreate_swapchain(void) {
     vk_shutdown_render_profiler();
     vk_init_render_profiler();
     ri.Printf(PRINT_ALL, "Vulkan: Render profiler reinitialized after swapchain recreation\n");
+  }
+  return VK_SUCCESS;
+}
+
+void vk_recreate_swapchain(void) {
+  VkResult result = vk_recreate_swapchain_safe();
+  if (result != VK_SUCCESS) {
+    ri.Error(ERR_FATAL, "Vulkan: Failed to recreate swapchain: %s", vk_result_string(result));
   }
 }
 
