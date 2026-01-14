@@ -147,7 +147,13 @@ static inline void Matrix16MultiplyOptimized( const mat4_t a, const mat4_t b, ma
 
 // Optimized matrix inversion using block-wise method for better numerical stability
 // This is faster and more stable than cofactor expansion for typical transform matrices
+#ifdef __cplusplus
+extern "C" {
+#endif
 void Matrix16InverseOptimized( const mat4_t in, mat4_t out );
+#ifdef __cplusplus
+}
+#endif
 
 /*
 =============================================================================

@@ -4,6 +4,10 @@
 #include <vulkan/vulkan.h>
 #include "vk.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Framebuffer and render pass management function declarations
 void vk_create_render_passes(void);
 void vk_create_framebuffers(void);
@@ -19,5 +23,9 @@ void vk_end_post_bloom_render_pass(void);
 // Framebuffer state queries
 qboolean vk_has_framebuffers(void);
 uint32_t vk_get_framebuffer_count(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // __VK_FRAMEBUFFER_H__

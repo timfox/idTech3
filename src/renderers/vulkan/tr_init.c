@@ -132,13 +132,13 @@ extern cvar_t	*r_fsr_enable;
 extern cvar_t	*r_fsr_easu;
 extern cvar_t	*r_fsr_rcas;
 
-// RTX ray tracing CVARs
-extern cvar_t	*r_rtx_enable;
-extern cvar_t	*r_rtx_shadows;
-extern cvar_t	*r_rtx_reflections;
-extern cvar_t	*r_rtx_gi;
-extern cvar_t	*r_rtx_quality;
-extern cvar_t	*r_rtx_blasCompaction;
+// RTX ray tracing CVARs (defined below in RE_Init)
+cvar_t	*r_rtx_enable;
+cvar_t	*r_rtx_shadows;
+cvar_t	*r_rtx_reflections;
+cvar_t	*r_rtx_gi;
+cvar_t	*r_rtx_quality;
+cvar_t	*r_rtx_blasCompaction;
 extern cvar_t	*r_fsr_sharpness;
 
 extern cvar_t	*r_styleTransfer;
@@ -429,7 +429,13 @@ void R_Register( void ) {
     r_fsr_rcas = ri.Cvar_Get( "r_fsr_rcas", "1", CVAR_ARCHIVE_ND );
     r_fsr_sharpness = ri.Cvar_Get( "r_fsr_sharpness", "0.5", CVAR_ARCHIVE_ND );
 
-    // RTX CVARs are handled by the RTX renderer when enabled
+    // RTX ray tracing CVARs
+    r_rtx_enable = ri.Cvar_Get( "r_rtx_enable", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
+    r_rtx_shadows = ri.Cvar_Get( "r_rtx_shadows", "1", CVAR_ARCHIVE_ND );
+    r_rtx_reflections = ri.Cvar_Get( "r_rtx_reflections", "1", CVAR_ARCHIVE_ND );
+    r_rtx_gi = ri.Cvar_Get( "r_rtx_gi", "1", CVAR_ARCHIVE_ND );
+    r_rtx_quality = ri.Cvar_Get( "r_rtx_quality", "2", CVAR_ARCHIVE_ND );
+    r_rtx_blasCompaction = ri.Cvar_Get( "r_rtx_blasCompaction", "1", CVAR_ARCHIVE_ND );
 
     r_styleTransfer = ri.Cvar_Get( "r_styleTransfer", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 

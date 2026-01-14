@@ -15,6 +15,7 @@ extern refimport_t ri;
 #include "../vk_rtx_acceleration.h"
 #include "../tr_math_optimized.h"
 #include "../vk_framebuffer.h"
+#include "../tr_common.h"  // For R_LoadPNG, R_CreateImage declarations
 
 // RTX CVAR extern declarations
 extern cvar_t *r_rtx_enable;
@@ -22,6 +23,10 @@ extern cvar_t *r_rtx_shadows;
 extern cvar_t *r_rtx_reflections;
 extern cvar_t *r_rtx_gi;
 extern cvar_t *r_rtx_quality;
+
+// Forward declarations for image loading functions
+// These are declared in tr_common.h and vk_rtx_acceleration.h with proper linkage
+// We just need forward declarations here since they're in the same library
 
 // Forward declarations for ray tracing functions
 void vk_rt_create_denoise_resources( uint32_t width, uint32_t height );
