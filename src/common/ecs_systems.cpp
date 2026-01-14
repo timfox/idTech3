@@ -325,7 +325,13 @@ static void ECS_Bullet_Step(entt::registry &registry, float deltaTime) {
 
 	// Process collision events (call user callbacks if registered)
 	for (const auto &event : collisionEvents) {
-		// TODO: Call user-registered collision callbacks
+		// TODO: Call user-registered collision callbacks.
+		// Implementation approach:
+		//   1. Maintain a registry of user-defined collision callback functions
+		//   2. When collision is detected, iterate through registered callbacks
+		//   3. Call each callback with collision information (entities, contact points, etc.)
+		//   4. Allow callbacks to modify collision response or trigger game events
+		// This enables modders to customize collision behavior without modifying core systems.
 		// For now, just log the collision
 		if (false) { // Debug drawing disabled by default
 			Com_Printf("Bullet collision: entity %d <-> entity %d, impulse %.2f\n",
@@ -567,15 +573,27 @@ static void ECS_PickupSystem_Update(float deltaTime) {
 				if (pickup.timeUntilRespawn <= 0.0f) {
 					pickup.isPickedUp = qfalse;
 					pickup.timeUntilRespawn = pickup.respawnTime;
-					// TODO: Restore entity visibility/rendering
+					// TODO: Restore entity visibility/rendering.
+					// Implementation approach:
+					//   1. Check if entity has RenderComponent or similar
+					//   2. Set visibility flag to true
+					//   3. Trigger renderer update to show the entity again
+					//   4. Optionally play respawn sound/effect
+					// This ensures pickups become visible again after respawn timer expires.
 				}
 			}
 			continue;
 		}
 		
-		// TODO: Check proximity to players and handle pickup
-		// This would integrate with the game's player system
-		// For now, this is a placeholder for the system structure
+		// TODO: Check proximity to players and handle pickup.
+		// Implementation approach:
+		//   1. Get all entities with PlayerComponent or similar
+		//   2. Calculate distance from pickup to each player
+		//   3. If within pickup range (e.g., 64 units), trigger pickup
+		//   4. Apply pickup effects (health, armor, ammo, etc.) to player
+		//   5. Mark pickup as collected and start respawn timer if applicable
+		//   6. Play pickup sound and visual effects
+		// This integrates with the game's player system to handle item collection.
 	}
 }
 
@@ -594,8 +612,14 @@ static void ECS_KeySystem_Update(float deltaTime) {
 	for (auto entity : view) {
 		auto &key = view.get<KeyComponent>(entity);
 		
-		// TODO: Check if key has been picked up and unlock target door
-		// This would integrate with door/trigger systems
+		// TODO: Check if key has been picked up and unlock target door.
+		// Implementation approach:
+		//   1. Check if key.isPickedUp flag is set
+		//   2. Find target door entity using key.targetDoorId or similar
+		//   3. If door has DoorComponent, set door.locked = false
+		//   4. Trigger door unlock animation/sound
+		//   5. Update door state in game world
+		// This enables key-based door unlocking mechanics in the game.
 		(void)key; // Suppress unused warning
 	}
 	
@@ -621,8 +645,14 @@ static void ECS_BackpackSystem_Update(float deltaTime) {
 		if (!backpack.permanent && backpack.timeRemaining > 0.0f) {
 			backpack.timeRemaining -= deltaTime;
 			if (backpack.timeRemaining <= 0.0f) {
-				// TODO: Remove backpack effects from player
-				// Remove component or mark for removal
+				// TODO: Remove backpack effects from player.
+				// Implementation approach:
+				//   1. Find player entity associated with this backpack
+				//   2. Remove or modify HealthComponent/ArmorComponent to remove bonuses
+				//   3. Restore original health/armor values if they were modified
+				//   4. Remove BackpackComponent from entity or mark for removal
+				//   5. Play effect removal sound/visual feedback
+				// This ensures temporary backpack effects are properly cleaned up.
 			}
 		}
 	}
@@ -651,11 +681,23 @@ static void ECS_ObjectiveSystem_Update(float deltaTime) {
 		// Check if objective is complete
 		if (objective.progress >= objective.targetProgress) {
 			objective.completed = qtrue;
-			// TODO: Play completion sound, trigger completion events
+			// TODO: Play completion sound, trigger completion events.
+			// Implementation approach:
+			//   1. Play objective completion sound (S_StartLocalSound or similar)
+			//   2. Trigger Lua event "objective_completed" with objective data
+			//   3. Update UI to show objective completion
+			//   4. Award XP or rewards if applicable
+			//   5. Check if all objectives are complete (mission completion)
+			// This provides feedback and triggers game progression events.
 		}
 		
-		// TODO: Update progress based on game state
-		// This would integrate with game logic to track objective progress
+		// TODO: Update progress based on game state.
+		// Implementation approach:
+		//   1. Query game state for objective-relevant data (kills, items collected, etc.)
+		//   2. Calculate progress percentage based on current vs. target values
+		//   3. Update objective.progress field
+		//   4. Trigger progress update events for UI display
+		// This integrates with game logic to track objective progress in real-time.
 	}
 	
 	(void)deltaTime; // Suppress unused warning
@@ -689,8 +731,15 @@ static void ECS_DebrisSystem_Update(float deltaTime) {
 		
 		// Handle fade out
 		if (debris.fadeOut && debris.timeRemaining <= debris.fadeStartTime) {
-			// TODO: Apply fade alpha to rendering
-			// This would integrate with the renderer
+			// TODO: Apply fade alpha to rendering.
+			// Implementation approach:
+			//   1. Calculate fade alpha: alpha = (timeRemaining / fadeStartTime)
+			//   2. Get RenderComponent or similar for this entity
+			//   3. Set render component alpha/color alpha channel
+			//   4. Renderer will use this alpha value for transparency
+			//   5. Optionally use shader uniforms for per-entity alpha
+			// This creates smooth fade-out effects for debris before removal.
+			// Note: Requires renderer integration - see renderer boundary notes.
 		}
 	}
 	
@@ -714,12 +763,20 @@ static void ECS_PlayerClassSystem_Update(float deltaTime) {
 	
 	for (auto entity : view) {
 		auto &playerClass = view.get<PlayerClassComponent>(entity);
-		(void)playerClass; // Reserved for future use (see TODOs below)
+		// TODO: Apply class-specific bonuses to health/armor.
+		// Implementation approach:
+		//   1. Get HealthComponent for this entity
+		//   2. Apply class-specific health/armor multipliers based on playerClass.type
+		//   3. Update max health/armor values accordingly
+		// This would integrate with HealthComponent to provide class-based gameplay variety.
+		(void)playerClass; // Reserved for future use (see TODOs above and below)
 		
-		// TODO: Apply class-specific bonuses to health/armor
-		// This would integrate with HealthComponent
-		// TODO: Apply movement speed modifiers
-		// This would integrate with PhysicsComponent
+		// TODO: Apply movement speed modifiers.
+		// Implementation approach:
+		//   1. Get PhysicsComponent for this entity
+		//   2. Apply class-specific speed multipliers based on playerClass.type
+		//   3. Update movement parameters (walk speed, run speed, etc.)
+		// This would integrate with PhysicsComponent to provide class-based movement variety.
 	}
 	
 	(void)deltaTime; // Suppress unused warning
@@ -786,6 +843,13 @@ static void ECS_FireteamSystem_Update(float deltaTime) {
 		}
 		
 		// TODO: Handle fireteam communication, shared objectives, etc.
+		// Implementation approach:
+		//   1. Implement fireteam chat/voice communication system
+		//   2. Share objective progress across fireteam members
+		//   3. Coordinate fireteam actions (synchronized attacks, etc.)
+		//   4. Track fireteam statistics and achievements
+		//   5. Handle fireteam member join/leave events
+		// This enables cooperative gameplay features for multiplayer modes.
 	}
 	
 	(void)deltaTime; // Suppress unused warning

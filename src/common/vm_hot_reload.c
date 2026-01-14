@@ -277,15 +277,42 @@ static void VM_HotReloadStatus_f(void) {
 VM_HotReloadRegisterCommands
 ================
 */
+/*
+================
+Cmd_CompleteVMName
+Command completion function for VM names (qagame, cgame, ui)
+
+Provides tab-completion for the vm_reload command, allowing users to
+tab-complete VM names instead of typing them manually.
+================
+*/
+static void Cmd_CompleteVMName(const char *args, int argNum) {
+	// Complete VM names for the second argument (argNum == 2)
+	// args contains the partial string being completed
+	if (argNum == 2) {
+		// Field_CompleteCommand will match the partial string in args against VM names
+		// The completion system will filter and display matching VM names
+		// Note: Field_CompleteCommand may be a stub in dedicated server builds,
+		// but will work properly in client builds where the console system is available
+		const char *partial = args ? args : "";
+		
+		// Try to match each VM name against the partial string
+		for (vmIndex_t i = 0; i < VM_COUNT; i++) {
+			// If partial string matches the beginning of VM name, complete it
+			if (!partial[0] || Q_strnicmp(vmName[i], partial, strlen(partial)) == 0) {
+				Field_CompleteCommand(vmName[i], qfalse, qfalse);
+			}
+		}
+	}
+}
+
 void VM_HotReloadRegisterCommands(void) {
 	Cmd_AddCommand("vm_reload", VM_ReloadVM_f);
 	Cmd_AddCommand("vm_reload_all", VM_ReloadAll_f);
 	Cmd_AddCommand("vm_hotreload_status", VM_HotReloadStatus_f);
 
-	// TODO: Implement command completion for vm_reload command.
-	// This would allow tab-completion of VM names (game, cgame, ui) when using
-	// the vm_reload command, improving developer experience and reducing typos.
-	// Cmd_SetCommandCompletionFunc("vm_reload", Cmd_CompleteVMName);
+	// Command completion for vm_reload - allows tab-completion of VM names
+	Cmd_SetCommandCompletionFunc("vm_reload", Cmd_CompleteVMName);
 }
 
 /*

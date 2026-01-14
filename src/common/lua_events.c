@@ -214,8 +214,13 @@ static qboolean Lua_Events_Subscribe(lua_State *L, const char *event_name, int c
 	sub->once = once;
 	sub->filter = NULL;
 	// TODO: Extract and store script name for better debugging and event tracking.
+	// Implementation approach:
+	//   1. Use lua_getinfo(L, "S", &dbg) to get source file information
+	//   2. Extract filename from dbg.source (may need to strip '@' prefix and path)
+	//   3. Store in sub->script_name for hot-reload tracking
 	// This would help identify which Lua script registered each event subscription,
 	// useful for debugging event handler issues and tracking script dependencies.
+	// Note: Requires Lua debug library to be enabled (LUA_USE_APICHECK or similar)
 	Q_strncpyz(sub->script_name, "", sizeof(sub->script_name));
 	entry->num_subscribers++;
 	return qtrue;

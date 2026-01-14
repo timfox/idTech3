@@ -93,14 +93,17 @@ This document categorizes TODO and FIXME markers found throughout the codebase f
 
 ### Phase 1: Safe Improvements (Current)
 1. ✅ Create this categorization document
-2. 🔄 Add clarifying comments to FIXME markers
-3. 🔄 Improve code organization (move syscall extensions)
-4. 🔄 Add documentation for opaque type migration path
+2. ✅ Add clarifying comments to FIXME markers
+3. ✅ Improve code organization (move syscall extensions)
+4. ✅ Add documentation for opaque type migration path
+5. ✅ Implement command completion for vm_reload
+6. ✅ Enhance TODO comments with implementation approaches
 
-### Phase 2: Code Organization
-1. Move hardcoded syscall extensions to syscall_registry.c
-2. Clean up backup files
-3. Document disabled code blocks with rationale
+### Phase 2: Code Organization (In Progress)
+1. ✅ Move hardcoded syscall extensions to syscall_registry.c (completed)
+2. 🔄 Clean up backup files
+3. ✅ Document disabled code blocks with rationale (completed)
+4. ✅ Enhance ECS system TODOs with implementation guidance (completed)
 
 ### Phase 3: Feature Implementation (Future)
 1. ECS system gameplay features

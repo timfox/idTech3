@@ -288,6 +288,78 @@ The improved documentation explains the problem and provides a path forward.
 - ✅ No linter errors
 - ✅ All validation improvements verified
 
+## Additional Improvements (Session 10)
+
+### TODO Implementation - Command Completion ✅
+**File**: `src/common/vm_hot_reload.c`
+
+**Changes**:
+- Implemented `Cmd_CompleteVMName()` completion function for `vm_reload` command
+- Registered completion function with command system
+- Added partial string matching for better tab-completion experience
+- Enhanced documentation explaining completion behavior
+
+**Implementation**:
+- Created completion function that matches VM names (qagame, cgame, ui)
+- Handles partial string matching for incremental completion
+- Works in client builds where console completion is available
+- Gracefully handles dedicated server builds (no-op if completion unavailable)
+
+### TODO Documentation Improvements ✅
+**Files**: 
+- `src/common/lua_events.c` - Enhanced script name extraction TODO
+- `src/common/ecs_systems.cpp` - Enhanced ECS system TODOs (3 locations)
+
+**Changes**:
+- Added implementation approach for Lua script name extraction
+- Enhanced ECS collision callback TODO with implementation details
+- Improved player class system TODOs with step-by-step approach
+- Added integration notes for component systems
+
+**Improvements**:
+1. **Implementation Guidance**: Clear step-by-step approaches for TODOs
+2. **Integration Notes**: Explained how features integrate with existing systems
+3. **Developer Clarity**: Better understanding of what needs to be implemented
+
+### Build Verification ✅
+- ✅ OpenGL renderer build: Successful
+- ✅ No compilation errors
+- ✅ No linter errors
+- ✅ Command completion implementation verified
+
+## Additional Improvements (Session 11)
+
+### ECS System TODO Documentation Enhancements ✅
+**File**: `src/common/ecs_systems.cpp`
+
+**Changes**:
+- Enhanced 7 ECS system TODOs with detailed implementation approaches
+- Added step-by-step guidance for each feature
+- Documented integration points with existing systems
+- Explained component interactions and data flow
+
+**Improved TODOs**:
+1. **Entity visibility/rendering** - Respawn visibility restoration
+2. **Pickup system** - Player proximity and item collection
+3. **Door unlocking** - Key-based door mechanics
+4. **Backpack effects** - Effect removal and cleanup
+5. **Objective completion** - Sound, events, and progression
+6. **Progress tracking** - Real-time objective updates
+7. **Fade alpha rendering** - Debris fade-out effects
+8. **Fireteam communication** - Cooperative gameplay features
+
+**Improvements**:
+- Clear implementation paths for each feature
+- Component integration guidance
+- Gameplay system integration notes
+- Renderer boundary awareness (for fade alpha)
+
+### Build Verification ✅
+- ✅ Vulkan renderer build: Successful
+- ✅ No compilation errors
+- ✅ No linter errors
+- ✅ All ECS TODO improvements verified
+
 ## Additional Improvements (Session 9)
 
 ### Code Clarity and Magic Number Improvements ✅
