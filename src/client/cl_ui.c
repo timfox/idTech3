@@ -782,24 +782,8 @@ static qboolean UI_GetValue( char* value, int valueSize, const char* key ) {
 	}
 
 	// Use centralized syscall registry for extension lookups
+	// All UI extensions are now registered in syscall_registry.c
 	if ( Syscall_GetValue( VM_UI, value, valueSize, key ) ) {
-		return qtrue;
-	}
-
-	// Legacy hardcoded extensions (for compatibility)
-	// TODO: Move these to syscall_registry.c
-	if ( !Q_stricmp( key, "trap_R_AddRefEntityToScene2" ) ) {
-		Com_sprintf( value, valueSize, "%i", UI_R_ADDREFENTITYTOSCENE2 );
-		return qtrue;
-	}
-
-	if ( !Q_stricmp( key, "trap_R_AddLinearLightToScene_Q3E" ) && re.AddLinearLightToScene ) {
-		Com_sprintf( value, valueSize, "%i", UI_R_ADDLINEARLIGHTTOSCENE );
-		return qtrue;
-	}
-
-	if ( !Q_stricmp( key, "trap_Cvar_SetDescription_Q3E" ) ) {
-		Com_sprintf( value, valueSize, "%i", UI_CVAR_SETDESCRIPTION );
 		return qtrue;
 	}
 

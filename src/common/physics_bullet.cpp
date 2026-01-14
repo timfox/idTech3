@@ -32,7 +32,10 @@ static void *g_collisionUserData = nullptr;
 class PhysicsDebugDraw : public btIDebugDraw {
 public:
     void drawLine(const btVector3& from, const btVector3& to, const btVector3& color) override {
-        // TODO: Implement debug line drawing
+        // TODO: Implement debug line drawing for Bullet physics visualization.
+        // This would integrate with the engine's debug rendering system (e.g., r_debugDraw)
+        // to visualize collision shapes, contact points, and constraint axes during
+        // physics simulation, useful for debugging physics issues.
         (void)from; (void)to; (void)color;
     }
 
@@ -507,7 +510,10 @@ physicsResult_t Physics_GetStats(int *numBodies, int *numConstraints, float *ste
     }
     if (numBodies) *numBodies = g_world->getNumCollisionObjects();
     if (numConstraints) *numConstraints = g_world->getNumConstraints();
-    if (stepTime) *stepTime = 0.0f; // TODO: Track step time
+    // TODO: Track physics step time for performance monitoring.
+    // This would measure the time taken for each physics simulation step,
+    // useful for profiling and identifying performance bottlenecks in complex scenes.
+    if (stepTime) *stepTime = 0.0f;
     return PHYSICS_OK;
 }
 

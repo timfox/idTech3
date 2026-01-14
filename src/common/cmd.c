@@ -696,7 +696,9 @@ static void Cmd_TokenizeString2( const char *text_in, qboolean ignoreQuotes ) {
 	char sanitizedInput[MAX_CMD_BUFFER];
 
 #ifdef TKN_DBG
-	// FIXME TTimo blunt hook to try to find the tokenization of userinfo
+	// FIXME: Debug hook for tokenization - this is a temporary debugging aid.
+	// Consider implementing proper tokenization debugging with structured output
+	// (token boundaries, types, etc.) rather than just printing the input string.
 	Com_DPrintf("Cmd_TokenizeString: %s\n", text_in);
 #endif
 

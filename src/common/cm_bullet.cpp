@@ -118,9 +118,16 @@ static void CM_Bullet_BrushToTriangles(const cbrush_t *brush,
                                       std::vector<btVector3> &vertices,
                                       std::vector<int> &indices) {
 	// For now, create a simple box approximation for each brush
-	// TODO: Proper brush geometry extraction
+	// TODO: Proper brush geometry extraction - extract actual brush planes
+	// and generate proper convex hull geometry instead of AABB approximation.
+	// This will improve collision accuracy, especially for sloped surfaces.
 
-	if (!brush || brush->numsides < 4) {
+	// Validate brush pointer and minimum geometry requirements
+	if (!brush) {
+		return; // Invalid brush pointer
+	}
+	if (brush->numsides < 4) {
+		// A brush needs at least 4 sides to form a valid 3D volume
 		return;
 	}
 
@@ -192,7 +199,10 @@ Build collision shape for a BSP model
 ================
 */
 btCollisionShape* CM_Bullet_BuildModelCollision(clipHandle_t model) {
+	// Validate model handle range
 	if (model < 0 || model >= MAX_BSP_MODELS) {
+		Com_DPrintf("CM_Bullet_BuildModelCollision: invalid model handle %d (range: 0-%d)\n",
+		            model, MAX_BSP_MODELS - 1);
 		return nullptr;
 	}
 
@@ -201,12 +211,19 @@ btCollisionShape* CM_Bullet_BuildModelCollision(clipHandle_t model) {
 		return bspModelShapes[model];
 	}
 
+	// Get the collision model from the clip handle
+	// Note: CM_ClipHandleToModel is defined in cm_load.c (C) and called from C++.
+	// The function should be accessible since cm_local.h is included, but linkage
+	// errors occur because cm_local.h declarations need extern "C" when included
+	// from C++ files. Until this is fixed, the function call remains commented out.
+	// TODO: Fix C/C++ linkage by adding extern "C" guards to cm_local.h or
+	//       creating a C++-compatible wrapper function.
 	// cmodel_t *cmod = CM_ClipHandleToModel(model);
 	// if (!cmod) {
-	//	return nullptr;
+	// 	Com_DPrintf("CM_Bullet_BuildModelCollision: failed to get collision model for handle %d\n", model);
+	// 	return nullptr;
 	// }
-	// TODO: Fix CM_ClipHandleToModel linkage issue
-	return nullptr;
+	return nullptr; // Temporary: disabled until linkage issue is resolved
 
 	// Collect all triangles from brushes in this model
 	std::vector<btVector3> vertices;
@@ -214,13 +231,21 @@ btCollisionShape* CM_Bullet_BuildModelCollision(clipHandle_t model) {
 
 	// For world model (model 0), include all brushes
 	if (model == 0) {
+		// Validate brush count before iteration
+		if (cm.numBrushes < 0 || !cm.brushes) {
+			Com_DPrintf("CM_Bullet_BuildModelCollision: invalid brush data for world model\n");
+			return nullptr;
+		}
 		for (int i = 0; i < cm.numBrushes; i++) {
 			const cbrush_t *brush = &cm.brushes[i];
 			CM_Bullet_BrushToTriangles(brush, vertices, indices);
 		}
 	} else {
-		// TODO: Implement submodel collision geometry
-		// For now, submodels don't have collision
+		// TODO: Implement submodel collision geometry.
+		// Submodels (brush models) need their own collision shape generation.
+		// This requires extracting geometry from the submodel's brushes and
+		// creating appropriate Bullet collision shapes (convex hulls or mesh shapes).
+		// For now, submodels don't have Bullet collision - fall back to BSP.
 		return nullptr;
 	}
 
@@ -308,7 +333,9 @@ void CM_Bullet_Trace(trace_t *results, const vec3_t start, const vec3_t end,
 	}
 
 	// For now, just call the regular BSP trace
-	// TODO: Implement Bullet-based tracing for dynamic objects
+	// TODO: Implement Bullet-based tracing for dynamic objects.
+	// This would use btCollisionWorld::rayTest() for more accurate dynamic object
+	// collision detection, especially for moving entities and complex shapes.
 	CM_BoxTrace(results, start, end, mins, maxs, model, brushmask, cylinder);
 }
 
@@ -325,7 +352,10 @@ int CM_Bullet_PointContents(const vec3_t p, clipHandle_t model) {
 	}
 
 	// For now, just call the regular BSP function
-	// TODO: Implement Bullet-based point contents checking
+	// TODO: Implement Bullet-based point contents checking.
+	// This would use btCollisionWorld::contactTest() or similar to determine
+	// if a point is inside collision geometry, useful for trigger volumes and
+	// area detection with better accuracy than BSP-based checks.
 	return CM_PointContents(p, model);
 }
 

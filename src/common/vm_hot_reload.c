@@ -282,7 +282,10 @@ void VM_HotReloadRegisterCommands(void) {
 	Cmd_AddCommand("vm_reload_all", VM_ReloadAll_f);
 	Cmd_AddCommand("vm_hotreload_status", VM_HotReloadStatus_f);
 
-	// Cmd_SetCommandCompletionFunc("vm_reload", Cmd_CompleteVMName); // TODO: Implement completion
+	// TODO: Implement command completion for vm_reload command.
+	// This would allow tab-completion of VM names (game, cgame, ui) when using
+	// the vm_reload command, improving developer experience and reducing typos.
+	// Cmd_SetCommandCompletionFunc("vm_reload", Cmd_CompleteVMName);
 }
 
 /*

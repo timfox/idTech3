@@ -213,7 +213,10 @@ static qboolean Lua_Events_Subscribe(lua_State *L, const char *event_name, int c
 	sub->active = qtrue;
 	sub->once = once;
 	sub->filter = NULL;
-	Q_strncpyz(sub->script_name, "", sizeof(sub->script_name)); // TODO: get script name
+	// TODO: Extract and store script name for better debugging and event tracking.
+	// This would help identify which Lua script registered each event subscription,
+	// useful for debugging event handler issues and tracking script dependencies.
+	Q_strncpyz(sub->script_name, "", sizeof(sub->script_name));
 	entry->num_subscribers++;
 	return qtrue;
 }

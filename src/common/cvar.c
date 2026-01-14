@@ -349,7 +349,11 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 		}
 	}
 
-#if 0 // FIXME: values with backslash happen
+#if 0
+	// FIXME: String validation disabled because values with backslashes are valid
+	// in some contexts (e.g., file paths). Need context-aware validation that
+	// distinguishes between user input and internal values.
+	// See: https://github.com/timfox/idtech3/issues/...
 	if ( !Cvar_ValidateString( var_value ) ) {
 		Com_Printf("invalid cvar value string: %s\n", var_value );
 		var_value = "BADVALUE";
@@ -625,7 +629,9 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 		var_name = "BADNAME";
 	}
 
-#if 0	// FIXME
+#if 0
+	// FIXME: String validation disabled - same issue as above (backslash handling).
+	// Re-enable once context-aware validation is implemented.
 	if ( value && !Cvar_ValidateString( value ) ) {
 		Com_Printf("invalid cvar value string: %s\n", value );
 		var_value = "BADVALUE";
@@ -1243,7 +1249,10 @@ static void Cvar_Func_f( void ) {
 	if ( !cvar ) {
 		if ( !AllowEmptyCvar( ftype ) )	{
 			Com_Printf( "Cvar '%s' does not exist.\n", cvar_name );
-			return; // FIXME: allow cvar creation for some functions?
+			// FIXME: Consider allowing cvar creation for some function types
+			// (e.g., set commands) to improve user experience. Currently
+			// requires explicit cvar declaration before use.
+			return;
 		}
 	} else if ( cvar->flags & ( CVAR_INIT | CVAR_ROM | CVAR_PROTECTED ) ) {
 		Com_Printf( "Cvar '%s' is write-protected.\n", cvar_name );

@@ -236,7 +236,10 @@ NET_ErrorString
 */
 static char *NET_ErrorString( void ) {
 #ifdef _WIN32
-	//FIXME: replace with FormatMessage?
+	// FIXME: Consider replacing with FormatMessage() for better error messages.
+	// FormatMessage() provides localized, human-readable error descriptions
+	// instead of error codes. However, current switch-based approach is more
+	// portable and doesn't require additional memory allocation.
 	switch( socketError ) {
 		case WSAEINTR: return "WSAEINTR";
 		case WSAEBADF: return "WSAEBADF";
@@ -913,7 +916,10 @@ qboolean Sys_IsLANAddress( const netadr_t *adr ) {
 #ifdef USE_IPV6
 			else if ( adr->type == NA_IP6 || adr->type == NA_MULTICAST6 )
 			{
-				// TODO? should we check the scope_id here?
+				// TODO: Consider checking scope_id for IPv6 link-local addresses.
+				// Link-local addresses (fe80::/10) require a scope_id to identify
+				// the network interface. This may be needed for proper address matching
+				// on systems with multiple network interfaces.
 
 				compareip = (byte *) &((struct sockaddr_in6 *) &localIP[index].addr)->sin6_addr;
 				comparemask = (byte *) &((struct sockaddr_in6 *) &localIP[index].netmask)->sin6_addr;

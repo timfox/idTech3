@@ -563,7 +563,9 @@ typedef union {
 
 
 // Handle types - keeping as int for array indexing compatibility
-// TODO: Consider making these opaque types in a future major version
+// TODO: Consider making these opaque types in a future major version.
+// Migration path: Use wrapper structs with implicit conversion operators (C++23)
+// or tagged integers to maintain type safety while preserving array indexing.
 typedef int qhandle_t;
 typedef int sfxHandle_t;
 typedef int fileHandle_t;
@@ -709,7 +711,9 @@ typedef enum {
 #define	MAX_MAP_AREA_BYTES		32		// bit vector of area visibility
 
 
-// print levels from renderer (FIXME: set up for game / cgame?)
+// Print levels used by renderer and engine subsystems
+// FIXME: Consider whether game/cgame should have separate print level contexts
+// to allow independent developer mode toggles. Currently shared across all VMs.
 typedef enum {
 	PRINT_ALL,
 	PRINT_DEVELOPER,		// only print when "developer 1"

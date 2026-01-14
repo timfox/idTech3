@@ -538,7 +538,9 @@ static void CMod_LoadPatches( const lump_t *surfs, const lump_t *verts ) {
 		if ( LittleLong( in->surfaceType ) != MST_PATCH ) {
 			continue;		// ignore other surfaces
 		}
-		// FIXME: check for non-colliding patches
+		// FIXME: Check for non-colliding patches (e.g., trigger volumes, decorative
+		// surfaces). Patches with SURF_NODRAW or specific content flags should be
+		// excluded from collision geometry to improve performance and accuracy.
 
 		cm.surfaces[ i ] = patch = Hunk_Alloc( sizeof( *patch ), h_high );
 

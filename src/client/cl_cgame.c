@@ -159,7 +159,9 @@ static qboolean CL_GetSnapshot( int snapshotNumber, snapshot_t *snapshot ) {
 			cl.parseEntities[ ( clSnap->parseEntitiesNum + i ) & (MAX_PARSE_ENTITIES-1) ];
 	}
 
-	// FIXME: configstring changes and server commands!!!
+	// FIXME: Handle configstring changes and server commands during cgame execution.
+	// Configstring updates can occur mid-frame and may require immediate processing
+	// to maintain game state consistency. Consider adding deferred processing queue.
 
 	return qtrue;
 }
@@ -435,34 +437,8 @@ static qboolean CL_GetValue( char* value, int valueSize, const char* key ) {
 	}
 
 	// Use centralized syscall registry for extension lookups
+	// All cgame extensions are now registered in syscall_registry.c
 	if ( Syscall_GetValue( VM_CGAME, value, valueSize, key ) ) {
-		return qtrue;
-	}
-
-	// Legacy hardcoded extensions (for compatibility)
-	// TODO: Move these to syscall_registry.c
-	if ( !Q_stricmp( key, "trap_R_AddRefEntityToScene2" ) ) {
-		Com_sprintf( value, valueSize, "%i", CG_R_ADDREFENTITYTOSCENE2 );
-		return qtrue;
-	}
-
-	if ( !Q_stricmp( key, "trap_R_ForceFixedDLights" ) ) {
-		Com_sprintf( value, valueSize, "%i", CG_R_FORCEFIXEDDLIGHTS );
-		return qtrue;
-	}
-
-	if ( !Q_stricmp( key, "trap_R_AddLinearLightToScene_Q3E" ) && re.AddLinearLightToScene ) {
-		Com_sprintf( value, valueSize, "%i", CG_R_ADDLINEARLIGHTTOSCENE );
-		return qtrue;
-	}
-
-	if ( !Q_stricmp( key, "trap_IsRecordingDemo" ) ) {
-		Com_sprintf( value, valueSize, "%i", CG_IS_RECORDING_DEMO );
-		return qtrue;
-	}
-
-	if ( !Q_stricmp( key, "trap_Cvar_SetDescription_Q3E" ) ) {
-		Com_sprintf( value, valueSize, "%i", CG_CVAR_SETDESCRIPTION );
 		return qtrue;
 	}
 
@@ -1198,7 +1174,10 @@ static void CL_AdjustTimeDelta( void ) {
 
 	if ( deltaDelta > RESET_TIME ) {
 		cl.serverTimeDelta = newDelta;
-		cl.oldServerTime = cl.snap.serverTime;	// FIXME: is this a problem for cgame?
+		// FIXME: oldServerTime update during time delta reset - verify cgame timing.
+		// This may cause timing inconsistencies if cgame is mid-frame when reset occurs.
+		// Consider deferring the update or ensuring cgame handles time resets gracefully.
+		cl.oldServerTime = cl.snap.serverTime;
 		cl.serverTime = cl.snap.serverTime;
 		if ( cl_showTimeDelta->integer ) {
 			Com_Printf( "<RESET> " );

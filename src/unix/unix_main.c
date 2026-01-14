@@ -60,7 +60,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
   #include <sys/file.h>
 #endif
 
-// FIXME TTimo should we gard this? most *nix system should comply?
+// FIXME: termios.h inclusion - most *nix systems should comply with POSIX.
+// Consider adding feature detection macro (HAVE_TERMIOS_H) for better
+// portability to non-POSIX systems. Currently required for terminal I/O.
 #include <termios.h>
 
 #include "../common/q_shared.h"
@@ -152,8 +154,10 @@ void Sys_BeginProfiling( void )
 //   so we provide tty_Clear and tty_Show to be called before and after a stdout or stderr output
 // =============================================================
 
-// flush stdin, I suspect some terminals are sending a LOT of shit
-// FIXME TTimo relevant?
+// Flush stdin to clear any buffered terminal input
+// FIXME: Verify if this is still relevant with modern terminal handling.
+// Some terminals may buffer input differently, but this may be legacy code
+// from older terminal implementations. Consider removing if no longer needed.
 static void tty_FlushIn( void )
 {
 #if 1
@@ -204,8 +208,10 @@ void tty_Hide( void )
 }
 
 
-// show the current line
-// FIXME TTimo need to position the cursor if needed??
+// Show the current line in terminal
+// FIXME: Consider adding cursor positioning for better terminal compatibility.
+// Some terminals may require explicit cursor movement for proper line display,
+// especially when dealing with multi-line input or terminal resizing.
 void tty_Show( void )
 {
 	if ( !ttycon_on )
