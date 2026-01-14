@@ -16,6 +16,7 @@ extern refimport_t ri;
 #include "../tr_math_optimized.h"
 #include "../vk_framebuffer.h"
 #include "../tr_common.h"  // For R_LoadPNG, R_CreateImage declarations
+#include <algorithm>  // For std::min, std::max, std::clamp
 
 // RTX CVAR extern declarations
 extern cvar_t *r_rtx_enable;
@@ -23,6 +24,18 @@ extern cvar_t *r_rtx_shadows;
 extern cvar_t *r_rtx_reflections;
 extern cvar_t *r_rtx_gi;
 extern cvar_t *r_rtx_quality;
+extern cvar_t *r_rt_pathtracing;
+extern cvar_t *r_rt_samples;
+extern cvar_t *r_rt_giBounces;
+extern cvar_t *r_rt_denoise;
+extern cvar_t *r_rt_temporal;
+extern cvar_t *r_rt_temporalAlpha;
+extern cvar_t *r_rt_denoiseIterations;
+extern cvar_t *r_rt_denoiseSpatialAlpha;
+extern cvar_t *r_rt_denoiseVarianceAlpha;
+extern cvar_t *r_rt_debugMagenta;
+extern cvar_t *r_raytracing;
+extern cvar_t *r_rt_giIntensity;
 
 // Forward declarations for image loading functions
 // These are declared in tr_common.h and vk_rtx_acceleration.h with proper linkage
@@ -31,11 +44,11 @@ extern cvar_t *r_rtx_quality;
 // Forward declarations for ray tracing functions
 void vk_rt_create_denoise_resources( uint32_t width, uint32_t height );
 void vk_rt_destroy_denoise_resources( void );
-void vk_rt_denoise( uint32_t width, uint32_t height );
+extern "C" void vk_rt_denoise( uint32_t width, uint32_t height );
 void vk_rt_create_denoise_pipeline( void );
 void vk_rt_update_composite_descriptor_set( void );
 void vk_rt_create_composite_descriptor_set( void );
-void vk_rt_composite( void );
+extern "C" void vk_rt_composite( void );
 
 // Forward declarations for local functions
 static void vk_rt_create_temporal_buffers( uint32_t width, uint32_t height );
@@ -2036,7 +2049,7 @@ extern "C" void vk_rt_update_uniform_buffer( void )
 	
 	// maxBounces (int) - maximum ray bounces for GI
 	idata = (int *)data;
-	idata[0] = (r_rt_gi && r_rt_gi->integer) ? (r_rt_giBounces ? r_rt_giBounces->integer : 2) : 0;
+	idata[0] = (r_rtx_gi && r_rtx_gi->integer) ? (r_rt_giBounces ? r_rt_giBounces->integer : 2) : 0;
 	idata += 1;
 	data = (float *)idata;
 	
@@ -2094,8 +2107,6 @@ extern "C" void vk_rt_update_uniform_buffer( void )
 	}
 	vk.rt.previousMatricesValid = qtrue;
 }
-
-} // extern "C" - close block for vk_rt_build_acceleration_structures, vk_rt_update_tlas, and vk_rt_update_uniform_buffer
 
 #ifdef USE_VULKAN_RAY_TRACING
 
@@ -2216,13 +2227,35 @@ extern "C" void vk_rt_trace_rays( uint32_t width, uint32_t height )
 			break;
 	}
 
-	uint32_t push_constants[6] = {
-		max_recursion, // max_recursion_depth
-		1, // samples_per_pixel
+	// Get path tracing settings from CVARs (already declared at top of file)
+	int path_tracing_enabled = r_rt_pathtracing ? r_rt_pathtracing->integer : 0;
+	int samples_per_pixel = r_rt_samples ? r_rt_samples->integer : 1;
+	int max_bounces = (r_rtx_gi && r_rtx_gi->integer) ? (r_rt_giBounces ? r_rt_giBounces->integer : 2) : 0;
+	
+	// If path tracing is enabled, use its bounce count and sample settings
+	if (path_tracing_enabled) {
+		extern cvar_t *r_path_tracer_max_bounces;
+		extern cvar_t *r_path_tracer_samples_per_pixel;
+		if (r_path_tracer_max_bounces) {
+			max_bounces = r_path_tracer_max_bounces->integer;
+		}
+		if (r_path_tracer_samples_per_pixel) {
+			samples_per_pixel = r_path_tracer_samples_per_pixel->integer;
+		}
+	}
+	
+	// Clamp values for safety
+	max_recursion = (uint32_t)std::min((int)max_recursion, std::max(max_bounces, 1));
+	samples_per_pixel = std::clamp(samples_per_pixel, 1, 16);
+	
+	uint32_t push_constants[7] = {
+		max_recursion, // max_recursion_depth (for path tracing bounces)
+		(uint32_t)samples_per_pixel, // samples_per_pixel
 		(r_rtx_shadows && r_rtx_shadows->integer) ? 1u : 0u, // enable_shadows
 		(r_rtx_reflections && r_rtx_reflections->integer) ? 1u : 0u, // enable_reflections
 		(r_rtx_gi && r_rtx_gi->integer) ? 1u : 0u, // enable_gi
-		gi_samples // gi_samples
+		gi_samples, // gi_samples
+		path_tracing_enabled ? 1u : 0u // enable_path_tracing
 	};
 
 	qvkCmdPushConstants(
@@ -3178,8 +3211,6 @@ extern "C" void vk_rt_composite( void )
 
 	vk_end_render_pass();
 }
-
-} // extern "C" - close block for vk_rt_composite
 
 #endif // USE_VULKAN_RAY_TRACING
 

@@ -139,6 +139,8 @@ cvar_t	*r_rtx_reflections;
 cvar_t	*r_rtx_gi;
 cvar_t	*r_rtx_quality;
 cvar_t	*r_rtx_blasCompaction;
+cvar_t	*r_rt_pathtracing;
+cvar_t	*r_rt_giBounces;
 extern cvar_t	*r_fsr_sharpness;
 
 extern cvar_t	*r_styleTransfer;
@@ -183,6 +185,8 @@ extern cvar_t	*r_shadows;
 extern cvar_t	*r_portalOnly;
 extern cvar_t	*r_raytracing;
 extern cvar_t	*r_rt_samples;
+extern cvar_t	*r_rt_pathtracing;
+extern cvar_t	*r_rt_giBounces;
 extern cvar_t	*r_rt_maxDepth;
 extern cvar_t	*r_rt_debugMagenta;
 extern cvar_t	*r_rt_tlasUpdateMode;
@@ -486,6 +490,15 @@ void R_Register( void ) {
 
     r_raytracing = ri.Cvar_Get( "r_vkRayTracing", "1", CVAR_ARCHIVE_ND | CVAR_LATCH );
     r_rt_samples = ri.Cvar_Get( "r_rt_samples", "1", CVAR_ARCHIVE_ND );
+    ri.Cvar_SetDescription( r_rt_samples, "Number of ray tracing samples per pixel." );
+    
+    // Path tracing CVAR
+    r_rt_pathtracing = ri.Cvar_Get( "r_rt_pathtracing", "0", CVAR_ARCHIVE_ND );
+    ri.Cvar_SetDescription( r_rt_pathtracing, "Enable path tracing mode (0=hybrid, 1=full path tracing)." );
+    
+    // GI bounces CVAR
+    r_rt_giBounces = ri.Cvar_Get( "r_rt_giBounces", "2", CVAR_ARCHIVE_ND );
+    ri.Cvar_SetDescription( r_rt_giBounces, "Maximum number of bounces for global illumination (0-8)." );
     r_rt_maxDepth = ri.Cvar_Get( "r_rt_maxDepth", "2", CVAR_ARCHIVE_ND );
     r_rt_debugMagenta = ri.Cvar_Get( "r_rt_debugMagenta", "0", CVAR_CHEAT );
     r_rt_tlasUpdateMode = ri.Cvar_Get( "r_rt_tlasUpdateMode", "1", CVAR_ARCHIVE_ND );
