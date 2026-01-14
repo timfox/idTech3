@@ -557,6 +557,7 @@ static void ECS_PickupSystem_Update(float deltaTime) {
 	for (auto entity : view) {
 		auto &pickup = view.get<PickupComponent>(entity);
 		auto &transform = view.get<TransformComponent>(entity);
+		(void)transform; // Reserved for future use (distance checks, positioning, etc.)
 		
 		// Skip if already picked up
 		if (pickup.isPickedUp) {
@@ -713,6 +714,7 @@ static void ECS_PlayerClassSystem_Update(float deltaTime) {
 	
 	for (auto entity : view) {
 		auto &playerClass = view.get<PlayerClassComponent>(entity);
+		(void)playerClass; // Reserved for future use (see TODOs below)
 		
 		// TODO: Apply class-specific bonuses to health/armor
 		// This would integrate with HealthComponent

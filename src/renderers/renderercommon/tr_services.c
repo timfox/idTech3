@@ -136,26 +136,28 @@ static qboolean R_LoadShaderFileSafe(const char *filename, int *fileIndex) {
 		return qfalse;
 	}
 
-	// Use FS_ReadFile with NULL buffer to get file size first
-	int fileSize = ri.FS_ReadFile(filename, NULL);
-	if (fileSize <= 0) {
+	// FS_ReadFile allocates the buffer itself using Hunk_AllocateTempMemory
+	// We need to copy it to our own buffer since temp memory gets freed
+	void *tempBuffer = NULL;
+	int fileSize = ri.FS_ReadFile(filename, &tempBuffer);
+	if (fileSize <= 0 || !tempBuffer) {
 		return qfalse;
 	}
 
-	// Allocate buffer using regular malloc (not temp memory)
+	// Allocate our own buffer using regular malloc (not temp memory)
+	// This ensures the data persists after temp memory is freed
 	char *buffer = (char *)ri.Malloc(fileSize + 1);
 	if (!buffer) {
+		ri.FS_FreeFile(tempBuffer);
 		return qfalse;
 	}
 
-	// Load the actual file content
-	int actualSize = ri.FS_ReadFile(filename, (void **)&buffer);
-	if (actualSize != fileSize || actualSize <= 0) {
-		ri.Free(buffer);
-		return qfalse;
-	}
-
+	// Copy from temp buffer to our persistent buffer
+	Com_Memcpy(buffer, tempBuffer, fileSize);
 	buffer[fileSize] = '\0'; // Null terminate
+
+	// Free the temp buffer allocated by FS_ReadFile
+	ri.FS_FreeFile(tempBuffer);
 
 	// Store in context
 	int index = shaderLoadCtx.numFiles++;
@@ -342,6 +344,7 @@ const char *R_GetSafeShaderText(int *size) {
 void ScanAndLoadShaderFiles_Safe(void) {
 	char **shaderFiles = NULL;
 	int numShaderFiles = 0;
+	const char *foundDir = NULL;
 
 	ri.Printf(PRINT_ALL, "=== SAFE SHADER LOADING STARTED ===\n");
 
@@ -358,6 +361,7 @@ void ScanAndLoadShaderFiles_Safe(void) {
 
 		if (dirFiles && numShaderFiles > 0) {
 			shaderFiles = dirFiles;
+			foundDir = dir; // Remember which directory we found files in
 			ri.Printf(PRINT_ALL, "Found %d shader files in %s/\n", numShaderFiles, dir);
 			break;
 		}
@@ -378,13 +382,23 @@ void ScanAndLoadShaderFiles_Safe(void) {
 	// Load all shader files safely
 	int loadedCount = 0;
 	for (int i = 0; i < numShaderFiles; i++) {
+		if (!shaderFiles[i]) {
+			continue; // Skip NULL entries
+		}
 		char filename[MAX_QPATH];
-		Com_sprintf(filename, sizeof(filename), "%s/%s", shaderFiles[i] ? "shaders" : "scripts", shaderFiles[i]);
+		Com_sprintf(filename, sizeof(filename), "%s/%s", foundDir, shaderFiles[i]);
 
 		if (R_LoadShaderFileSafe(filename, NULL)) {
 			loadedCount++;
+			ri.Printf(PRINT_DEVELOPER, "Loaded shader file: %s\n", filename);
 		} else {
-			ri.Printf(PRINT_DEVELOPER, "Failed to load shader file: %s\n", filename);
+			// Check if file exists to provide better error message
+			int fileSize = ri.FS_ReadFile(filename, NULL);
+			if (fileSize <= 0) {
+				ri.Printf(PRINT_WARNING, "Failed to load shader file: %s (file not found or empty, size=%d)\n", filename, fileSize);
+			} else {
+				ri.Printf(PRINT_WARNING, "Failed to load shader file: %s (file exists, size=%d, but load failed)\n", filename, fileSize);
+			}
 		}
 	}
 

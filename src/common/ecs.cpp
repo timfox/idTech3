@@ -590,6 +590,7 @@ ecs_entity_t ECS_CreatePlayerClass(int classTypeInt, int team, const vec3_t posi
 	
 	// Add SkillComponent for progression
 	SkillComponent &skill = registry->emplace<SkillComponent>(entity);
+	(void)skill; // Component created but not initialized yet (reserved for future use)
 	
 	return static_cast<ecs_entity_t>(entity);
 }

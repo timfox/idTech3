@@ -1735,11 +1735,6 @@ static void InitOpenGL( void )
 
 		ri.GLimp_Init( &glConfig );
 
-		// Initialize modern OpenGL systems
-		// FIXME: Temporarily disabled to isolate crash
-		// GL_ShaderInit();
-		// GL_VertexInit();
-
 		R_ClearSymTables();
 
 		init_err = R_ResolveSymbols( core_procs, ARRAY_LEN( core_procs ) );
@@ -1747,6 +1742,18 @@ static void InitOpenGL( void )
 			ri.Error( ERR_FATAL, "Error resolving core OpenGL function '%s'", init_err );
 
 		R_InitExtensions();
+
+		// Initialize modern OpenGL systems (after symbol resolution)
+		// These require OpenGL function pointers to be resolved first
+		if ( qglCreateProgram && qglCreateShader && qglGenVertexArrays && qglGenBuffers )
+		{
+			GL_ShaderInit();
+			GL_VertexInit();
+		}
+		else
+		{
+			ri.Printf( PRINT_WARNING, "Modern OpenGL features not available, using fixed-function pipeline\n" );
+		}
 
 		gls.windowWidth = glConfig.vidWidth;
 		gls.windowHeight = glConfig.vidHeight;
@@ -1810,12 +1817,12 @@ static void InitOpenGL( void )
 
 		gls.initTime = ri.Milliseconds();
 	}
+	}
 
 	// set default state
 	GL_SetDefaultState();
 
 	tr.inited = qtrue;
-}
 }
 
 
@@ -3263,9 +3270,11 @@ static void RE_Shutdown( refShutdownCode_t code ) {
 	ri.Printf( PRINT_ALL, "RE_Shutdown( %i )\n", code );
 
 	// Shutdown modern OpenGL systems first
-	// FIXME: Temporarily disabled to isolate crash
-	// GL_VertexShutdown();
-	// GL_ShaderShutdown();
+	if ( shaderManager.initialized )
+	{
+		GL_ShaderShutdown();
+	}
+	GL_VertexShutdown(); // Safe to call even if not initialized
 
 	ri.Cmd_RemoveCommand( "modellist" );
 	ri.Cmd_RemoveCommand( "screenshotBMP" );

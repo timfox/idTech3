@@ -2,6 +2,7 @@
 #include "../renderercommon/tr_public.h"
 #include "vk.h"
 #include <math.h>
+#include <string.h>
 
 // Renderer interface
 extern refimport_t ri;
@@ -316,6 +317,41 @@ void vk_reset_memory_tracking_on_device_lost(void) {
         freed_count, (unsigned long long)total_freed);
 }
 
+// Check if a resource name is a built-in image that should persist for renderer lifetime
+static qboolean is_builtin_image(const char *resource_name) {
+    if (!resource_name) {
+        return qfalse;
+    }
+    
+    // Built-in images that are intentionally kept alive for renderer lifetime
+    // These are created during initialization and persist until shutdown
+    // Using strstr for simple matching (resource names should match exactly)
+    const char *builtin_patterns[] = {
+        "*default",
+        "*black",
+        "*white",
+        "*identityLight",
+        "*checker",
+        "*grid",
+        "*noise",
+        "*empty",
+        "*emptyCubemap",
+        "*dlight",
+        "*fog",
+        "gfx/2d/bigchars",  // UI font texture
+        NULL
+    };
+    
+    // Simple string comparison (resource names should match exactly)
+    for (int i = 0; builtin_patterns[i] != NULL; i++) {
+        if (strcmp(resource_name, builtin_patterns[i]) == 0) {
+            return qtrue;
+        }
+    }
+    
+    return qfalse;
+}
+
 // Detect memory leaks and report them
 void vk_detect_memory_leaks(void) {
     if (!vk_memory_tracker.leak_detection_enabled) {
@@ -323,39 +359,66 @@ void vk_detect_memory_leaks(void) {
     }
 
     uint32_t leak_count = 0;
-    ri.Printf(PRINT_ALL, "=== GPU Memory Leak Detection ===\n");
+    uint32_t builtin_count = 0;
 
     for (uint32_t i = 0; i < vk_memory_tracker.allocation_count; i++) {
         vk_memory_allocation_t *alloc = &vk_memory_tracker.allocations[i];
         if (!alloc->is_freed) {
             // Safely access string pointers - they may be invalid if device is lost
             const char *resource_name = "unnamed";
-            const char *allocation_site = "unknown";
             
             // Only access pointers if they look valid (non-NULL and not obviously corrupted)
             if (alloc->resource_name && (uintptr_t)alloc->resource_name > 0x1000) {
                 resource_name = alloc->resource_name;
             }
-            if (alloc->allocation_site && (uintptr_t)alloc->allocation_site > 0x1000) {
-                allocation_site = alloc->allocation_site;
+            
+            // Skip built-in images that are intentionally kept alive
+            if (is_builtin_image(resource_name)) {
+                builtin_count++;
+                continue;
             }
             
-            ri.Printf(PRINT_WARNING, "LEAK: Allocation ID %u, %s (%lu bytes) at %s\n",
-                alloc->allocation_id,
-                resource_name,
-                (unsigned long)alloc->size,
-                allocation_site);
             leak_count++;
         }
     }
 
-    if (leak_count == 0) {
-        ri.Printf(PRINT_ALL, "No GPU memory leaks detected\n");
-    } else {
-        ri.Printf(PRINT_ERROR, "Found %u GPU memory leaks\n", leak_count);
+    // Only print messages when there are actual leaks to report
+    if (leak_count > 0) {
+        ri.Printf(PRINT_ERROR, "=== GPU Memory Leak Detection ===\n");
+        ri.Printf(PRINT_ERROR, "Found %u GPU memory leaks:\n", leak_count);
+        
+        // Print details of each leak
+        for (uint32_t i = 0; i < vk_memory_tracker.allocation_count; i++) {
+            vk_memory_allocation_t *alloc = &vk_memory_tracker.allocations[i];
+            if (!alloc->is_freed) {
+                const char *resource_name = "unnamed";
+                const char *allocation_site = "unknown";
+                
+                if (alloc->resource_name && (uintptr_t)alloc->resource_name > 0x1000) {
+                    resource_name = alloc->resource_name;
+                }
+                if (alloc->allocation_site && (uintptr_t)alloc->allocation_site > 0x1000) {
+                    allocation_site = alloc->allocation_site;
+                }
+                
+                if (!is_builtin_image(resource_name)) {
+                    ri.Printf(PRINT_WARNING, "  LEAK: Allocation ID %u, %s (%lu bytes) at %s\n",
+                        alloc->allocation_id,
+                        resource_name,
+                        (unsigned long)alloc->size,
+                        allocation_site);
+                }
+            }
+        }
+        
+        if (builtin_count > 0) {
+            ri.Printf(PRINT_DEVELOPER, "  (Skipped %u built-in image allocation(s) - intentionally persistent)\n", builtin_count);
+        }
+        
         atomic_store_explicit(&vk.vram_stats.leaked_allocations, leak_count, memory_order_relaxed);
         atomic_store_explicit(&vk.vram_stats.memory_leaks_detected, qtrue, memory_order_relaxed);
     }
+    // No leaks - don't print anything to avoid spam
 }
 
 // Print comprehensive VRAM usage statistics

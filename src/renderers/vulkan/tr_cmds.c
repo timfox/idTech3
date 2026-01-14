@@ -887,9 +887,15 @@ void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	}
 
 #ifdef USE_VULKAN
-	// Memory validation on shutdown - detect leaks if enabled
+	// Memory validation - only check periodically to avoid spam (every 1000 frames)
+	// Full leak detection still runs on shutdown
+	static int leak_check_frame_counter = 0;
 	if (vk_memory_tracker.leak_detection_enabled && !vk.device_lost) {
-		vk_detect_memory_leaks();
+		if (++leak_check_frame_counter >= 1000) {
+			leak_check_frame_counter = 0;
+			// Only check, don't print unless there are leaks (handled inside function)
+			vk_detect_memory_leaks();
+		}
 	}
 #endif
 }

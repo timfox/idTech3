@@ -97,13 +97,22 @@ void vk_dlss_shutdown( void )
 
 	vk_dlss_destroy_resources();
 
-	// TODO: Shutdown DLSS SDK
-	// if ( vk.dlss.dlssContext ) {
-	//     NGX_VULKAN_Shutdown( vk.dlss.dlssContext );
-	//     vk.dlss.dlssContext = NULL;
-	// }
+	// Shutdown DLSS SDK if context exists
+	// Note: This requires the DLSS SDK to be linked. The actual shutdown function
+	// would be called via function pointer loaded from the SDK library.
+	// For now, we ensure the context pointer is cleared.
+	if ( vk.dlss.dlssContext != NULL ) {
+		// If DLSS SDK is available, this would call:
+		// PFN_NGX_VULKAN_Shutdown shutdownFunc = (PFN_NGX_VULKAN_Shutdown)dlsym(dlssLib, "NVSDK_NGX_VULKAN_Shutdown");
+		// if (shutdownFunc) {
+		//     shutdownFunc(vk.dlss.dlssContext);
+		// }
+		ri.Printf( PRINT_DEVELOPER, "DLSS: SDK shutdown would be called here if SDK is linked\n" );
+		vk.dlss.dlssContext = NULL;
+	}
 
 	vk.dlss.initialized = qfalse;
+	vk.dlss.supported = qfalse;
 }
 
 qboolean vk_dlss_is_supported( void )
