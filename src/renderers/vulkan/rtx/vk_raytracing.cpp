@@ -1271,6 +1271,7 @@ void vk_rt_build_blas( VkBuffer vertexBuffer, VkDeviceSize vertexOffset, uint32_
 }
 
 
+extern "C" {
 void vk_rt_build_acceleration_structures( void )
 {
 	if ( !vk.rayTracingSupported || !vk.rt.initialized ) {
@@ -1281,7 +1282,6 @@ void vk_rt_build_acceleration_structures( void )
 	// For now, it's a placeholder - will be integrated with world loading
 	ri.Printf( PRINT_DEVELOPER, "Building acceleration structures...\n" );
 }
-
 
 void vk_rt_update_tlas( void )
 {
@@ -1677,6 +1677,7 @@ void vk_rt_create_output_image( uint32_t width, uint32_t height )
 	}
 }
 
+} // extern "C" - close block before static functions
 
 // Create temporal accumulation buffers (history and motion vectors)
 static void vk_rt_create_temporal_buffers( uint32_t width, uint32_t height )
@@ -1948,7 +1949,7 @@ void vk_rt_update_descriptor_set( void )
 }
 
 // Update uniform buffer with camera data and debug flags
-static void vk_rt_update_uniform_buffer( void )
+extern "C" void vk_rt_update_uniform_buffer( void )
 {
 	if ( !vk.rayTracingSupported || !vk.rt.initialized || vk.rt.uniformBuffer == VK_NULL_HANDLE ) {
 		return;
@@ -2094,9 +2095,11 @@ static void vk_rt_update_uniform_buffer( void )
 	vk.rt.previousMatricesValid = qtrue;
 }
 
+} // extern "C" - close block for vk_rt_build_acceleration_structures, vk_rt_update_tlas, and vk_rt_update_uniform_buffer
+
 #ifdef USE_VULKAN_RAY_TRACING
 
-void vk_rt_trace_rays( uint32_t width, uint32_t height )
+extern "C" void vk_rt_trace_rays( uint32_t width, uint32_t height )
 {
 	if ( !vk.rayTracingSupported || !vk.rt.initialized || vk.rt.raytracingPipeline == VK_NULL_HANDLE ) {
 		return;
@@ -2787,8 +2790,7 @@ void vk_rt_create_denoise_pipeline( void )
 	ri.Printf( PRINT_DEVELOPER, "Created ReLAX denoising compute pipeline\n" );
 }
 
-
-void vk_rt_denoise( uint32_t width, uint32_t height )
+extern "C" void vk_rt_denoise( uint32_t width, uint32_t height )
 {
 	if ( !vk.rayTracingSupported || !vk.rt.initialized || 
 	     !r_rt_denoise || !r_rt_denoise->integer ||
@@ -3138,8 +3140,7 @@ void vk_rt_update_composite_descriptor_set( void )
 	qvkUpdateDescriptorSets( vk.device, 2, writes, 0, NULL );
 }
 
-
-void vk_rt_composite( void )
+extern "C" void vk_rt_composite( void )
 {
 	if ( !vk.rayTracingSupported || !vk.rt.initialized || vk.rt_composite_pipeline == VK_NULL_HANDLE || vk.rt_composite_descriptor == VK_NULL_HANDLE ) {
 		return;
@@ -3177,6 +3178,8 @@ void vk_rt_composite( void )
 
 	vk_end_render_pass();
 }
+
+} // extern "C" - close block for vk_rt_composite
 
 #endif // USE_VULKAN_RAY_TRACING
 

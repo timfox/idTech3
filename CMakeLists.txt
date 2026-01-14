@@ -1836,6 +1836,13 @@ IF(USE_RENDERER_DLOPEN)
 				set(USE_VMA OFF CACHE BOOL "" FORCE)
 			endif()
 		endif()
+		# Suppress missing-field-initializers warning for vk_rtx_acceleration.cpp
+		# (Vulkan structures have many optional fields that are NULL by default)
+		if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+			set_source_files_properties(src/renderers/vulkan/vk_rtx_acceleration.cpp PROPERTIES
+				COMPILE_FLAGS "-Wno-missing-field-initializers"
+			)
+		endif()
 	endif()
 	
 	IF(WIN32 AND USE_D3D12)

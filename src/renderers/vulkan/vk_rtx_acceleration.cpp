@@ -8,6 +8,43 @@
 #include <string.h>
 #include <vulkan/vulkan.h>
 #include <time.h>
+
+// RTX CVAR extern declarations
+extern cvar_t *r_rtx_enable;
+extern cvar_t *r_rtx_shadows;
+extern cvar_t *r_rtx_reflections;
+extern cvar_t *r_rtx_gi;
+extern cvar_t *r_rtx_quality;
+
+// External function declarations (these are already declared in headers with proper linkage)
+// RE_RegisterShader and RE_RegisterShaderNoMip are declared in tr_common.h
+// R_LoadPNG and R_CreateImage are declared in tr_local.h
+// vk_update_gpu_timing_ns is declared in vk_sync.h
+// RTX functions are declared in vk_rtx_main.cpp with extern "C"
+
+// Vulkan RTX function pointer declarations (from vk.h)
+extern PFN_vkCreateRayTracingPipelinesKHR qvkCreateRayTracingPipelinesKHR;
+extern PFN_vkGetRayTracingShaderGroupHandlesKHR qvkGetRayTracingShaderGroupHandlesKHR;
+extern PFN_vkGetAccelerationStructureBuildSizesKHR qvkGetAccelerationStructureBuildSizesKHR;
+extern PFN_vkCreateAccelerationStructureKHR qvkCreateAccelerationStructureKHR;
+extern PFN_vkGetAccelerationStructureDeviceAddressKHR qvkGetAccelerationStructureDeviceAddressKHR;
+extern PFN_vkCmdBuildAccelerationStructuresKHR qvkCmdBuildAccelerationStructuresKHR;
+extern PFN_vkDestroyAccelerationStructureKHR qvkDestroyAccelerationStructureKHR;
+extern PFN_vkCmdTraceRaysKHR qvkCmdTraceRaysKHR;
+
+// Global RTX state - defined at top for use throughout file
+qboolean g_rtx_accel_initialized = qfalse;
+qboolean g_rtx_blas_tlas_built = qfalse;
+uint32_t g_blas_count = 0;
+VkPipeline g_rt_pipeline = VK_NULL_HANDLE;
+
+// Shader handle storage - defined at top for use throughout file
+#define MAX_SHADER_HANDLE_SIZE 32
+uint8_t g_shader_handles[3 * MAX_SHADER_HANDLE_SIZE];
+uint32_t g_shader_handle_size = 0;
+
+// Calibrated timestamps availability flag (defined early for use throughout file)
+static qboolean g_cal_ts_available = qfalse;
 // Per-surface material indices
 #define MAX_SURFACES_FOR_INDICES 4096
 static uint32_t g_surface_indices_cpu[MAX_SURFACES_FOR_INDICES];
@@ -15,46 +52,12 @@ static VkBuffer g_surface_indices_buffer = VK_NULL_HANDLE;
 static VkDeviceMemory g_surface_indices_memory = VK_NULL_HANDLE;
 static VkDeviceAddress g_surface_indices_address = 0;
 static VkDeviceSize g_surface_indices_size = 0;
-static void vk_rtx_allocate_surface_indices_buffer(void);
-static void vk_rtx_allocate_surface_indices_buffer(void) {
-    if (g_surface_indices_buffer != VK_NULL_HANDLE) return;
-    VkBufferCreateInfo bufInfo = {};
-    bufInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufInfo.size = MAX_SURFACES_FOR_INDICES * sizeof(uint32_t);
-    bufInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-    bufInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    if (qvkCreateBuffer) {
-        if (qvkCreateBuffer(vk.device, &bufInfo, NULL, &g_surface_indices_buffer) != VK_SUCCESS) {
-            ri.Printf(PRINT_ERROR, "RTX: failed to create surface indices buffer\n");
-            g_surface_indices_buffer = VK_NULL_HANDLE;
-            return;
-        }
-    } else {
-        ri.Printf(PRINT_WARNING, "RTX: qvkCreateBuffer not available\n");
-        return;
-    }
-    VkMemoryRequirements memReqs;
-    qvkGetBufferMemoryRequirements(vk.device, g_surface_indices_buffer, &memReqs);
-    uint32_t memType = find_memory_type(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-    VkMemoryAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memReqs.size;
-    allocInfo.memoryTypeIndex = memType;
-    if (qvkAllocateMemory(vk.device, &allocInfo, NULL, &g_surface_indices_memory) != VK_SUCCESS) {
-        ri.Printf(PRINT_ERROR, "RTX: failed to allocate memory for surface indices buffer\n");
-        vkDestroyBuffer(vk.device, g_surface_indices_buffer, NULL);
-        g_surface_indices_buffer = VK_NULL_HANDLE;
-        g_surface_indices_memory = VK_NULL_HANDLE;
-        return;
-    }
-    qvkBindBufferMemory(vk.device, g_surface_indices_buffer, g_surface_indices_memory, 0);
-    g_surface_indices_size = bufInfo.size;
-    ri.Printf(PRINT_DEVELOPER, "RTX: surface indices buffer allocated: %llu bytes\n", (unsigned long long)g_surface_indices_size);
-}
+
+// Note: Duplicate implementation removed - using the implementation below (line ~68)
 static VkBuffer s_dummy_bind_buffer = VK_NULL_HANDLE;
 static VkDescriptorSet s_dummy_bind_desc = VK_NULL_HANDLE;
 
-// Ensure buffers for surface indices exist
+// Main implementation of vk_rtx_allocate_surface_indices_buffer (use this one)
 static void vk_rtx_allocate_surface_indices_buffer(void) {
     if (g_surface_indices_buffer != VK_NULL_HANDLE) {
         return;
@@ -94,24 +97,6 @@ static void vk_rtx_allocate_surface_indices_buffer(void) {
     ri.Printf(PRINT_DEVELOPER, "RTX: allocated surface indices buffer (%llu bytes)\n", (unsigned long long)g_surface_indices_size);
 }
 
-
-// Get material index for this surface's shader
-uint32_t materialIndex = 0; // Default material
-if (surf->shader && vk.materialSystem.enabled) {
-    // Try to find material entry for this shader
-    const materialEntry_t* entry = vk_material_parser_find_entry(surf->shader->name);
-    if (entry) {
-        // Find or create material index for this entry
-        materialIndex = vk_material_system_find_or_create_index(entry);
-        ri.Printf(PRINT_DEVELOPER, "RTX: Surface %d uses material %d for shader '%s'\n",
-                 i, materialIndex, surf->shader->name);
-    }
-}
-
-// Store material index in instance data for RTX shaders
-// This will be used by gl_InstanceCustomIndexEXT in closest-hit shader
-surf->materialIndex = materialIndex;
-
 qboolean vk_rtx_build_tlas_real_inline(VkCommandBuffer cmd_buffer) {
   ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: TLAS real build inline stub\n");
   (void)cmd_buffer;
@@ -136,17 +121,10 @@ uint32_t vk_rtx_get_surface_material_index(uint32_t surfaceIndex, uint32_t* outI
     return *outIndex;
 }
 
-void vk_rtx_bind_and_trace_raysKHR_from_main(VkCommandBuffer cmd_buffer, uint32_t width, uint32_t height) {
-  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: bind and trace from main (stub) width=%u height=%u cmd=%p\n", width, height, (void*)cmd_buffer);
-}
-
-void vk_rtx_trace_raysKHR(VkCommandBuffer cmd_buffer) {
-  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: trace raysKHR (stub) cmd=%p\n", (void*)cmd_buffer);
-}
-
-void vk_rtx_setup_sbt(VkCommandBuffer cmd_buffer) {
-  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: setup SBT (stub) cmd=%p\n", (void*)cmd_buffer);
-}
+// Note: These functions are stubs - real implementations may exist elsewhere
+// vk_rtx_bind_and_trace_raysKHR_from_main - stub (may need implementation)
+// vk_rtx_trace_raysKHR - stub (may need implementation)
+// vk_rtx_setup_sbt - implemented below (line ~2076)
 
 qboolean vk_rtx_build_tlas_real_full(VkCommandBuffer cmd_buffer) {
   ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: TLAS real full build (stub) started\n");
@@ -169,25 +147,6 @@ qboolean vk_rtx_build_tlas_real_full(VkCommandBuffer cmd_buffer) {
                        0, 1, &barrier, 0, NULL, 0, NULL);
   g_rtx_blas_tlas_built = qtrue;
   ri.Printf(PRINT_ALL, "TLAS real full build pathway invoked (delegated to vk_rtx_build_tlas).\n");
-  return qtrue;
-}
-
-void vk_rtx_create_sbt_buffer_full(void) {
-  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: create SBT buffer (full stub)\n");
-  // Placeholder for SBT buffer creation
-}
-
-qboolean vk_rtx_build_sbt_for_frame_full(VkCommandBuffer cmd_buffer) {
-  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: build SBT for frame (full stub)\n");
-  (void)cmd_buffer;
-  return qtrue;
-}
-
-// Real TLAS full build (stub)
-qboolean vk_rtx_build_tlas_real_full(VkCommandBuffer cmd_buffer) {
-  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: TLAS real full build (stub) started\n");
-  (void)cmd_buffer;
-  g_rtx_blas_tlas_built = qtrue;
   return qtrue;
 }
 
@@ -235,32 +194,17 @@ qboolean vk_rtx_build_blas_incremental(VkCommandBuffer cmd_buffer, uint32_t chan
               changed_surface_start, end_surface - 1, changed_surface_count);
 
     // Build BLAS for changed surfaces
+    // NOTE: msurface_t doesn't have a geometry member - this is a stub
+    // In a full implementation, geometry data would be extracted from surf->data
     for (uint32_t i = changed_surface_start; i < end_surface; i++) {
         msurface_t *surf = &tr.world->surfaces[i];
-        if (!surf || !surf->geometry) {
+        if (!surf) {
             continue;
         }
 
-        // Create BLAS for this surface
-        uint64_t blas_handle = vk_rtx_create_blas_for_geometry(
-            surf->geometry->vertex_buffer,
-            surf->geometry->index_buffer,
-            surf->geometry->vertex_count,
-            surf->geometry->index_count,
-            surf->geometry->vertex_stride,
-            va("surface_%u", i)
-        );
-
-        if (blas_handle == 0) {
-            ri.Printf(PRINT_WARNING, "RTX: Failed to create BLAS for surface %u\n", i);
-            continue;
-        }
-
-        // Update instance data for this surface
-        matrix3x4_t transform = {1.0f, 0.0f, 0.0f, 0.0f,
-                                0.0f, 1.0f, 0.0f, 0.0f,
-                                0.0f, 0.0f, 1.0f, 0.0f};
-        vk_rtx_update_instance_data(blas_handle, &transform, i);
+        // Stub: Skip geometry-based BLAS creation until geometry extraction is implemented
+        // TODO: Extract geometry from surf->data (surfaceType_t*) and create BLAS
+        ri.Printf(PRINT_DEVELOPER, "RTX: Skipping BLAS creation for surface %u (geometry extraction not implemented)\n", i);
     }
 
     // Rebuild TLAS with updated BLAS instances
@@ -399,27 +343,17 @@ qboolean vk_rtx_build_blas_parallel(VkCommandBuffer cmd_buffer, uint32_t max_par
     // 5. Build TLAS with all completed BLAS
 
     // For now, fall back to serial building
+    // NOTE: msurface_t doesn't have a geometry member - this is a stub
+    // In a full implementation, geometry data would be extracted from surf->data
     for (uint32_t i = 0; i < total_surfaces; i++) {
         msurface_t *surf = &tr.world->surfaces[i];
-        if (!surf || !surf->geometry) {
+        if (!surf) {
             continue;
         }
 
-        uint64_t blas_handle = vk_rtx_create_blas_for_geometry(
-            surf->geometry->vertex_buffer,
-            surf->geometry->index_buffer,
-            surf->geometry->vertex_count,
-            surf->geometry->index_count,
-            surf->geometry->vertex_stride,
-            va("surface_%u", i)
-        );
-
-        if (blas_handle != 0) {
-            matrix3x4_t transform = {1.0f, 0.0f, 0.0f, 0.0f,
-                                    0.0f, 0.0f, 1.0f, 0.0f,
-                                    0.0f, 0.0f, 0.0f, 1.0f};
-            vk_rtx_update_instance_data(blas_handle, &transform, i);
-        }
+        // Stub: Skip geometry-based BLAS creation until geometry extraction is implemented
+        // TODO: Extract geometry from surf->data (surfaceType_t*) and create BLAS
+        ri.Printf(PRINT_DEVELOPER, "RTX: Skipping BLAS creation for surface %u (geometry extraction not implemented)\n", i);
     }
 
     vk_rtx_build_tlas(cmd_buffer);
@@ -776,7 +710,7 @@ vk_rtx_lazy_allocate
 Allocate buffer only when actually needed
 =================
 */
-qboolean vk_rtx_lazy_allocate(RTLazyAllocator_t *allocator, VkDeviceSize minimum_size) {
+qboolean vk_rtx_lazy_allocate(RTXLazyAllocator_t *allocator, VkDeviceSize minimum_size) {
     if (!allocator) {
         return qfalse;
     }
@@ -849,7 +783,7 @@ vk_rtx_lazy_free
 Free lazy allocated buffer
 =================
 */
-void vk_rtx_lazy_free(RTLazyAllocator_t *allocator) {
+void vk_rtx_lazy_free(RTXLazyAllocator_t *allocator) {
     if (!allocator || !allocator->allocated) {
         return;
     }
@@ -877,7 +811,7 @@ vk_rtx_lazy_get_free_space
 Get amount of free space in lazy allocator
 =================
 */
-VkDeviceSize vk_rtx_lazy_get_free_space(RTLazyAllocator_t *allocator) {
+VkDeviceSize vk_rtx_lazy_get_free_space(RTXLazyAllocator_t *allocator) {
     if (!allocator || !allocator->allocated) {
         return 0;
     }
@@ -1107,6 +1041,29 @@ qboolean vk_rtx_sbt_prefetch_groups(VkCommandBuffer cmd_buffer, RTXSBTCache_t *c
     return qtrue;
 }
 
+// Forward declare types - full definitions are later (after line ~1115)
+typedef struct {
+    VkBuffer buffer;
+    VkDeviceMemory memory;
+    VkDeviceAddress address;
+    void* mapped;
+    VkDeviceSize size;
+} rtx_buffer_t;
+
+typedef struct {
+    rtx_buffer_t sbt_buffer;
+    uint32_t sbt_record_size;
+    uint32_t sbt_raygen_offset;
+    uint32_t sbt_miss_offset;
+    uint32_t sbt_hit_offset;
+    uint32_t sbt_callable_offset;
+} rtx_sbt_t;
+
+// SBT (Shader Binding Table) state - defined early for use throughout file
+rtx_sbt_t g_sbt;
+
+// Global RTX state and shader handles are defined at top of file (after includes)
+
 void vk_rtx_create_sbt_buffer_full(void) {
   ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: creating full SBT buffer (stub)\n");
   if (g_sbt.sbt_buffer.buffer == VK_NULL_HANDLE) {
@@ -1124,7 +1081,7 @@ void vk_rtx_build_sbt_for_frame_full(VkCommandBuffer cmd_buffer) {
     }
   }
   // Get the shader group handles for 3 groups
-  VkResult result = vkGetRayTracingShaderGroupHandlesKHR(vk.device, g_rt_pipeline, 0, 3,
+  VkResult result = qvkGetRayTracingShaderGroupHandlesKHR(vk.device, g_rt_pipeline, 0, 3,
                                                       3 * MAX_SHADER_HANDLE_SIZE, g_shader_handles);
   if (result != VK_SUCCESS) {
     ri.Printf(PRINT_ERROR, "RTX: Failed to get shader group handles for SBT\n");
@@ -1150,44 +1107,20 @@ void vk_rtx_build_sbt_for_frame_full(VkCommandBuffer cmd_buffer) {
   g_sbt.sbt_hit_offset = 2 * g_sbt.sbt_record_size;
   ri.Printf(PRINT_ALL, "Vulkan RTX: SBT built for frame (full)\n");
 }
-void vk_rtx_build_sbt_for_frame(VkCommandBuffer cmd_buffer) {
-    ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: per-frame SBT build request (wrapper)\n");
-    // Placeholder; actual SBT population would occur here
-}
-#include "tr_local.h"
-#include "vk_rtx_acceleration.h"
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <vulkan/vulkan.h>
-#include <time.h>
-// Stub: create RT pipeline (Plan A groundwork)
-VkResult vk_rtx_create_pipeline(void) {
-  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: creating (stub) RT pipeline\n");
-  // In a real implementation, you'd create g_rt_pipeline and g_rt_pipeline_layout here.
-  g_rt_pipeline = VK_NULL_HANDLE;
-  g_rt_pipeline_layout = VK_NULL_HANDLE;
-  return VK_SUCCESS;
-}
+// Note: vk_rtx_build_sbt_for_frame is implemented below (line ~2030) - stub removed
+// Note: vk_rtx_create_pipeline is implemented below (line ~2206) as a static function
+// The old stub function has been removed - use the real implementation below
 #ifdef VK_CALIBRATED_TIMESTAMPS_ENABLED
 static void VK_debug_calibrated_ts(void) {
   ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: calibrated timestamps are enabled\n");
 }
 #endif
 void vk_update_gpu_timing_ns(uint64_t gpu_ns);
-// Lightweight stub for calibrated timestamp initialization
-void VK_try_init_calibrated_timestamps(void) {
-  ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: VK_try_init_calibrated_timestamps (stub)\n");
-}
+// Note: VK_try_init_calibrated_timestamps is implemented below - stub removed
 
 // Include Vulkan headers for ray tracing
 #ifdef USE_VULKAN
 // Note: VMA not used in this implementation - using raw Vulkan memory allocation
-#endif
-
-#ifdef __cplusplus
-extern "C" {
 #endif
 
 // RTX acceleration structure state
@@ -1198,26 +1131,14 @@ typedef struct {
     uint64_t handle;
 } rtx_acceleration_t; // end of rtx_acceleration_t
 
-typedef struct {
-    VkBuffer buffer;
-    VkDeviceMemory memory;
-    VkDeviceAddress address;
-    void* mapped;
-    VkDeviceSize size;
-} rtx_buffer_t; // end of rtx_buffer_t
+// rtx_buffer_t and rtx_sbt_t are defined earlier (line ~1061) for use throughout file
+// g_sbt is also defined earlier (line ~1080)
 
-typedef struct {
-    rtx_buffer_t sbt_buffer;
-    uint32_t sbt_record_size;
-    uint32_t sbt_raygen_offset;
-    uint32_t sbt_miss_offset;
-    uint32_t sbt_hit_offset;
-    uint32_t sbt_callable_offset;
-} rtx_sbt_t;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-// Global RTX state
-static qboolean g_rtx_accel_initialized = qfalse;
-static qboolean g_rtx_blas_tlas_built = qfalse;
+// Global RTX state - variables moved earlier (line ~1087) for use throughout file
 // Timing: GPU/RT timestamps
 static VkQueryPool g_rtx_timing_query_pool = VK_NULL_HANDLE;
 static float     g_rtx_timestamp_period = 1.0f;
@@ -1226,13 +1147,9 @@ static float     g_rtx_timestamp_period = 1.0f;
 #define MAX_TLAS_INSTANCES 4096
 
 static rtx_acceleration_t g_blas[MAX_BLAS];
-static uint32_t g_blas_count = 0;
 
 static rtx_acceleration_t g_tlas;
 static rtx_buffer_t g_instance_buffer;
-static rtx_sbt_t g_sbt;
-
-static VkPipeline g_rt_pipeline = VK_NULL_HANDLE;
 static VkPipelineLayout g_rt_pipeline_layout = VK_NULL_HANDLE;
 static VkDescriptorSetLayout g_rt_descriptor_set_layout = VK_NULL_HANDLE;
 static VkDescriptorSet g_rt_descriptor_set = VK_NULL_HANDLE;
@@ -1242,32 +1159,35 @@ VkDeviceMemory g_rt_scratch_memory = VK_NULL_HANDLE;
 VkDeviceSize g_rt_scratch_size = 0;
 
 // Ray tracing shader groups
-static VkRayTracingShaderGroupCreateInfoKHR g_shader_groups[3] = {0};
+static VkRayTracingShaderGroupCreateInfoKHR g_shader_groups[3] = {};
 
-// Shader handle storage
-#define MAX_SHADER_HANDLE_SIZE 32
-static uint8_t g_shader_handles[3 * MAX_SHADER_HANDLE_SIZE];
-static uint32_t g_shader_handle_size = 0;
+// Shader handle storage - defined earlier (line ~1084) for use throughout file
 
 // Utility functions
 static void* rtx_alloc(VkDeviceSize size, VkBuffer* buffer, VkDeviceMemory* memory, VkDeviceAddress* address) {
-    if (!vk.allocator) return nullptr;
+    // Note: VMA not available - using standard Vulkan allocation
 
-    VkBufferCreateInfo buffer_info = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-        .size = size,
-        .usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
+    VkBufferCreateInfo buffer_info = {};
+    buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buffer_info.size = size;
+    buffer_info.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR |
                  VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
-                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-        .sharingMode = VK_SHARING_MODE_EXCLUSIVE
-    };
+                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    VmaAllocationCreateInfo alloc_info = {
-        .usage = VMA_MEMORY_USAGE_GPU_ONLY
-    };
-
-    VmaAllocation allocation;
-    VkResult result = vmaCreateBuffer(vk.allocator, &buffer_info, &alloc_info, buffer, &allocation, NULL);
+    VkResult result = qvkCreateBuffer(vk.device, &buffer_info, NULL, buffer);
+    if (result == VK_SUCCESS) {
+        VkMemoryRequirements memReqs;
+        qvkGetBufferMemoryRequirements(vk.device, *buffer, &memReqs);
+        VkMemoryAllocateInfo memAlloc = {};
+        memAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        memAlloc.allocationSize = memReqs.size;
+        memAlloc.memoryTypeIndex = find_memory_type(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        result = qvkAllocateMemory(vk.device, &memAlloc, NULL, memory);
+        if (result == VK_SUCCESS) {
+            qvkBindBufferMemory(vk.device, *buffer, *memory, 0);
+        }
+    }
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "RTX: Failed to allocate buffer\n");
         return nullptr;
@@ -1326,15 +1246,9 @@ qboolean vk_rtx_build_tlas_real(VkCommandBuffer cmd_buffer) {
   return qtrue;
 }
 
-void vk_rtx_build_tlas_for_frame(VkCommandBuffer cmd_buffer) {
-    ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: per-frame TLAS build request (wrapper)\n");
-    vk_rtx_build_tlas(cmd_buffer);
-}
+// Note: vk_rtx_build_tlas_for_frame is implemented below - stub removed
 
-void vk_rtx_build_sbt_for_frame(VkCommandBuffer cmd_buffer) {
-    ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: per-frame SBT build request (wrapper)\n");
-    // placeholder; actual SBT population would occur here in a full impl
-}
+// Note: vk_rtx_build_sbt_for_frame is implemented below (line ~2030) - stub removed
 
 static void rtx_free_buffer(rtx_buffer_t* buffer) {
     if (buffer->mapped) {
@@ -1388,7 +1302,7 @@ qboolean vk_rtx_acceleration_init(void) {
     }
 
     // Initialize calibrated timestamps support (best-effort)
-    VK_CAL_TS_INIT_ONCE
+    // Note: VK_CAL_TS_INIT_ONCE macro removed - handled by VK_try_init_calibrated_timestamps() below
 
     // Initialize timing query pool for GPU timing - add defensive check
     if (vk.device != VK_NULL_HANDLE) {
@@ -1419,14 +1333,14 @@ void vk_rtx_acceleration_shutdown(void) {
 
     // Destroy TLAS
     if (g_tlas.accel != VK_NULL_HANDLE) {
-        vkDestroyAccelerationStructureKHR(vk.device, g_tlas.accel, NULL);
+        qvkDestroyAccelerationStructureKHR(vk.device, g_tlas.accel, NULL);
         g_tlas.accel = VK_NULL_HANDLE;
     }
 
     // Destroy BLAS
     for (uint32_t i = 0; i < g_blas_count; i++) {
         if (g_blas[i].accel != VK_NULL_HANDLE) {
-            vkDestroyAccelerationStructureKHR(vk.device, g_blas[i].accel, NULL);
+            qvkDestroyAccelerationStructureKHR(vk.device, g_blas[i].accel, NULL);
             g_blas[i].accel = VK_NULL_HANDLE;
         }
     }
@@ -1480,29 +1394,42 @@ uint64_t vk_rtx_create_blas_for_geometry(VkBuffer vertex_buffer, VkBuffer index_
               debug_name ? debug_name : "unnamed", vertex_count, index_count);
 
     // Create geometry info
-    VkAccelerationStructureGeometryKHR geometry = {
-        .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
-        .geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR,
-        .flags = VK_GEOMETRY_OPAQUE_BIT_KHR,
-        .geometry = {
-            .triangles = {
-                .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR,
-                .vertexFormat = VK_FORMAT_R32G32B32_SFLOAT,
-                .vertexData = {
-                    .deviceAddress = vertex_buffer ? vkGetBufferDeviceAddress(vk.device,
-                        &(VkBufferDeviceAddressInfo){.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = vertex_buffer}) : 0
-                },
-                .vertexStride = vertex_stride,
-                .maxVertex = vertex_count,
-                .indexType = index_buffer ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_NONE_KHR,
-                .indexData = {
-                    .deviceAddress = index_buffer ? vkGetBufferDeviceAddress(vk.device,
-                        &(VkBufferDeviceAddressInfo){.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, .buffer = index_buffer}) : 0
-                },
-                .transformData = {0} // Identity transform
-            }
-        }
-    };
+    // Note: Must initialize in struct field order (sType, pNext, geometryType, flags, geometry)
+    VkAccelerationStructureGeometryTrianglesDataKHR triangles_data = {};
+    triangles_data.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
+    triangles_data.pNext = NULL;
+    triangles_data.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+    
+    // Get vertex buffer device address
+    VkDeviceAddress vertex_addr = 0;
+    if (vertex_buffer) {
+        VkBufferDeviceAddressInfo addr_info = {};
+        addr_info.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+        addr_info.buffer = vertex_buffer;
+        vertex_addr = vkGetBufferDeviceAddress(vk.device, &addr_info);
+    }
+    triangles_data.vertexData.deviceAddress = vertex_addr;
+    triangles_data.vertexStride = vertex_stride;
+    triangles_data.maxVertex = vertex_count;
+    triangles_data.indexType = index_buffer ? VK_INDEX_TYPE_UINT32 : VK_INDEX_TYPE_NONE_KHR;
+    
+    // Get index buffer device address
+    VkDeviceAddress index_addr = 0;
+    if (index_buffer) {
+        VkBufferDeviceAddressInfo addr_info = {};
+        addr_info.sType = VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO;
+        addr_info.buffer = index_buffer;
+        index_addr = vkGetBufferDeviceAddress(vk.device, &addr_info);
+    }
+    triangles_data.indexData.deviceAddress = index_addr;
+    Com_Memset(&triangles_data.transformData, 0, sizeof(triangles_data.transformData)); // Identity transform
+
+    VkAccelerationStructureGeometryKHR geometry = {};
+    geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+    geometry.pNext = NULL;
+    geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+    geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+    geometry.geometry.triangles = triangles_data;
 
     // Build info for BLAS
     VkAccelerationStructureBuildGeometryInfoKHR build_info = {
@@ -1519,7 +1446,7 @@ uint64_t vk_rtx_create_blas_for_geometry(VkBuffer vertex_buffer, VkBuffer index_
     };
 
     uint32_t primitive_count = index_count / 3; // Assuming triangles
-    vkGetAccelerationStructureBuildSizesKHR(vk.device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
+    qvkGetAccelerationStructureBuildSizesKHR(vk.device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
                                            &build_info, &primitive_count, &build_sizes);
 
     // Allocate BLAS buffer
@@ -1535,7 +1462,7 @@ uint64_t vk_rtx_create_blas_for_geometry(VkBuffer vertex_buffer, VkBuffer index_
     };
 
     VkAccelerationStructureKHR accel;
-    VkResult result = vkCreateAccelerationStructureKHR(vk.device, &create_info, NULL, &accel);
+    VkResult result = qvkCreateAccelerationStructureKHR(vk.device, &create_info, NULL, &accel);
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "RTX: Failed to create BLAS\n");
         return 0;
@@ -1637,18 +1564,19 @@ void vk_rtx_build_tlas(VkCommandBuffer cmd_buffer) {
     g_instance_buffer.address = vkGetBufferDeviceAddress(vk.device, &address_info);
 
     // Create geometry for TLAS
-    VkAccelerationStructureGeometryKHR geometry = {
-        .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR,
-        .geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR,
-        .geometry = {
-            .instances = {
-                .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR,
-                .data = {
-                    .deviceAddress = g_instance_buffer.address
-                }
-            }
-        }
-    };
+    // Note: Must initialize in struct field order
+    VkAccelerationStructureGeometryInstancesDataKHR instances_data = {};
+    instances_data.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
+    instances_data.pNext = NULL;
+    instances_data.arrayOfPointers = VK_FALSE;
+    instances_data.data.deviceAddress = g_instance_buffer.address;
+
+    VkAccelerationStructureGeometryKHR geometry = {};
+    geometry.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+    geometry.pNext = NULL;
+    geometry.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
+    geometry.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+    geometry.geometry.instances = instances_data;
 
     // Build info for TLAS
     VkAccelerationStructureBuildGeometryInfoKHR build_info = {
@@ -1664,7 +1592,7 @@ void vk_rtx_build_tlas(VkCommandBuffer cmd_buffer) {
         .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR
     };
 
-    vkGetAccelerationStructureBuildSizesKHR(vk.device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
+    qvkGetAccelerationStructureBuildSizesKHR(vk.device, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR,
                                            &build_info, &g_blas_count, &build_sizes);
 
     // Allocate TLAS buffer
@@ -1679,7 +1607,7 @@ void vk_rtx_build_tlas(VkCommandBuffer cmd_buffer) {
         .type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR
     };
 
-    result = vkCreateAccelerationStructureKHR(vk.device, &create_info, NULL, &g_tlas.accel);
+    result = qvkCreateAccelerationStructureKHR(vk.device, &create_info, NULL, &g_tlas.accel);
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "RTX: Failed to create TLAS\n");
         return;
@@ -1692,7 +1620,7 @@ void vk_rtx_build_tlas(VkCommandBuffer cmd_buffer) {
         .sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,
         .accelerationStructure = g_tlas.accel
     };
-    g_tlas.handle = vkGetAccelerationStructureDeviceAddressKHR(vk.device, &device_address_info);
+    g_tlas.handle = qvkGetAccelerationStructureDeviceAddressKHR(vk.device, &device_address_info);
 
     // Build TLAS
     VkAccelerationStructureBuildRangeInfoKHR build_range = {
@@ -1706,7 +1634,9 @@ void vk_rtx_build_tlas(VkCommandBuffer cmd_buffer) {
     build_info.scratchData.deviceAddress = 0; // Would need scratch buffer
 
     // Build acceleration structure
-    vkCmdBuildAccelerationStructuresKHR(cmd_buffer, 1, &build_info, &build_range);
+    // Note: 4th parameter must be pointer to pointer (const VkAccelerationStructureBuildRangeInfoKHR* const*)
+    const VkAccelerationStructureBuildRangeInfoKHR* p_build_ranges = &build_range;
+    qvkCmdBuildAccelerationStructuresKHR(cmd_buffer, 1, &build_info, &p_build_ranges);
 
     // Add barrier
     VkMemoryBarrier barrier = {
@@ -1741,7 +1671,7 @@ void vk_rtx_set_light_advanced_properties(uint32_t light_id, float temperature,
 }
 
 void vk_rtx_create_shadow_acceleration(uint32_t light_id, VkCommandBuffer cmd_buffer) {
-    if (!g_rtx_accel_initialized || !g_rtx_available) {
+    if (!g_rtx_accel_initialized || !g_rtx_accel_initialized) {
         ri.Printf(PRINT_DEVELOPER, "RTX: shadow acceleration skipped (not initialized)\n");
         return;
     }
@@ -1758,7 +1688,7 @@ void vk_rtx_create_shadow_acceleration(uint32_t light_id, VkCommandBuffer cmd_bu
 
 // Perform shadow ray tracing for a point and light direction
 qboolean vk_rtx_trace_shadow_ray(const vec3_t origin, const vec3_t direction, float distance) {
-    if (!g_rtx_accel_initialized || !g_rtx_available || !g_rt_pipeline) {
+    if (!g_rtx_accel_initialized || !g_rt_pipeline) {
         return qfalse; // No shadow information available
     }
 
@@ -1816,7 +1746,11 @@ void vk_rtx_trace_raysKHR(VkCommandBuffer cmd_buffer) {
         vkCmdWriteTimestamp(cmd_buffer, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, g_rtx_timing_query_pool, 0);
     }
     // Issue the trace rays command
-    vkCmdTraceRaysKHR(cmd_buffer, &raygen_region, &miss_region, &hit_region, &callable_region,
+    if (!qvkCmdTraceRaysKHR) {
+        ri.Printf(PRINT_ERROR, "RTX: qvkCmdTraceRaysKHR not loaded\n");
+        return;
+    }
+    qvkCmdTraceRaysKHR(cmd_buffer, &raygen_region, &miss_region, &hit_region, &callable_region,
                      glConfig.vidWidth, glConfig.vidHeight, 1);
     // Optional end timestamp (only if calibrated timestamps available)
     if (g_rtx_timing_query_pool != VK_NULL_HANDLE && g_cal_ts_available) {
@@ -1942,7 +1876,7 @@ void vk_rtx_bind_and_trace_raysKHR_from_main(VkCommandBuffer cmd_buffer, uint32_
 
 // Calibrated timestamps preliminary wiring (best-effort)
 static qboolean g_cal_ts_attempted = qfalse;
-static qboolean g_cal_ts_available = qfalse;
+// g_cal_ts_available is defined earlier (line ~1182) for use throughout the file
 #if defined(VK_EXT_CALIBRATED_TIMESTAMPS_ENABLED)
 static bool g_cal_ts_ext_present = false;
 static void vk_rtx_init_calibrated_ts_stub(void) {
@@ -2040,7 +1974,7 @@ void vk_rtx_build_sbt_for_frame(VkCommandBuffer cmd_buffer) {
     }
 
     // Get shader group handles
-    VkResult result = vkGetRayTracingShaderGroupHandlesKHR(vk.device, g_rt_pipeline, 0, 3,
+    VkResult result = qvkGetRayTracingShaderGroupHandlesKHR(vk.device, g_rt_pipeline, 0, 3,
                                                           3 * g_shader_handle_size, g_shader_handles);
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "RTX: Failed to get shader group handles\n");
@@ -2203,7 +2137,7 @@ static VkShaderModule vk_rtx_load_shader(const char* filename) {
 }
 
 // Ray tracing pipeline creation
-static VkResult vk_rtx_create_pipeline(void) {
+VkResult vk_rtx_create_pipeline(void) {
     // Create descriptor set layout for ray tracing
     VkDescriptorSetLayoutBinding bindings[] = {
         // TLAS binding
@@ -2250,11 +2184,12 @@ static VkResult vk_rtx_create_pipeline(void) {
         }
     };
 
-    VkDescriptorSetLayoutCreateInfo layout_info = {
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-        .bindingCount = 6,
-        .pBindings = bindings
-    };
+    VkDescriptorSetLayoutCreateInfo layout_info = {};
+    layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layout_info.pNext = NULL;
+    layout_info.flags = 0;
+    layout_info.bindingCount = 6;
+    layout_info.pBindings = bindings;
 
     VkResult result = vkCreateDescriptorSetLayout(vk.device, &layout_info, NULL, &g_rt_descriptor_set_layout);
     if (result != VK_SUCCESS) {
@@ -2269,13 +2204,14 @@ static VkResult vk_rtx_create_pipeline(void) {
         .size = sizeof(uint32_t) * 4  // max_recursion_depth, samples_per_pixel, enable_shadows, enable_reflections
     };
 
-    VkPipelineLayoutCreateInfo pipeline_layout_info = {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        .setLayoutCount = 1,
-        .pSetLayouts = &g_rt_descriptor_set_layout,
-        .pushConstantRangeCount = 1,
-        .pPushConstantRanges = &push_constant_range
-    };
+    VkPipelineLayoutCreateInfo pipeline_layout_info = {};
+    pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipeline_layout_info.pNext = NULL;
+    pipeline_layout_info.flags = 0;
+    pipeline_layout_info.setLayoutCount = 1;
+    pipeline_layout_info.pSetLayouts = &g_rt_descriptor_set_layout;
+    pipeline_layout_info.pushConstantRangeCount = 1;
+    pipeline_layout_info.pPushConstantRanges = &push_constant_range;
 
     result = vkCreatePipelineLayout(vk.device, &pipeline_layout_info, NULL, &g_rt_pipeline_layout);
     if (result != VK_SUCCESS) {
@@ -2294,57 +2230,61 @@ static VkResult vk_rtx_create_pipeline(void) {
     }
 
     // Shader stages
-    VkPipelineShaderStageCreateInfo shader_stages[3] = {
-        {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR,
-            .module = raygen_shader,
-            .pName = "main"
-        },
-        {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_MISS_BIT_KHR,
-            .module = miss_shader,
-            .pName = "main"
-        },
-        {
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-            .stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
-            .module = closesthit_shader,
-            .pName = "main"
-        }
-    };
+    VkPipelineShaderStageCreateInfo shader_stages[3] = {};
+    // Raygen shader
+    shader_stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shader_stages[0].pNext = NULL;
+    shader_stages[0].flags = 0;
+    shader_stages[0].stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+    shader_stages[0].module = raygen_shader;
+    shader_stages[0].pName = "main";
+    shader_stages[0].pSpecializationInfo = NULL;
+    // Miss shader
+    shader_stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shader_stages[1].pNext = NULL;
+    shader_stages[1].flags = 0;
+    shader_stages[1].stage = VK_SHADER_STAGE_MISS_BIT_KHR;
+    shader_stages[1].module = miss_shader;
+    shader_stages[1].pName = "main";
+    shader_stages[1].pSpecializationInfo = NULL;
+    // Closest hit shader
+    shader_stages[2].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shader_stages[2].pNext = NULL;
+    shader_stages[2].flags = 0;
+    shader_stages[2].stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
+    shader_stages[2].module = closesthit_shader;
+    shader_stages[2].pName = "main";
+    shader_stages[2].pSpecializationInfo = NULL;
 
     // Shader groups
-    VkRayTracingShaderGroupCreateInfoKHR shader_groups[3] = {
-        // Raygen group
-        {
-            .sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR,
-            .type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR,
-            .generalShader = 0, // raygen shader index
-            .closestHitShader = VK_SHADER_UNUSED_KHR,
-            .anyHitShader = VK_SHADER_UNUSED_KHR,
-            .intersectionShader = VK_SHADER_UNUSED_KHR
-        },
-        // Miss group
-        {
-            .sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR,
-            .type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR,
-            .generalShader = 1, // miss shader index
-            .closestHitShader = VK_SHADER_UNUSED_KHR,
-            .anyHitShader = VK_SHADER_UNUSED_KHR,
-            .intersectionShader = VK_SHADER_UNUSED_KHR
-        },
-        // Hit group
-        {
-            .sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR,
-            .type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR,
-            .generalShader = VK_SHADER_UNUSED_KHR,
-            .closestHitShader = 2, // closest hit shader index
-            .anyHitShader = VK_SHADER_UNUSED_KHR,
-            .intersectionShader = VK_SHADER_UNUSED_KHR
-        }
-    };
+    VkRayTracingShaderGroupCreateInfoKHR shader_groups[3] = {};
+    // Raygen group
+    shader_groups[0].sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+    shader_groups[0].pNext = NULL;
+    shader_groups[0].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+    shader_groups[0].generalShader = 0; // raygen shader index
+    shader_groups[0].closestHitShader = VK_SHADER_UNUSED_KHR;
+    shader_groups[0].anyHitShader = VK_SHADER_UNUSED_KHR;
+    shader_groups[0].intersectionShader = VK_SHADER_UNUSED_KHR;
+    shader_groups[0].pShaderGroupCaptureReplayHandle = NULL;
+    // Miss group
+    shader_groups[1].sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+    shader_groups[1].pNext = NULL;
+    shader_groups[1].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+    shader_groups[1].generalShader = 1; // miss shader index
+    shader_groups[1].closestHitShader = VK_SHADER_UNUSED_KHR;
+    shader_groups[1].anyHitShader = VK_SHADER_UNUSED_KHR;
+    shader_groups[1].intersectionShader = VK_SHADER_UNUSED_KHR;
+    shader_groups[1].pShaderGroupCaptureReplayHandle = NULL;
+    // Hit group
+    shader_groups[2].sType = VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR;
+    shader_groups[2].pNext = NULL;
+    shader_groups[2].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+    shader_groups[2].generalShader = VK_SHADER_UNUSED_KHR;
+    shader_groups[2].closestHitShader = 2; // closest hit shader index
+    shader_groups[2].anyHitShader = VK_SHADER_UNUSED_KHR;
+    shader_groups[2].intersectionShader = VK_SHADER_UNUSED_KHR;
+    shader_groups[2].pShaderGroupCaptureReplayHandle = NULL;
 
     // Create ray tracing pipeline
     VkRayTracingPipelineCreateInfoKHR pipeline_info = {};
@@ -2363,7 +2303,7 @@ static VkResult vk_rtx_create_pipeline(void) {
     pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
     pipeline_info.basePipelineIndex = 0;
 
-    result = vkCreateRayTracingPipelinesKHR(vk.device, VK_NULL_HANDLE, VK_NULL_HANDLE,
+    result = qvkCreateRayTracingPipelinesKHR(vk.device, VK_NULL_HANDLE, VK_NULL_HANDLE,
                                            1, &pipeline_info, NULL, &g_rt_pipeline);
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "RTX: Failed to create ray tracing pipeline: %d\n", result);
@@ -2386,7 +2326,7 @@ static VkResult vk_rtx_create_pipeline(void) {
     g_sbt.sbt_record_size = rt_props.shaderGroupBaseAlignment;
 
     // Get shader group handles
-    result = vkGetRayTracingShaderGroupHandlesKHR(vk.device, g_rt_pipeline, 0, 3,
+    result = qvkGetRayTracingShaderGroupHandlesKHR(vk.device, g_rt_pipeline, 0, 3,
                                                  3 * MAX_SHADER_HANDLE_SIZE, g_shader_handles);
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "RTX: Failed to get shader group handles\n");
