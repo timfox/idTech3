@@ -1,7 +1,7 @@
 #include "vk_compute_raytracing.h"
-#include "vk.h"
-#include "vk_rtx_acceleration.h"
-#include "tr_local.h"
+#include "../vk.h"
+#include "../vk_rtx_acceleration.h"
+#include "../tr_local.h"
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
 #include "../../common/qcommon.h"

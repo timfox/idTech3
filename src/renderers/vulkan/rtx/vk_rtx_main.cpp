@@ -19,6 +19,8 @@ RAY TRACING GATING:
 #include "../../renderercommon/tr_public.h"
 #include "../../common/q_shared.h"
 #include "../../common/qcommon.h"
+#include "../vk.h"  // For vk global variable and Vulkan state
+#include "../tr_local.h"  // For renderer local definitions
 
 #include <algorithm>
 #include <memory>
@@ -31,11 +33,23 @@ RAY TRACING GATING:
 #include <print>
 #include <cstring>
 
-// Forward declarations for hardware ray tracing functions
-extern void vk_rt_init(void);
-extern void vk_rt_shutdown(void);
-extern void vk_rt_trace_rays(uint32_t width, uint32_t height);
-extern void vk_rt_denoise(uint32_t width, uint32_t height);
+// Forward declarations for hardware ray tracing functions (C functions)
+extern "C" {
+    void vk_rt_init(void);
+    void vk_rt_shutdown(void);
+    void vk_rt_trace_rays(uint32_t width, uint32_t height);
+    void vk_rt_denoise(uint32_t width, uint32_t height);
+    void vk_rt_build_acceleration_structures(void);
+    void vk_rt_update_tlas(void);
+    void vk_rt_composite(void);
+    void VK_ComputeRT_Dispatch(void);
+    void VK_ComputeRT_Shutdown(void);
+    void vk_rtx_acceleration_shutdown(void);
+    void vk_rt_update_uniform_buffer(void);
+}
+
+// Forward declarations for C functions from main renderer (declared in headers with C linkage)
+// These are already declared in tr_common.h and tr_entry.c with proper linkage
 
 // RTX renderer is self-contained - no external Vulkan API dependencies
 
@@ -55,7 +69,6 @@ qhandle_t RTX_RegisterModel(const char *name) {
     if (!name || !vk.active) {
         return 0;
     }
-    extern qhandle_t RE_RegisterModel(const char *name);
     return RE_RegisterModel(name);
 }
 qhandle_t RTX_RegisterSkin(const char *name) {
@@ -63,7 +76,6 @@ qhandle_t RTX_RegisterSkin(const char *name) {
     if (!name || !vk.active) {
         return 0;
     }
-    extern qhandle_t RE_RegisterSkin(const char *name);
     return RE_RegisterSkin(name);
 }
 qhandle_t RTX_RegisterShader(const char *name) {
@@ -71,7 +83,6 @@ qhandle_t RTX_RegisterShader(const char *name) {
     if (!name || !vk.active) {
         return 0;
     }
-    extern qhandle_t RE_RegisterShader(const char *name);
     return RE_RegisterShader(name);
 }
 qhandle_t RTX_RegisterShaderNoMip(const char *name) {
@@ -79,7 +90,6 @@ qhandle_t RTX_RegisterShaderNoMip(const char *name) {
     if (!name || !vk.active) {
         return 0;
     }
-    extern qhandle_t RE_RegisterShaderNoMip(const char *name);
     return RE_RegisterShaderNoMip(name);
 }
 
@@ -91,12 +101,10 @@ void RTX_LoadWorld(const char *name) {
     }
     
     // Use standard world loading (handled by main renderer)
-    extern void R_LoadWorld(const char *name);
-    R_LoadWorld(name);
+    RE_LoadWorldMap(name);
     
     // Build BLAS for world geometry if RTX is supported
     if (vk.rayTracingSupported && vk.rt.initialized) {
-        extern void vk_rt_build_acceleration_structures(void);
         vk_rt_build_acceleration_structures();
         ri.Printf(PRINT_DEVELOPER, "RTX: World loaded, acceleration structures built\n");
     }
@@ -120,7 +128,6 @@ void RTX_EndRegistration(void) {
     
     // Update TLAS if RTX is supported and entities were added
     if (vk.rayTracingSupported && vk.rt.initialized) {
-        extern void vk_rt_update_tlas(void);
         vk_rt_update_tlas();
         ri.Printf(PRINT_DEVELOPER, "RTX: Registration ended, TLAS updated\n");
     }
@@ -380,20 +387,16 @@ void RTX_RenderScene(const refdef_t *fd) {
     
     // Use hardware ray tracing if available
     if (vk.rayTracingSupported) {
-        extern void vk_rt_trace_rays(uint32_t width, uint32_t height);
         vk_rt_trace_rays(fd->width, fd->height);
         
         // Denoise ray-traced output
-        extern void vk_rt_denoise(uint32_t width, uint32_t height);
         vk_rt_denoise(fd->width, fd->height);
     } else {
         // Fall back to compute ray tracing
-        extern void VK_ComputeRT_Dispatch(void);
         VK_ComputeRT_Dispatch();
     }
     
     // Composite RTX output with scene
-    extern void vk_rt_composite(void);
     vk_rt_composite();
 }
 
@@ -404,14 +407,13 @@ void RTX_BeginFrame(stereoFrame_t stereoFrame) {
     }
     
     // Use standard frame begin which handles all frame setup
-    extern void vk_begin_frame(void);
-    vk_begin_frame();
+    // Note: vk_begin_frame is called from main renderer, not directly here
+    // RTX frame setup is handled in RTX_BeginFrame implementation
     
     // Initialize RTX-specific frame resources if RTX is enabled
     cvar_t* r_rtx_enable = ri.Cvar_Get("r_rtx_enable", "0", CVAR_ARCHIVE);
     if (r_rtx_enable && r_rtx_enable->integer && vk.rayTracingSupported && vk.rt.initialized) {
         // Update RTX uniform buffers with current frame data
-        extern void vk_rt_update_uniform_buffer(void);
         vk_rt_update_uniform_buffer();
     }
     
@@ -499,8 +501,13 @@ refexport_t* RTX_GetRefAPI(int apiVersion, refimport_t* rimp) {
     return &rtxExport;
 }
 
+// NOTE: GetRefAPI is not exported here because RTX renderer is integrated into main Vulkan renderer
+// The RTX functions are called directly from the main renderer, not as a separate library
+// If you need a standalone RTX renderer library, uncomment below and ensure USE_RENDERER_DLOPEN is defined
+/*
 #ifdef USE_RENDERER_DLOPEN
 extern "C" Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI( int apiVersion, refimport_t *rimp ) {
     return RTX_GetRefAPI(apiVersion, rimp);
 }
 #endif
+*/

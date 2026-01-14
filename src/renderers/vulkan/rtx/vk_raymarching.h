@@ -15,7 +15,7 @@ Advanced raymarching implementation for:
 
 #ifdef USE_VULKAN
 
-#include "vk.h"
+#include "../vk.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -10,8 +10,8 @@ volumetric effects, and procedural geometry.
 #ifdef USE_VULKAN
 
 #include "vk_raymarching.h"
-#include "vk.h"
-#include "tr_local.h"
+#include "../vk.h"
+#include "../tr_local.h"
 #include <cstring>
 #include <vector>
 #include <memory>

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tr_local.h"
+#include "../tr_local.h"
 #include <vulkan/vulkan.h>
 
 // Compute Shader-Based Ray Tracing System

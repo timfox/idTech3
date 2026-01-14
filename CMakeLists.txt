@@ -1622,29 +1622,17 @@ IF(USE_VMA AND USE_VULKAN)
 ENDIF()
 
 # RTX renderer integrates all advanced Vulkan features
-
-# RTX renderer - minimal implementation for now
-set(RENDERER_RTX_SRCS
+# RTX renderer files - added directly to main renderer sources
+# Note: Headers are included via source files, no need to list them separately
+list(APPEND RENDERER_VK_SRCS
 	src/renderers/vulkan/rtx/vk_rtx_main.cpp
+	src/renderers/vulkan/rtx/vk_path_tracer.cpp
+	src/renderers/vulkan/rtx/vk_denoiser.cpp
+	src/renderers/vulkan/rtx/vk_rtx_raii.cpp
+	src/renderers/vulkan/rtx/vk_raytracing.cpp
+	src/renderers/vulkan/rtx/vk_compute_raytracing.c
+	src/renderers/vulkan/rtx/vk_raymarching.cpp
 )
-
-# RTX renderer files - modernized with C++23 RAII patterns
-# Temporarily disabled - causing undefined symbol errors
-# set(RENDERER_RTX_SRCS
-#	src/renderers/vulkan/rtx/vk_rtx_main.cpp
-#	src/renderers/vulkan/rtx/vk_path_tracer.cpp
-#	src/renderers/vulkan/rtx/vk_denoiser.cpp
-#	src/renderers/vulkan/rtx/vk_rtx_raii.cpp
-#	src/renderers/vulkan/rtx/vk_raytracing.cpp
-#	src/renderers/vulkan/rtx/vk_compute_raytracing.c
-#	src/renderers/vulkan/rtx/vk_raymarching.cpp
-#	src/renderers/vulkan/rtx/vk_rtx.h
-#	src/renderers/vulkan/rtx/vk_path_tracer.h
-#	src/renderers/vulkan/rtx/vk_denoiser.h
-#	src/renderers/vulkan/rtx/vk_rtx_raii.h
-#	src/renderers/vulkan/rtx/vk_compute_raytracing.h
-#	src/renderers/vulkan/rtx/vk_raymarching.h
-# )
 
 # Add RTX renderer as separate shared library
 # Temporarily disabled due to undefined symbol errors
