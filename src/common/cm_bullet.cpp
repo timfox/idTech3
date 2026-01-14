@@ -34,14 +34,22 @@ static qboolean bspModelShapeValid[MAX_BSP_MODELS];
 ================
 CM_Bullet_Init
 Initialize Bullet physics for BSP collision
+
+Initializes the Bullet Physics engine for static world collision detection.
+Creates the collision world, broadphase, dispatcher, and solver components.
+Sets gravity to zero since we're only using Bullet for static geometry collision.
+
+Note: This function is idempotent - calling it multiple times is safe.
 ================
 */
 void CM_Bullet_Init(void) {
+	// Idempotent initialization check
 	if (bspPhysicsInitialized) {
 		return;
 	}
 
 	// Initialize Bullet components
+	// These are allocated with 'new' and must be freed in CM_Bullet_Shutdown()
 	bspBroadphase = new btDbvtBroadphase();
 	bspConfig = new btDefaultCollisionConfiguration();
 	bspDispatcher = new btCollisionDispatcher(bspConfig);
@@ -49,9 +57,11 @@ void CM_Bullet_Init(void) {
 	bspWorld = new btDiscreteDynamicsWorld(bspDispatcher, bspBroadphase, bspSolver, bspConfig);
 
 	// Set gravity to zero for static world collision
+	// We only use Bullet for static geometry, not dynamic physics simulation
 	bspWorld->setGravity(btVector3(0.0f, 0.0f, 0.0f));
 
-	// Initialize shape cache
+	// Initialize shape cache to track collision shapes per model
+	// This cache prevents rebuilding shapes on every map load
 	Com_Memset(bspModelShapes, 0, sizeof(bspModelShapes));
 	Com_Memset(bspModelShapeValid, 0, sizeof(bspModelShapeValid));
 
@@ -63,40 +73,53 @@ void CM_Bullet_Init(void) {
 ================
 CM_Bullet_Shutdown
 Shutdown Bullet physics for BSP collision
+
+Cleans up all Bullet Physics components and frees allocated memory.
+Removes all collision shapes from the world and deletes the physics world.
+
+Note: This function is idempotent - calling it multiple times is safe.
 ================
 */
 void CM_Bullet_Shutdown(void) {
+	// Idempotent shutdown check
 	if (!bspPhysicsInitialized) {
 		return;
 	}
 
-	// Clean up collision shapes
+	// Clean up collision shapes from cache
+	// Iterate through all cached shapes and delete them, then mark cache as invalid
 	for (int i = 0; i < MAX_BSP_MODELS; i++) {
 		if (bspModelShapes[i]) {
 			delete bspModelShapes[i];
-			bspModelShapes[i] = nullptr;
+			bspModelShapes[i] = nullptr;  // Clear pointer to prevent use-after-free
 		}
-		bspModelShapeValid[i] = qfalse;
+		bspModelShapeValid[i] = qfalse;  // Mark cache entry as invalid
 	}
 
-	// Clean up world
+	// Clean up world and all collision objects
+	// Iterate backwards to safely remove objects while iterating
 	if (bspWorld) {
-		// Remove all collision objects
+		// Remove all collision objects from the world
+		// Iterate backwards to avoid index shifting issues when removing items
 		for (int i = bspWorld->getNumCollisionObjects() - 1; i >= 0; i--) {
 			btCollisionObject *obj = bspWorld->getCollisionObjectArray()[i];
 			btRigidBody *body = btRigidBody::upcast(obj);
+			// Clean up motion state if this is a rigid body with one
 			if (body && body->getMotionState()) {
 				delete body->getMotionState();
 			}
+			// Remove from world and delete the object
 			bspWorld->removeCollisionObject(obj);
 			delete obj;
 		}
 
-		delete bspWorld;
-		delete bspSolver;
-		delete bspDispatcher;
-		delete bspConfig;
-		delete bspBroadphase;
+		// Delete Bullet components in reverse order of initialization
+		// This ensures dependencies are cleaned up properly
+		delete bspWorld;        // Delete world first (depends on others)
+		delete bspSolver;       // Delete solver
+		delete bspDispatcher;   // Delete dispatcher (depends on config)
+		delete bspConfig;        // Delete configuration
+		delete bspBroadphase;   // Delete broadphase last
 
 		bspWorld = nullptr;
 		bspSolver = nullptr;
@@ -142,19 +165,29 @@ static void CM_Bullet_BrushToTriangles(const cbrush_t *brush,
 		// Approximate brush bounds from planes
 		// This is a simplified approach - real implementation would
 		// need proper brush geometry extraction
-		(void)plane; // Suppress unused variable warning - placeholder for future implementation
+		// TODO: Use plane information to calculate proper brush bounds
+		// For now, these variables are placeholders for future implementation
+		(void)plane;
 	}
 
-	// Suppress unused variable warnings - placeholder for future bounds calculation
+	// Suppress unused variable warnings - these will be used when proper
+	// brush geometry extraction is implemented (see TODO above)
 	(void)mins;
 	(void)maxs;
 
 	// Create a simple box mesh as placeholder
-	float halfWidth = 32.0f;  // Default brush size
-	float halfHeight = 32.0f;
-	float halfDepth = 32.0f;
+	// This is a temporary approximation - proper implementation would extract
+	// actual brush geometry from the brush planes to create accurate collision shapes.
+	// The default size is arbitrary and should be replaced with actual brush bounds.
+	// Note: 32.0f units = 64x64x64 unit box, which is a common brush size in Quake maps
+	// This provides reasonable collision for most brushes until proper geometry extraction is implemented
+	static const float DEFAULT_BRUSH_HALF_SIZE = 32.0f;  // 64x64x64 unit box (temporary)
+	float halfWidth = DEFAULT_BRUSH_HALF_SIZE;
+	float halfHeight = DEFAULT_BRUSH_HALF_SIZE;
+	float halfDepth = DEFAULT_BRUSH_HALF_SIZE;
 
-	// Define box vertices
+	// Define box vertices in local space
+	// These form a unit box centered at origin, which will be scaled by halfWidth/Height/Depth
 	btVector3 boxVerts[8] = {
 		btVector3(-halfWidth, -halfHeight, -halfDepth),
 		btVector3(halfWidth, -halfHeight, -halfDepth),
@@ -167,12 +200,14 @@ static void CM_Bullet_BrushToTriangles(const cbrush_t *brush,
 	};
 
 	// Define box triangles (12 triangles, 36 indices)
+	// Each face is composed of 2 triangles (6 indices per face)
+	// Vertices are ordered to ensure correct winding (counter-clockwise when viewed from outside)
 	int boxIndices[36] = {
-		// Front face
+		// Front face (+Z direction)
 		0, 1, 2, 0, 2, 3,
-		// Back face
+		// Back face (-Z direction)
 		5, 4, 7, 5, 7, 6,
-		// Left face
+		// Left face (-X direction)
 		4, 0, 3, 4, 3, 7,
 		// Right face
 		1, 5, 6, 1, 6, 2,
@@ -183,6 +218,8 @@ static void CM_Bullet_BrushToTriangles(const cbrush_t *brush,
 	};
 
 	// Add to output arrays
+	// baseVertex tracks the starting index for this brush's vertices
+	// This allows multiple brushes to share the same vertex array
 	int baseVertex = vertices.size();
 	for (int i = 0; i < 8; i++) {
 		vertices.push_back(boxVerts[i]);
@@ -226,16 +263,19 @@ btCollisionShape* CM_Bullet_BuildModelCollision(clipHandle_t model) {
 	return nullptr; // Temporary: disabled until linkage issue is resolved
 
 	// Collect all triangles from brushes in this model
+	// We accumulate vertices and indices from all brushes to create a single collision mesh
 	std::vector<btVector3> vertices;
 	std::vector<int> indices;
 
 	// For world model (model 0), include all brushes
+	// World model contains all static geometry that needs collision detection
 	if (model == 0) {
-		// Validate brush count before iteration
+		// Validate brush count before iteration to prevent invalid memory access
 		if (cm.numBrushes < 0 || !cm.brushes) {
 			Com_DPrintf("CM_Bullet_BuildModelCollision: invalid brush data for world model\n");
 			return nullptr;
 		}
+		// Convert each brush in the world model to triangle data
 		for (int i = 0; i < cm.numBrushes; i++) {
 			const cbrush_t *brush = &cm.brushes[i];
 			CM_Bullet_BrushToTriangles(brush, vertices, indices);
@@ -249,19 +289,46 @@ btCollisionShape* CM_Bullet_BuildModelCollision(clipHandle_t model) {
 		return nullptr;
 	}
 
+	// Validate that we have geometry data before creating collision shape
+	// Empty vertex list means no collision geometry was generated for this model
 	if (vertices.empty()) {
+		Com_DPrintf("CM_Bullet_BuildModelCollision: no geometry data for model %d\n", model);
 		return nullptr;
 	}
 
-	// Create triangle mesh
+	// Validate that indices are properly aligned (must be multiple of 3 for triangles)
+	if (indices.size() % 3 != 0) {
+		Com_DPrintf("CM_Bullet_BuildModelCollision: invalid index count for model %d (%zu indices, not multiple of 3)\n",
+		            model, indices.size());
+		return nullptr;
+	}
+
+	// Create triangle mesh from collected vertices and indices
+	// The triangle mesh stores the actual geometry data for Bullet Physics
 	btTriangleMesh *mesh = new btTriangleMesh();
+	if (!mesh) {
+		Com_Printf("CM_Bullet_BuildModelCollision: failed to allocate triangle mesh for model %d\n", model);
+		return nullptr;
+	}
+
+	// Add triangles to the mesh (indices are validated above to be multiple of 3)
 	for (size_t i = 0; i < indices.size(); i += 3) {
+		// Validate index bounds before accessing vertices
+		if (indices[i] >= vertices.size() || indices[i + 1] >= vertices.size() || indices[i + 2] >= vertices.size()) {
+			Com_Printf("CM_Bullet_BuildModelCollision: index out of bounds for model %d (vertex count: %zu)\n",
+			           model, vertices.size());
+			delete mesh;
+			return nullptr;
+		}
+		// Add each triangle (3 consecutive indices form one triangle)
 		mesh->addTriangle(vertices[indices[i]],
 		                 vertices[indices[i + 1]],
 		                 vertices[indices[i + 2]]);
 	}
 
 	// Create BvhTriangleMeshShape for static collision
+	// BVH (Bounding Volume Hierarchy) provides efficient collision queries
+	// The 'true' parameter enables useQuantizedAabbCompression for memory efficiency
 	btBvhTriangleMeshShape *shape = new btBvhTriangleMeshShape(mesh, true);
 
 	// Cache the shape
@@ -277,20 +344,29 @@ btCollisionShape* CM_Bullet_BuildModelCollision(clipHandle_t model) {
 ================
 CM_Bullet_LoadMap
 Called when a map is loaded to build collision geometry
+
+Builds Bullet collision shapes for the current BSP map.
+Clears any existing collision shapes and rebuilds them from the current map data.
+This should be called whenever a new map is loaded.
+
+Note: Automatically initializes Bullet if not already initialized.
 ================
 */
 void CM_Bullet_LoadMap(void) {
+	// Ensure Bullet is initialized before loading map geometry
+	// This allows the function to be called safely even if initialization was skipped
 	if (!bspPhysicsInitialized) {
 		CM_Bullet_Init();
 	}
 
-	// Clear old shapes
+	// Clear old shapes from previous map
+	// This prevents memory leaks and ensures clean state for new map
 	for (int i = 0; i < MAX_BSP_MODELS; i++) {
 		if (bspModelShapes[i]) {
 			delete bspModelShapes[i];
-			bspModelShapes[i] = nullptr;
+			bspModelShapes[i] = nullptr;  // Clear pointer
 		}
-		bspModelShapeValid[i] = qfalse;
+		bspModelShapeValid[i] = qfalse;  // Invalidate cache entry
 	}
 
 	// Build collision shapes for all models
@@ -326,8 +402,15 @@ Perform a trace using Bullet physics (complement to BSP tracing)
 void CM_Bullet_Trace(trace_t *results, const vec3_t start, const vec3_t end,
                     const vec3_t mins, const vec3_t maxs, clipHandle_t model,
                     int brushmask, qboolean cylinder) {
+	// Validate input parameters
+	if (!results) {
+		Com_Printf("CM_Bullet_Trace: NULL results pointer\n");
+		return;
+	}
+
+	// Fall back to BSP tracing if Bullet physics not initialized
+	// This ensures the engine always has a working trace function
 	if (!bspPhysicsInitialized || !bspWorld) {
-		// Fall back to BSP tracing if Bullet not available
 		CM_BoxTrace(results, start, end, mins, maxs, model, brushmask, cylinder);
 		return;
 	}
@@ -346,8 +429,15 @@ Check point contents using Bullet physics
 ================
 */
 int CM_Bullet_PointContents(const vec3_t p, clipHandle_t model) {
+	// Validate input parameter
+	if (!p) {
+		Com_Printf("CM_Bullet_PointContents: NULL point pointer\n");
+		return 0; // Default to empty contents
+	}
+
+	// Fall back to BSP point contents if Bullet physics not initialized
+	// This ensures the engine always has a working point contents function
 	if (!bspPhysicsInitialized || !bspWorld) {
-		// Fall back to BSP point contents
 		return CM_PointContents(p, model);
 	}
 
