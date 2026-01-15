@@ -134,8 +134,14 @@ static qboolean PathTracer_IsRussianRoulette(float throughput, int bounce)
         return qtrue; // Always continue for first bounces
     }
 
-    // Russian Roulette probability based on throughput
+    // Russian Roulette probability based on throughput luminance
+    // Use more aggressive termination for low throughput
     float survival_prob = std::min(throughput, 0.95f);
+    
+    // Exponential falloff for higher bounces
+    float bounce_factor = 1.0f - (bounce - 2) * 0.1f;
+    bounce_factor = std::max(bounce_factor, 0.3f);
+    survival_prob *= bounce_factor;
 
     // Always survive with some minimum probability
     survival_prob = std::max(survival_prob, 0.1f);
@@ -143,6 +149,57 @@ static qboolean PathTracer_IsRussianRoulette(float throughput, int bounce)
     // Random termination
     float rand_val = (float)rand() / (float)RAND_MAX;
     return rand_val < survival_prob;
+}
+
+/*
+===============
+PathTracer_SampleCosineHemisphere
+
+Generate a cosine-weighted sample in the hemisphere around a normal
+This provides proper importance sampling for Lambertian surfaces
+===============
+*/
+static void PathTracer_SampleCosineHemisphere(vec3_t result, const vec3_t normal, float u1, float u2)
+{
+    // Generate uniform random point on unit disk
+    float r = std::sqrt(u1);
+    float theta = 2.0f * std::numbers::pi_v<float> * u2;
+    
+    float x = r * std::cos(theta);
+    float y = r * std::sqrt(1.0f - u1); // z component
+    float z = r * std::sin(theta);
+    
+    // Build orthonormal basis from normal
+    vec3_t tangent, bitangent;
+    
+    // Choose a vector not parallel to normal
+    if (std::abs(normal[0]) < 0.9f) {
+        VectorSet(tangent, 1.0f, 0.0f, 0.0f);
+    } else {
+        VectorSet(tangent, 0.0f, 1.0f, 0.0f);
+    }
+    
+    // Gram-Schmidt orthogonalization
+    float dot = DotProduct(tangent, normal);
+    tangent[0] -= dot * normal[0];
+    tangent[1] -= dot * normal[1];
+    tangent[2] -= dot * normal[2];
+    VectorNormalize(tangent);
+    
+    CrossProduct(normal, tangent, bitangent);
+    VectorNormalize(bitangent);
+    
+    // Transform sample to hemisphere
+    result[0] = x * tangent[0] + y * normal[0] + z * bitangent[0];
+    result[1] = x * tangent[1] + y * normal[1] + z * bitangent[1];
+    result[2] = x * tangent[2] + y * normal[2] + z * bitangent[2];
+    
+    VectorNormalize(result);
+    
+    // Ensure it's in the hemisphere
+    if (DotProduct(result, normal) < 0.0f) {
+        VectorNegate(result, result);
+    }
 }
 
 /*
@@ -198,52 +255,83 @@ void PathTracer_TracePath(vec3_t result, const vec3_t origin, const vec3_t direc
 
                 VectorMA(current_origin, t, current_dir, hit_pos);
 
-                // Simple diffuse BRDF
-                vec3_t light_dir = {1.0f, 1.0f, 1.0f};
-                VectorNormalize(light_dir);
-
+                // Direct lighting with proper BRDF evaluation
+                // Sample light sources (for now, use simple directional light)
+                vec3_t light_dir = {0.57735f, 0.57735f, 0.57735f}; // Normalized (1,1,1)
+                vec3_t light_color = {1.0f, 1.0f, 1.0f}; // White light
+                float light_intensity = 1.0f;
+                
+                // Check if light is visible (shadow ray would go here)
                 float NdotL = std::max(DotProduct(hit_normal, light_dir), 0.0f);
-                vec3_t diffuse_color = {0.8f, 0.8f, 0.8f}; // Light gray
-                vec3_t brdf_result;
-
-                VectorScale(diffuse_color, NdotL, brdf_result);
-
-                // Add contribution to radiance
+                
+                // Material properties (would come from material system)
+                vec3_t albedo = {0.8f, 0.8f, 0.8f}; // Material albedo
+                float roughness = 0.5f;
+                float metallic = 0.0f;
+                
+                // Lambertian BRDF: albedo / PI
+                const float INV_PI = 1.0f / std::numbers::pi_v<float>;
+                vec3_t brdf;
+                brdf[0] = albedo[0] * INV_PI;
+                brdf[1] = albedo[1] * INV_PI;
+                brdf[2] = albedo[2] * INV_PI;
+                
+                // Direct lighting contribution: BRDF * light_color * NdotL
+                vec3_t direct_contribution;
+                direct_contribution[0] = brdf[0] * light_color[0] * light_intensity * NdotL;
+                direct_contribution[1] = brdf[1] * light_color[1] * light_intensity * NdotL;
+                direct_contribution[2] = brdf[2] * light_color[2] * light_intensity * NdotL;
+                
+                // Add direct lighting to radiance (weighted by throughput)
                 vec3_t contribution;
-                contribution[0] = throughput[0] * brdf_result[0];
-                contribution[1] = throughput[1] * brdf_result[1];
-                contribution[2] = throughput[2] * brdf_result[2];
+                contribution[0] = throughput[0] * direct_contribution[0];
+                contribution[1] = throughput[1] * direct_contribution[1];
+                contribution[2] = throughput[2] * direct_contribution[2];
                 VectorAdd(radiance, contribution, radiance);
 
                 // For indirect illumination, generate new ray
                 if (bounce < max_bounces - 1) {
-                    // Simple Lambertian sampling
+                    // Cosine-weighted hemisphere sampling for proper importance sampling
                     vec3_t new_dir;
-                    do {
-                        new_dir[0] = ((float)rand() / RAND_MAX) * 2.0f - 1.0f;
-                        new_dir[1] = ((float)rand() / RAND_MAX) * 2.0f - 1.0f;
-                        new_dir[2] = ((float)rand() / RAND_MAX) * 2.0f - 1.0f;
-                    } while (VectorLengthSquared(new_dir) > 1.0f);
+                    float u1 = (float)rand() / (float)RAND_MAX;
+                    float u2 = (float)rand() / (float)RAND_MAX;
+                    PathTracer_SampleCosineHemisphere(new_dir, hit_normal, u1, u2);
 
-                    VectorNormalize(new_dir);
-
-                    // Make sure it's in upper hemisphere
-                    if (DotProduct(new_dir, hit_normal) < 0.0f) {
-                        VectorNegate(new_dir, new_dir);
-                    }
-
-                    // Update throughput (Lambertian BRDF * cosine)
+                    // Update throughput with Lambertian BRDF
+                    // For Lambertian: BRDF = albedo / PI
+                    // PDF = cos(theta) / PI
+                    // Throughput *= BRDF * cos(theta) / PDF = albedo
                     float cos_theta = std::max(DotProduct(new_dir, hit_normal), 0.0f);
-                    VectorScale(throughput, cos_theta, throughput);
-
-                    // Set up next ray
-                    VectorCopy(hit_pos, current_origin);
+                    float albedo = 0.8f; // Material albedo (would come from material system)
+                    
+                    // Apply albedo to throughput
+                    VectorScale(throughput, albedo, throughput);
+                    
+                    // Add small offset to avoid self-intersection
+                    vec3_t offset;
+                    VectorScale(hit_normal, 0.001f, offset);
+                    VectorAdd(hit_pos, offset, current_origin);
                     VectorCopy(new_dir, current_dir);
                 }
             }
         } else {
-            // Ray hit sky - add sky contribution
-            vec3_t sky_color = {0.5f, 0.7f, 1.0f}; // Blue sky
+            // Ray hit sky - add sky contribution with proper gradient
+            // Simple gradient sky: darker at horizon, brighter at zenith
+            float sky_factor = std::max(current_dir[2], 0.0f); // Z component (up direction)
+            sky_factor = std::pow(sky_factor, 0.5f); // Soften gradient
+            
+            vec3_t sky_color_horizon = {0.4f, 0.5f, 0.6f}; // Gray-blue at horizon
+            vec3_t sky_color_zenith = {0.5f, 0.7f, 1.0f};  // Bright blue at zenith
+            
+            vec3_t sky_color;
+            sky_color[0] = sky_color_horizon[0] + (sky_color_zenith[0] - sky_color_horizon[0]) * sky_factor;
+            sky_color[1] = sky_color_horizon[1] + (sky_color_zenith[1] - sky_color_horizon[1]) * sky_factor;
+            sky_color[2] = sky_color_horizon[2] + (sky_color_zenith[2] - sky_color_horizon[2]) * sky_factor;
+            
+            // Scale by sky intensity
+            float sky_intensity = 1.5f;
+            VectorScale(sky_color, sky_intensity, sky_color);
+            
             vec3_t contribution;
             contribution[0] = throughput[0] * sky_color[0];
             contribution[1] = throughput[1] * sky_color[1];

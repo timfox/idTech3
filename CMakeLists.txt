@@ -60,11 +60,65 @@ include("${CMAKE_SOURCE_DIR}/cmake/backend_select.cmake" NO_POLICY_SCOPE)
 include("${CMAKE_SOURCE_DIR}/cmake/moltenvk_setup.cmake" NO_POLICY_SCOPE)
 
 if(ANDROID)
-    set(CMAKE_TOOLCHAIN_FILE "$ENV{ANDROID_HOME}/ndk/25.1.8937393/build/cmake/android.toolchain.cmake")
-    set(ANDROID_ABI "arm64-v8a") # Target 64-bit ARM
-    set(ANDROID_PLATFORM "android-21") # Minimum API level
-    set(ANDROID_STL "c++_static") # Use static C++ standard library
-    # You might also want to set ANDROID_NATIVE_API_LEVEL and ANDROID_APP_PLATFORM if needed
+    # Use ANDROID_NDK if set, otherwise try ANDROID_HOME
+    if(DEFINED ENV{ANDROID_NDK})
+        set(ANDROID_NDK_PATH "$ENV{ANDROID_NDK}")
+    elseif(DEFINED ENV{ANDROID_HOME})
+        set(ANDROID_NDK_PATH "$ENV{ANDROID_HOME}/ndk")
+    elseif(DEFINED ENV{ANDROID_NDK_HOME})
+        set(ANDROID_NDK_PATH "$ENV{ANDROID_NDK_HOME}")
+    else()
+        message(FATAL_ERROR "ANDROID_NDK, ANDROID_HOME, or ANDROID_NDK_HOME must be set for Android builds")
+    endif()
+    
+    # Find the toolchain file
+    if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
+        # Try to find the latest NDK version
+        file(GLOB NDK_VERSIONS "${ANDROID_NDK_PATH}/*")
+        list(SORT NDK_VERSIONS)
+        list(REVERSE NDK_VERSIONS)
+        
+        set(TOOLCHAIN_FILE_FOUND FALSE)
+        foreach(NDK_VERSION ${NDK_VERSIONS})
+            set(POSSIBLE_TOOLCHAIN "${NDK_VERSION}/build/cmake/android.toolchain.cmake")
+            if(EXISTS "${POSSIBLE_TOOLCHAIN}")
+                set(CMAKE_TOOLCHAIN_FILE "${POSSIBLE_TOOLCHAIN}")
+                set(TOOLCHAIN_FILE_FOUND TRUE)
+                message(STATUS "Found Android NDK toolchain: ${CMAKE_TOOLCHAIN_FILE}")
+                break()
+            endif()
+        endforeach()
+        
+        if(NOT TOOLCHAIN_FILE_FOUND)
+            # Fallback to a specific version if available
+            set(CMAKE_TOOLCHAIN_FILE "${ANDROID_NDK_PATH}/25.1.8937393/build/cmake/android.toolchain.cmake")
+            if(NOT EXISTS "${CMAKE_TOOLCHAIN_FILE}")
+                message(FATAL_ERROR "Could not find Android NDK toolchain file. Please set CMAKE_TOOLCHAIN_FILE manually.")
+            endif()
+        endif()
+    endif()
+    
+    # Set Android platform - minimum API 24 for Vulkan support
+    if(NOT DEFINED ANDROID_PLATFORM)
+        set(ANDROID_PLATFORM "android-24" CACHE STRING "Android platform API level")
+    endif()
+    
+    # Set ABI if not already set
+    if(NOT DEFINED ANDROID_ABI)
+        set(ANDROID_ABI "arm64-v8a" CACHE STRING "Android ABI")
+    endif()
+    
+    # Use static C++ standard library
+    if(NOT DEFINED ANDROID_STL)
+        set(ANDROID_STL "c++_static" CACHE STRING "Android STL")
+    endif()
+    
+    message(STATUS "Android build configuration:")
+    message(STATUS "  NDK Path: ${ANDROID_NDK_PATH}")
+    message(STATUS "  Toolchain: ${CMAKE_TOOLCHAIN_FILE}")
+    message(STATUS "  Platform: ${ANDROID_PLATFORM}")
+    message(STATUS "  ABI: ${ANDROID_ABI}")
+    message(STATUS "  STL: ${ANDROID_STL}")
 endif()
 
 # Find dependencies
@@ -748,6 +802,11 @@ IF(USE_LUA)
 	list(APPEND QCOMMON_SRCS src/game/g_lua.c)
 ENDIF()
 
+# Single Player enhancements (always available)
+IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/game/g_singleplayer.c)
+	list(APPEND QCOMMON_SRCS src/game/g_singleplayer.c)
+ENDIF()
+
 # LuaSQL system
 IF(USE_LUASQL)
 	list(APPEND QCOMMON_SRCS src/common/luasql.c src/common/ls_sqlite3.c)
@@ -755,13 +814,19 @@ ENDIF()
 
 # EnTT ECS system
 IF(USE_ENTT)
-	# Add EnTT include directory
-            INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/external/include/entt/src)
+	# Add EnTT include directory (use single-header version for easier integration)
+	INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/external/include/entt/single_include)
+	# Also add src directory as fallback
+	INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/external/include/entt/src)
 	# Add compile definition
 	ADD_COMPILE_DEFINITIONS(USE_ENTT)
-	# Add C++ source files for ECS (will be created)
-IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/common/ecs.cpp)
-		list(APPEND QCOMMON_SRCS src/common/ecs.cpp)
+	# Add C++ source files for ECS
+	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/game/g_ecs.cpp)
+		list(APPEND QCOMMON_SRCS src/game/g_ecs.cpp)
+	ENDIF()
+	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/game/g_ecs_integration.cpp)
+		list(APPEND QCOMMON_SRCS src/game/g_ecs_integration.cpp)
+	ENDIF()
 ENDIF()
 IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/common/ecs_systems.cpp)
 		list(APPEND QCOMMON_SRCS src/common/ecs_systems.cpp)
@@ -1514,7 +1579,7 @@ SET(RENDERER_VK_SRCS
 	src/renderers/vulkan/tr_mesh.c
 	src/renderers/vulkan/tr_model.c
 	src/renderers/vulkan/tr_model_iqm.c
-	# NOTE: tr_rtx.c is a standalone q2rtx-style experimental renderer stub and
+	# NOTE: tr_rtx.c is a standalone experimental renderer stub and
 	# defines symbols that conflict with the main Vulkan renderer.
 	# Keep it out of the build unless/ until it is namespaced and integrated.
 	# src/renderers/vulkan/tr_rtx.c
@@ -1554,6 +1619,7 @@ SET(RENDERER_VK_SRCS
 	src/renderers/vulkan/vk_shader_validation.c
 	src/renderers/vulkan/vk_material_parser.c
 	src/renderers/vulkan/vk_material_system.c
+	src/renderers/vulkan/vk_material_pbr.c
 	src/renderers/vulkan/vk_advanced_materials.c
 	src/renderers/vulkan/vk_atmosphere.c
 	src/renderers/vulkan/vk_buffers.c
@@ -1627,6 +1693,7 @@ ENDIF()
 list(APPEND RENDERER_VK_SRCS
 	src/renderers/vulkan/rtx/vk_rtx_main.cpp
 	src/renderers/vulkan/rtx/vk_path_tracer.cpp
+	src/renderers/vulkan/rtx/vk_path_tracer_multistage.cpp
 	src/renderers/vulkan/rtx/vk_denoiser.cpp
 	src/renderers/vulkan/rtx/vk_rtx_raii.cpp
 	src/renderers/vulkan/rtx/vk_raytracing.cpp
@@ -1773,8 +1840,18 @@ IF(USE_RENDERER_DLOPEN)
 		SET_TARGET_PROPERTIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES
 			OUTPUT_NAME "${RENDERER_PREFIX}_vulkan${RENDEXT}"
 			PREFIX ""
-			LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/../release"
 		)
+		# On Android, libraries should go to the standard build output directory
+		# Gradle will automatically package them into the APK
+		if(ANDROID)
+			SET_TARGET_PROPERTIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES
+				LIBRARY_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
+			)
+		else()
+			SET_TARGET_PROPERTIES(${RENDERER_PREFIX}_vulkan${RENDEXT} PROPERTIES
+				LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/../release"
+			)
+		endif()
 		target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE USE_RENDERER_DLOPEN USE_VULKAN USE_OPENGL $<$<BOOL:${USE_VULKAN_RAY_TRACING}>:USE_VULKAN_RAY_TRACING>)
 		if(ANDROID)
 			target_compile_definitions(${RENDERER_PREFIX}_vulkan${RENDEXT} PRIVATE VK_USE_PLATFORM_ANDROID_KHR)
@@ -2589,7 +2666,67 @@ IF(USE_VULKAN)
 		ENDIF()
 	ELSE()
 		# Try CMake's find_package first
-		find_package(Vulkan)
+		# On Android, Vulkan is provided by the NDK
+		if(ANDROID)
+			# Android NDK includes Vulkan headers and library
+			# Vulkan library is linked via -lvulkan in target_link_libraries
+			# Headers are in ${ANDROID_NDK}/sources/third_party/vulkan/src/include
+			# Try to find the NDK path
+			set(NDK_PATH "")
+			if(DEFINED ANDROID_NDK)
+				set(NDK_PATH "${ANDROID_NDK}")
+			elseif(DEFINED ENV{ANDROID_NDK})
+				set(NDK_PATH "$ENV{ANDROID_NDK}")
+			elseif(DEFINED CMAKE_ANDROID_NDK)
+				set(NDK_PATH "${CMAKE_ANDROID_NDK}")
+			elseif(DEFINED ENV{ANDROID_HOME})
+				# Try to find latest NDK in ANDROID_HOME/ndk
+				set(NDK_BASE "$ENV{ANDROID_HOME}/ndk")
+				if(EXISTS "${NDK_BASE}")
+					file(GLOB NDK_VERSIONS "${NDK_BASE}/*")
+					if(NDK_VERSIONS)
+						list(SORT NDK_VERSIONS)
+						list(REVERSE NDK_VERSIONS)
+						list(GET NDK_VERSIONS 0 NDK_PATH)
+					endif()
+				endif()
+			endif()
+			
+			# Set Vulkan paths
+			set(Vulkan_FOUND TRUE)
+			set(Vulkan_LIBRARIES vulkan)
+			
+			# Find Vulkan headers
+			if(NDK_PATH AND EXISTS "${NDK_PATH}/sources/third_party/vulkan/src/include")
+				set(Vulkan_INCLUDE_DIRS "${NDK_PATH}/sources/third_party/vulkan/src/include")
+				message(STATUS "Using Android NDK Vulkan support from: ${NDK_PATH}")
+			elseif(DEFINED CMAKE_ANDROID_NDK AND EXISTS "${CMAKE_ANDROID_NDK}/sources/third_party/vulkan/src/include")
+				set(Vulkan_INCLUDE_DIRS "${CMAKE_ANDROID_NDK}/sources/third_party/vulkan/src/include")
+				message(STATUS "Using Android NDK Vulkan support (CMAKE_ANDROID_NDK=${CMAKE_ANDROID_NDK})")
+			else
+				# Fallback: try common NDK locations
+				set(VULKAN_HEADER_SEARCH_PATHS
+					"${ANDROID_NDK}/sources/third_party/vulkan/src/include"
+					"$ENV{ANDROID_NDK}/sources/third_party/vulkan/src/include"
+					"$ENV{ANDROID_HOME}/ndk/*/sources/third_party/vulkan/src/include"
+				)
+				foreach(SEARCH_PATH ${VULKAN_HEADER_SEARCH_PATHS})
+					if(EXISTS "${SEARCH_PATH}/vulkan/vulkan.h")
+						set(Vulkan_INCLUDE_DIRS "${SEARCH_PATH}")
+						message(STATUS "Using Android NDK Vulkan support (found at: ${SEARCH_PATH})")
+						break()
+					endif()
+				endforeach()
+				if(NOT DEFINED Vulkan_INCLUDE_DIRS)
+					message(WARNING "Could not find Vulkan headers in Android NDK. Vulkan may not work correctly.")
+					# Set a default path anyway - the build might still work
+					set(Vulkan_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/src/renderercommon/vulkan")
+				endif()
+			endif()
+		else()
+			find_package(Vulkan)
+		endif()
+		
 		IF(Vulkan_FOUND)
 			TARGET_COMPILE_DEFINITIONS(client PRIVATE USE_VULKAN)
 			TARGET_INCLUDE_DIRECTORIES(client PUBLIC ${Vulkan_INCLUDE_DIRS})
@@ -2739,6 +2876,8 @@ ENDIF()
 
 IF(ANDROID)
 	ADD_LIBRARY(${CNAME}${BINEXT} SHARED ${Q3_SRCS})
+	# On Android, Gradle's externalNativeBuild handles library output automatically
+	# No need to set LIBRARY_OUTPUT_DIRECTORY - Gradle will package it correctly
 ELSE()
 	ADD_EXECUTABLE(${CNAME}${BINEXT} ${EXE_TYPE} ${Q3_SRCS})
 ENDIF()

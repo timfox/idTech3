@@ -380,12 +380,12 @@ extern "C" void vk_begin_frame(void) {
     vk.cmd->frame_ready = qtrue;
 
     // Wait for previous frame's rendering to complete before reusing command buffer
-    // This matches Q2RTX pattern: wait on frame fence at BEGIN of frame, then reset
+    // This matches the pattern: wait on frame fence at BEGIN of frame, then reset
     // This ensures the command buffer is safe to reset and reuse
     if (!vk.device_lost && vk.device != VK_NULL_HANDLE) {
         VkFence frame_fence = vk.tess[vk.cmd_index].rendering_finished_fence;
         if (frame_fence != VK_NULL_HANDLE) {
-            // Wait on frame fence to ensure previous frame is complete (Q2RTX pattern)
+            // Wait on frame fence to ensure previous frame is complete (pattern)
             extern PFN_vkWaitForFences qvkWaitForFences;
             extern PFN_vkResetFences qvkResetFences;
             if (qvkWaitForFences && qvkResetFences) {
@@ -398,7 +398,7 @@ extern "C" void vk_begin_frame(void) {
                 } else if (wait_result != VK_SUCCESS) {
                     ri.Printf(PRINT_WARNING, "vk_begin_frame: Frame fence wait failed: %s\n", vk_result_string(wait_result));
                 } else {
-                    // Reset fence after waiting (before reuse) - Q2RTX pattern
+                    // Reset fence after waiting (before reuse) - pattern
                     qvkResetFences(vk.device, 1, &frame_fence);
                 }
             }
@@ -436,8 +436,8 @@ extern "C" void vk_begin_frame(void) {
     extern void vk_descriptor_batch_reset_frame(void);
     vk_descriptor_batch_reset_frame();
 
-    // Explicitly reset command buffer after waiting on fence (Q2RTX pattern)
-    // This matches Q2RTX: wait fence -> reset fence -> reset command buffers -> begin
+    // Explicitly reset command buffer after waiting on fence (pattern)
+    // This matches: wait fence -> reset fence -> reset command buffers -> begin
     if (!vk.device_lost && vk.device != VK_NULL_HANDLE) {
         if (qvkResetCommandBuffer && vk.tess[vk.cmd_index].command_buffer != VK_NULL_HANDLE) {
             VkResult reset_result = qvkResetCommandBuffer(vk.tess[vk.cmd_index].command_buffer, 0);

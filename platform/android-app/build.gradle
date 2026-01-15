@@ -1,10 +1,34 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath "com.android.tools.build:gradle:8.1.4"
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
 apply plugin: 'com.android.application'
 
 android {
     compileSdkVersion 33
+    namespace "com.idtech3"
+    
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    
     defaultConfig {
         applicationId "com.idtech3"
-        minSdkVersion 21
+        minSdkVersion 24  // Android 7.0 - required for Vulkan support
         targetSdkVersion 33
         versionCode 1
         versionName "0.1"
@@ -13,20 +37,98 @@ android {
         }
         externalNativeBuild {
             cmake {
-                cppFlags "-frtti -fexceptions"
+                cppFlags "-frtti -fexceptions -std=c++17"
+                arguments "-DANDROID=ON",
+                          "-DUSE_VULKAN=ON",
+                          "-DUSE_RENDERER_DLOPEN=ON",
+                          "-DRENDERER_DEFAULT=vulkan",
+                          "-DUSE_ANDROID=ON"
             }
         }
     }
-    buildTypes {
-        release {
-            minifyEnabled false
-            signingConfig signingConfigs.release
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
-    }
+    
     externalNativeBuild {
         cmake {
-            path "src/main/cpp/CMakeLists.txt"
+            // Use the main project CMakeLists.txt which builds the full engine
+            // Path is relative to the android-app directory (go up 3 levels to project root)
+            // Use file() to ensure proper path resolution
+            path file("${project.rootDir}/../../../CMakeLists.txt")
+            version "3.22.1"
+        }
+    }
+    
+    // Source sets for assets
+    sourceSets {
+        main {
+            assets.srcDirs = ['src/main/assets']
+            // Optionally include baseq3 if it exists
+            if (file("../../../baseq3").exists()) {
+                assets.srcDirs += '../../../baseq3'
+            }
+            // Native libraries are automatically packaged by Gradle from CMake build outputs
+            // No need to specify jniLibs.srcDirs - Gradle handles this automatically
+        }
+    }
+    
+    // Ensure native libraries are packaged correctly
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
+    
+    signingConfigs {
+        release {
+            def keystorePath = null
+            if (project.hasProperty("RELEASE_STORE_FILE")) {
+                keystorePath = project.property("RELEASE_STORE_FILE")
+            } else if (System.getenv("RELEASE_STORE_FILE") != null) {
+                keystorePath = System.getenv("RELEASE_STORE_FILE")
+            }
+            if (keystorePath != null) {
+                storeFile file(keystorePath)
+                def storePassword = null
+                if (project.hasProperty("RELEASE_STORE_PASSWORD")) {
+                    storePassword = project.property("RELEASE_STORE_PASSWORD")
+                } else if (System.getenv("RELEASE_STORE_PASSWORD") != null) {
+                    storePassword = System.getenv("RELEASE_STORE_PASSWORD")
+                }
+                def keyAlias = null
+                if (project.hasProperty("RELEASE_KEY_ALIAS")) {
+                    keyAlias = project.property("RELEASE_KEY_ALIAS")
+                } else if (System.getenv("RELEASE_KEY_ALIAS") != null) {
+                    keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+                }
+                def keyPassword = null
+                if (project.hasProperty("RELEASE_KEY_PASSWORD")) {
+                    keyPassword = project.property("RELEASE_KEY_PASSWORD")
+                } else if (System.getenv("RELEASE_KEY_PASSWORD") != null) {
+                    keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+                }
+                if (storePassword != null) {
+                    storePassword storePassword
+                }
+                if (keyAlias != null) {
+                    keyAlias keyAlias
+                }
+                if (keyPassword != null) {
+                    keyPassword keyPassword
+                }
+            }
+            // Don't throw error if keystore not configured - allow debug builds
+        }
+    }
+
+    buildTypes {
+        release {
+            if (signingConfigs.release.storeFile != null) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled false
         }
     }
 }
@@ -37,53 +139,6 @@ dependencies {
     implementation "androidx.constraintlayout:constraintlayout:2.1.4"
 }
 
-signingConfigs {
-    release {
-        def keystorePath = null
-        if (project.hasProperty("RELEASE_STORE_FILE")) {
-            keystorePath = project.property("RELEASE_STORE_FILE")
-        } else if (System.getenv("RELEASE_STORE_FILE") != null) {
-            keystorePath = System.getenv("RELEASE_STORE_FILE")
-        }
-        if (keystorePath != null) {
-            storeFile file(keystorePath)
-            def storePassword = null
-            if (project.hasProperty("RELEASE_STORE_PASSWORD")) {
-                storePassword = project.property("RELEASE_STORE_PASSWORD")
-            } else if (System.getenv("RELEASE_STORE_PASSWORD") != null) {
-                storePassword = System.getenv("RELEASE_STORE_PASSWORD")
-            }
-            def keyAlias = null
-            if (project.hasProperty("RELEASE_KEY_ALIAS")) {
-                keyAlias = project.property("RELEASE_KEY_ALIAS")
-            } else if (System.getenv("RELEASE_KEY_ALIAS") != null) {
-                keyAlias = System.getenv("RELEASE_KEY_ALIAS")
-            }
-            def keyPassword = null
-            if (project.hasProperty("RELEASE_KEY_PASSWORD")) {
-                keyPassword = project.property("RELEASE_KEY_PASSWORD")
-            } else if (System.getenv("RELEASE_KEY_PASSWORD") != null) {
-                keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
-            }
-            if (storePassword != null) {
-                storePassword storePassword
-            }
-            if (keyAlias != null) {
-                keyAlias keyAlias
-            }
-            if (keyPassword != null) {
-                keyPassword keyPassword
-            }
-        } else {
-            throw new GradleException("Release keystore not configured. Set RELEASE_STORE_FILE or RELEASE_STORE_FILE env var.")
-        }
-    }
-}
-
-buildTypes {
-    release {
-        signingConfig signingConfigs.release
-        minifyEnabled false
-        proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-    }
-}
+// Gradle automatically packages native libraries from CMake build outputs
+// Libraries built by externalNativeBuild are automatically included in the APK
+// No manual copying needed - Gradle handles this via the build system

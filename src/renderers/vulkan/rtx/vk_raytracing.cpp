@@ -603,7 +603,12 @@ void vk_rt_init(void)
 	//      = 16+16+4+2+6+3+16+16+4+1+1+1+2+1+1+1 = 91 floats + 5 ints = 91*4 + 5*4 = 364 + 20 = 384 bytes
 	VkBufferCreateInfo bufferInfo = {};
 	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-	bufferInfo.size = sizeof(float) * (16 + 16 + 4 + 2 + 6 + 1 + 16 + 16 + 4 + 1 + 1 + 1 + 2 + 1 + 1) + sizeof(int) * (3 + 1 + 1); // All fields including denoising parameters + pathTracing
+	// Buffer size calculation:
+	// viewInverse(16) + projInverse(16) + cameraPos(4) + resolution(2) + time/near/far/exposure(4) + frameIndex/samplesPerPixel/debugMagenta(3 int)
+	// + temporalAlpha(1) + maxBounces(1 int) + giIntensity(1) + previousViewInverse(16) + previousProjInverse(16) + previousCameraPos(4)
+	// + invResolution(2) + spatialAlpha(1) + varianceAlpha(1) + iterations(1 int) + pathTracing(1 int)
+	// + materialAlbedo(4) + materialRoughness(1) + materialMetallic(1)
+	bufferInfo.size = sizeof(float) * (16 + 16 + 4 + 2 + 4 + 1 + 1 + 1 + 1 + 16 + 16 + 4 + 2 + 1 + 1 + 4 + 1 + 1) + sizeof(int) * (3 + 1 + 1); // All fields including denoising parameters + pathTracing + material properties
 	bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
@@ -804,6 +809,10 @@ void vk_rt_shutdown(void)
 	vk.rt_composite_descriptor = VK_NULL_HANDLE;
 #endif
 
+	// Shutdown multi-stage systems
+	PT_Q2RTX_Shutdown();
+	MAT_Q2RTX_Shutdown();
+	
 	vk.rt.initialized = qfalse;
 }
 
@@ -991,7 +1000,11 @@ void vk_rt_create_pipeline( void )
 	pipelineInfo.pStages = shaderStages;
 	pipelineInfo.groupCount = groupCount;
 	pipelineInfo.pGroups = shaderGroups;
-	pipelineInfo.maxPipelineRayRecursionDepth = 2; // Primary + shadow
+	// Increase recursion depth for path tracing with multiple bounces
+	// Path tracing can use up to 8 bounces, but we'll limit to 4 for performance
+	// This can be adjusted based on quality settings
+	int max_recursion = r_rt_giBounces ? std::min(r_rt_giBounces->integer, 4) : 2;
+	pipelineInfo.maxPipelineRayRecursionDepth = max_recursion + 1; // +1 for primary ray
 	pipelineInfo.pLibraryInfo = NULL;
 	pipelineInfo.pLibraryInterface = NULL;
 	pipelineInfo.layout = vk.rt.raytracingPipelineLayout;
@@ -2056,6 +2069,17 @@ extern "C" void vk_rt_update_uniform_buffer( void )
 	// giIntensity (float) - GI contribution scale
 	data[0] = r_rt_giIntensity ? r_rt_giIntensity->value : 1.0f;
 	data += 1;
+	
+	// Material properties for path tracing (albedo, roughness, metallic)
+	// Default material: neutral gray, slightly rough, non-metallic
+	data[0] = 0.8f; // albedo.r
+	data[1] = 0.8f; // albedo.g
+	data[2] = 0.8f; // albedo.b
+	data[3] = 0.5f; // roughness (0=smooth, 1=rough)
+	data += 4;
+	
+	data[0] = 0.0f; // metallic (0=dielectric, 1=metal)
+	data += 1;
 
 	// previousViewInverse (mat4 = 16 floats)
 	Com_Memcpy( data, vk.rt.previousViewInverse, sizeof(float) * 16 );
@@ -2096,6 +2120,22 @@ extern "C" void vk_rt_update_uniform_buffer( void )
 	idata[0] = ri.Cvar_VariableIntegerValue( "r_rt_pathtracing" );
 	idata += 1;
 	data = (float *)idata;
+	
+	// Material properties for path tracing
+	// materialAlbedo (vec4 = 4 floats) - base color/albedo
+	data[0] = 0.8f; // r - default neutral gray
+	data[1] = 0.8f; // g
+	data[2] = 0.8f; // b
+	data[3] = 1.0f; // a (unused, for alignment)
+	data += 4;
+	
+	// materialRoughness (float) - surface roughness (0=smooth, 1=rough)
+	data[0] = 0.5f; // Default medium roughness
+	data += 1;
+	
+	// materialMetallic (float) - metallic factor (0=dielectric, 1=metal)
+	data[0] = 0.0f; // Default non-metallic
+	data += 1;
 
 	qvkUnmapMemory( vk.device, vk.rt.uniformBufferMemory );
 
@@ -2110,8 +2150,24 @@ extern "C" void vk_rt_update_uniform_buffer( void )
 
 #ifdef USE_VULKAN_RAY_TRACING
 
+// Forward declarations for multi-stage systems
+extern void PT_Q2RTX_Render(uint32_t width, uint32_t height);
+extern void PT_Q2RTX_Init(void);
+extern void PT_Q2RTX_Shutdown(void);
+extern void MAT_Q2RTX_Init(void);
+extern void MAT_Q2RTX_Shutdown(void);
+
 extern "C" void vk_rt_trace_rays( uint32_t width, uint32_t height )
 {
+	// Check if multi-stage path tracer is enabled
+	cvar_t *r_pt_enable = ri.Cvar_Get("r_pt_enable", "1", CVAR_ARCHIVE);
+	if (r_pt_enable && r_pt_enable->integer) {
+		// Use multi-stage path tracer
+		PT_Q2RTX_Render(width, height);
+		return;
+	}
+	
+	// Fall back to original single-stage path tracer
 	if ( !vk.rayTracingSupported || !vk.rt.initialized || vk.rt.raytracingPipeline == VK_NULL_HANDLE ) {
 		return;
 	}

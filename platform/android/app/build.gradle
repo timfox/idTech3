@@ -3,6 +3,12 @@ apply plugin: 'com.android.application'
 android {
     compileSdkVersion 33
     namespace "com.idtech3"
+    
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    
     defaultConfig {
         applicationId "com.idtech3"
         minSdkVersion 21
@@ -24,29 +30,29 @@ android {
             path "src/main/cpp/CMakeLists.txt"
         }
     }
+    
+    signingConfigs {
+        release {
+            // TODO: replace with real keystore path and credentials
+            // storeFile file("/path/to/keystore.jks")
+            // storePassword "your-keystore-password"
+            // keyAlias "your-key-alias"
+            // keyPassword "your-key-password"
+        }
+    }
+
+    buildTypes {
+        release {
+            // Use signing config if provided
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
 }
 
 dependencies {
     implementation "androidx.appcompat:appcompat:1.6.1"
     implementation "com.google.android.material:material:1.9.0"
     implementation "androidx.constraintlayout:constraintlayout:2.1.4"
-}
-
-signingConfigs {
-    release {
-        // TODO: replace with real keystore path and credentials
-        // storeFile file("/path/to/keystore.jks")
-        // storePassword "your-keystore-password"
-        // keyAlias "your-key-alias"
-        // keyPassword "your-key-password"
-    }
-}
-
-buildTypes {
-    release {
-        // Use signing config if provided
-        signingConfig signingConfigs.release
-        minifyEnabled false
-        proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-    }
 }

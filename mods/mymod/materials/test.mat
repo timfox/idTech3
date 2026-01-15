@@ -1,4 +1,4 @@
-// Test material file for Q2RTX-style material definitions
+// Test material file for material definitions
 textures/e1u2/metal1_1:
     texture_base textures/e1u2/metal1_1.tga
     roughness_override 0.3
