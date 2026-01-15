@@ -4131,6 +4131,8 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 		Com_Error( ERR_FATAL, "Graphics initialization failed - no suitable display found" );
 	}
 
+	CL_PlayQueuedIntroVideo();
+
 	// unpause so the cgame definitely gets a snapshot and renders a frame
 	Cvar_Set( "cl_paused", "0" );
 }

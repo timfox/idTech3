@@ -1937,16 +1937,6 @@ void CL_PlayCinematic_f( void ) {
 		do {
 			SCR_RunCinematic();
 		} while (cinTable[currentHandle].buf == NULL && cinTable[currentHandle].status == FMV_PLAY); // wait for first frame (load codebook and sound)
-
-		// Don't reset client state immediately - let it stay in cinematic mode
-		// The cinematic will be stopped by user input or other means
-		Com_Printf("Cinematic finished, but keeping cls.state as CA_CINEMATIC\n");
-
-		// For cinematic playback, stop the cinematic and reset state
-		// This simulates the cinematic completing and returning to main menu
-		Com_Printf("DEBUG: Cinematic playback test completed successfully\n");
-		CL_handle = -1; // Stop cinematic
-		cls.state = CA_ACTIVE; // Return to active state for main menu
 	}
 }
 

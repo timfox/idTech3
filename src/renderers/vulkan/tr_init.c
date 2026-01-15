@@ -703,9 +703,6 @@ refexport_t *GetRefAPI( int apiVersion, refimport_t *rimp ) {
         return NULL;
     }
 
-    R_Register();
-    R_ModelInit();
-
     re.Shutdown = RE_Shutdown;
     re.BeginRegistration = RE_BeginRegistration;
     re.RegisterModel = RE_RegisterModel;
@@ -715,6 +712,7 @@ refexport_t *GetRefAPI( int apiVersion, refimport_t *rimp ) {
     re.LoadWorld = RE_LoadWorldMap;
     re.SetWorldVisData = RE_SetWorldVisData;
     re.EndRegistration = RE_EndRegistration;
+    re.GetConfig = RE_GetConfig;
     re.BeginFrame = RE_BeginFrame;
     re.EndFrame = RE_EndFrame;
     re.MarkFragments = R_MarkFragments;

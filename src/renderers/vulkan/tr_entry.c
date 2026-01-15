@@ -37,7 +37,37 @@ static qboolean g_vk_safe_mode = qfalse;
 static qboolean g_vulkan_patch1_enabled = qfalse;
 static qboolean g_vulkan_patch1_tiny_enabled = qfalse;
 
+static qboolean is_vulkan_forced_by_cmdline(void) {
+  if (!ri.Cmd_Argc || !ri.Cmd_Argv) {
+    return qfalse;
+  }
+
+  int argc = ri.Cmd_Argc();
+  for (int i = 0; i + 2 < argc; i++) {
+    const char *arg = ri.Cmd_Argv(i);
+    if (!arg) {
+      continue;
+    }
+    if (!Q_stricmp(arg, "+set") || !Q_stricmp(arg, "set") || !Q_stricmp(arg, "+seta")) {
+      const char *cvar = ri.Cmd_Argv(i + 1);
+      const char *value = ri.Cmd_Argv(i + 2);
+      if (cvar && value &&
+          (!Q_stricmp(cvar, "cl_renderer") || !Q_stricmp(cvar, "r_renderer")) &&
+          !Q_stricmp(value, "vulkan")) {
+        return qtrue;
+      }
+    }
+  }
+  return qfalse;
+}
+
 static void check_safe_mode_flag(void) {
+  const char *cl_renderer = ri.Cvar_VariableString ? ri.Cvar_VariableString("cl_renderer") : NULL;
+  const char *r_renderer = ri.Cvar_VariableString ? ri.Cvar_VariableString("r_renderer") : NULL;
+  qboolean vulkan_forced = (cl_renderer && cl_renderer[0] && !Q_stricmp(cl_renderer, "vulkan")) ||
+                           (r_renderer && r_renderer[0] && !Q_stricmp(r_renderer, "vulkan")) ||
+                           is_vulkan_forced_by_cmdline();
+
   if (g_vk_safe_mode) return;
 
   // Check for safe mode flag in multiple locations
@@ -49,8 +79,33 @@ static void check_safe_mode_flag(void) {
 
   for (int i = 0; i < sizeof(checkPaths)/sizeof(checkPaths[0]); i++) {
     if (access(checkPaths[i], F_OK) == 0) {
+      if (vulkan_forced) {
+        if (ri.Printf) {
+          ri.Printf(PRINT_ALL, "SAFE MODE: flag found at %s but Vulkan is forced; ignoring\n", checkPaths[i]);
+        } else {
+          fprintf(stderr, "SAFE MODE: flag found at %s but Vulkan is forced; ignoring\n", checkPaths[i]);
+        }
+        break;
+      }
+      if (ri.Printf) {
+        ri.Printf(PRINT_WARNING,
+                  "SAFE MODE: Vulkan not forced (cl_renderer='%s' r_renderer='%s' argc=%d)\n",
+                  cl_renderer ? cl_renderer : "",
+                  r_renderer ? r_renderer : "",
+                  ri.Cmd_Argc ? ri.Cmd_Argc() : -1);
+      } else {
+        fprintf(stderr,
+                "SAFE MODE: Vulkan not forced (cl_renderer='%s' r_renderer='%s' argc=%d)\n",
+                cl_renderer ? cl_renderer : "",
+                r_renderer ? r_renderer : "",
+                ri.Cmd_Argc ? ri.Cmd_Argc() : -1);
+      }
       g_vk_safe_mode = qtrue;
-      ri.Printf(PRINT_ALL, "SAFE MODE: Vulkan path disabled via flag at %s\n", checkPaths[i]);
+      if (ri.Printf) {
+        ri.Printf(PRINT_ALL, "SAFE MODE: Vulkan path disabled via flag at %s\n", checkPaths[i]);
+      } else {
+        fprintf(stderr, "SAFE MODE: Vulkan path disabled via flag at %s\n", checkPaths[i]);
+      }
       return;
     }
   }
@@ -174,27 +229,45 @@ Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI(int
 
   // Validate API version
   if (apiVersion != REF_API_VERSION) {
-    ri.Printf(PRINT_ERROR, "Vulkan GetRefAPI: Unsupported API version %d, expected %d\n",
+    if (ri.Printf) {
+      ri.Printf(PRINT_ERROR, "Vulkan GetRefAPI: Unsupported API version %d, expected %d\n",
+                apiVersion, REF_API_VERSION);
+    } else {
+      fprintf(stderr, "Vulkan GetRefAPI: Unsupported API version %d, expected %d\n",
               apiVersion, REF_API_VERSION);
+    }
     return NULL;
   }
 
   // Check for safe mode
   check_safe_mode_flag();
   if (g_vk_safe_mode) {
-    ri.Printf(PRINT_ALL, "SAFE MODE active: Vulkan disabled\n");
+    if (ri.Printf) {
+      ri.Printf(PRINT_ALL, "SAFE MODE active: Vulkan disabled\n");
+    } else {
+      fprintf(stderr, "SAFE MODE active: Vulkan disabled\n");
+    }
     return NULL;
   }
 
   // Note: SIGFPE handling is done in R_Init for better coverage of Vulkan initialization
 
-	// Test basic Vulkan device availability before proceeding
-	// This prevents SIGFPE crashes when Vulkan is not initialized
-	if (vk.device == VK_NULL_HANDLE) {
-		ri.Printf(PRINT_WARNING, "Vulkan: Device not initialized, cannot test shaders yet. Tiny mode enabled.\n");
-		// Don't return NULL - allow tiny mode to proceed without shader test
-	} else {
-		// Test basic shader loading only if Vulkan is initialized
+  // Tiny patch mode is opt-in only. If not enabled, use the full renderer entry.
+  if (!g_vulkan_patch1_tiny_enabled) {
+#ifdef USE_RENDERER_DLOPEN
+    extern refexport_t *GetRefAPI_Internal( int apiVersion, refimport_t *rimp );
+#else
+    extern refexport_t *GetRefAPI( int apiVersion, refimport_t *rimp );
+#endif
+#ifdef USE_RENDERER_DLOPEN
+    return GetRefAPI_Internal(apiVersion, rimp);
+#else
+    return GetRefAPI(apiVersion, rimp);
+#endif
+  }
+
+	// Tiny mode: optionally sanity-check device/shader availability if Vulkan is initialized
+	if (vk.device != VK_NULL_HANDLE) {
 		VkShaderModule test_vs = vk_load_shader("color_vert", VK_SHADER_STAGE_VERTEX_BIT);
 		VkShaderModule test_fs = vk_load_shader("color_frag", VK_SHADER_STAGE_FRAGMENT_BIT);
 
@@ -203,8 +276,7 @@ Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI(int
 			return NULL;
 		}
 
-		// Test basic Vulkan device operations to catch device lost errors early
-		// Try a simple Vulkan operation that would fail if device is lost
+		// Test a simple Vulkan operation to catch device lost errors early
 		VkCommandPool testPool = VK_NULL_HANDLE;
 		VkCommandPoolCreateInfo poolInfo = {
 			.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -218,96 +290,12 @@ Q_EXPORT __attribute__((visibility("default"))) refexport_t* QDECL GetRefAPI(int
 			return NULL;
 		}
 
-		// Clean up test resources
 		if (testPool != VK_NULL_HANDLE) {
 			qvkDestroyCommandPool(vk.device, testPool, NULL);
 		}
-
-		// Test more comprehensive Vulkan initialization (similar to what vk_create_attachments does)
-		// Try to create a basic attachment to test if device is really functional
-		VkImage testImage = VK_NULL_HANDLE;
-		VkDeviceMemory testMemory = VK_NULL_HANDLE;
-		VkImageView testView = VK_NULL_HANDLE;
-
-		// Create a tiny 1x1 test image
-		VkImageCreateInfo imageInfo = {
-			.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-			.imageType = VK_IMAGE_TYPE_2D,
-			.format = VK_FORMAT_R8G8B8A8_UNORM,
-			.extent = {1, 1, 1},
-			.mipLevels = 1,
-			.arrayLayers = 1,
-			.samples = VK_SAMPLE_COUNT_1_BIT,
-			.tiling = VK_IMAGE_TILING_OPTIMAL,
-			.usage = VK_IMAGE_USAGE_SAMPLED_BIT,
-			.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-			.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED
-		};
-
-		VkResult imageResult = qvkCreateImage(vk.device, &imageInfo, NULL, &testImage);
-		if (imageResult != VK_SUCCESS) {
-			ri.Printf(PRINT_ERROR, "Vulkan: Image creation test failed (%s), falling back to OpenGL\n", vk_result_string(imageResult));
-			return NULL;
-		}
-
-		// Get memory requirements
-		VkMemoryRequirements memReqs;
-		qvkGetImageMemoryRequirements(vk.device, testImage, &memReqs);
-
-		// Allocate memory
-		VkMemoryAllocateInfo allocInfo = {
-			.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-			.allocationSize = memReqs.size,
-			.memoryTypeIndex = find_memory_type(memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT)
-		};
-
-		VkResult allocResult = qvkAllocateMemory(vk.device, &allocInfo, NULL, &testMemory);
-		if (allocResult != VK_SUCCESS) {
-			qvkDestroyImage(vk.device, testImage, NULL);
-			ri.Printf(PRINT_ERROR, "Vulkan: Memory allocation test failed (%s), falling back to OpenGL\n", vk_result_string(allocResult));
-			return NULL;
-		}
-
-		// Bind memory
-		VkResult bindResult = qvkBindImageMemory(vk.device, testImage, testMemory, 0);
-		if (bindResult != VK_SUCCESS) {
-			qvkDestroyImage(vk.device, testImage, NULL);
-			qvkFreeMemory(vk.device, testMemory, NULL);
-			ri.Printf(PRINT_ERROR, "Vulkan: Memory binding test failed (%s), falling back to OpenGL\n", vk_result_string(bindResult));
-			return NULL;
-		}
-
-		// Create image view
-		VkImageViewCreateInfo viewInfo = {
-			.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-			.image = testImage,
-			.viewType = VK_IMAGE_VIEW_TYPE_2D,
-			.format = VK_FORMAT_R8G8B8A8_UNORM,
-			.subresourceRange = {
-				.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-				.baseMipLevel = 0,
-				.levelCount = 1,
-				.baseArrayLayer = 0,
-				.layerCount = 1
-			}
-		};
-
-		VkResult viewResult = qvkCreateImageView(vk.device, &viewInfo, NULL, &testView);
-		if (viewResult != VK_SUCCESS) {
-			qvkDestroyImage(vk.device, testImage, NULL);
-			qvkFreeMemory(vk.device, testMemory, NULL);
-			ri.Printf(PRINT_ERROR, "Vulkan: Image view creation test failed (%s), falling back to OpenGL\n", vk_result_string(viewResult));
-			return NULL;
-		}
-
-		// Clean up test resources
-		if (testView != VK_NULL_HANDLE) qvkDestroyImageView(vk.device, testView, NULL);
-		if (testImage != VK_NULL_HANDLE) qvkDestroyImage(vk.device, testImage, NULL);
-		if (testMemory != VK_NULL_HANDLE) qvkFreeMemory(vk.device, testMemory, NULL);
-
 	}
 
-  // Initialize Vulkan tiny mode - always enabled
+  // Initialize Vulkan tiny mode (flag-gated)
   ri.Printf(PRINT_ALL, "Vulkan: Tiny mode enabled\n");
   ri.Printf(PRINT_ALL, "Vulkan: Renderer initialized with RTX hardware support\n");
   ri.Printf(PRINT_ALL, "Vulkan: imGUI performance monitoring available\n");

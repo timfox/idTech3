@@ -194,6 +194,27 @@ static void Crash_SetSafeModeFlag(void)
     }
 }
 
+static qboolean Crash_CommandLineForcesVulkan(void)
+{
+    int argc = Cmd_Argc();
+    for (int i = 0; i + 2 < argc; i++) {
+        const char *arg = Cmd_Argv(i);
+        if (!arg) {
+            continue;
+        }
+        if (!Q_stricmp(arg, "+set") || !Q_stricmp(arg, "set") || !Q_stricmp(arg, "+seta")) {
+            const char *cvar = Cmd_Argv(i + 1);
+            const char *value = Cmd_Argv(i + 2);
+            if (cvar && value &&
+                (!Q_stricmp(cvar, "cl_renderer") || !Q_stricmp(cvar, "r_renderer")) &&
+                !Q_stricmp(value, "vulkan")) {
+                return qtrue;
+            }
+        }
+    }
+    return qfalse;
+}
+
 /*
 =================
 Crash_GetSignalName
@@ -499,8 +520,12 @@ static void Crash_HandleCrash(int sig, void *fault_addr, const char *reason)
     // Capture stack trace
     Crash_CaptureStackTrace(&g_crash_info);
 
-    // Set safe mode flag for next boot
-    Crash_SetSafeModeFlag();
+    // Set safe mode flag for next boot (skip when Vulkan is explicitly forced)
+    if (!Crash_CommandLineForcesVulkan()) {
+        Crash_SetSafeModeFlag();
+    } else {
+        fprintf(stderr, "Crash handler: Vulkan forced, skipping safe mode flag\n");
+    }
 
     // Write crash report
     Crash_WriteReport(&g_crash_info, reason);

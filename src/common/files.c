@@ -44,6 +44,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "q_fallback_assets.h"  // Fallback asset system
 #include "job_system.h"
 #include "thread_platform.h"  // For thread synchronization
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <sys/stat.h>
+#endif
 
 // Path security validation structures
 typedef enum {
@@ -302,6 +307,16 @@ static	cvar_t		*fs_gamedirvar;
 #ifndef USE_HANDLE_CACHE
 static	cvar_t		*fs_locked;
 #endif
+
+static qboolean FS_OSPathIsDirectory(const char *path) {
+#ifdef _WIN32
+	DWORD attr = GetFileAttributesA(path);
+	return (attr != INVALID_FILE_ATTRIBUTES) && (attr & FILE_ATTRIBUTE_DIRECTORY);
+#else
+	struct stat st;
+	return (stat(path, &st) == 0) && S_ISDIR(st.st_mode);
+#endif
+}
 static	cvar_t		*fs_excludeReference;
 
 // C23 Filesystem Improvements: Cache cvars
@@ -6784,12 +6799,13 @@ static void FS_Startup( void ) {
 
 		Com_sprintf( modDiskDir, sizeof( modDiskDir ), "mods/%s", fs_gamedirvar->string );
 		if ( fs_basepath && fs_basepath->string[0] != '\0' ) {
-		const char *modOSPath = FS_BuildOSPath( fs_basepath->string, modDiskDir, NULL );
-		(void)modOSPath; // Suppress unused variable warning - directory check temporarily disabled
-		// Temporarily disable directory check
-		// if ( FS_DirectoryExists( modOSPath ) ) {
-			effectiveDir = modDiskDir;
-		// }
+			const char *modOSPath = FS_BuildOSPath( fs_basepath->string, modDiskDir, NULL );
+			const char *directOSPath = FS_BuildOSPath( fs_basepath->string, fs_gamedirvar->string, NULL );
+			if ( FS_OSPathIsDirectory( modOSPath ) ) {
+				effectiveDir = modDiskDir;
+			} else if ( FS_OSPathIsDirectory( directOSPath ) ) {
+				effectiveDir = fs_gamedirvar->string;
+			}
 		}
 
 		if ( fs_debug && fs_debug->integer ) {

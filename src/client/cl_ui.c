@@ -31,6 +31,24 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 extern	botlib_export_t	*botlib_export;
 extern qboolean re_initialized;
 
+static char cl_queued_intro_video[MAX_OSPATH];
+
+void CL_QueueIntroVideo(const char *videoFile) {
+	if (!videoFile || !videoFile[0]) {
+		return;
+	}
+	Q_strncpyz(cl_queued_intro_video, videoFile, sizeof(cl_queued_intro_video));
+}
+
+void CL_PlayQueuedIntroVideo(void) {
+	if (!re_initialized || !cl_queued_intro_video[0]) {
+		return;
+	}
+	Com_Printf( "Playing queued intro video: %s\n", cl_queued_intro_video );
+	Cbuf_AddText( va( "cinematic %s 2\n", cl_queued_intro_video ) );
+	cl_queued_intro_video[0] = '\0';
+}
+
 static ext_trap_keys_t ui_extensionTraps[] = {
 	{ "trap_R_AddRefEntityToScene2",       UI_R_ADDREFENTITYTOSCENE2, qfalse },
 	{ "trap_R_AddLinearLightToScene_Q3E", UI_R_ADDLINEARLIGHTTOSCENE, qfalse },
@@ -1608,9 +1626,10 @@ void CL_InitUI( void ) {
 		extern qboolean re_initialized;
 		if ( re_initialized ) {
 			Com_Printf( "Playing intro video: %s\n", videoFile );
-			Cbuf_ExecuteText( EXEC_NOW, va( "cinematic %s 2\n", videoFile ) ); // 2 = loop mode
+			Cbuf_AddText( va( "cinematic %s 2\n", videoFile ) ); // 2 = loop mode
 		} else {
 			Com_Printf( "Intro video '%s' queued (renderer not initialized yet)\n", videoFile );
+			CL_QueueIntroVideo( videoFile );
 		}
 	} else {
 		Com_Printf( "No intro video found for mod '%s'\n", fs_game && fs_game[0] ? fs_game : "base" );
