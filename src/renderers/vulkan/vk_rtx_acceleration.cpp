@@ -2,6 +2,7 @@
 
 #include "tr_local.h"
 #include "vk_rtx_acceleration.h"
+#include "vk_sync.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1134,10 +1135,6 @@ typedef struct {
 // rtx_buffer_t and rtx_sbt_t are defined earlier (line ~1061) for use throughout file
 // g_sbt is also defined earlier (line ~1080)
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 // Global RTX state - variables moved earlier (line ~1087) for use throughout file
 // Timing: GPU/RT timestamps
 static VkQueryPool g_rtx_timing_query_pool = VK_NULL_HANDLE;
@@ -1264,7 +1261,7 @@ static void rtx_free_buffer(rtx_buffer_t* buffer) {
         buffer->memory = VK_NULL_HANDLE;
     }
 }
-qboolean vk_rtx_acceleration_init(void) {
+extern "C" qboolean vk_rtx_acceleration_init(void) {
     // Defensive guard: prevent double initialization
     if (g_rtx_accel_initialized) {
         ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: acceleration already initialized\n");
@@ -1323,7 +1320,7 @@ qboolean vk_rtx_acceleration_init(void) {
     return qtrue;
 }
 
-void vk_rtx_acceleration_shutdown(void) {
+extern "C" void vk_rtx_acceleration_shutdown(void) {
     if (!g_rtx_accel_initialized) {
         ri.Printf(PRINT_DEVELOPER, "Vulkan RTX: acceleration shutdown called; not initialized\n");
         return;
@@ -2349,7 +2346,7 @@ vk_rtx_build_blas_from_world
 Build BLAS for world geometry from BSP surfaces
 =================
 */
-qboolean vk_rtx_build_blas_from_world(void) {
+extern "C" qboolean vk_rtx_build_blas_from_world(void) {
     if (!g_rtx_accel_initialized) {
         ri.Printf(PRINT_WARNING, "RTX: Acceleration structures not initialized, cannot build world BLAS\n");
         return qfalse;
@@ -2386,14 +2383,13 @@ qboolean vk_rtx_build_blas_from_world(void) {
 }
 
 // Accessors for surface indices buffer
-extern "C" {
 VkBuffer vk_rtx_get_surface_indices_buffer(void) {
     return g_surface_indices_buffer;
 }
 VkDeviceSize vk_rtx_get_surface_indices_size(void) {
     return g_surface_indices_size;
 }
-void vk_rtx_bind_surface_indices_buffer(VkDescriptorSet descriptorSet) {
+extern "C" void vk_rtx_bind_surface_indices_buffer(VkDescriptorSet descriptorSet) {
     if (g_surface_indices_buffer == VK_NULL_HANDLE || g_surface_indices_size == 0) return;
     VkDescriptorBufferInfo bufferInfo = { .buffer = g_surface_indices_buffer, .offset = 0, .range = g_surface_indices_size };
     VkWriteDescriptorSet write = {};
@@ -2408,12 +2404,7 @@ void vk_rtx_bind_surface_indices_buffer(VkDescriptorSet descriptorSet) {
     write.pTexelBufferView = NULL;
     qvkUpdateDescriptorSets(vk.device, 1, &write, 0, NULL);
 }
-}
-#ifdef __cplusplus
-}
-#endif
-
-void vk_rtx_update_surface_material_indices_buffer(void) {
+extern "C" void vk_rtx_update_surface_material_indices_buffer(void) {
     if (!g_rtx_accel_initialized) {
         ri.Printf(PRINT_DEVELOPER, "RTX: surface indices buffer update skipped (not initialized)\n");
         return;

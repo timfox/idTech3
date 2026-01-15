@@ -41,6 +41,10 @@ typedef enum {
 
 typedef struct image_s image_t;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // any change in the LIGHTMAP_* defines here MUST be reflected in
 // R_FindShader() in tr_bsp.c
 #define LIGHTMAP_2D         -4	// shader is for 2D rendering
@@ -96,20 +100,11 @@ qhandle_t RE_RegisterShaderLightMap( const char *name, int lightmapIndex );
 qhandle_t RE_RegisterShader( const char *name );
 qhandle_t RE_RegisterShaderNoMip( const char *name );
 qhandle_t RE_RegisterShaderFromImage(const char *name, int lightmapIndex, image_t *image, qboolean mipRawImage);
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 // font stuff
 void R_InitFreeType( void );
 void R_DoneFreeType( void );
 qboolean RE_RegisterFont(const char *fontName, int pointSize, fontInfo_t *font);
 qboolean RE_RegisterFont_Stb(const char *fontName, int pointSize, fontInfo_t *font);
-
-#ifdef __cplusplus
-}
-#endif
 
 #include "../renderercommon/tr_font_enhanced.h"
 
@@ -139,16 +134,8 @@ extern cvar_t *r_fontAntialiasing;
 extern cvar_t *r_fontLCDFilter;
 extern cvar_t *r_fontKerning;
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 // Vulkan-specific font functions
 qboolean RE_RegisterFont_Vulkan(const char *fontName, int pointSize, fontInfo_t *font);
-
-#ifdef __cplusplus
-}
-#endif
 
 
 /*
@@ -174,5 +161,9 @@ IMPLEMENTATION SPECIFIC FUNCTIONS
 
 ====================================================================
 */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

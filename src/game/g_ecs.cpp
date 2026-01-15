@@ -10,6 +10,7 @@ Modern ECS implementation using entt library.
 
 #include "g_ecs.h"
 #include "g_public.h"
+#include "g_local.h"
 #include "../common/qcommon.h"
 
 // Forward declaration - g_local.h may not exist in all builds

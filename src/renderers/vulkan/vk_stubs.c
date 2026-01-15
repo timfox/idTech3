@@ -389,21 +389,21 @@ cvar_t *r_bloom_threshold_mode;
 cvar_t *r_glint;
 
 // Ray tracing CVARs
-cvar_t *r_rt_denoiseSpatialAlpha;
-cvar_t *r_rt_denoiseVarianceAlpha;
-cvar_t *r_rt_denoiseIterations;
-cvar_t *r_rt_denoise;
-cvar_t *r_rt_temporal;
-cvar_t *r_rt_temporalAlpha;
-cvar_t *r_rt_blasCompaction;
-cvar_t *r_rt_blasReuse;
-cvar_t *r_rt_denoiseMode;
-cvar_t *r_rt_outputScale;
-cvar_t *r_rt_shadowRays;
-cvar_t *r_rt_adaptiveSampling;
-cvar_t *r_rt_gi;
-cvar_t *r_rt_giBounces;
-cvar_t *r_rt_giIntensity;
+extern cvar_t *r_rt_denoiseSpatialAlpha;
+extern cvar_t *r_rt_denoiseVarianceAlpha;
+extern cvar_t *r_rt_denoiseIterations;
+extern cvar_t *r_rt_denoise;
+extern cvar_t *r_rt_temporal;
+extern cvar_t *r_rt_temporalAlpha;
+extern cvar_t *r_rt_blasCompaction;
+extern cvar_t *r_rt_blasReuse;
+extern cvar_t *r_rt_denoiseMode;
+extern cvar_t *r_rt_outputScale;
+extern cvar_t *r_rt_shadowRays;
+extern cvar_t *r_rt_adaptiveSampling;
+extern cvar_t *r_rt_gi;
+extern cvar_t *r_rt_giBounces;
+extern cvar_t *r_rt_giIntensity;
 
 // ---------------------------------------------------------------------------
 // Optional subsystems are compiled from their respective translation units.

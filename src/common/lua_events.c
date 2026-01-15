@@ -66,6 +66,156 @@ static qboolean s_initialized = qfalse;
 
 #define INITIAL_EVENT_MAP_SIZE 32
 
+static void Lua_Events_RemoveSubscriber(event_entry_t *entry, int index)
+{
+	event_subscriber_t *sub;
+
+	if (!entry || index < 0 || index >= entry->num_subscribers) {
+		return;
+	}
+
+	sub = &entry->subscribers[index];
+	if (sub->callback_ref != LUA_NOREF && sub->L) {
+		luaL_unref(sub->L, LUA_REGISTRYINDEX, sub->callback_ref);
+	}
+
+	memmove(sub, sub + 1, sizeof(event_subscriber_t) * (entry->num_subscribers - index - 1));
+	entry->num_subscribers--;
+}
+
+static void Lua_Events_RemoveWaiter(event_entry_t *entry, int index)
+{
+	event_waiter_t *waiter;
+
+	if (!entry || index < 0 || index >= entry->num_waiters) {
+		return;
+	}
+
+	waiter = &entry->waiters[index];
+	if (waiter->coroutine_ref != LUA_NOREF && waiter->L) {
+		luaL_unref(waiter->L, LUA_REGISTRYINDEX, waiter->coroutine_ref);
+	}
+
+	memmove(waiter, waiter + 1, sizeof(event_waiter_t) * (entry->num_waiters - index - 1));
+	entry->num_waiters--;
+}
+
+static void Lua_Events_StoreScriptName(lua_State *L, event_subscriber_t *sub)
+{
+	lua_Debug dbg;
+	const char *source = NULL;
+	const char *base = NULL;
+
+	if (!sub) {
+		return;
+	}
+
+	sub->script_name[0] = '\0';
+	if (!L) {
+		return;
+	}
+
+	if (!lua_getstack(L, 1, &dbg) || !lua_getinfo(L, "S", &dbg) || !dbg.source) {
+		return;
+	}
+
+	source = dbg.source;
+	if (source[0] == '@') {
+		source++;
+	}
+
+	base = strrchr(source, '/');
+	if (!base) {
+		base = strrchr(source, '\\');
+	}
+	if (base) {
+		source = base + 1;
+	}
+
+	Q_strncpyz(sub->script_name, source, sizeof(sub->script_name));
+}
+
+static lua_State *Lua_Events_GetWaiterThread(event_waiter_t *waiter)
+{
+	lua_State *co = NULL;
+
+	if (!waiter || !waiter->L || waiter->coroutine_ref == LUA_NOREF) {
+		return NULL;
+	}
+
+	lua_rawgeti(waiter->L, LUA_REGISTRYINDEX, waiter->coroutine_ref);
+	if (lua_isthread(waiter->L, -1)) {
+		co = lua_tothread(waiter->L, -1);
+	}
+	lua_pop(waiter->L, 1);
+
+	return co;
+}
+
+static qboolean Lua_Events_ResumeWaiter(event_waiter_t *waiter, const queued_event_t *evt, qboolean timed_out)
+{
+	lua_State *co;
+	int num_args = 0;
+	int result;
+
+	co = Lua_Events_GetWaiterThread(waiter);
+	if (!co) {
+		return qtrue;
+	}
+
+	if (timed_out) {
+		lua_pushnil(co);
+		lua_pushstring(co, "timeout");
+		num_args = 2;
+	} else {
+		lua_pushstring(co, evt->event_name);
+		num_args = 1;
+		if (evt->from_lua && evt->source_L == waiter->L) {
+			for (int j = 0; j < evt->num_args; j++) {
+				lua_rawgeti(waiter->L, LUA_REGISTRYINDEX, evt->arg_refs[j]);
+				lua_xmove(waiter->L, co, 1);
+				num_args++;
+			}
+		}
+	}
+
+	result = lua_resume(co, NULL, num_args, NULL);
+	if (result == LUA_OK) {
+		return qtrue;
+	}
+	if (result == LUA_YIELD) {
+		return qtrue;
+	}
+
+	{
+		const char *error = lua_tostring(co, -1);
+		Com_Printf("Lua_Events: Error resuming waiter: %s\n", error ? error : "Unknown error");
+		lua_pop(co, 1);
+	}
+
+	return qtrue;
+}
+
+static void Lua_Events_ProcessTimeouts(int now_ms)
+{
+	for (int i = 0; i < s_event_map_size; i++) {
+		event_entry_t *entry = &s_event_map[i];
+		for (int j = 0; j < entry->num_waiters; j++) {
+			event_waiter_t *waiter = &entry->waiters[j];
+			if (!waiter->active || !waiter->L) {
+				Lua_Events_RemoveWaiter(entry, j);
+				j--;
+				continue;
+			}
+			if (waiter->timeout_frame > 0 && now_ms >= waiter->timeout_frame) {
+				Lua_Events_ResumeWaiter(waiter, NULL, qtrue);
+				Lua_Events_RemoveWaiter(entry, j);
+				j--;
+			}
+		}
+	}
+}
+
 /*
 =================
 Lua_Events_Init
@@ -111,6 +261,12 @@ void Lua_Events_Shutdown(void)
 			event_subscriber_t *sub = &s_event_map[i].subscribers[j];
 			if (sub->callback_ref != LUA_NOREF && sub->L) {
 				luaL_unref(sub->L, LUA_REGISTRYINDEX, sub->callback_ref);
+			}
+		}
+		for (j = 0; j < s_event_map[i].num_waiters; j++) {
+			event_waiter_t *waiter = &s_event_map[i].waiters[j];
+			if (waiter->coroutine_ref != LUA_NOREF && waiter->L) {
+				luaL_unref(waiter->L, LUA_REGISTRYINDEX, waiter->coroutine_ref);
 			}
 		}
 	}
@@ -213,15 +369,7 @@ static qboolean Lua_Events_Subscribe(lua_State *L, const char *event_name, int c
 	sub->active = qtrue;
 	sub->once = once;
 	sub->filter = NULL;
-	// TODO: Extract and store script name for better debugging and event tracking.
-	// Implementation approach:
-	//   1. Use lua_getinfo(L, "S", &dbg) to get source file information
-	//   2. Extract filename from dbg.source (may need to strip '@' prefix and path)
-	//   3. Store in sub->script_name for hot-reload tracking
-	// This would help identify which Lua script registered each event subscription,
-	// useful for debugging event handler issues and tracking script dependencies.
-	// Note: Requires Lua debug library to be enabled (LUA_USE_APICHECK or similar)
-	Q_strncpyz(sub->script_name, "", sizeof(sub->script_name));
+	Lua_Events_StoreScriptName(L, sub);
 	entry->num_subscribers++;
 	return qtrue;
 }
@@ -276,15 +424,29 @@ qboolean Lua_Events_SubscribeCallback(lua_State *L, const char *event_name, int 
 
 /*
 =================
+Lua_Events_SubscribeOnce
+Subscribe a Lua callback (registry ref) to an event for one-time execution
+=================
+*/
+qboolean Lua_Events_SubscribeOnce(lua_State *L, const char *event_name, int callback_ref)
+{
+	return Lua_Events_Subscribe(L, event_name, callback_ref, qtrue);
+}
+
+/*
+=================
 Lua_Events_WaitFor
 Lua coroutine support: Wait for an event and resume with event data.
-Returns the number of arguments pushed to Lua stack.
+Yields the current coroutine and resumes with (event_name, ...args)
+or (nil, "timeout") if a timeout is set.
 =================
 */
 int Lua_Events_WaitFor(lua_State *L, const char *event_name, int timeout_ms)
 {
 	int i;
 	event_entry_t *entry = NULL;
+	int coroutine_ref;
+	int is_main_thread;
 
 	if (!s_initialized || !L || !event_name) {
 		lua_pushboolean(L, 0);
@@ -320,8 +482,13 @@ int Lua_Events_WaitFor(lua_State *L, const char *event_name, int timeout_ms)
 		return 1;
 	}
 
-	// Create coroutine reference
-	int coroutine_ref = luaL_ref(L, LUA_REGISTRYINDEX);
+	is_main_thread = lua_pushthread(L);
+	if (is_main_thread) {
+		lua_pop(L, 1);
+		lua_pushboolean(L, 0);
+		return 1;
+	}
+	coroutine_ref = luaL_ref(L, LUA_REGISTRYINDEX);
 
 	// Add to waiters
 	event_waiter_t *waiter = &entry->waiters[entry->num_waiters];
@@ -331,9 +498,7 @@ int Lua_Events_WaitFor(lua_State *L, const char *event_name, int timeout_ms)
 	waiter->active = qtrue;
 	entry->num_waiters++;
 
-	// Return success
-	lua_pushboolean(L, 1);
-	return 1;
+	return lua_yield(L, 0);
 }
 
 /*
@@ -357,6 +522,7 @@ void Lua_Events_Update(void)
 {
 	int processed = 0;
 	const int max_per_frame = 64;  // Limit processing per frame
+	int now_ms;
 
 	if (!s_initialized) {
 		return;
@@ -387,6 +553,8 @@ void Lua_Events_Update(void)
 				lua_rawgeti(sub->L, LUA_REGISTRYINDEX, sub->callback_ref);
 				if (!lua_isfunction(sub->L, -1)) {
 					lua_pop(sub->L, 1);
+					Lua_Events_RemoveSubscriber(entry, i);
+					i--;
 					continue;
 				}
 
@@ -413,6 +581,24 @@ void Lua_Events_Update(void)
 						evt->event_name, error ? error : "Unknown error");
 					lua_pop(sub->L, 1);
 				}
+
+				if (sub->once) {
+					Lua_Events_RemoveSubscriber(entry, i);
+					i--;
+				}
+			}
+
+			// Resume waiters for this event
+			for (i = 0; i < entry->num_waiters; i++) {
+				event_waiter_t *waiter = &entry->waiters[i];
+				if (!waiter->active || !waiter->L) {
+					Lua_Events_RemoveWaiter(entry, i);
+					i--;
+					continue;
+				}
+				Lua_Events_ResumeWaiter(waiter, evt, qfalse);
+				Lua_Events_RemoveWaiter(entry, i);
+				i--;
 			}
 		}
 
@@ -431,6 +617,9 @@ void Lua_Events_Update(void)
 		s_event_queue_count--;
 		processed++;
 	}
+
+	now_ms = Sys_Milliseconds();
+	Lua_Events_ProcessTimeouts(now_ms);
 }
 
 /*
@@ -787,6 +976,7 @@ void Lua_Events_HotReload(const char *script_name)
 
 				luaL_unref(waiter->L, LUA_REGISTRYINDEX, waiter->coroutine_ref);
 				waiter->active = qfalse;
+				waiter->coroutine_ref = LUA_NOREF;
 			}
 		}
 	}

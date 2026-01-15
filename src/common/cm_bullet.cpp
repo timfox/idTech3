@@ -312,18 +312,26 @@ btCollisionShape* CM_Bullet_BuildModelCollision(clipHandle_t model) {
 	}
 
 	// Add triangles to the mesh (indices are validated above to be multiple of 3)
+	const size_t vertex_count = vertices.size();
 	for (size_t i = 0; i < indices.size(); i += 3) {
+		const int index_a = indices[i];
+		const int index_b = indices[i + 1];
+		const int index_c = indices[i + 2];
+
 		// Validate index bounds before accessing vertices
-		if (indices[i] >= vertices.size() || indices[i + 1] >= vertices.size() || indices[i + 2] >= vertices.size()) {
+		if (index_a < 0 || index_b < 0 || index_c < 0 ||
+			static_cast<size_t>(index_a) >= vertex_count ||
+			static_cast<size_t>(index_b) >= vertex_count ||
+			static_cast<size_t>(index_c) >= vertex_count) {
 			Com_Printf("CM_Bullet_BuildModelCollision: index out of bounds for model %d (vertex count: %zu)\n",
-			           model, vertices.size());
+			           model, vertex_count);
 			delete mesh;
 			return nullptr;
 		}
 		// Add each triangle (3 consecutive indices form one triangle)
-		mesh->addTriangle(vertices[indices[i]],
-		                 vertices[indices[i + 1]],
-		                 vertices[indices[i + 2]]);
+		mesh->addTriangle(vertices[static_cast<size_t>(index_a)],
+		                 vertices[static_cast<size_t>(index_b)],
+		                 vertices[static_cast<size_t>(index_c)]);
 	}
 
 	// Create BvhTriangleMeshShape for static collision

@@ -140,7 +140,7 @@ cvar_t	*r_rtx_gi;
 cvar_t	*r_rtx_quality;
 cvar_t	*r_rtx_blasCompaction;
 cvar_t	*r_rt_pathtracing;
-cvar_t	*r_rt_giBounces;
+extern cvar_t	*r_rt_giBounces;
 extern cvar_t	*r_fsr_sharpness;
 
 extern cvar_t	*r_styleTransfer;
@@ -502,6 +502,20 @@ void R_Register( void ) {
     r_rt_maxDepth = ri.Cvar_Get( "r_rt_maxDepth", "2", CVAR_ARCHIVE_ND );
     r_rt_debugMagenta = ri.Cvar_Get( "r_rt_debugMagenta", "0", CVAR_CHEAT );
     r_rt_tlasUpdateMode = ri.Cvar_Get( "r_rt_tlasUpdateMode", "1", CVAR_ARCHIVE_ND );
+    r_rt_temporal = ri.Cvar_Get( "r_rt_temporal", "1", CVAR_ARCHIVE_ND );
+    r_rt_temporalAlpha = ri.Cvar_Get( "r_rt_temporalAlpha", "0.9", CVAR_ARCHIVE_ND );
+    r_rt_blasCompaction = ri.Cvar_Get( "r_rt_blasCompaction", "1", CVAR_ARCHIVE_ND );
+    r_rt_blasReuse = ri.Cvar_Get( "r_rt_blasReuse", "1", CVAR_ARCHIVE_ND );
+    r_rt_denoise = ri.Cvar_Get( "r_rt_denoise", "1", CVAR_ARCHIVE_ND );
+    r_rt_denoiseMode = ri.Cvar_Get( "r_rt_denoiseMode", "0", CVAR_ARCHIVE_ND );
+    r_rt_denoiseIterations = ri.Cvar_Get( "r_rt_denoiseIterations", "4", CVAR_ARCHIVE_ND );
+    r_rt_denoiseSpatialAlpha = ri.Cvar_Get( "r_rt_denoiseSpatialAlpha", "0.5", CVAR_ARCHIVE_ND );
+    r_rt_denoiseVarianceAlpha = ri.Cvar_Get( "r_rt_denoiseVarianceAlpha", "0.5", CVAR_ARCHIVE_ND );
+    r_rt_outputScale = ri.Cvar_Get( "r_rt_outputScale", "1.0", CVAR_ARCHIVE_ND );
+    r_rt_shadowRays = ri.Cvar_Get( "r_rt_shadowRays", "1", CVAR_ARCHIVE_ND );
+    r_rt_adaptiveSampling = ri.Cvar_Get( "r_rt_adaptiveSampling", "0", CVAR_ARCHIVE_ND );
+    r_rt_gi = ri.Cvar_Get( "r_rt_gi", "1", CVAR_ARCHIVE_ND );
+    r_rt_giIntensity = ri.Cvar_Get( "r_rt_giIntensity", "1.0", CVAR_ARCHIVE_ND );
 
     r_gamma = ri.Cvar_Get( "r_gamma", "1", CVAR_ARCHIVE );
     r_intensity = ri.Cvar_Get( "r_intensity", "1", CVAR_LATCH );

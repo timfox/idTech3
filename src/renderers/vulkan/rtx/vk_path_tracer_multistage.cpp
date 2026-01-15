@@ -49,7 +49,7 @@ typedef struct {
     uint64_t total_bounces;
 } pt_q2rtx_state_t;
 
-static pt_q2rtx_state_t pt_state = {0};
+static pt_q2rtx_state_t pt_state = {};
 
 // CVARs
 static cvar_t *r_pt_enable = NULL;
@@ -63,7 +63,7 @@ static cvar_t *r_pt_temporal_alpha = NULL;
 static VkPipeline pt_pipelines[PT_STAGE_COUNT] = {VK_NULL_HANDLE};
 static VkPipelineLayout pt_pipeline_layout = VK_NULL_HANDLE;
 static VkDescriptorSetLayout pt_descriptor_layout = VK_NULL_HANDLE;
-static VkDescriptorSet pt_descriptor_sets[MAX_FRAMES_IN_FLIGHT] = {VK_NULL_HANDLE};
+static VkDescriptorSet pt_descriptor_sets[MAX_SWAPCHAIN_IMAGES] = {VK_NULL_HANDLE};
 
 // Buffers for multi-stage rendering
 typedef struct {
@@ -74,10 +74,10 @@ typedef struct {
     uint32_t height;
 } pt_image_t;
 
-static pt_image_t gbuffer_image = {0};           // G-buffer (visibility buffer)
-static pt_image_t direct_lighting_image = {0};   // Direct lighting result
-static pt_image_t indirect_lighting_image = {0}; // Indirect lighting result
-static pt_image_t final_image = {0};             // Final composited result
+static pt_image_t gbuffer_image = { VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, 0, 0 };           // G-buffer (visibility buffer)
+static pt_image_t direct_lighting_image = { VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, 0, 0 };   // Direct lighting result
+static pt_image_t indirect_lighting_image = { VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, 0, 0 }; // Indirect lighting result
+static pt_image_t final_image = { VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE, 0, 0 };             // Final composited result
 
 /*
 ===============
@@ -228,6 +228,7 @@ static void PT_Q2RTX_Stage_PrimaryRays(uint32_t width, uint32_t height)
     // Memory barrier to ensure primary rays complete before next stage
     VkMemoryBarrier barrier = {
         .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+        .pNext = NULL,
         .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
         .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
     };
@@ -317,6 +318,7 @@ static void PT_Q2RTX_Stage_ReflectRefract(uint32_t width, uint32_t height, int i
     // Memory barrier
     VkMemoryBarrier barrier = {
         .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+        .pNext = NULL,
         .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
         .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
     };
@@ -432,6 +434,7 @@ static void PT_Q2RTX_Stage_IndirectLighting(uint32_t width, uint32_t height, int
     // Memory barrier
     VkMemoryBarrier barrier = {
         .sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER,
+        .pNext = NULL,
         .srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT,
         .dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
     };

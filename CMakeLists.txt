@@ -802,9 +802,11 @@ IF(USE_LUA)
 	list(APPEND QCOMMON_SRCS src/game/g_lua.c)
 ENDIF()
 
-# Single Player enhancements (always available)
-IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/game/g_singleplayer.c)
-	list(APPEND QCOMMON_SRCS src/game/g_singleplayer.c)
+# Single Player enhancements (requires game globals)
+IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/game/g_local.h)
+	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/game/g_singleplayer.c)
+		list(APPEND QCOMMON_SRCS src/game/g_singleplayer.c)
+	ENDIF()
 ENDIF()
 
 # LuaSQL system
@@ -821,11 +823,15 @@ IF(USE_ENTT)
 	# Add compile definition
 	ADD_COMPILE_DEFINITIONS(USE_ENTT)
 	# Add C++ source files for ECS
-	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/game/g_ecs.cpp)
-		list(APPEND QCOMMON_SRCS src/game/g_ecs.cpp)
-	ENDIF()
-	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/game/g_ecs_integration.cpp)
-		list(APPEND QCOMMON_SRCS src/game/g_ecs_integration.cpp)
+	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/game/g_local.h)
+		IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/game/g_ecs.cpp)
+			list(APPEND QCOMMON_SRCS src/game/g_ecs.cpp)
+		ENDIF()
+		IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/game/g_ecs_integration.cpp)
+			list(APPEND QCOMMON_SRCS src/game/g_ecs_integration.cpp)
+		ENDIF()
+	ELSE()
+		message(WARNING "USE_ENTT enabled but g_local.h is missing; skipping ECS game integration sources.")
 	ENDIF()
 ENDIF()
 IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/common/ecs_systems.cpp)
@@ -837,7 +843,6 @@ ENDIF()
 	IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/server/sv_ecs_systems.cpp)
 		list(APPEND SERVER_SRCS src/server/sv_ecs_systems.cpp)
 	ENDIF()
-ENDIF()
 
 IF(USE_BULLET)
 	# Try CMake's config package first (common when Bullet is installed from source or via vcpkg)
@@ -2703,7 +2708,7 @@ IF(USE_VULKAN)
 			elseif(DEFINED CMAKE_ANDROID_NDK AND EXISTS "${CMAKE_ANDROID_NDK}/sources/third_party/vulkan/src/include")
 				set(Vulkan_INCLUDE_DIRS "${CMAKE_ANDROID_NDK}/sources/third_party/vulkan/src/include")
 				message(STATUS "Using Android NDK Vulkan support (CMAKE_ANDROID_NDK=${CMAKE_ANDROID_NDK})")
-			else
+			else()
 				# Fallback: try common NDK locations
 				set(VULKAN_HEADER_SEARCH_PATHS
 					"${ANDROID_NDK}/sources/third_party/vulkan/src/include"

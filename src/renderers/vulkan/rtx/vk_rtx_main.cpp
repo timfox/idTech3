@@ -33,7 +33,7 @@ RAY TRACING GATING:
 #include <print>
 #include <cstring>
 
-// Forward declarations for hardware ray tracing functions (C functions)
+// Forward declarations for hardware ray tracing functions (C linkage)
 extern "C" {
     void vk_rt_init(void);
     void vk_rt_shutdown(void);
@@ -42,10 +42,12 @@ extern "C" {
     void vk_rt_build_acceleration_structures(void);
     void vk_rt_update_tlas(void);
     void vk_rt_composite(void);
+    void vk_rt_update_uniform_buffer(void);
+    void vk_rtx_acceleration_shutdown(void);
+
+    // Compute ray tracing fallback (C implementation)
     void VK_ComputeRT_Dispatch(void);
     void VK_ComputeRT_Shutdown(void);
-    void vk_rtx_acceleration_shutdown(void);
-    void vk_rt_update_uniform_buffer(void);
 }
 
 // Forward declarations for C functions from main renderer (declared in headers with C linkage)

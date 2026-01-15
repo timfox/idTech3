@@ -10,6 +10,7 @@ Bridges ECS system with existing gentity_t system.
 
 #include "g_ecs.h"
 #include "g_public.h"
+#include "g_local.h"
 #include "../common/qcommon.h"
 
 // External reference to entity map (defined in g_ecs.c)

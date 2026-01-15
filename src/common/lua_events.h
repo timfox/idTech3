@@ -114,7 +114,8 @@ qboolean Lua_Events_SubscribeOnce(lua_State *L, const char *event_name, int call
 =================
 Lua_Events_WaitFor
 Lua coroutine support: Wait for an event and resume with event data.
-Returns the number of arguments pushed to Lua stack.
+Yields the current coroutine and resumes with (event_name, ...args)
+or (nil, "timeout") if a timeout is set.
 =================
 */
 int Lua_Events_WaitFor(lua_State *L, const char *event_name, int timeout_ms);

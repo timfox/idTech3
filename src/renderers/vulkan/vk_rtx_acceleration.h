@@ -11,10 +11,6 @@ Enhanced RTX Integration with Acceleration Structures and Advanced Lighting
 
 #ifdef USE_VULKAN
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 // Ensure matrix3x4_t is defined for this header if not pulled in by consumers.
 #ifndef MATRIX3X4_T_DEFINED
 typedef struct { float m[12]; } matrix3x4_t;
@@ -22,8 +18,17 @@ typedef struct { float m[12]; } matrix3x4_t;
 #endif
 
 // RTX acceleration structure management
+#ifdef __cplusplus
+extern "C" {
+#endif
 qboolean vk_rtx_acceleration_init(void);
 void vk_rtx_acceleration_shutdown(void);
+qboolean vk_rtx_build_blas_from_world(void);
+void vk_rtx_update_surface_material_indices_buffer(void);
+void vk_rtx_bind_surface_indices_buffer(VkDescriptorSet descriptorSet);
+#ifdef __cplusplus
+}
+#endif
 
 // Acceleration structure creation
 uint64_t vk_rtx_create_blas_for_geometry(VkBuffer vertex_buffer, VkBuffer index_buffer,
@@ -37,12 +42,8 @@ qboolean vk_rtx_build_tlas_real_full(VkCommandBuffer cmd_buffer);
 qboolean vk_rtx_build_blas_for_geometry_real(VkCommandBuffer cmd_buffer);
 // Query per-surface material index
 uint32_t vk_rtx_get_surface_material_index(uint32_t surfaceIndex, uint32_t* outIndex);
-// Build BLAS for world geometry during map load
-qboolean vk_rtx_build_blas_from_world(void);
-void vk_rtx_update_surface_material_indices_buffer(void);
 VkBuffer vk_rtx_get_surface_indices_buffer(void);
 VkDeviceSize vk_rtx_get_surface_indices_size(void);
-void vk_rtx_bind_surface_indices_buffer(VkDescriptorSet descriptorSet);
 void vk_rtx_create_sbt_buffer_full(void);
 VkResult vk_rtx_create_pipeline(void);
 void VK_try_init_calibrated_timestamps(void);
@@ -175,9 +176,5 @@ qboolean vk_rtx_sbt_prefetch_groups(VkCommandBuffer cmd_buffer, RTXSBTCache_t *c
 void vk_rtx_get_statistics(uint32_t* triangles, uint32_t* instances, uint32_t* lights,
                          VkDeviceSize* memory_usage, float* quality);
 void vk_rtx_performance_monitor(uint64_t frame_time_ns, uint32_t ray_count);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif // USE_VULKAN

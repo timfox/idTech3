@@ -23,6 +23,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 // g_public.h -- game module information visible to server
 
+#ifndef G_PUBLIC_H
+#define G_PUBLIC_H
+
 #include "../common/qcommon.h" // For COM_TRAP_GETVALUE
 
 #ifdef __cplusplus
@@ -451,3 +454,4 @@ typedef enum {
 }
 #endif
 
+#endif // G_PUBLIC_H

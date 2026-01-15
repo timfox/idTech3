@@ -18,7 +18,6 @@ extern refimport_t ri;
 #include "vk_material_parser.h"
 #include "../../common/q_shared.h"
 #include "../../common/qcommon.h"
-#include "../../common/files.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -73,6 +72,39 @@ typedef struct pbr_material_q2rtx_s {
 
 static pbr_material_q2rtx_t r_materials_q2rtx[MAX_PBR_MATERIALS];
 static int r_materials_q2rtx_count = 0;
+
+static char *MAT_StrTok(char *str, const char *delim, char **saveptr)
+{
+	char *token;
+	char *cursor;
+
+	if (str != NULL) {
+		*saveptr = str;
+	}
+
+	cursor = *saveptr;
+	if (cursor == NULL) {
+		return NULL;
+	}
+
+	cursor += strspn(cursor, delim);
+	if (*cursor == '\0') {
+		*saveptr = NULL;
+		return NULL;
+	}
+
+	token = cursor;
+	cursor = token + strcspn(token, delim);
+	if (*cursor != '\0') {
+		*cursor = '\0';
+		cursor++;
+	} else {
+		cursor = NULL;
+	}
+
+	*saveptr = cursor;
+	return token;
+}
 
 // CVARs
 static cvar_t *r_mat_enable = NULL;
@@ -153,7 +185,7 @@ static qboolean MAT_Q2RTX_ParseLine(const char *line, const char *filename, int 
     
     // Parse material names (comma-separated)
     saveptr = NULL;
-    token = strtok_r(material_names, ",", &saveptr);
+    token = MAT_StrTok(material_names, ",", &saveptr);
     
     while (token) {
         // Trim whitespace
@@ -194,77 +226,77 @@ static qboolean MAT_Q2RTX_ParseLine(const char *line, const char *filename, int 
             // Parse properties
             char prop_copy[1024];
             Q_strncpyz(prop_copy, properties, sizeof(prop_copy));
-            char *prop_token = strtok_r(prop_copy, " \t", &saveptr);
+            char *prop_token = MAT_StrTok(prop_copy, " \t", &saveptr);
             
             while (prop_token) {
                 if (!Q_stricmp(prop_token, "texture_base")) {
-                    prop_token = strtok_r(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
                     if (prop_token) {
                         Q_strncpyz(mat->filename_base, prop_token, sizeof(mat->filename_base));
                     }
                 } else if (!Q_stricmp(prop_token, "texture_normals")) {
-                    prop_token = strtok_r(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
                     if (prop_token) {
                         Q_strncpyz(mat->filename_normals, prop_token, sizeof(mat->filename_normals));
                     }
                 } else if (!Q_stricmp(prop_token, "texture_emissive")) {
-                    prop_token = strtok_r(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
                     if (prop_token) {
                         Q_strncpyz(mat->filename_emissive, prop_token, sizeof(mat->filename_emissive));
                     }
                 } else if (!Q_stricmp(prop_token, "texture_mask")) {
-                    prop_token = strtok_r(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
                     if (prop_token) {
                         Q_strncpyz(mat->filename_mask, prop_token, sizeof(mat->filename_mask));
                     }
                 } else if (!Q_stricmp(prop_token, "is_light")) {
-                    prop_token = strtok_r(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
                     if (prop_token && atoi(prop_token)) {
                         mat->flags |= MAT_FLAG_IS_LIGHT;
                     }
                 } else if (!Q_stricmp(prop_token, "correct_albedo")) {
-                    prop_token = strtok_r(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
                     if (prop_token && atoi(prop_token)) {
                         mat->flags |= MAT_FLAG_CORRECT_ALBEDO;
                     }
                 } else if (!Q_stricmp(prop_token, "synth_emissive")) {
-                    prop_token = strtok_r(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
                     if (prop_token && atoi(prop_token)) {
                         mat->flags |= MAT_FLAG_SYNTH_EMISSIVE;
                         mat->synth_emissive = qtrue;
                     }
                 } else if (!Q_stricmp(prop_token, "emissive_threshold")) {
-                    prop_token = strtok_r(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
                     if (prop_token) {
                         mat->emissive_threshold = atoi(prop_token);
                     }
                 } else if (!Q_stricmp(prop_token, "roughness")) {
-                    prop_token = strtok_r(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
                     if (prop_token) {
                         mat->roughness_override = atof(prop_token);
                     }
                 } else if (!Q_stricmp(prop_token, "metalness")) {
-                    prop_token = strtok_r(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
                     if (prop_token) {
                         mat->metalness_factor = atof(prop_token);
                     }
                 } else if (!Q_stricmp(prop_token, "emissive_factor")) {
-                    prop_token = strtok_r(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
                     if (prop_token) {
                         mat->emissive_factor = atof(prop_token);
                     }
                 } else if (!Q_stricmp(prop_token, "bump_scale")) {
-                    prop_token = strtok_r(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
                     if (prop_token) {
                         mat->bump_scale = atof(prop_token);
                     }
                 }
                 
-                prop_token = strtok_r(NULL, " \t", &saveptr);
+                prop_token = MAT_StrTok(NULL, " \t", &saveptr);
             }
         }
         
-        token = strtok_r(NULL, ",", &saveptr);
+        token = MAT_StrTok(NULL, ",", &saveptr);
     }
     
     return qtrue;
@@ -332,18 +364,15 @@ Load all .mat files from materials/ directory
 void MAT_Q2RTX_LoadMaterials(const char *game_dir)
 {
     char path[MAX_OSPATH];
-    char **file_list;
-    int num_files;
+    char **file_list = NULL;
+    int num_files = 0;
     int i;
     
     // Load global materials from materials/*.mat
-    Com_sprintf(path, sizeof(path), "%s/materials", game_dir);
-    num_files = ri.FS_GetFileList(path, ".mat", NULL, 0);
+    (void)game_dir;
+    file_list = ri.FS_ListFiles("materials", ".mat", &num_files);
     
-    if (num_files > 0) {
-        file_list = (char **)ri.Malloc(sizeof(char *) * num_files);
-        ri.FS_GetFileList(path, ".mat", file_list, num_files);
-        
+    if (file_list && num_files > 0) {
         // Sort alphabetically (later files override earlier ones)
         // Simple bubble sort
         for (i = 0; i < num_files - 1; i++) {
@@ -355,14 +384,13 @@ void MAT_Q2RTX_LoadMaterials(const char *game_dir)
                 }
             }
         }
-        
+
         for (i = 0; i < num_files; i++) {
-            Com_sprintf(path, sizeof(path), "%s/materials/%s", game_dir, (char *)file_list[i]);
+            Com_sprintf(path, sizeof(path), "materials/%s", file_list[i]);
             MAT_Q2RTX_LoadFile(path);
-            ri.Free(file_list[i]); // Free each filename
         }
-        
-        ri.Free(file_list); // Free the list array
+
+        ri.FS_FreeFileList(file_list);
     }
     
     // Load map-specific materials from <mapname>.mat

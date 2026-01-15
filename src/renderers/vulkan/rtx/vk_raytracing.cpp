@@ -11,11 +11,13 @@ Based on Quake-III-Arena-R reference implementation
 extern refimport_t ri;
 #include "../vk.h"
 #include "../vk_material_system.h"
+#include "../vk_material_pbr.h"
 #include "../vk_material_parser.h"
 #include "../vk_rtx_acceleration.h"
 #include "../tr_math_optimized.h"
 #include "../vk_framebuffer.h"
 #include "../tr_common.h"  // For R_LoadPNG, R_CreateImage declarations
+#include "vk_path_tracer_multistage.h"
 #include <algorithm>  // For std::min, std::max, std::clamp
 
 // RTX CVAR extern declarations
@@ -59,6 +61,17 @@ static void vk_rt_create_shader_binding_table( void );
 #ifdef USE_VULKAN
 
 // find_memory_type and VK_CHECK are now declared in vk.h
+
+#ifndef USE_VULKAN_RAY_TRACING
+extern "C" void vk_rt_init(void) { }
+extern "C" void vk_rt_shutdown(void) { }
+extern "C" void vk_rt_trace_rays(uint32_t width, uint32_t height) { (void)width; (void)height; }
+extern "C" void vk_rt_denoise(uint32_t width, uint32_t height) { (void)width; (void)height; }
+extern "C" void vk_rt_build_acceleration_structures(void) { }
+extern "C" void vk_rt_update_tlas(void) { }
+extern "C" void vk_rt_composite(void) { }
+extern "C" void vk_rt_update_uniform_buffer(void) { }
+#endif
 
 #ifdef USE_VULKAN_RAY_TRACING
 
@@ -510,7 +523,7 @@ static void vk_rt_load_blue_noise_array( void )
 	ri.Printf( PRINT_ALL, "Loaded blue noise texture array: %u layers (%ux%u each)\n", loaded_count, BLUE_NOISE_WIDTH, BLUE_NOISE_HEIGHT );
 }
 
-void vk_rt_init(void)
+extern "C" void vk_rt_init(void)
 {
 	if ( !vk.rayTracingSupported ) {
 		return;
@@ -629,7 +642,7 @@ void vk_rt_init(void)
 }
 
 
-void vk_rt_shutdown(void)
+extern "C" void vk_rt_shutdown(void)
 {
 	if ( !vk.rayTracingSupported || !vk.rt.initialized ) {
 		return;
@@ -3109,6 +3122,7 @@ extern "C" void vk_rt_denoise( uint32_t width, uint32_t height )
 }
 
 #endif // USE_VULKAN_RAY_TRACING
+#endif // USE_VULKAN_RAY_TRACING
 
 /*
 =============================================================================
@@ -3269,8 +3283,6 @@ extern "C" void vk_rt_composite( void )
 }
 
 #endif // USE_VULKAN_RAY_TRACING
-
-#endif // USE_VULKAN_RAY_TRACING (closes line 16)
 
 #endif // USE_VULKAN
 
