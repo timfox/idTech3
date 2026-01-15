@@ -160,7 +160,8 @@ static qboolean MAT_Q2RTX_ParseLine(const char *line, const char *filename, int 
     char *material_names;
     char *properties;
     char *token;
-    char *saveptr;
+    char *material_saveptr;
+    char *prop_saveptr;
     
     // Skip empty lines and comments
     if (!line || line[0] == '\0' || line[0] == '#' || line[0] == '/') {
@@ -184,14 +185,22 @@ static qboolean MAT_Q2RTX_ParseLine(const char *line, const char *filename, int 
     while (*properties == ' ' || *properties == '\t') properties++;
     
     // Parse material names (comma-separated)
-    saveptr = NULL;
-    token = MAT_StrTok(material_names, ",", &saveptr);
+    material_saveptr = NULL;
+    token = MAT_StrTok(material_names, ",", &material_saveptr);
     
     while (token) {
         // Trim whitespace
-        while (*token == ' ' || *token == '\t') token++;
+        while (*token == ' ' || *token == '\t') {
+            token++;
+        }
+        if (!*token) {
+            token = MAT_StrTok(NULL, ",", &material_saveptr);
+            continue;
+        }
         char *end = token + strlen(token) - 1;
-        while (end > token && (*end == ' ' || *end == '\t')) *end-- = '\0';
+        while (end > token && (*end == ' ' || *end == '\t')) {
+            *end-- = '\0';
+        }
         
         if (*token) {
             // Find or create material
@@ -226,77 +235,78 @@ static qboolean MAT_Q2RTX_ParseLine(const char *line, const char *filename, int 
             // Parse properties
             char prop_copy[1024];
             Q_strncpyz(prop_copy, properties, sizeof(prop_copy));
-            char *prop_token = MAT_StrTok(prop_copy, " \t", &saveptr);
+            prop_saveptr = NULL;
+            char *prop_token = MAT_StrTok(prop_copy, " \t", &prop_saveptr);
             
             while (prop_token) {
                 if (!Q_stricmp(prop_token, "texture_base")) {
-                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &prop_saveptr);
                     if (prop_token) {
                         Q_strncpyz(mat->filename_base, prop_token, sizeof(mat->filename_base));
                     }
                 } else if (!Q_stricmp(prop_token, "texture_normals")) {
-                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &prop_saveptr);
                     if (prop_token) {
                         Q_strncpyz(mat->filename_normals, prop_token, sizeof(mat->filename_normals));
                     }
                 } else if (!Q_stricmp(prop_token, "texture_emissive")) {
-                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &prop_saveptr);
                     if (prop_token) {
                         Q_strncpyz(mat->filename_emissive, prop_token, sizeof(mat->filename_emissive));
                     }
                 } else if (!Q_stricmp(prop_token, "texture_mask")) {
-                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &prop_saveptr);
                     if (prop_token) {
                         Q_strncpyz(mat->filename_mask, prop_token, sizeof(mat->filename_mask));
                     }
                 } else if (!Q_stricmp(prop_token, "is_light")) {
-                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &prop_saveptr);
                     if (prop_token && atoi(prop_token)) {
                         mat->flags |= MAT_FLAG_IS_LIGHT;
                     }
                 } else if (!Q_stricmp(prop_token, "correct_albedo")) {
-                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &prop_saveptr);
                     if (prop_token && atoi(prop_token)) {
                         mat->flags |= MAT_FLAG_CORRECT_ALBEDO;
                     }
                 } else if (!Q_stricmp(prop_token, "synth_emissive")) {
-                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &prop_saveptr);
                     if (prop_token && atoi(prop_token)) {
                         mat->flags |= MAT_FLAG_SYNTH_EMISSIVE;
                         mat->synth_emissive = qtrue;
                     }
                 } else if (!Q_stricmp(prop_token, "emissive_threshold")) {
-                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &prop_saveptr);
                     if (prop_token) {
                         mat->emissive_threshold = atoi(prop_token);
                     }
                 } else if (!Q_stricmp(prop_token, "roughness")) {
-                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &prop_saveptr);
                     if (prop_token) {
                         mat->roughness_override = atof(prop_token);
                     }
                 } else if (!Q_stricmp(prop_token, "metalness")) {
-                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &prop_saveptr);
                     if (prop_token) {
                         mat->metalness_factor = atof(prop_token);
                     }
                 } else if (!Q_stricmp(prop_token, "emissive_factor")) {
-                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &prop_saveptr);
                     if (prop_token) {
                         mat->emissive_factor = atof(prop_token);
                     }
                 } else if (!Q_stricmp(prop_token, "bump_scale")) {
-                    prop_token = MAT_StrTok(NULL, " \t", &saveptr);
+                    prop_token = MAT_StrTok(NULL, " \t", &prop_saveptr);
                     if (prop_token) {
                         mat->bump_scale = atof(prop_token);
                     }
                 }
                 
-                prop_token = MAT_StrTok(NULL, " \t", &saveptr);
+                prop_token = MAT_StrTok(NULL, " \t", &prop_saveptr);
             }
         }
         
-        token = MAT_StrTok(NULL, ",", &saveptr);
+        token = MAT_StrTok(NULL, ",", &material_saveptr);
     }
     
     return qtrue;
