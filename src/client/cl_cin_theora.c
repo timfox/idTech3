@@ -48,23 +48,30 @@ static size_t Theora_ReadOggPage(int handle, ogg_page *page) {
 	char *buffer;
 	int bytes;
 	size_t ret = 0;
+	int attempts = 0;
 
 	if (!data) return 0;
 
-	// Get buffer from Ogg sync
-	buffer = ogg_sync_buffer(&data->ogg_sync, 4096);
-	if (!buffer) return 0;
+	// Try to get a page; if not enough data, read more.
+	while (attempts++ < 16) {
+		int pageout = ogg_sync_pageout(&data->ogg_sync, page);
+		if (pageout == 1) {
+			ret = page->header_len + page->body_len;
+			break;
+		}
 
-	// Read from file
-	bytes = FS_Read((byte *)buffer, 4096, cinTable[handle].iFile);
-	if (bytes <= 0) return 0;
+		// Need more data
+		buffer = ogg_sync_buffer(&data->ogg_sync, 4096);
+		if (!buffer) {
+			return 0;
+		}
 
-	// Tell Ogg how many bytes we read
-	ogg_sync_wrote(&data->ogg_sync, bytes);
+		bytes = FS_Read((byte *)buffer, 4096, cinTable[handle].iFile);
+		if (bytes <= 0) {
+			return 0;
+		}
 
-	// Get a page
-	if (ogg_sync_pageout(&data->ogg_sync, page) == 1) {
-		ret = page->header_len + page->body_len;
+		ogg_sync_wrote(&data->ogg_sync, bytes);
 	}
 
 	return ret;
@@ -287,12 +294,7 @@ e_status Theora_Run(int handle) {
 	}
 
 	data = (theora_data_t *)cinTable[handle].codecData;
-	// A1: function entry log
-	char _logbuf[256];
-	snprintf(_logbuf, sizeof(_logbuf), "handle=%d data=%p init=%d", handle, (void*)data, data ? data->initialized : -1);
-	agent_log("A1","src/client/cl_cin_theora.c:Theora_Run entry", _logbuf);
-    Com_Printf("Theora_Run: data=%p initialized=%d decoder=%p\n",
-        (void*)data, data ? data->initialized : -1, (void*)(data ? data->theora_decoder : NULL));
+	// Debug logging removed to avoid log spam during playback.
 	if (!data || !data->initialized) {
 		Com_Printf("Theora_Run: data not initialized\n");
 		return FMV_EOF;
@@ -323,7 +325,6 @@ e_status Theora_Run(int handle) {
 		
 		// Add page to stream
 		ogg_stream_pagein(&data->ogg_stream, &ogg_page);
-		Com_Printf("DEBUG: Theora_Run: added page to stream\n");
 
 		// Try to get a video packet
 		while (ogg_stream_packetout(&data->ogg_stream, &ogg_packet) > 0) {
@@ -337,12 +338,6 @@ e_status Theora_Run(int handle) {
 					return FMV_EOF;
 				}
 	th_decode_ycbcr_out(data->theora_decoder, ycbcr);
-	// A2: after decode
-	{
-		char _logbuf2[256];
-		snprintf(_logbuf2, sizeof(_logbuf2), "decoded_ycbcr=%p %p %p", ycbcr[0].data, ycbcr[1].data, ycbcr[2].data);
-		agent_log("A2","src/client/cl_cin_theora.c:Theora_Run after_decode", _logbuf2);
-	}
     // Additional safety: ensure buffers exist after decode
     if (!data->theora_decoder || !ycbcr[0].data || !ycbcr[1].data || !ycbcr[2].data || !cinTable[handle].buf) {
         Com_Printf("Theora_Run: invalid post-decode buffers\n");
@@ -356,45 +351,11 @@ e_status Theora_Run(int handle) {
 					return FMV_EOF;
 				}
 
-		// A3: before RGB conversion guard log
-		{
-			char _logbuf3[256];
-			snprintf(_logbuf3, sizeof(_logbuf3), "buf=%p y0=%p y1=%p y2=%p", cinTable[handle].buf, ycbcr[0].data, ycbcr[1].data, ycbcr[2].data);
-			agent_log("A3","src/client/cl_cin_theora.c:Theora_Run RGB_guard", _logbuf3);
-		}
-		// A3: before RGB conversion guard log
-		{
-			char _logbuf3[256];
-			snprintf(_logbuf3, sizeof(_logbuf3), "buf=%p y0=%p y1=%p y2=%p", cinTable[handle].buf, ycbcr[0].data, ycbcr[1].data, ycbcr[2].data);
-			agent_log("A3","src/client/cl_cin_theora.c:Theora_Run RGB_guard", _logbuf3);
-		}
-                // A3: before RGB conversion guard log
-                {
-                    char _logbuf3[256];
-                    snprintf(_logbuf3, sizeof(_logbuf3), "buf=%p y0=%p y1=%p y2=%p", cinTable[handle].buf, ycbcr[0].data, ycbcr[1].data, ycbcr[2].data);
-                    agent_log("A3","src/client/cl_cin_theora.c:Theora_Run RGB_guard", _logbuf3);
-                }
                 // Convert YUV to RGB (guard against invalid/NULL YCbCr buffers)
                 if (cinTable[handle].buf && ycbcr[0].data && ycbcr[1].data && ycbcr[2].data) {
                 Theora_YUVtoRGB(ycbcr, cinTable[handle].buf, 
                     cinTable[handle].CIN_WIDTH, cinTable[handle].CIN_HEIGHT);
                 cinTable[handle].dirty = qtrue;
-                {
-                    char _logbuf4[256];
-                    snprintf(_logbuf4, sizeof(_logbuf4), "frame_count=%d", data ? data->frame_count : -1);
-                    agent_log("A4","src/client/cl_cin_theora.c:Theora_Run RGB_done", _logbuf4);
-                }
-				{
-					char _logbuf4[256];
-					snprintf(_logbuf4, sizeof(_logbuf4), "frame_count=%d", data ? data->frame_count : -1);
-					agent_log("A4","src/client/cl_cin_theora.c:Theora_Run RGB_done", _logbuf4);
-				}
-				// A4: after RGB conversion
-                {
-                    char _logbuf4[256];
-                    snprintf(_logbuf4, sizeof(_logbuf4), "frame_count=%d", data ? data->frame_count : -1);
-                    agent_log("A4","src/client/cl_cin_theora.c:Theora_Run RGB_done", _logbuf4);
-                }
                 }
 				
 				data->frame_count++;

@@ -3591,6 +3591,9 @@ static void CL_InitRenderer( void ) {
 	}
 
 	SCR_Init();
+
+	// Renderer and UI are fully initialized; play any queued intro now.
+	CL_PlayQueuedIntroVideo();
 }
 
 
@@ -4130,8 +4133,6 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 		Com_Printf( S_COLOR_CYAN "  4. For server-only: use idtech3.server.x86_64\n" );
 		Com_Error( ERR_FATAL, "Graphics initialization failed - no suitable display found" );
 	}
-
-	CL_PlayQueuedIntroVideo();
 
 	// unpause so the cgame definitely gets a snapshot and renders a frame
 	Cvar_Set( "cl_paused", "0" );

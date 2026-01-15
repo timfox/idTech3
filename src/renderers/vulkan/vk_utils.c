@@ -324,8 +324,8 @@ static qboolean is_builtin_image(const char *resource_name) {
     }
     
     // Built-in images that are intentionally kept alive for renderer lifetime
-    // These are created during initialization and persist until shutdown
-    // Using strstr for simple matching (resource names should match exactly)
+    // These are created during initialization and persist until shutdown.
+    // Use exact matches plus a prefix check for scratch images.
     const char *builtin_patterns[] = {
         "*default",
         "*black",
@@ -338,15 +338,21 @@ static qboolean is_builtin_image(const char *resource_name) {
         "*emptyCubemap",
         "*dlight",
         "*fog",
+        "*scratch",
         "gfx/2d/bigchars",  // UI font texture
         NULL
     };
     
-    // Simple string comparison (resource names should match exactly)
+    // Exact matches
     for (int i = 0; builtin_patterns[i] != NULL; i++) {
         if (strcmp(resource_name, builtin_patterns[i]) == 0) {
             return qtrue;
         }
+    }
+
+    // Scratch images are indexed (*scratch0, *scratch1, ...)
+    if (strncmp(resource_name, "*scratch", strlen("*scratch")) == 0) {
+        return qtrue;
     }
     
     return qfalse;
