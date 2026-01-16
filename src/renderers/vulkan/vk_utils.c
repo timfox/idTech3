@@ -468,7 +468,10 @@ void vk_print_vram_stats(void) {
 
 // Validate Vulkan memory state for corruption
 qboolean vk_validate_memory_state(void) {
-    ri.Printf(PRINT_ALL, "vk_validate_memory_state: Checking for memory corruption\n");
+    static uint32_t validate_log_counter = 0;
+    if ((validate_log_counter++ % 600) == 0) {
+        ri.Printf(PRINT_DEVELOPER, "vk_validate_memory_state: Checking for memory corruption\n");
+    }
 
     // Load VRAM stats atomically to get consistent snapshot
     VkDeviceSize used_vram = __atomic_load_n(&vk.vram_stats.used_vram, __ATOMIC_RELAXED);
@@ -514,7 +517,9 @@ qboolean vk_validate_memory_state(void) {
         return qfalse;
     }
 
-    ri.Printf(PRINT_ALL, "vk_validate_memory_state: Memory state appears valid\n");
+    if ((validate_log_counter % 600) == 0) {
+        ri.Printf(PRINT_DEVELOPER, "vk_validate_memory_state: Memory state appears valid\n");
+    }
     return qtrue;
 }
 

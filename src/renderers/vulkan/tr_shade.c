@@ -1015,14 +1015,22 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	int local_fog_stage;
 	int fog_stage;
 	qboolean pushUniform;
-	if (!vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk.cmd->render_pass_active) {
-		static qboolean logged_bad_cmd = qfalse;
-		if (!logged_bad_cmd) {
-			ri.Printf(PRINT_WARNING, "RB_IterateStagesGeneric: missing active render pass\n");
-			logged_bad_cmd = qtrue;
-		}
-		return;
-	}
+    if (!vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE) {
+        return;
+    }
+    if (!vk.cmd->render_pass_active) {
+        if (vk.cmd->swapchain_image_acquired) {
+            vk_begin_main_render_pass();
+        }
+        if (!vk.cmd->render_pass_active) {
+            static qboolean logged_bad_cmd = qfalse;
+            if (!logged_bad_cmd) {
+                ri.Printf(PRINT_WARNING, "RB_IterateStagesGeneric: missing active render pass\n");
+                logged_bad_cmd = qtrue;
+            }
+            return;
+        }
+    }
 
 	if (!tess.xstages) {
 		ri.Printf(PRINT_WARNING, "RB_IterateStagesGeneric: tess.xstages is NULL\n");

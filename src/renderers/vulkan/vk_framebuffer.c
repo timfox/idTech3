@@ -359,6 +359,10 @@ void vk_begin_main_render_pass(void) {
 
     if (vk.cmd->swapchain_image_acquired) {
         vk_begin_specific_render_pass(vk.render_pass.main, vk.framebuffers.main[vk.cmd->swapchain_image_index], qtrue, vk.renderWidth, vk.renderHeight);
+        if (vk.cmd && vk.render_pass.main != VK_NULL_HANDLE &&
+            vk.framebuffers.main[vk.cmd->swapchain_image_index] != VK_NULL_HANDLE) {
+            vk.cmd->render_pass_active = qtrue;
+        }
     }
 }
 

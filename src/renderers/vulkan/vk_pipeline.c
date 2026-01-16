@@ -35,6 +35,12 @@ extern PFN_vkCmdBindPipeline qvkCmdBindPipeline;
 extern PFN_vkCmdPipelineBarrier qvkCmdPipelineBarrier;
 extern PFN_vkGetPipelineExecutablePropertiesKHR qvkGetPipelineExecutablePropertiesKHR;
 
+// Embedded SPIR-V shaders
+extern const unsigned char tonemap_comp_spv[];
+extern const unsigned int tonemap_comp_spv_size;
+extern const unsigned char gamma_comp_spv[];
+extern const unsigned int gamma_comp_spv_size;
+
 // Utility functions
 // Com_Memcpy and Com_Memset are defined in q_shared.h
 extern void *Z_Malloc(int size);
@@ -453,6 +459,10 @@ void vk_create_shader_modules(void)
 	// Fog shader
 	vk.modules.fog_vs = vk_load_spirv_shader("fog_vert");
 	vk.modules.fog_fs = vk_load_spirv_shader("fog_frag");
+
+	// Post-process compute shaders (embedded)
+	vk.modules.tonemap_comp = vk_create_shader_module(tonemap_comp_spv, (int)tonemap_comp_spv_size);
+	vk.modules.gamma_comp = vk_create_shader_module(gamma_comp_spv, (int)gamma_comp_spv_size);
 
 	// Try to bind generated shaders as fallback
 	vk_bind_generated_shaders();

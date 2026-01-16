@@ -80902,3 +80902,5 @@ const unsigned int fsr_rcas_comp_spv_size = sizeof(fsr_rcas_comp_spv);
 
 const unsigned int gibs_spawn_comp_spv_size = sizeof(gibs_spawn_comp_spv);
 const unsigned int gibs_update_comp_spv_size = sizeof(gibs_update_comp_spv);
+const unsigned int tonemap_comp_spv_size = sizeof(tonemap_comp_spv);
+const unsigned int gamma_comp_spv_size = sizeof(gamma_comp_spv);

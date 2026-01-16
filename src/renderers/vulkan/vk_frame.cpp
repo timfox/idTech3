@@ -180,6 +180,7 @@ extern "C" void vk_begin_frame(void) {
     vk.cmd->curr_index_buffer = VK_NULL_HANDLE;
     vk.cmd->curr_index_offset = 0;
     vk.cmd->render_pass_active = qfalse;
+    vk.renderPassIndex = RENDER_PASS_COUNT;
     // Record frame start time for GPU timing (non-RTX path)
     clock_gettime(CLOCK_MONOTONIC, &g_vk_frame_start_ts);
 
@@ -563,6 +564,9 @@ extern "C" void vk_end_frame(void) {
     if (!vk.cmd || !vk.cmd->frame_ready) {
         return;
     }
+    vk.postprocess_output_image = VK_NULL_HANDLE;
+    vk.postprocess_output_layout = VK_IMAGE_LAYOUT_UNDEFINED;
+    vk.postprocess_output_format = VK_FORMAT_UNDEFINED;
     static VkSwapchainKHR last_swapchain = VK_NULL_HANDLE;
     static qboolean swapchain_initialized[MAX_SWAPCHAIN_IMAGES] = { qfalse };
     if (vk.swapchain != last_swapchain) {
@@ -722,15 +726,9 @@ extern "C" void vk_end_frame(void) {
         };
         qvkCmdPipelineBarrier(vk.cmd->command_buffer, swapchain_src_stage, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &swapchain_barrier);
 
-        if (same_size && qvkCmdCopyImage) {
-            qvkCmdCopyImage(vk.cmd->command_buffer, vk.upscale.image[1], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                            vk.swapchain_images[vk.cmd->swapchain_image_index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                            1, &copy);
-        } else {
-            qvkCmdBlitImage(vk.cmd->command_buffer, vk.upscale.image[1], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                            vk.swapchain_images[vk.cmd->swapchain_image_index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                            1, &blit, VK_FILTER_LINEAR);
-        }
+        qvkCmdBlitImage(vk.cmd->command_buffer, vk.upscale.image[1], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        vk.swapchain_images[vk.cmd->swapchain_image_index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        1, &blit, VK_FILTER_LINEAR);
 
         // Transition swapchain image to COLOR_ATTACHMENT_OPTIMAL for UI
         swapchain_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -740,19 +738,26 @@ extern "C" void vk_end_frame(void) {
         qvkCmdPipelineBarrier(vk.cmd->command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, &swapchain_barrier);
     } else {
         // No FSR: blit color image to swapchain.
-        VkImageMemoryBarrier color_barrier = {
-            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-            .pNext = nullptr,
-            .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT,
-            .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
-            .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-            .image = vk.color_image,
-            .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
-        };
-        qvkCmdPipelineBarrier(vk.cmd->command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &color_barrier);
+        VkImage source_image = vk.color_image;
+        VkImageLayout source_layout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        if (vk.postprocess_output_image != VK_NULL_HANDLE) {
+            source_image = vk.postprocess_output_image;
+            source_layout = vk.postprocess_output_layout;
+        } else {
+            VkImageMemoryBarrier color_barrier = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = nullptr,
+                .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_READ_BIT,
+                .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = vk.color_image,
+                .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+            };
+            qvkCmdPipelineBarrier(vk.cmd->command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &color_barrier);
+        }
 
         VkImageLayout swapchain_old_layout =
             swapchain_initialized[vk.cmd->swapchain_image_index] ? VK_IMAGE_LAYOUT_PRESENT_SRC_KHR : VK_IMAGE_LAYOUT_UNDEFINED;
@@ -776,6 +781,16 @@ extern "C" void vk_end_frame(void) {
         VkImageBlit blit = {};
         VkImageCopy copy = {};
         const qboolean same_size = (vk.renderWidth == glConfig.vidWidth && vk.renderHeight == glConfig.vidHeight);
+        qboolean can_copy = qfalse;
+        if (vk.postprocess_output_image != VK_NULL_HANDLE &&
+            vk.postprocess_output_format != VK_FORMAT_UNDEFINED &&
+            vk.postprocess_output_format != vk.present_format.format) {
+            can_copy = qfalse;
+        }
+        if (vk.postprocess_output_image == VK_NULL_HANDLE &&
+            vk.color_format != vk.present_format.format) {
+            can_copy = qfalse;
+        }
         blit.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
         blit.srcOffsets[0] = { 0, 0, 0 };
         blit.srcOffsets[1] = { (int32_t)vk.renderWidth, (int32_t)vk.renderHeight, 1 };
@@ -788,12 +803,12 @@ extern "C" void vk_end_frame(void) {
         copy.extent.height = (uint32_t)vk.renderHeight;
         copy.extent.depth = 1;
 
-        if (same_size && qvkCmdCopyImage) {
-            qvkCmdCopyImage(vk.cmd->command_buffer, vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        if (can_copy) {
+            qvkCmdCopyImage(vk.cmd->command_buffer, source_image, source_layout,
                             vk.swapchain_images[vk.cmd->swapchain_image_index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                             1, &copy);
         } else {
-            qvkCmdBlitImage(vk.cmd->command_buffer, vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            qvkCmdBlitImage(vk.cmd->command_buffer, source_image, source_layout,
                             vk.swapchain_images[vk.cmd->swapchain_image_index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                             1, &blit, VK_FILTER_LINEAR);
         }
@@ -805,12 +820,22 @@ extern "C" void vk_end_frame(void) {
         swapchain_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         qvkCmdPipelineBarrier(vk.cmd->command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, &swapchain_barrier);
 
-        // Restore color image layout after blit.
-        color_barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-        color_barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        color_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        color_barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        qvkCmdPipelineBarrier(vk.cmd->command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &color_barrier);
+        if (vk.postprocess_output_image == VK_NULL_HANDLE) {
+            // Restore color image layout after blit.
+            VkImageMemoryBarrier color_restore = {
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .pNext = nullptr,
+                .srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+                .dstAccessMask = VK_ACCESS_SHADER_READ_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                .newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = vk.color_image,
+                .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+            };
+            qvkCmdPipelineBarrier(vk.cmd->command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, NULL, 0, NULL, 1, &color_restore);
+        }
     }
 
     // Transition swapchain image to present layout

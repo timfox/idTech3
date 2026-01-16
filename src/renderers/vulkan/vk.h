@@ -698,6 +698,8 @@ typedef struct {
     VkShaderModule gibs_update_comp; // Added
     VkShaderModule volumetric_fog_comp; // Volumetric fog compute shader
     VkShaderModule volumetric_fog_composite_comp; // Volumetric fog composite compute shader
+    VkShaderModule tonemap_comp; // Tonemap compute shader
+    VkShaderModule gamma_comp; // Gamma compute shader
     VkShaderModule post_vert; // Post-process/shared fullscreen vertex shader
 } vk_modules_t;
 
@@ -1368,6 +1370,27 @@ typedef struct {
     VkPipeline surface_axis_pipeline;
     VkPipeline capture_pipeline;
     VkPipeline gamma_pipeline;
+    VkPipeline tonemap_pipeline;
+    VkPipeline gamma_compute_pipeline;
+
+    VkPipelineLayout tonemap_layout;
+    VkPipelineLayout gamma_layout;
+
+    VkDescriptorSetLayout tonemap_descriptor_layout;
+    VkDescriptorSetLayout gamma_descriptor_layout;
+    VkDescriptorSet tonemap_descriptor;
+    VkDescriptorSet gamma_descriptor;
+
+    VkImage tonemap_image;
+    VkImageView tonemap_image_view;
+    VkDeviceMemory tonemap_image_memory;
+    VkImage gamma_image;
+    VkImageView gamma_image_view;
+    VkDeviceMemory gamma_image_memory;
+
+    VkImage postprocess_output_image;
+    VkImageLayout postprocess_output_layout;
+    VkFormat postprocess_output_format;
     qboolean cubemapActive;
     qboolean fboActive;
     qboolean offscreenRender;

@@ -719,6 +719,13 @@ void Com_StartupVariable( const char *match )
 		if ( !match || Q_stricmp( match, var ) == 0 ) {
 			// Cvar_Set will create the cvar if it doesn't exist yet.
 			Cvar_Set( var, val[0] ? val : "" );
+
+			// Alias fs_game and game command line arguments so both can be used
+			if ( Q_stricmp( var, "fs_game" ) == 0 ) {
+				Cvar_Set( "game", val[0] ? val : "" );
+			} else if ( Q_stricmp( var, "game" ) == 0 ) {
+				Cvar_Set( "fs_game", val[0] ? val : "" );
+			}
 		}
 	}
 }

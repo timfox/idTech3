@@ -88,28 +88,66 @@ static void Theora_YUVtoRGB(th_ycbcr_buffer ycbcr, byte *rgb, int width, int hei
 	int y_stride = ycbcr[0].stride;
 	int u_stride = ycbcr[1].stride;
 	int v_stride = ycbcr[2].stride;
-	
+
+	// Debug output for strides (only once per video)
+	static int debug_count = 0;
+	if (debug_count < 3) {
+		Com_Printf("Theora_YUVtoRGB: width=%d height=%d y_stride=%d u_stride=%d v_stride=%d\n",
+			width, height, y_stride, u_stride, v_stride);
+		debug_count++;
+	}
+
 	for (y = 0; y < height; y++) {
 		for (x = 0; x < width; x++) {
-			Y = y_plane[y * y_stride + x];
-			Cb = u_plane[(y / 2) * u_stride + (x / 2)] - 128;
-			Cr = v_plane[(y / 2) * v_stride + (x / 2)] - 128;
-			
+			// Bounds checking for Y plane
+			int y_idx = y * y_stride + x;
+			if (y_idx < 0 || y_idx >= ycbcr[0].stride * height) {
+				Com_Printf("Theora_YUVtoRGB: Y plane bounds error y=%d x=%d idx=%d\n", y, x, y_idx);
+				Y = 0;
+			} else {
+				Y = y_plane[y_idx];
+			}
+
+			// Bounds checking for U/V planes (4:2:0 subsampling)
+			int u_idx = (y / 2) * u_stride + (x / 2);
+			int v_idx = (y / 2) * v_stride + (x / 2);
+
+			if (u_idx < 0 || u_idx >= ycbcr[1].stride * (height / 2)) {
+				Com_Printf("Theora_YUVtoRGB: U plane bounds error y=%d x=%d idx=%d\n", y, x, u_idx);
+				Cb = 0;
+			} else {
+				Cb = u_plane[u_idx] - 128;
+			}
+
+			if (v_idx < 0 || v_idx >= ycbcr[2].stride * (height / 2)) {
+				Com_Printf("Theora_YUVtoRGB: V plane bounds error y=%d x=%d idx=%d\n", y, x, v_idx);
+				Cr = 0;
+			} else {
+				Cr = v_plane[v_idx] - 128;
+			}
+
 			// YUV to RGB conversion
 			R = Y + (int)(1.402f * Cr);
 			G = Y - (int)(0.344f * Cb + 0.714f * Cr);
 			B = Y + (int)(1.772f * Cb);
-			
+
 			// Clamp values
 			if (R < 0) R = 0; else if (R > 255) R = 255;
 			if (G < 0) G = 0; else if (G > 255) G = 255;
 			if (B < 0) B = 0; else if (B > 255) B = 255;
-			
+
+			// Bounds checking for RGB output buffer
+			int rgb_idx = (y * width + x) * 4;
+			if (rgb_idx + 3 >= width * height * 4) {
+				Com_Printf("Theora_YUVtoRGB: RGB buffer bounds error y=%d x=%d idx=%d\n", y, x, rgb_idx);
+				continue;
+			}
+
 			// Write RGBA (little-endian)
-			rgb[(y * width + x) * 4 + 0] = R;
-			rgb[(y * width + x) * 4 + 1] = G;
-			rgb[(y * width + x) * 4 + 2] = B;
-			rgb[(y * width + x) * 4 + 3] = 255;
+			rgb[rgb_idx + 0] = R;
+			rgb[rgb_idx + 1] = G;
+			rgb[rgb_idx + 2] = B;
+			rgb[rgb_idx + 3] = 255;
 		}
 	}
 }
@@ -349,19 +387,22 @@ e_status Theora_Run(int handle) {
         cinTable[handle].status = FMV_EOF;
         return FMV_EOF;
     }
-    // Validate YUV buffer
-    if (!ycbcr[0].data || !ycbcr[1].data || !ycbcr[2].data) {
-					Com_Printf("Theora_Run: invalid YUV buffer from decoder\n");
-					cinTable[handle].status = FMV_EOF;
-					return FMV_EOF;
-				}
 
-                // Convert YUV to RGB (guard against invalid/NULL YCbCr buffers)
-                if (cinTable[handle].buf && ycbcr[0].data && ycbcr[1].data && ycbcr[2].data) {
-                Theora_YUVtoRGB(ycbcr, cinTable[handle].buf, 
-                    cinTable[handle].CIN_WIDTH, cinTable[handle].CIN_HEIGHT);
-                cinTable[handle].dirty = qtrue;
-                }
+    // Validate YUV buffer dimensions and strides
+    if (ycbcr[0].stride < cinTable[handle].CIN_WIDTH ||
+        ycbcr[1].stride < cinTable[handle].CIN_WIDTH / 2 ||
+        ycbcr[2].stride < cinTable[handle].CIN_WIDTH / 2) {
+        Com_Printf("Theora_Run: invalid YUV buffer strides: Y=%d U=%d V=%d (expected Y>=%d U>=%d V>=%d)\n",
+            ycbcr[0].stride, ycbcr[1].stride, ycbcr[2].stride,
+            cinTable[handle].CIN_WIDTH, cinTable[handle].CIN_WIDTH / 2, cinTable[handle].CIN_WIDTH / 2);
+        cinTable[handle].status = FMV_EOF;
+        return FMV_EOF;
+    }
+
+    // Convert YUV to RGB
+    Theora_YUVtoRGB(ycbcr, cinTable[handle].buf,
+        cinTable[handle].CIN_WIDTH, cinTable[handle].CIN_HEIGHT);
+    cinTable[handle].dirty = qtrue;
 				
 				data->frame_count++;
 				data->last_frame_time = current_time;

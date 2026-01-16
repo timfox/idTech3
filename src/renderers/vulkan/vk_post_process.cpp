@@ -212,7 +212,7 @@ void vk_shutdown_enhanced_post_processing(void)
 vk_create_compute_pipeline
 ===============
 */
-VkPipeline vk_create_compute_pipeline(VkShaderModule computeShader, VkPipelineLayout layout, const char *name)
+extern "C" VkPipeline vk_create_compute_pipeline(VkShaderModule computeShader, VkPipelineLayout layout, const char *name)
 {
     VkComputePipelineCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
