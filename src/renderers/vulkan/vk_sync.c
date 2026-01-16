@@ -35,10 +35,8 @@ void vk_create_sync_primitives(void) {
         // Image acquired semaphore
         VK_CHECK(qvkCreateSemaphore(vk.device, &desc, NULL, &vk.tess[i].image_acquired));
 
-#ifdef USE_UPLOAD_QUEUE
-        // Additional semaphore for upload queue synchronization
+        // Rendering finished semaphore (used for present)
         VK_CHECK(qvkCreateSemaphore(vk.device, &desc, NULL, &vk.tess[i].rendering_finished2));
-#endif
 
         // Rendering finished fence
         fence_desc.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -119,9 +117,7 @@ void vk_destroy_sync_primitives(void) {
 
     for (i = 0; i < NUM_COMMAND_BUFFERS; i++) {
         qvkDestroySemaphore(vk.device, vk.tess[i].image_acquired, NULL);
-#ifdef USE_UPLOAD_QUEUE
         qvkDestroySemaphore(vk.device, vk.tess[i].rendering_finished2, NULL);
-#endif
         qvkDestroyFence(vk.device, vk.tess[i].rendering_finished_fence, NULL);
         vk.tess[i].waitForFence = qfalse;
         vk.tess[i].swapchain_image_acquired = qfalse;

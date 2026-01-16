@@ -623,37 +623,8 @@ extern "C" void vk_end_frame(void) {
         }
     }
     #endif
-    {
-        static int logged_timeline = 0;
-        if (logged_timeline < 3) {
-            ri.Printf(PRINT_ALL, "vk_end_frame: timeline signaling done\n");
-            logged_timeline++;
-        }
-    }
-
-    if (backEnd.refdef.rdflags & RDF_NOWORLDMODEL) {
-        static int logged_ui_only = 0;
-        if (logged_ui_only < 3) {
-            ri.Printf(PRINT_ALL, "vk_end_frame: UI-only frame, skipping FSR path\n");
-            logged_ui_only++;
-        }
-        return;
-    }
-
     // Apply FSR (FidelityFX Super Resolution) after post-processing but before UI
-    {
-        static int logged_fsr_check = 0;
-        if (logged_fsr_check < 3) {
-            ri.Printf(PRINT_ALL, "vk_end_frame: before FSR check\n");
-            logged_fsr_check++;
-        }
-    }
     if (vk_fsr_is_enabled()) {
-        static int logged_fsr = 0;
-        if (logged_fsr < 3) {
-            ri.Printf(PRINT_ALL, "vk_end_frame: FSR begin\n");
-            logged_fsr++;
-        }
         vk_fsr_update_constants(vk.renderWidth, vk.renderHeight, glConfig.vidWidth, glConfig.vidHeight);
 
         // 1. EASU: Upscale color_image -> upscale.image[0]
@@ -677,14 +648,6 @@ extern "C" void vk_end_frame(void) {
 
         // 3. RCAS: Sharpen upscale.image[0] -> upscale.image[1]
         vk_fsr_apply_rcas(vk.cmd->command_buffer, vk.upscale.image[0], vk.upscale.view[0], vk.upscale.image[1], vk.upscale.view[1]);
-        {
-            static int logged_fsr_done = 0;
-            if (logged_fsr_done < 3) {
-                ri.Printf(PRINT_ALL, "vk_end_frame: FSR done\n");
-                logged_fsr_done++;
-            }
-        }
-
         // 4. Barrier for RCAS output -> Transfer source
         VkImageMemoryBarrier rcas_barrier = {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -734,6 +697,61 @@ extern "C" void vk_end_frame(void) {
         swapchain_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
         swapchain_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         qvkCmdPipelineBarrier(vk.cmd->command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, &swapchain_barrier);
+    } else {
+        // No FSR: blit color image to swapchain.
+        VkImageMemoryBarrier color_barrier = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .pNext = nullptr,
+            .srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+            .dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT,
+            .oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = vk.color_image,
+            .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+        };
+        qvkCmdPipelineBarrier(vk.cmd->command_buffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &color_barrier);
+
+        VkImageMemoryBarrier swapchain_barrier = {
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .pNext = nullptr,
+            .srcAccessMask = 0,
+            .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = vk.swapchain_images[vk.cmd->swapchain_image_index],
+            .subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 }
+        };
+        qvkCmdPipelineBarrier(vk.cmd->command_buffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, NULL, 0, NULL, 1, &swapchain_barrier);
+
+        VkImageBlit blit = {};
+        blit.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+        blit.srcOffsets[0] = { 0, 0, 0 };
+        blit.srcOffsets[1] = { (int32_t)vk.renderWidth, (int32_t)vk.renderHeight, 1 };
+        blit.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+        blit.dstOffsets[0] = { 0, 0, 0 };
+        blit.dstOffsets[1] = { (int32_t)glConfig.vidWidth, (int32_t)glConfig.vidHeight, 1 };
+
+        qvkCmdBlitImage(vk.cmd->command_buffer, vk.color_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                        vk.swapchain_images[vk.cmd->swapchain_image_index], VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                        1, &blit, VK_FILTER_LINEAR);
+
+        // Transition swapchain to COLOR_ATTACHMENT_OPTIMAL for final layout change.
+        swapchain_barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        swapchain_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        swapchain_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        swapchain_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        qvkCmdPipelineBarrier(vk.cmd->command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, &swapchain_barrier);
+
+        // Restore color image layout for next frame.
+        color_barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+        color_barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+        color_barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+        color_barrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        qvkCmdPipelineBarrier(vk.cmd->command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, NULL, 0, NULL, 1, &color_barrier);
     }
 
     // Transition swapchain image to present layout
@@ -789,6 +807,30 @@ extern "C" void vk_end_frame(void) {
         return;
     }
 
+    if (!qvkQueueSubmit) {
+        ri.Printf(PRINT_ERROR, "vk_end_frame: qvkQueueSubmit is NULL\n");
+        return;
+    }
+    if (!vk_validate_handle(vk.queue, "queue")) {
+        ri.Printf(PRINT_ERROR, "vk_end_frame: queue handle invalid\n");
+        return;
+    }
+    if (!vk_validate_handle(vk.cmd->command_buffer, "command buffer")) {
+        ri.Printf(PRINT_ERROR, "vk_end_frame: command buffer invalid\n");
+        return;
+    }
+    if (!vk_validate_handle(vk.cmd->image_acquired, "image acquired")) {
+        ri.Printf(PRINT_ERROR, "vk_end_frame: image_acquired invalid\n");
+        return;
+    }
+    if (!vk_validate_handle(vk.cmd->rendering_finished2, "rendering finished")) {
+        ri.Printf(PRINT_ERROR, "vk_end_frame: rendering_finished2 invalid\n");
+        return;
+    }
+    if (vk.cmd->rendering_finished_fence == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_ERROR, "vk_end_frame: rendering_finished_fence is NULL\n");
+        return;
+    }
     result = qvkQueueSubmit(vk.queue, 1, &submit_info, vk.cmd->rendering_finished_fence);
     if (result != VK_SUCCESS) {
         if (result == VK_ERROR_DEVICE_LOST) {
@@ -801,6 +843,7 @@ extern "C" void vk_end_frame(void) {
         }
         return;
     }
+    vk.rendering_finished = vk.cmd->rendering_finished2;
 
     vk.cmd->waitForFence = qtrue;
     vk.frame_count++;

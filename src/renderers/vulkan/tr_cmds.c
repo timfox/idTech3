@@ -677,35 +677,7 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 
 	backEnd.color2D.u32 = ~0U;
 
-	// For real Vulkan devices, acquire next swapchain image
-	// Skip if device is lost - prevents operations on invalid device
-	if (!vk.device_lost && vk.device != (VkDevice)0x20000000 && vk.active && vk.swapchain != VK_NULL_HANDLE && qvkAcquireNextImageKHR) {
-		// Acquire next image from swapchain
-		VkResult result = qvkAcquireNextImageKHR(vk.device, vk.swapchain, UINT64_MAX,
-			vk.image_available, VK_NULL_HANDLE, &vk.current_swapchain_image_index);
-
-		if (result == VK_ERROR_DEVICE_LOST) {
-			vk.device_lost = qtrue;
-			vk_reset_memory_tracking_on_device_lost(); // Reset memory tracking so recovery knows memory is available
-			ri.Printf(PRINT_ERROR, "Vulkan: Device lost during image acquisition - GPU driver issue\n");
-			return;
-		} else if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-			// Swapchain is out of date, need to recreate
-			ri.Printf(PRINT_WARNING, "Vulkan: Swapchain out of date, skipping frame\n");
-			return;
-		} else if (result == VK_TIMEOUT) {
-			// Timeout acquiring swapchain image (common in headless environments)
-			ri.Printf(PRINT_WARNING, "Vulkan: Timeout acquiring swapchain image, skipping frame (headless mode?)\n");
-			return;
-		} else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-			// Non-recoverable swapchain acquisition error (after all recovery attempts)
-			// This should be rare - most errors are handled above
-			ri.Printf(PRINT_ERROR, "Vulkan: Failed to acquire swapchain image: %s (result: %d)\n", 
-				vk_result_string(result), result);
-			ri.Error(ERR_DROP, "Vulkan: Cannot continue without swapchain image");
-		}
-		ri.Printf(PRINT_DEVELOPER, "Vulkan: Acquired swapchain image %u\n", vk.current_swapchain_image_index);
-	}
+	// Swapchain acquisition is handled in vk_begin_frame(). Avoid double-acquire here.
 
 	tr.frameCount++;
 	tr.frameSceneNum = 0;
