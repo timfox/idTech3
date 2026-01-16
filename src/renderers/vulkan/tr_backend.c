@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 extern refimport_t ri;
 #include "../../common/performance_counters.h"
 #include "vk.h"
+#include "vk_images.h"
 #include "../../common/thread_platform.h"
 
 backEndData_t	*backEndData;
@@ -1264,7 +1265,9 @@ void RE_UploadCinematic( int w, int h, int cols, int rows, byte *data, int clien
 		if ( image->internalFormat != VK_FORMAT_R8G8B8A8_UNORM ) {
 			image->internalFormat = VK_FORMAT_R8G8B8A8_UNORM;
 		}
+		image->mip_levels = 1;
 		vk_create_image( image, cols, rows, 1 );
+		vk_create_image_view( image, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT );
 		vk_upload_image_data( image, 0, 0, cols, rows, 1, data, cols * rows * 4, qfalse );
 #else
 		qglTexImage2D( GL_TEXTURE_2D, 0, image->internalFormat, cols, rows, 0, GL_RGBA, GL_UNSIGNED_BYTE, data );

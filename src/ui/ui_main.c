@@ -53,12 +53,20 @@ Q_EXPORT intptr_t QDECL vmMain_ui( int command, intptr_t arg0, intptr_t arg1 __a
     case UI_REFRESH:
         // Refresh UI - draw a simple main menu
         if (uiActiveMenu == UIMENU_MAIN) {
-            // Draw a simple white background
-            vec4_t color = {1.0f, 1.0f, 1.0f, 1.0f};
+            // Draw a simple background to confirm UI rendering works
+            static qhandle_t uiWhiteShader = 0;
+            if (uiWhiteShader == 0) {
+                uiWhiteShader = syscall( UI_R_REGISTERSHADERNOMIP, "white" );
+                if (!uiWhiteShader) {
+                    uiWhiteShader = syscall( UI_R_REGISTERSHADERNOMIP, "gfx/2d/bigchars" );
+                }
+            }
+
+            vec4_t color = {0.2f, 0.2f, 0.2f, 1.0f};
             int color_int;
             memcpy(&color_int, &color, sizeof(int)); // Avoid strict aliasing violation
             syscall( UI_R_SETCOLOR, color_int );
-            syscall( UI_R_DRAWSTRETCHPIC, 100, 100, 400, 300, 0, 0, 1, 1, 0 );
+            syscall( UI_R_DRAWSTRETCHPIC, 0, 0, 640, 480, 0, 0, 1, 1, uiWhiteShader );
         }
         return 0;
 

@@ -32,6 +32,7 @@ extern	botlib_export_t	*botlib_export;
 extern qboolean re_initialized;
 
 static char cl_queued_intro_video[MAX_OSPATH];
+static qboolean ui_initialized = qfalse;
 
 void CL_QueueIntroVideo(const char *videoFile) {
 	if (!videoFile || !videoFile[0]) {
@@ -163,6 +164,14 @@ static void LAN_ResetPings(int source) {
 			servers[i].ping = -1;
 		}
 	}
+}
+
+void CL_EnsureUIInitialized(void) {
+	if (ui_initialized || !uivm) {
+		return;
+	}
+	VM_Call(uivm, 1, UI_INIT, cls.realtime);
+	ui_initialized = qtrue;
 }
 
 
@@ -1088,7 +1097,18 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 		return 0;
 
 	case UI_R_DRAWSTRETCHPIC:
-		re.DrawStretchPic( VMF(1), VMF(2), VMF(3), VMF(4), VMF(5), VMF(6), VMF(7), VMF(8), args[9] );
+		{
+			static int logged_draw = 0;
+			if (logged_draw < 5) {
+				Com_Printf("UI_R_DRAWSTRETCHPIC[%d]: shader=%d x=%.1f y=%.1f w=%.1f h=%.1f\n",
+				           logged_draw, (int)args[9], VMF(1), VMF(2), VMF(3), VMF(4));
+				logged_draw++;
+			}
+		}
+		{
+			qhandle_t shader = (args[9] != 0) ? (qhandle_t)args[9] : cls.whiteShader;
+			re.DrawStretchPic( VMF(1), VMF(2), VMF(3), VMF(4), VMF(5), VMF(6), VMF(7), VMF(8), shader );
+		}
 		return 0;
 
 	case UI_R_MODELBOUNDS:
@@ -1564,6 +1584,9 @@ void CL_InitUI( void ) {
 		cls.uiStarted = qtrue;
 		Com_Printf( "UI VM loaded successfully (vm_ui = %d)\n", vm_ui->integer );
 	}
+
+	// UI_INIT is deferred until after renderer initialization.
+	ui_initialized = qfalse;
 
 	// Check if intro should be skipped
 	cvar_t *skipIntro = Cvar_Get( "cl_skipIntro", "0", CVAR_ARCHIVE );

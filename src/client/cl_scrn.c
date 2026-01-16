@@ -522,10 +522,20 @@ This will be called twice if rendering in stereo mode
 */
 static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 	qboolean uiFullscreen;
+	static connstate_t last_state = CA_UNINITIALIZED;
 
 	re.BeginFrame( stereoFrame );
 
 	uiFullscreen = (uivm && VM_Call( uivm, 0, UI_IS_FULLSCREEN ));
+
+	if (last_state != cls.state) {
+		Com_Printf("SCR_DrawScreenField: state=%d uivm=%s uiFullscreen=%d catcher=%d\n",
+		           cls.state,
+		           uivm ? "yes" : "no",
+		           uiFullscreen,
+		           Key_GetCatcher());
+		last_state = cls.state;
+	}
 
 	// wide aspect ratio screens need to have the sides cleared
 	// unless they are displaying game renderings

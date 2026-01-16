@@ -638,6 +638,7 @@ typedef struct image_s {
 	VkSamplerAddressMode wrapClampMode;
 	uint32_t	type;
 	uint32_t	layers;
+	uint32_t	mip_levels;
 	VkImage		handle;
 	VkImageView	view;
 	VkDeviceMemory memory;		// Allocated device memory for the image

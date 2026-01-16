@@ -610,6 +610,7 @@ void CL_UpdateLevelHunkUsage( void );
 void CL_InitUI( void );
 void CL_QueueIntroVideo( const char *videoFile );
 void CL_PlayQueuedIntroVideo( void );
+void CL_EnsureUIInitialized( void );
 void CL_ShutdownUI( void );
 int Key_GetCatcher( void );
 void Key_SetCatcher( int catcher );

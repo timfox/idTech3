@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_local.h"
 #ifdef USE_VULKAN
 #include "vk_utils.h"  // For vk_track_gpu_free
+#include "vk_images.h"
 #endif
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
@@ -839,13 +840,15 @@ static void vk_upload_cube( image_t *image ) {
 	image->handle = VK_NULL_HANDLE;
 	image->view = VK_NULL_HANDLE;
 	image->descriptor = VK_NULL_HANDLE;
+	image->mip_levels = 0;
 
 	image->uploadWidth = image->uploadHeight = image->width;
 	image->layers = 6;
-
 	const uint32_t numMips = (uint32_t)(floor(log2(image->width))) + 1;
+	image->mip_levels = numMips;
 
 	vk_create_image( image, image->width, image->height, numMips );
+	vk_create_image_view( image, VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_ASPECT_COLOR_BIT );
 	
 	VkClearColorValue color;
 
@@ -883,8 +886,10 @@ static void upload_vk_image( image_t *image, byte *pic ) {
 	image->uploadWidth = w;
 	image->uploadHeight = h;
 	image->layers = 1;
+	image->mip_levels = (uint32_t)upload_data.mip_levels;
 
 	vk_create_image( image, w, h, upload_data.mip_levels );
+	vk_create_image_view( image, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT );
 	vk_upload_image_data( image, 0, 0, w, h, upload_data.mip_levels, upload_data.buffer, upload_data.buffer_size, qfalse );
 
 	ri.Hunk_FreeTempMemory( upload_data.buffer );
@@ -1223,6 +1228,7 @@ image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int widt
 	image->handle = VK_NULL_HANDLE;
 	image->view = VK_NULL_HANDLE;
 	image->descriptor = VK_NULL_HANDLE;
+	image->mip_levels = 0;
 	image->internalFormat = format;
 
 	if ( image->flags & IMGFLAG_CUBEMAP )
@@ -2000,6 +2006,7 @@ static void R_CreateDummyBuiltinImages( void ) {
 	tr.defaultImage->view = VK_NULL_HANDLE;
 	tr.defaultImage->memory = VK_NULL_HANDLE;
 	tr.defaultImage->descriptor = VK_NULL_HANDLE;
+	tr.defaultImage->mip_levels = 0;
 #else
 	tr.defaultImage->texnum = 0; // Dummy texture ID
 #endif
@@ -2016,6 +2023,7 @@ static void R_CreateDummyBuiltinImages( void ) {
 	tr.blackImage->view = VK_NULL_HANDLE;
 	tr.blackImage->memory = VK_NULL_HANDLE;
 	tr.blackImage->descriptor = VK_NULL_HANDLE;
+	tr.blackImage->mip_levels = 0;
 #else
 	tr.blackImage->texnum = 0;
 #endif
@@ -2030,6 +2038,7 @@ static void R_CreateDummyBuiltinImages( void ) {
 	tr.whiteImage->view = VK_NULL_HANDLE;
 	tr.whiteImage->memory = VK_NULL_HANDLE;
 	tr.whiteImage->descriptor = VK_NULL_HANDLE;
+	tr.whiteImage->mip_levels = 0;
 #else
 	tr.whiteImage->texnum = 0;
 #endif
@@ -2044,6 +2053,7 @@ static void R_CreateDummyBuiltinImages( void ) {
 	tr.identityLightImage->view = VK_NULL_HANDLE;
 	tr.identityLightImage->memory = VK_NULL_HANDLE;
 	tr.identityLightImage->descriptor = VK_NULL_HANDLE;
+	tr.identityLightImage->mip_levels = 0;
 #else
 	tr.identityLightImage->texnum = 0;
 #endif

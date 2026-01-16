@@ -1968,6 +1968,7 @@ void SCR_RunCinematic( void ) {
 				if (uivm) {
 					VM_Call(uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_MAIN);
 				}
+				Cbuf_AddText("mainmenu\n");
 				return;
 			}
 		}
@@ -1979,6 +1980,7 @@ void SCR_RunCinematic( void ) {
 			if (uivm) {
 				VM_Call(uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_MAIN);
 			}
+			Cbuf_AddText("mainmenu\n");
 		}
 	}
 }

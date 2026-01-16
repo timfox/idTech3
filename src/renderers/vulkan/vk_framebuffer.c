@@ -349,13 +349,25 @@ static const VkClearValue main_clear_values[] = {
 };
 
 void vk_begin_main_render_pass(void) {
+    if (vk.renderPassIndex < RENDER_PASS_COUNT) {
+        return;
+    }
+
+    vk.renderPassIndex = RENDER_PASS_MAIN;
+    vk.renderScaleX = (float)vk.renderWidth / (float)glConfig.vidWidth;
+    vk.renderScaleY = (float)vk.renderHeight / (float)glConfig.vidHeight;
+
     if (vk.cmd->swapchain_image_acquired) {
         vk_begin_specific_render_pass(vk.render_pass.main, vk.framebuffers.main[vk.cmd->swapchain_image_index], qtrue, vk.renderWidth, vk.renderHeight);
     }
 }
 
 void vk_end_main_render_pass(void) {
+    if (vk.renderPassIndex >= RENDER_PASS_COUNT) {
+        return;
+    }
     vk_end_render_pass();
+    vk.renderPassIndex = RENDER_PASS_COUNT;
 }
 
 void vk_begin_post_bloom_render_pass(void) {

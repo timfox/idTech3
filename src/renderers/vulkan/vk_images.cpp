@@ -18,6 +18,9 @@ extern PFN_vkDestroyImageView qvkDestroyImageView;
 extern PFN_vkBindImageMemory qvkBindImageMemory;
 extern PFN_vkCmdCopyBufferToImage qvkCmdCopyBufferToImage;
 extern PFN_vkCmdPipelineBarrier qvkCmdPipelineBarrier;
+extern PFN_vkAllocateDescriptorSets qvkAllocateDescriptorSets;
+
+extern void vk_update_descriptor_set(image_t *image, qboolean mipmap);
 
 // Utility functions
 extern void vk_set_object_name(uint64_t obj, const char *name, VkDebugReportObjectTypeEXT type);
@@ -31,6 +34,31 @@ extern void vk_track_free(VkDeviceSize size);
 static void record_image_layout_transition(VkCommandBuffer command_buffer, VkImage image,
     VkImageAspectFlags aspect_mask, VkImageLayout old_layout, VkImageLayout new_layout,
     VkPipelineStageFlags src_stage_mask, VkPipelineStageFlags dst_stage_mask);
+
+static void vk_allocate_image_descriptor(image_t *image) {
+    if (!image || image->descriptor != VK_NULL_HANDLE) {
+        return;
+    }
+    if (vk.descriptor_pool == VK_NULL_HANDLE || vk.set_layout_sampler == VK_NULL_HANDLE) {
+        return;
+    }
+    VkDescriptorSetAllocateInfo alloc = {};
+    alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    alloc.pNext = NULL;
+    alloc.descriptorPool = vk.descriptor_pool;
+    alloc.descriptorSetCount = 1;
+    alloc.pSetLayouts = &vk.set_layout_sampler;
+
+    VkResult result = qvkAllocateDescriptorSets(vk.device, &alloc, &image->descriptor);
+    if (result != VK_SUCCESS) {
+        ri.Printf(PRINT_WARNING, "vk_allocate_image_descriptor: failed for %s (%s)\n",
+                  image->imgName ? image->imgName : "<unnamed>", vk_result_string(result));
+        image->descriptor = VK_NULL_HANDLE;
+        return;
+    }
+    SET_OBJECT_NAME(image->descriptor, va("%s descriptor", image->imgName), VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT);
+    vk_update_descriptor_set(image, (image->flags & IMGFLAG_MIPMAP) ? qtrue : qfalse);
+}
 
 // Create Vulkan image
 extern "C" void vk_create_image(image_t *image, int width, int height, int mip_levels) {
@@ -87,6 +115,7 @@ extern "C" void vk_create_image(image_t *image, int width, int height, int mip_l
     VK_CHECK(qvkBindImageMemory(vk.device, image->handle, memory, 0));
 
     image->memory = memory;
+    image->mip_levels = mip_levels;
 
     SET_OBJECT_NAME(image->handle, image->imgName, VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_EXT);
     SET_OBJECT_NAME(image->memory, va("%s memory", image->imgName), VK_DEBUG_REPORT_OBJECT_TYPE_DEVICE_MEMORY_EXT);
@@ -112,13 +141,14 @@ extern "C" void vk_create_image_view(image_t *image, VkImageViewType view_type, 
     desc.components.a = VK_COMPONENT_SWIZZLE_A;
     desc.subresourceRange.aspectMask = aspect;
     desc.subresourceRange.baseMipLevel = 0;
-    desc.subresourceRange.levelCount = (uint32_t)(floor(log2(image->width))) + 1;
+    desc.subresourceRange.levelCount = image->mip_levels > 0 ? image->mip_levels : 1;
     desc.subresourceRange.baseArrayLayer = 0;
-    desc.subresourceRange.layerCount = 1;
+    desc.subresourceRange.layerCount = (view_type == VK_IMAGE_VIEW_TYPE_CUBE) ? 6 : 1;
 
     VK_CHECK(qvkCreateImageView(vk.device, &desc, NULL, &image->view));
 
     SET_OBJECT_NAME(image->view, va("%s view", image->imgName), VK_DEBUG_REPORT_OBJECT_TYPE_IMAGE_VIEW_EXT);
+    vk_allocate_image_descriptor(image);
 }
 
 // Destroy image and associated resources

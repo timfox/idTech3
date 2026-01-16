@@ -3599,6 +3599,8 @@ static void CL_InitRenderer( void ) {
 
 	SCR_Init();
 
+	CL_EnsureUIInitialized();
+
 	// Renderer and UI are fully initialized; play any queued intro now.
 	CL_PlayQueuedIntroVideo();
 }

@@ -5782,6 +5782,7 @@ void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
 	Vk_Sampler_Def sampler_def;
 	VkDescriptorImageInfo image_info;
 	VkWriteDescriptorSet descriptor_write;
+	VkDescriptorSetAllocateInfo alloc;
 
 	Com_Memset( &sampler_def, 0, sizeof( sampler_def ) );
 
@@ -5846,6 +5847,19 @@ void vk_update_descriptor_set( image_t *image, qboolean mipmap ) {
 
 	// Pass font texture flag to sampler so it can set maxLod=0.0f for fonts without mipmaps
 	sampler_def.isFontTexture = isFontTexture;
+
+	if ( image->descriptor == VK_NULL_HANDLE ) {
+		if ( vk.descriptor_pool == VK_NULL_HANDLE || vk.set_layout_sampler == VK_NULL_HANDLE ) {
+			return;
+		}
+		alloc.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+		alloc.pNext = NULL;
+		alloc.descriptorPool = vk.descriptor_pool;
+		alloc.descriptorSetCount = 1;
+		alloc.pSetLayouts = &vk.set_layout_sampler;
+		VK_CHECK( qvkAllocateDescriptorSets( vk.device, &alloc, &image->descriptor ) );
+		SET_OBJECT_NAME( image->descriptor, va("%s descriptor", image->imgName), VK_DEBUG_REPORT_OBJECT_TYPE_DESCRIPTOR_SET_EXT );
+	}
 
 	image_info.sampler = vk_find_sampler( &sampler_def );
 	image_info.imageView = image->view;
