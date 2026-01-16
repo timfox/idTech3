@@ -3435,6 +3435,11 @@ void CL_Frame(int msec, int realMsec) {
 
 	CL_ImGui_FrameBegin();
 
+	// For cinematics, advance decoding before drawing so the first frame is visible.
+	if (cls.state == CA_CINEMATIC) {
+		SCR_RunCinematic();
+	}
+
 	// update the screen
 	cls.framecount++;
 	SCR_UpdateScreen();
@@ -3444,7 +3449,9 @@ void CL_Frame(int msec, int realMsec) {
 	S_Update( realMsec );
 
 	// advance local effects for next frame
-	SCR_RunCinematic();
+	if (cls.state != CA_CINEMATIC) {
+		SCR_RunCinematic();
+	}
 	
 	// Run Steam Deck frame updates
 	CL_SteamDeck_RunFrame();

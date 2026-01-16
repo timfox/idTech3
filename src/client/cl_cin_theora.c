@@ -360,6 +360,7 @@ e_status Theora_Run(int handle) {
 				
 				data->frame_count++;
 				data->last_frame_time = current_time;
+				cinTable[handle].lastTime = current_time;
 				
 				return cinTable[handle].status;
 			} else if (ret == TH_DUPFRAME) {

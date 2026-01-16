@@ -1751,6 +1751,8 @@ int CIN_PlayCinematic( const char *arg, int x, int y, int w, int h, int systemBi
 
 	if (cinTable[currentHandle].alterGameState) {
 		Com_Printf("Setting cls.state to CA_CINEMATIC\n");
+		cinTable[currentHandle].startTime = cls.realtime;
+		cinTable[currentHandle].lastTime = cls.realtime;
 		cls.state = CA_CINEMATIC;
 		// Force a screen update to ensure cinematic is visible
 		SCR_UpdateScreen();
@@ -1957,6 +1959,19 @@ void SCR_RunCinematic( void ) {
 		printf("DEBUG: Calling CIN_RunCinematic\n");
 #endif
 		e_status status = CIN_RunCinematic(CL_handle);
+		// If cinematic is stuck without decoding frames, fall back to main menu.
+		if (cls.state == CA_CINEMATIC && status == FMV_PLAY) {
+			int now = cls.realtime;
+			if (cinTable[CL_handle].lastTime > 0 && now - cinTable[CL_handle].lastTime > 3000) {
+				Com_Printf("Cinematic stalled; returning to main menu\n");
+				SCR_StopCinematic();
+				cls.state = CA_DISCONNECTED;
+				if (uivm) {
+					VM_Call(uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_MAIN);
+				}
+				return;
+			}
+		}
 		// If cinematic reached EOF, stop it automatically (like user pressing a key)
 		if (status == FMV_EOF) {
 			SCR_StopCinematic();

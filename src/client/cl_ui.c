@@ -1592,12 +1592,18 @@ void CL_InitUI( void ) {
 	}
 
 	// Try different formats in order of preference
-	const char *formats[] = { ".roq", ".webm", ".ogv", ".ogg" };
+	const char *formats_default[] = { ".roq", ".webm", ".ogv", ".ogg" };
+	const char *formats_openarena[] = { ".ogv", ".webm", ".roq", ".ogg" };
+	const char **formats = formats_default;
+	int formatCount = 4;
+	if ( fs_game && !Q_stricmp( fs_game, "openarena" ) ) {
+		formats = formats_openarena;
+	}
 	static char selectedVideoFile[256] = {0};
 	const char *videoFile = NULL;
 	int i;
 
-	for ( i = 0; i < 4; i++ ) {
+	for ( i = 0; i < formatCount; i++ ) {
 		char testFile[256];
 		Com_sprintf( testFile, sizeof(testFile), "%s%s", baseName, formats[i] );
 		if ( FS_FileExists( testFile ) ) {
@@ -1610,8 +1616,8 @@ void CL_InitUI( void ) {
 	// Fallback to any available intro file
 	if ( !videoFile ) {
 		const char *fallbackFiles[] = {
-			"video/intro.roq", "video/intro.webm", "video/intro.ogv",
-			"video/idlogo.roq", "video/idlogo.webm", "video/idlogo.ogv"
+			"video/intro.ogv", "video/intro.webm", "video/intro.roq",
+			"video/idlogo.ogv", "video/idlogo.webm", "video/idlogo.roq"
 		};
 
 		for ( i = 0; i < 6; i++ ) {
