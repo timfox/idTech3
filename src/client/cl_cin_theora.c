@@ -141,6 +141,11 @@ qboolean Theora_Init(int handle) {
 	Com_Memset(data, 0, sizeof(theora_data_t));
 	cinTable[handle].codecData = data;
 	Com_Printf("Theora_Init: allocated data at %p\n", (void*)data);
+
+	// Initialize Theora state before parsing headers
+	th_info_init(&data->theora_info);
+	th_comment_init(&data->theora_comment);
+	data->theora_setup = NULL;
 	
 	// Initialize Ogg sync
 	ogg_sync_init(&data->ogg_sync);
@@ -407,6 +412,16 @@ void Theora_Reset(int handle) {
 		ogg_sync_clear(&data->ogg_sync);
 	}
 	ogg_sync_init(&data->ogg_sync);
+
+	// Reset Theora header state
+	if (data->theora_setup) {
+		th_setup_free(data->theora_setup);
+		data->theora_setup = NULL;
+	}
+	th_comment_clear(&data->theora_comment);
+	th_info_clear(&data->theora_info);
+	th_info_init(&data->theora_info);
+	th_comment_init(&data->theora_comment);
 	
 	// Reset state
 	data->header_read = qfalse;
