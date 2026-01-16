@@ -230,11 +230,22 @@ void vk_begin_specific_render_pass(VkRenderPass render_pass, VkFramebuffer frame
     };
 
     qvkCmdBeginRenderPass(vk.cmd->command_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
+    vk.cmd->render_pass_active = qtrue;
 }
 
 // End render pass
 void vk_end_render_pass(void) {
+    if (vk.renderPassIndex >= RENDER_PASS_COUNT || !vk.cmd->render_pass_active) {
+        return;
+    }
+    if (!vk_validate_handle(vk.cmd->command_buffer, "command buffer") || !qvkCmdEndRenderPass) {
+        vk.renderPassIndex = RENDER_PASS_COUNT;
+        vk.cmd->render_pass_active = qfalse;
+        return;
+    }
     qvkCmdEndRenderPass(vk.cmd->command_buffer);
+    vk.renderPassIndex = RENDER_PASS_COUNT;
+    vk.cmd->render_pass_active = qfalse;
 }
 
 // Transition to next subpass

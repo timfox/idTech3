@@ -1015,6 +1015,14 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	int local_fog_stage;
 	int fog_stage;
 	qboolean pushUniform;
+	if (!vk.cmd || vk.cmd->command_buffer == VK_NULL_HANDLE || !vk.cmd->render_pass_active) {
+		static qboolean logged_bad_cmd = qfalse;
+		if (!logged_bad_cmd) {
+			ri.Printf(PRINT_WARNING, "RB_IterateStagesGeneric: missing active render pass\n");
+			logged_bad_cmd = qtrue;
+		}
+		return;
+	}
 
 	if (!tess.xstages) {
 		ri.Printf(PRINT_WARNING, "RB_IterateStagesGeneric: tess.xstages is NULL\n");
@@ -1101,7 +1109,17 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 #ifdef USE_VULKAN
 		tess_flags |= pStage->tessFlags;
 
-		for ( i = 0;  i < (int)pStage->numTexBundles; i++ ) {
+		uint32_t num_bundles = pStage->numTexBundles;
+		if (num_bundles == 0 || num_bundles > NUM_TEXTURE_BUNDLES) {
+			ri.Printf(PRINT_WARNING, "RB_IterateStagesGeneric: invalid numTexBundles=%u (shader=%s)\n",
+			          num_bundles, input->shader ? input->shader->name : "<null>");
+			if (num_bundles == 0) {
+				continue;
+			}
+			num_bundles = NUM_TEXTURE_BUNDLES;
+		}
+
+		for ( i = 0;  i < (int)num_bundles; i++ ) {
 			if ( pStage->bundle[i].image[0] != NULL ) {
 				{
 					static int logged_bind = 0;

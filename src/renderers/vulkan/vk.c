@@ -1293,10 +1293,9 @@ static VkResult vk_create_swapchain_safe( VkPhysicalDevice physical_device, VkDe
 	desc.imageColorSpace = surface_format.colorSpace;
 	desc.imageExtent = image_extent;
 	desc.imageArrayLayers = 1;
-	desc.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-	if ( !vk.fboActive ) {
-		desc.imageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
-	}
+	desc.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT |
+	                  VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+	                  VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	desc.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	desc.queueFamilyIndexCount = 0;
 	desc.pQueueFamilyIndices = NULL;

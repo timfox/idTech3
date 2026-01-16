@@ -401,6 +401,7 @@ typedef struct {
     VkSemaphore image_acquired;
     qboolean swapchain_image_acquired;
     uint32_t swapchain_image_index;
+    qboolean render_pass_active;
 } vk_cmd_t;
 
 // World structure for Vulkan
