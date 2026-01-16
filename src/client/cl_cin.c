@@ -1754,8 +1754,6 @@ int CIN_PlayCinematic( const char *arg, int x, int y, int w, int h, int systemBi
 		cinTable[currentHandle].startTime = cls.realtime;
 		cinTable[currentHandle].lastTime = cls.realtime;
 		cls.state = CA_CINEMATIC;
-		// Force a screen update to ensure cinematic is visible
-		SCR_UpdateScreen();
 	} else {
 		Com_Printf("Not setting cls.state to CA_CINEMATIC (alterGameState = %d)\n", cinTable[currentHandle].alterGameState);
 	}
@@ -1966,6 +1964,7 @@ void SCR_RunCinematic( void ) {
 				Com_Printf("Cinematic stalled; returning to main menu\n");
 				SCR_StopCinematic();
 				cls.state = CA_DISCONNECTED;
+				Key_SetCatcher( Key_GetCatcher() | KEYCATCH_UI );
 				if (uivm) {
 					VM_Call(uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_MAIN);
 				}
@@ -1976,6 +1975,10 @@ void SCR_RunCinematic( void ) {
 		if (status == FMV_EOF) {
 			SCR_StopCinematic();
 			cls.state = CA_DISCONNECTED; // Transition out of cinematic mode
+			Key_SetCatcher( Key_GetCatcher() | KEYCATCH_UI );
+			if (uivm) {
+				VM_Call(uivm, 1, UI_SET_ACTIVE_MENU, UIMENU_MAIN);
+			}
 		}
 	}
 }
