@@ -14,6 +14,7 @@
 #include <execinfo.h>
 #endif
 #include "vk_memory.h"
+#include "vk_buffers.h"
 #include "vk_swapchain_manager.h"
 extern VkSurfaceFormatKHR vk_present_format;
 // Renderer import interface - defined in renderer main file
@@ -3986,12 +3987,22 @@ skip_device_creation:
 				return;
 			}
 			ri.Printf(PRINT_ALL, "Vulkan: Main command pool created\n");
+			{
+				extern qboolean vk_allocate_command_buffers(uint32_t count);
+				if (!vk_allocate_command_buffers(NUM_COMMAND_BUFFERS)) {
+					ri.Printf(PRINT_ERROR, "Vulkan: Failed to allocate frame command buffers\n");
+					return;
+				}
+			}
 		} else {
 		}
 	} // End of !is_fake_device check
 
 	// Initialize systems that require a valid vk.device
 	if (!is_fake_device) {
+		// Create per-frame geometry buffers for dynamic draws
+		vk_create_geometry_buffers(8 * 1024 * 1024);
+
 		// Initialize VRAM statistics
 		vk_init_vram_stats();
 
@@ -7999,7 +8010,15 @@ uint32_t vk_tess_index( uint32_t numIndexes, const void *src ) {
 	const uint32_t offset = vk.cmd->vertex_buffer_offset;
 	const uint32_t size = numIndexes * sizeof( tess.indexes[0] );
 
+	if ( !vk.cmd->vertex_buffer_ptr ) {
+		ri.Printf(PRINT_WARNING, "vk_tess_index: vertex_buffer_ptr is NULL\n");
+		return ~0U;
+	}
+
 	if ( offset + size > vk.geometry_buffer_size ) {
+		ri.Printf(PRINT_WARNING,
+		          "vk_tess_index: overflow offset=%u size=%u geom=%zu\n",
+		          offset, size, (size_t)vk.geometry_buffer_size);
 		// schedule geometry buffer resize - use history for pre-allocation
 		VkDeviceSize requested_size = log2pad( offset + size, 1 );
 		if ( vk.geometry_buffer_history.count >= 4 ) {

@@ -284,6 +284,16 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 
 	shader_t *state;
 
+#ifdef USE_VULKAN
+	if (!shader) {
+		ri.Printf(PRINT_WARNING, "RB_BeginSurface: NULL shader\n");
+		tess.numIndexes = 0;
+		tess.numVertexes = 0;
+		tess.shader = NULL;
+		return;
+	}
+#endif
+
 #ifdef USE_VBO
 	if ( shader->isStaticShader && !shader->remappedShader ) {
 		tess.allowVBO = qtrue;
@@ -320,6 +330,15 @@ void RB_BeginSurface( shader_t *shader, int fogNum ) {
 	tess.numVertexes = 0;
 	tess.shader = state;
 	tess.fogNum = fogNum;
+	{
+		static int logged_begin = 0;
+		if (logged_begin < 3) {
+			ri.Printf(PRINT_ALL, "RB_BeginSurface: shader=%p name=%s\n",
+			          (void *)tess.shader,
+			          tess.shader ? tess.shader->name : "<null>");
+			logged_begin++;
+		}
+	}
 
 #ifdef USE_LEGACY_DLIGHTS
 	tess.dlightBits = 0;		// will be OR'd in by surface functions
@@ -997,6 +1016,18 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 	int fog_stage;
 	qboolean pushUniform;
 
+	if (!tess.xstages) {
+		ri.Printf(PRINT_WARNING, "RB_IterateStagesGeneric: tess.xstages is NULL\n");
+		return;
+	}
+	{
+		static int logged_iterate = 0;
+		if (logged_iterate < 3) {
+			ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: shader=%s\n",
+			          input->shader ? input->shader->name : "<null>");
+			logged_iterate++;
+		}
+	}
 	vk_bind_index();
 
 	fog_stage = 0;
@@ -1049,6 +1080,19 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		pStage = tess.xstages[ stage ];
 		if ( !pStage )
 			break;
+		{
+			static int logged_stage = 0;
+			if (logged_stage < 5) {
+				const image_t *img = pStage->bundle[0].image[0];
+				ri.Printf(PRINT_ALL,
+				          "RB_IterateStagesGeneric: stage=%d pStage=%p img=%p name=%s\n",
+				          stage,
+				          (void *)pStage,
+				          (void *)img,
+				          img ? img->imgName : "<null>");
+				logged_stage++;
+			}
+		}
 
 #ifdef USE_VBO
 		tess.vboStage = stage;
@@ -1059,13 +1103,62 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 
 		for ( i = 0;  i < (int)pStage->numTexBundles; i++ ) {
 			if ( pStage->bundle[i].image[0] != NULL ) {
+				{
+					static int logged_bind = 0;
+					if (logged_bind < 3) {
+						ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: bind stage=%d bundle=%d\n", stage, i);
+						logged_bind++;
+					}
+				}
 				GL_SelectTexture( i );
+				{
+					static int logged_bind2 = 0;
+					if (logged_bind2 < 3) {
+						ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: before R_BindAnimatedImage\n");
+						logged_bind2++;
+					}
+				}
 				R_BindAnimatedImage( &pStage->bundle[i] );
+				{
+					static int logged_bind3 = 0;
+					if (logged_bind3 < 3) {
+						ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: after R_BindAnimatedImage\n");
+						logged_bind3++;
+					}
+				}
 				if ( tess_flags & ( TESS_ST0 << i ) ) {
+					{
+						static int logged_tc = 0;
+						if (logged_tc < 3) {
+							ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: before R_ComputeTexCoords\n");
+							logged_tc++;
+						}
+					}
 					R_ComputeTexCoords( i, &pStage->bundle[i] );
+					{
+						static int logged_tc2 = 0;
+						if (logged_tc2 < 3) {
+							ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: after R_ComputeTexCoords\n");
+							logged_tc2++;
+						}
+					}
 				}
 				if ( tess_flags & ( TESS_RGBA0 << i ) ) {
+					{
+						static int logged_col = 0;
+						if (logged_col < 3) {
+							ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: before R_ComputeColors\n");
+							logged_col++;
+						}
+					}
 					R_ComputeColors( i, tess.svars.colors[i], pStage );
+					{
+						static int logged_col2 = 0;
+						if (logged_col2 < 3) {
+							ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: after R_ComputeColors\n");
+							logged_col2++;
+						}
+					}
 				}
 				if ( tess_flags & (TESS_ENT0 << i) && backEnd.currentEntity ) {
 					uniform.ent.color[i][0] = backEnd.currentEntity->e.shader.rgba[0] / 255.0;
@@ -1078,18 +1171,61 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		}
 
 		if ( pushUniform ) {
+			{
+				static int logged_push = 0;
+				if (logged_push < 3) {
+					ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: before vk_push_uniform\n");
+					logged_push++;
+				}
+			}
 			pushUniform = qfalse;
 			vk_push_uniform( &uniform );
+			{
+				static int logged_push2 = 0;
+				if (logged_push2 < 3) {
+					ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: after vk_push_uniform\n");
+					logged_push2++;
+				}
+			}
 		}
 
+		{
+			static int logged_sel = 0;
+			if (logged_sel < 3) {
+				ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: before GL_SelectTexture(0)\n");
+				logged_sel++;
+			}
+		}
 		GL_SelectTexture( 0 );
+		{
+			static int logged_sel2 = 0;
+			if (logged_sel2 < 3) {
+				ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: after GL_SelectTexture(0)\n");
+				logged_sel2++;
+			}
+		}
 
 		if ( r_lightmap->integer && pStage->bundle[1].lightmap != LIGHTMAP_INDEX_NONE ) {
 			//GL_SelectTexture( 0 );
 			GL_Bind( tr.whiteImage ); // replace diffuse texture with a white one thus effectively render only lightmap
 		}
+		{
+			static int logged_lm = 0;
+			if (logged_lm < 3) {
+				ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: after lightmap block\n");
+				logged_lm++;
+			}
+		}
 
 #ifdef USE_VK_PBR
+		{
+			static int logged_pbr = 0;
+			if (logged_pbr < 3) {
+				ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: pbr_surface=%d vk_pbr_flags=0x%x\n",
+				          is_pbr_surface, pStage->vk_pbr_flags);
+				logged_pbr++;
+			}
+		}
 		if ( is_pbr_surface && pStage->vk_pbr_flags ) {
 			vk_update_descriptor( VK_DESC_PBR_BRDFLUT, vk.brdflut_image_descriptor );
 				
@@ -1116,10 +1252,26 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		}
 #endif
 
+		{
+			static int logged_pipe = 0;
+			if (logged_pipe < 3) {
+				ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: selecting pipeline (mirror=%d)\n",
+				          backEnd.viewParms.portalView == PV_MIRROR);
+				logged_pipe++;
+			}
+		}
 		if ( backEnd.viewParms.portalView == PV_MIRROR ) {
 			pipeline = pStage->vk_mirror_pipeline[fog_stage];
 		} else {
 			pipeline = pStage->vk_pipeline[fog_stage];
+		}
+		{
+			static int logged_pipe2 = 0;
+			if (logged_pipe2 < 3) {
+				ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: pipeline=%p fog_stage=%d\n",
+				          (void *)pipeline, fog_stage);
+				logged_pipe2++;
+			}
 		}
 
 #ifdef USE_VK_PBR
@@ -1133,9 +1285,56 @@ static void RB_IterateStagesGeneric( const shaderCommands_t *input )
 		}
 #endif
 
+		if (pipeline == VK_NULL_HANDLE) {
+			ri.Printf(PRINT_WARNING, "RB_StageIteratorGeneric: missing pipeline for shader '%s'\n", tess.shader->name);
+			return;
+		}
+		{
+			static int logged_bindpipe = 0;
+			if (logged_bindpipe < 3) {
+				ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: before vk_bind_pipeline\n");
+				logged_bindpipe++;
+			}
+		}
 		vk_bind_pipeline( pipeline );
+		{
+			static int logged_bindpipe2 = 0;
+			if (logged_bindpipe2 < 3) {
+				ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: after vk_bind_pipeline\n");
+				logged_bindpipe2++;
+			}
+		}
+		{
+			static int logged_bindgeo = 0;
+			if (logged_bindgeo < 3) {
+				ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: before vk_bind_geometry flags=0x%x\n",
+				          tess_flags);
+				logged_bindgeo++;
+			}
+		}
 		vk_bind_geometry( tess_flags );
+		{
+			static int logged_bindgeo2 = 0;
+			if (logged_bindgeo2 < 3) {
+				ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: after vk_bind_geometry\n");
+				logged_bindgeo2++;
+			}
+		}
+		{
+			static int logged_draw = 0;
+			if (logged_draw < 3) {
+				ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: before vk_draw_geometry\n");
+				logged_draw++;
+			}
+		}
 		vk_draw_geometry( tess.depthRange, qtrue );
+		{
+			static int logged_draw2 = 0;
+			if (logged_draw2 < 3) {
+				ri.Printf(PRINT_ALL, "RB_IterateStagesGeneric: after vk_draw_geometry\n");
+				logged_draw2++;
+			}
+		}
 
 		if ( pStage->depthFragment ) {
 			if ( backEnd.viewParms.portalView == PV_MIRROR )
@@ -1355,6 +1554,20 @@ void RB_StageIteratorGeneric( void )
 	qboolean rebindIndex = qfalse;
 #endif
 	qboolean fogCollapse = qfalse;
+	{
+		static int logged_generic = 0;
+		if (logged_generic < 3) {
+			ri.Printf(PRINT_ALL, "RB_StageIteratorGeneric: shader=%s xstages=%p numPasses=%d\n",
+			          tess.shader ? tess.shader->name : "<null>",
+			          (void *)tess.xstages,
+			          tess.numPasses);
+			logged_generic++;
+		}
+	}
+	if (!tess.shader || !tess.xstages) {
+		ri.Printf(PRINT_WARNING, "RB_StageIteratorGeneric: missing shader or stages\n");
+		return;
+	}
 
 #ifdef USE_VBO
 	if ( tess.vboIndex != 0 ) {
@@ -1376,6 +1589,13 @@ void RB_StageIteratorGeneric( void )
 #endif
 
 	// call shader function
+	{
+		static int logged_iter = 0;
+		if (logged_iter < 3) {
+			ri.Printf(PRINT_ALL, "RB_StageIteratorGeneric: iterate stages\n");
+			logged_iter++;
+		}
+	}
 	RB_IterateStagesGeneric( &tess, fogCollapse );
 
 	// now do any dynamic lighting needed
@@ -1531,9 +1751,23 @@ void RB_EndSurface( void ) {
 	const shaderCommands_t *input;
 
 	input = &tess;
+	{
+		static int logged_end = 0;
+		if (logged_end < 3) {
+			ri.Printf(PRINT_ALL, "RB_EndSurface: shader=%p numIndexes=%d numVertexes=%d\n",
+			          (void *)tess.shader, tess.numIndexes, tess.numVertexes);
+			logged_end++;
+		}
+	}
 
 	if ( input->numIndexes == 0 ) {
 		//VBO_UnBind();
+		return;
+	}
+	if (!tess.shader) {
+		ri.Printf(PRINT_WARNING, "RB_EndSurface: tess.shader is NULL\n");
+		tess.numIndexes = 0;
+		tess.numVertexes = 0;
 		return;
 	}
 
@@ -1578,6 +1812,24 @@ void RB_EndSurface( void ) {
 	//
 	// call off to shader specific tess end function
 	//
+	if (!tess.shader || !tess.shader->optimalStageIteratorFunc) {
+		ri.Printf(PRINT_WARNING, "RB_EndSurface: missing shader or stage iterator\n");
+		tess.numIndexes = 0;
+		tess.numVertexes = 0;
+		return;
+	}
+	{
+		static int logged_iter = 0;
+		if (logged_iter < 3) {
+			ri.Printf(PRINT_ALL,
+			          "RB_EndSurface: shader=%s iterator=%p numPasses=%d xstages=%p\n",
+			          tess.shader->name,
+			          (void *)tess.shader->optimalStageIteratorFunc,
+			          tess.numPasses,
+			          (void *)tess.xstages);
+			logged_iter++;
+		}
+	}
 	tess.shader->optimalStageIteratorFunc();
 
 	//

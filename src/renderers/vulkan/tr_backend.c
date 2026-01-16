@@ -181,6 +181,16 @@ void GL_Bind( image_t *image ) {
 */
 void GL_SelectTexture( int unit )
 {
+#ifdef USE_VULKAN
+	{
+		static int logged_select = 0;
+		if (logged_select < 3) {
+			ri.Printf(PRINT_ALL, "GL_SelectTexture: unit=%d numTextureUnits=%d\n",
+			          unit, glConfig.numTextureUnits);
+			logged_select++;
+		}
+	}
+#endif
 #ifndef USE_VULKAN
 	if ( glState.currenttmu == unit )
 	{
@@ -196,6 +206,15 @@ void GL_SelectTexture( int unit )
 	qglActiveTextureARB( GL_TEXTURE0_ARB + unit );
 #endif
 	glState.currenttmu = unit;
+#ifdef USE_VULKAN
+	{
+		static int logged_select_done = 0;
+		if (logged_select_done < 3) {
+			ri.Printf(PRINT_ALL, "GL_SelectTexture: set currenttmu=%d\n", glState.currenttmu);
+			logged_select_done++;
+		}
+	}
+#endif
 }
 
 
@@ -608,6 +627,13 @@ static void RB_BeginDrawingView( void ) {
 #ifndef USE_VULKAN
 	int clearBits = 0;
 #endif
+	{
+		static qboolean logged_begin_view = qfalse;
+		if (!logged_begin_view) {
+			ri.Printf(PRINT_ALL, "RB_BeginDrawingView: enter\n");
+			logged_begin_view = qtrue;
+		}
+	}
 
 	// sync with gl if needed
 	if ( r_finish->integer == 1 && !glState.finishCalled ) {
@@ -635,6 +661,13 @@ static void RB_BeginDrawingView( void ) {
 	// vkCmdClearAttachments requires an active render pass.
 	if ( vk.renderPassIndex >= RENDER_PASS_COUNT ) {
 		vk_begin_main_render_pass();
+	}
+	{
+		static qboolean logged_clear = qfalse;
+		if (!logged_clear) {
+			ri.Printf(PRINT_ALL, "RB_BeginDrawingView: clearing depth\n");
+			logged_clear = qtrue;
+		}
 	}
 	vk_clear_depth( qtrue );
 #else
@@ -734,6 +767,14 @@ static void RB_RenderDrawSurfList( drawSurf_t *drawSurfs, int numDrawSurfs ) {
 	atomic_fetch_add_explicit(&backEnd.pc.c_surfaces, numDrawSurfs, memory_order_relaxed);
 
 	for (i = 0, drawSurf = drawSurfs ; i < numDrawSurfs ; i++, drawSurf++) {
+		if (drawSurf->surface == NULL) {
+			static qboolean logged_null_surface = qfalse;
+			if (!logged_null_surface) {
+				ri.Printf(PRINT_WARNING, "RB_RenderDrawSurfList: null surface encountered, skipping\n");
+				logged_null_surface = qtrue;
+			}
+			continue;
+		}
 		if ( drawSurf->sort == oldSort ) {
 			// fast path, same as previous sort
 			RB_CallSurfaceSafe( drawSurf->surface );
@@ -1519,12 +1560,43 @@ static const void *RB_DrawSurfs( const void *data ) {
 	const drawSurfsCommand_t *cmd;
 
 	// finish any 2D drawing if needed
+	if (tess.numIndexes > 0 && !tess.shader) {
+		ri.Printf(PRINT_WARNING, "RB_DrawSurfs: clearing tess with NULL shader\n");
+		tess.numIndexes = 0;
+		tess.numVertexes = 0;
+	}
+	{
+		static qboolean logged_end_surface = qfalse;
+		if (!logged_end_surface) {
+			ri.Printf(PRINT_ALL, "RB_DrawSurfs: calling RB_EndSurface\n");
+			logged_end_surface = qtrue;
+		}
+	}
 	RB_EndSurface();
+	{
+		static qboolean logged_end_surface_done = qfalse;
+		if (!logged_end_surface_done) {
+			ri.Printf(PRINT_ALL, "RB_DrawSurfs: RB_EndSurface done\n");
+			logged_end_surface_done = qtrue;
+		}
+	}
 
 	cmd = (const drawSurfsCommand_t *)data;
 
 	backEnd.refdef = cmd->refdef;
 	backEnd.viewParms = cmd->viewParms;
+
+	// No world loaded yet (menu), skip 3D rendering.
+	if (!tr.world) {
+		backEnd.doneSurfaces = qtrue;
+		return (const void *)(cmd + 1);
+	}
+
+	// UI-only/menu frames shouldn't render world geometry.
+	if (cmd->refdef.rdflags & RDF_NOWORLDMODEL) {
+		backEnd.doneSurfaces = qtrue;
+		return (const void *)(cmd + 1);
+	}
 
 #ifdef USE_VBO
 	VBO_UnBind();
@@ -1532,6 +1604,13 @@ static const void *RB_DrawSurfs( const void *data ) {
 
 	// clear the z buffer, set the modelview, etc
 	RB_BeginDrawingView();
+	{
+		static qboolean logged_view = qfalse;
+		if (!logged_view) {
+			ri.Printf(PRINT_ALL, "RB_DrawSurfs: begin view (numSurfs=%d)\n", cmd->numDrawSurfs);
+			logged_view = qtrue;
+		}
+	}
 
 #ifdef VK_CUBEMAP
 	if ( backEnd.viewParms.targetCube != NULL ) 
@@ -1539,6 +1618,13 @@ static const void *RB_DrawSurfs( const void *data ) {
 		vk_end_render_pass();
 		vk_begin_cubemap_render_pass();
 		RB_RenderDrawSurfList( cmd->drawSurfs, cmd->numDrawSurfs );
+		{
+			static qboolean logged_render = qfalse;
+			if (!logged_render) {
+				ri.Printf(PRINT_ALL, "RB_DrawSurfs: render list done\n");
+				logged_render = qtrue;
+			}
+		}
 		backEnd.doneSurfaces = qtrue; // for bloom
 		return (const void*)(cmd + 1);
 	}
@@ -1647,10 +1733,15 @@ RB_DrawBuffer
 */
 static const void *RB_DrawBuffer( const void *data ) {
 	const drawBufferCommand_t	*cmd;
+	static qboolean logged_drawbuffer = qfalse;
 
 	cmd = (const drawBufferCommand_t *)data;
 
 #ifdef USE_VULKAN
+	if (!logged_drawbuffer) {
+		ri.Printf(PRINT_ALL, "RB_DrawBuffer: called, entering vk_begin_frame\n");
+		logged_drawbuffer = qtrue;
+	}
 	// Reset per-frame 2D/UI debug stats at the start of a frame
 	rb_debug2D_quadCount = 0;
 	rb_debug2D_hasFullscreen = qfalse;
@@ -1660,7 +1751,9 @@ static const void *RB_DrawBuffer( const void *data ) {
 	backEnd.useRayTracingWorld = qfalse;
 #endif
 
-	vk_begin_frame();
+	if (!VK_IsCmdReady()) {
+		vk_begin_frame();
+	}
 
 	tess.depthRange = DEPTH_RANGE_NORMAL;
 
@@ -2104,12 +2197,17 @@ RB_ExecuteRenderCommands
 ====================
 */
 void RB_ExecuteRenderCommands( const void *data ) {
+	static qboolean logged_cmd = qfalse;
+	static int cmd_log_count = 0;
 
 #ifdef USE_VULKAN
 	// Skip rendering if Vulkan is not fully initialized to prevent crashes
 	if (!VK_IsCmdReady()) {
-		ri.Printf(PRINT_DEVELOPER, "Vulkan: Skipping render commands - not fully initialized\n");
-		return;
+		vk_begin_frame();
+		if (!VK_IsCmdReady()) {
+			ri.Printf(PRINT_WARNING, "Vulkan: Skipping render commands (cmd not ready after begin)\n");
+			return;
+		}
 	}
 #endif
 
@@ -2117,6 +2215,15 @@ void RB_ExecuteRenderCommands( const void *data ) {
 
 	while ( 1 ) {
 		data = PADP(data, sizeof(void *));
+
+		if (!logged_cmd) {
+			ri.Printf(PRINT_ALL, "RB_ExecuteRenderCommands: cmd=%d\n", *(const int *)data);
+			logged_cmd = qtrue;
+		}
+		if (cmd_log_count < 10) {
+			ri.Printf(PRINT_ALL, "RB_ExecuteRenderCommands: cmd[%d]=%d\n", cmd_log_count, *(const int *)data);
+			cmd_log_count++;
+		}
 
 		switch ( *(const int *)data ) {
 		case RC_SET_COLOR:

@@ -181,7 +181,7 @@ qboolean vk_create_command_pool(void) {
 
 // Allocate command buffers
 // Allocates NUM_COMMAND_BUFFERS to match frame pipelining
-qboolean vk_allocate_command_buffers(uint32_t count) {
+extern "C" qboolean vk_allocate_command_buffers(uint32_t count) {
     if (!vk.command_pool) {
         return qfalse;
     }
@@ -209,6 +209,11 @@ qboolean vk_allocate_command_buffers(uint32_t count) {
             ri.Printf(PRINT_ERROR, "Command: Failed to allocate command buffers: %d\n", result);
         }
         return qfalse;
+    }
+
+    // Bind allocated command buffers to per-frame slots
+    for (uint32_t i = 0; i < NUM_COMMAND_BUFFERS && i < command_buffers.size(); i++) {
+        vk.tess[i].command_buffer = command_buffers[i];
     }
 
     ri.Printf(PRINT_ALL, "Command: Allocated %u command buffers (for %u frames)\n", alloc_count, NUM_COMMAND_BUFFERS);

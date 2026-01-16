@@ -147,6 +147,13 @@ extern "C" void vk_begin_frame(void) {
     return;
   }
 #endif
+  {
+    static qboolean logged_begin = qfalse;
+    if (!logged_begin) {
+      ri.Printf(PRINT_ALL, "vk_begin_frame: entered (swapchain=%p)\n", (void*)vk.swapchain);
+      logged_begin = qtrue;
+    }
+  }
   // region agent log
   // Initialize per-frame timeline value increment if available
   static uint64_t last_timeline_value = 0;
@@ -166,6 +173,11 @@ extern "C" void vk_begin_frame(void) {
 
     // Set command buffer pointer early so we can use vk.cmd
     vk.cmd = &vk.tess[vk.cmd_index];
+    // Reset per-frame geometry state to avoid buffer overflows
+    vk.cmd->vertex_buffer_offset = 0;
+    vk.cmd->num_indexes = 0;
+    vk.cmd->curr_index_buffer = VK_NULL_HANDLE;
+    vk.cmd->curr_index_offset = 0;
     // Record frame start time for GPU timing (non-RTX path)
     clock_gettime(CLOCK_MONOTONIC, &g_vk_frame_start_ts);
 
@@ -427,20 +439,68 @@ extern "C" void vk_begin_frame(void) {
 
     vk.cmd->swapchain_image_index = image_index;
     vk.tess[vk.cmd_index].swapchain_image_acquired = qtrue;
+    {
+        static qboolean logged_acquire = qfalse;
+        if (!logged_acquire) {
+            ri.Printf(PRINT_ALL, "vk_begin_frame: acquired swapchain image %u (cmd_index=%d)\n",
+                      image_index, vk.cmd_index);
+            logged_acquire = qtrue;
+        }
+    }
 
 
     // Update performance statistics
+    {
+        static qboolean logged_perf = qfalse;
+        if (!logged_perf) {
+            ri.Printf(PRINT_ALL, "vk_begin_frame: updating performance stats\n");
+            logged_perf = qtrue;
+        }
+    }
     vk_update_performance_stats();
+    {
+        static qboolean logged_perf_done = qfalse;
+        if (!logged_perf_done) {
+            ri.Printf(PRINT_ALL, "vk_begin_frame: performance stats updated\n");
+            logged_perf_done = qtrue;
+        }
+    }
 
     // Reset descriptor batching for new frame
+    {
+        static qboolean logged_desc = qfalse;
+        if (!logged_desc) {
+            ri.Printf(PRINT_ALL, "vk_begin_frame: resetting descriptor batch\n");
+            logged_desc = qtrue;
+        }
+    }
     extern void vk_descriptor_batch_reset_frame(void);
     vk_descriptor_batch_reset_frame();
+    {
+        static qboolean logged_desc_done = qfalse;
+        if (!logged_desc_done) {
+            ri.Printf(PRINT_ALL, "vk_begin_frame: descriptor batch reset\n");
+            logged_desc_done = qtrue;
+        }
+    }
 
     // Explicitly reset command buffer after waiting on fence (pattern)
     // This matches: wait fence -> reset fence -> reset command buffers -> begin
+    if (vk.cmd_index >= NUM_COMMAND_BUFFERS) {
+        ri.Printf(PRINT_ERROR, "vk_begin_frame: cmd_index out of range (%d)\n", vk.cmd_index);
+        return;
+    }
     if (!vk.device_lost && vk.device != VK_NULL_HANDLE) {
         if (qvkResetCommandBuffer && vk.tess[vk.cmd_index].command_buffer != VK_NULL_HANDLE) {
-            VkResult reset_result = qvkResetCommandBuffer(vk.tess[vk.cmd_index].command_buffer, 0);
+            VkCommandBuffer cmd_buf = vk.tess[vk.cmd_index].command_buffer;
+            {
+                static qboolean logged_reset = qfalse;
+                if (!logged_reset) {
+                    ri.Printf(PRINT_ALL, "vk_begin_frame: resetting command buffer %p\n", (void*)cmd_buf);
+                    logged_reset = qtrue;
+                }
+            }
+            VkResult reset_result = qvkResetCommandBuffer(cmd_buf, 0);
             if (reset_result == VK_ERROR_DEVICE_LOST) {
                 vk.device_lost = qtrue;
                 vk_reset_memory_tracking_on_device_lost();
@@ -462,10 +522,21 @@ extern "C" void vk_begin_frame(void) {
         .pInheritanceInfo = nullptr
     };
 
+    if (vk.tess[vk.cmd_index].command_buffer == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_ERROR, "vk_begin_frame: command buffer is NULL (cmd_index=%d)\n", vk.cmd_index);
+        return;
+    }
     result = qvkBeginCommandBuffer(vk.tess[vk.cmd_index].command_buffer, &begin_info);
     if (result != VK_SUCCESS) {
         ri.Printf(PRINT_ERROR, "vk_begin_frame: Failed to begin command buffer: %s\n", vk_result_string(result));
         return;
+    }
+    {
+        static qboolean logged_begin_cb = qfalse;
+        if (!logged_begin_cb) {
+            ri.Printf(PRINT_ALL, "vk_begin_frame: command buffer begun (cmd_index=%d)\n", vk.cmd_index);
+            logged_begin_cb = qtrue;
+        }
     }
 
     // Set up render area
@@ -476,6 +547,13 @@ extern "C" void vk_begin_frame(void) {
 
     // Begin main render pass
     vk_begin_main_render_pass();
+    {
+        static qboolean logged_begin_pass = qfalse;
+        if (!logged_begin_pass) {
+            ri.Printf(PRINT_ALL, "vk_begin_frame: main render pass begun\n");
+            logged_begin_pass = qtrue;
+        }
+    }
 }
 
 // End frame
@@ -520,6 +598,13 @@ extern "C" void vk_end_frame(void) {
         vk_apply_tone_mapping();
         vk_apply_gamma_correction();
     }
+    {
+        static int logged_post = 0;
+        if (logged_post < 3) {
+            ri.Printf(PRINT_ALL, "vk_end_frame: post-processing done\n");
+            logged_post++;
+        }
+    }
 
     // Ray marching moved to RTX renderer only
     // Timeline signaling at end of frame
@@ -538,9 +623,37 @@ extern "C" void vk_end_frame(void) {
         }
     }
     #endif
+    {
+        static int logged_timeline = 0;
+        if (logged_timeline < 3) {
+            ri.Printf(PRINT_ALL, "vk_end_frame: timeline signaling done\n");
+            logged_timeline++;
+        }
+    }
+
+    if (backEnd.refdef.rdflags & RDF_NOWORLDMODEL) {
+        static int logged_ui_only = 0;
+        if (logged_ui_only < 3) {
+            ri.Printf(PRINT_ALL, "vk_end_frame: UI-only frame, skipping FSR path\n");
+            logged_ui_only++;
+        }
+        return;
+    }
 
     // Apply FSR (FidelityFX Super Resolution) after post-processing but before UI
+    {
+        static int logged_fsr_check = 0;
+        if (logged_fsr_check < 3) {
+            ri.Printf(PRINT_ALL, "vk_end_frame: before FSR check\n");
+            logged_fsr_check++;
+        }
+    }
     if (vk_fsr_is_enabled()) {
+        static int logged_fsr = 0;
+        if (logged_fsr < 3) {
+            ri.Printf(PRINT_ALL, "vk_end_frame: FSR begin\n");
+            logged_fsr++;
+        }
         vk_fsr_update_constants(vk.renderWidth, vk.renderHeight, glConfig.vidWidth, glConfig.vidHeight);
 
         // 1. EASU: Upscale color_image -> upscale.image[0]
@@ -564,6 +677,13 @@ extern "C" void vk_end_frame(void) {
 
         // 3. RCAS: Sharpen upscale.image[0] -> upscale.image[1]
         vk_fsr_apply_rcas(vk.cmd->command_buffer, vk.upscale.image[0], vk.upscale.view[0], vk.upscale.image[1], vk.upscale.view[1]);
+        {
+            static int logged_fsr_done = 0;
+            if (logged_fsr_done < 3) {
+                ri.Printf(PRINT_ALL, "vk_end_frame: FSR done\n");
+                logged_fsr_done++;
+            }
+        }
 
         // 4. Barrier for RCAS output -> Transfer source
         VkImageMemoryBarrier rcas_barrier = {
@@ -790,7 +910,19 @@ extern "C" void vk_end_frame(void) {
     }
 
     // Check if we have an acquired image to present
+    {
+        static qboolean logged_present_entry = qfalse;
+        if (!logged_present_entry) {
+            ri.Printf(PRINT_ALL, "vk_present_frame: entered (swapchain=%p)\n", (void*)vk.swapchain);
+            logged_present_entry = qtrue;
+        }
+    }
     if (!vk.cmd->swapchain_image_acquired) {
+        static qboolean logged_no_present = qfalse;
+        if (!logged_no_present) {
+            ri.Printf(PRINT_WARNING, "vk_present_frame: no swapchain image acquired, skipping present\n");
+            logged_no_present = qtrue;
+        }
         return;
     }
 
@@ -847,6 +979,13 @@ extern "C" void vk_end_frame(void) {
     };
 
     VkResult result = qvkQueuePresentKHR(vk.queue, &present_info);
+    {
+        static qboolean logged_present = qfalse;
+        if (!logged_present) {
+            ri.Printf(PRINT_ALL, "vk_present_frame: present result=%d\n", (int)result);
+            logged_present = qtrue;
+        }
+    }
     {
         char pres[64];
         snprintf(pres, sizeof(pres), "{\"present_result\":%d}", (int)result);

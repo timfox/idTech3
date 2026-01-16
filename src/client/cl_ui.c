@@ -1070,7 +1070,23 @@ static intptr_t CL_UISystemCalls( intptr_t *args ) {
 		return re.RegisterSkin( VMA(1) );
 
 	case UI_R_REGISTERSHADERNOMIP:
-		return re.RegisterShaderNoMip( VMA(1) );
+		{
+			static qboolean logged_missing = qfalse;
+			const char *name = (const char *)VMA(1);
+			qhandle_t shader = re.RegisterShaderNoMip( name );
+			if (!shader) {
+				if (!logged_missing) {
+					Com_Printf("UI_R_REGISTERSHADERNOMIP: missing '%s', using fallback\n", name);
+					logged_missing = qtrue;
+				}
+				if (name && !Q_stricmp(name, "gfx/2d/bigchars") && cls.charSetShader) {
+					shader = cls.charSetShader;
+				} else if (cls.whiteShader) {
+					shader = cls.whiteShader;
+				}
+			}
+			return shader;
+		}
 
 	case UI_R_CLEARSCENE:
 		re.ClearScene();

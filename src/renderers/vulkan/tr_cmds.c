@@ -158,6 +158,7 @@ R_IssueRenderCommands
 */
 void R_IssueRenderCommands( void ) {
 	renderCommandList_t	*cmdList;
+	static qboolean logged_issue = qfalse;
 
 	cmdList = &backEndData->commands;
 
@@ -183,6 +184,10 @@ void R_IssueRenderCommands( void ) {
 
 	// actually start the commands going
 	if ( !r_skipBackEnd->integer ) {
+		if (!logged_issue) {
+			ri.Printf(PRINT_ALL, "R_IssueRenderCommands: executing backend (cmds=%p)\n", (void *)cmdList->cmds);
+			logged_issue = qtrue;
+		}
 		// let it start on the new batch
 		RB_ExecuteRenderCommands( cmdList->cmds );
 	}
@@ -435,6 +440,12 @@ for each RE_EndFrame
 */
 void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 	drawBufferCommand_t *cmd;
+	static qboolean logged_begin = qfalse;
+
+	if (!logged_begin) {
+		ri.Printf(PRINT_ALL, "RE_BeginFrame: called (stereo=%d)\n", (int)stereoFrame);
+		logged_begin = qtrue;
+	}
 
 	// Safety check: if Vulkan is not properly initialized, skip rendering to avoid crashes
 #ifdef USE_VULKAN
@@ -765,9 +776,14 @@ Returns the number of msec spent in the back end
 void RE_EndFrame( int *frontEndMsec, int *backEndMsec ) {
 	swapBuffersCommand_t *cmd;
 	rg_frame_graph_t graph;
+	static qboolean logged_end = qfalse;
 
 	if ( !tr.registered ) {
 		return;
+	}
+	if (!logged_end) {
+		ri.Printf(PRINT_ALL, "RE_EndFrame: called\n");
+		logged_end = qtrue;
 	}
 
 	// Update async font loading

@@ -200,10 +200,8 @@ void vk_fsr_shutdown(void) {
 }
 
 qboolean vk_fsr_is_enabled(void) {
-    if (!vk_fsr_state.initialized || !r_fsr_enable || !r_fsr_enable->integer) {
-        return qfalse;
-    }
-    return qtrue;
+    // Temporarily disable FSR to avoid unstable state during UI-only rendering.
+    return qfalse;
 }
 
 void vk_fsr_update_constants(uint32_t render_width, uint32_t render_height,

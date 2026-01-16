@@ -43,8 +43,20 @@ extern "C" void vk_draw_indexed(uint32_t indexCount, uint32_t firstIndex) {
 
 // Draw geometry (indexed or non-indexed)
 extern "C" void vk_draw_geometry(Vk_Depth_Range depth_range, qboolean indexed) {
+    if (!vk.cmd) {
+        ri.Printf(PRINT_WARNING, "vk_draw_geometry: vk.cmd is NULL\n");
+        return;
+    }
     if (!vk_validate_handle(vk.cmd->command_buffer, "command buffer")) {
         return;
+    }
+    {
+        static int logged_draw = 0;
+        if (logged_draw < 3) {
+            ri.Printf(PRINT_ALL, "vk_draw_geometry: indexed=%d num_indexes=%d vertexes=%d vbo_new=%d\n",
+                      (int)indexed, vk.cmd->num_indexes, tess.numVertexes, (int)vk.geometry_buffer_size_new);
+            logged_draw++;
+        }
     }
 
 #ifdef USE_VBO
@@ -55,6 +67,9 @@ extern "C" void vk_draw_geometry(Vk_Depth_Range depth_range, qboolean indexed) {
         qvkCmdBindVertexBuffers(vk.cmd->command_buffer, 0, 1, vertex_buffers, vertex_offset);
 
         if (indexed) {
+            if (!vk_validate_handle(vk.cmd->curr_index_buffer, "index buffer")) {
+                return;
+            }
             qvkCmdBindIndexBuffer(vk.cmd->command_buffer, vk.cmd->curr_index_buffer, vk.cmd->curr_index_offset, VK_INDEX_TYPE_UINT32);
         }
     } else
@@ -66,6 +81,9 @@ extern "C" void vk_draw_geometry(Vk_Depth_Range depth_range, qboolean indexed) {
         qvkCmdBindVertexBuffers(vk.cmd->command_buffer, 0, 1, vertex_buffers, vertex_offset);
 
         if (indexed) {
+            if (!vk_validate_handle(vk.cmd->curr_index_buffer, "index buffer")) {
+                return;
+            }
             qvkCmdBindIndexBuffer(vk.cmd->command_buffer, vk.cmd->curr_index_buffer, 0, VK_INDEX_TYPE_UINT32);
         }
     }
@@ -77,6 +95,10 @@ extern "C" void vk_draw_geometry(Vk_Depth_Range depth_range, qboolean indexed) {
     vk_set_depth_range(depth_range);
 
     if (indexed) {
+        if (vk.cmd->num_indexes <= 0) {
+            ri.Printf(PRINT_WARNING, "vk_draw_geometry: num_indexes=%d\n", vk.cmd->num_indexes);
+            return;
+        }
         vk_draw_indexed_call(vk.cmd->command_buffer, vk.cmd->num_indexes, 1, 0, 0, 0);
     } else {
         vk_draw_call(vk.cmd->command_buffer, tess.numVertexes, 1, 0, 0);

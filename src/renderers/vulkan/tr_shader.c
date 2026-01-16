@@ -4142,14 +4142,15 @@ static shader_t *FinishShader( void ) {
 			}
 			#endif
 
-			// Vulkan pipeline creation is disabled due to memory corruption issues
-			// TEMPORARILY DISABLE EARLY RETURN TO TEST IF THIS CAUSES THE CRASH
-			// def.mirror = qfalse;
-			// ri.Printf(PRINT_ALL, "DEBUG: EARLY RETURN - Using default shader for Vulkan (shader_type=%d)\n", def.shader_type);
-			// return tr.defaultShader;
+			// Create the primary (non-mirror) pipeline for this stage.
+			def.mirror = qfalse;
+			pStage->vk_pipeline[0] = vk_find_pipeline_ext( 0, &def, qtrue );
+			if (pStage->vk_pipeline[0] == VK_NULL_HANDLE) {
+				ri.Printf(PRINT_WARNING, "Failed to create Vulkan pipeline for shader stage %s\n", shader.name);
+			}
+
+			// Mirror pipeline is optional; keep it disabled for now.
 			def.mirror = qtrue;
-			// Disable mirror pipeline creation to prevent crashes
-			// Note: Mirror pipeline is optional, NULL is acceptable
 			pStage->vk_mirror_pipeline[0] = VK_NULL_HANDLE;
 
 			// Safe depth fragment processing - re-enabled with SIGFPE protection
