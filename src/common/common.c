@@ -416,6 +416,9 @@ static void Com_InitCrashRecovery(void) {
     // Set up signal handlers for crash recovery
     Com_Printf( "Initializing crash recovery system...\n" );
 
+    // Initialize the comprehensive error handling system
+    Error_Init();
+
     // Initialize the crash handler system
     Crash_Init();
 

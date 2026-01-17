@@ -36,11 +36,14 @@ Platform-specific crash handling with diagnostics.
 #ifdef __APPLE__
 #include <execinfo.h>
 #endif
+#include <pthread.h>
+#include <malloc.h>
 #endif
 
 // Forward declaration for Unix signal handler
 #ifndef _WIN32
 static void Crash_UnixSignalHandler(int sig, siginfo_t *info, void *context);
+static void Crash_MallocErrorHook(int errcode, void *ptr);
 #endif
 
 // Global crash info
@@ -48,6 +51,9 @@ static crash_info_t g_crash_info;
 static qboolean g_crash_initialized = qfalse;
 static int g_start_time = 0;
 static crash_callback_t g_crash_callbacks[8];
+
+// Alternate signal stack for crash handler
+static stack_t g_sigaltstack;
 static int g_crash_callback_count = 0;
 
 // Enhanced reliability features
@@ -95,26 +101,51 @@ void Crash_Init(void)
     g_crash_info.build_date = BUILD_DATE;
     g_start_time = Sys_Milliseconds();
 
+    // Debug: Print thread info
+    fprintf(stderr, "CRASH_HANDLER: Installing signal handlers in thread %lu\n", (unsigned long)pthread_self());
+
+    // Set up alternate signal stack for better signal handler execution
+    g_sigaltstack.ss_sp = malloc(SIGSTKSZ);
+    if (g_sigaltstack.ss_sp) {
+        g_sigaltstack.ss_size = SIGSTKSZ;
+        g_sigaltstack.ss_flags = 0;
+        if (sigaltstack(&g_sigaltstack, NULL) == 0) {
+            fprintf(stderr, "CRASH_HANDLER: Alternate signal stack installed\n");
+        }
+    }
+
 #ifdef _WIN32
     // Windows: Set up structured exception handler
     SetUnhandledExceptionFilter(Crash_WindowsExceptionHandler);
 #else
-    // Unix: Set up signal handlers - conservative approach
+    // Unix: Set up signal handlers - comprehensive approach
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_sigaction = Crash_UnixSignalHandler;
-    sa.sa_flags = SA_SIGINFO | SA_NODEFER;  // Get extra info, don't block signal during handler
+    sa.sa_flags = SA_SIGINFO | SA_RESETHAND | SA_ONSTACK;  // Use alternate stack
     sigemptyset(&sa.sa_mask);
 
-    // Only handle critical crash signals, avoid signals that might occur during normal operation
+    // Fill mask to block all signals during handler execution (except the one being handled)
+    sigfillset(&sa.sa_mask);
+
+    // Handle critical crash signals, including SIGABRT for memory corruption and abort() calls
     sigaction(SIGSEGV, &sa, NULL);  // Segmentation fault - critical
     sigaction(SIGBUS, &sa, NULL);   // Bus error - critical
     sigaction(SIGILL, &sa, NULL);   // Illegal instruction - critical
-    // Skip SIGFPE (floating point exceptions) and SIGABRT as they can occur in normal code
+
+    // Special handling for SIGABRT - use alternate stack
+    struct sigaction sa_abort;
+    memset(&sa_abort, 0, sizeof(sa_abort));
+    sa_abort.sa_sigaction = Crash_UnixSignalHandler;
+    sa_abort.sa_flags = SA_SIGINFO | SA_RESETHAND | SA_ONSTACK;  // Use alternate stack
+    sigemptyset(&sa_abort.sa_mask);
+    sigfillset(&sa_abort.sa_mask);  // Block all signals during handler
+    sigaction(SIGABRT, &sa_abort, NULL);  // Abort signal - critical for crashes like free() invalid pointer
+    // Skip SIGFPE (floating point exceptions) as they can occur in normal math operations
 #endif
 
     g_crash_initialized = qtrue;
-    Com_Printf("Crash handler initialized (Build: %s)\n", BUILD_ID);
+    Com_Printf("Crash handler initialized (Build: %s) - handling SIGSEGV, SIGBUS, SIGILL, SIGABRT + abort override\n", BUILD_ID);
 }
 
 /*
@@ -549,13 +580,29 @@ static void Crash_HandleCrash(int sig, void *fault_addr, const char *reason)
 Crash_UnixSignalHandler
 =================
 */
+// Override abort to generate crash reports
+void abort(void)
+{
+    fprintf(stderr, "CRASH_HANDLER: abort() called - generating crash report\n");
+
+    // Generate crash report
+    Crash_HandleCrash(SIGABRT, NULL, NULL);
+
+    // Call the real abort
+    _exit(134);  // Exit code for SIGABRT
+}
+
 static void Crash_UnixSignalHandler(int sig, siginfo_t *info, void *context)
 {
     (void)context;
 
+    // Debug: Print that we caught the signal
+    fprintf(stderr, "CRASH_HANDLER: Caught signal %d (%s) in thread %lu\n", sig, strsignal(sig), (unsigned long)pthread_self());
+
     void *fault_addr = NULL;
     if (info) {
         fault_addr = info->si_addr;
+        fprintf(stderr, "CRASH_HANDLER: Fault address: %p\n", fault_addr);
     }
 
     Crash_HandleCrash(sig, fault_addr, NULL);

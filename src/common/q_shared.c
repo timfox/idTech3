@@ -53,6 +53,24 @@ static inline qboolean Q_IsValidString(const char *str, size_t max_len) {
 
 // Legacy function implementation for backward compatibility
 float Com_Clamp(float min, float max, float value) {
+    // Enhanced error handling for invalid parameters
+    if (min > max) {
+        ERR_REPORT_CTX(ERR_INVALID_PARAMETER, va("Com_Clamp: min > max (%.2f > %.2f)", min, max),
+                      "Parameter validation");
+        // Recovery: swap min/max for backward compatibility
+        float temp = min;
+        min = max;
+        max = temp;
+    }
+
+    // Validate for NaN/inf values that could cause issues
+    if (!isfinite(min) || !isfinite(max) || !isfinite(value)) {
+        ERR_REPORT_CTX(ERR_INVALID_PARAMETER, "Com_Clamp: Non-finite value detected",
+                      va("min=%.2f, max=%.2f, value=%.2f", min, max, value));
+        // Recovery: return safe default
+        return 0.0f;
+    }
+
     // Use modern conditional expression with better readability
     return (value < min) ? min : ((value > max) ? max : value);
 }

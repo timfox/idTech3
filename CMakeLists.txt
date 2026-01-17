@@ -732,6 +732,8 @@ list(APPEND QCOMMON_SRCS src/common/q_error_recovery.c)
 list(APPEND QCOMMON_SRCS src/common/input_validation.c)
 # Add backwards compatibility system
 list(APPEND QCOMMON_SRCS src/common/backwards_compatibility.c)
+# Add comprehensive error handling system
+list(APPEND QCOMMON_SRCS src/common/q_error_system.c)
 # Add compatibility shims system
 list(APPEND QCOMMON_SRCS src/common/compatibility_shims.c)
 # Add font effects system
@@ -1564,6 +1566,8 @@ IF(USE_STB_TRUETYPE)
 ENDIF()
 # Always include tr_services.c for safe shader loading
 list(APPEND RENDERER_COMMON_SRCS src/renderers/renderercommon/tr_services.c)
+# Add comprehensive error handling system to renderers
+list(APPEND RENDERER_COMMON_SRCS src/common/q_error_system.c)
 # Note: FreeType-dependent files are included when USE_FREETYPE is defined
 # They have proper guards to compile to empty implementations when FreeType is not available
 AUX_SOURCE_DIRECTORY(src/renderers/opengl RENDERER_GL_SRCS)

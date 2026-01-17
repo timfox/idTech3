@@ -812,6 +812,112 @@ typedef vec_t quat_t[4];
 
 // Static assertions for critical structure sizes (must be after type definitions)
 static_assert(sizeof(vec3_t) == 12, "vec3_t must be 12 bytes for network compatibility");
+
+//============================================================================
+// AAA Quality Error Handling Integration
+//============================================================================
+
+#include "q_error_system.h"
+
+// Enhanced error macros that integrate with the comprehensive error system
+#define ERR_CHECK(condition, code, msg) \
+    do { \
+        if (!(condition)) { \
+            ERR_REPORT(code, msg); \
+        } \
+    } while(0)
+
+#define ERR_CHECK_RETURN(condition, code, msg, retval) \
+    do { \
+        if (!(condition)) { \
+            ERR_REPORT(code, msg); \
+            return (retval); \
+        } \
+    } while(0)
+
+#define ERR_CHECK_GOTO(condition, code, msg, label) \
+    do { \
+        if (!(condition)) { \
+            ERR_REPORT(code, msg); \
+            goto label; \
+        } \
+    } while(0)
+
+// Resource allocation with error handling
+#define SAFE_MALLOC(size, context) \
+    Resource_Allocate(size, context)
+
+#define SAFE_FREE(ptr, context) \
+    Resource_Free(ptr, context)
+
+#define SAFE_CALLOC(count, size, context) \
+    ({ \
+        void *ptr = SAFE_MALLOC((count) * (size), context); \
+        if (ptr) memset(ptr, 0, (count) * (size)); \
+        ptr; \
+    })
+
+// File operations with error handling
+#define SAFE_FOPEN(filename, mode, context) \
+    File_OpenSafe(filename, mode, context)
+
+#define SAFE_FCLOSE(fp, context) \
+    File_CloseSafe(fp, context)
+
+// Validation macros
+#define VALIDATE_PTR(ptr) \
+    ERR_VALIDATE(ptr != NULL, ERR_INVALID_PARAMETER, "Pointer is NULL")
+
+#define VALIDATE_RANGE(value, min, max) \
+    ERR_VALIDATE((value) >= (min) && (value) <= (max), ERR_INVALID_PARAMETER, "Value out of range")
+
+#define VALIDATE_STRING(str) \
+    ERR_VALIDATE(str && *str, ERR_INVALID_PARAMETER, "Invalid string")
+
+#define VALIDATE_ARRAY_INDEX(index, size) \
+    ERR_VALIDATE((index) >= 0 && (index) < (size), ERR_INVALID_PARAMETER, "Array index out of bounds")
+
+// Context management for better error tracing
+#define ERROR_CONTEXT(context) \
+    Error_PushContext(context)
+
+#define ERROR_CONTEXT_END() \
+    Error_PopContext()
+
+// Recovery-aware error reporting
+#define ERR_RECOVERABLE_CHECK(condition, code, msg, recovery) \
+    do { \
+        if (!(condition)) { \
+            ERR_RECOVERABLE(code, msg, recovery); \
+        } \
+    } while(0)
+
+// Exception-safe resource management (C equivalent)
+#define RESOURCE_SCOPE(name, resource, cleanup) \
+    SCOPED_RESOURCE(name, resource, cleanup)
+
+#define RESOURCE_DISARM(name) \
+    SCOPED_RESOURCE_DISARM(name)
+
+#define RESOURCE_CLEANUP(name) \
+    SCOPED_RESOURCE_CLEANUP(name)
+
+// Transaction-like operations
+#define TRANSACTION_BEGIN(tx) \
+    Transaction_Begin(tx)
+
+#define TRANSACTION_END(tx, success) \
+    Transaction_End(tx, success)
+
+// Validation framework integration
+#define VALIDATOR_ADD(name, func) \
+    Validation_AddRule(name, func)
+
+#define VALIDATE_DATA(data, error) \
+    Validation_RunAll(data, error)
+
+#define VALIDATE_WITH_RULE(rule, data, error) \
+    Validation_RunRule(rule, data, error)
 static_assert(sizeof(color4ub_t) == 4, "color4ub_t must be 4 bytes");
 static_assert(sizeof(floatint_t) == 4, "floatint_t must be 4 bytes for type punning");
 
@@ -1703,26 +1809,7 @@ void Com_LogPerformance(const char *operation, int duration_ms);
 void Com_StartTiming(const char *operation);
 void Com_EndTiming(const char *operation);
 
-// RAII-style resource management for C
-typedef struct {
-    void *resource;
-    void (*cleanup)(void *);
-} scoped_resource_t;
-
-static inline scoped_resource_t make_scoped_resource(void *resource, void (*cleanup)(void *)) {
-    scoped_resource_t sr = { resource, cleanup };
-    return sr;
-}
-
-static inline void scoped_resource_free(scoped_resource_t *sr) {
-    if (sr->resource && sr->cleanup) {
-        sr->cleanup(sr->resource);
-        sr->resource = nullptr;
-    }
-}
-
-#define SCOPED_RESOURCE(name, alloc_expr, cleanup_func) \
-    scoped_resource_t name __attribute__((cleanup(scoped_resource_free))) = make_scoped_resource(alloc_expr, cleanup_func)
+// Resource management is now handled by the comprehensive error system in q_error_system.h
 void FORMAT_PRINTF(1, 2) QDECL Com_Printf( const char *msg, ... );
 #ifdef __cplusplus
 }
