@@ -8,6 +8,7 @@ operations for improved performance on supported architectures.
 */
 
 #include "q_shared.h"
+#include "q_math_simd.h"
 #include <math.h>
 
 // SIMD optimization detection and includes

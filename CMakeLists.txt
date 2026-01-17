@@ -1566,8 +1566,6 @@ IF(USE_STB_TRUETYPE)
 ENDIF()
 # Always include tr_services.c for safe shader loading
 list(APPEND RENDERER_COMMON_SRCS src/renderers/renderercommon/tr_services.c)
-# Add comprehensive error handling system to renderers
-list(APPEND RENDERER_COMMON_SRCS src/common/q_error_system.c)
 # Note: FreeType-dependent files are included when USE_FREETYPE is defined
 # They have proper guards to compile to empty implementations when FreeType is not available
 AUX_SOURCE_DIRECTORY(src/renderers/opengl RENDERER_GL_SRCS)
@@ -4112,6 +4110,7 @@ IF(BUILD_TESTS)
 		src/tests/test_qcommon.c
 		src/common/q_shared.c
 	)
+	target_compile_definitions(test_qcommon PRIVATE UNIT_TEST)
 	TARGET_LINK_LIBRARIES(test_qcommon PRIVATE m)
 	TARGET_INCLUDE_DIRECTORIES(test_qcommon PRIVATE
 		${CMAKE_SOURCE_DIR}/src
@@ -4127,6 +4126,7 @@ IF(BUILD_TESTS)
 		src/common/q_shared.c
 		src/common/q_math.c
 	)
+	target_compile_definitions(test_qmath PRIVATE UNIT_TEST)
 	TARGET_LINK_LIBRARIES(test_qmath PRIVATE m)
 	TARGET_INCLUDE_DIRECTORIES(test_qmath PRIVATE
 		${CMAKE_SOURCE_DIR}/src
@@ -4141,6 +4141,7 @@ IF(BUILD_TESTS)
 		src/tests/test_info.c
 		src/common/q_shared.c
 	)
+	target_compile_definitions(test_info PRIVATE UNIT_TEST)
 	TARGET_LINK_LIBRARIES(test_info PRIVATE m)
 	TARGET_INCLUDE_DIRECTORIES(test_info PRIVATE
 		${CMAKE_SOURCE_DIR}/src
@@ -4158,6 +4159,7 @@ IF(BUILD_TESTS)
 		src/common/msg_secure.c
 		src/common/huffman_static.c
 	)
+	target_compile_definitions(test_msg_secure PRIVATE UNIT_TEST)
 	TARGET_LINK_LIBRARIES(test_msg_secure PRIVATE m)
 	TARGET_INCLUDE_DIRECTORIES(test_msg_secure PRIVATE
 		${CMAKE_SOURCE_DIR}/src
@@ -4171,6 +4173,7 @@ IF(BUILD_TESTS)
 	ADD_EXECUTABLE(test_renderer_init
 		src/tests/test_renderer_init.c
 	)
+target_compile_definitions(test_renderer_init PRIVATE UNIT_TEST)
 ADD_EXECUTABLE(test_renderer_abstraction_usage_mock
 	src/tests/test_renderer_abstraction_usage_mock.c
 )
@@ -4278,6 +4281,7 @@ ADD_EXECUTABLE(benchmark_performance
     src/common/q_shared.c
     src/common/q_math.c
 )
+target_compile_definitions(benchmark_performance PRIVATE UNIT_TEST)
 TARGET_LINK_LIBRARIES(benchmark_performance PRIVATE m)
 TARGET_INCLUDE_DIRECTORIES(benchmark_performance PRIVATE
     ${CMAKE_SOURCE_DIR}/src

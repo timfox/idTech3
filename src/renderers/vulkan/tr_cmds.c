@@ -340,6 +340,14 @@ void RE_SetColor( const float *rgba ) {
 	if ( !tr.registered ) {
 		return;
 	}
+
+	// Safety check: Skip rendering if Vulkan is not in a safe state (e.g., device lost)
+#ifdef USE_VULKAN
+	extern qboolean vk_is_safe_state(void);
+	if (!vk_is_safe_state()) {
+		return;
+	}
+#endif
 	cmd = R_GetCommandBuffer( sizeof( *cmd ) );
 	if ( !cmd ) {
 		return;
@@ -368,6 +376,14 @@ void RE_StretchPic( float x, float y, float w, float h,
 	if ( !tr.registered ) {
 		return;
 	}
+
+	// Safety check: Skip rendering if Vulkan is not in a safe state (e.g., device lost)
+#ifdef USE_VULKAN
+	extern qboolean vk_is_safe_state(void);
+	if (!vk_is_safe_state()) {
+		return;
+	}
+#endif
 	cmd = R_GetCommandBuffer( sizeof( *cmd ) );
 	if ( !cmd ) {
 		return;
@@ -458,6 +474,10 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 			return;
 		}
 
+		// For now, terminate immediately on device loss to prevent NVIDIA driver crashes
+		// TODO: Implement proper device recovery
+		ri.Error(ERR_FATAL, "Vulkan device lost - terminating to prevent crashes");
+
 		// Only log once per second to avoid spam
 		static int last_log_time = 0;
 		static int last_recovery_attempt = -1; // Initialize to -1 to trigger immediate first attempt
@@ -499,11 +519,12 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 		// Check recovery attempt limit
 		if (recovery_attempt_count >= MAX_RECOVERY_ATTEMPTS) {
 			if (current_time - last_log_time > 5000) { // Log every 5 seconds when max attempts reached
-				ri.Printf(PRINT_WARNING, "Vulkan: Maximum recovery attempts (%d) reached. Device recovery may not be possible.\n", 
+				ri.Printf(PRINT_ERROR, "Vulkan: Maximum recovery attempts (%d) reached. Device recovery failed - terminating to prevent crashes.\n",
 					MAX_RECOVERY_ATTEMPTS);
 				last_log_time = current_time;
 			}
-			return; // Stop attempting recovery after max attempts
+			// Device recovery failed - terminate the engine to prevent crashes
+			ri.Error(ERR_FATAL, "Vulkan device lost and recovery failed after %d attempts", MAX_RECOVERY_ATTEMPTS);
 		}
 
 		if (last_recovery_attempt == -1 || current_time - last_recovery_attempt > recovery_delay) {
@@ -523,21 +544,18 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 				// This will safely check if device is responsive
 				qboolean was_device_lost = vk.device_lost;
 				
-				// Only test device if it wasn't already lost (to avoid redundant checks)
-				if (!was_device_lost) {
-					vk_wait_idle();
-					// If device was lost during wait, it will be set in vk_wait_idle
-					if (vk.device_lost) {
-						ri.Printf(PRINT_WARNING, "Vulkan: Device lost during wait test. Will retry in %d seconds.\n", recovery_delay / 1000);
-						return; // Skip swapchain operations if device is still lost
+				// Always attempt recovery when device is lost, regardless of previous state
+				// The "waiting" logic was causing crashes by allowing rendering to continue with device_lost = true
+				qboolean device_was_lost_before_wait = vk.device_lost;
+				vk_wait_idle();
+				// If device was lost during wait, or was already lost, skip swapchain operations
+				if (vk.device_lost) {
+					if (!device_was_lost_before_wait) {
+						ri.Printf(PRINT_WARNING, "Vulkan: Device lost during wait test. Will retry recovery later.\n");
+					} else {
+						ri.Printf(PRINT_WARNING, "Vulkan: Device still lost after wait. Skipping recovery attempt.\n");
 					}
-				} else {
-					// Device was already lost - wait longer before attempting recovery
-					// Don't try to recreate swapchain immediately - driver needs time to stabilize
-					// The NVIDIA driver crashes if we try to access it too soon after device loss
-					ri.Printf(PRINT_WARNING, "Vulkan: Device is lost - waiting for driver to stabilize before recovery attempt.\n");
-					ri.Printf(PRINT_WARNING, "Vulkan: Will retry recovery in %d seconds.\n", recovery_delay / 1000);
-					return; // Wait longer - don't attempt swapchain recreation yet
+					return; // Don't attempt swapchain operations if device is lost
 				}
 				
 				// Only proceed with swapchain recreation if device wasn't lost before
@@ -588,9 +606,9 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 				
 				// Test if swapchain creation/recreation succeeded by trying to acquire an image
 				// Only test if swapchain recreation succeeded (swapchain_result == VK_SUCCESS)
-				if (swapchain_result == VK_SUCCESS && qvkAcquireNextImageKHR && vk.swapchain != VK_NULL_HANDLE) {
+				if (swapchain_result == VK_SUCCESS && qvkAcquireNextImageKHR && vk.swapchain != VK_NULL_HANDLE && vk.image_available != VK_NULL_HANDLE) {
 					uint32_t test_index;
-					VkResult test_result = qvkAcquireNextImageKHR(vk.device, vk.swapchain, 0, 
+					VkResult test_result = qvkAcquireNextImageKHR(vk.device, vk.swapchain, 0,
 						vk.image_available, VK_NULL_HANDLE, &test_index);
 					
 					if (test_result == VK_SUCCESS || test_result == VK_SUBOPTIMAL_KHR) {

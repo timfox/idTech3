@@ -1511,7 +1511,7 @@ static inline qboolean VK_IsHeadless(void)
 // Lightweight helper to check if Vulkan command buffer is ready (inlined for zero-cost checks)
 static inline qboolean VK_IsCmdReady(void)
 {
-    return vk.active && vk.cmd != NULL && vk.cmd->command_buffer != VK_NULL_HANDLE;
+    return vk.active && !vk.device_lost && vk.cmd != NULL && vk.cmd->command_buffer != VK_NULL_HANDLE;
 }
 
 // Function prototypes

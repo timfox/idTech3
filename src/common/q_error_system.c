@@ -14,6 +14,9 @@ and comprehensive logging for enterprise-level reliability.
 #include <string.h>
 #include <time.h>
 
+// Stub implementations are provided by individual renderers (vk_stubs.c for Vulkan, etc.)
+// Do not provide Sys_Milliseconds here to avoid conflicts
+
 //============================================================================
 // Global State
 //============================================================================
@@ -38,7 +41,7 @@ static char g_context_stack[CONTEXT_STACK_DEPTH][ERROR_CONTEXT_MAX];
 static int g_context_depth = 0;
 
 // Recovery database
-static recovery_info_t g_recovery_db[4096];
+static error_recovery_info_t g_recovery_db[4096];
 
 //============================================================================
 // String Conversion Functions
@@ -118,8 +121,8 @@ const char *Error_CategoryToString(error_category_t category) {
         case ERR_CATEGORY_USER: return "User";
         case ERR_CATEGORY_CONFIG: return "Config";
         case ERR_CATEGORY_VALIDATION: return "Validation";
-        case ERR_CATEGORY_RECOVERY: return "Recovery";
-        case ERR_CATEGORY_FALLBACK: return "Fallback";
+        case ERR_CATEGORY_ERROR_RECOVERY: return "Error Recovery";
+        case ERR_CATEGORY_ERROR_FALLBACK: return "Error Fallback";
         default: return "Unknown";
     }
 }
@@ -301,7 +304,7 @@ void Error_ReportWithContext(error_code_t code, const char *message, const char 
 }
 
 void Error_ReportRecoverable(error_code_t code, const char *message,
-                           const recovery_info_t *recovery,
+                           const error_recovery_info_t *recovery,
                            const char *file, int line, const char *function) {
     Error_ReportWithContext(code, message, NULL, file, line, function);
 
@@ -309,8 +312,8 @@ void Error_ReportRecoverable(error_code_t code, const char *message,
         g_last_error.recoverable = qtrue;
         g_last_error.recovery_hint = "Recovery strategy available";
 
-        // Store recovery info for later use
-        memcpy(&g_recovery_db[code], recovery, sizeof(recovery_info_t));
+    // Store recovery info for later use
+    memcpy(&g_recovery_db[code], recovery, sizeof(error_recovery_info_t));
     }
 }
 
@@ -334,29 +337,29 @@ void Error_Clear(void) {
 // Error Recovery System
 //============================================================================
 
-recovery_strategy_t Error_SuggestRecovery(error_code_t code) {
+error_recovery_strategy_t Error_SuggestRecovery(error_code_t code) {
     // Recovery suggestions based on error type
     switch (code) {
         case ERR_OUT_OF_MEMORY:
-            return RECOVERY_DEGRADE;
+            return ERROR_RECOVERY_DEGRADE;
 
         case ERR_FILE_NOT_FOUND:
         case ERR_FILE_ACCESS_DENIED:
-            return RECOVERY_FALLBACK;
+            return ERROR_RECOVERY_FALLBACK;
 
         case ERR_CONNECTION_LOST:
         case ERR_CONNECTION_FAILED:
-            return RECOVERY_RETRY;
+            return ERROR_RECOVERY_RETRY;
 
         case ERR_SHADER_COMPILE_FAILED:
         case ERR_TEXTURE_LOAD_FAILED:
-            return RECOVERY_FALLBACK;
+            return ERROR_RECOVERY_FALLBACK;
 
         case ERR_GPU_NOT_SUPPORTED:
-            return RECOVERY_FALLBACK;
+            return ERROR_RECOVERY_FALLBACK;
 
         default:
-            return RECOVERY_NONE;
+            return ERROR_RECOVERY_NONE;
     }
 }
 
@@ -365,13 +368,13 @@ qboolean Error_AttemptRecovery(const error_info_t *error) {
         return qfalse;
     }
 
-    recovery_strategy_t strategy = Error_SuggestRecovery(error->code);
-    const recovery_info_t *recovery = &g_recovery_db[error->code];
+    error_recovery_strategy_t strategy = Error_SuggestRecovery(error->code);
+    const error_recovery_info_t *recovery = &g_recovery_db[error->code];
 
     g_error_stats.recovery_attempts++;
 
     switch (strategy) {
-        case RECOVERY_RETRY:
+        case ERROR_RECOVERY_RETRY:
             // Implement retry logic
             if (recovery->max_retries > 0) {
                 Com_Printf("Attempting recovery: retry operation\n");
@@ -381,7 +384,7 @@ qboolean Error_AttemptRecovery(const error_info_t *error) {
             }
             break;
 
-        case RECOVERY_FALLBACK:
+        case ERROR_RECOVERY_FALLBACK:
             if (recovery->fallback_func) {
                 Com_Printf("Attempting recovery: fallback implementation\n");
                 recovery->fallback_func();
@@ -390,13 +393,13 @@ qboolean Error_AttemptRecovery(const error_info_t *error) {
             }
             break;
 
-        case RECOVERY_DEGRADE:
+        case ERROR_RECOVERY_DEGRADE:
             Com_Printf("Attempting recovery: degrading functionality\n");
             // TODO: Implement degradation logic
             g_error_stats.recovery_successes++;
             return qtrue;
 
-        case RECOVERY_RESTART:
+        case ERROR_RECOVERY_RESTART:
             Com_Printf("Recovery requires restart\n");
             return qfalse;
 
@@ -558,7 +561,7 @@ void File_CloseSafe(FILE *fp, const char *context) {
 // Transaction System
 //============================================================================
 
-void Transaction_Begin(transaction_t *tx) {
+void Error_TransactionBegin(error_transaction_t *tx) {
     if (!tx) return;
     // Initialize transaction state
     tx->commit = NULL;
@@ -566,7 +569,7 @@ void Transaction_Begin(transaction_t *tx) {
     tx->data = NULL;
 }
 
-qboolean Transaction_End(transaction_t *tx, qboolean success) {
+qboolean Error_TransactionEnd(error_transaction_t *tx, qboolean success) {
     if (!tx) return qtrue;
 
     if (success && tx->commit) {

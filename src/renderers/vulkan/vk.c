@@ -2961,6 +2961,11 @@ qboolean vk_is_safe_state(void) {
 		return qfalse;
 	}
 
+	// Critical: Check if device is lost - any Vulkan operations will crash the driver
+	if (vk.device_lost) {
+		return qfalse;
+	}
+
 	return qtrue;
 }
 

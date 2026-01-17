@@ -316,6 +316,11 @@ qboolean vk_acquire_next_image(void) {
         return qfalse;
     }
 
+    if (vk.image_available == VK_NULL_HANDLE) {
+        ri.Printf(PRINT_ERROR, "Vulkan: Image available semaphore is NULL, cannot acquire image\n");
+        return VK_ERROR_UNKNOWN; // Return error instead of crashing
+    }
+
 #ifdef USE_VULKAN
     if (VK_IsHeadless()) {
         // In headless mode, do not acquire swapchain images

@@ -43,7 +43,6 @@ Platform-specific crash handling with diagnostics.
 // Forward declaration for Unix signal handler
 #ifndef _WIN32
 static void Crash_UnixSignalHandler(int sig, siginfo_t *info, void *context);
-static void Crash_MallocErrorHook(int errcode, void *ptr);
 #endif
 
 // Global crash info

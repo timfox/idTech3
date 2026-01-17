@@ -53,7 +53,8 @@ static inline qboolean Q_IsValidString(const char *str, size_t max_len) {
 
 // Legacy function implementation for backward compatibility
 float Com_Clamp(float min, float max, float value) {
-    // Enhanced error handling for invalid parameters
+    // Enhanced error handling for invalid parameters (only when error system is available)
+#if !defined(USE_RENDERER_DLOPEN) && !defined(UNIT_TEST) && defined(ERR_REPORT_CTX)
     if (min > max) {
         ERR_REPORT_CTX(ERR_INVALID_PARAMETER, va("Com_Clamp: min > max (%.2f > %.2f)", min, max),
                       "Parameter validation");
@@ -70,6 +71,7 @@ float Com_Clamp(float min, float max, float value) {
         // Recovery: return safe default
         return 0.0f;
     }
+#endif
 
     // Use modern conditional expression with better readability
     return (value < min) ? min : ((value > max) ? max : value);

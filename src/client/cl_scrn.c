@@ -529,11 +529,11 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 	uiFullscreen = (uivm && VM_Call( uivm, 0, UI_IS_FULLSCREEN ));
 
 	if (last_state != cls.state) {
-		Com_Printf("SCR_DrawScreenField: state=%d uivm=%s uiFullscreen=%d catcher=%d\n",
-		           cls.state,
-		           uivm ? "yes" : "no",
-		           uiFullscreen,
-		           Key_GetCatcher());
+		// Com_Printf("SCR_DrawScreenField: state=%d uivm=%s uiFullscreen=%d catcher=%d\n",
+		//            cls.state,
+		//            uivm ? "yes" : "no",
+		//            uiFullscreen,
+		//            Key_GetCatcher());
 		last_state = cls.state;
 	}
 
@@ -541,9 +541,12 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 	// unless they are displaying game renderings
 	if ( uiFullscreen || cls.state < CA_LOADING ) {
 		if ( cls.glconfig.vidWidth * 480 > cls.glconfig.vidHeight * 640 ) {
+			Com_Printf("DEBUG: About to draw wide aspect bars\n");
 			// draw vertical bars on sides for legacy mods
 			const int w = (cls.glconfig.vidWidth - ((cls.glconfig.vidHeight * 640) / 480)) /2;
+			Com_Printf("DEBUG: About to call re.SetColor\n");
 			re.SetColor( g_color_table[ ColorIndex( COLOR_BLACK ) ] );
+			Com_Printf("DEBUG: About to call re.DrawStretchPic\n");
 			re.DrawStretchPic( 0, 0, w, cls.glconfig.vidHeight, 0, 0, 0, 0, cls.whiteShader );
 			re.DrawStretchPic( cls.glconfig.vidWidth - w, 0, w, cls.glconfig.vidHeight, 0, 0, 0, 0, cls.whiteShader );
 			re.SetColor( NULL );
@@ -606,6 +609,8 @@ static void SCR_DrawScreenField( stereoFrame_t stereoFrame ) {
 
 	// the menu draws next
 	if ( Key_GetCatcher( ) & KEYCATCH_UI && uivm ) {
+		// Skip UI rendering during device recovery to prevent crashes
+		// TODO: Check Vulkan device state here
 		VM_Call( uivm, 1, UI_REFRESH, cls.realtime );
 	}
 

@@ -19,6 +19,7 @@ allocator_t *g_allocators[ALLOCATOR_COUNT];
 //============================================================================
 
 static void *PoolAlloc_Alloc(allocator_t *alloc, size_t size, const char *tag) {
+    (void)tag; // Unused parameter - reserved for future debugging/categorization
     pool_allocator_data_t *data = (pool_allocator_data_t *)alloc->private_data;
 
     if (size > data->block_size) {
@@ -132,6 +133,7 @@ allocator_t *Alloc_CreatePoolAllocator(size_t block_size, size_t blocks_per_chun
 //============================================================================
 
 static void *ArenaAlloc_Alloc(allocator_t *alloc, size_t size, const char *tag) {
+    (void)tag; // Unused parameter - reserved for future debugging/categorization
     arena_allocator_data_t *data = (arena_allocator_data_t *)alloc->private_data;
 
     // Align to pointer size
@@ -214,6 +216,7 @@ allocator_t *Alloc_CreateArenaAllocator(size_t size, qboolean auto_reset, const 
 //============================================================================
 
 static void *SlabAlloc_Alloc(allocator_t *alloc, size_t size, const char *tag) {
+    (void)tag; // Unused parameter - reserved for future debugging/categorization
     slab_allocator_data_t *data = (slab_allocator_data_t *)alloc->private_data;
 
     if (size != data->object_size) {

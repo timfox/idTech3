@@ -50,8 +50,8 @@ typedef enum {
     ERR_CATEGORY_VALIDATION     = 0x3200,
 
     // Recovery Categories (0xF000-0xFFFF)
-    ERR_CATEGORY_RECOVERY       = 0xF000,
-    ERR_CATEGORY_FALLBACK       = 0xF100,
+    ERR_CATEGORY_ERROR_RECOVERY = 0xF000,
+    ERR_CATEGORY_ERROR_FALLBACK = 0xF100,
 } error_category_t;
 
 //============================================================================
@@ -133,8 +133,8 @@ typedef enum {
     ERR_PERMISSION_DENIED       = ERR_CATEGORY_USER + 2,
 
     // Recovery Errors (ERR_CATEGORY_RECOVERY)
-    ERR_RECOVERY_FAILED         = ERR_CATEGORY_RECOVERY + 1,
-    ERR_FALLBACK_FAILED         = ERR_CATEGORY_RECOVERY + 2,
+    ERR_RECOVERY_FAILED         = ERR_CATEGORY_ERROR_RECOVERY + 1,
+    ERR_FALLBACK_FAILED         = ERR_CATEGORY_ERROR_FALLBACK + 2,
 } error_code_t;
 
 //============================================================================
@@ -190,21 +190,21 @@ typedef struct {
 //============================================================================
 
 typedef enum {
-    RECOVERY_NONE,              // No recovery possible
-    RECOVERY_RETRY,             // Retry the operation
-    RECOVERY_FALLBACK,          // Use fallback implementation
-    RECOVERY_DEGRADE,           // Degrade functionality
-    RECOVERY_RESTART,           // Restart subsystem
-    RECOVERY_TERMINATE          // Terminate gracefully
-} recovery_strategy_t;
+    ERROR_RECOVERY_NONE,        // No recovery possible
+    ERROR_RECOVERY_RETRY,       // Retry the operation
+    ERROR_RECOVERY_FALLBACK,    // Use fallback implementation
+    ERROR_RECOVERY_DEGRADE,     // Degrade functionality
+    ERROR_RECOVERY_RESTART,     // Restart subsystem
+    ERROR_RECOVERY_TERMINATE    // Terminate gracefully
+} error_recovery_strategy_t;
 
 typedef struct {
-    recovery_strategy_t strategy;
+    error_recovery_strategy_t strategy;
     int max_retries;
     int retry_delay_ms;
     void (*fallback_func)(void);
     void (*cleanup_func)(void);
-} recovery_info_t;
+} error_recovery_info_t;
 
 //============================================================================
 // Exception Safety Patterns (C Equivalent)
@@ -233,12 +233,21 @@ typedef struct {
 // Error Handling Macros
 //============================================================================
 
-// Basic error reporting
+// Basic error reporting (conditional for different build types)
+#if !defined(USE_RENDERER_DLOPEN) && !defined(UNIT_TEST)
 #define ERR_REPORT(code, msg) \
     Error_Report(code, msg, __FILE__, __LINE__, __func__)
 
 #define ERR_REPORT_CTX(code, msg, ctx) \
     Error_ReportWithContext(code, msg, ctx, __FILE__, __LINE__, __func__)
+#else
+// Stub versions for renderer and test builds
+#define ERR_REPORT(code, msg) \
+    do { /* Error reporting disabled */ } while(0)
+
+#define ERR_REPORT_CTX(code, msg, ctx) \
+    do { /* Error reporting disabled */ } while(0)
+#endif
 
 // Error with recovery
 #define ERR_RECOVERABLE(code, msg, recovery) \
@@ -272,7 +281,7 @@ void Error_Report(error_code_t code, const char *message,
 void Error_ReportWithContext(error_code_t code, const char *message, const char *context,
                             const char *file, int line, const char *function);
 void Error_ReportRecoverable(error_code_t code, const char *message,
-                           const recovery_info_t *recovery,
+                           const error_recovery_info_t *recovery,
                            const char *file, int line, const char *function);
 
 // Error querying and handling
@@ -282,7 +291,7 @@ void Error_Clear(void);
 
 // Error recovery
 qboolean Error_AttemptRecovery(const error_info_t *error);
-recovery_strategy_t Error_SuggestRecovery(error_code_t code);
+error_recovery_strategy_t Error_SuggestRecovery(error_code_t code);
 
 // Error formatting
 const char *Error_CodeToString(error_code_t code);
@@ -337,10 +346,10 @@ typedef struct {
     void (*commit)(void *data);
     void (*rollback)(void *data);
     void *data;
-} transaction_t;
+} error_transaction_t;
 
-void Transaction_Begin(transaction_t *tx);
-qboolean Transaction_End(transaction_t *tx, qboolean success);
+void Error_TransactionBegin(error_transaction_t *tx);
+qboolean Error_TransactionEnd(error_transaction_t *tx, qboolean success);
 
 //============================================================================
 // Validation Framework

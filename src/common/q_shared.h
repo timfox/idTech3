@@ -817,9 +817,14 @@ static_assert(sizeof(vec3_t) == 12, "vec3_t must be 12 bytes for network compati
 // AAA Quality Error Handling Integration
 //============================================================================
 
+// Include error system only for main engine builds
+#if !defined(USE_RENDERER_DLOPEN) && !defined(UNIT_TEST)
 #include "q_error_system.h"
+#endif
 
 // Enhanced error macros that integrate with the comprehensive error system
+// Only available when error system is included
+#ifdef ERR_REPORT // This is defined in q_error_system.h
 #define ERR_CHECK(condition, code, msg) \
     do { \
         if (!(condition)) { \
@@ -842,6 +847,29 @@ static_assert(sizeof(vec3_t) == 12, "vec3_t must be 12 bytes for network compati
             goto label; \
         } \
     } while(0)
+#else
+// Stub versions when error system is not available
+#define ERR_CHECK(condition, code, msg) \
+    do { \
+        if (!(condition)) { \
+            /* Error reporting disabled */ \
+        } \
+    } while(0)
+
+#define ERR_CHECK_RETURN(condition, code, msg, retval) \
+    do { \
+        if (!(condition)) { \
+            return (retval); \
+        } \
+    } while(0)
+
+#define ERR_CHECK_GOTO(condition, code, msg, label) \
+    do { \
+        if (!(condition)) { \
+            goto label; \
+        } \
+    } while(0)
+#endif
 
 // Resource allocation with error handling
 #define SAFE_MALLOC(size, context) \
