@@ -224,6 +224,13 @@ static void DrawNormals( const shaderCommands_t *input ) {
 	GL_Bind( tr.whiteImage );
 
 	tess.numIndexes = 0;
+
+	// Bounds check: ensure we don't exceed maximum vertex count when doubling
+	if (tess.numVertexes * 2 > SHADER_MAX_VERTEXES) {
+		Com_Printf("R_DebugNormals: too many vertices (%d), skipping debug normals\n", tess.numVertexes);
+		return;
+	}
+
 	for ( i = 0; i < tess.numVertexes; i++ ) {
 		VectorMA( tess.xyz[i], 2.0, tess.normal[i], tess.xyz[i + tess.numVertexes] );
 		tess.indexes[  tess.numIndexes + 0 ] = i;

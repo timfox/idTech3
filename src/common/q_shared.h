@@ -815,6 +815,13 @@ static_assert(sizeof(vec3_t) == 12, "vec3_t must be 12 bytes for network compati
 static_assert(sizeof(color4ub_t) == 4, "color4ub_t must be 4 bytes");
 static_assert(sizeof(floatint_t) == 4, "floatint_t must be 4 bytes for type punning");
 
+// Memory pool validation
+#define TEMP_BUFFER_POOL_SIZE 8
+#define TEMP_BUFFER_SIZE 1024
+static_assert(TEMP_BUFFER_POOL_SIZE > 0, "TEMP_BUFFER_POOL_SIZE must be greater than 0");
+static_assert(TEMP_BUFFER_SIZE >= 256, "TEMP_BUFFER_SIZE should be at least 256 bytes");
+static_assert(TEMP_BUFFER_SIZE <= 4096, "TEMP_BUFFER_SIZE should not exceed 4096 bytes");
+
 typedef	int	fixed4_t;
 typedef	int	fixed8_t;
 typedef	int	fixed16_t;
@@ -1608,6 +1615,21 @@ typedef enum {
 	LOG_LEVEL_COUNT
 } log_level_t;
 
+// Performance profiling
+typedef struct {
+	const char *name;
+	int start_time;
+	int total_calls;
+	int total_time;
+	int min_time;
+	int max_time;
+	int avg_time;
+} perf_counter_t;
+
+#define MAX_PERF_COUNTERS 64
+static_assert(MAX_PERF_COUNTERS > 0, "MAX_PERF_COUNTERS must be greater than 0");
+static_assert(MAX_PERF_COUNTERS <= 256, "MAX_PERF_COUNTERS should not exceed reasonable limits");
+
 typedef enum {
 	LOG_CATEGORY_GENERAL,
 	LOG_CATEGORY_RENDERER,
@@ -1625,6 +1647,10 @@ typedef enum {
 	LOG_CATEGORY_CLIENT,
 	LOG_CATEGORY_COUNT
 } log_category_t;
+
+// Input validation constants
+static_assert(LOG_CATEGORY_COUNT > 0, "LOG_CATEGORY_COUNT must be greater than 0");
+static_assert(LOG_LEVEL_COUNT > 0, "LOG_LEVEL_COUNT must be greater than 0");
 
 void Com_Log(log_level_t level, log_category_t category, const char *fmt, ...) FORMAT_PRINTF(3, 4);
 void Com_LogPerformance(const char *operation, int duration_ms);
@@ -2328,5 +2354,131 @@ typedef enum _flag_status {
 
 #define LERP( a, b, w ) ( ( a ) * ( 1.0f - ( w ) ) + ( b ) * ( w ) )
 #define LUMA( red, green, blue ) ( 0.2126f * ( red ) + 0.7152f * ( green ) + 0.0722f * ( blue ) )
+
+//============================================================================
+// Utility Functions for Code Refactoring
+//============================================================================
+
+// Common validation helpers for better code reuse
+static inline __attribute__((const)) qboolean VALID_HANDLE(int handle, int max_handles) {
+    return (handle >= 0 && handle < max_handles);
+}
+
+static inline __attribute__((const)) qboolean VALID_CLIENT(int client, int max_clients) {
+    return (client >= 0 && client < max_clients);
+}
+
+static inline __attribute__((const)) qboolean VALID_ENTITY(int entity, int max_entities) {
+    return (entity >= 0 && entity < max_entities);
+}
+
+// Safe pointer validation with null checks
+static inline __attribute__((pure)) qboolean VALID_PTR(const void *ptr) {
+    return (ptr != NULL);
+}
+
+// Range validation for numeric values
+static inline __attribute__((const)) qboolean IN_RANGE(int value, int min_val, int max_val) {
+    return (value >= min_val && value <= max_val);
+}
+
+static inline __attribute__((const)) qboolean IN_RANGE_FLOAT(float value, float min_val, float max_val) {
+    return (value >= min_val && value <= max_val);
+}
+
+// String validation helpers
+static inline __attribute__((pure)) qboolean VALID_STRING(const char *str) {
+    return (str != NULL && str[0] != '\0');
+}
+
+static inline __attribute__((pure)) qboolean STRING_LENGTH_VALID(const char *str, size_t max_len) {
+    return (str != NULL && strlen(str) < max_len);
+}
+
+//============================================================================
+// Error Handling Macros for Consistent Error Checking
+//============================================================================
+
+// Macro for consistent null pointer checking with error logging
+#define CHECK_NULL(ptr, category, level, msg) \
+    do { \
+        if (!(ptr)) { \
+            Com_LogPrintf((category), (level), "NULL pointer: %s", (msg)); \
+            return; \
+        } \
+    } while(0)
+
+// Macro for bounds checking with error logging
+#define CHECK_BOUNDS(value, min_val, max_val, category, level, msg) \
+    do { \
+        if ((value) < (min_val) || (value) > (max_val)) { \
+            Com_LogPrintf((category), (level), "Bounds check failed: %s (value=%d, range=[%d,%d])", \
+                         (msg), (value), (min_val), (max_val)); \
+            return; \
+        } \
+    } while(0)
+
+// Macro for handle validation (returns false on error for boolean functions)
+#define VALIDATE_HANDLE_BOOL(handle, max_handles, category, level, func_name) \
+    do { \
+        if (!VALID_HANDLE((handle), (max_handles))) { \
+            Com_LogPrintf((category), (level), "%s: invalid handle %d (max=%d)", \
+                         (func_name), (handle), (max_handles)); \
+            return qfalse; \
+        } \
+    } while(0)
+
+// Macro for handle validation (void return for void functions)
+#define VALIDATE_HANDLE_VOID(handle, max_handles, category, level, func_name) \
+    do { \
+        if (!VALID_HANDLE((handle), (max_handles))) { \
+            Com_LogPrintf((category), (level), "%s: invalid handle %d (max=%d)", \
+                         (func_name), (handle), (max_handles)); \
+            return; \
+        } \
+    } while(0)
+
+// Macro for client validation
+#define VALIDATE_CLIENT(client, max_clients, category, level, func_name) \
+    do { \
+        if (!VALID_CLIENT((client), (max_clients))) { \
+            Com_LogPrintf((category), (level), "%s: invalid client %d (max=%d)", \
+                         (func_name), (client), (max_clients)); \
+            return; \
+        } \
+    } while(0)
+
+//============================================================================
+// Convenience Functions for Common Operations
+//============================================================================
+
+// Safe memory operations with bounds checking
+static inline qboolean SAFE_MEMCPY(void *dest, const void *src, size_t size, size_t dest_size) {
+    if (!dest || !src || size > dest_size) {
+        return qfalse;
+    }
+    memcpy(dest, src, size);
+    return qtrue;
+}
+
+static inline qboolean SAFE_STRCPY(char *dest, const char *src, size_t dest_size) {
+    if (!dest || !src || dest_size == 0) {
+        return qfalse;
+    }
+
+    size_t src_len = strlen(src);
+    if (src_len >= dest_size) {
+        Q_strncpyz(dest, src, dest_size);
+        return qfalse; // Truncated
+    } else {
+        strcpy(dest, src);
+        return qtrue;
+    }
+}
+
+// Time utilities
+static inline double TIME_DIFF(int start_time, int end_time) {
+    return (double)(end_time - start_time) / 1000.0;
+}
 
 #endif	// __Q_SHARED_CORE_H__

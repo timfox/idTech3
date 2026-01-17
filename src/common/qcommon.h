@@ -1222,6 +1222,24 @@ void		Com_EndRedirect( void );
 void 		QDECL Com_Printf( const char *fmt, ... ) __attribute__ ((format (printf, 1, 2)));
 
 void 		QDECL Com_DPrintf( const char *fmt, ... ) __attribute__ ((format (printf, 1, 2)));
+void 		QDECL Com_LogPrintf( log_category_t category, log_level_t level, const char *fmt, ... ) __attribute__ ((format (printf, 3, 4)));
+
+// Performance profiling
+void 		Perf_BeginCounter( const char *name );
+void 		Perf_EndCounter( const char *name );
+void 		Perf_PrintReport( void );
+void 		Perf_ResetCounters( void );
+
+// Convenience macros for performance profiling
+#define PERF_BEGIN(name) Perf_BeginCounter(name)
+#define PERF_END(name) Perf_EndCounter(name)
+#define PERF_REPORT() Perf_PrintReport()
+#define PERF_RESET() Perf_ResetCounters()
+
+// Mark performance functions as not affecting program correctness
+#define PERF_FUNCTION __attribute__((pure))
+#define PERF_FUNCTION_END __attribute__((nothrow))
+
 void 		Com_Quit_f( void );
 void 		Com_Help_f( void );
 void 		Com_About_f( void );

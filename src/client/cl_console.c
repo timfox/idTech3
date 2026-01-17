@@ -30,6 +30,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define  CON_TEXTSIZE   65536
 
+// Function prototypes
+void Perf_Report_f( void );
+void Perf_Reset_f( void );
+
 int bigchar_width;
 int bigchar_height;
 int smallchar_width;
@@ -523,6 +527,10 @@ void Con_Init( void )
 	Cmd_SetCommandCompletionFunc( "condump", Cmd_CompleteTxtName );
 	Cmd_AddCommand( "toggleconsole", Con_ToggleConsole_f );
 	Cmd_AddCommand( "messagemode", Con_MessageMode_f );
+
+	// Performance profiling commands
+	Cmd_AddCommand( "perf_report", Perf_Report_f );
+	Cmd_AddCommand( "perf_reset", Perf_Reset_f );
 	Cmd_AddCommand( "messagemode2", Con_MessageMode2_f );
 	Cmd_AddCommand( "messagemode3", Con_MessageMode3_f );
 	Cmd_AddCommand( "messagemode4", Con_MessageMode4_f );
@@ -543,8 +551,33 @@ void Con_Shutdown( void )
 	Cmd_RemoveCommand( "messagemode2" );
 	Cmd_RemoveCommand( "messagemode3" );
 	Cmd_RemoveCommand( "messagemode4" );
+	Cmd_RemoveCommand( "perf_report" );
+	Cmd_RemoveCommand( "perf_reset" );
 }
 
+
+/*
+==================
+Perf_Report_f
+
+Display performance profiling report
+==================
+*/
+void Perf_Report_f( void ) {
+	Perf_PrintReport();
+}
+
+/*
+==================
+Perf_Reset_f
+
+Reset performance profiling counters
+==================
+*/
+void Perf_Reset_f( void ) {
+	Perf_ResetCounters();
+	Com_Printf("Performance counters reset\n");
+}
 
 /*
 ===============

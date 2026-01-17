@@ -49,6 +49,21 @@ cvar_t	*cl_noprint;
 cvar_t	*cl_debugMove;
 cvar_t	*cl_motd;
 
+
+// Memory optimization: static buffer pool for temporary operations
+#define TEMP_BUFFER_POOL_SIZE 8
+#define TEMP_BUFFER_SIZE 1024
+static char temp_buffer_pool[TEMP_BUFFER_POOL_SIZE][TEMP_BUFFER_SIZE];
+static int temp_buffer_index = 0;
+
+// Get a temporary buffer from the pool (rotates through available buffers)
+static char *CL_GetTempBuffer(void) {
+    char *buffer = temp_buffer_pool[temp_buffer_index];
+    temp_buffer_index = (temp_buffer_index + 1) % TEMP_BUFFER_POOL_SIZE;
+    buffer[0] = '\0'; // Ensure null termination
+    return buffer;
+}
+
 // Input validation context
 static input_validation_context_t input_validation_ctx;
 
@@ -265,7 +280,9 @@ void CL_AddReliableCommand( const char *cmd, qboolean isDisconnectCmd ) {
 
 		// Check rate limiting
 		if (!Input_CheckRateLimit(&input_validation_ctx, Sys_Milliseconds())) {
-			Com_DPrintf("Command rate limit exceeded\n");
+			atomic_fetch_add(&input_validation_ctx.stats.rate_limit_hits, 1);
+			Com_LogPrintf(LOG_CATEGORY_NETWORK, LOG_LEVEL_WARNING,
+				"Input rate limit exceeded for command processing");
 			return;
 		}
 	}
@@ -1675,7 +1692,11 @@ static void CL_Reconnect_f( void ) {
 	if ( cl_reconnectArgs->string[0] == '\0' || Q_stricmp( cl_reconnectArgs->string, "localhost" ) == 0 )
 		return;
 	Cvar_Set( "ui_singlePlayerActive", "0" );
-	Cbuf_AddText( va( "connect %s\n", cl_reconnectArgs->string ) );
+		{
+			char *temp = CL_GetTempBuffer();
+			Com_sprintf(temp, TEMP_BUFFER_SIZE, "connect %s\n", cl_reconnectArgs->string);
+			Cbuf_AddText(temp);
+		}
 }
 
 
@@ -1716,6 +1737,18 @@ static void CL_Connect_f( void ) {
 			Com_Printf( S_COLOR_YELLOW "warning: only -4 as address type understood.\n" );
 #endif
 		server = Cmd_Argv(2);
+	}
+
+	// Validate server name input
+	if (!server || !Input_BoundsCheckString(server, sizeof(buffer))) {
+		Com_Printf( "connect: invalid or too long server name\n" );
+		return;
+	}
+
+	// Check for injection attempts and path traversal in server name
+	if (Input_DetectInjection(server) || Input_DetectPathTraversal(server)) {
+		Com_Printf( "connect: invalid characters in server name\n" );
+		return;
 	}
 
 	Q_strncpyz( buffer, server, sizeof( buffer ) );

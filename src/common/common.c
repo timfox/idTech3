@@ -192,6 +192,150 @@ void QDECL Com_DPrintf( const char *fmt, ... ) {
 
 /*
 ==================
+Com_LogPrintf
+
+Enhanced logging with categories and severity levels
+==================
+*/
+static const char *log_category_names[LOG_CATEGORY_COUNT] = {
+    "GENERAL",
+    "RENDERER",
+    "FILESYSTEM",
+    "NETWORK",
+    "GAME",
+    "SOUND",
+    "PERFORMANCE",
+    "INPUT",
+    "PHYSICS",
+    "AI",
+    "SCRIPT",
+    "MEMORY",
+    "SERVER",
+    "CLIENT"
+};
+
+static const char *log_level_names[LOG_LEVEL_COUNT] = {
+    "DEBUG",
+    "INFO",
+    "WARNING",
+    "ERROR",
+    "CRITICAL"
+};
+
+void QDECL Com_LogPrintf( log_category_t category, log_level_t level, const char *fmt, ... ) {
+    if (level < LOG_LEVEL_DEBUG || level >= LOG_LEVEL_COUNT) return;
+    if (category < LOG_CATEGORY_GENERAL || category >= LOG_CATEGORY_COUNT) return;
+
+    // Only show debug messages if developer mode is enabled
+    if (level == LOG_LEVEL_DEBUG && (!com_developer || !com_developer->integer)) return;
+
+    // Format the log message with timestamp and category
+    static char log_buffer[4096];
+    time_t now = time(NULL);
+    struct tm *tm_info = localtime(&now);
+
+    int prefix_len = Com_sprintf(log_buffer, sizeof(log_buffer), "[%02d:%02d:%02d] %s/%s: ",
+        tm_info->tm_hour, tm_info->tm_min, tm_info->tm_sec,
+        log_category_names[category], log_level_names[level]);
+
+    va_list argptr;
+    va_start( argptr, fmt );
+    Q_vsnprintf( log_buffer + prefix_len, sizeof(log_buffer) - prefix_len, fmt, argptr );
+    va_end( argptr );
+
+    // Output to console and crash handler
+    Crash_LogMessage( log_buffer );
+    fputs( log_buffer, stdout );
+    fflush( stdout );
+}
+
+/*
+==================
+Performance Profiling System
+==================
+*/
+static perf_counter_t perf_counters[MAX_PERF_COUNTERS];
+static int num_perf_counters = 0;
+
+void Perf_BeginCounter( const char *name ) {
+    if (!name || num_perf_counters >= MAX_PERF_COUNTERS) return;
+
+    // Find existing counter or create new one
+    for (int i = 0; i < num_perf_counters; i++) {
+        if (Q_stricmp(perf_counters[i].name, name) == 0) {
+            perf_counters[i].start_time = Sys_Milliseconds();
+            return;
+        }
+    }
+
+    // Create new counter
+    if (num_perf_counters < MAX_PERF_COUNTERS) {
+        perf_counters[num_perf_counters].name = name;
+        perf_counters[num_perf_counters].start_time = Sys_Milliseconds();
+        perf_counters[num_perf_counters].total_calls = 0;
+        perf_counters[num_perf_counters].total_time = 0;
+        perf_counters[num_perf_counters].min_time = INT_MAX;
+        perf_counters[num_perf_counters].max_time = 0;
+        perf_counters[num_perf_counters].avg_time = 0;
+        num_perf_counters++;
+    }
+}
+
+void Perf_EndCounter( const char *name ) {
+    if (!name) return;
+
+    int current_time = Sys_Milliseconds();
+
+    for (int i = 0; i < num_perf_counters; i++) {
+        if (Q_stricmp(perf_counters[i].name, name) == 0) {
+            int elapsed = current_time - perf_counters[i].start_time;
+            perf_counters[i].total_calls++;
+            perf_counters[i].total_time += elapsed;
+
+            if (elapsed < perf_counters[i].min_time) {
+                perf_counters[i].min_time = elapsed;
+            }
+            if (elapsed > perf_counters[i].max_time) {
+                perf_counters[i].max_time = elapsed;
+            }
+
+            if (perf_counters[i].total_calls > 0) {
+                perf_counters[i].avg_time = perf_counters[i].total_time / perf_counters[i].total_calls;
+            }
+            return;
+        }
+    }
+}
+
+void Perf_PrintReport( void ) {
+    Com_Printf("\n=== Performance Report ===\n");
+    Com_Printf("%-30s %-8s %-8s %-8s %-8s %-8s\n",
+        "Function", "Calls", "Total", "Avg", "Min", "Max");
+    Com_Printf("%-30s %-8s %-8s %-8s %-8s %-8s\n",
+        "--------", "-----", "-----", "-----", "-----", "-----");
+
+    for (int i = 0; i < num_perf_counters; i++) {
+        perf_counter_t *counter = &perf_counters[i];
+        if (counter->total_calls > 0) {
+            Com_Printf("%-30s %-8d %-8d %-8d %-8d %-8d\n",
+                counter->name,
+                counter->total_calls,
+                counter->total_time,
+                counter->avg_time,
+                counter->min_time == INT_MAX ? 0 : counter->min_time,
+                counter->max_time);
+        }
+    }
+    Com_Printf("========================\n\n");
+}
+
+void Perf_ResetCounters( void ) {
+    Com_Memset(perf_counters, 0, sizeof(perf_counters));
+    num_perf_counters = 0;
+}
+
+/*
+==================
 Com_Error
 ==================
 */

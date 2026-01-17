@@ -3,15 +3,6 @@
 #include "client.h"
 #include "cl_cin_codec.h"
 #include <theora/theora.h>
-// region agent log
-static void agent_log(const char* hypothesisId, const char* location, const char* message) {
-  FILE* f = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
-  if (!f) return;
-  long long ts = (long long)time(NULL) * 1000;
-  fprintf(f, "{\"sessionId\":\"debug-session\",\"runId\":\"runtime-test\",\"hypothesisId\":\"%s\",\"location\":\"%s\",\"message\":\"%s\",\"timestamp\":%lld}\n", hypothesisId, location, message, ts);
-  fclose(f);
-}
-// endregion
 #include <theora/theoradec.h>
 #include <ogg/ogg.h>
 
@@ -77,7 +68,34 @@ static size_t Theora_ReadOggPage(int handle, ogg_page *page) {
 	return ret;
 }
 
-// Convert YUV to RGB
+/*
+==================
+Theora_YUVtoRGB
+
+Converts YUV 4:2:0 video frames to RGB format for display.
+
+The function performs color space conversion from the compressed YUV format
+used by Theora video codec to RGB format required for rendering. It handles
+4:2:0 subsampling where chroma components (U/V) are half the resolution of
+luma (Y) in both dimensions.
+
+Parameters:
+- ycbcr: Theora YUV buffer containing Y, U, V planes with their respective strides
+- rgb: Output buffer for RGB data (must be pre-allocated, width*height*4 bytes)
+- width: Frame width in pixels
+- height: Frame height in pixels
+
+Security Notes:
+- Performs bounds checking to prevent buffer overflows
+- Validates chroma plane access to ensure safe memory access
+- Handles edge cases where video dimensions aren't evenly divisible by 2
+
+Performance Notes:
+- Processes pixels in scanline order for optimal cache performance
+- Pre-calculates chroma dimensions to avoid repeated computations
+- Uses integer arithmetic for color conversion efficiency
+==================
+*/
 static void Theora_YUVtoRGB(th_ycbcr_buffer ycbcr, byte *rgb, int width, int height) {
 	int x, y;
 	int Y, Cb, Cr;
@@ -89,38 +107,48 @@ static void Theora_YUVtoRGB(th_ycbcr_buffer ycbcr, byte *rgb, int width, int hei
 	int u_stride = ycbcr[1].stride;
 	int v_stride = ycbcr[2].stride;
 
-	// Debug output for strides (only once per video)
+	// Pre-calculate chroma dimensions for efficiency
+	int chroma_width = (width + 1) / 2;
+	int chroma_height = (height + 1) / 2;
+
+	// Debug output for strides (only first few frames)
 	static int debug_count = 0;
 	if (debug_count < 3) {
-		Com_Printf("Theora_YUVtoRGB: width=%d height=%d y_stride=%d u_stride=%d v_stride=%d\n",
-			width, height, y_stride, u_stride, v_stride);
+		Com_DPrintf("Theora_YUVtoRGB: %dx%d -> %dx%d chroma, strides Y:%d U:%d V:%d\n",
+			width, height, chroma_width, chroma_height, y_stride, u_stride, v_stride);
 		debug_count++;
 	}
 
 	for (y = 0; y < height; y++) {
 		for (x = 0; x < width; x++) {
-			// Bounds checking for Y plane
+			// Bounds checking for Y plane - ensure we don't exceed the valid data width
 			int y_idx = y * y_stride + x;
-			if (y_idx < 0 || y_idx >= ycbcr[0].stride * height) {
-				Com_Printf("Theora_YUVtoRGB: Y plane bounds error y=%d x=%d idx=%d\n", y, x, y_idx);
+			if (y_idx < 0 || x >= width || y_idx >= y_stride * height) {
+				Com_Printf("Theora_YUVtoRGB: Y plane bounds error y=%d x=%d idx=%d (max=%d)\n",
+					y, x, y_idx, y_stride * height);
 				Y = 0;
 			} else {
 				Y = y_plane[y_idx];
 			}
 
 			// Bounds checking for U/V planes (4:2:0 subsampling)
-			int u_idx = (y / 2) * u_stride + (x / 2);
-			int v_idx = (y / 2) * v_stride + (x / 2);
+			int chroma_x = x / 2;
+			int chroma_y = y / 2;
+			int u_idx = chroma_y * u_stride + chroma_x;
+			int v_idx = chroma_y * v_stride + chroma_x;
 
-			if (u_idx < 0 || u_idx >= ycbcr[1].stride * (height / 2)) {
-				Com_Printf("Theora_YUVtoRGB: U plane bounds error y=%d x=%d idx=%d\n", y, x, u_idx);
+			// Ensure chroma coordinates are within valid range
+			if (chroma_x >= chroma_width || chroma_y >= chroma_height ||
+				u_idx < 0 || u_idx >= u_stride * chroma_height) {
+				// Skip invalid chroma access - use default values
 				Cb = 0;
 			} else {
 				Cb = u_plane[u_idx] - 128;
 			}
 
-			if (v_idx < 0 || v_idx >= ycbcr[2].stride * (height / 2)) {
-				Com_Printf("Theora_YUVtoRGB: V plane bounds error y=%d x=%d idx=%d\n", y, x, v_idx);
+			if (chroma_x >= chroma_width || chroma_y >= chroma_height ||
+				v_idx < 0 || v_idx >= v_stride * chroma_height) {
+				// Skip invalid chroma access - use default values
 				Cr = 0;
 			} else {
 				Cr = v_plane[v_idx] - 128;
@@ -285,8 +313,8 @@ Clean up Theora decoder
 */
 void Theora_Shutdown(int handle) {
 	theora_data_t *data;
-	
-	if (handle < 0 || handle >= MAX_VIDEO_HANDLES) return;
+
+	if (!VALID_HANDLE(handle, MAX_VIDEO_HANDLES)) return;
 	
 	data = (theora_data_t *)cinTable[handle].codecData;
 	if (!data) return;
@@ -321,6 +349,8 @@ Decode and display next frame
 ==================
 */
 e_status Theora_Run(int handle) {
+	Perf_BeginCounter("Theora_Run");
+
 	theora_data_t *data;
 	ogg_page ogg_page;
 	ogg_packet ogg_packet;
@@ -331,8 +361,9 @@ e_status Theora_Run(int handle) {
 
 	Com_Memset(&ycbcr, 0, sizeof(th_ycbcr_buffer));
 
-	if (handle < 0 || handle >= MAX_VIDEO_HANDLES) {
-		Com_Printf("Theora_Run: invalid handle %d\n", handle);
+	if (!VALID_HANDLE(handle, MAX_VIDEO_HANDLES)) {
+		Com_LogPrintf(LOG_CATEGORY_GENERAL, LOG_LEVEL_ERROR,
+			"Theora_Run: invalid handle %d", handle);
 		return FMV_EOF;
 	}
 
@@ -416,7 +447,8 @@ e_status Theora_Run(int handle) {
 			// Otherwise, not a video packet, continue
 		}
 	}
-	
+
+	Perf_EndCounter("Theora_Run");
 	return cinTable[handle].status;
 }
 
@@ -429,8 +461,8 @@ Reset decoder to beginning
 */
 void Theora_Reset(int handle) {
 	theora_data_t *data;
-	
-	if (handle < 0 || handle >= MAX_VIDEO_HANDLES) return;
+
+	if (!VALID_HANDLE(handle, MAX_VIDEO_HANDLES)) return;
 	
 	data = (theora_data_t *)cinTable[handle].codecData;
 	if (!data) return;

@@ -23,6 +23,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "server.h"
 #include "../client/client.h"
 #include "../common/q_memory_safety.h"
+#include "../common/input_validation.h"
 static qboolean CM_CheckAssetDependencies( const char *mapname )
 {
     // Preflight: verify map asset availability before loading
@@ -216,7 +217,7 @@ SV_SetUserinfo
 ===============
 */
 void SV_SetUserinfo( int index, const char *val ) {
-	if ( index < 0 || index >= sv.maxclients ) {
+	if (!VALID_CLIENT(index, sv.maxclients)) {
 		Com_Error( ERR_DROP, "%s: bad index %i", __func__, index );
 	}
 
@@ -225,7 +226,26 @@ void SV_SetUserinfo( int index, const char *val ) {
 	}
 
 	Q_strncpyz( svs.clients[index].userinfo, val, sizeof( svs.clients[ index ].userinfo ) );
-	Q_strncpyz( svs.clients[index].name, Info_ValueForKey( val, "name" ), sizeof(svs.clients[index].name) );
+
+	// Validate and sanitize player name
+	const char *raw_name = Info_ValueForKey( val, "name" );
+	char sanitized_name[MAX_NAME_LENGTH];
+
+	if (!Input_BoundsCheckString(raw_name, MAX_NAME_LENGTH)) {
+		Com_Printf("SV_SetUserinfo: player name too long from client %d, truncating\n", index);
+		Q_strncpyz(sanitized_name, raw_name, sizeof(sanitized_name));
+	} else {
+		Input_SanitizePlayerName(sanitized_name, sizeof(sanitized_name), raw_name);
+	}
+
+	// Validate for injection attempts
+	if (Input_DetectInjection(sanitized_name)) {
+		Com_Printf("SV_SetUserinfo: injection attempt detected in player name from client %d, sanitizing\n", index);
+		// Remove potentially dangerous characters
+		Input_RemoveControlCharacters(sanitized_name);
+	}
+
+	Q_strncpyz( svs.clients[index].name, sanitized_name, sizeof(svs.clients[index].name) );
 }
 
 
@@ -1074,6 +1094,11 @@ void SV_Shutdown( const char *finalmsg ) {
 	SV_RemoveOperatorCommands();
 	SV_MasterShutdown();
 	SV_ShutdownGameProgs();
+
+	// Shutdown input validation
+	extern input_validation_context_t server_input_validation_ctx;
+	Input_ValidationShutdown(&server_input_validation_ctx);
+
 	SV_InitChallenger();
 
 	// free current level
@@ -1115,6 +1140,10 @@ void SV_Shutdown( const char *finalmsg ) {
 	Cvar_Set( "sv_referencedPakNames", "" );
 	Cvar_Set( "sv_mapChecksum", "" );
 	Cvar_Set( "sv_serverid", "0" );
+
+	// Initialize input validation for server
+	extern input_validation_context_t server_input_validation_ctx;
+	Input_ValidationInit(&server_input_validation_ctx);
 
 	Sys_SetStatus( "Server is not running" );
 }

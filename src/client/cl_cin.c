@@ -1880,18 +1880,6 @@ void CIN_DrawCinematic( int handle ) {
 
 	SCR_AdjustFrom640( &x, &y, &w, &h );
 
-	// #region agent log - hypothesis E: which rendering path taken
-	{
-		FILE *debug_log_e = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
-		if (debug_log_e) {
-			fprintf(debug_log_e, "{\"id\":\"log_%lld_E\",\"timestamp\":%lld,\"location\":\"cl_cin.c:CIN_DrawCinematic\",\"message\":\"Render path check\",\"data\":{\"dirty\":%d,\"CIN_WIDTH\":%ld,\"drawX\":%ld,\"CIN_HEIGHT\":%ld,\"drawY\":%ld},\"sessionId\":\"debug-session\",\"runId\":\"pre-fix\",\"hypothesisId\":\"E\"}\n",
-				(long long)time(NULL), (long long)time(NULL)*1000,
-				cinTable[handle].dirty, (long)cinTable[handle].CIN_WIDTH, (long)cinTable[handle].drawX,
-				(long)cinTable[handle].CIN_HEIGHT, (long)cinTable[handle].drawY);
-			fclose(debug_log_e);
-		}
-	}
-	// #endregion
 
 	if (cinTable[handle].dirty && (cinTable[handle].CIN_WIDTH != cinTable[handle].drawX || cinTable[handle].CIN_HEIGHT != cinTable[handle].drawY)) {
 		int *buf2;

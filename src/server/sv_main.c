@@ -24,10 +24,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #ifdef USE_ENTT
 #include "sv_ecs.h"
 #endif
+#include "../common/input_validation.h"
 
 serverStatic_t	svs;				// persistant server info
 server_t		sv;					// local server
 vm_t			*gvm = NULL;		// game virtual machine
+input_validation_context_t server_input_validation_ctx; // input validation context
 
 cvar_t	*sv_fps;				// time rate for running non-clients
 cvar_t	*sv_timeout;			// seconds without any message
@@ -852,10 +854,46 @@ static void SVC_RemoteCommand( const netadr_t *from ) {
 	}
 
 	pw = Cmd_Argv( 1 );
+
+	// Validate rcon password input
+	if (!pw || !Input_BoundsCheckString(pw, 256)) {
+		Com_LogPrintf(LOG_CATEGORY_NETWORK, LOG_LEVEL_WARNING,
+			"SVC_RemoteCommand: invalid or too long password from %s, dropping request",
+			NET_AdrToString(from));
+		return;
+	}
+
+	// Additional security: basic length validation is already done above
+
+	// Validate command arguments
+	const char *cmd_args = Cmd_ArgsFrom( 2 );
+	if (!cmd_args || !Input_BoundsCheckString(cmd_args, 1024)) {
+		Com_LogPrintf(LOG_CATEGORY_NETWORK, LOG_LEVEL_WARNING,
+			"SVC_RemoteCommand: invalid or too long command from %s, dropping request",
+			NET_AdrToString(from));
+		return;
+	}
+
+	// Check for injection attempts in command arguments
+	if (Input_DetectInjection(cmd_args) || Input_DetectInjection(pw)) {
+		Com_LogPrintf(LOG_CATEGORY_NETWORK, LOG_LEVEL_ERROR,
+			"SVC_RemoteCommand: injection attempt detected from %s, dropping request",
+			NET_AdrToString(from));
+		return;
+	}
+
+	// Additional security: validate command doesn't contain shell metacharacters
+	if (strpbrk(cmd_args, "|&;<>()$`\\")) {
+		Com_LogPrintf(LOG_CATEGORY_NETWORK, LOG_LEVEL_ERROR,
+			"SVC_RemoteCommand: shell metacharacters detected in command from %s, dropping request",
+			NET_AdrToString(from));
+		return;
+	}
+
 	if ( ( sv_rconPassword->string[0] && strcmp( pw, sv_rconPassword->string ) == 0 ) ||
 		( rconPassword2[0] && strcmp( pw, rconPassword2 ) == 0 ) ) {
 		valid = qtrue;
-		Com_Printf( "Rcon from %s: %s\n", NET_AdrToString( from ), Cmd_ArgsFrom( 2 ) );
+		Com_Printf( "Rcon from %s: %s\n", NET_AdrToString( from ), cmd_args );
 	} else {
 		// Make DoS via rcon impractical
 		if ( SVC_RateLimit( &bucket, 10, 1000 ) ) {
@@ -864,7 +902,7 @@ static void SVC_RemoteCommand( const netadr_t *from ) {
 		}
 
 		valid = qfalse;
-		Com_Printf( "Bad rcon from %s: %s\n", NET_AdrToString( from ), Cmd_ArgsFrom( 2 ) );
+		Com_Printf( "Bad rcon from %s: %s\n", NET_AdrToString( from ), cmd_args );
 	}
 
 	// start redirecting all print outputs to the packet
