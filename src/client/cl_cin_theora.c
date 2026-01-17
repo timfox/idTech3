@@ -107,15 +107,16 @@ static void Theora_YUVtoRGB(th_ycbcr_buffer ycbcr, byte *rgb, int width, int hei
 	int u_stride = ycbcr[1].stride;
 	int v_stride = ycbcr[2].stride;
 
-	// Pre-calculate chroma dimensions for efficiency
-	int chroma_width = (width + 1) / 2;
-	int chroma_height = (height + 1) / 2;
+	// Use the actual dimensions reported by Theora library
+	int chroma_width = ycbcr[1].width;
+	int chroma_height = ycbcr[1].height;
 
-	// Debug output for strides (only first few frames)
+	// Debug output and validation
 	static int debug_count = 0;
 	if (debug_count < 3) {
-		Com_DPrintf("Theora_YUVtoRGB: %dx%d -> %dx%d chroma, strides Y:%d U:%d V:%d\n",
-			width, height, chroma_width, chroma_height, y_stride, u_stride, v_stride);
+		int expected_rgb_size = width * height * 4;
+		Com_Printf("Theora_YUVtoRGB: %dx%d -> expected_rgb_size=%d, chroma %dx%d, strides Y:%d U:%d V:%d\n",
+			width, height, expected_rgb_size, chroma_width, chroma_height, y_stride, u_stride, v_stride);
 		debug_count++;
 	}
 
@@ -131,24 +132,29 @@ static void Theora_YUVtoRGB(th_ycbcr_buffer ycbcr, byte *rgb, int width, int hei
 				Y = y_plane[y_idx];
 			}
 
-			// Bounds checking for U/V planes (4:2:0 subsampling)
-			int chroma_x = x / 2;
-			int chroma_y = y / 2;
+			// Calculate chroma coordinates based on actual buffer dimensions
+			int chroma_x, chroma_y;
+			if (chroma_width == width && chroma_height == height) {
+				// No subsampling - direct mapping
+				chroma_x = x;
+				chroma_y = y;
+			} else {
+				// Assume subsampling - scale coordinates
+				chroma_x = x * chroma_width / width;
+				chroma_y = y * chroma_height / height;
+			}
+
 			int u_idx = chroma_y * u_stride + chroma_x;
 			int v_idx = chroma_y * v_stride + chroma_x;
 
-			// Ensure chroma coordinates are within valid range
-			if (chroma_x >= chroma_width || chroma_y >= chroma_height ||
-				u_idx < 0 || u_idx >= u_stride * chroma_height) {
-				// Skip invalid chroma access - use default values
+			// Bounds checking for U/V planes
+			if (u_idx < 0 || u_idx >= ycbcr[1].stride * ycbcr[1].height) {
 				Cb = 0;
 			} else {
 				Cb = u_plane[u_idx] - 128;
 			}
 
-			if (chroma_x >= chroma_width || chroma_y >= chroma_height ||
-				v_idx < 0 || v_idx >= v_stride * chroma_height) {
-				// Skip invalid chroma access - use default values
+			if (v_idx < 0 || v_idx >= ycbcr[2].stride * ycbcr[2].height) {
 				Cr = 0;
 			} else {
 				Cr = v_plane[v_idx] - 128;
@@ -166,16 +172,21 @@ static void Theora_YUVtoRGB(th_ycbcr_buffer ycbcr, byte *rgb, int width, int hei
 
 			// Bounds checking for RGB output buffer
 			int rgb_idx = (y * width + x) * 4;
-			if (rgb_idx + 3 >= width * height * 4) {
-				Com_Printf("Theora_YUVtoRGB: RGB buffer bounds error y=%d x=%d idx=%d\n", y, x, rgb_idx);
+			if (rgb_idx < 0 || rgb_idx + 3 >= width * height * 4) {
+				Com_Printf("Theora_YUVtoRGB: RGB buffer bounds error y=%d x=%d idx=%d (max=%d)\n", y, x, rgb_idx, width * height * 4);
 				continue;
 			}
 
-			// Write RGBA (little-endian)
-			rgb[rgb_idx + 0] = R;
-			rgb[rgb_idx + 1] = G;
-			rgb[rgb_idx + 2] = B;
-			rgb[rgb_idx + 3] = 255;
+			// Write RGBA (little-endian) - ensure we don't write beyond buffer
+			if (rgb_idx + 3 < width * height * 4) {
+				rgb[rgb_idx + 0] = R;
+				rgb[rgb_idx + 1] = G;
+				rgb[rgb_idx + 2] = B;
+				rgb[rgb_idx + 3] = 255;
+			} else {
+				Com_Printf("Theora_YUVtoRGB: RGB write would overflow buffer y=%d x=%d idx=%d (max=%d)\n", y, x, rgb_idx, width * height * 4);
+				continue; // Skip this pixel
+			}
 		}
 	}
 }
@@ -411,13 +422,20 @@ e_status Theora_Run(int handle) {
 					cinTable[handle].status = FMV_EOF;
 					return FMV_EOF;
 				}
-	th_decode_ycbcr_out(data->theora_decoder, ycbcr);
-    // Additional safety: ensure buffers exist after decode
-    if (!data->theora_decoder || !ycbcr[0].data || !ycbcr[1].data || !ycbcr[2].data || !cinTable[handle].buf) {
-        Com_Printf("Theora_Run: invalid post-decode buffers\n");
-        cinTable[handle].status = FMV_EOF;
-        return FMV_EOF;
-    }
+				th_decode_ycbcr_out(data->theora_decoder, ycbcr);
+				// Additional safety: ensure buffers exist after decode
+				if (!data->theora_decoder || !ycbcr[0].data || !ycbcr[1].data || !ycbcr[2].data || !cinTable[handle].buf) {
+					Com_Printf("Theora_Run: invalid post-decode buffers\n");
+					cinTable[handle].status = FMV_EOF;
+					return FMV_EOF;
+				}
+
+				// Debug: check what dimensions Theora library reports
+				Com_Printf("Theora_Run: YUV buffer info - Y:%dx%d U:%dx%d V:%dx%d strides Y:%d U:%d V:%d\n",
+					ycbcr[0].width, ycbcr[0].height,
+					ycbcr[1].width, ycbcr[1].height,
+					ycbcr[2].width, ycbcr[2].height,
+					ycbcr[0].stride, ycbcr[1].stride, ycbcr[2].stride);
 
     // Validate YUV buffer dimensions and strides
     if (ycbcr[0].stride < cinTable[handle].CIN_WIDTH ||

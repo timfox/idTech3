@@ -915,8 +915,16 @@ static vmHeader_t *VM_LoadQVM( vm_t *vm, qboolean alloc ) {
 	Com_sprintf( filename, sizeof(filename), "vm/%s.qvm", vm->name );
 	Com_Printf( "Loading vm file %s...\n", filename );
 	length = FS_ReadFile( filename, (void **)&header );
-	if ( !header ) {
+	if ( length < 0 || !header ) {
 		Com_Printf( "Failed.\n" );
+		VM_Free( vm );
+		return NULL;
+	}
+
+	// Check for empty or too small files
+	if ( length == 0 ) {
+		Com_Printf( "File is empty.\n" );
+		FS_FreeFile( header );
 		VM_Free( vm );
 		return NULL;
 	}

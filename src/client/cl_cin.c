@@ -1792,53 +1792,60 @@ Resample cinematic to 256x256 and store in buf2
 ==================
 */
 static void CIN_ResampleCinematic( int handle, int *buf2 ) {
-	int ix, iy, *buf3, xm, ym, ll;
-	byte	*buf;
+	int src_width = cinTable[handle].CIN_WIDTH;
+	int src_height = cinTable[handle].CIN_HEIGHT;
+	int dst_width = 256;
+	int dst_height = 256;
+	byte *src_buf = cinTable[handle].buf;
+	byte *dst_buf = (byte *)buf2;
+	int x, y;
+	float x_ratio = (float)src_width / dst_width;
+	float y_ratio = (float)src_height / dst_height;
 
-	buf = cinTable[handle].buf;
+	// Use bilinear interpolation for proper scaling to any dimensions
+	for (y = 0; y < dst_height; y++) {
+		for (x = 0; x < dst_width; x++) {
+			// Calculate source coordinates
+			float src_x = x * x_ratio;
+			float src_y = y * y_ratio;
 
-	xm = cinTable[handle].CIN_WIDTH/256;
-	ym = cinTable[handle].CIN_HEIGHT/256;
-	ll = 8;
-	if (cinTable[handle].CIN_WIDTH==512) {
-		ll = 9;
-	}
+			// Get integer and fractional parts
+			int x1 = (int)src_x;
+			int y1 = (int)src_y;
+			int x2 = MIN(x1 + 1, src_width - 1);
+			int y2 = MIN(y1 + 1, src_height - 1);
 
-	buf3 = (int*)buf;
-	if (xm==2 && ym==2) {
-		byte *bc2, *bc3;
-		int	ic, iiy;
+			float x_frac = src_x - x1;
+			float y_frac = src_y - y1;
 
-		bc2 = (byte *)buf2;
-		bc3 = (byte *)buf3;
-		for (iy = 0; iy<256; iy++) {
-			iiy = iy<<12;
-			for (ix = 0; ix<2048; ix+=8) {
-				for(ic = ix;ic<(ix+4);ic++) {
-					*bc2=(bc3[iiy+ic]+bc3[iiy+4+ic]+bc3[iiy+2048+ic]+bc3[iiy+2048+4+ic])>>2;
-					bc2++;
-				}
+			// Bounds checking
+			if (x1 < 0 || x1 >= src_width || y1 < 0 || y1 >= src_height) {
+				// Out of bounds - use black
+				dst_buf[(y * dst_width + x) * 4 + 0] = 0;
+				dst_buf[(y * dst_width + x) * 4 + 1] = 0;
+				dst_buf[(y * dst_width + x) * 4 + 2] = 0;
+				dst_buf[(y * dst_width + x) * 4 + 3] = 255;
+				continue;
 			}
-		}
-	} else if (xm==2 && ym==1) {
-		byte *bc2, *bc3;
-		int	ic, iiy;
 
-		bc2 = (byte *)buf2;
-		bc3 = (byte *)buf3;
-		for (iy = 0; iy<256; iy++) {
-			iiy = iy<<11;
-			for (ix = 0; ix<2048; ix+=8) {
-				for(ic = ix;ic<(ix+4);ic++) {
-					*bc2=(bc3[iiy+ic]+bc3[iiy+4+ic])>>1;
-					bc2++;
-				}
-			}
-		}
-	} else {
-		for (iy = 0; iy<256; iy++) {
-			for (ix = 0; ix<256; ix++) {
-					buf2[(iy<<8)+ix] = buf3[((iy*ym)<<ll) + (ix*xm)];
+			// Bilinear interpolation for each color channel
+			int src_idx1 = (y1 * src_width + x1) * 4;
+			int src_idx2 = (y1 * src_width + x2) * 4;
+			int src_idx3 = (y2 * src_width + x1) * 4;
+			int src_idx4 = (y2 * src_width + x2) * 4;
+
+			for (int c = 0; c < 4; c++) {  // RGBA channels
+				float val1 = src_buf[src_idx1 + c];
+				float val2 = src_buf[src_idx2 + c];
+				float val3 = src_buf[src_idx3 + c];
+				float val4 = src_buf[src_idx4 + c];
+
+				// Bilinear interpolation
+				float top = val1 * (1 - x_frac) + val2 * x_frac;
+				float bottom = val3 * (1 - x_frac) + val4 * x_frac;
+				float result = top * (1 - y_frac) + bottom * y_frac;
+
+				dst_buf[(y * dst_width + x) * 4 + c] = (byte)Com_Clamp(0, 255, result);
 			}
 		}
 	}
@@ -1883,12 +1890,14 @@ void CIN_DrawCinematic( int handle ) {
 
 	if (cinTable[handle].dirty && (cinTable[handle].CIN_WIDTH != cinTable[handle].drawX || cinTable[handle].CIN_HEIGHT != cinTable[handle].drawY)) {
 		int *buf2;
+		int resample_width = 256;
+		int resample_height = 256;
 
-		buf2 = Hunk_AllocateTempMemory( 256*256*4 );
+		buf2 = Hunk_AllocateTempMemory( resample_width * resample_height * 4 );
 
 		CIN_ResampleCinematic(handle, buf2);
 
-		re.DrawStretchRaw( x, y, w, h, 256, 256, (byte *)buf2, handle, qtrue);
+		re.DrawStretchRaw( x, y, w, h, resample_width, resample_height, (byte *)buf2, handle, qtrue);
 		cinTable[handle].dirty = qfalse;
 		Hunk_FreeTempMemory(buf2);
 		return;
@@ -2003,12 +2012,14 @@ void CIN_UploadCinematic( int handle ) {
 		// Resample the video if needed
 		if (cinTable[handle].dirty && (cinTable[handle].CIN_WIDTH != cinTable[handle].drawX || cinTable[handle].CIN_HEIGHT != cinTable[handle].drawY))  {
 			int *buf2;
+			int resample_width = 256;
+			int resample_height = 256;
 
-			buf2 = Hunk_AllocateTempMemory( 256*256*4 );
+			buf2 = Hunk_AllocateTempMemory( resample_width * resample_height * 4 );
 
 			CIN_ResampleCinematic(handle, buf2);
 
-			re.UploadCinematic( cinTable[handle].CIN_WIDTH, cinTable[handle].CIN_HEIGHT, 256, 256, (byte *)buf2, handle, qtrue);
+			re.UploadCinematic( cinTable[handle].CIN_WIDTH, cinTable[handle].CIN_HEIGHT, resample_width, resample_height, (byte *)buf2, handle, qtrue);
 			cinTable[handle].dirty = qfalse;
 			Hunk_FreeTempMemory(buf2);
 		} else {

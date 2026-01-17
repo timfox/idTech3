@@ -1267,11 +1267,57 @@ float Q_atof( const char *str );
 #ifdef __cplusplus
 extern "C" {
 #endif
-// Modern clamp function with better implementation
+// Clamp function declarations (implementations in q_shared.c)
+// Note: Com_Clamp is implemented in q_shared.c to avoid multiple definition errors
 float Com_Clamp(float min, float max, float value);
-
-// Legacy function for backward compatibility (deprecated)
 float Com_ClampLegacy(float min, float max, float value);
+
+// C23 constexpr-like functionality using static inline
+#define CONSTEXPR
+
+// Vector utility macros (compatible with array-based vec3_t)
+#define Vec3_Set(out, x, y, z) \
+    do { \
+        (out)[0] = (x); \
+        (out)[1] = (y); \
+        (out)[2] = (z); \
+    } while(0)
+
+#define Vec3_Copy(a, b) \
+    do { \
+        (a)[0] = (b)[0]; \
+        (a)[1] = (b)[1]; \
+        (a)[2] = (b)[2]; \
+    } while(0)
+
+#define Vec3_Zero(v) Vec3_Set(v, 0.0f, 0.0f, 0.0f)
+#define Vec3_One(v) Vec3_Set(v, 1.0f, 1.0f, 1.0f)
+
+// Modern vector operations
+// Note: vec3_t is typedef'd as vec_t[3], so these are array operations
+#define Vec3_Add(out, a, b) \
+    do { \
+        (out)[0] = (a)[0] + (b)[0]; \
+        (out)[1] = (a)[1] + (b)[1]; \
+        (out)[2] = (a)[2] + (b)[2]; \
+    } while(0)
+
+#define Vec3_Scale(out, v, scale) \
+    do { \
+        (out)[0] = (v)[0] * (scale); \
+        (out)[1] = (v)[1] * (scale); \
+        (out)[2] = (v)[2] * (scale); \
+    } while(0)
+
+#define Vec3_Dot(a, b) \
+    ((a)[0] * (b)[0] + (a)[1] * (b)[1] + (a)[2] * (b)[2])
+
+#define Vec3_Cross(out, a, b) \
+    do { \
+        (out)[0] = (a)[1] * (b)[2] - (a)[2] * (b)[1]; \
+        (out)[1] = (a)[2] * (b)[0] - (a)[0] * (b)[2]; \
+        (out)[2] = (a)[0] * (b)[1] - (a)[1] * (b)[0]; \
+    } while(0)
 
 char	*COM_SkipPath( char *pathname );
 const char	*COM_GetExtension( const char *name );

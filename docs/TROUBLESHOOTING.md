@@ -1,12 +1,81 @@
-# idTech3 Engine Troubleshooting Guide
+# id Tech 3 Troubleshooting Guide
+
+This guide provides solutions for common issues encountered when building, running, or developing with the id Tech 3 engine.
+
+## Table of Contents
+
+1. [Build Issues](#build-issues)
+2. [Runtime Crashes](#runtime-crashes)
+3. [Graphics Problems](#graphics-problems)
+4. [Network Issues](#network-issues)
+5. [Audio Problems](#audio-problems)
+6. [Performance Issues](#performance-issues)
+7. [Mod Development Issues](#mod-development-issues)
+8. [Debugging Techniques](#debugging-techniques)
+
+## Build Issues
+
+### CMake Configuration Errors
+
+**Problem:** CMake fails with missing dependencies
+```
+CMake Error: The following variables are used in this project, but they are set to NOTFOUND
+```
+
+**Solutions:**
+```bash
+# Install missing development packages
+sudo apt-get install build-essential cmake libsdl2-dev libopenal-dev libcurl4-openssl-dev
+
+# For Vulkan support
+sudo apt-get install libvulkan-dev vulkan-tools spirv-tools
+
+# Clear CMake cache and reconfigure
+rm -rf build/
+cmake -S . -B build
+```
+
+**Problem:** Compiler errors about missing headers
+```
+fatal error: SDL2/SDL.h: No such file or directory
+```
+
+**Solutions:**
+```bash
+# Check include paths
+pkg-config --cflags sdl2
+
+# Add include paths manually
+cmake -S . -B build -DCMAKE_C_FLAGS="-I/usr/include/SDL2"
+
+# Install development headers
+sudo apt-get install libsdl2-dev
+```
+
+### Linker Errors
+
+**Problem:** Undefined reference errors
+```
+undefined reference to `SDL_Init'
+```
+
+**Solutions:**
+```bash
+# Check library linking
+pkg-config --libs sdl2
+
+# Add library paths
+cmake -S . -B build -DCMAKE_EXE_LINKER_FLAGS="-L/usr/lib/x86_64-linux-gnu"
+
+# For static linking issues
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--copy-dt-needed-entries")
+```
 
 ## Common Issues
 
 ### Engine Won't Start
 
 #### "Failed to load any renderer"
-
-**Symptoms**: Engine exits immediately with renderer loading error
 
 **Solutions**:
 1. Check that renderer `.so` files are present:

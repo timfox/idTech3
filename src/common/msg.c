@@ -32,11 +32,24 @@ static int pcount[256];
 Handles byte ordering and avoids alignment errors
 ==============================================================================
 */
+// Modern C23-style function with designated initializers
 void MSG_Init( msg_t *buf, byte *data, int length ) {
-	Com_Memset (buf, 0, sizeof(*buf));
-	buf->data = data;
-	buf->maxsize = length;
-	buf->maxbits = length * 8;
+	if (!buf || !data || length < 0) {
+		Com_Error(ERR_FATAL, "MSG_Init: Invalid parameters");
+		return;
+	}
+
+	// C23 designated initializers for cleaner initialization
+	*buf = (msg_t){
+		.data = data,
+		.maxsize = length,
+		.maxbits = length * 8,
+		.cursize = 0,
+		.readcount = 0,
+		.bit = 0,
+		.overflowed = qfalse,
+		.oob = qfalse
+	};
 }
 
 
