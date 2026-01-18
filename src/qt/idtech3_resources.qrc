@@ -1,0 +1,27 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+<qresource>
+    <!-- Icons -->
+    <file>icons/idtech3.png</file>
+    <file>icons/texture.png</file>
+    <file>icons/model.png</file>
+    <file>icons/sound.png</file>
+    <file>icons/shader.png</file>
+    <file>icons/material.png</file>
+    <file>icons/level.png</file>
+    <file>icons/file.png</file>
+    <file>icons/folder.png</file>
+
+    <!-- Backgrounds -->
+    <file>backgrounds/main_menu.jpg</file>
+    <file>backgrounds/loading.jpg</file>
+
+    <!-- Stylesheets -->
+    <file>styles/main.qss</file>
+    <file>styles/dark.qss</file>
+    <file>styles/light.qss</file>
+
+    <!-- Fonts -->
+    <file>fonts/quake.ttf</file>
+</qresource>
+</RCC>

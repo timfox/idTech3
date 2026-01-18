@@ -4244,6 +4244,63 @@ ENDIF()
 # Add include directories for q3ui
 TARGET_INCLUDE_DIRECTORIES(q3ui PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR}/src/client)
 
+# Qt Integration - Modern UI Development
+OPTION(USE_QT "Enable Qt integration for modern UI" OFF)
+IF(USE_QT)
+	FIND_PACKAGE(Qt6 REQUIRED COMPONENTS Core Widgets OpenGL Network Charts)
+	SET(CMAKE_AUTOMOC ON)
+	SET(CMAKE_AUTORCC ON)
+	SET(CMAKE_AUTOUIC ON)
+
+	FILE(GLOB QT_SRCS
+		"src/qt/*.cpp"
+		"src/qt/*.h"
+		"src/qt/*.qrc"
+	)
+
+	# Exclude launcher from main build (it's standalone)
+	LIST(FILTER QT_SRCS EXCLUDE REGEX ".*qt_launcher\\.cpp$")
+
+	IF(QT_SRCS)
+		# Add Qt integration to main engine
+		TARGET_SOURCES(${CMAKE_PROJECT_NAME} PRIVATE ${QT_SRCS})
+
+		TARGET_LINK_LIBRARIES(${CMAKE_PROJECT_NAME}
+			Qt6::Core
+			Qt6::Widgets
+			Qt6::OpenGL
+			Qt6::Network
+			Qt6::Charts
+		)
+
+		TARGET_COMPILE_DEFINITIONS(${CMAKE_PROJECT_NAME} PRIVATE QT_ENABLED)
+		TARGET_INCLUDE_DIRECTORIES(${CMAKE_PROJECT_NAME} PRIVATE src/qt)
+
+		# Create standalone Qt launcher
+		FILE(GLOB LAUNCHER_SRCS "src/qt/qt_launcher.cpp" "src/qt/idtech3_resources.qrc")
+		IF(LAUNCHER_SRCS)
+			ADD_EXECUTABLE(qt_launcher ${LAUNCHER_SRCS})
+
+			TARGET_LINK_LIBRARIES(qt_launcher
+				Qt6::Core
+				Qt6::Widgets
+				Qt6::Network
+			)
+
+			TARGET_COMPILE_DEFINITIONS(qt_launcher PRIVATE QT_STANDALONE)
+			TARGET_INCLUDE_DIRECTORIES(qt_launcher PRIVATE src/qt)
+			MESSAGE(STATUS "Qt launcher: enabled")
+		ENDIF()
+
+		MESSAGE(STATUS "Qt integration: enabled")
+	ELSE()
+		MESSAGE(WARNING "Qt integration requested but no source files found")
+		SET(USE_QT OFF)
+	ENDIF()
+ELSE()
+	MESSAGE(STATUS "Qt integration: disabled")
+ENDIF()
+
 # UI2 - Deterministic UI/Layout System (C++23)
 OPTION(USE_UI2 "Enable UI2 deterministic UI/layout system" OFF)
 IF(USE_UI2)

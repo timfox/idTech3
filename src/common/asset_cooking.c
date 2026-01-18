@@ -53,6 +53,14 @@ static const char* error_strings[COOK_ERROR_COUNT] = {
     "Dependency missing"
 };
 
+// Forward declarations for compression functions
+qboolean AssetCooking_CompressKTX2(byte* input_data, size_t input_size,
+                                   byte** output_data, size_t* output_size,
+                                   texture_cook_options_t* options);
+qboolean AssetCooking_CompressBasisU(byte* input_data, size_t input_size,
+                                    byte** output_data, size_t* output_size,
+                                    texture_cook_options_t* options);
+
 /*
 =============================================================================
 Asset Cooking API Implementation
@@ -1369,12 +1377,12 @@ void AssetCooking_GenerateReport(const char* report_path) {
     fprintf(file, "  Total Assets: %u\n", stats.total_assets);
     fprintf(file, "  Successfully Processed: %u\n", stats.processed_assets);
     fprintf(file, "  Failed: %u\n", stats.failed_assets);
-    fprintf(file, "  Total Input Size: %llu bytes (%.2f MB)\n",
+    fprintf(file, "  Total Input Size: %zu bytes (%.2f MB)\n",
             stats.total_input_size, stats.total_input_size / (1024.0 * 1024.0));
-    fprintf(file, "  Total Output Size: %llu bytes (%.2f MB)\n",
-            stats.total_output_size, stats.total_output_size / (1024.0 * 1024.0));
-    fprintf(file, "  Processing Time: %llu ms (%.2f seconds)\n",
-            stats.processing_time_ms, stats.processing_time_ms / 1000.0);
+    fprintf(file, "  Total Output Size: %zu bytes (%.2f MB)\n",
+             (size_t)stats.total_output_size, stats.total_output_size / (1024.0 * 1024.0));
+    fprintf(file, "  Processing Time: %u ms (%.2f seconds)\n",
+             (unsigned int)stats.processing_time_ms, stats.processing_time_ms / 1000.0);
     fprintf(file, "  Average Compression Ratio: %.3f\n", stats.average_compression_ratio);
 
     if (stats.total_assets > 0) {
@@ -1396,7 +1404,7 @@ void AssetCooking_GenerateReport(const char* report_path) {
         }
     }
 
-    fprintf(file, "\nReport generated at: %llu\n", Sys_Milliseconds());
+    fprintf(file, "\nReport generated at: %u\n", (unsigned int)Sys_Milliseconds());
 
     fclose(file);
 }
@@ -1542,7 +1550,171 @@ void AssetCooking_Platform_f(void) {
         }
     }
 
-    Com_Printf("Invalid platform: %s\n", platform_str);
+	Com_Printf("Invalid platform: %s\n", platform_str);
+}
+
+/*
+===============
+AssetCooking_AddDependency
+===============
+*/
+qboolean AssetCooking_AddDependency(cook_job_t *job, const char *dependency_path, asset_type_t dep_type) {
+	if (!job || !dependency_path || job->dependency_count >= MAX_ASSET_DEPENDENCIES) {
+		return qfalse;
+	}
+
+	// Check if dependency already exists
+	for (uint32_t i = 0; i < job->dependency_count; i++) {
+		if (strcmp(job->dependencies[i].asset_path, dependency_path) == 0) {
+			return qtrue; // Already exists
+		}
+	}
+
+	asset_dependency_t *dep = &job->dependencies[job->dependency_count++];
+	Q_strncpyz(dep->asset_path, dependency_path, sizeof(dep->asset_path));
+	dep->asset_type = dep_type;
+	dep->last_modified = 0;
+	dep->checksum = 0;
+
+	// Get current file info
+	struct stat st;
+	if (stat(dependency_path, &st) == 0) {
+		dep->last_modified = st.st_mtime;
+		// TODO: Calculate checksum
+		dep->checksum = 0;
+	}
+
+	return qtrue;
+}
+
+/*
+===============
+AssetCooking_CheckDependencies
+===============
+*/
+qboolean AssetCooking_CheckDependencies(const cook_job_t *job) {
+	if (!job) return qtrue;
+
+	for (uint32_t i = 0; i < job->dependency_count; i++) {
+		const asset_dependency_t *dep = &job->dependencies[i];
+
+		struct stat st;
+		if (stat(dep->asset_path, &st) != 0) {
+			Com_Printf("AssetCooking: Dependency missing: %s\n", dep->asset_path);
+			return qfalse; // Dependency file missing
+		}
+
+		if (st.st_mtime > dep->last_modified) {
+			Com_Printf("AssetCooking: Dependency modified: %s\n", dep->asset_path);
+			return qfalse; // Dependency was modified
+		}
+
+		// TODO: Check checksum as well
+	}
+
+	return qtrue;
+}
+
+/*
+===============
+AssetCooking_ResolveDependencies
+===============
+*/
+qboolean AssetCooking_ResolveDependencies(cook_job_t *job) {
+	if (!job) return qfalse;
+
+	switch (job->asset_type) {
+		case ASSET_TYPE_MATERIAL: {
+			// Materials depend on their textures and shaders
+			// TODO: Implement material parsing for dependency extraction
+			// For now, assume materials don't have external dependencies
+			break;
+		}
+
+		case ASSET_TYPE_MODEL: {
+			// Models may depend on textures and animations
+			// TODO: Implement model parsing for dependency extraction
+			break;
+		}
+
+		case ASSET_TYPE_SHADER: {
+			// Shaders may depend on other shaders or textures
+			// TODO: Implement shader parsing for dependency extraction
+			break;
+		}
+
+		default:
+			// Other asset types typically don't have complex dependencies
+			break;
+	}
+
+	return qtrue;
+}
+
+/*
+===============
+AssetCooking_ClearDependencies
+===============
+*/
+void AssetCooking_ClearDependencies(cook_job_t *job) {
+	if (!job) return;
+
+	job->dependency_count = 0;
+	Com_Memset(job->dependencies, 0, sizeof(job->dependencies));
+}
+
+/*
+===============
+AssetCooking_OptimizeAsset
+===============
+*/
+qboolean AssetCooking_OptimizeAsset(const cook_job_t *job) {
+	if (!job) return qfalse;
+
+	switch (job->asset_type) {
+		case ASSET_TYPE_TEXTURE: {
+			// Texture optimization: mipmaps, compression, etc.
+			// TODO: Implement texture optimization
+			break;
+		}
+
+		case ASSET_TYPE_MODEL: {
+			// Model optimization: LOD generation, mesh simplification
+			// TODO: Implement model optimization
+			break;
+		}
+
+		case ASSET_TYPE_SOUND: {
+			// Sound optimization: compression, sample rate conversion
+			// TODO: Implement sound optimization
+			break;
+		}
+
+		default:
+			break;
+	}
+
+	return qtrue;
+}
+
+
+/*
+===============
+AssetCooking_GetAssetInfo
+===============
+*/
+qboolean AssetCooking_GetAssetInfo(const char *asset_path, asset_type_t type, void *info) {
+	if (!asset_path || !info) return qfalse;
+
+	struct stat st;
+	if (stat(asset_path, &st) != 0) {
+		return qfalse;
+	}
+
+	// Fill in basic file info
+	// TODO: Parse asset-specific metadata
+
+	return qtrue;
 }
 
 void AssetCooking_Cache_f(void) {

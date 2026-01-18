@@ -73,6 +73,16 @@ typedef struct {
     float quality;
 } sound_cook_options_t;
 
+// Asset dependency tracking
+typedef struct {
+    char asset_path[512];        // Path to dependent asset
+    asset_type_t asset_type;     // Type of dependent asset
+    uint64_t last_modified;      // Last modification time
+    uint32_t checksum;           // Checksum for change detection
+} asset_dependency_t;
+
+#define MAX_ASSET_DEPENDENCIES 16
+
 // Cooking job definition
 typedef struct {
     char source_path[512];
@@ -85,7 +95,7 @@ typedef struct {
     qboolean force_recook;
     void* type_specific_options; // Texture/Model/Sound options
     uint32_t dependency_count;
-    char dependencies[8][256]; // Max 8 dependencies
+    asset_dependency_t dependencies[MAX_ASSET_DEPENDENCIES];
 } cook_job_t;
 
 // Cooking statistics
@@ -178,6 +188,17 @@ typedef enum {
 
 cook_error_t AssetCooking_GetLastError(void);
 const char* AssetCooking_GetErrorString(cook_error_t error);
+
+// Dependency management
+qboolean AssetCooking_AddDependency(cook_job_t *job, const char *dependency_path, asset_type_t dep_type);
+qboolean AssetCooking_CheckDependencies(const cook_job_t *job);
+qboolean AssetCooking_ResolveDependencies(cook_job_t *job);
+void AssetCooking_ClearDependencies(cook_job_t *job);
+
+// Asset optimization
+qboolean AssetCooking_OptimizeAsset(const cook_job_t *job);
+qboolean AssetCooking_ValidateAsset(const char *asset_path, asset_type_t type);
+qboolean AssetCooking_GetAssetInfo(const char *asset_path, asset_type_t type, void *info);
 
 // Console commands
 void AssetCooking_Status_f(void);
