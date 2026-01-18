@@ -11,10 +11,10 @@ Bullet physics capabilities.
 */
 
 #ifdef USE_BULLET
-#include "cm_local.h"
-#include "cm_bullet.h"
 #include <btBulletDynamicsCommon.h>
 #include <vector>
+#include "cm_local.h"
+#include "cm_bullet.h"
 
 // Static collision world for BSP geometry
 static btBroadphaseInterface *bspBroadphase = nullptr;
