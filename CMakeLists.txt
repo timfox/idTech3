@@ -628,6 +628,8 @@ OPTION(USE_CIMGUI "Enable ImGui" ON)
 OPTION(USE_WEBSOCKETS "Enable WebSocket support" ON)
 OPTION(USE_OPENAL "Enable OpenAL enhanced audio system" ON)
 OPTION(REPRODUCIBLE_BUILD "Enable reproducible build features" OFF)
+OPTION(USE_KTX2 "Enable KTX2 texture compression support" OFF)
+OPTION(USE_BASISU "Enable Basis Universal texture compression support" OFF)
 OPTION(USE_BULLET "Enable Bullet Physics library for rigid body simulation" ON)
 OPTION(USE_JOBSYSTEM "Enable multi-threaded job system for parallel execution" ON)
 OPTION(USE_THEORA "Enable Theora (Ogg Theora) video codec support" ON)
@@ -1276,6 +1278,103 @@ IF(USE_OPENEXR)
 		message(WARNING "OpenEXR not found, disabling OpenEXR support")
 		message(STATUS "To enable OpenEXR support, install: sudo apt-get install libopenexr-dev")
 		set(USE_OPENEXR OFF CACHE BOOL "" FORCE)
+	endif()
+ENDIF()
+
+# KTX2 texture compression support
+IF(USE_KTX2)
+	find_package(PkgConfig QUIET)
+	if(PKG_CONFIG_FOUND)
+		pkg_check_modules(KTX QUIET ktx)
+		if(KTX_FOUND)
+			set(KTX2_FOUND TRUE)
+			set(KTX2_LIBRARIES ${KTX_LIBRARIES})
+			set(KTX2_INCLUDE_DIRS ${KTX_INCLUDE_DIRS})
+		else()
+			# Fallback: look for KTX-Software
+			FIND_PATH(KTX2_INCLUDE_DIR
+				NAMES ktx.h KTX-Software/include/ktx.h
+				PATHS
+					/usr/include
+					/usr/local/include
+					/opt/local/include
+			)
+			FIND_LIBRARY(KTX2_LIBRARY
+				NAMES ktx KTX-Software/lib/libktx.so
+				PATHS
+					/usr/lib
+					/usr/lib/x86_64-linux-gnu
+					/usr/local/lib
+					/opt/local/lib
+			)
+			if(KTX2_INCLUDE_DIR AND KTX2_LIBRARY)
+				set(KTX2_FOUND TRUE)
+				set(KTX2_LIBRARIES ${KTX2_LIBRARY})
+			endif()
+		endif()
+	endif()
+
+	if(KTX2_FOUND)
+		ADD_COMPILE_DEFINITIONS(USE_KTX2)
+		message(STATUS "KTX2 found: ${KTX2_LIBRARIES}")
+		if(KTX2_INCLUDE_DIRS)
+			include_directories(${KTX2_INCLUDE_DIRS})
+		elseif(KTX2_INCLUDE_DIR)
+			include_directories(${KTX2_INCLUDE_DIR})
+		endif()
+	else()
+		message(WARNING "KTX2 not found, disabling KTX2 support")
+		message(STATUS "To enable KTX2 support, install KTX-Software from https://github.com/KhronosGroup/KTX-Software")
+		set(USE_KTX2 OFF CACHE BOOL "" FORCE)
+	endif()
+ENDIF()
+
+# Basis Universal texture compression support
+IF(USE_BASISU)
+	FIND_PATH(BASISU_INCLUDE_DIR
+		NAMES basisu_transcoder.h basisu_enc.h
+		PATHS
+			/usr/include
+			/usr/local/include
+			/opt/local/include
+			/usr/include/basisu
+			/usr/local/include/basisu
+	)
+	FIND_LIBRARY(BASISU_LIBRARY
+		NAMES basisu_transcoder basisu_encoder
+		PATHS
+			/usr/lib
+			/usr/lib/x86_64-linux-gnu
+			/usr/local/lib
+			/opt/local/lib
+	)
+	if(BASISU_INCLUDE_DIR AND BASISU_LIBRARY)
+		set(BASISU_FOUND TRUE)
+		set(BASISU_LIBRARIES ${BASISU_LIBRARY})
+	else()
+		# Try to find combined library
+		FIND_LIBRARY(BASISU_COMBINED_LIBRARY
+			NAMES basisu
+			PATHS
+				/usr/lib
+				/usr/lib/x86_64-linux-gnu
+				/usr/local/lib
+				/opt/local/lib
+		)
+		if(BASISU_INCLUDE_DIR AND BASISU_COMBINED_LIBRARY)
+			set(BASISU_FOUND TRUE)
+			set(BASISU_LIBRARIES ${BASISU_COMBINED_LIBRARY})
+		endif()
+	endif()
+
+	if(BASISU_FOUND)
+		ADD_COMPILE_DEFINITIONS(USE_BASISU)
+		message(STATUS "BasisU found: ${BASISU_LIBRARIES}")
+		include_directories(${BASISU_INCLUDE_DIR})
+	else()
+		message(WARNING "BasisU not found, disabling BasisU support")
+		message(STATUS "To enable BasisU support, install Basis Universal from https://github.com/BinomialLLC/basis_universal")
+		set(USE_BASISU OFF CACHE BOOL "" FORCE)
 	endif()
 ENDIF()
 

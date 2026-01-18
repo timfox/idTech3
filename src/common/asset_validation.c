@@ -364,7 +364,25 @@ qboolean AssetValidation_ValidateTexture(const char* texture_path,
                                        ISSUE_ERROR, CHECK_CORRECTNESS, texture_path, 0, qfalse);
             }
         }
-        // BasisU doesn't have a standard file signature, but we can check file size
+        // KTX2 signature validation
+        else if (Q_stricmp(extension, ".ktx2") == 0) {
+            // KTX2 files have a specific signature and header structure
+            if (header_read >= 12) {
+                // Check for KTX2 identifier (AB 4B 54 58 20 32 30 BB)
+                if (header[0] != 0xAB || header[1] != 0x4B || header[2] != 0x54 ||
+                    header[3] != 0x58 || header[4] != 0x20 || header[5] != 0x32 ||
+                    header[6] != 0x30 || header[7] != 0xBB) {
+                    AssetValidation_AddIssue(result,
+                                           "Invalid KTX2 file signature",
+                                           "File may be corrupted or not a valid KTX2 texture",
+                                           ISSUE_ERROR, CHECK_CORRECTNESS, texture_path, 0, qfalse);
+                } else {
+                    // Additional KTX2 validation could check format fields
+                    Com_Printf("Validated KTX2 file: %s\n", texture_path);
+                }
+            }
+        }
+        // BasisU format validation
         else if (Q_stricmp(extension, ".basis") == 0) {
             // BasisU files should be reasonably sized
             if (result->file_size_bytes < 64) {
@@ -372,6 +390,17 @@ qboolean AssetValidation_ValidateTexture(const char* texture_path,
                                        "BasisU file too small",
                                        "File may be corrupted or incomplete",
                                        ISSUE_WARNING, CHECK_CORRECTNESS, texture_path, 0, qfalse);
+            }
+
+            // Check for BasisU magic number if available
+            if (header_read >= 4) {
+                // BasisU files typically start with 'sB' (Basis Universal)
+                if (header[0] != 's' || header[1] != 'B') {
+                    AssetValidation_AddIssue(result,
+                                           "Invalid BasisU file signature",
+                                           "File may not be a valid BasisU texture",
+                                           ISSUE_WARNING, CHECK_CORRECTNESS, texture_path, 0, qfalse);
+                }
             }
         }
     }
