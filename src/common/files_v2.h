@@ -128,6 +128,10 @@ qboolean FS_Mount_SetWriteMount(const char *mountPoint);
 // Get write mount
 fsMount_t *FS_Mount_GetWriteMount(void);
 
+// Mount table debugging and monitoring
+void FS_MountTable_Dump(void);
+void FS_MountTable_Stats(void);
+
 // ============================================================================
 // File Search API
 // ============================================================================

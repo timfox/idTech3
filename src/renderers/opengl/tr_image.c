@@ -841,7 +841,9 @@ image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int widt
 		image->flags |= IMGFLAG_NO_COMPRESSION | IMGFLAG_NOSCALE;
 	}
 
-	if ( flags & IMGFLAG_RGB )
+	if ( flags & IMGFLAG_RGB9E5 )
+		image->internalFormat = GL_RGB9_E5;  // RGB9E5 for HDR support
+	else if ( flags & IMGFLAG_RGB )
 		image->internalFormat = GL_RGB;
 	else
 		image->internalFormat = 0; // autodetect

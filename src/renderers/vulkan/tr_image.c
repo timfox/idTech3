@@ -1229,7 +1229,13 @@ image_t *R_CreateImage( const char *name, const char *name2, byte *pic, int widt
 	image->view = VK_NULL_HANDLE;
 	image->descriptor = VK_NULL_HANDLE;
 	image->mip_levels = 0;
-	image->internalFormat = format;
+
+	// Handle special image formats
+	if (flags & IMGFLAG_RGB9E5) {
+		image->internalFormat = VK_FORMAT_E5B9G9R9_UFLOAT_PACK32;
+	} else {
+		image->internalFormat = format;
+	}
 
 	if ( image->flags & IMGFLAG_CUBEMAP )
 		vk_upload_cube( image );

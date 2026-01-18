@@ -103,6 +103,7 @@ typedef enum {
 	IMGFLAG_RGB            = 0x0100,
 	IMGFLAG_COLORSHIFT     = 0x0200,
 	IMGFLAG_CUBEMAP		   = 0x0400,
+	IMGFLAG_RGB9E5         = 0x0800,  // RGB9E5 HDR format support
 } imgFlags_t;
 
 // Renderer context for dependency injection

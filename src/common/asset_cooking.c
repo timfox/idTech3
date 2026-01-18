@@ -338,7 +338,7 @@ qboolean AssetCooking_CookTexture(cook_job_t* job) {
     // In a real implementation, this would:
     // 1. Load image data (PNG, JPEG, TGA, etc.)
     // 2. Generate mipmaps if requested
-    // 3. Apply compression (DXT, ETC2, ASTC, etc.)
+    // 3. Apply compression (DXT, ETC2, ASTC, KTX2, BasisU, etc.)
     // 4. Save optimized texture
 
     FILE* input = fopen(job->source_path, "rb");
@@ -548,12 +548,12 @@ texture_cook_options_t* AssetCooking_CreateTextureOptions(cook_quality_t quality
         case COOK_QUALITY_HIGH:
             options->max_texture_size = 4096;
             options->compression_quality = 0.9f;
-            Q_strncpyz(options->compression_format, "ASTC", sizeof(options->compression_format));
+            Q_strncpyz(options->compression_format, "KTX2", sizeof(options->compression_format)); // Use modern KTX2 format
             break;
         case COOK_QUALITY_ULTRA:
             options->max_texture_size = 8192;
             options->compression_quality = 1.0f;
-            Q_strncpyz(options->compression_format, "UNCOMPRESSED", sizeof(options->compression_format));
+            Q_strncpyz(options->compression_format, "KTX2", sizeof(options->compression_format)); // High quality with modern format
             break;
     }
 
@@ -564,6 +564,13 @@ texture_cook_options_t* AssetCooking_CreateTextureOptions(cook_quality_t quality
             Q_strncpyz(options->compression_format, "ETC2", sizeof(options->compression_format));
         }
         options->max_texture_size /= 2; // Smaller textures on mobile
+    } else if (platform == COOK_PLATFORM_WEB) {
+        // Use BasisU for web (universal compression)
+        if (strcmp(options->compression_format, "DXT5") == 0 ||
+            strcmp(options->compression_format, "KTX2") == 0) {
+            Q_strncpyz(options->compression_format, "BASISU", sizeof(options->compression_format));
+        }
+        options->max_texture_size = MIN(options->max_texture_size, 2048); // Web texture limits
     }
 
     return options;

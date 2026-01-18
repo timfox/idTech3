@@ -52,6 +52,8 @@ static const struct {
     {".tga", "TGA (Targa)", qtrue, qfalse},
     {".dds", "DDS (DirectDraw Surface)", qtrue, qtrue},
     {".ktx", "KTX (Khronos Texture)", qtrue, qtrue},
+    {".ktx2", "KTX2 (Khronos Texture v2)", qtrue, qtrue},
+    {".basis", "BasisU Universal Texture", qtrue, qtrue},
     {NULL, NULL, qfalse, qfalse}
 };
 
@@ -349,6 +351,27 @@ qboolean AssetValidation_ValidateTexture(const char* texture_path,
                                        "Invalid JPEG file signature",
                                        "File may be corrupted or not a valid JPEG",
                                        ISSUE_ERROR, CHECK_CORRECTNESS, texture_path, 0, qfalse);
+            }
+        }
+        // KTX2 signature: AB 4B 54 58 20 32 30 BB 0D 0A 1A 0A
+        else if (Q_stricmp(extension, ".ktx2") == 0) {
+            if (!(header[0] == 0xAB && header[1] == 0x4B && header[2] == 0x54 && header[3] == 0x58 &&
+                  header[4] == 0x20 && header[5] == 0x32 && header[6] == 0x30 && header[7] == 0xBB &&
+                  header[8] == 0x0D && header[9] == 0x0A && header[10] == 0x1A && header[11] == 0x0A)) {
+                AssetValidation_AddIssue(result,
+                                       "Invalid KTX2 file signature",
+                                       "File may be corrupted or not a valid KTX2 texture",
+                                       ISSUE_ERROR, CHECK_CORRECTNESS, texture_path, 0, qfalse);
+            }
+        }
+        // BasisU doesn't have a standard file signature, but we can check file size
+        else if (Q_stricmp(extension, ".basis") == 0) {
+            // BasisU files should be reasonably sized
+            if (result->file_size_bytes < 64) {
+                AssetValidation_AddIssue(result,
+                                       "BasisU file too small",
+                                       "File may be corrupted or incomplete",
+                                       ISSUE_WARNING, CHECK_CORRECTNESS, texture_path, 0, qfalse);
             }
         }
     }

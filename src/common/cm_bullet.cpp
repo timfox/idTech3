@@ -30,6 +30,12 @@ static qboolean bspPhysicsInitialized = qfalse;
 static btCollisionShape *bspModelShapes[MAX_BSP_MODELS];
 static qboolean bspModelShapeValid[MAX_BSP_MODELS];
 
+// Dynamic rigid body management
+#define MAX_RIGID_BODIES 512
+static btRigidBody *rigidBodies[MAX_RIGID_BODIES];
+static btCollisionShape *rigidBodyShapes[MAX_RIGID_BODIES];
+static int nextRigidBodyId = 0;
+
 /*
 ================
 CM_Bullet_Init
@@ -455,6 +461,236 @@ int CM_Bullet_PointContents(const vec3_t p, clipHandle_t model) {
 	// if a point is inside collision geometry, useful for trigger volumes and
 	// area detection with better accuracy than BSP-based checks.
 	return CM_PointContents(p, model);
+}
+
+/*
+================
+CM_Bullet_CreateRigidBody
+Create a dynamic rigid body for physics simulation
+
+Creates a new rigid body with the specified mass, collision shape, and initial transform.
+Returns a handle to the rigid body for later manipulation.
+
+Parameters:
+- mass: Mass of the rigid body (0 for static, >0 for dynamic)
+- shape: Collision shape (box, sphere, capsule, etc.)
+- position: Initial position in world space
+- rotation: Initial rotation quaternion
+================
+*/
+int CM_Bullet_CreateRigidBody(float mass, btCollisionShape *shape,
+                             const vec3_t position, const vec4_t rotation) {
+	if (!bspPhysicsInitialized || !bspWorld || nextRigidBodyId >= MAX_RIGID_BODIES) {
+		return -1; // Invalid handle
+	}
+
+	// Create motion state
+	btTransform startTransform;
+	startTransform.setIdentity();
+	startTransform.setOrigin(btVector3(position[0], position[1], position[2]));
+	if (rotation) {
+		startTransform.setRotation(btQuaternion(rotation[0], rotation[1], rotation[2], rotation[3]));
+	}
+
+	btVector3 localInertia(0, 0, 0);
+	if (mass > 0.0f) {
+		shape->calculateLocalInertia(mass, localInertia);
+	}
+
+	btDefaultMotionState *motionState = new btDefaultMotionState(startTransform);
+	btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, shape, localInertia);
+	btRigidBody *body = new btRigidBody(rbInfo);
+
+	// Store references
+	int handle = nextRigidBodyId++;
+	rigidBodies[handle] = body;
+	rigidBodyShapes[handle] = shape;
+
+	// Add to world
+	bspWorld->addRigidBody(body);
+
+	Com_DPrintf("Created rigid body (handle %d, mass %.2f)\n", handle, mass);
+	return handle;
+}
+
+/*
+================
+CM_Bullet_DestroyRigidBody
+Destroy a dynamic rigid body
+
+Removes the rigid body from the physics world and frees associated resources.
+================
+*/
+void CM_Bullet_DestroyRigidBody(int handle) {
+	if (handle < 0 || handle >= MAX_RIGID_BODIES || !rigidBodies[handle]) {
+		return;
+	}
+
+	btRigidBody *body = rigidBodies[handle];
+
+	// Remove from world
+	if (bspWorld) {
+		bspWorld->removeRigidBody(body);
+	}
+
+	// Clean up resources
+	delete body->getMotionState();
+	delete body;
+
+	// Clear references
+	rigidBodies[handle] = nullptr;
+	rigidBodyShapes[handle] = nullptr;
+
+	Com_DPrintf("Destroyed rigid body (handle %d)\n", handle);
+}
+
+/*
+================
+CM_Bullet_UpdateRigidBody
+Update rigid body transform and properties
+
+Allows external systems to update the position, rotation, and other properties
+of dynamic rigid bodies.
+================
+*/
+void CM_Bullet_UpdateRigidBody(int handle, const vec3_t position,
+                              const vec4_t rotation, const vec3_t velocity) {
+	if (handle < 0 || handle >= MAX_RIGID_BODIES || !rigidBodies[handle]) {
+		return;
+	}
+
+	btRigidBody *body = rigidBodies[handle];
+
+	// Update transform
+	if (position || rotation) {
+		btTransform transform = body->getWorldTransform();
+
+		if (position) {
+			transform.setOrigin(btVector3(position[0], position[1], position[2]));
+		}
+
+		if (rotation) {
+			transform.setRotation(btQuaternion(rotation[0], rotation[1], rotation[2], rotation[3]));
+		}
+
+		body->setWorldTransform(transform);
+	}
+
+	// Update velocity
+	if (velocity) {
+		body->setLinearVelocity(btVector3(velocity[0], velocity[1], velocity[2]));
+	}
+
+	// Activate the body to ensure it's processed in the next simulation step
+	body->activate(true);
+}
+
+/*
+================
+CM_Bullet_GetRigidBodyTransform
+Get current rigid body transform
+
+Retrieves the current position and rotation of a rigid body.
+================
+*/
+void CM_Bullet_GetRigidBodyTransform(int handle, vec3_t position, vec4_t rotation) {
+	if (handle < 0 || handle >= MAX_RIGID_BODIES || !rigidBodies[handle] ||
+	    !position || !rotation) {
+		return;
+	}
+
+	btRigidBody *body = rigidBodies[handle];
+	const btTransform &transform = body->getWorldTransform();
+
+	// Get position
+	const btVector3 &origin = transform.getOrigin();
+	position[0] = origin.x();
+	position[1] = origin.y();
+	position[2] = origin.z();
+
+	// Get rotation
+	const btQuaternion &quat = transform.getRotation();
+	rotation[0] = quat.x();
+	rotation[1] = quat.y();
+	rotation[2] = quat.z();
+	rotation[3] = quat.w();
+}
+
+/*
+================
+CM_Bullet_StepSimulation
+Step the physics simulation forward
+
+Advances the physics simulation by the specified time step.
+Should be called once per frame or at a fixed rate.
+================
+*/
+void CM_Bullet_StepSimulation(float timeStep) {
+	if (!bspPhysicsInitialized || !bspWorld) {
+		return;
+	}
+
+	// Step the simulation
+	// Use fixed time step for stability, accumulate time if needed
+	static float accumulatedTime = 0.0f;
+	const float fixedTimeStep = 1.0f / 60.0f; // 60 Hz simulation
+	const int maxSubSteps = 10;
+
+	accumulatedTime += timeStep;
+
+	int numSteps = 0;
+	while (accumulatedTime >= fixedTimeStep && numSteps < maxSubSteps) {
+		bspWorld->stepSimulation(fixedTimeStep, 0, fixedTimeStep);
+		accumulatedTime -= fixedTimeStep;
+		numSteps++;
+	}
+
+	// Prevent accumulation from growing too large
+	if (accumulatedTime > fixedTimeStep * 5.0f) {
+		accumulatedTime = fixedTimeStep * 5.0f;
+	}
+}
+
+/*
+================
+CM_Bullet_CreateBoxShape
+Create a box collision shape
+================
+*/
+btCollisionShape *CM_Bullet_CreateBoxShape(const vec3_t halfExtents) {
+	return new btBoxShape(btVector3(halfExtents[0], halfExtents[1], halfExtents[2]));
+}
+
+/*
+================
+CM_Bullet_CreateSphereShape
+Create a sphere collision shape
+================
+*/
+btCollisionShape *CM_Bullet_CreateSphereShape(float radius) {
+	return new btSphereShape(radius);
+}
+
+/*
+================
+CM_Bullet_CreateCapsuleShape
+Create a capsule collision shape
+================
+*/
+btCollisionShape *CM_Bullet_CreateCapsuleShape(float radius, float height) {
+	return new btCapsuleShape(radius, height);
+}
+
+/*
+================
+CM_Bullet_DestroyShape
+Destroy a collision shape
+================
+*/
+void CM_Bullet_DestroyShape(btCollisionShape *shape) {
+	if (shape) {
+		delete shape;
+	}
 }
 
 #endif // USE_BULLET

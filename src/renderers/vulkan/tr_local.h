@@ -571,6 +571,12 @@ typedef struct shader_s {
 
 	struct shader_s *remappedShader;		// current shader this one is remapped too
 
+	// Shader versioning and hot-reload support
+	uint32_t shaderVersion;					// version number for change detection
+	time_t lastModifiedTime;				// file modification time for hot-reload
+	qboolean supportsHotReload;				// whether this shader can be hot-reloaded
+	char shaderFilePath[MAX_QPATH];			// full path to shader file for monitoring
+
 	struct	shader_s	*next;
 } shader_t;
 
@@ -1777,6 +1783,12 @@ void		RE_UploadCinematic( int w, int h, int cols, int rows, byte *data, int clie
 
 void		RE_BeginFrame( stereoFrame_t stereoFrame );
 void		RE_BeginRegistration( glconfig_t *glconfig );
+
+// Shader hot-reload functions
+void R_CheckShaderHotReload(void);
+qboolean R_CheckShaderFileModified(shader_t *shader);
+void R_UpdateShaderVersion(shader_t *shader, const char *filePath);
+const char *R_ShaderVersionString(shader_t *shader);
 void		RE_LoadWorldMap( const char *mapname );
 void		RE_SetWorldVisData( const byte *vis );
 void		RE_EndRegistration( void );

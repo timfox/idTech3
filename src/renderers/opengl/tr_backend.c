@@ -1098,25 +1098,25 @@ void RE_StretchRaw( int x, int y, int w, int h, int cols, int rows, byte *data, 
 void RE_UploadCinematic( int w, int h, int cols, int rows, byte *data, int client, qboolean dirty ) {
 	(void)w;  // Suppress unused parameter warning
 	(void)h;  // Suppress unused parameter warning
-
-	// Validate parameters
-	if (!data) {
-		ri.Printf(PRINT_ALL, "RE_UploadCinematic: NULL data buffer\n");
-		return;
-	}
-
-	if (cols <= 0 || rows <= 0 || cols > 4096 || rows > 4096) {
-		ri.Printf(PRINT_ALL, "RE_UploadCinematic: Invalid dimensions %dx%d\n", cols, rows);
-		return;
-	}
-
-	// TEMP: Skip OpenGL texture upload to prevent buffer overflow with software rasterizer
-	// The issue is in Mesa's OpenGL implementation with texture uploads
-	return;
-
 	image_t *image;
 
 	if ( !tr.scratchImage[ client ] ) {
+		// #region agent log - hypothesis F: video texture creation
+		FILE *debug_log = fopen("/home/tim/Desktop/idtech3/.cursor/debug.log", "a");
+		if (debug_log) {
+			// Sample first few bytes of video data
+			char data_sample[64];
+			int sample_len = cols * rows * 4 < 64 ? cols * rows * 4 : 64;
+			for (int i = 0; i < sample_len; i++) {
+				sprintf(data_sample + i*2, "%02x", (unsigned char)data[i]);
+			}
+			data_sample[sample_len*2] = '\0';
+
+			fprintf(debug_log, "{\"id\":\"log_%lld_F\",\"timestamp\":%lld,\"location\":\"tr_backend.c:RE_UploadCinematic\",\"message\":\"Video texture creation\",\"data\":{\"client\":%d,\"cols\":%d,\"rows\":%d,\"data_sample\":\"%s\",\"data_ptr\":\"%p\"},\"sessionId\":\"debug-session\",\"runId\":\"pre-fix\",\"hypothesisId\":\"F\"}\n",
+				(long long)time(NULL), (long long)time(NULL)*1000, client, cols, rows, data_sample, data);
+			fclose(debug_log);
+		}
+		// #endregion
 		tr.scratchImage[ client ] = R_CreateImage( va( "*scratch%i", client ), NULL, data, cols, rows, IMGFLAG_CLAMPTOEDGE | IMGFLAG_NOSCALE );
 		return;
 	}
@@ -1129,19 +1129,15 @@ void RE_UploadCinematic( int w, int h, int cols, int rows, byte *data, int clien
 	if ( cols != image->width || rows != image->height ) {
 		image->width = image->uploadWidth = cols;
 		image->height = image->uploadHeight = rows;
-		qglTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA, cols, rows, 0, GL_RGBA, GL_UNSIGNED_BYTE, data );
+		qglTexImage2D( GL_TEXTURE_2D, 0, image->internalFormat, cols, rows, 0, GL_RGBA, GL_UNSIGNED_BYTE, data );
 		qglTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR );
 		qglTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
-		qglTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE );
-		qglTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE );
+		qglTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, gl_clamp_mode );
+		qglTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, gl_clamp_mode );
 	} else if ( dirty ) {
+		// otherwise, just subimage upload it so that drivers can tell we are going to be changing
+		// it and don't try and do a texture compression
 		qglTexSubImage2D( GL_TEXTURE_2D, 0, 0, 0, cols, rows, GL_RGBA, GL_UNSIGNED_BYTE, data );
-	}
-
-	// Check for OpenGL errors
-	GLenum error = qglGetError();
-	if (error != GL_NO_ERROR) {
-		ri.Printf(PRINT_ALL, "RE_UploadCinematic: OpenGL error %d\n", error);
 	}
 }
 

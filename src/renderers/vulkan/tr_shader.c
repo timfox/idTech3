@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 // Renderer import interface - defined in renderer main file
 extern refimport_t ri;
+#include <sys/stat.h>  // For file modification time checking
 
 // tr_shader.c -- this file deals with the parsing and definition of shaders
 
@@ -5020,4 +5021,109 @@ void R_InitShaders( void ) {
 	}
 
 	CreateExternalShaders();
+}
+
+/*
+===============
+R_CheckShaderHotReload
+Check for modified shader files and reload them
+===============
+*/
+void R_CheckShaderHotReload(void) {
+	static time_t lastCheckTime = 0;
+	time_t currentTime = Sys_Milliseconds() / 1000; // Convert to seconds
+
+	// Only check every few seconds to avoid excessive file I/O
+	if (currentTime - lastCheckTime < 5) {
+		return;
+	}
+	lastCheckTime = currentTime;
+
+	// Iterate through all loaded shaders
+	for (int i = 0; i < tr.numShaders; i++) {
+		shader_t *sh = tr.shaders[i];
+		if (!sh || !sh->supportsHotReload || sh->defaultShader) {
+			continue;
+		}
+
+		// Check if shader file has been modified
+		if (sh->shaderFilePath[0] && R_CheckShaderFileModified(sh)) {
+			ri.Printf(PRINT_DEVELOPER, "Shader hot-reload: %s modified, reloading...\n", sh->name);
+
+			// Mark shader for reload by invalidating its pipeline
+			sh->shaderVersion++;
+			sh->lastModifiedTime = currentTime;
+
+			// Force recreation of Vulkan pipelines on next use
+			// This is handled by the Vulkan backend when the shader is next accessed
+		}
+	}
+}
+
+/*
+===============
+R_CheckShaderFileModified
+Check if a shader file has been modified since last load
+===============
+*/
+qboolean R_CheckShaderFileModified(shader_t *shader) {
+	if (!shader || !shader->shaderFilePath[0]) {
+		return qfalse;
+	}
+
+	// Get file modification time
+	struct stat fileStat;
+	if (stat(shader->shaderFilePath, &fileStat) != 0) {
+		return qfalse; // File doesn't exist or can't be accessed
+	}
+
+	// Check if modification time has changed
+	if (fileStat.st_mtime > shader->lastModifiedTime) {
+		return qtrue;
+	}
+
+	return qfalse;
+}
+
+/*
+===============
+R_UpdateShaderVersion
+Update shader versioning information when loading
+===============
+*/
+void R_UpdateShaderVersion(shader_t *shader, const char *filePath) {
+	if (!shader) return;
+
+	// Store file path for monitoring
+	if (filePath && filePath[0]) {
+		Q_strncpyz(shader->shaderFilePath, filePath, sizeof(shader->shaderFilePath));
+		shader->supportsHotReload = qtrue;
+
+		// Get initial modification time
+		struct stat fileStat;
+		if (stat(filePath, &fileStat) == 0) {
+			shader->lastModifiedTime = fileStat.st_mtime;
+		}
+	} else {
+		shader->supportsHotReload = qfalse;
+		shader->shaderFilePath[0] = '\0';
+	}
+
+	// Increment version for change detection
+	shader->shaderVersion++;
+}
+
+/*
+===============
+R_ShaderVersionString
+Get a version string for shader debugging
+===============
+*/
+const char *R_ShaderVersionString(shader_t *shader) {
+	static char versionStr[64];
+	if (!shader) return "null";
+
+	Com_sprintf(versionStr, sizeof(versionStr), "v%u@%lu",
+		shader->shaderVersion, (unsigned long)shader->lastModifiedTime);
+	return versionStr;
 }

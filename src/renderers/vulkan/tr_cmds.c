@@ -27,6 +27,7 @@ extern refimport_t ri;
 #ifdef USE_VULKAN
 #include "vk_post_process.h"  // For post-processing types and functions
 #endif
+#include <sys/stat.h>  // For file modification time checking
 
 /*
 =====================
@@ -751,6 +752,9 @@ void RE_BeginFrame( stereoFrame_t stereoFrame ) {
 		}
 	}
 #endif // USE_BUFFER_CLEAR
+
+	// Check for shader hot-reload every frame
+	R_CheckShaderHotReload();
 
 	tr.refdef.stereoFrame = stereoFrame;
 }
