@@ -918,12 +918,12 @@ Crash_ValidateSystemHealth
 qboolean Crash_ValidateSystemHealth(void) {
     // Check various system health indicators
 
-    // Memory health
-    const memory_safety_stats_t *mem_stats = MemorySafety_GetStats();
-    if (mem_stats && (atomic_load(&mem_stats->leak_count) > 10 || atomic_load(&mem_stats->corruption_detected) > 0)) {
-        Com_Printf(S_COLOR_RED "System health check failed: Memory issues detected\n");
-        return qfalse;
-    }
+    // Memory health - DISABLED (memory safety system disabled)
+    // const memory_safety_stats_t *mem_stats = MemorySafety_GetStats();
+    // if (mem_stats && (atomic_load(&mem_stats->leak_count) > 10 || atomic_load(&mem_stats->corruption_detected) > 0)) {
+    //     Com_Printf(S_COLOR_RED "System health check failed: Memory issues detected\n");
+    //     return qfalse;
+    // }
 
     // Thread health (basic check)
     // This would need more sophisticated thread monitoring

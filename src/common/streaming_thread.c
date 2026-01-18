@@ -98,7 +98,7 @@ static THREAD_RETURN THREAD_CALL StreamThreadWorker(void* arg) {
             thread->last_activity_time = end_time;
 
             // Free work item
-            MEMORY_SAFETY_FREE(work);
+            Z_Free(work);
         } else {
             // Yield to prevent busy-waiting
             Thread_Yield();
@@ -444,7 +444,7 @@ qboolean StreamThread_RequestAssetLoad(const char* assetName, assetType_t assetT
     }
 
     // Create load request
-    asset_load_request_t* request = (asset_load_request_t*)MEMORY_SAFETY_MALLOC(sizeof(asset_load_request_t));
+    asset_load_request_t* request = (asset_load_request_t*)Z_Malloc(sizeof(asset_load_request_t));
     if (!request) return qfalse;
 
     memset(request, 0, sizeof(asset_load_request_t));
@@ -637,7 +637,7 @@ static void SubmitStreamWork(stream_thread_type_t threadType, void* workData,
     stream_thread_data_t* thread = &stream_thread_system.threads[threadType];
 
     // Create work item
-    stream_work_item_t* workItem = (stream_work_item_t*)MEMORY_SAFETY_MALLOC(sizeof(stream_work_item_t));
+    stream_work_item_t* workItem = (stream_work_item_t*)Z_Malloc(sizeof(stream_work_item_t));
     if (!workItem) {
         workFunction(workData); // Fallback
         return;
@@ -653,7 +653,7 @@ static void SubmitStreamWork(stream_thread_type_t threadType, void* workData,
     // Add to appropriate priority queue
     if (!LF_Queue_Enqueue(&thread->work_queues[priority], workItem)) {
         // Queue full - execute immediately as fallback
-        MEMORY_SAFETY_FREE(workItem);
+        Z_Free(workItem);
         workFunction(workData);
         return;
     }
@@ -753,7 +753,7 @@ void StreamThread_FlushQueues(asset_priority_t minPriority) {
                     StreamThread_ProcessGeneralLoad(request);
                     break;
             }
-            MEMORY_SAFETY_FREE(request);
+            Z_Free(request);
         }
     }
 }

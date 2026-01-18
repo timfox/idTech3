@@ -169,13 +169,38 @@ static error_severity_t Error_CodeToSeverity(error_code_t code) {
 
 static void Error_BuildContext(char *buffer, size_t size) {
     buffer[0] = '\0';
+    size_t remaining = size - 1; // Leave room for null terminator
+    size_t offset = 0;
 
     for (int i = 0; i < g_context_depth && i < CONTEXT_STACK_DEPTH; i++) {
         if (i > 0) {
-            strncat(buffer, " -> ", size - strlen(buffer) - 1);
+            const char *separator = " -> ";
+            size_t sep_len = strlen(separator);
+            if (offset + sep_len < remaining) {
+                memcpy(buffer + offset, separator, sep_len);
+                offset += sep_len;
+            } else {
+                break; // Not enough space
+            }
         }
-        strncat(buffer, g_context_stack[i], size - strlen(buffer) - 1);
+
+        const char *context = g_context_stack[i];
+        size_t context_len = strlen(context);
+        if (offset + context_len < remaining) {
+            memcpy(buffer + offset, context, context_len);
+            offset += context_len;
+        } else {
+            // Truncate if necessary
+            size_t copy_len = remaining - offset - 1;
+            if (copy_len > 0) {
+                memcpy(buffer + offset, context, copy_len);
+                offset += copy_len;
+            }
+            break;
+        }
     }
+
+    buffer[offset] = '\0';
 }
 
 static void Error_Log(const error_info_t *error) {

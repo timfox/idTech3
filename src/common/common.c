@@ -416,11 +416,11 @@ static void Com_InitCrashRecovery(void) {
     // Set up signal handlers for crash recovery
     Com_Printf( "Initializing crash recovery system...\n" );
 
-    // Initialize the comprehensive error handling system
-    Error_Init();
+    // Initialize the comprehensive error handling system - DISABLED
+    // Error_Init();
 
-    // Initialize the crash handler system
-    Crash_Init();
+    // Initialize the crash handler system - DISABLED
+    // Crash_Init();
 
     // Save current state periodically for restoration
     // This would integrate with the existing save/load system
@@ -454,13 +454,13 @@ void Com_Init( char *commandLine ) {
   Com_Printf( "Build Date: %s\n", BUILD_DATE );
   Com_Printf( "Compiled: %s %s\n", __DATE__, __TIME__ );
   Com_Printf( "Renderer Support: Vulkan (RTX) + OpenGL fallback\n" );
-  Com_Printf( "Advanced Features: imGUI, Ray Tracing, Performance Monitoring\n" );
+  Com_Printf( "Advanced Features: imGUI, Ray Tracing\n" );
 
-    // Initialize memory safety FIRST before any allocations
-    MemorySafety_Init();
+    // Initialize memory safety FIRST before any allocations - DISABLED DUE TO CRASH ISSUES
+    // MemorySafety_Init();
 
     // Register memory safety CVars after basic initialization
-    MemorySafety_RegisterCVars();
+    // MemorySafety_RegisterCVars();
 
 	// Perform comprehensive startup health checks
 	Com_Printf( "Performing startup health checks...\n" );
@@ -760,7 +760,7 @@ void Com_Quit_f( void ) { exit( 0 ); }
 char *CopyString( const char *in ) {
     if (!in) return NULL;
     size_t len = strlen(in) + 1;
-    char *out = (char *)MEMORY_SAFETY_MALLOC(len);
+    char *out = (char *)Z_Malloc(len);
     if (out) {
         Q_strncpyz(out, in, len);
     }

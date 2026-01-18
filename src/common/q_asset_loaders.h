@@ -70,6 +70,22 @@ typedef struct assetPathConfig_s {
 // Global asset system
 extern assetPathConfig_t assetPaths;
 
+// Function pointers for actual asset loading (set by renderer/client)
+extern qhandle_t (*Asset_LoadModelFunc)(const char *name);
+extern qhandle_t (*Asset_LoadShaderFunc)(const char *name);
+extern qhandle_t (*Asset_LoadTextureFunc)(const char *name, int flags);
+extern qboolean (*Asset_LoadSoundFunc)(const char *name, sfxHandle_t *handle);
+extern qhandle_t (*Asset_LoadFontFunc)(const char *fontName, int pointSize, fontInfo_t *font);
+extern qboolean (*Asset_LoadConfigFunc)(const char *name, void *buffer, int bufferSize);
+
+// Set asset loading function pointers
+void Asset_SetLoadModelFunc(qhandle_t (*func)(const char *name));
+void Asset_SetLoadShaderFunc(qhandle_t (*func)(const char *name));
+void Asset_SetLoadTextureFunc(qhandle_t (*func)(const char *name, int flags));
+void Asset_SetLoadSoundFunc(qboolean (*func)(const char *name, sfxHandle_t *handle));
+void Asset_SetLoadFontFunc(qhandle_t (*func)(const char *fontName, int pointSize, fontInfo_t *font));
+void Asset_SetLoadConfigFunc(qboolean (*func)(const char *name, void *buffer, int bufferSize));
+
 // Initialize asset loader system
 void Asset_LoadersInit(void);
 

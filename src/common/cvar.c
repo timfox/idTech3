@@ -384,7 +384,7 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 		if(var->flags & CVAR_USER_CREATED)
 		{
 			var->flags &= ~CVAR_USER_CREATED;
-			MEMORY_SAFETY_FREE( var->resetString );
+			Z_Free( var->resetString );
 			var->resetString = CopyString( var_value );
 
 			if ( flags & CVAR_ROM || ( (flags & CVAR_DEVELOPER) && !cvar_developer->integer ) )
@@ -393,7 +393,7 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 				// so force it to value given by the engine.
 
 				if(var->latchedString)
-					MEMORY_SAFETY_FREE(var->latchedString);
+					Z_Free(var->latchedString);
 				
 				var->latchedString = CopyString(var_value);
 			}
@@ -408,10 +408,10 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 				if ( vm_created ) {
 					// reset to state requested by local VM module
 					var->flags &= ~CVAR_ROM;
-					MEMORY_SAFETY_FREE( var->resetString );
+					Z_Free( var->resetString );
 					var->resetString = CopyString( var_value );
 					if ( var->latchedString )
-						MEMORY_SAFETY_FREE( var->latchedString );
+						Z_Free( var->latchedString );
 					var->latchedString = CopyString( var_value );
 				}
 			}
@@ -427,7 +427,7 @@ cvar_t *Cvar_Get( const char *var_name, const char *var_value, int flags ) {
 		// only allow one non-empty reset string without a warning
 		if ( !var->resetString[0] ) {
 			// we don't have a reset string yet
-			MEMORY_SAFETY_FREE( var->resetString );
+			Z_Free( var->resetString );
 			var->resetString = CopyString( var_value );
 		} else if ( var_value[0] && strcmp( var->resetString, var_value ) ) {
 			Com_DPrintf( "Warning: cvar \"%s\" given initial values: \"%s\" and \"%s\"\n",
@@ -696,7 +696,7 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 	{
 		if ( strcmp( value, var->string ) == 0 )
 		{
-			MEMORY_SAFETY_FREE( var->latchedString );
+			Z_Free( var->latchedString );
 			var->latchedString = NULL;
             MUTEX_UNLOCK(cvar_mutex);
 			return var;
@@ -725,7 +725,7 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
                     MUTEX_UNLOCK(cvar_mutex);
 					return var;
                 }
-				MEMORY_SAFETY_FREE( var->latchedString );
+				Z_Free( var->latchedString );
 			}
 			else
 			{
@@ -753,7 +753,7 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 			if ( var->flags & CVAR_ARCHIVE ) {
 				cvar_modifiedFlags |=(CVAR_ARCHIVE);
 			}
-			MEMORY_SAFETY_FREE( var->latchedString );
+			Z_Free( var->latchedString );
 			var->latchedString = NULL;
 		}
 	}
@@ -767,7 +767,7 @@ cvar_t *Cvar_Set2( const char *var_name, const char *value, qboolean force ) {
 	ATOMIC_INCREMENT(&var->modificationCount);
 	cvar_group[ var->group ] = 1;
 	
-	MEMORY_SAFETY_FREE( var->string ); // free the old value string
+	Z_Free( var->string ); // free the old value string
 	
 	var->string = CopyString( value );
 	var->value = Q_atof( var->string );
@@ -900,7 +900,7 @@ void Cvar_SetCheatState(void)
 			// because of a different var->latchedString
 			if (var->latchedString)
 			{
-				MEMORY_SAFETY_FREE(var->latchedString);
+				Z_Free(var->latchedString);
 				var->latchedString = NULL;
 			}
 			if (strcmp(var->resetString,var->string))
@@ -1486,19 +1486,19 @@ static cvar_t *Cvar_Unset( cvar_t *cv )
 	cvar_modifiedFlags |=(cv->flags);
 	
 	if ( cv->name )
-		MEMORY_SAFETY_FREE( cv->name );
+		Z_Free( cv->name );
 	if ( cv->string )
-		MEMORY_SAFETY_FREE( cv->string );
+		Z_Free( cv->string );
 	if ( cv->latchedString )
-		MEMORY_SAFETY_FREE( cv->latchedString );
+		Z_Free( cv->latchedString );
 	if ( cv->resetString )
-		MEMORY_SAFETY_FREE( cv->resetString );
+		Z_Free( cv->resetString );
 	if ( cv->description )
-		MEMORY_SAFETY_FREE( cv->description );
+		Z_Free( cv->description );
 	if ( cv->mins )
-		MEMORY_SAFETY_FREE( cv->mins );
+		Z_Free( cv->mins );
 	if ( cv->maxs )
-		MEMORY_SAFETY_FREE( cv->maxs );
+		Z_Free( cv->maxs );
 
 	if ( cv->prev )
 		cv->prev->next = cv->next;
@@ -1741,11 +1741,11 @@ void Cvar_CheckRange( cvar_t *var, const char *mins, const char *maxs, cvarValid
 	}
 
 	if ( var->mins ) {
-		MEMORY_SAFETY_FREE( var->mins );
+		Z_Free( var->mins );
 		var->mins = NULL;
 	}
 	if ( var->maxs ) {
-		MEMORY_SAFETY_FREE( var->maxs );
+		Z_Free( var->maxs );
 		var->maxs = NULL;
 	}
 
@@ -1771,7 +1771,7 @@ void Cvar_SetDescription( cvar_t *var, const char *var_description )
 	{
 		if( var->description != NULL )
 		{
-			MEMORY_SAFETY_FREE( var->description );
+			Z_Free( var->description );
 		}
 		var->description = CopyString( var_description );
 	}
@@ -1793,7 +1793,7 @@ void Cvar_SetDescription2( const char *var_name, const char* var_description )
 	{
 		if ( var->description != NULL )
 		{
-			MEMORY_SAFETY_FREE( var->description );
+			Z_Free( var->description );
 		}
 		var->description = CopyString( var_description );
 	}
@@ -2035,7 +2035,7 @@ cvar_t *Cvar_GetJSON( const char *var_name, const char *json_value, int flags ) 
 				var->jsonObject = NULL;
 			}
 			if ( var->jsonString ) {
-				MEMORY_SAFETY_FREE( var->jsonString );
+				Z_Free( var->jsonString );
 				var->jsonString = NULL;
 			}
 		} else {
@@ -2051,14 +2051,14 @@ cvar_t *Cvar_GetJSON( const char *var_name, const char *json_value, int flags ) 
 		char *json_str = cJSON_PrintUnformatted( json_obj );
 		if ( json_str ) {
 			if ( var->string ) {
-				MEMORY_SAFETY_FREE( var->string );
+				Z_Free( var->string );
 			}
 			var->string = CopyString( json_str );
 			cJSON_free( json_str ); // Use cJSON's free function
 		} else {
 			// Fallback if printing fails
 			if ( var->string ) {
-				MEMORY_SAFETY_FREE( var->string );
+				Z_Free( var->string );
 			}
 			var->string = CopyString( json_value );
 		}
@@ -2159,7 +2159,7 @@ void Cvar_SetJSON( const char *var_name, const char *json_value ) {
 			cJSON_Delete( var->jsonObject );
 		}
 		if ( var->jsonString ) {
-			MEMORY_SAFETY_FREE( var->jsonString );
+			Z_Free( var->jsonString );
 		}
 	} else {
 		// Convert to JSON cvar
@@ -2173,13 +2173,13 @@ void Cvar_SetJSON( const char *var_name, const char *json_value ) {
 	char *json_str = cJSON_PrintUnformatted( json_obj );
 	if ( json_str ) {
 		if ( var->string ) {
-			MEMORY_SAFETY_FREE( var->string );
+			Z_Free( var->string );
 		}
 		var->string = CopyString( json_str );
 		cJSON_free( json_str );
 	} else {
 		if ( var->string ) {
-			MEMORY_SAFETY_FREE( var->string );
+			Z_Free( var->string );
 		}
 		var->string = CopyString( json_value );
 	}

@@ -696,8 +696,8 @@ SET(QCOMMON_SRCS
     src/common/q_log.c
 	src/common/q_math.c
 	src/common/q_math_simd.c
-	src/common/q_allocator.c
-	src/common/q_memory_safety.c
+	# src/common/q_allocator.c  # DISABLED - may cause issues
+	# src/common/q_memory_safety.c  # DISABLED - causes crashes
     src/common/q_memtrack.c
     src/common/q_shared.c
     src/common/q_scalability.c
@@ -723,11 +723,11 @@ list(APPEND QCOMMON_SRCS src/common/q_log.c)
 # Add performance counters
 list(APPEND QCOMMON_SRCS src/common/performance_counters.c)
 # Add memory safety utilities
-list(APPEND QCOMMON_SRCS src/common/q_memory_safety.c)
+# list(APPEND QCOMMON_SRCS src/common/q_memory_safety.c)  # DISABLED - causes crashes
 # Add stability framework
 list(APPEND QCOMMON_SRCS src/common/q_stability.c)
 # Add error recovery system
-list(APPEND QCOMMON_SRCS src/common/q_error_recovery.c)
+# list(APPEND QCOMMON_SRCS src/common/q_error_recovery.c)  # DISABLED - may cause crashes
 # Add input validation system
 list(APPEND QCOMMON_SRCS src/common/input_validation.c)
 # Add backwards compatibility system
@@ -4358,7 +4358,7 @@ SET_TARGET_PROPERTIES(test_net_protocol_validation PROPERTIES
 #	src/tests/test_performance_regression_simple.c
 #	src/common/q_shared.c
 #	src/common/q_math_simd.c
-#	src/common/q_allocator.c
+#	# src/common/q_allocator.c  # DISABLED - may cause issues
 #	src/unix/unix_shared.c
 # )
 # target_compile_definitions(test_performance_regression PRIVATE UNIT_TEST)

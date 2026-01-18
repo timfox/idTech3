@@ -45,6 +45,7 @@ qhandle_t RE_RegisterModel( const char *name );
 qhandle_t RE_RegisterSkin( const char *name );
 qhandle_t RE_RegisterShader( const char *name );
 qhandle_t RE_RegisterShaderNoMip( const char *name );
+qhandle_t RE_RegisterTexture( const char *name, int flags );
 void RE_LoadWorldMap( const char *name );
 void RE_SetWorldVisData( const byte *vis );
 void RE_EndRegistration( void );

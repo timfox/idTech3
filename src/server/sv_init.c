@@ -150,7 +150,7 @@ void SV_SetConfigstring (int index, const char *val) {
 	}
 
 	// change the string in sv
-	MEMORY_SAFETY_FREE( sv.configstrings[index] );
+	Z_Free( sv.configstrings[index] );
 	sv.configstrings[index] = CopyString( val );
 
 	// send it to all the clients if we aren't
@@ -451,7 +451,7 @@ static void SV_ClearServer( void ) {
 
 	for ( i = 0; i < MAX_CONFIGSTRINGS; i++ ) {
 		if ( sv.configstrings[i] ) {
-			MEMORY_SAFETY_FREE( sv.configstrings[i] );
+			Z_Free( sv.configstrings[i] );
 		}
 	}
 

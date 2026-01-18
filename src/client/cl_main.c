@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "../common/ecs.h"
 #include "../common/q_fallback_assets.h"
 #include "../common/input_validation.h"
+#include "../common/q_asset_loaders.h"
 
 // Debug command functions are registered with Cmd_AddCommand but may appear unused to the compiler
 
@@ -3606,6 +3607,13 @@ static void CL_InitRenderer( void ) {
 
 	// this sets up the renderer and calls R_Init
 	re.BeginRegistration( &cls.glconfig );
+
+	// Register asset loading functions with the asset loader system
+	Asset_SetLoadModelFunc(re.RegisterModel);
+	Asset_SetLoadShaderFunc(re.RegisterShader);
+	// Asset_SetLoadTextureFunc(re.RegisterShader); // Textures loaded as shaders for now
+	// Asset_SetLoadSoundFunc(S_RegisterSound); // Need wrapper due to signature mismatch
+	Asset_SetLoadFontFunc(re.RegisterFont);
 
 	// load character sets
 	cls.whiteShader = re.RegisterShader( "white" );

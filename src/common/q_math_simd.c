@@ -27,8 +27,8 @@ operations for improved performance on supported architectures.
 #endif
 
 // Feature detection
-static qboolean q_math_simd_available = qfalse;
-static int q_math_simd_features = 0;
+qboolean q_math_simd_available = qfalse;
+int q_math_simd_features = 0;
 
 #define SIMD_FEATURE_SSE    (1 << 0)
 #define SIMD_FEATURE_SSE2   (1 << 1)
@@ -86,7 +86,12 @@ static inline __m128 Vec3ToM128(const vec3_t v) {
 }
 
 static inline void M128ToVec3(__m128 m, vec3_t v) {
-    _mm_storeu_ps(v, m);
+    // Store to aligned memory and copy - suppresses false positive warnings
+    __attribute__((aligned(16))) float temp[4];
+    _mm_storeu_ps(temp, m);
+    v[0] = temp[0];
+    v[1] = temp[1];
+    v[2] = temp[2];
 }
 
 void VectorAdd_SIMD(const vec3_t a, const vec3_t b, vec3_t out) {

@@ -23,6 +23,39 @@ assetPathConfig_t assetPaths;
 // Linked list of registered loaders
 static assetLoader_t *assetLoaders[ASSET_TYPE_MAX] = {NULL};
 
+// Function pointers for actual asset loading (set by renderer/client)
+qhandle_t (*Asset_LoadModelFunc)(const char *name) = NULL;
+qhandle_t (*Asset_LoadShaderFunc)(const char *name) = NULL;
+qhandle_t (*Asset_LoadTextureFunc)(const char *name, int flags) = NULL;
+qboolean (*Asset_LoadSoundFunc)(const char *name, sfxHandle_t *handle) = NULL;
+qhandle_t (*Asset_LoadFontFunc)(const char *fontName, int pointSize, fontInfo_t *font) = NULL;
+qboolean (*Asset_LoadConfigFunc)(const char *name, void *buffer, int bufferSize) = NULL;
+
+// Set asset loading function pointers
+void Asset_SetLoadModelFunc(qhandle_t (*func)(const char *name)) {
+	Asset_LoadModelFunc = func;
+}
+
+void Asset_SetLoadShaderFunc(qhandle_t (*func)(const char *name)) {
+	Asset_LoadShaderFunc = func;
+}
+
+void Asset_SetLoadTextureFunc(qhandle_t (*func)(const char *name, int flags)) {
+	Asset_LoadTextureFunc = func;
+}
+
+void Asset_SetLoadSoundFunc(qboolean (*func)(const char *name, sfxHandle_t *handle)) {
+	Asset_LoadSoundFunc = func;
+}
+
+void Asset_SetLoadFontFunc(qhandle_t (*func)(const char *fontName, int pointSize, fontInfo_t *font)) {
+	Asset_LoadFontFunc = func;
+}
+
+void Asset_SetLoadConfigFunc(qboolean (*func)(const char *name, void *buffer, int bufferSize)) {
+	Asset_LoadConfigFunc = func;
+}
+
 // Initialize asset loader system
 void Asset_LoadersInit(void) {
 	Com_Memset(&assetPaths, 0, sizeof(assetPaths));
@@ -421,50 +454,73 @@ void Asset_RegisterBuiltInLoaders(void) {
 
 // Stub implementations for built-in loaders (to be implemented)
 qhandle_t Asset_LoadMD3(const char *name) {
-	Com_Printf("Asset_LoadMD3: %s (stub implementation)\n", name);
-	return 0; // No renderer available in common code
+	if (Asset_LoadModelFunc) {
+		return Asset_LoadModelFunc(name);
+	}
+	Com_Printf("Asset_LoadMD3: No renderer function available for %s\n", name);
+	return 0;
 }
 
 qhandle_t Asset_LoadMDR(const char *name) {
-	Com_Printf("Asset_LoadMDR: %s (stub implementation)\n", name);
-	return 0; // No renderer available in common code // Fallback to engine
+	if (Asset_LoadModelFunc) {
+		return Asset_LoadModelFunc(name);
+	}
+	Com_Printf("Asset_LoadMDR: No renderer function available for %s\n", name);
+	return 0;
 }
 
 qhandle_t Asset_LoadIQM(const char *name) {
-	Com_Printf("Asset_LoadIQM: %s (stub implementation)\n", name);
+	if (Asset_LoadModelFunc) {
+		return Asset_LoadModelFunc(name);
+	}
+	Com_Printf("Asset_LoadIQM: No renderer function available for %s\n", name);
 	return 0; // No renderer available in common code // Fallback to engine
 }
 
 qhandle_t Asset_LoadOBJ(const char *name) {
-	Com_Printf("Asset_LoadOBJ: %s (stub implementation)\n", name);
+	if (Asset_LoadModelFunc) {
+		return Asset_LoadModelFunc(name);
+	}
+	Com_Printf("Asset_LoadOBJ: No renderer function available for %s\n", name);
 	return 0; // No renderer available in common code // Fallback to engine
 }
 
 qhandle_t Asset_LoadShaderFile(const char *name) {
-	Com_Printf("Asset_LoadShaderFile: %s (stub implementation)\n", name);
-	return 0; // No renderer available in common code // Fallback to engine
+	if (Asset_LoadShaderFunc) {
+		return Asset_LoadShaderFunc(name);
+	}
+	Com_Printf("Asset_LoadShaderFile: No renderer function available for %s\n", name);
+	return 0;
 }
 
 qhandle_t Asset_LoadTGA(const char *name, int flags) {
-	(void)flags;
-	Com_Printf("Asset_LoadTGA: %s (stub implementation)\n", name);
-	return 0; // No renderer available in common code // Fallback to engine
+	if (Asset_LoadTextureFunc) {
+		return Asset_LoadTextureFunc(name, flags);
+	}
+	Com_Printf("Asset_LoadTGA: No renderer function available for %s\n", name);
+	return 0;
 }
 
 qhandle_t Asset_LoadJPG(const char *name, int flags) {
-	(void)flags;
-	Com_Printf("Asset_LoadJPG: %s (stub implementation)\n", name);
-	return 0; // No renderer available in common code // Fallback to engine
+	if (Asset_LoadTextureFunc) {
+		return Asset_LoadTextureFunc(name, flags);
+	}
+	Com_Printf("Asset_LoadJPG: No renderer function available for %s\n", name);
+	return 0;
 }
 
 qhandle_t Asset_LoadPNG(const char *name, int flags) {
-	(void)flags;
-	Com_Printf("Asset_LoadPNG: %s (stub implementation)\n", name);
-	return 0; // No renderer available in common code
+	if (Asset_LoadTextureFunc) {
+		return Asset_LoadTextureFunc(name, flags);
+	}
+	Com_Printf("Asset_LoadPNG: No renderer function available for %s\n", name);
+	return 0;
 }
 
 qhandle_t Asset_LoadTTF(const char *fontName, int pointSize, fontInfo_t *font) {
-	(void)pointSize; (void)font;
-	Com_Printf("Asset_LoadTTF: %s (stub implementation)\n", fontName);
-	return 0; // No renderer available in common code
+	if (Asset_LoadFontFunc) {
+		return Asset_LoadFontFunc(fontName, pointSize, font);
+	}
+	Com_Printf("Asset_LoadTTF: No renderer function available for %s\n", fontName);
+	return 0;
 }
