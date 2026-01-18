@@ -76,21 +76,49 @@ qboolean SndOpenAL_Init(void)
 
 	s_openal_reverb = Cvar_Get("s_openal_reverb", "0", CVAR_ARCHIVE);
 	Cvar_SetDescription(s_openal_reverb, "Enable reverb effects (may impact performance)");
-	
+
+	cvar_t *s_openal_hrtf = Cvar_Get("s_openal_hrtf", "1", CVAR_ARCHIVE);
+	Cvar_SetDescription(s_openal_hrtf, "Enable HRTF (Head-Related Transfer Function) for realistic 3D audio");
+
+	cvar_t *s_openal_max_distance = Cvar_Get("s_openal_max_distance", "10000", CVAR_ARCHIVE);
+	Cvar_SetDescription(s_openal_max_distance, "Maximum distance for 3D audio attenuation");
+
+	cvar_t *s_openal_rolloff = Cvar_Get("s_openal_rolloff", "1.0", CVAR_ARCHIVE);
+	Cvar_SetDescription(s_openal_rolloff, "Distance rolloff factor for 3D audio");
+
 	if (!s_openal_enabled->integer) {
 		return qfalse;
 	}
 	
 	// Open default device
 	deviceName = alcGetString(NULL, ALC_DEFAULT_DEVICE_SPECIFIER);
+
+	// Try to enable HRTF if requested
+	ALCint contextAttrs[5] = {0};
+	int attrIndex = 0;
+
+	cvar_t *s_openal_hrtf = Cvar_Get("s_openal_hrtf", "1", CVAR_ARCHIVE);
+	if (s_openal_hrtf->integer) {
+		// Check if HRTF is supported
+		ALCint hrtfStatus = 0;
+		alcGetIntegerv(NULL, ALC_HRTF_STATUS_SOFT, 1, &hrtfStatus);
+		if (hrtfStatus == ALC_HRTF_ENABLED_SOFT || hrtfStatus == ALC_HRTF_HEADPHONES_DETECTED_SOFT) {
+			contextAttrs[attrIndex++] = ALC_HRTF_SOFT;
+			contextAttrs[attrIndex++] = ALC_TRUE;
+			LOG_SOUND_INFO("OpenAL: HRTF enabled for enhanced spatial audio");
+		} else {
+			LOG_SOUND_INFO("OpenAL: HRTF not supported by audio device");
+		}
+	}
+
 	openalDevice = alcOpenDevice(deviceName);
 	if (!openalDevice) {
 		LOG_SOUND_WARN("OpenAL: failed to open default device");
 		return qfalse;
 	}
-	
-	// Create context
-	openalContext = alcCreateContext(openalDevice, NULL);
+
+	// Create context with attributes
+	openalContext = alcCreateContext(openalDevice, contextAttrs);
 	if (!openalContext) {
 		LOG_SOUND_WARN("OpenAL: failed to create context");
 		alcCloseDevice(openalDevice);
@@ -296,9 +324,21 @@ static void SndOpenAL_InitEfx(void) {
 		return;
 	}
 
-	// Reasonable defaults
+	// Enhanced reverb settings for realistic environmental audio
+	// These settings create a subtle room effect suitable for most game environments
+	alEffectf(openalReverbEffect, AL_REVERB_DENSITY, 1.0f);
+	alEffectf(openalReverbEffect, AL_REVERB_DIFFUSION, 1.0f);
 	alEffectf(openalReverbEffect, AL_REVERB_GAIN, 0.32f);
-	alEffectf(openalReverbEffect, AL_REVERB_DECAY_TIME, 1.5f);
+	alEffectf(openalReverbEffect, AL_REVERB_GAINHF, 0.89f);
+	alEffectf(openalReverbEffect, AL_REVERB_DECAY_TIME, 1.49f);
+	alEffectf(openalReverbEffect, AL_REVERB_DECAY_HFRATIO, 0.83f);
+	alEffectf(openalReverbEffect, AL_REVERB_REFLECTIONS_GAIN, 0.05f);
+	alEffectf(openalReverbEffect, AL_REVERB_REFLECTIONS_DELAY, 0.007f);
+	alEffectf(openalReverbEffect, AL_REVERB_LATE_REVERB_GAIN, 1.26f);
+	alEffectf(openalReverbEffect, AL_REVERB_LATE_REVERB_DELAY, 0.011f);
+	alEffectf(openalReverbEffect, AL_REVERB_ROOM_ROLLOFF_FACTOR, 0.0f);
+	alEffectf(openalReverbEffect, AL_REVERB_AIR_ABSORPTION_GAINHF, 0.994f);
+	alEffectf(openalReverbEffect, AL_REVERB_HFREFERENCE, 5000.0f);
 
 	alGenAuxiliaryEffectSlots(1, &openalReverbSlot);
 	if (alGetError() != AL_NO_ERROR) {
@@ -410,22 +450,46 @@ sndOpenALHandle_t SndOpenAL_PlaySound(const char *soundName, const sndOpenAL3DPr
 			alSource3f(source, AL_POSITION, props->position[0], props->position[1], props->position[2]);
 			alSource3f(source, AL_VELOCITY, props->velocity[0], props->velocity[1], props->velocity[2]);
 
-			// Distance attenuation with better defaults
+			// Distance attenuation with better defaults and configurable rolloff
 			float minDist = props->minDistance > 0 ? props->minDistance : 128.0f;
 			float maxDist = props->maxDistance > 0 ? props->maxDistance : 1024.0f;
+			cvar_t *s_openal_rolloff = Cvar_Get("s_openal_rolloff", "1.0", CVAR_ARCHIVE);
+
 			alSourcef(source, AL_REFERENCE_DISTANCE, minDist);
 			alSourcef(source, AL_MAX_DISTANCE, maxDist);
-			alSourcef(source, AL_ROLLOFF_FACTOR, 1.0f); // Linear distance attenuation
+			alSourcef(source, AL_ROLLOFF_FACTOR, s_openal_rolloff->value);
+
+			// Air absorption for distant sounds (high frequency attenuation)
+			// This creates more realistic distance-based frequency filtering
+			float distance = sqrt(position[0]*position[0] + position[1]*position[1] + position[2]*position[2]);
+			float airAbsorptionFactor = 1.0f - (distance / maxDist);
+			airAbsorptionFactor = Com_Clamp(0.0f, 1.0f, airAbsorptionFactor);
+			alSourcef(source, AL_AIR_ABSORPTION_FACTOR, airAbsorptionFactor * 0.05f); // Subtle effect
 
 			// Directional sound cone for more realistic spatialization
-			alSourcef(source, AL_CONE_INNER_ANGLE, 360.0f); // Omnidirectional
-			alSourcef(source, AL_CONE_OUTER_ANGLE, 360.0f);
-			alSourcef(source, AL_CONE_OUTER_GAIN, 0.0f);
+			if (props->flags & SND_OPENAL_DIRECTIONAL) {
+				// Use narrower cone for directional sounds
+				alSourcef(source, AL_CONE_INNER_ANGLE, 90.0f);
+				alSourcef(source, AL_CONE_OUTER_ANGLE, 180.0f);
+				alSourcef(source, AL_CONE_OUTER_GAIN, 0.3f);
+			} else {
+				// Omnidirectional for ambient sounds
+				alSourcef(source, AL_CONE_INNER_ANGLE, 360.0f);
+				alSourcef(source, AL_CONE_OUTER_ANGLE, 360.0f);
+				alSourcef(source, AL_CONE_OUTER_GAIN, 1.0f);
+			}
 
 			// Enable Doppler effect for moving sounds
 			if (props->flags & SND_OPENAL_DOPPLER && s_doppler && s_doppler->integer) {
-				// Doppler settings are global, but we can adjust per-source velocity
 				alSource3f(source, AL_VELOCITY, props->velocity[0], props->velocity[1], props->velocity[2]);
+			} else {
+				alSource3f(source, AL_VELOCITY, 0.0f, 0.0f, 0.0f);
+			}
+
+			// Room effects for immersive audio
+			if (s_openal_reverb && s_openal_reverb->integer && openalEfxAvailable) {
+				alSource3f(source, AL_AUXILIARY_SEND_FILTER, openalReverbSlot, 0, AL_FILTER_NULL);
+				alSourcef(source, AL_ROOM_ROLLOFF_FACTOR, 1.0f);
 			}
 		} else {
 			// 2D sounds are positioned relative to listener
@@ -551,15 +615,15 @@ void SndOpenAL_SetListenerPosition(const vec3_t position, const vec3_t forward, 
 {
 	if (!s_openal_enabled || !s_openal_enabled->integer || !openalContext)
 		return;
-	
+
 	ALfloat orientation[6];
-	
+
 	// Set position
 	alListener3f(AL_POSITION, position[0], position[1], position[2]);
-	
+
 	// Set velocity
 	alListener3f(AL_VELOCITY, velocity[0], velocity[1], velocity[2]);
-	
+
 	// Set orientation (forward and up vectors)
 	orientation[0] = forward[0];
 	orientation[1] = forward[1];
@@ -568,6 +632,19 @@ void SndOpenAL_SetListenerPosition(const vec3_t position, const vec3_t forward, 
 	orientation[4] = up[1];
 	orientation[5] = up[2];
 	alListenerfv(AL_ORIENTATION, orientation);
+
+	// Configure distance model and attenuation for realistic spatialization
+	cvar_t *s_openal_max_distance = Cvar_Get("s_openal_max_distance", "10000", CVAR_ARCHIVE);
+	cvar_t *s_openal_rolloff = Cvar_Get("s_openal_rolloff", "1.0", CVAR_ARCHIVE);
+
+	// Use inverse distance clamped model for realistic attenuation
+	alDistanceModel(AL_INVERSE_DISTANCE_CLAMPED);
+	alListenerf(AL_MAX_DISTANCE, s_openal_max_distance->value);
+
+	// Set global doppler factor for moving sounds
+	cvar_t *s_doppler = Cvar_Get("s_doppler", "1", CVAR_ARCHIVE);
+	alDopplerFactor(s_doppler->value);
+	alDopplerVelocity(343.3f); // Speed of sound in air (m/s)
 }
 
 /*

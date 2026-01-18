@@ -9,6 +9,7 @@
 #define SND_OPENAL_OCCLUSION		0x0004
 #define SND_OPENAL_REVERB		0x0008
 #define SND_OPENAL_DOPPLER		0x0010
+#define SND_OPENAL_DIRECTIONAL		0x0020
 
 // Sound handle type
 typedef int sndOpenALHandle_t;

@@ -600,7 +600,7 @@ OPTION(USE_STEAMWORKS "Enable Steamworks SDK integration for Steam Deck features
 OPTION(USE_TRACY "Enable Tracy profiler instrumentation (header-only shim)" OFF)
 OPTION(USE_CIMGUI "Enable ImGui" ON)
 OPTION(USE_WEBSOCKETS "Enable WebSocket support" ON)
-OPTION(USE_OPENAL "Enable OpenAL enhanced audio system" OFF)
+OPTION(USE_OPENAL "Enable OpenAL enhanced audio system" ON)
 OPTION(USE_BULLET "Enable Bullet Physics library for rigid body simulation" ON)
 OPTION(USE_JOBSYSTEM "Enable multi-threaded job system for parallel execution" ON)
 OPTION(USE_THEORA "Enable Theora (Ogg Theora) video codec support" ON)
