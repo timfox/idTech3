@@ -213,6 +213,59 @@ struct NetworkComponent {
 		: entityIndex(idx), entityType(type), needsSync(qtrue), isServer(server) {}
 };
 
+// Render Component - Controls visual appearance and rendering properties
+struct RenderComponent {
+	char model[MAX_QPATH];    // Model filename
+	int modelIndex;           // Cached model index
+	int skinIndex;            // Skin/material index
+	float scale[3];           // Scale factors (x, y, z)
+	float alpha;              // Transparency (0.0 = invisible, 1.0 = opaque)
+	qboolean visible;         // Whether entity should be rendered
+	int renderFx;             // Special render effects (glow, outline, etc.)
+	vec3_t mins, maxs;       // Bounding box for culling
+
+	RenderComponent() : modelIndex(0), skinIndex(0), alpha(1.0f), visible(qtrue), renderFx(0) {
+		model[0] = '\0';
+		VectorSet(scale, 1.0f, 1.0f, 1.0f);
+		VectorSet(mins, -16, -16, -16);
+		VectorSet(maxs, 16, 16, 16);
+	}
+};
+
+// Door Component - Controls door behavior and locking mechanics
+struct DoorComponent {
+	char doorId[MAX_QPATH];       // Unique door identifier
+	char requiredKey[MAX_QPATH];  // Required key/keycard name
+	qboolean isLocked;            // Whether door is currently locked
+	qboolean isOpen;              // Whether door is currently open
+	float openProgress;           // 0.0 = closed, 1.0 = fully open
+	float openSpeed;              // Speed of door opening/closing
+	vec3_t closedPos;             // Position when closed
+	vec3_t openPos;               // Position when open
+	int autoCloseTime;            // Time in ms before auto-closing (0 = manual only)
+	int lastUsedTime;             // When door was last opened/closed
+
+	DoorComponent() : isLocked(qfalse), isOpen(qfalse), openProgress(0.0f),
+	                  openSpeed(1.0f), autoCloseTime(0), lastUsedTime(0) {
+		doorId[0] = '\0';
+		requiredKey[0] = '\0';
+		VectorClear(closedPos);
+		VectorClear(openPos);
+	}
+};
+
+// Animation Component - Controls entity animation state
+struct AnimationComponent {
+	int legsAnim;                 // Current leg animation
+	int torsoAnim;                // Current torso animation
+	int movementFlags;            // Movement state flags
+	float frameTime;              // Time in current animation frame
+	int currentFrame;             // Current animation frame
+
+	AnimationComponent() : legsAnim(0), torsoAnim(0), movementFlags(0),
+	                      frameTime(0.0f), currentFrame(0) {}
+};
+
 // Collision callback types
 #ifdef USE_BULLET
 using CollisionCallback = void(*)(ecs_entity_t entityA, ecs_entity_t entityB,

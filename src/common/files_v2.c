@@ -7,10 +7,13 @@ Virtual Filesystem v2 - Complete implementation
 #include "q_shared.h"
 #include "qcommon.h"
 #include "files_v2.h"
+#include "files_internal.h"
 #include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
 #include <errno.h>
+#include <vector>
+#include <algorithm>
 
 static fsMountTable_t mountTable;
 static qboolean fs_v2_active = qfalse;
@@ -440,13 +443,98 @@ int FS_Mount_FindFile(const char *qpath, fileHandle_t *file, fsMount_t **outMoun
 		if (mount->enabled) {
 			mount->accessCount++;
 
-			// TODO: Implement actual file search in mount
-			// For now, just return not found
+			// Search based on mount type
+			switch (mount->type) {
+			case FS_MOUNT_PAK:
+				if (mount->backend.pak) {
+					fileInPack_t *pakFile = FS_FindPakFile(mount->backend.pak, qpath);
+					if (pakFile) {
+						mount->hitCount++;
+						if (outMount) *outMount = mount;
+						if (outPak) *outPak = mount->backend.pak;
+						if (outPakFile) *outPakFile = pakFile;
+
+						// If file handle requested, open the file
+						if (file) {
+							return FS_OpenFileInPak(file, mount->backend.pak, pakFile, qtrue);
+						}
+						return pakFile->size;
+					}
+				}
+				break;
+
+			case FS_MOUNT_DIR:
+				if (mount->backend.dir) {
+					// Construct full path: mount->backend.dir->path + qpath
+					char fullPath[MAX_OSPATH];
+					Com_sprintf(fullPath, sizeof(fullPath), "%s/%s",
+							   mount->backend.dir->path, qpath);
+
+					// Check if file exists
+					fileHandle_t testFile;
+					int len = FS_FOpenFileRead(fullPath, &testFile, qtrue);
+					if (len > 0) {
+						mount->hitCount++;
+						if (outMount) *outMount = mount;
+						if (outPak) *outPak = NULL; // Not in a PAK
+						if (outPakFile) *outPakFile = NULL; // Not in a PAK
+
+						// If file handle requested, return the opened file
+						if (file) {
+							*file = testFile;
+							return len;
+						} else {
+							// Close the test file
+							FS_FCloseFile(testFile);
+							return len;
+						}
+					}
+				}
+				break;
+
+			case FS_MOUNT_VIRTUAL:
+				// Virtual mounts are placeholders for future features
+				// (network mounts, generated content, etc.)
+				break;
+
+			default:
+				break;
+			}
 		}
 		mount = mount->next;
 	}
 
 	return 0; // Not found
+}
+
+/*
+===============
+FS_FindPakFile
+Find a file in a PAK file's hash table
+===============
+*/
+fileInPack_t *FS_FindPakFile(pack_t *pak, const char *filename) {
+	if (!pak || !filename || !pak->hashTable) {
+		return NULL;
+	}
+
+	// Hash the filename to find the right bucket
+	unsigned int hash = 0;
+	for (const char *c = filename; *c; c++) {
+		hash = (hash * 31) + *c;
+	}
+	hash &= (pak->hashSize - 1);
+
+	// Search through the hash chain
+	fileInPack_t *pakFile = pak->hashTable[hash];
+	while (pakFile) {
+		if (Q_stricmp(pakFile->name, filename) == 0) {
+			return pakFile;
+		}
+		pakFile = pakFile->next;
+	}
+
+	return NULL;
 }
 
 /*
@@ -844,6 +932,84 @@ qboolean FS_Cache_Get(const char *path, void **data, size_t *size) {
 
 /*
 ===============
+FS_Cache_EvictLRU
+Evict least recently used cache entries to make room for new data
+===============
+*/
+static void FS_Cache_EvictLRU(size_t requiredSpace) {
+	if (!cacheInitialized) return;
+
+	size_t targetSize = cacheStats.cacheSizeBytes - requiredSpace;
+	if (targetSize > cacheConfig.maxSizeBytes * cacheConfig.evictionThreshold) {
+		targetSize = cacheConfig.maxSizeBytes * cacheConfig.evictionThreshold;
+	}
+
+	// Collect all entries for sorting by access time
+	struct EvictCandidate {
+		fsCacheEntry_t *entry;
+		uint32_t hash;
+		uint32_t bucketIndex;
+	};
+
+	std::vector<EvictCandidate> candidates;
+	candidates.reserve(cacheStats.cachedEntries);
+
+	// Scan all hash buckets to find entries
+	for (uint32_t hash = 0; hash < FS_CACHE_HASH_SIZE; hash++) {
+		fsCacheEntry_t *entry = cacheHashTable[hash];
+		while (entry) {
+			if (entry->cachedData) { // Only consider entries with cached data
+				candidates.push_back({entry, hash, hash});
+			}
+			entry = (fsCacheEntry_t *)entry->cachedData; // Next in hash chain
+		}
+	}
+
+	// Sort by access time (oldest first)
+	std::sort(candidates.begin(), candidates.end(),
+		[](const EvictCandidate &a, const EvictCandidate &b) {
+			return a.entry->lastAccess < b.entry->lastAccess;
+		});
+
+	// Evict entries until we reach target size
+	size_t evictedSize = 0;
+	size_t evictedCount = 0;
+
+	for (const auto &candidate : candidates) {
+		if (cacheStats.cacheSizeBytes <= targetSize) {
+			break; // Reached target size
+		}
+
+		// Remove from hash table
+		fsCacheEntry_t **entryPtr = &cacheHashTable[candidate.hash];
+		while (*entryPtr) {
+			if (*entryPtr == candidate.entry) {
+				*entryPtr = (fsCacheEntry_t *)(*entryPtr)->cachedData;
+				break;
+			}
+			entryPtr = (fsCacheEntry_t **)&(*entryPtr)->cachedData;
+		}
+
+		// Free resources
+		if (candidate.entry->cachedData) {
+			Z_Free(candidate.entry->cachedData);
+			cacheStats.cacheSizeBytes -= candidate.entry->dataSize;
+			evictedSize += candidate.entry->dataSize;
+			evictedCount++;
+		}
+
+		Z_Free(candidate.entry);
+		cacheStats.cachedEntries--;
+	}
+
+	if (evictedCount > 0) {
+		Com_DPrintf("VFS: Evicted %d entries (%d KB) for LRU cache\n",
+				   (int)evictedCount, (int)(evictedSize / 1024));
+	}
+}
+
+/*
+===============
 FS_Cache_Put
 ===============
 */
@@ -856,10 +1022,7 @@ qboolean FS_Cache_Put(const char *path, const void *data, size_t size) {
 
 		// Need to evict some entries
 		if (cacheStats.cacheSizeBytes > cacheConfig.maxSizeBytes * cacheConfig.evictionThreshold) {
-			// Simple eviction: clear 25% of cache
-			size_t targetSize = cacheStats.cacheSizeBytes * 0.75f;
-			// TODO: Implement LRU eviction
-			FS_Cache_Clear(); // For now, just clear everything
+			FS_Cache_EvictLRU(size);
 			cacheStats.evictions++;
 		}
 	}
@@ -992,6 +1155,11 @@ static fsChangeCallback_t changeCallbacks[16];
 static int numChangeCallbacks = 0;
 static qboolean monitorInitialized = qfalse;
 
+#define MAX_MONITORED_PATHS 64
+static char monitoredPaths[MAX_MONITORED_PATHS][MAX_QPATH];
+static uint32_t monitoredPathTimes[MAX_MONITORED_PATHS];
+static int numMonitoredPaths = 0;
+
 /*
 ===============
 FS_Monitor_Init
@@ -1028,9 +1196,30 @@ FS_Monitor_AddPath
 ===============
 */
 qboolean FS_Monitor_AddPath(const char *path) {
-	(void)path;
-	// TODO: Implement platform-specific file monitoring
-	// This would use inotify on Linux, FSEvents on macOS, etc.
+	if (!monitorInitialized || !path || numMonitoredPaths >= MAX_MONITORED_PATHS) {
+		return qfalse;
+	}
+
+	// Check if path is already monitored
+	for (int i = 0; i < numMonitoredPaths; i++) {
+		if (Q_stricmp(monitoredPaths[i], path) == 0) {
+			return qtrue; // Already monitored
+		}
+	}
+
+	// Add path to monitoring list
+	Q_strncpyz(monitoredPaths[numMonitoredPaths], path, sizeof(monitoredPaths[0]));
+
+	// Get initial modification time
+	struct stat st;
+	if (stat(path, &st) == 0) {
+		monitoredPathTimes[numMonitoredPaths] = st.st_mtime;
+	} else {
+		monitoredPathTimes[numMonitoredPaths] = 0; // File doesn't exist yet
+	}
+
+	numMonitoredPaths++;
+	Com_DPrintf("VFS: Added path to monitoring: %s\n", path);
 	return qtrue;
 }
 
@@ -1040,8 +1229,22 @@ FS_Monitor_RemovePath
 ===============
 */
 void FS_Monitor_RemovePath(const char *path) {
-	(void)path;
-	// TODO: Remove from monitoring
+	if (!monitorInitialized || !path) return;
+
+	// Find and remove the path
+	for (int i = 0; i < numMonitoredPaths; i++) {
+		if (Q_stricmp(monitoredPaths[i], path) == 0) {
+			// Shift remaining entries
+			for (int j = i; j < numMonitoredPaths - 1; j++) {
+				Q_strncpyz(monitoredPaths[j], monitoredPaths[j + 1], sizeof(monitoredPaths[0]));
+				monitoredPathTimes[j] = monitoredPathTimes[j + 1];
+			}
+
+			numMonitoredPaths--;
+			Com_DPrintf("VFS: Removed path from monitoring: %s\n", path);
+			break;
+		}
+	}
 }
 
 /*
@@ -1063,6 +1266,76 @@ FS_Monitor_Update
 void FS_Monitor_Update(void) {
 	if (!monitorInitialized) return;
 
-	// TODO: Check for file changes and call callbacks
-	// This would be called regularly from the main loop
+	static uint32_t lastCheckTime = 0;
+	uint32_t currentTime = Sys_Milliseconds();
+
+	// Check every 100ms to avoid excessive I/O
+	if (currentTime - lastCheckTime < 100) {
+		return;
+	}
+	lastCheckTime = currentTime;
+
+	// Check monitored paths for changes
+	for (int i = 0; i < numMonitoredPaths; i++) {
+		const char *path = monitoredPaths[i];
+		if (!path || !path[0]) continue;
+
+		struct stat st;
+		if (stat(path, &st) == 0) {
+			// Check if modification time changed
+			if (st.st_mtime != monitoredPathTimes[i]) {
+				fsChangeType_t changeType = FS_CHANGE_MODIFIED;
+
+				// Determine change type based on previous state
+				if (monitoredPathTimes[i] == 0) {
+					changeType = FS_CHANGE_ADDED;
+				}
+
+				// Check if file was deleted and recreated
+				if (st.st_mtime > monitoredPathTimes[i] + 1) {
+					changeType = FS_CHANGE_MODIFIED;
+				}
+
+				monitoredPathTimes[i] = st.st_mtime;
+
+				// Notify callbacks
+				fsChangeEvent_t event;
+				Q_strncpyz(event.oldPath, path, sizeof(event.oldPath));
+				Q_strncpyz(event.newPath, path, sizeof(event.newPath));
+				event.type = changeType;
+				event.timestamp = currentTime;
+
+				for (int j = 0; j < numChangeCallbacks; j++) {
+					if (changeCallbacks[j]) {
+						changeCallbacks[j](&event);
+					}
+				}
+
+				Com_DPrintf("VFS: File change detected: %s (%s)\n", path,
+						   changeType == FS_CHANGE_ADDED ? "added" :
+						   changeType == FS_CHANGE_MODIFIED ? "modified" : "unknown");
+			}
+		} else {
+			// File was deleted
+			if (monitoredPathTimes[i] != 0) {
+				fsChangeEvent_t event;
+				Q_strncpyz(event.oldPath, path, sizeof(event.oldPath));
+				event.newPath[0] = '\0'; // No new path for deletions
+				event.type = FS_CHANGE_DELETED;
+				event.timestamp = currentTime;
+
+				// Notify callbacks
+				for (int j = 0; j < numChangeCallbacks; j++) {
+					if (changeCallbacks[j]) {
+						changeCallbacks[j](&event);
+					}
+				}
+
+				Com_DPrintf("VFS: File deleted: %s\n", path);
+			}
+
+			// Reset timestamp to detect if file is recreated
+			monitoredPathTimes[i] = 0;
+		}
+	}
 }

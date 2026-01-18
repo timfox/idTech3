@@ -13,6 +13,7 @@ Core system implementations for physics, health, and network sync.
 #include "ecs_internal.h"
 #include "q_shared.h"
 #include "qcommon.h"
+#include "../game/g_local.h"
 #include <entt/entt.hpp>
 #include <vector>
 #include <ctime>
@@ -725,8 +726,201 @@ This is a placeholder - actual implementation will sync to gentity_t/svEntity_t
 ================
 */
 void ECS_NetworkSyncSystem_Update(void) {
-	// Placeholder intentionally left as a no-op. Actual syncing is handled
-	// in the game/server bridge layers (G_ECS_SyncToGentity, SV_ECS_SyncToSvEntity).
+	// Sync ECS components to/from engine entity structures
+	// This handles bidirectional synchronization between ECS and legacy systems
+
+	auto &registry = ECS::GetRegistry();
+	auto networkView = registry.view<NetworkComponent>();
+
+	for (auto entity : networkView) {
+		auto &network = networkView.get<NetworkComponent>(entity);
+
+		if (!network.needsSync) {
+			continue;
+		}
+
+		// Get the corresponding engine entity
+		gentity_t *gent = NULL;
+		if (network.entityIndex >= 0 && network.entityIndex < MAX_GENTITIES) {
+			gent = &g_entities[network.entityIndex];
+		}
+
+		if (!gent || !gent->inuse) {
+			// Entity no longer exists in engine, remove from ECS
+			ECS_DestroyEntity(static_cast<ecs_entity_t>(entity));
+			continue;
+		}
+
+		// Sync transform component to engine
+		if (auto transform = registry.try_get<TransformComponent>(entity)) {
+			VectorCopy(transform->position, gent->r.currentOrigin);
+			VectorCopy(transform->rotation, gent->r.currentAngles);
+
+			// Update entity state for networking
+			VectorCopy(transform->position, gent->s.origin);
+			VectorCopy(transform->rotation, gent->s.angles);
+		}
+
+		// Sync health component to engine
+		if (auto health = registry.try_get<HealthComponent>(entity)) {
+			gent->health = health->health;
+			if (gent->health <= 0) {
+				gent->s.eFlags |= EF_DEAD;
+			} else {
+				gent->s.eFlags &= ~EF_DEAD;
+			}
+		}
+
+		// Sync physics component state
+		if (auto physics = registry.try_get<PhysicsComponent>(entity)) {
+			// Update entity velocity for network sync
+			gent->s.pos.trBase[0] = physics->velocity[0];
+			gent->s.pos.trBase[1] = physics->velocity[1];
+			gent->s.pos.trBase[2] = physics->velocity[2];
+			gent->s.pos.trType = TR_LINEAR; // Simple linear motion
+		}
+
+		// Sync render component
+		if (auto render = registry.try_get<RenderComponent>(entity)) {
+			// Update model and skin information
+			if (render->model[0]) {
+				gent->model = render->model;
+			}
+			gent->s.modelindex = render->modelIndex;
+			// gent->s.skinNum = render->skinIndex; // skinNum not in entityState_t
+
+			// Update visibility and rendering properties
+			if (!render->visible) {
+				gent->r.svFlags |= SVF_NOCLIENT; // Don't send to clients
+			} else {
+				gent->r.svFlags &= ~SVF_NOCLIENT;
+			}
+
+			// Apply render effects
+			if (render->renderFx & RF_GLOW) {
+				gent->s.eFlags |= EF_BOUNCE;
+			}
+		}
+
+		// Sync animation component
+		if (auto anim = registry.try_get<AnimationComponent>(entity)) {
+			gent->s.legsAnim = anim->legsAnim;
+			gent->s.torsoAnim = anim->torsoAnim;
+			gent->s.animMovements = anim->movementFlags;
+		}
+
+		// Mark entity as needing network update
+		gent->r.svFlags |= SVF_BROADCAST;
+
+		// Reset sync flag
+		network.needsSync = qfalse;
+	}
+}
+
+/*
+================
+ECS_RenderSystem_Update
+Update render components and prepare entities for rendering
+================
+*/
+void ECS_RenderSystem_Update(void) {
+	auto &registry = ECS::GetRegistry();
+
+	// Update render components based on other component states
+	auto renderView = registry.view<RenderComponent>();
+
+	for (auto entity : renderView) {
+		auto &render = renderView.get<RenderComponent>(entity);
+
+		// Update visibility based on health
+		if (auto health = registry.try_get<HealthComponent>(entity)) {
+			if (health->health <= 0) {
+				render.visible = qfalse; // Dead entities are invisible
+			} else {
+				render.visible = qtrue;
+			}
+
+			// Apply damage flash effect
+			if (health->damageFlashTime > 0) {
+				render.alpha = 0.7f; // Semi-transparent when taking damage
+				health->damageFlashTime -= 16; // Assume 60 FPS
+			} else {
+				render.alpha = 1.0f; // Normal opacity
+			}
+		}
+
+		// Update animation state for rendering
+		if (auto anim = registry.try_get<AnimationComponent>(entity)) {
+			// Animation updates would be handled here
+			// For now, just ensure proper timing
+			anim->frameTime += 16; // Assume 60 FPS
+		}
+
+		// Update particle effects
+		if (auto particles = registry.try_get<ParticleComponent>(entity)) {
+			// Update particle system
+			particles->time += 16;
+			if (particles->time >= particles->lifetime) {
+				// Remove expired particle system
+				registry.remove<ParticleComponent>(entity);
+			}
+		}
+
+		// Mark for network sync if render state changed
+		if (auto network = registry.try_get<NetworkComponent>(entity)) {
+			network->needsSync = qtrue;
+		}
+	}
+}
+
+/*
+================
+ECS_DoorSystem_Update
+Handle door opening, closing, and locking mechanics
+================
+*/
+void ECS_DoorSystem_Update(float deltaTime) {
+	auto &registry = ECS::GetRegistry();
+	auto doorView = registry.view<DoorComponent, TransformComponent>();
+
+	for (auto entity : doorView) {
+		auto &door = doorView.get<DoorComponent>(entity);
+		auto &transform = doorView.get<TransformComponent>(entity);
+
+		// Handle door state transitions
+		if (door.isOpen && door.openProgress < 1.0f) {
+			// Door is opening
+			door.openProgress += door.openSpeed * deltaTime * 0.001f; // Convert to seconds
+			if (door.openProgress >= 1.0f) {
+				door.openProgress = 1.0f;
+				door.lastUsedTime = Sys_Milliseconds();
+			}
+		} else if (!door.isOpen && door.openProgress > 0.0f) {
+			// Door is closing
+			door.openProgress -= door.openSpeed * deltaTime * 0.001f;
+			if (door.openProgress <= 0.0f) {
+				door.openProgress = 0.0f;
+			}
+		}
+
+		// Auto-close doors
+		if (door.autoCloseTime > 0 && door.isOpen && door.openProgress >= 1.0f) {
+			int currentTime = Sys_Milliseconds();
+			if (currentTime - door.lastUsedTime >= door.autoCloseTime) {
+				door.isOpen = qfalse; // Start closing
+			}
+		}
+
+		// Interpolate door position between closed and open positions
+		vec3_t targetPos;
+		VectorLerp(door.closedPos, door.openPos, door.openProgress, targetPos);
+		VectorCopy(targetPos, transform.position);
+
+		// Mark for network sync if position changed
+		if (auto network = registry.try_get<NetworkComponent>(entity)) {
+			network->needsSync = qtrue;
+		}
+	}
 }
 
 /*
@@ -898,40 +1092,47 @@ static void ECS_KeySystem_Update(float deltaTime) {
 		}
 
 		// Find door entities that match the target
-		// For now, we'll search through all entities with NetworkComponent
-		// In a real implementation, doors would have a DoorComponent
-		auto networkView = registry.view<NetworkComponent>();
+		auto doorView = registry.view<DoorComponent>();
 		bool doorFound = false;
 
-		for (auto doorEntity : networkView) {
-			auto &net = networkView.get<NetworkComponent>(doorEntity);
+		for (auto doorEntity : doorView) {
+			auto &door = doorView.get<DoorComponent>(doorEntity);
 
-			// Check if this entity matches the target door
-			// This is a simplified check - in practice, doors would have specific components
-			// TODO: Add DoorComponent with locked state, target key ID, etc.
+			// Check if this door requires the key we have
+			if (Q_stricmp(door.requiredKey, key.keyId) == 0) {
+				// Found matching door
+				if (door.isLocked) {
+					// Unlock the door
+					door.isLocked = qfalse;
+					Com_Printf("Key '%s' unlocked door '%s'\n", key.keyId, door.doorId);
 
-			// For now, just check entity index or name match
-			char entityName[64];
-			Com_sprintf(entityName, sizeof(entityName), "door_%s", key.doorTarget);
+					// Mark door as needing network sync
+					if (auto network = registry.try_get<NetworkComponent>(doorEntity)) {
+						network->needsSync = qtrue;
+					}
 
-			// Simplified door unlocking logic
-			// In a real game, this would check door state and unlock it
-			if (net.entityIndex >= 0) {
-				Com_DPrintf("Key %d (ID: %d) attempting to unlock door: %s\n",
-                                            static_cast<int>(entity), key.keyId, key.doorTarget);
-
-				// Check if door is locked and can be unlocked by this key
-				// TODO: Implement proper door locking/unlocking system
-				// For now, just log the attempt
-				doorFound = true;
+					doorFound = true;
+				} else {
+					Com_Printf("Door '%s' is already unlocked\n", door.doorId);
+					doorFound = true;
+				}
 
 				// Play unlock sound if available
 				if (key.pickupSound[0] != '\0') {
-					// S_StartSound(position, ENTITYNUM_WORLD, CHAN_AUTO, key.pickupSound);
 					Com_DPrintf("Playing key unlock sound: %s\n", key.pickupSound);
 				}
 
-				// Mark network sync needed for the door
+				break;
+			}
+		}
+
+		if (!doorFound) {
+			Com_Printf("No door found that requires key '%s'\n", key.keyId);
+		}
+
+		// Remove the used key regardless of whether door was found
+		// (prevents key duplication exploits)
+		registry.remove<KeyComponent>(entity);
 				net.needsSync = qtrue;
 
 				break; // Only unlock one door per key per frame

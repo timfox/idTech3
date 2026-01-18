@@ -623,9 +623,9 @@ qboolean AssetCooking_CompressBasisU(byte* input_data, size_t input_size,
     byte* compressedData = (byte*)malloc(compressedSize);
     if (!compressedData) return qfalse;
 
-    // Simple ETC1S-like compression (placeholder)
-    // In a real implementation, this would use the BasisU encoder
-    memset(compressedData, 0, compressedSize);
+    // Enhanced ETC1S-like compression with better quality
+    // In a real implementation with BasisU library, this would use proper ETC1S encoding
+    // For now, we implement a simplified but more realistic compression
 
     // For each 4x4 block in the input texture
     const uint32_t* rgbaPixels = (const uint32_t*)input_data;
@@ -648,20 +648,81 @@ qboolean AssetCooking_CompressBasisU(byte* input_data, size_t input_size,
                 }
             }
 
-            // Compress 4x4 block to 16 bytes (simplified ETC1S encoding)
+            // Compress 4x4 block to 16 bytes (enhanced ETC1S-like encoding)
             uint8_t* blockData = compressedBlocks + (by * blocksX + bx) * 16;
 
-            // Simple color encoding - find min/max colors
-            uint32_t minColor = 0xFFFFFFFF;
-            uint32_t maxColor = 0x00000000;
+            // Analyze block for better compression
+            // Find dominant colors using a simplified clustering approach
+            uint32_t colors[16];
+            memcpy(colors, blockPixels, sizeof(colors));
 
-            for (int i = 0; i < 16; i++) {
-                uint32_t color = blockPixels[i];
-                if (color < minColor) minColor = color;
-                if (color > maxColor) maxColor = color;
+            // Sort colors by luminance for better compression
+            for (int i = 0; i < 15; i++) {
+                for (int j = 0; j < 15 - i; j++) {
+                    // Extract RGB components and calculate luminance
+                    uint32_t c1 = colors[j];
+                    uint32_t c2 = colors[j + 1];
+
+                    uint8_t r1 = (c1 >> 16) & 0xFF, g1 = (c1 >> 8) & 0xFF, b1 = c1 & 0xFF;
+                    uint8_t r2 = (c2 >> 16) & 0xFF, g2 = (c2 >> 8) & 0xFF, b2 = c2 & 0xFF;
+
+                    float lum1 = 0.299f * r1 + 0.587f * g1 + 0.114f * b1;
+                    float lum2 = 0.299f * r2 + 0.587f * g2 + 0.114f * b2;
+
+                    if (lum1 > lum2) {
+                        uint32_t temp = colors[j];
+                        colors[j] = colors[j + 1];
+                        colors[j + 1] = temp;
+                    }
+                }
             }
 
-            // Encode endpoints (simplified)
+            // Use first and last colors as endpoints (after sorting)
+            uint32_t endpoint1 = colors[0];
+            uint32_t endpoint2 = colors[15];
+
+            // Create a simple ETC1S-style block
+            // Format: [endpoint1 RGB] [endpoint2 RGB] [selectors]
+            uint8_t r1 = (endpoint1 >> 16) & 0xFF;
+            uint8_t g1 = (endpoint1 >> 8) & 0xFF;
+            uint8_t b1 = endpoint1 & 0xFF;
+
+            uint8_t r2 = (endpoint2 >> 16) & 0xFF;
+            uint8_t g2 = (endpoint2 >> 8) & 0xFF;
+            uint8_t b2 = endpoint2 & 0xFF;
+
+            // Store endpoints (6 bytes: 3 bytes each for RGB565-like encoding)
+            blockData[0] = (r1 >> 3) | ((g1 >> 2) << 5); // RRRRRGGG
+            blockData[1] = ((g1 & 0x3) << 6) | (b1 >> 3) | ((r2 >> 3) << 3); // GGGBBBB RRR
+            blockData[2] = ((r2 & 0x7) << 5) | ((g2 >> 3) << 2) | (b2 >> 6); // RRR GGGGG BB
+            blockData[3] = (b2 & 0x3F) << 2; // BBBBBB
+
+            // Generate selectors based on distance to endpoints (8 bytes for 16 pixels * 4 bits each)
+            for (int i = 0; i < 16; i++) {
+                uint32_t pixel = blockPixels[i];
+                uint8_t pr = (pixel >> 16) & 0xFF;
+                uint8_t pg = (pixel >> 8) & 0xFF;
+                uint8_t pb = pixel & 0xFF;
+
+                // Calculate distance to both endpoints
+                int dr1 = abs(pr - r1), dg1 = abs(pg - g1), db1 = abs(pb - b1);
+                int dr2 = abs(pr - r2), dg2 = abs(pg - g2), db2 = abs(pb - b2);
+
+                int dist1 = dr1 + dg1 + db1;
+                int dist2 = dr2 + dg2 + db2;
+
+                // Choose closer endpoint (0 = endpoint1, 1 = endpoint2)
+                int selector = (dist2 < dist1) ? 1 : 0;
+
+                // Store selector (2 bits per pixel, 8 pixels per byte)
+                int byteIndex = 4 + (i / 4);
+                int bitOffset = (i % 4) * 2;
+                blockData[byteIndex] |= (selector << bitOffset);
+            }
+
+            // Fill remaining bytes with pattern data (simplified)
+            for (int i = 12; i < 16; i++) {
+                blockData[i] = 0xAA; // Simple pattern
             blockData[0] = (minColor >> 16) & 0xFF; // R0
             blockData[1] = (minColor >> 8) & 0xFF;  // G0
             blockData[2] = minColor & 0xFF;         // B0
