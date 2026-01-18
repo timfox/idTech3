@@ -224,4 +224,88 @@ void FS_MigrateLegacySearchPaths(void);
 // Check if mount table is active
 qboolean FS_MountTable_IsActive(void);
 
+// ============================================================================
+// File Caching System
+// ============================================================================
+
+#define FS_CACHE_HASH_SIZE 1024
+
+// Cache entry structure
+typedef struct fsCacheEntry_s {
+	char path[MAX_QPATH];            // File path
+	char realPath[MAX_QPATH];        // Real filesystem path
+	void *cachedData;                // Pointer to cached data or next entry
+	size_t dataSize;                 // Size of cached data
+	size_t cachedSize;               // Size of cached data (duplicate for compatibility)
+	size_t fileSize;                 // Original file size
+	uint32_t lastAccess;             // Last access time
+	uint32_t lastModified;           // Last modification time
+	uint32_t hitCount;               // Number of cache hits
+	qboolean isDirectory;            // Is this a directory entry
+	struct fsCacheEntry_s *next;     // Next entry in hash chain
+} fsCacheEntry_t;
+
+// Cache statistics
+typedef struct {
+	uint32_t totalEntries;
+	uint32_t cachedEntries;
+	uint64_t cacheSizeBytes;
+	uint64_t maxCacheSizeBytes;
+	uint32_t evictions;
+	uint32_t hits;
+	uint32_t misses;
+	float hitRate;
+} fsCacheStats_t;
+
+// Cache configuration
+typedef struct {
+	qboolean enabled;
+	size_t maxSizeBytes;
+	uint32_t maxEntries;
+	float evictionThreshold;
+	uint32_t timeToLiveSeconds;
+	qboolean compressData;
+} fsCacheConfig_t;
+
+// Cache management functions
+void FS_Cache_Init(const fsCacheConfig_t *config);
+void FS_Cache_Shutdown(void);
+qboolean FS_Cache_Lookup(const char *qpath, void **data, size_t *size);
+qboolean FS_Cache_Store(const char *qpath, const void *data, size_t size);
+void FS_Cache_Remove(const char *qpath);
+void FS_Cache_Clear(void);
+void FS_Cache_SetSizeLimit(size_t maxBytes);
+void FS_Cache_GetStats(fsCacheStats_t *stats);
+
+// ============================================================================
+// File Monitoring System (Hot Reload)
+// ============================================================================
+
+// Change types
+typedef enum {
+	FS_CHANGE_ADDED,
+	FS_CHANGE_MODIFIED,
+	FS_CHANGE_DELETED,
+	FS_CHANGE_RENAMED
+} fsChangeType_t;
+
+// Change event structure
+typedef struct fsChangeEvent_s {
+	fsChangeType_t type;
+	char oldPath[MAX_QPATH];
+	char newPath[MAX_QPATH];
+	uint32_t timestamp;
+} fsChangeEvent_t;
+
+// Callback function type
+typedef void (*fsChangeCallback_t)(const fsChangeEvent_t *event);
+
+// Monitoring functions
+void FS_Monitor_Init(void);
+void FS_Monitor_Shutdown(void);
+qboolean FS_Monitor_AddPath(const char *path);
+void FS_Monitor_RemovePath(const char *path);
+void FS_Monitor_Update(void);
+void FS_Monitor_RegisterCallback(fsChangeCallback_t callback);
+
 #endif // __FILES_V2_H__

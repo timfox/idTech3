@@ -1578,11 +1578,17 @@ static void R_MovePatchSurfacesToHunk( void ) {
 		hunkgrid = ri.Hunk_Alloc( size, h_low );
 		Com_Memcpy(hunkgrid, grid, size);
 
-		hunkgrid->widthLodError = ri.Hunk_Alloc( grid->width * 4, h_low );
-		Com_Memcpy( hunkgrid->widthLodError, grid->widthLodError, grid->width * 4 );
+		{
+			size_t widthSize = (size_t)grid->width * 4;
+			hunkgrid->widthLodError = ri.Hunk_Alloc( widthSize, h_low );
+			Com_Memcpy( hunkgrid->widthLodError, grid->widthLodError, widthSize );
+		}
 
-		hunkgrid->heightLodError = ri.Hunk_Alloc( grid->height * 4, h_low );
-		Com_Memcpy( hunkgrid->heightLodError, grid->heightLodError, grid->height * 4 );
+		{
+			size_t heightSize = (size_t)grid->height * 4;
+			hunkgrid->heightLodError = ri.Hunk_Alloc( heightSize, h_low );
+			Com_Memcpy( hunkgrid->heightLodError, grid->heightLodError, heightSize );
+		}
 
 		R_FreeSurfaceGridMesh( grid );
 

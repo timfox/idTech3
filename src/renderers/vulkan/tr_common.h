@@ -153,6 +153,8 @@ void R_LoadPNG( const char *name, byte **pic, int *width, int *height );
 void R_LoadTGA( const char *name, byte **pic, int *width, int *height );
 void R_LoadEXR( const char *name, byte **pic, int *width, int *height );
 void R_LoadSVG( const char *name, byte **pic, int *width, int *height );
+void R_LoadRGB9E5( const char *name, byte **pic, int *width, int *height );
+void R_LoadKTX2( const char *name, byte **pic, int *width, int *height );
 
 /*
 ====================================================================

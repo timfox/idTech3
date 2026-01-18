@@ -26,7 +26,10 @@ extern "C" {
 
 // Forward declarations for internal functions
 static void ECS_IntegrateWithCMSystem(entt::registry &registry);
+static void ECS_DebugDrawPhysics(entt::registry &registry);
+#ifdef USE_BULLET
 static void ECS_ProcessCollisionEvent(entt::registry &registry, const CollisionEvent &event);
+#endif
 
 #ifdef USE_BULLET
 #include <btBulletDynamicsCommon.h>
