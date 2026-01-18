@@ -33,6 +33,95 @@ void Theora_Shutdown(int handle);
 e_status Theora_Run(int handle);
 void Theora_Reset(int handle);
 
+// Internal helper functions
+static qboolean Theora_ParseHeaders(int handle);
+static size_t Theora_ReadOggPage(int handle, ogg_page *page);
+
+// Helper function to parse Theora headers from OGG stream
+static qboolean Theora_ParseHeaders(int handle) {
+	theora_data_t *data = (theora_data_t *)cinTable[handle].codecData;
+	ogg_page page;
+	ogg_packet packet;
+	int packet_count = 0;
+	int theora_header_count = 0;
+	qboolean have_identification = qfalse;
+	qboolean have_comment = qfalse;
+	qboolean have_setup = qfalse;
+	qboolean stream_initialized = qfalse;
+
+	if (!data) return qfalse;
+
+	// Read pages and extract Theora headers
+	while (!have_setup) {
+		size_t page_size = Theora_ReadOggPage(handle, &page);
+		if (page_size == 0) {
+			Com_Printf("Theora_ParseHeaders: failed to read OGG page\n");
+			return qfalse;
+		}
+
+		// Initialize stream on first page
+		if (!stream_initialized) {
+			if (ogg_stream_init(&data->ogg_stream, ogg_page_serialno(&page)) != 0) {
+				Com_Printf("Theora_ParseHeaders: failed to initialize OGG stream\n");
+				return qfalse;
+			}
+			stream_initialized = qtrue;
+			Com_Printf("Theora_ParseHeaders: initialized OGG stream with serial %d\n", ogg_page_serialno(&page));
+		}
+
+		// Submit page to stream state
+		if (ogg_stream_pagein(&data->ogg_stream, &page) != 0) {
+			Com_Printf("Theora_ParseHeaders: failed to submit page to stream\n");
+			return qfalse;
+		}
+
+		// Extract packets from page
+		while (ogg_stream_packetout(&data->ogg_stream, &packet) == 1) {
+			packet_count++;
+
+			// Try to decode as Theora header
+			int ret = th_decode_headerin(&data->theora_info, &data->theora_comment,
+										&data->theora_setup, &packet);
+
+			if (ret < 0 && ret != TH_ENOTFORMAT) {
+				Com_Printf("Theora_ParseHeaders: error parsing header packet %d (ret=%d)\n", packet_count, ret);
+				continue;
+			}
+
+			if (ret > 0) {
+				// This is a valid Theora header
+				theora_header_count++;
+
+				switch (theora_header_count) {
+					case 1: // Identification header
+						have_identification = qtrue;
+						break;
+					case 2: // Comment header
+						have_comment = qtrue;
+						break;
+					case 3: // Setup header
+						have_setup = qtrue;
+						break;
+				}
+			}
+		}
+
+		// Safety check to prevent infinite loops
+		if (packet_count > 100) {
+			Com_Printf("Theora_ParseHeaders: too many packets, aborting\n");
+			return qfalse;
+		}
+	}
+
+	if (!have_identification || !have_comment || !have_setup) {
+		Com_Printf("Theora_ParseHeaders: missing required Theora headers\n");
+		return qfalse;
+	}
+
+	Com_Printf("Theora_ParseHeaders: successfully parsed %d Theora headers\n", theora_header_count);
+	return qtrue;
+}
+
 // Helper function to read data from file into Ogg buffer
 static size_t Theora_ReadOggPage(int handle, ogg_page *page) {
 	theora_data_t *data = (theora_data_t *)cinTable[handle].codecData;
@@ -235,8 +324,8 @@ qboolean Theora_Init(int handle) {
 	// Initialize OGG sync state
 	ogg_sync_init(&data->ogg_sync);
 
-	// Parse Theora headers
-	// ... header parsing code would go here ...
+	// Initialize OGG stream state (will be set up during header parsing)
+	// ogg_stream_init will be called when we identify the stream
 
 	// Set up video dimensions (dummy for now since we don't parse headers)
 	cinTable[handle].CIN_WIDTH = 320;
@@ -257,12 +346,55 @@ qboolean Theora_Init(int handle) {
 	cinTable[handle].status = FMV_PLAY;
 	cinTable[handle].lastTime = CL_ScaledMilliseconds();
 
-	// Mark as initialized but without actual decoder (for testing)
+	// Try to parse Theora headers and create decoder
+	if (!Theora_ParseHeaders(handle)) {
+		Com_Printf("Theora_Init: failed to parse Theora headers\n");
+		Theora_Shutdown(handle);
+		return qfalse;
+	}
+
+	// Create the decoder context
+	data->theora_decoder = th_decode_alloc(&data->theora_info, data->theora_setup);
+	if (!data->theora_decoder) {
+		Com_Printf("Theora_Init: failed to create Theora decoder\n");
+		Theora_Shutdown(handle);
+		return qfalse;
+	}
+
+	// Clean up setup info (no longer needed after decoder creation)
+	if (data->theora_setup) {
+		th_setup_free(data->theora_setup);
+		data->theora_setup = NULL;
+	}
+
+	// Set video parameters from parsed headers
+	cinTable[handle].CIN_WIDTH = data->theora_info.frame_width;
+	cinTable[handle].CIN_HEIGHT = data->theora_info.frame_height;
+	cinTable[handle].drawX = cinTable[handle].CIN_WIDTH;
+	cinTable[handle].drawY = cinTable[handle].CIN_HEIGHT;
+
+	// Calculate FPS
+	data->fps = (double)data->theora_info.fps_numerator / data->theora_info.fps_denominator;
+	if (data->fps <= 0) data->fps = 30.0; // Default fallback
+
+	Com_Printf("Theora_Init: decoder created successfully (%dx%d @ %.2f fps)\n",
+		cinTable[handle].CIN_WIDTH, cinTable[handle].CIN_HEIGHT, data->fps);
+
+	// Re-allocate frame buffer with correct dimensions
+	if (cinTable[handle].buf) {
+		Z_Free(cinTable[handle].buf);
+	}
+	cinTable[handle].buf = Z_Malloc(cinTable[handle].CIN_WIDTH * cinTable[handle].CIN_HEIGHT * 4);
+	if (!cinTable[handle].buf) {
+		Com_Printf("Theora_Init: failed to allocate frame buffer\n");
+		Theora_Shutdown(handle);
+		return qfalse;
+	}
+
 	data->initialized = qtrue;
+	data->header_read = qtrue;
 
-	Com_Printf("Theora_Init: basic initialization completed (decoder not created yet)\n");
-
-	return qfalse; // Disable Theora to prevent crashes
+	return qtrue;
 }
 
 /*

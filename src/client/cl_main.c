@@ -3869,6 +3869,9 @@ fprintf(stderr, "About to enter renderer loading logic\n");
 			continue;
 		}
 
+		// Note: Could set environment variable here to indicate which renderer is being tried first
+		// This would help the renderer know if it was explicitly requested, but setenv() is not portable
+
 		Com_sprintf( dllName, sizeof( dllName ), RENDERER_PREFIX "_%s_" REND_ARCH_STRING DLL_EXT, tryRenderer );
 		Com_Printf( "Trying renderer: %s (%s)\n", tryRenderer, dllName );
 

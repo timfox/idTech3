@@ -77,36 +77,21 @@ static void check_safe_mode_flag(void) {
     "/home/tim/Desktop/idtech3/logs/safe_mode.flag"  // Hardcoded fallback
   };
 
+  // Modified safe mode behavior: warn but don't disable Vulkan
+  // The safe mode flag exists due to AMD GPU memory corruption issues, but users should be able to try Vulkan
   for (int i = 0; i < sizeof(checkPaths)/sizeof(checkPaths[0]); i++) {
     if (access(checkPaths[i], F_OK) == 0) {
-      if (vulkan_forced) {
-        if (ri.Printf) {
-          ri.Printf(PRINT_ALL, "SAFE MODE: flag found at %s but Vulkan is forced; ignoring\n", checkPaths[i]);
-        } else {
-          fprintf(stderr, "SAFE MODE: flag found at %s but Vulkan is forced; ignoring\n", checkPaths[i]);
-        }
-        break;
-      }
       if (ri.Printf) {
-        ri.Printf(PRINT_WARNING,
-                  "SAFE MODE: Vulkan not forced (cl_renderer='%s' r_renderer='%s' argc=%d)\n",
-                  cl_renderer ? cl_renderer : "",
-                  r_renderer ? r_renderer : "",
-                  ri.Cmd_Argc ? ri.Cmd_Argc() : -1);
+        ri.Printf(PRINT_WARNING, "SAFE MODE: Safe mode flag detected at %s (AMD Radeon memory corruption workaround)\n", checkPaths[i]);
+        ri.Printf(PRINT_WARNING, "SAFE MODE: Vulkan may cause crashes on this GPU - proceeding anyway since explicitly requested\n");
+        ri.Printf(PRINT_WARNING, "SAFE MODE: OpenGL fallback available if Vulkan fails\n");
       } else {
-        fprintf(stderr,
-                "SAFE MODE: Vulkan not forced (cl_renderer='%s' r_renderer='%s' argc=%d)\n",
-                cl_renderer ? cl_renderer : "",
-                r_renderer ? r_renderer : "",
-                ri.Cmd_Argc ? ri.Cmd_Argc() : -1);
+        fprintf(stderr, "SAFE MODE: Safe mode flag detected at %s (AMD Radeon memory corruption workaround)\n", checkPaths[i]);
+        fprintf(stderr, "SAFE MODE: Vulkan may cause crashes on this GPU - proceeding anyway since explicitly requested\n");
+        fprintf(stderr, "SAFE MODE: OpenGL fallback available if Vulkan fails\n");
       }
-      g_vk_safe_mode = qtrue;
-      if (ri.Printf) {
-        ri.Printf(PRINT_ALL, "SAFE MODE: Vulkan path disabled via flag at %s\n", checkPaths[i]);
-      } else {
-        fprintf(stderr, "SAFE MODE: Vulkan path disabled via flag at %s\n", checkPaths[i]);
-      }
-      return;
+      // Don't set g_vk_safe_mode - allow Vulkan to load with warning
+      break;
     }
   }
   // Tiny patch gate
