@@ -186,9 +186,107 @@ Performance Notes:
 ==================
 */
 static void Theora_YUVtoRGB(th_ycbcr_buffer ycbcr, byte *rgb, int width, int height) {
-	// Do absolutely nothing to isolate the buffer overflow
-	Com_Printf("Theora_YUVtoRGB: called but doing nothing\n");
-	return;
+	// Validate input parameters
+	if (!rgb) {
+		Com_Printf("Theora_YUVtoRGB: RGB buffer is NULL\n");
+		return;
+	}
+
+	if (!ycbcr[0].data || !ycbcr[1].data || !ycbcr[2].data) {
+		Com_Printf("Theora_YUVtoRGB: YUV buffers are NULL\n");
+		return;
+	}
+
+	if (width <= 0 || height <= 0) {
+		Com_Printf("Theora_YUVtoRGB: invalid dimensions %dx%d\n", width, height);
+		return;
+	}
+
+	int x, y;
+	int Y, Cb, Cr;
+	int R, G, B;
+	byte *y_plane = ycbcr[0].data;
+	byte *u_plane = ycbcr[1].data;
+	byte *v_plane = ycbcr[2].data;
+	int y_stride = ycbcr[0].stride;
+	int u_stride = ycbcr[1].stride;
+	int v_stride = ycbcr[2].stride;
+
+	// Use the actual dimensions reported by Theora library
+	int chroma_width = ycbcr[1].width;
+	int chroma_height = ycbcr[1].height;
+
+	// Validate buffer dimensions
+	if (ycbcr[0].width != width || ycbcr[0].height != height) {
+		Com_Printf("Theora_YUVtoRGB: Y plane dimensions mismatch: expected %dx%d, got %dx%d\n",
+			width, height, ycbcr[0].width, ycbcr[0].height);
+		return;
+	}
+
+	if (chroma_width <= 0 || chroma_height <= 0) {
+		Com_Printf("Theora_YUVtoRGB: invalid chroma dimensions %dx%d\n", chroma_width, chroma_height);
+		return;
+	}
+
+	// Debug output and validation
+	static int debug_count = 0;
+	if (debug_count < 10) {  // Increased debug count to see more frames
+		int expected_rgb_size = width * height * 4;
+		Com_Printf("Theora_YUVtoRGB: %dx%d -> expected_rgb_size=%d, chroma %dx%d, strides Y:%d U:%d V:%d\n",
+			width, height, expected_rgb_size, chroma_width, chroma_height, y_stride, u_stride, v_stride);
+		debug_count++;
+	}
+
+	for (y = 0; y < height; y++) {
+		for (x = 0; x < width; x++) {
+			// For 4:4:4 format, all planes have the same dimensions
+			int chroma_x = x;
+			int chroma_y = y;
+
+			// Bounds checking for Y plane
+			int y_idx = y * y_stride + x;
+			if (y_idx < 0 || y_idx >= ycbcr[0].stride * ycbcr[0].height || x >= ycbcr[0].width) {
+				Y = 128; // Default luminance
+			} else {
+				Y = y_plane[y_idx];
+			}
+
+			// Bounds checking for chroma planes (4:4:4 = same as luma)
+			int u_idx = chroma_y * u_stride + chroma_x;
+			int v_idx = chroma_y * v_stride + chroma_x;
+
+			if (u_idx < 0 || u_idx >= ycbcr[1].stride * ycbcr[1].height) {
+				Cb = 128; // Default chrominance
+			} else {
+				Cb = u_plane[u_idx] - 128;
+			}
+
+			if (v_idx < 0 || v_idx >= ycbcr[2].stride * ycbcr[2].height) {
+				Cr = 128; // Default chrominance
+			} else {
+				Cr = v_plane[v_idx] - 128;
+			}
+
+			// YUV to RGB conversion
+			R = Y + (int)(1.402f * Cr);
+			G = Y - (int)(0.344f * Cb + 0.714f * Cr);
+			B = Y + (int)(1.772f * Cb);
+
+			// Clamp values
+			if (R < 0) R = 0; else if (R > 255) R = 255;
+			if (G < 0) G = 0; else if (G > 255) G = 255;
+			if (B < 0) B = 0; else if (B > 255) B = 255;
+
+			// Write RGBA (little-endian)
+			int rgb_idx = (y * width + x) * 4;
+			if (rgb_idx >= 0 && rgb_idx < (width * height * 4 - 4)) {
+				rgb[rgb_idx + 0] = (byte)R;
+				rgb[rgb_idx + 1] = (byte)G;
+				rgb[rgb_idx + 2] = (byte)B;
+				rgb[rgb_idx + 3] = 255;
+			}
+		}
+	}
 }
 
 /*
@@ -199,9 +297,6 @@ Initialize Theora decoder
 ==================
 */
 qboolean Theora_Init(int handle) {
-	// TEMP: Disable Theora to prevent buffer overflow issues
-	return qfalse;
-
 	theora_data_t *data;
 	// ogg_page ogg_page;
 	// ogg_packet ogg_packet;
