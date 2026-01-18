@@ -14,19 +14,48 @@ extern refimport_t ri;
 #ifdef USE_VULKAN
 
 // Mesh shader function pointer types (VK_EXT_mesh_shader)
-// Match the pattern used in vk.c for function pointer definitions
-// These are defined in vulkan.h but we define them here for compatibility
-typedef void (*PFN_vkCmdDrawMeshTasksEXT)(VkCommandBuffer commandBuffer, uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
-typedef void (*PFN_vkCmdDrawMeshTasksIndirectEXT)(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, uint32_t drawCount, uint32_t stride);
-typedef void (*PFN_vkCmdDrawMeshTasksIndirectCountEXT)(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, VkBuffer countBuffer, VkDeviceSize countBufferOffset, uint32_t maxDrawCount, uint32_t stride);
-typedef VkResult (*PFN_vkCreateGraphicsPipelines)(VkDevice device, VkPipelineCache pipelineCache, uint32_t createInfoCount, const VkGraphicsPipelineCreateInfo* pCreateInfos, const VkAllocationCallbacks* pAllocator, VkPipeline* pPipelines);
+typedef void (VKAPI_PTR *PFN_vkCmdDrawMeshTasksEXT)(
+    VkCommandBuffer                             commandBuffer,
+    uint32_t                                    groupCountX,
+    uint32_t                                    groupCountY,
+    uint32_t                                    groupCountZ);
+
+typedef void (VKAPI_PTR *PFN_vkCmdDrawMeshTasksIndirectEXT)(
+    VkCommandBuffer                             commandBuffer,
+    VkBuffer                                    buffer,
+    VkDeviceSize                                offset,
+    uint32_t                                    drawCount,
+    uint32_t                                    stride);
+
+typedef void (VKAPI_PTR *PFN_vkCmdDrawMeshTasksIndirectCountEXT)(
+    VkCommandBuffer                             commandBuffer,
+    VkBuffer                                    buffer,
+    VkDeviceSize                                offset,
+    VkBuffer                                    countBuffer,
+    VkDeviceSize                                countBufferOffset,
+    uint32_t                                    maxDrawCount,
+    uint32_t                                    stride);
 
 // Mesh shader stage flags (VK_EXT_mesh_shader)
 #ifndef VK_SHADER_STAGE_TASK_BIT_EXT
-#define VK_SHADER_STAGE_TASK_BIT_EXT 0x00000040
+#define VK_SHADER_STAGE_TASK_BIT_EXT         0x00000040U
 #endif
 #ifndef VK_SHADER_STAGE_MESH_BIT_EXT
-#define VK_SHADER_STAGE_MESH_BIT_EXT 0x00000080
+#define VK_SHADER_STAGE_MESH_BIT_EXT         0x00000080U
+#endif
+
+// Mesh shader features structure
+#ifndef VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT
+#define VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT 1000328000
+typedef struct VkPhysicalDeviceMeshShaderFeaturesEXT {
+    VkStructureType    sType;
+    void*              pNext;
+    VkBool32           taskShader;
+    VkBool32           meshShader;
+    VkBool32           multiviewMeshShader;
+    VkBool32           primitiveFragmentShadingRateMeshShader;
+    VkBool32           meshShaderQueries;
+} VkPhysicalDeviceMeshShaderFeaturesEXT;
 #endif
 
 // Mesh shader function pointers

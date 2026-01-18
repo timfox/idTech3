@@ -1,12 +1,98 @@
 #version 460
-#extension GL_NV_mesh_shader : require
+#extension GL_EXT_mesh_shader : require
 
-layout(local_size_x = 1) in;
-layout(triangles, max_vertices = 1, max_primitives = 0) out;
+// Mesh shader for meshlet rendering
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+layout(triangles, max_vertices = 64, max_primitives = 42) out;
 
-void main()
-{
-    // No primitives emitted; placeholder mesh shader to satisfy pipeline modules.
-    gl_PrimitiveCountNV = 0;
+// Input payload from task shader
+taskPayloadSharedEXT MeshletPayload {
+    uint meshletIndices[32];
+    uint meshletCount;
+} payload;
+
+// Per-meshlet data structure
+struct Meshlet {
+    vec3 center;
+    float radius;
+    uint vertexOffset;
+    uint vertexCount;
+    uint indexOffset;
+    uint indexCount;
+    uint lodLevel;
+};
+
+// Vertex data structure
+struct Vertex {
+    vec3 position;
+    vec3 normal;
+    vec2 texCoord;
+    vec4 tangent;
+};
+
+// Meshlet buffer
+layout(set = 0, binding = 0) readonly buffer Meshlets {
+    Meshlet meshlets[];
+};
+
+// Vertex buffer
+layout(set = 0, binding = 1) readonly buffer Vertices {
+    Vertex vertices[];
+};
+
+// Index buffer
+layout(set = 0, binding = 2) readonly buffer Indices {
+    uint indices[];
+};
+
+// Output vertex data
+layout(location = 0) out vec3 outPosition[];
+layout(location = 1) out vec3 outNormal[];
+layout(location = 2) out vec2 outTexCoord[];
+layout(location = 3) out vec4 outTangent[];
+
+// Uniforms
+uniform mat4 modelMatrix;
+uniform mat4 viewMatrix;
+uniform mat4 projectionMatrix;
+uniform mat4 normalMatrix;
+
+void main() {
+    uint localIndex = gl_LocalInvocationIndex;
+    uint meshletIndex = payload.meshletIndices[gl_WorkGroupID.x];
+    Meshlet meshlet = meshlets[meshletIndex];
+
+    // Early exit if we're beyond the meshlet's vertex count
+    if (localIndex >= meshlet.vertexCount) {
+        return;
+    }
+
+    uint vertexIndex = meshlet.vertexOffset + localIndex;
+    Vertex vertex = vertices[vertexIndex];
+
+    // Transform vertex position
+    vec4 worldPos = modelMatrix * vec4(vertex.position, 1.0);
+    vec4 viewPos = viewMatrix * worldPos;
+    vec4 clipPos = projectionMatrix * viewPos;
+
+    // Output transformed vertex data
+    gl_MeshVerticesEXT[localIndex].gl_Position = clipPos;
+    outPosition[localIndex] = worldPos.xyz;
+    outNormal[localIndex] = normalize(mat3(normalMatrix) * vertex.normal);
+    outTexCoord[localIndex] = vertex.texCoord;
+    outTangent[localIndex] = vec4(normalize(mat3(normalMatrix) * vertex.tangent.xyz), vertex.tangent.w);
+
+    // Set mesh vertices
+    SetMeshOutputsEXT(meshlet.vertexCount, min(meshlet.indexCount / 3, 42u));
+
+    // Process triangles
+    if (localIndex < meshlet.indexCount / 3) {
+        uint triangleIndex = localIndex * 3;
+        uint i0 = indices[meshlet.indexOffset + triangleIndex];
+        uint i1 = indices[meshlet.indexOffset + triangleIndex + 1];
+        uint i2 = indices[meshlet.indexOffset + triangleIndex + 2];
+
+        gl_PrimitiveTriangleIndicesEXT[localIndex] = uvec3(i0, i1, i2);
+    }
 }
 

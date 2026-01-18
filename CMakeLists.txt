@@ -882,6 +882,17 @@ ELSE()
 	message(STATUS "Using legacy gentity_t (USE_OOP_ENTITIES=OFF)")
 ENDIF()
 
+# Mesh Shaders / Meshlet System
+IF(USE_KTX2 OR USE_BASISU)
+	# Add compile definition for mesh shaders
+	ADD_COMPILE_DEFINITIONS(USE_MESH_SHADERS)
+	# Add meshlet system source files
+	list(APPEND QCOMMON_SRCS src/common/meshlet.c)
+	message(STATUS "Mesh shaders and meshlet system enabled")
+ELSE()
+	message(STATUS "Mesh shaders disabled (enable USE_KTX2 or USE_BASISU)")
+ENDIF()
+
 IF(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/common/ecs_systems.cpp)
 		list(APPEND QCOMMON_SRCS src/common/ecs_systems.cpp)
 ENDIF()

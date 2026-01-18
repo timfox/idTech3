@@ -1,11 +1,79 @@
 #version 460
-#extension GL_NV_mesh_shader : require
+#extension GL_EXT_mesh_shader : require
 
-layout(local_size_x = 1) in;
+// Task shader for meshlet culling and LOD selection
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 
-void main()
-{
-    // Emit zero mesh tasks; placeholder task shader.
-	gl_TaskCountNV = 0;
+// Per-meshlet data structure
+struct Meshlet {
+    vec3 center;
+    float radius;
+    uint vertexOffset;
+    uint vertexCount;
+    uint indexOffset;
+    uint indexCount;
+    uint lodLevel;
+};
+
+// Input meshlet buffer
+layout(set = 0, binding = 0) readonly buffer Meshlets {
+    Meshlet meshlets[];
+};
+
+// Output payload for mesh shader
+taskPayloadSharedEXT MeshletPayload {
+    uint meshletIndices[32];
+    uint meshletCount;
+} payload;
+
+uniform mat4 viewProjectionMatrix;
+uniform vec3 cameraPosition;
+uniform float lodDistanceMultiplier;
+
+// Frustum culling planes
+uniform vec4 frustumPlanes[6];
+
+bool isVisible(vec3 center, float radius) {
+    for (int i = 0; i < 6; ++i) {
+        if (dot(frustumPlanes[i], vec4(center, 1.0)) + radius < 0.0) {
+            return false;
+        }
+    }
+    return true;
+}
+
+uint computeLOD(vec3 center, float radius) {
+    float distance = length(center - cameraPosition);
+    float screenSize = radius / (distance * lodDistanceMultiplier);
+    return clamp(uint(4.0 - log2(screenSize)), 0, 3);
+}
+
+void main() {
+    uint meshletIndex = gl_GlobalInvocationID.x;
+    if (meshletIndex >= meshlets.length()) {
+        return;
+    }
+
+    Meshlet meshlet = meshlets[meshletIndex];
+
+    // Frustum culling
+    if (!isVisible(meshlet.center, meshlet.radius)) {
+        return;
+    }
+
+    // LOD selection
+    uint lod = computeLOD(meshlet.center, meshlet.radius);
+    if (lod > meshlet.lodLevel) {
+        return; // Skip this meshlet if LOD is too high
+    }
+
+    // Add meshlet to payload
+    uint index = atomicAdd(payload.meshletCount, 1);
+    if (index < 32) {
+        payload.meshletIndices[index] = meshletIndex;
+    }
+
+    // Emit mesh tasks
+    EmitMeshTasksEXT(1, 1, 1);
 }
 
