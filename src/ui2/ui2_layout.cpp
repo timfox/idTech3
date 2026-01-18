@@ -34,7 +34,7 @@ static void ApplyStyles(ui2Context_t *ctx, UiNode *node) {
 }
 
 // Compute content box from layout box and padding
-static void ComputeContentBox(LayoutBox &box, const ComputedStyle &computed) {
+static constexpr void ComputeContentBox(LayoutBox &box, const ComputedStyle &computed) noexcept {
 	box.contentX = box.x + computed.padding[3];  // left padding
 	box.contentY = box.y + computed.padding[0];  // top padding
 	box.contentWidth = box.width - computed.padding[1] - computed.padding[3];  // right + left
@@ -86,10 +86,8 @@ static void LayoutBlock(ui2Context_t *ctx, int32_t nodeIdx, int32_t parentX, int
 	}
 	
 	// Padding and margin
-	for (int i = 0; i < 4; ++i) {
-		computed.padding[i] = node->style.padding[i];
-		computed.margin[i] = node->style.margin[i];
-	}
+	std::ranges::copy(node->style.padding, computed.padding.begin());
+	std::ranges::copy(node->style.margin, computed.margin.begin());
 	
 	// Colors
 	computed.backgroundColor = node->style.backgroundColor;

@@ -22,6 +22,10 @@ Provides Qt-based UI integration with seamless game/engine interaction.
 #include <QTextEdit>
 #include <QSplitter>
 #include <memory>
+#include <vector>
+#include <string>
+#include <string_view>
+#include <functional>
 
 class QOpenGLContext;
 class QSurfaceFormat;

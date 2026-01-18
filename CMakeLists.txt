@@ -235,32 +235,127 @@ color_msg("${COL_STEP}"  "-- Compiler: ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER
 # ------------------------------------------------------------------------------
 # Language Standard Configuration
 # ------------------------------------------------------------------------------
-# Set C17 as default for broad compatibility, C23 for GCC/Clang
-IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
-    SET(CMAKE_C_STANDARD 23)
-    SET(CMAKE_C_STANDARD_REQUIRED ON)
-    MESSAGE(STATUS "Using C23 standard")
-ELSE()
+# Modern C/C++ Standards Configuration
+# Prioritize C23/C++23 for supported compilers, with fallbacks for compatibility
+
+# C Standard Configuration
+IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang|Intel")
+    IF(CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "13.0")
+        SET(CMAKE_C_STANDARD 23)
+        SET(CMAKE_C_STANDARD_REQUIRED ON)
+        MESSAGE(STATUS "Using C23 standard (full support)")
+    ELSEIF(CMAKE_C_COMPILER_VERSION VERSION_GREATER_EQUAL "9.0")
+        SET(CMAKE_C_STANDARD 17)
+        SET(CMAKE_C_STANDARD_REQUIRED ON)
+        MESSAGE(STATUS "Using C17 standard (C23 features partially available)")
+    ELSE()
+        SET(CMAKE_C_STANDARD 11)
+        SET(CMAKE_C_STANDARD_REQUIRED OFF)
+        MESSAGE(STATUS "Using C11 standard (limited modern features)")
+    ENDIF()
+ELSEIF(MSVC)
+    # MSVC C23 support is experimental, use C17 as fallback
     SET(CMAKE_C_STANDARD 17)
-    SET(CMAKE_C_STANDARD_REQUIRED OFF)  # Allow fallback for MSVC
-    MESSAGE(STATUS "Using C17 standard (MSVC or other compiler)")
+    SET(CMAKE_C_STANDARD_REQUIRED OFF)
+    MESSAGE(STATUS "Using C17 standard (MSVC C23 support limited)")
+ELSE()
+    SET(CMAKE_C_STANDARD 11)
+    SET(CMAKE_C_STANDARD_REQUIRED OFF)
+    MESSAGE(STATUS "Using C11 standard (unknown compiler)")
+ENDIF()
+
+# Disable C extensions for strict standard compliance
+SET(CMAKE_C_EXTENSIONS OFF)
+
+# C++ Standard Configuration
+IF(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|Intel")
+    IF(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "13.0")
+        SET(CMAKE_CXX_STANDARD 23)
+        SET(CMAKE_CXX_STANDARD_REQUIRED ON)
+        MESSAGE(STATUS "Using C++23 standard (full modern features)")
+    ELSEIF(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "9.0")
+        SET(CMAKE_CXX_STANDARD 20)
+        SET(CMAKE_CXX_STANDARD_REQUIRED ON)
+        MESSAGE(STATUS "Using C++20 standard (most C++23 features available)")
+    ELSE()
+        SET(CMAKE_CXX_STANDARD 17)
+        SET(CMAKE_CXX_STANDARD_REQUIRED ON)
+        MESSAGE(STATUS "Using C++17 standard (core modern features)")
+    ENDIF()
+ELSEIF(MSVC)
+    IF(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "19.30")
+        SET(CMAKE_CXX_STANDARD 20)
+        SET(CMAKE_CXX_STANDARD_REQUIRED OFF)
+        MESSAGE(STATUS "Using C++20 standard (MSVC latest)")
+    ELSE()
+        SET(CMAKE_CXX_STANDARD 17)
+        SET(CMAKE_CXX_STANDARD_REQUIRED OFF)
+        MESSAGE(STATUS "Using C++17 standard (MSVC compatibility)")
+    ENDIF()
+ELSE()
+    SET(CMAKE_CXX_STANDARD 17)
+    SET(CMAKE_CXX_STANDARD_REQUIRED OFF)
+    MESSAGE(STATUS "Using C++17 standard (unknown compiler)")
+ENDIF()
+
+# Disable C++ extensions for strict standard compliance
+SET(CMAKE_CXX_EXTENSIONS OFF)
+
+# Modern Compiler Features and Optimizations
+INCLUDE(CheckCXXCompilerFlag)
+INCLUDE(CheckCCompilerFlag)
+
+# Check for and enable modern compiler features
+IF(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    # GCC/Clang specific modern features
+    CHECK_CXX_COMPILER_FLAG("-fcoroutines" HAS_COROUTINES)
+    IF(HAS_COROUTINES)
+        ADD_COMPILE_OPTIONS("$<$<COMPILE_LANGUAGE:CXX>:-fcoroutines>")
+        MESSAGE(STATUS "Coroutines support enabled")
+    ENDIF()
+
+    # LTO (Link Time Optimization) for better performance
+    CHECK_CXX_COMPILER_FLAG("-flto" HAS_LTO)
+    IF(HAS_LTO AND NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+        SET(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+        MESSAGE(STATUS "Link Time Optimization enabled")
+    ENDIF()
+
+    # Modern warning flags
+    ADD_COMPILE_OPTIONS(
+        "$<$<COMPILE_LANGUAGE:C>:-Wpedantic;-Wall;-Wextra;-Wshadow;-Wconversion>"
+        "$<$<COMPILE_LANGUAGE:CXX>:-Wpedantic;-Wall;-Wextra;-Wshadow;-Wconversion;-Wold-style-cast;-Woverloaded-virtual>"
+    )
+
+    # Address sanitizer for debug builds
+    IF(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        CHECK_CXX_COMPILER_FLAG("-fsanitize=address" HAS_ASAN)
+        IF(HAS_ASAN)
+            ADD_COMPILE_OPTIONS(-fsanitize=address -fno-omit-frame-pointer)
+            ADD_LINK_OPTIONS(-fsanitize=address)
+            MESSAGE(STATUS "Address Sanitizer enabled for debug builds")
+        ENDIF()
+    ENDIF()
+
+ELSEIF(MSVC)
+    # MSVC specific modern features
+    ADD_COMPILE_OPTIONS(
+        /permissive-  # Standards conforming mode
+        /Zc:__cplusplus  # Correct __cplusplus value
+        /Zc:preprocessor  # Standards conforming preprocessor
+    )
+
+    # Modern warning level
+    ADD_COMPILE_OPTIONS(/W4)
+
+    # External warnings as errors for strict compliance
+    IF(CMAKE_BUILD_TYPE STREQUAL "Release")
+        ADD_COMPILE_OPTIONS(/WX)
+    ENDIF()
 ENDIF()
 
 # Dependency graph generation (optional)
-option(ENABLE_DEPENDENCY_GRAPH "Generate a Graphviz dependency graph" ON)
-SET(CMAKE_C_EXTENSIONS OFF)
-
-# Set C++17 as default for broad compatibility, C++23 for GCC/Clang
-IF(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    SET(CMAKE_CXX_STANDARD 23)
-    SET(CMAKE_CXX_STANDARD_REQUIRED ON)
-    MESSAGE(STATUS "Using C++23 standard")
-ELSE()
-    SET(CMAKE_CXX_STANDARD 17)
-    SET(CMAKE_CXX_STANDARD_REQUIRED OFF)  # Allow fallback for MSVC
-    MESSAGE(STATUS "Using C++17 standard (MSVC or other compiler)")
-ENDIF()
-SET(CMAKE_CXX_EXTENSIONS OFF)
+OPTION(ENABLE_DEPENDENCY_GRAPH "Generate a Graphviz dependency graph" ON)
 
 # Enable modern compiler warnings for better code quality
 IF(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")

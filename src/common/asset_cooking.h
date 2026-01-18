@@ -10,6 +10,11 @@ Automated asset processing and optimization system.
 #define __ASSET_COOKING_H__
 
 #include "q_shared.h"
+#include <memory>
+#include <vector>
+#include <string>
+#include <functional>
+#include <chrono>
 
 // Asset types
 typedef enum {
@@ -83,20 +88,34 @@ typedef struct {
 
 #define MAX_ASSET_DEPENDENCIES 16
 
-// Cooking job definition
-typedef struct {
-    char source_path[512];
-    char output_path[512];
-    asset_type_t asset_type;
-    cook_quality_t quality;
-    cook_platform_t platform;
-    uint64_t source_timestamp;
-    uint64_t cooked_timestamp;
-    qboolean force_recook;
-    void* type_specific_options; // Texture/Model/Sound options
-    uint32_t dependency_count;
-    asset_dependency_t dependencies[MAX_ASSET_DEPENDENCIES];
-} cook_job_t;
+// Modern cooking job with RAII and smart pointers
+struct CookJob {
+    std::string source_path;
+    std::string output_path;
+    asset_type_t asset_type = ASSET_TYPE_TEXTURE;
+    cook_quality_t quality = COOK_QUALITY_MEDIUM;
+    cook_platform_t platform = COOK_PLATFORM_DESKTOP;
+    std::chrono::system_clock::time_point source_timestamp;
+    std::chrono::system_clock::time_point cooked_timestamp;
+    bool force_recook = false;
+    std::unique_ptr<void, std::function<void(void*)>> type_specific_options;
+    std::vector<asset_dependency_t> dependencies;
+
+    // RAII constructor
+    CookJob() = default;
+    CookJob(const CookJob&) = delete;
+    CookJob& operator=(const CookJob&) = delete;
+    CookJob(CookJob&&) = default;
+    CookJob& operator=(CookJob&&) = default;
+
+    // Helper methods
+    void add_dependency(const std::string& path, asset_type_t type);
+    bool check_dependencies() const;
+    void clear_dependencies();
+};
+
+// Legacy typedef for backward compatibility
+typedef struct CookJob cook_job_t;
 
 // Cooking statistics
 typedef struct {

@@ -11,6 +11,13 @@ UI2 - Internal C++ Types and Structures
 #include "../common/q_shared.h"
 #include <cstdint>
 #include <cstring>
+#include <span>
+#include <array>
+#include <vector>
+#include <string_view>
+#include <algorithm>
+#include <ranges>
+#include <utility>
 
 #ifdef __cplusplus
 
@@ -124,15 +131,15 @@ struct Style {
 	int32_t minWidth = 0;
 	int32_t minHeight = 0;
 	
-	int32_t padding[4] = {0, 0, 0, 0};  // top, right, bottom, left
-	int32_t margin[4] = {0, 0, 0, 0};   // top, right, bottom, left
+	std::array<int32_t, 4> padding = {0, 0, 0, 0};  // top, right, bottom, left
+	std::array<int32_t, 4> margin = {0, 0, 0, 0};   // top, right, bottom, left
 	
 	Color backgroundColor = Color(0, 0, 0, 0);  // transparent
 	Color color = Color(255, 255, 255, 255);    // white
 	
 	int32_t borderWidth = 0;
 	Color borderColor = Color(0, 0, 0, 0);
-	int32_t borderRadius[4] = {0, 0, 0, 0};  // top-left, top-right, bottom-right, bottom-left
+	std::array<int32_t, 4> borderRadius = {0, 0, 0, 0};  // top-left, top-right, bottom-right, bottom-left
 	
 	PositionType position = PositionType::Relative;
 	int32_t left = UI2_AUTO;
@@ -150,8 +157,8 @@ struct Style {
 struct ComputedStyle {
 	int32_t width = 0;
 	int32_t height = 0;
-	int32_t padding[4] = {0, 0, 0, 0};
-	int32_t margin[4] = {0, 0, 0, 0};
+	std::array<int32_t, 4> padding = {0, 0, 0, 0};
+	std::array<int32_t, 4> margin = {0, 0, 0, 0};
 	Color backgroundColor;
 	Color color;
 	int32_t borderWidth = 0;

@@ -54,12 +54,12 @@ static const char* error_strings[COOK_ERROR_COUNT] = {
 };
 
 // Forward declarations for compression functions
-qboolean AssetCooking_CompressKTX2(byte* input_data, size_t input_size,
-                                   byte** output_data, size_t* output_size,
-                                   texture_cook_options_t* options);
-qboolean AssetCooking_CompressBasisU(byte* input_data, size_t input_size,
-                                    byte** output_data, size_t* output_size,
-                                    texture_cook_options_t* options);
+static qboolean AssetCooking_CompressKTX2(byte* input_data, size_t input_size,
+                                          byte** output_data, size_t* output_size,
+                                          texture_cook_options_t* options);
+static qboolean AssetCooking_CompressBasisU(byte* input_data, size_t input_size,
+                                           byte** output_data, size_t* output_size,
+                                           texture_cook_options_t* options);
 
 /*
 =============================================================================

@@ -1,328 +1,281 @@
 /*
-=============================================================================
-Error Handling Framework
+===============================================================================
 
-Structured error handling with stack traces and comprehensive error management.
-=============================================================================
+Modern Error Handling System for id Tech 3
+
+Provides exception-based error handling with proper RAII cleanup.
+
+===============================================================================
 */
 
-#ifndef __ERROR_HANDLING_H__
-#define __ERROR_HANDLING_H__
+#pragma once
 
 #include "q_shared.h"
-#include <setjmp.h>
+#include <exception>
+#include <string>
+#include <string_view>
+#include <source_location>
+#include <memory>
+#include <vector>
+#include <functional>
 
-// Error severity levels
-typedef enum {
-    ERROR_SEVERITY_INFO,           // Informational message
-    ERROR_SEVERITY_WARNING,        // Warning that doesn't prevent operation
-    ERROR_SEVERITY_ERROR,          // Error that affects operation but is recoverable
-    ERROR_SEVERITY_CRITICAL,       // Critical error that requires attention
-    ERROR_SEVERITY_FATAL,          // Fatal error that terminates the program
-    ERROR_SEVERITY_COUNT
-} error_severity_t;
+// Stack trace support (C++23)
+#if __cplusplus >= 202302L
+#include <stacktrace>
+#endif
 
-// Error categories
-typedef enum {
-    ERROR_CATEGORY_GENERAL,        // General/unknown errors
-    ERROR_CATEGORY_MEMORY,         // Memory allocation/deallocation errors
-    ERROR_CATEGORY_FILE_IO,        // File I/O operations
-    ERROR_CATEGORY_NETWORK,        // Network operations
-    ERROR_CATEGORY_RENDERING,      // Rendering/graphics operations
-    ERROR_CATEGORY_AUDIO,          // Audio operations
-    ERROR_CATEGORY_INPUT,          // Input handling
-    ERROR_CATEGORY_SCRIPTING,      // Scripting engine errors
-    ERROR_CATEGORY_SECURITY,       // Security-related errors
-    ERROR_CATEGORY_VALIDATION,     // Data validation errors
-    ERROR_CATEGORY_SYSTEM,         // System-level errors
-    ERROR_CATEGORY_COUNT
-} error_category_t;
+//===============================================================================
+// Exception Classes
+//===============================================================================
 
-// Error codes
-typedef enum {
-    // General errors
-    ERROR_SUCCESS = 0,
-    ERROR_UNKNOWN = 1,
-    ERROR_INVALID_PARAMETER = 2,
-    ERROR_OUT_OF_MEMORY = 3,
-    ERROR_NOT_IMPLEMENTED = 4,
-    ERROR_TIMEOUT = 5,
-    ERROR_PERMISSION_DENIED = 6,
-    ERROR_NOT_FOUND = 7,
-    ERROR_ALREADY_EXISTS = 8,
+class IdTech3Exception : public std::exception
+{
+public:
+    explicit IdTech3Exception(std::string_view message,
+                             std::source_location location = std::source_location::current()) noexcept;
 
-    // Memory errors
-    ERROR_MEMORY_CORRUPTION = 100,
-    ERROR_DOUBLE_FREE = 101,
-    ERROR_INVALID_FREE = 102,
-    ERROR_MEMORY_LEAK = 103,
-    ERROR_BUFFER_OVERFLOW = 104,
-    ERROR_BUFFER_UNDERFLOW = 105,
+    IdTech3Exception(const IdTech3Exception&) noexcept = default;
+    IdTech3Exception& operator=(const IdTech3Exception&) noexcept = default;
 
-    // File I/O errors
-    ERROR_FILE_NOT_FOUND = 200,
-    ERROR_FILE_ACCESS_DENIED = 201,
-    ERROR_FILE_CORRUPTED = 202,
-    ERROR_FILE_TOO_LARGE = 203,
-    ERROR_DISK_FULL = 204,
-    ERROR_IO_ERROR = 205,
+    virtual ~IdTech3Exception() override = default;
 
-    // Network errors
-    ERROR_NETWORK_UNREACHABLE = 300,
-    ERROR_CONNECTION_REFUSED = 301,
-    ERROR_CONNECTION_TIMEOUT = 302,
-    ERROR_PROTOCOL_ERROR = 303,
-    ERROR_HOST_NOT_FOUND = 304,
-
-    // Rendering errors
-    ERROR_GPU_NOT_SUPPORTED = 400,
-    ERROR_SHADER_COMPILE_FAILED = 401,
-    ERROR_TEXTURE_LOAD_FAILED = 402,
-    ERROR_RENDER_TARGET_ERROR = 403,
-    ERROR_PIPELINE_ERROR = 404,
-
-    // Audio errors
-    ERROR_AUDIO_DEVICE_ERROR = 500,
-    ERROR_AUDIO_FORMAT_UNSUPPORTED = 501,
-    ERROR_AUDIO_BUFFER_UNDERFLOW = 502,
-
-    // Validation errors
-    ERROR_VALIDATION_FAILED = 600,
-    ERROR_TYPE_MISMATCH = 601,
-    ERROR_RANGE_ERROR = 602,
-    ERROR_FORMAT_ERROR = 603,
-
-    // System errors
-    ERROR_SYSTEM_CALL_FAILED = 700,
-    ERROR_THREAD_ERROR = 701,
-    ERROR_SYNCHRONIZATION_ERROR = 702,
-
-    ERROR_CODE_COUNT
-} error_code_t;
-
-// Stack frame information for stack traces
-#define MAX_STACK_DEPTH 32
-#define MAX_FUNCTION_NAME 128
-#define MAX_FILE_NAME 256
-
-typedef struct {
-    char function_name[MAX_FUNCTION_NAME];
-    char file_name[MAX_FILE_NAME];
-    int line_number;
-    uintptr_t address;             // Function address for symbol resolution
-} stack_frame_t;
-
-// Error context information
-typedef struct {
-    error_code_t error_code;
-    error_severity_t severity;
-    error_category_t category;
-    char message[512];             // Human-readable error message
-    char details[1024];            // Detailed error information
+    // Exception interface
+    virtual const char* what() const noexcept override;
+    virtual const char* type() const noexcept { return "IdTech3Exception"; }
 
     // Location information
-    char file[MAX_FILE_NAME];
-    char function[MAX_FUNCTION_NAME];
-    int line;
+    const std::source_location& location() const noexcept { return m_location; }
+    std::string location_string() const;
 
-    // Stack trace
-    stack_frame_t stack_trace[MAX_STACK_DEPTH];
-    int stack_depth;
+    // Stack trace (if available)
+#if __cplusplus >= 202302L
+    const std::stacktrace& stack_trace() const noexcept { return m_stackTrace; }
+#endif
 
-    // Context data
-    uint64_t timestamp;            // When the error occurred
-    int thread_id;                 // Thread that generated the error
-    char module[64];               // Module/component that generated the error
+protected:
+    std::string m_message;
+    std::source_location m_location;
+#if __cplusplus >= 202302L
+    std::stacktrace m_stackTrace;
+#endif
+};
 
-    // Recovery information
-    qboolean recoverable;          // Whether this error can be recovered from
-    char recovery_hint[256];       // Suggestion for recovery
+// Specific exception types
+class FileException : public IdTech3Exception
+{
+public:
+    FileException(std::string_view filename, std::string_view message,
+                  std::source_location location = std::source_location::current());
 
-    // Chain of errors (for nested error handling)
-    struct error_context_t *cause; // Root cause of this error
-} error_context_t;
+    const char* type() const noexcept override { return "FileException"; }
+    const std::string& filename() const noexcept { return m_filename; }
 
-// Error handler function type
-typedef void (*error_handler_t)(const error_context_t *error);
+private:
+    std::string m_filename;
+};
 
-// Exception handling context (setjmp/longjmp based)
-typedef struct {
-    jmp_buf jump_buffer;
-    error_context_t error_context;
-    qboolean error_occurred;
-    qboolean handler_installed;
-} exception_context_t;
+class MemoryException : public IdTech3Exception
+{
+public:
+    explicit MemoryException(std::string_view message,
+                            std::source_location location = std::source_location::current());
 
-// Global error handling system
-typedef struct {
-    // Configuration
-    qboolean stack_traces_enabled;
-    qboolean error_logging_enabled;
-    qboolean fatal_errors_exit;
-    int max_errors_per_second;     // Rate limiting
-    char log_file[256];
+    const char* type() const noexcept override { return "MemoryException"; }
+};
 
-    // Statistics
-    uint64_t total_errors;
-    uint64_t errors_by_severity[ERROR_SEVERITY_COUNT];
-    uint64_t errors_by_category[ERROR_CATEGORY_COUNT];
+class NetworkException : public IdTech3Exception
+{
+public:
+    explicit NetworkException(std::string_view message,
+                             std::source_location location = std::source_location::current());
 
-    // Error handlers
-    error_handler_t global_error_handler;
-    error_handler_t category_handlers[ERROR_CATEGORY_COUNT];
+    const char* type() const noexcept override { return "NetworkException"; }
+};
 
-    // Current error state
-    error_context_t *current_error;
-    exception_context_t *current_exception;
+class RenderingException : public IdTech3Exception
+{
+public:
+    explicit RenderingException(std::string_view message,
+                               std::source_location location = std::source_location::current());
 
-    // System state
-    qboolean initialized;
-    uint64_t last_error_time;
-    int error_count_this_second;
-} error_system_t;
+    const char* type() const noexcept override { return "RenderingException"; }
+};
 
-extern error_system_t error_system;
+class AssetException : public IdTech3Exception
+{
+public:
+    AssetException(std::string_view assetName, std::string_view message,
+                   std::source_location location = std::source_location::current());
 
-// Error Handling API
-qboolean Error_Init(void);
-void Error_Shutdown(void);
+    const char* type() const noexcept override { return "AssetException"; }
+    const std::string& asset_name() const noexcept { return m_assetName; }
 
-// Error creation and reporting
-error_context_t* Error_Create(error_code_t code, error_severity_t severity,
-                             const char *message, const char *file,
-                             const char *function, int line);
-void Error_Report(error_context_t *error);
-void Error_ReportSimple(error_code_t code, const char *message);
-void Error_ReportWithContext(error_code_t code, const char *message,
-                           error_category_t category, const char *details);
+private:
+    std::string m_assetName;
+};
 
-// Stack trace generation
-qboolean Error_CaptureStackTrace(error_context_t *error);
-qboolean Error_ResolveSymbols(stack_frame_t *frames, int depth);
-void Error_PrintStackTrace(const error_context_t *error);
+//===============================================================================
+// Error Context and RAII Cleanup
+//===============================================================================
 
-// Error recovery and handling
-qboolean Error_IsRecoverable(const error_context_t *error);
-qboolean Error_AttemptRecovery(error_context_t *error);
-void Error_SetRecoveryHint(error_context_t *error, const char *hint);
+class ErrorContext
+{
+public:
+    ErrorContext() = default;
+    ~ErrorContext() = default;
 
-// Exception handling (setjmp/longjmp based)
-#define TRY \
-    do { \
-        exception_context_t __exception_ctx; \
-        __exception_ctx.error_occurred = qfalse; \
-        __exception_ctx.handler_installed = qtrue; \
-        if (setjmp(__exception_ctx.jump_buffer) == 0) { \
-            error_system.current_exception = &__exception_ctx;
+    // Add cleanup function to be called on error
+    void add_cleanup(std::function<void()> cleanup);
 
-#define CATCH(error_var) \
-        } else { \
-            error_var = &__exception_ctx.error_context; \
-            __exception_ctx.handler_installed = qfalse;
+    // Execute all cleanup functions
+    void cleanup();
 
-#define END_TRY \
-        } \
-        if (__exception_ctx.handler_installed) { \
-            error_system.current_exception = NULL; \
-        } \
-    } while(0)
+    // Check if cleanup is needed
+    bool needs_cleanup() const { return !m_cleanups.empty(); }
 
-#define THROW(code, message) \
-    Error_Throw(code, ERROR_SEVERITY_ERROR, message, __FILE__, __FUNCTION__, __LINE__)
+private:
+    std::vector<std::function<void()>> m_cleanups;
+};
 
-#define THROW_FATAL(code, message) \
-    Error_Throw(code, ERROR_SEVERITY_FATAL, message, __FILE__, __FUNCTION__, __LINE__)
+// RAII error context guard
+class ErrorGuard
+{
+public:
+    explicit ErrorGuard(ErrorContext& context);
+    ~ErrorGuard();
 
-void Error_Throw(error_code_t code, error_severity_t severity, const char *message,
-                const char *file, const char *function, int line) __attribute__((noreturn));
+    // Prevent copying
+    ErrorGuard(const ErrorGuard&) = delete;
+    ErrorGuard& operator=(const ErrorGuard&) = delete;
 
-// Error handler registration
-void Error_SetGlobalHandler(error_handler_t handler);
-void Error_SetCategoryHandler(error_category_t category, error_handler_t handler);
-void Error_RemoveHandler(error_handler_t handler);
+private:
+    ErrorContext& m_context;
+    bool m_cleanupDone;
+};
 
-// Error querying and management
-uint64_t Error_GetTotalCount(void);
-uint64_t Error_GetCountBySeverity(error_severity_t severity);
-uint64_t Error_GetCountByCategory(error_category_t category);
-const error_context_t* Error_GetLastError(void);
-qboolean Error_HasPendingErrors(void);
+//===============================================================================
+// Error Handling Macros and Functions
+//===============================================================================
 
-// Error logging and serialization
-qboolean Error_LogToFile(const error_context_t *error, const char *filename);
-qboolean Error_SerializeToJSON(const error_context_t *error, char *buffer, size_t buffer_size);
-qboolean Error_SerializeToXML(const error_context_t *error, char *buffer, size_t buffer_size);
+// Modern TRY-CATCH macros that work with exceptions
+#define IDTECH3_TRY try {
+#define IDTECH3_CATCH(exception_type) } catch (const exception_type& e) {
+#define IDTECH3_CATCH_ALL } catch (const std::exception& e) {
+#define IDTECH3_END_TRY }
 
-// Error filtering and suppression
-typedef qboolean (*error_filter_t)(const error_context_t *error);
-void Error_AddFilter(error_filter_t filter);
-void Error_RemoveFilter(error_filter_t filter);
-void Error_ClearFilters(void);
+// Safe resource management with automatic cleanup
+#define IDTECH3_SCOPE_GUARD(context) ErrorGuard guard(context)
 
-// Utility functions
-const char* Error_GetSeverityString(error_severity_t severity);
-const char* Error_GetCategoryString(error_category_t category);
-const char* Error_GetCodeString(error_code_t code);
-qboolean Error_IsSystemError(error_code_t code);
-qboolean Error_IsNetworkError(error_code_t code);
-qboolean Error_IsFileError(error_code_t code);
-
-// Error context management
-error_context_t* Error_AllocateContext(void);
-void Error_FreeContext(error_context_t *context);
-void Error_CopyContext(error_context_t *dest, const error_context_t *src);
-
-// Performance and statistics
-typedef struct {
-    uint64_t total_errors_handled;
-    uint64_t stack_traces_captured;
-    uint64_t exceptions_thrown;
-    uint64_t exceptions_caught;
-    uint64_t errors_filtered;
-    uint64_t errors_logged;
-    double avg_error_handling_time_ms;
-    uint64_t max_concurrent_errors;
-} error_statistics_t;
-
-void Error_GetStatistics(error_statistics_t *stats);
-void Error_ResetStatistics(void);
-
-// Integration helpers for common operations
-#define ERROR_CHECK(condition, code, message) \
+// Error checking macros
+#define IDTECH3_CHECK(condition, exception_type, message) \
     do { \
         if (!(condition)) { \
-            Error_ReportSimple(code, message); \
+            throw exception_type(message); \
         } \
-    } while(0)
+    } while (0)
 
-#define ERROR_CHECK_RETURN(condition, code, message, return_value) \
-    do { \
-        if (!(condition)) { \
-            Error_ReportSimple(code, message); \
-            return return_value; \
-        } \
-    } while(0)
+#define IDTECH3_CHECK_NULL(ptr, exception_type, message) \
+    IDTECH3_CHECK(ptr != nullptr, exception_type, message)
 
-#define ERROR_CHECK_GOTO(condition, code, message, label) \
-    do { \
-        if (!(condition)) { \
-            Error_ReportSimple(code, message); \
-            goto label; \
-        } \
-    } while(0)
+#define IDTECH3_CHECK_FILE(file, filename) \
+    IDTECH3_CHECK(file != nullptr, FileException, std::string("Failed to open file: ") + filename)
 
-// Memory error helpers
-#define MEMORY_ERROR_CHECK(ptr, operation) \
-    ERROR_CHECK((ptr) != NULL, ERROR_OUT_OF_MEMORY, "Memory allocation failed in " operation)
+// Assertion with exception throwing
+#ifdef _DEBUG
+#define IDTECH3_ASSERT(condition, exception_type, message) \
+    IDTECH3_CHECK(condition, exception_type, message)
+#else
+#define IDTECH3_ASSERT(condition, exception_type, message) ((void)0)
+#endif
 
-#define MEMORY_ERROR_CHECK_RETURN(ptr, operation, return_value) \
-    ERROR_CHECK_RETURN((ptr) != NULL, ERROR_OUT_OF_MEMORY, "Memory allocation failed in " operation, return_value)
+//===============================================================================
+// Global Error Handler
+//===============================================================================
 
-// File I/O error helpers
-#define FILE_ERROR_CHECK(result, filename, operation) \
-    ERROR_CHECK(result, ERROR_IO_ERROR, va("File operation '%s' failed on '%s'", operation, filename))
+class GlobalErrorHandler
+{
+public:
+    static GlobalErrorHandler& instance();
 
-#define FILE_ERROR_CHECK_RETURN(result, filename, operation, return_value) \
-    ERROR_CHECK_RETURN(result, ERROR_IO_ERROR, va("File operation '%s' failed on '%s'", operation, filename), return_value)
+    // Set custom error handlers
+    void set_exception_handler(std::function<void(const IdTech3Exception&)> handler);
+    void set_fatal_error_handler(std::function<void(const std::string&)> handler);
 
-#endif // __ERROR_HANDLING_H__
+    // Handle exceptions
+    void handle_exception(const IdTech3Exception& e);
+    void handle_fatal_error(const std::string& message);
+
+    // Error logging
+    void log_error(const IdTech3Exception& e);
+    void log_error(const std::string& message, std::source_location location = std::source_location::current());
+
+    // Error recovery
+    bool can_recover_from(const IdTech3Exception& e) const;
+    void attempt_recovery(const IdTech3Exception& e);
+
+private:
+    GlobalErrorHandler() = default;
+    ~GlobalErrorHandler() = default;
+
+    GlobalErrorHandler(const GlobalErrorHandler&) = delete;
+    GlobalErrorHandler& operator=(const GlobalErrorHandler&) = delete;
+
+    std::function<void(const IdTech3Exception&)> m_exceptionHandler;
+    std::function<void(const std::string&)> m_fatalErrorHandler;
+};
+
+//===============================================================================
+// Utility Functions
+//===============================================================================
+
+namespace ErrorUtils {
+
+// Convert legacy error codes to exceptions
+[[noreturn]] void throw_from_error_code(int error_code, std::string_view context = "");
+
+// Safe string operations
+std::string safe_string_copy(const char* source, size_t max_length = 4096);
+
+// Safe memory operations
+void* safe_malloc(size_t size);
+void* safe_calloc(size_t num, size_t size);
+void* safe_realloc(void* ptr, size_t size);
+
+// Resource management helpers
+template<typename T, typename Deleter = std::default_delete<T>>
+using unique_resource = std::unique_ptr<T, Deleter>;
+
+template<typename T>
+using resource_ptr = std::shared_ptr<T>;
+
+// File operations with error handling
+std::vector<char> read_file_safe(const std::string& filename);
+void write_file_safe(const std::string& filename, const void* data, size_t size);
+
+} // namespace ErrorUtils
+
+//===============================================================================
+// Integration with Legacy Code
+//===============================================================================
+
+// Convert exceptions to legacy error handling
+extern "C" {
+void Com_Error(int level, const char* error, ...);
+void Com_Printf(const char* msg, ...);
+}
+
+// Exception-safe wrapper for legacy functions
+template<typename Func, typename... Args>
+auto safe_call(Func&& func, Args&&... args) {
+    try {
+        return std::forward<Func>(func)(std::forward<Args>(args)...);
+    } catch (const IdTech3Exception& e) {
+        GlobalErrorHandler::instance().handle_exception(e);
+        // Return default value for function return type
+        if constexpr (std::is_same_v<decltype(func(args...)), void>) {
+            return;
+        } else {
+            return decltype(func(args...)){};
+        }
+    }
+}
